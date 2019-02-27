@@ -1,0 +1,3 @@
+add_subdirectory(google_test)
+add_subdirectory(assimp)
+add_subdirectory(stacktrace)
