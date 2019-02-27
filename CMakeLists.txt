@@ -1,0 +1,13 @@
+cmake_minimum_required(VERSION 3.12)
+# cmake_policy(SET CMP0042 NEW)
+# cmake_policy(SET CMP0048 NEW)
+project(manifold VERSION 0.1 LANGUAGES CXX CUDA)
+
+add_subdirectory(third_party)
+add_subdirectory(utilities)
+add_subdirectory(polygon)
+add_subdirectory(collider)
+add_subdirectory(mesh)
+add_subdirectory(mesh_host)
+add_subdirectory(test)
+add_subdirectory(tools)
