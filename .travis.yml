@@ -18,7 +18,7 @@ before_install:
     - sudo apt update
     - CUDA=9.2
     - CUDA_APT=${CUDA/./-}
-    - sudo apt install -y cuda-drivers cuda-core-${CUDA_APT} cuda-cudart-dev-${CUDA_APT} cuda-nvgraph-dev-${CUDA_APT}
+    - sudo apt install -y cuda-drivers cuda-core-${CUDA_APT} cuda-cudart-dev-${CUDA_APT} cuda-nvgraph-dev-${CUDA_APT} libglm-dev
     - sudo apt clean
     - CUDA_HOME=/usr/local/cuda-${CUDA}
     - LD_LIBRARY_PATH=${CUDA_HOME}/lib64:${LD_LIBRARY_PATH}
