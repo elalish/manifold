@@ -10,6 +10,17 @@ language: cpp
 compiler:
   - gcc
   
+before_install:
+    - wget http://developer.download.nvidia.com/compute/cuda/repos/ubuntu1604/x86_64/cuda-repo-ubuntu1604_9.2.148-1_amd64.deb
+    - sudo dpkg -i cuda-repo-ubuntu1604_9.2.148-1_amd64.deb
+    - sudo apt-key adv --fetch-keys http://developer.download.nvidia.com/compute/cuda/repos/ubuntu1604/x86_64/7fa2af80.pub
+    - sudo apt-get update -qq
+    - sudo apt-get install cuda
+    - sudo apt-get clean
+    - CUDA_HOME=/usr/local/cuda-9.2
+    - LD_LIBRARY_PATH=${CUDA_HOME}/lib64:${LD_LIBRARY_PATH}
+    - PATH=${CUDA_HOME}/bin:${PATH} 
+
 # Build steps
 script:
   - mkdir build
