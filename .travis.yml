@@ -16,11 +16,11 @@ before_install:
     - sudo apt-key adv --fetch-keys http://developer.download.nvidia.com/compute/cuda/repos/ubuntu1604/x86_64/7fa2af80.pub
     - sudo bash -c 'echo "deb http://developer.download.nvidia.com/compute/cuda/repos/ubuntu1604/x86_64 /" > /etc/apt/sources.list.d/cuda.list'
     - sudo apt update
-    - CUDA=cuda-9.2
+    - CUDA=9.2
     - CUDA_APT=${CUDA/./-}
     - sudo apt install -y cuda-drivers cuda-core-${CUDA_APT} cuda-cudart-dev-${CUDA_APT} cuda-nvgraph-dev-${CUDA_APT}
     - sudo apt clean
-    - CUDA_HOME=/usr/local/${CUDA}
+    - CUDA_HOME=/usr/local/cuda-${CUDA}
     - LD_LIBRARY_PATH=${CUDA_HOME}/lib64:${LD_LIBRARY_PATH}
     - PATH=${CUDA_HOME}/bin:${PATH} 
 
