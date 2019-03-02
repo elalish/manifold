@@ -28,4 +28,4 @@ before_install:
 script:
   - mkdir build
   - cd build
-  - cmake .. && make
+  - cmake -DBUILD_SHARED_LIBS=false -DASSIMP_BUILD_ASSIMP_TOOLS=false -DASSIMP_BUILD_TESTS=false -DASSIMP_INSTALL_PDB=false .. && make
