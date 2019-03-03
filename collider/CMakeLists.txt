@@ -10,7 +10,7 @@ target_link_libraries( ${PROJECT_NAME}
 )
 
 target_compile_options(${PROJECT_NAME} 
-    PRIVATE --gpu-architecture=compute_30 --gpu-code=sm_30 -Xcompiler -Werror 
+    PRIVATE -Xcompiler -Werror 
 )
 target_compile_features(${PROJECT_NAME} 
     PUBLIC cxx_std_11
