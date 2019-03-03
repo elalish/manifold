@@ -12,12 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <assimp/postprocess.h>
-#include <assimp/scene.h>
-#include <assimp/Exporter.hpp>
-#include <assimp/Importer.hpp>
-
 #include "mesh_host.h"
+#include "assimp/Exporter.hpp"
+#include "assimp/Importer.hpp"
+#include "assimp/postprocess.h"
+#include "assimp/scene.h"
 
 namespace manifold {
 
