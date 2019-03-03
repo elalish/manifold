@@ -7,8 +7,8 @@ target_include_directories( ${PROJECT_NAME}
 )
 
 target_link_libraries( ${PROJECT_NAME}
-    assimp
-    utilities
+    PUBLIC utilities
+    PRIVATE assimp
 )
 
 target_compile_options(${PROJECT_NAME} PRIVATE -Werror -Wall -Wno-sign-compare)

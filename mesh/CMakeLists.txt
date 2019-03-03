@@ -6,10 +6,8 @@ target_include_directories( ${PROJECT_NAME}
     PUBLIC ${PROJECT_SOURCE_DIR}/include
 )
 target_link_libraries( ${PROJECT_NAME}
-    utilities
-    mesh_host
-    collider
-    polygon
+    PUBLIC utilities mesh_host
+    PRIVATE collider polygon
 )
 
 target_compile_options(${PROJECT_NAME} 
