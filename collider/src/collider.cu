@@ -13,7 +13,6 @@
 // limitations under the License.
 
 #include "collider.cuh"
-#include "stack_exception.hpp"
 #include "utils.cuh"
 
 // Adjustable parameters
