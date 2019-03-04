@@ -5,5 +5,5 @@ option(ASSIMP_BUILD_TESTS "" OFF)
 option(ASSIMP_INSTALL_PDB "" OFF)
 add_subdirectory(assimp)
 target_include_directories(assimp
-    PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/assimp/include ${CMAKE_CURRENT_SOURCE_DIR}/assimp/build/include
+    PUBLIC ${ASSIMP_SOURCE_DIR}/include ${ASSIMP_BINARY_DIR}/include
 )
