@@ -11,11 +11,11 @@ project(manifold VERSION 0.1 LANGUAGES CXX CUDA)
 
 find_package(OpenMP REQUIRED)
 
-add_subdirectory(third_party)
 add_subdirectory(utilities)
 add_subdirectory(polygon)
 add_subdirectory(collider)
 add_subdirectory(mesh)
+add_subdirectory(third_party)
 add_subdirectory(mesh_host)
 add_subdirectory(test)
 add_subdirectory(tools)
