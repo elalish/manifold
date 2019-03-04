@@ -15,13 +15,13 @@
 #pragma once
 #include <glm/glm.hpp>
 #include <iostream>
+#include <sstream>
 #include <vector>
-#include "stack_exception.hpp"
 
 namespace manifold {
 
-using runtimeErr = stacktrace::stack_runtime_error;
-using logicErr = stacktrace::stack_logic_error;
+using runtimeErr = std::runtime_error;
+using logicErr = std::logic_error;
 
 template <typename Ex>
 void AlwaysAssert(bool condition, const char* file, int line,

@@ -6,11 +6,11 @@ target_include_directories( ${PROJECT_NAME}
     PUBLIC ${PROJECT_SOURCE_DIR}/include
 )
 target_link_libraries( ${PROJECT_NAME}
-    utilities
+    PUBLIC utilities
 )
 
 target_compile_options(${PROJECT_NAME} 
-    PRIVATE --gpu-architecture=compute_30 --gpu-code=sm_30 -Xcompiler -Werror 
+    PRIVATE -Xcompiler -Werror 
 )
 target_compile_features(${PROJECT_NAME} 
     PUBLIC cxx_std_11
