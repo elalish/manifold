@@ -14,6 +14,7 @@
 
 #include <thrust/gather.h>
 #include <thrust/logical.h>
+#include <thrust/sequence.h>
 #include <thrust/sort.h>
 #include <algorithm>
 
