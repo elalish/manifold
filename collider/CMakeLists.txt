@@ -7,10 +7,11 @@ target_include_directories( ${PROJECT_NAME}
 )
 target_link_libraries( ${PROJECT_NAME}
     PUBLIC utilities
+    PRIVATE OpenMP::OpenMP_CXX
 )
 
 target_compile_options(${PROJECT_NAME} 
-    PRIVATE -Xcompiler -Werror 
+    PRIVATE -DTHRUST_DEVICE_SYSTEM=THRUST_DEVICE_SYSTEM_OMP -Xcompiler=-Werror 
 )
 target_compile_features(${PROJECT_NAME} 
     PUBLIC cxx_std_11
