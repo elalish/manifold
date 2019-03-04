@@ -15,6 +15,7 @@
 #include <thrust/gather.h>
 #include <thrust/logical.h>
 #include <thrust/sort.h>
+#include <algorithm>
 
 // #include "boolean3D.cuh"
 #include "mesh.cuh"
