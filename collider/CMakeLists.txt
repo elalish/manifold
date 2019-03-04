@@ -11,7 +11,7 @@ target_link_libraries( ${PROJECT_NAME}
 )
 
 target_compile_options(${PROJECT_NAME} 
-    PRIVATE -DTHRUST_DEVICE_SYSTEM=THRUST_DEVICE_SYSTEM_OMP #-Xcompiler=-Werror 
+    PRIVATE -DTHRUST_DEVICE_SYSTEM=THRUST_DEVICE_SYSTEM_OMP -Xcompiler -fopenmp#-Xcompiler=-Werror 
 )
 target_compile_features(${PROJECT_NAME} 
     PUBLIC cxx_std_11
