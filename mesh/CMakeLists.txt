@@ -7,11 +7,11 @@ target_include_directories( ${PROJECT_NAME}
 )
 target_link_libraries( ${PROJECT_NAME}
     PUBLIC utilities mesh_host
-    PRIVATE collider polygon
+    PRIVATE collider polygon ${MANIFOLD_OMP_INCLUDE}
 )
 
 target_compile_options(${PROJECT_NAME} 
-    PRIVATE -Xcompiler -Werror 
+    PRIVATE ${MANIFOLD_NVCC_FLAGS}
 )
 target_compile_features(${PROJECT_NAME} 
     PUBLIC cxx_std_11 
