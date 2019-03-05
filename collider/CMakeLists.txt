@@ -7,11 +7,11 @@ target_include_directories( ${PROJECT_NAME}
 )
 target_link_libraries( ${PROJECT_NAME}
     PUBLIC utilities
-    PRIVATE OpenMP::OpenMP_CXX
+    PRIVATE ${MANIFOLD_OMP_INCLUDE}
 )
 
 target_compile_options(${PROJECT_NAME} 
-    PRIVATE -DTHRUST_DEVICE_SYSTEM=THRUST_DEVICE_SYSTEM_OMP -Xcompiler -fopenmp#-Xcompiler=-Werror 
+    PRIVATE ${MANIFOLD_NVCC_FLAGS}
 )
 target_compile_features(${PROJECT_NAME} 
     PUBLIC cxx_std_11
