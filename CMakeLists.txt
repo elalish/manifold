@@ -9,17 +9,30 @@ project(manifold VERSION 0.1 LANGUAGES CXX CUDA)
 #         )
 # endif()
 
+OPTION( MANIFOLD_USE_SYSTEM_ASSIMP
+  "Use assimp system-installed assimp library instead of building it here."
+  OFF
+)
 OPTION( MANIFOLD_USE_OMP
   "Use OpenMP as the Thrust backend instead of CUDA."
   OFF
 )
+OPTION( MANIFOLD_USE_CPP
+  "Use C++ (single-threaded) as the Thrust backend instead of CUDA."
+  OFF
+)
+
+set(MANIFOLD_NVCC_FLAGS -Xcompiler=-Werror)
 IF(MANIFOLD_USE_OMP)
+    message("------------------------- Using OpenMP instead of CUDA.")
     find_package(OpenMP REQUIRED)
     set(MANIFOLD_OMP_INCLUDE OpenMP::OpenMP_CXX)
     set(MANIFOLD_NVCC_FLAGS -DTHRUST_DEVICE_SYSTEM=THRUST_DEVICE_SYSTEM_OMP -Xcompiler=-fopenmp)
-ELSE()
-    set(MANIFOLD_NVCC_FLAGS -Xcompiler=-Werror)
 ENDIF(MANIFOLD_USE_OMP)
+IF(MANIFOLD_USE_CPP)
+    message("------------------------- Using C++ instead of CUDA.")
+    set(MANIFOLD_NVCC_FLAGS -DTHRUST_DEVICE_SYSTEM=THRUST_DEVICE_SYSTEM_CPP)
+ENDIF(MANIFOLD_USE_CPP)
 
 add_subdirectory(utilities)
 add_subdirectory(collider)

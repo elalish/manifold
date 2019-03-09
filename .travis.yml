@@ -12,7 +12,7 @@ before_install:
   - sudo apt update
   - CUDA=9.2
   - CUDA_APT=${CUDA/./-}
-  - sudo apt install -y cuda-drivers cuda-core-${CUDA_APT} cuda-cudart-dev-${CUDA_APT} cuda-nvgraph-dev-${CUDA_APT} libglm-dev
+  - sudo apt install -y cuda-drivers cuda-core-${CUDA_APT} cuda-cudart-dev-${CUDA_APT} cuda-nvgraph-dev-${CUDA_APT} libglm-dev libassimp-dev
   - sudo apt clean
   - CUDA_HOME=/usr/local/cuda-${CUDA}
   - LD_LIBRARY_PATH=${CUDA_HOME}/lib64:${LD_LIBRARY_PATH}
@@ -23,6 +23,6 @@ script:
   - OMP_NUM_THREADS=4
   - mkdir build
   - cd build
-  - cmake -DMANIFOLD_USE_OMP=ON .. && make
+  - cmake -DMANIFOLD_USE_CPP=ON -DMANIFOLD_USE_SYSTEM_ASSIMP=ON .. && make
   - cd test
   - ./manifold_test

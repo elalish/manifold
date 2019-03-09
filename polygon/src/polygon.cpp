@@ -72,7 +72,7 @@ class Monotones {
     }
     // std::cout << "starting sweep" << std::endl;
     std::sort(sweep_line.begin(), sweep_line.end());
-    VertType v_type;
+    VertType v_type = START;
     for (const auto &tmp : sweep_line) {
       v_type = ProcessVert(std::get<1>(tmp));
       // std::cout << v_type << std::endl;
