@@ -42,8 +42,7 @@ MeshHost ImportMesh(const std::string& filename) {
                             aiProcess_RemoveComponent |       //
                             aiProcess_PreTransformVertices |  //
                             aiProcess_SortByPType |           //
-                            aiProcess_OptimizeMeshes |        //
-                            aiProcess_OptimizeGraph);
+                            aiProcess_OptimizeMeshes);
 
   ALWAYS_ASSERT(scene, runtimeErr, importer.GetErrorString());
 

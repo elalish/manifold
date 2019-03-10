@@ -24,7 +24,7 @@ void Identical(MeshHost& mesh1, MeshHost& mesh2) {
   for (int i = 0; i < mesh1.vertPos.size(); ++i) {
     glm::vec3 v_in = mesh1.vertPos[i];
     glm::vec3 v_out = mesh2.vertPos[i];
-    for (int j : {0, 1, 2}) ASSERT_FLOAT_EQ(v_in[j], v_out[j]);
+    for (int j : {0, 1, 2}) ASSERT_NEAR(v_in[j], v_out[j], 0.0001);
   }
   ASSERT_EQ(mesh1.triVerts.size(), mesh2.triVerts.size());
   for (int i = 0; i < mesh1.triVerts.size(); ++i) {
@@ -64,8 +64,9 @@ TEST(Mesh, Regression) {
   int num_overlaps = mesh.NumOverlaps(mesh1, 1000000);
   ASSERT_EQ(expect_num_overlaps, num_overlaps);
 
-  MeshHost mesh_check = ImportMesh("data/gyroidpuzzle_check.ply");
-  MeshHost mesh_out;
+  MeshHost mesh_out, mesh_out2;
   mesh.Append2Host(mesh_out);
-  Identical(mesh_out, mesh_check);
+  Mesh mesh2(mesh_out);
+  mesh2.Append2Host(mesh_out2);
+  Identical(mesh_out, mesh_out2);
 }

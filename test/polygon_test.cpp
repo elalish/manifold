@@ -178,7 +178,10 @@ TEST(SimplePolygon, ColinearY) {
   TestPoly(polys);
 }
 
+// void fnExit() { throw std::runtime_error("Someone called Exit()!"); }
+
 int main(int argc, char **argv) {
+  // atexit(fnExit);
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }
