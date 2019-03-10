@@ -31,11 +31,14 @@ __host__ __device__ int Internal2Node(int internal) { return internal * 2 + 1; }
 __host__ __device__ int Node2Leaf(int node) { return node / 2; }
 __host__ __device__ int Leaf2Node(int leaf) { return leaf * 2; }
 
-__host__ __device__ int AtomicInc(int* ptr) {
+__host__ __device__ int AtomicIncrement(int* ptr) {
 #ifdef __CUDA_ARCH__
   return atomicAdd(ptr, 1);
 #else
-  return (*ptr)++;
+  int out;
+#pragma omp atomic capture
+  out = (*ptr)++;
+  return out;
 #endif
 }
 
@@ -135,7 +138,7 @@ struct FindCollisions {
                                            const thrust::tuple<T, int>& query) {
     bool overlaps = nodeBBox_[node].DoesOverlap(thrust::get<0>(query));
     if (overlaps && IsLeaf(node)) {
-      int pos = AtomicInc(num_overlaps_);
+      int pos = AtomicIncrement(num_overlaps_);
       query_overlaps_[pos] = thrust::get<1>(query);
       face_overlaps_[pos] = Node2Leaf(node);
     }
@@ -181,7 +184,7 @@ struct BuildInternalBoxes {
     do {
       node = nodeParent_[node];
       int internal = Node2Internal(node);
-      if (AtomicInc(&counter_[internal]) == 0) return;
+      if (AtomicIncrement(&counter_[internal]) == 0) return;
       nodeBBox_[node] = nodeBBox_[internalChildren_[internal].first].Union(
           nodeBBox_[internalChildren_[internal].second]);
     } while (node != kRoot);
