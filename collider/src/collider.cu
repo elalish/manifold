@@ -58,9 +58,13 @@ struct CreateRadixTree {
     if (j < 0 || j >= leafMorton_.size()) {
       return -1;
     } else {
-      int out = PrefixLength(leafMorton_[i], leafMorton_[j]);
-      if (out == 32)  // identical, use index to disambiguate
-        out += PrefixLength(static_cast<uint32_t>(i), static_cast<uint32_t>(j));
+      int out;
+      if (leafMorton_[i] == leafMorton_[j])
+        // use index to disambiguate
+        out = 32 +
+              PrefixLength(static_cast<uint32_t>(i), static_cast<uint32_t>(j));
+      else
+        out = PrefixLength(leafMorton_[i], leafMorton_[j]);
       return out;
     }
   }

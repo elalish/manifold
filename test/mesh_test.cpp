@@ -59,7 +59,7 @@ TEST(Mesh, Regression) {
   ASSERT_TRUE(mesh.IsValid());
 
   Mesh mesh1 = mesh.Copy();
-  mesh1.Translate(glm::vec3(0.5f));
+  mesh1.Translate(glm::vec3(5.0f));
   int expect_num_overlaps = 237472;
   int num_overlaps = mesh.NumOverlaps(mesh1, 1000000);
   ASSERT_EQ(expect_num_overlaps, num_overlaps);
