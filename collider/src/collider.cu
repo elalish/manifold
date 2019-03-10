@@ -35,8 +35,9 @@ __host__ __device__ int AtomicIncrement(int* ptr) {
 #ifdef __CUDA_ARCH__
   return atomicAdd(ptr, 1);
 #else
+  int out;
 #pragma omp atomic
-  int out = (*ptr)++;
+  out = (*ptr)++;
   return out;
 #endif
 }
