@@ -36,7 +36,7 @@ __host__ __device__ int AtomicIncrement(int* ptr) {
   return atomicAdd(ptr, 1);
 #else
   int out;
-#pragma omp atomic
+#pragma omp atomic capture
   out = (*ptr)++;
   return out;
 #endif
