@@ -64,8 +64,9 @@ TEST(Mesh, Regression) {
   int num_overlaps = mesh.NumOverlaps(mesh1, 1000000);
   ASSERT_EQ(expect_num_overlaps, num_overlaps);
 
-  MeshHost mesh_check = ImportMesh("data/gyroidpuzzle_check.ply");
-  MeshHost mesh_out;
+  MeshHost mesh_out, mesh_out2;
   mesh.Append2Host(mesh_out);
-  Identical(mesh_out, mesh_check);
+  Mesh mesh2(mesh_out);
+  mesh2.Append2Host(mesh_out2);
+  Identical(mesh_out, mesh_out2);
 }
