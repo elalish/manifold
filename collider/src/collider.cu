@@ -115,10 +115,6 @@ struct CreateRadixTree {
     ++split;
     int child2 = split == last ? Leaf2Node(split) : Internal2Node(split);
     // Record parent_child relationships.
-    if (nodeParent_[child1] != -1)
-      printf("child %d is already assigned!\n", child1);
-    if (nodeParent_[child2] != -1)
-      printf("child %d is already assigned!\n", child2);
     internalChildren_[internal].first = child1;
     internalChildren_[internal].second = child2;
     int node = Internal2Node(internal);
@@ -179,28 +175,15 @@ struct BuildInternalBoxes {
   int* counter_;
   const int* nodeParent_;
   const thrust::pair<int, int>* internalChildren_;
-  bool found;
 
   __host__ __device__ void operator()(int leaf) {
-    if (leaf == 1880) {
-      printf("bad leaf");
-    }
     int node = Leaf2Node(leaf);
     do {
       node = nodeParent_[node];
       int internal = Node2Internal(node);
-      if (AtomicInc(&counter_[internal]) == 0) {
-        // printf("internal = %d, count = %d\n", internal, counter_[internal]);
-        return;
-      }  // first thread to internal node exits
-      // printf("internal = %d, count = %d\n", internal, counter_[internal]);
+      if (AtomicInc(&counter_[internal]) == 0) return;
       nodeBBox_[node] = nodeBBox_[internalChildren_[internal].first].Union(
           nodeBBox_[internalChildren_[internal].second]);
-      if (isnan(nodeBBox_[0].min.x) && !found) {
-        printf("First leaf is NAN! leaf = %d, node = %d, internal=%d\n", leaf,
-               node, internal);
-        found = true;
-      }
     } while (node != kRoot);
   }
 };
@@ -230,14 +213,6 @@ Collider::Collider(const VecDH<Box>& leafBB,
   thrust::for_each_n(thrust::make_counting_iterator(0), NumInternal(),
                      CreateRadixTree({nodeParent_.ptrD(),
                                       internalChildren_.ptrD(), leafMorton}));
-  for (int i = 0; i < nodeParent_.size(); ++i) {
-    if (nodeParent_.H()[i] == -1)
-      std::cout << "node " << i << " has no parent" << std::endl;
-  }
-  for (int i = 0; i < internalChildren_.size(); ++i) {
-    if (internalChildren_.H()[i].first == -1)
-      std::cout << "internal node " << i << " has no children" << std::endl;
-  }
   UpdateBoxes(leafBB);
 }
 
@@ -273,8 +248,6 @@ void Collider::UpdateBoxes(const VecDH<Box>& leafBB) {
   strided_range<VecDH<Box>::IterD> leaves(nodeBBox_.beginD(), nodeBBox_.endD(),
                                           2);
   thrust::copy(leafBB.cbeginD(), leafBB.cendD(), leaves.begin());
-  std::cout << nodeBBox_.H()[0] << std::endl;
-  std::cout << nodeBBox_.H()[1] << std::endl;
   // create global counters
   VecDH<int> counter_(NumInternal());
   thrust::fill(counter_.beginD(), counter_.endD(), 0);
@@ -282,9 +255,7 @@ void Collider::UpdateBoxes(const VecDH<Box>& leafBB) {
   thrust::for_each_n(
       thrust::make_counting_iterator(0), NumLeaves(),
       BuildInternalBoxes({nodeBBox_.ptrD(), counter_.ptrD(), nodeParent_.ptrD(),
-                          internalChildren_.ptrD(), false}));
-  std::cout << nodeBBox_.H()[0] << std::endl;
-  std::cout << nodeBBox_.H()[1] << std::endl;
+                          internalChildren_.ptrD()}));
 }
 
 void Collider::Translate(glm::vec3 T) {
