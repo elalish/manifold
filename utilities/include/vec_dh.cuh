@@ -174,8 +174,8 @@ class VecD {
  public:
   VecD(const VecDH<T>& vec) : ptr_(vec.ptrD()), size_(vec.size()) {}
 
-  __device__ const T& operator[](int i) const { return ptr_[i]; }
-  __device__ int size() const { return size_; }
+  __host__ __device__ const T& operator[](int i) const { return ptr_[i]; }
+  __host__ __device__ int size() const { return size_; }
 
  private:
   T const* const ptr_;

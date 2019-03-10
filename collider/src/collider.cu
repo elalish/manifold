@@ -24,36 +24,52 @@ constexpr int kRoot = 1;
 namespace {
 using namespace manifold;
 
-__device__ bool IsLeaf(int node) { return node % 2 == 0; }
-__device__ bool IsInternal(int node) { return node % 2 == 1; }
-__device__ int Node2Internal(int node) { return (node - 1) / 2; }
-__device__ int Internal2Node(int internal) { return internal * 2 + 1; }
-__device__ int Node2Leaf(int node) { return node / 2; }
-__device__ int Leaf2Node(int leaf) { return leaf * 2; }
+__host__ __device__ bool IsLeaf(int node) { return node % 2 == 0; }
+__host__ __device__ bool IsInternal(int node) { return node % 2 == 1; }
+__host__ __device__ int Node2Internal(int node) { return (node - 1) / 2; }
+__host__ __device__ int Internal2Node(int internal) { return internal * 2 + 1; }
+__host__ __device__ int Node2Leaf(int node) { return node / 2; }
+__host__ __device__ int Leaf2Node(int leaf) { return leaf * 2; }
+
+__host__ __device__ int AtomicInc(int* ptr) {
+#ifdef __CUDA_ARCH__
+  return atomicAdd(ptr, 1);
+#else
+  return (*ptr)++;
+#endif
+}
 
 struct CreateRadixTree {
   int* nodeParent_;
   thrust::pair<int, int>* internalChildren_;
   const VecD<uint32_t> leafMorton_;
 
-  __device__ int PrefixLength(uint32_t a, uint32_t b) const {
-    // count-leading-zeros is used to find the number of identical highest-order
-    // bits
+  __host__ __device__ int PrefixLength(uint32_t a, uint32_t b) const {
+// count-leading-zeros is used to find the number of identical highest-order
+// bits
+#ifdef __CUDA_ARCH__
     return __clz(a ^ b);
+#else
+    return __builtin_clz(a ^ b);
+#endif
   }
 
-  __device__ int PrefixLength(int i, int j) const {
+  __host__ __device__ int PrefixLength(int i, int j) const {
     if (j < 0 || j >= leafMorton_.size()) {
       return -1;
     } else {
-      int out = PrefixLength(leafMorton_[i], leafMorton_[j]);
-      if (out == 32)  // identical, use index to disambiguate
-        out += PrefixLength(static_cast<uint32_t>(i), static_cast<uint32_t>(j));
+      int out;
+      if (leafMorton_[i] == leafMorton_[j])
+        // use index to disambiguate
+        out = 32 +
+              PrefixLength(static_cast<uint32_t>(i), static_cast<uint32_t>(j));
+      else
+        out = PrefixLength(leafMorton_[i], leafMorton_[j]);
       return out;
     }
   }
 
-  __device__ int RangeEnd(int i) const {
+  __host__ __device__ int RangeEnd(int i) const {
     // Determine direction of range (+1 or -1)
     int dir = PrefixLength(i, i + 1) - PrefixLength(i, i - 1);
     dir = (dir > 0) - (dir < 0);
@@ -71,7 +87,7 @@ struct CreateRadixTree {
     return i + dir * length;
   }
 
-  __device__ int FindSplit(int first, int last) const {
+  __host__ __device__ int FindSplit(int first, int last) const {
     int commonPrefix = PrefixLength(first, last);
     // Find the furthest object that shares more than commonPrefix bits with the
     // first one, using binary search.
@@ -88,7 +104,7 @@ struct CreateRadixTree {
     return split;
   }
 
-  __device__ void operator()(int internal) {
+  __host__ __device__ void operator()(int internal) {
     int first = internal;
     // Find the range of objects with a common prefix
     int last = RangeEnd(first);
@@ -115,18 +131,18 @@ struct FindCollisions {
   const Box* nodeBBox_;
   const thrust::pair<int, int>* internalChildren_;
 
-  __device__ bool RecordCollision(int node,
-                                  const thrust::tuple<T, int>& query) {
+  __host__ __device__ bool RecordCollision(int node,
+                                           const thrust::tuple<T, int>& query) {
     bool overlaps = nodeBBox_[node].DoesOverlap(thrust::get<0>(query));
     if (overlaps && IsLeaf(node)) {
-      int pos = atomicAdd(num_overlaps_, 1);
+      int pos = AtomicInc(num_overlaps_);
       query_overlaps_[pos] = thrust::get<1>(query);
       face_overlaps_[pos] = Node2Leaf(node);
     }
     return overlaps && IsInternal(node);  // Should traverse into node
   }
 
-  __device__ void operator()(thrust::tuple<T, int> query) {
+  __host__ __device__ void operator()(thrust::tuple<T, int> query) {
     // stack cannot overflow because radix tree has max depth 30 (Morton code) +
     // 32 (index).
     int stack[64];
@@ -160,13 +176,12 @@ struct BuildInternalBoxes {
   const int* nodeParent_;
   const thrust::pair<int, int>* internalChildren_;
 
-  __device__ void operator()(int leaf) {
+  __host__ __device__ void operator()(int leaf) {
     int node = Leaf2Node(leaf);
     do {
       node = nodeParent_[node];
       int internal = Node2Internal(node);
-      if (atomicAdd(&counter_[internal], 1) == 0)
-        return;  // first thread to internal node exits
+      if (AtomicInc(&counter_[internal]) == 0) return;
       nodeBBox_[node] = nodeBBox_[internalChildren_[internal].first].Union(
           nodeBBox_[internalChildren_[internal].second]);
     } while (node != kRoot);
@@ -186,15 +201,14 @@ struct ScaleBox {
 }  // namespace
 
 namespace manifold {
-
 Collider::Collider(const VecDH<Box>& leafBB,
                    const VecDH<uint32_t>& leafMorton) {
   ALWAYS_ASSERT(leafBB.size() == leafMorton.size(), runtimeErr, "");
   int num_nodes = 2 * leafBB.size() - 1;
   // assign and allocate members
   nodeBBox_.resize(num_nodes);
-  nodeParent_.resize(num_nodes);
-  internalChildren_.resize(leafBB.size() - 1);
+  nodeParent_.resize(num_nodes, -1);
+  internalChildren_.resize(leafBB.size() - 1, thrust::make_pair(-1, -1));
   // organize tree
   thrust::for_each_n(thrust::make_counting_iterator(0), NumInternal(),
                      CreateRadixTree({nodeParent_.ptrD(),

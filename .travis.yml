@@ -1,32 +1,28 @@
 sudo: required
 dist: xenial
-before_install:
-  # - sudo apt-get install 
-
-# Enable C++ support
 language: cpp
-
-# Compiler selection
 compiler:
   - gcc
   
 before_install:
-    - wget http://developer.download.nvidia.com/compute/cuda/repos/ubuntu1604/x86_64/cuda-repo-ubuntu1604_9.2.148-1_amd64.deb
-    - sudo dpkg -i cuda-repo-ubuntu1604_9.2.148-1_amd64.deb
-    - sudo apt-key adv --fetch-keys http://developer.download.nvidia.com/compute/cuda/repos/ubuntu1604/x86_64/7fa2af80.pub
-    - sudo bash -c 'echo "deb http://developer.download.nvidia.com/compute/cuda/repos/ubuntu1604/x86_64 /" > /etc/apt/sources.list.d/cuda.list'
-    - sudo apt update
-    - CUDA=9.2
-    - CUDA_APT=${CUDA/./-}
-    - sudo apt install -y cuda-drivers cuda-core-${CUDA_APT} cuda-cudart-dev-${CUDA_APT} cuda-nvgraph-dev-${CUDA_APT} libglm-dev
-    - sudo apt clean
-    - CUDA_HOME=/usr/local/cuda-${CUDA}
-    - LD_LIBRARY_PATH=${CUDA_HOME}/lib64:${LD_LIBRARY_PATH}
-    - PATH=${CUDA_HOME}/bin:${PATH} 
+  - wget http://developer.download.nvidia.com/compute/cuda/repos/ubuntu1604/x86_64/cuda-repo-ubuntu1604_9.2.148-1_amd64.deb
+  - sudo dpkg -i cuda-repo-ubuntu1604_9.2.148-1_amd64.deb
+  - sudo apt-key adv --fetch-keys http://developer.download.nvidia.com/compute/cuda/repos/ubuntu1604/x86_64/7fa2af80.pub
+  - sudo bash -c 'echo "deb http://developer.download.nvidia.com/compute/cuda/repos/ubuntu1604/x86_64 /" > /etc/apt/sources.list.d/cuda.list'
+  - sudo apt update
+  - CUDA=9.2
+  - CUDA_APT=${CUDA/./-}
+  - sudo apt install -y cuda-drivers cuda-core-${CUDA_APT} cuda-cudart-dev-${CUDA_APT} cuda-nvgraph-dev-${CUDA_APT} libglm-dev libassimp-dev
+  - sudo apt clean
+  - CUDA_HOME=/usr/local/cuda-${CUDA}
+  - LD_LIBRARY_PATH=${CUDA_HOME}/lib64:${LD_LIBRARY_PATH}
+  - PATH=${CUDA_HOME}/bin:${PATH} 
 
 # Build steps
 script:
   - OMP_NUM_THREADS=4
   - mkdir build
   - cd build
-  - cmake -DMANIFOLD_USE_OMP=ON .. && make
+  - cmake -DMANIFOLD_USE_CPP=ON -DMANIFOLD_USE_SYSTEM_ASSIMP=ON .. && make
+  - cd test
+  - ./manifold_test
