@@ -23,6 +23,7 @@ script:
   - OMP_NUM_THREADS=4
   - mkdir build
   - cd build
-  - cmake -DMANIFOLD_USE_CPP=ON -DMANIFOLD_USE_SYSTEM_ASSIMP=ON .. && make
+  - cmake -DCMAKE_BUILD_TYPE=Release .. && make
+  - cmake -DCMAKE_BUILD_TYPE=Release -DMANIFOLD_USE_OMP=ON .. && make
   - cd test
   - ./manifold_test

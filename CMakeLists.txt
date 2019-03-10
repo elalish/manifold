@@ -9,10 +9,6 @@ project(manifold VERSION 0.1 LANGUAGES CXX CUDA)
 #         )
 # endif()
 
-OPTION( MANIFOLD_USE_SYSTEM_ASSIMP
-  "Use assimp system-installed assimp library instead of building it here."
-  OFF
-)
 OPTION( MANIFOLD_USE_OMP
   "Use OpenMP as the Thrust backend instead of CUDA."
   OFF
