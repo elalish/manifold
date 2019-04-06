@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.12)
-project(manifold VERSION 0.1 LANGUAGES CXX CUDA)
+project(manifold LANGUAGES CXX CUDA)
 
 # set(CMAKE_VERBOSE_MAKEFILE ON)
 # OPTION(DEBUG_CMAKE_TARGETS "enable debug output for cmake target properties" ON)
@@ -18,7 +18,7 @@ OPTION( MANIFOLD_USE_CPP
   OFF
 )
 
-set(MANIFOLD_NVCC_FLAGS -Xcompiler=-Werror)
+set(MANIFOLD_NVCC_FLAGS -Xcompiler=-Werror)#-DTHRUST_DEBUG 
 IF(MANIFOLD_USE_OMP)
     message("------------------------- Using OpenMP instead of CUDA.")
     find_package(OpenMP REQUIRED)

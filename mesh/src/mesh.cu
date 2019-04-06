@@ -227,6 +227,7 @@ void Mesh::ApplyTransform() const {
 
 Mesh::Impl::Impl(const MeshHost& mesh)
     : vertPos_(mesh.vertPos), triVerts_(mesh.triVerts) {
+  CheckDevice();
   CalculateBBox();
   SortVerts();
   VecDH<Box> triBox;

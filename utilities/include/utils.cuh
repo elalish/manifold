@@ -20,10 +20,19 @@
 namespace manifold {
 
 inline void MemUsage() {
+#ifdef __CUDA_ARCH__
   size_t free, total;
   cudaMemGetInfo(&free, &total);
   std::cout << "Using " << (total - free) / 1048575 << " Mb ("
             << float(total - free) / total << " %)" << std::endl;
+#endif
+}
+
+inline void CheckDevice() {
+#ifdef __CUDA_ARCH__
+  cudaError_t error = cudaGetLastError();
+  if (error != cudaSuccess) throw std::runtime_error(cudaGetErrorString(error));
+#endif
 }
 
 template <typename... Iters>
