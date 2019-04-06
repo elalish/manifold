@@ -12,13 +12,14 @@ before_install:
   - sudo apt update
   - CUDA=9.2
   - CUDA_APT=${CUDA/./-}
-  - sudo apt install -y cuda-drivers cuda-core-${CUDA_APT} cuda-cudart-dev-${CUDA_APT} cuda-nvgraph-dev-${CUDA_APT} libglm-dev libassimp-dev
+  - sudo apt install -y cuda-drivers cuda-core-${CUDA_APT} cuda-cudart-dev-${CUDA_APT} libglm-dev libassimp-dev
+#  - sudo apt install -y cuda-nvgraph-dev-${CUDA_APT} cuda-cublas-dev-${CUDA_APT} cuda-cusparse-dev-${CUDA_APT} cuda-curand-dev-${CUDA_APT} cuda-cusolver-dev-${CUDA_APT}
   - sudo apt clean
   - CUDA_HOME=/usr/local/cuda-${CUDA}
   - LD_LIBRARY_PATH=${CUDA_HOME}/lib64:${LD_LIBRARY_PATH}
   - PATH=${CUDA_HOME}/bin:${PATH} 
 
-# Build steps
+# build and test
 script:
   - OMP_NUM_THREADS=4
   - mkdir build
