@@ -24,7 +24,9 @@ script:
   - OMP_NUM_THREADS=4
   - mkdir build
   - cd build
+  # build CUDA version to check for compile errors
   - cmake -DCMAKE_BUILD_TYPE=Release .. && make
+  # build OpenMP version so it can run on Travis CI where there is no GPU
   - cmake -DCMAKE_BUILD_TYPE=Release -DMANIFOLD_USE_OMP=ON .. && make
   - cd test
   - ./manifold_test
