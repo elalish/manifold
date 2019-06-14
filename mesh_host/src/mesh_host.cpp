@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "mesh_host.h"
+#include <algorithm>
 #include "assimp/Exporter.hpp"
 #include "assimp/Importer.hpp"
 #include "assimp/postprocess.h"

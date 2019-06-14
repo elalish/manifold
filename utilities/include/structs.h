@@ -13,12 +13,16 @@
 // limitations under the License.
 
 #pragma once
+#define GLM_FORCE_EXPLICIT_CTOR
 #include <glm/glm.hpp>
+#include <glm/gtx/compatibility.hpp>
 #include <iostream>
 #include <sstream>
 #include <vector>
 
 namespace manifold {
+
+constexpr int kInvalidInt = std::numeric_limits<int>::max();
 
 using runtimeErr = std::runtime_error;
 using logicErr = std::logic_error;
@@ -43,8 +47,12 @@ void AlwaysAssert(bool condition, const char* file, int line,
 #define HOST_DEVICE
 #endif
 
+using EdgeVerts = std::pair<int, int>;
+using TriVerts = glm::ivec3;
+
 struct EdgeIdx {
   uint32_t idx;
+  HOST_DEVICE EdgeIdx() { EdgeIdx(0, 1); }
   HOST_DEVICE EdgeIdx(int ind, int dir) {
     idx = static_cast<uint32_t>(ind) + (dir > 0 ? 0 : (1U << 31));
   }
@@ -54,14 +62,18 @@ struct EdgeIdx {
   }
 };
 
+struct TriEdges {
+  EdgeIdx edges[3];
+  HOST_DEVICE TriEdges() {}
+  HOST_DEVICE EdgeIdx& operator[](int i) { return edges[i]; }
+  HOST_DEVICE EdgeIdx operator[](int i) const { return edges[i]; }
+};
+
 struct PolyVert {
   glm::vec2 pos;
   int idx;
 };
 
-using EdgeVerts = std::pair<int, int>;
-using TriVerts = glm::ivec3;
-using TriEdges = glm::tvec3<EdgeIdx>;
 using SimplePolygon = std::vector<PolyVert>;
 using Polygons = std::vector<SimplePolygon>;
 
@@ -128,6 +140,10 @@ struct Box {
   HOST_DEVICE bool DoesOverlap(glm::vec3 p) const {  // projected in z
     return p.x <= max.x && p.x >= min.x && p.y <= max.y && p.y >= min.y;
   }
+
+  HOST_DEVICE bool isFinite() const {
+    return glm::all(glm::isfinite(min)) && glm::all(glm::isfinite(max));
+  }
 };
 
 inline std::ostream& operator<<(std::ostream& stream, const Box& box) {
@@ -142,8 +158,19 @@ inline std::ostream& operator<<(std::ostream& stream, const EdgeIdx& edge) {
 }
 
 template <typename T>
+inline std::ostream& operator<<(std::ostream& stream, const glm::tvec2<T>& v) {
+  return stream << "x = " << v.x << ", y = " << v.y;
+}
+
+template <typename T>
 inline std::ostream& operator<<(std::ostream& stream, const glm::tvec3<T>& v) {
   return stream << "x = " << v.x << ", y = " << v.y << ", z = " << v.z;
+}
+
+template <typename T>
+inline std::ostream& operator<<(std::ostream& stream, const glm::tvec4<T>& v) {
+  return stream << "x = " << v.x << ", y = " << v.y << ", z = " << v.z
+                << ", w = " << v.w;
 }
 }  // namespace manifold
 
