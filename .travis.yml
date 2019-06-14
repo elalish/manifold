@@ -10,10 +10,11 @@ before_install:
   - sudo apt-key adv --fetch-keys http://developer.download.nvidia.com/compute/cuda/repos/ubuntu1604/x86_64/7fa2af80.pub
   - sudo bash -c 'echo "deb http://developer.download.nvidia.com/compute/cuda/repos/ubuntu1604/x86_64 /" > /etc/apt/sources.list.d/cuda.list'
   - sudo apt update
+  - sudo apt install -y libglm-dev libassimp-dev libboost-graph-dev
   - CUDA=9.2
   - CUDA_APT=${CUDA/./-}
-  - sudo apt install -y cuda-drivers cuda-core-${CUDA_APT} cuda-cudart-dev-${CUDA_APT} libglm-dev libassimp-dev
-#  - sudo apt install -y cuda-nvgraph-dev-${CUDA_APT} cuda-cublas-dev-${CUDA_APT} cuda-cusparse-dev-${CUDA_APT} cuda-curand-dev-${CUDA_APT} cuda-cusolver-dev-${CUDA_APT}
+  - sudo apt install -y cuda-drivers cuda-core-${CUDA_APT} cuda-cudart-dev-${CUDA_APT}
+  - sudo apt install -y cuda-nvgraph-dev-${CUDA_APT} cuda-cublas-dev-${CUDA_APT} cuda-cusparse-dev-${CUDA_APT} cuda-curand-dev-${CUDA_APT} cuda-cusolver-dev-${CUDA_APT}
   - sudo apt clean
   - CUDA_HOME=/usr/local/cuda-${CUDA}
   - LD_LIBRARY_PATH=${CUDA_HOME}/lib64:${LD_LIBRARY_PATH}

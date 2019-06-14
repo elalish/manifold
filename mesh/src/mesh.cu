@@ -18,11 +18,155 @@
 #include <thrust/sort.h>
 #include <algorithm>
 
-// #include "boolean3D.cuh"
+#include "boolean3.cuh"
+#include "connected_components.cuh"
 #include "mesh.cuh"
 
 namespace {
 using namespace manifold;
+
+struct Normalize {
+  __host__ __device__ void operator()(glm::vec3& v) { v = glm::normalize(v); }
+};
+
+struct Positive {
+  __host__ __device__ bool operator()(int x) { return x >= 0; }
+};
+
+struct Equals {
+  int val;
+  __host__ __device__ bool operator()(int x) { return x == val; }
+};
+
+struct KeepTri {
+  int val;
+  const int* components;
+  __host__ __device__ bool operator()(TriVerts tri) {
+    return components[tri[0]] == val;
+  }
+};
+
+struct SplitEdges {
+  glm::vec3* vertPos;
+  const int startIdx;
+  const int n;
+
+  __host__ __device__ void operator()(thrust::tuple<int, EdgeVertsD> in) {
+    int edge = thrust::get<0>(in);
+    EdgeVertsD edgeVerts = thrust::get<1>(in);
+
+    float invTotal = 1.0f / n;
+    for (int i = 1; i < n; ++i)
+      vertPos[startIdx + (n - 1) * edge + i - 1] =
+          (float(n - i) * vertPos[edgeVerts.first] +
+           float(i) * vertPos[edgeVerts.second]) *
+          invTotal;
+  }
+};
+
+struct InteriorVerts {
+  glm::vec3* vertPos;
+  const int startIdx;
+  const int n;
+
+  __host__ __device__ void operator()(thrust::tuple<int, TriVerts> in) {
+    int tri = thrust::get<0>(in);
+    TriVerts triVerts = thrust::get<1>(in);
+
+    int vertsPerTri = ((n - 2) * (n - 2) + (n - 2)) / 2;
+    float invTotal = 1.0f / n;
+    int pos = startIdx + vertsPerTri * tri;
+    for (int i = 1; i < n - 1; ++i)
+      for (int j = 1; j < n - i; ++j)
+        vertPos[pos++] = (float(i) * vertPos[triVerts[2]] +  //
+                          float(j) * vertPos[triVerts[0]] +  //
+                          float(n - i - j) * vertPos[triVerts[1]]) *
+                         invTotal;
+  }
+};
+
+struct SplitTris {
+  TriVerts* triVerts;
+  const int edgeIdx;
+  const int triIdx;
+  const int n;
+
+  __host__ __device__ int EdgeVert(int i, EdgeIdx edge) const {
+    return edgeIdx + (n - 1) * edge.Idx() +
+           (edge.Dir() > 0 ? i - 1 : n - 1 - i);
+  }
+
+  __host__ __device__ int TriVert(int i, int j, int tri) const {
+    --i;
+    --j;
+    int m = n - 2;
+    int vertsPerTri = (m * m + m) / 2;
+    int vertOffset = (i * (2 * m - i + 1)) / 2 + j;
+    return triIdx + vertsPerTri * tri + vertOffset;
+  }
+
+  __host__ __device__ int Vert(int i, int j, int tri, TriVerts triVert,
+                               TriEdges triEdge) const {
+    bool edge0 = i == 0;
+    bool edge1 = j == 0;
+    bool edge2 = j == n - i;
+    if (edge0) {
+      if (edge1)
+        return triVert[1];
+      else if (edge2)
+        return triVert[0];
+      else
+        return EdgeVert(n - j, triEdge[0]);
+    } else if (edge1) {
+      if (edge2)
+        return triVert[2];
+      else
+        return EdgeVert(i, triEdge[1]);
+    } else if (edge2)
+      return EdgeVert(j, triEdge[2]);
+    else
+      return TriVert(i, j, tri);
+  }
+
+  __host__ __device__ void operator()(
+      thrust::tuple<int, TriVerts, TriEdges> in) {
+    int tri = thrust::get<0>(in);
+    TriVerts triVert = thrust::get<1>(in);
+    TriEdges triEdge = thrust::get<2>(in);
+
+    int pos = n * n * tri;
+    for (int i = 0; i < n; ++i) {
+      for (int j = 0; j < n - i; ++j) {
+        int a = Vert(i, j, tri, triVert, triEdge);
+        int b = Vert(i + 1, j, tri, triVert, triEdge);
+        int c = Vert(i, j + 1, tri, triVert, triEdge);
+        triVerts[pos++] = TriVerts(a, b, c);
+        if (j < n - 1 - i) {
+          int d = Vert(i + 1, j + 1, tri, triVert, triEdge);
+          triVerts[pos++] = TriVerts(b, d, c);
+        }
+      }
+    }
+  }
+};
+
+struct IdxMin : public thrust::binary_function<TriVerts, TriVerts, TriVerts> {
+  __host__ __device__ int min3(TriVerts a) {
+    return glm::min(a.x, glm::min(a.y, a.z));
+  }
+  __host__ __device__ TriVerts operator()(TriVerts a, TriVerts b) {
+    return TriVerts(glm::min(min3(a), min3(b)));
+  }
+};
+
+struct IdxMax : public thrust::binary_function<TriVerts, TriVerts, TriVerts> {
+  __host__ __device__ int max3(TriVerts a) {
+    return glm::max(a.x, glm::max(a.y, a.z));
+  }
+  __host__ __device__ TriVerts operator()(TriVerts a, TriVerts b) {
+    return TriVerts(glm::max(max3(a), max3(b)));
+  }
+};
 
 struct PosMin
     : public thrust::binary_function<glm::vec3, glm::vec3, glm::vec3> {
@@ -87,13 +231,16 @@ struct TriMortonBox {
 
   __host__ __device__ void operator()(
       thrust::tuple<uint32_t&, Box&, const TriVerts&> inout) {
+    uint32_t& mortonCode = thrust::get<0>(inout);
+    Box& triBox = thrust::get<1>(inout);
     const TriVerts& triVerts = thrust::get<2>(inout);
+
     glm::vec3 center =
         (vertPos[triVerts[0]] + vertPos[triVerts[1]] + vertPos[triVerts[2]]) /
         3.0f;
-    thrust::get<0>(inout) = MortonCode(center, bBox);
-    thrust::get<1>(inout) = Box(vertPos[triVerts[0]], vertPos[triVerts[1]]);
-    thrust::get<1>(inout).Union(vertPos[triVerts[2]]);
+    mortonCode = MortonCode(center, bBox);
+    triBox = Box(vertPos[triVerts[0]], vertPos[triVerts[1]]);
+    triBox.Union(vertPos[triVerts[2]]);
   }
 };
 
@@ -143,13 +290,27 @@ struct OpposedDir {
   __host__ __device__ bool operator()(int a, int b) const { return a + b == 0; }
 };
 
+struct LinkEdges2Tris {
+  EdgeTrisD* edgeTris;
+
+  __host__ __device__ void operator()(thrust::tuple<int, TriEdges> in) {
+    const int tri = thrust::get<0>(in);
+    const TriEdges triEdges = thrust::get<1>(in);
+    for (int i : {0, 1, 2}) {
+      if (triEdges[i].Dir() > 0)
+        edgeTris[triEdges[i].Idx()].left = tri;
+      else
+        edgeTris[triEdges[i].Idx()].right = tri;
+    }
+  }
+};
+
 struct CheckTris {
   const EdgeVertsD* edgeVerts;
 
-  __host__ __device__ void operator()(
-      thrust::tuple<bool&, const TriVerts&, const TriEdges&> inout) {
-    const TriVerts& triVerts = thrust::get<1>(inout);
-    const TriEdges& triEdges = thrust::get<2>(inout);
+  __host__ __device__ bool operator()(thrust::tuple<TriVerts, TriEdges> in) {
+    const TriVerts& triVerts = thrust::get<0>(in);
+    const TriEdges& triEdges = thrust::get<1>(in);
     bool good = true;
     for (int i : {0, 1, 2}) {
       int j = (i + 1) % 3;
@@ -161,19 +322,154 @@ struct CheckTris {
         good &= triVerts[j] == edgeVerts[triEdges[i].Idx()].first;
       }
     }
-    thrust::get<0>(inout) = good;
+    return good;
   }
 };
 }  // namespace
 
 namespace manifold {
 
-Mesh::Mesh() { pImpl_ = nullptr; }
+Mesh::Mesh() : pImpl_{std::make_unique<Impl>()} {}
+Mesh::Mesh(const MeshHost& mesh) : pImpl_{std::make_unique<Impl>(mesh)} {}
+Mesh::~Mesh() = default;
+Mesh::Mesh(Mesh&&) = default;
+Mesh& Mesh::operator=(Mesh&&) = default;
 
-void Mesh::Append2Host(MeshHost& mesh) const { pImpl_->Append2Host(mesh); }
+Mesh::Mesh(const Mesh& other)
+    : pImpl_(new Impl(*other.pImpl_)), transform_(other.transform_) {}
+
+Mesh& Mesh::operator=(const Mesh& other) {
+  if (this != &other) {
+    pImpl_.reset(new Impl(*other.pImpl_));
+  }
+  transform_ = other.transform_;
+  return *this;
+}
+
+Mesh Mesh::Tetrahedron() {
+  Mesh tetrahedron;
+  tetrahedron.pImpl_ = std::make_unique<Impl>(Mesh::Impl::Shape::TETRAHEDRON);
+  return tetrahedron;
+}
+
+Mesh Mesh::Cube() {
+  Mesh cube;
+  cube.pImpl_ = std::make_unique<Impl>(Mesh::Impl::Shape::CUBE);
+  return cube;
+}
+
+Mesh Mesh::Octahedron() {
+  Mesh octahedron;
+  octahedron.pImpl_ = std::make_unique<Impl>(Mesh::Impl::Shape::OCTAHEDRON);
+  return octahedron;
+}
+
+Mesh Mesh::Sphere(int circularSegments) {
+  int n = (circularSegments + 3) / 4;
+  Mesh sphere;
+  sphere.pImpl_ = std::make_unique<Impl>(Mesh::Impl::Shape::OCTAHEDRON);
+  sphere.Refine(n);
+  thrust::for_each_n(sphere.pImpl_->vertPos_.beginD(), sphere.NumVert(),
+                     Normalize());
+  sphere.pImpl_->Finish();
+  return sphere;
+}
+
+Mesh::Mesh(const std::vector<Mesh>& meshes) : pImpl_{std::make_unique<Impl>()} {
+  for (Mesh mesh : meshes) {
+    mesh.ApplyTransform();
+    const int startIdx = NumVert();
+    pImpl_->vertPos_.H().insert(pImpl_->vertPos_.end(),
+                                mesh.pImpl_->vertPos_.begin(),
+                                mesh.pImpl_->vertPos_.end());
+    for (auto tri : mesh.pImpl_->triVerts_.H())
+      pImpl_->triVerts_.H().push_back(tri + startIdx);
+  }
+  pImpl_->Finish();
+}
+
+void Mesh::Append2Host(MeshHost& mesh) const {
+  ApplyTransform();
+  pImpl_->Append2Host(mesh);
+}
 
 Mesh Mesh::Copy() const { return *this; }
 
+std::vector<Mesh> Mesh::Decompose() const {
+  VecDH<int> components;
+  int nManifolds =
+      ConnectedComponents(components, NumVert(), pImpl_->edgeVerts_);
+  std::vector<Mesh> meshes(nManifolds);
+  VecDH<int> vertOld2New(NumVert(), -1);
+  for (int i = 0; i < nManifolds; ++i) {
+    int compVert =
+        thrust::find_if(components.beginD(), components.endD(), Positive()) -
+        components.beginD();
+    int compLabel = components.H()[compVert];
+
+    meshes[i].pImpl_->vertPos_.resize(NumVert());
+    VecDH<int> vertNew2Old(NumVert());
+    int nVert =
+        thrust::copy_if(
+            zip(pImpl_->vertPos_.beginD(), thrust::make_counting_iterator(0)),
+            zip(pImpl_->vertPos_.endD(),
+                thrust::make_counting_iterator(NumVert())),
+            components.beginD(),
+            zip(meshes[i].pImpl_->vertPos_.beginD(), vertNew2Old.beginD()),
+            Equals({compLabel})) -
+        zip(meshes[i].pImpl_->vertPos_.beginD(),
+            thrust::make_counting_iterator(0));
+    thrust::scatter(thrust::make_counting_iterator(0),
+                    thrust::make_counting_iterator(nVert), vertNew2Old.beginD(),
+                    vertOld2New.beginD());
+    meshes[i].pImpl_->vertPos_.resize(nVert);
+
+    meshes[i].pImpl_->triVerts_.resize(NumTri());
+    int nTri =
+        thrust::copy_if(pImpl_->triVerts_.beginD(), pImpl_->triVerts_.endD(),
+                        meshes[i].pImpl_->triVerts_.beginD(),
+                        KeepTri({compLabel, components.ptrD()})) -
+        meshes[i].pImpl_->triVerts_.beginD();
+    meshes[i].pImpl_->triVerts_.resize(nTri);
+
+    thrust::for_each_n(meshes[i].pImpl_->triVerts_.beginD(), nTri,
+                       Reindex({vertOld2New.ptrD()}));
+
+    meshes[i].pImpl_->Finish();
+    meshes[i].transform_ = transform_;
+    thrust::replace(components.beginD(), components.endD(), compLabel, -1);
+  }
+  return meshes;
+}
+
+void Mesh::Refine(int n) {
+  int numVert = NumVert();
+  int numEdge = NumEdge();
+  int numTri = NumTri();
+  // Append new verts
+  int vertsPerEdge = n - 1;
+  int vertsPerTri = ((n - 2) * (n - 2) + (n - 2)) / 2;
+  int triVertStart = numVert + numEdge * vertsPerEdge;
+  pImpl_->vertPos_.resize(triVertStart + numTri * vertsPerTri);
+  thrust::for_each_n(
+      zip(thrust::make_counting_iterator(0), pImpl_->edgeVerts_.beginD()),
+      numEdge, SplitEdges({pImpl_->vertPos_.ptrD(), numVert, n}));
+  thrust::for_each_n(
+      zip(thrust::make_counting_iterator(0), pImpl_->triVerts_.beginD()),
+      numTri, InteriorVerts({pImpl_->vertPos_.ptrD(), triVertStart, n}));
+  // Create subtriangles
+  VecDH<TriVerts> inTri(pImpl_->triVerts_);
+  pImpl_->triVerts_.resize(n * n * numTri);
+  thrust::for_each_n(
+      zip(thrust::make_counting_iterator(0), inTri.beginD(),
+          pImpl_->triEdges_.beginD()),
+      numTri, SplitTris({pImpl_->triVerts_.ptrD(), numVert, triVertStart, n}));
+  pImpl_->Finish();
+}
+
+int Mesh::NumVert() const { return pImpl_->NumVert(); }
+int Mesh::NumEdge() const { return pImpl_->NumEdge(); }
+int Mesh::NumTri() const { return pImpl_->NumTri(); }
 Box Mesh::BoundingBox() const { return pImpl_->bBox_.Transform(transform_); }
 
 void Mesh::Translate(glm::vec3 v) { transform_[3] += glm::vec4(v, 0.0f); }
@@ -188,26 +484,23 @@ void Mesh::Rotate(glm::mat3 r) { transform_ *= glm::mat4(r); }
 
 bool Mesh::IsValid() const { return pImpl_->IsValid(); }
 
-int Mesh::NumOverlaps(const Mesh& B, int max_overlaps) const {
+int Mesh::NumOverlaps(const Mesh& B) const {
   ApplyTransform();
   B.ApplyTransform();
 
-  VecDH<int> edgesB(max_overlaps), tris(max_overlaps);
-  pImpl_->EdgeCollisions(edgesB, tris, *B.pImpl_);
-  int num_overlaps = tris.size();
+  SparseIndices overlaps = pImpl_->EdgeCollisions(*B.pImpl_);
+  int num_overlaps = overlaps.size();
 
-  edgesB.resize(max_overlaps);
-  tris.resize(max_overlaps);
-  B.pImpl_->EdgeCollisions(edgesB, tris, *pImpl_);
-  return num_overlaps += tris.size();
+  overlaps = B.pImpl_->EdgeCollisions(*pImpl_);
+  return num_overlaps += overlaps.size();
 }
 
-Mesh Mesh::Boolean(const Mesh& second, OpType op, int max_overlaps) const {
+Mesh Mesh::Boolean(const Mesh& second, OpType op) const {
   ApplyTransform();
   second.ApplyTransform();
-  // Boolean3D boolean(*pImpl_, *second.pImpl_, max_overlaps);
+  Boolean3 boolean(*pImpl_, *second.pImpl_);
   Mesh result;
-  // result.pImpl_ = std::make_unique<Impl>(boolean.Result(op));
+  result.pImpl_ = std::make_unique<Impl>(boolean.Result(op));
   return result;
 }
 
@@ -228,7 +521,67 @@ void Mesh::ApplyTransform() const {
 Mesh::Impl::Impl(const MeshHost& mesh)
     : vertPos_(mesh.vertPos), triVerts_(mesh.triVerts) {
   CheckDevice();
+  Finish();
+}
+
+Mesh::Impl::Impl(Shape shape) {
+  std::vector<glm::vec3> vertPos;
+  std::vector<TriVerts> triVerts;
+  switch (shape) {
+    case Mesh::Impl::Shape::TETRAHEDRON:
+      vertPos = {{-1.0f, -1.0f, 1.0f},
+                 {-1.0f, 1.0f, -1.0f},
+                 {1.0f, -1.0f, -1.0f},
+                 {1.0f, 1.0f, 1.0f}};
+      triVerts = {{2, 0, 1}, {0, 3, 1}, {2, 3, 0}, {3, 2, 1}};
+      break;
+    case Mesh::Impl::Shape::CUBE:
+      vertPos = {{-1.0f, -1.0f, -1.0f},  //
+                 {1.0f, -1.0f, -1.0f},   //
+                 {1.0f, 1.0f, -1.0f},    //
+                 {-1.0f, 1.0f, -1.0f},   //
+                 {-1.0f, -1.0f, 1.0f},   //
+                 {1.0f, -1.0f, 1.0f},    //
+                 {1.0f, 1.0f, 1.0f},     //
+                 {-1.0f, 1.0f, 1.0f}};
+      triVerts = {{0, 2, 1}, {0, 3, 2},  //
+                  {4, 5, 6}, {4, 6, 7},  //
+                  {0, 1, 5}, {0, 5, 4},  //
+                  {1, 2, 6}, {1, 6, 5},  //
+                  {2, 3, 7}, {2, 7, 6},  //
+                  {3, 0, 4}, {3, 4, 7}};
+      break;
+    case Mesh::Impl::Shape::OCTAHEDRON:
+      vertPos = {{1.0f, 0.0f, 0.0f},   //
+                 {-1.0f, 0.0f, 0.0f},  //
+                 {0.0f, 1.0f, 0.0f},   //
+                 {0.0f, -1.0f, 0.0f},  //
+                 {0.0f, 0.0f, 1.0f},   //
+                 {0.0f, 0.0f, -1.0f}};
+      triVerts = {{0, 2, 4}, {1, 5, 3},  //
+                  {2, 1, 4}, {3, 5, 0},  //
+                  {1, 3, 4}, {0, 5, 2},  //
+                  {3, 0, 4}, {2, 5, 1}};
+      break;
+    default:
+      throw logicErr("Unrecognized shape!");
+  }
+  vertPos_ = vertPos;
+  triVerts_ = triVerts;
+  Finish();
+}
+
+void Mesh::Impl::Finish() {
+  ALWAYS_ASSERT(thrust::reduce(triVerts_.beginD(), triVerts_.endD(),
+                               TriVerts(std::numeric_limits<int>::max()),
+                               IdxMin())[0] >= 0,
+                runtimeErr, "Negative vertex index!");
+  ALWAYS_ASSERT(thrust::reduce(triVerts_.beginD(), triVerts_.endD(),
+                               TriVerts(-1), IdxMax())[0] < NumVert(),
+                runtimeErr, "Vertex index exceeds number of verts!");
   CalculateBBox();
+  ALWAYS_ASSERT(bBox_.isFinite(), runtimeErr,
+                "Input vertices are not all finite!");
   SortVerts();
   VecDH<Box> triBox;
   VecDH<uint32_t> triMorton;
@@ -276,14 +629,17 @@ void Mesh::Impl::TranslateScale(const glm::mat4& T) {
 }
 
 bool Mesh::Impl::IsValid() const {
-  VecDH<bool> check(NumTri());
-  thrust::for_each_n(
-      zip(check.beginD(), triVerts_.cbeginD(), triEdges_.cbeginD()), NumTri(),
-      CheckTris({edgeVerts_.cptrD()}));
-  return thrust::all_of(check.beginD(), check.endD(), thrust::identity<bool>());
-  // return thrust::all_of(zip(triVerts_.beginD(), triEdges_.beginD()),
-  //                       zip(triVerts_.endD(), triEdges_.endD()),
-  //                       CheckTris({edgeVerts_.ptrD()}));
+  return thrust::all_of(zip(triVerts_.beginD(), triEdges_.beginD()),
+                        zip(triVerts_.endD(), triEdges_.endD()),
+                        CheckTris({edgeVerts_.ptrD()}));
+}
+
+glm::vec3 Mesh::Impl::GetTriNormal(int tri) const {
+  glm::vec3 normal = glm::normalize(glm::cross(
+      vertPos_.H()[triVerts_.H()[tri][1]] - vertPos_.H()[triVerts_.H()[tri][0]],
+      vertPos_.H()[triVerts_.H()[tri][2]] -
+          vertPos_.H()[triVerts_.H()[tri][0]]));
+  return std::isfinite(normal.x) ? normal : glm::vec3(0.0f);
 }
 
 void Mesh::Impl::CalculateBBox() {
@@ -315,7 +671,8 @@ void Mesh::Impl::CreateEdges() {
   VecDH<EdgeVertsD> halfEdgeVerts(NumTri() * 3);
   VecDH<int> dir(NumTri() * 3);
   edgeVerts_.resize(halfEdgeVerts.size() / 2);
-  triEdges_.resize(NumTri(), TriEdges({0, 1}));
+  triEdges_.resize(NumTri());
+  edgeTris_.resize(NumEdge());
   for (int i : {0, 1, 2}) {
     int j = (i + 1) % 3;
     int start = i * NumTri();
@@ -327,6 +684,9 @@ void Mesh::Impl::CreateEdges() {
   strided_range<VecDH<EdgeVertsD>::IterD> edgeVerts(halfEdgeVerts.beginD(),
                                                     halfEdgeVerts.endD(), 2);
   thrust::copy(edgeVerts.begin(), edgeVerts.end(), edgeVerts_.beginD());
+
+  thrust::for_each_n(zip(thrust::make_counting_iterator(0), triEdges_.beginD()),
+                     NumTri(), LinkEdges2Tris({edgeTris_.ptrD()}));
   // verify
   strided_range<VecDH<EdgeVertsD>::IterD> edgesOdd(halfEdgeVerts.beginD() + 1,
                                                    halfEdgeVerts.endD(), 2);
@@ -381,14 +741,13 @@ void Mesh::Impl::SortTris(VecDH<Box>& triBox, VecDH<uint32_t>& triMorton) {
                       zip(triBox.beginD(), triVerts_.beginD()));
 }
 
-void Mesh::Impl::EdgeCollisions(VecDH<int>& edgesB, VecDH<int>& tris,
-                                const Mesh::Impl& B) const {
+SparseIndices Mesh::Impl::EdgeCollisions(const Mesh::Impl& B) const {
   VecDH<Box> BedgeBB = B.GetEdgeBox();
-  collider_.Collisions(edgesB, tris, BedgeBB);
+  return collider_.Collisions(BedgeBB);
 }
 
-void Mesh::Impl::VertexCollisionsZ(VecDH<int>& vertsOut, VecDH<int>& tris,
-                                   const VecDH<glm::vec3>& vertsIn) const {
-  collider_.Collisions(vertsOut, tris, vertsIn);
+SparseIndices Mesh::Impl::VertexCollisionsZ(
+    const VecDH<glm::vec3>& vertsIn) const {
+  return collider_.Collisions(vertsIn);
 }
 }  // namespace manifold
