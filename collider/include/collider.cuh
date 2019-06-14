@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #pragma once
+#include "sparse.cuh"
 #include "structs.h"
 #include "vec_dh.cuh"
 
@@ -25,9 +26,10 @@ class Collider {
   void Translate(glm::vec3);
   void Scale(glm::vec3);
   void UpdateBoxes(const VecDH<Box>& leafBB);
+  // Collisions returns a sparse result, where i is the querry index and j is
+  // the leaf index where their bounding boxes overlap.
   template <typename T>
-  void Collisions(VecDH<int>& querriesOut, VecDH<int>& facesOut,
-                  const VecDH<T>& querriesIn) const;
+  SparseIndices Collisions(const VecDH<T>& querriesIn) const;
 
  private:
   VecDH<Box> nodeBBox_;

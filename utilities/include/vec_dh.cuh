@@ -13,17 +13,10 @@
 // limitations under the License.
 
 #pragma once
-#define GLM_FORCE_CUDA
 #include <thrust/device_vector.h>
-#include <glm/glm.hpp>
+#include <thrust/host_vector.h>
 
 namespace manifold {
-
-using EdgeVertsD = thrust::pair<int, int>;
-
-inline std::ostream& operator<<(std::ostream& stream, const EdgeVertsD& edge) {
-  return stream << edge.first << ", " << edge.second;
-}
 
 template <typename T>
 class VecDH {
@@ -42,14 +35,16 @@ class VecDH {
 
   int size() const { return device_valid_ ? device_.size() : host_.size(); }
 
-  void resize(int size, T val = T()) {
-    if (device_valid_) device_.resize(size, val);
-    if (host_valid_) host_.resize(size, val);
-  }
-
-  void shrink_to_fit() const {
-    if (device_valid_) device_.shrink_to_fit();
-    if (host_valid_) host_.shrink_to_fit();
+  void resize(int newSize, T val = T()) {
+    bool shrink = size() > 2 * newSize;
+    if (device_valid_) {
+      device_.resize(newSize, val);
+      if (shrink) device_.shrink_to_fit();
+    }
+    if (host_valid_) {
+      host_.resize(newSize, val);
+      if (shrink) host_.shrink_to_fit();
+    }
   }
 
   void swap(VecDH<T>& other) {

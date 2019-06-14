@@ -11,5 +11,5 @@ target_link_libraries( ${PROJECT_NAME}
     PRIVATE assimp
 )
 
-target_compile_options(${PROJECT_NAME} PRIVATE -Werror -Wall -Wno-sign-compare)
+target_compile_options(${PROJECT_NAME} PRIVATE ${MANIFOLD_FLAGS})
 target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_11)
