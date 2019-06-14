@@ -22,16 +22,29 @@ class Mesh {
  public:
   Mesh();
   Mesh(const MeshHost&);
+  static Mesh Tetrahedron();
+  static Mesh Cube();
+  static Mesh Octahedron();
+  static Mesh Sphere(int circularSegments);
+  Mesh(const std::vector<Mesh>&);
+  std::vector<Mesh> Decompose() const;
   void Append2Host(MeshHost&) const;
   Mesh Copy() const;
+  void Refine(int n);
+
+  int NumVert() const;
+  int NumEdge() const;
+  int NumTri() const;
   Box BoundingBox() const;
+  bool IsValid() const;
+
   void Translate(glm::vec3);
   void Scale(glm::vec3);
   void Rotate(glm::mat3);
-  bool IsValid() const;
-  int NumOverlaps(const Mesh& B, int max_overlaps = 1 << 20) const;
+
+  int NumOverlaps(const Mesh& B) const;
   enum class OpType { ADD, SUBTRACT, INTERSECT };
-  Mesh Boolean(const Mesh& second, OpType op, int max_overlaps = 1 << 20) const;
+  Mesh Boolean(const Mesh& second, OpType op) const;
 
   ~Mesh();
   Mesh(Mesh&&);

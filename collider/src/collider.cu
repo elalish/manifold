@@ -128,19 +128,24 @@ struct CreateRadixTree {
 
 template <typename T>
 struct FindCollisions {
-  int* query_overlaps_;
-  int* face_overlaps_;
-  int* num_overlaps_;
+  thrust::pair<int*, int*> querryTri_;
+  int* numOverlaps_;
+  const int maxOverlaps_;
   const Box* nodeBBox_;
   const thrust::pair<int, int>* internalChildren_;
 
-  __host__ __device__ bool RecordCollision(int node,
-                                           const thrust::tuple<T, int>& query) {
-    bool overlaps = nodeBBox_[node].DoesOverlap(thrust::get<0>(query));
+  __host__ __device__ int RecordCollision(int node,
+                                          const thrust::tuple<T, int>& query) {
+    const T& queryObj = thrust::get<0>(query);
+    const int queryIdx = thrust::get<1>(query);
+
+    bool overlaps = nodeBBox_[node].DoesOverlap(queryObj);
     if (overlaps && IsLeaf(node)) {
-      int pos = AtomicIncrement(num_overlaps_);
-      query_overlaps_[pos] = thrust::get<1>(query);
-      face_overlaps_[pos] = Node2Leaf(node);
+      int pos = AtomicIncrement(numOverlaps_);
+      if (pos >= maxOverlaps_)
+        return -1;  // Didn't allocate enough memory; bail out
+      querryTri_.first[pos] = queryIdx;
+      querryTri_.second[pos] = Node2Leaf(node);
     }
     return overlaps && IsInternal(node);  // Should traverse into node
   }
@@ -157,8 +162,10 @@ struct FindCollisions {
       int child1 = internalChildren_[internal].first;
       int child2 = internalChildren_[internal].second;
 
-      bool traverse1 = RecordCollision(child1, query);
-      bool traverse2 = RecordCollision(child2, query);
+      int traverse1 = RecordCollision(child1, query);
+      if (traverse1 < 0) return;
+      int traverse2 = RecordCollision(child2, query);
+      if (traverse2 < 0) return;
 
       if (!traverse1 && !traverse2) {
         if (top < 0) break;   // done
@@ -220,29 +227,31 @@ Collider::Collider(const VecDH<Box>& leafBB,
 }
 
 template <typename T>
-void Collider::Collisions(VecDH<int>& querriesOut, VecDH<int>& facesOut,
-                          const VecDH<T>& querriesIn) const {
-  ALWAYS_ASSERT(querriesOut.size() == facesOut.size(), runtimeErr, "");
-  ALWAYS_ASSERT(facesOut.size() > 0, runtimeErr,
-                "querriesOut and facesOut are empty! Their size is the maximum "
-                "overlaps that will be reported.");
-  // scalar number of overlaps found
-  VecDH<int> n_overlaps_dev(1, 0);
-  // calculate Bounding Box overlaps
-  thrust::for_each_n(
-      zip(querriesIn.cbeginD(), thrust::make_counting_iterator(0)),
-      querriesIn.size(),
-      FindCollisions<T>({querriesOut.ptrD(), facesOut.ptrD(),
-                         n_overlaps_dev.ptrD(), nodeBBox_.ptrD(),
-                         internalChildren_.ptrD()}));
-  int n_overlaps = n_overlaps_dev.H()[0];
-  ALWAYS_ASSERT(n_overlaps <= querriesOut.size(), runtimeErr,
-                "max_overlaps exceeded.");
+SparseIndices Collider::Collisions(const VecDH<T>& querriesIn) const {
+  int maxOverlaps = 1 << 20;
+  SparseIndices querryTri(maxOverlaps);
+  int nOverlaps = 0;
+  for (;;) {
+    // scalar number of overlaps found
+    VecDH<int> nOverlapsD(1, 0);
+    // calculate Bounding Box overlaps
+    thrust::for_each_n(
+        zip(querriesIn.cbeginD(), thrust::make_counting_iterator(0)),
+        querriesIn.size(),
+        FindCollisions<T>({querryTri.ptrDpq(), nOverlapsD.ptrD(), maxOverlaps,
+                           nodeBBox_.ptrD(), internalChildren_.ptrD()}));
+    nOverlaps = nOverlapsD.H()[0];
+    if (nOverlaps <= maxOverlaps)
+      break;
+    else {  // if not enough memory was allocated, guess how much will be needed
+      int lastQuery = querryTri.Get(0).H().back();
+      maxOverlaps *= 2 * static_cast<float>(querriesIn.size()) / lastQuery;
+      querryTri.Resize(maxOverlaps);
+    }
+  }
   // remove unused part of array
-  querriesOut.resize(n_overlaps);
-  querriesOut.shrink_to_fit();
-  facesOut.resize(n_overlaps);
-  facesOut.shrink_to_fit();
+  querryTri.Resize(nOverlaps);
+  return querryTri;
 }
 
 void Collider::UpdateBoxes(const VecDH<Box>& leafBB) {
@@ -269,12 +278,9 @@ void Collider::Scale(glm::vec3 T) {
   thrust::for_each(nodeBBox_.beginD(), nodeBBox_.endD(), ScaleBox({T}));
 }
 
-template void Collider::Collisions<Box>(VecDH<int>& querriesOut,
-                                        VecDH<int>& facesOut,
-                                        const VecDH<Box>& querriesIn) const;
+template SparseIndices Collider::Collisions<Box>(const VecDH<Box>&) const;
 
-template void Collider::Collisions<glm::vec3>(
-    VecDH<int>& querriesOut, VecDH<int>& facesOu,
-    const VecDH<glm::vec3>& querriesIn) const;
+template SparseIndices Collider::Collisions<glm::vec3>(
+    const VecDH<glm::vec3>&) const;
 
 }  // namespace manifold

@@ -1,0 +1,32 @@
+C++
+
+nTri = 512, time = 0.0126414 sec
+nTri = 2048, time = 0.0216948 sec
+nTri = 8192, time = 0.0442905 sec
+nTri = 32768, time = 0.117616 sec
+nTri = 131072, time = 0.45148 sec
+nTri = 524288, time = 1.51442 sec
+nTri = 2097152, time = 6.6246 sec
+nTri = 8388608, time = 26.4176 sec
+
+OMP
+
+nTri = 512, time = 0.0191766 sec
+nTri = 2048, time = 0.0159518 sec
+nTri = 8192, time = 0.0480458 sec
+nTri = 32768, time = 0.106746 sec
+nTri = 131072, time = 0.395244 sec
+nTri = 524288, time = 1.5425 sec
+nTri = 2097152, time = 6.02868 sec
+nTri = 8388608, time = 23.4957 sec
+
+CUDA
+
+nTri = 512, time = 0.57831 sec
+nTri = 2048, time = 0.0306555 sec
+nTri = 8192, time = 0.0487548 sec
+nTri = 32768, time = 0.0962693 sec
+nTri = 131072, time = 0.243456 sec
+nTri = 524288, time = 0.734006 sec
+nTri = 2097152, time = 2.54531 sec
+nTri = 8388608, time = 9.97956 sec
