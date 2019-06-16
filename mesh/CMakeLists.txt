@@ -1,22 +1,15 @@
 project (mesh)
 
-find_package(Boost COMPONENTS graph REQUIRED)
-
-add_library(${PROJECT_NAME} src/mesh.cu src/boolean3.cu src/connected_components.cu)
+add_library(${PROJECT_NAME} src/mesh.cpp)
 
 target_include_directories( ${PROJECT_NAME}
     PUBLIC ${PROJECT_SOURCE_DIR}/include
 )
+
 target_link_libraries( ${PROJECT_NAME}
-    PUBLIC utilities mesh_host
-    PRIVATE collider polygon nvgraph ${MANIFOLD_OMP_INCLUDE} Boost::graph 
+    PUBLIC utilities
+    PRIVATE assimp
 )
 
-target_compile_options(${PROJECT_NAME} 
-    PRIVATE ${MANIFOLD_NVCC_FLAGS}
-)
-target_compile_features(${PROJECT_NAME} 
-    PUBLIC cxx_std_11 
-    PRIVATE cxx_std_14
-)
-
+target_compile_options(${PROJECT_NAME} PRIVATE ${MANIFOLD_FLAGS})
+target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_11)

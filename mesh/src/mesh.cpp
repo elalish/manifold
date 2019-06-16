@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "mesh_host.h"
+#include "mesh.h"
 #include <algorithm>
 #include "assimp/Exporter.hpp"
 #include "assimp/Importer.hpp"
@@ -21,7 +21,7 @@
 
 namespace manifold {
 
-MeshHost ImportMesh(const std::string& filename) {
+Mesh ImportMesh(const std::string& filename) {
   Assimp::Importer importer;
   importer.SetPropertyInteger(AI_CONFIG_PP_RVC_FLAGS,                    //
                               aiComponent_NORMALS |                      //
@@ -47,7 +47,7 @@ MeshHost ImportMesh(const std::string& filename) {
 
   ALWAYS_ASSERT(scene, runtimeErr, importer.GetErrorString());
 
-  MeshHost mesh_out;
+  Mesh mesh_out;
   for (int i = 0; i < scene->mNumMeshes; ++i) {
     const aiMesh* mesh_i = scene->mMeshes[i];
     for (int j = 0; j < mesh_i->mNumVertices; ++j) {
@@ -65,7 +65,7 @@ MeshHost ImportMesh(const std::string& filename) {
   return mesh_out;
 }
 
-void ExportMesh(const std::string& filename, const MeshHost& mesh) {
+void ExportMesh(const std::string& filename, const Mesh& manifold) {
   aiScene* scene = new aiScene();
 
   scene->mNumMaterials = 1;
@@ -84,22 +84,22 @@ void ExportMesh(const std::string& filename, const MeshHost& mesh) {
 
   aiMesh* mesh_out = scene->mMeshes[0];
 
-  mesh_out->mNumVertices = mesh.vertPos.size();
+  mesh_out->mNumVertices = manifold.vertPos.size();
   mesh_out->mVertices = new aiVector3D[mesh_out->mNumVertices];
 
   for (int i = 0; i < mesh_out->mNumVertices; ++i) {
-    const glm::vec3& v = mesh.vertPos[i];
+    const glm::vec3& v = manifold.vertPos[i];
     mesh_out->mVertices[i] = aiVector3D(v.x, v.y, v.z);
   }
 
-  mesh_out->mNumFaces = mesh.triVerts.size();
+  mesh_out->mNumFaces = manifold.triVerts.size();
   mesh_out->mFaces = new aiFace[mesh_out->mNumFaces];
 
   for (int i = 0; i < mesh_out->mNumFaces; ++i) {
     aiFace& face = mesh_out->mFaces[i];
     face.mNumIndices = 3;
     face.mIndices = new uint[face.mNumIndices];
-    for (int j : {0, 1, 2}) face.mIndices[j] = mesh.triVerts[i][j];
+    for (int j : {0, 1, 2}) face.mIndices[j] = manifold.triVerts[i][j];
   }
 
   Assimp::Exporter exporter;
