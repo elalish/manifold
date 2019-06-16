@@ -14,18 +14,18 @@
 
 #include <chrono>
 #include <iostream>
-#include "mesh.h"
+#include "manifold.h"
 
 using namespace manifold;
 
 int main(int argc, char **argv) {
   std::vector<double> times;
   for (int i = 0; i < 8; ++i) {
-    Mesh sphere = Mesh::Sphere((8 << i) * 4);
-    Mesh sphere2 = sphere.Copy();
+    Manifold sphere = Manifold::Sphere((8 << i) * 4);
+    Manifold sphere2 = sphere.Copy();
     sphere2.Translate(glm::vec3(0.5));
     auto start = std::chrono::high_resolution_clock::now();
-    Mesh diff = sphere.Boolean(sphere2, Mesh::OpType::SUBTRACT);
+    Manifold diff = sphere.Boolean(sphere2, Manifold::OpType::SUBTRACT);
     auto end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsed = end - start;
     times.push_back(elapsed.count());

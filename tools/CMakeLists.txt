@@ -1,7 +1,7 @@
 project (tools)
 
 add_executable(loadMesh load_mesh.cpp)
-target_link_libraries(loadMesh mesh)
+target_link_libraries(loadMesh manifold)
 
 target_compile_options(loadMesh PRIVATE ${MANIFOLD_FLAGS})
 target_compile_features(loadMesh PUBLIC cxx_std_11)
@@ -17,7 +17,7 @@ endif()
 
 
 add_executable(perfTest perf_test.cpp)
-target_link_libraries(perfTest mesh)
+target_link_libraries(perfTest manifold)
 
 target_compile_options(perfTest PRIVATE ${MANIFOLD_FLAGS})
 target_compile_features(perfTest PUBLIC cxx_std_11)

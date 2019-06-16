@@ -20,7 +20,7 @@
 
 #include "boolean3.cuh"
 #include "connected_components.cuh"
-#include "mesh.cuh"
+#include "manifold.cuh"
 
 namespace {
 using namespace manifold;
@@ -329,16 +329,17 @@ struct CheckTris {
 
 namespace manifold {
 
-Mesh::Mesh() : pImpl_{std::make_unique<Impl>()} {}
-Mesh::Mesh(const MeshHost& mesh) : pImpl_{std::make_unique<Impl>(mesh)} {}
-Mesh::~Mesh() = default;
-Mesh::Mesh(Mesh&&) = default;
-Mesh& Mesh::operator=(Mesh&&) = default;
+Manifold::Manifold() : pImpl_{std::make_unique<Impl>()} {}
+Manifold::Manifold(const Mesh& manifold)
+    : pImpl_{std::make_unique<Impl>(manifold)} {}
+Manifold::~Manifold() = default;
+Manifold::Manifold(Manifold&&) = default;
+Manifold& Manifold::operator=(Manifold&&) = default;
 
-Mesh::Mesh(const Mesh& other)
+Manifold::Manifold(const Manifold& other)
     : pImpl_(new Impl(*other.pImpl_)), transform_(other.transform_) {}
 
-Mesh& Mesh::operator=(const Mesh& other) {
+Manifold& Manifold::operator=(const Manifold& other) {
   if (this != &other) {
     pImpl_.reset(new Impl(*other.pImpl_));
   }
@@ -346,28 +347,29 @@ Mesh& Mesh::operator=(const Mesh& other) {
   return *this;
 }
 
-Mesh Mesh::Tetrahedron() {
-  Mesh tetrahedron;
-  tetrahedron.pImpl_ = std::make_unique<Impl>(Mesh::Impl::Shape::TETRAHEDRON);
+Manifold Manifold::Tetrahedron() {
+  Manifold tetrahedron;
+  tetrahedron.pImpl_ =
+      std::make_unique<Impl>(Manifold::Impl::Shape::TETRAHEDRON);
   return tetrahedron;
 }
 
-Mesh Mesh::Cube() {
-  Mesh cube;
-  cube.pImpl_ = std::make_unique<Impl>(Mesh::Impl::Shape::CUBE);
+Manifold Manifold::Cube() {
+  Manifold cube;
+  cube.pImpl_ = std::make_unique<Impl>(Manifold::Impl::Shape::CUBE);
   return cube;
 }
 
-Mesh Mesh::Octahedron() {
-  Mesh octahedron;
-  octahedron.pImpl_ = std::make_unique<Impl>(Mesh::Impl::Shape::OCTAHEDRON);
+Manifold Manifold::Octahedron() {
+  Manifold octahedron;
+  octahedron.pImpl_ = std::make_unique<Impl>(Manifold::Impl::Shape::OCTAHEDRON);
   return octahedron;
 }
 
-Mesh Mesh::Sphere(int circularSegments) {
+Manifold Manifold::Sphere(int circularSegments) {
   int n = (circularSegments + 3) / 4;
-  Mesh sphere;
-  sphere.pImpl_ = std::make_unique<Impl>(Mesh::Impl::Shape::OCTAHEDRON);
+  Manifold sphere;
+  sphere.pImpl_ = std::make_unique<Impl>(Manifold::Impl::Shape::OCTAHEDRON);
   sphere.Refine(n);
   thrust::for_each_n(sphere.pImpl_->vertPos_.beginD(), sphere.NumVert(),
                      Normalize());
@@ -375,31 +377,32 @@ Mesh Mesh::Sphere(int circularSegments) {
   return sphere;
 }
 
-Mesh::Mesh(const std::vector<Mesh>& meshes) : pImpl_{std::make_unique<Impl>()} {
-  for (Mesh mesh : meshes) {
-    mesh.ApplyTransform();
+Manifold::Manifold(const std::vector<Manifold>& meshes)
+    : pImpl_{std::make_unique<Impl>()} {
+  for (Manifold manifold : meshes) {
+    manifold.ApplyTransform();
     const int startIdx = NumVert();
     pImpl_->vertPos_.H().insert(pImpl_->vertPos_.end(),
-                                mesh.pImpl_->vertPos_.begin(),
-                                mesh.pImpl_->vertPos_.end());
-    for (auto tri : mesh.pImpl_->triVerts_.H())
+                                manifold.pImpl_->vertPos_.begin(),
+                                manifold.pImpl_->vertPos_.end());
+    for (auto tri : manifold.pImpl_->triVerts_.H())
       pImpl_->triVerts_.H().push_back(tri + startIdx);
   }
   pImpl_->Finish();
 }
 
-void Mesh::Append2Host(MeshHost& mesh) const {
+void Manifold::Append2Host(Mesh& manifold) const {
   ApplyTransform();
-  pImpl_->Append2Host(mesh);
+  pImpl_->Append2Host(manifold);
 }
 
-Mesh Mesh::Copy() const { return *this; }
+Manifold Manifold::Copy() const { return *this; }
 
-std::vector<Mesh> Mesh::Decompose() const {
+std::vector<Manifold> Manifold::Decompose() const {
   VecDH<int> components;
   int nManifolds =
       ConnectedComponents(components, NumVert(), pImpl_->edgeVerts_);
-  std::vector<Mesh> meshes(nManifolds);
+  std::vector<Manifold> meshes(nManifolds);
   VecDH<int> vertOld2New(NumVert(), -1);
   for (int i = 0; i < nManifolds; ++i) {
     int compVert =
@@ -442,7 +445,7 @@ std::vector<Mesh> Mesh::Decompose() const {
   return meshes;
 }
 
-void Mesh::Refine(int n) {
+void Manifold::Refine(int n) {
   int numVert = NumVert();
   int numEdge = NumEdge();
   int numTri = NumTri();
@@ -467,24 +470,26 @@ void Mesh::Refine(int n) {
   pImpl_->Finish();
 }
 
-int Mesh::NumVert() const { return pImpl_->NumVert(); }
-int Mesh::NumEdge() const { return pImpl_->NumEdge(); }
-int Mesh::NumTri() const { return pImpl_->NumTri(); }
-Box Mesh::BoundingBox() const { return pImpl_->bBox_.Transform(transform_); }
+int Manifold::NumVert() const { return pImpl_->NumVert(); }
+int Manifold::NumEdge() const { return pImpl_->NumEdge(); }
+int Manifold::NumTri() const { return pImpl_->NumTri(); }
+Box Manifold::BoundingBox() const {
+  return pImpl_->bBox_.Transform(transform_);
+}
 
-void Mesh::Translate(glm::vec3 v) { transform_[3] += glm::vec4(v, 0.0f); }
+void Manifold::Translate(glm::vec3 v) { transform_[3] += glm::vec4(v, 0.0f); }
 
-void Mesh::Scale(glm::vec3 v) {
+void Manifold::Scale(glm::vec3 v) {
   glm::mat4 s(1.0f);
   for (int i : {0, 1, 2}) s[i][i] = v[i];
   transform_ *= s;
 }
 
-void Mesh::Rotate(glm::mat3 r) { transform_ *= glm::mat4(r); }
+void Manifold::Rotate(glm::mat3 r) { transform_ *= glm::mat4(r); }
 
-bool Mesh::IsValid() const { return pImpl_->IsValid(); }
+bool Manifold::IsValid() const { return pImpl_->IsValid(); }
 
-int Mesh::NumOverlaps(const Mesh& B) const {
+int Manifold::NumOverlaps(const Manifold& B) const {
   ApplyTransform();
   B.ApplyTransform();
 
@@ -495,16 +500,16 @@ int Mesh::NumOverlaps(const Mesh& B) const {
   return num_overlaps += overlaps.size();
 }
 
-Mesh Mesh::Boolean(const Mesh& second, OpType op) const {
+Manifold Manifold::Boolean(const Manifold& second, OpType op) const {
   ApplyTransform();
   second.ApplyTransform();
   Boolean3 boolean(*pImpl_, *second.pImpl_);
-  Mesh result;
+  Manifold result;
   result.pImpl_ = std::make_unique<Impl>(boolean.Result(op));
   return result;
 }
 
-void Mesh::ApplyTransform() const {
+void Manifold::ApplyTransform() const {
   if (transform_ == glm::mat4(1.0f)) return;
   glm::mat4 TS(1.0f);
   for (int i : {0, 1, 2}) {
@@ -518,24 +523,24 @@ void Mesh::ApplyTransform() const {
   transform_ = glm::mat4(1.0f);
 }
 
-Mesh::Impl::Impl(const MeshHost& mesh)
-    : vertPos_(mesh.vertPos), triVerts_(mesh.triVerts) {
+Manifold::Impl::Impl(const Mesh& manifold)
+    : vertPos_(manifold.vertPos), triVerts_(manifold.triVerts) {
   CheckDevice();
   Finish();
 }
 
-Mesh::Impl::Impl(Shape shape) {
+Manifold::Impl::Impl(Shape shape) {
   std::vector<glm::vec3> vertPos;
   std::vector<TriVerts> triVerts;
   switch (shape) {
-    case Mesh::Impl::Shape::TETRAHEDRON:
+    case Manifold::Impl::Shape::TETRAHEDRON:
       vertPos = {{-1.0f, -1.0f, 1.0f},
                  {-1.0f, 1.0f, -1.0f},
                  {1.0f, -1.0f, -1.0f},
                  {1.0f, 1.0f, 1.0f}};
       triVerts = {{2, 0, 1}, {0, 3, 1}, {2, 3, 0}, {3, 2, 1}};
       break;
-    case Mesh::Impl::Shape::CUBE:
+    case Manifold::Impl::Shape::CUBE:
       vertPos = {{-1.0f, -1.0f, -1.0f},  //
                  {1.0f, -1.0f, -1.0f},   //
                  {1.0f, 1.0f, -1.0f},    //
@@ -551,7 +556,7 @@ Mesh::Impl::Impl(Shape shape) {
                   {2, 3, 7}, {2, 7, 6},  //
                   {3, 0, 4}, {3, 4, 7}};
       break;
-    case Mesh::Impl::Shape::OCTAHEDRON:
+    case Manifold::Impl::Shape::OCTAHEDRON:
       vertPos = {{1.0f, 0.0f, 0.0f},   //
                  {-1.0f, 0.0f, 0.0f},  //
                  {0.0f, 1.0f, 0.0f},   //
@@ -571,7 +576,7 @@ Mesh::Impl::Impl(Shape shape) {
   Finish();
 }
 
-void Mesh::Impl::Finish() {
+void Manifold::Impl::Finish() {
   ALWAYS_ASSERT(thrust::reduce(triVerts_.beginD(), triVerts_.endD(),
                                TriVerts(std::numeric_limits<int>::max()),
                                IdxMin())[0] >= 0,
@@ -591,7 +596,7 @@ void Mesh::Impl::Finish() {
   collider_ = Collider(triBox, triMorton);
 }
 
-void Mesh::Impl::Append2Host(MeshHost& pImpl_out) const {
+void Manifold::Impl::Append2Host(Mesh& pImpl_out) const {
   const int start = pImpl_out.vertPos.size();
   std::transform(
       triVerts_.begin(), triVerts_.end(),
@@ -601,7 +606,7 @@ void Mesh::Impl::Append2Host(MeshHost& pImpl_out) const {
                            vertPos_.end());
 }
 
-void Mesh::Impl::Transform(const glm::mat4& T) {
+void Manifold::Impl::Transform(const glm::mat4& T) {
   thrust::for_each(vertPos_.beginD(), vertPos_.endD(), Transform3({T}));
   CalculateBBox();
   VecDH<Box> triBox;
@@ -610,7 +615,7 @@ void Mesh::Impl::Transform(const glm::mat4& T) {
   collider_.UpdateBoxes(triBox);
 }
 
-void Mesh::Impl::TranslateScale(const glm::mat4& T) {
+void Manifold::Impl::TranslateScale(const glm::mat4& T) {
   glm::vec3 translate, scale;
   for (int i : {0, 1, 2}) {
     translate[i] = T[3][i];
@@ -628,13 +633,13 @@ void Mesh::Impl::TranslateScale(const glm::mat4& T) {
   collider_.Translate(translate);
 }
 
-bool Mesh::Impl::IsValid() const {
+bool Manifold::Impl::IsValid() const {
   return thrust::all_of(zip(triVerts_.beginD(), triEdges_.beginD()),
                         zip(triVerts_.endD(), triEdges_.endD()),
                         CheckTris({edgeVerts_.ptrD()}));
 }
 
-glm::vec3 Mesh::Impl::GetTriNormal(int tri) const {
+glm::vec3 Manifold::Impl::GetTriNormal(int tri) const {
   glm::vec3 normal = glm::normalize(glm::cross(
       vertPos_.H()[triVerts_.H()[tri][1]] - vertPos_.H()[triVerts_.H()[tri][0]],
       vertPos_.H()[triVerts_.H()[tri][2]] -
@@ -642,14 +647,14 @@ glm::vec3 Mesh::Impl::GetTriNormal(int tri) const {
   return std::isfinite(normal.x) ? normal : glm::vec3(0.0f);
 }
 
-void Mesh::Impl::CalculateBBox() {
+void Manifold::Impl::CalculateBBox() {
   bBox_.min = thrust::reduce(vertPos_.begin(), vertPos_.end(),
                              glm::vec3(1 / 0.0f), PosMin());
   bBox_.max = thrust::reduce(vertPos_.begin(), vertPos_.end(),
                              glm::vec3(-1 / 0.0f), PosMax());
 }
 
-void Mesh::Impl::SortVerts() {
+void Manifold::Impl::SortVerts() {
   VecDH<uint32_t> vertMorton(NumVert());
   thrust::for_each_n(zip(vertMorton.beginD(), vertPos_.cbeginD()), NumVert(),
                      Morton({bBox_}));
@@ -667,7 +672,7 @@ void Mesh::Impl::SortVerts() {
                    Reindex({vertOld2New.cptrD()}));
 }
 
-void Mesh::Impl::CreateEdges() {
+void Manifold::Impl::CreateEdges() {
   VecDH<EdgeVertsD> halfEdgeVerts(NumTri() * 3);
   VecDH<int> dir(NumTri() * 3);
   edgeVerts_.resize(halfEdgeVerts.size() / 2);
@@ -692,16 +697,16 @@ void Mesh::Impl::CreateEdges() {
                                                    halfEdgeVerts.endD(), 2);
   ALWAYS_ASSERT(
       thrust::equal(edgeVerts.begin(), edgeVerts.end(), edgesOdd.begin()),
-      runtimeErr, "Mesh is not manifold!");
+      runtimeErr, "Manifold is not manifold!");
   strided_range<VecDH<int>::IterD> dir1(dir.beginD(), dir.endD(), 2);
   strided_range<VecDH<int>::IterD> dir2(dir.beginD() + 1, dir.endD(), 2);
   ALWAYS_ASSERT(
       thrust::equal(dir1.begin(), dir1.end(), dir2.begin(), OpposedDir()),
-      runtimeErr, "Mesh is not oriented!");
+      runtimeErr, "Manifold is not oriented!");
 }
 
-void Mesh::Impl::SortHalfedges(VecDH<EdgeVertsD>& halfEdgeVerts,
-                               VecDH<int>& dir) {
+void Manifold::Impl::SortHalfedges(VecDH<EdgeVertsD>& halfEdgeVerts,
+                                   VecDH<int>& dir) {
   VecDH<int> halfedgeNew2Old(NumTri() * 3);
   thrust::sequence(halfedgeNew2Old.beginD(), halfedgeNew2Old.endD());
   thrust::sort_by_key(halfEdgeVerts.beginD(), halfEdgeVerts.endD(),
@@ -720,15 +725,15 @@ void Mesh::Impl::SortHalfedges(VecDH<EdgeVertsD>& halfEdgeVerts,
   }
 }
 
-VecDH<Box> Mesh::Impl::GetEdgeBox() const {
+VecDH<Box> Manifold::Impl::GetEdgeBox() const {
   VecDH<Box> edgeBox(NumEdge());
   thrust::for_each_n(zip(edgeBox.beginD(), edgeVerts_.cbeginD()), NumEdge(),
                      EdgeBox({vertPos_.cptrD()}));
   return edgeBox;
 }
 
-void Mesh::Impl::GetTriBoxMorton(VecDH<Box>& triBox,
-                                 VecDH<uint32_t>& triMorton) const {
+void Manifold::Impl::GetTriBoxMorton(VecDH<Box>& triBox,
+                                     VecDH<uint32_t>& triMorton) const {
   triBox.resize(NumTri());
   triMorton.resize(NumTri());
   thrust::for_each_n(
@@ -736,17 +741,17 @@ void Mesh::Impl::GetTriBoxMorton(VecDH<Box>& triBox,
       TriMortonBox({vertPos_.cptrD(), bBox_}));
 }
 
-void Mesh::Impl::SortTris(VecDH<Box>& triBox, VecDH<uint32_t>& triMorton) {
+void Manifold::Impl::SortTris(VecDH<Box>& triBox, VecDH<uint32_t>& triMorton) {
   thrust::sort_by_key(triMorton.beginD(), triMorton.endD(),
                       zip(triBox.beginD(), triVerts_.beginD()));
 }
 
-SparseIndices Mesh::Impl::EdgeCollisions(const Mesh::Impl& B) const {
+SparseIndices Manifold::Impl::EdgeCollisions(const Manifold::Impl& B) const {
   VecDH<Box> BedgeBB = B.GetEdgeBox();
   return collider_.Collisions(BedgeBB);
 }
 
-SparseIndices Mesh::Impl::VertexCollisionsZ(
+SparseIndices Manifold::Impl::VertexCollisionsZ(
     const VecDH<glm::vec3>& vertsIn) const {
   return collider_.Collisions(vertsIn);
 }

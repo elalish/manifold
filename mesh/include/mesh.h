@@ -13,50 +13,18 @@
 // limitations under the License.
 
 #pragma once
-#include <memory>
-#include "mesh_host.h"
+#include <glm/glm.hpp>
+#include <vector>
+#include "structs.h"
 
 namespace manifold {
 
-class Mesh {
- public:
-  Mesh();
-  Mesh(const MeshHost&);
-  static Mesh Tetrahedron();
-  static Mesh Cube();
-  static Mesh Octahedron();
-  static Mesh Sphere(int circularSegments);
-  Mesh(const std::vector<Mesh>&);
-  std::vector<Mesh> Decompose() const;
-  void Append2Host(MeshHost&) const;
-  Mesh Copy() const;
-  void Refine(int n);
-
-  int NumVert() const;
-  int NumEdge() const;
-  int NumTri() const;
-  Box BoundingBox() const;
-  bool IsValid() const;
-
-  void Translate(glm::vec3);
-  void Scale(glm::vec3);
-  void Rotate(glm::mat3);
-
-  int NumOverlaps(const Mesh& B) const;
-  enum class OpType { ADD, SUBTRACT, INTERSECT };
-  Mesh Boolean(const Mesh& second, OpType op) const;
-
-  ~Mesh();
-  Mesh(Mesh&&);
-  Mesh& operator=(Mesh&&);
-  struct Impl;
-
- private:
-  mutable std::unique_ptr<Impl> pImpl_;
-  mutable glm::mat4 transform_ = glm::mat4(1.0f);
-
-  void ApplyTransform() const;
-  Mesh(const Mesh& other);
-  Mesh& operator=(const Mesh& other);
+struct Mesh {
+  std::vector<glm::vec3> vertPos;
+  std::vector<TriVerts> triVerts;
 };
+
+Mesh ImportMesh(const std::string& filename);
+void ExportMesh(const std::string& filename, const Mesh&);
+
 }  // namespace manifold
