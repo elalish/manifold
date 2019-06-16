@@ -12,14 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "mesh.h"
 #include "gtest/gtest.h"
+#include "manifold.h"
 
 namespace {
 
 using namespace manifold;
 
-void Identical(MeshHost& mesh1, MeshHost& mesh2) {
+void Identical(Mesh& mesh1, Mesh& mesh2) {
   ASSERT_EQ(mesh1.vertPos.size(), mesh2.vertPos.size());
   for (int i = 0; i < mesh1.vertPos.size(); ++i) {
     glm::vec3 v_in = mesh1.vertPos[i];
@@ -38,15 +38,16 @@ void CheckIdx(int idx, int dir) {
   ASSERT_EQ(edge.Dir(), dir);
 }
 
-void ExpectMeshes(const Mesh& mesh,
+void ExpectMeshes(const Manifold& manifold,
                   const std::vector<std::pair<int, int>>& numVertTri) {
-  ASSERT_TRUE(mesh.IsValid());
-  std::vector<Mesh> meshes = mesh.Decompose();
+  ASSERT_TRUE(manifold.IsValid());
+  std::vector<Manifold> meshes = manifold.Decompose();
   ASSERT_EQ(meshes.size(), numVertTri.size());
-  std::sort(meshes.begin(), meshes.end(), [](const Mesh& a, const Mesh& b) {
-    return a.NumVert() != b.NumVert() ? a.NumVert() > b.NumVert()
-                                      : a.NumTri() > b.NumTri();
-  });
+  std::sort(meshes.begin(), meshes.end(),
+            [](const Manifold& a, const Manifold& b) {
+              return a.NumVert() != b.NumVert() ? a.NumVert() > b.NumVert()
+                                                : a.NumTri() > b.NumTri();
+            });
   for (int i = 0; i < meshes.size(); ++i) {
     EXPECT_TRUE(meshes[i].IsValid());
     EXPECT_EQ(meshes[i].NumVert(), numVertTri[i].first);
@@ -55,132 +56,132 @@ void ExpectMeshes(const Mesh& mesh,
 }
 }  // namespace
 
-TEST(MeshHost, EdgeIdx) {
+TEST(Mesh, EdgeIdx) {
   CheckIdx(0, 1);
   CheckIdx(0, -1);
   CheckIdx(1, 1);
   CheckIdx(1, -1);
 }
 
-TEST(MeshHost, ReadWrite) {
-  MeshHost mesh_host = ImportMesh("data/gyroidpuzzle.ply");
-  ExportMesh("data/gyroidpuzzle1.ply", mesh_host);
-  MeshHost mesh_out = ImportMesh("data/gyroidpuzzle1.ply");
-  Identical(mesh_host, mesh_out);
+TEST(Mesh, ReadWrite) {
+  Mesh mesh = ImportMesh("data/gyroidpuzzle.ply");
+  ExportMesh("data/gyroidpuzzle1.ply", mesh);
+  Mesh mesh_out = ImportMesh("data/gyroidpuzzle1.ply");
+  Identical(mesh, mesh_out);
 }
 
-TEST(Mesh, Regression) {
-  Mesh mesh(ImportMesh("data/gyroidpuzzle.ply"));
-  ASSERT_TRUE(mesh.IsValid());
+TEST(Manifold, Regression) {
+  Manifold manifold(ImportMesh("data/gyroidpuzzle.ply"));
+  ASSERT_TRUE(manifold.IsValid());
 
-  Mesh mesh1 = mesh.Copy();
+  Manifold mesh1 = manifold.Copy();
   mesh1.Translate(glm::vec3(5.0f));
-  int num_overlaps = mesh.NumOverlaps(mesh1);
+  int num_overlaps = manifold.NumOverlaps(mesh1);
   ASSERT_EQ(num_overlaps, 237472);
 
-  MeshHost mesh_out, mesh_out2;
-  mesh.Append2Host(mesh_out);
-  Mesh mesh2(mesh_out);
+  Mesh mesh_out, mesh_out2;
+  manifold.Append2Host(mesh_out);
+  Manifold mesh2(mesh_out);
   mesh2.Append2Host(mesh_out2);
   Identical(mesh_out, mesh_out2);
 }
 
-TEST(Mesh, Decompose) {
-  std::vector<Mesh> meshList;
-  meshList.push_back(Mesh::Tetrahedron());
-  meshList.push_back(Mesh::Cube());
-  meshList.push_back(Mesh::Octahedron());
-  Mesh meshes(meshList);
+TEST(Manifold, Decompose) {
+  std::vector<Manifold> meshList;
+  meshList.push_back(Manifold::Tetrahedron());
+  meshList.push_back(Manifold::Cube());
+  meshList.push_back(Manifold::Octahedron());
+  Manifold meshes(meshList);
   ASSERT_TRUE(meshes.IsValid());
 
   ExpectMeshes(meshes, {{8, 12}, {6, 8}, {4, 4}});
 }
 
-TEST(Mesh, Refine) {
+TEST(Manifold, Refine) {
   int n = 5;
-  Mesh tetra = Mesh::Tetrahedron();
+  Manifold tetra = Manifold::Tetrahedron();
   ASSERT_TRUE(tetra.IsValid());
   tetra.Refine(n);
   ASSERT_TRUE(tetra.IsValid());
   ASSERT_EQ(tetra.NumTri(), n * n * 4);
 }
 
-TEST(Mesh, Sphere) {
+TEST(Manifold, Sphere) {
   int n = 25;
-  Mesh sphere = Mesh::Sphere(4 * n);
+  Manifold sphere = Manifold::Sphere(4 * n);
   ASSERT_TRUE(sphere.IsValid());
   ASSERT_EQ(sphere.NumTri(), n * n * 8);
 }
 
-TEST(Mesh, BooleanTetra) {
-  Mesh tetra = Mesh::Tetrahedron();
+TEST(Manifold, BooleanTetra) {
+  Manifold tetra = Manifold::Tetrahedron();
   ASSERT_TRUE(tetra.IsValid());
 
-  Mesh tetra2 = tetra.Copy();
+  Manifold tetra2 = tetra.Copy();
   tetra2.Translate(glm::vec3(0.5f));
-  Mesh result = tetra2.Boolean(tetra, Mesh::OpType::SUBTRACT);
+  Manifold result = tetra2.Boolean(tetra, Manifold::OpType::SUBTRACT);
 
   ExpectMeshes(result, {{8, 12}});
 }
 
-TEST(Mesh, BooleanSphere) {
-  Mesh sphere = Mesh::Sphere(12);
-  Mesh sphere2 = sphere.Copy();
+TEST(Manifold, BooleanSphere) {
+  Manifold sphere = Manifold::Sphere(12);
+  Manifold sphere2 = sphere.Copy();
   sphere2.Translate(glm::vec3(0.5));
-  Mesh result = sphere.Boolean(sphere2, Mesh::OpType::SUBTRACT);
+  Manifold result = sphere.Boolean(sphere2, Manifold::OpType::SUBTRACT);
 
   ExpectMeshes(result, {{74, 144}});
 }
 
-TEST(Mesh, Boolean3) {
-  Mesh gyroid(ImportMesh("data/gyroidpuzzle.ply"));
+TEST(Manifold, Boolean3) {
+  Manifold gyroid(ImportMesh("data/gyroidpuzzle.ply"));
   ASSERT_TRUE(gyroid.IsValid());
 
-  Mesh gyroid2 = gyroid.Copy();
+  Manifold gyroid2 = gyroid.Copy();
   gyroid2.Translate(glm::vec3(5.0f));
-  Mesh result = gyroid.Boolean(gyroid2, Mesh::OpType::ADD);
+  Manifold result = gyroid.Boolean(gyroid2, Manifold::OpType::ADD);
 
   ExpectMeshes(result, {{31733, 63602}});
 }
 
-TEST(Mesh, BooleanSelfIntersecting) {
-  std::vector<Mesh> meshList;
-  meshList.push_back(Mesh::Tetrahedron());
-  meshList.push_back(Mesh::Tetrahedron());
+TEST(Manifold, BooleanSelfIntersecting) {
+  std::vector<Manifold> meshList;
+  meshList.push_back(Manifold::Tetrahedron());
+  meshList.push_back(Manifold::Tetrahedron());
   meshList[1].Translate(glm::vec3(0, 0, 0.25));
-  Mesh tetras(meshList);
+  Manifold tetras(meshList);
   ASSERT_TRUE(tetras.IsValid());
 
   meshList[0].Translate(glm::vec3(0, 0, 0.5f));
-  Mesh result = meshList[0].Boolean(tetras, Mesh::OpType::SUBTRACT);
+  Manifold result = meshList[0].Boolean(tetras, Manifold::OpType::SUBTRACT);
 
   ExpectMeshes(result, {{8, 12}, {4, 4}});
 }
 
-TEST(Mesh, BooleanSelfIntersectingAlt) {
-  std::vector<Mesh> meshList;
-  meshList.push_back(Mesh::Tetrahedron());
-  meshList.push_back(Mesh::Tetrahedron());
+TEST(Manifold, BooleanSelfIntersectingAlt) {
+  std::vector<Manifold> meshList;
+  meshList.push_back(Manifold::Tetrahedron());
+  meshList.push_back(Manifold::Tetrahedron());
   meshList[1].Translate(glm::vec3(0, 0, 0.5));
-  Mesh tetras(meshList);
+  Manifold tetras(meshList);
   ASSERT_TRUE(tetras.IsValid());
 
   meshList[0].Translate(glm::vec3(0, 0, -0.5f));
-  Mesh result = meshList[0].Boolean(tetras, Mesh::OpType::SUBTRACT);
+  Manifold result = meshList[0].Boolean(tetras, Manifold::OpType::SUBTRACT);
 
   ExpectMeshes(result, {{8, 12}, {4, 4}});
 }
 
-TEST(Mesh, BooleanWinding) {
-  std::vector<Mesh> meshList;
-  meshList.push_back(Mesh::Tetrahedron());
-  meshList.push_back(Mesh::Tetrahedron());
+TEST(Manifold, BooleanWinding) {
+  std::vector<Manifold> meshList;
+  meshList.push_back(Manifold::Tetrahedron());
+  meshList.push_back(Manifold::Tetrahedron());
   meshList[1].Translate(glm::vec3(0.25));
-  Mesh tetras(meshList);
+  Manifold tetras(meshList);
   ASSERT_TRUE(tetras.IsValid());
 
   meshList[0].Translate(glm::vec3(-0.25f));
-  Mesh result = tetras.Boolean(meshList[0], Mesh::OpType::SUBTRACT);
+  Manifold result = tetras.Boolean(meshList[0], Manifold::OpType::SUBTRACT);
 
   ExpectMeshes(result, {{8, 12}, {8, 12}});
 }

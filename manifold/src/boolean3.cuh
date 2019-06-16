@@ -12,19 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#pragma once
-#include <glm/glm.hpp>
-#include <vector>
-#include "structs.h"
+#include "manifold.cuh"
+#include "polygon.h"
 
 namespace manifold {
 
-struct MeshHost {
-  std::vector<glm::vec3> vertPos;
-  std::vector<TriVerts> triVerts;
+class Boolean3 {
+ public:
+  Boolean3(const Manifold::Impl& inP, const Manifold::Impl& inQ);
+  Manifold::Impl Result(Manifold::OpType op) const;
+
+ private:
+  const Manifold::Impl &inP_, &inQ_;
+  SparseIndices p1q2_, p2q1_, p2q2_;
+  VecDH<int> dir12_, dir21_, w03_, w30_;
+  VecDH<glm::vec3> v12_, v21_;
 };
-
-MeshHost ImportMesh(const std::string& filename);
-void ExportMesh(const std::string& filename, const MeshHost&);
-
 }  // namespace manifold

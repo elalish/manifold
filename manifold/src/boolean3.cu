@@ -1,3 +1,17 @@
+// Copyright 2019 Emmett Lalish
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 #include "boolean3.cuh"
 #include "connected_components.cuh"
 
@@ -110,7 +124,7 @@ struct CopyTriEdges {
   }
 };
 
-SparseIndices Filter02(const Mesh::Impl &inP, const Mesh::Impl &inQ,
+SparseIndices Filter02(const Manifold::Impl &inP, const Manifold::Impl &inQ,
                        const VecDH<int> &edges, const VecDH<int> &tris) {
   // find one vertex from each connected component of inP (in case it has no
   // intersections)
@@ -155,7 +169,7 @@ struct Fill11 {
   }
 };
 
-SparseIndices Filter11(const Mesh::Impl &inP, const Mesh::Impl &inQ,
+SparseIndices Filter11(const Manifold::Impl &inP, const Manifold::Impl &inQ,
                        const SparseIndices &p1q2, const SparseIndices &p2q1) {
   SparseIndices p1q1(3 * p1q2.size() + 3 * p2q1.size());
   thrust::for_each_n(
@@ -171,7 +185,7 @@ SparseIndices Filter11(const Mesh::Impl &inP, const Mesh::Impl &inQ,
   return p1q1;
 }
 
-SparseIndices Filter01(const Mesh::Impl &inP, const Mesh::Impl &inQ,
+SparseIndices Filter01(const Manifold::Impl &inP, const Manifold::Impl &inQ,
                        const SparseIndices &p0q2, const SparseIndices &p1q1) {
   SparseIndices p0q1(3 * p0q2.size() + 2 * p1q1.size());
   // Copy vertices
@@ -254,8 +268,8 @@ struct Kernel01 {
 };
 
 std::tuple<VecDH<int>, VecDH<glm::vec2>> Shadow01(SparseIndices &p0q1,
-                                                  const Mesh::Impl &inP,
-                                                  const Mesh::Impl &inQ,
+                                                  const Manifold::Impl &inP,
+                                                  const Manifold::Impl &inQ,
                                                   bool reverse) {
   // TODO: remove reverse once symbolic perturbation is updated to be per-vertex
   VecDH<int> s01(p0q1.size());
@@ -401,7 +415,7 @@ struct Kernel11 {
 };
 
 std::tuple<VecDH<int>, VecDH<glm::vec4>> Shadow11(
-    SparseIndices &p1q1, const Mesh::Impl &inP, const Mesh::Impl &inQ,
+    SparseIndices &p1q1, const Manifold::Impl &inP, const Manifold::Impl &inQ,
     const SparseIndices &p0q1, const VecDH<int> &s01,
     const VecDH<glm::vec2> &yz01, const SparseIndices &p1q0,
     const VecDH<int> &s10, const VecDH<glm::vec2> &yz10) {
@@ -498,7 +512,7 @@ struct Kernel02 {
 };
 
 std::tuple<VecDH<int>, VecDH<float>> Shadow02(
-    const VecDH<glm::vec3> &vertPosP, const Mesh::Impl &inQ,
+    const VecDH<glm::vec3> &vertPosP, const Manifold::Impl &inQ,
     const VecDH<int> &s01, const SparseIndices &p0q1,
     const VecDH<glm::vec2> &yz01, SparseIndices &p0q2, bool forward) {
   VecDH<int> s02(p0q2.size(), 0);
@@ -627,7 +641,7 @@ struct Kernel12 {
 };
 
 std::tuple<VecDH<int>, VecDH<glm::vec3>> Intersect12(
-    const Mesh::Impl &inP, const Mesh::Impl &inQ, const VecDH<int> &s02,
+    const Manifold::Impl &inP, const Manifold::Impl &inQ, const VecDH<int> &s02,
     const SparseIndices &p0q2, const VecDH<int> &s11, const SparseIndices &p1q1,
     const VecDH<float> &z02, const VecDH<glm::vec4> &xyzz11,
     SparseIndices &p1q2, bool forward) {
@@ -670,7 +684,7 @@ struct AssignZeros {
   }
 };
 
-VecDH<int> Winding03(const Mesh::Impl &inP, SparseIndices &p0q2,
+VecDH<int> Winding03(const Manifold::Impl &inP, SparseIndices &p0q2,
                      VecDH<int> &s02, const SparseIndices &p1q2, bool reverse) {
   VecDH<int> w03(inP.NumVert(), kInvalidInt);
   VecDH<bool> keepEdgesA(inP.NumEdge(), true);
@@ -705,7 +719,7 @@ VecDH<int> Winding03(const Mesh::Impl &inP, SparseIndices &p0q2,
   return w03;
 };
 
-SparseIndices Intersect22(const Mesh::Impl &inP, const Mesh::Impl &inQ,
+SparseIndices Intersect22(const Manifold::Impl &inP, const Manifold::Impl &inQ,
                           const SparseIndices &p1q2, const SparseIndices &p2q1,
                           const VecDH<int> &dir12, const VecDH<int> &dir21) {
   SparseIndices p2q2(2 * (p1q2.size() + p2q1.size()));
@@ -768,7 +782,7 @@ struct DuplicateVerts {
 
 void AppendRetainedFaces(VecDH<TriVerts> &triVerts, VecDH<int> p12,
                          VecDH<int> p21, const VecDH<int> &i03,
-                         const VecDH<int> &vP2R, const Mesh::Impl &inP) {
+                         const VecDH<int> &vP2R, const Manifold::Impl &inP) {
   // keepTriP is a list of the triangle indicies of P which does not include the
   // triangles that intersect edges of Q.
   VecDH<int> keepTriP(inP.NumTri());
@@ -849,7 +863,7 @@ std::vector<EdgeVerts> PairUp(std::vector<VertsPos> &vertsPos) {
 int Signum(int x) { return (x > 0) - (x < 0); }
 
 void AppendRetainedEdges(std::vector<std::vector<EdgeVerts>> &faces,
-                         const Mesh::Impl &inP, const VecDH<int> &i03,
+                         const Manifold::Impl &inP, const VecDH<int> &i03,
                          const VecDH<int> &i12, const VecDH<int> &p12,
                          const VecDH<bool> &intersectedTriP,
                          const VecDH<glm::vec3> &vertPos,
@@ -965,7 +979,7 @@ void AppendNewEdges(std::vector<std::vector<EdgeVerts>> &facesP,
 void AppendIntersectedFaces(VecDH<TriVerts> &triVerts,
                             const VecDH<glm::vec3> &vertPos,
                             const std::vector<std::vector<EdgeVerts>> &facesP,
-                            const Mesh::Impl &inP) {
+                            const Manifold::Impl &inP) {
   for (int i = 0; i < facesP.size(); ++i) {
     auto &face = facesP[i];
     switch (face.size()) {
@@ -1049,7 +1063,7 @@ void CheckPreTriangulationManfold(
 
 namespace manifold {
 
-Boolean3::Boolean3(const Mesh::Impl &inP, const Mesh::Impl &inQ)
+Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ)
     : inP_(inP), inQ_(inQ) {
   // TODO: new symbolic perturbation:
   // Union -> expand inP
@@ -1156,20 +1170,20 @@ Boolean3::Boolean3(const Mesh::Impl &inP, const Mesh::Impl &inQ)
   p2q2_ = Intersect22(inP_, inQ_, p1q2_, p2q1_, dir12_, dir21_);
 }
 
-Mesh::Impl Boolean3::Result(Mesh::OpType op) const {
+Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
   int c1, c2, c3;
   switch (op) {
-    case Mesh::OpType::ADD:
+    case Manifold::OpType::ADD:
       c1 = 1;
       c2 = 1;
       c3 = -1;
       break;
-    case Mesh::OpType::SUBTRACT:
+    case Manifold::OpType::SUBTRACT:
       c1 = 1;
       c2 = 0;
       c3 = -1;
       break;
-    case Mesh::OpType::INTERSECT:
+    case Manifold::OpType::INTERSECT:
       c1 = 0;
       c2 = 0;
       c3 = 1;
@@ -1207,7 +1221,7 @@ Mesh::Impl Boolean3::Result(Mesh::OpType op) const {
   int n21 = v21_.size();
 
   // Create the output Manifold
-  Mesh::Impl outR;
+  Manifold::Impl outR;
 
   outR.vertPos_.resize(nPv + nQv + n12 + n21);
   // Add retained vertices, duplicating for inclusion numbers not in [-1, 1].
