@@ -28,7 +28,7 @@ using namespace manifold;
 
 struct VertAdj {
   glm::vec2 pos;
-  int mesh_idx;             // this is a global index into the mesh
+  int mesh_idx;             // this is a global index into the manifold
   int right, left, across;  // these are local indices within this vector
   bool merge;
   bool Processed() const { return across >= 0; }

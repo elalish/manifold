@@ -13,7 +13,7 @@
 // limitations under the License.
 
 #include <iostream>
-#include "mesh.h"
+#include "manifold.h"
 
 using namespace manifold;
 
@@ -21,9 +21,9 @@ int main(int argc, char **argv) {
   std::string filename = "tetra.ply";
   if (argc > 1) filename = argv[1];
 
-  MeshHost mesh_host = ImportMesh(filename);
-  Mesh mesh(mesh_host);
-  std::cout << "Mesh is ";
-  if (!mesh.IsValid()) std::cout << "NOT " << std::endl;
+  Mesh mesh = ImportMesh(filename);
+  Manifold manifold(mesh);
+  std::cout << "Manifold is ";
+  if (!manifold.IsValid()) std::cout << "NOT " << std::endl;
   std::cout << "valid" << std::endl;
 }

@@ -14,7 +14,7 @@
 
 #pragma once
 #include "collider.cuh"
-#include "mesh.h"
+#include "manifold.h"
 #include "sparse.cuh"
 #include "utils.cuh"
 #include "vec_dh.cuh"
@@ -30,7 +30,7 @@ inline std::ostream& operator<<(std::ostream& stream, const EdgeVertsD& edge) {
   return stream << edge.first << ", " << edge.second;
 }
 
-struct Mesh::Impl {
+struct Manifold::Impl {
   Box bBox_;
   VecDH<glm::vec3> vertPos_;
   VecDH<EdgeVertsD> edgeVerts_;
@@ -40,11 +40,11 @@ struct Mesh::Impl {
   Collider collider_;
 
   Impl() {}
-  Impl(const MeshHost&);
+  Impl(const Mesh&);
   enum class Shape { TETRAHEDRON, CUBE, OCTAHEDRON };
   Impl(Shape);
   void Finish();
-  void Append2Host(MeshHost&) const;
+  void Append2Host(Mesh&) const;
   void Transform(const glm::mat4&);
   void TranslateScale(const glm::mat4&);
   bool IsValid() const;
@@ -62,7 +62,7 @@ struct Mesh::Impl {
   void GetTriBoxMorton(VecDH<Box>& triBox, VecDH<uint32_t>& triMorton) const;
   void SortTris(VecDH<Box>& triBox, VecDH<uint32_t>& triMorton);
 
-  SparseIndices EdgeCollisions(const Mesh::Impl& B) const;
+  SparseIndices EdgeCollisions(const Manifold::Impl& B) const;
   SparseIndices VertexCollisionsZ(const VecDH<glm::vec3>& vertsIn) const;
 };
 }  // namespace manifold
