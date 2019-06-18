@@ -74,7 +74,7 @@ TEST(Manifold, Regression) {
   Manifold manifold(ImportMesh("data/gyroidpuzzle.ply"));
   ASSERT_TRUE(manifold.IsValid());
 
-  Manifold mesh1 = manifold.Copy();
+  Manifold mesh1 = manifold.DeepCopy();
   mesh1.Translate(glm::vec3(5.0f));
   int num_overlaps = manifold.NumOverlaps(mesh1);
   ASSERT_EQ(num_overlaps, 237472);
@@ -97,15 +97,6 @@ TEST(Manifold, Decompose) {
   ExpectMeshes(meshes, {{8, 12}, {6, 8}, {4, 4}});
 }
 
-TEST(Manifold, Refine) {
-  int n = 5;
-  Manifold tetra = Manifold::Tetrahedron();
-  ASSERT_TRUE(tetra.IsValid());
-  tetra.Refine(n);
-  ASSERT_TRUE(tetra.IsValid());
-  ASSERT_EQ(tetra.NumTri(), n * n * 4);
-}
-
 TEST(Manifold, Sphere) {
   int n = 25;
   Manifold sphere = Manifold::Sphere(4 * n);
@@ -117,18 +108,49 @@ TEST(Manifold, BooleanTetra) {
   Manifold tetra = Manifold::Tetrahedron();
   ASSERT_TRUE(tetra.IsValid());
 
-  Manifold tetra2 = tetra.Copy();
+  Manifold tetra2 = tetra.DeepCopy();
   tetra2.Translate(glm::vec3(0.5f));
-  Manifold result = tetra2.Boolean(tetra, Manifold::OpType::SUBTRACT);
+  Manifold result = tetra2 - tetra;
 
   ExpectMeshes(result, {{8, 12}});
 }
 
+TEST(Manifold, Volume) {
+  Manifold cube = Manifold::Cube();
+  ASSERT_TRUE(cube.IsValid());
+  float vol = cube.Volume();
+  EXPECT_FLOAT_EQ(vol, 8.0f);
+
+  cube.Scale(glm::vec3(-1.0f));
+  vol = cube.Volume();
+  EXPECT_FLOAT_EQ(vol, -8.0f);
+}
+
+TEST(Manifold, SurfaceArea) {
+  Manifold cube = Manifold::Cube();
+  ASSERT_TRUE(cube.IsValid());
+  float area = cube.SurfaceArea();
+  EXPECT_FLOAT_EQ(area, 24.0f);
+
+  cube.Scale(glm::vec3(-1.0f));
+  area = cube.SurfaceArea();
+  EXPECT_FLOAT_EQ(area, 24.0f);
+}
+
+TEST(Manifold, DISABLED_Split) {
+  Manifold cube = Manifold::Cube();
+  Manifold oct = Manifold::Octahedron();
+  oct.Translate(glm::vec3(0.0f, 0.0f, 1.0f));
+  std::pair<Manifold, Manifold> splits = cube.Split(oct);
+  EXPECT_FLOAT_EQ(splits.first.Volume() + splits.second.Volume(),
+                  cube.Volume());
+}
+
 TEST(Manifold, BooleanSphere) {
   Manifold sphere = Manifold::Sphere(12);
-  Manifold sphere2 = sphere.Copy();
+  Manifold sphere2 = sphere.DeepCopy();
   sphere2.Translate(glm::vec3(0.5));
-  Manifold result = sphere.Boolean(sphere2, Manifold::OpType::SUBTRACT);
+  Manifold result = sphere - sphere2;
 
   ExpectMeshes(result, {{74, 144}});
 }
@@ -137,9 +159,9 @@ TEST(Manifold, Boolean3) {
   Manifold gyroid(ImportMesh("data/gyroidpuzzle.ply"));
   ASSERT_TRUE(gyroid.IsValid());
 
-  Manifold gyroid2 = gyroid.Copy();
+  Manifold gyroid2 = gyroid.DeepCopy();
   gyroid2.Translate(glm::vec3(5.0f));
-  Manifold result = gyroid.Boolean(gyroid2, Manifold::OpType::ADD);
+  Manifold result = gyroid + gyroid2;
 
   ExpectMeshes(result, {{31733, 63602}});
 }
@@ -153,7 +175,7 @@ TEST(Manifold, BooleanSelfIntersecting) {
   ASSERT_TRUE(tetras.IsValid());
 
   meshList[0].Translate(glm::vec3(0, 0, 0.5f));
-  Manifold result = meshList[0].Boolean(tetras, Manifold::OpType::SUBTRACT);
+  Manifold result = meshList[0] - tetras;
 
   ExpectMeshes(result, {{8, 12}, {4, 4}});
 }
@@ -167,7 +189,7 @@ TEST(Manifold, BooleanSelfIntersectingAlt) {
   ASSERT_TRUE(tetras.IsValid());
 
   meshList[0].Translate(glm::vec3(0, 0, -0.5f));
-  Manifold result = meshList[0].Boolean(tetras, Manifold::OpType::SUBTRACT);
+  Manifold result = meshList[0] - tetras;
 
   ExpectMeshes(result, {{8, 12}, {4, 4}});
 }
@@ -181,7 +203,7 @@ TEST(Manifold, BooleanWinding) {
   ASSERT_TRUE(tetras.IsValid());
 
   meshList[0].Translate(glm::vec3(-0.25f));
-  Manifold result = tetras.Boolean(meshList[0], Manifold::OpType::SUBTRACT);
+  Manifold result = tetras - meshList[0];
 
   ExpectMeshes(result, {{8, 12}, {8, 12}});
 }
