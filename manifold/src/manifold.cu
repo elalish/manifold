@@ -38,6 +38,26 @@ struct Equals {
   __host__ __device__ bool operator()(int x) { return x == val; }
 };
 
+struct TetVolume {
+  const glm::vec3* vertPos;
+
+  __host__ __device__ float operator()(const TriVerts& triVerts) {
+    return glm::dot(vertPos[triVerts[0]],
+                    glm::cross(vertPos[triVerts[1]], vertPos[triVerts[2]])) /
+           6;
+  }
+};
+
+struct TriArea {
+  const glm::vec3* vertPos;
+
+  __host__ __device__ float operator()(const TriVerts& triVerts) {
+    return 0.5 *
+           glm::length(glm::cross(vertPos[triVerts[1]] - vertPos[triVerts[0]],
+                                  vertPos[triVerts[2]] - vertPos[triVerts[0]]));
+  }
+};
+
 struct KeepTri {
   int val;
   const int* components;
@@ -370,7 +390,7 @@ Manifold Manifold::Sphere(int circularSegments) {
   int n = (circularSegments + 3) / 4;
   Manifold sphere;
   sphere.pImpl_ = std::make_unique<Impl>(Manifold::Impl::Shape::OCTAHEDRON);
-  sphere.Refine(n);
+  sphere.pImpl_->Refine(n);
   thrust::for_each_n(sphere.pImpl_->vertPos_.beginD(), sphere.NumVert(),
                      Normalize());
   sphere.pImpl_->Finish();
@@ -396,7 +416,7 @@ void Manifold::Append2Host(Mesh& manifold) const {
   pImpl_->Append2Host(manifold);
 }
 
-Manifold Manifold::Copy() const { return *this; }
+Manifold Manifold::DeepCopy() const { return *this; }
 
 std::vector<Manifold> Manifold::Decompose() const {
   VecDH<int> components;
@@ -445,37 +465,29 @@ std::vector<Manifold> Manifold::Decompose() const {
   return meshes;
 }
 
-void Manifold::Refine(int n) {
-  int numVert = NumVert();
-  int numEdge = NumEdge();
-  int numTri = NumTri();
-  // Append new verts
-  int vertsPerEdge = n - 1;
-  int vertsPerTri = ((n - 2) * (n - 2) + (n - 2)) / 2;
-  int triVertStart = numVert + numEdge * vertsPerEdge;
-  pImpl_->vertPos_.resize(triVertStart + numTri * vertsPerTri);
-  thrust::for_each_n(
-      zip(thrust::make_counting_iterator(0), pImpl_->edgeVerts_.beginD()),
-      numEdge, SplitEdges({pImpl_->vertPos_.ptrD(), numVert, n}));
-  thrust::for_each_n(
-      zip(thrust::make_counting_iterator(0), pImpl_->triVerts_.beginD()),
-      numTri, InteriorVerts({pImpl_->vertPos_.ptrD(), triVertStart, n}));
-  // Create subtriangles
-  VecDH<TriVerts> inTri(pImpl_->triVerts_);
-  pImpl_->triVerts_.resize(n * n * numTri);
-  thrust::for_each_n(
-      zip(thrust::make_counting_iterator(0), inTri.beginD(),
-          pImpl_->triEdges_.beginD()),
-      numTri, SplitTris({pImpl_->triVerts_.ptrD(), numVert, triVertStart, n}));
-  pImpl_->Finish();
-}
-
 int Manifold::NumVert() const { return pImpl_->NumVert(); }
 int Manifold::NumEdge() const { return pImpl_->NumEdge(); }
 int Manifold::NumTri() const { return pImpl_->NumTri(); }
+
 Box Manifold::BoundingBox() const {
   return pImpl_->bBox_.Transform(transform_);
 }
+
+float Manifold::Volume() const {
+  ApplyTransform();
+  return thrust::transform_reduce(
+      pImpl_->triVerts_.beginD(), pImpl_->triVerts_.endD(),
+      TetVolume({pImpl_->vertPos_.ptrD()}), 0.0f, thrust::plus<float>());
+}
+
+float Manifold::SurfaceArea() const {
+  ApplyTransform();
+  return thrust::transform_reduce(
+      pImpl_->triVerts_.beginD(), pImpl_->triVerts_.endD(),
+      TriArea({pImpl_->vertPos_.ptrD()}), 0.0f, thrust::plus<float>());
+}
+
+bool Manifold::IsValid() const { return pImpl_->IsValid(); }
 
 void Manifold::Translate(glm::vec3 v) { transform_[3] += glm::vec4(v, 0.0f); }
 
@@ -486,8 +498,6 @@ void Manifold::Scale(glm::vec3 v) {
 }
 
 void Manifold::Rotate(glm::mat3 r) { transform_ *= glm::mat4(r); }
-
-bool Manifold::IsValid() const { return pImpl_->IsValid(); }
 
 int Manifold::NumOverlaps(const Manifold& B) const {
   ApplyTransform();
@@ -506,6 +516,30 @@ Manifold Manifold::Boolean(const Manifold& second, OpType op) const {
   Boolean3 boolean(*pImpl_, *second.pImpl_);
   Manifold result;
   result.pImpl_ = std::make_unique<Impl>(boolean.Result(op));
+  return result;
+}
+
+Manifold Manifold::operator+(const Manifold& Q) const {
+  return Boolean(Q, OpType::ADD);
+}
+
+Manifold Manifold::operator-(const Manifold& Q) const {
+  return Boolean(Q, OpType::SUBTRACT);
+}
+
+Manifold Manifold::operator^(const Manifold& Q) const {
+  return Boolean(Q, OpType::INTERSECT);
+}
+
+std::pair<Manifold, Manifold> Manifold::Split(const Manifold& cutter) const {
+  ApplyTransform();
+  cutter.ApplyTransform();
+  Boolean3 boolean(*pImpl_, *cutter.pImpl_);
+  std::pair<Manifold, Manifold> result;
+  result.first.pImpl_ =
+      std::make_unique<Impl>(boolean.Result(OpType::INTERSECT));
+  result.second.pImpl_ =
+      std::make_unique<Impl>(boolean.Result(OpType::SUBTRACT));
   return result;
 }
 
@@ -533,14 +567,14 @@ Manifold::Impl::Impl(Shape shape) {
   std::vector<glm::vec3> vertPos;
   std::vector<TriVerts> triVerts;
   switch (shape) {
-    case Manifold::Impl::Shape::TETRAHEDRON:
+    case Shape::TETRAHEDRON:
       vertPos = {{-1.0f, -1.0f, 1.0f},
                  {-1.0f, 1.0f, -1.0f},
                  {1.0f, -1.0f, -1.0f},
                  {1.0f, 1.0f, 1.0f}};
       triVerts = {{2, 0, 1}, {0, 3, 1}, {2, 3, 0}, {3, 2, 1}};
       break;
-    case Manifold::Impl::Shape::CUBE:
+    case Shape::CUBE:
       vertPos = {{-1.0f, -1.0f, -1.0f},  //
                  {1.0f, -1.0f, -1.0f},   //
                  {1.0f, 1.0f, -1.0f},    //
@@ -556,7 +590,7 @@ Manifold::Impl::Impl(Shape shape) {
                   {2, 3, 7}, {2, 7, 6},  //
                   {3, 0, 4}, {3, 4, 7}};
       break;
-    case Manifold::Impl::Shape::OCTAHEDRON:
+    case Shape::OCTAHEDRON:
       vertPos = {{1.0f, 0.0f, 0.0f},   //
                  {-1.0f, 0.0f, 0.0f},  //
                  {0.0f, 1.0f, 0.0f},   //
@@ -631,6 +665,32 @@ void Manifold::Impl::TranslateScale(const glm::mat4& T) {
   bBox_ += translate;
   collider_.Scale(scale);
   collider_.Translate(translate);
+}
+
+void Manifold::Impl::Refine(int n) {
+  // This function doesn't run Finish(), as that is expensive and it'll need to
+  // be run after the new vertices have moved, which is a likely scenario after
+  // refinement (smoothing).
+  int numVert = NumVert();
+  int numEdge = NumEdge();
+  int numTri = NumTri();
+  // Append new verts
+  int vertsPerEdge = n - 1;
+  int vertsPerTri = ((n - 2) * (n - 2) + (n - 2)) / 2;
+  int triVertStart = numVert + numEdge * vertsPerEdge;
+  vertPos_.resize(triVertStart + numTri * vertsPerTri);
+  thrust::for_each_n(
+      zip(thrust::make_counting_iterator(0), edgeVerts_.beginD()), numEdge,
+      SplitEdges({vertPos_.ptrD(), numVert, n}));
+  thrust::for_each_n(zip(thrust::make_counting_iterator(0), triVerts_.beginD()),
+                     numTri, InteriorVerts({vertPos_.ptrD(), triVertStart, n}));
+  // Create subtriangles
+  VecDH<TriVerts> inTri(triVerts_);
+  triVerts_.resize(n * n * numTri);
+  thrust::for_each_n(zip(thrust::make_counting_iterator(0), inTri.beginD(),
+                         triEdges_.beginD()),
+                     numTri,
+                     SplitTris({triVerts_.ptrD(), numVert, triVertStart, n}));
 }
 
 bool Manifold::Impl::IsValid() const {
