@@ -29,22 +29,30 @@ class Manifold {
   Manifold(const std::vector<Manifold>&);
   std::vector<Manifold> Decompose() const;
   void Append2Host(Mesh&) const;
-  Manifold Copy() const;
-  void Refine(int n);
+  Manifold DeepCopy() const;
 
   int NumVert() const;
   int NumEdge() const;
   int NumTri() const;
   Box BoundingBox() const;
+  float Volume() const;
+  float SurfaceArea() const;
   bool IsValid() const;
 
   void Translate(glm::vec3);
   void Scale(glm::vec3);
   void Rotate(glm::mat3);
 
-  int NumOverlaps(const Manifold& B) const;
+  int NumOverlaps(const Manifold& second) const;
   enum class OpType { ADD, SUBTRACT, INTERSECT };
   Manifold Boolean(const Manifold& second, OpType op) const;
+  // Boolean operation shorthand
+  Manifold operator+(const Manifold&) const;  // ADD (Union)
+  Manifold operator-(const Manifold&) const;  // SUBTRACT (Difference)
+  Manifold operator^(const Manifold&) const;  // INTERSECT
+  // First result is the intersection, second is the difference. This is more
+  // efficient than doing them separately.
+  std::pair<Manifold, Manifold> Split(const Manifold&) const;
 
   ~Manifold();
   Manifold(Manifold&&);
@@ -52,10 +60,11 @@ class Manifold {
   struct Impl;
 
  private:
-  mutable std::unique_ptr<Impl> pImpl_;
+  std::unique_ptr<Impl> pImpl_;
   mutable glm::mat4 transform_ = glm::mat4(1.0f);
 
   void ApplyTransform() const;
+  // Implicit copy is private because it is expensive; use DeepCopy() above.
   Manifold(const Manifold& other);
   Manifold& operator=(const Manifold& other);
 };
