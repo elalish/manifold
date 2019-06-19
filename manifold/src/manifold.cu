@@ -16,6 +16,7 @@
 #include <thrust/logical.h>
 #include <thrust/sequence.h>
 #include <thrust/sort.h>
+#include <thrust/transform_reduce.h>
 #include <algorithm>
 
 #include "boolean3.cuh"
