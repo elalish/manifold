@@ -137,7 +137,7 @@ TEST(Manifold, SurfaceArea) {
   EXPECT_FLOAT_EQ(area, 24.0f);
 }
 
-TEST(Manifold, DISABLED_Split) {
+TEST(Manifold, Split) {
   Manifold cube = Manifold::Cube();
   Manifold oct = Manifold::Octahedron();
   oct.Translate(glm::vec3(0.0f, 0.0f, 1.0f));

@@ -236,11 +236,10 @@ struct ShadowKernel01 {
     int vertP = thrust::get<1>(inout);
     EdgeVertsD edgeVertsQ = thrust::get<2>(inout);
 
-    s01 = reverse
-              ? (vertPosQ[edgeVertsQ.first].x <= vertPosP[vertP].x) -
-                    (vertPosQ[edgeVertsQ.second].x <= vertPosP[vertP].x)
-              : (vertPosQ[edgeVertsQ.second].x >= vertPosP[vertP].x) -
-                    (vertPosQ[edgeVertsQ.first].x >= vertPosP[vertP].x);
+    s01 = reverse ? (vertPosQ[edgeVertsQ.first].x <= vertPosP[vertP].x) -
+                        (vertPosQ[edgeVertsQ.second].x <= vertPosP[vertP].x)
+                  : (vertPosQ[edgeVertsQ.second].x >= vertPosP[vertP].x) -
+                        (vertPosQ[edgeVertsQ.first].x >= vertPosP[vertP].x);
   }
 };
 
@@ -292,6 +291,7 @@ template <typename Val>
 __host__ __device__ Val BinarySearchByKey(
     const thrust::pair<const int *, const int *> keys, const Val *vals,
     const int size, const thrust::pair<int, int> key, const Val missingVal) {
+  if (size <= 0) return missingVal;
   int left = 0;
   int right = size - 1;
   int m;
@@ -519,8 +519,9 @@ std::tuple<VecDH<int>, VecDH<float>> Shadow02(
 
   thrust::for_each_n(
       zip(s02.beginD(), p0q2.beginD(!forward), p0q2.beginD(forward)),
-      p0q2.size(), Gather02({p0q1.ptrDpq(), s01.ptrD(), p0q1.size(),
-                             inQ.triEdges_.ptrD(), forward}));
+      p0q2.size(),
+      Gather02({p0q1.ptrDpq(), s01.ptrD(), p0q1.size(), inQ.triEdges_.ptrD(),
+                forward}));
 
   size_t size = p0q2.RemoveZeros(s02);
   VecDH<float> z02(size);
@@ -662,9 +663,10 @@ std::tuple<VecDH<int>, VecDH<glm::vec3>> Intersect12(
   auto vertPosPtr = forward ? inP.vertPos_.ptrD() : inQ.vertPos_.ptrD();
   thrust::for_each_n(
       zip(v12.beginD(), p1q2.beginD(!forward), p1q2.beginD(forward)),
-      p1q2.size(), Kernel12({p0q2.ptrDpq(), z02.ptrD(), p0q2.size(),
-                             p1q1.ptrDpq(), xyzz11.ptrD(), p1q1.size(),
-                             edgeVertsPtr, triEdgesPtr, vertPosPtr, forward}));
+      p1q2.size(),
+      Kernel12({p0q2.ptrDpq(), z02.ptrD(), p0q2.size(), p1q1.ptrDpq(),
+                xyzz11.ptrD(), p1q1.size(), edgeVertsPtr, triEdgesPtr,
+                vertPosPtr, forward}));
   return std::make_tuple(x12, v12);
 };
 
