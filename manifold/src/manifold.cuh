@@ -47,6 +47,7 @@ struct Manifold::Impl {
   void Append2Host(Mesh&) const;
   void Transform(const glm::mat4&);
   void TranslateScale(const glm::mat4&);
+  void Refine(int n);
   bool IsValid() const;
 
   int NumVert() const { return vertPos_.size(); }
@@ -62,7 +63,7 @@ struct Manifold::Impl {
   void GetTriBoxMorton(VecDH<Box>& triBox, VecDH<uint32_t>& triMorton) const;
   void SortTris(VecDH<Box>& triBox, VecDH<uint32_t>& triMorton);
 
-  SparseIndices EdgeCollisions(const Manifold::Impl& B) const;
+  SparseIndices EdgeCollisions(const Impl& B) const;
   SparseIndices VertexCollisionsZ(const VecDH<glm::vec3>& vertsIn) const;
 };
 }  // namespace manifold
