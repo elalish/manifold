@@ -105,7 +105,7 @@ class Monotones {
                     "monotone vert neighbors don't agree!");
     }
     Polygons polys = Assemble(edges);
-    Dump(polys);
+    if (kVerbose) Dump(polys);
   }
 
  private:
@@ -501,11 +501,10 @@ void CheckManifold(const std::vector<TriVerts> &triangles,
 }
 
 void Dump(const Polygons &polys) {
-  for (const SimplePolygon &poly : polys) {
-    if (kVerbose) std::cout << "next poly" << std::endl;
-    for (const PolyVert &v : poly) {
-      if (kVerbose)
-        std::cout << v.pos.x << ", " << v.pos.y << ", " << v.idx << std::endl;
+  for (auto poly : polys) {
+    std::cout << "next poly" << std::endl;
+    for (auto v : poly) {
+      std::cout << v.pos.x << ", " << v.pos.y << ", " << v.idx << std::endl;
     }
   }
 }
