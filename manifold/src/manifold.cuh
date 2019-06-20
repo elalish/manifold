@@ -45,6 +45,7 @@ struct Manifold::Impl {
   Impl(Shape);
   void Finish();
   void Append2Host(Mesh&) const;
+  void Update();
   void Transform(const glm::mat4&);
   void TranslateScale(const glm::mat4&);
   void Refine(int n);

@@ -38,10 +38,12 @@ class Manifold {
   float Volume() const;
   float SurfaceArea() const;
   bool IsValid() const;
+  std::vector<glm::vec3> GetVerts() const;
 
   void Translate(glm::vec3);
   void Scale(glm::vec3);
   void Rotate(glm::mat3);
+  void SetVerts(const std::vector<glm::vec3>& vertPos);
 
   int NumOverlaps(const Manifold& second) const;
   enum class OpType { ADD, SUBTRACT, INTERSECT };

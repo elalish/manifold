@@ -490,6 +490,14 @@ float Manifold::SurfaceArea() const {
 
 bool Manifold::IsValid() const { return pImpl_->IsValid(); }
 
+std::vector<glm::vec3> Manifold::GetVerts() const {
+  ApplyTransform();
+  std::vector<glm::vec3> vertPos(NumVert());
+  thrust::copy(pImpl_->vertPos_.begin(), pImpl_->vertPos_.end(),
+               vertPos.begin());
+  return vertPos;
+}
+
 void Manifold::Translate(glm::vec3 v) { transform_[3] += glm::vec4(v, 0.0f); }
 
 void Manifold::Scale(glm::vec3 v) {
@@ -499,6 +507,13 @@ void Manifold::Scale(glm::vec3 v) {
 }
 
 void Manifold::Rotate(glm::mat3 r) { transform_ *= glm::mat4(r); }
+
+void Manifold::SetVerts(const std::vector<glm::vec3>& vertPos) {
+  ALWAYS_ASSERT(vertPos.size() == NumVert(), runtimeErr,
+                "Must supply the same number of vertices as the manifold has!");
+  thrust::copy(vertPos.begin(), vertPos.end(), pImpl_->vertPos_.begin());
+  pImpl_->Update();
+}
 
 int Manifold::NumOverlaps(const Manifold& B) const {
   ApplyTransform();
@@ -641,13 +656,17 @@ void Manifold::Impl::Append2Host(Mesh& pImpl_out) const {
                            vertPos_.end());
 }
 
-void Manifold::Impl::Transform(const glm::mat4& T) {
-  thrust::for_each(vertPos_.beginD(), vertPos_.endD(), Transform3({T}));
+void Manifold::Impl::Update() {
   CalculateBBox();
   VecDH<Box> triBox;
   VecDH<uint32_t> triMorton;
   GetTriBoxMorton(triBox, triMorton);
   collider_.UpdateBoxes(triBox);
+}
+
+void Manifold::Impl::Transform(const glm::mat4& T) {
+  thrust::for_each(vertPos_.beginD(), vertPos_.endD(), Transform3({T}));
+  Update();
 }
 
 void Manifold::Impl::TranslateScale(const glm::mat4& T) {
