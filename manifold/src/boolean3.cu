@@ -1018,25 +1018,8 @@ void AppendIntersectedFaces(VecDH<TriVerts> &triVerts,
             v.pos = glm::transpose(projection) * vertPos.H()[v.idx];
           }
         }
-        std::vector<TriVerts> newFaces;
-        Triangulate(newFaces, polys);
-
-        for (auto tri : newFaces) triVerts.H().push_back(tri);
-
-        // check triangulation (DEBUG)
-        try {
-          CheckManifold(newFaces, polys);
-        } catch (const runtimeErr &e) {
-          std::cout << "Triangulation of face " << i << " has a problem!"
-                    << std::endl;
-          Dump(polys);
-          std::cout << "produced this triangulation:" << std::endl;
-          for (int j = 0; j < newFaces.size(); ++j) {
-            std::cout << newFaces[j][0] << ", " << newFaces[j][1] << ", "
-                      << newFaces[j][2] << std::endl;
-          }
-          throw e;
-        }
+        std::vector<TriVerts> newTris = Triangulate(polys);
+        for (auto tri : newTris) triVerts.H().push_back(tri);
       }
     }
   }
