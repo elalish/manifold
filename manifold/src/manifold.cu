@@ -500,6 +500,12 @@ void Manifold::Scale(glm::vec3 v) {
 
 void Manifold::Rotate(glm::mat3 r) { transform_ *= glm::mat4(r); }
 
+void Manifold::Warp(std::function<void(glm::vec3&)> warpFunc) {
+  ApplyTransform();
+  thrust::for_each_n(pImpl_->vertPos_.begin(), NumVert(), warpFunc);
+  pImpl_->Update();
+}
+
 int Manifold::NumOverlaps(const Manifold& B) const {
   ApplyTransform();
   B.ApplyTransform();
@@ -620,8 +626,6 @@ void Manifold::Impl::Finish() {
                                TriVerts(-1), IdxMax())[0] < NumVert(),
                 runtimeErr, "Vertex index exceeds number of verts!");
   CalculateBBox();
-  ALWAYS_ASSERT(bBox_.isFinite(), runtimeErr,
-                "Input vertices are not all finite!");
   SortVerts();
   VecDH<Box> triBox;
   VecDH<uint32_t> triMorton;
@@ -641,13 +645,17 @@ void Manifold::Impl::Append2Host(Mesh& pImpl_out) const {
                            vertPos_.end());
 }
 
-void Manifold::Impl::Transform(const glm::mat4& T) {
-  thrust::for_each(vertPos_.beginD(), vertPos_.endD(), Transform3({T}));
+void Manifold::Impl::Update() {
   CalculateBBox();
   VecDH<Box> triBox;
   VecDH<uint32_t> triMorton;
   GetTriBoxMorton(triBox, triMorton);
   collider_.UpdateBoxes(triBox);
+}
+
+void Manifold::Impl::Transform(const glm::mat4& T) {
+  thrust::for_each(vertPos_.beginD(), vertPos_.endD(), Transform3({T}));
+  Update();
 }
 
 void Manifold::Impl::TranslateScale(const glm::mat4& T) {
@@ -713,6 +721,8 @@ void Manifold::Impl::CalculateBBox() {
                              glm::vec3(1 / 0.0f), PosMin());
   bBox_.max = thrust::reduce(vertPos_.begin(), vertPos_.end(),
                              glm::vec3(-1 / 0.0f), PosMax());
+  ALWAYS_ASSERT(bBox_.isFinite(), runtimeErr,
+                "Input vertices are not all finite!");
 }
 
 void Manifold::Impl::SortVerts() {

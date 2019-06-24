@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #pragma once
+#include <functional>
 #include <memory>
 #include "mesh.h"
 
@@ -20,30 +21,37 @@ namespace manifold {
 
 class Manifold {
  public:
+  // Creation
   Manifold();
   Manifold(const Mesh&);
+  Manifold DeepCopy() const;
   static Manifold Tetrahedron();
   static Manifold Cube();
   static Manifold Octahedron();
   static Manifold Sphere(int circularSegments);
+
+  // Topological
   Manifold(const std::vector<Manifold>&);
   std::vector<Manifold> Decompose() const;
-  void Append2Host(Mesh&) const;
-  Manifold DeepCopy() const;
 
+  // Extraction
+  void Append2Host(Mesh&) const;
+
+  // Information
   int NumVert() const;
   int NumEdge() const;
   int NumTri() const;
   Box BoundingBox() const;
   float Volume() const;
   float SurfaceArea() const;
-  bool IsValid() const;
 
+  // Modification
   void Translate(glm::vec3);
   void Scale(glm::vec3);
   void Rotate(glm::mat3);
+  void Warp(std::function<void(glm::vec3&)>);
 
-  int NumOverlaps(const Manifold& second) const;
+  // Boolean
   enum class OpType { ADD, SUBTRACT, INTERSECT };
   Manifold Boolean(const Manifold& second, OpType op) const;
   // Boolean operation shorthand
@@ -53,6 +61,10 @@ class Manifold {
   // First result is the intersection, second is the difference. This is more
   // efficient than doing them separately.
   std::pair<Manifold, Manifold> Split(const Manifold&) const;
+
+  // Testing hooks
+  bool IsValid() const;
+  int NumOverlaps(const Manifold& second) const;
 
   ~Manifold();
   Manifold(Manifold&&);

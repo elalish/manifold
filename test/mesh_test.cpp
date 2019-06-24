@@ -137,6 +137,14 @@ TEST(Manifold, SurfaceArea) {
   EXPECT_FLOAT_EQ(area, 24.0f);
 }
 
+TEST(Manifold, SelfSubtract) {
+  Manifold cube = Manifold::Cube();
+  Manifold empty = cube - cube;
+  EXPECT_TRUE(empty.IsValid());
+  EXPECT_FLOAT_EQ(empty.Volume(), 0.0f);
+  // EXPECT_FLOAT_EQ(empty.SurfaceArea(), 0.0f);
+}
+
 TEST(Manifold, Split) {
   Manifold cube = Manifold::Cube();
   Manifold oct = Manifold::Octahedron();
@@ -206,4 +214,19 @@ TEST(Manifold, BooleanWinding) {
   Manifold result = tetras - meshList[0];
 
   ExpectMeshes(result, {{8, 12}, {8, 12}});
+}
+
+TEST(Manifold, DISABLED_BooleanHorrible) {
+  Manifold random = Manifold::Sphere(10);
+  std::mt19937 gen(12345);  // Standard mersenne_twister_engine
+  std::uniform_real_distribution<float> dis(-1.0f, 1.0f);
+  random.Warp([&dis, &gen](glm::vec3& v) {
+    v = glm::vec3(dis(gen), dis(gen), dis(gen));
+  });
+  Manifold random2 = random.DeepCopy();
+  random2.Rotate(glm::mat3(1.0f, 0.0f, 0.0f,  //
+                           0.0f, 0.0f, 1.0f,  //
+                           0.0f, -1.0f, 0.0f));
+  Manifold result = random ^ random2;
+  EXPECT_TRUE(result.IsValid());
 }
