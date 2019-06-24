@@ -60,8 +60,15 @@ void TestAssemble(const Polygons &polys) {
 
 void TestPoly(const Polygons &polys, int expectedNumTri) {
   TestAssemble(polys);
-  std::vector<TriVerts> triangles;
-  Triangulate(triangles, polys);
+
+  std::vector<TriVerts> triangles = BackupTriangulate(polys);
+  if (kVerbose)
+    for (auto tri : triangles) {
+      std::cout << tri.x << ", " << tri.y << ", " << tri.z << std::endl;
+    }
+  CheckManifold(triangles, polys);
+
+  triangles = PrimaryTriangulate(polys);
   if (kVerbose)
     for (auto tri : triangles) {
       std::cout << tri.x << ", " << tri.y << ", " << tri.z << std::endl;

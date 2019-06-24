@@ -429,9 +429,67 @@ Polygons Assemble(const std::vector<EdgeVerts> &halfedges) {
   return polys;
 }
 
-void Triangulate(std::vector<TriVerts> &triangles, const Polygons &polys) {
+std::vector<TriVerts> Triangulate(const Polygons &polys) {
+  std::vector<TriVerts> triangles;
+  try {
+    triangles = PrimaryTriangulate(polys);
+    CheckManifold(triangles, polys);
+  } catch (const std::exception &e) {
+    std::cout << "Primary triangulation failed, switching to backup"
+              << std::endl;
+    if (kVerbose) {
+      Dump(polys);
+      std::cout << "produced this triangulation:" << std::endl;
+      for (int j = 0; j < triangles.size(); ++j) {
+        std::cout << triangles[j][0] << ", " << triangles[j][1] << ", "
+                  << triangles[j][2] << std::endl;
+      }
+    }
+    try {
+      triangles = BackupTriangulate(polys);
+      CheckManifold(triangles, polys);
+    } catch (const std::exception &e) {
+      std::cout << "Backup triangulation failed!" << std::endl;
+      Dump(polys);
+      std::cout << "backup produced this triangulation:" << std::endl;
+      for (int j = 0; j < triangles.size(); ++j) {
+        std::cout << triangles[j][0] << ", " << triangles[j][1] << ", "
+                  << triangles[j][2] << std::endl;
+      }
+      throw e;
+    }
+  }
+  return triangles;
+}
+
+std::vector<TriVerts> PrimaryTriangulate(const Polygons &polys) {
+  std::vector<TriVerts> triangles;
   Monotones monotones(polys);
   TriangulateMonotones(monotones.GetMonotones(), triangles);
+  return triangles;
+}
+
+std::vector<TriVerts> BackupTriangulate(const Polygons &polys) {
+  std::vector<TriVerts> triangles;
+  for (auto poly : polys) {
+    if (poly.size() < 3) continue;
+    TriVerts tri = {poly[0].idx, poly[1].idx, poly[2].idx};
+    int start = 2;
+    int end = poly.size();
+    bool forward = true;
+    for (;;) {
+      triangles.push_back(tri);
+      forward = !forward;
+      if (forward) {
+        tri = {tri[2], tri[1], poly[++start].idx};
+      } else {
+        tri[1] = tri[2];
+        tri[2] = poly[--end].idx;
+      }
+      if (start == end) break;
+    }
+  }
+  return triangles;
 }
 
 std::vector<EdgeVerts> Polygons2Edges(const Polygons &polys) {
@@ -502,9 +560,10 @@ void CheckManifold(const std::vector<TriVerts> &triangles,
 
 void Dump(const Polygons &polys) {
   for (auto poly : polys) {
-    std::cout << "next poly" << std::endl;
+    std::cout << "polys.push_back({" << std::endl;
     for (auto v : poly) {
-      std::cout << v.pos.x << ", " << v.pos.y << ", " << v.idx << std::endl;
+      std::cout << "    {glm::vec2(" << v.pos.x << ", " << v.pos.y << "), "
+                << v.idx << "},  //" << std::endl;
     }
   }
 }

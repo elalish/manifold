@@ -490,14 +490,6 @@ float Manifold::SurfaceArea() const {
 
 bool Manifold::IsValid() const { return pImpl_->IsValid(); }
 
-std::vector<glm::vec3> Manifold::GetVerts() const {
-  ApplyTransform();
-  std::vector<glm::vec3> vertPos(NumVert());
-  thrust::copy(pImpl_->vertPos_.begin(), pImpl_->vertPos_.end(),
-               vertPos.begin());
-  return vertPos;
-}
-
 void Manifold::Translate(glm::vec3 v) { transform_[3] += glm::vec4(v, 0.0f); }
 
 void Manifold::Scale(glm::vec3 v) {
@@ -508,10 +500,9 @@ void Manifold::Scale(glm::vec3 v) {
 
 void Manifold::Rotate(glm::mat3 r) { transform_ *= glm::mat4(r); }
 
-void Manifold::SetVerts(const std::vector<glm::vec3>& vertPos) {
-  ALWAYS_ASSERT(vertPos.size() == NumVert(), runtimeErr,
-                "Must supply the same number of vertices as the manifold has!");
-  thrust::copy(vertPos.begin(), vertPos.end(), pImpl_->vertPos_.begin());
+void Manifold::Warp(std::function<void(glm::vec3&)> warpFunc) {
+  ApplyTransform();
+  thrust::for_each_n(pImpl_->vertPos_.begin(), NumVert(), warpFunc);
   pImpl_->Update();
 }
 
@@ -635,8 +626,6 @@ void Manifold::Impl::Finish() {
                                TriVerts(-1), IdxMax())[0] < NumVert(),
                 runtimeErr, "Vertex index exceeds number of verts!");
   CalculateBBox();
-  ALWAYS_ASSERT(bBox_.isFinite(), runtimeErr,
-                "Input vertices are not all finite!");
   SortVerts();
   VecDH<Box> triBox;
   VecDH<uint32_t> triMorton;
@@ -732,6 +721,8 @@ void Manifold::Impl::CalculateBBox() {
                              glm::vec3(1 / 0.0f), PosMin());
   bBox_.max = thrust::reduce(vertPos_.begin(), vertPos_.end(),
                              glm::vec3(-1 / 0.0f), PosMax());
+  ALWAYS_ASSERT(bBox_.isFinite(), runtimeErr,
+                "Input vertices are not all finite!");
 }
 
 void Manifold::Impl::SortVerts() {
