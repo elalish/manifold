@@ -224,9 +224,7 @@ TEST(Manifold, DISABLED_BooleanHorrible) {
     v = glm::vec3(dis(gen), dis(gen), dis(gen));
   });
   Manifold random2 = random.DeepCopy();
-  random2.Rotate(glm::mat3(1.0f, 0.0f, 0.0f,  //
-                           0.0f, 0.0f, 1.0f,  //
-                           0.0f, -1.0f, 0.0f));
+  random2.Rotate(90);
   Manifold result = random ^ random2;
   EXPECT_TRUE(result.IsValid());
 }
