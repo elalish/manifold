@@ -99,10 +99,10 @@ struct Box {
     return out;
   }
 
-  HOST_DEVICE Box Transform(const glm::mat4& transform) const {
-    Box out;  // TODO: update to support perspective transforms
-    out.min = glm::vec3(transform * glm::vec4(min, 1.0f));
-    out.max = glm::vec3(transform * glm::vec4(max, 1.0f));
+  HOST_DEVICE Box Transform(const glm::mat4x3& transform) const {
+    Box out;
+    out.min = transform * glm::vec4(min, 1.0f);
+    out.max = transform * glm::vec4(max, 1.0f);
     return out;
   }
 
