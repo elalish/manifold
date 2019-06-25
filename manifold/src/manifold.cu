@@ -23,6 +23,9 @@
 #include "connected_components.cuh"
 #include "manifold.cuh"
 
+#define sind(x) (sin(fmod((x), 360) * M_PI / 180))
+#define cosd(x) (cos(fmod((x), 360) * M_PI / 180))
+
 namespace {
 using namespace manifold;
 
@@ -203,11 +206,11 @@ struct PosMax
   }
 };
 
-struct Transform3 {
-  const glm::mat4 T;
+struct Transform {
+  const glm::mat4x3 transform;
 
   __host__ __device__ void operator()(glm::vec3& position) {
-    position = glm::vec3(T * glm::vec4(position, 1.0f));
+    position = transform * glm::vec4(position, 1.0f);
   }
 };
 
@@ -357,40 +360,37 @@ Manifold::~Manifold() = default;
 Manifold::Manifold(Manifold&&) = default;
 Manifold& Manifold::operator=(Manifold&&) = default;
 
-Manifold::Manifold(const Manifold& other)
-    : pImpl_(new Impl(*other.pImpl_)), transform_(other.transform_) {}
+Manifold::Manifold(const Manifold& other) : pImpl_(new Impl(*other.pImpl_)) {}
 
 Manifold& Manifold::operator=(const Manifold& other) {
   if (this != &other) {
     pImpl_.reset(new Impl(*other.pImpl_));
   }
-  transform_ = other.transform_;
   return *this;
 }
 
 Manifold Manifold::Tetrahedron() {
   Manifold tetrahedron;
-  tetrahedron.pImpl_ =
-      std::make_unique<Impl>(Manifold::Impl::Shape::TETRAHEDRON);
+  tetrahedron.pImpl_ = std::make_unique<Impl>(Impl::Shape::TETRAHEDRON);
   return tetrahedron;
 }
 
 Manifold Manifold::Cube() {
   Manifold cube;
-  cube.pImpl_ = std::make_unique<Impl>(Manifold::Impl::Shape::CUBE);
+  cube.pImpl_ = std::make_unique<Impl>(Impl::Shape::CUBE);
   return cube;
 }
 
 Manifold Manifold::Octahedron() {
   Manifold octahedron;
-  octahedron.pImpl_ = std::make_unique<Impl>(Manifold::Impl::Shape::OCTAHEDRON);
+  octahedron.pImpl_ = std::make_unique<Impl>(Impl::Shape::OCTAHEDRON);
   return octahedron;
 }
 
 Manifold Manifold::Sphere(int circularSegments) {
   int n = (circularSegments + 3) / 4;
   Manifold sphere;
-  sphere.pImpl_ = std::make_unique<Impl>(Manifold::Impl::Shape::OCTAHEDRON);
+  sphere.pImpl_ = std::make_unique<Impl>(Impl::Shape::OCTAHEDRON);
   sphere.pImpl_->Refine(n);
   thrust::for_each_n(sphere.pImpl_->vertPos_.beginD(), sphere.NumVert(),
                      Normalize());
@@ -398,10 +398,10 @@ Manifold Manifold::Sphere(int circularSegments) {
   return sphere;
 }
 
-Manifold::Manifold(const std::vector<Manifold>& meshes)
+Manifold::Manifold(const std::vector<Manifold>& manifolds)
     : pImpl_{std::make_unique<Impl>()} {
-  for (Manifold manifold : meshes) {
-    manifold.ApplyTransform();
+  for (Manifold manifold : manifolds) {
+    manifold.pImpl_->ApplyTransform();
     const int startIdx = NumVert();
     pImpl_->vertPos_.H().insert(pImpl_->vertPos_.end(),
                                 manifold.pImpl_->vertPos_.begin(),
@@ -413,7 +413,6 @@ Manifold::Manifold(const std::vector<Manifold>& meshes)
 }
 
 void Manifold::Append2Host(Mesh& manifold) const {
-  ApplyTransform();
   pImpl_->Append2Host(manifold);
 }
 
@@ -460,7 +459,7 @@ std::vector<Manifold> Manifold::Decompose() const {
                        Reindex({vertOld2New.ptrD()}));
 
     meshes[i].pImpl_->Finish();
-    meshes[i].transform_ = transform_;
+    meshes[i].pImpl_->transform_ = pImpl_->transform_;
     thrust::replace(components.beginD(), components.endD(), compLabel, -1);
   }
   return meshes;
@@ -471,18 +470,18 @@ int Manifold::NumEdge() const { return pImpl_->NumEdge(); }
 int Manifold::NumTri() const { return pImpl_->NumTri(); }
 
 Box Manifold::BoundingBox() const {
-  return pImpl_->bBox_.Transform(transform_);
+  return pImpl_->bBox_.Transform(pImpl_->transform_);
 }
 
 float Manifold::Volume() const {
-  ApplyTransform();
+  pImpl_->ApplyTransform();
   return thrust::transform_reduce(
       pImpl_->triVerts_.beginD(), pImpl_->triVerts_.endD(),
       TetVolume({pImpl_->vertPos_.ptrD()}), 0.0f, thrust::plus<float>());
 }
 
 float Manifold::SurfaceArea() const {
-  ApplyTransform();
+  pImpl_->ApplyTransform();
   return thrust::transform_reduce(
       pImpl_->triVerts_.beginD(), pImpl_->triVerts_.endD(),
       TriArea({pImpl_->vertPos_.ptrD()}), 0.0f, thrust::plus<float>());
@@ -490,25 +489,35 @@ float Manifold::SurfaceArea() const {
 
 bool Manifold::IsValid() const { return pImpl_->IsValid(); }
 
-void Manifold::Translate(glm::vec3 v) { transform_[3] += glm::vec4(v, 0.0f); }
+void Manifold::Translate(glm::vec3 v) { pImpl_->transform_[3] += v; }
 
 void Manifold::Scale(glm::vec3 v) {
-  glm::mat4 s(1.0f);
-  for (int i : {0, 1, 2}) s[i][i] = v[i];
-  transform_ *= s;
+  glm::mat3 s(1.0f);
+  for (int i : {0, 1, 2}) pImpl_->transform_[i] *= v;
 }
 
-void Manifold::Rotate(glm::mat3 r) { transform_ *= glm::mat4(r); }
+void Manifold::Rotate(float xDegrees, float yDegrees, float zDegrees) {
+  glm::mat3 rX(1.0f, 0.0f, 0.0f,                      //
+               0.0f, cosd(xDegrees), sind(xDegrees),  //
+               0.0f, -sind(xDegrees), cosd(xDegrees));
+  glm::mat3 rY(cosd(yDegrees), 0.0f, -sind(yDegrees),  //
+               0.0f, 1.0f, 0.0f,                       //
+               sind(yDegrees), 0.0f, cosd(yDegrees));
+  glm::mat3 rZ(cosd(zDegrees), sind(zDegrees), 0.0f,   //
+               -sind(zDegrees), cosd(zDegrees), 0.0f,  //
+               0.0f, 0.0f, 1.0f);
+  pImpl_->transform_ = rZ * rY * rX * pImpl_->transform_;
+}
 
 void Manifold::Warp(std::function<void(glm::vec3&)> warpFunc) {
-  ApplyTransform();
+  pImpl_->ApplyTransform();
   thrust::for_each_n(pImpl_->vertPos_.begin(), NumVert(), warpFunc);
   pImpl_->Update();
 }
 
 int Manifold::NumOverlaps(const Manifold& B) const {
-  ApplyTransform();
-  B.ApplyTransform();
+  pImpl_->ApplyTransform();
+  B.pImpl_->ApplyTransform();
 
   SparseIndices overlaps = pImpl_->EdgeCollisions(*B.pImpl_);
   int num_overlaps = overlaps.size();
@@ -518,8 +527,8 @@ int Manifold::NumOverlaps(const Manifold& B) const {
 }
 
 Manifold Manifold::Boolean(const Manifold& second, OpType op) const {
-  ApplyTransform();
-  second.ApplyTransform();
+  pImpl_->ApplyTransform();
+  second.pImpl_->ApplyTransform();
   Boolean3 boolean(*pImpl_, *second.pImpl_);
   Manifold result;
   result.pImpl_ = std::make_unique<Impl>(boolean.Result(op));
@@ -539,8 +548,8 @@ Manifold Manifold::operator^(const Manifold& Q) const {
 }
 
 std::pair<Manifold, Manifold> Manifold::Split(const Manifold& cutter) const {
-  ApplyTransform();
-  cutter.ApplyTransform();
+  pImpl_->ApplyTransform();
+  cutter.pImpl_->ApplyTransform();
   Boolean3 boolean(*pImpl_, *cutter.pImpl_);
   std::pair<Manifold, Manifold> result;
   result.first.pImpl_ =
@@ -548,20 +557,6 @@ std::pair<Manifold, Manifold> Manifold::Split(const Manifold& cutter) const {
   result.second.pImpl_ =
       std::make_unique<Impl>(boolean.Result(OpType::SUBTRACT));
   return result;
-}
-
-void Manifold::ApplyTransform() const {
-  if (transform_ == glm::mat4(1.0f)) return;
-  glm::mat4 TS(1.0f);
-  for (int i : {0, 1, 2}) {
-    TS[i][i] = transform_[i][i];  // scale
-    TS[3][i] = transform_[3][i];  // translate
-  }
-  if (transform_ == TS)
-    pImpl_->TranslateScale(transform_);
-  else
-    pImpl_->Transform(transform_);
-  transform_ = glm::mat4(1.0f);
 }
 
 Manifold::Impl::Impl(const Mesh& manifold)
@@ -636,6 +631,7 @@ void Manifold::Impl::Finish() {
 }
 
 void Manifold::Impl::Append2Host(Mesh& pImpl_out) const {
+  ApplyTransform();
   const int start = pImpl_out.vertPos.size();
   std::transform(
       triVerts_.begin(), triVerts_.end(),
@@ -653,27 +649,34 @@ void Manifold::Impl::Update() {
   collider_.UpdateBoxes(triBox);
 }
 
-void Manifold::Impl::Transform(const glm::mat4& T) {
-  thrust::for_each(vertPos_.beginD(), vertPos_.endD(), Transform3({T}));
-  Update();
+void Manifold::Impl::ApplyTransform() const {
+  // This const_cast is here because these operations cancel out, leaving the
+  // state conceptually unchanged. This enables lazy transformation evaluation.
+  const_cast<Impl*>(this)->ApplyTransform();
 }
 
-void Manifold::Impl::TranslateScale(const glm::mat4& T) {
-  glm::vec3 translate, scale;
+void Manifold::Impl::ApplyTransform() {
+  if (transform_ == glm::mat4x3(1.0f)) return;
+  glm::mat4x3 ts(1.0f);
   for (int i : {0, 1, 2}) {
-    translate[i] = T[3][i];
-    scale[i] = T[i][i];
+    ts[i][i] = transform_[i][i];  // scale
+    ts[3][i] = transform_[3][i];  // translate
   }
-  glm::mat4 transform(1.0f);
-  for (int i : {0, 1, 2}) {
-    transform[3][i] = translate[i];
-    transform[i][i] = scale[i];
+  if (transform_ == ts) {
+    thrust::for_each(vertPos_.beginD(), vertPos_.endD(), Transform({ts}));
+    glm::vec3 scale;
+    for (int i : {0, 1, 2}) scale[i] = ts[i][i];
+    glm::vec3 position = ts[3];
+    bBox_ *= scale;
+    bBox_ += position;
+    collider_.Scale(scale);
+    collider_.Translate(position);
+  } else {
+    thrust::for_each(vertPos_.beginD(), vertPos_.endD(),
+                     Transform({transform_}));
+    Update();
   }
-  thrust::for_each(vertPos_.beginD(), vertPos_.endD(), Transform3({transform}));
-  bBox_ *= scale;
-  bBox_ += translate;
-  collider_.Scale(scale);
-  collider_.Translate(translate);
+  transform_ = glm::mat4x3(1.0f);
 }
 
 void Manifold::Impl::Refine(int n) {
@@ -817,7 +820,7 @@ void Manifold::Impl::SortTris(VecDH<Box>& triBox, VecDH<uint32_t>& triMorton) {
                       zip(triBox.beginD(), triVerts_.beginD()));
 }
 
-SparseIndices Manifold::Impl::EdgeCollisions(const Manifold::Impl& B) const {
+SparseIndices Manifold::Impl::EdgeCollisions(const Impl& B) const {
   VecDH<Box> BedgeBB = B.GetEdgeBox();
   return collider_.Collisions(BedgeBB);
 }
