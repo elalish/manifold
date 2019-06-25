@@ -38,6 +38,7 @@ struct Manifold::Impl {
   VecDH<TriVerts> triVerts_;
   VecDH<TriEdges> triEdges_;
   Collider collider_;
+  glm::mat4x3 transform_ = glm::mat4x3(1.0f);
 
   Impl() {}
   Impl(const Mesh&);
@@ -46,8 +47,8 @@ struct Manifold::Impl {
   void Finish();
   void Append2Host(Mesh&) const;
   void Update();
-  void Transform(const glm::mat4&);
-  void TranslateScale(const glm::mat4&);
+  void ApplyTransform() const;
+  void ApplyTransform();
   void Refine(int n);
   bool IsValid() const;
 

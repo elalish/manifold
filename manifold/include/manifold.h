@@ -48,7 +48,7 @@ class Manifold {
   // Modification
   void Translate(glm::vec3);
   void Scale(glm::vec3);
-  void Rotate(glm::mat3);
+  void Rotate(float xDegrees, float yDegrees = 0.0f, float zDegrees = 0.0f);
   void Warp(std::function<void(glm::vec3&)>);
 
   // Boolean
@@ -73,9 +73,7 @@ class Manifold {
 
  private:
   std::unique_ptr<Impl> pImpl_;
-  mutable glm::mat4 transform_ = glm::mat4(1.0f);
 
-  void ApplyTransform() const;
   // Implicit copy is private because it is expensive; use DeepCopy() above.
   Manifold(const Manifold& other);
   Manifold& operator=(const Manifold& other);
