@@ -45,7 +45,6 @@ struct Manifold::Impl {
   enum class Shape { TETRAHEDRON, CUBE, OCTAHEDRON };
   Impl(Shape);
   void Finish();
-  void Append2Host(Mesh&) const;
   void Update();
   void ApplyTransform() const;
   void ApplyTransform();

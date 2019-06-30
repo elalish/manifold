@@ -98,6 +98,10 @@ struct NextStart : public thrust::binary_function<int, int, bool> {
   }
 };
 
+struct NextLabel {
+  __host__ __device__ bool operator()(int component) { return component >= 0; }
+};
+
 struct FloodComponent {
   int value;
   int label;
@@ -221,10 +225,17 @@ void FloodComponents(VecDH<int>& valuesInOut, VecDH<int>& componentsToDie,
                                       componentsToDie.begin(), NextStart())
                          .first -
                      valuesInOut.begin();
-    ALWAYS_ASSERT(sourceVert < valuesInOut.size(), logicErr,
-                  "Failed to find component!");
-    int label = componentsToDie.H()[sourceVert];
-    int value = valuesInOut.H()[sourceVert];
+    int label, value;
+    if (sourceVert < valuesInOut.size()) {
+      label = componentsToDie.H()[sourceVert];
+      value = valuesInOut.H()[sourceVert];
+    } else {
+      sourceVert = thrust::find_if(componentsToDie.begin(),
+                                   componentsToDie.end(), NextLabel()) -
+                   componentsToDie.begin();
+      label = componentsToDie.H()[sourceVert];
+      value = 0;
+    }
     thrust::for_each_n(zip(valuesInOut.beginD(), componentsToDie.beginD()),
                        valuesInOut.size(), FloodComponent({value, label}));
   }
