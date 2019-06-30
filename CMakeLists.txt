@@ -1,4 +1,7 @@
 cmake_minimum_required(VERSION 3.12)
+# if (NOT CMAKE_CUDA_COMPILER)
+#     set(CMAKE_CUDA_COMPILER "/usr/local/cuda-9.2/bin/nvcc")
+# endif()
 project(manifold LANGUAGES CXX CUDA)
 
 # set(CMAKE_VERBOSE_MAKEFILE ON)
