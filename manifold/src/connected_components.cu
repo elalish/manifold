@@ -98,6 +98,10 @@ struct NextStart : public thrust::binary_function<int, int, bool> {
   }
 };
 
+struct NextLabel {
+  __host__ __device__ bool operator()(int component) { return component >= 0; }
+};
+
 struct FloodComponent {
   int value;
   int label;
@@ -210,22 +214,31 @@ int ConnectedComponentsCPU(VecDH<int>& components, int numVert,
   return numComponent;
 }
 
-void FloodComponents(VecDH<int>& valuesInOut, VecDH<int>& componentsToDie,
+void FloodComponents(VecDH<int>& valuesInOut, VecDH<int>& componentLabels,
                      int numComponent) {
-  // componentsToDie will be replaced entirely with -1
-  ALWAYS_ASSERT(valuesInOut.size() == componentsToDie.size(), logicErr,
+  // componentLabels will be replaced entirely with -1
+  ALWAYS_ASSERT(valuesInOut.size() == componentLabels.size(), logicErr,
                 "These vectors must both be NumVert long.");
   for (int comp = 0; comp < numComponent; ++comp) {
     // find first vertex in component that is also has a value
     int sourceVert = thrust::mismatch(valuesInOut.begin(), valuesInOut.end(),
-                                      componentsToDie.begin(), NextStart())
+                                      componentLabels.begin(), NextStart())
                          .first -
                      valuesInOut.begin();
-    ALWAYS_ASSERT(sourceVert < valuesInOut.size(), logicErr,
-                  "Failed to find component!");
-    int label = componentsToDie.H()[sourceVert];
-    int value = valuesInOut.H()[sourceVert];
-    thrust::for_each_n(zip(valuesInOut.beginD(), componentsToDie.beginD()),
+    int label, value;
+    if (sourceVert < valuesInOut.size()) {
+      label = componentLabels.H()[sourceVert];
+      value = valuesInOut.H()[sourceVert];
+    } else {
+      // If no vertices in a component have a value, then their value must be
+      // zero, because zeros are removed from the sparse representation.
+      sourceVert = thrust::find_if(componentLabels.begin(),
+                                   componentLabels.end(), NextLabel()) -
+                   componentLabels.begin();
+      label = componentLabels.H()[sourceVert];
+      value = 0;
+    }
+    thrust::for_each_n(zip(valuesInOut.beginD(), componentLabels.beginD()),
                        valuesInOut.size(), FloodComponent({value, label}));
   }
 }

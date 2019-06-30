@@ -670,29 +670,16 @@ std::tuple<VecDH<int>, VecDH<glm::vec3>> Intersect12(
   return std::make_tuple(x12, v12);
 };
 
-struct AssignZeros {
-  bool *keepEdges;
-  int *w03;
-  const EdgeVertsD *edgeVerts;
-
-  __host__ __device__ void operator()(int edge) {
-    keepEdges[edge] = false;
-    // Since s02 is sparse, its non-included values are all zero. If all the
-    // values associated with a vertex are zero, that vertex will not be
-    // calculated at all, thus they need to be initialized here, as we know that
-    // all verts on intersected edges have had their winding numbers calculated.
-    w03[edgeVerts[edge].first] = 0;
-    w03[edgeVerts[edge].second] = 0;
-  }
-};
-
 VecDH<int> Winding03(const Manifold::Impl &inP, SparseIndices &p0q2,
                      VecDH<int> &s02, const SparseIndices &p1q2, bool reverse) {
   VecDH<int> w03(inP.NumVert(), kInvalidInt);
-  VecDH<bool> keepEdgesA(inP.NumEdge(), true);
-  thrust::for_each(
-      p1q2.beginD(reverse), p1q2.endD(reverse),
-      AssignZeros({keepEdgesA.ptrD(), w03.ptrD(), inP.edgeVerts_.ptrD()}));
+  // keepEdgesP is the set of edges that connect regions of the manifold with
+  // the same winding number, so we remove any edges associated with
+  // intersections.
+  VecDH<bool> keepEdgesP(inP.NumEdge(), true);
+  thrust::scatter(thrust::make_constant_iterator(false, 0),
+                  thrust::make_constant_iterator(false, p1q2.size()),
+                  p1q2.beginD(reverse), keepEdgesP.beginD());
 
   if (!thrust::is_sorted(p0q2.beginD(reverse), p0q2.endD(reverse)))
     thrust::sort_by_key(p0q2.beginD(reverse), p0q2.endD(reverse), s02.beginD());
@@ -708,7 +695,7 @@ VecDH<int> Winding03(const Manifold::Impl &inP, SparseIndices &p0q2,
   // find connected regions (separated by intersections)
   VecDH<int> vLabels;
   int n_comp =
-      ConnectedComponents(vLabels, inP.NumVert(), inP.edgeVerts_, keepEdgesA);
+      ConnectedComponents(vLabels, inP.NumVert(), inP.edgeVerts_, keepEdgesP);
   // flood the w03 values throughout their connected components (they are
   // consistent)
   FloodComponents(w03, vLabels, n_comp);
@@ -1208,7 +1195,10 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
   // Create the output Manifold
   Manifold::Impl outR;
 
-  outR.vertPos_.resize(nPv + nQv + n12 + n21);
+  int totalVerts = nPv + nQv + n12 + n21;
+  if (totalVerts == 0) return outR;
+
+  outR.vertPos_.resize(totalVerts);
   // Add retained vertices, duplicating for inclusion numbers not in [-1, 1].
   VecDH<int> vertR2PQ(nPv + nQv);
   thrust::for_each_n(zip(thrust::make_counting_iterator(0), i03.beginD(),

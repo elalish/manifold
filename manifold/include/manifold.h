@@ -35,9 +35,10 @@ class Manifold {
   std::vector<Manifold> Decompose() const;
 
   // Extraction
-  void Append2Host(Mesh&) const;
+  Mesh Extract() const;
 
   // Information
+  bool IsEmpty() const;
   int NumVert() const;
   int NumEdge() const;
   int NumTri() const;
@@ -46,10 +47,11 @@ class Manifold {
   float SurfaceArea() const;
 
   // Modification
-  void Translate(glm::vec3);
-  void Scale(glm::vec3);
-  void Rotate(float xDegrees, float yDegrees = 0.0f, float zDegrees = 0.0f);
-  void Warp(std::function<void(glm::vec3&)>);
+  Manifold& Translate(glm::vec3);
+  Manifold& Scale(glm::vec3);
+  Manifold& Rotate(float xDegrees, float yDegrees = 0.0f,
+                   float zDegrees = 0.0f);
+  Manifold& Warp(std::function<void(glm::vec3&)>);
 
   // Boolean
   enum class OpType { ADD, SUBTRACT, INTERSECT };
@@ -61,6 +63,8 @@ class Manifold {
   // First result is the intersection, second is the difference. This is more
   // efficient than doing them separately.
   std::pair<Manifold, Manifold> Split(const Manifold&) const;
+  std::pair<Manifold, Manifold> SplitByPlane(glm::vec3 normal,
+                                             float originOffset) const;
 
   // Testing hooks
   bool IsValid() const;

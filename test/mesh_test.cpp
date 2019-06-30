@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <glm/gtc/constants.hpp>
 #include "gtest/gtest.h"
 #include "manifold.h"
 
@@ -79,10 +80,9 @@ TEST(Manifold, Regression) {
   int num_overlaps = manifold.NumOverlaps(mesh1);
   ASSERT_EQ(num_overlaps, 237472);
 
-  Mesh mesh_out, mesh_out2;
-  manifold.Append2Host(mesh_out);
+  Mesh mesh_out = manifold.Extract();
   Manifold mesh2(mesh_out);
-  mesh2.Append2Host(mesh_out2);
+  Mesh mesh_out2 = mesh2.Extract();
   Identical(mesh_out, mesh_out2);
 }
 
@@ -152,6 +152,17 @@ TEST(Manifold, Split) {
   std::pair<Manifold, Manifold> splits = cube.Split(oct);
   EXPECT_FLOAT_EQ(splits.first.Volume() + splits.second.Volume(),
                   cube.Volume());
+}
+
+TEST(Manifold, SplitByPlane) {
+  Manifold cube = Manifold::Cube();
+  cube.Translate({0.0f, 1.0f, 0.0f});
+  cube.Rotate(0.0f, 0.0f, -60.0f);
+  cube.Translate({2.0f, 0.0f, 0.0f});
+  float phi = glm::pi<float>() / 6.0f;
+  std::pair<Manifold, Manifold> splits =
+      cube.SplitByPlane({glm::sin(phi), -glm::cos(phi), 0.0f}, 1.0f);
+  EXPECT_FLOAT_EQ(splits.first.Volume(), splits.second.Volume());
 }
 
 TEST(Manifold, BooleanSphere) {
