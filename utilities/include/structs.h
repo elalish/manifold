@@ -15,6 +15,7 @@
 #pragma once
 #define GLM_FORCE_EXPLICIT_CTOR
 #include <glm/glm.hpp>
+#include <glm/gtc/constants.hpp>
 #include <glm/gtx/compatibility.hpp>
 #include <iostream>
 #include <sstream>
@@ -86,6 +87,10 @@ struct Box {
     min = glm::min(p1, p2);
     max = glm::max(p1, p2);
   }
+
+  HOST_DEVICE glm::vec3 Size() const { return max - min; }
+
+  HOST_DEVICE glm::vec3 Center() const { return 0.5f * (max + min); }
 
   HOST_DEVICE void Union(const glm::vec3 p) {
     min = glm::min(min, p);

@@ -412,8 +412,14 @@ Manifold::Manifold(const std::vector<Manifold>& manifolds)
   pImpl_->Finish();
 }
 
-void Manifold::Append2Host(Mesh& manifold) const {
-  pImpl_->Append2Host(manifold);
+Mesh Manifold::Extract() const {
+  pImpl_->ApplyTransform();
+  Mesh result;
+  result.vertPos.insert(result.vertPos.end(), pImpl_->vertPos_.begin(),
+                        pImpl_->vertPos_.end());
+  result.triVerts.insert(result.triVerts.end(), pImpl_->triVerts_.begin(),
+                         pImpl_->triVerts_.end());
+  return result;
 }
 
 Manifold Manifold::DeepCopy() const { return *this; }
@@ -465,6 +471,7 @@ std::vector<Manifold> Manifold::Decompose() const {
   return meshes;
 }
 
+bool Manifold::IsEmpty() const { return NumVert() == 0; }
 int Manifold::NumVert() const { return pImpl_->NumVert(); }
 int Manifold::NumEdge() const { return pImpl_->NumEdge(); }
 int Manifold::NumTri() const { return pImpl_->NumTri(); }
@@ -489,14 +496,19 @@ float Manifold::SurfaceArea() const {
 
 bool Manifold::IsValid() const { return pImpl_->IsValid(); }
 
-void Manifold::Translate(glm::vec3 v) { pImpl_->transform_[3] += v; }
-
-void Manifold::Scale(glm::vec3 v) {
-  glm::mat3 s(1.0f);
-  for (int i : {0, 1, 2}) pImpl_->transform_[i] *= v;
+Manifold& Manifold::Translate(glm::vec3 v) {
+  pImpl_->transform_[3] += v;
+  return *this;
 }
 
-void Manifold::Rotate(float xDegrees, float yDegrees, float zDegrees) {
+Manifold& Manifold::Scale(glm::vec3 v) {
+  glm::mat3 s(1.0f);
+  for (int i : {0, 1, 2}) s[i] *= v;
+  pImpl_->transform_ = s * pImpl_->transform_;
+  return *this;
+}
+
+Manifold& Manifold::Rotate(float xDegrees, float yDegrees, float zDegrees) {
   glm::mat3 rX(1.0f, 0.0f, 0.0f,                      //
                0.0f, cosd(xDegrees), sind(xDegrees),  //
                0.0f, -sind(xDegrees), cosd(xDegrees));
@@ -507,12 +519,14 @@ void Manifold::Rotate(float xDegrees, float yDegrees, float zDegrees) {
                -sind(zDegrees), cosd(zDegrees), 0.0f,  //
                0.0f, 0.0f, 1.0f);
   pImpl_->transform_ = rZ * rY * rX * pImpl_->transform_;
+  return *this;
 }
 
-void Manifold::Warp(std::function<void(glm::vec3&)> warpFunc) {
+Manifold& Manifold::Warp(std::function<void(glm::vec3&)> warpFunc) {
   pImpl_->ApplyTransform();
   thrust::for_each_n(pImpl_->vertPos_.begin(), NumVert(), warpFunc);
   pImpl_->Update();
+  return *this;
 }
 
 int Manifold::NumOverlaps(const Manifold& B) const {
@@ -557,6 +571,19 @@ std::pair<Manifold, Manifold> Manifold::Split(const Manifold& cutter) const {
   result.second.pImpl_ =
       std::make_unique<Impl>(boolean.Result(OpType::SUBTRACT));
   return result;
+}
+
+std::pair<Manifold, Manifold> Manifold::SplitByPlane(glm::vec3 normal,
+                                                     float originOffset) const {
+  normal = glm::normalize(normal);
+  Manifold cutter = Manifold::Cube().Translate({1.0f, 0.0f, 0.0f});
+  float size = glm::length(BoundingBox().Center() - normal * originOffset) +
+               0.5f * glm::length(BoundingBox().Size());
+  cutter.Scale(glm::vec3(size)).Translate({originOffset, 0.0f, 0.0f});
+  float yDeg = -glm::asin(normal.z) * 180.0f / glm::pi<float>();
+  float zDeg = glm::atan(normal.y, normal.x) * 180.0f / glm::pi<float>();
+  cutter.Rotate(0.0f, yDeg, zDeg);
+  return Split(cutter);
 }
 
 Manifold::Impl::Impl(const Mesh& manifold)
@@ -628,17 +655,6 @@ void Manifold::Impl::Finish() {
   SortTris(triBox, triMorton);
   CreateEdges();
   collider_ = Collider(triBox, triMorton);
-}
-
-void Manifold::Impl::Append2Host(Mesh& pImpl_out) const {
-  ApplyTransform();
-  const int start = pImpl_out.vertPos.size();
-  std::transform(
-      triVerts_.begin(), triVerts_.end(),
-      std::back_inserter(pImpl_out.triVerts),
-      [start](const glm::ivec3& triVerts) { return triVerts + start; });
-  pImpl_out.vertPos.insert(pImpl_out.vertPos.end(), vertPos_.begin(),
-                           vertPos_.end());
 }
 
 void Manifold::Impl::Update() {

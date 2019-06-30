@@ -1208,7 +1208,10 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
   // Create the output Manifold
   Manifold::Impl outR;
 
-  outR.vertPos_.resize(nPv + nQv + n12 + n21);
+  int totalVerts = nPv + nQv + n12 + n21;
+  if (totalVerts == 0) return outR;
+
+  outR.vertPos_.resize(totalVerts);
   // Add retained vertices, duplicating for inclusion numbers not in [-1, 1].
   VecDH<int> vertR2PQ(nPv + nQv);
   thrust::for_each_n(zip(thrust::make_counting_iterator(0), i03.beginD(),
