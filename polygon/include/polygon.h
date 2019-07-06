@@ -18,14 +18,15 @@
 namespace manifold {
 
 Polygons Assemble(const std::vector<EdgeVerts> &edges);
-std::vector<TriVerts> Triangulate(const Polygons &polys);
-std::vector<TriVerts> PrimaryTriangulate(const Polygons &polys);
-std::vector<TriVerts> BackupTriangulate(const Polygons &polys);
+std::vector<glm::ivec3> Triangulate(const Polygons &polys);
+std::vector<glm::ivec3> PrimaryTriangulate(const Polygons &polys);
+std::vector<glm::ivec3> BackupTriangulate(const Polygons &polys);
 
 std::vector<EdgeVerts> Polygons2Edges(const Polygons &polys);
-std::vector<EdgeVerts> Triangles2Edges(const std::vector<TriVerts> &triangles);
+std::vector<EdgeVerts> Triangles2Edges(
+    const std::vector<glm::ivec3> &triangles);
 void CheckManifold(const std::vector<EdgeVerts> &halfedges);
-void CheckManifold(const std::vector<TriVerts> &triangles,
+void CheckManifold(const std::vector<glm::ivec3> &triangles,
                    const Polygons &polys);
 void Dump(const Polygons &polys);
 

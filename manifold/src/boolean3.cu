@@ -31,7 +31,7 @@
 #include <thrust/unique.h>
 #include <algorithm>
 
-constexpr bool kVerbose = false;
+constexpr bool kVerbose = true;
 
 using namespace thrust::placeholders;
 
@@ -100,7 +100,7 @@ struct CopyEdgeVerts {
 
 struct CopyTriVerts {
   int *verts;
-  const TriVerts *triVerts;
+  const glm::ivec3 *triVerts;
 
   __host__ __device__ void operator()(thrust::tuple<int, int> in) {
     int idx = 3 * thrust::get<0>(in);
@@ -769,7 +769,7 @@ struct DuplicateVerts {
   }
 };
 
-void AppendRetainedFaces(VecDH<TriVerts> &triVerts, VecDH<int> p12,
+void AppendRetainedFaces(VecDH<glm::ivec3> &triVerts, VecDH<int> p12,
                          VecDH<int> p21, const VecDH<int> &i03,
                          const VecDH<int> &vP2R, const Manifold::Impl &inP) {
   // keepTriP is a list of the triangle indicies of P which does not include the
@@ -799,10 +799,10 @@ void AppendRetainedFaces(VecDH<TriVerts> &triVerts, VecDH<int> p12,
       continue;
     // Check the inclusion number of a single vertex of a triangle, since
     // non-intersecting triangles must have all identical inclusion numbers.
-    TriVerts triVertsP = inP.triVerts_.H()[i];
+    glm::ivec3 triVertsP = inP.triVerts_.H()[i];
     int inclusion = i03.H()[triVertsP[0]];
-    TriVerts triVertsR(vP2R.H()[triVertsP[0]], vP2R.H()[triVertsP[1]],
-                       vP2R.H()[triVertsP[2]]);
+    glm::ivec3 triVertsR(vP2R.H()[triVertsP[0]], vP2R.H()[triVertsP[1]],
+                         vP2R.H()[triVertsP[2]]);
     if (inclusion < 0) std::swap(triVertsR[1], triVertsR[2]);
     for (int i = 0; i < abs(inclusion); ++i)
       triVerts.H().push_back(triVertsR + i);
@@ -827,7 +827,7 @@ struct VertsPos {
   float edgePos;
 };
 
-std::vector<EdgeVerts> PairUp(std::vector<VertsPos> &vertsPos) {
+std::vector<EdgeVerts> PairUp(std::vector<VertsPos> &vertsPos, int edge) {
   // Pair start vertices with end vertices to form edges. The choice of pairing
   // is arbitrary for the manifoldness guarantee, but must be ordered to be
   // geometrically valid. If the order does not go start-end-start-end... then
@@ -845,7 +845,7 @@ std::vector<EdgeVerts> PairUp(std::vector<VertsPos> &vertsPos) {
   std::sort(middle, vertsPos.end(), cmp);
   std::vector<EdgeVerts> edges;
   for (int i = 0; i < nEdges; ++i)
-    edges.emplace_back(vertsPos[i].vidx, vertsPos[i + nEdges].vidx);
+    edges.push_back({vertsPos[i].vidx, vertsPos[i + nEdges].vidx, edge});
   return edges;
 }
 
@@ -892,7 +892,7 @@ void AppendRetainedEdges(std::vector<std::vector<EdgeVerts>> &faces,
           {v, Signum(i12.H()[i]), glm::dot(vertPos.H()[v], edgeVec)});
     }
     // sort edges into start/end pairs along length
-    std::vector<EdgeVerts> edges = PairUp(vertsPos);
+    std::vector<EdgeVerts> edges = PairUp(vertsPos, edge);
     // add edges to face lists
     int faceidx = inP.edgeTris_.H()[edge].left;
     if (intersectedTriP.H()[faceidx]) {
@@ -960,12 +960,13 @@ void AppendNewEdges(std::vector<std::vector<EdgeVerts>> &facesP,
     ALWAYS_ASSERT(dir[0] == -dir[1], logicErr,
                   "Intersection points do not have opposite directions!");
     if (dir[0] > 0) std::swap(edge[0], edge[1]);
-    facesP[triP].emplace_back(edge[0], edge[1]);
-    facesQ[triQ].emplace_back(edge[1], edge[0]);
+    // Since these are not input edges, their index is undefined, so set to -1.
+    facesP[triP].push_back({edge[0], edge[1], Edge::kNoIdx});
+    facesQ[triQ].push_back({edge[1], edge[0], Edge::kNoIdx});
   }
 }
 
-void AppendIntersectedFaces(VecDH<TriVerts> &triVerts,
+void AppendIntersectedFaces(VecDH<glm::ivec3> &triVerts,
                             const VecDH<glm::vec3> &vertPos,
                             const std::vector<std::vector<EdgeVerts>> &facesP,
                             const Manifold::Impl &inP) {
@@ -985,7 +986,7 @@ void AppendIntersectedFaces(VecDH<TriVerts> &triVerts,
                           tri[1].second == tri[2].first &&
                           tri[2].second == tri[0].first,
                       runtimeErr, "These 3 edges do not form a triangle!");
-        TriVerts triangle(tri[0].first, tri[1].first, tri[2].first);
+        glm::ivec3 triangle(tri[0].first, tri[1].first, tri[2].first);
         triVerts.H().push_back(triangle);
         break;
       }
@@ -1005,7 +1006,14 @@ void AppendIntersectedFaces(VecDH<TriVerts> &triVerts,
             v.pos = glm::transpose(projection) * vertPos.H()[v.idx];
           }
         }
-        std::vector<TriVerts> newTris = Triangulate(polys);
+        // bool print = false;
+        // for (auto edge : face)
+        //   if (edge.first == 0) print = true;
+        // if (print) {
+        //   std::cout << "Face through 0" << std::endl;
+        //   Dump(polys);
+        // }
+        std::vector<glm::ivec3> newTris = Triangulate(polys);
         for (auto tri : newTris) triVerts.H().push_back(tri);
       }
     }
@@ -1013,10 +1021,10 @@ void AppendIntersectedFaces(VecDH<TriVerts> &triVerts,
 }
 
 void CheckPreTriangulationManfold(
-    const VecDH<TriVerts> &triVerts,
+    const VecDH<glm::ivec3> &triVerts,
     const std::vector<std::vector<EdgeVerts>> &facesP,
     const std::vector<std::vector<EdgeVerts>> &facesQ) {
-  std::vector<TriVerts> triVertsH;
+  std::vector<glm::ivec3> triVertsH;
   for (auto tri : triVerts) triVertsH.push_back(tri);
   std::vector<EdgeVerts> edges = Triangles2Edges(triVertsH);
   for (const auto &face : facesP) {
@@ -1029,6 +1037,7 @@ void CheckPreTriangulationManfold(
       edges.push_back(edge);
     }
   }
+  for (auto &edge : edges) edge.edge = Edge::kNoIdx;
   CheckManifold(edges);
 }
 }  // namespace
