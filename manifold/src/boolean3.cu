@@ -1011,6 +1011,19 @@ void AppendIntersectedFaces(VecDH<glm::ivec3> &triVerts,
         try {
           newTris = Triangulate(polys);
         } catch (const std::exception &e) {
+          /**
+          To ensure the triangulation maintains the mesh as 2-manifold, we
+          require it to not create edges connecting non-neighboring vertices
+          from the same input edge. This is because if two neighboring polygons
+          were to create an edge like this between two of their shared vertices,
+          this would create a 4-manifold edge, which is not allowed.
+
+          For some self-overlapping polygons, there exists no triangulation that
+          adheres to this constraint. In this case, we create an extra vertex
+          for each polygon and triangulate them like a wagon wheel, which is
+          guaranteed to be manifold. This is very rare and only occurs when the
+          input manifold are self-overlapping.
+           */
           for (const auto &poly : polys) {
             glm::vec3 centroid = thrust::transform_reduce(
                 poly.begin(), poly.end(),
@@ -1048,6 +1061,8 @@ void CheckPreTriangulationManfold(
       edges.push_back(edge);
     }
   }
+  // Edge data creates an extra manifoldness constraint that is only needed for
+  // checking polygon triangulation.
   for (auto &edge : edges) edge.edge = Edge::kNoIdx;
   CheckManifold(edges);
 }

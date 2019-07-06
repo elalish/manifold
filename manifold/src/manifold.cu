@@ -23,9 +23,6 @@
 #include "connected_components.cuh"
 #include "manifold.cuh"
 
-#define sind(x) (sin(glm::radians(fmod((x), 360))))
-#define cosd(x) (cos(glm::radians(fmod((x), 360))))
-
 namespace {
 using namespace manifold;
 
@@ -511,14 +508,17 @@ Manifold& Manifold::Scale(glm::vec3 v) {
 }
 
 Manifold& Manifold::Rotate(float xDegrees, float yDegrees, float zDegrees) {
-  glm::mat3 rX(1.0f, 0.0f, 0.0f,                      //
-               0.0f, cosd(xDegrees), sind(xDegrees),  //
-               0.0f, -sind(xDegrees), cosd(xDegrees));
-  glm::mat3 rY(cosd(yDegrees), 0.0f, -sind(yDegrees),  //
-               0.0f, 1.0f, 0.0f,                       //
-               sind(yDegrees), 0.0f, cosd(yDegrees));
-  glm::mat3 rZ(cosd(zDegrees), sind(zDegrees), 0.0f,   //
-               -sind(zDegrees), cosd(zDegrees), 0.0f,  //
+  float xRad = glm::radians(fmod(xDegrees, 360));
+  float yRad = glm::radians(fmod(yDegrees, 360));
+  float zRad = glm::radians(fmod(zDegrees, 360));
+  glm::mat3 rX(1.0f, 0.0f, 0.0f,            //
+               0.0f, cos(xRad), sin(xRad),  //
+               0.0f, -sin(xRad), cos(xRad));
+  glm::mat3 rY(cos(yRad), 0.0f, -sin(yRad),  //
+               0.0f, 1.0f, 0.0f,             //
+               sin(yRad), 0.0f, cos(yRad));
+  glm::mat3 rZ(cos(zRad), sin(zRad), 0.0f,   //
+               -sin(zRad), cos(zRad), 0.0f,  //
                0.0f, 0.0f, 1.0f);
   pImpl_->transform_ = rZ * rY * rX * pImpl_->transform_;
   return *this;
