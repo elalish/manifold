@@ -228,7 +228,7 @@ TEST(Manifold, BooleanWinding) {
 }
 
 TEST(Manifold, DISABLED_BooleanHorrible) {
-  Manifold random = Manifold::Sphere(10);
+  Manifold random = Manifold::Sphere(8);
   std::mt19937 gen(12345);  // Standard mersenne_twister_engine
   std::uniform_real_distribution<float> dis(-1.0f, 1.0f);
   random.Warp([&dis, &gen](glm::vec3& v) {
