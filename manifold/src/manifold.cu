@@ -23,8 +23,8 @@
 #include "connected_components.cuh"
 #include "manifold.cuh"
 
-#define sind(x) (sin(fmod((x), 360) * M_PI / 180))
-#define cosd(x) (cos(fmod((x), 360) * M_PI / 180))
+#define sind(x) (sin(glm::radians(fmod((x), 360))))
+#define cosd(x) (cos(glm::radians(fmod((x), 360))))
 
 namespace {
 using namespace manifold;
@@ -582,8 +582,8 @@ std::pair<Manifold, Manifold> Manifold::SplitByPlane(glm::vec3 normal,
   float size = glm::length(BoundingBox().Center() - normal * originOffset) +
                0.5f * glm::length(BoundingBox().Size());
   cutter.Scale(glm::vec3(size)).Translate({originOffset, 0.0f, 0.0f});
-  float yDeg = -glm::asin(normal.z) * 180.0f / glm::pi<float>();
-  float zDeg = glm::atan(normal.y, normal.x) * 180.0f / glm::pi<float>();
+  float yDeg = glm::degrees(-glm::asin(normal.z));
+  float zDeg = glm::degrees(glm::atan(normal.y, normal.x));
   cutter.Rotate(0.0f, yDeg, zDeg);
   return Split(cutter);
 }
