@@ -443,6 +443,11 @@ std::vector<glm::ivec3> Triangulate(const Polygons &polys) {
     triangles = PrimaryTriangulate(polys);
     CheckManifold(triangles, polys);
   } catch (const std::exception &e) {
+    // The primary triangulator has guaranteed manifold and non-overlapping
+    // output for non-overlapping input. For overlapping input it occasionally
+    // has trouble, and if so we switch to a simpler, toplogical backup
+    // triangulator that has guaranteed manifold output, except in the presence
+    // of
     if (kVerbose) {
       std::cout << "Primary triangulation failed, switching to backup"
                 << std::endl;
@@ -492,7 +497,7 @@ std::vector<glm::ivec3> BackupTriangulate(const Polygons &polys) {
     for (;;) {
       if (start == end) break;
       if (SharedEdge(startEdges, endEdges)) {
-        // Avoid shared edges by switching to the other side.
+        // Attempt to avoid shared edges by switching to the other side.
         if (forward) {
           start = Prev(start, poly.size());
           end = Prev(end, poly.size());
@@ -585,7 +590,7 @@ void CheckManifold(const std::vector<EdgeVerts> &halfedges) {
                     runtimeErr, "Not a 2-manifold.");
     }
   }
-  // Check that no internal edges link vertices that share the same edge data.
+  // Check that no interior edges link vertices that share the same edge data.
   std::map<int, glm::ivec2> vert2edges;
   for (EdgeVerts halfedge : halfedges) {
     if (halfedge.edge == Edge::kInterior)
@@ -599,18 +604,10 @@ void CheckManifold(const std::vector<EdgeVerts> &halfedges) {
     if (!vert.second) (vert.first->second)[1] = halfedge.edge;
   }
   for (int i = 0; i < n_edges; ++i) {
-    // only interested in internal edges
     if (forward[i].edge == Edge::kInterior &&
         backward[i].edge == Edge::kInterior) {
       glm::ivec2 TwoEdges0 = vert2edges.find(forward[i].first)->second;
       glm::ivec2 TwoEdges1 = vert2edges.find(forward[i].second)->second;
-      // std::cout << "verts = " << forward[i].first << ", " <<
-      // forward[i].second
-      //           << ", edge0 = " << TwoEdges0[0] << ", " <<
-      //           TwoEdges0[1]
-      //           << ", edge1 = " << TwoEdges1[0] << ", " <<
-      //           TwoEdges1[1]
-      //           << std::endl;
       ALWAYS_ASSERT(!SharedEdge(TwoEdges0, TwoEdges1), runtimeErr,
                     "Added an interface edge!");
     }

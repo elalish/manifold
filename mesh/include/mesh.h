@@ -13,8 +13,6 @@
 // limitations under the License.
 
 #pragma once
-#include <glm/glm.hpp>
-#include <vector>
 #include "structs.h"
 
 namespace manifold {
