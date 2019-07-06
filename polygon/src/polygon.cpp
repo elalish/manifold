@@ -443,9 +443,9 @@ std::vector<glm::ivec3> Triangulate(const Polygons &polys) {
     triangles = PrimaryTriangulate(polys);
     CheckManifold(triangles, polys);
   } catch (const std::exception &e) {
-    std::cout << "Primary triangulation failed, switching to backup"
-              << std::endl;
     if (kVerbose) {
+      std::cout << "Primary triangulation failed, switching to backup"
+                << std::endl;
       Dump(polys);
       std::cout << "produced this triangulation:" << std::endl;
       for (int j = 0; j < triangles.size(); ++j) {
@@ -457,12 +457,14 @@ std::vector<glm::ivec3> Triangulate(const Polygons &polys) {
       triangles = BackupTriangulate(polys);
       CheckManifold(triangles, polys);
     } catch (const std::exception &e) {
-      std::cout << "Backup triangulation failed!" << std::endl;
-      Dump(polys);
-      std::cout << "backup produced this triangulation:" << std::endl;
-      for (int j = 0; j < triangles.size(); ++j) {
-        std::cout << triangles[j][0] << ", " << triangles[j][1] << ", "
-                  << triangles[j][2] << std::endl;
+      if (kVerbose) {
+        std::cout << "Backup triangulation failed!" << std::endl;
+        Dump(polys);
+        std::cout << "backup produced this triangulation:" << std::endl;
+        for (int j = 0; j < triangles.size(); ++j) {
+          std::cout << triangles[j][0] << ", " << triangles[j][1] << ", "
+                    << triangles[j][2] << std::endl;
+        }
       }
       throw;
     }
@@ -479,14 +481,14 @@ std::vector<glm::ivec3> PrimaryTriangulate(const Polygons &polys) {
 
 std::vector<glm::ivec3> BackupTriangulate(const Polygons &polys) {
   std::vector<glm::ivec3> triangles;
-  for (auto poly : polys) {
+  for (const auto &poly : polys) {
     if (poly.size() < 3) continue;
     int start = 1;
     int end = poly.size() - 1;
     glm::ivec3 tri{poly[end].idx, poly[0].idx, poly[start].idx};
     glm::ivec2 startEdges{poly[start - 1].nextEdge, poly[start].nextEdge};
     glm::ivec2 endEdges{poly[end - 1].nextEdge, poly[end].nextEdge};
-    bool forward = true;
+    bool forward = false;
     for (;;) {
       if (start == end) break;
       if (SharedEdge(startEdges, endEdges)) {
@@ -505,6 +507,8 @@ std::vector<glm::ivec3> BackupTriangulate(const Polygons &polys) {
         forward = !forward;
       }
       triangles.push_back(tri);
+      // By default, alternate to avoid making a high degree vertex.
+      forward = !forward;
       if (forward) {
         start = Next(start, poly.size());
         startEdges = {poly[Prev(start, poly.size())].nextEdge,
@@ -515,8 +519,6 @@ std::vector<glm::ivec3> BackupTriangulate(const Polygons &polys) {
         endEdges = {poly[Prev(end, poly.size())].nextEdge, poly[end].nextEdge};
         tri = {poly[end].idx, tri[0], tri[2]};
       }
-      // By default, alternate to avoid making a high degree vertex.
-      forward = !forward;
     }
   }
   return triangles;

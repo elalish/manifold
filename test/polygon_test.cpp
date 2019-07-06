@@ -78,7 +78,7 @@ void TestPoly(const Polygons &polys, int expectedNumTri) {
 }
 }  // namespace
 
-TEST(SimplePolygon, NoAssemble) {
+TEST(Polygon, NoAssemble) {
   std::vector<EdgeVerts> edges;
   edges.push_back({0, 2});
   edges.push_back({7, 0});
@@ -86,7 +86,7 @@ TEST(SimplePolygon, NoAssemble) {
   ASSERT_THROW(Assemble(edges), runtimeErr);
 }
 
-TEST(SimplePolygon, SimpleHole) {
+TEST(Polygon, SimpleHole) {
   Polygons polys;
   polys.push_back({
       {glm::vec2(0, -2), 11, Edge::kNoIdx},  //
@@ -102,7 +102,7 @@ TEST(SimplePolygon, SimpleHole) {
   TestPoly(polys, 7);
 }
 
-TEST(SimplePolygon, SimpleHole2) {
+TEST(Polygon, SimpleHole2) {
   Polygons polys;
   polys.push_back({
       {glm::vec2(0, 1.63299), 0, Edge::kNoIdx},           //
@@ -117,7 +117,7 @@ TEST(SimplePolygon, SimpleHole2) {
   TestPoly(polys, 6);
 }
 
-TEST(SimplePolygon, MultiMerge) {
+TEST(Polygon, MultiMerge) {
   Polygons polys;
   polys.push_back({
       {glm::vec2(-7, 0), 5, Edge::kNoIdx},    //
@@ -139,7 +139,7 @@ TEST(SimplePolygon, MultiMerge) {
   TestPoly(polys, 13);
 }
 
-TEST(SimplePolygon, Colinear) {
+TEST(Polygon, Colinear) {
   Polygons polys;
   polys.push_back({
       {glm::vec2(-5.48368, -3.73905), 0, Edge::kNoIdx},   //
@@ -172,7 +172,7 @@ TEST(SimplePolygon, Colinear) {
   TestPoly(polys, 24);
 }
 
-TEST(SimplePolygon, Merges) {
+TEST(Polygon, Merges) {
   Polygons polys;
   polys.push_back({
       {glm::vec2(-3.22039, 10.2769), 0, Edge::kNoIdx},   //
@@ -190,7 +190,7 @@ TEST(SimplePolygon, Merges) {
   TestPoly(polys, 9);
 }
 
-TEST(SimplePolygon, ColinearY) {
+TEST(Polygon, ColinearY) {
   Polygons polys;
   polys.push_back({
       {glm::vec2(0, 0), 0, Edge::kNoIdx},   //
@@ -215,7 +215,7 @@ TEST(SimplePolygon, ColinearY) {
   TestPoly(polys, 16);
 }
 
-TEST(SimplePolygon, Inverted) {
+TEST(Polygon, Inverted) {
   Polygons polys;
   polys.push_back({
       {glm::vec2(0, 2.04124), 0, Edge::kNoIdx},           //
@@ -304,6 +304,26 @@ TEST(Polygon, BadEdges) {
       std::cout << tri.x << ", " << tri.y << ", " << tri.z << std::endl;
     }
   CheckManifold(triangles, polys);
+}
+
+TEST(Polygon, BadEdges2) {
+  Polygons polys;
+  polys.push_back({
+      {glm::vec2(-0.292598, -0.322469), 1, 0},    //
+      {glm::vec2(-0.282797, -0.340069), 2, -1},   //
+      {glm::vec2(-0.158295, -0.30762), 26, 8},    //
+      {glm::vec2(-0.189351, -0.230253), 27, -1},  //
+      {glm::vec2(-0.329733, -0.255784), 3, 0},    //
+      {glm::vec2(-0.342412, -0.233016), 4, -1},   //
+      {glm::vec2(-0.202167, -0.198325), 28, 8},   //
+      {glm::vec2(-0.223625, -0.144868), 25, -1},  //
+  });
+  std::vector<glm::ivec3> triangles = BackupTriangulate(polys);
+  if (kVerbose)
+    for (auto tri : triangles) {
+      std::cout << tri.x << ", " << tri.y << ", " << tri.z << std::endl;
+    }
+  EXPECT_THROW(CheckManifold(triangles, polys), runtimeErr);
 }
 
 // void fnExit() { throw std::runtime_error("Someone called Exit()!"); }
