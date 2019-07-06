@@ -227,7 +227,7 @@ TEST(Manifold, BooleanWinding) {
   ExpectMeshes(result, {{8, 12}, {8, 12}});
 }
 
-TEST(Manifold, DISABLED_BooleanHorrible) {
+TEST(Manifold, BooleanHorrible) {
   Manifold random = Manifold::Sphere(8);
   std::mt19937 gen(12345);  // Standard mersenne_twister_engine
   std::uniform_real_distribution<float> dis(-1.0f, 1.0f);

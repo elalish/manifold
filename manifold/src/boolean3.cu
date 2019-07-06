@@ -27,11 +27,12 @@
 #include <thrust/sequence.h>
 #include <thrust/set_operations.h>
 #include <thrust/sort.h>
+#include <thrust/transform_reduce.h>
 #include <thrust/transform_scan.h>
 #include <thrust/unique.h>
 #include <algorithm>
 
-constexpr bool kVerbose = true;
+constexpr bool kVerbose = false;
 
 using namespace thrust::placeholders;
 
@@ -967,7 +968,7 @@ void AppendNewEdges(std::vector<std::vector<EdgeVerts>> &facesP,
 }
 
 void AppendIntersectedFaces(VecDH<glm::ivec3> &triVerts,
-                            const VecDH<glm::vec3> &vertPos,
+                            VecDH<glm::vec3> &vertPos,
                             const std::vector<std::vector<EdgeVerts>> &facesP,
                             const Manifold::Impl &inP) {
   for (int i = 0; i < facesP.size(); ++i) {
@@ -1006,14 +1007,24 @@ void AppendIntersectedFaces(VecDH<glm::ivec3> &triVerts,
             v.pos = glm::transpose(projection) * vertPos.H()[v.idx];
           }
         }
-        // bool print = false;
-        // for (auto edge : face)
-        //   if (edge.first == 0) print = true;
-        // if (print) {
-        //   std::cout << "Face through 0" << std::endl;
-        //   Dump(polys);
-        // }
-        std::vector<glm::ivec3> newTris = Triangulate(polys);
+        std::vector<glm::ivec3> newTris;
+        try {
+          newTris = Triangulate(polys);
+        } catch (const std::exception &e) {
+          for (const auto &poly : polys) {
+            glm::vec3 centroid = thrust::transform_reduce(
+                poly.begin(), poly.end(),
+                [&vertPos](PolyVert v) { return vertPos.H()[v.idx]; },
+                glm::vec3(0.0f),
+                [](glm::vec3 a, glm::vec3 b) { return a + b; });
+            centroid /= poly.size();
+            int newVert = vertPos.size();
+            vertPos.H().push_back(centroid);
+            newTris.push_back({poly.back().idx, poly.front().idx, newVert});
+            for (int i = 1; i < poly.size(); ++i)
+              newTris.push_back({poly[i - 1].idx, poly[i].idx, newVert});
+          }
+        }
         for (auto tri : newTris) triVerts.H().push_back(tri);
       }
     }
