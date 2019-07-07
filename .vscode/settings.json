@@ -2,7 +2,7 @@
     "files.associations": {
         "*.cu": "cpp",
         "*.cuh": "cpp",
-        "*.m": "matlab"
+        "*.m": "matlab",
     },
     "C_Cpp.clang_format_style": "google",
     "C_Cpp.clang_format_fallbackStyle": "google",

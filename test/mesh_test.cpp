@@ -162,7 +162,7 @@ TEST(Manifold, SplitByPlane) {
   float phi = glm::pi<float>() / 6.0f;
   std::pair<Manifold, Manifold> splits =
       cube.SplitByPlane({glm::sin(phi), -glm::cos(phi), 0.0f}, 1.0f);
-  EXPECT_FLOAT_EQ(splits.first.Volume(), splits.second.Volume());
+  EXPECT_NEAR(splits.first.Volume(), splits.second.Volume(), 1e-5);
 }
 
 TEST(Manifold, BooleanSphere) {
@@ -227,8 +227,8 @@ TEST(Manifold, BooleanWinding) {
   ExpectMeshes(result, {{8, 12}, {8, 12}});
 }
 
-TEST(Manifold, DISABLED_BooleanHorrible) {
-  Manifold random = Manifold::Sphere(10);
+TEST(Manifold, BooleanHorrible) {
+  Manifold random = Manifold::Sphere(8);
   std::mt19937 gen(12345);  // Standard mersenne_twister_engine
   std::uniform_real_distribution<float> dis(-1.0f, 1.0f);
   random.Warp([&dis, &gen](glm::vec3& v) {
@@ -238,4 +238,41 @@ TEST(Manifold, DISABLED_BooleanHorrible) {
   random2.Rotate(90);
   Manifold result = random ^ random2;
   EXPECT_TRUE(result.IsValid());
+}
+
+TEST(Manifold, BooleanHorrible2) {
+  Manifold random = Manifold::Sphere(32);
+  std::mt19937 gen(54321);  // Standard mersenne_twister_engine
+  std::uniform_real_distribution<float> dis(-1.0f, 1.0f);
+  random.Warp([&dis, &gen](glm::vec3& v) {
+    v = glm::vec3(dis(gen), dis(gen), dis(gen));
+  });
+  Manifold random2 = random.DeepCopy();
+  random2.Rotate(90);
+  Manifold result = random ^ random2;
+  EXPECT_TRUE(result.IsValid());
+}
+
+TEST(Manifold, BooleanHorriblePlanar) {
+  Manifold random = Manifold::Sphere(32);
+  std::mt19937 gen(654321);  // Standard mersenne_twister_engine
+  std::uniform_real_distribution<float> dis(-1.0f, 1.0f);
+  random.Warp(
+      [&dis, &gen](glm::vec3& v) { v = glm::vec3(dis(gen), dis(gen), 0.0f); });
+  Manifold random2 = random.DeepCopy();
+  float a = 0.2;
+  float phi = asin(a);
+  random.Rotate(0, glm::degrees(-phi));
+  random2.Rotate(glm::degrees(phi));
+  Manifold result = random ^ random2;
+  result.Rotate(0, 0, 45).Rotate(glm::degrees(atan(sqrt(2.0f) / tan(phi))));
+  EXPECT_TRUE(result.IsValid());
+  Box BB = result.BoundingBox();
+  float tol = 1e-7;
+  EXPECT_NEAR(BB.Center().x, 0.0f, tol);
+  EXPECT_NEAR(BB.Center().y, 0.0f, tol);
+  EXPECT_NEAR(BB.Size().x, 0.0f, tol);
+  EXPECT_NEAR(BB.Size().y, 0.0f, tol);
+  EXPECT_GT(BB.Size().z, 1.0f);
+  EXPECT_LT(BB.Size().z, 4.0f);
 }
