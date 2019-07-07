@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "mesh.h"
+#include "meshIO.h"
 #include <algorithm>
 #include "assimp/Exporter.hpp"
 #include "assimp/Importer.hpp"
