@@ -48,8 +48,17 @@ void AlwaysAssert(bool condition, const char* file, int line,
 #define HOST_DEVICE
 #endif
 
-using EdgeVerts = std::pair<int, int>;
-using TriVerts = glm::ivec3;
+namespace Edge {
+constexpr int kNoIdx = -1;
+constexpr int kInterior = -2;
+constexpr int kInvalid = -3;
+}  // namespace Edge
+
+struct EdgeVerts {
+  int first;
+  int second;
+  int edge;
+};
 
 struct EdgeIdx {
   uint32_t idx;
@@ -73,6 +82,7 @@ struct TriEdges {
 struct PolyVert {
   glm::vec2 pos;
   int idx;
+  int nextEdge;
 };
 
 using SimplePolygon = std::vector<PolyVert>;

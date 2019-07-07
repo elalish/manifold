@@ -13,15 +13,13 @@
 // limitations under the License.
 
 #pragma once
-#include <glm/glm.hpp>
-#include <vector>
 #include "structs.h"
 
 namespace manifold {
 
 struct Mesh {
   std::vector<glm::vec3> vertPos;
-  std::vector<TriVerts> triVerts;
+  std::vector<glm::ivec3> triVerts;
 };
 
 Mesh ImportMesh(const std::string& filename);

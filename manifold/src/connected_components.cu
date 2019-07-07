@@ -237,6 +237,8 @@ void FloodComponents(VecDH<int>& valuesInOut, VecDH<int>& componentLabels,
                    componentLabels.begin();
       label = componentLabels.H()[sourceVert];
       value = 0;
+      ALWAYS_ASSERT(sourceVert < componentLabels.size(), logicErr,
+                    "Failed to find component!");
     }
     thrust::for_each_n(zip(valuesInOut.beginD(), componentLabels.beginD()),
                        valuesInOut.size(), FloodComponent({value, label}));

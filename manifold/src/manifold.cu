@@ -23,9 +23,6 @@
 #include "connected_components.cuh"
 #include "manifold.cuh"
 
-#define sind(x) (sin(fmod((x), 360) * M_PI / 180))
-#define cosd(x) (cos(fmod((x), 360) * M_PI / 180))
-
 namespace {
 using namespace manifold;
 
@@ -45,7 +42,7 @@ struct Equals {
 struct TetVolume {
   const glm::vec3* vertPos;
 
-  __host__ __device__ float operator()(const TriVerts& triVerts) {
+  __host__ __device__ float operator()(const glm::ivec3& triVerts) {
     return glm::dot(vertPos[triVerts[0]],
                     glm::cross(vertPos[triVerts[1]], vertPos[triVerts[2]])) /
            6;
@@ -55,7 +52,7 @@ struct TetVolume {
 struct TriArea {
   const glm::vec3* vertPos;
 
-  __host__ __device__ float operator()(const TriVerts& triVerts) {
+  __host__ __device__ float operator()(const glm::ivec3& triVerts) {
     return 0.5 *
            glm::length(glm::cross(vertPos[triVerts[1]] - vertPos[triVerts[0]],
                                   vertPos[triVerts[2]] - vertPos[triVerts[0]]));
@@ -65,7 +62,7 @@ struct TriArea {
 struct KeepTri {
   int val;
   const int* components;
-  __host__ __device__ bool operator()(TriVerts tri) {
+  __host__ __device__ bool operator()(glm::ivec3 tri) {
     return components[tri[0]] == val;
   }
 };
@@ -93,9 +90,9 @@ struct InteriorVerts {
   const int startIdx;
   const int n;
 
-  __host__ __device__ void operator()(thrust::tuple<int, TriVerts> in) {
+  __host__ __device__ void operator()(thrust::tuple<int, glm::ivec3> in) {
     int tri = thrust::get<0>(in);
-    TriVerts triVerts = thrust::get<1>(in);
+    glm::ivec3 triVerts = thrust::get<1>(in);
 
     int vertsPerTri = ((n - 2) * (n - 2) + (n - 2)) / 2;
     float invTotal = 1.0f / n;
@@ -110,7 +107,7 @@ struct InteriorVerts {
 };
 
 struct SplitTris {
-  TriVerts* triVerts;
+  glm::ivec3* triVerts;
   const int edgeIdx;
   const int triIdx;
   const int n;
@@ -129,7 +126,7 @@ struct SplitTris {
     return triIdx + vertsPerTri * tri + vertOffset;
   }
 
-  __host__ __device__ int Vert(int i, int j, int tri, TriVerts triVert,
+  __host__ __device__ int Vert(int i, int j, int tri, glm::ivec3 triVert,
                                TriEdges triEdge) const {
     bool edge0 = i == 0;
     bool edge1 = j == 0;
@@ -153,9 +150,9 @@ struct SplitTris {
   }
 
   __host__ __device__ void operator()(
-      thrust::tuple<int, TriVerts, TriEdges> in) {
+      thrust::tuple<int, glm::ivec3, TriEdges> in) {
     int tri = thrust::get<0>(in);
-    TriVerts triVert = thrust::get<1>(in);
+    glm::ivec3 triVert = thrust::get<1>(in);
     TriEdges triEdge = thrust::get<2>(in);
 
     int pos = n * n * tri;
@@ -164,31 +161,33 @@ struct SplitTris {
         int a = Vert(i, j, tri, triVert, triEdge);
         int b = Vert(i + 1, j, tri, triVert, triEdge);
         int c = Vert(i, j + 1, tri, triVert, triEdge);
-        triVerts[pos++] = TriVerts(a, b, c);
+        triVerts[pos++] = glm::ivec3(a, b, c);
         if (j < n - 1 - i) {
           int d = Vert(i + 1, j + 1, tri, triVert, triEdge);
-          triVerts[pos++] = TriVerts(b, d, c);
+          triVerts[pos++] = glm::ivec3(b, d, c);
         }
       }
     }
   }
 };
 
-struct IdxMin : public thrust::binary_function<TriVerts, TriVerts, TriVerts> {
-  __host__ __device__ int min3(TriVerts a) {
+struct IdxMin
+    : public thrust::binary_function<glm::ivec3, glm::ivec3, glm::ivec3> {
+  __host__ __device__ int min3(glm::ivec3 a) {
     return glm::min(a.x, glm::min(a.y, a.z));
   }
-  __host__ __device__ TriVerts operator()(TriVerts a, TriVerts b) {
-    return TriVerts(glm::min(min3(a), min3(b)));
+  __host__ __device__ glm::ivec3 operator()(glm::ivec3 a, glm::ivec3 b) {
+    return glm::ivec3(glm::min(min3(a), min3(b)));
   }
 };
 
-struct IdxMax : public thrust::binary_function<TriVerts, TriVerts, TriVerts> {
-  __host__ __device__ int max3(TriVerts a) {
+struct IdxMax
+    : public thrust::binary_function<glm::ivec3, glm::ivec3, glm::ivec3> {
+  __host__ __device__ int max3(glm::ivec3 a) {
     return glm::max(a.x, glm::max(a.y, a.z));
   }
-  __host__ __device__ TriVerts operator()(TriVerts a, TriVerts b) {
-    return TriVerts(glm::max(max3(a), max3(b)));
+  __host__ __device__ glm::ivec3 operator()(glm::ivec3 a, glm::ivec3 b) {
+    return glm::ivec3(glm::max(max3(a), max3(b)));
   }
 };
 
@@ -244,7 +243,7 @@ struct Morton {
 struct Reindex {
   const int* indexInv_;
 
-  __host__ __device__ void operator()(TriVerts& triVerts) {
+  __host__ __device__ void operator()(glm::ivec3& triVerts) {
     for (int i : {0, 1, 2}) triVerts[i] = indexInv_[triVerts[i]];
   }
 };
@@ -254,10 +253,10 @@ struct TriMortonBox {
   const Box bBox;
 
   __host__ __device__ void operator()(
-      thrust::tuple<uint32_t&, Box&, const TriVerts&> inout) {
+      thrust::tuple<uint32_t&, Box&, const glm::ivec3&> inout) {
     uint32_t& mortonCode = thrust::get<0>(inout);
     Box& triBox = thrust::get<1>(inout);
-    const TriVerts& triVerts = thrust::get<2>(inout);
+    const glm::ivec3& triVerts = thrust::get<2>(inout);
 
     glm::vec3 center =
         (vertPos[triVerts[0]] + vertPos[triVerts[1]] + vertPos[triVerts[2]]) /
@@ -282,8 +281,8 @@ struct MakeHalfedges {
   int i, j;
 
   __host__ __device__ void operator()(
-      thrust::tuple<TriEdges&, int&, EdgeVertsD&, const TriVerts&> inout) {
-    const TriVerts& in = thrust::get<3>(inout);
+      thrust::tuple<TriEdges&, int&, EdgeVertsD&, const glm::ivec3&> inout) {
+    const glm::ivec3& in = thrust::get<3>(inout);
     int V1 = in[i];
     int V2 = in[j];
     TriEdges& triEdges = thrust::get<0>(inout);
@@ -332,8 +331,8 @@ struct LinkEdges2Tris {
 struct CheckTris {
   const EdgeVertsD* edgeVerts;
 
-  __host__ __device__ bool operator()(thrust::tuple<TriVerts, TriEdges> in) {
-    const TriVerts& triVerts = thrust::get<0>(in);
+  __host__ __device__ bool operator()(thrust::tuple<glm::ivec3, TriEdges> in) {
+    const glm::ivec3& triVerts = thrust::get<0>(in);
     const TriEdges& triEdges = thrust::get<1>(in);
     bool good = true;
     for (int i : {0, 1, 2}) {
@@ -509,14 +508,17 @@ Manifold& Manifold::Scale(glm::vec3 v) {
 }
 
 Manifold& Manifold::Rotate(float xDegrees, float yDegrees, float zDegrees) {
-  glm::mat3 rX(1.0f, 0.0f, 0.0f,                      //
-               0.0f, cosd(xDegrees), sind(xDegrees),  //
-               0.0f, -sind(xDegrees), cosd(xDegrees));
-  glm::mat3 rY(cosd(yDegrees), 0.0f, -sind(yDegrees),  //
-               0.0f, 1.0f, 0.0f,                       //
-               sind(yDegrees), 0.0f, cosd(yDegrees));
-  glm::mat3 rZ(cosd(zDegrees), sind(zDegrees), 0.0f,   //
-               -sind(zDegrees), cosd(zDegrees), 0.0f,  //
+  float xRad = glm::radians(fmod(xDegrees, 360));
+  float yRad = glm::radians(fmod(yDegrees, 360));
+  float zRad = glm::radians(fmod(zDegrees, 360));
+  glm::mat3 rX(1.0f, 0.0f, 0.0f,            //
+               0.0f, cos(xRad), sin(xRad),  //
+               0.0f, -sin(xRad), cos(xRad));
+  glm::mat3 rY(cos(yRad), 0.0f, -sin(yRad),  //
+               0.0f, 1.0f, 0.0f,             //
+               sin(yRad), 0.0f, cos(yRad));
+  glm::mat3 rZ(cos(zRad), sin(zRad), 0.0f,   //
+               -sin(zRad), cos(zRad), 0.0f,  //
                0.0f, 0.0f, 1.0f);
   pImpl_->transform_ = rZ * rY * rX * pImpl_->transform_;
   return *this;
@@ -580,8 +582,8 @@ std::pair<Manifold, Manifold> Manifold::SplitByPlane(glm::vec3 normal,
   float size = glm::length(BoundingBox().Center() - normal * originOffset) +
                0.5f * glm::length(BoundingBox().Size());
   cutter.Scale(glm::vec3(size)).Translate({originOffset, 0.0f, 0.0f});
-  float yDeg = -glm::asin(normal.z) * 180.0f / glm::pi<float>();
-  float zDeg = glm::atan(normal.y, normal.x) * 180.0f / glm::pi<float>();
+  float yDeg = glm::degrees(-glm::asin(normal.z));
+  float zDeg = glm::degrees(glm::atan(normal.y, normal.x));
   cutter.Rotate(0.0f, yDeg, zDeg);
   return Split(cutter);
 }
@@ -594,7 +596,7 @@ Manifold::Impl::Impl(const Mesh& manifold)
 
 Manifold::Impl::Impl(Shape shape) {
   std::vector<glm::vec3> vertPos;
-  std::vector<TriVerts> triVerts;
+  std::vector<glm::ivec3> triVerts;
   switch (shape) {
     case Shape::TETRAHEDRON:
       vertPos = {{-1.0f, -1.0f, 1.0f},
@@ -641,11 +643,11 @@ Manifold::Impl::Impl(Shape shape) {
 
 void Manifold::Impl::Finish() {
   ALWAYS_ASSERT(thrust::reduce(triVerts_.beginD(), triVerts_.endD(),
-                               TriVerts(std::numeric_limits<int>::max()),
+                               glm::ivec3(std::numeric_limits<int>::max()),
                                IdxMin())[0] >= 0,
                 runtimeErr, "Negative vertex index!");
   ALWAYS_ASSERT(thrust::reduce(triVerts_.beginD(), triVerts_.endD(),
-                               TriVerts(-1), IdxMax())[0] < NumVert(),
+                               glm::ivec3(-1), IdxMax())[0] < NumVert(),
                 runtimeErr, "Vertex index exceeds number of verts!");
   CalculateBBox();
   SortVerts();
@@ -713,7 +715,7 @@ void Manifold::Impl::Refine(int n) {
   thrust::for_each_n(zip(thrust::make_counting_iterator(0), triVerts_.beginD()),
                      numTri, InteriorVerts({vertPos_.ptrD(), triVertStart, n}));
   // Create subtriangles
-  VecDH<TriVerts> inTri(triVerts_);
+  VecDH<glm::ivec3> inTri(triVerts_);
   triVerts_.resize(n * n * numTri);
   thrust::for_each_n(zip(thrust::make_counting_iterator(0), inTri.beginD(),
                          triEdges_.beginD()),

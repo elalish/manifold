@@ -28,7 +28,7 @@ class Manifold {
   static Manifold Tetrahedron();
   static Manifold Cube();
   static Manifold Octahedron();
-  static Manifold Sphere(int circularSegments);
+  static Manifold Sphere(int circularSegments);  // rounds up to multiple of 4
 
   // Topological
   Manifold(const std::vector<Manifold>&);

@@ -34,8 +34,8 @@ struct VertAdj {
   bool Processed() const { return across >= 0; }
 };
 
-int next(int i, int n) { return ++i >= n ? 0 : i; }
-int prev(int i, int n) { return --i < 0 ? n - 1 : i; }
+int Next(int i, int n) { return ++i >= n ? 0 : i; }
+int Prev(int i, int n) { return --i < 0 ? n - 1 : i; }
 
 int CCW(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2) {
   glm::vec2 v1 = p1 - p0;
@@ -64,8 +64,8 @@ class Monotones {
       for (int i = 0; i < poly.size(); ++i) {
         monotones_.push_back({poly[i].pos,                   //
                               poly[i].idx,                   //
-                              next(i, poly.size()) + start,  //
-                              prev(i, poly.size()) + start,  //
+                              Next(i, poly.size()) + start,  //
+                              Prev(i, poly.size()) + start,  //
                               -1, false});
         // Ensure sweep line is sorted identically here and in the Triangulator
         // below, including when the y-values are identical.
@@ -98,7 +98,7 @@ class Monotones {
   void Check() {
     std::vector<EdgeVerts> edges;
     for (int i = 0; i < monotones_.size(); ++i) {
-      edges.emplace_back(i, monotones_[i].right);
+      edges.push_back({i, monotones_[i].right, Edge::kNoIdx});
       ALWAYS_ASSERT(monotones_[monotones_[i].right].right != i, logicErr,
                     "two-edge monotone!");
       ALWAYS_ASSERT(monotones_[monotones_[i].right].left == i, logicErr,
@@ -274,7 +274,7 @@ class Triangulator {
   }
   int NumTriangles() { return triangles_output; }
 
-  bool ProcessVert(int vi_idx, std::vector<TriVerts> &triangles) {
+  bool ProcessVert(int vi_idx, std::vector<glm::ivec3> &triangles) {
     int attached = Attached(vi_idx);
     if (attached == 0)
       return 0;
@@ -349,7 +349,7 @@ class Triangulator {
     }
   }
 
-  void AddTriangle(std::vector<TriVerts> &triangles, int v0, int v1, int v2) {
+  void AddTriangle(std::vector<glm::ivec3> &triangles, int v0, int v1, int v2) {
     if (onRight_)
       triangles.emplace_back(v0, v1, v2);
     else
@@ -359,7 +359,7 @@ class Triangulator {
 };
 
 void TriangulateMonotones(const std::vector<VertAdj> &monotones,
-                          std::vector<TriVerts> &triangles) {
+                          std::vector<glm::ivec3> &triangles) {
   // make sorted index list to traverse the sweep line.
   std::vector<std::tuple<float, int, int>> sweep_line;
   for (int i = 0; i < monotones.size(); ++i) {
@@ -399,6 +399,13 @@ void TriangulateMonotones(const std::vector<VertAdj> &monotones,
   ALWAYS_ASSERT(triangles_left == 0, logicErr,
                 "Triangulation produced wrong number of triangles.");
 }
+
+bool SharedEdge(glm::ivec2 edges0, glm::ivec2 edges1) {
+  return (edges0[0] != Edge::kNoIdx &&
+          (edges0[0] == edges1[0] || edges0[0] == edges1[1])) ||
+         (edges0[1] != Edge::kNoIdx &&
+          (edges0[1] == edges1[0] || edges0[1] == edges1[1]));
+}
 }  // namespace
 
 namespace manifold {
@@ -420,7 +427,8 @@ Polygons Assemble(const std::vector<EdgeVerts> &halfedges) {
       thisEdge = startEdge;
       polys.push_back({});
     }
-    polys.back().push_back({glm::vec2(1.0f / 0.0f), thisEdge->first});
+    polys.back().push_back(
+        {glm::vec2(1.0f / 0.0f), thisEdge->first, thisEdge->edge});
     auto result = vert_edge.find(thisEdge->second);
     ALWAYS_ASSERT(result != vert_edge.end(), runtimeErr, "nonmanifold edge");
     thisEdge = std::next(halfedges.begin(), result->second);
@@ -429,15 +437,20 @@ Polygons Assemble(const std::vector<EdgeVerts> &halfedges) {
   return polys;
 }
 
-std::vector<TriVerts> Triangulate(const Polygons &polys) {
-  std::vector<TriVerts> triangles;
+std::vector<glm::ivec3> Triangulate(const Polygons &polys) {
+  std::vector<glm::ivec3> triangles;
   try {
     triangles = PrimaryTriangulate(polys);
     CheckManifold(triangles, polys);
   } catch (const std::exception &e) {
-    std::cout << "Primary triangulation failed, switching to backup"
-              << std::endl;
+    // The primary triangulator has guaranteed manifold and non-overlapping
+    // output for non-overlapping input. For overlapping input it occasionally
+    // has trouble, and if so we switch to a simpler, toplogical backup
+    // triangulator that has guaranteed manifold output, except in the presence
+    // of
     if (kVerbose) {
+      std::cout << "Primary triangulation failed, switching to backup"
+                << std::endl;
       Dump(polys);
       std::cout << "produced this triangulation:" << std::endl;
       for (int j = 0; j < triangles.size(); ++j) {
@@ -449,44 +462,68 @@ std::vector<TriVerts> Triangulate(const Polygons &polys) {
       triangles = BackupTriangulate(polys);
       CheckManifold(triangles, polys);
     } catch (const std::exception &e) {
-      std::cout << "Backup triangulation failed!" << std::endl;
-      Dump(polys);
-      std::cout << "backup produced this triangulation:" << std::endl;
-      for (int j = 0; j < triangles.size(); ++j) {
-        std::cout << triangles[j][0] << ", " << triangles[j][1] << ", "
-                  << triangles[j][2] << std::endl;
+      if (kVerbose) {
+        std::cout << "Backup triangulation failed!" << std::endl;
+        Dump(polys);
+        std::cout << "backup produced this triangulation:" << std::endl;
+        for (int j = 0; j < triangles.size(); ++j) {
+          std::cout << triangles[j][0] << ", " << triangles[j][1] << ", "
+                    << triangles[j][2] << std::endl;
+        }
       }
-      throw e;
+      throw;
     }
   }
   return triangles;
 }
 
-std::vector<TriVerts> PrimaryTriangulate(const Polygons &polys) {
-  std::vector<TriVerts> triangles;
+std::vector<glm::ivec3> PrimaryTriangulate(const Polygons &polys) {
+  std::vector<glm::ivec3> triangles;
   Monotones monotones(polys);
   TriangulateMonotones(monotones.GetMonotones(), triangles);
   return triangles;
 }
 
-std::vector<TriVerts> BackupTriangulate(const Polygons &polys) {
-  std::vector<TriVerts> triangles;
-  for (auto poly : polys) {
+std::vector<glm::ivec3> BackupTriangulate(const Polygons &polys) {
+  std::vector<glm::ivec3> triangles;
+  for (const auto &poly : polys) {
     if (poly.size() < 3) continue;
-    TriVerts tri = {poly[0].idx, poly[1].idx, poly[2].idx};
-    int start = 2;
-    int end = poly.size();
-    bool forward = true;
+    int start = 1;
+    int end = poly.size() - 1;
+    glm::ivec3 tri{poly[end].idx, poly[0].idx, poly[start].idx};
+    glm::ivec2 startEdges{poly[start - 1].nextEdge, poly[start].nextEdge};
+    glm::ivec2 endEdges{poly[end - 1].nextEdge, poly[end].nextEdge};
+    bool forward = false;
     for (;;) {
+      if (start == end) break;
+      if (SharedEdge(startEdges, endEdges)) {
+        // Attempt to avoid shared edges by switching to the other side.
+        if (forward) {
+          start = Prev(start, poly.size());
+          end = Prev(end, poly.size());
+          tri = {poly[end].idx, tri[0], tri[1]};
+        } else {
+          start = Next(start, poly.size());
+          end = Next(end, poly.size());
+          tri = {tri[1], tri[2], poly[start].idx};
+        }
+        startEdges = {poly[start - 1].nextEdge, poly[start].nextEdge};
+        endEdges = {poly[end - 1].nextEdge, poly[end].nextEdge};
+        forward = !forward;
+      }
       triangles.push_back(tri);
+      // By default, alternate to avoid making a high degree vertex.
       forward = !forward;
       if (forward) {
-        tri = {tri[2], tri[1], poly[++start].idx};
+        start = Next(start, poly.size());
+        startEdges = {poly[Prev(start, poly.size())].nextEdge,
+                      poly[start].nextEdge};
+        tri = {tri[0], tri[2], poly[start].idx};
       } else {
-        tri[1] = tri[2];
-        tri[2] = poly[--end].idx;
+        end = Prev(end, poly.size());
+        endEdges = {poly[Prev(end, poly.size())].nextEdge, poly[end].nextEdge};
+        tri = {poly[end].idx, tri[0], tri[2]};
       }
-      if (start == end) break;
     }
   }
   return triangles;
@@ -496,19 +533,21 @@ std::vector<EdgeVerts> Polygons2Edges(const Polygons &polys) {
   std::vector<EdgeVerts> halfedges;
   for (const auto &poly : polys) {
     for (int i = 1; i < poly.size(); ++i) {
-      halfedges.emplace_back(poly[i - 1].idx, poly[i].idx);
+      halfedges.push_back({poly[i - 1].idx, poly[i].idx, poly[i - 1].nextEdge});
     }
-    halfedges.emplace_back(poly.back().idx, poly[0].idx);
+    halfedges.push_back({poly.back().idx, poly[0].idx, poly.back().nextEdge});
   }
   return halfedges;
 }
 
-std::vector<EdgeVerts> Triangles2Edges(const std::vector<TriVerts> &triangles) {
+std::vector<EdgeVerts> Triangles2Edges(
+    const std::vector<glm::ivec3> &triangles) {
   std::vector<EdgeVerts> halfedges;
-  for (const TriVerts &tri : triangles) {
-    halfedges.emplace_back(tri[0], tri[1]);
-    halfedges.emplace_back(tri[1], tri[2]);
-    halfedges.emplace_back(tri[2], tri[0]);
+  for (const glm::ivec3 &tri : triangles) {
+    // Differentiate edges of triangles by setting index to Edge::kInterior.
+    halfedges.push_back({tri[0], tri[1], Edge::kInterior});
+    halfedges.push_back({tri[1], tri[2], Edge::kInterior});
+    halfedges.push_back({tri[2], tri[0], Edge::kInterior});
   }
   return halfedges;
 }
@@ -533,27 +572,54 @@ void CheckManifold(const std::vector<EdgeVerts> &halfedges) {
 
   std::for_each(backward.begin(), backward.end(),
                 [](EdgeVerts &e) { std::swap(e.first, e.second); });
-  std::sort(forward.begin(), forward.end());
-  std::sort(backward.begin(), backward.end());
-  for (int i = 0; i < forward.size(); ++i) {
+  auto cmp = [](const EdgeVerts &a, const EdgeVerts &b) {
+    return a.first < b.first || (a.first == b.first && a.second < b.second);
+  };
+  std::sort(forward.begin(), forward.end(), cmp);
+  std::sort(backward.begin(), backward.end(), cmp);
+  for (int i = 0; i < n_edges; ++i) {
     ALWAYS_ASSERT(forward[i].first == backward[i].first &&
                       forward[i].second == backward[i].second,
                   runtimeErr, "Forward and backward edge do not match.");
+    if (i > 0) {
+      ALWAYS_ASSERT(forward[i - 1].first == forward[i - 1].first &&
+                        forward[i].second == forward[i].second,
+                    runtimeErr, "Not a 2-manifold.");
+      ALWAYS_ASSERT(backward[i - 1].first == backward[i - 1].first &&
+                        backward[i].second == backward[i].second,
+                    runtimeErr, "Not a 2-manifold.");
+    }
   }
-  ALWAYS_ASSERT(
-      forward.end() == std::adjacent_find(forward.begin(), forward.end()),
-      runtimeErr, "Not a 2-manifold.");
-  ALWAYS_ASSERT(
-      backward.end() == std::adjacent_find(backward.begin(), backward.end()),
-      runtimeErr, "Not a 2-manifold.");
+  // Check that no interior edges link vertices that share the same edge data.
+  std::map<int, glm::ivec2> vert2edges;
+  for (EdgeVerts halfedge : halfedges) {
+    if (halfedge.edge == Edge::kInterior)
+      continue;  // only interested in polygon edges
+    auto vert = vert2edges.emplace(halfedge.first,
+                                   glm::ivec2(halfedge.edge, Edge::kInvalid));
+    if (!vert.second) (vert.first->second)[1] = halfedge.edge;
+
+    vert = vert2edges.emplace(halfedge.second,
+                              glm::ivec2(halfedge.edge, Edge::kInvalid));
+    if (!vert.second) (vert.first->second)[1] = halfedge.edge;
+  }
+  for (int i = 0; i < n_edges; ++i) {
+    if (forward[i].edge == Edge::kInterior &&
+        backward[i].edge == Edge::kInterior) {
+      glm::ivec2 TwoEdges0 = vert2edges.find(forward[i].first)->second;
+      glm::ivec2 TwoEdges1 = vert2edges.find(forward[i].second)->second;
+      ALWAYS_ASSERT(!SharedEdge(TwoEdges0, TwoEdges1), runtimeErr,
+                    "Added an interface edge!");
+    }
+  }
 }
 
-void CheckManifold(const std::vector<TriVerts> &triangles,
+void CheckManifold(const std::vector<glm::ivec3> &triangles,
                    const Polygons &polys) {
   std::vector<EdgeVerts> halfedges = Triangles2Edges(triangles);
   std::vector<EdgeVerts> openEdges = Polygons2Edges(polys);
   for (EdgeVerts e : openEdges) {
-    halfedges.emplace_back(e.second, e.first);
+    halfedges.push_back({e.second, e.first, e.edge});
   }
   CheckManifold(halfedges);
 }
@@ -563,7 +629,7 @@ void Dump(const Polygons &polys) {
     std::cout << "polys.push_back({" << std::endl;
     for (auto v : poly) {
       std::cout << "    {glm::vec2(" << v.pos.x << ", " << v.pos.y << "), "
-                << v.idx << "},  //" << std::endl;
+                << v.idx << ", " << v.nextEdge << "},  //" << std::endl;
     }
   }
 }
