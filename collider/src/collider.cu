@@ -198,19 +198,16 @@ struct BuildInternalBoxes {
   }
 };
 
-struct TranslateBox {
-  const glm::vec3 v;
-  __host__ __device__ void operator()(Box& box) { box += v; }
+struct TransformBox {
+  const glm::mat4x3 transform;
+  __host__ __device__ void operator()(Box& box) {
+    box = box.Transform(transform);
+  }
 };
-
-struct ScaleBox {
-  const glm::vec3 v;
-  __host__ __device__ void operator()(Box& box) { box *= v; }
-};
-
 }  // namespace
 
 namespace manifold {
+
 Collider::Collider(const VecDH<Box>& leafBB,
                    const VecDH<uint32_t>& leafMorton) {
   ALWAYS_ASSERT(leafBB.size() == leafMorton.size(), runtimeErr, "");
@@ -270,12 +267,20 @@ void Collider::UpdateBoxes(const VecDH<Box>& leafBB) {
                           internalChildren_.ptrD()}));
 }
 
-void Collider::Translate(glm::vec3 T) {
-  thrust::for_each(nodeBBox_.beginD(), nodeBBox_.endD(), TranslateBox({T}));
-}
-
-void Collider::Scale(glm::vec3 T) {
-  thrust::for_each(nodeBBox_.beginD(), nodeBBox_.endD(), ScaleBox({T}));
+bool Collider::Transform(glm::mat4x3 transform) {
+  bool axisAligned = true;
+  for (int row : {0, 1, 2}) {
+    int count = 0;
+    for (int col : {0, 1, 2}) {
+      if (transform[col][row] == 0.0f) ++count;
+    }
+    if (count != 2) axisAligned = false;
+  }
+  if (axisAligned) {
+    thrust::for_each(nodeBBox_.beginD(), nodeBBox_.endD(),
+                     TransformBox({transform}));
+  }
+  return axisAligned;
 }
 
 template SparseIndices Collider::Collisions<Box>(const VecDH<Box>&) const;
