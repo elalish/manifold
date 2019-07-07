@@ -447,7 +447,7 @@ std::vector<glm::ivec3> Triangulate(const Polygons &polys) {
     // output for non-overlapping input. For overlapping input it occasionally
     // has trouble, and if so we switch to a simpler, toplogical backup
     // triangulator that has guaranteed manifold output, except in the presence
-    // of
+    // of certain edge constraints.
     if (kVerbose) {
       std::cout << "Primary triangulation failed, switching to backup"
                 << std::endl;

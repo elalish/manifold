@@ -23,8 +23,8 @@ class Collider {
  public:
   Collider() {}
   Collider(const VecDH<Box>& leafBB, const VecDH<uint32_t>& leafMorton);
-  void Translate(glm::vec3);
-  void Scale(glm::vec3);
+  // Aborts and returns false if transform is not axis aligned.
+  bool Transform(glm::mat4x3);
   void UpdateBoxes(const VecDH<Box>& leafBB);
   // Collisions returns a sparse result, where i is the querry index and j is
   // the leaf index where their bounding boxes overlap.

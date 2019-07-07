@@ -675,25 +675,8 @@ void Manifold::Impl::ApplyTransform() const {
 
 void Manifold::Impl::ApplyTransform() {
   if (transform_ == glm::mat4x3(1.0f)) return;
-  glm::mat4x3 ts(1.0f);
-  for (int i : {0, 1, 2}) {
-    ts[i][i] = transform_[i][i];  // scale
-    ts[3][i] = transform_[3][i];  // translate
-  }
-  if (transform_ == ts) {
-    thrust::for_each(vertPos_.beginD(), vertPos_.endD(), Transform({ts}));
-    glm::vec3 scale;
-    for (int i : {0, 1, 2}) scale[i] = ts[i][i];
-    glm::vec3 position = ts[3];
-    bBox_ *= scale;
-    bBox_ += position;
-    collider_.Scale(scale);
-    collider_.Translate(position);
-  } else {
-    thrust::for_each(vertPos_.beginD(), vertPos_.endD(),
-                     Transform({transform_}));
-    Update();
-  }
+  thrust::for_each(vertPos_.beginD(), vertPos_.endD(), Transform({transform_}));
+  if (!collider_.Transform(transform_)) Update();
   transform_ = glm::mat4x3(1.0f);
 }
 
