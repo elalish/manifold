@@ -14,6 +14,7 @@
 
 #include <iostream>
 #include "manifold.h"
+#include "meshIO.h"
 
 using namespace manifold;
 

@@ -15,6 +15,7 @@
 #include <glm/gtc/constants.hpp>
 #include "gtest/gtest.h"
 #include "manifold.h"
+#include "meshIO.h"
 
 namespace {
 

@@ -88,6 +88,11 @@ struct PolyVert {
 using SimplePolygon = std::vector<PolyVert>;
 using Polygons = std::vector<SimplePolygon>;
 
+struct Mesh {
+  std::vector<glm::vec3> vertPos;
+  std::vector<glm::ivec3> triVerts;
+};
+
 struct Box {
   glm::vec3 min = glm::vec3(0.0f / 0.0f);
   glm::vec3 max = glm::vec3(0.0f / 0.0f);
