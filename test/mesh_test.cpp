@@ -102,7 +102,48 @@ TEST(Manifold, Sphere) {
   int n = 25;
   Manifold sphere = Manifold::Sphere(4 * n);
   ASSERT_TRUE(sphere.IsValid());
-  ASSERT_EQ(sphere.NumTri(), n * n * 8);
+  EXPECT_EQ(sphere.NumTri(), n * n * 8);
+}
+
+TEST(Manifold, Extrude) {
+  Polygons polys;
+  polys.push_back({
+      {glm::vec2(-2, -2), 0, Edge::kNoIdx},  //
+      {glm::vec2(2, -2), 0, Edge::kNoIdx},   //
+      {glm::vec2(2, 2), 0, Edge::kNoIdx},    //
+      {glm::vec2(-2, 2), 0, Edge::kNoIdx},   //
+  });
+  polys.push_back({
+      {glm::vec2(-1, 1), 0, Edge::kNoIdx},   //
+      {glm::vec2(1, 1), 0, Edge::kNoIdx},    //
+      {glm::vec2(1, -1), 0, Edge::kNoIdx},   //
+      {glm::vec2(-1, -1), 0, Edge::kNoIdx},  //
+  });
+  Manifold donut = Manifold::Extrude(polys, 1.0f, 3);
+  ASSERT_TRUE(donut.IsValid());
+  EXPECT_EQ(donut.Genus(), 1);
+  EXPECT_FLOAT_EQ(donut.Volume(), 12.0f);
+  EXPECT_FLOAT_EQ(donut.SurfaceArea(), 48.0f);
+}
+
+TEST(Manifold, ExtrudeCone) {
+  Polygons polys;
+  polys.push_back({
+      {glm::vec2(-2, -2), 0, Edge::kNoIdx},  //
+      {glm::vec2(2, -2), 0, Edge::kNoIdx},   //
+      {glm::vec2(2, 2), 0, Edge::kNoIdx},    //
+      {glm::vec2(-2, 2), 0, Edge::kNoIdx},   //
+  });
+  polys.push_back({
+      {glm::vec2(-1, 1), 0, Edge::kNoIdx},   //
+      {glm::vec2(1, 1), 0, Edge::kNoIdx},    //
+      {glm::vec2(1, -1), 0, Edge::kNoIdx},   //
+      {glm::vec2(-1, -1), 0, Edge::kNoIdx},  //
+  });
+  Manifold donut = Manifold::Extrude(polys, 1.0f, 0, glm::vec2(0.0f));
+  ASSERT_TRUE(donut.IsValid());
+  EXPECT_EQ(donut.Genus(), 0);
+  EXPECT_FLOAT_EQ(donut.Volume(), 4.0f);
 }
 
 TEST(Manifold, BooleanTetra) {
