@@ -19,7 +19,7 @@
 using namespace manifold;
 
 int main(int argc, char **argv) {
-  std::string filename = "tetra.ply";
+  std::string filename = "../test/data/Csaszar.ply";
   if (argc > 1) filename = argv[1];
 
   Mesh mesh = ImportMesh(filename);
@@ -27,4 +27,5 @@ int main(int argc, char **argv) {
   std::cout << "Manifold is ";
   if (!manifold.IsValid()) std::cout << "NOT " << std::endl;
   std::cout << "valid" << std::endl;
+  ExportMesh("Csaszar.stl", manifold.Extract());
 }

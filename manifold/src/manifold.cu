@@ -397,6 +397,59 @@ Manifold Manifold::Sphere(int circularSegments) {
   return sphere;
 }
 
+Manifold Manifold::Extrude(Polygons crossSection, float height, int nDivisions,
+                           glm::vec2 scaleTop) {
+  Manifold extrusion;
+  ++nDivisions;
+  auto& vertPos = extrusion.pImpl_->vertPos_.H();
+  auto& triVerts = extrusion.pImpl_->triVerts_.H();
+  int nCrossSection = 0;
+  bool isCone = scaleTop.x == 0.0 && scaleTop.y == 0.0;
+  int idx = 0;
+  for (auto& poly : crossSection) {
+    nCrossSection += poly.size();
+    for (PolyVert& polyVert : poly) {
+      vertPos.push_back({polyVert.pos.x, polyVert.pos.y, 0.0f});
+      polyVert.idx = idx++;
+    }
+  }
+  for (int i = 1; i < nDivisions + 1; ++i) {
+    float alpha = i / nDivisions;
+    glm::vec2 scale = glm::mix(glm::vec2(1.0f), scaleTop, alpha);
+    int j = 0;
+    int idx = 0;
+    for (const auto& poly : crossSection) {
+      for (int vert = 0; vert < poly.size(); ++vert) {
+        int offset = idx + nCrossSection * i;
+        int thisVert = vert + offset;
+        int lastVert = (vert == 0 ? poly.size() : vert) - 1 + offset;
+        if (i == nDivisions && isCone) {
+          triVerts.push_back({nCrossSection * i + j, lastVert - nCrossSection,
+                              thisVert - nCrossSection});
+        } else {
+          vertPos.push_back({poly[vert].pos.x * scale.x,
+                             poly[vert].pos.y * scale.y, height * alpha});
+          triVerts.push_back({thisVert, lastVert, thisVert - nCrossSection});
+          triVerts.push_back(
+              {lastVert, lastVert - nCrossSection, thisVert - nCrossSection});
+        }
+      }
+      ++j;
+      idx += poly.size();
+    }
+  }
+  if (isCone)
+    for (int j = 0; j < crossSection.size(); ++j)  // Duplicate vertex for Genus
+      vertPos.push_back({0.0f, 0.0f, height});
+  std::vector<glm::ivec3> top = Triangulate(crossSection);
+  for (const glm::ivec3& tri : top) {
+    triVerts.push_back({tri[0], tri[2], tri[1]});
+    if (!isCone) triVerts.push_back(tri + nCrossSection * nDivisions);
+  }
+  extrusion.pImpl_->Finish();
+  return extrusion;
+}
+
 Manifold::Manifold(const std::vector<Manifold>& manifolds)
     : pImpl_{std::make_unique<Impl>()} {
   for (Manifold manifold : manifolds) {
@@ -491,6 +544,11 @@ float Manifold::SurfaceArea() const {
   return thrust::transform_reduce(
       pImpl_->triVerts_.beginD(), pImpl_->triVerts_.endD(),
       TriArea({pImpl_->vertPos_.ptrD()}), 0.0f, thrust::plus<float>());
+}
+
+int Manifold::Genus() const {
+  int chi = NumVert() - NumTri() / 2;
+  return 1 - chi / 2;
 }
 
 bool Manifold::IsValid() const { return pImpl_->IsValid(); }
