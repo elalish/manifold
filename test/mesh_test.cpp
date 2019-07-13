@@ -56,6 +56,24 @@ void ExpectMeshes(const Manifold& manifold,
     EXPECT_EQ(meshes[i].NumTri(), numVertTri[i].second);
   }
 }
+
+Polygons SquareHole() {
+  Polygons polys;
+  polys.push_back({
+      {glm::vec2(-2, -2), 0, Edge::kNoIdx},  //
+      {glm::vec2(2, -2), 0, Edge::kNoIdx},   //
+      {glm::vec2(2, 2), 0, Edge::kNoIdx},    //
+      {glm::vec2(-2, 2), 0, Edge::kNoIdx},   //
+  });
+  polys.push_back({
+      {glm::vec2(-1, 1), 0, Edge::kNoIdx},   //
+      {glm::vec2(1, 1), 0, Edge::kNoIdx},    //
+      {glm::vec2(1, -1), 0, Edge::kNoIdx},   //
+      {glm::vec2(-1, -1), 0, Edge::kNoIdx},  //
+  });
+  return polys;
+}
+
 }  // namespace
 
 TEST(Mesh, EdgeIdx) {
@@ -106,19 +124,7 @@ TEST(Manifold, Sphere) {
 }
 
 TEST(Manifold, Extrude) {
-  Polygons polys;
-  polys.push_back({
-      {glm::vec2(-2, -2), 0, Edge::kNoIdx},  //
-      {glm::vec2(2, -2), 0, Edge::kNoIdx},   //
-      {glm::vec2(2, 2), 0, Edge::kNoIdx},    //
-      {glm::vec2(-2, 2), 0, Edge::kNoIdx},   //
-  });
-  polys.push_back({
-      {glm::vec2(-1, 1), 0, Edge::kNoIdx},   //
-      {glm::vec2(1, 1), 0, Edge::kNoIdx},    //
-      {glm::vec2(1, -1), 0, Edge::kNoIdx},   //
-      {glm::vec2(-1, -1), 0, Edge::kNoIdx},  //
-  });
+  Polygons polys = SquareHole();
   Manifold donut = Manifold::Extrude(polys, 1.0f, 3);
   ASSERT_TRUE(donut.IsValid());
   EXPECT_EQ(donut.Genus(), 1);
@@ -127,23 +133,20 @@ TEST(Manifold, Extrude) {
 }
 
 TEST(Manifold, ExtrudeCone) {
-  Polygons polys;
-  polys.push_back({
-      {glm::vec2(-2, -2), 0, Edge::kNoIdx},  //
-      {glm::vec2(2, -2), 0, Edge::kNoIdx},   //
-      {glm::vec2(2, 2), 0, Edge::kNoIdx},    //
-      {glm::vec2(-2, 2), 0, Edge::kNoIdx},   //
-  });
-  polys.push_back({
-      {glm::vec2(-1, 1), 0, Edge::kNoIdx},   //
-      {glm::vec2(1, 1), 0, Edge::kNoIdx},    //
-      {glm::vec2(1, -1), 0, Edge::kNoIdx},   //
-      {glm::vec2(-1, -1), 0, Edge::kNoIdx},  //
-  });
+  Polygons polys = SquareHole();
   Manifold donut = Manifold::Extrude(polys, 1.0f, 0, glm::vec2(0.0f));
   ASSERT_TRUE(donut.IsValid());
   EXPECT_EQ(donut.Genus(), 0);
   EXPECT_FLOAT_EQ(donut.Volume(), 4.0f);
+}
+
+TEST(Manifold, Revolve) {
+  Polygons polys = SquareHole();
+  Manifold vug = Manifold::Revolve(polys, 4);
+  ASSERT_TRUE(vug.IsValid());
+  EXPECT_EQ(vug.Genus(), -1);
+  EXPECT_FLOAT_EQ(vug.Volume(), 14.0f * glm::pi<float>());
+  EXPECT_FLOAT_EQ(vug.SurfaceArea(), 30.0f * glm::pi<float>());
 }
 
 TEST(Manifold, BooleanTetra) {

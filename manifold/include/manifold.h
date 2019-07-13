@@ -32,6 +32,7 @@ class Manifold {
   static Manifold Extrude(Polygons crossSection, float height,
                           int nDivisions = 0,
                           glm::vec2 scaleTop = glm::vec2(1.0f));
+  static Manifold Revolve(const Polygons& crossSection, int nDivisions = 48);
 
   // Topological
   Manifold(const std::vector<Manifold>&);
