@@ -29,6 +29,9 @@ class Manifold {
   static Manifold Cube();
   static Manifold Octahedron();
   static Manifold Sphere(int circularSegments);  // rounds up to multiple of 4
+  static Manifold Extrude(Polygons crossSection, float height,
+                          int nDivisions = 0,
+                          glm::vec2 scaleTop = glm::vec2(1.0f));
 
   // Topological
   Manifold(const std::vector<Manifold>&);
@@ -45,6 +48,7 @@ class Manifold {
   Box BoundingBox() const;
   float Volume() const;
   float SurfaceArea() const;
+  int Genus() const;
 
   // Modification
   Manifold& Translate(glm::vec3);
