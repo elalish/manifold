@@ -450,6 +450,67 @@ Manifold Manifold::Extrude(Polygons crossSection, float height, int nDivisions,
   return extrusion;
 }
 
+Manifold Manifold::Revolve(const Polygons& crossSection, int nDivisions) {
+  Manifold revoloid;
+  auto& vertPos = revoloid.pImpl_->vertPos_.H();
+  auto& triVerts = revoloid.pImpl_->triVerts_.H();
+  for (const auto& poly : crossSection) {
+    glm::vec2 lastPos = poly.back().pos;
+    int polyVert = 0;
+    int start = poly.size() - 1;
+    for (; polyVert != start; polyVert = (polyVert + 1) % poly.size()) {
+      glm::vec2 pos = poly[polyVert].pos;
+      int nextVert = vertPos.size();
+      bool escape = false;
+      if (pos.x * lastPos.x <= 0 && (pos.x > 0 || lastPos.x > 0)) {
+        for (int slice = 0; slice < nDivisions; ++slice) {
+          int lastSlice = (slice == 0 ? nDivisions : slice) - 1;
+          if (pos.x > 0) {
+            triVerts.push_back(
+                {nextVert, nextVert + lastSlice, nextVert + slice});
+          } else {
+            if (polyVert == 0) {
+              start = 0;
+              escape = true;
+              break;
+            }
+            triVerts.push_back({nextVert, nextVert - nDivisions + slice,
+                                nextVert - nDivisions + lastSlice});
+          }
+        }
+        if (escape) {
+          lastPos = pos;
+          escape = false;
+          continue;
+        }
+        float a = pos.x / (pos.x - lastPos.x);
+        vertPos.push_back({0.0f, 0.0f, glm::mix(pos.y, lastPos.y, a)});
+      } else if (pos.x > 0 && lastPos.x > 0) {
+        for (int slice = 0; slice < nDivisions; ++slice) {
+          int lastSlice = (slice == 0 ? nDivisions : slice) - 1;
+          triVerts.push_back({nextVert + lastSlice, nextVert + slice,
+                              nextVert - nDivisions + lastSlice});
+          triVerts.push_back({nextVert - nDivisions + slice,
+                              nextVert - nDivisions + lastSlice,
+                              nextVert + slice});
+        }
+      }
+      if (pos.x > 0) {
+        for (int slice = 0; slice < nDivisions; ++slice) {
+          float phi = slice * 2 * glm::pi<float>() / nDivisions;
+          vertPos.push_back(
+              {pos.x * glm::cos(phi), pos.x * glm::sin(phi), pos.y});
+        }
+      }
+      lastPos = pos;
+    }
+  }
+  revoloid.pImpl_->vertPos_.Dump();
+  revoloid.pImpl_->triVerts_.Dump();
+  revoloid.pImpl_->Finish();
+  return revoloid;
+}
+
 Manifold::Manifold(const std::vector<Manifold>& manifolds)
     : pImpl_{std::make_unique<Impl>()} {
   for (Manifold manifold : manifolds) {
