@@ -204,9 +204,9 @@ TEST(Manifold, SplitByPlane) {
   cube.Translate({0.0f, 1.0f, 0.0f});
   cube.Rotate(0.0f, 0.0f, -60.0f);
   cube.Translate({2.0f, 0.0f, 0.0f});
-  float phi = glm::pi<float>() / 6.0f;
+  float phi = 30.0f;
   std::pair<Manifold, Manifold> splits =
-      cube.SplitByPlane({glm::sin(phi), -glm::cos(phi), 0.0f}, 1.0f);
+      cube.SplitByPlane({sind(phi), -cosd(phi), 0.0f}, 1.0f);
   EXPECT_NEAR(splits.first.Volume(), splits.second.Volume(), 1e-5);
 }
 
