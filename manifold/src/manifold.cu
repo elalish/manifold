@@ -457,8 +457,8 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int nDivisions) {
   for (const auto& poly : crossSection) {
     glm::vec2 lastPos = poly.back().pos;
     int polyVert = 0;
-    int start = poly.size() - 1;
-    for (; polyVert != start; polyVert = (polyVert + 1) % poly.size()) {
+    int start = 0;
+    do {
       glm::vec2 pos = poly[polyVert].pos;
       int nextVert = vertPos.size();
       bool escape = false;
@@ -470,7 +470,7 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int nDivisions) {
                 {nextVert, nextVert + lastSlice, nextVert + slice});
           } else {
             if (polyVert == 0) {
-              start = 0;
+              start = 1;
               escape = true;
               break;
             }
@@ -480,11 +480,13 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int nDivisions) {
         }
         if (escape) {
           lastPos = pos;
+          polyVert = (polyVert + 1) % poly.size();
           escape = false;
           continue;
         }
         float a = pos.x / (pos.x - lastPos.x);
         vertPos.push_back({0.0f, 0.0f, glm::mix(pos.y, lastPos.y, a)});
+
       } else if (pos.x > 0 && lastPos.x > 0) {
         for (int slice = 0; slice < nDivisions; ++slice) {
           int lastSlice = (slice == 0 ? nDivisions : slice) - 1;
@@ -496,14 +498,15 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int nDivisions) {
         }
       }
       if (pos.x > 0) {
+        float dPhi = 360.0f / nDivisions;
         for (int slice = 0; slice < nDivisions; ++slice) {
-          float phi = slice * 2 * glm::pi<float>() / nDivisions;
-          vertPos.push_back(
-              {pos.x * glm::cos(phi), pos.x * glm::sin(phi), pos.y});
+          float phi = slice * dPhi;
+          vertPos.push_back({pos.x * cosd(phi), pos.x * sind(phi), pos.y});
         }
       }
       lastPos = pos;
-    }
+      polyVert = (polyVert + 1) % poly.size();
+    } while (polyVert != start);
   }
   revoloid.pImpl_->vertPos_.Dump();
   revoloid.pImpl_->triVerts_.Dump();
@@ -627,17 +630,14 @@ Manifold& Manifold::Scale(glm::vec3 v) {
 }
 
 Manifold& Manifold::Rotate(float xDegrees, float yDegrees, float zDegrees) {
-  float xRad = glm::radians(fmod(xDegrees, 360));
-  float yRad = glm::radians(fmod(yDegrees, 360));
-  float zRad = glm::radians(fmod(zDegrees, 360));
-  glm::mat3 rX(1.0f, 0.0f, 0.0f,            //
-               0.0f, cos(xRad), sin(xRad),  //
-               0.0f, -sin(xRad), cos(xRad));
-  glm::mat3 rY(cos(yRad), 0.0f, -sin(yRad),  //
-               0.0f, 1.0f, 0.0f,             //
-               sin(yRad), 0.0f, cos(yRad));
-  glm::mat3 rZ(cos(zRad), sin(zRad), 0.0f,   //
-               -sin(zRad), cos(zRad), 0.0f,  //
+  glm::mat3 rX(1.0f, 0.0f, 0.0f,                      //
+               0.0f, cosd(xDegrees), sind(xDegrees),  //
+               0.0f, -sind(xDegrees), cosd(xDegrees));
+  glm::mat3 rY(cosd(yDegrees), 0.0f, -sind(yDegrees),  //
+               0.0f, 1.0f, 0.0f,                       //
+               sind(yDegrees), 0.0f, cosd(yDegrees));
+  glm::mat3 rZ(cosd(zDegrees), sind(zDegrees), 0.0f,   //
+               -sind(zDegrees), cosd(zDegrees), 0.0f,  //
                0.0f, 0.0f, 1.0f);
   pImpl_->transform_ = rZ * rY * rX * pImpl_->transform_;
   return *this;

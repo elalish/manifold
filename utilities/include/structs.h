@@ -39,6 +39,26 @@ void AlwaysAssert(bool condition, const char* file, int line,
   }
 }
 
+inline float sind(float x) {
+  if (!std::isfinite(x)) return sin(x);
+  if (x < 0.0f) return -sind(-x);
+  int quo;
+  x = remquo(fabs(x), 90.0f, &quo);
+  switch (quo % 4) {
+    case 0:
+      return sin(glm::radians(x));
+    case 1:
+      return cos(glm::radians(x));
+    case 2:
+      return -sin(glm::radians(x));
+    case 3:
+      return -cos(glm::radians(x));
+  }
+  return 0.0f;
+}
+
+inline float cosd(float x) { return sind(x + 90.0f); }
+
 #define ALWAYS_ASSERT(condition, EX, msg) \
   AlwaysAssert<EX>(condition, __FILE__, __LINE__, #condition, msg);
 
