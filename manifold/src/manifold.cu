@@ -451,65 +451,79 @@ Manifold Manifold::Extrude(Polygons crossSection, float height, int nDivisions,
 }
 
 Manifold Manifold::Revolve(const Polygons& crossSection, int nDivisions) {
+  ALWAYS_ASSERT(nDivisions > 2, runtimeErr,
+                "With less than three divisions the result is degenerate.");
   Manifold revoloid;
   auto& vertPos = revoloid.pImpl_->vertPos_.H();
   auto& triVerts = revoloid.pImpl_->triVerts_.H();
+  float dPhi = 360.0f / nDivisions;
   for (const auto& poly : crossSection) {
-    glm::vec2 lastPos = poly.back().pos;
-    int polyVert = 0;
-    int start = 0;
-    do {
-      glm::vec2 pos = poly[polyVert].pos;
-      int nextVert = vertPos.size();
-      bool escape = false;
-      if (pos.x * lastPos.x <= 0 && (pos.x > 0 || lastPos.x > 0)) {
+    int start = -1;
+    for (int polyVert = 0; polyVert < poly.size(); ++polyVert) {
+      if (poly[polyVert].pos.x <= 0) {
+        start = polyVert;
+        break;
+      }
+    }
+    if (start == -1) {  // poly all positive
+      for (int polyVert = 0; polyVert < poly.size(); ++polyVert) {
+        int startVert = vertPos.size();
+        int lastStart =
+            startVert +
+            (polyVert == 0 ? nDivisions * (poly.size() - 1) : -nDivisions);
         for (int slice = 0; slice < nDivisions; ++slice) {
           int lastSlice = (slice == 0 ? nDivisions : slice) - 1;
-          if (pos.x > 0) {
-            triVerts.push_back(
-                {nextVert, nextVert + lastSlice, nextVert + slice});
-          } else {
-            if (polyVert == 0) {
-              start = 1;
-              escape = true;
-              break;
+          float phi = slice * dPhi;
+          glm::vec2 pos = poly[polyVert].pos;
+          vertPos.push_back({pos.x * cosd(phi), pos.x * sind(phi), pos.y});
+          triVerts.push_back({startVert + slice, startVert + lastSlice,
+                              lastStart + lastSlice});
+          triVerts.push_back(
+              {lastStart + lastSlice, lastStart + slice, startVert + slice});
+        }
+      }
+    } else {  // poly crosses zero
+      int polyVert = start;
+      glm::vec2 pos = poly[polyVert].pos;
+      do {
+        glm::vec2 lastPos = pos;
+        polyVert = (polyVert + 1) % poly.size();
+        pos = poly[polyVert].pos;
+        if (pos.x > 0) {
+          if (lastPos.x <= 0) {
+            float a = pos.x / (pos.x - lastPos.x);
+            vertPos.push_back({0.0f, 0.0f, glm::mix(pos.y, lastPos.y, a)});
+          }
+          int startVert = vertPos.size();
+          for (int slice = 0; slice < nDivisions; ++slice) {
+            int lastSlice = (slice == 0 ? nDivisions : slice) - 1;
+            float phi = slice * dPhi;
+            glm::vec2 pos = poly[polyVert].pos;
+            vertPos.push_back({pos.x * cosd(phi), pos.x * sind(phi), pos.y});
+            if (lastPos.x > 0) {
+              triVerts.push_back({startVert + slice, startVert + lastSlice,
+                                  startVert - nDivisions + lastSlice});
+              triVerts.push_back({startVert - nDivisions + lastSlice,
+                                  startVert - nDivisions + slice,
+                                  startVert + slice});
+            } else {
+              triVerts.push_back(
+                  {startVert - 1, startVert + slice, startVert + lastSlice});
             }
-            triVerts.push_back({nextVert, nextVert - nDivisions + slice,
-                                nextVert - nDivisions + lastSlice});
+          }
+        } else if (lastPos.x > 0) {
+          int startVert = vertPos.size();
+          float a = pos.x / (pos.x - lastPos.x);
+          vertPos.push_back({0.0f, 0.0f, glm::mix(pos.y, lastPos.y, a)});
+          for (int slice = 0; slice < nDivisions; ++slice) {
+            int lastSlice = (slice == 0 ? nDivisions : slice) - 1;
+            triVerts.push_back({startVert, startVert - nDivisions + lastSlice,
+                                startVert - nDivisions + slice});
           }
         }
-        if (escape) {
-          lastPos = pos;
-          polyVert = (polyVert + 1) % poly.size();
-          escape = false;
-          continue;
-        }
-        float a = pos.x / (pos.x - lastPos.x);
-        vertPos.push_back({0.0f, 0.0f, glm::mix(pos.y, lastPos.y, a)});
-
-      } else if (pos.x > 0 && lastPos.x > 0) {
-        for (int slice = 0; slice < nDivisions; ++slice) {
-          int lastSlice = (slice == 0 ? nDivisions : slice) - 1;
-          triVerts.push_back({nextVert + lastSlice, nextVert + slice,
-                              nextVert - nDivisions + lastSlice});
-          triVerts.push_back({nextVert - nDivisions + slice,
-                              nextVert - nDivisions + lastSlice,
-                              nextVert + slice});
-        }
-      }
-      if (pos.x > 0) {
-        float dPhi = 360.0f / nDivisions;
-        for (int slice = 0; slice < nDivisions; ++slice) {
-          float phi = slice * dPhi;
-          vertPos.push_back({pos.x * cosd(phi), pos.x * sind(phi), pos.y});
-        }
-      }
-      lastPos = pos;
-      polyVert = (polyVert + 1) % poly.size();
-    } while (polyVert != start);
+      } while (polyVert != start);
+    }
   }
-  revoloid.pImpl_->vertPos_.Dump();
-  revoloid.pImpl_->triVerts_.Dump();
   revoloid.pImpl_->Finish();
   return revoloid;
 }
