@@ -57,19 +57,19 @@ void ExpectMeshes(const Manifold& manifold,
   }
 }
 
-Polygons SquareHole() {
+Polygons SquareHole(float xOffset = 0.0) {
   Polygons polys;
   polys.push_back({
-      {glm::vec2(-2, -2), 0, Edge::kNoIdx},  //
-      {glm::vec2(2, -2), 0, Edge::kNoIdx},   //
-      {glm::vec2(2, 2), 0, Edge::kNoIdx},    //
-      {glm::vec2(-2, 2), 0, Edge::kNoIdx},   //
+      {glm::vec2(2 + xOffset, 2), 0, Edge::kNoIdx},    //
+      {glm::vec2(-2 + xOffset, 2), 0, Edge::kNoIdx},   //
+      {glm::vec2(-2 + xOffset, -2), 0, Edge::kNoIdx},  //
+      {glm::vec2(2 + xOffset, -2), 0, Edge::kNoIdx},   //
   });
   polys.push_back({
-      {glm::vec2(-1, 1), 0, Edge::kNoIdx},   //
-      {glm::vec2(1, 1), 0, Edge::kNoIdx},    //
-      {glm::vec2(1, -1), 0, Edge::kNoIdx},   //
-      {glm::vec2(-1, -1), 0, Edge::kNoIdx},  //
+      {glm::vec2(-1 + xOffset, 1), 0, Edge::kNoIdx},   //
+      {glm::vec2(1 + xOffset, 1), 0, Edge::kNoIdx},    //
+      {glm::vec2(1 + xOffset, -1), 0, Edge::kNoIdx},   //
+      {glm::vec2(-1 + xOffset, -1), 0, Edge::kNoIdx},  //
   });
   return polys;
 }
@@ -142,11 +142,20 @@ TEST(Manifold, ExtrudeCone) {
 
 TEST(Manifold, Revolve) {
   Polygons polys = SquareHole();
-  Manifold vug = Manifold::Revolve(polys, 4);
+  Manifold vug = Manifold::Revolve(polys, 48);
   ASSERT_TRUE(vug.IsValid());
   EXPECT_EQ(vug.Genus(), -1);
-  EXPECT_FLOAT_EQ(vug.Volume(), 14.0f * glm::pi<float>());
-  EXPECT_FLOAT_EQ(vug.SurfaceArea(), 30.0f * glm::pi<float>());
+  EXPECT_NEAR(vug.Volume(), 14.0f * glm::pi<float>(), 0.2f);
+  EXPECT_NEAR(vug.SurfaceArea(), 30.0f * glm::pi<float>(), 0.2f);
+}
+
+TEST(Manifold, Revolve2) {
+  Polygons polys = SquareHole(2.0f);
+  Manifold donutHole = Manifold::Revolve(polys, 48);
+  ASSERT_TRUE(donutHole.IsValid());
+  EXPECT_EQ(donutHole.Genus(), 0);
+  EXPECT_NEAR(donutHole.Volume(), 48.0f * glm::pi<float>(), 1.0f);
+  EXPECT_NEAR(donutHole.SurfaceArea(), 96.0f * glm::pi<float>(), 1.0f);
 }
 
 TEST(Manifold, BooleanTetra) {
