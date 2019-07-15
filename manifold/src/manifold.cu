@@ -809,8 +809,10 @@ void Manifold::Impl::ApplyTransform() const {
 void Manifold::Impl::ApplyTransform() {
   if (transform_ == glm::mat4x3(1.0f)) return;
   thrust::for_each(vertPos_.beginD(), vertPos_.endD(), Transform({transform_}));
-  if (!collider_.Transform(transform_)) Update();
+  // if (!collider_.Transform(transform_))
+  Update();
   transform_ = glm::mat4x3(1.0f);
+  CalculateBBox();
 }
 
 void Manifold::Impl::Refine(int n) {
