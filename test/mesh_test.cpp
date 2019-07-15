@@ -134,7 +134,7 @@ TEST(Manifold, Extrude) {
 
 TEST(Manifold, ExtrudeCone) {
   Polygons polys = SquareHole();
-  Manifold donut = Manifold::Extrude(polys, 1.0f, 0, glm::vec2(0.0f));
+  Manifold donut = Manifold::Extrude(polys, 1.0f, 0, 0, glm::vec2(0.0f));
   ASSERT_TRUE(donut.IsValid());
   EXPECT_EQ(donut.Genus(), 0);
   EXPECT_FLOAT_EQ(donut.Volume(), 4.0f);

@@ -398,7 +398,8 @@ Manifold Manifold::Sphere(int circularSegments) {
 }
 
 Manifold Manifold::Extrude(Polygons crossSection, float height, int nDivisions,
-                           glm::vec2 scaleTop) {
+                           float twistDegrees, glm::vec2 scaleTop) {
+  ALWAYS_ASSERT(scaleTop.x >= 0 && scaleTop.y >= 0, runtimeErr, "");
   Manifold extrusion;
   ++nDivisions;
   auto& vertPos = extrusion.pImpl_->vertPos_.H();
@@ -415,7 +416,10 @@ Manifold Manifold::Extrude(Polygons crossSection, float height, int nDivisions,
   }
   for (int i = 1; i < nDivisions + 1; ++i) {
     float alpha = i / nDivisions;
+    float phi = alpha * twistDegrees;
+    glm::mat2 transform(cos(phi), sin(phi), -sin(phi), cos(phi));
     glm::vec2 scale = glm::mix(glm::vec2(1.0f), scaleTop, alpha);
+    transform = transform * glm::mat2(scale.x, 0.0f, 0.0f, scale.y);
     int j = 0;
     int idx = 0;
     for (const auto& poly : crossSection) {
@@ -427,8 +431,8 @@ Manifold Manifold::Extrude(Polygons crossSection, float height, int nDivisions,
           triVerts.push_back({nCrossSection * i + j, lastVert - nCrossSection,
                               thisVert - nCrossSection});
         } else {
-          vertPos.push_back({poly[vert].pos.x * scale.x,
-                             poly[vert].pos.y * scale.y, height * alpha});
+          glm::vec2 pos = transform * poly[vert].pos;
+          vertPos.push_back({pos.x, pos.y, height * alpha});
           triVerts.push_back({thisVert, lastVert, thisVert - nCrossSection});
           triVerts.push_back(
               {lastVert, lastVert - nCrossSection, thisVert - nCrossSection});
