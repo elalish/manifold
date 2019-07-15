@@ -76,18 +76,18 @@ Polygons SquareHole(float xOffset = 0.0) {
 
 }  // namespace
 
-TEST(Mesh, EdgeIdx) {
-  CheckIdx(0, 1);
-  CheckIdx(0, -1);
-  CheckIdx(1, 1);
-  CheckIdx(1, -1);
-}
-
-TEST(Mesh, ReadWrite) {
+TEST(MeshIO, ReadWrite) {
   Mesh mesh = ImportMesh("data/gyroidpuzzle.ply");
   ExportMesh("data/gyroidpuzzle1.ply", mesh);
   Mesh mesh_out = ImportMesh("data/gyroidpuzzle1.ply");
   Identical(mesh, mesh_out);
+}
+
+TEST(Manifold, EdgeIdx) {
+  CheckIdx(0, 1);
+  CheckIdx(0, -1);
+  CheckIdx(1, 1);
+  CheckIdx(1, -1);
 }
 
 TEST(Manifold, Regression) {
