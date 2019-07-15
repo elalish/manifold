@@ -158,17 +158,6 @@ TEST(Manifold, Revolve2) {
   EXPECT_NEAR(donutHole.SurfaceArea(), 96.0f * glm::pi<float>(), 1.0f);
 }
 
-TEST(Manifold, BooleanTetra) {
-  Manifold tetra = Manifold::Tetrahedron();
-  ASSERT_TRUE(tetra.IsValid());
-
-  Manifold tetra2 = tetra.DeepCopy();
-  tetra2.Translate(glm::vec3(0.5f));
-  Manifold result = tetra2 - tetra;
-
-  ExpectMeshes(result, {{8, 12}});
-}
-
 TEST(Manifold, Volume) {
   Manifold cube = Manifold::Cube();
   ASSERT_TRUE(cube.IsValid());
@@ -191,6 +180,17 @@ TEST(Manifold, SurfaceArea) {
   EXPECT_FLOAT_EQ(area, 24.0f);
 }
 
+TEST(Manifold, BooleanTetra) {
+  Manifold tetra = Manifold::Tetrahedron();
+  ASSERT_TRUE(tetra.IsValid());
+
+  Manifold tetra2 = tetra.DeepCopy();
+  tetra2.Translate(glm::vec3(0.5f));
+  Manifold result = tetra2 - tetra;
+
+  ExpectMeshes(result, {{8, 12}});
+}
+
 TEST(Manifold, SelfSubtract) {
   Manifold cube = Manifold::Cube();
   Manifold empty = cube - cube;
@@ -209,6 +209,15 @@ TEST(Manifold, Split) {
 }
 
 TEST(Manifold, SplitByPlane) {
+  Manifold cube = Manifold::Cube();
+  cube.Translate({0.0f, 1.0f, 0.0f});
+  cube.Rotate(90.0f, 0.0f, 0.0f);
+  std::pair<Manifold, Manifold> splits =
+      cube.SplitByPlane({0.0f, 0.0f, 1.0f}, 1.0f);
+  EXPECT_NEAR(splits.first.Volume(), splits.second.Volume(), 1e-5);
+}
+
+TEST(Manifold, SplitByPlane60) {
   Manifold cube = Manifold::Cube();
   cube.Translate({0.0f, 1.0f, 0.0f});
   cube.Rotate(0.0f, 0.0f, -60.0f);
