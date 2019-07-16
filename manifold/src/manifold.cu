@@ -398,7 +398,8 @@ Manifold Manifold::Sphere(int circularSegments) {
 }
 
 Manifold Manifold::Extrude(Polygons crossSection, float height, int nDivisions,
-                           glm::vec2 scaleTop) {
+                           float twistDegrees, glm::vec2 scaleTop) {
+  ALWAYS_ASSERT(scaleTop.x >= 0 && scaleTop.y >= 0, runtimeErr, "");
   Manifold extrusion;
   ++nDivisions;
   auto& vertPos = extrusion.pImpl_->vertPos_.H();
@@ -415,7 +416,10 @@ Manifold Manifold::Extrude(Polygons crossSection, float height, int nDivisions,
   }
   for (int i = 1; i < nDivisions + 1; ++i) {
     float alpha = i / nDivisions;
+    float phi = alpha * twistDegrees;
+    glm::mat2 transform(cos(phi), sin(phi), -sin(phi), cos(phi));
     glm::vec2 scale = glm::mix(glm::vec2(1.0f), scaleTop, alpha);
+    transform = transform * glm::mat2(scale.x, 0.0f, 0.0f, scale.y);
     int j = 0;
     int idx = 0;
     for (const auto& poly : crossSection) {
@@ -427,8 +431,8 @@ Manifold Manifold::Extrude(Polygons crossSection, float height, int nDivisions,
           triVerts.push_back({nCrossSection * i + j, lastVert - nCrossSection,
                               thisVert - nCrossSection});
         } else {
-          vertPos.push_back({poly[vert].pos.x * scale.x,
-                             poly[vert].pos.y * scale.y, height * alpha});
+          glm::vec2 pos = transform * poly[vert].pos;
+          vertPos.push_back({pos.x, pos.y, height * alpha});
           triVerts.push_back({thisVert, lastVert, thisVert - nCrossSection});
           triVerts.push_back(
               {lastVert, lastVert - nCrossSection, thisVert - nCrossSection});
@@ -448,6 +452,84 @@ Manifold Manifold::Extrude(Polygons crossSection, float height, int nDivisions,
   }
   extrusion.pImpl_->Finish();
   return extrusion;
+}
+
+Manifold Manifold::Revolve(const Polygons& crossSection, int nDivisions) {
+  ALWAYS_ASSERT(nDivisions > 2, runtimeErr,
+                "With less than three divisions the result is degenerate.");
+  Manifold revoloid;
+  auto& vertPos = revoloid.pImpl_->vertPos_.H();
+  auto& triVerts = revoloid.pImpl_->triVerts_.H();
+  float dPhi = 360.0f / nDivisions;
+  for (const auto& poly : crossSection) {
+    int start = -1;
+    for (int polyVert = 0; polyVert < poly.size(); ++polyVert) {
+      if (poly[polyVert].pos.x <= 0) {
+        start = polyVert;
+        break;
+      }
+    }
+    if (start == -1) {  // poly all positive
+      for (int polyVert = 0; polyVert < poly.size(); ++polyVert) {
+        int startVert = vertPos.size();
+        int lastStart =
+            startVert +
+            (polyVert == 0 ? nDivisions * (poly.size() - 1) : -nDivisions);
+        for (int slice = 0; slice < nDivisions; ++slice) {
+          int lastSlice = (slice == 0 ? nDivisions : slice) - 1;
+          float phi = slice * dPhi;
+          glm::vec2 pos = poly[polyVert].pos;
+          vertPos.push_back({pos.x * cosd(phi), pos.x * sind(phi), pos.y});
+          triVerts.push_back({startVert + slice, startVert + lastSlice,
+                              lastStart + lastSlice});
+          triVerts.push_back(
+              {lastStart + lastSlice, lastStart + slice, startVert + slice});
+        }
+      }
+    } else {  // poly crosses zero
+      int polyVert = start;
+      glm::vec2 pos = poly[polyVert].pos;
+      do {
+        glm::vec2 lastPos = pos;
+        polyVert = (polyVert + 1) % poly.size();
+        pos = poly[polyVert].pos;
+        if (pos.x > 0) {
+          if (lastPos.x <= 0) {
+            float a = pos.x / (pos.x - lastPos.x);
+            vertPos.push_back({0.0f, 0.0f, glm::mix(pos.y, lastPos.y, a)});
+          }
+          int startVert = vertPos.size();
+          for (int slice = 0; slice < nDivisions; ++slice) {
+            int lastSlice = (slice == 0 ? nDivisions : slice) - 1;
+            float phi = slice * dPhi;
+            glm::vec2 pos = poly[polyVert].pos;
+            vertPos.push_back({pos.x * cosd(phi), pos.x * sind(phi), pos.y});
+            if (lastPos.x > 0) {
+              triVerts.push_back({startVert + slice, startVert + lastSlice,
+                                  startVert - nDivisions + lastSlice});
+              triVerts.push_back({startVert - nDivisions + lastSlice,
+                                  startVert - nDivisions + slice,
+                                  startVert + slice});
+            } else {
+              triVerts.push_back(
+                  {startVert - 1, startVert + slice, startVert + lastSlice});
+            }
+          }
+        } else if (lastPos.x > 0) {
+          int startVert = vertPos.size();
+          float a = pos.x / (pos.x - lastPos.x);
+          vertPos.push_back({0.0f, 0.0f, glm::mix(pos.y, lastPos.y, a)});
+          for (int slice = 0; slice < nDivisions; ++slice) {
+            int lastSlice = (slice == 0 ? nDivisions : slice) - 1;
+            triVerts.push_back({startVert, startVert - nDivisions + lastSlice,
+                                startVert - nDivisions + slice});
+          }
+        }
+      } while (polyVert != start);
+    }
+  }
+  revoloid.pImpl_->Finish();
+  return revoloid;
 }
 
 Manifold::Manifold(const std::vector<Manifold>& manifolds)
@@ -566,17 +648,14 @@ Manifold& Manifold::Scale(glm::vec3 v) {
 }
 
 Manifold& Manifold::Rotate(float xDegrees, float yDegrees, float zDegrees) {
-  float xRad = glm::radians(fmod(xDegrees, 360));
-  float yRad = glm::radians(fmod(yDegrees, 360));
-  float zRad = glm::radians(fmod(zDegrees, 360));
-  glm::mat3 rX(1.0f, 0.0f, 0.0f,            //
-               0.0f, cos(xRad), sin(xRad),  //
-               0.0f, -sin(xRad), cos(xRad));
-  glm::mat3 rY(cos(yRad), 0.0f, -sin(yRad),  //
-               0.0f, 1.0f, 0.0f,             //
-               sin(yRad), 0.0f, cos(yRad));
-  glm::mat3 rZ(cos(zRad), sin(zRad), 0.0f,   //
-               -sin(zRad), cos(zRad), 0.0f,  //
+  glm::mat3 rX(1.0f, 0.0f, 0.0f,                      //
+               0.0f, cosd(xDegrees), sind(xDegrees),  //
+               0.0f, -sind(xDegrees), cosd(xDegrees));
+  glm::mat3 rY(cosd(yDegrees), 0.0f, -sind(yDegrees),  //
+               0.0f, 1.0f, 0.0f,                       //
+               sind(yDegrees), 0.0f, cosd(yDegrees));
+  glm::mat3 rZ(cosd(zDegrees), sind(zDegrees), 0.0f,   //
+               -sind(zDegrees), cosd(zDegrees), 0.0f,  //
                0.0f, 0.0f, 1.0f);
   pImpl_->transform_ = rZ * rY * rX * pImpl_->transform_;
   return *this;
@@ -734,8 +813,11 @@ void Manifold::Impl::ApplyTransform() const {
 void Manifold::Impl::ApplyTransform() {
   if (transform_ == glm::mat4x3(1.0f)) return;
   thrust::for_each(vertPos_.beginD(), vertPos_.endD(), Transform({transform_}));
+  // This optimization does a cheap collider update if the transform is
+  // axis-aligned.
   if (!collider_.Transform(transform_)) Update();
   transform_ = glm::mat4x3(1.0f);
+  CalculateBBox();
 }
 
 void Manifold::Impl::Refine(int n) {

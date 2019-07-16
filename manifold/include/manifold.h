@@ -30,8 +30,9 @@ class Manifold {
   static Manifold Octahedron();
   static Manifold Sphere(int circularSegments);  // rounds up to multiple of 4
   static Manifold Extrude(Polygons crossSection, float height,
-                          int nDivisions = 0,
+                          int nDivisions = 0, float twistDegrees = 0.0f,
                           glm::vec2 scaleTop = glm::vec2(1.0f));
+  static Manifold Revolve(const Polygons& crossSection, int nDivisions = 48);
 
   // Topological
   Manifold(const std::vector<Manifold>&);
