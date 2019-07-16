@@ -39,6 +39,28 @@ void AlwaysAssert(bool condition, const char* file, int line,
   }
 }
 
+// Use sind and cosd for inputs in degrees so that multiples of 90 degrees come
+// out exact.
+inline float sind(float x) {
+  if (!std::isfinite(x)) return sin(x);
+  if (x < 0.0f) return -sind(-x);
+  int quo;
+  x = remquo(fabs(x), 90.0f, &quo);
+  switch (quo % 4) {
+    case 0:
+      return sin(glm::radians(x));
+    case 1:
+      return cos(glm::radians(x));
+    case 2:
+      return -sin(glm::radians(x));
+    case 3:
+      return -cos(glm::radians(x));
+  }
+  return 0.0f;
+}
+
+inline float cosd(float x) { return sind(x + 90.0f); }
+
 #define ALWAYS_ASSERT(condition, EX, msg) \
   AlwaysAssert<EX>(condition, __FILE__, __LINE__, #condition, msg);
 
@@ -119,10 +141,15 @@ struct Box {
     return out;
   }
 
+  // Ensure the transform passed in is axis-aligned (rotations are all multiples
+  // of 90 degrees), or else the resulting bounding box will no longer bound
+  // properly.
   HOST_DEVICE Box Transform(const glm::mat4x3& transform) const {
     Box out;
-    out.min = transform * glm::vec4(min, 1.0f);
-    out.max = transform * glm::vec4(max, 1.0f);
+    glm::vec3 minT = transform * glm::vec4(min, 1.0f);
+    glm::vec3 maxT = transform * glm::vec4(max, 1.0f);
+    out.min = glm::min(minT, maxT);
+    out.max = glm::max(minT, maxT);
     return out;
   }
 

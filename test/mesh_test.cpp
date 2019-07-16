@@ -56,20 +56,38 @@ void ExpectMeshes(const Manifold& manifold,
     EXPECT_EQ(meshes[i].NumTri(), numVertTri[i].second);
   }
 }
-}  // namespace
 
-TEST(Mesh, EdgeIdx) {
-  CheckIdx(0, 1);
-  CheckIdx(0, -1);
-  CheckIdx(1, 1);
-  CheckIdx(1, -1);
+Polygons SquareHole(float xOffset = 0.0) {
+  Polygons polys;
+  polys.push_back({
+      {glm::vec2(2 + xOffset, 2), 0, Edge::kNoIdx},    //
+      {glm::vec2(-2 + xOffset, 2), 0, Edge::kNoIdx},   //
+      {glm::vec2(-2 + xOffset, -2), 0, Edge::kNoIdx},  //
+      {glm::vec2(2 + xOffset, -2), 0, Edge::kNoIdx},   //
+  });
+  polys.push_back({
+      {glm::vec2(-1 + xOffset, 1), 0, Edge::kNoIdx},   //
+      {glm::vec2(1 + xOffset, 1), 0, Edge::kNoIdx},    //
+      {glm::vec2(1 + xOffset, -1), 0, Edge::kNoIdx},   //
+      {glm::vec2(-1 + xOffset, -1), 0, Edge::kNoIdx},  //
+  });
+  return polys;
 }
 
-TEST(Mesh, ReadWrite) {
+}  // namespace
+
+TEST(MeshIO, ReadWrite) {
   Mesh mesh = ImportMesh("data/gyroidpuzzle.ply");
   ExportMesh("data/gyroidpuzzle1.ply", mesh);
   Mesh mesh_out = ImportMesh("data/gyroidpuzzle1.ply");
   Identical(mesh, mesh_out);
+}
+
+TEST(Manifold, EdgeIdx) {
+  CheckIdx(0, 1);
+  CheckIdx(0, -1);
+  CheckIdx(1, 1);
+  CheckIdx(1, -1);
 }
 
 TEST(Manifold, Regression) {
@@ -106,19 +124,7 @@ TEST(Manifold, Sphere) {
 }
 
 TEST(Manifold, Extrude) {
-  Polygons polys;
-  polys.push_back({
-      {glm::vec2(-2, -2), 0, Edge::kNoIdx},  //
-      {glm::vec2(2, -2), 0, Edge::kNoIdx},   //
-      {glm::vec2(2, 2), 0, Edge::kNoIdx},    //
-      {glm::vec2(-2, 2), 0, Edge::kNoIdx},   //
-  });
-  polys.push_back({
-      {glm::vec2(-1, 1), 0, Edge::kNoIdx},   //
-      {glm::vec2(1, 1), 0, Edge::kNoIdx},    //
-      {glm::vec2(1, -1), 0, Edge::kNoIdx},   //
-      {glm::vec2(-1, -1), 0, Edge::kNoIdx},  //
-  });
+  Polygons polys = SquareHole();
   Manifold donut = Manifold::Extrude(polys, 1.0f, 3);
   ASSERT_TRUE(donut.IsValid());
   EXPECT_EQ(donut.Genus(), 1);
@@ -127,34 +133,29 @@ TEST(Manifold, Extrude) {
 }
 
 TEST(Manifold, ExtrudeCone) {
-  Polygons polys;
-  polys.push_back({
-      {glm::vec2(-2, -2), 0, Edge::kNoIdx},  //
-      {glm::vec2(2, -2), 0, Edge::kNoIdx},   //
-      {glm::vec2(2, 2), 0, Edge::kNoIdx},    //
-      {glm::vec2(-2, 2), 0, Edge::kNoIdx},   //
-  });
-  polys.push_back({
-      {glm::vec2(-1, 1), 0, Edge::kNoIdx},   //
-      {glm::vec2(1, 1), 0, Edge::kNoIdx},    //
-      {glm::vec2(1, -1), 0, Edge::kNoIdx},   //
-      {glm::vec2(-1, -1), 0, Edge::kNoIdx},  //
-  });
-  Manifold donut = Manifold::Extrude(polys, 1.0f, 0, glm::vec2(0.0f));
+  Polygons polys = SquareHole();
+  Manifold donut = Manifold::Extrude(polys, 1.0f, 0, 0, glm::vec2(0.0f));
   ASSERT_TRUE(donut.IsValid());
   EXPECT_EQ(donut.Genus(), 0);
   EXPECT_FLOAT_EQ(donut.Volume(), 4.0f);
 }
 
-TEST(Manifold, BooleanTetra) {
-  Manifold tetra = Manifold::Tetrahedron();
-  ASSERT_TRUE(tetra.IsValid());
+TEST(Manifold, Revolve) {
+  Polygons polys = SquareHole();
+  Manifold vug = Manifold::Revolve(polys, 48);
+  ASSERT_TRUE(vug.IsValid());
+  EXPECT_EQ(vug.Genus(), -1);
+  EXPECT_NEAR(vug.Volume(), 14.0f * glm::pi<float>(), 0.2f);
+  EXPECT_NEAR(vug.SurfaceArea(), 30.0f * glm::pi<float>(), 0.2f);
+}
 
-  Manifold tetra2 = tetra.DeepCopy();
-  tetra2.Translate(glm::vec3(0.5f));
-  Manifold result = tetra2 - tetra;
-
-  ExpectMeshes(result, {{8, 12}});
+TEST(Manifold, Revolve2) {
+  Polygons polys = SquareHole(2.0f);
+  Manifold donutHole = Manifold::Revolve(polys, 48);
+  ASSERT_TRUE(donutHole.IsValid());
+  EXPECT_EQ(donutHole.Genus(), 0);
+  EXPECT_NEAR(donutHole.Volume(), 48.0f * glm::pi<float>(), 1.0f);
+  EXPECT_NEAR(donutHole.SurfaceArea(), 96.0f * glm::pi<float>(), 1.0f);
 }
 
 TEST(Manifold, Volume) {
@@ -179,6 +180,17 @@ TEST(Manifold, SurfaceArea) {
   EXPECT_FLOAT_EQ(area, 24.0f);
 }
 
+TEST(Manifold, BooleanTetra) {
+  Manifold tetra = Manifold::Tetrahedron();
+  ASSERT_TRUE(tetra.IsValid());
+
+  Manifold tetra2 = tetra.DeepCopy();
+  tetra2.Translate(glm::vec3(0.5f));
+  Manifold result = tetra2 - tetra;
+
+  ExpectMeshes(result, {{8, 12}});
+}
+
 TEST(Manifold, SelfSubtract) {
   Manifold cube = Manifold::Cube();
   Manifold empty = cube - cube;
@@ -199,11 +211,20 @@ TEST(Manifold, Split) {
 TEST(Manifold, SplitByPlane) {
   Manifold cube = Manifold::Cube();
   cube.Translate({0.0f, 1.0f, 0.0f});
+  cube.Rotate(90.0f, 0.0f, 0.0f);
+  std::pair<Manifold, Manifold> splits =
+      cube.SplitByPlane({0.0f, 0.0f, 1.0f}, 1.0f);
+  EXPECT_NEAR(splits.first.Volume(), splits.second.Volume(), 1e-5);
+}
+
+TEST(Manifold, SplitByPlane60) {
+  Manifold cube = Manifold::Cube();
+  cube.Translate({0.0f, 1.0f, 0.0f});
   cube.Rotate(0.0f, 0.0f, -60.0f);
   cube.Translate({2.0f, 0.0f, 0.0f});
-  float phi = glm::pi<float>() / 6.0f;
+  float phi = 30.0f;
   std::pair<Manifold, Manifold> splits =
-      cube.SplitByPlane({glm::sin(phi), -glm::cos(phi), 0.0f}, 1.0f);
+      cube.SplitByPlane({sind(phi), -cosd(phi), 0.0f}, 1.0f);
   EXPECT_NEAR(splits.first.Volume(), splits.second.Volume(), 1e-5);
 }
 
