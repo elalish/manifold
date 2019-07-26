@@ -26,8 +26,11 @@
 namespace {
 using namespace manifold;
 
-struct Normalize {
-  __host__ __device__ void operator()(glm::vec3& v) { v = glm::normalize(v); }
+struct NormalizeTo {
+  float length;
+  __host__ __device__ void operator()(glm::vec3& v) {
+    v = length * glm::normalize(v);
+  }
 };
 
 struct Positive {
@@ -368,16 +371,12 @@ Manifold& Manifold::operator=(const Manifold& other) {
   return *this;
 }
 
+Manifold Manifold::DeepCopy() const { return *this; }
+
 Manifold Manifold::Tetrahedron() {
   Manifold tetrahedron;
   tetrahedron.pImpl_ = std::make_unique<Impl>(Impl::Shape::TETRAHEDRON);
   return tetrahedron;
-}
-
-Manifold Manifold::Cube() {
-  Manifold cube;
-  cube.pImpl_ = std::make_unique<Impl>(Impl::Shape::CUBE);
-  return cube;
 }
 
 Manifold Manifold::Octahedron() {
@@ -386,13 +385,39 @@ Manifold Manifold::Octahedron() {
   return octahedron;
 }
 
-Manifold Manifold::Sphere(int circularSegments) {
-  int n = (circularSegments + 3) / 4;
+Manifold Manifold::Cube(glm::vec3 size, bool center) {
+  Manifold cube;
+  cube.pImpl_ = std::make_unique<Impl>(Impl::Shape::CUBE);
+  cube.Scale(size);
+  if (center) cube.Translate(-size / 2.0f);
+  return cube;
+}
+
+Manifold Manifold::Cylinder(float height, float radiusLow, float radiusHigh,
+                            int circularSegments, bool center) {
+  float scale = radiusHigh >= 0.0f ? radiusHigh / radiusLow : 1.0f;
+  float radius = max(radiusLow, radiusHigh);
+  int n = circularSegments > 2 ? circularSegments : GetCircularSegments(radius);
+  Polygons circle(1);
+  float dPhi = 360.0f / n;
+  for (int i = 0; i < n; ++i) {
+    circle[0].push_back({radiusLow * glm::vec2(cosd(dPhi * i), sind(dPhi * i)),
+                         0, Edge::kNoIdx});
+  }
+  Manifold cylinder =
+      Manifold::Extrude(circle, height, 0, 0.0f, glm::vec2(scale));
+  if (center) cylinder.Translate(glm::vec3(0.0f, 0.0f, -height / 2.0f));
+  return cylinder;
+}
+
+Manifold Manifold::Sphere(float radius, int circularSegments) {
+  int n = circularSegments > 0 ? (circularSegments + 3) / 4
+                               : GetCircularSegments(radius) / 4;
   Manifold sphere;
   sphere.pImpl_ = std::make_unique<Impl>(Impl::Shape::OCTAHEDRON);
   sphere.pImpl_->Refine(n);
   thrust::for_each_n(sphere.pImpl_->vertPos_.beginD(), sphere.NumVert(),
-                     Normalize());
+                     NormalizeTo({radius}));
   sphere.pImpl_->Finish();
   return sphere;
 }
@@ -454,9 +479,15 @@ Manifold Manifold::Extrude(Polygons crossSection, float height, int nDivisions,
   return extrusion;
 }
 
-Manifold Manifold::Revolve(const Polygons& crossSection, int nDivisions) {
-  ALWAYS_ASSERT(nDivisions > 2, runtimeErr,
-                "With less than three divisions the result is degenerate.");
+Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments) {
+  float radius = 0.0f;
+  for (const auto& poly : crossSection) {
+    for (const auto& vert : poly) {
+      radius = max(radius, vert.pos.x);
+    }
+  }
+  int nDivisions =
+      circularSegments > 2 ? circularSegments : GetCircularSegments(radius);
   Manifold revoloid;
   auto& vertPos = revoloid.pImpl_->vertPos_.H();
   auto& triVerts = revoloid.pImpl_->triVerts_.H();
@@ -532,31 +563,20 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int nDivisions) {
   return revoloid;
 }
 
-Manifold::Manifold(const std::vector<Manifold>& manifolds)
-    : pImpl_{std::make_unique<Impl>()} {
+Manifold Manifold::Compose(const std::vector<Manifold>& manifolds) {
+  Manifold combined;
   for (Manifold manifold : manifolds) {
     manifold.pImpl_->ApplyTransform();
-    const int startIdx = NumVert();
-    pImpl_->vertPos_.H().insert(pImpl_->vertPos_.end(),
-                                manifold.pImpl_->vertPos_.begin(),
-                                manifold.pImpl_->vertPos_.end());
+    const int startIdx = combined.NumVert();
+    combined.pImpl_->vertPos_.H().insert(combined.pImpl_->vertPos_.end(),
+                                         manifold.pImpl_->vertPos_.begin(),
+                                         manifold.pImpl_->vertPos_.end());
     for (auto tri : manifold.pImpl_->triVerts_.H())
-      pImpl_->triVerts_.H().push_back(tri + startIdx);
+      combined.pImpl_->triVerts_.H().push_back(tri + startIdx);
   }
-  pImpl_->Finish();
+  combined.pImpl_->Finish();
+  return combined;
 }
-
-Mesh Manifold::Extract() const {
-  pImpl_->ApplyTransform();
-  Mesh result;
-  result.vertPos.insert(result.vertPos.end(), pImpl_->vertPos_.begin(),
-                        pImpl_->vertPos_.end());
-  result.triVerts.insert(result.triVerts.end(), pImpl_->triVerts_.begin(),
-                         pImpl_->triVerts_.end());
-  return result;
-}
-
-Manifold Manifold::DeepCopy() const { return *this; }
 
 std::vector<Manifold> Manifold::Decompose() const {
   VecDH<int> components;
@@ -603,6 +623,45 @@ std::vector<Manifold> Manifold::Decompose() const {
     thrust::replace(components.beginD(), components.endD(), compLabel, -1);
   }
   return meshes;
+}
+
+Mesh Manifold::Extract() const {
+  pImpl_->ApplyTransform();
+  Mesh result;
+  result.vertPos.insert(result.vertPos.end(), pImpl_->vertPos_.begin(),
+                        pImpl_->vertPos_.end());
+  result.triVerts.insert(result.triVerts.end(), pImpl_->triVerts_.begin(),
+                         pImpl_->triVerts_.end());
+  return result;
+}
+
+int Manifold::circularSegments = 0;
+float Manifold::circularAngle = 12.0f;
+float Manifold::circularEdgeLength = 2.0f;
+
+void Manifold::SetMinCircularAngle(float angle) {
+  ALWAYS_ASSERT(angle > 0.0f, runtimeErr, "angle must be positive!");
+  Manifold::circularAngle = angle;
+}
+
+void Manifold::SetMinCircularEdgeLength(float length) {
+  ALWAYS_ASSERT(length > 0.0f, runtimeErr, "length must be positive!");
+  Manifold::circularEdgeLength = length;
+}
+
+void Manifold::SetCircularSegments(int number) {
+  ALWAYS_ASSERT(number > 2, runtimeErr,
+                "must have at least three segments in circle!");
+  Manifold::circularSegments = number;
+}
+
+int Manifold::GetCircularSegments(float radius) {
+  if (Manifold::circularSegments > 0) return Manifold::circularSegments;
+  int nSegA = 360.0f / Manifold::circularAngle;
+  int nSegL = 2.0f * radius * glm::pi<float>() / Manifold::circularEdgeLength;
+  int nSeg = min(nSegA, nSegL) + 3;
+  nSeg -= nSeg % 4;
+  return nSeg;
 }
 
 bool Manifold::IsEmpty() const { return NumVert() == 0; }
@@ -715,7 +774,8 @@ std::pair<Manifold, Manifold> Manifold::Split(const Manifold& cutter) const {
 std::pair<Manifold, Manifold> Manifold::SplitByPlane(glm::vec3 normal,
                                                      float originOffset) const {
   normal = glm::normalize(normal);
-  Manifold cutter = Manifold::Cube().Translate({1.0f, 0.0f, 0.0f});
+  Manifold cutter =
+      Manifold::Cube(glm::vec3(2.0f), true).Translate({1.0f, 0.0f, 0.0f});
   float size = glm::length(BoundingBox().Center() - normal * originOffset) +
                0.5f * glm::length(BoundingBox().Size());
   cutter.Scale(glm::vec3(size)).Translate({originOffset, 0.0f, 0.0f});
@@ -743,14 +803,14 @@ Manifold::Impl::Impl(Shape shape) {
       triVerts = {{2, 0, 1}, {0, 3, 1}, {2, 3, 0}, {3, 2, 1}};
       break;
     case Shape::CUBE:
-      vertPos = {{-1.0f, -1.0f, -1.0f},  //
-                 {1.0f, -1.0f, -1.0f},   //
-                 {1.0f, 1.0f, -1.0f},    //
-                 {-1.0f, 1.0f, -1.0f},   //
-                 {-1.0f, -1.0f, 1.0f},   //
-                 {1.0f, -1.0f, 1.0f},    //
-                 {1.0f, 1.0f, 1.0f},     //
-                 {-1.0f, 1.0f, 1.0f}};
+      vertPos = {{0.0f, 0.0f, 0.0f},  //
+                 {1.0f, 0.0f, 0.0f},  //
+                 {1.0f, 1.0f, 0.0f},  //
+                 {0.0f, 1.0f, 0.0f},  //
+                 {0.0f, 0.0f, 1.0f},  //
+                 {1.0f, 0.0f, 1.0f},  //
+                 {1.0f, 1.0f, 1.0f},  //
+                 {0.0f, 1.0f, 1.0f}};
       triVerts = {{0, 2, 1}, {0, 3, 2},  //
                   {4, 5, 6}, {4, 6, 7},  //
                   {0, 1, 5}, {0, 5, 4},  //

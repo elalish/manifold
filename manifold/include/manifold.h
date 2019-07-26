@@ -26,20 +26,30 @@ class Manifold {
   Manifold(const Mesh&);
   Manifold DeepCopy() const;
   static Manifold Tetrahedron();
-  static Manifold Cube();
   static Manifold Octahedron();
-  static Manifold Sphere(int circularSegments);  // rounds up to multiple of 4
+  static Manifold Cube(glm::vec3 size = glm::vec3(1.0f), bool center = false);
+  static Manifold Cylinder(float height, float radiusLow,
+                           float radiusHigh = -1.0f, int circularSegments = 0,
+                           bool center = false);
+  static Manifold Sphere(float radius, int circularSegments = 0);
   static Manifold Extrude(Polygons crossSection, float height,
                           int nDivisions = 0, float twistDegrees = 0.0f,
                           glm::vec2 scaleTop = glm::vec2(1.0f));
-  static Manifold Revolve(const Polygons& crossSection, int nDivisions = 48);
+  static Manifold Revolve(const Polygons& crossSection,
+                          int circularSegments = 0);
 
   // Topological
-  Manifold(const std::vector<Manifold>&);
+  static Manifold Compose(const std::vector<Manifold>&);
   std::vector<Manifold> Decompose() const;
 
   // Extraction
   Mesh Extract() const;
+
+  // Defaults for construction
+  static void SetMinCircularAngle(float degrees);
+  static void SetMinCircularEdgeLength(float length);
+  static void SetCircularSegments(int number);
+  static int GetCircularSegments(float radius);
 
   // Information
   bool IsEmpty() const;
@@ -82,6 +92,9 @@ class Manifold {
 
  private:
   std::unique_ptr<Impl> pImpl_;
+  static int circularSegments;
+  static float circularAngle;
+  static float circularEdgeLength;
 
   // Implicit copy is private because it is expensive; use DeepCopy() above.
   Manifold(const Manifold& other);

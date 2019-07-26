@@ -219,6 +219,14 @@ inline std::ostream& operator<<(std::ostream& stream, const glm::tvec4<T>& v) {
   return stream << "x = " << v.x << ", y = " << v.y << ", z = " << v.z
                 << ", w = " << v.w;
 }
+
+inline std::ostream& operator<<(std::ostream& stream, const glm::mat4x3& mat) {
+  glm::mat3x4 tam = glm::transpose(mat);
+  return stream << tam[0] << std::endl
+                << tam[1] << std::endl
+                << tam[2] << std::endl;
+}
+
 }  // namespace manifold
 
 #undef HOST_DEVICE
