@@ -110,7 +110,7 @@ TEST(Manifold, Decompose) {
   meshList.push_back(Manifold::Tetrahedron());
   meshList.push_back(Manifold::Cube());
   meshList.push_back(Manifold::Octahedron());
-  Manifold meshes(meshList);
+  Manifold meshes = Manifold::Compose(meshList);
   ASSERT_TRUE(meshes.IsValid());
 
   ExpectMeshes(meshes, {{8, 12}, {6, 8}, {4, 4}});
@@ -118,7 +118,7 @@ TEST(Manifold, Decompose) {
 
 TEST(Manifold, Sphere) {
   int n = 25;
-  Manifold sphere = Manifold::Sphere(4 * n);
+  Manifold sphere = Manifold::Sphere(1.0f, 4 * n);
   ASSERT_TRUE(sphere.IsValid());
   EXPECT_EQ(sphere.NumTri(), n * n * 8);
 }
@@ -162,22 +162,22 @@ TEST(Manifold, Volume) {
   Manifold cube = Manifold::Cube();
   ASSERT_TRUE(cube.IsValid());
   float vol = cube.Volume();
-  EXPECT_FLOAT_EQ(vol, 8.0f);
+  EXPECT_FLOAT_EQ(vol, 1.0f);
 
   cube.Scale(glm::vec3(-1.0f));
   vol = cube.Volume();
-  EXPECT_FLOAT_EQ(vol, -8.0f);
+  EXPECT_FLOAT_EQ(vol, -1.0f);
 }
 
 TEST(Manifold, SurfaceArea) {
   Manifold cube = Manifold::Cube();
   ASSERT_TRUE(cube.IsValid());
   float area = cube.SurfaceArea();
-  EXPECT_FLOAT_EQ(area, 24.0f);
+  EXPECT_FLOAT_EQ(area, 6.0f);
 
   cube.Scale(glm::vec3(-1.0f));
   area = cube.SurfaceArea();
-  EXPECT_FLOAT_EQ(area, 24.0f);
+  EXPECT_FLOAT_EQ(area, 6.0f);
 }
 
 TEST(Manifold, BooleanTetra) {
@@ -200,7 +200,7 @@ TEST(Manifold, SelfSubtract) {
 }
 
 TEST(Manifold, Split) {
-  Manifold cube = Manifold::Cube();
+  Manifold cube = Manifold::Cube(glm::vec3(2.0f), true);
   Manifold oct = Manifold::Octahedron();
   oct.Translate(glm::vec3(0.0f, 0.0f, 1.0f));
   std::pair<Manifold, Manifold> splits = cube.Split(oct);
@@ -209,7 +209,7 @@ TEST(Manifold, Split) {
 }
 
 TEST(Manifold, SplitByPlane) {
-  Manifold cube = Manifold::Cube();
+  Manifold cube = Manifold::Cube(glm::vec3(2.0f), true);
   cube.Translate({0.0f, 1.0f, 0.0f});
   cube.Rotate(90.0f, 0.0f, 0.0f);
   std::pair<Manifold, Manifold> splits =
@@ -218,7 +218,7 @@ TEST(Manifold, SplitByPlane) {
 }
 
 TEST(Manifold, SplitByPlane60) {
-  Manifold cube = Manifold::Cube();
+  Manifold cube = Manifold::Cube(glm::vec3(2.0f), true);
   cube.Translate({0.0f, 1.0f, 0.0f});
   cube.Rotate(0.0f, 0.0f, -60.0f);
   cube.Translate({2.0f, 0.0f, 0.0f});
@@ -229,7 +229,7 @@ TEST(Manifold, SplitByPlane60) {
 }
 
 TEST(Manifold, BooleanSphere) {
-  Manifold sphere = Manifold::Sphere(12);
+  Manifold sphere = Manifold::Sphere(1.0f, 12);
   Manifold sphere2 = sphere.DeepCopy();
   sphere2.Translate(glm::vec3(0.5));
   Manifold result = sphere - sphere2;
@@ -253,7 +253,7 @@ TEST(Manifold, BooleanSelfIntersecting) {
   meshList.push_back(Manifold::Tetrahedron());
   meshList.push_back(Manifold::Tetrahedron());
   meshList[1].Translate(glm::vec3(0, 0, 0.25));
-  Manifold tetras(meshList);
+  Manifold tetras = Manifold::Compose(meshList);
   ASSERT_TRUE(tetras.IsValid());
 
   meshList[0].Translate(glm::vec3(0, 0, 0.5f));
@@ -267,7 +267,7 @@ TEST(Manifold, BooleanSelfIntersectingAlt) {
   meshList.push_back(Manifold::Tetrahedron());
   meshList.push_back(Manifold::Tetrahedron());
   meshList[1].Translate(glm::vec3(0, 0, 0.5));
-  Manifold tetras(meshList);
+  Manifold tetras = Manifold::Compose(meshList);
   ASSERT_TRUE(tetras.IsValid());
 
   meshList[0].Translate(glm::vec3(0, 0, -0.5f));
@@ -281,7 +281,7 @@ TEST(Manifold, BooleanWinding) {
   meshList.push_back(Manifold::Tetrahedron());
   meshList.push_back(Manifold::Tetrahedron());
   meshList[1].Translate(glm::vec3(0.25));
-  Manifold tetras(meshList);
+  Manifold tetras = Manifold::Compose(meshList);
   ASSERT_TRUE(tetras.IsValid());
 
   meshList[0].Translate(glm::vec3(-0.25f));
@@ -291,7 +291,7 @@ TEST(Manifold, BooleanWinding) {
 }
 
 TEST(Manifold, BooleanHorrible) {
-  Manifold random = Manifold::Sphere(8);
+  Manifold random = Manifold::Sphere(1.0f, 8);
   std::mt19937 gen(12345);  // Standard mersenne_twister_engine
   std::uniform_real_distribution<float> dis(-1.0f, 1.0f);
   random.Warp([&dis, &gen](glm::vec3& v) {
@@ -304,7 +304,7 @@ TEST(Manifold, BooleanHorrible) {
 }
 
 TEST(Manifold, BooleanHorrible2) {
-  Manifold random = Manifold::Sphere(32);
+  Manifold random = Manifold::Sphere(1.0f, 32);
   std::mt19937 gen(54321);  // Standard mersenne_twister_engine
   std::uniform_real_distribution<float> dis(-1.0f, 1.0f);
   random.Warp([&dis, &gen](glm::vec3& v) {
@@ -317,7 +317,7 @@ TEST(Manifold, BooleanHorrible2) {
 }
 
 TEST(Manifold, BooleanHorriblePlanar) {
-  Manifold random = Manifold::Sphere(32);
+  Manifold random = Manifold::Sphere(1.0f, 32);
   std::mt19937 gen(654321);  // Standard mersenne_twister_engine
   std::uniform_real_distribution<float> dis(-1.0f, 1.0f);
   random.Warp(
