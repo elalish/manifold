@@ -57,6 +57,7 @@ Manifold TorusKnot(int p, int q, float majorRadius, float minorRadius,
     v.x += majorRadius;
     v = glm::rotateZ(v, psi);
   });
+
   if (kLoops > 1) {
     std::vector<Manifold> knots;
     for (float k = 0; k < kLoops; ++k) {
@@ -65,6 +66,7 @@ Manifold TorusKnot(int p, int q, float majorRadius, float minorRadius,
     }
     knot = Manifold::Compose(knots);
   }
+
   return knot;
 }
 }  // namespace manifold
