@@ -12,19 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <iostream>
+#pragma once
 #include "manifold.h"
-#include "meshIO.h"
 
-using namespace manifold;
+namespace manifold {
 
-int main(int argc, char **argv) {
-  std::string filename = "../test/data/Csaszar.ply";
-  if (argc > 1) filename = argv[1];
-
-  Mesh mesh = ImportMesh(filename);
-  Manifold manifold(mesh);
-  std::cout << "Manifold is ";
-  if (!manifold.IsValid()) std::cout << "NOT ";
-  std::cout << "valid" << std::endl;
+Manifold TorusKnot(int p, int q, float majorRadius, float minorRadius,
+                   float threadRadius, int circularSegments = 0,
+                   int linearSegments = 0);
 }
