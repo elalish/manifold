@@ -636,8 +636,8 @@ Mesh Manifold::Extract() const {
 }
 
 int Manifold::circularSegments = 0;
-float Manifold::circularAngle = 12.0f;
-float Manifold::circularEdgeLength = 2.0f;
+float Manifold::circularAngle = 10.0f;
+float Manifold::circularEdgeLength = 1.0f;
 
 void Manifold::SetMinCircularAngle(float angle) {
   ALWAYS_ASSERT(angle > 0.0f, runtimeErr, "angle must be positive!");
