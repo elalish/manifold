@@ -41,3 +41,8 @@ TEST(Samples, Knot42) {
   EXPECT_NEAR(knots[0].Volume(), knots[1].Volume(), 1);
   EXPECT_NEAR(knots[0].SurfaceArea(), knots[1].SurfaceArea(), 1);
 }
+
+TEST(Samples, Bracelet) {
+  Manifold bracelet = StretchyBracelet();
+  ExportMesh("bracelet.stl", bracelet.Extract());
+}
