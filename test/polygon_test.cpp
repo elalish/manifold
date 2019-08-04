@@ -326,6 +326,22 @@ TEST(Polygon, BadEdges2) {
   EXPECT_THROW(CheckManifold(triangles, polys), runtimeErr);
 }
 
+TEST(Polygon, Concave) {
+  Polygons polys;
+  polys.push_back({
+      {glm::vec2(-0.707107, -0.707107), 1, 10},     //
+      {glm::vec2(1, 0), 14, 21},                    //
+      {glm::vec2(0.683013, 0), 25, -1},             //
+      {glm::vec2(0.37941, -0.232963), 33, -1},      //
+      {glm::vec2(0.37941, -0.232963), 32, -1},      //
+      {glm::vec2(1.49012e-08, -0.183013), 31, -1},  //
+      {glm::vec2(1.49012e-08, -0.183013), 30, -1},  //
+      {glm::vec2(-0.140431, 0), 24, 21},            //
+      {glm::vec2(-1, 0), 4, 6},                     //
+  });
+  TestPoly(polys, 7);
+}
+
 // void fnExit() { throw std::runtime_error("Someone called Exit()!"); }
 
 int main(int argc, char **argv) {

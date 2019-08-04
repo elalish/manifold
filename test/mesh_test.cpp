@@ -198,6 +198,15 @@ TEST(Manifold, SelfSubtract) {
   // EXPECT_FLOAT_EQ(empty.SurfaceArea(), 0.0f);
 }
 
+TEST(Manifold, Coplanar) {
+  Manifold cube = Manifold::Cylinder(1.0f, 1.0f);
+  Manifold cube2 = cube.DeepCopy();
+  Manifold out = cube - cube2.Scale({0.5f, 0.5f, 1.0f})
+                            .Rotate(0, 0, 15)
+                            .Translate({0.25f, 0.25f, 0.0f});
+  ExportMesh("cubes.ply", out.Extract());
+}
+
 TEST(Manifold, Split) {
   Manifold cube = Manifold::Cube(glm::vec3(2.0f), true);
   Manifold oct = Manifold::Octahedron();
@@ -244,7 +253,7 @@ TEST(Manifold, Boolean3) {
   gyroid2.Translate(glm::vec3(5.0f));
   Manifold result = gyroid + gyroid2;
 
-  ExpectMeshes(result, {{31733, 63602}});
+  ExpectMeshes(result, {{31733, 63606}});
 }
 
 TEST(Manifold, BooleanSelfIntersecting) {
