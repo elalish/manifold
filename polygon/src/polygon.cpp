@@ -20,6 +20,7 @@
 #include "polygon.h"
 
 constexpr bool kVerbose = false;
+constexpr bool kWarning = true;
 
 constexpr float kTolerance = 1e5;
 
@@ -242,7 +243,7 @@ class Monotones {
           Match(idx, helper_idx);
         return RIGHTWARDS;
       } else {
-        if (CCW(vert.pos, Right(vert).pos, Left(vert).pos) >= 0) {  // Start
+        if (CCW(vert.pos, Right(vert).pos, Left(vert).pos) > 0) {  // Start
           vert.across = idx;
           return START;
         } else {
@@ -448,9 +449,11 @@ std::vector<glm::ivec3> Triangulate(const Polygons &polys) {
     // has trouble, and if so we switch to a simpler, toplogical backup
     // triangulator that has guaranteed manifold output, except in the presence
     // of certain edge constraints.
-    if (kVerbose) {
+    if (kWarning) {
+      std::cout << "-----------------------------------" << std::endl;
       std::cout << "Primary triangulation failed, switching to backup"
                 << std::endl;
+      std::cout << e.what() << std::endl;
       Dump(polys);
       std::cout << "produced this triangulation:" << std::endl;
       for (int j = 0; j < triangles.size(); ++j) {
@@ -462,8 +465,10 @@ std::vector<glm::ivec3> Triangulate(const Polygons &polys) {
       triangles = BackupTriangulate(polys);
       CheckManifold(triangles, polys);
     } catch (const std::exception &e) {
-      if (kVerbose) {
+      if (kWarning) {
+        std::cout << "-----------------------------------" << std::endl;
         std::cout << "Backup triangulation failed!" << std::endl;
+        std::cout << e.what() << std::endl;
         Dump(polys);
         std::cout << "backup produced this triangulation:" << std::endl;
         for (int j = 0; j < triangles.size(); ++j) {
@@ -582,11 +587,11 @@ void CheckManifold(const std::vector<EdgeVerts> &halfedges) {
                       forward[i].second == backward[i].second,
                   runtimeErr, "Forward and backward edge do not match.");
     if (i > 0) {
-      ALWAYS_ASSERT(forward[i - 1].first == forward[i - 1].first &&
-                        forward[i].second == forward[i].second,
+      ALWAYS_ASSERT(forward[i - 1].first != forward[i].first ||
+                        forward[i - 1].second != forward[i].second,
                     runtimeErr, "Not a 2-manifold.");
-      ALWAYS_ASSERT(backward[i - 1].first == backward[i - 1].first &&
-                        backward[i].second == backward[i].second,
+      ALWAYS_ASSERT(backward[i - 1].first != backward[i].first ||
+                        backward[i - 1].second != backward[i].second,
                     runtimeErr, "Not a 2-manifold.");
     }
   }

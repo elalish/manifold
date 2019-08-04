@@ -34,7 +34,7 @@ Manifold Base(float radius, float width, float bigRadius, float rr, int n) {
                                  .Translate({0.0f, bigRadius, 0.0f}));
 
   Manifold base = center + decor;
-  for (int i = 1; i < 6; ++i) {
+  for (int i = 1; i < n; ++i) {
     base = base + decor.Rotate(0, 0, 360.0f / n);
   }
   return base;
