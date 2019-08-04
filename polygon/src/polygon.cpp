@@ -407,6 +407,24 @@ bool SharedEdge(glm::ivec2 edges0, glm::ivec2 edges1) {
          (edges0[1] != Edge::kNoIdx &&
           (edges0[1] == edges1[0] || edges0[1] == edges1[1]));
 }
+
+void PrintTriangulationWarning(const std::string &triangulationType,
+                               const Polygons &polys,
+                               const std::vector<glm::ivec3> &triangles,
+                               const std::exception &e) {
+  if (kWarning) {
+    std::cout << "-----------------------------------" << std::endl;
+    std::cout << triangulationType
+              << " triangulation failed, switching to backup" << std::endl;
+    std::cout << e.what() << std::endl;
+    Dump(polys);
+    std::cout << "produced this triangulation:" << std::endl;
+    for (int j = 0; j < triangles.size(); ++j) {
+      std::cout << triangles[j][0] << ", " << triangles[j][1] << ", "
+                << triangles[j][2] << std::endl;
+    }
+  }
+}
 }  // namespace
 
 namespace manifold {
@@ -449,33 +467,12 @@ std::vector<glm::ivec3> Triangulate(const Polygons &polys) {
     // has trouble, and if so we switch to a simpler, toplogical backup
     // triangulator that has guaranteed manifold output, except in the presence
     // of certain edge constraints.
-    if (kWarning) {
-      std::cout << "-----------------------------------" << std::endl;
-      std::cout << "Primary triangulation failed, switching to backup"
-                << std::endl;
-      std::cout << e.what() << std::endl;
-      Dump(polys);
-      std::cout << "produced this triangulation:" << std::endl;
-      for (int j = 0; j < triangles.size(); ++j) {
-        std::cout << triangles[j][0] << ", " << triangles[j][1] << ", "
-                  << triangles[j][2] << std::endl;
-      }
-    }
+    PrintTriangulationWarning("Primary", polys, triangles, e);
     try {
       triangles = BackupTriangulate(polys);
       CheckManifold(triangles, polys);
-    } catch (const std::exception &e) {
-      if (kWarning) {
-        std::cout << "-----------------------------------" << std::endl;
-        std::cout << "Backup triangulation failed!" << std::endl;
-        std::cout << e.what() << std::endl;
-        Dump(polys);
-        std::cout << "backup produced this triangulation:" << std::endl;
-        for (int j = 0; j < triangles.size(); ++j) {
-          std::cout << triangles[j][0] << ", " << triangles[j][1] << ", "
-                    << triangles[j][2] << std::endl;
-        }
-      }
+    } catch (const std::exception &e2) {
+      PrintTriangulationWarning("Backup", polys, triangles, e2);
       throw;
     }
   }
