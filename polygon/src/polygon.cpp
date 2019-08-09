@@ -32,6 +32,7 @@ struct VertAdj {
   int mesh_idx;             // this is a global index into the manifold
   int right, left, across;  // these are local indices within this vector
   bool merge;
+  int sweep_order;
   bool Processed() const { return across >= 0; }
 };
 
@@ -46,7 +47,7 @@ int CCW(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2) {
   p1 = glm::abs(p1);
   p2 = glm::abs(p2);
   float norm = p0.x * p0.y + p1.x * p1.y + p2.x * p2.y;
-  if (std::abs(result) * kTolerance < norm)
+  if (std::abs(result) * kTolerance <= norm)
     return 0;
   else
     return result > 0 ? 1 : -1;
@@ -59,7 +60,7 @@ class Monotones {
   enum VertType { START, END, RIGHTWARDS, LEFTWARDS, MERGE, SPLIT, REV_START };
 
   Monotones(const Polygons &polys) {
-    std::vector<std::tuple<float, int, int>> sweep_line;
+    std::vector<std::tuple<float, int>> sweep_line;
     for (const SimplePolygon &poly : polys) {
       int start = Num_verts();
       for (int i = 0; i < poly.size(); ++i) {
@@ -67,11 +68,11 @@ class Monotones {
                               poly[i].idx,                   //
                               Next(i, poly.size()) + start,  //
                               Prev(i, poly.size()) + start,  //
-                              -1, false});
+                              -1, false, -1});
         // Ensure sweep line is sorted identically here and in the Triangulator
         // below, including when the y-values are identical.
         sweep_line.push_back(
-            std::make_tuple(monotones_.back().pos.y, poly[i].idx, start + i));
+            std::make_tuple(monotones_.back().pos.y, start + i));
         if (kVerbose)
           std::cout << "idx = " << start + i
                     << ", mesh_idx = " << monotones_.back().mesh_idx
@@ -81,8 +82,10 @@ class Monotones {
     if (kVerbose) std::cout << "starting sweep" << std::endl;
     std::sort(sweep_line.begin(), sweep_line.end());
     VertType v_type = START;
-    for (const auto &tmp : sweep_line) {
-      v_type = ProcessVert(std::get<2>(tmp));
+    for (int i = 0; i < sweep_line.size(); ++i) {
+      int idx = std::get<1>(sweep_line[i]);
+      Vert(idx).sweep_order = i;
+      v_type = ProcessVert(idx);
       if (kVerbose) std::cout << v_type << std::endl;
     }
     Check();
@@ -90,9 +93,10 @@ class Monotones {
                   "Monotones did not finish with an END.");
 
     // for (int i = sweep_line.size(); i < monotones_.size(); ++i) {
-    //   if(kVerbose) std::cout << "idx = " << i << ", mesh_idx = " <<
-    //   monotones_[i].mesh_idx
-    //             << std::endl;
+    //   if (kVerbose)
+    //     std::cout << "idx = " << i << ", mesh_idx = " <<
+    //     monotones_[i].mesh_idx
+    //               << std::endl;
     // }
   }
 
@@ -106,7 +110,15 @@ class Monotones {
                     "monotone vert neighbors don't agree!");
     }
     Polygons polys = Assemble(edges);
-    if (kVerbose) Dump(polys);
+    if (kVerbose) {
+      for (auto &poly : polys)
+        for (auto &v : poly) {
+          auto vert = monotones_[v.idx];
+          v.idx = vert.mesh_idx;
+          v.pos = vert.pos;
+        }
+      Dump(polys);
+    }
   }
 
  private:
@@ -293,7 +305,7 @@ class Triangulator {
       VertAdj vj = monotones_[vj_idx];
       if (attached == 1) {
         if (kVerbose) std::cout << "same chain" << std::endl;
-        while (CCW(vi.pos, vj.pos, v_top.pos) == (onRight_ ? 1 : -1)) {
+        while (CCW(vi.pos, vj.pos, v_top.pos) != (onRight_ ? -1 : 1)) {
           AddTriangle(triangles, vi.mesh_idx, vj.mesh_idx, v_top.mesh_idx);
           v_top_idx = vj_idx;
           reflex_chain_.pop();
@@ -362,27 +374,26 @@ class Triangulator {
 void TriangulateMonotones(const std::vector<VertAdj> &monotones,
                           std::vector<glm::ivec3> &triangles) {
   // make sorted index list to traverse the sweep line.
-  std::vector<std::tuple<float, int, int>> sweep_line;
+  std::vector<std::tuple<int, int>> sweep_line;
   for (int i = 0; i < monotones.size(); ++i) {
     // Ensure sweep line is sorted identically here and in Monotones
     // above, including when the y-values are identical.
-    sweep_line.push_back(
-        std::make_tuple(monotones[i].pos.y, monotones[i].mesh_idx, i));
+    sweep_line.push_back(std::make_tuple(monotones[i].sweep_order, i));
   }
   std::sort(sweep_line.begin(), sweep_line.end());
   std::vector<Triangulator> triangulators;
   for (int i = 0; i < sweep_line.size(); ++i) {
-    const int v_idx = std::get<2>(sweep_line[i]);
+    const int v_idx = std::get<1>(sweep_line[i]);
     if (kVerbose)
       std::cout << "i = " << i << ", v_idx = " << v_idx
                 << ", mesh_idx = " << monotones[v_idx].mesh_idx << std::endl;
     bool found = false;
-    for (int i = 0; i < triangulators.size(); ++i) {
-      if (triangulators[i].ProcessVert(v_idx, triangles)) {
+    for (int j = 0; j < triangulators.size(); ++j) {
+      if (triangulators[j].ProcessVert(v_idx, triangles)) {
         found = true;
         if (kVerbose)
-          std::cout << "in triangulator " << i << ", with "
-                    << triangulators[i].NumTriangles() << " triangles so far"
+          std::cout << "in triangulator " << j << ", with "
+                    << triangulators[j].NumTriangles() << " triangles so far"
                     << std::endl;
         break;
       }
@@ -633,6 +644,13 @@ void Dump(const Polygons &polys) {
       std::cout << "    {glm::vec2(" << v.pos.x << ", " << v.pos.y << "), "
                 << v.idx << ", " << v.nextEdge << "},  //" << std::endl;
     }
+  }
+  for (auto poly : polys) {
+    std::cout << "array([" << std::endl;
+    for (auto v : poly) {
+      std::cout << "  [" << v.pos.x << ", " << v.pos.y << "]," << std::endl;
+    }
+    std::cout << "])" << std::endl;
   }
 }
 
