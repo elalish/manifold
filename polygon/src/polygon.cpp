@@ -39,20 +39,6 @@ struct VertAdj {
 int Next(int i, int n) { return ++i >= n ? 0 : i; }
 int Prev(int i, int n) { return --i < 0 ? n - 1 : i; }
 
-int CCW(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2) {
-  glm::vec2 v1 = p1 - p0;
-  glm::vec2 v2 = p2 - p0;
-  float result = v1.x * v2.y - v1.y * v2.x;
-  p0 = glm::abs(p0);
-  p1 = glm::abs(p1);
-  p2 = glm::abs(p2);
-  float norm = p0.x * p0.y + p1.x * p1.y + p2.x * p2.y;
-  if (std::abs(result) * kTolerance <= norm)
-    return 0;
-  else
-    return result > 0 ? 1 : -1;
-}
-
 class Monotones {
  public:
   const std::vector<VertAdj> &GetMonotones() { return monotones_; }
@@ -440,6 +426,20 @@ void PrintTriangulationWarning(const std::string &triangulationType,
 
 namespace manifold {
 
+int CCW(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2) {
+  glm::vec2 v1 = p1 - p0;
+  glm::vec2 v2 = p2 - p0;
+  float result = v1.x * v2.y - v1.y * v2.x;
+  p0 = glm::abs(p0);
+  p1 = glm::abs(p1);
+  p2 = glm::abs(p2);
+  float norm = p0.x * p0.y + p1.x * p1.y + p2.x * p2.y;
+  if (std::abs(result) * kTolerance <= norm)
+    return 0;
+  else
+    return result > 0 ? 1 : -1;
+}
+
 Polygons Assemble(const std::vector<EdgeVerts> &halfedges) {
   Polygons polys;
   std::map<int, int> vert_edge;
@@ -638,12 +638,14 @@ void CheckManifold(const std::vector<glm::ivec3> &triangles,
 }
 
 void Dump(const Polygons &polys) {
+  int i = 0;
   for (auto poly : polys) {
     std::cout << "polys.push_back({" << std::endl;
     for (auto v : poly) {
       std::cout << "    {glm::vec2(" << v.pos.x << ", " << v.pos.y << "), "
-                << v.idx << ", " << v.nextEdge << "},  //" << std::endl;
+                << i++ << ", " << v.nextEdge << "},  //" << std::endl;
     }
+    std::cout << "});" << std::endl;
   }
   for (auto poly : polys) {
     std::cout << "array([" << std::endl;

@@ -58,6 +58,53 @@ void TestAssemble(const Polygons &polys) {
   Identical(polys, polys_out);
 }
 
+void CheckFolded(const std::vector<glm::ivec3> &triangles,
+                 const Polygons &polys) {
+  std::vector<glm::ivec3> halfedges;
+  std::vector<glm::vec2> vertPos;
+  for (const glm::ivec3 &tri : triangles) {
+    // Differentiate edges of triangles by setting index to Edge::kInterior.
+    halfedges.push_back({tri[0], tri[1], tri[2]});
+    halfedges.push_back({tri[1], tri[2], tri[0]});
+    halfedges.push_back({tri[2], tri[0], tri[1]});
+  }
+  for (const auto &poly : polys) {
+    vertPos.push_back(poly[0].pos);
+    for (int i = 1; i < poly.size(); ++i) {
+      halfedges.push_back({poly[i].idx, poly[i - 1].idx, -1});
+      vertPos.push_back(poly[i].pos);
+    }
+    halfedges.push_back({poly[0].idx, poly.back().idx, -1});
+  }
+  size_t n_edges = halfedges.size() / 2;
+  std::vector<glm::ivec3> forward(n_edges), backward(n_edges);
+
+  auto end = std::copy_if(halfedges.begin(), halfedges.end(), forward.begin(),
+                          [](glm::ivec3 e) { return e.y > e.x; });
+
+  end = std::copy_if(halfedges.begin(), halfedges.end(), backward.begin(),
+                     [](glm::ivec3 e) { return e.y < e.x; });
+
+  std::for_each(backward.begin(), backward.end(),
+                [](glm::ivec3 &e) { std::swap(e.x, e.y); });
+  auto cmp = [](const glm::ivec3 &a, const glm::ivec3 &b) {
+    return a.x < b.x || (a.x == b.x && a.y < b.y);
+  };
+  std::sort(forward.begin(), forward.end(), cmp);
+  std::sort(backward.begin(), backward.end(), cmp);
+  for (int i = 0; i < n_edges; ++i) {
+    if (forward[i].z >= 0 && backward[i].z >= 0) {
+      glm::vec2 origin = vertPos[forward[i].x];
+      glm::vec2 edge = vertPos[forward[i].y];
+      glm::vec2 vL = vertPos[forward[i].z];
+      glm::vec2 vR = vertPos[backward[i].z];
+      float CCWL = CCW(origin, vL, edge);
+      float CCWR = CCW(origin, edge, vR);
+      ASSERT_GE(CCWL * CCWR, 0);
+    }
+  }
+}
+
 void TestPoly(const Polygons &polys, int expectedNumTri) {
   TestAssemble(polys);
 
@@ -75,6 +122,7 @@ void TestPoly(const Polygons &polys, int expectedNumTri) {
     }
   CheckManifold(triangles, polys);
   ASSERT_EQ(triangles.size(), expectedNumTri);
+  CheckFolded(triangles, polys);
 }
 }  // namespace
 
@@ -89,15 +137,15 @@ TEST(Polygon, NoAssemble) {
 TEST(Polygon, SimpleHole) {
   Polygons polys;
   polys.push_back({
-      {glm::vec2(0, -2), 11, Edge::kNoIdx},  //
-      {glm::vec2(2, 2), 21, Edge::kNoIdx},   //
-      {glm::vec2(0, 4), 47, Edge::kNoIdx},   //
-      {glm::vec2(-3, 3), 14, Edge::kNoIdx},  //
+      {glm::vec2(0, -2), 0, Edge::kNoIdx},  //
+      {glm::vec2(2, 2), 1, Edge::kNoIdx},   //
+      {glm::vec2(0, 4), 2, Edge::kNoIdx},   //
+      {glm::vec2(-3, 3), 3, Edge::kNoIdx},  //
   });
   polys.push_back({
-      {glm::vec2(0, -1), 5, Edge::kNoIdx},  //
-      {glm::vec2(-1, 1), 8, Edge::kNoIdx},  //
-      {glm::vec2(1, 1), 3, Edge::kNoIdx},   //
+      {glm::vec2(0, -1), 4, Edge::kNoIdx},  //
+      {glm::vec2(-1, 1), 5, Edge::kNoIdx},  //
+      {glm::vec2(1, 1), 6, Edge::kNoIdx},   //
   });
   TestPoly(polys, 7);
 }
@@ -120,21 +168,21 @@ TEST(Polygon, SimpleHole2) {
 TEST(Polygon, MultiMerge) {
   Polygons polys;
   polys.push_back({
-      {glm::vec2(-7, 0), 5, Edge::kNoIdx},    //
-      {glm::vec2(-6, 3), 4, Edge::kNoIdx},    //
-      {glm::vec2(-5, 1), 7, Edge::kNoIdx},    //
-      {glm::vec2(-4, 6), 1, Edge::kNoIdx},    //
-      {glm::vec2(-3, 2), 2, Edge::kNoIdx},    //
-      {glm::vec2(-2, 5), 9, Edge::kNoIdx},    //
-      {glm::vec2(-1, 4), 3, Edge::kNoIdx},    //
-      {glm::vec2(0, 12), 6, Edge::kNoIdx},    //
-      {glm::vec2(-6, 10), 12, Edge::kNoIdx},  //
-      {glm::vec2(-8, 11), 18, Edge::kNoIdx},  //
+      {glm::vec2(-7, 0), 0, Edge::kNoIdx},   //
+      {glm::vec2(-6, 3), 1, Edge::kNoIdx},   //
+      {glm::vec2(-5, 1), 2, Edge::kNoIdx},   //
+      {glm::vec2(-4, 6), 3, Edge::kNoIdx},   //
+      {glm::vec2(-3, 2), 4, Edge::kNoIdx},   //
+      {glm::vec2(-2, 5), 5, Edge::kNoIdx},   //
+      {glm::vec2(-1, 4), 6, Edge::kNoIdx},   //
+      {glm::vec2(0, 12), 7, Edge::kNoIdx},   //
+      {glm::vec2(-6, 10), 8, Edge::kNoIdx},  //
+      {glm::vec2(-8, 11), 9, Edge::kNoIdx},  //
   });
   polys.push_back({
-      {glm::vec2(-5, 7), 11, Edge::kNoIdx},  //
-      {glm::vec2(-6, 8), 21, Edge::kNoIdx},  //
-      {glm::vec2(-5, 9), 47, Edge::kNoIdx},  //
+      {glm::vec2(-5, 7), 10, Edge::kNoIdx},  //
+      {glm::vec2(-6, 8), 11, Edge::kNoIdx},  //
+      {glm::vec2(-5, 9), 12, Edge::kNoIdx},  //
   });
   TestPoly(polys, 13);
 }
@@ -194,23 +242,23 @@ TEST(Polygon, ColinearY) {
   Polygons polys;
   polys.push_back({
       {glm::vec2(0, 0), 0, Edge::kNoIdx},   //
-      {glm::vec2(-1, 1), 5, Edge::kNoIdx},  //
+      {glm::vec2(-1, 1), 1, Edge::kNoIdx},  //
       {glm::vec2(-2, 1), 2, Edge::kNoIdx},  //
-      {glm::vec2(-3, 1), 1, Edge::kNoIdx},  //
-      {glm::vec2(-4, 1), 7, Edge::kNoIdx},  //
-      {glm::vec2(-4, 2), 8, Edge::kNoIdx},  //
-      {glm::vec2(-3, 2), 3, Edge::kNoIdx},  //
-      {glm::vec2(-2, 2), 9, Edge::kNoIdx},  //
-      {glm::vec2(-1, 2), 4, Edge::kNoIdx},  //
-      {glm::vec2(0, 3), 10, Edge::kNoIdx},  //
-      {glm::vec2(1, 2), 11, Edge::kNoIdx},  //
-      {glm::vec2(2, 2), 12, Edge::kNoIdx},  //
-      {glm::vec2(3, 2), 14, Edge::kNoIdx},  //
+      {glm::vec2(-3, 1), 3, Edge::kNoIdx},  //
+      {glm::vec2(-4, 1), 4, Edge::kNoIdx},  //
+      {glm::vec2(-4, 2), 5, Edge::kNoIdx},  //
+      {glm::vec2(-3, 2), 6, Edge::kNoIdx},  //
+      {glm::vec2(-2, 2), 7, Edge::kNoIdx},  //
+      {glm::vec2(-1, 2), 8, Edge::kNoIdx},  //
+      {glm::vec2(0, 3), 9, Edge::kNoIdx},   //
+      {glm::vec2(1, 2), 10, Edge::kNoIdx},  //
+      {glm::vec2(2, 2), 11, Edge::kNoIdx},  //
+      {glm::vec2(3, 2), 12, Edge::kNoIdx},  //
       {glm::vec2(4, 2), 13, Edge::kNoIdx},  //
-      {glm::vec2(4, 1), 15, Edge::kNoIdx},  //
-      {glm::vec2(3, 1), 18, Edge::kNoIdx},  //
-      {glm::vec2(2, 1), 19, Edge::kNoIdx},  //
-      {glm::vec2(1, 1), 16, Edge::kNoIdx},  //
+      {glm::vec2(4, 1), 14, Edge::kNoIdx},  //
+      {glm::vec2(3, 1), 15, Edge::kNoIdx},  //
+      {glm::vec2(2, 1), 16, Edge::kNoIdx},  //
+      {glm::vec2(1, 1), 17, Edge::kNoIdx},  //
   });
   TestPoly(polys, 16);
 }
@@ -220,15 +268,15 @@ TEST(Polygon, Inverted) {
   polys.push_back({
       {glm::vec2(0, 2.04124), 0, Edge::kNoIdx},           //
       {glm::vec2(-1.41421, -0.408248), 1, Edge::kNoIdx},  //
-      {glm::vec2(-1.23744, -0.408248), 5, Edge::kNoIdx},  //
-      {glm::vec2(0, 1.73506), 9, Edge::kNoIdx},           //
-      {glm::vec2(1.23744, -0.408248), 7, Edge::kNoIdx},   //
-      {glm::vec2(1.41421, -0.408248), 2, Edge::kNoIdx},   //
+      {glm::vec2(-1.23744, -0.408248), 2, Edge::kNoIdx},  //
+      {glm::vec2(0, 1.73506), 3, Edge::kNoIdx},           //
+      {glm::vec2(1.23744, -0.408248), 4, Edge::kNoIdx},   //
+      {glm::vec2(1.41421, -0.408248), 5, Edge::kNoIdx},   //
   });
   polys.push_back({
-      {glm::vec2(-1.06066, -0.408248), 4, Edge::kNoIdx},  //
-      {glm::vec2(0, 1.42887), 8, Edge::kNoIdx},           //
-      {glm::vec2(1.06066, -0.408248), 6, Edge::kNoIdx},   //
+      {glm::vec2(-1.06066, -0.408248), 6, Edge::kNoIdx},  //
+      {glm::vec2(0, 1.42887), 7, Edge::kNoIdx},           //
+      {glm::vec2(1.06066, -0.408248), 8, Edge::kNoIdx},   //
   });
   TestPoly(polys, 5);
 }
@@ -236,66 +284,66 @@ TEST(Polygon, Inverted) {
 TEST(Polygon, DISABLED_Ugly) {
   Polygons polys;
   polys.push_back({
-      {glm::vec2(0.550049, -0.484235), 0, Edge::kNoIdx},      //
-      {glm::vec2(0.411479, -0.20602), 165, Edge::kNoIdx},     //
-      {glm::vec2(0.515815, -0.205784), 1067, Edge::kNoIdx},   //
-      {glm::vec2(0.548218, -0.172791), 283, Edge::kNoIdx},    //
-      {glm::vec2(0.547651, -0.0762587), 280, Edge::kNoIdx},   //
-      {glm::vec2(0.358672, -0.0999957), 164, Edge::kNoIdx},   //
-      {glm::vec2(0.3837, -0.150245), 169, Edge::kNoIdx},      //
-      {glm::vec2(0.505506, -0.154427), 1072, Edge::kNoIdx},   //
-      {glm::vec2(0.546988, 0.0365588), 284, Edge::kNoIdx},    //
-      {glm::vec2(0.546255, 0.161176), 285, Edge::kNoIdx},     //
-      {glm::vec2(0.47977, -0.0196254), 1070, Edge::kNoIdx},   //
-      {glm::vec2(0.492479, 0.0576864), 1071, Edge::kNoIdx},   //
-      {glm::vec2(0.549446, -0.381719), 286, Edge::kNoIdx},    //
-      {glm::vec2(0.547831, -0.106901), 282, Edge::kNoIdx},    //
-      {glm::vec2(0.36829, -0.00350715), 1066, Edge::kNoIdx},  //
-      {glm::vec2(0.301766, 0.0142589), 166, Edge::kNoIdx},    //
-      {glm::vec2(0.205266, 0.208008), 167, Edge::kNoIdx},     //
-      {glm::vec2(0.340096, 0.562179), 1068, Edge::kNoIdx},    //
-      {glm::vec2(0.255078, 0.464996), 1063, Edge::kNoIdx},    //
-      {glm::vec2(0.545534, 0.283844), 278, Edge::kNoIdx},     //
-      {glm::vec2(0.543549, 0.621731), 287, Edge::kNoIdx},     //
-      {glm::vec2(0.363675, 0.790003), 1073, Edge::kNoIdx},    //
-      {glm::vec2(0.102785, 0.413765), 170, Edge::kNoIdx},     //
-      {glm::vec2(0.152009, 0.314934), 174, Edge::kNoIdx},     //
-      {glm::vec2(0.198766, 0.33883), 1076, Edge::kNoIdx},     //
-      {glm::vec2(0.344385, -0.0713115), 173, Edge::kNoIdx},   //
-      {glm::vec2(0.261844, 0.0944117), 163, Edge::kNoIdx},    //
-      {glm::vec2(0.546909, 0.0499438), 279, Edge::kNoIdx},    //
-      {glm::vec2(0.544994, 0.375805), 277, Edge::kNoIdx},     //
-      {glm::vec2(0.112526, 0.732868), 1062, Edge::kNoIdx},    //
-      {glm::vec2(0.205606, 0.429447), 1064, Edge::kNoIdx},    //
-      {glm::vec2(0.0249926, 0.763546), 1065, Edge::kNoIdx},   //
-      {glm::vec2(-0.0523676, 0.725275), 162, Edge::kNoIdx},   //
-      {glm::vec2(0.124038, 0.371095), 161, Edge::kNoIdx},     //
-      {glm::vec2(0.0406817, 0.937559), 1069, Edge::kNoIdx},   //
-      {glm::vec2(-0.176136, 0.973774), 168, Edge::kNoIdx},    //
-      {glm::vec2(-0.111522, 0.844043), 172, Edge::kNoIdx},    //
-      {glm::vec2(0.396158, 0.428476), 1075, Edge::kNoIdx},    //
-      {glm::vec2(0.549669, -0.419631), 281, Edge::kNoIdx},    //
+      {glm::vec2(0.550049, -0.484235), 0, Edge::kNoIdx},    //
+      {glm::vec2(0.411479, -0.20602), 1, Edge::kNoIdx},     //
+      {glm::vec2(0.515815, -0.205784), 2, Edge::kNoIdx},    //
+      {glm::vec2(0.548218, -0.172791), 3, Edge::kNoIdx},    //
+      {glm::vec2(0.547651, -0.0762587), 4, Edge::kNoIdx},   //
+      {glm::vec2(0.358672, -0.0999957), 5, Edge::kNoIdx},   //
+      {glm::vec2(0.3837, -0.150245), 6, Edge::kNoIdx},      //
+      {glm::vec2(0.505506, -0.154427), 7, Edge::kNoIdx},    //
+      {glm::vec2(0.546988, 0.0365588), 8, Edge::kNoIdx},    //
+      {glm::vec2(0.546255, 0.161176), 9, Edge::kNoIdx},     //
+      {glm::vec2(0.47977, -0.0196254), 10, Edge::kNoIdx},   //
+      {glm::vec2(0.492479, 0.0576864), 11, Edge::kNoIdx},   //
+      {glm::vec2(0.549446, -0.381719), 12, Edge::kNoIdx},   //
+      {glm::vec2(0.547831, -0.106901), 13, Edge::kNoIdx},   //
+      {glm::vec2(0.36829, -0.00350715), 14, Edge::kNoIdx},  //
+      {glm::vec2(0.301766, 0.0142589), 15, Edge::kNoIdx},   //
+      {glm::vec2(0.205266, 0.208008), 16, Edge::kNoIdx},    //
+      {glm::vec2(0.340096, 0.562179), 17, Edge::kNoIdx},    //
+      {glm::vec2(0.255078, 0.464996), 18, Edge::kNoIdx},    //
+      {glm::vec2(0.545534, 0.283844), 19, Edge::kNoIdx},    //
+      {glm::vec2(0.543549, 0.621731), 20, Edge::kNoIdx},    //
+      {glm::vec2(0.363675, 0.790003), 21, Edge::kNoIdx},    //
+      {glm::vec2(0.102785, 0.413765), 22, Edge::kNoIdx},    //
+      {glm::vec2(0.152009, 0.314934), 23, Edge::kNoIdx},    //
+      {glm::vec2(0.198766, 0.33883), 24, Edge::kNoIdx},     //
+      {glm::vec2(0.344385, -0.0713115), 25, Edge::kNoIdx},  //
+      {glm::vec2(0.261844, 0.0944117), 26, Edge::kNoIdx},   //
+      {glm::vec2(0.546909, 0.0499438), 27, Edge::kNoIdx},   //
+      {glm::vec2(0.544994, 0.375805), 28, Edge::kNoIdx},    //
+      {glm::vec2(0.112526, 0.732868), 29, Edge::kNoIdx},    //
+      {glm::vec2(0.205606, 0.429447), 30, Edge::kNoIdx},    //
+      {glm::vec2(0.0249926, 0.763546), 31, Edge::kNoIdx},   //
+      {glm::vec2(-0.0523676, 0.725275), 32, Edge::kNoIdx},  //
+      {glm::vec2(0.124038, 0.371095), 33, Edge::kNoIdx},    //
+      {glm::vec2(0.0406817, 0.937559), 34, Edge::kNoIdx},   //
+      {glm::vec2(-0.176136, 0.973774), 35, Edge::kNoIdx},   //
+      {glm::vec2(-0.111522, 0.844043), 36, Edge::kNoIdx},   //
+      {glm::vec2(0.396158, 0.428476), 37, Edge::kNoIdx},    //
+      {glm::vec2(0.549669, -0.419631), 38, Edge::kNoIdx},   //
   });
   polys.push_back({
-      {glm::vec2(-0.102551, 0.826033), 171, Edge::kNoIdx},    //
-      {glm::vec2(-0.0320386, 0.876701), 1074, Edge::kNoIdx},  //
-      {glm::vec2(0.54275, 0.757552), 288, Edge::kNoIdx},      //
-      {glm::vec2(0.542592, 0.784444), 289, Edge::kNoIdx},     //
-      {glm::vec2(0.163827, 0.854684), 1077, Edge::kNoIdx},    //
-      {glm::vec2(-0.0562895, 0.733149), 175, Edge::kNoIdx},   //
+      {glm::vec2(-0.102551, 0.826033), 39, Edge::kNoIdx},   //
+      {glm::vec2(-0.0320386, 0.876701), 40, Edge::kNoIdx},  //
+      {glm::vec2(0.54275, 0.757552), 41, Edge::kNoIdx},     //
+      {glm::vec2(0.542592, 0.784444), 42, Edge::kNoIdx},    //
+      {glm::vec2(0.163827, 0.854684), 43, Edge::kNoIdx},    //
+      {glm::vec2(-0.0562895, 0.733149), 44, Edge::kNoIdx},  //
   });
-  TestPoly(polys, 5);
+  TestPoly(polys, 45);
 }
 
 TEST(Polygon, BadEdges) {
   Polygons polys;
   polys.push_back({
-      {glm::vec2(1, -1), 2, 9},    //
-      {glm::vec2(1, 1), 3, 11},    //
-      {glm::vec2(1, 1), 10, -1},   //
-      {glm::vec2(1, -1), 16, -1},  //
-      {glm::vec2(1, -1), 15, -1},  //
-      {glm::vec2(-1, -1), 9, 11},  //
+      {glm::vec2(1, -1), 0, 9},    //
+      {glm::vec2(1, 1), 1, 11},    //
+      {glm::vec2(1, 1), 2, -1},    //
+      {glm::vec2(1, -1), 3, -1},   //
+      {glm::vec2(1, -1), 4, -1},   //
+      {glm::vec2(-1, -1), 5, 11},  //
       {glm::vec2(-1, -1), 6, 10},  //
   });
   std::vector<glm::ivec3> triangles = BackupTriangulate(polys);
@@ -309,14 +357,14 @@ TEST(Polygon, BadEdges) {
 TEST(Polygon, BadEdges2) {
   Polygons polys;
   polys.push_back({
-      {glm::vec2(-0.292598, -0.322469), 1, 0},    //
-      {glm::vec2(-0.282797, -0.340069), 2, -1},   //
-      {glm::vec2(-0.158295, -0.30762), 26, 8},    //
-      {glm::vec2(-0.189351, -0.230253), 27, -1},  //
-      {glm::vec2(-0.329733, -0.255784), 3, 0},    //
-      {glm::vec2(-0.342412, -0.233016), 4, -1},   //
-      {glm::vec2(-0.202167, -0.198325), 28, 8},   //
-      {glm::vec2(-0.223625, -0.144868), 25, -1},  //
+      {glm::vec2(-0.292598, -0.322469), 0, 0},   //
+      {glm::vec2(-0.282797, -0.340069), 1, -1},  //
+      {glm::vec2(-0.158295, -0.30762), 2, 8},    //
+      {glm::vec2(-0.189351, -0.230253), 3, -1},  //
+      {glm::vec2(-0.329733, -0.255784), 4, 0},   //
+      {glm::vec2(-0.342412, -0.233016), 5, -1},  //
+      {glm::vec2(-0.202167, -0.198325), 6, 8},   //
+      {glm::vec2(-0.223625, -0.144868), 7, -1},  //
   });
   std::vector<glm::ivec3> triangles = BackupTriangulate(polys);
   if (kVerbose)
@@ -329,15 +377,15 @@ TEST(Polygon, BadEdges2) {
 TEST(Polygon, Concave) {
   Polygons polys;
   polys.push_back({
-      {glm::vec2(-0.707107, -0.707107), 1, 10},     //
-      {glm::vec2(1, 0), 14, 21},                    //
-      {glm::vec2(0.683013, 0), 25, -1},             //
-      {glm::vec2(0.37941, -0.232963), 33, -1},      //
-      {glm::vec2(0.37941, -0.232963), 32, -1},      //
-      {glm::vec2(1.49012e-08, -0.183013), 31, -1},  //
-      {glm::vec2(1.49012e-08, -0.183013), 30, -1},  //
-      {glm::vec2(-0.140431, 0), 24, 21},            //
-      {glm::vec2(-1, 0), 4, 6},                     //
+      {glm::vec2(-0.707107, -0.707107), 0, 10},    //
+      {glm::vec2(1, 0), 1, 21},                    //
+      {glm::vec2(0.683013, 0), 2, -1},             //
+      {glm::vec2(0.37941, -0.232963), 3, -1},      //
+      {glm::vec2(0.37941, -0.232963), 4, -1},      //
+      {glm::vec2(1.49012e-08, -0.183013), 5, -1},  //
+      {glm::vec2(1.49012e-08, -0.183013), 6, -1},  //
+      {glm::vec2(-0.140431, 0), 7, 21},            //
+      {glm::vec2(-1, 0), 8, 6},                    //
   });
   TestPoly(polys, 7);
 }
@@ -345,15 +393,15 @@ TEST(Polygon, Concave) {
 TEST(Polygon, Sliver) {
   Polygons polys;
   polys.push_back({
-      {glm::vec2(2.82003, 0), 52, 181},          //
-      {glm::vec2(2.82003, 0), 224, -1},          //
-      {glm::vec2(2.06106, 0), 285, -1},          //
-      {glm::vec2(2.05793, 0.0680379), 287, -1},  //
-      {glm::vec2(2.0641, 0.206908), 286, -1},    //
-      {glm::vec2(2.28446, 1.04696), 284, -1},    //
-      {glm::vec2(2.35006, 1.2499), 225, 181},    //
-      {glm::vec2(-2.82003, 15), 65, 191},        //
-      {glm::vec2(-2.82003, 0), 56, 179},         //
+      {glm::vec2(2.82003, 0), 0, 181},         //
+      {glm::vec2(2.82003, 0), 1, -1},          //
+      {glm::vec2(2.06106, 0), 2, -1},          //
+      {glm::vec2(2.05793, 0.0680379), 3, -1},  //
+      {glm::vec2(2.0641, 0.206908), 4, -1},    //
+      {glm::vec2(2.28446, 1.04696), 5, -1},    //
+      {glm::vec2(2.35006, 1.2499), 6, 181},    //
+      {glm::vec2(-2.82003, 15), 7, 191},       //
+      {glm::vec2(-2.82003, 0), 8, 179},        //
   });
   TestPoly(polys, 7);
 }
@@ -361,28 +409,28 @@ TEST(Polygon, Sliver) {
 TEST(Polygon, Duplicate) {
   Polygons polys;
   polys.push_back({
-      {glm::vec2(-32.0774, -10.431), 1127, 36},    //
-      {glm::vec2(-31.7347, -6.10349), 1289, -1},   //
-      {glm::vec2(-31.8646, -5.61859), 1201, -1},   //
-      {glm::vec2(-31.8646, -5.61859), 1202, -1},   //
-      {glm::vec2(-31.8646, -5.61859), 1203, -1},   //
-      {glm::vec2(-31.8646, -5.61859), 1204, -1},   //
-      {glm::vec2(-31.8646, -5.61859), 1208, -1},   //
-      {glm::vec2(-31.8646, -5.61859), 1205, -1},   //
-      {glm::vec2(-31.8646, -5.61859), 1206, -1},   //
-      {glm::vec2(-31.8646, -5.61859), 1207, -1},   //
-      {glm::vec2(-31.8646, -5.61859), 1209, -1},   //
-      {glm::vec2(-31.8646, -5.61859), 1210, -1},   //
-      {glm::vec2(-31.8646, -5.61859), 1211, -1},   //
-      {glm::vec2(-31.8646, -5.61859), 1213, -1},   //
-      {glm::vec2(-31.8646, -5.61859), 1214, -1},   //
-      {glm::vec2(-31.8646, -5.61859), 1215, -1},   //
-      {glm::vec2(-31.8646, -5.61859), 1216, -1},   //
-      {glm::vec2(-31.8646, -5.61859), 1218, -1},   //
-      {glm::vec2(-31.8646, -5.61859), 1217, -1},   //
-      {glm::vec2(-31.8646, -5.61859), 1219, -1},   //
-      {glm::vec2(-31.8646, -5.61859), 1212, -1},   //
-      {glm::vec2(-32.0774, -3.18655), 1285, 226},  //
+      {glm::vec2(-32.0774, -10.431), 0, 36},     //
+      {glm::vec2(-31.7347, -6.10349), 1, -1},    //
+      {glm::vec2(-31.8646, -5.61859), 2, -1},    //
+      {glm::vec2(-31.8646, -5.61859), 3, -1},    //
+      {glm::vec2(-31.8646, -5.61859), 4, -1},    //
+      {glm::vec2(-31.8646, -5.61859), 5, -1},    //
+      {glm::vec2(-31.8646, -5.61859), 6, -1},    //
+      {glm::vec2(-31.8646, -5.61859), 7, -1},    //
+      {glm::vec2(-31.8646, -5.61859), 8, -1},    //
+      {glm::vec2(-31.8646, -5.61859), 9, -1},    //
+      {glm::vec2(-31.8646, -5.61859), 10, -1},   //
+      {glm::vec2(-31.8646, -5.61859), 11, -1},   //
+      {glm::vec2(-31.8646, -5.61859), 12, -1},   //
+      {glm::vec2(-31.8646, -5.61859), 13, -1},   //
+      {glm::vec2(-31.8646, -5.61859), 14, -1},   //
+      {glm::vec2(-31.8646, -5.61859), 15, -1},   //
+      {glm::vec2(-31.8646, -5.61859), 16, -1},   //
+      {glm::vec2(-31.8646, -5.61859), 17, -1},   //
+      {glm::vec2(-31.8646, -5.61859), 18, -1},   //
+      {glm::vec2(-31.8646, -5.61859), 19, -1},   //
+      {glm::vec2(-31.8646, -5.61859), 20, -1},   //
+      {glm::vec2(-32.0774, -3.18655), 21, 226},  //
   });
   TestPoly(polys, 20);
 }
