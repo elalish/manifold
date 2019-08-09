@@ -1023,7 +1023,7 @@ void AppendIntersectedFaces(VecDH<glm::ivec3> &triVerts,
           adheres to this constraint. In this case, we create an extra vertex
           for each polygon and triangulate them like a wagon wheel, which is
           guaranteed to be manifold. This is very rare and only occurs when the
-          input manifold are self-overlapping.
+          input manifolds are self-overlapping.
            */
           for (const auto &poly : polys) {
             glm::vec3 centroid = thrust::transform_reduce(
@@ -1256,8 +1256,10 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
                       inQ_);
 
   if (kVerbose) {
-    std::cout << nPv << " verts from inP" << std::endl;
-    std::cout << nQv << " verts from inQ" << std::endl;
+    std::cout << nPv << " verts from inP, including duplcations" << std::endl;
+    std::cout << nQv << " verts from inQ, including duplcations" << std::endl;
+    std::cout << n12 << " new verts from edgesP -> facesQ" << std::endl;
+    std::cout << n21 << " new verts from facesP -> edgesQ" << std::endl;
   }
 
   // Build up new polygonal faces from triangle intersections. At this point the
