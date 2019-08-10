@@ -20,7 +20,7 @@
 #include "polygon.h"
 
 constexpr bool kVerbose = false;
-constexpr bool kWarning = true;
+constexpr bool kWarning = false;
 
 constexpr float kTolerance = 1e5;
 
@@ -133,14 +133,23 @@ class Monotones {
     int v_right_idx = Num_verts();
     monotones_.push_back(Vert(v_idx));
     Right(Vert(v_idx)).left = v_right_idx;
-    if (Left(Vert(v_idx)).Processed())
-      Match(v_idx, Helper(v_idx, Vert(v_idx).left));
-    else
-      Vert(v_idx).across = v_idx;
-    if (Right(Vert(v_idx)).Processed())
-      Match(v_right_idx, Helper(v_idx, Vert(v_idx).right));
-    else
-      Vert(v_right_idx).across = v_right_idx;
+    if (Vert(v_idx).Processed()) {
+      if (Right(Vert(v_idx)).Processed()) {
+        Match(v_right_idx, Vert(v_idx).across);
+        Match(v_idx, v_idx);
+      } else {
+        Match(v_right_idx, v_right_idx);
+      }
+    } else {
+      if (Left(Vert(v_idx)).Processed())
+        Match(v_idx, Helper(v_idx, Vert(v_idx).left));
+      else
+        Vert(v_idx).across = v_idx;
+      if (Right(Vert(v_idx)).Processed())
+        Match(v_right_idx, Helper(v_idx, Vert(v_idx).right));
+      else
+        Vert(v_right_idx).across = v_right_idx;
+    }
     Link(v_idx, v_right_idx);
   }
 
@@ -174,9 +183,13 @@ class Monotones {
       if (Vert(i).Processed() != Left(Vert(i)).Processed()) {  // active edge
         float a = (Vert(i).pos.y - Vert(v_idx).pos.y) /
                   (Vert(i).pos.y - Left(Vert(i)).pos.y);
-        if (std::isnan(a)) a = 0.0f;
-        a = std::max(std::min(a, 1.0f), 0.0f);
-        float x = (1.0f - a) * Vert(i).pos.x + a * Left(Vert(i)).pos.x;
+        float x;
+        if (std::isnan(a)) {
+          x = std::min(Vert(i).pos.x, Left(Vert(i)).pos.x);
+        } else {
+          a = std::max(std::min(a, 1.0f), 0.0f);
+          x = (1.0f - a) * Vert(i).pos.x + a * Left(Vert(i)).pos.x;
+        }
         if (kVerbose)
           std::cout << "x = " << x << ", v_x = " << Vert(v_idx).pos.x
                     << std::endl;
@@ -472,6 +485,7 @@ std::vector<glm::ivec3> Triangulate(const Polygons &polys) {
   try {
     triangles = PrimaryTriangulate(polys);
     CheckManifold(triangles, polys);
+    if (kWarning) CheckFolded(triangles, polys);
   } catch (const std::exception &e) {
     // The primary triangulator has guaranteed manifold and non-overlapping
     // output for non-overlapping input. For overlapping input it occasionally
@@ -637,13 +651,59 @@ void CheckManifold(const std::vector<glm::ivec3> &triangles,
   CheckManifold(halfedges);
 }
 
+void CheckFolded(const std::vector<glm::ivec3> &triangles,
+                 const Polygons &polys) {
+  std::vector<glm::ivec3> halfedges;
+  std::map<int, glm::vec2> vertPos;
+  for (const glm::ivec3 &tri : triangles) {
+    // Differentiate edges of triangles by setting index to Edge::kInterior.
+    halfedges.push_back({tri[0], tri[1], tri[2]});
+    halfedges.push_back({tri[1], tri[2], tri[0]});
+    halfedges.push_back({tri[2], tri[0], tri[1]});
+  }
+  for (const auto &poly : polys) {
+    vertPos[poly[0].idx] = poly[0].pos;
+    for (int i = 1; i < poly.size(); ++i) {
+      halfedges.push_back({poly[i].idx, poly[i - 1].idx, -1});
+      vertPos[poly[i].idx] = poly[i].pos;
+    }
+    halfedges.push_back({poly[0].idx, poly.back().idx, -1});
+  }
+  size_t n_edges = halfedges.size() / 2;
+  std::vector<glm::ivec3> forward(n_edges), backward(n_edges);
+
+  auto end = std::copy_if(halfedges.begin(), halfedges.end(), forward.begin(),
+                          [](glm::ivec3 e) { return e.y > e.x; });
+
+  end = std::copy_if(halfedges.begin(), halfedges.end(), backward.begin(),
+                     [](glm::ivec3 e) { return e.y < e.x; });
+
+  std::for_each(backward.begin(), backward.end(),
+                [](glm::ivec3 &e) { std::swap(e.x, e.y); });
+  auto cmp = [](const glm::ivec3 &a, const glm::ivec3 &b) {
+    return a.x < b.x || (a.x == b.x && a.y < b.y);
+  };
+  std::sort(forward.begin(), forward.end(), cmp);
+  std::sort(backward.begin(), backward.end(), cmp);
+  for (int i = 0; i < n_edges; ++i) {
+    if (forward[i].z >= 0 && backward[i].z >= 0) {
+      glm::vec2 origin = vertPos[forward[i].x];
+      glm::vec2 edge = vertPos[forward[i].y];
+      glm::vec2 vL = vertPos[forward[i].z];
+      glm::vec2 vR = vertPos[backward[i].z];
+      float CCWL = CCW(origin, vL, edge);
+      float CCWR = CCW(origin, edge, vR);
+      ALWAYS_ASSERT(CCWL * CCWR >= 0, runtimeErr, "Triangulation is folded!");
+    }
+  }
+}
+
 void Dump(const Polygons &polys) {
-  int i = 0;
   for (auto poly : polys) {
     std::cout << "polys.push_back({" << std::endl;
     for (auto v : poly) {
       std::cout << "    {glm::vec2(" << v.pos.x << ", " << v.pos.y << "), "
-                << i++ << ", " << v.nextEdge << "},  //" << std::endl;
+                << v.idx << ", " << v.nextEdge << "},  //" << std::endl;
     }
     std::cout << "});" << std::endl;
   }
