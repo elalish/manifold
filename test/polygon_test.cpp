@@ -58,58 +58,11 @@ void TestAssemble(const Polygons &polys) {
   Identical(polys, polys_out);
 }
 
-void CheckFolded(const std::vector<glm::ivec3> &triangles,
-                 const Polygons &polys) {
-  std::vector<glm::ivec3> halfedges;
-  std::vector<glm::vec2> vertPos;
-  for (const glm::ivec3 &tri : triangles) {
-    // Differentiate edges of triangles by setting index to Edge::kInterior.
-    halfedges.push_back({tri[0], tri[1], tri[2]});
-    halfedges.push_back({tri[1], tri[2], tri[0]});
-    halfedges.push_back({tri[2], tri[0], tri[1]});
-  }
-  for (const auto &poly : polys) {
-    vertPos.push_back(poly[0].pos);
-    for (int i = 1; i < poly.size(); ++i) {
-      halfedges.push_back({poly[i].idx, poly[i - 1].idx, -1});
-      vertPos.push_back(poly[i].pos);
-    }
-    halfedges.push_back({poly[0].idx, poly.back().idx, -1});
-  }
-  size_t n_edges = halfedges.size() / 2;
-  std::vector<glm::ivec3> forward(n_edges), backward(n_edges);
-
-  auto end = std::copy_if(halfedges.begin(), halfedges.end(), forward.begin(),
-                          [](glm::ivec3 e) { return e.y > e.x; });
-
-  end = std::copy_if(halfedges.begin(), halfedges.end(), backward.begin(),
-                     [](glm::ivec3 e) { return e.y < e.x; });
-
-  std::for_each(backward.begin(), backward.end(),
-                [](glm::ivec3 &e) { std::swap(e.x, e.y); });
-  auto cmp = [](const glm::ivec3 &a, const glm::ivec3 &b) {
-    return a.x < b.x || (a.x == b.x && a.y < b.y);
-  };
-  std::sort(forward.begin(), forward.end(), cmp);
-  std::sort(backward.begin(), backward.end(), cmp);
-  for (int i = 0; i < n_edges; ++i) {
-    if (forward[i].z >= 0 && backward[i].z >= 0) {
-      glm::vec2 origin = vertPos[forward[i].x];
-      glm::vec2 edge = vertPos[forward[i].y];
-      glm::vec2 vL = vertPos[forward[i].z];
-      glm::vec2 vR = vertPos[backward[i].z];
-      float CCWL = CCW(origin, vL, edge);
-      float CCWR = CCW(origin, edge, vR);
-      ASSERT_GE(CCWL * CCWR, 0);
-    }
-  }
-}
-
 void TestPoly(const Polygons &polys, int expectedNumTri) {
   TestAssemble(polys);
 
   std::vector<glm::ivec3> triangles = BackupTriangulate(polys);
-  if (kVerbose)
+  if (0)
     for (auto tri : triangles) {
       std::cout << tri.x << ", " << tri.y << ", " << tri.z << std::endl;
     }
@@ -241,24 +194,24 @@ TEST(Polygon, Merges) {
 TEST(Polygon, ColinearY) {
   Polygons polys;
   polys.push_back({
-      {glm::vec2(0, 0), 0, Edge::kNoIdx},   //
-      {glm::vec2(-1, 1), 1, Edge::kNoIdx},  //
-      {glm::vec2(-2, 1), 2, Edge::kNoIdx},  //
-      {glm::vec2(-3, 1), 3, Edge::kNoIdx},  //
-      {glm::vec2(-4, 1), 4, Edge::kNoIdx},  //
-      {glm::vec2(-4, 2), 5, Edge::kNoIdx},  //
-      {glm::vec2(-3, 2), 6, Edge::kNoIdx},  //
-      {glm::vec2(-2, 2), 7, Edge::kNoIdx},  //
-      {glm::vec2(-1, 2), 8, Edge::kNoIdx},  //
-      {glm::vec2(0, 3), 9, Edge::kNoIdx},   //
-      {glm::vec2(1, 2), 10, Edge::kNoIdx},  //
-      {glm::vec2(2, 2), 11, Edge::kNoIdx},  //
-      {glm::vec2(3, 2), 12, Edge::kNoIdx},  //
-      {glm::vec2(4, 2), 13, Edge::kNoIdx},  //
-      {glm::vec2(4, 1), 14, Edge::kNoIdx},  //
-      {glm::vec2(3, 1), 15, Edge::kNoIdx},  //
-      {glm::vec2(2, 1), 16, Edge::kNoIdx},  //
-      {glm::vec2(1, 1), 17, Edge::kNoIdx},  //
+      {glm::vec2(0, 0), 0, Edge::kNoIdx},    //
+      {glm::vec2(1, 1), 1, Edge::kNoIdx},    //
+      {glm::vec2(2, 1), 2, Edge::kNoIdx},    //
+      {glm::vec2(3, 1), 3, Edge::kNoIdx},    //
+      {glm::vec2(4, 1), 4, Edge::kNoIdx},    //
+      {glm::vec2(4, 2), 5, Edge::kNoIdx},    //
+      {glm::vec2(3, 2), 6, Edge::kNoIdx},    //
+      {glm::vec2(2, 2), 7, Edge::kNoIdx},    //
+      {glm::vec2(1, 2), 8, Edge::kNoIdx},    //
+      {glm::vec2(0, 3), 9, Edge::kNoIdx},    //
+      {glm::vec2(-1, 2), 10, Edge::kNoIdx},  //
+      {glm::vec2(-2, 2), 11, Edge::kNoIdx},  //
+      {glm::vec2(-3, 2), 12, Edge::kNoIdx},  //
+      {glm::vec2(-4, 2), 13, Edge::kNoIdx},  //
+      {glm::vec2(-4, 1), 14, Edge::kNoIdx},  //
+      {glm::vec2(-3, 1), 15, Edge::kNoIdx},  //
+      {glm::vec2(-2, 1), 16, Edge::kNoIdx},  //
+      {glm::vec2(-1, 1), 17, Edge::kNoIdx},  //
   });
   TestPoly(polys, 16);
 }
@@ -435,6 +388,37 @@ TEST(Polygon, Duplicate) {
   TestPoly(polys, 20);
 }
 
+TEST(Polygon, Folded) {
+  Polygons polys;
+  polys.push_back({
+      {glm::vec2(2.82003, 0), 0, 110},          //
+      {glm::vec2(1.23707, 4.20995), 1, -1},     //
+      {glm::vec2(1.14141, 4.09091), 2, -1},     //
+      {glm::vec2(1.05896, 3.94496), 3, -1},     //
+      {glm::vec2(0.00757742, 2.72727), 4, -1},  //
+      {glm::vec2(-0.468092, 1.94364), 5, -1},   //
+      {glm::vec2(-1.06107, 1.36364), 6, -1},    //
+      {glm::vec2(-1.79214, 0.34649), 7, -1},    //
+      {glm::vec2(-2.27417, 0), 8, -1},          //
+      {glm::vec2(-2.82003, 0), 9, 174},         //
+      {glm::vec2(-2.82003, 0), 10, 108},        //
+  });
+  TestPoly(polys, 9);
+}
+
+TEST(Polygon, NearlyLinear) {
+  Polygons polys;
+  polys.push_back({
+      {glm::vec2(2.82003, -8.22814e-05), 0, 231},   //
+      {glm::vec2(2.82003, -8.22814e-05), 1, -1},    //
+      {glm::vec2(2.31802, -8.22814e-05), 2, -1},    //
+      {glm::vec2(-0.164567, -8.22813e-05), 3, -1},  //
+      {glm::vec2(-0.857388, -8.22814e-05), 4, -1},  //
+      {glm::vec2(-1.01091, -8.22814e-05), 5, 257},  //
+      {glm::vec2(-1.01091, -8.22814e-05), 6, 233},  //
+  });
+  TestPoly(polys, 5);
+}
 // void fnExit() { throw std::runtime_error("Someone called Exit()!"); }
 
 int main(int argc, char **argv) {
