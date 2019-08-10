@@ -237,11 +237,10 @@ struct ShadowKernel01 {
     int vertP = thrust::get<1>(inout);
     EdgeVertsD edgeVertsQ = thrust::get<2>(inout);
 
-    s01 = reverse
-              ? (vertPosQ[edgeVertsQ.first].x <= vertPosP[vertP].x) -
-                    (vertPosQ[edgeVertsQ.second].x <= vertPosP[vertP].x)
-              : (vertPosQ[edgeVertsQ.second].x >= vertPosP[vertP].x) -
-                    (vertPosQ[edgeVertsQ.first].x >= vertPosP[vertP].x);
+    s01 = reverse ? (vertPosQ[edgeVertsQ.first].x <= vertPosP[vertP].x) -
+                        (vertPosQ[edgeVertsQ.second].x <= vertPosP[vertP].x)
+                  : (vertPosQ[edgeVertsQ.second].x >= vertPosP[vertP].x) -
+                        (vertPosQ[edgeVertsQ.first].x >= vertPosP[vertP].x);
   }
 };
 
@@ -521,8 +520,9 @@ std::tuple<VecDH<int>, VecDH<float>> Shadow02(
 
   thrust::for_each_n(
       zip(s02.beginD(), p0q2.beginD(!forward), p0q2.beginD(forward)),
-      p0q2.size(), Gather02({p0q1.ptrDpq(), s01.ptrD(), p0q1.size(),
-                             inQ.triEdges_.ptrD(), forward}));
+      p0q2.size(),
+      Gather02({p0q1.ptrDpq(), s01.ptrD(), p0q1.size(), inQ.triEdges_.ptrD(),
+                forward}));
 
   size_t size = p0q2.RemoveZeros(s02);
   VecDH<float> z02(size);
@@ -664,9 +664,10 @@ std::tuple<VecDH<int>, VecDH<glm::vec3>> Intersect12(
   auto vertPosPtr = forward ? inP.vertPos_.ptrD() : inQ.vertPos_.ptrD();
   thrust::for_each_n(
       zip(v12.beginD(), p1q2.beginD(!forward), p1q2.beginD(forward)),
-      p1q2.size(), Kernel12({p0q2.ptrDpq(), z02.ptrD(), p0q2.size(),
-                             p1q1.ptrDpq(), xyzz11.ptrD(), p1q1.size(),
-                             edgeVertsPtr, triEdgesPtr, vertPosPtr, forward}));
+      p1q2.size(),
+      Kernel12({p0q2.ptrDpq(), z02.ptrD(), p0q2.size(), p1q1.ptrDpq(),
+                xyzz11.ptrD(), p1q1.size(), edgeVertsPtr, triEdgesPtr,
+                vertPosPtr, forward}));
   return std::make_tuple(x12, v12);
 };
 
@@ -1022,7 +1023,7 @@ void AppendIntersectedFaces(VecDH<glm::ivec3> &triVerts,
           adheres to this constraint. In this case, we create an extra vertex
           for each polygon and triangulate them like a wagon wheel, which is
           guaranteed to be manifold. This is very rare and only occurs when the
-          input manifold are self-overlapping.
+          input manifolds are self-overlapping.
            */
           for (const auto &poly : polys) {
             glm::vec3 centroid = thrust::transform_reduce(
@@ -1255,8 +1256,10 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
                       inQ_);
 
   if (kVerbose) {
-    std::cout << nPv << " verts from inP" << std::endl;
-    std::cout << nQv << " verts from inQ" << std::endl;
+    std::cout << nPv << " verts from inP, including duplcations" << std::endl;
+    std::cout << nQv << " verts from inQ, including duplcations" << std::endl;
+    std::cout << n12 << " new verts from edgesP -> facesQ" << std::endl;
+    std::cout << n21 << " new verts from facesP -> edgesQ" << std::endl;
   }
 
   // Build up new polygonal faces from triangle intersections. At this point the

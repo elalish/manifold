@@ -440,9 +440,9 @@ Manifold Manifold::Extrude(Polygons crossSection, float height, int nDivisions,
     }
   }
   for (int i = 1; i < nDivisions + 1; ++i) {
-    float alpha = i / nDivisions;
+    float alpha = i / float(nDivisions);
     float phi = alpha * twistDegrees;
-    glm::mat2 transform(cos(phi), sin(phi), -sin(phi), cos(phi));
+    glm::mat2 transform(cosd(phi), sind(phi), -sind(phi), cosd(phi));
     glm::vec2 scale = glm::mix(glm::vec2(1.0f), scaleTop, alpha);
     transform = transform * glm::mat2(scale.x, 0.0f, 0.0f, scale.y);
     int j = 0;
@@ -636,8 +636,8 @@ Mesh Manifold::Extract() const {
 }
 
 int Manifold::circularSegments = 0;
-float Manifold::circularAngle = 12.0f;
-float Manifold::circularEdgeLength = 2.0f;
+float Manifold::circularAngle = 10.0f;
+float Manifold::circularEdgeLength = 1.0f;
 
 void Manifold::SetMinCircularAngle(float angle) {
   ALWAYS_ASSERT(angle > 0.0f, runtimeErr, "angle must be positive!");

@@ -25,7 +25,6 @@ int main(int argc, char **argv) {
   Mesh mesh = ImportMesh(filename);
   Manifold manifold(mesh);
   std::cout << "Manifold is ";
-  if (!manifold.IsValid()) std::cout << "NOT " << std::endl;
+  if (!manifold.IsValid()) std::cout << "NOT ";
   std::cout << "valid" << std::endl;
-  ExportMesh("Csaszar.stl", manifold.Extract());
 }
