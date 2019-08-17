@@ -419,6 +419,20 @@ TEST(Polygon, NearlyLinear) {
   });
   TestPoly(polys, 5);
 }
+
+TEST(Polygon, Sliver2) {
+  Polygons polys;
+  polys.push_back({
+      {glm::vec2(27.4996014, 8.6873703), 74, 151},    //
+      {glm::vec2(28.27701, 9.52887344), 76, 156},     //
+      {glm::vec2(27.6687469, 10.8811588), 104, 152},  //
+      {glm::vec2(27.5080414, 8.79682922), 242, -1},   //
+      {glm::vec2(27.5594807, 8.75218964), 207, -1},   //
+      {glm::vec2(27.4996014, 8.6873703), 268, 152},   //
+  });
+  TestPoly(polys, 4);
+}
+
 // void fnExit() { throw std::runtime_error("Someone called Exit()!"); }
 
 int main(int argc, char **argv) {

@@ -995,14 +995,22 @@ void AppendIntersectedFaces(VecDH<glm::ivec3> &triVerts,
       default: {  // requires triangulation
         Polygons polys = Assemble(face);
         glm::vec3 normal = inP.GetTriNormal(i);
-        glm::mat2x3 projection;
-        if (normal.x == 0 && normal.y == 0) {
-          projection[0] = glm::vec3(1.0f, 0.0f, 0.0f);
-          projection[1] = glm::vec3(0.0f, normal.z > 0 ? 1.0f : -1.0f, 0.0f);
-        } else {
-          projection[0] = glm::normalize(glm::vec3(-normal.y, normal.x, 0.0f));
-          projection[1] = glm::cross(normal, projection[0]);
+        glm::vec3 centroid(0.0f);
+        for (auto edge : face) centroid += vertPos.H()[edge.first];
+        centroid /= face.size();
+        float maxLength = 0;
+        glm::vec3 direction;
+        for (auto edge : face) {
+          glm::vec3 dir = vertPos.H()[edge.first] - centroid;
+          float length = glm::dot(dir, dir);
+          if (length > maxLength) {
+            maxLength = length;
+            direction = dir;
+          }
         }
+        glm::mat2x3 projection;
+        projection[1] = glm::normalize(direction);
+        projection[0] = glm::cross(projection[1], normal);
         for (auto &poly : polys) {
           for (PolyVert &v : poly) {
             v.pos = glm::transpose(projection) * vertPos.H()[v.idx];
