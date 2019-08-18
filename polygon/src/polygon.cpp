@@ -408,8 +408,8 @@ void TriangulateMonotones(const std::vector<VertAdj> &monotones,
   int triangles_left = monotones.size();
   for (auto &triangulator : triangulators) {
     triangles_left -= 2;
-    // ALWAYS_ASSERT(triangulator.NumTriangles() > 0, logicErr,
-    //               "Monotone produced no triangles.");
+    ALWAYS_ASSERT(triangulator.NumTriangles() > 0, logicErr,
+                  "Monotone produced no triangles.");
     triangles_left -= triangulator.NumTriangles();
   }
   ALWAYS_ASSERT(triangles_left == 0, logicErr,
@@ -496,6 +496,11 @@ std::vector<glm::ivec3> Triangulate(const Polygons &polys) {
       std::cout << "Warning: triangulation is folded! Warnings so far: "
                 << ++debug.numWarnings << std::endl;
       Dump(polys);
+      std::cout << "produced this triangulation:" << std::endl;
+      for (int j = 0; j < triangles.size(); ++j) {
+        std::cout << triangles[j][0] << ", " << triangles[j][1] << ", "
+                  << triangles[j][2] << std::endl;
+      }
     };
   } catch (const std::exception &e) {
     // The primary triangulator has guaranteed manifold and non-overlapping

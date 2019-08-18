@@ -971,7 +971,7 @@ void AppendNewEdges(std::vector<std::vector<EdgeVerts>> &facesP,
 void AppendIntersectedFaces(VecDH<glm::ivec3> &triVerts,
                             VecDH<glm::vec3> &vertPos,
                             const std::vector<std::vector<EdgeVerts>> &facesP,
-                            const Manifold::Impl &inP) {
+                            const Manifold::Impl &inP, bool invertNormals) {
   for (int i = 0; i < facesP.size(); ++i) {
     auto &face = facesP[i];
     switch (face.size()) {
@@ -995,6 +995,7 @@ void AppendIntersectedFaces(VecDH<glm::ivec3> &triVerts,
       default: {  // requires triangulation
         Polygons polys = Assemble(face);
         glm::vec3 normal = inP.GetTriNormal(i);
+        if (invertNormals) normal *= -1.0f;
         glm::mat2x3 projection;
         if (normal.x == 0 && normal.y == 0) {
           projection[0] = glm::vec3(1.0f, 0.0f, 0.0f);
@@ -1278,9 +1279,10 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
 
   // Triangulate the faces and add them to the manifold.
   if (kVerbose) std::cout << "Adding intersected faces of inP" << std::endl;
-  AppendIntersectedFaces(outR.triVerts_, outR.vertPos_, facesP, inP_);
+  AppendIntersectedFaces(outR.triVerts_, outR.vertPos_, facesP, inP_, false);
   if (kVerbose) std::cout << "Adding intersected faces of inQ" << std::endl;
-  AppendIntersectedFaces(outR.triVerts_, outR.vertPos_, facesQ, inQ_);
+  AppendIntersectedFaces(outR.triVerts_, outR.vertPos_, facesQ, inQ_,
+                         op == Manifold::OpType::SUBTRACT);
 
   // Create the manifold's data structures and verify manifoldness.
   outR.Finish();
