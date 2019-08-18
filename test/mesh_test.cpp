@@ -180,6 +180,7 @@ TEST(Manifold, SurfaceArea) {
 }
 
 TEST(Manifold, BooleanTetra) {
+  Manifold::SetGeometricWarnings(true);
   Manifold tetra = Manifold::Tetrahedron();
   ASSERT_TRUE(tetra.IsValid());
 
@@ -191,6 +192,7 @@ TEST(Manifold, BooleanTetra) {
 }
 
 TEST(Manifold, SelfSubtract) {
+  Manifold::SetGeometricWarnings(false);
   Manifold cube = Manifold::Cube();
   Manifold empty = cube - cube;
   EXPECT_TRUE(empty.IsValid());
@@ -199,6 +201,7 @@ TEST(Manifold, SelfSubtract) {
 }
 
 TEST(Manifold, Coplanar) {
+  Manifold::SetGeometricWarnings(true);
   Manifold cube = Manifold::Cylinder(1.0f, 1.0f);
   Manifold cube2 = cube.DeepCopy();
   Manifold out = cube - cube2.Scale({0.5f, 0.5f, 1.0f})
@@ -208,6 +211,7 @@ TEST(Manifold, Coplanar) {
 }
 
 TEST(Manifold, Split) {
+  Manifold::SetGeometricWarnings(true);
   Manifold cube = Manifold::Cube(glm::vec3(2.0f), true);
   Manifold oct = Manifold::Octahedron();
   oct.Translate(glm::vec3(0.0f, 0.0f, 1.0f));
@@ -217,6 +221,7 @@ TEST(Manifold, Split) {
 }
 
 TEST(Manifold, SplitByPlane) {
+  Manifold::SetGeometricWarnings(true);
   Manifold cube = Manifold::Cube(glm::vec3(2.0f), true);
   cube.Translate({0.0f, 1.0f, 0.0f});
   cube.Rotate(90.0f, 0.0f, 0.0f);
@@ -226,6 +231,7 @@ TEST(Manifold, SplitByPlane) {
 }
 
 TEST(Manifold, SplitByPlane60) {
+  Manifold::SetGeometricWarnings(true);
   Manifold cube = Manifold::Cube(glm::vec3(2.0f), true);
   cube.Translate({0.0f, 1.0f, 0.0f});
   cube.Rotate(0.0f, 0.0f, -60.0f);
@@ -237,6 +243,7 @@ TEST(Manifold, SplitByPlane60) {
 }
 
 TEST(Manifold, BooleanSphere) {
+  Manifold::SetGeometricWarnings(true);
   Manifold sphere = Manifold::Sphere(1.0f, 12);
   Manifold sphere2 = sphere.DeepCopy();
   sphere2.Translate(glm::vec3(0.5));
@@ -246,6 +253,7 @@ TEST(Manifold, BooleanSphere) {
 }
 
 TEST(Manifold, Boolean3) {
+  Manifold::SetGeometricWarnings(true);
   Manifold gyroid(ImportMesh("data/gyroidpuzzle.ply"));
   ASSERT_TRUE(gyroid.IsValid());
 
@@ -257,6 +265,7 @@ TEST(Manifold, Boolean3) {
 }
 
 TEST(Manifold, BooleanSelfIntersecting) {
+  Manifold::SetGeometricWarnings(false);
   std::vector<Manifold> meshList;
   meshList.push_back(Manifold::Tetrahedron());
   meshList.push_back(Manifold::Tetrahedron());
@@ -271,6 +280,7 @@ TEST(Manifold, BooleanSelfIntersecting) {
 }
 
 TEST(Manifold, BooleanSelfIntersectingAlt) {
+  Manifold::SetGeometricWarnings(false);
   std::vector<Manifold> meshList;
   meshList.push_back(Manifold::Tetrahedron());
   meshList.push_back(Manifold::Tetrahedron());
@@ -299,6 +309,7 @@ TEST(Manifold, BooleanWinding) {
 }
 
 TEST(Manifold, BooleanHorrible) {
+  Manifold::SetGeometricWarnings(false);
   Manifold random = Manifold::Sphere(1.0f, 8);
   std::mt19937 gen(12345);  // Standard mersenne_twister_engine
   std::uniform_real_distribution<float> dis(-1.0f, 1.0f);
@@ -312,6 +323,7 @@ TEST(Manifold, BooleanHorrible) {
 }
 
 TEST(Manifold, BooleanHorrible2) {
+  Manifold::SetGeometricWarnings(false);
   Manifold random = Manifold::Sphere(1.0f, 32);
   std::mt19937 gen(54321);  // Standard mersenne_twister_engine
   std::uniform_real_distribution<float> dis(-1.0f, 1.0f);
@@ -325,6 +337,7 @@ TEST(Manifold, BooleanHorrible2) {
 }
 
 TEST(Manifold, BooleanHorriblePlanar) {
+  Manifold::SetGeometricWarnings(false);
   Manifold random = Manifold::Sphere(1.0f, 32);
   std::mt19937 gen(654321);  // Standard mersenne_twister_engine
   std::uniform_real_distribution<float> dis(-1.0f, 1.0f);
