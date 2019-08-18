@@ -74,6 +74,7 @@ struct DebugControls {
   bool extraTopologyChecks = false;
   bool geometricWarnings = false;
   bool verbose = false;
+  int numWarnings = 0;
 };
 
 namespace Edge {

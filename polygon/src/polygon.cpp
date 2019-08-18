@@ -430,7 +430,8 @@ void PrintTriangulationWarning(const std::string &triangulationType,
   if (debug.geometricWarnings) {
     std::cout << "-----------------------------------" << std::endl;
     std::cout << triangulationType
-              << " triangulation failed, switching to backup" << std::endl;
+              << " triangulation failed, switching to backup! Warnings so far: "
+              << ++debug.numWarnings << std::endl;
     std::cout << e.what() << std::endl;
     Dump(polys);
     std::cout << "produced this triangulation:" << std::endl;
@@ -491,7 +492,9 @@ std::vector<glm::ivec3> Triangulate(const Polygons &polys) {
     triangles = PrimaryTriangulate(polys);
     CheckManifold(triangles, polys);
     if (debug.geometricWarnings && !CheckFolded(triangles, polys)) {
-      std::cout << "triangulation is folded!" << std::endl;
+      std::cout << "-----------------------------------" << std::endl;
+      std::cout << "Warning: triangulation is folded! Warnings so far: "
+                << ++debug.numWarnings << std::endl;
       Dump(polys);
     };
   } catch (const std::exception &e) {
