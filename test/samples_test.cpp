@@ -21,6 +21,7 @@ using namespace manifold;
 // If you print this knot (with support), you can snap a half-inch marble into
 // it and it'll roll around (dimensions in mm).
 TEST(Samples, Knot13) {
+  Manifold::SetGeometricWarnings(true);
   Manifold knot13 = TorusKnot(1, 3, 25, 10, 3.75);
   //   ExportMesh("knot13.stl", knot13.Extract());
   ASSERT_TRUE(knot13.IsValid());
@@ -31,6 +32,7 @@ TEST(Samples, Knot13) {
 
 // This creates two interlinked knots.
 TEST(Samples, Knot42) {
+  Manifold::SetGeometricWarnings(true);
   Manifold knot42 = TorusKnot(4, 2, 15, 6, 5);
   //   ExportMesh("knot42.stl", knot42.Extract());
   ASSERT_TRUE(knot42.IsValid());

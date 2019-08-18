@@ -70,6 +70,13 @@ inline float cosd(float x) { return sind(x + 90.0f); }
 #define HOST_DEVICE
 #endif
 
+struct DebugControls {
+  bool extraTopologyChecks = false;
+  bool geometricWarnings = false;
+  bool verbose = false;
+  int numWarnings = 0;
+};
+
 namespace Edge {
 constexpr int kNoIdx = -1;
 constexpr int kInterior = -2;
