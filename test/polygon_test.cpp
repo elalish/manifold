@@ -59,6 +59,7 @@ void TestAssemble(const Polygons &polys) {
 }
 
 void TestPoly(const Polygons &polys, int expectedNumTri) {
+  SetPolygonWarnings(true);
   TestAssemble(polys);
 
   std::vector<glm::ivec3> triangles = BackupTriangulate(polys);
@@ -420,7 +421,7 @@ TEST(Polygon, NearlyLinear) {
   TestPoly(polys, 5);
 }
 
-TEST(Polygon, Sliver2) {
+TEST(Polygon, DISABLED_Sliver2) {
   Polygons polys;
   polys.push_back({
       {glm::vec2(27.4996014, 8.6873703), 74, 151},    //

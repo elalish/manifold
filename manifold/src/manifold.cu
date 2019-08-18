@@ -738,6 +738,8 @@ int Manifold::NumOverlaps(const Manifold& B) const {
   return num_overlaps += overlaps.size();
 }
 
+void Manifold::SetGeometricWarnings(bool val) { SetPolygonWarnings(val); }
+
 Manifold Manifold::Boolean(const Manifold& second, OpType op) const {
   pImpl_->ApplyTransform();
   second.pImpl_->ApplyTransform();
