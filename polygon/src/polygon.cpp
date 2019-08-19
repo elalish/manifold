@@ -32,7 +32,7 @@ struct VertAdj {
   int mesh_idx;             // this is a global index into the manifold
   int right, left, across;  // these are local indices within this vector
   bool merge;
-  int sweep_order;
+  int sweep_order;  // Ensures same processing order in both steps
   bool Processed() const { return across >= 0; }
 };
 
@@ -46,24 +46,28 @@ class Monotones {
   enum VertType { START, END, RIGHTWARDS, LEFTWARDS, MERGE, SPLIT, REV_START };
 
   Monotones(const Polygons &polys) {
-    std::vector<std::tuple<float, int>> sweep_line;
+    std::vector<std::tuple<float, int, int>> sweep_line;
     for (const SimplePolygon &poly : polys) {
       int start = Num_verts();
-      int j = 0;
-      for (; j < poly.size() - 1; ++j) {
-        if (poly[j].pos.y != poly[j + 1].pos.y) break;
-      }
       for (int i = 0; i < poly.size(); ++i) {
-        int k = (i + j + 1) % poly.size();
-        monotones_.push_back({poly[k].pos,                   //
-                              poly[k].idx,                   //
+        monotones_.push_back({poly[i].pos,                   //
+                              poly[i].idx,                   //
                               Next(i, poly.size()) + start,  //
                               Prev(i, poly.size()) + start,  //
                               -1, false, -1});
-        // Ensure sweep line is sorted identically here and in the Triangulator
-        // below, including when the y-values are identical.
+        int right = Next(i, poly.size());
+        while (poly[right].pos == poly[i].pos && right != i) {
+          right = Next(right, poly.size());
+        }
+        int rightDir = Signum(poly[right].pos.y - poly[i].pos.y);
+        int left = Prev(i, poly.size());
+        while (poly[left].pos == poly[i].pos && left != i) {
+          left = Prev(left, poly.size());
+        }
+        int leftDir = Signum(poly[left].pos.y - poly[i].pos.y);
+        int tieBreak = rightDir + leftDir;
         sweep_line.push_back(
-            std::make_tuple(monotones_.back().pos.y, start + i));
+            std::make_tuple(monotones_.back().pos.y, tieBreak, start + i));
         if (debug.verbose)
           std::cout << "idx = " << start + i
                     << ", mesh_idx = " << monotones_.back().mesh_idx
@@ -74,7 +78,7 @@ class Monotones {
     std::sort(sweep_line.begin(), sweep_line.end());
     VertType v_type = START;
     for (int i = 0; i < sweep_line.size(); ++i) {
-      int idx = std::get<1>(sweep_line[i]);
+      int idx = std::get<2>(sweep_line[i]);
       Vert(idx).sweep_order = i;
       v_type = ProcessVert(idx);
       if (debug.verbose) std::cout << v_type << std::endl;
