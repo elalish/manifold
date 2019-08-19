@@ -850,8 +850,6 @@ std::vector<EdgeVerts> PairUp(std::vector<VertsPos> &vertsPos, int edge) {
   return edges;
 }
 
-int Signum(int x) { return (x > 0) - (x < 0); }
-
 void AppendRetainedEdges(std::vector<std::vector<EdgeVerts>> &faces,
                          const Manifold::Impl &inP, const VecDH<int> &i03,
                          const VecDH<int> &i12, const VecDH<int> &p12,
@@ -968,6 +966,27 @@ void AppendNewEdges(std::vector<std::vector<EdgeVerts>> &facesP,
   }
 }
 
+glm::mat3x2 GetAxisAlignedProjection(glm::vec3 normal) {
+  glm::vec3 absNormal = glm::abs(normal);
+  float xyzMax;
+  glm::mat2x3 projection;
+  if (absNormal.z > absNormal.x && absNormal.z > absNormal.y) {
+    projection = glm::mat2x3(1.0f, 0.0f, 0.0f,  //
+                             0.0f, 1.0f, 0.0f);
+    xyzMax = normal.z;
+  } else if (absNormal.y > absNormal.x) {
+    projection = glm::mat2x3(0.0f, 0.0f, 1.0f,  //
+                             1.0f, 0.0f, 0.0f);
+    xyzMax = normal.y;
+  } else {
+    projection = glm::mat2x3(0.0f, 1.0f, 0.0f,  //
+                             0.0f, 0.0f, 1.0f);
+    xyzMax = normal.x;
+  }
+  if (xyzMax < 0) projection[0] *= -1.0f;
+  return glm::transpose(projection);
+}
+
 void AppendIntersectedFaces(VecDH<glm::ivec3> &triVerts,
                             VecDH<glm::vec3> &vertPos,
                             const std::vector<std::vector<EdgeVerts>> &facesP,
@@ -996,17 +1015,10 @@ void AppendIntersectedFaces(VecDH<glm::ivec3> &triVerts,
         Polygons polys = Assemble(face);
         glm::vec3 normal = inP.GetTriNormal(i);
         if (invertNormals) normal *= -1.0f;
-        glm::mat2x3 projection;
-        if (normal.x == 0 && normal.y == 0) {
-          projection[0] = glm::vec3(1.0f, 0.0f, 0.0f);
-          projection[1] = glm::vec3(0.0f, normal.z > 0 ? 1.0f : -1.0f, 0.0f);
-        } else {
-          projection[0] = glm::normalize(glm::vec3(-normal.y, normal.x, 0.0f));
-          projection[1] = glm::cross(normal, projection[0]);
-        }
+        glm::mat3x2 projection = GetAxisAlignedProjection(normal);
         for (auto &poly : polys) {
           for (PolyVert &v : poly) {
-            v.pos = glm::transpose(projection) * vertPos.H()[v.idx];
+            v.pos = projection * vertPos.H()[v.idx];
           }
         }
         std::vector<glm::ivec3> newTris;
