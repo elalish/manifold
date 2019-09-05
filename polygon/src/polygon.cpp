@@ -29,8 +29,9 @@ constexpr float kTolerance = 1e5;
 
 struct VertAdj {
   glm::vec2 pos;
-  int mesh_idx;             // this is a global index into the manifold
-  int right, left, across;  // these are local indices within this vector
+  int mesh_idx;             // This is a global index into the manifold.
+  int edgeRight;            // Cannot join identical edges with a triangle.
+  int right, left, across;  // These are local indices within this vector.
   bool merge;
   int sweep_order;  // Ensures same processing order in both steps
   bool Processed() const { return across >= 0; }
@@ -52,6 +53,7 @@ class Monotones {
       for (int i = 0; i < poly.size(); ++i) {
         monotones_.push_back({poly[i].pos,                   //
                               poly[i].idx,                   //
+                              poly[i].nextEdge,              //
                               Next(i, poly.size()) + start,  //
                               Prev(i, poly.size()) + start,  //
                               -1, false, -1});
@@ -185,9 +187,9 @@ class Monotones {
 
   int PositiveExteriorHelper(int v_idx) {
     // find nearest sweep line crossing -X of this vertex
-    float best_x = -std::numeric_limits<float>::infinity();
     int helper_idx = -1;
     int winding = 0;
+    std::vector<std::pair<float, int>> activeBelowX;
     for (int i = 0; i < Num_verts(); ++i) {
       if (Vert(i).Processed() != Left(Vert(i)).Processed()) {  // active edge
         float a = (Vert(i).pos.y - Vert(v_idx).pos.y) /
@@ -199,22 +201,28 @@ class Monotones {
           a = std::max(std::min(a, 1.0f), 0.0f);
           x = (1.0f - a) * Vert(i).pos.x + a * Left(Vert(i)).pos.x;
         }
-        if (debug.verbose)
-          std::cout << "x = " << x << ", v_x = " << Vert(v_idx).pos.x
-                    << std::endl;
-        if (x < Vert(v_idx).pos.x) {
-          winding += Vert(i).Processed() ? 1 : -1;
-          if (Vert(i).Processed() && x > best_x) {  // Rightward & nearest
-            best_x = x;
-            helper_idx = i;
-          }
+        if (x <= Vert(v_idx).pos.x)
+          activeBelowX.push_back(std::make_pair(x, i));
+      }
+    }
+    std::sort(activeBelowX.begin(), activeBelowX.end());
+    for (auto active : activeBelowX) {
+      float x = active.first;
+      int i = active.second;
+      if (debug.verbose)
+        std::cout << "x = " << x << ", v_x = " << Vert(v_idx).pos.x
+                  << std::endl;
+      if (x < Vert(v_idx).pos.x) {
+        winding += Vert(i).Processed() ? 1 : -1;
+        if (Vert(i).Processed()) {  // Rightward
+          helper_idx = i;
         }
       }
     }
     if (debug.verbose) std::cout << "winding = " << winding << std::endl;
     // only return helper if geometrically valid
     return winding == 1 ? helper_idx : -1;
-  }
+  }  // namespace
 
   VertType ProcessVert(int idx) {
     auto &vert = Vert(idx);
@@ -286,6 +294,13 @@ class Monotones {
   }
 };
 
+bool SharedEdge(glm::ivec2 edges0, glm::ivec2 edges1) {
+  return (edges0[0] != Edge::kNoIdx &&
+          (edges0[0] == edges1[0] || edges0[0] == edges1[1])) ||
+         (edges0[1] != Edge::kNoIdx &&
+          (edges0[1] == edges1[0] || edges0[1] == edges1[1]));
+}
+
 class Triangulator {
  public:
   Triangulator(const std::vector<VertAdj> &monotones, int v_idx)
@@ -313,7 +328,9 @@ class Triangulator {
       VertAdj vj = monotones_[vj_idx];
       if (attached == 1) {
         if (debug.verbose) std::cout << "same chain" << std::endl;
-        while (CCW(vi.pos, vj.pos, v_top.pos) != (onRight_ ? -1 : 1)) {
+        while (CCW(vi.pos, vj.pos, v_top.pos) == (onRight_ ? 1 : -1) ||
+               (CCW(vi.pos, vj.pos, v_top.pos) == 0 &&
+                !SharesEdge(vi, vj, v_top))) {
           AddTriangle(triangles, vi.mesh_idx, vj.mesh_idx, v_top.mesh_idx);
           v_top_idx = vj_idx;
           reflex_chain_.pop();
@@ -377,6 +394,13 @@ class Triangulator {
       triangles.emplace_back(v0, v2, v1);
     ++triangles_output;
   }
+
+  bool SharesEdge(const VertAdj &v0, const VertAdj &v1, const VertAdj &v2) {
+    glm::ivec2 e0(v0.edgeRight, monotones_[v0.left].edgeRight);
+    glm::ivec2 e1(v1.edgeRight, monotones_[v1.left].edgeRight);
+    glm::ivec2 e2(v2.edgeRight, monotones_[v2.left].edgeRight);
+    return SharedEdge(e0, e1) || SharedEdge(e1, e2) || SharedEdge(e2, e0);
+  }
 };
 
 void TriangulateMonotones(const std::vector<VertAdj> &monotones,
@@ -418,13 +442,6 @@ void TriangulateMonotones(const std::vector<VertAdj> &monotones,
   }
   ALWAYS_ASSERT(triangles_left == 0, logicErr,
                 "Triangulation produced wrong number of triangles.");
-}
-
-bool SharedEdge(glm::ivec2 edges0, glm::ivec2 edges1) {
-  return (edges0[0] != Edge::kNoIdx &&
-          (edges0[0] == edges1[0] || edges0[0] == edges1[1])) ||
-         (edges0[1] != Edge::kNoIdx &&
-          (edges0[1] == edges1[0] || edges0[1] == edges1[1]));
 }
 
 void PrintTriangulationWarning(const std::string &triangulationType,
