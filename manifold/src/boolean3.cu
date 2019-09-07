@@ -850,8 +850,6 @@ std::vector<EdgeVerts> PairUp(std::vector<VertsPos> &vertsPos, int edge) {
   return edges;
 }
 
-int Signum(int x) { return (x > 0) - (x < 0); }
-
 void AppendRetainedEdges(std::vector<std::vector<EdgeVerts>> &faces,
                          const Manifold::Impl &inP, const VecDH<int> &i03,
                          const VecDH<int> &i12, const VecDH<int> &p12,
@@ -968,10 +966,31 @@ void AppendNewEdges(std::vector<std::vector<EdgeVerts>> &facesP,
   }
 }
 
+glm::mat3x2 GetAxisAlignedProjection(glm::vec3 normal) {
+  glm::vec3 absNormal = glm::abs(normal);
+  float xyzMax;
+  glm::mat2x3 projection;
+  if (absNormal.z > absNormal.x && absNormal.z > absNormal.y) {
+    projection = glm::mat2x3(1.0f, 0.0f, 0.0f,  //
+                             0.0f, 1.0f, 0.0f);
+    xyzMax = normal.z;
+  } else if (absNormal.y > absNormal.x) {
+    projection = glm::mat2x3(0.0f, 0.0f, 1.0f,  //
+                             1.0f, 0.0f, 0.0f);
+    xyzMax = normal.y;
+  } else {
+    projection = glm::mat2x3(0.0f, 1.0f, 0.0f,  //
+                             0.0f, 0.0f, 1.0f);
+    xyzMax = normal.x;
+  }
+  if (xyzMax < 0) projection[0] *= -1.0f;
+  return glm::transpose(projection);
+}
+
 void AppendIntersectedFaces(VecDH<glm::ivec3> &triVerts,
                             VecDH<glm::vec3> &vertPos,
                             const std::vector<std::vector<EdgeVerts>> &facesP,
-                            const Manifold::Impl &inP) {
+                            const Manifold::Impl &inP, bool invertNormals) {
   for (int i = 0; i < facesP.size(); ++i) {
     auto &face = facesP[i];
     switch (face.size()) {
@@ -995,17 +1014,11 @@ void AppendIntersectedFaces(VecDH<glm::ivec3> &triVerts,
       default: {  // requires triangulation
         Polygons polys = Assemble(face);
         glm::vec3 normal = inP.GetTriNormal(i);
-        glm::mat2x3 projection;
-        if (normal.x == 0 && normal.y == 0) {
-          projection[0] = glm::vec3(1.0f, 0.0f, 0.0f);
-          projection[1] = glm::vec3(0.0f, normal.z > 0 ? 1.0f : -1.0f, 0.0f);
-        } else {
-          projection[0] = glm::normalize(glm::vec3(-normal.y, normal.x, 0.0f));
-          projection[1] = glm::cross(normal, projection[0]);
-        }
+        if (invertNormals) normal *= -1.0f;
+        glm::mat3x2 projection = GetAxisAlignedProjection(normal);
         for (auto &poly : polys) {
           for (PolyVert &v : poly) {
-            v.pos = glm::transpose(projection) * vertPos.H()[v.idx];
+            v.pos = projection * vertPos.H()[v.idx];
           }
         }
         std::vector<glm::ivec3> newTris;
@@ -1278,9 +1291,10 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
 
   // Triangulate the faces and add them to the manifold.
   if (kVerbose) std::cout << "Adding intersected faces of inP" << std::endl;
-  AppendIntersectedFaces(outR.triVerts_, outR.vertPos_, facesP, inP_);
+  AppendIntersectedFaces(outR.triVerts_, outR.vertPos_, facesP, inP_, false);
   if (kVerbose) std::cout << "Adding intersected faces of inQ" << std::endl;
-  AppendIntersectedFaces(outR.triVerts_, outR.vertPos_, facesQ, inQ_);
+  AppendIntersectedFaces(outR.triVerts_, outR.vertPos_, facesQ, inQ_,
+                         op == Manifold::OpType::SUBTRACT);
 
   // Create the manifold's data structures and verify manifoldness.
   outR.Finish();

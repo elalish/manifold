@@ -39,6 +39,8 @@ void AlwaysAssert(bool condition, const char* file, int line,
   }
 }
 
+inline int Signum(float val) { return (val > 0) - (val < 0); }
+
 // Use sind and cosd for inputs in degrees so that multiples of 90 degrees come
 // out exact.
 inline float sind(float x) {
