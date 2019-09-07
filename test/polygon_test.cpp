@@ -217,7 +217,7 @@ TEST(Polygon, ColinearY) {
   TestPoly(polys, 16);
 }
 
-TEST(Polygon, Inverted) {
+TEST(Polygon, DISABLED_Inverted) {
   Polygons polys;
   polys.push_back({
       {glm::vec2(0, 2.04124), 0, Edge::kNoIdx},           //
@@ -421,7 +421,7 @@ TEST(Polygon, NearlyLinear) {
   TestPoly(polys, 5);
 }
 
-TEST(Polygon, DISABLED_Sliver2) {
+TEST(Polygon, Sliver2) {
   Polygons polys;
   polys.push_back({
       {glm::vec2(27.4996014, 8.6873703), 74, 151},    //
@@ -435,7 +435,7 @@ TEST(Polygon, DISABLED_Sliver2) {
 }
 
 TEST(Polygon, Colinear2) {
-  SetPolygonVerbose(true);
+  // SetPolygonVerbose(true);
   Polygons polys;
   polys.push_back({
       {glm::vec2(11.7864399, -7.4572401), 4176, 13521},    //
@@ -449,7 +449,7 @@ TEST(Polygon, Colinear2) {
 }
 
 TEST(Polygon, Split) {
-  SetPolygonVerbose(true);
+  // SetPolygonVerbose(true);
   Polygons polys;
   polys.push_back({
       {glm::vec2(-0.707106769, -0.707106769), 1, 10},     //
@@ -463,11 +463,11 @@ TEST(Polygon, Split) {
       {glm::vec2(-1, 0), 4, 6},                           //
   });
   TestPoly(polys, 7);
-  SetPolygonVerbose(false);
+  // SetPolygonVerbose(false);
 }
 
-TEST(Polygon, Duplicates) {
-  SetPolygonVerbose(true);
+TEST(Polygon, DISABLED_Duplicates) {
+  // SetPolygonVerbose(true);
   Polygons polys;
   polys.push_back({
       {glm::vec2(-15, -8.10255623), 1648, 151},        //
@@ -478,7 +478,7 @@ TEST(Polygon, Duplicates) {
       {glm::vec2(-15, -8.10255623), 1922, 152},        //
   });
   TestPoly(polys, 7);
-  SetPolygonVerbose(false);
+  // SetPolygonVerbose(false);
 }
 
 // void fnExit() { throw std::runtime_error("Someone called Exit()!"); }
