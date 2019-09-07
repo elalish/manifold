@@ -76,7 +76,7 @@ void TestPoly(const Polygons &polys, int expectedNumTri) {
     }
   CheckManifold(triangles, polys);
   ASSERT_EQ(triangles.size(), expectedNumTri);
-  CheckFolded(triangles, polys);
+  ASSERT_TRUE(CheckFolded(triangles, polys));
 }
 }  // namespace
 
@@ -217,7 +217,7 @@ TEST(Polygon, ColinearY) {
   TestPoly(polys, 16);
 }
 
-TEST(Polygon, Inverted) {
+TEST(Polygon, DISABLED_Inverted) {
   Polygons polys;
   polys.push_back({
       {glm::vec2(0, 2.04124), 0, Edge::kNoIdx},           //
@@ -421,7 +421,7 @@ TEST(Polygon, NearlyLinear) {
   TestPoly(polys, 5);
 }
 
-TEST(Polygon, DISABLED_Sliver2) {
+TEST(Polygon, Sliver2) {
   Polygons polys;
   polys.push_back({
       {glm::vec2(27.4996014, 8.6873703), 74, 151},    //
@@ -432,6 +432,53 @@ TEST(Polygon, DISABLED_Sliver2) {
       {glm::vec2(27.4996014, 8.6873703), 268, 152},   //
   });
   TestPoly(polys, 4);
+}
+
+TEST(Polygon, Colinear2) {
+  // SetPolygonVerbose(true);
+  Polygons polys;
+  polys.push_back({
+      {glm::vec2(11.7864399, -7.4572401), 4176, 13521},    //
+      {glm::vec2(11.6818037, -7.30982304), 24873, -1},     //
+      {glm::vec2(11.6777582, -7.30626202), 28498, -1},     //
+      {glm::vec2(11.6789398, -7.30578804), 24872, 13521},  //
+      {glm::vec2(11.3459997, -6.83671999), 4889, 16146},   //
+      {glm::vec2(11.25597, -6.9267602), 4888, 13520},      //
+  });
+  TestPoly(polys, 4);
+}
+
+TEST(Polygon, Split) {
+  // SetPolygonVerbose(true);
+  Polygons polys;
+  polys.push_back({
+      {glm::vec2(-0.707106769, -0.707106769), 1, 10},     //
+      {glm::vec2(1, 0), 14, 21},                          //
+      {glm::vec2(0.683012664, 0), 25, -1},                //
+      {glm::vec2(0.379409522, -0.232962906), 33, -1},     //
+      {glm::vec2(0.379409522, -0.232962906), 32, -1},     //
+      {glm::vec2(1.49011612e-08, -0.183012664), 31, -1},  //
+      {glm::vec2(1.49011612e-08, -0.183012664), 30, -1},  //
+      {glm::vec2(-0.14043057, 0), 24, 21},                //
+      {glm::vec2(-1, 0), 4, 6},                           //
+  });
+  TestPoly(polys, 7);
+  // SetPolygonVerbose(false);
+}
+
+TEST(Polygon, DISABLED_Duplicates) {
+  // SetPolygonVerbose(true);
+  Polygons polys;
+  polys.push_back({
+      {glm::vec2(-15, -8.10255623), 1648, 151},        //
+      {glm::vec2(-15, -9.02439785), 1650, 157},        //
+      {glm::vec2(-13.636364, -9.4640789), 1678, 152},  //
+      {glm::vec2(-14.996314, -8.10623646), 1916, -1},  //
+      {glm::vec2(-15, -8.10639), 1845, -1},            //
+      {glm::vec2(-15, -8.10255623), 1922, 152},        //
+  });
+  TestPoly(polys, 7);
+  // SetPolygonVerbose(false);
 }
 
 // void fnExit() { throw std::runtime_error("Someone called Exit()!"); }
