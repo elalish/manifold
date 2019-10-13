@@ -15,6 +15,7 @@
 #include <algorithm>
 #include <iomanip>
 #include <iostream>
+#include <list>
 #include <map>
 #include <queue>
 #include <stack>
@@ -35,13 +36,12 @@ struct VertAdj {
   int right, left;  // These are local indices within this vector.
   int sweepOrder;
   bool processed;
-  int activeEdge;
+  std::list<ActiveEdge>::iterator activeEdge;
 };
 
 struct ActiveEdge {
   int vRight, vLeft;
   int vMerge = -1;
-  int edgePos, edgeNeg;
   bool surePos, sureNeg;
 };
 
@@ -52,7 +52,7 @@ class Monotones {
  public:
   const std::vector<VertAdj> &GetMonotones() { return monotones_; }
 
-  enum VertType { START, END, RIGHTWARDS, LEFTWARDS, MERGE, SPLIT, REV_START };
+  enum VertType { START, END, RIGHTWARDS, LEFTWARDS, MERGE };
 
   Monotones(const Polygons &polys) {
     std::vector<std::tuple<float, int, int>> sweep_line;
@@ -64,7 +64,7 @@ class Monotones {
                               poly[i].nextEdge,              //
                               Next(i, poly.size()) + start,  //
                               Prev(i, poly.size()) + start,  //
-                              -1, false, -1});
+                              -1, false, activeEdges_.begin()});
         sweep_line.push_back(
             std::make_tuple(monotones_.back().pos.y, 0, start + i));
       }
@@ -158,7 +158,7 @@ class Monotones {
 
  private:
   std::vector<VertAdj> monotones_;
-  std::vector<ActiveEdge> activeEdges_;
+  std::list<ActiveEdge> activeEdges_;
 
   VertAdj &Vert(int idx) { return monotones_[idx]; }
   VertAdj &Right(const VertAdj &v) { return monotones_[v.right]; }
@@ -170,11 +170,12 @@ class Monotones {
     Vert(right_idx).left = left_idx;
   }
 
-  void Duplicate(int v_idx) {
+  int Duplicate(int v_idx) {
     int v_right_idx = Num_verts();
     monotones_.push_back(Vert(v_idx));
-    Right(Vert(v_idx)).left = v_right_idx;
+    Link(v_right_idx, Vert(v_idx).right);
     Link(v_idx, v_right_idx);
+    return v_right_idx;
   }
 
   int SplitVerts(int v_idx, int left_dupe_idx) {
@@ -235,25 +236,67 @@ class Monotones {
     if (debug.verbose)
       std::cout << "idx = " << idx << ", mesh_idx = " << vert.mesh_idx
                 << std::endl;
+    VertType vertType;
     if (Right(vert).processed) {
       if (Left(vert).processed) {
-        // if facing
-        return END;
-        // else, mark merge
-        return MERGE;
+        auto rightEdge = Right(vert).activeEdge;
+        auto leftEdge = Left(vert).activeEdge;
+        if (std::next(rightEdge) == leftEdge) {  // facing in
+          vertType = END;
+        } else {  // facing out
+          vertType = MERGE;
+          int dupeIdx = Duplicate(idx);
+          std::prev(leftEdge)->vMerge = idx;
+          std::next(rightEdge)->vMerge = idx;
+        }
+        activeEdges_.erase(rightEdge, leftEdge);
       } else {
-        // update edge; split if marked
-        return LEFTWARDS;
+        vertType = LEFTWARDS;
+        // update edge
+        vert.activeEdge = Right(vert).activeEdge;
+        if (vert.activeEdge->vLeft != idx) {
+          --vert.activeEdge;  // start verts only point to their right edge
+        }
+        ActiveEdge &activeEdge = *vert.activeEdge;
+        activeEdge.vRight = activeEdge.vLeft;
+        activeEdge.vLeft = idx;
       }
     } else {
       if (Left(vert).processed) {
-        // update edge; split if marked
-        return RIGHTWARDS;
+        vertType = RIGHTWARDS;
+        // update edge
+        vert.activeEdge = Left(vert).activeEdge;
+        ActiveEdge &activeEdge = *vert.activeEdge;
+        activeEdge.vLeft = activeEdge.vRight;
+        activeEdge.vRight = idx;
       } else {
-        // add edges, sorted appropriately; split if marked
-        return START;
+        vertType = START;
+        // add edges, sorted appropriately
+        auto loc = std::find_if(
+            activeEdges_.begin(), activeEdges_.end(),
+            [vert, this](ActiveEdge &edge) {
+              float a = (Vert(edge.vRight).pos.y - vert.pos.y) /
+                        (Vert(edge.vRight).pos.y - Vert(edge.vLeft).pos.y);
+              float x;
+              if (std::isnan(a)) {
+                x = std::min(Vert(edge.vRight).pos.x, Vert(edge.vLeft).pos.x);
+              } else {
+                a = std::max(std::min(a, 1.0f), 0.0f);
+                x = (1.0f - a) * Vert(edge.vRight).pos.x +
+                    a * Vert(edge.vLeft).pos.x;
+              }
+              return x <= vert.pos.x;
+            });
+        // TODO: record certainty
+        activeEdges_.emplace(loc, vert.left, idx, -1, false, false);
+        activeEdges_.emplace(loc, vert.right, loc->vMerge, false, false);
+        vert.activeEdge = std::prev(loc);  // right edge is active
       }
     }
+    int mergeIdx = vert.activeEdge->vMerge;
+    if (mergeIdx >= 0) SplitVerts(idx, mergeIdx);
+    // if edge order was uncertain, re-sort
+    return vertType;
   }
 };
 
