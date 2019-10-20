@@ -29,20 +29,20 @@ DebugControls debug;
 
 constexpr float kTolerance = 1e5;
 
+struct ActiveEdge {
+  int vRight, vLeft;
+  int vMerge = -1;
+  bool surePos, sureNeg;
+};
+
 struct VertAdj {
   glm::vec2 pos;
   int mesh_idx;     // This is a global index into the manifold.
   int edgeRight;    // Cannot join identical edges with a triangle.
   int right, left;  // These are local indices within this vector.
   int sweepOrder;
-  bool processed;
+  bool processed, needsSplit;
   std::list<ActiveEdge>::iterator activeEdge;
-};
-
-struct ActiveEdge {
-  int vRight, vLeft;
-  int vMerge = -1;
-  bool surePos, sureNeg;
 };
 
 int Next(int i, int n) { return ++i >= n ? 0 : i; }
@@ -55,7 +55,7 @@ class Monotones {
   enum VertType { START, END, RIGHTWARDS, LEFTWARDS, MERGE };
 
   Monotones(const Polygons &polys) {
-    std::vector<std::tuple<float, int, int>> sweep_line;
+    std::vector<std::tuple<float, int, int>> sweepForward;
     for (const SimplePolygon &poly : polys) {
       int start = Num_verts();
       for (int i = 0; i < poly.size(); ++i) {
@@ -64,27 +64,27 @@ class Monotones {
                               poly[i].nextEdge,              //
                               Next(i, poly.size()) + start,  //
                               Prev(i, poly.size()) + start,  //
-                              -1, false, activeEdges_.begin()});
-        sweep_line.push_back(
+                              -1, false, false, activeEdges_.begin()});
+        sweepForward.push_back(
             std::make_tuple(monotones_.back().pos.y, 0, start + i));
       }
     }
-    std::sort(sweep_line.begin(), sweep_line.end());
+    std::sort(sweepForward.begin(), sweepForward.end());
     // Collapse degenerate sweep-line stops
     float yLast = -std::numeric_limits<float>::infinity();
     float yFirst = yLast;
-    for (auto &sweepPoint : sweep_line) {
+    for (auto &sweepPoint : sweepForward) {
       float &y = std::get<0>(sweepPoint);
       int idx = std::get<2>(sweepPoint);
       if (y - yLast < kTolerance) {
         yLast = y;
         y = yFirst;
-        monotones_[idx].pos.y = y;
+        Vert(idx).pos.y = y;
       } else
         yFirst = yLast = y;
     }
     // Sort degenerates by degenerate radius
-    for (auto &sweepPoint : sweep_line) {
+    for (auto &sweepPoint : sweepForward) {
       VertAdj start = Vert(std::get<2>(sweepPoint));
       VertAdj right = Right(start);
       int radiusR = 0;
@@ -106,11 +106,11 @@ class Monotones {
                                            : std::numeric_limits<int>::max() -
                                                  std::min(radiusR, radiusL));
     }
-    std::sort(sweep_line.begin(), sweep_line.end());
+    std::sort(sweepForward.begin(), sweepForward.end());
     // Sweep forward
     VertType v_type = START;
-    for (int i = 0; i < sweep_line.size(); ++i) {
-      int idx = std::get<2>(sweep_line[i]);
+    for (int i = 0; i < sweepForward.size(); ++i) {
+      int idx = std::get<2>(sweepForward[i]);
       Vert(idx).sweepOrder = i;
       v_type = ProcessVert(idx);
       if (debug.verbose) std::cout << v_type << std::endl;
@@ -119,14 +119,17 @@ class Monotones {
                   "Monotones did not finish with an END.");
     Check();
     // Sweep backward
-    for (auto &sweepPoint : sweep_line) {
-      VertAdj &v = Vert(std::get<2>(sweepPoint));
+    std::vector<std::tuple<int, int>> sweepBack;
+    for (int i = 0; i < monotones_.size(); ++i) {
+      VertAdj &v = Vert(i);
       v.pos *= -1;
       v.processed = false;
+      sweepBack.push_back(std::make_tuple(v.sweepOrder, -i));
     }
+    std::sort(sweepBack.begin(), sweepBack.end());
     activeEdges_.clear();
-    for (int i = sweep_line.size() - 1; i >= 0; --i) {
-      int idx = std::get<2>(sweep_line[i]);
+    for (auto sweepPoint : sweepBack) {
+      int idx = std::get<1>(sweepPoint);
       v_type = ProcessVert(idx);
       if (debug.verbose) std::cout << v_type << std::endl;
     }
@@ -170,65 +173,24 @@ class Monotones {
     Vert(right_idx).left = left_idx;
   }
 
-  int Duplicate(int v_idx) {
-    int v_right_idx = Num_verts();
-    monotones_.push_back(Vert(v_idx));
-    Link(v_right_idx, Vert(v_idx).right);
-    Link(v_idx, v_right_idx);
-    return v_right_idx;
-  }
-
-  int SplitVerts(int v_idx, int left_dupe_idx) {
+  void SplitVerts(int v_idx, int merge_idx) {
     // at split events, add duplicate vertices to end of list and reconnect
     if (debug.verbose)
-      std::cout << "split from " << v_idx << " to " << left_dupe_idx
-                << std::endl;
-    int newVert_idx = Num_verts();
-    monotones_.push_back(Vert(v_idx));
-    Left(Vert(newVert_idx)).right = newVert_idx;
-    Link(newVert_idx, Vert(left_dupe_idx).right);
-    Link(left_dupe_idx, v_idx);
-    return newVert_idx;
-  }
+      std::cout << "split from " << v_idx << " to " << merge_idx << std::endl;
 
-  int PositiveExteriorHelper(int v_idx) {
-    // find nearest sweep line crossing -X of this vertex
-    int helper_idx = -1;
-    int winding = 0;
-    std::vector<std::pair<float, int>> activeBelowX;
-    for (int i = 0; i < Num_verts(); ++i) {
-      if (Vert(i).processed != Left(Vert(i)).processed) {  // active edge
-        float a = (Vert(i).pos.y - Vert(v_idx).pos.y) /
-                  (Vert(i).pos.y - Left(Vert(i)).pos.y);
-        float x;
-        if (std::isnan(a)) {
-          x = std::min(Vert(i).pos.x, Left(Vert(i)).pos.x);
-        } else {
-          a = std::max(std::min(a, 1.0f), 0.0f);
-          x = (1.0f - a) * Vert(i).pos.x + a * Left(Vert(i)).pos.x;
-        }
-        if (x <= Vert(v_idx).pos.x)
-          activeBelowX.push_back(std::make_pair(x, i));
-      }
-    }
-    std::sort(activeBelowX.begin(), activeBelowX.end());
-    for (auto active : activeBelowX) {
-      float x = active.first;
-      int i = active.second;
-      if (debug.verbose)
-        std::cout << "x = " << x << ", v_x = " << Vert(v_idx).pos.x
-                  << std::endl;
-      if (x < Vert(v_idx).pos.x) {
-        winding += Vert(i).processed ? 1 : -1;
-        if (Vert(i).processed) {  // Rightward
-          helper_idx = i;
-        }
-      }
-    }
-    if (debug.verbose) std::cout << "winding = " << winding << std::endl;
-    // only return helper if geometrically valid
-    return winding == 1 ? helper_idx : -1;
-  }  // namespace
+    int vLeft_idx = Num_verts();
+    monotones_.push_back(Vert(v_idx));
+    Link(Vert(v_idx).left, vLeft_idx);
+
+    int mergeRight_idx = Num_verts();
+    monotones_.push_back(Vert(merge_idx));
+    Link(mergeRight_idx, Vert(merge_idx).right);
+
+    Link(v_idx, merge_idx);
+    Link(mergeRight_idx, vLeft_idx);
+
+    Vert(merge_idx).needsSplit = false;
+  }
 
   VertType ProcessVert(int idx) {
     auto &vert = Vert(idx);
@@ -245,7 +207,6 @@ class Monotones {
           vertType = END;
         } else {  // facing out
           vertType = MERGE;
-          int dupeIdx = Duplicate(idx);
           std::prev(leftEdge)->vMerge = idx;
           std::next(rightEdge)->vMerge = idx;
         }
@@ -288,12 +249,13 @@ class Monotones {
               return x <= vert.pos.x;
             });
         // TODO: record certainty
-        activeEdges_.emplace(loc, vert.left, idx, -1, false, false);
-        activeEdges_.emplace(loc, vert.right, loc->vMerge, false, false);
+        activeEdges_.insert(loc, {vert.left, idx, -1, false, false});
+        activeEdges_.insert(loc, {idx, vert.right, loc->vMerge, false, false});
         vert.activeEdge = std::prev(loc);  // right edge is active
       }
     }
-    int mergeIdx = vert.activeEdge->vMerge;
+    int &mergeIdx = vert.activeEdge->vMerge;
+    if (!Vert(mergeIdx).needsSplit) mergeIdx = -1;
     if (mergeIdx >= 0) SplitVerts(idx, mergeIdx);
     // if edge order was uncertain, re-sort
     return vertType;
