@@ -27,10 +27,10 @@ using namespace manifold;
 
 DebugControls debug;
 
-constexpr float kTolerance = 1e5;
+constexpr float kTolerance = 1e-5;
 
 struct ActiveEdge {
-  int vRight, vLeft;
+  int vLeft, vRight;
   int vMerge = -1;
   bool surePos, sureNeg;
 };
@@ -39,7 +39,7 @@ struct VertAdj {
   glm::vec2 pos;
   int mesh_idx;     // This is a global index into the manifold.
   int edgeRight;    // Cannot join identical edges with a triangle.
-  int right, left;  // These are local indices within this vector.
+  int left, right;  // These are local indices within this vector.
   int sweepOrder;
   bool processed, needsSplit;
   std::list<ActiveEdge>::iterator activeEdge;
@@ -52,7 +52,7 @@ class Monotones {
  public:
   const std::vector<VertAdj> &GetMonotones() { return monotones_; }
 
-  enum VertType { START, END, RIGHTWARDS, LEFTWARDS, MERGE };
+  enum VertType { START, LEFTWARDS, RIGHTWARDS, MERGE, END };
 
   Monotones(const Polygons &polys) {
     std::vector<std::tuple<float, int, int>> sweepForward;
@@ -62,8 +62,8 @@ class Monotones {
         monotones_.push_back({poly[i].pos,                   //
                               poly[i].idx,                   //
                               poly[i].nextEdge,              //
-                              Next(i, poly.size()) + start,  //
                               Prev(i, poly.size()) + start,  //
+                              Next(i, poly.size()) + start,  //
                               -1, false, false, activeEdges_.begin()});
         sweepForward.push_back(
             std::make_tuple(monotones_.back().pos.y, 0, start + i));
@@ -124,7 +124,7 @@ class Monotones {
       VertAdj &v = Vert(i);
       v.pos *= -1;
       v.processed = false;
-      sweepBack.push_back(std::make_tuple(v.sweepOrder, -i));
+      sweepBack.push_back(std::make_tuple(-v.sweepOrder, i));
     }
     std::sort(sweepBack.begin(), sweepBack.end());
     activeEdges_.clear();
@@ -173,10 +173,12 @@ class Monotones {
     Vert(right_idx).left = left_idx;
   }
 
-  void SplitVerts(int v_idx, int merge_idx) {
+  int SplitVerts(int v_idx, int merge_idx) {
     // at split events, add duplicate vertices to end of list and reconnect
     if (debug.verbose)
       std::cout << "split from " << v_idx << " to " << merge_idx << std::endl;
+
+    Vert(merge_idx).needsSplit = false;
 
     int vLeft_idx = Num_verts();
     monotones_.push_back(Vert(v_idx));
@@ -188,8 +190,40 @@ class Monotones {
 
     Link(v_idx, merge_idx);
     Link(mergeRight_idx, vLeft_idx);
+    return vLeft_idx;
+  }
 
-    Vert(merge_idx).needsSplit = false;
+  auto LeftActiveEdge(int idx) {
+    auto activeEdge = Left(Vert(idx)).activeEdge;
+    if (activeEdge->vRight != idx) {
+      activeEdge =
+          std::find_if(activeEdges_.begin(), activeEdges_.end(),
+                       [idx](ActiveEdge &edge) { return edge.vRight == idx; });
+    }
+    return activeEdge;
+  }
+
+  auto RightActiveEdge(int idx) {
+    auto activeEdge = Right(Vert(idx)).activeEdge;
+    if (activeEdge->vLeft != idx) {
+      activeEdge =
+          std::find_if(activeEdges_.begin(), activeEdges_.end(),
+                       [idx](ActiveEdge &edge) { return edge.vLeft == idx; });
+    }
+    return activeEdge;
+  }
+
+  float DistanceX(VertAdj vert, ActiveEdge edge) {
+    float a = (Vert(edge.vRight).pos.y - vert.pos.y) /
+              (Vert(edge.vRight).pos.y - Vert(edge.vLeft).pos.y);
+    float x;
+    if (std::isnan(a)) {
+      x = std::min(Vert(edge.vRight).pos.x, Vert(edge.vLeft).pos.x);
+    } else {
+      // a = std::max(std::min(a, 1.0f), 0.0f);
+      x = (1.0f - a) * Vert(edge.vRight).pos.x + a * Vert(edge.vLeft).pos.x;
+    }
+    return vert.pos.x - x;
   }
 
   VertType ProcessVert(int idx) {
@@ -201,64 +235,82 @@ class Monotones {
     VertType vertType;
     if (Right(vert).processed) {
       if (Left(vert).processed) {
-        auto rightEdge = Right(vert).activeEdge;
-        auto leftEdge = Left(vert).activeEdge;
+        auto leftEdge = LeftActiveEdge(idx);
+        auto rightEdge = RightActiveEdge(idx);
         if (std::next(rightEdge) == leftEdge) {  // facing in
           vertType = END;
+          int mergeIdx = rightEdge->vMerge;
+          if (mergeIdx >= 0 && Vert(mergeIdx).needsSplit)
+            SplitVerts(idx, mergeIdx);
         } else {  // facing out
           vertType = MERGE;
+          int mergeIdx = rightEdge->vMerge;
+          if (mergeIdx >= 0 && Vert(mergeIdx).needsSplit)
+            idx = SplitVerts(idx, mergeIdx);
+          mergeIdx = leftEdge->vMerge;
+          if (mergeIdx >= 0 && Vert(mergeIdx).needsSplit)
+            SplitVerts(idx, mergeIdx);
+          Vert(idx).needsSplit = true;
           std::prev(leftEdge)->vMerge = idx;
           std::next(rightEdge)->vMerge = idx;
         }
-        activeEdges_.erase(rightEdge, leftEdge);
+        ListEdge(*leftEdge);
+        ListEdge(*rightEdge);
+        activeEdges_.erase(leftEdge, ++rightEdge);
+        // early return because no active edge for further processing
+        return vertType;
       } else {
         vertType = LEFTWARDS;
         // update edge
-        vert.activeEdge = Right(vert).activeEdge;
-        if (vert.activeEdge->vLeft != idx) {
-          --vert.activeEdge;  // start verts only point to their right edge
-        }
+        vert.activeEdge = RightActiveEdge(idx);
         ActiveEdge &activeEdge = *vert.activeEdge;
-        activeEdge.vRight = activeEdge.vLeft;
-        activeEdge.vLeft = idx;
+        activeEdge.vRight = idx;
+        activeEdge.vLeft = vert.left;
       }
     } else {
       if (Left(vert).processed) {
         vertType = RIGHTWARDS;
         // update edge
-        vert.activeEdge = Left(vert).activeEdge;
+        vert.activeEdge = LeftActiveEdge(idx);
         ActiveEdge &activeEdge = *vert.activeEdge;
-        activeEdge.vLeft = activeEdge.vRight;
-        activeEdge.vRight = idx;
+        activeEdge.vLeft = idx;
+        activeEdge.vRight = vert.right;
       } else {
         vertType = START;
         // add edges, sorted appropriately
-        auto loc = std::find_if(
-            activeEdges_.begin(), activeEdges_.end(),
-            [vert, this](ActiveEdge &edge) {
-              float a = (Vert(edge.vRight).pos.y - vert.pos.y) /
-                        (Vert(edge.vRight).pos.y - Vert(edge.vLeft).pos.y);
-              float x;
-              if (std::isnan(a)) {
-                x = std::min(Vert(edge.vRight).pos.x, Vert(edge.vLeft).pos.x);
-              } else {
-                a = std::max(std::min(a, 1.0f), 0.0f);
-                x = (1.0f - a) * Vert(edge.vRight).pos.x +
-                    a * Vert(edge.vLeft).pos.x;
-              }
-              return x <= vert.pos.x;
-            });
+        auto loc = std::find_if(activeEdges_.begin(), activeEdges_.end(),
+                                [vert, this](ActiveEdge &edge) {
+                                  return DistanceX(vert, edge) <= 0;
+                                });
         // TODO: record certainty
-        activeEdges_.insert(loc, {vert.left, idx, -1, false, false});
-        activeEdges_.insert(loc, {idx, vert.right, loc->vMerge, false, false});
-        vert.activeEdge = std::prev(loc);  // right edge is active
+        int vMerge = loc == activeEdges_.end() ? -1 : loc->vMerge;
+        activeEdges_.insert(loc, {vert.left, idx, vMerge, false, false});
+        vert.activeEdge = std::prev(loc);  // left edge is active
+        auto pos =
+            DistanceX(Right(vert), *std::prev(loc)) > 0 ? loc : std::prev(loc);
+        activeEdges_.insert(pos, {idx, vert.right, vMerge, false, false});
       }
     }
+    ListEdges();
     int &mergeIdx = vert.activeEdge->vMerge;
-    if (!Vert(mergeIdx).needsSplit) mergeIdx = -1;
-    if (mergeIdx >= 0) SplitVerts(idx, mergeIdx);
+    if (mergeIdx >= 0) {
+      if (Vert(mergeIdx).needsSplit)
+        SplitVerts(idx, mergeIdx);
+      else
+        mergeIdx = -1;
+    }
     // if edge order was uncertain, re-sort
     return vertType;
+  }
+
+  void ListEdges() {
+    for (ActiveEdge edge : activeEdges_) {
+      ListEdge(edge);
+    }
+  }
+  void ListEdge(ActiveEdge edge) {
+    std::cout << "edge: L = " << edge.vLeft << ", R = " << edge.vRight
+              << ", M = " << edge.vMerge << std::endl;
   }
 };
 
@@ -442,7 +494,7 @@ int CCW(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2) {
   p1 = glm::abs(p1);
   p2 = glm::abs(p2);
   float norm = p0.x * p0.y + p1.x * p1.y + p2.x * p2.y;
-  if (std::abs(result) * kTolerance <= norm)
+  if (std::abs(result) <= norm * kTolerance)
     return 0;
   else
     return result > 0 ? 1 : -1;
