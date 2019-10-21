@@ -67,16 +67,16 @@ void TestPoly(const Polygons &polys, int expectedNumTri) {
     for (auto tri : triangles) {
       std::cout << tri.x << ", " << tri.y << ", " << tri.z << std::endl;
     }
-  CheckManifold(triangles, polys);
+  CheckTopology(triangles, polys);
 
   triangles = PrimaryTriangulate(polys);
   if (kVerbose)
     for (auto tri : triangles) {
       std::cout << tri.x << ", " << tri.y << ", " << tri.z << std::endl;
     }
-  CheckManifold(triangles, polys);
+  CheckTopology(triangles, polys);
   ASSERT_EQ(triangles.size(), expectedNumTri);
-  ASSERT_TRUE(CheckFolded(triangles, polys));
+  ASSERT_TRUE(CheckGeometry(triangles, polys));
 }
 }  // namespace
 
@@ -120,6 +120,7 @@ TEST(Polygon, SimpleHole2) {
 }
 
 TEST(Polygon, MultiMerge) {
+  SetPolygonVerbose(true);
   Polygons polys;
   polys.push_back({
       {glm::vec2(-7, 0), 0, Edge::kNoIdx},   //
@@ -305,7 +306,7 @@ TEST(Polygon, BadEdges) {
     for (auto tri : triangles) {
       std::cout << tri.x << ", " << tri.y << ", " << tri.z << std::endl;
     }
-  CheckManifold(triangles, polys);
+  CheckTopology(triangles, polys);
 }
 
 TEST(Polygon, BadEdges2) {
@@ -325,7 +326,7 @@ TEST(Polygon, BadEdges2) {
     for (auto tri : triangles) {
       std::cout << tri.x << ", " << tri.y << ", " << tri.z << std::endl;
     }
-  EXPECT_THROW(CheckManifold(triangles, polys), runtimeErr);
+  EXPECT_THROW(CheckTopology(triangles, polys), runtimeErr);
 }
 
 TEST(Polygon, Concave) {

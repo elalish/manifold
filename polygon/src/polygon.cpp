@@ -127,12 +127,15 @@ class Monotones {
       sweepBack.push_back(std::make_tuple(-v.sweepOrder, i));
     }
     std::sort(sweepBack.begin(), sweepBack.end());
-    activeEdges_.clear();
+    ALWAYS_ASSERT(activeEdges_.empty(), logicErr,
+                  "There are still active edges.");
     for (auto sweepPoint : sweepBack) {
       int idx = std::get<1>(sweepPoint);
       v_type = ProcessVert(idx);
       if (debug.verbose) std::cout << v_type << std::endl;
     }
+    ALWAYS_ASSERT(activeEdges_.empty(), logicErr,
+                  "There are still active edges.");
     ALWAYS_ASSERT(v_type == END, logicErr,
                   "Monotones did not finish with an END.");
     Check();
@@ -188,8 +191,8 @@ class Monotones {
     monotones_.push_back(Vert(merge_idx));
     Link(mergeRight_idx, Vert(merge_idx).right);
 
-    Link(v_idx, merge_idx);
-    Link(mergeRight_idx, vLeft_idx);
+    Link(merge_idx, v_idx);
+    Link(vLeft_idx, mergeRight_idx);
     return vLeft_idx;
   }
 
@@ -254,9 +257,9 @@ class Monotones {
           std::prev(leftEdge)->vMerge = idx;
           std::next(rightEdge)->vMerge = idx;
         }
-        ListEdge(*leftEdge);
-        ListEdge(*rightEdge);
-        activeEdges_.erase(leftEdge, ++rightEdge);
+        activeEdges_.erase(leftEdge);
+        activeEdges_.erase(rightEdge);
+        if (debug.verbose) ListEdges();
         // early return because no active edge for further processing
         return vertType;
       } else {
@@ -291,7 +294,7 @@ class Monotones {
         activeEdges_.insert(pos, {idx, vert.right, vMerge, false, false});
       }
     }
-    ListEdges();
+    if (debug.verbose) ListEdges();
     int &mergeIdx = vert.activeEdge->vMerge;
     if (mergeIdx >= 0) {
       if (Vert(mergeIdx).needsSplit)
@@ -531,8 +534,8 @@ std::vector<glm::ivec3> Triangulate(const Polygons &polys) {
   std::vector<glm::ivec3> triangles;
   try {
     triangles = PrimaryTriangulate(polys);
-    CheckManifold(triangles, polys);
-    if (debug.geometricWarnings && !CheckFolded(triangles, polys)) {
+    CheckTopology(triangles, polys);
+    if (debug.geometricWarnings && !CheckGeometry(triangles, polys)) {
       std::cout << "-----------------------------------" << std::endl;
       std::cout << "Warning: triangulation is folded! Warnings so far: "
                 << ++debug.numWarnings << std::endl;
@@ -553,7 +556,7 @@ std::vector<glm::ivec3> Triangulate(const Polygons &polys) {
     throw;
     // try {
     //   triangles = BackupTriangulate(polys);
-    //   CheckManifold(triangles, polys);
+    //   CheckTopology(triangles, polys);
     // } catch (const std::exception &e2) {
     //   PrintTriangulationWarning("Backup", polys, triangles, e2);
     //   throw;
@@ -637,7 +640,7 @@ std::vector<EdgeVerts> Triangles2Edges(
   return halfedges;
 }
 
-void CheckManifold(const std::vector<EdgeVerts> &halfedges) {
+void CheckTopology(const std::vector<EdgeVerts> &halfedges) {
   ALWAYS_ASSERT(halfedges.size() % 2 == 0, runtimeErr,
                 "Odd number of halfedges.");
   size_t n_edges = halfedges.size() / 2;
@@ -699,18 +702,18 @@ void CheckManifold(const std::vector<EdgeVerts> &halfedges) {
   }
 }
 
-void CheckManifold(const std::vector<glm::ivec3> &triangles,
+void CheckTopology(const std::vector<glm::ivec3> &triangles,
                    const Polygons &polys) {
   std::vector<EdgeVerts> halfedges = Triangles2Edges(triangles);
   std::vector<EdgeVerts> openEdges = Polygons2Edges(polys);
   for (EdgeVerts e : openEdges) {
     halfedges.push_back({e.second, e.first, e.edge});
   }
-  CheckManifold(halfedges);
+  CheckTopology(halfedges);
 }
 
-bool CheckFolded(const std::vector<glm::ivec3> &triangles,
-                 const Polygons &polys) {
+bool CheckGeometry(const std::vector<glm::ivec3> &triangles,
+                   const Polygons &polys) {
   std::map<int, glm::vec2> vertPos;
   for (const auto &poly : polys) {
     for (int i = 0; i < poly.size(); ++i) {
