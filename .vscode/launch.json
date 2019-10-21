@@ -11,7 +11,7 @@
             "program": "${workspaceFolder}/build/test/manifold_test",
             "args": [
                 "--gtest_break_on_failure",
-                "--gtest_filter=Polygon.Concave"
+                "--gtest_filter=Polygon.SimpleHole"
             ],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}/build/test",
@@ -20,9 +20,7 @@
                     "name": "MALLOC_CHECK_",
                     "value": "2"
                 }
-            ],
-            "externalConsole": true,
-            "MIMode": "lldb"
+            ]
         }
     ]
 }
