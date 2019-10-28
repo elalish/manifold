@@ -30,9 +30,12 @@ DebugControls debug;
 constexpr float kTolerance = 1e-5;
 
 struct ActiveEdge {
-  int vLeft, vRight;
-  int vMerge = -1;
-  bool surePos, sureNeg;
+  int vLast, vNext;
+};
+
+struct EdgePair {
+  ActiveEdge first, second;
+  int vMerge;
 };
 
 struct VertAdj {
@@ -42,7 +45,7 @@ struct VertAdj {
   int left, right;  // These are local indices within this vector.
   int sweepOrder;
   bool processed, needsSplit;
-  std::list<ActiveEdge>::iterator activeEdge;
+  std::list<EdgePair>::iterator activePair;
 };
 
 int Next(int i, int n) { return ++i >= n ? 0 : i; }
@@ -52,9 +55,10 @@ class Monotones {
  public:
   const std::vector<VertAdj> &GetMonotones() { return monotones_; }
 
-  enum VertType { START, LEFTWARDS, RIGHTWARDS, MERGE, END };
+  enum VertType { START, HOLE, LEFTWARDS, RIGHTWARDS, MERGE, END };
 
   Monotones(const Polygons &polys) {
+    Dump(polys);
     std::vector<std::tuple<float, int, int>> sweepForward;
     for (const SimplePolygon &poly : polys) {
       int start = Num_verts();
@@ -64,7 +68,7 @@ class Monotones {
                               poly[i].nextEdge,              //
                               Prev(i, poly.size()) + start,  //
                               Next(i, poly.size()) + start,  //
-                              -1, false, false, activeEdges_.begin()});
+                              -1, false, false, activePairs_.begin()});
         sweepForward.push_back(
             std::make_tuple(monotones_.back().pos.y, 0, start + i));
       }
@@ -127,14 +131,14 @@ class Monotones {
       sweepBack.push_back(std::make_tuple(-v.sweepOrder, i));
     }
     std::sort(sweepBack.begin(), sweepBack.end());
-    ALWAYS_ASSERT(activeEdges_.empty(), logicErr,
+    ALWAYS_ASSERT(activePairs_.empty(), logicErr,
                   "There are still active edges.");
     for (auto sweepPoint : sweepBack) {
       int idx = std::get<1>(sweepPoint);
       v_type = ProcessVert(idx);
       if (debug.verbose) std::cout << v_type << std::endl;
     }
-    ALWAYS_ASSERT(activeEdges_.empty(), logicErr,
+    ALWAYS_ASSERT(activePairs_.empty(), logicErr,
                   "There are still active edges.");
     ALWAYS_ASSERT(v_type == END, logicErr,
                   "Monotones did not finish with an END.");
@@ -164,7 +168,7 @@ class Monotones {
 
  private:
   std::vector<VertAdj> monotones_;
-  std::list<ActiveEdge> activeEdges_;
+  std::list<EdgePair> activePairs_;
 
   VertAdj &Vert(int idx) { return monotones_[idx]; }
   VertAdj &Right(const VertAdj &v) { return monotones_[v.right]; }
@@ -196,37 +200,9 @@ class Monotones {
     return vLeft_idx;
   }
 
-  auto LeftActiveEdge(int idx) {
-    auto activeEdge = Left(Vert(idx)).activeEdge;
-    if (activeEdge->vRight != idx) {
-      activeEdge =
-          std::find_if(activeEdges_.begin(), activeEdges_.end(),
-                       [idx](ActiveEdge &edge) { return edge.vRight == idx; });
-    }
-    return activeEdge;
-  }
-
-  auto RightActiveEdge(int idx) {
-    auto activeEdge = Right(Vert(idx)).activeEdge;
-    if (activeEdge->vLeft != idx) {
-      activeEdge =
-          std::find_if(activeEdges_.begin(), activeEdges_.end(),
-                       [idx](ActiveEdge &edge) { return edge.vLeft == idx; });
-    }
-    return activeEdge;
-  }
-
-  float DistanceX(VertAdj vert, ActiveEdge edge) {
-    float a = (Vert(edge.vRight).pos.y - vert.pos.y) /
-              (Vert(edge.vRight).pos.y - Vert(edge.vLeft).pos.y);
-    float x;
-    if (std::isnan(a)) {
-      x = std::min(Vert(edge.vRight).pos.x, Vert(edge.vLeft).pos.x);
-    } else {
-      // a = std::max(std::min(a, 1.0f), 0.0f);
-      x = (1.0f - a) * Vert(edge.vRight).pos.x + a * Vert(edge.vLeft).pos.x;
-    }
-    return vert.pos.x - x;
+  auto RightPair(int idx) {
+    auto pair = Right(Vert(idx)).activePair;
+    return pair->first.vNext == idx ? pair : std::next(pair);
   }
 
   VertType ProcessVert(int idx) {
@@ -238,64 +214,85 @@ class Monotones {
     VertType vertType;
     if (Right(vert).processed) {
       if (Left(vert).processed) {
-        auto leftEdge = LeftActiveEdge(idx);
-        auto rightEdge = RightActiveEdge(idx);
-        if (std::next(rightEdge) == leftEdge) {  // facing in
+        auto leftPair = Left(vert).activePair;
+        auto rightPair = RightPair(idx);
+        if (leftPair == rightPair) {  // facing in
           vertType = END;
-          int mergeIdx = rightEdge->vMerge;
+          int mergeIdx = rightPair->vMerge;
           if (mergeIdx >= 0 && Vert(mergeIdx).needsSplit)
             SplitVerts(idx, mergeIdx);
         } else {  // facing out
           vertType = MERGE;
-          int mergeIdx = rightEdge->vMerge;
+          int mergeIdx = rightPair->vMerge;
           if (mergeIdx >= 0 && Vert(mergeIdx).needsSplit)
             idx = SplitVerts(idx, mergeIdx);
-          mergeIdx = leftEdge->vMerge;
+          mergeIdx = leftPair->vMerge;
           if (mergeIdx >= 0 && Vert(mergeIdx).needsSplit)
             SplitVerts(idx, mergeIdx);
           Vert(idx).needsSplit = true;
-          std::prev(leftEdge)->vMerge = idx;
-          std::next(rightEdge)->vMerge = idx;
+          leftPair->second = rightPair->second;
+          leftPair->vMerge = idx;
         }
-        activeEdges_.erase(leftEdge);
-        activeEdges_.erase(rightEdge);
+        activePairs_.erase(rightPair);
         if (debug.verbose) ListEdges();
         // early return because no active edge for further processing
         return vertType;
       } else {
         vertType = LEFTWARDS;
         // update edge
-        vert.activeEdge = RightActiveEdge(idx);
-        ActiveEdge &activeEdge = *vert.activeEdge;
-        activeEdge.vRight = idx;
-        activeEdge.vLeft = vert.left;
+        vert.activePair = RightPair(idx);
+        ActiveEdge &activeEdge = vert.activePair->first;
+        activeEdge.vLast = idx;
+        activeEdge.vNext = vert.left;
       }
     } else {
       if (Left(vert).processed) {
         vertType = RIGHTWARDS;
         // update edge
-        vert.activeEdge = LeftActiveEdge(idx);
-        ActiveEdge &activeEdge = *vert.activeEdge;
-        activeEdge.vLeft = idx;
-        activeEdge.vRight = vert.right;
+        vert.activePair = Left(vert).activePair;
+        ActiveEdge &activeEdge = vert.activePair->second;
+        activeEdge.vLast = idx;
+        activeEdge.vNext = vert.right;
       } else {
-        vertType = START;
-        // add edges, sorted appropriately
-        auto loc = std::find_if(activeEdges_.begin(), activeEdges_.end(),
-                                [vert, this](ActiveEdge &edge) {
-                                  return DistanceX(vert, edge) <= 0;
-                                });
+        if (CCW(vert.pos, Right(vert).pos, Left(vert).pos) >= 0 ||
+            activePairs_.empty()) {
+          vertType = START;
+          auto loc = std::find_if(activePairs_.begin(), activePairs_.end(),
+                                  [vert, this](const EdgePair &pair) {
+                                    ActiveEdge edge = pair.first;
+                                    glm::vec2 last = Vert(edge.vLast).pos;
+                                    glm::vec2 next = Vert(edge.vNext).pos;
+                                    int side = CCW(next, last, vert.pos);
+                                    if (side == 0)
+                                      side = CCW(next, last, Left(vert).pos);
+                                    return side <= 0;
+                                  });
+          vert.activePair = activePairs_.insert(
+              loc, {{idx, vert.left}, {idx, vert.right}, -1});
+        } else {
+          vertType = HOLE;
+          auto loc = std::find_if(activePairs_.begin(), activePairs_.end(),
+                                  [vert, this](const EdgePair &pair) {
+                                    ActiveEdge edge = pair.second;
+                                    glm::vec2 last = Vert(edge.vLast).pos;
+                                    glm::vec2 next = Vert(edge.vNext).pos;
+                                    int side = CCW(next, last, vert.pos);
+                                    if (side == 0)
+                                      side = CCW(next, last, Right(vert).pos);
+                                    return side <= 0;
+                                  });
+          if (loc == activePairs_.end()) --loc;
+          // hole-starting vert links earlier activePair
+          vert.activePair = activePairs_.insert(
+              loc, {loc->first, {idx, vert.right}, loc->vMerge});
+          Vert(loc->first.vLast).activePair = vert.activePair;
+          loc->first = {idx, vert.left};
+        }
         // TODO: record certainty
-        int vMerge = loc == activeEdges_.end() ? -1 : loc->vMerge;
-        activeEdges_.insert(loc, {vert.left, idx, vMerge, false, false});
-        vert.activeEdge = std::prev(loc);  // left edge is active
-        auto pos =
-            DistanceX(Right(vert), *std::prev(loc)) > 0 ? loc : std::prev(loc);
-        activeEdges_.insert(pos, {idx, vert.right, vMerge, false, false});
       }
     }
     if (debug.verbose) ListEdges();
-    int &mergeIdx = vert.activeEdge->vMerge;
+    int &mergeIdx = vert.activePair->vMerge;
     if (mergeIdx >= 0) {
       if (Vert(mergeIdx).needsSplit)
         SplitVerts(idx, mergeIdx);
@@ -307,13 +304,14 @@ class Monotones {
   }
 
   void ListEdges() {
-    for (ActiveEdge edge : activeEdges_) {
-      ListEdge(edge);
+    for (EdgePair edge : activePairs_) {
+      ListEdge(edge.first);
+      ListEdge(edge.second);
     }
   }
   void ListEdge(ActiveEdge edge) {
-    std::cout << "edge: L = " << edge.vLeft << ", R = " << edge.vRight
-              << ", M = " << edge.vMerge << std::endl;
+    std::cout << "edge: L = " << edge.vLast << ", R = " << edge.vNext
+              << std::endl;
   }
 };
 
