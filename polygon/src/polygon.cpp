@@ -44,7 +44,7 @@ struct VertAdj {
   int edgeRight;    // Cannot join identical edges with a triangle.
   int left, right;  // These are local indices within this vector.
   int sweepOrder;
-  bool processed, needsSplit;
+  bool processed;
   std::list<EdgePair>::iterator activePair;
 };
 
@@ -58,7 +58,6 @@ class Monotones {
   enum VertType { START, HOLE, LEFTWARDS, RIGHTWARDS, MERGE, END };
 
   Monotones(const Polygons &polys) {
-    Dump(polys);
     std::vector<std::tuple<float, int, int>> sweepForward;
     for (const SimplePolygon &poly : polys) {
       int start = Num_verts();
@@ -68,7 +67,7 @@ class Monotones {
                               poly[i].nextEdge,              //
                               Prev(i, poly.size()) + start,  //
                               Next(i, poly.size()) + start,  //
-                              -1, false, false, activePairs_.begin()});
+                              -1, false, activePairs_.begin()});
         sweepForward.push_back(
             std::make_tuple(monotones_.back().pos.y, 0, start + i));
       }
@@ -180,23 +179,26 @@ class Monotones {
     Vert(right_idx).left = left_idx;
   }
 
-  int SplitVerts(int v_idx, int merge_idx) {
+  int SplitVerts(int v_idx, EdgePair &pair) {
+    int mergeIdx = pair.vMerge;
+    if (mergeIdx < 0) return -1;
+
     // at split events, add duplicate vertices to end of list and reconnect
     if (debug.verbose)
-      std::cout << "split from " << v_idx << " to " << merge_idx << std::endl;
-
-    Vert(merge_idx).needsSplit = false;
+      std::cout << "split from " << v_idx << " to " << mergeIdx << std::endl;
 
     int vLeft_idx = Num_verts();
     monotones_.push_back(Vert(v_idx));
     Link(Vert(v_idx).left, vLeft_idx);
 
     int mergeRight_idx = Num_verts();
-    monotones_.push_back(Vert(merge_idx));
-    Link(mergeRight_idx, Vert(merge_idx).right);
+    monotones_.push_back(Vert(mergeIdx));
+    Link(mergeRight_idx, Vert(mergeIdx).right);
 
-    Link(merge_idx, v_idx);
+    Link(mergeIdx, v_idx);
     Link(vLeft_idx, mergeRight_idx);
+
+    pair.vMerge = -1;
     return vLeft_idx;
   }
 
@@ -218,19 +220,14 @@ class Monotones {
         auto rightPair = RightPair(idx);
         if (leftPair == rightPair) {  // facing in
           vertType = END;
-          int mergeIdx = rightPair->vMerge;
-          if (mergeIdx >= 0 && Vert(mergeIdx).needsSplit)
-            SplitVerts(idx, mergeIdx);
+          SplitVerts(idx, *rightPair);
         } else {  // facing out
           vertType = MERGE;
-          int mergeIdx = rightPair->vMerge;
-          if (mergeIdx >= 0 && Vert(mergeIdx).needsSplit)
-            idx = SplitVerts(idx, mergeIdx);
-          mergeIdx = leftPair->vMerge;
-          if (mergeIdx >= 0 && Vert(mergeIdx).needsSplit)
-            SplitVerts(idx, mergeIdx);
-          Vert(idx).needsSplit = true;
+          int newIdx = SplitVerts(idx, *rightPair);
+          if (newIdx >= 0) idx = newIdx;
+          SplitVerts(idx, *leftPair);
           leftPair->second = rightPair->second;
+          Vert(leftPair->second.vLast).activePair = leftPair;
           leftPair->vMerge = idx;
         }
         activePairs_.erase(rightPair);
@@ -244,6 +241,7 @@ class Monotones {
         ActiveEdge &activeEdge = vert.activePair->first;
         activeEdge.vLast = idx;
         activeEdge.vNext = vert.left;
+        SplitVerts(idx, *vert.activePair);
       }
     } else {
       if (Left(vert).processed) {
@@ -253,6 +251,7 @@ class Monotones {
         ActiveEdge &activeEdge = vert.activePair->second;
         activeEdge.vLast = idx;
         activeEdge.vNext = vert.right;
+        SplitVerts(idx, *vert.activePair);
       } else {
         if (CCW(vert.pos, Right(vert).pos, Left(vert).pos) >= 0 ||
             activePairs_.empty()) {
@@ -269,6 +268,7 @@ class Monotones {
                                   });
           vert.activePair = activePairs_.insert(
               loc, {{idx, vert.left}, {idx, vert.right}, -1});
+          SplitVerts(idx, *vert.activePair);
         } else {
           vertType = HOLE;
           auto loc = std::find_if(activePairs_.begin(), activePairs_.end(),
@@ -287,27 +287,28 @@ class Monotones {
               loc, {loc->first, {idx, vert.right}, loc->vMerge});
           Vert(loc->first.vLast).activePair = vert.activePair;
           loc->first = {idx, vert.left};
+          loc->vMerge = -1;
+          int newIdx = SplitVerts(idx, *vert.activePair);
+          if (newIdx >= 0) Vert(newIdx).activePair = loc;
         }
         // TODO: record certainty
       }
     }
     if (debug.verbose) ListEdges();
-    int &mergeIdx = vert.activePair->vMerge;
-    if (mergeIdx >= 0) {
-      if (Vert(mergeIdx).needsSplit)
-        SplitVerts(idx, mergeIdx);
-      else
-        mergeIdx = -1;
-    }
     // if edge order was uncertain, re-sort
     return vertType;
   }
 
   void ListEdges() {
-    for (EdgePair edge : activePairs_) {
-      ListEdge(edge.first);
-      ListEdge(edge.second);
+    std::cout << "active edges:" << std::endl;
+    for (EdgePair pair : activePairs_) {
+      ListPair(pair);
     }
+  }
+  void ListPair(EdgePair pair) {
+    ListEdge(pair.first);
+    ListEdge(pair.second);
+    std::cout << "pair vMerge: " << pair.vMerge << std::endl;
   }
   void ListEdge(ActiveEdge edge) {
     std::cout << "edge: L = " << edge.vLast << ", R = " << edge.vNext
