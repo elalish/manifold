@@ -120,7 +120,6 @@ TEST(Polygon, SimpleHole2) {
 }
 
 TEST(Polygon, MultiMerge) {
-  SetPolygonVerbose(true);
   Polygons polys;
   polys.push_back({
       {glm::vec2(-7, 0), 0, Edge::kNoIdx},   //
