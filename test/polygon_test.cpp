@@ -89,6 +89,7 @@ TEST(Polygon, NoAssemble) {
 }
 
 TEST(Polygon, SimpleHole) {
+  SetPolygonVerbose(true);
   Polygons polys;
   polys.push_back({
       {glm::vec2(0, -2), 0, Edge::kNoIdx},  //
