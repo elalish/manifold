@@ -29,21 +29,24 @@ DebugControls debug;
 
 constexpr float kTolerance = 1e-5;
 
+struct VertAdj;
+typedef std::list<VertAdj>::iterator VertItr;
+
 struct ActiveEdge {
-  int vSouth, vNorth;
+  VertAdj *vSouth, *vNorth;
 };
 
 struct EdgePair {
   ActiveEdge west, east;
-  int vMerge;
+  VertItr vMerge;
 };
 
 struct VertAdj {
   glm::vec2 pos;
-  int mesh_idx;     // This is a global index into the manifold.
-  int edgeRight;    // Cannot join identical edges with a triangle.
-  int left, right;  // These are local indices within this vector.
-  int sweepOrder;
+  int mesh_idx;   // This is a global index into the manifold.
+  int edgeRight;  // Cannot join identical edges with a triangle.
+  VertAdj *left, *right;
+  int degenerateRadius;
   bool processed;
   std::list<EdgePair>::iterator activePair;
 };
@@ -53,88 +56,97 @@ int Prev(int i, int n) { return --i < 0 ? n - 1 : i; }
 
 class Monotones {
  public:
-  const std::vector<VertAdj> &GetMonotones() { return monotones_; }
+  const std::list<VertAdj> &GetMonotones() { return monotones_; }
 
   enum VertType { START, HOLE, LEFTWARDS, RIGHTWARDS, MERGE, END };
 
   Monotones(const Polygons &polys) {
-    std::vector<std::tuple<float, int, int>> sweepForward;
+    // std::vector<std::tuple<float, int, int>> sweepForward;
+    VertAdj *start, *last, *current;
     for (const SimplePolygon &poly : polys) {
-      int start = Num_verts();
+      // int start = Num_verts();
       for (int i = 0; i < poly.size(); ++i) {
-        monotones_.push_back({poly[i].pos,                   //
-                              poly[i].idx,                   //
-                              poly[i].nextEdge,              //
-                              Prev(i, poly.size()) + start,  //
-                              Next(i, poly.size()) + start,  //
+        monotones_.push_back({poly[i].pos,       //
+                              poly[i].idx,       //
+                              poly[i].nextEdge,  //
+                              nullptr,           //
+                              nullptr,           //
                               -1, false, activePairs_.begin()});
-        sweepForward.push_back(
-            std::make_tuple(monotones_.back().pos.y, 0, start + i));
+        current = &monotones_.back();
+        if (i == 0)
+          start = current;
+        else
+          Link(last, current);
+        last = current;
+
+        // sweepForward.push_back(
+        //     std::make_tuple(monotones_.back().pos.y, 0, start + i));
       }
+      Link(current, start);
     }
-    std::sort(sweepForward.begin(), sweepForward.end());
+    std::sort(
+        monotones_.begin(), monotones_.end(),
+        [](const VertAdj &a, const VertAdj &b) { return a.pos.y < b.pos.y; });
     // Collapse degenerate sweep-line stops
     float yLast = -std::numeric_limits<float>::infinity();
     float yFirst = yLast;
-    for (auto &sweepPoint : sweepForward) {
-      float &y = std::get<0>(sweepPoint);
-      int idx = std::get<2>(sweepPoint);
-      if (y - yLast < kTolerance) {
-        yLast = y;
-        y = yFirst;
-        Vert(idx).pos.y = y;
+    for (auto &vert : monotones_) {
+      if (vert.pos.y - yLast < kTolerance) {
+        yLast = vert.pos.y;
+        vert.pos.y = yFirst;
       } else
-        yFirst = yLast = y;
+        yFirst = yLast = vert.pos.y;
     }
     // Sort degenerates by degenerate radius
-    for (auto &sweepPoint : sweepForward) {
-      VertAdj start = Vert(std::get<2>(sweepPoint));
-      VertAdj right = Right(start);
+    for (auto &start : monotones_) {
+      VertAdj *right = start.right;
       int radiusR = 0;
-      while (right.pos.y == start.pos.y && right.mesh_idx != start.mesh_idx) {
+      while (right->pos.y == start.pos.y && right->mesh_idx != start.mesh_idx) {
         ++radiusR;
-        right = Right(right);
+        right = right->right;
       }
-      VertAdj left = Left(start);
+      VertAdj *left = start.left;
       int radiusL = 0;
-      while (left.pos.y == start.pos.y && left.mesh_idx != start.mesh_idx) {
+      while (left->pos.y == start.pos.y && left->mesh_idx != start.mesh_idx) {
         ++radiusL;
-        left = Left(left);
+        left = left->left;
       }
-      std::get<1>(sweepPoint) =
-          left.pos.y < start.pos.y
-              ? (right.pos.y < start.pos.y ? std::min(radiusR, radiusL)
-                                           : radiusL)
-              : (right.pos.y < start.pos.y ? radiusR
-                                           : std::numeric_limits<int>::max() -
-                                                 std::min(radiusR, radiusL));
+      start.degenerateRadius =
+          left->pos.y < start.pos.y
+              ? (right->pos.y < start.pos.y ? std::min(radiusR, radiusL)
+                                            : radiusL)
+              : (right->pos.y < start.pos.y ? radiusR
+                                            : std::numeric_limits<int>::max() -
+                                                  std::min(radiusR, radiusL));
     }
-    std::sort(sweepForward.begin(), sweepForward.end());
+    std::sort(monotones_.begin(), monotones_.end(),
+              [](const VertAdj &a, const VertAdj &b) {
+                return a.pos.y != b.pos.y
+                           ? a.pos.y < b.pos.y
+                           : a.degenerateRadius < b.degenerateRadius;
+              });
     // Sweep forward
     VertType v_type = START;
-    for (int i = 0; i < sweepForward.size(); ++i) {
-      int idx = std::get<2>(sweepForward[i]);
-      Vert(idx).sweepOrder = i;
-      v_type = ProcessVert(idx);
+    for (VertItr vItr = monotones_.begin(); vItr != monotones_.end(); ++vItr) {
+      v_type = ProcessVert(vItr);
       if (debug.verbose) std::cout << v_type << std::endl;
     }
     ALWAYS_ASSERT(v_type == END, logicErr,
                   "Monotones did not finish with an END.");
     Check();
     // Sweep backward
-    std::vector<std::tuple<int, int>> sweepBack;
-    for (int i = 0; i < monotones_.size(); ++i) {
-      VertAdj &v = Vert(i);
-      v.pos *= -1;
-      v.processed = false;
-      sweepBack.push_back(std::make_tuple(-v.sweepOrder, i));
+    // std::vector<std::tuple<int, int>> sweepBack;
+    for (auto &vert : monotones_) {
+      vert.pos *= -1;
+      vert.processed = false;
+      // sweepBack.push_back(std::make_tuple(-v.sweepOrder, i));
     }
-    std::sort(sweepBack.begin(), sweepBack.end());
+    monotones_.reverse();
+    // std::sort(sweepBack.begin(), sweepBack.end());
     ALWAYS_ASSERT(activePairs_.empty(), logicErr,
                   "There are still active edges.");
-    for (auto sweepPoint : sweepBack) {
-      int idx = std::get<1>(sweepPoint);
-      v_type = ProcessVert(idx);
+    for (VertItr vItr = monotones_.begin(); vItr != monotones_.end(); ++vItr) {
+      v_type = ProcessVert(vItr);
       if (debug.verbose) std::cout << v_type << std::endl;
     }
     ALWAYS_ASSERT(activePairs_.empty(), logicErr,
@@ -146,108 +158,91 @@ class Monotones {
 
   void Check() {
     std::vector<EdgeVerts> edges;
-    for (int i = 0; i < monotones_.size(); ++i) {
-      edges.push_back({i, monotones_[i].right, Edge::kNoIdx});
-      ALWAYS_ASSERT(monotones_[monotones_[i].right].right != i, logicErr,
-                    "two-edge monotone!");
-      ALWAYS_ASSERT(monotones_[monotones_[i].right].left == i, logicErr,
+    for (auto &vert : monotones_) {
+      edges.push_back({vert.mesh_idx, vert.right->mesh_idx, Edge::kNoIdx});
+      ALWAYS_ASSERT(vert.right->right != &vert, logicErr, "two-edge monotone!");
+      ALWAYS_ASSERT(vert.left->right == &vert, logicErr,
                     "monotone vert neighbors don't agree!");
     }
     Polygons polys = Assemble(edges);
-    if (debug.verbose) {
-      for (auto &poly : polys)
-        for (auto &v : poly) {
-          auto vert = monotones_[v.idx];
-          v.idx = vert.mesh_idx;
-          v.pos = vert.pos;
-        }
-      Dump(polys);
-    }
+    if (debug.verbose) Dump(polys);
   }
 
  private:
-  std::vector<VertAdj> monotones_;
+  std::list<VertAdj> monotones_;
   std::list<EdgePair> activePairs_;
 
-  VertAdj &Vert(int idx) { return monotones_[idx]; }
-  VertAdj &Right(const VertAdj &v) { return monotones_[v.right]; }
-  VertAdj &Left(const VertAdj &v) { return monotones_[v.left]; }
-  int Num_verts() const { return monotones_.size(); }
-
-  void Link(int left_idx, int right_idx) {
-    Vert(left_idx).right = right_idx;
-    Vert(right_idx).left = left_idx;
+  void Link(VertAdj *left, VertAdj *right) {
+    left->right = right;
+    right->left = left;
   }
 
-  int SplitVerts(int north, EdgePair &pair) {
-    int south = pair.vMerge;
-    if (south < 0) return -1;
+  VertItr SplitVerts(VertItr north, EdgePair &pair) {
+    VertItr south = pair.vMerge;
+    if (south == monotones_.end()) return monotones_.end();
 
     // at split events, add duplicate vertices to end of list and reconnect
     if (debug.verbose)
-      std::cout << "split from " << north << " to " << south << std::endl;
+      std::cout << "split from " << north->mesh_idx << " to " << south->mesh_idx
+                << std::endl;
 
-    int northEast = Num_verts();
-    monotones_.push_back(Vert(north));
-    Link(Vert(north).left, northEast);
+    VertItr northEast = monotones_.insert(north, *north);
+    Link(north->left, &*northEast);
 
-    int southEast = Num_verts();
-    monotones_.push_back(Vert(south));
-    Link(southEast, Vert(south).right);
+    VertItr southEast = monotones_.insert(south, *south);
+    Link(&*southEast, south->right);
 
-    Link(south, north);
-    Link(northEast, southEast);
+    Link(&*south, &*north);
+    Link(&*northEast, &*southEast);
 
-    pair.vMerge = -1;
+    pair.vMerge = monotones_.end();
     return northEast;
   }
 
-  auto LeftPair(int idx) {
-    auto pair = Left(Vert(idx)).activePair;
-    if (pair->east.vNorth == idx) return pair;
+  auto LeftPair(VertAdj *vert) {
+    auto pair = vert->left->activePair;
+    if (pair->east.vNorth == vert) return pair;
     return std::find_if(
         activePairs_.begin(), activePairs_.end(),
-        [idx](const EdgePair &pair) { return pair.east.vNorth == idx; });
+        [vert](const EdgePair &pair) { return pair.east.vNorth == vert; });
   }
 
-  auto RightPair(int idx) {
-    auto pair = Right(Vert(idx)).activePair;
-    if (pair->west.vNorth == idx) return pair;
+  auto RightPair(VertAdj *vert) {
+    auto pair = vert->right->activePair;
+    if (pair->west.vNorth == vert) return pair;
     return std::find_if(
         activePairs_.begin(), activePairs_.end(),
-        [idx](const EdgePair &pair) { return pair.west.vNorth == idx; });
+        [vert](const EdgePair &pair) { return pair.west.vNorth == vert; });
   }
 
   int VertWestOfEdge(const VertAdj &vert, const ActiveEdge &edge) {
-    glm::vec2 last = Vert(edge.vSouth).pos;
-    glm::vec2 next = Vert(edge.vNorth).pos;
+    glm::vec2 last = edge.vSouth->pos;
+    glm::vec2 next = edge.vNorth->pos;
     int side = CCW(last, next, vert.pos);
-    if (side == 0) side = CCW(last, next, Right(vert).pos);
+    if (side == 0) side = CCW(last, next, vert.right->pos);
     return side;
   }
 
-  VertType ProcessVert(int idx) {
-    auto &vert = Vert(idx);
-    vert.processed = true;
+  VertType ProcessVert(VertItr vert) {
+    vert->processed = true;
     if (debug.verbose)
-      std::cout << "idx = " << idx << ", mesh_idx = " << vert.mesh_idx
-                << std::endl;
+      std::cout << "mesh_idx = " << vert->mesh_idx << std::endl;
     VertType vertType;
-    if (Right(vert).processed) {
-      if (Left(vert).processed) {
-        auto leftPair = LeftPair(idx);
-        auto rightPair = RightPair(idx);
+    if (vert->right->processed) {
+      if (vert->left->processed) {
+        auto leftPair = LeftPair(&*vert);
+        auto rightPair = RightPair(&*vert);
         if (leftPair == rightPair) {  // facing in
           vertType = END;
-          SplitVerts(idx, *rightPair);
+          SplitVerts(vert, *rightPair);
         } else {  // facing out
           vertType = MERGE;
-          int newIdx = SplitVerts(idx, *rightPair);
-          if (newIdx >= 0) idx = newIdx;
-          SplitVerts(idx, *leftPair);
+          VertItr newVert = SplitVerts(vert, *rightPair);
+          if (newVert != monotones_.end()) vert = newVert;
+          SplitVerts(vert, *leftPair);
           leftPair->east = rightPair->east;
-          Vert(leftPair->east.vSouth).activePair = leftPair;
-          leftPair->vMerge = idx;
+          leftPair->east.vSouth->left->activePair = leftPair;
+          leftPair->vMerge = vert;
         }
         activePairs_.erase(rightPair);
         if (debug.verbose) ListEdges();
@@ -256,47 +251,48 @@ class Monotones {
       } else {
         vertType = LEFTWARDS;
         // update edge
-        vert.activePair = RightPair(idx);
-        ActiveEdge &activeEdge = vert.activePair->west;
-        activeEdge.vSouth = idx;
-        activeEdge.vNorth = vert.left;
-        SplitVerts(idx, *vert.activePair);
+        vert->activePair = RightPair(&*vert);
+        ActiveEdge &activeEdge = vert->activePair->west;
+        activeEdge.vSouth = &*vert;
+        activeEdge.vNorth = vert->left;
+        SplitVerts(vert, *vert->activePair);
       }
     } else {
-      if (Left(vert).processed) {
+      if (vert->left->processed) {
         vertType = RIGHTWARDS;
         // update edge
-        vert.activePair = LeftPair(idx);
-        ActiveEdge &activeEdge = vert.activePair->east;
-        activeEdge.vSouth = idx;
-        activeEdge.vNorth = vert.right;
-        SplitVerts(idx, *vert.activePair);
+        vert->activePair = LeftPair(&*vert);
+        ActiveEdge &activeEdge = vert->activePair->east;
+        activeEdge.vSouth = &*vert;
+        activeEdge.vNorth = vert->right;
+        SplitVerts(vert, *vert->activePair);
       } else {
         auto loc = std::find_if(activePairs_.begin(), activePairs_.end(),
                                 [vert, this](const EdgePair &pair) {
-                                  return VertWestOfEdge(vert, pair.east) >= 0;
+                                  return VertWestOfEdge(*vert, pair.east) >= 0;
                                 });
-        int isStart = CCW(vert.pos, Right(vert).pos, Left(vert).pos);
+        int isStart = CCW(vert->pos, vert->right->pos, vert->left->pos);
         if (loc != activePairs_.end())
-          isStart += VertWestOfEdge(vert, loc->west);
+          isStart += VertWestOfEdge(*vert, loc->west);
         if (activePairs_.empty() || isStart >= 0) {
           vertType = START;
 
-          vert.activePair = activePairs_.insert(
-              loc, {{idx, vert.left}, {idx, vert.right}, -1});
-          SplitVerts(idx, *vert.activePair);
+          vert->activePair = activePairs_.insert(
+              loc,
+              {{&*vert, vert->left}, {&*vert, vert->right}, monotones_.end()});
+          SplitVerts(vert, *vert->activePair);
         } else {
           vertType = HOLE;
 
           if (loc == activePairs_.end()) --loc;
           // hole-starting vert links earlier activePair
-          vert.activePair = activePairs_.insert(
-              loc, {loc->west, {idx, vert.right}, loc->vMerge});
-          Vert(loc->west.vSouth).activePair = vert.activePair;
-          loc->west = {idx, vert.left};
-          loc->vMerge = -1;
-          int newIdx = SplitVerts(idx, *vert.activePair);
-          if (newIdx >= 0) Vert(newIdx).activePair = loc;
+          vert->activePair = activePairs_.insert(
+              loc, {loc->west, {&*vert, vert->right}, loc->vMerge});
+          loc->west.vSouth->activePair = vert->activePair;
+          loc->west = {&*vert, vert->left};
+          loc->vMerge = monotones_.end();
+          VertItr newVert = SplitVerts(vert, *vert->activePair);
+          if (newVert != monotones_.end()) newVert->activePair = loc;
         }
         // TODO: record certainty
       }
