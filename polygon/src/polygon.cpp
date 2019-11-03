@@ -202,9 +202,28 @@ class Monotones {
     return vLeft_idx;
   }
 
+  auto LeftPair(int idx) {
+    auto pair = Left(Vert(idx)).activePair;
+    if (pair->second.vNext == idx) return pair;
+    return std::find_if(
+        activePairs_.begin(), activePairs_.end(),
+        [idx](const EdgePair &pair) { return pair.second.vNext == idx; });
+  }
+
   auto RightPair(int idx) {
     auto pair = Right(Vert(idx)).activePair;
-    return pair->first.vNext == idx ? pair : std::next(pair);
+    if (pair->first.vNext == idx) return pair;
+    return std::find_if(
+        activePairs_.begin(), activePairs_.end(),
+        [idx](const EdgePair &pair) { return pair.first.vNext == idx; });
+  }
+
+  int VertWestOfEdge(const VertAdj &vert, const ActiveEdge &edge) {
+    glm::vec2 last = Vert(edge.vLast).pos;
+    glm::vec2 next = Vert(edge.vNext).pos;
+    int side = CCW(last, next, vert.pos);
+    if (side == 0) side = CCW(last, next, Right(vert).pos);
+    return side;
   }
 
   VertType ProcessVert(int idx) {
@@ -216,7 +235,7 @@ class Monotones {
     VertType vertType;
     if (Right(vert).processed) {
       if (Left(vert).processed) {
-        auto leftPair = Left(vert).activePair;
+        auto leftPair = LeftPair(idx);
         auto rightPair = RightPair(idx);
         if (leftPair == rightPair) {  // facing in
           vertType = END;
@@ -247,40 +266,28 @@ class Monotones {
       if (Left(vert).processed) {
         vertType = RIGHTWARDS;
         // update edge
-        vert.activePair = Left(vert).activePair;
+        vert.activePair = LeftPair(idx);
         ActiveEdge &activeEdge = vert.activePair->second;
         activeEdge.vLast = idx;
         activeEdge.vNext = vert.right;
         SplitVerts(idx, *vert.activePair);
       } else {
-        if (CCW(vert.pos, Right(vert).pos, Left(vert).pos) >= 0 ||
-            activePairs_.empty()) {
+        auto loc = std::find_if(activePairs_.begin(), activePairs_.end(),
+                                [vert, this](const EdgePair &pair) {
+                                  return VertWestOfEdge(vert, pair.second) >= 0;
+                                });
+        int isStart = CCW(vert.pos, Right(vert).pos, Left(vert).pos);
+        if (loc != activePairs_.end())
+          isStart += VertWestOfEdge(vert, loc->first);
+        if (activePairs_.empty() || isStart >= 0) {
           vertType = START;
-          auto loc = std::find_if(activePairs_.begin(), activePairs_.end(),
-                                  [vert, this](const EdgePair &pair) {
-                                    ActiveEdge edge = pair.first;
-                                    glm::vec2 last = Vert(edge.vLast).pos;
-                                    glm::vec2 next = Vert(edge.vNext).pos;
-                                    int side = CCW(next, last, vert.pos);
-                                    if (side == 0)
-                                      side = CCW(next, last, Left(vert).pos);
-                                    return side <= 0;
-                                  });
+
           vert.activePair = activePairs_.insert(
               loc, {{idx, vert.left}, {idx, vert.right}, -1});
           SplitVerts(idx, *vert.activePair);
         } else {
           vertType = HOLE;
-          auto loc = std::find_if(activePairs_.begin(), activePairs_.end(),
-                                  [vert, this](const EdgePair &pair) {
-                                    ActiveEdge edge = pair.second;
-                                    glm::vec2 last = Vert(edge.vLast).pos;
-                                    glm::vec2 next = Vert(edge.vNext).pos;
-                                    int side = CCW(next, last, vert.pos);
-                                    if (side == 0)
-                                      side = CCW(next, last, Right(vert).pos);
-                                    return side <= 0;
-                                  });
+
           if (loc == activePairs_.end()) --loc;
           // hole-starting vert links earlier activePair
           vert.activePair = activePairs_.insert(
