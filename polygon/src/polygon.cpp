@@ -230,11 +230,11 @@ class Monotones {
         [vert](const EdgePair &pair) { return pair.west.vNorth == vert; });
   }
 
-  int VertWestOfEdge(const VertAdj &vert, const ActiveEdge &edge) {
+  int VertWestOfEdge(const VertAdj *vert, const ActiveEdge &edge) {
     glm::vec2 last = edge.vSouth->pos;
     glm::vec2 next = edge.vNorth->pos;
-    int side = CCW(last, next, vert.pos);
-    if (side == 0) side = CCW(last, next, vert.right->pos);
+    int side = CCW(last, next, vert->pos);
+    if (side == 0) side = CCW(last, next, vert->right->pos);
     return side;
   }
 
@@ -284,11 +284,11 @@ class Monotones {
       } else {
         auto loc = std::find_if(activePairs_.begin(), activePairs_.end(),
                                 [vert, this](const EdgePair &pair) {
-                                  return VertWestOfEdge(*vert, pair.east) >= 0;
+                                  return VertWestOfEdge(&*vert, pair.east) >= 0;
                                 });
         int isStart = CCW(vert->pos, vert->right->pos, vert->left->pos);
         if (loc != activePairs_.end())
-          isStart += VertWestOfEdge(*vert, loc->west);
+          isStart += VertWestOfEdge(&*vert, loc->west);
         if (activePairs_.empty() || isStart >= 0) {
           vertType = START;
 
@@ -346,12 +346,12 @@ bool SharedEdge(glm::ivec2 edges0, glm::ivec2 edges1) {
 
 class Triangulator {
  public:
-  Triangulator(const std::list<VertAdj> &monotones, const VertAdj &vert)
+  Triangulator(const std::list<VertAdj> &monotones, const VertAdj *vert)
       : monotones_(monotones) {
-    reflex_chain_.push(&vert);
-    other_side_ = &vert;
+    reflex_chain_.push(vert);
+    other_side_ = vert;
   }
-  int NumTriangles() { return triangles_output; }
+  int NumTriangles() { return triangles_output_; }
 
   bool ProcessVert(const VertAdj *vi, std::vector<glm::ivec3> &triangles) {
     int attached = Attached(vi);
@@ -374,7 +374,7 @@ class Triangulator {
           AddTriangle(triangles, vi->mesh_idx, vj->mesh_idx, v_top->mesh_idx);
           v_top = vj;
           reflex_chain_.pop();
-          if (reflex_chain_.size() == 0) break;
+          if (reflex_chain_.empty()) break;
           vj = reflex_chain_.top();
         }
         reflex_chain_.push(v_top);
@@ -401,7 +401,7 @@ class Triangulator {
   const std::list<VertAdj> &monotones_;
   std::stack<const VertAdj *> reflex_chain_;
   const VertAdj *other_side_;
-  int triangles_output = 0;
+  int triangles_output_ = 0;
   bool onRight_;
 
   int Attached(const VertAdj *vert) {
@@ -427,7 +427,7 @@ class Triangulator {
       triangles.emplace_back(v0, v1, v2);
     else
       triangles.emplace_back(v0, v2, v1);
-    ++triangles_output;
+    ++triangles_output_;
   }
 
   bool SharesEdge(const VertAdj *v0, const VertAdj *v1, const VertAdj *v2) {
@@ -454,7 +454,7 @@ void TriangulateMonotones(const std::list<VertAdj> &monotones,
         break;
       }
     }
-    if (!found) triangulators.emplace_back(monotones, vert);
+    if (!found) triangulators.emplace_back(monotones, &vert);
   }
   // quick validation
   int triangles_left = monotones.size();
@@ -493,15 +493,15 @@ namespace manifold {
 int CCW(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2) {
   glm::vec2 v1 = p1 - p0;
   glm::vec2 v2 = p2 - p0;
-  float result = v1.x * v2.y - v1.y * v2.x;
+  float area = v1.x * v2.y - v1.y * v2.x;
   p0 = glm::abs(p0);
   p1 = glm::abs(p1);
   p2 = glm::abs(p2);
   float norm = p0.x * p0.y + p1.x * p1.y + p2.x * p2.y;
-  if (std::abs(result) <= norm * kTolerance)
+  if (std::abs(area) <= norm * kTolerance)
     return 0;
   else
-    return result > 0 ? 1 : -1;
+    return area > 0 ? 1 : -1;
 }
 
 Polygons Assemble(const std::vector<EdgeVerts> &halfedges) {
