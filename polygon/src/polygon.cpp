@@ -156,16 +156,31 @@ class Monotones {
   void Check() {
     std::vector<EdgeVerts> edges;
     for (auto &vert : monotones_) {
+      vert.processed = false;
       edges.push_back({vert.mesh_idx, vert.right->mesh_idx, Edge::kNoIdx});
-      // std::cout << "edge: " << edges.back().first << ", " <<
-      // edges.back().second
-      //           << std::endl;
       ALWAYS_ASSERT(vert.right->right != &vert, logicErr, "two-edge monotone!");
       ALWAYS_ASSERT(vert.left->right == &vert, logicErr,
                     "monotone vert neighbors don't agree!");
     }
-    // Polygons polys = Assemble(edges);
-    // if (debug.verbose) Dump(polys);
+    if (debug.verbose) {
+      VertAdj *start = &monotones_.front();
+      while (1) {
+        start->processed = true;
+        std::cout << "monotone start: " << start->mesh_idx;
+        VertAdj *v = start->right;
+        while (v != start) {
+          std::cout << ", " << v->mesh_idx;
+          v->processed = true;
+          v = v->right;
+        }
+        std::cout << std::endl;
+        VertItr itr =
+            std::find_if(monotones_.begin(), monotones_.end(),
+                         [](const VertAdj &v) { return !v.processed; });
+        if (itr == monotones_.end()) break;
+        start = &*itr;
+      }
+    }
   }
 
  private:
@@ -241,11 +256,11 @@ class Monotones {
           if (newVert != monotones_.end()) vert = newVert;
           SplitVerts(vert, *leftPair);
           leftPair->east = rightPair->east;
-          leftPair->east.vSouth->left->activePair = leftPair;
+          leftPair->east.vSouth->activePair = leftPair;
           leftPair->vMerge = vert;
         }
         activePairs_.erase(rightPair);
-        if (debug.verbose) ListEdges();
+        if (debug.verbose) ListPairs();
         // early return because no active edge for further processing
         return vertType;
       } else {
@@ -297,23 +312,25 @@ class Monotones {
         // TODO: record certainty
       }
     }
-    if (debug.verbose) ListEdges();
+    if (debug.verbose) ListPairs();
     // if edge order was uncertain, re-sort
     return vertType;
   }
 
-  void ListEdges() {
+  void ListPairs() {
     std::cout << "active edges:" << std::endl;
     for (EdgePair pair : activePairs_) {
       ListPair(pair);
     }
   }
+
   void ListPair(EdgePair pair) {
     ListEdge(pair.west);
     ListEdge(pair.east);
     if (pair.vMerge != monotones_.end())
       std::cout << "pair vMerge: " << pair.vMerge->mesh_idx << std::endl;
   }
+
   void ListEdge(ActiveEdge edge) {
     std::cout << "edge: S = " << edge.vSouth->mesh_idx
               << ", N = " << edge.vNorth->mesh_idx << std::endl;
@@ -355,9 +372,9 @@ class Triangulator {
                (CCW(vi->pos, vj->pos, v_top->pos) == 0 &&
                 !SharesEdge(vi, vj, v_top))) {
           AddTriangle(triangles, vi->mesh_idx, vj->mesh_idx, v_top->mesh_idx);
+          v_top = vj;
           reflex_chain_.pop();
           if (reflex_chain_.size() == 0) break;
-          v_top = vj;
           vj = reflex_chain_.top();
         }
         reflex_chain_.push(v_top);
