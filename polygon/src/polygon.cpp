@@ -56,7 +56,7 @@ int Prev(int i, int n) { return --i < 0 ? n - 1 : i; }
 
 class Monotones {
  public:
-  std::list<VertAdj> &GetMonotones() { return monotones_; }
+  const std::list<VertAdj> &GetMonotones() { return monotones_; }
 
   enum VertType { START, HOLE, LEFTWARDS, RIGHTWARDS, MERGE, END };
 
@@ -346,26 +346,26 @@ bool SharedEdge(glm::ivec2 edges0, glm::ivec2 edges1) {
 
 class Triangulator {
  public:
-  Triangulator(const std::list<VertAdj> &monotones, VertAdj &vert)
+  Triangulator(const std::list<VertAdj> &monotones, const VertAdj &vert)
       : monotones_(monotones) {
     reflex_chain_.push(&vert);
     other_side_ = &vert;
   }
   int NumTriangles() { return triangles_output; }
 
-  bool ProcessVert(VertAdj *vi, std::vector<glm::ivec3> &triangles) {
+  bool ProcessVert(const VertAdj *vi, std::vector<glm::ivec3> &triangles) {
     int attached = Attached(vi);
     if (attached == 0)
       return 0;
     else {
-      VertAdj *v_top = reflex_chain_.top();
+      const VertAdj *v_top = reflex_chain_.top();
       if (reflex_chain_.size() < 2) {
         reflex_chain_.push(vi);
         onRight_ = vi->left == v_top;
         return 1;
       }
       reflex_chain_.pop();
-      VertAdj *vj = reflex_chain_.top();
+      const VertAdj *vj = reflex_chain_.top();
       if (attached == 1) {
         if (debug.verbose) std::cout << "same chain" << std::endl;
         while (CCW(vi->pos, vj->pos, v_top->pos) == (onRight_ ? 1 : -1) ||
@@ -382,7 +382,7 @@ class Triangulator {
       } else {
         if (debug.verbose) std::cout << "different chain" << std::endl;
         onRight_ = !onRight_;
-        VertAdj *v_last = v_top;
+        const VertAdj *v_last = v_top;
         while (!reflex_chain_.empty()) {
           vj = reflex_chain_.top();
           AddTriangle(triangles, vi->mesh_idx, v_last->mesh_idx, vj->mesh_idx);
@@ -399,12 +399,12 @@ class Triangulator {
 
  private:
   const std::list<VertAdj> &monotones_;
-  std::stack<VertAdj *> reflex_chain_;
-  VertAdj *other_side_;
+  std::stack<const VertAdj *> reflex_chain_;
+  const VertAdj *other_side_;
   int triangles_output = 0;
   bool onRight_;
 
-  int Attached(VertAdj *vert) {
+  int Attached(const VertAdj *vert) {
     if (onRight_) {
       if (other_side_->left == vert)
         return -1;
@@ -438,7 +438,7 @@ class Triangulator {
   }
 };
 
-void TriangulateMonotones(std::list<VertAdj> &monotones,
+void TriangulateMonotones(const std::list<VertAdj> &monotones,
                           std::vector<glm::ivec3> &triangles) {
   std::vector<Triangulator> triangulators;
   for (auto &vert : monotones) {
