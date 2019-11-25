@@ -28,6 +28,7 @@ using namespace manifold;
 DebugControls debug;
 
 constexpr float kTolerance = 1e-5;
+constexpr float kTolerance2 = kTolerance * kTolerance;
 
 struct VertAdj;
 typedef std::list<VertAdj>::iterator VertItr;
@@ -192,7 +193,7 @@ class Monotones {
     right->left = left;
   }
 
-  VertItr SplitVerts(VertItr north, EdgePair &pair) {
+  VertItr SplitVerts(VertItr north, EdgePair &pair, bool NEisNofNW = false) {
     VertItr south = pair.vMerge;
     if (south == monotones_.end()) return monotones_.end();
 
@@ -201,7 +202,8 @@ class Monotones {
       std::cout << "split from " << north->mesh_idx << " to " << south->mesh_idx
                 << std::endl;
 
-    VertItr northEast = monotones_.insert(north, *north);
+    VertItr insertAt = NEisNofNW ? std::next(north) : north;
+    VertItr northEast = monotones_.insert(insertAt, *north);
     Link(north->left, &*northEast);
 
     VertItr southEast = monotones_.insert(south, *south);
@@ -239,6 +241,8 @@ class Monotones {
   }
 
   VertType ProcessVert(VertItr vert) {
+    // Skip newly duplicated verts
+    if (vert->processed) return END;
     vert->processed = true;
     if (debug.verbose)
       std::cout << "mesh_idx = " << vert->mesh_idx << std::endl;
@@ -252,9 +256,9 @@ class Monotones {
           SplitVerts(vert, *rightPair);
         } else {  // facing out
           vertType = MERGE;
-          VertItr newVert = SplitVerts(vert, *rightPair);
+          VertItr newVert = SplitVerts(vert, *rightPair, true);
           if (newVert != monotones_.end()) vert = newVert;
-          SplitVerts(vert, *leftPair);
+          SplitVerts(vert, *leftPair, false);
           leftPair->east = rightPair->east;
           leftPair->east.vSouth->activePair = leftPair;
           leftPair->vMerge = vert;
@@ -270,7 +274,7 @@ class Monotones {
         ActiveEdge &activeEdge = vert->activePair->west;
         activeEdge.vSouth = &*vert;
         activeEdge.vNorth = vert->left;
-        SplitVerts(vert, *vert->activePair);
+        SplitVerts(vert, *vert->activePair, true);
       }
     } else {
       if (vert->left->processed) {
@@ -280,22 +284,24 @@ class Monotones {
         ActiveEdge &activeEdge = vert->activePair->east;
         activeEdge.vSouth = &*vert;
         activeEdge.vNorth = vert->right;
-        SplitVerts(vert, *vert->activePair);
+        SplitVerts(vert, *vert->activePair, false);
       } else {
         auto loc = std::find_if(activePairs_.begin(), activePairs_.end(),
                                 [vert, this](const EdgePair &pair) {
-                                  return VertWestOfEdge(&*vert, pair.east) >= 0;
+                                  return VertWestOfEdge(&*vert, pair.east) > 0;
                                 });
         int isStart = CCW(vert->pos, vert->right->pos, vert->left->pos);
+        if (debug.verbose) std::cout << "isStart ? " << isStart << std::endl;
         if (loc != activePairs_.end())
           isStart += VertWestOfEdge(&*vert, loc->west);
+        if (debug.verbose)
+          std::cout << "isStart new ? " << isStart << std::endl;
         if (activePairs_.empty() || isStart >= 0) {
           vertType = START;
 
           vert->activePair = activePairs_.insert(
               loc,
               {{&*vert, vert->left}, {&*vert, vert->right}, monotones_.end()});
-          SplitVerts(vert, *vert->activePair);
         } else {
           vertType = HOLE;
 
@@ -368,9 +374,9 @@ class Triangulator {
       const VertAdj *vj = reflex_chain_.top();
       if (attached == 1) {
         if (debug.verbose) std::cout << "same chain" << std::endl;
-        while (CCW(vi->pos, vj->pos, v_top->pos) == (onRight_ ? 1 : -1) ||
-               (CCW(vi->pos, vj->pos, v_top->pos) == 0 &&
-                !SharesEdge(vi, vj, v_top))) {
+        while (
+            CCW(vi->pos, vj->pos, v_top->pos) == (onRight_ ? 1 : -1) ||
+            (CCW(vi->pos, vj->pos, v_top->pos) == 0 && !SharesEdge(vi, vj))) {
           AddTriangle(triangles, vi->mesh_idx, vj->mesh_idx, v_top->mesh_idx);
           v_top = vj;
           reflex_chain_.pop();
@@ -430,11 +436,17 @@ class Triangulator {
     ++triangles_output_;
   }
 
-  bool SharesEdge(const VertAdj *v0, const VertAdj *v1, const VertAdj *v2) {
+  bool ColinearIsOrdered(const VertAdj *v0, const VertAdj *v1,
+                         const VertAdj *v2) {
+    float min = std::min(v0->pos.x, v2->pos.x) + kTolerance;
+    float max = std::max(v0->pos.x, v2->pos.x) - kTolerance;
+    return v1->pos.x > min && v1->pos.x < max;
+  }
+
+  bool SharesEdge(const VertAdj *v0, const VertAdj *v1) {
     glm::ivec2 e0(v0->edgeRight, v0->left->edgeRight);
     glm::ivec2 e1(v1->edgeRight, v1->left->edgeRight);
-    glm::ivec2 e2(v2->edgeRight, v2->left->edgeRight);
-    return SharedEdge(e0, e1) || SharedEdge(e1, e2) || SharedEdge(e2, e0);
+    return SharedEdge(e0, e1);
   }
 };
 
@@ -494,11 +506,8 @@ int CCW(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2) {
   glm::vec2 v1 = p1 - p0;
   glm::vec2 v2 = p2 - p0;
   float area = v1.x * v2.y - v1.y * v2.x;
-  p0 = glm::abs(p0);
-  p1 = glm::abs(p1);
-  p2 = glm::abs(p2);
-  float norm = p0.x * p0.y + p1.x * p1.y + p2.x * p2.y;
-  if (std::abs(area) <= norm * kTolerance)
+  float base2 = glm::max(glm::dot(v1, v1), glm::dot(v2, v2));
+  if (area * area <= base2 * kTolerance2)
     return 0;
   else
     return area > 0 ? 1 : -1;

@@ -45,7 +45,7 @@ TEST(Samples, Knot42) {
 }
 
 TEST(Samples, Bracelet) {
-  Manifold::SetGeometricWarnings(false);
+  Manifold::SetGeometricWarnings(true);
   Manifold bracelet = StretchyBracelet();
   ExportMesh("bracelet.stl", bracelet.Extract());
 }

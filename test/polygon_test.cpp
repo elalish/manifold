@@ -467,7 +467,7 @@ TEST(Polygon, Split) {
 }
 
 TEST(Polygon, DISABLED_Duplicates) {
-  // SetPolygonVerbose(true);
+  SetPolygonVerbose(true);
   Polygons polys;
   polys.push_back({
       {glm::vec2(-15, -8.10255623), 1648, 151},        //
@@ -477,7 +477,52 @@ TEST(Polygon, DISABLED_Duplicates) {
       {glm::vec2(-15, -8.10639), 1845, -1},            //
       {glm::vec2(-15, -8.10255623), 1922, 152},        //
   });
-  TestPoly(polys, 7);
+  TestPoly(polys, 4);
+  // SetPolygonVerbose(false);
+}
+
+TEST(Polygon, Simple1) {
+  // SetPolygonVerbose(true);
+  Polygons polys;
+  polys.push_back({
+      {glm::vec2(4.04059982, -4.01843977), 2872, 8988},   //
+      {glm::vec2(3.95867562, -4.25263977), 24604, -1},    //
+      {glm::vec2(4.23459578, -4.30138493), 28274, -1},    //
+      {glm::vec2(4.235569, -4.30127287), 28273, -1},      //
+      {glm::vec2(4.23782539, -4.30141878), 24602, 8986},  //
+  });
+  TestPoly(polys, 3);
+  // SetPolygonVerbose(false);
+}
+
+TEST(Polygon, Simple2) {
+  // SetPolygonVerbose(true);
+  Polygons polys;
+  polys.push_back({
+      {glm::vec2(-1, -1), 1, 8},       //
+      {glm::vec2(-0.5, -0.5), 9, -1},  //
+      {glm::vec2(-1, 0), 11, -1},      //
+      {glm::vec2(0, 1), 12, -1},       //
+      {glm::vec2(0.5, 0.5), 10, 8},    //
+      {glm::vec2(1, 1), 7, 12},        //
+      {glm::vec2(-1, 1), 3, 6},        //
+  });
+  TestPoly(polys, 5);
+  // SetPolygonVerbose(false);
+}
+
+TEST(Polygon, Simple3) {
+  // SetPolygonVerbose(true);
+  Polygons polys;
+  polys.push_back({
+      {glm::vec2(19.7193489, 6.15445995), 19798, 28537},  //
+      {glm::vec2(20.2308197, 5.64299059), 31187, -1},     //
+      {glm::vec2(20.3464642, 5.65459776), 27273, -1},     //
+      {glm::vec2(20.3733711, 5.65404081), 27274, -1},     //
+      {glm::vec2(20.373394, 5.65404034), 31188, 28538},   //
+      {glm::vec2(20.8738098, 6.15445995), 19801, 28541},  //
+  });
+  TestPoly(polys, 4);
   // SetPolygonVerbose(false);
 }
 
