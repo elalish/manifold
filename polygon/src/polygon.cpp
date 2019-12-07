@@ -40,6 +40,12 @@ struct ActiveEdge {
 struct EdgePair {
   ActiveEdge west, east;
   VertItr vMerge;
+  bool westCertain, eastCertain;
+
+  bool &getCertainty(bool westSide) {
+    return westSide ? westCertain : eastCertain;
+  }
+  ActiveEdge &getEdge(bool westSide) { return westSide ? west : east; }
 };
 
 struct VertAdj {
@@ -236,8 +242,44 @@ class Monotones {
     glm::vec2 last = edge.vSouth->pos;
     glm::vec2 next = edge.vNorth->pos;
     int side = CCW(last, next, vert->pos);
-    if (side == 0) side = CCW(last, next, vert->right->pos);
+    if (side == 0) side = CCW(vert->pos, next, vert->right->pos);
     return side;
+  }
+
+  void Reorder(const VertAdj *vert, const bool west) {
+    auto activePair = vert->activePair;
+    if (!activePair->getCertainty(west)) {
+      int sign = west ? -1 : 1;
+      auto end = west ? activePairs_.begin() : std::prev(activePairs_.end());
+      while (activePair != end) {
+        activePair = west ? std::prev(activePair) : std::next(activePair);
+        int eastOf = sign * VertWestOfEdge(&*vert, activePair->getEdge(!west));
+        if (eastOf >= 0) {   // in the right place
+          if (eastOf > 0) {  // certain
+            vert->activePair->getCertainty(west) = true;
+          }
+          auto loc = west ? std::next(activePair) : activePair;
+          activePairs_.splice(loc, activePairs_, vert->activePair);
+          break;
+        }
+        eastOf = sign * VertWestOfEdge(&*vert, activePair->getEdge(west));
+        if (eastOf >= 0) {  // in the right place
+          auto loc = west ? activePair : std::next(activePair);
+          activePairs_.splice(loc, activePairs_, vert->activePair);
+          vert->activePair->getCertainty(!west) = false;
+          if (eastOf > 0) {  // certainly a hole
+            std::swap(activePair->west, vert->activePair->west);
+            std::swap(activePair->west, vert->activePair->east);
+            activePair->west.vSouth->activePair = activePair;
+            vert->activePair->west.vSouth->activePair = vert->activePair;
+            vert->activePair->east.vSouth->activePair = vert->activePair;
+            vert->activePair->eastCertain = true;
+            vert->activePair->westCertain = true;
+          }
+          break;
+        }
+      }
+    }
   }
 
   VertType ProcessVert(VertItr vert) {
@@ -271,6 +313,8 @@ class Monotones {
         vertType = LEFTWARDS;
         // update edge
         vert->activePair = RightPair(&*vert);
+        Reorder(&*vert, true);
+        Reorder(&*vert, false);
         ActiveEdge &activeEdge = vert->activePair->west;
         activeEdge.vSouth = &*vert;
         activeEdge.vNorth = vert->left;
@@ -281,6 +325,8 @@ class Monotones {
         vertType = RIGHTWARDS;
         // update edge
         vert->activePair = LeftPair(&*vert);
+        Reorder(&*vert, true);
+        Reorder(&*vert, false);
         ActiveEdge &activeEdge = vert->activePair->east;
         activeEdge.vSouth = &*vert;
         activeEdge.vNorth = vert->right;
@@ -292,34 +338,35 @@ class Monotones {
                                 });
         int isStart = CCW(vert->pos, vert->right->pos, vert->left->pos);
         if (debug.verbose) std::cout << "isStart ? " << isStart << std::endl;
-        if (loc != activePairs_.end())
-          isStart += VertWestOfEdge(&*vert, loc->west);
+        if (isStart == 0 && loc != activePairs_.end())
+          isStart = VertWestOfEdge(&*vert, loc->west);
         if (debug.verbose)
           std::cout << "isStart new ? " << isStart << std::endl;
         if (activePairs_.empty() || isStart >= 0) {
           vertType = START;
-
-          vert->activePair = activePairs_.insert(
-              loc,
-              {{&*vert, vert->left}, {&*vert, vert->right}, monotones_.end()});
+          bool westCertain = loc == activePairs_.begin() ||
+                             VertWestOfEdge(&*vert, std::prev(loc)->east) < 0;
+          bool eastCertain = isStart > 0;
+          vert->activePair = activePairs_.insert(loc, {{&*vert, vert->left},
+                                                       {&*vert, vert->right},
+                                                       monotones_.end(),
+                                                       westCertain,
+                                                       eastCertain});
         } else {
           vertType = HOLE;
-
           if (loc == activePairs_.end()) --loc;
           // hole-starting vert links earlier activePair
           vert->activePair = activePairs_.insert(
-              loc, {loc->west, {&*vert, vert->right}, loc->vMerge});
+              loc, {loc->west, {&*vert, vert->right}, loc->vMerge, true, true});
           loc->west.vSouth->activePair = vert->activePair;
           loc->west = {&*vert, vert->left};
           loc->vMerge = monotones_.end();
           VertItr newVert = SplitVerts(vert, *vert->activePair);
           if (newVert != monotones_.end()) newVert->activePair = loc;
         }
-        // TODO: record certainty
       }
     }
     if (debug.verbose) ListPairs();
-    // if edge order was uncertain, re-sort
     return vertType;
   }
 
