@@ -58,7 +58,8 @@ void TestAssemble(const Polygons &polys) {
   Identical(polys, polys_out);
 }
 
-void TestPoly(const Polygons &polys, int expectedNumTri) {
+void TestPoly(const Polygons &polys, int expectedNumTri,
+              bool expectGeometry = true) {
   SetPolygonWarnings(true);
   TestAssemble(polys);
 
@@ -76,7 +77,7 @@ void TestPoly(const Polygons &polys, int expectedNumTri) {
     }
   CheckTopology(triangles, polys);
   ASSERT_EQ(triangles.size(), expectedNumTri);
-  ASSERT_TRUE(CheckGeometry(triangles, polys));
+  if (expectGeometry) ASSERT_TRUE(CheckGeometry(triangles, polys));
 }
 }  // namespace
 
@@ -217,7 +218,7 @@ TEST(Polygon, ColinearY) {
   TestPoly(polys, 16);
 }
 
-TEST(Polygon, DISABLED_Inverted) {
+TEST(Polygon, Inverted) {
   Polygons polys;
   polys.push_back({
       {glm::vec2(0, 2.04124), 0, Edge::kNoIdx},           //
@@ -232,7 +233,7 @@ TEST(Polygon, DISABLED_Inverted) {
       {glm::vec2(0, 1.42887), 7, Edge::kNoIdx},           //
       {glm::vec2(1.06066, -0.408248), 8, Edge::kNoIdx},   //
   });
-  TestPoly(polys, 5);
+  TestPoly(polys, 5, false);
 }
 
 TEST(Polygon, DISABLED_Ugly) {
@@ -466,8 +467,8 @@ TEST(Polygon, Split) {
   // SetPolygonVerbose(false);
 }
 
-TEST(Polygon, DISABLED_Duplicates) {
-  SetPolygonVerbose(true);
+TEST(Polygon, Duplicates) {
+  // SetPolygonVerbose(true);
   Polygons polys;
   polys.push_back({
       {glm::vec2(-15, -8.10255623), 1648, 151},        //
@@ -523,6 +524,24 @@ TEST(Polygon, Simple3) {
       {glm::vec2(20.8738098, 6.15445995), 19801, 28541},  //
   });
   TestPoly(polys, 4);
+  // SetPolygonVerbose(false);
+}
+
+TEST(Polygon, Simple4) {
+  // SetPolygonVerbose(true);
+  Polygons polys;
+  polys.push_back({
+      {glm::vec2(15, -12.7135563), 287, 346},          //
+      {glm::vec2(15, -10.6843739), 288, 350},          //
+      {glm::vec2(15, -10.6843739), 492, -1},           //
+      {glm::vec2(15, -11.0041418), 413, -1},           //
+      {glm::vec2(15, -11.4550743), 409, -1},           //
+      {glm::vec2(15, -11.4550743), 411, -1},           //
+      {glm::vec2(14.9958763, -11.4545326), 408, -1},   //
+      {glm::vec2(14.4307623, -11.3802214), 412, -1},   //
+      {glm::vec2(13.9298496, -11.2768612), 480, 349},  //
+  });
+  TestPoly(polys, 7);
   // SetPolygonVerbose(false);
 }
 
