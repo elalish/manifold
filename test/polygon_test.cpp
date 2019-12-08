@@ -63,21 +63,10 @@ void TestPoly(const Polygons &polys, int expectedNumTri,
   SetPolygonWarnings(true);
   TestAssemble(polys);
 
-  std::vector<glm::ivec3> triangles = BackupTriangulate(polys);
-  if (0)
-    for (auto tri : triangles) {
-      std::cout << tri.x << ", " << tri.y << ", " << tri.z << std::endl;
-    }
-  CheckTopology(triangles, polys);
-
-  triangles = PrimaryTriangulate(polys);
-  if (kVerbose)
-    for (auto tri : triangles) {
-      std::cout << tri.x << ", " << tri.y << ", " << tri.z << std::endl;
-    }
-  CheckTopology(triangles, polys);
+  SetPolygonWarnings(expectGeometry);
+  std::vector<glm::ivec3> triangles = Triangulate(polys);
   ASSERT_EQ(triangles.size(), expectedNumTri);
-  if (expectGeometry) ASSERT_TRUE(CheckGeometry(triangles, polys));
+  SetPolygonWarnings(false);
 }
 }  // namespace
 
@@ -303,12 +292,7 @@ TEST(Polygon, BadEdges) {
       {glm::vec2(-1, -1), 5, 11},  //
       {glm::vec2(-1, -1), 6, 10},  //
   });
-  std::vector<glm::ivec3> triangles = BackupTriangulate(polys);
-  if (kVerbose)
-    for (auto tri : triangles) {
-      std::cout << tri.x << ", " << tri.y << ", " << tri.z << std::endl;
-    }
-  CheckTopology(triangles, polys);
+  TestPoly(polys, 5);
 }
 
 TEST(Polygon, BadEdges2) {
@@ -323,12 +307,7 @@ TEST(Polygon, BadEdges2) {
       {glm::vec2(-0.202167, -0.198325), 6, 8},   //
       {glm::vec2(-0.223625, -0.144868), 7, -1},  //
   });
-  std::vector<glm::ivec3> triangles = BackupTriangulate(polys);
-  if (kVerbose)
-    for (auto tri : triangles) {
-      std::cout << tri.x << ", " << tri.y << ", " << tri.z << std::endl;
-    }
-  EXPECT_THROW(CheckTopology(triangles, polys), runtimeErr);
+  EXPECT_THROW(Triangulate(polys), runtimeErr);
 }
 
 TEST(Polygon, Concave) {
