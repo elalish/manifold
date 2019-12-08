@@ -68,10 +68,8 @@ class Monotones {
   enum VertType { START, HOLE, LEFTWARDS, RIGHTWARDS, MERGE, END };
 
   Monotones(const Polygons &polys) {
-    // std::vector<std::tuple<float, int, int>> sweepForward;
     VertAdj *start, *last, *current;
     for (const SimplePolygon &poly : polys) {
-      // int start = Num_verts();
       for (int i = 0; i < poly.size(); ++i) {
         monotones_.push_back({poly[i].pos,       //
                               poly[i].idx,       //
@@ -85,9 +83,6 @@ class Monotones {
         else
           Link(last, current);
         last = current;
-
-        // sweepForward.push_back(
-        //     std::make_tuple(monotones_.back().pos.y, 0, start + i));
       }
       Link(current, start);
     }
@@ -139,14 +134,11 @@ class Monotones {
                   "Monotones did not finish with an END.");
     Check();
     // Sweep backward
-    // std::vector<std::tuple<int, int>> sweepBack;
     for (auto &vert : monotones_) {
       vert.pos *= -1;
       vert.processed = false;
-      // sweepBack.push_back(std::make_tuple(-v.sweepOrder, i));
     }
     monotones_.reverse();
-    // std::sort(sweepBack.begin(), sweepBack.end());
     ALWAYS_ASSERT(activePairs_.empty(), logicErr,
                   "There are still active edges.");
     for (VertItr vItr = monotones_.begin(); vItr != monotones_.end(); ++vItr) {
@@ -269,7 +261,6 @@ class Monotones {
           vert->activePair->getCertainty(!west) = false;
           if (eastOf > 0) {  // certainly a hole
             std::swap(activePair->west, vert->activePair->west);
-            std::swap(activePair->west, vert->activePair->east);
             activePair->west.vSouth->activePair = activePair;
             vert->activePair->west.vSouth->activePair = vert->activePair;
             vert->activePair->east.vSouth->activePair = vert->activePair;
@@ -291,10 +282,10 @@ class Monotones {
     VertType vertType;
     if (vert->right->processed) {
       if (vert->left->processed) {
+        vertType = END;
         auto leftPair = LeftPair(&*vert);
         auto rightPair = RightPair(&*vert);
         if (leftPair == rightPair) {  // facing in
-          vertType = END;
           SplitVerts(vert, *rightPair);
         } else {  // facing out
           vertType = MERGE;
@@ -303,21 +294,21 @@ class Monotones {
           SplitVerts(vert, *leftPair, false);
           leftPair->east = rightPair->east;
           leftPair->east.vSouth->activePair = leftPair;
-          leftPair->vMerge = vert;
+          if (std::next(leftPair) == rightPair) {
+            leftPair->vMerge = vert;
+            vertType = MERGE;
+          }
         }
         activePairs_.erase(rightPair);
-        if (debug.verbose) ListPairs();
-        // early return because no active edge for further processing
-        return vertType;
       } else {
         vertType = LEFTWARDS;
         // update edge
         vert->activePair = RightPair(&*vert);
-        Reorder(&*vert, true);
-        Reorder(&*vert, false);
         ActiveEdge &activeEdge = vert->activePair->west;
         activeEdge.vSouth = &*vert;
         activeEdge.vNorth = vert->left;
+        Reorder(&*vert, true);
+        Reorder(&*vert, false);
         SplitVerts(vert, *vert->activePair, true);
       }
     } else {
@@ -325,24 +316,20 @@ class Monotones {
         vertType = RIGHTWARDS;
         // update edge
         vert->activePair = LeftPair(&*vert);
-        Reorder(&*vert, true);
-        Reorder(&*vert, false);
         ActiveEdge &activeEdge = vert->activePair->east;
         activeEdge.vSouth = &*vert;
         activeEdge.vNorth = vert->right;
+        Reorder(&*vert, true);
+        Reorder(&*vert, false);
         SplitVerts(vert, *vert->activePair, false);
       } else {
         auto loc = std::find_if(activePairs_.begin(), activePairs_.end(),
                                 [vert, this](const EdgePair &pair) {
                                   return VertWestOfEdge(&*vert, pair.east) > 0;
                                 });
-        int isStart = CCW(vert->pos, vert->right->pos, vert->left->pos);
-        if (debug.verbose) std::cout << "isStart ? " << isStart << std::endl;
-        if (isStart == 0 && loc != activePairs_.end())
-          isStart = VertWestOfEdge(&*vert, loc->west);
-        if (debug.verbose)
-          std::cout << "isStart new ? " << isStart << std::endl;
-        if (activePairs_.empty() || isStart >= 0) {
+        int isStart =
+            loc == activePairs_.end() ? 1 : VertWestOfEdge(&*vert, loc->west);
+        if (isStart >= 0) {
           vertType = START;
           bool westCertain = loc == activePairs_.begin() ||
                              VertWestOfEdge(&*vert, std::prev(loc)->east) < 0;

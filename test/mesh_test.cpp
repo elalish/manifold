@@ -276,6 +276,7 @@ TEST(Manifold, BooleanSelfIntersecting) {
   meshList[0].Translate(glm::vec3(0, 0, 0.5f));
   Manifold result = meshList[0] - tetras;
 
+  ExportMesh("selfIntersecting.stl", result.Extract());
   ExpectMeshes(result, {{8, 12}, {4, 4}});
 }
 

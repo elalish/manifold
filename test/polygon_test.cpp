@@ -237,6 +237,7 @@ TEST(Polygon, Inverted) {
 }
 
 TEST(Polygon, DISABLED_Ugly) {
+  SetPolygonVerbose(true);
   Polygons polys;
   polys.push_back({
       {glm::vec2(0.550049, -0.484235), 0, Edge::kNoIdx},    //
@@ -288,6 +289,7 @@ TEST(Polygon, DISABLED_Ugly) {
       {glm::vec2(-0.0562895, 0.733149), 44, Edge::kNoIdx},  //
   });
   TestPoly(polys, 45);
+  SetPolygonVerbose(false);
 }
 
 TEST(Polygon, BadEdges) {
@@ -542,6 +544,31 @@ TEST(Polygon, Simple4) {
       {glm::vec2(13.9298496, -11.2768612), 480, 349},  //
   });
   TestPoly(polys, 7);
+  // SetPolygonVerbose(false);
+}
+
+TEST(Polygon, Intersected) {
+  // SetPolygonVerbose(true);
+  Polygons polys;
+  polys.push_back({
+      {glm::vec2(0.20988664, 0.645049632), 9, -1},     //
+      {glm::vec2(0.140454829, 0.684921205), 61, 20},   //
+      {glm::vec2(-0.368753016, 0.453292787), 62, -1},  //
+      {glm::vec2(-0.325120926, 0.444164693), 10, 4},   //
+  });
+  polys.push_back({
+      {glm::vec2(-0.321355969, 0.445578367), 11, -1},  //
+      {glm::vec2(-0.355203509, 0.459456205), 63, 20},  //
+      {glm::vec2(-0.486033946, 0.399944067), 66, -1},  //
+      {glm::vec2(-0.47572422, 0.387616128), 14, 4},    //
+  });
+  polys.push_back({
+      {glm::vec2(-0.441979349, 0.400286674), 12, 4},   //
+      {glm::vec2(-0.18760772, 0.49579826), 13, -1},    //
+      {glm::vec2(-0.18741411, 0.535780251), 65, 20},   //
+      {glm::vec2(-0.435777694, 0.422804594), 64, -1},  //
+  });
+  TestPoly(polys, 6, false);
   // SetPolygonVerbose(false);
 }
 
