@@ -577,7 +577,8 @@ Polygons Assemble(const std::vector<EdgeVerts> &halfedges) {
 std::vector<glm::ivec3> Triangulate(const Polygons &polys) {
   std::vector<glm::ivec3> triangles;
   try {
-    triangles = PrimaryTriangulate(polys);
+    Monotones monotones(polys);
+    TriangulateMonotones(monotones.GetMonotones(), triangles);
     CheckTopology(triangles, polys);
     if (debug.geometricWarnings && !CheckGeometry(triangles, polys)) {
       std::cout << "-----------------------------------" << std::endl;
@@ -591,72 +592,8 @@ std::vector<glm::ivec3> Triangulate(const Polygons &polys) {
       }
     };
   } catch (const std::exception &e) {
-    // The primary triangulator has guaranteed manifold and non-overlapping
-    // output for non-overlapping input. For overlapping input it occasionally
-    // has trouble, and if so we switch to a simpler, toplogical backup
-    // triangulator that has guaranteed manifold output, except in the presence
-    // of certain edge constraints.
     PrintTriangulationWarning("Primary", polys, triangles, e);
     throw;
-    // try {
-    //   triangles = BackupTriangulate(polys);
-    //   CheckTopology(triangles, polys);
-    // } catch (const std::exception &e2) {
-    //   PrintTriangulationWarning("Backup", polys, triangles, e2);
-    //   throw;
-    // }
-  }
-  return triangles;
-}
-
-std::vector<glm::ivec3> PrimaryTriangulate(const Polygons &polys) {
-  std::vector<glm::ivec3> triangles;
-  Monotones monotones(polys);
-  TriangulateMonotones(monotones.GetMonotones(), triangles);
-  return triangles;
-}
-
-std::vector<glm::ivec3> BackupTriangulate(const Polygons &polys) {
-  std::vector<glm::ivec3> triangles;
-  for (const auto &poly : polys) {
-    if (poly.size() < 3) continue;
-    int start = 1;
-    int end = poly.size() - 1;
-    glm::ivec3 tri{poly[end].idx, poly[0].idx, poly[start].idx};
-    glm::ivec2 startEdges{poly[start - 1].nextEdge, poly[start].nextEdge};
-    glm::ivec2 endEdges{poly[end - 1].nextEdge, poly[end].nextEdge};
-    bool forward = false;
-    for (;;) {
-      if (start == end) break;
-      if (SharedEdge(startEdges, endEdges)) {
-        // Attempt to avoid shared edges by switching to the other side.
-        if (forward) {
-          start = Prev(start, poly.size());
-          end = Prev(end, poly.size());
-          tri = {poly[end].idx, tri[0], tri[1]};
-        } else {
-          start = Next(start, poly.size());
-          end = Next(end, poly.size());
-          tri = {tri[1], tri[2], poly[start].idx};
-        }
-        startEdges = {poly[start - 1].nextEdge, poly[start].nextEdge};
-        endEdges = {poly[end - 1].nextEdge, poly[end].nextEdge};
-        forward = !forward;
-      }
-      triangles.push_back(tri);
-      // By default, alternate to avoid making a high degree vertex.
-      forward = !forward;
-      if (forward) {
-        start = Next(start, poly.size());
-        startEdges = {poly[Prev(start, poly.size())].nextEdge,
-                      poly[start].nextEdge};
-        tri = {tri[0], tri[2], poly[start].idx};
-      } else {
-        end = Prev(end, poly.size());
-        endEdges = {poly[Prev(end, poly.size())].nextEdge, poly[end].nextEdge};
-        tri = {poly[end].idx, tri[0], tri[2]};
-      }
-    }
   }
   return triangles;
 }
