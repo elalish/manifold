@@ -60,10 +60,8 @@ void TestAssemble(const Polygons &polys) {
 
 void TestPoly(const Polygons &polys, int expectedNumTri,
               bool expectGeometry = true) {
-  SetPolygonWarnings(true);
-  TestAssemble(polys);
-
   SetPolygonWarnings(expectGeometry);
+  TestAssemble(polys);
   std::vector<glm::ivec3> triangles = Triangulate(polys);
   ASSERT_EQ(triangles.size(), expectedNumTri);
   SetPolygonWarnings(false);
@@ -225,8 +223,7 @@ TEST(Polygon, Inverted) {
   TestPoly(polys, 5, false);
 }
 
-TEST(Polygon, DISABLED_Ugly) {
-  SetPolygonVerbose(true);
+TEST(Polygon, Ugly) {
   Polygons polys;
   polys.push_back({
       {glm::vec2(0.550049, -0.484235), 0, Edge::kNoIdx},    //
@@ -277,8 +274,7 @@ TEST(Polygon, DISABLED_Ugly) {
       {glm::vec2(0.163827, 0.854684), 43, Edge::kNoIdx},    //
       {glm::vec2(-0.0562895, 0.733149), 44, Edge::kNoIdx},  //
   });
-  TestPoly(polys, 45);
-  SetPolygonVerbose(false);
+  TestPoly(polys, 41, false);
 }
 
 TEST(Polygon, BadEdges) {
