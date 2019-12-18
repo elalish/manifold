@@ -54,8 +54,11 @@ struct VertAdj {
   int edgeRight;  // Cannot join identical edges with a triangle.
   VertAdj *left, *right;
   int degenerateRadius;
-  bool processed;
+  int index;
   std::list<EdgePair>::iterator activePair;
+
+  bool Processed() const { return index < 0; }
+  void setProcessed(bool processed) { index = processed ? -1 : 0; }
 };
 
 int Next(int i, int n) { return ++i >= n ? 0 : i; }
@@ -63,7 +66,7 @@ int Prev(int i, int n) { return --i < 0 ? n - 1 : i; }
 
 class Monotones {
  public:
-  const std::list<VertAdj> &GetMonotones() { return monotones_; }
+  std::list<VertAdj> &GetMonotones() { return monotones_; }
 
   enum VertType { START, HOLE, LEFTWARDS, RIGHTWARDS, MERGE, END };
 
@@ -136,7 +139,7 @@ class Monotones {
     // Sweep backward
     for (auto &vert : monotones_) {
       vert.pos *= -1;
-      vert.processed = false;
+      vert.setProcessed(false);
     }
     monotones_.reverse();
     ALWAYS_ASSERT(activePairs_.empty(), logicErr,
@@ -155,7 +158,7 @@ class Monotones {
   void Check() {
     std::vector<EdgeVerts> edges;
     for (auto &vert : monotones_) {
-      vert.processed = false;
+      vert.setProcessed(false);
       edges.push_back({vert.mesh_idx, vert.right->mesh_idx, Edge::kNoIdx});
       ALWAYS_ASSERT(vert.right->right != &vert, logicErr, "two-edge monotone!");
       ALWAYS_ASSERT(vert.left->right == &vert, logicErr,
@@ -164,18 +167,19 @@ class Monotones {
     if (debug.verbose) {
       VertAdj *start = &monotones_.front();
       while (1) {
-        start->processed = true;
-        std::cout << "monotone start: " << start->mesh_idx;
+        start->setProcessed(true);
+        std::cout << "monotone start: " << start->mesh_idx << ", "
+                  << start->pos.y << std::endl;
         VertAdj *v = start->right;
         while (v != start) {
-          std::cout << ", " << v->mesh_idx;
-          v->processed = true;
+          std::cout << v->mesh_idx << ", " << v->pos.y << std::endl;
+          v->setProcessed(true);
           v = v->right;
         }
         std::cout << std::endl;
         VertItr itr =
             std::find_if(monotones_.begin(), monotones_.end(),
-                         [](const VertAdj &v) { return !v.processed; });
+                         [](const VertAdj &v) { return !v.Processed(); });
         if (itr == monotones_.end()) break;
         start = &*itr;
       }
@@ -275,13 +279,13 @@ class Monotones {
 
   VertType ProcessVert(VertItr vert) {
     // Skip newly duplicated verts
-    if (vert->processed) return END;
-    vert->processed = true;
+    if (vert->Processed()) return END;
+    vert->setProcessed(true);
     if (debug.verbose)
       std::cout << "mesh_idx = " << vert->mesh_idx << std::endl;
     VertType vertType;
-    if (vert->right->processed) {
-      if (vert->left->processed) {
+    if (vert->right->Processed()) {
+      if (vert->left->Processed()) {
         vertType = END;
         auto leftPair = LeftPair(&*vert);
         auto rightPair = RightPair(&*vert);
@@ -312,7 +316,7 @@ class Monotones {
         SplitVerts(vert, *vert->activePair, true);
       }
     } else {
-      if (vert->left->processed) {
+      if (vert->left->Processed()) {
         vertType = RIGHTWARDS;
         // update edge
         vert->activePair = LeftPair(&*vert);
@@ -393,47 +397,41 @@ class Triangulator {
   }
   int NumTriangles() { return triangles_output_; }
 
-  bool ProcessVert(const VertAdj *vi, std::vector<glm::ivec3> &triangles) {
-    int attached = Attached(vi);
-    if (attached == 0)
-      return 0;
-    else {
-      const VertAdj *v_top = reflex_chain_.top();
-      if (reflex_chain_.size() < 2) {
-        reflex_chain_.push(vi);
-        onRight_ = vi->left == v_top;
-        return 1;
+  void ProcessVert(const VertAdj *vi, bool onRight, bool last,
+                   std::vector<glm::ivec3> &triangles) {
+    const VertAdj *v_top = reflex_chain_.top();
+    if (reflex_chain_.size() < 2) {
+      reflex_chain_.push(vi);
+      onRight_ = onRight;
+      return;
+    }
+    reflex_chain_.pop();
+    const VertAdj *vj = reflex_chain_.top();
+    if (onRight_ == onRight && !last) {
+      if (debug.verbose) std::cout << "same chain" << std::endl;
+      while (CCW(vi->pos, vj->pos, v_top->pos) == (onRight_ ? 1 : -1) ||
+             (CCW(vi->pos, vj->pos, v_top->pos) == 0 && !SharesEdge(vi, vj))) {
+        AddTriangle(triangles, vi->mesh_idx, vj->mesh_idx, v_top->mesh_idx);
+        v_top = vj;
+        reflex_chain_.pop();
+        if (reflex_chain_.empty()) break;
+        vj = reflex_chain_.top();
       }
-      reflex_chain_.pop();
-      const VertAdj *vj = reflex_chain_.top();
-      if (attached == 1) {
-        if (debug.verbose) std::cout << "same chain" << std::endl;
-        while (
-            CCW(vi->pos, vj->pos, v_top->pos) == (onRight_ ? 1 : -1) ||
-            (CCW(vi->pos, vj->pos, v_top->pos) == 0 && !SharesEdge(vi, vj))) {
-          AddTriangle(triangles, vi->mesh_idx, vj->mesh_idx, v_top->mesh_idx);
-          v_top = vj;
-          reflex_chain_.pop();
-          if (reflex_chain_.empty()) break;
-          vj = reflex_chain_.top();
-        }
-        reflex_chain_.push(v_top);
-        reflex_chain_.push(vi);
-      } else {
-        if (debug.verbose) std::cout << "different chain" << std::endl;
-        onRight_ = !onRight_;
-        const VertAdj *v_last = v_top;
-        while (!reflex_chain_.empty()) {
-          vj = reflex_chain_.top();
-          AddTriangle(triangles, vi->mesh_idx, v_last->mesh_idx, vj->mesh_idx);
-          v_last = vj;
-          reflex_chain_.pop();
-        }
-        reflex_chain_.push(v_top);
-        reflex_chain_.push(vi);
-        other_side_ = v_top;
+      reflex_chain_.push(v_top);
+      reflex_chain_.push(vi);
+    } else {
+      if (debug.verbose) std::cout << "different chain" << std::endl;
+      onRight_ = !onRight_;
+      const VertAdj *v_last = v_top;
+      while (!reflex_chain_.empty()) {
+        vj = reflex_chain_.top();
+        AddTriangle(triangles, vi->mesh_idx, v_last->mesh_idx, vj->mesh_idx);
+        v_last = vj;
+        reflex_chain_.pop();
       }
-      return 1;
+      reflex_chain_.push(v_top);
+      reflex_chain_.push(vi);
+      other_side_ = v_top;
     }
   }
 
@@ -444,37 +442,12 @@ class Triangulator {
   int triangles_output_ = 0;
   bool onRight_;
 
-  int Attached(const VertAdj *vert) {
-    if (onRight_) {
-      if (other_side_->left == vert)
-        return -1;
-      else if (reflex_chain_.top()->right == vert)
-        return 1;
-      else
-        return 0;
-    } else {
-      if (other_side_->right == vert)
-        return -1;
-      else if (reflex_chain_.top()->left == vert)
-        return 1;
-      else
-        return 0;
-    }
-  }
-
   void AddTriangle(std::vector<glm::ivec3> &triangles, int v0, int v1, int v2) {
     if (onRight_)
       triangles.emplace_back(v0, v1, v2);
     else
       triangles.emplace_back(v0, v2, v1);
     ++triangles_output_;
-  }
-
-  bool ColinearIsOrdered(const VertAdj *v0, const VertAdj *v1,
-                         const VertAdj *v2) {
-    float min = std::min(v0->pos.x, v2->pos.x) + kTolerance;
-    float max = std::max(v0->pos.x, v2->pos.x) - kTolerance;
-    return v1->pos.x > min && v1->pos.x < max;
   }
 
   bool SharesEdge(const VertAdj *v0, const VertAdj *v1) {
@@ -484,31 +457,45 @@ class Triangulator {
   }
 };
 
-void TriangulateMonotones(const std::list<VertAdj> &monotones,
+void TriangulateMonotones(std::list<VertAdj> &monotones,
                           std::vector<glm::ivec3> &triangles) {
-  std::vector<Triangulator> triangulators;
+  int i = 1;
   for (auto &vert : monotones) {
-    if (debug.verbose) std::cout << "mesh_idx = " << vert.mesh_idx << std::endl;
-    bool found = false;
-    for (int j = 0; j < triangulators.size(); ++j) {
-      if (triangulators[j].ProcessVert(&vert, triangles)) {
-        found = true;
-        if (debug.verbose)
-          std::cout << "in triangulator " << j << ", with "
-                    << triangulators[j].NumTriangles() << " triangles so far"
-                    << std::endl;
-        break;
+    vert.index = i++;
+  }
+  int triangles_left = monotones.size();
+  VertAdj *start = &monotones.front();
+  while (1) {
+    if (debug.verbose) std::cout << start->mesh_idx << std::endl;
+    Triangulator triangulator(monotones, start);
+    start->setProcessed(true);
+    VertAdj *vR = start->right;
+    VertAdj *vL = start->left;
+    while (vR != vL) {
+      if (vR->index < vL->index) {
+        if (debug.verbose) std::cout << vR->mesh_idx << std::endl;
+        triangulator.ProcessVert(vR, true, false, triangles);
+        vR->setProcessed(true);
+        vR = vR->right;
+      } else {
+        triangulator.ProcessVert(vL, false, false, triangles);
+        vL->setProcessed(true);
+        if (debug.verbose) std::cout << vL->mesh_idx << std::endl;
+        vL = vL->left;
       }
     }
-    if (!found) triangulators.emplace_back(monotones, &vert);
-  }
-  // quick validation
-  int triangles_left = monotones.size();
-  for (auto &triangulator : triangulators) {
-    triangles_left -= 2;
+    triangulator.ProcessVert(vR, true, true, triangles);
+    vR->setProcessed(true);
+    if (debug.verbose) std::cout << vR->mesh_idx << std::endl;
+    // validation
     ALWAYS_ASSERT(triangulator.NumTriangles() > 0, logicErr,
                   "Monotone produced no triangles.");
-    triangles_left -= triangulator.NumTriangles();
+    triangles_left -= 2 + triangulator.NumTriangles();
+    // Find next monotone
+    VertItr itr = std::find_if(monotones.begin(), monotones.end(),
+                               [](const VertAdj &v) { return !v.Processed(); });
+    if (itr == monotones.end()) break;
+    start = &*itr;
   }
   ALWAYS_ASSERT(triangles_left == 0, logicErr,
                 "Triangulation produced wrong number of triangles.");
@@ -582,8 +569,9 @@ std::vector<glm::ivec3> Triangulate(const Polygons &polys) {
     CheckTopology(triangles, polys);
     if (debug.geometricWarnings && !CheckGeometry(triangles, polys)) {
       std::cout << "-----------------------------------" << std::endl;
-      std::cout << "Warning: triangulation is folded! Warnings so far: "
-                << ++debug.numWarnings << std::endl;
+      std::cout
+          << "Warning: triangulation is not entirely CCW! Warnings so far: "
+          << ++debug.numWarnings << std::endl;
       Dump(polys);
       std::cout << "produced this triangulation:" << std::endl;
       for (int j = 0; j < triangles.size(); ++j) {
