@@ -16,7 +16,7 @@ target_compile_options(${PROJECT_NAME}
     PRIVATE ${MANIFOLD_NVCC_FLAGS}
 )
 target_compile_features(${PROJECT_NAME} 
-    PUBLIC cxx_std_11 
+    PUBLIC cxx_std_14 
     PRIVATE cxx_std_14
 )
 
