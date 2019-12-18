@@ -20,17 +20,15 @@ namespace manifold {
 int CCW(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2);
 Polygons Assemble(const std::vector<EdgeVerts> &edges);
 std::vector<glm::ivec3> Triangulate(const Polygons &polys);
-std::vector<glm::ivec3> PrimaryTriangulate(const Polygons &polys);
-std::vector<glm::ivec3> BackupTriangulate(const Polygons &polys);
 
 std::vector<EdgeVerts> Polygons2Edges(const Polygons &polys);
 std::vector<EdgeVerts> Triangles2Edges(
     const std::vector<glm::ivec3> &triangles);
-void CheckManifold(const std::vector<EdgeVerts> &halfedges);
-void CheckManifold(const std::vector<glm::ivec3> &triangles,
+void CheckTopology(const std::vector<EdgeVerts> &halfedges);
+void CheckTopology(const std::vector<glm::ivec3> &triangles,
                    const Polygons &polys);
-bool CheckFolded(const std::vector<glm::ivec3> &triangles,
-                 const Polygons &polys);
+bool CheckGeometry(const std::vector<glm::ivec3> &triangles,
+                   const Polygons &polys);
 void Dump(const Polygons &polys);
 void SetPolygonWarnings(bool);
 void SetPolygonVerbose(bool);

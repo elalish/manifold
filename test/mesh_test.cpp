@@ -192,7 +192,7 @@ TEST(Manifold, BooleanTetra) {
 }
 
 TEST(Manifold, SelfSubtract) {
-  Manifold::SetGeometricWarnings(false);
+  Manifold::SetGeometricWarnings(true);
   Manifold cube = Manifold::Cube();
   Manifold empty = cube - cube;
   EXPECT_TRUE(empty.IsValid());

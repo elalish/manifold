@@ -1078,7 +1078,7 @@ void CheckPreTriangulationManfold(
   // Edge data creates an extra manifoldness constraint that is only needed for
   // checking polygon triangulation.
   for (auto &edge : edges) edge.edge = Edge::kNoIdx;
-  CheckManifold(edges);
+  CheckTopology(edges);
 }
 }  // namespace
 
