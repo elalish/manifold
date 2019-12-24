@@ -22,6 +22,7 @@
 #include "boolean3.cuh"
 #include "connected_components.cuh"
 #include "manifold.cuh"
+#include "polygon.h"
 
 namespace {
 using namespace manifold;
@@ -738,7 +739,9 @@ int Manifold::NumOverlaps(const Manifold& B) const {
   return num_overlaps += overlaps.size();
 }
 
-void Manifold::SetGeometricWarnings(bool val) { SetPolygonWarnings(val); }
+void Manifold::SetExpectGeometry(bool val) {
+  PolygonParams().checkGeometry = val;
+}
 
 Manifold Manifold::Boolean(const Manifold& second, OpType op) const {
   pImpl_->ApplyTransform();
