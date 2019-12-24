@@ -60,11 +60,12 @@ void TestAssemble(const Polygons &polys) {
 
 void TestPoly(const Polygons &polys, int expectedNumTri,
               bool expectGeometry = true) {
-  SetPolygonWarnings(expectGeometry);
+  // PolygonParams().verbose = true;
+  PolygonParams().checkGeometry = expectGeometry;
+  PolygonParams().intermediateChecks = true;
   TestAssemble(polys);
   std::vector<glm::ivec3> triangles = Triangulate(polys);
   ASSERT_EQ(triangles.size(), expectedNumTri);
-  SetPolygonWarnings(false);
 }
 }  // namespace
 
@@ -303,7 +304,7 @@ TEST(Polygon, BadEdges2) {
       {glm::vec2(-0.202167, -0.198325), 6, 8},   //
       {glm::vec2(-0.223625, -0.144868), 7, -1},  //
   });
-  EXPECT_THROW(Triangulate(polys), runtimeErr);
+  EXPECT_THROW(TestPoly(polys, 6), runtimeErr);
 }
 
 TEST(Polygon, Concave) {
@@ -413,7 +414,6 @@ TEST(Polygon, Sliver2) {
 }
 
 TEST(Polygon, Colinear2) {
-  // SetPolygonVerbose(true);
   Polygons polys;
   polys.push_back({
       {glm::vec2(11.7864399, -7.4572401), 4176, 13521},    //
@@ -427,7 +427,6 @@ TEST(Polygon, Colinear2) {
 }
 
 TEST(Polygon, Split) {
-  // SetPolygonVerbose(true);
   Polygons polys;
   polys.push_back({
       {glm::vec2(-0.707106769, -0.707106769), 1, 10},     //
@@ -441,11 +440,9 @@ TEST(Polygon, Split) {
       {glm::vec2(-1, 0), 4, 6},                           //
   });
   TestPoly(polys, 7);
-  // SetPolygonVerbose(false);
 }
 
 TEST(Polygon, Duplicates) {
-  // SetPolygonVerbose(true);
   Polygons polys;
   polys.push_back({
       {glm::vec2(-15, -8.10255623), 1648, 151},        //
@@ -456,11 +453,9 @@ TEST(Polygon, Duplicates) {
       {glm::vec2(-15, -8.10255623), 1922, 152},        //
   });
   TestPoly(polys, 4);
-  // SetPolygonVerbose(false);
 }
 
 TEST(Polygon, Simple1) {
-  // SetPolygonVerbose(true);
   Polygons polys;
   polys.push_back({
       {glm::vec2(4.04059982, -4.01843977), 2872, 8988},   //
@@ -470,11 +465,9 @@ TEST(Polygon, Simple1) {
       {glm::vec2(4.23782539, -4.30141878), 24602, 8986},  //
   });
   TestPoly(polys, 3);
-  // SetPolygonVerbose(false);
 }
 
 TEST(Polygon, Simple2) {
-  // SetPolygonVerbose(true);
   Polygons polys;
   polys.push_back({
       {glm::vec2(-1, -1), 1, 8},       //
@@ -486,11 +479,9 @@ TEST(Polygon, Simple2) {
       {glm::vec2(-1, 1), 3, 6},        //
   });
   TestPoly(polys, 5);
-  // SetPolygonVerbose(false);
 }
 
 TEST(Polygon, Simple3) {
-  // SetPolygonVerbose(true);
   Polygons polys;
   polys.push_back({
       {glm::vec2(19.7193489, 6.15445995), 19798, 28537},  //
@@ -501,11 +492,9 @@ TEST(Polygon, Simple3) {
       {glm::vec2(20.8738098, 6.15445995), 19801, 28541},  //
   });
   TestPoly(polys, 4);
-  // SetPolygonVerbose(false);
 }
 
 TEST(Polygon, Simple4) {
-  // SetPolygonVerbose(true);
   Polygons polys;
   polys.push_back({
       {glm::vec2(15, -12.7135563), 287, 346},          //
@@ -519,11 +508,9 @@ TEST(Polygon, Simple4) {
       {glm::vec2(13.9298496, -11.2768612), 480, 349},  //
   });
   TestPoly(polys, 7);
-  // SetPolygonVerbose(false);
 }
 
 TEST(Polygon, Intersected) {
-  // SetPolygonVerbose(true);
   Polygons polys;
   polys.push_back({
       {glm::vec2(0.20988664, 0.645049632), 9, -1},     //
@@ -544,7 +531,20 @@ TEST(Polygon, Intersected) {
       {glm::vec2(-0.435777694, 0.422804594), 64, -1},  //
   });
   TestPoly(polys, 6, false);
-  // SetPolygonVerbose(false);
+}
+
+TEST(Polygon, Intersected2) {
+  Polygons polys;
+  polys.push_back({
+      {glm::vec2(-0.542905211, 0.26293695), 41, 12},    //
+      {glm::vec2(-0.534729958, 0.262017727), 43, -1},   //
+      {glm::vec2(-0.154050604, 0.501501143), 197, -1},  //
+      {glm::vec2(-0.266216218, 0.616827428), 198, -1},  //
+      {glm::vec2(-0.532943189, 0.2618168), 44, 12},     //
+      {glm::vec2(-0.433016717, 0.250580698), 42, -1},   //
+      {glm::vec2(-0.320804417, 0.694312572), 196, -1},  //
+  });
+  EXPECT_THROW(TestPoly(polys, 5, false), runtimeErr);
 }
 
 // void fnExit() { throw std::runtime_error("Someone called Exit()!"); }
