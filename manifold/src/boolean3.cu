@@ -1289,8 +1289,8 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
   AppendNewEdges(facesP, facesQ, inP_.triEdges_, inQ_.triEdges_, p1q2_, p2q1_,
                  p2q2_, i12, i21, nPv + nQv);
 
-  // debug check
-  CheckPreTriangulationManfold(outR.triVerts_, facesP, facesQ);
+  if (PolygonParams().intermediateChecks)
+    CheckPreTriangulationManfold(outR.triVerts_, facesP, facesQ);
 
   // Triangulate the faces and add them to the manifold.
   if (kVerbose) std::cout << "Adding intersected faces of inP" << std::endl;

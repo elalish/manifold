@@ -77,6 +77,176 @@ TEST(Polygon, NoAssemble) {
   ASSERT_THROW(Assemble(edges), runtimeErr);
 }
 
+/**
+ * This polygon is geometrically valid except that it is wound CW instead of
+ * CCW. Therefore we expect it to fail the geometric check.
+ */
+TEST(Polygon, Inverted) {
+  Polygons polys;
+  polys.push_back({
+      {glm::vec2(0, 2.04124), 0, Edge::kNoIdx},           //
+      {glm::vec2(-1.41421, -0.408248), 1, Edge::kNoIdx},  //
+      {glm::vec2(-1.23744, -0.408248), 2, Edge::kNoIdx},  //
+      {glm::vec2(0, 1.73506), 3, Edge::kNoIdx},           //
+      {glm::vec2(1.23744, -0.408248), 4, Edge::kNoIdx},   //
+      {glm::vec2(1.41421, -0.408248), 5, Edge::kNoIdx},   //
+  });
+  polys.push_back({
+      {glm::vec2(-1.06066, -0.408248), 6, Edge::kNoIdx},  //
+      {glm::vec2(0, 1.42887), 7, Edge::kNoIdx},           //
+      {glm::vec2(1.06066, -0.408248), 8, Edge::kNoIdx},   //
+  });
+  TestPoly(polys, 5, false);
+}
+
+/**
+ * These polygons are horribly self-intersected. They are not expected to pass
+ * geometric checks, but should still produce valid topology.
+ */
+TEST(Polygon, Ugly) {
+  Polygons polys;
+  polys.push_back({
+      {glm::vec2(0.550049, -0.484235), 0, Edge::kNoIdx},    //
+      {glm::vec2(0.411479, -0.20602), 1, Edge::kNoIdx},     //
+      {glm::vec2(0.515815, -0.205784), 2, Edge::kNoIdx},    //
+      {glm::vec2(0.548218, -0.172791), 3, Edge::kNoIdx},    //
+      {glm::vec2(0.547651, -0.0762587), 4, Edge::kNoIdx},   //
+      {glm::vec2(0.358672, -0.0999957), 5, Edge::kNoIdx},   //
+      {glm::vec2(0.3837, -0.150245), 6, Edge::kNoIdx},      //
+      {glm::vec2(0.505506, -0.154427), 7, Edge::kNoIdx},    //
+      {glm::vec2(0.546988, 0.0365588), 8, Edge::kNoIdx},    //
+      {glm::vec2(0.546255, 0.161176), 9, Edge::kNoIdx},     //
+      {glm::vec2(0.47977, -0.0196254), 10, Edge::kNoIdx},   //
+      {glm::vec2(0.492479, 0.0576864), 11, Edge::kNoIdx},   //
+      {glm::vec2(0.549446, -0.381719), 12, Edge::kNoIdx},   //
+      {glm::vec2(0.547831, -0.106901), 13, Edge::kNoIdx},   //
+      {glm::vec2(0.36829, -0.00350715), 14, Edge::kNoIdx},  //
+      {glm::vec2(0.301766, 0.0142589), 15, Edge::kNoIdx},   //
+      {glm::vec2(0.205266, 0.208008), 16, Edge::kNoIdx},    //
+      {glm::vec2(0.340096, 0.562179), 17, Edge::kNoIdx},    //
+      {glm::vec2(0.255078, 0.464996), 18, Edge::kNoIdx},    //
+      {glm::vec2(0.545534, 0.283844), 19, Edge::kNoIdx},    //
+      {glm::vec2(0.543549, 0.621731), 20, Edge::kNoIdx},    //
+      {glm::vec2(0.363675, 0.790003), 21, Edge::kNoIdx},    //
+      {glm::vec2(0.102785, 0.413765), 22, Edge::kNoIdx},    //
+      {glm::vec2(0.152009, 0.314934), 23, Edge::kNoIdx},    //
+      {glm::vec2(0.198766, 0.33883), 24, Edge::kNoIdx},     //
+      {glm::vec2(0.344385, -0.0713115), 25, Edge::kNoIdx},  //
+      {glm::vec2(0.261844, 0.0944117), 26, Edge::kNoIdx},   //
+      {glm::vec2(0.546909, 0.0499438), 27, Edge::kNoIdx},   //
+      {glm::vec2(0.544994, 0.375805), 28, Edge::kNoIdx},    //
+      {glm::vec2(0.112526, 0.732868), 29, Edge::kNoIdx},    //
+      {glm::vec2(0.205606, 0.429447), 30, Edge::kNoIdx},    //
+      {glm::vec2(0.0249926, 0.763546), 31, Edge::kNoIdx},   //
+      {glm::vec2(-0.0523676, 0.725275), 32, Edge::kNoIdx},  //
+      {glm::vec2(0.124038, 0.371095), 33, Edge::kNoIdx},    //
+      {glm::vec2(0.0406817, 0.937559), 34, Edge::kNoIdx},   //
+      {glm::vec2(-0.176136, 0.973774), 35, Edge::kNoIdx},   //
+      {glm::vec2(-0.111522, 0.844043), 36, Edge::kNoIdx},   //
+      {glm::vec2(0.396158, 0.428476), 37, Edge::kNoIdx},    //
+      {glm::vec2(0.549669, -0.419631), 38, Edge::kNoIdx},   //
+  });
+  polys.push_back({
+      {glm::vec2(-0.102551, 0.826033), 39, Edge::kNoIdx},   //
+      {glm::vec2(-0.0320386, 0.876701), 40, Edge::kNoIdx},  //
+      {glm::vec2(0.54275, 0.757552), 41, Edge::kNoIdx},     //
+      {glm::vec2(0.542592, 0.784444), 42, Edge::kNoIdx},    //
+      {glm::vec2(0.163827, 0.854684), 43, Edge::kNoIdx},    //
+      {glm::vec2(-0.0562895, 0.733149), 44, Edge::kNoIdx},  //
+  });
+  TestPoly(polys, 41, false);
+}
+
+TEST(Polygon, Intersected) {
+  Polygons polys;
+  polys.push_back({
+      {glm::vec2(0.20988664, 0.645049632), 9, -1},     //
+      {glm::vec2(0.140454829, 0.684921205), 61, 20},   //
+      {glm::vec2(-0.368753016, 0.453292787), 62, -1},  //
+      {glm::vec2(-0.325120926, 0.444164693), 10, 4},   //
+  });
+  polys.push_back({
+      {glm::vec2(-0.321355969, 0.445578367), 11, -1},  //
+      {glm::vec2(-0.355203509, 0.459456205), 63, 20},  //
+      {glm::vec2(-0.486033946, 0.399944067), 66, -1},  //
+      {glm::vec2(-0.47572422, 0.387616128), 14, 4},    //
+  });
+  polys.push_back({
+      {glm::vec2(-0.441979349, 0.400286674), 12, 4},   //
+      {glm::vec2(-0.18760772, 0.49579826), 13, -1},    //
+      {glm::vec2(-0.18741411, 0.535780251), 65, 20},   //
+      {glm::vec2(-0.435777694, 0.422804594), 64, -1},  //
+  });
+  TestPoly(polys, 6, false);
+}
+
+/**
+ * This polygon is degenerate (but still geometrically valid) and demonstrates
+ * why the SharesEdge() check is necessary in the triangulator.
+ */
+TEST(Polygon, BadEdges) {
+  Polygons polys;
+  polys.push_back({
+      {glm::vec2(1, -1), 0, 9},    //
+      {glm::vec2(1, 1), 1, 11},    //
+      {glm::vec2(1, 1), 2, -1},    //
+      {glm::vec2(1, -1), 3, -1},   //
+      {glm::vec2(1, -1), 4, -1},   //
+      {glm::vec2(-1, -1), 5, 11},  //
+      {glm::vec2(-1, -1), 6, 10},  //
+  });
+  TestPoly(polys, 5);
+}
+
+/**
+ * This polygon is self-intersected and demonstrates a simple example for which
+ * no triangulation exists that satisfies the edge constraints. This is the
+ * reason the Boolean contains a fallback triangulator that adds an extra
+ * vertex. This situation is only possible with input that is not geometrically
+ * valid.
+ */
+TEST(Polygon, BadEdges2) {
+  Polygons polys;
+  polys.push_back({
+      {glm::vec2(-0.292598, -0.322469), 0, 0},   //
+      {glm::vec2(-0.282797, -0.340069), 1, -1},  //
+      {glm::vec2(-0.158295, -0.30762), 2, 8},    //
+      {glm::vec2(-0.189351, -0.230253), 3, -1},  //
+      {glm::vec2(-0.329733, -0.255784), 4, 0},   //
+      {glm::vec2(-0.342412, -0.233016), 5, -1},  //
+      {glm::vec2(-0.202167, -0.198325), 6, 8},   //
+      {glm::vec2(-0.223625, -0.144868), 7, -1},  //
+  });
+  EXPECT_THROW(TestPoly(polys, 6), runtimeErr);
+}
+
+/**
+ * This self-intersected polygon demonstrates a situation where the first step
+ * of the triangulator does not produce monotone polygons. Unfortunately, the
+ * polygon it produces confuses the second step such that it outputs triangles
+ * with duplicate indices. This is another example where the Boolean will use
+ * its fallback, and again it will only occur with self-intersected input (and
+ * only a small fraction of that).
+ */
+TEST(Polygon, Intersected2) {
+  Polygons polys;
+  polys.push_back({
+      {glm::vec2(-0.542905211, 0.26293695), 41, 12},    //
+      {glm::vec2(-0.534729958, 0.262017727), 43, -1},   //
+      {glm::vec2(-0.154050604, 0.501501143), 197, -1},  //
+      {glm::vec2(-0.266216218, 0.616827428), 198, -1},  //
+      {glm::vec2(-0.532943189, 0.2618168), 44, 12},     //
+      {glm::vec2(-0.433016717, 0.250580698), 42, -1},   //
+      {glm::vec2(-0.320804417, 0.694312572), 196, -1},  //
+  });
+  EXPECT_THROW(TestPoly(polys, 5, false), runtimeErr);
+}
+
+/**
+ * These polygons are all valid geometry. Some are clearly valid, while many are
+ * marginal, but all should produce correct topology and geometry, within
+ * tolerance.
+ */
 TEST(Polygon, SimpleHole) {
   Polygons polys;
   polys.push_back({
@@ -204,107 +374,6 @@ TEST(Polygon, ColinearY) {
       {glm::vec2(-1, 1), 17, Edge::kNoIdx},  //
   });
   TestPoly(polys, 16);
-}
-
-TEST(Polygon, Inverted) {
-  Polygons polys;
-  polys.push_back({
-      {glm::vec2(0, 2.04124), 0, Edge::kNoIdx},           //
-      {glm::vec2(-1.41421, -0.408248), 1, Edge::kNoIdx},  //
-      {glm::vec2(-1.23744, -0.408248), 2, Edge::kNoIdx},  //
-      {glm::vec2(0, 1.73506), 3, Edge::kNoIdx},           //
-      {glm::vec2(1.23744, -0.408248), 4, Edge::kNoIdx},   //
-      {glm::vec2(1.41421, -0.408248), 5, Edge::kNoIdx},   //
-  });
-  polys.push_back({
-      {glm::vec2(-1.06066, -0.408248), 6, Edge::kNoIdx},  //
-      {glm::vec2(0, 1.42887), 7, Edge::kNoIdx},           //
-      {glm::vec2(1.06066, -0.408248), 8, Edge::kNoIdx},   //
-  });
-  TestPoly(polys, 5, false);
-}
-
-TEST(Polygon, Ugly) {
-  Polygons polys;
-  polys.push_back({
-      {glm::vec2(0.550049, -0.484235), 0, Edge::kNoIdx},    //
-      {glm::vec2(0.411479, -0.20602), 1, Edge::kNoIdx},     //
-      {glm::vec2(0.515815, -0.205784), 2, Edge::kNoIdx},    //
-      {glm::vec2(0.548218, -0.172791), 3, Edge::kNoIdx},    //
-      {glm::vec2(0.547651, -0.0762587), 4, Edge::kNoIdx},   //
-      {glm::vec2(0.358672, -0.0999957), 5, Edge::kNoIdx},   //
-      {glm::vec2(0.3837, -0.150245), 6, Edge::kNoIdx},      //
-      {glm::vec2(0.505506, -0.154427), 7, Edge::kNoIdx},    //
-      {glm::vec2(0.546988, 0.0365588), 8, Edge::kNoIdx},    //
-      {glm::vec2(0.546255, 0.161176), 9, Edge::kNoIdx},     //
-      {glm::vec2(0.47977, -0.0196254), 10, Edge::kNoIdx},   //
-      {glm::vec2(0.492479, 0.0576864), 11, Edge::kNoIdx},   //
-      {glm::vec2(0.549446, -0.381719), 12, Edge::kNoIdx},   //
-      {glm::vec2(0.547831, -0.106901), 13, Edge::kNoIdx},   //
-      {glm::vec2(0.36829, -0.00350715), 14, Edge::kNoIdx},  //
-      {glm::vec2(0.301766, 0.0142589), 15, Edge::kNoIdx},   //
-      {glm::vec2(0.205266, 0.208008), 16, Edge::kNoIdx},    //
-      {glm::vec2(0.340096, 0.562179), 17, Edge::kNoIdx},    //
-      {glm::vec2(0.255078, 0.464996), 18, Edge::kNoIdx},    //
-      {glm::vec2(0.545534, 0.283844), 19, Edge::kNoIdx},    //
-      {glm::vec2(0.543549, 0.621731), 20, Edge::kNoIdx},    //
-      {glm::vec2(0.363675, 0.790003), 21, Edge::kNoIdx},    //
-      {glm::vec2(0.102785, 0.413765), 22, Edge::kNoIdx},    //
-      {glm::vec2(0.152009, 0.314934), 23, Edge::kNoIdx},    //
-      {glm::vec2(0.198766, 0.33883), 24, Edge::kNoIdx},     //
-      {glm::vec2(0.344385, -0.0713115), 25, Edge::kNoIdx},  //
-      {glm::vec2(0.261844, 0.0944117), 26, Edge::kNoIdx},   //
-      {glm::vec2(0.546909, 0.0499438), 27, Edge::kNoIdx},   //
-      {glm::vec2(0.544994, 0.375805), 28, Edge::kNoIdx},    //
-      {glm::vec2(0.112526, 0.732868), 29, Edge::kNoIdx},    //
-      {glm::vec2(0.205606, 0.429447), 30, Edge::kNoIdx},    //
-      {glm::vec2(0.0249926, 0.763546), 31, Edge::kNoIdx},   //
-      {glm::vec2(-0.0523676, 0.725275), 32, Edge::kNoIdx},  //
-      {glm::vec2(0.124038, 0.371095), 33, Edge::kNoIdx},    //
-      {glm::vec2(0.0406817, 0.937559), 34, Edge::kNoIdx},   //
-      {glm::vec2(-0.176136, 0.973774), 35, Edge::kNoIdx},   //
-      {glm::vec2(-0.111522, 0.844043), 36, Edge::kNoIdx},   //
-      {glm::vec2(0.396158, 0.428476), 37, Edge::kNoIdx},    //
-      {glm::vec2(0.549669, -0.419631), 38, Edge::kNoIdx},   //
-  });
-  polys.push_back({
-      {glm::vec2(-0.102551, 0.826033), 39, Edge::kNoIdx},   //
-      {glm::vec2(-0.0320386, 0.876701), 40, Edge::kNoIdx},  //
-      {glm::vec2(0.54275, 0.757552), 41, Edge::kNoIdx},     //
-      {glm::vec2(0.542592, 0.784444), 42, Edge::kNoIdx},    //
-      {glm::vec2(0.163827, 0.854684), 43, Edge::kNoIdx},    //
-      {glm::vec2(-0.0562895, 0.733149), 44, Edge::kNoIdx},  //
-  });
-  TestPoly(polys, 41, false);
-}
-
-TEST(Polygon, BadEdges) {
-  Polygons polys;
-  polys.push_back({
-      {glm::vec2(1, -1), 0, 9},    //
-      {glm::vec2(1, 1), 1, 11},    //
-      {glm::vec2(1, 1), 2, -1},    //
-      {glm::vec2(1, -1), 3, -1},   //
-      {glm::vec2(1, -1), 4, -1},   //
-      {glm::vec2(-1, -1), 5, 11},  //
-      {glm::vec2(-1, -1), 6, 10},  //
-  });
-  TestPoly(polys, 5);
-}
-
-TEST(Polygon, BadEdges2) {
-  Polygons polys;
-  polys.push_back({
-      {glm::vec2(-0.292598, -0.322469), 0, 0},   //
-      {glm::vec2(-0.282797, -0.340069), 1, -1},  //
-      {glm::vec2(-0.158295, -0.30762), 2, 8},    //
-      {glm::vec2(-0.189351, -0.230253), 3, -1},  //
-      {glm::vec2(-0.329733, -0.255784), 4, 0},   //
-      {glm::vec2(-0.342412, -0.233016), 5, -1},  //
-      {glm::vec2(-0.202167, -0.198325), 6, 8},   //
-      {glm::vec2(-0.223625, -0.144868), 7, -1},  //
-  });
-  EXPECT_THROW(TestPoly(polys, 6), runtimeErr);
 }
 
 TEST(Polygon, Concave) {
@@ -508,43 +577,6 @@ TEST(Polygon, Simple4) {
       {glm::vec2(13.9298496, -11.2768612), 480, 349},  //
   });
   TestPoly(polys, 7);
-}
-
-TEST(Polygon, Intersected) {
-  Polygons polys;
-  polys.push_back({
-      {glm::vec2(0.20988664, 0.645049632), 9, -1},     //
-      {glm::vec2(0.140454829, 0.684921205), 61, 20},   //
-      {glm::vec2(-0.368753016, 0.453292787), 62, -1},  //
-      {glm::vec2(-0.325120926, 0.444164693), 10, 4},   //
-  });
-  polys.push_back({
-      {glm::vec2(-0.321355969, 0.445578367), 11, -1},  //
-      {glm::vec2(-0.355203509, 0.459456205), 63, 20},  //
-      {glm::vec2(-0.486033946, 0.399944067), 66, -1},  //
-      {glm::vec2(-0.47572422, 0.387616128), 14, 4},    //
-  });
-  polys.push_back({
-      {glm::vec2(-0.441979349, 0.400286674), 12, 4},   //
-      {glm::vec2(-0.18760772, 0.49579826), 13, -1},    //
-      {glm::vec2(-0.18741411, 0.535780251), 65, 20},   //
-      {glm::vec2(-0.435777694, 0.422804594), 64, -1},  //
-  });
-  TestPoly(polys, 6, false);
-}
-
-TEST(Polygon, Intersected2) {
-  Polygons polys;
-  polys.push_back({
-      {glm::vec2(-0.542905211, 0.26293695), 41, 12},    //
-      {glm::vec2(-0.534729958, 0.262017727), 43, -1},   //
-      {glm::vec2(-0.154050604, 0.501501143), 197, -1},  //
-      {glm::vec2(-0.266216218, 0.616827428), 198, -1},  //
-      {glm::vec2(-0.532943189, 0.2618168), 44, 12},     //
-      {glm::vec2(-0.433016717, 0.250580698), 42, -1},   //
-      {glm::vec2(-0.320804417, 0.694312572), 196, -1},  //
-  });
-  EXPECT_THROW(TestPoly(polys, 5, false), runtimeErr);
 }
 
 // void fnExit() { throw std::runtime_error("Someone called Exit()!"); }

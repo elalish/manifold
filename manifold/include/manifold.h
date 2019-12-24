@@ -84,7 +84,7 @@ class Manifold {
   // Testing hooks
   bool IsValid() const;
   int NumOverlaps(const Manifold& second) const;
-  static void SetCheckGeometry(bool);
+  static void SetExpectGeometry(bool);
 
   ~Manifold();
   Manifold(Manifold&&);
