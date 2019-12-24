@@ -14,6 +14,7 @@
 
 #include "boolean3.cuh"
 #include "connected_components.cuh"
+#include "polygon.h"
 
 #include <math_constants.h>
 #include <thrust/binary_search.h>
@@ -1025,18 +1026,20 @@ void AppendIntersectedFaces(VecDH<glm::ivec3> &triVerts,
         try {
           newTris = Triangulate(polys);
         } catch (const std::exception &e) {
+          if (PolygonParams().checkGeometry) throw;
           /**
           To ensure the triangulation maintains the mesh as 2-manifold, we
           require it to not create edges connecting non-neighboring vertices
-          from the same input edge. This is because if two neighboring polygons
-          were to create an edge like this between two of their shared vertices,
-          this would create a 4-manifold edge, which is not allowed.
+          from the same input edge. This is because if two neighboring
+          polygons were to create an edge like this between two of their
+          shared vertices, this would create a 4-manifold edge, which is not
+          allowed.
 
-          For some self-overlapping polygons, there exists no triangulation that
-          adheres to this constraint. In this case, we create an extra vertex
-          for each polygon and triangulate them like a wagon wheel, which is
-          guaranteed to be manifold. This is very rare and only occurs when the
-          input manifolds are self-overlapping.
+          For some self-overlapping polygons, there exists no triangulation
+          that adheres to this constraint. In this case, we create an extra
+          vertex for each polygon and triangulate them like a wagon wheel,
+          which is guaranteed to be manifold. This is very rare and only
+          occurs when the input manifolds are self-overlapping.
            */
           for (const auto &poly : polys) {
             glm::vec3 centroid = thrust::transform_reduce(
@@ -1286,8 +1289,8 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
   AppendNewEdges(facesP, facesQ, inP_.triEdges_, inQ_.triEdges_, p1q2_, p2q1_,
                  p2q2_, i12, i21, nPv + nQv);
 
-  // debug check
-  CheckPreTriangulationManfold(outR.triVerts_, facesP, facesQ);
+  if (PolygonParams().intermediateChecks)
+    CheckPreTriangulationManfold(outR.triVerts_, facesP, facesQ);
 
   // Triangulate the faces and add them to the manifold.
   if (kVerbose) std::cout << "Adding intersected faces of inP" << std::endl;
