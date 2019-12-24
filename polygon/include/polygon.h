@@ -27,10 +27,9 @@ std::vector<EdgeVerts> Triangles2Edges(
 void CheckTopology(const std::vector<EdgeVerts> &halfedges);
 void CheckTopology(const std::vector<glm::ivec3> &triangles,
                    const Polygons &polys);
-bool CheckGeometry(const std::vector<glm::ivec3> &triangles,
+void CheckGeometry(const std::vector<glm::ivec3> &triangles,
                    const Polygons &polys);
 void Dump(const Polygons &polys);
-void SetPolygonWarnings(bool);
-void SetPolygonVerbose(bool);
+ExecutionParams &PolygonParams();
 
 }  // namespace manifold
