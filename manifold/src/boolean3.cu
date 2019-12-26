@@ -743,6 +743,10 @@ SparseIndices Intersect22(const Manifold::Impl &inP, const Manifold::Impl &inQ,
   return p2q2;
 }
 
+struct CheckWinding {
+  __host__ __device__ bool operator()(int i) { return abs(i) <= 1; }
+};
+
 struct AssignOnes {
   bool *keepTrisP;
   bool *keepTrisQ;
@@ -1226,6 +1230,15 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
   thrust::transform(w03_.beginD(), w03_.endD(), i03.beginD(), c1 + c3 * _1);
   thrust::transform(w30_.beginD(), w30_.endD(), i30.beginD(), c2 + c3 * _1);
 
+  if (PolygonParams().checkGeometry) {
+    ALWAYS_ASSERT(thrust::all_of(i03.beginD(), i03.endD(), CheckWinding()),
+                  runtimeErr,
+                  "Not all i03 vertices have winding numbers of -1, 0 or 1!");
+    ALWAYS_ASSERT(thrust::all_of(i30.beginD(), i30.endD(), CheckWinding()),
+                  runtimeErr,
+                  "Not all i30 vertices have winding numbers of -1, 0 or 1!");
+  }
+
   // Calculate some internal indexing vectors
   VecDH<bool> intersectedTriP(inP_.NumTri(), false);
   VecDH<bool> intersectedTriQ(inQ_.NumTri(), false);
@@ -1233,12 +1246,12 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
       p2q2_.beginDpq(), p2q2_.size(),
       AssignOnes({intersectedTriP.ptrD(), intersectedTriQ.ptrD()}));
 
-  VecDH<int> vP2R(inP_.NumVert() + 1, 0);
-  VecDH<int> vQ2R(inQ_.NumVert() + 1, 0);
-  thrust::inclusive_scan(i03.beginD(), i03.endD(), vP2R.beginD() + 1, AbsSum());
-  thrust::inclusive_scan(i30.beginD(), i30.endD(), vQ2R.beginD() + 1, AbsSum());
-  const int nPv = vP2R.H()[inP_.NumVert()];
-  const int nQv = vQ2R.H()[inQ_.NumVert()];
+  VecDH<int> vP2R(inP_.NumVert());
+  VecDH<int> vQ2R(inQ_.NumVert());
+  thrust::exclusive_scan(i03.beginD(), i03.endD(), vP2R.beginD(), 0, AbsSum());
+  thrust::exclusive_scan(i30.beginD(), i30.endD(), vQ2R.beginD(), 0, AbsSum());
+  const int nPv = AbsSum()(vP2R.H().back(), i03.H().back());
+  const int nQv = AbsSum()(vQ2R.H().back(), i30.H().back());
   thrust::transform(vQ2R.beginD(), vQ2R.endD(), vQ2R.beginD(), _1 + nPv);
 
   int n12 = v12_.size();
@@ -1272,8 +1285,8 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
                       inQ_);
 
   if (kVerbose) {
-    std::cout << nPv << " verts from inP, including duplcations" << std::endl;
-    std::cout << nQv << " verts from inQ, including duplcations" << std::endl;
+    std::cout << nPv << " verts from inP, including duplications" << std::endl;
+    std::cout << nQv << " verts from inQ, including duplications" << std::endl;
     std::cout << n12 << " new verts from edgesP -> facesQ" << std::endl;
     std::cout << n21 << " new verts from facesP -> edgesQ" << std::endl;
   }

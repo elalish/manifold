@@ -295,8 +295,11 @@ struct MakeHalfedges {
     if (V1 < V2) {  // forward
       dir = 1;
       edgeVerts = thrust::make_pair(V1, V2);
-    } else {  // backward
+    } else if (V1 > V2) {  // backward
       dir = -1;
+      edgeVerts = thrust::make_pair(V2, V1);
+    } else {
+      dir = 0;
       edgeVerts = thrust::make_pair(V2, V1);
     }
     triEdges[i] = EdgeIdx(0, dir);
@@ -314,7 +317,9 @@ struct AssignEdges {
 };
 
 struct OpposedDir {
-  __host__ __device__ bool operator()(int a, int b) const { return a + b == 0; }
+  __host__ __device__ bool operator()(int a, int b) const {
+    return a * b == -1;
+  }
 };
 
 struct LinkEdges2Tris {
