@@ -17,8 +17,6 @@
 #include <random>
 #include "gtest/gtest.h"
 
-constexpr bool kVerbose = false;
-
 namespace {
 
 using namespace manifold;
@@ -217,7 +215,7 @@ TEST(Polygon, BadEdges2) {
       {glm::vec2(-0.202167, -0.198325), 6, 8},   //
       {glm::vec2(-0.223625, -0.144868), 7, -1},  //
   });
-  EXPECT_THROW(TestPoly(polys, 6), runtimeErr);
+  EXPECT_THROW(TestPoly(polys, 6, false), runtimeErr);
 }
 
 /**

@@ -85,6 +85,7 @@ class Manifold {
   bool IsValid() const;
   int NumOverlaps(const Manifold& second) const;
   static void SetExpectGeometry(bool);
+  static void SetSuppressErrors(bool);
 
   ~Manifold();
   Manifold(Manifold&&);

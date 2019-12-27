@@ -545,7 +545,7 @@ std::vector<glm::ivec3> Triangulate(const Polygons &polys) {
     CheckTopology(triangles, polys);
     if (params.checkGeometry) CheckGeometry(triangles, polys);
   } catch (const std::exception &e) {
-    if (params.verbose) {
+    if (params.checkGeometry && !params.suppressErrors) {
       std::cout << "-----------------------------------" << std::endl;
       std::cout << "Triangulation failed!" << std::endl;
       std::cout << e.what() << std::endl;
