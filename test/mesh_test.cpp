@@ -365,7 +365,9 @@ TEST(Manifold, BooleanHorrible) {
   EXPECT_TRUE(result.IsValid());
 
   Manifold::SetExpectGeometry(true);
+  Manifold::SetSuppressErrors(true);
   EXPECT_THROW(result = random ^ random2, runtimeErr);
+  Manifold::SetSuppressErrors(false);
 }
 
 TEST(Manifold, BooleanHorrible2) {

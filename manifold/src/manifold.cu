@@ -748,6 +748,10 @@ void Manifold::SetExpectGeometry(bool val) {
   PolygonParams().checkGeometry = val;
 }
 
+void Manifold::SetSuppressErrors(bool val) {
+  PolygonParams().suppressErrors = val;
+}
+
 Manifold Manifold::Boolean(const Manifold& second, OpType op) const {
   pImpl_->ApplyTransform();
   second.pImpl_->ApplyTransform();
