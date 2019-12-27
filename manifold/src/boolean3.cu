@@ -1230,14 +1230,16 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
   thrust::transform(w03_.beginD(), w03_.endD(), i03.beginD(), c1 + c3 * _1);
   thrust::transform(w30_.beginD(), w30_.endD(), i30.beginD(), c2 + c3 * _1);
 
-  if (PolygonParams().checkGeometry) {
-    ALWAYS_ASSERT(thrust::all_of(i03.beginD(), i03.endD(), CheckWinding()),
-                  runtimeErr,
-                  "Not all i03 vertices have winding numbers of -1, 0 or 1!");
-    ALWAYS_ASSERT(thrust::all_of(i30.beginD(), i30.endD(), CheckWinding()),
-                  runtimeErr,
-                  "Not all i30 vertices have winding numbers of -1, 0 or 1!");
-  }
+  // if (PolygonParams().checkGeometry) {
+  //   ALWAYS_ASSERT(thrust::all_of(i03.beginD(), i03.endD(), CheckWinding()),
+  //                 runtimeErr,
+  //                 "Not all i03 vertices have winding numbers of -1, 0 or
+  //                 1!");
+  //   ALWAYS_ASSERT(thrust::all_of(i30.beginD(), i30.endD(), CheckWinding()),
+  //                 runtimeErr,
+  //                 "Not all i30 vertices have winding numbers of -1, 0 or
+  //                 1!");
+  // }
 
   // Calculate some internal indexing vectors
   VecDH<bool> intersectedTriP(inP_.NumTri(), false);

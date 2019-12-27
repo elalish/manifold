@@ -76,6 +76,7 @@ struct ExecutionParams {
   bool intermediateChecks = false;
   bool checkGeometry = false;
   bool verbose = false;
+  bool suppressErrors = false;
 };
 
 namespace Edge {
