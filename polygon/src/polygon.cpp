@@ -335,7 +335,7 @@ class Monotones {
 
   auto LeftPair(VertAdj *vert) {
     auto pair = vert->left->activePair;
-    if (pair->east.vNorth == vert) return pair;
+    if (pair != activePairs_.end() && pair->east.vNorth == vert) return pair;
     return std::find_if(
         activePairs_.begin(), activePairs_.end(),
         [vert](const EdgePair &pair) { return pair.east.vNorth == vert; });
@@ -343,7 +343,7 @@ class Monotones {
 
   auto RightPair(VertAdj *vert) {
     auto pair = vert->right->activePair;
-    if (pair->west.vNorth == vert) return pair;
+    if (pair != activePairs_.end() && pair->west.vNorth == vert) return pair;
     return std::find_if(
         activePairs_.begin(), activePairs_.end(),
         [vert](const EdgePair &pair) { return pair.west.vNorth == vert; });
@@ -418,6 +418,10 @@ class Monotones {
             vertType = MERGE;
           }
         }
+        if (rightPair->east.vSouth->activePair == rightPair)
+          rightPair->east.vSouth->activePair = activePairs_.end();
+        if (rightPair->west.vSouth->activePair == rightPair)
+          rightPair->west.vSouth->activePair = activePairs_.end();
         activePairs_.erase(rightPair);
       } else {
         vertType = LEFTWARDS;
