@@ -48,6 +48,8 @@ struct EdgePair {
   ActiveEdge &getEdge(bool westSide) { return westSide ? west : east; }
 };
 
+typedef std::list<EdgePair>::iterator PairItr;
+
 struct VertAdj {
   glm::vec2 pos;
   int mesh_idx;   // This is a global index into the manifold.
@@ -55,7 +57,7 @@ struct VertAdj {
   VertAdj *left, *right;
   int degenerateRadius;
   int index;
-  std::list<EdgePair>::iterator activePair;
+  PairItr leftPair, rightPair;
 
   bool Processed() const { return index < 0; }
   void setProcessed(bool processed) { index = processed ? -1 : 0; }
@@ -334,7 +336,7 @@ class Monotones {
   }
 
   auto LeftPair(VertAdj *vert) {
-    auto pair = vert->left->activePair;
+    auto pair = vert->left->rightPair;
     if (pair != activePairs_.end() && pair->east.vNorth == vert) return pair;
     return std::find_if(
         activePairs_.begin(), activePairs_.end(),
@@ -342,7 +344,7 @@ class Monotones {
   }
 
   auto RightPair(VertAdj *vert) {
-    auto pair = vert->right->activePair;
+    auto pair = vert->right->leftPair;
     if (pair != activePairs_.end() && pair->west.vNorth == vert) return pair;
     return std::find_if(
         activePairs_.begin(), activePairs_.end(),
@@ -357,34 +359,36 @@ class Monotones {
     return side;
   }
 
-  void Reorder(const VertAdj *vert, const bool west) {
-    auto activePair = vert->activePair;
-    if (!activePair->getCertainty(west)) {
+  void Reorder(const VertAdj *vert, const PairItr &inputPair, const bool west) {
+    auto potentialPair = inputPair;
+    if (!potentialPair->getCertainty(west)) {
       int sign = west ? -1 : 1;
       auto end = west ? activePairs_.begin() : std::prev(activePairs_.end());
-      while (activePair != end) {
-        activePair = west ? std::prev(activePair) : std::next(activePair);
-        int eastOf = sign * VertWestOfEdge(&*vert, activePair->getEdge(!west));
+      while (potentialPair != end) {
+        potentialPair =
+            west ? std::prev(potentialPair) : std::next(potentialPair);
+        int eastOf =
+            sign * VertWestOfEdge(&*vert, potentialPair->getEdge(!west));
         if (eastOf >= 0) {   // in the right place
           if (eastOf > 0) {  // certain
-            vert->activePair->getCertainty(west) = true;
+            inputPair->getCertainty(west) = true;
           }
-          auto loc = west ? std::next(activePair) : activePair;
-          activePairs_.splice(loc, activePairs_, vert->activePair);
+          auto loc = west ? std::next(potentialPair) : potentialPair;
+          activePairs_.splice(loc, activePairs_, inputPair);
           break;
         }
-        eastOf = sign * VertWestOfEdge(&*vert, activePair->getEdge(west));
+        eastOf = sign * VertWestOfEdge(&*vert, potentialPair->getEdge(west));
         if (eastOf >= 0) {  // in the right place
-          auto loc = west ? activePair : std::next(activePair);
-          activePairs_.splice(loc, activePairs_, vert->activePair);
-          vert->activePair->getCertainty(!west) = false;
+          auto loc = west ? potentialPair : std::next(potentialPair);
+          activePairs_.splice(loc, activePairs_, inputPair);
+          inputPair->getCertainty(!west) = false;
           if (eastOf > 0) {  // certainly a hole
-            std::swap(activePair->west, vert->activePair->west);
-            activePair->west.vSouth->activePair = activePair;
-            vert->activePair->west.vSouth->activePair = vert->activePair;
-            vert->activePair->east.vSouth->activePair = vert->activePair;
-            vert->activePair->eastCertain = true;
-            vert->activePair->westCertain = true;
+            std::swap(potentialPair->west, inputPair->west);
+            potentialPair->west.vSouth->leftPair = potentialPair;
+            inputPair->west.vSouth->leftPair = inputPair;
+            inputPair->east.vSouth->rightPair = inputPair;
+            inputPair->eastCertain = true;
+            inputPair->westCertain = true;
           }
           break;
         }
@@ -412,39 +416,35 @@ class Monotones {
           if (newVert != monotones_.end()) vert = newVert;
           SplitVerts(vert, *leftPair, false);
           leftPair->east = rightPair->east;
-          leftPair->east.vSouth->activePair = leftPair;
+          leftPair->east.vSouth->rightPair = leftPair;
           if (std::next(leftPair) == rightPair) {
             leftPair->vMerge = vert;
             vertType = MERGE;
           }
         }
-        if (rightPair->east.vSouth->activePair == rightPair)
-          rightPair->east.vSouth->activePair = activePairs_.end();
-        if (rightPair->west.vSouth->activePair == rightPair)
-          rightPair->west.vSouth->activePair = activePairs_.end();
         activePairs_.erase(rightPair);
       } else {
         vertType = LEFTWARDS;
         // update edge
-        vert->activePair = RightPair(&*vert);
-        ActiveEdge &activeEdge = vert->activePair->west;
+        vert->leftPair = RightPair(&*vert);
+        ActiveEdge &activeEdge = vert->leftPair->west;
         activeEdge.vSouth = &*vert;
         activeEdge.vNorth = vert->left;
-        Reorder(&*vert, true);
-        Reorder(&*vert, false);
-        SplitVerts(vert, *vert->activePair, true);
+        Reorder(&*vert, vert->leftPair, true);
+        Reorder(&*vert, vert->leftPair, false);
+        SplitVerts(vert, *vert->leftPair, true);
       }
     } else {
       if (vert->left->Processed()) {
         vertType = RIGHTWARDS;
         // update edge
-        vert->activePair = LeftPair(&*vert);
-        ActiveEdge &activeEdge = vert->activePair->east;
+        vert->rightPair = LeftPair(&*vert);
+        ActiveEdge &activeEdge = vert->rightPair->east;
         activeEdge.vSouth = &*vert;
         activeEdge.vNorth = vert->right;
-        Reorder(&*vert, true);
-        Reorder(&*vert, false);
-        SplitVerts(vert, *vert->activePair, false);
+        Reorder(&*vert, vert->rightPair, true);
+        Reorder(&*vert, vert->rightPair, false);
+        SplitVerts(vert, *vert->rightPair, false);
       } else {
         auto loc = std::find_if(activePairs_.begin(), activePairs_.end(),
                                 [vert, this](const EdgePair &pair) {
@@ -457,22 +457,24 @@ class Monotones {
           bool westCertain = loc == activePairs_.begin() ||
                              VertWestOfEdge(&*vert, std::prev(loc)->east) < 0;
           bool eastCertain = isStart > 0;
-          vert->activePair = activePairs_.insert(loc, {{&*vert, vert->left},
-                                                       {&*vert, vert->right},
-                                                       monotones_.end(),
-                                                       westCertain,
-                                                       eastCertain});
+          vert->leftPair = activePairs_.insert(loc, {{&*vert, vert->left},
+                                                     {&*vert, vert->right},
+                                                     monotones_.end(),
+                                                     westCertain,
+                                                     eastCertain});
+          vert->rightPair = vert->leftPair;
         } else {
           vertType = HOLE;
           if (loc == activePairs_.end()) --loc;
           // hole-starting vert links earlier activePair
-          vert->activePair = activePairs_.insert(
+          vert->rightPair = activePairs_.insert(
               loc, {loc->west, {&*vert, vert->right}, loc->vMerge, true, true});
-          loc->west.vSouth->activePair = vert->activePair;
+          vert->leftPair = loc;
+          loc->west.vSouth->leftPair = vert->rightPair;
           loc->west = {&*vert, vert->left};
           loc->vMerge = monotones_.end();
-          VertItr newVert = SplitVerts(vert, *vert->activePair);
-          if (newVert != monotones_.end()) newVert->activePair = loc;
+          VertItr newVert = SplitVerts(vert, *vert->rightPair);
+          if (newVert != monotones_.end()) newVert->leftPair = loc;
         }
       }
     }
@@ -482,14 +484,18 @@ class Monotones {
 
   void ListPairs() {
     std::cout << "active edges:" << std::endl;
-    for (EdgePair pair : activePairs_) {
+    for (EdgePair &pair : activePairs_) {
       ListPair(pair);
     }
   }
 
-  void ListPair(EdgePair pair) {
+  void ListPair(EdgePair &pair) {
     ListEdge(pair.west);
+    if (&*(pair.west.vSouth->leftPair) != &pair)
+      std::cout << "west vSouth does not point back!" << std::endl;
     ListEdge(pair.east);
+    if (&*(pair.east.vSouth->rightPair) != &pair)
+      std::cout << "east vSouth does not point back!" << std::endl;
     if (pair.vMerge != monotones_.end())
       std::cout << "pair vMerge: " << pair.vMerge->mesh_idx << std::endl;
   }
