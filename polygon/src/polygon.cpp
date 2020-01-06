@@ -33,6 +33,20 @@ constexpr float kTolerance2 = kTolerance * kTolerance;
 struct VertAdj;
 typedef std::list<VertAdj>::iterator VertItr;
 
+/**
+ * The EdgePairs form the two active edges of a monotone polygon as they are
+ * being constructed. The sweep-line is horizontal and moves from -y to +y, or
+ * South to North. The West edge is a backwards edge while the East edge is
+ * forwards, a topological constraint. If the polygon is geometrically valid,
+ * then the West edge will also be to the -x side of the East edge, hence the
+ * name.
+ *
+ * The purpose of the certainty booleans is to represent if we're sure the pairs
+ * (or monotones) are in the right order. This is uncertain if they are
+ * degenerate, for instance if several active edges are colinear (within
+ * tolerance). If the order is uncertain, then as each vert is processed, if it
+ * yields new information, it can cause the order to be updated until certain.
+ */
 struct ActiveEdge {
   VertAdj *vSouth, *vNorth;
 };
@@ -50,6 +64,13 @@ struct EdgePair {
 
 typedef std::list<EdgePair>::iterator PairItr;
 
+/**
+ * This is the data structure of the polygons themselves. They are stored as a
+ * list in sweep-line order. The left and right pointers form the polygons,
+ * while the mesh_idx describes the input indices that will be tranfered to the
+ * output triangulation. The edgeRight value represents an extra contraint from
+ * the mesh Boolean algorithm.
+ */
 struct VertAdj {
   glm::vec2 pos;
   int mesh_idx;   // This is a global index into the manifold.
@@ -63,9 +84,6 @@ struct VertAdj {
   void setProcessed(bool processed) { index = processed ? -1 : 0; }
 };
 
-int Next(int i, int n) { return ++i >= n ? 0 : i; }
-int Prev(int i, int n) { return --i < 0 ? n - 1 : i; }
-
 bool SharedEdge(glm::ivec2 edges0, glm::ivec2 edges1) {
   return (edges0[0] != Edge::kNoIdx &&
           (edges0[0] == edges1[0] || edges0[0] == edges1[1])) ||
@@ -73,6 +91,10 @@ bool SharedEdge(glm::ivec2 edges0, glm::ivec2 edges1) {
           (edges0[1] == edges1[0] || edges0[1] == edges1[1]));
 }
 
+/**
+ * This class takes sequential verts of a monotone polygon and outputs a
+ * geometrically valid triangulation, step by step.
+ */
 class Triangulator {
  public:
   Triangulator(const VertAdj *vert) {
@@ -81,6 +103,14 @@ class Triangulator {
   }
   int NumTriangles() { return triangles_output_; }
 
+  /**
+   * The vert, vi, must attach to the free end (specified by onRight) of the
+   * polygon that has been input so far. The verts must also be processed in
+   * sweep-line order to get a geometrically valid result. If not, then the
+   * polygon is not monotone, as the result should be topologically valid, but
+   * not geometrically. The parameter, last, must be set true only for the final
+   * point, as this ensures the last triangle is output.
+   */
   void ProcessVert(const VertAdj *vi, bool onRight, bool last,
                    std::vector<glm::ivec3> &triangles) {
     const VertAdj *v_top = reflex_chain_.top();
@@ -92,6 +122,8 @@ class Triangulator {
     reflex_chain_.pop();
     const VertAdj *vj = reflex_chain_.top();
     if (onRight_ == onRight && !last) {
+      // This only creates enough triangles to ensure the reflex chain is still
+      // reflex.
       if (params.verbose) std::cout << "same chain" << std::endl;
       while (CCW(vi->pos, vj->pos, v_top->pos) == (onRight_ ? 1 : -1) ||
              (CCW(vi->pos, vj->pos, v_top->pos) == 0 && !SharesEdge(vi, vj))) {
@@ -104,6 +136,9 @@ class Triangulator {
       reflex_chain_.push(v_top);
       reflex_chain_.push(vi);
     } else {
+      // This branch empties the reflex chain and switches sides. It must be
+      // used for the last point, as it will output all the triangles regardless
+      // of geometry.
       if (params.verbose) std::cout << "different chain" << std::endl;
       onRight_ = !onRight_;
       const VertAdj *v_last = v_top;
@@ -121,9 +156,9 @@ class Triangulator {
 
  private:
   std::stack<const VertAdj *> reflex_chain_;
-  const VertAdj *other_side_;
+  const VertAdj *other_side_;  // The end vertex across from the reflex chain
+  bool onRight_;               // The side the reflex chain is on
   int triangles_output_ = 0;
-  bool onRight_;
 
   void AddTriangle(std::vector<glm::ivec3> &triangles, int v0, int v1, int v2) {
     // if (v0 == v1 || v1 == v2 || v2 == v0) return;
@@ -135,6 +170,7 @@ class Triangulator {
     if (params.verbose) std::cout << triangles.back() << std::endl;
   }
 
+  // This checks the extra edge constraint from the mesh Boolean.
   bool SharesEdge(const VertAdj *v0, const VertAdj *v1) {
     glm::ivec2 e0(v0->edgeRight, v0->left->edgeRight);
     glm::ivec2 e1(v1->edgeRight, v1->left->edgeRight);
@@ -142,8 +178,13 @@ class Triangulator {
   }
 };
 
+/**
+ * The class first turns input polygons into monotone polygons, then
+ * triangulates them using the above class.
+ */
 class Monotones {
  public:
+  // This enum is just for documentation and debug.
   enum VertType { START, HOLE, LEFTWARDS, RIGHTWARDS, MERGE, END };
 
   Monotones(const Polygons &polys) {
@@ -165,6 +206,7 @@ class Monotones {
       }
       Link(current, start);
     }
+    // Sorting makes this list into a sweep-line.
     monotones_.sort(
         [](const VertAdj &a, const VertAdj &b) { return a.pos.y < b.pos.y; });
     // Collapse degenerate sweep-line stops
@@ -224,6 +266,7 @@ class Monotones {
   }
 
   void Triangulate(std::vector<glm::ivec3> &triangles) {
+    // Save the sweep-line order in the vert to check further down.
     int i = 1;
     for (auto &vert : monotones_) {
       vert.index = i++;
@@ -237,6 +280,7 @@ class Monotones {
       VertAdj *vR = start->right;
       VertAdj *vL = start->left;
       while (vR != vL) {
+        // Process the neighbor vert that is next in the sweep-line.
         if (vR->index < vL->index) {
           if (params.verbose) std::cout << vR->mesh_idx << std::endl;
           triangulator.ProcessVert(vR, true, false, triangles);
@@ -267,6 +311,8 @@ class Monotones {
                   "Triangulation produced wrong number of triangles.");
   }
 
+  // A variety of sanity checks on the data structure. Expensive checks are only
+  // performed if params.intermediateChecks = true.
   void Check(VertType v_type) {
     ALWAYS_ASSERT(activePairs_.empty(), logicErr,
                   "There are still active edges.");
@@ -304,14 +350,20 @@ class Monotones {
   }
 
  private:
-  std::list<VertAdj> monotones_;
-  std::list<EdgePair> activePairs_;
+  std::list<VertAdj> monotones_;     // sweep-line list of verts
+  std::list<EdgePair> activePairs_;  // west to east list of monotone edge pairs
 
   void Link(VertAdj *left, VertAdj *right) {
     left->right = right;
     right->left = left;
   }
 
+  /**
+   * This is the only function that actually changes monotones_; all the rest is
+   * bookkeeping. This divides or attaches polygons by connecting two verts. It
+   * duplicates these verts to break the polygons, then attaches them across to
+   * each other with two new edges.
+   */
   VertItr SplitVerts(VertItr north, PairItr pair, bool NEisNofNW = false) {
     VertItr south = pair->vMerge;
     if (south == monotones_.end()) return monotones_.end();
@@ -335,6 +387,8 @@ class Monotones {
     return northEast;
   }
 
+  // If the first result is degenerate, its neighbor is used to attempt a
+  // tie-break.
   int VertWestOfEdge(const VertAdj *vert, const ActiveEdge &edge) {
     glm::vec2 last = edge.vSouth->pos;
     glm::vec2 next = edge.vNorth->pos;
@@ -343,6 +397,16 @@ class Monotones {
     return side;
   }
 
+  /**
+   * This is the key function for handling degeneracies, and is the purpose of
+   * running the sweep-line forwards and backwards. Splits are only performed
+   * after a merge vert has been found, which means we have as much information
+   * as we can about where it is geometrically. This is the function that uses
+   * that new information to reorder the uncertain monotone edge pairs.
+   *
+   * This function is designed to search both ways, with direction chosen by the
+   * input boolean, west.
+   */
   void Reorder(const VertAdj *vert, const PairItr inputPair, const bool west) {
     PairItr potentialPair = inputPair;
     if (!potentialPair->getCertainty(west)) {
@@ -378,6 +442,7 @@ class Monotones {
     }
   }
 
+  // Central function for processing each sweep-line vert.
   VertType ProcessVert(VertItr vert) {
     // Skip newly duplicated verts
     if (vert->Processed()) return END;
@@ -510,6 +575,9 @@ void PrintFailure(const std::exception &e, const Polygons &polys,
 
 namespace manifold {
 
+// This is nearly the only function to do a floating point comparison in this
+// whole triangulator (the other is the check for sweep-line degeneracies). This
+// is done to maintain maximum consistency.
 int CCW(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2) {
   glm::vec2 v1 = p1 - p0;
   glm::vec2 v2 = p2 - p0;
