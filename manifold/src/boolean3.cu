@@ -1029,7 +1029,7 @@ void AppendIntersectedFaces(VecDH<glm::ivec3> &triVerts,
         std::vector<glm::ivec3> newTris;
         try {
           newTris = Triangulate(polys);
-        } catch (const std::exception &e) {
+        } catch (const runtimeErr &e) {
           if (PolygonParams().checkGeometry) throw;
           /**
           To ensure the triangulation maintains the mesh as 2-manifold, we
