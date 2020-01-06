@@ -315,6 +315,19 @@ TEST(Polygon, Sliver2) {
   TestPoly(polys, 4);
 }
 
+TEST(Polygon, Sliver3) {
+  Polygons polys;
+  polys.push_back({
+      {glm::vec2(0, -2.65168381), 369, 1173},               //
+      {glm::vec2(0, -0.792692184), 1889, 5777},             //
+      {glm::vec2(0, -0.792692184), 2330, -1},               //
+      {glm::vec2(0, -1.04356134), 2430, -1},                //
+      {glm::vec2(-0.953957975, -0.768045247), 2331, 5777},  //
+      {glm::vec2(-1.36363637, -0.757460594), 1892, 1174},   //
+  });
+  TestPoly(polys, 4);
+}
+
 TEST(Polygon, Colinear2) {
   Polygons polys;
   polys.push_back({
