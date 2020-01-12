@@ -37,6 +37,9 @@ struct Manifold::Impl {
   VecDH<EdgeTrisD> edgeTris_;
   VecDH<glm::ivec3> triVerts_;
   VecDH<TriEdges> triEdges_;
+  VecDH<glm::vec3> vertNormal_;
+  VecDH<glm::vec3> edgeNormal_;
+  VecDH<glm::vec3> triNormal_;
   Collider collider_;
   glm::mat4x3 transform_ = glm::mat4x3(1.0f);
 
@@ -63,6 +66,7 @@ struct Manifold::Impl {
   VecDH<Box> GetEdgeBox() const;
   void GetTriBoxMorton(VecDH<Box>& triBox, VecDH<uint32_t>& triMorton) const;
   void SortTris(VecDH<Box>& triBox, VecDH<uint32_t>& triMorton);
+  void CalculateNormals();
 
   SparseIndices EdgeCollisions(const Impl& B) const;
   SparseIndices VertexCollisionsZ(const VecDH<glm::vec3>& vertsIn) const;
