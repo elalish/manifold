@@ -313,7 +313,7 @@ __host__ __device__ Val BinarySearchByKey(
     return missingVal;
 }
 
-struct Gather01 {
+struct Gather11 {
   const thrust::pair<const int *, const int *> p0q1;
   const int *s01;
   const int size;
@@ -425,11 +425,11 @@ std::tuple<VecDH<int>, VecDH<glm::vec4>> Shadow11(
 
   thrust::for_each_n(zip(s11.beginD(), p1q1.beginD(0), p1q1.beginD(1)),
                      p1q1.size(),
-                     Gather01({p0q1.ptrDpq(), s01.ptrD(), p0q1.size(),
+                     Gather11({p0q1.ptrDpq(), s01.ptrD(), p0q1.size(),
                                inP.edgeVerts_.ptrD(), false}));
   thrust::for_each_n(zip(s11.beginD(), p1q1.beginD(1), p1q1.beginD(0)),
                      p1q1.size(),
-                     Gather01({p1q0.ptrDpq(), s10.ptrD(), p1q0.size(),
+                     Gather11({p1q0.ptrDpq(), s10.ptrD(), p1q0.size(),
                                inQ.edgeVerts_.ptrD(), true}));
 
   size_t size = p1q1.RemoveZeros(s11);

@@ -31,6 +31,7 @@ struct NormalizeTo {
   float length;
   __host__ __device__ void operator()(glm::vec3& v) {
     v = length * glm::normalize(v);
+    if (isnan(v.x)) v = glm::vec3(0.0);
   }
 };
 
@@ -268,6 +269,54 @@ struct TriMortonBox {
     mortonCode = MortonCode(center, bBox);
     triBox = Box(vertPos[triVerts[0]], vertPos[triVerts[1]]);
     triBox.Union(vertPos[triVerts[2]]);
+  }
+};
+
+__host__ __device__ void AtomicAddVec3(glm::vec3& target,
+                                       const glm::vec3& add) {
+  for (int i : {0, 1, 2}) {
+#ifdef __CUDA_ARCH__
+    atomicAdd(&target[i], add[i]);
+#else
+#pragma omp atomic
+    target[i] += add[i];
+#endif
+  }
+}
+
+struct AssignNormals {
+  glm::vec3* vertNormal;
+  glm::vec3* edgeNormal;
+  const glm::vec3* vertPos;
+
+  __host__ __device__ void operator()(
+      thrust::tuple<glm::vec3&, const glm::ivec3&, const TriEdges&> in) {
+    glm::vec3& triNormal = thrust::get<0>(in);
+    const glm::ivec3& triVerts = thrust::get<1>(in);
+    const TriEdges& triEdges = thrust::get<2>(in);
+
+    glm::vec3 v0 = vertPos[triVerts[0]];
+    glm::vec3 v1 = vertPos[triVerts[1]];
+    glm::vec3 v2 = vertPos[triVerts[2]];
+    // edge vectors
+    glm::vec3 e01 = glm::normalize(v1 - v0);
+    glm::vec3 e12 = glm::normalize(v2 - v1);
+    glm::vec3 e20 = glm::normalize(v0 - v2);
+
+    glm::vec3 normal = glm::normalize(glm::cross(e01, e12));
+    if (isnan(normal.x)) normal = glm::vec3(0.0);
+    // corner angles
+    glm::vec3 phi;
+    phi[0] = glm::acos(-glm::dot(e01, e12));
+    phi[1] = glm::acos(-glm::dot(e12, e20));
+    phi[2] = glm::pi<float>() - phi[0] - phi[1];
+    // assign weighted sum
+    triNormal = normal;
+    for (int i : {0, 1, 2}) {
+      if (isnan(phi[i])) phi[i] = 0.0;
+      AtomicAddVec3(edgeNormal[triEdges[i].Idx()], normal);
+      AtomicAddVec3(vertNormal[triVerts[i]], phi[i] * normal);
+    }
   }
 };
 
@@ -868,6 +917,7 @@ void Manifold::Impl::Finish() {
   GetTriBoxMorton(triBox, triMorton);
   SortTris(triBox, triMorton);
   CreateEdges();
+  CalculateNormals();
   collider_ = Collider(triBox, triMorton);
 }
 
@@ -1034,6 +1084,18 @@ void Manifold::Impl::GetTriBoxMorton(VecDH<Box>& triBox,
 void Manifold::Impl::SortTris(VecDH<Box>& triBox, VecDH<uint32_t>& triMorton) {
   thrust::sort_by_key(triMorton.beginD(), triMorton.endD(),
                       zip(triBox.beginD(), triVerts_.beginD()));
+}
+
+void Manifold::Impl::CalculateNormals() {
+  vertNormal_.resize(NumVert());
+  edgeNormal_.resize(NumEdge());
+  triNormal_.resize(NumTri());
+  thrust::for_each_n(
+      zip(triNormal_.begin(), triVerts_.begin(), triEdges_.begin()), NumTri(),
+      AssignNormals(
+          {vertNormal_.ptrD(), edgeNormal_.ptrD(), vertPos_.cptrD()}));
+  thrust::for_each(vertNormal_.begin(), vertNormal_.end(), NormalizeTo({1.0}));
+  thrust::for_each(edgeNormal_.begin(), edgeNormal_.end(), NormalizeTo({1.0}));
 }
 
 SparseIndices Manifold::Impl::EdgeCollisions(const Impl& B) const {
