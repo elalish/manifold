@@ -15,6 +15,7 @@
 #include "samples.h"
 #include "gtest/gtest.h"
 #include "meshIO.h"
+#include "polygon.h"
 
 using namespace manifold;
 
