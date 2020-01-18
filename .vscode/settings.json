@@ -54,7 +54,9 @@
         "complex": "cpp",
         "list": "cpp",
         "algorithm": "cpp",
-        "cfenv": "cpp"
+        "cfenv": "cpp",
+        "*.ipp": "cpp",
+        "string": "cpp"
     },
     "C_Cpp.clang_format_style": "google",
     "C_Cpp.clang_format_fallbackStyle": "google",

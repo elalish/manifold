@@ -805,7 +805,7 @@ void Manifold::SetSuppressErrors(bool val) {
 Manifold Manifold::Boolean(const Manifold& second, OpType op) const {
   pImpl_->ApplyTransform();
   second.pImpl_->ApplyTransform();
-  Boolean3 boolean(*pImpl_, *second.pImpl_);
+  Boolean3 boolean(*pImpl_, *second.pImpl_, op);
   Manifold result;
   result.pImpl_ = std::make_unique<Impl>(boolean.Result(op));
   return result;
@@ -826,7 +826,7 @@ Manifold Manifold::operator^(const Manifold& Q) const {
 std::pair<Manifold, Manifold> Manifold::Split(const Manifold& cutter) const {
   pImpl_->ApplyTransform();
   cutter.pImpl_->ApplyTransform();
-  Boolean3 boolean(*pImpl_, *cutter.pImpl_);
+  Boolean3 boolean(*pImpl_, *cutter.pImpl_, OpType::SUBTRACT);
   std::pair<Manifold, Manifold> result;
   result.first.pImpl_ =
       std::make_unique<Impl>(boolean.Result(OpType::INTERSECT));
