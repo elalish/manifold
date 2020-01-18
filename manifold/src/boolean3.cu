@@ -915,6 +915,7 @@ void AppendNewEdges(std::vector<std::vector<EdgeVerts>> &facesP,
                     const VecDH<TriEdges> &triEdgesQ, const SparseIndices &p1q2,
                     const SparseIndices &p2q1, const SparseIndices &p2q2,
                     const VecDH<int> &i12, const VecDH<int> &i21, int start12) {
+  int edgeID = 2 * (triEdgesP.size() + triEdgesQ.size());
   for (int k = 0; k < p2q2.size(); ++k) {
     int triP = p2q2.Get(0).H()[k];
     int triQ = p2q2.Get(1).H()[k];
@@ -958,12 +959,7 @@ void AppendNewEdges(std::vector<std::vector<EdgeVerts>> &facesP,
     }
     // sort edges into start/end pairs along length
     // Since these are not input edges, their index is undefined.
-    std::vector<EdgeVerts> edges = PairUp(vertsPos, Edge::kNoIdx);
-    if (edges.size() > 1) {
-      for (auto e : edges)
-        std::cout << e.first << ", " << e.second << std::endl;
-      std::cout << std::endl;
-    }
+    std::vector<EdgeVerts> edges = PairUp(vertsPos, edgeID++);
 
     facesP[triP].insert(facesP[triP].end(), edges.begin(), edges.end());
 
