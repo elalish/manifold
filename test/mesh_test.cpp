@@ -222,6 +222,28 @@ TEST(Manifold, SelfSubtract) {
   // EXPECT_FLOAT_EQ(empty.SurfaceArea(), 0.0f);
 }
 
+TEST(Manifold, Perturb) {
+  Manifold::SetExpectGeometry(true);
+  Mesh tmp;
+  tmp.vertPos = {{0.0f, 0.0f, 0.0f},
+                 {0.0f, 1.0f, 0.0f},
+                 {1.0f, 0.0f, 0.0f},
+                 {0.0f, 0.0f, 1.0f}};
+  tmp.triVerts = {{2, 0, 1}, {0, 3, 1}, {2, 3, 0}, {3, 2, 1}};
+  std::vector<Manifold> meshList;
+  meshList.push_back(tmp);
+  // meshList[0].Rotate(0, 0, 180);
+  meshList.push_back(meshList[0].DeepCopy());
+  // meshList[1].Scale(glm::vec3(4.0f));
+  // meshList[0].Translate({0.0f, 0.0f, 1.0f});
+
+  Manifold in = Manifold::Compose(meshList);
+  ExportMesh("perturbIn.ply", in.Extract());
+
+  Manifold out = meshList[1] - meshList[0];
+  ExportMesh("perturb.ply", out.Extract());
+}
+
 TEST(Manifold, Coplanar) {
   Manifold::SetExpectGeometry(true);
   Manifold cube = Manifold::Cylinder(1.0f, 1.0f);

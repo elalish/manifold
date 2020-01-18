@@ -19,11 +19,13 @@ namespace manifold {
 
 class Boolean3 {
  public:
-  Boolean3(const Manifold::Impl& inP, const Manifold::Impl& inQ);
+  Boolean3(const Manifold::Impl& inP, const Manifold::Impl& inQ,
+           Manifold::OpType op);
   Manifold::Impl Result(Manifold::OpType op) const;
 
  private:
   const Manifold::Impl &inP_, &inQ_;
+  const float expandP_;
   SparseIndices p1q2_, p2q1_, p2q2_;
   VecDH<int> dir12_, dir21_, w03_, w30_;
   VecDH<glm::vec3> v12_, v21_;
