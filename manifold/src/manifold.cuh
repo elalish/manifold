@@ -57,7 +57,6 @@ struct Manifold::Impl {
   int NumVert() const { return vertPos_.size(); }
   int NumEdge() const { return edgeVerts_.size(); }
   int NumTri() const { return triVerts_.size(); }
-  glm::vec3 GetTriNormal(int tri) const;
   void CalculateBBox();
 
   void SortVerts();
