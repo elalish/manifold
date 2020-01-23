@@ -288,6 +288,7 @@ struct AssignNormals {
   glm::vec3* vertNormal;
   glm::vec3* edgeNormal;
   const glm::vec3* vertPos;
+  const bool calculateTriNormal;
 
   __host__ __device__ void operator()(
       thrust::tuple<glm::vec3&, const glm::ivec3&, const TriEdges&> in) {
@@ -303,19 +304,20 @@ struct AssignNormals {
     glm::vec3 e12 = glm::normalize(v2 - v1);
     glm::vec3 e20 = glm::normalize(v0 - v2);
 
-    glm::vec3 normal = glm::normalize(glm::cross(e01, e12));
-    if (isnan(normal.x)) normal = glm::vec3(0.0);
+    if (calculateTriNormal) {
+      triNormal = glm::normalize(glm::cross(e01, e12));
+      if (isnan(triNormal.x)) triNormal = glm::vec3(0.0);
+    }
     // corner angles
     glm::vec3 phi;
     phi[0] = glm::acos(-glm::dot(e01, e12));
     phi[1] = glm::acos(-glm::dot(e12, e20));
     phi[2] = glm::pi<float>() - phi[0] - phi[1];
     // assign weighted sum
-    triNormal = normal;
     for (int i : {0, 1, 2}) {
       if (isnan(phi[i])) phi[i] = 0.0;
-      AtomicAddVec3(edgeNormal[triEdges[i].Idx()], normal);
-      AtomicAddVec3(vertNormal[triVerts[i]], phi[i] * normal);
+      AtomicAddVec3(edgeNormal[triEdges[i].Idx()], triNormal);
+      AtomicAddVec3(vertNormal[triVerts[i]], phi[i] * triNormal);
     }
   }
 };
@@ -977,14 +979,6 @@ bool Manifold::Impl::IsValid() const {
                         CheckTris({edgeVerts_.ptrD()}));
 }
 
-glm::vec3 Manifold::Impl::GetTriNormal(int tri) const {
-  glm::vec3 normal = glm::normalize(glm::cross(
-      vertPos_.H()[triVerts_.H()[tri][1]] - vertPos_.H()[triVerts_.H()[tri][0]],
-      vertPos_.H()[triVerts_.H()[tri][2]] -
-          vertPos_.H()[triVerts_.H()[tri][0]]));
-  return std::isfinite(normal.x) ? normal : glm::vec3(0.0f);
-}
-
 void Manifold::Impl::CalculateBBox() {
   bBox_.min = thrust::reduce(vertPos_.begin(), vertPos_.end(),
                              glm::vec3(1 / 0.0f), PosMin());
@@ -1082,18 +1076,28 @@ void Manifold::Impl::GetTriBoxMorton(VecDH<Box>& triBox,
 }
 
 void Manifold::Impl::SortTris(VecDH<Box>& triBox, VecDH<uint32_t>& triMorton) {
-  thrust::sort_by_key(triMorton.beginD(), triMorton.endD(),
-                      zip(triBox.beginD(), triVerts_.beginD()));
+  if (triNormal_.size() == NumTri()) {
+    thrust::sort_by_key(
+        triMorton.beginD(), triMorton.endD(),
+        zip(triBox.beginD(), triVerts_.beginD(), triNormal_.beginD()));
+  } else {
+    thrust::sort_by_key(triMorton.beginD(), triMorton.endD(),
+                        zip(triBox.beginD(), triVerts_.beginD()));
+  }
 }
 
 void Manifold::Impl::CalculateNormals() {
   vertNormal_.resize(NumVert());
   edgeNormal_.resize(NumEdge());
-  triNormal_.resize(NumTri());
+  bool calculateTriNormal = false;
+  if (triNormal_.size() != NumTri()) {
+    triNormal_.resize(NumTri());
+    calculateTriNormal = true;
+  }
   thrust::for_each_n(
       zip(triNormal_.begin(), triVerts_.begin(), triEdges_.begin()), NumTri(),
-      AssignNormals(
-          {vertNormal_.ptrD(), edgeNormal_.ptrD(), vertPos_.cptrD()}));
+      AssignNormals({vertNormal_.ptrD(), edgeNormal_.ptrD(), vertPos_.cptrD(),
+                     calculateTriNormal}));
   thrust::for_each(vertNormal_.begin(), vertNormal_.end(), NormalizeTo({1.0}));
   thrust::for_each(edgeNormal_.begin(), edgeNormal_.end(), NormalizeTo({1.0}));
 }

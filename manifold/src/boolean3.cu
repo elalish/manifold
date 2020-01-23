@@ -33,7 +33,7 @@
 #include <thrust/unique.h>
 #include <algorithm>
 
-constexpr bool kVerbose = false;
+constexpr bool kVerbose = true;
 
 using namespace thrust::placeholders;
 
@@ -771,9 +771,9 @@ struct DuplicateVerts {
   }
 };
 
-void AppendRetainedFaces(VecDH<glm::ivec3> &triVerts, VecDH<int> p12,
-                         VecDH<int> p21, const VecDH<int> &i03,
-                         const VecDH<int> &vP2R, const Manifold::Impl &inP) {
+void AppendRetainedFaces(Manifold::Impl &outR, VecDH<int> p12, VecDH<int> p21,
+                         const VecDH<int> &i03, const VecDH<int> &vP2R,
+                         const Manifold::Impl &inP) {
   // keepTriP is a list of the triangle indicies of P which does not include the
   // triangles that intersect edges of Q.
   VecDH<int> keepTriP(inP.NumTri());
@@ -802,12 +802,18 @@ void AppendRetainedFaces(VecDH<glm::ivec3> &triVerts, VecDH<int> p12,
     // Check the inclusion number of a single vertex of a triangle, since
     // non-intersecting triangles must have all identical inclusion numbers.
     glm::ivec3 triVertsP = inP.triVerts_.H()[i];
+    glm::vec3 normal = inP.triNormal_.H()[i];
     int inclusion = i03.H()[triVertsP[0]];
     glm::ivec3 triVertsR(vP2R.H()[triVertsP[0]], vP2R.H()[triVertsP[1]],
                          vP2R.H()[triVertsP[2]]);
-    if (inclusion < 0) std::swap(triVertsR[1], triVertsR[2]);
-    for (int i = 0; i < abs(inclusion); ++i)
-      triVerts.H().push_back(triVertsR + i);
+    if (inclusion < 0) {
+      std::swap(triVertsR[1], triVertsR[2]);
+      normal *= -1.0f;
+    }
+    for (int j = 0; j < abs(inclusion); ++j) {
+      outR.triVerts_.H().push_back(triVertsR + j);
+      outR.triNormal_.H().push_back(normal);
+    }
   }
 }
 
@@ -989,12 +995,13 @@ glm::mat3x2 GetAxisAlignedProjection(glm::vec3 normal) {
   return glm::transpose(projection);
 }
 
-void AppendIntersectedFaces(VecDH<glm::ivec3> &triVerts,
-                            VecDH<glm::vec3> &vertPos,
+void AppendIntersectedFaces(Manifold::Impl &outR,
                             const std::vector<std::vector<EdgeVerts>> &facesP,
                             const Manifold::Impl &inP, bool invertNormals) {
   for (int i = 0; i < facesP.size(); ++i) {
     auto &face = facesP[i];
+    glm::vec3 normal = inP.triNormal_.H()[i];
+    if (invertNormals) normal *= -1.0f;
     switch (face.size()) {
       case 0:
         break;
@@ -1010,14 +1017,14 @@ void AppendIntersectedFaces(VecDH<glm::ivec3> &triVerts,
                           tri[2].second == tri[0].first,
                       runtimeErr, "These 3 edges do not form a triangle!");
         glm::ivec3 triangle(tri[0].first, tri[1].first, tri[2].first);
-        triVerts.H().push_back(triangle);
+        outR.triVerts_.H().push_back(triangle);
+        outR.triNormal_.H().push_back(normal);
         break;
       }
       default: {  // requires triangulation
         Polygons polys = Assemble(face);
-        glm::vec3 normal = inP.GetTriNormal(i);
-        if (invertNormals) normal *= -1.0f;
         glm::mat3x2 projection = GetAxisAlignedProjection(normal);
+        auto &vertPos = outR.vertPos_;
         for (auto &poly : polys) {
           for (PolyVert &v : poly) {
             v.pos = projection * vertPos.H()[v.idx];
@@ -1052,11 +1059,14 @@ void AppendIntersectedFaces(VecDH<glm::ivec3> &triVerts,
             int newVert = vertPos.size();
             vertPos.H().push_back(centroid);
             newTris.push_back({poly.back().idx, poly.front().idx, newVert});
-            for (int i = 1; i < poly.size(); ++i)
-              newTris.push_back({poly[i - 1].idx, poly[i].idx, newVert});
+            for (int j = 1; j < poly.size(); ++j)
+              newTris.push_back({poly[j - 1].idx, poly[j].idx, newVert});
           }
         }
-        for (auto tri : newTris) triVerts.H().push_back(tri);
+        for (auto tri : newTris) {
+          outR.triVerts_.H().push_back(tri);
+          outR.triNormal_.H().push_back(normal);
+        }
       }
     }
   }
@@ -1207,17 +1217,20 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
       c1 = 1;
       c2 = 1;
       c3 = -1;
+      if (kVerbose) std::cout << "ADD" << std::endl;
       break;
     case Manifold::OpType::SUBTRACT:
       c1 = 1;
       c2 = 0;
       c3 = -1;
+      if (kVerbose) std::cout << "SUBTRACT" << std::endl;
       break;
     case Manifold::OpType::INTERSECT:
       c1 = 0;
       c2 = 0;
       c3 = 1;
       break;
+      if (kVerbose) std::cout << "INTERSECT" << std::endl;
     default:
       throw std::invalid_argument("invalid enum: OpType.");
   }
@@ -1283,10 +1296,8 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
   thrust::copy(v21_.beginD(), v21_.endD(),
                outR.vertPos_.beginD() + nPv + nQv + n12);
   // Duplicate retained faces as above.
-  AppendRetainedFaces(outR.triVerts_, p1q2_.Copy(0), p2q1_.Copy(0), i03, vP2R,
-                      inP_);
-  AppendRetainedFaces(outR.triVerts_, p2q1_.Copy(1), p1q2_.Copy(1), i30, vQ2R,
-                      inQ_);
+  AppendRetainedFaces(outR, p1q2_.Copy(0), p2q1_.Copy(0), i03, vP2R, inP_);
+  AppendRetainedFaces(outR, p2q1_.Copy(1), p1q2_.Copy(1), i30, vQ2R, inQ_);
 
   if (kVerbose) {
     std::cout << nPv << " verts from inP, including duplications" << std::endl;
@@ -1311,10 +1322,9 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
 
   // Triangulate the faces and add them to the manifold.
   if (kVerbose) std::cout << "Adding intersected faces of inP" << std::endl;
-  AppendIntersectedFaces(outR.triVerts_, outR.vertPos_, facesP, inP_, false);
+  AppendIntersectedFaces(outR, facesP, inP_, false);
   if (kVerbose) std::cout << "Adding intersected faces of inQ" << std::endl;
-  AppendIntersectedFaces(outR.triVerts_, outR.vertPos_, facesQ, inQ_,
-                         op == Manifold::OpType::SUBTRACT);
+  AppendIntersectedFaces(outR, facesQ, inQ_, op == Manifold::OpType::SUBTRACT);
 
   // Create the manifold's data structures and verify manifoldness.
   outR.Finish();

@@ -254,6 +254,15 @@ TEST(Manifold, Coplanar) {
   // ExportMesh("cubes.ply", out.Extract());
 }
 
+TEST(Manifold, MultiCoplanar) {
+  Manifold::SetExpectGeometry(false);
+  Manifold cube = Manifold::Cube();
+  Manifold cube2 = cube.DeepCopy();
+  Manifold out = cube + cube2.Translate({0.6f, 0.6f, 0.0f});
+  out = out + cube.Translate({-0.6f, -0.6f, 0.0f});
+  ExportMesh("cubes.ply", out.Extract());
+}
+
 /**
  * These tests verify that the spliting helper functions return meshes with
  * volumes that make sense.
