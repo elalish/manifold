@@ -255,11 +255,12 @@ TEST(Manifold, Coplanar) {
 }
 
 TEST(Manifold, MultiCoplanar) {
-  Manifold::SetExpectGeometry(false);
+  Manifold::SetExpectGeometry(true);
   Manifold cube = Manifold::Cube();
   Manifold cube2 = cube.DeepCopy();
-  Manifold out = cube + cube2.Translate({0.6f, 0.6f, 0.0f});
-  out = out + cube.Translate({-0.6f, -0.6f, 0.0f});
+  Manifold out = cube - cube2.Translate({0.3f, 0.3f, 0.0f});
+  out = out - cube.Translate({-0.3f, -0.3f, 0.0f});
+  EXPECT_EQ(out.Genus(), -1);
   ExportMesh("cubes.ply", out.Extract());
 }
 
