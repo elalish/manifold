@@ -52,7 +52,19 @@ void TestAssemble(const Polygons &polys) {
   std::vector<EdgeVerts> edges = Polygons2Edges(polys);
   std::mt19937 g;
   std::shuffle(edges.begin(), edges.end(), g);
-  Polygons polys_out = Assemble(edges);
+
+  std::vector<glm::vec2> vertPos;
+  for (const auto &poly : polys) {
+    for (const PolyVert &vert : poly) {
+      if (vert.idx >= vertPos.size()) vertPos.resize(vert.idx + 1);
+      vertPos[vert.idx] = vert.pos;
+    }
+  }
+  std::vector<int> vertAssignment(vertPos.size());
+  std::iota(vertAssignment.begin(), vertAssignment.end(), 0);
+
+  Polygons polys_out = Assemble(vertAssignment, edges,
+                                [&vertPos](int vert) { return vertPos[vert]; });
   Identical(polys, polys_out);
 }
 
@@ -70,9 +82,12 @@ void TestPoly(const Polygons &polys, int expectedNumTri,
 TEST(Polygon, NoAssemble) {
   std::vector<EdgeVerts> edges;
   edges.push_back({0, 2});
-  edges.push_back({7, 0});
-  edges.push_back({9, 7});
-  ASSERT_THROW(Assemble(edges), runtimeErr);
+  edges.push_back({1, 2});
+  edges.push_back({0, 1});
+  std::vector<int> vertAssignment = {0, 1, 2};
+  ASSERT_THROW(
+      Assemble(vertAssignment, edges, [](int) { return glm::vec2(0.0 / 0.0); }),
+      runtimeErr);
 }
 
 /**

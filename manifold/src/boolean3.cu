@@ -33,7 +33,7 @@
 #include <thrust/unique.h>
 #include <algorithm>
 
-constexpr bool kVerbose = true;
+constexpr bool kVerbose = false;
 
 using namespace thrust::placeholders;
 
@@ -996,6 +996,7 @@ glm::mat3x2 GetAxisAlignedProjection(glm::vec3 normal) {
 }
 
 void AppendIntersectedFaces(Manifold::Impl &outR,
+                            std::vector<int> &vertAssignmentR,
                             const std::vector<std::vector<EdgeVerts>> &facesP,
                             const Manifold::Impl &inP, bool invertNormals) {
   for (int i = 0; i < facesP.size(); ++i) {
@@ -1022,14 +1023,12 @@ void AppendIntersectedFaces(Manifold::Impl &outR,
         break;
       }
       default: {  // requires triangulation
-        Polygons polys = Assemble(face);
-        glm::mat3x2 projection = GetAxisAlignedProjection(normal);
-        auto &vertPos = outR.vertPos_;
-        for (auto &poly : polys) {
-          for (PolyVert &v : poly) {
-            v.pos = projection * vertPos.H()[v.idx];
-          }
-        }
+        auto &vertPos = outR.vertPos_.H();
+        const glm::mat3x2 projection = GetAxisAlignedProjection(normal);
+        Polygons polys =
+            Assemble(vertAssignmentR, face, [&vertPos, &projection](int vert) {
+              return projection * vertPos[vert];
+            });
         std::vector<glm::ivec3> newTris;
         try {
           newTris = Triangulate(polys);
@@ -1052,12 +1051,12 @@ void AppendIntersectedFaces(Manifold::Impl &outR,
           for (const auto &poly : polys) {
             glm::vec3 centroid = thrust::transform_reduce(
                 poly.begin(), poly.end(),
-                [&vertPos](PolyVert v) { return vertPos.H()[v.idx]; },
+                [&vertPos](PolyVert v) { return vertPos[v.idx]; },
                 glm::vec3(0.0f),
                 [](glm::vec3 a, glm::vec3 b) { return a + b; });
             centroid /= poly.size();
             int newVert = vertPos.size();
-            vertPos.H().push_back(centroid);
+            vertPos.push_back(centroid);
             newTris.push_back({poly.back().idx, poly.front().idx, newVert});
             for (int j = 1; j < poly.size(); ++j)
               newTris.push_back({poly[j - 1].idx, poly[j].idx, newVert});
@@ -1229,8 +1228,8 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
       c1 = 0;
       c2 = 0;
       c3 = 1;
-      break;
       if (kVerbose) std::cout << "INTERSECT" << std::endl;
+      break;
     default:
       throw std::invalid_argument("invalid enum: OpType.");
   }
@@ -1310,6 +1309,9 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
   // calculation switches from parallel to serial.
   std::vector<std::vector<EdgeVerts>> facesP(inP_.NumTri()),
       facesQ(inQ_.NumTri());
+  std::vector<int> vertAssignmentR(outR.NumVert());
+  // initialize verts as pointing to themselves; update as verts are merged.
+  thrust::sequence(vertAssignmentR.begin(), vertAssignmentR.end());
   AppendRetainedEdges(facesP, inP_, i03, i12, p1q2_.Get(0), intersectedTriP,
                       outR.vertPos_, vP2R, nPv + nQv);
   AppendRetainedEdges(facesQ, inQ_, i30, i21, p2q1_.Get(1), intersectedTriQ,
@@ -1322,9 +1324,10 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
 
   // Triangulate the faces and add them to the manifold.
   if (kVerbose) std::cout << "Adding intersected faces of inP" << std::endl;
-  AppendIntersectedFaces(outR, facesP, inP_, false);
+  AppendIntersectedFaces(outR, vertAssignmentR, facesP, inP_, false);
   if (kVerbose) std::cout << "Adding intersected faces of inQ" << std::endl;
-  AppendIntersectedFaces(outR, facesQ, inQ_, op == Manifold::OpType::SUBTRACT);
+  AppendIntersectedFaces(outR, vertAssignmentR, facesQ, inQ_,
+                         op == Manifold::OpType::SUBTRACT);
 
   // Create the manifold's data structures and verify manifoldness.
   outR.Finish();
