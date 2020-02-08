@@ -218,6 +218,15 @@ struct Transform {
   }
 };
 
+struct TransformNormals {
+  const glm::mat3 transform;
+
+  __host__ __device__ void operator()(glm::vec3& normal) {
+    normal = glm::normalize(transform * normal);
+    if (isnan(normal.x)) normal = glm::vec3(0.0f);
+  }
+};
+
 __host__ __device__ uint32_t SpreadBits3(uint32_t v) {
   v = 0xFF0000FFu & (v * 0x00010001u);
   v = 0x0F00F00Fu & (v * 0x00000101u);
@@ -781,6 +790,8 @@ Manifold& Manifold::Warp(std::function<void(glm::vec3&)> warpFunc) {
   pImpl_->ApplyTransform();
   thrust::for_each_n(pImpl_->vertPos_.begin(), NumVert(), warpFunc);
   pImpl_->Update();
+  pImpl_->triNormal_.resize(0);  // force recalculation of triNormal
+  pImpl_->CalculateNormals();
   return *this;
 }
 
@@ -797,7 +808,7 @@ int Manifold::NumOverlaps(const Manifold& B) const {
 
 void Manifold::SetExpectGeometry(bool val) {
   PolygonParams().checkGeometry = val;
-  PolygonParams().intermediateChecks = false;
+  PolygonParams().intermediateChecks = true;
 }
 
 void Manifold::SetSuppressErrors(bool val) {
@@ -905,6 +916,7 @@ Manifold::Impl::Impl(Shape shape) {
 }
 
 void Manifold::Impl::Finish() {
+  if (triVerts_.size() == 0) return;
   ALWAYS_ASSERT(thrust::reduce(triVerts_.beginD(), triVerts_.endD(),
                                glm::ivec3(std::numeric_limits<int>::max()),
                                IdxMin())[0] >= 0,
@@ -940,6 +952,15 @@ void Manifold::Impl::ApplyTransform() const {
 void Manifold::Impl::ApplyTransform() {
   if (transform_ == glm::mat4x3(1.0f)) return;
   thrust::for_each(vertPos_.beginD(), vertPos_.endD(), Transform({transform_}));
+
+  glm::mat3 normalTransform =
+      glm::inverse(glm::transpose(glm::mat3(transform_)));
+  thrust::for_each(triNormal_.beginD(), triNormal_.endD(),
+                   TransformNormals({normalTransform}));
+  thrust::for_each(edgeNormal_.beginD(), edgeNormal_.endD(),
+                   TransformNormals({normalTransform}));
+  thrust::for_each(vertNormal_.beginD(), vertNormal_.endD(),
+                   TransformNormals({normalTransform}));
   // This optimization does a cheap collider update if the transform is
   // axis-aligned.
   if (!collider_.Transform(transform_)) Update();

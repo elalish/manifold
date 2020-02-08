@@ -157,7 +157,7 @@ struct FindCollisions {
     int top = -1;
     // Depth-first search
     int node = kRoot;
-    for (;;) {
+    while(1) {
       int internal = Node2Internal(node);
       int child1 = internalChildren_[internal].first;
       int child2 = internalChildren_[internal].second;
@@ -228,7 +228,7 @@ SparseIndices Collider::Collisions(const VecDH<T>& querriesIn) const {
   int maxOverlaps = 1 << 20;
   SparseIndices querryTri(maxOverlaps);
   int nOverlaps = 0;
-  for (;;) {
+  while(1) {
     // scalar number of overlaps found
     VecDH<int> nOverlapsD(1, 0);
     // calculate Bounding Box overlaps
