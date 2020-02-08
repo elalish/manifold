@@ -33,6 +33,7 @@ inline std::ostream& operator<<(std::ostream& stream, const EdgeVertsD& edge) {
 struct Manifold::Impl {
   Box bBox_;
   VecDH<glm::vec3> vertPos_;
+  VecDH<int> vLabel_;
   VecDH<EdgeVertsD> edgeVerts_;
   VecDH<EdgeTrisD> edgeTris_;
   VecDH<glm::ivec3> triVerts_;
@@ -47,6 +48,7 @@ struct Manifold::Impl {
   Impl(const Mesh&);
   enum class Shape { TETRAHEDRON, CUBE, OCTAHEDRON };
   Impl(Shape);
+  void RemoveChaff();
   void Finish();
   void Update();
   void ApplyTransform() const;

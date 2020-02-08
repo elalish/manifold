@@ -237,11 +237,8 @@ TEST(Manifold, Perturb) {
   // meshList[1].Scale(glm::vec3(4.0f));
   // meshList[0].Translate({0.0f, 0.0f, 1.0f});
 
-  Manifold in = Manifold::Compose(meshList);
-  ExportMesh("perturbIn.ply", in.Extract());
-
   Manifold out = meshList[1] - meshList[0];
-  ExportMesh("perturb.ply", out.Extract());
+  EXPECT_TRUE(out.IsEmpty());
 }
 
 TEST(Manifold, Coplanar) {
@@ -439,13 +436,13 @@ TEST(Manifold, BooleanHorriblePlanar) {
   random2.Rotate(glm::degrees(phi));
   Manifold result = random ^ random2;
   result.Rotate(0, 0, 45).Rotate(glm::degrees(atan(sqrt(2.0f) / tan(phi))));
-  EXPECT_TRUE(result.IsValid());
-  Box BB = result.BoundingBox();
-  float tol = 1e-7;
-  EXPECT_NEAR(BB.Center().x, 0.0f, tol);
-  EXPECT_NEAR(BB.Center().y, 0.0f, tol);
-  EXPECT_NEAR(BB.Size().x, 0.0f, tol);
-  EXPECT_NEAR(BB.Size().y, 0.0f, tol);
-  EXPECT_GT(BB.Size().z, 1.0f);
-  EXPECT_LT(BB.Size().z, 4.0f);
+  EXPECT_TRUE(result.IsEmpty());
+  // Box BB = result.BoundingBox();
+  // float tol = 1e-7;
+  // EXPECT_NEAR(BB.Center().x, 0.0f, tol);
+  // EXPECT_NEAR(BB.Center().y, 0.0f, tol);
+  // EXPECT_NEAR(BB.Size().x, 0.0f, tol);
+  // EXPECT_NEAR(BB.Size().y, 0.0f, tol);
+  // EXPECT_GT(BB.Size().z, 1.0f);
+  // EXPECT_LT(BB.Size().z, 4.0f);
 }
