@@ -27,6 +27,8 @@
 namespace {
 using namespace manifold;
 
+constexpr float kTolerance = 1e-5;
+
 struct NormalizeTo {
   float length;
   __host__ __device__ void operator()(glm::vec3& v) {
@@ -173,6 +175,69 @@ struct SplitTris {
         }
       }
     }
+  }
+};
+
+__host__ __device__ void AtomicAddFloat(float& target, float add) {
+#ifdef __CUDA_ARCH__
+  atomicAdd(&target, add);
+#else
+#pragma omp atomic
+  target += add;
+#endif
+}
+
+struct AreaVolume {
+  float* surfaceArea;
+  float* volume;
+  const int* vLabel;
+  const glm::vec3* vertPos;
+
+  __host__ __device__ void operator()(const glm::ivec3& triVerts) {
+    glm::vec3 edge[3];
+    float perimeter = 0.0f;
+    for (int i : {0, 1, 2}) {
+      edge[i] = vertPos[triVerts[(i + 1) % 3]] - vertPos[triVerts[i]];
+      perimeter += glm::length(edge[i]);
+    }
+    glm::vec3 crossP = glm::cross(edge[0], edge[1]);
+    float area = glm::length(crossP) / 2.0f;
+    if (area > perimeter * kTolerance) {
+      int comp = vLabel[triVerts[0]];
+      AtomicAddFloat(surfaceArea[comp], area);
+      AtomicAddFloat(volume[comp],
+                     glm::dot(crossP, vertPos[triVerts[0]]) / 6.0f);
+    }
+  }
+};
+
+struct ClampVolume {
+  __host__ __device__ void operator()(thrust::tuple<float&, float> inOut) {
+    float& volume = thrust::get<0>(inOut);
+    float surfaceArea = thrust::get<1>(inOut);
+
+    if (glm::abs(volume) < surfaceArea * kTolerance) volume = 0.0f;
+  }
+};
+
+struct RemoveVert {
+  const float* volume;
+
+  __host__ __device__ bool operator()(thrust::tuple<int, int, glm::vec3> in) {
+    int vLabel = thrust::get<0>(in);
+    return volume[vLabel] == 0.0f;
+  }
+};
+
+struct ReindexAndRemove {
+  const int* oldVert2New;
+
+  __host__ __device__ bool operator()(glm::ivec3& triVerts) {
+    if (oldVert2New[triVerts[0]] < 0) return true;
+    for (int i : {0, 1, 2}) {
+      triVerts[i] = oldVert2New[triVerts[i]];
+    }
+    return false;
   }
 };
 
@@ -915,6 +980,39 @@ Manifold::Impl::Impl(Shape shape) {
   Finish();
 }
 
+void Manifold::Impl::RemoveChaff() {
+  CreateEdges();
+  int n_comp = ConnectedComponents(vLabel_, NumVert(), edgeVerts_);
+
+  VecDH<float> surfaceArea(n_comp), volume(n_comp);
+  thrust::for_each_n(triVerts_.beginD(), NumTri(),
+                     AreaVolume({surfaceArea.ptrD(), volume.ptrD(),
+                                 vLabel_.cptrD(), vertPos_.cptrD()}));
+  thrust::for_each_n(zip(volume.beginD(), surfaceArea.beginD()), n_comp,
+                     ClampVolume());
+
+  VecDH<int> newVert2Old(NumVert());
+  thrust::sequence(newVert2Old.begin(), newVert2Old.end());
+  auto begin = zip(vLabel_.beginD(), newVert2Old.beginD(), vertPos_.beginD());
+  int newNumVert =
+      thrust::remove_if(
+          begin, zip(vLabel_.endD(), newVert2Old.endD(), vertPos_.endD()),
+          RemoveVert({volume.cptrD()})) -
+      begin;
+
+  VecDH<int> oldVert2New(NumVert(), -1);
+  vertPos_.resize(newNumVert);
+  vLabel_.resize(newNumVert);
+  thrust::scatter(thrust::make_counting_iterator(0),
+                  thrust::make_counting_iterator(newNumVert),
+                  newVert2Old.beginD(), oldVert2New.beginD());
+
+  int newNumTri = thrust::remove_if(triVerts_.beginD(), triVerts_.endD(),
+                                    ReindexAndRemove({oldVert2New.cptrD()})) -
+                  triVerts_.beginD();
+  triVerts_.resize(newNumTri);
+}
+
 void Manifold::Impl::Finish() {
   if (triVerts_.size() == 0) return;
   ALWAYS_ASSERT(thrust::reduce(triVerts_.beginD(), triVerts_.endD(),
@@ -924,6 +1022,7 @@ void Manifold::Impl::Finish() {
   ALWAYS_ASSERT(thrust::reduce(triVerts_.beginD(), triVerts_.endD(),
                                glm::ivec3(-1), IdxMax())[0] < NumVert(),
                 runtimeErr, "Vertex index exceeds number of verts!");
+  if (vLabel_.size() != NumVert()) vLabel_.resize(NumVert(), 0);
   CalculateBBox();
   SortVerts();
   VecDH<Box> triBox;
@@ -1016,8 +1115,9 @@ void Manifold::Impl::SortVerts() {
 
   VecDH<int> vertNew2Old(NumVert());
   thrust::sequence(vertNew2Old.beginD(), vertNew2Old.endD());
-  thrust::sort_by_key(vertMorton.beginD(), vertMorton.endD(),
-                      zip(vertPos_.beginD(), vertNew2Old.beginD()));
+  thrust::sort_by_key(
+      vertMorton.beginD(), vertMorton.endD(),
+      zip(vertPos_.beginD(), vLabel_.beginD(), vertNew2Old.beginD()));
 
   VecDH<int> vertOld2New(NumVert());
   thrust::scatter(thrust::make_counting_iterator(0),

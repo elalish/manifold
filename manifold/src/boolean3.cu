@@ -320,7 +320,7 @@ __host__ __device__ Val BinarySearchByKey(
   int right = size - 1;
   int m;
   thrust::pair<int, int> keyM;
-  for (;;) {
+  while (1) {
     m = right - (right - left) / 2;
     keyM = thrust::make_pair(keys.first[m], keys.second[m]);
     if (left == right) break;
@@ -1330,6 +1330,7 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
                          op == Manifold::OpType::SUBTRACT);
 
   // Create the manifold's data structures and verify manifoldness.
+  outR.RemoveChaff();
   outR.Finish();
 
   return outR;
