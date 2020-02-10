@@ -298,6 +298,23 @@ TEST(Manifold, SplitByPlane60) {
 }
 
 /**
+ * This tests that non-intersecting geometry is properly retained.
+ */
+TEST(Manifold, BooleanVug) {
+  Manifold::SetExpectGeometry(true);
+  Manifold cube = Manifold::Cube(glm::vec3(4.0f), true);
+  Manifold vug = cube - Manifold::Cube();
+
+  EXPECT_EQ(vug.Genus(), -1);
+
+  Manifold half = vug.SplitByPlane(glm::vec3(0.0f, 0.0f, 1.0f), -1.0f).first;
+
+  EXPECT_EQ(half.Genus(), -1);
+  EXPECT_FLOAT_EQ(half.Volume(), 4.0 * 4.0 * 3.0 - 1.0);
+  EXPECT_FLOAT_EQ(half.SurfaceArea(), 16.0 * 2 + 12.0 * 4 + 6.0);
+}
+
+/**
  * These tests verify correct topology and geometry for complex boolean
  * operations between valid shapes with many faces.
  */

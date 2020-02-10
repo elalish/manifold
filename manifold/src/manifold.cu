@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <thrust/count.h>
 #include <thrust/gather.h>
 #include <thrust/logical.h>
 #include <thrust/sequence.h>
@@ -190,7 +191,7 @@ __host__ __device__ void AtomicAddFloat(float& target, float add) {
 struct AreaVolume {
   float* surfaceArea;
   float* volume;
-  const int* vLabel;
+  const int* vertLabel;
   const glm::vec3* vertPos;
 
   __host__ __device__ void operator()(const glm::ivec3& triVerts) {
@@ -203,7 +204,7 @@ struct AreaVolume {
     glm::vec3 crossP = glm::cross(edge[0], edge[1]);
     float area = glm::length(crossP) / 2.0f;
     if (area > perimeter * kTolerance) {
-      int comp = vLabel[triVerts[0]];
+      int comp = vertLabel[triVerts[0]];
       AtomicAddFloat(surfaceArea[comp], area);
       AtomicAddFloat(volume[comp],
                      glm::dot(crossP, vertPos[triVerts[0]]) / 6.0f);
@@ -220,12 +221,16 @@ struct ClampVolume {
   }
 };
 
+struct NonZero {
+  __host__ __device__ bool operator()(float val) { return val != 0.0f; }
+};
+
 struct RemoveVert {
   const float* volume;
 
   __host__ __device__ bool operator()(thrust::tuple<int, int, glm::vec3> in) {
-    int vLabel = thrust::get<0>(in);
-    return volume[vLabel] == 0.0f;
+    int vertLabel = thrust::get<0>(in);
+    return volume[vertLabel] == 0.0f;
   }
 };
 
@@ -982,27 +987,29 @@ Manifold::Impl::Impl(Shape shape) {
 
 void Manifold::Impl::RemoveChaff() {
   CreateEdges();
-  int n_comp = ConnectedComponents(vLabel_, NumVert(), edgeVerts_);
+  int n_comp = ConnectedComponents(vertLabel_, NumVert(), edgeVerts_);
 
   VecDH<float> surfaceArea(n_comp), volume(n_comp);
   thrust::for_each_n(triVerts_.beginD(), NumTri(),
                      AreaVolume({surfaceArea.ptrD(), volume.ptrD(),
-                                 vLabel_.cptrD(), vertPos_.cptrD()}));
+                                 vertLabel_.cptrD(), vertPos_.cptrD()}));
   thrust::for_each_n(zip(volume.beginD(), surfaceArea.beginD()), n_comp,
                      ClampVolume());
+  numLabel_ = thrust::count_if(volume.beginD(), volume.endD(), NonZero());
 
   VecDH<int> newVert2Old(NumVert());
   thrust::sequence(newVert2Old.begin(), newVert2Old.end());
-  auto begin = zip(vLabel_.beginD(), newVert2Old.beginD(), vertPos_.beginD());
+  auto begin =
+      zip(vertLabel_.beginD(), newVert2Old.beginD(), vertPos_.beginD());
   int newNumVert =
       thrust::remove_if(
-          begin, zip(vLabel_.endD(), newVert2Old.endD(), vertPos_.endD()),
+          begin, zip(vertLabel_.endD(), newVert2Old.endD(), vertPos_.endD()),
           RemoveVert({volume.cptrD()})) -
       begin;
 
   VecDH<int> oldVert2New(NumVert(), -1);
   vertPos_.resize(newNumVert);
-  vLabel_.resize(newNumVert);
+  vertLabel_.resize(newNumVert);
   thrust::scatter(thrust::make_counting_iterator(0),
                   thrust::make_counting_iterator(newNumVert),
                   newVert2Old.beginD(), oldVert2New.beginD());
@@ -1022,7 +1029,11 @@ void Manifold::Impl::Finish() {
   ALWAYS_ASSERT(thrust::reduce(triVerts_.beginD(), triVerts_.endD(),
                                glm::ivec3(-1), IdxMax())[0] < NumVert(),
                 runtimeErr, "Vertex index exceeds number of verts!");
-  if (vLabel_.size() != NumVert()) vLabel_.resize(NumVert(), 0);
+  if (vertLabel_.size() != NumVert()) {
+    vertLabel_.resize(NumVert());
+    numLabel_ = 1;
+    thrust::fill(vertLabel_.beginD(), vertLabel_.endD(), 0);
+  }
   CalculateBBox();
   SortVerts();
   VecDH<Box> triBox;
@@ -1117,7 +1128,7 @@ void Manifold::Impl::SortVerts() {
   thrust::sequence(vertNew2Old.beginD(), vertNew2Old.endD());
   thrust::sort_by_key(
       vertMorton.beginD(), vertMorton.endD(),
-      zip(vertPos_.beginD(), vLabel_.beginD(), vertNew2Old.beginD()));
+      zip(vertPos_.beginD(), vertLabel_.beginD(), vertNew2Old.beginD()));
 
   VecDH<int> vertOld2New(NumVert());
   thrust::scatter(thrust::make_counting_iterator(0),

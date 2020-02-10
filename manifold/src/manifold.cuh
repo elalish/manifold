@@ -33,7 +33,8 @@ inline std::ostream& operator<<(std::ostream& stream, const EdgeVertsD& edge) {
 struct Manifold::Impl {
   Box bBox_;
   VecDH<glm::vec3> vertPos_;
-  VecDH<int> vLabel_;
+  VecDH<int> vertLabel_;
+  int numLabel_ = 1;
   VecDH<EdgeVertsD> edgeVerts_;
   VecDH<EdgeTrisD> edgeTris_;
   VecDH<glm::ivec3> triVerts_;
