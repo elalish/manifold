@@ -130,21 +130,21 @@ struct CopyTriEdges {
 
 SparseIndices Filter02(const Manifold::Impl &inP, const Manifold::Impl &inQ,
                        const VecDH<int> &edges, const VecDH<int> &tris) {
-  // find one vertex from each connected component of inP (in case it has no
-  // intersections)
-  VecDH<int> vLabels;
-  int n_comp = ConnectedComponents(vLabels, inP.NumVert(), inP.edgeVerts_);
-  thrust::sort(vLabels.beginD(), vLabels.endD());
-  thrust::unique(vLabels.beginD(), vLabels.endD());
   // find inP's involved vertices from edges & tris
-  VecDH<int> A0(2 * edges.size() + 3 * tris.size() + n_comp);
+  VecDH<int> A0(2 * edges.size() + 3 * tris.size() + inP.numLabel_);
   thrust::for_each_n(zip(thrust::make_counting_iterator(0), edges.beginD()),
                      edges.size(),
                      CopyEdgeVerts({A0.ptrD(), inP.edgeVerts_.cptrD()}));
   thrust::for_each_n(
       zip(thrust::make_counting_iterator(0), tris.beginD()), tris.size(),
       CopyTriVerts({A0.ptrD() + 2 * edges.size(), inP.triVerts_.cptrD()}));
-  thrust::copy(vLabels.beginD(), vLabels.beginD() + n_comp, A0.endD() - n_comp);
+  // find one vertex from each connected component of inP (in case it has no
+  // intersections)
+  thrust::lower_bound(inP.vertLabel_.beginD(), inP.vertLabel_.endD(),
+                      thrust::make_counting_iterator(0),
+                      thrust::make_counting_iterator(inP.numLabel_),
+                      A0.endD() - inP.numLabel_);
+
   thrust::sort(A0.beginD(), A0.endD());
   A0.resize(thrust::unique(A0.beginD(), A0.endD()) - A0.beginD());
   // find which inQ faces shadow these vertices
@@ -691,12 +691,12 @@ VecDH<int> Winding03(const Manifold::Impl &inP, SparseIndices &p0q2,
                   w03.beginD());
 
   // find connected regions (separated by intersections)
-  VecDH<int> vLabels;
-  int n_comp =
-      ConnectedComponents(vLabels, inP.NumVert(), inP.edgeVerts_, keepEdgesP);
+  VecDH<int> vertLabels;
+  int n_comp = ConnectedComponents(vertLabels, inP.NumVert(), inP.edgeVerts_,
+                                   keepEdgesP);
   // flood the w03 values throughout their connected components (they are
   // consistent)
-  FloodComponents(w03, vLabels, n_comp);
+  FloodComponents(w03, vertLabels, n_comp);
 
   if (kVerbose) std::cout << n_comp << " components" << std::endl;
 
