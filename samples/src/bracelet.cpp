@@ -62,9 +62,8 @@ Manifold StretchyBracelet(float radius, float height, float width,
   float ri = ro - height;
   float a = glm::pi<float>() * 2 * ri / m - thickness;
 
-  return Base(r1, width, radius, rr,
-              n);  // -
-                   //  Base(r1 - thickness, width, radius, rr, n);
+  return Base(r1, width, radius, rr, n) -
+         Base(r1 - thickness, width, radius, rr, n);
 
   // module hollow(){
   // difference(){

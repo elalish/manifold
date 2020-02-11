@@ -53,7 +53,7 @@ __host__ __device__ glm::vec2 Interpolate(glm::vec3 pL, glm::vec3 pR, float x) {
   //   printf("dxL = %f, dxR = %f\n", dxL, dxR);
   bool useL = fabs(dxL) < fabs(dxR);
   float lambda = (useL ? dxL : dxR) / (pR.x - pL.x);
-  // if (isnan(lambda)) return glm::vec2(pL.y, pL.z);
+  if (isnan(lambda)) return glm::vec2(pL.y, pL.z);
   glm::vec2 yz;
   yz[0] = (useL ? pL.y : pR.y) + lambda * (pR.y - pL.y);
   yz[1] = (useL ? pL.z : pR.z) + lambda * (pR.z - pL.z);
