@@ -50,5 +50,6 @@ TEST(Samples, Knot42) {
 TEST(Samples, Bracelet) {
   Manifold::SetExpectGeometry(false);
   Manifold bracelet = StretchyBracelet();
+  EXPECT_EQ(bracelet.Genus(), 1);
   ExportMesh("bracelet.ply", bracelet.Extract());
 }
