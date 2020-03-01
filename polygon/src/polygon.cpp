@@ -589,28 +589,29 @@ int CCW(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2) {
     return area > 0 ? 1 : -1;
 }
 
-Polygons Assemble(const std::vector<EdgeVerts> &halfedges) {
+Polygons Assemble(std::vector<int> &vertAssignment,
+                  const std::vector<EdgeVerts> &edges,
+                  std::function<glm::vec2(int)> vertProjection) {
   Polygons polys;
   std::map<int, int> vert_edge;
-  for (int i = 0; i < halfedges.size(); ++i) {
-    ALWAYS_ASSERT(
-        vert_edge.emplace(std::make_pair(halfedges[i].first, i)).second,
-        runtimeErr, "polygon has duplicate vertices.");
+  for (int i = 0; i < edges.size(); ++i) {
+    ALWAYS_ASSERT(vert_edge.emplace(std::make_pair(edges[i].first, i)).second,
+                  runtimeErr, "polygon has duplicate vertices.");
   }
-  auto startEdge = halfedges.begin();
-  auto thisEdge = halfedges.begin();
+  auto startEdge = edges.begin();
+  auto thisEdge = edges.begin();
   for (;;) {
     if (thisEdge == startEdge) {
       if (vert_edge.empty()) break;
-      startEdge = std::next(halfedges.begin(), vert_edge.begin()->second);
+      startEdge = std::next(edges.begin(), vert_edge.begin()->second);
       thisEdge = startEdge;
       polys.push_back({});
     }
-    polys.back().push_back(
-        {glm::vec2(1.0f / 0.0f), thisEdge->first, thisEdge->edge});
+    int vert = thisEdge->first;
+    polys.back().push_back({vertProjection(vert), vert, thisEdge->edge});
     auto result = vert_edge.find(thisEdge->second);
     ALWAYS_ASSERT(result != vert_edge.end(), runtimeErr, "nonmanifold edge");
-    thisEdge = std::next(halfedges.begin(), result->second);
+    thisEdge = std::next(edges.begin(), result->second);
     vert_edge.erase(result);
   }
   return polys;

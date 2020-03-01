@@ -49,10 +49,11 @@ __host__ __device__ glm::vec2 Interpolate(glm::vec3 pL, glm::vec3 pR, float x) {
   float dxL = x - pL.x;
   float dxR = x - pR.x;
   // assert dxL and dxR have opposite signs, cannot both be zero
-  // if (dxL * dxR > 0 || (dxL == 0 && dxR == 0))
+  // if (!(dxL * dxR <= 0 && (dxL != 0 || dxR != 0)))
   //   printf("dxL = %f, dxR = %f\n", dxL, dxR);
   bool useL = fabs(dxL) < fabs(dxR);
   float lambda = (useL ? dxL : dxR) / (pR.x - pL.x);
+  if (isnan(lambda)) return glm::vec2(pL.y, pL.z);
   glm::vec2 yz;
   yz[0] = (useL ? pL.y : pR.y) + lambda * (pR.y - pL.y);
   yz[1] = (useL ? pL.z : pR.z) + lambda * (pR.z - pL.z);
@@ -64,17 +65,18 @@ __host__ __device__ glm::vec4 Intersect(const glm::vec3 &pL,
                                         const glm::vec3 &qL,
                                         const glm::vec3 &qR) {
   // assert pL.x == qL.x, pR.x == qR.x
-  // if (pL.x != qL.x || pR.x != qR.x)
+  // if (!(pL.x == qL.x && pR.x == qR.x))
   //   printf("pL.x = %f, qL.x = %f, pR.x = %f, qR.x = %f\n", pL.x, qL.x, pR.x,
   //          qR.x);
   float dyL = qL.y - pL.y;
   float dyR = qR.y - pR.y;
   // assert dyL and dyR have opposite signs, cannot both be zero
-  // if (dyL * dyR > 0 || (dyL == 0 && dyR == 0))
+  // if (!(dyL * dyR <= 0 && (dyL != 0 || dyR != 0)))
   //   printf("dyL = %f, dyR = %f\n", dyL, dyR);
   bool useL = fabs(dyL) < fabs(dyR);
   float dx = pR.x - pL.x;
   float lambda = (useL ? dyL : dyR) / (dyL - dyR);
+  if (isnan(lambda)) lambda = 0.0f;
   glm::vec4 xyzz;
   xyzz.x = (useL ? pL.x : pR.x) + lambda * dx;
   float pDy = pR.y - pL.y;
@@ -128,21 +130,21 @@ struct CopyTriEdges {
 
 SparseIndices Filter02(const Manifold::Impl &inP, const Manifold::Impl &inQ,
                        const VecDH<int> &edges, const VecDH<int> &tris) {
-  // find one vertex from each connected component of inP (in case it has no
-  // intersections)
-  VecDH<int> vLabels;
-  int n_comp = ConnectedComponents(vLabels, inP.NumVert(), inP.edgeVerts_);
-  thrust::sort(vLabels.beginD(), vLabels.endD());
-  thrust::unique(vLabels.beginD(), vLabels.endD());
   // find inP's involved vertices from edges & tris
-  VecDH<int> A0(2 * edges.size() + 3 * tris.size() + n_comp);
+  VecDH<int> A0(2 * edges.size() + 3 * tris.size() + inP.numLabel_);
   thrust::for_each_n(zip(thrust::make_counting_iterator(0), edges.beginD()),
                      edges.size(),
                      CopyEdgeVerts({A0.ptrD(), inP.edgeVerts_.cptrD()}));
   thrust::for_each_n(
       zip(thrust::make_counting_iterator(0), tris.beginD()), tris.size(),
       CopyTriVerts({A0.ptrD() + 2 * edges.size(), inP.triVerts_.cptrD()}));
-  thrust::copy(vLabels.beginD(), vLabels.beginD() + n_comp, A0.endD() - n_comp);
+  // find one vertex from each connected component of inP (in case it has no
+  // intersections)
+  thrust::lower_bound(inP.vertLabel_.beginD(), inP.vertLabel_.endD(),
+                      thrust::make_counting_iterator(0),
+                      thrust::make_counting_iterator(inP.numLabel_),
+                      A0.endD() - inP.numLabel_);
+
   thrust::sort(A0.beginD(), A0.endD());
   A0.resize(thrust::unique(A0.beginD(), A0.endD()) - A0.beginD());
   // find which inQ faces shadow these vertices
@@ -177,12 +179,12 @@ SparseIndices Filter11(const Manifold::Impl &inP, const Manifold::Impl &inQ,
   thrust::for_each_n(
       zip(thrust::make_counting_iterator(0), p1q2.beginD(0), p1q2.beginD(1)),
       p1q2.size(), Fill11({p1q1.ptrDpq(), inQ.triEdges_.cptrD()}));
-  p1q1.Swap();
+  p1q1.SwapPQ();
   thrust::for_each_n(zip(thrust::make_counting_iterator(p1q2.size()),
                          p2q1.beginD(1), p2q1.beginD(0)),
                      p2q1.size(),
                      Fill11({p1q1.ptrDpq(), inP.triEdges_.cptrD()}));
-  p1q1.Swap();
+  p1q1.SwapPQ();
   p1q1.Unique();
   return p1q1;
 }
@@ -227,21 +229,33 @@ struct AbsSum : public thrust::binary_function<int, int, int> {
   __host__ __device__ int operator()(int a, int b) { return abs(a) + abs(b); }
 };
 
+__host__ __device__ bool Shadows(float p, float q, float dir) {
+  return p == q ? dir < 0 : p < q;
+}
+
 struct ShadowKernel01 {
   const bool reverse;
   const glm::vec3 *vertPosP;
   const glm::vec3 *vertPosQ;
+  const EdgeVertsD *edgeVertsQ;
+  const float expandP;
+  const glm::vec3 *normalP;
 
-  __host__ __device__ void operator()(
-      thrust::tuple<int &, int, EdgeVertsD> inout) {
+  __host__ __device__ void operator()(thrust::tuple<int &, int, int> inout) {
     int &s01 = thrust::get<0>(inout);
     int vertP = thrust::get<1>(inout);
-    EdgeVertsD edgeVertsQ = thrust::get<2>(inout);
+    int edgeQ = thrust::get<2>(inout);
 
-    s01 = reverse ? (vertPosQ[edgeVertsQ.first].x <= vertPosP[vertP].x) -
-                        (vertPosQ[edgeVertsQ.second].x <= vertPosP[vertP].x)
-                  : (vertPosQ[edgeVertsQ.second].x >= vertPosP[vertP].x) -
-                        (vertPosQ[edgeVertsQ.first].x >= vertPosP[vertP].x);
+    int vertQ0 = edgeVertsQ[edgeQ].first;
+    int vertQ1 = edgeVertsQ[edgeQ].second;
+    float p = vertPosP[vertP].x;
+    float q0 = vertPosQ[vertQ0].x;
+    float q1 = vertPosQ[vertQ1].x;
+    s01 = reverse
+              ? Shadows(q0, p, expandP * normalP[vertQ0].x) -
+                    Shadows(q1, p, expandP * normalP[vertQ1].x)
+              : Shadows(p, q1, expandP * normalP[vertP].x) -
+                    Shadows(p, q0, expandP * normalP[vertP].x);
   }
 };
 
@@ -249,21 +263,28 @@ struct Kernel01 {
   const bool reverse;
   const glm::vec3 *vertPosP;
   const glm::vec3 *vertPosQ;
+  const EdgeVertsD *edgeVertsQ;
+  const float expandP;
+  const glm::vec3 *normalP;
 
   __host__ __device__ void operator()(
-      thrust::tuple<glm::vec2 &, int &, EdgeVertsD, int> inout) {
+      thrust::tuple<glm::vec2 &, int &, int, int> inout) {
     glm::vec2 &yz01 = thrust::get<0>(inout);
     int &s01 = thrust::get<1>(inout);
-    EdgeVertsD edgeVertsQ = thrust::get<2>(inout);
-    int vertP = thrust::get<3>(inout);
+    int vertP = thrust::get<2>(inout);
+    int edgeQ = thrust::get<3>(inout);
 
-    glm::vec3 vertPos0 = vertPosQ[edgeVertsQ.first];
-    glm::vec3 vertPos1 = vertPosQ[edgeVertsQ.second];
+    int vertQ0 = edgeVertsQ[edgeQ].first;
+    int vertQ1 = edgeVertsQ[edgeQ].second;
+    glm::vec3 vertPos0 = vertPosQ[vertQ0];
+    glm::vec3 vertPos1 = vertPosQ[vertQ1];
     yz01 = Interpolate(vertPos0, vertPos1, vertPosP[vertP].x);
     if (reverse) {
-      if (yz01[0] > vertPosP[vertP].y) s01 = 0;
+      if (!Shadows(yz01[0], vertPosP[vertP].y, expandP * normalP[edgeQ].y))
+        s01 = 0;
     } else {
-      if (yz01[0] < vertPosP[vertP].y) s01 = 0;
+      if (!Shadows(vertPosP[vertP].y, yz01[0], expandP * normalP[vertP].y))
+        s01 = 0;
     }
   }
 };
@@ -271,21 +292,23 @@ struct Kernel01 {
 std::tuple<VecDH<int>, VecDH<glm::vec2>> Shadow01(SparseIndices &p0q1,
                                                   const Manifold::Impl &inP,
                                                   const Manifold::Impl &inQ,
-                                                  bool reverse) {
-  // TODO: remove reverse once symbolic perturbation is updated to be per-vertex
+                                                  bool reverse, float expandP) {
   VecDH<int> s01(p0q1.size());
-  if (reverse) p0q1.Swap();
-  auto BedgeV = perm(inQ.edgeVerts_.beginD(), p0q1.beginD(1));
+  if (reverse) p0q1.SwapPQ();
+  auto normalP = reverse ? inQ.vertNormal_.cptrD() : inP.vertNormal_.cptrD();
   thrust::for_each_n(
-      zip(s01.beginD(), p0q1.beginD(0), BedgeV), p0q1.size(),
-      ShadowKernel01({reverse, inP.vertPos_.cptrD(), inQ.vertPos_.cptrD()}));
+      zip(s01.beginD(), p0q1.beginD(0), p0q1.beginD(1)), p0q1.size(),
+      ShadowKernel01({reverse, inP.vertPos_.cptrD(), inQ.vertPos_.cptrD(),
+                      inQ.edgeVerts_.cptrD(), expandP, normalP}));
   size_t size = p0q1.RemoveZeros(s01);
   VecDH<glm::vec2> yz01(size);
-  BedgeV = perm(inQ.edgeVerts_.beginD(), p0q1.beginD(1));
+
+  normalP = reverse ? inQ.edgeNormal_.cptrD() : inP.vertNormal_.cptrD();
   thrust::for_each_n(
-      zip(yz01.beginD(), s01.beginD(), BedgeV, p0q1.beginD(0)), size,
-      Kernel01({reverse, inP.vertPos_.cptrD(), inQ.vertPos_.cptrD()}));
-  if (reverse) p0q1.Swap();
+      zip(yz01.beginD(), s01.beginD(), p0q1.beginD(0), p0q1.beginD(1)), size,
+      Kernel01({reverse, inP.vertPos_.cptrD(), inQ.vertPos_.cptrD(),
+                inQ.edgeVerts_.cptrD(), expandP, normalP}));
+  if (reverse) p0q1.SwapPQ();
   return std::make_tuple(s01, yz01);
 }
 
@@ -298,7 +321,7 @@ __host__ __device__ Val BinarySearchByKey(
   int right = size - 1;
   int m;
   thrust::pair<int, int> keyM;
-  for (;;) {
+  while (1) {
     m = right - (right - left) / 2;
     keyM = thrust::make_pair(keys.first[m], keys.second[m]);
     if (left == right) break;
@@ -313,7 +336,7 @@ __host__ __device__ Val BinarySearchByKey(
     return missingVal;
 }
 
-struct Gather01 {
+struct Gather11 {
   const thrust::pair<const int *, const int *> p0q1;
   const int *s01;
   const int size;
@@ -334,26 +357,6 @@ struct Gather01 {
   }
 };
 
-__host__ __device__ glm::ivec2 Middle2of4(glm::vec4 in) {
-  glm::ivec4 idx(0, 1, 2, 3);
-#define SWAP(a, b)     \
-  if (in[b] < in[a]) { \
-    float x1 = in[a];  \
-    in[a] = in[b];     \
-    in[b] = x1;        \
-    int idx1 = idx[a]; \
-    idx[a] = idx[b];   \
-    idx[b] = idx1;     \
-  }
-  SWAP(0, 1);
-  SWAP(2, 3);
-  SWAP(0, 2);
-  SWAP(1, 3);
-  SWAP(1, 2);
-#undef SWAP
-  return glm::ivec2(idx[1], idx[2]);
-}
-
 struct Kernel11 {
   const glm::vec3 *vertPosP;
   const glm::vec3 *vertPosQ;
@@ -365,6 +368,8 @@ struct Kernel11 {
   thrust::pair<const int *, const int *> p1q0;
   const glm::vec2 *yz10;
   int size10;
+  float expandP;
+  const glm::vec3 *normalP;
 
   __host__ __device__ void operator()(
       thrust::tuple<glm::vec4 &, int &, int, int> inout) {
@@ -373,46 +378,34 @@ struct Kernel11 {
     const int p1 = thrust::get<2>(inout);
     const int q1 = thrust::get<3>(inout);
 
-    thrust::pair<int, int> key4[4];
-    key4[0] = thrust::make_pair(edgeVertsP[p1].first, q1);
-    key4[1] = thrust::make_pair(edgeVertsP[p1].second, q1);
-    key4[2] = thrust::make_pair(p1, edgeVertsQ[q1].first);
-    key4[3] = thrust::make_pair(p1, edgeVertsQ[q1].second);
+    glm::vec3 p2[2], q2[2];
+    int k = 0;
+    thrust::pair<int, int> key2[2];
 
-    glm::vec3 vertPos4[4];
-    glm::vec4 x;
-    for (int i : {0, 1, 2, 3}) {
-      vertPos4[i] = i < 2 ? vertPosP[key4[i].first] : vertPosQ[key4[i].second];
-      x[i] = vertPos4[i].x;
+    key2[0] = thrust::make_pair(edgeVertsP[p1].first, q1);
+    key2[1] = thrust::make_pair(edgeVertsP[p1].second, q1);
+    for (int i : {0, 1}) {
+      p2[k] = vertPosP[key2[i].first];
+      q2[k] = glm::vec3(p2[k].x, BinarySearchByKey(p0q1, yz01, size01, key2[i],
+                                                   glm::vec2(0.0f / 0.0f)));
+      if (!isnan(q2[k].y)) k++;
     }
-    const glm::ivec2 tmpLR = Middle2of4(x);
-    const int idxL = tmpLR.x;
-    const int idxR = tmpLR.y;
 
-    auto pq = idxL < 2 ? p0q1 : p1q0;
-    auto yz = idxL < 2 ? yz01 : yz10;
-    int size = idxL < 2 ? size01 : size10;
-    const glm::vec2 yzL =
-        BinarySearchByKey(pq, yz, size, key4[idxL], glm::vec2(0.0f / 0.0f));
-    pq = idxR < 2 ? p0q1 : p1q0;
-    yz = idxR < 2 ? yz01 : yz10;
-    size = idxR < 2 ? size01 : size10;
-    const glm::vec2 yzR =
-        BinarySearchByKey(pq, yz, size, key4[idxR], glm::vec2(0.0f / 0.0f));
+    key2[0] = thrust::make_pair(p1, edgeVertsQ[q1].first);
+    key2[1] = thrust::make_pair(p1, edgeVertsQ[q1].second);
+    for (int i : {0, 1}) {
+      if (k > 1) break;
+      q2[k] = vertPosQ[key2[i].second];
+      p2[k] = glm::vec3(q2[k].x, BinarySearchByKey(p1q0, yz10, size10, key2[i],
+                                                   glm::vec2(0.0f / 0.0f)));
+      if (!isnan(p2[k].y)) k++;
+    }
 
-    glm::vec3 pL, pR, qL, qR;
-    pL = vertPos4[idxL];
-    qL.x = pL.x;
-    qL.y = yzL[0];
-    qL.z = yzL[1];
-    if (idxL > 1) thrust::swap(pL, qL);  // idxL is an endpoint of Q
-    pR = vertPos4[idxR];
-    qR.x = pR.x;
-    qR.y = yzR[0];
-    qR.z = yzR[1];
-    if (idxR > 1) thrust::swap(pR, qR);  // idxR is an endpoint of Q
-    xyzz11 = Intersect(pL, pR, qL, qR);
-    if (xyzz11.z > xyzz11.w) s11 = 0;
+    // assert two of these four were found
+    if (k != 2) printf("k = %d\n", k);
+
+    xyzz11 = Intersect(p2[0], p2[1], q2[0], q2[1]);
+    if (!Shadows(xyzz11.z, xyzz11.w, expandP * normalP[p1].z)) s11 = 0;
   }
 };
 
@@ -420,16 +413,16 @@ std::tuple<VecDH<int>, VecDH<glm::vec4>> Shadow11(
     SparseIndices &p1q1, const Manifold::Impl &inP, const Manifold::Impl &inQ,
     const SparseIndices &p0q1, const VecDH<int> &s01,
     const VecDH<glm::vec2> &yz01, const SparseIndices &p1q0,
-    const VecDH<int> &s10, const VecDH<glm::vec2> &yz10) {
+    const VecDH<int> &s10, const VecDH<glm::vec2> &yz10, float expandP) {
   VecDH<int> s11(p1q1.size(), 0);
 
   thrust::for_each_n(zip(s11.beginD(), p1q1.beginD(0), p1q1.beginD(1)),
                      p1q1.size(),
-                     Gather01({p0q1.ptrDpq(), s01.ptrD(), p0q1.size(),
+                     Gather11({p0q1.ptrDpq(), s01.ptrD(), p0q1.size(),
                                inP.edgeVerts_.ptrD(), false}));
   thrust::for_each_n(zip(s11.beginD(), p1q1.beginD(1), p1q1.beginD(0)),
                      p1q1.size(),
-                     Gather01({p1q0.ptrDpq(), s10.ptrD(), p1q0.size(),
+                     Gather11({p1q0.ptrDpq(), s10.ptrD(), p1q0.size(),
                                inQ.edgeVerts_.ptrD(), true}));
 
   size_t size = p1q1.RemoveZeros(s11);
@@ -438,9 +431,10 @@ std::tuple<VecDH<int>, VecDH<glm::vec4>> Shadow11(
   thrust::for_each_n(
       zip(xyzz11.beginD(), s11.beginD(), p1q1.beginD(0), p1q1.beginD(1)),
       p1q1.size(),
-      Kernel11({inP.vertPos_.ptrD(), inQ.vertPos_.ptrD(), inP.edgeVerts_.ptrD(),
-                inQ.edgeVerts_.ptrD(), p0q1.ptrDpq(), yz01.ptrD(), p0q1.size(),
-                p1q0.ptrDpq(), yz10.ptrD(), p1q0.size()}));
+      Kernel11({inP.vertPos_.cptrD(), inQ.vertPos_.cptrD(),
+                inP.edgeVerts_.cptrD(), inQ.edgeVerts_.cptrD(), p0q1.ptrDpq(),
+                yz01.cptrD(), p0q1.size(), p1q0.ptrDpq(), yz10.cptrD(),
+                p1q0.size(), expandP, inP.edgeNormal_.cptrD()}));
 
   return std::make_tuple(s11, xyzz11);
 };
@@ -474,6 +468,8 @@ struct Kernel02 {
   const int size;
   const TriEdges *triEdgesQ;
   const bool forward;
+  const float expandP;
+  const glm::vec3 *normalP;
 
   __host__ __device__ void operator()(
       thrust::tuple<float &, int &, int, int> inout) {
@@ -491,9 +487,8 @@ struct Kernel02 {
     }
 
     // assert exactly 2 of yz3 are found
-    // if (isnan(yz3[0][0]) + isnan(yz3[1][0]) + isnan(yz3[2][0]) != 1)
-    //   printf("yz0 = %f, yz1 = %f, yz2 = %f\n", yz3[0][0], yz3[1][0],
-    //   yz3[2][0]);
+    if (isnan(yz3[0][0]) + isnan(yz3[1][0]) + isnan(yz3[2][0]) != 1)
+      printf("yz0 = %f, yz1 = %f, yz2 = %f\n", yz3[0][0], yz3[1][0], yz3[2][0]);
     if (isnan(yz3[0][0])) yz3[0] = yz3[2];
     if (isnan(yz3[1][0])) yz3[1] = yz3[2];
     glm::vec3 pL, pR;
@@ -506,33 +501,34 @@ struct Kernel02 {
     glm::vec3 vertPos = vertPosP[p0];
     z02 = Interpolate(pL, pR, vertPos.y)[1];
     if (forward) {
-      if (z02 < vertPos.z) s02 = 0;
+      if (!Shadows(vertPos.z, z02, expandP * normalP[p0].z)) s02 = 0;
     } else {
-      if (z02 > vertPos.z) s02 = 0;
+      if (!Shadows(z02, vertPos.z, expandP * normalP[q2].z)) s02 = 0;
     }
   }
 };
 
 std::tuple<VecDH<int>, VecDH<float>> Shadow02(
-    const VecDH<glm::vec3> &vertPosP, const Manifold::Impl &inQ,
-    const VecDH<int> &s01, const SparseIndices &p0q1,
-    const VecDH<glm::vec2> &yz01, SparseIndices &p0q2, bool forward) {
+    const Manifold::Impl &inP, const Manifold::Impl &inQ, const VecDH<int> &s01,
+    const SparseIndices &p0q1, const VecDH<glm::vec2> &yz01,
+    SparseIndices &p0q2, bool forward, float expandP) {
   VecDH<int> s02(p0q2.size(), 0);
 
   thrust::for_each_n(
       zip(s02.beginD(), p0q2.beginD(!forward), p0q2.beginD(forward)),
-      p0q2.size(),
-      Gather02({p0q1.ptrDpq(), s01.ptrD(), p0q1.size(), inQ.triEdges_.ptrD(),
-                forward}));
+      p0q2.size(), Gather02({p0q1.ptrDpq(), s01.ptrD(), p0q1.size(),
+                             inQ.triEdges_.ptrD(), forward}));
 
   size_t size = p0q2.RemoveZeros(s02);
   VecDH<float> z02(size);
 
-  thrust::for_each_n(zip(z02.beginD(), s02.beginD(), p0q2.beginD(!forward),
-                         p0q2.beginD(forward)),
-                     size,
-                     Kernel02({vertPosP.ptrD(), p0q1.ptrDpq(), yz01.ptrD(),
-                               p0q1.size(), inQ.triEdges_.ptrD(), forward}));
+  auto normalP = forward ? inP.vertNormal_.cptrD() : inQ.triNormal_.cptrD();
+  thrust::for_each_n(
+      zip(z02.beginD(), s02.beginD(), p0q2.beginD(!forward),
+          p0q2.beginD(forward)),
+      size,
+      Kernel02({inP.vertPos_.cptrD(), p0q1.ptrDpq(), yz01.cptrD(), p0q1.size(),
+                inQ.triEdges_.cptrD(), forward, expandP, normalP}));
 
   return std::make_tuple(s02, z02);
 };
@@ -623,6 +619,7 @@ struct Kernel12 {
       k++;
     }
     for (int i : {0, 1, 2}) {
+      if (k > 1) break;
       if (!isnan(xyzz3[i].x)) {
         xzyLR0[k][0] = xyzz3[i].x;
         xzyLR0[k][1] = xyzz3[i].z;
@@ -633,8 +630,8 @@ struct Kernel12 {
         k++;
       }
     }
-    // assert exactly two of these five were found
-    // if (k != 2) printf("k = %d\n", k);
+    // assert two of these five were found
+    if (k != 2) printf("k = %d\n", k);
 
     glm::vec4 xzyy = Intersect(xzyLR0[0], xzyLR0[1], xzyLR1[0], xzyLR1[1]);
     v12.x = xzyy[0];
@@ -665,10 +662,9 @@ std::tuple<VecDH<int>, VecDH<glm::vec3>> Intersect12(
   auto vertPosPtr = forward ? inP.vertPos_.ptrD() : inQ.vertPos_.ptrD();
   thrust::for_each_n(
       zip(v12.beginD(), p1q2.beginD(!forward), p1q2.beginD(forward)),
-      p1q2.size(),
-      Kernel12({p0q2.ptrDpq(), z02.ptrD(), p0q2.size(), p1q1.ptrDpq(),
-                xyzz11.ptrD(), p1q1.size(), edgeVertsPtr, triEdgesPtr,
-                vertPosPtr, forward}));
+      p1q2.size(), Kernel12({p0q2.ptrDpq(), z02.ptrD(), p0q2.size(),
+                             p1q1.ptrDpq(), xyzz11.ptrD(), p1q1.size(),
+                             edgeVertsPtr, triEdgesPtr, vertPosPtr, forward}));
   return std::make_tuple(x12, v12);
 };
 
@@ -695,12 +691,12 @@ VecDH<int> Winding03(const Manifold::Impl &inP, SparseIndices &p0q2,
                   w03.beginD());
 
   // find connected regions (separated by intersections)
-  VecDH<int> vLabels;
-  int n_comp =
-      ConnectedComponents(vLabels, inP.NumVert(), inP.edgeVerts_, keepEdgesP);
+  VecDH<int> vertLabels;
+  int n_comp = ConnectedComponents(vertLabels, inP.NumVert(), inP.edgeVerts_,
+                                   keepEdgesP);
   // flood the w03 values throughout their connected components (they are
   // consistent)
-  FloodComponents(w03, vLabels, n_comp);
+  FloodComponents(w03, vertLabels, n_comp);
 
   if (kVerbose) std::cout << n_comp << " components" << std::endl;
 
@@ -743,10 +739,6 @@ SparseIndices Intersect22(const Manifold::Impl &inP, const Manifold::Impl &inQ,
   return p2q2;
 }
 
-struct CheckWinding {
-  __host__ __device__ bool operator()(int i) { return abs(i) <= 1; }
-};
-
 struct AssignOnes {
   bool *keepTrisP;
   bool *keepTrisQ;
@@ -775,9 +767,9 @@ struct DuplicateVerts {
   }
 };
 
-void AppendRetainedFaces(VecDH<glm::ivec3> &triVerts, VecDH<int> p12,
-                         VecDH<int> p21, const VecDH<int> &i03,
-                         const VecDH<int> &vP2R, const Manifold::Impl &inP) {
+void AppendRetainedFaces(Manifold::Impl &outR, VecDH<int> p12, VecDH<int> p21,
+                         const VecDH<int> &i03, const VecDH<int> &vP2R,
+                         const Manifold::Impl &inP) {
   // keepTriP is a list of the triangle indicies of P which does not include the
   // triangles that intersect edges of Q.
   VecDH<int> keepTriP(inP.NumTri());
@@ -806,12 +798,18 @@ void AppendRetainedFaces(VecDH<glm::ivec3> &triVerts, VecDH<int> p12,
     // Check the inclusion number of a single vertex of a triangle, since
     // non-intersecting triangles must have all identical inclusion numbers.
     glm::ivec3 triVertsP = inP.triVerts_.H()[i];
+    glm::vec3 normal = inP.triNormal_.H()[i];
     int inclusion = i03.H()[triVertsP[0]];
     glm::ivec3 triVertsR(vP2R.H()[triVertsP[0]], vP2R.H()[triVertsP[1]],
                          vP2R.H()[triVertsP[2]]);
-    if (inclusion < 0) std::swap(triVertsR[1], triVertsR[2]);
-    for (int i = 0; i < abs(inclusion); ++i)
-      triVerts.H().push_back(triVertsR + i);
+    if (inclusion < 0) {
+      std::swap(triVertsR[1], triVertsR[2]);
+      normal *= -1.0f;
+    }
+    for (int j = 0; j < abs(inclusion); ++j) {
+      outR.triVerts_.H().push_back(triVertsR + j);
+      outR.triNormal_.H().push_back(normal);
+    }
   }
 }
 
@@ -919,55 +917,56 @@ void AppendNewEdges(std::vector<std::vector<EdgeVerts>> &facesP,
                     const VecDH<TriEdges> &triEdgesQ, const SparseIndices &p1q2,
                     const SparseIndices &p2q1, const SparseIndices &p2q2,
                     const VecDH<int> &i12, const VecDH<int> &i21, int start12) {
+  int edgeID = 2 * (triEdgesP.size() + triEdgesQ.size());
   for (int k = 0; k < p2q2.size(); ++k) {
     int triP = p2q2.Get(0).H()[k];
     int triQ = p2q2.Get(1).H()[k];
-    std::vector<int> edge, dir;
-    thrust::host_vector<int> edges(3), found(3), idx(3);
+    std::vector<VertsPos> vertsPos;
+    thrust::host_vector<int> edge3(3), found(3), idx(3);
     // edges of inP - face of inQ
-    for (int i : {0, 1, 2}) edges[i] = triEdgesP.H()[triP][i].Idx();
+    for (int i : {0, 1, 2}) edge3[i] = triEdgesP.H()[triP][i].Idx();
     // TODO: simplify this logic
     thrust::binary_search(
         p1q2.beginHpq(), p1q2.endHpq(),
-        zip(edges.begin(), thrust::make_constant_iterator(triQ, 0)),
-        zip(edges.end(), thrust::make_constant_iterator(triQ, 3)),
+        zip(edge3.begin(), thrust::make_constant_iterator(triQ, 0)),
+        zip(edge3.end(), thrust::make_constant_iterator(triQ, 3)),
         found.begin());
     thrust::lower_bound(
         p1q2.beginHpq(), p1q2.endHpq(),
-        zip(edges.begin(), thrust::make_constant_iterator(triQ, 0)),
-        zip(edges.end(), thrust::make_constant_iterator(triQ, 3)), idx.begin());
+        zip(edge3.begin(), thrust::make_constant_iterator(triQ, 0)),
+        zip(edge3.end(), thrust::make_constant_iterator(triQ, 3)), idx.begin());
     for (int i : {0, 1, 2}) {
       if (found[i]) {
-        edge.push_back(idx[i] + start12);
-        dir.push_back(-i12.H()[idx[i]] * triEdgesP.H()[triP][i].Dir());
+        vertsPos.push_back({idx[i] + start12,
+                            -i12.H()[idx[i]] * triEdgesP.H()[triP][i].Dir(),
+                            0});
       }
     }
     // face of inP - edges of inQ
-    for (int i : {0, 1, 2}) edges[i] = triEdgesQ.H()[triQ][i].Idx();
+    for (int i : {0, 1, 2}) edge3[i] = triEdgesQ.H()[triQ][i].Idx();
     thrust::binary_search(
         p2q1.beginHpq(), p2q1.endHpq(),
-        zip(thrust::make_constant_iterator(triP, 0), edges.begin()),
-        zip(thrust::make_constant_iterator(triP, 3), edges.end()),
+        zip(thrust::make_constant_iterator(triP, 0), edge3.begin()),
+        zip(thrust::make_constant_iterator(triP, 3), edge3.end()),
         found.begin());
     thrust::lower_bound(
         p2q1.beginHpq(), p2q1.endHpq(),
-        zip(thrust::make_constant_iterator(triP, 0), edges.begin()),
-        zip(thrust::make_constant_iterator(triP, 3), edges.end()), idx.begin());
+        zip(thrust::make_constant_iterator(triP, 0), edge3.begin()),
+        zip(thrust::make_constant_iterator(triP, 3), edge3.end()), idx.begin());
     for (int i : {0, 1, 2}) {
       if (found[i]) {
-        edge.push_back(idx[i] + start12 + p1q2.size());
-        dir.push_back(i21.H()[idx[i]] * triEdgesQ.H()[triQ][i].Dir());
+        vertsPos.push_back({idx[i] + start12 + p1q2.size(),
+                            i21.H()[idx[i]] * triEdgesQ.H()[triQ][i].Dir(), 0});
       }
     }
-    ALWAYS_ASSERT(
-        edge.size() == 2, logicErr,
-        "Number of points in intersection of two triangles did not equal 2!");
-    ALWAYS_ASSERT(dir[0] == -dir[1], logicErr,
-                  "Intersection points do not have opposite directions!");
-    if (dir[0] > 0) std::swap(edge[0], edge[1]);
-    // Since these are not input edges, their index is undefined, so set to -1.
-    facesP[triP].push_back({edge[0], edge[1], Edge::kNoIdx});
-    facesQ[triQ].push_back({edge[1], edge[0], Edge::kNoIdx});
+    // sort edges into start/end pairs along length
+    // Since these are not input edges, their index is undefined.
+    std::vector<EdgeVerts> edges = PairUp(vertsPos, edgeID++);
+
+    facesP[triP].insert(facesP[triP].end(), edges.begin(), edges.end());
+
+    for (auto &e : edges) std::swap(e.first, e.second);
+    facesQ[triQ].insert(facesQ[triQ].end(), edges.begin(), edges.end());
   }
 }
 
@@ -992,12 +991,14 @@ glm::mat3x2 GetAxisAlignedProjection(glm::vec3 normal) {
   return glm::transpose(projection);
 }
 
-void AppendIntersectedFaces(VecDH<glm::ivec3> &triVerts,
-                            VecDH<glm::vec3> &vertPos,
+void AppendIntersectedFaces(Manifold::Impl &outR,
+                            std::vector<int> &vertAssignmentR,
                             const std::vector<std::vector<EdgeVerts>> &facesP,
                             const Manifold::Impl &inP, bool invertNormals) {
   for (int i = 0; i < facesP.size(); ++i) {
     auto &face = facesP[i];
+    glm::vec3 normal = inP.triNormal_.H()[i];
+    if (invertNormals) normal *= -1.0f;
     switch (face.size()) {
       case 0:
         break;
@@ -1013,19 +1014,17 @@ void AppendIntersectedFaces(VecDH<glm::ivec3> &triVerts,
                           tri[2].second == tri[0].first,
                       runtimeErr, "These 3 edges do not form a triangle!");
         glm::ivec3 triangle(tri[0].first, tri[1].first, tri[2].first);
-        triVerts.H().push_back(triangle);
+        outR.triVerts_.H().push_back(triangle);
+        outR.triNormal_.H().push_back(normal);
         break;
       }
       default: {  // requires triangulation
-        Polygons polys = Assemble(face);
-        glm::vec3 normal = inP.GetTriNormal(i);
-        if (invertNormals) normal *= -1.0f;
-        glm::mat3x2 projection = GetAxisAlignedProjection(normal);
-        for (auto &poly : polys) {
-          for (PolyVert &v : poly) {
-            v.pos = projection * vertPos.H()[v.idx];
-          }
-        }
+        auto &vertPos = outR.vertPos_.H();
+        const glm::mat3x2 projection = GetAxisAlignedProjection(normal);
+        Polygons polys =
+            Assemble(vertAssignmentR, face, [&vertPos, &projection](int vert) {
+              return projection * vertPos[vert];
+            });
         std::vector<glm::ivec3> newTris;
         try {
           newTris = Triangulate(polys);
@@ -1048,18 +1047,21 @@ void AppendIntersectedFaces(VecDH<glm::ivec3> &triVerts,
           for (const auto &poly : polys) {
             glm::vec3 centroid = thrust::transform_reduce(
                 poly.begin(), poly.end(),
-                [&vertPos](PolyVert v) { return vertPos.H()[v.idx]; },
+                [&vertPos](PolyVert v) { return vertPos[v.idx]; },
                 glm::vec3(0.0f),
                 [](glm::vec3 a, glm::vec3 b) { return a + b; });
             centroid /= poly.size();
             int newVert = vertPos.size();
-            vertPos.H().push_back(centroid);
+            vertPos.push_back(centroid);
             newTris.push_back({poly.back().idx, poly.front().idx, newVert});
-            for (int i = 1; i < poly.size(); ++i)
-              newTris.push_back({poly[i - 1].idx, poly[i].idx, newVert});
+            for (int j = 1; j < poly.size(); ++j)
+              newTris.push_back({poly[j - 1].idx, poly[j].idx, newVert});
           }
         }
-        for (auto tri : newTris) triVerts.H().push_back(tri);
+        for (auto tri : newTris) {
+          outR.triVerts_.H().push_back(tri);
+          outR.triNormal_.H().push_back(normal);
+        }
       }
     }
   }
@@ -1091,9 +1093,10 @@ void CheckPreTriangulationManfold(
 
 namespace manifold {
 
-Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ)
-    : inP_(inP), inQ_(inQ) {
-  // TODO: new symbolic perturbation:
+Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ,
+                   Manifold::OpType op)
+    : inP_(inP), inQ_(inQ), expandP_(op == Manifold::OpType::ADD ? 1.0 : -1.0) {
+  // Symbolic perturbation:
   // Union -> expand inP
   // Difference, Intersection -> contract inP
 
@@ -1104,7 +1107,7 @@ Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ)
   if (kVerbose) std::cout << "p1q2 size = " << p1q2_.size() << std::endl;
 
   p2q1_ = inP_.EdgeCollisions(inQ_);
-  p2q1_.Swap();
+  p2q1_.SwapPQ();
   p2q1_.Sort();
   if (kVerbose) std::cout << "p2q1 size = " << p2q1_.size() << std::endl;
 
@@ -1115,7 +1118,7 @@ Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ)
   if (kVerbose) std::cout << "p0q2 size = " << p0q2.size() << std::endl;
 
   SparseIndices p2q0 = Filter02(inQ_, inP_, p2q1_.Get(1), p1q2_.Get(1));
-  p2q0.Swap();
+  p2q0.SwapPQ();
   p2q0.Sort();
   if (kVerbose) std::cout << "p2q0 size = " << p2q0.size() << std::endl;
 
@@ -1124,17 +1127,17 @@ Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ)
   if (kVerbose) std::cout << "p1q1 size = " << p1q1.size() << std::endl;
 
   // Level 1
-  // Find involved vertex-edge pairs Level 2
+  // Find involved vertex-edge pairs from Level 2
   SparseIndices p0q1 = Filter01(inP_, inQ_, p0q2, p1q1);
   p0q1.Unique();
   if (kVerbose) std::cout << "p0q1 size = " << p0q1.size() << std::endl;
 
-  p2q0.Swap();
-  p1q1.Swap();
+  p2q0.SwapPQ();
+  p1q1.SwapPQ();
   SparseIndices p1q0 = Filter01(inQ_, inP_, p2q0, p1q1);
-  p2q0.Swap();
-  p1q1.Swap();
-  p1q0.Swap();
+  p2q0.SwapPQ();
+  p1q1.SwapPQ();
+  p1q0.SwapPQ();
   p1q0.Unique();
   if (kVerbose) std::cout << "p1q0 size = " << p1q0.size() << std::endl;
 
@@ -1143,12 +1146,12 @@ Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ)
   // fall inside the edge.
   VecDH<int> s01;
   VecDH<glm::vec2> yz01;
-  std::tie(s01, yz01) = Shadow01(p0q1, inP, inQ, false);
+  std::tie(s01, yz01) = Shadow01(p0q1, inP, inQ, false, expandP_);
   if (kVerbose) std::cout << "s01 size = " << s01.size() << std::endl;
 
   VecDH<int> s10;
   VecDH<glm::vec2> yz10;
-  std::tie(s10, yz10) = Shadow01(p1q0, inQ, inP, true);
+  std::tie(s10, yz10) = Shadow01(p1q0, inQ, inP, true, expandP_);
   if (kVerbose) std::cout << "s10 size = " << s10.size() << std::endl;
 
   // Level 2
@@ -1157,7 +1160,7 @@ Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ)
   VecDH<int> s11;
   VecDH<glm::vec4> xyzz11;
   std::tie(s11, xyzz11) =
-      Shadow11(p1q1, inP, inQ, p0q1, s01, yz01, p1q0, s10, yz10);
+      Shadow11(p1q1, inP, inQ, p0q1, s01, yz01, p1q0, s10, yz10, expandP_);
   if (kVerbose) std::cout << "s11 size = " << s11.size() << std::endl;
 
   // Build up Z-projection of vertices onto triangles, keeping only those that
@@ -1165,13 +1168,13 @@ Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ)
   VecDH<int> s02;
   VecDH<float> z02;
   std::tie(s02, z02) =
-      Shadow02(inP_.vertPos_, inQ, s01, p0q1, yz01, p0q2, true);
+      Shadow02(inP, inQ, s01, p0q1, yz01, p0q2, true, expandP_);
   if (kVerbose) std::cout << "s02 size = " << s02.size() << std::endl;
 
   VecDH<int> s20;
   VecDH<float> z20;
   std::tie(s20, z20) =
-      Shadow02(inQ_.vertPos_, inP, s10, p1q0, yz10, p2q0, false);
+      Shadow02(inQ, inP, s10, p1q0, yz10, p2q0, false, expandP_);
   if (kVerbose) std::cout << "s20 size = " << s20.size() << std::endl;
 
   // Level 3
@@ -1199,22 +1202,29 @@ Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ)
 }
 
 Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
+  if ((expandP_ > 0) != (op == Manifold::OpType::ADD))
+    std::cout << "Warning! Result op type not compatible with constructor op "
+                 "type: coplanar faces may have incorrect results."
+              << std::endl;
   int c1, c2, c3;
   switch (op) {
     case Manifold::OpType::ADD:
       c1 = 1;
       c2 = 1;
       c3 = -1;
+      if (kVerbose) std::cout << "ADD" << std::endl;
       break;
     case Manifold::OpType::SUBTRACT:
       c1 = 1;
       c2 = 0;
       c3 = -1;
+      if (kVerbose) std::cout << "SUBTRACT" << std::endl;
       break;
     case Manifold::OpType::INTERSECT:
       c1 = 0;
       c2 = 0;
       c3 = 1;
+      if (kVerbose) std::cout << "INTERSECT" << std::endl;
       break;
     default:
       throw std::invalid_argument("invalid enum: OpType.");
@@ -1229,17 +1239,6 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
   thrust::transform(dir21_.beginD(), dir21_.endD(), i21.beginD(), c3 * _1);
   thrust::transform(w03_.beginD(), w03_.endD(), i03.beginD(), c1 + c3 * _1);
   thrust::transform(w30_.beginD(), w30_.endD(), i30.beginD(), c2 + c3 * _1);
-
-  // if (PolygonParams().checkGeometry) {
-  //   ALWAYS_ASSERT(thrust::all_of(i03.beginD(), i03.endD(), CheckWinding()),
-  //                 runtimeErr,
-  //                 "Not all i03 vertices have winding numbers of -1, 0 or
-  //                 1!");
-  //   ALWAYS_ASSERT(thrust::all_of(i30.beginD(), i30.endD(), CheckWinding()),
-  //                 runtimeErr,
-  //                 "Not all i30 vertices have winding numbers of -1, 0 or
-  //                 1!");
-  // }
 
   // Calculate some internal indexing vectors
   VecDH<bool> intersectedTriP(inP_.NumTri(), false);
@@ -1281,10 +1280,8 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
   thrust::copy(v21_.beginD(), v21_.endD(),
                outR.vertPos_.beginD() + nPv + nQv + n12);
   // Duplicate retained faces as above.
-  AppendRetainedFaces(outR.triVerts_, p1q2_.Copy(0), p2q1_.Copy(0), i03, vP2R,
-                      inP_);
-  AppendRetainedFaces(outR.triVerts_, p2q1_.Copy(1), p1q2_.Copy(1), i30, vQ2R,
-                      inQ_);
+  AppendRetainedFaces(outR, p1q2_.Copy(0), p2q1_.Copy(0), i03, vP2R, inP_);
+  AppendRetainedFaces(outR, p2q1_.Copy(1), p1q2_.Copy(1), i30, vQ2R, inQ_);
 
   if (kVerbose) {
     std::cout << nPv << " verts from inP, including duplications" << std::endl;
@@ -1297,6 +1294,9 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
   // calculation switches from parallel to serial.
   std::vector<std::vector<EdgeVerts>> facesP(inP_.NumTri()),
       facesQ(inQ_.NumTri());
+  std::vector<int> vertAssignmentR(outR.NumVert());
+  // initialize verts as pointing to themselves; update as verts are merged.
+  thrust::sequence(vertAssignmentR.begin(), vertAssignmentR.end());
   AppendRetainedEdges(facesP, inP_, i03, i12, p1q2_.Get(0), intersectedTriP,
                       outR.vertPos_, vP2R, nPv + nQv);
   AppendRetainedEdges(facesQ, inQ_, i30, i21, p2q1_.Get(1), intersectedTriQ,
@@ -1309,12 +1309,13 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
 
   // Triangulate the faces and add them to the manifold.
   if (kVerbose) std::cout << "Adding intersected faces of inP" << std::endl;
-  AppendIntersectedFaces(outR.triVerts_, outR.vertPos_, facesP, inP_, false);
+  AppendIntersectedFaces(outR, vertAssignmentR, facesP, inP_, false);
   if (kVerbose) std::cout << "Adding intersected faces of inQ" << std::endl;
-  AppendIntersectedFaces(outR.triVerts_, outR.vertPos_, facesQ, inQ_,
+  AppendIntersectedFaces(outR, vertAssignmentR, facesQ, inQ_,
                          op == Manifold::OpType::SUBTRACT);
 
   // Create the manifold's data structures and verify manifoldness.
+  outR.RemoveChaff();
   outR.Finish();
 
   return outR;

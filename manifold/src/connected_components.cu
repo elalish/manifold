@@ -178,7 +178,7 @@ int ConnectedComponentsGPU(VecDH<int>& components, int numVert,
   thrust::fill(components.beginD(), components.endD(), -1);
   VecDH<int> distBFS(numVert);
   int numComponent = 0;
-  for (;;) {
+  while(1) {
     // Find the first vertex that hasn't been visited
     int sourceVert = thrust::find(components.beginD(), components.endD(), -1) -
                      components.beginD();

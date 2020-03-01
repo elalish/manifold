@@ -210,8 +210,7 @@ TEST(Manifold, BooleanTetra) {
 }
 
 /**
- * These tests check Boolean operations on coplanar faces. TODO: check correct
- * degeneracy handling once this feature is built.
+ * These tests check Boolean operations on coplanar faces.
  */
 TEST(Manifold, SelfSubtract) {
   Manifold::SetExpectGeometry(true);
@@ -219,16 +218,43 @@ TEST(Manifold, SelfSubtract) {
   Manifold empty = cube - cube;
   EXPECT_TRUE(empty.IsValid());
   EXPECT_FLOAT_EQ(empty.Volume(), 0.0f);
-  // EXPECT_FLOAT_EQ(empty.SurfaceArea(), 0.0f);
+  EXPECT_FLOAT_EQ(empty.SurfaceArea(), 0.0f);
+  EXPECT_TRUE(empty.IsEmpty());
+}
+
+TEST(Manifold, Perturb) {
+  Manifold::SetExpectGeometry(true);
+  Mesh tmp;
+  tmp.vertPos = {{0.0f, 0.0f, 0.0f},
+                 {0.0f, 1.0f, 0.0f},
+                 {1.0f, 0.0f, 0.0f},
+                 {0.0f, 0.0f, 1.0f}};
+  tmp.triVerts = {{2, 0, 1}, {0, 3, 1}, {2, 3, 0}, {3, 2, 1}};
+  std::vector<Manifold> meshList;
+  meshList.push_back(tmp);
+  meshList.push_back(meshList[0].DeepCopy());
+  Manifold out = meshList[1] - meshList[0];
+  EXPECT_TRUE(out.IsEmpty());
 }
 
 TEST(Manifold, Coplanar) {
   Manifold::SetExpectGeometry(true);
   Manifold cube = Manifold::Cylinder(1.0f, 1.0f);
   Manifold cube2 = cube.DeepCopy();
-  Manifold out = cube - cube2.Scale({0.5f, 0.5f, 1.0f})
-                            .Rotate(0, 0, 15)
-                            .Translate({0.25f, 0.25f, 0.0f});
+  Manifold out = cube -
+                 cube2.Scale({0.5f, 0.5f, 1.0f})
+                     .Rotate(0, 0, 15)
+                     .Translate({0.25f, 0.25f, 0.0f});
+  // ExportMesh("cubes.ply", out.Extract());
+}
+
+TEST(Manifold, MultiCoplanar) {
+  Manifold::SetExpectGeometry(true);
+  Manifold cube = Manifold::Cube();
+  Manifold cube2 = cube.DeepCopy();
+  Manifold out = cube - cube2.Translate({0.3f, 0.3f, 0.0f});
+  out = out - cube.Translate({-0.3f, -0.3f, 0.0f});
+  EXPECT_EQ(out.Genus(), -1);
   // ExportMesh("cubes.ply", out.Extract());
 }
 
@@ -266,6 +292,23 @@ TEST(Manifold, SplitByPlane60) {
   std::pair<Manifold, Manifold> splits =
       cube.SplitByPlane({sind(phi), -cosd(phi), 0.0f}, 1.0f);
   EXPECT_NEAR(splits.first.Volume(), splits.second.Volume(), 1e-5);
+}
+
+/**
+ * This tests that non-intersecting geometry is properly retained.
+ */
+TEST(Manifold, BooleanVug) {
+  Manifold::SetExpectGeometry(true);
+  Manifold cube = Manifold::Cube(glm::vec3(4.0f), true);
+  Manifold vug = cube - Manifold::Cube();
+
+  EXPECT_EQ(vug.Genus(), -1);
+
+  Manifold half = vug.SplitByPlane(glm::vec3(0.0f, 0.0f, 1.0f), -1.0f).first;
+
+  EXPECT_EQ(half.Genus(), -1);
+  EXPECT_FLOAT_EQ(half.Volume(), 4.0 * 4.0 * 3.0 - 1.0);
+  EXPECT_FLOAT_EQ(half.SurfaceArea(), 16.0 * 2 + 12.0 * 4 + 6.0);
 }
 
 /**
@@ -407,13 +450,13 @@ TEST(Manifold, BooleanHorriblePlanar) {
   random2.Rotate(glm::degrees(phi));
   Manifold result = random ^ random2;
   result.Rotate(0, 0, 45).Rotate(glm::degrees(atan(sqrt(2.0f) / tan(phi))));
-  EXPECT_TRUE(result.IsValid());
-  Box BB = result.BoundingBox();
-  float tol = 1e-7;
-  EXPECT_NEAR(BB.Center().x, 0.0f, tol);
-  EXPECT_NEAR(BB.Center().y, 0.0f, tol);
-  EXPECT_NEAR(BB.Size().x, 0.0f, tol);
-  EXPECT_NEAR(BB.Size().y, 0.0f, tol);
-  EXPECT_GT(BB.Size().z, 1.0f);
-  EXPECT_LT(BB.Size().z, 4.0f);
+  EXPECT_TRUE(result.IsEmpty());
+  // Box BB = result.BoundingBox();
+  // float tol = 1e-7;
+  // EXPECT_NEAR(BB.Center().x, 0.0f, tol);
+  // EXPECT_NEAR(BB.Center().y, 0.0f, tol);
+  // EXPECT_NEAR(BB.Size().x, 0.0f, tol);
+  // EXPECT_NEAR(BB.Size().y, 0.0f, tol);
+  // EXPECT_GT(BB.Size().z, 1.0f);
+  // EXPECT_LT(BB.Size().z, 4.0f);
 }

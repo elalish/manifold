@@ -54,12 +54,15 @@
         "complex": "cpp",
         "list": "cpp",
         "algorithm": "cpp",
-        "cfenv": "cpp"
+        "cfenv": "cpp",
+        "*.ipp": "cpp",
+        "string": "cpp"
     },
     "C_Cpp.clang_format_style": "google",
     "C_Cpp.clang_format_fallbackStyle": "google",
     "editor.formatOnSave": true,
     "cmake.configureArgs": [
-        "-DMANIFOLD_USE_CPP=ON"
+        "-DMANIFOLD_USE_CPP=OFF",
+        // "-DMANIFOLD_USE_OMP=OFF"
     ],
 }
