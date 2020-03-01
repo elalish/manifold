@@ -251,10 +251,11 @@ struct ShadowKernel01 {
     float p = vertPosP[vertP].x;
     float q0 = vertPosQ[vertQ0].x;
     float q1 = vertPosQ[vertQ1].x;
-    s01 = reverse ? Shadows(q0, p, expandP * normalP[vertQ0].x) -
-                        Shadows(q1, p, expandP * normalP[vertQ1].x)
-                  : Shadows(p, q1, expandP * normalP[vertP].x) -
-                        Shadows(p, q0, expandP * normalP[vertP].x);
+    s01 = reverse
+              ? Shadows(q0, p, expandP * normalP[vertQ0].x) -
+                    Shadows(q1, p, expandP * normalP[vertQ1].x)
+              : Shadows(p, q1, expandP * normalP[vertP].x) -
+                    Shadows(p, q0, expandP * normalP[vertP].x);
   }
 };
 
@@ -515,9 +516,8 @@ std::tuple<VecDH<int>, VecDH<float>> Shadow02(
 
   thrust::for_each_n(
       zip(s02.beginD(), p0q2.beginD(!forward), p0q2.beginD(forward)),
-      p0q2.size(),
-      Gather02({p0q1.ptrDpq(), s01.ptrD(), p0q1.size(), inQ.triEdges_.ptrD(),
-                forward}));
+      p0q2.size(), Gather02({p0q1.ptrDpq(), s01.ptrD(), p0q1.size(),
+                             inQ.triEdges_.ptrD(), forward}));
 
   size_t size = p0q2.RemoveZeros(s02);
   VecDH<float> z02(size);
@@ -661,10 +661,9 @@ std::tuple<VecDH<int>, VecDH<glm::vec3>> Intersect12(
   auto vertPosPtr = forward ? inP.vertPos_.ptrD() : inQ.vertPos_.ptrD();
   thrust::for_each_n(
       zip(v12.beginD(), p1q2.beginD(!forward), p1q2.beginD(forward)),
-      p1q2.size(),
-      Kernel12({p0q2.ptrDpq(), z02.ptrD(), p0q2.size(), p1q1.ptrDpq(),
-                xyzz11.ptrD(), p1q1.size(), edgeVertsPtr, triEdgesPtr,
-                vertPosPtr, forward}));
+      p1q2.size(), Kernel12({p0q2.ptrDpq(), z02.ptrD(), p0q2.size(),
+                             p1q1.ptrDpq(), xyzz11.ptrD(), p1q1.size(),
+                             edgeVertsPtr, triEdgesPtr, vertPosPtr, forward}));
   return std::make_tuple(x12, v12);
 };
 
@@ -738,10 +737,6 @@ SparseIndices Intersect22(const Manifold::Impl &inP, const Manifold::Impl &inQ,
   p2q2.Unique();
   return p2q2;
 }
-
-struct CheckWinding {
-  __host__ __device__ bool operator()(int i) { return abs(i) <= 1; }
-};
 
 struct AssignOnes {
   bool *keepTrisP;
@@ -1243,17 +1238,6 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
   thrust::transform(dir21_.beginD(), dir21_.endD(), i21.beginD(), c3 * _1);
   thrust::transform(w03_.beginD(), w03_.endD(), i03.beginD(), c1 + c3 * _1);
   thrust::transform(w30_.beginD(), w30_.endD(), i30.beginD(), c2 + c3 * _1);
-
-  // if (PolygonParams().checkGeometry) {
-  //   ALWAYS_ASSERT(thrust::all_of(i03.beginD(), i03.endD(), CheckWinding()),
-  //                 runtimeErr,
-  //                 "Not all i03 vertices have winding numbers of -1, 0 or
-  //                 1!");
-  //   ALWAYS_ASSERT(thrust::all_of(i30.beginD(), i30.endD(), CheckWinding()),
-  //                 runtimeErr,
-  //                 "Not all i30 vertices have winding numbers of -1, 0 or
-  //                 1!");
-  // }
 
   // Calculate some internal indexing vectors
   VecDH<bool> intersectedTriP(inP_.NumTri(), false);

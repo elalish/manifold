@@ -11,7 +11,7 @@
             "program": "${workspaceFolder}/build/test/manifold_test",
             "args": [
                 "--gtest_break_on_failure",
-                "--gtest_filter=Polygon.Ugly"
+                "--gtest_filter=Manifold.Sphere"
             ],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}/build/test",

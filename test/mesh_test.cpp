@@ -210,8 +210,7 @@ TEST(Manifold, BooleanTetra) {
 }
 
 /**
- * These tests check Boolean operations on coplanar faces. TODO: check correct
- * degeneracy handling once this feature is built.
+ * These tests check Boolean operations on coplanar faces.
  */
 TEST(Manifold, SelfSubtract) {
   Manifold::SetExpectGeometry(true);
@@ -219,7 +218,8 @@ TEST(Manifold, SelfSubtract) {
   Manifold empty = cube - cube;
   EXPECT_TRUE(empty.IsValid());
   EXPECT_FLOAT_EQ(empty.Volume(), 0.0f);
-  // EXPECT_FLOAT_EQ(empty.SurfaceArea(), 0.0f);
+  EXPECT_FLOAT_EQ(empty.SurfaceArea(), 0.0f);
+  EXPECT_TRUE(empty.IsEmpty());
 }
 
 TEST(Manifold, Perturb) {
@@ -232,11 +232,7 @@ TEST(Manifold, Perturb) {
   tmp.triVerts = {{2, 0, 1}, {0, 3, 1}, {2, 3, 0}, {3, 2, 1}};
   std::vector<Manifold> meshList;
   meshList.push_back(tmp);
-  // meshList[0].Rotate(0, 0, 180);
   meshList.push_back(meshList[0].DeepCopy());
-  // meshList[1].Scale(glm::vec3(4.0f));
-  // meshList[0].Translate({0.0f, 0.0f, 1.0f});
-
   Manifold out = meshList[1] - meshList[0];
   EXPECT_TRUE(out.IsEmpty());
 }
@@ -245,9 +241,10 @@ TEST(Manifold, Coplanar) {
   Manifold::SetExpectGeometry(true);
   Manifold cube = Manifold::Cylinder(1.0f, 1.0f);
   Manifold cube2 = cube.DeepCopy();
-  Manifold out = cube - cube2.Scale({0.5f, 0.5f, 1.0f})
-                            .Rotate(0, 0, 15)
-                            .Translate({0.25f, 0.25f, 0.0f});
+  Manifold out = cube -
+                 cube2.Scale({0.5f, 0.5f, 1.0f})
+                     .Rotate(0, 0, 15)
+                     .Translate({0.25f, 0.25f, 0.0f});
   // ExportMesh("cubes.ply", out.Extract());
 }
 
@@ -258,7 +255,7 @@ TEST(Manifold, MultiCoplanar) {
   Manifold out = cube - cube2.Translate({0.3f, 0.3f, 0.0f});
   out = out - cube.Translate({-0.3f, -0.3f, 0.0f});
   EXPECT_EQ(out.Genus(), -1);
-  ExportMesh("cubes.ply", out.Extract());
+  // ExportMesh("cubes.ply", out.Extract());
 }
 
 /**
