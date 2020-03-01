@@ -234,15 +234,9 @@ struct RemoveVert {
   }
 };
 
-struct ReindexAndRemove {
-  const int* oldVert2New;
-
-  __host__ __device__ bool operator()(glm::ivec3& triVerts) {
-    if (oldVert2New[triVerts[0]] < 0) return true;
-    for (int i : {0, 1, 2}) {
-      triVerts[i] = oldVert2New[triVerts[i]];
-    }
-    return false;
+struct RemoveTri {
+  __host__ __device__ bool operator()(const glm::ivec3& triVerts) {
+    return triVerts[0] < 0;
   }
 };
 
@@ -1014,9 +1008,11 @@ void Manifold::Impl::RemoveChaff() {
                   thrust::make_counting_iterator(newNumVert),
                   newVert2Old.beginD(), oldVert2New.beginD());
 
-  int newNumTri = thrust::remove_if(triVerts_.beginD(), triVerts_.endD(),
-                                    ReindexAndRemove({oldVert2New.cptrD()})) -
-                  triVerts_.beginD();
+  thrust::for_each(triVerts_.beginD(), triVerts_.endD(),
+                   Reindex({oldVert2New.cptrD()}));
+  int newNumTri =
+      thrust::remove_if(triVerts_.beginD(), triVerts_.endD(), RemoveTri()) -
+      triVerts_.beginD();
   triVerts_.resize(newNumTri);
 }
 
