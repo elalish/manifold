@@ -1223,9 +1223,9 @@ void Manifold::Impl::CalculateNormals() {
     calculateTriNormal = true;
   }
   thrust::for_each_n(
-      zip(triNormal_.begin(), triVerts_.begin(), triEdges_.begin()), NumTri(),
-      AssignNormals({vertNormal_.ptrD(), edgeNormal_.ptrD(), vertPos_.cptrD(),
-                     calculateTriNormal}));
+      zip(triNormal_.beginD(), triVerts_.beginD(), triEdges_.beginD()),
+      NumTri(), AssignNormals({vertNormal_.ptrD(), edgeNormal_.ptrD(),
+                               vertPos_.cptrD(), calculateTriNormal}));
   thrust::for_each(vertNormal_.begin(), vertNormal_.end(), NormalizeTo({1.0}));
   thrust::for_each(edgeNormal_.begin(), edgeNormal_.end(), NormalizeTo({1.0}));
 }
