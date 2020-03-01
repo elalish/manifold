@@ -878,7 +878,7 @@ int Manifold::NumOverlaps(const Manifold& B) const {
 
 void Manifold::SetExpectGeometry(bool val) {
   PolygonParams().checkGeometry = val;
-  PolygonParams().intermediateChecks = true;
+  PolygonParams().intermediateChecks = false;
 }
 
 void Manifold::SetSuppressErrors(bool val) {
