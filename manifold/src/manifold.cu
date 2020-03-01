@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <thrust/count.h>
 #include <thrust/gather.h>
 #include <thrust/logical.h>
 #include <thrust/sequence.h>
@@ -27,10 +28,13 @@
 namespace {
 using namespace manifold;
 
+constexpr float kTolerance = 1e-5;
+
 struct NormalizeTo {
   float length;
   __host__ __device__ void operator()(glm::vec3& v) {
     v = length * glm::normalize(v);
+    if (isnan(v.x)) v = glm::vec3(0.0);
   }
 };
 
@@ -175,6 +179,67 @@ struct SplitTris {
   }
 };
 
+__host__ __device__ void AtomicAddFloat(float& target, float add) {
+#ifdef __CUDA_ARCH__
+  atomicAdd(&target, add);
+#else
+#pragma omp atomic
+  target += add;
+#endif
+}
+
+struct AreaVolume {
+  float* surfaceArea;
+  float* volume;
+  const int* vertLabel;
+  const glm::vec3* vertPos;
+
+  __host__ __device__ void operator()(const glm::ivec3& triVerts) {
+    glm::vec3 edge[3];
+    float perimeter = 0.0f;
+    for (int i : {0, 1, 2}) {
+      edge[i] = vertPos[triVerts[(i + 1) % 3]] - vertPos[triVerts[i]];
+      perimeter += glm::length(edge[i]);
+    }
+    glm::vec3 crossP = glm::cross(edge[0], edge[1]);
+    float area = glm::length(crossP) / 2.0f;
+    if (area > perimeter * kTolerance) {
+      int comp = vertLabel[triVerts[0]];
+      AtomicAddFloat(surfaceArea[comp], area);
+      AtomicAddFloat(volume[comp],
+                     glm::dot(crossP, vertPos[triVerts[0]]) / 6.0f);
+    }
+  }
+};
+
+struct ClampVolume {
+  __host__ __device__ void operator()(thrust::tuple<float&, float> inOut) {
+    float& volume = thrust::get<0>(inOut);
+    float surfaceArea = thrust::get<1>(inOut);
+
+    if (glm::abs(volume) < surfaceArea * kTolerance) volume = 0.0f;
+  }
+};
+
+struct NonZero {
+  __host__ __device__ bool operator()(float val) { return val != 0.0f; }
+};
+
+struct RemoveVert {
+  const float* volume;
+
+  __host__ __device__ bool operator()(thrust::tuple<int, int, glm::vec3> in) {
+    int vertLabel = thrust::get<0>(in);
+    return volume[vertLabel] == 0.0f;
+  }
+};
+
+struct RemoveTri {
+  __host__ __device__ bool operator()(const glm::ivec3& triVerts) {
+    return triVerts[0] < 0;
+  }
+};
+
 struct IdxMin
     : public thrust::binary_function<glm::ivec3, glm::ivec3, glm::ivec3> {
   __host__ __device__ int min3(glm::ivec3 a) {
@@ -214,6 +279,15 @@ struct Transform {
 
   __host__ __device__ void operator()(glm::vec3& position) {
     position = transform * glm::vec4(position, 1.0f);
+  }
+};
+
+struct TransformNormals {
+  const glm::mat3 transform;
+
+  __host__ __device__ void operator()(glm::vec3& normal) {
+    normal = glm::normalize(transform * normal);
+    if (isnan(normal.x)) normal = glm::vec3(0.0f);
   }
 };
 
@@ -268,6 +342,56 @@ struct TriMortonBox {
     mortonCode = MortonCode(center, bBox);
     triBox = Box(vertPos[triVerts[0]], vertPos[triVerts[1]]);
     triBox.Union(vertPos[triVerts[2]]);
+  }
+};
+
+__host__ __device__ void AtomicAddVec3(glm::vec3& target,
+                                       const glm::vec3& add) {
+  for (int i : {0, 1, 2}) {
+#ifdef __CUDA_ARCH__
+    atomicAdd(&target[i], add[i]);
+#else
+#pragma omp atomic
+    target[i] += add[i];
+#endif
+  }
+}
+
+struct AssignNormals {
+  glm::vec3* vertNormal;
+  glm::vec3* edgeNormal;
+  const glm::vec3* vertPos;
+  const bool calculateTriNormal;
+
+  __host__ __device__ void operator()(
+      thrust::tuple<glm::vec3&, const glm::ivec3&, const TriEdges&> in) {
+    glm::vec3& triNormal = thrust::get<0>(in);
+    const glm::ivec3& triVerts = thrust::get<1>(in);
+    const TriEdges& triEdges = thrust::get<2>(in);
+
+    glm::vec3 v0 = vertPos[triVerts[0]];
+    glm::vec3 v1 = vertPos[triVerts[1]];
+    glm::vec3 v2 = vertPos[triVerts[2]];
+    // edge vectors
+    glm::vec3 e01 = glm::normalize(v1 - v0);
+    glm::vec3 e12 = glm::normalize(v2 - v1);
+    glm::vec3 e20 = glm::normalize(v0 - v2);
+
+    if (calculateTriNormal) {
+      triNormal = glm::normalize(glm::cross(e01, e12));
+      if (isnan(triNormal.x)) triNormal = glm::vec3(0.0);
+    }
+    // corner angles
+    glm::vec3 phi;
+    phi[0] = glm::acos(-glm::dot(e01, e12));
+    phi[1] = glm::acos(-glm::dot(e12, e20));
+    phi[2] = glm::pi<float>() - phi[0] - phi[1];
+    // assign weighted sum
+    for (int i : {0, 1, 2}) {
+      if (isnan(phi[i])) phi[i] = 0.0;
+      AtomicAddVec3(edgeNormal[triEdges[i].Idx()], triNormal);
+      AtomicAddVec3(vertNormal[triVerts[i]], phi[i] * triNormal);
+    }
   }
 };
 
@@ -730,6 +854,8 @@ Manifold& Manifold::Warp(std::function<void(glm::vec3&)> warpFunc) {
   pImpl_->ApplyTransform();
   thrust::for_each_n(pImpl_->vertPos_.begin(), NumVert(), warpFunc);
   pImpl_->Update();
+  pImpl_->triNormal_.resize(0);  // force recalculation of triNormal
+  pImpl_->CalculateNormals();
   return *this;
 }
 
@@ -756,7 +882,7 @@ void Manifold::SetSuppressErrors(bool val) {
 Manifold Manifold::Boolean(const Manifold& second, OpType op) const {
   pImpl_->ApplyTransform();
   second.pImpl_->ApplyTransform();
-  Boolean3 boolean(*pImpl_, *second.pImpl_);
+  Boolean3 boolean(*pImpl_, *second.pImpl_, op);
   Manifold result;
   result.pImpl_ = std::make_unique<Impl>(boolean.Result(op));
   return result;
@@ -777,7 +903,7 @@ Manifold Manifold::operator^(const Manifold& Q) const {
 std::pair<Manifold, Manifold> Manifold::Split(const Manifold& cutter) const {
   pImpl_->ApplyTransform();
   cutter.pImpl_->ApplyTransform();
-  Boolean3 boolean(*pImpl_, *cutter.pImpl_);
+  Boolean3 boolean(*pImpl_, *cutter.pImpl_, OpType::SUBTRACT);
   std::pair<Manifold, Manifold> result;
   result.first.pImpl_ =
       std::make_unique<Impl>(boolean.Result(OpType::INTERSECT));
@@ -853,7 +979,45 @@ Manifold::Impl::Impl(Shape shape) {
   Finish();
 }
 
+void Manifold::Impl::RemoveChaff() {
+  CreateEdges();
+  int n_comp = ConnectedComponents(vertLabel_, NumVert(), edgeVerts_);
+
+  VecDH<float> surfaceArea(n_comp), volume(n_comp);
+  thrust::for_each_n(triVerts_.beginD(), NumTri(),
+                     AreaVolume({surfaceArea.ptrD(), volume.ptrD(),
+                                 vertLabel_.cptrD(), vertPos_.cptrD()}));
+  thrust::for_each_n(zip(volume.beginD(), surfaceArea.beginD()), n_comp,
+                     ClampVolume());
+  numLabel_ = thrust::count_if(volume.beginD(), volume.endD(), NonZero());
+
+  VecDH<int> newVert2Old(NumVert());
+  thrust::sequence(newVert2Old.begin(), newVert2Old.end());
+  auto begin =
+      zip(vertLabel_.beginD(), newVert2Old.beginD(), vertPos_.beginD());
+  int newNumVert =
+      thrust::remove_if(
+          begin, zip(vertLabel_.endD(), newVert2Old.endD(), vertPos_.endD()),
+          RemoveVert({volume.cptrD()})) -
+      begin;
+
+  VecDH<int> oldVert2New(NumVert(), -1);
+  vertPos_.resize(newNumVert);
+  vertLabel_.resize(newNumVert);
+  thrust::scatter(thrust::make_counting_iterator(0),
+                  thrust::make_counting_iterator(newNumVert),
+                  newVert2Old.beginD(), oldVert2New.beginD());
+
+  thrust::for_each(triVerts_.beginD(), triVerts_.endD(),
+                   Reindex({oldVert2New.cptrD()}));
+  int newNumTri =
+      thrust::remove_if(triVerts_.beginD(), triVerts_.endD(), RemoveTri()) -
+      triVerts_.beginD();
+  triVerts_.resize(newNumTri);
+}
+
 void Manifold::Impl::Finish() {
+  if (triVerts_.size() == 0) return;
   ALWAYS_ASSERT(thrust::reduce(triVerts_.beginD(), triVerts_.endD(),
                                glm::ivec3(std::numeric_limits<int>::max()),
                                IdxMin())[0] >= 0,
@@ -861,6 +1025,11 @@ void Manifold::Impl::Finish() {
   ALWAYS_ASSERT(thrust::reduce(triVerts_.beginD(), triVerts_.endD(),
                                glm::ivec3(-1), IdxMax())[0] < NumVert(),
                 runtimeErr, "Vertex index exceeds number of verts!");
+  if (vertLabel_.size() != NumVert()) {
+    vertLabel_.resize(NumVert());
+    numLabel_ = 1;
+    thrust::fill(vertLabel_.beginD(), vertLabel_.endD(), 0);
+  }
   CalculateBBox();
   SortVerts();
   VecDH<Box> triBox;
@@ -868,6 +1037,7 @@ void Manifold::Impl::Finish() {
   GetTriBoxMorton(triBox, triMorton);
   SortTris(triBox, triMorton);
   CreateEdges();
+  CalculateNormals();
   collider_ = Collider(triBox, triMorton);
 }
 
@@ -888,6 +1058,15 @@ void Manifold::Impl::ApplyTransform() const {
 void Manifold::Impl::ApplyTransform() {
   if (transform_ == glm::mat4x3(1.0f)) return;
   thrust::for_each(vertPos_.beginD(), vertPos_.endD(), Transform({transform_}));
+
+  glm::mat3 normalTransform =
+      glm::inverse(glm::transpose(glm::mat3(transform_)));
+  thrust::for_each(triNormal_.beginD(), triNormal_.endD(),
+                   TransformNormals({normalTransform}));
+  thrust::for_each(edgeNormal_.beginD(), edgeNormal_.endD(),
+                   TransformNormals({normalTransform}));
+  thrust::for_each(vertNormal_.beginD(), vertNormal_.endD(),
+                   TransformNormals({normalTransform}));
   // This optimization does a cheap collider update if the transform is
   // axis-aligned.
   if (!collider_.Transform(transform_)) Update();
@@ -927,14 +1106,6 @@ bool Manifold::Impl::IsValid() const {
                         CheckTris({edgeVerts_.ptrD()}));
 }
 
-glm::vec3 Manifold::Impl::GetTriNormal(int tri) const {
-  glm::vec3 normal = glm::normalize(glm::cross(
-      vertPos_.H()[triVerts_.H()[tri][1]] - vertPos_.H()[triVerts_.H()[tri][0]],
-      vertPos_.H()[triVerts_.H()[tri][2]] -
-          vertPos_.H()[triVerts_.H()[tri][0]]));
-  return std::isfinite(normal.x) ? normal : glm::vec3(0.0f);
-}
-
 void Manifold::Impl::CalculateBBox() {
   bBox_.min = thrust::reduce(vertPos_.begin(), vertPos_.end(),
                              glm::vec3(1 / 0.0f), PosMin());
@@ -951,8 +1122,9 @@ void Manifold::Impl::SortVerts() {
 
   VecDH<int> vertNew2Old(NumVert());
   thrust::sequence(vertNew2Old.beginD(), vertNew2Old.endD());
-  thrust::sort_by_key(vertMorton.beginD(), vertMorton.endD(),
-                      zip(vertPos_.beginD(), vertNew2Old.beginD()));
+  thrust::sort_by_key(
+      vertMorton.beginD(), vertMorton.endD(),
+      zip(vertPos_.beginD(), vertLabel_.beginD(), vertNew2Old.beginD()));
 
   VecDH<int> vertOld2New(NumVert());
   thrust::scatter(thrust::make_counting_iterator(0),
@@ -1032,8 +1204,30 @@ void Manifold::Impl::GetTriBoxMorton(VecDH<Box>& triBox,
 }
 
 void Manifold::Impl::SortTris(VecDH<Box>& triBox, VecDH<uint32_t>& triMorton) {
-  thrust::sort_by_key(triMorton.beginD(), triMorton.endD(),
-                      zip(triBox.beginD(), triVerts_.beginD()));
+  if (triNormal_.size() == NumTri()) {
+    thrust::sort_by_key(
+        triMorton.beginD(), triMorton.endD(),
+        zip(triBox.beginD(), triVerts_.beginD(), triNormal_.beginD()));
+  } else {
+    thrust::sort_by_key(triMorton.beginD(), triMorton.endD(),
+                        zip(triBox.beginD(), triVerts_.beginD()));
+  }
+}
+
+void Manifold::Impl::CalculateNormals() {
+  vertNormal_.resize(NumVert());
+  edgeNormal_.resize(NumEdge());
+  bool calculateTriNormal = false;
+  if (triNormal_.size() != NumTri()) {
+    triNormal_.resize(NumTri());
+    calculateTriNormal = true;
+  }
+  thrust::for_each_n(
+      zip(triNormal_.beginD(), triVerts_.beginD(), triEdges_.beginD()),
+      NumTri(), AssignNormals({vertNormal_.ptrD(), edgeNormal_.ptrD(),
+                               vertPos_.cptrD(), calculateTriNormal}));
+  thrust::for_each(vertNormal_.begin(), vertNormal_.end(), NormalizeTo({1.0}));
+  thrust::for_each(edgeNormal_.begin(), edgeNormal_.end(), NormalizeTo({1.0}));
 }
 
 SparseIndices Manifold::Impl::EdgeCollisions(const Impl& B) const {

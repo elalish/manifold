@@ -63,7 +63,7 @@ class SparseIndices {
   ZipHC endHpq() const { return zip(p.end(), q.end()); }
 
   int size() const { return p.size(); }
-  void Swap() { p.swap(q); }
+  void SwapPQ() { p.swap(q); }
 
   void Sort() { thrust::sort(beginDpq(), endDpq()); }
 

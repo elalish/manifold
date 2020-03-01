@@ -66,6 +66,12 @@ Mesh ImportMesh(const std::string& filename) {
 }
 
 void ExportMesh(const std::string& filename, const Mesh& manifold) {
+  if (manifold.triVerts.size() == 0) {
+    std::cout << filename << " was not saved because the input mesh was empty."
+              << std::endl;
+    return;
+  }
+
   aiScene* scene = new aiScene();
 
   scene->mNumMaterials = 1;

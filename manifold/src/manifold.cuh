@@ -33,10 +33,15 @@ inline std::ostream& operator<<(std::ostream& stream, const EdgeVertsD& edge) {
 struct Manifold::Impl {
   Box bBox_;
   VecDH<glm::vec3> vertPos_;
+  VecDH<int> vertLabel_;
+  int numLabel_ = 1;
   VecDH<EdgeVertsD> edgeVerts_;
   VecDH<EdgeTrisD> edgeTris_;
   VecDH<glm::ivec3> triVerts_;
   VecDH<TriEdges> triEdges_;
+  VecDH<glm::vec3> vertNormal_;
+  VecDH<glm::vec3> edgeNormal_;
+  VecDH<glm::vec3> triNormal_;
   Collider collider_;
   glm::mat4x3 transform_ = glm::mat4x3(1.0f);
 
@@ -44,6 +49,7 @@ struct Manifold::Impl {
   Impl(const Mesh&);
   enum class Shape { TETRAHEDRON, CUBE, OCTAHEDRON };
   Impl(Shape);
+  void RemoveChaff();
   void Finish();
   void Update();
   void ApplyTransform() const;
@@ -54,7 +60,6 @@ struct Manifold::Impl {
   int NumVert() const { return vertPos_.size(); }
   int NumEdge() const { return edgeVerts_.size(); }
   int NumTri() const { return triVerts_.size(); }
-  glm::vec3 GetTriNormal(int tri) const;
   void CalculateBBox();
 
   void SortVerts();
@@ -63,6 +68,7 @@ struct Manifold::Impl {
   VecDH<Box> GetEdgeBox() const;
   void GetTriBoxMorton(VecDH<Box>& triBox, VecDH<uint32_t>& triMorton) const;
   void SortTris(VecDH<Box>& triBox, VecDH<uint32_t>& triMorton);
+  void CalculateNormals();
 
   SparseIndices EdgeCollisions(const Impl& B) const;
   SparseIndices VertexCollisionsZ(const VecDH<glm::vec3>& vertsIn) const;
