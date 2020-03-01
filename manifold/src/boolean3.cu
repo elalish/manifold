@@ -401,8 +401,8 @@ struct Kernel11 {
       if (!isnan(p2[k].y)) k++;
     }
 
-    // assert exactly two of these four were found
-    // if (k != 2) printf("k = %d\n", k);
+    // assert two of these four were found
+    if (k != 2) printf("k = %d\n", k);
 
     xyzz11 = Intersect(p2[0], p2[1], q2[0], q2[1]);
     if (!Shadows(xyzz11.z, xyzz11.w, expandP * normalP[p1].z)) s11 = 0;
@@ -619,6 +619,7 @@ struct Kernel12 {
       k++;
     }
     for (int i : {0, 1, 2}) {
+      if (k > 1) break;
       if (!isnan(xyzz3[i].x)) {
         xzyLR0[k][0] = xyzz3[i].x;
         xzyLR0[k][1] = xyzz3[i].z;
@@ -629,7 +630,7 @@ struct Kernel12 {
         k++;
       }
     }
-    // assert exactly two of these five were found
+    // assert two of these five were found
     if (k != 2) printf("k = %d\n", k);
 
     glm::vec4 xzyy = Intersect(xzyLR0[0], xzyLR0[1], xzyLR1[0], xzyLR1[1]);
