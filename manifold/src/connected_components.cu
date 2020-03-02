@@ -125,7 +125,9 @@ int ConnectedComponents(VecDH<int>& components, int numVert,
                         const VecDH<EdgeVertsD>& edgeVerts,
                         const VecDH<bool>& keep) {
 #if THRUST_DEVICE_SYSTEM == THRUST_DEVICE_SYSTEM_CUDA
-  return ConnectedComponentsGPU(components, numVert, edgeVerts, keep);
+  // Using the CPU version of connected components even when GPU is available,
+  // because it is dramatically faster.
+  return ConnectedComponentsCPU(components, numVert, edgeVerts, keep);
 #else
   return ConnectedComponentsCPU(components, numVert, edgeVerts, keep);
 #endif
@@ -178,7 +180,7 @@ int ConnectedComponentsGPU(VecDH<int>& components, int numVert,
   thrust::fill(components.beginD(), components.endD(), -1);
   VecDH<int> distBFS(numVert);
   int numComponent = 0;
-  while(1) {
+  while (1) {
     // Find the first vertex that hasn't been visited
     int sourceVert = thrust::find(components.beginD(), components.endD(), -1) -
                      components.beginD();
