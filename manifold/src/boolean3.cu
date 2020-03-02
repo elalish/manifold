@@ -1100,6 +1100,8 @@ Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ,
   // Union -> expand inP
   // Difference, Intersection -> contract inP
 
+  Time t0 = NOW();
+  Time t1;
   // Level 3
   // Find edge-triangle overlaps (broad phase)
   p1q2_ = inQ_.EdgeCollisions(inP_);
@@ -1140,6 +1142,13 @@ Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ,
   p1q0.SwapPQ();
   p1q0.Unique();
   if (kVerbose) std::cout << "p1q0 size = " << p1q0.size() << std::endl;
+
+  if (kVerbose) {
+    std::cout << "Time for Filter";
+    t1 = NOW();
+    PrintDuration(t1 - t0);
+    t0 = t1;
+  }
 
   // Level 1
   // Find X-projections of vertices onto edges, keeping only those that actually
@@ -1189,6 +1198,13 @@ Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ,
       Intersect12(inP, inQ, s20, p2q0, s11, p1q1, z20, xyzz11, p2q1_, false);
   if (kVerbose) std::cout << "dir21 size = " << dir21_.size() << std::endl;
 
+  if (kVerbose) {
+    std::cout << "Time for Levels 1-3";
+    t1 = NOW();
+    PrintDuration(t1 - t0);
+    t0 = t1;
+  }
+
   // Build up the winding numbers of all vertices. The involved vertices are
   // calculated from Level 2, while the rest are assigned consistently with
   // connected-components flooding.
@@ -1199,6 +1215,13 @@ Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ,
   // Level 4
   // Record all intersecting triangle pairs.
   p2q2_ = Intersect22(inP_, inQ_, p1q2_, p2q1_, dir12_, dir21_);
+
+  if (kVerbose) {
+    std::cout << "Time for rest of first stage";
+    t1 = NOW();
+    PrintDuration(t1 - t0);
+    t0 = t1;
+  }
 }
 
 Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
@@ -1229,6 +1252,9 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
     default:
       throw std::invalid_argument("invalid enum: OpType.");
   }
+
+  Time t0 = NOW();
+  Time t1;
 
   // Convert winding numbers to inclusion values based on operation type.
   VecDH<int> i12(dir12_.size());
@@ -1290,6 +1316,13 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
     std::cout << n21 << " new verts from facesP -> edgesQ" << std::endl;
   }
 
+  if (kVerbose) {
+    std::cout << "Time for GPU part of result";
+    t1 = NOW();
+    PrintDuration(t1 - t0);
+    t0 = t1;
+  }
+
   // Build up new polygonal faces from triangle intersections. At this point the
   // calculation switches from parallel to serial.
   std::vector<std::vector<EdgeVerts>> facesP(inP_.NumTri()),
@@ -1307,6 +1340,13 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
   if (PolygonParams().intermediateChecks)
     CheckPreTriangulationManfold(outR.triVerts_, facesP, facesQ);
 
+  if (kVerbose) {
+    std::cout << "Time for CPU part of result";
+    t1 = NOW();
+    PrintDuration(t1 - t0);
+    t0 = t1;
+  }
+
   // Triangulate the faces and add them to the manifold.
   if (kVerbose) std::cout << "Adding intersected faces of inP" << std::endl;
   AppendIntersectedFaces(outR, vertAssignmentR, facesP, inP_, false);
@@ -1314,9 +1354,23 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
   AppendIntersectedFaces(outR, vertAssignmentR, facesQ, inQ_,
                          op == Manifold::OpType::SUBTRACT);
 
+  if (kVerbose) {
+    std::cout << "Time for triangulation";
+    t1 = NOW();
+    PrintDuration(t1 - t0);
+    t0 = t1;
+  }
+
   // Create the manifold's data structures and verify manifoldness.
   outR.RemoveChaff();
   outR.Finish();
+
+  if (kVerbose) {
+    std::cout << "Time for manifold finishing";
+    t1 = NOW();
+    PrintDuration(t1 - t0);
+    t0 = t1;
+  }
 
   return outR;
 }
