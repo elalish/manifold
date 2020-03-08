@@ -280,7 +280,7 @@ struct Kernel01 {
     glm::vec3 vertPos1 = vertPosQ[vertQ1];
     yz01 = Interpolate(vertPos0, vertPos1, vertPosP[vertP].x);
     if (reverse) {
-      if (!Shadows(yz01[0], vertPosP[vertP].y, expandP * normalP[edgeQ].y))
+      if (!Shadows(yz01[0], vertPosP[vertP].y, expandP * normalP[vertQ0].y))
         s01 = 0;
     } else {
       if (!Shadows(vertPosP[vertP].y, yz01[0], expandP * normalP[vertP].y))
@@ -303,7 +303,7 @@ std::tuple<VecDH<int>, VecDH<glm::vec2>> Shadow01(SparseIndices &p0q1,
   size_t size = p0q1.RemoveZeros(s01);
   VecDH<glm::vec2> yz01(size);
 
-  normalP = reverse ? inQ.edgeNormal_.cptrD() : inP.vertNormal_.cptrD();
+  normalP = reverse ? inQ.vertNormal_.cptrD() : inP.vertNormal_.cptrD();
   thrust::for_each_n(
       zip(yz01.beginD(), s01.beginD(), p0q1.beginD(0), p0q1.beginD(1)), size,
       Kernel01({reverse, inP.vertPos_.cptrD(), inQ.vertPos_.cptrD(),
@@ -405,7 +405,8 @@ struct Kernel11 {
     if (k != 2) printf("k = %d\n", k);
 
     xyzz11 = Intersect(p2[0], p2[1], q2[0], q2[1]);
-    if (!Shadows(xyzz11.z, xyzz11.w, expandP * normalP[p1].z)) s11 = 0;
+    if (!Shadows(xyzz11.z, xyzz11.w, expandP * normalP[edgeVertsP[p1].first].z))
+      s11 = 0;
   }
 };
 
@@ -434,7 +435,7 @@ std::tuple<VecDH<int>, VecDH<glm::vec4>> Shadow11(
       Kernel11({inP.vertPos_.cptrD(), inQ.vertPos_.cptrD(),
                 inP.edgeVerts_.cptrD(), inQ.edgeVerts_.cptrD(), p0q1.ptrDpq(),
                 yz01.cptrD(), p0q1.size(), p1q0.ptrDpq(), yz10.cptrD(),
-                p1q0.size(), expandP, inP.edgeNormal_.cptrD()}));
+                p1q0.size(), expandP, inP.vertNormal_.cptrD()}));
 
   return std::make_tuple(s11, xyzz11);
 };
