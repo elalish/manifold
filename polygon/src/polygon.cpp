@@ -589,8 +589,7 @@ int CCW(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2) {
     return area > 0 ? 1 : -1;
 }
 
-Polygons Assemble(std::vector<int> &vertAssignment,
-                  const std::vector<EdgeVerts> &edges,
+Polygons Assemble(const std::vector<EdgeVerts> &edges,
                   std::function<glm::vec2(int)> vertProjection) {
   Polygons polys;
   std::map<int, int> vert_edge;
