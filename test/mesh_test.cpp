@@ -245,7 +245,6 @@ TEST(Manifold, Coplanar) {
                  cube2.Scale({0.5f, 0.5f, 1.0f})
                      .Rotate(0, 0, 15)
                      .Translate({0.25f, 0.25f, 0.0f});
-  // ExportMesh("cubes.ply", out.Extract());
 }
 
 TEST(Manifold, MultiCoplanar) {
@@ -255,7 +254,6 @@ TEST(Manifold, MultiCoplanar) {
   Manifold out = cube - cube2.Translate({0.3f, 0.3f, 0.0f});
   out = out - cube.Translate({-0.3f, -0.3f, 0.0f});
   EXPECT_EQ(out.Genus(), -1);
-  // ExportMesh("cubes.ply", out.Extract());
 }
 
 /**
@@ -387,7 +385,6 @@ TEST(Manifold, BooleanWinding) {
   Manifold result = tetras - meshList[0];
 
   ExpectMeshes(result, {{11, 18}, {11, 18}});
-  ExportMesh("winding.ply", result.Extract());
 }
 
 /**
