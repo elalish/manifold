@@ -386,7 +386,8 @@ TEST(Manifold, BooleanWinding) {
   meshList[0].Translate(glm::vec3(-0.25f));
   Manifold result = tetras - meshList[0];
 
-  ExpectMeshes(result, {{8, 12}, {8, 12}});
+  ExpectMeshes(result, {{11, 18}, {11, 18}});
+  ExportMesh("winding.ply", result.Extract());
 }
 
 /**
