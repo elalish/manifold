@@ -1071,30 +1071,6 @@ void AppendFaces(Manifold::Impl &outR,
     }
   }
 }
-
-// void CheckPreTriangulationManfold(
-//     const VecDH<glm::ivec3> &triVerts,
-//     const std::map<int, std::vector<EdgeVerts>> &facesP,
-//     const std::map<int, std::vector<EdgeVerts>> &facesQ) {
-//   std::vector<glm::ivec3> triVertsH;
-//   for (auto tri : triVerts) triVertsH.push_back(tri);
-//   std::vector<EdgeVerts> edges = Triangles2Edges(triVertsH);
-//   for (const auto &face : facesP) {
-//     for (const EdgeVerts &edge : face) {
-//       edges.push_back(edge);
-//     }
-//   }
-//   for (const auto &face : facesQ) {
-//     for (const EdgeVerts &edge : face) {
-//       edges.push_back(edge);
-//     }
-//   }
-//   // Edge data creates an extra manifoldness constraint that is only needed
-//   for
-//   // checking polygon triangulation.
-//   for (auto &edge : edges) edge.edge = Edge::kNoIdx;
-//   CheckTopology(edges);
-// }
 }  // namespace
 
 namespace manifold {
@@ -1329,15 +1305,10 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
                      i21.size(), DuplicateVerts({outR.vertPos_.ptrD()}));
 
   if (kVerbose) {
-    std::cout << nPv << " verts from inP, including duplications" << std::endl;
-    std::cout << nQv << " verts from inQ, including duplications" << std::endl;
+    std::cout << nPv << " verts from inP" << std::endl;
+    std::cout << nQv << " verts from inQ" << std::endl;
     std::cout << n12 << " new verts from edgesP -> facesQ" << std::endl;
     std::cout << n21 << " new verts from facesP -> edgesQ" << std::endl;
-    // outR.vertPos_.Dump();
-    // vP2R.Dump();
-    // vQ2R.Dump();
-    // v12R.Dump();
-    // v21R.Dump();
   }
 
   if (kVerbose) {
@@ -1359,31 +1330,6 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
                   inP_.edgeTris_.H(), true);
   AddNewEdgeVerts(edgesQ, edgesNew, p2q1_, i21.H(), v21R.H(),
                   inQ_.edgeTris_.H(), false);
-  // std::cout << "edgesP:" << std::endl;
-  // for (const auto &value : edgesP) {
-  //   std::cout << value.first << std::endl;
-  //   for (const auto &edge : value.second) {
-  //     std::cout << edge.vert << ", " << (edge.isStart ? "true" : "false")
-  //               << std::endl;
-  //   }
-  // }
-  // std::cout << "edgesQ:" << std::endl;
-  // for (const auto &value : edgesQ) {
-  //   std::cout << value.first << std::endl;
-  //   for (const auto &edge : value.second) {
-  //     std::cout << edge.vert << ", " << (edge.isStart ? "true" : "false")
-  //               << std::endl;
-  //   }
-  // }
-  // std::cout << "edgesNew:" << std::endl;
-  // for (const auto &value : edgesNew) {
-  //   std::cout << value.first.first << ", " << value.first.second <<
-  //   std::endl;
-  //   for (const auto &edge : value.second) {
-  //     std::cout << edge.vert << ", " << (edge.isStart ? "true" : "false")
-  //               << std::endl;
-  //   }
-  // }
 
   // This key is the tri index of P or Q. Only includes intersected faces.
   std::map<int, std::vector<EdgeVerts>> facesP, facesQ;
@@ -1393,24 +1339,6 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
   AppendRetainedEdges(facesQ, edgesQ, inQ_, i30.H(), vQ2R.H(),
                       outR.vertPos_.H());
   AppendNewEdges(facesP, facesQ, edgesNew);
-
-  // std::cout << "facesP:" << std::endl;
-  // for (const auto &value : facesP) {
-  //   std::cout << value.first << std::endl;
-  //   for (const auto &edge : value.second) {
-  //     std::cout << edge.first << ", " << edge.second << std::endl;
-  //   }
-  // }
-  // std::cout << "facesQ:" << std::endl;
-  // for (const auto &value : facesQ) {
-  //   std::cout << value.first << std::endl;
-  //   for (const auto &edge : value.second) {
-  //     std::cout << edge.first << ", " << edge.second << std::endl;
-  //   }
-  // }
-
-  // if (PolygonParams().intermediateChecks)
-  //   CheckPreTriangulationManfold(outR.triVerts_, facesP, facesQ);
 
   if (kVerbose) {
     std::cout << "Time for CPU part of result";
