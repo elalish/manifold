@@ -34,7 +34,7 @@
 #include <algorithm>
 #include <map>
 
-constexpr bool kVerbose = true;
+constexpr bool kVerbose = false;
 
 using namespace thrust::placeholders;
 
@@ -790,30 +790,27 @@ void AddNewEdgeVerts(
     const int vert = v12R[i];
     const int inclusion = i12[i];
 
-    EdgePos edgePos = {vert, 0.0f, inclusion < 0};
-    const int nDupe = glm::abs(inclusion);
-    auto result = edgesP.insert({edgeP, {}});
-    for (int j = 0; j < nDupe; ++j) {
-      result.first->second.push_back(edgePos);
-    }
+    const auto edgePosP = edgesP.insert({edgeP, {}});
 
     EdgeTrisD edgePfaces = edgeTrisP[edgeP];
     std::pair<int, int> key = {edgePfaces.right, faceQ};
-    if (!forward) {
-      edgePos.isStart = !edgePos.isStart;
-      std::swap(key.first, key.second);
-    }
-    auto result2 = edgesNew.insert({key, {}});
-    for (int j = 0; j < nDupe; ++j) {
-      result2.first->second.push_back(edgePos);
-    }
+    if (!forward) std::swap(key.first, key.second);
+    const auto edgePosRight = edgesNew.insert({key, {}});
 
     key = {edgePfaces.left, faceQ};
     if (!forward) std::swap(key.first, key.second);
-    edgePos.isStart = !edgePos.isStart;
-    result2 = edgesNew.insert({key, {}});
-    for (int j = 0; j < nDupe; ++j) {
-      result2.first->second.push_back(edgePos);
+    const auto edgePosLeft = edgesNew.insert({key, {}});
+
+    EdgePos edgePos = {vert, 0.0f, inclusion < 0};
+    EdgePos edgePosRev = edgePos;
+    edgePosRev.isStart = !edgePos.isStart;
+
+    for (int j = 0; j < glm::abs(inclusion); ++j) {
+      edgePosP.first->second.push_back(edgePos);
+      edgePosRight.first->second.push_back(forward ? edgePos : edgePosRev);
+      edgePosLeft.first->second.push_back(forward ? edgePosRev : edgePos);
+      ++edgePos.vert;
+      ++edgePosRev.vert;
     }
   }
 }
@@ -871,12 +868,14 @@ void AppendRetainedEdges(std::map<int, std::vector<EdgeVerts>> &facesP,
     EdgePos edgePos = {vP2R[vStart], -1.0f / 0.0f, inclusion > 0};
     for (int j = 0; j < glm::abs(inclusion); ++j) {
       edgePosP.push_back(edgePos);
+      ++edgePos.vert;
     }
 
     inclusion = i03[vEnd];
     edgePos = {vP2R[vEnd], 1.0f / 0.0f, inclusion < 0};
     for (int j = 0; j < glm::abs(inclusion); ++j) {
       edgePosP.push_back(edgePos);
+      ++edgePos.vert;
     }
 
     // sort edges into start/end pairs along length
@@ -971,7 +970,7 @@ void AppendFaces(Manifold::Impl &outR,
 
   auto nextIntersectedFace = facesP.begin();
   for (int triP = 0; triP < inP.NumTri(); ++triP) {
-    const int faceP = nextIntersectedFace->first;
+    const int faceP = facesP.empty() ? -1 : nextIntersectedFace->first;
     if (faceP != triP) {  // Non-intersecting face
       // Copy triangle from inP
       glm::ivec3 triVerts = triVertsP[triP];
@@ -992,6 +991,7 @@ void AppendFaces(Manifold::Impl &outR,
     } else {  // intersecting face
       std::vector<EdgeVerts> &faceEdges = nextIntersectedFace->second;
       if (std::next(nextIntersectedFace) != facesP.end()) ++nextIntersectedFace;
+
       // Copy in non-intersecting edges of intersected face
       for (int i : {0, 1, 2}) {
         EdgeIdx edge = triEdgesP[faceP][i];
@@ -1007,6 +1007,7 @@ void AppendFaces(Manifold::Impl &outR,
           }
         }
       }
+
       // Triangulate intersected face
       ALWAYS_ASSERT(faceEdges.size() >= 3, logicErr,
                     "face has less than three edges.");
@@ -1420,10 +1421,10 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
 
   // Copy retained triangles and triangulate the intersected faces and add them
   // to the manifold.
-  if (kVerbose) std::cout << "Adding intersected faces of inP" << std::endl;
+  if (kVerbose) std::cout << "Adding faces of inP" << std::endl;
   AppendFaces(outR, facesP, edgesP, i03.H(), inP_, vP2R.H(), false);
-  if (kVerbose) std::cout << "Adding intersected faces of inQ" << std::endl;
-  AppendFaces(outR, facesQ, edgesP, i30.H(), inQ_, vQ2R.H(),
+  if (kVerbose) std::cout << "Adding faces of inQ" << std::endl;
+  AppendFaces(outR, facesQ, edgesQ, i30.H(), inQ_, vQ2R.H(),
               op == Manifold::OpType::SUBTRACT);
 
   // outR.triVerts_.Dump();
