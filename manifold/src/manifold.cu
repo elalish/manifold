@@ -822,19 +822,19 @@ int Manifold::Genus() const {
 
 bool Manifold::IsValid() const { return pImpl_->IsValid(); }
 
-Manifold&& Manifold::Translate(glm::vec3 v) {
+Manifold& Manifold::Translate(glm::vec3 v) {
   pImpl_->transform_[3] += v;
-  return std::move(*this);
+  return *this;
 }
 
-Manifold&& Manifold::Scale(glm::vec3 v) {
+Manifold& Manifold::Scale(glm::vec3 v) {
   glm::mat3 s(1.0f);
   for (int i : {0, 1, 2}) s[i] *= v;
   pImpl_->transform_ = s * pImpl_->transform_;
-  return std::move(*this);
+  return *this;
 }
 
-Manifold&& Manifold::Rotate(float xDegrees, float yDegrees, float zDegrees) {
+Manifold& Manifold::Rotate(float xDegrees, float yDegrees, float zDegrees) {
   glm::mat3 rX(1.0f, 0.0f, 0.0f,                      //
                0.0f, cosd(xDegrees), sind(xDegrees),  //
                0.0f, -sind(xDegrees), cosd(xDegrees));
@@ -845,16 +845,16 @@ Manifold&& Manifold::Rotate(float xDegrees, float yDegrees, float zDegrees) {
                -sind(zDegrees), cosd(zDegrees), 0.0f,  //
                0.0f, 0.0f, 1.0f);
   pImpl_->transform_ = rZ * rY * rX * pImpl_->transform_;
-  return std::move(*this);
+  return *this;
 }
 
-Manifold&& Manifold::Warp(std::function<void(glm::vec3&)> warpFunc) {
+Manifold& Manifold::Warp(std::function<void(glm::vec3&)> warpFunc) {
   pImpl_->ApplyTransform();
   thrust::for_each_n(pImpl_->vertPos_.begin(), NumVert(), warpFunc);
   pImpl_->Update();
   pImpl_->triNormal_.resize(0);  // force recalculation of triNormal
   pImpl_->CalculateNormals();
-  return std::move(*this);
+  return *this;
 }
 
 int Manifold::NumOverlaps(const Manifold& B) const {
