@@ -62,11 +62,11 @@ class Manifold {
   int Genus() const;
 
   // Modification
-  Manifold&& Translate(glm::vec3);
-  Manifold&& Scale(glm::vec3);
-  Manifold&& Rotate(float xDegrees, float yDegrees = 0.0f,
-                    float zDegrees = 0.0f);
-  Manifold&& Warp(std::function<void(glm::vec3&)>);
+  Manifold& Translate(glm::vec3);
+  Manifold& Scale(glm::vec3);
+  Manifold& Rotate(float xDegrees, float yDegrees = 0.0f,
+                   float zDegrees = 0.0f);
+  Manifold& Warp(std::function<void(glm::vec3&)>);
 
   // Boolean
   enum class OpType { ADD, SUBTRACT, INTERSECT };
