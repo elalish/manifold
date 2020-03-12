@@ -449,12 +449,4 @@ TEST(Manifold, BooleanHorriblePlanar) {
   Manifold result = random ^ random2;
   result.Rotate(0, 0, 45).Rotate(glm::degrees(atan(sqrt(2.0f) / tan(phi))));
   EXPECT_TRUE(result.IsEmpty());
-  // Box BB = result.BoundingBox();
-  // float tol = 1e-7;
-  // EXPECT_NEAR(BB.Center().x, 0.0f, tol);
-  // EXPECT_NEAR(BB.Center().y, 0.0f, tol);
-  // EXPECT_NEAR(BB.Size().x, 0.0f, tol);
-  // EXPECT_NEAR(BB.Size().y, 0.0f, tol);
-  // EXPECT_GT(BB.Size().z, 1.0f);
-  // EXPECT_LT(BB.Size().z, 4.0f);
 }
