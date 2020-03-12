@@ -19,7 +19,7 @@ namespace {
 using namespace manifold;
 
 Manifold Base(float radius, float width, float bigRadius, float rr, int n) {
-  Manifold center = Manifold::Cylinder(width, bigRadius + rr / 2);
+  Manifold base = Manifold::Cylinder(width, bigRadius + rr / 2);
 
   Polygons circle(1);
   int m = 20;
@@ -29,13 +29,12 @@ Manifold Base(float radius, float width, float bigRadius, float rr, int n) {
         {glm::vec2(radius * cosd(dPhi * i) + rr, radius * sind(dPhi * i)), 0,
          Edge::kNoIdx});
   }
-  Manifold decor = std::move(Manifold::Extrude(circle, width, 10, 180)
-                                 .Scale({1.0f, 0.5f, 1.0f})
-                                 .Translate({0.0f, bigRadius, 0.0f}));
+  Manifold decor = Manifold::Extrude(circle, width, 10, 180)
+                       .Scale({1.0f, 0.5f, 1.0f})
+                       .Translate({0.0f, bigRadius, 0.0f});
 
-  Manifold base = center + decor;
-  for (int i = 1; i < n; ++i) {
-    base = base + decor.Rotate(0, 0, 360.0f / n);
+  for (int i = 0; i < n; ++i) {
+    base += decor.Rotate(0, 0, 360.0f / n);
   }
   return base;
 }

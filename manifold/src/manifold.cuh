@@ -44,7 +44,6 @@ struct Manifold::Impl {
   VecDH<TriEdges> triEdges_;
 
   VecDH<glm::vec3> vertNormal_;
-  // VecDH<glm::vec3> edgeNormal_;
   VecDH<glm::vec3> triNormal_;
   Collider collider_;
   glm::mat4x3 transform_ = glm::mat4x3(1.0f);

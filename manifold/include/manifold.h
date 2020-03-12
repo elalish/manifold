@@ -62,22 +62,26 @@ class Manifold {
   int Genus() const;
 
   // Modification
-  Manifold& Translate(glm::vec3);
-  Manifold& Scale(glm::vec3);
-  Manifold& Rotate(float xDegrees, float yDegrees = 0.0f,
-                   float zDegrees = 0.0f);
-  Manifold& Warp(std::function<void(glm::vec3&)>);
+  Manifold&& Translate(glm::vec3);
+  Manifold&& Scale(glm::vec3);
+  Manifold&& Rotate(float xDegrees, float yDegrees = 0.0f,
+                    float zDegrees = 0.0f);
+  Manifold&& Warp(std::function<void(glm::vec3&)>);
 
   // Boolean
   enum class OpType { ADD, SUBTRACT, INTERSECT };
   Manifold Boolean(const Manifold& second, OpType op) const;
   // Boolean operation shorthand
   Manifold operator+(const Manifold&) const;  // ADD (Union)
+  Manifold& operator+=(const Manifold&);
   Manifold operator-(const Manifold&) const;  // SUBTRACT (Difference)
+  Manifold& operator-=(const Manifold&);
   Manifold operator^(const Manifold&) const;  // INTERSECT
+  Manifold& operator^=(const Manifold&);
   // First result is the intersection, second is the difference. This is more
   // efficient than doing them separately.
   std::pair<Manifold, Manifold> Split(const Manifold&) const;
+  // First is in the direction of the normal, second is opposite.
   std::pair<Manifold, Manifold> SplitByPlane(glm::vec3 normal,
                                              float originOffset) const;
 
