@@ -359,7 +359,6 @@ __host__ __device__ void AtomicAddVec3(glm::vec3& target,
 
 struct AssignNormals {
   glm::vec3* vertNormal;
-  glm::vec3* edgeNormal;
   const glm::vec3* vertPos;
   const bool calculateTriNormal;
 
@@ -389,7 +388,6 @@ struct AssignNormals {
     // assign weighted sum
     for (int i : {0, 1, 2}) {
       if (isnan(phi[i])) phi[i] = 0.0;
-      AtomicAddVec3(edgeNormal[triEdges[i].Idx()], triNormal);
       AtomicAddVec3(vertNormal[triVerts[i]], phi[i] * triNormal);
     }
   }
@@ -1063,8 +1061,6 @@ void Manifold::Impl::ApplyTransform() {
       glm::inverse(glm::transpose(glm::mat3(transform_)));
   thrust::for_each(triNormal_.beginD(), triNormal_.endD(),
                    TransformNormals({normalTransform}));
-  thrust::for_each(edgeNormal_.beginD(), edgeNormal_.endD(),
-                   TransformNormals({normalTransform}));
   thrust::for_each(vertNormal_.beginD(), vertNormal_.endD(),
                    TransformNormals({normalTransform}));
   // This optimization does a cheap collider update if the transform is
@@ -1216,7 +1212,6 @@ void Manifold::Impl::SortTris(VecDH<Box>& triBox, VecDH<uint32_t>& triMorton) {
 
 void Manifold::Impl::CalculateNormals() {
   vertNormal_.resize(NumVert());
-  edgeNormal_.resize(NumEdge());
   bool calculateTriNormal = false;
   if (triNormal_.size() != NumTri()) {
     triNormal_.resize(NumTri());
@@ -1224,10 +1219,9 @@ void Manifold::Impl::CalculateNormals() {
   }
   thrust::for_each_n(
       zip(triNormal_.beginD(), triVerts_.beginD(), triEdges_.beginD()),
-      NumTri(), AssignNormals({vertNormal_.ptrD(), edgeNormal_.ptrD(),
-                               vertPos_.cptrD(), calculateTriNormal}));
+      NumTri(), AssignNormals({vertNormal_.ptrD(), vertPos_.cptrD(),
+                               calculateTriNormal}));
   thrust::for_each(vertNormal_.begin(), vertNormal_.end(), NormalizeTo({1.0}));
-  thrust::for_each(edgeNormal_.begin(), edgeNormal_.end(), NormalizeTo({1.0}));
 }
 
 SparseIndices Manifold::Impl::EdgeCollisions(const Impl& B) const {
