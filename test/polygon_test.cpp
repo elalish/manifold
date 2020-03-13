@@ -60,11 +60,9 @@ void TestAssemble(const Polygons &polys) {
       vertPos[vert.idx] = vert.pos;
     }
   }
-  std::vector<int> vertAssignment(vertPos.size());
-  std::iota(vertAssignment.begin(), vertAssignment.end(), 0);
 
-  Polygons polys_out = Assemble(vertAssignment, edges,
-                                [&vertPos](int vert) { return vertPos[vert]; });
+  Polygons polys_out =
+      Assemble(edges, [&vertPos](int vert) { return vertPos[vert]; });
   Identical(polys, polys_out);
 }
 
@@ -84,10 +82,8 @@ TEST(Polygon, NoAssemble) {
   edges.push_back({0, 2});
   edges.push_back({1, 2});
   edges.push_back({0, 1});
-  std::vector<int> vertAssignment = {0, 1, 2};
-  ASSERT_THROW(
-      Assemble(vertAssignment, edges, [](int) { return glm::vec2(0.0 / 0.0); }),
-      runtimeErr);
+  ASSERT_THROW(Assemble(edges, [](int) { return glm::vec2(0.0 / 0.0); }),
+               runtimeErr);
 }
 
 /**
