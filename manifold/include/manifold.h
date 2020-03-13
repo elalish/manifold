@@ -73,11 +73,15 @@ class Manifold {
   Manifold Boolean(const Manifold& second, OpType op) const;
   // Boolean operation shorthand
   Manifold operator+(const Manifold&) const;  // ADD (Union)
+  Manifold& operator+=(const Manifold&);
   Manifold operator-(const Manifold&) const;  // SUBTRACT (Difference)
+  Manifold& operator-=(const Manifold&);
   Manifold operator^(const Manifold&) const;  // INTERSECT
+  Manifold& operator^=(const Manifold&);
   // First result is the intersection, second is the difference. This is more
   // efficient than doing them separately.
   std::pair<Manifold, Manifold> Split(const Manifold&) const;
+  // First is in the direction of the normal, second is opposite.
   std::pair<Manifold, Manifold> SplitByPlane(glm::vec3 normal,
                                              float originOffset) const;
 
