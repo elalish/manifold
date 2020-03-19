@@ -235,7 +235,8 @@ struct RemoveVert {
 };
 
 struct RemoveTri {
-  __host__ __device__ bool operator()(const glm::ivec3& triVerts) {
+  __host__ __device__ bool operator()(thrust::tuple<glm::ivec3, glm::vec3> in) {
+    const glm::ivec3& triVerts = thrust::get<0>(in);
     return triVerts[0] < 0;
   }
 };
@@ -387,8 +388,8 @@ struct AssignNormals {
     phi[2] = glm::pi<float>() - phi[0] - phi[1];
     // assign weighted sum
     for (int i : {0, 1, 2}) {
-      if (isnan(phi[i])) phi[i] = 0.0;
-      AtomicAddVec3(vertNormal[triVerts[i]], phi[i] * triNormal);
+      AtomicAddVec3(vertNormal[triVerts[i]],
+                    glm::max(phi[i], kTolerance) * triNormal);
     }
   }
 };
@@ -1023,10 +1024,14 @@ void Manifold::Impl::RemoveChaff() {
 
   thrust::for_each(triVerts_.beginD(), triVerts_.endD(),
                    Reindex({oldVert2New.cptrD()}));
+
+  auto start = zip(triVerts_.beginD(), triNormal_.beginD());
   int newNumTri =
-      thrust::remove_if(triVerts_.beginD(), triVerts_.endD(), RemoveTri()) -
-      triVerts_.beginD();
+      thrust::remove_if(start, zip(triVerts_.endD(), triNormal_.endD()),
+                        RemoveTri()) -
+      start;
   triVerts_.resize(newNumTri);
+  triNormal_.resize(newNumTri);
 }
 
 void Manifold::Impl::Finish() {
