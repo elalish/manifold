@@ -18,6 +18,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/constants.hpp>
 #include <glm/gtx/compatibility.hpp>
+#include <glm/gtx/rotate_vector.hpp>
 #include <iostream>
 #include <sstream>
 #include <vector>
