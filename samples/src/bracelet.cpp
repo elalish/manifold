@@ -18,32 +18,33 @@ namespace {
 
 using namespace manifold;
 
-Manifold Base(float radius, float width, float bigRadius, float rr, int n,
-              float ri, float a, float ro, int m) {
-  Manifold base = Manifold::Cylinder(width, bigRadius + rr / 2);
+Manifold Base(float width, float radius, float decorRadius, float twistRadius,
+              int nDecor, float innerRadius, float outerRadius, float cut,
+              int nCut, int nDivision) {
+  Manifold base = Manifold::Cylinder(width, radius + twistRadius / 2);
 
   Polygons circle(1);
-  int k = 20;
-  float dPhiDeg = 360.0f / k;
-  for (int i = 0; i < k; ++i) {
+  float dPhiDeg = 180.0f / nDivision;
+  for (int i = 0; i < 2 * nDivision; ++i) {
     circle[0].push_back(
-        {glm::vec2(radius * cosd(dPhiDeg * i) + rr, radius * sind(dPhiDeg * i)),
+        {glm::vec2(decorRadius * cosd(dPhiDeg * i) + twistRadius,
+                   decorRadius * sind(dPhiDeg * i)),
          0, Edge::kNoIdx});
   }
-  Manifold decor = std::move(Manifold::Extrude(circle, width, 10, 180)
+  Manifold decor = std::move(Manifold::Extrude(circle, width, nDivision, 180)
                                  .Scale({1.0f, 0.5f, 1.0f})
-                                 .Translate({0.0f, bigRadius, 0.0f}));
+                                 .Translate({0.0f, radius, 0.0f}));
 
-  for (int i = 0; i < n; ++i) {
-    base += decor.Rotate(0, 0, 360.0f / n);
+  for (int i = 0; i < nDecor; ++i) {
+    base += decor.Rotate(0, 0, 360.0f / nDecor);
   }
 
   Polygons stretch(1);
-  float dPhiRad = 2 * glm::pi<float>() / m;
-  glm::vec2 p0(ro, 0.0f);
-  glm::vec2 p1(ri, -a);
-  glm::vec2 p2(ri, a);
-  for (int i = 0; i < m; ++i) {
+  float dPhiRad = 2 * glm::pi<float>() / nCut;
+  glm::vec2 p0(outerRadius, 0.0f);
+  glm::vec2 p1(innerRadius, -cut);
+  glm::vec2 p2(innerRadius, cut);
+  for (int i = 0; i < nCut; ++i) {
     stretch[0].push_back({glm::rotate(p0, dPhiRad * i), 0, Edge::kNoIdx});
     stretch[0].push_back({glm::rotate(p1, dPhiRad * i), 0, Edge::kNoIdx});
     stretch[0].push_back({glm::rotate(p2, dPhiRad * i), 0, Edge::kNoIdx});
@@ -57,15 +58,20 @@ Manifold Base(float radius, float width, float bigRadius, float rr, int n,
 namespace manifold {
 
 Manifold StretchyBracelet(float radius, float height, float width,
-                          float thickness, int n, int m) {
-  float rr = glm::pi<float>() * radius / n;
-  float r1 = rr * 1.5;
-  float ro = radius + (r1 + rr) * 0.5;
-  float ri = ro - height;
-  float a = 0.5 * (glm::pi<float>() * 2 * ri / m - thickness);
-  float rot = 0.5 * thickness * height / a;
+                          float thickness, int nDecor, int nCut,
+                          int nDivision) {
+  float twistRadius = glm::pi<float>() * radius / nDecor;
+  float decorRadius = twistRadius * 1.5;
+  float outerRadius = radius + (decorRadius + twistRadius) * 0.5;
+  float innerRadius = outerRadius - height;
+  float cut = 0.5 * (glm::pi<float>() * 2 * innerRadius / nCut - thickness);
+  float adjThickness = 0.5 * thickness * height / cut;
 
-  return Base(r1, width, radius, rr, n, ri + thickness, a - rot, ro + rot, m) -
-         Base(r1, width, radius - thickness, rr, n, ri, a, ro + 3 * rot, m);
+  return Base(width, radius, decorRadius, twistRadius, nDecor,
+              innerRadius + thickness, outerRadius + adjThickness,
+              cut - adjThickness, nCut, nDivision) -
+         Base(width, radius - thickness, decorRadius, twistRadius, nDecor,
+              innerRadius, outerRadius + 3 * adjThickness, cut, nCut,
+              nDivision);
 }
 }  // namespace manifold
