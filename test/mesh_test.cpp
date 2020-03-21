@@ -245,7 +245,6 @@ TEST(Manifold, Coplanar) {
                  cube2.Scale({0.5f, 0.5f, 1.0f})
                      .Rotate(0, 0, 15)
                      .Translate({0.25f, 0.25f, 0.0f});
-  // ExportMesh("cubes.ply", out.Extract());
 }
 
 TEST(Manifold, MultiCoplanar) {
@@ -255,7 +254,6 @@ TEST(Manifold, MultiCoplanar) {
   Manifold out = cube - cube2.Translate({0.3f, 0.3f, 0.0f});
   out = out - cube.Translate({-0.3f, -0.3f, 0.0f});
   EXPECT_EQ(out.Genus(), -1);
-  // ExportMesh("cubes.ply", out.Extract());
 }
 
 /**
@@ -386,7 +384,7 @@ TEST(Manifold, BooleanWinding) {
   meshList[0].Translate(glm::vec3(-0.25f));
   Manifold result = tetras - meshList[0];
 
-  ExpectMeshes(result, {{8, 12}, {8, 12}});
+  ExpectMeshes(result, {{11, 18}, {11, 18}});
 }
 
 /**
@@ -451,12 +449,4 @@ TEST(Manifold, BooleanHorriblePlanar) {
   Manifold result = random ^ random2;
   result.Rotate(0, 0, 45).Rotate(glm::degrees(atan(sqrt(2.0f) / tan(phi))));
   EXPECT_TRUE(result.IsEmpty());
-  // Box BB = result.BoundingBox();
-  // float tol = 1e-7;
-  // EXPECT_NEAR(BB.Center().x, 0.0f, tol);
-  // EXPECT_NEAR(BB.Center().y, 0.0f, tol);
-  // EXPECT_NEAR(BB.Size().x, 0.0f, tol);
-  // EXPECT_NEAR(BB.Size().y, 0.0f, tol);
-  // EXPECT_GT(BB.Size().z, 1.0f);
-  // EXPECT_LT(BB.Size().z, 4.0f);
 }

@@ -56,7 +56,10 @@
         "algorithm": "cpp",
         "cfenv": "cpp",
         "*.ipp": "cpp",
-        "string": "cpp"
+        "string": "cpp",
+        "forward_list": "cpp",
+        "unordered_set": "cpp",
+        "valarray": "cpp"
     },
     "C_Cpp.clang_format_style": "google",
     "C_Cpp.clang_format_fallbackStyle": "google",

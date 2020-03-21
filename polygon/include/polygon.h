@@ -19,8 +19,7 @@
 namespace manifold {
 
 int CCW(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2);
-Polygons Assemble(std::vector<int> &vertAssignment,
-                  const std::vector<EdgeVerts> &edges,
+Polygons Assemble(const std::vector<EdgeVerts> &edges,
                   std::function<glm::vec2(int)> vertProjection);
 std::vector<glm::ivec3> Triangulate(const Polygons &polys);
 

@@ -18,6 +18,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/constants.hpp>
 #include <glm/gtx/compatibility.hpp>
+#include <glm/gtx/rotate_vector.hpp>
 #include <iostream>
 #include <sstream>
 #include <vector>
@@ -94,6 +95,12 @@ constexpr int kNoIdx = -1;
 constexpr int kInterior = -2;
 constexpr int kInvalid = -3;
 }  // namespace Edge
+
+struct HalfEdge {
+  int startVert;
+  int pairedHalfedge, nextHalfedge;
+  int face;
+};
 
 struct EdgeVerts {
   int first;
