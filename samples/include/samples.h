@@ -39,7 +39,14 @@ Manifold TorusKnot(int p, int q, float majorRadius, float minorRadius,
                    float threadRadius, int circularSegments = 0,
                    int linearSegments = 0);
 
+// The overall size is given by radius; the radius left for your wrist is
+// roughly radius - height. Its length along your arm (the height of the print)
+// is given by width. The thickness parameter is the width of the material,
+// which should be equal to your printer's nozzle diameter. The number of twisty
+// shapes around the outside is nDecor, while the number of cuts that enable
+// stretching is nCut. The resolution is given by nDivision, the number of
+// divisions along the width.
 Manifold StretchyBracelet(float radius = 30.0f, float height = 8.0f,
                           float width = 15.0f, float thickness = 0.4f,
-                          int n = 20, int m = 27);
+                          int nDecor = 20, int nCut = 27, int nDivision = 30);
 }  // namespace manifold

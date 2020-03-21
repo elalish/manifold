@@ -19,6 +19,9 @@
 namespace manifold {
 
 template <typename T>
+using VecH = thrust::host_vector<T>;
+
+template <typename T>
 class VecDH {
  public:
   VecDH() {}
@@ -54,7 +57,6 @@ class VecDH {
     thrust::swap(device_valid_, other.device_valid_);
   }
 
-  using VecH = typename thrust::host_vector<T>;
   using IterD = typename thrust::device_vector<T>::iterator;
   using IterH = typename thrust::host_vector<T>::iterator;
   using IterDc = typename thrust::device_vector<T>::const_iterator;
@@ -123,12 +125,12 @@ class VecDH {
 
   const T* ptrD() const { return cptrD(); }
 
-  const VecH& H() const {
+  const VecH<T>& H() const {
     RefreshHost();
     return host_;
   }
 
-  VecH& H() {
+  VecH<T>& H() {
     RefreshHost();
     device_valid_ = false;
     return host_;

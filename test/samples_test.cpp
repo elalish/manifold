@@ -48,7 +48,7 @@ TEST(Samples, Knot42) {
 // This creates a bracelet sample which involves many operations between shapes
 // that are not in general position, e.g. coplanar faces.
 TEST(Samples, Bracelet) {
-  Manifold::SetExpectGeometry(false);
+  Manifold::SetExpectGeometry(true);
   Manifold bracelet = StretchyBracelet();
   EXPECT_EQ(bracelet.Genus(), 1);
   ExportMesh("bracelet.ply", bracelet.Extract());

@@ -18,65 +18,60 @@ namespace {
 
 using namespace manifold;
 
-Manifold Base(float radius, float width, float bigRadius, float rr, int n) {
-  Manifold center = Manifold::Cylinder(width, bigRadius + rr / 2);
+Manifold Base(float width, float radius, float decorRadius, float twistRadius,
+              int nDecor, float innerRadius, float outerRadius, float cut,
+              int nCut, int nDivision) {
+  Manifold base = Manifold::Cylinder(width, radius + twistRadius / 2);
 
   Polygons circle(1);
-  int m = 20;
-  float dPhi = 360.0f / m;
-  for (int i = 0; i < m; ++i) {
+  float dPhiDeg = 180.0f / nDivision;
+  for (int i = 0; i < 2 * nDivision; ++i) {
     circle[0].push_back(
-        {glm::vec2(radius * cosd(dPhi * i) + rr, radius * sind(dPhi * i)), 0,
-         Edge::kNoIdx});
+        {glm::vec2(decorRadius * cosd(dPhiDeg * i) + twistRadius,
+                   decorRadius * sind(dPhiDeg * i)),
+         0, Edge::kNoIdx});
   }
-  Manifold decor = std::move(Manifold::Extrude(circle, width, 10, 180)
+  Manifold decor = std::move(Manifold::Extrude(circle, width, nDivision, 180)
                                  .Scale({1.0f, 0.5f, 1.0f})
-                                 .Translate({0.0f, bigRadius, 0.0f}));
+                                 .Translate({0.0f, radius, 0.0f}));
 
-  Manifold base = center + decor;
-  for (int i = 1; i < n; ++i) {
-    base = base + decor.Rotate(0, 0, 360.0f / n);
+  for (int i = 0; i < nDecor; ++i) {
+    base += decor.Rotate(0, 0, 360.0f / nDecor);
   }
-  return base;
+
+  Polygons stretch(1);
+  float dPhiRad = 2 * glm::pi<float>() / nCut;
+  glm::vec2 p0(outerRadius, 0.0f);
+  glm::vec2 p1(innerRadius, -cut);
+  glm::vec2 p2(innerRadius, cut);
+  for (int i = 0; i < nCut; ++i) {
+    stretch[0].push_back({glm::rotate(p0, dPhiRad * i), 0, Edge::kNoIdx});
+    stretch[0].push_back({glm::rotate(p1, dPhiRad * i), 0, Edge::kNoIdx});
+    stretch[0].push_back({glm::rotate(p2, dPhiRad * i), 0, Edge::kNoIdx});
+    stretch[0].push_back({glm::rotate(p0, dPhiRad * i), 0, Edge::kNoIdx});
+  }
+
+  return Manifold::Extrude(stretch, width) ^ base;
 }
 }  // namespace
-
-// module base(r1,w){
-// render()
-// union(){
-// 	cylinder(r=r2+rr*0.5,h=w);
-// 	for(i=[1:n]){
-// 		rotate([0,0,i*360/n])translate([0,-r2,0])
-// 		scale([1,0.5,1])linear_extrude(height=w,twist=180,slices=10)
-// 			translate([rr,0,0])circle(r=r1,$fn=20);
-// 	}
-// }}
 
 namespace manifold {
 
 Manifold StretchyBracelet(float radius, float height, float width,
-                          float thickness, int n, int m) {
-  float rr = glm::pi<float>() * radius / n;
-  float r1 = rr * 1.5;
-  float ro = radius + (r1 + rr) * 0.5;
-  float ri = ro - height;
-  float a = glm::pi<float>() * 2 * ri / m - thickness;
+                          float thickness, int nDecor, int nCut,
+                          int nDivision) {
+  float twistRadius = glm::pi<float>() * radius / nDecor;
+  float decorRadius = twistRadius * 1.5;
+  float outerRadius = radius + (decorRadius + twistRadius) * 0.5;
+  float innerRadius = outerRadius - height;
+  float cut = 0.5 * (glm::pi<float>() * 2 * innerRadius / nCut - thickness);
+  float adjThickness = 0.5 * thickness * height / cut;
 
-  return Base(r1, width, radius, rr, n) -
-         Base(r1 - thickness, width, radius, rr, n);
-
-  // module hollow(){
-  // difference(){
-  // 	base(r1=r1,w=w);
-  // 	difference(){
-  // 		translate([0,0,-0.01])base(r1=r1-t,w=w+0.02);
-  // 		for(i=[1:m])rotate([0,0,i*360/m])
-  // 			translate([0,0,-0.02])linear_extrude(height=w+0.04)
-  // 				polygon(points=[[ri,a/2],[ri,-a/2],[ro+3*t*h/a,0]],paths=[[0,1,2]]);
-  // 	}
-  // 	for(i=[1:m])rotate([0,0,i*360/m])
-  // 		translate([0,0,-0.03])linear_extrude(height=w+0.06)
-  // 			polygon(points=[[ri+t,a/2-t],[ri+t,t-a/2],[ro+t*h/a,0]],paths=[[0,1,2]]);
-  // }}
+  return Base(width, radius, decorRadius, twistRadius, nDecor,
+              innerRadius + thickness, outerRadius + adjThickness,
+              cut - adjThickness, nCut, nDivision) -
+         Base(width, radius - thickness, decorRadius, twistRadius, nDecor,
+              innerRadius, outerRadius + 3 * adjThickness, cut, nCut,
+              nDivision);
 }
 }  // namespace manifold

@@ -2,7 +2,7 @@ project (manifold)
 
 find_package(Boost COMPONENTS graph REQUIRED)
 
-add_library(${PROJECT_NAME} src/manifold.cu src/boolean3.cu src/connected_components.cu)
+add_library(${PROJECT_NAME} src/manifold.cu src/manifold_impl.cu src/boolean3.cu src/connected_components.cu)
 
 target_include_directories( ${PROJECT_NAME}
     PUBLIC ${PROJECT_SOURCE_DIR}/include
