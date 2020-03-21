@@ -21,7 +21,7 @@
 #include <algorithm>
 
 #include "connected_components.cuh"
-#include "manifold.cuh"
+#include "manifold_impl.cuh"
 #include "polygon.h"
 
 namespace {
