@@ -97,9 +97,9 @@ constexpr int kInvalid = -3;
 }  // namespace Edge
 
 struct HalfEdge {
-  int startVert, endVert;
-  int pairedHalfedge;
-  int idx;
+  int startVert;
+  int pairedHalfedge, nextHalfedge;
+  int face;
 };
 
 struct EdgeVerts {
