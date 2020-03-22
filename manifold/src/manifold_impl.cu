@@ -366,6 +366,55 @@ struct EdgeBox {
   }
 };
 
+struct TmpEdge {
+  int first, second, halfedgeIdx;
+
+  __host__ __device__ TmpEdge() {}
+  __host__ __device__ TmpEdge(int start, int end, int idx) {
+    first = glm::min(start, end);
+    second = glm::max(start, end);
+    halfedgeIdx = idx;
+  }
+
+  __host__ __device__ bool operator<(const TmpEdge& other) const {
+    return first == other.first ? second < other.second : first < other.first;
+  }
+};
+
+struct Tri2Halfedges {
+  Halfedge* halfedges;
+  TmpEdge* edges;
+
+  __host__ __device__ void operator()(
+      thrust::tuple<int, const glm::ivec3&> in) {
+    const int tri = thrust::get<0>(in);
+    const glm::ivec3& triVerts = thrust::get<1>(in);
+    const int i = 3 * tri;
+    halfedges[i] = {triVerts[0], -1, i + 1, tri};
+    halfedges[i + 1] = {triVerts[1], -1, i + 2, tri};
+    halfedges[i + 2] = {triVerts[2], -1, i, tri};
+    edges[i] = TmpEdge(triVerts[0], triVerts[1], i);
+    edges[i + 1] = TmpEdge(triVerts[1], triVerts[2], i + 1);
+    edges[i + 2] = TmpEdge(triVerts[2], triVerts[0], i + 2);
+  }
+};
+
+struct LinkHalfedges {
+  Halfedge* halfedges;
+  const TmpEdge* edges;
+
+  __host__ __device__ void operator()(int k) {
+    const int i = 2 * k;
+    const int j = i + 1;
+    if (edges[i].first != edges[j].first || edges[i].second != edges[j].second)
+      printf("Not manifold!\n");
+    const int pair0 = edges[i].halfedgeIdx;
+    const int pair1 = edges[j].halfedgeIdx;
+    halfedges[pair0].pairedHalfedge = pair1;
+    halfedges[pair1].pairedHalfedge = pair0;
+  }
+};
+
 struct MakeHalfedges {
   int i, j;
 
@@ -561,8 +610,20 @@ void Manifold::Impl::Finish() {
   GetTriBoxMorton(triBox, triMorton);
   SortTris(triBox, triMorton);
   CreateEdges();
+  CreateHalfedges(triVerts_);
   CalculateNormals();
   collider_ = Collider(triBox, triMorton);
+}
+
+void Manifold::Impl::CreateHalfedges(const VecDH<glm::ivec3>& triVerts) {
+  const int numTri = triVerts.size();
+  halfedge_.resize(3 * numTri);
+  VecDH<TmpEdge> edge(3 * numTri);
+  thrust::for_each_n(zip(thrust::make_counting_iterator(0), triVerts.beginD()),
+                     numTri, Tri2Halfedges({halfedge_.ptrD(), edge.ptrD()}));
+  thrust::sort(edge.beginD(), edge.endD());
+  thrust::for_each_n(thrust::make_counting_iterator(0), halfedge_.size() / 2,
+                     LinkHalfedges({halfedge_.ptrD(), edge.cptrD()}));
 }
 
 void Manifold::Impl::Update() {
