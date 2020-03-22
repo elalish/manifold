@@ -35,7 +35,7 @@ struct Manifold::Impl {
   VecDH<glm::vec3> vertPos_;
   VecDH<int> vertLabel_;
   int numLabel_ = 1;
-  VecDH<HalfEdge> halfEdge_;
+  VecDH<Halfedge> halfedge_;
   VecDH<int> face_;
 
   VecDH<EdgeVertsD> edgeVerts_;
@@ -54,6 +54,7 @@ struct Manifold::Impl {
   Impl(Shape);
   void RemoveChaff();
   void Finish();
+  void CreateHalfedges(const VecDH<glm::ivec3>& triVerts);
   void Update();
   void ApplyTransform() const;
   void ApplyTransform();

@@ -96,7 +96,7 @@ constexpr int kInterior = -2;
 constexpr int kInvalid = -3;
 }  // namespace Edge
 
-struct HalfEdge {
+struct Halfedge {
   int startVert;
   int pairedHalfedge, nextHalfedge;
   int face;
