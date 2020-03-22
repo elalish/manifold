@@ -741,16 +741,6 @@ SparseIndices Intersect22(const Manifold::Impl &inP, const Manifold::Impl &inQ,
   return p2q2;
 }
 
-struct AssignOnes {
-  bool *keepTrisP;
-  bool *keepTrisQ;
-
-  __host__ __device__ void operator()(thrust::tuple<int, int> p2q2) {
-    keepTrisP[thrust::get<0>(p2q2)] = true;
-    keepTrisQ[thrust::get<1>(p2q2)] = true;
-  }
-};
-
 struct DuplicateVerts {
   glm::vec3 *vertPosR;
 
@@ -1248,13 +1238,6 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
   thrust::transform(dir21_.beginD(), dir21_.endD(), i21.beginD(), c3 * _1);
   thrust::transform(w03_.beginD(), w03_.endD(), i03.beginD(), c1 + c3 * _1);
   thrust::transform(w30_.beginD(), w30_.endD(), i30.beginD(), c2 + c3 * _1);
-
-  // Calculate some internal indexing vectors
-  VecDH<bool> intersectedTriP(inP_.NumTri(), false);
-  VecDH<bool> intersectedTriQ(inQ_.NumTri(), false);
-  thrust::for_each_n(
-      p2q2_.beginDpq(), p2q2_.size(),
-      AssignOnes({intersectedTriP.ptrD(), intersectedTriQ.ptrD()}));
 
   VecDH<int> vP2R(inP_.NumVert());
   thrust::exclusive_scan(i03.beginD(), i03.endD(), vP2R.beginD(), 0, AbsSum());
