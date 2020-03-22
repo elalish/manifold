@@ -389,13 +389,12 @@ struct Tri2Halfedges {
       thrust::tuple<int, const glm::ivec3&> in) {
     const int tri = thrust::get<0>(in);
     const glm::ivec3& triVerts = thrust::get<1>(in);
-    const int i = 3 * tri;
-    halfedges[i] = {triVerts[0], -1, i + 1, tri};
-    halfedges[i + 1] = {triVerts[1], -1, i + 2, tri};
-    halfedges[i + 2] = {triVerts[2], -1, i, tri};
-    edges[i] = TmpEdge(triVerts[0], triVerts[1], i);
-    edges[i + 1] = TmpEdge(triVerts[1], triVerts[2], i + 1);
-    edges[i + 2] = TmpEdge(triVerts[2], triVerts[0], i + 2);
+    for (const int i : {0, 1, 2}) {
+      const int j = (i + 1) % 3;
+      const int edge = 3 * tri + i;
+      halfedges[edge] = {triVerts[i], triVerts[j], -1, tri};
+      edges[edge] = TmpEdge(triVerts[i], triVerts[j], edge);
+    }
   }
 };
 
@@ -406,10 +405,12 @@ struct LinkHalfedges {
   __host__ __device__ void operator()(int k) {
     const int i = 2 * k;
     const int j = i + 1;
-    if (edges[i].first != edges[j].first || edges[i].second != edges[j].second)
-      printf("Not manifold!\n");
     const int pair0 = edges[i].halfedgeIdx;
     const int pair1 = edges[j].halfedgeIdx;
+    if (halfedges[pair0].startVert != halfedges[pair1].endVert ||
+        halfedges[pair0].endVert != halfedges[pair1].startVert ||
+        halfedges[pair0].face == halfedges[pair1].face)
+      printf("Not manifold!\n");
     halfedges[pair0].pairedHalfedge = pair1;
     halfedges[pair1].pairedHalfedge = pair0;
   }
