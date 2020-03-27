@@ -356,16 +356,6 @@ struct AssignNormals {
   }
 };
 
-struct EdgeBox {
-  const glm::vec3* vertPos;
-
-  __host__ __device__ void operator()(thrust::tuple<Box&, EdgeVertsD> inout) {
-    EdgeVertsD edgeVerts = thrust::get<1>(inout);
-    thrust::get<0>(inout) =
-        Box(vertPos[edgeVerts.first], vertPos[edgeVerts.second]);
-  }
-};
-
 struct TmpEdge {
   int first, second, halfedgeIdx;
 
@@ -469,6 +459,41 @@ struct LinkEdges2Tris {
       else
         edgeTris[triEdges[i].Idx()].right = tri;
     }
+  }
+};
+
+struct Halfedge2Tmp {
+  __host__ __device__ void operator()(
+      thrust::tuple<TmpEdge&, const Halfedge&, int> inout) {
+    const Halfedge& halfedge = thrust::get<1>(inout);
+    int idx = thrust::get<2>(inout);
+    if (halfedge.startVert > halfedge.endVert) idx = -1;
+
+    thrust::get<0>(inout) = TmpEdge(halfedge.startVert, halfedge.endVert, idx);
+  }
+};
+
+struct TmpInvalid {
+  __host__ __device__ bool operator()(const TmpEdge& edge) {
+    return edge.halfedgeIdx < 0;
+  }
+};
+
+struct EdgeBox {
+  const glm::vec3* vertPos;
+
+  __host__ __device__ void operator()(
+      thrust::tuple<Box&, const TmpEdge&> inout) {
+    const TmpEdge& edge = thrust::get<1>(inout);
+    thrust::get<0>(inout) = Box(vertPos[edge.first], vertPos[edge.second]);
+  }
+};
+
+struct ReindexEdge {
+  const TmpEdge* edges;
+
+  __host__ __device__ void operator()(int& edge) {
+    edge = edges[edge].halfedgeIdx;
   }
 };
 
@@ -658,6 +683,19 @@ void Manifold::Impl::ApplyTransform() {
   CalculateBBox();
 }
 
+bool Manifold::Impl::Tri2Face() const {
+  // This const_cast is here because this operation tweaks the internal data
+  // structure, but does not change what it represents.
+  return const_cast<Impl*>(this)->Tri2Face();
+}
+
+bool Manifold::Impl::Tri2Face() {
+  if (face_.size() != 0 || halfedge_.size() % 3 != 0) return false;
+  face_.resize(halfedge_.size() / 3 + 1);
+  thrust::sequence(face_.beginD(), face_.endD(), 0, 3);
+  return true;
+}
+
 void Manifold::Impl::Refine(int n) {
   // This function doesn't run Finish(), as that is expensive and it'll need to
   // be run after the new vertices have moved, which is a likely scenario after
@@ -771,13 +809,6 @@ void Manifold::Impl::SortHalfedges(VecDH<EdgeVertsD>& halfEdgeVerts,
   }
 }
 
-VecDH<Box> Manifold::Impl::GetEdgeBox() const {
-  VecDH<Box> edgeBox(NumEdge());
-  thrust::for_each_n(zip(edgeBox.beginD(), edgeVerts_.cbeginD()), NumEdge(),
-                     EdgeBox({vertPos_.cptrD()}));
-  return edgeBox;
-}
-
 void Manifold::Impl::GetTriBoxMorton(VecDH<Box>& triBox,
                                      VecDH<uint32_t>& triMorton) const {
   triBox.resize(NumTri());
@@ -812,9 +843,24 @@ void Manifold::Impl::CalculateNormals() {
   thrust::for_each(vertNormal_.begin(), vertNormal_.end(), NormalizeTo({1.0}));
 }
 
-SparseIndices Manifold::Impl::EdgeCollisions(const Impl& B) const {
-  VecDH<Box> BedgeBB = B.GetEdgeBox();
-  return collider_.Collisions(BedgeBB);
+SparseIndices Manifold::Impl::EdgeCollisions(const Impl& Q) const {
+  VecDH<TmpEdge> edges(Q.halfedge_.size());
+  thrust::for_each_n(zip(edges.beginD(), Q.halfedge_.beginD(),
+                         thrust::make_counting_iterator(0)),
+                     edges.size(), Halfedge2Tmp());
+  int numEdge = thrust::remove_if(edges.beginD(), edges.endD(), TmpInvalid()) -
+                edges.beginD();
+  ALWAYS_ASSERT(numEdge == Q.NumEdge(), runtimeErr, "Not oriented!");
+  edges.resize(numEdge);
+
+  VecDH<Box> QedgeBB(numEdge);
+  thrust::for_each_n(zip(QedgeBB.beginD(), edges.cbeginD()), numEdge,
+                     EdgeBox({Q.vertPos_.cptrD()}));
+
+  SparseIndices p2q1 = collider_.Collisions(QedgeBB);
+
+  thrust::for_each(p2q1.beginD(1), p2q1.endD(1), ReindexEdge({edges.cptrD()}));
+  return p2q1;
 }
 
 SparseIndices Manifold::Impl::VertexCollisionsZ(

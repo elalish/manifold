@@ -1073,6 +1073,9 @@ Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ,
   // Union -> expand inP
   // Difference, Intersection -> contract inP
 
+  inP_.Tri2Face();
+  inQ_.Tri2Face();
+
   Time t0 = NOW();
   Time t1;
   // Level 3
@@ -1163,13 +1166,13 @@ Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ,
   // Build up the intersection of the edges and triangles, keeping only those
   // that intersect, and record the direction the edge is passing through the
   // triangle.
-  std::tie(dir12_, v12_) =
+  std::tie(x12_, v12_) =
       Intersect12(inP, inQ, s02, p0q2, s11, p1q1, z02, xyzz11, p1q2_, true);
-  if (kVerbose) std::cout << "dir12 size = " << dir12_.size() << std::endl;
+  if (kVerbose) std::cout << "dir12 size = " << x12_.size() << std::endl;
 
-  std::tie(dir21_, v21_) =
+  std::tie(x21_, v21_) =
       Intersect12(inP, inQ, s20, p2q0, s11, p1q1, z20, xyzz11, p2q1_, false);
-  if (kVerbose) std::cout << "dir21 size = " << dir21_.size() << std::endl;
+  if (kVerbose) std::cout << "dir21 size = " << x21_.size() << std::endl;
 
   if (kVerbose) {
     std::cout << "Time for Levels 1-3";
@@ -1187,7 +1190,7 @@ Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ,
 
   // Level 4
   // Record all intersecting triangle pairs.
-  p2q2_ = Intersect22(inP_, inQ_, p1q2_, p2q1_, dir12_, dir21_);
+  p2q2_ = Intersect22(inP_, inQ_, p1q2_, p2q1_, x12_, x21_);
 
   if (kVerbose) {
     std::cout << "Time for rest of first stage";
@@ -1230,12 +1233,12 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
   Time t1;
 
   // Convert winding numbers to inclusion values based on operation type.
-  VecDH<int> i12(dir12_.size());
-  VecDH<int> i21(dir21_.size());
+  VecDH<int> i12(x12_.size());
+  VecDH<int> i21(x21_.size());
   VecDH<int> i03(w03_.size());
   VecDH<int> i30(w30_.size());
-  thrust::transform(dir12_.beginD(), dir12_.endD(), i12.beginD(), c3 * _1);
-  thrust::transform(dir21_.beginD(), dir21_.endD(), i21.beginD(), c3 * _1);
+  thrust::transform(x12_.beginD(), x12_.endD(), i12.beginD(), c3 * _1);
+  thrust::transform(x21_.beginD(), x21_.endD(), i21.beginD(), c3 * _1);
   thrust::transform(w03_.beginD(), w03_.endD(), i03.beginD(), c1 + c3 * _1);
   thrust::transform(w30_.beginD(), w30_.endD(), i30.beginD(), c2 + c3 * _1);
 
@@ -1305,6 +1308,8 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
   // Build up new polygonal faces from triangle intersections. At this point the
   // calculation switches from parallel to serial.
 
+  // Level 3
+
   // This key is the edge index of P or Q. Only includes intersected edges.
   std::map<int, std::vector<EdgePos>> edgesP, edgesQ;
   // This key is the tri index of <P, Q>
@@ -1314,6 +1319,8 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
                   inP_.edgeTris_.H(), true);
   AddNewEdgeVerts(edgesQ, edgesNew, p2q1_, i21.H(), v21R.H(),
                   inQ_.edgeTris_.H(), false);
+
+  // Level 4
 
   // This key is the tri index of P or Q. Only includes intersected faces.
   std::map<int, std::vector<EdgeVerts>> facesP, facesQ;
@@ -1331,6 +1338,8 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
     t0 = t1;
   }
 
+  // Level 5
+
   // Copy retained triangles and triangulate the intersected faces and add them
   // to the manifold.
   if (kVerbose) std::cout << "Adding faces of inP" << std::endl;
@@ -1347,6 +1356,8 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
     PrintDuration(t1 - t0);
     t0 = t1;
   }
+
+  // Level 6
 
   // Create the manifold's data structures and verify manifoldness.
   outR.RemoveChaff();
