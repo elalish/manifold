@@ -58,18 +58,19 @@ struct Manifold::Impl {
   void Update();
   void ApplyTransform() const;
   void ApplyTransform();
+  bool Tri2Face() const;
+  bool Tri2Face();
   void Refine(int n);
   bool IsValid() const;
 
   int NumVert() const { return vertPos_.size(); }
-  int NumEdge() const { return edgeVerts_.size(); }
+  int NumEdge() const { return halfedge_.size() / 2; }
   int NumTri() const { return triVerts_.size(); }
   void CalculateBBox();
 
   void SortVerts();
   void CreateEdges();
   void SortHalfedges(VecDH<EdgeVertsD>& halfEdges, VecDH<int>& dir);
-  VecDH<Box> GetEdgeBox() const;
   void GetTriBoxMorton(VecDH<Box>& triBox, VecDH<uint32_t>& triMorton) const;
   void SortTris(VecDH<Box>& triBox, VecDH<uint32_t>& triMorton);
   void CalculateNormals();
