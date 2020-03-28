@@ -49,9 +49,6 @@ using namespace manifold;
 __host__ __device__ glm::vec2 Interpolate(glm::vec3 pL, glm::vec3 pR, float x) {
   float dxL = x - pL.x;
   float dxR = x - pR.x;
-  // assert dxL and dxR have opposite signs, cannot both be zero
-  // if (!(dxL * dxR <= 0 && (dxL != 0 || dxR != 0)))
-  //   printf("dxL = %f, dxR = %f\n", dxL, dxR);
   bool useL = fabs(dxL) < fabs(dxR);
   float lambda = (useL ? dxL : dxR) / (pR.x - pL.x);
   if (isnan(lambda)) return glm::vec2(pL.y, pL.z);
@@ -65,15 +62,8 @@ __host__ __device__ glm::vec4 Intersect(const glm::vec3 &pL,
                                         const glm::vec3 &pR,
                                         const glm::vec3 &qL,
                                         const glm::vec3 &qR) {
-  // assert pL.x == qL.x, pR.x == qR.x
-  // if (!(pL.x == qL.x && pR.x == qR.x))
-  //   printf("pL.x = %f, qL.x = %f, pR.x = %f, qR.x = %f\n", pL.x, qL.x, pR.x,
-  //          qR.x);
   float dyL = qL.y - pL.y;
   float dyR = qR.y - pR.y;
-  // assert dyL and dyR have opposite signs, cannot both be zero
-  // if (!(dyL * dyR <= 0 && (dyL != 0 || dyR != 0)))
-  //   printf("dyL = %f, dyR = %f\n", dyL, dyR);
   bool useL = fabs(dyL) < fabs(dyR);
   float dx = pR.x - pL.x;
   float lambda = (useL ? dyL : dyR) / (dyL - dyR);
@@ -90,71 +80,68 @@ __host__ __device__ glm::vec4 Intersect(const glm::vec3 &pL,
   return xyzz;
 }
 
-struct CopyEdgeVerts {
+struct MarkEdgeVerts {
   int *verts;
-  const EdgeVertsD *edgeVerts;
+  const Halfedge *halfedges;
 
-  __host__ __device__ void operator()(thrust::tuple<int, int> in) {
-    int idx = 2 * thrust::get<0>(in);
-    int edge = thrust::get<1>(in);
-
-    verts[idx] = edgeVerts[edge].first;
-    verts[idx + 1] = edgeVerts[edge].second;
+  __host__ __device__ void operator()(int edge) {
+    int vert = halfedges[edge].startVert;
+    verts[vert] = vert;
+    vert = halfedges[edge].endVert;
+    verts[vert] = vert;
   }
 };
 
-struct CopyTriVerts {
+struct MarkFaceVerts {
   int *verts;
-  const glm::ivec3 *triVerts;
+  const Halfedge *halfedges;
+  const int *faces;
 
-  __host__ __device__ void operator()(thrust::tuple<int, int> in) {
-    int idx = 3 * thrust::get<0>(in);
-    int tri = thrust::get<1>(in);
-
-    for (int i : {0, 1, 2}) verts[idx + i] = triVerts[tri][i];
-  }
-};
-
-struct CopyTriEdges {
-  int *edges;
-  const TriEdges *triEdges;
-
-  __host__ __device__ void operator()(thrust::tuple<int, int> in) {
-    int idx = 3 * thrust::get<0>(in);
-    int tri = thrust::get<1>(in);
-
-    for (int i : {0, 1, 2}) {
-      edges[idx + i] = triEdges[tri][i].Idx();
+  __host__ __device__ void operator()(int face) {
+    int edge = faces[face];
+    const int lastEdge = faces[face + 1];
+    while (edge < lastEdge) {
+      int vert = halfedges[edge++].startVert;
+      verts[vert] = vert;
     }
   }
 };
 
 SparseIndices Filter02(const Manifold::Impl &inP, const Manifold::Impl &inQ,
-                       const VecDH<int> &edges, const VecDH<int> &tris) {
-  // find inP's involved vertices from edges & tris
-  VecDH<int> A0(2 * edges.size() + 3 * tris.size() + inP.numLabel_);
-  thrust::for_each_n(zip(thrust::make_counting_iterator(0), edges.beginD()),
-                     edges.size(),
-                     CopyEdgeVerts({A0.ptrD(), inP.edgeVerts_.cptrD()}));
+                       const VecDH<int> &edges, const VecDH<int> &faces) {
+  // find inP's involved vertices from edges & faces
+  VecDH<int> p0(inP.NumVert(), -1);
+  // We keep the verts unique by marking the ones we want to keep
+  // with their own index in parallel (collisions don't matter because any given
+  // element is always being written with the same value). Any that are still
+  // initialized to -1 are not involved and can be removed.
+  thrust::for_each_n(edges.beginD(), edges.size(),
+                     MarkEdgeVerts({p0.ptrD(), inP.halfedge_.cptrD()}));
+
   thrust::for_each_n(
-      zip(thrust::make_counting_iterator(0), tris.beginD()), tris.size(),
-      CopyTriVerts({A0.ptrD() + 2 * edges.size(), inP.triVerts_.cptrD()}));
+      faces.beginD(), faces.size(),
+      MarkFaceVerts({p0.ptrD(), inP.halfedge_.cptrD(), inP.face_.cptrD()}));
+
   // find one vertex from each connected component of inP (in case it has no
   // intersections)
-  thrust::lower_bound(inP.vertLabel_.beginD(), inP.vertLabel_.endD(),
-                      thrust::make_counting_iterator(0),
-                      thrust::make_counting_iterator(inP.numLabel_),
-                      A0.endD() - inP.numLabel_);
+  VecDH<int> compVerts(inP.numLabel_);
+  for (int i = 0; i < inP.numLabel_; ++i) {
+    compVerts.H()[i] =
+        thrust::find(inP.vertLabel_.beginD(), inP.vertLabel_.endD(), i) -
+        inP.vertLabel_.beginD();
+  }
+  thrust::scatter(compVerts.beginD(), compVerts.endD(), compVerts.beginD(),
+                  p0.beginD());
 
-  thrust::sort(A0.beginD(), A0.endD());
-  A0.resize(thrust::unique(A0.beginD(), A0.endD()) - A0.beginD());
+  p0.resize(thrust::remove(p0.beginD(), p0.endD(), -1) - p0.beginD());
   // find which inQ faces shadow these vertices
-  VecDH<glm::vec3> AV(A0.size());
-  thrust::gather(A0.beginD(), A0.endD(), inP.vertPos_.cbeginD(), AV.beginD());
-  SparseIndices p0q2 = inQ.VertexCollisionsZ(AV);
+  VecDH<glm::vec3> vertPosP(p0.size());
+  thrust::gather(p0.beginD(), p0.endD(), inP.vertPos_.cbeginD(),
+                 vertPosP.beginD());
+  SparseIndices p0q2 = inQ.VertexCollisionsZ(vertPosP);
   VecDH<int> i02temp(p0q2.size());
   thrust::copy(p0q2.beginD(0), p0q2.endD(0), i02temp.beginD());
-  thrust::gather(i02temp.beginD(), i02temp.endD(), A0.beginD(), p0q2.beginD(0));
+  thrust::gather(i02temp.beginD(), i02temp.endD(), p0.beginD(), p0q2.beginD(0));
   return p0q2;
 }
 
@@ -189,6 +176,20 @@ SparseIndices Filter11(const Manifold::Impl &inP, const Manifold::Impl &inQ,
   p1q1.Unique();
   return p1q1;
 }
+
+struct CopyTriEdges {
+  int *edges;
+  const TriEdges *triEdges;
+
+  __host__ __device__ void operator()(thrust::tuple<int, int> in) {
+    int idx = 3 * thrust::get<0>(in);
+    int tri = thrust::get<1>(in);
+
+    for (int i : {0, 1, 2}) {
+      edges[idx + i] = triEdges[tri][i].Idx();
+    }
+  }
+};
 
 SparseIndices Filter01(const Manifold::Impl &inP, const Manifold::Impl &inQ,
                        const SparseIndices &p0q2, const SparseIndices &p1q1) {
@@ -1065,7 +1066,6 @@ void AppendFaces(Manifold::Impl &outR,
 }  // namespace
 
 namespace manifold {
-
 Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ,
                    Manifold::OpType op)
     : inP_(inP), inQ_(inQ), expandP_(op == Manifold::OpType::ADD ? 1.0 : -1.0) {
@@ -1090,7 +1090,7 @@ Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ,
   if (kVerbose) std::cout << "p2q1 size = " << p2q1_.size() << std::endl;
 
   // Level 2
-  // Find vertices from Level 3 that overlap triangles in XY-projection
+  // Find vertices from Level 3 that overlap faces in XY-projection
   SparseIndices p0q2 = Filter02(inP_, inQ_, p1q2_.Get(0), p2q1_.Get(0));
   p0q2.Sort();
   if (kVerbose) std::cout << "p0q2 size = " << p0q2.size() << std::endl;
