@@ -100,6 +100,7 @@ struct Halfedge {
   int startVert, endVert;
   int pairedHalfedge;
   int face;
+  HOST_DEVICE bool IsForward() const { return startVert < endVert; }
 };
 
 struct EdgeVerts {
