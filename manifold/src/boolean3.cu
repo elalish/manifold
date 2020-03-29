@@ -145,21 +145,22 @@ SparseIndices Filter02(const Manifold::Impl &inP, const Manifold::Impl &inQ,
   return p0q2;
 }
 
-struct Fill11 {
-  thrust::pair<int *, int *> p1q1;
+struct CopyFaceEdges {
+  // x can be either vert or edge (0 or 1).
+  thrust::pair<int *, int *> pXq1;
   const Halfedge *halfedges;
   const int *faces;
 
   __host__ __device__ void operator()(thrust::tuple<int, int, int> in) {
     int idx = thrust::get<0>(in);
-    const int edgeP = thrust::get<1>(in);
+    const int xP = thrust::get<1>(in);
     const int faceQ = thrust::get<2>(in);
 
     int edgeQ = faces[faceQ];
     const int lastEdge = faces[faceQ + 1];
     while (edgeQ < lastEdge) {
-      p1q1.first[idx] = edgeP;
-      p1q1.second[idx++] = edgeQ++;
+      pXq1.first[idx] = xP;
+      pXq1.second[idx++] = edgeQ++;
     }
   }
 };
@@ -183,53 +184,54 @@ SparseIndices Filter11(const Manifold::Impl &inP, const VecDH<int> &faceSizeP,
   SparseIndices p1q1(secondStart + expandedIdxP.H().back());
   thrust::for_each_n(
       zip(expandedIdxQ.beginD(), p1q2.beginD(0), p1q2.beginD(1)), p1q2.size(),
-      Fill11({p1q1.ptrDpq(), inQ.halfedge_.cptrD(), inQ.face_.cptrD()}));
+      CopyFaceEdges({p1q1.ptrDpq(), inQ.halfedge_.cptrD(), inQ.face_.cptrD()}));
 
   p1q1.SwapPQ();
   thrust::for_each_n(zip(expandedIdxP.beginD(), p2q1.beginD(1), p2q1.beginD(0)),
                      p2q1.size(),
-                     Fill11({p1q1.ptrDpq(secondStart), inP.halfedge_.cptrD(),
-                             inP.face_.cptrD()}));
+                     CopyFaceEdges({p1q1.ptrDpq(secondStart),
+                                    inP.halfedge_.cptrD(), inP.face_.cptrD()}));
   p1q1.SwapPQ();
   p1q1.Unique();
   return p1q1;
 }
 
-struct CopyTriEdges {
-  int *edges;
-  const TriEdges *triEdges;
+struct CopyEdgeVerts {
+  thrust::pair<int *, int *> p0q1;
+  const Halfedge *halfedges;
 
-  __host__ __device__ void operator()(thrust::tuple<int, int> in) {
-    int idx = 3 * thrust::get<0>(in);
-    int tri = thrust::get<1>(in);
+  __host__ __device__ void operator()(thrust::tuple<int, int, int> in) {
+    int idx = 2 * thrust::get<0>(in);
+    const int edgeP = thrust::get<1>(in);
+    const int edgeQ = thrust::get<2>(in);
 
-    for (int i : {0, 1, 2}) {
-      edges[idx + i] = triEdges[tri][i].Idx();
-    }
+    p0q1.first[idx] = halfedges[edgeP].startVert;
+    p0q1.second[idx] = edgeQ;
+    p0q1.first[idx + 1] = halfedges[edgeP].endVert;
+    p0q1.second[idx + 1] = edgeQ;
   }
 };
 
 SparseIndices Filter01(const Manifold::Impl &inP, const Manifold::Impl &inQ,
-                       const SparseIndices &p0q2, const SparseIndices &p1q1) {
-  SparseIndices p0q1(3 * p0q2.size() + 2 * p1q1.size());
-  // Copy vertices
-  for (int i : {0, 1, 2}) {
-    auto verts3 =
-        strided_range<VecDH<int>::IterD>(p0q1.beginD(0) + i, p0q1.endD(0), 3);
-    thrust::copy(p0q2.beginD(0), p0q2.endD(0), verts3.begin());
-  }
+                       const VecDH<int> &faceSizeQ, const SparseIndices &p0q2,
+                       const SparseIndices &p1q1) {
+  VecDH<int> expandedIdxQ(p0q2.size() + 1);
+  auto includedFaceSizeQ = perm(faceSizeQ.beginD(), p0q2.beginD(1));
+  thrust::inclusive_scan(includedFaceSizeQ + 1,
+                         includedFaceSizeQ + p0q2.size() + 1,
+                         expandedIdxQ.beginD());
+  const int secondStart = expandedIdxQ.H().back();
+
+  SparseIndices p0q1(secondStart + 2 * p1q1.size());
+
   thrust::for_each_n(
-      zip(thrust::make_counting_iterator(0), p1q1.beginD(0)), p1q1.size(),
-      CopyEdgeVerts({p0q1.ptrD(0) + 3 * p0q2.size(), inP.edgeVerts_.cptrD()}));
-  // Copy edges
-  thrust::for_each_n(zip(thrust::make_counting_iterator(0), p0q2.beginD(1)),
-                     p0q2.size(),
-                     CopyTriEdges({p0q1.ptrD(1), inQ.triEdges_.cptrD()}));
-  for (int i : {0, 1}) {
-    auto edges2 = strided_range<VecDH<int>::IterD>(
-        p0q1.beginD(1) + 3 * p0q2.size() + i, p0q1.endD(1), 2);
-    thrust::copy(p1q1.beginD(1), p1q1.endD(1), edges2.begin());
-  }
+      zip(expandedIdxQ.beginD(), p0q2.beginD(0), p0q2.beginD(1)), p0q2.size(),
+      CopyFaceEdges({p0q1.ptrDpq(), inQ.halfedge_.cptrD(), inQ.face_.cptrD()}));
+
+  thrust::for_each_n(
+      zip(thrust::make_counting_iterator(0), p1q1.beginD(0), p1q1.beginD(1)),
+      p1q1.size(),
+      CopyEdgeVerts({p0q1.ptrDpq(secondStart), inP.halfedge_.cptrD()}));
   return p0q1;
 }
 
@@ -1131,13 +1133,13 @@ Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ,
 
   // Level 1
   // Find involved vertex-edge pairs from Level 2
-  SparseIndices p0q1 = Filter01(inP_, inQ_, p0q2, p1q1);
+  SparseIndices p0q1 = Filter01(inP_, inQ_, faceSizeQ, p0q2, p1q1);
   p0q1.Unique();
   if (kVerbose) std::cout << "p0q1 size = " << p0q1.size() << std::endl;
 
   p2q0.SwapPQ();
   p1q1.SwapPQ();
-  SparseIndices p1q0 = Filter01(inQ_, inP_, p2q0, p1q1);
+  SparseIndices p1q0 = Filter01(inQ_, inP_, faceSizeP, p2q0, p1q1);
   p2q0.SwapPQ();
   p1q1.SwapPQ();
   p1q0.SwapPQ();
