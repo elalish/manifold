@@ -153,14 +153,14 @@ struct CopyFaceEdges {
 
   __host__ __device__ void operator()(thrust::tuple<int, int, int> in) {
     int idx = thrust::get<0>(in);
-    const int xP = thrust::get<1>(in);
-    const int faceQ = thrust::get<2>(in);
+    const int pX = thrust::get<1>(in);
+    const int q2 = thrust::get<2>(in);
 
-    int edgeQ = faces[faceQ];
-    const int lastEdge = faces[faceQ + 1];
-    while (edgeQ < lastEdge) {
-      pXq1.first[idx] = xP;
-      pXq1.second[idx++] = edgeQ++;
+    int q1 = faces[q2];
+    const int end = faces[q2 + 1];
+    while (q1 < end) {
+      pXq1.first[idx] = pX;
+      pXq1.second[idx++] = q1++;
     }
   }
 };
@@ -202,13 +202,13 @@ struct CopyEdgeVerts {
 
   __host__ __device__ void operator()(thrust::tuple<int, int, int> in) {
     int idx = 2 * thrust::get<0>(in);
-    const int edgeP = thrust::get<1>(in);
-    const int edgeQ = thrust::get<2>(in);
+    const int p1 = thrust::get<1>(in);
+    const int q1 = thrust::get<2>(in);
 
-    p0q1.first[idx] = halfedges[edgeP].startVert;
-    p0q1.second[idx] = edgeQ;
-    p0q1.first[idx + 1] = halfedges[edgeP].endVert;
-    p0q1.second[idx + 1] = edgeQ;
+    p0q1.first[idx] = halfedges[p1].startVert;
+    p0q1.second[idx] = q1;
+    p0q1.first[idx + 1] = halfedges[p1].endVert;
+    p0q1.second[idx + 1] = q1;
   }
 };
 
@@ -259,25 +259,25 @@ struct ShadowKernel01 {
   const bool reverse;
   const glm::vec3 *vertPosP;
   const glm::vec3 *vertPosQ;
-  const EdgeVertsD *edgeVertsQ;
+  const Halfedge *halfedgeQ;
   const float expandP;
   const glm::vec3 *normalP;
 
   __host__ __device__ void operator()(thrust::tuple<int &, int, int> inout) {
     int &s01 = thrust::get<0>(inout);
-    int vertP = thrust::get<1>(inout);
-    int edgeQ = thrust::get<2>(inout);
+    int p0 = thrust::get<1>(inout);
+    int q1 = thrust::get<2>(inout);
 
-    int vertQ0 = edgeVertsQ[edgeQ].first;
-    int vertQ1 = edgeVertsQ[edgeQ].second;
-    float p = vertPosP[vertP].x;
-    float q0 = vertPosQ[vertQ0].x;
-    float q1 = vertPosQ[vertQ1].x;
+    int q1s = halfedgeQ[q1].startVert;
+    int q1e = halfedgeQ[q1].endVert;
+    float p0x = vertPosP[p0].x;
+    float q1sx = vertPosQ[q1s].x;
+    float q1ex = vertPosQ[q1e].x;
     s01 = reverse
-              ? Shadows(q0, p, expandP * normalP[vertQ0].x) -
-                    Shadows(q1, p, expandP * normalP[vertQ1].x)
-              : Shadows(p, q1, expandP * normalP[vertP].x) -
-                    Shadows(p, q0, expandP * normalP[vertP].x);
+              ? Shadows(q1sx, p0x, expandP * normalP[q1s].x) -
+                    Shadows(q1ex, p0x, expandP * normalP[q1e].x)
+              : Shadows(p0x, q1ex, expandP * normalP[p0].x) -
+                    Shadows(p0x, q1sx, expandP * normalP[p0].x);
   }
 };
 
@@ -285,7 +285,7 @@ struct Kernel01 {
   const bool reverse;
   const glm::vec3 *vertPosP;
   const glm::vec3 *vertPosQ;
-  const EdgeVertsD *edgeVertsQ;
+  const Halfedge *halfedgeQ;
   const float expandP;
   const glm::vec3 *normalP;
 
@@ -293,20 +293,16 @@ struct Kernel01 {
       thrust::tuple<glm::vec2 &, int &, int, int> inout) {
     glm::vec2 &yz01 = thrust::get<0>(inout);
     int &s01 = thrust::get<1>(inout);
-    int vertP = thrust::get<2>(inout);
-    int edgeQ = thrust::get<3>(inout);
+    int p0 = thrust::get<2>(inout);
+    int q1 = thrust::get<3>(inout);
 
-    int vertQ0 = edgeVertsQ[edgeQ].first;
-    int vertQ1 = edgeVertsQ[edgeQ].second;
-    glm::vec3 vertPos0 = vertPosQ[vertQ0];
-    glm::vec3 vertPos1 = vertPosQ[vertQ1];
-    yz01 = Interpolate(vertPos0, vertPos1, vertPosP[vertP].x);
+    int q1s = halfedgeQ[q1].startVert;
+    int q1e = halfedgeQ[q1].endVert;
+    yz01 = Interpolate(vertPosQ[q1s], vertPosQ[q1e], vertPosP[p0].x);
     if (reverse) {
-      if (!Shadows(yz01[0], vertPosP[vertP].y, expandP * normalP[vertQ0].y))
-        s01 = 0;
+      if (!Shadows(yz01[0], vertPosP[p0].y, expandP * normalP[q1s].y)) s01 = 0;
     } else {
-      if (!Shadows(vertPosP[vertP].y, yz01[0], expandP * normalP[vertP].y))
-        s01 = 0;
+      if (!Shadows(vertPosP[p0].y, yz01[0], expandP * normalP[p0].y)) s01 = 0;
     }
   }
 };
@@ -321,7 +317,7 @@ std::tuple<VecDH<int>, VecDH<glm::vec2>> Shadow01(SparseIndices &p0q1,
   thrust::for_each_n(
       zip(s01.beginD(), p0q1.beginD(0), p0q1.beginD(1)), p0q1.size(),
       ShadowKernel01({reverse, inP.vertPos_.cptrD(), inQ.vertPos_.cptrD(),
-                      inQ.edgeVerts_.cptrD(), expandP, normalP}));
+                      inQ.halfedge_.cptrD(), expandP, normalP}));
   size_t size = p0q1.RemoveZeros(s01);
   VecDH<glm::vec2> yz01(size);
 
@@ -329,7 +325,7 @@ std::tuple<VecDH<int>, VecDH<glm::vec2>> Shadow01(SparseIndices &p0q1,
   thrust::for_each_n(
       zip(yz01.beginD(), s01.beginD(), p0q1.beginD(0), p0q1.beginD(1)), size,
       Kernel01({reverse, inP.vertPos_.cptrD(), inQ.vertPos_.cptrD(),
-                inQ.edgeVerts_.cptrD(), expandP, normalP}));
+                inQ.halfedge_.cptrD(), expandP, normalP}));
   if (reverse) p0q1.SwapPQ();
   return std::make_tuple(s01, yz01);
 }
