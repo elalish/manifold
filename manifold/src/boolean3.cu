@@ -148,18 +148,21 @@ SparseIndices Filter02(const Manifold::Impl &inP, const Manifold::Impl &inQ,
 struct CopyFaceEdges {
   // x can be either vert or edge (0 or 1).
   thrust::pair<int *, int *> pXq1;
-  const int *faces;
+  const int *facesQ;
+  const Halfedge *halfedgesQ;
 
   __host__ __device__ void operator()(thrust::tuple<int, int, int> in) {
     int idx = thrust::get<0>(in);
     const int pX = thrust::get<1>(in);
     const int q2 = thrust::get<2>(in);
 
-    int q1 = faces[q2];
-    const int end = faces[q2 + 1];
+    int q1 = facesQ[q2];
+    const int end = facesQ[q2 + 1];
     while (q1 < end) {
       pXq1.first[idx] = pX;
-      pXq1.second[idx++] = q1++;
+      const Halfedge edge = halfedgesQ[q1];
+      pXq1.second[idx++] = edge.IsForward() ? q1 : edge.pairedHalfedge;
+      ++q1;
     }
   }
 };
@@ -181,14 +184,15 @@ SparseIndices Filter11(const Manifold::Impl &inP, const VecDH<int> &faceSizeP,
                          expandedIdxP.beginD());
 
   SparseIndices p1q1(secondStart + expandedIdxP.H().back());
-  thrust::for_each_n(zip(expandedIdxQ.beginD(), p1q2.beginD(0), p1q2.beginD(1)),
-                     p1q2.size(),
-                     CopyFaceEdges({p1q1.ptrDpq(), inQ.face_.cptrD()}));
+  thrust::for_each_n(
+      zip(expandedIdxQ.beginD(), p1q2.beginD(0), p1q2.beginD(1)), p1q2.size(),
+      CopyFaceEdges({p1q1.ptrDpq(), inQ.face_.cptrD(), inQ.halfedge_.cptrD()}));
 
   p1q1.SwapPQ();
-  thrust::for_each_n(
-      zip(expandedIdxP.beginD(), p2q1.beginD(1), p2q1.beginD(0)), p2q1.size(),
-      CopyFaceEdges({p1q1.ptrDpq(secondStart), inP.face_.cptrD()}));
+  thrust::for_each_n(zip(expandedIdxP.beginD(), p2q1.beginD(1), p2q1.beginD(0)),
+                     p2q1.size(),
+                     CopyFaceEdges({p1q1.ptrDpq(secondStart), inP.face_.cptrD(),
+                                    inP.halfedge_.cptrD()}));
   p1q1.SwapPQ();
   p1q1.Unique();
   return p1q1;
@@ -222,9 +226,9 @@ SparseIndices Filter01(const Manifold::Impl &inP, const Manifold::Impl &inQ,
 
   SparseIndices p0q1(secondStart + 2 * p1q1.size());
 
-  thrust::for_each_n(zip(expandedIdxQ.beginD(), p0q2.beginD(0), p0q2.beginD(1)),
-                     p0q2.size(),
-                     CopyFaceEdges({p0q1.ptrDpq(), inQ.face_.cptrD()}));
+  thrust::for_each_n(
+      zip(expandedIdxQ.beginD(), p0q2.beginD(0), p0q2.beginD(1)), p0q2.size(),
+      CopyFaceEdges({p0q1.ptrDpq(), inQ.face_.cptrD(), inQ.halfedge_.cptrD()}));
 
   thrust::for_each_n(
       zip(thrust::make_counting_iterator(0), p1q1.beginD(0), p1q1.beginD(1)),
@@ -263,14 +267,14 @@ struct ShadowKernel01 {
 
   __host__ __device__ void operator()(thrust::tuple<int &, int, int> inout) {
     int &s01 = thrust::get<0>(inout);
-    int p0 = thrust::get<1>(inout);
-    int q1 = thrust::get<2>(inout);
+    const int p0 = thrust::get<1>(inout);
+    const int q1 = thrust::get<2>(inout);
 
-    int q1s = halfedgeQ[q1].startVert;
-    int q1e = halfedgeQ[q1].endVert;
-    float p0x = vertPosP[p0].x;
-    float q1sx = vertPosQ[q1s].x;
-    float q1ex = vertPosQ[q1e].x;
+    const int q1s = halfedgeQ[q1].startVert;
+    const int q1e = halfedgeQ[q1].endVert;
+    const float p0x = vertPosP[p0].x;
+    const float q1sx = vertPosQ[q1s].x;
+    const float q1ex = vertPosQ[q1e].x;
     s01 = reverse
               ? Shadows(q1sx, p0x, expandP * normalP[q1s].x) -
                     Shadows(q1ex, p0x, expandP * normalP[q1e].x)
@@ -291,11 +295,11 @@ struct Kernel01 {
       thrust::tuple<glm::vec2 &, int &, int, int> inout) {
     glm::vec2 &yz01 = thrust::get<0>(inout);
     int &s01 = thrust::get<1>(inout);
-    int p0 = thrust::get<2>(inout);
-    int q1 = thrust::get<3>(inout);
+    const int p0 = thrust::get<2>(inout);
+    const int q1 = thrust::get<3>(inout);
 
-    int q1s = halfedgeQ[q1].startVert;
-    int q1e = halfedgeQ[q1].endVert;
+    const int q1s = halfedgeQ[q1].startVert;
+    const int q1e = halfedgeQ[q1].endVert;
     yz01 = Interpolate(vertPosQ[q1s], vertPosQ[q1e], vertPosP[p0].x);
     if (reverse) {
       if (!Shadows(yz01[0], vertPosP[p0].y, expandP * normalP[q1s].y)) s01 = 0;
@@ -461,8 +465,8 @@ struct Gather02 {
   const thrust::pair<const int *, const int *> p0q1;
   const int *s01;
   const int size;
-  const Halfedge *halfedgesQ;
   const int *facesQ;
+  const Halfedge *halfedgesQ;
   const bool forward;
 
   __host__ __device__ void operator()(thrust::tuple<int &, int, int> inout) {
@@ -473,9 +477,11 @@ struct Gather02 {
     int q1 = facesQ[q2];
     const int lastEdge = facesQ[q2 + 1];
     while (q1 < lastEdge) {
-      auto key =
-          forward ? thrust::make_pair(p0, q1) : thrust::make_pair(q1, p0);
-      s02 += (forward == (halfedgesQ[q1].face == q2) ? -1 : 1) *
+      const Halfedge edge = halfedgesQ[q1];
+      const int q1F = edge.IsForward() ? q1 : edge.pairedHalfedge;
+      const auto key =
+          forward ? thrust::make_pair(p0, q1F) : thrust::make_pair(q1F, p0);
+      s02 += (forward == edge.IsForward() ? -1 : 1) *
              BinarySearchByKey(p0q1, s01, size, key, 0);
       ++q1;
     }
@@ -488,6 +494,7 @@ struct Kernel02 {
   const glm::vec2 *yz01;
   const int size;
   const int *facesQ;
+  const Halfedge *halfedgesQ;
   const bool forward;
   const float expandP;
   const glm::vec3 *normalP;
@@ -504,9 +511,11 @@ struct Kernel02 {
     glm::vec3 yzz2[2];
     int k = 0;
     while (q1 < lastEdge) {
-      auto key =
-          forward ? thrust::make_pair(p0, q1) : thrust::make_pair(q1, p0);
-      glm::vec2 yz =
+      const Halfedge edge = halfedgesQ[q1];
+      const int q1F = edge.IsForward() ? q1 : edge.pairedHalfedge;
+      const auto key =
+          forward ? thrust::make_pair(p0, q1F) : thrust::make_pair(q1F, p0);
+      const glm::vec2 yz =
           BinarySearchByKey(p0q1, yz01, size, key, glm::vec2(0.0f / 0.0f));
       if (!isnan(yz[0])) yzz2[k++] = glm::vec3(yz[0], yz[1], yz[1]);
       if (k > 1) break;
@@ -534,7 +543,7 @@ std::tuple<VecDH<int>, VecDH<float>> Shadow02(
   thrust::for_each_n(
       zip(s02.beginD(), p0q2.beginD(!forward), p0q2.beginD(forward)),
       p0q2.size(), Gather02({p0q1.ptrDpq(), s01.ptrD(), p0q1.size(),
-                             inQ.halfedge_.ptrD(), inQ.face_.ptrD(), forward}));
+                             inQ.face_.ptrD(), inQ.halfedge_.ptrD(), forward}));
 
   size_t size = p0q2.RemoveZeros(s02);
   VecDH<float> z02(size);
@@ -543,9 +552,9 @@ std::tuple<VecDH<int>, VecDH<float>> Shadow02(
   thrust::for_each_n(
       zip(z02.beginD(), s02.beginD(), p0q2.beginD(!forward),
           p0q2.beginD(forward)),
-      size,
-      Kernel02({inP.vertPos_.cptrD(), p0q1.ptrDpq(), yz01.cptrD(), p0q1.size(),
-                inQ.face_.cptrD(), forward, expandP, normalP}));
+      size, Kernel02({inP.vertPos_.cptrD(), p0q1.ptrDpq(), yz01.cptrD(),
+                      p0q1.size(), inQ.face_.cptrD(), inQ.halfedge_.ptrD(),
+                      forward, expandP, normalP}));
 
   return std::make_tuple(s02, z02);
 };
@@ -558,6 +567,7 @@ struct Gather12 {
   const int *s11;
   const int size11;
   const EdgeVertsD *edgeVertsP;
+
   const TriEdges *triEdgesQ;
   const bool forward;
 
