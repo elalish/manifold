@@ -358,7 +358,7 @@ struct Gather11 {
   const thrust::pair<const int *, const int *> p0q1;
   const int *s01;
   const int size;
-  const EdgeVertsD *edgeVertsP;
+  const Halfedge *halfedgeP;
   const bool reverse;
 
   __host__ __device__ void operator()(thrust::tuple<int &, int, int> inout) {
@@ -366,10 +366,10 @@ struct Gather11 {
     const int p1 = thrust::get<1>(inout);
     const int q1 = thrust::get<2>(inout);
 
-    int p0 = edgeVertsP[p1].second;
+    int p0 = halfedgeP[p1].endVert;
     auto key = reverse ? thrust::make_pair(q1, p0) : thrust::make_pair(p0, q1);
     s11 += BinarySearchByKey(p0q1, s01, size, key, 0);
-    p0 = edgeVertsP[p1].first;
+    p0 = halfedgeP[p1].startVert;
     key = reverse ? thrust::make_pair(q1, p0) : thrust::make_pair(p0, q1);
     s11 -= BinarySearchByKey(p0q1, s01, size, key, 0);
   }
@@ -378,8 +378,8 @@ struct Gather11 {
 struct Kernel11 {
   const glm::vec3 *vertPosP;
   const glm::vec3 *vertPosQ;
-  const EdgeVertsD *edgeVertsP;
-  const EdgeVertsD *edgeVertsQ;
+  const Halfedge *halfedgeP;
+  const Halfedge *halfedgeQ;
   thrust::pair<const int *, const int *> p0q1;
   const glm::vec2 *yz01;
   int size01;
@@ -400,8 +400,8 @@ struct Kernel11 {
     int k = 0;
     thrust::pair<int, int> key2[2];
 
-    key2[0] = thrust::make_pair(edgeVertsP[p1].first, q1);
-    key2[1] = thrust::make_pair(edgeVertsP[p1].second, q1);
+    key2[0] = thrust::make_pair(halfedgeP[p1].startVert, q1);
+    key2[1] = thrust::make_pair(halfedgeP[p1].endVert, q1);
     for (int i : {0, 1}) {
       p2[k] = vertPosP[key2[i].first];
       q2[k] = glm::vec3(p2[k].x, BinarySearchByKey(p0q1, yz01, size01, key2[i],
@@ -409,8 +409,8 @@ struct Kernel11 {
       if (!isnan(q2[k].y)) k++;
     }
 
-    key2[0] = thrust::make_pair(p1, edgeVertsQ[q1].first);
-    key2[1] = thrust::make_pair(p1, edgeVertsQ[q1].second);
+    key2[0] = thrust::make_pair(p1, halfedgeQ[q1].startVert);
+    key2[1] = thrust::make_pair(p1, halfedgeQ[q1].endVert);
     for (int i : {0, 1}) {
       if (k > 1) break;
       q2[k] = vertPosQ[key2[i].second];
@@ -423,7 +423,8 @@ struct Kernel11 {
     if (k != 2) printf("k = %d\n", k);
 
     xyzz11 = Intersect(p2[0], p2[1], q2[0], q2[1]);
-    if (!Shadows(xyzz11.z, xyzz11.w, expandP * normalP[edgeVertsP[p1].first].z))
+    if (!Shadows(xyzz11.z, xyzz11.w,
+                 expandP * normalP[halfedgeP[p1].startVert].z))
       s11 = 0;
   }
 };
@@ -438,11 +439,11 @@ std::tuple<VecDH<int>, VecDH<glm::vec4>> Shadow11(
   thrust::for_each_n(zip(s11.beginD(), p1q1.beginD(0), p1q1.beginD(1)),
                      p1q1.size(),
                      Gather11({p0q1.ptrDpq(), s01.ptrD(), p0q1.size(),
-                               inP.edgeVerts_.ptrD(), false}));
+                               inP.halfedge_.ptrD(), false}));
   thrust::for_each_n(zip(s11.beginD(), p1q1.beginD(1), p1q1.beginD(0)),
                      p1q1.size(),
                      Gather11({p1q0.ptrDpq(), s10.ptrD(), p1q0.size(),
-                               inQ.edgeVerts_.ptrD(), true}));
+                               inQ.halfedge_.ptrD(), true}));
 
   size_t size = p1q1.RemoveZeros(s11);
   VecDH<glm::vec4> xyzz11(size);
@@ -451,7 +452,7 @@ std::tuple<VecDH<int>, VecDH<glm::vec4>> Shadow11(
       zip(xyzz11.beginD(), s11.beginD(), p1q1.beginD(0), p1q1.beginD(1)),
       p1q1.size(),
       Kernel11({inP.vertPos_.cptrD(), inQ.vertPos_.cptrD(),
-                inP.edgeVerts_.cptrD(), inQ.edgeVerts_.cptrD(), p0q1.ptrDpq(),
+                inP.halfedge_.cptrD(), inQ.halfedge_.cptrD(), p0q1.ptrDpq(),
                 yz01.cptrD(), p0q1.size(), p1q0.ptrDpq(), yz10.cptrD(),
                 p1q0.size(), expandP, inP.vertNormal_.cptrD()}));
 
