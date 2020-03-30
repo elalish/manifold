@@ -747,39 +747,6 @@ VecDH<int> Winding03(const Manifold::Impl &inP, SparseIndices &p0q2,
   return w03;
 };
 
-SparseIndices Intersect22(const Manifold::Impl &inP, const Manifold::Impl &inQ,
-                          const SparseIndices &p1q2, const SparseIndices &p2q1,
-                          const VecDH<int> &dir12, const VecDH<int> &dir21) {
-  SparseIndices p2q2(2 * (p1q2.size() + p2q1.size()));
-  auto f22ptr = p2q2.beginDpq();
-  auto rightTrisA =
-      zip(perm(thrust::make_transform_iterator(inP.edgeTris_.beginD(), Right()),
-               p1q2.beginD(0)),
-          p1q2.beginD(1));
-  f22ptr = thrust::copy_if(rightTrisA, rightTrisA + p1q2.size(), dir12.beginD(),
-                           f22ptr, Not_zero());
-  auto leftTrisA =
-      zip(perm(thrust::make_transform_iterator(inP.edgeTris_.beginD(), Left()),
-               p1q2.beginD(0)),
-          p1q2.beginD(1));
-  f22ptr = thrust::copy_if(leftTrisA, leftTrisA + p1q2.size(), dir12.beginD(),
-                           f22ptr, Not_zero());
-  auto rightTrisB =
-      zip(p2q1.beginD(0),
-          perm(thrust::make_transform_iterator(inQ.edgeTris_.beginD(), Right()),
-               p2q1.beginD(1)));
-  f22ptr = thrust::copy_if(rightTrisB, rightTrisB + p2q1.size(), dir21.beginD(),
-                           f22ptr, Not_zero());
-  auto leftTrisB =
-      zip(p2q1.beginD(0),
-          perm(thrust::make_transform_iterator(inQ.edgeTris_.beginD(), Left()),
-               p2q1.beginD(1)));
-  f22ptr = thrust::copy_if(leftTrisB, leftTrisB + p2q1.size(), dir21.beginD(),
-                           f22ptr, Not_zero());
-  p2q2.Unique();
-  return p2q2;
-}
-
 struct DuplicateVerts {
   glm::vec3 *vertPosR;
 
@@ -1232,10 +1199,6 @@ Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ,
   w03_ = Winding03(inP, p0q2, s02, p1q2_, false);
 
   w30_ = Winding03(inQ, p2q0, s20, p2q1_, true);
-
-  // Level 4
-  // Record all intersecting triangle pairs.
-  p2q2_ = Intersect22(inP_, inQ_, p1q2_, p2q1_, x12_, x21_);
 
   if (kVerbose) {
     std::cout << "Time for rest of first stage";
