@@ -440,12 +440,12 @@ std::tuple<VecDH<int>, VecDH<glm::vec4>> Shadow11(
 
   thrust::for_each_n(zip(s11.beginD(), p1q1.beginD(0), p1q1.beginD(1)),
                      p1q1.size(),
-                     Gather11({p0q1.ptrDpq(), s01.ptrD(), p0q1.size(),
-                               inP.halfedge_.ptrD(), false}));
+                     Gather11({p0q1.ptrDpq(), s01.cptrD(), p0q1.size(),
+                               inP.halfedge_.cptrD(), false}));
   thrust::for_each_n(zip(s11.beginD(), p1q1.beginD(1), p1q1.beginD(0)),
                      p1q1.size(),
-                     Gather11({p1q0.ptrDpq(), s10.ptrD(), p1q0.size(),
-                               inQ.halfedge_.ptrD(), true}));
+                     Gather11({p1q0.ptrDpq(), s10.cptrD(), p1q0.size(),
+                               inQ.halfedge_.cptrD(), true}));
 
   size_t size = p1q1.RemoveZeros(s11);
   VecDH<glm::vec4> xyzz11(size);
@@ -542,8 +542,9 @@ std::tuple<VecDH<int>, VecDH<float>> Shadow02(
 
   thrust::for_each_n(
       zip(s02.beginD(), p0q2.beginD(!forward), p0q2.beginD(forward)),
-      p0q2.size(), Gather02({p0q1.ptrDpq(), s01.ptrD(), p0q1.size(),
-                             inQ.face_.ptrD(), inQ.halfedge_.ptrD(), forward}));
+      p0q2.size(),
+      Gather02({p0q1.ptrDpq(), s01.cptrD(), p0q1.size(), inQ.face_.cptrD(),
+                inQ.halfedge_.cptrD(), forward}));
 
   size_t size = p0q2.RemoveZeros(s02);
   VecDH<float> z02(size);
@@ -553,7 +554,7 @@ std::tuple<VecDH<int>, VecDH<float>> Shadow02(
       zip(z02.beginD(), s02.beginD(), p0q2.beginD(!forward),
           p0q2.beginD(forward)),
       size, Kernel02({inP.vertPos_.cptrD(), p0q1.ptrDpq(), yz01.cptrD(),
-                      p0q1.size(), inQ.face_.cptrD(), inQ.halfedge_.ptrD(),
+                      p0q1.size(), inQ.face_.cptrD(), inQ.halfedge_.cptrD(),
                       forward, expandP, normalP}));
 
   return std::make_tuple(s02, z02);
@@ -566,9 +567,9 @@ struct Gather12 {
   const thrust::pair<const int *, const int *> p1q1;
   const int *s11;
   const int size11;
-  const EdgeVertsD *edgeVertsP;
-
-  const TriEdges *triEdgesQ;
+  const Halfedge *halfedgesP;
+  const int *facesQ;
+  const Halfedge *halfedgesQ;
   const bool forward;
 
   __host__ __device__ void operator()(thrust::tuple<int &, int, int> inout) {
@@ -576,19 +577,23 @@ struct Gather12 {
     const int p1 = thrust::get<1>(inout);
     const int q2 = thrust::get<2>(inout);
 
-    const EdgeVertsD edgeVerts = edgeVertsP[p1];
-    auto key = forward ? thrust::make_pair(edgeVerts.first, q2)
-                       : thrust::make_pair(q2, edgeVerts.second);
+    const Halfedge edge = halfedgesP[p1];
+    auto key = forward ? thrust::make_pair(edge.startVert, q2)
+                       : thrust::make_pair(q2, edge.endVert);
     x12 = BinarySearchByKey(p0q2, s02, size02, key, 0);
-    key = forward ? thrust::make_pair(edgeVerts.second, q2)
-                  : thrust::make_pair(q2, edgeVerts.first);
+    key = forward ? thrust::make_pair(edge.endVert, q2)
+                  : thrust::make_pair(q2, edge.startVert);
     x12 -= BinarySearchByKey(p0q2, s02, size02, key, 0);
 
-    const TriEdges triEdges = triEdgesQ[q2];
-    for (int i : {0, 1, 2}) {
-      key = forward ? thrust::make_pair(p1, triEdges[i].Idx())
-                    : thrust::make_pair(triEdges[i].Idx(), p1);
-      x12 -= triEdges[i].Dir() * BinarySearchByKey(p1q1, s11, size11, key, 0);
+    int q1 = facesQ[q2];
+    const int lastEdge = facesQ[q2 + 1];
+    while (q1 < lastEdge) {
+      const Halfedge edge = halfedgesQ[q1];
+      const int q1F = edge.IsForward() ? q1 : edge.pairedHalfedge;
+      key = forward ? thrust::make_pair(p1, q1F) : thrust::make_pair(q1F, p1);
+      x12 -= (edge.IsForward() ? 1 : -1) *
+             BinarySearchByKey(p1q1, s11, size11, key, 0);
+      ++q1;
     }
   }
 };
@@ -600,8 +605,9 @@ struct Kernel12 {
   const thrust::pair<const int *, const int *> p1q1;
   const glm::vec4 *xyzz11;
   const int size11;
-  const EdgeVertsD *edgeVertsP;
-  const TriEdges *triEdgesQ;
+  const Halfedge *halfedgesP;
+  const int *facesQ;
+  const Halfedge *halfedgesQ;
   const glm::vec3 *vertPosP;
   const bool forward;
 
@@ -611,56 +617,59 @@ struct Kernel12 {
     const int p1 = thrust::get<1>(inout);
     const int q2 = thrust::get<2>(inout);
 
-    const EdgeVertsD edgeVerts = edgeVertsP[p1];
-    auto key = forward ? thrust::make_pair(edgeVerts.first, q2)
-                       : thrust::make_pair(q2, edgeVerts.first);
-    float z0 = BinarySearchByKey(p0q2, z02, size02, key, 0.0f / 0.0f);
-    key = forward ? thrust::make_pair(edgeVerts.second, q2)
-                  : thrust::make_pair(q2, edgeVerts.second);
-    float z1 = BinarySearchByKey(p0q2, z02, size02, key, 0.0f / 0.0f);
-
-    const TriEdges triEdges = triEdgesQ[q2];
-    glm::vec4 xyzz3[3];
-    for (int i : {0, 1, 2}) {
-      key = forward ? thrust::make_pair(p1, triEdges[i].Idx())
-                    : thrust::make_pair(triEdges[i].Idx(), p1);
-      xyzz3[i] =
-          BinarySearchByKey(p1q1, xyzz11, size11, key, glm::vec4(0.0f / 0.0f));
-    }
+    const Halfedge edge = halfedgesP[p1];
+    auto key = forward ? thrust::make_pair(edge.startVert, q2)
+                       : thrust::make_pair(q2, edge.endVert);
+    const float z0 = BinarySearchByKey(p0q2, z02, size02, key, 0.0f / 0.0f);
+    key = forward ? thrust::make_pair(edge.endVert, q2)
+                  : thrust::make_pair(q2, edge.startVert);
+    const float z1 = BinarySearchByKey(p0q2, z02, size02, key, 0.0f / 0.0f);
 
     glm::vec3 xzyLR0[2];
     glm::vec3 xzyLR1[2];
     int k = 0;
     if (!isnan(z0)) {
-      xzyLR0[k] = vertPosP[edgeVerts.first];
+      xzyLR0[k] = vertPosP[edge.startVert];
       thrust::swap(xzyLR0[k].y, xzyLR0[k].z);
       xzyLR1[k] = xzyLR0[k];
       xzyLR1[k][1] = z0;
       k++;
     }
     if (!isnan(z1)) {
-      xzyLR0[k] = vertPosP[edgeVerts.second];
+      xzyLR0[k] = vertPosP[edge.endVert];
       thrust::swap(xzyLR0[k].y, xzyLR0[k].z);
       xzyLR1[k] = xzyLR0[k];
       xzyLR1[k][1] = z1;
       k++;
     }
-    for (int i : {0, 1, 2}) {
+
+    int q1 = facesQ[q2];
+    const int lastEdge = facesQ[q2 + 1];
+    while (q1 < lastEdge) {
       if (k > 1) break;
-      if (!isnan(xyzz3[i].x)) {
-        xzyLR0[k][0] = xyzz3[i].x;
-        xzyLR0[k][1] = xyzz3[i].z;
-        xzyLR0[k][2] = xyzz3[i].y;
+      const Halfedge edge = halfedgesQ[q1];
+      const int q1F = edge.IsForward() ? q1 : edge.pairedHalfedge;
+      key = forward ? thrust::make_pair(p1, q1F) : thrust::make_pair(q1F, p1);
+      const glm::vec4 xyzz =
+          BinarySearchByKey(p1q1, xyzz11, size11, key, glm::vec4(0.0f / 0.0f));
+
+      if (!isnan(xyzz.x)) {
+        xzyLR0[k][0] = xyzz.x;
+        xzyLR0[k][1] = xyzz.z;
+        xzyLR0[k][2] = xyzz.y;
         xzyLR1[k] = xzyLR0[k];
-        xzyLR1[k][1] = xyzz3[i].w;
+        xzyLR1[k][1] = xyzz.w;
         if (!forward) thrust::swap(xzyLR0[k][1], xzyLR1[k][1]);
         k++;
       }
+      ++q1;
     }
+
     // assert two of these five were found
     if (k != 2) printf("k = %d\n", k);
 
-    glm::vec4 xzyy = Intersect(xzyLR0[0], xzyLR0[1], xzyLR1[0], xzyLR1[1]);
+    const glm::vec4 xzyy =
+        Intersect(xzyLR0[0], xzyLR0[1], xzyLR1[0], xzyLR1[1]);
     v12.x = xzyy[0];
     v12.y = xzyy[2];
     v12.z = xzyy[1];
@@ -675,23 +684,28 @@ std::tuple<VecDH<int>, VecDH<glm::vec3>> Intersect12(
   VecDH<int> x12(p1q2.size());
   VecDH<glm::vec3> v12;
 
-  auto edgeVertsPtr = forward ? inP.edgeVerts_.ptrD() : inQ.edgeVerts_.ptrD();
-  auto triEdgesPtr = forward ? inQ.triEdges_.ptrD() : inP.triEdges_.ptrD();
+  const auto halfedgesP =
+      forward ? inP.halfedge_.cptrD() : inQ.halfedge_.cptrD();
+  const auto halfedgesQ =
+      forward ? inQ.halfedge_.cptrD() : inP.halfedge_.cptrD();
+  const auto facesQ = forward ? inQ.face_.cptrD() : inP.face_.cptrD();
+
   thrust::for_each_n(
       zip(x12.beginD(), p1q2.beginD(!forward), p1q2.beginD(forward)),
-      p1q2.size(),
-      Gather12({p0q2.ptrDpq(), s02.ptrD(), p0q2.size(), p1q1.ptrDpq(),
-                s11.ptrD(), p1q1.size(), edgeVertsPtr, triEdgesPtr, forward}));
+      p1q2.size(), Gather12({p0q2.ptrDpq(), s02.ptrD(), p0q2.size(),
+                             p1q1.ptrDpq(), s11.ptrD(), p1q1.size(), halfedgesP,
+                             facesQ, halfedgesQ, forward}));
 
   size_t size = p1q2.RemoveZeros(x12);
   v12.resize(size);
 
-  auto vertPosPtr = forward ? inP.vertPos_.ptrD() : inQ.vertPos_.ptrD();
+  const auto vertPosPtr = forward ? inP.vertPos_.cptrD() : inQ.vertPos_.cptrD();
   thrust::for_each_n(
       zip(v12.beginD(), p1q2.beginD(!forward), p1q2.beginD(forward)),
-      p1q2.size(), Kernel12({p0q2.ptrDpq(), z02.ptrD(), p0q2.size(),
-                             p1q1.ptrDpq(), xyzz11.ptrD(), p1q1.size(),
-                             edgeVertsPtr, triEdgesPtr, vertPosPtr, forward}));
+      p1q2.size(),
+      Kernel12({p0q2.ptrDpq(), z02.cptrD(), p0q2.size(), p1q1.ptrDpq(),
+                xyzz11.cptrD(), p1q1.size(), halfedgesP, facesQ, halfedgesQ,
+                vertPosPtr, forward}));
   return std::make_tuple(x12, v12);
 };
 
