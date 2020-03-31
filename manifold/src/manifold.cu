@@ -288,30 +288,32 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments) {
 
 Manifold Manifold::Compose(const std::vector<Manifold>& manifolds) {
   Manifold combined;
+  int nextLabel = 0;
   for (Manifold manifold : manifolds) {
     manifold.pImpl_->ApplyTransform();
     const int startIdx = combined.NumVert();
     combined.pImpl_->vertPos_.H().insert(combined.pImpl_->vertPos_.end(),
                                          manifold.pImpl_->vertPos_.begin(),
                                          manifold.pImpl_->vertPos_.end());
+    for (int label : manifold.pImpl_->vertLabel_.H())
+      combined.pImpl_->vertLabel_.H().push_back(label + nextLabel);
     for (auto tri : manifold.pImpl_->triVerts_.H())
       combined.pImpl_->triVerts_.H().push_back(tri + startIdx);
+    nextLabel += manifold.pImpl_->numLabel_;
   }
+  combined.pImpl_->numLabel_ = nextLabel;
   combined.pImpl_->Finish();
   return combined;
 }
 
 std::vector<Manifold> Manifold::Decompose() const {
-  VecDH<int> components;
-  int nManifolds =
-      ConnectedComponents(components, NumVert(), pImpl_->edgeVerts_);
-  std::vector<Manifold> meshes(nManifolds);
+  std::vector<Manifold> meshes(pImpl_->numLabel_);
   VecDH<int> vertOld2New(NumVert(), -1);
-  for (int i = 0; i < nManifolds; ++i) {
-    int compVert =
-        thrust::find_if(components.beginD(), components.endD(), Positive()) -
-        components.beginD();
-    int compLabel = components.H()[compVert];
+  for (int i = 0; i < pImpl_->numLabel_; ++i) {
+    int compVert = thrust::find_if(pImpl_->vertLabel_.beginD(),
+                                   pImpl_->vertLabel_.endD(), Positive()) -
+                   pImpl_->vertLabel_.beginD();
+    int compLabel = pImpl_->vertLabel_.H()[compVert];
 
     meshes[i].pImpl_->vertPos_.resize(NumVert());
     VecDH<int> vertNew2Old(NumVert());
@@ -320,7 +322,7 @@ std::vector<Manifold> Manifold::Decompose() const {
             zip(pImpl_->vertPos_.beginD(), thrust::make_counting_iterator(0)),
             zip(pImpl_->vertPos_.endD(),
                 thrust::make_counting_iterator(NumVert())),
-            components.beginD(),
+            pImpl_->vertLabel_.beginD(),
             zip(meshes[i].pImpl_->vertPos_.beginD(), vertNew2Old.beginD()),
             Equals({compLabel})) -
         zip(meshes[i].pImpl_->vertPos_.beginD(),
@@ -334,7 +336,7 @@ std::vector<Manifold> Manifold::Decompose() const {
     int nTri =
         thrust::copy_if(pImpl_->triVerts_.beginD(), pImpl_->triVerts_.endD(),
                         meshes[i].pImpl_->triVerts_.beginD(),
-                        KeepTri({compLabel, components.ptrD()})) -
+                        KeepTri({compLabel, pImpl_->vertLabel_.ptrD()})) -
         meshes[i].pImpl_->triVerts_.beginD();
     meshes[i].pImpl_->triVerts_.resize(nTri);
 
@@ -343,7 +345,8 @@ std::vector<Manifold> Manifold::Decompose() const {
 
     meshes[i].pImpl_->Finish();
     meshes[i].pImpl_->transform_ = pImpl_->transform_;
-    thrust::replace(components.beginD(), components.endD(), compLabel, -1);
+    thrust::replace(pImpl_->vertLabel_.beginD(), pImpl_->vertLabel_.endD(),
+                    compLabel, -1);
   }
   return meshes;
 }

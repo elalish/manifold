@@ -576,7 +576,7 @@ Manifold::Impl::Impl(Shape shape) {
 
 void Manifold::Impl::RemoveChaff() {
   CreateEdges();
-  int n_comp = ConnectedComponents(vertLabel_, NumVert(), edgeVerts_);
+  int n_comp = ConnectedComponents(vertLabel_, NumVert(), halfedge_);
 
   VecDH<float> surfaceArea(n_comp), volume(n_comp);
   thrust::for_each_n(triVerts_.beginD(), NumTri(),

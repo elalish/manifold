@@ -33,45 +33,45 @@ struct DuplicateEdges {
   int* source;
   int* sink;
 
-  __host__ __device__ void operator()(thrust::tuple<int, EdgeVertsD> in) {
-    int idx = 2 * thrust::get<0>(in);
-    EdgeVertsD edgeVerts = thrust::get<1>(in);
-    source[idx] = edgeVerts.first;
-    sink[idx] = edgeVerts.second;
-    source[idx + 1] = edgeVerts.second;
-    sink[idx + 1] = edgeVerts.first;
+  __host__ __device__ void operator()(thrust::tuple<int, Halfedge> in) {
+    int idx = thrust::get<0>(in);
+    Halfedge halfedges = thrust::get<1>(in);
+    source[idx] = halfedges.startVert;
+    sink[idx] = halfedges.endVert;
   }
 };
 
 struct DuplicateKeep {
   int* edgeMask;
 
-  __host__ __device__ void operator()(thrust::tuple<int, bool> in) {
-    int idx = 2 * thrust::get<0>(in);
+  __host__ __device__ void operator()(thrust::tuple<int, bool, Halfedge> in) {
+    int idx = thrust::get<0>(in);
     bool keep = thrust::get<1>(in);
+    Halfedge halfedge = thrust::get<2>(in);
     edgeMask[idx] = keep;
-    edgeMask[idx + 1] = keep;
+    edgeMask[halfedge.pairedHalfedge] = keep;
   }
 };
 
 void Edges2CSR(VecDH<int>& rowOffsets, VecDH<int>& sink, VecDH<int>& edgeMask,
-               const VecDH<EdgeVertsD>& edgeVerts, const VecDH<bool>& keep,
+               const VecDH<Halfedge>& halfedges, const VecDH<bool>& keep,
                int numVert) {
   // Duplicate undirected graph edges
-  int numEdge = edgeVerts.size();
-  VecDH<int> source(2 * numEdge);
-  sink.resize(2 * numEdge);
+  int numHalfedge = halfedges.size();
+  VecDH<int> source(numHalfedge);
+  sink.resize(numHalfedge);
   thrust::for_each_n(
-      zip(thrust::make_counting_iterator(0), edgeVerts.cbeginD()), numEdge,
+      zip(thrust::make_counting_iterator(0), halfedges.cbeginD()), numHalfedge,
       DuplicateEdges({source.ptrD(), sink.ptrD()}));
   // Build symmetric CSR adjacency matrix
   VecDH<int> degree(numVert, 0);
   VecDH<int> vid(numVert);
   VecDH<int> temp(numVert);
   if (keep.size() > 0) {
-    edgeMask.resize(2 * numEdge);
-    thrust::for_each_n(zip(thrust::make_counting_iterator(0), keep.cbeginD()),
-                       numEdge, DuplicateKeep({edgeMask.ptrD()}));
+    edgeMask.resize(numHalfedge);
+    thrust::for_each_n(zip(thrust::make_counting_iterator(0), keep.cbeginD(),
+                           halfedges.cbeginD()),
+                       numHalfedge, DuplicateKeep({edgeMask.ptrD()}));
     thrust::sort_by_key(zip(source.beginD(), sink.beginD()),
                         zip(source.endD(), sink.endD()), edgeMask.beginD());
   } else {
@@ -122,22 +122,22 @@ struct FloodComponent {
 namespace manifold {
 
 int ConnectedComponents(VecDH<int>& components, int numVert,
-                        const VecDH<EdgeVertsD>& edgeVerts,
+                        const VecDH<Halfedge>& halfedges,
                         const VecDH<bool>& keep) {
 #if THRUST_DEVICE_SYSTEM == THRUST_DEVICE_SYSTEM_CUDA
   // Using the CPU version of connected components even when GPU is available,
   // because it is dramatically faster.
-  return ConnectedComponentsCPU(components, numVert, edgeVerts, keep);
+  return ConnectedComponentsCPU(components, numVert, halfedges, keep);
 #else
-  return ConnectedComponentsCPU(components, numVert, edgeVerts, keep);
+  return ConnectedComponentsCPU(components, numVert, halfedges, keep);
 #endif
 }
 
 int ConnectedComponentsGPU(VecDH<int>& components, int numVert,
-                           const VecDH<EdgeVertsD>& edgeVerts,
+                           const VecDH<Halfedge>& halfedges,
                            const VecDH<bool>& keep) {
   VecDH<int> rowOffsets, sink, edgeMask;
-  Edges2CSR(rowOffsets, sink, edgeMask, edgeVerts, keep, numVert);
+  Edges2CSR(rowOffsets, sink, edgeMask, halfedges, keep, numVert);
   // Set up graph
   nvgraphHandle_t handle;
   nvgraphGraphDescr_t graph;
@@ -202,13 +202,14 @@ int ConnectedComponentsGPU(VecDH<int>& components, int numVert,
 }
 
 int ConnectedComponentsCPU(VecDH<int>& components, int numVert,
-                           const VecDH<EdgeVertsD>& edgeVerts,
+                           const VecDH<Halfedge>& halfedges,
                            const VecDH<bool>& keep) {
   boost::adjacency_list<boost::vecS, boost::vecS, boost::undirectedS> graph(
       numVert);
-  for (int i = 0; i < edgeVerts.size(); ++i) {
-    if (keep.size() == 0 || keep.H()[i]) {
-      boost::add_edge(edgeVerts.H()[i].first, edgeVerts.H()[i].second, graph);
+  for (int i = 0; i < halfedges.size(); ++i) {
+    const Halfedge halfedge = halfedges.H()[i];
+    if (halfedge.IsForward() && (keep.size() == 0 || keep.H()[i])) {
+      boost::add_edge(halfedge.startVert, halfedge.endVert, graph);
     }
   }
   components.resize(numVert);
