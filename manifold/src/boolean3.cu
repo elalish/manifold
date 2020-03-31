@@ -715,7 +715,7 @@ VecDH<int> Winding03(const Manifold::Impl &inP, SparseIndices &p0q2,
   // keepEdgesP is the set of edges that connect regions of the manifold with
   // the same winding number, so we remove any edges associated with
   // intersections.
-  VecDH<bool> keepEdgesP(inP.NumEdge(), true);
+  VecDH<bool> keepEdgesP(inP.halfedge_.size(), true);
   thrust::scatter(thrust::make_constant_iterator(false, 0),
                   thrust::make_constant_iterator(false, p1q2.size()),
                   p1q2.beginD(reverse), keepEdgesP.beginD());
@@ -733,8 +733,8 @@ VecDH<int> Winding03(const Manifold::Impl &inP, SparseIndices &p0q2,
 
   // find connected regions (separated by intersections)
   VecDH<int> vertLabels;
-  int n_comp = ConnectedComponents(vertLabels, inP.NumVert(), inP.edgeVerts_,
-                                   keepEdgesP);
+  int n_comp =
+      ConnectedComponents(vertLabels, inP.NumVert(), inP.halfedge_, keepEdgesP);
   // flood the w03 values throughout their connected components (they are
   // consistent)
   FloodComponents(w03, vertLabels, n_comp);
