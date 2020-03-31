@@ -773,7 +773,7 @@ void AddNewEdgeVerts(
     std::map<int, std::vector<EdgePos>> &edgesP,
     std::map<std::pair<int, int>, std::vector<EdgePos>> &edgesNew,
     const SparseIndices &p1q2, const VecH<int> &i12, const VecH<int> &v12R,
-    const VecH<EdgeTrisD> &edgeTrisP, bool forward) {
+    const VecH<Halfedge> &halfedgeP, bool forward) {
   // For each edge of P that intersects a face of Q (p1q2), add this vertex to
   // P's corresponding edge vector and to the two new edges, which are
   // intersections between the face of Q and the two faces of P attached to the
@@ -789,12 +789,12 @@ void AddNewEdgeVerts(
 
     const auto edgePosP = edgesP.insert({edgeP, {}});
 
-    EdgeTrisD edgePfaces = edgeTrisP[edgeP];
-    std::pair<int, int> key = {edgePfaces.right, faceQ};
+    Halfedge halfedge = halfedgeP[edgeP];
+    std::pair<int, int> key = {halfedgeP[halfedge.pairedHalfedge].face, faceQ};
     if (!forward) std::swap(key.first, key.second);
     const auto edgePosRight = edgesNew.insert({key, {}});
 
-    key = {edgePfaces.left, faceQ};
+    key = {halfedge.face, faceQ};
     if (!forward) std::swap(key.first, key.second);
     const auto edgePosLeft = edgesNew.insert({key, {}});
 
@@ -1324,9 +1324,9 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
   std::map<std::pair<int, int>, std::vector<EdgePos>> edgesNew;
 
   AddNewEdgeVerts(edgesP, edgesNew, p1q2_, i12.H(), v12R.H(),
-                  inP_.edgeTris_.H(), true);
+                  inP_.halfedge_.H(), true);
   AddNewEdgeVerts(edgesQ, edgesNew, p2q1_, i21.H(), v21R.H(),
-                  inQ_.edgeTris_.H(), false);
+                  inQ_.halfedge_.H(), false);
 
   // Level 4
 
