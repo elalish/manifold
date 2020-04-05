@@ -17,6 +17,7 @@
 #include "polygon.h"
 
 #include <math_constants.h>
+#include <thrust/adjacent_difference.h>
 #include <thrust/binary_search.h>
 #include <thrust/count.h>
 #include <thrust/gather.h>
@@ -34,7 +35,7 @@
 #include <algorithm>
 #include <map>
 
-constexpr bool kVerbose = false;
+constexpr bool kVerbose = true;
 
 using namespace thrust::placeholders;
 
@@ -172,16 +173,14 @@ SparseIndices Filter11(const Manifold::Impl &inP, const VecDH<int> &faceSizeP,
                        const SparseIndices &p1q2, const SparseIndices &p2q1) {
   VecDH<int> expandedIdxQ(p1q2.size() + 1);
   auto includedFaceSizeQ = perm(faceSizeQ.beginD(), p1q2.beginD(1));
-  thrust::inclusive_scan(includedFaceSizeQ + 1,
-                         includedFaceSizeQ + p1q2.size() + 1,
-                         expandedIdxQ.beginD());
+  thrust::inclusive_scan(includedFaceSizeQ, includedFaceSizeQ + p1q2.size(),
+                         expandedIdxQ.beginD() + 1);
   const int secondStart = expandedIdxQ.H().back();
 
   VecDH<int> expandedIdxP(p2q1.size() + 1);
   auto includedFaceSizeP = perm(faceSizeP.beginD(), p2q1.beginD(0));
-  thrust::inclusive_scan(includedFaceSizeP + 1,
-                         includedFaceSizeP + p2q1.size() + 1,
-                         expandedIdxP.beginD());
+  thrust::inclusive_scan(includedFaceSizeP, includedFaceSizeP + p2q1.size(),
+                         expandedIdxP.beginD() + 1);
 
   SparseIndices p1q1(secondStart + expandedIdxP.H().back());
   thrust::for_each_n(
@@ -219,9 +218,8 @@ SparseIndices Filter01(const Manifold::Impl &inP, const Manifold::Impl &inQ,
                        const SparseIndices &p1q1) {
   VecDH<int> expandedIdxQ(p0q2.size() + 1);
   auto includedFaceSizeQ = perm(faceSizeQ.beginD(), p0q2.beginD(1));
-  thrust::inclusive_scan(includedFaceSizeQ + 1,
-                         includedFaceSizeQ + p0q2.size() + 1,
-                         expandedIdxQ.beginD());
+  thrust::inclusive_scan(includedFaceSizeQ, includedFaceSizeQ + p0q2.size(),
+                         expandedIdxQ.beginD() + 1);
   const int secondStart = expandedIdxQ.H().back();
 
   SparseIndices p0q1(secondStart + 2 * p1q1.size());

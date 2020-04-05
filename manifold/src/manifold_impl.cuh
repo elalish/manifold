@@ -64,7 +64,7 @@ struct Manifold::Impl {
   bool IsValid() const;
 
   int NumVert() const { return vertPos_.size(); }
-  int NumEdge() const { return halfedge_.size() / 2; }
+  int NumEdge() const { return edgeVerts_.size(); }
   int NumTri() const { return triVerts_.size(); }
   void CalculateBBox();
 
