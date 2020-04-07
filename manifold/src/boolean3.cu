@@ -844,15 +844,15 @@ void AppendRetainedEdges(std::map<int, std::vector<EdgeVerts>> &facesP,
   // edges to their faces. Copy any original edges of each face in that are not
   // in the retained edge map.
   const VecH<glm::vec3> &vertPosP = inP.vertPos_.H();
-  const VecH<EdgeVertsD> &edgeVertsP = inP.edgeVerts_.H();
-  const VecH<EdgeTrisD> &edgeTrisP = inP.edgeTris_.H();
+  const VecH<Halfedge> &halfedgeP = inP.halfedge_.H();
 
   for (auto &value : edgesP) {
     const int edgeP = value.first;
     std::vector<EdgePos> &edgePosP = value.second;
 
-    const int vStart = edgeVertsP[edgeP].first;
-    const int vEnd = edgeVertsP[edgeP].second;
+    const Halfedge &halfedge = halfedgeP[edgeP];
+    const int vStart = halfedge.startVert;
+    const int vEnd = halfedge.endVert;
     const glm::vec3 edgeVec = vertPosP[vEnd] - vertPosP[vStart];
     // Fill in the edge positions of the old points.
     for (EdgePos &edge : edgePosP) {
@@ -877,7 +877,7 @@ void AppendRetainedEdges(std::map<int, std::vector<EdgeVerts>> &facesP,
     std::vector<EdgeVerts> edges = PairUp(edgePosP, edgeP);
 
     // add edges to left face
-    const int faceLeft = edgeTrisP[edgeP].left;
+    const int faceLeft = halfedge.face;
     auto result = facesP.insert({faceLeft, edges});
     if (!result.second) {
       auto &vec = result.first->second;
@@ -885,7 +885,7 @@ void AppendRetainedEdges(std::map<int, std::vector<EdgeVerts>> &facesP,
     }
     // reverse edges and add to right face
     for (auto &e : edges) std::swap(e.first, e.second);
-    const int faceRight = edgeTrisP[edgeP].right;
+    const int faceRight = halfedgeP[halfedge.pairedHalfedge].face;
     result = facesP.insert({faceRight, edges});
     if (!result.second) {
       auto &vec = result.first->second;
