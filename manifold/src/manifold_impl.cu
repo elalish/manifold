@@ -467,7 +467,7 @@ struct Halfedge2Tmp {
       thrust::tuple<TmpEdge&, const Halfedge&, int> inout) {
     const Halfedge& halfedge = thrust::get<1>(inout);
     int idx = thrust::get<2>(inout);
-    if (halfedge.startVert > halfedge.endVert) idx = -1;
+    if (!halfedge.IsForward()) idx = -1;
 
     thrust::get<0>(inout) = TmpEdge(halfedge.startVert, halfedge.endVert, idx);
   }
@@ -857,10 +857,10 @@ SparseIndices Manifold::Impl::EdgeCollisions(const Impl& Q) const {
   thrust::for_each_n(zip(QedgeBB.beginD(), edges.cbeginD()), numEdge,
                      EdgeBox({Q.vertPos_.cptrD()}));
 
-  SparseIndices p2q1 = collider_.Collisions(QedgeBB);
+  SparseIndices q1p2 = collider_.Collisions(QedgeBB);
 
-  thrust::for_each(p2q1.beginD(1), p2q1.endD(1), ReindexEdge({edges.cptrD()}));
-  return p2q1;
+  thrust::for_each(q1p2.beginD(0), q1p2.endD(0), ReindexEdge({edges.cptrD()}));
+  return q1p2;
 }
 
 SparseIndices Manifold::Impl::VertexCollisionsZ(
