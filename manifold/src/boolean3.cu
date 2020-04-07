@@ -35,7 +35,7 @@
 #include <algorithm>
 #include <map>
 
-constexpr bool kVerbose = true;
+constexpr bool kVerbose = false;
 
 using namespace thrust::placeholders;
 
@@ -748,12 +748,10 @@ VecDH<int> Winding03(const Manifold::Impl &inP, SparseIndices &p0q2,
 struct DuplicateVerts {
   glm::vec3 *vertPosR;
 
-  __host__ __device__ void operator()(
-      thrust::tuple<int, int, int, glm::vec3> in) {
-    int vertP = thrust::get<0>(in);
-    int inclusion = abs(thrust::get<1>(in));
-    int vertR = thrust::get<2>(in);
-    glm::vec3 vertPosP = thrust::get<3>(in);
+  __host__ __device__ void operator()(thrust::tuple<int, int, glm::vec3> in) {
+    int inclusion = abs(thrust::get<0>(in));
+    int vertR = thrust::get<1>(in);
+    glm::vec3 vertPosP = thrust::get<2>(in);
 
     for (int i = 0; i < inclusion; ++i) {
       vertPosR[vertR + i] = vertPosP;
@@ -1283,18 +1281,14 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
   outR.vertPos_.resize(numVertR);
   // Add vertices, duplicating for inclusion numbers not in [-1, 1].
   // Retained vertices from P and Q:
-  thrust::for_each_n(zip(thrust::make_counting_iterator(0), i03.beginD(),
-                         vP2R.beginD(), inP_.vertPos_.beginD()),
+  thrust::for_each_n(zip(i03.beginD(), vP2R.beginD(), inP_.vertPos_.beginD()),
                      inP_.NumVert(), DuplicateVerts({outR.vertPos_.ptrD()}));
-  thrust::for_each_n(zip(thrust::make_counting_iterator(0), i30.beginD(),
-                         vQ2R.beginD(), inQ_.vertPos_.beginD()),
+  thrust::for_each_n(zip(i30.beginD(), vQ2R.beginD(), inQ_.vertPos_.beginD()),
                      inQ_.NumVert(), DuplicateVerts({outR.vertPos_.ptrD()}));
   // New vertices created from intersections:
-  thrust::for_each_n(zip(thrust::make_counting_iterator(0), i12.beginD(),
-                         v12R.beginD(), v12_.beginD()),
+  thrust::for_each_n(zip(i12.beginD(), v12R.beginD(), v12_.beginD()),
                      i12.size(), DuplicateVerts({outR.vertPos_.ptrD()}));
-  thrust::for_each_n(zip(thrust::make_counting_iterator(0), i21.beginD(),
-                         v21R.beginD(), v21_.beginD()),
+  thrust::for_each_n(zip(i21.beginD(), v21R.beginD(), v21_.beginD()),
                      i21.size(), DuplicateVerts({outR.vertPos_.ptrD()}));
 
   if (kVerbose) {
@@ -1366,6 +1360,7 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
   // Level 6
 
   // Create the manifold's data structures and verify manifoldness.
+  outR.Finish();
   outR.RemoveChaff();
   outR.Finish();
 
