@@ -231,6 +231,13 @@ inline std::ostream& operator<<(std::ostream& stream, const EdgeIdx& edge) {
   return stream << (edge.Dir() > 0 ? "F-" : "B-") << edge.Idx();
 }
 
+inline std::ostream& operator<<(std::ostream& stream, const Halfedge& edge) {
+  return stream << "startVert = " << edge.startVert
+                << ", endVert = " << edge.endVert
+                << ", pairedHalfedge = " << edge.pairedHalfedge
+                << ", face = " << edge.face;
+}
+
 template <typename T>
 inline std::ostream& operator<<(std::ostream& stream, const glm::tvec2<T>& v) {
   return stream << "x = " << v.x << ", y = " << v.y;
