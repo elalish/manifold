@@ -759,6 +759,76 @@ struct DuplicateVerts {
   }
 };
 
+__host__ __device__ void AtomicAddInt(int &target, int add) {
+#ifdef __CUDA_ARCH__
+  atomicAdd(&target, add);
+#else
+#pragma omp atomic
+  target += add;
+#endif
+}
+
+struct CountVerts {
+  int *count;
+  const int *inclusion;
+
+  __host__ __device__ void operator()(const Halfedge &edge) {
+    AtomicAddInt(count[edge.face], glm::abs(inclusion[edge.startVert]));
+  }
+};
+
+struct CountNewVerts {
+  int *countP;
+  int *countQ;
+  const Halfedge *halfedges;
+
+  __host__ __device__ void operator()(thrust::tuple<int, int, int> in) {
+    int edgeP = thrust::get<0>(in);
+    int faceQ = thrust::get<1>(in);
+    int inclusion = glm::abs(thrust::get<2>(in));
+
+    AtomicAddInt(countQ[faceQ], inclusion);
+    const Halfedge half = halfedges[edgeP];
+    AtomicAddInt(countP[half.face], inclusion);
+    AtomicAddInt(countP[halfedges[half.pairedHalfedge].face], inclusion);
+  }
+};
+
+VecDH<int> SizeOutput(Manifold::Impl &outR, const Manifold::Impl &inP,
+                      const Manifold::Impl &inQ, const VecDH<int> &i03,
+                      const VecDH<int> &i30, const VecDH<int> &i12,
+                      const VecDH<int> &i21, const SparseIndices &p1q2,
+                      const SparseIndices &p2q1) {
+  VecDH<int> sidesPerFacePQ(inP.NumTri() + inQ.NumTri());
+  auto sidesPerFaceP = sidesPerFacePQ.ptrD();
+  auto sidesPerFaceQ = sidesPerFacePQ.ptrD() + inP.NumTri();
+
+  thrust::for_each(inP.halfedge_.beginD(), inP.halfedge_.endD(),
+                   CountVerts({sidesPerFaceP, i03.cptrD()}));
+  thrust::for_each(inQ.halfedge_.beginD(), inQ.halfedge_.endD(),
+                   CountVerts({sidesPerFaceQ, i30.cptrD()}));
+  thrust::for_each_n(
+      zip(p1q2.beginD(0), p1q2.beginD(1), i12.beginD()), i12.size(),
+      CountNewVerts({sidesPerFaceP, sidesPerFaceQ, inP.halfedge_.cptrD()}));
+  thrust::for_each_n(
+      zip(p2q1.beginD(1), p2q1.beginD(0), i21.beginD()), i21.size(),
+      CountNewVerts({sidesPerFaceQ, sidesPerFaceP, inQ.halfedge_.cptrD()}));
+
+  VecDH<int> facePQ2R(inP.NumTri() + inQ.NumTri() + 1);
+  thrust::inclusive_scan(sidesPerFacePQ.beginD(), sidesPerFacePQ.endD(),
+                         facePQ2R.beginD() + 1);
+
+  outR.halfedge_.resize(facePQ2R.H().back());
+
+  auto newEnd =
+      thrust::remove(sidesPerFacePQ.beginD(), sidesPerFacePQ.endD(), 0);
+  outR.face_.resize(newEnd - sidesPerFacePQ.beginD() + 1);
+  thrust::inclusive_scan(sidesPerFacePQ.beginD(), newEnd,
+                         outR.face_.beginD() + 1);
+
+  return facePQ2R;
+}
+
 struct EdgePos {
   int vert;
   float edgePos;
@@ -1321,6 +1391,9 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
                   inQ_.halfedge_.H(), false);
 
   // Level 4
+
+  VecDH<int> facePQ2R =
+      SizeOutput(outR, inP_, inQ_, i03, i30, i12, i21, p1q2_, p2q1_);
 
   // This key is the tri index of P or Q. Only includes intersected faces.
   std::map<int, std::vector<EdgeVerts>> facesP, facesQ;
