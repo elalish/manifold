@@ -829,6 +829,40 @@ VecDH<int> SizeOutput(Manifold::Impl &outR, const Manifold::Impl &inP,
   return facePQ2R;
 }
 
+struct DuplicateHalfedges {
+  Halfedge *halfedges;
+  int *facePtr;
+  const Halfedge *halfedgesP;
+  const int *i03;
+  const int *vP2R;
+  const int *faceP2R;
+
+  __host__ __device__ void operator()(thrust::tuple<bool, Halfedge> in) {
+    if (!thrust::get<0>(in)) return;
+    Halfedge halfedge = thrust::get<1>(in);
+    if (!halfedge.IsForward()) return;
+
+    const int inclusion = i03[halfedge.startVert];
+    if (inclusion == 0) return;
+    if (inclusion < 0) {  // swap
+      int tmp = halfedge.startVert;
+      halfedge.startVert = halfedge.endVert;
+      halfedge.endVert = tmp;
+    }
+    halfedge.startVert = vP2R[halfedge.startVert];
+    halfedge.endVert = vP2R[halfedge.endVert];
+    halfedge.face = faceP2R[halfedge.face];
+    int faceRight = faceP2R[halfedgesP[halfedges.pairedHalfedge].face];
+
+    Halfedge backward = {halfedge.endVert, halfedge.startVert, -1, faceRight};
+
+    for (int i = 0; i < glm::abs(inclusion); ++i) {
+      AtomicAddInt(facePtr[halfedge.face], 1);
+      AtomicAddInt(facePtr[faceRight], 1);
+    }
+  }
+};
+
 struct EdgePos {
   int vert;
   float edgePos;
@@ -878,7 +912,7 @@ void AddNewEdgeVerts(
   }
 }
 
-std::vector<EdgeVerts> PairUp(std::vector<EdgePos> &edgePos, int edge) {
+std::vector<Halfedge> PairUp(std::vector<EdgePos> &edgePos) {
   // Pair start vertices with end vertices to form edges. The choice of pairing
   // is arbitrary for the manifoldness guarantee, but must be ordered to be
   // geometrically valid. If the order does not go start-end-start-end... then
@@ -894,23 +928,24 @@ std::vector<EdgeVerts> PairUp(std::vector<EdgePos> &edgePos, int edge) {
   auto cmp = [](EdgePos a, EdgePos b) { return a.edgePos < b.edgePos; };
   std::sort(edgePos.begin(), middle, cmp);
   std::sort(middle, edgePos.end(), cmp);
-  std::vector<EdgeVerts> edges;
+  std::vector<Halfedge> edges;
   for (int i = 0; i < nEdges; ++i)
-    edges.push_back({edgePos[i].vert, edgePos[i + nEdges].vert, edge});
+    edges.push_back({edgePos[i].vert, edgePos[i + nEdges].vert, -1, -1});
   return edges;
 }
 
-void AppendRetainedEdges(std::map<int, std::vector<EdgeVerts>> &facesP,
-                         std::map<int, std::vector<EdgePos>> &edgesP,
-                         const Manifold::Impl &inP, const VecH<int> &i03,
-                         const VecH<int> &vP2R,
-                         const VecH<glm::vec3> &vertPos) {
+void AppendPartialEdges(
+    Manifold::Impl &outR, VecH<bool> wholeHalfedgeP, VecH<int> &facePtrR,
+    std::map<int, std::vector<EdgePos>> &edgesP, const Manifold::Impl &inP,
+    const VecH<int> &i03, const VecH<int> &vP2R,
+    const thrust::host_vector<int>::const_iterator faceP2R) {
   // Each edge in the map is partially retained; for each of these, look up
   // their original verts and include them based on their winding number (i03),
   // while remaping them to the output using vP2R. Use the verts position
   // projected along the edge vector to pair them up, then distribute these
   // edges to their faces. Copy any original edges of each face in that are not
   // in the retained edge map.
+  VecH<Halfedge> &halfedgeR = outR.halfedge_.H();
   const VecH<glm::vec3> &vertPosP = inP.vertPos_.H();
   const VecH<Halfedge> &halfedgeP = inP.halfedge_.H();
 
@@ -919,12 +954,15 @@ void AppendRetainedEdges(std::map<int, std::vector<EdgeVerts>> &facesP,
     std::vector<EdgePos> &edgePosP = value.second;
 
     const Halfedge &halfedge = halfedgeP[edgeP];
+    wholeHalfedgeP[edgeP] = false;
+    wholeHalfedgeP[halfedge.pairedHalfedge] = false;
+
     const int vStart = halfedge.startVert;
     const int vEnd = halfedge.endVert;
     const glm::vec3 edgeVec = vertPosP[vEnd] - vertPosP[vStart];
     // Fill in the edge positions of the old points.
     for (EdgePos &edge : edgePosP) {
-      edge.edgePos = glm::dot(vertPos[edge.vert], edgeVec);
+      edge.edgePos = glm::dot(outR.vertPos_.H()[edge.vert], edgeVec);
     }
 
     int inclusion = i03[vStart];
@@ -942,56 +980,71 @@ void AppendRetainedEdges(std::map<int, std::vector<EdgeVerts>> &facesP,
     }
 
     // sort edges into start/end pairs along length
-    std::vector<EdgeVerts> edges = PairUp(edgePosP, edgeP);
+    std::vector<Halfedge> edges = PairUp(edgePosP);
 
-    // add edges to left face
-    const int faceLeft = halfedge.face;
-    auto result = facesP.insert({faceLeft, edges});
-    if (!result.second) {
-      auto &vec = result.first->second;
-      vec.insert(vec.end(), edges.begin(), edges.end());
-    }
-    // reverse edges and add to right face
-    for (auto &e : edges) std::swap(e.first, e.second);
-    const int faceRight = halfedgeP[halfedge.pairedHalfedge].face;
-    result = facesP.insert({faceRight, edges});
-    if (!result.second) {
-      auto &vec = result.first->second;
-      vec.insert(vec.end(), edges.begin(), edges.end());
+    // add halfedges to result
+    const int faceLeft = *(faceP2R + halfedge.face);
+    const int faceRight = *(faceP2R + halfedgeP[halfedge.pairedHalfedge].face);
+    for (Halfedge e : edges) {
+      const int forwardEdge = facePtrR[faceLeft]++;
+      const int backwardEdge = facePtrR[faceRight]++;
+
+      e.face = faceLeft;
+      e.pairedHalfedge = backwardEdge;
+      halfedgeR[forwardEdge] = e;
+
+      std::swap(e.startVert, e.endVert);
+      e.face = faceRight;
+      e.pairedHalfedge = forwardEdge;
+      halfedgeR[backwardEdge] = e;
     }
   }
 }
 
 void AppendNewEdges(
-    std::map<int, std::vector<EdgeVerts>> &facesP,
-    std::map<int, std::vector<EdgeVerts>> &facesQ,
-    std::map<std::pair<int, int>, std::vector<EdgePos>> &edgesNew) {
+    Manifold::Impl &outR, VecH<int> &facePtrR,
+    std::map<std::pair<int, int>, std::vector<EdgePos>> &edgesNew,
+    const VecH<int> &facePQ2R, const int numFaceP) {
   // Pair up each edge's verts and distribute to faces based on indices in key.
   // Usually only two verts are in each edge, and if not, they are degenerate
   // anyway, so pair arbitrarily without bothering with vertex projections.
-  int edgeID = std::numeric_limits<int>::max();
+  VecH<Halfedge> &halfedgeR = outR.halfedge_.H();
+
   for (auto &value : edgesNew) {
     const int faceP = value.first.first;
     const int faceQ = value.first.second;
     std::vector<EdgePos> &edgePos = value.second;
 
-    // sort edges into start/end pairs along length
-    // Since these are not input edges, their index is undefined.
-    std::vector<EdgeVerts> edges = PairUp(edgePos, edgeID--);
+    // sort edges into start/end pairs along length.
+    std::vector<Halfedge> edges = PairUp(edgePos);
 
-    auto result = facesP.insert({faceP, edges});
-    if (!result.second) {
-      auto &vec = result.first->second;
-      vec.insert(vec.end(), edges.begin(), edges.end());
-    }
-    // reverse edges and add to right face
-    for (auto &e : edges) std::swap(e.first, e.second);
-    result = facesQ.insert({faceQ, edges});
-    if (!result.second) {
-      auto &vec = result.first->second;
-      vec.insert(vec.end(), edges.begin(), edges.end());
+    // add halfedges to result
+    const int faceLeft = facePQ2R[faceP];
+    const int faceRight = facePQ2R[numFaceP + faceQ];
+    for (Halfedge e : edges) {
+      const int forwardEdge = facePtrR[faceLeft]++;
+      const int backwardEdge = facePtrR[faceRight]++;
+
+      e.face = faceLeft;
+      e.pairedHalfedge = backwardEdge;
+      halfedgeR[forwardEdge] = e;
+
+      std::swap(e.startVert, e.endVert);
+      e.face = faceRight;
+      e.pairedHalfedge = forwardEdge;
+      halfedgeR[backwardEdge] = e;
     }
   }
+}
+
+void AppendWholeEdges(Manifold::Impl &outR, VecDH<int> &facePtrR,
+                      const Manifold::Impl &inP, VecDH<bool> wholeHalfedgeP,
+                      const VecDH<int> &i03, const VecDH<int> &vP2R,
+                      const int *faceP2R) {
+  thrust::for_each_n(zip(wholeHalfedgeP.beginD(), inP.halfedge_.beginD()),
+                     inP.halfedge_.size(),
+                     DuplicateHalfedges({outR.halfedge_.ptrD(), facePtrR.ptrD(),
+                                         i03.cptrD(), vP2R.cptrD(), faceP2R}));
 }
 
 glm::mat3x2 GetAxisAlignedProjection(glm::vec3 normal) {
@@ -1380,9 +1433,10 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
 
   // Level 3
 
-  // This key is the edge index of P or Q. Only includes intersected edges.
+  // This key is the forward halfedge index of P or Q. Only includes intersected
+  // edges.
   std::map<int, std::vector<EdgePos>> edgesP, edgesQ;
-  // This key is the tri index of <P, Q>
+  // This key is the face index of <P, Q>
   std::map<std::pair<int, int>, std::vector<EdgePos>> edgesNew;
 
   AddNewEdgeVerts(edgesP, edgesNew, p1q2_, i12.H(), v12R.H(),
@@ -1395,14 +1449,24 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
   VecDH<int> facePQ2R =
       SizeOutput(outR, inP_, inQ_, i03, i30, i12, i21, p1q2_, p2q1_);
 
-  // This key is the tri index of P or Q. Only includes intersected faces.
-  std::map<int, std::vector<EdgeVerts>> facesP, facesQ;
+  // This gets incremented for each halfedge that's added to a face so that the
+  // next one knows where to slot in.
+  VecDH<int> facePtrR = outR.face_;
+  // Intersected halfedges are marked false.
+  VecDH<bool> wholeHalfedgeP(inP_.halfedge_.size(), true);
+  VecDH<bool> wholeHalfedgeQ(inQ_.halfedge_.size(), true);
 
-  AppendRetainedEdges(facesP, edgesP, inP_, i03.H(), vP2R.H(),
-                      outR.vertPos_.H());
-  AppendRetainedEdges(facesQ, edgesQ, inQ_, i30.H(), vQ2R.H(),
-                      outR.vertPos_.H());
-  AppendNewEdges(facesP, facesQ, edgesNew);
+  AppendPartialEdges(outR, wholeHalfedgeP.H(), facePtrR.H(), edgesP, inP_,
+                     i03.H(), vP2R.H(), facePQ2R.begin());
+  AppendPartialEdges(outR, wholeHalfedgeQ.H(), facePtrR.H(), edgesQ, inQ_,
+                     i30.H(), vQ2R.H(), facePQ2R.begin() + inP_.NumTri());
+
+  AppendNewEdges(outR, facePtrR.H(), edgesNew, facePQ2R.H(), inP_.NumTri());
+
+  AppendWholeEdges(outR, facePtrR, inP_, wholeHalfedgeP, i03, vP2R,
+                   facePQ2R.cptrD());
+  AppendWholeEdges(outR, facePtrR, inQ_, wholeHalfedgeQ, i30, vQ2R,
+                   facePQ2R.cptrD() + inP_.NumTri());
 
   if (kVerbose) {
     std::cout << "Time for CPU part of result";
