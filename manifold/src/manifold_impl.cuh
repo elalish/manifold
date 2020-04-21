@@ -60,6 +60,7 @@ struct Manifold::Impl {
   void ApplyTransform();
   bool Tri2Face() const;
   bool Tri2Face();
+  bool Face2Tri();
   void Refine(int n);
   bool IsValid() const;
 

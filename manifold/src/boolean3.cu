@@ -759,12 +759,16 @@ struct DuplicateVerts {
   }
 };
 
-__host__ __device__ void AtomicAddInt(int &target, int add) {
+__host__ __device__ int AtomicAddInt(int &target, int add) {
 #ifdef __CUDA_ARCH__
-  atomicAdd(&target, add);
+  return atomicAdd(&target, add);
 #else
 #pragma omp atomic
-  target += add;
+  {
+    int out = target;
+    target += add;
+  }
+  return out;
 #endif
 }
 
@@ -830,7 +834,7 @@ VecDH<int> SizeOutput(Manifold::Impl &outR, const Manifold::Impl &inP,
 }
 
 struct DuplicateHalfedges {
-  Halfedge *halfedges;
+  Halfedge *halfedgesR;
   int *facePtr;
   const Halfedge *halfedgesP;
   const int *i03;
@@ -844,7 +848,7 @@ struct DuplicateHalfedges {
 
     const int inclusion = i03[halfedge.startVert];
     if (inclusion == 0) return;
-    if (inclusion < 0) {  // swap
+    if (inclusion < 0) {  // reverse
       int tmp = halfedge.startVert;
       halfedge.startVert = halfedge.endVert;
       halfedge.endVert = tmp;
@@ -852,13 +856,13 @@ struct DuplicateHalfedges {
     halfedge.startVert = vP2R[halfedge.startVert];
     halfedge.endVert = vP2R[halfedge.endVert];
     halfedge.face = faceP2R[halfedge.face];
-    int faceRight = faceP2R[halfedgesP[halfedges.pairedHalfedge].face];
+    int faceRight = faceP2R[halfedgesP[halfedge.pairedHalfedge].face];
 
     Halfedge backward = {halfedge.endVert, halfedge.startVert, -1, faceRight};
 
     for (int i = 0; i < glm::abs(inclusion); ++i) {
-      AtomicAddInt(facePtr[halfedge.face], 1);
-      AtomicAddInt(facePtr[faceRight], 1);
+      halfedgesR[AtomicAddInt(facePtr[halfedge.face], 1)] = halfedge;
+      halfedgesR[AtomicAddInt(facePtr[faceRight], 1)] = backward;
     }
   }
 };
@@ -1045,147 +1049,6 @@ void AppendWholeEdges(Manifold::Impl &outR, VecDH<int> &facePtrR,
                      inP.halfedge_.size(),
                      DuplicateHalfedges({outR.halfedge_.ptrD(), facePtrR.ptrD(),
                                          i03.cptrD(), vP2R.cptrD(), faceP2R}));
-}
-
-glm::mat3x2 GetAxisAlignedProjection(glm::vec3 normal) {
-  glm::vec3 absNormal = glm::abs(normal);
-  float xyzMax;
-  glm::mat2x3 projection;
-  if (absNormal.z > absNormal.x && absNormal.z > absNormal.y) {
-    projection = glm::mat2x3(1.0f, 0.0f, 0.0f,  //
-                             0.0f, 1.0f, 0.0f);
-    xyzMax = normal.z;
-  } else if (absNormal.y > absNormal.x) {
-    projection = glm::mat2x3(0.0f, 0.0f, 1.0f,  //
-                             1.0f, 0.0f, 0.0f);
-    xyzMax = normal.y;
-  } else {
-    projection = glm::mat2x3(0.0f, 1.0f, 0.0f,  //
-                             0.0f, 0.0f, 1.0f);
-    xyzMax = normal.x;
-  }
-  if (xyzMax < 0) projection[0] *= -1.0f;
-  return glm::transpose(projection);
-}
-
-void AppendFaces(Manifold::Impl &outR,
-                 std::map<int, std::vector<EdgeVerts>> &facesP,
-                 const std::map<int, std::vector<EdgePos>> &edgesP,
-                 const VecH<int> &i03, const Manifold::Impl &inP,
-                 const VecH<int> &vP2R, bool invertNormals) {
-  // Proceed through the map, triangulating each face into the result. For each
-  // face not included as a map index, copy it from the original mesh,
-  // duplicating according to its inclusion number (i03).
-  const VecH<glm::ivec3> &triVertsP = inP.triVerts_.H();
-  const VecH<TriEdges> &triEdgesP = inP.triEdges_.H();
-  const VecH<glm::vec3> &triNormalP = inP.triNormal_.H();
-  const VecH<EdgeVertsD> &edgeVertsP = inP.edgeVerts_.H();
-  VecH<glm::ivec3> &triVertsR = outR.triVerts_.H();
-  VecH<glm::vec3> &triNormalR = outR.triNormal_.H();
-  VecH<glm::vec3> &vertPosR = outR.vertPos_.H();
-
-  auto nextIntersectedFace = facesP.begin();
-  for (int triP = 0; triP < inP.NumTri(); ++triP) {
-    const int faceP = facesP.empty() ? -1 : nextIntersectedFace->first;
-    if (faceP != triP) {  // Non-intersecting face
-      // Copy triangle from inP
-      glm::ivec3 triVerts = triVertsP[triP];
-      glm::vec3 normal = triNormalP[triP];
-      // Check the inclusion number of a single vertex of a triangle, since
-      // non-intersecting triangles must have all identical inclusion numbers.
-      int inclusion = i03[triVerts[0]];
-      glm::ivec3 outTri(vP2R[triVerts[0]], vP2R[triVerts[1]],
-                        vP2R[triVerts[2]]);
-      if (inclusion < 0) {
-        std::swap(outTri[1], outTri[2]);
-        normal *= -1.0f;
-      }
-      for (int j = 0; j < abs(inclusion); ++j) {
-        triVertsR.push_back(outTri + j);
-        triNormalR.push_back(normal);
-      }
-    } else {  // intersecting face
-      std::vector<EdgeVerts> &faceEdges = nextIntersectedFace->second;
-      if (std::next(nextIntersectedFace) != facesP.end()) ++nextIntersectedFace;
-
-      // Copy in non-intersecting edges of intersected face
-      for (int i : {0, 1, 2}) {
-        EdgeIdx edge = triEdgesP[faceP][i];
-        if (edgesP.find(edge.Idx()) == edgesP.end()) {
-          EdgeVertsD oldEdgeVerts = edgeVertsP[edge.Idx()];
-          // Non-intersecting edge has the same inclusion number at both ends.
-          const int inclusion = i03[oldEdgeVerts.first];
-          int vStart = vP2R[oldEdgeVerts.first];
-          int vEnd = vP2R[oldEdgeVerts.second];
-          if ((inclusion > 0) != (edge.Dir() > 0)) std::swap(vStart, vEnd);
-          for (int j = 0; j < std::abs(inclusion); ++j) {
-            faceEdges.push_back({vStart + j, vEnd + j, edge.Idx()});
-          }
-        }
-      }
-
-      // Triangulate intersected face
-      ALWAYS_ASSERT(faceEdges.size() >= 3, logicErr,
-                    "face has less than three edges.");
-      const glm::vec3 normal =
-          (invertNormals ? -1.0f : 1.0f) * triNormalP[faceP];
-
-      if (faceEdges.size() == 3) {  // Special case to increase performance
-        auto tri = faceEdges;
-        if (tri[0].second == tri[2].first) std::swap(tri[1], tri[2]);
-        ALWAYS_ASSERT(tri[0].second == tri[1].first &&
-                          tri[1].second == tri[2].first &&
-                          tri[2].second == tri[0].first,
-                      runtimeErr, "These 3 edges do not form a triangle!");
-        glm::ivec3 triangle(tri[0].first, tri[1].first, tri[2].first);
-        triVertsR.push_back(triangle);
-        triNormalR.push_back(normal);
-      } else {  // General triangulation
-        const glm::mat3x2 projection = GetAxisAlignedProjection(normal);
-        Polygons polys =
-            Assemble(faceEdges, [&vertPosR, &projection](int vert) {
-              return projection * vertPosR[vert];
-            });
-        std::vector<glm::ivec3> newTris;
-        try {
-          newTris = Triangulate(polys);
-        } catch (const runtimeErr &e) {
-          if (PolygonParams().checkGeometry) throw;
-          /**
-          To ensure the triangulation maintains the mesh as 2-manifold, we
-          require it to not create edges connecting non-neighboring vertices
-          from the same input edge. This is because if two neighboring
-          polygons were to create an edge like this between two of their
-          shared vertices, this would create a 4-manifold edge, which is not
-          allowed.
-
-          For some self-overlapping polygons, there exists no triangulation
-          that adheres to this constraint. In this case, we create an extra
-          vertex for each polygon and triangulate them like a wagon wheel,
-          which is guaranteed to be manifold. This is very rare and only
-          occurs when the input manifolds are self-overlapping.
-           */
-          for (const auto &poly : polys) {
-            glm::vec3 centroid = thrust::transform_reduce(
-                poly.begin(), poly.end(),
-                [&vertPosR](PolyVert v) { return vertPosR[v.idx]; },
-                glm::vec3(0.0f),
-                [](glm::vec3 a, glm::vec3 b) { return a + b; });
-            centroid /= poly.size();
-            int newVert = vertPosR.size();
-            vertPosR.push_back(centroid);
-            newTris.push_back({poly.back().idx, poly.front().idx, newVert});
-            for (int j = 1; j < poly.size(); ++j)
-              newTris.push_back({poly[j - 1].idx, poly[j].idx, newVert});
-          }
-        }
-        for (auto tri : newTris) {
-          triVertsR.push_back(tri);
-          triNormalR.push_back(normal);
-        }
-      }
-    }
-  }
 }
 }  // namespace
 
@@ -1470,25 +1333,6 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
 
   if (kVerbose) {
     std::cout << "Time for CPU part of result";
-    t1 = NOW();
-    PrintDuration(t1 - t0);
-    t0 = t1;
-  }
-
-  // Level 5
-
-  // Copy retained triangles and triangulate the intersected faces and add them
-  // to the manifold.
-  if (kVerbose) std::cout << "Adding faces of inP" << std::endl;
-  AppendFaces(outR, facesP, edgesP, i03.H(), inP_, vP2R.H(), false);
-  if (kVerbose) std::cout << "Adding faces of inQ" << std::endl;
-  AppendFaces(outR, facesQ, edgesQ, i30.H(), inQ_, vQ2R.H(),
-              op == Manifold::OpType::SUBTRACT);
-
-  // outR.triVerts_.Dump();
-
-  if (kVerbose) {
-    std::cout << "Time for triangulation";
     t1 = NOW();
     PrintDuration(t1 - t0);
     t0 = t1;
