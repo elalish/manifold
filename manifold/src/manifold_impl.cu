@@ -517,6 +517,27 @@ struct CheckTris {
     return good;
   }
 };
+
+glm::mat3x2 GetAxisAlignedProjection(glm::vec3 normal) {
+  glm::vec3 absNormal = glm::abs(normal);
+  float xyzMax;
+  glm::mat2x3 projection;
+  if (absNormal.z > absNormal.x && absNormal.z > absNormal.y) {
+    projection = glm::mat2x3(1.0f, 0.0f, 0.0f,  //
+                             0.0f, 1.0f, 0.0f);
+    xyzMax = normal.z;
+  } else if (absNormal.y > absNormal.x) {
+    projection = glm::mat2x3(0.0f, 0.0f, 1.0f,  //
+                             1.0f, 0.0f, 0.0f);
+    xyzMax = normal.y;
+  } else {
+    projection = glm::mat2x3(0.0f, 1.0f, 0.0f,  //
+                             0.0f, 0.0f, 1.0f);
+    xyzMax = normal.x;
+  }
+  if (xyzMax < 0) projection[0] *= -1.0f;
+  return glm::transpose(projection);
+}
 }  // namespace
 
 namespace manifold {
@@ -630,19 +651,20 @@ void Manifold::Impl::Finish() {
     thrust::fill(vertLabel_.beginD(), vertLabel_.endD(), 0);
   }
   CalculateBBox();
+  CreateHalfedges(triVerts_);
   SortVerts();
   VecDH<Box> triBox;
   VecDH<uint32_t> triMorton;
   GetTriBoxMorton(triBox, triMorton);
   SortTris(triBox, triMorton);
   CreateEdges();
-  CreateHalfedges(triVerts_);
   CalculateNormals();
   collider_ = Collider(triBox, triMorton);
 }
 
 void Manifold::Impl::CreateHalfedges(const VecDH<glm::ivec3>& triVerts) {
   const int numTri = triVerts.size();
+  face_.resize(0);
   halfedge_.resize(3 * numTri);
   VecDH<TmpEdge> edge(3 * numTri);
   thrust::for_each_n(zip(thrust::make_counting_iterator(0), triVerts.beginD()),
@@ -693,6 +715,89 @@ bool Manifold::Impl::Tri2Face() {
   if (face_.size() != 0 || halfedge_.size() % 3 != 0) return false;
   face_.resize(halfedge_.size() / 3 + 1);
   thrust::sequence(face_.beginD(), face_.endD(), 0, 3);
+  return true;
+}
+
+bool Manifold::Impl::Face2Tri() {
+  if (face_.size() == 0 && halfedge_.size() % 3 == 0) return false;
+  VecDH<glm::ivec3> triVertsOut;
+  VecDH<glm::vec3> triNormalOut;
+
+  VecDH<glm::ivec3>& triVerts = triVertsOut.H();
+  VecDH<glm::vec3>& triNormal = triNormalOut.H();
+  VecH<glm::vec3>& vertPos = vertPos_.H();
+  const VecH<int>& face = face_.H();
+  const VecH<Halfedge>& halfedge = halfedge_.H();
+  const VecH<glm::vec3>& faceNormal = triNormal_.H();
+
+  for (int i = 0; i < face.size() - 1; ++i) {
+    const int edge = face[i];
+    const int lastEdge = face[i + 1];
+    const int numEdge = lastEdge - edge;
+    ALWAYS_ASSERT(numEdge >= 3, logicErr, "face has less than three edges.");
+    const glm::vec3 normal = faceNormal[i];
+
+    if (numEdge == 3) {  // Special case to increase performance
+
+      glm::ivec3 tri(halfedge[edge].startVert, halfedge[edge + 1].startVert,
+                     halfedge[edge + 2].startVert);
+      glm::ivec3 ends(halfedge[edge].endVert, halfedge[edge + 1].endVert,
+                      halfedge[edge + 2].endVert);
+      if (ends[0] == tri[2]) {
+        std::swap(tri[1], tri[2]);
+        std::swap(ends[1], end[2]);
+      }
+      ALWAYS_ASSERT(ends[0] == tri[1] && ends[1] == tri[2] && ends[2] == tri[0],
+                    runtimeErr, "These 3 edges do not form a triangle!");
+
+      triVerts.push_back(tri);
+      triNormal.push_back(normal);
+    } else {  // General triangulation
+      const glm::mat3x2 projection = GetAxisAlignedProjection(normal);
+      Polygons polys = Assemble(&halfedge[edge], &halfedge[lastEdge],
+                                [&vertPos, &projection](int vert) {
+                                  return projection * vertPos[vert];
+                                });
+      std::vector<glm::ivec3> newTris;
+      try {
+        newTris = Triangulate(polys);
+      } catch (const runtimeErr& e) {
+        if (PolygonParams().checkGeometry) throw;
+        /**
+        To ensure the triangulation maintains the mesh as 2-manifold, we
+        require it to not create edges connecting non-neighboring vertices
+        from the same input edge. This is because if two neighboring
+        polygons were to create an edge like this between two of their
+        shared vertices, this would create a 4-manifold edge, which is not
+        allowed.
+
+        For some self-overlapping polygons, there exists no triangulation
+        that adheres to this constraint. In this case, we create an extra
+        vertex for each polygon and triangulate them like a wagon wheel,
+        which is guaranteed to be manifold. This is very rare and only
+        occurs when the input manifolds are self-overlapping.
+         */
+        for (const auto& poly : polys) {
+          glm::vec3 centroid = thrust::transform_reduce(
+              poly.begin(), poly.end(),
+              [&vertPos](PolyVert v) { return vertPos[v.idx]; },
+              glm::vec3(0.0f), [](glm::vec3 a, glm::vec3 b) { return a + b; });
+          centroid /= poly.size();
+          int newVert = vertPos.size();
+          vertPos.push_back(centroid);
+          newTris.push_back({poly.back().idx, poly.front().idx, newVert});
+          for (int j = 1; j < poly.size(); ++j)
+            newTris.push_back({poly[j - 1].idx, poly[j].idx, newVert});
+        }
+      }
+      for (auto tri : newTris) {
+        triVerts.push_back(tri);
+        triNormal.push_back(normal);
+      }
+    }
+  }
+  triNormal_ = triNormalOut;
+  CreateHalfedges(triVertsOut);
   return true;
 }
 
