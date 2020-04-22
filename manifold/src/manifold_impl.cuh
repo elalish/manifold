@@ -36,15 +36,10 @@ struct Manifold::Impl {
   VecDH<int> vertLabel_;
   int numLabel_ = 1;
   VecDH<Halfedge> halfedge_;
-  VecDH<int> face_;
-
-  VecDH<EdgeVertsD> edgeVerts_;
-  VecDH<EdgeTrisD> edgeTris_;
-  VecDH<glm::ivec3> triVerts_;
-  VecDH<TriEdges> triEdges_;
+  VecDH<int> faceEdge_;
 
   VecDH<glm::vec3> vertNormal_;
-  VecDH<glm::vec3> triNormal_;
+  VecDH<glm::vec3> faceNormal_;
   Collider collider_;
   glm::mat4x3 transform_ = glm::mat4x3(1.0f);
 
@@ -65,15 +60,13 @@ struct Manifold::Impl {
   bool IsValid() const;
 
   int NumVert() const { return vertPos_.size(); }
-  int NumEdge() const { return edgeVerts_.size(); }
-  int NumTri() const { return triVerts_.size(); }
+  int NumEdge() const { return halfedge_.size() / 2; }
+  int NumFace() const { return faceEdge_.size() - 1; }
   void CalculateBBox();
 
   void SortVerts();
-  void CreateEdges();
-  void SortHalfedges(VecDH<EdgeVertsD>& halfEdges, VecDH<int>& dir);
-  void GetTriBoxMorton(VecDH<Box>& triBox, VecDH<uint32_t>& triMorton) const;
-  void SortTris(VecDH<Box>& triBox, VecDH<uint32_t>& triMorton);
+  void GetFaceBoxMorton(VecDH<Box>& faceBox, VecDH<uint32_t>& faceMorton) const;
+  void SortFaces(VecDH<Box>& faceBox, VecDH<uint32_t>& faceMorton);
   void CalculateNormals();
 
   SparseIndices EdgeCollisions(const Impl& B) const;

@@ -281,30 +281,65 @@ struct Morton {
   }
 };
 
-struct Reindex {
-  const int* indexInv_;
-
-  __host__ __device__ void operator()(glm::ivec3& triVerts) {
-    for (int i : {0, 1, 2}) triVerts[i] = indexInv_[triVerts[i]];
-  }
-};
-
-struct TriMortonBox {
+struct FaceMortonBox {
+  const int* faceEdge;
+  const Halfedge* halfedge;
   const glm::vec3* vertPos;
   const Box bBox;
 
   __host__ __device__ void operator()(
-      thrust::tuple<uint32_t&, Box&, const glm::ivec3&> inout) {
+      thrust::tuple<uint32_t&, Box&, int> inout) {
     uint32_t& mortonCode = thrust::get<0>(inout);
-    Box& triBox = thrust::get<1>(inout);
-    const glm::ivec3& triVerts = thrust::get<2>(inout);
+    Box& faceBox = thrust::get<1>(inout);
+    int face = thrust::get<2>(inout);
 
-    glm::vec3 center =
-        (vertPos[triVerts[0]] + vertPos[triVerts[1]] + vertPos[triVerts[2]]) /
-        3.0f;
+    glm::vec3 center;
+
+    int iEdge = faceEdge[face];
+    const int end = faceEdge[face + 1];
+    const int nEdge = end - iEdge;
+    while (iEdge < end) {
+      const glm::vec3 pos = vertPos[halfedge[iEdge].startVert];
+      center += pos;
+      faceBox.Union(pos);
+      ++iEdge;
+    }
+    center /= nEdge;
+
     mortonCode = MortonCode(center, bBox);
-    triBox = Box(vertPos[triVerts[0]], vertPos[triVerts[1]]);
-    triBox.Union(vertPos[triVerts[2]]);
+  }
+};
+
+struct Reindex {
+  const int* indexInv;
+
+  __host__ __device__ void operator()(Halfedge& edge) {
+    edge.startVert = indexInv[edge.startVert];
+    edge.endVert = indexInv[edge.endVert];
+  }
+};
+
+struct ReindexFace {
+  Halfedge* halfedge;
+  const int* faceEdge;
+  const Halfedge* oldHalfedge;
+  const int* oldFaceEdge;
+  const int* faceOld2New;
+
+  __host__ __device__ void operator()(thrust::tuple<int, int> in) {
+    const int oldFace = thrust::get<0>(in);
+    int outEdge = thrust::get<1>(in);
+
+    int iEdge = oldFaceEdge[oldFace];
+    const int end = oldFaceEdge[oldFace + 1];
+    while (iEdge < end) {
+      Halfedge edge = oldHalfedge[iEdge++];
+      edge.face = faceOld2New[oldFace];
+      const int pairedFace = edge.pairedHalfedge.face;
+      const int offset = edge.pairedHalfedge - oldFaceEdge[pairedFace];
+      edge.pairedHalfedge = faceEdge[faceOld2New[pairedFace]] + offset;
+      halfedge[outEdge++] = edge;
+    }
   }
 };
 
@@ -542,9 +577,9 @@ glm::mat3x2 GetAxisAlignedProjection(glm::vec3 normal) {
 
 namespace manifold {
 
-Manifold::Impl::Impl(const Mesh& manifold)
-    : vertPos_(manifold.vertPos), triVerts_(manifold.triVerts) {
+Manifold::Impl::Impl(const Mesh& manifold) : vertPos_(manifold.vertPos) {
   CheckDevice();
+  CreateHalfedges(manifold.triVerts);
   Finish();
 }
 
@@ -591,7 +626,7 @@ Manifold::Impl::Impl(Shape shape) {
       throw logicErr("Unrecognized shape!");
   }
   vertPos_ = vertPos;
-  triVerts_ = triVerts;
+  CreateHalfedges(triVerts);
   Finish();
 }
 
@@ -600,7 +635,7 @@ void Manifold::Impl::RemoveChaff() {
   int n_comp = ConnectedComponents(vertLabel_, NumVert(), halfedge_);
 
   VecDH<float> surfaceArea(n_comp), volume(n_comp);
-  thrust::for_each_n(triVerts_.beginD(), NumTri(),
+  thrust::for_each_n(triVerts_.beginD(), NumFace(),
                      AreaVolume({surfaceArea.ptrD(), volume.ptrD(),
                                  vertLabel_.cptrD(), vertPos_.cptrD()}));
   thrust::for_each_n(zip(volume.beginD(), surfaceArea.beginD()), n_comp,
@@ -624,16 +659,16 @@ void Manifold::Impl::RemoveChaff() {
                   thrust::make_counting_iterator(newNumVert),
                   newVert2Old.beginD(), oldVert2New.beginD());
 
-  thrust::for_each(triVerts_.beginD(), triVerts_.endD(),
+  thrust::for_each(halfedge_.beginD(), halfedge_.endD(),
                    Reindex({oldVert2New.cptrD()}));
 
-  auto start = zip(triVerts_.beginD(), triNormal_.beginD());
+  auto start = zip(triVerts_.beginD(), faceNormal_.beginD());
   int newNumTri =
-      thrust::remove_if(start, zip(triVerts_.endD(), triNormal_.endD()),
+      thrust::remove_if(start, zip(triVerts_.endD(), faceNormal_.endD()),
                         RemoveTri()) -
       start;
   triVerts_.resize(newNumTri);
-  triNormal_.resize(newNumTri);
+  faceNormal_.resize(newNumTri);
 }
 
 void Manifold::Impl::Finish() {
@@ -651,20 +686,18 @@ void Manifold::Impl::Finish() {
     thrust::fill(vertLabel_.beginD(), vertLabel_.endD(), 0);
   }
   CalculateBBox();
-  CreateHalfedges(triVerts_);
   SortVerts();
-  VecDH<Box> triBox;
-  VecDH<uint32_t> triMorton;
-  GetTriBoxMorton(triBox, triMorton);
-  SortTris(triBox, triMorton);
-  CreateEdges();
+  VecDH<Box> faceBox;
+  VecDH<uint32_t> faceMorton;
+  GetFaceBoxMorton(faceBox, faceMorton);
   CalculateNormals();
-  collider_ = Collider(triBox, triMorton);
+  SortFaces(faceBox, faceMorton);
+  collider_ = Collider(faceBox, faceMorton);
 }
 
 void Manifold::Impl::CreateHalfedges(const VecDH<glm::ivec3>& triVerts) {
   const int numTri = triVerts.size();
-  face_.resize(0);
+  faceEdge_.resize(0);
   halfedge_.resize(3 * numTri);
   VecDH<TmpEdge> edge(3 * numTri);
   thrust::for_each_n(zip(thrust::make_counting_iterator(0), triVerts.beginD()),
@@ -676,10 +709,10 @@ void Manifold::Impl::CreateHalfedges(const VecDH<glm::ivec3>& triVerts) {
 
 void Manifold::Impl::Update() {
   CalculateBBox();
-  VecDH<Box> triBox;
-  VecDH<uint32_t> triMorton;
-  GetTriBoxMorton(triBox, triMorton);
-  collider_.UpdateBoxes(triBox);
+  VecDH<Box> faceBox;
+  VecDH<uint32_t> faceMorton;
+  GetFaceBoxMorton(faceBox, faceMorton);
+  collider_.UpdateBoxes(faceBox);
 }
 
 void Manifold::Impl::ApplyTransform() const {
@@ -694,7 +727,7 @@ void Manifold::Impl::ApplyTransform() {
 
   glm::mat3 normalTransform =
       glm::inverse(glm::transpose(glm::mat3(transform_)));
-  thrust::for_each(triNormal_.beginD(), triNormal_.endD(),
+  thrust::for_each(faceNormal_.beginD(), faceNormal_.endD(),
                    TransformNormals({normalTransform}));
   thrust::for_each(vertNormal_.beginD(), vertNormal_.endD(),
                    TransformNormals({normalTransform}));
@@ -712,23 +745,23 @@ bool Manifold::Impl::Tri2Face() const {
 }
 
 bool Manifold::Impl::Tri2Face() {
-  if (face_.size() != 0 || halfedge_.size() % 3 != 0) return false;
-  face_.resize(halfedge_.size() / 3 + 1);
-  thrust::sequence(face_.beginD(), face_.endD(), 0, 3);
+  if (faceEdge_.size() != 0 || halfedge_.size() % 3 != 0) return false;
+  faceEdge_.resize(halfedge_.size() / 3 + 1);
+  thrust::sequence(faceEdge_.beginD(), faceEdge_.endD(), 0, 3);
   return true;
 }
 
 bool Manifold::Impl::Face2Tri() {
-  if (face_.size() == 0 && halfedge_.size() % 3 == 0) return false;
+  if (faceEdge_.size() == 0 && halfedge_.size() % 3 == 0) return false;
   VecDH<glm::ivec3> triVertsOut;
   VecDH<glm::vec3> triNormalOut;
 
   VecDH<glm::ivec3>& triVerts = triVertsOut.H();
   VecDH<glm::vec3>& triNormal = triNormalOut.H();
   VecH<glm::vec3>& vertPos = vertPos_.H();
-  const VecH<int>& face = face_.H();
+  const VecH<int>& face = faceEdge_.H();
   const VecH<Halfedge>& halfedge = halfedge_.H();
-  const VecH<glm::vec3>& faceNormal = triNormal_.H();
+  const VecH<glm::vec3>& faceNormal = faceNormal_.H();
 
   for (int i = 0; i < face.size() - 1; ++i) {
     const int edge = face[i];
@@ -796,7 +829,7 @@ bool Manifold::Impl::Face2Tri() {
       }
     }
   }
-  triNormal_ = triNormalOut;
+  faceNormal_ = triNormalOut;
   CreateHalfedges(triVertsOut);
   return true;
 }
@@ -807,7 +840,7 @@ void Manifold::Impl::Refine(int n) {
   // refinement (smoothing).
   int numVert = NumVert();
   int numEdge = NumEdge();
-  int numTri = NumTri();
+  int numTri = NumFace();
   // Append new verts
   int vertsPerEdge = n - 1;
   int vertsPerTri = ((n - 2) * (n - 2) + (n - 2)) / 2;
@@ -857,94 +890,61 @@ void Manifold::Impl::SortVerts() {
   thrust::scatter(thrust::make_counting_iterator(0),
                   thrust::make_counting_iterator(NumVert()),
                   vertNew2Old.beginD(), vertOld2New.beginD());
-  thrust::for_each(triVerts_.beginD(), triVerts_.endD(),
+  thrust::for_each(halfedge_.beginD(), halfedge_.endD(),
                    Reindex({vertOld2New.cptrD()}));
 }
 
-void Manifold::Impl::CreateEdges() {
-  VecDH<EdgeVertsD> halfEdgeVerts(NumTri() * 3);
-  VecDH<int> dir(NumTri() * 3);
-  edgeVerts_.resize(halfEdgeVerts.size() / 2);
-  triEdges_.resize(NumTri());
-  edgeTris_.resize(NumEdge());
-  for (int i : {0, 1, 2}) {
-    int j = (i + 1) % 3;
-    int start = i * NumTri();
-    thrust::for_each_n(zip(triEdges_.beginD(), dir.beginD() + start,
-                           halfEdgeVerts.beginD() + start, triVerts_.cbeginD()),
-                       NumTri(), MakeHalfedges({i, j}));
-  }
-  SortHalfedges(halfEdgeVerts, dir);
-  strided_range<VecDH<EdgeVertsD>::IterD> edgeVerts(halfEdgeVerts.beginD(),
-                                                    halfEdgeVerts.endD(), 2);
-  thrust::copy(edgeVerts.begin(), edgeVerts.end(), edgeVerts_.beginD());
-
-  thrust::for_each_n(zip(thrust::make_counting_iterator(0), triEdges_.beginD()),
-                     NumTri(), LinkEdges2Tris({edgeTris_.ptrD()}));
-  // verify
-  strided_range<VecDH<EdgeVertsD>::IterD> edgesOdd(halfEdgeVerts.beginD() + 1,
-                                                   halfEdgeVerts.endD(), 2);
-  ALWAYS_ASSERT(
-      thrust::equal(edgeVerts.begin(), edgeVerts.end(), edgesOdd.begin()),
-      runtimeErr, "Manifold is not manifold!");
-  strided_range<VecDH<int>::IterD> dir1(dir.beginD(), dir.endD(), 2);
-  strided_range<VecDH<int>::IterD> dir2(dir.beginD() + 1, dir.endD(), 2);
-  ALWAYS_ASSERT(
-      thrust::equal(dir1.begin(), dir1.end(), dir2.begin(), OpposedDir()),
-      runtimeErr, "Manifold is not oriented!");
+void Manifold::Impl::GetFaceBoxMorton(VecDH<Box>& faceBox,
+                                      VecDH<uint32_t>& faceMorton) const {
+  faceBox.resize(NumFace());
+  faceMorton.resize(NumFace());
+  thrust::for_each_n(zip(faceMorton.beginD(), faceBox.beginD(),
+                         thrust::make_counting_iterator(0)),
+                     NumFace(),
+                     FaceMortonBox({faceEdge_.cptrD(), halfedge_.cptrD(),
+                                    vertPos_.cptrD(), bBox_}));
 }
 
-void Manifold::Impl::SortHalfedges(VecDH<EdgeVertsD>& halfEdgeVerts,
-                                   VecDH<int>& dir) {
-  VecDH<int> halfedgeNew2Old(NumTri() * 3);
-  thrust::sequence(halfedgeNew2Old.beginD(), halfedgeNew2Old.endD());
-  thrust::sort_by_key(halfEdgeVerts.beginD(), halfEdgeVerts.endD(),
-                      zip(dir.beginD(), halfedgeNew2Old.beginD()));
+void Manifold::Impl::SortFaces(VecDH<Box>& faceBox,
+                               VecDH<uint32_t>& faceMorton) {
+  VecDH<int> faceNew2Old(NumVert());
+  thrust::sequence(faceNew2Old.beginD(), faceNew2Old.endD());
 
-  VecDH<int> halfedgeOld2New(NumTri() * 3);
+  VecDH<int> faceSize(faceEdge_.size());
+  thrust::adjacent_difference(faceEdge_.beginD(), faceEdge_.endD(),
+                              faceSize.beginD());
+
+  thrust::sort_by_key(faceMorton.beginD(), faceMorton.endD(),
+                      zip(faceBox.beginD(), faceNew2Old.beginD(),
+                          faceSize.beginD(), faceNormal_.beginD()));
+
+  VecDH<int> faceOld2New(NumVert());
   thrust::scatter(thrust::make_counting_iterator(0),
-                  thrust::make_counting_iterator((int)halfedgeNew2Old.size()),
-                  halfedgeNew2Old.beginD(), halfedgeOld2New.beginD());
-  // assign edge idx to triEdges_ (assumes edge dir is already assigned)
-  for (int i : {0, 1, 2}) {
-    int start = i * NumTri();
-    thrust::for_each_n(
-        zip(triEdges_.beginD(), halfedgeOld2New.cbeginD() + start), NumTri(),
-        AssignEdges({i}));
-  }
-}
+                  thrust::make_counting_iterator(NumFace()),
+                  faceNew2Old.beginD(), faceOld2New.beginD());
 
-void Manifold::Impl::GetTriBoxMorton(VecDH<Box>& triBox,
-                                     VecDH<uint32_t>& triMorton) const {
-  triBox.resize(NumTri());
-  triMorton.resize(NumTri());
+  VecDH<Halfedge> oldHalfedge = halfedge_;
+  VecDH<int> oldFaceEdge = faceEdge_;
+  thrust::inclusive_scan(faceSize.beginD(), faceSize.endD(),
+                         faceEdge_.beginD() + 1);
+
   thrust::for_each_n(
-      zip(triMorton.beginD(), triBox.beginD(), triVerts_.cbeginD()), NumTri(),
-      TriMortonBox({vertPos_.cptrD(), bBox_}));
-}
-
-void Manifold::Impl::SortTris(VecDH<Box>& triBox, VecDH<uint32_t>& triMorton) {
-  if (triNormal_.size() == NumTri()) {
-    thrust::sort_by_key(
-        triMorton.beginD(), triMorton.endD(),
-        zip(triBox.beginD(), triVerts_.beginD(), triNormal_.beginD()));
-  } else {
-    thrust::sort_by_key(triMorton.beginD(), triMorton.endD(),
-                        zip(triBox.beginD(), triVerts_.beginD()));
-  }
+      zip(thrust::make_counting_iterator(0), faceEdge_.beginD()), NumFace(),
+      ReindexFace({halfedge_.ptrD(), faceEdge_.cptrD(), oldHalfedge.cptrD(),
+                   oldFaceEdge.cptrD(), faceNew2Old.cptrD()}));
 }
 
 void Manifold::Impl::CalculateNormals() {
   vertNormal_.resize(NumVert());
   bool calculateTriNormal = false;
-  if (triNormal_.size() != NumTri()) {
-    triNormal_.resize(NumTri());
+  if (faceNormal_.size() != NumFace()) {
+    faceNormal_.resize(NumFace());
     calculateTriNormal = true;
   }
   thrust::for_each_n(
-      zip(triNormal_.beginD(), triVerts_.beginD(), triEdges_.beginD()),
-      NumTri(), AssignNormals({vertNormal_.ptrD(), vertPos_.cptrD(),
-                               calculateTriNormal}));
+      zip(faceNormal_.beginD(), triVerts_.beginD(), triEdges_.beginD()),
+      NumFace(), AssignNormals({vertNormal_.ptrD(), vertPos_.cptrD(),
+                                calculateTriNormal}));
   thrust::for_each(vertNormal_.begin(), vertNormal_.end(), NormalizeTo({1.0}));
 }
 
