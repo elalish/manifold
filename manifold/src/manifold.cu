@@ -332,7 +332,7 @@ std::vector<Manifold> Manifold::Decompose() const {
                     vertOld2New.beginD());
     meshes[i].pImpl_->vertPos_.resize(nVert);
 
-    meshes[i].pImpl_->triVerts_.resize(NumTri());
+    meshes[i].pImpl_->triVerts_.resize(NumFace());
     int nTri =
         thrust::copy_if(pImpl_->triVerts_.beginD(), pImpl_->triVerts_.endD(),
                         meshes[i].pImpl_->triVerts_.beginD(),
@@ -393,7 +393,7 @@ int Manifold::GetCircularSegments(float radius) {
 bool Manifold::IsEmpty() const { return NumVert() == 0; }
 int Manifold::NumVert() const { return pImpl_->NumVert(); }
 int Manifold::NumEdge() const { return pImpl_->NumEdge(); }
-int Manifold::NumTri() const { return pImpl_->NumTri(); }
+int Manifold::NumFace() const { return pImpl_->NumFace(); }
 
 Box Manifold::BoundingBox() const {
   return pImpl_->bBox_.Transform(pImpl_->transform_);
@@ -414,7 +414,7 @@ float Manifold::SurfaceArea() const {
 }
 
 int Manifold::Genus() const {
-  int chi = NumVert() - NumTri() / 2;
+  int chi = NumVert() - NumFace() / 2;
   return 1 - chi / 2;
 }
 
@@ -450,7 +450,7 @@ Manifold& Manifold::Warp(std::function<void(glm::vec3&)> warpFunc) {
   pImpl_->ApplyTransform();
   thrust::for_each_n(pImpl_->vertPos_.begin(), NumVert(), warpFunc);
   pImpl_->Update();
-  pImpl_->triNormal_.resize(0);  // force recalculation of triNormal
+  pImpl_->faceNormal_.resize(0);  // force recalculation of triNormal
   pImpl_->CalculateNormals();
   return *this;
 }
