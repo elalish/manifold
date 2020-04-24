@@ -37,14 +37,77 @@ struct NormalizeTo {
   }
 };
 
+struct TmpEdge {
+  int first, second, halfedgeIdx;
+
+  __host__ __device__ TmpEdge() {}
+  __host__ __device__ TmpEdge(int start, int end, int idx) {
+    first = glm::min(start, end);
+    second = glm::max(start, end);
+    halfedgeIdx = idx;
+  }
+
+  __host__ __device__ bool operator<(const TmpEdge& other) const {
+    return first == other.first ? second < other.second : first < other.first;
+  }
+};
+
+struct Halfedge2Tmp {
+  __host__ __device__ void operator()(
+      thrust::tuple<TmpEdge&, const Halfedge&, int> inout) {
+    const Halfedge& halfedge = thrust::get<1>(inout);
+    int idx = thrust::get<2>(inout);
+    if (!halfedge.IsForward()) idx = -1;
+
+    thrust::get<0>(inout) = TmpEdge(halfedge.startVert, halfedge.endVert, idx);
+  }
+};
+
+struct TmpInvalid {
+  __host__ __device__ bool operator()(const TmpEdge& edge) {
+    return edge.halfedgeIdx < 0;
+  }
+};
+
+VecDH<TmpEdge> CreateTmpEdges(const VecDH<Halfedge>& halfedge) {
+  VecDH<TmpEdge> edges(halfedge.size());
+  thrust::for_each_n(
+      zip(edges.beginD(), halfedge.beginD(), thrust::make_counting_iterator(0)),
+      edges.size(), Halfedge2Tmp());
+  int numEdge = thrust::remove_if(edges.beginD(), edges.endD(), TmpInvalid()) -
+                edges.beginD();
+  ALWAYS_ASSERT(numEdge == halfedge.size() / 2, runtimeErr, "Not oriented!");
+  edges.resize(numEdge);
+  return edges;
+}
+
+struct ReindexEdge {
+  const TmpEdge* edges;
+
+  __host__ __device__ void operator()(int& edge) {
+    edge = edges[edge].halfedgeIdx;
+  }
+};
+
+struct ReindexHalfedge {
+  int* half2Edge;
+
+  __host__ __device__ void operator()(thrust::tuple<int, TmpEdge> in) {
+    const int edge = thrust::get<0>(edge);
+    const int halfedge = thrust::get<1>(edge).halfedgeIdx;
+
+    half2Edge[halfedge] = edge;
+  }
+};
+
 struct SplitEdges {
   glm::vec3* vertPos;
   const int startIdx;
   const int n;
 
-  __host__ __device__ void operator()(thrust::tuple<int, EdgeVertsD> in) {
+  __host__ __device__ void operator()(thrust::tuple<int, TmpEdge> in) {
     int edge = thrust::get<0>(in);
-    EdgeVertsD edgeVerts = thrust::get<1>(in);
+    TmpEdge edgeVerts = thrust::get<1>(in);
 
     float invTotal = 1.0f / n;
     for (int i = 1; i < n; ++i)
@@ -59,32 +122,35 @@ struct InteriorVerts {
   glm::vec3* vertPos;
   const int startIdx;
   const int n;
+  const Halfedge* halfedge;
 
-  __host__ __device__ void operator()(thrust::tuple<int, glm::ivec3> in) {
-    int tri = thrust::get<0>(in);
-    glm::ivec3 triVerts = thrust::get<1>(in);
-
+  __host__ __device__ void operator()(int tri) {
     int vertsPerTri = ((n - 2) * (n - 2) + (n - 2)) / 2;
     float invTotal = 1.0f / n;
     int pos = startIdx + vertsPerTri * tri;
     for (int i = 1; i < n - 1; ++i)
       for (int j = 1; j < n - i; ++j)
-        vertPos[pos++] = (float(i) * vertPos[triVerts[2]] +  //
-                          float(j) * vertPos[triVerts[0]] +  //
-                          float(n - i - j) * vertPos[triVerts[1]]) *
-                         invTotal;
+        vertPos[pos++] =
+            (float(i) * vertPos[halfedge[3 * tri + 2].startVert] +  //
+             float(j) * vertPos[halfedge[3 * tri].startVert] +      //
+             float(n - i - j) * vertPos[halfedge[3 * tri + 1].startVert]) *
+            invTotal;
   }
 };
 
 struct SplitTris {
   glm::ivec3* triVerts;
+  const Halfedge* halfedge;
+  const int* half2Edge;
   const int edgeIdx;
   const int triIdx;
   const int n;
 
-  __host__ __device__ int EdgeVert(int i, EdgeIdx edge) const {
-    return edgeIdx + (n - 1) * edge.Idx() +
-           (edge.Dir() > 0 ? i - 1 : n - 1 - i);
+  __host__ __device__ int EdgeVert(int i, int inHalfedge) const {
+    bool forward = halfedge[inHalfedge].IsForward();
+    int edge = forward ? half2Edge[inHalfedge]
+                       : half2Edge[halfedge[inHalfedge].pairedHalfedge];
+    return edgeIdx + (n - 1) * edge + (forward ? i - 1 : n - 1 - i);
   }
 
   __host__ __device__ int TriVert(int i, int j, int tri) const {
@@ -103,37 +169,32 @@ struct SplitTris {
     bool edge2 = j == n - i;
     if (edge0) {
       if (edge1)
-        return triVert[1];
+        return halfedge[3 * tri + 1].startVert;
       else if (edge2)
-        return triVert[0];
+        return halfedge[3 * tri].startVert;
       else
-        return EdgeVert(n - j, triEdge[0]);
+        return EdgeVert(n - j, 3 * tri);
     } else if (edge1) {
       if (edge2)
-        return triVert[2];
+        return halfedge[3 * tri + 2].startVert;
       else
-        return EdgeVert(i, triEdge[1]);
+        return EdgeVert(i, 3 * tri + 1);
     } else if (edge2)
-      return EdgeVert(j, triEdge[2]);
+      return EdgeVert(j, 3 * tri + 2);
     else
       return TriVert(i, j, tri);
   }
 
-  __host__ __device__ void operator()(
-      thrust::tuple<int, glm::ivec3, TriEdges> in) {
-    int tri = thrust::get<0>(in);
-    glm::ivec3 triVert = thrust::get<1>(in);
-    TriEdges triEdge = thrust::get<2>(in);
-
+  __host__ __device__ void operator()(int tri) {
     int pos = n * n * tri;
     for (int i = 0; i < n; ++i) {
       for (int j = 0; j < n - i; ++j) {
-        int a = Vert(i, j, tri, triVert, triEdge);
-        int b = Vert(i + 1, j, tri, triVert, triEdge);
-        int c = Vert(i, j + 1, tri, triVert, triEdge);
+        int a = Vert(i, j, tri);
+        int b = Vert(i + 1, j, tri);
+        int c = Vert(i, j + 1, tri);
         triVerts[pos++] = glm::ivec3(a, b, c);
         if (j < n - 1 - i) {
-          int d = Vert(i + 1, j + 1, tri, triVert, triEdge);
+          int d = Vert(i + 1, j + 1, tri);
           triVerts[pos++] = glm::ivec3(b, d, c);
         }
       }
@@ -391,21 +452,6 @@ struct AssignNormals {
   }
 };
 
-struct TmpEdge {
-  int first, second, halfedgeIdx;
-
-  __host__ __device__ TmpEdge() {}
-  __host__ __device__ TmpEdge(int start, int end, int idx) {
-    first = glm::min(start, end);
-    second = glm::max(start, end);
-    halfedgeIdx = idx;
-  }
-
-  __host__ __device__ bool operator<(const TmpEdge& other) const {
-    return first == other.first ? second < other.second : first < other.first;
-  }
-};
-
 struct Tri2Halfedges {
   Halfedge* halfedges;
   TmpEdge* edges;
@@ -497,23 +543,6 @@ struct LinkEdges2Tris {
   }
 };
 
-struct Halfedge2Tmp {
-  __host__ __device__ void operator()(
-      thrust::tuple<TmpEdge&, const Halfedge&, int> inout) {
-    const Halfedge& halfedge = thrust::get<1>(inout);
-    int idx = thrust::get<2>(inout);
-    if (!halfedge.IsForward()) idx = -1;
-
-    thrust::get<0>(inout) = TmpEdge(halfedge.startVert, halfedge.endVert, idx);
-  }
-};
-
-struct TmpInvalid {
-  __host__ __device__ bool operator()(const TmpEdge& edge) {
-    return edge.halfedgeIdx < 0;
-  }
-};
-
 struct EdgeBox {
   const glm::vec3* vertPos;
 
@@ -521,14 +550,6 @@ struct EdgeBox {
       thrust::tuple<Box&, const TmpEdge&> inout) {
     const TmpEdge& edge = thrust::get<1>(inout);
     thrust::get<0>(inout) = Box(vertPos[edge.first], vertPos[edge.second]);
-  }
-};
-
-struct ReindexEdge {
-  const TmpEdge* edges;
-
-  __host__ __device__ void operator()(int& edge) {
-    edge = edges[edge].halfedgeIdx;
   }
 };
 
@@ -705,6 +726,7 @@ void Manifold::Impl::CreateHalfedges(const VecDH<glm::ivec3>& triVerts) {
   thrust::sort(edge.beginD(), edge.endD());
   thrust::for_each_n(thrust::make_counting_iterator(0), halfedge_.size() / 2,
                      LinkHalfedges({halfedge_.ptrD(), edge.cptrD()}));
+  Tri2Face();
 }
 
 void Manifold::Impl::Update() {
@@ -838,6 +860,7 @@ void Manifold::Impl::Refine(int n) {
   // This function doesn't run Finish(), as that is expensive and it'll need to
   // be run after the new vertices have moved, which is a likely scenario after
   // refinement (smoothing).
+  Face2Tri();
   int numVert = NumVert();
   int numEdge = NumEdge();
   int numTri = NumFace();
@@ -846,18 +869,21 @@ void Manifold::Impl::Refine(int n) {
   int vertsPerTri = ((n - 2) * (n - 2) + (n - 2)) / 2;
   int triVertStart = numVert + numEdge * vertsPerEdge;
   vertPos_.resize(triVertStart + numTri * vertsPerTri);
+  VecDH<TmpEdge> edges = CreateTmpEdges(halfedge_);
+  VecDH<int> half2Edge(2 * numEdge);
+  thrust::for_each_n(zip(thrust::make_counting_iterator(0), edges.beginD()),
+                     numEdge, ReindexHalfedge({half2Edge.ptrD()}));
+  thrust::for_each_n(zip(thrust::make_counting_iterator(0), edges.beginD()),
+                     numEdge, SplitEdges({vertPos_.ptrD(), numVert, n}));
   thrust::for_each_n(
-      zip(thrust::make_counting_iterator(0), edgeVerts_.beginD()), numEdge,
-      SplitEdges({vertPos_.ptrD(), numVert, n}));
-  thrust::for_each_n(zip(thrust::make_counting_iterator(0), triVerts_.beginD()),
-                     numTri, InteriorVerts({vertPos_.ptrD(), triVertStart, n}));
+      thrust::make_counting_iterator(0), numTri,
+      InteriorVerts({vertPos_.ptrD(), triVertStart, n, halfedge_.ptrD()}));
   // Create subtriangles
-  VecDH<glm::ivec3> inTri(triVerts_);
-  triVerts_.resize(n * n * numTri);
-  thrust::for_each_n(zip(thrust::make_counting_iterator(0), inTri.beginD(),
-                         triEdges_.beginD()),
-                     numTri,
-                     SplitTris({triVerts_.ptrD(), numVert, triVertStart, n}));
+  VecDH<glm::ivec3> triVerts(n * n * numTri);
+  thrust::for_each_n(thrust::make_counting_iterator(0), numTri,
+                     SplitTris({triVerts.ptrD(), halfedge_.cptrD(),
+                                half2Edge.cptrD(), numVert, triVertStart, n}));
+  CreateHalfedges(triVerts);
 }
 
 bool Manifold::Impl::IsValid() const {
@@ -949,15 +975,8 @@ void Manifold::Impl::CalculateNormals() {
 }
 
 SparseIndices Manifold::Impl::EdgeCollisions(const Impl& Q) const {
-  VecDH<TmpEdge> edges(Q.halfedge_.size());
-  thrust::for_each_n(zip(edges.beginD(), Q.halfedge_.beginD(),
-                         thrust::make_counting_iterator(0)),
-                     edges.size(), Halfedge2Tmp());
-  int numEdge = thrust::remove_if(edges.beginD(), edges.endD(), TmpInvalid()) -
-                edges.beginD();
-  ALWAYS_ASSERT(numEdge == Q.NumEdge(), runtimeErr, "Not oriented!");
-  edges.resize(numEdge);
-
+  VecDH<TmpEdge> edges = CreateTmpEdges(Q.halfedge_);
+  const int numEdge = edges.size();
   VecDH<Box> QedgeBB(numEdge);
   thrust::for_each_n(zip(QedgeBB.beginD(), edges.cbeginD()), numEdge,
                      EdgeBox({Q.vertPos_.cptrD()}));
