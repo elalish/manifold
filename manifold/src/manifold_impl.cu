@@ -264,23 +264,27 @@ struct RemoveTri {
   }
 };
 
-struct IdxMin
-    : public thrust::binary_function<glm::ivec3, glm::ivec3, glm::ivec3> {
-  __host__ __device__ int min3(glm::ivec3 a) {
-    return glm::min(a.x, glm::min(a.y, a.z));
+struct Extrema : public thrust::binary_function<Halfedge, Halfedge, Halfedge> {
+  __host__ __device__ void MakeForward(Halfedge& a) {
+    if (!a.IsForward()) {
+      int tmp = a.startVert;
+      a.startVert = a.endVert;
+      a.endVert = tmp;
+    }
   }
-  __host__ __device__ glm::ivec3 operator()(glm::ivec3 a, glm::ivec3 b) {
-    return glm::ivec3(glm::min(min3(a), min3(b)));
-  }
-};
 
-struct IdxMax
-    : public thrust::binary_function<glm::ivec3, glm::ivec3, glm::ivec3> {
-  __host__ __device__ int max3(glm::ivec3 a) {
-    return glm::max(a.x, glm::max(a.y, a.z));
+  __host__ __device__ int MaxOrMinus(int a, int b) {
+    return glm::min(a, b) < 0 ? -1 : glm::max(a, b);
   }
-  __host__ __device__ glm::ivec3 operator()(glm::ivec3 a, glm::ivec3 b) {
-    return glm::ivec3(glm::max(max3(a), max3(b)));
+
+  __host__ __device__ Halfedge operator()(Halfedge a, Halfedge b) {
+    MakeForward(a);
+    MakeForward(b);
+    a.startVert = glm::min(a.startVert, b.startVert);
+    a.endVert = glm::max(a.endVert, b.endVert);
+    a.face = MaxOrMinus(a.face, b.face);
+    a.pairedHalfedge = MaxOrMinus(a.pairedHalfedge, b.pairedHalfedge);
+    return a;
   }
 };
 
@@ -553,23 +557,25 @@ struct EdgeBox {
   }
 };
 
-struct CheckTris {
-  const EdgeVertsD* edgeVerts;
+struct CheckManifold {
+  const Halfedge* halfedges;
+  const int* faces;
 
-  __host__ __device__ bool operator()(thrust::tuple<glm::ivec3, TriEdges> in) {
-    const glm::ivec3& triVerts = thrust::get<0>(in);
-    const TriEdges& triEdges = thrust::get<1>(in);
+  __host__ __device__ bool operator()(int face) {
     bool good = true;
-    for (int i : {0, 1, 2}) {
-      int j = (i + 1) % 3;
-      if (triEdges[i].Dir() > 0) {
-        good &= triVerts[i] == edgeVerts[triEdges[i].Idx()].first;
-        good &= triVerts[j] == edgeVerts[triEdges[i].Idx()].second;
-      } else {
-        good &= triVerts[i] == edgeVerts[triEdges[i].Idx()].second;
-        good &= triVerts[j] == edgeVerts[triEdges[i].Idx()].first;
-      }
+    int edge = faces[face];
+    const int end = faces[face + 1];
+    int while (edge < end) {
+      const Halfedge halfedge = halfedges[edge];
+      const Halfedge paired = halfedges[halfedge.pairedHalfedge];
+      good &= halfedge.face == face;
+      good &= paired.pairedHalfedge == edge;
+      good &= halfedge.startVert == paired.endVert;
+      good &= halfedge.endVert == paired.startVert;
+      ++edge;
     }
+    // TODO: also test that face can assemble (same start verts as end verts) to
+    // complete manifoldness check.
     return good;
   }
 };
@@ -693,14 +699,27 @@ void Manifold::Impl::RemoveChaff() {
 }
 
 void Manifold::Impl::Finish() {
-  if (triVerts_.size() == 0) return;
-  ALWAYS_ASSERT(thrust::reduce(triVerts_.beginD(), triVerts_.endD(),
-                               glm::ivec3(std::numeric_limits<int>::max()),
-                               IdxMin())[0] >= 0,
-                runtimeErr, "Negative vertex index!");
-  ALWAYS_ASSERT(thrust::reduce(triVerts_.beginD(), triVerts_.endD(),
-                               glm::ivec3(-1), IdxMax())[0] < NumVert(),
-                runtimeErr, "Vertex index exceeds number of verts!");
+  if (halfedge_.size() == 0) return;
+  Halfedge extrema = {0, 0, 0, 0};
+  extrema =
+      thrust::reduce(halfedge_.beginD(), halfedge_.endD(), extrema, Extrema());
+
+  ALWAYS_ASSERT(extrema.startVert >= 0, runtimeErr,
+                "Vertex index is negative!");
+  ALWAYS_ASSERT(extrema.endVert < NumVert(), runtimeErr,
+                "Vertex index exceeds number of verts!");
+  ALWAYS_ASSERT(extrema.face >= 0, runtimeErr, "Face index is negative!");
+  ALWAYS_ASSERT(extrema.face < NumFace(), runtimeErr,
+                "Face index exceeds number of faces!");
+  ALWAYS_ASSERT(extrema.pairedHalfedge >= 0, runtimeErr,
+                "Halfedge index is negative!");
+  ALWAYS_ASSERT(extrema.pairedHalfedge < 2 * NumEdge(), runtimeErr,
+                "Halfedge index exceeds number of halfedges!");
+  ALWAYS_ASSERT(face_.H().front() == 0, runtimeErr,
+                "Faces do not start at zero!");
+  ALWAYS_ASSERT(face_.H().back() == 2 * NumEdge(), runtimeErr,
+                "Faces do not end at halfedge length!");
+
   if (vertLabel_.size() != NumVert()) {
     vertLabel_.resize(NumVert());
     numLabel_ = 1;
@@ -886,10 +905,10 @@ void Manifold::Impl::Refine(int n) {
   CreateHalfedges(triVerts);
 }
 
-bool Manifold::Impl::IsValid() const {
-  return thrust::all_of(zip(triVerts_.beginD(), triEdges_.beginD()),
-                        zip(triVerts_.endD(), triEdges_.endD()),
-                        CheckTris({edgeVerts_.ptrD()}));
+bool Manifold::Impl::IsManifold() const {
+  return thrust::all_of(thrust::make_counting_iterator(0),
+                        thrust::make_counting_iterator(NumFace()),
+                        CheckManifold({halfedge_.cptrD(), face_.cptrD()}));
 }
 
 void Manifold::Impl::CalculateBBox() {

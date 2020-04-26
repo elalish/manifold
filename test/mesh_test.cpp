@@ -42,7 +42,7 @@ void CheckIdx(int idx, int dir) {
 
 void ExpectMeshes(const Manifold& manifold,
                   const std::vector<std::pair<int, int>>& numVertTri) {
-  ASSERT_TRUE(manifold.IsValid());
+  ASSERT_TRUE(manifold.IsManifold());
   std::vector<Manifold> meshes = manifold.Decompose();
   ASSERT_EQ(meshes.size(), numVertTri.size());
   std::sort(meshes.begin(), meshes.end(),
@@ -51,7 +51,7 @@ void ExpectMeshes(const Manifold& manifold,
                                                 : a.NumFace() > b.NumFace();
             });
   for (int i = 0; i < meshes.size(); ++i) {
-    EXPECT_TRUE(meshes[i].IsValid());
+    EXPECT_TRUE(meshes[i].IsManifold());
     EXPECT_EQ(meshes[i].NumVert(), numVertTri[i].first);
     EXPECT_EQ(meshes[i].NumFace(), numVertTri[i].second);
   }
@@ -96,7 +96,7 @@ TEST(Manifold, EdgeIdx) {
  */
 TEST(Manifold, Regression) {
   Manifold manifold(ImportMesh("data/gyroidpuzzle.ply"));
-  ASSERT_TRUE(manifold.IsValid());
+  ASSERT_TRUE(manifold.IsManifold());
 
   Manifold mesh1 = manifold.DeepCopy();
   mesh1.Translate(glm::vec3(5.0f));
@@ -119,7 +119,7 @@ TEST(Manifold, Decompose) {
   meshList.push_back(Manifold::Cube());
   meshList.push_back(Manifold::Octahedron());
   Manifold meshes = Manifold::Compose(meshList);
-  ASSERT_TRUE(meshes.IsValid());
+  ASSERT_TRUE(meshes.IsManifold());
 
   ExpectMeshes(meshes, {{8, 12}, {6, 8}, {4, 4}});
 }
@@ -130,14 +130,14 @@ TEST(Manifold, Decompose) {
 TEST(Manifold, Sphere) {
   int n = 25;
   Manifold sphere = Manifold::Sphere(1.0f, 4 * n);
-  ASSERT_TRUE(sphere.IsValid());
+  ASSERT_TRUE(sphere.IsManifold());
   EXPECT_EQ(sphere.NumFace(), n * n * 8);
 }
 
 TEST(Manifold, Extrude) {
   Polygons polys = SquareHole();
   Manifold donut = Manifold::Extrude(polys, 1.0f, 3);
-  ASSERT_TRUE(donut.IsValid());
+  ASSERT_TRUE(donut.IsManifold());
   EXPECT_EQ(donut.Genus(), 1);
   EXPECT_FLOAT_EQ(donut.Volume(), 12.0f);
   EXPECT_FLOAT_EQ(donut.SurfaceArea(), 48.0f);
@@ -146,7 +146,7 @@ TEST(Manifold, Extrude) {
 TEST(Manifold, ExtrudeCone) {
   Polygons polys = SquareHole();
   Manifold donut = Manifold::Extrude(polys, 1.0f, 0, 0, glm::vec2(0.0f));
-  ASSERT_TRUE(donut.IsValid());
+  ASSERT_TRUE(donut.IsManifold());
   EXPECT_EQ(donut.Genus(), 0);
   EXPECT_FLOAT_EQ(donut.Volume(), 4.0f);
 }
@@ -154,7 +154,7 @@ TEST(Manifold, ExtrudeCone) {
 TEST(Manifold, Revolve) {
   Polygons polys = SquareHole();
   Manifold vug = Manifold::Revolve(polys, 48);
-  ASSERT_TRUE(vug.IsValid());
+  ASSERT_TRUE(vug.IsManifold());
   EXPECT_EQ(vug.Genus(), -1);
   EXPECT_NEAR(vug.Volume(), 14.0f * glm::pi<float>(), 0.2f);
   EXPECT_NEAR(vug.SurfaceArea(), 30.0f * glm::pi<float>(), 0.2f);
@@ -163,7 +163,7 @@ TEST(Manifold, Revolve) {
 TEST(Manifold, Revolve2) {
   Polygons polys = SquareHole(2.0f);
   Manifold donutHole = Manifold::Revolve(polys, 48);
-  ASSERT_TRUE(donutHole.IsValid());
+  ASSERT_TRUE(donutHole.IsManifold());
   EXPECT_EQ(donutHole.Genus(), 0);
   EXPECT_NEAR(donutHole.Volume(), 48.0f * glm::pi<float>(), 1.0f);
   EXPECT_NEAR(donutHole.SurfaceArea(), 96.0f * glm::pi<float>(), 1.0f);
@@ -174,7 +174,7 @@ TEST(Manifold, Revolve2) {
  */
 TEST(Manifold, Volume) {
   Manifold cube = Manifold::Cube();
-  ASSERT_TRUE(cube.IsValid());
+  ASSERT_TRUE(cube.IsManifold());
   float vol = cube.Volume();
   EXPECT_FLOAT_EQ(vol, 1.0f);
 
@@ -185,7 +185,7 @@ TEST(Manifold, Volume) {
 
 TEST(Manifold, SurfaceArea) {
   Manifold cube = Manifold::Cube();
-  ASSERT_TRUE(cube.IsValid());
+  ASSERT_TRUE(cube.IsManifold());
   float area = cube.SurfaceArea();
   EXPECT_FLOAT_EQ(area, 6.0f);
 
@@ -200,7 +200,7 @@ TEST(Manifold, SurfaceArea) {
 TEST(Manifold, BooleanTetra) {
   Manifold::SetExpectGeometry(true);
   Manifold tetra = Manifold::Tetrahedron();
-  ASSERT_TRUE(tetra.IsValid());
+  ASSERT_TRUE(tetra.IsManifold());
 
   Manifold tetra2 = tetra.DeepCopy();
   tetra2.Translate(glm::vec3(0.5f));
@@ -216,7 +216,7 @@ TEST(Manifold, SelfSubtract) {
   Manifold::SetExpectGeometry(true);
   Manifold cube = Manifold::Cube();
   Manifold empty = cube - cube;
-  EXPECT_TRUE(empty.IsValid());
+  EXPECT_TRUE(empty.IsManifold());
   EXPECT_FLOAT_EQ(empty.Volume(), 0.0f);
   EXPECT_FLOAT_EQ(empty.SurfaceArea(), 0.0f);
   EXPECT_TRUE(empty.IsEmpty());
@@ -326,7 +326,7 @@ TEST(Manifold, BooleanSphere) {
 TEST(Manifold, Boolean3) {
   Manifold::SetExpectGeometry(true);
   Manifold gyroid(ImportMesh("data/gyroidpuzzle.ply"));
-  ASSERT_TRUE(gyroid.IsValid());
+  ASSERT_TRUE(gyroid.IsManifold());
 
   Manifold gyroid2 = gyroid.DeepCopy();
   gyroid2.Translate(glm::vec3(5.0f));
@@ -349,7 +349,7 @@ TEST(Manifold, BooleanSelfIntersecting) {
   meshList.push_back(Manifold::Tetrahedron());
   meshList[1].Translate(glm::vec3(0, 0, 0.25));
   Manifold tetras = Manifold::Compose(meshList);
-  ASSERT_TRUE(tetras.IsValid());
+  ASSERT_TRUE(tetras.IsManifold());
 
   meshList[0].Translate(glm::vec3(0, 0, 0.5f));
   Manifold result = meshList[0] - tetras;
@@ -364,7 +364,7 @@ TEST(Manifold, BooleanSelfIntersectingAlt) {
   meshList.push_back(Manifold::Tetrahedron());
   meshList[1].Translate(glm::vec3(0, 0, 0.5));
   Manifold tetras = Manifold::Compose(meshList);
-  ASSERT_TRUE(tetras.IsValid());
+  ASSERT_TRUE(tetras.IsManifold());
 
   meshList[0].Translate(glm::vec3(0, 0, -0.5f));
   Manifold result = meshList[0] - tetras;
@@ -379,7 +379,7 @@ TEST(Manifold, BooleanWinding) {
   meshList.push_back(Manifold::Tetrahedron());
   meshList[1].Translate(glm::vec3(0.25));
   Manifold tetras = Manifold::Compose(meshList);
-  ASSERT_TRUE(tetras.IsValid());
+  ASSERT_TRUE(tetras.IsManifold());
 
   meshList[0].Translate(glm::vec3(-0.25f));
   Manifold result = tetras - meshList[0];
@@ -403,7 +403,7 @@ TEST(Manifold, BooleanHorrible) {
   Manifold random2 = random.DeepCopy();
   random2.Rotate(90);
   Manifold result = random ^ random2;
-  EXPECT_TRUE(result.IsValid());
+  EXPECT_TRUE(result.IsManifold());
 
   Manifold::SetExpectGeometry(true);
   Manifold::SetSuppressErrors(true);
@@ -422,7 +422,7 @@ TEST(Manifold, BooleanHorrible2) {
   Manifold random2 = random.DeepCopy();
   random2.Rotate(90);
   Manifold result = random ^ random2;
-  EXPECT_TRUE(result.IsValid());
+  EXPECT_TRUE(result.IsManifold());
 }
 
 /**

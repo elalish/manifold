@@ -25,7 +25,7 @@ TEST(Samples, Knot13) {
   Manifold::SetExpectGeometry(true);
   Manifold knot13 = TorusKnot(1, 3, 25, 10, 3.75);
   //   ExportMesh("knot13.stl", knot13.Extract());
-  ASSERT_TRUE(knot13.IsValid());
+  ASSERT_TRUE(knot13.IsManifold());
   EXPECT_EQ(knot13.Genus(), 1);
   EXPECT_NEAR(knot13.Volume(), 20786, 1);
   EXPECT_NEAR(knot13.SurfaceArea(), 11177, 1);
@@ -36,7 +36,7 @@ TEST(Samples, Knot42) {
   Manifold::SetExpectGeometry(true);
   Manifold knot42 = TorusKnot(4, 2, 15, 6, 5);
   //   ExportMesh("knot42.stl", knot42.Extract());
-  ASSERT_TRUE(knot42.IsValid());
+  ASSERT_TRUE(knot42.IsManifold());
   std::vector<Manifold> knots = knot42.Decompose();
   ASSERT_EQ(knots.size(), 2);
   EXPECT_EQ(knots[0].Genus(), 1);
