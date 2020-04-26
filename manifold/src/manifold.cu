@@ -418,7 +418,7 @@ int Manifold::Genus() const {
   return 1 - chi / 2;
 }
 
-bool Manifold::IsValid() const { return pImpl_->IsValid(); }
+bool Manifold::IsManifold() const { return pImpl_->IsManifold(); }
 
 Manifold& Manifold::Translate(glm::vec3 v) {
   pImpl_->transform_[3] += v;

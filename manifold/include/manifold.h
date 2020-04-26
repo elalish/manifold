@@ -86,7 +86,7 @@ class Manifold {
                                              float originOffset) const;
 
   // Testing hooks
-  bool IsValid() const;
+  bool IsManifold() const;
   int NumOverlaps(const Manifold& second) const;
   static void SetExpectGeometry(bool);
   static void SetSuppressErrors(bool);

@@ -57,7 +57,7 @@ struct Manifold::Impl {
   bool Tri2Face();
   bool Face2Tri();
   void Refine(int n);
-  bool IsValid() const;
+  bool IsManifold() const;
 
   int NumVert() const { return vertPos_.size(); }
   int NumEdge() const { return halfedge_.size() / 2; }
