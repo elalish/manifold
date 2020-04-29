@@ -589,35 +589,6 @@ int CCW(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2) {
     return area > 0 ? 1 : -1;
 }
 
-Polygons Assemble(const Halfedge *edgeBegin, const Halfedge *edgeEnd,
-                  std::function<glm::vec2(int)> vertProjection) {
-  Polygons polys;
-  std::map<int, int> vert_edge;
-  int numEdge = edgeEnd - edgeBegin;
-  for (int i = 0; i < numEdge; ++i) {
-    ALWAYS_ASSERT(
-        vert_edge.emplace(std::make_pair(edgeBegin[i].startVert, i)).second,
-        runtimeErr, "polygon has duplicate vertices.");
-  }
-  auto startEdge = edgeBegin;
-  auto thisEdge = edgeBegin;
-  for (;;) {
-    if (thisEdge == startEdge) {
-      if (vert_edge.empty()) break;
-      startEdge = std::next(edgeBegin, vert_edge.begin()->second);
-      thisEdge = startEdge;
-      polys.push_back({});
-    }
-    int vert = thisEdge->startVert;
-    polys.back().push_back({vertProjection(vert), vert, thisEdge->face});
-    auto result = vert_edge.find(thisEdge->endVert);
-    ALWAYS_ASSERT(result != vert_edge.end(), runtimeErr, "nonmanifold edge");
-    thisEdge = std::next(edgeBegin, result->second);
-    vert_edge.erase(result);
-  }
-  return polys;
-}
-
 std::vector<glm::ivec3> Triangulate(const Polygons &polys) {
   std::vector<glm::ivec3> triangles;
   try {

@@ -423,35 +423,51 @@ __host__ __device__ void AtomicAddVec3(glm::vec3& target,
 struct AssignNormals {
   glm::vec3* vertNormal;
   const glm::vec3* vertPos;
+  const Halfedge* halfedges;
+  const Halfedge** nextHalfedge;
+  const int* faceEdge;
   const bool calculateTriNormal;
 
-  __host__ __device__ void operator()(
-      thrust::tuple<glm::vec3&, const glm::ivec3&, const TriEdges&> in) {
+  __host__ __device__ void operator()(thrust::tuple<glm::vec3&, int> in) {
     glm::vec3& triNormal = thrust::get<0>(in);
-    const glm::ivec3& triVerts = thrust::get<1>(in);
-    const TriEdges& triEdges = thrust::get<2>(in);
-
-    glm::vec3 v0 = vertPos[triVerts[0]];
-    glm::vec3 v1 = vertPos[triVerts[1]];
-    glm::vec3 v2 = vertPos[triVerts[2]];
-    // edge vectors
-    glm::vec3 e01 = glm::normalize(v1 - v0);
-    glm::vec3 e12 = glm::normalize(v2 - v1);
-    glm::vec3 e20 = glm::normalize(v0 - v2);
+    const int face = thrust::get<1>(in);
 
     if (calculateTriNormal) {
-      triNormal = glm::normalize(glm::cross(e01, e12));
+      triNormal = glm::vec3(0.0f);
+      int iEdge = faceEdge[face];
+      const int end = faceEdge[face + 1];
+      Halfedge edge = halfedges[iEdge];
+      glm::vec3 edgeVec = vertPos[edge.endVert] - vertPos[edge.startVert];
+      while (iEdge < end) {
+        Halfedge nextEdge = *(nextHalfedge[iEdge]);
+        glm::vec3 nextEdgeVec =
+            vertPos[nextEdge.endVert] - vertPos[nextEdge.startVert];
+        triNormal += glm::cross(edgeVec, nextEdgeVec);
+        edge = nextEdge;
+        edgeVec = nextEdgeVec;
+        ++iEdge;
+      }
+      triNormal = glm::normalize(triNormal);
       if (isnan(triNormal.x)) triNormal = glm::vec3(0.0);
     }
-    // corner angles
-    glm::vec3 phi;
-    phi[0] = glm::acos(-glm::dot(e01, e12));
-    phi[1] = glm::acos(-glm::dot(e12, e20));
-    phi[2] = glm::pi<float>() - phi[0] - phi[1];
-    // assign weighted sum
-    for (int i : {0, 1, 2}) {
-      AtomicAddVec3(vertNormal[triVerts[i]],
+
+    int iEdge = faceEdge[face];
+    const int end = faceEdge[face + 1];
+    const int nEdge = end - iEdge;
+    Halfedge edge = halfedges[iEdge];
+    glm::vec3 edgeVec =
+        glm::normalize(vertPos[edge.endVert] - vertPos[edge.startVert]);
+    while (iEdge < end) {
+      Halfedge nextEdge = *(nextHalfedge[iEdge]);
+      glm::vec3 nextEdgeVec = glm::normalize(vertPos[nextEdge.endVert] -
+                                             vertPos[nextEdge.startVert]);
+      // corner angle
+      float phi = glm::acos(-glm::dot(edgeVec, nextEdgeVec));
+      AtomicAddVec3(vertNormal[edge.endVert],
                     glm::max(phi[i], kTolerance) * triNormal);
+      edge = nextEdge;
+      edgeVec = nextEdgeVec;
+      ++iEdge;
     }
   }
 };
@@ -730,6 +746,7 @@ void Manifold::Impl::Finish() {
   VecDH<Box> faceBox;
   VecDH<uint32_t> faceMorton;
   GetFaceBoxMorton(faceBox, faceMorton);
+  AssembleFaces();
   CalculateNormals();
   SortFaces(faceBox, faceMorton);
   collider_ = Collider(faceBox, faceMorton);
@@ -777,6 +794,22 @@ void Manifold::Impl::ApplyTransform() {
   if (!collider_.Transform(transform_)) Update();
   transform_ = glm::mat4x3(1.0f);
   CalculateBBox();
+}
+
+void Manifold::Impl::AssembleFaces() const {
+  // This const_cast is here because this operation tweaks the internal data
+  // structure, but does not change what it represents.
+  return const_cast<Impl*>(this)->AssembleFaces();
+}
+
+void Manifold::Impl::AssembleFaces() {
+  nextHalfedge_.resize(halfedge_.size());
+  const VecH<int>& faceEdge = faceEdge_.H();
+  for (int i = 0; i < NumFace(); ++i) {
+    int start = faceEdge[i];
+    NextEdges(nextHalfedge_.begin() + start, halfedge_.begin() + start,
+              halfedge_.begin() + faceEdge[i + 1]);
+  }
 }
 
 bool Manifold::Impl::Tri2Face() const {
@@ -987,9 +1020,10 @@ void Manifold::Impl::CalculateNormals() {
     calculateTriNormal = true;
   }
   thrust::for_each_n(
-      zip(faceNormal_.beginD(), triVerts_.beginD(), triEdges_.beginD()),
-      NumFace(), AssignNormals({vertNormal_.ptrD(), vertPos_.cptrD(),
-                                calculateTriNormal}));
+      zip(faceNormal_.beginD(), thrust::make_counting_iterator(0)), NumFace(),
+      AssignNormals({vertNormal_.ptrD(), vertPos_.cptrD(), halfedge_.cptrD(),
+                     nextHalfedge_.cptrD(), faceEdge_.cptrD(),
+                     calculateTriNormal}));
   thrust::for_each(vertNormal_.begin(), vertNormal_.end(), NormalizeTo({1.0}));
 }
 
@@ -1009,5 +1043,56 @@ SparseIndices Manifold::Impl::EdgeCollisions(const Impl& Q) const {
 SparseIndices Manifold::Impl::VertexCollisionsZ(
     const VecDH<glm::vec3>& vertsIn) const {
   return collider_.Collisions(vertsIn);
+}
+
+void Manifold::Impl::NextEdges(Halfedge* nextHalfedge,
+                               const Halfedge* edgeBegin,
+                               const Halfedge* edgeEnd) {
+  int numEdge = edgeEnd - edgeBegin;
+  std::map<int, int> vert_edge;
+  for (int i = 0; i < numEdge; ++i) {
+    ALWAYS_ASSERT(
+        vert_edge.emplace(std::make_pair(edgeBegin[i].startVert, i)).second,
+        runtimeErr, "polygon has duplicate vertices.");
+  }
+
+  auto startEdge = edgeBegin;
+  auto thisEdge = edgeBegin;
+  for (;;) {
+    if (thisEdge == startEdge) {
+      if (vert_edge.empty()) break;
+      startEdge = std::next(edgeBegin, vert_edge.begin()->second);
+      thisEdge = startEdge;
+    }
+    auto result = vert_edge.find(thisEdge->endVert);
+    ALWAYS_ASSERT(result != vert_edge.end(), runtimeErr, "nonmanifold edge");
+    auto nextEdge = std::next(edgeBegin, result->second);
+    nextHalfedge[thisEdge - edgeBegin] = nextEdge;
+    thisEdge = nextEdge;
+    vert_edge.erase(result);
+  }
+}
+
+Polygons Manifold::Impl::Assemble(
+    const Halfedge* edgeBegin, const Halfedge* edgeEnd,
+    const Halfedge* nextEdge, std::function<glm::vec2(int)> vertProjection) {
+  Polygons polys;
+  std::vector<bool> visited(edgeEnd - edgeBegin, false);
+  auto startEdge = edgeBegin;
+  auto thisEdge = edgeBegin;
+  for (;;) {
+    if (thisEdge == startEdge) {
+      auto next = std::find(visited.begin(), visited.end(), false);
+      if (next == visited.end()) break;
+      int idx = next - visited.begin();
+      startEdge = edgeBegin + idx;
+      thisEdge = startEdge;
+      polys.push_back({});
+    }
+    int vert = thisEdge->startVert;
+    polys.back().push_back({vertProjection(vert), vert, thisEdge->face});
+    thisEdge = nextEdge[thisEdge - edgeBegin];
+  }
+  return polys;
 }
 }  // namespace manifold
