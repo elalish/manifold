@@ -36,6 +36,7 @@ struct Manifold::Impl {
   VecDH<int> vertLabel_;
   int numLabel_ = 1;
   VecDH<Halfedge> halfedge_;
+  VecDH<Halfedge*> nextHalfedge_;
   VecDH<int> faceEdge_;
 
   VecDH<glm::vec3> vertNormal_;
@@ -53,6 +54,8 @@ struct Manifold::Impl {
   void Update();
   void ApplyTransform() const;
   void ApplyTransform();
+  void AssembleFaces() const;
+  void AssembleFaces();
   bool Tri2Face() const;
   bool Tri2Face();
   bool Face2Tri();
@@ -71,5 +74,11 @@ struct Manifold::Impl {
 
   SparseIndices EdgeCollisions(const Impl& B) const;
   SparseIndices VertexCollisionsZ(const VecDH<glm::vec3>& vertsIn) const;
+
+  static void NextEdges(Halfedge* nextEdge, const Halfedge* edgeBegin,
+                        const Halfedge* edgeEnd);
+  static Polygons Assemble(const Halfedge* edgeBegin, const Halfedge* edgeEnd,
+                           const Halfedge* nextEdge,
+                           std::function<glm::vec2(int)> vertProjection);
 };
 }  // namespace manifold
