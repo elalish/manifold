@@ -103,31 +103,6 @@ struct Halfedge {
   HOST_DEVICE bool IsForward() const { return startVert < endVert; }
 };
 
-struct EdgeVerts {
-  int first;
-  int second;
-  int edge;
-};
-
-struct EdgeIdx {
-  uint32_t idx;
-  HOST_DEVICE EdgeIdx() { EdgeIdx(0, 1); }
-  HOST_DEVICE EdgeIdx(int ind, int dir) {
-    idx = static_cast<uint32_t>(ind) + (dir > 0 ? 0 : (1U << 31));
-  }
-  HOST_DEVICE int Dir() const { return idx < (1U << 31) ? 1 : -1; }
-  HOST_DEVICE int Idx() const {
-    return idx < (1U << 31) ? idx : idx - (1U << 31);
-  }
-};
-
-struct TriEdges {
-  EdgeIdx edges[3];
-  HOST_DEVICE TriEdges() {}
-  HOST_DEVICE EdgeIdx& operator[](int i) { return edges[i]; }
-  HOST_DEVICE EdgeIdx operator[](int i) const { return edges[i]; }
-};
-
 struct PolyVert {
   glm::vec2 pos;
   int idx;

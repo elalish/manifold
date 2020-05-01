@@ -670,45 +670,8 @@ Manifold::Impl::Impl(Shape shape) {
   Finish();
 }
 
-void Manifold::Impl::RemoveChaff() {
-  CreateEdges();
-  int n_comp = ConnectedComponents(vertLabel_, NumVert(), halfedge_);
-
-  VecDH<float> surfaceArea(n_comp), volume(n_comp);
-  thrust::for_each_n(triVerts_.beginD(), NumFace(),
-                     AreaVolume({surfaceArea.ptrD(), volume.ptrD(),
-                                 vertLabel_.cptrD(), vertPos_.cptrD()}));
-  thrust::for_each_n(zip(volume.beginD(), surfaceArea.beginD()), n_comp,
-                     ClampVolume());
-  numLabel_ = thrust::count_if(volume.beginD(), volume.endD(), NonZero());
-
-  VecDH<int> newVert2Old(NumVert());
-  thrust::sequence(newVert2Old.begin(), newVert2Old.end());
-  auto begin =
-      zip(vertLabel_.beginD(), newVert2Old.beginD(), vertPos_.beginD());
-  int newNumVert =
-      thrust::remove_if(
-          begin, zip(vertLabel_.endD(), newVert2Old.endD(), vertPos_.endD()),
-          RemoveVert({volume.cptrD()})) -
-      begin;
-
-  VecDH<int> oldVert2New(NumVert(), -1);
-  vertPos_.resize(newNumVert);
-  vertLabel_.resize(newNumVert);
-  thrust::scatter(thrust::make_counting_iterator(0),
-                  thrust::make_counting_iterator(newNumVert),
-                  newVert2Old.beginD(), oldVert2New.beginD());
-
-  thrust::for_each(halfedge_.beginD(), halfedge_.endD(),
-                   Reindex({oldVert2New.cptrD()}));
-
-  auto start = zip(triVerts_.beginD(), faceNormal_.beginD());
-  int newNumTri =
-      thrust::remove_if(start, zip(triVerts_.endD(), faceNormal_.endD()),
-                        RemoveTri()) -
-      start;
-  triVerts_.resize(newNumTri);
-  faceNormal_.resize(newNumTri);
+void Manifold::Impl::LabelVerts() {
+  numLabel_ = ConnectedComponents(vertLabel_, NumVert(), halfedge_);
 }
 
 void Manifold::Impl::Finish() {

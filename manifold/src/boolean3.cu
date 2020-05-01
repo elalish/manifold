@@ -183,15 +183,16 @@ SparseIndices Filter11(const Manifold::Impl &inP, const VecDH<int> &faceSizeP,
                          expandedIdxP.beginD() + 1);
 
   SparseIndices p1q1(secondStart + expandedIdxP.H().back());
-  thrust::for_each_n(
-      zip(expandedIdxQ.beginD(), p1q2.beginD(0), p1q2.beginD(1)), p1q2.size(),
-      CopyFaceEdges({p1q1.ptrDpq(), inQ.faceEdge_.cptrD(), inQ.halfedge_.cptrD()}));
+  thrust::for_each_n(zip(expandedIdxQ.beginD(), p1q2.beginD(0), p1q2.beginD(1)),
+                     p1q2.size(),
+                     CopyFaceEdges({p1q1.ptrDpq(), inQ.faceEdge_.cptrD(),
+                                    inQ.halfedge_.cptrD()}));
 
   p1q1.SwapPQ();
-  thrust::for_each_n(zip(expandedIdxP.beginD(), p2q1.beginD(1), p2q1.beginD(0)),
-                     p2q1.size(),
-                     CopyFaceEdges({p1q1.ptrDpq(secondStart), inP.faceEdge_.cptrD(),
-                                    inP.halfedge_.cptrD()}));
+  thrust::for_each_n(
+      zip(expandedIdxP.beginD(), p2q1.beginD(1), p2q1.beginD(0)), p2q1.size(),
+      CopyFaceEdges({p1q1.ptrDpq(secondStart), inP.faceEdge_.cptrD(),
+                     inP.halfedge_.cptrD()}));
   p1q1.SwapPQ();
   p1q1.Unique();
   return p1q1;
@@ -224,9 +225,10 @@ SparseIndices Filter01(const Manifold::Impl &inP, const Manifold::Impl &inQ,
 
   SparseIndices p0q1(secondStart + 2 * p1q1.size());
 
-  thrust::for_each_n(
-      zip(expandedIdxQ.beginD(), p0q2.beginD(0), p0q2.beginD(1)), p0q2.size(),
-      CopyFaceEdges({p0q1.ptrDpq(), inQ.faceEdge_.cptrD(), inQ.halfedge_.cptrD()}));
+  thrust::for_each_n(zip(expandedIdxQ.beginD(), p0q2.beginD(0), p0q2.beginD(1)),
+                     p0q2.size(),
+                     CopyFaceEdges({p0q1.ptrDpq(), inQ.faceEdge_.cptrD(),
+                                    inQ.halfedge_.cptrD()}));
 
   thrust::for_each_n(
       zip(thrust::make_counting_iterator(0), p1q1.beginD(0), p1q1.beginD(1)),
@@ -1341,8 +1343,7 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
   // Level 6
 
   // Create the manifold's data structures and verify manifoldness.
-  outR.Finish();
-  outR.RemoveChaff();
+  outR.LabelVerts();
   outR.Finish();
 
   if (kVerbose) {
