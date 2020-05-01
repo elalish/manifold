@@ -202,36 +202,33 @@ struct SplitTris {
   }
 };
 
-__host__ __device__ void AtomicAddFloat(float& target, float add) {
-#ifdef __CUDA_ARCH__
-  atomicAdd(&target, add);
-#else
-#pragma omp atomic
-  target += add;
-#endif
-}
-
 struct AreaVolume {
-  float* surfaceArea;
-  float* volume;
-  const int* vertLabel;
+  const Halfedge* halfedges;
+  const int* faceEdge;
   const glm::vec3* vertPos;
 
-  __host__ __device__ void operator()(const glm::ivec3& triVerts) {
-    glm::vec3 edge[3];
+  __host__ __device__ thrust::pair<float, float> operator()(int face) {
     float perimeter = 0.0f;
-    for (int i : {0, 1, 2}) {
-      edge[i] = vertPos[triVerts[(i + 1) % 3]] - vertPos[triVerts[i]];
-      perimeter += glm::length(edge[i]);
+    float area = 0.0f;
+    float volume = 0.0f;
+
+    int edge = faceEdge[face];
+    const glm::vec3 anchor = vertPos[halfeges[edge].startVert];
+
+    const int end = facesEdge[face + 1];
+    while (edge < end) {
+      const Halfedge halfedge = halfedges[edge++];
+      const glm::vec3 start = vertPos[halfedge.startVert];
+      const glm::vec3 edgeVec = vertPos[halfedge.endVert] - start;
+      perimeter += glm::length(edgeVec);
+      const glm::vec3 crossP = glm::cross(start - anchor, edgeVec);
+      area += glm::length(crossP);
+      volume += glm::dot(crossP, anchor);
     }
-    glm::vec3 crossP = glm::cross(edge[0], edge[1]);
-    float area = glm::length(crossP) / 2.0f;
-    if (area > perimeter * kTolerance) {
-      int comp = vertLabel[triVerts[0]];
-      AtomicAddFloat(surfaceArea[comp], area);
-      AtomicAddFloat(volume[comp],
-                     glm::dot(crossP, vertPos[triVerts[0]]) / 6.0f);
-    }
+
+    return area > perimeter * kTolerance
+               ? thrust::make_pair(area / 2.0f, volume / 6.0f)
+               : thrust::make_pair(0.0f, 0.0f);
   }
 };
 
@@ -942,6 +939,16 @@ bool Manifold::Impl::IsManifold() const {
   return thrust::all_of(thrust::make_counting_iterator(0),
                         thrust::make_counting_iterator(NumFace()),
                         CheckManifold({halfedge_.cptrD(), face_.cptrD()}));
+}
+
+std::pair<float, float> AreaVolume() const {
+  ApplyTransform();
+  return thrust::transform_reduce(
+      thrust::make_counting_iterator(0),
+      thrust::make_counting_iterator(NumFace()),
+      AreaVolume({halfedge_.cptrD(), faceEdge_.cptrD(), vertPos_.cptrD()}),
+      thrust::make_pair(0.0f, 0.0f),
+      thrust::plus<thrust::pair<float, float>>());
 }
 
 void Manifold::Impl::CalculateBBox() {
