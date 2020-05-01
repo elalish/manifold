@@ -21,15 +21,6 @@
 
 namespace manifold {
 
-using EdgeVertsD = thrust::pair<int, int>;
-struct EdgeTrisD {
-  int right, left;
-};
-
-inline std::ostream& operator<<(std::ostream& stream, const EdgeVertsD& edge) {
-  return stream << edge.first << ", " << edge.second;
-}
-
 struct Manifold::Impl {
   Box bBox_;
   VecDH<glm::vec3> vertPos_;
@@ -65,6 +56,7 @@ struct Manifold::Impl {
   int NumVert() const { return vertPos_.size(); }
   int NumEdge() const { return halfedge_.size() / 2; }
   int NumFace() const { return faceEdge_.size() - 1; }
+  std::pair<float, float> AreaVolume() const;
   void CalculateBBox();
 
   void SortVerts();

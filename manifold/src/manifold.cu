@@ -54,26 +54,6 @@ struct Reindex {
     for (int i : {0, 1, 2}) triVerts[i] = indexInv_[triVerts[i]];
   }
 };
-
-struct TetVolume {
-  const glm::vec3* vertPos;
-
-  __host__ __device__ float operator()(const glm::ivec3& triVerts) {
-    return glm::dot(vertPos[triVerts[0]],
-                    glm::cross(vertPos[triVerts[1]], vertPos[triVerts[2]])) /
-           6;
-  }
-};
-
-struct TriArea {
-  const glm::vec3* vertPos;
-
-  __host__ __device__ float operator()(const glm::ivec3& triVerts) {
-    return 0.5 *
-           glm::length(glm::cross(vertPos[triVerts[1]] - vertPos[triVerts[0]],
-                                  vertPos[triVerts[2]] - vertPos[triVerts[0]]));
-  }
-};
 }
 
 namespace manifold {
@@ -399,18 +379,8 @@ Box Manifold::BoundingBox() const {
   return pImpl_->bBox_.Transform(pImpl_->transform_);
 }
 
-float Manifold::Volume() const {
-  pImpl_->ApplyTransform();
-  return thrust::transform_reduce(
-      pImpl_->triVerts_.beginD(), pImpl_->triVerts_.endD(),
-      TetVolume({pImpl_->vertPos_.ptrD()}), 0.0f, thrust::plus<float>());
-}
-
-float Manifold::SurfaceArea() const {
-  pImpl_->ApplyTransform();
-  return thrust::transform_reduce(
-      pImpl_->triVerts_.beginD(), pImpl_->triVerts_.endD(),
-      TriArea({pImpl_->vertPos_.ptrD()}), 0.0f, thrust::plus<float>());
+std::pair<float, float> Manifold::AreaVolume() const {
+  return pImpl_->AreaVolume();
 }
 
 int Manifold::Genus() const {

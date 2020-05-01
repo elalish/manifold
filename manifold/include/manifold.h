@@ -57,8 +57,7 @@ class Manifold {
   int NumEdge() const;
   int NumFace() const;
   Box BoundingBox() const;
-  float Volume() const;
-  float SurfaceArea() const;
+  std::pair<float, float> AreaVolume() const;
   int Genus() const;
 
   // Modification
