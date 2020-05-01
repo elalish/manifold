@@ -21,12 +21,26 @@
 
 namespace {
 using namespace manifold;
+using namespace thrust::placeholders;
 
 struct NormalizeTo {
   float length;
   __host__ __device__ void operator()(glm::vec3& v) {
     v = length * glm::normalize(v);
     if (isnan(v.x)) v = glm::vec3(0.0);
+  }
+};
+
+struct UpdateHalfedge {
+  const int nextVert;
+  const int nextEdge;
+  const int nextFace;
+
+  __host__ __device__ void operator()(Halfedge& edge) {
+    edge.startVert += nextVert;
+    edge.endVert += nextVert;
+    edge.pairedHalfedge += nextEdge;
+    edge.face += nextFace;
   }
 };
 
@@ -52,6 +66,19 @@ struct Reindex {
 
   __host__ __device__ void operator()(glm::ivec3& triVerts) {
     for (int i : {0, 1, 2}) triVerts[i] = indexInv_[triVerts[i]];
+  }
+};
+
+struct MakeTri {
+  const Halfedge* halfedges;
+
+  __host__ __device__ void operator()(thrust::tuple<glm::ivec3&, int> inOut) {
+    glm::ivec3& tri = thrust::get<0>(inOut);
+    const int face = 3 * thrust::get<1>(inOut);
+
+    for (int i : {0, 1, 2}) {
+      tri[i] = halfedges[face + i].startVert;
+    }
   }
 };
 }
@@ -131,7 +158,8 @@ Manifold Manifold::Extrude(Polygons crossSection, float height, int nDivisions,
   Manifold extrusion;
   ++nDivisions;
   auto& vertPos = extrusion.pImpl_->vertPos_.H();
-  auto& triVerts = extrusion.pImpl_->triVerts_.H();
+  VecDH<glm::ivec3> triVertsDH;
+  auto& triVerts = triVertsDH.H();
   int nCrossSection = 0;
   bool isCone = scaleTop.x == 0.0 && scaleTop.y == 0.0;
   int idx = 0;
@@ -178,6 +206,8 @@ Manifold Manifold::Extrude(Polygons crossSection, float height, int nDivisions,
     triVerts.push_back({tri[0], tri[2], tri[1]});
     if (!isCone) triVerts.push_back(tri + nCrossSection * nDivisions);
   }
+
+  extrusion.pImpl_->CreateHalfedges(triVertsDH);
   extrusion.pImpl_->Finish();
   return extrusion;
 }
@@ -193,7 +223,8 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments) {
       circularSegments > 2 ? circularSegments : GetCircularSegments(radius);
   Manifold revoloid;
   auto& vertPos = revoloid.pImpl_->vertPos_.H();
-  auto& triVerts = revoloid.pImpl_->triVerts_.H();
+  VecDH<glm::ivec3> triVertsDH;
+  auto& triVerts = triVertsDH.H();
   float dPhi = 360.0f / nDivisions;
   for (const auto& poly : crossSection) {
     int start = -1;
@@ -262,28 +293,59 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments) {
       } while (polyVert != start);
     }
   }
+
+  revoloid.pImpl_->CreateHalfedges(triVertsDH);
   revoloid.pImpl_->Finish();
   return revoloid;
 }
 
 Manifold Manifold::Compose(const std::vector<Manifold>& manifolds) {
-  Manifold combined;
-  int nextLabel = 0;
-  for (Manifold manifold : manifolds) {
-    manifold.pImpl_->ApplyTransform();
-    const int startIdx = combined.NumVert();
-    combined.pImpl_->vertPos_.H().insert(combined.pImpl_->vertPos_.end(),
-                                         manifold.pImpl_->vertPos_.begin(),
-                                         manifold.pImpl_->vertPos_.end());
-    for (int label : manifold.pImpl_->vertLabel_.H())
-      combined.pImpl_->vertLabel_.H().push_back(label + nextLabel);
-    for (auto tri : manifold.pImpl_->triVerts_.H())
-      combined.pImpl_->triVerts_.H().push_back(tri + startIdx);
-    nextLabel += manifold.pImpl_->numLabel_;
+  int numVert = 0;
+  int numEdge = 0;
+  int numFace = 0;
+  for (const Manifold& manifold : manifolds) {
+    numVert += manifold.NumVert();
+    numEdge += manifold.NumEdge();
+    numFace += manifold.NumFace();
   }
-  combined.pImpl_->numLabel_ = nextLabel;
-  combined.pImpl_->Finish();
-  return combined;
+
+  Manifold out;
+  Impl& combined = *(out.pImpl_);
+  combined.vertPos_.resize(numVert);
+  combined.halfedge_.resize(2 * numEdge);
+  combined.faceEdge_.resize(numFace + 1);
+  combined.vertLabel_.resize(numVert);
+  combined.faceNormal_.resize(numFace);
+
+  int nextVert = 0;
+  int nextEdge = 0;
+  int nextFace = 0;
+  int nextLabel = 0;
+  for (const Manifold& manifold : manifolds) {
+    const Impl& impl = *(manifold.pImpl_);
+    impl.ApplyTransform();
+
+    thrust::copy(impl.vertPos_.beginD(), impl.vertPos_.endD(),
+                 combined.vertPos_.beginD() + nextVert);
+    thrust::copy(impl.faceNormal_.beginD(), impl.faceNormal_.endD(),
+                 combined.faceNormal_.beginD() + nextFace);
+    thrust::transform(impl.faceEdge_.beginD(), impl.faceEdge_.endD(),
+                      combined.faceEdge_.beginD() + nextFace, _1 + nextEdge);
+    thrust::transform(impl.vertLabel_.beginD(), impl.vertLabel_.endD(),
+                      combined.vertLabel_.beginD() + nextVert, _1 + nextLabel);
+    thrust::transform(impl.halfedge_.beginD(), impl.halfedge_.endD(),
+                      combined.halfedge_.beginD() + nextEdge,
+                      UpdateHalfedge({nextVert, nextEdge, nextFace}));
+
+    nextVert += manifold.NumVert();
+    nextEdge += 2 * manifold.NumEdge();
+    nextFace += manifold.NumFace();
+    nextLabel += impl.numLabel_;
+  }
+
+  combined.numLabel_ = nextLabel;
+  combined.Finish();
+  return out;
 }
 
 std::vector<Manifold> Manifold::Decompose() const {
@@ -333,11 +395,16 @@ std::vector<Manifold> Manifold::Decompose() const {
 
 Mesh Manifold::Extract() const {
   pImpl_->ApplyTransform();
+  pImpl_->Face2Tri();
   Mesh result;
+
   result.vertPos.insert(result.vertPos.end(), pImpl_->vertPos_.begin(),
                         pImpl_->vertPos_.end());
-  result.triVerts.insert(result.triVerts.end(), pImpl_->triVerts_.begin(),
-                         pImpl_->triVerts_.end());
+
+  result.triVerts.resize(NumFace());
+  thrust::for_each_n(
+      zip(result.triVerts.begin(), thrust::make_counting_iterator(0)),
+      NumFace(), MakeTri({pImpl_->halfedge_.cptrD()}));
   return result;
 }
 

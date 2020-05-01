@@ -670,6 +670,19 @@ Manifold::Impl::Impl(Shape shape) {
   Finish();
 }
 
+void Manifold::Impl::CreateHalfedges(const VecDH<glm::ivec3>& triVerts) {
+  const int numTri = triVerts.size();
+  faceEdge_.resize(0);
+  halfedge_.resize(3 * numTri);
+  VecDH<TmpEdge> edge(3 * numTri);
+  thrust::for_each_n(zip(thrust::make_counting_iterator(0), triVerts.beginD()),
+                     numTri, Tri2Halfedges({halfedge_.ptrD(), edge.ptrD()}));
+  thrust::sort(edge.beginD(), edge.endD());
+  thrust::for_each_n(thrust::make_counting_iterator(0), halfedge_.size() / 2,
+                     LinkHalfedges({halfedge_.ptrD(), edge.cptrD()}));
+  Tri2Face();
+}
+
 void Manifold::Impl::LabelVerts() {
   numLabel_ = ConnectedComponents(vertLabel_, NumVert(), halfedge_);
 }
@@ -710,19 +723,6 @@ void Manifold::Impl::Finish() {
   CalculateNormals();
   SortFaces(faceBox, faceMorton);
   collider_ = Collider(faceBox, faceMorton);
-}
-
-void Manifold::Impl::CreateHalfedges(const VecDH<glm::ivec3>& triVerts) {
-  const int numTri = triVerts.size();
-  faceEdge_.resize(0);
-  halfedge_.resize(3 * numTri);
-  VecDH<TmpEdge> edge(3 * numTri);
-  thrust::for_each_n(zip(thrust::make_counting_iterator(0), triVerts.beginD()),
-                     numTri, Tri2Halfedges({halfedge_.ptrD(), edge.ptrD()}));
-  thrust::sort(edge.beginD(), edge.endD());
-  thrust::for_each_n(thrust::make_counting_iterator(0), halfedge_.size() / 2,
-                     LinkHalfedges({halfedge_.ptrD(), edge.cptrD()}));
-  Tri2Face();
 }
 
 void Manifold::Impl::Update() {

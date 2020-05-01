@@ -39,6 +39,7 @@ struct Manifold::Impl {
   Impl(const Mesh&);
   enum class Shape { TETRAHEDRON, CUBE, OCTAHEDRON };
   Impl(Shape);
+
   void CreateHalfedges(const VecDH<glm::ivec3>& triVerts);
   void LabelVerts();
   void Finish();
