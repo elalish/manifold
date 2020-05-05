@@ -53,19 +53,16 @@ struct Equals {
   __host__ __device__ bool operator()(int x) { return x == val; }
 };
 
-struct KeepTri {
-  int val;
-  const int* components;
-  __host__ __device__ bool operator()(glm::ivec3 tri) {
-    return components[tri[0]] == val;
-  }
-};
+struct RemoveFace {
+  const Halfedge* halfedge;
+  const int* faceEdge;
+  const int* vertLabel;
+  const int keepLabel;
 
-struct Reindex {
-  const int* indexInv_;
+  __host__ __device__ bool operator()(thrust::tuple<int, int> in) {
+    int face = thrust::get<0>(in);
 
-  __host__ __device__ void operator()(glm::ivec3& triVerts) {
-    for (int i : {0, 1, 2}) triVerts[i] = indexInv_[triVerts[i]];
+    return vertLabel[halfedge[faceEdge[face]].startVert] != keepLabel;
   }
 };
 
@@ -352,11 +349,6 @@ std::vector<Manifold> Manifold::Decompose() const {
   std::vector<Manifold> meshes(pImpl_->numLabel_);
   VecDH<int> vertOld2New(NumVert(), -1);
   for (int i = 0; i < pImpl_->numLabel_; ++i) {
-    int compVert = thrust::find_if(pImpl_->vertLabel_.beginD(),
-                                   pImpl_->vertLabel_.endD(), Positive()) -
-                   pImpl_->vertLabel_.beginD();
-    int compLabel = pImpl_->vertLabel_.H()[compVert];
-
     meshes[i].pImpl_->vertPos_.resize(NumVert());
     VecDH<int> vertNew2Old(NumVert());
     int nVert =
@@ -366,7 +358,7 @@ std::vector<Manifold> Manifold::Decompose() const {
                 thrust::make_counting_iterator(NumVert())),
             pImpl_->vertLabel_.beginD(),
             zip(meshes[i].pImpl_->vertPos_.beginD(), vertNew2Old.beginD()),
-            Equals({compLabel})) -
+            Equals({i})) -
         zip(meshes[i].pImpl_->vertPos_.beginD(),
             thrust::make_counting_iterator(0));
     thrust::scatter(thrust::make_counting_iterator(0),
@@ -374,21 +366,20 @@ std::vector<Manifold> Manifold::Decompose() const {
                     vertOld2New.beginD());
     meshes[i].pImpl_->vertPos_.resize(nVert);
 
-    meshes[i].pImpl_->triVerts_.resize(NumFace());
-    int nTri =
-        thrust::copy_if(pImpl_->triVerts_.beginD(), pImpl_->triVerts_.endD(),
-                        meshes[i].pImpl_->triVerts_.beginD(),
-                        KeepTri({compLabel, pImpl_->vertLabel_.ptrD()})) -
-        meshes[i].pImpl_->triVerts_.beginD();
-    meshes[i].pImpl_->triVerts_.resize(nTri);
+    VecDH<int> faceNew2Old(NumFace());
+    thrust::sequence(faceNew2Old.beginD(), faceNew2Old.endD());
 
-    thrust::for_each_n(meshes[i].pImpl_->triVerts_.beginD(), nTri,
-                       Reindex({vertOld2New.ptrD()}));
+    VecDH<int> faceSize = pImpl_->FaceSize();
+
+    thrust::remove_if(zip(faceNew2Old.beginD(), faceSize.beginD()),
+                      zip(faceNew2Old.endD(), faceSize.endD()),
+                      RemoveFace({halfedge_.cptrD(), faceEdge_.cptrD(),
+                                  vertLabel_.cptrD(), i}));
+
+    meshes[i].pImpl_->GatherFaces(halfedge_, faceEdge_, faceNew2Old, faceSize);
 
     meshes[i].pImpl_->Finish();
     meshes[i].pImpl_->transform_ = pImpl_->transform_;
-    thrust::replace(pImpl_->vertLabel_.beginD(), pImpl_->vertLabel_.endD(),
-                    compLabel, -1);
   }
   return meshes;
 }
