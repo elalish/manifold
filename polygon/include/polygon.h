@@ -19,6 +19,9 @@
 namespace manifold {
 
 int CCW(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2);
+Polygons Halfedge2Poly(const Halfedge *halfedge, const int *halfedgeBegin,
+                       const int *halfedgeEnd,
+                       std::function<glm::vec2(int)> vertProjection);
 std::vector<glm::ivec3> Triangulate(const Polygons &polys);
 
 std::vector<EdgeVerts> Polygons2Edges(const Polygons &polys);

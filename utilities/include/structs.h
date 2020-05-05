@@ -202,10 +202,6 @@ inline std::ostream& operator<<(std::ostream& stream, const Box& box) {
                 << box.max.z;
 }
 
-inline std::ostream& operator<<(std::ostream& stream, const EdgeIdx& edge) {
-  return stream << (edge.Dir() > 0 ? "F-" : "B-") << edge.Idx();
-}
-
 inline std::ostream& operator<<(std::ostream& stream, const Halfedge& edge) {
   return stream << "startVert = " << edge.startVert
                 << ", endVert = " << edge.endVert
