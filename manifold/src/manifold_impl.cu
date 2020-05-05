@@ -955,31 +955,43 @@ void Manifold::Impl::GetFaceBoxMorton(VecDH<Box>& faceBox,
 
 void Manifold::Impl::SortFaces(VecDH<Box>& faceBox,
                                VecDH<uint32_t>& faceMorton) {
-  VecDH<int> faceNew2Old(NumVert());
+  VecDH<int> faceNew2Old(NumFace());
   thrust::sequence(faceNew2Old.beginD(), faceNew2Old.endD());
 
-  VecDH<int> faceSize(faceEdge_.size());
-  thrust::adjacent_difference(faceEdge_.beginD(), faceEdge_.endD(),
-                              faceSize.beginD());
+  VecDH<int> faceSize = FaceSize();
 
   thrust::sort_by_key(faceMorton.beginD(), faceMorton.endD(),
                       zip(faceBox.beginD(), faceNew2Old.beginD(),
                           faceSize.beginD(), faceNormal_.beginD()));
 
-  VecDH<int> faceOld2New(NumVert());
+  VecDH<Halfedge> oldHalfedge = halfedge_;
+  VecDH<int> oldFaceEdge = faceEdge_;
+  GatherFaces(oldHalfedge, oldFaceEdge, faceNew2Old, faceSize);
+}
+
+VecDH<int> Manifold::Impl::FaceSize() const {
+  VecDH<int> faceSize(faceEdge_.size());
+  thrust::adjacent_difference(faceEdge_.beginD(), faceEdge_.endD(),
+                              faceSize.beginD());
+  return faceSize;
+}
+
+void Manifold::Impl::GatherFaces(const VecDH<Halfedge>& oldHalfedge,
+                                 const VecDH<int>& oldFaceEdge,
+                                 const VecDH<int>& faceNew2Old;
+                                 const VecDH<int>& faceSize) {
+  VecDH<int> faceOld2New(NumFace());
   thrust::scatter(thrust::make_counting_iterator(0),
                   thrust::make_counting_iterator(NumFace()),
                   faceNew2Old.beginD(), faceOld2New.beginD());
 
-  VecDH<Halfedge> oldHalfedge = halfedge_;
-  VecDH<int> oldFaceEdge = faceEdge_;
   thrust::inclusive_scan(faceSize.beginD(), faceSize.endD(),
                          faceEdge_.beginD() + 1);
 
   thrust::for_each_n(
       zip(thrust::make_counting_iterator(0), faceEdge_.beginD()), NumFace(),
       ReindexFace({halfedge_.ptrD(), faceEdge_.cptrD(), oldHalfedge.cptrD(),
-                   oldFaceEdge.cptrD(), faceNew2Old.cptrD()}));
+                   oldFaceEdge.cptrD(), faceOld2New.cptrD()}));
 }
 
 void Manifold::Impl::CalculateNormals() {

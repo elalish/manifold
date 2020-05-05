@@ -63,6 +63,10 @@ struct Manifold::Impl {
   void SortVerts();
   void GetFaceBoxMorton(VecDH<Box>& faceBox, VecDH<uint32_t>& faceMorton) const;
   void SortFaces(VecDH<Box>& faceBox, VecDH<uint32_t>& faceMorton);
+  VecDH<int> FaceSize() const;
+  void GatherFaces(const VecDH<Halfedge>& oldHalfedge,
+                   const VecDH<int>& oldFaceEdge, const VecDH<int>& faceNew2Old;
+                   const VecDH<int>& faceSize);
   void CalculateNormals();
 
   SparseIndices EdgeCollisions(const Impl& B) const;
