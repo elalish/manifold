@@ -421,7 +421,7 @@ struct AssignNormals {
   glm::vec3* vertNormal;
   const glm::vec3* vertPos;
   const Halfedge* halfedges;
-  const Halfedge** nextHalfedge;
+  const int* nextHalfedge;
   const int* faceEdge;
   const bool calculateTriNormal;
 
@@ -436,7 +436,7 @@ struct AssignNormals {
       Halfedge edge = halfedges[iEdge];
       glm::vec3 edgeVec = vertPos[edge.endVert] - vertPos[edge.startVert];
       while (iEdge < end) {
-        Halfedge nextEdge = *(nextHalfedge[iEdge]);
+        Halfedge nextEdge = halfedges[nextHalfedge[iEdge]];
         glm::vec3 nextEdgeVec =
             vertPos[nextEdge.endVert] - vertPos[nextEdge.startVert];
         triNormal += glm::cross(edgeVec, nextEdgeVec);
@@ -455,7 +455,7 @@ struct AssignNormals {
     glm::vec3 edgeVec =
         glm::normalize(vertPos[edge.endVert] - vertPos[edge.startVert]);
     while (iEdge < end) {
-      Halfedge nextEdge = *(nextHalfedge[iEdge]);
+      Halfedge nextEdge = halfedges[nextHalfedge[iEdge]];
       glm::vec3 nextEdgeVec = glm::normalize(vertPos[nextEdge.endVert] -
                                              vertPos[nextEdge.startVert]);
       // corner angle
@@ -504,62 +504,6 @@ struct LinkHalfedges {
   }
 };
 
-struct MakeHalfedges {
-  int i, j;
-
-  __host__ __device__ void operator()(
-      thrust::tuple<TriEdges&, int&, EdgeVertsD&, const glm::ivec3&> inout) {
-    const glm::ivec3& in = thrust::get<3>(inout);
-    int V1 = in[i];
-    int V2 = in[j];
-    TriEdges& triEdges = thrust::get<0>(inout);
-    int& dir = thrust::get<1>(inout);
-    EdgeVertsD& edgeVerts = thrust::get<2>(inout);
-    if (V1 < V2) {  // forward
-      dir = 1;
-      edgeVerts = thrust::make_pair(V1, V2);
-    } else if (V1 > V2) {  // backward
-      dir = -1;
-      edgeVerts = thrust::make_pair(V2, V1);
-    } else {
-      dir = 0;
-      edgeVerts = thrust::make_pair(V2, V1);
-    }
-    triEdges[i] = EdgeIdx(0, dir);
-  }
-};
-
-struct AssignEdges {
-  int i;
-
-  __host__ __device__ void operator()(thrust::tuple<TriEdges&, int> inout) {
-    int idx2 = thrust::get<1>(inout);
-    TriEdges& triEdges = thrust::get<0>(inout);
-    triEdges[i] = EdgeIdx(idx2 / 2, triEdges[i].Dir());
-  }
-};
-
-struct OpposedDir {
-  __host__ __device__ bool operator()(int a, int b) const {
-    return a * b == -1;
-  }
-};
-
-struct LinkEdges2Tris {
-  EdgeTrisD* edgeTris;
-
-  __host__ __device__ void operator()(thrust::tuple<int, TriEdges> in) {
-    const int tri = thrust::get<0>(in);
-    const TriEdges triEdges = thrust::get<1>(in);
-    for (int i : {0, 1, 2}) {
-      if (triEdges[i].Dir() > 0)
-        edgeTris[triEdges[i].Idx()].left = tri;
-      else
-        edgeTris[triEdges[i].Idx()].right = tri;
-    }
-  }
-};
-
 struct EdgeBox {
   const glm::vec3* vertPos;
 
@@ -587,8 +531,7 @@ struct CheckManifold {
       good &= halfedge.endVert == paired.startVert;
       ++edge;
     }
-    // TODO: also test that face can assemble (same start verts as end verts) to
-    // complete manifoldness check.
+    // TODO: also test for duplicate halfedge pairs.
     return good;
   }
 };
@@ -795,6 +738,7 @@ bool Manifold::Impl::Face2Tri() {
   VecH<glm::vec3>& vertPos = vertPos_.H();
   const VecH<int>& face = faceEdge_.H();
   const VecH<Halfedge>& halfedge = halfedge_.H();
+  const VecH<int>& nextHalfedge = nextHalfedge_.H();
   const VecH<glm::vec3>& faceNormal = faceNormal_.H();
 
   for (int i = 0; i < face.size() - 1; ++i) {
@@ -821,10 +765,11 @@ bool Manifold::Impl::Face2Tri() {
       triNormal.push_back(normal);
     } else {  // General triangulation
       const glm::mat3x2 projection = GetAxisAlignedProjection(normal);
-      Polygons polys = Assemble(&halfedge[edge], &halfedge[lastEdge],
-                                [&vertPos, &projection](int vert) {
-                                  return projection * vertPos[vert];
-                                });
+      Polygons polys = Halfedge2Poly(&halfedge[0], &nextHalfedge[edge],
+                                     &nextHalfedge[lastEdge],
+                                     [&vertPos, &projection](int vert) {
+                                       return projection * vertPos[vert];
+                                     });
       std::vector<glm::ivec3> newTris;
       try {
         newTris = Triangulate(polys);
@@ -1027,8 +972,7 @@ SparseIndices Manifold::Impl::VertexCollisionsZ(
   return collider_.Collisions(vertsIn);
 }
 
-void Manifold::Impl::NextEdges(Halfedge* nextHalfedge,
-                               const Halfedge* edgeBegin,
+void Manifold::Impl::NextEdges(int* nextHalfedge, const Halfedge* edgeBegin,
                                const Halfedge* edgeEnd) {
   int numEdge = edgeEnd - edgeBegin;
   std::map<int, int> vert_edge;
@@ -1049,7 +993,7 @@ void Manifold::Impl::NextEdges(Halfedge* nextHalfedge,
     auto result = vert_edge.find(thisEdge->endVert);
     ALWAYS_ASSERT(result != vert_edge.end(), runtimeErr, "nonmanifold edge");
     auto nextEdge = std::next(edgeBegin, result->second);
-    nextHalfedge[thisEdge - edgeBegin] = nextEdge;
+    nextHalfedge[thisEdge - edgeBegin] = result->second;
     thisEdge = nextEdge;
     vert_edge.erase(result);
   }

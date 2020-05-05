@@ -18,6 +18,7 @@
 #include <list>
 #include <map>
 #include <queue>
+#include <set>
 #include <stack>
 
 #include "polygon.h"
@@ -587,6 +588,30 @@ int CCW(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2) {
     return 0;
   else
     return area > 0 ? 1 : -1;
+}
+
+Polygons Halfedge2Poly(const Halfedge *halfedge, const int *halfedgeBegin,
+                       const int *halfedgeEnd,
+                       std::function<glm::vec2(int)> vertProjection) {
+  Polygons polys;
+  std::set<int> notVisited;
+  for (const int *ptr = halfedgeBegin; ptr != halfedgeEnd; ++ptr) {
+    notVisited.insert(*ptr);
+  }
+  int startEdge = *halfedgeBegin;
+  int thisEdge = startEdge;
+  while (1) {
+    if (thisEdge == startEdge) {
+      if (notVisited.empty()) break;
+      startEdge = *notVisited.begin();
+      thisEdge = startEdge;
+      polys.push_back({});
+    }
+    int vert = halfedge[thisEdge].startVert;
+    polys.back().push_back(
+        {vertProjection(vert), vert, halfedge[thisEdge].face});
+  }
+  return polys;
 }
 
 std::vector<glm::ivec3> Triangulate(const Polygons &polys) {

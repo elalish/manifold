@@ -27,7 +27,7 @@ struct Manifold::Impl {
   VecDH<int> vertLabel_;
   int numLabel_ = 1;
   VecDH<Halfedge> halfedge_;
-  VecDH<Halfedge*> nextHalfedge_;
+  VecDH<int> nextHalfedge_;
   VecDH<int> faceEdge_;
 
   VecDH<glm::vec3> vertNormal_;
