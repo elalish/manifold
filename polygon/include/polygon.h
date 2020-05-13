@@ -24,10 +24,9 @@ Polygons Halfedge2Poly(const Halfedge *halfedge, const int *halfedgeBegin,
                        std::function<glm::vec2(int)> vertProjection);
 std::vector<glm::ivec3> Triangulate(const Polygons &polys);
 
-std::vector<EdgeVerts> Polygons2Edges(const Polygons &polys);
-std::vector<EdgeVerts> Triangles2Edges(
-    const std::vector<glm::ivec3> &triangles);
-void CheckTopology(const std::vector<EdgeVerts> &halfedges);
+std::vector<Halfedge> Polygons2Edges(const Polygons &polys);
+std::vector<Halfedge> Triangles2Edges(const std::vector<glm::ivec3> &triangles);
+void CheckTopology(const std::vector<Halfedge> &halfedges);
 void CheckTopology(const std::vector<glm::ivec3> &triangles,
                    const Polygons &polys);
 void CheckGeometry(const std::vector<glm::ivec3> &triangles,

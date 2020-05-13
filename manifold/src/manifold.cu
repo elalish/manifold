@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <thrust/sequence.h>
 #include <thrust/transform_reduce.h>
 
 #include "boolean3.cuh"
@@ -36,11 +37,12 @@ struct UpdateHalfedge {
   const int nextEdge;
   const int nextFace;
 
-  __host__ __device__ void operator()(Halfedge& edge) {
+  __host__ __device__ Halfedge operator()(Halfedge edge) {
     edge.startVert += nextVert;
     edge.endVert += nextVert;
     edge.pairedHalfedge += nextEdge;
     edge.face += nextFace;
+    return edge;
   }
 };
 
@@ -371,12 +373,14 @@ std::vector<Manifold> Manifold::Decompose() const {
 
     VecDH<int> faceSize = pImpl_->FaceSize();
 
-    thrust::remove_if(zip(faceNew2Old.beginD(), faceSize.beginD()),
-                      zip(faceNew2Old.endD(), faceSize.endD()),
-                      RemoveFace({halfedge_.cptrD(), faceEdge_.cptrD(),
-                                  vertLabel_.cptrD(), i}));
+    thrust::remove_if(
+        zip(faceNew2Old.beginD(), faceSize.beginD()),
+        zip(faceNew2Old.endD(), faceSize.endD()),
+        RemoveFace({pImpl_->halfedge_.cptrD(), pImpl_->faceEdge_.cptrD(),
+                    pImpl_->vertLabel_.cptrD(), i}));
 
-    meshes[i].pImpl_->GatherFaces(halfedge_, faceEdge_, faceNew2Old, faceSize);
+    meshes[i].pImpl_->GatherFaces(pImpl_->halfedge_, pImpl_->faceEdge_,
+                                  faceNew2Old, faceSize);
 
     meshes[i].pImpl_->Finish();
     meshes[i].pImpl_->transform_ = pImpl_->transform_;

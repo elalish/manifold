@@ -241,14 +241,6 @@ struct Not_zero {
   __host__ __device__ bool operator()(const int x) { return x != 0; }
 };
 
-struct Right : public thrust::unary_function<EdgeTrisD, int> {
-  __host__ __device__ int operator()(EdgeTrisD edge) { return edge.right; }
-};
-
-struct Left : public thrust::unary_function<EdgeTrisD, int> {
-  __host__ __device__ int operator()(EdgeTrisD edge) { return edge.left; }
-};
-
 struct AbsSum : public thrust::binary_function<int, int, int> {
   __host__ __device__ int operator()(int a, int b) { return abs(a) + abs(b); }
 };
