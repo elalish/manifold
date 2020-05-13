@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <thrust/adjacent_difference.h>
 #include <thrust/count.h>
 #include <thrust/gather.h>
 #include <thrust/logical.h>
@@ -19,6 +20,7 @@
 #include <thrust/sort.h>
 #include <thrust/transform_reduce.h>
 #include <algorithm>
+#include <map>
 
 #include "connected_components.cuh"
 #include "manifold_impl.cuh"
@@ -93,8 +95,8 @@ struct ReindexHalfedge {
   int* half2Edge;
 
   __host__ __device__ void operator()(thrust::tuple<int, TmpEdge> in) {
-    const int edge = thrust::get<0>(edge);
-    const int halfedge = thrust::get<1>(edge).halfedgeIdx;
+    const int edge = thrust::get<0>(in);
+    const int halfedge = thrust::get<1>(in).halfedgeIdx;
 
     half2Edge[halfedge] = edge;
   }
@@ -162,8 +164,7 @@ struct SplitTris {
     return triIdx + vertsPerTri * tri + vertOffset;
   }
 
-  __host__ __device__ int Vert(int i, int j, int tri, glm::ivec3 triVert,
-                               TriEdges triEdge) const {
+  __host__ __device__ int Vert(int i, int j, int tri) const {
     bool edge0 = i == 0;
     bool edge1 = j == 0;
     bool edge2 = j == n - i;
@@ -202,7 +203,7 @@ struct SplitTris {
   }
 };
 
-struct AreaVolume {
+struct FaceAreaVolume {
   const Halfedge* halfedges;
   const int* faceEdge;
   const glm::vec3* vertPos;
@@ -213,9 +214,9 @@ struct AreaVolume {
     float volume = 0.0f;
 
     int edge = faceEdge[face];
-    const glm::vec3 anchor = vertPos[halfeges[edge].startVert];
+    const glm::vec3 anchor = vertPos[halfedges[edge].startVert];
 
-    const int end = facesEdge[face + 1];
+    const int end = faceEdge[face + 1];
     while (edge < end) {
       const Halfedge halfedge = halfedges[edge++];
       const glm::vec3 start = vertPos[halfedge.startVert];
@@ -397,7 +398,7 @@ struct ReindexFace {
     while (iEdge < end) {
       Halfedge edge = oldHalfedge[iEdge++];
       edge.face = faceOld2New[oldFace];
-      const int pairedFace = edge.pairedHalfedge.face;
+      const int pairedFace = halfedge[edge.pairedHalfedge].face;
       const int offset = edge.pairedHalfedge - oldFaceEdge[pairedFace];
       edge.pairedHalfedge = faceEdge[faceOld2New[pairedFace]] + offset;
       halfedge[outEdge++] = edge;
@@ -461,7 +462,7 @@ struct AssignNormals {
       // corner angle
       float phi = glm::acos(-glm::dot(edgeVec, nextEdgeVec));
       AtomicAddVec3(vertNormal[edge.endVert],
-                    glm::max(phi[i], kTolerance) * triNormal);
+                    glm::max(phi, kTolerance) * triNormal);
       edge = nextEdge;
       edgeVec = nextEdgeVec;
       ++iEdge;
@@ -522,7 +523,7 @@ struct CheckManifold {
     bool good = true;
     int edge = faces[face];
     const int end = faces[face + 1];
-    int while (edge < end) {
+    while (edge < end) {
       const Halfedge halfedge = halfedges[edge];
       const Halfedge paired = halfedges[halfedge.pairedHalfedge];
       good &= halfedge.face == face;
@@ -647,9 +648,9 @@ void Manifold::Impl::Finish() {
                 "Halfedge index is negative!");
   ALWAYS_ASSERT(extrema.pairedHalfedge < 2 * NumEdge(), runtimeErr,
                 "Halfedge index exceeds number of halfedges!");
-  ALWAYS_ASSERT(face_.H().front() == 0, runtimeErr,
+  ALWAYS_ASSERT(faceEdge_.H().front() == 0, runtimeErr,
                 "Faces do not start at zero!");
-  ALWAYS_ASSERT(face_.H().back() == 2 * NumEdge(), runtimeErr,
+  ALWAYS_ASSERT(faceEdge_.H().back() == 2 * NumEdge(), runtimeErr,
                 "Faces do not end at halfedge length!");
 
   if (vertLabel_.size() != NumVert()) {
@@ -710,8 +711,9 @@ void Manifold::Impl::AssembleFaces() {
   const VecH<int>& faceEdge = faceEdge_.H();
   for (int i = 0; i < NumFace(); ++i) {
     int start = faceEdge[i];
-    NextEdges(nextHalfedge_.begin() + start, halfedge_.begin() + start,
-              halfedge_.begin() + faceEdge[i + 1]);
+    Manifold::Impl::NextEdges(nextHalfedge_.H().data().get() + start,
+                              halfedge_.H().data().get() + start,
+                              halfedge_.H().data().get() + faceEdge[i + 1]);
   }
 }
 
@@ -733,12 +735,11 @@ bool Manifold::Impl::Face2Tri() {
   VecDH<glm::ivec3> triVertsOut;
   VecDH<glm::vec3> triNormalOut;
 
-  VecDH<glm::ivec3>& triVerts = triVertsOut.H();
-  VecDH<glm::vec3>& triNormal = triNormalOut.H();
+  VecH<glm::ivec3>& triVerts = triVertsOut.H();
+  VecH<glm::vec3>& triNormal = triNormalOut.H();
   VecH<glm::vec3>& vertPos = vertPos_.H();
   const VecH<int>& face = faceEdge_.H();
   const VecH<Halfedge>& halfedge = halfedge_.H();
-  const VecH<int>& nextHalfedge = nextHalfedge_.H();
   const VecH<glm::vec3>& faceNormal = faceNormal_.H();
 
   for (int i = 0; i < face.size() - 1; ++i) {
@@ -756,7 +757,7 @@ bool Manifold::Impl::Face2Tri() {
                       halfedge[edge + 2].endVert);
       if (ends[0] == tri[2]) {
         std::swap(tri[1], tri[2]);
-        std::swap(ends[1], end[2]);
+        std::swap(ends[1], ends[2]);
       }
       ALWAYS_ASSERT(ends[0] == tri[1] && ends[1] == tri[2] && ends[2] == tri[0],
                     runtimeErr, "These 3 edges do not form a triangle!");
@@ -765,11 +766,10 @@ bool Manifold::Impl::Face2Tri() {
       triNormal.push_back(normal);
     } else {  // General triangulation
       const glm::mat3x2 projection = GetAxisAlignedProjection(normal);
-      Polygons polys = Halfedge2Poly(&halfedge[0], &nextHalfedge[edge],
-                                     &nextHalfedge[lastEdge],
-                                     [&vertPos, &projection](int vert) {
-                                       return projection * vertPos[vert];
-                                     });
+      Polygons polys =
+          Manifold::Impl::Face2Polygons(i, [&vertPos, &projection](int vert) {
+            return projection * vertPos[vert];
+          });
       std::vector<glm::ivec3> newTris;
       try {
         newTris = Triangulate(polys);
@@ -846,17 +846,18 @@ void Manifold::Impl::Refine(int n) {
 bool Manifold::Impl::IsManifold() const {
   return thrust::all_of(thrust::make_counting_iterator(0),
                         thrust::make_counting_iterator(NumFace()),
-                        CheckManifold({halfedge_.cptrD(), face_.cptrD()}));
+                        CheckManifold({halfedge_.cptrD(), faceEdge_.cptrD()}));
 }
 
-std::pair<float, float> AreaVolume() const {
+std::pair<float, float> Manifold::Impl::AreaVolume() const {
   ApplyTransform();
-  return thrust::transform_reduce(
+  thrust::pair<float, float> areaVolume = thrust::transform_reduce(
       thrust::make_counting_iterator(0),
       thrust::make_counting_iterator(NumFace()),
-      AreaVolume({halfedge_.cptrD(), faceEdge_.cptrD(), vertPos_.cptrD()}),
+      FaceAreaVolume({halfedge_.cptrD(), faceEdge_.cptrD(), vertPos_.cptrD()}),
       thrust::make_pair(0.0f, 0.0f),
       thrust::plus<thrust::pair<float, float>>());
+  return std::make_pair(areaVolume.first, areaVolume.second);
 }
 
 void Manifold::Impl::CalculateBBox() {
@@ -923,7 +924,7 @@ VecDH<int> Manifold::Impl::FaceSize() const {
 
 void Manifold::Impl::GatherFaces(const VecDH<Halfedge>& oldHalfedge,
                                  const VecDH<int>& oldFaceEdge,
-                                 const VecDH<int>& faceNew2Old;
+                                 const VecDH<int>& faceNew2Old,
                                  const VecDH<int>& faceSize) {
   VecDH<int> faceOld2New(NumFace());
   thrust::scatter(thrust::make_counting_iterator(0),
@@ -999,25 +1000,30 @@ void Manifold::Impl::NextEdges(int* nextHalfedge, const Halfedge* edgeBegin,
   }
 }
 
-Polygons Manifold::Impl::Assemble(
-    const Halfedge* edgeBegin, const Halfedge* edgeEnd,
-    const Halfedge* nextEdge, std::function<glm::vec2(int)> vertProjection) {
+Polygons Manifold::Impl::Face2Polygons(
+    int face, std::function<glm::vec2(int)> vertProjection) const {
+  const VecH<int>& faceEdge = faceEdge_.H();
+  const VecH<Halfedge>& halfedge = halfedge_.H();
+  const VecH<int>& nextHalfedge = nextHalfedge_.H();
+  const int edge = faceEdge[face];
+  const int lastEdge = faceEdge[face + 1];
+
   Polygons polys;
-  std::vector<bool> visited(edgeEnd - edgeBegin, false);
-  auto startEdge = edgeBegin;
-  auto thisEdge = edgeBegin;
+  std::vector<bool> visited(lastEdge - edge, false);
+  int startEdge = edge;
+  int thisEdge = edge;
   for (;;) {
     if (thisEdge == startEdge) {
       auto next = std::find(visited.begin(), visited.end(), false);
       if (next == visited.end()) break;
-      int idx = next - visited.begin();
-      startEdge = edgeBegin + idx;
+      startEdge = next - visited.begin();
       thisEdge = startEdge;
       polys.push_back({});
     }
-    int vert = thisEdge->startVert;
-    polys.back().push_back({vertProjection(vert), vert, thisEdge->face});
-    thisEdge = nextEdge[thisEdge - edgeBegin];
+    int vert = halfedge[thisEdge].startVert;
+    polys.back().push_back(
+        {vertProjection(vert), vert, halfedge[thisEdge].face});
+    thisEdge = nextHalfedge[thisEdge];
   }
   return polys;
 }

@@ -65,17 +65,16 @@ struct Manifold::Impl {
   void SortFaces(VecDH<Box>& faceBox, VecDH<uint32_t>& faceMorton);
   VecDH<int> FaceSize() const;
   void GatherFaces(const VecDH<Halfedge>& oldHalfedge,
-                   const VecDH<int>& oldFaceEdge, const VecDH<int>& faceNew2Old;
+                   const VecDH<int>& oldFaceEdge, const VecDH<int>& faceNew2Old,
                    const VecDH<int>& faceSize);
   void CalculateNormals();
 
   SparseIndices EdgeCollisions(const Impl& B) const;
   SparseIndices VertexCollisionsZ(const VecDH<glm::vec3>& vertsIn) const;
 
-  static void NextEdges(Halfedge* nextEdge, const Halfedge* edgeBegin,
+  static void NextEdges(int* nextEdge, const Halfedge* edgeBegin,
                         const Halfedge* edgeEnd);
-  static Polygons Assemble(const Halfedge* edgeBegin, const Halfedge* edgeEnd,
-                           const Halfedge* nextEdge,
-                           std::function<glm::vec2(int)> vertProjection);
+  Polygons Face2Polygons(int face,
+                         std::function<glm::vec2(int)> vertProjection) const;
 };
 }  // namespace manifold

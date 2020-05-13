@@ -320,7 +320,7 @@ class Monotones {
     ALWAYS_ASSERT(v_type == END, logicErr,
                   "Monotones did not finish with an END.");
     if (!params.intermediateChecks) return;
-    std::vector<EdgeVerts> edges;
+    std::vector<Halfedge> edges;
     for (auto &vert : monotones_) {
       vert.setProcessed(false);
       edges.push_back({vert.mesh_idx, vert.right->mesh_idx, Edge::kNoIdx});
@@ -633,8 +633,8 @@ std::vector<glm::ivec3> Triangulate(const Polygons &polys) {
   return triangles;
 }
 
-std::vector<EdgeVerts> Polygons2Edges(const Polygons &polys) {
-  std::vector<EdgeVerts> halfedges;
+std::vector<Halfedge> Polygons2Edges(const Polygons &polys) {
+  std::vector<Halfedge> halfedges;
   for (const auto &poly : polys) {
     for (int i = 1; i < poly.size(); ++i) {
       halfedges.push_back({poly[i - 1].idx, poly[i].idx, poly[i - 1].nextEdge});
@@ -644,9 +644,9 @@ std::vector<EdgeVerts> Polygons2Edges(const Polygons &polys) {
   return halfedges;
 }
 
-std::vector<EdgeVerts> Triangles2Edges(
+std::vector<Halfedge> Triangles2Edges(
     const std::vector<glm::ivec3> &triangles) {
-  std::vector<EdgeVerts> halfedges;
+  std::vector<Halfedge> halfedges;
   for (const glm::ivec3 &tri : triangles) {
     // Differentiate edges of triangles by setting index to Edge::kInterior.
     halfedges.push_back({tri[0], tri[1], Edge::kInterior});
@@ -656,62 +656,63 @@ std::vector<EdgeVerts> Triangles2Edges(
   return halfedges;
 }
 
-void CheckTopology(const std::vector<EdgeVerts> &halfedges) {
+void CheckTopology(const std::vector<Halfedge> &halfedges) {
   ALWAYS_ASSERT(halfedges.size() % 2 == 0, runtimeErr,
                 "Odd number of halfedges.");
   size_t n_edges = halfedges.size() / 2;
-  std::vector<EdgeVerts> forward(halfedges.size()), backward(halfedges.size());
+  std::vector<Halfedge> forward(halfedges.size()), backward(halfedges.size());
 
   auto end = std::copy_if(halfedges.begin(), halfedges.end(), forward.begin(),
-                          [](EdgeVerts e) { return e.second > e.first; });
+                          [](Halfedge e) { return e.endVert > e.startVert; });
   ALWAYS_ASSERT(std::distance(forward.begin(), end) == n_edges, runtimeErr,
                 "Half of halfedges should be forward.");
   forward.resize(n_edges);
 
   end = std::copy_if(halfedges.begin(), halfedges.end(), backward.begin(),
-                     [](EdgeVerts e) { return e.second < e.first; });
+                     [](Halfedge e) { return e.endVert < e.startVert; });
   ALWAYS_ASSERT(std::distance(backward.begin(), end) == n_edges, runtimeErr,
                 "Half of halfedges should be backward.");
   backward.resize(n_edges);
 
   std::for_each(backward.begin(), backward.end(),
-                [](EdgeVerts &e) { std::swap(e.first, e.second); });
-  auto cmp = [](const EdgeVerts &a, const EdgeVerts &b) {
-    return a.first < b.first || (a.first == b.first && a.second < b.second);
+                [](Halfedge &e) { std::swap(e.startVert, e.endVert); });
+  auto cmp = [](const Halfedge &a, const Halfedge &b) {
+    return a.startVert < b.startVert ||
+           (a.startVert == b.startVert && a.endVert < b.endVert);
   };
   std::sort(forward.begin(), forward.end(), cmp);
   std::sort(backward.begin(), backward.end(), cmp);
   for (int i = 0; i < n_edges; ++i) {
-    ALWAYS_ASSERT(forward[i].first == backward[i].first &&
-                      forward[i].second == backward[i].second,
+    ALWAYS_ASSERT(forward[i].startVert == backward[i].startVert &&
+                      forward[i].endVert == backward[i].endVert,
                   runtimeErr, "Forward and backward edge do not match.");
     if (i > 0) {
-      ALWAYS_ASSERT(forward[i - 1].first != forward[i].first ||
-                        forward[i - 1].second != forward[i].second,
+      ALWAYS_ASSERT(forward[i - 1].startVert != forward[i].startVert ||
+                        forward[i - 1].endVert != forward[i].endVert,
                     runtimeErr, "Not a 2-manifold.");
-      ALWAYS_ASSERT(backward[i - 1].first != backward[i].first ||
-                        backward[i - 1].second != backward[i].second,
+      ALWAYS_ASSERT(backward[i - 1].startVert != backward[i].startVert ||
+                        backward[i - 1].endVert != backward[i].endVert,
                     runtimeErr, "Not a 2-manifold.");
     }
   }
   // Check that no interior edges link vertices that share the same edge data.
   std::map<int, glm::ivec2> vert2edges;
-  for (EdgeVerts halfedge : halfedges) {
-    if (halfedge.edge == Edge::kInterior)
+  for (Halfedge halfedge : halfedges) {
+    if (halfedge.face == Edge::kInterior)
       continue;  // only interested in polygon edges
-    auto vert = vert2edges.emplace(halfedge.first,
-                                   glm::ivec2(halfedge.edge, Edge::kInvalid));
-    if (!vert.second) (vert.first->second)[1] = halfedge.edge;
+    auto vert = vert2edges.emplace(halfedge.startVert,
+                                   glm::ivec2(halfedge.face, Edge::kInvalid));
+    if (!vert.second) (vert.first->second)[1] = halfedge.face;
 
-    vert = vert2edges.emplace(halfedge.second,
-                              glm::ivec2(halfedge.edge, Edge::kInvalid));
-    if (!vert.second) (vert.first->second)[1] = halfedge.edge;
+    vert = vert2edges.emplace(halfedge.endVert,
+                              glm::ivec2(halfedge.face, Edge::kInvalid));
+    if (!vert.second) (vert.first->second)[1] = halfedge.face;
   }
   for (int i = 0; i < n_edges; ++i) {
-    if (forward[i].edge == Edge::kInterior &&
-        backward[i].edge == Edge::kInterior) {
-      glm::ivec2 TwoEdges0 = vert2edges.find(forward[i].first)->second;
-      glm::ivec2 TwoEdges1 = vert2edges.find(forward[i].second)->second;
+    if (forward[i].face == Edge::kInterior &&
+        backward[i].face == Edge::kInterior) {
+      glm::ivec2 TwoEdges0 = vert2edges.find(forward[i].startVert)->second;
+      glm::ivec2 TwoEdges1 = vert2edges.find(forward[i].endVert)->second;
       ALWAYS_ASSERT(!SharedEdge(TwoEdges0, TwoEdges1), runtimeErr,
                     "Added an interface edge!");
     }
@@ -720,10 +721,10 @@ void CheckTopology(const std::vector<EdgeVerts> &halfedges) {
 
 void CheckTopology(const std::vector<glm::ivec3> &triangles,
                    const Polygons &polys) {
-  std::vector<EdgeVerts> halfedges = Triangles2Edges(triangles);
-  std::vector<EdgeVerts> openEdges = Polygons2Edges(polys);
-  for (EdgeVerts e : openEdges) {
-    halfedges.push_back({e.second, e.first, e.edge});
+  std::vector<Halfedge> halfedges = Triangles2Edges(triangles);
+  std::vector<Halfedge> openEdges = Polygons2Edges(polys);
+  for (Halfedge e : openEdges) {
+    halfedges.push_back({e.endVert, e.startVert, e.face});
   }
   CheckTopology(halfedges);
 }
