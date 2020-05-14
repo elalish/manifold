@@ -48,43 +48,15 @@ void Identical(Polygons p1, Polygons p2) {
   }
 }
 
-void TestAssemble(const Polygons &polys) {
-  std::vector<EdgeVerts> edges = Polygons2Edges(polys);
-  std::mt19937 g;
-  std::shuffle(edges.begin(), edges.end(), g);
-
-  std::vector<glm::vec2> vertPos;
-  for (const auto &poly : polys) {
-    for (const PolyVert &vert : poly) {
-      if (vert.idx >= vertPos.size()) vertPos.resize(vert.idx + 1);
-      vertPos[vert.idx] = vert.pos;
-    }
-  }
-
-  Polygons polys_out =
-      Face2Polygons(edges, [&vertPos](int vert) { return vertPos[vert]; });
-  Identical(polys, polys_out);
-}
-
 void TestPoly(const Polygons &polys, int expectedNumTri,
               bool expectGeometry = true) {
   // PolygonParams().verbose = true;
   PolygonParams().checkGeometry = expectGeometry;
   PolygonParams().intermediateChecks = true;
-  TestAssemble(polys);
   std::vector<glm::ivec3> triangles = Triangulate(polys);
   ASSERT_EQ(triangles.size(), expectedNumTri);
 }
 }  // namespace
-
-TEST(Polygon, NoAssemble) {
-  std::vector<EdgeVerts> edges;
-  edges.push_back({0, 2});
-  edges.push_back({1, 2});
-  edges.push_back({0, 1});
-  ASSERT_THROW(Face2Polygons(edges, [](int) { return glm::vec2(0.0 / 0.0); }),
-               runtimeErr);
-}
 
 /**
  * These polygons are all valid geometry. Some are clearly valid, while many are

@@ -34,12 +34,6 @@ void Identical(Mesh& mesh1, Mesh& mesh2) {
   }
 }
 
-void CheckIdx(int idx, int dir) {
-  EdgeIdx edge(idx, dir);
-  ASSERT_EQ(edge.Idx(), idx);
-  ASSERT_EQ(edge.Dir(), dir);
-}
-
 void ExpectMeshes(const Manifold& manifold,
                   const std::vector<std::pair<int, int>>& numVertTri) {
   ASSERT_TRUE(manifold.IsManifold());
@@ -81,13 +75,6 @@ TEST(MeshIO, ReadWrite) {
   ExportMesh("data/gyroidpuzzle1.ply", mesh);
   Mesh mesh_out = ImportMesh("data/gyroidpuzzle1.ply");
   Identical(mesh, mesh_out);
-}
-
-TEST(Manifold, EdgeIdx) {
-  CheckIdx(0, 1);
-  CheckIdx(0, -1);
-  CheckIdx(1, 1);
-  CheckIdx(1, -1);
 }
 
 /**
@@ -139,8 +126,9 @@ TEST(Manifold, Extrude) {
   Manifold donut = Manifold::Extrude(polys, 1.0f, 3);
   ASSERT_TRUE(donut.IsManifold());
   EXPECT_EQ(donut.Genus(), 1);
-  EXPECT_FLOAT_EQ(donut.Volume(), 12.0f);
-  EXPECT_FLOAT_EQ(donut.SurfaceArea(), 48.0f);
+  auto prop = donut.GetProperties();
+  EXPECT_FLOAT_EQ(prop.volume, 12.0f);
+  EXPECT_FLOAT_EQ(prop.surfaceArea, 48.0f);
 }
 
 TEST(Manifold, ExtrudeCone) {
@@ -148,7 +136,7 @@ TEST(Manifold, ExtrudeCone) {
   Manifold donut = Manifold::Extrude(polys, 1.0f, 0, 0, glm::vec2(0.0f));
   ASSERT_TRUE(donut.IsManifold());
   EXPECT_EQ(donut.Genus(), 0);
-  EXPECT_FLOAT_EQ(donut.Volume(), 4.0f);
+  EXPECT_FLOAT_EQ(donut.GetProperties().volume, 4.0f);
 }
 
 TEST(Manifold, Revolve) {
@@ -156,8 +144,9 @@ TEST(Manifold, Revolve) {
   Manifold vug = Manifold::Revolve(polys, 48);
   ASSERT_TRUE(vug.IsManifold());
   EXPECT_EQ(vug.Genus(), -1);
-  EXPECT_NEAR(vug.Volume(), 14.0f * glm::pi<float>(), 0.2f);
-  EXPECT_NEAR(vug.SurfaceArea(), 30.0f * glm::pi<float>(), 0.2f);
+  auto prop = vug.GetProperties();
+  EXPECT_NEAR(prop.volume, 14.0f * glm::pi<float>(), 0.2f);
+  EXPECT_NEAR(prop.surfaceArea, 30.0f * glm::pi<float>(), 0.2f);
 }
 
 TEST(Manifold, Revolve2) {
@@ -165,33 +154,25 @@ TEST(Manifold, Revolve2) {
   Manifold donutHole = Manifold::Revolve(polys, 48);
   ASSERT_TRUE(donutHole.IsManifold());
   EXPECT_EQ(donutHole.Genus(), 0);
-  EXPECT_NEAR(donutHole.Volume(), 48.0f * glm::pi<float>(), 1.0f);
-  EXPECT_NEAR(donutHole.SurfaceArea(), 96.0f * glm::pi<float>(), 1.0f);
+  auto prop = donutHole.GetProperties();
+  EXPECT_NEAR(prop.volume, 48.0f * glm::pi<float>(), 1.0f);
+  EXPECT_NEAR(prop.surfaceArea, 96.0f * glm::pi<float>(), 1.0f);
 }
 
 /**
  * These tests verify the calculation of a manifold's geometric properties.
  */
-TEST(Manifold, Volume) {
+TEST(Manifold, GetProperties) {
   Manifold cube = Manifold::Cube();
   ASSERT_TRUE(cube.IsManifold());
-  float vol = cube.Volume();
-  EXPECT_FLOAT_EQ(vol, 1.0f);
+  auto prop = cube.GetProperties();
+  EXPECT_FLOAT_EQ(prop.volume, 1.0f);
+  EXPECT_FLOAT_EQ(prop.surfaceArea, 6.0f);
 
   cube.Scale(glm::vec3(-1.0f));
-  vol = cube.Volume();
-  EXPECT_FLOAT_EQ(vol, -1.0f);
-}
-
-TEST(Manifold, SurfaceArea) {
-  Manifold cube = Manifold::Cube();
-  ASSERT_TRUE(cube.IsManifold());
-  float area = cube.SurfaceArea();
-  EXPECT_FLOAT_EQ(area, 6.0f);
-
-  cube.Scale(glm::vec3(-1.0f));
-  area = cube.SurfaceArea();
-  EXPECT_FLOAT_EQ(area, 6.0f);
+  prop = cube.GetProperties();
+  EXPECT_FLOAT_EQ(prop.volume, -1.0f);
+  EXPECT_FLOAT_EQ(prop.surfaceArea, 6.0f);
 }
 
 /**
@@ -217,9 +198,11 @@ TEST(Manifold, SelfSubtract) {
   Manifold cube = Manifold::Cube();
   Manifold empty = cube - cube;
   EXPECT_TRUE(empty.IsManifold());
-  EXPECT_FLOAT_EQ(empty.Volume(), 0.0f);
-  EXPECT_FLOAT_EQ(empty.SurfaceArea(), 0.0f);
   EXPECT_TRUE(empty.IsEmpty());
+
+  auto prop = empty.GetProperties();
+  EXPECT_FLOAT_EQ(prop.volume, 0.0f);
+  EXPECT_FLOAT_EQ(prop.surfaceArea, 0.0f);
 }
 
 TEST(Manifold, Perturb) {
@@ -241,10 +224,9 @@ TEST(Manifold, Coplanar) {
   Manifold::SetExpectGeometry(true);
   Manifold cube = Manifold::Cylinder(1.0f, 1.0f);
   Manifold cube2 = cube.DeepCopy();
-  Manifold out = cube -
-                 cube2.Scale({0.5f, 0.5f, 1.0f})
-                     .Rotate(0, 0, 15)
-                     .Translate({0.25f, 0.25f, 0.0f});
+  Manifold out = cube - cube2.Scale({0.5f, 0.5f, 1.0f})
+                            .Rotate(0, 0, 15)
+                            .Translate({0.25f, 0.25f, 0.0f});
 }
 
 TEST(Manifold, MultiCoplanar) {
@@ -266,8 +248,9 @@ TEST(Manifold, Split) {
   Manifold oct = Manifold::Octahedron();
   oct.Translate(glm::vec3(0.0f, 0.0f, 1.0f));
   std::pair<Manifold, Manifold> splits = cube.Split(oct);
-  EXPECT_FLOAT_EQ(splits.first.Volume() + splits.second.Volume(),
-                  cube.Volume());
+  EXPECT_FLOAT_EQ(splits.first.GetProperties().volume +
+                      splits.second.GetProperties().volume,
+                  cube.GetProperties().volume);
 }
 
 TEST(Manifold, SplitByPlane) {
@@ -277,7 +260,8 @@ TEST(Manifold, SplitByPlane) {
   cube.Rotate(90.0f, 0.0f, 0.0f);
   std::pair<Manifold, Manifold> splits =
       cube.SplitByPlane({0.0f, 0.0f, 1.0f}, 1.0f);
-  EXPECT_NEAR(splits.first.Volume(), splits.second.Volume(), 1e-5);
+  EXPECT_NEAR(splits.first.GetProperties().volume,
+              splits.second.GetProperties().volume, 1e-5);
 }
 
 TEST(Manifold, SplitByPlane60) {
@@ -289,7 +273,8 @@ TEST(Manifold, SplitByPlane60) {
   float phi = 30.0f;
   std::pair<Manifold, Manifold> splits =
       cube.SplitByPlane({sind(phi), -cosd(phi), 0.0f}, 1.0f);
-  EXPECT_NEAR(splits.first.Volume(), splits.second.Volume(), 1e-5);
+  EXPECT_NEAR(splits.first.GetProperties().volume,
+              splits.second.GetProperties().volume, 1e-5);
 }
 
 /**
@@ -305,8 +290,9 @@ TEST(Manifold, BooleanVug) {
   Manifold half = vug.SplitByPlane(glm::vec3(0.0f, 0.0f, 1.0f), -1.0f).first;
 
   EXPECT_EQ(half.Genus(), -1);
-  EXPECT_FLOAT_EQ(half.Volume(), 4.0 * 4.0 * 3.0 - 1.0);
-  EXPECT_FLOAT_EQ(half.SurfaceArea(), 16.0 * 2 + 12.0 * 4 + 6.0);
+  auto prop = vug.GetProperties();
+  EXPECT_FLOAT_EQ(prop.volume, 4.0 * 4.0 * 3.0 - 1.0);
+  EXPECT_FLOAT_EQ(prop.surfaceArea, 16.0 * 2 + 12.0 * 4 + 6.0);
 }
 
 /**

@@ -233,35 +233,6 @@ struct FaceAreaVolume {
   }
 };
 
-struct ClampVolume {
-  __host__ __device__ void operator()(thrust::tuple<float&, float> inOut) {
-    float& volume = thrust::get<0>(inOut);
-    float surfaceArea = thrust::get<1>(inOut);
-
-    if (glm::abs(volume) < surfaceArea * kTolerance) volume = 0.0f;
-  }
-};
-
-struct NonZero {
-  __host__ __device__ bool operator()(float val) { return val != 0.0f; }
-};
-
-struct RemoveVert {
-  const float* volume;
-
-  __host__ __device__ bool operator()(thrust::tuple<int, int, glm::vec3> in) {
-    int vertLabel = thrust::get<0>(in);
-    return volume[vertLabel] == 0.0f;
-  }
-};
-
-struct RemoveTri {
-  __host__ __device__ bool operator()(thrust::tuple<glm::ivec3, glm::vec3> in) {
-    const glm::ivec3& triVerts = thrust::get<0>(in);
-    return triVerts[0] < 0;
-  }
-};
-
 struct Extrema : public thrust::binary_function<Halfedge, Halfedge, Halfedge> {
   __host__ __device__ void MakeForward(Halfedge& a) {
     if (!a.IsForward()) {
@@ -297,6 +268,17 @@ struct PosMax
     : public thrust::binary_function<glm::vec3, glm::vec3, glm::vec3> {
   __host__ __device__ glm::vec3 operator()(glm::vec3 a, glm::vec3 b) {
     return glm::max(a, b);
+  }
+};
+
+struct SumPair : public thrust::binary_function<thrust::pair<float, float>,
+                                                thrust::pair<float, float>,
+                                                thrust::pair<float, float>> {
+  __host__ __device__ thrust::pair<float, float> operator()(
+      thrust::pair<float, float> a, thrust::pair<float, float> b) {
+    a.first += b.first;
+    a.second += b.second;
+    return a;
   }
 };
 
@@ -451,7 +433,6 @@ struct AssignNormals {
 
     int iEdge = faceEdge[face];
     const int end = faceEdge[face + 1];
-    const int nEdge = end - iEdge;
     Halfedge edge = halfedges[iEdge];
     glm::vec3 edgeVec =
         glm::normalize(vertPos[edge.endVert] - vertPos[edge.startVert]);
@@ -711,9 +692,9 @@ void Manifold::Impl::AssembleFaces() {
   const VecH<int>& faceEdge = faceEdge_.H();
   for (int i = 0; i < NumFace(); ++i) {
     int start = faceEdge[i];
-    Manifold::Impl::NextEdges(nextHalfedge_.H().data().get() + start,
-                              halfedge_.H().data().get() + start,
-                              halfedge_.H().data().get() + faceEdge[i + 1]);
+    Manifold::Impl::NextEdges(&nextHalfedge_.H()[0] + start,
+                              &halfedge_.H()[0] + start,
+                              &halfedge_.H()[0] + faceEdge[i + 1]);
   }
 }
 
@@ -849,15 +830,14 @@ bool Manifold::Impl::IsManifold() const {
                         CheckManifold({halfedge_.cptrD(), faceEdge_.cptrD()}));
 }
 
-std::pair<float, float> Manifold::Impl::AreaVolume() const {
+Manifold::Properties Manifold::Impl::GetProperties() const {
   ApplyTransform();
   thrust::pair<float, float> areaVolume = thrust::transform_reduce(
       thrust::make_counting_iterator(0),
       thrust::make_counting_iterator(NumFace()),
       FaceAreaVolume({halfedge_.cptrD(), faceEdge_.cptrD(), vertPos_.cptrD()}),
-      thrust::make_pair(0.0f, 0.0f),
-      thrust::plus<thrust::pair<float, float>>());
-  return std::make_pair(areaVolume.first, areaVolume.second);
+      thrust::make_pair(0.0f, 0.0f), SumPair());
+  return {areaVolume.first, areaVolume.second};
 }
 
 void Manifold::Impl::CalculateBBox() {

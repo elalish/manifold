@@ -237,10 +237,6 @@ SparseIndices Filter01(const Manifold::Impl &inP, const Manifold::Impl &inQ,
   return p0q1;
 }
 
-struct Not_zero {
-  __host__ __device__ bool operator()(const int x) { return x != 0; }
-};
-
 struct AbsSum : public thrust::binary_function<int, int, int> {
   __host__ __device__ int operator()(int a, int b) { return abs(a) + abs(b); }
 };
@@ -757,9 +753,10 @@ __host__ __device__ int AtomicAddInt(int &target, int add) {
 #ifdef __CUDA_ARCH__
   return atomicAdd(&target, add);
 #else
+  int out;
 #pragma omp atomic
   {
-    int out = target;
+    out = target;
     target += add;
   }
   return out;
@@ -1042,7 +1039,8 @@ void AppendWholeEdges(Manifold::Impl &outR, VecDH<int> &facePtrR,
   thrust::for_each_n(zip(wholeHalfedgeP.beginD(), inP.halfedge_.beginD()),
                      inP.halfedge_.size(),
                      DuplicateHalfedges({outR.halfedge_.ptrD(), facePtrR.ptrD(),
-                                         i03.cptrD(), vP2R.cptrD(), faceP2R}));
+                                         inP.halfedge_.cptrD(), i03.cptrD(),
+                                         vP2R.cptrD(), faceP2R}));
 }
 }  // namespace
 
