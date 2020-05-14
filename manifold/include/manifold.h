@@ -51,14 +51,17 @@ class Manifold {
   static void SetCircularSegments(int number);
   static int GetCircularSegments(float radius);
 
+  struct Properties {
+    float surfaceArea, volume;
+  };
   // Information
   bool IsEmpty() const;
   int NumVert() const;
   int NumEdge() const;
   int NumFace() const;
   Box BoundingBox() const;
-  std::pair<float, float> AreaVolume() const;
   int Genus() const;
+  Properties GetProperties() const;
 
   // Modification
   Manifold& Translate(glm::vec3);

@@ -46,10 +46,6 @@ struct UpdateHalfedge {
   }
 };
 
-struct Positive {
-  __host__ __device__ bool operator()(int x) { return x >= 0; }
-};
-
 struct Equals {
   int val;
   __host__ __device__ bool operator()(int x) { return x == val; }
@@ -441,13 +437,13 @@ Box Manifold::BoundingBox() const {
   return pImpl_->bBox_.Transform(pImpl_->transform_);
 }
 
-std::pair<float, float> Manifold::AreaVolume() const {
-  return pImpl_->AreaVolume();
-}
-
 int Manifold::Genus() const {
   int chi = NumVert() - NumFace() / 2;
   return 1 - chi / 2;
+}
+
+Manifold::Properties Manifold::GetProperties() const {
+  return pImpl_->GetProperties();
 }
 
 bool Manifold::IsManifold() const { return pImpl_->IsManifold(); }

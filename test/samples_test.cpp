@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "samples.h"
+
 #include "gtest/gtest.h"
 #include "meshIO.h"
 #include "polygon.h"
@@ -27,8 +28,9 @@ TEST(Samples, Knot13) {
   //   ExportMesh("knot13.stl", knot13.Extract());
   ASSERT_TRUE(knot13.IsManifold());
   EXPECT_EQ(knot13.Genus(), 1);
-  EXPECT_NEAR(knot13.Volume(), 20786, 1);
-  EXPECT_NEAR(knot13.SurfaceArea(), 11177, 1);
+  auto prop = knot13.GetProperties();
+  EXPECT_NEAR(prop.volume, 20786, 1);
+  EXPECT_NEAR(prop.surfaceArea, 11177, 1);
 }
 
 // This creates two interlinked knots.
@@ -41,8 +43,10 @@ TEST(Samples, Knot42) {
   ASSERT_EQ(knots.size(), 2);
   EXPECT_EQ(knots[0].Genus(), 1);
   EXPECT_EQ(knots[1].Genus(), 1);
-  EXPECT_NEAR(knots[0].Volume(), knots[1].Volume(), 1);
-  EXPECT_NEAR(knots[0].SurfaceArea(), knots[1].SurfaceArea(), 1);
+  auto prop0 = knots[0].GetProperties();
+  auto prop1 = knots[1].GetProperties();
+  EXPECT_NEAR(prop0.volume, prop1.volume, 1);
+  EXPECT_NEAR(prop0.surfaceArea, prop1.surfaceArea, 1);
 }
 
 // This creates a bracelet sample which involves many operations between shapes

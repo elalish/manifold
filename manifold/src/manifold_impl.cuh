@@ -57,7 +57,7 @@ struct Manifold::Impl {
   int NumVert() const { return vertPos_.size(); }
   int NumEdge() const { return halfedge_.size() / 2; }
   int NumFace() const { return faceEdge_.size() - 1; }
-  std::pair<float, float> AreaVolume() const;
+  Properties GetProperties() const;
   void CalculateBBox();
 
   void SortVerts();
