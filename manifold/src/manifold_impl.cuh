@@ -61,6 +61,7 @@ struct Manifold::Impl {
   void CalculateBBox();
 
   void SortVerts();
+  void ReindexVerts(const VecDH<int>& vertNew2Old, int numOldVert);
   void GetFaceBoxMorton(VecDH<Box>& faceBox, VecDH<uint32_t>& faceMorton) const;
   void SortFaces(VecDH<Box>& faceBox, VecDH<uint32_t>& faceMorton);
   VecDH<int> FaceSize() const;

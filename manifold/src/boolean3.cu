@@ -12,12 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "boolean3.cuh"
-#include "connected_components.cuh"
-#include "polygon.h"
-
 #include <math_constants.h>
-#include <thrust/adjacent_difference.h>
 #include <thrust/binary_search.h>
 #include <thrust/count.h>
 #include <thrust/gather.h>
@@ -32,8 +27,13 @@
 #include <thrust/transform_reduce.h>
 #include <thrust/transform_scan.h>
 #include <thrust/unique.h>
+
 #include <algorithm>
 #include <map>
+
+#include "boolean3.cuh"
+#include "connected_components.cuh"
+#include "polygon.h"
 
 constexpr bool kVerbose = false;
 
@@ -178,7 +178,7 @@ SparseIndices Filter11(const Manifold::Impl &inP, const VecDH<int> &faceSizeP,
   const int secondStart = expandedIdxQ.H().back();
 
   VecDH<int> expandedIdxP(p2q1.size() + 1);
-  auto includedFaceSizeP = perm(faceSizeP.beginD(), p2q1.beginD(0));
+  auto includedFaceSizeP = perm(faceSizeP.beginD() + 1, p2q1.beginD(0));
   thrust::inclusive_scan(includedFaceSizeP, includedFaceSizeP + p2q1.size(),
                          expandedIdxP.beginD() + 1);
 
@@ -263,11 +263,10 @@ struct ShadowKernel01 {
     const float p0x = vertPosP[p0].x;
     const float q1sx = vertPosQ[q1s].x;
     const float q1ex = vertPosQ[q1e].x;
-    s01 = reverse
-              ? Shadows(q1sx, p0x, expandP * normalP[q1s].x) -
-                    Shadows(q1ex, p0x, expandP * normalP[q1e].x)
-              : Shadows(p0x, q1ex, expandP * normalP[p0].x) -
-                    Shadows(p0x, q1sx, expandP * normalP[p0].x);
+    s01 = reverse ? Shadows(q1sx, p0x, expandP * normalP[q1s].x) -
+                        Shadows(q1ex, p0x, expandP * normalP[q1e].x)
+                  : Shadows(p0x, q1ex, expandP * normalP[p0].x) -
+                        Shadows(p0x, q1sx, expandP * normalP[p0].x);
   }
 };
 
@@ -541,9 +540,10 @@ std::tuple<VecDH<int>, VecDH<float>> Shadow02(
   thrust::for_each_n(
       zip(z02.beginD(), s02.beginD(), p0q2.beginD(!forward),
           p0q2.beginD(forward)),
-      size, Kernel02({inP.vertPos_.cptrD(), p0q1.ptrDpq(), yz01.cptrD(),
-                      p0q1.size(), inQ.faceEdge_.cptrD(), inQ.halfedge_.cptrD(),
-                      forward, expandP, normalP}));
+      size,
+      Kernel02({inP.vertPos_.cptrD(), p0q1.ptrDpq(), yz01.cptrD(), p0q1.size(),
+                inQ.faceEdge_.cptrD(), inQ.halfedge_.cptrD(), forward, expandP,
+                normalP}));
 
   return std::make_tuple(s02, z02);
 };
@@ -680,9 +680,10 @@ std::tuple<VecDH<int>, VecDH<glm::vec3>> Intersect12(
 
   thrust::for_each_n(
       zip(x12.beginD(), p1q2.beginD(!forward), p1q2.beginD(forward)),
-      p1q2.size(), Gather12({p0q2.ptrDpq(), s02.ptrD(), p0q2.size(),
-                             p1q1.ptrDpq(), s11.ptrD(), p1q1.size(), halfedgesP,
-                             facesQ, halfedgesQ, forward}));
+      p1q2.size(),
+      Gather12({p0q2.ptrDpq(), s02.ptrD(), p0q2.size(), p1q1.ptrDpq(),
+                s11.ptrD(), p1q1.size(), halfedgesP, facesQ, halfedgesQ,
+                forward}));
 
   size_t size = p1q2.RemoveZeros(x12);
   v12.resize(size);
@@ -1055,12 +1056,8 @@ Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ,
   inP_.Tri2Face();
   inQ_.Tri2Face();
 
-  VecDH<int> faceSizeP(inP_.faceEdge_.size());
-  thrust::adjacent_difference(inP_.faceEdge_.beginD(), inP_.faceEdge_.endD(),
-                              faceSizeP.beginD());
-  VecDH<int> faceSizeQ(inQ_.faceEdge_.size());
-  thrust::adjacent_difference(inQ_.faceEdge_.beginD(), inQ_.faceEdge_.endD(),
-                              faceSizeQ.beginD());
+  VecDH<int> faceSizeP = inP_.FaceSize();
+  VecDH<int> faceSizeQ = inQ_.FaceSize();
 
   Time t0 = NOW();
   Time t1;
