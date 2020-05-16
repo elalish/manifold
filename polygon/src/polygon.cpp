@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "polygon.h"
+
 #include <algorithm>
 #include <iomanip>
 #include <iostream>
@@ -20,8 +22,6 @@
 #include <queue>
 #include <set>
 #include <stack>
-
-#include "polygon.h"
 
 namespace {
 using namespace manifold;
@@ -613,9 +613,11 @@ std::vector<Halfedge> Polygons2Edges(const Polygons &polys) {
   std::vector<Halfedge> halfedges;
   for (const auto &poly : polys) {
     for (int i = 1; i < poly.size(); ++i) {
-      halfedges.push_back({poly[i - 1].idx, poly[i].idx, poly[i - 1].nextEdge});
+      halfedges.push_back(
+          {poly[i - 1].idx, poly[i].idx, -1, poly[i - 1].nextEdge});
     }
-    halfedges.push_back({poly.back().idx, poly[0].idx, poly.back().nextEdge});
+    halfedges.push_back(
+        {poly.back().idx, poly[0].idx, -1, poly.back().nextEdge});
   }
   return halfedges;
 }
@@ -625,9 +627,9 @@ std::vector<Halfedge> Triangles2Edges(
   std::vector<Halfedge> halfedges;
   for (const glm::ivec3 &tri : triangles) {
     // Differentiate edges of triangles by setting index to Edge::kInterior.
-    halfedges.push_back({tri[0], tri[1], Edge::kInterior});
-    halfedges.push_back({tri[1], tri[2], Edge::kInterior});
-    halfedges.push_back({tri[2], tri[0], Edge::kInterior});
+    halfedges.push_back({tri[0], tri[1], -1, Edge::kInterior});
+    halfedges.push_back({tri[1], tri[2], -1, Edge::kInterior});
+    halfedges.push_back({tri[2], tri[0], -1, Edge::kInterior});
   }
   return halfedges;
 }
@@ -700,7 +702,7 @@ void CheckTopology(const std::vector<glm::ivec3> &triangles,
   std::vector<Halfedge> halfedges = Triangles2Edges(triangles);
   std::vector<Halfedge> openEdges = Polygons2Edges(polys);
   for (Halfedge e : openEdges) {
-    halfedges.push_back({e.endVert, e.startVert, e.face});
+    halfedges.push_back({e.endVert, e.startVert, -1, e.face});
   }
   CheckTopology(halfedges);
 }
