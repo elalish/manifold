@@ -19,6 +19,7 @@
 #include <thrust/sequence.h>
 #include <thrust/sort.h>
 #include <thrust/transform_reduce.h>
+
 #include <algorithm>
 #include <map>
 
@@ -369,18 +370,20 @@ struct ReindexFace {
   const int* faceEdge;
   const Halfedge* oldHalfedge;
   const int* oldFaceEdge;
+  const int* faceNew2Old;
   const int* faceOld2New;
 
   __host__ __device__ void operator()(thrust::tuple<int, int> in) {
-    const int oldFace = thrust::get<0>(in);
+    const int newFace = thrust::get<0>(in);
     int outEdge = thrust::get<1>(in);
 
+    const int oldFace = faceNew2Old[newFace];
     int iEdge = oldFaceEdge[oldFace];
     const int end = oldFaceEdge[oldFace + 1];
     while (iEdge < end) {
       Halfedge edge = oldHalfedge[iEdge++];
-      edge.face = faceOld2New[oldFace];
-      const int pairedFace = halfedge[edge.pairedHalfedge].face;
+      edge.face = newFace;
+      const int pairedFace = oldHalfedge[edge.pairedHalfedge].face;
       const int offset = edge.pairedHalfedge - oldFaceEdge[pairedFace];
       edge.pairedHalfedge = faceEdge[faceOld2New[pairedFace]] + offset;
       halfedge[outEdge++] = edge;
@@ -888,7 +891,7 @@ void Manifold::Impl::SortFaces(VecDH<Box>& faceBox,
 
   thrust::sort_by_key(faceMorton.beginD(), faceMorton.endD(),
                       zip(faceBox.beginD(), faceNew2Old.beginD(),
-                          faceSize.beginD(), faceNormal_.beginD()));
+                          faceSize.beginD() + 1, faceNormal_.beginD()));
 
   VecDH<Halfedge> oldHalfedge = halfedge_;
   VecDH<int> oldFaceEdge = faceEdge_;
@@ -911,13 +914,14 @@ void Manifold::Impl::GatherFaces(const VecDH<Halfedge>& oldHalfedge,
                   thrust::make_counting_iterator(NumFace()),
                   faceNew2Old.beginD(), faceOld2New.beginD());
 
-  thrust::inclusive_scan(faceSize.beginD(), faceSize.endD(),
+  thrust::inclusive_scan(faceSize.beginD() + 1, faceSize.endD(),
                          faceEdge_.beginD() + 1);
 
-  thrust::for_each_n(
-      zip(thrust::make_counting_iterator(0), faceEdge_.beginD()), NumFace(),
-      ReindexFace({halfedge_.ptrD(), faceEdge_.cptrD(), oldHalfedge.cptrD(),
-                   oldFaceEdge.cptrD(), faceOld2New.cptrD()}));
+  thrust::for_each_n(zip(thrust::make_counting_iterator(0), faceEdge_.beginD()),
+                     NumFace(),
+                     ReindexFace({halfedge_.ptrD(), faceEdge_.cptrD(),
+                                  oldHalfedge.cptrD(), oldFaceEdge.cptrD(),
+                                  faceNew2Old.cptrD(), faceOld2New.cptrD()}));
 }
 
 void Manifold::Impl::CalculateNormals() {
