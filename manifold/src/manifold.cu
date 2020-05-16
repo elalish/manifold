@@ -76,7 +76,7 @@ struct MakeTri {
     }
   }
 };
-}
+}  // namespace
 
 namespace manifold {
 
@@ -345,7 +345,6 @@ Manifold Manifold::Compose(const std::vector<Manifold>& manifolds) {
 
 std::vector<Manifold> Manifold::Decompose() const {
   std::vector<Manifold> meshes(pImpl_->numLabel_);
-  VecDH<int> vertOld2New(NumVert(), -1);
   for (int i = 0; i < pImpl_->numLabel_; ++i) {
     meshes[i].pImpl_->vertPos_.resize(NumVert());
     VecDH<int> vertNew2Old(NumVert());
@@ -359,9 +358,6 @@ std::vector<Manifold> Manifold::Decompose() const {
             Equals({i})) -
         zip(meshes[i].pImpl_->vertPos_.beginD(),
             thrust::make_counting_iterator(0));
-    thrust::scatter(thrust::make_counting_iterator(0),
-                    thrust::make_counting_iterator(nVert), vertNew2Old.beginD(),
-                    vertOld2New.beginD());
     meshes[i].pImpl_->vertPos_.resize(nVert);
 
     VecDH<int> faceNew2Old(NumFace());
@@ -369,14 +365,22 @@ std::vector<Manifold> Manifold::Decompose() const {
 
     VecDH<int> faceSize = pImpl_->FaceSize();
 
-    thrust::remove_if(
-        zip(faceNew2Old.beginD(), faceSize.beginD()),
-        zip(faceNew2Old.endD(), faceSize.endD()),
-        RemoveFace({pImpl_->halfedge_.cptrD(), pImpl_->faceEdge_.cptrD(),
-                    pImpl_->vertLabel_.cptrD(), i}));
+    auto start = zip(faceNew2Old.beginD(), faceSize.beginD() + 1);
+    int nFace =
+        thrust::remove_if(
+            start, zip(faceNew2Old.endD(), faceSize.endD()),
+            RemoveFace({pImpl_->halfedge_.cptrD(), pImpl_->faceEdge_.cptrD(),
+                        pImpl_->vertLabel_.cptrD(), i})) -
+        start;
+
+    faceNew2Old.resize(nFace);
+    faceSize.resize(nFace + 1);
+    meshes[i].pImpl_->halfedge_.resize(3 * nFace);
+    meshes[i].pImpl_->faceEdge_.resize(nFace + 1);
 
     meshes[i].pImpl_->GatherFaces(pImpl_->halfedge_, pImpl_->faceEdge_,
                                   faceNew2Old, faceSize);
+    meshes[i].pImpl_->ReindexVerts(vertNew2Old, pImpl_->NumVert());
 
     meshes[i].pImpl_->Finish();
     meshes[i].pImpl_->transform_ = pImpl_->transform_;
@@ -564,4 +568,4 @@ std::pair<Manifold, Manifold> Manifold::SplitByPlane(glm::vec3 normal,
   cutter.Rotate(0.0f, yDeg, zDeg);
   return Split(cutter);
 }
-}
+}  // namespace manifold

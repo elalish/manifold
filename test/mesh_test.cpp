@@ -106,7 +106,6 @@ TEST(Manifold, Decompose) {
   meshList.push_back(Manifold::Cube());
   meshList.push_back(Manifold::Octahedron());
   Manifold meshes = Manifold::Compose(meshList);
-  ASSERT_TRUE(meshes.IsManifold());
 
   ExpectMeshes(meshes, {{8, 12}, {6, 8}, {4, 4}});
 }

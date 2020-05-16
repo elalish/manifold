@@ -863,7 +863,12 @@ void Manifold::Impl::SortVerts() {
       vertMorton.beginD(), vertMorton.endD(),
       zip(vertPos_.beginD(), vertLabel_.beginD(), vertNew2Old.beginD()));
 
-  VecDH<int> vertOld2New(NumVert());
+  ReindexVerts(vertNew2Old, NumVert());
+}
+
+void Manifold::Impl::ReindexVerts(const VecDH<int>& vertNew2Old,
+                                  int oldNumVert) {
+  VecDH<int> vertOld2New(oldNumVert);
   thrust::scatter(thrust::make_counting_iterator(0),
                   thrust::make_counting_iterator(NumVert()),
                   vertNew2Old.beginD(), vertOld2New.beginD());
@@ -908,13 +913,13 @@ VecDH<int> Manifold::Impl::FaceSize() const {
 void Manifold::Impl::GatherFaces(const VecDH<Halfedge>& oldHalfedge,
                                  const VecDH<int>& oldFaceEdge,
                                  const VecDH<int>& faceNew2Old,
-                                 const VecDH<int>& faceSize) {
-  VecDH<int> faceOld2New(NumFace());
+                                 const VecDH<int>& newFaceSize) {
+  VecDH<int> faceOld2New(oldFaceEdge.size() - 1);
   thrust::scatter(thrust::make_counting_iterator(0),
                   thrust::make_counting_iterator(NumFace()),
                   faceNew2Old.beginD(), faceOld2New.beginD());
 
-  thrust::inclusive_scan(faceSize.beginD() + 1, faceSize.endD(),
+  thrust::inclusive_scan(newFaceSize.beginD() + 1, newFaceSize.endD(),
                          faceEdge_.beginD() + 1);
 
   thrust::for_each_n(zip(thrust::make_counting_iterator(0), faceEdge_.beginD()),
