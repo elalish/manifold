@@ -62,9 +62,7 @@ struct Manifold::Impl {
 
   void SortVerts();
   void ReindexVerts(const VecDH<int>& vertNew2Old, int numOldVert);
-  void GetFaceBoxMorton(VecDH<Box>& faceBox, VecDH<uint32_t>& faceMorton) const;
   void SortFaces(VecDH<Box>& faceBox, VecDH<uint32_t>& faceMorton);
-  VecDH<int> FaceSize() const;
   void GatherFaces(const VecDH<Halfedge>& oldHalfedge,
                    const VecDH<int>& oldFaceEdge, const VecDH<int>& faceNew2Old,
                    const VecDH<int>& faceSize);
@@ -72,10 +70,14 @@ struct Manifold::Impl {
 
   SparseIndices EdgeCollisions(const Impl& B) const;
   SparseIndices VertexCollisionsZ(const VecDH<glm::vec3>& vertsIn) const;
+  VecDH<int> FaceSize() const;
+  void GetFaceBoxMorton(VecDH<Box>& faceBox, VecDH<uint32_t>& faceMorton) const;
+  int GetLabels(VecDH<int>& components,
+                const VecDH<bool>& keep = VecDH<bool>()) const;
+  Polygons Face2Polygons(int face,
+                         std::function<glm::vec2(int)> vertProjection) const;
 
   static void NextEdges(int* nextEdge, const Halfedge* edgeBegin,
                         const Halfedge* edgeEnd);
-  Polygons Face2Polygons(int face,
-                         std::function<glm::vec2(int)> vertProjection) const;
 };
 }  // namespace manifold
