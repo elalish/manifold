@@ -722,8 +722,7 @@ VecDH<int> Winding03(const Manifold::Impl &inP, SparseIndices &p0q2,
 
   // find connected regions (separated by intersections)
   VecDH<int> vertLabels;
-  int n_comp =
-      ConnectedComponents(vertLabels, inP.NumVert(), inP.halfedge_, keepEdgesP);
+  int n_comp = inP.GetLabels(vertLabels, keepEdgesP);
   // flood the w03 values throughout their connected components (they are
   // consistent)
   FloodComponents(w03, vertLabels, n_comp);

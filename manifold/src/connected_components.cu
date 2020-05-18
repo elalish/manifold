@@ -14,9 +14,11 @@
 
 #include <nvgraph.h>
 #include <thrust/iterator/constant_iterator.h>
+
 #include <boost/config.hpp>
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/graph/connected_components.hpp>
+
 #include "connected_components.cuh"
 
 // 2^31-1 is nvgraph's unreachable flag
