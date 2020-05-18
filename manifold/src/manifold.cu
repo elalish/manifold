@@ -345,6 +345,10 @@ Manifold Manifold::Compose(const std::vector<Manifold>& manifolds) {
 
 std::vector<Manifold> Manifold::Decompose() const {
   std::vector<Manifold> meshes(pImpl_->numLabel_);
+  if (pImpl_->numLabel_ == 1) {
+    meshes[0] = DeepCopy();
+    return meshes;
+  }
   for (int i = 0; i < pImpl_->numLabel_; ++i) {
     meshes[i].pImpl_->vertPos_.resize(NumVert());
     VecDH<int> vertNew2Old(NumVert());
