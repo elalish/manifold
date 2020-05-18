@@ -790,6 +790,10 @@ struct CountNewVerts {
   }
 };
 
+struct NotZero : public thrust::unary_function<int, int> {
+  __host__ __device__ int operator()(int x) const { return x > 0 ? 1 : 0; }
+};
+
 VecDH<int> SizeOutput(Manifold::Impl &outR, const Manifold::Impl &inP,
                       const Manifold::Impl &inQ, const VecDH<int> &i03,
                       const VecDH<int> &i30, const VecDH<int> &i12,
@@ -810,17 +814,18 @@ VecDH<int> SizeOutput(Manifold::Impl &outR, const Manifold::Impl &inP,
       zip(p2q1.beginD(1), p2q1.beginD(0), i21.beginD()), i21.size(),
       CountNewVerts({sidesPerFaceQ, sidesPerFaceP, inQ.halfedge_.cptrD()}));
 
-  VecDH<int> facePQ2R(inP.NumFace() + inQ.NumFace() + 1);
-  thrust::inclusive_scan(sidesPerFacePQ.beginD(), sidesPerFacePQ.endD(),
-                         facePQ2R.beginD() + 1);
-
-  outR.halfedge_.resize(facePQ2R.H().back());
+  VecDH<int> facePQ2R(inP.NumFace() + inQ.NumFace());
+  auto keepFace =
+      thrust::make_transform_iterator(sidesPerFacePQ.beginD(), NotZero());
+  thrust::exclusive_scan(keepFace, keepFace + sidesPerFacePQ.size(),
+                         facePQ2R.beginD());
 
   auto newEnd =
       thrust::remove(sidesPerFacePQ.beginD(), sidesPerFacePQ.endD(), 0);
   outR.faceEdge_.resize(newEnd - sidesPerFacePQ.beginD() + 1);
   thrust::inclusive_scan(sidesPerFacePQ.beginD(), newEnd,
                          outR.faceEdge_.beginD() + 1);
+  outR.halfedge_.resize(outR.faceEdge_.H().back());
 
   return facePQ2R;
 }
@@ -853,8 +858,12 @@ struct DuplicateHalfedges {
     Halfedge backward = {halfedge.endVert, halfedge.startVert, -1, faceRight};
 
     for (int i = 0; i < glm::abs(inclusion); ++i) {
-      halfedgesR[AtomicAddInt(facePtr[halfedge.face], 1)] = halfedge;
-      halfedgesR[AtomicAddInt(facePtr[faceRight], 1)] = backward;
+      int forwardIdx = AtomicAddInt(facePtr[halfedge.face], 1);
+      int backwardIdx = AtomicAddInt(facePtr[faceRight], 1);
+      halfedge.pairedHalfedge = backwardIdx;
+      backward.pairedHalfedge = forwardIdx;
+      halfedgesR[forwardIdx] = halfedge;
+      halfedgesR[backwardIdx] = backward;
     }
   }
 };
@@ -883,25 +892,25 @@ void AddNewEdgeVerts(
     const int vert = v12R[i];
     const int inclusion = i12[i];
 
-    const auto edgePosP = edgesP.insert({edgeP, {}});
+    auto &edgePosP = edgesP[edgeP];
 
     Halfedge halfedge = halfedgeP[edgeP];
     std::pair<int, int> key = {halfedgeP[halfedge.pairedHalfedge].face, faceQ};
     if (!forward) std::swap(key.first, key.second);
-    const auto edgePosRight = edgesNew.insert({key, {}});
+    auto &edgePosRight = edgesNew[key];
 
     key = {halfedge.face, faceQ};
     if (!forward) std::swap(key.first, key.second);
-    const auto edgePosLeft = edgesNew.insert({key, {}});
+    auto &edgePosLeft = edgesNew[key];
 
     EdgePos edgePos = {vert, 0.0f, inclusion < 0};
     EdgePos edgePosRev = edgePos;
     edgePosRev.isStart = !edgePos.isStart;
 
     for (int j = 0; j < glm::abs(inclusion); ++j) {
-      edgePosP.first->second.push_back(edgePos);
-      edgePosRight.first->second.push_back(forward ? edgePos : edgePosRev);
-      edgePosLeft.first->second.push_back(forward ? edgePosRev : edgePos);
+      edgePosP.push_back(edgePos);
+      edgePosRight.push_back(forward ? edgePos : edgePosRev);
+      edgePosLeft.push_back(forward ? edgePosRev : edgePos);
       ++edgePos.vert;
       ++edgePosRev.vert;
     }
@@ -979,8 +988,8 @@ void AppendPartialEdges(
     std::vector<Halfedge> edges = PairUp(edgePosP);
 
     // add halfedges to result
-    const int faceLeft = *(faceP2R + halfedge.face);
-    const int faceRight = *(faceP2R + halfedgeP[halfedge.pairedHalfedge].face);
+    const int faceLeft = faceP2R[halfedge.face];
+    const int faceRight = faceP2R[halfedgeP[halfedge.pairedHalfedge].face];
     for (Halfedge e : edges) {
       const int forwardEdge = facePtrR[faceLeft]++;
       const int backwardEdge = facePtrR[faceRight]++;
