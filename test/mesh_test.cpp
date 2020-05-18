@@ -186,7 +186,7 @@ TEST(Manifold, BooleanTetra) {
   tetra2.Translate(glm::vec3(0.5f));
   Manifold result = tetra2 - tetra;
 
-  ExpectMeshes(result, {{8, 12}});
+  ExpectMeshes(result, {{8, 7}});
 }
 
 /**
