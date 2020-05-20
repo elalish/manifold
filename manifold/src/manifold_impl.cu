@@ -719,12 +719,33 @@ void Manifold::Impl::AssembleFaces() const {
 
 void Manifold::Impl::AssembleFaces() {
   nextHalfedge_.resize(halfedge_.size());
+  VecH<int>& nextHalfedge = nextHalfedge_.H();
   const VecH<int>& faceEdge = faceEdge_.H();
-  for (int i = 0; i < NumFace(); ++i) {
-    int start = faceEdge[i];
-    Manifold::Impl::NextEdges(&nextHalfedge_.H()[0] + start,
-                              &halfedge_.H()[0] + start,
-                              &halfedge_.H()[0] + faceEdge[i + 1]);
+  const VecH<Halfedge>& halfedge = halfedge_.H();
+
+  for (int face = 0; face < NumFace(); ++face) {
+    std::map<int, int> vert_edge;
+    for (int edge = faceEdge[face]; edge < faceEdge[face + 1]; ++edge) {
+      ALWAYS_ASSERT(
+          vert_edge.emplace(std::make_pair(halfedge[edge].startVert, edge))
+              .second,
+          runtimeErr, "polygon has duplicate vertices.");
+    }
+
+    int startEdge = 0;
+    int thisEdge = startEdge;
+    while (1) {
+      if (thisEdge == startEdge) {
+        if (vert_edge.empty()) break;
+        startEdge = vert_edge.begin()->second;
+        thisEdge = startEdge;
+      }
+      const auto result = vert_edge.find(halfedge[thisEdge].endVert);
+      ALWAYS_ASSERT(result != vert_edge.end(), runtimeErr, "nonmanifold edge");
+      nextHalfedge[thisEdge] = result->second;
+      thisEdge = result->second;
+      vert_edge.erase(result);
+    }
   }
 }
 
@@ -987,33 +1008,6 @@ SparseIndices Manifold::Impl::EdgeCollisions(const Impl& Q) const {
 SparseIndices Manifold::Impl::VertexCollisionsZ(
     const VecDH<glm::vec3>& vertsIn) const {
   return collider_.Collisions(vertsIn);
-}
-
-void Manifold::Impl::NextEdges(int* nextHalfedge, const Halfedge* edgeBegin,
-                               const Halfedge* edgeEnd) {
-  int numEdge = edgeEnd - edgeBegin;
-  std::map<int, int> vert_edge;
-  for (int i = 0; i < numEdge; ++i) {
-    ALWAYS_ASSERT(
-        vert_edge.emplace(std::make_pair(edgeBegin[i].startVert, i)).second,
-        runtimeErr, "polygon has duplicate vertices.");
-  }
-
-  auto startEdge = edgeBegin;
-  auto thisEdge = edgeBegin;
-  for (;;) {
-    if (thisEdge == startEdge) {
-      if (vert_edge.empty()) break;
-      startEdge = std::next(edgeBegin, vert_edge.begin()->second);
-      thisEdge = startEdge;
-    }
-    auto result = vert_edge.find(thisEdge->endVert);
-    ALWAYS_ASSERT(result != vert_edge.end(), runtimeErr, "nonmanifold edge");
-    auto nextEdge = std::next(edgeBegin, result->second);
-    nextHalfedge[thisEdge - edgeBegin] = result->second;
-    thisEdge = nextEdge;
-    vert_edge.erase(result);
-  }
 }
 
 Polygons Manifold::Impl::Face2Polygons(

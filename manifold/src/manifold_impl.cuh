@@ -76,8 +76,5 @@ struct Manifold::Impl {
                 const VecDH<bool>& keep = VecDH<bool>()) const;
   Polygons Face2Polygons(int face,
                          std::function<glm::vec2(int)> vertProjection) const;
-
-  static void NextEdges(int* nextEdge, const Halfedge* edgeBegin,
-                        const Halfedge* edgeEnd);
 };
 }  // namespace manifold
