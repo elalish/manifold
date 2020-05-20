@@ -939,7 +939,7 @@ std::vector<Halfedge> PairUp(std::vector<EdgePos> &edgePos) {
 }
 
 void AppendPartialEdges(
-    Manifold::Impl &outR, VecH<bool> wholeHalfedgeP, VecH<int> &facePtrR,
+    Manifold::Impl &outR, VecH<bool> &wholeHalfedgeP, VecH<int> &facePtrR,
     std::map<int, std::vector<EdgePos>> &edgesP, const Manifold::Impl &inP,
     const VecH<int> &i03, const VecH<int> &vP2R,
     const thrust::host_vector<int>::const_iterator faceP2R) {
