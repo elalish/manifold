@@ -13,15 +13,15 @@
 // limitations under the License.
 
 #pragma once
-#include "structs.h"
-#include "utils.cuh"
-#include "vec_dh.cuh"
-
 #include <thrust/binary_search.h>
 #include <thrust/gather.h>
 #include <thrust/remove.h>
 #include <thrust/sort.h>
 #include <thrust/unique.h>
+
+#include "structs.h"
+#include "utils.cuh"
+#include "vec_dh.cuh"
 
 namespace manifold {
 
@@ -111,6 +111,16 @@ class SparseIndices {
     thrust::gather_if(temp.beginD(), temp.endD(), found.beginD(), val.beginD(),
                       result.beginD());
     return result;
+  }
+
+  void Dump() const {
+    const auto& p = Get(0).H();
+    const auto& q = Get(1).H();
+    std::cout << "SparseIndices = " << std::endl;
+    for (int i = 0; i < size(); ++i) {
+      std::cout << i << ", p = " << p[i] << ", q = " << q[i] << std::endl;
+    }
+    std::cout << std::endl;
   }
 
  private:

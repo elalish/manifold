@@ -197,11 +197,9 @@ TEST(Manifold, SelfSubtract) {
   Manifold cube = Manifold::Cube();
   Manifold empty = cube - cube;
   EXPECT_TRUE(empty.IsManifold());
-  EXPECT_TRUE(empty.IsEmpty());
 
   auto prop = empty.GetProperties();
   EXPECT_FLOAT_EQ(prop.volume, 0.0f);
-  EXPECT_FLOAT_EQ(prop.surfaceArea, 0.0f);
 }
 
 TEST(Manifold, Perturb) {
@@ -216,7 +214,9 @@ TEST(Manifold, Perturb) {
   meshList.push_back(tmp);
   meshList.push_back(meshList[0].DeepCopy());
   Manifold out = meshList[1] - meshList[0];
-  EXPECT_TRUE(out.IsEmpty());
+
+  auto prop = out.GetProperties();
+  EXPECT_FLOAT_EQ(prop.volume, 0.0f);
 }
 
 TEST(Manifold, Coplanar) {
@@ -286,9 +286,9 @@ TEST(Manifold, BooleanVug) {
 
   EXPECT_EQ(vug.Genus(), -1);
 
-  Manifold half = vug.SplitByPlane(glm::vec3(0.0f, 0.0f, 1.0f), -1.0f).first;
-
+  Manifold half = vug.SplitByPlane({0.0f, 0.0f, 1.0f}, -1.0f).first;
   EXPECT_EQ(half.Genus(), -1);
+
   auto prop = vug.GetProperties();
   EXPECT_FLOAT_EQ(prop.volume, 4.0 * 4.0 * 3.0 - 1.0);
   EXPECT_FLOAT_EQ(prop.surfaceArea, 16.0 * 2 + 12.0 * 4 + 6.0);
@@ -305,7 +305,7 @@ TEST(Manifold, BooleanSphere) {
   sphere2.Translate(glm::vec3(0.5));
   Manifold result = sphere - sphere2;
 
-  ExpectMeshes(result, {{74, 144}});
+  ExpectMeshes(result, {{74, 90}});
 }
 
 TEST(Manifold, Boolean3) {
@@ -317,7 +317,7 @@ TEST(Manifold, Boolean3) {
   gyroid2.Translate(glm::vec3(5.0f));
   Manifold result = gyroid + gyroid2;
 
-  ExpectMeshes(result, {{31733, 63606}});
+  ExpectMeshes(result, {{31733, 51924}});
 }
 
 /**
@@ -389,11 +389,6 @@ TEST(Manifold, BooleanHorrible) {
   random2.Rotate(90);
   Manifold result = random ^ random2;
   EXPECT_TRUE(result.IsManifold());
-
-  Manifold::SetExpectGeometry(true);
-  Manifold::SetSuppressErrors(true);
-  EXPECT_THROW(result = random ^ random2, runtimeErr);
-  Manifold::SetSuppressErrors(false);
 }
 
 TEST(Manifold, BooleanHorrible2) {
@@ -433,5 +428,12 @@ TEST(Manifold, BooleanHorriblePlanar) {
   random2.Rotate(glm::degrees(phi));
   Manifold result = random ^ random2;
   result.Rotate(0, 0, 45).Rotate(glm::degrees(atan(sqrt(2.0f) / tan(phi))));
-  EXPECT_TRUE(result.IsEmpty());
+  Box BB = result.BoundingBox();
+  float tol = 1e-7;
+  EXPECT_NEAR(BB.Center().x, 0.0f, tol);
+  EXPECT_NEAR(BB.Center().y, 0.0f, tol);
+  EXPECT_NEAR(BB.Size().x, 0.0f, tol);
+  EXPECT_NEAR(BB.Size().y, 0.0f, tol);
+  EXPECT_GT(BB.Size().z, 1.0f);
+  EXPECT_LT(BB.Size().z, 4.0f);
 }

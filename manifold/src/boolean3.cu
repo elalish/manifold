@@ -52,7 +52,7 @@ __host__ __device__ glm::vec2 Interpolate(glm::vec3 pL, glm::vec3 pR, float x) {
   float dxR = x - pR.x;
   bool useL = fabs(dxL) < fabs(dxR);
   float lambda = (useL ? dxL : dxR) / (pR.x - pL.x);
-  if (isnan(lambda)) return glm::vec2(pL.y, pL.z);
+  if (!isfinite(lambda)) return glm::vec2(pL.y, pL.z);
   glm::vec2 yz;
   yz[0] = (useL ? pL.y : pR.y) + lambda * (pR.y - pL.y);
   yz[1] = (useL ? pL.z : pR.z) + lambda * (pR.z - pL.z);
@@ -68,7 +68,7 @@ __host__ __device__ glm::vec4 Intersect(const glm::vec3 &pL,
   bool useL = fabs(dyL) < fabs(dyR);
   float dx = pR.x - pL.x;
   float lambda = (useL ? dyL : dyR) / (dyL - dyR);
-  if (isnan(lambda)) lambda = 0.0f;
+  if (!isfinite(lambda)) lambda = 0.0f;
   glm::vec4 xyzz;
   xyzz.x = (useL ? pL.x : pR.x) + lambda * dx;
   float pDy = pR.y - pL.y;
@@ -172,7 +172,7 @@ SparseIndices Filter11(const Manifold::Impl &inP, const VecDH<int> &faceSizeP,
                        const Manifold::Impl &inQ, const VecDH<int> &faceSizeQ,
                        const SparseIndices &p1q2, const SparseIndices &p2q1) {
   VecDH<int> expandedIdxQ(p1q2.size() + 1);
-  auto includedFaceSizeQ = perm(faceSizeQ.beginD(), p1q2.beginD(1));
+  auto includedFaceSizeQ = perm(faceSizeQ.beginD() + 1, p1q2.beginD(1));
   thrust::inclusive_scan(includedFaceSizeQ, includedFaceSizeQ + p1q2.size(),
                          expandedIdxQ.beginD() + 1);
   const int secondStart = expandedIdxQ.H().back();
@@ -218,7 +218,7 @@ SparseIndices Filter01(const Manifold::Impl &inP, const Manifold::Impl &inQ,
                        const VecDH<int> &faceSizeQ, const SparseIndices &p0q2,
                        const SparseIndices &p1q1) {
   VecDH<int> expandedIdxQ(p0q2.size() + 1);
-  auto includedFaceSizeQ = perm(faceSizeQ.beginD(), p0q2.beginD(1));
+  auto includedFaceSizeQ = perm(faceSizeQ.beginD() + 1, p0q2.beginD(1));
   thrust::inclusive_scan(includedFaceSizeQ, includedFaceSizeQ + p0q2.size(),
                          expandedIdxQ.beginD() + 1);
   const int secondStart = expandedIdxQ.H().back();
