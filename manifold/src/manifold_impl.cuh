@@ -74,7 +74,6 @@ struct Manifold::Impl {
   void GetFaceBoxMorton(VecDH<Box>& faceBox, VecDH<uint32_t>& faceMorton) const;
   int GetLabels(VecDH<int>& components,
                 const VecDH<bool>& keep = VecDH<bool>()) const;
-  Polygons Face2Polygons(int face,
-                         std::function<glm::vec2(int)> vertProjection) const;
+  Polygons Face2Polygons(int face, glm::mat3x2 projection) const;
 };
 }  // namespace manifold
