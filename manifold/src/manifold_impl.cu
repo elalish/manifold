@@ -798,10 +798,7 @@ bool Manifold::Impl::Face2Tri() {
       triNormal.push_back(normal);
     } else {  // General triangulation
       const glm::mat3x2 projection = GetAxisAlignedProjection(normal);
-      Polygons polys =
-          Manifold::Impl::Face2Polygons(i, [&vertPos, &projection](int vert) {
-            return projection * vertPos[vert];
-          });
+      Polygons polys = Face2Polygons(i, projection);
       std::vector<glm::ivec3> newTris;
       try {
         newTris = Triangulate(polys);
@@ -1010,11 +1007,11 @@ SparseIndices Manifold::Impl::VertexCollisionsZ(
   return collider_.Collisions(vertsIn);
 }
 
-Polygons Manifold::Impl::Face2Polygons(
-    int face, std::function<glm::vec2(int)> vertProjection) const {
+Polygons Manifold::Impl::Face2Polygons(int face, glm::mat3x2 projection) const {
   const VecH<int>& faceEdge = faceEdge_.H();
   const VecH<Halfedge>& halfedge = halfedge_.H();
   const VecH<int>& nextHalfedge = nextHalfedge_.H();
+  const VecH<glm::vec3>& vertPos = vertPos_.H();
   const int edge = faceEdge[face];
   const int lastEdge = faceEdge[face + 1];
 
@@ -1022,7 +1019,7 @@ Polygons Manifold::Impl::Face2Polygons(
   std::vector<bool> visited(lastEdge - edge, false);
   int startEdge = edge;
   int thisEdge = edge;
-  for (;;) {
+  while (1) {
     if (thisEdge == startEdge) {
       auto next = std::find(visited.begin(), visited.end(), false);
       if (next == visited.end()) break;
@@ -1031,8 +1028,9 @@ Polygons Manifold::Impl::Face2Polygons(
       polys.push_back({});
     }
     int vert = halfedge[thisEdge].startVert;
-    polys.back().push_back(
-        {vertProjection(vert), vert, halfedge[thisEdge].face});
+    polys.back().push_back({projection * vertPos[vert], vert,
+                            halfedge[halfedge[thisEdge].pairedHalfedge].face});
+    visited[thisEdge - edge] = true;
     thisEdge = nextHalfedge[thisEdge];
   }
   return polys;
