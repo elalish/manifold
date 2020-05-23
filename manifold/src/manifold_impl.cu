@@ -674,9 +674,9 @@ void Manifold::Impl::Finish() {
   VecDH<Box> faceBox;
   VecDH<uint32_t> faceMorton;
   GetFaceBoxMorton(faceBox, faceMorton);
+  SortFaces(faceBox, faceMorton);
   AssembleFaces();
   CalculateNormals();
-  SortFaces(faceBox, faceMorton);
   collider_ = Collider(faceBox, faceMorton);
 }
 
@@ -939,9 +939,15 @@ void Manifold::Impl::SortFaces(VecDH<Box>& faceBox,
 
   VecDH<int> faceSize = FaceSize();
 
-  thrust::sort_by_key(faceMorton.beginD(), faceMorton.endD(),
-                      zip(faceBox.beginD(), faceNew2Old.beginD(),
-                          faceSize.beginD() + 1, faceNormal_.beginD()));
+  if (faceNormal_.size() == NumFace()) {
+    thrust::sort_by_key(faceMorton.beginD(), faceMorton.endD(),
+                        zip(faceBox.beginD(), faceNew2Old.beginD(),
+                            faceSize.beginD() + 1, faceNormal_.beginD()));
+  } else {
+    thrust::sort_by_key(
+        faceMorton.beginD(), faceMorton.endD(),
+        zip(faceBox.beginD(), faceNew2Old.beginD(), faceSize.beginD() + 1));
+  }
 
   VecDH<Halfedge> oldHalfedge = halfedge_;
   VecDH<int> oldFaceEdge = faceEdge_;
@@ -977,6 +983,8 @@ void Manifold::Impl::GatherFaces(const VecDH<Halfedge>& oldHalfedge,
 void Manifold::Impl::CalculateNormals() {
   vertNormal_.resize(NumVert());
   bool calculateTriNormal = false;
+  // faceNormal_.Dump();
+  // faceNormal_.resize(0);
   if (faceNormal_.size() != NumFace()) {
     faceNormal_.resize(NumFace());
     calculateTriNormal = true;
@@ -987,6 +995,7 @@ void Manifold::Impl::CalculateNormals() {
                      nextHalfedge_.cptrD(), faceEdge_.cptrD(),
                      calculateTriNormal}));
   thrust::for_each(vertNormal_.begin(), vertNormal_.end(), NormalizeTo({1.0}));
+  // faceNormal_.Dump();
 }
 
 SparseIndices Manifold::Impl::EdgeCollisions(const Impl& Q) const {
@@ -1012,25 +1021,25 @@ Polygons Manifold::Impl::Face2Polygons(int face, glm::mat3x2 projection) const {
   const VecH<Halfedge>& halfedge = halfedge_.H();
   const VecH<int>& nextHalfedge = nextHalfedge_.H();
   const VecH<glm::vec3>& vertPos = vertPos_.H();
-  const int edge = faceEdge[face];
+  const int firstEdge = faceEdge[face];
   const int lastEdge = faceEdge[face + 1];
 
   Polygons polys;
-  std::vector<bool> visited(lastEdge - edge, false);
-  int startEdge = edge;
-  int thisEdge = edge;
+  std::vector<bool> visited(lastEdge - firstEdge, false);
+  int startEdge = firstEdge;
+  int thisEdge = firstEdge;
   while (1) {
     if (thisEdge == startEdge) {
       auto next = std::find(visited.begin(), visited.end(), false);
       if (next == visited.end()) break;
-      startEdge = next - visited.begin();
+      startEdge = next - visited.begin() + firstEdge;
       thisEdge = startEdge;
       polys.push_back({});
     }
     int vert = halfedge[thisEdge].startVert;
     polys.back().push_back({projection * vertPos[vert], vert,
                             halfedge[halfedge[thisEdge].pairedHalfedge].face});
-    visited[thisEdge - edge] = true;
+    visited[thisEdge - firstEdge] = true;
     thisEdge = nextHalfedge[thisEdge];
   }
   return polys;

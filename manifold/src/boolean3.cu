@@ -797,7 +797,7 @@ VecDH<int> SizeOutput(Manifold::Impl &outR, const Manifold::Impl &inP,
                       const Manifold::Impl &inQ, const VecDH<int> &i03,
                       const VecDH<int> &i30, const VecDH<int> &i12,
                       const VecDH<int> &i21, const SparseIndices &p1q2,
-                      const SparseIndices &p2q1) {
+                      const SparseIndices &p2q1, bool invertQ) {
   VecDH<int> sidesPerFacePQ(inP.NumFace() + inQ.NumFace());
   auto sidesPerFaceP = sidesPerFacePQ.ptrD();
   auto sidesPerFaceQ = sidesPerFacePQ.ptrD() + inP.NumFace();
@@ -813,11 +813,29 @@ VecDH<int> SizeOutput(Manifold::Impl &outR, const Manifold::Impl &inP,
       zip(p2q1.beginD(1), p2q1.beginD(0), i21.beginD()), i21.size(),
       CountNewVerts({sidesPerFaceQ, sidesPerFaceP, inQ.halfedge_.cptrD()}));
 
-  VecDH<int> facePQ2R(inP.NumFace() + inQ.NumFace());
+  VecDH<int> facePQ2R(inP.NumFace() + inQ.NumFace() + 1);
   auto keepFace =
       thrust::make_transform_iterator(sidesPerFacePQ.beginD(), NotZero());
-  thrust::exclusive_scan(keepFace, keepFace + sidesPerFacePQ.size(),
-                         facePQ2R.beginD());
+  thrust::inclusive_scan(keepFace, keepFace + sidesPerFacePQ.size(),
+                         facePQ2R.beginD() + 1);
+  int numFaceR = facePQ2R.H().back();
+  facePQ2R.resize(inP.NumFace() + inQ.NumFace());
+
+  outR.faceNormal_.resize(numFaceR);
+  auto next =
+      thrust::copy_if(inP.faceNormal_.begin(), inP.faceNormal_.end(), keepFace,
+                      outR.faceNormal_.begin(), thrust::identity<bool>());
+  if (invertQ) {
+    auto start = thrust::make_transform_iterator(inQ.faceNormal_.begin(),
+                                                 thrust::negate<glm::vec3>());
+    auto end = thrust::make_transform_iterator(inQ.faceNormal_.end(),
+                                               thrust::negate<glm::vec3>());
+    thrust::copy_if(start, end, keepFace + inP.NumFace(), next,
+                    thrust::identity<bool>());
+  } else {
+    thrust::copy_if(inQ.faceNormal_.begin(), inQ.faceNormal_.end(),
+                    keepFace + inP.NumFace(), next, thrust::identity<bool>());
+  }
 
   auto newEnd =
       thrust::remove(sidesPerFacePQ.beginD(), sidesPerFacePQ.endD(), 0);
@@ -1306,8 +1324,8 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
 
   // Level 4
 
-  VecDH<int> facePQ2R =
-      SizeOutput(outR, inP_, inQ_, i03, i30, i12, i21, p1q2_, p2q1_);
+  VecDH<int> facePQ2R = SizeOutput(outR, inP_, inQ_, i03, i30, i12, i21, p1q2_,
+                                   p2q1_, op == Manifold::OpType::SUBTRACT);
 
   // This gets incremented for each halfedge that's added to a face so that the
   // next one knows where to slot in.
