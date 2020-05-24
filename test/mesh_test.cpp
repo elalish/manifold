@@ -289,9 +289,7 @@ TEST(Manifold, BooleanVug) {
   Manifold half = vug.SplitByPlane({0.0f, 0.0f, 1.0f}, -1.0f).first;
   EXPECT_EQ(half.Genus(), -1);
 
-  ExportMesh("data/half.ply", half.Extract());
-
-  auto prop = vug.GetProperties();
+  auto prop = half.GetProperties();
   EXPECT_FLOAT_EQ(prop.volume, 4.0 * 4.0 * 3.0 - 1.0);
   EXPECT_FLOAT_EQ(prop.surfaceArea, 16.0 * 2 + 12.0 * 4 + 6.0);
 }
