@@ -446,7 +446,7 @@ Box Manifold::BoundingBox() const {
 }
 
 int Manifold::Genus() const {
-  int chi = NumVert() - NumFace() / 2;
+  int chi = NumVert() - NumEdge() + NumFace();
   return 1 - chi / 2;
 }
 

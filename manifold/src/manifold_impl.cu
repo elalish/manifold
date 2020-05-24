@@ -417,30 +417,26 @@ struct AssignNormals {
 
     if (calculateTriNormal) {
       triNormal = glm::vec3(0.0f);
-      int iEdge = faceEdge[face];
+      int edge = faceEdge[face];
+      const glm::vec3 anchor = vertPos[halfedges[edge].startVert];
       const int end = faceEdge[face + 1];
-      Halfedge edge = halfedges[iEdge];
-      glm::vec3 edgeVec = vertPos[edge.endVert] - vertPos[edge.startVert];
-      while (iEdge < end) {
-        Halfedge nextEdge = halfedges[nextHalfedge[iEdge]];
-        glm::vec3 nextEdgeVec =
-            vertPos[nextEdge.endVert] - vertPos[nextEdge.startVert];
-        triNormal += glm::cross(edgeVec, nextEdgeVec);
-        edge = nextEdge;
-        edgeVec = nextEdgeVec;
-        ++iEdge;
+      while (edge < end) {
+        const Halfedge halfedge = halfedges[edge++];
+        const glm::vec3 start = vertPos[halfedge.startVert];
+        const glm::vec3 edgeVec = vertPos[halfedge.endVert] - start;
+        triNormal += glm::cross(start - anchor, edgeVec);
       }
       triNormal = glm::normalize(triNormal);
       if (isnan(triNormal.x)) triNormal = glm::vec3(0.0);
     }
 
-    int iEdge = faceEdge[face];
-    const int end = faceEdge[face + 1];
-    Halfedge edge = halfedges[iEdge];
+    const int start = faceEdge[face];
+    int next = nextHalfedge[start];
+    Halfedge edge = halfedges[start];
     glm::vec3 edgeVec =
         glm::normalize(vertPos[edge.endVert] - vertPos[edge.startVert]);
-    while (iEdge < end) {
-      Halfedge nextEdge = halfedges[nextHalfedge[iEdge]];
+    while (next != start) {
+      Halfedge nextEdge = halfedges[next];
       glm::vec3 nextEdgeVec = glm::normalize(vertPos[nextEdge.endVert] -
                                              vertPos[nextEdge.startVert]);
       // corner angle
@@ -449,7 +445,7 @@ struct AssignNormals {
                     glm::max(phi, kTolerance) * triNormal);
       edge = nextEdge;
       edgeVec = nextEdgeVec;
-      ++iEdge;
+      next = nextHalfedge[next];
     }
   }
 };
@@ -983,8 +979,6 @@ void Manifold::Impl::GatherFaces(const VecDH<Halfedge>& oldHalfedge,
 void Manifold::Impl::CalculateNormals() {
   vertNormal_.resize(NumVert());
   bool calculateTriNormal = false;
-  // faceNormal_.Dump();
-  // faceNormal_.resize(0);
   if (faceNormal_.size() != NumFace()) {
     faceNormal_.resize(NumFace());
     calculateTriNormal = true;
@@ -995,7 +989,6 @@ void Manifold::Impl::CalculateNormals() {
                      nextHalfedge_.cptrD(), faceEdge_.cptrD(),
                      calculateTriNormal}));
   thrust::for_each(vertNormal_.begin(), vertNormal_.end(), NormalizeTo({1.0}));
-  // faceNormal_.Dump();
 }
 
 SparseIndices Manifold::Impl::EdgeCollisions(const Impl& Q) const {
