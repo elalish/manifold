@@ -392,9 +392,10 @@ std::vector<Manifold> Manifold::Decompose() const {
   return meshes;
 }
 
-Mesh Manifold::Extract() const {
+Mesh Manifold::Extract() {
   pImpl_->ApplyTransform();
   pImpl_->Face2Tri();
+  pImpl_->Finish();
   Mesh result;
 
   result.vertPos.insert(result.vertPos.end(), pImpl_->vertPos_.begin(),

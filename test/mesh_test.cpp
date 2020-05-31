@@ -232,9 +232,16 @@ TEST(Manifold, MultiCoplanar) {
   Manifold::SetExpectGeometry(true);
   Manifold cube = Manifold::Cube();
   Manifold cube2 = cube.DeepCopy();
-  Manifold out = cube - cube2.Translate({0.3f, 0.3f, 0.0f});
-  out = out - cube.Translate({-0.3f, -0.3f, 0.0f});
+  Manifold first = cube - cube2.Translate({0.3f, 0.3f, 0.0f});
+  cube.Translate({-0.3f, -0.3f, 0.0f});
+  Manifold out = first - cube;
+  first.Extract();  // Force triangulation and compare results
+  Manifold out2 = first - cube;
   EXPECT_EQ(out.Genus(), -1);
+  auto prop = out.GetProperties();
+  auto prop2 = out2.GetProperties();
+  EXPECT_NEAR(prop.volume, prop2.volume, 1e-5);
+  EXPECT_NEAR(prop.surfaceArea, prop2.surfaceArea, 1e-5);
 }
 
 /**

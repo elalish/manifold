@@ -15,6 +15,7 @@
 #pragma once
 #include <functional>
 #include <memory>
+
 #include "structs.h"
 
 namespace manifold {
@@ -42,8 +43,8 @@ class Manifold {
   static Manifold Compose(const std::vector<Manifold>&);
   std::vector<Manifold> Decompose() const;
 
-  // Extraction
-  Mesh Extract() const;
+  // Extraction is not const because it triangulates the Manifold.
+  Mesh Extract();
 
   // Defaults for construction
   static void SetMinCircularAngle(float degrees);
