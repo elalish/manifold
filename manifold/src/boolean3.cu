@@ -125,14 +125,13 @@ SparseIndices Filter02(const Manifold::Impl &inP, const Manifold::Impl &inQ,
 
   // find one vertex from each connected component of inP (in case it has no
   // intersections)
-  VecDH<int> compVerts(inP.numLabel_);
-  for (int i = 0; i < inP.numLabel_; ++i) {
-    compVerts.H()[i] =
-        thrust::find(inP.vertLabel_.beginD(), inP.vertLabel_.endD(), i) -
-        inP.vertLabel_.beginD();
+  VecDH<int> vertLabels;
+  int n_comp = ConnectedComponents(vertLabels, inP.NumVert(), inP.halfedge_);
+  for (int i = 0; i < n_comp; ++i) {
+    int vert = thrust::find(vertLabels.beginD(), vertLabels.endD(), i) -
+               vertLabels.beginD();
+    p0.H()[vert] = vert;
   }
-  thrust::scatter(compVerts.beginD(), compVerts.endD(), compVerts.beginD(),
-                  p0.beginD());
 
   p0.resize(thrust::remove(p0.beginD(), p0.endD(), -1) - p0.beginD());
   // find which inQ faces shadow these vertices
@@ -722,7 +721,8 @@ VecDH<int> Winding03(const Manifold::Impl &inP, SparseIndices &p0q2,
 
   // find connected regions (separated by intersections)
   VecDH<int> vertLabels;
-  int n_comp = inP.GetLabels(vertLabels, keepEdgesP);
+  int n_comp =
+      ConnectedComponents(vertLabels, inP.NumVert(), inP.halfedge_, keepEdgesP);
   // flood the w03 values throughout their connected components (they are
   // consistent)
   FloodComponents(w03, vertLabels, n_comp);

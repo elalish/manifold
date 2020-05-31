@@ -607,22 +607,16 @@ void Manifold::Impl::CreateHalfedges(const VecDH<glm::ivec3>& triVerts) {
   Tri2Face();
 }
 
-void Manifold::Impl::LabelVerts() { numLabel_ = GetLabels(vertLabel_); }
-
-int Manifold::Impl::GetLabels(VecDH<int>& components,
-                              const VecDH<bool>& keep) const {
+void Manifold::Impl::LabelVerts() {
   VecDH<Halfedge> edges = halfedge_;
 
   VecH<Halfedge>& edgesH = edges.H();
   const VecH<int>& faceEdgeH = faceEdge_.H();
-  VecDH<bool> newKeep = keep;
-  VecH<bool>& newKeepH = newKeep.H();
 
   for (int face = 0; face < NumFace(); ++face) {
     const int firstEdge = faceEdgeH[face];
     const int lastEdge = faceEdgeH[face + 1];
-    if (lastEdge - firstEdge > 5 &&
-        (newKeepH.size() == 0 || newKeepH[firstEdge])) {
+    if (lastEdge - firstEdge > 5) {
       // With 6 edges or more, the face could be made of multiple polygons. Add
       // a star graph of edges to ensure the face's verts are connected.
       const int startVert = edgesH[firstEdge].startVert;
@@ -631,11 +625,11 @@ int Manifold::Impl::GetLabels(VecDH<int>& components,
         // ConnectedComponents only uses forward halfedges.
         if (!edge.IsForward()) std::swap(edge.startVert, edge.endVert);
         edgesH.push_back(edge);
-        if (keep.size() > 0) newKeepH.push_back(true);
       }
     }
   }
-  return ConnectedComponents(components, NumVert(), edges, newKeep);
+
+  numLabel_ = ConnectedComponents(vertLabel_, NumVert(), edges);
 }
 
 void Manifold::Impl::Finish() {
