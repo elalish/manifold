@@ -24,8 +24,6 @@ namespace manifold {
 struct Manifold::Impl {
   Box bBox_;
   VecDH<glm::vec3> vertPos_;
-  VecDH<int> vertLabel_;
-  int numLabel_ = 1;
   VecDH<Halfedge> halfedge_;
   VecDH<int> nextHalfedge_;
   VecDH<int> faceEdge_;
@@ -41,7 +39,6 @@ struct Manifold::Impl {
   Impl(Shape);
 
   void CreateHalfedges(const VecDH<glm::ivec3>& triVerts);
-  void LabelVerts();
   void Finish();
   void Update();
   void ApplyTransform() const;
