@@ -435,7 +435,7 @@ struct AssignNormals {
     Halfedge edge = halfedges[start];
     glm::vec3 edgeVec =
         glm::normalize(vertPos[edge.endVert] - vertPos[edge.startVert]);
-    while (next != start) {
+    while (1) {
       Halfedge nextEdge = halfedges[next];
       glm::vec3 nextEdgeVec = glm::normalize(vertPos[nextEdge.endVert] -
                                              vertPos[nextEdge.startVert]);
@@ -443,6 +443,7 @@ struct AssignNormals {
       float phi = glm::acos(-glm::dot(edgeVec, nextEdgeVec));
       AtomicAddVec3(vertNormal[edge.endVert],
                     glm::max(phi, kTolerance) * triNormal);
+      if (next == start) break;
       edge = nextEdge;
       edgeVec = nextEdgeVec;
       next = nextHalfedge[next];
