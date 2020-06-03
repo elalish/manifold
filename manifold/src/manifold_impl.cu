@@ -834,12 +834,14 @@ void Manifold::Impl::Refine(int n) {
 }
 
 bool Manifold::Impl::IsManifold() const {
+  if (halfedge_.size() == 0) return true;
   return thrust::all_of(thrust::make_counting_iterator(0),
                         thrust::make_counting_iterator(NumFace()),
                         CheckManifold({halfedge_.cptrD(), faceEdge_.cptrD()}));
 }
 
 Manifold::Properties Manifold::Impl::GetProperties() const {
+  if (halfedge_.size() == 0) return {0, 0};
   ApplyTransform();
   thrust::pair<float, float> areaVolume = thrust::transform_reduce(
       thrust::make_counting_iterator(0),

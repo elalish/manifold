@@ -288,7 +288,12 @@ struct Kernel01 {
     const int q1e = halfedgeQ[q1].endVert;
     yz01 = Interpolate(vertPosQ[q1s], vertPosQ[q1e], vertPosP[p0].x);
     if (reverse) {
-      if (!Shadows(yz01[0], vertPosP[p0].y, expandP * normalP[q1s].y)) s01 = 0;
+      glm::vec3 diff = vertPosQ[q1s] - vertPosP[p0];
+      const float start2 = glm::dot(diff, diff);
+      diff = vertPosQ[q1e] - vertPosP[p0];
+      const float end2 = glm::dot(diff, diff);
+      const float dir = start2 < end2 ? normalP[q1s].y : normalP[q1e].y;
+      if (!Shadows(yz01[0], vertPosP[p0].y, expandP * dir)) s01 = 0;
     } else {
       if (!Shadows(vertPosP[p0].y, yz01[0], expandP * normalP[p0].y)) s01 = 0;
     }
@@ -411,9 +416,16 @@ struct Kernel11 {
     if (k != 2) printf("k = %d\n", k);
 
     xyzz11 = Intersect(p2[0], p2[1], q2[0], q2[1]);
-    if (!Shadows(xyzz11.z, xyzz11.w,
-                 expandP * normalP[halfedgeP[p1].startVert].z))
-      s11 = 0;
+
+    const int p1s = halfedgeP[p1].startVert;
+    const int p1e = halfedgeP[p1].endVert;
+    glm::vec3 diff = vertPosP[p1s] - glm::vec3(xyzz11);
+    const float start2 = glm::dot(diff, diff);
+    diff = vertPosP[p1e] - glm::vec3(xyzz11);
+    const float end2 = glm::dot(diff, diff);
+    const float dir = start2 < end2 ? normalP[p1s].z : normalP[p1e].z;
+
+    if (!Shadows(xyzz11.z, xyzz11.w, expandP * dir)) s11 = 0;
   }
 };
 
