@@ -197,9 +197,11 @@ TEST(Manifold, SelfSubtract) {
   Manifold cube = Manifold::Cube();
   Manifold empty = cube - cube;
   EXPECT_TRUE(empty.IsManifold());
+  EXPECT_TRUE(empty.IsEmpty());
 
   auto prop = empty.GetProperties();
   EXPECT_FLOAT_EQ(prop.volume, 0.0f);
+  EXPECT_FLOAT_EQ(prop.surfaceArea, 0.0f);
 }
 
 TEST(Manifold, Perturb) {
@@ -210,13 +212,14 @@ TEST(Manifold, Perturb) {
                  {1.0f, 0.0f, 0.0f},
                  {0.0f, 0.0f, 1.0f}};
   tmp.triVerts = {{2, 0, 1}, {0, 3, 1}, {2, 3, 0}, {3, 2, 1}};
-  std::vector<Manifold> meshList;
-  meshList.push_back(tmp);
-  meshList.push_back(meshList[0].DeepCopy());
-  Manifold out = meshList[1] - meshList[0];
+  Manifold corner(tmp);
+  Manifold empty = corner - corner;
+  EXPECT_TRUE(empty.IsManifold());
+  // EXPECT_TRUE(empty.IsEmpty());
 
-  auto prop = out.GetProperties();
+  auto prop = empty.GetProperties();
   EXPECT_FLOAT_EQ(prop.volume, 0.0f);
+  EXPECT_FLOAT_EQ(prop.surfaceArea, 0.0f);
 }
 
 TEST(Manifold, Coplanar) {
@@ -226,6 +229,8 @@ TEST(Manifold, Coplanar) {
   Manifold out = cube - cube2.Scale({0.5f, 0.5f, 1.0f})
                             .Rotate(0, 0, 15)
                             .Translate({0.25f, 0.25f, 0.0f});
+  EXPECT_TRUE(out.IsManifold());
+  EXPECT_EQ(out.Genus(), 1);
 }
 
 TEST(Manifold, MultiCoplanar) {
