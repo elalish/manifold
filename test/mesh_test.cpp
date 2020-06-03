@@ -324,7 +324,7 @@ TEST(Manifold, Boolean3) {
   gyroid2.Translate(glm::vec3(5.0f));
   Manifold result = gyroid + gyroid2;
 
-  ExpectMeshes(result, {{31733, 51924}});
+  ExpectMeshes(result, {{31733, 63606}});
 }
 
 /**

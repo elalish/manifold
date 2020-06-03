@@ -606,10 +606,10 @@ struct Kernel12 {
 
     const Halfedge edge = halfedgesP[p1];
     auto key = forward ? thrust::make_pair(edge.startVert, q2)
-                       : thrust::make_pair(q2, edge.endVert);
+                       : thrust::make_pair(q2, edge.startVert);
     const float z0 = BinarySearchByKey(p0q2, z02, size02, key, 0.0f / 0.0f);
     key = forward ? thrust::make_pair(edge.endVert, q2)
-                  : thrust::make_pair(q2, edge.startVert);
+                  : thrust::make_pair(q2, edge.endVert);
     const float z1 = BinarySearchByKey(p0q2, z02, size02, key, 0.0f / 0.0f);
 
     glm::vec3 xzyLR0[2];
