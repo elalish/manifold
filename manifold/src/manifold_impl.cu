@@ -694,12 +694,29 @@ void Manifold::Impl::AssembleFaces() {
   const VecH<Halfedge>& halfedge = halfedge_.H();
 
   for (int face = 0; face < NumFace(); ++face) {
+    int edge = faceEdge[face];
+    const int nEdge = faceEdge[face + 1] - edge;
+    ALWAYS_ASSERT(nEdge >= 3, runtimeErr, "face has less than three edges.");
+    if (nEdge == 3) {
+      const bool forward =
+          halfedge[edge].endVert == halfedge[edge + 1].startVert;
+      const int edge1 = edge + (forward ? 1 : 2);
+      const int edge2 = edge + (forward ? 2 : 1);
+      ALWAYS_ASSERT(halfedge[edge].endVert == halfedge[edge1].startVert &&
+                        halfedge[edge1].endVert == halfedge[edge2].startVert &&
+                        halfedge[edge2].endVert == halfedge[edge].startVert,
+                    runtimeErr, "triangle does not assemble.");
+      nextHalfedge[edge] = edge1;
+      nextHalfedge[edge1] = edge2;
+      nextHalfedge[edge2] = edge;
+      continue;
+    }
     std::map<int, int> vert_edge;
-    for (int edge = faceEdge[face]; edge < faceEdge[face + 1]; ++edge) {
+    for (; edge < faceEdge[face + 1]; ++edge) {
       ALWAYS_ASSERT(
           vert_edge.emplace(std::make_pair(halfedge[edge].startVert, edge))
               .second,
-          runtimeErr, "polygon has duplicate vertices.");
+          runtimeErr, "face has duplicate vertices.");
     }
 
     int startEdge = 0;
