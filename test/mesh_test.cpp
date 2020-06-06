@@ -229,7 +229,7 @@ TEST(Manifold, Coplanar) {
   Manifold out = cube - cube2.Scale({0.5f, 0.5f, 1.0f})
                             .Rotate(0, 0, 15)
                             .Translate({0.25f, 0.25f, 0.0f});
-  EXPECT_TRUE(out.IsManifold());
+  ExpectMeshes(out, {{60, 120}});
   EXPECT_EQ(out.Genus(), 1);
 }
 
