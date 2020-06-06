@@ -834,18 +834,18 @@ VecDH<int> SizeOutput(Manifold::Impl &outR, const Manifold::Impl &inP,
   facePQ2R.resize(inP.NumFace() + inQ.NumFace());
 
   outR.faceNormal_.resize(numFaceR);
-  auto next =
-      thrust::copy_if(inP.faceNormal_.begin(), inP.faceNormal_.end(), keepFace,
-                      outR.faceNormal_.begin(), thrust::identity<bool>());
+  auto next = thrust::copy_if(inP.faceNormal_.beginD(), inP.faceNormal_.endD(),
+                              keepFace, outR.faceNormal_.beginD(),
+                              thrust::identity<bool>());
   if (invertQ) {
-    auto start = thrust::make_transform_iterator(inQ.faceNormal_.begin(),
+    auto start = thrust::make_transform_iterator(inQ.faceNormal_.beginD(),
                                                  thrust::negate<glm::vec3>());
-    auto end = thrust::make_transform_iterator(inQ.faceNormal_.end(),
+    auto end = thrust::make_transform_iterator(inQ.faceNormal_.endD(),
                                                thrust::negate<glm::vec3>());
     thrust::copy_if(start, end, keepFace + inP.NumFace(), next,
                     thrust::identity<bool>());
   } else {
-    thrust::copy_if(inQ.faceNormal_.begin(), inQ.faceNormal_.end(),
+    thrust::copy_if(inQ.faceNormal_.beginD(), inQ.faceNormal_.endD(),
                     keepFace + inP.NumFace(), next, thrust::identity<bool>());
   }
 

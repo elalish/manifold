@@ -396,15 +396,16 @@ Mesh Manifold::Extract() {
   pImpl_->ApplyTransform();
   pImpl_->Face2Tri();
   pImpl_->Finish();
-  Mesh result;
 
+  Mesh result;
   result.vertPos.insert(result.vertPos.end(), pImpl_->vertPos_.begin(),
                         pImpl_->vertPos_.end());
 
   result.triVerts.resize(NumFace());
   thrust::for_each_n(
       zip(result.triVerts.begin(), thrust::make_counting_iterator(0)),
-      NumFace(), MakeTri({pImpl_->halfedge_.cptrD()}));
+      NumFace(), MakeTri({pImpl_->halfedge_.cptrH()}));
+
   return result;
 }
 
