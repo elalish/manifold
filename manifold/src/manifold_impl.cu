@@ -509,12 +509,21 @@ struct CheckManifold {
       const Halfedge paired = halfedges[halfedge.pairedHalfedge];
       good &= halfedge.face == face;
       good &= paired.pairedHalfedge == edge;
+      good &= halfedge.startVert != halfedge.endVert;
       good &= halfedge.startVert == paired.endVert;
       good &= halfedge.endVert == paired.startVert;
       ++edge;
     }
-    // TODO: also test for duplicate halfedge pairs.
     return good;
+  }
+};
+
+struct NoDuplicates {
+  const Halfedge* halfedges;
+
+  __host__ __device__ bool operator()(int edge) {
+    return halfedges[2 * edge].startVert != halfedges[2 * edge + 1].startVert ||
+           halfedges[2 * edge].endVert != halfedges[2 * edge + 1].endVert;
   }
 };
 
@@ -835,9 +844,17 @@ void Manifold::Impl::Refine(int n) {
 
 bool Manifold::Impl::IsManifold() const {
   if (halfedge_.size() == 0) return true;
-  return thrust::all_of(thrust::make_counting_iterator(0),
-                        thrust::make_counting_iterator(NumFace()),
-                        CheckManifold({halfedge_.cptrD(), faceEdge_.cptrD()}));
+  bool isManifold =
+      thrust::all_of(thrust::make_counting_iterator(0),
+                     thrust::make_counting_iterator(NumFace()),
+                     CheckManifold({halfedge_.cptrD(), faceEdge_.cptrD()}));
+
+  VecDH<Halfedge> halfedge(halfedge_);
+  thrust::sort(halfedge.beginD(), halfedge.endD());
+  isManifold &= thrust::all_of(thrust::make_counting_iterator(0),
+                               thrust::make_counting_iterator(NumEdge()),
+                               NoDuplicates({halfedge.cptrD()}));
+  return isManifold;
 }
 
 Manifold::Properties Manifold::Impl::GetProperties() const {
