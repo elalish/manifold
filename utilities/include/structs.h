@@ -101,6 +101,10 @@ struct Halfedge {
   int pairedHalfedge;
   int face;
   HOST_DEVICE bool IsForward() const { return startVert < endVert; }
+  HOST_DEVICE bool operator<(const Halfedge& other) const {
+    return startVert == other.startVert ? endVert < other.endVert
+                                        : startVert < other.startVert;
+  }
 };
 
 struct PolyVert {
