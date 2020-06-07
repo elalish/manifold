@@ -66,6 +66,6 @@
     "editor.formatOnSave": true,
     "cmake.configureArgs": [
         "-DMANIFOLD_USE_CPP=OFF",
-        // "-DMANIFOLD_USE_OMP=OFF"
+        // "-DMANIFOLD_USE_OMP=ON"
     ],
 }
