@@ -125,11 +125,9 @@ SparseIndices Filter02(const Manifold::Impl &inP, const Manifold::Impl &inQ,
 
   // find one vertex from each connected component of inP (in case it has no
   // intersections)
-  VecDH<int> vertLabels;
-  int n_comp = ConnectedComponents(vertLabels, inP.NumVert(), inP.halfedge_);
-  for (int i = 0; i < n_comp; ++i) {
-    int vert = thrust::find(vertLabels.beginD(), vertLabels.endD(), i) -
-               vertLabels.beginD();
+  for (int i = 0; i < inP.numLabel_; ++i) {
+    int vert = thrust::find(inP.vertLabel_.beginD(), inP.vertLabel_.endD(), i) -
+               inP.vertLabel_.beginD();
     p0.H()[vert] = vert;
   }
 
