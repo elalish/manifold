@@ -34,9 +34,10 @@ void Identical(Mesh& mesh1, Mesh& mesh2) {
   }
 }
 
-void ExpectMeshes(const Manifold& manifold,
+void ExpectMeshes(Manifold& manifold,
                   const std::vector<std::pair<int, int>>& numVertTri) {
   ASSERT_TRUE(manifold.IsManifold());
+  manifold.Extract();
   std::vector<Manifold> meshes = manifold.Decompose();
   ASSERT_EQ(meshes.size(), numVertTri.size());
   std::sort(meshes.begin(), meshes.end(),
@@ -186,7 +187,7 @@ TEST(Manifold, BooleanTetra) {
   tetra2.Translate(glm::vec3(0.5f));
   Manifold result = tetra2 - tetra;
 
-  ExpectMeshes(result, {{8, 7}});
+  ExpectMeshes(result, {{8, 12}});
 }
 
 /**
@@ -317,7 +318,7 @@ TEST(Manifold, BooleanSphere) {
   sphere2.Translate(glm::vec3(0.5));
   Manifold result = sphere - sphere2;
 
-  ExpectMeshes(result, {{74, 90}});
+  ExpectMeshes(result, {{74, 144}});
 }
 
 TEST(Manifold, Boolean3) {
@@ -381,7 +382,7 @@ TEST(Manifold, BooleanWinding) {
   meshList[0].Translate(glm::vec3(-0.25f));
   Manifold result = tetras - meshList[0];
 
-  ExpectMeshes(result, {{11, 18}, {11, 18}});
+  ExpectMeshes(result, {{8, 12}, {8, 12}});
 }
 
 /**

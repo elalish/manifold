@@ -618,28 +618,7 @@ void Manifold::Impl::CreateHalfedges(const VecDH<glm::ivec3>& triVerts) {
 }
 
 void Manifold::Impl::LabelVerts() {
-  VecDH<Halfedge> edges = halfedge_;
-
-  VecH<Halfedge>& edgesH = edges.H();
-  const VecH<int>& faceEdgeH = faceEdge_.H();
-
-  for (int face = 0; face < NumFace(); ++face) {
-    const int firstEdge = faceEdgeH[face];
-    const int lastEdge = faceEdgeH[face + 1];
-    if (lastEdge - firstEdge > 5) {
-      // With 6 edges or more, the face could be made of multiple polygons. Add
-      // a star graph of edges to ensure the face's verts are connected.
-      const int startVert = edgesH[firstEdge].startVert;
-      for (int i = firstEdge + 1; i < lastEdge; ++i) {
-        Halfedge edge = {startVert, edgesH[i].startVert};
-        // ConnectedComponents only uses forward halfedges.
-        if (!edge.IsForward()) std::swap(edge.startVert, edge.endVert);
-        edgesH.push_back(edge);
-      }
-    }
-  }
-
-  numLabel_ = ConnectedComponents(vertLabel_, NumVert(), edges);
+  numLabel_ = ConnectedComponents(vertLabel_, NumVert(), halfedge_);
 }
 
 void Manifold::Impl::Finish() {
@@ -992,6 +971,8 @@ void Manifold::Impl::GatherFaces(const VecDH<Halfedge>& oldHalfedge,
                                  const VecDH<int>& oldFaceEdge,
                                  const VecDH<int>& faceNew2Old,
                                  const VecDH<int>& newFaceSize) {
+  faceEdge_.resize(faceNew2Old.size() + 1);
+
   VecDH<int> faceOld2New(oldFaceEdge.size() - 1);
   thrust::scatter(thrust::make_counting_iterator(0),
                   thrust::make_counting_iterator(NumFace()),
@@ -1000,6 +981,7 @@ void Manifold::Impl::GatherFaces(const VecDH<Halfedge>& oldHalfedge,
   thrust::inclusive_scan(newFaceSize.beginD() + 1, newFaceSize.endD(),
                          faceEdge_.beginD() + 1);
 
+  halfedge_.resize(faceEdge_.H().back());
   thrust::for_each_n(zip(thrust::make_counting_iterator(0), faceEdge_.beginD()),
                      NumFace(),
                      ReindexFace({halfedge_.ptrD(), faceEdge_.cptrD(),

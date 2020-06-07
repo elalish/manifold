@@ -344,12 +344,38 @@ Manifold Manifold::Compose(const std::vector<Manifold>& manifolds) {
 }
 
 std::vector<Manifold> Manifold::Decompose() const {
-  std::vector<Manifold> meshes(pImpl_->numLabel_);
   if (pImpl_->numLabel_ == 1) {
+    std::vector<Manifold> meshes(1);
     meshes[0] = DeepCopy();
     return meshes;
   }
-  for (int i = 0; i < pImpl_->numLabel_; ++i) {
+
+  VecDH<Halfedge> edges = pImpl_->halfedge_;
+
+  VecH<Halfedge>& edgesH = edges.H();
+  const VecH<int>& faceEdgeH = pImpl_->faceEdge_.H();
+
+  for (int face = 0; face < NumFace(); ++face) {
+    const int firstEdge = faceEdgeH[face];
+    const int lastEdge = faceEdgeH[face + 1];
+    if (lastEdge - firstEdge > 5) {
+      // With 6 edges or more, the face could be made of multiple polygons. Add
+      // a star graph of edges to ensure the face's verts are connected.
+      const int startVert = edgesH[firstEdge].startVert;
+      for (int i = firstEdge + 1; i < lastEdge; ++i) {
+        Halfedge edge = {startVert, edgesH[i].startVert};
+        // ConnectedComponents only uses forward halfedges.
+        if (!edge.IsForward()) std::swap(edge.startVert, edge.endVert);
+        edgesH.push_back(edge);
+      }
+    }
+  }
+
+  VecDH<int> vertLabel;
+  int numLabel = ConnectedComponents(vertLabel, NumVert(), edges);
+
+  std::vector<Manifold> meshes(numLabel);
+  for (int i = 0; i < numLabel; ++i) {
     meshes[i].pImpl_->vertPos_.resize(NumVert());
     VecDH<int> vertNew2Old(NumVert());
     int nVert =
@@ -357,7 +383,7 @@ std::vector<Manifold> Manifold::Decompose() const {
             zip(pImpl_->vertPos_.beginD(), thrust::make_counting_iterator(0)),
             zip(pImpl_->vertPos_.endD(),
                 thrust::make_counting_iterator(NumVert())),
-            pImpl_->vertLabel_.beginD(),
+            vertLabel.beginD(),
             zip(meshes[i].pImpl_->vertPos_.beginD(), vertNew2Old.beginD()),
             Equals({i})) -
         zip(meshes[i].pImpl_->vertPos_.beginD(),
@@ -374,13 +400,10 @@ std::vector<Manifold> Manifold::Decompose() const {
         thrust::remove_if(
             start, zip(faceNew2Old.endD(), faceSize.endD()),
             RemoveFace({pImpl_->halfedge_.cptrD(), pImpl_->faceEdge_.cptrD(),
-                        pImpl_->vertLabel_.cptrD(), i})) -
+                        vertLabel.cptrD(), i})) -
         start;
-
     faceNew2Old.resize(nFace);
     faceSize.resize(nFace + 1);
-    meshes[i].pImpl_->halfedge_.resize(3 * nFace);
-    meshes[i].pImpl_->faceEdge_.resize(nFace + 1);
 
     meshes[i].pImpl_->GatherFaces(pImpl_->halfedge_, pImpl_->faceEdge_,
                                   faceNew2Old, faceSize);
