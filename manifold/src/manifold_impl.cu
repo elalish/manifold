@@ -30,6 +30,14 @@
 namespace {
 using namespace manifold;
 
+/**
+ * Represents the uncertainty of the vertices (greater than or equal to
+ * worst-case floating-point precision). Used to determine when face surface
+ * area or volume is small enough to clamp to zero. TODO: this should be based
+ * on the bounding box, and probably passed through Boolean operations. It
+ * should also be passed into the Polygon triangulator, where it is more
+ * important.
+ */
 constexpr float kTolerance = 1e-5;
 
 struct NormalizeTo {
@@ -40,6 +48,10 @@ struct NormalizeTo {
   }
 };
 
+/**
+ * This is a temporary edge strcture which only stores edges forward and
+ * references the halfedge it was created from.
+ */
 struct TmpEdge {
   int first, second, halfedgeIdx;
 
@@ -527,6 +539,10 @@ struct NoDuplicates {
   }
 };
 
+/**
+ * By using the closest axis-aligned projection to the normal instead of a
+ * projection along the normal, we avoid introducing any rounding error.
+ */
 glm::mat3x2 GetAxisAlignedProjection(glm::vec3 normal) {
   glm::vec3 absNormal = glm::abs(normal);
   float xyzMax;
@@ -551,12 +567,20 @@ glm::mat3x2 GetAxisAlignedProjection(glm::vec3 normal) {
 
 namespace manifold {
 
+/**
+ * Create a manifold from an input triangle Mesh. Will throw if the Mesh is not
+ * manifold.
+ */
 Manifold::Impl::Impl(const Mesh& manifold) : vertPos_(manifold.vertPos) {
   CheckDevice();
   CreateHalfedges(manifold.triVerts);
   Finish();
 }
 
+/**
+ * Create eiter a unit tetrahedron, cube or octahedron. The cube is in the first
+ * octant, while the others are symmetric about the origin.
+ */
 Manifold::Impl::Impl(Shape shape) {
   std::vector<glm::vec3> vertPos;
   std::vector<glm::ivec3> triVerts;
@@ -604,6 +628,9 @@ Manifold::Impl::Impl(Shape shape) {
   Finish();
 }
 
+/**
+ * Create the halfedge_ data structure from an input triVerts array like Mesh.
+ */
 void Manifold::Impl::CreateHalfedges(const VecDH<glm::ivec3>& triVerts) {
   const int numTri = triVerts.size();
   faceEdge_.resize(0);
@@ -617,10 +644,25 @@ void Manifold::Impl::CreateHalfedges(const VecDH<glm::ivec3>& triVerts) {
   Tri2Face();
 }
 
+/**
+ * Calculate vertLabels_ by running connected components on the halfedges. This
+ * operation is a bit slow and currently CPU-only. Note: by operating on
+ * halfedges, connectivity can be broken by faces that are polygons with holes
+ * (no edges to attach one polygon to the other, even though they are part of
+ * the same face). This style of labeling is consistent with what is needed in
+ * the Boolean operation. To separate manifolds topologically, it is best to
+ * first triangulate them.
+ */
 void Manifold::Impl::LabelVerts() {
   numLabel_ = ConnectedComponents(vertLabel_, NumVert(), halfedge_);
 }
 
+/**
+ * Once halfedge_ and faceEdge_ have been filled in, this function can be called
+ * to create the rest of the internal data structures. If vertLabel_ hasn't been
+ * filled in, it is assumed the object is simply-connected and numLabel_ is set
+ * to 1.
+ */
 void Manifold::Impl::Finish() {
   if (halfedge_.size() == 0) return;
   Halfedge extrema = {0, 0, 0, 0};
@@ -659,6 +701,10 @@ void Manifold::Impl::Finish() {
   collider_ = Collider(faceBox, faceMorton);
 }
 
+/**
+ * Does a full recalculation of the face bounding boxes, including updating the
+ * collider, but does not resort the faces.
+ */
 void Manifold::Impl::Update() {
   CalculateBBox();
   VecDH<Box> faceBox;
@@ -673,6 +719,11 @@ void Manifold::Impl::ApplyTransform() const {
   const_cast<Impl*>(this)->ApplyTransform();
 }
 
+/**
+ * Bake the manifold's transform into its vertices. This function allows lazy
+ * evaluation, which is important because often several transforms are applied
+ * between operations.
+ */
 void Manifold::Impl::ApplyTransform() {
   if (transform_ == glm::mat4x3(1.0f)) return;
   thrust::for_each(vertPos_.beginD(), vertPos_.endD(), Transform({transform_}));
@@ -696,6 +747,13 @@ void Manifold::Impl::AssembleFaces() const {
   return const_cast<Impl*>(this)->AssembleFaces();
 }
 
+/**
+ * This fills in the nextHalfedge_ vector indicating how the halfedges connect
+ * to each other going CCW around a face. This data cannot be stored by simply
+ * sorting the halfedges, as the faces may be polygons with holes.
+ *
+ * TODO: This function is slow and should be moved from CPU to GPU.
+ */
 void Manifold::Impl::AssembleFaces() {
   nextHalfedge_.resize(halfedge_.size());
   VecH<int>& nextHalfedge = nextHalfedge_.H();
@@ -751,6 +809,10 @@ bool Manifold::Impl::Tri2Face() const {
   return const_cast<Impl*>(this)->Tri2Face();
 }
 
+/**
+ * Fills in the faceEdge_ structure for the situation where the halfedges
+ * correspond to triVerts entries.
+ */
 bool Manifold::Impl::Tri2Face() {
   if (faceEdge_.size() != 0 || halfedge_.size() % 3 != 0) return false;
   faceEdge_.resize(halfedge_.size() / 3 + 1);
@@ -758,6 +820,10 @@ bool Manifold::Impl::Tri2Face() {
   return true;
 }
 
+/**
+ * Triangulates the faces. It is possible, but rare, that this function can
+ * also add vertices. This never happens for geometrically valid manifolds.
+ */
 bool Manifold::Impl::Face2Tri() {
   if (faceEdge_.size() == 0 && halfedge_.size() % 3 == 0) return false;
   VecDH<glm::ivec3> triVertsOut;
@@ -838,10 +904,13 @@ bool Manifold::Impl::Face2Tri() {
   return true;
 }
 
+/**
+ * Triangulate the manifold, then split each resulting edge into n pieces and
+ * sub-triangulate each triangle accordingly. This function doesn't run
+ * Finish(), as that is expensive and it'll need to be run after the new
+ * vertices have moved, which is a likely scenario after refinement (smoothing).
+ */
 void Manifold::Impl::Refine(int n) {
-  // This function doesn't run Finish(), as that is expensive and it'll need to
-  // be run after the new vertices have moved, which is a likely scenario after
-  // refinement (smoothing).
   Face2Tri();
   int numVert = NumVert();
   int numEdge = NumEdge();
@@ -868,6 +937,10 @@ void Manifold::Impl::Refine(int n) {
   CreateHalfedges(triVerts);
 }
 
+/**
+ * Returns true if this manifold is in fact an oriented 2-manifold and all of
+ * the data structures are consistent.
+ */
 bool Manifold::Impl::IsManifold() const {
   if (halfedge_.size() == 0) return true;
   bool isManifold =
@@ -883,6 +956,12 @@ bool Manifold::Impl::IsManifold() const {
   return isManifold;
 }
 
+/**
+ * Returns the surface area and volume of the manifold in a Properties
+ * structure. These properties are clamped to zero for a given face if they are
+ * within rounding tolerance. This means degenerate manifolds can by identified
+ * by testing these properties as == 0.
+ */
 Manifold::Properties Manifold::Impl::GetProperties() const {
   if (halfedge_.size() == 0) return {0, 0};
   ApplyTransform();
@@ -894,6 +973,11 @@ Manifold::Properties Manifold::Impl::GetProperties() const {
   return {areaVolume.first, areaVolume.second};
 }
 
+/**
+ * Calculates the bounding box of the entire manifold, which is stored
+ * internally to short-cut Boolean operations and to serve as the precision
+ * range for Morton code calulation.
+ */
 void Manifold::Impl::CalculateBBox() {
   bBox_.min = thrust::reduce(vertPos_.begin(), vertPos_.end(),
                              glm::vec3(1 / 0.0f), PosMin());
@@ -903,6 +987,9 @@ void Manifold::Impl::CalculateBBox() {
                 "Input vertices are not all finite!");
 }
 
+/**
+ * Sorts the vertices according to their Morton code.
+ */
 void Manifold::Impl::SortVerts() {
   VecDH<uint32_t> vertMorton(NumVert());
   thrust::for_each_n(zip(vertMorton.beginD(), vertPos_.cbeginD()), NumVert(),
@@ -917,6 +1004,11 @@ void Manifold::Impl::SortVerts() {
   ReindexVerts(vertNew2Old, NumVert());
 }
 
+/**
+ * Updates the halfedges to point to new vert indices based on a mapping,
+ * vertNew2Old. This may be a subset, so the total number of original verts is
+ * also given.
+ */
 void Manifold::Impl::ReindexVerts(const VecDH<int>& vertNew2Old,
                                   int oldNumVert) {
   VecDH<int> vertOld2New(oldNumVert);
@@ -927,6 +1019,11 @@ void Manifold::Impl::ReindexVerts(const VecDH<int>& vertNew2Old,
                    Reindex({vertOld2New.cptrD()}));
 }
 
+/**
+ * Fills the faceBox and faceMorton input with the bounding boxes and Morton
+ * codes of the faces, respectively. The Morton code is based on the center of
+ * the bounding box.
+ */
 void Manifold::Impl::GetFaceBoxMorton(VecDH<Box>& faceBox,
                                       VecDH<uint32_t>& faceMorton) const {
   faceBox.resize(NumFace());
@@ -938,6 +1035,10 @@ void Manifold::Impl::GetFaceBoxMorton(VecDH<Box>& faceBox,
                                     vertPos_.cptrD(), bBox_}));
 }
 
+/**
+ * Sorts the faces of this manifold according to their input Morton code. The
+ * bounding box and Morton code arrays are also sorted accordingly.
+ */
 void Manifold::Impl::SortFaces(VecDH<Box>& faceBox,
                                VecDH<uint32_t>& faceMorton) {
   VecDH<int> faceNew2Old(NumFace());
@@ -967,6 +1068,13 @@ VecDH<int> Manifold::Impl::FaceSize() const {
   return faceSize;
 }
 
+/**
+ * Creates the halfedge_ and faceEdge_ vectors for this manifold by copying a
+ * set of faces from another manifold, given by oldHalfedge and oldFaceEdge.
+ * Input faceNew2Old defines the old faces to gather into this, while
+ * newFaceSize is the same length as faceNew2Old and contains the sizes of the
+ * faces to be copied.
+ */
 void Manifold::Impl::GatherFaces(const VecDH<Halfedge>& oldHalfedge,
                                  const VecDH<int>& oldFaceEdge,
                                  const VecDH<int>& faceNew2Old,
@@ -989,6 +1097,18 @@ void Manifold::Impl::GatherFaces(const VecDH<Halfedge>& oldHalfedge,
                                   faceNew2Old.cptrD(), faceOld2New.cptrD()}));
 }
 
+/**
+ * If face normals are already present, this function uses them to compute
+ * vertex normals (angle-weighted pseudo-normals); otherwise it also computes
+ * the face normals as well. Face normals are only calculated when needed
+ * because nearly degenerate faces will accrue rounding error, while the Boolean
+ * can retain their original normal, which is more accurate and can help with
+ * merging coplanar faces.
+ *
+ * If the face normals have been invalidated by an operation like Warp(), ensure
+ * you do faceNormal_.resize(0) before calling this function to force
+ * recalculation.
+ */
 void Manifold::Impl::CalculateNormals() {
   vertNormal_.resize(NumVert());
   bool calculateTriNormal = false;
@@ -1004,6 +1124,11 @@ void Manifold::Impl::CalculateNormals() {
   thrust::for_each(vertNormal_.begin(), vertNormal_.end(), NormalizeTo({1.0}));
 }
 
+/**
+ * Returns a sparse array of the bounding box overlaps between the edges of the
+ * input manifold, Q and the faces of this manifold. Returned indices only
+ * point to forward halfedges.
+ */
 SparseIndices Manifold::Impl::EdgeCollisions(const Impl& Q) const {
   VecDH<TmpEdge> edges = CreateTmpEdges(Q.halfedge_);
   const int numEdge = edges.size();
@@ -1017,11 +1142,19 @@ SparseIndices Manifold::Impl::EdgeCollisions(const Impl& Q) const {
   return q1p2;
 }
 
+/**
+ * Returns a sparse array of the input vertices that project inside the XY
+ * bounding boxes of the faces of this manifold.
+ */
 SparseIndices Manifold::Impl::VertexCollisionsZ(
     const VecDH<glm::vec3>& vertsIn) const {
   return collider_.Collisions(vertsIn);
 }
 
+/**
+ * For the input face index, return a set of 2D polygons formed by the input
+ * projection of the vertices.
+ */
 Polygons Manifold::Impl::Face2Polygons(int face, glm::mat3x2 projection) const {
   const VecH<int>& faceEdge = faceEdge_.H();
   const VecH<Halfedge>& halfedge = halfedge_.H();
