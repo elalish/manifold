@@ -785,7 +785,7 @@ __host__ __device__ int AtomicAddInt(int &target, int add) {
   return atomicAdd(&target, add);
 #else
   int out;
-#pragma omp atomic
+#pragma omp atomic capture
   {
     out = target;
     target += add;
