@@ -617,6 +617,31 @@ void Manifold::Impl::CreateHalfedges(const VecDH<glm::ivec3>& triVerts) {
   Tri2Face();
 }
 
+void Manifold::Impl::LabelVerts() {
+  VecDH<Halfedge> edges = halfedge_;
+
+  VecH<Halfedge>& edgesH = edges.H();
+  const VecH<int>& faceEdgeH = faceEdge_.H();
+
+  for (int face = 0; face < NumFace(); ++face) {
+    const int firstEdge = faceEdgeH[face];
+    const int lastEdge = faceEdgeH[face + 1];
+    if (lastEdge - firstEdge > 5) {
+      // With 6 edges or more, the face could be made of multiple polygons. Add
+      // a star graph of edges to ensure the face's verts are connected.
+      const int startVert = edgesH[firstEdge].startVert;
+      for (int i = firstEdge + 1; i < lastEdge; ++i) {
+        Halfedge edge = {startVert, edgesH[i].startVert};
+        // ConnectedComponents only uses forward halfedges.
+        if (!edge.IsForward()) std::swap(edge.startVert, edge.endVert);
+        edgesH.push_back(edge);
+      }
+    }
+  }
+
+  numLabel_ = ConnectedComponents(vertLabel_, NumVert(), edges);
+}
+
 void Manifold::Impl::Finish() {
   if (halfedge_.size() == 0) return;
   Halfedge extrema = {0, 0, 0, 0};
@@ -639,6 +664,11 @@ void Manifold::Impl::Finish() {
   ALWAYS_ASSERT(faceEdge_.H().back() == 2 * NumEdge(), runtimeErr,
                 "Faces do not end at halfedge length!");
 
+  if (vertLabel_.size() != NumVert()) {
+    vertLabel_.resize(NumVert());
+    numLabel_ = 1;
+    thrust::fill(vertLabel_.beginD(), vertLabel_.endD(), 0);
+  }
   CalculateBBox();
   SortVerts();
   VecDH<Box> faceBox;
@@ -901,8 +931,9 @@ void Manifold::Impl::SortVerts() {
 
   VecDH<int> vertNew2Old(NumVert());
   thrust::sequence(vertNew2Old.beginD(), vertNew2Old.endD());
-  thrust::sort_by_key(vertMorton.beginD(), vertMorton.endD(),
-                      zip(vertPos_.beginD(), vertNew2Old.beginD()));
+  thrust::sort_by_key(
+      vertMorton.beginD(), vertMorton.endD(),
+      zip(vertPos_.beginD(), vertLabel_.beginD(), vertNew2Old.beginD()));
 
   ReindexVerts(vertNew2Old, NumVert());
 }
