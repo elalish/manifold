@@ -35,6 +35,27 @@
 #include "connected_components.cuh"
 #include "polygon.h"
 
+/**
+ * The notation in this file is abbreviated due to the complexity of the
+ * functions involved. The key is that the input manifolds are P and Q, while
+ * the output is R, and these letters in both upper and lower case refer to
+ * these objects. Operations are based on dimensionality: vert: 0, edge: 1,
+ * face: 2, solid: 3. X denotes a winding-number type quantity from the source
+ * paper of this algorithm, while S is closely related but includes only the
+ * subset of X values which "shadow" (are on the correct side of).
+ *
+ * Nearly everything here are sparse arrays, where for instance each pair in
+ * p2q1 refers to a face index of P interacting with a halfedge index of Q.
+ * Adjacent arrays like x21 refer to the values of X corresponding to each
+ * sparse index pair.
+ *
+ * Note many functions are designed to work symmetrically, for instance for both
+ * p2q1 and p1q2. Inside of these functions P and Q are marked as though the
+ * funtion is forwards, but it may include a Boolean "reverse" that indicates P
+ * and Q have been swapped.
+ */
+
+// TODO: make this runtime configurable for quicker debug
 constexpr bool kVerbose = false;
 
 using namespace thrust::placeholders;
@@ -1309,13 +1330,6 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
     std::cout << n21 << " new verts from facesP -> edgesQ" << std::endl;
   }
 
-  if (kVerbose) {
-    std::cout << "Time for GPU part of result";
-    t1 = NOW();
-    PrintDuration(t1 - t0);
-    t0 = t1;
-  }
-
   // Build up new polygonal faces from triangle intersections. At this point the
   // calculation switches from parallel to serial.
 
@@ -1357,7 +1371,7 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
                    facePQ2R.cptrD() + inP_.NumFace());
 
   if (kVerbose) {
-    std::cout << "Time for CPU part of result";
+    std::cout << "Time for assembling the result";
     t1 = NOW();
     PrintDuration(t1 - t0);
     t0 = t1;
@@ -1370,7 +1384,7 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
   outR.Finish();
 
   if (kVerbose) {
-    std::cout << "Time for manifold finishing";
+    std::cout << "Time for finishing the manifold";
     t1 = NOW();
     PrintDuration(t1 - t0);
     t0 = t1;

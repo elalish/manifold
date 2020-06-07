@@ -96,20 +96,37 @@ Manifold& Manifold::operator=(const Manifold& other) {
   return *this;
 }
 
+/**
+ * Since these manifolds include a lot of memory, implicit copying is disabled.
+ * Instead this explicit method must be called to remind users of the penalty.
+ */
 Manifold Manifold::DeepCopy() const { return *this; }
 
+/**
+ * Constructs a tetrahedron centered at the origin with one vertex at (1,1,1)
+ * and the rest at similarly symmetric points.
+ */
 Manifold Manifold::Tetrahedron() {
   Manifold tetrahedron;
   tetrahedron.pImpl_ = std::make_unique<Impl>(Impl::Shape::TETRAHEDRON);
   return tetrahedron;
 }
 
+/**
+ * Constructs an octahedron centered at the origin with vertices one unit out
+ * along each axis.
+ */
 Manifold Manifold::Octahedron() {
   Manifold octahedron;
   octahedron.pImpl_ = std::make_unique<Impl>(Impl::Shape::OCTAHEDRON);
   return octahedron;
 }
 
+/**
+ * Constructs a unit cube (edge lengths all one), by default in the first
+ * octant, touching the origin. Set center to true to shift the center to the
+ * origin.
+ */
 Manifold Manifold::Cube(glm::vec3 size, bool center) {
   Manifold cube;
   cube.pImpl_ = std::make_unique<Impl>(Impl::Shape::CUBE);
@@ -118,6 +135,11 @@ Manifold Manifold::Cube(glm::vec3 size, bool center) {
   return cube;
 }
 
+/**
+ * A convenience constructor for the common case of extruding a circle. Can also
+ * form cones if both radii are specified. Set center to true to center the
+ * manifold vertically on the origin (default places the bottom on the origin).
+ */
 Manifold Manifold::Cylinder(float height, float radiusLow, float radiusHigh,
                             int circularSegments, bool center) {
   float scale = radiusHigh >= 0.0f ? radiusHigh / radiusLow : 1.0f;
@@ -135,6 +157,12 @@ Manifold Manifold::Cylinder(float height, float radiusLow, float radiusHigh,
   return cylinder;
 }
 
+/**
+ * Constructs a sphere of a given radius and number of segments along its
+ * diameter. This number will always be rounded up to the nearest factor of
+ * four, as this sphere is constructed by refining an octahedron. This means
+ * there are a circle of vertices on all three of the axis planes.
+ */
 Manifold Manifold::Sphere(float radius, int circularSegments) {
   int n = circularSegments > 0 ? (circularSegments + 3) / 4
                                : GetCircularSegments(radius) / 4;
@@ -147,6 +175,14 @@ Manifold Manifold::Sphere(float radius, int circularSegments) {
   return sphere;
 }
 
+/**
+ * Constructs a manifold from a set of polygons by extruding them along the
+ * Z-axis. The overall height and the scale at the top (X and Y independently)
+ * can be specified, as can a twist, to be applied linearly. In the case of
+ * twist, it can also be helpful to specify nDivisions, which specifies the
+ * quantization of the triangles vertically. If the scale is {0,0}, a pure cone
+ * is formed with only a single vertex at the top.
+ */
 Manifold Manifold::Extrude(Polygons crossSection, float height, int nDivisions,
                            float twistDegrees, glm::vec2 scaleTop) {
   ALWAYS_ASSERT(scaleTop.x >= 0 && scaleTop.y >= 0, runtimeErr, "");
@@ -207,6 +243,13 @@ Manifold Manifold::Extrude(Polygons crossSection, float height, int nDivisions,
   return extrusion;
 }
 
+/**
+ * Constructs a manifold from a set of polygons by revolving this cross-section
+ * around its Y-axis and then setting this as the Z-axis of the resulting
+ * manifold. If the polygons cross the Y-axis, only the part on the positive X
+ * side is used. Geometrically valid input will result in geometrically valid
+ * output.
+ */
 Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments) {
   float radius = 0.0f;
   for (const auto& poly : crossSection) {
@@ -294,6 +337,11 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments) {
   return revoloid;
 }
 
+/**
+ * Constructs a new manifold from a vector of other manifolds. This is a purely
+ * topological operation, so care should be taken to avoid creating
+ * geometrically-invalid results (unless that is desired).
+ */
 Manifold Manifold::Compose(const std::vector<Manifold>& manifolds) {
   int numVert = 0;
   int numEdge = 0;
@@ -343,6 +391,15 @@ Manifold Manifold::Compose(const std::vector<Manifold>& manifolds) {
   return out;
 }
 
+/**
+ * This operation returns a copy of this manifold, but as a vector of meshes
+ * that are topologically disconnected. It cannot use vertLabel_ directly for
+ * this due to possible polygons with holes, so instead it recomputes the
+ * connected components after adding a start graph of edges to each face that
+ * has more than five edges to ensure proper connectivity. In some situations
+ * this could cause disjoint manifolds to not be separated, so triangulating
+ * first may be preferable.
+ */
 std::vector<Manifold> Manifold::Decompose() const {
   if (pImpl_->numLabel_ == 1) {
     std::vector<Manifold> meshes(1);
@@ -415,6 +472,11 @@ std::vector<Manifold> Manifold::Decompose() const {
   return meshes;
 }
 
+/**
+ * This returns a Mesh of simple vectors of vertices and triangles suitable for
+ * saving or other operations outside of the context of this library. It is not
+ * a const function because it first triangulates the Manifold.
+ */
 Mesh Manifold::Extract() {
   pImpl_->ApplyTransform();
   pImpl_->Face2Tri();
@@ -432,6 +494,13 @@ Mesh Manifold::Extract() {
   return result;
 }
 
+/**
+ * These static properties control how circular shapes are quantized by default
+ * on construction. If circularSegments is specified, it takes precedence. If it
+ * is zero, then instead the minimum is used of the segments calculated based on
+ * edge length and angle, rounded up to the nearest multiple of four. To get
+ * numbers not divisible by four, circularSegements must be specified.
+ */
 int Manifold::circularSegments = 0;
 float Manifold::circularAngle = 10.0f;
 float Manifold::circularEdgeLength = 1.0f;
@@ -470,6 +539,12 @@ Box Manifold::BoundingBox() const {
   return pImpl_->bBox_.Transform(pImpl_->transform_);
 }
 
+/**
+ * The genus is a topological property of the manifold, representing the number
+ * of "handles". A sphere is 0, torus 1, etc. It is only meaningful for a
+ * single, triangulated mesh (faces that are polygons with holes violate its
+ * assumptions), so it is best to call Face2Tri() and Decompose() first.
+ */
 int Manifold::Genus() const {
   int chi = NumVert() - NumEdge() + NumFace();
   return 1 - chi / 2;
@@ -493,6 +568,13 @@ Manifold& Manifold::Scale(glm::vec3 v) {
   return *this;
 }
 
+/**
+ * Applys an Euler angle rotation to the manifold, first about the X axis, then
+ * Y, then Z, in degrees. We use degrees so that we can minimize rounding error,
+ * and elimiate it completely for any multiples of 90 degrees. Addtionally, more
+ * efficient code paths are used to update the manifold when the transforms only
+ * rotate by multiples of 90 degrees.
+ */
 Manifold& Manifold::Rotate(float xDegrees, float yDegrees, float zDegrees) {
   glm::mat3 rX(1.0f, 0.0f, 0.0f,                      //
                0.0f, cosd(xDegrees), sind(xDegrees),  //
@@ -507,6 +589,13 @@ Manifold& Manifold::Rotate(float xDegrees, float yDegrees, float zDegrees) {
   return *this;
 }
 
+/**
+ * This function does not change the topology, but allows the vertices to be
+ * moved according to any arbitrary input function. It is easy to create a
+ * function that warps a geometrically valid object into one with is not, but
+ * that is not checked here, so it is up to the user to choose their function
+ * with discretion.
+ */
 Manifold& Manifold::Warp(std::function<void(glm::vec3&)> warpFunc) {
   pImpl_->ApplyTransform();
   thrust::for_each_n(pImpl_->vertPos_.begin(), NumVert(), warpFunc);
@@ -516,14 +605,18 @@ Manifold& Manifold::Warp(std::function<void(glm::vec3&)> warpFunc) {
   return *this;
 }
 
-int Manifold::NumOverlaps(const Manifold& B) const {
+/**
+ * This is a checksum-style verification of the collider, simply returning the
+ * total number of edge-face bounding box overlaps between this and other.
+ */
+int Manifold::NumOverlaps(const Manifold& other) const {
   pImpl_->ApplyTransform();
-  B.pImpl_->ApplyTransform();
+  other.pImpl_->ApplyTransform();
 
-  SparseIndices overlaps = pImpl_->EdgeCollisions(*B.pImpl_);
+  SparseIndices overlaps = pImpl_->EdgeCollisions(*other.pImpl_);
   int num_overlaps = overlaps.size();
 
-  overlaps = B.pImpl_->EdgeCollisions(*pImpl_);
+  overlaps = other.pImpl_->EdgeCollisions(*pImpl_);
   return num_overlaps += overlaps.size();
 }
 
