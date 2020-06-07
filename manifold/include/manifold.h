@@ -41,7 +41,7 @@ class Manifold {
 
   // Topological
   static Manifold Compose(const std::vector<Manifold>&);
-  std::vector<Manifold> Decompose();
+  std::vector<Manifold> Decompose() const;
 
   // Extraction is not const because it triangulates the Manifold.
   Mesh Extract();

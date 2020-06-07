@@ -309,11 +309,13 @@ Manifold Manifold::Compose(const std::vector<Manifold>& manifolds) {
   combined.vertPos_.resize(numVert);
   combined.halfedge_.resize(2 * numEdge);
   combined.faceEdge_.resize(numFace + 1);
+  combined.vertLabel_.resize(numVert);
   combined.faceNormal_.resize(numFace);
 
   int nextVert = 0;
   int nextEdge = 0;
   int nextFace = 0;
+  int nextLabel = 0;
   for (const Manifold& manifold : manifolds) {
     const Impl& impl = *(manifold.pImpl_);
     impl.ApplyTransform();
@@ -324,6 +326,8 @@ Manifold Manifold::Compose(const std::vector<Manifold>& manifolds) {
                  combined.faceNormal_.beginD() + nextFace);
     thrust::transform(impl.faceEdge_.beginD(), impl.faceEdge_.endD(),
                       combined.faceEdge_.beginD() + nextFace, _1 + nextEdge);
+    thrust::transform(impl.vertLabel_.beginD(), impl.vertLabel_.endD(),
+                      combined.vertLabel_.beginD() + nextVert, _1 + nextLabel);
     thrust::transform(impl.halfedge_.beginD(), impl.halfedge_.endD(),
                       combined.halfedge_.beginD() + nextEdge,
                       UpdateHalfedge({nextVert, nextEdge, nextFace}));
@@ -331,25 +335,21 @@ Manifold Manifold::Compose(const std::vector<Manifold>& manifolds) {
     nextVert += manifold.NumVert();
     nextEdge += 2 * manifold.NumEdge();
     nextFace += manifold.NumFace();
+    nextLabel += impl.numLabel_;
   }
 
+  combined.numLabel_ = nextLabel;
   combined.Finish();
   return out;
 }
 
-std::vector<Manifold> Manifold::Decompose() {
-  pImpl_->Face2Tri();
-
-  VecDH<int> vertLabel;
-  int numLabel = ConnectedComponents(vertLabel, NumVert(), pImpl_->halfedge_);
-
-  std::vector<Manifold> meshes(numLabel);
-  if (numLabel == 1) {
+std::vector<Manifold> Manifold::Decompose() const {
+  std::vector<Manifold> meshes(pImpl_->numLabel_);
+  if (pImpl_->numLabel_ == 1) {
     meshes[0] = DeepCopy();
     return meshes;
   }
-
-  for (int i = 0; i < numLabel; ++i) {
+  for (int i = 0; i < pImpl_->numLabel_; ++i) {
     meshes[i].pImpl_->vertPos_.resize(NumVert());
     VecDH<int> vertNew2Old(NumVert());
     int nVert =
@@ -357,7 +357,7 @@ std::vector<Manifold> Manifold::Decompose() {
             zip(pImpl_->vertPos_.beginD(), thrust::make_counting_iterator(0)),
             zip(pImpl_->vertPos_.endD(),
                 thrust::make_counting_iterator(NumVert())),
-            vertLabel.beginD(),
+            pImpl_->vertLabel_.beginD(),
             zip(meshes[i].pImpl_->vertPos_.beginD(), vertNew2Old.beginD()),
             Equals({i})) -
         zip(meshes[i].pImpl_->vertPos_.beginD(),
@@ -374,7 +374,7 @@ std::vector<Manifold> Manifold::Decompose() {
         thrust::remove_if(
             start, zip(faceNew2Old.endD(), faceSize.endD()),
             RemoveFace({pImpl_->halfedge_.cptrD(), pImpl_->faceEdge_.cptrD(),
-                        vertLabel.cptrD(), i})) -
+                        pImpl_->vertLabel_.cptrD(), i})) -
         start;
 
     faceNew2Old.resize(nFace);
