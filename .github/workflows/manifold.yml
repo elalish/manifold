@@ -54,6 +54,6 @@ jobs:
         cmake -DCMAKE_BUILD_TYPE=Release -DMANIFOLD_USE_OMP=ON .. && make
     - name: Test OMP
       run: |
-        cd test
+        cd buildOMP/test
         ./manifold_test
       
