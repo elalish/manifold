@@ -35,7 +35,7 @@ jobs:
         cd cmake-$version.$build/
         ./bootstrap
         make -j$(nproc)
-        make install
+        sudo make install
     - name: Install dependencies
       run: |
         sudo apt install -y libglm-dev libassimp-dev libboost-graph-dev
