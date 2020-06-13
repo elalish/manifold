@@ -23,9 +23,8 @@ jobs:
     - uses: actions/checkout@v2
     - uses: docker://nvidia/cuda:9.2-devel-ubuntu16.04
 
-    - name: Build and Test
+    - name: Install CMake
       run: |
-        apt-get -y update
         apt-get -y install wget libssl-dev
         version=3.17
         build=3
@@ -37,14 +36,22 @@ jobs:
         ./bootstrap
         make -j$(nproc)
         make install
+    - name: Install dependencies
+      run: |
         sudo apt install -y libglm-dev libassimp-dev libboost-graph-dev
-        OMP_NUM_THREADS=4
-        mkdir build
-        cd build
+    - name: Build CUDA
+        run: |
+        mkdir buildCUDA
+        cd buildCUDA
         cmake -DCMAKE_BUILD_TYPE=Release .. && make
+    - name: Build OMP
+      run: |
+        OMP_NUM_THREADS=4
+        mkdir buildOMP
+        cd buildOMP
         cmake -DCMAKE_BUILD_TYPE=Release -DMANIFOLD_USE_OMP=ON .. && make
+    - name: Test OMP
+      run: |
         cd test
         ./manifold_test
-      env:
-        CUDACXX: /usr/local/cuda/bin/nvcc
       
