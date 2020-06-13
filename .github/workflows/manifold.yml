@@ -21,18 +21,4 @@ jobs:
     steps:
     # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
     - uses: actions/checkout@v2
-    - uses: docker://nvidia/cuda:9.2-devel-ubuntu16.04
-
-    - name: Build and Test
-      run: |
-        sudo apt install -y libglm-dev libassimp-dev libboost-graph-dev
-        OMP_NUM_THREADS=4
-        mkdir build
-        cd build
-        cmake -DCMAKE_BUILD_TYPE=Release .. && make
-        cmake -DCMAKE_BUILD_TYPE=Release -DMANIFOLD_USE_OMP=ON .. && make
-        cd test
-        ./manifold_test
-      env:
-        CUDACXX: /usr/local/cuda/bin/nvcc
-      
+    - uses: Dockerfile
