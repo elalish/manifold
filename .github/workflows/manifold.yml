@@ -40,7 +40,7 @@ jobs:
       run: |
         sudo apt install -y libglm-dev libassimp-dev libboost-graph-dev
     - name: Build CUDA
-        run: |
+      run: |
         mkdir buildCUDA
         cd buildCUDA
         cmake -DCMAKE_BUILD_TYPE=Release .. && make
