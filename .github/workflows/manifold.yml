@@ -18,12 +18,10 @@ jobs:
     runs-on: ubuntu-16.04
     container:
       image: docker://nvidia/cuda:9.2-devel-ubuntu16.04
-
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
     # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
     - uses: actions/checkout@v2
-
     - name: Install CMake
       run: |
         apt-get -y update
