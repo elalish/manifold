@@ -25,7 +25,7 @@ jobs:
 
     - name: Install CMake
       run: |
-        apt-get -y install wget libssl-dev
+        sudo apt-get -y install wget libssl-dev
         version=3.17
         build=3
         mkdir ~/temp
