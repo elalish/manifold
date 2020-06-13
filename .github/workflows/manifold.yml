@@ -26,7 +26,7 @@ jobs:
 
     - name: Install CMake
       run: |
-        sudo apt-get -y install wget libssl-dev
+        apt-get -y install wget libssl-dev
         version=3.17
         build=3
         mkdir ~/temp
@@ -36,10 +36,10 @@ jobs:
         cd cmake-$version.$build/
         ./bootstrap
         make -j$(nproc)
-        sudo make install
+        make install
     - name: Install dependencies
       run: |
-        sudo apt install -y libglm-dev libassimp-dev libboost-graph-dev
+        apt install -y libglm-dev libassimp-dev libboost-graph-dev
     - name: Build CUDA
       run: |
         mkdir buildCUDA
