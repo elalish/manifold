@@ -96,35 +96,15 @@ constexpr int kInterior = -2;
 constexpr int kInvalid = -3;
 }  // namespace Edge
 
-struct HalfEdge {
-  int startVert;
-  int pairedHalfedge, nextHalfedge;
+struct Halfedge {
+  int startVert, endVert;
+  int pairedHalfedge;
   int face;
-};
-
-struct EdgeVerts {
-  int first;
-  int second;
-  int edge;
-};
-
-struct EdgeIdx {
-  uint32_t idx;
-  HOST_DEVICE EdgeIdx() { EdgeIdx(0, 1); }
-  HOST_DEVICE EdgeIdx(int ind, int dir) {
-    idx = static_cast<uint32_t>(ind) + (dir > 0 ? 0 : (1U << 31));
+  HOST_DEVICE bool IsForward() const { return startVert < endVert; }
+  HOST_DEVICE bool operator<(const Halfedge& other) const {
+    return startVert == other.startVert ? endVert < other.endVert
+                                        : startVert < other.startVert;
   }
-  HOST_DEVICE int Dir() const { return idx < (1U << 31) ? 1 : -1; }
-  HOST_DEVICE int Idx() const {
-    return idx < (1U << 31) ? idx : idx - (1U << 31);
-  }
-};
-
-struct TriEdges {
-  EdgeIdx edges[3];
-  HOST_DEVICE TriEdges() {}
-  HOST_DEVICE EdgeIdx& operator[](int i) { return edges[i]; }
-  HOST_DEVICE EdgeIdx operator[](int i) const { return edges[i]; }
 };
 
 struct PolyVert {
@@ -226,8 +206,11 @@ inline std::ostream& operator<<(std::ostream& stream, const Box& box) {
                 << box.max.z;
 }
 
-inline std::ostream& operator<<(std::ostream& stream, const EdgeIdx& edge) {
-  return stream << (edge.Dir() > 0 ? "F-" : "B-") << edge.Idx();
+inline std::ostream& operator<<(std::ostream& stream, const Halfedge& edge) {
+  return stream << "startVert = " << edge.startVert
+                << ", endVert = " << edge.endVert
+                << ", pairedHalfedge = " << edge.pairedHalfedge
+                << ", face = " << edge.face;
 }
 
 template <typename T>

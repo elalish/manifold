@@ -21,30 +21,17 @@
 
 namespace manifold {
 
-using EdgeVertsD = thrust::pair<int, int>;
-struct EdgeTrisD {
-  int right, left;
-};
-
-inline std::ostream& operator<<(std::ostream& stream, const EdgeVertsD& edge) {
-  return stream << edge.first << ", " << edge.second;
-}
-
 struct Manifold::Impl {
   Box bBox_;
   VecDH<glm::vec3> vertPos_;
   VecDH<int> vertLabel_;
   int numLabel_ = 1;
-  VecDH<HalfEdge> halfEdge_;
-  VecDH<int> face_;
-
-  VecDH<EdgeVertsD> edgeVerts_;
-  VecDH<EdgeTrisD> edgeTris_;
-  VecDH<glm::ivec3> triVerts_;
-  VecDH<TriEdges> triEdges_;
+  VecDH<Halfedge> halfedge_;
+  VecDH<int> nextHalfedge_;
+  VecDH<int> faceEdge_;
 
   VecDH<glm::vec3> vertNormal_;
-  VecDH<glm::vec3> triNormal_;
+  VecDH<glm::vec3> faceNormal_;
   Collider collider_;
   glm::mat4x3 transform_ = glm::mat4x3(1.0f);
 
@@ -52,28 +39,39 @@ struct Manifold::Impl {
   Impl(const Mesh&);
   enum class Shape { TETRAHEDRON, CUBE, OCTAHEDRON };
   Impl(Shape);
-  void RemoveChaff();
+
+  void CreateHalfedges(const VecDH<glm::ivec3>& triVerts);
+  void LabelVerts();
   void Finish();
   void Update();
   void ApplyTransform() const;
   void ApplyTransform();
+  void AssembleFaces() const;
+  void AssembleFaces();
+  bool Tri2Face() const;
+  bool Tri2Face();
+  bool Face2Tri();
   void Refine(int n);
-  bool IsValid() const;
+  bool IsManifold() const;
 
   int NumVert() const { return vertPos_.size(); }
-  int NumEdge() const { return edgeVerts_.size(); }
-  int NumTri() const { return triVerts_.size(); }
+  int NumEdge() const { return halfedge_.size() / 2; }
+  int NumFace() const { return faceEdge_.size() - 1; }
+  Properties GetProperties() const;
   void CalculateBBox();
 
   void SortVerts();
-  void CreateEdges();
-  void SortHalfedges(VecDH<EdgeVertsD>& halfEdges, VecDH<int>& dir);
-  VecDH<Box> GetEdgeBox() const;
-  void GetTriBoxMorton(VecDH<Box>& triBox, VecDH<uint32_t>& triMorton) const;
-  void SortTris(VecDH<Box>& triBox, VecDH<uint32_t>& triMorton);
+  void ReindexVerts(const VecDH<int>& vertNew2Old, int numOldVert);
+  void SortFaces(VecDH<Box>& faceBox, VecDH<uint32_t>& faceMorton);
+  void GatherFaces(const VecDH<Halfedge>& oldHalfedge,
+                   const VecDH<int>& oldFaceEdge, const VecDH<int>& faceNew2Old,
+                   const VecDH<int>& faceSize);
   void CalculateNormals();
 
   SparseIndices EdgeCollisions(const Impl& B) const;
   SparseIndices VertexCollisionsZ(const VecDH<glm::vec3>& vertsIn) const;
+  VecDH<int> FaceSize() const;
+  void GetFaceBoxMorton(VecDH<Box>& faceBox, VecDH<uint32_t>& faceMorton) const;
+  Polygons Face2Polygons(int face, glm::mat3x2 projection) const;
 };
 }  // namespace manifold

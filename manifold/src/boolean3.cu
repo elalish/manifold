@@ -12,10 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "boolean3.cuh"
-#include "connected_components.cuh"
-#include "polygon.h"
-
 #include <math_constants.h>
 #include <thrust/binary_search.h>
 #include <thrust/count.h>
@@ -31,9 +27,35 @@
 #include <thrust/transform_reduce.h>
 #include <thrust/transform_scan.h>
 #include <thrust/unique.h>
+
 #include <algorithm>
 #include <map>
 
+#include "boolean3.cuh"
+#include "connected_components.cuh"
+#include "polygon.h"
+
+/**
+ * The notation in this file is abbreviated due to the complexity of the
+ * functions involved. The key is that the input manifolds are P and Q, while
+ * the output is R, and these letters in both upper and lower case refer to
+ * these objects. Operations are based on dimensionality: vert: 0, edge: 1,
+ * face: 2, solid: 3. X denotes a winding-number type quantity from the source
+ * paper of this algorithm, while S is closely related but includes only the
+ * subset of X values which "shadow" (are on the correct side of).
+ *
+ * Nearly everything here are sparse arrays, where for instance each pair in
+ * p2q1 refers to a face index of P interacting with a halfedge index of Q.
+ * Adjacent arrays like x21 refer to the values of X corresponding to each
+ * sparse index pair.
+ *
+ * Note many functions are designed to work symmetrically, for instance for both
+ * p2q1 and p1q2. Inside of these functions P and Q are marked as though the
+ * funtion is forwards, but it may include a Boolean "reverse" that indicates P
+ * and Q have been swapped.
+ */
+
+// TODO: make this runtime configurable for quicker debug
 constexpr bool kVerbose = false;
 
 using namespace thrust::placeholders;
@@ -49,12 +71,9 @@ using namespace manifold;
 __host__ __device__ glm::vec2 Interpolate(glm::vec3 pL, glm::vec3 pR, float x) {
   float dxL = x - pL.x;
   float dxR = x - pR.x;
-  // assert dxL and dxR have opposite signs, cannot both be zero
-  // if (!(dxL * dxR <= 0 && (dxL != 0 || dxR != 0)))
-  //   printf("dxL = %f, dxR = %f\n", dxL, dxR);
   bool useL = fabs(dxL) < fabs(dxR);
   float lambda = (useL ? dxL : dxR) / (pR.x - pL.x);
-  if (isnan(lambda)) return glm::vec2(pL.y, pL.z);
+  if (!isfinite(lambda)) return glm::vec2(pL.y, pL.z);
   glm::vec2 yz;
   yz[0] = (useL ? pL.y : pR.y) + lambda * (pR.y - pL.y);
   yz[1] = (useL ? pL.z : pR.z) + lambda * (pR.z - pL.z);
@@ -65,19 +84,12 @@ __host__ __device__ glm::vec4 Intersect(const glm::vec3 &pL,
                                         const glm::vec3 &pR,
                                         const glm::vec3 &qL,
                                         const glm::vec3 &qR) {
-  // assert pL.x == qL.x, pR.x == qR.x
-  // if (!(pL.x == qL.x && pR.x == qR.x))
-  //   printf("pL.x = %f, qL.x = %f, pR.x = %f, qR.x = %f\n", pL.x, qL.x, pR.x,
-  //          qR.x);
   float dyL = qL.y - pL.y;
   float dyR = qR.y - pR.y;
-  // assert dyL and dyR have opposite signs, cannot both be zero
-  // if (!(dyL * dyR <= 0 && (dyL != 0 || dyR != 0)))
-  //   printf("dyL = %f, dyR = %f\n", dyL, dyR);
   bool useL = fabs(dyL) < fabs(dyR);
   float dx = pR.x - pL.x;
   float lambda = (useL ? dyL : dyR) / (dyL - dyR);
-  if (isnan(lambda)) lambda = 0.0f;
+  if (!isfinite(lambda)) lambda = 0.0f;
   glm::vec4 xyzz;
   xyzz.x = (useL ? pL.x : pR.x) + lambda * dx;
   float pDy = pR.y - pL.y;
@@ -90,141 +102,158 @@ __host__ __device__ glm::vec4 Intersect(const glm::vec3 &pL,
   return xyzz;
 }
 
-struct CopyEdgeVerts {
+struct MarkEdgeVerts {
   int *verts;
-  const EdgeVertsD *edgeVerts;
+  const Halfedge *halfedges;
 
-  __host__ __device__ void operator()(thrust::tuple<int, int> in) {
-    int idx = 2 * thrust::get<0>(in);
-    int edge = thrust::get<1>(in);
-
-    verts[idx] = edgeVerts[edge].first;
-    verts[idx + 1] = edgeVerts[edge].second;
+  __host__ __device__ void operator()(int edge) {
+    int vert = halfedges[edge].startVert;
+    verts[vert] = vert;
+    vert = halfedges[edge].endVert;
+    verts[vert] = vert;
   }
 };
 
-struct CopyTriVerts {
+struct MarkFaceVerts {
   int *verts;
-  const glm::ivec3 *triVerts;
+  const Halfedge *halfedges;
+  const int *faces;
 
-  __host__ __device__ void operator()(thrust::tuple<int, int> in) {
-    int idx = 3 * thrust::get<0>(in);
-    int tri = thrust::get<1>(in);
-
-    for (int i : {0, 1, 2}) verts[idx + i] = triVerts[tri][i];
-  }
-};
-
-struct CopyTriEdges {
-  int *edges;
-  const TriEdges *triEdges;
-
-  __host__ __device__ void operator()(thrust::tuple<int, int> in) {
-    int idx = 3 * thrust::get<0>(in);
-    int tri = thrust::get<1>(in);
-
-    for (int i : {0, 1, 2}) {
-      edges[idx + i] = triEdges[tri][i].Idx();
+  __host__ __device__ void operator()(int face) {
+    int edge = faces[face];
+    const int lastEdge = faces[face + 1];
+    while (edge < lastEdge) {
+      int vert = halfedges[edge++].startVert;
+      verts[vert] = vert;
     }
   }
 };
 
 SparseIndices Filter02(const Manifold::Impl &inP, const Manifold::Impl &inQ,
-                       const VecDH<int> &edges, const VecDH<int> &tris) {
-  // find inP's involved vertices from edges & tris
-  VecDH<int> A0(2 * edges.size() + 3 * tris.size() + inP.numLabel_);
-  thrust::for_each_n(zip(thrust::make_counting_iterator(0), edges.beginD()),
-                     edges.size(),
-                     CopyEdgeVerts({A0.ptrD(), inP.edgeVerts_.cptrD()}));
+                       const VecDH<int> &edges, const VecDH<int> &faces) {
+  // find inP's involved vertices from edges & faces
+  VecDH<int> p0(inP.NumVert(), -1);
+  // We keep the verts unique by marking the ones we want to keep
+  // with their own index in parallel (collisions don't matter because any given
+  // element is always being written with the same value). Any that are still
+  // initialized to -1 are not involved and can be removed.
+  thrust::for_each_n(edges.beginD(), edges.size(),
+                     MarkEdgeVerts({p0.ptrD(), inP.halfedge_.cptrD()}));
+
   thrust::for_each_n(
-      zip(thrust::make_counting_iterator(0), tris.beginD()), tris.size(),
-      CopyTriVerts({A0.ptrD() + 2 * edges.size(), inP.triVerts_.cptrD()}));
+      faces.beginD(), faces.size(),
+      MarkFaceVerts({p0.ptrD(), inP.halfedge_.cptrD(), inP.faceEdge_.cptrD()}));
+
   // find one vertex from each connected component of inP (in case it has no
   // intersections)
-  thrust::lower_bound(inP.vertLabel_.beginD(), inP.vertLabel_.endD(),
-                      thrust::make_counting_iterator(0),
-                      thrust::make_counting_iterator(inP.numLabel_),
-                      A0.endD() - inP.numLabel_);
+  for (int i = 0; i < inP.numLabel_; ++i) {
+    int vert = thrust::find(inP.vertLabel_.beginD(), inP.vertLabel_.endD(), i) -
+               inP.vertLabel_.beginD();
+    p0.H()[vert] = vert;
+  }
 
-  thrust::sort(A0.beginD(), A0.endD());
-  A0.resize(thrust::unique(A0.beginD(), A0.endD()) - A0.beginD());
+  p0.resize(thrust::remove(p0.beginD(), p0.endD(), -1) - p0.beginD());
   // find which inQ faces shadow these vertices
-  VecDH<glm::vec3> AV(A0.size());
-  thrust::gather(A0.beginD(), A0.endD(), inP.vertPos_.cbeginD(), AV.beginD());
-  SparseIndices p0q2 = inQ.VertexCollisionsZ(AV);
+  VecDH<glm::vec3> vertPosP(p0.size());
+  thrust::gather(p0.beginD(), p0.endD(), inP.vertPos_.cbeginD(),
+                 vertPosP.beginD());
+  SparseIndices p0q2 = inQ.VertexCollisionsZ(vertPosP);
   VecDH<int> i02temp(p0q2.size());
   thrust::copy(p0q2.beginD(0), p0q2.endD(0), i02temp.beginD());
-  thrust::gather(i02temp.beginD(), i02temp.endD(), A0.beginD(), p0q2.beginD(0));
+  thrust::gather(i02temp.beginD(), i02temp.endD(), p0.beginD(), p0q2.beginD(0));
   return p0q2;
 }
 
-struct Fill11 {
-  thrust::pair<int *, int *> p1q1;
-  const TriEdges *triEdgesQ;
+struct CopyFaceEdges {
+  // x can be either vert or edge (0 or 1).
+  thrust::pair<int *, int *> pXq1;
+  const int *facesQ;
+  const Halfedge *halfedgesQ;
 
   __host__ __device__ void operator()(thrust::tuple<int, int, int> in) {
-    int idx = 3 * thrust::get<0>(in);
-    int edgeP = thrust::get<1>(in);
-    int triQ = thrust::get<2>(in);
+    int idx = thrust::get<0>(in);
+    const int pX = thrust::get<1>(in);
+    const int q2 = thrust::get<2>(in);
 
-    for (int i : {0, 1, 2}) {
-      p1q1.first[idx + i] = edgeP;
-      p1q1.second[idx + i] = triEdgesQ[triQ][i].Idx();
+    int q1 = facesQ[q2];
+    const int end = facesQ[q2 + 1];
+    while (q1 < end) {
+      pXq1.first[idx] = pX;
+      const Halfedge edge = halfedgesQ[q1];
+      pXq1.second[idx++] = edge.IsForward() ? q1 : edge.pairedHalfedge;
+      ++q1;
     }
   }
 };
 
-SparseIndices Filter11(const Manifold::Impl &inP, const Manifold::Impl &inQ,
+SparseIndices Filter11(const Manifold::Impl &inP, const VecDH<int> &faceSizeP,
+                       const Manifold::Impl &inQ, const VecDH<int> &faceSizeQ,
                        const SparseIndices &p1q2, const SparseIndices &p2q1) {
-  SparseIndices p1q1(3 * p1q2.size() + 3 * p2q1.size());
-  thrust::for_each_n(
-      zip(thrust::make_counting_iterator(0), p1q2.beginD(0), p1q2.beginD(1)),
-      p1q2.size(), Fill11({p1q1.ptrDpq(), inQ.triEdges_.cptrD()}));
+  VecDH<int> expandedIdxQ(p1q2.size() + 1);
+  auto includedFaceSizeQ = perm(faceSizeQ.beginD() + 1, p1q2.beginD(1));
+  thrust::inclusive_scan(includedFaceSizeQ, includedFaceSizeQ + p1q2.size(),
+                         expandedIdxQ.beginD() + 1);
+  const int secondStart = expandedIdxQ.H().back();
+
+  VecDH<int> expandedIdxP(p2q1.size() + 1);
+  auto includedFaceSizeP = perm(faceSizeP.beginD() + 1, p2q1.beginD(0));
+  thrust::inclusive_scan(includedFaceSizeP, includedFaceSizeP + p2q1.size(),
+                         expandedIdxP.beginD() + 1);
+
+  SparseIndices p1q1(secondStart + expandedIdxP.H().back());
+  thrust::for_each_n(zip(expandedIdxQ.beginD(), p1q2.beginD(0), p1q2.beginD(1)),
+                     p1q2.size(),
+                     CopyFaceEdges({p1q1.ptrDpq(), inQ.faceEdge_.cptrD(),
+                                    inQ.halfedge_.cptrD()}));
+
   p1q1.SwapPQ();
-  thrust::for_each_n(zip(thrust::make_counting_iterator(p1q2.size()),
-                         p2q1.beginD(1), p2q1.beginD(0)),
-                     p2q1.size(),
-                     Fill11({p1q1.ptrDpq(), inP.triEdges_.cptrD()}));
+  thrust::for_each_n(
+      zip(expandedIdxP.beginD(), p2q1.beginD(1), p2q1.beginD(0)), p2q1.size(),
+      CopyFaceEdges({p1q1.ptrDpq(secondStart), inP.faceEdge_.cptrD(),
+                     inP.halfedge_.cptrD()}));
   p1q1.SwapPQ();
   p1q1.Unique();
   return p1q1;
 }
 
+struct CopyEdgeVerts {
+  thrust::pair<int *, int *> p0q1;
+  const Halfedge *halfedges;
+
+  __host__ __device__ void operator()(thrust::tuple<int, int, int> in) {
+    int idx = 2 * thrust::get<0>(in);
+    const int p1 = thrust::get<1>(in);
+    const int q1 = thrust::get<2>(in);
+
+    p0q1.first[idx] = halfedges[p1].startVert;
+    p0q1.second[idx] = q1;
+    p0q1.first[idx + 1] = halfedges[p1].endVert;
+    p0q1.second[idx + 1] = q1;
+  }
+};
+
 SparseIndices Filter01(const Manifold::Impl &inP, const Manifold::Impl &inQ,
-                       const SparseIndices &p0q2, const SparseIndices &p1q1) {
-  SparseIndices p0q1(3 * p0q2.size() + 2 * p1q1.size());
-  // Copy vertices
-  for (int i : {0, 1, 2}) {
-    auto verts3 =
-        strided_range<VecDH<int>::IterD>(p0q1.beginD(0) + i, p0q1.endD(0), 3);
-    thrust::copy(p0q2.beginD(0), p0q2.endD(0), verts3.begin());
-  }
-  thrust::for_each_n(
-      zip(thrust::make_counting_iterator(0), p1q1.beginD(0)), p1q1.size(),
-      CopyEdgeVerts({p0q1.ptrD(0) + 3 * p0q2.size(), inP.edgeVerts_.cptrD()}));
-  // Copy edges
-  thrust::for_each_n(zip(thrust::make_counting_iterator(0), p0q2.beginD(1)),
+                       const VecDH<int> &faceSizeQ, const SparseIndices &p0q2,
+                       const SparseIndices &p1q1) {
+  VecDH<int> expandedIdxQ(p0q2.size() + 1);
+  auto includedFaceSizeQ = perm(faceSizeQ.beginD() + 1, p0q2.beginD(1));
+  thrust::inclusive_scan(includedFaceSizeQ, includedFaceSizeQ + p0q2.size(),
+                         expandedIdxQ.beginD() + 1);
+  const int secondStart = expandedIdxQ.H().back();
+
+  SparseIndices p0q1(secondStart + 2 * p1q1.size());
+
+  thrust::for_each_n(zip(expandedIdxQ.beginD(), p0q2.beginD(0), p0q2.beginD(1)),
                      p0q2.size(),
-                     CopyTriEdges({p0q1.ptrD(1), inQ.triEdges_.cptrD()}));
-  for (int i : {0, 1}) {
-    auto edges2 = strided_range<VecDH<int>::IterD>(
-        p0q1.beginD(1) + 3 * p0q2.size() + i, p0q1.endD(1), 2);
-    thrust::copy(p1q1.beginD(1), p1q1.endD(1), edges2.begin());
-  }
+                     CopyFaceEdges({p0q1.ptrDpq(), inQ.faceEdge_.cptrD(),
+                                    inQ.halfedge_.cptrD()}));
+
+  thrust::for_each_n(
+      zip(thrust::make_counting_iterator(0), p1q1.beginD(0), p1q1.beginD(1)),
+      p1q1.size(),
+      CopyEdgeVerts({p0q1.ptrDpq(secondStart), inP.halfedge_.cptrD()}));
   return p0q1;
 }
-
-struct Not_zero {
-  __host__ __device__ bool operator()(const int x) { return x != 0; }
-};
-
-struct Right : public thrust::unary_function<EdgeTrisD, int> {
-  __host__ __device__ int operator()(EdgeTrisD edge) { return edge.right; }
-};
-
-struct Left : public thrust::unary_function<EdgeTrisD, int> {
-  __host__ __device__ int operator()(EdgeTrisD edge) { return edge.left; }
-};
 
 struct AbsSum : public thrust::binary_function<int, int, int> {
   __host__ __device__ int operator()(int a, int b) { return abs(a) + abs(b); }
@@ -238,25 +267,24 @@ struct ShadowKernel01 {
   const bool reverse;
   const glm::vec3 *vertPosP;
   const glm::vec3 *vertPosQ;
-  const EdgeVertsD *edgeVertsQ;
+  const Halfedge *halfedgeQ;
   const float expandP;
   const glm::vec3 *normalP;
 
   __host__ __device__ void operator()(thrust::tuple<int &, int, int> inout) {
     int &s01 = thrust::get<0>(inout);
-    int vertP = thrust::get<1>(inout);
-    int edgeQ = thrust::get<2>(inout);
+    const int p0 = thrust::get<1>(inout);
+    const int q1 = thrust::get<2>(inout);
 
-    int vertQ0 = edgeVertsQ[edgeQ].first;
-    int vertQ1 = edgeVertsQ[edgeQ].second;
-    float p = vertPosP[vertP].x;
-    float q0 = vertPosQ[vertQ0].x;
-    float q1 = vertPosQ[vertQ1].x;
-    s01 = reverse
-              ? Shadows(q0, p, expandP * normalP[vertQ0].x) -
-                    Shadows(q1, p, expandP * normalP[vertQ1].x)
-              : Shadows(p, q1, expandP * normalP[vertP].x) -
-                    Shadows(p, q0, expandP * normalP[vertP].x);
+    const int q1s = halfedgeQ[q1].startVert;
+    const int q1e = halfedgeQ[q1].endVert;
+    const float p0x = vertPosP[p0].x;
+    const float q1sx = vertPosQ[q1s].x;
+    const float q1ex = vertPosQ[q1e].x;
+    s01 = reverse ? Shadows(q1sx, p0x, expandP * normalP[q1s].x) -
+                        Shadows(q1ex, p0x, expandP * normalP[q1e].x)
+                  : Shadows(p0x, q1ex, expandP * normalP[p0].x) -
+                        Shadows(p0x, q1sx, expandP * normalP[p0].x);
   }
 };
 
@@ -264,7 +292,7 @@ struct Kernel01 {
   const bool reverse;
   const glm::vec3 *vertPosP;
   const glm::vec3 *vertPosQ;
-  const EdgeVertsD *edgeVertsQ;
+  const Halfedge *halfedgeQ;
   const float expandP;
   const glm::vec3 *normalP;
 
@@ -272,20 +300,21 @@ struct Kernel01 {
       thrust::tuple<glm::vec2 &, int &, int, int> inout) {
     glm::vec2 &yz01 = thrust::get<0>(inout);
     int &s01 = thrust::get<1>(inout);
-    int vertP = thrust::get<2>(inout);
-    int edgeQ = thrust::get<3>(inout);
+    const int p0 = thrust::get<2>(inout);
+    const int q1 = thrust::get<3>(inout);
 
-    int vertQ0 = edgeVertsQ[edgeQ].first;
-    int vertQ1 = edgeVertsQ[edgeQ].second;
-    glm::vec3 vertPos0 = vertPosQ[vertQ0];
-    glm::vec3 vertPos1 = vertPosQ[vertQ1];
-    yz01 = Interpolate(vertPos0, vertPos1, vertPosP[vertP].x);
+    const int q1s = halfedgeQ[q1].startVert;
+    const int q1e = halfedgeQ[q1].endVert;
+    yz01 = Interpolate(vertPosQ[q1s], vertPosQ[q1e], vertPosP[p0].x);
     if (reverse) {
-      if (!Shadows(yz01[0], vertPosP[vertP].y, expandP * normalP[vertQ0].y))
-        s01 = 0;
+      glm::vec3 diff = vertPosQ[q1s] - vertPosP[p0];
+      const float start2 = glm::dot(diff, diff);
+      diff = vertPosQ[q1e] - vertPosP[p0];
+      const float end2 = glm::dot(diff, diff);
+      const float dir = start2 < end2 ? normalP[q1s].y : normalP[q1e].y;
+      if (!Shadows(yz01[0], vertPosP[p0].y, expandP * dir)) s01 = 0;
     } else {
-      if (!Shadows(vertPosP[vertP].y, yz01[0], expandP * normalP[vertP].y))
-        s01 = 0;
+      if (!Shadows(vertPosP[p0].y, yz01[0], expandP * normalP[p0].y)) s01 = 0;
     }
   }
 };
@@ -300,7 +329,7 @@ std::tuple<VecDH<int>, VecDH<glm::vec2>> Shadow01(SparseIndices &p0q1,
   thrust::for_each_n(
       zip(s01.beginD(), p0q1.beginD(0), p0q1.beginD(1)), p0q1.size(),
       ShadowKernel01({reverse, inP.vertPos_.cptrD(), inQ.vertPos_.cptrD(),
-                      inQ.edgeVerts_.cptrD(), expandP, normalP}));
+                      inQ.halfedge_.cptrD(), expandP, normalP}));
   size_t size = p0q1.RemoveZeros(s01);
   VecDH<glm::vec2> yz01(size);
 
@@ -308,7 +337,7 @@ std::tuple<VecDH<int>, VecDH<glm::vec2>> Shadow01(SparseIndices &p0q1,
   thrust::for_each_n(
       zip(yz01.beginD(), s01.beginD(), p0q1.beginD(0), p0q1.beginD(1)), size,
       Kernel01({reverse, inP.vertPos_.cptrD(), inQ.vertPos_.cptrD(),
-                inQ.edgeVerts_.cptrD(), expandP, normalP}));
+                inQ.halfedge_.cptrD(), expandP, normalP}));
   if (reverse) p0q1.SwapPQ();
   return std::make_tuple(s01, yz01);
 }
@@ -341,7 +370,7 @@ struct Gather11 {
   const thrust::pair<const int *, const int *> p0q1;
   const int *s01;
   const int size;
-  const EdgeVertsD *edgeVertsP;
+  const Halfedge *halfedgeP;
   const bool reverse;
 
   __host__ __device__ void operator()(thrust::tuple<int &, int, int> inout) {
@@ -349,10 +378,10 @@ struct Gather11 {
     const int p1 = thrust::get<1>(inout);
     const int q1 = thrust::get<2>(inout);
 
-    int p0 = edgeVertsP[p1].second;
+    int p0 = halfedgeP[p1].endVert;
     auto key = reverse ? thrust::make_pair(q1, p0) : thrust::make_pair(p0, q1);
     s11 += BinarySearchByKey(p0q1, s01, size, key, 0);
-    p0 = edgeVertsP[p1].first;
+    p0 = halfedgeP[p1].startVert;
     key = reverse ? thrust::make_pair(q1, p0) : thrust::make_pair(p0, q1);
     s11 -= BinarySearchByKey(p0q1, s01, size, key, 0);
   }
@@ -361,8 +390,8 @@ struct Gather11 {
 struct Kernel11 {
   const glm::vec3 *vertPosP;
   const glm::vec3 *vertPosQ;
-  const EdgeVertsD *edgeVertsP;
-  const EdgeVertsD *edgeVertsQ;
+  const Halfedge *halfedgeP;
+  const Halfedge *halfedgeQ;
   thrust::pair<const int *, const int *> p0q1;
   const glm::vec2 *yz01;
   int size01;
@@ -383,8 +412,8 @@ struct Kernel11 {
     int k = 0;
     thrust::pair<int, int> key2[2];
 
-    key2[0] = thrust::make_pair(edgeVertsP[p1].first, q1);
-    key2[1] = thrust::make_pair(edgeVertsP[p1].second, q1);
+    key2[0] = thrust::make_pair(halfedgeP[p1].startVert, q1);
+    key2[1] = thrust::make_pair(halfedgeP[p1].endVert, q1);
     for (int i : {0, 1}) {
       p2[k] = vertPosP[key2[i].first];
       q2[k] = glm::vec3(p2[k].x, BinarySearchByKey(p0q1, yz01, size01, key2[i],
@@ -392,8 +421,8 @@ struct Kernel11 {
       if (!isnan(q2[k].y)) k++;
     }
 
-    key2[0] = thrust::make_pair(p1, edgeVertsQ[q1].first);
-    key2[1] = thrust::make_pair(p1, edgeVertsQ[q1].second);
+    key2[0] = thrust::make_pair(p1, halfedgeQ[q1].startVert);
+    key2[1] = thrust::make_pair(p1, halfedgeQ[q1].endVert);
     for (int i : {0, 1}) {
       if (k > 1) break;
       q2[k] = vertPosQ[key2[i].second];
@@ -406,8 +435,16 @@ struct Kernel11 {
     if (k != 2) printf("k = %d\n", k);
 
     xyzz11 = Intersect(p2[0], p2[1], q2[0], q2[1]);
-    if (!Shadows(xyzz11.z, xyzz11.w, expandP * normalP[edgeVertsP[p1].first].z))
-      s11 = 0;
+
+    const int p1s = halfedgeP[p1].startVert;
+    const int p1e = halfedgeP[p1].endVert;
+    glm::vec3 diff = vertPosP[p1s] - glm::vec3(xyzz11);
+    const float start2 = glm::dot(diff, diff);
+    diff = vertPosP[p1e] - glm::vec3(xyzz11);
+    const float end2 = glm::dot(diff, diff);
+    const float dir = start2 < end2 ? normalP[p1s].z : normalP[p1e].z;
+
+    if (!Shadows(xyzz11.z, xyzz11.w, expandP * dir)) s11 = 0;
   }
 };
 
@@ -420,12 +457,12 @@ std::tuple<VecDH<int>, VecDH<glm::vec4>> Shadow11(
 
   thrust::for_each_n(zip(s11.beginD(), p1q1.beginD(0), p1q1.beginD(1)),
                      p1q1.size(),
-                     Gather11({p0q1.ptrDpq(), s01.ptrD(), p0q1.size(),
-                               inP.edgeVerts_.ptrD(), false}));
+                     Gather11({p0q1.ptrDpq(), s01.cptrD(), p0q1.size(),
+                               inP.halfedge_.cptrD(), false}));
   thrust::for_each_n(zip(s11.beginD(), p1q1.beginD(1), p1q1.beginD(0)),
                      p1q1.size(),
-                     Gather11({p1q0.ptrDpq(), s10.ptrD(), p1q0.size(),
-                               inQ.edgeVerts_.ptrD(), true}));
+                     Gather11({p1q0.ptrDpq(), s10.cptrD(), p1q0.size(),
+                               inQ.halfedge_.cptrD(), true}));
 
   size_t size = p1q1.RemoveZeros(s11);
   VecDH<glm::vec4> xyzz11(size);
@@ -434,7 +471,7 @@ std::tuple<VecDH<int>, VecDH<glm::vec4>> Shadow11(
       zip(xyzz11.beginD(), s11.beginD(), p1q1.beginD(0), p1q1.beginD(1)),
       p1q1.size(),
       Kernel11({inP.vertPos_.cptrD(), inQ.vertPos_.cptrD(),
-                inP.edgeVerts_.cptrD(), inQ.edgeVerts_.cptrD(), p0q1.ptrDpq(),
+                inP.halfedge_.cptrD(), inQ.halfedge_.cptrD(), p0q1.ptrDpq(),
                 yz01.cptrD(), p0q1.size(), p1q0.ptrDpq(), yz10.cptrD(),
                 p1q0.size(), expandP, inP.vertNormal_.cptrD()}));
 
@@ -445,7 +482,8 @@ struct Gather02 {
   const thrust::pair<const int *, const int *> p0q1;
   const int *s01;
   const int size;
-  const TriEdges *triEdgesQ;
+  const int *facesQ;
+  const Halfedge *halfedgesQ;
   const bool forward;
 
   __host__ __device__ void operator()(thrust::tuple<int &, int, int> inout) {
@@ -453,12 +491,16 @@ struct Gather02 {
     const int p0 = thrust::get<1>(inout);
     const int q2 = thrust::get<2>(inout);
 
-    const TriEdges triEdges = triEdgesQ[q2];
-    for (int i : {0, 1, 2}) {
-      auto key = forward ? thrust::make_pair(p0, triEdges[i].Idx())
-                         : thrust::make_pair(triEdges[i].Idx(), p0);
-      s02 += (forward ? -1 : 1) * triEdges[i].Dir() *
+    int q1 = facesQ[q2];
+    const int lastEdge = facesQ[q2 + 1];
+    while (q1 < lastEdge) {
+      const Halfedge edge = halfedgesQ[q1];
+      const int q1F = edge.IsForward() ? q1 : edge.pairedHalfedge;
+      const auto key =
+          forward ? thrust::make_pair(p0, q1F) : thrust::make_pair(q1F, p0);
+      s02 += (forward == edge.IsForward() ? -1 : 1) *
              BinarySearchByKey(p0q1, s01, size, key, 0);
+      ++q1;
     }
   }
 };
@@ -468,7 +510,8 @@ struct Kernel02 {
   const thrust::pair<const int *, const int *> p0q1;
   const glm::vec2 *yz01;
   const int size;
-  const TriEdges *triEdgesQ;
+  const int *facesQ;
+  const Halfedge *halfedgesQ;
   const bool forward;
   const float expandP;
   const glm::vec3 *normalP;
@@ -480,28 +523,26 @@ struct Kernel02 {
     const int p0 = thrust::get<2>(inout);
     const int q2 = thrust::get<3>(inout);
 
-    const TriEdges triEdges = triEdgesQ[q2];
-    glm::vec2 yz3[3];
-    for (int i : {0, 1, 2}) {
-      auto key = forward ? thrust::make_pair(p0, triEdges[i].Idx())
-                         : thrust::make_pair(triEdges[i].Idx(), p0);
-      yz3[i] = BinarySearchByKey(p0q1, yz01, size, key, glm::vec2(0.0f / 0.0f));
+    int q1 = facesQ[q2];
+    const int lastEdge = facesQ[q2 + 1];
+    glm::vec3 yzz2[2];
+    int k = 0;
+    while (q1 < lastEdge) {
+      const Halfedge edge = halfedgesQ[q1];
+      const int q1F = edge.IsForward() ? q1 : edge.pairedHalfedge;
+      const auto key =
+          forward ? thrust::make_pair(p0, q1F) : thrust::make_pair(q1F, p0);
+      const glm::vec2 yz =
+          BinarySearchByKey(p0q1, yz01, size, key, glm::vec2(0.0f / 0.0f));
+      if (!isnan(yz[0])) yzz2[k++] = glm::vec3(yz[0], yz[1], yz[1]);
+      if (k > 1) break;
+      ++q1;
     }
+    // assert two of these were found
+    if (k != 2) printf("k = %d\n", k);
 
-    // assert exactly 2 of yz3 are found
-    if (isnan(yz3[0][0]) + isnan(yz3[1][0]) + isnan(yz3[2][0]) != 1)
-      printf("yz0 = %f, yz1 = %f, yz2 = %f\n", yz3[0][0], yz3[1][0], yz3[2][0]);
-    if (isnan(yz3[0][0])) yz3[0] = yz3[2];
-    if (isnan(yz3[1][0])) yz3[1] = yz3[2];
-    glm::vec3 pL, pR;
-    pL.x = yz3[0][0];
-    pL.y = yz3[0][1];
-    pL.z = yz3[0][1];
-    pR.x = yz3[1][0];
-    pR.y = yz3[1][1];
-    pR.z = yz3[1][1];
     glm::vec3 vertPos = vertPosP[p0];
-    z02 = Interpolate(pL, pR, vertPos.y)[1];
+    z02 = Interpolate(yzz2[0], yzz2[1], vertPos.y)[1];
     if (forward) {
       if (!Shadows(vertPos.z, z02, expandP * normalP[p0].z)) s02 = 0;
     } else {
@@ -518,19 +559,21 @@ std::tuple<VecDH<int>, VecDH<float>> Shadow02(
 
   thrust::for_each_n(
       zip(s02.beginD(), p0q2.beginD(!forward), p0q2.beginD(forward)),
-      p0q2.size(), Gather02({p0q1.ptrDpq(), s01.ptrD(), p0q1.size(),
-                             inQ.triEdges_.ptrD(), forward}));
+      p0q2.size(),
+      Gather02({p0q1.ptrDpq(), s01.cptrD(), p0q1.size(), inQ.faceEdge_.cptrD(),
+                inQ.halfedge_.cptrD(), forward}));
 
   size_t size = p0q2.RemoveZeros(s02);
   VecDH<float> z02(size);
 
-  auto normalP = forward ? inP.vertNormal_.cptrD() : inQ.triNormal_.cptrD();
+  auto normalP = forward ? inP.vertNormal_.cptrD() : inQ.faceNormal_.cptrD();
   thrust::for_each_n(
       zip(z02.beginD(), s02.beginD(), p0q2.beginD(!forward),
           p0q2.beginD(forward)),
       size,
       Kernel02({inP.vertPos_.cptrD(), p0q1.ptrDpq(), yz01.cptrD(), p0q1.size(),
-                inQ.triEdges_.cptrD(), forward, expandP, normalP}));
+                inQ.faceEdge_.cptrD(), inQ.halfedge_.cptrD(), forward, expandP,
+                normalP}));
 
   return std::make_tuple(s02, z02);
 };
@@ -542,8 +585,9 @@ struct Gather12 {
   const thrust::pair<const int *, const int *> p1q1;
   const int *s11;
   const int size11;
-  const EdgeVertsD *edgeVertsP;
-  const TriEdges *triEdgesQ;
+  const Halfedge *halfedgesP;
+  const int *facesQ;
+  const Halfedge *halfedgesQ;
   const bool forward;
 
   __host__ __device__ void operator()(thrust::tuple<int &, int, int> inout) {
@@ -551,19 +595,23 @@ struct Gather12 {
     const int p1 = thrust::get<1>(inout);
     const int q2 = thrust::get<2>(inout);
 
-    const EdgeVertsD edgeVerts = edgeVertsP[p1];
-    auto key = forward ? thrust::make_pair(edgeVerts.first, q2)
-                       : thrust::make_pair(q2, edgeVerts.second);
+    const Halfedge edge = halfedgesP[p1];
+    auto key = forward ? thrust::make_pair(edge.startVert, q2)
+                       : thrust::make_pair(q2, edge.endVert);
     x12 = BinarySearchByKey(p0q2, s02, size02, key, 0);
-    key = forward ? thrust::make_pair(edgeVerts.second, q2)
-                  : thrust::make_pair(q2, edgeVerts.first);
+    key = forward ? thrust::make_pair(edge.endVert, q2)
+                  : thrust::make_pair(q2, edge.startVert);
     x12 -= BinarySearchByKey(p0q2, s02, size02, key, 0);
 
-    const TriEdges triEdges = triEdgesQ[q2];
-    for (int i : {0, 1, 2}) {
-      key = forward ? thrust::make_pair(p1, triEdges[i].Idx())
-                    : thrust::make_pair(triEdges[i].Idx(), p1);
-      x12 -= triEdges[i].Dir() * BinarySearchByKey(p1q1, s11, size11, key, 0);
+    int q1 = facesQ[q2];
+    const int lastEdge = facesQ[q2 + 1];
+    while (q1 < lastEdge) {
+      const Halfedge edge = halfedgesQ[q1];
+      const int q1F = edge.IsForward() ? q1 : edge.pairedHalfedge;
+      key = forward ? thrust::make_pair(p1, q1F) : thrust::make_pair(q1F, p1);
+      x12 -= (edge.IsForward() ? 1 : -1) *
+             BinarySearchByKey(p1q1, s11, size11, key, 0);
+      ++q1;
     }
   }
 };
@@ -575,8 +623,9 @@ struct Kernel12 {
   const thrust::pair<const int *, const int *> p1q1;
   const glm::vec4 *xyzz11;
   const int size11;
-  const EdgeVertsD *edgeVertsP;
-  const TriEdges *triEdgesQ;
+  const Halfedge *halfedgesP;
+  const int *facesQ;
+  const Halfedge *halfedgesQ;
   const glm::vec3 *vertPosP;
   const bool forward;
 
@@ -586,56 +635,59 @@ struct Kernel12 {
     const int p1 = thrust::get<1>(inout);
     const int q2 = thrust::get<2>(inout);
 
-    const EdgeVertsD edgeVerts = edgeVertsP[p1];
-    auto key = forward ? thrust::make_pair(edgeVerts.first, q2)
-                       : thrust::make_pair(q2, edgeVerts.first);
-    float z0 = BinarySearchByKey(p0q2, z02, size02, key, 0.0f / 0.0f);
-    key = forward ? thrust::make_pair(edgeVerts.second, q2)
-                  : thrust::make_pair(q2, edgeVerts.second);
-    float z1 = BinarySearchByKey(p0q2, z02, size02, key, 0.0f / 0.0f);
-
-    const TriEdges triEdges = triEdgesQ[q2];
-    glm::vec4 xyzz3[3];
-    for (int i : {0, 1, 2}) {
-      key = forward ? thrust::make_pair(p1, triEdges[i].Idx())
-                    : thrust::make_pair(triEdges[i].Idx(), p1);
-      xyzz3[i] =
-          BinarySearchByKey(p1q1, xyzz11, size11, key, glm::vec4(0.0f / 0.0f));
-    }
+    const Halfedge edge = halfedgesP[p1];
+    auto key = forward ? thrust::make_pair(edge.startVert, q2)
+                       : thrust::make_pair(q2, edge.startVert);
+    const float z0 = BinarySearchByKey(p0q2, z02, size02, key, 0.0f / 0.0f);
+    key = forward ? thrust::make_pair(edge.endVert, q2)
+                  : thrust::make_pair(q2, edge.endVert);
+    const float z1 = BinarySearchByKey(p0q2, z02, size02, key, 0.0f / 0.0f);
 
     glm::vec3 xzyLR0[2];
     glm::vec3 xzyLR1[2];
     int k = 0;
     if (!isnan(z0)) {
-      xzyLR0[k] = vertPosP[edgeVerts.first];
+      xzyLR0[k] = vertPosP[edge.startVert];
       thrust::swap(xzyLR0[k].y, xzyLR0[k].z);
       xzyLR1[k] = xzyLR0[k];
       xzyLR1[k][1] = z0;
       k++;
     }
     if (!isnan(z1)) {
-      xzyLR0[k] = vertPosP[edgeVerts.second];
+      xzyLR0[k] = vertPosP[edge.endVert];
       thrust::swap(xzyLR0[k].y, xzyLR0[k].z);
       xzyLR1[k] = xzyLR0[k];
       xzyLR1[k][1] = z1;
       k++;
     }
-    for (int i : {0, 1, 2}) {
+
+    int q1 = facesQ[q2];
+    const int lastEdge = facesQ[q2 + 1];
+    while (q1 < lastEdge) {
       if (k > 1) break;
-      if (!isnan(xyzz3[i].x)) {
-        xzyLR0[k][0] = xyzz3[i].x;
-        xzyLR0[k][1] = xyzz3[i].z;
-        xzyLR0[k][2] = xyzz3[i].y;
+      const Halfedge edge = halfedgesQ[q1];
+      const int q1F = edge.IsForward() ? q1 : edge.pairedHalfedge;
+      key = forward ? thrust::make_pair(p1, q1F) : thrust::make_pair(q1F, p1);
+      const glm::vec4 xyzz =
+          BinarySearchByKey(p1q1, xyzz11, size11, key, glm::vec4(0.0f / 0.0f));
+
+      if (!isnan(xyzz.x)) {
+        xzyLR0[k][0] = xyzz.x;
+        xzyLR0[k][1] = xyzz.z;
+        xzyLR0[k][2] = xyzz.y;
         xzyLR1[k] = xzyLR0[k];
-        xzyLR1[k][1] = xyzz3[i].w;
+        xzyLR1[k][1] = xyzz.w;
         if (!forward) thrust::swap(xzyLR0[k][1], xzyLR1[k][1]);
         k++;
       }
+      ++q1;
     }
+
     // assert two of these five were found
     if (k != 2) printf("k = %d\n", k);
 
-    glm::vec4 xzyy = Intersect(xzyLR0[0], xzyLR0[1], xzyLR1[0], xzyLR1[1]);
+    const glm::vec4 xzyy =
+        Intersect(xzyLR0[0], xzyLR0[1], xzyLR1[0], xzyLR1[1]);
     v12.x = xzyy[0];
     v12.y = xzyy[2];
     v12.z = xzyy[1];
@@ -650,23 +702,29 @@ std::tuple<VecDH<int>, VecDH<glm::vec3>> Intersect12(
   VecDH<int> x12(p1q2.size());
   VecDH<glm::vec3> v12;
 
-  auto edgeVertsPtr = forward ? inP.edgeVerts_.ptrD() : inQ.edgeVerts_.ptrD();
-  auto triEdgesPtr = forward ? inQ.triEdges_.ptrD() : inP.triEdges_.ptrD();
+  const auto halfedgesP =
+      forward ? inP.halfedge_.cptrD() : inQ.halfedge_.cptrD();
+  const auto halfedgesQ =
+      forward ? inQ.halfedge_.cptrD() : inP.halfedge_.cptrD();
+  const auto facesQ = forward ? inQ.faceEdge_.cptrD() : inP.faceEdge_.cptrD();
+
   thrust::for_each_n(
       zip(x12.beginD(), p1q2.beginD(!forward), p1q2.beginD(forward)),
       p1q2.size(),
       Gather12({p0q2.ptrDpq(), s02.ptrD(), p0q2.size(), p1q1.ptrDpq(),
-                s11.ptrD(), p1q1.size(), edgeVertsPtr, triEdgesPtr, forward}));
+                s11.ptrD(), p1q1.size(), halfedgesP, facesQ, halfedgesQ,
+                forward}));
 
   size_t size = p1q2.RemoveZeros(x12);
   v12.resize(size);
 
-  auto vertPosPtr = forward ? inP.vertPos_.ptrD() : inQ.vertPos_.ptrD();
+  const auto vertPosPtr = forward ? inP.vertPos_.cptrD() : inQ.vertPos_.cptrD();
   thrust::for_each_n(
       zip(v12.beginD(), p1q2.beginD(!forward), p1q2.beginD(forward)),
-      p1q2.size(), Kernel12({p0q2.ptrDpq(), z02.ptrD(), p0q2.size(),
-                             p1q1.ptrDpq(), xyzz11.ptrD(), p1q1.size(),
-                             edgeVertsPtr, triEdgesPtr, vertPosPtr, forward}));
+      p1q2.size(),
+      Kernel12({p0q2.ptrDpq(), z02.cptrD(), p0q2.size(), p1q1.ptrDpq(),
+                xyzz11.cptrD(), p1q1.size(), halfedgesP, facesQ, halfedgesQ,
+                vertPosPtr, forward}));
   return std::make_tuple(x12, v12);
 };
 
@@ -676,7 +734,7 @@ VecDH<int> Winding03(const Manifold::Impl &inP, SparseIndices &p0q2,
   // keepEdgesP is the set of edges that connect regions of the manifold with
   // the same winding number, so we remove any edges associated with
   // intersections.
-  VecDH<bool> keepEdgesP(inP.NumEdge(), true);
+  VecDH<bool> keepEdgesP(inP.halfedge_.size(), true);
   thrust::scatter(thrust::make_constant_iterator(false, 0),
                   thrust::make_constant_iterator(false, p1q2.size()),
                   p1q2.beginD(reverse), keepEdgesP.beginD());
@@ -694,8 +752,8 @@ VecDH<int> Winding03(const Manifold::Impl &inP, SparseIndices &p0q2,
 
   // find connected regions (separated by intersections)
   VecDH<int> vertLabels;
-  int n_comp = ConnectedComponents(vertLabels, inP.NumVert(), inP.edgeVerts_,
-                                   keepEdgesP);
+  int n_comp =
+      ConnectedComponents(vertLabels, inP.NumVert(), inP.halfedge_, keepEdgesP);
   // flood the w03 values throughout their connected components (they are
   // consistent)
   FloodComponents(w03, vertLabels, n_comp);
@@ -708,61 +766,152 @@ VecDH<int> Winding03(const Manifold::Impl &inP, SparseIndices &p0q2,
   return w03;
 };
 
-SparseIndices Intersect22(const Manifold::Impl &inP, const Manifold::Impl &inQ,
-                          const SparseIndices &p1q2, const SparseIndices &p2q1,
-                          const VecDH<int> &dir12, const VecDH<int> &dir21) {
-  SparseIndices p2q2(2 * (p1q2.size() + p2q1.size()));
-  auto f22ptr = p2q2.beginDpq();
-  auto rightTrisA =
-      zip(perm(thrust::make_transform_iterator(inP.edgeTris_.beginD(), Right()),
-               p1q2.beginD(0)),
-          p1q2.beginD(1));
-  f22ptr = thrust::copy_if(rightTrisA, rightTrisA + p1q2.size(), dir12.beginD(),
-                           f22ptr, Not_zero());
-  auto leftTrisA =
-      zip(perm(thrust::make_transform_iterator(inP.edgeTris_.beginD(), Left()),
-               p1q2.beginD(0)),
-          p1q2.beginD(1));
-  f22ptr = thrust::copy_if(leftTrisA, leftTrisA + p1q2.size(), dir12.beginD(),
-                           f22ptr, Not_zero());
-  auto rightTrisB =
-      zip(p2q1.beginD(0),
-          perm(thrust::make_transform_iterator(inQ.edgeTris_.beginD(), Right()),
-               p2q1.beginD(1)));
-  f22ptr = thrust::copy_if(rightTrisB, rightTrisB + p2q1.size(), dir21.beginD(),
-                           f22ptr, Not_zero());
-  auto leftTrisB =
-      zip(p2q1.beginD(0),
-          perm(thrust::make_transform_iterator(inQ.edgeTris_.beginD(), Left()),
-               p2q1.beginD(1)));
-  f22ptr = thrust::copy_if(leftTrisB, leftTrisB + p2q1.size(), dir21.beginD(),
-                           f22ptr, Not_zero());
-  p2q2.Unique();
-  return p2q2;
-}
-
-struct AssignOnes {
-  bool *keepTrisP;
-  bool *keepTrisQ;
-
-  __host__ __device__ void operator()(thrust::tuple<int, int> p2q2) {
-    keepTrisP[thrust::get<0>(p2q2)] = true;
-    keepTrisQ[thrust::get<1>(p2q2)] = true;
-  }
-};
-
 struct DuplicateVerts {
   glm::vec3 *vertPosR;
 
-  __host__ __device__ void operator()(
-      thrust::tuple<int, int, int, glm::vec3> in) {
-    int vertP = thrust::get<0>(in);
-    int inclusion = abs(thrust::get<1>(in));
-    int vertR = thrust::get<2>(in);
-    glm::vec3 vertPosP = thrust::get<3>(in);
+  __host__ __device__ void operator()(thrust::tuple<int, int, glm::vec3> in) {
+    int inclusion = abs(thrust::get<0>(in));
+    int vertR = thrust::get<1>(in);
+    glm::vec3 vertPosP = thrust::get<2>(in);
 
     for (int i = 0; i < inclusion; ++i) {
       vertPosR[vertR + i] = vertPosP;
+    }
+  }
+};
+
+__host__ __device__ int AtomicAddInt(int &target, int add) {
+#ifdef __CUDA_ARCH__
+  return atomicAdd(&target, add);
+#else
+  int out;
+#pragma omp atomic capture
+  {
+    out = target;
+    target += add;
+  }
+  return out;
+#endif
+}
+
+struct CountVerts {
+  int *count;
+  const int *inclusion;
+
+  __host__ __device__ void operator()(const Halfedge &edge) {
+    AtomicAddInt(count[edge.face], glm::abs(inclusion[edge.startVert]));
+  }
+};
+
+struct CountNewVerts {
+  int *countP;
+  int *countQ;
+  const Halfedge *halfedges;
+
+  __host__ __device__ void operator()(thrust::tuple<int, int, int> in) {
+    int edgeP = thrust::get<0>(in);
+    int faceQ = thrust::get<1>(in);
+    int inclusion = glm::abs(thrust::get<2>(in));
+
+    AtomicAddInt(countQ[faceQ], inclusion);
+    const Halfedge half = halfedges[edgeP];
+    AtomicAddInt(countP[half.face], inclusion);
+    AtomicAddInt(countP[halfedges[half.pairedHalfedge].face], inclusion);
+  }
+};
+
+struct NotZero : public thrust::unary_function<int, int> {
+  __host__ __device__ int operator()(int x) const { return x > 0 ? 1 : 0; }
+};
+
+VecDH<int> SizeOutput(Manifold::Impl &outR, const Manifold::Impl &inP,
+                      const Manifold::Impl &inQ, const VecDH<int> &i03,
+                      const VecDH<int> &i30, const VecDH<int> &i12,
+                      const VecDH<int> &i21, const SparseIndices &p1q2,
+                      const SparseIndices &p2q1, bool invertQ) {
+  VecDH<int> sidesPerFacePQ(inP.NumFace() + inQ.NumFace());
+  auto sidesPerFaceP = sidesPerFacePQ.ptrD();
+  auto sidesPerFaceQ = sidesPerFacePQ.ptrD() + inP.NumFace();
+
+  thrust::for_each(inP.halfedge_.beginD(), inP.halfedge_.endD(),
+                   CountVerts({sidesPerFaceP, i03.cptrD()}));
+  thrust::for_each(inQ.halfedge_.beginD(), inQ.halfedge_.endD(),
+                   CountVerts({sidesPerFaceQ, i30.cptrD()}));
+  thrust::for_each_n(
+      zip(p1q2.beginD(0), p1q2.beginD(1), i12.beginD()), i12.size(),
+      CountNewVerts({sidesPerFaceP, sidesPerFaceQ, inP.halfedge_.cptrD()}));
+  thrust::for_each_n(
+      zip(p2q1.beginD(1), p2q1.beginD(0), i21.beginD()), i21.size(),
+      CountNewVerts({sidesPerFaceQ, sidesPerFaceP, inQ.halfedge_.cptrD()}));
+
+  VecDH<int> facePQ2R(inP.NumFace() + inQ.NumFace() + 1);
+  auto keepFace =
+      thrust::make_transform_iterator(sidesPerFacePQ.beginD(), NotZero());
+  thrust::inclusive_scan(keepFace, keepFace + sidesPerFacePQ.size(),
+                         facePQ2R.beginD() + 1);
+  int numFaceR = facePQ2R.H().back();
+  facePQ2R.resize(inP.NumFace() + inQ.NumFace());
+
+  outR.faceNormal_.resize(numFaceR);
+  auto next = thrust::copy_if(inP.faceNormal_.beginD(), inP.faceNormal_.endD(),
+                              keepFace, outR.faceNormal_.beginD(),
+                              thrust::identity<bool>());
+  if (invertQ) {
+    auto start = thrust::make_transform_iterator(inQ.faceNormal_.beginD(),
+                                                 thrust::negate<glm::vec3>());
+    auto end = thrust::make_transform_iterator(inQ.faceNormal_.endD(),
+                                               thrust::negate<glm::vec3>());
+    thrust::copy_if(start, end, keepFace + inP.NumFace(), next,
+                    thrust::identity<bool>());
+  } else {
+    thrust::copy_if(inQ.faceNormal_.beginD(), inQ.faceNormal_.endD(),
+                    keepFace + inP.NumFace(), next, thrust::identity<bool>());
+  }
+
+  auto newEnd =
+      thrust::remove(sidesPerFacePQ.beginD(), sidesPerFacePQ.endD(), 0);
+  outR.faceEdge_.resize(newEnd - sidesPerFacePQ.beginD() + 1);
+  thrust::inclusive_scan(sidesPerFacePQ.beginD(), newEnd,
+                         outR.faceEdge_.beginD() + 1);
+  outR.halfedge_.resize(outR.faceEdge_.H().back());
+
+  return facePQ2R;
+}
+
+struct DuplicateHalfedges {
+  Halfedge *halfedgesR;
+  int *facePtr;
+  const Halfedge *halfedgesP;
+  const int *i03;
+  const int *vP2R;
+  const int *faceP2R;
+
+  __host__ __device__ void operator()(thrust::tuple<bool, Halfedge> in) {
+    if (!thrust::get<0>(in)) return;
+    Halfedge halfedge = thrust::get<1>(in);
+    if (!halfedge.IsForward()) return;
+
+    const int inclusion = i03[halfedge.startVert];
+    if (inclusion == 0) return;
+    if (inclusion < 0) {  // reverse
+      int tmp = halfedge.startVert;
+      halfedge.startVert = halfedge.endVert;
+      halfedge.endVert = tmp;
+    }
+    halfedge.startVert = vP2R[halfedge.startVert];
+    halfedge.endVert = vP2R[halfedge.endVert];
+    halfedge.face = faceP2R[halfedge.face];
+    int faceRight = faceP2R[halfedgesP[halfedge.pairedHalfedge].face];
+
+    Halfedge backward = {halfedge.endVert, halfedge.startVert, -1, faceRight};
+
+    for (int i = 0; i < glm::abs(inclusion); ++i) {
+      int forwardIdx = AtomicAddInt(facePtr[halfedge.face], 1);
+      int backwardIdx = AtomicAddInt(facePtr[faceRight], 1);
+      halfedge.pairedHalfedge = backwardIdx;
+      backward.pairedHalfedge = forwardIdx;
+      halfedgesR[forwardIdx] = halfedge;
+      halfedgesR[backwardIdx] = backward;
     }
   }
 };
@@ -777,7 +926,7 @@ void AddNewEdgeVerts(
     std::map<int, std::vector<EdgePos>> &edgesP,
     std::map<std::pair<int, int>, std::vector<EdgePos>> &edgesNew,
     const SparseIndices &p1q2, const VecH<int> &i12, const VecH<int> &v12R,
-    const VecH<EdgeTrisD> &edgeTrisP, bool forward) {
+    const VecH<Halfedge> &halfedgeP, bool forward) {
   // For each edge of P that intersects a face of Q (p1q2), add this vertex to
   // P's corresponding edge vector and to the two new edges, which are
   // intersections between the face of Q and the two faces of P attached to the
@@ -791,32 +940,32 @@ void AddNewEdgeVerts(
     const int vert = v12R[i];
     const int inclusion = i12[i];
 
-    const auto edgePosP = edgesP.insert({edgeP, {}});
+    auto &edgePosP = edgesP[edgeP];
 
-    EdgeTrisD edgePfaces = edgeTrisP[edgeP];
-    std::pair<int, int> key = {edgePfaces.right, faceQ};
+    Halfedge halfedge = halfedgeP[edgeP];
+    std::pair<int, int> key = {halfedgeP[halfedge.pairedHalfedge].face, faceQ};
     if (!forward) std::swap(key.first, key.second);
-    const auto edgePosRight = edgesNew.insert({key, {}});
+    auto &edgePosRight = edgesNew[key];
 
-    key = {edgePfaces.left, faceQ};
+    key = {halfedge.face, faceQ};
     if (!forward) std::swap(key.first, key.second);
-    const auto edgePosLeft = edgesNew.insert({key, {}});
+    auto &edgePosLeft = edgesNew[key];
 
     EdgePos edgePos = {vert, 0.0f, inclusion < 0};
     EdgePos edgePosRev = edgePos;
     edgePosRev.isStart = !edgePos.isStart;
 
     for (int j = 0; j < glm::abs(inclusion); ++j) {
-      edgePosP.first->second.push_back(edgePos);
-      edgePosRight.first->second.push_back(forward ? edgePos : edgePosRev);
-      edgePosLeft.first->second.push_back(forward ? edgePosRev : edgePos);
+      edgePosP.push_back(edgePos);
+      edgePosRight.push_back(forward ? edgePos : edgePosRev);
+      edgePosLeft.push_back(forward ? edgePosRev : edgePos);
       ++edgePos.vert;
       ++edgePosRev.vert;
     }
   }
 }
 
-std::vector<EdgeVerts> PairUp(std::vector<EdgePos> &edgePos, int edge) {
+std::vector<Halfedge> PairUp(std::vector<EdgePos> &edgePos) {
   // Pair start vertices with end vertices to form edges. The choice of pairing
   // is arbitrary for the manifoldness guarantee, but must be ordered to be
   // geometrically valid. If the order does not go start-end-start-end... then
@@ -832,37 +981,41 @@ std::vector<EdgeVerts> PairUp(std::vector<EdgePos> &edgePos, int edge) {
   auto cmp = [](EdgePos a, EdgePos b) { return a.edgePos < b.edgePos; };
   std::sort(edgePos.begin(), middle, cmp);
   std::sort(middle, edgePos.end(), cmp);
-  std::vector<EdgeVerts> edges;
+  std::vector<Halfedge> edges;
   for (int i = 0; i < nEdges; ++i)
-    edges.push_back({edgePos[i].vert, edgePos[i + nEdges].vert, edge});
+    edges.push_back({edgePos[i].vert, edgePos[i + nEdges].vert, -1, -1});
   return edges;
 }
 
-void AppendRetainedEdges(std::map<int, std::vector<EdgeVerts>> &facesP,
-                         std::map<int, std::vector<EdgePos>> &edgesP,
-                         const Manifold::Impl &inP, const VecH<int> &i03,
-                         const VecH<int> &vP2R,
-                         const VecH<glm::vec3> &vertPos) {
+void AppendPartialEdges(
+    Manifold::Impl &outR, VecH<bool> &wholeHalfedgeP, VecH<int> &facePtrR,
+    std::map<int, std::vector<EdgePos>> &edgesP, const Manifold::Impl &inP,
+    const VecH<int> &i03, const VecH<int> &vP2R,
+    const thrust::host_vector<int>::const_iterator faceP2R) {
   // Each edge in the map is partially retained; for each of these, look up
   // their original verts and include them based on their winding number (i03),
   // while remaping them to the output using vP2R. Use the verts position
   // projected along the edge vector to pair them up, then distribute these
   // edges to their faces. Copy any original edges of each face in that are not
   // in the retained edge map.
+  VecH<Halfedge> &halfedgeR = outR.halfedge_.H();
   const VecH<glm::vec3> &vertPosP = inP.vertPos_.H();
-  const VecH<EdgeVertsD> &edgeVertsP = inP.edgeVerts_.H();
-  const VecH<EdgeTrisD> &edgeTrisP = inP.edgeTris_.H();
+  const VecH<Halfedge> &halfedgeP = inP.halfedge_.H();
 
   for (auto &value : edgesP) {
     const int edgeP = value.first;
     std::vector<EdgePos> &edgePosP = value.second;
 
-    const int vStart = edgeVertsP[edgeP].first;
-    const int vEnd = edgeVertsP[edgeP].second;
+    const Halfedge &halfedge = halfedgeP[edgeP];
+    wholeHalfedgeP[edgeP] = false;
+    wholeHalfedgeP[halfedge.pairedHalfedge] = false;
+
+    const int vStart = halfedge.startVert;
+    const int vEnd = halfedge.endVert;
     const glm::vec3 edgeVec = vertPosP[vEnd] - vertPosP[vStart];
     // Fill in the edge positions of the old points.
     for (EdgePos &edge : edgePosP) {
-      edge.edgePos = glm::dot(vertPos[edge.vert], edgeVec);
+      edge.edgePos = glm::dot(outR.vertPos_.H()[edge.vert], edgeVec);
     }
 
     int inclusion = i03[vStart];
@@ -880,208 +1033,88 @@ void AppendRetainedEdges(std::map<int, std::vector<EdgeVerts>> &facesP,
     }
 
     // sort edges into start/end pairs along length
-    std::vector<EdgeVerts> edges = PairUp(edgePosP, edgeP);
+    std::vector<Halfedge> edges = PairUp(edgePosP);
 
-    // add edges to left face
-    const int faceLeft = edgeTrisP[edgeP].left;
-    auto result = facesP.insert({faceLeft, edges});
-    if (!result.second) {
-      auto &vec = result.first->second;
-      vec.insert(vec.end(), edges.begin(), edges.end());
-    }
-    // reverse edges and add to right face
-    for (auto &e : edges) std::swap(e.first, e.second);
-    const int faceRight = edgeTrisP[edgeP].right;
-    result = facesP.insert({faceRight, edges});
-    if (!result.second) {
-      auto &vec = result.first->second;
-      vec.insert(vec.end(), edges.begin(), edges.end());
+    // add halfedges to result
+    const int faceLeft = faceP2R[halfedge.face];
+    const int faceRight = faceP2R[halfedgeP[halfedge.pairedHalfedge].face];
+    for (Halfedge e : edges) {
+      const int forwardEdge = facePtrR[faceLeft]++;
+      const int backwardEdge = facePtrR[faceRight]++;
+
+      e.face = faceLeft;
+      e.pairedHalfedge = backwardEdge;
+      halfedgeR[forwardEdge] = e;
+
+      std::swap(e.startVert, e.endVert);
+      e.face = faceRight;
+      e.pairedHalfedge = forwardEdge;
+      halfedgeR[backwardEdge] = e;
     }
   }
 }
 
 void AppendNewEdges(
-    std::map<int, std::vector<EdgeVerts>> &facesP,
-    std::map<int, std::vector<EdgeVerts>> &facesQ,
-    std::map<std::pair<int, int>, std::vector<EdgePos>> &edgesNew) {
+    Manifold::Impl &outR, VecH<int> &facePtrR,
+    std::map<std::pair<int, int>, std::vector<EdgePos>> &edgesNew,
+    const VecH<int> &facePQ2R, const int numFaceP) {
   // Pair up each edge's verts and distribute to faces based on indices in key.
   // Usually only two verts are in each edge, and if not, they are degenerate
   // anyway, so pair arbitrarily without bothering with vertex projections.
-  int edgeID = std::numeric_limits<int>::max();
+  VecH<Halfedge> &halfedgeR = outR.halfedge_.H();
+
   for (auto &value : edgesNew) {
     const int faceP = value.first.first;
     const int faceQ = value.first.second;
     std::vector<EdgePos> &edgePos = value.second;
 
-    // sort edges into start/end pairs along length
-    // Since these are not input edges, their index is undefined.
-    std::vector<EdgeVerts> edges = PairUp(edgePos, edgeID--);
+    // sort edges into start/end pairs along length.
+    std::vector<Halfedge> edges = PairUp(edgePos);
 
-    auto result = facesP.insert({faceP, edges});
-    if (!result.second) {
-      auto &vec = result.first->second;
-      vec.insert(vec.end(), edges.begin(), edges.end());
-    }
-    // reverse edges and add to right face
-    for (auto &e : edges) std::swap(e.first, e.second);
-    result = facesQ.insert({faceQ, edges});
-    if (!result.second) {
-      auto &vec = result.first->second;
-      vec.insert(vec.end(), edges.begin(), edges.end());
+    // add halfedges to result
+    const int faceLeft = facePQ2R[faceP];
+    const int faceRight = facePQ2R[numFaceP + faceQ];
+    for (Halfedge e : edges) {
+      const int forwardEdge = facePtrR[faceLeft]++;
+      const int backwardEdge = facePtrR[faceRight]++;
+
+      e.face = faceLeft;
+      e.pairedHalfedge = backwardEdge;
+      halfedgeR[forwardEdge] = e;
+
+      std::swap(e.startVert, e.endVert);
+      e.face = faceRight;
+      e.pairedHalfedge = forwardEdge;
+      halfedgeR[backwardEdge] = e;
     }
   }
 }
 
-glm::mat3x2 GetAxisAlignedProjection(glm::vec3 normal) {
-  glm::vec3 absNormal = glm::abs(normal);
-  float xyzMax;
-  glm::mat2x3 projection;
-  if (absNormal.z > absNormal.x && absNormal.z > absNormal.y) {
-    projection = glm::mat2x3(1.0f, 0.0f, 0.0f,  //
-                             0.0f, 1.0f, 0.0f);
-    xyzMax = normal.z;
-  } else if (absNormal.y > absNormal.x) {
-    projection = glm::mat2x3(0.0f, 0.0f, 1.0f,  //
-                             1.0f, 0.0f, 0.0f);
-    xyzMax = normal.y;
-  } else {
-    projection = glm::mat2x3(0.0f, 1.0f, 0.0f,  //
-                             0.0f, 0.0f, 1.0f);
-    xyzMax = normal.x;
-  }
-  if (xyzMax < 0) projection[0] *= -1.0f;
-  return glm::transpose(projection);
-}
-
-void AppendFaces(Manifold::Impl &outR,
-                 std::map<int, std::vector<EdgeVerts>> &facesP,
-                 const std::map<int, std::vector<EdgePos>> &edgesP,
-                 const VecH<int> &i03, const Manifold::Impl &inP,
-                 const VecH<int> &vP2R, bool invertNormals) {
-  // Proceed through the map, triangulating each face into the result. For each
-  // face not included as a map index, copy it from the original mesh,
-  // duplicating according to its inclusion number (i03).
-  const VecH<glm::ivec3> &triVertsP = inP.triVerts_.H();
-  const VecH<TriEdges> &triEdgesP = inP.triEdges_.H();
-  const VecH<glm::vec3> &triNormalP = inP.triNormal_.H();
-  const VecH<EdgeVertsD> &edgeVertsP = inP.edgeVerts_.H();
-  VecH<glm::ivec3> &triVertsR = outR.triVerts_.H();
-  VecH<glm::vec3> &triNormalR = outR.triNormal_.H();
-  VecH<glm::vec3> &vertPosR = outR.vertPos_.H();
-
-  auto nextIntersectedFace = facesP.begin();
-  for (int triP = 0; triP < inP.NumTri(); ++triP) {
-    const int faceP = facesP.empty() ? -1 : nextIntersectedFace->first;
-    if (faceP != triP) {  // Non-intersecting face
-      // Copy triangle from inP
-      glm::ivec3 triVerts = triVertsP[triP];
-      glm::vec3 normal = triNormalP[triP];
-      // Check the inclusion number of a single vertex of a triangle, since
-      // non-intersecting triangles must have all identical inclusion numbers.
-      int inclusion = i03[triVerts[0]];
-      glm::ivec3 outTri(vP2R[triVerts[0]], vP2R[triVerts[1]],
-                        vP2R[triVerts[2]]);
-      if (inclusion < 0) {
-        std::swap(outTri[1], outTri[2]);
-        normal *= -1.0f;
-      }
-      for (int j = 0; j < abs(inclusion); ++j) {
-        triVertsR.push_back(outTri + j);
-        triNormalR.push_back(normal);
-      }
-    } else {  // intersecting face
-      std::vector<EdgeVerts> &faceEdges = nextIntersectedFace->second;
-      if (std::next(nextIntersectedFace) != facesP.end()) ++nextIntersectedFace;
-
-      // Copy in non-intersecting edges of intersected face
-      for (int i : {0, 1, 2}) {
-        EdgeIdx edge = triEdgesP[faceP][i];
-        if (edgesP.find(edge.Idx()) == edgesP.end()) {
-          EdgeVertsD oldEdgeVerts = edgeVertsP[edge.Idx()];
-          // Non-intersecting edge has the same inclusion number at both ends.
-          const int inclusion = i03[oldEdgeVerts.first];
-          int vStart = vP2R[oldEdgeVerts.first];
-          int vEnd = vP2R[oldEdgeVerts.second];
-          if ((inclusion > 0) != (edge.Dir() > 0)) std::swap(vStart, vEnd);
-          for (int j = 0; j < std::abs(inclusion); ++j) {
-            faceEdges.push_back({vStart + j, vEnd + j, edge.Idx()});
-          }
-        }
-      }
-
-      // Triangulate intersected face
-      ALWAYS_ASSERT(faceEdges.size() >= 3, logicErr,
-                    "face has less than three edges.");
-      const glm::vec3 normal =
-          (invertNormals ? -1.0f : 1.0f) * triNormalP[faceP];
-
-      if (faceEdges.size() == 3) {  // Special case to increase performance
-        auto tri = faceEdges;
-        if (tri[0].second == tri[2].first) std::swap(tri[1], tri[2]);
-        ALWAYS_ASSERT(tri[0].second == tri[1].first &&
-                          tri[1].second == tri[2].first &&
-                          tri[2].second == tri[0].first,
-                      runtimeErr, "These 3 edges do not form a triangle!");
-        glm::ivec3 triangle(tri[0].first, tri[1].first, tri[2].first);
-        triVertsR.push_back(triangle);
-        triNormalR.push_back(normal);
-      } else {  // General triangulation
-        const glm::mat3x2 projection = GetAxisAlignedProjection(normal);
-        Polygons polys =
-            Assemble(faceEdges, [&vertPosR, &projection](int vert) {
-              return projection * vertPosR[vert];
-            });
-        std::vector<glm::ivec3> newTris;
-        try {
-          newTris = Triangulate(polys);
-        } catch (const runtimeErr &e) {
-          if (PolygonParams().checkGeometry) throw;
-          /**
-          To ensure the triangulation maintains the mesh as 2-manifold, we
-          require it to not create edges connecting non-neighboring vertices
-          from the same input edge. This is because if two neighboring
-          polygons were to create an edge like this between two of their
-          shared vertices, this would create a 4-manifold edge, which is not
-          allowed.
-
-          For some self-overlapping polygons, there exists no triangulation
-          that adheres to this constraint. In this case, we create an extra
-          vertex for each polygon and triangulate them like a wagon wheel,
-          which is guaranteed to be manifold. This is very rare and only
-          occurs when the input manifolds are self-overlapping.
-           */
-          for (const auto &poly : polys) {
-            glm::vec3 centroid = thrust::transform_reduce(
-                poly.begin(), poly.end(),
-                [&vertPosR](PolyVert v) { return vertPosR[v.idx]; },
-                glm::vec3(0.0f),
-                [](glm::vec3 a, glm::vec3 b) { return a + b; });
-            centroid /= poly.size();
-            int newVert = vertPosR.size();
-            vertPosR.push_back(centroid);
-            newTris.push_back({poly.back().idx, poly.front().idx, newVert});
-            for (int j = 1; j < poly.size(); ++j)
-              newTris.push_back({poly[j - 1].idx, poly[j].idx, newVert});
-          }
-        }
-        for (auto tri : newTris) {
-          triVertsR.push_back(tri);
-          triNormalR.push_back(normal);
-        }
-      }
-    }
-  }
+void AppendWholeEdges(Manifold::Impl &outR, VecDH<int> &facePtrR,
+                      const Manifold::Impl &inP, VecDH<bool> wholeHalfedgeP,
+                      const VecDH<int> &i03, const VecDH<int> &vP2R,
+                      const int *faceP2R) {
+  thrust::for_each_n(zip(wholeHalfedgeP.beginD(), inP.halfedge_.beginD()),
+                     inP.halfedge_.size(),
+                     DuplicateHalfedges({outR.halfedge_.ptrD(), facePtrR.ptrD(),
+                                         inP.halfedge_.cptrD(), i03.cptrD(),
+                                         vP2R.cptrD(), faceP2R}));
 }
 }  // namespace
 
 namespace manifold {
-
 Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ,
                    Manifold::OpType op)
     : inP_(inP), inQ_(inQ), expandP_(op == Manifold::OpType::ADD ? 1.0 : -1.0) {
   // Symbolic perturbation:
   // Union -> expand inP
   // Difference, Intersection -> contract inP
+
+  inP_.Tri2Face();
+  inQ_.Tri2Face();
+
+  VecDH<int> faceSizeP = inP_.FaceSize();
+  VecDH<int> faceSizeQ = inQ_.FaceSize();
 
   Time t0 = NOW();
   Time t1;
@@ -1097,7 +1130,7 @@ Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ,
   if (kVerbose) std::cout << "p2q1 size = " << p2q1_.size() << std::endl;
 
   // Level 2
-  // Find vertices from Level 3 that overlap triangles in XY-projection
+  // Find vertices from Level 3 that overlap faces in XY-projection
   SparseIndices p0q2 = Filter02(inP_, inQ_, p1q2_.Get(0), p2q1_.Get(0));
   p0q2.Sort();
   if (kVerbose) std::cout << "p0q2 size = " << p0q2.size() << std::endl;
@@ -1108,18 +1141,18 @@ Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ,
   if (kVerbose) std::cout << "p2q0 size = " << p2q0.size() << std::endl;
 
   // Find involved edge pairs from Level 3
-  SparseIndices p1q1 = Filter11(inP_, inQ_, p1q2_, p2q1_);
+  SparseIndices p1q1 = Filter11(inP_, faceSizeP, inQ_, faceSizeQ, p1q2_, p2q1_);
   if (kVerbose) std::cout << "p1q1 size = " << p1q1.size() << std::endl;
 
   // Level 1
   // Find involved vertex-edge pairs from Level 2
-  SparseIndices p0q1 = Filter01(inP_, inQ_, p0q2, p1q1);
+  SparseIndices p0q1 = Filter01(inP_, inQ_, faceSizeQ, p0q2, p1q1);
   p0q1.Unique();
   if (kVerbose) std::cout << "p0q1 size = " << p0q1.size() << std::endl;
 
   p2q0.SwapPQ();
   p1q1.SwapPQ();
-  SparseIndices p1q0 = Filter01(inQ_, inP_, p2q0, p1q1);
+  SparseIndices p1q0 = Filter01(inQ_, inP_, faceSizeP, p2q0, p1q1);
   p2q0.SwapPQ();
   p1q1.SwapPQ();
   p1q0.SwapPQ();
@@ -1173,13 +1206,13 @@ Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ,
   // Build up the intersection of the edges and triangles, keeping only those
   // that intersect, and record the direction the edge is passing through the
   // triangle.
-  std::tie(dir12_, v12_) =
+  std::tie(x12_, v12_) =
       Intersect12(inP, inQ, s02, p0q2, s11, p1q1, z02, xyzz11, p1q2_, true);
-  if (kVerbose) std::cout << "dir12 size = " << dir12_.size() << std::endl;
+  if (kVerbose) std::cout << "dir12 size = " << x12_.size() << std::endl;
 
-  std::tie(dir21_, v21_) =
+  std::tie(x21_, v21_) =
       Intersect12(inP, inQ, s20, p2q0, s11, p1q1, z20, xyzz11, p2q1_, false);
-  if (kVerbose) std::cout << "dir21 size = " << dir21_.size() << std::endl;
+  if (kVerbose) std::cout << "dir21 size = " << x21_.size() << std::endl;
 
   if (kVerbose) {
     std::cout << "Time for Levels 1-3";
@@ -1194,10 +1227,6 @@ Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ,
   w03_ = Winding03(inP, p0q2, s02, p1q2_, false);
 
   w30_ = Winding03(inQ, p2q0, s20, p2q1_, true);
-
-  // Level 4
-  // Record all intersecting triangle pairs.
-  p2q2_ = Intersect22(inP_, inQ_, p1q2_, p2q1_, dir12_, dir21_);
 
   if (kVerbose) {
     std::cout << "Time for rest of first stage";
@@ -1240,21 +1269,14 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
   Time t1;
 
   // Convert winding numbers to inclusion values based on operation type.
-  VecDH<int> i12(dir12_.size());
-  VecDH<int> i21(dir21_.size());
+  VecDH<int> i12(x12_.size());
+  VecDH<int> i21(x21_.size());
   VecDH<int> i03(w03_.size());
   VecDH<int> i30(w30_.size());
-  thrust::transform(dir12_.beginD(), dir12_.endD(), i12.beginD(), c3 * _1);
-  thrust::transform(dir21_.beginD(), dir21_.endD(), i21.beginD(), c3 * _1);
+  thrust::transform(x12_.beginD(), x12_.endD(), i12.beginD(), c3 * _1);
+  thrust::transform(x21_.beginD(), x21_.endD(), i21.beginD(), c3 * _1);
   thrust::transform(w03_.beginD(), w03_.endD(), i03.beginD(), c1 + c3 * _1);
   thrust::transform(w30_.beginD(), w30_.endD(), i30.beginD(), c2 + c3 * _1);
-
-  // Calculate some internal indexing vectors
-  VecDH<bool> intersectedTriP(inP_.NumTri(), false);
-  VecDH<bool> intersectedTriQ(inQ_.NumTri(), false);
-  thrust::for_each_n(
-      p2q2_.beginDpq(), p2q2_.size(),
-      AssignOnes({intersectedTriP.ptrD(), intersectedTriQ.ptrD()}));
 
   VecDH<int> vP2R(inP_.NumVert());
   thrust::exclusive_scan(i03.beginD(), i03.endD(), vP2R.beginD(), 0, AbsSum());
@@ -1291,18 +1313,14 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
   outR.vertPos_.resize(numVertR);
   // Add vertices, duplicating for inclusion numbers not in [-1, 1].
   // Retained vertices from P and Q:
-  thrust::for_each_n(zip(thrust::make_counting_iterator(0), i03.beginD(),
-                         vP2R.beginD(), inP_.vertPos_.beginD()),
+  thrust::for_each_n(zip(i03.beginD(), vP2R.beginD(), inP_.vertPos_.beginD()),
                      inP_.NumVert(), DuplicateVerts({outR.vertPos_.ptrD()}));
-  thrust::for_each_n(zip(thrust::make_counting_iterator(0), i30.beginD(),
-                         vQ2R.beginD(), inQ_.vertPos_.beginD()),
+  thrust::for_each_n(zip(i30.beginD(), vQ2R.beginD(), inQ_.vertPos_.beginD()),
                      inQ_.NumVert(), DuplicateVerts({outR.vertPos_.ptrD()}));
   // New vertices created from intersections:
-  thrust::for_each_n(zip(thrust::make_counting_iterator(0), i12.beginD(),
-                         v12R.beginD(), v12_.beginD()),
+  thrust::for_each_n(zip(i12.beginD(), v12R.beginD(), v12_.beginD()),
                      i12.size(), DuplicateVerts({outR.vertPos_.ptrD()}));
-  thrust::for_each_n(zip(thrust::make_counting_iterator(0), i21.beginD(),
-                         v21R.beginD(), v21_.beginD()),
+  thrust::for_each_n(zip(i21.beginD(), v21R.beginD(), v21_.beginD()),
                      i21.size(), DuplicateVerts({outR.vertPos_.ptrD()}));
 
   if (kVerbose) {
@@ -1312,65 +1330,61 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
     std::cout << n21 << " new verts from facesP -> edgesQ" << std::endl;
   }
 
-  if (kVerbose) {
-    std::cout << "Time for GPU part of result";
-    t1 = NOW();
-    PrintDuration(t1 - t0);
-    t0 = t1;
-  }
-
   // Build up new polygonal faces from triangle intersections. At this point the
   // calculation switches from parallel to serial.
 
-  // This key is the edge index of P or Q. Only includes intersected edges.
+  // Level 3
+
+  // This key is the forward halfedge index of P or Q. Only includes intersected
+  // edges.
   std::map<int, std::vector<EdgePos>> edgesP, edgesQ;
-  // This key is the tri index of <P, Q>
+  // This key is the face index of <P, Q>
   std::map<std::pair<int, int>, std::vector<EdgePos>> edgesNew;
 
   AddNewEdgeVerts(edgesP, edgesNew, p1q2_, i12.H(), v12R.H(),
-                  inP_.edgeTris_.H(), true);
+                  inP_.halfedge_.H(), true);
   AddNewEdgeVerts(edgesQ, edgesNew, p2q1_, i21.H(), v21R.H(),
-                  inQ_.edgeTris_.H(), false);
+                  inQ_.halfedge_.H(), false);
 
-  // This key is the tri index of P or Q. Only includes intersected faces.
-  std::map<int, std::vector<EdgeVerts>> facesP, facesQ;
+  // Level 4
 
-  AppendRetainedEdges(facesP, edgesP, inP_, i03.H(), vP2R.H(),
-                      outR.vertPos_.H());
-  AppendRetainedEdges(facesQ, edgesQ, inQ_, i30.H(), vQ2R.H(),
-                      outR.vertPos_.H());
-  AppendNewEdges(facesP, facesQ, edgesNew);
+  VecDH<int> facePQ2R = SizeOutput(outR, inP_, inQ_, i03, i30, i12, i21, p1q2_,
+                                   p2q1_, op == Manifold::OpType::SUBTRACT);
+
+  // This gets incremented for each halfedge that's added to a face so that the
+  // next one knows where to slot in.
+  VecDH<int> facePtrR = outR.faceEdge_;
+  // Intersected halfedges are marked false.
+  VecDH<bool> wholeHalfedgeP(inP_.halfedge_.size(), true);
+  VecDH<bool> wholeHalfedgeQ(inQ_.halfedge_.size(), true);
+
+  AppendPartialEdges(outR, wholeHalfedgeP.H(), facePtrR.H(), edgesP, inP_,
+                     i03.H(), vP2R.H(), facePQ2R.begin());
+  AppendPartialEdges(outR, wholeHalfedgeQ.H(), facePtrR.H(), edgesQ, inQ_,
+                     i30.H(), vQ2R.H(), facePQ2R.begin() + inP_.NumFace());
+
+  AppendNewEdges(outR, facePtrR.H(), edgesNew, facePQ2R.H(), inP_.NumFace());
+
+  AppendWholeEdges(outR, facePtrR, inP_, wholeHalfedgeP, i03, vP2R,
+                   facePQ2R.cptrD());
+  AppendWholeEdges(outR, facePtrR, inQ_, wholeHalfedgeQ, i30, vQ2R,
+                   facePQ2R.cptrD() + inP_.NumFace());
 
   if (kVerbose) {
-    std::cout << "Time for CPU part of result";
+    std::cout << "Time for assembling the result";
     t1 = NOW();
     PrintDuration(t1 - t0);
     t0 = t1;
   }
 
-  // Copy retained triangles and triangulate the intersected faces and add them
-  // to the manifold.
-  if (kVerbose) std::cout << "Adding faces of inP" << std::endl;
-  AppendFaces(outR, facesP, edgesP, i03.H(), inP_, vP2R.H(), false);
-  if (kVerbose) std::cout << "Adding faces of inQ" << std::endl;
-  AppendFaces(outR, facesQ, edgesQ, i30.H(), inQ_, vQ2R.H(),
-              op == Manifold::OpType::SUBTRACT);
-
-  // outR.triVerts_.Dump();
-
-  if (kVerbose) {
-    std::cout << "Time for triangulation";
-    t1 = NOW();
-    PrintDuration(t1 - t0);
-    t0 = t1;
-  }
+  // Level 6
 
   // Create the manifold's data structures and verify manifoldness.
-  outR.RemoveChaff();
+  outR.LabelVerts();
   outR.Finish();
 
   if (kVerbose) {
-    std::cout << "Time for manifold finishing";
+    std::cout << "Time for finishing the manifold";
     t1 = NOW();
     PrintDuration(t1 - t0);
     t0 = t1;

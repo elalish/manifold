@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <thrust/sequence.h>
 #include <thrust/transform_reduce.h>
 
 #include "boolean3.cuh"
@@ -21,6 +22,7 @@
 
 namespace {
 using namespace manifold;
+using namespace thrust::placeholders;
 
 struct NormalizeTo {
   float length;
@@ -30,8 +32,18 @@ struct NormalizeTo {
   }
 };
 
-struct Positive {
-  __host__ __device__ bool operator()(int x) { return x >= 0; }
+struct UpdateHalfedge {
+  const int nextVert;
+  const int nextEdge;
+  const int nextFace;
+
+  __host__ __device__ Halfedge operator()(Halfedge edge) {
+    edge.startVert += nextVert;
+    edge.endVert += nextVert;
+    edge.pairedHalfedge += nextEdge;
+    edge.face += nextFace;
+    return edge;
+  }
 };
 
 struct Equals {
@@ -39,42 +51,32 @@ struct Equals {
   __host__ __device__ bool operator()(int x) { return x == val; }
 };
 
-struct KeepTri {
-  int val;
-  const int* components;
-  __host__ __device__ bool operator()(glm::ivec3 tri) {
-    return components[tri[0]] == val;
+struct RemoveFace {
+  const Halfedge* halfedge;
+  const int* faceEdge;
+  const int* vertLabel;
+  const int keepLabel;
+
+  __host__ __device__ bool operator()(thrust::tuple<int, int> in) {
+    int face = thrust::get<0>(in);
+
+    return vertLabel[halfedge[faceEdge[face]].startVert] != keepLabel;
   }
 };
 
-struct Reindex {
-  const int* indexInv_;
+struct MakeTri {
+  const Halfedge* halfedges;
 
-  __host__ __device__ void operator()(glm::ivec3& triVerts) {
-    for (int i : {0, 1, 2}) triVerts[i] = indexInv_[triVerts[i]];
+  __host__ __device__ void operator()(thrust::tuple<glm::ivec3&, int> inOut) {
+    glm::ivec3& tri = thrust::get<0>(inOut);
+    const int face = 3 * thrust::get<1>(inOut);
+
+    for (int i : {0, 1, 2}) {
+      tri[i] = halfedges[face + i].startVert;
+    }
   }
 };
-
-struct TetVolume {
-  const glm::vec3* vertPos;
-
-  __host__ __device__ float operator()(const glm::ivec3& triVerts) {
-    return glm::dot(vertPos[triVerts[0]],
-                    glm::cross(vertPos[triVerts[1]], vertPos[triVerts[2]])) /
-           6;
-  }
-};
-
-struct TriArea {
-  const glm::vec3* vertPos;
-
-  __host__ __device__ float operator()(const glm::ivec3& triVerts) {
-    return 0.5 *
-           glm::length(glm::cross(vertPos[triVerts[1]] - vertPos[triVerts[0]],
-                                  vertPos[triVerts[2]] - vertPos[triVerts[0]]));
-  }
-};
-}
+}  // namespace
 
 namespace manifold {
 
@@ -94,20 +96,37 @@ Manifold& Manifold::operator=(const Manifold& other) {
   return *this;
 }
 
+/**
+ * Since these manifolds include a lot of memory, implicit copying is disabled.
+ * Instead this explicit method must be called to remind users of the penalty.
+ */
 Manifold Manifold::DeepCopy() const { return *this; }
 
+/**
+ * Constructs a tetrahedron centered at the origin with one vertex at (1,1,1)
+ * and the rest at similarly symmetric points.
+ */
 Manifold Manifold::Tetrahedron() {
   Manifold tetrahedron;
   tetrahedron.pImpl_ = std::make_unique<Impl>(Impl::Shape::TETRAHEDRON);
   return tetrahedron;
 }
 
+/**
+ * Constructs an octahedron centered at the origin with vertices one unit out
+ * along each axis.
+ */
 Manifold Manifold::Octahedron() {
   Manifold octahedron;
   octahedron.pImpl_ = std::make_unique<Impl>(Impl::Shape::OCTAHEDRON);
   return octahedron;
 }
 
+/**
+ * Constructs a unit cube (edge lengths all one), by default in the first
+ * octant, touching the origin. Set center to true to shift the center to the
+ * origin.
+ */
 Manifold Manifold::Cube(glm::vec3 size, bool center) {
   Manifold cube;
   cube.pImpl_ = std::make_unique<Impl>(Impl::Shape::CUBE);
@@ -116,6 +135,11 @@ Manifold Manifold::Cube(glm::vec3 size, bool center) {
   return cube;
 }
 
+/**
+ * A convenience constructor for the common case of extruding a circle. Can also
+ * form cones if both radii are specified. Set center to true to center the
+ * manifold vertically on the origin (default places the bottom on the origin).
+ */
 Manifold Manifold::Cylinder(float height, float radiusLow, float radiusHigh,
                             int circularSegments, bool center) {
   float scale = radiusHigh >= 0.0f ? radiusHigh / radiusLow : 1.0f;
@@ -133,6 +157,12 @@ Manifold Manifold::Cylinder(float height, float radiusLow, float radiusHigh,
   return cylinder;
 }
 
+/**
+ * Constructs a sphere of a given radius and number of segments along its
+ * diameter. This number will always be rounded up to the nearest factor of
+ * four, as this sphere is constructed by refining an octahedron. This means
+ * there are a circle of vertices on all three of the axis planes.
+ */
 Manifold Manifold::Sphere(float radius, int circularSegments) {
   int n = circularSegments > 0 ? (circularSegments + 3) / 4
                                : GetCircularSegments(radius) / 4;
@@ -145,13 +175,22 @@ Manifold Manifold::Sphere(float radius, int circularSegments) {
   return sphere;
 }
 
+/**
+ * Constructs a manifold from a set of polygons by extruding them along the
+ * Z-axis. The overall height and the scale at the top (X and Y independently)
+ * can be specified, as can a twist, to be applied linearly. In the case of
+ * twist, it can also be helpful to specify nDivisions, which specifies the
+ * quantization of the triangles vertically. If the scale is {0,0}, a pure cone
+ * is formed with only a single vertex at the top.
+ */
 Manifold Manifold::Extrude(Polygons crossSection, float height, int nDivisions,
                            float twistDegrees, glm::vec2 scaleTop) {
   ALWAYS_ASSERT(scaleTop.x >= 0 && scaleTop.y >= 0, runtimeErr, "");
   Manifold extrusion;
   ++nDivisions;
   auto& vertPos = extrusion.pImpl_->vertPos_.H();
-  auto& triVerts = extrusion.pImpl_->triVerts_.H();
+  VecDH<glm::ivec3> triVertsDH;
+  auto& triVerts = triVertsDH.H();
   int nCrossSection = 0;
   bool isCone = scaleTop.x == 0.0 && scaleTop.y == 0.0;
   int idx = 0;
@@ -198,10 +237,19 @@ Manifold Manifold::Extrude(Polygons crossSection, float height, int nDivisions,
     triVerts.push_back({tri[0], tri[2], tri[1]});
     if (!isCone) triVerts.push_back(tri + nCrossSection * nDivisions);
   }
+
+  extrusion.pImpl_->CreateHalfedges(triVertsDH);
   extrusion.pImpl_->Finish();
   return extrusion;
 }
 
+/**
+ * Constructs a manifold from a set of polygons by revolving this cross-section
+ * around its Y-axis and then setting this as the Z-axis of the resulting
+ * manifold. If the polygons cross the Y-axis, only the part on the positive X
+ * side is used. Geometrically valid input will result in geometrically valid
+ * output.
+ */
 Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments) {
   float radius = 0.0f;
   for (const auto& poly : crossSection) {
@@ -213,7 +261,8 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments) {
       circularSegments > 2 ? circularSegments : GetCircularSegments(radius);
   Manifold revoloid;
   auto& vertPos = revoloid.pImpl_->vertPos_.H();
-  auto& triVerts = revoloid.pImpl_->triVerts_.H();
+  VecDH<glm::ivec3> triVertsDH;
+  auto& triVerts = triVertsDH.H();
   float dPhi = 360.0f / nDivisions;
   for (const auto& poly : crossSection) {
     int start = -1;
@@ -282,37 +331,108 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments) {
       } while (polyVert != start);
     }
   }
+
+  revoloid.pImpl_->CreateHalfedges(triVertsDH);
   revoloid.pImpl_->Finish();
   return revoloid;
 }
 
+/**
+ * Constructs a new manifold from a vector of other manifolds. This is a purely
+ * topological operation, so care should be taken to avoid creating
+ * geometrically-invalid results (unless that is desired).
+ */
 Manifold Manifold::Compose(const std::vector<Manifold>& manifolds) {
-  Manifold combined;
-  for (Manifold manifold : manifolds) {
-    manifold.pImpl_->ApplyTransform();
-    const int startIdx = combined.NumVert();
-    combined.pImpl_->vertPos_.H().insert(combined.pImpl_->vertPos_.end(),
-                                         manifold.pImpl_->vertPos_.begin(),
-                                         manifold.pImpl_->vertPos_.end());
-    for (auto tri : manifold.pImpl_->triVerts_.H())
-      combined.pImpl_->triVerts_.H().push_back(tri + startIdx);
+  int numVert = 0;
+  int numEdge = 0;
+  int numFace = 0;
+  for (const Manifold& manifold : manifolds) {
+    numVert += manifold.NumVert();
+    numEdge += manifold.NumEdge();
+    numFace += manifold.NumFace();
   }
-  combined.pImpl_->Finish();
-  return combined;
+
+  Manifold out;
+  Impl& combined = *(out.pImpl_);
+  combined.vertPos_.resize(numVert);
+  combined.halfedge_.resize(2 * numEdge);
+  combined.faceEdge_.resize(numFace + 1);
+  combined.vertLabel_.resize(numVert);
+  combined.faceNormal_.resize(numFace);
+
+  int nextVert = 0;
+  int nextEdge = 0;
+  int nextFace = 0;
+  int nextLabel = 0;
+  for (const Manifold& manifold : manifolds) {
+    const Impl& impl = *(manifold.pImpl_);
+    impl.ApplyTransform();
+
+    thrust::copy(impl.vertPos_.beginD(), impl.vertPos_.endD(),
+                 combined.vertPos_.beginD() + nextVert);
+    thrust::copy(impl.faceNormal_.beginD(), impl.faceNormal_.endD(),
+                 combined.faceNormal_.beginD() + nextFace);
+    thrust::transform(impl.faceEdge_.beginD(), impl.faceEdge_.endD(),
+                      combined.faceEdge_.beginD() + nextFace, _1 + nextEdge);
+    thrust::transform(impl.vertLabel_.beginD(), impl.vertLabel_.endD(),
+                      combined.vertLabel_.beginD() + nextVert, _1 + nextLabel);
+    thrust::transform(impl.halfedge_.beginD(), impl.halfedge_.endD(),
+                      combined.halfedge_.beginD() + nextEdge,
+                      UpdateHalfedge({nextVert, nextEdge, nextFace}));
+
+    nextVert += manifold.NumVert();
+    nextEdge += 2 * manifold.NumEdge();
+    nextFace += manifold.NumFace();
+    nextLabel += impl.numLabel_;
+  }
+
+  combined.numLabel_ = nextLabel;
+  combined.Finish();
+  return out;
 }
 
+/**
+ * This operation returns a copy of this manifold, but as a vector of meshes
+ * that are topologically disconnected. It cannot use vertLabel_ directly for
+ * this due to possible polygons with holes, so instead it recomputes the
+ * connected components after adding a start graph of edges to each face that
+ * has more than five edges to ensure proper connectivity. In some situations
+ * this could cause disjoint manifolds to not be separated, so triangulating
+ * first may be preferable.
+ */
 std::vector<Manifold> Manifold::Decompose() const {
-  VecDH<int> components;
-  int nManifolds =
-      ConnectedComponents(components, NumVert(), pImpl_->edgeVerts_);
-  std::vector<Manifold> meshes(nManifolds);
-  VecDH<int> vertOld2New(NumVert(), -1);
-  for (int i = 0; i < nManifolds; ++i) {
-    int compVert =
-        thrust::find_if(components.beginD(), components.endD(), Positive()) -
-        components.beginD();
-    int compLabel = components.H()[compVert];
+  if (pImpl_->numLabel_ == 1) {
+    std::vector<Manifold> meshes(1);
+    meshes[0] = DeepCopy();
+    return meshes;
+  }
 
+  VecDH<Halfedge> edges = pImpl_->halfedge_;
+
+  VecH<Halfedge>& edgesH = edges.H();
+  const VecH<int>& faceEdgeH = pImpl_->faceEdge_.H();
+
+  for (int face = 0; face < NumFace(); ++face) {
+    const int firstEdge = faceEdgeH[face];
+    const int lastEdge = faceEdgeH[face + 1];
+    if (lastEdge - firstEdge > 5) {
+      // With 6 edges or more, the face could be made of multiple polygons. Add
+      // a star graph of edges to ensure the face's verts are connected.
+      const int startVert = edgesH[firstEdge].startVert;
+      for (int i = firstEdge + 1; i < lastEdge; ++i) {
+        Halfedge edge = {startVert, edgesH[i].startVert};
+        // ConnectedComponents only uses forward halfedges.
+        if (!edge.IsForward()) std::swap(edge.startVert, edge.endVert);
+        edgesH.push_back(edge);
+      }
+    }
+  }
+
+  VecDH<int> vertLabel;
+  int numLabel = ConnectedComponents(vertLabel, NumVert(), edges);
+
+  std::vector<Manifold> meshes(numLabel);
+  for (int i = 0; i < numLabel; ++i) {
     meshes[i].pImpl_->vertPos_.resize(NumVert());
     VecDH<int> vertNew2Old(NumVert());
     int nVert =
@@ -320,44 +440,67 @@ std::vector<Manifold> Manifold::Decompose() const {
             zip(pImpl_->vertPos_.beginD(), thrust::make_counting_iterator(0)),
             zip(pImpl_->vertPos_.endD(),
                 thrust::make_counting_iterator(NumVert())),
-            components.beginD(),
+            vertLabel.beginD(),
             zip(meshes[i].pImpl_->vertPos_.beginD(), vertNew2Old.beginD()),
-            Equals({compLabel})) -
+            Equals({i})) -
         zip(meshes[i].pImpl_->vertPos_.beginD(),
             thrust::make_counting_iterator(0));
-    thrust::scatter(thrust::make_counting_iterator(0),
-                    thrust::make_counting_iterator(nVert), vertNew2Old.beginD(),
-                    vertOld2New.beginD());
     meshes[i].pImpl_->vertPos_.resize(nVert);
 
-    meshes[i].pImpl_->triVerts_.resize(NumTri());
-    int nTri =
-        thrust::copy_if(pImpl_->triVerts_.beginD(), pImpl_->triVerts_.endD(),
-                        meshes[i].pImpl_->triVerts_.beginD(),
-                        KeepTri({compLabel, components.ptrD()})) -
-        meshes[i].pImpl_->triVerts_.beginD();
-    meshes[i].pImpl_->triVerts_.resize(nTri);
+    VecDH<int> faceNew2Old(NumFace());
+    thrust::sequence(faceNew2Old.beginD(), faceNew2Old.endD());
 
-    thrust::for_each_n(meshes[i].pImpl_->triVerts_.beginD(), nTri,
-                       Reindex({vertOld2New.ptrD()}));
+    VecDH<int> faceSize = pImpl_->FaceSize();
+
+    auto start = zip(faceNew2Old.beginD(), faceSize.beginD() + 1);
+    int nFace =
+        thrust::remove_if(
+            start, zip(faceNew2Old.endD(), faceSize.endD()),
+            RemoveFace({pImpl_->halfedge_.cptrD(), pImpl_->faceEdge_.cptrD(),
+                        vertLabel.cptrD(), i})) -
+        start;
+    faceNew2Old.resize(nFace);
+    faceSize.resize(nFace + 1);
+
+    meshes[i].pImpl_->GatherFaces(pImpl_->halfedge_, pImpl_->faceEdge_,
+                                  faceNew2Old, faceSize);
+    meshes[i].pImpl_->ReindexVerts(vertNew2Old, pImpl_->NumVert());
 
     meshes[i].pImpl_->Finish();
     meshes[i].pImpl_->transform_ = pImpl_->transform_;
-    thrust::replace(components.beginD(), components.endD(), compLabel, -1);
   }
   return meshes;
 }
 
-Mesh Manifold::Extract() const {
+/**
+ * This returns a Mesh of simple vectors of vertices and triangles suitable for
+ * saving or other operations outside of the context of this library. It is not
+ * a const function because it first triangulates the Manifold.
+ */
+Mesh Manifold::Extract() {
   pImpl_->ApplyTransform();
+  pImpl_->Face2Tri();
+  pImpl_->Finish();
+
   Mesh result;
   result.vertPos.insert(result.vertPos.end(), pImpl_->vertPos_.begin(),
                         pImpl_->vertPos_.end());
-  result.triVerts.insert(result.triVerts.end(), pImpl_->triVerts_.begin(),
-                         pImpl_->triVerts_.end());
+
+  result.triVerts.resize(NumFace());
+  thrust::for_each_n(
+      zip(result.triVerts.begin(), thrust::make_counting_iterator(0)),
+      NumFace(), MakeTri({pImpl_->halfedge_.cptrH()}));
+
   return result;
 }
 
+/**
+ * These static properties control how circular shapes are quantized by default
+ * on construction. If circularSegments is specified, it takes precedence. If it
+ * is zero, then instead the minimum is used of the segments calculated based on
+ * edge length and angle, rounded up to the nearest multiple of four. To get
+ * numbers not divisible by four, circularSegements must be specified.
+ */
 int Manifold::circularSegments = 0;
 float Manifold::circularAngle = 10.0f;
 float Manifold::circularEdgeLength = 1.0f;
@@ -390,32 +533,28 @@ int Manifold::GetCircularSegments(float radius) {
 bool Manifold::IsEmpty() const { return NumVert() == 0; }
 int Manifold::NumVert() const { return pImpl_->NumVert(); }
 int Manifold::NumEdge() const { return pImpl_->NumEdge(); }
-int Manifold::NumTri() const { return pImpl_->NumTri(); }
+int Manifold::NumFace() const { return pImpl_->NumFace(); }
 
 Box Manifold::BoundingBox() const {
   return pImpl_->bBox_.Transform(pImpl_->transform_);
 }
 
-float Manifold::Volume() const {
-  pImpl_->ApplyTransform();
-  return thrust::transform_reduce(
-      pImpl_->triVerts_.beginD(), pImpl_->triVerts_.endD(),
-      TetVolume({pImpl_->vertPos_.ptrD()}), 0.0f, thrust::plus<float>());
-}
-
-float Manifold::SurfaceArea() const {
-  pImpl_->ApplyTransform();
-  return thrust::transform_reduce(
-      pImpl_->triVerts_.beginD(), pImpl_->triVerts_.endD(),
-      TriArea({pImpl_->vertPos_.ptrD()}), 0.0f, thrust::plus<float>());
-}
-
+/**
+ * The genus is a topological property of the manifold, representing the number
+ * of "handles". A sphere is 0, torus 1, etc. It is only meaningful for a
+ * single, triangulated mesh (faces that are polygons with holes violate its
+ * assumptions), so it is best to call Face2Tri() and Decompose() first.
+ */
 int Manifold::Genus() const {
-  int chi = NumVert() - NumTri() / 2;
+  int chi = NumVert() - NumEdge() + NumFace();
   return 1 - chi / 2;
 }
 
-bool Manifold::IsValid() const { return pImpl_->IsValid(); }
+Manifold::Properties Manifold::GetProperties() const {
+  return pImpl_->GetProperties();
+}
+
+bool Manifold::IsManifold() const { return pImpl_->IsManifold(); }
 
 Manifold& Manifold::Translate(glm::vec3 v) {
   pImpl_->transform_[3] += v;
@@ -429,6 +568,13 @@ Manifold& Manifold::Scale(glm::vec3 v) {
   return *this;
 }
 
+/**
+ * Applys an Euler angle rotation to the manifold, first about the X axis, then
+ * Y, then Z, in degrees. We use degrees so that we can minimize rounding error,
+ * and elimiate it completely for any multiples of 90 degrees. Addtionally, more
+ * efficient code paths are used to update the manifold when the transforms only
+ * rotate by multiples of 90 degrees.
+ */
 Manifold& Manifold::Rotate(float xDegrees, float yDegrees, float zDegrees) {
   glm::mat3 rX(1.0f, 0.0f, 0.0f,                      //
                0.0f, cosd(xDegrees), sind(xDegrees),  //
@@ -443,23 +589,34 @@ Manifold& Manifold::Rotate(float xDegrees, float yDegrees, float zDegrees) {
   return *this;
 }
 
+/**
+ * This function does not change the topology, but allows the vertices to be
+ * moved according to any arbitrary input function. It is easy to create a
+ * function that warps a geometrically valid object into one with is not, but
+ * that is not checked here, so it is up to the user to choose their function
+ * with discretion.
+ */
 Manifold& Manifold::Warp(std::function<void(glm::vec3&)> warpFunc) {
   pImpl_->ApplyTransform();
   thrust::for_each_n(pImpl_->vertPos_.begin(), NumVert(), warpFunc);
   pImpl_->Update();
-  pImpl_->triNormal_.resize(0);  // force recalculation of triNormal
+  pImpl_->faceNormal_.resize(0);  // force recalculation of triNormal
   pImpl_->CalculateNormals();
   return *this;
 }
 
-int Manifold::NumOverlaps(const Manifold& B) const {
+/**
+ * This is a checksum-style verification of the collider, simply returning the
+ * total number of edge-face bounding box overlaps between this and other.
+ */
+int Manifold::NumOverlaps(const Manifold& other) const {
   pImpl_->ApplyTransform();
-  B.pImpl_->ApplyTransform();
+  other.pImpl_->ApplyTransform();
 
-  SparseIndices overlaps = pImpl_->EdgeCollisions(*B.pImpl_);
+  SparseIndices overlaps = pImpl_->EdgeCollisions(*other.pImpl_);
   int num_overlaps = overlaps.size();
 
-  overlaps = B.pImpl_->EdgeCollisions(*pImpl_);
+  overlaps = other.pImpl_->EdgeCollisions(*pImpl_);
   return num_overlaps += overlaps.size();
 }
 
@@ -533,4 +690,4 @@ std::pair<Manifold, Manifold> Manifold::SplitByPlane(glm::vec3 normal,
   cutter.Rotate(0.0f, yDeg, zDeg);
   return Split(cutter);
 }
-}
+}  // namespace manifold
