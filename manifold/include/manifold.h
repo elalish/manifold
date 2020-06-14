@@ -15,6 +15,7 @@
 #pragma once
 #include <functional>
 #include <memory>
+
 #include "structs.h"
 
 namespace manifold {
@@ -42,8 +43,8 @@ class Manifold {
   static Manifold Compose(const std::vector<Manifold>&);
   std::vector<Manifold> Decompose() const;
 
-  // Extraction
-  Mesh Extract() const;
+  // Extraction is not const because it triangulates the Manifold.
+  Mesh Extract();
 
   // Defaults for construction
   static void SetMinCircularAngle(float degrees);
@@ -51,15 +52,17 @@ class Manifold {
   static void SetCircularSegments(int number);
   static int GetCircularSegments(float radius);
 
+  struct Properties {
+    float surfaceArea, volume;
+  };
   // Information
   bool IsEmpty() const;
   int NumVert() const;
   int NumEdge() const;
-  int NumTri() const;
+  int NumFace() const;
   Box BoundingBox() const;
-  float Volume() const;
-  float SurfaceArea() const;
   int Genus() const;
+  Properties GetProperties() const;
 
   // Modification
   Manifold& Translate(glm::vec3);
@@ -86,7 +89,7 @@ class Manifold {
                                              float originOffset) const;
 
   // Testing hooks
-  bool IsValid() const;
+  bool IsManifold() const;
   int NumOverlaps(const Manifold& second) const;
   static void SetExpectGeometry(bool);
   static void SetSuppressErrors(bool);

@@ -157,7 +157,7 @@ struct FindCollisions {
     int top = -1;
     // Depth-first search
     int node = kRoot;
-    while(1) {
+    while (1) {
       int internal = Node2Internal(node);
       int child1 = internalChildren_[internal].first;
       int child2 = internalChildren_[internal].second;
@@ -208,6 +208,11 @@ struct TransformBox {
 
 namespace manifold {
 
+/**
+ * Creates a Bounding Volume Hierarchy (BVH) from an input set of axis-aligned
+ * bounding boxes and corresponding Morton codes. It is assumed these vectors
+ * are already sorted by increasing Morton code.
+ */
 Collider::Collider(const VecDH<Box>& leafBB,
                    const VecDH<uint32_t>& leafMorton) {
   ALWAYS_ASSERT(leafBB.size() == leafMorton.size(), runtimeErr, "");
@@ -223,12 +228,18 @@ Collider::Collider(const VecDH<Box>& leafBB,
   UpdateBoxes(leafBB);
 }
 
+/**
+ * For a vector of querry objects, this returns a sparse array of overlaps
+ * between the querries and the bounding boxes of the collider. Querries are
+ * normally axis-aligned bounding boxes. Points can also be used, and this case
+ * overlaps are defined as lying in the XY projection of the bounding box.
+ */
 template <typename T>
 SparseIndices Collider::Collisions(const VecDH<T>& querriesIn) const {
   int maxOverlaps = 1 << 20;
   SparseIndices querryTri(maxOverlaps);
   int nOverlaps = 0;
-  while(1) {
+  while (1) {
     // scalar number of overlaps found
     VecDH<int> nOverlapsD(1, 0);
     // calculate Bounding Box overlaps
@@ -251,6 +262,10 @@ SparseIndices Collider::Collisions(const VecDH<T>& querriesIn) const {
   return querryTri;
 }
 
+/**
+ * Recalculate the collider's internal bounding boxes without changing the
+ * hierarchy.
+ */
 void Collider::UpdateBoxes(const VecDH<Box>& leafBB) {
   ALWAYS_ASSERT(leafBB.size() == NumLeaves(), runtimeErr, "");
   // copy in leaf node Boxs
@@ -267,6 +282,10 @@ void Collider::UpdateBoxes(const VecDH<Box>& leafBB) {
                           internalChildren_.ptrD()}));
 }
 
+/**
+ * Apply axis-aligned transform to all bounding boxes. If transform is not
+ * axis-aligned, abort and return false to indicate recalculation is necessary.
+ */
 bool Collider::Transform(glm::mat4x3 transform) {
   bool axisAligned = true;
   for (int row : {0, 1, 2}) {

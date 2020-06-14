@@ -26,8 +26,8 @@ class Boolean3 {
  private:
   const Manifold::Impl &inP_, &inQ_;
   const float expandP_;
-  SparseIndices p1q2_, p2q1_, p2q2_;
-  VecDH<int> dir12_, dir21_, w03_, w30_;
+  SparseIndices p1q2_, p2q1_;
+  VecDH<int> x12_, x21_, w03_, w30_;
   VecDH<glm::vec3> v12_, v21_;
 };
 }  // namespace manifold

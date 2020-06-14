@@ -29,7 +29,7 @@ int main(int argc, char **argv) {
     auto end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsed = end - start;
     times.push_back(elapsed.count());
-    std::cout << "nTri = " << sphere.NumTri() << ", time = " << elapsed.count()
+    std::cout << "nTri = " << sphere.NumFace() << ", time = " << elapsed.count()
               << " sec" << std::endl;
   }
 }

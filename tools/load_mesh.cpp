@@ -25,6 +25,6 @@ int main(int argc, char **argv) {
   Mesh mesh = ImportMesh(filename);
   Manifold manifold(mesh);
   std::cout << "Manifold is ";
-  if (!manifold.IsValid()) std::cout << "NOT ";
+  if (!manifold.IsManifold()) std::cout << "NOT ";
   std::cout << "valid" << std::endl;
 }

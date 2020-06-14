@@ -125,6 +125,19 @@ class VecDH {
 
   const T* ptrD() const { return cptrD(); }
 
+  T* ptrH() {
+    RefreshHost();
+    device_valid_ = false;
+    return host_.data();
+  }
+
+  const T* cptrH() const {
+    RefreshHost();
+    return host_.data();
+  }
+
+  const T* ptrH() const { return cptrH(); }
+
   const VecH<T>& H() const {
     RefreshHost();
     return host_;

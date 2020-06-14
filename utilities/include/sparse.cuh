@@ -13,15 +13,15 @@
 // limitations under the License.
 
 #pragma once
-#include "structs.h"
-#include "utils.cuh"
-#include "vec_dh.cuh"
-
 #include <thrust/binary_search.h>
 #include <thrust/gather.h>
 #include <thrust/remove.h>
 #include <thrust/sort.h>
 #include <thrust/unique.h>
+
+#include "structs.h"
+#include "utils.cuh"
+#include "vec_dh.cuh"
 
 namespace manifold {
 
@@ -37,11 +37,11 @@ class SparseIndices {
   Iter beginD(bool use_q) { return use_q ? q.beginD() : p.beginD(); }
   Iter endD(bool use_q) { return use_q ? q.endD() : p.endD(); }
   int* ptrD(bool use_q) { return use_q ? q.ptrD() : p.ptrD(); }
-  thrust::pair<int*, int*> ptrDpq() {
-    return thrust::make_pair(p.ptrD(), q.ptrD());
+  thrust::pair<int*, int*> ptrDpq(int idx = 0) {
+    return thrust::make_pair(p.ptrD() + idx, q.ptrD() + idx);
   }
-  const thrust::pair<const int*, const int*> ptrDpq() const {
-    return thrust::make_pair(p.ptrD(), q.ptrD());
+  const thrust::pair<const int*, const int*> ptrDpq(int idx = 0) const {
+    return thrust::make_pair(p.ptrD() + idx, q.ptrD() + idx);
   }
   const VecDH<int>& Get(bool use_q) const { return use_q ? q : p; }
   VecDH<int> Copy(bool use_q) const {
@@ -111,6 +111,16 @@ class SparseIndices {
     thrust::gather_if(temp.beginD(), temp.endD(), found.beginD(), val.beginD(),
                       result.beginD());
     return result;
+  }
+
+  void Dump() const {
+    const auto& p = Get(0).H();
+    const auto& q = Get(1).H();
+    std::cout << "SparseIndices = " << std::endl;
+    for (int i = 0; i < size(); ++i) {
+      std::cout << i << ", p = " << p[i] << ", q = " << q[i] << std::endl;
+    }
+    std::cout << std::endl;
   }
 
  private:
