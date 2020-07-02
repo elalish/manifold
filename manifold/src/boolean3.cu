@@ -56,7 +56,7 @@
  */
 
 // TODO: make this runtime configurable for quicker debug
-constexpr bool kVerbose = false;
+constexpr bool kVerbose = true;
 
 using namespace thrust::placeholders;
 
@@ -71,6 +71,7 @@ using namespace manifold;
 __host__ __device__ glm::vec2 Interpolate(glm::vec3 pL, glm::vec3 pR, float x) {
   float dxL = x - pL.x;
   float dxR = x - pR.x;
+  if (dxL * dxR > 0) printf("Not in domain!\n");
   bool useL = fabs(dxL) < fabs(dxR);
   float lambda = (useL ? dxL : dxR) / (pR.x - pL.x);
   if (!isfinite(lambda)) return glm::vec2(pL.y, pL.z);
@@ -86,6 +87,7 @@ __host__ __device__ glm::vec4 Intersect(const glm::vec3 &pL,
                                         const glm::vec3 &qR) {
   float dyL = qL.y - pL.y;
   float dyR = qR.y - pR.y;
+  if (dyL * dyR > 0) printf("No intersection!\n");
   bool useL = fabs(dyL) < fabs(dyR);
   float dx = pR.x - pL.x;
   float lambda = (useL ? dyL : dyR) / (dyL - dyR);
@@ -342,6 +344,29 @@ std::tuple<VecDH<int>, VecDH<glm::vec2>> Shadow01(SparseIndices &p0q1,
   return std::make_tuple(s01, yz01);
 }
 
+__host__ __device__ int BinarySearch(
+    const thrust::pair<const int *, const int *> keys, const int size,
+    const thrust::pair<int, int> key) {
+  if (size <= 0) return -1;
+  int left = 0;
+  int right = size - 1;
+  int m;
+  thrust::pair<int, int> keyM;
+  while (1) {
+    m = right - (right - left) / 2;
+    keyM = thrust::make_pair(keys.first[m], keys.second[m]);
+    if (left == right) break;
+    if (keyM > key)
+      right = m - 1;
+    else
+      left = m;
+  }
+  if (keyM == key)
+    return m;
+  else
+    return -1;
+}
+
 template <typename Val>
 __host__ __device__ Val BinarySearchByKey(
     const thrust::pair<const int *, const int *> keys, const Val *vals,
@@ -478,36 +503,10 @@ std::tuple<VecDH<int>, VecDH<glm::vec4>> Shadow11(
   return std::make_tuple(s11, xyzz11);
 };
 
-struct Gather02 {
-  const thrust::pair<const int *, const int *> p0q1;
-  const int *s01;
-  const int size;
-  const int *facesQ;
-  const Halfedge *halfedgesQ;
-  const bool forward;
-
-  __host__ __device__ void operator()(thrust::tuple<int &, int, int> inout) {
-    int &s02 = thrust::get<0>(inout);
-    const int p0 = thrust::get<1>(inout);
-    const int q2 = thrust::get<2>(inout);
-
-    int q1 = facesQ[q2];
-    const int lastEdge = facesQ[q2 + 1];
-    while (q1 < lastEdge) {
-      const Halfedge edge = halfedgesQ[q1];
-      const int q1F = edge.IsForward() ? q1 : edge.pairedHalfedge;
-      const auto key =
-          forward ? thrust::make_pair(p0, q1F) : thrust::make_pair(q1F, p0);
-      s02 += (forward == edge.IsForward() ? -1 : 1) *
-             BinarySearchByKey(p0q1, s01, size, key, 0);
-      ++q1;
-    }
-  }
-};
-
 struct Kernel02 {
   const glm::vec3 *vertPosP;
   const thrust::pair<const int *, const int *> p0q1;
+  const int *s01;
   const glm::vec2 *yz01;
   const int size;
   const int *facesQ;
@@ -517,36 +516,55 @@ struct Kernel02 {
   const glm::vec3 *normalP;
 
   __host__ __device__ void operator()(
-      thrust::tuple<float &, int &, int, int> inout) {
-    float &z02 = thrust::get<0>(inout);
-    int &s02 = thrust::get<1>(inout);
+      thrust::tuple<int &, float &, int, int> inout) {
+    int &s02 = thrust::get<0>(inout);
+    float &z02 = thrust::get<1>(inout);
     const int p0 = thrust::get<2>(inout);
     const int q2 = thrust::get<3>(inout);
 
+    // For yzzLR[k], k==0 is the left and k==1 is the right.
+    int k = 0;
+    glm::vec3 yzz2[2];
+    // Either the left or right must shadow, but not both. This ensures the
+    // intersection is between the left and right.
+    bool shadows;
+    s02 = 0;
+
     int q1 = facesQ[q2];
     const int lastEdge = facesQ[q2 + 1];
-    glm::vec3 yzz2[2];
-    int k = 0;
     while (q1 < lastEdge) {
       const Halfedge edge = halfedgesQ[q1];
       const int q1F = edge.IsForward() ? q1 : edge.pairedHalfedge;
       const auto key =
           forward ? thrust::make_pair(p0, q1F) : thrust::make_pair(q1F, p0);
-      const glm::vec2 yz =
-          BinarySearchByKey(p0q1, yz01, size, key, glm::vec2(0.0f / 0.0f));
-      if (!isnan(yz[0])) yzz2[k++] = glm::vec3(yz[0], yz[1], yz[1]);
-      if (k > 1) break;
+      const int idx = BinarySearch(p0q1, size, key);
+      if (idx != -1) {
+        const int s = s01[idx];
+        s02 += s * (forward == edge.IsForward() ? -1 : 1);
+        if (k < 2 && (k == 0 || (s != 0) != shadows)) {
+          shadows = s != 0;
+          const glm::vec2 yz = yz01[idx];
+          yzz2[k++] = glm::vec3(yz[0], yz[1], yz[1]);
+        }
+      }
       ++q1;
     }
-    // assert two of these were found
-    if (k != 2) printf("k = %d\n", k);
 
-    glm::vec3 vertPos = vertPosP[p0];
-    z02 = Interpolate(yzz2[0], yzz2[1], vertPos.y)[1];
-    if (forward) {
-      if (!Shadows(vertPos.z, z02, expandP * normalP[p0].z)) s02 = 0;
+    if (s02 == 0) {  // No intersection
+      z02 = 0.0f / 0.0f;
     } else {
-      if (!Shadows(z02, vertPos.z, expandP * normalP[q2].z)) s02 = 0;
+      // Assert left and right were both found
+      if (k != 2) {
+        printf("k = %d\n", k);
+      }
+
+      glm::vec3 vertPos = vertPosP[p0];
+      z02 = Interpolate(yzz2[0], yzz2[1], vertPos.y)[1];
+      if (forward) {
+        if (!Shadows(vertPos.z, z02, expandP * normalP[p0].z)) s02 = 0;
+      } else {
+        if (!Shadows(z02, vertPos.z, expandP * normalP[q2].z)) s02 = 0;
+      }
     }
   }
 };
@@ -555,72 +573,30 @@ std::tuple<VecDH<int>, VecDH<float>> Shadow02(
     const Manifold::Impl &inP, const Manifold::Impl &inQ, const VecDH<int> &s01,
     const SparseIndices &p0q1, const VecDH<glm::vec2> &yz01,
     SparseIndices &p0q2, bool forward, float expandP) {
-  VecDH<int> s02(p0q2.size(), 0);
-
-  thrust::for_each_n(
-      zip(s02.beginD(), p0q2.beginD(!forward), p0q2.beginD(forward)),
-      p0q2.size(),
-      Gather02({p0q1.ptrDpq(), s01.cptrD(), p0q1.size(), inQ.faceEdge_.cptrD(),
-                inQ.halfedge_.cptrD(), forward}));
-
-  size_t size = p0q2.RemoveZeros(s02);
-  VecDH<float> z02(size);
+  VecDH<int> s02(p0q2.size());
+  VecDH<float> z02(p0q2.size());
 
   auto normalP = forward ? inP.vertNormal_.cptrD() : inQ.faceNormal_.cptrD();
   thrust::for_each_n(
-      zip(z02.beginD(), s02.beginD(), p0q2.beginD(!forward),
+      zip(s02.beginD(), z02.beginD(), p0q2.beginD(!forward),
           p0q2.beginD(forward)),
-      size,
-      Kernel02({inP.vertPos_.cptrD(), p0q1.ptrDpq(), yz01.cptrD(), p0q1.size(),
-                inQ.faceEdge_.cptrD(), inQ.halfedge_.cptrD(), forward, expandP,
-                normalP}));
+      p0q2.size(),
+      Kernel02({inP.vertPos_.cptrD(), p0q1.ptrDpq(), s01.cptrD(), yz01.cptrD(),
+                p0q1.size(), inQ.faceEdge_.cptrD(), inQ.halfedge_.cptrD(),
+                forward, expandP, normalP}));
+
+  p0q2.KeepFinite(z02, s02);
 
   return std::make_tuple(s02, z02);
 };
 
-struct Gather12 {
-  const thrust::pair<const int *, const int *> p0q2;
-  const int *s02;
-  const int size02;
-  const thrust::pair<const int *, const int *> p1q1;
-  const int *s11;
-  const int size11;
-  const Halfedge *halfedgesP;
-  const int *facesQ;
-  const Halfedge *halfedgesQ;
-  const bool forward;
-
-  __host__ __device__ void operator()(thrust::tuple<int &, int, int> inout) {
-    int &x12 = thrust::get<0>(inout);
-    const int p1 = thrust::get<1>(inout);
-    const int q2 = thrust::get<2>(inout);
-
-    const Halfedge edge = halfedgesP[p1];
-    auto key = forward ? thrust::make_pair(edge.startVert, q2)
-                       : thrust::make_pair(q2, edge.endVert);
-    x12 = BinarySearchByKey(p0q2, s02, size02, key, 0);
-    key = forward ? thrust::make_pair(edge.endVert, q2)
-                  : thrust::make_pair(q2, edge.startVert);
-    x12 -= BinarySearchByKey(p0q2, s02, size02, key, 0);
-
-    int q1 = facesQ[q2];
-    const int lastEdge = facesQ[q2 + 1];
-    while (q1 < lastEdge) {
-      const Halfedge edge = halfedgesQ[q1];
-      const int q1F = edge.IsForward() ? q1 : edge.pairedHalfedge;
-      key = forward ? thrust::make_pair(p1, q1F) : thrust::make_pair(q1F, p1);
-      x12 -= (edge.IsForward() ? 1 : -1) *
-             BinarySearchByKey(p1q1, s11, size11, key, 0);
-      ++q1;
-    }
-  }
-};
-
 struct Kernel12 {
   const thrust::pair<const int *, const int *> p0q2;
+  const int *s02;
   const float *z02;
   const int size02;
   const thrust::pair<const int *, const int *> p1q1;
+  const int *s11;
   const glm::vec4 *xyzz11;
   const int size11;
   const Halfedge *halfedgesP;
@@ -630,67 +606,80 @@ struct Kernel12 {
   const bool forward;
 
   __host__ __device__ void operator()(
-      thrust::tuple<glm::vec3 &, int, int> inout) {
-    glm::vec3 &v12 = thrust::get<0>(inout);
-    const int p1 = thrust::get<1>(inout);
-    const int q2 = thrust::get<2>(inout);
+      thrust::tuple<int &, glm::vec3 &, int, int> inout) {
+    int &x12 = thrust::get<0>(inout);
+    glm::vec3 &v12 = thrust::get<1>(inout);
+    const int p1 = thrust::get<2>(inout);
+    const int q2 = thrust::get<3>(inout);
 
-    const Halfedge edge = halfedgesP[p1];
-    auto key = forward ? thrust::make_pair(edge.startVert, q2)
-                       : thrust::make_pair(q2, edge.startVert);
-    const float z0 = BinarySearchByKey(p0q2, z02, size02, key, 0.0f / 0.0f);
-    key = forward ? thrust::make_pair(edge.endVert, q2)
-                  : thrust::make_pair(q2, edge.endVert);
-    const float z1 = BinarySearchByKey(p0q2, z02, size02, key, 0.0f / 0.0f);
-
+    // For xzyLR-[k], k==0 is the left and k==1 is the right.
+    int k = 0;
     glm::vec3 xzyLR0[2];
     glm::vec3 xzyLR1[2];
-    int k = 0;
-    if (!isnan(z0)) {
-      xzyLR0[k] = vertPosP[edge.startVert];
-      thrust::swap(xzyLR0[k].y, xzyLR0[k].z);
-      xzyLR1[k] = xzyLR0[k];
-      xzyLR1[k][1] = z0;
-      k++;
-    }
-    if (!isnan(z1)) {
-      xzyLR0[k] = vertPosP[edge.endVert];
-      thrust::swap(xzyLR0[k].y, xzyLR0[k].z);
-      xzyLR1[k] = xzyLR0[k];
-      xzyLR1[k][1] = z1;
-      k++;
+    // Either the left or right must shadow, but not both. This ensures the
+    // intersection is between the left and right.
+    bool shadows;
+    x12 = 0;
+
+    const Halfedge edge = halfedgesP[p1];
+
+    for (int vert : {edge.startVert, edge.endVert}) {
+      const auto key =
+          forward ? thrust::make_pair(vert, q2) : thrust::make_pair(q2, vert);
+      const int idx = BinarySearch(p0q2, size02, key);
+      if (idx != -1) {
+        const int s = s02[idx];
+        x12 += s * ((vert == edge.startVert) == forward ? 1 : -1);
+        if (k < 2 && (k == 0 || (s != 0) != shadows)) {
+          shadows = s != 0;
+          xzyLR0[k] = vertPosP[vert];
+          thrust::swap(xzyLR0[k].y, xzyLR0[k].z);
+          xzyLR1[k] = xzyLR0[k];
+          xzyLR1[k][1] = z02[idx];
+          k++;
+        }
+      }
     }
 
     int q1 = facesQ[q2];
     const int lastEdge = facesQ[q2 + 1];
     while (q1 < lastEdge) {
-      if (k > 1) break;
       const Halfedge edge = halfedgesQ[q1];
       const int q1F = edge.IsForward() ? q1 : edge.pairedHalfedge;
-      key = forward ? thrust::make_pair(p1, q1F) : thrust::make_pair(q1F, p1);
-      const glm::vec4 xyzz =
-          BinarySearchByKey(p1q1, xyzz11, size11, key, glm::vec4(0.0f / 0.0f));
-
-      if (!isnan(xyzz.x)) {
-        xzyLR0[k][0] = xyzz.x;
-        xzyLR0[k][1] = xyzz.z;
-        xzyLR0[k][2] = xyzz.y;
-        xzyLR1[k] = xzyLR0[k];
-        xzyLR1[k][1] = xyzz.w;
-        if (!forward) thrust::swap(xzyLR0[k][1], xzyLR1[k][1]);
-        k++;
+      const auto key =
+          forward ? thrust::make_pair(p1, q1F) : thrust::make_pair(q1F, p1);
+      const int idx = BinarySearch(p1q1, size11, key);
+      if (idx != -1) {  // s is implicitly zero for anything not found
+        const int s = s11[idx];
+        x12 -= s * (edge.IsForward() ? 1 : -1);
+        if (k < 2 && (k == 0 || (s != 0) != shadows)) {
+          shadows = s != 0;
+          const glm::vec4 xyzz = xyzz11[idx];
+          xzyLR0[k][0] = xyzz.x;
+          xzyLR0[k][1] = xyzz.z;
+          xzyLR0[k][2] = xyzz.y;
+          xzyLR1[k] = xzyLR0[k];
+          xzyLR1[k][1] = xyzz.w;
+          if (!forward) thrust::swap(xzyLR0[k][1], xzyLR1[k][1]);
+          k++;
+        }
       }
       ++q1;
     }
 
-    // assert two of these five were found
-    if (k != 2) printf("k = %d\n", k);
-
-    const glm::vec4 xzyy =
-        Intersect(xzyLR0[0], xzyLR0[1], xzyLR1[0], xzyLR1[1]);
-    v12.x = xzyy[0];
-    v12.y = xzyy[2];
-    v12.z = xzyy[1];
+    if (x12 == 0) {  // No intersection
+      v12 = glm::vec3(0.0f / 0.0f);
+    } else {
+      // Assert left and right were both found
+      if (k != 2) {
+        printf("k = %d\n", k);
+      }
+      const glm::vec4 xzyy =
+          Intersect(xzyLR0[0], xzyLR0[1], xzyLR1[0], xzyLR1[1]);
+      v12.x = xzyy[0];
+      v12.y = xzyy[2];
+      v12.z = xzyy[1];
+    }
   }
 };
 
@@ -700,31 +689,19 @@ std::tuple<VecDH<int>, VecDH<glm::vec3>> Intersect12(
     const VecDH<float> &z02, const VecDH<glm::vec4> &xyzz11,
     SparseIndices &p1q2, bool forward) {
   VecDH<int> x12(p1q2.size());
-  VecDH<glm::vec3> v12;
-
-  const auto halfedgesP =
-      forward ? inP.halfedge_.cptrD() : inQ.halfedge_.cptrD();
-  const auto halfedgesQ =
-      forward ? inQ.halfedge_.cptrD() : inP.halfedge_.cptrD();
-  const auto facesQ = forward ? inQ.faceEdge_.cptrD() : inP.faceEdge_.cptrD();
+  VecDH<glm::vec3> v12(p1q2.size());
 
   thrust::for_each_n(
-      zip(x12.beginD(), p1q2.beginD(!forward), p1q2.beginD(forward)),
+      zip(x12.beginD(), v12.beginD(), p1q2.beginD(!forward),
+          p1q2.beginD(forward)),
       p1q2.size(),
-      Gather12({p0q2.ptrDpq(), s02.ptrD(), p0q2.size(), p1q1.ptrDpq(),
-                s11.ptrD(), p1q1.size(), halfedgesP, facesQ, halfedgesQ,
-                forward}));
+      Kernel12({p0q2.ptrDpq(), s02.ptrD(), z02.cptrD(), p0q2.size(),
+                p1q1.ptrDpq(), s11.ptrD(), xyzz11.cptrD(), p1q1.size(),
+                inP.halfedge_.cptrD(), inQ.faceEdge_.cptrD(),
+                inQ.halfedge_.cptrD(), inP.vertPos_.cptrD(), forward}));
 
-  size_t size = p1q2.RemoveZeros(x12);
-  v12.resize(size);
+  p1q2.KeepFinite(v12, x12);
 
-  const auto vertPosPtr = forward ? inP.vertPos_.cptrD() : inQ.vertPos_.cptrD();
-  thrust::for_each_n(
-      zip(v12.beginD(), p1q2.beginD(!forward), p1q2.beginD(forward)),
-      p1q2.size(),
-      Kernel12({p0q2.ptrDpq(), z02.cptrD(), p0q2.size(), p1q1.ptrDpq(),
-                xyzz11.cptrD(), p1q1.size(), halfedgesP, facesQ, halfedgesQ,
-                vertPosPtr, forward}));
   return std::make_tuple(x12, v12);
 };
 
@@ -1208,11 +1185,11 @@ Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ,
   // triangle.
   std::tie(x12_, v12_) =
       Intersect12(inP, inQ, s02, p0q2, s11, p1q1, z02, xyzz11, p1q2_, true);
-  if (kVerbose) std::cout << "dir12 size = " << x12_.size() << std::endl;
+  if (kVerbose) std::cout << "x12 size = " << x12_.size() << std::endl;
 
   std::tie(x21_, v21_) =
-      Intersect12(inP, inQ, s20, p2q0, s11, p1q1, z20, xyzz11, p2q1_, false);
-  if (kVerbose) std::cout << "dir21 size = " << x21_.size() << std::endl;
+      Intersect12(inQ, inP, s20, p2q0, s11, p1q1, z20, xyzz11, p2q1_, false);
+  if (kVerbose) std::cout << "x21 size = " << x21_.size() << std::endl;
 
   if (kVerbose) {
     std::cout << "Time for Levels 1-3";

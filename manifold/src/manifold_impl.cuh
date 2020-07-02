@@ -40,7 +40,8 @@ struct Manifold::Impl {
   enum class Shape { TETRAHEDRON, CUBE, OCTAHEDRON };
   Impl(Shape);
 
-  void CreateHalfedges(const VecDH<glm::ivec3>& triVerts);
+  void Tri2Halfedges(const VecDH<glm::ivec3>& triVerts);
+  void PairHalfedges();
   void LabelVerts();
   void Finish();
   void Update();

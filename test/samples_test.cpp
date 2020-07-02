@@ -56,5 +56,5 @@ TEST(Samples, Bracelet) {
   Manifold bracelet = StretchyBracelet();
   Mesh triangulated = bracelet.Extract();
   EXPECT_EQ(bracelet.Genus(), 1);
-  // ExportMesh("bracelet.ply", triangulated);
+  ExportMesh("bracelet.ply", triangulated);
 }
