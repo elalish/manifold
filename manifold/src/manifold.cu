@@ -189,8 +189,8 @@ Manifold Manifold::Extrude(Polygons crossSection, float height, int nDivisions,
   Manifold extrusion;
   ++nDivisions;
   auto& vertPos = extrusion.pImpl_->vertPos_.H();
-  VecDH<glm::ivec3> triVertsDH;
-  auto& triVerts = triVertsDH.H();
+  auto& halfedge = extrusion.pImpl_->halfedge_.H();
+  auto& faceEdge = extrusion.pImpl_->faceEdge_.H();
   int nCrossSection = 0;
   bool isCone = scaleTop.x == 0.0 && scaleTop.y == 0.0;
   int idx = 0;
@@ -201,7 +201,7 @@ Manifold Manifold::Extrude(Polygons crossSection, float height, int nDivisions,
       polyVert.idx = idx++;
     }
   }
-  for (int i = 1; i < nDivisions + 1; ++i) {
+  for (int i = 0; i <= nDivisions; ++i) {
     float alpha = i / float(nDivisions);
     float phi = alpha * twistDegrees;
     glm::mat2 transform(cosd(phi), sind(phi), -sind(phi), cosd(phi));
@@ -214,31 +214,57 @@ Manifold Manifold::Extrude(Polygons crossSection, float height, int nDivisions,
         int offset = idx + nCrossSection * i;
         int thisVert = vert + offset;
         int lastVert = (vert == 0 ? poly.size() : vert) - 1 + offset;
-        if (i == nDivisions && isCone) {
-          triVerts.push_back({nCrossSection * i + j, lastVert - nCrossSection,
-                              thisVert - nCrossSection});
-        } else {
+        int thisFace = faceEdge.size();
+        if (thisFace == 0 || i > 0) faceEdge.push_back(halfedge.size());
+        if (i == 0) {  // Bottom
+          halfedge.push_back({thisVert, lastVert, -1, 0});
+        } else if (i == nDivisions && isCone) {  // Tip
+          halfedge.push_back(
+              {nCrossSection * i + j, lastVert - nCrossSection, -1, thisFace});
+          halfedge.push_back({lastVert - nCrossSection,
+                              thisVert - nCrossSection, -1, thisFace});
+          halfedge.push_back(
+              {thisVert - nCrossSection, nCrossSection * i + j, -1, thisFace});
+        } else {  // Sides
           glm::vec2 pos = transform * poly[vert].pos;
           vertPos.push_back({pos.x, pos.y, height * alpha});
-          triVerts.push_back({thisVert, lastVert, thisVert - nCrossSection});
-          triVerts.push_back(
-              {lastVert, lastVert - nCrossSection, thisVert - nCrossSection});
+          halfedge.push_back({thisVert, lastVert, -1, thisFace});
+          halfedge.push_back(
+              {lastVert, lastVert - nCrossSection, -1, thisFace});
+          halfedge.push_back({lastVert - nCrossSection,
+                              thisVert - nCrossSection, -1, thisFace});
+          halfedge.push_back(
+              {thisVert - nCrossSection, thisVert, -1, thisFace});
         }
       }
       ++j;
       idx += poly.size();
     }
   }
-  if (isCone)
-    for (int j = 0; j < crossSection.size(); ++j)  // Duplicate vertex for Genus
+  if (isCone) {  // Point: duplicate vertex for Genus
+    for (int j = 0; j < crossSection.size(); ++j)
       vertPos.push_back({0.0f, 0.0f, height});
-  std::vector<glm::ivec3> top = Triangulate(crossSection);
-  for (const glm::ivec3& tri : top) {
-    triVerts.push_back({tri[0], tri[2], tri[1]});
-    if (!isCone) triVerts.push_back(tri + nCrossSection * nDivisions);
+  } else {  // Top
+    int thisFace = faceEdge.size();
+    faceEdge.push_back(halfedge.size());
+    idx = nCrossSection * nDivisions;
+    for (const auto& poly : crossSection) {
+      for (int vert = 0; vert < poly.size(); ++vert) {
+        int lastVert = (vert == 0 ? poly.size() : vert) - 1;
+        halfedge.push_back({lastVert + idx, vert + idx, -1, thisFace});
+      }
+      idx += poly.size();
+    }
   }
-
-  extrusion.pImpl_->CreateHalfedges(triVertsDH);
+  faceEdge.push_back(halfedge.size());
+  // Complete data structures
+  extrusion.pImpl_->PairHalfedges();
+  if (twistDegrees != 0) {  // Triangulate since twist makes faces non-planar
+    extrusion.pImpl_->AssembleFaces();
+    extrusion.pImpl_->CalculateNormals();
+    extrusion.pImpl_->Face2Tri();
+    extrusion.pImpl_->faceNormal_.resize(0);
+  }
   extrusion.pImpl_->Finish();
   return extrusion;
 }
@@ -332,7 +358,7 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments) {
     }
   }
 
-  revoloid.pImpl_->CreateHalfedges(triVertsDH);
+  revoloid.pImpl_->Tri2Halfedges(triVertsDH);
   revoloid.pImpl_->Finish();
   return revoloid;
 }
