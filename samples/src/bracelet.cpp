@@ -69,9 +69,9 @@ Manifold StretchyBracelet(float radius, float height, float width,
 
   return Base(width, radius, decorRadius, twistRadius, nDecor,
               innerRadius + thickness, outerRadius + adjThickness,
-              cut - adjThickness, nCut, nDivision);  // -
-  //  Base(width, radius - thickness, decorRadius, twistRadius, nDecor,
-  //       innerRadius, outerRadius + 3 * adjThickness, cut, nCut,
-  //       nDivision);
+              cut - adjThickness, nCut, nDivision) -
+         Base(width, radius - thickness, decorRadius, twistRadius, nDecor,
+              innerRadius, outerRadius + 3 * adjThickness, cut, nCut,
+              nDivision);
 }
 }  // namespace manifold
