@@ -228,12 +228,11 @@ TEST(Manifold, Coplanar) {
   Manifold::SetExpectGeometry(true);
   Manifold cube = Manifold::Cylinder(1.0f, 1.0f);
   Manifold cube2 = cube.DeepCopy();
-  Manifold out = cube -
-                 cube2.Scale({0.5f, 0.5f, 1.0f})
-                     .Rotate(0, 0, 15)
-                     .Translate({0.25f, 0.25f, 0.0f});
+  Manifold out = cube - cube2.Scale({0.5f, 0.5f, 1.0f})
+                            .Rotate(0, 0, 15)
+                            .Translate({0.25f, 0.25f, 0.0f});
   ExportMesh("test.ply", out.Extract());
-  ExpectMeshes(out, {{60, 120}});
+  ExpectMeshes(out, {{32, 64}});
   EXPECT_EQ(out.Genus(), 1);
 }
 

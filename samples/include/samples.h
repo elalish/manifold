@@ -48,5 +48,5 @@ Manifold TorusKnot(int p, int q, float majorRadius, float minorRadius,
 // divisions along the width.
 Manifold StretchyBracelet(float radius = 30.0f, float height = 8.0f,
                           float width = 15.0f, float thickness = 0.4f,
-                          int nDecor = 20, int nCut = 27, int nDivision = 6);
+                          int nDecor = 20, int nCut = 27, int nDivision = 30);
 }  // namespace manifold

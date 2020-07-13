@@ -56,7 +56,7 @@
  */
 
 // TODO: make this runtime configurable for quicker debug
-constexpr bool kVerbose = true;
+constexpr bool kVerbose = false;
 
 using namespace thrust::placeholders;
 
@@ -996,14 +996,17 @@ void AppendPartialEdges(
     }
 
     int inclusion = i03[vStart];
-    EdgePos edgePos = {vP2R[vStart], -1.0f / 0.0f, inclusion > 0};
+    EdgePos edgePos = {vP2R[vStart],
+                       glm::dot(outR.vertPos_.H()[vP2R[vStart]], edgeVec),
+                       inclusion > 0};
     for (int j = 0; j < glm::abs(inclusion); ++j) {
       edgePosP.push_back(edgePos);
       ++edgePos.vert;
     }
 
     inclusion = i03[vEnd];
-    edgePos = {vP2R[vEnd], 1.0f / 0.0f, inclusion < 0};
+    edgePos = {vP2R[vEnd], glm::dot(outR.vertPos_.H()[vP2R[vEnd]], edgeVec),
+               inclusion < 0};
     for (int j = 0; j < glm::abs(inclusion); ++j) {
       edgePosP.push_back(edgePos);
       ++edgePos.vert;
@@ -1036,14 +1039,25 @@ void AppendNewEdges(
     std::map<std::pair<int, int>, std::vector<EdgePos>> &edgesNew,
     const VecH<int> &facePQ2R, const int numFaceP) {
   // Pair up each edge's verts and distribute to faces based on indices in key.
-  // Usually only two verts are in each edge, and if not, they are degenerate
-  // anyway, so pair arbitrarily without bothering with vertex projections.
   VecH<Halfedge> &halfedgeR = outR.halfedge_.H();
+  VecH<glm::vec3> &vertPosR = outR.vertPos_.H();
 
   for (auto &value : edgesNew) {
     const int faceP = value.first.first;
     const int faceQ = value.first.second;
     std::vector<EdgePos> &edgePos = value.second;
+
+    Box bbox;
+    for (auto edge : edgePos) {
+      bbox.Union(vertPosR[edge.vert]);
+    }
+    const glm::vec3 size = bbox.Size();
+    // Order the points along their longest dimension.
+    const int i =
+        (size.x > size.y && size.x > size.z) ? 0 : size.y > size.z ? 1 : 2;
+    for (auto &edge : edgePos) {
+      edge.edgePos = vertPosR[edge.vert][i];
+    }
 
     // sort edges into start/end pairs along length.
     std::vector<Halfedge> edges = PairUp(edgePos);
