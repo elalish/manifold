@@ -367,60 +367,17 @@ __host__ __device__ int BinarySearch(
     return -1;
 }
 
-template <typename Val>
-__host__ __device__ Val BinarySearchByKey(
-    const thrust::pair<const int *, const int *> keys, const Val *vals,
-    const int size, const thrust::pair<int, int> key, const Val missingVal) {
-  if (size <= 0) return missingVal;
-  int left = 0;
-  int right = size - 1;
-  int m;
-  thrust::pair<int, int> keyM;
-  while (1) {
-    m = right - (right - left) / 2;
-    keyM = thrust::make_pair(keys.first[m], keys.second[m]);
-    if (left == right) break;
-    if (keyM > key)
-      right = m - 1;
-    else
-      left = m;
-  }
-  if (keyM == key)
-    return vals[m];
-  else
-    return missingVal;
-}
-
-struct Gather11 {
-  const thrust::pair<const int *, const int *> p0q1;
-  const int *s01;
-  const int size;
-  const Halfedge *halfedgeP;
-  const bool reverse;
-
-  __host__ __device__ void operator()(thrust::tuple<int &, int, int> inout) {
-    int &s11 = thrust::get<0>(inout);
-    const int p1 = thrust::get<1>(inout);
-    const int q1 = thrust::get<2>(inout);
-
-    int p0 = halfedgeP[p1].endVert;
-    auto key = reverse ? thrust::make_pair(q1, p0) : thrust::make_pair(p0, q1);
-    s11 += BinarySearchByKey(p0q1, s01, size, key, 0);
-    p0 = halfedgeP[p1].startVert;
-    key = reverse ? thrust::make_pair(q1, p0) : thrust::make_pair(p0, q1);
-    s11 -= BinarySearchByKey(p0q1, s01, size, key, 0);
-  }
-};
-
 struct Kernel11 {
   const glm::vec3 *vertPosP;
   const glm::vec3 *vertPosQ;
   const Halfedge *halfedgeP;
   const Halfedge *halfedgeQ;
   thrust::pair<const int *, const int *> p0q1;
+  const int *s01;
   const glm::vec2 *yz01;
   int size01;
   thrust::pair<const int *, const int *> p1q0;
+  const int *s10;
   const glm::vec2 *yz10;
   int size10;
   float expandP;
@@ -433,43 +390,67 @@ struct Kernel11 {
     const int p1 = thrust::get<2>(inout);
     const int q1 = thrust::get<3>(inout);
 
-    glm::vec3 p2[2], q2[2];
+    // For p[k], q[k], k==0 is the left and k==1 is the right.
     int k = 0;
+    glm::vec3 p2[2], q2[2];
+    // Either the left or right must shadow, but not both. This ensures the
+    // intersection is between the left and right.
+    bool shadows;
+    s11 = 0;
     thrust::pair<int, int> key2[2];
 
     key2[0] = thrust::make_pair(halfedgeP[p1].startVert, q1);
     key2[1] = thrust::make_pair(halfedgeP[p1].endVert, q1);
     for (int i : {0, 1}) {
-      p2[k] = vertPosP[key2[i].first];
-      q2[k] = glm::vec3(p2[k].x, BinarySearchByKey(p0q1, yz01, size01, key2[i],
-                                                   glm::vec2(0.0f / 0.0f)));
-      if (!isnan(q2[k].y)) k++;
+      const int idx = BinarySearch(p0q1, size01, key2[i]);
+      if (idx != -1) {
+        const int s = s01[idx];
+        s11 += s * (i == 0 ? -1 : 1);
+        if (k < 2 && (k == 0 || (s != 0) != shadows)) {
+          shadows = s != 0;
+          p2[k] = vertPosP[key2[i].first];
+          q2[k] = glm::vec3(p2[k].x, yz01[idx]);
+          ++k;
+        }
+      }
     }
 
     key2[0] = thrust::make_pair(p1, halfedgeQ[q1].startVert);
     key2[1] = thrust::make_pair(p1, halfedgeQ[q1].endVert);
     for (int i : {0, 1}) {
-      if (k > 1) break;
-      q2[k] = vertPosQ[key2[i].second];
-      p2[k] = glm::vec3(q2[k].x, BinarySearchByKey(p1q0, yz10, size10, key2[i],
-                                                   glm::vec2(0.0f / 0.0f)));
-      if (!isnan(p2[k].y)) k++;
+      const int idx = BinarySearch(p1q0, size10, key2[i]);
+      if (idx != -1) {
+        const int s = s10[idx];
+        s11 += s * (i == 0 ? -1 : 1);
+        if (k < 2 && (k == 0 || (s != 0) != shadows)) {
+          shadows = s != 0;
+          q2[k] = vertPosQ[key2[i].second];
+          p2[k] = glm::vec3(q2[k].x, yz10[idx]);
+          ++k;
+        }
+      }
     }
 
-    // assert two of these four were found
-    if (k != 2) printf("k = %d\n", k);
+    if (s11 == 0) {  // No intersection
+      xyzz11 = glm::vec4(0.0f / 0.0f);
+    } else {
+      // Assert left and right were both found
+      if (k != 2) {
+        printf("k = %d\n", k);
+      }
 
-    xyzz11 = Intersect(p2[0], p2[1], q2[0], q2[1]);
+      xyzz11 = Intersect(p2[0], p2[1], q2[0], q2[1]);
 
-    const int p1s = halfedgeP[p1].startVert;
-    const int p1e = halfedgeP[p1].endVert;
-    glm::vec3 diff = vertPosP[p1s] - glm::vec3(xyzz11);
-    const float start2 = glm::dot(diff, diff);
-    diff = vertPosP[p1e] - glm::vec3(xyzz11);
-    const float end2 = glm::dot(diff, diff);
-    const float dir = start2 < end2 ? normalP[p1s].z : normalP[p1e].z;
+      const int p1s = halfedgeP[p1].startVert;
+      const int p1e = halfedgeP[p1].endVert;
+      glm::vec3 diff = vertPosP[p1s] - glm::vec3(xyzz11);
+      const float start2 = glm::dot(diff, diff);
+      diff = vertPosP[p1e] - glm::vec3(xyzz11);
+      const float end2 = glm::dot(diff, diff);
+      const float dir = start2 < end2 ? normalP[p1s].z : normalP[p1e].z;
 
-    if (!Shadows(xyzz11.z, xyzz11.w, expandP * dir)) s11 = 0;
+      if (!Shadows(xyzz11.z, xyzz11.w, expandP * dir)) s11 = 0;
+    }
   }
 };
 
@@ -478,27 +459,19 @@ std::tuple<VecDH<int>, VecDH<glm::vec4>> Shadow11(
     const SparseIndices &p0q1, const VecDH<int> &s01,
     const VecDH<glm::vec2> &yz01, const SparseIndices &p1q0,
     const VecDH<int> &s10, const VecDH<glm::vec2> &yz10, float expandP) {
-  VecDH<int> s11(p1q1.size(), 0);
-
-  thrust::for_each_n(zip(s11.beginD(), p1q1.beginD(0), p1q1.beginD(1)),
-                     p1q1.size(),
-                     Gather11({p0q1.ptrDpq(), s01.cptrD(), p0q1.size(),
-                               inP.halfedge_.cptrD(), false}));
-  thrust::for_each_n(zip(s11.beginD(), p1q1.beginD(1), p1q1.beginD(0)),
-                     p1q1.size(),
-                     Gather11({p1q0.ptrDpq(), s10.cptrD(), p1q0.size(),
-                               inQ.halfedge_.cptrD(), true}));
-
-  size_t size = p1q1.RemoveZeros(s11);
-  VecDH<glm::vec4> xyzz11(size);
+  VecDH<int> s11(p1q1.size());
+  VecDH<glm::vec4> xyzz11(p1q1.size());
 
   thrust::for_each_n(
       zip(xyzz11.beginD(), s11.beginD(), p1q1.beginD(0), p1q1.beginD(1)),
       p1q1.size(),
       Kernel11({inP.vertPos_.cptrD(), inQ.vertPos_.cptrD(),
                 inP.halfedge_.cptrD(), inQ.halfedge_.cptrD(), p0q1.ptrDpq(),
-                yz01.cptrD(), p0q1.size(), p1q0.ptrDpq(), yz10.cptrD(),
-                p1q0.size(), expandP, inP.vertNormal_.cptrD()}));
+                s01.cptrD(), yz01.cptrD(), p0q1.size(), p1q0.ptrDpq(),
+                s10.cptrD(), yz10.cptrD(), p1q0.size(), expandP,
+                inP.vertNormal_.cptrD()}));
+
+  p1q1.KeepFinite(xyzz11, s11);
 
   return std::make_tuple(s11, xyzz11);
 };
