@@ -116,24 +116,9 @@ struct MarkEdgeVerts {
   }
 };
 
-struct MarkFaceVerts {
-  int *verts;
-  const Halfedge *halfedges;
-  const int *faces;
-
-  __host__ __device__ void operator()(int face) {
-    int edge = faces[face];
-    const int lastEdge = faces[face + 1];
-    while (edge < lastEdge) {
-      int vert = halfedges[edge++].startVert;
-      verts[vert] = vert;
-    }
-  }
-};
-
 SparseIndices Filter02(const Manifold::Impl &inP, const Manifold::Impl &inQ,
-                       const VecDH<int> &edges, const VecDH<int> &faces) {
-  // find inP's involved vertices from edges & faces
+                       const VecDH<int> &edges) {
+  // find inP's involved vertices from edges collisions
   VecDH<int> p0(inP.NumVert(), -1);
   // We keep the verts unique by marking the ones we want to keep
   // with their own index in parallel (collisions don't matter because any given
@@ -141,10 +126,6 @@ SparseIndices Filter02(const Manifold::Impl &inP, const Manifold::Impl &inQ,
   // initialized to -1 are not involved and can be removed.
   thrust::for_each_n(edges.beginD(), edges.size(),
                      MarkEdgeVerts({p0.ptrD(), inP.halfedge_.cptrD()}));
-
-  thrust::for_each_n(
-      faces.beginD(), faces.size(),
-      MarkFaceVerts({p0.ptrD(), inP.halfedge_.cptrD(), inP.faceEdge_.cptrD()}));
 
   // find one vertex from each connected component of inP (in case it has no
   // intersections)
@@ -1095,11 +1076,11 @@ Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ,
 
   // Level 2
   // Find vertices from Level 3 that overlap faces in XY-projection
-  SparseIndices p0q2 = Filter02(inP_, inQ_, p1q2_.Get(0), p2q1_.Get(0));
+  SparseIndices p0q2 = Filter02(inP_, inQ_, p1q2_.Get(0));
   p0q2.Sort();
   if (kVerbose) std::cout << "p0q2 size = " << p0q2.size() << std::endl;
 
-  SparseIndices p2q0 = Filter02(inQ_, inP_, p2q1_.Get(1), p1q2_.Get(1));
+  SparseIndices p2q0 = Filter02(inQ_, inP_, p2q1_.Get(1));
   p2q0.SwapPQ();
   p2q0.Sort();
   if (kVerbose) std::cout << "p2q0 size = " << p2q0.size() << std::endl;
