@@ -9,7 +9,7 @@ target_include_directories( ${PROJECT_NAME}
 )
 target_link_libraries( ${PROJECT_NAME}
     PUBLIC utilities
-    PRIVATE collider polygon nvgraph ${MANIFOLD_OMP_INCLUDE} Boost::graph 
+    PRIVATE collider polygon ${MANIFOLD_OMP_INCLUDE} Boost::graph 
 )
 
 target_compile_options(${PROJECT_NAME} 

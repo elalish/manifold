@@ -22,7 +22,7 @@ OPTION( MANIFOLD_USE_CPP
 )
 
 set(MAINFOLD_FLAGS -Werror -Wall -Wno-sign-compare)
-set(MANIFOLD_NVCC_FLAGS -DTHRUST_DEBUG)# -Xcompiler=-Werror -Xcompiler=-Wno-macro-redefined)
+set(MANIFOLD_NVCC_FLAGS -DTHRUST_DEBUG)
 IF(MANIFOLD_USE_OMP)
     message("------------------------- Using OpenMP instead of CUDA.")
     find_package(OpenMP REQUIRED)
