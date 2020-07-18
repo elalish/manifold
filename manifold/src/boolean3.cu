@@ -421,6 +421,8 @@ struct Kernel02 {
       if (forward) {
         if (!Shadows(vertPos.z, z02, expandP * vertNormalP[p0].z)) s02 = 0;
       } else {
+        // TODO: Would be better to perturb using nearest vertNormal, see
+        // Kernel11.
         if (!Shadows(z02, vertPos.z, expandP * faceNormalP[q2].z)) s02 = 0;
       }
     }
