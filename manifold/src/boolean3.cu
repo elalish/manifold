@@ -246,6 +246,37 @@ __host__ __device__ bool Shadows(float p, float q, float dir) {
   return p == q ? dir < 0 : p < q;
 }
 
+__host__ __device__ thrust::pair<int, glm::vec2> Shadow01(
+    const int p0, const int q1, const glm::vec3 *vertPosP,
+    const glm::vec3 *vertPosQ, const Halfedge *halfedgeQ, const float expandP,
+    const glm::vec3 *normalP, const bool reverse) {
+  const int q1s = halfedgeQ[q1].startVert;
+  const int q1e = halfedgeQ[q1].endVert;
+  const float p0x = vertPosP[p0].x;
+  const float q1sx = vertPosQ[q1s].x;
+  const float q1ex = vertPosQ[q1e].x;
+  int s01 = reverse ? Shadows(q1sx, p0x, expandP * normalP[q1s].x) -
+                          Shadows(q1ex, p0x, expandP * normalP[q1e].x)
+                    : Shadows(p0x, q1ex, expandP * normalP[p0].x) -
+                          Shadows(p0x, q1sx, expandP * normalP[p0].x);
+  glm::vec2 yz01(0.0f / 0.0f);
+
+  if (s01 != 0) {
+    yz01 = Interpolate(vertPosQ[q1s], vertPosQ[q1e], vertPosP[p0].x);
+    if (reverse) {
+      glm::vec3 diff = vertPosQ[q1s] - vertPosP[p0];
+      const float start2 = glm::dot(diff, diff);
+      diff = vertPosQ[q1e] - vertPosP[p0];
+      const float end2 = glm::dot(diff, diff);
+      const float dir = start2 < end2 ? normalP[q1s].y : normalP[q1e].y;
+      if (!Shadows(yz01[0], vertPosP[p0].y, expandP * dir)) s01 = 0;
+    } else {
+      if (!Shadows(vertPosP[p0].y, yz01[0], expandP * normalP[p0].y)) s01 = 0;
+    }
+  }
+  return thrust::make_pair(s01, yz01);
+}
+
 struct ShadowKernel01 {
   const bool reverse;
   const glm::vec3 *vertPosP;
@@ -353,14 +384,6 @@ struct Kernel11 {
   const glm::vec3 *vertPosQ;
   const Halfedge *halfedgeP;
   const Halfedge *halfedgeQ;
-  thrust::pair<const int *, const int *> p0q1;
-  const int *s01;
-  const glm::vec2 *yz01;
-  int size01;
-  thrust::pair<const int *, const int *> p1q0;
-  const int *s10;
-  const glm::vec2 *yz10;
-  int size10;
   float expandP;
   const glm::vec3 *normalP;
 
@@ -371,42 +394,45 @@ struct Kernel11 {
     const int p1 = thrust::get<2>(inout);
     const int q1 = thrust::get<3>(inout);
 
-    // For p[k], q[k], k==0 is the left and k==1 is the right.
+    // For pRL[k], qRL[k], k==0 is the left and k==1 is the right.
     int k = 0;
-    glm::vec3 p2[2], q2[2];
+    glm::vec3 pRL[2], qRL[2];
     // Either the left or right must shadow, but not both. This ensures the
     // intersection is between the left and right.
     bool shadows;
     s11 = 0;
-    thrust::pair<int, int> key2[2];
 
-    key2[0] = thrust::make_pair(halfedgeP[p1].startVert, q1);
-    key2[1] = thrust::make_pair(halfedgeP[p1].endVert, q1);
+    const int p0[2] = {halfedgeP[p1].startVert, halfedgeP[p1].endVert};
     for (int i : {0, 1}) {
-      const int idx = BinarySearch(p0q1, size01, key2[i]);
-      if (idx != -1) {
-        const int s = s01[idx];
-        s11 += s * (i == 0 ? -1 : 1);
-        if (k < 2 && (k == 0 || (s != 0) != shadows)) {
-          shadows = s != 0;
-          p2[k] = vertPosP[key2[i].first];
-          q2[k] = glm::vec3(p2[k].x, yz01[idx]);
+      const auto syz01 = Shadow01(p0[i], q1, vertPosP, vertPosQ, halfedgeQ,
+                                  expandP, normalP, false);
+      const int s01 = syz01.first;
+      const glm::vec2 yz01 = syz01.second;
+      // If the value is NaN, then these do not overlap.
+      if (isfinite(yz01[0])) {
+        s11 += s01 * (i == 0 ? -1 : 1);
+        if (k < 2 && (k == 0 || (s01 != 0) != shadows)) {
+          shadows = s01 != 0;
+          pRL[k] = vertPosP[p0[i]];
+          qRL[k] = glm::vec3(pRL[k].x, yz01);
           ++k;
         }
       }
     }
 
-    key2[0] = thrust::make_pair(p1, halfedgeQ[q1].startVert);
-    key2[1] = thrust::make_pair(p1, halfedgeQ[q1].endVert);
+    const int q0[2] = {halfedgeQ[q1].startVert, halfedgeQ[q1].endVert};
     for (int i : {0, 1}) {
-      const int idx = BinarySearch(p1q0, size10, key2[i]);
-      if (idx != -1) {
-        const int s = s10[idx];
-        s11 += s * (i == 0 ? -1 : 1);
-        if (k < 2 && (k == 0 || (s != 0) != shadows)) {
-          shadows = s != 0;
-          q2[k] = vertPosQ[key2[i].second];
-          p2[k] = glm::vec3(q2[k].x, yz10[idx]);
+      const auto syz10 = Shadow01(q0[i], p1, vertPosQ, vertPosP, halfedgeP,
+                                  expandP, normalP, true);
+      const int s10 = syz10.first;
+      const glm::vec2 yz10 = syz10.second;
+      // If the value is NaN, then these do not overlap.
+      if (isfinite(yz10[0])) {
+        s11 += s10 * (i == 0 ? -1 : 1);
+        if (k < 2 && (k == 0 || (s10 != 0) != shadows)) {
+          shadows = s10 != 0;
+          qRL[k] = vertPosQ[q0[i]];
+          pRL[k] = glm::vec3(qRL[k].x, yz10);
           ++k;
         }
       }
@@ -420,7 +446,7 @@ struct Kernel11 {
         printf("k = %d\n", k);
       }
 
-      xyzz11 = Intersect(p2[0], p2[1], q2[0], q2[1]);
+      xyzz11 = Intersect(pRL[0], pRL[1], qRL[0], qRL[1]);
 
       const int p1s = halfedgeP[p1].startVert;
       const int p1e = halfedgeP[p1].endVert;
@@ -435,11 +461,10 @@ struct Kernel11 {
   }
 };
 
-std::tuple<VecDH<int>, VecDH<glm::vec4>> Shadow11(
-    SparseIndices &p1q1, const Manifold::Impl &inP, const Manifold::Impl &inQ,
-    const SparseIndices &p0q1, const VecDH<int> &s01,
-    const VecDH<glm::vec2> &yz01, const SparseIndices &p1q0,
-    const VecDH<int> &s10, const VecDH<glm::vec2> &yz10, float expandP) {
+std::tuple<VecDH<int>, VecDH<glm::vec4>> Shadow11(SparseIndices &p1q1,
+                                                  const Manifold::Impl &inP,
+                                                  const Manifold::Impl &inQ,
+                                                  float expandP) {
   VecDH<int> s11(p1q1.size());
   VecDH<glm::vec4> xyzz11(p1q1.size());
 
@@ -447,9 +472,7 @@ std::tuple<VecDH<int>, VecDH<glm::vec4>> Shadow11(
       zip(xyzz11.beginD(), s11.beginD(), p1q1.beginD(0), p1q1.beginD(1)),
       p1q1.size(),
       Kernel11({inP.vertPos_.cptrD(), inQ.vertPos_.cptrD(),
-                inP.halfedge_.cptrD(), inQ.halfedge_.cptrD(), p0q1.ptrDpq(),
-                s01.cptrD(), yz01.cptrD(), p0q1.size(), p1q0.ptrDpq(),
-                s10.cptrD(), yz10.cptrD(), p1q0.size(), expandP,
+                inP.halfedge_.cptrD(), inQ.halfedge_.cptrD(), expandP,
                 inP.vertNormal_.cptrD()}));
 
   p1q1.KeepFinite(xyzz11, s11);
@@ -1129,8 +1152,7 @@ Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ,
   // each edge, keeping only those whose intersection exists.
   VecDH<int> s11;
   VecDH<glm::vec4> xyzz11;
-  std::tie(s11, xyzz11) =
-      Shadow11(p1q1, inP, inQ, p0q1, s01, yz01, p1q0, s10, yz10, expandP_);
+  std::tie(s11, xyzz11) = Shadow11(p1q1, inP, inQ, expandP_);
   if (kVerbose) std::cout << "s11 size = " << s11.size() << std::endl;
 
   // Build up Z-projection of vertices onto triangles, keeping only those that
