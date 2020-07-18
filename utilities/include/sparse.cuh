@@ -96,6 +96,40 @@ class SparseIndices {
     return size;
   }
 
+  template <typename T>
+  struct firstNonFinite {
+    __host__ __device__ bool NotFinite(float v) const { return !isfinite(v); }
+    __host__ __device__ bool NotFinite(glm::vec2 v) const {
+      return !isfinite(v[0]);
+    }
+    __host__ __device__ bool NotFinite(glm::vec3 v) const {
+      return !isfinite(v[0]);
+    }
+    __host__ __device__ bool NotFinite(glm::vec4 v) const {
+      return !isfinite(v[0]);
+    }
+
+    __host__ __device__ bool operator()(
+        thrust::tuple<T, int, int, int> x) const {
+      bool result = NotFinite(thrust::get<0>(x));
+      return result;
+    }
+  };
+
+  template <typename T>
+  size_t KeepFinite(VecDH<T>& v, VecDH<int>& x) {
+    ALWAYS_ASSERT(x.size() == p.size(), runtimeErr,
+                  "Different number of values than indicies!");
+    auto zBegin = zip(v.beginD(), x.beginD(), beginD(false), beginD(true));
+    auto zEnd = zip(v.endD(), x.endD(), endD(false), endD(true));
+    size_t size = thrust::remove_if(zBegin, zEnd, firstNonFinite<T>()) - zBegin;
+    v.resize(size);
+    x.resize(size, -1);
+    p.resize(size, -1);
+    q.resize(size, -1);
+    return size;
+  }
+
   template <typename Iter, typename T>
   VecDH<T> Gather(const VecDH<T>& val, const Iter pqBegin, const Iter pqEnd,
                   T missingVal) const {
