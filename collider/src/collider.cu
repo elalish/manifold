@@ -259,13 +259,6 @@ SparseIndices Collider::Collisions(const VecDH<T>& querriesIn) const {
   }
   // remove unused part of array
   querryTri.Resize(nOverlaps);
-
-  for (int i = 0; i < querryTri.size(); ++i) {
-    if (querryTri.Get(0).H()[i] == 203 && querryTri.Get(1).H()[i] == 570) {
-      std::cout << i << std::endl;
-    }
-  }
-
   return querryTri;
 }
 
