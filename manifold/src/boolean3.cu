@@ -199,45 +199,6 @@ SparseIndices Filter11(const Manifold::Impl &inP, const VecDH<int> &faceSizeP,
   return p1q1;
 }
 
-struct CopyEdgeVerts {
-  thrust::pair<int *, int *> p0q1;
-  const Halfedge *halfedges;
-
-  __host__ __device__ void operator()(thrust::tuple<int, int, int> in) {
-    int idx = 2 * thrust::get<0>(in);
-    const int p1 = thrust::get<1>(in);
-    const int q1 = thrust::get<2>(in);
-
-    p0q1.first[idx] = halfedges[p1].startVert;
-    p0q1.second[idx] = q1;
-    p0q1.first[idx + 1] = halfedges[p1].endVert;
-    p0q1.second[idx + 1] = q1;
-  }
-};
-
-SparseIndices Filter01(const Manifold::Impl &inP, const Manifold::Impl &inQ,
-                       const VecDH<int> &faceSizeQ, const SparseIndices &p0q2,
-                       const SparseIndices &p1q1) {
-  VecDH<int> expandedIdxQ(p0q2.size() + 1);
-  auto includedFaceSizeQ = perm(faceSizeQ.beginD() + 1, p0q2.beginD(1));
-  thrust::inclusive_scan(includedFaceSizeQ, includedFaceSizeQ + p0q2.size(),
-                         expandedIdxQ.beginD() + 1);
-  const int secondStart = expandedIdxQ.H().back();
-
-  SparseIndices p0q1(secondStart + 2 * p1q1.size());
-
-  thrust::for_each_n(zip(expandedIdxQ.beginD(), p0q2.beginD(0), p0q2.beginD(1)),
-                     p0q2.size(),
-                     CopyFaceEdges({p0q1.ptrDpq(), inQ.faceEdge_.cptrD(),
-                                    inQ.halfedge_.cptrD()}));
-
-  thrust::for_each_n(
-      zip(thrust::make_counting_iterator(0), p1q1.beginD(0), p1q1.beginD(1)),
-      p1q1.size(),
-      CopyEdgeVerts({p0q1.ptrDpq(secondStart), inP.halfedge_.cptrD()}));
-  return p0q1;
-}
-
 struct AbsSum : public thrust::binary_function<int, int, int> {
   __host__ __device__ int operator()(int a, int b) { return abs(a) + abs(b); }
 };
@@ -275,85 +236,6 @@ __host__ __device__ thrust::pair<int, glm::vec2> Shadow01(
     }
   }
   return thrust::make_pair(s01, yz01);
-}
-
-struct ShadowKernel01 {
-  const bool reverse;
-  const glm::vec3 *vertPosP;
-  const glm::vec3 *vertPosQ;
-  const Halfedge *halfedgeQ;
-  const float expandP;
-  const glm::vec3 *normalP;
-
-  __host__ __device__ void operator()(thrust::tuple<int &, int, int> inout) {
-    int &s01 = thrust::get<0>(inout);
-    const int p0 = thrust::get<1>(inout);
-    const int q1 = thrust::get<2>(inout);
-
-    const int q1s = halfedgeQ[q1].startVert;
-    const int q1e = halfedgeQ[q1].endVert;
-    const float p0x = vertPosP[p0].x;
-    const float q1sx = vertPosQ[q1s].x;
-    const float q1ex = vertPosQ[q1e].x;
-    s01 = reverse ? Shadows(q1sx, p0x, expandP * normalP[q1s].x) -
-                        Shadows(q1ex, p0x, expandP * normalP[q1e].x)
-                  : Shadows(p0x, q1ex, expandP * normalP[p0].x) -
-                        Shadows(p0x, q1sx, expandP * normalP[p0].x);
-  }
-};
-
-struct Kernel01 {
-  const bool reverse;
-  const glm::vec3 *vertPosP;
-  const glm::vec3 *vertPosQ;
-  const Halfedge *halfedgeQ;
-  const float expandP;
-  const glm::vec3 *normalP;
-
-  __host__ __device__ void operator()(
-      thrust::tuple<glm::vec2 &, int &, int, int> inout) {
-    glm::vec2 &yz01 = thrust::get<0>(inout);
-    int &s01 = thrust::get<1>(inout);
-    const int p0 = thrust::get<2>(inout);
-    const int q1 = thrust::get<3>(inout);
-
-    const int q1s = halfedgeQ[q1].startVert;
-    const int q1e = halfedgeQ[q1].endVert;
-    yz01 = Interpolate(vertPosQ[q1s], vertPosQ[q1e], vertPosP[p0].x);
-    if (reverse) {
-      glm::vec3 diff = vertPosQ[q1s] - vertPosP[p0];
-      const float start2 = glm::dot(diff, diff);
-      diff = vertPosQ[q1e] - vertPosP[p0];
-      const float end2 = glm::dot(diff, diff);
-      const float dir = start2 < end2 ? normalP[q1s].y : normalP[q1e].y;
-      if (!Shadows(yz01[0], vertPosP[p0].y, expandP * dir)) s01 = 0;
-    } else {
-      if (!Shadows(vertPosP[p0].y, yz01[0], expandP * normalP[p0].y)) s01 = 0;
-    }
-  }
-};
-
-std::tuple<VecDH<int>, VecDH<glm::vec2>> Shadow01(SparseIndices &p0q1,
-                                                  const Manifold::Impl &inP,
-                                                  const Manifold::Impl &inQ,
-                                                  bool reverse, float expandP) {
-  VecDH<int> s01(p0q1.size());
-  if (reverse) p0q1.SwapPQ();
-  auto normalP = reverse ? inQ.vertNormal_.cptrD() : inP.vertNormal_.cptrD();
-  thrust::for_each_n(
-      zip(s01.beginD(), p0q1.beginD(0), p0q1.beginD(1)), p0q1.size(),
-      ShadowKernel01({reverse, inP.vertPos_.cptrD(), inQ.vertPos_.cptrD(),
-                      inQ.halfedge_.cptrD(), expandP, normalP}));
-  size_t size = p0q1.RemoveZeros(s01);
-  VecDH<glm::vec2> yz01(size);
-
-  normalP = reverse ? inQ.vertNormal_.cptrD() : inP.vertNormal_.cptrD();
-  thrust::for_each_n(
-      zip(yz01.beginD(), s01.beginD(), p0q1.beginD(0), p0q1.beginD(1)), size,
-      Kernel01({reverse, inP.vertPos_.cptrD(), inQ.vertPos_.cptrD(),
-                inQ.halfedge_.cptrD(), expandP, normalP}));
-  if (reverse) p0q1.SwapPQ();
-  return std::make_tuple(s01, yz01);
 }
 
 __host__ __device__ int BinarySearch(
@@ -482,15 +364,13 @@ std::tuple<VecDH<int>, VecDH<glm::vec4>> Shadow11(SparseIndices &p1q1,
 
 struct Kernel02 {
   const glm::vec3 *vertPosP;
-  const thrust::pair<const int *, const int *> p0q1;
-  const int *s01;
-  const glm::vec2 *yz01;
-  const int size;
   const int *facesQ;
-  const Halfedge *halfedgesQ;
+  const Halfedge *halfedgeQ;
+  const glm::vec3 *vertPosQ;
   const bool forward;
   const float expandP;
-  const glm::vec3 *normalP;
+  const glm::vec3 *vertNormalP;
+  const glm::vec3 *faceNormalP;
 
   __host__ __device__ void operator()(
       thrust::tuple<int &, float &, int, int> inout) {
@@ -501,7 +381,7 @@ struct Kernel02 {
 
     // For yzzLR[k], k==0 is the left and k==1 is the right.
     int k = 0;
-    glm::vec3 yzz2[2];
+    glm::vec3 yzzRL[2];
     // Either the left or right must shadow, but not both. This ensures the
     // intersection is between the left and right.
     bool shadows;
@@ -510,18 +390,19 @@ struct Kernel02 {
     int q1 = facesQ[q2];
     const int lastEdge = facesQ[q2 + 1];
     while (q1 < lastEdge) {
-      const Halfedge edge = halfedgesQ[q1];
+      const Halfedge edge = halfedgeQ[q1];
       const int q1F = edge.IsForward() ? q1 : edge.pairedHalfedge;
-      const auto key =
-          forward ? thrust::make_pair(p0, q1F) : thrust::make_pair(q1F, p0);
-      const int idx = BinarySearch(p0q1, size, key);
-      if (idx != -1) {
-        const int s = s01[idx];
-        s02 += s * (forward == edge.IsForward() ? -1 : 1);
-        if (k < 2 && (k == 0 || (s != 0) != shadows)) {
-          shadows = s != 0;
-          const glm::vec2 yz = yz01[idx];
-          yzz2[k++] = glm::vec3(yz[0], yz[1], yz[1]);
+
+      const auto syz01 = Shadow01(p0, q1F, vertPosP, vertPosQ, halfedgeQ,
+                                  expandP, vertNormalP, !forward);
+      const int s01 = syz01.first;
+      const glm::vec2 yz01 = syz01.second;
+      // If the value is NaN, then these do not overlap.
+      if (isfinite(yz01[0])) {
+        s02 += s01 * (forward == edge.IsForward() ? -1 : 1);
+        if (k < 2 && (k == 0 || (s01 != 0) != shadows)) {
+          shadows = s01 != 0;
+          yzzRL[k++] = glm::vec3(yz01[0], yz01[1], yz01[1]);
         }
       }
       ++q1;
@@ -536,31 +417,33 @@ struct Kernel02 {
       }
 
       glm::vec3 vertPos = vertPosP[p0];
-      z02 = Interpolate(yzz2[0], yzz2[1], vertPos.y)[1];
+      z02 = Interpolate(yzzRL[0], yzzRL[1], vertPos.y)[1];
       if (forward) {
-        if (!Shadows(vertPos.z, z02, expandP * normalP[p0].z)) s02 = 0;
+        if (!Shadows(vertPos.z, z02, expandP * vertNormalP[p0].z)) s02 = 0;
       } else {
-        if (!Shadows(z02, vertPos.z, expandP * normalP[q2].z)) s02 = 0;
+        if (!Shadows(z02, vertPos.z, expandP * faceNormalP[q2].z)) s02 = 0;
       }
     }
   }
 };
 
-std::tuple<VecDH<int>, VecDH<float>> Shadow02(
-    const Manifold::Impl &inP, const Manifold::Impl &inQ, const VecDH<int> &s01,
-    const SparseIndices &p0q1, const VecDH<glm::vec2> &yz01,
-    SparseIndices &p0q2, bool forward, float expandP) {
+std::tuple<VecDH<int>, VecDH<float>> Shadow02(const Manifold::Impl &inP,
+                                              const Manifold::Impl &inQ,
+                                              SparseIndices &p0q2, bool forward,
+                                              float expandP) {
   VecDH<int> s02(p0q2.size());
   VecDH<float> z02(p0q2.size());
 
-  auto normalP = forward ? inP.vertNormal_.cptrD() : inQ.faceNormal_.cptrD();
-  thrust::for_each_n(
-      zip(s02.beginD(), z02.beginD(), p0q2.beginD(!forward),
-          p0q2.beginD(forward)),
-      p0q2.size(),
-      Kernel02({inP.vertPos_.cptrD(), p0q1.ptrDpq(), s01.cptrD(), yz01.cptrD(),
-                p0q1.size(), inQ.faceEdge_.cptrD(), inQ.halfedge_.cptrD(),
-                forward, expandP, normalP}));
+  auto vertNormalP =
+      forward ? inP.vertNormal_.cptrD() : inQ.vertNormal_.cptrD();
+  auto faceNormalP =
+      forward ? inP.faceNormal_.cptrD() : inQ.faceNormal_.cptrD();
+  thrust::for_each_n(zip(s02.beginD(), z02.beginD(), p0q2.beginD(!forward),
+                         p0q2.beginD(forward)),
+                     p0q2.size(),
+                     Kernel02({inP.vertPos_.cptrD(), inQ.faceEdge_.cptrD(),
+                               inQ.halfedge_.cptrD(), inQ.vertPos_.cptrD(),
+                               forward, expandP, vertNormalP, faceNormalP}));
 
   p0q2.KeepFinite(z02, s02);
 
@@ -1112,40 +995,12 @@ Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ,
   SparseIndices p1q1 = Filter11(inP_, faceSizeP, inQ_, faceSizeQ, p1q2_, p2q1_);
   if (kVerbose) std::cout << "p1q1 size = " << p1q1.size() << std::endl;
 
-  // Level 1
-  // Find involved vertex-edge pairs from Level 2
-  SparseIndices p0q1 = Filter01(inP_, inQ_, faceSizeQ, p0q2, p1q1);
-  p0q1.Unique();
-  if (kVerbose) std::cout << "p0q1 size = " << p0q1.size() << std::endl;
-
-  p2q0.SwapPQ();
-  p1q1.SwapPQ();
-  SparseIndices p1q0 = Filter01(inQ_, inP_, faceSizeP, p2q0, p1q1);
-  p2q0.SwapPQ();
-  p1q1.SwapPQ();
-  p1q0.SwapPQ();
-  p1q0.Unique();
-  if (kVerbose) std::cout << "p1q0 size = " << p1q0.size() << std::endl;
-
   if (kVerbose) {
     std::cout << "Time for Filter";
     t1 = NOW();
     PrintDuration(t1 - t0);
     t0 = t1;
   }
-
-  // Level 1
-  // Find X-projections of vertices onto edges, keeping only those that actually
-  // fall inside the edge.
-  VecDH<int> s01;
-  VecDH<glm::vec2> yz01;
-  std::tie(s01, yz01) = Shadow01(p0q1, inP, inQ, false, expandP_);
-  if (kVerbose) std::cout << "s01 size = " << s01.size() << std::endl;
-
-  VecDH<int> s10;
-  VecDH<glm::vec2> yz10;
-  std::tie(s10, yz10) = Shadow01(p1q0, inQ, inP, true, expandP_);
-  if (kVerbose) std::cout << "s10 size = " << s10.size() << std::endl;
 
   // Level 2
   // Build up XY-projection intersection of two edges, including the z-value for
@@ -1159,14 +1014,12 @@ Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ,
   // fall inside the triangle.
   VecDH<int> s02;
   VecDH<float> z02;
-  std::tie(s02, z02) =
-      Shadow02(inP, inQ, s01, p0q1, yz01, p0q2, true, expandP_);
+  std::tie(s02, z02) = Shadow02(inP, inQ, p0q2, true, expandP_);
   if (kVerbose) std::cout << "s02 size = " << s02.size() << std::endl;
 
   VecDH<int> s20;
   VecDH<float> z20;
-  std::tie(s20, z20) =
-      Shadow02(inQ, inP, s10, p1q0, yz10, p2q0, false, expandP_);
+  std::tie(s20, z20) = Shadow02(inQ, inP, p2q0, false, expandP_);
   if (kVerbose) std::cout << "s20 size = " << s20.size() << std::endl;
 
   // Level 3
