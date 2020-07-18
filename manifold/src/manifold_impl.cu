@@ -463,7 +463,7 @@ struct AssignNormals {
   }
 };
 
-struct Tri2Halfedge {
+struct Tri2Halfedges {
   Halfedge* halfedges;
   TmpEdge* edges;
 
@@ -477,16 +477,6 @@ struct Tri2Halfedge {
       halfedges[edge] = {triVerts[i], triVerts[j], -1, tri};
       edges[edge] = TmpEdge(triVerts[i], triVerts[j], edge);
     }
-  }
-};
-
-struct Halfedge2Edge {
-  __host__ __device__ void operator()(
-      thrust::tuple<TmpEdge&, const Halfedge&, int> in) {
-    TmpEdge& edge = thrust::get<0>(in);
-    const Halfedge& halfedge = thrust::get<1>(in);
-    int idx = thrust::get<2>(in);
-    edge = TmpEdge(halfedge.startVert, halfedge.endVert, idx);
   }
 };
 
@@ -583,7 +573,7 @@ namespace manifold {
  */
 Manifold::Impl::Impl(const Mesh& manifold) : vertPos_(manifold.vertPos) {
   CheckDevice();
-  Tri2Halfedges(manifold.triVerts);
+  CreateHalfedges(manifold.triVerts);
   Finish();
 }
 
@@ -634,37 +624,24 @@ Manifold::Impl::Impl(Shape shape) {
       throw logicErr("Unrecognized shape!");
   }
   vertPos_ = vertPos;
-  Tri2Halfedges(triVerts);
+  CreateHalfedges(triVerts);
   Finish();
 }
 
 /**
  * Create the halfedge_ data structure from an input triVerts array like Mesh.
  */
-void Manifold::Impl::Tri2Halfedges(const VecDH<glm::ivec3>& triVerts) {
+void Manifold::Impl::CreateHalfedges(const VecDH<glm::ivec3>& triVerts) {
   const int numTri = triVerts.size();
   faceEdge_.resize(0);
   halfedge_.resize(3 * numTri);
   VecDH<TmpEdge> edge(3 * numTri);
   thrust::for_each_n(zip(thrust::make_counting_iterator(0), triVerts.beginD()),
-                     numTri, Tri2Halfedge({halfedge_.ptrD(), edge.ptrD()}));
+                     numTri, Tri2Halfedges({halfedge_.ptrD(), edge.ptrD()}));
   thrust::sort(edge.beginD(), edge.endD());
   thrust::for_each_n(thrust::make_counting_iterator(0), halfedge_.size() / 2,
                      LinkHalfedges({halfedge_.ptrD(), edge.cptrD()}));
   Tri2Face();
-}
-
-/**
- * Create the halfedge_ data structure from an input triVerts array like Mesh.
- */
-void Manifold::Impl::PairHalfedges() {
-  VecDH<TmpEdge> edge(halfedge_.size());
-  thrust::for_each_n(
-      zip(edge.beginD(), halfedge_.beginD(), thrust::make_counting_iterator(0)),
-      edge.size(), Halfedge2Edge());
-  thrust::sort(edge.beginD(), edge.endD());
-  thrust::for_each_n(thrust::make_counting_iterator(0), halfedge_.size() / 2,
-                     LinkHalfedges({halfedge_.ptrD(), edge.cptrD()}));
 }
 
 /**
@@ -923,7 +900,7 @@ bool Manifold::Impl::Face2Tri() {
     }
   }
   faceNormal_ = triNormalOut;
-  Tri2Halfedges(triVertsOut);
+  CreateHalfedges(triVertsOut);
   return true;
 }
 
@@ -957,7 +934,7 @@ void Manifold::Impl::Refine(int n) {
   thrust::for_each_n(thrust::make_counting_iterator(0), numTri,
                      SplitTris({triVerts.ptrD(), halfedge_.cptrD(),
                                 half2Edge.cptrD(), numVert, triVertStart, n}));
-  Tri2Halfedges(triVerts);
+  CreateHalfedges(triVerts);
 }
 
 /**
