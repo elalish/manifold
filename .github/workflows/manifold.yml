@@ -34,12 +34,11 @@ jobs:
         cmake -DCMAKE_BUILD_TYPE=Release .. && make
     - name: Build OMP
       run: |
-        OMP_NUM_THREADS=4
-        mkdir buildOMP
-        cd buildOMP
-        cmake -DCMAKE_BUILD_TYPE=Release -DMANIFOLD_USE_OMP=ON .. && make
-    - name: Test OMP
+        mkdir buildCPP
+        cd buildCPP
+        cmake -DCMAKE_BUILD_TYPE=Release -DMANIFOLD_USE_CPP=ON .. && make
+    - name: Test CPP
       run: |
-        cd buildOMP/test
+        cd buildCPP/test
         ./manifold_test
       

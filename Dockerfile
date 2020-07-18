@@ -9,9 +9,9 @@ RUN apt-get -y update && apt-get -y install \
 # RUN DEBIAN_FRONTEND=noninteractive apt-get -y install cuda-drivers
 COPY . /usr/src
 WORKDIR /usr/src
-RUN mkdir buildOMP && cd buildOMP && \
-    cmake -DCMAKE_BUILD_TYPE=Release -DMANIFOLD_USE_OMP=ON .. && make
+RUN mkdir buildCPP && cd buildCPP && \
+    cmake -DCMAKE_BUILD_TYPE=Release -DMANIFOLD_USE_CPP=ON .. && make
 RUN mkdir buildCUDA && cd buildCUDA && \
     cmake -DCMAKE_BUILD_TYPE=Release .. && make
-CMD cd buildOMP/test && \
+CMD cd buildCPP/test && \
     ./manifold_test
