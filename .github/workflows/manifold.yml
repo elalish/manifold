@@ -32,7 +32,7 @@ jobs:
         mkdir buildCUDA
         cd buildCUDA
         cmake -DCMAKE_BUILD_TYPE=Release .. && make
-    - name: Build OMP
+    - name: Build CPP
       run: |
         mkdir buildCPP
         cd buildCPP
