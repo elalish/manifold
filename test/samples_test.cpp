@@ -63,6 +63,6 @@ TEST(Samples, Bracelet) {
 // degree rotations.
 TEST(Samples, Sponge) {
   Manifold::SetExpectGeometry(true);
-  Manifold sponge = MengerSponge(2, false);
+  Manifold sponge = MengerSponge(1, false);
   ExportMesh("mengerSponge.ply", sponge.Extract());
 }
