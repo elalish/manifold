@@ -408,6 +408,24 @@ TEST(Polygon, Simple4) {
   TestPoly(polys, 7);
 }
 
+TEST(Polygon, TouchingHole) {
+  Polygons polys;
+  PolygonParams().verbose = true;
+  polys.push_back({
+      {glm::vec2(-2, -1), 0, Edge::kNoIdx},  //
+      {glm::vec2(2, -1), 1, Edge::kNoIdx},   //
+      {glm::vec2(2, 1), 2, Edge::kNoIdx},    //
+      {glm::vec2(-2, 1), 3, Edge::kNoIdx},   //
+  });
+  polys.push_back({
+      {glm::vec2(-1, -1), 4, Edge::kNoIdx},  //
+      {glm::vec2(-1, 1), 5, Edge::kNoIdx},   //
+      {glm::vec2(1, 1), 6, Edge::kNoIdx},    //
+      {glm::vec2(1, -1), 7, Edge::kNoIdx},   //
+  });
+  TestPoly(polys, 8);
+}
+
 TEST(Polygon, Sponge) {
   Polygons polys;
   polys.push_back({
