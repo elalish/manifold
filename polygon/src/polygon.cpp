@@ -402,7 +402,6 @@ class Monotones {
         ++vert;
       } else {
         monotones_.splice(vert, monotones_, nextVert);
-        vert = nextVert;
       }
     }
   }
@@ -424,7 +423,8 @@ class Monotones {
                    std::next(leftPair) == rightPair) {  // facing out
           if (params.verbose) std::cout << "MERGE" << std::endl;
           const VertItr newVert = SplitVerts(vert, rightPair, true);
-          if (newVert != monotones_.end()) vert = newVert;
+          if (newVert != monotones_.end())
+            vert = newVert;  // TODO: causing erroneous sweep splice?
           SplitVerts(vert, leftPair, false);
           leftPair->east = rightPair->east;
           leftPair->east.vSouth->rightPair = leftPair;
@@ -434,10 +434,9 @@ class Monotones {
         } else {
           const VertItr nextVert = std::next(vert);
           if (vert != monotones_.end() &&
-              nextVert->pos.y - vert->pos.y <
-                  kTolerance) {  // TODO: search for next good
-            if (params.verbose) std::cout << "REORDER" << std::endl;
-            return nextVert;
+              nextVert->pos.y - vert->pos.y < kTolerance) {
+            if (params.verbose) std::cout << "SKIP" << std::endl;
+            return ProcessVert(nextVert);
           } else {
             if (params.verbose) std::cout << "SELF-INTERSECTION" << std::endl;
           }
@@ -467,11 +466,6 @@ class Monotones {
         Reorder(&*vert, vert->rightPair, true);
         Reorder(&*vert, vert->rightPair, false);
         SplitVerts(vert, vert->rightPair, false);
-      } else if (vert != monotones_.end() &&
-                 std::next(vert)->pos.y - vert->pos.y <
-                     kTolerance) {  // TODO: search for next good
-        if (params.verbose) std::cout << "REORDER" << std::endl;
-        return std::next(vert);
       } else {
         auto loc = std::find_if(activePairs_.begin(), activePairs_.end(),
                                 [vert, this](const EdgePair &pair) {
@@ -479,6 +473,16 @@ class Monotones {
                                 });
         int isStart =
             loc == activePairs_.end() ? 1 : VertWestOfEdge(&*vert, loc->west);
+        int isStart2 = CCW(vert->left->pos, vert->pos, vert->right->pos);
+        if (isStart * isStart2 < 0) {
+          if (vert != monotones_.end() &&
+              std::next(vert)->pos.y - vert->pos.y < kTolerance) {
+            if (params.verbose) std::cout << "SKIP" << std::endl;
+            return ProcessVert(std::next(vert));
+          } else {
+            if (params.verbose) std::cout << "SELF-INTERSECTION" << std::endl;
+          }
+        }
         if (isStart >= 0) {
           if (params.verbose) std::cout << "START" << std::endl;
           bool westCertain = loc == activePairs_.begin() ||
