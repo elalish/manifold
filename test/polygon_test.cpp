@@ -13,8 +13,10 @@
 // limitations under the License.
 
 #include "polygon.h"
+
 #include <algorithm>
 #include <random>
+
 #include "gtest/gtest.h"
 
 namespace {
@@ -96,6 +98,7 @@ TEST(Polygon, SimpleHole2) {
 
 TEST(Polygon, MultiMerge) {
   Polygons polys;
+  PolygonParams().verbose = true;
   polys.push_back({
       {glm::vec2(-7, 0), 0, Edge::kNoIdx},   //
       {glm::vec2(-6, 3), 1, Edge::kNoIdx},   //
@@ -410,7 +413,7 @@ TEST(Polygon, Simple4) {
 
 TEST(Polygon, TouchingHole) {
   Polygons polys;
-  PolygonParams().verbose = true;
+  // PolygonParams().verbose = true;
   polys.push_back({
       {glm::vec2(-2, -1), 0, Edge::kNoIdx},  //
       {glm::vec2(2, -1), 1, Edge::kNoIdx},   //
