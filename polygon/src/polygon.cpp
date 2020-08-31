@@ -220,14 +220,14 @@ class Monotones {
     }
     std::sort(starts.begin(), starts.end(), cmp);
 
-    Sweep(nextAttached, starts);  // forward
+    Sweep(nextAttached, starts, false);  // forward
     Check();
     for (auto &vert : monotones_) {
       vert.pos *= -1;
       vert.SetProcessed(false);
     }
     monotones_.reverse();
-    Sweep(nextAttached, starts);  // backward
+    Sweep(nextAttached, starts, true);  // backward
     Check();
   }
 
@@ -403,24 +403,27 @@ class Monotones {
   }
 
   template <typename T>
-  void Sweep(T &nextAttached, std::vector<VertItr> &starts) {
+  void Sweep(T &nextAttached, std::vector<VertItr> &starts,
+             bool maintainOrder) {
     std::vector<VertItr> skipped;
     VertItr insertAt = monotones_.begin();
     while (insertAt != monotones_.end()) {
       VertItr vert = insertAt;
-      if (!nextAttached.empty() &&
-          (starts.empty() || starts.back()->IsPast(*nextAttached.top()))) {
-        vert = nextAttached.top();
-        nextAttached.pop();
-      } else if (!starts.empty()) {
-        vert = starts.back();
-        starts.pop_back();
+      if (!maintainOrder) {
+        if (!nextAttached.empty() &&
+            (starts.empty() || starts.back()->IsPast(*nextAttached.top()))) {
+          vert = nextAttached.top();
+          nextAttached.pop();
+        } else if (!starts.empty()) {
+          vert = starts.back();
+          starts.pop_back();
+        }
       }
-
-      if (vert->Processed()) continue;
 
       if (params.verbose)
         std::cout << "mesh_idx = " << vert->mesh_idx << std::endl;
+
+      if (vert->Processed()) continue;
 
       if (!skipped.empty() && vert->IsPast(*skipped.back())) {
         std::cout << "Not Geometrically Valid!" << std::endl;
@@ -431,7 +434,7 @@ class Monotones {
 
       auto loc = activePairs_.end();
       int isStart = false;
-      if (type = START) {
+      if (type == START) {
         loc = std::find_if(activePairs_.begin(), activePairs_.end(),
                            [vert, this](const EdgePair &pair) {
                              return VertWestOfEdge(vert, pair.east) > 0;
@@ -445,12 +448,19 @@ class Monotones {
       }
 
       if (type == SKIP) {
+        if (maintainOrder) {
+          std::cout << "Not Geometrically Valid!" << std::endl;
+          break;
+        }
         skipped.push_back(vert);
         if (params.verbose) std::cout << "Skipping vert" << std::endl;
         continue;
       }
 
-      monotones_.splice(insertAt, monotones_, vert);
+      if (vert == insertAt)
+        ++insertAt;
+      else
+        monotones_.splice(insertAt, monotones_, vert);
 
       switch (type) {
         case LEFTWARDS:
@@ -510,8 +520,6 @@ class Monotones {
       if (vert->left->Processed()) {
         return RIGHTWARDS;
       } else {
-        std::cout << vert->left->index << std::endl;
-        std::cout << vert->right->index << std::endl;
         return START;
       }
     }
@@ -579,12 +587,14 @@ class Monotones {
     if (std::next(leftPair) == rightPair) {
       leftPair->vMerge = vert;
     }
+    activePairs_.erase(rightPair);
   }
 
   void End(VertItr vert) {
     if (params.verbose) std::cout << "END" << std::endl;
     const PairItr rightPair = vert->right->leftPair;
     SplitVerts(vert, rightPair);
+    activePairs_.erase(rightPair);
   }
 
   // // Central function for processing each sweep-line vert.
