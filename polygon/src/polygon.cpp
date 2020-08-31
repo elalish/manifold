@@ -83,6 +83,9 @@ struct VertAdj {
   bool Processed() const { return index < 0; }
   void SetProcessed(bool processed) { index = processed ? -1 : 0; }
   bool IsStart() const { return left->pos.y >= pos.y && right->pos.y > pos.y; }
+  bool IsPast(const VertAdj &other) const {
+    return pos.y > other.pos.y + kTolerance;
+  }
   bool operator<(const VertAdj &other) const { return pos.y < other.pos.y; }
 };
 
@@ -214,7 +217,7 @@ public:
     // Reversed so that minimum element is at queue.top() / vector.back().
     auto cmp = [](VertItr a, VertItr b) { return *b < *a; };
     std::priority_queue<VertItr, std::vector<VertItr>, decltype(cmp)>
-        nextAttached;
+        nextAttached(cmp);
 
     std::vector<VertItr> starts;
     for (VertItr v = monotones_.begin(); v != monotones_.end(); v++) {
@@ -424,10 +427,11 @@ private:
   template <typename T>
   void Sweep(T &nextAttached, std::vector<VertItr> &starts) {
     std::vector<VertItr> skipped;
-    VertItr pos = monotones_.begin();
-    while (pos != monotones_.end()) {
-      VertItr vert = pos;
-      if (!nextAttached.empty()) {
+    VertItr insertAt = monotones_.begin();
+    while (insertAt != monotones_.end()) {
+      VertItr vert = insertAt;
+      if (!nextAttached.empty() &&
+          (starts.empty() || starts.back()->IsPast(*nextAttached.top()))) {
         vert = nextAttached.top();
         nextAttached.pop();
       } else if (!starts.empty()) {
@@ -438,8 +442,7 @@ private:
       if (vert->Processed())
         continue;
 
-      if (!skipped.empty() &&
-          vert->pos.y > skipped.back()->pos.y + kTolerance) {
+      if (!skipped.empty() && vert->IsPast(*skipped.back())) {
         std::cout << "Not Geometrically Valid!" << std::endl;
         break;
       }
@@ -466,7 +469,7 @@ private:
         continue;
       }
 
-      monotones_.splice(pos, monotones_, vert);
+      monotones_.splice(insertAt, monotones_, vert);
 
       switch (type) {
       case LEFTWARDS:
@@ -495,11 +498,13 @@ private:
       }
 
       vert->SetProcessed(true);
+      // Push skipped verts back into unprocessed queue.
       while (!skipped.empty()) {
         starts.push_back(skipped.back());
         skipped.pop_back();
       }
 
+      // Debug
       if (params.intermediateChecks)
         ListPairs();
     }
@@ -515,7 +520,7 @@ private:
         } else if (leftPair != activePairs_.end() &&
                    std::next(leftPair) == rightPair) { // facing out
           return MERGE;
-        } else {
+        } else { // not neighbors
           return SKIP;
         }
       } else {
