@@ -11,7 +11,7 @@
             "program": "${workspaceFolder}/build/test/manifold_test",
             "args": [
                 "--gtest_break_on_failure",
-                "--gtest_filter=Samples.Bracelet"
+                "--gtest_filter=Polygon.TouchingHole"
             ],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}/build/test",
