@@ -76,8 +76,8 @@ struct VertAdj {
   glm::vec2 pos;
   int mesh_idx;  // This is a global index into the manifold.
   int edgeRight; // Cannot join identical edges with a triangle.
-  VertItr left, right;
   int index;
+  VertItr left, right;
   PairItr leftPair, rightPair;
 
   bool Processed() const { return index < 0; }
@@ -197,9 +197,10 @@ public:
     VertItr start, last, current;
     for (const SimplePolygon &poly : polys) {
       for (int i = 0; i < poly.size(); ++i) {
-        monotones_.push_back({poly[i].pos, //
-                              poly[i].idx, //
-                              poly[i].nextEdge});
+        monotones_.push_back({poly[i].pos,      //
+                              poly[i].idx,      //
+                              poly[i].nextEdge, //
+                              0});
         current = std::prev(monotones_.end());
         if (i == 0)
           start = current;
@@ -430,6 +431,9 @@ private:
       if (vert->Processed())
         continue;
 
+      if (params.verbose)
+        std::cout << "mesh_idx = " << vert->mesh_idx << std::endl;
+
       if (!skipped.empty() && vert->IsPast(*skipped.back())) {
         std::cout << "Not Geometrically Valid!" << std::endl;
         break;
@@ -454,6 +458,8 @@ private:
 
       if (type == SKIP) {
         skipped.push_back(vert);
+        if (params.verbose)
+          std::cout << "Skipping vert" << std::endl;
         continue;
       }
 
@@ -518,12 +524,16 @@ private:
       if (vert->left->Processed()) {
         return RIGHTWARDS;
       } else {
+        std::cout << vert->left->index << std::endl;
+        std::cout << vert->right->index << std::endl;
         return START;
       }
     }
   }
 
   void Leftwards(VertItr vert) {
+    if (params.verbose)
+      std::cout << "LEFTWARDS" << std::endl;
     vert->leftPair = vert->right->leftPair;
     ActiveEdge &activeEdge = vert->leftPair->west;
     activeEdge.vSouth = vert;
@@ -536,6 +546,8 @@ private:
   }
 
   void Rightwards(VertItr vert) {
+    if (params.verbose)
+      std::cout << "RIGHTWARDS" << std::endl;
     vert->rightPair = vert->left->rightPair;
     ActiveEdge &activeEdge = vert->rightPair->east;
     activeEdge.vSouth = vert;
@@ -546,6 +558,8 @@ private:
   }
 
   void Start(VertItr vert, std::list<EdgePair>::iterator loc, int isStart) {
+    if (params.verbose)
+      std::cout << "START" << std::endl;
     bool westCertain = loc == activePairs_.begin() ||
                        VertWestOfEdge(vert, std::prev(loc)->east) < 0;
     bool eastCertain = isStart > 0;
@@ -558,6 +572,8 @@ private:
   }
 
   void Hole(VertItr vert, std::list<EdgePair>::iterator loc) {
+    if (params.verbose)
+      std::cout << "HOLE" << std::endl;
     if (loc == activePairs_.end())
       --loc;
     // hole-starting vert links earlier activePair
@@ -573,6 +589,8 @@ private:
   }
 
   void Merge(VertItr vert) {
+    if (params.verbose)
+      std::cout << "MERGE" << std::endl;
     const PairItr leftPair = vert->left->rightPair;
     const PairItr rightPair = vert->right->leftPair;
     const VertItr newVert = SplitVerts(vert, rightPair, true);
@@ -587,6 +605,8 @@ private:
   }
 
   void End(VertItr vert) {
+    if (params.verbose)
+      std::cout << "END" << std::endl;
     const PairItr rightPair = vert->right->leftPair;
     SplitVerts(vert, rightPair);
   }
