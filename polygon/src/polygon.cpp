@@ -74,8 +74,8 @@ typedef std::list<EdgePair>::iterator PairItr;
  */
 struct VertAdj {
   glm::vec2 pos;
-  int mesh_idx;  // This is a global index into the manifold.
-  int edgeRight; // Cannot join identical edges with a triangle.
+  int mesh_idx;   // This is a global index into the manifold.
+  int edgeRight;  // Cannot join identical edges with a triangle.
   int index;
   VertItr left, right;
   PairItr leftPair, rightPair;
@@ -101,7 +101,7 @@ bool SharedEdge(glm::ivec2 edges0, glm::ivec2 edges1) {
  * geometrically valid triangulation, step by step.
  */
 class Triangulator {
-public:
+ public:
   Triangulator(VertItr vert) {
     reflex_chain_.push(vert);
     other_side_ = vert;
@@ -129,15 +129,13 @@ public:
     if (onRight_ == onRight && !last) {
       // This only creates enough triangles to ensure the reflex chain is still
       // reflex.
-      if (params.verbose)
-        std::cout << "same chain" << std::endl;
+      if (params.verbose) std::cout << "same chain" << std::endl;
       while (CCW(vi->pos, vj->pos, v_top->pos) == (onRight_ ? 1 : -1) ||
              (CCW(vi->pos, vj->pos, v_top->pos) == 0 && !SharesEdge(vi, vj))) {
         AddTriangle(triangles, vi->mesh_idx, vj->mesh_idx, v_top->mesh_idx);
         v_top = vj;
         reflex_chain_.pop();
-        if (reflex_chain_.empty())
-          break;
+        if (reflex_chain_.empty()) break;
         vj = reflex_chain_.top();
       }
       reflex_chain_.push(v_top);
@@ -146,8 +144,7 @@ public:
       // This branch empties the reflex chain and switches sides. It must be
       // used for the last point, as it will output all the triangles regardless
       // of geometry.
-      if (params.verbose)
-        std::cout << "different chain" << std::endl;
+      if (params.verbose) std::cout << "different chain" << std::endl;
       onRight_ = !onRight_;
       VertItr v_last = v_top;
       while (!reflex_chain_.empty()) {
@@ -162,10 +159,10 @@ public:
     }
   }
 
-private:
+ private:
   std::stack<VertItr> reflex_chain_;
-  VertItr other_side_; // The end vertex across from the reflex chain
-  bool onRight_;       // The side the reflex chain is on
+  VertItr other_side_;  // The end vertex across from the reflex chain
+  bool onRight_;        // The side the reflex chain is on
   int triangles_output_ = 0;
 
   void AddTriangle(std::vector<glm::ivec3> &triangles, int v0, int v1, int v2) {
@@ -175,8 +172,7 @@ private:
     else
       triangles.emplace_back(v0, v2, v1);
     ++triangles_output_;
-    if (params.verbose)
-      std::cout << triangles.back() << std::endl;
+    if (params.verbose) std::cout << triangles.back() << std::endl;
   }
 
   // This checks the extra edge constraint from the mesh Boolean.
@@ -192,14 +188,14 @@ private:
  * triangulates them using the above class.
  */
 class Monotones {
-public:
+ public:
   Monotones(const Polygons &polys) {
     VertItr start, last, current;
     for (const SimplePolygon &poly : polys) {
       for (int i = 0; i < poly.size(); ++i) {
-        monotones_.push_back({poly[i].pos,      //
-                              poly[i].idx,      //
-                              poly[i].nextEdge, //
+        monotones_.push_back({poly[i].pos,       //
+                              poly[i].idx,       //
+                              poly[i].nextEdge,  //
                               0});
         current = std::prev(monotones_.end());
         if (i == 0)
@@ -224,14 +220,14 @@ public:
     }
     std::sort(starts.begin(), starts.end(), cmp);
 
-    Sweep(nextAttached, starts); // forward
+    Sweep(nextAttached, starts);  // forward
     Check();
     for (auto &vert : monotones_) {
       vert.pos *= -1;
       vert.SetProcessed(false);
     }
     monotones_.reverse();
-    Sweep(nextAttached, starts); // backward
+    Sweep(nextAttached, starts);  // backward
     Check();
   }
 
@@ -244,8 +240,7 @@ public:
     int triangles_left = monotones_.size();
     VertItr start = monotones_.begin();
     while (start != monotones_.end()) {
-      if (params.verbose)
-        std::cout << start->mesh_idx << std::endl;
+      if (params.verbose) std::cout << start->mesh_idx << std::endl;
       Triangulator triangulator(start);
       start->SetProcessed(true);
       VertItr vR = start->right;
@@ -253,21 +248,18 @@ public:
       while (vR != vL) {
         // Process the neighbor vert that is next in the sweep-line.
         if (vR->index < vL->index) {
-          if (params.verbose)
-            std::cout << vR->mesh_idx << std::endl;
+          if (params.verbose) std::cout << vR->mesh_idx << std::endl;
           triangulator.ProcessVert(vR, true, false, triangles);
           vR->SetProcessed(true);
           vR = vR->right;
         } else {
-          if (params.verbose)
-            std::cout << vL->mesh_idx << std::endl;
+          if (params.verbose) std::cout << vL->mesh_idx << std::endl;
           triangulator.ProcessVert(vL, false, false, triangles);
           vL->SetProcessed(true);
           vL = vL->left;
         }
       }
-      if (params.verbose)
-        std::cout << vR->mesh_idx << std::endl;
+      if (params.verbose) std::cout << vR->mesh_idx << std::endl;
       triangulator.ProcessVert(vR, true, true, triangles);
       vR->SetProcessed(true);
       // validation
@@ -287,8 +279,7 @@ public:
   void Check() {
     ALWAYS_ASSERT(activePairs_.empty(), logicErr,
                   "There are still active edges.");
-    if (!params.intermediateChecks)
-      return;
+    if (!params.intermediateChecks) return;
     std::vector<Halfedge> edges;
     for (VertItr vert = monotones_.begin(); vert != monotones_.end(); vert++) {
       vert->SetProcessed(false);
@@ -316,10 +307,10 @@ public:
     }
   }
 
-private:
+ private:
   enum VertType { START, LEFTWARDS, RIGHTWARDS, MERGE, END, SKIP };
-  std::list<VertAdj> monotones_;    // sweep-line list of verts
-  std::list<EdgePair> activePairs_; // west to east list of monotone edge pairs
+  std::list<VertAdj> monotones_;     // sweep-line list of verts
+  std::list<EdgePair> activePairs_;  // west to east list of monotone edge pairs
 
   void Link(VertItr left, VertItr right) {
     left->right = right;
@@ -334,8 +325,7 @@ private:
    */
   VertItr SplitVerts(VertItr north, PairItr pair, bool NEisNofNW = false) {
     VertItr south = pair->vMerge;
-    if (south == monotones_.end())
-      return monotones_.end();
+    if (south == monotones_.end()) return monotones_.end();
 
     // at split events, add duplicate vertices to end of list and reconnect
     if (params.verbose)
@@ -363,8 +353,7 @@ private:
     glm::vec2 last = edge.vSouth->pos;
     glm::vec2 next = edge.vNorth->pos;
     int side = CCW(last, next, vert->pos);
-    if (side == 0)
-      side = CCW(vert->pos, next, vert->right->pos);
+    if (side == 0) side = CCW(vert->pos, next, vert->right->pos);
     return side;
   }
 
@@ -387,8 +376,8 @@ private:
         potentialPair =
             west ? std::prev(potentialPair) : std::next(potentialPair);
         int eastOf = sign * VertWestOfEdge(vert, potentialPair->getEdge(!west));
-        if (eastOf >= 0) {  // in the right place
-          if (eastOf > 0) { // certain
+        if (eastOf >= 0) {   // in the right place
+          if (eastOf > 0) {  // certain
             inputPair->getCertainty(west) = true;
           }
           PairItr loc = west ? std::next(potentialPair) : potentialPair;
@@ -396,11 +385,11 @@ private:
           break;
         }
         eastOf = sign * VertWestOfEdge(vert, potentialPair->getEdge(west));
-        if (eastOf >= 0) { // in the right place
+        if (eastOf >= 0) {  // in the right place
           PairItr loc = west ? potentialPair : std::next(potentialPair);
           activePairs_.splice(loc, activePairs_, inputPair);
           inputPair->getCertainty(!west) = false;
-          if (eastOf > 0) { // certainly a hole
+          if (eastOf > 0) {  // certainly a hole
             std::swap(potentialPair->west, inputPair->west);
             potentialPair->west.vSouth->leftPair = potentialPair;
             inputPair->west.vSouth->leftPair = inputPair;
@@ -428,8 +417,7 @@ private:
         starts.pop_back();
       }
 
-      if (vert->Processed())
-        continue;
+      if (vert->Processed()) continue;
 
       if (params.verbose)
         std::cout << "mesh_idx = " << vert->mesh_idx << std::endl;
@@ -458,37 +446,36 @@ private:
 
       if (type == SKIP) {
         skipped.push_back(vert);
-        if (params.verbose)
-          std::cout << "Skipping vert" << std::endl;
+        if (params.verbose) std::cout << "Skipping vert" << std::endl;
         continue;
       }
 
       monotones_.splice(insertAt, monotones_, vert);
 
       switch (type) {
-      case LEFTWARDS:
-        Leftwards(vert);
-        nextAttached.push(vert->left);
-        break;
-      case RIGHTWARDS:
-        Rightwards(vert);
-        nextAttached.push(vert->right);
-        break;
-      case START:
-        if (isStart >= 0) {
-          Start(vert, loc, isStart);
-        } else {
-          Hole(vert, loc);
-        }
-        nextAttached.push(vert->left);
-        nextAttached.push(vert->right);
-        break;
-      case MERGE:
-        Merge(vert);
-        break;
-      case END:
-        End(vert);
-        break;
+        case LEFTWARDS:
+          Leftwards(vert);
+          nextAttached.push(vert->left);
+          break;
+        case RIGHTWARDS:
+          Rightwards(vert);
+          nextAttached.push(vert->right);
+          break;
+        case START:
+          if (isStart >= 0) {
+            Start(vert, loc, isStart);
+          } else {
+            Hole(vert, loc);
+          }
+          nextAttached.push(vert->left);
+          nextAttached.push(vert->right);
+          break;
+        case MERGE:
+          Merge(vert);
+          break;
+        case END:
+          End(vert);
+          break;
       }
 
       vert->SetProcessed(true);
@@ -499,8 +486,7 @@ private:
       }
 
       // Debug
-      if (params.intermediateChecks)
-        ListPairs();
+      if (params.intermediateChecks) ListPairs();
     }
   }
 
@@ -509,12 +495,12 @@ private:
       if (vert->left->Processed()) {
         const PairItr leftPair = vert->left->rightPair;
         const PairItr rightPair = vert->right->leftPair;
-        if (leftPair == rightPair) { // facing in
+        if (leftPair == rightPair) {  // facing in
           return END;
         } else if (leftPair != activePairs_.end() &&
-                   std::next(leftPair) == rightPair) { // facing out
+                   std::next(leftPair) == rightPair) {  // facing out
           return MERGE;
-        } else { // not neighbors
+        } else {  // not neighbors
           return SKIP;
         }
       } else {
@@ -532,8 +518,7 @@ private:
   }
 
   void Leftwards(VertItr vert) {
-    if (params.verbose)
-      std::cout << "LEFTWARDS" << std::endl;
+    if (params.verbose) std::cout << "LEFTWARDS" << std::endl;
     vert->leftPair = vert->right->leftPair;
     ActiveEdge &activeEdge = vert->leftPair->west;
     activeEdge.vSouth = vert;
@@ -541,13 +526,11 @@ private:
     Reorder(vert, vert->leftPair, true);
     Reorder(vert, vert->leftPair, false);
     const VertItr newVert = SplitVerts(vert, vert->leftPair, true);
-    if (newVert != monotones_.end())
-      newVert->leftPair->west.vSouth = newVert;
+    if (newVert != monotones_.end()) newVert->leftPair->west.vSouth = newVert;
   }
 
   void Rightwards(VertItr vert) {
-    if (params.verbose)
-      std::cout << "RIGHTWARDS" << std::endl;
+    if (params.verbose) std::cout << "RIGHTWARDS" << std::endl;
     vert->rightPair = vert->left->rightPair;
     ActiveEdge &activeEdge = vert->rightPair->east;
     activeEdge.vSouth = vert;
@@ -558,8 +541,7 @@ private:
   }
 
   void Start(VertItr vert, std::list<EdgePair>::iterator loc, int isStart) {
-    if (params.verbose)
-      std::cout << "START" << std::endl;
+    if (params.verbose) std::cout << "START" << std::endl;
     bool westCertain = loc == activePairs_.begin() ||
                        VertWestOfEdge(vert, std::prev(loc)->east) < 0;
     bool eastCertain = isStart > 0;
@@ -572,30 +554,25 @@ private:
   }
 
   void Hole(VertItr vert, std::list<EdgePair>::iterator loc) {
-    if (params.verbose)
-      std::cout << "HOLE" << std::endl;
-    if (loc == activePairs_.end())
-      --loc;
+    if (params.verbose) std::cout << "HOLE" << std::endl;
+    if (loc == activePairs_.end()) --loc;
     // hole-starting vert links earlier activePair
     vert->rightPair = activePairs_.insert(
         loc, {loc->west, {vert, vert->right}, loc->vMerge, true, true});
     loc->west.vSouth->leftPair = vert->rightPair;
     loc->vMerge = monotones_.end();
     VertItr newVert = SplitVerts(vert, vert->rightPair);
-    if (newVert != monotones_.end())
-      vert = newVert;
+    if (newVert != monotones_.end()) vert = newVert;
     vert->leftPair = loc;
     loc->west = {vert, vert->left};
   }
 
   void Merge(VertItr vert) {
-    if (params.verbose)
-      std::cout << "MERGE" << std::endl;
+    if (params.verbose) std::cout << "MERGE" << std::endl;
     const PairItr leftPair = vert->left->rightPair;
     const PairItr rightPair = vert->right->leftPair;
     const VertItr newVert = SplitVerts(vert, rightPair, true);
-    if (newVert != monotones_.end())
-      vert = newVert;
+    if (newVert != monotones_.end()) vert = newVert;
     SplitVerts(vert, leftPair, false);
     leftPair->east = rightPair->east;
     leftPair->east.vSouth->rightPair = leftPair;
@@ -605,8 +582,7 @@ private:
   }
 
   void End(VertItr vert) {
-    if (params.verbose)
-      std::cout << "END" << std::endl;
+    if (params.verbose) std::cout << "END" << std::endl;
     const PairItr rightPair = vert->right->leftPair;
     SplitVerts(vert, rightPair);
   }
@@ -739,8 +715,7 @@ private:
   // }
 
   void ListPairs() {
-    if (params.verbose)
-      std::cout << "active edges:" << std::endl;
+    if (params.verbose) std::cout << "active edges:" << std::endl;
     for (EdgePair &pair : activePairs_) {
       ListPair(pair);
     }
@@ -780,7 +755,7 @@ void PrintFailure(const std::exception &e, const Polygons &polys,
               << triangles[j][2] << std::endl;
   }
 }
-} // namespace
+}  // namespace
 
 namespace manifold {
 // This is nearly the only function to do a floating point comparison in this
@@ -803,8 +778,7 @@ std::vector<glm::ivec3> Triangulate(const Polygons &polys) {
     Monotones monotones(polys);
     monotones.Triangulate(triangles);
     CheckTopology(triangles, polys);
-    if (params.checkGeometry)
-      CheckGeometry(triangles, polys);
+    if (params.checkGeometry) CheckGeometry(triangles, polys);
   } catch (const runtimeErr &e) {
     if (params.checkGeometry && !params.suppressErrors) {
       PrintFailure(e, polys, triangles);
@@ -830,8 +804,8 @@ std::vector<Halfedge> Polygons2Edges(const Polygons &polys) {
   return halfedges;
 }
 
-std::vector<Halfedge>
-Triangles2Edges(const std::vector<glm::ivec3> &triangles) {
+std::vector<Halfedge> Triangles2Edges(
+    const std::vector<glm::ivec3> &triangles) {
   std::vector<Halfedge> halfedges;
   for (const glm::ivec3 &tri : triangles) {
     // Differentiate edges of triangles by setting index to Edge::kInterior.
@@ -885,16 +859,14 @@ void CheckTopology(const std::vector<Halfedge> &halfedges) {
   std::map<int, glm::ivec2> vert2edges;
   for (Halfedge halfedge : halfedges) {
     if (halfedge.face == Edge::kInterior)
-      continue; // only interested in polygon edges
+      continue;  // only interested in polygon edges
     auto vert = vert2edges.emplace(halfedge.startVert,
                                    glm::ivec2(halfedge.face, Edge::kInvalid));
-    if (!vert.second)
-      (vert.first->second)[1] = halfedge.face;
+    if (!vert.second) (vert.first->second)[1] = halfedge.face;
 
     vert = vert2edges.emplace(halfedge.endVert,
                               glm::ivec2(halfedge.face, Edge::kInvalid));
-    if (!vert.second)
-      (vert.first->second)[1] = halfedge.face;
+    if (!vert.second) (vert.first->second)[1] = halfedge.face;
   }
   for (int i = 0; i < n_edges; ++i) {
     if (forward[i].face == Edge::kInterior &&
@@ -953,4 +925,4 @@ void Dump(const Polygons &polys) {
 
 ExecutionParams &PolygonParams() { return params; }
 
-} // namespace manifold
+}  // namespace manifold

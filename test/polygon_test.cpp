@@ -413,7 +413,7 @@ TEST(Polygon, Simple4) {
 
 TEST(Polygon, TouchingHole) {
   Polygons polys;
-  // PolygonParams().verbose = true;
+  PolygonParams().verbose = true;
   polys.push_back({
       {glm::vec2(-2, -1), 0, Edge::kNoIdx},  //
       {glm::vec2(2, -1), 1, Edge::kNoIdx},   //
