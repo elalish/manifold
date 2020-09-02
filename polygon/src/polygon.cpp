@@ -277,8 +277,6 @@ class Monotones {
   // A variety of sanity checks on the data structure. Expensive checks are only
   // performed if params.intermediateChecks = true.
   void Check() {
-    ALWAYS_ASSERT(activePairs_.empty(), logicErr,
-                  "There are still active edges.");
     if (!params.intermediateChecks) return;
     std::vector<Halfedge> edges;
     for (VertItr vert = monotones_.begin(); vert != monotones_.end(); vert++) {
@@ -354,6 +352,7 @@ class Monotones {
     glm::vec2 next = edge.vNorth->pos;
     int side = CCW(last, next, vert->pos);
     if (side == 0) side = CCW(vert->pos, next, vert->right->pos);
+    if (side == 0) side = CCW(vert->pos, next, vert->left->pos);
     return side;
   }
 
@@ -411,7 +410,7 @@ class Monotones {
       VertItr vert = insertAt;
       if (!maintainOrder) {
         if (!nextAttached.empty() &&
-            (starts.empty() || starts.back()->IsPast(*nextAttached.top()))) {
+            (starts.empty() || !nextAttached.top()->IsPast(*starts.back()))) {
           vert = nextAttached.top();
           nextAttached.pop();
         } else if (!starts.empty()) {
@@ -426,7 +425,8 @@ class Monotones {
       if (vert->Processed()) continue;
 
       if (!skipped.empty() && vert->IsPast(*skipped.back())) {
-        std::cout << "Not Geometrically Valid!" << std::endl;
+        if (params.verbose)
+          std::cout << "Not Geometrically Valid!" << std::endl;
         break;
       }
 
@@ -449,7 +449,8 @@ class Monotones {
 
       if (type == SKIP) {
         if (maintainOrder) {
-          std::cout << "Not Geometrically Valid!" << std::endl;
+          if (params.verbose)
+            std::cout << "Not Geometrically Valid!" << std::endl;
           break;
         }
         skipped.push_back(vert);
