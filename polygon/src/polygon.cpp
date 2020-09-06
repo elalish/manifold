@@ -426,7 +426,10 @@ class Monotones {
 
       if (!skipped.empty() && vert->IsPast(*skipped.back())) {
         if (params.verbose)
-          std::cout << "Not Geometrically Valid!" << std::endl;
+          std::cout
+              << "Not Geometrically Valid! None of the skipped verts is valid."
+              << std::endl;
+        // throw;
         break;
       }
 
@@ -450,7 +453,10 @@ class Monotones {
       if (type == SKIP) {
         if (maintainOrder) {
           if (params.verbose)
-            std::cout << "Not Geometrically Valid!" << std::endl;
+            std::cout
+                << "Not Geometrically Valid! Skipped during reverse sweep."
+                << std::endl;
+          // throw;
           break;
         }
         skipped.push_back(vert);
@@ -465,21 +471,21 @@ class Monotones {
 
       switch (type) {
         case LEFTWARDS:
-          Leftwards(vert);
           nextAttached.push(vert->left);
+          Leftwards(vert);
           break;
         case RIGHTWARDS:
-          Rightwards(vert);
           nextAttached.push(vert->right);
+          Rightwards(vert);
           break;
         case START:
+          nextAttached.push(vert->left);
+          nextAttached.push(vert->right);
           if (isStart >= 0) {
             Start(vert, loc, isStart);
           } else {
             Hole(vert, loc);
           }
-          nextAttached.push(vert->left);
-          nextAttached.push(vert->right);
           break;
         case MERGE:
           Merge(vert);
@@ -606,18 +612,20 @@ class Monotones {
   }
 
   void ListPair(EdgePair &pair) {
+    // std::cout << (pair.westCertain ? "certain " : "uncertain ");
     ListEdge(pair.west);
     ALWAYS_ASSERT(&*(pair.west.vSouth->leftPair) == &pair, logicErr,
                   "west vSouth does not point back!");
     ALWAYS_ASSERT(pair.west.vSouth->left == pair.west.vNorth, logicErr,
                   "west edge does not go left!");
+    if (params.verbose && pair.vMerge != monotones_.end())
+      std::cout << "pair vMerge: " << pair.vMerge->mesh_idx << std::endl;
+    // std::cout << (pair.eastCertain ? "certain " : "uncertain ");
     ListEdge(pair.east);
     ALWAYS_ASSERT(&*(pair.east.vSouth->rightPair) == &pair, logicErr,
                   "east vSouth does not point back!");
     ALWAYS_ASSERT(pair.east.vSouth->right == pair.east.vNorth, logicErr,
                   "east edge does not go right!");
-    if (params.verbose && pair.vMerge != monotones_.end())
-      std::cout << "pair vMerge: " << pair.vMerge->mesh_idx << std::endl;
   }
 
   void ListEdge(ActiveEdge edge) {

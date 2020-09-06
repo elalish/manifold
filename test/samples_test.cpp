@@ -56,13 +56,13 @@ TEST(Samples, Bracelet) {
   Manifold bracelet = StretchyBracelet();
   Mesh triangulated = bracelet.Extract();
   EXPECT_EQ(bracelet.Genus(), 1);
-  // ExportMesh("bracelet.ply", triangulated);
+  ExportMesh("bracelet.ply", triangulated);
 }
 
 // A fractal with many degenerate intersections, which also tests exact 90
 // degree rotations.
 TEST(Samples, Sponge) {
-  Manifold::SetExpectGeometry(false);
-  Manifold sponge = MengerSponge(1, false);
+  Manifold::SetExpectGeometry(true);
+  Manifold sponge = MengerSponge(3, false);
   ExportMesh("mengerSponge.ply", sponge.Extract());
 }
