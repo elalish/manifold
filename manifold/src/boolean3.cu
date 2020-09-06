@@ -385,13 +385,26 @@ struct Kernel02 {
     // Either the left or right must shadow, but not both. This ensures the
     // intersection is between the left and right.
     bool shadows;
+    int closestVert;
+    float minMetric = 1.0f / 0.0f;
     s02 = 0;
 
     int q1 = facesQ[q2];
     const int lastEdge = facesQ[q2 + 1];
+    const glm::vec3 posP = vertPosP[p0];
     while (q1 < lastEdge) {
       const Halfedge edge = halfedgeQ[q1];
       const int q1F = edge.IsForward() ? q1 : edge.pairedHalfedge;
+
+      if (!forward) {
+        const int qVert = halfedgeQ[q1F].startVert;
+        const glm::vec3 diff = posP - vertPosQ[qVert];
+        const float metric = glm::dot(diff, diff);
+        if (metric < minMetric) {
+          minMetric = metric;
+          closestVert = qVert;
+        }
+      }
 
       const auto syz01 = Shadow01(p0, q1F, vertPosP, vertPosQ, halfedgeQ,
                                   expandP, vertNormalP, !forward);
@@ -421,9 +434,8 @@ struct Kernel02 {
       if (forward) {
         if (!Shadows(vertPos.z, z02, expandP * vertNormalP[p0].z)) s02 = 0;
       } else {
-        // TODO: Would be better to perturb using nearest vertNormal, see
-        // Kernel11.
-        if (!Shadows(z02, vertPos.z, expandP * faceNormalP[q2].z)) s02 = 0;
+        if (!Shadows(z02, vertPos.z, expandP * vertNormalP[closestVert].z))
+          s02 = 0;
       }
     }
   }
@@ -1203,6 +1215,10 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
 
   // Create the manifold's data structures and verify manifoldness.
   outR.LabelVerts();
+  outR.Finish();
+
+  // TODO: Revert Manifold back to only triangles.
+  outR.Face2Tri();
   outR.Finish();
 
   if (kVerbose) {
