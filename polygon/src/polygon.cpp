@@ -345,15 +345,8 @@ class Monotones {
     return northEast;
   }
 
-  // If the first result is degenerate, its neighbor is used to attempt a
-  // tie-break.
   int VertWestOfEdge(const VertItr vert, const ActiveEdge &edge) {
-    glm::vec2 last = edge.vSouth->pos;
-    glm::vec2 next = edge.vNorth->pos;
-    int side = CCW(last, next, vert->pos);
-    if (side == 0) side = CCW(vert->pos, next, vert->right->pos);
-    if (side == 0) side = CCW(vert->pos, next, vert->left->pos);
-    return side;
+    return CCW(edge.vSouth->pos, edge.vNorth->pos, vert->pos);
   }
 
   /**
@@ -436,26 +429,32 @@ class Monotones {
       VertType type = CategorizeVert(vert);
 
       auto loc = activePairs_.end();
-      int isStart = false;
+      int isStart = 0;
       if (type == START) {
-        loc = std::find_if(activePairs_.begin(), activePairs_.end(),
-                           [vert, this](const EdgePair &pair) {
-                             return VertWestOfEdge(vert, pair.east) > 0;
-                           });
-        isStart =
-            loc == activePairs_.end() ? 1 : VertWestOfEdge(vert, loc->west);
+        if (activePairs_.empty()) {
+          isStart = 1;
+        } else {
+          loc = std::find_if(activePairs_.begin(), activePairs_.end(),
+                             [vert, this](const EdgePair &pair) {
+                               return VertWestOfEdge(vert, pair.east) > 0;
+                             });
+          isStart = loc == activePairs_.end()
+                        ? -1 * VertWestOfEdge(vert, activePairs_.back().east)
+                        : VertWestOfEdge(vert, loc->west);
+        }
         int isStart2 = CCW(vert->left->pos, vert->pos, vert->right->pos);
         if (isStart * isStart2 < 0) {
           type = SKIP;
         }
+        isStart += isStart2;
       }
 
       if (type == SKIP) {
-        if (maintainOrder) {
+        if (vert == insertAt) {
           if (params.verbose)
-            std::cout
-                << "Not Geometrically Valid! Skipped during reverse sweep."
-                << std::endl;
+            std::cout << "Not Geometrically Valid! Skipped during reverse "
+                         "sweep or tried to skip final vert."
+                      << std::endl;
           // throw;
           break;
         }
@@ -510,6 +509,8 @@ class Monotones {
   VertType CategorizeVert(VertItr vert) {
     if (vert->right->Processed()) {
       if (vert->left->Processed()) {
+        Reorder(vert, vert->left->rightPair, true);
+        Reorder(vert, vert->right->leftPair, false);
         const PairItr leftPair = vert->left->rightPair;
         const PairItr rightPair = vert->right->leftPair;
         if (leftPair == rightPair) {  // facing in
