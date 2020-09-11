@@ -355,6 +355,21 @@ TEST(Polygon, Duplicates) {
   TestPoly(polys, 4);
 }
 
+TEST(Polygon, Sliver4) {
+  Polygons polys;
+  polys.push_back({
+      {glm::vec2(-0.375669807, 8.90489388), 7474, 14932},  //
+      {glm::vec2(0, 8.39722729), 7459, 14704},             //
+      {glm::vec2(0, 8.9723053), 7468, 14940},              //
+      {glm::vec2(0, 8.9723053), 7469, 14998},              //
+      {glm::vec2(0, 8.96719646), 7467, 15006},             //
+      {glm::vec2(0, 8.89326191), 7466, 15000},             //
+      {glm::vec2(0, 8.78047276), 7465, 14941},             //
+      {glm::vec2(-0.330551624, 8.8897438), 7473, 14945},   //
+  });
+  TestPoly(polys, 6);
+}
+
 TEST(Polygon, Simple1) {
   Polygons polys;
   polys.push_back({

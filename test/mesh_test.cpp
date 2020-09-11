@@ -391,7 +391,7 @@ TEST(Manifold, BooleanWinding) {
  * and perform an intersection to test that the topology stays sane in extremely
  * complex and unexpected situations.
  */
-TEST(Manifold, DISABLED_BooleanHorrible) {
+TEST(Manifold, BooleanHorrible) {
   Manifold::SetExpectGeometry(false);
   Manifold random = Manifold::Sphere(1.0f, 8);
   std::mt19937 gen(12345);  // Standard mersenne_twister_engine
@@ -405,7 +405,7 @@ TEST(Manifold, DISABLED_BooleanHorrible) {
   EXPECT_TRUE(result.IsManifold());
 }
 
-TEST(Manifold, DISABLED_BooleanHorrible2) {
+TEST(Manifold, BooleanHorrible2) {
   Manifold::SetExpectGeometry(false);
   Manifold random = Manifold::Sphere(1.0f, 32);
   std::mt19937 gen(54321);  // Standard mersenne_twister_engine
@@ -428,7 +428,7 @@ TEST(Manifold, DISABLED_BooleanHorrible2) {
  * still correct even when Euclidean geometry gives inconsistent results due to
  * floating point error.
  */
-TEST(Manifold, DISABLED_BooleanHorriblePlanar) {
+TEST(Manifold, BooleanHorriblePlanar) {
   Manifold::SetExpectGeometry(false);
   Manifold random = Manifold::Sphere(1.0f, 32);
   std::mt19937 gen(654321);  // Standard mersenne_twister_engine
