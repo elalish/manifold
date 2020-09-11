@@ -361,35 +361,36 @@ class Monotones {
    */
   void Reorder(const VertItr vert, const PairItr inputPair, const bool west) {
     PairItr potentialPair = inputPair;
-    if (!potentialPair->getCertainty(west)) {
-      int sign = west ? -1 : 1;
-      PairItr end = west ? activePairs_.begin() : std::prev(activePairs_.end());
-      while (potentialPair != end) {
-        potentialPair =
-            west ? std::prev(potentialPair) : std::next(potentialPair);
-        int eastOf = sign * VertWestOfEdge(vert, potentialPair->getEdge(!west));
-        if (eastOf >= 0) {   // in the right place
-          if (eastOf > 0) {  // certain
-            inputPair->getCertainty(west) = true;
-          }
-          PairItr loc = west ? std::next(potentialPair) : potentialPair;
-          activePairs_.splice(loc, activePairs_, inputPair);
-          break;
+
+    if (potentialPair->getCertainty(west)) return;
+
+    int sign = west ? -1 : 1;
+    PairItr end = west ? activePairs_.begin() : std::prev(activePairs_.end());
+    while (potentialPair != end) {
+      potentialPair =
+          west ? std::prev(potentialPair) : std::next(potentialPair);
+      int eastOf = sign * VertWestOfEdge(vert, potentialPair->getEdge(!west));
+      if (eastOf >= 0) {   // in the right place
+        if (eastOf > 0) {  // certain
+          inputPair->getCertainty(west) = true;
         }
-        eastOf = sign * VertWestOfEdge(vert, potentialPair->getEdge(west));
-        if (eastOf >= 0) {  // in the right place
-          PairItr loc = west ? potentialPair : std::next(potentialPair);
-          activePairs_.splice(loc, activePairs_, inputPair);
-          inputPair->getCertainty(!west) = false;
-          if (eastOf > 0) {  // certainly a hole
-            std::swap(potentialPair->west, inputPair->west);
-            potentialPair->west.vSouth->leftPair = potentialPair;
-            inputPair->west.vSouth->leftPair = inputPair;
-            inputPair->eastCertain = true;
-            inputPair->westCertain = true;
-          }
-          break;
+        PairItr loc = west ? std::next(potentialPair) : potentialPair;
+        activePairs_.splice(loc, activePairs_, inputPair);
+        break;
+      }
+      eastOf = sign * VertWestOfEdge(vert, potentialPair->getEdge(west));
+      if (eastOf >= 0) {  // in the right place
+        PairItr loc = west ? potentialPair : std::next(potentialPair);
+        activePairs_.splice(loc, activePairs_, inputPair);
+        inputPair->getCertainty(!west) = false;
+        if (eastOf > 0) {  // certainly a hole
+          std::swap(potentialPair->west, inputPair->west);
+          potentialPair->west.vSouth->leftPair = potentialPair;
+          inputPair->west.vSouth->leftPair = inputPair;
+          inputPair->eastCertain = true;
+          inputPair->westCertain = true;
         }
+        break;
       }
     }
   }
@@ -443,9 +444,12 @@ class Monotones {
                         : VertWestOfEdge(vert, loc->west);
         }
         int isStart2 = CCW(vert->left->pos, vert->pos, vert->right->pos);
+        // Disagreement is not geometrically valid, so skip to find a better
+        // order.
         if (isStart * isStart2 < 0) {
           type = SKIP;
         }
+        // Confidence takes precendence.
         isStart += isStart2;
       }
 
@@ -522,10 +526,16 @@ class Monotones {
           return SKIP;
         }
       } else {
+        vert->leftPair = vert->right->leftPair;
+        Reorder(vert, vert->leftPair, true);
+        Reorder(vert, vert->leftPair, false);
         return LEFTWARDS;
       }
     } else {
       if (vert->left->Processed()) {
+        vert->rightPair = vert->left->rightPair;
+        Reorder(vert, vert->rightPair, true);
+        Reorder(vert, vert->rightPair, false);
         return RIGHTWARDS;
       } else {
         return START;
@@ -535,24 +545,18 @@ class Monotones {
 
   void Leftwards(VertItr vert) {
     if (params.verbose) std::cout << "LEFTWARDS" << std::endl;
-    vert->leftPair = vert->right->leftPair;
     ActiveEdge &activeEdge = vert->leftPair->west;
     activeEdge.vSouth = vert;
     activeEdge.vNorth = vert->left;
-    Reorder(vert, vert->leftPair, true);
-    Reorder(vert, vert->leftPair, false);
     const VertItr newVert = SplitVerts(vert, vert->leftPair, true);
     if (newVert != monotones_.end()) newVert->leftPair->west.vSouth = newVert;
   }
 
   void Rightwards(VertItr vert) {
     if (params.verbose) std::cout << "RIGHTWARDS" << std::endl;
-    vert->rightPair = vert->left->rightPair;
     ActiveEdge &activeEdge = vert->rightPair->east;
     activeEdge.vSouth = vert;
     activeEdge.vNorth = vert->right;
-    Reorder(vert, vert->rightPair, true);
-    Reorder(vert, vert->rightPair, false);
     SplitVerts(vert, vert->rightPair, false);
   }
 
