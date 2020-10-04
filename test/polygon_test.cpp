@@ -66,7 +66,7 @@ void TestPoly(const Polygons &polys, int expectedNumTri,
  * tolerance.
  */
 TEST(Polygon, SimpleHole) {
-  PolygonParams().verbose = true;
+  //   PolygonParams().verbose = true;
   Polygons polys;
   polys.push_back({
       {glm::vec2(0, -2), 0, Edge::kNoIdx},  //
@@ -83,7 +83,7 @@ TEST(Polygon, SimpleHole) {
 }
 
 TEST(Polygon, SimpleHole2) {
-  PolygonParams().verbose = true;
+  //   PolygonParams().verbose = true;
   Polygons polys;
   polys.push_back({
       {glm::vec2(0, 1.63299), 0, Edge::kNoIdx},           //
@@ -99,6 +99,7 @@ TEST(Polygon, SimpleHole2) {
 }
 
 TEST(Polygon, MultiMerge) {
+  PolygonParams().verbose = true;
   Polygons polys;
   polys.push_back({
       {glm::vec2(-7, 0), 0, Edge::kNoIdx},   //
