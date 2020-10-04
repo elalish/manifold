@@ -213,10 +213,10 @@ class Monotones {
       Link(current, start);
     }
 
-    SweepForward();
+    if (SweepForward()) return;
     Check();
 
-    SweepBack();
+    if (SweepBack()) return;
     Check();
   }
 
@@ -337,11 +337,14 @@ class Monotones {
    * each other with two new edges.
    */
   VertItr SplitVerts(VertItr north) {
-    PairItr pair = north->pair;
+    const PairItr pair = north->pair;
     if (pair->merge == MergeType::NONE) return monotones_.end();
-    VertItr south = pair->merge == MergeType::WEST ? pair->vWest : pair->vEast;
-    PairItr pairWest = pair->merge == MergeType::WEST ? std::prev(pair) : pair;
-    PairItr pairEast = pair->merge == MergeType::WEST ? pair : std::next(pair);
+    const VertItr south =
+        pair->merge == MergeType::WEST ? pair->vWest : pair->vEast;
+    const PairItr pairWest =
+        pair->merge == MergeType::WEST ? std::prev(pair) : pair;
+    const PairItr pairEast =
+        pair->merge == MergeType::WEST ? pair : std::next(pair);
 
     // at split events, add duplicate vertices to end of list and reconnect
     if (params.verbose)
@@ -364,11 +367,11 @@ class Monotones {
     Link(south, north);
     Link(northEast, southEast);
 
-    if (north == pairWest->vWest) {
+    if (north == pairWest->vWest || north == pairWest->vEast) {
       if (params.verbose) std::cout << "removing pair West" << std::endl;
       RemovePair(pairWest);
     }
-    if (north == pairEast->vEast) {
+    if (north == pairEast->vEast || north == pairEast->vWest) {
       if (params.verbose) std::cout << "removing pair East" << std::endl;
       RemovePair(pairEast);
     }
@@ -428,7 +431,7 @@ class Monotones {
     }
   }
 
-  void SweepForward() {
+  bool SweepForward() {
     // Reversed so that minimum element is at queue.top() / vector.back().
     auto cmp = [](VertItr a, VertItr b) { return *b < *a; };
     std::priority_queue<VertItr, std::vector<VertItr>, decltype(cmp)>
@@ -444,6 +447,7 @@ class Monotones {
 
     std::vector<VertItr> skipped;
     VertItr insertAt = monotones_.begin();
+
     while (insertAt != monotones_.end()) {
       VertItr vert = insertAt;
       if (!nextAttached.empty() &&
@@ -465,21 +469,20 @@ class Monotones {
           std::cout
               << "Not Geometrically Valid! None of the skipped verts is valid."
               << std::endl;
-        // throw;
-        break;
+        return true;
       }
 
       VertType type = CategorizeVert(vert);
 
-      auto loc = activePairs_.end();
+      PairItr loc = activePairs_.begin();
       int isStart = 0;
       if (type == START) {
         if (activePairs_.empty()) {
           isStart = 1;
         } else {
-          loc = std::find_if(
-              activePairs_.begin(), activePairs_.end(),
-              [vert](const EdgePair &pair) { return pair.westOf(vert) < 0; });
+          for (; loc != activePairs_.end(); ++loc) {
+            if (VertEastOfPair(vert, loc) < 0) break;
+          }
           isStart = loc == activePairs_.end()
                         ? VertEastOfPair(vert, std::prev(activePairs_.end()))
                         : VertWestOfPair(vert, loc);
@@ -499,8 +502,7 @@ class Monotones {
           if (params.verbose)
             std::cout << "Not Geometrically Valid! Tried to skip final vert."
                       << std::endl;
-          // throw;
-          break;
+          return true;
         }
         skipped.push_back(vert);
         if (params.verbose) std::cout << "Skipping vert" << std::endl;
@@ -546,11 +548,12 @@ class Monotones {
       }
 
       // Debug
-      if (params.verbose) ListPairs(true);
+      if (params.verbose) ListPairs();
     }
+    return false;
   }
 
-  void SweepBack() {
+  bool SweepBack() {
     for (auto &vert : monotones_) vert.SetProcessed(false);
     monotones_.reverse();
     for (VertItr vert = monotones_.begin(); vert != monotones_.end(); ++vert) {
@@ -581,14 +584,15 @@ class Monotones {
           break;
         case SKIP:
           std::cout << "SKIP should not happen on reverse sweep!" << std::endl;
-          break;
+          return true;
       }
 
       vert->SetProcessed(true);
 
       // Debug
-      if (params.verbose) ListPairs(false);
+      if (params.verbose) ListPairs();
     }
+    return false;
   }
 
   VertType CategorizeVert(VertItr vert) {
@@ -656,9 +660,13 @@ class Monotones {
   void Hole(VertItr vert, PairItr loc) {
     if (params.verbose) std::cout << "HOLE" << std::endl;
     vert->pair = loc;
-    VertItr newVert = SplitVerts(vert);
+    VertItr vertEast = SplitVerts(vert);
     // If a split occurred then no pairs have to change.
-    if (newVert != monotones_.end()) return;
+    if (vertEast != monotones_.end()) {
+      vert->right->pair = vert->pair;
+      vertEast->left->pair = vertEast->pair;
+      return;
+    }
 
     if (loc == activePairs_.end()) --loc;
     PairItr pairWest = activePairs_.insert(
@@ -678,15 +686,23 @@ class Monotones {
     if (params.verbose) std::cout << "MERGE" << std::endl;
     PairItr pairWest = vert->left->pair;
     PairItr pairEast = vert->right->pair;
+    pairWest->vEast = vert;
+    pairEast->vWest = vert;
 
     vert->pair = pairEast;
-    const VertItr newVert = SplitVerts(vert);
-    if (newVert != monotones_.end()) vert = newVert;
+    const VertItr vertEast = SplitVerts(vert);
+    if (vertEast != monotones_.end()) {
+      vert = vertEast;
+      pairWest->vEast = vert;
+    }
+    pairEast = vert->right->pair;
+
     vert->pair = pairWest;
     SplitVerts(vert);
+
+    pairWest = vert->left->pair;
     pairWest->merge = MergeType::EAST;
     pairEast->merge = MergeType::WEST;
-    pairWest->vEast = vert;
     pairEast->vWest = vert;
   }
 
@@ -698,26 +714,24 @@ class Monotones {
     pairWest->vWest = vert;
     pairEast->vEast = vert;
 
-    const VertItr newVert = SplitVerts(vert);
+    const VertItr vertEast = SplitVerts(vert);
     // If a split occurred then both pairs have already been removed.
-    if (newVert != monotones_.end()) return;
+    if (vertEast != monotones_.end()) return;
 
     RemovePair(vert->pair);
   }
 
-  void ListPairs(bool forward) {
+  void ListPairs() {
     std::cout << "active edges:" << std::endl;
     for (EdgePair &pair : activePairs_) {
       if (pair.merge == MergeType::WEST) std::cout << "merge West" << std::endl;
       // std::cout << (pair.westCertain ? "certain " : "uncertain ");
-      VertItr north = forward ? pair.vWest->left : pair.vWest->right;
       std::cout << "edge West: S = " << pair.vWest->mesh_idx
-                << ", N = " << north->mesh_idx << std::endl;
+                << ", N = " << pair.vWest->left->mesh_idx << std::endl;
 
       // std::cout << (pair.eastCertain ? "certain " : "uncertain ");
-      north = forward ? pair.vEast->right : pair.vEast->left;
       std::cout << "edge East: S = " << pair.vEast->mesh_idx
-                << ", N = " << north->mesh_idx << std::endl;
+                << ", N = " << pair.vEast->right->mesh_idx << std::endl;
       if (pair.merge == MergeType::EAST) std::cout << "merge East" << std::endl;
     }
   }
