@@ -600,10 +600,12 @@ class Monotones {
       if (vert->left->Processed()) {
         Reorder(vert, true);  // TODO: this might need some thought...
         Reorder(vert, false);
-        PairItr pairLeft = vert->left->pair;
-        PairItr pairRight = vert->right->pair;
+        // TODO: This isn't quite right and we probably need vert->pairWest and
+        // vert->pairEast instead.
+        bool isLeftPair = vert->pair->vEast->right == vert;
+        PairItr pairLeft = isLeftPair ? vert->pair : vert->left->pair;
+        PairItr pairRight = isLeftPair ? vert->right->pair : vert->pair;
 
-        vert->pair = pairLeft;
         if (pairLeft == pairRight || (pairRight != activePairs_.end() &&
                                       std::next(pairRight) == pairLeft)) {
           // facing in
@@ -634,21 +636,22 @@ class Monotones {
   void Leftwards(VertItr vert) {
     if (params.verbose) std::cout << "LEFTWARDS" << std::endl;
     vert->pair->vWest = vert;
+    VertItr vertEast = SplitVerts(vert);
+    if (vertEast != monotones_.end()) vert = vertEast;
     vert->left->pair = vert->pair;
-    SplitVerts(vert);
   }
 
   void Rightwards(VertItr vert) {
     if (params.verbose) std::cout << "RIGHTWARDS" << std::endl;
     vert->pair->vEast = vert;
-    vert->right->pair = vert->pair;
     SplitVerts(vert);
+    vert->right->pair = vert->pair;
   }
 
   void Start(VertItr vert, PairItr loc, int isStart) {
     if (params.verbose) std::cout << "START" << std::endl;
     bool westCertain =
-        loc == activePairs_.begin() || VertEastOfPair(vert, loc) > 0;
+        loc == activePairs_.begin() || VertEastOfPair(vert, std::prev(loc)) > 0;
     bool eastCertain = isStart > 0;
     vert->pair = activePairs_.insert(
         loc, {vert, vert, MergeType::NONE, activePairs_.end(), westCertain,
