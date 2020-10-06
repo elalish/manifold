@@ -303,6 +303,7 @@ TEST(Polygon, Sliver2) {
 }
 
 TEST(Polygon, Sliver3) {
+  PolygonParams().verbose = true;
   Polygons polys;
   polys.push_back({
       {glm::vec2(0, -2.65168381), 369, 1173},               //
