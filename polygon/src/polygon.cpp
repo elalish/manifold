@@ -50,7 +50,7 @@ struct VertAdj {
   int edgeRight;  // Cannot join identical edges with a triangle.
   int index;
   VertItr left, right;
-  PairItr pair;
+  PairItr pairWest, pairEast;
 
   bool Processed() const { return index < 0; }
   void SetProcessed(bool processed) { index = processed ? -1 : 0; }
@@ -336,15 +336,12 @@ class Monotones {
    * duplicates these verts to break the polygons, then attaches them across to
    * each other with two new edges.
    */
-  VertItr SplitVerts(VertItr north) {
-    const PairItr pair = north->pair;
+  VertItr SplitVerts(VertItr north, bool west) {
+    const PairItr pair = west ? north->pairWest : north->pairEast;
     if (pair->merge == MergeType::NONE) return monotones_.end();
-    const VertItr south =
-        pair->merge == MergeType::WEST ? pair->vWest : pair->vEast;
-    const PairItr pairWest =
-        pair->merge == MergeType::WEST ? std::prev(pair) : pair;
-    const PairItr pairEast =
-        pair->merge == MergeType::WEST ? pair : std::next(pair);
+    const VertItr south = west ? pair->vWest : pair->vEast;
+    const PairItr pairWest = west ? std::prev(pair) : pair;
+    const PairItr pairEast = west ? pair : std::next(pair);
 
     // at split events, add duplicate vertices to end of list and reconnect
     if (params.verbose)
@@ -355,14 +352,14 @@ class Monotones {
     VertItr northEast = monotones_.insert(insertAt, *north);
     Link(north->left, northEast);
     northEast->SetProcessed(true);
-    north->pair = pairWest;
-    northEast->pair = pairEast;
+    north->pairWest = pairWest;
+    northEast->pairEast = pairEast;
 
     VertItr southEast = monotones_.insert(south, *south);
     Link(southEast, south->right);
     southEast->SetProcessed(true);
-    south->pair = pairWest;
-    southEast->pair = pairEast;
+    south->pairWest = pairWest;
+    southEast->pairEast = pairEast;
 
     Link(south, north);
     Link(northEast, southEast);
@@ -393,8 +390,7 @@ class Monotones {
    * This function is designed to search both ways, with direction chosen by the
    * input boolean, west.
    */
-  void Reorder(const VertItr vert, const bool west) {
-    const PairItr inputPair = vert->pair;
+  void Reorder(const VertItr vert, const PairItr inputPair, const bool west) {
     PairItr potentialPair = inputPair;
 
     if (potentialPair->getCertainty(west)) return;
@@ -421,8 +417,8 @@ class Monotones {
         inputPair->getCertainty(!west) = false;
         if (eastOf > 0) {  // certainly a hole
           std::swap(potentialPair->vWest, inputPair->vWest);
-          potentialPair->vWest->pair = potentialPair;
-          inputPair->vWest->pair = inputPair;
+          potentialPair->vWest->pairEast = potentialPair;
+          inputPair->vWest->pairEast = inputPair;
           inputPair->eastCertain = true;
           inputPair->westCertain = true;
         }
@@ -562,7 +558,7 @@ class Monotones {
 
       VertType type = CategorizeVert(vert);
 
-      PairItr newPair = vert->pair;
+      PairItr newPair = vert->pairWest;
       switch (type) {
         case LEFTWARDS:
           Leftwards(vert);
@@ -573,8 +569,14 @@ class Monotones {
         case START:
           if (params.verbose) std::cout << "START" << std::endl;
           activePairs_.splice(newPair->lastNeighbor, inactivePairs_, newPair);
-          vert->pair->vWest = vert;
-          vert->pair->vEast = vert;
+          newPair->vWest = vert;
+          newPair->vEast = vert;
+          newPair->westCertain = true;
+          newPair->eastCertain = true;
+          vert->pairWest = newPair;
+          vert->pairEast = newPair;
+          vert->left->pairEast = newPair;
+          vert->right->pairWest = newPair;
           break;
         case MERGE:
           Merge(vert);
@@ -598,34 +600,32 @@ class Monotones {
   VertType CategorizeVert(VertItr vert) {
     if (vert->right->Processed()) {
       if (vert->left->Processed()) {
-        Reorder(vert, true);  // TODO: this might need some thought...
-        Reorder(vert, false);
-        // TODO: This isn't quite right and we probably need vert->pairWest and
-        // vert->pairEast instead.
-        bool isLeftPair = vert->pair->vEast->right == vert;
-        PairItr pairLeft = isLeftPair ? vert->pair : vert->left->pair;
-        PairItr pairRight = isLeftPair ? vert->right->pair : vert->pair;
+        // TODO: this might need some thought...
+        Reorder(vert, vert->pairWest, true);
+        Reorder(vert, vert->pairWest, false);
+        const PairItr pairWest = vert->pairWest;
+        const PairItr pairEast = vert->pairEast;
 
-        if (pairLeft == pairRight || (pairRight != activePairs_.end() &&
-                                      std::next(pairRight) == pairLeft)) {
+        if (pairWest == pairEast || (pairEast != activePairs_.end() &&
+                                     std::next(pairEast) == pairWest)) {
           // facing in
           return END;
-        } else if (pairLeft != activePairs_.end() &&
-                   std::next(pairLeft) == pairRight) {
+        } else if (pairWest != activePairs_.end() &&
+                   std::next(pairWest) == pairEast) {
           // facing out
           return MERGE;
         } else {  // not neighbors
           return SKIP;
         }
       } else {
-        Reorder(vert, true);
-        Reorder(vert, false);
+        Reorder(vert, vert->pairEast, true);
+        Reorder(vert, vert->pairEast, false);
         return LEFTWARDS;
       }
     } else {
       if (vert->left->Processed()) {
-        Reorder(vert, true);
-        Reorder(vert, false);
+        Reorder(vert, vert->pairWest, true);
+        Reorder(vert, vert->pairWest, false);
         return RIGHTWARDS;
       } else {
         return START;
@@ -635,17 +635,17 @@ class Monotones {
 
   void Leftwards(VertItr vert) {
     if (params.verbose) std::cout << "LEFTWARDS" << std::endl;
-    vert->pair->vWest = vert;
-    VertItr vertEast = SplitVerts(vert);
+    vert->pairEast->vWest = vert;
+    VertItr vertEast = SplitVerts(vert, false);
     if (vertEast != monotones_.end()) vert = vertEast;
-    vert->left->pair = vert->pair;
+    vert->left->pairEast = vert->pairEast;
   }
 
   void Rightwards(VertItr vert) {
     if (params.verbose) std::cout << "RIGHTWARDS" << std::endl;
-    vert->pair->vEast = vert;
-    SplitVerts(vert);
-    vert->right->pair = vert->pair;
+    vert->pairWest->vEast = vert;
+    SplitVerts(vert, true);
+    vert->right->pairWest = vert->pairWest;
   }
 
   void Start(VertItr vert, PairItr loc, int isStart) {
@@ -653,57 +653,58 @@ class Monotones {
     bool westCertain =
         loc == activePairs_.begin() || VertEastOfPair(vert, std::prev(loc)) > 0;
     bool eastCertain = isStart > 0;
-    vert->pair = activePairs_.insert(
+    const PairItr newPair = activePairs_.insert(
         loc, {vert, vert, MergeType::NONE, activePairs_.end(), westCertain,
               eastCertain});
-    vert->left->pair = vert->pair;
-    vert->right->pair = vert->pair;
+    vert->pairWest = newPair;
+    vert->pairEast = newPair;
+    vert->left->pairEast = newPair;
+    vert->right->pairWest = newPair;
   }
 
-  void Hole(VertItr vert, PairItr loc) {
+  void Hole(VertItr vert, PairItr pairEast) {
     if (params.verbose) std::cout << "HOLE" << std::endl;
-    vert->pair = loc;
-    VertItr vertEast = SplitVerts(vert);
+    vert->pairEast = pairEast;
+    VertItr vertEast = SplitVerts(vert, false);
     // If a split occurred then no pairs have to change.
     if (vertEast != monotones_.end()) {
-      vert->right->pair = vert->pair;
-      vertEast->left->pair = vertEast->pair;
+      vert->right->pairWest = vert->pairWest;
+      vertEast->left->pairEast = vertEast->pairEast;
       return;
     }
 
-    if (loc == activePairs_.end()) --loc;
-    PairItr pairWest = activePairs_.insert(
-        loc,
-        {loc->vWest, vert, MergeType::NONE, activePairs_.end(), true, true});
-    vert->pair = pairWest;
-    loc->vWest->pair = pairWest;
-    loc->vWest->left->pair = pairWest;
-    loc->merge = MergeType::NONE;
+    if (pairEast == activePairs_.end()) --pairEast;
+    PairItr pairWest =
+        activePairs_.insert(pairEast, {pairEast->vWest, vert, MergeType::NONE,
+                                       activePairs_.end(), true, true});
+    vert->pairEast = pairEast;
+    vert->pairWest = pairWest;
+    pairEast->vWest->pairEast = pairWest;
+    pairEast->vWest->left->pairEast = pairWest;
 
-    vert->left->pair = loc;
-    vert->right->pair = pairWest;
-    loc->vWest = vert;
+    vert->left->pairEast = pairEast;
+    vert->right->pairWest = pairWest;
+    pairEast->vWest = vert;
   }
 
   void Merge(VertItr vert) {
     if (params.verbose) std::cout << "MERGE" << std::endl;
-    PairItr pairWest = vert->left->pair;
-    PairItr pairEast = vert->right->pair;
+    PairItr pairWest = vert->pairWest;
+    PairItr pairEast = vert->pairEast;
     pairWest->vEast = vert;
     pairEast->vWest = vert;
 
-    vert->pair = pairEast;
-    const VertItr vertEast = SplitVerts(vert);
+    const VertItr vertEast = SplitVerts(vert, false);
     if (vertEast != monotones_.end()) {
       vert = vertEast;
       pairWest->vEast = vert;
     }
-    pairEast = vert->right->pair;
+    pairEast = vert->pairEast;
 
-    vert->pair = pairWest;
-    SplitVerts(vert);
+    vert->pairWest = pairWest;
+    SplitVerts(vert, true);
 
-    pairWest = vert->left->pair;
+    pairWest = vert->pairWest;
     pairWest->merge = MergeType::EAST;
     pairEast->merge = MergeType::WEST;
     pairEast->vWest = vert;
@@ -711,17 +712,13 @@ class Monotones {
 
   void End(VertItr vert) {
     if (params.verbose) std::cout << "END" << std::endl;
-    PairItr pairWest = vert->right->pair;
-    PairItr pairEast = vert->left->pair;
-
-    pairWest->vWest = vert;
-    pairEast->vEast = vert;
-
-    const VertItr vertEast = SplitVerts(vert);
+    vert->pairEast->vWest = vert;
+    vert->pairWest->vEast = vert;
+    const VertItr vertEast = SplitVerts(vert, true);
     // If a split occurred then both pairs have already been removed.
     if (vertEast != monotones_.end()) return;
 
-    RemovePair(vert->pair);
+    RemovePair(vert->pairWest);
   }
 
   void ListPairs() {
