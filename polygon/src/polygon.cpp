@@ -421,6 +421,7 @@ class Monotones {
           inputPair->vWest->pairEast = inputPair;
           inputPair->eastCertain = true;
           inputPair->westCertain = true;
+          // TODO: SplitVerts and such
         }
         break;
       }
@@ -473,17 +474,18 @@ class Monotones {
       PairItr loc = activePairs_.begin();
       int isStart = 0;
       if (type == START) {
+        int isStart2 = CCW(vert->left->pos, vert->pos, vert->right->pos);
         if (activePairs_.empty()) {
           isStart = 1;
         } else {
           for (; loc != activePairs_.end(); ++loc) {
-            if (VertEastOfPair(vert, loc) < 0) break;
+            int eastOf = VertEastOfPair(vert, loc);
+            if (eastOf < 0 || (isStart2 < 0 && eastOf == 0)) break;
           }
           isStart = loc == activePairs_.end()
                         ? VertEastOfPair(vert, std::prev(activePairs_.end()))
                         : VertWestOfPair(vert, loc);
         }
-        int isStart2 = CCW(vert->left->pos, vert->pos, vert->right->pos);
         // Disagreement is not geometrically valid, so skip to find a better
         // order.
         if (isStart * isStart2 < 0) {
