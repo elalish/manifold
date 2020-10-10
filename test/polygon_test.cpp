@@ -303,7 +303,6 @@ TEST(Polygon, Sliver2) {
 }
 
 TEST(Polygon, Sliver3) {
-  PolygonParams().verbose = true;
   Polygons polys;
   polys.push_back({
       {glm::vec2(0, -2.65168381), 369, 1173},               //
@@ -413,6 +412,7 @@ TEST(Polygon, Simple3) {
 }
 
 TEST(Polygon, Simple4) {
+  PolygonParams().verbose = true;
   Polygons polys;
   polys.push_back({
       {glm::vec2(15, -12.7135563), 287, 346},          //
@@ -446,6 +446,7 @@ TEST(Polygon, TouchingHole) {
 }
 
 TEST(Polygon, Sponge) {
+  PolygonParams().verbose = true;
   Polygons polys;
   polys.push_back({
       {glm::vec2(-0.5, -0.5), 22, 50},                  //
