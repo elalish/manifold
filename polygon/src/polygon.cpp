@@ -421,6 +421,8 @@ class Monotones {
           inputPair->vWest->pairEast = inputPair;
           inputPair->eastCertain = true;
           inputPair->westCertain = true;
+          vert->pairEast = potentialPair;
+          vert->pairWest = inputPair;
           // TODO: SplitVerts and such
         }
         break;
@@ -577,8 +579,6 @@ class Monotones {
           newPair->eastCertain = true;
           vert->pairWest = newPair;
           vert->pairEast = newPair;
-          vert->left->pairEast = newPair;
-          vert->right->pairWest = newPair;
           break;
         case MERGE:
           Merge(vert);
@@ -603,6 +603,8 @@ class Monotones {
     if (vert->right->Processed()) {
       if (vert->left->Processed()) {
         // TODO: this might need some thought...
+        vert->pairEast = vert->right->pairEast;
+        vert->pairWest = vert->left->pairWest;
         Reorder(vert, vert->pairWest, true);
         Reorder(vert, vert->pairWest, false);
         const PairItr pairWest = vert->pairWest;
@@ -620,12 +622,14 @@ class Monotones {
           return SKIP;
         }
       } else {
+        vert->pairEast = vert->right->pairEast;
         Reorder(vert, vert->pairEast, true);
         Reorder(vert, vert->pairEast, false);
         return LEFTWARDS;
       }
     } else {
       if (vert->left->Processed()) {
+        vert->pairWest = vert->left->pairWest;
         Reorder(vert, vert->pairWest, true);
         Reorder(vert, vert->pairWest, false);
         return RIGHTWARDS;
@@ -639,15 +643,12 @@ class Monotones {
     if (params.verbose) std::cout << "LEFTWARDS" << std::endl;
     vert->pairEast->vWest = vert;
     VertItr vertEast = SplitVerts(vert, false);
-    if (vertEast != monotones_.end()) vert = vertEast;
-    vert->left->pairEast = vert->pairEast;
   }
 
   void Rightwards(VertItr vert) {
     if (params.verbose) std::cout << "RIGHTWARDS" << std::endl;
     vert->pairWest->vEast = vert;
     SplitVerts(vert, true);
-    vert->right->pairWest = vert->pairWest;
   }
 
   void Start(VertItr vert, PairItr loc, int isStart) {
@@ -660,8 +661,6 @@ class Monotones {
               eastCertain});
     vert->pairWest = newPair;
     vert->pairEast = newPair;
-    vert->left->pairEast = newPair;
-    vert->right->pairWest = newPair;
   }
 
   void Hole(VertItr vert, PairItr pairEast) {
@@ -683,9 +682,6 @@ class Monotones {
     vert->pairWest = pairWest;
     pairEast->vWest->pairEast = pairWest;
     pairEast->vWest->left->pairEast = pairWest;
-
-    vert->left->pairEast = pairEast;
-    vert->right->pairWest = pairWest;
     pairEast->vWest = vert;
   }
 

@@ -412,7 +412,6 @@ TEST(Polygon, Simple3) {
 }
 
 TEST(Polygon, Simple4) {
-  PolygonParams().verbose = true;
   Polygons polys;
   polys.push_back({
       {glm::vec2(15, -12.7135563), 287, 346},          //
