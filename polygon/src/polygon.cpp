@@ -81,7 +81,7 @@ enum MergeType { WEST, EAST, NONE };
 struct EdgePair {
   VertItr vWest, vEast;
   MergeType merge;
-  PairItr lastNeighbor;
+  int nEast;
   bool westCertain, eastCertain;
 
   bool &getCertainty(bool westSide) {
@@ -325,8 +325,7 @@ class Monotones {
    * inserted previous to that mark in the reverse sweep.
    */
   void RemovePair(PairItr pair) {
-    pair->lastNeighbor =
-        pair == activePairs_.begin() ? activePairs_.end() : std::prev(pair);
+    pair->nEast = std::distance(pair, activePairs_.end()) - 1;
     inactivePairs_.splice(inactivePairs_.end(), activePairs_, pair);
   }
 
@@ -366,10 +365,12 @@ class Monotones {
 
     if (north == pairWest->vWest || north == pairWest->vEast) {
       if (params.verbose) std::cout << "removing pair West" << std::endl;
+      north->pairEast = pairWest;
       RemovePair(pairWest);
     }
     if (north == pairEast->vEast || north == pairEast->vWest) {
       if (params.verbose) std::cout << "removing pair East" << std::endl;
+      northEast->pairWest = pairEast;
       RemovePair(pairEast);
     }
 
@@ -560,6 +561,8 @@ class Monotones {
       if (params.verbose)
         std::cout << "mesh_idx = " << vert->mesh_idx << std::endl;
 
+      if (vert->Processed()) continue;
+
       VertType type = CategorizeVert(vert);
 
       PairItr newPair = vert->pairWest;
@@ -572,7 +575,8 @@ class Monotones {
           break;
         case START:
           if (params.verbose) std::cout << "START" << std::endl;
-          activePairs_.splice(newPair->lastNeighbor, inactivePairs_, newPair);
+          activePairs_.splice(std::next(activePairs_.begin(), newPair->nEast),
+                              inactivePairs_, newPair);
           newPair->vWest = vert;
           newPair->vEast = vert;
           newPair->westCertain = true;
@@ -657,8 +661,7 @@ class Monotones {
         loc == activePairs_.begin() || VertEastOfPair(vert, std::prev(loc)) > 0;
     bool eastCertain = isStart > 0;
     const PairItr newPair = activePairs_.insert(
-        loc, {vert, vert, MergeType::NONE, activePairs_.end(), westCertain,
-              eastCertain});
+        loc, {vert, vert, MergeType::NONE, -1, westCertain, eastCertain});
     vert->pairWest = newPair;
     vert->pairEast = newPair;
   }
@@ -675,9 +678,8 @@ class Monotones {
     }
 
     if (pairEast == activePairs_.end()) --pairEast;
-    PairItr pairWest =
-        activePairs_.insert(pairEast, {pairEast->vWest, vert, MergeType::NONE,
-                                       activePairs_.end(), true, true});
+    PairItr pairWest = activePairs_.insert(
+        pairEast, {pairEast->vWest, vert, MergeType::NONE, -1, true, true});
     vert->pairEast = pairEast;
     vert->pairWest = pairWest;
     pairEast->vWest->pairEast = pairWest;
