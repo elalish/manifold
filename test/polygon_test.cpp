@@ -445,7 +445,6 @@ TEST(Polygon, TouchingHole) {
 }
 
 TEST(Polygon, Sponge) {
-  PolygonParams().verbose = true;
   Polygons polys;
   polys.push_back({
       {glm::vec2(-0.5, -0.5), 22, 50},                  //
@@ -568,8 +567,7 @@ TEST(Polygon, SquareHoles) {
   TestPoly(polys, 56);
 }
 
-TEST(Polygon, DISABLED_BigSponge) {
-  PolygonParams().verbose = true;
+TEST(Polygon, BigSponge) {
   Polygons polys;
   polys.push_back({
       {glm::vec2(0.5, 0.5), 1, 8596},                         //
@@ -2346,7 +2344,7 @@ TEST(Polygon, DISABLED_BigSponge) {
       {glm::vec2(0.475308657, 0.450617284), 83867, 11095},  //
       {glm::vec2(0.487654328, 0.450617284), 83865, 11092},  //
   });
-  TestPoly(polys, 5);
+  TestPoly(polys, 1771);
 }
 
 /**
