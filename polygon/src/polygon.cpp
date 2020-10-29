@@ -54,7 +54,11 @@ struct VertAdj {
 
   bool Processed() const { return index < 0; }
   void SetProcessed(bool processed) { index = processed ? -1 : 0; }
-  bool IsStart() const { return left->pos.y >= pos.y && right->pos.y > pos.y; }
+  bool IsStart() const {
+    return (left->pos.y >= pos.y && right->pos.y > pos.y) ||
+           (left->pos.y == pos.y && right->pos.y == pos.y &&
+            left->pos.x <= pos.x && right->pos.x < pos.x);
+  }
   bool IsPast(const VertAdj &other) const {
     return pos.y > other.pos.y + kTolerance;
   }
@@ -325,6 +329,7 @@ class Monotones {
    * inserted previous to that mark in the reverse sweep.
    */
   void RemovePair(PairItr pair) {
+    if (pair == activePairs_.end()) throw logicErr("No pair to remove!");
     pair->nEast = std::distance(pair, activePairs_.end()) - 1;
     inactivePairs_.splice(inactivePairs_.end(), activePairs_, pair);
   }
@@ -353,12 +358,14 @@ class Monotones {
     northEast->SetProcessed(true);
     north->pairWest = pairWest;
     northEast->pairEast = pairEast;
+    northEast->pairWest = activePairs_.end();
 
     VertItr southEast = monotones_.insert(south, *south);
     Link(southEast, south->right);
     southEast->SetProcessed(true);
     south->pairWest = pairWest;
     southEast->pairEast = pairEast;
+    southEast->pairWest = activePairs_.end();
 
     Link(south, north);
     Link(northEast, southEast);
@@ -392,6 +399,10 @@ class Monotones {
    * input boolean, west.
    */
   void Reorder(const VertItr vert, const PairItr inputPair, const bool west) {
+    if (inputPair == activePairs_.end()) {
+      std::cout << "input pair is not defined!" << std::endl;
+      return;
+    }
     PairItr potentialPair = inputPair;
 
     if (potentialPair->getCertainty(west)) return;
@@ -400,6 +411,8 @@ class Monotones {
     while (potentialPair != end) {
       potentialPair =
           west ? std::prev(potentialPair) : std::next(potentialPair);
+      // TODO: Make these checks merge-aware (VertWestOfPair), and also fall
+      // back to checking next vert so as to catch divergent edge immediately.
       int eastOf =
           west ? potentialPair->westOf(vert) : potentialPair->eastOf(vert);
       if (eastOf >= 0) {   // in the right place
@@ -424,7 +437,6 @@ class Monotones {
           inputPair->westCertain = true;
           vert->pairEast = potentialPair;
           vert->pairWest = inputPair;
-          // TODO: SplitVerts and such
         }
         break;
       }
@@ -465,11 +477,8 @@ class Monotones {
       if (vert->Processed()) continue;
 
       if (!skipped.empty() && vert->IsPast(*skipped.back())) {
-        if (params.verbose)
-          std::cout
-              << "Not Geometrically Valid! None of the skipped verts is valid."
-              << std::endl;
-        return true;
+        throw logicErr(
+            "Not Geometrically Valid! None of the skipped verts is valid.");
       }
 
       VertType type = CategorizeVert(vert);
@@ -500,10 +509,7 @@ class Monotones {
 
       if (type == SKIP) {
         if (vert == insertAt) {
-          if (params.verbose)
-            std::cout << "Not Geometrically Valid! Tried to skip final vert."
-                      << std::endl;
-          return true;
+          throw logicErr("Not Geometrically Valid! Tried to skip final vert.");
         }
         skipped.push_back(vert);
         if (params.verbose) std::cout << "Skipping vert" << std::endl;
@@ -575,6 +581,7 @@ class Monotones {
           break;
         case START:
           if (params.verbose) std::cout << "START" << std::endl;
+          if (newPair->nEast < 0) throw logicErr("Invalid location!");
           activePairs_.splice(std::next(activePairs_.begin(), newPair->nEast),
                               inactivePairs_, newPair);
           newPair->vWest = vert;
@@ -591,8 +598,7 @@ class Monotones {
           End(vert);
           break;
         case SKIP:
-          std::cout << "SKIP should not happen on reverse sweep!" << std::endl;
-          return true;
+          throw logicErr("SKIP should not happen on reverse sweep!");
       }
 
       vert->SetProcessed(true);
@@ -627,12 +633,14 @@ class Monotones {
         }
       } else {
         vert->pairEast = vert->right->pairEast;
+        vert->pairWest = activePairs_.end();
         Reorder(vert, vert->pairEast, true);
         Reorder(vert, vert->pairEast, false);
         return LEFTWARDS;
       }
     } else {
       if (vert->left->Processed()) {
+        vert->pairEast = activePairs_.end();
         vert->pairWest = vert->left->pairWest;
         Reorder(vert, vert->pairWest, true);
         Reorder(vert, vert->pairWest, false);
@@ -671,19 +679,14 @@ class Monotones {
     vert->pairEast = pairEast;
     VertItr vertEast = SplitVerts(vert, false);
     // If a split occurred then no pairs have to change.
-    if (vertEast != monotones_.end()) {
-      vert->right->pairWest = vert->pairWest;
-      vertEast->left->pairEast = vertEast->pairEast;
-      return;
-    }
+    if (vertEast != monotones_.end()) return;
 
-    if (pairEast == activePairs_.end()) --pairEast;
+    if (pairEast == activePairs_.end()) throw logicErr("Hole is past the end!");
     PairItr pairWest = activePairs_.insert(
         pairEast, {pairEast->vWest, vert, MergeType::NONE, -1, true, true});
     vert->pairEast = pairEast;
     vert->pairWest = pairWest;
     pairEast->vWest->pairEast = pairWest;
-    pairEast->vWest->left->pairEast = pairWest;
     pairEast->vWest = vert;
   }
 
