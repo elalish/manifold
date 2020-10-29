@@ -3,7 +3,7 @@ project (manifold_test)
 enable_testing()
 
 add_executable(${PROJECT_NAME} polygon_test.cpp mesh_test.cpp samples_test.cpp)
-target_link_libraries(${PROJECT_NAME} polygon manifold meshIO samples GTest::GTest)
+target_link_libraries(${PROJECT_NAME} polygon GTest::GTest manifold meshIO samples)
 
 target_compile_options(${PROJECT_NAME} PRIVATE ${MANIFOLD_FLAGS})
 target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_14)

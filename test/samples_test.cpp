@@ -51,10 +51,18 @@ TEST(Samples, Knot42) {
 
 // This creates a bracelet sample which involves many operations between shapes
 // that are not in general position, e.g. coplanar faces.
-TEST(Samples, Bracelet) {
+TEST(Samples, DISABLED_Bracelet) {
   Manifold::SetExpectGeometry(true);
   Manifold bracelet = StretchyBracelet();
   Mesh triangulated = bracelet.Extract();
   EXPECT_EQ(bracelet.Genus(), 1);
-  // ExportMesh("bracelet.ply", triangulated);
+  ExportMesh("bracelet.ply", triangulated);
+}
+
+// A fractal with many degenerate intersections, which also tests exact 90
+// degree rotations.
+TEST(Samples, DISABLED_Sponge) {
+  Manifold::SetExpectGeometry(true);
+  Manifold sponge = MengerSponge(3, false);
+  ExportMesh("mengerSponge.ply", sponge.Extract());
 }
