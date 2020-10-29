@@ -129,7 +129,44 @@ Manifold Manifold::Octahedron() {
  */
 Manifold Manifold::Cube(glm::vec3 size, bool center) {
   Manifold cube;
-  cube.pImpl_ = std::make_unique<Impl>(Impl::Shape::CUBE);
+  std::vector<glm::vec3> vertPos = {{0.0f, 0.0f, 0.0f},  //
+                                    {1.0f, 0.0f, 0.0f},  //
+                                    {1.0f, 1.0f, 0.0f},  //
+                                    {0.0f, 1.0f, 0.0f},  //
+                                    {0.0f, 0.0f, 1.0f},  //
+                                    {1.0f, 0.0f, 1.0f},  //
+                                    {1.0f, 1.0f, 1.0f},  //
+                                    {0.0f, 1.0f, 1.0f}};
+  std::vector<Halfedge> halfedge = {{0, 3, 20, 0},  //
+                                    {3, 2, 16, 0},  //
+                                    {2, 1, 12, 0},  //
+                                    {1, 0, 8, 0},   //
+                                    {4, 5, 10, 1},  //
+                                    {5, 6, 14, 1},  //
+                                    {6, 7, 18, 1},  //
+                                    {7, 4, 22, 1},  //
+                                    {0, 1, 3, 2},   //
+                                    {1, 5, 15, 2},  //
+                                    {5, 4, 4, 2},   //
+                                    {4, 0, 21, 2},  //
+                                    {1, 2, 2, 3},   //
+                                    {2, 6, 19, 3},  //
+                                    {6, 5, 5, 3},   //
+                                    {5, 1, 9, 3},   //
+                                    {2, 3, 1, 4},   //
+                                    {3, 7, 23, 4},  //
+                                    {7, 6, 6, 4},   //
+                                    {6, 2, 13, 4},  //
+                                    {3, 0, 0, 5},   //
+                                    {0, 4, 11, 5},  //
+                                    {4, 7, 7, 5},   //
+                                    {7, 3, 17, 5}};
+  std::vector<int> faceEdge = {0, 4, 8, 12, 16, 20, 24};
+  cube.pImpl_->vertPos_ = vertPos;
+  cube.pImpl_->halfedge_ = halfedge;
+  cube.pImpl_->faceEdge_ = faceEdge;
+  cube.pImpl_->Finish();
+
   cube.Scale(size);
   if (center) cube.Translate(-size / 2.0f);
   return cube;
