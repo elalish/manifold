@@ -592,7 +592,7 @@ class Monotones {
    * duplicates these verts to break the polygons, then attaches them across to
    * each other with two new edges.
    */
-  void SplitVerts(VertItr north, VertItr south) {
+  VertItr SplitVerts(VertItr north, VertItr south) {
     // at split events, add duplicate vertices to end of list and reconnect
     if (params.verbose)
       std::cout << "split from " << north->mesh_idx << " to " << south->mesh_idx
@@ -608,6 +608,8 @@ class Monotones {
 
     Link(south, north);
     Link(northEast, southEast);
+
+    return northEast;
   }
 
   /**
@@ -634,44 +636,53 @@ class Monotones {
         case MERGE: {
           PairItr eastPair = std::next(westPair);
           if (eastPair->vMerge != monotones_.end()) {
-            SplitVerts(eastPair->vMerge, vert);
+            SplitVerts(vert, eastPair->vMerge);
           }
           eastPair->vMerge = vert;
+          eastPair->vWest = westPair->vWest;
+          eastPair->vWest->pair = eastPair;
         }
         case END:
           RemovePair(westPair);
         case LEFTWARDS:
         case RIGHTWARDS:
           if (westPair->vMerge != monotones_.end()) {
-            SplitVerts(westPair->vMerge, vert);
+            VertItr eastVert = SplitVerts(vert, westPair->vMerge);
             westPair->vMerge = monotones_.end();
+            if (type == LEFTWARDS) westPair->vWest = eastVert;
           }
           break;
-        case START:
-          // Due to sweeping in the opposite direction, what was the next pair
-          // is now the previous pair and begin and end are swapped.
-          activePairs_.splice(westPair->nextPair == activePairs_.end()
+        case START: {
+          // Due to sweeping in the opposite direction, east and west are
+          // swapped and what was the next pair is now the previous pair and
+          // begin and end are swapped.
+          PairItr eastPair = westPair;
+          westPair = westPair->nextPair;
+          activePairs_.splice(westPair == activePairs_.end()
                                   ? activePairs_.begin()
-                                  : std::next(westPair->nextPair),
-                              inactivePairs_, westPair);
+                                  : std::next(westPair),
+                              inactivePairs_, eastPair);
 
-          if (vert->pair->vMerge == vert) {  // Hole
+          if (eastPair->vMerge == vert) {  // Hole
             VertItr split =
                 westPair->vMerge != monotones_.end()
                     ? westPair->vMerge
                     : westPair->vWest->pos.y < westPair->vEast->pos.y
                           ? westPair->vWest
                           : westPair->vEast;
-            SplitVerts(split, vert);
+            VertItr eastVert = SplitVerts(vert, split);
             westPair->vMerge = monotones_.end();
-            westPair->vWest = westPair->nextPair->vWest;
-            westPair->nextPair->vWest = vert;
+            eastPair->vMerge = monotones_.end();
+            eastPair->vEast = westPair->vEast;
+            eastPair->vWest = eastVert;
             westPair->vEast = vert;
+            vert->pair = westPair;
           } else {  // Start
-            westPair->vWest = vert;
-            westPair->vEast = vert;
+            eastPair->vWest = vert;
+            eastPair->vEast = vert;
           }
           break;
+        }
         case SKIP:
           throw logicErr("SKIP should not happen on reverse sweep!");
       }
