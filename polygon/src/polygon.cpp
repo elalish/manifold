@@ -639,8 +639,6 @@ class Monotones {
             SplitVerts(vert, eastPair->vMerge);
           }
           eastPair->vMerge = vert;
-          eastPair->vWest = westPair->vWest;
-          eastPair->vWest->pair = eastPair;
         }
         case END:
           RemovePair(westPair);
@@ -673,7 +671,10 @@ class Monotones {
             VertItr eastVert = SplitVerts(vert, split);
             westPair->vMerge = monotones_.end();
             eastPair->vMerge = monotones_.end();
-            eastPair->vEast = westPair->vEast;
+            eastPair->vEast = westPair->vEast == westPair->vWest
+                                  ? eastVert->right
+                                  : westPair->vEast;
+            eastPair->vEast->pair = eastPair;
             eastPair->vWest = eastVert;
             westPair->vEast = vert;
             vert->pair = westPair;
