@@ -66,7 +66,7 @@ void TestPoly(const Polygons &polys, int expectedNumTri,
  * tolerance.
  */
 TEST(Polygon, SimpleHole) {
-  //   PolygonParams().verbose = true;
+  PolygonParams().verbose = true;
   Polygons polys;
   polys.push_back({
       {glm::vec2(0, -2), 0, Edge::kNoIdx},  //
