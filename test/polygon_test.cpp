@@ -99,7 +99,7 @@ TEST(Polygon, SimpleHole2) {
 }
 
 TEST(Polygon, MultiMerge) {
-  PolygonParams().verbose = true;
+  //   PolygonParams().verbose = true;
   Polygons polys;
   polys.push_back({
       {glm::vec2(-7, 0), 0, Edge::kNoIdx},   //
