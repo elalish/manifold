@@ -50,7 +50,7 @@ struct VertAdj {
   int edgeRight;  // Cannot join identical edges with a triangle.
   int index;
   VertItr left, right;
-  PairItr pair;
+  PairItr eastPair, westPair;
 
   bool Processed() const { return index < 0; }
   void SetProcessed(bool processed) { index = processed ? -1 : 0; }
@@ -85,13 +85,10 @@ struct EdgePair {
   PairItr nextPair;
   bool westCertain, eastCertain, startCertain;
 
-  bool &getCertainty(bool westSide) {
-    return westSide ? westCertain : eastCertain;
-  }
-  int westOf(VertItr vert) const {
+  int WestOf(VertItr vert) const {
     return CCW(vEast->right->pos, vEast->pos, vert->pos);
   }
-  int eastOf(VertItr vert) const {
+  int EastOf(VertItr vert) const {
     return CCW(vWest->pos, vWest->left->pos, vert->pos);
   }
 };
@@ -308,26 +305,31 @@ class Monotones {
     right->left = left;
   }
 
+  void SetVWest(PairItr pair, VertItr vert) {
+    pair->vWest = vert;
+    vert->eastPair = pair;
+  }
+
+  void SetVEast(PairItr pair, VertItr vert) {
+    pair->vEast = vert;
+    vert->westPair = pair;
+  }
+
+  PairItr GetPair(VertItr vert, VertType type) {
+    // MERGE returns westPair, as this is the one that will be removed.
+    return type == LEFTWARDS ? vert->eastPair : vert->westPair;
+  }
+
   VertType ProcessVert(VertItr vert) {
+    PairItr eastPair = vert->right->eastPair;
+    PairItr westPair = vert->left->westPair;
     if (vert->right->Processed()) {
-      PairItr eastPair = vert->right->pair;
-      // If the vert is a hole it is between two pairs, but only points to the
-      // western one. If this is true, increment to get the eastern instead.
-      if (eastPair->vWest != vert->right) {
-        ++eastPair;
-        if (eastPair == activePairs_.end())
-          throw logicErr("No pair East of hole!");
-      }
+      SetVWest(eastPair, vert);
       if (vert->left->Processed()) {
-        PairItr westPair = vert->left->pair;
-        vert->pair = westPair;  // Point to the pair that's getting removed.
+        SetVEast(westPair, vert);
         if (westPair == eastPair) {
           // facing in
           if (params.verbose) std::cout << "END" << std::endl;
-          // Hole verts point to westPair; point them to eastPair instead since
-          // westPair is being removed. Any vert that is not a hole will not
-          // matter anyway.
-          westPair->vEast->pair = std::next(westPair);
           westPair->westCertain = true;
           westPair->eastCertain = true;
           return END;
@@ -337,8 +339,8 @@ class Monotones {
           if (params.verbose) std::cout << "MERGE" << std::endl;
           westPair->westCertain = true;
           westPair->eastCertain = true;
-          eastPair->vWest = westPair->vWest;
-          eastPair->vWest->pair = eastPair;
+          // westPair is removed and eastPair takes over.
+          SetVWest(eastPair, westPair->vWest);
           return MERGE;
         } else {  // not neighbors
           if (params.verbose) std::cout << "SKIP" << std::endl;
@@ -346,16 +348,12 @@ class Monotones {
         }
       } else {
         if (params.verbose) std::cout << "LEFTWARDS" << std::endl;
-        vert->pair = eastPair;
-        eastPair->vWest = vert;
         return LEFTWARDS;
       }
     } else {
       if (vert->left->Processed()) {
+        SetVEast(westPair, vert);
         if (params.verbose) std::cout << "RIGHTWARDS" << std::endl;
-        PairItr westPair = vert->left->pair;
-        vert->pair = westPair;
-        westPair->vEast = vert;
         return RIGHTWARDS;
       } else {
         if (params.verbose) std::cout << "START" << std::endl;
@@ -385,8 +383,7 @@ class Monotones {
    * This function is designed to search both ways, with direction chosen by the
    * input boolean, west.
    */
-  bool ShiftEast(const VertItr vert) {
-    const PairItr inputPair = vert->pair;
+  bool ShiftEast(const VertItr vert, const PairItr inputPair) {
     if (inputPair == activePairs_.end()) {
       throw logicErr("input pair is not defined!");
     }
@@ -404,30 +401,29 @@ class Monotones {
 
     PairItr potentialPair = std::next(inputPair);
     while (potentialPair != activePairs_.end()) {
-      const int eastOf = potentialPair->eastOf(vert);
-      if (eastOf > 0 && isStart < 0) {
+      const int EastOf = potentialPair->EastOf(vert);
+      if (EastOf > 0 && isStart < 0) {
         // Conflicting certainties indicate we should skip this vert.
         return true;
       }
-      if (eastOf >= 0 && isStart >= 0) {  // in the right place
-        if (eastOf > 0) {                 // certain
+      if (EastOf >= 0 && isStart >= 0) {  // in the right place
+        if (EastOf > 0) {                 // certain
           inputPair->eastCertain = true;
           potentialPair->westCertain = true;
         }
         activePairs_.splice(potentialPair, activePairs_, inputPair);
         return false;
       }  // else (implicit from break above)
-      const int outside = potentialPair->westOf(vert);
+      const int outside = potentialPair->WestOf(vert);
       if (outside < 0 && isStart > 0) {
         // Conflicting certainties indicate we should skip this vert.
         return true;
       }
       if (outside < 0 || isStart < 0) {  // certainly a hole
         // potentialPair becomes westPair and inputPair becomes eastPair.
-        std::swap(potentialPair->vEast, inputPair->vEast);
-        inputPair->vEast->pair = inputPair;
-        // This line means if vert is a START, then vert->pair points west.
-        potentialPair->vEast->pair = potentialPair;
+        VertItr tmp = potentialPair->vEast;
+        SetVEast(potentialPair, inputPair->vEast);
+        SetVEast(inputPair, tmp);
 
         potentialPair->eastCertain = true;
         inputPair->westCertain = true;
@@ -456,23 +452,23 @@ class Monotones {
   //   while (potentialPair != end) {
   //     potentialPair =
   //         west ? std::prev(potentialPair) : std::next(potentialPair);
-  //     int eastOf =
-  //         west ? potentialPair->westOf(vert) : potentialPair->eastOf(vert);
-  //     if (eastOf >= 0) {   // in the right place
-  //       if (eastOf > 0) {  // certain
+  //     int EastOf =
+  //         west ? potentialPair->WestOf(vert) : potentialPair->EastOf(vert);
+  //     if (EastOf >= 0) {   // in the right place
+  //       if (EastOf > 0) {  // certain
   //         inputPair->getCertainty(west) = true;
   //       }
   //       PairItr loc = west ? std::next(potentialPair) : potentialPair;
   //       activePairs_.splice(loc, activePairs_, inputPair);
   //       break;
   //     }
-  //     eastOf = -1 * (west ? potentialPair->eastOf(vert)
-  //                         : potentialPair->westOf(vert));
-  //     if (eastOf >= 0) {  // in the right place
+  //     EastOf = -1 * (west ? potentialPair->EastOf(vert)
+  //                         : potentialPair->WestOf(vert));
+  //     if (EastOf >= 0) {  // in the right place
   //       PairItr loc = west ? potentialPair : std::next(potentialPair);
   //       activePairs_.splice(loc, activePairs_, inputPair);
   //       inputPair->getCertainty(!west) = false;
-  //       if (eastOf > 0) {  // certainly a hole
+  //       if (EastOf > 0) {  // certainly a hole
   //         std::swap(potentialPair->vWest, inputPair->vWest);
   //         potentialPair->vWest->pairEast = potentialPair;
   //         inputPair->vWest->pairEast = inputPair;
@@ -533,16 +529,21 @@ class Monotones {
       VertType type = ProcessVert(vert);
 
       if (type == START) {
-        vert->pair = activePairs_.insert(
+        PairItr newPair;
+        newPair = activePairs_.insert(
             activePairs_.begin(), {vert, vert, monotones_.end(),
                                    activePairs_.end(), false, false, false});
+        SetVWest(newPair, vert);
+        SetVEast(newPair, vert);
       }
 
-      if (ShiftEast(vert)) {
-        activePairs_.erase(vert->pair);
+      PairItr pair = GetPair(vert, type);
+
+      if (ShiftEast(vert, pair) && type == START) {
+        activePairs_.erase(pair);
         type = SKIP;
       }
-      // ShiftWest(vert);
+      // ShiftWest(vert, pair);
 
       if (type == SKIP) {
         if (vert == insertAt) {
@@ -571,9 +572,9 @@ class Monotones {
           break;
         case MERGE:
           // Mark merge as hole for sweep-back.
-          vert->pair->vMerge = vert;
+          pair->vMerge = vert;
         case END:
-          RemovePair(vert->pair);
+          RemovePair(pair);
           break;
       }
 
@@ -635,7 +636,7 @@ class Monotones {
 
       VertType type = ProcessVert(vert);
 
-      PairItr westPair = vert->pair;
+      PairItr westPair = GetPair(vert, type);
       switch (type) {
         case MERGE: {
           PairItr eastPair = std::next(westPair);
@@ -659,7 +660,7 @@ class Monotones {
           // swapped and what was the next pair is now the previous pair and
           // begin and end are swapped.
           PairItr eastPair = westPair;
-          westPair = westPair->nextPair;
+          westPair = eastPair->nextPair;
           activePairs_.splice(westPair == activePairs_.end()
                                   ? activePairs_.begin()
                                   : std::next(westPair),
@@ -675,17 +676,13 @@ class Monotones {
             VertItr eastVert = SplitVerts(vert, split);
             westPair->vMerge = monotones_.end();
             eastPair->vMerge = monotones_.end();
-            eastPair->vEast =
-                westPair->vEast->mesh_idx == eastVert->right->mesh_idx
-                    ? eastVert->right
-                    : westPair->vEast;
-            eastPair->vEast->pair = eastPair;
-            eastPair->vWest = eastVert;
-            westPair->vEast = vert;
-            vert->pair = westPair;
+            SetVWest(eastPair, eastVert);
+            SetVEast(eastPair, split == westPair->vEast ? eastVert->right
+                                                        : westPair->vEast);
+            SetVEast(westPair, vert);
           } else {  // Start
-            eastPair->vWest = vert;
-            eastPair->vEast = vert;
+            SetVWest(eastPair, vert);
+            SetVEast(eastPair, vert);
           }
           break;
         }
@@ -707,13 +704,13 @@ class Monotones {
       // std::cout << (pair.westCertain ? "certain " : "uncertain ");
       std::cout << "edge West: S = " << pair.vWest->mesh_idx
                 << ", N = " << pair.vWest->left->mesh_idx << std::endl;
-      if (&*(pair.vWest->pair) != &pair)
+      if (&*(pair.vWest->eastPair) != &pair)
         std::cout << "west does not point back!" << std::endl;
 
       // std::cout << (pair.eastCertain ? "certain " : "uncertain ");
       std::cout << "edge East: S = " << pair.vEast->mesh_idx
                 << ", N = " << pair.vEast->right->mesh_idx << std::endl;
-      if (&*(pair.vEast->pair) != &pair)
+      if (&*(pair.vEast->westPair) != &pair)
         std::cout << "east does not point back!" << std::endl;
     }
   }
