@@ -201,7 +201,7 @@ class Monotones {
                               poly[i].idx,       //
                               poly[i].nextEdge,  //
                               0, monotones_.end(), monotones_.end(),
-                              activePairs_.end()});
+                              activePairs_.end(), activePairs_.end()});
 
         current = std::prev(monotones_.end());
         if (i == 0)
@@ -315,6 +315,11 @@ class Monotones {
     vert->westPair = pair;
   }
 
+  void SetEastCertainty(PairItr westPair, bool certain) {
+    westPair->eastCertain = certain;
+    std::next(westPair)->westCertain = certain;
+  }
+
   PairItr GetPair(VertItr vert, VertType type) {
     // MERGE returns westPair, as this is the one that will be removed.
     return type == LEFTWARDS ? vert->eastPair : vert->westPair;
@@ -373,23 +378,7 @@ class Monotones {
     inactivePairs_.splice(inactivePairs_.end(), activePairs_, pair);
   }
 
-  /**
-   * This is the key function for handling degeneracies, and is the purpose of
-   * running the sweep-line forwards and backwards. Splits are only performed
-   * after a merge vert has been found, which means we have as much information
-   * as we can about where it is geometrically. This is the function that uses
-   * that new information to reorder the uncertain monotone edge pairs.
-   *
-   * This function is designed to search both ways, with direction chosen by the
-   * input boolean, west.
-   */
-  bool ShiftEast(const VertItr vert, const PairItr inputPair) {
-    if (inputPair == activePairs_.end()) {
-      throw logicErr("input pair is not defined!");
-    }
-
-    if (inputPair->eastCertain) return false;
-
+  int UpdateStart(VertItr vert, PairItr inputPair) {
     int isStart = 1;
     if (!inputPair->startCertain) {
       isStart =
@@ -397,90 +386,103 @@ class Monotones {
               ? CCW(vert->left->pos, vert->pos, inputPair->vEast->right->pos)
               : CCW(inputPair->vWest->left->pos, vert->pos, vert->right->pos);
       inputPair->startCertain = isStart != 0;
+      if (params.verbose) std::cout << "isStart = " << isStart << std::endl;
     }
+    return isStart;
+  }
+
+  void SwapHole(PairItr outside, PairItr inside) {
+    // outside becomes westPair and inside becomes eastPair.
+    VertItr tmp = outside->vEast;
+    SetVEast(outside, inside->vEast);
+    SetVEast(inside, tmp);
+    inside->eastCertain = outside->eastCertain;
+
+    activePairs_.splice(std::next(outside), activePairs_, inside);
+    SetEastCertainty(outside, true);
+  }
+
+  /**
+   * This is the key function for handling east-west degeneracies, and is the
+   * purpose of running the sweep-line forwards and backwards. If the ordering
+   * of inputPair is uncertain, this function uses the edge ahead of vert to
+   * check if this new bit of geometric information is enough to place the pair
+   * with certainty. It can also invert the pair if it is determined to be a
+   * hole, in which case the inputPair becomes the eastPair while the pair it is
+   * inside of becomes the westPair.
+   */
+  bool ShiftEast(const VertItr vert, const PairItr inputPair,
+                 const int isStart) {
+    if (inputPair == activePairs_.end()) {
+      throw logicErr("input pair is not defined!");
+    }
+
+    if (inputPair->eastCertain) return false;
 
     PairItr potentialPair = std::next(inputPair);
     while (potentialPair != activePairs_.end()) {
       const int EastOf = potentialPair->EastOf(vert);
-      if (EastOf > 0 && isStart < 0) {
-        // Conflicting certainties indicate we should skip this vert.
-        return true;
-      }
+      if (EastOf > 0 && isStart < 0)
+        throw runtimeErr("conflict certainties -> overlap");
+
       if (EastOf >= 0 && isStart >= 0) {  // in the right place
-        if (EastOf > 0) {                 // certain
-          inputPair->eastCertain = true;
-          potentialPair->westCertain = true;
-        }
         activePairs_.splice(potentialPair, activePairs_, inputPair);
+        SetEastCertainty(inputPair, EastOf != 0);
         return false;
-      }  // else (implicit from break above)
-      const int outside = potentialPair->WestOf(vert);
-      if (outside < 0 && isStart > 0) {
-        // Conflicting certainties indicate we should skip this vert.
-        return true;
       }
+      const int outside = potentialPair->WestOf(vert);
+      if (outside < 0 && isStart > 0)
+        throw runtimeErr("conflict certainties -> overlap");
+
       if (outside < 0 || isStart < 0) {  // certainly a hole
-        // potentialPair becomes westPair and inputPair becomes eastPair.
-        VertItr tmp = potentialPair->vEast;
-        SetVEast(potentialPair, inputPair->vEast);
-        SetVEast(inputPair, tmp);
-
-        potentialPair->eastCertain = true;
-        inputPair->westCertain = true;
-
-        activePairs_.splice(++potentialPair, activePairs_, inputPair);
-        return false;
+        SwapHole(potentialPair, inputPair);
+        return true;
       }
       ++potentialPair;
     }
+    if (isStart < 0) throw runtimeErr("conflict certainties -> overlap");
+
     activePairs_.splice(activePairs_.end(), activePairs_, inputPair);
     return false;
   }
 
-  // void Reorder(const VertItr vert, const bool west) {
-  //   const PairItr inputPair = vert->pair;
-  //   if (inputPair == activePairs_.end()) {
-  //     std::cout << "input pair is not defined!" << std::endl;
-  //     return;
-  //   }
-  //   PairItr potentialPair = inputPair;
+  /**
+   * Identical to the above function, but swapped to search westward instead.
+  */
+  bool ShiftWest(const VertItr vert, const PairItr inputPair,
+                 const int isStart) {
+    if (inputPair == activePairs_.end()) {
+      throw logicErr("input pair is not defined!");
+    }
 
-  //   if (potentialPair->getCertainty(west)) return;
+    if (inputPair->westCertain) return false;
 
-  //   PairItr end = west ? activePairs_.begin() :
-  //   std::prev(activePairs_.end());
-  //   while (potentialPair != end) {
-  //     potentialPair =
-  //         west ? std::prev(potentialPair) : std::next(potentialPair);
-  //     int EastOf =
-  //         west ? potentialPair->WestOf(vert) : potentialPair->EastOf(vert);
-  //     if (EastOf >= 0) {   // in the right place
-  //       if (EastOf > 0) {  // certain
-  //         inputPair->getCertainty(west) = true;
-  //       }
-  //       PairItr loc = west ? std::next(potentialPair) : potentialPair;
-  //       activePairs_.splice(loc, activePairs_, inputPair);
-  //       break;
-  //     }
-  //     EastOf = -1 * (west ? potentialPair->EastOf(vert)
-  //                         : potentialPair->WestOf(vert));
-  //     if (EastOf >= 0) {  // in the right place
-  //       PairItr loc = west ? potentialPair : std::next(potentialPair);
-  //       activePairs_.splice(loc, activePairs_, inputPair);
-  //       inputPair->getCertainty(!west) = false;
-  //       if (EastOf > 0) {  // certainly a hole
-  //         std::swap(potentialPair->vWest, inputPair->vWest);
-  //         potentialPair->vWest->pairEast = potentialPair;
-  //         inputPair->vWest->pairEast = inputPair;
-  //         inputPair->eastCertain = true;
-  //         inputPair->westCertain = true;
-  //         vert->pairEast = potentialPair;
-  //         vert->pairWest = inputPair;
-  //       }
-  //       break;
-  //     }
-  //   }
-  // }
+    PairItr potentialPair = inputPair;
+    while (potentialPair != activePairs_.begin()) {
+      --potentialPair;
+      const int WestOf = potentialPair->WestOf(vert);
+      if (WestOf > 0 && isStart < 0)
+        throw runtimeErr("conflict certainties -> overlap");
+
+      if (WestOf >= 0 && isStart >= 0) {  // in the right place
+        activePairs_.splice(++potentialPair, activePairs_, inputPair);
+        SetEastCertainty(inputPair, WestOf != 0);
+        return false;
+      }
+      const int outside = potentialPair->EastOf(vert);
+      if (outside < 0 && isStart > 0)
+        throw runtimeErr("conflict certainties -> overlap");
+
+      if (outside < 0 || isStart < 0) {  // certainly a hole
+        SwapHole(potentialPair, inputPair);
+        return true;
+      }
+    }
+    if (isStart < 0) throw runtimeErr("conflict certainties -> overlap");
+
+    activePairs_.splice(activePairs_.begin(), activePairs_, inputPair);
+    return false;
+  }
 
   /**
    * This function sweeps forward (South to North) keeping track of the
@@ -538,12 +540,8 @@ class Monotones {
       }
 
       PairItr pair = GetPair(vert, type);
-
-      if (ShiftEast(vert, pair) && type == START) {
-        activePairs_.erase(pair);
-        type = SKIP;
-      }
-      // ShiftWest(vert, pair);
+      int isStart = UpdateStart(vert, pair);
+      if (isStart < 0 && activePairs_.size() == 1) type = SKIP;
 
       if (type == SKIP) {
         if (vert == insertAt) {
@@ -552,6 +550,12 @@ class Monotones {
         skipped.push_back(vert);
         if (params.verbose) std::cout << "Skipping vert" << std::endl;
         continue;
+      }
+
+      PairItr neighbor = std::next(pair);
+      if (!ShiftEast(vert, pair, isStart) && neighbor == std::next(pair)) {
+        // TODO: why does this cause stack smashing?
+        ShiftWest(vert, pair, isStart);
       }
 
       if (vert == insertAt)
@@ -701,13 +705,13 @@ class Monotones {
   void ListPairs() {
     std::cout << "active edges:" << std::endl;
     for (EdgePair &pair : activePairs_) {
-      // std::cout << (pair.westCertain ? "certain " : "uncertain ");
+      std::cout << (pair.westCertain ? "certain " : "uncertain ");
       std::cout << "edge West: S = " << pair.vWest->mesh_idx
                 << ", N = " << pair.vWest->left->mesh_idx << std::endl;
       if (&*(pair.vWest->eastPair) != &pair)
         std::cout << "west does not point back!" << std::endl;
 
-      // std::cout << (pair.eastCertain ? "certain " : "uncertain ");
+      std::cout << (pair.eastCertain ? "certain " : "uncertain ");
       std::cout << "edge East: S = " << pair.vEast->mesh_idx
                 << ", N = " << pair.vEast->right->mesh_idx << std::endl;
       if (&*(pair.vEast->westPair) != &pair)
