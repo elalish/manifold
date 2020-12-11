@@ -86,10 +86,21 @@ struct EdgePair {
   bool westCertain, eastCertain, startCertain;
 
   int WestOf(VertItr vert) const {
-    return CCW(vEast->right->pos, vEast->pos, vert->pos);
+    int westOf = CCW(vEast->right->pos, vEast->pos, vert->pos);
+    if (westOf == 0 && !vert->right->Processed())
+      westOf = CCW(vEast->right->pos, vEast->pos, vert->right->pos);
+    if (westOf == 0 && !vert->left->Processed())
+      westOf = CCW(vEast->right->pos, vEast->pos, vert->left->pos);
+    return westOf;
   }
+
   int EastOf(VertItr vert) const {
-    return CCW(vWest->pos, vWest->left->pos, vert->pos);
+    int eastOf = CCW(vWest->pos, vWest->left->pos, vert->pos);
+    if (eastOf == 0 && !vert->right->Processed())
+      eastOf = CCW(vWest->pos, vWest->left->pos, vert->right->pos);
+    if (eastOf == 0 && !vert->left->Processed())
+      eastOf = CCW(vWest->pos, vWest->left->pos, vert->left->pos);
+    return eastOf;
   }
 };
 
@@ -295,7 +306,7 @@ class Monotones {
   }
 
  private:
-  enum VertType { START, LEFTWARDS, RIGHTWARDS, MERGE, END, SKIP };
+  enum VertType { START, WESTSIDE, EASTSIDE, MERGE, END, SKIP };
   std::list<VertAdj> monotones_;     // sweep-line list of verts
   std::list<EdgePair> activePairs_;  // west to east list of monotone edge pairs
   std::list<EdgePair> inactivePairs_;  // completed monotones
@@ -322,7 +333,7 @@ class Monotones {
 
   PairItr GetPair(VertItr vert, VertType type) {
     // MERGE returns westPair, as this is the one that will be removed.
-    return type == LEFTWARDS ? vert->eastPair : vert->westPair;
+    return type == WESTSIDE ? vert->eastPair : vert->westPair;
   }
 
   VertType ProcessVert(VertItr vert) {
@@ -352,14 +363,14 @@ class Monotones {
           return SKIP;
         }
       } else {
-        if (params.verbose) std::cout << "LEFTWARDS" << std::endl;
-        return LEFTWARDS;
+        if (params.verbose) std::cout << "WESTSIDE" << std::endl;
+        return WESTSIDE;
       }
     } else {
       if (vert->left->Processed()) {
         SetVEast(westPair, vert);
-        if (params.verbose) std::cout << "RIGHTWARDS" << std::endl;
-        return RIGHTWARDS;
+        if (params.verbose) std::cout << "EASTSIDE" << std::endl;
+        return EASTSIDE;
       } else {
         if (params.verbose) std::cout << "START" << std::endl;
         return START;
@@ -430,19 +441,17 @@ class Monotones {
         SetEastCertainty(inputPair, EastOf != 0);
         return false;
       }
-      const int outside = potentialPair->WestOf(vert);
-      if (outside < 0 && isStart > 0)
-        throw runtimeErr("conflict certainties -> overlap");
 
-      if (outside < 0 || isStart < 0) {  // certainly a hole
+      const int outside = potentialPair->WestOf(vert);
+      if (outside < 0) {  // certainly a hole
+        if (isStart > 0) throw runtimeErr("conflict certainties -> overlap");
         SwapHole(potentialPair, inputPair);
         return true;
       }
       ++potentialPair;
     }
-    if (isStart < 0) throw runtimeErr("conflict certainties -> overlap");
-
     activePairs_.splice(activePairs_.end(), activePairs_, inputPair);
+    inputPair->eastCertain = true;
     return false;
   }
 
@@ -465,22 +474,24 @@ class Monotones {
         throw runtimeErr("conflict certainties -> overlap");
 
       if (WestOf >= 0 && isStart >= 0) {  // in the right place
-        activePairs_.splice(++potentialPair, activePairs_, inputPair);
+        if (++potentialPair != inputPair)
+          activePairs_.splice(potentialPair, activePairs_, inputPair);
         SetEastCertainty(inputPair, WestOf != 0);
         return false;
       }
-      const int outside = potentialPair->EastOf(vert);
-      if (outside < 0 && isStart > 0)
-        throw runtimeErr("conflict certainties -> overlap");
 
-      if (outside < 0 || isStart < 0) {  // certainly a hole
+      const int outside = potentialPair->EastOf(vert);
+      if (outside < 0) {  // certainly a hole
+        if (isStart > 0) throw runtimeErr("conflict certainties -> overlap");
         SwapHole(potentialPair, inputPair);
         return true;
       }
     }
     if (isStart < 0) throw runtimeErr("conflict certainties -> overlap");
 
-    activePairs_.splice(activePairs_.begin(), activePairs_, inputPair);
+    if (inputPair != activePairs_.begin())
+      activePairs_.splice(activePairs_.begin(), activePairs_, inputPair);
+    inputPair->westCertain = true;
     return false;
   }
 
@@ -531,17 +542,21 @@ class Monotones {
       VertType type = ProcessVert(vert);
 
       if (type == START) {
-        PairItr newPair;
-        newPair = activePairs_.insert(
+        const PairItr newPair = activePairs_.insert(
             activePairs_.begin(), {vert, vert, monotones_.end(),
                                    activePairs_.end(), false, false, false});
         SetVWest(newPair, vert);
         SetVEast(newPair, vert);
       }
 
-      PairItr pair = GetPair(vert, type);
-      int isStart = UpdateStart(vert, pair);
-      if (isStart < 0 && activePairs_.size() == 1) type = SKIP;
+      const PairItr pair = GetPair(vert, type);
+      const int isStart = UpdateStart(vert, pair);
+      if (isStart < 0 && activePairs_.size() == 1) {
+        type = SKIP;
+        activePairs_.erase(pair);
+        vert->westPair = activePairs_.end();
+        vert->eastPair = activePairs_.end();
+      }
 
       if (type == SKIP) {
         if (vert == insertAt) {
@@ -552,7 +567,7 @@ class Monotones {
         continue;
       }
 
-      PairItr neighbor = std::next(pair);
+      const PairItr neighbor = std::next(pair);
       if (!ShiftEast(vert, pair, isStart) && neighbor == std::next(pair)) {
         // TODO: why does this cause stack smashing?
         ShiftWest(vert, pair, isStart);
@@ -564,10 +579,10 @@ class Monotones {
         monotones_.splice(insertAt, monotones_, vert);
 
       switch (type) {
-        case LEFTWARDS:
+        case WESTSIDE:
           nextAttached.push(vert->left);
           break;
-        case RIGHTWARDS:
+        case EASTSIDE:
           nextAttached.push(vert->right);
           break;
         case START:
@@ -651,12 +666,12 @@ class Monotones {
         }
         case END:
           RemovePair(westPair);
-        case LEFTWARDS:
-        case RIGHTWARDS:
+        case WESTSIDE:
+        case EASTSIDE:
           if (westPair->vMerge != monotones_.end()) {
             VertItr eastVert = SplitVerts(vert, westPair->vMerge);
             westPair->vMerge = monotones_.end();
-            if (type == LEFTWARDS) westPair->vWest = eastVert;
+            if (type == WESTSIDE) westPair->vWest = eastVert;
           }
           break;
         case START: {
