@@ -660,9 +660,11 @@ class Monotones {
         case MERGE: {
           PairItr eastPair = std::next(westPair);
           if (eastPair->vMerge != monotones_.end()) {
-            SplitVerts(vert, eastPair->vMerge);
+            VertItr eastVert = SplitVerts(vert, eastPair->vMerge);
+            eastPair->vMerge = eastVert;
+          } else {
+            eastPair->vMerge = vert;
           }
-          eastPair->vMerge = vert;
         }
         case END:
           RemovePair(westPair);
@@ -670,8 +672,8 @@ class Monotones {
         case EASTSIDE:
           if (westPair->vMerge != monotones_.end()) {
             VertItr eastVert = SplitVerts(vert, westPair->vMerge);
-            westPair->vMerge = monotones_.end();
             if (type == WESTSIDE) westPair->vWest = eastVert;
+            westPair->vMerge = monotones_.end();
           }
           break;
         case START: {

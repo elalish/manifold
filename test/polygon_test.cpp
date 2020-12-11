@@ -635,7 +635,6 @@ TEST(Polygon, Sponge) {
 }
 
 TEST(Polygon, SquareHoles) {
-  PolygonParams().verbose = true;
   Polygons polys;
   polys.push_back({
       {glm::vec2(0.388888896, -0.277777791), 10, 0},  //
