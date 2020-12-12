@@ -769,9 +769,9 @@ std::vector<glm::ivec3> Triangulate(const Polygons &polys) {
     Monotones monotones(polys);
     monotones.Triangulate(triangles);
     CheckTopology(triangles, polys);
-    if (params.checkGeometry) CheckGeometry(triangles, polys);
+    CheckGeometry(triangles, polys);
   } catch (const runtimeErr &e) {
-    if (params.checkGeometry && !params.suppressErrors) {
+    if (!params.suppressErrors) {
       PrintFailure(e, polys, triangles);
     }
     throw;
