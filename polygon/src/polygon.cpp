@@ -539,7 +539,7 @@ class Monotones {
       if (vert->Processed()) continue;
 
       if (!skipped.empty() && vert->IsPast(*skipped.back())) {
-        throw logicErr(
+        throw runtimeErr(
             "Not Geometrically Valid! None of the skipped verts is valid.");
       }
 
@@ -562,7 +562,8 @@ class Monotones {
 
       if (type == SKIP) {
         if (vert == insertAt) {
-          throw logicErr("Not Geometrically Valid! Tried to skip final vert.");
+          throw runtimeErr(
+              "Not Geometrically Valid! Tried to skip final vert.");
         }
         skipped.push_back(vert);
         if (params.verbose) std::cout << "Skipping vert" << std::endl;
@@ -661,12 +662,9 @@ class Monotones {
       switch (type) {
         case MERGE: {
           PairItr eastPair = std::next(westPair);
-          if (eastPair->vMerge != monotones_.end()) {
-            VertItr eastVert = SplitVerts(vert, eastPair->vMerge);
-            eastPair->vMerge = eastVert;
-          } else {
-            eastPair->vMerge = vert;
-          }
+          if (eastPair->vMerge != monotones_.end())
+            vert = SplitVerts(vert, eastPair->vMerge);
+          eastPair->vMerge = vert;
         }
         case END:
           RemovePair(westPair);
