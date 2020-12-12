@@ -50,13 +50,56 @@ void Identical(Polygons p1, Polygons p2) {
   }
 }
 
+Polygons Turn180(Polygons polys) {
+  for (SimplePolygon &poly : polys) {
+    for (PolyVert &vert : poly) {
+      vert.pos *= -1;
+    }
+  }
+  return polys;
+}
+
+Polygons Duplicate(Polygons polys) {
+  float xMin = 1.0 / 0.0;
+  float xMax = -1.0 / 0.0;
+  int indexMax = 0;
+  for (SimplePolygon &poly : polys) {
+    for (PolyVert &vert : poly) {
+      xMin = std::min(xMin, vert.pos.x);
+      xMax = std::max(xMax, vert.pos.x);
+      indexMax = std::max(indexMax, vert.idx);
+    }
+  }
+  ++indexMax;
+  const float shift = xMax - xMin;
+
+  const int nPolys = polys.size();
+  for (int i = 0; i < nPolys; ++i) {
+    SimplePolygon poly = polys[i];
+    for (PolyVert &vert : poly) {
+      vert.pos.x += shift;
+      vert.idx += indexMax;
+    }
+    polys.push_back(poly);
+  }
+  return polys;
+}
+
 void TestPoly(const Polygons &polys, int expectedNumTri,
               bool expectGeometry = true) {
-  // PolygonParams().verbose = true;
+  //   PolygonParams().verbose = true;
   PolygonParams().checkGeometry = expectGeometry;
   PolygonParams().intermediateChecks = true;
-  std::vector<glm::ivec3> triangles = Triangulate(polys);
-  ASSERT_EQ(triangles.size(), expectedNumTri);
+
+  std::vector<glm::ivec3> triangles;
+  EXPECT_NO_THROW(triangles = Triangulate(polys)) << "Basic";
+  EXPECT_EQ(triangles.size(), expectedNumTri) << "Basic";
+
+  EXPECT_NO_THROW(triangles = Triangulate(Turn180(polys))) << "Turn 180";
+  EXPECT_EQ(triangles.size(), expectedNumTri) << "Turn 180";
+
+  EXPECT_NO_THROW(triangles = Triangulate(Duplicate(polys))) << "Duplicate";
+  EXPECT_EQ(triangles.size(), 2 * expectedNumTri) << "Duplicate";
 }
 }  // namespace
 
@@ -2559,7 +2602,7 @@ TEST(Polygon, DISABLED_Ugly) {
   TestPoly(polys, 41, false);
 }
 
-TEST(Polygon, Intersected) {
+TEST(Polygon, DISABLED_Intersected) {
   Polygons polys;
   polys.push_back({
       {glm::vec2(0.20988664, 0.645049632), 9, -1},     //
@@ -2630,7 +2673,7 @@ TEST(Polygon, DISABLED_BadEdges2) {
  * its fallback, and again it will only occur with self-intersected input (and
  * only a small fraction of that).
  */
-TEST(Polygon, Intersected2) {
+TEST(Polygon, DISABLED_Intersected2) {
   Polygons polys;
   polys.push_back({
       {glm::vec2(-0.542905211, 0.26293695), 41, 12},    //
