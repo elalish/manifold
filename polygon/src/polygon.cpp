@@ -355,7 +355,7 @@ class Monotones {
           if (params.verbose) std::cout << "MERGE" << std::endl;
           westPair->westCertain = true;
           westPair->eastCertain = true;
-          // westPair is removed and eastPair takes over.
+          // westPair will be removed and eastPair takes over.
           SetVWest(eastPair, westPair->vWest);
           return MERGE;
         } else {  // not neighbors
@@ -421,20 +421,22 @@ class Monotones {
    * with certainty. It can also invert the pair if it is determined to be a
    * hole, in which case the inputPair becomes the eastPair while the pair it is
    * inside of becomes the westPair.
+   *
+   * This function normally returns false, but will instead return true if the
+   * certainties conflict, indicating this vertex is not yet geometrically valid
+   * and must be skipped.
    */
   bool ShiftEast(const VertItr vert, const PairItr inputPair,
                  const int isStart) {
-    if (inputPair == activePairs_.end()) {
+    if (inputPair == activePairs_.end())
       throw logicErr("input pair is not defined!");
-    }
 
     if (inputPair->eastCertain) return false;
 
     PairItr potentialPair = std::next(inputPair);
     while (potentialPair != activePairs_.end()) {
       const int EastOf = potentialPair->EastOf(vert);
-      if (EastOf > 0 && isStart < 0)
-        throw runtimeErr("conflict certainties -> overlap");
+      if (EastOf > 0 && isStart < 0) return true;
 
       if (EastOf >= 0 && isStart >= 0) {  // in the right place
         activePairs_.splice(potentialPair, activePairs_, inputPair);
@@ -444,12 +446,15 @@ class Monotones {
 
       const int outside = potentialPair->WestOf(vert);
       if (outside < 0) {  // certainly a hole
-        if (isStart > 0) throw runtimeErr("conflict certainties -> overlap");
+        if (isStart > 0) return true;
+
         SwapHole(potentialPair, inputPair);
-        return true;
+        return false;
       }
       ++potentialPair;
     }
+    if (isStart < 0) return true;
+
     activePairs_.splice(activePairs_.end(), activePairs_, inputPair);
     inputPair->eastCertain = true;
     return false;
@@ -460,9 +465,8 @@ class Monotones {
   */
   bool ShiftWest(const VertItr vert, const PairItr inputPair,
                  const int isStart) {
-    if (inputPair == activePairs_.end()) {
+    if (inputPair == activePairs_.end())
       throw logicErr("input pair is not defined!");
-    }
 
     if (inputPair->westCertain) return false;
 
@@ -470,8 +474,7 @@ class Monotones {
     while (potentialPair != activePairs_.begin()) {
       --potentialPair;
       const int WestOf = potentialPair->WestOf(vert);
-      if (WestOf > 0 && isStart < 0)
-        throw runtimeErr("conflict certainties -> overlap");
+      if (WestOf > 0 && isStart < 0) return true;
 
       if (WestOf >= 0 && isStart >= 0) {  // in the right place
         SetEastCertainty(potentialPair, WestOf != 0);
@@ -482,12 +485,13 @@ class Monotones {
 
       const int outside = potentialPair->EastOf(vert);
       if (outside < 0) {  // certainly a hole
-        if (isStart > 0) throw runtimeErr("conflict certainties -> overlap");
+        if (isStart > 0) return true;
+
         SwapHole(potentialPair, inputPair);
-        return true;
+        return false;
       }
     }
-    if (isStart < 0) throw runtimeErr("conflict certainties -> overlap");
+    if (isStart < 0) return true;
 
     if (inputPair != activePairs_.begin())
       activePairs_.splice(activePairs_.begin(), activePairs_, inputPair);
@@ -541,8 +545,9 @@ class Monotones {
 
       VertType type = ProcessVert(vert);
 
+      PairItr newPair = activePairs_.end();
       if (type == START) {
-        const PairItr newPair = activePairs_.insert(
+        newPair = activePairs_.insert(
             activePairs_.begin(), {vert, vert, monotones_.end(),
                                    activePairs_.end(), false, false, false});
         SetVWest(newPair, vert);
@@ -551,12 +556,9 @@ class Monotones {
 
       const PairItr pair = GetPair(vert, type);
       const int isStart = UpdateStart(vert, pair);
-      if (isStart < 0 && activePairs_.size() == 1) {
-        type = SKIP;
-        activePairs_.erase(pair);
-        vert->westPair = activePairs_.end();
-        vert->eastPair = activePairs_.end();
-      }
+
+      if (type != SKIP && ShiftEast(vert, pair, isStart)) type = SKIP;
+      if (type != SKIP && ShiftWest(vert, pair, isStart)) type = SKIP;
 
       if (type == SKIP) {
         if (vert == insertAt) {
@@ -564,11 +566,14 @@ class Monotones {
         }
         skipped.push_back(vert);
         if (params.verbose) std::cout << "Skipping vert" << std::endl;
+        // If a new pair was added, remove it.
+        if (newPair != activePairs_.end()) {
+          activePairs_.erase(newPair);
+          vert->westPair = activePairs_.end();
+          vert->eastPair = activePairs_.end();
+        }
         continue;
       }
-
-      ShiftEast(vert, pair, isStart);
-      ShiftWest(vert, pair, isStart);
 
       if (vert == insertAt)
         ++insertAt;
