@@ -474,9 +474,9 @@ class Monotones {
         throw runtimeErr("conflict certainties -> overlap");
 
       if (WestOf >= 0 && isStart >= 0) {  // in the right place
+        SetEastCertainty(potentialPair, WestOf != 0);
         if (++potentialPair != inputPair)
           activePairs_.splice(potentialPair, activePairs_, inputPair);
-        SetEastCertainty(inputPair, WestOf != 0);
         return false;
       }
 
@@ -567,11 +567,8 @@ class Monotones {
         continue;
       }
 
-      const PairItr neighbor = std::next(pair);
-      if (!ShiftEast(vert, pair, isStart) && neighbor == std::next(pair)) {
-        // TODO: why does this cause stack smashing?
-        ShiftWest(vert, pair, isStart);
-      }
+      ShiftEast(vert, pair, isStart);
+      ShiftWest(vert, pair, isStart);
 
       if (vert == insertAt)
         ++insertAt;
