@@ -436,7 +436,9 @@ class Monotones {
     PairItr potentialPair = std::next(inputPair);
     while (potentialPair != activePairs_.end()) {
       const int EastOf = potentialPair->EastOf(vert);
-      if (EastOf > 0 && isStart < 0) return true;
+      // This does not trigger a skip because ShiftWest may still succeed, and
+      // if not it will mark the skip.
+      if (EastOf > 0 && isStart < 0) return false;
 
       if (EastOf >= 0 && isStart >= 0) {  // in the right place
         activePairs_.splice(potentialPair, activePairs_, inputPair);

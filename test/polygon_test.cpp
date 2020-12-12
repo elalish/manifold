@@ -481,6 +481,70 @@ TEST(Polygon, Simple5) {
   TestPoly(polys, 6);
 }
 
+TEST(Polygon, TouchingHole) {
+  Polygons polys;
+  polys.push_back({
+      {glm::vec2(-2, -1), 0, Edge::kNoIdx},  //
+      {glm::vec2(2, -1), 1, Edge::kNoIdx},   //
+      {glm::vec2(2, 1), 2, Edge::kNoIdx},    //
+      {glm::vec2(-2, 1), 3, Edge::kNoIdx},   //
+  });
+  polys.push_back({
+      {glm::vec2(-1, -1), 4, Edge::kNoIdx},  //
+      {glm::vec2(-1, 1), 5, Edge::kNoIdx},   //
+      {glm::vec2(1, 1), 6, Edge::kNoIdx},    //
+      {glm::vec2(1, -1), 7, Edge::kNoIdx},   //
+  });
+  TestPoly(polys, 8);
+}
+
+TEST(Polygon, Degenerate) {
+  Polygons polys;
+  polys.push_back({
+      {glm::vec2(1, -1), 0, 9},    //
+      {glm::vec2(1, 1), 1, 11},    //
+      {glm::vec2(1, 1), 2, -1},    //
+      {glm::vec2(1, -1), 3, -1},   //
+      {glm::vec2(1, -1), 4, -1},   //
+      {glm::vec2(-1, -1), 5, 11},  //
+      {glm::vec2(-1, -1), 6, 10},  //
+  });
+  TestPoly(polys, 5);
+}
+
+TEST(Polygon, Tricky) {
+  Polygons polys;
+  polys.push_back({
+      {glm::vec2(1, 0), 0, Edge::kNoIdx},  //
+      {glm::vec2(2, 1), 1, Edge::kNoIdx},  //
+      {glm::vec2(3, 0), 2, Edge::kNoIdx},  //
+      {glm::vec2(3, 5), 3, Edge::kNoIdx},  //
+      {glm::vec2(2, 5), 4, Edge::kNoIdx},  //
+      {glm::vec2(3, 4), 5, Edge::kNoIdx},  //
+      {glm::vec2(3, 2), 6, Edge::kNoIdx},  //
+      {glm::vec2(3, 3), 7, Edge::kNoIdx},  //
+      {glm::vec2(0, 6), 8, Edge::kNoIdx},  //
+  });
+  TestPoly(polys, 7);
+}
+
+TEST(Polygon, DISABLED_Tricky2) {
+  Polygons polys;
+  polys.push_back({
+      {glm::vec2(1, 0), 0, Edge::kNoIdx},    //
+      {glm::vec2(3, 1), 1, Edge::kNoIdx},    //
+      {glm::vec2(3, 3.5), 9, Edge::kNoIdx},  //
+      {glm::vec2(3, 0), 2, Edge::kNoIdx},    //
+      {glm::vec2(3, 5), 3, Edge::kNoIdx},    //
+      {glm::vec2(2, 5), 4, Edge::kNoIdx},    //
+      {glm::vec2(3, 4), 5, Edge::kNoIdx},    //
+      {glm::vec2(3, 2), 6, Edge::kNoIdx},    //
+      {glm::vec2(3, 3), 7, Edge::kNoIdx},    //
+      {glm::vec2(0, 6), 8, Edge::kNoIdx},    //
+  });
+  TestPoly(polys, 8);
+}
+
 TEST(Polygon, KissingZigzag) {
   Polygons polys;
   polys.push_back({
@@ -594,23 +658,6 @@ TEST(Polygon, KissingZigzag) {
       {glm::vec2(36.4568138, -8.64042759), 107, -1},  //
   });
   TestPoly(polys, 106);
-}
-
-TEST(Polygon, TouchingHole) {
-  Polygons polys;
-  polys.push_back({
-      {glm::vec2(-2, -1), 0, Edge::kNoIdx},  //
-      {glm::vec2(2, -1), 1, Edge::kNoIdx},   //
-      {glm::vec2(2, 1), 2, Edge::kNoIdx},    //
-      {glm::vec2(-2, 1), 3, Edge::kNoIdx},   //
-  });
-  polys.push_back({
-      {glm::vec2(-1, -1), 4, Edge::kNoIdx},  //
-      {glm::vec2(-1, 1), 5, Edge::kNoIdx},   //
-      {glm::vec2(1, 1), 6, Edge::kNoIdx},    //
-      {glm::vec2(1, -1), 7, Edge::kNoIdx},   //
-  });
-  TestPoly(polys, 8);
 }
 
 TEST(Polygon, Sponge) {
@@ -2514,24 +2561,6 @@ TEST(Polygon, BigSponge) {
       {glm::vec2(0.487654328, 0.450617284), 83865, 11092},  //
   });
   TestPoly(polys, 1771);
-}
-
-/**
- * This polygon is degenerate (but still geometrically valid) and demonstrates
- * why the SharesEdge() check is necessary in the triangulator.
- */
-TEST(Polygon, DISABLED_BadEdges) {
-  Polygons polys;
-  polys.push_back({
-      {glm::vec2(1, -1), 0, 9},    //
-      {glm::vec2(1, 1), 1, 11},    //
-      {glm::vec2(1, 1), 2, -1},    //
-      {glm::vec2(1, -1), 3, -1},   //
-      {glm::vec2(1, -1), 4, -1},   //
-      {glm::vec2(-1, -1), 5, 11},  //
-      {glm::vec2(-1, -1), 6, 10},  //
-  });
-  TestPoly(polys, 5);
 }
 
 // void fnExit() { throw std::runtime_error("Someone called Exit()!"); }
