@@ -59,8 +59,8 @@ struct VertAdj {
            (left->pos.y == pos.y && right->pos.y == pos.y &&
             left->pos.x <= pos.x && right->pos.x < pos.x);
   }
-  bool IsPast(const VertAdj &other) const {
-    return pos.y > other.pos.y + kTolerance;
+  bool IsPast(const VertItr other) const {
+    return pos.y > other->pos.y + kTolerance;
   }
   bool operator<(const VertAdj &other) const { return pos.y < other.pos.y; }
 };
@@ -389,17 +389,37 @@ class Monotones {
     inactivePairs_.splice(inactivePairs_.end(), activePairs_, pair);
   }
 
-  int UpdateStart(VertItr vert, PairItr inputPair) {
-    int isStart = 1;
-    if (!inputPair->startCertain) {
-      isStart =
-          inputPair->vWest == vert
-              ? CCW(vert->left->pos, vert->pos, inputPair->vEast->right->pos)
-              : CCW(inputPair->vWest->left->pos, vert->pos, vert->right->pos);
-      inputPair->startCertain = isStart != 0;
-      if (params.verbose) std::cout << "isStart = " << isStart << std::endl;
+  int IsStart(VertItr vert) {
+    VertItr left = vert->left;
+    VertItr right = vert->right;
+    int isStart = CCW(left->pos, vert->pos, right->pos);
+    if (isStart != 0) return isStart;
+
+    while (left != right && !left->IsPast(vert)) {
+      left = left->left;
     }
-    return isStart;
+    while (right != left && !right->IsPast(vert)) {
+      right = right->right;
+    }
+    left = left->right;
+    right = right->left;
+    const float xLeft = left->pos.x;
+    const float xRight = right->pos.x;
+    isStart =
+        xRight > xLeft + kTolerance ? 1 : xRight < xLeft - kTolerance ? -1 : 0;
+    if (isStart != 0) return isStart;
+
+    while (left != right || left == vert) {
+      if (left->pos.y < right->pos.y) {
+        isStart = CCW(left->pos, right->pos, left->left->pos);
+        left = left->left;
+      } else {
+        isStart = CCW(right->pos, right->right->pos, left->pos);
+        right = right->right;
+      }
+      if (isStart != 0) return isStart;
+    }
+    return 1;
   }
 
   void SwapHole(PairItr outside, PairItr inside) {
@@ -447,9 +467,9 @@ class Monotones {
       }
 
       const int outside = potentialPair->WestOf(vert);
-      if (outside < 0) {  // certainly a hole
-        if (isStart > 0) return true;
+      if (outside < 0 && isStart > 0) return true;
 
+      if (outside <= 0 && isStart < 0) {  // certainly a hole
         SwapHole(potentialPair, inputPair);
         return false;
       }
@@ -486,9 +506,9 @@ class Monotones {
       }
 
       const int outside = potentialPair->EastOf(vert);
-      if (outside < 0) {  // certainly a hole
-        if (isStart > 0) return true;
+      if (outside < 0 && isStart > 0) return true;
 
+      if (outside <= 0 && isStart < 0) {  // certainly a hole
         SwapHole(potentialPair, inputPair);
         return false;
       }
@@ -527,7 +547,7 @@ class Monotones {
     while (insertAt != monotones_.end()) {
       VertItr vert = insertAt;
       if (!nextAttached.empty() &&
-          (starts.empty() || !nextAttached.top()->IsPast(*starts.back()))) {
+          (starts.empty() || !nextAttached.top()->IsPast(starts.back()))) {
         vert = nextAttached.top();
         nextAttached.pop();
       } else if (!starts.empty()) {
@@ -540,7 +560,7 @@ class Monotones {
 
       if (vert->Processed()) continue;
 
-      if (!skipped.empty() && vert->IsPast(*skipped.back())) {
+      if (!skipped.empty() && vert->IsPast(skipped.back())) {
         throw runtimeErr(
             "Not Geometrically Valid! None of the skipped verts is valid.");
       }
@@ -548,17 +568,17 @@ class Monotones {
       VertType type = ProcessVert(vert);
 
       PairItr newPair = activePairs_.end();
+      int isStart = 1;
       if (type == START) {
         newPair = activePairs_.insert(
             activePairs_.begin(), {vert, vert, monotones_.end(),
                                    activePairs_.end(), false, false, false});
         SetVWest(newPair, vert);
         SetVEast(newPair, vert);
+        isStart = IsStart(vert);
       }
 
       const PairItr pair = GetPair(vert, type);
-      const int isStart = UpdateStart(vert, pair);
-
       if (type != SKIP && ShiftEast(vert, pair, isStart)) type = SKIP;
       if (type != SKIP && ShiftWest(vert, pair, isStart)) type = SKIP;
 

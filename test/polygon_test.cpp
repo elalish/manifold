@@ -528,7 +528,7 @@ TEST(Polygon, Tricky) {
   TestPoly(polys, 7);
 }
 
-TEST(Polygon, DISABLED_Tricky2) {
+TEST(Polygon, Tricky2) {
   Polygons polys;
   polys.push_back({
       {glm::vec2(1, 0), 0, Edge::kNoIdx},    //
