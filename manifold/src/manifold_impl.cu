@@ -844,7 +844,6 @@ bool Manifold::Impl::Face2Tri() {
     const glm::vec3 normal = faceNormal[i];
 
     if (numEdge == 3) {  // Special case to increase performance
-
       glm::ivec3 tri(halfedge[edge].startVert, halfedge[edge + 1].startVert,
                      halfedge[edge + 2].startVert);
       glm::ivec3 ends(halfedge[edge].endVert, halfedge[edge + 1].endVert,
@@ -861,38 +860,9 @@ bool Manifold::Impl::Face2Tri() {
     } else {  // General triangulation
       const glm::mat3x2 projection = GetAxisAlignedProjection(normal);
       Polygons polys = Face2Polygons(i, projection);
-      std::vector<glm::ivec3> newTris;
-      try {
-        newTris = Triangulate(polys);
-      } catch (const runtimeErr& e) {
-        if (PolygonParams().checkGeometry) throw;
-        /**
-        To ensure the triangulation maintains the mesh as 2-manifold, we
-        require it to not create edges connecting non-neighboring vertices
-        from the same input edge. This is because if two neighboring
-        polygons were to create an edge like this between two of their
-        shared vertices, this would create a 4-manifold edge, which is not
-        allowed.
 
-        For some self-overlapping polygons, there exists no triangulation
-        that adheres to this constraint. In this case, we create an extra
-        vertex for each polygon and triangulate them like a wagon wheel,
-        which is guaranteed to be manifold. This is very rare and only
-        occurs when the input manifolds are self-overlapping.
-         */
-        for (const auto& poly : polys) {
-          glm::vec3 centroid = thrust::transform_reduce(
-              poly.begin(), poly.end(),
-              [&vertPos](PolyVert v) { return vertPos[v.idx]; },
-              glm::vec3(0.0f), [](glm::vec3 a, glm::vec3 b) { return a + b; });
-          centroid /= poly.size();
-          int newVert = vertPos.size();
-          vertPos.push_back(centroid);
-          newTris.push_back({poly.back().idx, poly.front().idx, newVert});
-          for (int j = 1; j < poly.size(); ++j)
-            newTris.push_back({poly[j - 1].idx, poly[j].idx, newVert});
-        }
-      }
+      std::vector<glm::ivec3> newTris = Triangulate(polys);
+
       for (auto tri : newTris) {
         triVerts.push_back(tri);
         triNormal.push_back(normal);
