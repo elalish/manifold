@@ -28,9 +28,6 @@ using namespace manifold;
 
 ExecutionParams params;
 
-constexpr float kTolerance = 1e-5;
-constexpr float kTolerance2 = kTolerance * kTolerance;
-
 struct VertAdj;
 typedef std::list<VertAdj>::iterator VertItr;
 
@@ -60,7 +57,7 @@ struct VertAdj {
             left->pos.x <= pos.x && right->pos.x < pos.x);
   }
   bool IsPast(const VertItr other) const {
-    return pos.y > other->pos.y + kTolerance;
+    return pos.y > other->pos.y + params.kTolerance;
   }
   bool operator<(const VertAdj &other) const { return pos.y < other.pos.y; }
 };
@@ -336,6 +333,15 @@ class Monotones {
     return type == WESTSIDE ? vert->eastPair : vert->westPair;
   }
 
+  void CloseEnd(VertItr vert) {
+    PairItr eastPair = vert->right->eastPair;
+    PairItr westPair = vert->left->westPair;
+    SetVWest(eastPair, vert);
+    SetVEast(westPair, vert);
+    westPair->westCertain = true;
+    westPair->eastCertain = true;
+  }
+
   /**
    * This function is shared between the forward and backward sweeps and
    * determines the topology of the vertex relative to the sweep line.
@@ -344,21 +350,17 @@ class Monotones {
     PairItr eastPair = vert->right->eastPair;
     PairItr westPair = vert->left->westPair;
     if (vert->right->Processed()) {
-      SetVWest(eastPair, vert);
       if (vert->left->Processed()) {
-        SetVEast(westPair, vert);
         if (westPair == eastPair) {
           // facing in
           if (params.verbose) std::cout << "END" << std::endl;
-          westPair->westCertain = true;
-          westPair->eastCertain = true;
+          CloseEnd(vert);
           return END;
         } else if (westPair != activePairs_.end() &&
                    std::next(westPair) == eastPair) {
           // facing out
           if (params.verbose) std::cout << "MERGE" << std::endl;
-          westPair->westCertain = true;
-          westPair->eastCertain = true;
+          CloseEnd(vert);
           // westPair will be removed and eastPair takes over.
           SetVWest(eastPair, westPair->vWest);
           return MERGE;
@@ -367,6 +369,7 @@ class Monotones {
           return SKIP;
         }
       } else {
+        SetVWest(eastPair, vert);
         if (params.verbose) std::cout << "WESTSIDE" << std::endl;
         return WESTSIDE;
       }
@@ -415,8 +418,9 @@ class Monotones {
     right = right->left;
     const float xLeft = left->pos.x;
     const float xRight = right->pos.x;
-    isHole =
-        xRight > xLeft + kTolerance ? -1 : xRight < xLeft - kTolerance ? 1 : 0;
+    isHole = xRight > xLeft + params.kTolerance
+                 ? -1
+                 : xRight < xLeft - params.kTolerance ? 1 : 0;
     if (isHole != 0) return isHole > 0;
 
     while (left != right || left == vert) {
@@ -800,7 +804,7 @@ int CCW(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2) {
   glm::vec2 v2 = p2 - p0;
   float area = v1.x * v2.y - v1.y * v2.x;
   float base2 = glm::max(glm::dot(v1, v1), glm::dot(v2, v2));
-  if (area * area <= base2 * kTolerance2)
+  if (area * area <= base2 * params.kTolerance * params.kTolerance)
     return 0;
   else
     return area > 0 ? 1 : -1;

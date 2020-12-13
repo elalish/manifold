@@ -23,7 +23,6 @@ using namespace manifold;
 // If you print this knot (with support), you can snap a half-inch marble into
 // it and it'll roll around (dimensions in mm).
 TEST(Samples, Knot13) {
-  Manifold::SetExpectGeometry(true);
   Manifold knot13 = TorusKnot(1, 3, 25, 10, 3.75);
   //   ExportMesh("knot13.stl", knot13.Extract());
   ASSERT_TRUE(knot13.IsManifold());
@@ -35,7 +34,6 @@ TEST(Samples, Knot13) {
 
 // This creates two interlinked knots.
 TEST(Samples, Knot42) {
-  Manifold::SetExpectGeometry(true);
   Manifold knot42 = TorusKnot(4, 2, 15, 6, 5);
   //   ExportMesh("knot42.stl", knot42.Extract());
   ASSERT_TRUE(knot42.IsManifold());
@@ -51,8 +49,7 @@ TEST(Samples, Knot42) {
 
 // This creates a bracelet sample which involves many operations between shapes
 // that are not in general position, e.g. coplanar faces.
-TEST(Samples, DISABLED_Bracelet) {
-  Manifold::SetExpectGeometry(true);
+TEST(Samples, Bracelet) {
   Manifold bracelet = StretchyBracelet();
   Mesh triangulated = bracelet.Extract();
   EXPECT_EQ(bracelet.Genus(), 1);
@@ -61,8 +58,7 @@ TEST(Samples, DISABLED_Bracelet) {
 
 // A fractal with many degenerate intersections, which also tests exact 90
 // degree rotations.
-TEST(Samples, DISABLED_Sponge) {
-  Manifold::SetExpectGeometry(true);
+TEST(Samples, Sponge) {
   Manifold sponge = MengerSponge(3, false);
   ExportMesh("mengerSponge.ply", sponge.Extract());
 }
