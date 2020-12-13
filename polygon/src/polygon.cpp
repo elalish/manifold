@@ -336,6 +336,10 @@ class Monotones {
     return type == WESTSIDE ? vert->eastPair : vert->westPair;
   }
 
+  /**
+   * This function is shared between the forward and backward sweeps and
+   * determines the topology of the vertex relative to the sweep line.
+  */
   VertType ProcessVert(VertItr vert) {
     PairItr eastPair = vert->right->eastPair;
     PairItr westPair = vert->left->westPair;
@@ -389,11 +393,17 @@ class Monotones {
     inactivePairs_.splice(inactivePairs_.end(), activePairs_, pair);
   }
 
-  int IsStart(VertItr vert) {
+  /**
+   * When vert is a START, this determines if it is backwards (forming a void or
+   * hole). Usually the first return is adequate, but if it is degenerate, the
+   * function will continue to search up the neighbors until the degeneracy is
+   * broken and a certain answer is returned.
+  */
+  bool IsHole(VertItr vert) {
     VertItr left = vert->left;
     VertItr right = vert->right;
-    int isStart = CCW(left->pos, vert->pos, right->pos);
-    if (isStart != 0) return isStart;
+    int isHole = CCW(right->pos, vert->pos, left->pos);
+    if (isHole != 0) return isHole > 0;
 
     while (left != right && !left->IsPast(vert)) {
       left = left->left;
@@ -405,25 +415,30 @@ class Monotones {
     right = right->left;
     const float xLeft = left->pos.x;
     const float xRight = right->pos.x;
-    isStart =
-        xRight > xLeft + kTolerance ? 1 : xRight < xLeft - kTolerance ? -1 : 0;
-    if (isStart != 0) return isStart;
+    isHole =
+        xRight > xLeft + kTolerance ? -1 : xRight < xLeft - kTolerance ? 1 : 0;
+    if (isHole != 0) return isHole > 0;
 
     while (left != right || left == vert) {
       if (left->pos.y < right->pos.y) {
-        isStart = CCW(left->pos, right->pos, left->left->pos);
+        isHole = CCW(left->pos, left->left->pos, right->pos);
         left = left->left;
       } else {
-        isStart = CCW(right->pos, right->right->pos, left->pos);
+        isHole = CCW(right->pos, left->pos, right->right->pos);
         right = right->right;
       }
-      if (isStart != 0) return isStart;
+      if (isHole != 0) return isHole > 0;
     }
-    return 1;
+    return false;
   }
 
+  /**
+   * A backwards pair (hole) must be interior to a forwards pair for geometric
+   * validity. In this situation, this function is used to swap their east edges
+   * such that they become forward neighbor pairs. The outside becomes westPair
+   * and inside becomes eastPair.
+  */
   void SwapHole(PairItr outside, PairItr inside) {
-    // outside becomes westPair and inside becomes eastPair.
     VertItr tmp = outside->vEast;
     SetVEast(outside, inside->vEast);
     SetVEast(inside, tmp);
@@ -447,7 +462,7 @@ class Monotones {
    * and must be skipped.
    */
   bool ShiftEast(const VertItr vert, const PairItr inputPair,
-                 const int isStart) {
+                 const bool isHole) {
     if (inputPair == activePairs_.end())
       throw logicErr("input pair is not defined!");
 
@@ -458,24 +473,24 @@ class Monotones {
       const int EastOf = potentialPair->EastOf(vert);
       // This does not trigger a skip because ShiftWest may still succeed, and
       // if not it will mark the skip.
-      if (EastOf > 0 && isStart < 0) return false;
+      if (EastOf > 0 && isHole) return false;
 
-      if (EastOf >= 0 && isStart >= 0) {  // in the right place
+      if (EastOf >= 0 && !isHole) {  // in the right place
         activePairs_.splice(potentialPair, activePairs_, inputPair);
         SetEastCertainty(inputPair, EastOf != 0);
         return false;
       }
 
       const int outside = potentialPair->WestOf(vert);
-      if (outside < 0 && isStart > 0) return true;
+      if (outside < 0 && !isHole) return true;
 
-      if (outside <= 0 && isStart < 0) {  // certainly a hole
+      if (outside <= 0 && isHole) {  // certainly a hole
         SwapHole(potentialPair, inputPair);
         return false;
       }
       ++potentialPair;
     }
-    if (isStart < 0) return true;
+    if (isHole) return true;
 
     activePairs_.splice(activePairs_.end(), activePairs_, inputPair);
     inputPair->eastCertain = true;
@@ -486,7 +501,7 @@ class Monotones {
    * Identical to the above function, but swapped to search westward instead.
   */
   bool ShiftWest(const VertItr vert, const PairItr inputPair,
-                 const int isStart) {
+                 const bool isHole) {
     if (inputPair == activePairs_.end())
       throw logicErr("input pair is not defined!");
 
@@ -496,9 +511,9 @@ class Monotones {
     while (potentialPair != activePairs_.begin()) {
       --potentialPair;
       const int WestOf = potentialPair->WestOf(vert);
-      if (WestOf > 0 && isStart < 0) return true;
+      if (WestOf > 0 && isHole) return true;
 
-      if (WestOf >= 0 && isStart >= 0) {  // in the right place
+      if (WestOf >= 0 && !isHole) {  // in the right place
         SetEastCertainty(potentialPair, WestOf != 0);
         if (++potentialPair != inputPair)
           activePairs_.splice(potentialPair, activePairs_, inputPair);
@@ -506,14 +521,14 @@ class Monotones {
       }
 
       const int outside = potentialPair->EastOf(vert);
-      if (outside < 0 && isStart > 0) return true;
+      if (outside < 0 && !isHole) return true;
 
-      if (outside <= 0 && isStart < 0) {  // certainly a hole
+      if (outside <= 0 && isHole) {  // certainly a hole
         SwapHole(potentialPair, inputPair);
         return false;
       }
     }
-    if (isStart < 0) return true;
+    if (isHole) return true;
 
     if (inputPair != activePairs_.begin())
       activePairs_.splice(activePairs_.begin(), activePairs_, inputPair);
@@ -568,19 +583,19 @@ class Monotones {
       VertType type = ProcessVert(vert);
 
       PairItr newPair = activePairs_.end();
-      int isStart = 1;
+      bool isHole = false;
       if (type == START) {
         newPair = activePairs_.insert(
             activePairs_.begin(), {vert, vert, monotones_.end(),
                                    activePairs_.end(), false, false, false});
         SetVWest(newPair, vert);
         SetVEast(newPair, vert);
-        isStart = IsStart(vert);
+        isHole = IsHole(vert);
       }
 
       const PairItr pair = GetPair(vert, type);
-      if (type != SKIP && ShiftEast(vert, pair, isStart)) type = SKIP;
-      if (type != SKIP && ShiftWest(vert, pair, isStart)) type = SKIP;
+      if (type != SKIP && ShiftEast(vert, pair, isHole)) type = SKIP;
+      if (type != SKIP && ShiftWest(vert, pair, isHole)) type = SKIP;
 
       if (type == SKIP) {
         if (vert == insertAt) {
@@ -637,9 +652,9 @@ class Monotones {
 
   /**
    * This is the only function that actually changes monotones_; all the rest is
-   * bookkeeping. This divides polygons by connecting two verts. It
-   * duplicates these verts to break the polygons, then attaches them across to
-   * each other with two new edges.
+   * bookkeeping. This divides polygons by connecting two verts. It duplicates
+   * these verts to break the polygons, then attaches them across to each other
+   * with two new edges.
    */
   VertItr SplitVerts(VertItr north, VertItr south) {
     // at split events, add duplicate vertices to end of list and reconnect
@@ -662,10 +677,13 @@ class Monotones {
   }
 
   /**
-   * This function sweeps back (North to South), splitting the input polygons
+   * This function sweeps back, splitting the input polygons
    * into monotone polygons without doing a single geometric calculation.
    * Instead everything is based on the topology saved from the forward sweep,
-   * primarily the relative ordering of new monotones.
+   * primarily the relative ordering of new monotones. Even though the sweep is
+   * going back, the polygon is considered rotated, so we still refer to
+   * sweeping from South to North and the pairs as ordered from West to East
+   * (though this is now the opposite order from the forward sweep).
    */
   bool SweepBack() {
     for (auto &vert : monotones_) vert.SetProcessed(false);
