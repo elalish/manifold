@@ -414,6 +414,8 @@ class Monotones {
     while (right != left && !right->IsPast(vert)) {
       right = right->right;
     }
+    if (left == right) return false;  // degenerate
+
     left = left->right;
     right = right->left;
     const float xLeft = left->pos.x;
@@ -610,6 +612,9 @@ class Monotones {
           throw runtimeErr(
               "Not Geometrically Valid! Tried to skip final vert.");
         }
+        if (nextAttached.empty() && starts.empty())
+          throw runtimeErr(
+              "Not Geometrically Valid! Tried to skip last queued vert.");
         skipped.push_back(vert);
         if (params.verbose) std::cout << "Skipping vert" << std::endl;
         // If a new pair was added, remove it.
