@@ -53,12 +53,16 @@ TEST(Samples, Bracelet) {
   Manifold bracelet = StretchyBracelet();
   Mesh triangulated = bracelet.Extract();
   EXPECT_EQ(bracelet.Genus(), 1);
-  ExportMesh("bracelet.ply", triangulated);
+  // ExportMesh("bracelet.ply", triangulated);
 }
 
 // A fractal with many degenerate intersections, which also tests exact 90
 // degree rotations.
 TEST(Samples, Sponge) {
-  Manifold sponge = MengerSponge(4, false);
-  ExportMesh("mengerSponge.ply", sponge.Extract());
+  Manifold sponge = MengerSponge(4);
+  EXPECT_EQ(sponge.Genus(), 26433);
+  std::pair<Manifold, Manifold> cutSponge = sponge.SplitByPlane({1, 1, 1}, 0);
+  EXPECT_EQ(cutSponge.first.Genus(), 13394);
+  EXPECT_EQ(cutSponge.second.Genus(), 13394);
+  // ExportMesh("mengerSponge.ply", cutSponge.first.Extract());
 }

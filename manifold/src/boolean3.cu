@@ -216,10 +216,11 @@ __host__ __device__ thrust::pair<int, glm::vec2> Shadow01(
   const float p0x = vertPosP[p0].x;
   const float q1sx = vertPosQ[q1s].x;
   const float q1ex = vertPosQ[q1e].x;
-  int s01 = reverse ? Shadows(q1sx, p0x, expandP * normalP[q1s].x) -
-                          Shadows(q1ex, p0x, expandP * normalP[q1e].x)
-                    : Shadows(p0x, q1ex, expandP * normalP[p0].x) -
-                          Shadows(p0x, q1sx, expandP * normalP[p0].x);
+  int s01 = reverse
+                ? Shadows(q1sx, p0x, expandP * normalP[q1s].x) -
+                      Shadows(q1ex, p0x, expandP * normalP[q1e].x)
+                : Shadows(p0x, q1ex, expandP * normalP[p0].x) -
+                      Shadows(p0x, q1sx, expandP * normalP[p0].x);
   glm::vec2 yz01(0.0f / 0.0f);
 
   if (s01 != 0) {
@@ -352,10 +353,9 @@ std::tuple<VecDH<int>, VecDH<glm::vec4>> Shadow11(SparseIndices &p1q1,
 
   thrust::for_each_n(
       zip(xyzz11.beginD(), s11.beginD(), p1q1.beginD(0), p1q1.beginD(1)),
-      p1q1.size(),
-      Kernel11({inP.vertPos_.cptrD(), inQ.vertPos_.cptrD(),
-                inP.halfedge_.cptrD(), inQ.halfedge_.cptrD(), expandP,
-                inP.vertNormal_.cptrD()}));
+      p1q1.size(), Kernel11({inP.vertPos_.cptrD(), inQ.vertPos_.cptrD(),
+                             inP.halfedge_.cptrD(), inQ.halfedge_.cptrD(),
+                             expandP, inP.vertNormal_.cptrD()}));
 
   p1q1.KeepFinite(xyzz11, s11);
 

@@ -524,6 +524,17 @@ TEST(Polygon, Degenerate) {
   TestPoly(polys, 5);
 }
 
+TEST(Polygon, Degenerate2) {
+  Polygons polys;
+  polys.push_back({
+      {glm::vec2(0.0740740597, -0.314814836), 4829, 10824},  //
+      {glm::vec2(0.0925925896, -0.314814806), 4828, 10829},  //
+      {glm::vec2(0.0925925896, -0.314814806), 4826, 10826},  //
+      {glm::vec2(0.0740740597, -0.314814836), 4830, 25738},  //
+  });
+  TestPoly(polys, 2);
+}
+
 TEST(Polygon, Tricky) {
   Polygons polys;
   polys.push_back({
@@ -555,6 +566,19 @@ TEST(Polygon, Tricky2) {
       {glm::vec2(0, 6), 8, Edge::kNoIdx},    //
   });
   TestPoly(polys, 8);
+}
+
+TEST(Polygon, SharedEdge) {
+  Polygons polys;
+  polys.push_back({
+      {glm::vec2(0.265432119, 0.0061728349), 61185, 11383},     //
+      {glm::vec2(0.277777791, -3.7252903e-09), 61180, 235729},  //
+      {glm::vec2(0.277777791, 0.0185185187), 61184, 49810},     //
+      {glm::vec2(0.240740761, 0.0185185187), 76345, 11383},     //
+      {glm::vec2(0.265432119, 0.00617283955), 61186, 235731},   //
+      {glm::vec2(0.265432119, 0.00617283955), 61187, 235730},   //
+  });
+  TestPoly(polys, 4);
 }
 
 TEST(Polygon, Comb) {
