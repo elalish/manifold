@@ -59,6 +59,6 @@ TEST(Samples, Bracelet) {
 // A fractal with many degenerate intersections, which also tests exact 90
 // degree rotations.
 TEST(Samples, Sponge) {
-  Manifold sponge = MengerSponge(3, false);
+  Manifold sponge = MengerSponge(4, false);
   ExportMesh("mengerSponge.ply", sponge.Extract());
 }

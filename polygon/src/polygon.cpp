@@ -564,12 +564,16 @@ class Monotones {
     VertItr insertAt = monotones_.begin();
 
     while (insertAt != monotones_.end()) {
+      // fallback for completely degenerate polygons that have no starts.
       VertItr vert = insertAt;
       if (!nextAttached.empty() &&
           (starts.empty() || !nextAttached.top()->IsPast(starts.back()))) {
+        // Prefer neighbors, which may process starts without needing a new
+        // pair.
         vert = nextAttached.top();
         nextAttached.pop();
       } else if (!starts.empty()) {
+        // Create a new pair with the next vert from the sorted list of starts.
         vert = starts.back();
         starts.pop_back();
       }
@@ -602,7 +606,7 @@ class Monotones {
       if (type != SKIP && ShiftWest(vert, pair, isHole)) type = SKIP;
 
       if (type == SKIP) {
-        if (vert == insertAt) {
+        if (std::next(insertAt) == monotones_.end()) {
           throw runtimeErr(
               "Not Geometrically Valid! Tried to skip final vert.");
         }
