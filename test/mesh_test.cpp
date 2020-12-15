@@ -179,7 +179,6 @@ TEST(Manifold, GetProperties) {
  * The very simplest Boolean operation test.
  */
 TEST(Manifold, BooleanTetra) {
-  Manifold::SetExpectGeometry(true);
   Manifold tetra = Manifold::Tetrahedron();
   ASSERT_TRUE(tetra.IsManifold());
 
@@ -194,7 +193,6 @@ TEST(Manifold, BooleanTetra) {
  * These tests check Boolean operations on coplanar faces.
  */
 TEST(Manifold, SelfSubtract) {
-  Manifold::SetExpectGeometry(true);
   Manifold cube = Manifold::Cube();
   Manifold empty = cube - cube;
   EXPECT_TRUE(empty.IsManifold());
@@ -206,7 +204,6 @@ TEST(Manifold, SelfSubtract) {
 }
 
 TEST(Manifold, Perturb) {
-  Manifold::SetExpectGeometry(true);
   Mesh tmp;
   tmp.vertPos = {{0.0f, 0.0f, 0.0f},
                  {0.0f, 1.0f, 0.0f},
@@ -225,18 +222,17 @@ TEST(Manifold, Perturb) {
 }
 
 TEST(Manifold, Coplanar) {
-  Manifold::SetExpectGeometry(true);
   Manifold cube = Manifold::Cylinder(1.0f, 1.0f);
   Manifold cube2 = cube.DeepCopy();
-  Manifold out = cube - cube2.Scale({0.5f, 0.5f, 1.0f})
-                            .Rotate(0, 0, 15)
-                            .Translate({0.25f, 0.25f, 0.0f});
+  Manifold out = cube -
+                 cube2.Scale({0.5f, 0.5f, 1.0f})
+                     .Rotate(0, 0, 15)
+                     .Translate({0.25f, 0.25f, 0.0f});
   ExpectMeshes(out, {{60, 120}});
   EXPECT_EQ(out.Genus(), 1);
 }
 
 TEST(Manifold, MultiCoplanar) {
-  Manifold::SetExpectGeometry(true);
   Manifold cube = Manifold::Cube();
   Manifold cube2 = cube.DeepCopy();
   Manifold first = cube - cube2.Translate({0.3f, 0.3f, 0.0f});
@@ -256,7 +252,6 @@ TEST(Manifold, MultiCoplanar) {
  * volumes that make sense.
  */
 TEST(Manifold, Split) {
-  Manifold::SetExpectGeometry(true);
   Manifold cube = Manifold::Cube(glm::vec3(2.0f), true);
   Manifold oct = Manifold::Octahedron();
   oct.Translate(glm::vec3(0.0f, 0.0f, 1.0f));
@@ -267,7 +262,6 @@ TEST(Manifold, Split) {
 }
 
 TEST(Manifold, SplitByPlane) {
-  Manifold::SetExpectGeometry(true);
   Manifold cube = Manifold::Cube(glm::vec3(2.0f), true);
   cube.Translate({0.0f, 1.0f, 0.0f});
   cube.Rotate(90.0f, 0.0f, 0.0f);
@@ -278,7 +272,6 @@ TEST(Manifold, SplitByPlane) {
 }
 
 TEST(Manifold, SplitByPlane60) {
-  Manifold::SetExpectGeometry(true);
   Manifold cube = Manifold::Cube(glm::vec3(2.0f), true);
   cube.Translate({0.0f, 1.0f, 0.0f});
   cube.Rotate(0.0f, 0.0f, -60.0f);
@@ -294,7 +287,6 @@ TEST(Manifold, SplitByPlane60) {
  * This tests that non-intersecting geometry is properly retained.
  */
 TEST(Manifold, BooleanVug) {
-  Manifold::SetExpectGeometry(true);
   Manifold cube = Manifold::Cube(glm::vec3(4.0f), true);
   Manifold vug = cube - Manifold::Cube();
 
@@ -313,7 +305,6 @@ TEST(Manifold, BooleanVug) {
  * operations between valid shapes with many faces.
  */
 TEST(Manifold, BooleanSphere) {
-  Manifold::SetExpectGeometry(true);
   Manifold sphere = Manifold::Sphere(1.0f, 12);
   Manifold sphere2 = sphere.DeepCopy();
   sphere2.Translate(glm::vec3(0.5));
@@ -323,7 +314,6 @@ TEST(Manifold, BooleanSphere) {
 }
 
 TEST(Manifold, Boolean3) {
-  Manifold::SetExpectGeometry(true);
   Manifold gyroid(ImportMesh("data/gyroidpuzzle.ply"));
   ASSERT_TRUE(gyroid.IsManifold());
 
@@ -332,122 +322,4 @@ TEST(Manifold, Boolean3) {
   Manifold result = gyroid + gyroid2;
 
   ExpectMeshes(result, {{31733, 63606}});
-}
-
-/**
- * These tests create self-intersecting geometry using the Compose() method with
- * overlapping shapes. Though we cannot expect the resulting Boolean products to
- * be geometrically valid, we can expect the topology to be sane, and by testing
- * the number of vertices and triangles produced, we verify that the
- * triangulation has not produced strange results.
- */
-TEST(Manifold, DISABLED_BooleanSelfIntersecting) {
-  Manifold::SetExpectGeometry(false);
-  std::vector<Manifold> meshList;
-  meshList.push_back(Manifold::Tetrahedron());
-  meshList.push_back(Manifold::Tetrahedron());
-  meshList[1].Translate(glm::vec3(0, 0, 0.25));
-  Manifold tetras = Manifold::Compose(meshList);
-  ASSERT_TRUE(tetras.IsManifold());
-
-  meshList[0].Translate(glm::vec3(0, 0, 0.5f));
-  Manifold result = meshList[0] - tetras;
-
-  ExpectMeshes(result, {{8, 12}, {4, 4}});
-}
-
-TEST(Manifold, DISABLED_BooleanSelfIntersectingAlt) {
-  Manifold::SetExpectGeometry(false);
-  std::vector<Manifold> meshList;
-  meshList.push_back(Manifold::Tetrahedron());
-  meshList.push_back(Manifold::Tetrahedron());
-  meshList[1].Translate(glm::vec3(0, 0, 0.5));
-  Manifold tetras = Manifold::Compose(meshList);
-  ASSERT_TRUE(tetras.IsManifold());
-
-  meshList[0].Translate(glm::vec3(0, 0, -0.5f));
-  Manifold result = meshList[0] - tetras;
-
-  ExpectMeshes(result, {{8, 12}, {4, 4}});
-}
-
-TEST(Manifold, BooleanWinding) {
-  Manifold::SetExpectGeometry(false);
-  std::vector<Manifold> meshList;
-  meshList.push_back(Manifold::Tetrahedron());
-  meshList.push_back(Manifold::Tetrahedron());
-  meshList[1].Translate(glm::vec3(0.25));
-  Manifold tetras = Manifold::Compose(meshList);
-  ASSERT_TRUE(tetras.IsManifold());
-
-  meshList[0].Translate(glm::vec3(-0.25f));
-  Manifold result = tetras - meshList[0];
-
-  ExpectMeshes(result, {{8, 12}, {8, 12}});
-}
-
-/**
- * These tests take the worst (most self-intersected) general-position geometry
- * and perform an intersection to test that the topology stays sane in extremely
- * complex and unexpected situations.
- */
-TEST(Manifold, DISABLED_BooleanHorrible) {
-  Manifold::SetExpectGeometry(false);
-  Manifold random = Manifold::Sphere(1.0f, 8);
-  std::mt19937 gen(12345);  // Standard mersenne_twister_engine
-  std::uniform_real_distribution<float> dis(-1.0f, 1.0f);
-  random.Warp([&dis, &gen](glm::vec3& v) {
-    v = glm::vec3(dis(gen), dis(gen), dis(gen));
-  });
-  Manifold random2 = random.DeepCopy();
-  random2.Rotate(90);
-  Manifold result = random ^ random2;
-  EXPECT_TRUE(result.IsManifold());
-}
-
-TEST(Manifold, DISABLED_BooleanHorrible2) {
-  Manifold::SetExpectGeometry(false);
-  Manifold random = Manifold::Sphere(1.0f, 32);
-  std::mt19937 gen(54321);  // Standard mersenne_twister_engine
-  std::uniform_real_distribution<float> dis(-1.0f, 1.0f);
-  random.Warp([&dis, &gen](glm::vec3& v) {
-    v = glm::vec3(dis(gen), dis(gen), dis(gen));
-  });
-  Manifold random2 = random.DeepCopy();
-  random2.Rotate(90);
-  Manifold result = random ^ random2;
-  EXPECT_TRUE(result.IsManifold());
-}
-
-/**
- * This test is the most extreme of all, taking random geometry and projecting
- * it to a plane to ensure that it is not in general position (lots of coplanar
- * geometry). Two of these planes are rotated and intersected and verified to
- * produce a line. Note that due to the rotations, none of the points are
- * exactly coplanar, but within rounding error, which verifies the topology is
- * still correct even when Euclidean geometry gives inconsistent results due to
- * floating point error.
- */
-TEST(Manifold, DISABLED_BooleanHorriblePlanar) {
-  Manifold::SetExpectGeometry(false);
-  Manifold random = Manifold::Sphere(1.0f, 32);
-  std::mt19937 gen(654321);  // Standard mersenne_twister_engine
-  std::uniform_real_distribution<float> dis(-1.0f, 1.0f);
-  random.Warp(
-      [&dis, &gen](glm::vec3& v) { v = glm::vec3(dis(gen), dis(gen), 0.0f); });
-  Manifold random2 = random.DeepCopy();
-  float a = 0.2;
-  float phi = asin(a);
-  random.Rotate(0, glm::degrees(-phi));
-  random2.Rotate(glm::degrees(phi));
-  Manifold result = random ^ random2;
-  result.Rotate(0, 0, 45).Rotate(glm::degrees(atan(sqrt(2.0f) / tan(phi))));
-  Box BB = result.BoundingBox();
-  float tol = 1e-7;
-  EXPECT_NEAR(BB.Center().x, 0.0f, tol);
-  EXPECT_NEAR(BB.Center().y, 0.0f, tol);
-  EXPECT_NEAR(BB.Size().x, 0.0f, tol);
-  EXPECT_NEAR(BB.Size().y, 0.0f, tol);
-  EXPECT_GT(BB.Size().z, 1.0f);
-  EXPECT_LT(BB.Size().z, 4.0f);
 }

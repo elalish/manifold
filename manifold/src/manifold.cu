@@ -657,11 +657,6 @@ int Manifold::NumOverlaps(const Manifold& other) const {
   return num_overlaps += overlaps.size();
 }
 
-void Manifold::SetExpectGeometry(bool val) {
-  PolygonParams().checkGeometry = val;
-  PolygonParams().intermediateChecks = false;
-}
-
 void Manifold::SetSuppressErrors(bool val) {
   PolygonParams().suppressErrors = val;
 }
