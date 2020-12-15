@@ -50,8 +50,6 @@ Manifold StretchyBracelet(float radius = 30.0f, float height = 8.0f,
                           float width = 15.0f, float thickness = 0.4f,
                           int nDecor = 20, int nCut = 27, int nDivision = 30);
 
-// The classic cubic fractal, going down recursively n times. If slice is true,
-// only half the cube is generated, bisected by a plane whose normal points
-// along [1,1,1].
-Manifold MengerSponge(int n = 3, bool slice = true);
+// The classic cubic fractal, going down recursively n times.
+Manifold MengerSponge(int n = 3);
 }  // namespace manifold

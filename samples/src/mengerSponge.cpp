@@ -36,7 +36,7 @@ void Fractal(std::vector<Manifold>& holes, Manifold& hole, float w,
 
 namespace manifold {
 
-Manifold MengerSponge(int n, bool slice) {
+Manifold MengerSponge(int n) {
   Manifold result = Manifold::Cube(glm::vec3(1.0f), true);
 
   std::vector<Manifold> holes;
