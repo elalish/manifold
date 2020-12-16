@@ -216,10 +216,11 @@ __host__ __device__ thrust::pair<int, glm::vec2> Shadow01(
   const float p0x = vertPosP[p0].x;
   const float q1sx = vertPosQ[q1s].x;
   const float q1ex = vertPosQ[q1e].x;
-  int s01 = reverse ? Shadows(q1sx, p0x, expandP * normalP[q1s].x) -
-                          Shadows(q1ex, p0x, expandP * normalP[q1e].x)
-                    : Shadows(p0x, q1ex, expandP * normalP[p0].x) -
-                          Shadows(p0x, q1sx, expandP * normalP[p0].x);
+  int s01 = reverse
+                ? Shadows(q1sx, p0x, expandP * normalP[q1s].x) -
+                      Shadows(q1ex, p0x, expandP * normalP[q1e].x)
+                : Shadows(p0x, q1ex, expandP * normalP[p0].x) -
+                      Shadows(p0x, q1sx, expandP * normalP[p0].x);
   glm::vec2 yz01(0.0f / 0.0f);
 
   if (s01 != 0) {
@@ -352,10 +353,9 @@ std::tuple<VecDH<int>, VecDH<glm::vec4>> Shadow11(SparseIndices &p1q1,
 
   thrust::for_each_n(
       zip(xyzz11.beginD(), s11.beginD(), p1q1.beginD(0), p1q1.beginD(1)),
-      p1q1.size(),
-      Kernel11({inP.vertPos_.cptrD(), inQ.vertPos_.cptrD(),
-                inP.halfedge_.cptrD(), inQ.halfedge_.cptrD(), expandP,
-                inP.vertNormal_.cptrD()}));
+      p1q1.size(), Kernel11({inP.vertPos_.cptrD(), inQ.vertPos_.cptrD(),
+                             inP.halfedge_.cptrD(), inQ.halfedge_.cptrD(),
+                             expandP, inP.vertNormal_.cptrD()}));
 
   p1q1.KeepFinite(xyzz11, s11);
 
@@ -385,13 +385,26 @@ struct Kernel02 {
     // Either the left or right must shadow, but not both. This ensures the
     // intersection is between the left and right.
     bool shadows;
+    int closestVert;
+    float minMetric = 1.0f / 0.0f;
     s02 = 0;
 
     int q1 = facesQ[q2];
     const int lastEdge = facesQ[q2 + 1];
+    const glm::vec3 posP = vertPosP[p0];
     while (q1 < lastEdge) {
       const Halfedge edge = halfedgeQ[q1];
       const int q1F = edge.IsForward() ? q1 : edge.pairedHalfedge;
+
+      if (!forward) {
+        const int qVert = halfedgeQ[q1F].startVert;
+        const glm::vec3 diff = posP - vertPosQ[qVert];
+        const float metric = glm::dot(diff, diff);
+        if (metric < minMetric) {
+          minMetric = metric;
+          closestVert = qVert;
+        }
+      }
 
       const auto syz01 = Shadow01(p0, q1F, vertPosP, vertPosQ, halfedgeQ,
                                   expandP, vertNormalP, !forward);
@@ -421,9 +434,8 @@ struct Kernel02 {
       if (forward) {
         if (!Shadows(vertPos.z, z02, expandP * vertNormalP[p0].z)) s02 = 0;
       } else {
-        // TODO: Would be better to perturb using nearest vertNormal, see
-        // Kernel11.
-        if (!Shadows(z02, vertPos.z, expandP * faceNormalP[q2].z)) s02 = 0;
+        if (!Shadows(z02, vertPos.z, expandP * vertNormalP[closestVert].z))
+          s02 = 0;
       }
     }
   }
@@ -1203,6 +1215,10 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
 
   // Create the manifold's data structures and verify manifoldness.
   outR.LabelVerts();
+  outR.Finish();
+
+  // TODO: Revert Manifold back to only triangles.
+  outR.Face2Tri();
   outR.Finish();
 
   if (kVerbose) {
