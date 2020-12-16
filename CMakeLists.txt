@@ -4,13 +4,13 @@ cmake_minimum_required(VERSION 3.12)
 # endif()
 project(manifold LANGUAGES CXX CUDA)
 
-# set(CMAKE_VERBOSE_MAKEFILE ON)
-# OPTION(DEBUG_CMAKE_TARGETS "enable debug output for cmake target properties" ON)
-# if(DEBUG_CMAKE_TARGETS)
-#     set(CMAKE_DEBUG_TARGET_PROPERTIES
-#             INCLUDE_DIRECTORIES
-#         )
-# endif()
+set(CMAKE_VERBOSE_MAKEFILE ON)
+OPTION(DEBUG_CMAKE_TARGETS "enable debug output for cmake target properties" ON)
+if(DEBUG_CMAKE_TARGETS)
+    set(CMAKE_DEBUG_TARGET_PROPERTIES
+            INCLUDE_DIRECTORIES
+        )
+endif()
 
 OPTION( MANIFOLD_USE_OMP
   "Use OpenMP as the Thrust backend instead of CUDA."
@@ -33,6 +33,8 @@ IF(MANIFOLD_USE_CPP)
     message("------------------------- Using C++ instead of CUDA.")
     set(MANIFOLD_NVCC_FLAGS -DTHRUST_DEVICE_SYSTEM=THRUST_DEVICE_SYSTEM_CPP)
 ENDIF(MANIFOLD_USE_CPP)
+
+# include_directories(/usr/local/include)
 
 add_subdirectory(utilities)
 add_subdirectory(collider)
