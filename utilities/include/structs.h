@@ -122,8 +122,8 @@ struct Mesh {
 };
 
 struct Box {
-  glm::vec3 min = glm::vec3(0.0f / 0.0f);
-  glm::vec3 max = glm::vec3(0.0f / 0.0f);
+  glm::vec3 min = glm::vec3(1.0f / 0.0f);
+  glm::vec3 max = glm::vec3(-1.0f / 0.0f);
 
   HOST_DEVICE Box() {}
   HOST_DEVICE Box(const glm::vec3 p1, const glm::vec3 p2) {
