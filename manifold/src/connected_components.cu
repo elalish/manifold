@@ -22,7 +22,7 @@
 #include "connected_components.cuh"
 
 // 2^31-1 is nvgraph's unreachable flag
-constexpr int kNvgraphInvalid = std::numeric_limits<int>::max();
+// constexpr int kNvgraphInvalid = std::numeric_limits<int>::max();
 
 namespace {
 using namespace manifold;

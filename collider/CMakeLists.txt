@@ -2,6 +2,8 @@ project (collider)
 
 add_library(${PROJECT_NAME} src/collider.cu)
 
+set_property(TARGET ${PROJECT_NAME} PROPERTY CUDA_ARCHITECTURES 61)
+
 target_include_directories( ${PROJECT_NAME}
     PUBLIC ${PROJECT_SOURCE_DIR}/include
 )

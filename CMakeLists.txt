@@ -1,16 +1,16 @@
 cmake_minimum_required(VERSION 3.12)
-# if (NOT CMAKE_CUDA_COMPILER)
-#     set(CMAKE_CUDA_COMPILER "/usr/local/cuda-9.2/bin/nvcc")
-# endif()
+if (NOT CMAKE_CUDA_COMPILER)
+    set(CMAKE_CUDA_COMPILER "/usr/local/cuda/bin/nvcc")
+endif()
 project(manifold LANGUAGES CXX CUDA)
 
 set(CMAKE_VERBOSE_MAKEFILE ON)
-OPTION(DEBUG_CMAKE_TARGETS "enable debug output for cmake target properties" ON)
-if(DEBUG_CMAKE_TARGETS)
-    set(CMAKE_DEBUG_TARGET_PROPERTIES
-            INCLUDE_DIRECTORIES
-        )
-endif()
+# OPTION(DEBUG_CMAKE_TARGETS "enable debug output for cmake target properties" OFF)
+# if(DEBUG_CMAKE_TARGETS)
+#     set(CMAKE_DEBUG_TARGET_PROPERTIES
+#             INCLUDE_DIRECTORIES
+#         )
+# endif()
 
 OPTION( MANIFOLD_USE_OMP
   "Use OpenMP as the Thrust backend instead of CUDA."
@@ -22,16 +22,16 @@ OPTION( MANIFOLD_USE_CPP
 )
 
 set(MAINFOLD_FLAGS -Werror -Wall -Wno-sign-compare)
-set(MANIFOLD_NVCC_FLAGS -DTHRUST_DEBUG)
+set(MANIFOLD_NVCC_FLAGS -O3 -Xcudafe --diag_suppress=esa_on_defaulted_function_ignored)
 IF(MANIFOLD_USE_OMP)
     message("------------------------- Using OpenMP instead of CUDA.")
     find_package(OpenMP REQUIRED)
     set(MANIFOLD_OMP_INCLUDE OpenMP::OpenMP_CXX)
-    set(MANIFOLD_NVCC_FLAGS -DTHRUST_DEVICE_SYSTEM=THRUST_DEVICE_SYSTEM_OMP -Xcompiler=-fopenmp)
+    set(MANIFOLD_NVCC_FLAGS ${MANIFOLD_NVCC_FLAGS} -DTHRUST_DEVICE_SYSTEM=THRUST_DEVICE_SYSTEM_OMP -Xcompiler=-fopenmp)
 ENDIF(MANIFOLD_USE_OMP)
 IF(MANIFOLD_USE_CPP)
     message("------------------------- Using C++ instead of CUDA.")
-    set(MANIFOLD_NVCC_FLAGS -DTHRUST_DEVICE_SYSTEM=THRUST_DEVICE_SYSTEM_CPP)
+    set(MANIFOLD_NVCC_FLAGS ${MANIFOLD_NVCC_FLAGS} -DTHRUST_DEVICE_SYSTEM=THRUST_DEVICE_SYSTEM_CPP)
 ENDIF(MANIFOLD_USE_CPP)
 
 # include_directories(/usr/local/include)
