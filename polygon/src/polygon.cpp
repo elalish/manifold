@@ -345,7 +345,7 @@ class Monotones {
   /**
    * This function is shared between the forward and backward sweeps and
    * determines the topology of the vertex relative to the sweep line.
-  */
+   */
   VertType ProcessVert(VertItr vert) {
     PairItr eastPair = vert->right->eastPair;
     PairItr westPair = vert->left->westPair;
@@ -401,7 +401,7 @@ class Monotones {
    * hole). Usually the first return is adequate, but if it is degenerate, the
    * function will continue to search up the neighbors until the degeneracy is
    * broken and a certain answer is returned.
-  */
+   */
   bool IsHole(VertItr vert) {
     VertItr left = vert->left;
     VertItr right = vert->right;
@@ -425,15 +425,16 @@ class Monotones {
                  : xRight < xLeft - params.kTolerance ? 1 : 0;
     if (isHole != 0) return isHole > 0;
 
+    // TODO: if left or right is Processed(), determine from east/west
     while (left != right || left == vert) {
+      isHole = CCW(right->pos, vert->pos, left->pos);
+      if (isHole != 0) return isHole > 0;
+
       if (left->pos.y < right->pos.y) {
-        isHole = CCW(left->pos, left->left->pos, right->pos);
         left = left->left;
       } else {
-        isHole = CCW(right->pos, left->pos, right->right->pos);
         right = right->right;
       }
-      if (isHole != 0) return isHole > 0;
     }
     return false;
   }
@@ -443,7 +444,7 @@ class Monotones {
    * validity. In this situation, this function is used to swap their east edges
    * such that they become forward neighbor pairs. The outside becomes westPair
    * and inside becomes eastPair.
-  */
+   */
   void SwapHole(PairItr outside, PairItr inside) {
     VertItr tmp = outside->vEast;
     SetVEast(outside, inside->vEast);
@@ -505,7 +506,7 @@ class Monotones {
 
   /**
    * Identical to the above function, but swapped to search westward instead.
-  */
+   */
   bool ShiftWest(const VertItr vert, const PairItr inputPair,
                  const bool isHole) {
     if (inputPair == activePairs_.end())
@@ -920,8 +921,8 @@ void CheckTopology(const std::vector<Halfedge> &halfedges) {
         backward[i].face == Edge::kInterior) {
       glm::ivec2 TwoEdges0 = vert2edges.find(forward[i].startVert)->second;
       glm::ivec2 TwoEdges1 = vert2edges.find(forward[i].endVert)->second;
-      ALWAYS_ASSERT(!SharedEdge(TwoEdges0, TwoEdges1), runtimeErr,
-                    "Added an interface edge!");
+      if (SharedEdge(TwoEdges0, TwoEdges1))
+        std::cout << "Added an interface edge!" << std::endl;
     }
   }
 }
