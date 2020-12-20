@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <random>
+
 #include "gtest/gtest.h"
 #include "manifold.h"
 #include "meshIO.h"
@@ -91,6 +93,14 @@ TEST(Manifold, Regression) {
   int num_overlaps = manifold.NumOverlaps(mesh1);
   ASSERT_EQ(num_overlaps, 237472);
 
+  Mesh mesh_out = manifold.Extract();
+  Manifold mesh2(mesh_out);
+  Mesh mesh_out2 = mesh2.Extract();
+  Identical(mesh_out, mesh_out2);
+}
+
+TEST(Manifold, Extract) {
+  Manifold manifold = Manifold::Sphere(1);
   Mesh mesh_out = manifold.Extract();
   Manifold mesh2(mesh_out);
   Mesh mesh_out2 = mesh2.Extract();
@@ -224,10 +234,9 @@ TEST(Manifold, Perturb) {
 TEST(Manifold, Coplanar) {
   Manifold cube = Manifold::Cylinder(1.0f, 1.0f);
   Manifold cube2 = cube.DeepCopy();
-  Manifold out = cube -
-                 cube2.Scale({0.5f, 0.5f, 1.0f})
-                     .Rotate(0, 0, 15)
-                     .Translate({0.25f, 0.25f, 0.0f});
+  Manifold out = cube - cube2.Scale({0.5f, 0.5f, 1.0f})
+                            .Rotate(0, 0, 15)
+                            .Translate({0.25f, 0.25f, 0.0f});
   ExpectMeshes(out, {{60, 120}});
   EXPECT_EQ(out.Genus(), 1);
 }

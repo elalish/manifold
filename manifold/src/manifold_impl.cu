@@ -351,7 +351,7 @@ struct FaceMortonBox {
     Box& faceBox = thrust::get<1>(inout);
     int face = thrust::get<2>(inout);
 
-    glm::vec3 center;
+    glm::vec3 center(0.0f);
 
     int iEdge = faceEdge[face];
     const int end = faceEdge[face + 1];
@@ -453,6 +453,7 @@ struct AssignNormals {
                                              vertPos[nextEdge.startVert]);
       // corner angle
       float phi = glm::acos(-glm::dot(edgeVec, nextEdgeVec));
+      if (isnan(phi)) phi = 0;
       AtomicAddVec3(vertNormal[edge.endVert],
                     glm::max(phi, kTolerance) * triNormal);
       if (next == start) break;
@@ -1080,7 +1081,7 @@ void Manifold::Impl::GatherFaces(const VecDH<Halfedge>& oldHalfedge,
  * recalculation.
  */
 void Manifold::Impl::CalculateNormals() {
-  vertNormal_.resize(NumVert());
+  vertNormal_.resize(NumVert(), glm::vec3(0.0f));
   bool calculateTriNormal = false;
   if (faceNormal_.size() != NumFace()) {
     faceNormal_.resize(NumFace());

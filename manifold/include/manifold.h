@@ -91,7 +91,6 @@ class Manifold {
   // Testing hooks
   bool IsManifold() const;
   int NumOverlaps(const Manifold& second) const;
-  static void SetSuppressErrors(bool);
 
   ~Manifold();
   Manifold(Manifold&&);
