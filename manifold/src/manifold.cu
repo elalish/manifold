@@ -657,10 +657,6 @@ int Manifold::NumOverlaps(const Manifold& other) const {
   return num_overlaps += overlaps.size();
 }
 
-void Manifold::SetSuppressErrors(bool val) {
-  PolygonParams().suppressErrors = val;
-}
-
 Manifold Manifold::Boolean(const Manifold& second, OpType op) const {
   pImpl_->ApplyTransform();
   second.pImpl_->ApplyTransform();
