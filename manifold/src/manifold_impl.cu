@@ -44,6 +44,7 @@ struct NormalizeTo {
   float length;
   __host__ __device__ void operator()(glm::vec3& v) {
     v = length * glm::normalize(v);
+    if (isnan(v.x)) v = glm::vec3(0.0);
   }
 };
 
@@ -438,6 +439,7 @@ struct AssignNormals {
         triNormal += glm::cross(start - anchor, edgeVec);
       }
       triNormal = glm::normalize(triNormal);
+      if (isnan(triNormal.x)) triNormal = glm::vec3(0.0);
     }
 
     const int start = faceEdge[face];
