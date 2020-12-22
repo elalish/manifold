@@ -218,7 +218,6 @@ struct SplitTris {
 
 struct FaceAreaVolume {
   const Halfedge* halfedges;
-  const int* faceEdge;
   const glm::vec3* vertPos;
 
   __host__ __device__ thrust::pair<float, float> operator()(int face) {
@@ -226,19 +225,17 @@ struct FaceAreaVolume {
     float area = 0.0f;
     float volume = 0.0f;
 
-    int edge = faceEdge[face];
-    const glm::vec3 anchor = vertPos[halfedges[edge].startVert];
-
-    const int end = faceEdge[face + 1];
-    while (edge < end) {
-      const Halfedge halfedge = halfedges[edge++];
-      const glm::vec3 start = vertPos[halfedge.startVert];
-      const glm::vec3 edgeVec = vertPos[halfedge.endVert] - start;
-      perimeter += glm::length(edgeVec);
-      const glm::vec3 crossP = glm::cross(start - anchor, edgeVec);
-      area += glm::length(crossP);
-      volume += glm::dot(crossP, anchor);
+    glm::vec3 edge[3];
+    for (int i : {0, 1, 2}) {
+      const int j = (i + 1) % 3;
+      edge[i] = vertPos[halfedges[3 * face + j].startVert] -
+                vertPos[halfedges[3 * face + i].startVert];
+      perimeter += glm::length(edge[i]);
     }
+    glm::vec3 crossP = glm::cross(edge[0], edge[1]);
+
+    area += glm::length(crossP);
+    volume += glm::dot(crossP, vertPos[halfedges[3 * face].startVert]);
 
     return area > perimeter * kTolerance
                ? thrust::make_pair(area / 2.0f, volume / 6.0f)
@@ -340,7 +337,6 @@ struct Morton {
 };
 
 struct FaceMortonBox {
-  const int* faceEdge;
   const Halfedge* halfedge;
   const glm::vec3* vertPos;
   const Box bBox;
@@ -353,16 +349,12 @@ struct FaceMortonBox {
 
     glm::vec3 center(0.0f);
 
-    int iEdge = faceEdge[face];
-    const int end = faceEdge[face + 1];
-    const int nEdge = end - iEdge;
-    while (iEdge < end) {
-      const glm::vec3 pos = vertPos[halfedge[iEdge].startVert];
+    for (const int i : {0, 1, 2}) {
+      const glm::vec3 pos = vertPos[halfedge[3 * face + i].startVert];
       center += pos;
       faceBox.Union(pos);
-      ++iEdge;
     }
-    center /= nEdge;
+    center /= 3;
 
     mortonCode = MortonCode(center, bBox);
   }
@@ -502,13 +494,11 @@ struct EdgeBox {
 
 struct CheckManifold {
   const Halfedge* halfedges;
-  const int* faces;
 
   __host__ __device__ bool operator()(int face) {
     bool good = true;
-    int edge = faces[face];
-    const int end = faces[face + 1];
-    while (edge < end) {
+    for (const int i : {0, 1, 2}) {
+      const int edge = 3 * face + i;
       const Halfedge halfedge = halfedges[edge];
       const Halfedge paired = halfedges[halfedge.pairedHalfedge];
       good &= halfedge.face == face;
@@ -516,7 +506,6 @@ struct CheckManifold {
       good &= halfedge.startVert != halfedge.endVert;
       good &= halfedge.startVert == paired.endVert;
       good &= halfedge.endVert == paired.startVert;
-      ++edge;
     }
     return good;
   }
@@ -739,9 +728,8 @@ void Manifold::Impl::ApplyTransform() {
  *
  * TODO: This function is slow and should be moved from CPU to GPU.
  */
-VecH<int> Manifold::Impl::AssembleFaces() const {
+VecH<int> Manifold::Impl::AssembleFaces(const VecH<int>& faceEdge) const {
   VecH<int> nextHalfedge(halfedge_.size());
-  const VecH<int>& faceEdge = faceEdge_.H();
   const VecH<Halfedge>& halfedge = halfedge_.H();
 
   for (int face = 0; face < NumFace(); ++face) {
@@ -820,7 +808,7 @@ bool Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge) {
   const VecH<int>& face = faceEdge.H();
   const VecH<Halfedge>& halfedge = halfedge_.H();
   const VecH<glm::vec3>& faceNormal = faceNormal_.H();
-  const VecH<int> nextHalfedge = AssembleFaces();
+  const VecH<int> nextHalfedge = AssembleFaces(face);
 
   for (int i = 0; i < face.size() - 1; ++i) {
     const int edge = face[i];
@@ -845,7 +833,7 @@ bool Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge) {
       triNormal.push_back(normal);
     } else {  // General triangulation
       const glm::mat3x2 projection = GetAxisAlignedProjection(normal);
-      Polygons polys = Face2Polygons(i, projection, nextHalfedge);
+      Polygons polys = Face2Polygons(i, projection, face, nextHalfedge);
 
       std::vector<glm::ivec3> newTris = Triangulate(polys);
 
@@ -898,10 +886,9 @@ void Manifold::Impl::Refine(int n) {
  */
 bool Manifold::Impl::IsManifold() const {
   if (halfedge_.size() == 0) return true;
-  bool isManifold =
-      thrust::all_of(thrust::make_counting_iterator(0),
-                     thrust::make_counting_iterator(NumFace()),
-                     CheckManifold({halfedge_.cptrD(), faceEdge_.cptrD()}));
+  bool isManifold = thrust::all_of(thrust::make_counting_iterator(0),
+                                   thrust::make_counting_iterator(NumFace()),
+                                   CheckManifold({halfedge_.cptrD()}));
 
   VecDH<Halfedge> halfedge(halfedge_);
   thrust::sort(halfedge.beginD(), halfedge.endD());
@@ -923,7 +910,7 @@ Manifold::Properties Manifold::Impl::GetProperties() const {
   thrust::pair<float, float> areaVolume = thrust::transform_reduce(
       thrust::make_counting_iterator(0),
       thrust::make_counting_iterator(NumFace()),
-      FaceAreaVolume({halfedge_.cptrD(), faceEdge_.cptrD(), vertPos_.cptrD()}),
+      FaceAreaVolume({halfedge_.cptrD(), vertPos_.cptrD()}),
       thrust::make_pair(0.0f, 0.0f), SumPair());
   return {areaVolume.first, areaVolume.second};
 }
@@ -983,11 +970,10 @@ void Manifold::Impl::GetFaceBoxMorton(VecDH<Box>& faceBox,
                                       VecDH<uint32_t>& faceMorton) const {
   faceBox.resize(NumFace());
   faceMorton.resize(NumFace());
-  thrust::for_each_n(zip(faceMorton.beginD(), faceBox.beginD(),
-                         thrust::make_counting_iterator(0)),
-                     NumFace(),
-                     FaceMortonBox({faceEdge_.cptrD(), halfedge_.cptrD(),
-                                    vertPos_.cptrD(), bBox_}));
+  thrust::for_each_n(
+      zip(faceMorton.beginD(), faceBox.beginD(),
+          thrust::make_counting_iterator(0)),
+      NumFace(), FaceMortonBox({halfedge_.cptrD(), vertPos_.cptrD(), bBox_}));
 }
 
 /**
@@ -1110,8 +1096,8 @@ SparseIndices Manifold::Impl::VertexCollisionsZ(
  * projection of the vertices.
  */
 Polygons Manifold::Impl::Face2Polygons(int face, glm::mat3x2 projection,
+                                       const VecH<int>& faceEdge,
                                        const VecH<int>& nextHalfedge) const {
-  const VecH<int>& faceEdge = faceEdge_.H();
   const VecH<Halfedge>& halfedge = halfedge_.H();
   const VecH<glm::vec3>& vertPos = vertPos_.H();
   const int firstEdge = faceEdge[face];
