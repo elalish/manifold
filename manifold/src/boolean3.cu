@@ -150,21 +150,18 @@ SparseIndices Filter02(const Manifold::Impl &inP, const Manifold::Impl &inQ,
 struct CopyFaceEdges {
   // x can be either vert or edge (0 or 1).
   thrust::pair<int *, int *> pXq1;
-  const int *facesQ;
   const Halfedge *halfedgesQ;
 
   __host__ __device__ void operator()(thrust::tuple<int, int, int> in) {
-    int idx = thrust::get<0>(in);
+    int idx = 3 * thrust::get<0>(in);
     const int pX = thrust::get<1>(in);
     const int q2 = thrust::get<2>(in);
 
-    int q1 = facesQ[q2];
-    const int end = facesQ[q2 + 1];
-    while (q1 < end) {
-      pXq1.first[idx] = pX;
+    for (const int i : {0, 1, 2}) {
+      pXq1.first[idx + i] = pX;
+      const int q1 = 3 * q2 + i;
       const Halfedge edge = halfedgesQ[q1];
-      pXq1.second[idx++] = edge.IsForward() ? q1 : edge.pairedHalfedge;
-      ++q1;
+      pXq1.second[idx + i] = edge.IsForward() ? q1 : edge.pairedHalfedge;
     }
   }
 };
@@ -172,28 +169,16 @@ struct CopyFaceEdges {
 SparseIndices Filter11(const Manifold::Impl &inP, const VecDH<int> &faceSizeP,
                        const Manifold::Impl &inQ, const VecDH<int> &faceSizeQ,
                        const SparseIndices &p1q2, const SparseIndices &p2q1) {
-  VecDH<int> expandedIdxQ(p1q2.size() + 1);
-  auto includedFaceSizeQ = perm(faceSizeQ.beginD() + 1, p1q2.beginD(1));
-  thrust::inclusive_scan(includedFaceSizeQ, includedFaceSizeQ + p1q2.size(),
-                         expandedIdxQ.beginD() + 1);
-  const int secondStart = expandedIdxQ.H().back();
-
-  VecDH<int> expandedIdxP(p2q1.size() + 1);
-  auto includedFaceSizeP = perm(faceSizeP.beginD() + 1, p2q1.beginD(0));
-  thrust::inclusive_scan(includedFaceSizeP, includedFaceSizeP + p2q1.size(),
-                         expandedIdxP.beginD() + 1);
-
-  SparseIndices p1q1(secondStart + expandedIdxP.H().back());
-  thrust::for_each_n(zip(expandedIdxQ.beginD(), p1q2.beginD(0), p1q2.beginD(1)),
-                     p1q2.size(),
-                     CopyFaceEdges({p1q1.ptrDpq(), inQ.faceEdge_.cptrD(),
-                                    inQ.halfedge_.cptrD()}));
+  SparseIndices p1q1(3 * p1q2.size() + 3 * p2q1.size());
+  thrust::for_each_n(
+      zip(thrust::make_counting_iterator(0), p1q2.beginD(0), p1q2.beginD(1)),
+      p1q2.size(), CopyFaceEdges({p1q1.ptrDpq(), inQ.halfedge_.cptrD()}));
 
   p1q1.SwapPQ();
-  thrust::for_each_n(
-      zip(expandedIdxP.beginD(), p2q1.beginD(1), p2q1.beginD(0)), p2q1.size(),
-      CopyFaceEdges({p1q1.ptrDpq(secondStart), inP.faceEdge_.cptrD(),
-                     inP.halfedge_.cptrD()}));
+  thrust::for_each_n(zip(thrust::make_counting_iterator(p1q2.size()),
+                         p2q1.beginD(1), p2q1.beginD(0)),
+                     p2q1.size(),
+                     CopyFaceEdges({p1q1.ptrDpq(), inP.halfedge_.cptrD()}));
   p1q1.SwapPQ();
   p1q1.Unique();
   return p1q1;
