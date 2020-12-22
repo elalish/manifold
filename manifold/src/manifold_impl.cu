@@ -515,8 +515,8 @@ struct NoDuplicates {
   const Halfedge* halfedges;
 
   __host__ __device__ bool operator()(int edge) {
-    return halfedges[2 * edge].startVert != halfedges[2 * edge + 1].startVert ||
-           halfedges[2 * edge].endVert != halfedges[2 * edge + 1].endVert;
+    return halfedges[edge].startVert != halfedges[edge + 1].startVert ||
+           halfedges[edge].endVert != halfedges[edge + 1].endVert;
   }
 };
 
@@ -892,9 +892,10 @@ bool Manifold::Impl::IsManifold() const {
 
   VecDH<Halfedge> halfedge(halfedge_);
   thrust::sort(halfedge.beginD(), halfedge.endD());
-  isManifold &= thrust::all_of(thrust::make_counting_iterator(0),
-                               thrust::make_counting_iterator(NumEdge()),
-                               NoDuplicates({halfedge.cptrD()}));
+  isManifold &=
+      thrust::all_of(thrust::make_counting_iterator(0),
+                     thrust::make_counting_iterator(2 * NumEdge() - 1),
+                     NoDuplicates({halfedge.cptrD()}));
   return isManifold;
 }
 
