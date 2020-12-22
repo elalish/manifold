@@ -48,7 +48,7 @@ struct Manifold::Impl {
   VecH<int> AssembleFaces() const;
   bool Tri2Face() const;
   bool Tri2Face();
-  bool Face2Tri();
+  bool Face2Tri(const VecDH<int>& faceEdge);
   void Refine(int n);
   bool IsManifold() const;
 

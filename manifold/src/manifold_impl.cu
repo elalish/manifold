@@ -809,15 +809,15 @@ bool Manifold::Impl::Tri2Face() {
  * Triangulates the faces. It is possible, but rare, that this function can
  * also add vertices. This never happens for geometrically valid manifolds.
  */
-bool Manifold::Impl::Face2Tri() {
-  if (faceEdge_.size() == 0 && halfedge_.size() % 3 == 0) return false;
+bool Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge) {
+  if (faceEdge.size() == 0 && halfedge_.size() % 3 == 0) return false;
   VecDH<glm::ivec3> triVertsOut;
   VecDH<glm::vec3> triNormalOut;
 
   VecH<glm::ivec3>& triVerts = triVertsOut.H();
   VecH<glm::vec3>& triNormal = triNormalOut.H();
   VecH<glm::vec3>& vertPos = vertPos_.H();
-  const VecH<int>& face = faceEdge_.H();
+  const VecH<int>& face = faceEdge.H();
   const VecH<Halfedge>& halfedge = halfedge_.H();
   const VecH<glm::vec3>& faceNormal = faceNormal_.H();
   const VecH<int> nextHalfedge = AssembleFaces();
