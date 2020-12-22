@@ -405,29 +405,9 @@ class Monotones {
   bool IsHole(VertItr vert) {
     VertItr left = vert->left;
     VertItr right = vert->right;
-    int isHole = CCW(right->pos, vert->pos, left->pos);
-    if (isHole != 0) return isHole > 0;
-
-    while (left != right && !left->IsPast(vert)) {
-      left = left->left;
-    }
-    while (right != left && !right->IsPast(vert)) {
-      right = right->right;
-    }
-    if (left == right) return false;  // degenerate
-
-    left = left->right;
-    right = right->left;
-    const float xLeft = left->pos.x;
-    const float xRight = right->pos.x;
-    isHole = xRight > xLeft + params.kTolerance
-                 ? -1
-                 : xRight < xLeft - params.kTolerance ? 1 : 0;
-    if (isHole != 0) return isHole > 0;
-
     // TODO: if left or right is Processed(), determine from east/west
     while (left != right || left == vert) {
-      isHole = CCW(right->pos, vert->pos, left->pos);
+      int isHole = CCW(right->pos, vert->pos, left->pos);
       if (isHole != 0) return isHole > 0;
 
       if (left->pos.y < right->pos.y) {

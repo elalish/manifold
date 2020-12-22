@@ -419,47 +419,38 @@ struct AssignNormals {
   glm::vec3* vertNormal;
   const glm::vec3* vertPos;
   const Halfedge* halfedges;
-  const int* nextHalfedge;
-  const int* faceEdge;
   const bool calculateTriNormal;
 
   __host__ __device__ void operator()(thrust::tuple<glm::vec3&, int> in) {
     glm::vec3& triNormal = thrust::get<0>(in);
     const int face = thrust::get<1>(in);
 
+    glm::ivec3 triVerts(halfedges[3 * face].startVert,
+                        halfedges[3 * face].endVert,
+                        halfedges[3 * face + 1].endVert);
+    glm::vec3 v0 = vertPos[triVerts[0]];
+    glm::vec3 v1 = vertPos[triVerts[1]];
+    glm::vec3 v2 = vertPos[triVerts[2]];
+    // edge vectors
+    glm::vec3 e01 = glm::normalize(v1 - v0);
+    glm::vec3 e12 = glm::normalize(v2 - v1);
+    glm::vec3 e20 = glm::normalize(v0 - v2);
+
     if (calculateTriNormal) {
-      triNormal = glm::vec3(0.0f);
-      int edge = faceEdge[face];
-      const glm::vec3 anchor = vertPos[halfedges[edge].startVert];
-      const int end = faceEdge[face + 1];
-      while (edge < end) {
-        const Halfedge halfedge = halfedges[edge++];
-        const glm::vec3 start = vertPos[halfedge.startVert];
-        const glm::vec3 edgeVec = vertPos[halfedge.endVert] - start;
-        triNormal += glm::cross(start - anchor, edgeVec);
-      }
-      triNormal = glm::normalize(triNormal);
+      triNormal = glm::normalize(glm::cross(e01, e12));
       if (isnan(triNormal.x)) triNormal = glm::vec3(0.0);
     }
 
-    const int start = faceEdge[face];
-    int next = nextHalfedge[start];
-    Halfedge edge = halfedges[start];
-    glm::vec3 edgeVec =
-        glm::normalize(vertPos[edge.endVert] - vertPos[edge.startVert]);
-    while (1) {
-      Halfedge nextEdge = halfedges[next];
-      glm::vec3 nextEdgeVec = glm::normalize(vertPos[nextEdge.endVert] -
-                                             vertPos[nextEdge.startVert]);
-      // corner angle
-      float phi = glm::acos(-glm::dot(edgeVec, nextEdgeVec));
-      if (isnan(phi)) phi = 0;
-      AtomicAddVec3(vertNormal[edge.endVert],
-                    glm::max(phi, kTolerance) * triNormal);
-      if (next == start) break;
-      edge = nextEdge;
-      edgeVec = nextEdgeVec;
-      next = nextHalfedge[next];
+    // corner angles
+    glm::vec3 phi;
+    phi[0] = glm::acos(-glm::dot(e01, e12));
+    phi[1] = glm::acos(-glm::dot(e12, e20));
+    phi[2] = glm::pi<float>() - phi[0] - phi[1];
+    // assign weighted sum
+    for (int i : {0, 1, 2}) {
+      if (isnan(phi[i])) phi[i] = 0;
+      AtomicAddVec3(vertNormal[triVerts[i]],
+                    glm::max(phi[i], kTolerance) * triNormal);
     }
   }
 };
@@ -697,7 +688,6 @@ void Manifold::Impl::Finish() {
   VecDH<uint32_t> faceMorton;
   GetFaceBoxMorton(faceBox, faceMorton);
   SortFaces(faceBox, faceMorton);
-  AssembleFaces();
   CalculateNormals();
   collider_ = Collider(faceBox, faceMorton);
 }
@@ -742,12 +732,6 @@ void Manifold::Impl::ApplyTransform() {
   CalculateBBox();
 }
 
-void Manifold::Impl::AssembleFaces() const {
-  // This const_cast is here because this operation tweaks the internal data
-  // structure, but does not change what it represents.
-  return const_cast<Impl*>(this)->AssembleFaces();
-}
-
 /**
  * This fills in the nextHalfedge_ vector indicating how the halfedges connect
  * to each other going CCW around a face. This data cannot be stored by simply
@@ -755,9 +739,8 @@ void Manifold::Impl::AssembleFaces() const {
  *
  * TODO: This function is slow and should be moved from CPU to GPU.
  */
-void Manifold::Impl::AssembleFaces() {
-  nextHalfedge_.resize(halfedge_.size());
-  VecH<int>& nextHalfedge = nextHalfedge_.H();
+VecH<int> Manifold::Impl::AssembleFaces() const {
+  VecH<int> nextHalfedge(halfedge_.size());
   const VecH<int>& faceEdge = faceEdge_.H();
   const VecH<Halfedge>& halfedge = halfedge_.H();
 
@@ -802,6 +785,7 @@ void Manifold::Impl::AssembleFaces() {
       vert_edge.erase(result);
     }
   }
+  return nextHalfedge;
 }
 
 bool Manifold::Impl::Tri2Face() const {
@@ -836,6 +820,7 @@ bool Manifold::Impl::Face2Tri() {
   const VecH<int>& face = faceEdge_.H();
   const VecH<Halfedge>& halfedge = halfedge_.H();
   const VecH<glm::vec3>& faceNormal = faceNormal_.H();
+  const VecH<int> nextHalfedge = AssembleFaces();
 
   for (int i = 0; i < face.size() - 1; ++i) {
     const int edge = face[i];
@@ -860,7 +845,7 @@ bool Manifold::Impl::Face2Tri() {
       triNormal.push_back(normal);
     } else {  // General triangulation
       const glm::mat3x2 projection = GetAxisAlignedProjection(normal);
-      Polygons polys = Face2Polygons(i, projection);
+      Polygons polys = Face2Polygons(i, projection, nextHalfedge);
 
       std::vector<glm::ivec3> newTris = Triangulate(polys);
 
@@ -882,7 +867,6 @@ bool Manifold::Impl::Face2Tri() {
  * vertices have moved, which is a likely scenario after refinement (smoothing).
  */
 void Manifold::Impl::Refine(int n) {
-  Face2Tri();
   int numVert = NumVert();
   int numEdge = NumEdge();
   int numTri = NumFace();
@@ -1090,7 +1074,6 @@ void Manifold::Impl::CalculateNormals() {
   thrust::for_each_n(
       zip(faceNormal_.beginD(), thrust::make_counting_iterator(0)), NumFace(),
       AssignNormals({vertNormal_.ptrD(), vertPos_.cptrD(), halfedge_.cptrD(),
-                     nextHalfedge_.cptrD(), faceEdge_.cptrD(),
                      calculateTriNormal}));
   thrust::for_each(vertNormal_.begin(), vertNormal_.end(), NormalizeTo({1.0}));
 }
@@ -1126,10 +1109,10 @@ SparseIndices Manifold::Impl::VertexCollisionsZ(
  * For the input face index, return a set of 2D polygons formed by the input
  * projection of the vertices.
  */
-Polygons Manifold::Impl::Face2Polygons(int face, glm::mat3x2 projection) const {
+Polygons Manifold::Impl::Face2Polygons(int face, glm::mat3x2 projection,
+                                       const VecH<int>& nextHalfedge) const {
   const VecH<int>& faceEdge = faceEdge_.H();
   const VecH<Halfedge>& halfedge = halfedge_.H();
-  const VecH<int>& nextHalfedge = nextHalfedge_.H();
   const VecH<glm::vec3>& vertPos = vertPos_.H();
   const int firstEdge = faceEdge[face];
   const int lastEdge = faceEdge[face + 1];
