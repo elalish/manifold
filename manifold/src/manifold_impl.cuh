@@ -45,7 +45,7 @@ struct Manifold::Impl {
   void Update();
   void ApplyTransform() const;
   void ApplyTransform();
-  VecH<int> AssembleFaces() const;
+  VecH<int> AssembleFaces(const VecH<int>& faceEdge) const;
   bool Tri2Face() const;
   bool Tri2Face();
   bool Face2Tri(const VecDH<int>& faceEdge);
@@ -71,6 +71,7 @@ struct Manifold::Impl {
   VecDH<int> FaceSize() const;
   void GetFaceBoxMorton(VecDH<Box>& faceBox, VecDH<uint32_t>& faceMorton) const;
   Polygons Face2Polygons(int face, glm::mat3x2 projection,
+                         const VecH<int>& faceEdge,
                          const VecH<int>& nextHalfedge) const;
 };
 }  // namespace manifold
