@@ -1215,7 +1215,6 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
 
   // Create the manifold's data structures and verify manifoldness.
   outR.LabelVerts();
-  outR.Finish();
 
   // TODO: Revert Manifold back to only triangles.
   outR.Face2Tri();

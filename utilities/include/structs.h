@@ -84,7 +84,7 @@ inline float cosd(float x) { return sind(x + 90.0f); }
 #endif
 
 struct ExecutionParams {
-  float kTolerance = 1e-4;
+  float kTolerance = 2e-5;
   bool intermediateChecks = false;
   bool verbose = false;
   bool suppressErrors = false;

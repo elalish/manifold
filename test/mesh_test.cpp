@@ -39,7 +39,6 @@ void Identical(Mesh& mesh1, Mesh& mesh2) {
 void ExpectMeshes(Manifold& manifold,
                   const std::vector<std::pair<int, int>>& numVertTri) {
   ASSERT_TRUE(manifold.IsManifold());
-  manifold.Extract();
   std::vector<Manifold> meshes = manifold.Decompose();
   ASSERT_EQ(meshes.size(), numVertTri.size());
   std::sort(meshes.begin(), meshes.end(),
