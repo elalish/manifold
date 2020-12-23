@@ -44,12 +44,12 @@ void ExpectMeshes(Manifold& manifold,
   std::sort(meshes.begin(), meshes.end(),
             [](const Manifold& a, const Manifold& b) {
               return a.NumVert() != b.NumVert() ? a.NumVert() > b.NumVert()
-                                                : a.NumFace() > b.NumFace();
+                                                : a.NumTri() > b.NumTri();
             });
   for (int i = 0; i < meshes.size(); ++i) {
     EXPECT_TRUE(meshes[i].IsManifold());
     EXPECT_EQ(meshes[i].NumVert(), numVertTri[i].first);
-    EXPECT_EQ(meshes[i].NumFace(), numVertTri[i].second);
+    EXPECT_EQ(meshes[i].NumTri(), numVertTri[i].second);
   }
 }
 
@@ -127,7 +127,7 @@ TEST(Manifold, Sphere) {
   int n = 25;
   Manifold sphere = Manifold::Sphere(1.0f, 4 * n);
   ASSERT_TRUE(sphere.IsManifold());
-  EXPECT_EQ(sphere.NumFace(), n * n * 8);
+  EXPECT_EQ(sphere.NumTri(), n * n * 8);
 }
 
 TEST(Manifold, Extrude) {

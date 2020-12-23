@@ -56,7 +56,7 @@ class Manifold {
   bool IsEmpty() const;
   int NumVert() const;
   int NumEdge() const;
-  int NumFace() const;
+  int NumTri() const;
   Box BoundingBox() const;
   int Genus() const;
   Properties GetProperties() const;

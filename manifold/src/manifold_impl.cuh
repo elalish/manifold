@@ -47,7 +47,7 @@ struct Manifold::Impl {
 
   int NumVert() const { return vertPos_.size(); }
   int NumEdge() const { return halfedge_.size() / 2; }
-  int NumFace() const { return halfedge_.size() / 3; }
+  int NumTri() const { return halfedge_.size() / 3; }
   Properties GetProperties() const;
   void CalculateBBox();
   bool IsManifold() const;

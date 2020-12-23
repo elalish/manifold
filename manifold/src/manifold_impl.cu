@@ -639,7 +639,7 @@ void Manifold::Impl::Finish() {
   ALWAYS_ASSERT(extrema.endVert < NumVert(), runtimeErr,
                 "Vertex index exceeds number of verts!");
   ALWAYS_ASSERT(extrema.face >= 0, runtimeErr, "Face index is negative!");
-  ALWAYS_ASSERT(extrema.face < NumFace(), runtimeErr,
+  ALWAYS_ASSERT(extrema.face < NumTri(), runtimeErr,
                 "Face index exceeds number of faces!");
   ALWAYS_ASSERT(extrema.pairedHalfedge >= 0, runtimeErr,
                 "Halfedge index is negative!");
@@ -824,7 +824,7 @@ void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge) {
 void Manifold::Impl::Refine(int n) {
   int numVert = NumVert();
   int numEdge = NumEdge();
-  int numTri = NumFace();
+  int numTri = NumTri();
   // Append new verts
   int vertsPerEdge = n - 1;
   int vertsPerTri = ((n - 2) * (n - 2) + (n - 2)) / 2;
@@ -853,7 +853,7 @@ void Manifold::Impl::Refine(int n) {
  */
 bool Manifold::Impl::IsManifold() const {
   if (halfedge_.size() == 0) return true;
-  bool isManifold = thrust::all_of(countAt(0), countAt(NumFace()),
+  bool isManifold = thrust::all_of(countAt(0), countAt(NumTri()),
                                    CheckManifold({halfedge_.cptrD()}));
 
   VecDH<Halfedge> halfedge(halfedge_);
@@ -873,7 +873,7 @@ Manifold::Properties Manifold::Impl::GetProperties() const {
   if (halfedge_.size() == 0) return {0, 0};
   ApplyTransform();
   thrust::pair<float, float> areaVolume = thrust::transform_reduce(
-      countAt(0), countAt(NumFace()),
+      countAt(0), countAt(NumTri()),
       FaceAreaVolume({halfedge_.cptrD(), vertPos_.cptrD()}),
       thrust::make_pair(0.0f, 0.0f), SumPair());
   return {areaVolume.first, areaVolume.second};
@@ -931,10 +931,10 @@ void Manifold::Impl::ReindexVerts(const VecDH<int>& vertNew2Old,
  */
 void Manifold::Impl::GetFaceBoxMorton(VecDH<Box>& faceBox,
                                       VecDH<uint32_t>& faceMorton) const {
-  faceBox.resize(NumFace());
-  faceMorton.resize(NumFace());
+  faceBox.resize(NumTri());
+  faceMorton.resize(NumTri());
   thrust::for_each_n(
-      zip(faceMorton.beginD(), faceBox.beginD(), countAt(0)), NumFace(),
+      zip(faceMorton.beginD(), faceBox.beginD(), countAt(0)), NumTri(),
       FaceMortonBox({halfedge_.cptrD(), vertPos_.cptrD(), bBox_}));
 }
 
@@ -944,10 +944,10 @@ void Manifold::Impl::GetFaceBoxMorton(VecDH<Box>& faceBox,
  */
 void Manifold::Impl::SortFaces(VecDH<Box>& faceBox,
                                VecDH<uint32_t>& faceMorton) {
-  VecDH<int> faceNew2Old(NumFace());
+  VecDH<int> faceNew2Old(NumTri());
   thrust::sequence(faceNew2Old.beginD(), faceNew2Old.endD());
 
-  if (faceNormal_.size() == NumFace()) {
+  if (faceNormal_.size() == NumTri()) {
     thrust::sort_by_key(
         faceMorton.beginD(), faceMorton.endD(),
         zip(faceBox.beginD(), faceNew2Old.beginD(), faceNormal_.beginD()));
@@ -993,11 +993,11 @@ void Manifold::Impl::GatherFaces(const VecDH<Halfedge>& oldHalfedge,
 void Manifold::Impl::CalculateNormals() {
   vertNormal_.resize(NumVert(), glm::vec3(0.0f));
   bool calculateTriNormal = false;
-  if (faceNormal_.size() != NumFace()) {
-    faceNormal_.resize(NumFace());
+  if (faceNormal_.size() != NumTri()) {
+    faceNormal_.resize(NumTri());
     calculateTriNormal = true;
   }
-  thrust::for_each_n(zip(faceNormal_.beginD(), countAt(0)), NumFace(),
+  thrust::for_each_n(zip(faceNormal_.beginD(), countAt(0)), NumTri(),
                      AssignNormals({vertNormal_.ptrD(), vertPos_.cptrD(),
                                     halfedge_.cptrD(), calculateTriNormal}));
   thrust::for_each(vertNormal_.begin(), vertNormal_.end(), NormalizeTo({1.0}));

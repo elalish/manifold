@@ -342,11 +342,11 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments) {
 Manifold Manifold::Compose(const std::vector<Manifold>& manifolds) {
   int numVert = 0;
   int numEdge = 0;
-  int numFace = 0;
+  int NumTri = 0;
   for (const Manifold& manifold : manifolds) {
     numVert += manifold.NumVert();
     numEdge += manifold.NumEdge();
-    numFace += manifold.NumFace();
+    NumTri += manifold.NumTri();
   }
 
   Manifold out;
@@ -354,7 +354,7 @@ Manifold Manifold::Compose(const std::vector<Manifold>& manifolds) {
   combined.vertPos_.resize(numVert);
   combined.halfedge_.resize(2 * numEdge);
   combined.vertLabel_.resize(numVert);
-  combined.faceNormal_.resize(numFace);
+  combined.faceNormal_.resize(NumTri);
 
   int nextVert = 0;
   int nextEdge = 0;
@@ -376,7 +376,7 @@ Manifold Manifold::Compose(const std::vector<Manifold>& manifolds) {
 
     nextVert += manifold.NumVert();
     nextEdge += 2 * manifold.NumEdge();
-    nextFace += manifold.NumFace();
+    nextFace += manifold.NumTri();
     nextLabel += impl.numLabel_;
   }
 
@@ -410,7 +410,7 @@ std::vector<Manifold> Manifold::Decompose() const {
         zip(meshes[i].pImpl_->vertPos_.beginD(), countAt(0));
     meshes[i].pImpl_->vertPos_.resize(nVert);
 
-    VecDH<int> faceNew2Old(NumFace());
+    VecDH<int> faceNew2Old(NumTri());
     thrust::sequence(faceNew2Old.beginD(), faceNew2Old.endD());
 
     int nFace = thrust::remove_if(faceNew2Old.beginD(), faceNew2Old.endD(),
@@ -439,8 +439,8 @@ Mesh Manifold::Extract() const {
   result.vertPos.insert(result.vertPos.end(), pImpl_->vertPos_.begin(),
                         pImpl_->vertPos_.end());
 
-  result.triVerts.resize(NumFace());
-  thrust::for_each_n(zip(result.triVerts.begin(), countAt(0)), NumFace(),
+  result.triVerts.resize(NumTri());
+  thrust::for_each_n(zip(result.triVerts.begin(), countAt(0)), NumTri(),
                      MakeTri({pImpl_->halfedge_.cptrH()}));
 
   return result;
@@ -485,7 +485,7 @@ int Manifold::GetCircularSegments(float radius) {
 bool Manifold::IsEmpty() const { return NumVert() == 0; }
 int Manifold::NumVert() const { return pImpl_->NumVert(); }
 int Manifold::NumEdge() const { return pImpl_->NumEdge(); }
-int Manifold::NumFace() const { return pImpl_->NumFace(); }
+int Manifold::NumTri() const { return pImpl_->NumTri(); }
 
 Box Manifold::BoundingBox() const {
   return pImpl_->bBox_.Transform(pImpl_->transform_);
@@ -497,7 +497,7 @@ Box Manifold::BoundingBox() const {
  * mesh, so it is best to call Decompose() first.
  */
 int Manifold::Genus() const {
-  int chi = NumVert() - NumEdge() + NumFace();
+  int chi = NumVert() - NumEdge() + NumTri();
   return 1 - chi / 2;
 }
 
