@@ -53,14 +53,11 @@ struct Equals {
 
 struct RemoveFace {
   const Halfedge* halfedge;
-  const int* faceEdge;
   const int* vertLabel;
   const int keepLabel;
 
-  __host__ __device__ bool operator()(thrust::tuple<int, int> in) {
-    int face = thrust::get<0>(in);
-
-    return vertLabel[halfedge[faceEdge[face]].startVert] != keepLabel;
+  __host__ __device__ bool operator()(int face) {
+    return vertLabel[halfedge[3 * face].startVert] != keepLabel;
   }
 };
 
@@ -450,20 +447,15 @@ std::vector<Manifold> Manifold::Decompose() const {
     VecDH<int> faceNew2Old(NumFace());
     thrust::sequence(faceNew2Old.beginD(), faceNew2Old.endD());
 
-    VecDH<int> faceSize = pImpl_->FaceSize();
-
-    auto start = zip(faceNew2Old.beginD(), faceSize.beginD() + 1);
     int nFace =
         thrust::remove_if(
-            start, zip(faceNew2Old.endD(), faceSize.endD()),
-            RemoveFace({pImpl_->halfedge_.cptrD(), pImpl_->faceEdge_.cptrD(),
-                        vertLabel.cptrD(), i})) -
-        start;
+            faceNew2Old.beginD(), faceNew2Old.endD(),
+            RemoveFace({pImpl_->halfedge_.cptrD(), vertLabel.cptrD(), i})) -
+        faceNew2Old.beginD();
     faceNew2Old.resize(nFace);
-    faceSize.resize(nFace + 1);
 
-    meshes[i].pImpl_->GatherFaces(pImpl_->halfedge_, pImpl_->faceEdge_,
-                                  faceNew2Old, faceSize);
+    meshes[i].pImpl_->GatherFaces(pImpl_->halfedge_, faceNew2Old);
+    meshes[i].pImpl_->Tri2Face();
     meshes[i].pImpl_->ReindexVerts(vertNew2Old, pImpl_->NumVert());
 
     meshes[i].pImpl_->Finish();
