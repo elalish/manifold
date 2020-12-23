@@ -222,7 +222,7 @@ Collider::Collider(const VecDH<Box>& leafBB,
   nodeParent_.resize(num_nodes, -1);
   internalChildren_.resize(leafBB.size() - 1, thrust::make_pair(-1, -1));
   // organize tree
-  thrust::for_each_n(thrust::make_counting_iterator(0), NumInternal(),
+  thrust::for_each_n(countAt(0), NumInternal(),
                      CreateRadixTree({nodeParent_.ptrD(),
                                       internalChildren_.ptrD(), leafMorton}));
   UpdateBoxes(leafBB);
@@ -244,8 +244,7 @@ SparseIndices Collider::Collisions(const VecDH<T>& querriesIn) const {
     VecDH<int> nOverlapsD(1, 0);
     // calculate Bounding Box overlaps
     thrust::for_each_n(
-        zip(querriesIn.cbeginD(), thrust::make_counting_iterator(0)),
-        querriesIn.size(),
+        zip(querriesIn.cbeginD(), countAt(0)), querriesIn.size(),
         FindCollisions<T>({querryTri.ptrDpq(), nOverlapsD.ptrD(), maxOverlaps,
                            nodeBBox_.ptrD(), internalChildren_.ptrD()}));
     nOverlaps = nOverlapsD.H()[0];
@@ -277,7 +276,7 @@ void Collider::UpdateBoxes(const VecDH<Box>& leafBB) {
   thrust::fill(counter_.beginD(), counter_.endD(), 0);
   // kernel over leaves to save internal Boxs
   thrust::for_each_n(
-      thrust::make_counting_iterator(0), NumLeaves(),
+      countAt(0), NumLeaves(),
       BuildInternalBoxes({nodeBBox_.ptrD(), counter_.ptrD(), nodeParent_.ptrD(),
                           internalChildren_.ptrD()}));
 }
