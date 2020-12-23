@@ -62,13 +62,11 @@ struct Manifold::Impl {
   void ReindexVerts(const VecDH<int>& vertNew2Old, int numOldVert);
   void SortFaces(VecDH<Box>& faceBox, VecDH<uint32_t>& faceMorton);
   void GatherFaces(const VecDH<Halfedge>& oldHalfedge,
-                   const VecDH<int>& oldFaceEdge, const VecDH<int>& faceNew2Old,
-                   const VecDH<int>& faceSize);
+                   const VecDH<int>& faceNew2Old);
   void CalculateNormals();
 
   SparseIndices EdgeCollisions(const Impl& B) const;
   SparseIndices VertexCollisionsZ(const VecDH<glm::vec3>& vertsIn) const;
-  VecDH<int> FaceSize() const;
   void GetFaceBoxMorton(VecDH<Box>& faceBox, VecDH<uint32_t>& faceMorton) const;
   Polygons Face2Polygons(int face, glm::mat3x2 projection,
                          const VecH<int>& faceEdge,

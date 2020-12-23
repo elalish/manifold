@@ -371,26 +371,19 @@ struct Reindex {
 
 struct ReindexFace {
   Halfedge* halfedge;
-  const int* faceEdge;
   const Halfedge* oldHalfedge;
-  const int* oldFaceEdge;
   const int* faceNew2Old;
   const int* faceOld2New;
 
-  __host__ __device__ void operator()(thrust::tuple<int, int> in) {
-    const int newFace = thrust::get<0>(in);
-    int outEdge = thrust::get<1>(in);
-
+  __host__ __device__ void operator()(int newFace) {
     const int oldFace = faceNew2Old[newFace];
-    int iEdge = oldFaceEdge[oldFace];
-    const int end = oldFaceEdge[oldFace + 1];
-    while (iEdge < end) {
-      Halfedge edge = oldHalfedge[iEdge++];
+    for (const int i : {0, 1, 2}) {
+      Halfedge edge = oldHalfedge[3 * oldFace + i];
       edge.face = newFace;
       const int pairedFace = oldHalfedge[edge.pairedHalfedge].face;
-      const int offset = edge.pairedHalfedge - oldFaceEdge[pairedFace];
-      edge.pairedHalfedge = faceEdge[faceOld2New[pairedFace]] + offset;
-      halfedge[outEdge++] = edge;
+      const int offset = edge.pairedHalfedge - 3 * pairedFace;
+      edge.pairedHalfedge = 3 * faceOld2New[pairedFace] + offset;
+      halfedge[3 * newFace + i] = edge;
     }
   }
 };
@@ -986,28 +979,18 @@ void Manifold::Impl::SortFaces(VecDH<Box>& faceBox,
   VecDH<int> faceNew2Old(NumFace());
   thrust::sequence(faceNew2Old.beginD(), faceNew2Old.endD());
 
-  VecDH<int> faceSize = FaceSize();
-
   if (faceNormal_.size() == NumFace()) {
-    thrust::sort_by_key(faceMorton.beginD(), faceMorton.endD(),
-                        zip(faceBox.beginD(), faceNew2Old.beginD(),
-                            faceSize.beginD() + 1, faceNormal_.beginD()));
-  } else {
     thrust::sort_by_key(
         faceMorton.beginD(), faceMorton.endD(),
-        zip(faceBox.beginD(), faceNew2Old.beginD(), faceSize.beginD() + 1));
+        zip(faceBox.beginD(), faceNew2Old.beginD(), faceNormal_.beginD()));
+  } else {
+    thrust::sort_by_key(faceMorton.beginD(), faceMorton.endD(),
+                        zip(faceBox.beginD(), faceNew2Old.beginD()));
   }
 
   VecDH<Halfedge> oldHalfedge = halfedge_;
-  VecDH<int> oldFaceEdge = faceEdge_;
-  GatherFaces(oldHalfedge, oldFaceEdge, faceNew2Old, faceSize);
-}
-
-VecDH<int> Manifold::Impl::FaceSize() const {
-  VecDH<int> faceSize(faceEdge_.size());
-  thrust::adjacent_difference(faceEdge_.beginD(), faceEdge_.endD(),
-                              faceSize.beginD());
-  return faceSize;
+  GatherFaces(oldHalfedge, faceNew2Old);
+  Tri2Face();
 }
 
 /**
@@ -1018,24 +1001,16 @@ VecDH<int> Manifold::Impl::FaceSize() const {
  * faces to be copied.
  */
 void Manifold::Impl::GatherFaces(const VecDH<Halfedge>& oldHalfedge,
-                                 const VecDH<int>& oldFaceEdge,
-                                 const VecDH<int>& faceNew2Old,
-                                 const VecDH<int>& newFaceSize) {
-  faceEdge_.resize(faceNew2Old.size() + 1);
-
-  VecDH<int> faceOld2New(oldFaceEdge.size() - 1);
+                                 const VecDH<int>& faceNew2Old) {
+  const int numTri = faceNew2Old.size();
+  VecDH<int> faceOld2New(oldHalfedge.size() / 3);
   thrust::scatter(thrust::make_counting_iterator(0),
-                  thrust::make_counting_iterator(NumFace()),
-                  faceNew2Old.beginD(), faceOld2New.beginD());
+                  thrust::make_counting_iterator(numTri), faceNew2Old.beginD(),
+                  faceOld2New.beginD());
 
-  thrust::inclusive_scan(newFaceSize.beginD() + 1, newFaceSize.endD(),
-                         faceEdge_.beginD() + 1);
-
-  halfedge_.resize(faceEdge_.H().back());
-  thrust::for_each_n(zip(thrust::make_counting_iterator(0), faceEdge_.beginD()),
-                     NumFace(),
-                     ReindexFace({halfedge_.ptrD(), faceEdge_.cptrD(),
-                                  oldHalfedge.cptrD(), oldFaceEdge.cptrD(),
+  halfedge_.resize(3 * numTri);
+  thrust::for_each_n(thrust::make_counting_iterator(0), numTri,
+                     ReindexFace({halfedge_.ptrD(), oldHalfedge.cptrD(),
                                   faceNew2Old.cptrD(), faceOld2New.cptrD()}));
 }
 

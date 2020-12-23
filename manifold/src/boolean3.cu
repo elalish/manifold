@@ -166,8 +166,7 @@ struct CopyFaceEdges {
   }
 };
 
-SparseIndices Filter11(const Manifold::Impl &inP, const VecDH<int> &faceSizeP,
-                       const Manifold::Impl &inQ, const VecDH<int> &faceSizeQ,
+SparseIndices Filter11(const Manifold::Impl &inP, const Manifold::Impl &inQ,
                        const SparseIndices &p1q2, const SparseIndices &p2q1) {
   SparseIndices p1q1(3 * p1q2.size() + 3 * p2q1.size());
   thrust::for_each_n(
@@ -957,9 +956,6 @@ Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ,
   inP_.Tri2Face();
   inQ_.Tri2Face();
 
-  VecDH<int> faceSizeP = inP_.FaceSize();
-  VecDH<int> faceSizeQ = inQ_.FaceSize();
-
   Time t0 = NOW();
   Time t1;
   // Level 3
@@ -985,7 +981,7 @@ Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ,
   if (kVerbose) std::cout << "p2q0 size = " << p2q0.size() << std::endl;
 
   // Find involved edge pairs from Level 3
-  SparseIndices p1q1 = Filter11(inP_, faceSizeP, inQ_, faceSizeQ, p1q2_, p2q1_);
+  SparseIndices p1q1 = Filter11(inP_, inQ_, p1q2_, p2q1_);
   if (kVerbose) std::cout << "p1q1 size = " << p1q1.size() << std::endl;
 
   if (kVerbose) {
