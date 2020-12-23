@@ -434,14 +434,12 @@ std::vector<Manifold> Manifold::Decompose() const {
     VecDH<int> vertNew2Old(NumVert());
     int nVert =
         thrust::copy_if(
-            zip(pImpl_->vertPos_.beginD(), thrust::make_counting_iterator(0)),
-            zip(pImpl_->vertPos_.endD(),
-                thrust::make_counting_iterator(NumVert())),
+            zip(pImpl_->vertPos_.beginD(), countAt(0)),
+            zip(pImpl_->vertPos_.endD(), countAt(NumVert())),
             vertLabel.beginD(),
             zip(meshes[i].pImpl_->vertPos_.beginD(), vertNew2Old.beginD()),
             Equals({i})) -
-        zip(meshes[i].pImpl_->vertPos_.beginD(),
-            thrust::make_counting_iterator(0));
+        zip(meshes[i].pImpl_->vertPos_.beginD(), countAt(0));
     meshes[i].pImpl_->vertPos_.resize(nVert);
 
     VecDH<int> faceNew2Old(NumFace());
@@ -477,9 +475,8 @@ Mesh Manifold::Extract() {
                         pImpl_->vertPos_.end());
 
   result.triVerts.resize(NumFace());
-  thrust::for_each_n(
-      zip(result.triVerts.begin(), thrust::make_counting_iterator(0)),
-      NumFace(), MakeTri({pImpl_->halfedge_.cptrH()}));
+  thrust::for_each_n(zip(result.triVerts.begin(), countAt(0)), NumFace(),
+                     MakeTri({pImpl_->halfedge_.cptrH()}));
 
   return result;
 }

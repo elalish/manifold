@@ -169,13 +169,12 @@ struct CopyFaceEdges {
 SparseIndices Filter11(const Manifold::Impl &inP, const Manifold::Impl &inQ,
                        const SparseIndices &p1q2, const SparseIndices &p2q1) {
   SparseIndices p1q1(3 * p1q2.size() + 3 * p2q1.size());
-  thrust::for_each_n(
-      zip(thrust::make_counting_iterator(0), p1q2.beginD(0), p1q2.beginD(1)),
-      p1q2.size(), CopyFaceEdges({p1q1.ptrDpq(), inQ.halfedge_.cptrD()}));
+  thrust::for_each_n(zip(countAt(0), p1q2.beginD(0), p1q2.beginD(1)),
+                     p1q2.size(),
+                     CopyFaceEdges({p1q1.ptrDpq(), inQ.halfedge_.cptrD()}));
 
   p1q1.SwapPQ();
-  thrust::for_each_n(zip(thrust::make_counting_iterator(p1q2.size()),
-                         p2q1.beginD(1), p2q1.beginD(0)),
+  thrust::for_each_n(zip(countAt(p1q2.size()), p2q1.beginD(1), p2q1.beginD(0)),
                      p2q1.size(),
                      CopyFaceEdges({p1q1.ptrDpq(), inP.halfedge_.cptrD()}));
   p1q1.SwapPQ();

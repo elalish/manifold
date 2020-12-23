@@ -86,9 +86,8 @@ struct TmpInvalid {
 
 VecDH<TmpEdge> CreateTmpEdges(const VecDH<Halfedge>& halfedge) {
   VecDH<TmpEdge> edges(halfedge.size());
-  thrust::for_each_n(
-      zip(edges.beginD(), halfedge.beginD(), thrust::make_counting_iterator(0)),
-      edges.size(), Halfedge2Tmp());
+  thrust::for_each_n(zip(edges.beginD(), halfedge.beginD(), countAt(0)),
+                     edges.size(), Halfedge2Tmp());
   int numEdge = thrust::remove_if(edges.beginD(), edges.endD(), TmpInvalid()) -
                 edges.beginD();
   ALWAYS_ASSERT(numEdge == halfedge.size() / 2, runtimeErr, "Not oriented!");
@@ -610,10 +609,10 @@ void Manifold::Impl::CreateHalfedges(const VecDH<glm::ivec3>& triVerts) {
   faceEdge_.resize(0);
   halfedge_.resize(3 * numTri);
   VecDH<TmpEdge> edge(3 * numTri);
-  thrust::for_each_n(zip(thrust::make_counting_iterator(0), triVerts.beginD()),
-                     numTri, Tri2Halfedges({halfedge_.ptrD(), edge.ptrD()}));
+  thrust::for_each_n(zip(countAt(0), triVerts.beginD()), numTri,
+                     Tri2Halfedges({halfedge_.ptrD(), edge.ptrD()}));
   thrust::sort(edge.beginD(), edge.endD());
-  thrust::for_each_n(thrust::make_counting_iterator(0), halfedge_.size() / 2,
+  thrust::for_each_n(countAt(0), halfedge_.size() / 2,
                      LinkHalfedges({halfedge_.ptrD(), edge.cptrD()}));
   Tri2Face();
 }
@@ -858,16 +857,16 @@ void Manifold::Impl::Refine(int n) {
   vertPos_.resize(triVertStart + numTri * vertsPerTri);
   VecDH<TmpEdge> edges = CreateTmpEdges(halfedge_);
   VecDH<int> half2Edge(2 * numEdge);
-  thrust::for_each_n(zip(thrust::make_counting_iterator(0), edges.beginD()),
-                     numEdge, ReindexHalfedge({half2Edge.ptrD()}));
-  thrust::for_each_n(zip(thrust::make_counting_iterator(0), edges.beginD()),
-                     numEdge, SplitEdges({vertPos_.ptrD(), numVert, n}));
+  thrust::for_each_n(zip(countAt(0), edges.beginD()), numEdge,
+                     ReindexHalfedge({half2Edge.ptrD()}));
+  thrust::for_each_n(zip(countAt(0), edges.beginD()), numEdge,
+                     SplitEdges({vertPos_.ptrD(), numVert, n}));
   thrust::for_each_n(
-      thrust::make_counting_iterator(0), numTri,
+      countAt(0), numTri,
       InteriorVerts({vertPos_.ptrD(), triVertStart, n, halfedge_.ptrD()}));
   // Create subtriangles
   VecDH<glm::ivec3> triVerts(n * n * numTri);
-  thrust::for_each_n(thrust::make_counting_iterator(0), numTri,
+  thrust::for_each_n(countAt(0), numTri,
                      SplitTris({triVerts.ptrD(), halfedge_.cptrD(),
                                 half2Edge.cptrD(), numVert, triVertStart, n}));
   CreateHalfedges(triVerts);
@@ -879,16 +878,13 @@ void Manifold::Impl::Refine(int n) {
  */
 bool Manifold::Impl::IsManifold() const {
   if (halfedge_.size() == 0) return true;
-  bool isManifold = thrust::all_of(thrust::make_counting_iterator(0),
-                                   thrust::make_counting_iterator(NumFace()),
+  bool isManifold = thrust::all_of(countAt(0), countAt(NumFace()),
                                    CheckManifold({halfedge_.cptrD()}));
 
   VecDH<Halfedge> halfedge(halfedge_);
   thrust::sort(halfedge.beginD(), halfedge.endD());
-  isManifold &=
-      thrust::all_of(thrust::make_counting_iterator(0),
-                     thrust::make_counting_iterator(2 * NumEdge() - 1),
-                     NoDuplicates({halfedge.cptrD()}));
+  isManifold &= thrust::all_of(countAt(0), countAt(2 * NumEdge() - 1),
+                               NoDuplicates({halfedge.cptrD()}));
   return isManifold;
 }
 
@@ -902,8 +898,7 @@ Manifold::Properties Manifold::Impl::GetProperties() const {
   if (halfedge_.size() == 0) return {0, 0};
   ApplyTransform();
   thrust::pair<float, float> areaVolume = thrust::transform_reduce(
-      thrust::make_counting_iterator(0),
-      thrust::make_counting_iterator(NumFace()),
+      countAt(0), countAt(NumFace()),
       FaceAreaVolume({halfedge_.cptrD(), vertPos_.cptrD()}),
       thrust::make_pair(0.0f, 0.0f), SumPair());
   return {areaVolume.first, areaVolume.second};
@@ -948,9 +943,8 @@ void Manifold::Impl::SortVerts() {
 void Manifold::Impl::ReindexVerts(const VecDH<int>& vertNew2Old,
                                   int oldNumVert) {
   VecDH<int> vertOld2New(oldNumVert);
-  thrust::scatter(thrust::make_counting_iterator(0),
-                  thrust::make_counting_iterator(NumVert()),
-                  vertNew2Old.beginD(), vertOld2New.beginD());
+  thrust::scatter(countAt(0), countAt(NumVert()), vertNew2Old.beginD(),
+                  vertOld2New.beginD());
   thrust::for_each(halfedge_.beginD(), halfedge_.endD(),
                    Reindex({vertOld2New.cptrD()}));
 }
@@ -965,9 +959,8 @@ void Manifold::Impl::GetFaceBoxMorton(VecDH<Box>& faceBox,
   faceBox.resize(NumFace());
   faceMorton.resize(NumFace());
   thrust::for_each_n(
-      zip(faceMorton.beginD(), faceBox.beginD(),
-          thrust::make_counting_iterator(0)),
-      NumFace(), FaceMortonBox({halfedge_.cptrD(), vertPos_.cptrD(), bBox_}));
+      zip(faceMorton.beginD(), faceBox.beginD(), countAt(0)), NumFace(),
+      FaceMortonBox({halfedge_.cptrD(), vertPos_.cptrD(), bBox_}));
 }
 
 /**
@@ -1004,12 +997,11 @@ void Manifold::Impl::GatherFaces(const VecDH<Halfedge>& oldHalfedge,
                                  const VecDH<int>& faceNew2Old) {
   const int numTri = faceNew2Old.size();
   VecDH<int> faceOld2New(oldHalfedge.size() / 3);
-  thrust::scatter(thrust::make_counting_iterator(0),
-                  thrust::make_counting_iterator(numTri), faceNew2Old.beginD(),
+  thrust::scatter(countAt(0), countAt(numTri), faceNew2Old.beginD(),
                   faceOld2New.beginD());
 
   halfedge_.resize(3 * numTri);
-  thrust::for_each_n(thrust::make_counting_iterator(0), numTri,
+  thrust::for_each_n(countAt(0), numTri,
                      ReindexFace({halfedge_.ptrD(), oldHalfedge.cptrD(),
                                   faceNew2Old.cptrD(), faceOld2New.cptrD()}));
 }
@@ -1033,10 +1025,9 @@ void Manifold::Impl::CalculateNormals() {
     faceNormal_.resize(NumFace());
     calculateTriNormal = true;
   }
-  thrust::for_each_n(
-      zip(faceNormal_.beginD(), thrust::make_counting_iterator(0)), NumFace(),
-      AssignNormals({vertNormal_.ptrD(), vertPos_.cptrD(), halfedge_.cptrD(),
-                     calculateTriNormal}));
+  thrust::for_each_n(zip(faceNormal_.beginD(), countAt(0)), NumFace(),
+                     AssignNormals({vertNormal_.ptrD(), vertPos_.cptrD(),
+                                    halfedge_.cptrD(), calculateTriNormal}));
   thrust::for_each(vertNormal_.begin(), vertNormal_.end(), NormalizeTo({1.0}));
 }
 

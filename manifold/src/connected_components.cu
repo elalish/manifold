@@ -65,7 +65,7 @@ using namespace manifold;
 //   VecDH<int> source(numHalfedge);
 //   sink.resize(numHalfedge);
 //   thrust::for_each_n(
-//       zip(thrust::make_counting_iterator(0), halfedges.cbeginD()),
+//       zip(countAt(0), halfedges.cbeginD()),
 //       numHalfedge, DuplicateEdges({source.ptrD(), sink.ptrD()}));
 //   // Build symmetric CSR adjacency matrix
 //   VecDH<int> degree(numVert, 0);
@@ -73,7 +73,7 @@ using namespace manifold;
 //   VecDH<int> temp(numVert);
 //   if (keep.size() > 0) {
 //     edgeMask.resize(numHalfedge);
-//     thrust::for_each_n(zip(thrust::make_counting_iterator(0), keep.cbeginD(),
+//     thrust::for_each_n(zip(countAt(0), keep.cbeginD(),
 //                            halfedges.cbeginD()),
 //                        numHalfedge, DuplicateKeep({edgeMask.ptrD()}));
 //     thrust::sort_by_key(zip(source.beginD(), sink.beginD()),
