@@ -657,9 +657,9 @@ std::tuple<VecDH<int>, VecDH<int>> SizeOutput(
     const VecDH<int> &i03, const VecDH<int> &i30, const VecDH<int> &i12,
     const VecDH<int> &i21, const SparseIndices &p1q2, const SparseIndices &p2q1,
     bool invertQ) {
-  VecDH<int> sidesPerFacePQ(inP.NumFace() + inQ.NumFace());
+  VecDH<int> sidesPerFacePQ(inP.NumTri() + inQ.NumTri());
   auto sidesPerFaceP = sidesPerFacePQ.ptrD();
-  auto sidesPerFaceQ = sidesPerFacePQ.ptrD() + inP.NumFace();
+  auto sidesPerFaceQ = sidesPerFacePQ.ptrD() + inP.NumTri();
 
   thrust::for_each(inP.halfedge_.beginD(), inP.halfedge_.endD(),
                    CountVerts({sidesPerFaceP, i03.cptrD()}));
@@ -672,13 +672,13 @@ std::tuple<VecDH<int>, VecDH<int>> SizeOutput(
       zip(p2q1.beginD(1), p2q1.beginD(0), i21.beginD()), i21.size(),
       CountNewVerts({sidesPerFaceQ, sidesPerFaceP, inQ.halfedge_.cptrD()}));
 
-  VecDH<int> facePQ2R(inP.NumFace() + inQ.NumFace() + 1);
+  VecDH<int> facePQ2R(inP.NumTri() + inQ.NumTri() + 1);
   auto keepFace =
       thrust::make_transform_iterator(sidesPerFacePQ.beginD(), NotZero());
   thrust::inclusive_scan(keepFace, keepFace + sidesPerFacePQ.size(),
                          facePQ2R.beginD() + 1);
   int numFaceR = facePQ2R.H().back();
-  facePQ2R.resize(inP.NumFace() + inQ.NumFace());
+  facePQ2R.resize(inP.NumTri() + inQ.NumTri());
 
   outR.faceNormal_.resize(numFaceR);
   auto next = thrust::copy_if(inP.faceNormal_.beginD(), inP.faceNormal_.endD(),
@@ -689,11 +689,11 @@ std::tuple<VecDH<int>, VecDH<int>> SizeOutput(
                                                  thrust::negate<glm::vec3>());
     auto end = thrust::make_transform_iterator(inQ.faceNormal_.endD(),
                                                thrust::negate<glm::vec3>());
-    thrust::copy_if(start, end, keepFace + inP.NumFace(), next,
+    thrust::copy_if(start, end, keepFace + inP.NumTri(), next,
                     thrust::identity<bool>());
   } else {
     thrust::copy_if(inQ.faceNormal_.beginD(), inQ.faceNormal_.endD(),
-                    keepFace + inP.NumFace(), next, thrust::identity<bool>());
+                    keepFace + inP.NumTri(), next, thrust::identity<bool>());
   }
 
   auto newEnd =
@@ -1168,14 +1168,14 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
   AppendPartialEdges(outR, wholeHalfedgeP.H(), facePtrR.H(), edgesP, inP_,
                      i03.H(), vP2R.H(), facePQ2R.begin());
   AppendPartialEdges(outR, wholeHalfedgeQ.H(), facePtrR.H(), edgesQ, inQ_,
-                     i30.H(), vQ2R.H(), facePQ2R.begin() + inP_.NumFace());
+                     i30.H(), vQ2R.H(), facePQ2R.begin() + inP_.NumTri());
 
-  AppendNewEdges(outR, facePtrR.H(), edgesNew, facePQ2R.H(), inP_.NumFace());
+  AppendNewEdges(outR, facePtrR.H(), edgesNew, facePQ2R.H(), inP_.NumTri());
 
   AppendWholeEdges(outR, facePtrR, inP_, wholeHalfedgeP, i03, vP2R,
                    facePQ2R.cptrD());
   AppendWholeEdges(outR, facePtrR, inQ_, wholeHalfedgeQ, i30, vQ2R,
-                   facePQ2R.cptrD() + inP_.NumFace());
+                   facePQ2R.cptrD() + inP_.NumTri());
 
   if (kVerbose) {
     std::cout << "Time for assembling the result";
