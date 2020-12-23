@@ -1186,11 +1186,9 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
 
   // Level 6
 
-  // Create the manifold's data structures and verify manifoldness.
-  outR.LabelVerts();
-
-  // TODO: Revert Manifold back to only triangles.
+  // Create the manifold's data structures.
   outR.Face2Tri(faceEdge);
+  outR.LabelVerts();
   outR.Finish();
 
   if (kVerbose) {
