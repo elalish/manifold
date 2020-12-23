@@ -27,7 +27,6 @@ struct Manifold::Impl {
   VecDH<int> vertLabel_;
   int numLabel_ = 1;
   VecDH<Halfedge> halfedge_;
-  VecDH<int> faceEdge_;
 
   VecDH<glm::vec3> vertNormal_;
   VecDH<glm::vec3> faceNormal_;
@@ -46,15 +45,13 @@ struct Manifold::Impl {
   void ApplyTransform() const;
   void ApplyTransform();
   VecH<int> AssembleFaces(const VecH<int>& faceEdge) const;
-  bool Tri2Face() const;
-  bool Tri2Face();
   bool Face2Tri(const VecDH<int>& faceEdge);
   void Refine(int n);
   bool IsManifold() const;
 
   int NumVert() const { return vertPos_.size(); }
   int NumEdge() const { return halfedge_.size() / 2; }
-  int NumFace() const { return faceEdge_.size() - 1; }
+  int NumFace() const { return halfedge_.size() / 3; }
   Properties GetProperties() const;
   void CalculateBBox();
 

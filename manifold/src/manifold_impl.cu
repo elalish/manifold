@@ -606,7 +606,6 @@ Manifold::Impl::Impl(Shape shape) {
  */
 void Manifold::Impl::CreateHalfedges(const VecDH<glm::ivec3>& triVerts) {
   const int numTri = triVerts.size();
-  faceEdge_.resize(0);
   halfedge_.resize(3 * numTri);
   VecDH<TmpEdge> edge(3 * numTri);
   thrust::for_each_n(zip(countAt(0), triVerts.beginD()), numTri,
@@ -614,7 +613,6 @@ void Manifold::Impl::CreateHalfedges(const VecDH<glm::ivec3>& triVerts) {
   thrust::sort(edge.beginD(), edge.endD());
   thrust::for_each_n(countAt(0), halfedge_.size() / 2,
                      LinkHalfedges({halfedge_.ptrD(), edge.cptrD()}));
-  Tri2Face();
 }
 
 /**
@@ -631,7 +629,7 @@ void Manifold::Impl::LabelVerts() {
 }
 
 /**
- * Once halfedge_ and faceEdge_ have been filled in, this function can be called
+ * Once halfedge_ has been filled in, this function can be called
  * to create the rest of the internal data structures. If vertLabel_ hasn't been
  * filled in, it is assumed the object is simply-connected and numLabel_ is set
  * to 1.
@@ -653,10 +651,6 @@ void Manifold::Impl::Finish() {
                 "Halfedge index is negative!");
   ALWAYS_ASSERT(extrema.pairedHalfedge < 2 * NumEdge(), runtimeErr,
                 "Halfedge index exceeds number of halfedges!");
-  ALWAYS_ASSERT(faceEdge_.H().front() == 0, runtimeErr,
-                "Faces do not start at zero!");
-  ALWAYS_ASSERT(faceEdge_.H().back() == 2 * NumEdge(), runtimeErr,
-                "Faces do not end at halfedge length!");
 
   if (vertLabel_.size() != NumVert()) {
     vertLabel_.resize(NumVert());
@@ -724,7 +718,7 @@ VecH<int> Manifold::Impl::AssembleFaces(const VecH<int>& faceEdge) const {
   VecH<int> nextHalfedge(halfedge_.size());
   const VecH<Halfedge>& halfedge = halfedge_.H();
 
-  for (int face = 0; face < NumFace(); ++face) {
+  for (int face = 0; face < faceEdge.size() - 1; ++face) {
     int edge = faceEdge[face];
     const int nEdge = faceEdge[face + 1] - edge;
     ALWAYS_ASSERT(nEdge >= 3, runtimeErr, "face has less than three edges.");
@@ -766,23 +760,6 @@ VecH<int> Manifold::Impl::AssembleFaces(const VecH<int>& faceEdge) const {
     }
   }
   return nextHalfedge;
-}
-
-bool Manifold::Impl::Tri2Face() const {
-  // This const_cast is here because this operation tweaks the internal data
-  // structure, but does not change what it represents.
-  return const_cast<Impl*>(this)->Tri2Face();
-}
-
-/**
- * Fills in the faceEdge_ structure for the situation where the halfedges
- * correspond to triVerts entries.
- */
-bool Manifold::Impl::Tri2Face() {
-  if (faceEdge_.size() != 0 || halfedge_.size() % 3 != 0) return false;
-  faceEdge_.resize(halfedge_.size() / 3 + 1);
-  thrust::sequence(faceEdge_.beginD(), faceEdge_.endD(), 0, 3);
-  return true;
 }
 
 /**
@@ -983,11 +960,10 @@ void Manifold::Impl::SortFaces(VecDH<Box>& faceBox,
 
   VecDH<Halfedge> oldHalfedge = halfedge_;
   GatherFaces(oldHalfedge, faceNew2Old);
-  Tri2Face();
 }
 
 /**
- * Creates the halfedge_ and faceEdge_ vectors for this manifold by copying a
+ * Creates the halfedge_ vector for this manifold by copying a
  * set of faces from another manifold, given by oldHalfedge and oldFaceEdge.
  * Input faceNew2Old defines the old faces to gather into this, while
  * newFaceSize is the same length as faceNew2Old and contains the sizes of the

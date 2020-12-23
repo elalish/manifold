@@ -952,9 +952,6 @@ Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ,
   // Union -> expand inP
   // Difference, Intersection -> contract inP
 
-  inP_.Tri2Face();
-  inQ_.Tri2Face();
-
   Time t0 = NOW();
   Time t1;
   // Level 3
@@ -1160,8 +1157,6 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
   std::tie(faceEdge, facePQ2R) =
       SizeOutput(outR, inP_, inQ_, i03, i30, i12, i21, p1q2_, p2q1_,
                  op == Manifold::OpType::SUBTRACT);
-
-  outR.faceEdge_ = faceEdge;
 
   // This gets incremented for each halfedge that's added to a face so that the
   // next one knows where to slot in.

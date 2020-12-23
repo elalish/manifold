@@ -353,7 +353,6 @@ Manifold Manifold::Compose(const std::vector<Manifold>& manifolds) {
   Impl& combined = *(out.pImpl_);
   combined.vertPos_.resize(numVert);
   combined.halfedge_.resize(2 * numEdge);
-  combined.faceEdge_.resize(numFace + 1);
   combined.vertLabel_.resize(numVert);
   combined.faceNormal_.resize(numFace);
 
@@ -369,8 +368,6 @@ Manifold Manifold::Compose(const std::vector<Manifold>& manifolds) {
                  combined.vertPos_.beginD() + nextVert);
     thrust::copy(impl.faceNormal_.beginD(), impl.faceNormal_.endD(),
                  combined.faceNormal_.beginD() + nextFace);
-    thrust::transform(impl.faceEdge_.beginD(), impl.faceEdge_.endD(),
-                      combined.faceEdge_.beginD() + nextFace, _1 + nextEdge);
     thrust::transform(impl.vertLabel_.beginD(), impl.vertLabel_.endD(),
                       combined.vertLabel_.beginD() + nextVert, _1 + nextLabel);
     thrust::transform(impl.halfedge_.beginD(), impl.halfedge_.endD(),
@@ -432,7 +429,6 @@ std::vector<Manifold> Manifold::Decompose() const {
     faceNew2Old.resize(nFace);
 
     meshes[i].pImpl_->GatherFaces(pImpl_->halfedge_, faceNew2Old);
-    meshes[i].pImpl_->Tri2Face();
     meshes[i].pImpl_->ReindexVerts(vertNew2Old, pImpl_->NumVert());
 
     meshes[i].pImpl_->Finish();
