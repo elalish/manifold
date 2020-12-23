@@ -337,7 +337,7 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments) {
 /**
  * Constructs a new manifold from a vector of other manifolds. This is a purely
  * topological operation, so care should be taken to avoid creating
- * geometrically-invalid results (unless that is desired).
+ * geometrically-invalid results.
  */
 Manifold Manifold::Compose(const std::vector<Manifold>& manifolds) {
   int numVert = 0;
@@ -387,12 +387,7 @@ Manifold Manifold::Compose(const std::vector<Manifold>& manifolds) {
 
 /**
  * This operation returns a copy of this manifold, but as a vector of meshes
- * that are topologically disconnected. It cannot use vertLabel_ directly for
- * this due to possible polygons with holes, so instead it recomputes the
- * connected components after adding a start graph of edges to each face that
- * has more than five edges to ensure proper connectivity. In some situations
- * this could cause disjoint manifolds to not be separated, so triangulating
- * first may be preferable.
+ * that are topologically disconnected.
  */
 std::vector<Manifold> Manifold::Decompose() const {
   if (pImpl_->numLabel_ == 1) {
@@ -401,18 +396,15 @@ std::vector<Manifold> Manifold::Decompose() const {
     return meshes;
   }
 
-  VecDH<int> vertLabel;
-  int numLabel = ConnectedComponents(vertLabel, NumVert(), pImpl_->halfedge_);
-
-  std::vector<Manifold> meshes(numLabel);
-  for (int i = 0; i < numLabel; ++i) {
+  std::vector<Manifold> meshes(pImpl_->numLabel_);
+  for (int i = 0; i < pImpl_->numLabel_; ++i) {
     meshes[i].pImpl_->vertPos_.resize(NumVert());
     VecDH<int> vertNew2Old(NumVert());
     int nVert =
         thrust::copy_if(
             zip(pImpl_->vertPos_.beginD(), countAt(0)),
             zip(pImpl_->vertPos_.endD(), countAt(NumVert())),
-            vertLabel.beginD(),
+            pImpl_->vertLabel_.beginD(),
             zip(meshes[i].pImpl_->vertPos_.beginD(), vertNew2Old.beginD()),
             Equals({i})) -
         zip(meshes[i].pImpl_->vertPos_.beginD(), countAt(0));
@@ -421,11 +413,10 @@ std::vector<Manifold> Manifold::Decompose() const {
     VecDH<int> faceNew2Old(NumFace());
     thrust::sequence(faceNew2Old.beginD(), faceNew2Old.endD());
 
-    int nFace =
-        thrust::remove_if(
-            faceNew2Old.beginD(), faceNew2Old.endD(),
-            RemoveFace({pImpl_->halfedge_.cptrD(), vertLabel.cptrD(), i})) -
-        faceNew2Old.beginD();
+    int nFace = thrust::remove_if(faceNew2Old.beginD(), faceNew2Old.endD(),
+                                  RemoveFace({pImpl_->halfedge_.cptrD(),
+                                              pImpl_->vertLabel_.cptrD(), i})) -
+                faceNew2Old.beginD();
     faceNew2Old.resize(nFace);
 
     meshes[i].pImpl_->GatherFaces(pImpl_->halfedge_, faceNew2Old);
@@ -439,10 +430,9 @@ std::vector<Manifold> Manifold::Decompose() const {
 
 /**
  * This returns a Mesh of simple vectors of vertices and triangles suitable for
- * saving or other operations outside of the context of this library. It is not
- * a const function because it first triangulates the Manifold.
+ * saving or other operations outside of the context of this library.
  */
-Mesh Manifold::Extract() {
+Mesh Manifold::Extract() const {
   pImpl_->ApplyTransform();
 
   Mesh result;
@@ -503,9 +493,8 @@ Box Manifold::BoundingBox() const {
 
 /**
  * The genus is a topological property of the manifold, representing the number
- * of "handles". A sphere is 0, torus 1, etc. It is only meaningful for a
- * single, triangulated mesh (faces that are polygons with holes violate its
- * assumptions), so it is best to call Face2Tri() and Decompose() first.
+ * of "handles". A sphere is 0, torus 1, etc. It is only meaningful for a single
+ * mesh, so it is best to call Decompose() first.
  */
 int Manifold::Genus() const {
   int chi = NumVert() - NumEdge() + NumFace();

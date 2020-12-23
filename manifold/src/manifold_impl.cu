@@ -617,22 +617,16 @@ void Manifold::Impl::CreateHalfedges(const VecDH<glm::ivec3>& triVerts) {
 
 /**
  * Calculate vertLabels_ by running connected components on the halfedges. This
- * operation is a bit slow and currently CPU-only. Note: by operating on
- * halfedges, connectivity can be broken by faces that are polygons with holes
- * (no edges to attach one polygon to the other, even though they are part of
- * the same face). This style of labeling is consistent with what is needed in
- * the Boolean operation. To separate manifolds topologically, it is best to
- * first triangulate them.
+ * operation is a bit slow and currently CPU-only.
  */
 void Manifold::Impl::LabelVerts() {
   numLabel_ = ConnectedComponents(vertLabel_, NumVert(), halfedge_);
 }
 
 /**
- * Once halfedge_ has been filled in, this function can be called
- * to create the rest of the internal data structures. If vertLabel_ hasn't been
- * filled in, it is assumed the object is simply-connected and numLabel_ is set
- * to 1.
+ * Once halfedge_ has been filled in, this function can be called to create the
+ * rest of the internal data structures. If vertLabel_ hasn't been filled in, it
+ * is assumed the object is simply-connected and numLabel_ is set to 1.
  */
 void Manifold::Impl::Finish() {
   if (halfedge_.size() == 0) return;
@@ -708,7 +702,7 @@ void Manifold::Impl::ApplyTransform() {
 }
 
 /**
- * This fills in the nextHalfedge_ vector indicating how the halfedges connect
+ * This returns the nextHalfedge_ vector indicating how the halfedges connect
  * to each other going CCW around a face. This data cannot be stored by simply
  * sorting the halfedges, as the faces may be polygons with holes.
  *
@@ -763,11 +757,16 @@ VecH<int> Manifold::Impl::AssembleFaces(const VecH<int>& faceEdge) const {
 }
 
 /**
- * Triangulates the faces. It is possible, but rare, that this function can
- * also add vertices. This never happens for geometrically valid manifolds.
+ * Triangulates the faces. In this case, the halfedge_ vector is not yet a set
+ * of triangles as required by this data structure, but is instead a set of
+ * general faces with the input faceEdge vector having length of the number of
+ * faces + 1. The values are indicies into the halfedge_ vector for the first
+ * edge of each face, with the final value being the length of the halfedge_
+ * vector itself. Upon return, halfedge_ has been lengthened and properly
+ * represents the mesh as a set of triangles as usual. In this process the
+ * faceNormal_ values are retained, repeated as necessary.
  */
-bool Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge) {
-  if (faceEdge.size() == 0 && halfedge_.size() % 3 == 0) return false;
+void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge) {
   VecDH<glm::ivec3> triVertsOut;
   VecDH<glm::vec3> triNormalOut;
 
@@ -814,14 +813,13 @@ bool Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge) {
   }
   faceNormal_ = triNormalOut;
   CreateHalfedges(triVertsOut);
-  return true;
 }
 
 /**
- * Triangulate the manifold, then split each resulting edge into n pieces and
- * sub-triangulate each triangle accordingly. This function doesn't run
- * Finish(), as that is expensive and it'll need to be run after the new
- * vertices have moved, which is a likely scenario after refinement (smoothing).
+ * Split each edge into n pieces and sub-triangulate each triangle accordingly.
+ * This function doesn't run Finish(), as that is expensive and it'll need to be
+ * run after the new vertices have moved, which is a likely scenario after
+ * refinement (smoothing).
  */
 void Manifold::Impl::Refine(int n) {
   int numVert = NumVert();
@@ -884,7 +882,7 @@ Manifold::Properties Manifold::Impl::GetProperties() const {
 /**
  * Calculates the bounding box of the entire manifold, which is stored
  * internally to short-cut Boolean operations and to serve as the precision
- * range for Morton code calulation.
+ * range for Morton code calculation.
  */
 void Manifold::Impl::CalculateBBox() {
   bBox_.min = thrust::reduce(vertPos_.begin(), vertPos_.end(),
@@ -963,11 +961,9 @@ void Manifold::Impl::SortFaces(VecDH<Box>& faceBox,
 }
 
 /**
- * Creates the halfedge_ vector for this manifold by copying a
- * set of faces from another manifold, given by oldHalfedge and oldFaceEdge.
- * Input faceNew2Old defines the old faces to gather into this, while
- * newFaceSize is the same length as faceNew2Old and contains the sizes of the
- * faces to be copied.
+ * Creates the halfedge_ vector for this manifold by copying a set of faces from
+ * another manifold, given by oldHalfedge. Input faceNew2Old defines the old
+ * faces to gather into this.
  */
 void Manifold::Impl::GatherFaces(const VecDH<Halfedge>& oldHalfedge,
                                  const VecDH<int>& faceNew2Old) {
@@ -985,10 +981,10 @@ void Manifold::Impl::GatherFaces(const VecDH<Halfedge>& oldHalfedge,
 /**
  * If face normals are already present, this function uses them to compute
  * vertex normals (angle-weighted pseudo-normals); otherwise it also computes
- * the face normals as well. Face normals are only calculated when needed
- * because nearly degenerate faces will accrue rounding error, while the Boolean
- * can retain their original normal, which is more accurate and can help with
- * merging coplanar faces.
+ * the face normals. Face normals are only calculated when needed because nearly
+ * degenerate faces will accrue rounding error, while the Boolean can retain
+ * their original normal, which is more accurate and can help with merging
+ * coplanar faces.
  *
  * If the face normals have been invalidated by an operation like Warp(), ensure
  * you do faceNormal_.resize(0) before calling this function to force

@@ -27,7 +27,6 @@ struct Manifold::Impl {
   VecDH<int> vertLabel_;
   int numLabel_ = 1;
   VecDH<Halfedge> halfedge_;
-
   VecDH<glm::vec3> vertNormal_;
   VecDH<glm::vec3> faceNormal_;
   Collider collider_;
@@ -44,16 +43,14 @@ struct Manifold::Impl {
   void Update();
   void ApplyTransform() const;
   void ApplyTransform();
-  VecH<int> AssembleFaces(const VecH<int>& faceEdge) const;
-  bool Face2Tri(const VecDH<int>& faceEdge);
   void Refine(int n);
-  bool IsManifold() const;
 
   int NumVert() const { return vertPos_.size(); }
   int NumEdge() const { return halfedge_.size() / 2; }
   int NumFace() const { return halfedge_.size() / 3; }
   Properties GetProperties() const;
   void CalculateBBox();
+  bool IsManifold() const;
 
   void SortVerts();
   void ReindexVerts(const VecDH<int>& vertNew2Old, int numOldVert);
@@ -61,10 +58,12 @@ struct Manifold::Impl {
   void GatherFaces(const VecDH<Halfedge>& oldHalfedge,
                    const VecDH<int>& faceNew2Old);
   void CalculateNormals();
+  void Face2Tri(const VecDH<int>& faceEdge);
 
   SparseIndices EdgeCollisions(const Impl& B) const;
   SparseIndices VertexCollisionsZ(const VecDH<glm::vec3>& vertsIn) const;
   void GetFaceBoxMorton(VecDH<Box>& faceBox, VecDH<uint32_t>& faceMorton) const;
+  VecH<int> AssembleFaces(const VecH<int>& faceEdge) const;
   Polygons Face2Polygons(int face, glm::mat3x2 projection,
                          const VecH<int>& faceEdge,
                          const VecH<int>& nextHalfedge) const;
