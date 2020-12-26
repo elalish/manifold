@@ -86,9 +86,8 @@ struct TmpInvalid {
 
 VecDH<TmpEdge> CreateTmpEdges(const VecDH<Halfedge>& halfedge) {
   VecDH<TmpEdge> edges(halfedge.size());
-  thrust::for_each_n(
-      zip(edges.beginD(), halfedge.beginD(), thrust::make_counting_iterator(0)),
-      edges.size(), Halfedge2Tmp());
+  thrust::for_each_n(zip(edges.beginD(), halfedge.beginD(), countAt(0)),
+                     edges.size(), Halfedge2Tmp());
   int numEdge = thrust::remove_if(edges.beginD(), edges.endD(), TmpInvalid()) -
                 edges.beginD();
   ALWAYS_ASSERT(numEdge == halfedge.size() / 2, runtimeErr, "Not oriented!");
@@ -218,7 +217,6 @@ struct SplitTris {
 
 struct FaceAreaVolume {
   const Halfedge* halfedges;
-  const int* faceEdge;
   const glm::vec3* vertPos;
 
   __host__ __device__ thrust::pair<float, float> operator()(int face) {
@@ -226,19 +224,17 @@ struct FaceAreaVolume {
     float area = 0.0f;
     float volume = 0.0f;
 
-    int edge = faceEdge[face];
-    const glm::vec3 anchor = vertPos[halfedges[edge].startVert];
-
-    const int end = faceEdge[face + 1];
-    while (edge < end) {
-      const Halfedge halfedge = halfedges[edge++];
-      const glm::vec3 start = vertPos[halfedge.startVert];
-      const glm::vec3 edgeVec = vertPos[halfedge.endVert] - start;
-      perimeter += glm::length(edgeVec);
-      const glm::vec3 crossP = glm::cross(start - anchor, edgeVec);
-      area += glm::length(crossP);
-      volume += glm::dot(crossP, anchor);
+    glm::vec3 edge[3];
+    for (int i : {0, 1, 2}) {
+      const int j = (i + 1) % 3;
+      edge[i] = vertPos[halfedges[3 * face + j].startVert] -
+                vertPos[halfedges[3 * face + i].startVert];
+      perimeter += glm::length(edge[i]);
     }
+    glm::vec3 crossP = glm::cross(edge[0], edge[1]);
+
+    area += glm::length(crossP);
+    volume += glm::dot(crossP, vertPos[halfedges[3 * face].startVert]);
 
     return area > perimeter * kTolerance
                ? thrust::make_pair(area / 2.0f, volume / 6.0f)
@@ -340,7 +336,6 @@ struct Morton {
 };
 
 struct FaceMortonBox {
-  const int* faceEdge;
   const Halfedge* halfedge;
   const glm::vec3* vertPos;
   const Box bBox;
@@ -353,16 +348,12 @@ struct FaceMortonBox {
 
     glm::vec3 center(0.0f);
 
-    int iEdge = faceEdge[face];
-    const int end = faceEdge[face + 1];
-    const int nEdge = end - iEdge;
-    while (iEdge < end) {
-      const glm::vec3 pos = vertPos[halfedge[iEdge].startVert];
+    for (const int i : {0, 1, 2}) {
+      const glm::vec3 pos = vertPos[halfedge[3 * face + i].startVert];
       center += pos;
       faceBox.Union(pos);
-      ++iEdge;
     }
-    center /= nEdge;
+    center /= 3;
 
     mortonCode = MortonCode(center, bBox);
   }
@@ -379,26 +370,19 @@ struct Reindex {
 
 struct ReindexFace {
   Halfedge* halfedge;
-  const int* faceEdge;
   const Halfedge* oldHalfedge;
-  const int* oldFaceEdge;
   const int* faceNew2Old;
   const int* faceOld2New;
 
-  __host__ __device__ void operator()(thrust::tuple<int, int> in) {
-    const int newFace = thrust::get<0>(in);
-    int outEdge = thrust::get<1>(in);
-
+  __host__ __device__ void operator()(int newFace) {
     const int oldFace = faceNew2Old[newFace];
-    int iEdge = oldFaceEdge[oldFace];
-    const int end = oldFaceEdge[oldFace + 1];
-    while (iEdge < end) {
-      Halfedge edge = oldHalfedge[iEdge++];
+    for (const int i : {0, 1, 2}) {
+      Halfedge edge = oldHalfedge[3 * oldFace + i];
       edge.face = newFace;
       const int pairedFace = oldHalfedge[edge.pairedHalfedge].face;
-      const int offset = edge.pairedHalfedge - oldFaceEdge[pairedFace];
-      edge.pairedHalfedge = faceEdge[faceOld2New[pairedFace]] + offset;
-      halfedge[outEdge++] = edge;
+      const int offset = edge.pairedHalfedge - 3 * pairedFace;
+      edge.pairedHalfedge = 3 * faceOld2New[pairedFace] + offset;
+      halfedge[3 * newFace + i] = edge;
     }
   }
 };
@@ -419,47 +403,38 @@ struct AssignNormals {
   glm::vec3* vertNormal;
   const glm::vec3* vertPos;
   const Halfedge* halfedges;
-  const int* nextHalfedge;
-  const int* faceEdge;
   const bool calculateTriNormal;
 
   __host__ __device__ void operator()(thrust::tuple<glm::vec3&, int> in) {
     glm::vec3& triNormal = thrust::get<0>(in);
     const int face = thrust::get<1>(in);
 
+    glm::ivec3 triVerts(halfedges[3 * face].startVert,
+                        halfedges[3 * face].endVert,
+                        halfedges[3 * face + 1].endVert);
+    glm::vec3 v0 = vertPos[triVerts[0]];
+    glm::vec3 v1 = vertPos[triVerts[1]];
+    glm::vec3 v2 = vertPos[triVerts[2]];
+    // edge vectors
+    glm::vec3 e01 = glm::normalize(v1 - v0);
+    glm::vec3 e12 = glm::normalize(v2 - v1);
+    glm::vec3 e20 = glm::normalize(v0 - v2);
+
     if (calculateTriNormal) {
-      triNormal = glm::vec3(0.0f);
-      int edge = faceEdge[face];
-      const glm::vec3 anchor = vertPos[halfedges[edge].startVert];
-      const int end = faceEdge[face + 1];
-      while (edge < end) {
-        const Halfedge halfedge = halfedges[edge++];
-        const glm::vec3 start = vertPos[halfedge.startVert];
-        const glm::vec3 edgeVec = vertPos[halfedge.endVert] - start;
-        triNormal += glm::cross(start - anchor, edgeVec);
-      }
-      triNormal = glm::normalize(triNormal);
+      triNormal = glm::normalize(glm::cross(e01, e12));
       if (isnan(triNormal.x)) triNormal = glm::vec3(0.0);
     }
 
-    const int start = faceEdge[face];
-    int next = nextHalfedge[start];
-    Halfedge edge = halfedges[start];
-    glm::vec3 edgeVec =
-        glm::normalize(vertPos[edge.endVert] - vertPos[edge.startVert]);
-    while (1) {
-      Halfedge nextEdge = halfedges[next];
-      glm::vec3 nextEdgeVec = glm::normalize(vertPos[nextEdge.endVert] -
-                                             vertPos[nextEdge.startVert]);
-      // corner angle
-      float phi = glm::acos(-glm::dot(edgeVec, nextEdgeVec));
-      if (isnan(phi)) phi = 0;
-      AtomicAddVec3(vertNormal[edge.endVert],
-                    glm::max(phi, kTolerance) * triNormal);
-      if (next == start) break;
-      edge = nextEdge;
-      edgeVec = nextEdgeVec;
-      next = nextHalfedge[next];
+    // corner angles
+    glm::vec3 phi;
+    phi[0] = glm::acos(-glm::dot(e01, e12));
+    phi[1] = glm::acos(-glm::dot(e12, e20));
+    phi[2] = glm::pi<float>() - phi[0] - phi[1];
+    // assign weighted sum
+    for (int i : {0, 1, 2}) {
+      if (isnan(phi[i])) phi[i] = 0;
+      AtomicAddVec3(vertNormal[triVerts[i]],
+                    glm::max(phi[i], kTolerance) * triNormal);
     }
   }
 };
@@ -511,13 +486,11 @@ struct EdgeBox {
 
 struct CheckManifold {
   const Halfedge* halfedges;
-  const int* faces;
 
   __host__ __device__ bool operator()(int face) {
     bool good = true;
-    int edge = faces[face];
-    const int end = faces[face + 1];
-    while (edge < end) {
+    for (const int i : {0, 1, 2}) {
+      const int edge = 3 * face + i;
       const Halfedge halfedge = halfedges[edge];
       const Halfedge paired = halfedges[halfedge.pairedHalfedge];
       good &= halfedge.face == face;
@@ -525,7 +498,6 @@ struct CheckManifold {
       good &= halfedge.startVert != halfedge.endVert;
       good &= halfedge.startVert == paired.endVert;
       good &= halfedge.endVert == paired.startVert;
-      ++edge;
     }
     return good;
   }
@@ -535,8 +507,8 @@ struct NoDuplicates {
   const Halfedge* halfedges;
 
   __host__ __device__ bool operator()(int edge) {
-    return halfedges[2 * edge].startVert != halfedges[2 * edge + 1].startVert ||
-           halfedges[2 * edge].endVert != halfedges[2 * edge + 1].endVert;
+    return halfedges[edge].startVert != halfedges[edge + 1].startVert ||
+           halfedges[edge].endVert != halfedges[edge + 1].endVert;
   }
 };
 
@@ -634,35 +606,27 @@ Manifold::Impl::Impl(Shape shape) {
  */
 void Manifold::Impl::CreateHalfedges(const VecDH<glm::ivec3>& triVerts) {
   const int numTri = triVerts.size();
-  faceEdge_.resize(0);
   halfedge_.resize(3 * numTri);
   VecDH<TmpEdge> edge(3 * numTri);
-  thrust::for_each_n(zip(thrust::make_counting_iterator(0), triVerts.beginD()),
-                     numTri, Tri2Halfedges({halfedge_.ptrD(), edge.ptrD()}));
+  thrust::for_each_n(zip(countAt(0), triVerts.beginD()), numTri,
+                     Tri2Halfedges({halfedge_.ptrD(), edge.ptrD()}));
   thrust::sort(edge.beginD(), edge.endD());
-  thrust::for_each_n(thrust::make_counting_iterator(0), halfedge_.size() / 2,
+  thrust::for_each_n(countAt(0), halfedge_.size() / 2,
                      LinkHalfedges({halfedge_.ptrD(), edge.cptrD()}));
-  Tri2Face();
 }
 
 /**
  * Calculate vertLabels_ by running connected components on the halfedges. This
- * operation is a bit slow and currently CPU-only. Note: by operating on
- * halfedges, connectivity can be broken by faces that are polygons with holes
- * (no edges to attach one polygon to the other, even though they are part of
- * the same face). This style of labeling is consistent with what is needed in
- * the Boolean operation. To separate manifolds topologically, it is best to
- * first triangulate them.
+ * operation is a bit slow and currently CPU-only.
  */
 void Manifold::Impl::LabelVerts() {
   numLabel_ = ConnectedComponents(vertLabel_, NumVert(), halfedge_);
 }
 
 /**
- * Once halfedge_ and faceEdge_ have been filled in, this function can be called
- * to create the rest of the internal data structures. If vertLabel_ hasn't been
- * filled in, it is assumed the object is simply-connected and numLabel_ is set
- * to 1.
+ * Once halfedge_ has been filled in, this function can be called to create the
+ * rest of the internal data structures. If vertLabel_ hasn't been filled in, it
+ * is assumed the object is simply-connected and numLabel_ is set to 1.
  */
 void Manifold::Impl::Finish() {
   if (halfedge_.size() == 0) return;
@@ -675,16 +639,12 @@ void Manifold::Impl::Finish() {
   ALWAYS_ASSERT(extrema.endVert < NumVert(), runtimeErr,
                 "Vertex index exceeds number of verts!");
   ALWAYS_ASSERT(extrema.face >= 0, runtimeErr, "Face index is negative!");
-  ALWAYS_ASSERT(extrema.face < NumFace(), runtimeErr,
+  ALWAYS_ASSERT(extrema.face < NumTri(), runtimeErr,
                 "Face index exceeds number of faces!");
   ALWAYS_ASSERT(extrema.pairedHalfedge >= 0, runtimeErr,
                 "Halfedge index is negative!");
   ALWAYS_ASSERT(extrema.pairedHalfedge < 2 * NumEdge(), runtimeErr,
                 "Halfedge index exceeds number of halfedges!");
-  ALWAYS_ASSERT(faceEdge_.H().front() == 0, runtimeErr,
-                "Faces do not start at zero!");
-  ALWAYS_ASSERT(faceEdge_.H().back() == 2 * NumEdge(), runtimeErr,
-                "Faces do not end at halfedge length!");
 
   if (vertLabel_.size() != NumVert()) {
     vertLabel_.resize(NumVert());
@@ -697,7 +657,6 @@ void Manifold::Impl::Finish() {
   VecDH<uint32_t> faceMorton;
   GetFaceBoxMorton(faceBox, faceMorton);
   SortFaces(faceBox, faceMorton);
-  AssembleFaces();
   CalculateNormals();
   collider_ = Collider(faceBox, faceMorton);
 }
@@ -742,26 +701,18 @@ void Manifold::Impl::ApplyTransform() {
   CalculateBBox();
 }
 
-void Manifold::Impl::AssembleFaces() const {
-  // This const_cast is here because this operation tweaks the internal data
-  // structure, but does not change what it represents.
-  return const_cast<Impl*>(this)->AssembleFaces();
-}
-
 /**
- * This fills in the nextHalfedge_ vector indicating how the halfedges connect
+ * This returns the nextHalfedge_ vector indicating how the halfedges connect
  * to each other going CCW around a face. This data cannot be stored by simply
  * sorting the halfedges, as the faces may be polygons with holes.
  *
  * TODO: This function is slow and should be moved from CPU to GPU.
  */
-void Manifold::Impl::AssembleFaces() {
-  nextHalfedge_.resize(halfedge_.size());
-  VecH<int>& nextHalfedge = nextHalfedge_.H();
-  const VecH<int>& faceEdge = faceEdge_.H();
+VecH<int> Manifold::Impl::AssembleFaces(const VecH<int>& faceEdge) const {
+  VecH<int> nextHalfedge(halfedge_.size());
   const VecH<Halfedge>& halfedge = halfedge_.H();
 
-  for (int face = 0; face < NumFace(); ++face) {
+  for (int face = 0; face < faceEdge.size() - 1; ++face) {
     int edge = faceEdge[face];
     const int nEdge = faceEdge[face + 1] - edge;
     ALWAYS_ASSERT(nEdge >= 3, runtimeErr, "face has less than three edges.");
@@ -802,40 +753,30 @@ void Manifold::Impl::AssembleFaces() {
       vert_edge.erase(result);
     }
   }
-}
-
-bool Manifold::Impl::Tri2Face() const {
-  // This const_cast is here because this operation tweaks the internal data
-  // structure, but does not change what it represents.
-  return const_cast<Impl*>(this)->Tri2Face();
+  return nextHalfedge;
 }
 
 /**
- * Fills in the faceEdge_ structure for the situation where the halfedges
- * correspond to triVerts entries.
+ * Triangulates the faces. In this case, the halfedge_ vector is not yet a set
+ * of triangles as required by this data structure, but is instead a set of
+ * general faces with the input faceEdge vector having length of the number of
+ * faces + 1. The values are indicies into the halfedge_ vector for the first
+ * edge of each face, with the final value being the length of the halfedge_
+ * vector itself. Upon return, halfedge_ has been lengthened and properly
+ * represents the mesh as a set of triangles as usual. In this process the
+ * faceNormal_ values are retained, repeated as necessary.
  */
-bool Manifold::Impl::Tri2Face() {
-  if (faceEdge_.size() != 0 || halfedge_.size() % 3 != 0) return false;
-  faceEdge_.resize(halfedge_.size() / 3 + 1);
-  thrust::sequence(faceEdge_.beginD(), faceEdge_.endD(), 0, 3);
-  return true;
-}
-
-/**
- * Triangulates the faces. It is possible, but rare, that this function can
- * also add vertices. This never happens for geometrically valid manifolds.
- */
-bool Manifold::Impl::Face2Tri() {
-  if (faceEdge_.size() == 0 && halfedge_.size() % 3 == 0) return false;
+void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge) {
   VecDH<glm::ivec3> triVertsOut;
   VecDH<glm::vec3> triNormalOut;
 
   VecH<glm::ivec3>& triVerts = triVertsOut.H();
   VecH<glm::vec3>& triNormal = triNormalOut.H();
   VecH<glm::vec3>& vertPos = vertPos_.H();
-  const VecH<int>& face = faceEdge_.H();
+  const VecH<int>& face = faceEdge.H();
   const VecH<Halfedge>& halfedge = halfedge_.H();
   const VecH<glm::vec3>& faceNormal = faceNormal_.H();
+  const VecH<int> nextHalfedge = AssembleFaces(face);
 
   for (int i = 0; i < face.size() - 1; ++i) {
     const int edge = face[i];
@@ -860,7 +801,7 @@ bool Manifold::Impl::Face2Tri() {
       triNormal.push_back(normal);
     } else {  // General triangulation
       const glm::mat3x2 projection = GetAxisAlignedProjection(normal);
-      Polygons polys = Face2Polygons(i, projection);
+      Polygons polys = Face2Polygons(i, projection, face, nextHalfedge);
 
       std::vector<glm::ivec3> newTris = Triangulate(polys);
 
@@ -872,20 +813,18 @@ bool Manifold::Impl::Face2Tri() {
   }
   faceNormal_ = triNormalOut;
   CreateHalfedges(triVertsOut);
-  return true;
 }
 
 /**
- * Triangulate the manifold, then split each resulting edge into n pieces and
- * sub-triangulate each triangle accordingly. This function doesn't run
- * Finish(), as that is expensive and it'll need to be run after the new
- * vertices have moved, which is a likely scenario after refinement (smoothing).
+ * Split each edge into n pieces and sub-triangulate each triangle accordingly.
+ * This function doesn't run Finish(), as that is expensive and it'll need to be
+ * run after the new vertices have moved, which is a likely scenario after
+ * refinement (smoothing).
  */
 void Manifold::Impl::Refine(int n) {
-  Face2Tri();
   int numVert = NumVert();
   int numEdge = NumEdge();
-  int numTri = NumFace();
+  int numTri = NumTri();
   // Append new verts
   int vertsPerEdge = n - 1;
   int vertsPerTri = ((n - 2) * (n - 2) + (n - 2)) / 2;
@@ -893,16 +832,16 @@ void Manifold::Impl::Refine(int n) {
   vertPos_.resize(triVertStart + numTri * vertsPerTri);
   VecDH<TmpEdge> edges = CreateTmpEdges(halfedge_);
   VecDH<int> half2Edge(2 * numEdge);
-  thrust::for_each_n(zip(thrust::make_counting_iterator(0), edges.beginD()),
-                     numEdge, ReindexHalfedge({half2Edge.ptrD()}));
-  thrust::for_each_n(zip(thrust::make_counting_iterator(0), edges.beginD()),
-                     numEdge, SplitEdges({vertPos_.ptrD(), numVert, n}));
+  thrust::for_each_n(zip(countAt(0), edges.beginD()), numEdge,
+                     ReindexHalfedge({half2Edge.ptrD()}));
+  thrust::for_each_n(zip(countAt(0), edges.beginD()), numEdge,
+                     SplitEdges({vertPos_.ptrD(), numVert, n}));
   thrust::for_each_n(
-      thrust::make_counting_iterator(0), numTri,
+      countAt(0), numTri,
       InteriorVerts({vertPos_.ptrD(), triVertStart, n, halfedge_.ptrD()}));
   // Create subtriangles
   VecDH<glm::ivec3> triVerts(n * n * numTri);
-  thrust::for_each_n(thrust::make_counting_iterator(0), numTri,
+  thrust::for_each_n(countAt(0), numTri,
                      SplitTris({triVerts.ptrD(), halfedge_.cptrD(),
                                 half2Edge.cptrD(), numVert, triVertStart, n}));
   CreateHalfedges(triVerts);
@@ -914,15 +853,12 @@ void Manifold::Impl::Refine(int n) {
  */
 bool Manifold::Impl::IsManifold() const {
   if (halfedge_.size() == 0) return true;
-  bool isManifold =
-      thrust::all_of(thrust::make_counting_iterator(0),
-                     thrust::make_counting_iterator(NumFace()),
-                     CheckManifold({halfedge_.cptrD(), faceEdge_.cptrD()}));
+  bool isManifold = thrust::all_of(countAt(0), countAt(NumTri()),
+                                   CheckManifold({halfedge_.cptrD()}));
 
   VecDH<Halfedge> halfedge(halfedge_);
   thrust::sort(halfedge.beginD(), halfedge.endD());
-  isManifold &= thrust::all_of(thrust::make_counting_iterator(0),
-                               thrust::make_counting_iterator(NumEdge()),
+  isManifold &= thrust::all_of(countAt(0), countAt(2 * NumEdge() - 1),
                                NoDuplicates({halfedge.cptrD()}));
   return isManifold;
 }
@@ -937,9 +873,8 @@ Manifold::Properties Manifold::Impl::GetProperties() const {
   if (halfedge_.size() == 0) return {0, 0};
   ApplyTransform();
   thrust::pair<float, float> areaVolume = thrust::transform_reduce(
-      thrust::make_counting_iterator(0),
-      thrust::make_counting_iterator(NumFace()),
-      FaceAreaVolume({halfedge_.cptrD(), faceEdge_.cptrD(), vertPos_.cptrD()}),
+      countAt(0), countAt(NumTri()),
+      FaceAreaVolume({halfedge_.cptrD(), vertPos_.cptrD()}),
       thrust::make_pair(0.0f, 0.0f), SumPair());
   return {areaVolume.first, areaVolume.second};
 }
@@ -947,7 +882,7 @@ Manifold::Properties Manifold::Impl::GetProperties() const {
 /**
  * Calculates the bounding box of the entire manifold, which is stored
  * internally to short-cut Boolean operations and to serve as the precision
- * range for Morton code calulation.
+ * range for Morton code calculation.
  */
 void Manifold::Impl::CalculateBBox() {
   bBox_.min = thrust::reduce(vertPos_.begin(), vertPos_.end(),
@@ -983,9 +918,8 @@ void Manifold::Impl::SortVerts() {
 void Manifold::Impl::ReindexVerts(const VecDH<int>& vertNew2Old,
                                   int oldNumVert) {
   VecDH<int> vertOld2New(oldNumVert);
-  thrust::scatter(thrust::make_counting_iterator(0),
-                  thrust::make_counting_iterator(NumVert()),
-                  vertNew2Old.beginD(), vertOld2New.beginD());
+  thrust::scatter(countAt(0), countAt(NumVert()), vertNew2Old.beginD(),
+                  vertOld2New.beginD());
   thrust::for_each(halfedge_.beginD(), halfedge_.endD(),
                    Reindex({vertOld2New.cptrD()}));
 }
@@ -997,13 +931,11 @@ void Manifold::Impl::ReindexVerts(const VecDH<int>& vertNew2Old,
  */
 void Manifold::Impl::GetFaceBoxMorton(VecDH<Box>& faceBox,
                                       VecDH<uint32_t>& faceMorton) const {
-  faceBox.resize(NumFace());
-  faceMorton.resize(NumFace());
-  thrust::for_each_n(zip(faceMorton.beginD(), faceBox.beginD(),
-                         thrust::make_counting_iterator(0)),
-                     NumFace(),
-                     FaceMortonBox({faceEdge_.cptrD(), halfedge_.cptrD(),
-                                    vertPos_.cptrD(), bBox_}));
+  faceBox.resize(NumTri());
+  faceMorton.resize(NumTri());
+  thrust::for_each_n(
+      zip(faceMorton.beginD(), faceBox.beginD(), countAt(0)), NumTri(),
+      FaceMortonBox({halfedge_.cptrD(), vertPos_.cptrD(), bBox_}));
 }
 
 /**
@@ -1012,69 +944,47 @@ void Manifold::Impl::GetFaceBoxMorton(VecDH<Box>& faceBox,
  */
 void Manifold::Impl::SortFaces(VecDH<Box>& faceBox,
                                VecDH<uint32_t>& faceMorton) {
-  VecDH<int> faceNew2Old(NumFace());
+  VecDH<int> faceNew2Old(NumTri());
   thrust::sequence(faceNew2Old.beginD(), faceNew2Old.endD());
 
-  VecDH<int> faceSize = FaceSize();
-
-  if (faceNormal_.size() == NumFace()) {
-    thrust::sort_by_key(faceMorton.beginD(), faceMorton.endD(),
-                        zip(faceBox.beginD(), faceNew2Old.beginD(),
-                            faceSize.beginD() + 1, faceNormal_.beginD()));
-  } else {
+  if (faceNormal_.size() == NumTri()) {
     thrust::sort_by_key(
         faceMorton.beginD(), faceMorton.endD(),
-        zip(faceBox.beginD(), faceNew2Old.beginD(), faceSize.beginD() + 1));
+        zip(faceBox.beginD(), faceNew2Old.beginD(), faceNormal_.beginD()));
+  } else {
+    thrust::sort_by_key(faceMorton.beginD(), faceMorton.endD(),
+                        zip(faceBox.beginD(), faceNew2Old.beginD()));
   }
 
   VecDH<Halfedge> oldHalfedge = halfedge_;
-  VecDH<int> oldFaceEdge = faceEdge_;
-  GatherFaces(oldHalfedge, oldFaceEdge, faceNew2Old, faceSize);
-}
-
-VecDH<int> Manifold::Impl::FaceSize() const {
-  VecDH<int> faceSize(faceEdge_.size());
-  thrust::adjacent_difference(faceEdge_.beginD(), faceEdge_.endD(),
-                              faceSize.beginD());
-  return faceSize;
+  GatherFaces(oldHalfedge, faceNew2Old);
 }
 
 /**
- * Creates the halfedge_ and faceEdge_ vectors for this manifold by copying a
- * set of faces from another manifold, given by oldHalfedge and oldFaceEdge.
- * Input faceNew2Old defines the old faces to gather into this, while
- * newFaceSize is the same length as faceNew2Old and contains the sizes of the
- * faces to be copied.
+ * Creates the halfedge_ vector for this manifold by copying a set of faces from
+ * another manifold, given by oldHalfedge. Input faceNew2Old defines the old
+ * faces to gather into this.
  */
 void Manifold::Impl::GatherFaces(const VecDH<Halfedge>& oldHalfedge,
-                                 const VecDH<int>& oldFaceEdge,
-                                 const VecDH<int>& faceNew2Old,
-                                 const VecDH<int>& newFaceSize) {
-  faceEdge_.resize(faceNew2Old.size() + 1);
+                                 const VecDH<int>& faceNew2Old) {
+  const int numTri = faceNew2Old.size();
+  VecDH<int> faceOld2New(oldHalfedge.size() / 3);
+  thrust::scatter(countAt(0), countAt(numTri), faceNew2Old.beginD(),
+                  faceOld2New.beginD());
 
-  VecDH<int> faceOld2New(oldFaceEdge.size() - 1);
-  thrust::scatter(thrust::make_counting_iterator(0),
-                  thrust::make_counting_iterator(NumFace()),
-                  faceNew2Old.beginD(), faceOld2New.beginD());
-
-  thrust::inclusive_scan(newFaceSize.beginD() + 1, newFaceSize.endD(),
-                         faceEdge_.beginD() + 1);
-
-  halfedge_.resize(faceEdge_.H().back());
-  thrust::for_each_n(zip(thrust::make_counting_iterator(0), faceEdge_.beginD()),
-                     NumFace(),
-                     ReindexFace({halfedge_.ptrD(), faceEdge_.cptrD(),
-                                  oldHalfedge.cptrD(), oldFaceEdge.cptrD(),
+  halfedge_.resize(3 * numTri);
+  thrust::for_each_n(countAt(0), numTri,
+                     ReindexFace({halfedge_.ptrD(), oldHalfedge.cptrD(),
                                   faceNew2Old.cptrD(), faceOld2New.cptrD()}));
 }
 
 /**
  * If face normals are already present, this function uses them to compute
  * vertex normals (angle-weighted pseudo-normals); otherwise it also computes
- * the face normals as well. Face normals are only calculated when needed
- * because nearly degenerate faces will accrue rounding error, while the Boolean
- * can retain their original normal, which is more accurate and can help with
- * merging coplanar faces.
+ * the face normals. Face normals are only calculated when needed because nearly
+ * degenerate faces will accrue rounding error, while the Boolean can retain
+ * their original normal, which is more accurate and can help with merging
+ * coplanar faces.
  *
  * If the face normals have been invalidated by an operation like Warp(), ensure
  * you do faceNormal_.resize(0) before calling this function to force
@@ -1083,15 +993,13 @@ void Manifold::Impl::GatherFaces(const VecDH<Halfedge>& oldHalfedge,
 void Manifold::Impl::CalculateNormals() {
   vertNormal_.resize(NumVert(), glm::vec3(0.0f));
   bool calculateTriNormal = false;
-  if (faceNormal_.size() != NumFace()) {
-    faceNormal_.resize(NumFace());
+  if (faceNormal_.size() != NumTri()) {
+    faceNormal_.resize(NumTri());
     calculateTriNormal = true;
   }
-  thrust::for_each_n(
-      zip(faceNormal_.beginD(), thrust::make_counting_iterator(0)), NumFace(),
-      AssignNormals({vertNormal_.ptrD(), vertPos_.cptrD(), halfedge_.cptrD(),
-                     nextHalfedge_.cptrD(), faceEdge_.cptrD(),
-                     calculateTriNormal}));
+  thrust::for_each_n(zip(faceNormal_.beginD(), countAt(0)), NumTri(),
+                     AssignNormals({vertNormal_.ptrD(), vertPos_.cptrD(),
+                                    halfedge_.cptrD(), calculateTriNormal}));
   thrust::for_each(vertNormal_.begin(), vertNormal_.end(), NormalizeTo({1.0}));
 }
 
@@ -1126,10 +1034,10 @@ SparseIndices Manifold::Impl::VertexCollisionsZ(
  * For the input face index, return a set of 2D polygons formed by the input
  * projection of the vertices.
  */
-Polygons Manifold::Impl::Face2Polygons(int face, glm::mat3x2 projection) const {
-  const VecH<int>& faceEdge = faceEdge_.H();
+Polygons Manifold::Impl::Face2Polygons(int face, glm::mat3x2 projection,
+                                       const VecH<int>& faceEdge,
+                                       const VecH<int>& nextHalfedge) const {
   const VecH<Halfedge>& halfedge = halfedge_.H();
-  const VecH<int>& nextHalfedge = nextHalfedge_.H();
   const VecH<glm::vec3>& vertPos = vertPos_.H();
   const int firstEdge = faceEdge[face];
   const int lastEdge = faceEdge[face + 1];

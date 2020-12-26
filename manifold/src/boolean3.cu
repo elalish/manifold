@@ -150,50 +150,33 @@ SparseIndices Filter02(const Manifold::Impl &inP, const Manifold::Impl &inQ,
 struct CopyFaceEdges {
   // x can be either vert or edge (0 or 1).
   thrust::pair<int *, int *> pXq1;
-  const int *facesQ;
   const Halfedge *halfedgesQ;
 
   __host__ __device__ void operator()(thrust::tuple<int, int, int> in) {
-    int idx = thrust::get<0>(in);
+    int idx = 3 * thrust::get<0>(in);
     const int pX = thrust::get<1>(in);
     const int q2 = thrust::get<2>(in);
 
-    int q1 = facesQ[q2];
-    const int end = facesQ[q2 + 1];
-    while (q1 < end) {
-      pXq1.first[idx] = pX;
+    for (const int i : {0, 1, 2}) {
+      pXq1.first[idx + i] = pX;
+      const int q1 = 3 * q2 + i;
       const Halfedge edge = halfedgesQ[q1];
-      pXq1.second[idx++] = edge.IsForward() ? q1 : edge.pairedHalfedge;
-      ++q1;
+      pXq1.second[idx + i] = edge.IsForward() ? q1 : edge.pairedHalfedge;
     }
   }
 };
 
-SparseIndices Filter11(const Manifold::Impl &inP, const VecDH<int> &faceSizeP,
-                       const Manifold::Impl &inQ, const VecDH<int> &faceSizeQ,
+SparseIndices Filter11(const Manifold::Impl &inP, const Manifold::Impl &inQ,
                        const SparseIndices &p1q2, const SparseIndices &p2q1) {
-  VecDH<int> expandedIdxQ(p1q2.size() + 1);
-  auto includedFaceSizeQ = perm(faceSizeQ.beginD() + 1, p1q2.beginD(1));
-  thrust::inclusive_scan(includedFaceSizeQ, includedFaceSizeQ + p1q2.size(),
-                         expandedIdxQ.beginD() + 1);
-  const int secondStart = expandedIdxQ.H().back();
-
-  VecDH<int> expandedIdxP(p2q1.size() + 1);
-  auto includedFaceSizeP = perm(faceSizeP.beginD() + 1, p2q1.beginD(0));
-  thrust::inclusive_scan(includedFaceSizeP, includedFaceSizeP + p2q1.size(),
-                         expandedIdxP.beginD() + 1);
-
-  SparseIndices p1q1(secondStart + expandedIdxP.H().back());
-  thrust::for_each_n(zip(expandedIdxQ.beginD(), p1q2.beginD(0), p1q2.beginD(1)),
+  SparseIndices p1q1(3 * p1q2.size() + 3 * p2q1.size());
+  thrust::for_each_n(zip(countAt(0), p1q2.beginD(0), p1q2.beginD(1)),
                      p1q2.size(),
-                     CopyFaceEdges({p1q1.ptrDpq(), inQ.faceEdge_.cptrD(),
-                                    inQ.halfedge_.cptrD()}));
+                     CopyFaceEdges({p1q1.ptrDpq(), inQ.halfedge_.cptrD()}));
 
   p1q1.SwapPQ();
-  thrust::for_each_n(
-      zip(expandedIdxP.beginD(), p2q1.beginD(1), p2q1.beginD(0)), p2q1.size(),
-      CopyFaceEdges({p1q1.ptrDpq(secondStart), inP.faceEdge_.cptrD(),
-                     inP.halfedge_.cptrD()}));
+  thrust::for_each_n(zip(countAt(p1q2.size()), p2q1.beginD(1), p2q1.beginD(0)),
+                     p2q1.size(),
+                     CopyFaceEdges({p1q1.ptrDpq(), inP.halfedge_.cptrD()}));
   p1q1.SwapPQ();
   p1q1.Unique();
   return p1q1;
@@ -364,7 +347,6 @@ std::tuple<VecDH<int>, VecDH<glm::vec4>> Shadow11(SparseIndices &p1q1,
 
 struct Kernel02 {
   const glm::vec3 *vertPosP;
-  const int *facesQ;
   const Halfedge *halfedgeQ;
   const glm::vec3 *vertPosQ;
   const bool forward;
@@ -389,10 +371,9 @@ struct Kernel02 {
     float minMetric = 1.0f / 0.0f;
     s02 = 0;
 
-    int q1 = facesQ[q2];
-    const int lastEdge = facesQ[q2 + 1];
     const glm::vec3 posP = vertPosP[p0];
-    while (q1 < lastEdge) {
+    for (const int i : {0, 1, 2}) {
+      const int q1 = 3 * q2 + i;
       const Halfedge edge = halfedgeQ[q1];
       const int q1F = edge.IsForward() ? q1 : edge.pairedHalfedge;
 
@@ -418,7 +399,6 @@ struct Kernel02 {
           yzzRL[k++] = glm::vec3(yz01[0], yz01[1], yz01[1]);
         }
       }
-      ++q1;
     }
 
     if (s02 == 0) {  // No intersection
@@ -455,9 +435,9 @@ std::tuple<VecDH<int>, VecDH<float>> Shadow02(const Manifold::Impl &inP,
   thrust::for_each_n(zip(s02.beginD(), z02.beginD(), p0q2.beginD(!forward),
                          p0q2.beginD(forward)),
                      p0q2.size(),
-                     Kernel02({inP.vertPos_.cptrD(), inQ.faceEdge_.cptrD(),
-                               inQ.halfedge_.cptrD(), inQ.vertPos_.cptrD(),
-                               forward, expandP, vertNormalP, faceNormalP}));
+                     Kernel02({inP.vertPos_.cptrD(), inQ.halfedge_.cptrD(),
+                               inQ.vertPos_.cptrD(), forward, expandP,
+                               vertNormalP, faceNormalP}));
 
   p0q2.KeepFinite(z02, s02);
 
@@ -474,7 +454,6 @@ struct Kernel12 {
   const glm::vec4 *xyzz11;
   const int size11;
   const Halfedge *halfedgesP;
-  const int *facesQ;
   const Halfedge *halfedgesQ;
   const glm::vec3 *vertPosP;
   const bool forward;
@@ -515,9 +494,8 @@ struct Kernel12 {
       }
     }
 
-    int q1 = facesQ[q2];
-    const int lastEdge = facesQ[q2 + 1];
-    while (q1 < lastEdge) {
+    for (const int i : {0, 1, 2}) {
+      const int q1 = 3 * q2 + i;
       const Halfedge edge = halfedgesQ[q1];
       const int q1F = edge.IsForward() ? q1 : edge.pairedHalfedge;
       const auto key =
@@ -538,7 +516,6 @@ struct Kernel12 {
           k++;
         }
       }
-      ++q1;
     }
 
     if (x12 == 0) {  // No intersection
@@ -571,8 +548,8 @@ std::tuple<VecDH<int>, VecDH<glm::vec3>> Intersect12(
       p1q2.size(),
       Kernel12({p0q2.ptrDpq(), s02.ptrD(), z02.cptrD(), p0q2.size(),
                 p1q1.ptrDpq(), s11.ptrD(), xyzz11.cptrD(), p1q1.size(),
-                inP.halfedge_.cptrD(), inQ.faceEdge_.cptrD(),
-                inQ.halfedge_.cptrD(), inP.vertPos_.cptrD(), forward}));
+                inP.halfedge_.cptrD(), inQ.halfedge_.cptrD(),
+                inP.vertPos_.cptrD(), forward}));
 
   p1q2.KeepFinite(v12, x12);
 
@@ -675,14 +652,14 @@ struct NotZero : public thrust::unary_function<int, int> {
   __host__ __device__ int operator()(int x) const { return x > 0 ? 1 : 0; }
 };
 
-VecDH<int> SizeOutput(Manifold::Impl &outR, const Manifold::Impl &inP,
-                      const Manifold::Impl &inQ, const VecDH<int> &i03,
-                      const VecDH<int> &i30, const VecDH<int> &i12,
-                      const VecDH<int> &i21, const SparseIndices &p1q2,
-                      const SparseIndices &p2q1, bool invertQ) {
-  VecDH<int> sidesPerFacePQ(inP.NumFace() + inQ.NumFace());
+std::tuple<VecDH<int>, VecDH<int>> SizeOutput(
+    Manifold::Impl &outR, const Manifold::Impl &inP, const Manifold::Impl &inQ,
+    const VecDH<int> &i03, const VecDH<int> &i30, const VecDH<int> &i12,
+    const VecDH<int> &i21, const SparseIndices &p1q2, const SparseIndices &p2q1,
+    bool invertQ) {
+  VecDH<int> sidesPerFacePQ(inP.NumTri() + inQ.NumTri());
   auto sidesPerFaceP = sidesPerFacePQ.ptrD();
-  auto sidesPerFaceQ = sidesPerFacePQ.ptrD() + inP.NumFace();
+  auto sidesPerFaceQ = sidesPerFacePQ.ptrD() + inP.NumTri();
 
   thrust::for_each(inP.halfedge_.beginD(), inP.halfedge_.endD(),
                    CountVerts({sidesPerFaceP, i03.cptrD()}));
@@ -695,13 +672,13 @@ VecDH<int> SizeOutput(Manifold::Impl &outR, const Manifold::Impl &inP,
       zip(p2q1.beginD(1), p2q1.beginD(0), i21.beginD()), i21.size(),
       CountNewVerts({sidesPerFaceQ, sidesPerFaceP, inQ.halfedge_.cptrD()}));
 
-  VecDH<int> facePQ2R(inP.NumFace() + inQ.NumFace() + 1);
+  VecDH<int> facePQ2R(inP.NumTri() + inQ.NumTri() + 1);
   auto keepFace =
       thrust::make_transform_iterator(sidesPerFacePQ.beginD(), NotZero());
   thrust::inclusive_scan(keepFace, keepFace + sidesPerFacePQ.size(),
                          facePQ2R.beginD() + 1);
   int numFaceR = facePQ2R.H().back();
-  facePQ2R.resize(inP.NumFace() + inQ.NumFace());
+  facePQ2R.resize(inP.NumTri() + inQ.NumTri());
 
   outR.faceNormal_.resize(numFaceR);
   auto next = thrust::copy_if(inP.faceNormal_.beginD(), inP.faceNormal_.endD(),
@@ -712,21 +689,21 @@ VecDH<int> SizeOutput(Manifold::Impl &outR, const Manifold::Impl &inP,
                                                  thrust::negate<glm::vec3>());
     auto end = thrust::make_transform_iterator(inQ.faceNormal_.endD(),
                                                thrust::negate<glm::vec3>());
-    thrust::copy_if(start, end, keepFace + inP.NumFace(), next,
+    thrust::copy_if(start, end, keepFace + inP.NumTri(), next,
                     thrust::identity<bool>());
   } else {
     thrust::copy_if(inQ.faceNormal_.beginD(), inQ.faceNormal_.endD(),
-                    keepFace + inP.NumFace(), next, thrust::identity<bool>());
+                    keepFace + inP.NumTri(), next, thrust::identity<bool>());
   }
 
   auto newEnd =
       thrust::remove(sidesPerFacePQ.beginD(), sidesPerFacePQ.endD(), 0);
-  outR.faceEdge_.resize(newEnd - sidesPerFacePQ.beginD() + 1);
+  VecDH<int> faceEdge(newEnd - sidesPerFacePQ.beginD() + 1);
   thrust::inclusive_scan(sidesPerFacePQ.beginD(), newEnd,
-                         outR.faceEdge_.beginD() + 1);
-  outR.halfedge_.resize(outR.faceEdge_.H().back());
+                         faceEdge.beginD() + 1);
+  outR.halfedge_.resize(faceEdge.H().back());
 
-  return facePQ2R;
+  return std::make_tuple(faceEdge, facePQ2R);
 }
 
 struct DuplicateHalfedges {
@@ -975,12 +952,6 @@ Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ,
   // Union -> expand inP
   // Difference, Intersection -> contract inP
 
-  inP_.Tri2Face();
-  inQ_.Tri2Face();
-
-  VecDH<int> faceSizeP = inP_.FaceSize();
-  VecDH<int> faceSizeQ = inQ_.FaceSize();
-
   Time t0 = NOW();
   Time t1;
   // Level 3
@@ -1006,7 +977,7 @@ Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ,
   if (kVerbose) std::cout << "p2q0 size = " << p2q0.size() << std::endl;
 
   // Find involved edge pairs from Level 3
-  SparseIndices p1q1 = Filter11(inP_, faceSizeP, inQ_, faceSizeQ, p1q2_, p2q1_);
+  SparseIndices p1q1 = Filter11(inP_, inQ_, p1q2_, p2q1_);
   if (kVerbose) std::cout << "p1q1 size = " << p1q1.size() << std::endl;
 
   if (kVerbose) {
@@ -1181,13 +1152,15 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
                   inQ_.halfedge_.H(), false);
 
   // Level 4
-
-  VecDH<int> facePQ2R = SizeOutput(outR, inP_, inQ_, i03, i30, i12, i21, p1q2_,
-                                   p2q1_, op == Manifold::OpType::SUBTRACT);
+  VecDH<int> faceEdge;
+  VecDH<int> facePQ2R;
+  std::tie(faceEdge, facePQ2R) =
+      SizeOutput(outR, inP_, inQ_, i03, i30, i12, i21, p1q2_, p2q1_,
+                 op == Manifold::OpType::SUBTRACT);
 
   // This gets incremented for each halfedge that's added to a face so that the
   // next one knows where to slot in.
-  VecDH<int> facePtrR = outR.faceEdge_;
+  VecDH<int> facePtrR = faceEdge;
   // Intersected halfedges are marked false.
   VecDH<bool> wholeHalfedgeP(inP_.halfedge_.size(), true);
   VecDH<bool> wholeHalfedgeQ(inQ_.halfedge_.size(), true);
@@ -1195,14 +1168,14 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
   AppendPartialEdges(outR, wholeHalfedgeP.H(), facePtrR.H(), edgesP, inP_,
                      i03.H(), vP2R.H(), facePQ2R.begin());
   AppendPartialEdges(outR, wholeHalfedgeQ.H(), facePtrR.H(), edgesQ, inQ_,
-                     i30.H(), vQ2R.H(), facePQ2R.begin() + inP_.NumFace());
+                     i30.H(), vQ2R.H(), facePQ2R.begin() + inP_.NumTri());
 
-  AppendNewEdges(outR, facePtrR.H(), edgesNew, facePQ2R.H(), inP_.NumFace());
+  AppendNewEdges(outR, facePtrR.H(), edgesNew, facePQ2R.H(), inP_.NumTri());
 
   AppendWholeEdges(outR, facePtrR, inP_, wholeHalfedgeP, i03, vP2R,
                    facePQ2R.cptrD());
   AppendWholeEdges(outR, facePtrR, inQ_, wholeHalfedgeQ, i30, vQ2R,
-                   facePQ2R.cptrD() + inP_.NumFace());
+                   facePQ2R.cptrD() + inP_.NumTri());
 
   if (kVerbose) {
     std::cout << "Time for assembling the result";
@@ -1213,12 +1186,9 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
 
   // Level 6
 
-  // Create the manifold's data structures and verify manifoldness.
+  // Create the manifold's data structures.
+  outR.Face2Tri(faceEdge);
   outR.LabelVerts();
-  outR.Finish();
-
-  // TODO: Revert Manifold back to only triangles.
-  outR.Face2Tri();
   outR.Finish();
 
   if (kVerbose) {

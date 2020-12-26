@@ -53,14 +53,11 @@ struct Equals {
 
 struct RemoveFace {
   const Halfedge* halfedge;
-  const int* faceEdge;
   const int* vertLabel;
   const int keepLabel;
 
-  __host__ __device__ bool operator()(thrust::tuple<int, int> in) {
-    int face = thrust::get<0>(in);
-
-    return vertLabel[halfedge[faceEdge[face]].startVert] != keepLabel;
+  __host__ __device__ bool operator()(int face) {
+    return vertLabel[halfedge[3 * face].startVert] != keepLabel;
   }
 };
 
@@ -129,44 +126,7 @@ Manifold Manifold::Octahedron() {
  */
 Manifold Manifold::Cube(glm::vec3 size, bool center) {
   Manifold cube;
-  std::vector<glm::vec3> vertPos = {{0.0f, 0.0f, 0.0f},  //
-                                    {1.0f, 0.0f, 0.0f},  //
-                                    {1.0f, 1.0f, 0.0f},  //
-                                    {0.0f, 1.0f, 0.0f},  //
-                                    {0.0f, 0.0f, 1.0f},  //
-                                    {1.0f, 0.0f, 1.0f},  //
-                                    {1.0f, 1.0f, 1.0f},  //
-                                    {0.0f, 1.0f, 1.0f}};
-  std::vector<Halfedge> halfedge = {{0, 3, 20, 0},  //
-                                    {3, 2, 16, 0},  //
-                                    {2, 1, 12, 0},  //
-                                    {1, 0, 8, 0},   //
-                                    {4, 5, 10, 1},  //
-                                    {5, 6, 14, 1},  //
-                                    {6, 7, 18, 1},  //
-                                    {7, 4, 22, 1},  //
-                                    {0, 1, 3, 2},   //
-                                    {1, 5, 15, 2},  //
-                                    {5, 4, 4, 2},   //
-                                    {4, 0, 21, 2},  //
-                                    {1, 2, 2, 3},   //
-                                    {2, 6, 19, 3},  //
-                                    {6, 5, 5, 3},   //
-                                    {5, 1, 9, 3},   //
-                                    {2, 3, 1, 4},   //
-                                    {3, 7, 23, 4},  //
-                                    {7, 6, 6, 4},   //
-                                    {6, 2, 13, 4},  //
-                                    {3, 0, 0, 5},   //
-                                    {0, 4, 11, 5},  //
-                                    {4, 7, 7, 5},   //
-                                    {7, 3, 17, 5}};
-  std::vector<int> faceEdge = {0, 4, 8, 12, 16, 20, 24};
-  cube.pImpl_->vertPos_ = vertPos;
-  cube.pImpl_->halfedge_ = halfedge;
-  cube.pImpl_->faceEdge_ = faceEdge;
-  cube.pImpl_->Finish();
-
+  cube.pImpl_ = std::make_unique<Impl>(Impl::Shape::CUBE);
   cube.Scale(size);
   if (center) cube.Translate(-size / 2.0f);
   return cube;
@@ -377,25 +337,24 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments) {
 /**
  * Constructs a new manifold from a vector of other manifolds. This is a purely
  * topological operation, so care should be taken to avoid creating
- * geometrically-invalid results (unless that is desired).
+ * geometrically-invalid results.
  */
 Manifold Manifold::Compose(const std::vector<Manifold>& manifolds) {
   int numVert = 0;
   int numEdge = 0;
-  int numFace = 0;
+  int NumTri = 0;
   for (const Manifold& manifold : manifolds) {
     numVert += manifold.NumVert();
     numEdge += manifold.NumEdge();
-    numFace += manifold.NumFace();
+    NumTri += manifold.NumTri();
   }
 
   Manifold out;
   Impl& combined = *(out.pImpl_);
   combined.vertPos_.resize(numVert);
   combined.halfedge_.resize(2 * numEdge);
-  combined.faceEdge_.resize(numFace + 1);
   combined.vertLabel_.resize(numVert);
-  combined.faceNormal_.resize(numFace);
+  combined.faceNormal_.resize(NumTri);
 
   int nextVert = 0;
   int nextEdge = 0;
@@ -409,8 +368,6 @@ Manifold Manifold::Compose(const std::vector<Manifold>& manifolds) {
                  combined.vertPos_.beginD() + nextVert);
     thrust::copy(impl.faceNormal_.beginD(), impl.faceNormal_.endD(),
                  combined.faceNormal_.beginD() + nextFace);
-    thrust::transform(impl.faceEdge_.beginD(), impl.faceEdge_.endD(),
-                      combined.faceEdge_.beginD() + nextFace, _1 + nextEdge);
     thrust::transform(impl.vertLabel_.beginD(), impl.vertLabel_.endD(),
                       combined.vertLabel_.beginD() + nextVert, _1 + nextLabel);
     thrust::transform(impl.halfedge_.beginD(), impl.halfedge_.endD(),
@@ -419,7 +376,7 @@ Manifold Manifold::Compose(const std::vector<Manifold>& manifolds) {
 
     nextVert += manifold.NumVert();
     nextEdge += 2 * manifold.NumEdge();
-    nextFace += manifold.NumFace();
+    nextFace += manifold.NumTri();
     nextLabel += impl.numLabel_;
   }
 
@@ -430,12 +387,7 @@ Manifold Manifold::Compose(const std::vector<Manifold>& manifolds) {
 
 /**
  * This operation returns a copy of this manifold, but as a vector of meshes
- * that are topologically disconnected. It cannot use vertLabel_ directly for
- * this due to possible polygons with holes, so instead it recomputes the
- * connected components after adding a start graph of edges to each face that
- * has more than five edges to ensure proper connectivity. In some situations
- * this could cause disjoint manifolds to not be separated, so triangulating
- * first may be preferable.
+ * that are topologically disconnected.
  */
 std::vector<Manifold> Manifold::Decompose() const {
   if (pImpl_->numLabel_ == 1) {
@@ -444,63 +396,30 @@ std::vector<Manifold> Manifold::Decompose() const {
     return meshes;
   }
 
-  VecDH<Halfedge> edges = pImpl_->halfedge_;
-
-  VecH<Halfedge>& edgesH = edges.H();
-  const VecH<int>& faceEdgeH = pImpl_->faceEdge_.H();
-
-  for (int face = 0; face < NumFace(); ++face) {
-    const int firstEdge = faceEdgeH[face];
-    const int lastEdge = faceEdgeH[face + 1];
-    if (lastEdge - firstEdge > 5) {
-      // With 6 edges or more, the face could be made of multiple polygons. Add
-      // a star graph of edges to ensure the face's verts are connected.
-      const int startVert = edgesH[firstEdge].startVert;
-      for (int i = firstEdge + 1; i < lastEdge; ++i) {
-        Halfedge edge = {startVert, edgesH[i].startVert};
-        // ConnectedComponents only uses forward halfedges.
-        if (!edge.IsForward()) std::swap(edge.startVert, edge.endVert);
-        edgesH.push_back(edge);
-      }
-    }
-  }
-
-  VecDH<int> vertLabel;
-  int numLabel = ConnectedComponents(vertLabel, NumVert(), edges);
-
-  std::vector<Manifold> meshes(numLabel);
-  for (int i = 0; i < numLabel; ++i) {
+  std::vector<Manifold> meshes(pImpl_->numLabel_);
+  for (int i = 0; i < pImpl_->numLabel_; ++i) {
     meshes[i].pImpl_->vertPos_.resize(NumVert());
     VecDH<int> vertNew2Old(NumVert());
     int nVert =
         thrust::copy_if(
-            zip(pImpl_->vertPos_.beginD(), thrust::make_counting_iterator(0)),
-            zip(pImpl_->vertPos_.endD(),
-                thrust::make_counting_iterator(NumVert())),
-            vertLabel.beginD(),
+            zip(pImpl_->vertPos_.beginD(), countAt(0)),
+            zip(pImpl_->vertPos_.endD(), countAt(NumVert())),
+            pImpl_->vertLabel_.beginD(),
             zip(meshes[i].pImpl_->vertPos_.beginD(), vertNew2Old.beginD()),
             Equals({i})) -
-        zip(meshes[i].pImpl_->vertPos_.beginD(),
-            thrust::make_counting_iterator(0));
+        zip(meshes[i].pImpl_->vertPos_.beginD(), countAt(0));
     meshes[i].pImpl_->vertPos_.resize(nVert);
 
-    VecDH<int> faceNew2Old(NumFace());
+    VecDH<int> faceNew2Old(NumTri());
     thrust::sequence(faceNew2Old.beginD(), faceNew2Old.endD());
 
-    VecDH<int> faceSize = pImpl_->FaceSize();
-
-    auto start = zip(faceNew2Old.beginD(), faceSize.beginD() + 1);
-    int nFace =
-        thrust::remove_if(
-            start, zip(faceNew2Old.endD(), faceSize.endD()),
-            RemoveFace({pImpl_->halfedge_.cptrD(), pImpl_->faceEdge_.cptrD(),
-                        vertLabel.cptrD(), i})) -
-        start;
+    int nFace = thrust::remove_if(faceNew2Old.beginD(), faceNew2Old.endD(),
+                                  RemoveFace({pImpl_->halfedge_.cptrD(),
+                                              pImpl_->vertLabel_.cptrD(), i})) -
+                faceNew2Old.beginD();
     faceNew2Old.resize(nFace);
-    faceSize.resize(nFace + 1);
 
-    meshes[i].pImpl_->GatherFaces(pImpl_->halfedge_, pImpl_->faceEdge_,
-                                  faceNew2Old, faceSize);
+    meshes[i].pImpl_->GatherFaces(pImpl_->halfedge_, faceNew2Old);
     meshes[i].pImpl_->ReindexVerts(vertNew2Old, pImpl_->NumVert());
 
     meshes[i].pImpl_->Finish();
@@ -511,22 +430,18 @@ std::vector<Manifold> Manifold::Decompose() const {
 
 /**
  * This returns a Mesh of simple vectors of vertices and triangles suitable for
- * saving or other operations outside of the context of this library. It is not
- * a const function because it first triangulates the Manifold.
+ * saving or other operations outside of the context of this library.
  */
-Mesh Manifold::Extract() {
+Mesh Manifold::Extract() const {
   pImpl_->ApplyTransform();
-  pImpl_->Face2Tri();
-  pImpl_->Finish();
 
   Mesh result;
   result.vertPos.insert(result.vertPos.end(), pImpl_->vertPos_.begin(),
                         pImpl_->vertPos_.end());
 
-  result.triVerts.resize(NumFace());
-  thrust::for_each_n(
-      zip(result.triVerts.begin(), thrust::make_counting_iterator(0)),
-      NumFace(), MakeTri({pImpl_->halfedge_.cptrH()}));
+  result.triVerts.resize(NumTri());
+  thrust::for_each_n(zip(result.triVerts.begin(), countAt(0)), NumTri(),
+                     MakeTri({pImpl_->halfedge_.cptrH()}));
 
   return result;
 }
@@ -570,7 +485,7 @@ int Manifold::GetCircularSegments(float radius) {
 bool Manifold::IsEmpty() const { return NumVert() == 0; }
 int Manifold::NumVert() const { return pImpl_->NumVert(); }
 int Manifold::NumEdge() const { return pImpl_->NumEdge(); }
-int Manifold::NumFace() const { return pImpl_->NumFace(); }
+int Manifold::NumTri() const { return pImpl_->NumTri(); }
 
 Box Manifold::BoundingBox() const {
   return pImpl_->bBox_.Transform(pImpl_->transform_);
@@ -578,12 +493,11 @@ Box Manifold::BoundingBox() const {
 
 /**
  * The genus is a topological property of the manifold, representing the number
- * of "handles". A sphere is 0, torus 1, etc. It is only meaningful for a
- * single, triangulated mesh (faces that are polygons with holes violate its
- * assumptions), so it is best to call Face2Tri() and Decompose() first.
+ * of "handles". A sphere is 0, torus 1, etc. It is only meaningful for a single
+ * mesh, so it is best to call Decompose() first.
  */
 int Manifold::Genus() const {
-  int chi = NumVert() - NumEdge() + NumFace();
+  int chi = NumVert() - NumEdge() + NumTri();
   return 1 - chi / 2;
 }
 

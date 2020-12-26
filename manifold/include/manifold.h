@@ -43,9 +43,6 @@ class Manifold {
   static Manifold Compose(const std::vector<Manifold>&);
   std::vector<Manifold> Decompose() const;
 
-  // Extraction is not const because it triangulates the Manifold.
-  Mesh Extract();
-
   // Defaults for construction
   static void SetMinCircularAngle(float degrees);
   static void SetMinCircularEdgeLength(float length);
@@ -59,10 +56,11 @@ class Manifold {
   bool IsEmpty() const;
   int NumVert() const;
   int NumEdge() const;
-  int NumFace() const;
+  int NumTri() const;
   Box BoundingBox() const;
   int Genus() const;
   Properties GetProperties() const;
+  Mesh Extract() const;
 
   // Modification
   Manifold& Translate(glm::vec3);
