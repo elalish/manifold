@@ -39,18 +39,17 @@ void Identical(Mesh& mesh1, Mesh& mesh2) {
 void ExpectMeshes(Manifold& manifold,
                   const std::vector<std::pair<int, int>>& numVertTri) {
   ASSERT_TRUE(manifold.IsManifold());
-  manifold.Extract();
   std::vector<Manifold> meshes = manifold.Decompose();
   ASSERT_EQ(meshes.size(), numVertTri.size());
   std::sort(meshes.begin(), meshes.end(),
             [](const Manifold& a, const Manifold& b) {
               return a.NumVert() != b.NumVert() ? a.NumVert() > b.NumVert()
-                                                : a.NumFace() > b.NumFace();
+                                                : a.NumTri() > b.NumTri();
             });
   for (int i = 0; i < meshes.size(); ++i) {
     EXPECT_TRUE(meshes[i].IsManifold());
     EXPECT_EQ(meshes[i].NumVert(), numVertTri[i].first);
-    EXPECT_EQ(meshes[i].NumFace(), numVertTri[i].second);
+    EXPECT_EQ(meshes[i].NumTri(), numVertTri[i].second);
   }
 }
 
@@ -128,7 +127,7 @@ TEST(Manifold, Sphere) {
   int n = 25;
   Manifold sphere = Manifold::Sphere(1.0f, 4 * n);
   ASSERT_TRUE(sphere.IsManifold());
-  EXPECT_EQ(sphere.NumFace(), n * n * 8);
+  EXPECT_EQ(sphere.NumTri(), n * n * 8);
 }
 
 TEST(Manifold, Extrude) {
@@ -247,13 +246,10 @@ TEST(Manifold, MultiCoplanar) {
   Manifold first = cube - cube2.Translate({0.3f, 0.3f, 0.0f});
   cube.Translate({-0.3f, -0.3f, 0.0f});
   Manifold out = first - cube;
-  first.Extract();  // Force triangulation and compare results
-  Manifold out2 = first - cube;
   EXPECT_EQ(out.Genus(), -1);
   auto prop = out.GetProperties();
-  auto prop2 = out2.GetProperties();
-  EXPECT_NEAR(prop.volume, prop2.volume, 1e-5);
-  EXPECT_NEAR(prop.surfaceArea, prop2.surfaceArea, 1e-5);
+  EXPECT_NEAR(prop.volume, 0.18, 1e-5);
+  EXPECT_NEAR(prop.surfaceArea, 2.76, 1e-5);
 }
 
 /**

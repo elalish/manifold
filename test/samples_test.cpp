@@ -25,7 +25,7 @@ using namespace manifold;
 TEST(Samples, Knot13) {
   Manifold knot13 = TorusKnot(1, 3, 25, 10, 3.75);
   //   ExportMesh("knot13.stl", knot13.Extract());
-  ASSERT_TRUE(knot13.IsManifold());
+  EXPECT_TRUE(knot13.IsManifold());
   EXPECT_EQ(knot13.Genus(), 1);
   auto prop = knot13.GetProperties();
   EXPECT_NEAR(prop.volume, 20786, 1);
@@ -36,7 +36,7 @@ TEST(Samples, Knot13) {
 TEST(Samples, Knot42) {
   Manifold knot42 = TorusKnot(4, 2, 15, 6, 5);
   //   ExportMesh("knot42.stl", knot42.Extract());
-  ASSERT_TRUE(knot42.IsManifold());
+  EXPECT_TRUE(knot42.IsManifold());
   std::vector<Manifold> knots = knot42.Decompose();
   ASSERT_EQ(knots.size(), 2);
   EXPECT_EQ(knots[0].Genus(), 1);
@@ -51,18 +51,21 @@ TEST(Samples, Knot42) {
 // that are not in general position, e.g. coplanar faces.
 TEST(Samples, Bracelet) {
   Manifold bracelet = StretchyBracelet();
-  Mesh triangulated = bracelet.Extract();
+  EXPECT_TRUE(bracelet.IsManifold());
   EXPECT_EQ(bracelet.Genus(), 1);
-  // ExportMesh("bracelet.ply", triangulated);
+  // ExportMesh("bracelet.ply", bracelet.Extract());
 }
 
 // A fractal with many degenerate intersections, which also tests exact 90
 // degree rotations.
 TEST(Samples, Sponge) {
   Manifold sponge = MengerSponge(4);
+  EXPECT_TRUE(sponge.IsManifold());
   EXPECT_EQ(sponge.Genus(), 26433);
   std::pair<Manifold, Manifold> cutSponge = sponge.SplitByPlane({1, 1, 1}, 0);
+  EXPECT_TRUE(cutSponge.first.IsManifold());
   EXPECT_EQ(cutSponge.first.Genus(), 13394);
+  EXPECT_TRUE(cutSponge.second.IsManifold());
   EXPECT_EQ(cutSponge.second.Genus(), 13394);
   // ExportMesh("mengerSponge.ply", cutSponge.first.Extract());
 }

@@ -16,7 +16,7 @@ target_compile_options(${PROJECT_NAME}
     PRIVATE ${MANIFOLD_NVCC_FLAGS}
 )
 target_compile_options(${PROJECT_NAME} 
-    PRIVATE "$<$<CONFIG:RELEASE>:${MANIFOLD_NVCC_RELEASE_FLAGS}>"
+    PRIVATE "$<$<CONFIG:RELEASE>:${MANIFOLD_NVCC_RELEASE_FLAGS}>" "$<$<CONFIG:DEBUG>:${MANIFOLD_NVCC_DEBUG_FLAGS}>"
 )
 target_compile_features(${PROJECT_NAME} 
     PUBLIC cxx_std_14

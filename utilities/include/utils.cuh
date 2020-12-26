@@ -19,6 +19,7 @@
 #include <thrust/iterator/permutation_iterator.h>
 #include <thrust/iterator/zip_iterator.h>
 #include <thrust/tuple.h>
+
 #include <iostream>
 
 namespace manifold {
@@ -47,6 +48,11 @@ thrust::zip_iterator<thrust::tuple<Iters...>> zip(Iters... iters) {
 template <typename A, typename B>
 thrust::permutation_iterator<A, B> perm(A a, B b) {
   return thrust::make_permutation_iterator(a, b);
+}
+
+template <typename T>
+thrust::counting_iterator<T> countAt(T i) {
+  return thrust::make_counting_iterator(i);
 }
 
 // Copied from

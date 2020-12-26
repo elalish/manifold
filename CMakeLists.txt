@@ -24,6 +24,7 @@ OPTION( MANIFOLD_USE_CPP
 set(MAINFOLD_FLAGS -Werror -Wall -Wno-sign-compare)
 set(MANIFOLD_NVCC_FLAGS -Xcudafe --diag_suppress=esa_on_defaulted_function_ignored)
 set(MANIFOLD_NVCC_RELEASE_FLAGS -O3)
+set(MANIFOLD_NVCC_DEBUG_FLAGS -G)
 
 IF(MANIFOLD_USE_OMP)
     message("------------------------- Using OpenMP instead of CUDA.")
