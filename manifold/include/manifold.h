@@ -25,7 +25,6 @@ class Manifold {
   // Creation
   Manifold();
   Manifold(const Mesh&);
-  Manifold DeepCopy() const;
   static Manifold Tetrahedron();
   static Manifold Octahedron();
   static Manifold Cube(glm::vec3 size = glm::vec3(1.0f), bool center = false);
@@ -91,8 +90,10 @@ class Manifold {
   int NumOverlaps(const Manifold& second) const;
 
   ~Manifold();
-  Manifold(Manifold&&);
-  Manifold& operator=(Manifold&&);
+  Manifold(const Manifold& other);
+  Manifold& operator=(const Manifold& other);
+  Manifold(Manifold&&) noexcept;
+  Manifold& operator=(Manifold&&) noexcept;
   struct Impl;
 
  private:
@@ -100,9 +101,5 @@ class Manifold {
   static int circularSegments;
   static float circularAngle;
   static float circularEdgeLength;
-
-  // Implicit copy is private because it is expensive; use DeepCopy() above.
-  Manifold(const Manifold& other);
-  Manifold& operator=(const Manifold& other);
 };
 }  // namespace manifold

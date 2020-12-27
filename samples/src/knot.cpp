@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <glm/gtx/rotate_vector.hpp>
+
 #include "samples.h"
 
 namespace {
@@ -61,8 +62,8 @@ Manifold TorusKnot(int p, int q, float majorRadius, float minorRadius,
   if (kLoops > 1) {
     std::vector<Manifold> knots;
     for (float k = 0; k < kLoops; ++k) {
-      knots.push_back(std::move(knot.DeepCopy().Rotate(
-          0, 0, 360.0f * (k / kLoops) * (q / float(p)))));
+      knots.emplace_back(knot);
+      knots.back().Rotate(0, 0, 360.0f * (k / kLoops) * (q / float(p)));
     }
     knot = Manifold::Compose(knots);
   }

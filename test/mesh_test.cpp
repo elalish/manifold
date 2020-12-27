@@ -87,7 +87,7 @@ TEST(Manifold, Regression) {
   Manifold manifold(ImportMesh("data/gyroidpuzzle.ply"));
   ASSERT_TRUE(manifold.IsManifold());
 
-  Manifold mesh1 = manifold.DeepCopy();
+  Manifold mesh1 = manifold;
   mesh1.Translate(glm::vec3(5.0f));
   int num_overlaps = manifold.NumOverlaps(mesh1);
   ASSERT_EQ(num_overlaps, 237472);
@@ -191,7 +191,7 @@ TEST(Manifold, BooleanTetra) {
   Manifold tetra = Manifold::Tetrahedron();
   ASSERT_TRUE(tetra.IsManifold());
 
-  Manifold tetra2 = tetra.DeepCopy();
+  Manifold tetra2 = tetra;
   tetra2.Translate(glm::vec3(0.5f));
   Manifold result = tetra2 - tetra;
 
@@ -232,7 +232,7 @@ TEST(Manifold, Perturb) {
 
 TEST(Manifold, Coplanar) {
   Manifold cube = Manifold::Cylinder(1.0f, 1.0f);
-  Manifold cube2 = cube.DeepCopy();
+  Manifold cube2 = cube;
   Manifold out = cube - cube2.Scale({0.5f, 0.5f, 1.0f})
                             .Rotate(0, 0, 15)
                             .Translate({0.25f, 0.25f, 0.0f});
@@ -242,7 +242,7 @@ TEST(Manifold, Coplanar) {
 
 TEST(Manifold, MultiCoplanar) {
   Manifold cube = Manifold::Cube();
-  Manifold cube2 = cube.DeepCopy();
+  Manifold cube2 = cube;
   Manifold first = cube - cube2.Translate({0.3f, 0.3f, 0.0f});
   cube.Translate({-0.3f, -0.3f, 0.0f});
   Manifold out = first - cube;
@@ -311,7 +311,7 @@ TEST(Manifold, BooleanVug) {
  */
 TEST(Manifold, BooleanSphere) {
   Manifold sphere = Manifold::Sphere(1.0f, 12);
-  Manifold sphere2 = sphere.DeepCopy();
+  Manifold sphere2 = sphere;
   sphere2.Translate(glm::vec3(0.5));
   Manifold result = sphere - sphere2;
 
@@ -322,7 +322,7 @@ TEST(Manifold, Boolean3) {
   Manifold gyroid(ImportMesh("data/gyroidpuzzle.ply"));
   ASSERT_TRUE(gyroid.IsManifold());
 
-  Manifold gyroid2 = gyroid.DeepCopy();
+  Manifold gyroid2 = gyroid;
   gyroid2.Translate(glm::vec3(5.0f));
   Manifold result = gyroid + gyroid2;
 
