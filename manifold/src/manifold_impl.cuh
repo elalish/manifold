@@ -45,6 +45,7 @@ struct Manifold::Impl {
   void ApplyTransform();
   void Refine(int n);
 
+  bool IsEmpty() const { return NumVert() == 0; }
   int NumVert() const { return vertPos_.size(); }
   int NumEdge() const { return halfedge_.size() / 2; }
   int NumTri() const { return halfedge_.size() / 3; }

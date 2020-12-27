@@ -69,3 +69,10 @@ TEST(Samples, Sponge) {
   EXPECT_EQ(cutSponge.second.Genus(), 13394);
   // ExportMesh("mengerSponge.ply", cutSponge.first.Extract());
 }
+
+TEST(Samples, Frame) {
+  Manifold frame = RoundedFrame(100, 10);
+  // EXPECT_TRUE(frame.IsManifold());
+  EXPECT_EQ(frame.Genus(), 13);
+  // ExportMesh("roundedFrame.ply", frame.Extract());
+}

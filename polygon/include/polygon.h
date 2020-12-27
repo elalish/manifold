@@ -14,11 +14,13 @@
 
 #pragma once
 #include <functional>
+
 #include "structs.h"
 
 namespace manifold {
 
 int CCW(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2);
+bool Coincident(glm::vec2 p0, glm::vec2 p1);
 std::vector<glm::ivec3> Triangulate(const Polygons &polys);
 
 std::vector<Halfedge> Polygons2Edges(const Polygons &polys);

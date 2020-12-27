@@ -23,7 +23,7 @@ int main(int argc, char **argv) {
   std::vector<double> times;
   for (int i = 0; i < 8; ++i) {
     Manifold sphere = Manifold::Sphere(1.0f, (8 << i) * 4);
-    Manifold sphere2 = sphere.DeepCopy();
+    Manifold sphere2 = sphere;
     sphere2.Translate(glm::vec3(0.5));
     auto start = std::chrono::high_resolution_clock::now();
     Manifold diff = sphere.Boolean(sphere2, Manifold::OpType::SUBTRACT);

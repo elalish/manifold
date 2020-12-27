@@ -954,6 +954,13 @@ Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ,
 
   Time t0 = NOW();
   Time t1;
+
+  if (inP.IsEmpty() || inQ.IsEmpty() || !inP.bBox_.DoesOverlap(inQ.bBox_)) {
+    w03_.resize(inP.NumVert(), 0);
+    w30_.resize(inQ.NumVert(), 0);
+    return;
+  }
+
   // Level 3
   // Find edge-triangle overlaps (broad phase)
   p1q2_ = inQ_.EdgeCollisions(inP_);
@@ -1042,6 +1049,9 @@ Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ,
 }
 
 Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
+  Time t0 = NOW();
+  Time t1;
+
   if ((expandP_ > 0) != (op == Manifold::OpType::ADD))
     std::cout << "Warning! Result op type not compatible with constructor op "
                  "type: coplanar faces may have incorrect results."
@@ -1070,8 +1080,17 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
       throw std::invalid_argument("invalid enum: OpType.");
   }
 
-  Time t0 = NOW();
-  Time t1;
+  if (w03_.size() == 0) {
+    if (w30_.size() != 0 && op == Manifold::OpType::ADD) {
+      return inQ_;
+    }
+    return Manifold::Impl();
+  } else if (w30_.size() == 0) {
+    if (op == Manifold::OpType::INTERSECT) {
+      return Manifold::Impl();
+    }
+    return inP_;
+  }
 
   // Convert winding numbers to inclusion values based on operation type.
   VecDH<int> i12(x12_.size());
