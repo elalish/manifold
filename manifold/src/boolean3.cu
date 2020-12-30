@@ -56,7 +56,7 @@
  */
 
 // TODO: make this runtime configurable for quicker debug
-constexpr bool kVerbose = false;
+constexpr bool kVerbose = true;
 
 using namespace thrust::placeholders;
 
@@ -824,8 +824,7 @@ void AppendPartialEdges(
   // their original verts and include them based on their winding number (i03),
   // while remaping them to the output using vP2R. Use the verts position
   // projected along the edge vector to pair them up, then distribute these
-  // edges to their faces. Copy any original edges of each face in that are not
-  // in the retained edge map.
+  // edges to their faces.
   VecH<Halfedge> &halfedgeR = outR.halfedge_.H();
   const VecH<glm::vec3> &vertPosP = inP.vertPos_.H();
   const VecH<Halfedge> &halfedgeP = inP.halfedge_.H();
@@ -1207,9 +1206,22 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
 
   // Create the manifold's data structures.
   outR.Face2Tri(faceEdge);
-  outR.LabelVerts();
-  outR.Finish();
+  if (kVerbose) {
+    std::cout << "Time for triangulation";
+    t1 = NOW();
+    PrintDuration(t1 - t0);
+    t0 = t1;
+  }
 
+  outR.LabelVerts();
+  if (kVerbose) {
+    std::cout << "Time for component labeling";
+    t1 = NOW();
+    PrintDuration(t1 - t0);
+    t0 = t1;
+  }
+
+  outR.Finish();
   if (kVerbose) {
     std::cout << "Time for finishing the manifold";
     t1 = NOW();
