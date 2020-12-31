@@ -891,8 +891,8 @@ Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ,
   // Union -> expand inP
   // Difference, Intersection -> contract inP
 
-  Time t0 = NOW();
-  Time t1;
+  Timer filter;
+  filter.Start();
 
   if (inP.IsEmpty() || inQ.IsEmpty() || !inP.bBox_.DoesOverlap(inQ.bBox_)) {
     w03_.resize(inP.NumVert(), 0);
@@ -926,12 +926,9 @@ Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ,
   SparseIndices p1q1 = Filter11(inP_, inQ_, p1q2_, p2q1_);
   if (kVerbose) std::cout << "p1q1 size = " << p1q1.size() << std::endl;
 
-  if (kVerbose) {
-    std::cout << "Time for Filter";
-    t1 = NOW();
-    PrintDuration(t1 - t0);
-    t0 = t1;
-  }
+  filter.Stop();
+  Timer levels;
+  levels.Start();
 
   // Level 2
   // Build up XY-projection intersection of two edges, including the z-value for
@@ -965,29 +962,23 @@ Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ,
       Intersect12(inQ, inP, s20, p2q0, s11, p1q1, z20, xyzz11, p2q1_, false);
   if (kVerbose) std::cout << "x21 size = " << x21_.size() << std::endl;
 
-  if (kVerbose) {
-    std::cout << "Time for Levels 1-3";
-    t1 = NOW();
-    PrintDuration(t1 - t0);
-    t0 = t1;
-  }
-
   // Sum up the winding numbers of all vertices.
   w03_ = Winding03(inP, p0q2, s02, p1q2_, false);
 
   w30_ = Winding03(inQ, p2q0, s20, p2q1_, true);
 
+  levels.Stop();
+
   if (kVerbose) {
-    std::cout << "Time for rest of first stage";
-    t1 = NOW();
-    PrintDuration(t1 - t0);
-    t0 = t1;
+    filter.Print("Filter");
+    levels.Print("Levels 1-3");
+    MemUsage();
   }
 }
 
 Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
-  Time t0 = NOW();
-  Time t1;
+  Timer assemble;
+  assemble.Start();
 
   if ((expandP_ > 0) != (op == Manifold::OpType::ADD))
     std::cout << "Warning! Result op type not compatible with constructor op "
@@ -1133,30 +1124,26 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
   AppendWholeEdges(outR, facePtrR, inQ_, wholeHalfedgeQ, i30, vQ2R,
                    facePQ2R.cptrD() + inP_.NumTri());
 
-  if (kVerbose) {
-    std::cout << "Time for assembling the result";
-    t1 = NOW();
-    PrintDuration(t1 - t0);
-    t0 = t1;
-  }
+  assemble.Stop();
+  Timer triangulate;
+  triangulate.Start();
 
   // Level 6
 
   // Create the manifold's data structures.
   outR.Face2Tri(faceEdge);
-  if (kVerbose) {
-    std::cout << "Time for triangulation";
-    t1 = NOW();
-    PrintDuration(t1 - t0);
-    t0 = t1;
-  }
+
+  triangulate.Stop();
+  Timer finish;
+  finish.Start();
 
   outR.Finish();
+
+  finish.Stop();
   if (kVerbose) {
-    std::cout << "Time for finishing the manifold";
-    t1 = NOW();
-    PrintDuration(t1 - t0);
-    t0 = t1;
+    assemble.Print("Assembly");
+    triangulate.Print("Triangulation");
+    finish.Print("Finishing the manifold");
   }
 
   return outR;

@@ -81,7 +81,12 @@
         "map": "cpp",
         "mutex": "cpp",
         "optional": "cpp",
-        "string_view": "cpp"
+        "string_view": "cpp",
+        "condition_variable": "cpp",
+        "set": "cpp",
+        "memory_resource": "cpp",
+        "random": "cpp",
+        "variant": "cpp"
     },
     "C_Cpp.clang_format_style": "google",
     "C_Cpp.clang_format_fallbackStyle": "google",
