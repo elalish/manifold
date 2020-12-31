@@ -41,15 +41,6 @@ void AlwaysAssert(bool condition, const char* file, int line,
   }
 }
 
-typedef std::chrono::high_resolution_clock::time_point Time;
-
-#define PrintDuration(a)                                                  \
-  std::cout                                                               \
-      << " = "                                                            \
-      << std::chrono::duration_cast<std::chrono::milliseconds>(a).count() \
-      << " ms ----------" << std::endl;
-#define NOW() std::chrono::high_resolution_clock::now()
-
 inline int Signum(float val) { return (val > 0) - (val < 0); }
 
 // Use sind and cosd for inputs in degrees so that multiples of 90 degrees come

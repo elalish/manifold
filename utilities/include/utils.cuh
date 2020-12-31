@@ -25,20 +25,62 @@
 namespace manifold {
 
 inline void MemUsage() {
-#ifdef __CUDA_ARCH__
+#if THRUST_DEVICE_SYSTEM == THRUST_DEVICE_SYSTEM_CUDA
   size_t free, total;
   cudaMemGetInfo(&free, &total);
   std::cout << "Using " << (total - free) / 1048575 << " Mb ("
-            << float(total - free) / total << " %)" << std::endl;
+            << (100 * (total - free)) / total << " %)" << std::endl;
 #endif
 }
 
 inline void CheckDevice() {
-#ifdef __CUDA_ARCH__
+#if THRUST_DEVICE_SYSTEM == THRUST_DEVICE_SYSTEM_CUDA
   cudaError_t error = cudaGetLastError();
   if (error != cudaSuccess) throw std::runtime_error(cudaGetErrorString(error));
 #endif
 }
+
+struct Timer {
+#if THRUST_DEVICE_SYSTEM == THRUST_DEVICE_SYSTEM_CUDA
+  cudaEvent_t start, end;
+
+  Timer() {
+    cudaEventCreate(&start);
+    cudaEventCreate(&end);
+  }
+
+  ~Timer() {
+    cudaEventDestroy(start);
+    cudaEventDestroy(end);
+  }
+
+  void Start() { cudaEventRecord(start, 0); }
+
+  void Stop() { cudaEventRecord(end, 0); }
+
+  float Elapsed() {
+    cudaEventSynchronize(end);
+    float elapsed;
+    cudaEventElapsedTime(&elapsed, start, end);
+    return elapsed;
+  }
+#else
+  std::chrono::high_resolution_clock::time_point start, end;
+
+  void Start() { start = std::chrono::high_resolution_clock::now(); }
+
+  void Stop() { end = std::chrono::high_resolution_clock::now(); }
+
+  float Elapsed() {
+    return std::chrono::duration_cast<std::chrono::milliseconds>(end - start)
+        .count();
+  }
+#endif
+  void Print(std::string message) {
+    std::cout << "----------- " << std::round(Elapsed()) << " ms for "
+              << message << std::endl;
+  }
+};
 
 template <typename... Iters>
 thrust::zip_iterator<thrust::tuple<Iters...>> zip(Iters... iters) {
