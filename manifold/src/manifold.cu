@@ -24,9 +24,10 @@ namespace {
 using namespace manifold;
 using namespace thrust::placeholders;
 
-struct NormalizeTo {
+struct ToSphere {
   float length;
   __host__ __device__ void operator()(glm::vec3& v) {
+    v = glm::cos(glm::half_pi<float>() * (1.0f - v));
     v = length * glm::normalize(v);
     if (isnan(v.x)) v = glm::vec3(0.0);
   }
@@ -81,8 +82,8 @@ Manifold::Manifold() : pImpl_{std::make_unique<Impl>()} {}
 Manifold::Manifold(const Mesh& manifold)
     : pImpl_{std::make_unique<Impl>(manifold)} {}
 Manifold::~Manifold() = default;
-Manifold::Manifold(Manifold&&) = default;
-Manifold& Manifold::operator=(Manifold&&) = default;
+Manifold::Manifold(Manifold&&) noexcept = default;
+Manifold& Manifold::operator=(Manifold&&) noexcept = default;
 
 Manifold::Manifold(const Manifold& other) : pImpl_(new Impl(*other.pImpl_)) {}
 
@@ -92,12 +93,6 @@ Manifold& Manifold::operator=(const Manifold& other) {
   }
   return *this;
 }
-
-/**
- * Since these manifolds include a lot of memory, implicit copying is disabled.
- * Instead this explicit method must be called to remind users of the penalty.
- */
-Manifold Manifold::DeepCopy() const { return *this; }
 
 /**
  * Constructs a tetrahedron centered at the origin with one vertex at (1,1,1)
@@ -167,7 +162,7 @@ Manifold Manifold::Sphere(float radius, int circularSegments) {
   sphere.pImpl_ = std::make_unique<Impl>(Impl::Shape::OCTAHEDRON);
   sphere.pImpl_->Refine(n);
   thrust::for_each_n(sphere.pImpl_->vertPos_.beginD(), sphere.NumVert(),
-                     NormalizeTo({radius}));
+                     ToSphere({radius}));
   sphere.pImpl_->Finish();
   return sphere;
 }
@@ -392,7 +387,7 @@ Manifold Manifold::Compose(const std::vector<Manifold>& manifolds) {
 std::vector<Manifold> Manifold::Decompose() const {
   if (pImpl_->numLabel_ == 1) {
     std::vector<Manifold> meshes(1);
-    meshes[0] = DeepCopy();
+    meshes[0] = *this;
     return meshes;
   }
 
@@ -482,7 +477,7 @@ int Manifold::GetCircularSegments(float radius) {
   return nSeg;
 }
 
-bool Manifold::IsEmpty() const { return NumVert() == 0; }
+bool Manifold::IsEmpty() const { return pImpl_->IsEmpty(); }
 int Manifold::NumVert() const { return pImpl_->NumVert(); }
 int Manifold::NumEdge() const { return pImpl_->NumEdge(); }
 int Manifold::NumTri() const { return pImpl_->NumTri(); }

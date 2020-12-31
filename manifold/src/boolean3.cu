@@ -56,7 +56,7 @@
  */
 
 // TODO: make this runtime configurable for quicker debug
-constexpr bool kVerbose = false;
+constexpr bool kVerbose = true;
 
 using namespace thrust::placeholders;
 
@@ -824,8 +824,7 @@ void AppendPartialEdges(
   // their original verts and include them based on their winding number (i03),
   // while remaping them to the output using vP2R. Use the verts position
   // projected along the edge vector to pair them up, then distribute these
-  // edges to their faces. Copy any original edges of each face in that are not
-  // in the retained edge map.
+  // edges to their faces.
   VecH<Halfedge> &halfedgeR = outR.halfedge_.H();
   const VecH<glm::vec3> &vertPosP = inP.vertPos_.H();
   const VecH<Halfedge> &halfedgeP = inP.halfedge_.H();
@@ -954,6 +953,13 @@ Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ,
 
   Time t0 = NOW();
   Time t1;
+
+  if (inP.IsEmpty() || inQ.IsEmpty() || !inP.bBox_.DoesOverlap(inQ.bBox_)) {
+    w03_.resize(inP.NumVert(), 0);
+    w30_.resize(inQ.NumVert(), 0);
+    return;
+  }
+
   // Level 3
   // Find edge-triangle overlaps (broad phase)
   p1q2_ = inQ_.EdgeCollisions(inP_);
@@ -1042,6 +1048,9 @@ Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ,
 }
 
 Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
+  Time t0 = NOW();
+  Time t1;
+
   if ((expandP_ > 0) != (op == Manifold::OpType::ADD))
     std::cout << "Warning! Result op type not compatible with constructor op "
                  "type: coplanar faces may have incorrect results."
@@ -1070,8 +1079,17 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
       throw std::invalid_argument("invalid enum: OpType.");
   }
 
-  Time t0 = NOW();
-  Time t1;
+  if (w03_.size() == 0) {
+    if (w30_.size() != 0 && op == Manifold::OpType::ADD) {
+      return inQ_;
+    }
+    return Manifold::Impl();
+  } else if (w30_.size() == 0) {
+    if (op == Manifold::OpType::INTERSECT) {
+      return Manifold::Impl();
+    }
+    return inP_;
+  }
 
   // Convert winding numbers to inclusion values based on operation type.
   VecDH<int> i12(x12_.size());
@@ -1188,9 +1206,22 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
 
   // Create the manifold's data structures.
   outR.Face2Tri(faceEdge);
-  outR.LabelVerts();
-  outR.Finish();
+  if (kVerbose) {
+    std::cout << "Time for triangulation";
+    t1 = NOW();
+    PrintDuration(t1 - t0);
+    t0 = t1;
+  }
 
+  outR.LabelVerts();
+  if (kVerbose) {
+    std::cout << "Time for component labeling";
+    t1 = NOW();
+    PrintDuration(t1 - t0);
+    t0 = t1;
+  }
+
+  outR.Finish();
   if (kVerbose) {
     std::cout << "Time for finishing the manifold";
     t1 = NOW();

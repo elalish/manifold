@@ -405,9 +405,30 @@ class Monotones {
   bool IsHole(VertItr vert) {
     VertItr left = vert->left;
     VertItr right = vert->right;
+    VertItr center = vert;
     // TODO: if left or right is Processed(), determine from east/west
-    while (left != right || left == vert) {
-      int isHole = CCW(right->pos, vert->pos, left->pos);
+    while (left != right) {
+      if (Coincident(left->pos, center->pos)) {
+        left = left->left;
+        continue;
+      }
+      if (Coincident(right->pos, center->pos)) {
+        right = right->right;
+        continue;
+      }
+      if (Coincident(left->pos, right->pos)) {
+        vert = center;
+        center = left;
+        left = left->left;
+        if (left == right) break;
+        right = right->right;
+        continue;
+      }
+      int isHole = CCW(right->pos, center->pos, left->pos);
+      if (center != vert) {
+        isHole += CCW(left->pos, center->pos, vert->pos) +
+                  CCW(vert->pos, center->pos, right->pos);
+      }
       if (isHole != 0) return isHole > 0;
 
       if (left->pos.y < right->pos.y) {
@@ -798,6 +819,11 @@ int CCW(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2) {
     return 0;
   else
     return area > 0 ? 1 : -1;
+}
+
+bool Coincident(glm::vec2 p0, glm::vec2 p1) {
+  glm::vec2 sep = p0 - p1;
+  return glm::dot(sep, sep) < params.kTolerance * params.kTolerance;
 }
 
 std::vector<glm::ivec3> Triangulate(const Polygons &polys) {
