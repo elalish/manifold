@@ -615,17 +615,8 @@ void Manifold::Impl::CreateHalfedges(const VecDH<glm::ivec3>& triVerts) {
 }
 
 /**
- * Calculate vertLabels_ by running connected components on the halfedges. This
- * operation is a bit slow and currently CPU-only.
- */
-void Manifold::Impl::LabelVerts() {
-  numLabel_ = ConnectedComponents(vertLabel_, NumVert(), halfedge_);
-}
-
-/**
  * Once halfedge_ has been filled in, this function can be called to create the
- * rest of the internal data structures. If vertLabel_ hasn't been filled in, it
- * is assumed the object is simply-connected and numLabel_ is set to 1.
+ * rest of the internal data structures.
  */
 void Manifold::Impl::Finish() {
   if (halfedge_.size() == 0) return;
@@ -645,11 +636,6 @@ void Manifold::Impl::Finish() {
   ALWAYS_ASSERT(extrema.pairedHalfedge < 2 * NumEdge(), runtimeErr,
                 "Halfedge index exceeds number of halfedges!");
 
-  if (vertLabel_.size() != NumVert()) {
-    vertLabel_.resize(NumVert());
-    numLabel_ = 1;
-    thrust::fill(vertLabel_.beginD(), vertLabel_.endD(), 0);
-  }
   CalculateBBox();
   SortVerts();
   VecDH<Box> faceBox;
@@ -902,9 +888,8 @@ void Manifold::Impl::SortVerts() {
 
   VecDH<int> vertNew2Old(NumVert());
   thrust::sequence(vertNew2Old.beginD(), vertNew2Old.endD());
-  thrust::sort_by_key(
-      vertMorton.beginD(), vertMorton.endD(),
-      zip(vertPos_.beginD(), vertLabel_.beginD(), vertNew2Old.beginD()));
+  thrust::sort_by_key(vertMorton.beginD(), vertMorton.endD(),
+                      zip(vertPos_.beginD(), vertNew2Old.beginD()));
 
   ReindexVerts(vertNew2Old, NumVert());
 }

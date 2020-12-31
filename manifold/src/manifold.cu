@@ -348,13 +348,11 @@ Manifold Manifold::Compose(const std::vector<Manifold>& manifolds) {
   Impl& combined = *(out.pImpl_);
   combined.vertPos_.resize(numVert);
   combined.halfedge_.resize(2 * numEdge);
-  combined.vertLabel_.resize(numVert);
   combined.faceNormal_.resize(NumTri);
 
   int nextVert = 0;
   int nextEdge = 0;
   int nextFace = 0;
-  int nextLabel = 0;
   for (const Manifold& manifold : manifolds) {
     const Impl& impl = *(manifold.pImpl_);
     impl.ApplyTransform();
@@ -363,8 +361,6 @@ Manifold Manifold::Compose(const std::vector<Manifold>& manifolds) {
                  combined.vertPos_.beginD() + nextVert);
     thrust::copy(impl.faceNormal_.beginD(), impl.faceNormal_.endD(),
                  combined.faceNormal_.beginD() + nextFace);
-    thrust::transform(impl.vertLabel_.beginD(), impl.vertLabel_.endD(),
-                      combined.vertLabel_.beginD() + nextVert, _1 + nextLabel);
     thrust::transform(impl.halfedge_.beginD(), impl.halfedge_.endD(),
                       combined.halfedge_.beginD() + nextEdge,
                       UpdateHalfedge({nextVert, nextEdge, nextFace}));
@@ -372,10 +368,8 @@ Manifold Manifold::Compose(const std::vector<Manifold>& manifolds) {
     nextVert += manifold.NumVert();
     nextEdge += 2 * manifold.NumEdge();
     nextFace += manifold.NumTri();
-    nextLabel += impl.numLabel_;
   }
 
-  combined.numLabel_ = nextLabel;
   combined.Finish();
   return out;
 }
@@ -385,21 +379,24 @@ Manifold Manifold::Compose(const std::vector<Manifold>& manifolds) {
  * that are topologically disconnected.
  */
 std::vector<Manifold> Manifold::Decompose() const {
-  if (pImpl_->numLabel_ == 1) {
+  VecDH<int> vertLabel;
+  int numLabel = ConnectedComponents(vertLabel, NumVert(), pImpl_->halfedge_);
+
+  if (numLabel == 1) {
     std::vector<Manifold> meshes(1);
     meshes[0] = *this;
     return meshes;
   }
 
-  std::vector<Manifold> meshes(pImpl_->numLabel_);
-  for (int i = 0; i < pImpl_->numLabel_; ++i) {
+  std::vector<Manifold> meshes(numLabel);
+  for (int i = 0; i < numLabel; ++i) {
     meshes[i].pImpl_->vertPos_.resize(NumVert());
     VecDH<int> vertNew2Old(NumVert());
     int nVert =
         thrust::copy_if(
             zip(pImpl_->vertPos_.beginD(), countAt(0)),
             zip(pImpl_->vertPos_.endD(), countAt(NumVert())),
-            pImpl_->vertLabel_.beginD(),
+            vertLabel.beginD(),
             zip(meshes[i].pImpl_->vertPos_.beginD(), vertNew2Old.beginD()),
             Equals({i})) -
         zip(meshes[i].pImpl_->vertPos_.beginD(), countAt(0));
@@ -408,10 +405,11 @@ std::vector<Manifold> Manifold::Decompose() const {
     VecDH<int> faceNew2Old(NumTri());
     thrust::sequence(faceNew2Old.beginD(), faceNew2Old.endD());
 
-    int nFace = thrust::remove_if(faceNew2Old.beginD(), faceNew2Old.endD(),
-                                  RemoveFace({pImpl_->halfedge_.cptrD(),
-                                              pImpl_->vertLabel_.cptrD(), i})) -
-                faceNew2Old.beginD();
+    int nFace =
+        thrust::remove_if(
+            faceNew2Old.beginD(), faceNew2Old.endD(),
+            RemoveFace({pImpl_->halfedge_.cptrD(), vertLabel.cptrD(), i})) -
+        faceNew2Old.beginD();
     faceNew2Old.resize(nFace);
 
     meshes[i].pImpl_->GatherFaces(pImpl_->halfedge_, faceNew2Old);

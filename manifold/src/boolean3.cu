@@ -32,7 +32,6 @@
 #include <map>
 
 #include "boolean3.cuh"
-#include "connected_components.cuh"
 #include "polygon.h"
 
 /**
@@ -56,7 +55,7 @@
  */
 
 // TODO: make this runtime configurable for quicker debug
-constexpr bool kVerbose = true;
+constexpr bool kVerbose = false;
 
 using namespace thrust::placeholders;
 
@@ -102,49 +101,6 @@ __host__ __device__ glm::vec4 Intersect(const glm::vec3 &pL,
   xyzz.z = (useL ? pL.z : pR.z) + lambda * (pR.z - pL.z);
   xyzz.w = (useL ? qL.z : qR.z) + lambda * (qR.z - qL.z);
   return xyzz;
-}
-
-struct MarkEdgeVerts {
-  int *verts;
-  const Halfedge *halfedges;
-
-  __host__ __device__ void operator()(int edge) {
-    int vert = halfedges[edge].startVert;
-    verts[vert] = vert;
-    vert = halfedges[edge].endVert;
-    verts[vert] = vert;
-  }
-};
-
-SparseIndices Filter02(const Manifold::Impl &inP, const Manifold::Impl &inQ,
-                       const VecDH<int> &edges) {
-  // find inP's involved vertices from edges collisions
-  VecDH<int> p0(inP.NumVert(), -1);
-  // We keep the verts unique by marking the ones we want to keep
-  // with their own index in parallel (collisions don't matter because any given
-  // element is always being written with the same value). Any that are still
-  // initialized to -1 are not involved and can be removed.
-  thrust::for_each_n(edges.beginD(), edges.size(),
-                     MarkEdgeVerts({p0.ptrD(), inP.halfedge_.cptrD()}));
-
-  // find one vertex from each connected component of inP (in case it has no
-  // intersections)
-  for (int i = 0; i < inP.numLabel_; ++i) {
-    int vert = thrust::find(inP.vertLabel_.beginD(), inP.vertLabel_.endD(), i) -
-               inP.vertLabel_.beginD();
-    p0.H()[vert] = vert;
-  }
-
-  p0.resize(thrust::remove(p0.beginD(), p0.endD(), -1) - p0.beginD());
-  // find which inQ faces shadow these vertices
-  VecDH<glm::vec3> vertPosP(p0.size());
-  thrust::gather(p0.beginD(), p0.endD(), inP.vertPos_.cbeginD(),
-                 vertPosP.beginD());
-  SparseIndices p0q2 = inQ.VertexCollisionsZ(vertPosP);
-  VecDH<int> i02temp(p0q2.size());
-  thrust::copy(p0q2.beginD(0), p0q2.endD(0), i02temp.beginD());
-  thrust::gather(i02temp.beginD(), i02temp.endD(), p0.beginD(), p0q2.beginD(0));
-  return p0q2;
 }
 
 struct CopyFaceEdges {
@@ -558,14 +514,8 @@ std::tuple<VecDH<int>, VecDH<glm::vec3>> Intersect12(
 
 VecDH<int> Winding03(const Manifold::Impl &inP, SparseIndices &p0q2,
                      VecDH<int> &s02, const SparseIndices &p1q2, bool reverse) {
-  VecDH<int> w03(inP.NumVert(), kInvalidInt);
-  // keepEdgesP is the set of edges that connect regions of the manifold with
-  // the same winding number, so we remove any edges associated with
-  // intersections.
-  VecDH<bool> keepEdgesP(inP.halfedge_.size(), true);
-  thrust::scatter(thrust::make_constant_iterator(false, 0),
-                  thrust::make_constant_iterator(false, p1q2.size()),
-                  p1q2.beginD(reverse), keepEdgesP.beginD());
+  // verts that are not shadowed (not in p0q2) have winding number zero.
+  VecDH<int> w03(inP.NumVert(), 0);
 
   if (!thrust::is_sorted(p0q2.beginD(reverse), p0q2.endD(reverse)))
     thrust::sort_by_key(p0q2.beginD(reverse), p0q2.endD(reverse), s02.beginD());
@@ -577,16 +527,6 @@ VecDH<int> Winding03(const Manifold::Impl &inP, SparseIndices &p0q2,
                             s02.beginD(), w03vert.beginD(), w03val.beginD());
   thrust::scatter(w03val.beginD(), endPair.second, w03vert.beginD(),
                   w03.beginD());
-
-  // find connected regions (separated by intersections)
-  VecDH<int> vertLabels;
-  int n_comp =
-      ConnectedComponents(vertLabels, inP.NumVert(), inP.halfedge_, keepEdgesP);
-  // flood the w03 values throughout their connected components (they are
-  // consistent)
-  FloodComponents(w03, vertLabels, n_comp);
-
-  if (kVerbose) std::cout << n_comp << " components" << std::endl;
 
   if (reverse)
     thrust::transform(w03.beginD(), w03.endD(), w03.beginD(),
@@ -972,12 +912,12 @@ Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ,
   if (kVerbose) std::cout << "p2q1 size = " << p2q1_.size() << std::endl;
 
   // Level 2
-  // Find vertices from Level 3 that overlap faces in XY-projection
-  SparseIndices p0q2 = Filter02(inP_, inQ_, p1q2_.Get(0));
+  // Find vertices that overlap faces in XY-projection
+  SparseIndices p0q2 = inQ.VertexCollisionsZ(inP.vertPos_);
   p0q2.Sort();
   if (kVerbose) std::cout << "p0q2 size = " << p0q2.size() << std::endl;
 
-  SparseIndices p2q0 = Filter02(inQ_, inP_, p2q1_.Get(1));
+  SparseIndices p2q0 = inP.VertexCollisionsZ(inQ.vertPos_);
   p2q0.SwapPQ();
   p2q0.Sort();
   if (kVerbose) std::cout << "p2q0 size = " << p2q0.size() << std::endl;
@@ -1032,9 +972,7 @@ Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ,
     t0 = t1;
   }
 
-  // Build up the winding numbers of all vertices. The involved vertices are
-  // calculated from Level 2, while the rest are assigned consistently with
-  // connected-components flooding.
+  // Sum up the winding numbers of all vertices.
   w03_ = Winding03(inP, p0q2, s02, p1q2_, false);
 
   w30_ = Winding03(inQ, p2q0, s20, p2q1_, true);
@@ -1208,14 +1146,6 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
   outR.Face2Tri(faceEdge);
   if (kVerbose) {
     std::cout << "Time for triangulation";
-    t1 = NOW();
-    PrintDuration(t1 - t0);
-    t0 = t1;
-  }
-
-  outR.LabelVerts();
-  if (kVerbose) {
-    std::cout << "Time for component labeling";
     t1 = NOW();
     PrintDuration(t1 - t0);
     t0 = t1;
