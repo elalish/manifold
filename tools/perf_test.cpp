@@ -20,16 +20,14 @@
 using namespace manifold;
 
 int main(int argc, char **argv) {
-  std::vector<double> times;
   for (int i = 0; i < 8; ++i) {
-    Manifold sphere = Manifold::Sphere(1.0f, (8 << i) * 4);
-    Manifold sphere2 = sphere.DeepCopy();
+    Manifold sphere = Manifold::Sphere(1, (8 << i) * 4);
+    Manifold sphere2 = sphere;
     sphere2.Translate(glm::vec3(0.5));
     auto start = std::chrono::high_resolution_clock::now();
-    Manifold diff = sphere.Boolean(sphere2, Manifold::OpType::SUBTRACT);
+    Manifold diff = sphere - sphere2;
     auto end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsed = end - start;
-    times.push_back(elapsed.count());
     std::cout << "nTri = " << sphere.NumTri() << ", time = " << elapsed.count()
               << " sec" << std::endl;
   }

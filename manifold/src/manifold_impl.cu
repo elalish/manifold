@@ -40,10 +40,9 @@ using namespace manifold;
  */
 constexpr float kTolerance = 1e-5;
 
-struct NormalizeTo {
-  float length;
+struct Normalize {
   __host__ __device__ void operator()(glm::vec3& v) {
-    v = length * glm::normalize(v);
+    v = glm::normalize(v);
     if (isnan(v.x)) v = glm::vec3(0.0);
   }
 };
@@ -1000,7 +999,7 @@ void Manifold::Impl::CalculateNormals() {
   thrust::for_each_n(zip(faceNormal_.beginD(), countAt(0)), NumTri(),
                      AssignNormals({vertNormal_.ptrD(), vertPos_.cptrD(),
                                     halfedge_.cptrD(), calculateTriNormal}));
-  thrust::for_each(vertNormal_.begin(), vertNormal_.end(), NormalizeTo({1.0}));
+  thrust::for_each(vertNormal_.begin(), vertNormal_.end(), Normalize());
 }
 
 /**

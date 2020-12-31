@@ -52,4 +52,6 @@ Manifold StretchyBracelet(float radius = 30.0f, float height = 8.0f,
 
 // The classic cubic fractal, going down recursively n times.
 Manifold MengerSponge(int n = 3);
+
+Manifold RoundedFrame(float edgeLength, float radius);
 }  // namespace manifold

@@ -21,9 +21,8 @@ using namespace manifold;
 void Fractal(std::vector<Manifold>& holes, Manifold& hole, float w,
              glm::vec2 position, int depth, int maxDepth) {
   w /= 3;
-  holes.push_back(std::move(hole.DeepCopy()
-                                .Scale({w, w, 1.0f})
-                                .Translate(glm::vec3(position, 0.0f))));
+  holes.emplace_back(hole);
+  holes.back().Scale({w, w, 1.0f}).Translate(glm::vec3(position, 0.0f));
   if (depth == maxDepth) return;
 
   glm::vec2 offsets[8] = {{-w, -w}, {-w, 0.0f}, {-w, w}, {0.0f, w},
