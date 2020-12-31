@@ -1,0 +1,21 @@
+2020-12-27
+CPU: 
+nTri = 512, time = 0.0177404 sec
+nTri = 2048, time = 0.020182 sec
+nTri = 8192, time = 0.0350801 sec
+nTri = 32768, time = 0.090847 sec
+nTri = 131072, time = 0.335753 sec
+nTri = 524288, time = 1.17349 sec
+nTri = 2097152, time = 4.96713 sec
+nTri = 8388608, time = 20.4223 sec
+
+GPU:
+nTri = 512, time = 0.00922685 sec
+nTri = 2048, time = 0.012492 sec
+nTri = 8192, time = 0.0244057 sec
+nTri = 32768, time = 0.0681854 sec
+nTri = 131072, time = 0.24731 sec
+nTri = 524288, time = 0.925412 sec
+nTri = 2097152, time = 3.58953 sec
+nTri = 8388608, time = 14.0618 sec
+

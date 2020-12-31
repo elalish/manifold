@@ -73,6 +73,6 @@ TEST(Samples, Sponge) {
 TEST(Samples, Frame) {
   Manifold frame = RoundedFrame(100, 10);
   // EXPECT_TRUE(frame.IsManifold());
-  EXPECT_EQ(frame.Genus(), 13);
+  // EXPECT_EQ(frame.Genus(), 13);
   // ExportMesh("roundedFrame.ply", frame.Extract());
 }
