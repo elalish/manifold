@@ -702,7 +702,7 @@ void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge) {
 
   VecH<glm::ivec3>& triVerts = triVertsOut.H();
   VecH<glm::vec3>& triNormal = triNormalOut.H();
-  VecH<glm::vec3>& vertPos = vertPos_.H();
+  const VecH<glm::vec3>& vertPos = vertPos_.H();
   const VecH<int>& face = faceEdge.H();
   const VecH<Halfedge>& halfedge = halfedge_.H();
   const VecH<glm::vec3>& faceNormal = faceNormal_.H();
@@ -714,7 +714,7 @@ void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge) {
     ALWAYS_ASSERT(numEdge >= 3, logicErr, "face has less than three edges.");
     const glm::vec3 normal = faceNormal[i];
 
-    if (numEdge == 3) {  // Special case to increase performance
+    if (numEdge == 3) {  // Single triangle
       glm::ivec3 tri(halfedge[edge].startVert, halfedge[edge + 1].startVert,
                      halfedge[edge + 2].startVert);
       glm::ivec3 ends(halfedge[edge].endVert, halfedge[edge + 1].endVert,
@@ -727,6 +727,49 @@ void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge) {
                     runtimeErr, "These 3 edges do not form a triangle!");
 
       triVerts.push_back(tri);
+      triNormal.push_back(normal);
+    } else if (numEdge == 4) {  // Pair of triangles
+      const glm::mat3x2 projection = GetAxisAlignedProjection(normal);
+      auto triCCW = [&projection, &vertPos](const glm::ivec3 tri) {
+        return CCW(projection * vertPos[tri[0]], projection * vertPos[tri[1]],
+                   projection * vertPos[tri[2]]) >= 0;
+      };
+
+      glm::ivec3 tri0(halfedge[edge].startVert, halfedge[edge].endVert, -1);
+      glm::ivec3 tri1(-1, -1, tri0[0]);
+      for (const int i : {1, 2, 3}) {
+        if (halfedge[edge + i].startVert == tri0[1]) {
+          tri0[2] = halfedge[edge + i].endVert;
+          tri1[0] = tri0[2];
+        }
+        if (halfedge[edge + i].endVert == tri0[0]) {
+          tri1[1] = halfedge[edge + i].startVert;
+        }
+      }
+      ALWAYS_ASSERT(glm::all(glm::greaterThanEqual(tri0, glm::ivec3(0))) &&
+                        glm::all(glm::greaterThanEqual(tri1, glm::ivec3(0))),
+                    runtimeErr, "non-manifold quad!");
+      bool firstValid = triCCW(tri0) && triCCW(tri1);
+      tri0[2] = tri1[1];
+      tri1[2] = tri0[1];
+      bool secondValid = triCCW(tri0) && triCCW(tri1);
+
+      if (!secondValid) {
+        tri0[2] = tri1[0];
+        tri1[2] = tri0[0];
+      } else if (firstValid) {
+        glm::vec3 firstCross = vertPos[tri0[0]] - vertPos[tri1[0]];
+        glm::vec3 secondCross = vertPos[tri0[1]] - vertPos[tri1[1]];
+        if (glm::dot(firstCross, firstCross) <
+            glm::dot(secondCross, secondCross)) {
+          tri0[2] = tri1[0];
+          tri1[2] = tri0[0];
+        }
+      }
+
+      triVerts.push_back(tri0);
+      triNormal.push_back(normal);
+      triVerts.push_back(tri1);
       triNormal.push_back(normal);
     } else {  // General triangulation
       const glm::mat3x2 projection = GetAxisAlignedProjection(normal);

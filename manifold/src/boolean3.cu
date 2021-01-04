@@ -895,6 +895,7 @@ Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ,
   filter.Start();
 
   if (inP.IsEmpty() || inQ.IsEmpty() || !inP.bBox_.DoesOverlap(inQ.bBox_)) {
+    if (kVerbose) std::cout << "No overlap, early out" << std::endl;
     w03_.resize(inP.NumVert(), 0);
     w30_.resize(inQ.NumVert(), 0);
     return;
