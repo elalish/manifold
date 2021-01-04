@@ -40,3 +40,24 @@ nTri = 524288, time = 0.388469 sec
 nTri = 2097152, time = 1.44631 sec
 nTri = 8388608, time = 5.5323 sec
 
+2021-01-03
+CPU:
+nTri = 512, time = 0.0199636 sec
+nTri = 2048, time = 0.0189914 sec
+nTri = 8192, time = 0.0318973 sec
+nTri = 32768, time = 0.0800193 sec
+nTri = 131072, time = 0.289744 sec
+nTri = 524288, time = 1.022 sec
+nTri = 2097152, time = 4.82382 sec
+nTri = 8388608, time = 21.6896 sec
+
+GPU:
+nTri = 512, time = 0.0072105 sec
+nTri = 2048, time = 0.00880571 sec
+nTri = 8192, time = 0.0144722 sec
+nTri = 32768, time = 0.0313637 sec
+nTri = 131072, time = 0.0924161 sec
+nTri = 524288, time = 0.334457 sec
+nTri = 2097152, time = 1.22776 sec
+nTri = 8388608, time = 4.8952 sec
+
