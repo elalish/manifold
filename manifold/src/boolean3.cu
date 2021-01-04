@@ -55,7 +55,7 @@
  */
 
 // TODO: make this runtime configurable for quicker debug
-constexpr bool kVerbose = true;
+constexpr bool kVerbose = false;
 
 using namespace thrust::placeholders;
 
