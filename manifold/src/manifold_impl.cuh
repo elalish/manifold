@@ -61,9 +61,7 @@ struct Manifold::Impl {
   SparseIndices EdgeCollisions(const Impl& B) const;
   SparseIndices VertexCollisionsZ(const VecDH<glm::vec3>& vertsIn) const;
   void GetFaceBoxMorton(VecDH<Box>& faceBox, VecDH<uint32_t>& faceMorton) const;
-  VecH<int> AssembleFaces(const VecH<int>& faceEdge) const;
   Polygons Face2Polygons(int face, glm::mat3x2 projection,
-                         const VecH<int>& faceEdge,
-                         const VecH<int>& nextHalfedge) const;
+                         const VecH<int>& faceEdge) const;
 };
 }  // namespace manifold

@@ -687,61 +687,6 @@ void Manifold::Impl::ApplyTransform() {
 }
 
 /**
- * This returns the nextHalfedge_ vector indicating how the halfedges connect
- * to each other going CCW around a face. This data cannot be stored by simply
- * sorting the halfedges, as the faces may be polygons with holes.
- *
- * TODO: This function is slow and should be moved from CPU to GPU.
- */
-VecH<int> Manifold::Impl::AssembleFaces(const VecH<int>& faceEdge) const {
-  VecH<int> nextHalfedge(halfedge_.size());
-  const VecH<Halfedge>& halfedge = halfedge_.H();
-
-  for (int face = 0; face < faceEdge.size() - 1; ++face) {
-    int edge = faceEdge[face];
-    const int nEdge = faceEdge[face + 1] - edge;
-    ALWAYS_ASSERT(nEdge >= 3, runtimeErr, "face has less than three edges.");
-    if (nEdge == 3) {
-      const bool forward =
-          halfedge[edge].endVert == halfedge[edge + 1].startVert;
-      const int edge1 = edge + (forward ? 1 : 2);
-      const int edge2 = edge + (forward ? 2 : 1);
-      ALWAYS_ASSERT(halfedge[edge].endVert == halfedge[edge1].startVert &&
-                        halfedge[edge1].endVert == halfedge[edge2].startVert &&
-                        halfedge[edge2].endVert == halfedge[edge].startVert,
-                    runtimeErr, "triangle does not assemble.");
-      nextHalfedge[edge] = edge1;
-      nextHalfedge[edge1] = edge2;
-      nextHalfedge[edge2] = edge;
-      continue;
-    }
-    std::map<int, int> vert_edge;
-    for (; edge < faceEdge[face + 1]; ++edge) {
-      ALWAYS_ASSERT(
-          vert_edge.emplace(std::make_pair(halfedge[edge].startVert, edge))
-              .second,
-          runtimeErr, "face has duplicate vertices.");
-    }
-
-    int startEdge = 0;
-    int thisEdge = startEdge;
-    while (1) {
-      if (thisEdge == startEdge) {
-        if (vert_edge.empty()) break;
-        startEdge = vert_edge.begin()->second;
-        thisEdge = startEdge;
-      }
-      const auto result = vert_edge.find(halfedge[thisEdge].endVert);
-      ALWAYS_ASSERT(result != vert_edge.end(), runtimeErr, "nonmanifold edge");
-      nextHalfedge[thisEdge] = result->second;
-      thisEdge = result->second;
-      vert_edge.erase(result);
-    }
-  }
-  return nextHalfedge;
-}
-
-/**
  * Triangulates the faces. In this case, the halfedge_ vector is not yet a set
  * of triangles as required by this data structure, but is instead a set of
  * general faces with the input faceEdge vector having length of the number of
@@ -757,11 +702,10 @@ void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge) {
 
   VecH<glm::ivec3>& triVerts = triVertsOut.H();
   VecH<glm::vec3>& triNormal = triNormalOut.H();
-  VecH<glm::vec3>& vertPos = vertPos_.H();
+  const VecH<glm::vec3>& vertPos = vertPos_.H();
   const VecH<int>& face = faceEdge.H();
   const VecH<Halfedge>& halfedge = halfedge_.H();
   const VecH<glm::vec3>& faceNormal = faceNormal_.H();
-  const VecH<int> nextHalfedge = AssembleFaces(face);
 
   for (int i = 0; i < face.size() - 1; ++i) {
     const int edge = face[i];
@@ -770,7 +714,7 @@ void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge) {
     ALWAYS_ASSERT(numEdge >= 3, logicErr, "face has less than three edges.");
     const glm::vec3 normal = faceNormal[i];
 
-    if (numEdge == 3) {  // Special case to increase performance
+    if (numEdge == 3) {  // Single triangle
       glm::ivec3 tri(halfedge[edge].startVert, halfedge[edge + 1].startVert,
                      halfedge[edge + 2].startVert);
       glm::ivec3 ends(halfedge[edge].endVert, halfedge[edge + 1].endVert,
@@ -784,9 +728,52 @@ void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge) {
 
       triVerts.push_back(tri);
       triNormal.push_back(normal);
+    } else if (numEdge == 4) {  // Pair of triangles
+      const glm::mat3x2 projection = GetAxisAlignedProjection(normal);
+      auto triCCW = [&projection, &vertPos](const glm::ivec3 tri) {
+        return CCW(projection * vertPos[tri[0]], projection * vertPos[tri[1]],
+                   projection * vertPos[tri[2]]) >= 0;
+      };
+
+      glm::ivec3 tri0(halfedge[edge].startVert, halfedge[edge].endVert, -1);
+      glm::ivec3 tri1(-1, -1, tri0[0]);
+      for (const int i : {1, 2, 3}) {
+        if (halfedge[edge + i].startVert == tri0[1]) {
+          tri0[2] = halfedge[edge + i].endVert;
+          tri1[0] = tri0[2];
+        }
+        if (halfedge[edge + i].endVert == tri0[0]) {
+          tri1[1] = halfedge[edge + i].startVert;
+        }
+      }
+      ALWAYS_ASSERT(glm::all(glm::greaterThanEqual(tri0, glm::ivec3(0))) &&
+                        glm::all(glm::greaterThanEqual(tri1, glm::ivec3(0))),
+                    runtimeErr, "non-manifold quad!");
+      bool firstValid = triCCW(tri0) && triCCW(tri1);
+      tri0[2] = tri1[1];
+      tri1[2] = tri0[1];
+      bool secondValid = triCCW(tri0) && triCCW(tri1);
+
+      if (!secondValid) {
+        tri0[2] = tri1[0];
+        tri1[2] = tri0[0];
+      } else if (firstValid) {
+        glm::vec3 firstCross = vertPos[tri0[0]] - vertPos[tri1[0]];
+        glm::vec3 secondCross = vertPos[tri0[1]] - vertPos[tri1[1]];
+        if (glm::dot(firstCross, firstCross) <
+            glm::dot(secondCross, secondCross)) {
+          tri0[2] = tri1[0];
+          tri1[2] = tri0[0];
+        }
+      }
+
+      triVerts.push_back(tri0);
+      triNormal.push_back(normal);
+      triVerts.push_back(tri1);
+      triNormal.push_back(normal);
     } else {  // General triangulation
       const glm::mat3x2 projection = GetAxisAlignedProjection(normal);
-      Polygons polys = Face2Polygons(i, projection, face, nextHalfedge);
+      Polygons polys = Face2Polygons(i, projection, face);
 
       std::vector<glm::ivec3> newTris = Triangulate(polys);
 
@@ -1019,30 +1006,37 @@ SparseIndices Manifold::Impl::VertexCollisionsZ(
  * projection of the vertices.
  */
 Polygons Manifold::Impl::Face2Polygons(int face, glm::mat3x2 projection,
-                                       const VecH<int>& faceEdge,
-                                       const VecH<int>& nextHalfedge) const {
-  const VecH<Halfedge>& halfedge = halfedge_.H();
+                                       const VecH<int>& faceEdge) const {
   const VecH<glm::vec3>& vertPos = vertPos_.H();
+  const VecH<Halfedge>& halfedge = halfedge_.H();
   const int firstEdge = faceEdge[face];
   const int lastEdge = faceEdge[face + 1];
 
+  std::map<int, int> vert_edge;
+  for (int edge = firstEdge; edge < faceEdge[face + 1]; ++edge) {
+    ALWAYS_ASSERT(
+        vert_edge.emplace(std::make_pair(halfedge[edge].startVert, edge))
+            .second,
+        runtimeErr, "face has duplicate vertices.");
+  }
+
   Polygons polys;
-  std::vector<bool> visited(lastEdge - firstEdge, false);
-  int startEdge = firstEdge;
-  int thisEdge = firstEdge;
+  int startEdge = 0;
+  int thisEdge = startEdge;
   while (1) {
     if (thisEdge == startEdge) {
-      auto next = std::find(visited.begin(), visited.end(), false);
-      if (next == visited.end()) break;
-      startEdge = next - visited.begin() + firstEdge;
+      if (vert_edge.empty()) break;
+      startEdge = vert_edge.begin()->second;
       thisEdge = startEdge;
       polys.push_back({});
     }
     int vert = halfedge[thisEdge].startVert;
     polys.back().push_back({projection * vertPos[vert], vert,
                             halfedge[halfedge[thisEdge].pairedHalfedge].face});
-    visited[thisEdge - firstEdge] = true;
-    thisEdge = nextHalfedge[thisEdge];
+    const auto result = vert_edge.find(halfedge[thisEdge].endVert);
+    ALWAYS_ASSERT(result != vert_edge.end(), runtimeErr, "nonmanifold edge");
+    thisEdge = result->second;
+    vert_edge.erase(result);
   }
   return polys;
 }
