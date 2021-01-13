@@ -1129,7 +1129,8 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
   Timer triangulate;
   triangulate.Start();
 
-  ALWAYS_ASSERT(outR.IsManifold(), runtimeErr, "polygon mesh is not manifold!");
+  if (!outR.IsManifold())
+    std::cout << "polygon mesh is not manifold!" << std::endl;
 
   // Level 6
 
@@ -1148,6 +1149,9 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
     triangulate.Print("Triangulation");
     finish.Print("Finishing the manifold");
   }
+
+  if (!outR.IsManifold())
+    std::cout << "triangle mesh is not manifold!" << std::endl;
 
   return outR;
 }
