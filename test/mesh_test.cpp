@@ -252,6 +252,28 @@ TEST(Manifold, MultiCoplanar) {
   EXPECT_NEAR(prop.surfaceArea, 2.76, 1e-5);
 }
 
+TEST(Manifold, EdgeUnion) {
+  Manifold cubes = Manifold::Cube();
+  auto propIn = cubes.GetProperties();
+  Manifold cube2 = cubes;
+  cubes += cube2.Translate({1, 1, 0});
+  EXPECT_EQ(cubes.Genus(), 0);
+  auto prop = cubes.GetProperties();
+  EXPECT_FLOAT_EQ(prop.volume, 2 * propIn.volume);
+  EXPECT_FLOAT_EQ(prop.surfaceArea, 2 * propIn.surfaceArea);
+}
+
+TEST(Manifold, CornerUnion) {
+  Manifold cubes = Manifold::Cube();
+  auto propIn = cubes.GetProperties();
+  Manifold cube2 = cubes;
+  cubes += cube2.Translate({1, 1, 1});
+  EXPECT_EQ(cubes.Genus(), 0);
+  auto prop = cubes.GetProperties();
+  EXPECT_FLOAT_EQ(prop.volume, 2 * propIn.volume);
+  EXPECT_FLOAT_EQ(prop.surfaceArea, 2 * propIn.surfaceArea);
+}
+
 /**
  * These tests verify that the spliting helper functions return meshes with
  * volumes that make sense.
@@ -303,6 +325,29 @@ TEST(Manifold, BooleanVug) {
   auto prop = half.GetProperties();
   EXPECT_FLOAT_EQ(prop.volume, 4.0 * 4.0 * 3.0 - 1.0);
   EXPECT_FLOAT_EQ(prop.surfaceArea, 16.0 * 2 + 12.0 * 4 + 6.0);
+}
+
+TEST(Manifold, BooleanEmpty) {
+  Manifold cube = Manifold::Cube();
+  float cubeVol = cube.GetProperties().volume;
+  Manifold empty;
+
+  EXPECT_EQ((cube + empty).GetProperties().volume, cubeVol);
+  EXPECT_EQ((cube - empty).GetProperties().volume, cubeVol);
+  EXPECT_TRUE((empty - cube).IsEmpty());
+  EXPECT_TRUE((cube ^ empty).IsEmpty());
+}
+
+TEST(Manifold, BooleanNonIntersecting) {
+  Manifold cube1 = Manifold::Cube();
+  float vol1 = cube1.GetProperties().volume;
+  Manifold cube2 = cube1;
+  cube2.Scale(glm::vec3(2)).Translate({3, 0, 0});
+  float vol2 = cube2.GetProperties().volume;
+
+  EXPECT_EQ((cube1 + cube2).GetProperties().volume, vol1 + vol2);
+  EXPECT_EQ((cube1 - cube2).GetProperties().volume, vol1);
+  EXPECT_TRUE((cube1 ^ cube2).IsEmpty());
 }
 
 /**

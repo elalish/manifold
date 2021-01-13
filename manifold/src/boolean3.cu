@@ -1129,6 +1129,8 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
   Timer triangulate;
   triangulate.Start();
 
+  ALWAYS_ASSERT(outR.IsManifold(), runtimeErr, "polygon mesh is not manifold!");
+
   // Level 6
 
   // Create the manifold's data structures.

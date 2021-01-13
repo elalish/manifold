@@ -87,7 +87,7 @@ Polygons Duplicate(Polygons polys) {
 
 void TestPoly(const Polygons &polys, int expectedNumTri) {
   //   PolygonParams().verbose = true;
-  //   PolygonParams().intermediateChecks = true;
+  PolygonParams().intermediateChecks = true;
 
   std::vector<glm::ivec3> triangles;
   EXPECT_NO_THROW(triangles = Triangulate(polys));
@@ -249,6 +249,25 @@ TEST(Polygon, Concave) {
       {glm::vec2(-1, 0), 8, 6},                    //
   });
   TestPoly(polys, 7);
+}
+
+TEST(Polygon, Concave2) {
+  Polygons polys;
+  polys.push_back({
+      {glm::vec2(4, 0), 1, Edge::kNoIdx},    //
+      {glm::vec2(3, 2), 3, Edge::kNoIdx},    //
+      {glm::vec2(3, 3), 4, Edge::kNoIdx},    //
+      {glm::vec2(6, 5), 6, Edge::kNoIdx},    //
+      {glm::vec2(6, 14), 13, Edge::kNoIdx},  //
+      {glm::vec2(0, 13), 12, Edge::kNoIdx},  //
+      {glm::vec2(0, 12), 11, Edge::kNoIdx},  //
+      {glm::vec2(3, 11), 10, Edge::kNoIdx},  //
+      {glm::vec2(4, 10), 9, Edge::kNoIdx},   //
+      {glm::vec2(5, 8), 8, Edge::kNoIdx},    //
+      {glm::vec2(1, 7), 7, Edge::kNoIdx},    //
+      {glm::vec2(2, 1), 2, Edge::kNoIdx},    //
+  });
+  TestPoly(polys, 10);
 }
 
 TEST(Polygon, Sliver) {
@@ -558,6 +577,21 @@ TEST(Polygon, Degenerate4) {
       {glm::vec2(0.636729717, 9.94429302), 340, 436},    //
   });
   TestPoly(polys, 2);
+}
+
+TEST(Polygon, Degenerate5) {
+  Polygons polys;
+  polys.push_back({
+      {glm::vec2(1, 0), 3, 5},    //
+      {glm::vec2(1, 1), 7, 10},   //
+      {glm::vec2(1, 1), 15, 17},  //
+      {glm::vec2(1, 1), 23, 16},  //
+      {glm::vec2(1, 1), 21, 12},  //
+      {glm::vec2(0, 1), 22, 14},  //
+      {glm::vec2(0, 1), 14, 10},  //
+      {glm::vec2(0, 1), 6, 3},    //
+  });
+  TestPoly(polys, 6);
 }
 
 TEST(Polygon, Tricky) {
