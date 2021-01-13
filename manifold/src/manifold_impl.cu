@@ -769,7 +769,17 @@ void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge) {
       triNormal.push_back(normal);
     } else {  // General triangulation
       const glm::mat3x2 projection = GetAxisAlignedProjection(normal);
-      Polygons polys = Face2Polygons(i, projection, face);
+
+      Polygons polys;
+      try {
+        polys = Face2Polygons(i, projection, face);
+      } catch (const std::exception& e) {
+        std::cout << e.what() << std::endl;
+        for (int edge = face[i]; edge < face[i + 1]; ++edge)
+          std::cout << "halfedge: " << edge << ", " << halfedge[edge]
+                    << std::endl;
+        throw;
+      }
 
       std::vector<glm::ivec3> newTris = Triangulate(polys);
 
@@ -1009,7 +1019,7 @@ Polygons Manifold::Impl::Face2Polygons(int face, glm::mat3x2 projection,
   const int lastEdge = faceEdge[face + 1];
 
   std::map<int, int> vert_edge;
-  for (int edge = firstEdge; edge < faceEdge[face + 1]; ++edge) {
+  for (int edge = firstEdge; edge < lastEdge; ++edge) {
     ALWAYS_ASSERT(
         vert_edge.emplace(std::make_pair(halfedge[edge].startVert, edge))
             .second,
