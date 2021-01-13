@@ -486,18 +486,14 @@ struct EdgeBox {
 struct CheckManifold {
   const Halfedge* halfedges;
 
-  __host__ __device__ bool operator()(int face) {
+  __host__ __device__ bool operator()(int edge) {
     bool good = true;
-    for (const int i : {0, 1, 2}) {
-      const int edge = 3 * face + i;
-      const Halfedge halfedge = halfedges[edge];
-      const Halfedge paired = halfedges[halfedge.pairedHalfedge];
-      good &= halfedge.face == face;
-      good &= paired.pairedHalfedge == edge;
-      good &= halfedge.startVert != halfedge.endVert;
-      good &= halfedge.startVert == paired.endVert;
-      good &= halfedge.endVert == paired.startVert;
-    }
+    const Halfedge halfedge = halfedges[edge];
+    const Halfedge paired = halfedges[halfedge.pairedHalfedge];
+    good &= paired.pairedHalfedge == edge;
+    good &= halfedge.startVert != halfedge.endVert;
+    good &= halfedge.startVert == paired.endVert;
+    good &= halfedge.endVert == paired.startVert;
     return good;
   }
 };
@@ -825,7 +821,7 @@ void Manifold::Impl::Refine(int n) {
  */
 bool Manifold::Impl::IsManifold() const {
   if (halfedge_.size() == 0) return true;
-  bool isManifold = thrust::all_of(countAt(0), countAt(NumTri()),
+  bool isManifold = thrust::all_of(countAt(0), countAt(halfedge_.size()),
                                    CheckManifold({halfedge_.cptrD()}));
 
   VecDH<Halfedge> halfedge(halfedge_);

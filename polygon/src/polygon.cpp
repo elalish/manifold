@@ -142,13 +142,16 @@ class Triangulator {
       // This only creates enough triangles to ensure the reflex chain is still
       // reflex.
       if (params.verbose) std::cout << "same chain" << std::endl;
-      while (CCW(vi->pos, vj->pos, v_top->pos) == (onRight_ ? 1 : -1) ||
-             (CCW(vi->pos, vj->pos, v_top->pos) == 0 && !SharesEdge(vi, vj))) {
-        AddTriangle(triangles, vi->mesh_idx, vj->mesh_idx, v_top->mesh_idx);
+      int ccw = CCW(vi->pos, vj->pos, v_top->pos);
+      while (ccw == (onRight_ ? 1 : -1) || ccw == 0) {
+        // && !SharesEdge(vi, vj)
+        // && IsBetween(vi->pos, vj->pos, v_top->pos)
+        AddTriangle(triangles, vi, vj, v_top);
         v_top = vj;
         reflex_chain_.pop();
         if (reflex_chain_.empty()) break;
         vj = reflex_chain_.top();
+        ccw = CCW(vi->pos, vj->pos, v_top->pos);
       }
       reflex_chain_.push(v_top);
       reflex_chain_.push(vi);
@@ -161,7 +164,7 @@ class Triangulator {
       VertItr v_last = v_top;
       while (!reflex_chain_.empty()) {
         vj = reflex_chain_.top();
-        AddTriangle(triangles, vi->mesh_idx, v_last->mesh_idx, vj->mesh_idx);
+        AddTriangle(triangles, vi, v_last, vj);
         v_last = vj;
         reflex_chain_.pop();
       }
@@ -177,22 +180,25 @@ class Triangulator {
   bool onRight_;        // The side the reflex chain is on
   int triangles_output_ = 0;
 
-  void AddTriangle(std::vector<glm::ivec3> &triangles, int v0, int v1, int v2) {
-    // if (v0 == v1 || v1 == v2 || v2 == v0) return;
-    if (onRight_)
-      triangles.emplace_back(v0, v1, v2);
-    else
-      triangles.emplace_back(v0, v2, v1);
+  void AddTriangle(std::vector<glm::ivec3> &triangles, VertItr v0, VertItr v1,
+                   VertItr v2) {
+    if (!onRight_) std::swap(v1, v2);
+    triangles.emplace_back(v0->mesh_idx, v1->mesh_idx, v2->mesh_idx);
     ++triangles_output_;
     if (params.verbose) std::cout << triangles.back() << std::endl;
   }
 
+  // bool IsBetween(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2) {
+  //   return glm::dot(p1 - p0, p2 - p0) <= 0;
+  // }
+
   // This checks the extra edge constraint from the mesh Boolean.
-  bool SharesEdge(const VertItr v0, const VertItr v1) {
-    glm::ivec2 e0(v0->edgeRight, v0->left->edgeRight);
-    glm::ivec2 e1(v1->edgeRight, v1->left->edgeRight);
-    return SharedEdge(e0, e1);
-  }
+  // bool SharesEdge(const VertItr v0, const VertItr v1) {
+  //   if (v0->right == v1) return false;
+  //   glm::ivec2 e0(v0->edgeRight, v0->left->edgeRight);
+  //   glm::ivec2 e1(v1->edgeRight, v1->left->edgeRight);
+  //   return SharedEdge(e0, e1);
+  // }
 };
 
 /**
@@ -831,8 +837,10 @@ std::vector<glm::ivec3> Triangulate(const Polygons &polys) {
   try {
     Monotones monotones(polys);
     monotones.Triangulate(triangles);
-    CheckTopology(triangles, polys);
-    CheckGeometry(triangles, polys);
+    if (params.intermediateChecks) {
+      CheckTopology(triangles, polys);
+      CheckGeometry(triangles, polys);
+    }
   } catch (const runtimeErr &e) {
     if (!params.suppressErrors) {
       PrintFailure(e, polys, triangles);
@@ -910,27 +918,28 @@ void CheckTopology(const std::vector<Halfedge> &halfedges) {
     }
   }
   // Check that no interior edges link vertices that share the same edge data.
-  std::map<int, glm::ivec2> vert2edges;
-  for (Halfedge halfedge : halfedges) {
-    if (halfedge.face == Edge::kInterior)
-      continue;  // only interested in polygon edges
-    auto vert = vert2edges.emplace(halfedge.startVert,
-                                   glm::ivec2(halfedge.face, Edge::kInvalid));
-    if (!vert.second) (vert.first->second)[1] = halfedge.face;
+  // std::map<int, glm::ivec2> vert2edges;
+  // for (Halfedge halfedge : halfedges) {
+  //   if (halfedge.face == Edge::kInterior)
+  //     continue;  // only interested in polygon edges
+  //   auto vert = vert2edges.emplace(halfedge.startVert,
+  //                                  glm::ivec2(halfedge.face,
+  //                                  Edge::kInvalid));
+  //   if (!vert.second) (vert.first->second)[1] = halfedge.face;
 
-    vert = vert2edges.emplace(halfedge.endVert,
-                              glm::ivec2(halfedge.face, Edge::kInvalid));
-    if (!vert.second) (vert.first->second)[1] = halfedge.face;
-  }
-  for (int i = 0; i < n_edges; ++i) {
-    if (forward[i].face == Edge::kInterior &&
-        backward[i].face == Edge::kInterior) {
-      glm::ivec2 TwoEdges0 = vert2edges.find(forward[i].startVert)->second;
-      glm::ivec2 TwoEdges1 = vert2edges.find(forward[i].endVert)->second;
-      if (SharedEdge(TwoEdges0, TwoEdges1))
-        std::cout << "Added an interface edge!" << std::endl;
-    }
-  }
+  //   vert = vert2edges.emplace(halfedge.endVert,
+  //                             glm::ivec2(halfedge.face, Edge::kInvalid));
+  //   if (!vert.second) (vert.first->second)[1] = halfedge.face;
+  // }
+  // for (int i = 0; i < n_edges; ++i) {
+  //   if (forward[i].face == Edge::kInterior &&
+  //       backward[i].face == Edge::kInterior) {
+  //     glm::ivec2 TwoEdges0 = vert2edges.find(forward[i].startVert)->second;
+  //     glm::ivec2 TwoEdges1 = vert2edges.find(forward[i].endVert)->second;
+  //     ALWAYS_ASSERT(!SharedEdge(TwoEdges0, TwoEdges1), runtimeErr,
+  //                   "Added an interface edge!");
+  //   }
+  // }
 }
 
 void CheckTopology(const std::vector<glm::ivec3> &triangles,
