@@ -38,7 +38,7 @@ void Identical(Mesh& mesh1, Mesh& mesh2) {
 
 void ExpectMeshes(Manifold& manifold,
                   const std::vector<std::pair<int, int>>& numVertTri) {
-  ASSERT_TRUE(manifold.IsManifold());
+  EXPECT_TRUE(manifold.IsManifold());
   std::vector<Manifold> meshes = manifold.Decompose();
   ASSERT_EQ(meshes.size(), numVertTri.size());
   std::sort(meshes.begin(), meshes.end(),
@@ -85,7 +85,7 @@ TEST(MeshIO, ReadWrite) {
  */
 TEST(Manifold, Regression) {
   Manifold manifold(ImportMesh("data/gyroidpuzzle.ply"));
-  ASSERT_TRUE(manifold.IsManifold());
+  EXPECT_TRUE(manifold.IsManifold());
 
   Manifold mesh1 = manifold;
   mesh1.Translate(glm::vec3(5.0f));
@@ -126,14 +126,14 @@ TEST(Manifold, Decompose) {
 TEST(Manifold, Sphere) {
   int n = 25;
   Manifold sphere = Manifold::Sphere(1.0f, 4 * n);
-  ASSERT_TRUE(sphere.IsManifold());
+  EXPECT_TRUE(sphere.IsManifold());
   EXPECT_EQ(sphere.NumTri(), n * n * 8);
 }
 
 TEST(Manifold, Extrude) {
   Polygons polys = SquareHole();
   Manifold donut = Manifold::Extrude(polys, 1.0f, 3);
-  ASSERT_TRUE(donut.IsManifold());
+  EXPECT_TRUE(donut.IsManifold());
   EXPECT_EQ(donut.Genus(), 1);
   auto prop = donut.GetProperties();
   EXPECT_FLOAT_EQ(prop.volume, 12.0f);
@@ -143,7 +143,7 @@ TEST(Manifold, Extrude) {
 TEST(Manifold, ExtrudeCone) {
   Polygons polys = SquareHole();
   Manifold donut = Manifold::Extrude(polys, 1.0f, 0, 0, glm::vec2(0.0f));
-  ASSERT_TRUE(donut.IsManifold());
+  EXPECT_TRUE(donut.IsManifold());
   EXPECT_EQ(donut.Genus(), 0);
   EXPECT_FLOAT_EQ(donut.GetProperties().volume, 4.0f);
 }
@@ -151,7 +151,7 @@ TEST(Manifold, ExtrudeCone) {
 TEST(Manifold, Revolve) {
   Polygons polys = SquareHole();
   Manifold vug = Manifold::Revolve(polys, 48);
-  ASSERT_TRUE(vug.IsManifold());
+  EXPECT_TRUE(vug.IsManifold());
   EXPECT_EQ(vug.Genus(), -1);
   auto prop = vug.GetProperties();
   EXPECT_NEAR(prop.volume, 14.0f * glm::pi<float>(), 0.2f);
@@ -161,7 +161,7 @@ TEST(Manifold, Revolve) {
 TEST(Manifold, Revolve2) {
   Polygons polys = SquareHole(2.0f);
   Manifold donutHole = Manifold::Revolve(polys, 48);
-  ASSERT_TRUE(donutHole.IsManifold());
+  EXPECT_TRUE(donutHole.IsManifold());
   EXPECT_EQ(donutHole.Genus(), 0);
   auto prop = donutHole.GetProperties();
   EXPECT_NEAR(prop.volume, 48.0f * glm::pi<float>(), 1.0f);
@@ -173,7 +173,7 @@ TEST(Manifold, Revolve2) {
  */
 TEST(Manifold, GetProperties) {
   Manifold cube = Manifold::Cube();
-  ASSERT_TRUE(cube.IsManifold());
+  EXPECT_TRUE(cube.IsManifold());
   auto prop = cube.GetProperties();
   EXPECT_FLOAT_EQ(prop.volume, 1.0f);
   EXPECT_FLOAT_EQ(prop.surfaceArea, 6.0f);
@@ -189,7 +189,7 @@ TEST(Manifold, GetProperties) {
  */
 TEST(Manifold, BooleanTetra) {
   Manifold tetra = Manifold::Tetrahedron();
-  ASSERT_TRUE(tetra.IsManifold());
+  EXPECT_TRUE(tetra.IsManifold());
 
   Manifold tetra2 = tetra;
   tetra2.Translate(glm::vec3(0.5f));
@@ -246,6 +246,7 @@ TEST(Manifold, MultiCoplanar) {
   Manifold first = cube - cube2.Translate({0.3f, 0.3f, 0.0f});
   cube.Translate({-0.3f, -0.3f, 0.0f});
   Manifold out = first - cube;
+  EXPECT_TRUE(out.IsManifold());
   EXPECT_EQ(out.Genus(), -1);
   auto prop = out.GetProperties();
   EXPECT_NEAR(prop.volume, 0.18, 1e-5);
@@ -257,6 +258,7 @@ TEST(Manifold, EdgeUnion) {
   auto propIn = cubes.GetProperties();
   Manifold cube2 = cubes;
   cubes += cube2.Translate({1, 1, 0});
+  EXPECT_TRUE(cubes.IsManifold());
   EXPECT_EQ(cubes.Genus(), 0);
   auto prop = cubes.GetProperties();
   EXPECT_FLOAT_EQ(prop.volume, 2 * propIn.volume);
@@ -268,6 +270,7 @@ TEST(Manifold, CornerUnion) {
   auto propIn = cubes.GetProperties();
   Manifold cube2 = cubes;
   cubes += cube2.Translate({1, 1, 1});
+  EXPECT_TRUE(cubes.IsManifold());
   EXPECT_EQ(cubes.Genus(), 0);
   auto prop = cubes.GetProperties();
   EXPECT_FLOAT_EQ(prop.volume, 2 * propIn.volume);
@@ -283,6 +286,8 @@ TEST(Manifold, Split) {
   Manifold oct = Manifold::Octahedron();
   oct.Translate(glm::vec3(0.0f, 0.0f, 1.0f));
   std::pair<Manifold, Manifold> splits = cube.Split(oct);
+  EXPECT_TRUE(splits.first.IsManifold());
+  EXPECT_TRUE(splits.second.IsManifold());
   EXPECT_FLOAT_EQ(splits.first.GetProperties().volume +
                       splits.second.GetProperties().volume,
                   cube.GetProperties().volume);
@@ -294,6 +299,8 @@ TEST(Manifold, SplitByPlane) {
   cube.Rotate(90.0f, 0.0f, 0.0f);
   std::pair<Manifold, Manifold> splits =
       cube.SplitByPlane({0.0f, 0.0f, 1.0f}, 1.0f);
+  EXPECT_TRUE(splits.first.IsManifold());
+  EXPECT_TRUE(splits.second.IsManifold());
   EXPECT_NEAR(splits.first.GetProperties().volume,
               splits.second.GetProperties().volume, 1e-5);
 }
@@ -306,6 +313,8 @@ TEST(Manifold, SplitByPlane60) {
   float phi = 30.0f;
   std::pair<Manifold, Manifold> splits =
       cube.SplitByPlane({sind(phi), -cosd(phi), 0.0f}, 1.0f);
+  EXPECT_TRUE(splits.first.IsManifold());
+  EXPECT_TRUE(splits.second.IsManifold());
   EXPECT_NEAR(splits.first.GetProperties().volume,
               splits.second.GetProperties().volume, 1e-5);
 }
@@ -320,6 +329,7 @@ TEST(Manifold, BooleanVug) {
   EXPECT_EQ(vug.Genus(), -1);
 
   Manifold half = vug.SplitByPlane({0.0f, 0.0f, 1.0f}, -1.0f).first;
+  EXPECT_TRUE(half.IsManifold());
   EXPECT_EQ(half.Genus(), -1);
 
   auto prop = half.GetProperties();
@@ -365,7 +375,7 @@ TEST(Manifold, BooleanSphere) {
 
 TEST(Manifold, Boolean3) {
   Manifold gyroid(ImportMesh("data/gyroidpuzzle.ply"));
-  ASSERT_TRUE(gyroid.IsManifold());
+  EXPECT_TRUE(gyroid.IsManifold());
 
   Manifold gyroid2 = gyroid;
   gyroid2.Translate(glm::vec3(5.0f));
