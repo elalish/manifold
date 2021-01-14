@@ -14,6 +14,7 @@
 
 #include <thrust/adjacent_difference.h>
 #include <thrust/count.h>
+#include <thrust/execution_policy.h>
 #include <thrust/gather.h>
 #include <thrust/logical.h>
 #include <thrust/sequence.h>
@@ -473,6 +474,41 @@ struct LinkHalfedges {
   }
 };
 
+struct SwapHalfedges {
+  Halfedge* halfedges;
+  const TmpEdge* edges;
+
+  __host__ void operator()(int k) {
+    const int i = 2 * k;
+    const int j = i - 2;
+    const TmpEdge thisEdge = edges[i];
+    const TmpEdge lastEdge = edges[j];
+    if (thisEdge.first == lastEdge.first &&
+        thisEdge.second == lastEdge.second) {
+      const int swap0idx = thisEdge.halfedgeIdx;
+      Halfedge& swap0 = halfedges[swap0idx];
+      const int swap1idx = swap0.pairedHalfedge;
+      Halfedge& swap1 = halfedges[swap1idx];
+
+      const int next0idx = swap0idx + ((swap0idx + 1) % 3 == 0 ? -2 : 1);
+      const int next1idx = swap1idx + ((swap1idx + 1) % 3 == 0 ? -2 : 1);
+      Halfedge& next0 = halfedges[next0idx];
+      Halfedge& next1 = halfedges[next1idx];
+
+      next0.startVert = swap0.endVert = next1.endVert;
+      swap0.pairedHalfedge = next1.pairedHalfedge;
+      halfedges[swap0.pairedHalfedge].pairedHalfedge = swap0idx;
+
+      next1.startVert = swap1.endVert = next0.endVert;
+      swap1.pairedHalfedge = next0.pairedHalfedge;
+      halfedges[swap1.pairedHalfedge].pairedHalfedge = swap1idx;
+
+      next0.pairedHalfedge = next1idx;
+      next1.pairedHalfedge = next0idx;
+    }
+  }
+};
+
 struct EdgeBox {
   const glm::vec3* vertPos;
 
@@ -541,7 +577,7 @@ namespace manifold {
  */
 Manifold::Impl::Impl(const Mesh& manifold) : vertPos_(manifold.vertPos) {
   CheckDevice();
-  CreateHalfedges(manifold.triVerts);
+  CreateAndFixHalfedges(manifold.triVerts);
   Finish();
 }
 
@@ -592,7 +628,7 @@ Manifold::Impl::Impl(Shape shape) {
       throw logicErr("Unrecognized shape!");
   }
   vertPos_ = vertPos;
-  CreateHalfedges(triVerts);
+  CreateAndFixHalfedges(triVerts);
   Finish();
 }
 
@@ -608,6 +644,31 @@ void Manifold::Impl::CreateHalfedges(const VecDH<glm::ivec3>& triVerts) {
   thrust::sort(edge.beginD(), edge.endD());
   thrust::for_each_n(countAt(0), halfedge_.size() / 2,
                      LinkHalfedges({halfedge_.ptrD(), edge.cptrD()}));
+}
+
+/**
+ * Create the halfedge_ data structure from an input triVerts array like Mesh.
+ * Check that the input is an even-manifold, and if it is not 2-manifold,
+ * perform edge swaps until it is. This is a host function.
+ */
+void Manifold::Impl::CreateAndFixHalfedges(const VecDH<glm::ivec3>& triVerts) {
+  const int numTri = triVerts.size();
+  halfedge_.resize(3 * numTri);
+  VecDH<TmpEdge> edge(3 * numTri);
+  thrust::for_each_n(zip(countAt(0), triVerts.begin()), numTri,
+                     Tri2Halfedges({halfedge_.ptrH(), edge.ptrH()}));
+  // Stable sort is required here so that halfedges from the same face are
+  // paired together (the triangles were created in face order). In some
+  // degenerate situations the triangulator can add the same internal edge in
+  // two different faces, causing this edge to not be 2-manifold. We detect this
+  // and fix it by swapping one of the identical edges, so it is important that
+  // we have the edges paired according to their face.
+  std::stable_sort(edge.begin(), edge.end());
+  thrust::for_each_n(thrust::host, countAt(0), halfedge_.size() / 2,
+                     LinkHalfedges({halfedge_.ptrH(), edge.cptrH()}));
+  thrust::for_each(thrust::host, countAt(1), countAt(halfedge_.size() / 2),
+                   SwapHalfedges({halfedge_.ptrH(), edge.cptrH()}));
+  // IsManifold();
 }
 
 /**
@@ -790,7 +851,7 @@ void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge) {
     }
   }
   faceNormal_ = triNormalOut;
-  CreateHalfedges(triVertsOut);
+  CreateAndFixHalfedges(triVertsOut);
 }
 
 /**
@@ -833,11 +894,12 @@ bool Manifold::Impl::IsManifold() const {
   if (halfedge_.size() == 0) return true;
   bool isManifold = thrust::all_of(countAt(0), countAt(halfedge_.size()),
                                    CheckManifold({halfedge_.cptrD()}));
-
+  if (!isManifold) std::cout << "not manifold!" << std::endl;
   VecDH<Halfedge> halfedge(halfedge_);
   thrust::sort(halfedge.beginD(), halfedge.endD());
   isManifold &= thrust::all_of(countAt(0), countAt(2 * NumEdge() - 1),
                                NoDuplicates({halfedge.cptrD()}));
+  if (!isManifold) std::cout << "not 2-manifold!" << std::endl;
   return isManifold;
 }
 
