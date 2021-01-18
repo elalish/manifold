@@ -461,7 +461,7 @@ void Manifold::SetMinCircularEdgeLength(float length) {
 }
 
 void Manifold::SetCircularSegments(int number) {
-  ALWAYS_ASSERT(number > 2, runtimeErr,
+  ALWAYS_ASSERT(number > 2 || number == 0, runtimeErr,
                 "must have at least three segments in circle!");
   Manifold::circularSegments = number;
 }

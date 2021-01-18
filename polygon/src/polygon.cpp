@@ -437,10 +437,22 @@ class Monotones {
       }
       if (isHole != 0) return isHole > 0;
 
-      if (left->pos.y < right->pos.y) {
-        left = left->left;
+      glm::vec2 edgeLeft = left->pos - center->pos;
+      glm::vec2 edgeRight = right->pos - center->pos;
+      if (glm::dot(edgeLeft, edgeRight) > 0) {
+        if (glm::dot(edgeLeft, edgeLeft) < glm::dot(edgeRight, edgeRight)) {
+          center = left;
+          left = left->left;
+        } else {
+          center = right;
+          right = right->right;
+        }
       } else {
-        right = right->right;
+        if (left->pos.y < right->pos.y) {
+          left = left->left;
+        } else {
+          right = right->right;
+        }
       }
     }
     return false;

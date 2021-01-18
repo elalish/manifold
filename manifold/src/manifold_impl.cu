@@ -668,7 +668,6 @@ void Manifold::Impl::CreateAndFixHalfedges(const VecDH<glm::ivec3>& triVerts) {
                      LinkHalfedges({halfedge_.ptrH(), edge.cptrH()}));
   thrust::for_each(thrust::host, countAt(1), countAt(halfedge_.size() / 2),
                    SwapHalfedges({halfedge_.ptrH(), edge.cptrH()}));
-  // IsManifold();
 }
 
 /**
