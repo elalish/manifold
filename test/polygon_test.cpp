@@ -594,6 +594,20 @@ TEST(Polygon, Degenerate5) {
   TestPoly(polys, 6);
 }
 
+TEST(Polygon, Degenerate6) {
+  Polygons polys;
+  polys.push_back({
+      {glm::vec2(4.37113897e-07, -4.37113897e-07), 0, 1},  //
+      {glm::vec2(4.37113897e-07, 0), 18, 10},              //
+      {glm::vec2(0, 0), 23, 23},                           //
+      {glm::vec2(-1.19421679e-06, 0), 25, 14},             //
+      {glm::vec2(-8.66025352, 0), 24, 24},                 //
+      {glm::vec2(-8.66025352, 1.339746), 19, 7},           //
+      {glm::vec2(-10, -4.37113897e-07), 3, 2},             //
+  });
+  TestPoly(polys, 5);
+}
+
 TEST(Polygon, Tricky) {
   Polygons polys;
   polys.push_back({
