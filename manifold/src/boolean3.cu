@@ -671,15 +671,17 @@ struct DuplicateHalfedges {
     halfedge.face = faceP2R[halfedge.face];
     int faceRight = faceP2R[halfedgesP[halfedge.pairedHalfedge].face];
 
-    Halfedge backward = {halfedge.endVert, halfedge.startVert, -1, faceRight};
-
     for (int i = 0; i < glm::abs(inclusion); ++i) {
       int forwardIdx = AtomicAddInt(facePtr[halfedge.face], 1);
       int backwardIdx = AtomicAddInt(facePtr[faceRight], 1);
       halfedge.pairedHalfedge = backwardIdx;
-      backward.pairedHalfedge = forwardIdx;
+
       halfedgesR[forwardIdx] = halfedge;
-      halfedgesR[backwardIdx] = backward;
+      halfedgesR[backwardIdx] = {halfedge.endVert, halfedge.startVert,
+                                 forwardIdx, faceRight};
+
+      ++halfedge.startVert;
+      ++halfedge.endVert;
     }
   }
 };
@@ -1129,9 +1131,6 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
   Timer triangulate;
   triangulate.Start();
 
-  if (!outR.IsManifold())
-    std::cout << "polygon mesh is not manifold!" << std::endl;
-
   // Level 6
 
   // Create the manifold's data structures.
@@ -1149,9 +1148,6 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
     triangulate.Print("Triangulation");
     finish.Print("Finishing the manifold");
   }
-
-  if (!outR.IsManifold())
-    std::cout << "triangle mesh is not manifold!" << std::endl;
 
   return outR;
 }
