@@ -348,6 +348,18 @@ TEST(Manifold, BooleanEmpty) {
   EXPECT_TRUE((cube ^ empty).IsEmpty());
 }
 
+TEST(Manifold, BooleanWinding) {
+  std::vector<Manifold> cubes;
+  cubes.push_back(Manifold::Cube(glm::vec3(3.0f), true));
+  cubes.push_back(Manifold::Cube(glm::vec3(2.0f), true));
+  Manifold doubled = Manifold::Compose(cubes);
+
+  Manifold cube = Manifold::Cube(glm::vec3(1.0f), true);
+  PolygonParams().suppressErrors = true;
+  EXPECT_THROW(cube ^= doubled, runtimeErr);
+  PolygonParams().suppressErrors = false;
+}
+
 TEST(Manifold, BooleanNonIntersecting) {
   Manifold cube1 = Manifold::Cube();
   float vol1 = cube1.GetProperties().volume;
