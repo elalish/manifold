@@ -140,8 +140,8 @@ Manifold Manifold::Cylinder(float height, float radiusLow, float radiusHigh,
   Polygons circle(1);
   float dPhi = 360.0f / n;
   for (int i = 0; i < n; ++i) {
-    circle[0].push_back({radiusLow * glm::vec2(cosd(dPhi * i), sind(dPhi * i)),
-                         0, Edge::kNoIdx});
+    circle[0].push_back(
+        {radiusLow * glm::vec2(cosd(dPhi * i), sind(dPhi * i)), 0});
   }
   Manifold cylinder =
       Manifold::Extrude(circle, height, 0, 0.0f, glm::vec2(scale));
@@ -177,7 +177,8 @@ Manifold Manifold::Sphere(float radius, int circularSegments) {
  */
 Manifold Manifold::Extrude(Polygons crossSection, float height, int nDivisions,
                            float twistDegrees, glm::vec2 scaleTop) {
-  ALWAYS_ASSERT(scaleTop.x >= 0 && scaleTop.y >= 0, runtimeErr, "");
+  ALWAYS_ASSERT(scaleTop.x >= 0 && scaleTop.y >= 0, userErr,
+                "scale values cannot be negative");
   Manifold extrusion;
   ++nDivisions;
   auto& vertPos = extrusion.pImpl_->vertPos_.H();
@@ -451,17 +452,17 @@ float Manifold::circularAngle = 10.0f;
 float Manifold::circularEdgeLength = 1.0f;
 
 void Manifold::SetMinCircularAngle(float angle) {
-  ALWAYS_ASSERT(angle > 0.0f, runtimeErr, "angle must be positive!");
+  ALWAYS_ASSERT(angle > 0.0f, userErr, "angle must be positive!");
   Manifold::circularAngle = angle;
 }
 
 void Manifold::SetMinCircularEdgeLength(float length) {
-  ALWAYS_ASSERT(length > 0.0f, runtimeErr, "length must be positive!");
+  ALWAYS_ASSERT(length > 0.0f, userErr, "length must be positive!");
   Manifold::circularEdgeLength = length;
 }
 
 void Manifold::SetCircularSegments(int number) {
-  ALWAYS_ASSERT(number > 2, runtimeErr,
+  ALWAYS_ASSERT(number > 2 || number == 0, userErr,
                 "must have at least three segments in circle!");
   Manifold::circularSegments = number;
 }

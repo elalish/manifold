@@ -37,8 +37,7 @@ Manifold TorusKnot(int p, int q, float majorRadius, float minorRadius,
   Polygons circle(1);
   float dPhi = 360.0f / n;
   for (int i = 0; i < n; ++i) {
-    circle[0].push_back(
-        {glm::vec2(cosd(dPhi * i) + 2.0f, sind(dPhi * i)), 0, Edge::kNoIdx});
+    circle[0].push_back({glm::vec2(cosd(dPhi * i) + 2.0f, sind(dPhi * i)), 0});
   }
 
   Manifold knot = Manifold::Revolve(circle, m);

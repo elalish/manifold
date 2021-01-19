@@ -25,9 +25,15 @@
 
 namespace manifold {
 
-constexpr int kInvalidInt = std::numeric_limits<int>::max();
-
-using runtimeErr = std::runtime_error;
+struct userErr : public virtual std::runtime_error {
+  using std::runtime_error::runtime_error;
+};
+struct topologyErr : public virtual std::runtime_error {
+  using std::runtime_error::runtime_error;
+};
+struct geometryErr : public virtual std::runtime_error {
+  using std::runtime_error::runtime_error;
+};
 using logicErr = std::logic_error;
 
 template <typename Ex>
@@ -81,12 +87,6 @@ struct ExecutionParams {
   bool suppressErrors = false;
 };
 
-namespace Edge {
-constexpr int kNoIdx = -1;
-constexpr int kInterior = -2;
-constexpr int kInvalid = -3;
-}  // namespace Edge
-
 struct Halfedge {
   int startVert, endVert;
   int pairedHalfedge;
@@ -101,7 +101,6 @@ struct Halfedge {
 struct PolyVert {
   glm::vec2 pos;
   int idx;
-  int nextEdge;
 };
 
 using SimplePolygon = std::vector<PolyVert>;

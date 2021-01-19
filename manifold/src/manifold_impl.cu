@@ -14,6 +14,7 @@
 
 #include <thrust/adjacent_difference.h>
 #include <thrust/count.h>
+#include <thrust/execution_policy.h>
 #include <thrust/gather.h>
 #include <thrust/logical.h>
 #include <thrust/sequence.h>
@@ -89,7 +90,7 @@ VecDH<TmpEdge> CreateTmpEdges(const VecDH<Halfedge>& halfedge) {
                      edges.size(), Halfedge2Tmp());
   int numEdge = thrust::remove_if(edges.beginD(), edges.endD(), TmpInvalid()) -
                 edges.beginD();
-  ALWAYS_ASSERT(numEdge == halfedge.size() / 2, runtimeErr, "Not oriented!");
+  ALWAYS_ASSERT(numEdge == halfedge.size() / 2, topologyErr, "Not oriented!");
   edges.resize(numEdge);
   return edges;
 }
@@ -473,6 +474,41 @@ struct LinkHalfedges {
   }
 };
 
+struct SwapHalfedges {
+  Halfedge* halfedges;
+  const TmpEdge* edges;
+
+  __host__ void operator()(int k) {
+    const int i = 2 * k;
+    const int j = i - 2;
+    const TmpEdge thisEdge = edges[i];
+    const TmpEdge lastEdge = edges[j];
+    if (thisEdge.first == lastEdge.first &&
+        thisEdge.second == lastEdge.second) {
+      const int swap0idx = thisEdge.halfedgeIdx;
+      Halfedge& swap0 = halfedges[swap0idx];
+      const int swap1idx = swap0.pairedHalfedge;
+      Halfedge& swap1 = halfedges[swap1idx];
+
+      const int next0idx = swap0idx + ((swap0idx + 1) % 3 == 0 ? -2 : 1);
+      const int next1idx = swap1idx + ((swap1idx + 1) % 3 == 0 ? -2 : 1);
+      Halfedge& next0 = halfedges[next0idx];
+      Halfedge& next1 = halfedges[next1idx];
+
+      next0.startVert = swap0.endVert = next1.endVert;
+      swap0.pairedHalfedge = next1.pairedHalfedge;
+      halfedges[swap0.pairedHalfedge].pairedHalfedge = swap0idx;
+
+      next1.startVert = swap1.endVert = next0.endVert;
+      swap1.pairedHalfedge = next0.pairedHalfedge;
+      halfedges[swap1.pairedHalfedge].pairedHalfedge = swap1idx;
+
+      next0.pairedHalfedge = next1idx;
+      next1.pairedHalfedge = next0idx;
+    }
+  }
+};
+
 struct EdgeBox {
   const glm::vec3* vertPos;
 
@@ -486,18 +522,14 @@ struct EdgeBox {
 struct CheckManifold {
   const Halfedge* halfedges;
 
-  __host__ __device__ bool operator()(int face) {
+  __host__ __device__ bool operator()(int edge) {
     bool good = true;
-    for (const int i : {0, 1, 2}) {
-      const int edge = 3 * face + i;
-      const Halfedge halfedge = halfedges[edge];
-      const Halfedge paired = halfedges[halfedge.pairedHalfedge];
-      good &= halfedge.face == face;
-      good &= paired.pairedHalfedge == edge;
-      good &= halfedge.startVert != halfedge.endVert;
-      good &= halfedge.startVert == paired.endVert;
-      good &= halfedge.endVert == paired.startVert;
-    }
+    const Halfedge halfedge = halfedges[edge];
+    const Halfedge paired = halfedges[halfedge.pairedHalfedge];
+    good &= paired.pairedHalfedge == edge;
+    good &= halfedge.startVert != halfedge.endVert;
+    good &= halfedge.startVert == paired.endVert;
+    good &= halfedge.endVert == paired.startVert;
     return good;
   }
 };
@@ -545,7 +577,7 @@ namespace manifold {
  */
 Manifold::Impl::Impl(const Mesh& manifold) : vertPos_(manifold.vertPos) {
   CheckDevice();
-  CreateHalfedges(manifold.triVerts);
+  CreateAndFixHalfedges(manifold.triVerts);
   Finish();
 }
 
@@ -593,10 +625,10 @@ Manifold::Impl::Impl(Shape shape) {
                   {3, 0, 4}, {2, 5, 1}};
       break;
     default:
-      throw logicErr("Unrecognized shape!");
+      throw userErr("Unrecognized shape!");
   }
   vertPos_ = vertPos;
-  CreateHalfedges(triVerts);
+  CreateAndFixHalfedges(triVerts);
   Finish();
 }
 
@@ -615,6 +647,30 @@ void Manifold::Impl::CreateHalfedges(const VecDH<glm::ivec3>& triVerts) {
 }
 
 /**
+ * Create the halfedge_ data structure from an input triVerts array like Mesh.
+ * Check that the input is an even-manifold, and if it is not 2-manifold,
+ * perform edge swaps until it is. This is a host function.
+ */
+void Manifold::Impl::CreateAndFixHalfedges(const VecDH<glm::ivec3>& triVerts) {
+  const int numTri = triVerts.size();
+  halfedge_.resize(3 * numTri);
+  VecDH<TmpEdge> edge(3 * numTri);
+  thrust::for_each_n(zip(countAt(0), triVerts.begin()), numTri,
+                     Tri2Halfedges({halfedge_.ptrH(), edge.ptrH()}));
+  // Stable sort is required here so that halfedges from the same face are
+  // paired together (the triangles were created in face order). In some
+  // degenerate situations the triangulator can add the same internal edge in
+  // two different faces, causing this edge to not be 2-manifold. We detect this
+  // and fix it by swapping one of the identical edges, so it is important that
+  // we have the edges paired according to their face.
+  std::stable_sort(edge.begin(), edge.end());
+  thrust::for_each_n(thrust::host, countAt(0), halfedge_.size() / 2,
+                     LinkHalfedges({halfedge_.ptrH(), edge.cptrH()}));
+  thrust::for_each(thrust::host, countAt(1), countAt(halfedge_.size() / 2),
+                   SwapHalfedges({halfedge_.ptrH(), edge.cptrH()}));
+}
+
+/**
  * Once halfedge_ has been filled in, this function can be called to create the
  * rest of the internal data structures.
  */
@@ -624,16 +680,16 @@ void Manifold::Impl::Finish() {
   extrema =
       thrust::reduce(halfedge_.beginD(), halfedge_.endD(), extrema, Extrema());
 
-  ALWAYS_ASSERT(extrema.startVert >= 0, runtimeErr,
+  ALWAYS_ASSERT(extrema.startVert >= 0, topologyErr,
                 "Vertex index is negative!");
-  ALWAYS_ASSERT(extrema.endVert < NumVert(), runtimeErr,
+  ALWAYS_ASSERT(extrema.endVert < NumVert(), topologyErr,
                 "Vertex index exceeds number of verts!");
-  ALWAYS_ASSERT(extrema.face >= 0, runtimeErr, "Face index is negative!");
-  ALWAYS_ASSERT(extrema.face < NumTri(), runtimeErr,
+  ALWAYS_ASSERT(extrema.face >= 0, topologyErr, "Face index is negative!");
+  ALWAYS_ASSERT(extrema.face < NumTri(), topologyErr,
                 "Face index exceeds number of faces!");
-  ALWAYS_ASSERT(extrema.pairedHalfedge >= 0, runtimeErr,
+  ALWAYS_ASSERT(extrema.pairedHalfedge >= 0, topologyErr,
                 "Halfedge index is negative!");
-  ALWAYS_ASSERT(extrema.pairedHalfedge < 2 * NumEdge(), runtimeErr,
+  ALWAYS_ASSERT(extrema.pairedHalfedge < 2 * NumEdge(), topologyErr,
                 "Halfedge index exceeds number of halfedges!");
 
   CalculateBBox();
@@ -711,7 +767,7 @@ void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge) {
     const int edge = face[i];
     const int lastEdge = face[i + 1];
     const int numEdge = lastEdge - edge;
-    ALWAYS_ASSERT(numEdge >= 3, logicErr, "face has less than three edges.");
+    ALWAYS_ASSERT(numEdge >= 3, topologyErr, "face has less than three edges.");
     const glm::vec3 normal = faceNormal[i];
 
     if (numEdge == 3) {  // Single triangle
@@ -724,7 +780,7 @@ void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge) {
         std::swap(ends[1], ends[2]);
       }
       ALWAYS_ASSERT(ends[0] == tri[1] && ends[1] == tri[2] && ends[2] == tri[0],
-                    runtimeErr, "These 3 edges do not form a triangle!");
+                    topologyErr, "These 3 edges do not form a triangle!");
 
       triVerts.push_back(tri);
       triNormal.push_back(normal);
@@ -748,7 +804,7 @@ void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge) {
       }
       ALWAYS_ASSERT(glm::all(glm::greaterThanEqual(tri0, glm::ivec3(0))) &&
                         glm::all(glm::greaterThanEqual(tri1, glm::ivec3(0))),
-                    runtimeErr, "non-manifold quad!");
+                    topologyErr, "non-manifold quad!");
       bool firstValid = triCCW(tri0) && triCCW(tri1);
       tri0[2] = tri1[1];
       tri1[2] = tri0[1];
@@ -773,7 +829,17 @@ void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge) {
       triNormal.push_back(normal);
     } else {  // General triangulation
       const glm::mat3x2 projection = GetAxisAlignedProjection(normal);
-      Polygons polys = Face2Polygons(i, projection, face);
+
+      Polygons polys;
+      try {
+        polys = Face2Polygons(i, projection, face);
+      } catch (const std::exception& e) {
+        std::cout << e.what() << std::endl;
+        for (int edge = face[i]; edge < face[i + 1]; ++edge)
+          std::cout << "halfedge: " << edge << ", " << halfedge[edge]
+                    << std::endl;
+        throw;
+      }
 
       std::vector<glm::ivec3> newTris = Triangulate(polys);
 
@@ -784,7 +850,7 @@ void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge) {
     }
   }
   faceNormal_ = triNormalOut;
-  CreateHalfedges(triVertsOut);
+  CreateAndFixHalfedges(triVertsOut);
 }
 
 /**
@@ -825,13 +891,14 @@ void Manifold::Impl::Refine(int n) {
  */
 bool Manifold::Impl::IsManifold() const {
   if (halfedge_.size() == 0) return true;
-  bool isManifold = thrust::all_of(countAt(0), countAt(NumTri()),
+  bool isManifold = thrust::all_of(countAt(0), countAt(halfedge_.size()),
                                    CheckManifold({halfedge_.cptrD()}));
-
+  if (!isManifold) std::cout << "not manifold!" << std::endl;
   VecDH<Halfedge> halfedge(halfedge_);
   thrust::sort(halfedge.beginD(), halfedge.endD());
   isManifold &= thrust::all_of(countAt(0), countAt(2 * NumEdge() - 1),
                                NoDuplicates({halfedge.cptrD()}));
+  if (!isManifold) std::cout << "not 2-manifold!" << std::endl;
   return isManifold;
 }
 
@@ -861,7 +928,7 @@ void Manifold::Impl::CalculateBBox() {
                              glm::vec3(1 / 0.0f), PosMin());
   bBox_.max = thrust::reduce(vertPos_.begin(), vertPos_.end(),
                              glm::vec3(-1 / 0.0f), PosMax());
-  ALWAYS_ASSERT(bBox_.isFinite(), runtimeErr,
+  ALWAYS_ASSERT(bBox_.isFinite(), topologyErr,
                 "Input vertices are not all finite!");
 }
 
@@ -1013,11 +1080,11 @@ Polygons Manifold::Impl::Face2Polygons(int face, glm::mat3x2 projection,
   const int lastEdge = faceEdge[face + 1];
 
   std::map<int, int> vert_edge;
-  for (int edge = firstEdge; edge < faceEdge[face + 1]; ++edge) {
+  for (int edge = firstEdge; edge < lastEdge; ++edge) {
     ALWAYS_ASSERT(
         vert_edge.emplace(std::make_pair(halfedge[edge].startVert, edge))
             .second,
-        runtimeErr, "face has duplicate vertices.");
+        topologyErr, "face has duplicate vertices.");
   }
 
   Polygons polys;
@@ -1031,10 +1098,9 @@ Polygons Manifold::Impl::Face2Polygons(int face, glm::mat3x2 projection,
       polys.push_back({});
     }
     int vert = halfedge[thisEdge].startVert;
-    polys.back().push_back({projection * vertPos[vert], vert,
-                            halfedge[halfedge[thisEdge].pairedHalfedge].face});
+    polys.back().push_back({projection * vertPos[vert], vert});
     const auto result = vert_edge.find(halfedge[thisEdge].endVert);
-    ALWAYS_ASSERT(result != vert_edge.end(), runtimeErr, "nonmanifold edge");
+    ALWAYS_ASSERT(result != vert_edge.end(), topologyErr, "nonmanifold edge");
     thisEdge = result->second;
     vert_edge.erase(result);
   }
