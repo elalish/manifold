@@ -25,9 +25,15 @@
 
 namespace manifold {
 
-constexpr int kInvalidInt = std::numeric_limits<int>::max();
-
-using runtimeErr = std::runtime_error;
+struct userErr : public virtual std::runtime_error {
+  using std::runtime_error::runtime_error;
+};
+struct topologyErr : public virtual std::runtime_error {
+  using std::runtime_error::runtime_error;
+};
+struct geometryErr : public virtual std::runtime_error {
+  using std::runtime_error::runtime_error;
+};
 using logicErr = std::logic_error;
 
 template <typename Ex>
