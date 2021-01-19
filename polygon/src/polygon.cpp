@@ -136,8 +136,6 @@ class Triangulator {
       if (params.verbose) std::cout << "same chain" << std::endl;
       int ccw = CCW(vi->pos, vj->pos, v_top->pos);
       while (ccw == (onRight_ ? 1 : -1) || ccw == 0) {
-        // && !SharesEdge(vi, vj)
-        // && IsBetween(vi->pos, vj->pos, v_top->pos)
         AddTriangle(triangles, vi, vj, v_top);
         v_top = vj;
         reflex_chain_.pop();
@@ -790,9 +788,11 @@ class Monotones {
   }
 };
 
-void PrintFailure(const Polygons &polys, std::vector<glm::ivec3> &triangles) {
+void PrintFailure(const std::exception &e, const Polygons &polys,
+                  std::vector<glm::ivec3> &triangles) {
   std::cout << "-----------------------------------" << std::endl;
   std::cout << "Triangulation failed!" << std::endl;
+  std::cout << e.what() << std::endl;
   Dump(polys);
   std::cout << "produced this triangulation:" << std::endl;
   for (int j = 0; j < triangles.size(); ++j) {
@@ -833,13 +833,11 @@ std::vector<glm::ivec3> Triangulate(const Polygons &polys) {
     }
   } catch (const geometryErr &e) {
     if (!params.suppressErrors) {
-      std::cout << e.what() << std::endl;
-      PrintFailure(polys, triangles);
+      PrintFailure(e, polys, triangles);
     }
     throw;
   } catch (const std::exception &e) {
-    std::cout << e.what() << std::endl;
-    PrintFailure(polys, triangles);
+    PrintFailure(e, polys, triangles);
     throw;
   }
   return triangles;
