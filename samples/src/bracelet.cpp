@@ -29,7 +29,7 @@ Manifold Base(float width, float radius, float decorRadius, float twistRadius,
     circle[0].push_back(
         {glm::vec2(decorRadius * cosd(dPhiDeg * i) + twistRadius,
                    decorRadius * sind(dPhiDeg * i)),
-         0, Edge::kNoIdx});
+         0});
   }
   Manifold decor = std::move(Manifold::Extrude(circle, width, nDivision, 180)
                                  .Scale({1.0f, 0.5f, 1.0f})
@@ -45,10 +45,10 @@ Manifold Base(float width, float radius, float decorRadius, float twistRadius,
   glm::vec2 p1(innerRadius, -cut);
   glm::vec2 p2(innerRadius, cut);
   for (int i = 0; i < nCut; ++i) {
-    stretch[0].push_back({glm::rotate(p0, dPhiRad * i), 0, Edge::kNoIdx});
-    stretch[0].push_back({glm::rotate(p1, dPhiRad * i), 0, Edge::kNoIdx});
-    stretch[0].push_back({glm::rotate(p2, dPhiRad * i), 0, Edge::kNoIdx});
-    stretch[0].push_back({glm::rotate(p0, dPhiRad * i), 0, Edge::kNoIdx});
+    stretch[0].push_back({glm::rotate(p0, dPhiRad * i), 0});
+    stretch[0].push_back({glm::rotate(p1, dPhiRad * i), 0});
+    stretch[0].push_back({glm::rotate(p2, dPhiRad * i), 0});
+    stretch[0].push_back({glm::rotate(p0, dPhiRad * i), 0});
   }
 
   return Manifold::Extrude(stretch, width) ^ base;

@@ -73,33 +73,6 @@ struct TriLabelsToVert {
     }
   }
 };
-
-struct NextStart : public thrust::binary_function<int, int, bool> {
-  __host__ __device__ bool operator()(int value, int component) {
-    // mismatch finds the point where this is false, so this is inverted.
-    return !(component >= 0 && value != kInvalidInt);
-  }
-};
-
-struct NextLabel {
-  __host__ __device__ bool operator()(int component) { return component >= 0; }
-};
-
-struct FloodComponent {
-  int value;
-  int label;
-
-  __host__ __device__ void operator()(thrust::tuple<int&, int&> inOut) {
-    int& valueOut = thrust::get<0>(inOut);
-    int& labelOut = thrust::get<1>(inOut);
-
-    if (labelOut == label) {
-      labelOut = -1;
-      valueOut = value;
-    }
-  }
-};
-
 }  // namespace
 
 namespace manifold {
@@ -159,36 +132,4 @@ int ConnectedComponentsCPU(VecDH<int>& components, int numVert,
   int numComponent = boost::connected_components(graph, components.H().data());
   return numComponent;
 }
-
-void FloodComponents(VecDH<int>& valuesInOut, VecDH<int>& componentLabels,
-                     int numComponent) {
-  // componentLabels will be replaced entirely with -1
-  ALWAYS_ASSERT(valuesInOut.size() == componentLabels.size(), logicErr,
-                "These vectors must both be NumVert long.");
-  for (int comp = 0; comp < numComponent; ++comp) {
-    // find first vertex in component that is also has a value
-    int sourceVert = thrust::mismatch(valuesInOut.begin(), valuesInOut.end(),
-                                      componentLabels.begin(), NextStart())
-                         .first -
-                     valuesInOut.begin();
-    int label, value;
-    if (sourceVert < valuesInOut.size()) {
-      label = componentLabels.H()[sourceVert];
-      value = valuesInOut.H()[sourceVert];
-    } else {
-      // If no vertices in a component have a value, then their value must be
-      // zero, because zeros are removed from the sparse representation.
-      sourceVert = thrust::find_if(componentLabels.begin(),
-                                   componentLabels.end(), NextLabel()) -
-                   componentLabels.begin();
-      label = componentLabels.H()[sourceVert];
-      value = 0;
-      ALWAYS_ASSERT(sourceVert < componentLabels.size(), logicErr,
-                    "Failed to find component!");
-    }
-    thrust::for_each_n(zip(valuesInOut.beginD(), componentLabels.beginD()),
-                       valuesInOut.size(), FloodComponent({value, label}));
-  }
-}
-
 }  // namespace manifold

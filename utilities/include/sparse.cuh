@@ -85,7 +85,7 @@ class SparseIndices {
   };
 
   size_t RemoveZeros(VecDH<int>& S) {
-    ALWAYS_ASSERT(S.size() == p.size(), runtimeErr,
+    ALWAYS_ASSERT(S.size() == p.size(), userErr,
                   "Different number of values than indicies!");
     auto zBegin = zip(S.beginD(), beginD(false), beginD(true));
     auto zEnd = zip(S.endD(), endD(false), endD(true));
@@ -118,7 +118,7 @@ class SparseIndices {
 
   template <typename T>
   size_t KeepFinite(VecDH<T>& v, VecDH<int>& x) {
-    ALWAYS_ASSERT(x.size() == p.size(), runtimeErr,
+    ALWAYS_ASSERT(x.size() == p.size(), userErr,
                   "Different number of values than indicies!");
     auto zBegin = zip(v.beginD(), x.beginD(), beginD(false), beginD(true));
     auto zEnd = zip(v.endD(), x.endD(), endD(false), endD(true));
@@ -133,7 +133,7 @@ class SparseIndices {
   template <typename Iter, typename T>
   VecDH<T> Gather(const VecDH<T>& val, const Iter pqBegin, const Iter pqEnd,
                   T missingVal) const {
-    ALWAYS_ASSERT(val.size() == p.size(), runtimeErr,
+    ALWAYS_ASSERT(val.size() == p.size(), userErr,
                   "Different number of values than indicies!");
     size_t size = pqEnd - pqBegin;
     VecDH<T> result(size);

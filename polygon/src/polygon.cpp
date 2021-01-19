@@ -43,8 +43,7 @@ typedef std::list<EdgePair>::iterator PairItr;
  */
 struct VertAdj {
   glm::vec2 pos;
-  int mesh_idx;   // This is a global index into the manifold.
-  int edgeRight;  // Cannot join identical edges with a triangle.
+  int mesh_idx;  // This is a global index into the manifold.
   int index;
   VertItr left, right;
   PairItr eastPair, westPair;
@@ -101,13 +100,6 @@ struct EdgePair {
   }
 };
 
-bool SharedEdge(glm::ivec2 edges0, glm::ivec2 edges1) {
-  return (edges0[0] != Edge::kNoIdx &&
-          (edges0[0] == edges1[0] || edges0[0] == edges1[1])) ||
-         (edges0[1] != Edge::kNoIdx &&
-          (edges0[1] == edges1[0] || edges0[1] == edges1[1]));
-}
-
 /**
  * This class takes sequential verts of a monotone polygon and outputs a
  * geometrically valid triangulation, step by step.
@@ -142,13 +134,14 @@ class Triangulator {
       // This only creates enough triangles to ensure the reflex chain is still
       // reflex.
       if (params.verbose) std::cout << "same chain" << std::endl;
-      while (CCW(vi->pos, vj->pos, v_top->pos) == (onRight_ ? 1 : -1) ||
-             (CCW(vi->pos, vj->pos, v_top->pos) == 0 && !SharesEdge(vi, vj))) {
-        AddTriangle(triangles, vi->mesh_idx, vj->mesh_idx, v_top->mesh_idx);
+      int ccw = CCW(vi->pos, vj->pos, v_top->pos);
+      while (ccw == (onRight_ ? 1 : -1) || ccw == 0) {
+        AddTriangle(triangles, vi, vj, v_top);
         v_top = vj;
         reflex_chain_.pop();
         if (reflex_chain_.empty()) break;
         vj = reflex_chain_.top();
+        ccw = CCW(vi->pos, vj->pos, v_top->pos);
       }
       reflex_chain_.push(v_top);
       reflex_chain_.push(vi);
@@ -161,7 +154,7 @@ class Triangulator {
       VertItr v_last = v_top;
       while (!reflex_chain_.empty()) {
         vj = reflex_chain_.top();
-        AddTriangle(triangles, vi->mesh_idx, v_last->mesh_idx, vj->mesh_idx);
+        AddTriangle(triangles, vi, v_last, vj);
         v_last = vj;
         reflex_chain_.pop();
       }
@@ -177,21 +170,12 @@ class Triangulator {
   bool onRight_;        // The side the reflex chain is on
   int triangles_output_ = 0;
 
-  void AddTriangle(std::vector<glm::ivec3> &triangles, int v0, int v1, int v2) {
-    // if (v0 == v1 || v1 == v2 || v2 == v0) return;
-    if (onRight_)
-      triangles.emplace_back(v0, v1, v2);
-    else
-      triangles.emplace_back(v0, v2, v1);
+  void AddTriangle(std::vector<glm::ivec3> &triangles, VertItr v0, VertItr v1,
+                   VertItr v2) {
+    if (!onRight_) std::swap(v1, v2);
+    triangles.emplace_back(v0->mesh_idx, v1->mesh_idx, v2->mesh_idx);
     ++triangles_output_;
     if (params.verbose) std::cout << triangles.back() << std::endl;
-  }
-
-  // This checks the extra edge constraint from the mesh Boolean.
-  bool SharesEdge(const VertItr v0, const VertItr v1) {
-    glm::ivec2 e0(v0->edgeRight, v0->left->edgeRight);
-    glm::ivec2 e1(v1->edgeRight, v1->left->edgeRight);
-    return SharedEdge(e0, e1);
   }
 };
 
@@ -205,9 +189,8 @@ class Monotones {
     VertItr start, last, current;
     for (const SimplePolygon &poly : polys) {
       for (int i = 0; i < poly.size(); ++i) {
-        monotones_.push_back({poly[i].pos,       //
-                              poly[i].idx,       //
-                              poly[i].nextEdge,  //
+        monotones_.push_back({poly[i].pos,  //
+                              poly[i].idx,  //
                               0, monotones_.end(), monotones_.end(),
                               activePairs_.end(), activePairs_.end()});
 
@@ -260,14 +243,14 @@ class Monotones {
       triangulator.ProcessVert(vR, true, true, triangles);
       vR->SetProcessed(true);
       // validation
-      ALWAYS_ASSERT(triangulator.NumTriangles() > 0, logicErr,
+      ALWAYS_ASSERT(triangulator.NumTriangles() > 0, topologyErr,
                     "Monotone produced no triangles.");
       triangles_left -= 2 + triangulator.NumTriangles();
       // Find next monotone
       start = std::find_if(monotones_.begin(), monotones_.end(),
                            [](const VertAdj &v) { return !v.Processed(); });
     }
-    ALWAYS_ASSERT(triangles_left == 0, logicErr,
+    ALWAYS_ASSERT(triangles_left == 0, topologyErr,
                   "Triangulation produced wrong number of triangles.");
   }
 
@@ -278,9 +261,10 @@ class Monotones {
     std::vector<Halfedge> edges;
     for (VertItr vert = monotones_.begin(); vert != monotones_.end(); vert++) {
       vert->SetProcessed(false);
-      edges.push_back({vert->mesh_idx, vert->right->mesh_idx, Edge::kNoIdx});
-      ALWAYS_ASSERT(vert->right->right != vert, logicErr, "two-edge monotone!");
-      ALWAYS_ASSERT(vert->left->right == vert, logicErr,
+      edges.push_back({vert->mesh_idx, vert->right->mesh_idx});
+      ALWAYS_ASSERT(vert->right->right != vert, topologyErr,
+                    "two-edge monotone!");
+      ALWAYS_ASSERT(vert->left->right == vert, topologyErr,
                     "monotone vert neighbors don't agree!");
     }
     if (params.verbose) {
@@ -431,10 +415,22 @@ class Monotones {
       }
       if (isHole != 0) return isHole > 0;
 
-      if (left->pos.y < right->pos.y) {
-        left = left->left;
+      glm::vec2 edgeLeft = left->pos - center->pos;
+      glm::vec2 edgeRight = right->pos - center->pos;
+      if (glm::dot(edgeLeft, edgeRight) > 0) {
+        if (glm::dot(edgeLeft, edgeLeft) < glm::dot(edgeRight, edgeRight)) {
+          center = left;
+          left = left->left;
+        } else {
+          center = right;
+          right = right->right;
+        }
       } else {
-        right = right->right;
+        if (left->pos.y < right->pos.y) {
+          left = left->left;
+        } else {
+          right = right->right;
+        }
       }
     }
     return false;
@@ -588,7 +584,7 @@ class Monotones {
       if (vert->Processed()) continue;
 
       if (!skipped.empty() && vert->IsPast(skipped.back())) {
-        throw runtimeErr(
+        throw geometryErr(
             "Not Geometrically Valid! None of the skipped verts is valid.");
       }
 
@@ -611,11 +607,11 @@ class Monotones {
 
       if (type == SKIP) {
         if (std::next(insertAt) == monotones_.end()) {
-          throw runtimeErr(
+          throw geometryErr(
               "Not Geometrically Valid! Tried to skip final vert.");
         }
         if (nextAttached.empty() && starts.empty())
-          throw runtimeErr(
+          throw geometryErr(
               "Not Geometrically Valid! Tried to skip last queued vert.");
         skipped.push_back(vert);
         if (params.verbose) std::cout << "Skipping vert" << std::endl;
@@ -831,9 +827,11 @@ std::vector<glm::ivec3> Triangulate(const Polygons &polys) {
   try {
     Monotones monotones(polys);
     monotones.Triangulate(triangles);
-    CheckTopology(triangles, polys);
-    CheckGeometry(triangles, polys);
-  } catch (const runtimeErr &e) {
+    if (params.intermediateChecks) {
+      CheckTopology(triangles, polys);
+      CheckGeometry(triangles, polys);
+    }
+  } catch (const geometryErr &e) {
     if (!params.suppressErrors) {
       PrintFailure(e, polys, triangles);
     }
@@ -849,11 +847,9 @@ std::vector<Halfedge> Polygons2Edges(const Polygons &polys) {
   std::vector<Halfedge> halfedges;
   for (const auto &poly : polys) {
     for (int i = 1; i < poly.size(); ++i) {
-      halfedges.push_back(
-          {poly[i - 1].idx, poly[i].idx, -1, poly[i - 1].nextEdge});
+      halfedges.push_back({poly[i - 1].idx, poly[i].idx, -1});
     }
-    halfedges.push_back(
-        {poly.back().idx, poly[0].idx, -1, poly.back().nextEdge});
+    halfedges.push_back({poly.back().idx, poly[0].idx, -1});
   }
   return halfedges;
 }
@@ -862,29 +858,28 @@ std::vector<Halfedge> Triangles2Edges(
     const std::vector<glm::ivec3> &triangles) {
   std::vector<Halfedge> halfedges;
   for (const glm::ivec3 &tri : triangles) {
-    // Differentiate edges of triangles by setting index to Edge::kInterior.
-    halfedges.push_back({tri[0], tri[1], -1, Edge::kInterior});
-    halfedges.push_back({tri[1], tri[2], -1, Edge::kInterior});
-    halfedges.push_back({tri[2], tri[0], -1, Edge::kInterior});
+    halfedges.push_back({tri[0], tri[1], -1});
+    halfedges.push_back({tri[1], tri[2], -1});
+    halfedges.push_back({tri[2], tri[0], -1});
   }
   return halfedges;
 }
 
 void CheckTopology(const std::vector<Halfedge> &halfedges) {
-  ALWAYS_ASSERT(halfedges.size() % 2 == 0, runtimeErr,
+  ALWAYS_ASSERT(halfedges.size() % 2 == 0, topologyErr,
                 "Odd number of halfedges.");
   size_t n_edges = halfedges.size() / 2;
   std::vector<Halfedge> forward(halfedges.size()), backward(halfedges.size());
 
   auto end = std::copy_if(halfedges.begin(), halfedges.end(), forward.begin(),
                           [](Halfedge e) { return e.endVert > e.startVert; });
-  ALWAYS_ASSERT(std::distance(forward.begin(), end) == n_edges, runtimeErr,
+  ALWAYS_ASSERT(std::distance(forward.begin(), end) == n_edges, topologyErr,
                 "Half of halfedges should be forward.");
   forward.resize(n_edges);
 
   end = std::copy_if(halfedges.begin(), halfedges.end(), backward.begin(),
                      [](Halfedge e) { return e.endVert < e.startVert; });
-  ALWAYS_ASSERT(std::distance(backward.begin(), end) == n_edges, runtimeErr,
+  ALWAYS_ASSERT(std::distance(backward.begin(), end) == n_edges, topologyErr,
                 "Half of halfedges should be backward.");
   backward.resize(n_edges);
 
@@ -899,36 +894,14 @@ void CheckTopology(const std::vector<Halfedge> &halfedges) {
   for (int i = 0; i < n_edges; ++i) {
     ALWAYS_ASSERT(forward[i].startVert == backward[i].startVert &&
                       forward[i].endVert == backward[i].endVert,
-                  runtimeErr, "Forward and backward edge do not match.");
+                  topologyErr, "Forward and backward edge do not match.");
     if (i > 0) {
       ALWAYS_ASSERT(forward[i - 1].startVert != forward[i].startVert ||
                         forward[i - 1].endVert != forward[i].endVert,
-                    runtimeErr, "Not a 2-manifold.");
+                    topologyErr, "Not a 2-manifold.");
       ALWAYS_ASSERT(backward[i - 1].startVert != backward[i].startVert ||
                         backward[i - 1].endVert != backward[i].endVert,
-                    runtimeErr, "Not a 2-manifold.");
-    }
-  }
-  // Check that no interior edges link vertices that share the same edge data.
-  std::map<int, glm::ivec2> vert2edges;
-  for (Halfedge halfedge : halfedges) {
-    if (halfedge.face == Edge::kInterior)
-      continue;  // only interested in polygon edges
-    auto vert = vert2edges.emplace(halfedge.startVert,
-                                   glm::ivec2(halfedge.face, Edge::kInvalid));
-    if (!vert.second) (vert.first->second)[1] = halfedge.face;
-
-    vert = vert2edges.emplace(halfedge.endVert,
-                              glm::ivec2(halfedge.face, Edge::kInvalid));
-    if (!vert.second) (vert.first->second)[1] = halfedge.face;
-  }
-  for (int i = 0; i < n_edges; ++i) {
-    if (forward[i].face == Edge::kInterior &&
-        backward[i].face == Edge::kInterior) {
-      glm::ivec2 TwoEdges0 = vert2edges.find(forward[i].startVert)->second;
-      glm::ivec2 TwoEdges1 = vert2edges.find(forward[i].endVert)->second;
-      if (SharedEdge(TwoEdges0, TwoEdges1))
-        std::cout << "Added an interface edge!" << std::endl;
+                    topologyErr, "Not a 2-manifold.");
     }
   }
 }
@@ -956,7 +929,7 @@ void CheckGeometry(const std::vector<glm::ivec3> &triangles,
                               return CCW(vertPos[tri[0]], vertPos[tri[1]],
                                          vertPos[tri[2]]) >= 0;
                             }),
-                runtimeErr, "triangulation is not entirely CCW!");
+                geometryErr, "triangulation is not entirely CCW!");
 }
 
 void Dump(const Polygons &polys) {
@@ -964,7 +937,7 @@ void Dump(const Polygons &polys) {
     std::cout << "polys.push_back({" << std::setprecision(9) << std::endl;
     for (auto v : poly) {
       std::cout << "    {glm::vec2(" << v.pos.x << ", " << v.pos.y << "), "
-                << v.idx << ", " << v.nextEdge << "},  //" << std::endl;
+                << v.idx << "},  //" << std::endl;
     }
     std::cout << "});" << std::endl;
   }

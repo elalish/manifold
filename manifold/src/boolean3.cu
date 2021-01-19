@@ -671,15 +671,17 @@ struct DuplicateHalfedges {
     halfedge.face = faceP2R[halfedge.face];
     int faceRight = faceP2R[halfedgesP[halfedge.pairedHalfedge].face];
 
-    Halfedge backward = {halfedge.endVert, halfedge.startVert, -1, faceRight};
-
     for (int i = 0; i < glm::abs(inclusion); ++i) {
       int forwardIdx = AtomicAddInt(facePtr[halfedge.face], 1);
       int backwardIdx = AtomicAddInt(facePtr[faceRight], 1);
       halfedge.pairedHalfedge = backwardIdx;
-      backward.pairedHalfedge = forwardIdx;
+
       halfedgesR[forwardIdx] = halfedge;
-      halfedgesR[backwardIdx] = backward;
+      halfedgesR[backwardIdx] = {halfedge.endVert, halfedge.startVert,
+                                 forwardIdx, faceRight};
+
+      ++halfedge.startVert;
+      ++halfedge.endVert;
     }
   }
 };
@@ -739,12 +741,12 @@ std::vector<Halfedge> PairUp(std::vector<EdgePos> &edgePos) {
   // geometrically valid. If the order does not go start-end-start-end... then
   // the input and output are not geometrically valid and this algorithm becomes
   // a heuristic.
-  ALWAYS_ASSERT(edgePos.size() % 2 == 0, logicErr,
+  ALWAYS_ASSERT(edgePos.size() % 2 == 0, topologyErr,
                 "Non-manifold edge! Not an even number of points.");
   int nEdges = edgePos.size() / 2;
   auto middle = std::partition(edgePos.begin(), edgePos.end(),
                                [](EdgePos x) { return x.isStart; });
-  ALWAYS_ASSERT(middle - edgePos.begin() == nEdges, logicErr,
+  ALWAYS_ASSERT(middle - edgePos.begin() == nEdges, topologyErr,
                 "Non-manifold edge!");
   auto cmp = [](EdgePos a, EdgePos b) { return a.edgePos < b.edgePos; };
   std::sort(edgePos.begin(), middle, cmp);

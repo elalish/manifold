@@ -70,9 +70,17 @@ TEST(Samples, Sponge) {
   // ExportMesh("mengerSponge.ply", cutSponge.first.Extract());
 }
 
+TEST(Samples, FrameReduced) {
+  Manifold::SetCircularSegments(6);
+  Manifold frame = RoundedFrame(100, 10);
+  EXPECT_TRUE(frame.IsManifold());
+  Manifold::SetCircularSegments(0);
+  // EXPECT_EQ(frame.Genus(), 13);
+}
+
 TEST(Samples, Frame) {
   Manifold frame = RoundedFrame(100, 10);
-  // EXPECT_TRUE(frame.IsManifold());
+  EXPECT_TRUE(frame.IsManifold());
   // EXPECT_EQ(frame.Genus(), 13);
   // ExportMesh("roundedFrame.ply", frame.Extract());
 }
