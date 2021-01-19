@@ -87,12 +87,6 @@ struct ExecutionParams {
   bool suppressErrors = false;
 };
 
-namespace Edge {
-constexpr int kNoIdx = -1;
-constexpr int kInterior = -2;
-constexpr int kInvalid = -3;
-}  // namespace Edge
-
 struct Halfedge {
   int startVert, endVert;
   int pairedHalfedge;
@@ -107,7 +101,6 @@ struct Halfedge {
 struct PolyVert {
   glm::vec2 pos;
   int idx;
-  int nextEdge;
 };
 
 using SimplePolygon = std::vector<PolyVert>;

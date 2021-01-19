@@ -1098,8 +1098,7 @@ Polygons Manifold::Impl::Face2Polygons(int face, glm::mat3x2 projection,
       polys.push_back({});
     }
     int vert = halfedge[thisEdge].startVert;
-    polys.back().push_back({projection * vertPos[vert], vert,
-                            halfedge[halfedge[thisEdge].pairedHalfedge].face});
+    polys.back().push_back({projection * vertPos[vert], vert});
     const auto result = vert_edge.find(halfedge[thisEdge].endVert);
     ALWAYS_ASSERT(result != vert_edge.end(), topologyErr, "nonmanifold edge");
     thisEdge = result->second;
