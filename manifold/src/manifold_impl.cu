@@ -90,7 +90,7 @@ VecDH<TmpEdge> CreateTmpEdges(const VecDH<Halfedge>& halfedge) {
                      edges.size(), Halfedge2Tmp());
   int numEdge = thrust::remove_if(edges.beginD(), edges.endD(), TmpInvalid()) -
                 edges.beginD();
-  ALWAYS_ASSERT(numEdge == halfedge.size() / 2, runtimeErr, "Not oriented!");
+  ALWAYS_ASSERT(numEdge == halfedge.size() / 2, topologyErr, "Not oriented!");
   edges.resize(numEdge);
   return edges;
 }
@@ -625,7 +625,7 @@ Manifold::Impl::Impl(Shape shape) {
                   {3, 0, 4}, {2, 5, 1}};
       break;
     default:
-      throw logicErr("Unrecognized shape!");
+      throw userErr("Unrecognized shape!");
   }
   vertPos_ = vertPos;
   CreateAndFixHalfedges(triVerts);
@@ -680,16 +680,16 @@ void Manifold::Impl::Finish() {
   extrema =
       thrust::reduce(halfedge_.beginD(), halfedge_.endD(), extrema, Extrema());
 
-  ALWAYS_ASSERT(extrema.startVert >= 0, runtimeErr,
+  ALWAYS_ASSERT(extrema.startVert >= 0, topologyErr,
                 "Vertex index is negative!");
-  ALWAYS_ASSERT(extrema.endVert < NumVert(), runtimeErr,
+  ALWAYS_ASSERT(extrema.endVert < NumVert(), topologyErr,
                 "Vertex index exceeds number of verts!");
-  ALWAYS_ASSERT(extrema.face >= 0, runtimeErr, "Face index is negative!");
-  ALWAYS_ASSERT(extrema.face < NumTri(), runtimeErr,
+  ALWAYS_ASSERT(extrema.face >= 0, topologyErr, "Face index is negative!");
+  ALWAYS_ASSERT(extrema.face < NumTri(), topologyErr,
                 "Face index exceeds number of faces!");
-  ALWAYS_ASSERT(extrema.pairedHalfedge >= 0, runtimeErr,
+  ALWAYS_ASSERT(extrema.pairedHalfedge >= 0, topologyErr,
                 "Halfedge index is negative!");
-  ALWAYS_ASSERT(extrema.pairedHalfedge < 2 * NumEdge(), runtimeErr,
+  ALWAYS_ASSERT(extrema.pairedHalfedge < 2 * NumEdge(), topologyErr,
                 "Halfedge index exceeds number of halfedges!");
 
   CalculateBBox();
@@ -767,7 +767,7 @@ void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge) {
     const int edge = face[i];
     const int lastEdge = face[i + 1];
     const int numEdge = lastEdge - edge;
-    ALWAYS_ASSERT(numEdge >= 3, logicErr, "face has less than three edges.");
+    ALWAYS_ASSERT(numEdge >= 3, topologyErr, "face has less than three edges.");
     const glm::vec3 normal = faceNormal[i];
 
     if (numEdge == 3) {  // Single triangle
@@ -780,7 +780,7 @@ void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge) {
         std::swap(ends[1], ends[2]);
       }
       ALWAYS_ASSERT(ends[0] == tri[1] && ends[1] == tri[2] && ends[2] == tri[0],
-                    runtimeErr, "These 3 edges do not form a triangle!");
+                    topologyErr, "These 3 edges do not form a triangle!");
 
       triVerts.push_back(tri);
       triNormal.push_back(normal);
@@ -804,7 +804,7 @@ void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge) {
       }
       ALWAYS_ASSERT(glm::all(glm::greaterThanEqual(tri0, glm::ivec3(0))) &&
                         glm::all(glm::greaterThanEqual(tri1, glm::ivec3(0))),
-                    runtimeErr, "non-manifold quad!");
+                    topologyErr, "non-manifold quad!");
       bool firstValid = triCCW(tri0) && triCCW(tri1);
       tri0[2] = tri1[1];
       tri1[2] = tri0[1];
@@ -928,7 +928,7 @@ void Manifold::Impl::CalculateBBox() {
                              glm::vec3(1 / 0.0f), PosMin());
   bBox_.max = thrust::reduce(vertPos_.begin(), vertPos_.end(),
                              glm::vec3(-1 / 0.0f), PosMax());
-  ALWAYS_ASSERT(bBox_.isFinite(), runtimeErr,
+  ALWAYS_ASSERT(bBox_.isFinite(), topologyErr,
                 "Input vertices are not all finite!");
 }
 
@@ -1084,7 +1084,7 @@ Polygons Manifold::Impl::Face2Polygons(int face, glm::mat3x2 projection,
     ALWAYS_ASSERT(
         vert_edge.emplace(std::make_pair(halfedge[edge].startVert, edge))
             .second,
-        runtimeErr, "face has duplicate vertices.");
+        topologyErr, "face has duplicate vertices.");
   }
 
   Polygons polys;
@@ -1101,7 +1101,7 @@ Polygons Manifold::Impl::Face2Polygons(int face, glm::mat3x2 projection,
     polys.back().push_back({projection * vertPos[vert], vert,
                             halfedge[halfedge[thisEdge].pairedHalfedge].face});
     const auto result = vert_edge.find(halfedge[thisEdge].endVert);
-    ALWAYS_ASSERT(result != vert_edge.end(), runtimeErr, "nonmanifold edge");
+    ALWAYS_ASSERT(result != vert_edge.end(), topologyErr, "nonmanifold edge");
     thisEdge = result->second;
     vert_edge.erase(result);
   }

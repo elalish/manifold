@@ -356,7 +356,9 @@ TEST(Manifold, BooleanWinding) {
 
   Manifold cube = Manifold::Cube(glm::vec3(1.0f), true);
   PolygonParams().suppressErrors = true;
-  EXPECT_THROW(cube ^= doubled, runtimeErr);
+  // The geometry error is expected due to triangulating a doubly-wound
+  // manifold, but we're checking that there was not first a topology error.
+  EXPECT_THROW(cube ^= doubled, geometryErr);
   PolygonParams().suppressErrors = false;
 }
 

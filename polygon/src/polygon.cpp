@@ -266,14 +266,14 @@ class Monotones {
       triangulator.ProcessVert(vR, true, true, triangles);
       vR->SetProcessed(true);
       // validation
-      ALWAYS_ASSERT(triangulator.NumTriangles() > 0, logicErr,
+      ALWAYS_ASSERT(triangulator.NumTriangles() > 0, topologyErr,
                     "Monotone produced no triangles.");
       triangles_left -= 2 + triangulator.NumTriangles();
       // Find next monotone
       start = std::find_if(monotones_.begin(), monotones_.end(),
                            [](const VertAdj &v) { return !v.Processed(); });
     }
-    ALWAYS_ASSERT(triangles_left == 0, logicErr,
+    ALWAYS_ASSERT(triangles_left == 0, topologyErr,
                   "Triangulation produced wrong number of triangles.");
   }
 
@@ -285,8 +285,9 @@ class Monotones {
     for (VertItr vert = monotones_.begin(); vert != monotones_.end(); vert++) {
       vert->SetProcessed(false);
       edges.push_back({vert->mesh_idx, vert->right->mesh_idx, Edge::kNoIdx});
-      ALWAYS_ASSERT(vert->right->right != vert, logicErr, "two-edge monotone!");
-      ALWAYS_ASSERT(vert->left->right == vert, logicErr,
+      ALWAYS_ASSERT(vert->right->right != vert, topologyErr,
+                    "two-edge monotone!");
+      ALWAYS_ASSERT(vert->left->right == vert, topologyErr,
                     "monotone vert neighbors don't agree!");
     }
     if (params.verbose) {
@@ -606,7 +607,7 @@ class Monotones {
       if (vert->Processed()) continue;
 
       if (!skipped.empty() && vert->IsPast(skipped.back())) {
-        throw runtimeErr(
+        throw geometryErr(
             "Not Geometrically Valid! None of the skipped verts is valid.");
       }
 
@@ -629,11 +630,11 @@ class Monotones {
 
       if (type == SKIP) {
         if (std::next(insertAt) == monotones_.end()) {
-          throw runtimeErr(
+          throw geometryErr(
               "Not Geometrically Valid! Tried to skip final vert.");
         }
         if (nextAttached.empty() && starts.empty())
-          throw runtimeErr(
+          throw geometryErr(
               "Not Geometrically Valid! Tried to skip last queued vert.");
         skipped.push_back(vert);
         if (params.verbose) std::cout << "Skipping vert" << std::endl;
@@ -810,11 +811,9 @@ class Monotones {
   }
 };
 
-void PrintFailure(const std::exception &e, const Polygons &polys,
-                  std::vector<glm::ivec3> &triangles) {
+void PrintFailure(const Polygons &polys, std::vector<glm::ivec3> &triangles) {
   std::cout << "-----------------------------------" << std::endl;
   std::cout << "Triangulation failed!" << std::endl;
-  std::cout << e.what() << std::endl;
   Dump(polys);
   std::cout << "produced this triangulation:" << std::endl;
   for (int j = 0; j < triangles.size(); ++j) {
@@ -853,13 +852,15 @@ std::vector<glm::ivec3> Triangulate(const Polygons &polys) {
       CheckTopology(triangles, polys);
       CheckGeometry(triangles, polys);
     }
-  } catch (const runtimeErr &e) {
+  } catch (const geometryErr &e) {
     if (!params.suppressErrors) {
-      PrintFailure(e, polys, triangles);
+      std::cout << e.what() << std::endl;
+      PrintFailure(polys, triangles);
     }
     throw;
   } catch (const std::exception &e) {
-    PrintFailure(e, polys, triangles);
+    std::cout << e.what() << std::endl;
+    PrintFailure(polys, triangles);
     throw;
   }
   return triangles;
@@ -891,20 +892,20 @@ std::vector<Halfedge> Triangles2Edges(
 }
 
 void CheckTopology(const std::vector<Halfedge> &halfedges) {
-  ALWAYS_ASSERT(halfedges.size() % 2 == 0, runtimeErr,
+  ALWAYS_ASSERT(halfedges.size() % 2 == 0, topologyErr,
                 "Odd number of halfedges.");
   size_t n_edges = halfedges.size() / 2;
   std::vector<Halfedge> forward(halfedges.size()), backward(halfedges.size());
 
   auto end = std::copy_if(halfedges.begin(), halfedges.end(), forward.begin(),
                           [](Halfedge e) { return e.endVert > e.startVert; });
-  ALWAYS_ASSERT(std::distance(forward.begin(), end) == n_edges, runtimeErr,
+  ALWAYS_ASSERT(std::distance(forward.begin(), end) == n_edges, topologyErr,
                 "Half of halfedges should be forward.");
   forward.resize(n_edges);
 
   end = std::copy_if(halfedges.begin(), halfedges.end(), backward.begin(),
                      [](Halfedge e) { return e.endVert < e.startVert; });
-  ALWAYS_ASSERT(std::distance(backward.begin(), end) == n_edges, runtimeErr,
+  ALWAYS_ASSERT(std::distance(backward.begin(), end) == n_edges, topologyErr,
                 "Half of halfedges should be backward.");
   backward.resize(n_edges);
 
@@ -919,14 +920,14 @@ void CheckTopology(const std::vector<Halfedge> &halfedges) {
   for (int i = 0; i < n_edges; ++i) {
     ALWAYS_ASSERT(forward[i].startVert == backward[i].startVert &&
                       forward[i].endVert == backward[i].endVert,
-                  runtimeErr, "Forward and backward edge do not match.");
+                  topologyErr, "Forward and backward edge do not match.");
     if (i > 0) {
       ALWAYS_ASSERT(forward[i - 1].startVert != forward[i].startVert ||
                         forward[i - 1].endVert != forward[i].endVert,
-                    runtimeErr, "Not a 2-manifold.");
+                    topologyErr, "Not a 2-manifold.");
       ALWAYS_ASSERT(backward[i - 1].startVert != backward[i].startVert ||
                         backward[i - 1].endVert != backward[i].endVert,
-                    runtimeErr, "Not a 2-manifold.");
+                    topologyErr, "Not a 2-manifold.");
     }
   }
   // Check that no interior edges link vertices that share the same edge data.
@@ -948,7 +949,7 @@ void CheckTopology(const std::vector<Halfedge> &halfedges) {
   //       backward[i].face == Edge::kInterior) {
   //     glm::ivec2 TwoEdges0 = vert2edges.find(forward[i].startVert)->second;
   //     glm::ivec2 TwoEdges1 = vert2edges.find(forward[i].endVert)->second;
-  //     ALWAYS_ASSERT(!SharedEdge(TwoEdges0, TwoEdges1), runtimeErr,
+  //     ALWAYS_ASSERT(!SharedEdge(TwoEdges0, TwoEdges1), topologyErr,
   //                   "Added an interface edge!");
   //   }
   // }
@@ -977,7 +978,7 @@ void CheckGeometry(const std::vector<glm::ivec3> &triangles,
                               return CCW(vertPos[tri[0]], vertPos[tri[1]],
                                          vertPos[tri[2]]) >= 0;
                             }),
-                runtimeErr, "triangulation is not entirely CCW!");
+                geometryErr, "triangulation is not entirely CCW!");
 }
 
 void Dump(const Polygons &polys) {

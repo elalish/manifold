@@ -13,7 +13,9 @@
 // limitations under the License.
 
 #include "meshIO.h"
+
 #include <algorithm>
+
 #include "assimp/Exporter.hpp"
 #include "assimp/Importer.hpp"
 #include "assimp/postprocess.h"
@@ -45,7 +47,7 @@ Mesh ImportMesh(const std::string& filename) {
                             aiProcess_SortByPType |           //
                             aiProcess_OptimizeMeshes);
 
-  ALWAYS_ASSERT(scene, runtimeErr, importer.GetErrorString());
+  ALWAYS_ASSERT(scene, userErr, importer.GetErrorString());
 
   Mesh mesh_out;
   for (int i = 0; i < scene->mNumMeshes; ++i) {
@@ -56,7 +58,7 @@ Mesh ImportMesh(const std::string& filename) {
     }
     for (int j = 0; j < mesh_i->mNumFaces; ++j) {
       const aiFace face = mesh_i->mFaces[j];
-      ALWAYS_ASSERT(face.mNumIndices == 3, runtimeErr,
+      ALWAYS_ASSERT(face.mNumIndices == 3, userErr,
                     "Non-triangular face in " + filename);
       mesh_out.triVerts.emplace_back(face.mIndices[0], face.mIndices[1],
                                      face.mIndices[2]);
@@ -114,7 +116,7 @@ void ExportMesh(const std::string& filename, const Mesh& manifold) {
 
   delete scene;
 
-  ALWAYS_ASSERT(result == AI_SUCCESS, runtimeErr, exporter.GetErrorString());
+  ALWAYS_ASSERT(result == AI_SUCCESS, userErr, exporter.GetErrorString());
 }
 
 }  // namespace manifold

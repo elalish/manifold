@@ -28,7 +28,4 @@ int ConnectedComponentsGPU(VecDH<int>& components, int numVert,
 int ConnectedComponentsCPU(VecDH<int>& components, int numVert,
                            const VecDH<Halfedge>& halfedges,
                            const VecDH<bool>& keep = VecDH<bool>());
-
-void FloodComponents(VecDH<int>& valuesInOut, VecDH<int>& componentsToDie,
-                     int numComponent);
 }
