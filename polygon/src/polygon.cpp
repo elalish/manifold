@@ -43,8 +43,7 @@ typedef std::list<EdgePair>::iterator PairItr;
  */
 struct VertAdj {
   glm::vec2 pos;
-  int mesh_idx;   // This is a global index into the manifold.
-  int edgeRight;  // Cannot join identical edges with a triangle.
+  int mesh_idx;  // This is a global index into the manifold.
   int index;
   VertItr left, right;
   PairItr eastPair, westPair;
@@ -100,13 +99,6 @@ struct EdgePair {
     return eastOf;
   }
 };
-
-bool SharedEdge(glm::ivec2 edges0, glm::ivec2 edges1) {
-  return (edges0[0] != Edge::kNoIdx &&
-          (edges0[0] == edges1[0] || edges0[0] == edges1[1])) ||
-         (edges0[1] != Edge::kNoIdx &&
-          (edges0[1] == edges1[0] || edges0[1] == edges1[1]));
-}
 
 /**
  * This class takes sequential verts of a monotone polygon and outputs a
@@ -187,18 +179,6 @@ class Triangulator {
     ++triangles_output_;
     if (params.verbose) std::cout << triangles.back() << std::endl;
   }
-
-  // bool IsBetween(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2) {
-  //   return glm::dot(p1 - p0, p2 - p0) <= 0;
-  // }
-
-  // This checks the extra edge constraint from the mesh Boolean.
-  // bool SharesEdge(const VertItr v0, const VertItr v1) {
-  //   if (v0->right == v1) return false;
-  //   glm::ivec2 e0(v0->edgeRight, v0->left->edgeRight);
-  //   glm::ivec2 e1(v1->edgeRight, v1->left->edgeRight);
-  //   return SharedEdge(e0, e1);
-  // }
 };
 
 /**
@@ -211,9 +191,8 @@ class Monotones {
     VertItr start, last, current;
     for (const SimplePolygon &poly : polys) {
       for (int i = 0; i < poly.size(); ++i) {
-        monotones_.push_back({poly[i].pos,       //
-                              poly[i].idx,       //
-                              poly[i].nextEdge,  //
+        monotones_.push_back({poly[i].pos,  //
+                              poly[i].idx,  //
                               0, monotones_.end(), monotones_.end(),
                               activePairs_.end(), activePairs_.end()});
 
@@ -284,7 +263,7 @@ class Monotones {
     std::vector<Halfedge> edges;
     for (VertItr vert = monotones_.begin(); vert != monotones_.end(); vert++) {
       vert->SetProcessed(false);
-      edges.push_back({vert->mesh_idx, vert->right->mesh_idx, Edge::kNoIdx});
+      edges.push_back({vert->mesh_idx, vert->right->mesh_idx});
       ALWAYS_ASSERT(vert->right->right != vert, topologyErr,
                     "two-edge monotone!");
       ALWAYS_ASSERT(vert->left->right == vert, topologyErr,
@@ -870,11 +849,9 @@ std::vector<Halfedge> Polygons2Edges(const Polygons &polys) {
   std::vector<Halfedge> halfedges;
   for (const auto &poly : polys) {
     for (int i = 1; i < poly.size(); ++i) {
-      halfedges.push_back(
-          {poly[i - 1].idx, poly[i].idx, -1, poly[i - 1].nextEdge});
+      halfedges.push_back({poly[i - 1].idx, poly[i].idx, -1});
     }
-    halfedges.push_back(
-        {poly.back().idx, poly[0].idx, -1, poly.back().nextEdge});
+    halfedges.push_back({poly.back().idx, poly[0].idx, -1});
   }
   return halfedges;
 }
@@ -883,10 +860,9 @@ std::vector<Halfedge> Triangles2Edges(
     const std::vector<glm::ivec3> &triangles) {
   std::vector<Halfedge> halfedges;
   for (const glm::ivec3 &tri : triangles) {
-    // Differentiate edges of triangles by setting index to Edge::kInterior.
-    halfedges.push_back({tri[0], tri[1], -1, Edge::kInterior});
-    halfedges.push_back({tri[1], tri[2], -1, Edge::kInterior});
-    halfedges.push_back({tri[2], tri[0], -1, Edge::kInterior});
+    halfedges.push_back({tri[0], tri[1], -1});
+    halfedges.push_back({tri[1], tri[2], -1});
+    halfedges.push_back({tri[2], tri[0], -1});
   }
   return halfedges;
 }
@@ -930,29 +906,6 @@ void CheckTopology(const std::vector<Halfedge> &halfedges) {
                     topologyErr, "Not a 2-manifold.");
     }
   }
-  // Check that no interior edges link vertices that share the same edge data.
-  // std::map<int, glm::ivec2> vert2edges;
-  // for (Halfedge halfedge : halfedges) {
-  //   if (halfedge.face == Edge::kInterior)
-  //     continue;  // only interested in polygon edges
-  //   auto vert = vert2edges.emplace(halfedge.startVert,
-  //                                  glm::ivec2(halfedge.face,
-  //                                  Edge::kInvalid));
-  //   if (!vert.second) (vert.first->second)[1] = halfedge.face;
-
-  //   vert = vert2edges.emplace(halfedge.endVert,
-  //                             glm::ivec2(halfedge.face, Edge::kInvalid));
-  //   if (!vert.second) (vert.first->second)[1] = halfedge.face;
-  // }
-  // for (int i = 0; i < n_edges; ++i) {
-  //   if (forward[i].face == Edge::kInterior &&
-  //       backward[i].face == Edge::kInterior) {
-  //     glm::ivec2 TwoEdges0 = vert2edges.find(forward[i].startVert)->second;
-  //     glm::ivec2 TwoEdges1 = vert2edges.find(forward[i].endVert)->second;
-  //     ALWAYS_ASSERT(!SharedEdge(TwoEdges0, TwoEdges1), topologyErr,
-  //                   "Added an interface edge!");
-  //   }
-  // }
 }
 
 void CheckTopology(const std::vector<glm::ivec3> &triangles,
@@ -986,7 +939,7 @@ void Dump(const Polygons &polys) {
     std::cout << "polys.push_back({" << std::setprecision(9) << std::endl;
     for (auto v : poly) {
       std::cout << "    {glm::vec2(" << v.pos.x << ", " << v.pos.y << "), "
-                << v.idx << ", " << v.nextEdge << "},  //" << std::endl;
+                << v.idx << "},  //" << std::endl;
     }
     std::cout << "});" << std::endl;
   }

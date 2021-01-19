@@ -56,16 +56,16 @@ void ExpectMeshes(Manifold& manifold,
 Polygons SquareHole(float xOffset = 0.0) {
   Polygons polys;
   polys.push_back({
-      {glm::vec2(2 + xOffset, 2), 0, Edge::kNoIdx},    //
-      {glm::vec2(-2 + xOffset, 2), 0, Edge::kNoIdx},   //
-      {glm::vec2(-2 + xOffset, -2), 0, Edge::kNoIdx},  //
-      {glm::vec2(2 + xOffset, -2), 0, Edge::kNoIdx},   //
+      {glm::vec2(2 + xOffset, 2), 0},    //
+      {glm::vec2(-2 + xOffset, 2), 0},   //
+      {glm::vec2(-2 + xOffset, -2), 0},  //
+      {glm::vec2(2 + xOffset, -2), 0},   //
   });
   polys.push_back({
-      {glm::vec2(-1 + xOffset, 1), 0, Edge::kNoIdx},   //
-      {glm::vec2(1 + xOffset, 1), 0, Edge::kNoIdx},    //
-      {glm::vec2(1 + xOffset, -1), 0, Edge::kNoIdx},   //
-      {glm::vec2(-1 + xOffset, -1), 0, Edge::kNoIdx},  //
+      {glm::vec2(-1 + xOffset, 1), 0},   //
+      {glm::vec2(1 + xOffset, 1), 0},    //
+      {glm::vec2(1 + xOffset, -1), 0},   //
+      {glm::vec2(-1 + xOffset, -1), 0},  //
   });
   return polys;
 }
