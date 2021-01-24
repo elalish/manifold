@@ -432,6 +432,8 @@ Mesh Manifold::Extract() const {
   Mesh result;
   result.vertPos.insert(result.vertPos.end(), pImpl_->vertPos_.begin(),
                         pImpl_->vertPos_.end());
+  result.vertNormal.insert(result.vertNormal.end(), pImpl_->vertNormal_.begin(),
+                           pImpl_->vertNormal_.end());
 
   result.triVerts.resize(NumTri());
   thrust::for_each_n(zip(result.triVerts.begin(), countAt(0)), NumTri(),

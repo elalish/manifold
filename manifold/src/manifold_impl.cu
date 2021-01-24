@@ -220,10 +220,7 @@ struct FaceAreaVolume {
   const glm::vec3* vertPos;
 
   __host__ __device__ thrust::pair<float, float> operator()(int face) {
-    float perimeter = 0.0f;
-    float area = 0.0f;
-    float volume = 0.0f;
-
+    float perimeter = 0;
     glm::vec3 edge[3];
     for (int i : {0, 1, 2}) {
       const int j = (i + 1) % 3;
@@ -233,8 +230,8 @@ struct FaceAreaVolume {
     }
     glm::vec3 crossP = glm::cross(edge[0], edge[1]);
 
-    area += glm::length(crossP);
-    volume += glm::dot(crossP, vertPos[halfedges[3 * face].startVert]);
+    float area = glm::length(crossP);
+    float volume = glm::dot(crossP, vertPos[halfedges[3 * face].startVert]);
 
     return area > perimeter * kTolerance
                ? thrust::make_pair(area / 2.0f, volume / 6.0f)
@@ -409,32 +406,41 @@ struct AssignNormals {
     glm::vec3& triNormal = thrust::get<0>(in);
     const int face = thrust::get<1>(in);
 
-    glm::ivec3 triVerts(halfedges[3 * face].startVert,
-                        halfedges[3 * face].endVert,
-                        halfedges[3 * face + 1].endVert);
-    glm::vec3 v0 = vertPos[triVerts[0]];
-    glm::vec3 v1 = vertPos[triVerts[1]];
-    glm::vec3 v2 = vertPos[triVerts[2]];
-    // edge vectors
-    glm::vec3 e01 = glm::normalize(v1 - v0);
-    glm::vec3 e12 = glm::normalize(v2 - v1);
-    glm::vec3 e20 = glm::normalize(v0 - v2);
+    glm::ivec3 triVerts;
+    for (int i : {0, 1, 2}) triVerts[i] = halfedges[3 * face + i].startVert;
+
+    glm::vec3 edge[3];
+    glm::vec3 edgeLength;
+    float perimeter = 0;
+    for (int i : {0, 1, 2}) {
+      const int j = (i + 1) % 3;
+      edge[i] = vertPos[triVerts[j]] - vertPos[triVerts[i]];
+      edgeLength[i] = glm::length(edge[i]);
+      perimeter += edgeLength[i];
+    }
+    glm::vec3 crossP = glm::cross(edge[0], edge[1]);
+
+    const bool isDegenerate = glm::length(crossP) <= perimeter * kTolerance;
 
     if (calculateTriNormal) {
-      triNormal = glm::normalize(glm::cross(e01, e12));
-      if (isnan(triNormal.x)) triNormal = glm::vec3(0.0);
+      triNormal = isDegenerate ? glm::vec3(0)
+                               : glm::normalize(glm::cross(edge[0], edge[1]));
     }
 
     // corner angles
     glm::vec3 phi;
-    phi[0] = glm::acos(-glm::dot(e01, e12));
-    phi[1] = glm::acos(-glm::dot(e12, e20));
-    phi[2] = glm::pi<float>() - phi[0] - phi[1];
+    if (isDegenerate) {
+      phi = glm::vec3(kTolerance);
+    } else {
+      for (int i : {0, 1, 2}) edge[i] /= edgeLength[i];
+      phi[0] = glm::acos(-glm::dot(edge[2], edge[0]));
+      phi[1] = glm::acos(-glm::dot(edge[0], edge[1]));
+      phi[2] = glm::pi<float>() - phi[0] - phi[1];
+    }
+
     // assign weighted sum
     for (int i : {0, 1, 2}) {
-      if (isnan(phi[i])) phi[i] = 0;
-      AtomicAddVec3(vertNormal[triVerts[i]],
-                    glm::max(phi[i], kTolerance) * triNormal);
+      AtomicAddVec3(vertNormal[triVerts[i]], phi[i] * triNormal);
     }
   }
 };
@@ -668,6 +674,44 @@ void Manifold::Impl::CreateAndFixHalfedges(const VecDH<glm::ivec3>& triVerts) {
                      LinkHalfedges({halfedge_.ptrH(), edge.cptrH()}));
   thrust::for_each(thrust::host, countAt(1), countAt(halfedge_.size() / 2),
                    SwapHalfedges({halfedge_.ptrH(), edge.cptrH()}));
+}
+
+void Manifold::Impl::SplitNonmanifoldVerts() {
+  // halfedge_.Dump();
+  const VecH<Halfedge>& halfedge = halfedge_.H();
+  VecH<Halfedge> sorted = halfedge;
+  VecH<int> sorted2non(halfedge.size());
+  thrust::sequence(sorted2non.begin(), sorted2non.end());
+  thrust::sort_by_key(sorted.begin(), sorted.end(), sorted2non.begin(),
+                      [](const Halfedge& a, const Halfedge& b) {
+                        return a.startVert == b.startVert
+                                   ? a.endVert < b.endVert
+                                   : a.startVert < b.startVert;
+                      });
+  int numVert = NumVert();
+  int edge = 0;
+  for (int i = 0; i < numVert; ++i) {
+    Halfedge start = sorted[edge];
+    if (i != start.startVert)
+      std::cout << i << " != " << start.startVert << std::endl;
+    int numEdge = 1;
+    while (sorted[edge + numEdge].startVert == i) {
+      ++numEdge;
+    }
+    const int first = sorted2non[edge];
+    int current = first;
+    // std::cout << numEdge << std::endl;
+    for (int numAround = 0; numAround < numEdge; ++numAround) {
+      // std::cout << halfedge[current] << std::endl;
+      current = halfedge[current].pairedHalfedge + 1;
+      if (current % 3 == 0) current -= 3;
+      if (current == first && numAround != numEdge - 1)
+        std::cout << "cycled in " << numAround + 1 << " when there are "
+                  << numEdge << " edges total!" << std::endl;
+    }
+    if (current != first) std::cout << "did not cycle!" << std::endl;
+    edge += numEdge;
+  }
 }
 
 /**

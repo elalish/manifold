@@ -130,6 +130,18 @@ TEST(Manifold, Sphere) {
   EXPECT_EQ(sphere.NumTri(), n * n * 8);
 }
 
+TEST(Manifold, Normals) {
+  Mesh cube = Manifold::Cube(glm::vec3(1), true).Extract();
+  const int nVert = cube.vertPos.size();
+  for (int i = 0; i < nVert; ++i) {
+    glm::vec3 v = glm::normalize(cube.vertPos[i]);
+    glm::vec3& n = cube.vertNormal[i];
+    EXPECT_FLOAT_EQ(v.x, n.x);
+    EXPECT_FLOAT_EQ(v.y, n.y);
+    EXPECT_FLOAT_EQ(v.z, n.z);
+  }
+}
+
 TEST(Manifold, Extrude) {
   Polygons polys = SquareHole();
   Manifold donut = Manifold::Extrude(polys, 1.0f, 3);
@@ -203,6 +215,7 @@ TEST(Manifold, BooleanTetra) {
  */
 TEST(Manifold, SelfSubtract) {
   Manifold cube = Manifold::Cube();
+  ExportMesh("cube.gltf", cube.Extract());
   Manifold empty = cube - cube;
   EXPECT_TRUE(empty.IsManifold());
   EXPECT_TRUE(empty.IsEmpty());

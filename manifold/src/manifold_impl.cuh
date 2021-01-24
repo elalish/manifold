@@ -37,6 +37,7 @@ struct Manifold::Impl {
 
   void CreateHalfedges(const VecDH<glm::ivec3>& triVerts);
   void CreateAndFixHalfedges(const VecDH<glm::ivec3>& triVerts);
+  void SplitNonmanifoldVerts();
   void Finish();
   void Update();
   void ApplyTransform() const;
