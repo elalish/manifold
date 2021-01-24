@@ -108,6 +108,7 @@ using Polygons = std::vector<SimplePolygon>;
 
 struct Mesh {
   std::vector<glm::vec3> vertPos;
+  std::vector<glm::vec3> vertNormal;
   std::vector<glm::ivec3> triVerts;
 };
 

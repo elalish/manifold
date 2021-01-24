@@ -1136,6 +1136,11 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
   // Create the manifold's data structures.
   outR.Face2Tri(faceEdge);
 
+  // int chi = outR.NumVert() - outR.NumEdge() + outR.NumTri();
+  // std::cout << "triangle Genus = " << 1 - chi / 2 << std::endl;
+
+  // outR.SplitNonmanifoldVerts();
+
   triangulate.Stop();
   Timer finish;
   finish.Start();
