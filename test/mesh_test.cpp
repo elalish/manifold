@@ -235,7 +235,7 @@ TEST(Manifold, Perturb) {
   Manifold corner(tmp);
   Manifold empty = corner - corner;
   EXPECT_TRUE(empty.IsManifold());
-  // EXPECT_TRUE(empty.IsEmpty());
+  EXPECT_TRUE(empty.IsEmpty());
 
   auto prop = empty.GetProperties();
   // ExportMesh("perturb.ply", empty.Extract());
