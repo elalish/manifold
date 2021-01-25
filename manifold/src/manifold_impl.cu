@@ -23,6 +23,7 @@
 
 #include <algorithm>
 #include <map>
+#include <set>
 
 #include "connected_components.cuh"
 #include "manifold_impl.cuh"
@@ -40,6 +41,8 @@ using namespace manifold;
  * important.
  */
 constexpr float kTolerance = 1e-5;
+
+constexpr uint32_t kNoCode = 0xFFFFFFFFu;
 
 struct Normalize {
   __host__ __device__ void operator()(glm::vec3& v) {
@@ -266,6 +269,8 @@ struct Extrema : public thrust::binary_function<Halfedge, Halfedge, Halfedge> {
 struct PosMin
     : public thrust::binary_function<glm::vec3, glm::vec3, glm::vec3> {
   __host__ __device__ glm::vec3 operator()(glm::vec3 a, glm::vec3 b) {
+    if (isnan(a.x)) return b;
+    if (isnan(b.x)) return a;
     return glm::min(a, b);
   }
 };
@@ -273,6 +278,8 @@ struct PosMin
 struct PosMax
     : public thrust::binary_function<glm::vec3, glm::vec3, glm::vec3> {
   __host__ __device__ glm::vec3 operator()(glm::vec3 a, glm::vec3 b) {
+    if (isnan(a.x)) return b;
+    if (isnan(b.x)) return a;
     return glm::max(a, b);
   }
 };
@@ -314,6 +321,10 @@ __host__ __device__ uint32_t SpreadBits3(uint32_t v) {
 }
 
 __host__ __device__ uint32_t MortonCode(glm::vec3 position, Box bBox) {
+  // Unreferenced vertices are marked NaN, and this will sort them to the end
+  // (the Morton code only uses the first 30 of 32 bits).
+  if (isnan(position.x)) return kNoCode;
+
   glm::vec3 xyz = (position - bBox.min) / (bBox.max - bBox.min);
   xyz = glm::min(glm::vec3(1023.0f), glm::max(glm::vec3(0.0f), 1024.0f * xyz));
   uint32_t x = SpreadBits3(static_cast<uint32_t>(xyz.x));
@@ -342,6 +353,14 @@ struct FaceMortonBox {
     uint32_t& mortonCode = thrust::get<0>(inout);
     Box& faceBox = thrust::get<1>(inout);
     int face = thrust::get<2>(inout);
+
+    // Removed tris are marked by all halfedges having pairedHalfedge = -1, and
+    // this will sort them to the end (the Morton code only uses the first 30 of
+    // 32 bits).
+    if (halfedge[3 * face].pairedHalfedge < 0) {
+      mortonCode = kNoCode;
+      return;
+    }
 
     glm::vec3 center(0.0f);
 
@@ -512,6 +531,91 @@ struct SwapHalfedges {
       next0.pairedHalfedge = next1idx;
       next1.pairedHalfedge = next0idx;
     }
+  }
+};
+
+struct MarkShortEdges {
+  const glm::vec3* vertPos;
+
+  __host__ __device__ void operator()(Halfedge& halfedge) {
+    glm::vec3 edge = vertPos[halfedge.endVert] - vertPos[halfedge.startVert];
+    if (glm::dot(edge, edge) < kTolerance * kTolerance) halfedge.face = -1;
+  }
+};
+
+struct CollapseEdge {
+  Halfedge* halfedge;
+  glm::vec3* vertPos;
+
+  __host__ glm::ivec3 TriOf(int edge) {
+    glm::ivec3 triEdge;
+    triEdge[0] = edge;
+    triEdge[1] = edge + ((edge + 1) % 3 == 0 ? -2 : 1);
+    triEdge[2] = triEdge[1] + ((triEdge[1] + 1) % 3 == 0 ? -2 : 1);
+    return triEdge;
+  }
+
+  __host__ bool IsConnected(std::set<int>& vertNeighbors, int start, int end) {
+    int current = start;
+    while (current != end) {
+      ++current;
+      if (current % 3 == 0) current -= 3;
+      auto result = vertNeighbors.insert(halfedge[current].endVert);
+      if (!result.second) return true;
+      current = halfedge[current].pairedHalfedge;
+    }
+    return false;
+  }
+
+  __host__ void CollapseTri(const glm::ivec3& triEdge) {
+    int pair1 = halfedge[triEdge[1]].pairedHalfedge;
+    int pair2 = halfedge[triEdge[2]].pairedHalfedge;
+    halfedge[pair1].pairedHalfedge = pair2;
+    halfedge[pair2].pairedHalfedge = pair1;
+    for (int i : {0, 1, 2}) {
+      halfedge[triEdge[i]] = {-1, -1, -1, -1};
+    }
+  }
+
+  __host__ void operator()(int edge) {
+    Halfedge& toRemove = halfedge[edge];
+    if (toRemove.face >= 0 || toRemove.pairedHalfedge < 0) return;
+
+    const glm::ivec3 tri0edge = TriOf(edge);
+    const glm::ivec3 tri1edge = TriOf(toRemove.pairedHalfedge);
+
+    // If the ends of this edge are connected to the same vertex not through a
+    // triangle, then this collapse must be skipped as it would result in a
+    // non-2-manifold edge.
+    std::set<int> vertNeighbors;
+    if (IsConnected(vertNeighbors, halfedge[tri0edge[1]].pairedHalfedge,
+                    tri1edge[2]) ||
+        IsConnected(vertNeighbors, halfedge[tri1edge[1]].pairedHalfedge,
+                    tri0edge[2])) {
+      toRemove.face = edge / 3;
+      return;
+    }
+
+    if (halfedge[tri0edge[1]].endVert == halfedge[tri1edge[1]].endVert) {
+      // Remove disconnected triangles
+      for (int i : {0, 1, 2}) {
+        vertPos[halfedge[tri0edge[i]].startVert] = glm::vec3(0.0f / 0.0f);
+      }
+    } else {
+      // Remove toRemove.endVert and replace with toRemove.startVert.
+      vertPos[toRemove.endVert] = glm::vec3(0.0f / 0.0f);
+      int current = halfedge[tri0edge[1]].pairedHalfedge;
+      while (current != tri1edge[2]) {
+        halfedge[current].endVert = toRemove.startVert;
+        ++current;
+        if (current % 3 == 0) current -= 3;
+        halfedge[current].startVert = toRemove.startVert;
+        current = halfedge[current].pairedHalfedge;
+      }
+    }
+
+    CollapseTri(tri0edge);
+    CollapseTri(tri1edge);
   }
 };
 
@@ -714,34 +818,51 @@ void Manifold::Impl::SplitNonmanifoldVerts() {
   }
 }
 
+void Manifold::Impl::CollapseDegenerates() {
+  thrust::for_each(halfedge_.beginD(), halfedge_.endD(),
+                   MarkShortEdges({vertPos_.cptrD()}));
+  thrust::for_each_n(thrust::host, countAt(0), halfedge_.size(),
+                     CollapseEdge({halfedge_.ptrH(), vertPos_.ptrH()}));
+}
+
 /**
  * Once halfedge_ has been filled in, this function can be called to create the
  * rest of the internal data structures.
  */
 void Manifold::Impl::Finish() {
   if (halfedge_.size() == 0) return;
-  Halfedge extrema = {0, 0, 0, 0};
-  extrema =
-      thrust::reduce(halfedge_.beginD(), halfedge_.endD(), extrema, Extrema());
+  // Halfedge extrema = {0, 0, 0, 0};
+  // extrema =
+  //     thrust::reduce(halfedge_.beginD(), halfedge_.endD(), extrema,
+  //     Extrema());
 
-  ALWAYS_ASSERT(extrema.startVert >= 0, topologyErr,
-                "Vertex index is negative!");
-  ALWAYS_ASSERT(extrema.endVert < NumVert(), topologyErr,
-                "Vertex index exceeds number of verts!");
-  ALWAYS_ASSERT(extrema.face >= 0, topologyErr, "Face index is negative!");
-  ALWAYS_ASSERT(extrema.face < NumTri(), topologyErr,
-                "Face index exceeds number of faces!");
-  ALWAYS_ASSERT(extrema.pairedHalfedge >= 0, topologyErr,
-                "Halfedge index is negative!");
-  ALWAYS_ASSERT(extrema.pairedHalfedge < 2 * NumEdge(), topologyErr,
-                "Halfedge index exceeds number of halfedges!");
+  // ALWAYS_ASSERT(extrema.startVert >= 0, topologyErr,
+  //               "Vertex index is negative!");
+  // ALWAYS_ASSERT(extrema.endVert < NumVert(), topologyErr,
+  //               "Vertex index exceeds number of verts!");
+  // ALWAYS_ASSERT(extrema.face >= 0, topologyErr, "Face index is negative!");
+  // ALWAYS_ASSERT(extrema.face < NumTri(), topologyErr,
+  //               "Face index exceeds number of faces!");
+  // ALWAYS_ASSERT(extrema.pairedHalfedge >= 0, topologyErr,
+  //               "Halfedge index is negative!");
+  // ALWAYS_ASSERT(extrema.pairedHalfedge < 2 * NumEdge(), topologyErr,
+  //               "Halfedge index exceeds number of halfedges!");
 
   CalculateBBox();
+  if (!bBox_.isFinite()) {
+    vertPos_.resize(0);
+    halfedge_.resize(0);
+    faceNormal_.resize(0);
+    return;
+  }
+
   SortVerts();
   VecDH<Box> faceBox;
   VecDH<uint32_t> faceMorton;
   GetFaceBoxMorton(faceBox, faceMorton);
   SortFaces(faceBox, faceMorton);
+  if (halfedge_.size() == 0) return;
+
   CalculateNormals();
   collider_ = Collider(faceBox, faceMorton);
 }
@@ -972,8 +1093,6 @@ void Manifold::Impl::CalculateBBox() {
                              glm::vec3(1 / 0.0f), PosMin());
   bBox_.max = thrust::reduce(vertPos_.begin(), vertPos_.end(),
                              glm::vec3(-1 / 0.0f), PosMax());
-  ALWAYS_ASSERT(bBox_.isFinite(), topologyErr,
-                "Input vertices are not all finite!");
 }
 
 /**
@@ -990,6 +1109,13 @@ void Manifold::Impl::SortVerts() {
                       zip(vertPos_.beginD(), vertNew2Old.beginD()));
 
   ReindexVerts(vertNew2Old, NumVert());
+
+  // Verts were flagged for removal with NaNs and assigned kNoCode to sort them
+  // to the end, which allows them to be removed.
+  const int newNumVert =
+      thrust::find(vertMorton.beginD(), vertMorton.endD(), kNoCode) -
+      vertMorton.beginD();
+  vertPos_.resize(newNumVert);
 }
 
 /**
@@ -1037,6 +1163,16 @@ void Manifold::Impl::SortFaces(VecDH<Box>& faceBox,
     thrust::sort_by_key(faceMorton.beginD(), faceMorton.endD(),
                         zip(faceBox.beginD(), faceNew2Old.beginD()));
   }
+
+  // Tris were flagged for removal with pairedHalfedge = -1 and assigned kNoCode
+  // to sort them to the end, which allows them to be removed.
+  const int newNumTri =
+      thrust::find(faceMorton.beginD(), faceMorton.endD(), kNoCode) -
+      faceMorton.beginD();
+  faceBox.resize(newNumTri);
+  faceMorton.resize(newNumTri);
+  faceNew2Old.resize(newNumTri);
+  if (faceNormal_.size() == NumTri()) faceNormal_.resize(newNumTri);
 
   VecDH<Halfedge> oldHalfedge = halfedge_;
   GatherFaces(oldHalfedge, faceNew2Old);

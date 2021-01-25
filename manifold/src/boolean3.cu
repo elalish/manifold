@@ -1141,6 +1141,8 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
 
   // outR.SplitNonmanifoldVerts();
 
+  outR.CollapseDegenerates();
+
   triangulate.Stop();
   Timer finish;
   finish.Start();
