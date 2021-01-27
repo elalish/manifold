@@ -110,7 +110,7 @@ class Triangulator {
     reflex_chain_.push(vert);
     other_side_ = vert;
   }
-  int NumTriangles() { return triangles_output_; }
+  int NumTriangles() const { return triangles_output_; }
 
   /**
    * The vert, vi, must attach to the free end (specified by onRight) of the
@@ -312,7 +312,7 @@ class Monotones {
     std::next(westPair)->westCertain = certain;
   }
 
-  PairItr GetPair(VertItr vert, VertType type) {
+  PairItr GetPair(VertItr vert, VertType type) const {
     // MERGE returns westPair, as this is the one that will be removed.
     return type == WESTSIDE ? vert->eastPair : vert->westPair;
   }
@@ -386,7 +386,7 @@ class Monotones {
    * function will continue to search up the neighbors until the degeneracy is
    * broken and a certain answer is returned.
    */
-  bool IsHole(VertItr vert) {
+  bool IsHole(VertItr vert) const {
     VertItr left = vert->left;
     VertItr right = vert->right;
     VertItr center = vert;
@@ -579,10 +579,9 @@ class Monotones {
 
       if (vert->Processed()) continue;
 
-      if (!skipped.empty() && vert->IsPast(skipped.back())) {
-        throw geometryErr(
-            "Not Geometrically Valid! None of the skipped verts is valid.");
-      }
+      ALWAYS_ASSERT(
+          skipped.empty() || !vert->IsPast(skipped.back()), geometryErr,
+          "Not Geometrically Valid! None of the skipped verts is valid.");
 
       VertType type = ProcessVert(vert);
 
@@ -602,13 +601,11 @@ class Monotones {
       if (type != SKIP && ShiftWest(vert, pair, isHole)) type = SKIP;
 
       if (type == SKIP) {
-        if (std::next(insertAt) == monotones_.end()) {
-          throw geometryErr(
-              "Not Geometrically Valid! Tried to skip final vert.");
-        }
-        if (nextAttached.empty() && starts.empty())
-          throw geometryErr(
-              "Not Geometrically Valid! Tried to skip last queued vert.");
+        ALWAYS_ASSERT(std::next(insertAt) != monotones_.end(), geometryErr,
+                      "Not Geometrically Valid! Tried to skip final vert.");
+        ALWAYS_ASSERT(
+            !nextAttached.empty() || !starts.empty(), geometryErr,
+            "Not Geometrically Valid! Tried to skip last queued vert.");
         skipped.push_back(vert);
         if (params.verbose) std::cout << "Skipping vert" << std::endl;
         // If a new pair was added, remove it.
@@ -655,7 +652,7 @@ class Monotones {
       if (params.verbose) ListPairs();
     }
     return false;
-  }
+  }  // namespace
 
   /**
    * This is the only function that actually changes monotones_; all the rest is
@@ -704,6 +701,8 @@ class Monotones {
       if (vert->Processed()) continue;
 
       VertType type = ProcessVert(vert);
+      ALWAYS_ASSERT(type != SKIP, logicErr,
+                    "SKIP should not happen on reverse sweep!");
 
       PairItr westPair = GetPair(vert, type);
       switch (type) {
@@ -754,8 +753,6 @@ class Monotones {
           }
           break;
         }
-        case SKIP:
-          throw logicErr("SKIP should not happen on reverse sweep!");
       }
 
       vert->SetProcessed(true);
@@ -766,9 +763,9 @@ class Monotones {
     return false;
   }
 
-  void ListPairs() {
+  void ListPairs() const {
     std::cout << "active edges:" << std::endl;
-    for (EdgePair &pair : activePairs_) {
+    for (const EdgePair &pair : activePairs_) {
       std::cout << (pair.westCertain ? "certain " : "uncertain ");
       std::cout << "edge West: S = " << pair.vWest->mesh_idx
                 << ", N = " << pair.vWest->left->mesh_idx << std::endl;
@@ -782,7 +779,7 @@ class Monotones {
         std::cout << "east does not point back!" << std::endl;
     }
   }
-};
+};  // namespace
 
 void PrintFailure(const std::exception &e, const Polygons &polys,
                   std::vector<glm::ivec3> &triangles) {
