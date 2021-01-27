@@ -249,7 +249,7 @@ TEST(Manifold, Coplanar) {
   Manifold out = cube - cube2.Scale({0.5f, 0.5f, 1.0f})
                             .Rotate(0, 0, 15)
                             .Translate({0.25f, 0.25f, 0.0f});
-  ExpectMeshes(out, {{60, 120}});
+  ExpectMeshes(out, {{42, 84}});
   EXPECT_EQ(out.Genus(), 1);
 }
 
@@ -368,11 +368,7 @@ TEST(Manifold, BooleanWinding) {
   Manifold doubled = Manifold::Compose(cubes);
 
   Manifold cube = Manifold::Cube(glm::vec3(1.0f), true);
-  PolygonParams().suppressErrors = true;
-  // The geometry error is expected due to triangulating a doubly-wound
-  // manifold, but we're checking that there was not first a topology error.
-  EXPECT_THROW(cube ^= doubled, geometryErr);
-  PolygonParams().suppressErrors = false;
+  EXPECT_TRUE((cube ^= doubled).IsManifold());
 }
 
 TEST(Manifold, BooleanNonIntersecting) {
@@ -408,5 +404,5 @@ TEST(Manifold, Boolean3) {
   gyroid2.Translate(glm::vec3(5.0f));
   Manifold result = gyroid + gyroid2;
 
-  ExpectMeshes(result, {{31733, 63606}});
+  ExpectMeshes(result, {{31526, 63192}});
 }

@@ -375,7 +375,7 @@ class Monotones {
    * of using geometry.
    */
   void RemovePair(PairItr pair) {
-    if (pair == activePairs_.end()) throw logicErr("No pair to remove!");
+    ALWAYS_ASSERT(pair != activePairs_.end(), logicErr, "No pair to remove!");
     pair->nextPair = std::next(pair);
     inactivePairs_.splice(inactivePairs_.end(), activePairs_, pair);
   }
@@ -467,8 +467,8 @@ class Monotones {
    */
   bool ShiftEast(const VertItr vert, const PairItr inputPair,
                  const bool isHole) {
-    if (inputPair == activePairs_.end())
-      throw logicErr("input pair is not defined!");
+    ALWAYS_ASSERT(inputPair != activePairs_.end(), logicErr,
+                  "input pair is not defined!");
 
     if (inputPair->eastCertain) return false;
 
@@ -486,8 +486,6 @@ class Monotones {
       }
 
       const int outside = potentialPair->WestOf(vert);
-      if (outside < 0 && !isHole) return true;
-
       if (outside <= 0 && isHole) {  // certainly a hole
         SwapHole(potentialPair, inputPair);
         return false;
@@ -506,8 +504,8 @@ class Monotones {
    */
   bool ShiftWest(const VertItr vert, const PairItr inputPair,
                  const bool isHole) {
-    if (inputPair == activePairs_.end())
-      throw logicErr("input pair is not defined!");
+    ALWAYS_ASSERT(inputPair != activePairs_.end(), logicErr,
+                  "input pair is not defined!");
 
     if (inputPair->westCertain) return false;
 
@@ -525,8 +523,6 @@ class Monotones {
       }
 
       const int outside = potentialPair->EastOf(vert);
-      if (outside < 0 && !isHole) return true;
-
       if (outside <= 0 && isHole) {  // certainly a hole
         SwapHole(potentialPair, inputPair);
         return false;
