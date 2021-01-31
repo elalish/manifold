@@ -544,10 +544,10 @@ struct MarkShortEdges {
 };
 
 struct CollapseEdge {
-  Halfedge* halfedge;
-  glm::vec3* vertPos;
+  VecH<Halfedge>& halfedge;
+  VecH<glm::vec3>& vertPos;
 
-  __host__ glm::ivec3 TriOf(int edge) {
+  __host__ glm::ivec3 TriOf(int edge) const {
     glm::ivec3 triEdge;
     triEdge[0] = edge;
     triEdge[1] = edge + ((edge + 1) % 3 == 0 ? -2 : 1);
@@ -555,16 +555,43 @@ struct CollapseEdge {
     return triEdge;
   }
 
-  __host__ bool IsConnected(std::set<int>& vertNeighbors, int start, int end) {
-    int current = start;
-    while (current != end) {
-      ++current;
-      if (current % 3 == 0) current -= 3;
-      auto result = vertNeighbors.insert(halfedge[current].endVert);
-      if (!result.second) return true;
-      current = halfedge[current].pairedHalfedge;
+  __host__ int nextHalfedge(int current) const {
+    ++current;
+    if (current % 3 == 0) current -= 3;
+    return current;
+  }
+
+  // Traverses CW around startEdge.endVert from startEdge to endEdge
+  // (edgeEdge.endVert must == startEdge.endVert), updating each edge to point
+  // to vert instead.
+  __host__ void UpdateVert(int vert, int startEdge, int endEdge) {
+    while (startEdge != endEdge) {
+      halfedge[startEdge].endVert = vert;
+      startEdge = nextHalfedge(startEdge);
+      halfedge[startEdge].startVert = vert;
+      startEdge = halfedge[startEdge].pairedHalfedge;
     }
-    return false;
+  }
+
+  // In the event that the edge collapse would create a non-manifold edge,
+  // instead we duplicate the two verts and attach the manifolds the other way
+  // across this edge.
+  __host__ void FormLoop(int current, int end) {
+    int startVert = vertPos.size();
+    vertPos.push_back(vertPos[halfedge[current].startVert]);
+    int endVert = vertPos.size();
+    vertPos.push_back(vertPos[halfedge[current].endVert]);
+
+    int oldMatch = halfedge[current].pairedHalfedge;
+    int newMatch = halfedge[end].pairedHalfedge;
+
+    UpdateVert(startVert, oldMatch, newMatch);
+    UpdateVert(endVert, end, current);
+
+    halfedge[current].pairedHalfedge = newMatch;
+    halfedge[newMatch].pairedHalfedge = current;
+    halfedge[end].pairedHalfedge = oldMatch;
+    halfedge[oldMatch].pairedHalfedge = end;
   }
 
   __host__ void CollapseTri(const glm::ivec3& triEdge) {
@@ -584,38 +611,49 @@ struct CollapseEdge {
     const glm::ivec3 tri0edge = TriOf(edge);
     const glm::ivec3 tri1edge = TriOf(toRemove.pairedHalfedge);
 
-    // If the ends of this edge are connected to the same vertex not through a
-    // triangle, then this collapse must be skipped as it would result in a
-    // non-2-manifold edge.
-    std::set<int> vertNeighbors;
-    if (IsConnected(vertNeighbors, halfedge[tri0edge[1]].pairedHalfedge,
-                    tri1edge[2]) ||
-        IsConnected(vertNeighbors, halfedge[tri1edge[1]].pairedHalfedge,
-                    tri0edge[2])) {
-      toRemove.face = edge / 3;
-      return;
-    }
-
     if (halfedge[tri0edge[1]].endVert == halfedge[tri1edge[1]].endVert) {
       // Remove disconnected triangles
       for (int i : {0, 1, 2}) {
         vertPos[halfedge[tri0edge[i]].startVert] = glm::vec3(0.0f / 0.0f);
+        halfedge[tri0edge[i]] = {-1, -1, -1, -1};
+        halfedge[tri1edge[i]] = {-1, -1, -1, -1};
       }
-    } else {
-      // Remove toRemove.endVert and replace with toRemove.startVert.
-      vertPos[toRemove.endVert] = glm::vec3(0.0f / 0.0f);
-      int current = halfedge[tri0edge[1]].pairedHalfedge;
-      while (current != tri1edge[2]) {
-        halfedge[current].endVert = toRemove.startVert;
-        ++current;
-        if (current % 3 == 0) current -= 3;
-        halfedge[current].startVert = toRemove.startVert;
-        current = halfedge[current].pairedHalfedge;
-      }
+      return;
     }
 
-    CollapseTri(tri0edge);
+    // Remove toRemove.startVert and replace with toRemove.endVert.
+    vertPos[toRemove.startVert] = glm::vec3(0.0f / 0.0f);
+    const int endVert = toRemove.endVert;
+
+    std::vector<int> edges;
+    int current = halfedge[tri0edge[1]].pairedHalfedge;
+    while (current != tri1edge[2]) {
+      current = nextHalfedge(current);
+      edges.push_back(current);
+      current = halfedge[current].pairedHalfedge;
+    }
+
+    int start = halfedge[tri1edge[1]].pairedHalfedge;
     CollapseTri(tri1edge);
+
+    current = start;
+    while (current != tri0edge[2]) {
+      current = nextHalfedge(current);
+      const int vert = halfedge[current].endVert;
+      const int next = halfedge[current].pairedHalfedge;
+      for (int i = 0; i < edges.size(); ++i) {
+        if (vert == halfedge[edges[i]].endVert) {
+          FormLoop(edges[i], current);
+          start = next;
+          edges.resize(i);
+          break;
+        }
+      }
+      current = next;
+    }
+
+    UpdateVert(endVert, start, tri0edge[2]);
+    CollapseTri(tri0edge);
   }
 };
 
@@ -822,7 +860,7 @@ void Manifold::Impl::CollapseDegenerates() {
   thrust::for_each(halfedge_.beginD(), halfedge_.endD(),
                    MarkShortEdges({vertPos_.cptrD()}));
   thrust::for_each_n(thrust::host, countAt(0), halfedge_.size(),
-                     CollapseEdge({halfedge_.ptrH(), vertPos_.ptrH()}));
+                     CollapseEdge({halfedge_.H(), vertPos_.H()}));
 }
 
 /**
@@ -831,22 +869,6 @@ void Manifold::Impl::CollapseDegenerates() {
  */
 void Manifold::Impl::Finish() {
   if (halfedge_.size() == 0) return;
-  // Halfedge extrema = {0, 0, 0, 0};
-  // extrema =
-  //     thrust::reduce(halfedge_.beginD(), halfedge_.endD(), extrema,
-  //     Extrema());
-
-  // ALWAYS_ASSERT(extrema.startVert >= 0, topologyErr,
-  //               "Vertex index is negative!");
-  // ALWAYS_ASSERT(extrema.endVert < NumVert(), topologyErr,
-  //               "Vertex index exceeds number of verts!");
-  // ALWAYS_ASSERT(extrema.face >= 0, topologyErr, "Face index is negative!");
-  // ALWAYS_ASSERT(extrema.face < NumTri(), topologyErr,
-  //               "Face index exceeds number of faces!");
-  // ALWAYS_ASSERT(extrema.pairedHalfedge >= 0, topologyErr,
-  //               "Halfedge index is negative!");
-  // ALWAYS_ASSERT(extrema.pairedHalfedge < 2 * NumEdge(), topologyErr,
-  //               "Halfedge index exceeds number of halfedges!");
 
   CalculateBBox();
   if (!bBox_.isFinite()) {
@@ -862,6 +884,24 @@ void Manifold::Impl::Finish() {
   GetFaceBoxMorton(faceBox, faceMorton);
   SortFaces(faceBox, faceMorton);
   if (halfedge_.size() == 0) return;
+
+  ALWAYS_ASSERT(halfedge_.size() % 6 == 0, topologyErr,
+                "Not an even number of faces after sorting faces!");
+  Halfedge extrema = {0, 0, 0, 0};
+  extrema =
+      thrust::reduce(halfedge_.beginD(), halfedge_.endD(), extrema, Extrema());
+
+  ALWAYS_ASSERT(extrema.startVert >= 0, topologyErr,
+                "Vertex index is negative!");
+  ALWAYS_ASSERT(extrema.endVert < NumVert(), topologyErr,
+                "Vertex index exceeds number of verts!");
+  ALWAYS_ASSERT(extrema.face >= 0, topologyErr, "Face index is negative!");
+  ALWAYS_ASSERT(extrema.face < NumTri(), topologyErr,
+                "Face index exceeds number of faces!");
+  ALWAYS_ASSERT(extrema.pairedHalfedge >= 0, topologyErr,
+                "Halfedge index is negative!");
+  ALWAYS_ASSERT(extrema.pairedHalfedge < 2 * NumEdge(), topologyErr,
+                "Halfedge index exceeds number of halfedges!");
 
   CalculateNormals();
   collider_ = Collider(faceBox, faceMorton);

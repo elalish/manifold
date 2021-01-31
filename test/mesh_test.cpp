@@ -268,26 +268,24 @@ TEST(Manifold, MultiCoplanar) {
 
 TEST(Manifold, EdgeUnion) {
   Manifold cubes = Manifold::Cube();
-  auto propIn = cubes.GetProperties();
   Manifold cube2 = cubes;
   cubes += cube2.Translate({1, 1, 0});
-  EXPECT_TRUE(cubes.IsManifold());
-  EXPECT_EQ(cubes.Genus(), 0);
-  auto prop = cubes.GetProperties();
-  EXPECT_FLOAT_EQ(prop.volume, 2 * propIn.volume);
-  EXPECT_FLOAT_EQ(prop.surfaceArea, 2 * propIn.surfaceArea);
+  ExpectMeshes(cubes, {{8, 12}, {8, 12}});
+}
+
+TEST(Manifold, EdgeUnion2) {
+  Manifold tets = Manifold::Tetrahedron();
+  Manifold cube2 = tets;
+  tets.Translate({0, 0, -1});
+  tets += cube2.Translate({0, 0, 1}).Rotate(0, 0, 90);
+  ExpectMeshes(tets, {{4, 4}, {4, 4}});
 }
 
 TEST(Manifold, CornerUnion) {
   Manifold cubes = Manifold::Cube();
-  auto propIn = cubes.GetProperties();
   Manifold cube2 = cubes;
   cubes += cube2.Translate({1, 1, 1});
-  EXPECT_TRUE(cubes.IsManifold());
-  EXPECT_EQ(cubes.Genus(), 0);
-  auto prop = cubes.GetProperties();
-  EXPECT_FLOAT_EQ(prop.volume, 2 * propIn.volume);
-  EXPECT_FLOAT_EQ(prop.surfaceArea, 2 * propIn.surfaceArea);
+  ExpectMeshes(cubes, {{8, 12}, {8, 12}});
 }
 
 /**

@@ -22,6 +22,15 @@ template <typename T>
 using VecH = thrust::host_vector<T>;
 
 template <typename T>
+void Dump(const VecH<T>& vec) {
+  std::cout << "VecDH = " << std::endl;
+  for (int i = 0; i < vec.size(); ++i) {
+    std::cout << i << ", " << vec[i] << ", " << std::endl;
+  }
+  std::cout << std::endl;
+}
+
+template <typename T>
 class VecDH {
  public:
   VecDH() {}
@@ -149,14 +158,7 @@ class VecDH {
     return host_;
   }
 
-  void Dump() const {
-    RefreshHost();
-    std::cout << "VecDH = " << std::endl;
-    for (int i = 0; i < size(); ++i) {
-      std::cout << i << ", " << host_[i] << ", " << std::endl;
-    }
-    std::cout << std::endl;
-  }
+  void Dump() const { manifold::Dump(H()); }
 
  private:
   mutable bool host_valid_ = true;
