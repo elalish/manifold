@@ -59,7 +59,7 @@ class Manifold {
   Box BoundingBox() const;
   int Genus() const;
   Properties GetProperties() const;
-  Mesh Extract() const;
+  Mesh Extract(bool includeNormals = false) const;
 
   // Modification
   Manifold& Translate(glm::vec3);
