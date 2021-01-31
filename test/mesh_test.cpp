@@ -131,7 +131,7 @@ TEST(Manifold, Sphere) {
 }
 
 TEST(Manifold, Normals) {
-  Mesh cube = Manifold::Cube(glm::vec3(1), true).Extract();
+  Mesh cube = Manifold::Cube(glm::vec3(1), true).Extract(true);
   const int nVert = cube.vertPos.size();
   for (int i = 0; i < nVert; ++i) {
     glm::vec3 v = glm::normalize(cube.vertPos[i]);
@@ -249,8 +249,9 @@ TEST(Manifold, Coplanar) {
   Manifold out = cube - cube2.Scale({0.5f, 0.5f, 1.0f})
                             .Rotate(0, 0, 15)
                             .Translate({0.25f, 0.25f, 0.0f});
-  ExpectMeshes(out, {{42, 84}});
+  ExpectMeshes(out, {{32, 64}});
   EXPECT_EQ(out.Genus(), 1);
+  ExportMesh("coplanar.gltf", out.Extract());
 }
 
 TEST(Manifold, MultiCoplanar) {
@@ -264,6 +265,18 @@ TEST(Manifold, MultiCoplanar) {
   auto prop = out.GetProperties();
   EXPECT_NEAR(prop.volume, 0.18, 1e-5);
   EXPECT_NEAR(prop.surfaceArea, 2.76, 1e-5);
+}
+
+TEST(Manifold, FaceUnion) {
+  Manifold cubes = Manifold::Cube();
+  Manifold cube2 = cubes;
+  cubes += cube2.Translate({1, 0, 0});
+  EXPECT_EQ(cubes.Genus(), 0);
+  ExpectMeshes(cubes, {{8, 12}});
+  auto prop = cubes.GetProperties();
+  EXPECT_NEAR(prop.volume, 2, 1e-5);
+  EXPECT_NEAR(prop.surfaceArea, 10, 1e-5);
+  ExportMesh("faceUnion.gltf", cubes.Extract());
 }
 
 TEST(Manifold, EdgeUnion) {
@@ -402,5 +415,5 @@ TEST(Manifold, Boolean3) {
   gyroid2.Translate(glm::vec3(5.0f));
   Manifold result = gyroid + gyroid2;
 
-  ExpectMeshes(result, {{31526, 63192}});
+  ExpectMeshes(result, {{29602, 59344}});
 }

@@ -44,6 +44,12 @@ constexpr float kTolerance = 1e-5;
 
 constexpr uint32_t kNoCode = 0xFFFFFFFFu;
 
+__host__ __device__ int nextHalfedge(int current) {
+  ++current;
+  if (current % 3 == 0) current -= 3;
+  return current;
+}
+
 struct Normalize {
   __host__ __device__ void operator()(glm::vec3& v) {
     v = glm::normalize(v);
@@ -534,12 +540,39 @@ struct SwapHalfedges {
   }
 };
 
-struct MarkShortEdges {
+struct MarkShortEdge {
   const glm::vec3* vertPos;
 
-  __host__ __device__ void operator()(Halfedge& halfedge) {
-    glm::vec3 edge = vertPos[halfedge.endVert] - vertPos[halfedge.startVert];
-    if (glm::dot(edge, edge) < kTolerance * kTolerance) halfedge.face = -1;
+  __host__ __device__ void operator()(Halfedge& edge) {
+    const glm::vec3 delta = vertPos[edge.endVert] - vertPos[edge.startVert];
+    if (glm::dot(delta, delta) < kTolerance * kTolerance) edge.face = -1;
+  }
+};
+
+struct MarkColinearEdge {
+  bool* marked;
+  const glm::vec3* vertPos;
+  const glm::vec3* faceNormal;
+  const Halfedge* halfedge;
+
+  __host__ __device__ void operator()(Halfedge& edge) {
+    if (edge.pairedHalfedge < 0) return;
+    const glm::vec3 delta = vertPos[edge.endVert] - vertPos[edge.startVert];
+
+    // If all triangles touching startVert are coplanar with the edge, then
+    // startVert can be moved to endVert and merged without altering the
+    // geometry.
+    int start = edge.pairedHalfedge;
+    int current = nextHalfedge(start);
+    current = halfedge[current].pairedHalfedge;
+    while (current != start) {
+      current = nextHalfedge(current);
+      glm::vec3 normal = faceNormal[current / 3];
+      if (glm::abs(glm::dot(delta, normal)) > kTolerance) return;
+      current = halfedge[current].pairedHalfedge;
+    }
+    edge.face = -1;
+    *marked = true;
   }
 };
 
@@ -553,12 +586,6 @@ struct CollapseEdge {
     triEdge[1] = edge + ((edge + 1) % 3 == 0 ? -2 : 1);
     triEdge[2] = triEdge[1] + ((triEdge[1] + 1) % 3 == 0 ? -2 : 1);
     return triEdge;
-  }
-
-  __host__ int nextHalfedge(int current) const {
-    ++current;
-    if (current % 3 == 0) current -= 3;
-    return current;
   }
 
   // Traverses CW around startEdge.endVert from startEdge to endEdge
@@ -605,7 +632,7 @@ struct CollapseEdge {
   }
 
   __host__ void operator()(int edge) {
-    Halfedge& toRemove = halfedge[edge];
+    const Halfedge toRemove = halfedge[edge];
     if (toRemove.face >= 0 || toRemove.pairedHalfedge < 0) return;
 
     const glm::ivec3 tri0edge = TriOf(edge);
@@ -630,6 +657,8 @@ struct CollapseEdge {
     while (current != tri1edge[2]) {
       current = nextHalfedge(current);
       edges.push_back(current);
+      // Unmark other edges with same startVert
+      halfedge[current].face = current / 3;
       current = halfedge[current].pairedHalfedge;
     }
 
@@ -639,6 +668,8 @@ struct CollapseEdge {
     current = start;
     while (current != tri0edge[2]) {
       current = nextHalfedge(current);
+      // Unmark other edges with same startVert
+      halfedge[current].face = current / 3;
       const int vert = halfedge[current].endVert;
       const int next = halfedge[current].pairedHalfedge;
       for (int i = 0; i < edges.size(); ++i) {
@@ -858,9 +889,22 @@ void Manifold::Impl::SplitNonmanifoldVerts() {
 
 void Manifold::Impl::CollapseDegenerates() {
   thrust::for_each(halfedge_.beginD(), halfedge_.endD(),
-                   MarkShortEdges({vertPos_.cptrD()}));
+                   MarkShortEdge({vertPos_.cptrD()}));
   thrust::for_each_n(thrust::host, countAt(0), halfedge_.size(),
                      CollapseEdge({halfedge_.H(), vertPos_.H()}));
+
+  VecDH<bool> marked(1);
+  while (1) {
+    marked.H()[0] = false;
+    thrust::for_each(
+        halfedge_.beginD(), halfedge_.endD(),
+        MarkColinearEdge({marked.ptrD(), vertPos_.cptrD(), faceNormal_.cptrD(),
+                          halfedge_.cptrD()}));
+    if (!marked.H()[0]) break;
+
+    thrust::for_each_n(thrust::host, countAt(0), halfedge_.size(),
+                       CollapseEdge({halfedge_.H(), vertPos_.H()}));
+  }
 }
 
 /**
