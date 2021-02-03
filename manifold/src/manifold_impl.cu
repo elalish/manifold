@@ -579,6 +579,7 @@ struct MarkColinearEdge {
 struct CollapseEdge {
   VecH<Halfedge>& halfedge;
   VecH<glm::vec3>& vertPos;
+  const bool shortEdge;
 
   __host__ glm::ivec3 TriOf(int edge) const {
     glm::ivec3 triEdge;
@@ -586,6 +587,10 @@ struct CollapseEdge {
     triEdge[1] = edge + ((edge + 1) % 3 == 0 ? -2 : 1);
     triEdge[2] = triEdge[1] + ((triEdge[1] + 1) % 3 == 0 ? -2 : 1);
     return triEdge;
+  }
+
+  __host__ void UnmarkEdge(int edge) {
+    if (!shortEdge) halfedge[edge].face = edge / 3;
   }
 
   // Traverses CW around startEdge.endVert from startEdge to endEdge
@@ -655,10 +660,10 @@ struct CollapseEdge {
     std::vector<int> edges;
     int current = halfedge[tri0edge[1]].pairedHalfedge;
     while (current != tri1edge[2]) {
+      UnmarkEdge(current);
       current = nextHalfedge(current);
       edges.push_back(current);
-      // Unmark other edges with same startVert
-      halfedge[current].face = current / 3;
+      UnmarkEdge(current);
       current = halfedge[current].pairedHalfedge;
     }
 
@@ -667,9 +672,9 @@ struct CollapseEdge {
 
     current = start;
     while (current != tri0edge[2]) {
+      UnmarkEdge(current);
       current = nextHalfedge(current);
-      // Unmark other edges with same startVert
-      halfedge[current].face = current / 3;
+      UnmarkEdge(current);
       const int vert = halfedge[current].endVert;
       const int next = halfedge[current].pairedHalfedge;
       for (int i = 0; i < edges.size(); ++i) {
@@ -891,7 +896,7 @@ void Manifold::Impl::CollapseDegenerates() {
   thrust::for_each(halfedge_.beginD(), halfedge_.endD(),
                    MarkShortEdge({vertPos_.cptrD()}));
   thrust::for_each_n(thrust::host, countAt(0), halfedge_.size(),
-                     CollapseEdge({halfedge_.H(), vertPos_.H()}));
+                     CollapseEdge({halfedge_.H(), vertPos_.H(), true}));
 
   VecDH<bool> marked(1);
   while (1) {
@@ -903,7 +908,7 @@ void Manifold::Impl::CollapseDegenerates() {
     if (!marked.H()[0]) break;
 
     thrust::for_each_n(thrust::host, countAt(0), halfedge_.size(),
-                       CollapseEdge({halfedge_.H(), vertPos_.H()}));
+                       CollapseEdge({halfedge_.H(), vertPos_.H(), false}));
   }
 }
 
