@@ -82,6 +82,9 @@ TEST(Samples, FrameReduced) {
   EXPECT_TRUE(frame.IsManifold());
   Manifold::SetCircularSegments(0);
   EXPECT_EQ(frame.Genus(), 5);
+  auto prop = frame.GetProperties();
+  EXPECT_NEAR(prop.volume, 227333, 10);
+  EXPECT_NEAR(prop.surfaceArea, 62635, 1);
   ExportMesh("roundedFrameReduced.gltf", frame.Extract());
 }
 
