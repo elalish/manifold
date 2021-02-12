@@ -845,8 +845,9 @@ void AppendNewEdges(
     }
     const glm::vec3 size = bbox.Size();
     // Order the points along their longest dimension.
-    const int i =
-        (size.x > size.y && size.x > size.z) ? 0 : size.y > size.z ? 1 : 2;
+    const int i = (size.x > size.y && size.x > size.z) ? 0
+                  : size.y > size.z                    ? 1
+                                                       : 2;
     for (auto &edge : edgePos) {
       edge.edgePos = vertPosR[edge.vert][i];
     }

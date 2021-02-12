@@ -27,6 +27,7 @@ namespace {
 using namespace manifold;
 
 ExecutionParams params;
+float kTol = params.kTolerance;
 
 struct VertAdj;
 typedef std::list<VertAdj>::iterator VertItr;
@@ -82,20 +83,20 @@ struct EdgePair {
   bool westCertain, eastCertain, startCertain;
 
   int WestOf(VertItr vert) const {
-    int westOf = CCW(vEast->right->pos, vEast->pos, vert->pos);
+    int westOf = CCW(vEast->right->pos, vEast->pos, vert->pos, kTol);
     if (westOf == 0 && !vert->right->Processed())
-      westOf = CCW(vEast->right->pos, vEast->pos, vert->right->pos);
+      westOf = CCW(vEast->right->pos, vEast->pos, vert->right->pos, kTol);
     if (westOf == 0 && !vert->left->Processed())
-      westOf = CCW(vEast->right->pos, vEast->pos, vert->left->pos);
+      westOf = CCW(vEast->right->pos, vEast->pos, vert->left->pos, kTol);
     return westOf;
   }
 
   int EastOf(VertItr vert) const {
-    int eastOf = CCW(vWest->pos, vWest->left->pos, vert->pos);
+    int eastOf = CCW(vWest->pos, vWest->left->pos, vert->pos, kTol);
     if (eastOf == 0 && !vert->right->Processed())
-      eastOf = CCW(vWest->pos, vWest->left->pos, vert->right->pos);
+      eastOf = CCW(vWest->pos, vWest->left->pos, vert->right->pos, kTol);
     if (eastOf == 0 && !vert->left->Processed())
-      eastOf = CCW(vWest->pos, vWest->left->pos, vert->left->pos);
+      eastOf = CCW(vWest->pos, vWest->left->pos, vert->left->pos, kTol);
     return eastOf;
   }
 };
@@ -134,14 +135,14 @@ class Triangulator {
       // This only creates enough triangles to ensure the reflex chain is still
       // reflex.
       if (params.verbose) std::cout << "same chain" << std::endl;
-      int ccw = CCW(vi->pos, vj->pos, v_top->pos);
+      int ccw = CCW(vi->pos, vj->pos, v_top->pos, kTol);
       while (ccw == (onRight_ ? 1 : -1) || ccw == 0) {
         AddTriangle(triangles, vi, vj, v_top);
         v_top = vj;
         reflex_chain_.pop();
         if (reflex_chain_.empty()) break;
         vj = reflex_chain_.top();
-        ccw = CCW(vi->pos, vj->pos, v_top->pos);
+        ccw = CCW(vi->pos, vj->pos, v_top->pos, kTol);
       }
       reflex_chain_.push(v_top);
       reflex_chain_.push(vi);
@@ -408,10 +409,10 @@ class Monotones {
         right = right->right;
         continue;
       }
-      int isHole = CCW(right->pos, center->pos, left->pos);
+      int isHole = CCW(right->pos, center->pos, left->pos, kTol);
       if (center != vert) {
-        isHole += CCW(left->pos, center->pos, vert->pos) +
-                  CCW(vert->pos, center->pos, right->pos);
+        isHole += CCW(left->pos, center->pos, vert->pos, kTol) +
+                  CCW(vert->pos, center->pos, right->pos, kTol);
       }
       if (isHole != 0) return isHole > 0;
 
@@ -796,19 +797,6 @@ void PrintFailure(const std::exception &e, const Polygons &polys,
 }  // namespace
 
 namespace manifold {
-// This is nearly the only function to do a floating point comparison in this
-// whole triangulator (the other is the check for sweep-line degeneracies).
-// This is done to maintain maximum consistency.
-int CCW(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2) {
-  glm::vec2 v1 = p1 - p0;
-  glm::vec2 v2 = p2 - p0;
-  float area = v1.x * v2.y - v1.y * v2.x;
-  float base2 = glm::max(glm::dot(v1, v1), glm::dot(v2, v2));
-  if (area * area <= base2 * params.kTolerance * params.kTolerance)
-    return 0;
-  else
-    return area > 0 ? 1 : -1;
-}
 
 bool Coincident(glm::vec2 p0, glm::vec2 p1) {
   glm::vec2 sep = p0 - p1;
@@ -920,7 +908,7 @@ void CheckGeometry(const std::vector<glm::ivec3> &triangles,
   ALWAYS_ASSERT(std::all_of(triangles.begin(), triangles.end(),
                             [&vertPos](const glm::ivec3 &tri) {
                               return CCW(vertPos[tri[0]], vertPos[tri[1]],
-                                         vertPos[tri[2]]) >= 0;
+                                         vertPos[tri[2]], kTol) >= 0;
                             }),
                 geometryErr, "triangulation is not entirely CCW!");
 }

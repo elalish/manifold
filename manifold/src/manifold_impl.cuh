@@ -52,6 +52,7 @@ struct Manifold::Impl {
   Properties GetProperties() const;
   void CalculateBBox();
   bool IsManifold() const;
+  bool MatchesTriNormals() const;
 
   void SortVerts();
   void ReindexVerts(const VecDH<int>& vertNew2Old, int numOldVert);
