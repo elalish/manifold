@@ -50,6 +50,31 @@ __host__ __device__ int nextHalfedge(int current) {
   return current;
 }
 
+/**
+ * By using the closest axis-aligned projection to the normal instead of a
+ * projection along the normal, we avoid introducing any rounding error.
+ */
+__host__ __device__ glm::mat3x2 GetAxisAlignedProjection(glm::vec3 normal) {
+  glm::vec3 absNormal = glm::abs(normal);
+  float xyzMax;
+  glm::mat2x3 projection;
+  if (absNormal.z > absNormal.x && absNormal.z > absNormal.y) {
+    projection = glm::mat2x3(1.0f, 0.0f, 0.0f,  //
+                             0.0f, 1.0f, 0.0f);
+    xyzMax = normal.z;
+  } else if (absNormal.y > absNormal.x) {
+    projection = glm::mat2x3(0.0f, 0.0f, 1.0f,  //
+                             1.0f, 0.0f, 0.0f);
+    xyzMax = normal.y;
+  } else {
+    projection = glm::mat2x3(0.0f, 1.0f, 0.0f,  //
+                             0.0f, 0.0f, 1.0f);
+    xyzMax = normal.x;
+  }
+  if (xyzMax < 0) projection[0] *= -1.0f;
+  return glm::transpose(projection);
+}
+
 struct Normalize {
   __host__ __device__ void operator()(glm::vec3& v) {
     v = glm::normalize(v);
@@ -577,8 +602,10 @@ struct MarkColinearEdge {
 };
 
 struct CollapseEdge {
+  bool& collapsed;
   VecH<Halfedge>& halfedge;
   VecH<glm::vec3>& vertPos;
+  const VecH<glm::vec3>& triNormal;
   const bool shortEdge;
 
   __host__ glm::ivec3 TriOf(int edge) const {
@@ -591,6 +618,11 @@ struct CollapseEdge {
 
   __host__ void UnmarkEdge(int edge) {
     if (!shortEdge) halfedge[edge].face = edge / 3;
+  }
+
+  __host__ bool CCW2Normal(const glm::vec3& a, const glm::vec3& b,
+                           const glm::vec3& normal) const {
+    return glm::dot(glm::cross(a, b), normal) >= 0;
   }
 
   // Traverses CW around startEdge.endVert from startEdge to endEdge
@@ -653,10 +685,6 @@ struct CollapseEdge {
       return;
     }
 
-    // Remove toRemove.startVert and replace with toRemove.endVert.
-    vertPos[toRemove.startVert] = glm::vec3(0.0f / 0.0f);
-    const int endVert = toRemove.endVert;
-
     std::vector<int> edges;
     int current = halfedge[tri0edge[1]].pairedHalfedge;
     while (current != tri1edge[2]) {
@@ -667,7 +695,27 @@ struct CollapseEdge {
       current = halfedge[current].pairedHalfedge;
     }
 
+    const int endVert = toRemove.endVert;
     int start = halfedge[tri1edge[1]].pairedHalfedge;
+    if (!shortEdge) {
+      current = start;
+      glm::vec3 lastEdge =
+          vertPos[halfedge[tri1edge[1]].endVert] - vertPos[endVert];
+      while (current != tri0edge[2]) {
+        current = nextHalfedge(current);
+        glm::vec3 thisEdge =
+            vertPos[halfedge[current].endVert] - vertPos[endVert];
+        if (!CCW2Normal(thisEdge, lastEdge, triNormal[current / 3])) {
+          UnmarkEdge(edge);
+          return;
+        }
+        lastEdge = thisEdge;
+        current = halfedge[current].pairedHalfedge;
+      }
+    }
+
+    // Remove toRemove.startVert and replace with endVert.
+    vertPos[toRemove.startVert] = glm::vec3(0.0f / 0.0f);
     CollapseTri(tri1edge);
 
     current = start;
@@ -690,6 +738,7 @@ struct CollapseEdge {
 
     UpdateVert(endVert, start, tri0edge[2]);
     CollapseTri(tri0edge);
+    collapsed = true;
   }
 };
 
@@ -727,30 +776,29 @@ struct NoDuplicates {
   }
 };
 
-/**
- * By using the closest axis-aligned projection to the normal instead of a
- * projection along the normal, we avoid introducing any rounding error.
- */
-glm::mat3x2 GetAxisAlignedProjection(glm::vec3 normal) {
-  glm::vec3 absNormal = glm::abs(normal);
-  float xyzMax;
-  glm::mat2x3 projection;
-  if (absNormal.z > absNormal.x && absNormal.z > absNormal.y) {
-    projection = glm::mat2x3(1.0f, 0.0f, 0.0f,  //
-                             0.0f, 1.0f, 0.0f);
-    xyzMax = normal.z;
-  } else if (absNormal.y > absNormal.x) {
-    projection = glm::mat2x3(0.0f, 0.0f, 1.0f,  //
-                             1.0f, 0.0f, 0.0f);
-    xyzMax = normal.y;
-  } else {
-    projection = glm::mat2x3(0.0f, 1.0f, 0.0f,  //
-                             0.0f, 0.0f, 1.0f);
-    xyzMax = normal.x;
+struct CheckCCW {
+  const Halfedge* halfedges;
+  const glm::vec3* vertPos;
+  const glm::vec3* triNormal;
+
+  __host__ __device__ bool operator()(int face) {
+    const glm::mat3x2 projection = GetAxisAlignedProjection(triNormal[face]);
+    glm::vec2 v[3];
+    for (int i : {0, 1, 2})
+      v[i] = projection * vertPos[halfedges[3 * face + i].startVert];
+    int ccw = CCW(v[0], v[1], v[2], 2 * kTolerance);
+    if (ccw < 0) {
+      glm::vec2 v1 = v[1] - v[0];
+      glm::vec2 v2 = v[2] - v[0];
+      float area = v1.x * v2.y - v1.y * v2.x;
+      float base = glm::sqrt(glm::max(glm::dot(v1, v1), glm::dot(v2, v2)));
+      printf("Tri %d does not match normal, height = %g, base = %g\n", face,
+             area / base, base);
+    }
+    return ccw >= 0;
   }
-  if (xyzMax < 0) projection[0] *= -1.0f;
-  return glm::transpose(projection);
-}
+};
+
 }  // namespace
 
 namespace manifold {
@@ -762,6 +810,8 @@ namespace manifold {
 Manifold::Impl::Impl(const Mesh& manifold) : vertPos_(manifold.vertPos) {
   CheckDevice();
   CreateAndFixHalfedges(manifold.triVerts);
+  CalculateNormals();
+  CollapseDegenerates();
   Finish();
 }
 
@@ -895,8 +945,10 @@ void Manifold::Impl::SplitNonmanifoldVerts() {
 void Manifold::Impl::CollapseDegenerates() {
   thrust::for_each(halfedge_.beginD(), halfedge_.endD(),
                    MarkShortEdge({vertPos_.cptrD()}));
+  bool collapsed = false;
   thrust::for_each_n(thrust::host, countAt(0), halfedge_.size(),
-                     CollapseEdge({halfedge_.H(), vertPos_.H(), true}));
+                     CollapseEdge({collapsed, halfedge_.H(), vertPos_.H(),
+                                   faceNormal_.H(), true}));
 
   VecDH<bool> marked(1);
   while (1) {
@@ -907,8 +959,11 @@ void Manifold::Impl::CollapseDegenerates() {
                           halfedge_.cptrD()}));
     if (!marked.H()[0]) break;
 
+    collapsed = false;
     thrust::for_each_n(thrust::host, countAt(0), halfedge_.size(),
-                       CollapseEdge({halfedge_.H(), vertPos_.H(), false}));
+                       CollapseEdge({collapsed, halfedge_.H(), vertPos_.H(),
+                                     faceNormal_.H(), false}));
+    if (!collapsed) break;
   }
 }
 
@@ -1042,7 +1097,7 @@ void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge) {
       const glm::mat3x2 projection = GetAxisAlignedProjection(normal);
       auto triCCW = [&projection, &vertPos](const glm::ivec3 tri) {
         return CCW(projection * vertPos[tri[0]], projection * vertPos[tri[1]],
-                   projection * vertPos[tri[2]]) >= 0;
+                   projection * vertPos[tri[2]], kTolerance) >= 0;
       };
 
       glm::ivec3 tri0(halfedge[edge].startVert, halfedge[edge].endVert, -1);
@@ -1154,6 +1209,16 @@ bool Manifold::Impl::IsManifold() const {
                                NoDuplicates({halfedge.cptrD()}));
   if (!isManifold) std::cout << "not 2-manifold!" << std::endl;
   return isManifold;
+}
+
+/**
+ * Returns true if all triangles are CCW relative to their triNormals_.
+ */
+bool Manifold::Impl::MatchesTriNormals() const {
+  if (halfedge_.size() == 0 || faceNormal_.size() != NumTri()) return true;
+  return thrust::all_of(
+      thrust::device, countAt(0), countAt(NumTri()),
+      CheckCCW({halfedge_.cptrD(), vertPos_.cptrD(), faceNormal_.cptrD()}));
 }
 
 /**

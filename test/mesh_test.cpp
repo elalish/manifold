@@ -39,6 +39,7 @@ void Identical(Mesh& mesh1, Mesh& mesh2) {
 void ExpectMeshes(Manifold& manifold,
                   const std::vector<std::pair<int, int>>& numVertTri) {
   EXPECT_TRUE(manifold.IsManifold());
+  EXPECT_TRUE(manifold.MatchesTriNormals());
   std::vector<Manifold> meshes = manifold.Decompose();
   ASSERT_EQ(meshes.size(), numVertTri.size());
   std::sort(meshes.begin(), meshes.end(),
@@ -90,7 +91,7 @@ TEST(Manifold, Regression) {
   Manifold mesh1 = manifold;
   mesh1.Translate(glm::vec3(5.0f));
   int num_overlaps = manifold.NumOverlaps(mesh1);
-  ASSERT_EQ(num_overlaps, 237472);
+  ASSERT_EQ(num_overlaps, 237125);
 
   Mesh mesh_out = manifold.Extract();
   Manifold mesh2(mesh_out);
@@ -410,10 +411,12 @@ TEST(Manifold, BooleanSphere) {
 TEST(Manifold, Boolean3) {
   Manifold gyroid(ImportMesh("data/gyroidpuzzle.ply"));
   EXPECT_TRUE(gyroid.IsManifold());
+  EXPECT_TRUE(gyroid.MatchesTriNormals());
 
   Manifold gyroid2 = gyroid;
   gyroid2.Translate(glm::vec3(5.0f));
   Manifold result = gyroid + gyroid2;
+  ExportMesh("gyroidUnion.gltf", result.Extract());
 
-  ExpectMeshes(result, {{29602, 59344}});
+  ExpectMeshes(result, {{29683, 59506}});
 }

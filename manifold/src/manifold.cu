@@ -506,6 +506,8 @@ Manifold::Properties Manifold::GetProperties() const {
 
 bool Manifold::IsManifold() const { return pImpl_->IsManifold(); }
 
+bool Manifold::MatchesTriNormals() const { return pImpl_->MatchesTriNormals(); }
+
 Manifold& Manifold::Translate(glm::vec3 v) {
   pImpl_->transform_[3] += v;
   return *this;
