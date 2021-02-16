@@ -373,6 +373,39 @@ TEST(Polygon, Sliver3) {
   TestPoly(polys, 4);
 }
 
+TEST(Polygon, Sliver4) {
+  Polygons polys;
+  polys.push_back({
+      {glm::vec2(-0.375669807, 8.90489388), 7474},  //
+      {glm::vec2(0, 8.39722729), 7459},             //
+      {glm::vec2(0, 8.9723053), 7468},              //
+      {glm::vec2(0, 8.9723053), 7469},              //
+      {glm::vec2(0, 8.96719646), 7467},             //
+      {glm::vec2(0, 8.89326191), 7466},             //
+      {glm::vec2(0, 8.78047276), 7465},             //
+      {glm::vec2(-0.330551624, 8.8897438), 7473},   //
+  });
+  TestPoly(polys, 6);
+}
+
+TEST(Polygon, Sliver5) {
+  Polygons polys;
+  polys.push_back({
+      {glm::vec2(-60, 0), 19},               //
+      {glm::vec2(-50, 0), 21},               //
+      {glm::vec2(-50, 0), 38},               //
+      {glm::vec2(-60, 4.37113897e-07), 24},  //
+      {glm::vec2(-60, 4.37113897e-07), 37},  //
+  });
+  polys.push_back({
+      {glm::vec2(-60, 100), 20},             //
+      {glm::vec2(-60, 4.37113897e-07), 44},  //
+      {glm::vec2(-60, 4.37113897e-07), 28},  //
+      {glm::vec2(-50, 0), 45},               //
+  });
+  TestPoly(polys, 5);
+}
+
 TEST(Polygon, Colinear2) {
   Polygons polys;
   polys.push_back({
@@ -413,21 +446,6 @@ TEST(Polygon, Duplicates) {
       {glm::vec2(-15, -8.10255623), 1922},         //
   });
   TestPoly(polys, 4);
-}
-
-TEST(Polygon, Sliver4) {
-  Polygons polys;
-  polys.push_back({
-      {glm::vec2(-0.375669807, 8.90489388), 7474},  //
-      {glm::vec2(0, 8.39722729), 7459},             //
-      {glm::vec2(0, 8.9723053), 7468},              //
-      {glm::vec2(0, 8.9723053), 7469},              //
-      {glm::vec2(0, 8.96719646), 7467},             //
-      {glm::vec2(0, 8.89326191), 7466},             //
-      {glm::vec2(0, 8.78047276), 7465},             //
-      {glm::vec2(-0.330551624, 8.8897438), 7473},   //
-  });
-  TestPoly(polys, 6);
 }
 
 TEST(Polygon, Simple1) {

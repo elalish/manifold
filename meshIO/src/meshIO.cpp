@@ -91,13 +91,20 @@ void ExportMesh(const std::string& filename, const Mesh& manifold) {
   scene->mRootNode->mMeshes[0] = 0;
 
   aiMesh* mesh_out = scene->mMeshes[0];
+  mesh_out->mPrimitiveTypes = aiPrimitiveType_TRIANGLE;
 
   mesh_out->mNumVertices = manifold.vertPos.size();
   mesh_out->mVertices = new aiVector3D[mesh_out->mNumVertices];
+  const bool hasNormals = manifold.vertNormal.size() == manifold.vertPos.size();
+  if (hasNormals) mesh_out->mNormals = new aiVector3D[mesh_out->mNumVertices];
 
   for (int i = 0; i < mesh_out->mNumVertices; ++i) {
     const glm::vec3& v = manifold.vertPos[i];
     mesh_out->mVertices[i] = aiVector3D(v.x, v.y, v.z);
+    if (hasNormals) {
+      const glm::vec3& n = manifold.vertNormal[i];
+      mesh_out->mNormals[i] = aiVector3D(n.x, n.y, n.z);
+    }
   }
 
   mesh_out->mNumFaces = manifold.triVerts.size();
@@ -111,8 +118,19 @@ void ExportMesh(const std::string& filename, const Mesh& manifold) {
   }
 
   Assimp::Exporter exporter;
-  auto result = exporter.Export(
-      scene, filename.substr(filename.find_last_of(".") + 1), filename);
+
+  // int n = exporter.GetExportFormatCount();
+  // for (int i = 0; i < n; ++i) {
+  //   auto desc = exporter.GetExportFormatDescription(i);
+  //   std::cout << i << ", id = " << desc->id << ", " << desc->description
+  //             << std::endl;
+  // }
+
+  std::string ext = filename.substr(filename.find_last_of(".") + 1);
+  if (ext == "glb") ext = "glb2";
+  if (ext == "gltf") ext = "gltf2";
+
+  auto result = exporter.Export(scene, ext, filename);
 
   delete scene;
 
