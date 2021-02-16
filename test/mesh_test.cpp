@@ -418,5 +418,10 @@ TEST(Manifold, Boolean3) {
   Manifold result = gyroid + gyroid2;
   ExportMesh("gyroidUnion.gltf", result.Extract());
 
-  ExpectMeshes(result, {{29683, 59506}});
+  EXPECT_TRUE(result.IsManifold());
+  EXPECT_TRUE(result.MatchesTriNormals());
+  EXPECT_EQ(result.Decompose().size(), 1);
+  auto prop = result.GetProperties();
+  EXPECT_NEAR(prop.volume, 7692, 1);
+  EXPECT_NEAR(prop.surfaceArea, 9642, 1);
 }
