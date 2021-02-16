@@ -472,7 +472,8 @@ struct AssignNormals {
 
     const bool isDegenerate = glm::length(crossP) <= perimeter * kTolerance;
 
-    if (calculateTriNormal) {
+    if (calculateTriNormal ||
+        (triNormal.x == 0 && triNormal.y == 0 && triNormal.z == 0)) {
       triNormal = isDegenerate ? glm::vec3(0)
                                : glm::normalize(glm::cross(edge[0], edge[1]));
     }
