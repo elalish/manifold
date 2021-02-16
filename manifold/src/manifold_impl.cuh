@@ -37,6 +37,8 @@ struct Manifold::Impl {
 
   void CreateHalfedges(const VecDH<glm::ivec3>& triVerts);
   void CreateAndFixHalfedges(const VecDH<glm::ivec3>& triVerts);
+  void SplitNonmanifoldVerts();
+  void CollapseDegenerates();
   void Finish();
   void Update();
   void ApplyTransform() const;
@@ -50,6 +52,7 @@ struct Manifold::Impl {
   Properties GetProperties() const;
   void CalculateBBox();
   bool IsManifold() const;
+  bool MatchesTriNormals() const;
 
   void SortVerts();
   void ReindexVerts(const VecDH<int>& vertNew2Old, int numOldVert);

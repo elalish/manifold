@@ -39,6 +39,7 @@ void Identical(Mesh& mesh1, Mesh& mesh2) {
 void ExpectMeshes(Manifold& manifold,
                   const std::vector<std::pair<int, int>>& numVertTri) {
   EXPECT_TRUE(manifold.IsManifold());
+  EXPECT_TRUE(manifold.MatchesTriNormals());
   std::vector<Manifold> meshes = manifold.Decompose();
   ASSERT_EQ(meshes.size(), numVertTri.size());
   std::sort(meshes.begin(), meshes.end(),
@@ -90,7 +91,7 @@ TEST(Manifold, Regression) {
   Manifold mesh1 = manifold;
   mesh1.Translate(glm::vec3(5.0f));
   int num_overlaps = manifold.NumOverlaps(mesh1);
-  ASSERT_EQ(num_overlaps, 237472);
+  ASSERT_EQ(num_overlaps, 237125);
 
   Mesh mesh_out = manifold.Extract();
   Manifold mesh2(mesh_out);
@@ -128,6 +129,18 @@ TEST(Manifold, Sphere) {
   Manifold sphere = Manifold::Sphere(1.0f, 4 * n);
   EXPECT_TRUE(sphere.IsManifold());
   EXPECT_EQ(sphere.NumTri(), n * n * 8);
+}
+
+TEST(Manifold, Normals) {
+  Mesh cube = Manifold::Cube(glm::vec3(1), true).Extract(true);
+  const int nVert = cube.vertPos.size();
+  for (int i = 0; i < nVert; ++i) {
+    glm::vec3 v = glm::normalize(cube.vertPos[i]);
+    glm::vec3& n = cube.vertNormal[i];
+    EXPECT_FLOAT_EQ(v.x, n.x);
+    EXPECT_FLOAT_EQ(v.y, n.y);
+    EXPECT_FLOAT_EQ(v.z, n.z);
+  }
 }
 
 TEST(Manifold, Extrude) {
@@ -203,6 +216,7 @@ TEST(Manifold, BooleanTetra) {
  */
 TEST(Manifold, SelfSubtract) {
   Manifold cube = Manifold::Cube();
+  ExportMesh("cube.gltf", cube.Extract());
   Manifold empty = cube - cube;
   EXPECT_TRUE(empty.IsManifold());
   EXPECT_TRUE(empty.IsEmpty());
@@ -222,7 +236,7 @@ TEST(Manifold, Perturb) {
   Manifold corner(tmp);
   Manifold empty = corner - corner;
   EXPECT_TRUE(empty.IsManifold());
-  // EXPECT_TRUE(empty.IsEmpty());
+  EXPECT_TRUE(empty.IsEmpty());
 
   auto prop = empty.GetProperties();
   // ExportMesh("perturb.ply", empty.Extract());
@@ -236,8 +250,9 @@ TEST(Manifold, Coplanar) {
   Manifold out = cube - cube2.Scale({0.5f, 0.5f, 1.0f})
                             .Rotate(0, 0, 15)
                             .Translate({0.25f, 0.25f, 0.0f});
-  ExpectMeshes(out, {{60, 120}});
+  ExpectMeshes(out, {{32, 64}});
   EXPECT_EQ(out.Genus(), 1);
+  ExportMesh("coplanar.gltf", out.Extract());
 }
 
 TEST(Manifold, MultiCoplanar) {
@@ -253,28 +268,38 @@ TEST(Manifold, MultiCoplanar) {
   EXPECT_NEAR(prop.surfaceArea, 2.76, 1e-5);
 }
 
+TEST(Manifold, FaceUnion) {
+  Manifold cubes = Manifold::Cube();
+  Manifold cube2 = cubes;
+  cubes += cube2.Translate({1, 0, 0});
+  EXPECT_EQ(cubes.Genus(), 0);
+  ExpectMeshes(cubes, {{8, 12}});
+  auto prop = cubes.GetProperties();
+  EXPECT_NEAR(prop.volume, 2, 1e-5);
+  EXPECT_NEAR(prop.surfaceArea, 10, 1e-5);
+  ExportMesh("faceUnion.gltf", cubes.Extract());
+}
+
 TEST(Manifold, EdgeUnion) {
   Manifold cubes = Manifold::Cube();
-  auto propIn = cubes.GetProperties();
   Manifold cube2 = cubes;
   cubes += cube2.Translate({1, 1, 0});
-  EXPECT_TRUE(cubes.IsManifold());
-  EXPECT_EQ(cubes.Genus(), 0);
-  auto prop = cubes.GetProperties();
-  EXPECT_FLOAT_EQ(prop.volume, 2 * propIn.volume);
-  EXPECT_FLOAT_EQ(prop.surfaceArea, 2 * propIn.surfaceArea);
+  ExpectMeshes(cubes, {{8, 12}, {8, 12}});
+}
+
+TEST(Manifold, EdgeUnion2) {
+  Manifold tets = Manifold::Tetrahedron();
+  Manifold cube2 = tets;
+  tets.Translate({0, 0, -1});
+  tets += cube2.Translate({0, 0, 1}).Rotate(0, 0, 90);
+  ExpectMeshes(tets, {{4, 4}, {4, 4}});
 }
 
 TEST(Manifold, CornerUnion) {
   Manifold cubes = Manifold::Cube();
-  auto propIn = cubes.GetProperties();
   Manifold cube2 = cubes;
   cubes += cube2.Translate({1, 1, 1});
-  EXPECT_TRUE(cubes.IsManifold());
-  EXPECT_EQ(cubes.Genus(), 0);
-  auto prop = cubes.GetProperties();
-  EXPECT_FLOAT_EQ(prop.volume, 2 * propIn.volume);
-  EXPECT_FLOAT_EQ(prop.surfaceArea, 2 * propIn.surfaceArea);
+  ExpectMeshes(cubes, {{8, 12}, {8, 12}});
 }
 
 /**
@@ -355,11 +380,7 @@ TEST(Manifold, BooleanWinding) {
   Manifold doubled = Manifold::Compose(cubes);
 
   Manifold cube = Manifold::Cube(glm::vec3(1.0f), true);
-  PolygonParams().suppressErrors = true;
-  // The geometry error is expected due to triangulating a doubly-wound
-  // manifold, but we're checking that there was not first a topology error.
-  EXPECT_THROW(cube ^= doubled, geometryErr);
-  PolygonParams().suppressErrors = false;
+  EXPECT_TRUE((cube ^= doubled).IsManifold());
 }
 
 TEST(Manifold, BooleanNonIntersecting) {
@@ -390,10 +411,17 @@ TEST(Manifold, BooleanSphere) {
 TEST(Manifold, Boolean3) {
   Manifold gyroid(ImportMesh("data/gyroidpuzzle.ply"));
   EXPECT_TRUE(gyroid.IsManifold());
+  EXPECT_TRUE(gyroid.MatchesTriNormals());
 
   Manifold gyroid2 = gyroid;
   gyroid2.Translate(glm::vec3(5.0f));
   Manifold result = gyroid + gyroid2;
+  ExportMesh("gyroidUnion.gltf", result.Extract());
 
-  ExpectMeshes(result, {{31733, 63606}});
+  EXPECT_TRUE(result.IsManifold());
+  EXPECT_TRUE(result.MatchesTriNormals());
+  EXPECT_EQ(result.Decompose().size(), 1);
+  auto prop = result.GetProperties();
+  EXPECT_NEAR(prop.volume, 7692, 1);
+  EXPECT_NEAR(prop.surfaceArea, 9642, 1);
 }

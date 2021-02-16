@@ -27,6 +27,7 @@ namespace {
 using namespace manifold;
 
 ExecutionParams params;
+float kTol = params.kTolerance;
 
 struct VertAdj;
 typedef std::list<VertAdj>::iterator VertItr;
@@ -82,20 +83,20 @@ struct EdgePair {
   bool westCertain, eastCertain, startCertain;
 
   int WestOf(VertItr vert) const {
-    int westOf = CCW(vEast->right->pos, vEast->pos, vert->pos);
+    int westOf = CCW(vEast->right->pos, vEast->pos, vert->pos, kTol);
     if (westOf == 0 && !vert->right->Processed())
-      westOf = CCW(vEast->right->pos, vEast->pos, vert->right->pos);
+      westOf = CCW(vEast->right->pos, vEast->pos, vert->right->pos, kTol);
     if (westOf == 0 && !vert->left->Processed())
-      westOf = CCW(vEast->right->pos, vEast->pos, vert->left->pos);
+      westOf = CCW(vEast->right->pos, vEast->pos, vert->left->pos, kTol);
     return westOf;
   }
 
   int EastOf(VertItr vert) const {
-    int eastOf = CCW(vWest->pos, vWest->left->pos, vert->pos);
+    int eastOf = CCW(vWest->pos, vWest->left->pos, vert->pos, kTol);
     if (eastOf == 0 && !vert->right->Processed())
-      eastOf = CCW(vWest->pos, vWest->left->pos, vert->right->pos);
+      eastOf = CCW(vWest->pos, vWest->left->pos, vert->right->pos, kTol);
     if (eastOf == 0 && !vert->left->Processed())
-      eastOf = CCW(vWest->pos, vWest->left->pos, vert->left->pos);
+      eastOf = CCW(vWest->pos, vWest->left->pos, vert->left->pos, kTol);
     return eastOf;
   }
 };
@@ -110,7 +111,7 @@ class Triangulator {
     reflex_chain_.push(vert);
     other_side_ = vert;
   }
-  int NumTriangles() { return triangles_output_; }
+  int NumTriangles() const { return triangles_output_; }
 
   /**
    * The vert, vi, must attach to the free end (specified by onRight) of the
@@ -134,14 +135,14 @@ class Triangulator {
       // This only creates enough triangles to ensure the reflex chain is still
       // reflex.
       if (params.verbose) std::cout << "same chain" << std::endl;
-      int ccw = CCW(vi->pos, vj->pos, v_top->pos);
+      int ccw = CCW(vi->pos, vj->pos, v_top->pos, kTol);
       while (ccw == (onRight_ ? 1 : -1) || ccw == 0) {
         AddTriangle(triangles, vi, vj, v_top);
         v_top = vj;
         reflex_chain_.pop();
         if (reflex_chain_.empty()) break;
         vj = reflex_chain_.top();
-        ccw = CCW(vi->pos, vj->pos, v_top->pos);
+        ccw = CCW(vi->pos, vj->pos, v_top->pos, kTol);
       }
       reflex_chain_.push(v_top);
       reflex_chain_.push(vi);
@@ -312,7 +313,7 @@ class Monotones {
     std::next(westPair)->westCertain = certain;
   }
 
-  PairItr GetPair(VertItr vert, VertType type) {
+  PairItr GetPair(VertItr vert, VertType type) const {
     // MERGE returns westPair, as this is the one that will be removed.
     return type == WESTSIDE ? vert->eastPair : vert->westPair;
   }
@@ -375,7 +376,7 @@ class Monotones {
    * of using geometry.
    */
   void RemovePair(PairItr pair) {
-    if (pair == activePairs_.end()) throw logicErr("No pair to remove!");
+    ALWAYS_ASSERT(pair != activePairs_.end(), logicErr, "No pair to remove!");
     pair->nextPair = std::next(pair);
     inactivePairs_.splice(inactivePairs_.end(), activePairs_, pair);
   }
@@ -386,7 +387,7 @@ class Monotones {
    * function will continue to search up the neighbors until the degeneracy is
    * broken and a certain answer is returned.
    */
-  bool IsHole(VertItr vert) {
+  bool IsHole(VertItr vert) const {
     VertItr left = vert->left;
     VertItr right = vert->right;
     VertItr center = vert;
@@ -408,10 +409,10 @@ class Monotones {
         right = right->right;
         continue;
       }
-      int isHole = CCW(right->pos, center->pos, left->pos);
+      int isHole = CCW(right->pos, center->pos, left->pos, kTol);
       if (center != vert) {
-        isHole += CCW(left->pos, center->pos, vert->pos) +
-                  CCW(vert->pos, center->pos, right->pos);
+        isHole += CCW(left->pos, center->pos, vert->pos, kTol) +
+                  CCW(vert->pos, center->pos, right->pos, kTol);
       }
       if (isHole != 0) return isHole > 0;
 
@@ -467,8 +468,8 @@ class Monotones {
    */
   bool ShiftEast(const VertItr vert, const PairItr inputPair,
                  const bool isHole) {
-    if (inputPair == activePairs_.end())
-      throw logicErr("input pair is not defined!");
+    ALWAYS_ASSERT(inputPair != activePairs_.end(), logicErr,
+                  "input pair is not defined!");
 
     if (inputPair->eastCertain) return false;
 
@@ -486,8 +487,6 @@ class Monotones {
       }
 
       const int outside = potentialPair->WestOf(vert);
-      if (outside < 0 && !isHole) return true;
-
       if (outside <= 0 && isHole) {  // certainly a hole
         SwapHole(potentialPair, inputPair);
         return false;
@@ -506,8 +505,8 @@ class Monotones {
    */
   bool ShiftWest(const VertItr vert, const PairItr inputPair,
                  const bool isHole) {
-    if (inputPair == activePairs_.end())
-      throw logicErr("input pair is not defined!");
+    ALWAYS_ASSERT(inputPair != activePairs_.end(), logicErr,
+                  "input pair is not defined!");
 
     if (inputPair->westCertain) return false;
 
@@ -525,8 +524,6 @@ class Monotones {
       }
 
       const int outside = potentialPair->EastOf(vert);
-      if (outside < 0 && !isHole) return true;
-
       if (outside <= 0 && isHole) {  // certainly a hole
         SwapHole(potentialPair, inputPair);
         return false;
@@ -583,10 +580,9 @@ class Monotones {
 
       if (vert->Processed()) continue;
 
-      if (!skipped.empty() && vert->IsPast(skipped.back())) {
-        throw geometryErr(
-            "Not Geometrically Valid! None of the skipped verts is valid.");
-      }
+      ALWAYS_ASSERT(
+          skipped.empty() || !vert->IsPast(skipped.back()), geometryErr,
+          "Not Geometrically Valid! None of the skipped verts is valid.");
 
       VertType type = ProcessVert(vert);
 
@@ -606,13 +602,11 @@ class Monotones {
       if (type != SKIP && ShiftWest(vert, pair, isHole)) type = SKIP;
 
       if (type == SKIP) {
-        if (std::next(insertAt) == monotones_.end()) {
-          throw geometryErr(
-              "Not Geometrically Valid! Tried to skip final vert.");
-        }
-        if (nextAttached.empty() && starts.empty())
-          throw geometryErr(
-              "Not Geometrically Valid! Tried to skip last queued vert.");
+        ALWAYS_ASSERT(std::next(insertAt) != monotones_.end(), geometryErr,
+                      "Not Geometrically Valid! Tried to skip final vert.");
+        ALWAYS_ASSERT(
+            !nextAttached.empty() || !starts.empty(), geometryErr,
+            "Not Geometrically Valid! Tried to skip last queued vert.");
         skipped.push_back(vert);
         if (params.verbose) std::cout << "Skipping vert" << std::endl;
         // If a new pair was added, remove it.
@@ -659,7 +653,7 @@ class Monotones {
       if (params.verbose) ListPairs();
     }
     return false;
-  }
+  }  // namespace
 
   /**
    * This is the only function that actually changes monotones_; all the rest is
@@ -708,6 +702,8 @@ class Monotones {
       if (vert->Processed()) continue;
 
       VertType type = ProcessVert(vert);
+      ALWAYS_ASSERT(type != SKIP, logicErr,
+                    "SKIP should not happen on reverse sweep!");
 
       PairItr westPair = GetPair(vert, type);
       switch (type) {
@@ -758,8 +754,6 @@ class Monotones {
           }
           break;
         }
-        case SKIP:
-          throw logicErr("SKIP should not happen on reverse sweep!");
       }
 
       vert->SetProcessed(true);
@@ -770,9 +764,9 @@ class Monotones {
     return false;
   }
 
-  void ListPairs() {
+  void ListPairs() const {
     std::cout << "active edges:" << std::endl;
-    for (EdgePair &pair : activePairs_) {
+    for (const EdgePair &pair : activePairs_) {
       std::cout << (pair.westCertain ? "certain " : "uncertain ");
       std::cout << "edge West: S = " << pair.vWest->mesh_idx
                 << ", N = " << pair.vWest->left->mesh_idx << std::endl;
@@ -786,7 +780,7 @@ class Monotones {
         std::cout << "east does not point back!" << std::endl;
     }
   }
-};
+};  // namespace
 
 void PrintFailure(const std::exception &e, const Polygons &polys,
                   std::vector<glm::ivec3> &triangles) {
@@ -803,19 +797,6 @@ void PrintFailure(const std::exception &e, const Polygons &polys,
 }  // namespace
 
 namespace manifold {
-// This is nearly the only function to do a floating point comparison in this
-// whole triangulator (the other is the check for sweep-line degeneracies).
-// This is done to maintain maximum consistency.
-int CCW(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2) {
-  glm::vec2 v1 = p1 - p0;
-  glm::vec2 v2 = p2 - p0;
-  float area = v1.x * v2.y - v1.y * v2.x;
-  float base2 = glm::max(glm::dot(v1, v1), glm::dot(v2, v2));
-  if (area * area <= base2 * params.kTolerance * params.kTolerance)
-    return 0;
-  else
-    return area > 0 ? 1 : -1;
-}
 
 bool Coincident(glm::vec2 p0, glm::vec2 p1) {
   glm::vec2 sep = p0 - p1;
@@ -927,7 +908,7 @@ void CheckGeometry(const std::vector<glm::ivec3> &triangles,
   ALWAYS_ASSERT(std::all_of(triangles.begin(), triangles.end(),
                             [&vertPos](const glm::ivec3 &tri) {
                               return CCW(vertPos[tri[0]], vertPos[tri[1]],
-                                         vertPos[tri[2]]) >= 0;
+                                         vertPos[tri[2]], kTol) >= 0;
                             }),
                 geometryErr, "triangulation is not entirely CCW!");
 }

@@ -59,7 +59,7 @@ class Manifold {
   Box BoundingBox() const;
   int Genus() const;
   Properties GetProperties() const;
-  Mesh Extract() const;
+  Mesh Extract(bool includeNormals = false) const;
 
   // Modification
   Manifold& Translate(glm::vec3);
@@ -87,6 +87,7 @@ class Manifold {
 
   // Testing hooks
   bool IsManifold() const;
+  bool MatchesTriNormals() const;
   int NumOverlaps(const Manifold& second) const;
 
   ~Manifold();

@@ -19,7 +19,6 @@
 
 namespace manifold {
 
-int CCW(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2);
 bool Coincident(glm::vec2 p0, glm::vec2 p1);
 std::vector<glm::ivec3> Triangulate(const Polygons &polys);
 

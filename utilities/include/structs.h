@@ -47,11 +47,20 @@ void AlwaysAssert(bool condition, const char* file, int line,
   }
 }
 
-inline int Signum(float val) { return (val > 0) - (val < 0); }
+#define ALWAYS_ASSERT(condition, EX, msg) \
+  AlwaysAssert<EX>(condition, __FILE__, __LINE__, #condition, msg);
+
+#ifdef __CUDACC__
+#define HOST_DEVICE __host__ __device__
+#else
+#define HOST_DEVICE
+#endif
+
+inline HOST_DEVICE int Signum(float val) { return (val > 0) - (val < 0); }
 
 // Use sind and cosd for inputs in degrees so that multiples of 90 degrees come
 // out exact.
-inline float sind(float x) {
+inline HOST_DEVICE float sind(float x) {
   if (!std::isfinite(x)) return sin(x);
   if (x < 0.0f) return -sind(-x);
   int quo;
@@ -69,16 +78,19 @@ inline float sind(float x) {
   return 0.0f;
 }
 
-inline float cosd(float x) { return sind(x + 90.0f); }
+inline HOST_DEVICE float cosd(float x) { return sind(x + 90.0f); }
 
-#define ALWAYS_ASSERT(condition, EX, msg) \
-  AlwaysAssert<EX>(condition, __FILE__, __LINE__, #condition, msg);
-
-#ifdef __CUDACC__
-#define HOST_DEVICE __host__ __device__
-#else
-#define HOST_DEVICE
-#endif
+inline HOST_DEVICE int CCW(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2,
+                           float tol) {
+  glm::vec2 v1 = p1 - p0;
+  glm::vec2 v2 = p2 - p0;
+  float area = v1.x * v2.y - v1.y * v2.x;
+  float base2 = glm::max(glm::dot(v1, v1), glm::dot(v2, v2));
+  if (area * area <= base2 * tol * tol)
+    return 0;
+  else
+    return area > 0 ? 1 : -1;
+}
 
 struct ExecutionParams {
   float kTolerance = 2e-5;
@@ -108,6 +120,7 @@ using Polygons = std::vector<SimplePolygon>;
 
 struct Mesh {
   std::vector<glm::vec3> vertPos;
+  std::vector<glm::vec3> vertNormal;
   std::vector<glm::ivec3> triVerts;
 };
 
