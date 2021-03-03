@@ -77,7 +77,7 @@ TEST(Samples, Sponge1) {
   EXPECT_TRUE(sponge.IsManifold());
   EXPECT_TRUE(sponge.MatchesTriNormals());
   EXPECT_EQ(sponge.Genus(), 5);
-  // ExportMesh("mengerSponge1.gltf", sponge.Extract());
+  ExportMesh("mengerSponge1.gltf", sponge.Extract());
 }
 
 TEST(Samples, FrameReduced) {
