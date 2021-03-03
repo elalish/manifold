@@ -50,6 +50,14 @@ __host__ __device__ int nextHalfedge(int current) {
   return current;
 }
 
+__host__ __device__ glm::ivec3 TriOf(int edge) {
+  glm::ivec3 triEdge;
+  triEdge[0] = edge;
+  triEdge[1] = nextHalfedge(triEdge[0]);
+  triEdge[2] = nextHalfedge(triEdge[1]);
+  return triEdge;
+}
+
 /**
  * By using the closest axis-aligned projection to the normal instead of a
  * projection along the normal, we avoid introducing any rounding error.
@@ -609,14 +617,6 @@ struct CollapseEdge {
   const VecH<glm::vec3>& triNormal;
   const bool shortEdge;
 
-  __host__ glm::ivec3 TriOf(int edge) const {
-    glm::ivec3 triEdge;
-    triEdge[0] = edge;
-    triEdge[1] = edge + ((edge + 1) % 3 == 0 ? -2 : 1);
-    triEdge[2] = triEdge[1] + ((triEdge[1] + 1) % 3 == 0 ? -2 : 1);
-    return triEdge;
-  }
-
   __host__ void UnmarkEdge(int edge) {
     if (!shortEdge) halfedge[edge].face = edge / 3;
   }
@@ -686,6 +686,8 @@ struct CollapseEdge {
       return;
     }
 
+    const int endVert = toRemove.endVert;
+
     std::vector<int> edges;
     int current = halfedge[tri0edge[1]].pairedHalfedge;
     while (current != tri1edge[2]) {
@@ -696,7 +698,6 @@ struct CollapseEdge {
       current = halfedge[current].pairedHalfedge;
     }
 
-    const int endVert = toRemove.endVert;
     int start = halfedge[tri1edge[1]].pairedHalfedge;
     if (!shortEdge) {
       current = start;
@@ -757,9 +758,13 @@ struct CheckManifold {
   const Halfedge* halfedges;
 
   __host__ __device__ bool operator()(int edge) {
-    bool good = true;
     const Halfedge halfedge = halfedges[edge];
+    if (halfedge.startVert == -1 && halfedge.endVert == -1 &&
+        halfedge.pairedHalfedge == -1)
+      return true;
+
     const Halfedge paired = halfedges[halfedge.pairedHalfedge];
+    bool good = true;
     good &= paired.pairedHalfedge == edge;
     good &= halfedge.startVert != halfedge.endVert;
     good &= halfedge.startVert == paired.endVert;
@@ -772,8 +777,12 @@ struct NoDuplicates {
   const Halfedge* halfedges;
 
   __host__ __device__ bool operator()(int edge) {
-    return halfedges[edge].startVert != halfedges[edge + 1].startVert ||
-           halfedges[edge].endVert != halfedges[edge + 1].endVert;
+    const Halfedge halfedge = halfedges[edge];
+    if (halfedge.startVert == -1 && halfedge.endVert == -1 &&
+        halfedge.pairedHalfedge == -1)
+      return true;
+    return halfedge.startVert != halfedges[edge + 1].startVert ||
+           halfedge.endVert != halfedges[edge + 1].endVert;
   }
 };
 
@@ -783,12 +792,14 @@ struct CheckCCW {
   const glm::vec3* triNormal;
 
   __host__ __device__ bool operator()(int face) {
+    if (halfedges[3 * face].pairedHalfedge < 0) return true;
+
     const glm::mat3x2 projection = GetAxisAlignedProjection(triNormal[face]);
     glm::vec2 v[3];
     for (int i : {0, 1, 2})
       v[i] = projection * vertPos[halfedges[3 * face + i].startVert];
-    int ccw = CCW(v[0], v[1], v[2], 2 * kTolerance);
-    if (ccw < 0) {
+    int ccw = CCW(v[0], v[1], v[2], kTolerance / 2);
+    if (ccw <= 0) {
       glm::vec2 v1 = v[1] - v[0];
       glm::vec2 v2 = v[2] - v[0];
       float area = v1.x * v2.y - v1.y * v2.x;
@@ -796,7 +807,7 @@ struct CheckCCW {
       printf("Tri %d does not match normal, height = %g, base = %g\n", face,
              area / base, base);
     }
-    return ccw >= 0;
+    return ccw > 0;
   }
 };
 
@@ -951,6 +962,12 @@ void Manifold::Impl::CollapseDegenerates() {
                      CollapseEdge({collapsed, halfedge_.H(), vertPos_.H(),
                                    faceNormal_.H(), true}));
 
+  if (!IsManifold()) std::cout << __LINE__ << std::endl;
+
+  SwapEdges();
+
+  if (!IsManifold()) std::cout << __LINE__ << std::endl;
+
   VecDH<bool> marked(1);
   while (1) {
     marked.H()[0] = false;
@@ -966,6 +983,7 @@ void Manifold::Impl::CollapseDegenerates() {
                                      faceNormal_.H(), false}));
     if (!collapsed) break;
   }
+  if (!IsManifold()) std::cout << __LINE__ << std::endl;
 }
 
 /**
@@ -1203,12 +1221,11 @@ bool Manifold::Impl::IsManifold() const {
   if (halfedge_.size() == 0) return true;
   bool isManifold = thrust::all_of(countAt(0), countAt(halfedge_.size()),
                                    CheckManifold({halfedge_.cptrD()}));
-  if (!isManifold) std::cout << "not manifold!" << std::endl;
+
   VecDH<Halfedge> halfedge(halfedge_);
   thrust::sort(halfedge.beginD(), halfedge.endD());
   isManifold &= thrust::all_of(countAt(0), countAt(2 * NumEdge() - 1),
                                NoDuplicates({halfedge.cptrD()}));
-  if (!isManifold) std::cout << "not 2-manifold!" << std::endl;
   return isManifold;
 }
 
@@ -1441,4 +1458,91 @@ Polygons Manifold::Impl::Face2Polygons(int face, glm::mat3x2 projection,
   }
   return polys;
 }
+
+void Manifold::Impl::PairUp(int edge0, int edge1) {
+  VecH<Halfedge>& halfedge = halfedge_.H();
+  halfedge[edge0].pairedHalfedge = edge1;
+  halfedge[edge1].pairedHalfedge = edge0;
+};
+
+void Manifold::Impl::SwapEdges() {
+  VecH<Halfedge>& halfedge = halfedge_.H();
+  VecH<glm::vec3>& vertPos = vertPos_.H();
+  VecH<glm::vec3>& triNormal = faceNormal_.H();
+
+  std::set<int> edges;
+  for (int i = 0; i < halfedge.size(); ++i) edges.insert(edges.end(), i);
+
+  while (!edges.empty()) {
+    const int edge = *(edges.begin());
+    edges.erase(edges.begin());
+
+    if (halfedge[edge].pairedHalfedge < 0) continue;
+
+    const glm::ivec3 tri0edge = TriOf(edge);
+    const glm::ivec3 tri1edge = TriOf(halfedge[edge].pairedHalfedge);
+
+    if (halfedge[tri0edge[1]].endVert == halfedge[tri1edge[1]].endVert) {
+      // Remove disconnected triangles
+      for (int i : {0, 1, 2}) {
+        vertPos[halfedge[tri0edge[i]].startVert] = glm::vec3(0.0f / 0.0f);
+        halfedge[tri0edge[i]] = {-1, -1, -1, -1};
+        halfedge[tri1edge[i]] = {-1, -1, -1, -1};
+      }
+      return;
+    }
+
+    const int face = edge / 3;
+    glm::mat3x2 projection = GetAxisAlignedProjection(triNormal[face]);
+    glm::vec2 v[3];
+    for (int i : {0, 1, 2})
+      v[i] = projection * vertPos[halfedge[tri0edge[i]].startVert];
+    const glm::vec2 e[3] = {v[1] - v[0], v[2] - v[1], v[0] - v[2]};
+    // Only operate on the long edge of a degenerate triangle.
+    if (glm::dot(e[0], e[0]) <= glm::dot(e[1], e[1]) ||
+        glm::dot(e[0], e[0]) <= glm::dot(e[2], e[2]) ||
+        CCW(v[0], v[1], v[2], kTolerance) != 0)
+      continue;
+
+    const int pairedEdge = halfedge[edge].pairedHalfedge;
+    const int pairedFace = pairedEdge / 3;
+    projection = GetAxisAlignedProjection(triNormal[pairedFace]);
+    for (int i : {0, 1, 2})
+      v[i] = projection * vertPos[halfedge[tri1edge[i]].startVert];
+    const glm::vec2 f[3] = {v[1] - v[0], v[2] - v[1], v[0] - v[2]};
+    // Only operate if the neighboring triangle is not degenerate.
+    if (CCW(v[0], v[1], v[2], kTolerance) == 0 &&
+        (glm::dot(f[0], f[0]) <= glm::dot(f[1], f[1]) ||
+         glm::dot(f[0], f[0]) <= glm::dot(f[2], f[2])))
+      continue;
+
+    // Add the paired edges of what was the degenerate triangle back to the
+    // list, to check if they can now be swapped.
+    edges.insert(edges.begin(), halfedge[tri0edge[1]].pairedHalfedge);
+    edges.insert(edges.begin(), halfedge[tri0edge[2]].pairedHalfedge);
+
+    // Swap the edge, but if the new edge already exists, duplicate the verts
+    // and split the mesh.
+    const int v0 = halfedge[tri0edge[1]].endVert;
+    const int v1 = halfedge[tri1edge[1]].endVert;
+    halfedge[tri0edge[0]].startVert = v1;
+    halfedge[tri0edge[2]].endVert = v1;
+    halfedge[tri1edge[0]].startVert = v0;
+    halfedge[tri1edge[2]].endVert = v0;
+    PairUp(tri0edge[0], halfedge[tri1edge[2]].pairedHalfedge);
+    PairUp(tri1edge[0], halfedge[tri0edge[2]].pairedHalfedge);
+    PairUp(tri0edge[2], tri1edge[2]);
+    triNormal[halfedge[tri0edge[0]].face] =
+        triNormal[halfedge[tri1edge[0]].face];
+
+    int current = halfedge[tri0edge[2]].pairedHalfedge;
+    const int endVert = halfedge[tri1edge[1]].endVert;
+    while (current != tri0edge[1]) {
+      current = nextHalfedge(current);
+      // if (halfedge[current].endVert ==endVert)
+      current = halfedge[current].pairedHalfedge;
+    }
+  }
+}
+
 }  // namespace manifold

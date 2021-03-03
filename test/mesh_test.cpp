@@ -411,17 +411,25 @@ TEST(Manifold, BooleanSphere) {
 TEST(Manifold, Boolean3) {
   Manifold gyroid(ImportMesh("data/gyroidpuzzle.ply"));
   EXPECT_TRUE(gyroid.IsManifold());
+  std::cout << __LINE__ << std::endl;
   EXPECT_TRUE(gyroid.MatchesTriNormals());
-
+  std::cout << __LINE__ << std::endl;
   Manifold gyroid2 = gyroid;
+  std::cout << __LINE__ << std::endl;
   gyroid2.Translate(glm::vec3(5.0f));
+  std::cout << __LINE__ << std::endl;
   Manifold result = gyroid + gyroid2;
+  std::cout << __LINE__ << std::endl;
   ExportMesh("gyroidUnion.gltf", result.Extract());
-
+  std::cout << __LINE__ << std::endl;
   EXPECT_TRUE(result.IsManifold());
+  std::cout << __LINE__ << std::endl;
   EXPECT_TRUE(result.MatchesTriNormals());
+  std::cout << __LINE__ << std::endl;
   EXPECT_EQ(result.Decompose().size(), 1);
+  std::cout << __LINE__ << std::endl;
   auto prop = result.GetProperties();
+  std::cout << __LINE__ << std::endl;
   EXPECT_NEAR(prop.volume, 7692, 1);
   EXPECT_NEAR(prop.surfaceArea, 9642, 1);
 }
