@@ -439,7 +439,7 @@ struct ReindexFace {
     for (const int i : {0, 1, 2}) {
       Halfedge edge = oldHalfedge[3 * oldFace + i];
       edge.face = newFace;
-      const int pairedFace = oldHalfedge[edge.pairedHalfedge].face;
+      const int pairedFace = edge.pairedHalfedge / 3;
       const int offset = edge.pairedHalfedge - 3 * pairedFace;
       edge.pairedHalfedge = 3 * faceOld2New[pairedFace] + offset;
       halfedge[3 * newFace + i] = edge;
@@ -606,8 +606,8 @@ struct MarkColinearEdge {
     current = halfedge[current].pairedHalfedge;
     while (current != start) {
       current = nextHalfedge(current);
-      glm::vec3 normal = faceNormal[current / 3];
-      if (glm::abs(glm::dot(delta, normal)) > kTolerance) return;
+      if (glm::abs(glm::dot(delta, faceNormal[current / 3])) > kTolerance)
+        return;
       current = halfedge[current].pairedHalfedge;
     }
     edge.face = -1;
@@ -846,6 +846,8 @@ void Manifold::Impl::CollapseDegenerates() {
     if (!marked.H()[0]) break;
 
     if (!CollapseEdges(false)) break;
+
+    SwapEdges();
   }
   if (!IsManifold()) std::cout << __LINE__ << std::endl;
 }
