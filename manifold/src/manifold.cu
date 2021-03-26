@@ -490,6 +490,11 @@ Box Manifold::BoundingBox() const {
   return pImpl_->bBox_.Transform(pImpl_->transform_);
 }
 
+float Manifold::Precision() const {
+  pImpl_->ApplyTransform();
+  return pImpl_->precision_;
+}
+
 /**
  * The genus is a topological property of the manifold, representing the number
  * of "handles". A sphere is 0, torus 1, etc. It is only meaningful for a single
@@ -554,6 +559,7 @@ Manifold& Manifold::Warp(std::function<void(glm::vec3&)> warpFunc) {
   pImpl_->Update();
   pImpl_->faceNormal_.resize(0);  // force recalculation of triNormal
   pImpl_->CalculateNormals();
+  pImpl_->SetPrecision();
   return *this;
 }
 
