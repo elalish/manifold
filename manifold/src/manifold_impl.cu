@@ -32,16 +32,6 @@
 namespace {
 using namespace manifold;
 
-/**
- * Represents the uncertainty of the vertices (greater than or equal to
- * worst-case floating-point precision). Used to determine when face surface
- * area or volume is small enough to clamp to zero. TODO: this should be based
- * on the bounding box, and probably passed through Boolean operations. It
- * should also be passed into the Polygon triangulator, where it is more
- * important.
- */
-constexpr float kTolerance = 1e-5;
-
 constexpr uint32_t kNoCode = 0xFFFFFFFFu;
 
 __host__ __device__ int nextHalfedge(int current) {
@@ -265,6 +255,7 @@ struct SplitTris {
 struct FaceAreaVolume {
   const Halfedge* halfedges;
   const glm::vec3* vertPos;
+  const float precision;
 
   __host__ __device__ thrust::pair<float, float> operator()(int face) {
     float perimeter = 0;
@@ -280,7 +271,7 @@ struct FaceAreaVolume {
     float area = glm::length(crossP);
     float volume = glm::dot(crossP, vertPos[halfedges[3 * face].startVert]);
 
-    return area > perimeter * kTolerance
+    return area > perimeter * precision
                ? thrust::make_pair(area / 2.0f, volume / 6.0f)
                : thrust::make_pair(0.0f, 0.0f);
   }
@@ -463,6 +454,7 @@ struct AssignNormals {
   glm::vec3* vertNormal;
   const glm::vec3* vertPos;
   const Halfedge* halfedges;
+  const float precision;
   const bool calculateTriNormal;
 
   __host__ __device__ void operator()(thrust::tuple<glm::vec3&, int> in) {
@@ -483,7 +475,7 @@ struct AssignNormals {
     }
     glm::vec3 crossP = glm::cross(edge[0], edge[1]);
 
-    const bool isDegenerate = glm::length(crossP) <= perimeter * kTolerance;
+    const bool isDegenerate = glm::length(crossP) <= perimeter * precision;
 
     if (calculateTriNormal ||
         (triNormal.x == 0 && triNormal.y == 0 && triNormal.z == 0)) {
@@ -581,10 +573,11 @@ struct SwapHalfedges {
 
 struct MarkShortEdge {
   const glm::vec3* vertPos;
+  const float precision;
 
   __host__ __device__ void operator()(Halfedge& edge) {
     const glm::vec3 delta = vertPos[edge.endVert] - vertPos[edge.startVert];
-    if (glm::dot(delta, delta) < kTolerance * kTolerance) edge.face = -1;
+    if (glm::dot(delta, delta) < precision * precision) edge.face = -1;
   }
 };
 
@@ -593,6 +586,7 @@ struct MarkColinearEdge {
   const glm::vec3* vertPos;
   const glm::vec3* faceNormal;
   const Halfedge* halfedge;
+  const float precision;
 
   __host__ __device__ void operator()(Halfedge& edge) {
     if (edge.pairedHalfedge < 0) return;
@@ -606,7 +600,7 @@ struct MarkColinearEdge {
     current = halfedge[current].pairedHalfedge;
     while (current != start) {
       current = nextHalfedge(current);
-      if (glm::abs(glm::dot(delta, faceNormal[current / 3])) > kTolerance)
+      if (glm::abs(glm::dot(delta, faceNormal[current / 3])) > precision)
         return;
       current = halfedge[current].pairedHalfedge;
     }
@@ -661,6 +655,7 @@ struct CheckCCW {
   const Halfedge* halfedges;
   const glm::vec3* vertPos;
   const glm::vec3* triNormal;
+  const float precision;
 
   __host__ __device__ bool operator()(int face) {
     if (halfedges[3 * face].pairedHalfedge < 0) return true;
@@ -669,14 +664,17 @@ struct CheckCCW {
     glm::vec2 v[3];
     for (int i : {0, 1, 2})
       v[i] = projection * vertPos[halfedges[3 * face + i].startVert];
-    int ccw = CCW(v[0], v[1], v[2], kTolerance / 2);
+    int ccw = CCW(v[0], v[1], v[2], precision / 2);
     if (ccw <= 0) {
       glm::vec2 v1 = v[1] - v[0];
       glm::vec2 v2 = v[2] - v[0];
       float area = v1.x * v2.y - v1.y * v2.x;
       float base = glm::sqrt(glm::max(glm::dot(v1, v1), glm::dot(v2, v2)));
-      printf("Tri %d does not match normal, height = %g, base = %g\n", face,
-             area / base, base);
+      printf(
+          "Tri %d does not match normal, height = %g, base = %g\n"
+          "normal = %g, %g, %g\n",
+          face, area / base, base, triNormal[face].x, triNormal[face].y,
+          triNormal[face].z);
     }
     return ccw > 0;
   }
@@ -690,9 +688,11 @@ namespace manifold {
  * Create a manifold from an input triangle Mesh. Will throw if the Mesh is not
  * manifold.
  */
-Manifold::Impl::Impl(const Mesh& manifold) : vertPos_(manifold.vertPos) {
+Manifold::Impl::Impl(const Mesh& mesh) : vertPos_(mesh.vertPos) {
   CheckDevice();
-  CreateAndFixHalfedges(manifold.triVerts);
+  CalculateBBox();
+  SetPrecision();
+  CreateAndFixHalfedges(mesh.triVerts);
   CalculateNormals();
   CollapseDegenerates();
   Finish();
@@ -827,7 +827,7 @@ void Manifold::Impl::SplitNonmanifoldVerts() {
 
 void Manifold::Impl::CollapseDegenerates() {
   thrust::for_each(halfedge_.beginD(), halfedge_.endD(),
-                   MarkShortEdge({vertPos_.cptrD()}));
+                   MarkShortEdge({vertPos_.cptrD(), precision_}));
   CollapseEdges(true);
 
   if (!IsManifold()) std::cout << __LINE__ << std::endl;
@@ -842,7 +842,7 @@ void Manifold::Impl::CollapseDegenerates() {
     thrust::for_each(
         halfedge_.beginD(), halfedge_.endD(),
         MarkColinearEdge({marked.ptrD(), vertPos_.cptrD(), faceNormal_.cptrD(),
-                          halfedge_.cptrD()}));
+                          halfedge_.cptrD(), precision_}));
     if (!marked.H()[0]) break;
 
     if (!CollapseEdges(false)) break;
@@ -860,6 +860,7 @@ void Manifold::Impl::Finish() {
   if (halfedge_.size() == 0) return;
 
   CalculateBBox();
+  SetPrecision(precision_);
   if (!bBox_.isFinite()) {
     vertPos_.resize(0);
     halfedge_.resize(0);
@@ -932,8 +933,14 @@ void Manifold::Impl::ApplyTransform() {
   // This optimization does a cheap collider update if the transform is
   // axis-aligned.
   if (!collider_.Transform(transform_)) Update();
+
+  precision_ *= glm::max(
+      glm::length(transform_[0]),
+      glm::max(glm::length(transform_[1]), glm::length(transform_[2])));
   transform_ = glm::mat4x3(1.0f);
   CalculateBBox();
+  // Maximum of inherited precision loss and translational precision loss.
+  SetPrecision(precision_);
 }
 
 /**
@@ -980,9 +987,9 @@ void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge) {
       triNormal.push_back(normal);
     } else if (numEdge == 4) {  // Pair of triangles
       const glm::mat3x2 projection = GetAxisAlignedProjection(normal);
-      auto triCCW = [&projection, &vertPos](const glm::ivec3 tri) {
+      auto triCCW = [&projection, &vertPos, this](const glm::ivec3 tri) {
         return CCW(projection * vertPos[tri[0]], projection * vertPos[tri[1]],
-                   projection * vertPos[tri[2]], kTolerance) >= 0;
+                   projection * vertPos[tri[2]], precision_) >= 0;
       };
 
       glm::ivec3 tri0(halfedge[edge].startVert, halfedge[edge].endVert, -1);
@@ -1035,7 +1042,7 @@ void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge) {
         throw;
       }
 
-      std::vector<glm::ivec3> newTris = Triangulate(polys);
+      std::vector<glm::ivec3> newTris = Triangulate(polys, precision_);
 
       for (auto tri : newTris) {
         triVerts.push_back(tri);
@@ -1100,9 +1107,9 @@ bool Manifold::Impl::IsManifold() const {
  */
 bool Manifold::Impl::MatchesTriNormals() const {
   if (halfedge_.size() == 0 || faceNormal_.size() != NumTri()) return true;
-  return thrust::all_of(
-      thrust::device, countAt(0), countAt(NumTri()),
-      CheckCCW({halfedge_.cptrD(), vertPos_.cptrD(), faceNormal_.cptrD()}));
+  return thrust::all_of(thrust::device, countAt(0), countAt(NumTri()),
+                        CheckCCW({halfedge_.cptrD(), vertPos_.cptrD(),
+                                  faceNormal_.cptrD(), precision_}));
 }
 
 /**
@@ -1116,7 +1123,7 @@ Manifold::Properties Manifold::Impl::GetProperties() const {
   ApplyTransform();
   thrust::pair<float, float> areaVolume = thrust::transform_reduce(
       countAt(0), countAt(NumTri()),
-      FaceAreaVolume({halfedge_.cptrD(), vertPos_.cptrD()}),
+      FaceAreaVolume({halfedge_.cptrD(), vertPos_.cptrD(), precision_}),
       thrust::make_pair(0.0f, 0.0f), SumPair());
   return {areaVolume.first, areaVolume.second};
 }
@@ -1131,6 +1138,18 @@ void Manifold::Impl::CalculateBBox() {
                              glm::vec3(1 / 0.0f), PosMin());
   bBox_.max = thrust::reduce(vertPos_.begin(), vertPos_.end(),
                              glm::vec3(-1 / 0.0f), PosMax());
+}
+
+/**
+ * Sets the precision based on the bounding box, and limits its minimum value by
+ * the optional input.
+ */
+void Manifold::Impl::SetPrecision(float minPrecision) {
+  glm::vec3 absMax =
+      kTolerance * glm::max(glm::abs(bBox_.min), glm::abs(bBox_.max));
+  precision_ =
+      glm::max(minPrecision, glm::max(absMax.x, glm::max(absMax.y, absMax.z)));
+  if (!glm::isfinite(precision_)) precision_ = -1;
 }
 
 /**
@@ -1253,9 +1272,10 @@ void Manifold::Impl::CalculateNormals() {
     faceNormal_.resize(NumTri());
     calculateTriNormal = true;
   }
-  thrust::for_each_n(zip(faceNormal_.beginD(), countAt(0)), NumTri(),
-                     AssignNormals({vertNormal_.ptrD(), vertPos_.cptrD(),
-                                    halfedge_.cptrD(), calculateTriNormal}));
+  thrust::for_each_n(
+      zip(faceNormal_.beginD(), countAt(0)), NumTri(),
+      AssignNormals({vertNormal_.ptrD(), vertPos_.cptrD(), halfedge_.cptrD(),
+                     precision_, calculateTriNormal}));
   thrust::for_each(vertNormal_.begin(), vertNormal_.end(), Normalize());
 }
 
@@ -1506,7 +1526,7 @@ void Manifold::Impl::SwapEdges() {
     // Only operate on the long edge of a degenerate triangle.
     if (glm::dot(e[0], e[0]) <= glm::dot(e[1], e[1]) ||
         glm::dot(e[0], e[0]) <= glm::dot(e[2], e[2]) ||
-        CCW(v[0], v[1], v[2], kTolerance) != 0)
+        CCW(v[0], v[1], v[2], precision_) != 0)
       continue;
 
     const int pairedEdge = halfedge[edge].pairedHalfedge;
@@ -1516,7 +1536,7 @@ void Manifold::Impl::SwapEdges() {
       v[i] = projection * vertPos[halfedge[tri1edge[i]].startVert];
     const glm::vec2 f[3] = {v[1] - v[0], v[2] - v[1], v[0] - v[2]};
     // Only operate if the neighboring triangle is not degenerate.
-    if (CCW(v[0], v[1], v[2], kTolerance) == 0 &&
+    if (CCW(v[0], v[1], v[2], precision_) == 0 &&
         (glm::dot(f[0], f[0]) <= glm::dot(f[1], f[1]) ||
          glm::dot(f[0], f[0]) <= glm::dot(f[2], f[2])))
       continue;

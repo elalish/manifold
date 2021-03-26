@@ -25,6 +25,8 @@
 
 namespace manifold {
 
+constexpr float kTolerance = 1e-5;
+
 struct userErr : public virtual std::runtime_error {
   using std::runtime_error::runtime_error;
 };
@@ -93,7 +95,6 @@ inline HOST_DEVICE int CCW(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2,
 }
 
 struct ExecutionParams {
-  float kTolerance = 2e-5;
   bool intermediateChecks = false;
   bool verbose = false;
   bool suppressErrors = false;
