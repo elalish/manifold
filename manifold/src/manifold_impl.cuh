@@ -70,8 +70,9 @@ struct Manifold::Impl {
   Polygons Face2Polygons(int face, glm::mat3x2 projection,
                          const VecH<int>& faceEdge) const;
 
-  bool CollapseEdges(bool shortEdge);
-  void SwapEdges();
+  void CollapseEdge(int edge);
+  void SwapEdge(int edge);
+  void RemoveIfFolded(int edge);
   void PairUp(int edge0, int edge1);
   void UpdateVert(int vert, int startEdge, int endEdge);
   void FormLoop(int current, int end);
