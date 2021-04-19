@@ -47,31 +47,6 @@ TEST(Samples, Knot42) {
   EXPECT_NEAR(prop0.surfaceArea, prop1.surfaceArea, 1);
 }
 
-// This creates a bracelet sample which involves many operations between shapes
-// that are not in general position, e.g. coplanar faces.
-TEST(Samples, Bracelet) {
-  Manifold bracelet = StretchyBracelet();
-  EXPECT_TRUE(bracelet.IsManifold());
-  EXPECT_EQ(bracelet.Genus(), 1);
-  // ExportMesh("bracelet.ply", bracelet.Extract());
-}
-
-// A fractal with many degenerate intersections, which also tests exact 90
-// degree rotations.
-TEST(Samples, Sponge) {
-  Manifold sponge = MengerSponge(4);
-  EXPECT_TRUE(sponge.IsManifold());
-  EXPECT_TRUE(sponge.MatchesTriNormals());
-  EXPECT_EQ(sponge.Genus(), 26433);  // should be 1:5, 2:81, 3:1409, 4:26433
-  ExportMesh("mengerSponge.gltf", sponge.Extract());
-  std::pair<Manifold, Manifold> cutSponge = sponge.SplitByPlane({1, 1, 1}, 0);
-  EXPECT_TRUE(cutSponge.first.IsManifold());
-  EXPECT_EQ(cutSponge.first.Genus(), 13394);
-  EXPECT_TRUE(cutSponge.second.IsManifold());
-  EXPECT_EQ(cutSponge.second.Genus(), 13394);
-  // ExportMesh("mengerSponge.ply", cutSponge.first.Extract());
-}
-
 TEST(Samples, Sponge1) {
   Manifold sponge = MengerSponge(1);
   EXPECT_TRUE(sponge.IsManifold());
@@ -97,4 +72,29 @@ TEST(Samples, Frame) {
   EXPECT_TRUE(frame.IsManifold());
   EXPECT_EQ(frame.Genus(), 5);
   // ExportMesh("roundedFrame.ply", frame.Extract());
+}
+
+// This creates a bracelet sample which involves many operations between shapes
+// that are not in general position, e.g. coplanar faces.
+TEST(Samples, Bracelet) {
+  Manifold bracelet = StretchyBracelet();
+  EXPECT_TRUE(bracelet.IsManifold());
+  EXPECT_EQ(bracelet.Genus(), 1);
+  // ExportMesh("bracelet.ply", bracelet.Extract());
+}
+
+// A fractal with many degenerate intersections, which also tests exact 90
+// degree rotations.
+TEST(Samples, Sponge) {
+  Manifold sponge = MengerSponge(4);
+  EXPECT_TRUE(sponge.IsManifold());
+  EXPECT_TRUE(sponge.MatchesTriNormals());
+  EXPECT_EQ(sponge.Genus(), 26433);  // should be 1:5, 2:81, 3:1409, 4:26433
+  ExportMesh("mengerSponge.gltf", sponge.Extract());
+  std::pair<Manifold, Manifold> cutSponge = sponge.SplitByPlane({1, 1, 1}, 0);
+  EXPECT_TRUE(cutSponge.first.IsManifold());
+  EXPECT_EQ(cutSponge.first.Genus(), 13394);
+  EXPECT_TRUE(cutSponge.second.IsManifold());
+  EXPECT_EQ(cutSponge.second.Genus(), 13394);
+  ExportMesh("mengerSponge.ply", cutSponge.first.Extract());
 }

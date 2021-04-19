@@ -568,16 +568,27 @@ struct SwapHalfedges {
   }
 };
 
-struct DegenerateEdge {
+struct ShortEdge {
+  const Halfedge* halfedge;
+  const glm::vec3* vertPos;
+  const float precision;
+
+  __host__ __device__ bool operator()(int edge) {
+    if (halfedge[edge].pairedHalfedge < 0) return false;
+    const glm::vec3 delta =
+        vertPos[halfedge[edge].endVert] - vertPos[halfedge[edge].startVert];
+    return glm::dot(delta, delta) < precision * precision;
+  }
+};
+
+struct ColinearEdge {
   const Halfedge* halfedge;
   const glm::vec3* vertPos;
   const glm::vec3* triNormal;
   const float precision;
 
   __host__ __device__ bool operator()(int edge) {
-    const glm::vec3 delta =
-        vertPos[halfedge[edge].endVert] - vertPos[halfedge[edge].startVert];
-    if (glm::dot(delta, delta) < precision * precision) return true;
+    if (halfedge[edge].pairedHalfedge < 0) return false;
 
     const glm::ivec3 tri0edge = TriOf(edge);
     const int face = edge / 3;
@@ -817,27 +828,26 @@ void Manifold::Impl::SplitNonmanifoldVerts() {
 }
 
 void Manifold::Impl::CollapseDegenerates() {
-  VecDH<int> degenerateEdges(halfedge_.size());
-  int numDegenerate =
+  VecDH<int> shortEdges(halfedge_.size());
+  int numShort =
+      thrust::copy_if(
+          countAt(0), countAt(halfedge_.size()), shortEdges.beginD(),
+          ShortEdge({halfedge_.cptrD(), vertPos_.cptrD(), precision_})) -
+      shortEdges.beginD();
+  shortEdges.resize(numShort);
+
+  for (const int edge : shortEdges.H()) CollapseEdge(edge);
+
+  VecDH<int> colinearEdges(halfedge_.size());
+  int numColinear =
       thrust::copy_if(countAt(0), countAt(halfedge_.size()),
-                      degenerateEdges.beginD(),
-                      DegenerateEdge({halfedge_.cptrD(), vertPos_.cptrD(),
-                                      faceNormal_.cptrD(), precision_})) -
-      degenerateEdges.beginD();
-  degenerateEdges.resize(numDegenerate);
+                      colinearEdges.beginD(),
+                      ColinearEdge({halfedge_.cptrD(), vertPos_.cptrD(),
+                                    faceNormal_.cptrD(), precision_})) -
+      colinearEdges.beginD();
+  colinearEdges.resize(numColinear);
 
-  VecH<Halfedge>& halfedge = halfedge_.H();
-  VecH<glm::vec3>& vertPos = vertPos_.H();
-
-  for (const int edge : degenerateEdges.H()) {
-    const glm::vec3 delta =
-        vertPos[halfedge[edge].endVert] - vertPos[halfedge[edge].startVert];
-    if (glm::dot(delta, delta) < precision_ * precision_) {
-      CollapseEdge(edge);
-    } else {
-      SwapEdge(edge);
-    }
-  }
+  for (const int edge : colinearEdges.H()) SwapEdge(edge);
 
   if (!IsManifold()) std::cout << __LINE__ << std::endl;
 }
@@ -1410,7 +1420,6 @@ void Manifold::Impl::CollapseEdge(int edge) {
   VecH<glm::vec3>& vertPos = vertPos_.H();
   VecH<glm::vec3>& triNormal = faceNormal_.H();
 
-  if (edge < 0) return;
   const Halfedge toRemove = halfedge[edge];
   if (toRemove.pairedHalfedge < 0) return;
 
@@ -1452,15 +1461,6 @@ void Manifold::Impl::CollapseEdge(int edge) {
   UpdateVert(endVert, start, tri0edge[2]);
   CollapseTri(tri0edge);
   RemoveIfFolded(start);
-
-  int other = halfedge[tri0edge[1]].pairedHalfedge;
-  if (other < edge) SwapEdge(other);
-  other = halfedge[tri0edge[2]].pairedHalfedge;
-  if (other < edge) SwapEdge(other);
-  other = halfedge[tri1edge[1]].pairedHalfedge;
-  if (other < edge) SwapEdge(other);
-  other = halfedge[tri1edge[2]].pairedHalfedge;
-  if (other < edge) SwapEdge(other);
 }
 
 void Manifold::Impl::SwapEdge(int edge) {
@@ -1526,7 +1526,14 @@ void Manifold::Impl::SwapEdge(int edge) {
   if (neighborDegenerate) {
     const glm::vec3 delta = vertPos[v0] - vertPos[v1];
     if (glm::dot(delta, delta) < precision_ * precision_) {
+      int pairs[4] = {halfedge[tri0edge[0]].pairedHalfedge,
+                      halfedge[tri0edge[1]].pairedHalfedge,
+                      halfedge[tri1edge[0]].pairedHalfedge,
+                      halfedge[tri1edge[1]].pairedHalfedge};
       CollapseEdge(tri0edge[2]);
+      for (int i : {0, 1, 2, 3}) {
+        if (pairs[i] < edge) SwapEdge(pairs[i]);
+      }
     } else {
       SwapEdge(tri0edge[1]);
       SwapEdge(tri1edge[0]);
@@ -1537,14 +1544,10 @@ void Manifold::Impl::SwapEdge(int edge) {
   }
   // Check if the paired edges of what was the degenerate triangle can now be
   // swapped.
-  int other = halfedge[tri0edge[0]].pairedHalfedge;
-  if (other < edge) SwapEdge(other);
-  other = halfedge[tri0edge[1]].pairedHalfedge;
-  if (other < edge) SwapEdge(other);
-  other = halfedge[tri1edge[0]].pairedHalfedge;
-  if (other < edge) SwapEdge(other);
-  other = halfedge[tri1edge[1]].pairedHalfedge;
-  if (other < edge) SwapEdge(other);
+  int pair = halfedge[tri1edge[0]].pairedHalfedge;
+  if (pair < edge) SwapEdge(pair);
+  pair = halfedge[tri0edge[1]].pairedHalfedge;
+  if (pair < edge) SwapEdge(pair);
 }
 
 }  // namespace manifold
