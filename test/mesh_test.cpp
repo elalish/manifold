@@ -312,7 +312,9 @@ TEST(Manifold, Split) {
   oct.Translate(glm::vec3(0.0f, 0.0f, 1.0f));
   std::pair<Manifold, Manifold> splits = cube.Split(oct);
   EXPECT_TRUE(splits.first.IsManifold());
+  EXPECT_TRUE(splits.first.MatchesTriNormals());
   EXPECT_TRUE(splits.second.IsManifold());
+  EXPECT_TRUE(splits.second.MatchesTriNormals());
   EXPECT_FLOAT_EQ(splits.first.GetProperties().volume +
                       splits.second.GetProperties().volume,
                   cube.GetProperties().volume);
@@ -325,7 +327,9 @@ TEST(Manifold, SplitByPlane) {
   std::pair<Manifold, Manifold> splits =
       cube.SplitByPlane({0.0f, 0.0f, 1.0f}, 1.0f);
   EXPECT_TRUE(splits.first.IsManifold());
+  EXPECT_TRUE(splits.first.MatchesTriNormals());
   EXPECT_TRUE(splits.second.IsManifold());
+  EXPECT_TRUE(splits.second.MatchesTriNormals());
   EXPECT_NEAR(splits.first.GetProperties().volume,
               splits.second.GetProperties().volume, 1e-5);
 }
@@ -339,7 +343,9 @@ TEST(Manifold, SplitByPlane60) {
   std::pair<Manifold, Manifold> splits =
       cube.SplitByPlane({sind(phi), -cosd(phi), 0.0f}, 1.0f);
   EXPECT_TRUE(splits.first.IsManifold());
+  EXPECT_TRUE(splits.first.MatchesTriNormals());
   EXPECT_TRUE(splits.second.IsManifold());
+  EXPECT_TRUE(splits.second.MatchesTriNormals());
   EXPECT_NEAR(splits.first.GetProperties().volume,
               splits.second.GetProperties().volume, 1e-5);
 }
@@ -355,6 +361,7 @@ TEST(Manifold, BooleanVug) {
 
   Manifold half = vug.SplitByPlane({0.0f, 0.0f, 1.0f}, -1.0f).first;
   EXPECT_TRUE(half.IsManifold());
+  EXPECT_TRUE(half.MatchesTriNormals());
   EXPECT_EQ(half.Genus(), -1);
 
   auto prop = half.GetProperties();

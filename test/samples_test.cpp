@@ -59,6 +59,7 @@ TEST(Samples, FrameReduced) {
   Manifold::SetCircularSegments(4);
   Manifold frame = RoundedFrame(100, 10);
   EXPECT_TRUE(frame.IsManifold());
+  EXPECT_TRUE(frame.MatchesTriNormals());
   Manifold::SetCircularSegments(0);
   EXPECT_EQ(frame.Genus(), 5);
   auto prop = frame.GetProperties();
@@ -70,6 +71,7 @@ TEST(Samples, FrameReduced) {
 TEST(Samples, Frame) {
   Manifold frame = RoundedFrame(100, 10);
   EXPECT_TRUE(frame.IsManifold());
+  EXPECT_TRUE(frame.MatchesTriNormals());
   EXPECT_EQ(frame.Genus(), 5);
   // ExportMesh("roundedFrame.ply", frame.Extract());
 }
@@ -79,6 +81,7 @@ TEST(Samples, Frame) {
 TEST(Samples, Bracelet) {
   Manifold bracelet = StretchyBracelet();
   EXPECT_TRUE(bracelet.IsManifold());
+  EXPECT_TRUE(bracelet.MatchesTriNormals());
   EXPECT_EQ(bracelet.Genus(), 1);
   // ExportMesh("bracelet.ply", bracelet.Extract());
 }
