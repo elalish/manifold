@@ -513,7 +513,7 @@ std::tuple<VecDH<int>, VecDH<glm::vec3>> Intersect12(
 };
 
 VecDH<int> Winding03(const Manifold::Impl &inP, SparseIndices &p0q2,
-                     VecDH<int> &s02, const SparseIndices &p1q2, bool reverse) {
+                     VecDH<int> &s02, bool reverse) {
   // verts that are not shadowed (not in p0q2) have winding number zero.
   VecDH<int> w03(inP.NumVert(), 0);
 
@@ -967,9 +967,9 @@ Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ,
   if (kVerbose) std::cout << "x21 size = " << x21_.size() << std::endl;
 
   // Sum up the winding numbers of all vertices.
-  w03_ = Winding03(inP, p0q2, s02, p1q2_, false);
+  w03_ = Winding03(inP, p0q2, s02, false);
 
-  w30_ = Winding03(inQ, p2q0, s20, p2q1_, true);
+  w30_ = Winding03(inQ, p2q0, s20, true);
 
   levels.Stop();
 
