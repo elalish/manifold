@@ -460,26 +460,18 @@ struct AssignNormals {
       edgeLength[i] = glm::length(edge[i]);
       perimeter += edgeLength[i];
     }
-    glm::vec3 crossP = glm::cross(edge[0], edge[1]);
 
-    const bool isDegenerate = glm::length(crossP) <= perimeter * precision;
-
-    if (calculateTriNormal ||
-        (triNormal.x == 0 && triNormal.y == 0 && triNormal.z == 0)) {
-      triNormal = isDegenerate ? glm::vec3(0)
-                               : glm::normalize(glm::cross(edge[0], edge[1]));
+    if (calculateTriNormal) {
+      triNormal = glm::normalize(glm::cross(edge[0], edge[1]));
+      if (isnan(triNormal.x)) triNormal = glm::vec3(0, 0, 1);
     }
 
     // corner angles
     glm::vec3 phi;
-    if (isDegenerate) {
-      phi = glm::vec3(kTolerance);
-    } else {
-      for (int i : {0, 1, 2}) edge[i] /= edgeLength[i];
-      phi[0] = glm::acos(-glm::dot(edge[2], edge[0]));
-      phi[1] = glm::acos(-glm::dot(edge[0], edge[1]));
-      phi[2] = glm::pi<float>() - phi[0] - phi[1];
-    }
+    for (int i : {0, 1, 2}) edge[i] /= edgeLength[i];
+    phi[0] = glm::acos(-glm::dot(edge[2], edge[0]));
+    phi[1] = glm::acos(-glm::dot(edge[0], edge[1]));
+    phi[2] = glm::pi<float>() - phi[0] - phi[1];
 
     // assign weighted sum
     for (int i : {0, 1, 2}) {
@@ -782,7 +774,7 @@ struct CheckCCW {
     glm::vec2 v[3];
     for (int i : {0, 1, 2})
       v[i] = projection * vertPos[halfedges[3 * face + i].startVert];
-    int ccw = CCW(v[0], v[1], v[2], 2 * kTolerance);
+    int ccw = CCW(v[0], v[1], v[2], 2 * precision);
     if (ccw < 0) {
       glm::vec2 v1 = v[1] - v[0];
       glm::vec2 v2 = v[2] - v[0];

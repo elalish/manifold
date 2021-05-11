@@ -37,6 +37,7 @@ TEST(Samples, Knot42) {
   Manifold knot42 = TorusKnot(4, 2, 15, 6, 5);
   //   ExportMesh("knot42.stl", knot42.Extract());
   EXPECT_TRUE(knot42.IsManifold());
+  EXPECT_TRUE(knot42.MatchesTriNormals());
   std::vector<Manifold> knots = knot42.Decompose();
   ASSERT_EQ(knots.size(), 2);
   EXPECT_EQ(knots[0].Genus(), 1);
@@ -52,6 +53,7 @@ TEST(Samples, Knot42) {
 TEST(Samples, Bracelet) {
   Manifold bracelet = StretchyBracelet();
   EXPECT_TRUE(bracelet.IsManifold());
+  EXPECT_TRUE(bracelet.MatchesTriNormals());
   EXPECT_EQ(bracelet.Genus(), 1);
   // ExportMesh("bracelet.ply", bracelet.Extract());
 }
@@ -63,7 +65,7 @@ TEST(Samples, Sponge) {
   EXPECT_TRUE(sponge.IsManifold());
   EXPECT_TRUE(sponge.MatchesTriNormals());
   EXPECT_EQ(sponge.Genus(), 26433);  // should be 1:5, 2:81, 3:737, 4:7713
-  ExportMesh("mengerSponge.gltf", sponge.Extract());
+  // ExportMesh("mengerSponge.gltf", sponge.Extract());
   std::pair<Manifold, Manifold> cutSponge = sponge.SplitByPlane({1, 1, 1}, 0);
   EXPECT_TRUE(cutSponge.first.IsManifold());
   EXPECT_EQ(cutSponge.first.Genus(), 13394);
@@ -84,17 +86,19 @@ TEST(Samples, FrameReduced) {
   Manifold::SetCircularSegments(4);
   Manifold frame = RoundedFrame(100, 10);
   EXPECT_TRUE(frame.IsManifold());
+  EXPECT_TRUE(frame.MatchesTriNormals());
   Manifold::SetCircularSegments(0);
   EXPECT_EQ(frame.Genus(), 5);
   auto prop = frame.GetProperties();
   EXPECT_NEAR(prop.volume, 227333, 10);
   EXPECT_NEAR(prop.surfaceArea, 62635, 1);
-  ExportMesh("roundedFrameReduced.gltf", frame.Extract());
+  // ExportMesh("roundedFrameReduced.gltf", frame.Extract());
 }
 
 TEST(Samples, Frame) {
   Manifold frame = RoundedFrame(100, 10);
   EXPECT_TRUE(frame.IsManifold());
+  EXPECT_TRUE(frame.MatchesTriNormals());
   EXPECT_EQ(frame.Genus(), 5);
   // ExportMesh("roundedFrame.ply", frame.Extract());
 }
