@@ -93,7 +93,7 @@ TEST(Samples, Sponge4) {
   Manifold sponge = MengerSponge(4);
   EXPECT_TRUE(sponge.IsManifold());
   EXPECT_TRUE(sponge.MatchesTriNormals());
-  EXPECT_EQ(sponge.Genus(), 26433);  // should be 1:5, 2:81, 3:737, 4:7713
+  EXPECT_EQ(sponge.Genus(), 26433);  // should be 1:5, 2:81, 3:1409, 4:26433
   // ExportMesh("mengerSponge.gltf", sponge.Extract());
   std::pair<Manifold, Manifold> cutSponge = sponge.SplitByPlane({1, 1, 1}, 0);
   EXPECT_TRUE(cutSponge.first.IsManifold());

@@ -200,7 +200,7 @@ TEST(Manifold, GetProperties) {
 /**
  * The very simplest Boolean operation test.
  */
-TEST(Manifold, BooleanTetra) {
+TEST(Boolean, Tetra) {
   Manifold tetra = Manifold::Tetrahedron();
   EXPECT_TRUE(tetra.IsManifold());
 
@@ -214,9 +214,8 @@ TEST(Manifold, BooleanTetra) {
 /**
  * These tests check Boolean operations on coplanar faces.
  */
-TEST(Manifold, SelfSubtract) {
+TEST(Boolean, SelfSubtract) {
   Manifold cube = Manifold::Cube();
-  ExportMesh("cube.gltf", cube.Extract());
   Manifold empty = cube - cube;
   EXPECT_TRUE(empty.IsManifold());
   EXPECT_TRUE(empty.IsEmpty());
@@ -226,7 +225,7 @@ TEST(Manifold, SelfSubtract) {
   EXPECT_FLOAT_EQ(prop.surfaceArea, 0.0f);
 }
 
-TEST(Manifold, Perturb) {
+TEST(Boolean, Perturb) {
   Mesh tmp;
   tmp.vertPos = {{0.0f, 0.0f, 0.0f},
                  {0.0f, 1.0f, 0.0f},
@@ -239,12 +238,11 @@ TEST(Manifold, Perturb) {
   EXPECT_TRUE(empty.IsEmpty());
 
   auto prop = empty.GetProperties();
-  // ExportMesh("perturb.ply", empty.Extract());
   EXPECT_FLOAT_EQ(prop.volume, 0.0f);
-  // EXPECT_FLOAT_EQ(prop.surfaceArea, 0.0f);
+  EXPECT_FLOAT_EQ(prop.surfaceArea, 0.0f);
 }
 
-TEST(Manifold, Coplanar) {
+TEST(Boolean, Coplanar) {
   Manifold cube = Manifold::Cylinder(1.0f, 1.0f);
   Manifold cube2 = cube;
   Manifold out = cube - cube2.Scale({0.5f, 0.5f, 1.0f})
@@ -252,10 +250,10 @@ TEST(Manifold, Coplanar) {
                             .Translate({0.25f, 0.25f, 0.0f});
   ExpectMeshes(out, {{32, 64}});
   EXPECT_EQ(out.Genus(), 1);
-  ExportMesh("coplanar.gltf", out.Extract());
+  // ExportMesh("coplanar.gltf", out.Extract());
 }
 
-TEST(Manifold, MultiCoplanar) {
+TEST(Boolean, MultiCoplanar) {
   Manifold cube = Manifold::Cube();
   Manifold cube2 = cube;
   Manifold first = cube - cube2.Translate({0.3f, 0.3f, 0.0f});
@@ -269,7 +267,7 @@ TEST(Manifold, MultiCoplanar) {
   EXPECT_NEAR(prop.surfaceArea, 2.76, 1e-5);
 }
 
-TEST(Manifold, FaceUnion) {
+TEST(Boolean, FaceUnion) {
   Manifold cubes = Manifold::Cube();
   Manifold cube2 = cubes;
   cubes += cube2.Translate({1, 0, 0});
@@ -278,17 +276,17 @@ TEST(Manifold, FaceUnion) {
   auto prop = cubes.GetProperties();
   EXPECT_NEAR(prop.volume, 2, 1e-5);
   EXPECT_NEAR(prop.surfaceArea, 10, 1e-5);
-  ExportMesh("faceUnion.gltf", cubes.Extract());
+  // ExportMesh("faceUnion.gltf", cubes.Extract());
 }
 
-TEST(Manifold, EdgeUnion) {
+TEST(Boolean, EdgeUnion) {
   Manifold cubes = Manifold::Cube();
   Manifold cube2 = cubes;
   cubes += cube2.Translate({1, 1, 0});
   ExpectMeshes(cubes, {{8, 12}, {8, 12}});
 }
 
-TEST(Manifold, EdgeUnion2) {
+TEST(Boolean, EdgeUnion2) {
   Manifold tets = Manifold::Tetrahedron();
   Manifold cube2 = tets;
   tets.Translate({0, 0, -1});
@@ -296,7 +294,7 @@ TEST(Manifold, EdgeUnion2) {
   ExpectMeshes(tets, {{4, 4}, {4, 4}});
 }
 
-TEST(Manifold, CornerUnion) {
+TEST(Boolean, CornerUnion) {
   Manifold cubes = Manifold::Cube();
   Manifold cube2 = cubes;
   cubes += cube2.Translate({1, 1, 1});
@@ -307,7 +305,7 @@ TEST(Manifold, CornerUnion) {
  * These tests verify that the spliting helper functions return meshes with
  * volumes that make sense.
  */
-TEST(Manifold, Split) {
+TEST(Boolean, Split) {
   Manifold cube = Manifold::Cube(glm::vec3(2.0f), true);
   Manifold oct = Manifold::Octahedron();
   oct.Translate(glm::vec3(0.0f, 0.0f, 1.0f));
@@ -321,7 +319,7 @@ TEST(Manifold, Split) {
                   cube.GetProperties().volume);
 }
 
-TEST(Manifold, SplitByPlane) {
+TEST(Boolean, SplitByPlane) {
   Manifold cube = Manifold::Cube(glm::vec3(2.0f), true);
   cube.Translate({0.0f, 1.0f, 0.0f});
   cube.Rotate(90.0f, 0.0f, 0.0f);
@@ -335,7 +333,7 @@ TEST(Manifold, SplitByPlane) {
               splits.second.GetProperties().volume, 1e-5);
 }
 
-TEST(Manifold, SplitByPlane60) {
+TEST(Boolean, SplitByPlane60) {
   Manifold cube = Manifold::Cube(glm::vec3(2.0f), true);
   cube.Translate({0.0f, 1.0f, 0.0f});
   cube.Rotate(0.0f, 0.0f, -60.0f);
@@ -354,7 +352,7 @@ TEST(Manifold, SplitByPlane60) {
 /**
  * This tests that non-intersecting geometry is properly retained.
  */
-TEST(Manifold, BooleanVug) {
+TEST(Boolean, Vug) {
   Manifold cube = Manifold::Cube(glm::vec3(4.0f), true);
   Manifold vug = cube - Manifold::Cube();
 
@@ -370,7 +368,7 @@ TEST(Manifold, BooleanVug) {
   EXPECT_FLOAT_EQ(prop.surfaceArea, 16.0 * 2 + 12.0 * 4 + 6.0);
 }
 
-TEST(Manifold, BooleanEmpty) {
+TEST(Boolean, Empty) {
   Manifold cube = Manifold::Cube();
   float cubeVol = cube.GetProperties().volume;
   Manifold empty;
@@ -381,7 +379,7 @@ TEST(Manifold, BooleanEmpty) {
   EXPECT_TRUE((cube ^ empty).IsEmpty());
 }
 
-TEST(Manifold, BooleanWinding) {
+TEST(Boolean, Winding) {
   std::vector<Manifold> cubes;
   cubes.push_back(Manifold::Cube(glm::vec3(3.0f), true));
   cubes.push_back(Manifold::Cube(glm::vec3(2.0f), true));
@@ -391,7 +389,7 @@ TEST(Manifold, BooleanWinding) {
   EXPECT_TRUE((cube ^= doubled).IsManifold());
 }
 
-TEST(Manifold, BooleanNonIntersecting) {
+TEST(Boolean, NonIntersecting) {
   Manifold cube1 = Manifold::Cube();
   float vol1 = cube1.GetProperties().volume;
   Manifold cube2 = cube1;
@@ -407,7 +405,7 @@ TEST(Manifold, BooleanNonIntersecting) {
  * These tests verify correct topology and geometry for complex boolean
  * operations between valid shapes with many faces.
  */
-TEST(Manifold, BooleanSphere) {
+TEST(Boolean, Sphere) {
   Manifold sphere = Manifold::Sphere(1.0f, 12);
   Manifold sphere2 = sphere;
   sphere2.Translate(glm::vec3(0.5));
@@ -416,7 +414,7 @@ TEST(Manifold, BooleanSphere) {
   ExpectMeshes(result, {{74, 144}});
 }
 
-TEST(Manifold, Boolean3) {
+TEST(Boolean, Gyroid) {
   Manifold gyroid(ImportMesh("data/gyroidpuzzle.ply"));
   EXPECT_TRUE(gyroid.IsManifold());
   EXPECT_TRUE(gyroid.MatchesTriNormals());
@@ -424,7 +422,7 @@ TEST(Manifold, Boolean3) {
   Manifold gyroid2 = gyroid;
   gyroid2.Translate(glm::vec3(5.0f));
   Manifold result = gyroid + gyroid2;
-  ExportMesh("gyroidUnion.gltf", result.Extract());
+  // ExportMesh("gyroidUnion.gltf", result.Extract());
 
   EXPECT_TRUE(result.IsManifold());
   EXPECT_TRUE(result.MatchesTriNormals());

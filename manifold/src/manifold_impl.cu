@@ -897,44 +897,6 @@ void Manifold::Impl::CreateAndFixHalfedges(const VecDH<glm::ivec3>& triVerts) {
                    SwapHalfedges({halfedge_.ptrH(), edge.cptrH()}));
 }
 
-void Manifold::Impl::SplitNonmanifoldVerts() {
-  // halfedge_.Dump();
-  const VecH<Halfedge>& halfedge = halfedge_.H();
-  VecH<Halfedge> sorted = halfedge;
-  VecH<int> sorted2non(halfedge.size());
-  thrust::sequence(sorted2non.begin(), sorted2non.end());
-  thrust::sort_by_key(sorted.begin(), sorted.end(), sorted2non.begin(),
-                      [](const Halfedge& a, const Halfedge& b) {
-                        return a.startVert == b.startVert
-                                   ? a.endVert < b.endVert
-                                   : a.startVert < b.startVert;
-                      });
-  int numVert = NumVert();
-  int edge = 0;
-  for (int i = 0; i < numVert; ++i) {
-    Halfedge start = sorted[edge];
-    if (i != start.startVert)
-      std::cout << i << " != " << start.startVert << std::endl;
-    int numEdge = 1;
-    while (sorted[edge + numEdge].startVert == i) {
-      ++numEdge;
-    }
-    const int first = sorted2non[edge];
-    int current = first;
-    // std::cout << numEdge << std::endl;
-    for (int numAround = 0; numAround < numEdge; ++numAround) {
-      // std::cout << halfedge[current] << std::endl;
-      current = halfedge[current].pairedHalfedge + 1;
-      if (current % 3 == 0) current -= 3;
-      if (current == first && numAround != numEdge - 1)
-        std::cout << "cycled in " << numAround + 1 << " when there are "
-                  << numEdge << " edges total!" << std::endl;
-    }
-    if (current != first) std::cout << "did not cycle!" << std::endl;
-    edge += numEdge;
-  }
-}
-
 void Manifold::Impl::CollapseDegenerates() {
   thrust::for_each(halfedge_.beginD(), halfedge_.endD(),
                    MarkShortEdge({vertPos_.cptrD()}));
