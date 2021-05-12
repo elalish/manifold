@@ -401,6 +401,7 @@ struct Reindex {
   const int* indexInv;
 
   __host__ __device__ void operator()(Halfedge& edge) {
+    if (edge.startVert < 0) return;
     edge.startVert = indexInv[edge.startVert];
     edge.endVert = indexInv[edge.endVert];
   }
@@ -897,9 +898,15 @@ void Manifold::Impl::CreateAndFixHalfedges(const VecDH<glm::ivec3>& triVerts) {
                    SwapHalfedges({halfedge_.ptrH(), edge.cptrH()}));
 }
 
+/**
+ * Collapses degenerate triangles by removing edges shorter than precision_ and
+ * edges that are colinear whose collapse does not generate a geometric change.
+ * Rather than actually removing them, this step merely marks them for removal,
+ * by setting vertPos to NaN and halfedge to -1.
+ */
 void Manifold::Impl::CollapseDegenerates() {
   thrust::for_each(halfedge_.beginD(), halfedge_.endD(),
-                   MarkShortEdge({vertPos_.cptrD()}));
+                   MarkShortEdge({vertPos_.cptrD(), precision_}));
   bool collapsed = false;
   thrust::for_each_n(thrust::host, countAt(0), halfedge_.size(),
                      CollapseEdge({collapsed, halfedge_.H(), vertPos_.H(),
@@ -924,7 +931,8 @@ void Manifold::Impl::CollapseDegenerates() {
 
 /**
  * Once halfedge_ has been filled in, this function can be called to create the
- * rest of the internal data structures.
+ * rest of the internal data structures. This function also removes the verts
+ * and halfedges flagged for removal (NaN verts and -1 halfedges).
  */
 void Manifold::Impl::Finish() {
   if (halfedge_.size() == 0) return;
@@ -1004,11 +1012,16 @@ void Manifold::Impl::ApplyTransform() {
   // axis-aligned.
   if (!collider_.Transform(transform_)) Update();
 
-  precision_ *= glm::max(
-      glm::length(transform_[0]),
-      glm::max(glm::length(transform_[1]), glm::length(transform_[2])));
+  const float oldScale = bBox_.Scale();
   transform_ = glm::mat4x3(1.0f);
   CalculateBBox();
+
+  const float newScale = bBox_.Scale();
+  precision_ *= glm::max(1.0f, newScale / oldScale) *
+                glm::max(glm::length(transform_[0]),
+                         glm::max(glm::length(transform_[1]),
+                                  glm::length(transform_[2])));
+
   // Maximum of inherited precision loss and translational precision loss.
   SetPrecision(precision_);
 }
@@ -1216,10 +1229,7 @@ void Manifold::Impl::CalculateBBox() {
  * the optional input.
  */
 void Manifold::Impl::SetPrecision(float minPrecision) {
-  glm::vec3 absMax =
-      kTolerance * glm::max(glm::abs(bBox_.min), glm::abs(bBox_.max));
-  precision_ =
-      glm::max(minPrecision, glm::max(absMax.x, glm::max(absMax.y, absMax.z)));
+  precision_ = glm::max(minPrecision, kTolerance * bBox_.Scale());
   if (!glm::isfinite(precision_)) precision_ = -1;
 }
 

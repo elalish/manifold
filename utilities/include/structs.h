@@ -139,6 +139,11 @@ struct Box {
 
   HOST_DEVICE glm::vec3 Center() const { return 0.5f * (max + min); }
 
+  HOST_DEVICE float Scale() const {
+    glm::vec3 absMax = glm::max(glm::abs(min), glm::abs(max));
+    return glm::max(absMax.x, glm::max(absMax.y, absMax.z));
+  }
+
   HOST_DEVICE void Union(const glm::vec3 p) {
     min = glm::min(min, p);
     max = glm::max(max, p);
