@@ -197,6 +197,15 @@ TEST(Manifold, GetProperties) {
   EXPECT_FLOAT_EQ(prop.surfaceArea, 6.0f);
 }
 
+TEST(Manifold, Precision) {
+  Manifold cube = Manifold::Cube();
+  EXPECT_FLOAT_EQ(cube.Precision(), kTolerance);
+  cube.Scale({0.1, 1, 10});
+  EXPECT_FLOAT_EQ(cube.Precision(), 10 * kTolerance);
+  cube.Translate({-100, -10, -1});
+  EXPECT_FLOAT_EQ(cube.Precision(), 100 * kTolerance);
+}
+
 /**
  * The very simplest Boolean operation test.
  */
@@ -399,6 +408,35 @@ TEST(Boolean, NonIntersecting) {
   EXPECT_EQ((cube1 + cube2).GetProperties().volume, vol1 + vol2);
   EXPECT_EQ((cube1 - cube2).GetProperties().volume, vol1);
   EXPECT_TRUE((cube1 ^ cube2).IsEmpty());
+}
+
+TEST(Boolean, Precision) {
+  Manifold cube = Manifold::Cube();
+  Manifold cube2 = cube;
+  Manifold cube3 = cube;
+  float distance = 100;
+  float scale = distance * kTolerance;
+  cube2.Scale(glm::vec3(scale)).Translate({distance, 0, 0});
+
+  cube += cube2;
+  ExpectMeshes(cube, {{8, 12}});
+
+  cube3.Scale(glm::vec3(2 * scale)).Translate({distance, 0, 0});
+  cube += cube3;
+  ExpectMeshes(cube, {{8, 12}, {8, 12}});
+}
+
+TEST(Boolean, Precision2) {
+  float scale = 1000;
+  Manifold cube = Manifold::Cube(glm::vec3(scale));
+  Manifold cube2 = cube;
+  float distance = scale * (1 - kTolerance / 2);
+
+  cube2.Translate(glm::vec3(-distance));
+  EXPECT_TRUE((cube ^ cube2).IsEmpty());
+
+  cube2.Translate(glm::vec3(scale * kTolerance));
+  EXPECT_FALSE((cube ^ cube2).IsEmpty());
 }
 
 /**
