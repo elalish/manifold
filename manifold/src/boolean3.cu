@@ -1135,12 +1135,9 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
   // Level 6
 
   // Create the manifold's data structures.
+  outR.precision_ = glm::max(inP_.precision_, inQ_.precision_);
+
   outR.Face2Tri(faceEdge);
-
-  // int chi = outR.NumVert() - outR.NumEdge() + outR.NumTri();
-  // std::cout << "triangle Genus = " << 1 - chi / 2 << std::endl;
-
-  // outR.SplitNonmanifoldVerts();
 
   outR.CollapseDegenerates();
 

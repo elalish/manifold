@@ -23,6 +23,7 @@ namespace manifold {
 
 struct Manifold::Impl {
   Box bBox_;
+  float precision_ = -1;
   VecDH<glm::vec3> vertPos_;
   VecDH<Halfedge> halfedge_;
   VecDH<glm::vec3> vertNormal_;
@@ -37,7 +38,6 @@ struct Manifold::Impl {
 
   void CreateHalfedges(const VecDH<glm::ivec3>& triVerts);
   void CreateAndFixHalfedges(const VecDH<glm::ivec3>& triVerts);
-  void SplitNonmanifoldVerts();
   void CollapseDegenerates();
   void Finish();
   void Update();
@@ -51,6 +51,7 @@ struct Manifold::Impl {
   int NumTri() const { return halfedge_.size() / 3; }
   Properties GetProperties() const;
   void CalculateBBox();
+  void SetPrecision(float minPrecision = -1);
   bool IsManifold() const;
   bool MatchesTriNormals() const;
 

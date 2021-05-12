@@ -57,6 +57,7 @@ class Manifold {
   int NumEdge() const;
   int NumTri() const;
   Box BoundingBox() const;
+  float Precision() const;
   int Genus() const;
   Properties GetProperties() const;
   Mesh Extract(bool includeNormals = false) const;

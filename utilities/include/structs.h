@@ -25,6 +25,8 @@
 
 namespace manifold {
 
+constexpr float kTolerance = 1e-5;
+
 struct userErr : public virtual std::runtime_error {
   using std::runtime_error::runtime_error;
 };
@@ -93,7 +95,6 @@ inline HOST_DEVICE int CCW(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2,
 }
 
 struct ExecutionParams {
-  float kTolerance = 2e-5;
   bool intermediateChecks = false;
   bool verbose = false;
   bool suppressErrors = false;
@@ -137,6 +138,11 @@ struct Box {
   HOST_DEVICE glm::vec3 Size() const { return max - min; }
 
   HOST_DEVICE glm::vec3 Center() const { return 0.5f * (max + min); }
+
+  HOST_DEVICE float Scale() const {
+    glm::vec3 absMax = glm::max(glm::abs(min), glm::abs(max));
+    return glm::max(absMax.x, glm::max(absMax.y, absMax.z));
+  }
 
   HOST_DEVICE void Union(const glm::vec3 p) {
     min = glm::min(min, p);
