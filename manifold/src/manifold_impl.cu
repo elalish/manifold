@@ -905,12 +905,18 @@ void Manifold::Impl::CreateAndFixHalfedges(const VecDH<glm::ivec3>& triVerts) {
  * by setting vertPos to NaN and halfedge to -1.
  */
 void Manifold::Impl::CollapseDegenerates() {
-  thrust::for_each(halfedge_.beginD(), halfedge_.endD(),
-                   MarkShortEdge({vertPos_.cptrD(), precision_}));
+  // Short edge collapse is commented out because it was causing a test to fail,
+  // but only on the GPU. Colinear removal is broader, so it should still
+  // accomplish the same thing, but with some additional computation. I'm
+  // leaving this here because I'd like to understand why it gets the wrong
+  // result and why it's not any faster.
+
+  // thrust::for_each(halfedge_.beginD(), halfedge_.endD(),
+  //                  MarkShortEdge({vertPos_.cptrD(), precision_}));
   bool collapsed = false;
-  thrust::for_each_n(thrust::host, countAt(0), halfedge_.size(),
-                     CollapseEdge({collapsed, halfedge_.H(), vertPos_.H(),
-                                   faceNormal_.H(), true}));
+  // thrust::for_each_n(thrust::host, countAt(0), halfedge_.size(),
+  //                    CollapseEdge({collapsed, halfedge_.H(), vertPos_.H(),
+  //                                  faceNormal_.H(), true}));
 
   VecDH<bool> marked(1);
   while (1) {
