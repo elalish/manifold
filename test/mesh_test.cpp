@@ -1,4 +1,4 @@
-// Copyright 2019 Emmett Lalish
+// Copyright 2021 Emmett Lalish
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -340,6 +340,12 @@ TEST(Boolean, SplitByPlane) {
   EXPECT_TRUE(splits.second.MatchesTriNormals());
   EXPECT_NEAR(splits.first.GetProperties().volume,
               splits.second.GetProperties().volume, 1e-5);
+
+  Manifold first = cube.TrimByPlane({0.0f, 0.0f, 1.0f}, 1.0f);
+  // Verify trim returns the same result as the first split by checking that
+  // their bounding boxes contain each other, thus they are equal.
+  EXPECT_TRUE(splits.first.BoundingBox().Contains(first.BoundingBox()));
+  EXPECT_TRUE(first.BoundingBox().Contains(splits.first.BoundingBox()));
 }
 
 TEST(Boolean, SplitByPlane60) {

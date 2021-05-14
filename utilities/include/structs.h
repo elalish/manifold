@@ -1,4 +1,4 @@
-// Copyright 2019 Emmett Lalish
+// Copyright 2021 Emmett Lalish
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -142,6 +142,11 @@ struct Box {
   HOST_DEVICE float Scale() const {
     glm::vec3 absMax = glm::max(glm::abs(min), glm::abs(max));
     return glm::max(absMax.x, glm::max(absMax.y, absMax.z));
+  }
+
+  HOST_DEVICE bool Contains(const Box& box) const {
+    return glm::all(glm::greaterThanEqual(box.min, min)) &&
+           glm::all(glm::greaterThanEqual(max, box.max));
   }
 
   HOST_DEVICE void Union(const glm::vec3 p) {
