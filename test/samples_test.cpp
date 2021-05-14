@@ -55,6 +55,7 @@ TEST(Samples, TetPuzzle) {
   Manifold puzzle2 = puzzle;
   puzzle2.Rotate(0, 0, 180);
   EXPECT_TRUE((puzzle ^ puzzle2).IsEmpty());
+  puzzle.Transform(RotateUp({1, -1, -1}));
   ExportMesh("tetPuzzle.gltf", puzzle.Extract());
 }
 
