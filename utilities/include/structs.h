@@ -144,6 +144,11 @@ struct Box {
     return glm::max(absMax.x, glm::max(absMax.y, absMax.z));
   }
 
+  HOST_DEVICE bool Contains(const Box& box) const {
+    return glm::all(glm::greaterThanEqual(box.min, min)) &&
+           glm::all(glm::greaterThanEqual(max, box.max));
+  }
+
   HOST_DEVICE void Union(const glm::vec3 p) {
     min = glm::min(min, p);
     max = glm::max(max, p);

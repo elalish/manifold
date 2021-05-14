@@ -74,6 +74,18 @@ struct MakeTri {
     }
   }
 };
+
+Manifold Halfspace(Box bBox, glm::vec3 normal, float originOffset) {
+  normal = glm::normalize(normal);
+  Manifold cutter =
+      Manifold::Cube(glm::vec3(2.0f), true).Translate({1.0f, 0.0f, 0.0f});
+  float size = glm::length(bBox.Center() - normal * originOffset) +
+               0.5f * glm::length(bBox.Size());
+  cutter.Scale(glm::vec3(size)).Translate({originOffset, 0.0f, 0.0f});
+  float yDeg = glm::degrees(-glm::asin(normal.z));
+  float zDeg = glm::degrees(glm::atan(normal.y, normal.x));
+  return cutter.Rotate(0.0f, yDeg, zDeg);
+}
 }  // namespace
 
 namespace manifold {
@@ -628,15 +640,10 @@ std::pair<Manifold, Manifold> Manifold::Split(const Manifold& cutter) const {
 
 std::pair<Manifold, Manifold> Manifold::SplitByPlane(glm::vec3 normal,
                                                      float originOffset) const {
-  normal = glm::normalize(normal);
-  Manifold cutter =
-      Manifold::Cube(glm::vec3(2.0f), true).Translate({1.0f, 0.0f, 0.0f});
-  float size = glm::length(BoundingBox().Center() - normal * originOffset) +
-               0.5f * glm::length(BoundingBox().Size());
-  cutter.Scale(glm::vec3(size)).Translate({originOffset, 0.0f, 0.0f});
-  float yDeg = glm::degrees(-glm::asin(normal.z));
-  float zDeg = glm::degrees(glm::atan(normal.y, normal.x));
-  cutter.Rotate(0.0f, yDeg, zDeg);
-  return Split(cutter);
+  return Split(Halfspace(BoundingBox(), normal, originOffset));
+}
+
+Manifold Manifold::TrimByPlane(glm::vec3 normal, float originOffset) const {
+  return *this ^ Halfspace(BoundingBox(), normal, originOffset);
 }
 }  // namespace manifold
