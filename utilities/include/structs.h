@@ -15,6 +15,7 @@
 #pragma once
 #define GLM_FORCE_EXPLICIT_CTOR
 #include <chrono>
+#include <glm/ext/matrix_transform.hpp>
 #include <glm/glm.hpp>
 #include <glm/gtc/constants.hpp>
 #include <glm/gtx/compatibility.hpp>
@@ -92,6 +93,14 @@ inline HOST_DEVICE int CCW(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2,
     return 0;
   else
     return area > 0 ? 1 : -1;
+}
+
+inline HOST_DEVICE glm::mat4x3 RotateUp(glm::vec3 up) {
+  up = glm::normalize(up);
+  glm::vec3 axis = glm::cross(up, {0, 0, 1});
+  float angle = glm::asin(glm::length(axis));
+  if (glm::dot(up, {0, 0, 1}) < 0) angle = glm::pi<float>() - angle;
+  return glm::mat4x3(glm::rotate(glm::mat4(1), angle, axis));
 }
 
 struct ExecutionParams {

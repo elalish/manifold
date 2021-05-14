@@ -317,7 +317,7 @@ struct SumPair : public thrust::binary_function<thrust::pair<float, float>,
   }
 };
 
-struct Transform {
+struct Transform4x3 {
   const glm::mat4x3 transform;
 
   __host__ __device__ void operator()(glm::vec3& position) {
@@ -1006,7 +1006,8 @@ void Manifold::Impl::ApplyTransform() const {
  */
 void Manifold::Impl::ApplyTransform() {
   if (transform_ == glm::mat4x3(1.0f)) return;
-  thrust::for_each(vertPos_.beginD(), vertPos_.endD(), Transform({transform_}));
+  thrust::for_each(vertPos_.beginD(), vertPos_.endD(),
+                   Transform4x3({transform_}));
 
   glm::mat3 normalTransform =
       glm::inverse(glm::transpose(glm::mat3(transform_)));
