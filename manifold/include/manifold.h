@@ -85,6 +85,8 @@ class Manifold {
   // First is in the direction of the normal, second is opposite.
   std::pair<Manifold, Manifold> SplitByPlane(glm::vec3 normal,
                                              float originOffset) const;
+  // Returns only the first of the above pair.
+  Manifold TrimByPlane(glm::vec3 normal, float originOffset) const;
 
   // Testing hooks
   bool IsManifold() const;
