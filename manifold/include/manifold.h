@@ -1,4 +1,4 @@
-// Copyright 2019 Emmett Lalish
+// Copyright 2021 Emmett Lalish
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -48,10 +48,8 @@ class Manifold {
   static void SetCircularSegments(int number);
   static int GetCircularSegments(float radius);
 
-  struct Properties {
-    float surfaceArea, volume;
-  };
   // Information
+  Mesh Extract(bool includeNormals = false) const;
   bool IsEmpty() const;
   int NumVert() const;
   int NumEdge() const;
@@ -59,8 +57,10 @@ class Manifold {
   Box BoundingBox() const;
   float Precision() const;
   int Genus() const;
+  struct Properties {
+    float surfaceArea, volume;
+  };
   Properties GetProperties() const;
-  Mesh Extract(bool includeNormals = false) const;
 
   // Modification
   Manifold& Translate(glm::vec3);
@@ -85,6 +85,8 @@ class Manifold {
   // First is in the direction of the normal, second is opposite.
   std::pair<Manifold, Manifold> SplitByPlane(glm::vec3 normal,
                                              float originOffset) const;
+  // Returns only the first of the above pair.
+  Manifold TrimByPlane(glm::vec3 normal, float originOffset) const;
 
   // Testing hooks
   bool IsManifold() const;
