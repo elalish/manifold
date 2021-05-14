@@ -54,7 +54,7 @@ Mesh ImportMesh(const std::string& filename) {
     const aiMesh* mesh_i = scene->mMeshes[i];
     for (int j = 0; j < mesh_i->mNumVertices; ++j) {
       const aiVector3D vert = mesh_i->mVertices[j];
-      mesh_out.vertPos.emplace_back(vert.x, vert.y, vert.z);
+      mesh_out.vertPos.emplace_back(vert.z, vert.x, vert.y);
     }
     for (int j = 0; j < mesh_i->mNumFaces; ++j) {
       const aiFace face = mesh_i->mFaces[j];
@@ -100,10 +100,10 @@ void ExportMesh(const std::string& filename, const Mesh& manifold) {
 
   for (int i = 0; i < mesh_out->mNumVertices; ++i) {
     const glm::vec3& v = manifold.vertPos[i];
-    mesh_out->mVertices[i] = aiVector3D(v.x, v.y, v.z);
+    mesh_out->mVertices[i] = aiVector3D(v.y, v.z, v.x);
     if (hasNormals) {
       const glm::vec3& n = manifold.vertNormal[i];
-      mesh_out->mNormals[i] = aiVector3D(n.x, n.y, n.z);
+      mesh_out->mNormals[i] = aiVector3D(n.y, n.z, n.x);
     }
   }
 
