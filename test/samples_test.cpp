@@ -48,6 +48,17 @@ TEST(Samples, Knot42) {
   EXPECT_NEAR(prop0.surfaceArea, prop1.surfaceArea, 1);
 }
 
+TEST(Samples, TetPuzzle) {
+  Manifold puzzle = TetPuzzle(50, 0.2, 100);
+  EXPECT_TRUE(puzzle.IsManifold());
+  EXPECT_TRUE(puzzle.MatchesTriNormals());
+  Manifold puzzle2 = puzzle;
+  puzzle2.Rotate(0, 0, 180);
+  EXPECT_TRUE((puzzle ^ puzzle2).IsEmpty());
+  puzzle.Transform(RotateUp({1, -1, -1}));
+  ExportMesh("tetPuzzle.gltf", puzzle.Extract());
+}
+
 TEST(Samples, FrameReduced) {
   Manifold::SetCircularSegments(4);
   Manifold frame = RoundedFrame(100, 10);

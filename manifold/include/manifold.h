@@ -67,6 +67,7 @@ class Manifold {
   Manifold& Scale(glm::vec3);
   Manifold& Rotate(float xDegrees, float yDegrees = 0.0f,
                    float zDegrees = 0.0f);
+  Manifold& Transform(glm::mat4x3 m);
   Manifold& Warp(std::function<void(glm::vec3&)>);
 
   // Boolean

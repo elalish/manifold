@@ -558,6 +558,13 @@ Manifold& Manifold::Rotate(float xDegrees, float yDegrees, float zDegrees) {
   return *this;
 }
 
+Manifold& Manifold::Transform(glm::mat4x3 m) {
+  glm::mat4 old(pImpl_->transform_);
+  old *= glm::mat4(m);
+  pImpl_->transform_ = glm::mat4x3(old);
+  return *this;
+}
+
 /**
  * This function does not change the topology, but allows the vertices to be
  * moved according to any arbitrary input function. It is easy to create a
