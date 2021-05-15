@@ -24,6 +24,9 @@
 namespace manifold {
 
 Mesh ImportMesh(const std::string& filename) {
+  std::string ext = filename.substr(filename.find_last_of(".") + 1);
+  const bool isYup = ext == "glb" || ext == "gltf";
+
   Assimp::Importer importer;
   importer.SetPropertyInteger(AI_CONFIG_PP_RVC_FLAGS,                    //
                               aiComponent_NORMALS |                      //
@@ -54,7 +57,8 @@ Mesh ImportMesh(const std::string& filename) {
     const aiMesh* mesh_i = scene->mMeshes[i];
     for (int j = 0; j < mesh_i->mNumVertices; ++j) {
       const aiVector3D vert = mesh_i->mVertices[j];
-      mesh_out.vertPos.emplace_back(vert.x, vert.y, vert.z);
+      mesh_out.vertPos.push_back(isYup ? glm::vec3(vert.z, vert.x, vert.y)
+                                       : glm::vec3(vert.x, vert.y, vert.z));
     }
     for (int j = 0; j < mesh_i->mNumFaces; ++j) {
       const aiFace face = mesh_i->mFaces[j];
@@ -73,6 +77,11 @@ void ExportMesh(const std::string& filename, const Mesh& manifold) {
               << std::endl;
     return;
   }
+
+  std::string ext = filename.substr(filename.find_last_of(".") + 1);
+  const bool isYup = ext == "glb" || ext == "gltf";
+  if (ext == "glb") ext = "glb2";
+  if (ext == "gltf") ext = "gltf2";
 
   aiScene* scene = new aiScene();
 
@@ -100,10 +109,12 @@ void ExportMesh(const std::string& filename, const Mesh& manifold) {
 
   for (int i = 0; i < mesh_out->mNumVertices; ++i) {
     const glm::vec3& v = manifold.vertPos[i];
-    mesh_out->mVertices[i] = aiVector3D(v.x, v.y, v.z);
+    mesh_out->mVertices[i] =
+        isYup ? aiVector3D(v.y, v.z, v.x) : aiVector3D(v.x, v.y, v.z);
     if (hasNormals) {
       const glm::vec3& n = manifold.vertNormal[i];
-      mesh_out->mNormals[i] = aiVector3D(n.x, n.y, n.z);
+      mesh_out->mNormals[i] =
+          isYup ? aiVector3D(n.y, n.z, n.x) : aiVector3D(n.x, n.y, n.z);
     }
   }
 
@@ -125,10 +136,6 @@ void ExportMesh(const std::string& filename, const Mesh& manifold) {
   //   std::cout << i << ", id = " << desc->id << ", " << desc->description
   //             << std::endl;
   // }
-
-  std::string ext = filename.substr(filename.find_last_of(".") + 1);
-  if (ext == "glb") ext = "glb2";
-  if (ext == "gltf") ext = "gltf2";
 
   auto result = exporter.Export(scene, ext, filename);
 

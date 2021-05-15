@@ -53,5 +53,9 @@ Manifold StretchyBracelet(float radius = 30.0f, float height = 8.0f,
 // The classic cubic fractal, going down recursively n times.
 Manifold MengerSponge(int n = 3);
 
+// A cubic frame with cylinders for edges and spheres at the corners.
 Manifold RoundedFrame(float edgeLength, float radius);
+
+// A tetrahedron cut into two halves that can screw together.
+Manifold TetPuzzle(float edgeLength, float gap, int nDivisions);
 }  // namespace manifold
