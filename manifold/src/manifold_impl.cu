@@ -431,21 +431,38 @@ struct Reindex {
   }
 };
 
+template <typename T>
+void Permute(VecDH<T>& inOut, const VecDH<int>& new2Old) {
+  VecDH<T> tmp(inOut);
+  inOut.resize(new2Old.size());
+  thrust::gather(new2Old.begin(), new2Old.end(), tmp.begin(), inOut.begin());
+}
+
+template void Permute<BaryRef>(VecDH<BaryRef>&, const VecDH<int>&);
+template void Permute<glm::vec3>(VecDH<glm::vec3>&, const VecDH<int>&);
+
 struct ReindexFace {
   Halfedge* halfedge;
+  glm::vec4* halfedgeBezier;
   const Halfedge* oldHalfedge;
+  const glm::vec4* oldHalfedgeBezier;
   const int* faceNew2Old;
   const int* faceOld2New;
 
   __host__ __device__ void operator()(int newFace) {
     const int oldFace = faceNew2Old[newFace];
     for (const int i : {0, 1, 2}) {
-      Halfedge edge = oldHalfedge[3 * oldFace + i];
+      const int oldEdge = 3 * oldFace + i;
+      Halfedge edge = oldHalfedge[oldEdge];
       edge.face = newFace;
       const int pairedFace = oldHalfedge[edge.pairedHalfedge].face;
       const int offset = edge.pairedHalfedge - 3 * pairedFace;
       edge.pairedHalfedge = 3 * faceOld2New[pairedFace] + offset;
-      halfedge[3 * newFace + i] = edge;
+      const int newEdge = 3 * newFace + i;
+      halfedge[newEdge] = edge;
+      if (oldHalfedgeBezier != nullptr) {
+        halfedgeBezier[newEdge] = oldHalfedgeBezier[oldEdge];
+      }
     }
   }
 };
@@ -831,9 +848,10 @@ namespace manifold {
 
 /**
  * Create a manifold from an input triangle Mesh. Will throw if the Mesh is not
- * manifold.
+ * manifold. TODO: update halfedgeBezier during CollapseDegenerates.
  */
-Manifold::Impl::Impl(const Mesh& mesh) : vertPos_(mesh.vertPos) {
+Manifold::Impl::Impl(const Mesh& mesh)
+    : vertPos_(mesh.vertPos), halfedgeBezier_(mesh.halfedgeBezier) {
   CheckDevice();
   CalculateBBox();
   SetPrecision();
@@ -1350,14 +1368,8 @@ void Manifold::Impl::SortFaces(VecDH<Box>& faceBox,
   VecDH<int> faceNew2Old(NumTri());
   thrust::sequence(faceNew2Old.beginD(), faceNew2Old.endD());
 
-  if (faceNormal_.size() == NumTri()) {
-    thrust::sort_by_key(
-        faceMorton.beginD(), faceMorton.endD(),
-        zip(faceBox.beginD(), faceNew2Old.beginD(), faceNormal_.beginD()));
-  } else {
-    thrust::sort_by_key(faceMorton.beginD(), faceMorton.endD(),
-                        zip(faceBox.beginD(), faceNew2Old.beginD()));
-  }
+  thrust::sort_by_key(faceMorton.beginD(), faceMorton.endD(),
+                      zip(faceBox.beginD(), faceNew2Old.beginD()));
 
   // Tris were flagged for removal with pairedHalfedge = -1 and assigned kNoCode
   // to sort them to the end, which allows them to be removed.
@@ -1367,10 +1379,8 @@ void Manifold::Impl::SortFaces(VecDH<Box>& faceBox,
   faceBox.resize(newNumTri);
   faceMorton.resize(newNumTri);
   faceNew2Old.resize(newNumTri);
-  if (faceNormal_.size() == NumTri()) faceNormal_.resize(newNumTri);
 
-  VecDH<Halfedge> oldHalfedge = halfedge_;
-  GatherFaces(oldHalfedge, faceNew2Old);
+  GatherFaces(faceNew2Old);
 }
 
 /**
@@ -1378,22 +1388,52 @@ void Manifold::Impl::SortFaces(VecDH<Box>& faceBox,
  * another manifold, given by oldHalfedge. Input faceNew2Old defines the old
  * faces to gather into this.
  */
-void Manifold::Impl::GatherFaces(const VecDH<Halfedge>& oldHalfedge,
-                                 const VecDH<int>& faceNew2Old) {
+void Manifold::Impl::GatherFaces(const VecDH<int>& faceNew2Old) {
   const int numTri = faceNew2Old.size();
-  VecDH<BaryRef> triBary = meshRelation_.triBary;
-  meshRelation_.triBary.resize(numTri);
-  thrust::gather(faceNew2Old.begin(), faceNew2Old.end(), triBary.begin(),
-                 meshRelation_.triBary.begin());
+  Permute(meshRelation_.triBary, faceNew2Old);
 
+  if (faceNormal_.size() == NumTri()) Permute(faceNormal_, faceNew2Old);
+
+  VecDH<Halfedge> oldHalfedge(halfedge_);
+  VecDH<glm::vec4> oldHalfedgeBezier(halfedgeBezier_);
   VecDH<int> faceOld2New(oldHalfedge.size() / 3);
   thrust::scatter(countAt(0), countAt(numTri), faceNew2Old.beginD(),
                   faceOld2New.beginD());
 
   halfedge_.resize(3 * numTri);
-  thrust::for_each_n(countAt(0), numTri,
-                     ReindexFace({halfedge_.ptrD(), oldHalfedge.cptrD(),
-                                  faceNew2Old.cptrD(), faceOld2New.cptrD()}));
+  if (oldHalfedgeBezier.size() != 0) halfedgeBezier_.resize(3 * numTri);
+  thrust::for_each_n(
+      countAt(0), numTri,
+      ReindexFace({halfedge_.ptrD(), halfedgeBezier_.ptrD(),
+                   oldHalfedge.cptrD(), oldHalfedgeBezier.cptrD(),
+                   faceNew2Old.cptrD(), faceOld2New.cptrD()}));
+}
+
+void Manifold::Impl::GatherFaces(const Impl& old,
+                                 const VecDH<int>& faceNew2Old) {
+  const int numTri = faceNew2Old.size();
+  meshRelation_.triBary.resize(numTri);
+  thrust::gather(faceNew2Old.begin(), faceNew2Old.end(),
+                 old.meshRelation_.triBary.begin(),
+                 meshRelation_.triBary.begin());
+
+  if (old.faceNormal_.size() == old.NumTri()) {
+    faceNormal_.resize(numTri);
+    thrust::gather(faceNew2Old.begin(), faceNew2Old.end(),
+                   old.faceNormal_.begin(), faceNormal_.begin());
+  }
+
+  VecDH<int> faceOld2New(old.NumTri());
+  thrust::scatter(countAt(0), countAt(numTri), faceNew2Old.beginD(),
+                  faceOld2New.beginD());
+
+  halfedge_.resize(3 * numTri);
+  if (old.halfedgeBezier_.size() != 0) halfedgeBezier_.resize(3 * numTri);
+  thrust::for_each_n(
+      countAt(0), numTri,
+      ReindexFace({halfedge_.ptrD(), halfedgeBezier_.ptrD(),
+                   old.halfedge_.cptrD(), old.halfedgeBezier_.cptrD(),
+                   faceNew2Old.cptrD(), faceOld2New.cptrD()}));
 }
 
 /**

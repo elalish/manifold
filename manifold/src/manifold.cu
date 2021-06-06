@@ -543,9 +543,7 @@ std::vector<Manifold> Manifold::Decompose() const {
         faceNew2Old.beginD();
     faceNew2Old.resize(nFace);
 
-    // TODO: populate this properly
-    meshes[i].pImpl_->meshRelation_.triBary = pImpl_->meshRelation_.triBary;
-    meshes[i].pImpl_->GatherFaces(pImpl_->halfedge_, faceNew2Old);
+    meshes[i].pImpl_->GatherFaces(*pImpl_, faceNew2Old);
     meshes[i].pImpl_->ReindexVerts(vertNew2Old, pImpl_->NumVert());
 
     meshes[i].pImpl_->Finish();

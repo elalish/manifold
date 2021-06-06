@@ -65,8 +65,8 @@ struct Manifold::Impl {
   void SortVerts();
   void ReindexVerts(const VecDH<int>& vertNew2Old, int numOldVert);
   void SortFaces(VecDH<Box>& faceBox, VecDH<uint32_t>& faceMorton);
-  void GatherFaces(const VecDH<Halfedge>& oldHalfedge,
-                   const VecDH<int>& faceNew2Old);
+  void GatherFaces(const VecDH<int>& faceNew2Old);
+  void GatherFaces(const Impl& old, const VecDH<int>& faceNew2Old);
   void CalculateNormals();
   void Face2Tri(const VecDH<int>& faceEdge);
 
