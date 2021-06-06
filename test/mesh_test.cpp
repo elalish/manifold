@@ -205,6 +205,27 @@ TEST(Manifold, Revolve2) {
   EXPECT_NEAR(prop.surfaceArea, 96.0f * glm::pi<float>(), 1.0f);
 }
 
+TEST(Manifold, Smooth) {
+  Manifold tet = Manifold::Tetrahedron();
+  Manifold smooth = Manifold::Smooth(tet.Extract());
+  Manifold interp = smooth.Refine(100);
+  ExpectMeshes(interp, {{20002, 40000}});
+  auto prop = interp.GetProperties();
+  EXPECT_NEAR(prop.volume, 17, 0.1);
+  EXPECT_NEAR(prop.surfaceArea, 33, 0.1);
+  // ExportMesh("smoothTet.gltf", interp.Extract());
+}
+
+TEST(Manifold, Csaszar) {
+  Manifold csaszar = Manifold::Smooth(ImportMesh("data/Csaszar.ply"));
+  Manifold interp = csaszar.Refine(100);
+  ExpectMeshes(interp, {{70000, 140000}});
+  // auto prop = interp.GetProperties();
+  // EXPECT_NEAR(prop.volume, 17, 0.1);
+  // EXPECT_NEAR(prop.surfaceArea, 33, 0.1);
+  // ExportMesh("smoothCsaszar.gltf", interp.Extract());
+}
+
 /**
  * These tests verify the calculation of a manifold's geometric properties.
  */

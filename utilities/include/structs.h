@@ -288,6 +288,10 @@ inline std::ostream& operator<<(std::ostream& stream, const BaryRef& ref) {
   return stream << "tri = " << ref.tri << ", uvw idx = " << ref.vertBary;
 }
 
+inline std::ostream& operator<<(std::ostream& stream, const Barycentric& bary) {
+  return stream << "tri = " << bary.tri << ", uvw idx = " << bary.uvw;
+}
+
 }  // namespace manifold
 
 #undef HOST_DEVICE
