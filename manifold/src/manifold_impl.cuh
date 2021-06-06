@@ -22,12 +22,19 @@
 namespace manifold {
 
 struct Manifold::Impl {
+  struct MeshRelationD {
+    VecDH<glm::vec3> barycentric;
+    VecDH<BaryRef> triBary;
+  };
+
   Box bBox_;
   float precision_ = -1;
   VecDH<glm::vec3> vertPos_;
   VecDH<Halfedge> halfedge_;
   VecDH<glm::vec3> vertNormal_;
   VecDH<glm::vec3> faceNormal_;
+  VecDH<glm::vec4> halfedgeBezier_;
+  MeshRelationD meshRelation_;
   Collider collider_;
   glm::mat4x3 transform_ = glm::mat4x3(1.0f);
 
@@ -43,7 +50,7 @@ struct Manifold::Impl {
   void Update();
   void ApplyTransform() const;
   void ApplyTransform();
-  void Refine(int n);
+  void Subdivide(int n);
 
   bool IsEmpty() const { return NumVert() == 0; }
   int NumVert() const { return vertPos_.size(); }
