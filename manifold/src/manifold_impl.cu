@@ -34,10 +34,18 @@ using namespace manifold;
 
 constexpr uint32_t kNoCode = 0xFFFFFFFFu;
 
-__host__ __device__ int nextHalfedge(int current) {
+__host__ __device__ int NextHalfedge(int current) {
   ++current;
   if (current % 3 == 0) current -= 3;
   return current;
+}
+
+/**
+ * The total number of verts if a triangle is subdivided naturally such that
+ * each edge has edgeVerts verts along it (edgeVerts >= 2).
+ */
+__host__ __device__ int VertsPerTri(int edgeVerts) {
+  return (edgeVerts * edgeVerts + edgeVerts) / 2;
 }
 
 /**
@@ -138,7 +146,7 @@ struct ReindexHalfedge {
   }
 };
 
-struct SplitEdges {
+struct EdgeVerts {
   glm::vec3* vertPos;
   const int startIdx;
   const int n;
@@ -158,21 +166,44 @@ struct SplitEdges {
 
 struct InteriorVerts {
   glm::vec3* vertPos;
+  glm::vec3* uvw;
+  BaryRef* triBary;
   const int startIdx;
   const int n;
   const Halfedge* halfedge;
 
   __host__ __device__ void operator()(int tri) {
-    int vertsPerTri = ((n - 2) * (n - 2) + (n - 2)) / 2;
-    float invTotal = 1.0f / n;
-    int pos = startIdx + vertsPerTri * tri;
-    for (int i = 1; i < n - 1; ++i)
-      for (int j = 1; j < n - i; ++j)
-        vertPos[pos++] =
-            (float(i) * vertPos[halfedge[3 * tri + 2].startVert] +  //
-             float(j) * vertPos[halfedge[3 * tri].startVert] +      //
-             float(n - i - j) * vertPos[halfedge[3 * tri + 1].startVert]) *
-            invTotal;
+    const float invTotal = 1.0f / n;
+    int posTri = tri * n * n;
+    int posBary = tri * VertsPerTri(n + 1);
+    int pos = startIdx + tri * VertsPerTri(n - 2);
+    for (int i = 0; i <= n; ++i)
+      for (int j = 0; j <= n - i; ++j) {
+        const int k = n - i - j;
+        const float u = invTotal * j;
+        const float v = invTotal * k;
+        const float w = invTotal * i;
+        const int first = posBary;
+        uvw[posBary++] = {u, v, w};
+        if (j == n - i) continue;
+
+        // The three retained verts are denoted -1. uvw entries are added for
+        // them out of laziness of indexing only.
+        const int a = (k == n) ? -1 : first;
+        const int b = (i == n - 1) ? -1 : first + n - i + 1;
+        const int c = (j == n - 1) ? -1 : first + 1;
+        triBary[posTri++] = {tri, {c, a, b}};
+        if (j < n - 1 - i) {
+          int d = b + 1;
+          triBary[posTri++] = {tri, {b, d, c}};
+        }
+
+        if (i == 0 || j == 0 || k == 0) continue;
+
+        vertPos[pos++] = u * vertPos[halfedge[3 * tri].startVert] +      //
+                         v * vertPos[halfedge[3 * tri + 1].startVert] +  //
+                         w * vertPos[halfedge[3 * tri + 2].startVert];
+      }
   }
 };
 
@@ -229,7 +260,7 @@ struct SplitTris {
         int a = Vert(i, j, tri);
         int b = Vert(i + 1, j, tri);
         int c = Vert(i, j + 1, tri);
-        triVerts[pos++] = glm::ivec3(a, b, c);
+        triVerts[pos++] = glm::ivec3(c, a, b);
         if (j < n - 1 - i) {
           int d = Vert(i + 1, j + 1, tri);
           triVerts[pos++] = glm::ivec3(b, d, c);
@@ -407,21 +438,38 @@ struct Reindex {
   }
 };
 
+template <typename T>
+void Permute(VecDH<T>& inOut, const VecDH<int>& new2Old) {
+  VecDH<T> tmp(inOut);
+  inOut.resize(new2Old.size());
+  thrust::gather(new2Old.begin(), new2Old.end(), tmp.begin(), inOut.begin());
+}
+
+template void Permute<BaryRef>(VecDH<BaryRef>&, const VecDH<int>&);
+template void Permute<glm::vec3>(VecDH<glm::vec3>&, const VecDH<int>&);
+
 struct ReindexFace {
   Halfedge* halfedge;
+  glm::vec4* halfedgeBezier;
   const Halfedge* oldHalfedge;
+  const glm::vec4* oldHalfedgeBezier;
   const int* faceNew2Old;
   const int* faceOld2New;
 
   __host__ __device__ void operator()(int newFace) {
     const int oldFace = faceNew2Old[newFace];
     for (const int i : {0, 1, 2}) {
-      Halfedge edge = oldHalfedge[3 * oldFace + i];
+      const int oldEdge = 3 * oldFace + i;
+      Halfedge edge = oldHalfedge[oldEdge];
       edge.face = newFace;
       const int pairedFace = oldHalfedge[edge.pairedHalfedge].face;
       const int offset = edge.pairedHalfedge - 3 * pairedFace;
       edge.pairedHalfedge = 3 * faceOld2New[pairedFace] + offset;
-      halfedge[3 * newFace + i] = edge;
+      const int newEdge = 3 * newFace + i;
+      halfedge[newEdge] = edge;
+      if (oldHalfedgeBezier != nullptr) {
+        halfedgeBezier[newEdge] = oldHalfedgeBezier[oldEdge];
+      }
     }
   }
 };
@@ -551,6 +599,16 @@ struct SwapHalfedges {
   }
 };
 
+struct InitializeBaryRef {
+  __host__ __device__ void operator()(thrust::tuple<BaryRef&, int> inOut) {
+    BaryRef& baryRef = thrust::get<0>(inOut);
+    int tri = thrust::get<1>(inOut);
+
+    baryRef.tri = tri;
+    baryRef.vertBary = {-1, -1, -1};
+  }
+};
+
 struct MarkShortEdge {
   const glm::vec3* vertPos;
   const float precision;
@@ -576,10 +634,10 @@ struct MarkColinearEdge {
     // startVert can be moved to endVert and merged without altering the
     // geometry.
     int start = edge.pairedHalfedge;
-    int current = nextHalfedge(start);
+    int current = NextHalfedge(start);
     current = halfedge[current].pairedHalfedge;
     while (current != start) {
-      current = nextHalfedge(current);
+      current = NextHalfedge(current);
       if (glm::abs(glm::dot(delta, faceNormal[current / 3])) > precision)
         return;
       current = halfedge[current].pairedHalfedge;
@@ -619,7 +677,7 @@ struct CollapseEdge {
   __host__ void UpdateVert(int vert, int startEdge, int endEdge) {
     while (startEdge != endEdge) {
       halfedge[startEdge].endVert = vert;
-      startEdge = nextHalfedge(startEdge);
+      startEdge = NextHalfedge(startEdge);
       halfedge[startEdge].startVert = vert;
       startEdge = halfedge[startEdge].pairedHalfedge;
     }
@@ -677,7 +735,7 @@ struct CollapseEdge {
     int current = halfedge[tri0edge[1]].pairedHalfedge;
     while (current != tri1edge[2]) {
       UnmarkEdge(current);
-      current = nextHalfedge(current);
+      current = NextHalfedge(current);
       edges.push_back(current);
       UnmarkEdge(current);
       current = halfedge[current].pairedHalfedge;
@@ -690,7 +748,7 @@ struct CollapseEdge {
       glm::vec3 lastEdge =
           vertPos[halfedge[tri1edge[1]].endVert] - vertPos[endVert];
       while (current != tri0edge[2]) {
-        current = nextHalfedge(current);
+        current = NextHalfedge(current);
         glm::vec3 thisEdge =
             vertPos[halfedge[current].endVert] - vertPos[endVert];
         if (!CCW2Normal(thisEdge, lastEdge, triNormal[current / 3])) {
@@ -709,7 +767,7 @@ struct CollapseEdge {
     current = start;
     while (current != tri0edge[2]) {
       UnmarkEdge(current);
-      current = nextHalfedge(current);
+      current = NextHalfedge(current);
       UnmarkEdge(current);
       const int vert = halfedge[current].endVert;
       const int next = halfedge[current].pairedHalfedge;
@@ -797,9 +855,10 @@ namespace manifold {
 
 /**
  * Create a manifold from an input triangle Mesh. Will throw if the Mesh is not
- * manifold.
+ * manifold. TODO: update halfedgeBezier during CollapseDegenerates.
  */
-Manifold::Impl::Impl(const Mesh& mesh) : vertPos_(mesh.vertPos) {
+Manifold::Impl::Impl(const Mesh& mesh)
+    : vertPos_(mesh.vertPos), halfedgeBezier_(mesh.halfedgeBezier) {
   CheckDevice();
   CalculateBBox();
   SetPrecision();
@@ -872,6 +931,11 @@ void Manifold::Impl::CreateHalfedges(const VecDH<glm::ivec3>& triVerts) {
   thrust::sort(edge.beginD(), edge.endD());
   thrust::for_each_n(countAt(0), halfedge_.size() / 2,
                      LinkHalfedges({halfedge_.ptrD(), edge.cptrD()}));
+  if (meshRelation_.triBary.size() != numTri) {
+    meshRelation_.triBary.resize(numTri);
+    thrust::for_each_n(zip(meshRelation_.triBary.begin(), countAt(0)), numTri,
+                       InitializeBaryRef());
+  }
 }
 
 /**
@@ -896,6 +960,9 @@ void Manifold::Impl::CreateAndFixHalfedges(const VecDH<glm::ivec3>& triVerts) {
                      LinkHalfedges({halfedge_.ptrH(), edge.cptrH()}));
   thrust::for_each(thrust::host, countAt(1), countAt(halfedge_.size() / 2),
                    SwapHalfedges({halfedge_.ptrH(), edge.cptrH()}));
+  meshRelation_.triBary.resize(numTri);
+  thrust::for_each_n(zip(meshRelation_.triBary.begin(), countAt(0)), numTri,
+                     InitializeBaryRef());
 }
 
 /**
@@ -903,6 +970,10 @@ void Manifold::Impl::CreateAndFixHalfedges(const VecDH<glm::ivec3>& triVerts) {
  * edges that are colinear whose collapse does not generate a geometric change.
  * Rather than actually removing them, this step merely marks them for removal,
  * by setting vertPos to NaN and halfedge to -1.
+ *
+ * TODO: remove colinear edge collapse, since this could easily conflict with
+ * mesh property junctions; consider test Boolean.FaceUnion if the two cubes
+ * were different colors - we are losing the verts that denote the boundary.
  */
 void Manifold::Impl::CollapseDegenerates() {
   // Short edge collapse is commented out because it was causing a test to fail,
@@ -1150,24 +1221,27 @@ void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge) {
  * run after the new vertices have moved, which is a likely scenario after
  * refinement (smoothing).
  */
-void Manifold::Impl::Refine(int n) {
+void Manifold::Impl::Subdivide(int n) {
   int numVert = NumVert();
   int numEdge = NumEdge();
   int numTri = NumTri();
   // Append new verts
   int vertsPerEdge = n - 1;
-  int vertsPerTri = ((n - 2) * (n - 2) + (n - 2)) / 2;
   int triVertStart = numVert + numEdge * vertsPerEdge;
-  vertPos_.resize(triVertStart + numTri * vertsPerTri);
+  vertPos_.resize(triVertStart + numTri * VertsPerTri(n - 2));
+  meshRelation_.barycentric.resize(numTri * VertsPerTri(n + 1));
+  meshRelation_.triBary.resize(n * n * numTri);
   VecDH<TmpEdge> edges = CreateTmpEdges(halfedge_);
   VecDH<int> half2Edge(2 * numEdge);
   thrust::for_each_n(zip(countAt(0), edges.beginD()), numEdge,
                      ReindexHalfedge({half2Edge.ptrD()}));
   thrust::for_each_n(zip(countAt(0), edges.beginD()), numEdge,
-                     SplitEdges({vertPos_.ptrD(), numVert, n}));
+                     EdgeVerts({vertPos_.ptrD(), numVert, n}));
   thrust::for_each_n(
       countAt(0), numTri,
-      InteriorVerts({vertPos_.ptrD(), triVertStart, n, halfedge_.ptrD()}));
+      InteriorVerts({vertPos_.ptrD(), meshRelation_.barycentric.ptrD(),
+                     meshRelation_.triBary.ptrD(), triVertStart, n,
+                     halfedge_.ptrD()}));
   // Create subtriangles
   VecDH<glm::ivec3> triVerts(n * n * numTri);
   thrust::for_each_n(countAt(0), numTri,
@@ -1300,14 +1374,8 @@ void Manifold::Impl::SortFaces(VecDH<Box>& faceBox,
   VecDH<int> faceNew2Old(NumTri());
   thrust::sequence(faceNew2Old.beginD(), faceNew2Old.endD());
 
-  if (faceNormal_.size() == NumTri()) {
-    thrust::sort_by_key(
-        faceMorton.beginD(), faceMorton.endD(),
-        zip(faceBox.beginD(), faceNew2Old.beginD(), faceNormal_.beginD()));
-  } else {
-    thrust::sort_by_key(faceMorton.beginD(), faceMorton.endD(),
-                        zip(faceBox.beginD(), faceNew2Old.beginD()));
-  }
+  thrust::sort_by_key(faceMorton.beginD(), faceMorton.endD(),
+                      zip(faceBox.beginD(), faceNew2Old.beginD()));
 
   // Tris were flagged for removal with pairedHalfedge = -1 and assigned kNoCode
   // to sort them to the end, which allows them to be removed.
@@ -1317,10 +1385,8 @@ void Manifold::Impl::SortFaces(VecDH<Box>& faceBox,
   faceBox.resize(newNumTri);
   faceMorton.resize(newNumTri);
   faceNew2Old.resize(newNumTri);
-  if (faceNormal_.size() == NumTri()) faceNormal_.resize(newNumTri);
 
-  VecDH<Halfedge> oldHalfedge = halfedge_;
-  GatherFaces(oldHalfedge, faceNew2Old);
+  GatherFaces(faceNew2Old);
 }
 
 /**
@@ -1328,17 +1394,52 @@ void Manifold::Impl::SortFaces(VecDH<Box>& faceBox,
  * another manifold, given by oldHalfedge. Input faceNew2Old defines the old
  * faces to gather into this.
  */
-void Manifold::Impl::GatherFaces(const VecDH<Halfedge>& oldHalfedge,
-                                 const VecDH<int>& faceNew2Old) {
+void Manifold::Impl::GatherFaces(const VecDH<int>& faceNew2Old) {
   const int numTri = faceNew2Old.size();
+  Permute(meshRelation_.triBary, faceNew2Old);
+
+  if (faceNormal_.size() == NumTri()) Permute(faceNormal_, faceNew2Old);
+
+  VecDH<Halfedge> oldHalfedge(halfedge_);
+  VecDH<glm::vec4> oldHalfedgeBezier(halfedgeBezier_);
   VecDH<int> faceOld2New(oldHalfedge.size() / 3);
   thrust::scatter(countAt(0), countAt(numTri), faceNew2Old.beginD(),
                   faceOld2New.beginD());
 
   halfedge_.resize(3 * numTri);
-  thrust::for_each_n(countAt(0), numTri,
-                     ReindexFace({halfedge_.ptrD(), oldHalfedge.cptrD(),
-                                  faceNew2Old.cptrD(), faceOld2New.cptrD()}));
+  if (oldHalfedgeBezier.size() != 0) halfedgeBezier_.resize(3 * numTri);
+  thrust::for_each_n(
+      countAt(0), numTri,
+      ReindexFace({halfedge_.ptrD(), halfedgeBezier_.ptrD(),
+                   oldHalfedge.cptrD(), oldHalfedgeBezier.cptrD(),
+                   faceNew2Old.cptrD(), faceOld2New.cptrD()}));
+}
+
+void Manifold::Impl::GatherFaces(const Impl& old,
+                                 const VecDH<int>& faceNew2Old) {
+  const int numTri = faceNew2Old.size();
+  meshRelation_.triBary.resize(numTri);
+  thrust::gather(faceNew2Old.begin(), faceNew2Old.end(),
+                 old.meshRelation_.triBary.begin(),
+                 meshRelation_.triBary.begin());
+
+  if (old.faceNormal_.size() == old.NumTri()) {
+    faceNormal_.resize(numTri);
+    thrust::gather(faceNew2Old.begin(), faceNew2Old.end(),
+                   old.faceNormal_.begin(), faceNormal_.begin());
+  }
+
+  VecDH<int> faceOld2New(old.NumTri());
+  thrust::scatter(countAt(0), countAt(numTri), faceNew2Old.beginD(),
+                  faceOld2New.beginD());
+
+  halfedge_.resize(3 * numTri);
+  if (old.halfedgeBezier_.size() != 0) halfedgeBezier_.resize(3 * numTri);
+  thrust::for_each_n(
+      countAt(0), numTri,
+      ReindexFace({halfedge_.ptrD(), halfedgeBezier_.ptrD(),
+                   old.halfedge_.cptrD(), old.halfedgeBezier_.cptrD(),
+                   faceNew2Old.cptrD(), faceOld2New.cptrD()}));
 }
 
 /**

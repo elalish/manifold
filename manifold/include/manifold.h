@@ -25,6 +25,11 @@ class Manifold {
   // Creation
   Manifold();
   Manifold(const Mesh&);
+  struct SmoothOptions {
+    bool distributeVertAngles;
+    const std::vector<glm::vec3>& triSharpness;
+  };
+  static Manifold Smooth(const Mesh&, const SmoothOptions& = {false, {}});
   static Manifold Tetrahedron();
   static Manifold Octahedron();
   static Manifold Cube(glm::vec3 size = glm::vec3(1.0f), bool center = false);
@@ -61,14 +66,20 @@ class Manifold {
     float surfaceArea, volume;
   };
   Properties GetProperties() const;
+  MeshRelation GetMeshRelation() const;
 
   // Modification
   Manifold& Translate(glm::vec3);
   Manifold& Scale(glm::vec3);
   Manifold& Rotate(float xDegrees, float yDegrees = 0.0f,
                    float zDegrees = 0.0f);
-  Manifold& Transform(glm::mat4x3 m);
+  Manifold& Transform(const glm::mat4x3&);
   Manifold& Warp(std::function<void(glm::vec3&)>);
+
+  // Refinement
+  Manifold Refine(int) const;
+  // Manifold RefineToLength(float) const;
+  // Manifold RefineToPrecision(float) const;
 
   // Boolean
   enum class OpType { ADD, SUBTRACT, INTERSECT };
