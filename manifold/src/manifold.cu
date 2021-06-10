@@ -261,15 +261,15 @@ Manifold& Manifold::operator=(const Manifold& other) {
   return *this;
 }
 
-Manifold Manifold::Smooth(const Mesh& mesh,
-                          const std::vector<glm::vec3>& triSharpness) {
+Manifold Manifold::Smooth(const Mesh& mesh, const SmoothOptions& options) {
   ALWAYS_ASSERT(mesh.halfedgeBezier.empty(), std::runtime_error,
                 "when supplying beziers, the normal constructor should be used "
                 "rather than Smooth().");
   Manifold manifold(mesh);
   const int numHalfedge = manifold.pImpl_->halfedge_.size();
   manifold.pImpl_->halfedgeBezier_.resize(numHalfedge);
-  if (triSharpness.empty()) {
+
+  if (options.triSharpness.empty()) {
     thrust::for_each_n(zip(manifold.pImpl_->halfedgeBezier_.begin(),
                            manifold.pImpl_->halfedge_.cbegin()),
                        numHalfedge,
@@ -277,9 +277,12 @@ Manifold Manifold::Smooth(const Mesh& mesh,
                                      manifold.pImpl_->faceNormal_.cptrD(),
                                      manifold.pImpl_->vertNormal_.cptrD(),
                                      manifold.pImpl_->halfedge_.cptrD()}));
+
+    if (options.distributeVertAngles) {
+    }
   } else {
     ALWAYS_ASSERT(
-        triSharpness.size() == mesh.triVerts.size(), std::runtime_error,
+        options.triSharpness.size() == mesh.triVerts.size(), std::runtime_error,
         "triSharpness vector must equal the length of the triVerts vector.");
   }
   return manifold;
