@@ -34,10 +34,18 @@ using namespace manifold;
 
 constexpr uint32_t kNoCode = 0xFFFFFFFFu;
 
-__host__ __device__ int nextHalfedge(int current) {
+__host__ __device__ int NextHalfedge(int current) {
   ++current;
   if (current % 3 == 0) current -= 3;
   return current;
+}
+
+/**
+ * The total number of verts if a triangle is subdivided naturally such that
+ * each edge has edgeVerts verts along it (edgeVerts >= 2).
+ */
+__host__ __device__ int VertsPerTri(int edgeVerts) {
+  return (edgeVerts * edgeVerts + edgeVerts) / 2;
 }
 
 /**
@@ -165,11 +173,10 @@ struct InteriorVerts {
   const Halfedge* halfedge;
 
   __host__ __device__ void operator()(int tri) {
-    const int vertsPerTri = ((n - 2) * (n - 2) + (n - 2)) / 2;
     const float invTotal = 1.0f / n;
     int posTri = tri * n * n;
-    int posBary = tri * ((n + 1) * (n + 1) + (n + 1)) / 2;
-    int pos = startIdx + vertsPerTri * tri;
+    int posBary = tri * VertsPerTri(n + 1);
+    int pos = startIdx + tri * VertsPerTri(n - 2);
     for (int i = 0; i <= n; ++i)
       for (int j = 0; j <= n - i; ++j) {
         const int k = n - i - j;
@@ -627,10 +634,10 @@ struct MarkColinearEdge {
     // startVert can be moved to endVert and merged without altering the
     // geometry.
     int start = edge.pairedHalfedge;
-    int current = nextHalfedge(start);
+    int current = NextHalfedge(start);
     current = halfedge[current].pairedHalfedge;
     while (current != start) {
-      current = nextHalfedge(current);
+      current = NextHalfedge(current);
       if (glm::abs(glm::dot(delta, faceNormal[current / 3])) > precision)
         return;
       current = halfedge[current].pairedHalfedge;
@@ -670,7 +677,7 @@ struct CollapseEdge {
   __host__ void UpdateVert(int vert, int startEdge, int endEdge) {
     while (startEdge != endEdge) {
       halfedge[startEdge].endVert = vert;
-      startEdge = nextHalfedge(startEdge);
+      startEdge = NextHalfedge(startEdge);
       halfedge[startEdge].startVert = vert;
       startEdge = halfedge[startEdge].pairedHalfedge;
     }
@@ -728,7 +735,7 @@ struct CollapseEdge {
     int current = halfedge[tri0edge[1]].pairedHalfedge;
     while (current != tri1edge[2]) {
       UnmarkEdge(current);
-      current = nextHalfedge(current);
+      current = NextHalfedge(current);
       edges.push_back(current);
       UnmarkEdge(current);
       current = halfedge[current].pairedHalfedge;
@@ -741,7 +748,7 @@ struct CollapseEdge {
       glm::vec3 lastEdge =
           vertPos[halfedge[tri1edge[1]].endVert] - vertPos[endVert];
       while (current != tri0edge[2]) {
-        current = nextHalfedge(current);
+        current = NextHalfedge(current);
         glm::vec3 thisEdge =
             vertPos[halfedge[current].endVert] - vertPos[endVert];
         if (!CCW2Normal(thisEdge, lastEdge, triNormal[current / 3])) {
@@ -760,7 +767,7 @@ struct CollapseEdge {
     current = start;
     while (current != tri0edge[2]) {
       UnmarkEdge(current);
-      current = nextHalfedge(current);
+      current = NextHalfedge(current);
       UnmarkEdge(current);
       const int vert = halfedge[current].endVert;
       const int next = halfedge[current].pairedHalfedge;
@@ -1220,10 +1227,9 @@ void Manifold::Impl::Subdivide(int n) {
   int numTri = NumTri();
   // Append new verts
   int vertsPerEdge = n - 1;
-  int vertsPerTri = ((n - 2) * (n - 2) + (n - 2)) / 2;
   int triVertStart = numVert + numEdge * vertsPerEdge;
-  vertPos_.resize(triVertStart + numTri * vertsPerTri);
-  meshRelation_.barycentric.resize(numTri * ((n + 1) * (n + 1) + (n + 1)) / 2);
+  vertPos_.resize(triVertStart + numTri * VertsPerTri(n - 2));
+  meshRelation_.barycentric.resize(numTri * VertsPerTri(n + 1));
   meshRelation_.triBary.resize(n * n * numTri);
   VecDH<TmpEdge> edges = CreateTmpEdges(halfedge_);
   VecDH<int> half2Edge(2 * numEdge);
