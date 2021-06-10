@@ -25,8 +25,11 @@ class Manifold {
   // Creation
   Manifold();
   Manifold(const Mesh&);
-  static Manifold Smooth(const Mesh&,
-                         const std::vector<glm::vec3>& triSharpness = {});
+  struct SmoothOptions {
+    bool distributeVertAngles;
+    const std::vector<glm::vec3>& triSharpness;
+  };
+  static Manifold Smooth(const Mesh&, const SmoothOptions& = {false, {}});
   static Manifold Tetrahedron();
   static Manifold Octahedron();
   static Manifold Cube(glm::vec3 size = glm::vec3(1.0f), bool center = false);
