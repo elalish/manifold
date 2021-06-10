@@ -260,7 +260,7 @@ TEST(Manifold, MeshRelation) {
   Manifold csaszar(input);
   Related(csaszar, input);
   Mesh sortedInput = csaszar.Extract();
-  Manifold refined = csaszar.Refine(1);
+  Manifold refined = csaszar.Refine(4);
   Related(refined, sortedInput);
 }
 
