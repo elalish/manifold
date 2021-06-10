@@ -23,16 +23,40 @@ namespace {
 
 using namespace manifold;
 
+void Identical(glm::vec3 v0, glm::vec3 v1) {
+  for (int j : {0, 1, 2}) ASSERT_NEAR(v0[j], v1[j], 0.0001);
+}
+
 void Identical(Mesh& mesh1, Mesh& mesh2) {
   ASSERT_EQ(mesh1.vertPos.size(), mesh2.vertPos.size());
-  for (int i = 0; i < mesh1.vertPos.size(); ++i) {
-    glm::vec3 v_in = mesh1.vertPos[i];
-    glm::vec3 v_out = mesh2.vertPos[i];
-    for (int j : {0, 1, 2}) ASSERT_NEAR(v_in[j], v_out[j], 0.0001);
-  }
+  for (int i = 0; i < mesh1.vertPos.size(); ++i)
+    Identical(mesh1.vertPos[i], mesh2.vertPos[i]);
+
   ASSERT_EQ(mesh1.triVerts.size(), mesh2.triVerts.size());
-  for (int i = 0; i < mesh1.triVerts.size(); ++i) {
+  for (int i = 0; i < mesh1.triVerts.size(); ++i)
     ASSERT_EQ(mesh1.triVerts[i], mesh2.triVerts[i]);
+}
+
+void Related(const Manifold& out, const Mesh& input) {
+  Mesh output = out.Extract();
+  MeshRelation relation = out.GetMeshRelation();
+  for (int i = 0; i < out.NumTri(); ++i) {
+    int inTri = relation.triBary[i].tri;
+    ASSERT_LT(inTri, input.triVerts.size());
+    for (int j : {0, 1, 2}) {
+      int v = relation.triBary[i].vertBary[j];
+      if (v < 0) {
+        Identical(output.vertPos[output.triVerts[i][j]],
+                  input.vertPos[input.triVerts[inTri][j]]);
+      } else {
+        ASSERT_LT(v, relation.barycentric.size());
+        glm::vec3 uvw = relation.barycentric[v];
+        glm::vec3 vPos = uvw[0] * input.vertPos[input.triVerts[inTri][0]] +
+                         uvw[1] * input.vertPos[input.triVerts[inTri][1]] +
+                         uvw[2] * input.vertPos[input.triVerts[inTri][2]];
+        Identical(output.vertPos[output.triVerts[i][j]], vPos);
+      }
+    }
   }
 }
 
@@ -84,6 +108,14 @@ TEST(MeshIO, ReadWrite) {
  * This tests that turning a mesh into a manifold and returning it to a mesh
  * produces a consistent result.
  */
+TEST(Manifold, Extract) {
+  Manifold manifold = Manifold::Sphere(1);
+  Mesh mesh_out = manifold.Extract();
+  Manifold mesh2(mesh_out);
+  Mesh mesh_out2 = mesh2.Extract();
+  Identical(mesh_out, mesh_out2);
+}
+
 TEST(Manifold, Regression) {
   Manifold manifold(ImportMesh("data/gyroidpuzzle.ply"));
   EXPECT_TRUE(manifold.IsManifold());
@@ -93,14 +125,6 @@ TEST(Manifold, Regression) {
   int num_overlaps = manifold.NumOverlaps(mesh1);
   ASSERT_EQ(num_overlaps, 222653);
 
-  Mesh mesh_out = manifold.Extract();
-  Manifold mesh2(mesh_out);
-  Mesh mesh_out2 = mesh2.Extract();
-  Identical(mesh_out, mesh_out2);
-}
-
-TEST(Manifold, Extract) {
-  Manifold manifold = Manifold::Sphere(1);
   Mesh mesh_out = manifold.Extract();
   Manifold mesh2(mesh_out);
   Mesh mesh_out2 = mesh2.Extract();
@@ -181,6 +205,27 @@ TEST(Manifold, Revolve2) {
   EXPECT_NEAR(prop.surfaceArea, 96.0f * glm::pi<float>(), 1.0f);
 }
 
+TEST(Manifold, Smooth) {
+  Manifold tet = Manifold::Tetrahedron();
+  Manifold smooth = Manifold::Smooth(tet.Extract());
+  Manifold interp = smooth.Refine(100);
+  ExpectMeshes(interp, {{20002, 40000}});
+  auto prop = interp.GetProperties();
+  EXPECT_NEAR(prop.volume, 17, 0.1);
+  EXPECT_NEAR(prop.surfaceArea, 33, 0.1);
+  // ExportMesh("smoothTet.gltf", interp.Extract());
+}
+
+TEST(Manifold, Csaszar) {
+  Manifold csaszar = Manifold::Smooth(ImportMesh("data/Csaszar.ply"));
+  Manifold interp = csaszar.Refine(100);
+  ExpectMeshes(interp, {{70000, 140000}});
+  // auto prop = interp.GetProperties();
+  // EXPECT_NEAR(prop.volume, 17, 0.1);
+  // EXPECT_NEAR(prop.surfaceArea, 33, 0.1);
+  // ExportMesh("smoothCsaszar.gltf", interp.Extract());
+}
+
 /**
  * These tests verify the calculation of a manifold's geometric properties.
  */
@@ -204,6 +249,19 @@ TEST(Manifold, Precision) {
   EXPECT_FLOAT_EQ(cube.Precision(), 10 * kTolerance);
   cube.Translate({-100, -10, -1});
   EXPECT_FLOAT_EQ(cube.Precision(), 100 * kTolerance);
+}
+
+/**
+ * Testing more advanced Manifold operations.
+ */
+
+TEST(Manifold, MeshRelation) {
+  Mesh input = ImportMesh("data/Csaszar.ply");
+  Manifold csaszar(input);
+  Related(csaszar, input);
+  Mesh sortedInput = csaszar.Extract();
+  Manifold refined = csaszar.Refine(4);
+  Related(refined, sortedInput);
 }
 
 /**
@@ -281,6 +339,8 @@ TEST(Boolean, FaceUnion) {
   Manifold cube2 = cubes;
   cubes += cube2.Translate({1, 0, 0});
   EXPECT_EQ(cubes.Genus(), 0);
+  // TODO: This should be {12, 20} once CollapseDegenerates is restricted to
+  // only degenerate triangles.
   ExpectMeshes(cubes, {{8, 12}});
   auto prop = cubes.GetProperties();
   EXPECT_NEAR(prop.volume, 2, 1e-5);

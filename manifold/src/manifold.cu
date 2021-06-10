@@ -24,6 +24,43 @@ namespace {
 using namespace manifold;
 using namespace thrust::placeholders;
 
+__host__ __device__ glm::vec3 OrthogonalTo(glm::vec3 in, glm::vec3 ref) {
+  in -= glm::dot(in, ref) * ref;
+  return in;
+}
+
+struct SmoothBezier {
+  const glm::vec3* vertPos;
+  const glm::vec3* triNormal;
+  const glm::vec3* vertNormal;
+  const Halfedge* halfedge;
+
+  __host__ __device__ void operator()(
+      thrust::tuple<glm::vec4&, Halfedge> inOut) {
+    glm::vec4& bez = thrust::get<0>(inOut);
+    const Halfedge edge = thrust::get<1>(inOut);
+
+    const glm::vec3 startV = vertPos[edge.startVert];
+    const glm::vec3 edgeVec = vertPos[edge.endVert] - startV;
+    const glm::vec3 edgePlane =
+        triNormal[edge.face] - triNormal[halfedge[edge.pairedHalfedge].face];
+    const glm::vec3 tangent =
+        glm::normalize(glm::length(edgePlane) < kTolerance
+                           ? OrthogonalTo(edgeVec, vertNormal[edge.startVert])
+                           : glm::cross(edgePlane, vertNormal[edge.startVert]));
+
+    const float weight = glm::dot(tangent, glm::normalize(edgeVec));
+    // Quadratic weighted bezier for circular interpolation
+    const glm::vec4 bz2 =
+        weight *
+        glm::vec4(startV + tangent * glm::length(edgeVec) / (2 * weight), 1.0f);
+    // Equivalent cubic weighted bezier
+    const glm::vec4 bz3 = glm::mix(glm::vec4(startV, 1.0f), bz2, 2 / 3.0f);
+    // Convert from homogeneous form to geometric form
+    bez = glm::vec4(glm::vec3(bz3) / bz3.w, bz3.w);
+  }
+};
+
 struct ToSphere {
   float length;
   __host__ __device__ void operator()(glm::vec3& v) {
@@ -75,6 +112,125 @@ struct MakeTri {
   }
 };
 
+struct TriBary2Vert {
+  Barycentric* vertBary;
+  const glm::vec3* uvw;
+  const Halfedge* halfedge;
+
+  __host__ __device__ void operator()(thrust::tuple<BaryRef, int> in) {
+    const BaryRef baryRef = thrust::get<0>(in);
+    const int tri = thrust::get<1>(in);
+
+    for (int i : {0, 1, 2}) {
+      const int idx = baryRef.vertBary[i];
+      glm::vec3 bary(0);
+      if (idx < 0)
+        bary[i] = 1;
+      else
+        bary = uvw[idx];
+      vertBary[halfedge[3 * tri + i].startVert] = {baryRef.tri, bary};
+    }
+  }
+};
+
+struct InterpTri {
+  const Halfedge* halfedge;
+  const glm::vec4* halfedgeBezier;
+  const glm::vec3* vertPos;
+
+  __host__ __device__ glm::vec4 Homogeneous(glm::vec4 v) {
+    v.x *= v.w;
+    v.y *= v.w;
+    v.z *= v.w;
+    return v;
+  }
+
+  __host__ __device__ glm::vec3 HNormalize(glm::vec4 v) {
+    return glm::vec3(v) / v.w;
+  }
+
+  __host__ __device__ glm::mat2x4 CubicBezier2Linear(glm::vec4 p0, glm::vec4 p1,
+                                                     glm::vec4 p2, glm::vec4 p3,
+                                                     float x) {
+    glm::mat2x4 out;
+    glm::vec4 p12 = glm::mix(p1, p2, x);
+    out[0] = glm::mix(glm::mix(p0, p1, x), p12, x);
+    out[1] = glm::mix(p12, glm::mix(p2, p3, x), x);
+    return out;
+  }
+
+  __host__ __device__ glm::vec3 BezierPoint(glm::mat2x4 points, float x) {
+    return HNormalize(glm::mix(points[0], points[1], x));
+  }
+
+  __host__ __device__ glm::vec3 BezierTangent(glm::mat2x4 points) {
+    return glm::normalize(HNormalize(points[1]) - HNormalize(points[0]));
+  }
+
+  __host__ __device__ void operator()(
+      thrust::tuple<glm::vec3&, Barycentric> inOut) {
+    glm::vec3& pos = thrust::get<0>(inOut);
+    const int tri = thrust::get<1>(inOut).tri;
+    const glm::vec3 uvw = thrust::get<1>(inOut).uvw;
+
+    glm::vec4 posH(0);
+    const glm::mat3x4 corners = {
+        glm::vec4(vertPos[halfedge[3 * tri].startVert], 1),
+        glm::vec4(vertPos[halfedge[3 * tri + 1].startVert], 1),
+        glm::vec4(vertPos[halfedge[3 * tri + 2].startVert], 1)};
+
+    for (const int i : {0, 1, 2}) {
+      if (uvw[i] == 1) {
+        pos = glm::vec3(corners[i]);
+        return;
+      }
+    }
+
+    const glm::mat3x4 bezierR = {halfedgeBezier[3 * tri],
+                                 halfedgeBezier[3 * tri + 1],
+                                 halfedgeBezier[3 * tri + 2]};
+    const glm::mat3x4 bezierL = {
+        halfedgeBezier[halfedge[3 * tri + 2].pairedHalfedge],
+        halfedgeBezier[halfedge[3 * tri].pairedHalfedge],
+        halfedgeBezier[halfedge[3 * tri + 1].pairedHalfedge]};
+
+    for (const int i : {0, 1, 2}) {
+      const int j = (i + 1) % 3;
+      const int k = (i + 2) % 3;
+      const float x = uvw[k] / (1 - uvw[i]);
+
+      const glm::mat2x4 bez =
+          CubicBezier2Linear(corners[j], Homogeneous(bezierR[j]),
+                             Homogeneous(bezierL[k]), corners[k], x);
+      const glm::vec3 end = BezierPoint(bez, x);
+      const glm::vec3 tangent = BezierTangent(bez);
+
+      const glm::vec3 jDelta = glm::vec3(bezierL[j]) - glm::vec3(corners[j]);
+      const glm::vec3 kDelta = glm::vec3(bezierR[k]) - glm::vec3(corners[k]);
+      const glm::vec3 jTangent =
+          glm::normalize(glm::vec3(bezierR[j]) - glm::vec3(corners[j]));
+      const glm::vec3 kTangent =
+          glm::normalize(glm::vec3(corners[k]) - glm::vec3(bezierL[k]));
+      const glm::vec3 jBitangent =
+          glm::normalize(OrthogonalTo(jDelta, jTangent));
+      const glm::vec3 kBitangent =
+          glm::normalize(OrthogonalTo(kDelta, kTangent));
+      const glm::vec3 normal = glm::normalize(
+          glm::cross(glm::mix(jBitangent, kBitangent, x), tangent));
+      const glm::vec3 delta = OrthogonalTo(glm::mix(jDelta, kDelta, x), normal);
+      const float deltaW = glm::mix(bezierL[j].w, bezierR[k].w, x);
+
+      const glm::mat2x4 bez1 = CubicBezier2Linear(
+          glm::vec4(end, 1), Homogeneous(glm::vec4(end + delta, deltaW)),
+          Homogeneous(glm::mix(bezierR[i], bezierL[i], x)), corners[i], uvw[i]);
+      const glm::vec3 p = BezierPoint(bez1, uvw[i]);
+      const float w = uvw[j] * uvw[k];
+      posH += Homogeneous(glm::vec4(p, w));
+    }
+    pos = HNormalize(posH);
+  }
+};
+
 Manifold Halfspace(Box bBox, glm::vec3 normal, float originOffset) {
   normal = glm::normalize(normal);
   Manifold cutter =
@@ -91,8 +247,7 @@ Manifold Halfspace(Box bBox, glm::vec3 normal, float originOffset) {
 namespace manifold {
 
 Manifold::Manifold() : pImpl_{std::make_unique<Impl>()} {}
-Manifold::Manifold(const Mesh& manifold)
-    : pImpl_{std::make_unique<Impl>(manifold)} {}
+Manifold::Manifold(const Mesh& mesh) : pImpl_{std::make_unique<Impl>(mesh)} {}
 Manifold::~Manifold() = default;
 Manifold::Manifold(Manifold&&) noexcept = default;
 Manifold& Manifold::operator=(Manifold&&) noexcept = default;
@@ -104,6 +259,33 @@ Manifold& Manifold::operator=(const Manifold& other) {
     pImpl_.reset(new Impl(*other.pImpl_));
   }
   return *this;
+}
+
+Manifold Manifold::Smooth(const Mesh& mesh, const SmoothOptions& options) {
+  ALWAYS_ASSERT(mesh.halfedgeBezier.empty(), std::runtime_error,
+                "when supplying beziers, the normal constructor should be used "
+                "rather than Smooth().");
+  Manifold manifold(mesh);
+  const int numHalfedge = manifold.pImpl_->halfedge_.size();
+  manifold.pImpl_->halfedgeBezier_.resize(numHalfedge);
+
+  if (options.triSharpness.empty()) {
+    thrust::for_each_n(zip(manifold.pImpl_->halfedgeBezier_.begin(),
+                           manifold.pImpl_->halfedge_.cbegin()),
+                       numHalfedge,
+                       SmoothBezier({manifold.pImpl_->vertPos_.cptrD(),
+                                     manifold.pImpl_->faceNormal_.cptrD(),
+                                     manifold.pImpl_->vertNormal_.cptrD(),
+                                     manifold.pImpl_->halfedge_.cptrD()}));
+
+    if (options.distributeVertAngles) {
+    }
+  } else {
+    ALWAYS_ASSERT(
+        options.triSharpness.size() == mesh.triVerts.size(), std::runtime_error,
+        "triSharpness vector must equal the length of the triVerts vector.");
+  }
+  return manifold;
 }
 
 /**
@@ -172,7 +354,7 @@ Manifold Manifold::Sphere(float radius, int circularSegments) {
                                : GetCircularSegments(radius) / 4;
   Manifold sphere;
   sphere.pImpl_ = std::make_unique<Impl>(Impl::Shape::OCTAHEDRON);
-  sphere.pImpl_->Refine(n);
+  sphere.pImpl_->Subdivide(n);
   thrust::for_each_n(sphere.pImpl_->vertPos_.beginD(), sphere.NumVert(),
                      ToSphere({radius}));
   sphere.pImpl_->Finish();
@@ -383,6 +565,8 @@ Manifold Manifold::Compose(const std::vector<Manifold>& manifolds) {
     nextFace += manifold.NumTri();
   }
 
+  // TODO: populate this properly
+  combined.meshRelation_.triBary.resize(combined.NumTri());
   combined.Finish();
   return out;
 }
@@ -425,7 +609,7 @@ std::vector<Manifold> Manifold::Decompose() const {
         faceNew2Old.beginD();
     faceNew2Old.resize(nFace);
 
-    meshes[i].pImpl_->GatherFaces(pImpl_->halfedge_, faceNew2Old);
+    meshes[i].pImpl_->GatherFaces(*pImpl_, faceNew2Old);
     meshes[i].pImpl_->ReindexVerts(vertNew2Old, pImpl_->NumVert());
 
     meshes[i].pImpl_->Finish();
@@ -521,6 +705,29 @@ Manifold::Properties Manifold::GetProperties() const {
   return pImpl_->GetProperties();
 }
 
+/**
+ * Gets the relationship to the previous mesh, for the purpose of assinging
+ * properties like texture coordinates. The triBary vector is the same length as
+ * Mesh.triVerts and BaryRef.tri gives the index into the input triVerts vector.
+ * BaryRef.vertBary gives an index for each vertex into the barycentric vector,
+ * if that vertex is >= 0, indicating it is a new vertex. The barycentric
+ * coordinates are relative to the original verts of the corresponding input
+ * tri. If the index is -1, this indicates it is the original vertex.
+ *
+ * TODO: After a Boolean operation, we can refer to triangles from two input
+ * meshes. Store these using negative tri indicies and add helper methods to
+ * separate the bool and the index.
+ */
+MeshRelation Manifold::GetMeshRelation() const {
+  MeshRelation out;
+  const auto& relation = pImpl_->meshRelation_;
+  out.triBary.insert(out.triBary.end(), relation.triBary.begin(),
+                     relation.triBary.end());
+  out.barycentric.insert(out.barycentric.end(), relation.barycentric.begin(),
+                         relation.barycentric.end());
+  return out;
+}
+
 bool Manifold::IsManifold() const { return pImpl_->IsManifold(); }
 
 bool Manifold::MatchesTriNormals() const { return pImpl_->MatchesTriNormals(); }
@@ -558,7 +765,7 @@ Manifold& Manifold::Rotate(float xDegrees, float yDegrees, float zDegrees) {
   return *this;
 }
 
-Manifold& Manifold::Transform(glm::mat4x3 m) {
+Manifold& Manifold::Transform(const glm::mat4x3& m) {
   glm::mat4 old(pImpl_->transform_);
   old *= glm::mat4(m);
   pImpl_->transform_ = glm::mat4x3(old);
@@ -580,6 +787,31 @@ Manifold& Manifold::Warp(std::function<void(glm::vec3&)> warpFunc) {
   pImpl_->CalculateNormals();
   pImpl_->SetPrecision();
   return *this;
+}
+
+Manifold Manifold::Refine(int n) const {
+  Manifold refined = *this;
+  refined.pImpl_->Subdivide(n);
+
+  if (pImpl_->halfedgeBezier_.size() == pImpl_->halfedge_.size()) {
+    Manifold::Impl::MeshRelationD relation = refined.pImpl_->meshRelation_;
+
+    VecDH<Barycentric> vertBary(refined.NumVert());
+    thrust::for_each_n(
+        zip(relation.triBary.begin(), countAt(0)), refined.NumTri(),
+        TriBary2Vert({vertBary.ptrD(), relation.barycentric.cptrD(),
+                      refined.pImpl_->halfedge_.cptrD()}));
+
+    thrust::for_each_n(
+        zip(refined.pImpl_->vertPos_.begin(), vertBary.begin()),
+        refined.NumVert(),
+        InterpTri({pImpl_->halfedge_.cptrD(), pImpl_->halfedgeBezier_.cptrD(),
+                   pImpl_->vertPos_.cptrD()}));
+  }
+
+  refined.pImpl_->halfedgeBezier_.resize(0);
+  refined.pImpl_->Finish();
+  return refined;
 }
 
 /**
