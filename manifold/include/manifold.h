@@ -53,7 +53,7 @@ class Manifold {
   static int GetCircularSegments(float radius);
 
   // Information
-  Mesh Extract(bool includeNormals = false) const;
+  Mesh Extract() const;
   bool IsEmpty() const;
   int NumVert() const;
   int NumEdge() const;
