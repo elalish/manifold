@@ -138,28 +138,34 @@ struct InterpTri {
   const glm::vec4* halfedgeTangent;
   const glm::vec3* vertPos;
 
-  __host__ __device__ glm::vec4 Homogeneous(glm::vec4 v) {
+  __host__ __device__ glm::vec4 Homogeneous(glm::vec4 v) const {
     v.x *= v.w;
     v.y *= v.w;
     v.z *= v.w;
     return v;
   }
 
-  __host__ __device__ glm::vec4 Homogeneous(glm::vec3 v) {
+  __host__ __device__ glm::vec4 Homogeneous(glm::vec3 v) const {
     return glm::vec4(v, 1.0f);
   }
 
-  __host__ __device__ glm::vec3 HNormalize(glm::vec4 v) {
+  __host__ __device__ glm::vec3 HNormalize(glm::vec4 v) const {
     return glm::vec3(v) / v.w;
   }
 
-  __host__ __device__ glm::vec4 Bezier(glm::vec3 point, glm::vec4 tangent) {
+  __host__ __device__ glm::vec3 SafeNormalize(glm::vec3 v) const {
+    v = glm::normalize(v);
+    return isfinite(v.x) ? v : glm::vec3(0);
+  }
+
+  __host__ __device__ glm::vec4 Bezier(glm::vec3 point,
+                                       glm::vec4 tangent) const {
     return Homogeneous(glm::vec4(point, 0) + tangent);
   }
 
   __host__ __device__ glm::mat2x4 CubicBezier2Linear(glm::vec4 p0, glm::vec4 p1,
                                                      glm::vec4 p2, glm::vec4 p3,
-                                                     float x) {
+                                                     float x) const {
     glm::mat2x4 out;
     glm::vec4 p12 = glm::mix(p1, p2, x);
     out[0] = glm::mix(glm::mix(p0, p1, x), p12, x);
@@ -167,11 +173,11 @@ struct InterpTri {
     return out;
   }
 
-  __host__ __device__ glm::vec3 BezierPoint(glm::mat2x4 points, float x) {
+  __host__ __device__ glm::vec3 BezierPoint(glm::mat2x4 points, float x) const {
     return HNormalize(glm::mix(points[0], points[1], x));
   }
 
-  __host__ __device__ glm::vec3 BezierTangent(glm::mat2x4 points) {
+  __host__ __device__ glm::vec3 BezierTangent(glm::mat2x4 points) const {
     return glm::normalize(HNormalize(points[1]) - HNormalize(points[0]));
   }
 
@@ -212,11 +218,11 @@ struct InterpTri {
       const glm::vec3 end = BezierPoint(bez, x);
       const glm::vec3 tangent = BezierTangent(bez);
 
-      const glm::vec3 jBitangent = glm::normalize(OrthogonalTo(
-          glm::vec3(tangentL[j]), glm::normalize(glm::vec3(tangentR[j]))));
-      const glm::vec3 kBitangent = glm::normalize(OrthogonalTo(
-          glm::vec3(tangentR[k]), -glm::normalize(glm::vec3(tangentL[k]))));
-      const glm::vec3 normal = glm::normalize(
+      const glm::vec3 jBitangent = SafeNormalize(OrthogonalTo(
+          glm::vec3(tangentL[j]), SafeNormalize(glm::vec3(tangentR[j]))));
+      const glm::vec3 kBitangent = SafeNormalize(OrthogonalTo(
+          glm::vec3(tangentR[k]), -SafeNormalize(glm::vec3(tangentL[k]))));
+      const glm::vec3 normal = SafeNormalize(
           glm::cross(glm::mix(jBitangent, kBitangent, x), tangent));
       const glm::vec3 delta = OrthogonalTo(
           glm::mix(glm::vec3(tangentL[j]), glm::vec3(tangentR[k]), x), normal);
@@ -621,6 +627,9 @@ Mesh Manifold::Extract(bool includeNormals) const {
   Mesh result;
   result.vertPos.insert(result.vertPos.end(), pImpl_->vertPos_.begin(),
                         pImpl_->vertPos_.end());
+  result.halfedgeTangent.insert(result.halfedgeTangent.end(),
+                                pImpl_->halfedgeTangent_.begin(),
+                                pImpl_->halfedgeTangent_.end());
   if (includeNormals) {
     result.vertNormal.insert(result.vertNormal.end(),
                              pImpl_->vertNormal_.begin(),
