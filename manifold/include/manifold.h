@@ -31,7 +31,6 @@ class Manifold {
   };
   static Manifold Smooth(const Mesh&, const SmoothOptions& = {false, {}});
   static Manifold Tetrahedron();
-  static Manifold Octahedron();
   static Manifold Cube(glm::vec3 size = glm::vec3(1.0f), bool center = false);
   static Manifold Cylinder(float height, float radiusLow,
                            float radiusHigh = -1.0f, int circularSegments = 0,

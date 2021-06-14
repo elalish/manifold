@@ -299,16 +299,6 @@ Manifold Manifold::Tetrahedron() {
 }
 
 /**
- * Constructs an octahedron centered at the origin with vertices one unit out
- * along each axis.
- */
-Manifold Manifold::Octahedron() {
-  Manifold octahedron;
-  octahedron.pImpl_ = std::make_unique<Impl>(Impl::Shape::OCTAHEDRON);
-  return octahedron;
-}
-
-/**
  * Constructs a unit cube (edge lengths all one), by default in the first
  * octant, touching the origin. Set center to true to shift the center to the
  * origin.
