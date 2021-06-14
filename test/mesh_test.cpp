@@ -219,15 +219,17 @@ TEST(Manifold, Smooth) {
 TEST(Manifold, ManualSmooth) {
   Mesh oct = Manifold::Sphere(1, 4).Extract();
   Mesh smooth = Manifold::Smooth(oct).Extract();
-  Dump(smooth.vertPos);
-  Dump(smooth.triVerts);
-  // smooth.halfedgeTangent[0]
+  // Sharpen the edge from vert 4 to 5
+  smooth.halfedgeTangent[6] = {0, 0, 0, 1};
+  smooth.halfedgeTangent[22] = {0, 0, 0, 1};
+  smooth.halfedgeTangent[16] = {0, 0, 0, 1};
+  smooth.halfedgeTangent[18] = {0, 0, 0, 1};
   Manifold interp = Manifold(smooth).Refine(100);
   ExpectMeshes(interp, {{40002, 80000}});
   auto prop = interp.GetProperties();
-  EXPECT_NEAR(prop.volume, 17, 0.1);
-  EXPECT_NEAR(prop.surfaceArea, 33, 0.1);
-  // ExportMesh("smoothTet.gltf", interp.Extract());
+  EXPECT_NEAR(prop.volume, 3.51, 0.01);
+  EXPECT_NEAR(prop.surfaceArea, 11.35, 0.01);
+  ExportMesh("sharpenedSphere.gltf", interp.Extract());
 }
 
 TEST(Manifold, Csaszar) {
