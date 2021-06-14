@@ -216,6 +216,20 @@ TEST(Manifold, Smooth) {
   // ExportMesh("smoothTet.gltf", interp.Extract());
 }
 
+TEST(Manifold, ManualSmooth) {
+  Mesh oct = Manifold::Sphere(1, 4).Extract();
+  Mesh smooth = Manifold::Smooth(oct).Extract();
+  Dump(smooth.vertPos);
+  Dump(smooth.triVerts);
+  // smooth.halfedgeTangent[0]
+  Manifold interp = Manifold(smooth).Refine(100);
+  ExpectMeshes(interp, {{40002, 80000}});
+  auto prop = interp.GetProperties();
+  EXPECT_NEAR(prop.volume, 17, 0.1);
+  EXPECT_NEAR(prop.surfaceArea, 33, 0.1);
+  // ExportMesh("smoothTet.gltf", interp.Extract());
+}
+
 TEST(Manifold, Csaszar) {
   Manifold csaszar = Manifold::Smooth(ImportMesh("data/Csaszar.ply"));
   Manifold interp = csaszar.Refine(100);
