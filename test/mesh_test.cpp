@@ -139,7 +139,7 @@ TEST(Manifold, Decompose) {
   std::vector<Manifold> meshList;
   meshList.push_back(Manifold::Tetrahedron());
   meshList.push_back(Manifold::Cube());
-  meshList.push_back(Manifold::Octahedron());
+  meshList.push_back(Manifold::Sphere(1, 4));
   Manifold meshes = Manifold::Compose(meshList);
 
   ExpectMeshes(meshes, {{8, 12}, {6, 8}, {4, 4}});
@@ -376,7 +376,7 @@ TEST(Boolean, CornerUnion) {
  */
 TEST(Boolean, Split) {
   Manifold cube = Manifold::Cube(glm::vec3(2.0f), true);
-  Manifold oct = Manifold::Octahedron();
+  Manifold oct = Manifold::Sphere(1, 4);
   oct.Translate(glm::vec3(0.0f, 0.0f, 1.0f));
   std::pair<Manifold, Manifold> splits = cube.Split(oct);
   EXPECT_TRUE(splits.first.IsManifold());
