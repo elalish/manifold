@@ -450,9 +450,9 @@ template void Permute<glm::vec3>(VecDH<glm::vec3>&, const VecDH<int>&);
 
 struct ReindexFace {
   Halfedge* halfedge;
-  glm::vec4* halfedgeBezier;
+  glm::vec4* halfedgeTangent;
   const Halfedge* oldHalfedge;
-  const glm::vec4* oldHalfedgeBezier;
+  const glm::vec4* oldHalfedgeTangent;
   const int* faceNew2Old;
   const int* faceOld2New;
 
@@ -467,8 +467,8 @@ struct ReindexFace {
       edge.pairedHalfedge = 3 * faceOld2New[pairedFace] + offset;
       const int newEdge = 3 * newFace + i;
       halfedge[newEdge] = edge;
-      if (oldHalfedgeBezier != nullptr) {
-        halfedgeBezier[newEdge] = oldHalfedgeBezier[oldEdge];
+      if (oldHalfedgeTangent != nullptr) {
+        halfedgeTangent[newEdge] = oldHalfedgeTangent[oldEdge];
       }
     }
   }
@@ -855,10 +855,10 @@ namespace manifold {
 
 /**
  * Create a manifold from an input triangle Mesh. Will throw if the Mesh is not
- * manifold. TODO: update halfedgeBezier during CollapseDegenerates.
+ * manifold. TODO: update halfedgeTangent during CollapseDegenerates.
  */
 Manifold::Impl::Impl(const Mesh& mesh)
-    : vertPos_(mesh.vertPos), halfedgeBezier_(mesh.halfedgeBezier) {
+    : vertPos_(mesh.vertPos), halfedgeTangent_(mesh.halfedgeTangent) {
   CheckDevice();
   CalculateBBox();
   SetPrecision();
@@ -1401,17 +1401,17 @@ void Manifold::Impl::GatherFaces(const VecDH<int>& faceNew2Old) {
   if (faceNormal_.size() == NumTri()) Permute(faceNormal_, faceNew2Old);
 
   VecDH<Halfedge> oldHalfedge(halfedge_);
-  VecDH<glm::vec4> oldHalfedgeBezier(halfedgeBezier_);
+  VecDH<glm::vec4> oldHalfedgeTangent(halfedgeTangent_);
   VecDH<int> faceOld2New(oldHalfedge.size() / 3);
   thrust::scatter(countAt(0), countAt(numTri), faceNew2Old.beginD(),
                   faceOld2New.beginD());
 
   halfedge_.resize(3 * numTri);
-  if (oldHalfedgeBezier.size() != 0) halfedgeBezier_.resize(3 * numTri);
+  if (oldHalfedgeTangent.size() != 0) halfedgeTangent_.resize(3 * numTri);
   thrust::for_each_n(
       countAt(0), numTri,
-      ReindexFace({halfedge_.ptrD(), halfedgeBezier_.ptrD(),
-                   oldHalfedge.cptrD(), oldHalfedgeBezier.cptrD(),
+      ReindexFace({halfedge_.ptrD(), halfedgeTangent_.ptrD(),
+                   oldHalfedge.cptrD(), oldHalfedgeTangent.cptrD(),
                    faceNew2Old.cptrD(), faceOld2New.cptrD()}));
 }
 
@@ -1434,11 +1434,11 @@ void Manifold::Impl::GatherFaces(const Impl& old,
                   faceOld2New.beginD());
 
   halfedge_.resize(3 * numTri);
-  if (old.halfedgeBezier_.size() != 0) halfedgeBezier_.resize(3 * numTri);
+  if (old.halfedgeTangent_.size() != 0) halfedgeTangent_.resize(3 * numTri);
   thrust::for_each_n(
       countAt(0), numTri,
-      ReindexFace({halfedge_.ptrD(), halfedgeBezier_.ptrD(),
-                   old.halfedge_.cptrD(), old.halfedgeBezier_.cptrD(),
+      ReindexFace({halfedge_.ptrD(), halfedgeTangent_.ptrD(),
+                   old.halfedge_.cptrD(), old.halfedgeTangent_.cptrD(),
                    faceNew2Old.cptrD(), faceOld2New.cptrD()}));
 }
 

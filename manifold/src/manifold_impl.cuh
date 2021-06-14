@@ -33,7 +33,7 @@ struct Manifold::Impl {
   VecDH<Halfedge> halfedge_;
   VecDH<glm::vec3> vertNormal_;
   VecDH<glm::vec3> faceNormal_;
-  VecDH<glm::vec4> halfedgeBezier_;
+  VecDH<glm::vec4> halfedgeTangent_;
   MeshRelationD meshRelation_;
   Collider collider_;
   glm::mat4x3 transform_ = glm::mat4x3(1.0f);

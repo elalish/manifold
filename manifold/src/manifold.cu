@@ -37,27 +37,27 @@ struct SmoothBezier {
 
   __host__ __device__ void operator()(
       thrust::tuple<glm::vec4&, Halfedge> inOut) {
-    glm::vec4& bez = thrust::get<0>(inOut);
+    glm::vec4& tangent = thrust::get<0>(inOut);
     const Halfedge edge = thrust::get<1>(inOut);
 
     const glm::vec3 startV = vertPos[edge.startVert];
     const glm::vec3 edgeVec = vertPos[edge.endVert] - startV;
     const glm::vec3 edgePlane =
         triNormal[edge.face] - triNormal[halfedge[edge.pairedHalfedge].face];
-    const glm::vec3 tangent =
+    const glm::vec3 dir =
         glm::normalize(glm::length(edgePlane) < kTolerance
                            ? OrthogonalTo(edgeVec, vertNormal[edge.startVert])
                            : glm::cross(edgePlane, vertNormal[edge.startVert]));
 
-    const float weight = glm::dot(tangent, glm::normalize(edgeVec));
+    const float weight = glm::dot(dir, glm::normalize(edgeVec));
     // Quadratic weighted bezier for circular interpolation
     const glm::vec4 bz2 =
         weight *
-        glm::vec4(startV + tangent * glm::length(edgeVec) / (2 * weight), 1.0f);
+        glm::vec4(startV + dir * glm::length(edgeVec) / (2 * weight), 1.0f);
     // Equivalent cubic weighted bezier
     const glm::vec4 bz3 = glm::mix(glm::vec4(startV, 1.0f), bz2, 2 / 3.0f);
     // Convert from homogeneous form to geometric form
-    bez = glm::vec4(glm::vec3(bz3) / bz3.w, bz3.w);
+    tangent = glm::vec4(glm::vec3(bz3) / bz3.w - startV, bz3.w);
   }
 };
 
@@ -135,7 +135,7 @@ struct TriBary2Vert {
 
 struct InterpTri {
   const Halfedge* halfedge;
-  const glm::vec4* halfedgeBezier;
+  const glm::vec4* halfedgeTangent;
   const glm::vec3* vertPos;
 
   __host__ __device__ glm::vec4 Homogeneous(glm::vec4 v) {
@@ -145,8 +145,16 @@ struct InterpTri {
     return v;
   }
 
+  __host__ __device__ glm::vec4 Homogeneous(glm::vec3 v) {
+    return glm::vec4(v, 1.0f);
+  }
+
   __host__ __device__ glm::vec3 HNormalize(glm::vec4 v) {
     return glm::vec3(v) / v.w;
+  }
+
+  __host__ __device__ glm::vec4 Bezier(glm::vec3 point, glm::vec4 tangent) {
+    return Homogeneous(glm::vec4(point, 0) + tangent);
   }
 
   __host__ __device__ glm::mat2x4 CubicBezier2Linear(glm::vec4 p0, glm::vec4 p1,
@@ -174,10 +182,9 @@ struct InterpTri {
     const glm::vec3 uvw = thrust::get<1>(inOut).uvw;
 
     glm::vec4 posH(0);
-    const glm::mat3x4 corners = {
-        glm::vec4(vertPos[halfedge[3 * tri].startVert], 1),
-        glm::vec4(vertPos[halfedge[3 * tri + 1].startVert], 1),
-        glm::vec4(vertPos[halfedge[3 * tri + 2].startVert], 1)};
+    const glm::mat3 corners = {vertPos[halfedge[3 * tri].startVert],
+                               vertPos[halfedge[3 * tri + 1].startVert],
+                               vertPos[halfedge[3 * tri + 2].startVert]};
 
     for (const int i : {0, 1, 2}) {
       if (uvw[i] == 1) {
@@ -186,43 +193,39 @@ struct InterpTri {
       }
     }
 
-    const glm::mat3x4 bezierR = {halfedgeBezier[3 * tri],
-                                 halfedgeBezier[3 * tri + 1],
-                                 halfedgeBezier[3 * tri + 2]};
-    const glm::mat3x4 bezierL = {
-        halfedgeBezier[halfedge[3 * tri + 2].pairedHalfedge],
-        halfedgeBezier[halfedge[3 * tri].pairedHalfedge],
-        halfedgeBezier[halfedge[3 * tri + 1].pairedHalfedge]};
+    const glm::mat3x4 tangentR = {halfedgeTangent[3 * tri],
+                                  halfedgeTangent[3 * tri + 1],
+                                  halfedgeTangent[3 * tri + 2]};
+    const glm::mat3x4 tangentL = {
+        halfedgeTangent[halfedge[3 * tri + 2].pairedHalfedge],
+        halfedgeTangent[halfedge[3 * tri].pairedHalfedge],
+        halfedgeTangent[halfedge[3 * tri + 1].pairedHalfedge]};
 
     for (const int i : {0, 1, 2}) {
       const int j = (i + 1) % 3;
       const int k = (i + 2) % 3;
       const float x = uvw[k] / (1 - uvw[i]);
 
-      const glm::mat2x4 bez =
-          CubicBezier2Linear(corners[j], Homogeneous(bezierR[j]),
-                             Homogeneous(bezierL[k]), corners[k], x);
+      const glm::mat2x4 bez = CubicBezier2Linear(
+          Homogeneous(corners[j]), Bezier(corners[j], tangentR[j]),
+          Bezier(corners[k], tangentL[k]), Homogeneous(corners[k]), x);
       const glm::vec3 end = BezierPoint(bez, x);
       const glm::vec3 tangent = BezierTangent(bez);
 
-      const glm::vec3 jDelta = glm::vec3(bezierL[j]) - glm::vec3(corners[j]);
-      const glm::vec3 kDelta = glm::vec3(bezierR[k]) - glm::vec3(corners[k]);
-      const glm::vec3 jTangent =
-          glm::normalize(glm::vec3(bezierR[j]) - glm::vec3(corners[j]));
-      const glm::vec3 kTangent =
-          glm::normalize(glm::vec3(corners[k]) - glm::vec3(bezierL[k]));
-      const glm::vec3 jBitangent =
-          glm::normalize(OrthogonalTo(jDelta, jTangent));
-      const glm::vec3 kBitangent =
-          glm::normalize(OrthogonalTo(kDelta, kTangent));
+      const glm::vec3 jBitangent = glm::normalize(OrthogonalTo(
+          glm::vec3(tangentL[j]), glm::normalize(glm::vec3(tangentR[j]))));
+      const glm::vec3 kBitangent = glm::normalize(OrthogonalTo(
+          glm::vec3(tangentR[k]), -glm::normalize(glm::vec3(tangentL[k]))));
       const glm::vec3 normal = glm::normalize(
           glm::cross(glm::mix(jBitangent, kBitangent, x), tangent));
-      const glm::vec3 delta = OrthogonalTo(glm::mix(jDelta, kDelta, x), normal);
-      const float deltaW = glm::mix(bezierL[j].w, bezierR[k].w, x);
+      const glm::vec3 delta = OrthogonalTo(
+          glm::mix(glm::vec3(tangentL[j]), glm::vec3(tangentR[k]), x), normal);
+      const float deltaW = glm::mix(tangentL[j].w, tangentR[k].w, x);
 
       const glm::mat2x4 bez1 = CubicBezier2Linear(
           glm::vec4(end, 1), Homogeneous(glm::vec4(end + delta, deltaW)),
-          Homogeneous(glm::mix(bezierR[i], bezierL[i], x)), corners[i], uvw[i]);
+          Bezier(corners[i], glm::mix(tangentR[i], tangentL[i], x)),
+          Homogeneous(corners[i]), uvw[i]);
       const glm::vec3 p = BezierPoint(bez1, uvw[i]);
       const float w = uvw[j] * uvw[k];
       posH += Homogeneous(glm::vec4(p, w));
@@ -262,15 +265,15 @@ Manifold& Manifold::operator=(const Manifold& other) {
 }
 
 Manifold Manifold::Smooth(const Mesh& mesh, const SmoothOptions& options) {
-  ALWAYS_ASSERT(mesh.halfedgeBezier.empty(), std::runtime_error,
+  ALWAYS_ASSERT(mesh.halfedgeTangent.empty(), std::runtime_error,
                 "when supplying beziers, the normal constructor should be used "
                 "rather than Smooth().");
   Manifold manifold(mesh);
   const int numHalfedge = manifold.pImpl_->halfedge_.size();
-  manifold.pImpl_->halfedgeBezier_.resize(numHalfedge);
+  manifold.pImpl_->halfedgeTangent_.resize(numHalfedge);
 
   if (options.triSharpness.empty()) {
-    thrust::for_each_n(zip(manifold.pImpl_->halfedgeBezier_.begin(),
+    thrust::for_each_n(zip(manifold.pImpl_->halfedgeTangent_.begin(),
                            manifold.pImpl_->halfedge_.cbegin()),
                        numHalfedge,
                        SmoothBezier({manifold.pImpl_->vertPos_.cptrD(),
@@ -783,7 +786,7 @@ Manifold Manifold::Refine(int n) const {
   Manifold refined = *this;
   refined.pImpl_->Subdivide(n);
 
-  if (pImpl_->halfedgeBezier_.size() == pImpl_->halfedge_.size()) {
+  if (pImpl_->halfedgeTangent_.size() == pImpl_->halfedge_.size()) {
     Manifold::Impl::MeshRelationD relation = refined.pImpl_->meshRelation_;
 
     VecDH<Barycentric> vertBary(refined.NumVert());
@@ -795,11 +798,11 @@ Manifold Manifold::Refine(int n) const {
     thrust::for_each_n(
         zip(refined.pImpl_->vertPos_.begin(), vertBary.begin()),
         refined.NumVert(),
-        InterpTri({pImpl_->halfedge_.cptrD(), pImpl_->halfedgeBezier_.cptrD(),
+        InterpTri({pImpl_->halfedge_.cptrD(), pImpl_->halfedgeTangent_.cptrD(),
                    pImpl_->vertPos_.cptrD()}));
   }
 
-  refined.pImpl_->halfedgeBezier_.resize(0);
+  refined.pImpl_->halfedgeTangent_.resize(0);
   refined.pImpl_->Finish();
   return refined;
 }
