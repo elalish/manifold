@@ -621,20 +621,17 @@ std::vector<Manifold> Manifold::Decompose() const {
  * This returns a Mesh of simple vectors of vertices and triangles suitable for
  * saving or other operations outside of the context of this library.
  */
-Mesh Manifold::Extract(bool includeNormals) const {
+Mesh Manifold::Extract() const {
   pImpl_->ApplyTransform();
 
   Mesh result;
   result.vertPos.insert(result.vertPos.end(), pImpl_->vertPos_.begin(),
                         pImpl_->vertPos_.end());
+  result.vertNormal.insert(result.vertNormal.end(), pImpl_->vertNormal_.begin(),
+                           pImpl_->vertNormal_.end());
   result.halfedgeTangent.insert(result.halfedgeTangent.end(),
                                 pImpl_->halfedgeTangent_.begin(),
                                 pImpl_->halfedgeTangent_.end());
-  if (includeNormals) {
-    result.vertNormal.insert(result.vertNormal.end(),
-                             pImpl_->vertNormal_.begin(),
-                             pImpl_->vertNormal_.end());
-  }
 
   result.triVerts.resize(NumTri());
   thrust::for_each_n(zip(result.triVerts.begin(), countAt(0)), NumTri(),

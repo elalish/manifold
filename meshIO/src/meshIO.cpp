@@ -18,6 +18,7 @@
 
 #include "assimp/Exporter.hpp"
 #include "assimp/Importer.hpp"
+#include "assimp/pbrmaterial.h"
 #include "assimp/postprocess.h"
 #include "assimp/scene.h"
 
@@ -71,7 +72,8 @@ Mesh ImportMesh(const std::string& filename) {
   return mesh_out;
 }
 
-void ExportMesh(const std::string& filename, const Mesh& manifold) {
+void ExportMesh(const std::string& filename, const Mesh& manifold,
+                const ExportOptions& options) {
   if (manifold.triVerts.size() == 0) {
     std::cout << filename << " was not saved because the input mesh was empty."
               << std::endl;
@@ -89,6 +91,15 @@ void ExportMesh(const std::string& filename, const Mesh& manifold) {
   scene->mMaterials = new aiMaterial*[scene->mNumMaterials];
   scene->mMaterials[0] = new aiMaterial();
 
+  aiMaterial* material = scene->mMaterials[0];
+  material->AddProperty(&options.mat.roughness, 1,
+                        AI_MATKEY_GLTF_PBRMETALLICROUGHNESS_ROUGHNESS_FACTOR);
+  material->AddProperty(&options.mat.metalness, 1,
+                        AI_MATKEY_GLTF_PBRMETALLICROUGHNESS_METALLIC_FACTOR);
+  const glm::vec4& color = options.mat.color;
+  aiColor4D baseColor(color.r, color.g, color.b, color.a);
+  material->AddProperty(&baseColor, 1, AI_MATKEY_COLOR_DIFFUSE);
+
   scene->mNumMeshes = 1;
   scene->mMeshes = new aiMesh*[scene->mNumMeshes];
   scene->mMeshes[0] = new aiMesh();
@@ -104,14 +115,18 @@ void ExportMesh(const std::string& filename, const Mesh& manifold) {
 
   mesh_out->mNumVertices = manifold.vertPos.size();
   mesh_out->mVertices = new aiVector3D[mesh_out->mNumVertices];
-  const bool hasNormals = manifold.vertNormal.size() == manifold.vertPos.size();
-  if (hasNormals) mesh_out->mNormals = new aiVector3D[mesh_out->mNumVertices];
+  if (!options.faceted) {
+    ALWAYS_ASSERT(
+        manifold.vertNormal.size() == manifold.vertPos.size(), userErr,
+        "vertNormal must be the same length as vertPos when faceted is false.");
+    mesh_out->mNormals = new aiVector3D[mesh_out->mNumVertices];
+  }
 
   for (int i = 0; i < mesh_out->mNumVertices; ++i) {
     const glm::vec3& v = manifold.vertPos[i];
     mesh_out->mVertices[i] =
         isYup ? aiVector3D(v.y, v.z, v.x) : aiVector3D(v.x, v.y, v.z);
-    if (hasNormals) {
+    if (!options.faceted) {
       const glm::vec3& n = manifold.vertNormal[i];
       mesh_out->mNormals[i] =
           isYup ? aiVector3D(n.y, n.z, n.x) : aiVector3D(n.x, n.y, n.z);

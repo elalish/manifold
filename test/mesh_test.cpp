@@ -99,7 +99,7 @@ Polygons SquareHole(float xOffset = 0.0) {
 
 TEST(MeshIO, ReadWrite) {
   Mesh mesh = ImportMesh("data/gyroidpuzzle.ply");
-  ExportMesh("data/gyroidpuzzle1.ply", mesh);
+  ExportMesh("data/gyroidpuzzle1.ply", mesh, {});
   Mesh mesh_out = ImportMesh("data/gyroidpuzzle1.ply");
   Identical(mesh, mesh_out);
 }
@@ -156,7 +156,7 @@ TEST(Manifold, Sphere) {
 }
 
 TEST(Manifold, Normals) {
-  Mesh cube = Manifold::Cube(glm::vec3(1), true).Extract(true);
+  Mesh cube = Manifold::Cube(glm::vec3(1), true).Extract();
   const int nVert = cube.vertPos.size();
   for (int i = 0; i < nVert; ++i) {
     glm::vec3 v = glm::normalize(cube.vertPos[i]);
@@ -217,6 +217,7 @@ TEST(Manifold, Smooth) {
 }
 
 TEST(Manifold, ManualSmooth) {
+  // Unit Octahedron
   Mesh oct = Manifold::Sphere(1, 4).Extract();
   Mesh smooth = Manifold::Smooth(oct).Extract();
   // Sharpen the edge from vert 4 to 5
@@ -229,7 +230,13 @@ TEST(Manifold, ManualSmooth) {
   auto prop = interp.GetProperties();
   EXPECT_NEAR(prop.volume, 3.51, 0.01);
   EXPECT_NEAR(prop.surfaceArea, 11.35, 0.01);
-  ExportMesh("sharpenedSphere.gltf", interp.Extract());
+
+  ExportOptions options;
+  options.faceted = false;
+  options.mat.roughness = 0.1;
+  options.mat.metalness = 1;
+  options.mat.color = {1, 0, 0, 1};
+  ExportMesh("sharpenedSphere.gltf", interp.Extract(), options);
 }
 
 TEST(Manifold, Csaszar) {
@@ -239,7 +246,7 @@ TEST(Manifold, Csaszar) {
   // auto prop = interp.GetProperties();
   // EXPECT_NEAR(prop.volume, 17, 0.1);
   // EXPECT_NEAR(prop.surfaceArea, 33, 0.1);
-  // ExportMesh("smoothCsaszar.gltf", interp.Extract());
+  // ExportMesh("smoothCsaszar.gltf", interp.Extract(), {});
 }
 
 /**
@@ -361,7 +368,7 @@ TEST(Boolean, FaceUnion) {
   auto prop = cubes.GetProperties();
   EXPECT_NEAR(prop.volume, 2, 1e-5);
   EXPECT_NEAR(prop.surfaceArea, 10, 1e-5);
-  // ExportMesh("faceUnion.gltf", cubes.Extract());
+  // ExportMesh("faceUnion.gltf", cubes.Extract(), {});
 }
 
 TEST(Boolean, EdgeUnion) {
@@ -542,7 +549,7 @@ TEST(Boolean, Gyroid) {
   Manifold gyroid2 = gyroid;
   gyroid2.Translate(glm::vec3(5.0f));
   Manifold result = gyroid + gyroid2;
-  // ExportMesh("gyroidUnion.gltf", result.Extract());
+  // ExportMesh("gyroidUnion.gltf", result.Extract(), {});
 
   EXPECT_TRUE(result.IsManifold());
   EXPECT_TRUE(result.MatchesTriNormals());
