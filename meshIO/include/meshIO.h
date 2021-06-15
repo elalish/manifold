@@ -21,6 +21,7 @@ struct Material {
   float roughness = 1;
   float metalness = 0;
   glm::vec4 color = glm::vec4(1.0f);
+  std::vector<glm::vec4> vertColor;
 };
 
 struct ExportOptions {
