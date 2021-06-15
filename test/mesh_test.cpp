@@ -229,14 +229,13 @@ TEST(Manifold, ManualSmooth) {
 
   ExpectMeshes(interp, {{40002, 80000}});
   auto prop = interp.GetProperties();
-  EXPECT_NEAR(prop.volume, 3.51, 0.01);
-  EXPECT_NEAR(prop.surfaceArea, 11.35, 0.01);
+  EXPECT_NEAR(prop.volume, 3.53, 0.01);
+  EXPECT_NEAR(prop.surfaceArea, 11.39, 0.01);
 
   const Mesh out = interp.Extract();
   ExportOptions options;
   options.faceted = false;
   options.mat.roughness = 0.1;
-  options.mat.metalness = 1;
 
   options.mat.vertColor.resize(interp.NumVert());
   MeshRelation rel = interp.GetMeshRelation();
@@ -245,10 +244,9 @@ TEST(Manifold, ManualSmooth) {
   for (int tri = 0; tri < interp.NumTri(); ++tri) {
     for (int i : {0, 1, 2}) {
       const glm::vec3& uvw = rel.barycentric[rel.triBary[tri].vertBary[i]];
-      const float width = 0.1;
-      const float alpha = glm::min(uvw[0], glm::min(uvw[1], uvw[2])) / width;
+      const float alpha = glm::min(uvw[0], glm::min(uvw[1], uvw[2]));
       options.mat.vertColor[out.triVerts[tri][i]] =
-          glm::mix(purple, red, glm::smoothstep(0.0f, 1.0f, alpha));
+          glm::mix(purple, red, glm::smoothstep(0.0f, 0.2f, alpha));
     }
   }
   ExportMesh("sharpenedSphere.gltf", out, options);

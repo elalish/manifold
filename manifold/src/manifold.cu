@@ -229,11 +229,11 @@ struct InterpTri {
       const float deltaW = glm::mix(tangentL[j].w, tangentR[k].w, x);
 
       const glm::mat2x4 bez1 = CubicBezier2Linear(
-          glm::vec4(end, 1), Homogeneous(glm::vec4(end + delta, deltaW)),
+          Homogeneous(end), Homogeneous(glm::vec4(end + delta, deltaW)),
           Bezier(corners[i], glm::mix(tangentR[i], tangentL[i], x)),
           Homogeneous(corners[i]), uvw[i]);
       const glm::vec3 p = BezierPoint(bez1, uvw[i]);
-      const float w = uvw[j] * uvw[k];
+      float w = uvw[j] * uvw[j] * uvw[k] * uvw[k];
       posH += Homogeneous(glm::vec4(p, w));
     }
     pos = HNormalize(posH);
