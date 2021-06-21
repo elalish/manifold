@@ -74,9 +74,7 @@ class Manifold {
                    float zDegrees = 0.0f);
   Manifold& Transform(const glm::mat4x3&);
   Manifold& Warp(std::function<void(glm::vec3&)>);
-
-  // Refinement
-  Manifold Refine(int) const;
+  Manifold& Refine(int);
   // Manifold RefineToLength(float) const;
   // Manifold RefineToPrecision(float) const;
 

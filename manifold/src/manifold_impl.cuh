@@ -50,7 +50,9 @@ struct Manifold::Impl {
   void Update();
   void ApplyTransform() const;
   void ApplyTransform();
+  void CreateTangents(const SmoothOptions&);
   void Subdivide(int n);
+  void Refine(int n);
 
   bool IsEmpty() const { return NumVert() == 0; }
   int NumVert() const { return vertPos_.size(); }
