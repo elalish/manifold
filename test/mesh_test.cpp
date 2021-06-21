@@ -208,12 +208,12 @@ TEST(Manifold, Revolve2) {
 TEST(Manifold, Smooth) {
   Manifold tet = Manifold::Tetrahedron();
   Manifold smooth = Manifold::Smooth(tet.Extract());
-  Manifold interp = smooth.Refine(100);
-  ExpectMeshes(interp, {{20002, 40000}});
-  auto prop = interp.GetProperties();
-  EXPECT_NEAR(prop.volume, 17, 0.1);
-  EXPECT_NEAR(prop.surfaceArea, 33, 0.1);
-  // ExportMesh("smoothTet.gltf", interp.Extract());
+  smooth.Refine(100);
+  ExpectMeshes(smooth, {{20002, 40000}});
+  auto prop = smooth.GetProperties();
+  EXPECT_NEAR(prop.volume, 17.38, 0.1);
+  EXPECT_NEAR(prop.surfaceArea, 33.38, 0.1);
+  // ExportMesh("smoothTet.gltf", smooth.Extract());
 }
 
 TEST(Manifold, ManualSmooth) {
@@ -225,7 +225,8 @@ TEST(Manifold, ManualSmooth) {
   smooth.halfedgeTangent[22] = {0, 0, 0, 1};
   smooth.halfedgeTangent[16] = {0, 0, 0, 1};
   smooth.halfedgeTangent[18] = {0, 0, 0, 1};
-  const Manifold interp = Manifold(smooth).Refine(100);
+  Manifold interp(smooth);
+  interp.Refine(100);
 
   ExpectMeshes(interp, {{40002, 80000}});
   auto prop = interp.GetProperties();
@@ -254,8 +255,8 @@ TEST(Manifold, ManualSmooth) {
 
 TEST(Manifold, Csaszar) {
   Manifold csaszar = Manifold::Smooth(ImportMesh("data/Csaszar.ply"));
-  Manifold interp = csaszar.Refine(100);
-  ExpectMeshes(interp, {{70000, 140000}});
+  csaszar.Refine(100);
+  ExpectMeshes(csaszar, {{70000, 140000}});
   // auto prop = interp.GetProperties();
   // EXPECT_NEAR(prop.volume, 17, 0.1);
   // EXPECT_NEAR(prop.surfaceArea, 33, 0.1);
@@ -296,8 +297,8 @@ TEST(Manifold, MeshRelation) {
   Manifold csaszar(input);
   Related(csaszar, input);
   Mesh sortedInput = csaszar.Extract();
-  Manifold refined = csaszar.Refine(4);
-  Related(refined, sortedInput);
+  csaszar.Refine(4);
+  Related(csaszar, sortedInput);
 }
 
 /**
