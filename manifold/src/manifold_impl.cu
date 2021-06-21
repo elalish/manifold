@@ -53,6 +53,32 @@ __host__ __device__ int VertsPerTri(int edgeVerts) {
   return (edgeVerts * edgeVerts + edgeVerts) / 2;
 }
 
+__host__ __device__ float AtomicAddFloat(float& target, float add) {
+#ifdef __CUDA_ARCH__
+  return atomicAdd(&target, add);
+#else
+  float out;
+#pragma omp atomic capture
+  {
+    out = target;
+    target += add;
+  }
+  return out;
+#endif
+}
+
+__host__ __device__ void AtomicAddVec3(glm::vec3& target,
+                                       const glm::vec3& add) {
+  for (int i : {0, 1, 2}) {
+#ifdef __CUDA_ARCH__
+    atomicAdd(&target[i], add[i]);
+#else
+#pragma omp atomic
+    target[i] += add[i];
+#endif
+  }
+}
+
 /**
  * By using the closest axis-aligned projection to the normal instead of a
  * projection along the normal, we avoid introducing any rounding error.
@@ -310,11 +336,65 @@ struct SmoothBezier {
 struct SumDegree {
   float* totalAngle;
   float* degree;
-  const glm::vec3* vertPos;
+  const glm::vec4* halfedgeTangent;
   const Halfedge* halfedge;
 
-  __host__ __device__ void operator()(Halfedge edge) {
-    ++degree[edge.startVert];
+  __host__ __device__ void operator()(int edge) {
+    const Halfedge half = halfedge[edge];
+    AtomicAddFloat(degree[half.startVert], 1);
+    const glm::vec3 e0 = glm::normalize(glm::vec3(halfedgeTangent[edge]));
+    edge = NextHalfedge(half.pairedHalfedge);
+    const glm::vec3 e1 = glm::normalize(glm::vec3(halfedgeTangent[edge]));
+    AtomicAddFloat(totalAngle[half.startVert], acos(glm::dot(e0, e1)));
+  }
+};
+
+struct DistributeEdges {
+  glm::vec4* halfedgeTangent;
+  float* totalAngle;
+  const float* degree;
+  const Halfedge* halfedge;
+  const glm::vec3* vertNormal;
+
+  __host__ __device__ void operator()(const int start) {
+    const int vert = halfedge[start].startVert;
+    float circleSum = AtomicAddFloat(totalAngle[vert], 0.0f / 0.0f);
+    // Calculate based on a single halfedge per vertex
+    if (!isfinite(circleSum)) return;
+
+    float angleFactor = glm::two_pi<float>() / circleSum;
+    glm::vec3 tangent = glm::normalize(glm::vec3(halfedgeTangent[start]));
+
+    float totalShift = 0;
+    int degree = 0;
+    int current = start;
+    do {
+      ++degree;
+      const glm::vec3 e0 = glm::normalize(glm::vec3(halfedgeTangent[current]));
+      current = NextHalfedge(halfedge[current].pairedHalfedge);
+      const glm::vec3 e1 = glm::normalize(glm::vec3(halfedgeTangent[current]));
+      tangent = glm::rotate(tangent, angleFactor * acos(glm::dot(e0, e1)),
+                            vertNormal[vert]);
+
+      float shift = acos(glm::dot(tangent, e1));
+      if (glm::dot(glm::cross(e1, tangent), vertNormal[vert]) < 0) shift *= -1;
+
+      halfedgeTangent[current] =
+          glm::vec4(glm::rotate(glm::vec3(halfedgeTangent[current]), shift,
+                                vertNormal[vert]),
+                    halfedgeTangent[current].w);
+      totalShift += shift;
+    } while (current != start);
+
+    const float shift = totalShift / degree;
+    current = start;
+    do {
+      halfedgeTangent[current] =
+          glm::vec4(glm::rotate(glm::vec3(halfedgeTangent[current]), -1 * shift,
+                                vertNormal[vert]),
+                    halfedgeTangent[current].w);
+      current = NextHalfedge(halfedge[current].pairedHalfedge);
+    } while (current != start);
   }
 };
 
@@ -649,18 +729,6 @@ struct ReindexFace {
     }
   }
 };
-
-__host__ __device__ void AtomicAddVec3(glm::vec3& target,
-                                       const glm::vec3& add) {
-  for (int i : {0, 1, 2}) {
-#ifdef __CUDA_ARCH__
-    atomicAdd(&target[i], add[i]);
-#else
-#pragma omp atomic
-    target[i] += add[i];
-#endif
-  }
-}
 
 struct AssignNormals {
   glm::vec3* vertNormal;
@@ -1395,19 +1463,23 @@ void Manifold::Impl::CreateTangents(const SmoothOptions& options) {
   const int numHalfedge = halfedge_.size();
   halfedgeTangent_.resize(numHalfedge);
 
-  if (options.triSharpness.empty()) {
-    thrust::for_each_n(zip(halfedgeTangent_.begin(), halfedge_.cbegin()),
-                       numHalfedge,
-                       SmoothBezier({vertPos_.cptrD(), faceNormal_.cptrD(),
-                                     vertNormal_.cptrD(), halfedge_.cptrD()}));
+  thrust::for_each_n(zip(halfedgeTangent_.begin(), halfedge_.cbegin()),
+                     numHalfedge,
+                     SmoothBezier({vertPos_.cptrD(), faceNormal_.cptrD(),
+                                   vertNormal_.cptrD(), halfedge_.cptrD()}));
 
-    if (options.distributeVertAngles) {
-      VecDH<float> totalAngle(NumVert(), 0);
-      VecDH<float> degree(NumVert(), 0);
-      thrust::for_each(halfedge_.begin(), halfedge_.end(),
-                       SumDegree({totalAngle.ptrD(), degree.ptrD(),
-                                  vertPos_.cptrD(), halfedge_.cptrD()}));
-    }
+  if (options.distributeVertAngles) {
+    VecDH<float> totalAngle(NumVert(), 0);
+    VecDH<float> degree(NumVert(), 0);
+    thrust::for_each_n(
+        countAt(0), halfedge_.size(),
+        SumDegree({totalAngle.ptrD(), degree.ptrD(), halfedgeTangent_.cptrD(),
+                   halfedge_.cptrD()}));
+    thrust::for_each_n(
+        countAt(0), halfedge_.size(),
+        DistributeEdges({halfedgeTangent_.ptrD(), totalAngle.ptrD(),
+                         degree.cptrD(), halfedge_.cptrD(),
+                         vertNormal_.cptrD()}));
   }
 }
 

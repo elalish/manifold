@@ -110,12 +110,6 @@ Manifold Manifold::Smooth(const Mesh& mesh, const SmoothOptions& options) {
                 "when supplying beziers, the normal constructor should be used "
                 "rather than Smooth().");
 
-  ALWAYS_ASSERT(
-      options.triSharpness.empty() ||
-          options.triSharpness.size() == mesh.triVerts.size(),
-      std::runtime_error,
-      "triSharpness vector must equal the length of the triVerts vector.");
-
   Manifold manifold(mesh);
   manifold.pImpl_->CreateTangents(options);
   return manifold;
