@@ -256,30 +256,35 @@ TEST(Manifold, ManualSmooth) {
 TEST(Manifold, Csaszar) {
   Manifold csaszar =
       Manifold::Smooth(ImportMesh("data/Csaszar.ply"), {true, {}});
-  csaszar.Refine(100);
-  ExpectMeshes(csaszar, {{70000, 140000}});
+  // csaszar.Refine(100);
+  // ExpectMeshes(csaszar, {{70000, 140000}});
   // auto prop = interp.GetProperties();
   // EXPECT_NEAR(prop.volume, 17, 0.1);
   // EXPECT_NEAR(prop.surfaceArea, 33, 0.1);
 
   const Mesh out = csaszar.Extract();
+
+  Dump(out.vertPos);
+  // Dump(out.triVerts);
+  // Dump(out.halfedgeTangent);
+
   ExportOptions options;
   options.faceted = false;
   options.mat.roughness = 0.1;
 
-  options.mat.vertColor.resize(csaszar.NumVert());
-  MeshRelation rel = csaszar.GetMeshRelation();
-  const glm::vec4 blue(0, 0, 1, 1);
-  const glm::vec4 yellow(1, 1, 0, 1);
-  for (int tri = 0; tri < csaszar.NumTri(); ++tri) {
-    for (int i : {0, 1, 2}) {
-      const glm::vec3& uvw = rel.barycentric[rel.triBary[tri].vertBary[i]];
-      const float alpha = glm::min(uvw[0], glm::min(uvw[1], uvw[2]));
-      options.mat.vertColor[out.triVerts[tri][i]] =
-          glm::mix(yellow, blue, glm::smoothstep(0.0f, 0.2f, alpha));
-    }
-  }
-  ExportMesh("smoothCsaszar.gltf", out, options);
+  // options.mat.vertColor.resize(csaszar.NumVert());
+  // MeshRelation rel = csaszar.GetMeshRelation();
+  // const glm::vec4 blue(0, 0, 1, 1);
+  // const glm::vec4 yellow(1, 1, 0, 1);
+  // for (int tri = 0; tri < csaszar.NumTri(); ++tri) {
+  //   for (int i : {0, 1, 2}) {
+  //     const glm::vec3& uvw = rel.barycentric[rel.triBary[tri].vertBary[i]];
+  //     const float alpha = glm::min(uvw[0], glm::min(uvw[1], uvw[2]));
+  //     options.mat.vertColor[out.triVerts[tri][i]] =
+  //         glm::mix(yellow, blue, glm::smoothstep(0.0f, 0.2f, alpha));
+  //   }
+  // }
+  // ExportMesh("smoothCsaszar.gltf", out, options);
 }
 
 /**

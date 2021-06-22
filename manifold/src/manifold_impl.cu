@@ -34,9 +34,18 @@ using namespace manifold;
 
 constexpr uint32_t kNoCode = 0xFFFFFFFFu;
 
+__host__ __device__ glm::vec3 SafeNormalize(glm::vec3 v) {
+  v = glm::normalize(v);
+  return isfinite(v.x) ? v : glm::vec3(0);
+}
+
 __host__ __device__ glm::vec3 OrthogonalTo(glm::vec3 in, glm::vec3 ref) {
   in -= glm::dot(in, ref) * ref;
   return in;
+}
+
+__host__ __device__ float AngleBetween(glm::vec3 a, glm::vec3 b) {
+  return glm::acos(glm::min(1.0f, glm::max(-1.0f, glm::dot(a, b))));
 }
 
 __host__ __device__ int NextHalfedge(int current) {
@@ -316,12 +325,17 @@ struct SmoothBezier {
     const glm::vec3 edgeVec = vertPos[edge.endVert] - startV;
     const glm::vec3 edgePlane =
         triNormal[edge.face] - triNormal[halfedge[edge.pairedHalfedge].face];
-    const glm::vec3 dir =
-        glm::normalize(glm::length(edgePlane) < kTolerance
-                           ? OrthogonalTo(edgeVec, vertNormal[edge.startVert])
-                           : glm::cross(edgePlane, vertNormal[edge.startVert]));
+    glm::vec3 dir = glm::normalize(
+        glm::cross(glm::length(edgePlane) > kTolerance
+                       ? edgePlane
+                       : glm::cross(edgeVec, triNormal[edge.face]),
+                   vertNormal[edge.startVert]));
 
-    const float weight = glm::dot(dir, glm::normalize(edgeVec));
+    float weight = glm::dot(dir, glm::normalize(edgeVec));
+    if (weight < 0) {
+      weight *= -1;
+      dir *= -1;
+    }
     // Quadratic weighted bezier for circular interpolation
     const glm::vec4 bz2 =
         weight *
@@ -335,26 +349,26 @@ struct SmoothBezier {
 
 struct SumDegree {
   float* totalAngle;
-  float* degree;
-  const glm::vec4* halfedgeTangent;
+  const glm::vec3* vertPos;
   const Halfedge* halfedge;
 
   __host__ __device__ void operator()(int edge) {
-    const Halfedge half = halfedge[edge];
-    AtomicAddFloat(degree[half.startVert], 1);
-    const glm::vec3 e0 = glm::normalize(glm::vec3(halfedgeTangent[edge]));
-    edge = NextHalfedge(half.pairedHalfedge);
-    const glm::vec3 e1 = glm::normalize(glm::vec3(halfedgeTangent[edge]));
-    AtomicAddFloat(totalAngle[half.startVert], acos(glm::dot(e0, e1)));
+    Halfedge half = halfedge[edge];
+    const glm::vec3 e0 =
+        SafeNormalize(vertPos[half.endVert] - vertPos[half.startVert]);
+    half = halfedge[NextHalfedge(half.pairedHalfedge)];
+    const glm::vec3 e1 =
+        SafeNormalize(vertPos[half.endVert] - vertPos[half.startVert]);
+    AtomicAddFloat(totalAngle[half.startVert], AngleBetween(e0, e1));
   }
 };
 
 struct DistributeEdges {
   glm::vec4* halfedgeTangent;
   float* totalAngle;
-  const float* degree;
-  const Halfedge* halfedge;
+  const glm::vec3* vertPos;
   const glm::vec3* vertNormal;
+  const Halfedge* halfedge;
 
   __host__ __device__ void operator()(const int start) {
     const int vert = halfedge[start].startVert;
@@ -362,22 +376,31 @@ struct DistributeEdges {
     // Calculate based on a single halfedge per vertex
     if (!isfinite(circleSum)) return;
 
-    float angleFactor = glm::two_pi<float>() / circleSum;
-    glm::vec3 tangent = glm::normalize(glm::vec3(halfedgeTangent[start]));
+    float angleFactor = -1 * glm::two_pi<float>() / circleSum;
+    glm::vec3 tangent = SafeNormalize(glm::vec3(halfedgeTangent[start]));
 
     float totalShift = 0;
     int degree = 0;
     int current = start;
     do {
       ++degree;
-      const glm::vec3 e0 = glm::normalize(glm::vec3(halfedgeTangent[current]));
+      Halfedge half = halfedge[current];
+      const glm::vec3 e0 =
+          SafeNormalize(vertPos[half.endVert] - vertPos[half.startVert]);
       current = NextHalfedge(halfedge[current].pairedHalfedge);
-      const glm::vec3 e1 = glm::normalize(glm::vec3(halfedgeTangent[current]));
-      tangent = glm::rotate(tangent, angleFactor * acos(glm::dot(e0, e1)),
-                            vertNormal[vert]);
+      half = halfedge[current];
+      const glm::vec3 e1 =
+          SafeNormalize(vertPos[half.endVert] - vertPos[half.startVert]);
+      tangent = SafeNormalize(glm::rotate(
+          tangent, angleFactor * AngleBetween(e0, e1), vertNormal[vert]));
 
-      float shift = acos(glm::dot(tangent, e1));
-      if (glm::dot(glm::cross(e1, tangent), vertNormal[vert]) < 0) shift *= -1;
+      const glm::vec3 oldTangent =
+          SafeNormalize(glm::vec3(halfedgeTangent[current]));
+      float shift = AngleBetween(tangent, oldTangent);
+      if (glm::dot(glm::cross(oldTangent, tangent), vertNormal[vert]) < 0)
+        shift *= -1;
+
+      printf("vert = %d, shift = %g\n", vert, shift);
 
       halfedgeTangent[current] =
           glm::vec4(glm::rotate(glm::vec3(halfedgeTangent[current]), shift,
@@ -387,6 +410,7 @@ struct DistributeEdges {
     } while (current != start);
 
     const float shift = totalShift / degree;
+    printf("vert = %d, totalShift = %g\n", vert, shift);
     current = start;
     do {
       halfedgeTangent[current] =
@@ -437,11 +461,6 @@ struct InterpTri {
 
   __host__ __device__ glm::vec3 HNormalize(glm::vec4 v) const {
     return glm::vec3(v) / v.w;
-  }
-
-  __host__ __device__ glm::vec3 SafeNormalize(glm::vec3 v) const {
-    v = glm::normalize(v);
-    return isfinite(v.x) ? v : glm::vec3(0);
   }
 
   __host__ __device__ glm::vec4 Bezier(glm::vec3 point,
@@ -1468,19 +1487,22 @@ void Manifold::Impl::CreateTangents(const SmoothOptions& options) {
                      SmoothBezier({vertPos_.cptrD(), faceNormal_.cptrD(),
                                    vertNormal_.cptrD(), halfedge_.cptrD()}));
 
+  halfedgeTangent_.Dump();
+
   if (options.distributeVertAngles) {
     VecDH<float> totalAngle(NumVert(), 0);
-    VecDH<float> degree(NumVert(), 0);
     thrust::for_each_n(
         countAt(0), halfedge_.size(),
-        SumDegree({totalAngle.ptrD(), degree.ptrD(), halfedgeTangent_.cptrD(),
-                   halfedge_.cptrD()}));
+        SumDegree({totalAngle.ptrD(), vertPos_.cptrD(), halfedge_.cptrD()}));
+    totalAngle.Dump();
     thrust::for_each_n(
         countAt(0), halfedge_.size(),
         DistributeEdges({halfedgeTangent_.ptrD(), totalAngle.ptrD(),
-                         degree.cptrD(), halfedge_.cptrD(),
-                         vertNormal_.cptrD()}));
+                         vertPos_.cptrD(), vertNormal_.cptrD(),
+                         halfedge_.cptrD()}));
   }
+  halfedgeTangent_.Dump();
+  halfedge_.Dump();
 }
 
 /**
@@ -1744,7 +1766,8 @@ void Manifold::Impl::GatherFaces(const Impl& old,
  * recalculation.
  */
 void Manifold::Impl::CalculateNormals() {
-  vertNormal_.resize(NumVert(), glm::vec3(0.0f));
+  vertNormal_.resize(NumVert());
+  thrust::fill(vertNormal_.begin(), vertNormal_.end(), glm::vec3(0));
   bool calculateTriNormal = false;
   if (faceNormal_.size() != NumTri()) {
     faceNormal_.resize(NumTri());
