@@ -323,19 +323,13 @@ struct SmoothBezier {
 
     const glm::vec3 startV = vertPos[edge.startVert];
     const glm::vec3 edgeVec = vertPos[edge.endVert] - startV;
-    const glm::vec3 edgePlane =
-        triNormal[edge.face] - triNormal[halfedge[edge.pairedHalfedge].face];
-    glm::vec3 dir = glm::normalize(
-        glm::cross(glm::length(edgePlane) > kTolerance
-                       ? edgePlane
-                       : glm::cross(edgeVec, triNormal[edge.face]),
-                   vertNormal[edge.startVert]));
+    const glm::vec3 edgeNormal =
+        (triNormal[edge.face] + triNormal[halfedge[edge.pairedHalfedge].face]) /
+        2.0f;
+    glm::vec3 dir = glm::normalize(glm::cross(glm::cross(edgeNormal, edgeVec),
+                                              vertNormal[edge.startVert]));
 
-    float weight = glm::dot(dir, glm::normalize(edgeVec));
-    if (weight < 0) {
-      weight *= -1;
-      dir *= -1;
-    }
+    const float weight = glm::abs(glm::dot(dir, glm::normalize(edgeVec)));
     // Quadratic weighted bezier for circular interpolation
     const glm::vec4 bz2 =
         weight *
@@ -400,8 +394,6 @@ struct DistributeEdges {
       if (glm::dot(glm::cross(oldTangent, tangent), vertNormal[vert]) < 0)
         shift *= -1;
 
-      printf("vert = %d, shift = %g\n", vert, shift);
-
       halfedgeTangent[current] =
           glm::vec4(glm::rotate(glm::vec3(halfedgeTangent[current]), shift,
                                 vertNormal[vert]),
@@ -410,7 +402,6 @@ struct DistributeEdges {
     } while (current != start);
 
     const float shift = totalShift / degree;
-    printf("vert = %d, totalShift = %g\n", vert, shift);
     current = start;
     do {
       halfedgeTangent[current] =
@@ -1487,22 +1478,17 @@ void Manifold::Impl::CreateTangents(const SmoothOptions& options) {
                      SmoothBezier({vertPos_.cptrD(), faceNormal_.cptrD(),
                                    vertNormal_.cptrD(), halfedge_.cptrD()}));
 
-  halfedgeTangent_.Dump();
-
   if (options.distributeVertAngles) {
     VecDH<float> totalAngle(NumVert(), 0);
     thrust::for_each_n(
         countAt(0), halfedge_.size(),
         SumDegree({totalAngle.ptrD(), vertPos_.cptrD(), halfedge_.cptrD()}));
-    totalAngle.Dump();
     thrust::for_each_n(
         countAt(0), halfedge_.size(),
         DistributeEdges({halfedgeTangent_.ptrD(), totalAngle.ptrD(),
                          vertPos_.cptrD(), vertNormal_.cptrD(),
                          halfedge_.cptrD()}));
   }
-  halfedgeTangent_.Dump();
-  halfedge_.Dump();
 }
 
 /**
