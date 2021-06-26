@@ -1,4 +1,4 @@
-// Copyright 2020 Emmett Lalish
+// Copyright 2021 Emmett Lalish
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,7 +17,19 @@
 
 namespace manifold {
 
+struct Material {
+  float roughness = 1;
+  float metalness = 0;
+  glm::vec4 color = glm::vec4(1.0f);
+  std::vector<glm::vec4> vertColor;
+};
+
+struct ExportOptions {
+  bool faceted = true;
+  Material mat = {};
+};
+
 Mesh ImportMesh(const std::string& filename);
-void ExportMesh(const std::string& filename, const Mesh&);
+void ExportMesh(const std::string& filename, const Mesh&, const ExportOptions&);
 
 }  // namespace manifold

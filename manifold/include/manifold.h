@@ -31,7 +31,6 @@ class Manifold {
   };
   static Manifold Smooth(const Mesh&, const SmoothOptions& = {false, {}});
   static Manifold Tetrahedron();
-  static Manifold Octahedron();
   static Manifold Cube(glm::vec3 size = glm::vec3(1.0f), bool center = false);
   static Manifold Cylinder(float height, float radiusLow,
                            float radiusHigh = -1.0f, int circularSegments = 0,
@@ -54,7 +53,7 @@ class Manifold {
   static int GetCircularSegments(float radius);
 
   // Information
-  Mesh Extract(bool includeNormals = false) const;
+  Mesh Extract() const;
   bool IsEmpty() const;
   int NumVert() const;
   int NumEdge() const;
@@ -75,9 +74,7 @@ class Manifold {
                    float zDegrees = 0.0f);
   Manifold& Transform(const glm::mat4x3&);
   Manifold& Warp(std::function<void(glm::vec3&)>);
-
-  // Refinement
-  Manifold Refine(int) const;
+  Manifold& Refine(int);
   // Manifold RefineToLength(float) const;
   // Manifold RefineToPrecision(float) const;
 

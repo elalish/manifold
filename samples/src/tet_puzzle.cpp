@@ -22,8 +22,8 @@ Manifold TetPuzzle(float edgeLength, float gap, int nDivisions) {
   Polygons box;
   box.push_back({{glm::vec2(2, -2), 0}, {glm::vec2(2, 2), 1}});
 
-  for (float i = 0; i <= nDivisions; ++i) {
-    box[0].push_back({glm::vec2(gap / 2, 2 - 4 * i / nDivisions), 2 + i});
+  for (int i = 0; i <= nDivisions; ++i) {
+    box[0].push_back({glm::vec2(gap / 2, 2 - i * 4.0f / nDivisions), 2 + i});
   }
 
   Manifold screw = Manifold::Extrude(box, 2, nDivisions, 270)
