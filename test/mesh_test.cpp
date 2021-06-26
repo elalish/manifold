@@ -60,7 +60,7 @@ void Related(const Manifold& out, const Mesh& input) {
   }
 }
 
-void ExpectMeshes(Manifold& manifold,
+void ExpectMeshes(const Manifold& manifold,
                   const std::vector<std::pair<int, int>>& numVertTri) {
   EXPECT_TRUE(manifold.IsManifold());
   EXPECT_TRUE(manifold.MatchesTriNormals());
@@ -99,7 +99,7 @@ Polygons SquareHole(float xOffset = 0.0) {
 
 TEST(MeshIO, ReadWrite) {
   Mesh mesh = ImportMesh("data/gyroidpuzzle.ply");
-  ExportMesh("data/gyroidpuzzle1.ply", mesh);
+  ExportMesh("data/gyroidpuzzle1.ply", mesh, {});
   Mesh mesh_out = ImportMesh("data/gyroidpuzzle1.ply");
   Identical(mesh, mesh_out);
 }
@@ -139,7 +139,7 @@ TEST(Manifold, Decompose) {
   std::vector<Manifold> meshList;
   meshList.push_back(Manifold::Tetrahedron());
   meshList.push_back(Manifold::Cube());
-  meshList.push_back(Manifold::Octahedron());
+  meshList.push_back(Manifold::Sphere(1, 4));
   Manifold meshes = Manifold::Compose(meshList);
 
   ExpectMeshes(meshes, {{8, 12}, {6, 8}, {4, 4}});
@@ -156,7 +156,7 @@ TEST(Manifold, Sphere) {
 }
 
 TEST(Manifold, Normals) {
-  Mesh cube = Manifold::Cube(glm::vec3(1), true).Extract(true);
+  Mesh cube = Manifold::Cube(glm::vec3(1), true).Extract();
   const int nVert = cube.vertPos.size();
   for (int i = 0; i < nVert; ++i) {
     glm::vec3 v = glm::normalize(cube.vertPos[i]);
@@ -208,22 +208,78 @@ TEST(Manifold, Revolve2) {
 TEST(Manifold, Smooth) {
   Manifold tet = Manifold::Tetrahedron();
   Manifold smooth = Manifold::Smooth(tet.Extract());
-  Manifold interp = smooth.Refine(100);
-  ExpectMeshes(interp, {{20002, 40000}});
+  smooth.Refine(100);
+  ExpectMeshes(smooth, {{20002, 40000}});
+  auto prop = smooth.GetProperties();
+  EXPECT_NEAR(prop.volume, 17.38, 0.1);
+  EXPECT_NEAR(prop.surfaceArea, 33.38, 0.1);
+  // ExportMesh("smoothTet.gltf", smooth.Extract());
+}
+
+TEST(Manifold, ManualSmooth) {
+  // Unit Octahedron
+  const Mesh oct = Manifold::Sphere(1, 4).Extract();
+  Mesh smooth = Manifold::Smooth(oct).Extract();
+  // Sharpen the edge from vert 4 to 5
+  smooth.halfedgeTangent[6] = {0, 0, 0, 1};
+  smooth.halfedgeTangent[22] = {0, 0, 0, 1};
+  smooth.halfedgeTangent[16] = {0, 0, 0, 1};
+  smooth.halfedgeTangent[18] = {0, 0, 0, 1};
+  Manifold interp(smooth);
+  interp.Refine(100);
+
+  ExpectMeshes(interp, {{40002, 80000}});
   auto prop = interp.GetProperties();
-  EXPECT_NEAR(prop.volume, 17, 0.1);
-  EXPECT_NEAR(prop.surfaceArea, 33, 0.1);
-  // ExportMesh("smoothTet.gltf", interp.Extract());
+  EXPECT_NEAR(prop.volume, 3.53, 0.01);
+  EXPECT_NEAR(prop.surfaceArea, 11.39, 0.01);
+
+  const Mesh out = interp.Extract();
+  ExportOptions options;
+  options.faceted = false;
+  options.mat.roughness = 0.1;
+
+  options.mat.vertColor.resize(interp.NumVert());
+  MeshRelation rel = interp.GetMeshRelation();
+  const glm::vec4 red(1, 0, 0, 1);
+  const glm::vec4 purple(1, 0, 1, 1);
+  for (int tri = 0; tri < interp.NumTri(); ++tri) {
+    for (int i : {0, 1, 2}) {
+      const glm::vec3& uvw = rel.barycentric[rel.triBary[tri].vertBary[i]];
+      const float alpha = glm::min(uvw[0], glm::min(uvw[1], uvw[2]));
+      options.mat.vertColor[out.triVerts[tri][i]] =
+          glm::mix(purple, red, glm::smoothstep(0.0f, 0.2f, alpha));
+    }
+  }
+  ExportMesh("sharpenedSphere.gltf", out, options);
 }
 
 TEST(Manifold, Csaszar) {
-  Manifold csaszar = Manifold::Smooth(ImportMesh("data/Csaszar.ply"));
-  Manifold interp = csaszar.Refine(100);
-  ExpectMeshes(interp, {{70000, 140000}});
-  // auto prop = interp.GetProperties();
-  // EXPECT_NEAR(prop.volume, 17, 0.1);
-  // EXPECT_NEAR(prop.surfaceArea, 33, 0.1);
-  // ExportMesh("smoothCsaszar.gltf", interp.Extract());
+  Manifold csaszar =
+      Manifold::Smooth(ImportMesh("data/Csaszar.ply"), {true, {}});
+  csaszar.Refine(100);
+  ExpectMeshes(csaszar, {{70000, 140000}});
+  auto prop = csaszar.GetProperties();
+  EXPECT_NEAR(prop.volume, 83546, 1);
+  EXPECT_NEAR(prop.surfaceArea, 12429, 1);
+
+  // const Mesh out = csaszar.Extract();
+  // ExportOptions options;
+  // options.faceted = false;
+  // options.mat.roughness = 0.1;
+
+  // options.mat.vertColor.resize(csaszar.NumVert());
+  // MeshRelation rel = csaszar.GetMeshRelation();
+  // const glm::vec4 blue(0, 0, 1, 1);
+  // const glm::vec4 yellow(1, 1, 0, 1);
+  // for (int tri = 0; tri < csaszar.NumTri(); ++tri) {
+  //   for (int i : {0, 1, 2}) {
+  //     const glm::vec3& uvw = rel.barycentric[rel.triBary[tri].vertBary[i]];
+  //     const float alpha = glm::min(uvw[0], glm::min(uvw[1], uvw[2]));
+  //     options.mat.vertColor[out.triVerts[tri][i]] =
+  //         glm::mix(yellow, blue, glm::smoothstep(0.0f, 0.2f, alpha));
+  //   }
+  // }
+  // ExportMesh("smoothCsaszar.gltf", out, options);
 }
 
 /**
@@ -260,8 +316,8 @@ TEST(Manifold, MeshRelation) {
   Manifold csaszar(input);
   Related(csaszar, input);
   Mesh sortedInput = csaszar.Extract();
-  Manifold refined = csaszar.Refine(4);
-  Related(refined, sortedInput);
+  csaszar.Refine(4);
+  Related(csaszar, sortedInput);
 }
 
 /**
@@ -345,7 +401,7 @@ TEST(Boolean, FaceUnion) {
   auto prop = cubes.GetProperties();
   EXPECT_NEAR(prop.volume, 2, 1e-5);
   EXPECT_NEAR(prop.surfaceArea, 10, 1e-5);
-  // ExportMesh("faceUnion.gltf", cubes.Extract());
+  // ExportMesh("faceUnion.gltf", cubes.Extract(), {});
 }
 
 TEST(Boolean, EdgeUnion) {
@@ -376,7 +432,7 @@ TEST(Boolean, CornerUnion) {
  */
 TEST(Boolean, Split) {
   Manifold cube = Manifold::Cube(glm::vec3(2.0f), true);
-  Manifold oct = Manifold::Octahedron();
+  Manifold oct = Manifold::Sphere(1, 4);
   oct.Translate(glm::vec3(0.0f, 0.0f, 1.0f));
   std::pair<Manifold, Manifold> splits = cube.Split(oct);
   EXPECT_TRUE(splits.first.IsManifold());
@@ -526,7 +582,7 @@ TEST(Boolean, Gyroid) {
   Manifold gyroid2 = gyroid;
   gyroid2.Translate(glm::vec3(5.0f));
   Manifold result = gyroid + gyroid2;
-  // ExportMesh("gyroidUnion.gltf", result.Extract());
+  // ExportMesh("gyroidUnion.gltf", result.Extract(), {});
 
   EXPECT_TRUE(result.IsManifold());
   EXPECT_TRUE(result.MatchesTriNormals());
