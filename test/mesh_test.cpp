@@ -256,21 +256,16 @@ TEST(Manifold, ManualSmooth) {
 TEST(Manifold, Csaszar) {
   Manifold csaszar =
       Manifold::Smooth(ImportMesh("data/Csaszar.ply"), {true, {}});
-  // csaszar.Refine(100);
-  // ExpectMeshes(csaszar, {{70000, 140000}});
-  // auto prop = interp.GetProperties();
-  // EXPECT_NEAR(prop.volume, 17, 0.1);
-  // EXPECT_NEAR(prop.surfaceArea, 33, 0.1);
+  csaszar.Refine(100);
+  ExpectMeshes(csaszar, {{70000, 140000}});
+  auto prop = csaszar.GetProperties();
+  EXPECT_NEAR(prop.volume, 83546, 1);
+  EXPECT_NEAR(prop.surfaceArea, 12429, 1);
 
-  const Mesh out = csaszar.Extract();
-
-  Dump(out.vertPos);
-  // Dump(out.triVerts);
-  // Dump(out.halfedgeTangent);
-
-  ExportOptions options;
-  options.faceted = false;
-  options.mat.roughness = 0.1;
+  // const Mesh out = csaszar.Extract();
+  // ExportOptions options;
+  // options.faceted = false;
+  // options.mat.roughness = 0.1;
 
   // options.mat.vertColor.resize(csaszar.NumVert());
   // MeshRelation rel = csaszar.GetMeshRelation();
