@@ -50,7 +50,7 @@ struct Manifold::Impl {
   void Update();
   void ApplyTransform() const;
   void ApplyTransform();
-  void CreateTangents(const SmoothOptions&);
+  void CreateTangents(const std::vector<Smoothness>&);
   void Subdivide(int n);
   void Refine(int n);
 

@@ -44,10 +44,6 @@ __host__ __device__ glm::vec3 OrthogonalTo(glm::vec3 in, glm::vec3 ref) {
   return in;
 }
 
-__host__ __device__ float AngleBetween(glm::vec3 a, glm::vec3 b) {
-  return glm::acos(glm::min(1.0f, glm::max(-1.0f, glm::dot(a, b))));
-}
-
 __host__ __device__ int NextHalfedge(int current) {
   ++current;
   if (current % 3 == 0) current -= 3;
@@ -327,84 +323,11 @@ struct SmoothBezier {
   }
 };
 
-struct SumDegree {
-  float* totalAngle;
-  const glm::vec3* vertPos;
-  const Halfedge* halfedge;
-
-  __host__ __device__ void operator()(int edge) {
-    Halfedge half = halfedge[edge];
-    const glm::vec3 e0 =
-        SafeNormalize(vertPos[half.endVert] - vertPos[half.startVert]);
-    half = halfedge[NextHalfedge(half.pairedHalfedge)];
-    const glm::vec3 e1 =
-        SafeNormalize(vertPos[half.endVert] - vertPos[half.startVert]);
-    AtomicAdd(totalAngle[half.startVert], AngleBetween(e0, e1));
-  }
-};
-
-struct DistributeEdges {
-  glm::vec4* halfedgeTangent;
-  float* totalAngle;
-  const glm::vec3* vertPos;
-  const glm::vec3* vertNormal;
-  const Halfedge* halfedge;
-
-  __host__ __device__ void operator()(const int start) {
-    const int vert = halfedge[start].startVert;
-    float circleSum = AtomicAdd(totalAngle[vert], 0.0f / 0.0f);
-    // Calculate based on a single halfedge per vertex
-    if (!isfinite(circleSum)) return;
-
-    float angleFactor = -1 * glm::two_pi<float>() / circleSum;
-    glm::vec3 tangent = SafeNormalize(glm::vec3(halfedgeTangent[start]));
-
-    float totalShift = 0;
-    int degree = 0;
-    int current = start;
-    do {
-      ++degree;
-      Halfedge half = halfedge[current];
-      const glm::vec3 e0 =
-          SafeNormalize(vertPos[half.endVert] - vertPos[half.startVert]);
-      current = NextHalfedge(halfedge[current].pairedHalfedge);
-      half = halfedge[current];
-      const glm::vec3 e1 =
-          SafeNormalize(vertPos[half.endVert] - vertPos[half.startVert]);
-      tangent = SafeNormalize(glm::rotate(
-          tangent, angleFactor * AngleBetween(e0, e1), vertNormal[vert]));
-
-      const glm::vec3 oldTangent =
-          SafeNormalize(glm::vec3(halfedgeTangent[current]));
-      float shift = AngleBetween(tangent, oldTangent);
-      if (glm::dot(glm::cross(oldTangent, tangent), vertNormal[vert]) < 0)
-        shift *= -1;
-
-      halfedgeTangent[current] =
-          glm::vec4(glm::rotate(glm::vec3(halfedgeTangent[current]), shift,
-                                vertNormal[vert]),
-                    halfedgeTangent[current].w);
-      totalShift += shift;
-    } while (current != start);
-
-    const float shift = totalShift / degree;
-    current = start;
-    do {
-      halfedgeTangent[current] =
-          glm::vec4(glm::rotate(glm::vec3(halfedgeTangent[current]), -1 * shift,
-                                vertNormal[vert]),
-                    halfedgeTangent[current].w);
-      current = NextHalfedge(halfedge[current].pairedHalfedge);
-    } while (current != start);
-  }
-};
-
 struct Sharpen {
   glm::vec4* tangent;
   const Halfedge* halfedge;
 
-  __host__ __device__ void operator()(
-      Manifold::SmoothOptions::Smoothness smoothness) {}
+  __host__ __device__ void operator()(Manifold::Smoothness smoothness) {}
 };
 
 struct TriBary2Vert {
@@ -1468,7 +1391,8 @@ void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge) {
   CreateAndFixHalfedges(triVertsOut);
 }
 
-void Manifold::Impl::CreateTangents(const SmoothOptions& options) {
+void Manifold::Impl::CreateTangents(
+    const std::vector<Smoothness>& smoothedEdges) {
   const int numHalfedge = halfedge_.size();
   halfedgeTangent_.resize(numHalfedge);
 
@@ -1477,21 +1401,9 @@ void Manifold::Impl::CreateTangents(const SmoothOptions& options) {
                      SmoothBezier({vertPos_.cptrD(), faceNormal_.cptrD(),
                                    vertNormal_.cptrD(), halfedge_.cptrD()}));
 
-  if (options.distributeVertAngles) {
-    VecDH<float> totalAngle(NumVert(), 0);
-    thrust::for_each_n(
-        countAt(0), halfedge_.size(),
-        SumDegree({totalAngle.ptrD(), vertPos_.cptrD(), halfedge_.cptrD()}));
-    thrust::for_each_n(
-        countAt(0), halfedge_.size(),
-        DistributeEdges({halfedgeTangent_.ptrD(), totalAngle.ptrD(),
-                         vertPos_.cptrD(), vertNormal_.cptrD(),
-                         halfedge_.cptrD()}));
-  }
-
-  if (!options.smoothedEdges.empty()) {
-    VecDH<SmoothOptions::Smoothness> smoothedEdges(options.smoothedEdges);
-    thrust::for_each(smoothedEdges.beginD(), smoothedEdges.endD(),
+  if (!smoothedEdges.empty()) {
+    VecDH<Smoothness> smoothed(smoothedEdges);
+    thrust::for_each(smoothed.beginD(), smoothed.endD(),
                      Sharpen({halfedgeTangent_.ptrD(), halfedge_.cptrD()}));
   }
 }

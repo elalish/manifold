@@ -25,15 +25,12 @@ class Manifold {
   // Creation
   Manifold();
   Manifold(const Mesh&);
-  struct SmoothOptions {
-    bool distributeVertAngles;
-    struct Smoothness {
-      int halfedge;
-      float smoothness;
-    };
-    const std::vector<Smoothness>& smoothedEdges;
+  struct Smoothness {
+    int halfedge;
+    float smoothness;
   };
-  static Manifold Smooth(const Mesh&, const SmoothOptions& = {false, {}});
+  static Manifold Smooth(const Mesh&,
+                         const std::vector<Smoothness>& smoothedEdges = {});
   static Manifold Tetrahedron();
   static Manifold Cube(glm::vec3 size = glm::vec3(1.0f), bool center = false);
   static Manifold Cylinder(float height, float radiusLow,
