@@ -27,7 +27,11 @@ class Manifold {
   Manifold(const Mesh&);
   struct SmoothOptions {
     bool distributeVertAngles;
-    const std::vector<glm::vec3>& triSharpness;
+    struct Smoothness {
+      int halfedge;
+      float smoothness;
+    };
+    const std::vector<Smoothness>& smoothedEdges;
   };
   static Manifold Smooth(const Mesh&, const SmoothOptions& = {false, {}});
   static Manifold Tetrahedron();

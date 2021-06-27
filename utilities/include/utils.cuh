@@ -97,6 +97,21 @@ thrust::counting_iterator<T> countAt(T i) {
   return thrust::make_counting_iterator(i);
 }
 
+template <typename T>
+__host__ __device__ T AtomicAdd(T& target, T add) {
+#ifdef __CUDA_ARCH__
+  return atomicAdd(&target, add);
+#else
+  float out;
+#pragma omp atomic capture
+  {
+    out = target;
+    target += add;
+  }
+  return out;
+#endif
+}
+
 // Copied from
 // https://github.com/thrust/thrust/blob/master/examples/strided_range.cu
 template <typename Iterator>

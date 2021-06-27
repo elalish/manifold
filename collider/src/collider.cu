@@ -31,17 +31,6 @@ __host__ __device__ int Internal2Node(int internal) { return internal * 2 + 1; }
 __host__ __device__ int Node2Leaf(int node) { return node / 2; }
 __host__ __device__ int Leaf2Node(int leaf) { return leaf * 2; }
 
-__host__ __device__ int AtomicIncrement(int* ptr) {
-#ifdef __CUDA_ARCH__
-  return atomicAdd(ptr, 1);
-#else
-  int out;
-#pragma omp atomic capture
-  out = (*ptr)++;
-  return out;
-#endif
-}
-
 struct CreateRadixTree {
   int* nodeParent_;
   thrust::pair<int, int>* internalChildren_;
@@ -141,7 +130,7 @@ struct FindCollisions {
 
     bool overlaps = nodeBBox_[node].DoesOverlap(queryObj);
     if (overlaps && IsLeaf(node)) {
-      int pos = AtomicIncrement(numOverlaps_);
+      int pos = AtomicAdd(*numOverlaps_, 1);
       if (pos >= maxOverlaps_)
         return -1;  // Didn't allocate enough memory; bail out
       querryTri_.first[pos] = queryIdx;
@@ -191,7 +180,7 @@ struct BuildInternalBoxes {
     do {
       node = nodeParent_[node];
       int internal = Node2Internal(node);
-      if (AtomicIncrement(&counter_[internal]) == 0) return;
+      if (AtomicAdd(counter_[internal], 1) == 0) return;
       nodeBBox_[node] = nodeBBox_[internalChildren_[internal].first].Union(
           nodeBBox_[internalChildren_[internal].second]);
     } while (node != kRoot);
