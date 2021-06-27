@@ -105,13 +105,14 @@ Manifold& Manifold::operator=(const Manifold& other) {
   return *this;
 }
 
-Manifold Manifold::Smooth(const Mesh& mesh, const SmoothOptions& options) {
+Manifold Manifold::Smooth(const Mesh& mesh,
+                          const std::vector<Smoothness>& smoothedEdges) {
   ALWAYS_ASSERT(mesh.halfedgeTangent.empty(), std::runtime_error,
                 "when supplying beziers, the normal constructor should be used "
                 "rather than Smooth().");
 
   Manifold manifold(mesh);
-  manifold.pImpl_->CreateTangents(options);
+  manifold.pImpl_->CreateTangents(smoothedEdges);
   return manifold;
 }
 

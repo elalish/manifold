@@ -254,13 +254,12 @@ TEST(Manifold, ManualSmooth) {
 }
 
 TEST(Manifold, Csaszar) {
-  Manifold csaszar =
-      Manifold::Smooth(ImportMesh("data/Csaszar.ply"), {true, {}});
+  Manifold csaszar = Manifold::Smooth(ImportMesh("data/Csaszar.ply"));
   csaszar.Refine(100);
   ExpectMeshes(csaszar, {{70000, 140000}});
   auto prop = csaszar.GetProperties();
-  EXPECT_NEAR(prop.volume, 83546, 10);
-  EXPECT_NEAR(prop.surfaceArea, 12429, 10);
+  EXPECT_NEAR(prop.volume, 84699, 10);
+  EXPECT_NEAR(prop.surfaceArea, 14796, 10);
 
   const Mesh out = csaszar.Extract();
   ExportOptions options;
