@@ -30,7 +30,7 @@ class Manifold {
     float smoothness;
   };
   static Manifold Smooth(const Mesh&,
-                         const std::vector<Smoothness>& smoothedEdges = {});
+                         const std::vector<Smoothness>& sharpenedEdges = {});
   static Manifold Tetrahedron();
   static Manifold Cube(glm::vec3 size = glm::vec3(1.0f), bool center = false);
   static Manifold Cylinder(float height, float radiusLow,
