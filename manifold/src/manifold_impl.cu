@@ -52,7 +52,7 @@ __host__ __device__ int NextHalfedge(int current) {
 
 /**
  * The total number of verts if a triangle is subdivided naturally such that
- * each edge has edgeVerts verts along it (edgeVerts >= 2).
+ * each edge has edgeVerts verts along it (edgeVerts >= -1).
  */
 __host__ __device__ int VertsPerTri(int edgeVerts) {
   return (edgeVerts * edgeVerts + edgeVerts) / 2;
@@ -321,13 +321,6 @@ struct SmoothBezier {
     // Convert from homogeneous form to geometric form
     tangent = glm::vec4(glm::vec3(bz3) / bz3.w - startV, bz3.w);
   }
-};
-
-struct Sharpen {
-  glm::vec4* tangent;
-  const Halfedge* halfedge;
-
-  __host__ __device__ void operator()(Manifold::Smoothness smoothness) {}
 };
 
 struct TriBary2Vert {
@@ -1392,7 +1385,7 @@ void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge) {
 }
 
 void Manifold::Impl::CreateTangents(
-    const std::vector<Smoothness>& smoothedEdges) {
+    const std::vector<Smoothness>& sharpenedEdges) {
   const int numHalfedge = halfedge_.size();
   halfedgeTangent_.resize(numHalfedge);
 
@@ -1401,10 +1394,80 @@ void Manifold::Impl::CreateTangents(
                      SmoothBezier({vertPos_.cptrD(), faceNormal_.cptrD(),
                                    vertNormal_.cptrD(), halfedge_.cptrD()}));
 
-  if (!smoothedEdges.empty()) {
-    VecDH<Smoothness> smoothed(smoothedEdges);
-    thrust::for_each(smoothed.beginD(), smoothed.endD(),
-                     Sharpen({halfedgeTangent_.ptrD(), halfedge_.cptrD()}));
+  if (!sharpenedEdges.empty()) {
+    const VecH<Halfedge>& halfedge = halfedge_.H();
+
+    using Pair = std::pair<Smoothness, Smoothness>;
+    // Fill in missing pairs with default smoothness = 1.
+    std::map<int, Pair> edges;
+    for (const Smoothness edge : sharpenedEdges) {
+      if (edge.smoothness == 1) continue;
+      int pair = halfedge[edge.halfedge].pairedHalfedge;
+      if (edges.find(pair) == edges.end()) {
+        edges[edge.halfedge] = {edge, {pair, 1}};
+      } else {
+        edges[pair].second = edge;
+      }
+    }
+
+    std::map<int, std::vector<Pair>> vertTangents;
+    for (const auto value : edges) {
+      const Pair edge = value.second;
+      vertTangents[halfedge[edge.first.halfedge].startVert].push_back(edge);
+      vertTangents[halfedge[edge.second.halfedge].startVert].push_back(
+          {edge.second, edge.first});
+    }
+
+    VecH<glm::vec4>& tangent = halfedgeTangent_.H();
+    for (const auto& value : vertTangents) {
+      const std::vector<Pair>& vert = value.second;
+      // Sharp edges that end are smooth at their terminal vert.
+      if (vert.size() == 1) continue;
+      if (vert.size() == 2) {  // Make continuous edge
+        const int first = vert[0].first.halfedge;
+        const int second = vert[1].first.halfedge;
+        const glm::vec3 newTangent = glm::normalize(glm::vec3(tangent[first]) -
+                                                    glm::vec3(tangent[second]));
+        tangent[first] = glm::vec4(glm::length(tangent[first]) * newTangent,
+                                   tangent[first].w);
+        tangent[second] = glm::vec4(-glm::length(tangent[second]) * newTangent,
+                                    tangent[second].w);
+
+        auto SmoothHalf = [&](int first, int last, float smoothness) {
+          int current = NextHalfedge(halfedge[first].pairedHalfedge);
+          while (current != last) {
+            const float cosBeta = glm::dot(
+                newTangent, glm::normalize(glm::vec3(tangent[current])));
+            const float factor =
+                (1 - smoothness) * cosBeta * cosBeta + smoothness;
+            tangent[current] = glm::vec4(factor * glm::vec3(tangent[current]),
+                                         tangent[current].w);
+            current = NextHalfedge(halfedge[current].pairedHalfedge);
+          }
+        };
+
+        SmoothHalf(first, second,
+                   (vert[0].second.smoothness + vert[1].first.smoothness) / 2);
+        SmoothHalf(second, first,
+                   (vert[1].second.smoothness + vert[0].first.smoothness) / 2);
+
+      } else {  // Sharpen vertex uniformly
+        float smoothness = 0;
+        for (const Pair pair : vert) {
+          smoothness += pair.first.smoothness;
+          smoothness += pair.second.smoothness;
+        }
+        smoothness /= 2 * vert.size();
+
+        const int start = vert[0].first.halfedge;
+        int current = start;
+        do {
+          tangent[current] = glm::vec4(smoothness * glm::vec3(tangent[current]),
+                                       tangent[current].w);
+          current = NextHalfedge(halfedge[current].pairedHalfedge);
+        } while (current != start);
+      }
+    }
   }
 }
 
