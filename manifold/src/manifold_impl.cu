@@ -1396,12 +1396,20 @@ void Manifold::Impl::CreateTangents(
 
   if (!sharpenedEdges.empty()) {
     const VecH<Halfedge>& halfedge = halfedge_.H();
+    const VecH<BaryRef>& triBary = meshRelation_.triBary.H();
+
+    std::vector<int> oldHalfedge2New(halfedge.size());
+    for (int tri = 0; tri < NumTri(); ++tri) {
+      int oldTri = triBary[tri].tri;
+      for (int i : {0, 1, 2}) oldHalfedge2New[3 * oldTri + i] = 3 * tri + i;
+    }
 
     using Pair = std::pair<Smoothness, Smoothness>;
     // Fill in missing pairs with default smoothness = 1.
     std::map<int, Pair> edges;
-    for (const Smoothness edge : sharpenedEdges) {
+    for (Smoothness edge : sharpenedEdges) {
       if (edge.smoothness == 1) continue;
+      edge.halfedge = oldHalfedge2New[edge.halfedge];
       int pair = halfedge[edge.halfedge].pairedHalfedge;
       if (edges.find(pair) == edges.end()) {
         edges[edge.halfedge] = {edge, {pair, 1}};
@@ -1428,10 +1436,12 @@ void Manifold::Impl::CreateTangents(
         const int second = vert[1].first.halfedge;
         const glm::vec3 newTangent = glm::normalize(glm::vec3(tangent[first]) -
                                                     glm::vec3(tangent[second]));
-        tangent[first] = glm::vec4(glm::length(tangent[first]) * newTangent,
-                                   tangent[first].w);
-        tangent[second] = glm::vec4(-glm::length(tangent[second]) * newTangent,
-                                    tangent[second].w);
+        tangent[first] =
+            glm::vec4(glm::length(glm::vec3(tangent[first])) * newTangent,
+                      tangent[first].w);
+        tangent[second] =
+            glm::vec4(-glm::length(glm::vec3(tangent[second])) * newTangent,
+                      tangent[second].w);
 
         auto SmoothHalf = [&](int first, int last, float smoothness) {
           int current = NextHalfedge(halfedge[first].pairedHalfedge);

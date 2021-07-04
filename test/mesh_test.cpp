@@ -250,7 +250,7 @@ TEST(Manifold, ManualSmooth) {
           glm::mix(purple, red, glm::smoothstep(0.0f, 0.2f, alpha));
     }
   }
-  ExportMesh("sharpenedSphere.gltf", out, options);
+  // ExportMesh("sharpenedSphere.gltf", out, options);
 }
 
 TEST(Manifold, Csaszar) {
@@ -278,7 +278,7 @@ TEST(Manifold, Csaszar) {
           glm::mix(yellow, blue, glm::smoothstep(0.0f, 0.2f, alpha));
     }
   }
-  ExportMesh("smoothCsaszar.gltf", out, options);
+  // ExportMesh("smoothCsaszar.gltf", out, options);
 }
 
 /**
