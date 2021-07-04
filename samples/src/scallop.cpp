@@ -38,11 +38,13 @@ Manifold Scallop() {
     int j = i + 1;
     if (j == 2 * wiggles) j = 0;
 
-    float sharp = 1 - sharpness * glm::cos((theta + delta / 2) / 2);
-    sharpenedEdges.push_back({3 * (int)scallop.triVerts.size() + 1, sharp});
+    float smoothness = 1 - sharpness * glm::cos((theta + delta / 2) / 2);
+    int halfedge = 3 * scallop.triVerts.size() + 1;
+    sharpenedEdges.push_back({halfedge, smoothness});
     scallop.triVerts.push_back({0, 2 + i, 2 + j});
 
-    sharpenedEdges.push_back({3 * (int)scallop.triVerts.size() + 1, sharp});
+    halfedge = 3 * scallop.triVerts.size() + 1;
+    sharpenedEdges.push_back({halfedge, smoothness});
     scallop.triVerts.push_back({1, 2 + j, 2 + i});
   }
 
