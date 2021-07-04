@@ -58,4 +58,8 @@ Manifold RoundedFrame(float edgeLength, float radius);
 
 // A tetrahedron cut into two halves that can screw together.
 Manifold TetPuzzle(float edgeLength, float gap, int nDivisions);
+
+// A smoothed manifold demonstrating selective edge sharpening. Refine before
+// export to see the curvature.
+Manifold Scallop();
 }  // namespace manifold

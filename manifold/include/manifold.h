@@ -25,11 +25,12 @@ class Manifold {
   // Creation
   Manifold();
   Manifold(const Mesh&);
-  struct SmoothOptions {
-    bool distributeVertAngles;
-    const std::vector<glm::vec3>& triSharpness;
+  struct Smoothness {
+    int halfedge;
+    float smoothness;
   };
-  static Manifold Smooth(const Mesh&, const SmoothOptions& = {false, {}});
+  static Manifold Smooth(const Mesh&,
+                         const std::vector<Smoothness>& sharpenedEdges = {});
   static Manifold Tetrahedron();
   static Manifold Cube(glm::vec3 size = glm::vec3(1.0f), bool center = false);
   static Manifold Cylinder(float height, float radiusLow,
@@ -75,8 +76,8 @@ class Manifold {
   Manifold& Transform(const glm::mat4x3&);
   Manifold& Warp(std::function<void(glm::vec3&)>);
   Manifold& Refine(int);
-  // Manifold RefineToLength(float) const;
-  // Manifold RefineToPrecision(float) const;
+  // Manifold RefineToLength(float);
+  // Manifold RefineToPrecision(float);
 
   // Boolean
   enum class OpType { ADD, SUBTRACT, INTERSECT };
@@ -88,13 +89,9 @@ class Manifold {
   Manifold& operator-=(const Manifold&);
   Manifold operator^(const Manifold&) const;  // INTERSECT
   Manifold& operator^=(const Manifold&);
-  // First result is the intersection, second is the difference. This is more
-  // efficient than doing them separately.
   std::pair<Manifold, Manifold> Split(const Manifold&) const;
-  // First is in the direction of the normal, second is opposite.
   std::pair<Manifold, Manifold> SplitByPlane(glm::vec3 normal,
                                              float originOffset) const;
-  // Returns only the first of the above pair.
   Manifold TrimByPlane(glm::vec3 normal, float originOffset) const;
 
   // Testing hooks
