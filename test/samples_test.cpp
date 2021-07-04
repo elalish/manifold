@@ -55,12 +55,12 @@ TEST(Samples, Scallop) {
   EXPECT_NEAR(prop.volume, 41.3, 0.1);
   EXPECT_NEAR(prop.surfaceArea, 81.2, 0.1);
 
-  const Mesh out = scallop.Extract();
-  ExportOptions options;
-  options.faceted = false;
-  options.mat.roughness = 0.1;
-  options.mat.color = {0, 0, 1, 1};
-  ExportMesh("scallop.gltf", out, options);
+  // const Mesh out = scallop.Extract();
+  // ExportOptions options;
+  // options.faceted = false;
+  // options.mat.roughness = 0.1;
+  // options.mat.color = {0, 0, 1, 1};
+  // ExportMesh("scallop.gltf", out, options);
 }
 
 TEST(Samples, TetPuzzle) {
