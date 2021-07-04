@@ -44,10 +44,6 @@ __host__ __device__ glm::vec3 OrthogonalTo(glm::vec3 in, glm::vec3 ref) {
   return in;
 }
 
-__host__ __device__ float AngleBetween(glm::vec3 a, glm::vec3 b) {
-  return glm::acos(glm::min(1.0f, glm::max(-1.0f, glm::dot(a, b))));
-}
-
 __host__ __device__ int NextHalfedge(int current) {
   ++current;
   if (current % 3 == 0) current -= 3;
@@ -56,24 +52,10 @@ __host__ __device__ int NextHalfedge(int current) {
 
 /**
  * The total number of verts if a triangle is subdivided naturally such that
- * each edge has edgeVerts verts along it (edgeVerts >= 2).
+ * each edge has edgeVerts verts along it (edgeVerts >= -1).
  */
 __host__ __device__ int VertsPerTri(int edgeVerts) {
   return (edgeVerts * edgeVerts + edgeVerts) / 2;
-}
-
-__host__ __device__ float AtomicAddFloat(float& target, float add) {
-#ifdef __CUDA_ARCH__
-  return atomicAdd(&target, add);
-#else
-  float out;
-#pragma omp atomic capture
-  {
-    out = target;
-    target += add;
-  }
-  return out;
-#endif
 }
 
 __host__ __device__ void AtomicAddVec3(glm::vec3& target,
@@ -341,80 +323,9 @@ struct SmoothBezier {
   }
 };
 
-struct SumDegree {
-  float* totalAngle;
-  const glm::vec3* vertPos;
-  const Halfedge* halfedge;
-
-  __host__ __device__ void operator()(int edge) {
-    Halfedge half = halfedge[edge];
-    const glm::vec3 e0 =
-        SafeNormalize(vertPos[half.endVert] - vertPos[half.startVert]);
-    half = halfedge[NextHalfedge(half.pairedHalfedge)];
-    const glm::vec3 e1 =
-        SafeNormalize(vertPos[half.endVert] - vertPos[half.startVert]);
-    AtomicAddFloat(totalAngle[half.startVert], AngleBetween(e0, e1));
-  }
-};
-
-struct DistributeEdges {
-  glm::vec4* halfedgeTangent;
-  float* totalAngle;
-  const glm::vec3* vertPos;
-  const glm::vec3* vertNormal;
-  const Halfedge* halfedge;
-
-  __host__ __device__ void operator()(const int start) {
-    const int vert = halfedge[start].startVert;
-    float circleSum = AtomicAddFloat(totalAngle[vert], 0.0f / 0.0f);
-    // Calculate based on a single halfedge per vertex
-    if (!isfinite(circleSum)) return;
-
-    float angleFactor = -1 * glm::two_pi<float>() / circleSum;
-    glm::vec3 tangent = SafeNormalize(glm::vec3(halfedgeTangent[start]));
-
-    float totalShift = 0;
-    int degree = 0;
-    int current = start;
-    do {
-      ++degree;
-      Halfedge half = halfedge[current];
-      const glm::vec3 e0 =
-          SafeNormalize(vertPos[half.endVert] - vertPos[half.startVert]);
-      current = NextHalfedge(halfedge[current].pairedHalfedge);
-      half = halfedge[current];
-      const glm::vec3 e1 =
-          SafeNormalize(vertPos[half.endVert] - vertPos[half.startVert]);
-      tangent = SafeNormalize(glm::rotate(
-          tangent, angleFactor * AngleBetween(e0, e1), vertNormal[vert]));
-
-      const glm::vec3 oldTangent =
-          SafeNormalize(glm::vec3(halfedgeTangent[current]));
-      float shift = AngleBetween(tangent, oldTangent);
-      if (glm::dot(glm::cross(oldTangent, tangent), vertNormal[vert]) < 0)
-        shift *= -1;
-
-      halfedgeTangent[current] =
-          glm::vec4(glm::rotate(glm::vec3(halfedgeTangent[current]), shift,
-                                vertNormal[vert]),
-                    halfedgeTangent[current].w);
-      totalShift += shift;
-    } while (current != start);
-
-    const float shift = totalShift / degree;
-    current = start;
-    do {
-      halfedgeTangent[current] =
-          glm::vec4(glm::rotate(glm::vec3(halfedgeTangent[current]), -1 * shift,
-                                vertNormal[vert]),
-                    halfedgeTangent[current].w);
-      current = NextHalfedge(halfedge[current].pairedHalfedge);
-    } while (current != start);
-  }
-};
-
 struct TriBary2Vert {
   Barycentric* vertBary;
+  int* lock;
   const glm::vec3* uvw;
   const Halfedge* halfedge;
 
@@ -423,13 +334,16 @@ struct TriBary2Vert {
     const int tri = thrust::get<1>(in);
 
     for (int i : {0, 1, 2}) {
+      int vert = halfedge[3 * tri + i].startVert;
+      if (AtomicAdd(lock[vert], 1) != 0) continue;
+
       const int idx = baryRef.vertBary[i];
       glm::vec3 bary(0);
       if (idx < 0)
         bary[i] = 1;
       else
         bary = uvw[idx];
-      vertBary[halfedge[3 * tri + i].startVert] = {baryRef.tri, bary};
+      vertBary[vert] = {baryRef.tri, bary};
     }
   }
 };
@@ -708,7 +622,8 @@ template <typename T>
 void Permute(VecDH<T>& inOut, const VecDH<int>& new2Old) {
   VecDH<T> tmp(inOut);
   inOut.resize(new2Old.size());
-  thrust::gather(new2Old.begin(), new2Old.end(), tmp.begin(), inOut.begin());
+  thrust::gather(new2Old.beginD(), new2Old.endD(), tmp.beginD(),
+                 inOut.beginD());
 }
 
 template void Permute<BaryRef>(VecDH<BaryRef>&, const VecDH<int>&);
@@ -1187,7 +1102,7 @@ void Manifold::Impl::CreateHalfedges(const VecDH<glm::ivec3>& triVerts) {
                      LinkHalfedges({halfedge_.ptrD(), edge.cptrD()}));
   if (meshRelation_.triBary.size() != numTri) {
     meshRelation_.triBary.resize(numTri);
-    thrust::for_each_n(zip(meshRelation_.triBary.begin(), countAt(0)), numTri,
+    thrust::for_each_n(zip(meshRelation_.triBary.beginD(), countAt(0)), numTri,
                        InitializeBaryRef());
   }
 }
@@ -1469,25 +1384,100 @@ void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge) {
   CreateAndFixHalfedges(triVertsOut);
 }
 
-void Manifold::Impl::CreateTangents(const SmoothOptions& options) {
+void Manifold::Impl::CreateTangents(
+    const std::vector<Smoothness>& sharpenedEdges) {
   const int numHalfedge = halfedge_.size();
   halfedgeTangent_.resize(numHalfedge);
 
-  thrust::for_each_n(zip(halfedgeTangent_.begin(), halfedge_.cbegin()),
+  thrust::for_each_n(zip(halfedgeTangent_.beginD(), halfedge_.cbeginD()),
                      numHalfedge,
                      SmoothBezier({vertPos_.cptrD(), faceNormal_.cptrD(),
                                    vertNormal_.cptrD(), halfedge_.cptrD()}));
 
-  if (options.distributeVertAngles) {
-    VecDH<float> totalAngle(NumVert(), 0);
-    thrust::for_each_n(
-        countAt(0), halfedge_.size(),
-        SumDegree({totalAngle.ptrD(), vertPos_.cptrD(), halfedge_.cptrD()}));
-    thrust::for_each_n(
-        countAt(0), halfedge_.size(),
-        DistributeEdges({halfedgeTangent_.ptrD(), totalAngle.ptrD(),
-                         vertPos_.cptrD(), vertNormal_.cptrD(),
-                         halfedge_.cptrD()}));
+  if (!sharpenedEdges.empty()) {
+    const VecH<Halfedge>& halfedge = halfedge_.H();
+    const VecH<BaryRef>& triBary = meshRelation_.triBary.H();
+
+    std::vector<int> oldHalfedge2New(halfedge.size());
+    for (int tri = 0; tri < NumTri(); ++tri) {
+      int oldTri = triBary[tri].tri;
+      for (int i : {0, 1, 2}) oldHalfedge2New[3 * oldTri + i] = 3 * tri + i;
+    }
+
+    using Pair = std::pair<Smoothness, Smoothness>;
+    // Fill in missing pairs with default smoothness = 1.
+    std::map<int, Pair> edges;
+    for (Smoothness edge : sharpenedEdges) {
+      if (edge.smoothness == 1) continue;
+      edge.halfedge = oldHalfedge2New[edge.halfedge];
+      int pair = halfedge[edge.halfedge].pairedHalfedge;
+      if (edges.find(pair) == edges.end()) {
+        edges[edge.halfedge] = {edge, {pair, 1}};
+      } else {
+        edges[pair].second = edge;
+      }
+    }
+
+    std::map<int, std::vector<Pair>> vertTangents;
+    for (const auto value : edges) {
+      const Pair edge = value.second;
+      vertTangents[halfedge[edge.first.halfedge].startVert].push_back(edge);
+      vertTangents[halfedge[edge.second.halfedge].startVert].push_back(
+          {edge.second, edge.first});
+    }
+
+    VecH<glm::vec4>& tangent = halfedgeTangent_.H();
+    for (const auto& value : vertTangents) {
+      const std::vector<Pair>& vert = value.second;
+      // Sharp edges that end are smooth at their terminal vert.
+      if (vert.size() == 1) continue;
+      if (vert.size() == 2) {  // Make continuous edge
+        const int first = vert[0].first.halfedge;
+        const int second = vert[1].first.halfedge;
+        const glm::vec3 newTangent = glm::normalize(glm::vec3(tangent[first]) -
+                                                    glm::vec3(tangent[second]));
+        tangent[first] =
+            glm::vec4(glm::length(glm::vec3(tangent[first])) * newTangent,
+                      tangent[first].w);
+        tangent[second] =
+            glm::vec4(-glm::length(glm::vec3(tangent[second])) * newTangent,
+                      tangent[second].w);
+
+        auto SmoothHalf = [&](int first, int last, float smoothness) {
+          int current = NextHalfedge(halfedge[first].pairedHalfedge);
+          while (current != last) {
+            const float cosBeta = glm::dot(
+                newTangent, glm::normalize(glm::vec3(tangent[current])));
+            const float factor =
+                (1 - smoothness) * cosBeta * cosBeta + smoothness;
+            tangent[current] = glm::vec4(factor * glm::vec3(tangent[current]),
+                                         tangent[current].w);
+            current = NextHalfedge(halfedge[current].pairedHalfedge);
+          }
+        };
+
+        SmoothHalf(first, second,
+                   (vert[0].second.smoothness + vert[1].first.smoothness) / 2);
+        SmoothHalf(second, first,
+                   (vert[1].second.smoothness + vert[0].first.smoothness) / 2);
+
+      } else {  // Sharpen vertex uniformly
+        float smoothness = 0;
+        for (const Pair pair : vert) {
+          smoothness += pair.first.smoothness;
+          smoothness += pair.second.smoothness;
+        }
+        smoothness /= 2 * vert.size();
+
+        const int start = vert[0].first.halfedge;
+        int current = start;
+        do {
+          tangent[current] = glm::vec4(smoothness * glm::vec3(tangent[current]),
+                                       tangent[current].w);
+          current = NextHalfedge(halfedge[current].pairedHalfedge);
+        } while (current != start);
+      }
+    }
   }
 }
 
@@ -1532,13 +1522,14 @@ void Manifold::Impl::Refine(int n) {
 
   if (old.halfedgeTangent_.size() == old.halfedge_.size()) {
     VecDH<Barycentric> vertBary(NumVert());
+    VecDH<int> lock(NumVert(), 0);
     thrust::for_each_n(
-        zip(meshRelation_.triBary.begin(), countAt(0)), NumTri(),
-        TriBary2Vert({vertBary.ptrD(), meshRelation_.barycentric.cptrD(),
-                      halfedge_.cptrD()}));
+        zip(meshRelation_.triBary.beginD(), countAt(0)), NumTri(),
+        TriBary2Vert({vertBary.ptrD(), lock.ptrD(),
+                      meshRelation_.barycentric.cptrD(), halfedge_.cptrD()}));
 
     thrust::for_each_n(
-        zip(vertPos_.begin(), vertBary.begin()), NumVert(),
+        zip(vertPos_.beginD(), vertBary.beginD()), NumVert(),
         InterpTri({old.halfedge_.cptrD(), old.halfedgeTangent_.cptrD(),
                    old.vertPos_.cptrD()}));
   }
@@ -1596,9 +1587,9 @@ Manifold::Properties Manifold::Impl::GetProperties() const {
  * range for Morton code calculation.
  */
 void Manifold::Impl::CalculateBBox() {
-  bBox_.min = thrust::reduce(vertPos_.begin(), vertPos_.end(),
+  bBox_.min = thrust::reduce(vertPos_.beginD(), vertPos_.endD(),
                              glm::vec3(1 / 0.0f), PosMin());
-  bBox_.max = thrust::reduce(vertPos_.begin(), vertPos_.end(),
+  bBox_.max = thrust::reduce(vertPos_.beginD(), vertPos_.endD(),
                              glm::vec3(-1 / 0.0f), PosMax());
 }
 
@@ -1716,14 +1707,14 @@ void Manifold::Impl::GatherFaces(const Impl& old,
                                  const VecDH<int>& faceNew2Old) {
   const int numTri = faceNew2Old.size();
   meshRelation_.triBary.resize(numTri);
-  thrust::gather(faceNew2Old.begin(), faceNew2Old.end(),
-                 old.meshRelation_.triBary.begin(),
-                 meshRelation_.triBary.begin());
+  thrust::gather(faceNew2Old.beginD(), faceNew2Old.endD(),
+                 old.meshRelation_.triBary.beginD(),
+                 meshRelation_.triBary.beginD());
 
   if (old.faceNormal_.size() == old.NumTri()) {
     faceNormal_.resize(numTri);
-    thrust::gather(faceNew2Old.begin(), faceNew2Old.end(),
-                   old.faceNormal_.begin(), faceNormal_.begin());
+    thrust::gather(faceNew2Old.beginD(), faceNew2Old.endD(),
+                   old.faceNormal_.beginD(), faceNormal_.beginD());
   }
 
   VecDH<int> faceOld2New(old.NumTri());
@@ -1753,7 +1744,7 @@ void Manifold::Impl::GatherFaces(const Impl& old,
  */
 void Manifold::Impl::CalculateNormals() {
   vertNormal_.resize(NumVert());
-  thrust::fill(vertNormal_.begin(), vertNormal_.end(), glm::vec3(0));
+  thrust::fill(vertNormal_.beginD(), vertNormal_.endD(), glm::vec3(0));
   bool calculateTriNormal = false;
   if (faceNormal_.size() != NumTri()) {
     faceNormal_.resize(NumTri());
@@ -1763,7 +1754,7 @@ void Manifold::Impl::CalculateNormals() {
       zip(faceNormal_.beginD(), countAt(0)), NumTri(),
       AssignNormals({vertNormal_.ptrD(), vertPos_.cptrD(), halfedge_.cptrD(),
                      precision_, calculateTriNormal}));
-  thrust::for_each(vertNormal_.begin(), vertNormal_.end(), Normalize());
+  thrust::for_each(vertNormal_.beginD(), vertNormal_.endD(), Normalize());
 }
 
 /**

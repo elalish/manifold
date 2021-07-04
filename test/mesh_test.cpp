@@ -250,17 +250,16 @@ TEST(Manifold, ManualSmooth) {
           glm::mix(purple, red, glm::smoothstep(0.0f, 0.2f, alpha));
     }
   }
-  ExportMesh("sharpenedSphere.gltf", out, options);
+  // ExportMesh("sharpenedSphere.gltf", out, options);
 }
 
 TEST(Manifold, Csaszar) {
-  Manifold csaszar =
-      Manifold::Smooth(ImportMesh("data/Csaszar.ply"), {true, {}});
+  Manifold csaszar = Manifold::Smooth(ImportMesh("data/Csaszar.ply"));
   csaszar.Refine(100);
   ExpectMeshes(csaszar, {{70000, 140000}});
   auto prop = csaszar.GetProperties();
-  EXPECT_NEAR(prop.volume, 83546, 1);
-  EXPECT_NEAR(prop.surfaceArea, 12429, 1);
+  EXPECT_NEAR(prop.volume, 84699, 10);
+  EXPECT_NEAR(prop.surfaceArea, 14796, 10);
 
   // const Mesh out = csaszar.Extract();
   // ExportOptions options;

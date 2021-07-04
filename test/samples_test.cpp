@@ -48,6 +48,21 @@ TEST(Samples, Knot42) {
   EXPECT_NEAR(prop0.surfaceArea, prop1.surfaceArea, 1);
 }
 
+TEST(Samples, Scallop) {
+  Manifold scallop = Scallop();
+  scallop.Refine(100);
+  auto prop = scallop.GetProperties();
+  EXPECT_NEAR(prop.volume, 41.3, 0.1);
+  EXPECT_NEAR(prop.surfaceArea, 81.2, 0.1);
+
+  // const Mesh out = scallop.Extract();
+  // ExportOptions options;
+  // options.faceted = false;
+  // options.mat.roughness = 0.1;
+  // options.mat.color = {0, 0, 1, 1};
+  // ExportMesh("scallop.gltf", out, options);
+}
+
 TEST(Samples, TetPuzzle) {
   Manifold puzzle = TetPuzzle(50, 0.2, 100);
   EXPECT_TRUE(puzzle.IsManifold());
