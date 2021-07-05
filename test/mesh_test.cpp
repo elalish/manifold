@@ -306,6 +306,14 @@ TEST(Manifold, Precision) {
   EXPECT_FLOAT_EQ(cube.Precision(), 100 * kTolerance);
 }
 
+TEST(Manifold, GetCurvature) {
+  for (int n = 4; n < 100; n *= 2) {
+    Manifold sphere = Manifold::Sphere(1, n);
+    Curvature curvature = sphere.GetCurvature();
+    EXPECT_NEAR(curvature.minMeanCurvature, 1, 1);
+  }
+}
+
 /**
  * Testing more advanced Manifold operations.
  */

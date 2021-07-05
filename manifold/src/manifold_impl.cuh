@@ -59,6 +59,7 @@ struct Manifold::Impl {
   int NumEdge() const { return halfedge_.size() / 2; }
   int NumTri() const { return halfedge_.size() / 3; }
   Properties GetProperties() const;
+  Curvature GetCurvature() const;
   void CalculateBBox();
   void SetPrecision(float minPrecision = -1);
   bool IsManifold() const;

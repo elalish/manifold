@@ -144,6 +144,12 @@ struct Properties {
   float surfaceArea, volume;
 };
 
+struct Curvature {
+  float maxMeanCurvature, minMeanCurvature;
+  float maxGaussianCurvature, minGaussianCurvature;
+  std::vector<float> vertMeanCurvature, vertGaussianCurvature;
+};
+
 struct BaryRef {
   int tri;
   glm::ivec3 vertBary;

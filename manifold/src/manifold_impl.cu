@@ -533,6 +533,58 @@ struct SumPair : public thrust::binary_function<thrust::pair<float, float>,
   }
 };
 
+struct CurvatureAngles {
+  float* meanCurvature;
+  float* gaussianCurvature;
+  float* area;
+  const Halfedge* halfedge;
+  const glm::vec3* vertPos;
+  const glm::vec3* triNormal;
+
+  __host__ __device__ void operator()(int tri) {
+    glm::vec3 edge[3];
+    glm::vec3 edgeLength;
+    for (int i : {0, 1, 2}) {
+      const int startVert = halfedge[3 * tri + i].startVert;
+      const int endVert = halfedge[3 * tri + i].endVert;
+      edge[i] = vertPos[endVert] - vertPos[startVert];
+      edgeLength[i] = glm::length(edge[i]);
+      edge[i] /= edgeLength[i];
+      const int neighborTri = halfedge[3 * tri + i].pairedHalfedge / 3;
+      const float dihedral =
+          0.5 * edgeLength[i] *
+          glm::asin(glm::dot(glm::cross(triNormal[tri], triNormal[neighborTri]),
+                             edge[i]));
+      AtomicAdd(meanCurvature[startVert], dihedral);
+      AtomicAdd(meanCurvature[endVert], dihedral);
+    }
+
+    glm::vec3 phi;
+    phi[0] = glm::acos(-glm::dot(edge[2], edge[0]));
+    phi[1] = glm::acos(-glm::dot(edge[0], edge[1]));
+    phi[2] = glm::pi<float>() - phi[0] - phi[1];
+    const float area3 = edgeLength[0] * edgeLength[1] *
+                        glm::length(glm::cross(edge[0], edge[1])) / 6;
+
+    for (int i : {0, 1, 2}) {
+      const int vert = halfedge[3 * tri + i].startVert;
+      AtomicAdd(gaussianCurvature[vert], phi[i]);
+      AtomicAdd(area[vert], area3);
+    }
+  }
+};
+
+struct NormalizeCurvature {
+  __host__ __device__ void operator()(
+      thrust::tuple<float&, float&, float> inOut) {
+    float& meanCurvature = thrust::get<0>(inOut);
+    float& gaussianCurvature = thrust::get<1>(inOut);
+    float area = thrust::get<2>(inOut);
+    meanCurvature /= area;
+    gaussianCurvature = (glm::two_pi<float>() - gaussianCurvature) / area;
+  }
+};
+
 struct Transform4x3 {
   const glm::mat4x3 transform;
 
@@ -1577,13 +1629,49 @@ bool Manifold::Impl::MatchesTriNormals() const {
  * by testing these properties as == 0.
  */
 Properties Manifold::Impl::GetProperties() const {
-  if (halfedge_.size() == 0) return {0, 0};
+  if (IsEmpty()) return {0, 0};
   ApplyTransform();
   thrust::pair<float, float> areaVolume = thrust::transform_reduce(
       countAt(0), countAt(NumTri()),
       FaceAreaVolume({halfedge_.cptrD(), vertPos_.cptrD(), precision_}),
       thrust::make_pair(0.0f, 0.0f), SumPair());
   return {areaVolume.first, areaVolume.second};
+}
+
+Curvature Manifold::Impl::GetCurvature() const {
+  Curvature result;
+  if (IsEmpty()) return result;
+  ApplyTransform();
+  VecDH<float> vertMeanCurvature(NumVert(), 0);
+  VecDH<float> vertGaussianCurvature(NumVert(), 0);
+  VecDH<float> vertArea(NumVert(), 0);
+  thrust::for_each(
+      countAt(0), countAt(NumTri()),
+      CurvatureAngles({vertMeanCurvature.ptrD(), vertGaussianCurvature.ptrD(),
+                       vertArea.ptrD(), halfedge_.cptrD(), vertPos_.cptrD(),
+                       faceNormal_.cptrD()}));
+  thrust::for_each_n(zip(vertMeanCurvature.beginD(),
+                         vertGaussianCurvature.beginD(), vertArea.beginD()),
+                     NumVert(), NormalizeCurvature());
+  result.minMeanCurvature =
+      thrust::reduce(vertMeanCurvature.beginD(), vertMeanCurvature.endD(),
+                     1.0f / 0.0f, thrust::minimum<float>());
+  result.maxMeanCurvature =
+      thrust::reduce(vertMeanCurvature.beginD(), vertMeanCurvature.endD(),
+                     -1.0f / 0.0f, thrust::maximum<float>());
+  result.minGaussianCurvature = thrust::reduce(
+      vertGaussianCurvature.beginD(), vertGaussianCurvature.endD(), 1.0f / 0.0f,
+      thrust::minimum<float>());
+  result.maxGaussianCurvature = thrust::reduce(
+      vertGaussianCurvature.beginD(), vertGaussianCurvature.endD(),
+      -1.0f / 0.0f, thrust::maximum<float>());
+  result.vertMeanCurvature.insert(result.vertMeanCurvature.end(),
+                                  vertMeanCurvature.begin(),
+                                  vertMeanCurvature.end());
+  result.vertGaussianCurvature.insert(result.vertGaussianCurvature.end(),
+                                      vertGaussianCurvature.begin(),
+                                      vertGaussianCurvature.end());
+  return result;
 }
 
 /**

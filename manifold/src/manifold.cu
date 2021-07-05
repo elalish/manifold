@@ -548,6 +548,8 @@ int Manifold::Genus() const {
 
 Properties Manifold::GetProperties() const { return pImpl_->GetProperties(); }
 
+Curvature Manifold::GetCurvature() const { return pImpl_->GetCurvature(); }
+
 /**
  * Gets the relationship to the previous mesh, for the purpose of assinging
  * properties like texture coordinates. The triBary vector is the same length as
