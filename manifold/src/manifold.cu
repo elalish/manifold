@@ -546,9 +546,7 @@ int Manifold::Genus() const {
   return 1 - chi / 2;
 }
 
-Manifold::Properties Manifold::GetProperties() const {
-  return pImpl_->GetProperties();
-}
+Properties Manifold::GetProperties() const { return pImpl_->GetProperties(); }
 
 /**
  * Gets the relationship to the previous mesh, for the purpose of assinging

@@ -95,6 +95,11 @@ __host__ __device__ glm::mat3x2 GetAxisAlignedProjection(glm::vec3 normal) {
   return glm::transpose(projection);
 }
 
+struct Barycentric {
+  int tri;
+  glm::vec3 uvw;
+};
+
 struct Normalize {
   __host__ __device__ void operator()(glm::vec3& v) {
     v = glm::normalize(v);
@@ -1571,7 +1576,7 @@ bool Manifold::Impl::MatchesTriNormals() const {
  * within rounding tolerance. This means degenerate manifolds can by identified
  * by testing these properties as == 0.
  */
-Manifold::Properties Manifold::Impl::GetProperties() const {
+Properties Manifold::Impl::GetProperties() const {
   if (halfedge_.size() == 0) return {0, 0};
   ApplyTransform();
   thrust::pair<float, float> areaVolume = thrust::transform_reduce(
