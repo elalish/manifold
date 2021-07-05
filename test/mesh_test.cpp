@@ -306,11 +306,31 @@ TEST(Manifold, Precision) {
   EXPECT_FLOAT_EQ(cube.Precision(), 100 * kTolerance);
 }
 
+/**
+ * Curvature is the inverse of the radius of curvature, and signed such that
+ * positive is convex and negative is concave. There are two orthogonal
+ * principal curvatures at any point on a manifold, with one maximum and the
+ * other minimum. Gaussian curvature is their product, while mean
+ * curvature is their sum. Here we check our discrete appoximations calculated
+ * at each vertex against the constant expected values of spheres of different
+ * radii and at different mesh resolutions.
+ */
 TEST(Manifold, GetCurvature) {
+  const float precision = 0.015;
   for (int n = 4; n < 100; n *= 2) {
-    Manifold sphere = Manifold::Sphere(1, n);
+    Manifold sphere = Manifold::Sphere(1, 64);
     Curvature curvature = sphere.GetCurvature();
-    EXPECT_NEAR(curvature.minMeanCurvature, 1, 1);
+    EXPECT_NEAR(curvature.minMeanCurvature, 2, 2 * precision);
+    EXPECT_NEAR(curvature.maxMeanCurvature, 2, 2 * precision);
+    EXPECT_NEAR(curvature.minGaussianCurvature, 1, precision);
+    EXPECT_NEAR(curvature.maxGaussianCurvature, 1, precision);
+
+    sphere.Scale(glm::vec3(2.0f));
+    curvature = sphere.GetCurvature();
+    EXPECT_NEAR(curvature.minMeanCurvature, 1, precision);
+    EXPECT_NEAR(curvature.maxMeanCurvature, 1, precision);
+    EXPECT_NEAR(curvature.minGaussianCurvature, 0.25, 0.25 * precision);
+    EXPECT_NEAR(curvature.maxGaussianCurvature, 0.25, 0.25 * precision);
   }
 }
 
