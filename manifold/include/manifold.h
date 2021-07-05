@@ -59,6 +59,7 @@ class Manifold {
   float Precision() const;
   int Genus() const;
   Properties GetProperties() const;
+  Curvature GetCurvature() const;
   MeshRelation GetMeshRelation() const;
 
   // Modification
