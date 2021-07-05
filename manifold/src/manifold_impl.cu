@@ -537,6 +537,7 @@ struct CurvatureAngles {
   float* meanCurvature;
   float* gaussianCurvature;
   float* area;
+  float* degree;
   const Halfedge* halfedge;
   const glm::vec3* vertPos;
   const glm::vec3* triNormal;
@@ -552,11 +553,12 @@ struct CurvatureAngles {
       edge[i] /= edgeLength[i];
       const int neighborTri = halfedge[3 * tri + i].pairedHalfedge / 3;
       const float dihedral =
-          0.5 * edgeLength[i] *
+          0.25 * edgeLength[i] *
           glm::asin(glm::dot(glm::cross(triNormal[tri], triNormal[neighborTri]),
                              edge[i]));
       AtomicAdd(meanCurvature[startVert], dihedral);
       AtomicAdd(meanCurvature[endVert], dihedral);
+      AtomicAdd(degree[startVert], 1.0f);
     }
 
     glm::vec3 phi;
@@ -568,7 +570,7 @@ struct CurvatureAngles {
 
     for (int i : {0, 1, 2}) {
       const int vert = halfedge[3 * tri + i].startVert;
-      AtomicAdd(gaussianCurvature[vert], phi[i]);
+      AtomicAdd(gaussianCurvature[vert], -phi[i]);
       AtomicAdd(area[vert], area3);
     }
   }
@@ -576,12 +578,14 @@ struct CurvatureAngles {
 
 struct NormalizeCurvature {
   __host__ __device__ void operator()(
-      thrust::tuple<float&, float&, float> inOut) {
+      thrust::tuple<float&, float&, float, float> inOut) {
     float& meanCurvature = thrust::get<0>(inOut);
     float& gaussianCurvature = thrust::get<1>(inOut);
     float area = thrust::get<2>(inOut);
-    meanCurvature /= area;
-    gaussianCurvature = (glm::two_pi<float>() - gaussianCurvature) / area;
+    float degree = thrust::get<3>(inOut);
+    float factor = degree / (6 * area);
+    meanCurvature *= factor;
+    gaussianCurvature *= factor;
   }
 };
 
@@ -1643,16 +1647,18 @@ Curvature Manifold::Impl::GetCurvature() const {
   if (IsEmpty()) return result;
   ApplyTransform();
   VecDH<float> vertMeanCurvature(NumVert(), 0);
-  VecDH<float> vertGaussianCurvature(NumVert(), 0);
+  VecDH<float> vertGaussianCurvature(NumVert(), glm::two_pi<float>());
   VecDH<float> vertArea(NumVert(), 0);
+  VecDH<float> degree(NumVert(), 0);
   thrust::for_each(
       countAt(0), countAt(NumTri()),
       CurvatureAngles({vertMeanCurvature.ptrD(), vertGaussianCurvature.ptrD(),
-                       vertArea.ptrD(), halfedge_.cptrD(), vertPos_.cptrD(),
-                       faceNormal_.cptrD()}));
-  thrust::for_each_n(zip(vertMeanCurvature.beginD(),
-                         vertGaussianCurvature.beginD(), vertArea.beginD()),
-                     NumVert(), NormalizeCurvature());
+                       vertArea.ptrD(), degree.ptrD(), halfedge_.cptrD(),
+                       vertPos_.cptrD(), faceNormal_.cptrD()}));
+  thrust::for_each_n(
+      zip(vertMeanCurvature.beginD(), vertGaussianCurvature.beginD(),
+          vertArea.beginD(), degree.beginD()),
+      NumVert(), NormalizeCurvature());
   result.minMeanCurvature =
       thrust::reduce(vertMeanCurvature.beginD(), vertMeanCurvature.endD(),
                      1.0f / 0.0f, thrust::minimum<float>());

@@ -59,7 +59,13 @@ TEST(Samples, Scallop) {
   // ExportOptions options;
   // options.faceted = false;
   // options.mat.roughness = 0.1;
-  // options.mat.color = {0, 0, 1, 1};
+  // const glm::vec4 blue(0, 0, 1, 1);
+  // const glm::vec4 red(1, 0, 0, 1);
+  // const float limit = 15;
+  // for (float curvature : scallop.GetCurvature().vertMeanCurvature) {
+  //   options.mat.vertColor.push_back(
+  //       glm::mix(blue, red, glm::smoothstep(-limit, limit, curvature)));
+  // }
   // ExportMesh("scallop.gltf", out, options);
 }
 
