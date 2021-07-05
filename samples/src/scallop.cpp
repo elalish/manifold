@@ -24,7 +24,7 @@ Manifold Scallop() {
   constexpr float sharpness = 0.8;
 
   Mesh scallop;
-  std::vector<Manifold::Smoothness> sharpenedEdges;
+  std::vector<Smoothness> sharpenedEdges;
   scallop.vertPos = {{-offset, 0, height}, {-offset, 0, -height}};
 
   const float delta = glm::pi<float>() / wiggles;
