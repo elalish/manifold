@@ -546,8 +546,22 @@ int Manifold::Genus() const {
   return 1 - chi / 2;
 }
 
+/**
+ * Returns the surface area and volume of the manifold in a Properties
+ * structure. These properties are clamped to zero for a given face if they are
+ * within rounding tolerance. This means degenerate manifolds can by identified
+ * by testing these properties as == 0.
+ */
 Properties Manifold::GetProperties() const { return pImpl_->GetProperties(); }
 
+/**
+ * Curvature is the inverse of the radius of curvature, and signed such that
+ * positive is convex and negative is concave. There are two orthogonal
+ * principal curvatures at any point on a manifold, with one maximum and the
+ * other minimum. Gaussian curvature is their product, while mean
+ * curvature is their sum. This approximates them for every vertex (returned as
+ * vectors in the structure) and also returns their minimum and maximum values.
+ */
 Curvature Manifold::GetCurvature() const { return pImpl_->GetCurvature(); }
 
 /**
