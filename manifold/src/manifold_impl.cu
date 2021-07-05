@@ -1626,12 +1626,6 @@ bool Manifold::Impl::MatchesTriNormals() const {
                                   faceNormal_.cptrD(), precision_}));
 }
 
-/**
- * Returns the surface area and volume of the manifold in a Properties
- * structure. These properties are clamped to zero for a given face if they are
- * within rounding tolerance. This means degenerate manifolds can by identified
- * by testing these properties as == 0.
- */
 Properties Manifold::Impl::GetProperties() const {
   if (IsEmpty()) return {0, 0};
   ApplyTransform();
