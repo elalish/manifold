@@ -135,9 +135,19 @@ struct Mesh {
   std::vector<glm::vec4> halfedgeTangent;
 };
 
-struct Barycentric {
-  int tri;
-  glm::vec3 uvw;
+struct Smoothness {
+  int halfedge;
+  float smoothness;
+};
+
+struct Properties {
+  float surfaceArea, volume;
+};
+
+struct Curvature {
+  float maxMeanCurvature, minMeanCurvature;
+  float maxGaussianCurvature, minGaussianCurvature;
+  std::vector<float> vertMeanCurvature, vertGaussianCurvature;
 };
 
 struct BaryRef {
@@ -287,11 +297,6 @@ inline std::ostream& operator<<(std::ostream& stream, const glm::mat4x3& mat) {
 inline std::ostream& operator<<(std::ostream& stream, const BaryRef& ref) {
   return stream << "tri = " << ref.tri << ", uvw idx = " << ref.vertBary;
 }
-
-inline std::ostream& operator<<(std::ostream& stream, const Barycentric& bary) {
-  return stream << "tri = " << bary.tri << ", uvw idx = " << bary.uvw;
-}
-
 }  // namespace manifold
 
 #undef HOST_DEVICE

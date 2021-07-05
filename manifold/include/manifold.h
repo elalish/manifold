@@ -25,10 +25,6 @@ class Manifold {
   // Creation
   Manifold();
   Manifold(const Mesh&);
-  struct Smoothness {
-    int halfedge;
-    float smoothness;
-  };
   static Manifold Smooth(const Mesh&,
                          const std::vector<Smoothness>& sharpenedEdges = {});
   static Manifold Tetrahedron();
@@ -62,10 +58,8 @@ class Manifold {
   Box BoundingBox() const;
   float Precision() const;
   int Genus() const;
-  struct Properties {
-    float surfaceArea, volume;
-  };
   Properties GetProperties() const;
+  Curvature GetCurvature() const;
   MeshRelation GetMeshRelation() const;
 
   // Modification
