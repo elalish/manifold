@@ -217,10 +217,10 @@ TEST(Manifold, Smooth) {
 }
 
 TEST(Manifold, SmoothSphere) {
+  int n[5] = {4, 8, 16, 32, 64};
   float precision[5] = {0.03, 0.003, 0.003, 0.0005, 0.00006};
-  int n = 4;
   for (int i = 0; i < 5; ++i) {
-    Manifold sphere = Manifold::Sphere(1, n);
+    Manifold sphere = Manifold::Sphere(1, n[i]);
     // Refine(odd) puts a center point in the triangle, which is the worst case.
     Manifold smoothed = Manifold::Smooth(sphere.Extract()).Refine(7);
     Mesh out = smoothed.Extract();
@@ -233,7 +233,6 @@ TEST(Manifold, SmoothSphere) {
     float max = glm::length(*bounds.second);
     EXPECT_NEAR(min, 1, precision[i]);
     EXPECT_NEAR(max, 1, precision[i]);
-    n *= 2;
   }
 }
 
