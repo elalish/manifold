@@ -27,7 +27,7 @@ void Identical(glm::vec3 v0, glm::vec3 v1) {
   for (int j : {0, 1, 2}) ASSERT_NEAR(v0[j], v1[j], 0.0001);
 }
 
-void Identical(Mesh& mesh1, Mesh& mesh2) {
+void Identical(const Mesh& mesh1, const Mesh& mesh2) {
   ASSERT_EQ(mesh1.vertPos.size(), mesh2.vertPos.size());
   for (int i = 0; i < mesh1.vertPos.size(); ++i)
     Identical(mesh1.vertPos[i], mesh2.vertPos[i]);
@@ -216,6 +216,26 @@ TEST(Manifold, Smooth) {
   // ExportMesh("smoothTet.gltf", smooth.Extract());
 }
 
+TEST(Manifold, SmoothSphere) {
+  int n[5] = {4, 8, 16, 32, 64};
+  float precision[5] = {0.03, 0.003, 0.003, 0.0005, 0.00006};
+  for (int i = 0; i < 5; ++i) {
+    Manifold sphere = Manifold::Sphere(1, n[i]);
+    // Refine(odd) puts a center point in the triangle, which is the worst case.
+    Manifold smoothed = Manifold::Smooth(sphere.Extract()).Refine(7);
+    Mesh out = smoothed.Extract();
+    auto bounds =
+        std::minmax_element(out.vertPos.begin(), out.vertPos.end(),
+                            [](const glm::vec3& a, const glm::vec3& b) {
+                              return glm::dot(a, a) < glm::dot(b, b);
+                            });
+    float min = glm::length(*bounds.first);
+    float max = glm::length(*bounds.second);
+    EXPECT_NEAR(min, 1, precision[i]);
+    EXPECT_NEAR(max, 1, precision[i]);
+  }
+}
+
 TEST(Manifold, ManualSmooth) {
   // Unit Octahedron
   const Mesh oct = Manifold::Sphere(1, 4).Extract();
@@ -337,6 +357,31 @@ TEST(Manifold, GetCurvature) {
 /**
  * Testing more advanced Manifold operations.
  */
+
+TEST(Manifold, Transform) {
+  Manifold cube = Manifold::Cube({1, 2, 3});
+  Manifold cube2 = cube;
+  cube.Rotate(30, 40, 50).Scale({6, 5, 4}).Translate({1, 2, 3});
+
+  glm::mat3 rX(1.0f, 0.0f, 0.0f,          //
+               0.0f, cosd(30), sind(30),  //
+               0.0f, -sind(30), cosd(30));
+  glm::mat3 rY(cosd(40), 0.0f, -sind(40),  //
+               0.0f, 1.0f, 0.0f,           //
+               sind(40), 0.0f, cosd(40));
+  glm::mat3 rZ(cosd(50), sind(50), 0.0f,   //
+               -sind(50), cosd(50), 0.0f,  //
+               0.0f, 0.0f, 1.0f);
+  glm::mat3 s = glm::mat3(1.0f);
+  s[0][0] = 6;
+  s[1][1] = 5;
+  s[2][2] = 4;
+  glm::mat4x3 transform = glm::mat4x3(s * rZ * rY * rX);
+  transform[3] = glm::vec3(1, 2, 3);
+  cube2.Transform(transform);
+
+  Identical(cube.Extract(), cube2.Extract());
+}
 
 TEST(Manifold, MeshRelation) {
   Mesh input = ImportMesh("data/Csaszar.ply");
