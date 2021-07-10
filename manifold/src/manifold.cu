@@ -626,8 +626,7 @@ Manifold& Manifold::Rotate(float xDegrees, float yDegrees, float zDegrees) {
 
 Manifold& Manifold::Transform(const glm::mat4x3& m) {
   glm::mat4 old(pImpl_->transform_);
-  old *= glm::mat4(m);
-  pImpl_->transform_ = glm::mat4x3(old);
+  pImpl_->transform_ = m * old;
   return *this;
 }
 
