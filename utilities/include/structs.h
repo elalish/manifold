@@ -1,4 +1,4 @@
-// Copyright 2019 Emmett Lalish
+// Copyright 2021 Emmett Lalish
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,6 +15,7 @@
 #pragma once
 #define GLM_FORCE_EXPLICIT_CTOR
 #include <chrono>
+#include <glm/ext/matrix_transform.hpp>
 #include <glm/glm.hpp>
 #include <glm/gtc/constants.hpp>
 #include <glm/gtx/compatibility.hpp>
@@ -94,6 +95,14 @@ inline HOST_DEVICE int CCW(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2,
     return area > 0 ? 1 : -1;
 }
 
+inline HOST_DEVICE glm::mat4x3 RotateUp(glm::vec3 up) {
+  up = glm::normalize(up);
+  glm::vec3 axis = glm::cross(up, {0, 0, 1});
+  float angle = glm::asin(glm::length(axis));
+  if (glm::dot(up, {0, 0, 1}) < 0) angle = glm::pi<float>() - angle;
+  return glm::mat4x3(glm::rotate(glm::mat4(1), angle, axis));
+}
+
 struct ExecutionParams {
   bool intermediateChecks = false;
   bool verbose = false;
@@ -123,6 +132,32 @@ struct Mesh {
   std::vector<glm::vec3> vertPos;
   std::vector<glm::vec3> vertNormal;
   std::vector<glm::ivec3> triVerts;
+  std::vector<glm::vec4> halfedgeTangent;
+};
+
+struct Smoothness {
+  int halfedge;
+  float smoothness;
+};
+
+struct Properties {
+  float surfaceArea, volume;
+};
+
+struct Curvature {
+  float maxMeanCurvature, minMeanCurvature;
+  float maxGaussianCurvature, minGaussianCurvature;
+  std::vector<float> vertMeanCurvature, vertGaussianCurvature;
+};
+
+struct BaryRef {
+  int tri;
+  glm::ivec3 vertBary;
+};
+
+struct MeshRelation {
+  std::vector<glm::vec3> barycentric;
+  std::vector<BaryRef> triBary;
 };
 
 struct Box {
@@ -138,6 +173,16 @@ struct Box {
   HOST_DEVICE glm::vec3 Size() const { return max - min; }
 
   HOST_DEVICE glm::vec3 Center() const { return 0.5f * (max + min); }
+
+  HOST_DEVICE float Scale() const {
+    glm::vec3 absMax = glm::max(glm::abs(min), glm::abs(max));
+    return glm::max(absMax.x, glm::max(absMax.y, absMax.z));
+  }
+
+  HOST_DEVICE bool Contains(const Box& box) const {
+    return glm::all(glm::greaterThanEqual(box.min, min)) &&
+           glm::all(glm::greaterThanEqual(max, box.max));
+  }
 
   HOST_DEVICE void Union(const glm::vec3 p) {
     min = glm::min(min, p);
@@ -203,6 +248,15 @@ struct Box {
   }
 };
 
+template <typename T>
+void Dump(const std::vector<T>& vec) {
+  std::cout << "Vec = " << std::endl;
+  for (int i = 0; i < vec.size(); ++i) {
+    std::cout << i << ", " << vec[i] << ", " << std::endl;
+  }
+  std::cout << std::endl;
+}
+
 inline std::ostream& operator<<(std::ostream& stream, const Box& box) {
   return stream << "min: " << box.min.x << ", " << box.min.y << ", "
                 << box.min.z << ", "
@@ -240,6 +294,9 @@ inline std::ostream& operator<<(std::ostream& stream, const glm::mat4x3& mat) {
                 << tam[2] << std::endl;
 }
 
+inline std::ostream& operator<<(std::ostream& stream, const BaryRef& ref) {
+  return stream << "tri = " << ref.tri << ", uvw idx = " << ref.vertBary;
+}
 }  // namespace manifold
 
 #undef HOST_DEVICE

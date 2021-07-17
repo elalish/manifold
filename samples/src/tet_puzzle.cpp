@@ -12,24 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#pragma once
-#include "structs.h"
+#include "samples.h"
 
 namespace manifold {
 
-struct Material {
-  float roughness = 1;
-  float metalness = 0;
-  glm::vec4 color = glm::vec4(1.0f);
-  std::vector<glm::vec4> vertColor;
-};
+Manifold TetPuzzle(float edgeLength, float gap, int nDivisions) {
+  Manifold tet = Manifold::Tetrahedron();
 
-struct ExportOptions {
-  bool faceted = true;
-  Material mat = {};
-};
+  Polygons box;
+  box.push_back({{glm::vec2(2, -2), 0}, {glm::vec2(2, 2), 1}});
 
-Mesh ImportMesh(const std::string& filename);
-void ExportMesh(const std::string& filename, const Mesh&, const ExportOptions&);
+  for (int i = 0; i <= nDivisions; ++i) {
+    box[0].push_back({glm::vec2(gap / 2, 2 - i * 4.0f / nDivisions), 2 + i});
+  }
 
+  Manifold screw = Manifold::Extrude(box, 2, nDivisions, 270)
+                       .Rotate(0, 0, -45)
+                       .Translate({0, 0, -1});
+
+  return tet ^ screw;
+}
 }  // namespace manifold

@@ -1,4 +1,4 @@
-// Copyright 2019 Emmett Lalish
+// Copyright 2021 Emmett Lalish
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -25,8 +25,9 @@ class Manifold {
   // Creation
   Manifold();
   Manifold(const Mesh&);
+  static Manifold Smooth(const Mesh&,
+                         const std::vector<Smoothness>& sharpenedEdges = {});
   static Manifold Tetrahedron();
-  static Manifold Octahedron();
   static Manifold Cube(glm::vec3 size = glm::vec3(1.0f), bool center = false);
   static Manifold Cylinder(float height, float radiusLow,
                            float radiusHigh = -1.0f, int circularSegments = 0,
@@ -48,10 +49,8 @@ class Manifold {
   static void SetCircularSegments(int number);
   static int GetCircularSegments(float radius);
 
-  struct Properties {
-    float surfaceArea, volume;
-  };
   // Information
+  Mesh Extract() const;
   bool IsEmpty() const;
   int NumVert() const;
   int NumEdge() const;
@@ -60,14 +59,19 @@ class Manifold {
   float Precision() const;
   int Genus() const;
   Properties GetProperties() const;
-  Mesh Extract(bool includeNormals = false) const;
+  Curvature GetCurvature() const;
+  MeshRelation GetMeshRelation() const;
 
   // Modification
   Manifold& Translate(glm::vec3);
   Manifold& Scale(glm::vec3);
   Manifold& Rotate(float xDegrees, float yDegrees = 0.0f,
                    float zDegrees = 0.0f);
+  Manifold& Transform(const glm::mat4x3&);
   Manifold& Warp(std::function<void(glm::vec3&)>);
+  Manifold& Refine(int);
+  // Manifold RefineToLength(float);
+  // Manifold RefineToPrecision(float);
 
   // Boolean
   enum class OpType { ADD, SUBTRACT, INTERSECT };
@@ -79,12 +83,10 @@ class Manifold {
   Manifold& operator-=(const Manifold&);
   Manifold operator^(const Manifold&) const;  // INTERSECT
   Manifold& operator^=(const Manifold&);
-  // First result is the intersection, second is the difference. This is more
-  // efficient than doing them separately.
   std::pair<Manifold, Manifold> Split(const Manifold&) const;
-  // First is in the direction of the normal, second is opposite.
   std::pair<Manifold, Manifold> SplitByPlane(glm::vec3 normal,
                                              float originOffset) const;
+  Manifold TrimByPlane(glm::vec3 normal, float originOffset) const;
 
   // Testing hooks
   bool IsManifold() const;

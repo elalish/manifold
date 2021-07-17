@@ -1,4 +1,4 @@
-// Copyright 2019 Emmett Lalish, Jared Hoberock and Nathan Bell of
+// Copyright 2020 Emmett Lalish, Jared Hoberock and Nathan Bell of
 // NVIDIA Research
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -95,6 +95,21 @@ thrust::permutation_iterator<A, B> perm(A a, B b) {
 template <typename T>
 thrust::counting_iterator<T> countAt(T i) {
   return thrust::make_counting_iterator(i);
+}
+
+template <typename T>
+__host__ __device__ T AtomicAdd(T& target, T add) {
+#ifdef __CUDA_ARCH__
+  return atomicAdd(&target, add);
+#else
+  float out;
+#pragma omp atomic capture
+  {
+    out = target;
+    target += add;
+  }
+  return out;
+#endif
 }
 
 // Copied from
