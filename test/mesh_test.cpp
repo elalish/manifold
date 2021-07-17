@@ -91,7 +91,7 @@ TEST(Manifold, Regression) {
   Manifold mesh1 = manifold;
   mesh1.Translate(glm::vec3(5.0f));
   int num_overlaps = manifold.NumOverlaps(mesh1);
-  ASSERT_EQ(num_overlaps, 237322);
+  ASSERT_EQ(num_overlaps, 239119);
 
   Mesh mesh_out = manifold.Extract();
   Manifold mesh2(mesh_out);
@@ -250,7 +250,7 @@ TEST(Manifold, Coplanar) {
   Manifold out = cube - cube2.Scale({0.5f, 0.5f, 1.0f})
                             .Rotate(0, 0, 15)
                             .Translate({0.25f, 0.25f, 0.0f});
-  ExpectMeshes(out, {{32, 64}});
+  ExpectMeshes(out, {{42, 84}});
   EXPECT_EQ(out.Genus(), 1);
   ExportMesh("coplanar.gltf", out.Extract());
 }
@@ -273,7 +273,7 @@ TEST(Manifold, FaceUnion) {
   Manifold cube2 = cubes;
   cubes += cube2.Translate({1, 0, 0});
   EXPECT_EQ(cubes.Genus(), 0);
-  ExpectMeshes(cubes, {{8, 12}});
+  ExpectMeshes(cubes, {{12, 20}});
   auto prop = cubes.GetProperties();
   EXPECT_NEAR(prop.volume, 2, 1e-5);
   EXPECT_NEAR(prop.surfaceArea, 10, 1e-5);
