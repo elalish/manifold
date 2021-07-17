@@ -1,4 +1,4 @@
-// Copyright 2019 Emmett Lalish
+// Copyright 2021 Emmett Lalish
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -33,7 +33,17 @@ using namespace manifold;
 
 constexpr uint32_t kNoCode = 0xFFFFFFFFu;
 
-__host__ __device__ int nextHalfedge(int current) {
+__host__ __device__ glm::vec3 SafeNormalize(glm::vec3 v) {
+  v = glm::normalize(v);
+  return isfinite(v.x) ? v : glm::vec3(0);
+}
+
+__host__ __device__ glm::vec3 OrthogonalTo(glm::vec3 in, glm::vec3 ref) {
+  in -= glm::dot(in, ref) * ref;
+  return in;
+}
+
+__host__ __device__ int NextHalfedge(int current) {
   ++current;
   if (current % 3 == 0) current -= 3;
   return current;
@@ -42,9 +52,29 @@ __host__ __device__ int nextHalfedge(int current) {
 __host__ __device__ glm::ivec3 TriOf(int edge) {
   glm::ivec3 triEdge;
   triEdge[0] = edge;
-  triEdge[1] = nextHalfedge(triEdge[0]);
-  triEdge[2] = nextHalfedge(triEdge[1]);
+  triEdge[1] = NextHalfedge(triEdge[0]);
+  triEdge[2] = NextHalfedge(triEdge[1]);
   return triEdge;
+}
+
+/**
+ * The total number of verts if a triangle is subdivided naturally such that
+ * each edge has edgeVerts verts along it (edgeVerts >= -1).
+ */
+__host__ __device__ int VertsPerTri(int edgeVerts) {
+  return (edgeVerts * edgeVerts + edgeVerts) / 2;
+}
+
+__host__ __device__ void AtomicAddVec3(glm::vec3& target,
+                                       const glm::vec3& add) {
+  for (int i : {0, 1, 2}) {
+#ifdef __CUDA_ARCH__
+    atomicAdd(&target[i], add[i]);
+#else
+#pragma omp atomic
+    target[i] += add[i];
+#endif
+  }
 }
 
 /**
@@ -71,6 +101,11 @@ __host__ __device__ glm::mat3x2 GetAxisAlignedProjection(glm::vec3 normal) {
   if (xyzMax < 0) projection[0] *= -1.0f;
   return glm::transpose(projection);
 }
+
+struct Barycentric {
+  int tri;
+  glm::vec3 uvw;
+};
 
 struct Normalize {
   __host__ __device__ void operator()(glm::vec3& v) {
@@ -145,7 +180,7 @@ struct ReindexHalfedge {
   }
 };
 
-struct SplitEdges {
+struct EdgeVerts {
   glm::vec3* vertPos;
   const int startIdx;
   const int n;
@@ -165,21 +200,44 @@ struct SplitEdges {
 
 struct InteriorVerts {
   glm::vec3* vertPos;
+  glm::vec3* uvw;
+  BaryRef* triBary;
   const int startIdx;
   const int n;
   const Halfedge* halfedge;
 
   __host__ __device__ void operator()(int tri) {
-    int vertsPerTri = ((n - 2) * (n - 2) + (n - 2)) / 2;
-    float invTotal = 1.0f / n;
-    int pos = startIdx + vertsPerTri * tri;
-    for (int i = 1; i < n - 1; ++i)
-      for (int j = 1; j < n - i; ++j)
-        vertPos[pos++] =
-            (float(i) * vertPos[halfedge[3 * tri + 2].startVert] +  //
-             float(j) * vertPos[halfedge[3 * tri].startVert] +      //
-             float(n - i - j) * vertPos[halfedge[3 * tri + 1].startVert]) *
-            invTotal;
+    const float invTotal = 1.0f / n;
+    int posTri = tri * n * n;
+    int posBary = tri * VertsPerTri(n + 1);
+    int pos = startIdx + tri * VertsPerTri(n - 2);
+    for (int i = 0; i <= n; ++i)
+      for (int j = 0; j <= n - i; ++j) {
+        const int k = n - i - j;
+        const float u = invTotal * j;
+        const float v = invTotal * k;
+        const float w = invTotal * i;
+        const int first = posBary;
+        uvw[posBary++] = {u, v, w};
+        if (j == n - i) continue;
+
+        // The three retained verts are denoted -1. uvw entries are added for
+        // them out of laziness of indexing only.
+        const int a = (k == n) ? -1 : first;
+        const int b = (i == n - 1) ? -1 : first + n - i + 1;
+        const int c = (j == n - 1) ? -1 : first + 1;
+        triBary[posTri++] = {tri, {c, a, b}};
+        if (j < n - 1 - i) {
+          int d = b + 1;
+          triBary[posTri++] = {tri, {b, d, c}};
+        }
+
+        if (i == 0 || j == 0 || k == 0) continue;
+
+        vertPos[pos++] = u * vertPos[halfedge[3 * tri].startVert] +      //
+                         v * vertPos[halfedge[3 * tri + 1].startVert] +  //
+                         w * vertPos[halfedge[3 * tri + 2].startVert];
+      }
   }
 };
 
@@ -236,13 +294,171 @@ struct SplitTris {
         int a = Vert(i, j, tri);
         int b = Vert(i + 1, j, tri);
         int c = Vert(i, j + 1, tri);
-        triVerts[pos++] = glm::ivec3(a, b, c);
+        triVerts[pos++] = glm::ivec3(c, a, b);
         if (j < n - 1 - i) {
           int d = Vert(i + 1, j + 1, tri);
           triVerts[pos++] = glm::ivec3(b, d, c);
         }
       }
     }
+  }
+};
+
+struct SmoothBezier {
+  const glm::vec3* vertPos;
+  const glm::vec3* triNormal;
+  const glm::vec3* vertNormal;
+  const Halfedge* halfedge;
+
+  __host__ __device__ void operator()(
+      thrust::tuple<glm::vec4&, Halfedge> inOut) {
+    glm::vec4& tangent = thrust::get<0>(inOut);
+    const Halfedge edge = thrust::get<1>(inOut);
+
+    const glm::vec3 startV = vertPos[edge.startVert];
+    const glm::vec3 edgeVec = vertPos[edge.endVert] - startV;
+    const glm::vec3 edgeNormal =
+        (triNormal[edge.face] + triNormal[halfedge[edge.pairedHalfedge].face]) /
+        2.0f;
+    glm::vec3 dir = glm::normalize(glm::cross(glm::cross(edgeNormal, edgeVec),
+                                              vertNormal[edge.startVert]));
+
+    const float weight = glm::abs(glm::dot(dir, glm::normalize(edgeVec)));
+    // Quadratic weighted bezier for circular interpolation
+    const glm::vec4 bz2 =
+        weight *
+        glm::vec4(startV + dir * glm::length(edgeVec) / (2 * weight), 1.0f);
+    // Equivalent cubic weighted bezier
+    const glm::vec4 bz3 = glm::mix(glm::vec4(startV, 1.0f), bz2, 2 / 3.0f);
+    // Convert from homogeneous form to geometric form
+    tangent = glm::vec4(glm::vec3(bz3) / bz3.w - startV, bz3.w);
+  }
+};
+
+struct TriBary2Vert {
+  Barycentric* vertBary;
+  int* lock;
+  const glm::vec3* uvw;
+  const Halfedge* halfedge;
+
+  __host__ __device__ void operator()(thrust::tuple<BaryRef, int> in) {
+    const BaryRef baryRef = thrust::get<0>(in);
+    const int tri = thrust::get<1>(in);
+
+    for (int i : {0, 1, 2}) {
+      int vert = halfedge[3 * tri + i].startVert;
+      if (AtomicAdd(lock[vert], 1) != 0) continue;
+
+      const int idx = baryRef.vertBary[i];
+      glm::vec3 bary(0);
+      if (idx < 0)
+        bary[i] = 1;
+      else
+        bary = uvw[idx];
+      vertBary[vert] = {baryRef.tri, bary};
+    }
+  }
+};
+
+struct InterpTri {
+  const Halfedge* halfedge;
+  const glm::vec4* halfedgeTangent;
+  const glm::vec3* vertPos;
+
+  __host__ __device__ glm::vec4 Homogeneous(glm::vec4 v) const {
+    v.x *= v.w;
+    v.y *= v.w;
+    v.z *= v.w;
+    return v;
+  }
+
+  __host__ __device__ glm::vec4 Homogeneous(glm::vec3 v) const {
+    return glm::vec4(v, 1.0f);
+  }
+
+  __host__ __device__ glm::vec3 HNormalize(glm::vec4 v) const {
+    return glm::vec3(v) / v.w;
+  }
+
+  __host__ __device__ glm::vec4 Bezier(glm::vec3 point,
+                                       glm::vec4 tangent) const {
+    return Homogeneous(glm::vec4(point, 0) + tangent);
+  }
+
+  __host__ __device__ glm::mat2x4 CubicBezier2Linear(glm::vec4 p0, glm::vec4 p1,
+                                                     glm::vec4 p2, glm::vec4 p3,
+                                                     float x) const {
+    glm::mat2x4 out;
+    glm::vec4 p12 = glm::mix(p1, p2, x);
+    out[0] = glm::mix(glm::mix(p0, p1, x), p12, x);
+    out[1] = glm::mix(p12, glm::mix(p2, p3, x), x);
+    return out;
+  }
+
+  __host__ __device__ glm::vec3 BezierPoint(glm::mat2x4 points, float x) const {
+    return HNormalize(glm::mix(points[0], points[1], x));
+  }
+
+  __host__ __device__ glm::vec3 BezierTangent(glm::mat2x4 points) const {
+    return glm::normalize(HNormalize(points[1]) - HNormalize(points[0]));
+  }
+
+  __host__ __device__ void operator()(
+      thrust::tuple<glm::vec3&, Barycentric> inOut) {
+    glm::vec3& pos = thrust::get<0>(inOut);
+    const int tri = thrust::get<1>(inOut).tri;
+    const glm::vec3 uvw = thrust::get<1>(inOut).uvw;
+
+    glm::vec4 posH(0);
+    const glm::mat3 corners = {vertPos[halfedge[3 * tri].startVert],
+                               vertPos[halfedge[3 * tri + 1].startVert],
+                               vertPos[halfedge[3 * tri + 2].startVert]};
+
+    for (const int i : {0, 1, 2}) {
+      if (uvw[i] == 1) {
+        pos = glm::vec3(corners[i]);
+        return;
+      }
+    }
+
+    const glm::mat3x4 tangentR = {halfedgeTangent[3 * tri],
+                                  halfedgeTangent[3 * tri + 1],
+                                  halfedgeTangent[3 * tri + 2]};
+    const glm::mat3x4 tangentL = {
+        halfedgeTangent[halfedge[3 * tri + 2].pairedHalfedge],
+        halfedgeTangent[halfedge[3 * tri].pairedHalfedge],
+        halfedgeTangent[halfedge[3 * tri + 1].pairedHalfedge]};
+
+    for (const int i : {0, 1, 2}) {
+      const int j = (i + 1) % 3;
+      const int k = (i + 2) % 3;
+      const float x = uvw[k] / (1 - uvw[i]);
+
+      const glm::mat2x4 bez = CubicBezier2Linear(
+          Homogeneous(corners[j]), Bezier(corners[j], tangentR[j]),
+          Bezier(corners[k], tangentL[k]), Homogeneous(corners[k]), x);
+      const glm::vec3 end = BezierPoint(bez, x);
+      const glm::vec3 tangent = BezierTangent(bez);
+
+      const glm::vec3 jBitangent = SafeNormalize(OrthogonalTo(
+          glm::vec3(tangentL[j]), SafeNormalize(glm::vec3(tangentR[j]))));
+      const glm::vec3 kBitangent = SafeNormalize(OrthogonalTo(
+          glm::vec3(tangentR[k]), -SafeNormalize(glm::vec3(tangentL[k]))));
+      const glm::vec3 normal = SafeNormalize(
+          glm::cross(glm::mix(jBitangent, kBitangent, x), tangent));
+      const glm::vec3 delta = OrthogonalTo(
+          glm::mix(glm::vec3(tangentL[j]), glm::vec3(tangentR[k]), x), normal);
+      const float deltaW = glm::mix(tangentL[j].w, tangentR[k].w, x);
+
+      const glm::mat2x4 bez1 = CubicBezier2Linear(
+          Homogeneous(end), Homogeneous(glm::vec4(end + delta, deltaW)),
+          Bezier(corners[i], glm::mix(tangentR[i], tangentL[i], x)),
+          Homogeneous(corners[i]), uvw[i]);
+      const glm::vec3 p = BezierPoint(bez1, uvw[i]);
+      float w = uvw[j] * uvw[j] * uvw[k] * uvw[k];
+      posH += Homogeneous(glm::vec4(p, w));
+    }
+    pos = HNormalize(posH);
   }
 };
 
@@ -324,7 +540,63 @@ struct SumPair : public thrust::binary_function<thrust::pair<float, float>,
   }
 };
 
-struct Transform {
+struct CurvatureAngles {
+  float* meanCurvature;
+  float* gaussianCurvature;
+  float* area;
+  float* degree;
+  const Halfedge* halfedge;
+  const glm::vec3* vertPos;
+  const glm::vec3* triNormal;
+
+  __host__ __device__ void operator()(int tri) {
+    glm::vec3 edge[3];
+    glm::vec3 edgeLength;
+    for (int i : {0, 1, 2}) {
+      const int startVert = halfedge[3 * tri + i].startVert;
+      const int endVert = halfedge[3 * tri + i].endVert;
+      edge[i] = vertPos[endVert] - vertPos[startVert];
+      edgeLength[i] = glm::length(edge[i]);
+      edge[i] /= edgeLength[i];
+      const int neighborTri = halfedge[3 * tri + i].pairedHalfedge / 3;
+      const float dihedral =
+          0.25 * edgeLength[i] *
+          glm::asin(glm::dot(glm::cross(triNormal[tri], triNormal[neighborTri]),
+                             edge[i]));
+      AtomicAdd(meanCurvature[startVert], dihedral);
+      AtomicAdd(meanCurvature[endVert], dihedral);
+      AtomicAdd(degree[startVert], 1.0f);
+    }
+
+    glm::vec3 phi;
+    phi[0] = glm::acos(-glm::dot(edge[2], edge[0]));
+    phi[1] = glm::acos(-glm::dot(edge[0], edge[1]));
+    phi[2] = glm::pi<float>() - phi[0] - phi[1];
+    const float area3 = edgeLength[0] * edgeLength[1] *
+                        glm::length(glm::cross(edge[0], edge[1])) / 6;
+
+    for (int i : {0, 1, 2}) {
+      const int vert = halfedge[3 * tri + i].startVert;
+      AtomicAdd(gaussianCurvature[vert], -phi[i]);
+      AtomicAdd(area[vert], area3);
+    }
+  }
+};
+
+struct NormalizeCurvature {
+  __host__ __device__ void operator()(
+      thrust::tuple<float&, float&, float, float> inOut) {
+    float& meanCurvature = thrust::get<0>(inOut);
+    float& gaussianCurvature = thrust::get<1>(inOut);
+    float area = thrust::get<2>(inOut);
+    float degree = thrust::get<3>(inOut);
+    float factor = degree / (6 * area);
+    meanCurvature *= factor;
+    gaussianCurvature *= factor;
+  }
+};
+
+struct Transform4x3 {
   const glm::mat4x3 transform;
 
   __host__ __device__ void operator()(glm::vec3& position) {
@@ -414,36 +686,42 @@ struct Reindex {
   }
 };
 
+template <typename T>
+void Permute(VecDH<T>& inOut, const VecDH<int>& new2Old) {
+  VecDH<T> tmp(inOut);
+  inOut.resize(new2Old.size());
+  thrust::gather(new2Old.beginD(), new2Old.endD(), tmp.beginD(),
+                 inOut.beginD());
+}
+
+template void Permute<BaryRef>(VecDH<BaryRef>&, const VecDH<int>&);
+template void Permute<glm::vec3>(VecDH<glm::vec3>&, const VecDH<int>&);
+
 struct ReindexFace {
   Halfedge* halfedge;
+  glm::vec4* halfedgeTangent;
   const Halfedge* oldHalfedge;
+  const glm::vec4* oldHalfedgeTangent;
   const int* faceNew2Old;
   const int* faceOld2New;
 
   __host__ __device__ void operator()(int newFace) {
     const int oldFace = faceNew2Old[newFace];
     for (const int i : {0, 1, 2}) {
-      Halfedge edge = oldHalfedge[3 * oldFace + i];
+      const int oldEdge = 3 * oldFace + i;
+      Halfedge edge = oldHalfedge[oldEdge];
       edge.face = newFace;
       const int pairedFace = edge.pairedHalfedge / 3;
       const int offset = edge.pairedHalfedge - 3 * pairedFace;
       edge.pairedHalfedge = 3 * faceOld2New[pairedFace] + offset;
-      halfedge[3 * newFace + i] = edge;
+      const int newEdge = 3 * newFace + i;
+      halfedge[newEdge] = edge;
+      if (oldHalfedgeTangent != nullptr) {
+        halfedgeTangent[newEdge] = oldHalfedgeTangent[oldEdge];
+      }
     }
   }
 };
-
-__host__ __device__ void AtomicAddVec3(glm::vec3& target,
-                                       const glm::vec3& add) {
-  for (int i : {0, 1, 2}) {
-#ifdef __CUDA_ARCH__
-    atomicAdd(&target[i], add[i]);
-#else
-#pragma omp atomic
-    target[i] += add[i];
-#endif
-  }
-}
 
 struct AssignNormals {
   glm::vec3* vertNormal;
@@ -468,29 +746,32 @@ struct AssignNormals {
       edgeLength[i] = glm::length(edge[i]);
       perimeter += edgeLength[i];
     }
-    glm::vec3 crossP = glm::cross(edge[0], edge[1]);
 
-    const bool isDegenerate = glm::length(crossP) <= perimeter * precision;
+    // glm::vec3 crossP = glm::cross(edge[0], edge[1]);
+    // const bool isDegenerate = glm::length(crossP) <= perimeter * precision;
 
-    if (calculateTriNormal ||
-        (triNormal.x == 0 && triNormal.y == 0 && triNormal.z == 0)) {
-      // if (!calculateTriNormal && triNormal.x == 0 && triNormal.y == 0 &&
-      //     triNormal.z == 0)
-      //   printf("Tri %d gets a new normal\n", face);
-      triNormal = isDegenerate ? glm::vec3(0)
-                               : glm::normalize(glm::cross(edge[0], edge[1]));
+    // if (calculateTriNormal ||
+    //     (triNormal.x == 0 && triNormal.y == 0 && triNormal.z == 0)) {
+    //   triNormal = isDegenerate ? glm::vec3(0)
+    //                            : glm::normalize(glm::cross(edge[0],
+    //                            edge[1]));
+    // }
+
+    if (calculateTriNormal) {
+      triNormal = glm::normalize(glm::cross(edge[0], edge[1]));
+      if (isnan(triNormal.x)) triNormal = glm::vec3(0, 0, 1);
     }
 
     // corner angles
     glm::vec3 phi;
-    if (isDegenerate) {
-      phi = glm::vec3(kTolerance);
-    } else {
-      for (int i : {0, 1, 2}) edge[i] /= edgeLength[i];
-      phi[0] = glm::acos(-glm::dot(edge[2], edge[0]));
-      phi[1] = glm::acos(-glm::dot(edge[0], edge[1]));
-      phi[2] = glm::pi<float>() - phi[0] - phi[1];
-    }
+    // if (isDegenerate) {
+    //   phi = glm::vec3(kTolerance);
+    // } else {
+    for (int i : {0, 1, 2}) edge[i] /= edgeLength[i];
+    phi[0] = glm::acos(-glm::dot(edge[2], edge[0]));
+    phi[1] = glm::acos(-glm::dot(edge[0], edge[1]));
+    phi[2] = glm::pi<float>() - phi[0] - phi[1];
+    // }
 
     // assign weighted sum
     for (int i : {0, 1, 2}) {
@@ -579,6 +860,16 @@ struct ShortEdge {
     const glm::vec3 delta =
         vertPos[halfedge[edge].endVert] - vertPos[halfedge[edge].startVert];
     return glm::dot(delta, delta) < precision * precision;
+  }
+};
+
+struct InitializeBaryRef {
+  __host__ __device__ void operator()(thrust::tuple<BaryRef&, int> inOut) {
+    BaryRef& baryRef = thrust::get<0>(inOut);
+    int tri = thrust::get<1>(inOut);
+
+    baryRef.tri = tri;
+    baryRef.vertBary = {-1, -1, -1};
   }
 };
 
@@ -685,9 +976,10 @@ namespace manifold {
 
 /**
  * Create a manifold from an input triangle Mesh. Will throw if the Mesh is not
- * manifold.
+ * manifold. TODO: update halfedgeTangent during CollapseDegenerates.
  */
-Manifold::Impl::Impl(const Mesh& mesh) : vertPos_(mesh.vertPos) {
+Manifold::Impl::Impl(const Mesh& mesh)
+    : vertPos_(mesh.vertPos), halfedgeTangent_(mesh.halfedgeTangent) {
   CheckDevice();
   CalculateBBox();
   SetPrecision();
@@ -761,6 +1053,11 @@ void Manifold::Impl::CreateHalfedges(const VecDH<glm::ivec3>& triVerts) {
   thrust::sort(edge.beginD(), edge.endD());
   thrust::for_each_n(countAt(0), halfedge_.size() / 2,
                      LinkHalfedges({halfedge_.ptrD(), edge.cptrD()}));
+  if (meshRelation_.triBary.size() != numTri) {
+    meshRelation_.triBary.resize(numTri);
+    thrust::for_each_n(zip(meshRelation_.triBary.beginD(), countAt(0)), numTri,
+                       InitializeBaryRef());
+  }
 }
 
 /**
@@ -785,46 +1082,21 @@ void Manifold::Impl::CreateAndFixHalfedges(const VecDH<glm::ivec3>& triVerts) {
                      LinkHalfedges({halfedge_.ptrH(), edge.cptrH()}));
   thrust::for_each(thrust::host, countAt(1), countAt(halfedge_.size() / 2),
                    SwapHalfedges({halfedge_.ptrH(), edge.cptrH()}));
+  meshRelation_.triBary.resize(numTri);
+  thrust::for_each_n(zip(meshRelation_.triBary.begin(), countAt(0)), numTri,
+                     InitializeBaryRef());
 }
 
-void Manifold::Impl::SplitNonmanifoldVerts() {
-  // halfedge_.Dump();
-  const VecH<Halfedge>& halfedge = halfedge_.H();
-  VecH<Halfedge> sorted = halfedge;
-  VecH<int> sorted2non(halfedge.size());
-  thrust::sequence(sorted2non.begin(), sorted2non.end());
-  thrust::sort_by_key(sorted.begin(), sorted.end(), sorted2non.begin(),
-                      [](const Halfedge& a, const Halfedge& b) {
-                        return a.startVert == b.startVert
-                                   ? a.endVert < b.endVert
-                                   : a.startVert < b.startVert;
-                      });
-  int numVert = NumVert();
-  int edge = 0;
-  for (int i = 0; i < numVert; ++i) {
-    Halfedge start = sorted[edge];
-    if (i != start.startVert)
-      std::cout << i << " != " << start.startVert << std::endl;
-    int numEdge = 1;
-    while (sorted[edge + numEdge].startVert == i) {
-      ++numEdge;
-    }
-    const int first = sorted2non[edge];
-    int current = first;
-    // std::cout << numEdge << std::endl;
-    for (int numAround = 0; numAround < numEdge; ++numAround) {
-      // std::cout << halfedge[current] << std::endl;
-      current = halfedge[current].pairedHalfedge + 1;
-      if (current % 3 == 0) current -= 3;
-      if (current == first && numAround != numEdge - 1)
-        std::cout << "cycled in " << numAround + 1 << " when there are "
-                  << numEdge << " edges total!" << std::endl;
-    }
-    if (current != first) std::cout << "did not cycle!" << std::endl;
-    edge += numEdge;
-  }
-}
-
+/**
+ * Collapses degenerate triangles by removing edges shorter than precision_ and
+ * edges that are colinear whose collapse does not generate a geometric change.
+ * Rather than actually removing them, this step merely marks them for removal,
+ * by setting vertPos to NaN and halfedge to -1.
+ *
+ * TODO: remove colinear edge collapse, since this could easily conflict with
+ * mesh property junctions; consider test Boolean.FaceUnion if the two cubes
+ * were different colors - we are losing the verts that denote the boundary.
+ */
 void Manifold::Impl::CollapseDegenerates() {
   VecDH<int> shortEdges(halfedge_.size());
   int numShort =
@@ -864,7 +1136,8 @@ void Manifold::Impl::CollapseDegenerates() {
 
 /**
  * Once halfedge_ has been filled in, this function can be called to create the
- * rest of the internal data structures.
+ * rest of the internal data structures. This function also removes the verts
+ * and halfedges flagged for removal (NaN verts and -1 halfedges).
  */
 void Manifold::Impl::Finish() {
   if (halfedge_.size() == 0) return;
@@ -932,7 +1205,8 @@ void Manifold::Impl::ApplyTransform() const {
  */
 void Manifold::Impl::ApplyTransform() {
   if (transform_ == glm::mat4x3(1.0f)) return;
-  thrust::for_each(vertPos_.beginD(), vertPos_.endD(), Transform({transform_}));
+  thrust::for_each(vertPos_.beginD(), vertPos_.endD(),
+                   Transform4x3({transform_}));
 
   glm::mat3 normalTransform =
       glm::inverse(glm::transpose(glm::mat3(transform_)));
@@ -944,11 +1218,16 @@ void Manifold::Impl::ApplyTransform() {
   // axis-aligned.
   if (!collider_.Transform(transform_)) Update();
 
-  precision_ *= glm::max(
-      glm::length(transform_[0]),
-      glm::max(glm::length(transform_[1]), glm::length(transform_[2])));
+  const float oldScale = bBox_.Scale();
   transform_ = glm::mat4x3(1.0f);
   CalculateBBox();
+
+  const float newScale = bBox_.Scale();
+  precision_ *= glm::max(1.0f, newScale / oldScale) *
+                glm::max(glm::length(transform_[0]),
+                         glm::max(glm::length(transform_[1]),
+                                  glm::length(transform_[2])));
+
   // Maximum of inherited precision loss and translational precision loss.
   SetPrecision(precision_);
 }
@@ -1064,36 +1343,158 @@ void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge) {
   CreateAndFixHalfedges(triVertsOut);
 }
 
+void Manifold::Impl::CreateTangents(
+    const std::vector<Smoothness>& sharpenedEdges) {
+  const int numHalfedge = halfedge_.size();
+  halfedgeTangent_.resize(numHalfedge);
+
+  thrust::for_each_n(zip(halfedgeTangent_.beginD(), halfedge_.cbeginD()),
+                     numHalfedge,
+                     SmoothBezier({vertPos_.cptrD(), faceNormal_.cptrD(),
+                                   vertNormal_.cptrD(), halfedge_.cptrD()}));
+
+  if (!sharpenedEdges.empty()) {
+    const VecH<Halfedge>& halfedge = halfedge_.H();
+    const VecH<BaryRef>& triBary = meshRelation_.triBary.H();
+
+    std::vector<int> oldHalfedge2New(halfedge.size());
+    for (int tri = 0; tri < NumTri(); ++tri) {
+      int oldTri = triBary[tri].tri;
+      for (int i : {0, 1, 2}) oldHalfedge2New[3 * oldTri + i] = 3 * tri + i;
+    }
+
+    using Pair = std::pair<Smoothness, Smoothness>;
+    // Fill in missing pairs with default smoothness = 1.
+    std::map<int, Pair> edges;
+    for (Smoothness edge : sharpenedEdges) {
+      if (edge.smoothness == 1) continue;
+      edge.halfedge = oldHalfedge2New[edge.halfedge];
+      int pair = halfedge[edge.halfedge].pairedHalfedge;
+      if (edges.find(pair) == edges.end()) {
+        edges[edge.halfedge] = {edge, {pair, 1}};
+      } else {
+        edges[pair].second = edge;
+      }
+    }
+
+    std::map<int, std::vector<Pair>> vertTangents;
+    for (const auto value : edges) {
+      const Pair edge = value.second;
+      vertTangents[halfedge[edge.first.halfedge].startVert].push_back(edge);
+      vertTangents[halfedge[edge.second.halfedge].startVert].push_back(
+          {edge.second, edge.first});
+    }
+
+    VecH<glm::vec4>& tangent = halfedgeTangent_.H();
+    for (const auto& value : vertTangents) {
+      const std::vector<Pair>& vert = value.second;
+      // Sharp edges that end are smooth at their terminal vert.
+      if (vert.size() == 1) continue;
+      if (vert.size() == 2) {  // Make continuous edge
+        const int first = vert[0].first.halfedge;
+        const int second = vert[1].first.halfedge;
+        const glm::vec3 newTangent = glm::normalize(glm::vec3(tangent[first]) -
+                                                    glm::vec3(tangent[second]));
+        tangent[first] =
+            glm::vec4(glm::length(glm::vec3(tangent[first])) * newTangent,
+                      tangent[first].w);
+        tangent[second] =
+            glm::vec4(-glm::length(glm::vec3(tangent[second])) * newTangent,
+                      tangent[second].w);
+
+        auto SmoothHalf = [&](int first, int last, float smoothness) {
+          int current = NextHalfedge(halfedge[first].pairedHalfedge);
+          while (current != last) {
+            const float cosBeta = glm::dot(
+                newTangent, glm::normalize(glm::vec3(tangent[current])));
+            const float factor =
+                (1 - smoothness) * cosBeta * cosBeta + smoothness;
+            tangent[current] = glm::vec4(factor * glm::vec3(tangent[current]),
+                                         tangent[current].w);
+            current = NextHalfedge(halfedge[current].pairedHalfedge);
+          }
+        };
+
+        SmoothHalf(first, second,
+                   (vert[0].second.smoothness + vert[1].first.smoothness) / 2);
+        SmoothHalf(second, first,
+                   (vert[1].second.smoothness + vert[0].first.smoothness) / 2);
+
+      } else {  // Sharpen vertex uniformly
+        float smoothness = 0;
+        for (const Pair pair : vert) {
+          smoothness += pair.first.smoothness;
+          smoothness += pair.second.smoothness;
+        }
+        smoothness /= 2 * vert.size();
+
+        const int start = vert[0].first.halfedge;
+        int current = start;
+        do {
+          tangent[current] = glm::vec4(smoothness * glm::vec3(tangent[current]),
+                                       tangent[current].w);
+          current = NextHalfedge(halfedge[current].pairedHalfedge);
+        } while (current != start);
+      }
+    }
+  }
+}
+
 /**
  * Split each edge into n pieces and sub-triangulate each triangle accordingly.
  * This function doesn't run Finish(), as that is expensive and it'll need to be
  * run after the new vertices have moved, which is a likely scenario after
  * refinement (smoothing).
  */
-void Manifold::Impl::Refine(int n) {
+void Manifold::Impl::Subdivide(int n) {
   int numVert = NumVert();
   int numEdge = NumEdge();
   int numTri = NumTri();
   // Append new verts
   int vertsPerEdge = n - 1;
-  int vertsPerTri = ((n - 2) * (n - 2) + (n - 2)) / 2;
   int triVertStart = numVert + numEdge * vertsPerEdge;
-  vertPos_.resize(triVertStart + numTri * vertsPerTri);
+  vertPos_.resize(triVertStart + numTri * VertsPerTri(n - 2));
+  meshRelation_.barycentric.resize(numTri * VertsPerTri(n + 1));
+  meshRelation_.triBary.resize(n * n * numTri);
   VecDH<TmpEdge> edges = CreateTmpEdges(halfedge_);
   VecDH<int> half2Edge(2 * numEdge);
   thrust::for_each_n(zip(countAt(0), edges.beginD()), numEdge,
                      ReindexHalfedge({half2Edge.ptrD()}));
   thrust::for_each_n(zip(countAt(0), edges.beginD()), numEdge,
-                     SplitEdges({vertPos_.ptrD(), numVert, n}));
+                     EdgeVerts({vertPos_.ptrD(), numVert, n}));
   thrust::for_each_n(
       countAt(0), numTri,
-      InteriorVerts({vertPos_.ptrD(), triVertStart, n, halfedge_.ptrD()}));
+      InteriorVerts({vertPos_.ptrD(), meshRelation_.barycentric.ptrD(),
+                     meshRelation_.triBary.ptrD(), triVertStart, n,
+                     halfedge_.ptrD()}));
   // Create subtriangles
   VecDH<glm::ivec3> triVerts(n * n * numTri);
   thrust::for_each_n(countAt(0), numTri,
                      SplitTris({triVerts.ptrD(), halfedge_.cptrD(),
                                 half2Edge.cptrD(), numVert, triVertStart, n}));
   CreateHalfedges(triVerts);
+}
+
+void Manifold::Impl::Refine(int n) {
+  Manifold::Impl old = *this;
+  Subdivide(n);
+
+  if (old.halfedgeTangent_.size() == old.halfedge_.size()) {
+    VecDH<Barycentric> vertBary(NumVert());
+    VecDH<int> lock(NumVert(), 0);
+    thrust::for_each_n(
+        zip(meshRelation_.triBary.beginD(), countAt(0)), NumTri(),
+        TriBary2Vert({vertBary.ptrD(), lock.ptrD(),
+                      meshRelation_.barycentric.cptrD(), halfedge_.cptrD()}));
+
+    thrust::for_each_n(
+        zip(vertPos_.beginD(), vertBary.beginD()), NumVert(),
+        InterpTri({old.halfedge_.cptrD(), old.halfedgeTangent_.cptrD(),
+                   old.vertPos_.cptrD()}));
+  }
+
+  halfedgeTangent_.resize(0);
+  Finish();
 }
 
 /**
@@ -1122,14 +1523,8 @@ bool Manifold::Impl::MatchesTriNormals() const {
                                   faceNormal_.cptrD(), precision_}));
 }
 
-/**
- * Returns the surface area and volume of the manifold in a Properties
- * structure. These properties are clamped to zero for a given face if they are
- * within rounding tolerance. This means degenerate manifolds can by identified
- * by testing these properties as == 0.
- */
-Manifold::Properties Manifold::Impl::GetProperties() const {
-  if (halfedge_.size() == 0) return {0, 0};
+Properties Manifold::Impl::GetProperties() const {
+  if (IsEmpty()) return {0, 0};
   ApplyTransform();
   thrust::pair<float, float> areaVolume = thrust::transform_reduce(
       countAt(0), countAt(NumTri()),
@@ -1138,15 +1533,53 @@ Manifold::Properties Manifold::Impl::GetProperties() const {
   return {areaVolume.first, areaVolume.second};
 }
 
+Curvature Manifold::Impl::GetCurvature() const {
+  Curvature result;
+  if (IsEmpty()) return result;
+  ApplyTransform();
+  VecDH<float> vertMeanCurvature(NumVert(), 0);
+  VecDH<float> vertGaussianCurvature(NumVert(), glm::two_pi<float>());
+  VecDH<float> vertArea(NumVert(), 0);
+  VecDH<float> degree(NumVert(), 0);
+  thrust::for_each(
+      countAt(0), countAt(NumTri()),
+      CurvatureAngles({vertMeanCurvature.ptrD(), vertGaussianCurvature.ptrD(),
+                       vertArea.ptrD(), degree.ptrD(), halfedge_.cptrD(),
+                       vertPos_.cptrD(), faceNormal_.cptrD()}));
+  thrust::for_each_n(
+      zip(vertMeanCurvature.beginD(), vertGaussianCurvature.beginD(),
+          vertArea.beginD(), degree.beginD()),
+      NumVert(), NormalizeCurvature());
+  result.minMeanCurvature =
+      thrust::reduce(vertMeanCurvature.beginD(), vertMeanCurvature.endD(),
+                     1.0f / 0.0f, thrust::minimum<float>());
+  result.maxMeanCurvature =
+      thrust::reduce(vertMeanCurvature.beginD(), vertMeanCurvature.endD(),
+                     -1.0f / 0.0f, thrust::maximum<float>());
+  result.minGaussianCurvature = thrust::reduce(
+      vertGaussianCurvature.beginD(), vertGaussianCurvature.endD(), 1.0f / 0.0f,
+      thrust::minimum<float>());
+  result.maxGaussianCurvature = thrust::reduce(
+      vertGaussianCurvature.beginD(), vertGaussianCurvature.endD(),
+      -1.0f / 0.0f, thrust::maximum<float>());
+  result.vertMeanCurvature.insert(result.vertMeanCurvature.end(),
+                                  vertMeanCurvature.begin(),
+                                  vertMeanCurvature.end());
+  result.vertGaussianCurvature.insert(result.vertGaussianCurvature.end(),
+                                      vertGaussianCurvature.begin(),
+                                      vertGaussianCurvature.end());
+  return result;
+}
+
 /**
  * Calculates the bounding box of the entire manifold, which is stored
  * internally to short-cut Boolean operations and to serve as the precision
  * range for Morton code calculation.
  */
 void Manifold::Impl::CalculateBBox() {
-  bBox_.min = thrust::reduce(vertPos_.begin(), vertPos_.end(),
+  bBox_.min = thrust::reduce(vertPos_.beginD(), vertPos_.endD(),
                              glm::vec3(1 / 0.0f), PosMin());
-  bBox_.max = thrust::reduce(vertPos_.begin(), vertPos_.end(),
+  bBox_.max = thrust::reduce(vertPos_.beginD(), vertPos_.endD(),
                              glm::vec3(-1 / 0.0f), PosMax());
 }
 
@@ -1155,10 +1588,7 @@ void Manifold::Impl::CalculateBBox() {
  * the optional input.
  */
 void Manifold::Impl::SetPrecision(float minPrecision) {
-  glm::vec3 absMax =
-      kTolerance * glm::max(glm::abs(bBox_.min), glm::abs(bBox_.max));
-  precision_ =
-      glm::max(minPrecision, glm::max(absMax.x, glm::max(absMax.y, absMax.z)));
+  precision_ = glm::max(minPrecision, kTolerance * bBox_.Scale());
   if (!glm::isfinite(precision_)) precision_ = -1;
 }
 
@@ -1222,14 +1652,8 @@ void Manifold::Impl::SortFaces(VecDH<Box>& faceBox,
   VecDH<int> faceNew2Old(NumTri());
   thrust::sequence(faceNew2Old.beginD(), faceNew2Old.endD());
 
-  if (faceNormal_.size() == NumTri()) {
-    thrust::sort_by_key(
-        faceMorton.beginD(), faceMorton.endD(),
-        zip(faceBox.beginD(), faceNew2Old.beginD(), faceNormal_.beginD()));
-  } else {
-    thrust::sort_by_key(faceMorton.beginD(), faceMorton.endD(),
-                        zip(faceBox.beginD(), faceNew2Old.beginD()));
-  }
+  thrust::sort_by_key(faceMorton.beginD(), faceMorton.endD(),
+                      zip(faceBox.beginD(), faceNew2Old.beginD()));
 
   // Tris were flagged for removal with pairedHalfedge = -1 and assigned kNoCode
   // to sort them to the end, which allows them to be removed.
@@ -1239,10 +1663,8 @@ void Manifold::Impl::SortFaces(VecDH<Box>& faceBox,
   faceBox.resize(newNumTri);
   faceMorton.resize(newNumTri);
   faceNew2Old.resize(newNumTri);
-  if (faceNormal_.size() == NumTri()) faceNormal_.resize(newNumTri);
 
-  VecDH<Halfedge> oldHalfedge = halfedge_;
-  GatherFaces(oldHalfedge, faceNew2Old);
+  GatherFaces(faceNew2Old);
 }
 
 /**
@@ -1250,17 +1672,52 @@ void Manifold::Impl::SortFaces(VecDH<Box>& faceBox,
  * another manifold, given by oldHalfedge. Input faceNew2Old defines the old
  * faces to gather into this.
  */
-void Manifold::Impl::GatherFaces(const VecDH<Halfedge>& oldHalfedge,
-                                 const VecDH<int>& faceNew2Old) {
+void Manifold::Impl::GatherFaces(const VecDH<int>& faceNew2Old) {
   const int numTri = faceNew2Old.size();
+  Permute(meshRelation_.triBary, faceNew2Old);
+
+  if (faceNormal_.size() == NumTri()) Permute(faceNormal_, faceNew2Old);
+
+  VecDH<Halfedge> oldHalfedge(halfedge_);
+  VecDH<glm::vec4> oldHalfedgeTangent(halfedgeTangent_);
   VecDH<int> faceOld2New(oldHalfedge.size() / 3);
   thrust::scatter(countAt(0), countAt(numTri), faceNew2Old.beginD(),
                   faceOld2New.beginD());
 
   halfedge_.resize(3 * numTri);
-  thrust::for_each_n(countAt(0), numTri,
-                     ReindexFace({halfedge_.ptrD(), oldHalfedge.cptrD(),
-                                  faceNew2Old.cptrD(), faceOld2New.cptrD()}));
+  if (oldHalfedgeTangent.size() != 0) halfedgeTangent_.resize(3 * numTri);
+  thrust::for_each_n(
+      countAt(0), numTri,
+      ReindexFace({halfedge_.ptrD(), halfedgeTangent_.ptrD(),
+                   oldHalfedge.cptrD(), oldHalfedgeTangent.cptrD(),
+                   faceNew2Old.cptrD(), faceOld2New.cptrD()}));
+}
+
+void Manifold::Impl::GatherFaces(const Impl& old,
+                                 const VecDH<int>& faceNew2Old) {
+  const int numTri = faceNew2Old.size();
+  meshRelation_.triBary.resize(numTri);
+  thrust::gather(faceNew2Old.beginD(), faceNew2Old.endD(),
+                 old.meshRelation_.triBary.beginD(),
+                 meshRelation_.triBary.beginD());
+
+  if (old.faceNormal_.size() == old.NumTri()) {
+    faceNormal_.resize(numTri);
+    thrust::gather(faceNew2Old.beginD(), faceNew2Old.endD(),
+                   old.faceNormal_.beginD(), faceNormal_.beginD());
+  }
+
+  VecDH<int> faceOld2New(old.NumTri());
+  thrust::scatter(countAt(0), countAt(numTri), faceNew2Old.beginD(),
+                  faceOld2New.beginD());
+
+  halfedge_.resize(3 * numTri);
+  if (old.halfedgeTangent_.size() != 0) halfedgeTangent_.resize(3 * numTri);
+  thrust::for_each_n(
+      countAt(0), numTri,
+      ReindexFace({halfedge_.ptrD(), halfedgeTangent_.ptrD(),
+                   old.halfedge_.cptrD(), old.halfedgeTangent_.cptrD(),
+                   faceNew2Old.cptrD(), faceOld2New.cptrD()}));
 }
 
 /**
@@ -1276,7 +1733,8 @@ void Manifold::Impl::GatherFaces(const VecDH<Halfedge>& oldHalfedge,
  * recalculation.
  */
 void Manifold::Impl::CalculateNormals() {
-  vertNormal_.resize(NumVert(), glm::vec3(0.0f));
+  vertNormal_.resize(NumVert());
+  thrust::fill(vertNormal_.beginD(), vertNormal_.endD(), glm::vec3(0));
   bool calculateTriNormal = false;
   if (faceNormal_.size() != NumTri()) {
     faceNormal_.resize(NumTri());
@@ -1286,7 +1744,7 @@ void Manifold::Impl::CalculateNormals() {
       zip(faceNormal_.beginD(), countAt(0)), NumTri(),
       AssignNormals({vertNormal_.ptrD(), vertPos_.cptrD(), halfedge_.cptrD(),
                      precision_, calculateTriNormal}));
-  thrust::for_each(vertNormal_.begin(), vertNormal_.end(), Normalize());
+  thrust::for_each(vertNormal_.beginD(), vertNormal_.endD(), Normalize());
 }
 
 /**
@@ -1368,7 +1826,7 @@ void Manifold::Impl::UpdateVert(int vert, int startEdge, int endEdge) {
   VecH<Halfedge>& halfedge = halfedge_.H();
   while (startEdge != endEdge) {
     halfedge[startEdge].endVert = vert;
-    startEdge = nextHalfedge(startEdge);
+    startEdge = NextHalfedge(startEdge);
     halfedge[startEdge].startVert = vert;
     startEdge = halfedge[startEdge].pairedHalfedge;
   }
@@ -1442,7 +1900,7 @@ void Manifold::Impl::CollapseEdge(int edge) {
   std::vector<int> edges;
   int current = halfedge[tri0edge[1]].pairedHalfedge;
   while (current != tri1edge[2]) {
-    current = nextHalfedge(current);
+    current = NextHalfedge(current);
     edges.push_back(current);
     current = halfedge[current].pairedHalfedge;
   }
@@ -1455,7 +1913,7 @@ void Manifold::Impl::CollapseEdge(int edge) {
 
   current = start;
   while (current != tri0edge[2]) {
-    current = nextHalfedge(current);
+    current = NextHalfedge(current);
     const int vert = halfedge[current].endVert;
     const int next = halfedge[current].pairedHalfedge;
     for (int i = 0; i < edges.size(); ++i) {
@@ -1561,7 +2019,7 @@ bool Manifold::Impl::SwapEdge(const int edge) {
   int current = halfedge[tri1edge[0]].pairedHalfedge;
   const int endVert = halfedge[tri1edge[1]].endVert;
   while (current != tri0edge[1]) {
-    current = nextHalfedge(current);
+    current = NextHalfedge(current);
     if (halfedge[current].endVert == endVert) {
       FormLoop(tri0edge[2], current);
       RemoveIfFolded(tri0edge[2]);

@@ -1,4 +1,4 @@
-// Copyright 2020 Emmett Lalish
+// Copyright 2021 Emmett Lalish
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -74,13 +74,24 @@ struct MakeTri {
     }
   }
 };
+
+Manifold Halfspace(Box bBox, glm::vec3 normal, float originOffset) {
+  normal = glm::normalize(normal);
+  Manifold cutter =
+      Manifold::Cube(glm::vec3(2.0f), true).Translate({1.0f, 0.0f, 0.0f});
+  float size = glm::length(bBox.Center() - normal * originOffset) +
+               0.5f * glm::length(bBox.Size());
+  cutter.Scale(glm::vec3(size)).Translate({originOffset, 0.0f, 0.0f});
+  float yDeg = glm::degrees(-glm::asin(normal.z));
+  float zDeg = glm::degrees(glm::atan(normal.y, normal.x));
+  return cutter.Rotate(0.0f, yDeg, zDeg);
+}
 }  // namespace
 
 namespace manifold {
 
 Manifold::Manifold() : pImpl_{std::make_unique<Impl>()} {}
-Manifold::Manifold(const Mesh& manifold)
-    : pImpl_{std::make_unique<Impl>(manifold)} {}
+Manifold::Manifold(const Mesh& mesh) : pImpl_{std::make_unique<Impl>(mesh)} {}
 Manifold::~Manifold() = default;
 Manifold::Manifold(Manifold&&) noexcept = default;
 Manifold& Manifold::operator=(Manifold&&) noexcept = default;
@@ -95,6 +106,44 @@ Manifold& Manifold::operator=(const Manifold& other) {
 }
 
 /**
+ * Constructs a smooth version of the input mesh by creating tangents; this
+ * method will throw if you have supplied tangnets with your mesh already. The
+ * actual triangle resolution is unchanged; use the Refine() method to
+ * interpolate to a higher-resolution curve.
+ *
+ * By default, every edge is calculated for maximum smoothness (very much
+ * approximately), attempting to minimize the maximum mean curvature magnitude.
+ * No higher-order derivatives are considered, as the interpolation is
+ * independent per triangle, only sharing constraints on their boundaries.
+ *
+ * If desired, you can supply a vector of sharpened halfedges, which should in
+ * general be a small subset of all halfedges. Order of entries doesn't matter,
+ * as each one specifies the desired smoothness (between zero and one, with one
+ * the default for all unspecified halfedges) and the halfedge index (3 *
+ * triangle index + [0,1,2] where 0 is the edge between triVert 0 and 1, etc).
+ *
+ * At a smoothness value of zero, a sharp crease is made. The smoothness is
+ * interpolated along each edge, so the specified value should be thought of as
+ * an average. Where exactly two sharpened edges meet at a vertex, their
+ * tangents are rotated to be colinear so that the sharpened edge can be
+ * continuous. Vertices with only one sharpened edge are completely smooth,
+ * allowing sharpened edges to smoothly vanish at termination. A single vertex
+ * can be sharpened by sharping all edges that are incident on it, allowing
+ * cones to be formed.
+ */
+Manifold Manifold::Smooth(const Mesh& mesh,
+                          const std::vector<Smoothness>& sharpenedEdges) {
+  ALWAYS_ASSERT(
+      mesh.halfedgeTangent.empty(), std::runtime_error,
+      "when supplying tangents, the normal constructor should be used "
+      "rather than Smooth().");
+
+  Manifold manifold(mesh);
+  manifold.pImpl_->CreateTangents(sharpenedEdges);
+  return manifold;
+}
+
+/**
  * Constructs a tetrahedron centered at the origin with one vertex at (1,1,1)
  * and the rest at similarly symmetric points.
  */
@@ -102,16 +151,6 @@ Manifold Manifold::Tetrahedron() {
   Manifold tetrahedron;
   tetrahedron.pImpl_ = std::make_unique<Impl>(Impl::Shape::TETRAHEDRON);
   return tetrahedron;
-}
-
-/**
- * Constructs an octahedron centered at the origin with vertices one unit out
- * along each axis.
- */
-Manifold Manifold::Octahedron() {
-  Manifold octahedron;
-  octahedron.pImpl_ = std::make_unique<Impl>(Impl::Shape::OCTAHEDRON);
-  return octahedron;
 }
 
 /**
@@ -160,7 +199,7 @@ Manifold Manifold::Sphere(float radius, int circularSegments) {
                                : GetCircularSegments(radius) / 4;
   Manifold sphere;
   sphere.pImpl_ = std::make_unique<Impl>(Impl::Shape::OCTAHEDRON);
-  sphere.pImpl_->Refine(n);
+  sphere.pImpl_->Subdivide(n);
   thrust::for_each_n(sphere.pImpl_->vertPos_.beginD(), sphere.NumVert(),
                      ToSphere({radius}));
   sphere.pImpl_->Finish();
@@ -371,6 +410,8 @@ Manifold Manifold::Compose(const std::vector<Manifold>& manifolds) {
     nextFace += manifold.NumTri();
   }
 
+  // TODO: populate this properly
+  combined.meshRelation_.triBary.resize(combined.NumTri());
   combined.Finish();
   return out;
 }
@@ -413,7 +454,7 @@ std::vector<Manifold> Manifold::Decompose() const {
         faceNew2Old.beginD();
     faceNew2Old.resize(nFace);
 
-    meshes[i].pImpl_->GatherFaces(pImpl_->halfedge_, faceNew2Old);
+    meshes[i].pImpl_->GatherFaces(*pImpl_, faceNew2Old);
     meshes[i].pImpl_->ReindexVerts(vertNew2Old, pImpl_->NumVert());
 
     meshes[i].pImpl_->Finish();
@@ -426,17 +467,17 @@ std::vector<Manifold> Manifold::Decompose() const {
  * This returns a Mesh of simple vectors of vertices and triangles suitable for
  * saving or other operations outside of the context of this library.
  */
-Mesh Manifold::Extract(bool includeNormals) const {
+Mesh Manifold::Extract() const {
   pImpl_->ApplyTransform();
 
   Mesh result;
   result.vertPos.insert(result.vertPos.end(), pImpl_->vertPos_.begin(),
                         pImpl_->vertPos_.end());
-  if (includeNormals) {
-    result.vertNormal.insert(result.vertNormal.end(),
-                             pImpl_->vertNormal_.begin(),
-                             pImpl_->vertNormal_.end());
-  }
+  result.vertNormal.insert(result.vertNormal.end(), pImpl_->vertNormal_.begin(),
+                           pImpl_->vertNormal_.end());
+  result.halfedgeTangent.insert(result.halfedgeTangent.end(),
+                                pImpl_->halfedgeTangent_.begin(),
+                                pImpl_->halfedgeTangent_.end());
 
   result.triVerts.resize(NumTri());
   thrust::for_each_n(zip(result.triVerts.begin(), countAt(0)), NumTri(),
@@ -505,8 +546,45 @@ int Manifold::Genus() const {
   return 1 - chi / 2;
 }
 
-Manifold::Properties Manifold::GetProperties() const {
-  return pImpl_->GetProperties();
+/**
+ * Returns the surface area and volume of the manifold in a Properties
+ * structure. These properties are clamped to zero for a given face if they are
+ * within rounding tolerance. This means degenerate manifolds can by identified
+ * by testing these properties as == 0.
+ */
+Properties Manifold::GetProperties() const { return pImpl_->GetProperties(); }
+
+/**
+ * Curvature is the inverse of the radius of curvature, and signed such that
+ * positive is convex and negative is concave. There are two orthogonal
+ * principal curvatures at any point on a manifold, with one maximum and the
+ * other minimum. Gaussian curvature is their product, while mean
+ * curvature is their sum. This approximates them for every vertex (returned as
+ * vectors in the structure) and also returns their minimum and maximum values.
+ */
+Curvature Manifold::GetCurvature() const { return pImpl_->GetCurvature(); }
+
+/**
+ * Gets the relationship to the previous mesh, for the purpose of assinging
+ * properties like texture coordinates. The triBary vector is the same length as
+ * Mesh.triVerts and BaryRef.tri gives the index into the input triVerts vector.
+ * BaryRef.vertBary gives an index for each vertex into the barycentric vector,
+ * if that vertex is >= 0, indicating it is a new vertex. The barycentric
+ * coordinates are relative to the original verts of the corresponding input
+ * tri. If the index is -1, this indicates it is the original vertex.
+ *
+ * TODO: After a Boolean operation, we can refer to triangles from two input
+ * meshes. Store these using negative tri indicies and add helper methods to
+ * separate the bool and the index.
+ */
+MeshRelation Manifold::GetMeshRelation() const {
+  MeshRelation out;
+  const auto& relation = pImpl_->meshRelation_;
+  out.triBary.insert(out.triBary.end(), relation.triBary.begin(),
+                     relation.triBary.end());
+  out.barycentric.insert(out.barycentric.end(), relation.barycentric.begin(),
+                         relation.barycentric.end());
+  return out;
 }
 
 bool Manifold::IsManifold() const { return pImpl_->IsManifold(); }
@@ -546,6 +624,12 @@ Manifold& Manifold::Rotate(float xDegrees, float yDegrees, float zDegrees) {
   return *this;
 }
 
+Manifold& Manifold::Transform(const glm::mat4x3& m) {
+  glm::mat4 old(pImpl_->transform_);
+  pImpl_->transform_ = m * old;
+  return *this;
+}
+
 /**
  * This function does not change the topology, but allows the vertices to be
  * moved according to any arbitrary input function. It is easy to create a
@@ -560,6 +644,11 @@ Manifold& Manifold::Warp(std::function<void(glm::vec3&)> warpFunc) {
   pImpl_->faceNormal_.resize(0);  // force recalculation of triNormal
   pImpl_->CalculateNormals();
   pImpl_->SetPrecision();
+  return *this;
+}
+
+Manifold& Manifold::Refine(int n) {
+  pImpl_->Refine(n);
   return *this;
 }
 
@@ -614,6 +703,11 @@ Manifold& Manifold::operator^=(const Manifold& Q) {
   return *this;
 }
 
+/**
+ * Split cuts this manifold in two using the input manifold. The first result is
+ * the intersection, second is the difference. This is more efficient than doing
+ * them separately.
+ */
 std::pair<Manifold, Manifold> Manifold::Split(const Manifold& cutter) const {
   pImpl_->ApplyTransform();
   cutter.pImpl_->ApplyTransform();
@@ -626,17 +720,23 @@ std::pair<Manifold, Manifold> Manifold::Split(const Manifold& cutter) const {
   return result;
 }
 
+/**
+ * Convient version of Split for a half-space. The first result is in the
+ * direction of the normal, second is opposite. Origin offset is the distance of
+ * the plane from the origin in the direction of the normal vector. The length
+ * of the normal is not important, as it is normalized internally.
+ */
 std::pair<Manifold, Manifold> Manifold::SplitByPlane(glm::vec3 normal,
                                                      float originOffset) const {
-  normal = glm::normalize(normal);
-  Manifold cutter =
-      Manifold::Cube(glm::vec3(2.0f), true).Translate({1.0f, 0.0f, 0.0f});
-  float size = glm::length(BoundingBox().Center() - normal * originOffset) +
-               0.5f * glm::length(BoundingBox().Size());
-  cutter.Scale(glm::vec3(size)).Translate({originOffset, 0.0f, 0.0f});
-  float yDeg = glm::degrees(-glm::asin(normal.z));
-  float zDeg = glm::degrees(glm::atan(normal.y, normal.x));
-  cutter.Rotate(0.0f, yDeg, zDeg);
-  return Split(cutter);
+  return Split(Halfspace(BoundingBox(), normal, originOffset));
+}
+
+/**
+ * Identical to SplitbyPlane, but calculating and returning only the first
+ * result.
+ */
+Manifold Manifold::TrimByPlane(glm::vec3 normal, float originOffset) const {
+  pImpl_->ApplyTransform();
+  return *this ^ Halfspace(BoundingBox(), normal, originOffset);
 }
 }  // namespace manifold

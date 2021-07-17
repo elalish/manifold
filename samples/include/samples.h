@@ -1,4 +1,4 @@
-// Copyright 2019 Emmett Lalish
+// Copyright 2021 Emmett Lalish
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -53,5 +53,13 @@ Manifold StretchyBracelet(float radius = 30.0f, float height = 8.0f,
 // The classic cubic fractal, going down recursively n times.
 Manifold MengerSponge(int n = 3);
 
+// A cubic frame with cylinders for edges and spheres at the corners.
 Manifold RoundedFrame(float edgeLength, float radius);
+
+// A tetrahedron cut into two halves that can screw together.
+Manifold TetPuzzle(float edgeLength, float gap, int nDivisions);
+
+// A smoothed manifold demonstrating selective edge sharpening. Refine before
+// export to see the curvature.
+Manifold Scallop();
 }  // namespace manifold

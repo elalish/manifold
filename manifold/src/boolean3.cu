@@ -1,4 +1,4 @@
-// Copyright 2019 Emmett Lalish
+// Copyright 2021 Emmett Lalish
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -548,26 +548,12 @@ struct DuplicateVerts {
   }
 };
 
-__host__ __device__ int AtomicAddInt(int &target, int add) {
-#ifdef __CUDA_ARCH__
-  return atomicAdd(&target, add);
-#else
-  int out;
-#pragma omp atomic capture
-  {
-    out = target;
-    target += add;
-  }
-  return out;
-#endif
-}
-
 struct CountVerts {
   int *count;
   const int *inclusion;
 
   __host__ __device__ void operator()(const Halfedge &edge) {
-    AtomicAddInt(count[edge.face], glm::abs(inclusion[edge.startVert]));
+    AtomicAdd(count[edge.face], glm::abs(inclusion[edge.startVert]));
   }
 };
 
@@ -581,10 +567,10 @@ struct CountNewVerts {
     int faceQ = thrust::get<1>(in);
     int inclusion = glm::abs(thrust::get<2>(in));
 
-    AtomicAddInt(countQ[faceQ], inclusion);
+    AtomicAdd(countQ[faceQ], inclusion);
     const Halfedge half = halfedges[edgeP];
-    AtomicAddInt(countP[half.face], inclusion);
-    AtomicAddInt(countP[halfedges[half.pairedHalfedge].face], inclusion);
+    AtomicAdd(countP[half.face], inclusion);
+    AtomicAdd(countP[halfedges[half.pairedHalfedge].face], inclusion);
   }
 };
 
@@ -672,8 +658,8 @@ struct DuplicateHalfedges {
     int faceRight = faceP2R[halfedgesP[halfedge.pairedHalfedge].face];
 
     for (int i = 0; i < glm::abs(inclusion); ++i) {
-      int forwardIdx = AtomicAddInt(facePtr[halfedge.face], 1);
-      int backwardIdx = AtomicAddInt(facePtr[faceRight], 1);
+      int forwardIdx = AtomicAdd(facePtr[halfedge.face], 1);
+      int backwardIdx = AtomicAdd(facePtr[faceRight], 1);
       halfedge.pairedHalfedge = backwardIdx;
 
       halfedgesR[forwardIdx] = halfedge;
@@ -1138,11 +1124,6 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
   outR.precision_ = glm::max(inP_.precision_, inQ_.precision_);
 
   outR.Face2Tri(faceEdge);
-
-  // int chi = outR.NumVert() - outR.NumEdge() + outR.NumTri();
-  // std::cout << "triangle Genus = " << 1 - chi / 2 << std::endl;
-
-  // outR.SplitNonmanifoldVerts();
 
   outR.CollapseDegenerates();
 

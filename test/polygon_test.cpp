@@ -1,4 +1,4 @@
-// Copyright 2019 Emmett Lalish
+// Copyright 2021 Emmett Lalish
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -98,6 +98,8 @@ void TestPoly(const Polygons &polys, int expectedNumTri) {
 
   EXPECT_NO_THROW(triangles = Triangulate(Duplicate(polys)));
   EXPECT_EQ(triangles.size(), 2 * expectedNumTri) << "Duplicate";
+
+  PolygonParams().intermediateChecks = false;
 }
 }  // namespace
 

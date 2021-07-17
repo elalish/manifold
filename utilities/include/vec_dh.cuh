@@ -1,4 +1,4 @@
-// Copyright 2019 Emmett Lalish
+// Copyright 2021 Emmett Lalish
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -122,12 +122,14 @@ class VecDH {
   IterDc endD() const { return cendD(); }
 
   T* ptrD() {
+    if (size() == 0) return nullptr;
     RefreshDevice();
     host_valid_ = false;
     return device_.data().get();
   }
 
   const T* cptrD() const {
+    if (size() == 0) return nullptr;
     RefreshDevice();
     return device_.data().get();
   }
@@ -135,12 +137,14 @@ class VecDH {
   const T* ptrD() const { return cptrD(); }
 
   T* ptrH() {
+    if (size() == 0) return nullptr;
     RefreshHost();
     device_valid_ = false;
     return host_.data();
   }
 
   const T* cptrH() const {
+    if (size() == 0) return nullptr;
     RefreshHost();
     return host_.data();
   }

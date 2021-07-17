@@ -1,4 +1,4 @@
-// Copyright 2019 Emmett Lalish
+// Copyright 2021 Emmett Lalish
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -22,12 +22,19 @@
 namespace manifold {
 
 struct Manifold::Impl {
+  struct MeshRelationD {
+    VecDH<glm::vec3> barycentric;
+    VecDH<BaryRef> triBary;
+  };
+
   Box bBox_;
   float precision_ = -1;
   VecDH<glm::vec3> vertPos_;
   VecDH<Halfedge> halfedge_;
   VecDH<glm::vec3> vertNormal_;
   VecDH<glm::vec3> faceNormal_;
+  VecDH<glm::vec4> halfedgeTangent_;
+  MeshRelationD meshRelation_;
   Collider collider_;
   glm::mat4x3 transform_ = glm::mat4x3(1.0f);
 
@@ -38,12 +45,13 @@ struct Manifold::Impl {
 
   void CreateHalfedges(const VecDH<glm::ivec3>& triVerts);
   void CreateAndFixHalfedges(const VecDH<glm::ivec3>& triVerts);
-  void SplitNonmanifoldVerts();
   void CollapseDegenerates();
   void Finish();
   void Update();
   void ApplyTransform() const;
   void ApplyTransform();
+  void CreateTangents(const std::vector<Smoothness>&);
+  void Subdivide(int n);
   void Refine(int n);
 
   bool IsEmpty() const { return NumVert() == 0; }
@@ -51,6 +59,7 @@ struct Manifold::Impl {
   int NumEdge() const { return halfedge_.size() / 2; }
   int NumTri() const { return halfedge_.size() / 3; }
   Properties GetProperties() const;
+  Curvature GetCurvature() const;
   void CalculateBBox();
   void SetPrecision(float minPrecision = -1);
   bool IsManifold() const;
@@ -59,8 +68,8 @@ struct Manifold::Impl {
   void SortVerts();
   void ReindexVerts(const VecDH<int>& vertNew2Old, int numOldVert);
   void SortFaces(VecDH<Box>& faceBox, VecDH<uint32_t>& faceMorton);
-  void GatherFaces(const VecDH<Halfedge>& oldHalfedge,
-                   const VecDH<int>& faceNew2Old);
+  void GatherFaces(const VecDH<int>& faceNew2Old);
+  void GatherFaces(const Impl& old, const VecDH<int>& faceNew2Old);
   void CalculateNormals();
   void Face2Tri(const VecDH<int>& faceEdge);
 
