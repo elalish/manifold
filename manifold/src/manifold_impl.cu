@@ -655,8 +655,8 @@ struct CheckCCW {
     glm::vec2 v[3];
     for (int i : {0, 1, 2})
       v[i] = projection * vertPos[halfedges[3 * face + i].startVert];
-    int ccw = CCW(v[0], v[1], v[2], precision / 2);
-    if (ccw <= 0) {
+    int ccw = CCW(v[0], v[1], v[2], 2 * precision);
+    if (ccw < 0) {
       glm::vec2 v1 = v[1] - v[0];
       glm::vec2 v2 = v[2] - v[0];
       float area = v1.x * v2.y - v1.y * v2.x;
@@ -675,7 +675,7 @@ struct CheckCCW {
           base2 * precision * precision, triNormal[face].x, triNormal[face].y,
           triNormal[face].z, norm.x, norm.y, norm.z);
     }
-    return ccw > 0;
+    return ccw >= 0;
   }
 };
 
