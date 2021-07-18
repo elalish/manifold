@@ -308,7 +308,6 @@ struct Kernel02 {
   const bool forward;
   const float expandP;
   const glm::vec3 *vertNormalP;
-  const glm::vec3 *faceNormalP;
 
   __host__ __device__ void operator()(
       thrust::tuple<int &, float &, int, int> inout) {
@@ -386,14 +385,12 @@ std::tuple<VecDH<int>, VecDH<float>> Shadow02(const Manifold::Impl &inP,
 
   auto vertNormalP =
       forward ? inP.vertNormal_.cptrD() : inQ.vertNormal_.cptrD();
-  auto faceNormalP =
-      forward ? inP.faceNormal_.cptrD() : inQ.faceNormal_.cptrD();
-  thrust::for_each_n(zip(s02.beginD(), z02.beginD(), p0q2.beginD(!forward),
-                         p0q2.beginD(forward)),
-                     p0q2.size(),
-                     Kernel02({inP.vertPos_.cptrD(), inQ.halfedge_.cptrD(),
-                               inQ.vertPos_.cptrD(), forward, expandP,
-                               vertNormalP, faceNormalP}));
+  thrust::for_each_n(
+      zip(s02.beginD(), z02.beginD(), p0q2.beginD(!forward),
+          p0q2.beginD(forward)),
+      p0q2.size(),
+      Kernel02({inP.vertPos_.cptrD(), inQ.halfedge_.cptrD(),
+                inQ.vertPos_.cptrD(), forward, expandP, vertNormalP}));
 
   p0q2.KeepFinite(z02, s02);
 
