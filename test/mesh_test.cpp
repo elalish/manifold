@@ -123,7 +123,7 @@ TEST(Manifold, Regression) {
   Manifold mesh1 = manifold;
   mesh1.Translate(glm::vec3(5.0f));
   int num_overlaps = manifold.NumOverlaps(mesh1);
-  ASSERT_EQ(num_overlaps, 239119);
+  ASSERT_EQ(num_overlaps, 238970);
 
   Mesh mesh_out = manifold.Extract();
   Manifold mesh2(mesh_out);
