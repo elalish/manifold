@@ -102,7 +102,7 @@ __host__ __device__ T AtomicAdd(T& target, T add) {
 #ifdef __CUDA_ARCH__
   return atomicAdd(&target, add);
 #else
-  float out;
+  T out;
 #pragma omp atomic capture
   {
     out = target;
