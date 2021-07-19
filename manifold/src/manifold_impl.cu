@@ -1121,17 +1121,15 @@ void Manifold::Impl::CollapseDegenerates() {
 
   for (const int tri : colinearTris.H()) SwapTri(tri);
 
-  // numColinear =
-  //     thrust::copy_if(countAt(0), countAt(NumTri()), colinearTris.beginD(),
-  //                     ColinearTri({halfedge_.cptrD(), vertPos_.cptrD(),
-  //                                  faceNormal_.cptrD(), precision_})) -
-  //     colinearTris.beginD();
-  // colinearTris.resize(numColinear);
+  // shortEdges.resize(halfedge_.size());
+  // numShort = thrust::copy_if(
+  //                countAt(0), countAt(halfedge_.size()), shortEdges.beginD(),
+  //                ShortEdge({halfedge_.cptrD(), vertPos_.cptrD(),
+  //                precision_})) -
+  //            shortEdges.beginD();
+  // std::cout << numShort << " remaining short edges" << std::endl;
 
-  // colinearTris.Dump();
-  // std::cout << numColinear << " colinear tris" << std::endl;
-
-  if (!IsManifold()) std::cout << __LINE__ << std::endl;
+  // if (!IsManifold()) std::cout << __LINE__ << std::endl;
 }
 
 /**
