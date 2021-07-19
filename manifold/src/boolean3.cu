@@ -1135,6 +1135,8 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
     assemble.Print("Assembly");
     triangulate.Print("Triangulation");
     finish.Print("Finishing the manifold");
+    std::cout << outR.NumVert() << " verts and " << outR.NumTri() << " tris"
+              << std::endl;
   }
 
   return outR;
