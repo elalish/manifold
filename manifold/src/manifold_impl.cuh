@@ -38,11 +38,15 @@ struct Manifold::Impl {
   Collider collider_;
   glm::mat4x3 transform_ = glm::mat4x3(1.0f);
 
+  static int nextMeshID_;
+  static std::vector<int> meshID2Original_;
+
   Impl() {}
   Impl(const Mesh&);
   enum class Shape { TETRAHEDRON, CUBE, OCTAHEDRON };
   Impl(Shape);
 
+  void DuplicateMeshIDs();
   void CreateHalfedges(const VecDH<glm::ivec3>& triVerts);
   void CreateAndFixHalfedges(const VecDH<glm::ivec3>& triVerts);
   void CollapseDegenerates();
@@ -51,7 +55,7 @@ struct Manifold::Impl {
   void ApplyTransform() const;
   void ApplyTransform();
   void CreateTangents(const std::vector<Smoothness>&);
-  void Subdivide(int n);
+  MeshRelationD Subdivide(int n);
   void Refine(int n);
 
   bool IsEmpty() const { return NumVert() == 0; }

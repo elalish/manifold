@@ -151,7 +151,7 @@ struct Curvature {
 };
 
 struct BaryRef {
-  int tri;
+  int meshID, tri;
   glm::ivec3 vertBary;
 };
 
