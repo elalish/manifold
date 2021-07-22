@@ -96,11 +96,14 @@ Manifold::~Manifold() = default;
 Manifold::Manifold(Manifold&&) noexcept = default;
 Manifold& Manifold::operator=(Manifold&&) noexcept = default;
 
-Manifold::Manifold(const Manifold& other) : pImpl_(new Impl(*other.pImpl_)) {}
+Manifold::Manifold(const Manifold& other) : pImpl_(new Impl(*other.pImpl_)) {
+  pImpl_->DuplicateMeshIDs();
+}
 
 Manifold& Manifold::operator=(const Manifold& other) {
   if (this != &other) {
     pImpl_.reset(new Impl(*other.pImpl_));
+    pImpl_->DuplicateMeshIDs();
   }
   return *this;
 }
@@ -493,30 +496,30 @@ Mesh Manifold::Extract() const {
  * edge length and angle, rounded up to the nearest multiple of four. To get
  * numbers not divisible by four, circularSegements must be specified.
  */
-int Manifold::circularSegments = 0;
-float Manifold::circularAngle = 10.0f;
-float Manifold::circularEdgeLength = 1.0f;
+int Manifold::circularSegments_ = 0;
+float Manifold::circularAngle_ = 10.0f;
+float Manifold::circularEdgeLength_ = 1.0f;
 
 void Manifold::SetMinCircularAngle(float angle) {
   ALWAYS_ASSERT(angle > 0.0f, userErr, "angle must be positive!");
-  Manifold::circularAngle = angle;
+  Manifold::circularAngle_ = angle;
 }
 
 void Manifold::SetMinCircularEdgeLength(float length) {
   ALWAYS_ASSERT(length > 0.0f, userErr, "length must be positive!");
-  Manifold::circularEdgeLength = length;
+  Manifold::circularEdgeLength_ = length;
 }
 
 void Manifold::SetCircularSegments(int number) {
   ALWAYS_ASSERT(number > 2 || number == 0, userErr,
                 "must have at least three segments in circle!");
-  Manifold::circularSegments = number;
+  Manifold::circularSegments_ = number;
 }
 
 int Manifold::GetCircularSegments(float radius) {
-  if (Manifold::circularSegments > 0) return Manifold::circularSegments;
-  int nSegA = 360.0f / Manifold::circularAngle;
-  int nSegL = 2.0f * radius * glm::pi<float>() / Manifold::circularEdgeLength;
+  if (Manifold::circularSegments_ > 0) return Manifold::circularSegments_;
+  int nSegA = 360.0f / Manifold::circularAngle_;
+  int nSegL = 2.0f * radius * glm::pi<float>() / Manifold::circularEdgeLength_;
   int nSeg = min(nSegA, nSegL) + 3;
   nSeg -= nSeg % 4;
   return nSeg;
