@@ -33,6 +33,15 @@ struct ToSphere {
   }
 };
 
+struct UpdateTriBary {
+  const int nextBary;
+
+  __host__ __device__ BaryRef operator()(BaryRef ref) {
+    ref.vertBary += nextBary;
+    return ref;
+  }
+};
+
 struct UpdateHalfedge {
   const int nextVert;
   const int nextEdge;
@@ -386,22 +395,28 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments) {
 Manifold Manifold::Compose(const std::vector<Manifold>& manifolds) {
   int numVert = 0;
   int numEdge = 0;
-  int NumTri = 0;
+  int numTri = 0;
+  int numBary = 0;
   for (const Manifold& manifold : manifolds) {
     numVert += manifold.NumVert();
     numEdge += manifold.NumEdge();
-    NumTri += manifold.NumTri();
+    numTri += manifold.NumTri();
+    numBary += manifold.pImpl_->meshRelation_.barycentric.size();
   }
 
   Manifold out;
   Impl& combined = *(out.pImpl_);
   combined.vertPos_.resize(numVert);
   combined.halfedge_.resize(2 * numEdge);
-  combined.faceNormal_.resize(NumTri);
+  combined.faceNormal_.resize(numTri);
+  combined.halfedgeTangent_.resize(2 * numEdge);
+  combined.meshRelation_.barycentric.resize(numBary);
+  combined.meshRelation_.triBary.resize(numTri);
 
   int nextVert = 0;
   int nextEdge = 0;
-  int nextFace = 0;
+  int nextTri = 0;
+  int nextBary = 0;
   for (const Manifold& manifold : manifolds) {
     const Impl& impl = *(manifold.pImpl_);
     impl.ApplyTransform();
@@ -409,18 +424,27 @@ Manifold Manifold::Compose(const std::vector<Manifold>& manifolds) {
     thrust::copy(impl.vertPos_.beginD(), impl.vertPos_.endD(),
                  combined.vertPos_.beginD() + nextVert);
     thrust::copy(impl.faceNormal_.beginD(), impl.faceNormal_.endD(),
-                 combined.faceNormal_.beginD() + nextFace);
+                 combined.faceNormal_.beginD() + nextTri);
+    thrust::copy(impl.halfedgeTangent_.beginD(), impl.halfedgeTangent_.endD(),
+                 combined.halfedgeTangent_.beginD() + nextEdge);
+    thrust::copy(impl.meshRelation_.barycentric.beginD(),
+                 impl.meshRelation_.barycentric.endD(),
+                 combined.meshRelation_.barycentric.beginD() + nextBary);
+    thrust::transform(impl.meshRelation_.triBary.beginD(),
+                      impl.meshRelation_.triBary.endD(),
+                      combined.meshRelation_.triBary.beginD() + nextTri,
+                      UpdateTriBary({nextBary}));
     thrust::transform(impl.halfedge_.beginD(), impl.halfedge_.endD(),
                       combined.halfedge_.beginD() + nextEdge,
-                      UpdateHalfedge({nextVert, nextEdge, nextFace}));
+                      UpdateHalfedge({nextVert, nextEdge, nextTri}));
 
     nextVert += manifold.NumVert();
     nextEdge += 2 * manifold.NumEdge();
-    nextFace += manifold.NumTri();
+    nextTri += manifold.NumTri();
+    nextBary += impl.meshRelation_.barycentric.size();
   }
 
-  // TODO: populate this properly
-  combined.meshRelation_.triBary.resize(combined.NumTri());
+  combined.DuplicateMeshIDs();
   combined.Finish();
   return out;
 }
