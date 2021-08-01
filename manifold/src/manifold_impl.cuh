@@ -38,7 +38,6 @@ struct Manifold::Impl {
   Collider collider_;
   glm::mat4x3 transform_ = glm::mat4x3(1.0f);
 
-  static int nextMeshID_;
   static std::vector<int> meshID2Original_;
 
   Impl() {}
