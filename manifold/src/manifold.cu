@@ -615,6 +615,19 @@ std::vector<int> Manifold::MeshID2Original() {
   return Manifold::Impl::meshID2Original_;
 }
 
+/**
+ * If you copy a manifold, but you want this new copy to have new properties
+ * (e.g. a different UV mapping), you can set this meshID as an original,
+ * meaning it will now be referenced by its descendents instead of the mesh it
+ * was copied from, allowing you to differentiate the copies when applying your
+ * properties to the final result.
+ */
+void Manifold::SetAsOriginal(int meshID) {
+  ALWAYS_ASSERT(meshID < Manifold::Impl::meshID2Original_.size(), userErr,
+                "This meshID has not been defined yet!");
+  Manifold::Impl::meshID2Original_[meshID] = meshID;
+}
+
 bool Manifold::IsManifold() const { return pImpl_->IsManifold(); }
 
 bool Manifold::MatchesTriNormals() const { return pImpl_->MatchesTriNormals(); }
