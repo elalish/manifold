@@ -37,23 +37,26 @@ void Identical(const Mesh& mesh1, const Mesh& mesh2) {
     ASSERT_EQ(mesh1.triVerts[i], mesh2.triVerts[i]);
 }
 
-void Related(const Manifold& out, const Mesh& input) {
+void Related(const Manifold& out, const std::vector<Mesh>& input) {
   Mesh output = out.Extract();
   MeshRelation relation = out.GetMeshRelation();
   for (int i = 0; i < out.NumTri(); ++i) {
+    int meshID = relation.triBary[i].meshID;
+    ASSERT_LT(meshID, input.size());
+    const Mesh& inMesh = input[meshID];
     int inTri = relation.triBary[i].tri;
-    ASSERT_LT(inTri, input.triVerts.size());
+    ASSERT_LT(inTri, inMesh.triVerts.size());
     for (int j : {0, 1, 2}) {
       int v = relation.triBary[i].vertBary[j];
       if (v < 0) {
         Identical(output.vertPos[output.triVerts[i][j]],
-                  input.vertPos[input.triVerts[inTri][j]]);
+                  inMesh.vertPos[inMesh.triVerts[inTri][j]]);
       } else {
         ASSERT_LT(v, relation.barycentric.size());
         glm::vec3 uvw = relation.barycentric[v];
-        glm::vec3 vPos = uvw[0] * input.vertPos[input.triVerts[inTri][0]] +
-                         uvw[1] * input.vertPos[input.triVerts[inTri][1]] +
-                         uvw[2] * input.vertPos[input.triVerts[inTri][2]];
+        glm::vec3 vPos = uvw[0] * inMesh.vertPos[inMesh.triVerts[inTri][0]] +
+                         uvw[1] * inMesh.vertPos[inMesh.triVerts[inTri][1]] +
+                         uvw[2] * inMesh.vertPos[inMesh.triVerts[inTri][2]];
         Identical(output.vertPos[output.triVerts[i][j]], vPos);
       }
     }
@@ -384,8 +387,11 @@ TEST(Manifold, Transform) {
 }
 
 TEST(Manifold, MeshRelation) {
-  Mesh input = ImportMesh("data/Csaszar.ply");
-  Manifold csaszar(input);
+  std::vector<Mesh> input;
+  input.push_back(ImportMesh("data/Csaszar.ply"));
+  Manifold csaszar(input[0]);
+  std::vector<int> meshIDs = csaszar.MeshIDs();
+  EXPECT_EQ(meshIDs.size(), 1);
   Related(csaszar, input);
   csaszar.Refine(4);
   Related(csaszar, input);

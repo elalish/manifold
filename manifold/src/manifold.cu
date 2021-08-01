@@ -590,6 +590,27 @@ MeshRelation Manifold::GetMeshRelation() const {
   return out;
 }
 
+std::vector<int> Manifold::MeshIDs() const {
+  VecDH<int> meshIDs(NumTri());
+  thrust::for_each_n(
+      zip(meshIDs.beginD(), pImpl_->meshRelation_.triBary.beginD()), NumTri(),
+      [](thrust::tuple<int&, BaryRef> inOut) {
+        thrust::get<0>(inOut) = thrust::get<1>(inOut).meshID;
+      });
+
+  thrust::sort(meshIDs.beginD(), meshIDs.endD());
+  int n = thrust::unique(meshIDs.beginD(), meshIDs.endD()) - meshIDs.beginD();
+  meshIDs.resize(n);
+
+  std::vector<int> out;
+  out.insert(out.end(), meshIDs.begin(), meshIDs.end());
+  return out;
+}
+
+// std::vector<int> Manifold::MeshID2Original() {
+//   return Manifold::Impl::meshID2Original_;
+// }
+
 bool Manifold::IsManifold() const { return pImpl_->IsManifold(); }
 
 bool Manifold::MatchesTriNormals() const { return pImpl_->MatchesTriNormals(); }
