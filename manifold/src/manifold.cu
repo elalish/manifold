@@ -75,6 +75,12 @@ struct MakeTri {
   }
 };
 
+struct GetMeshID {
+  __host__ __device__ void operator()(thrust::tuple<int&, BaryRef> inOut) {
+    thrust::get<0>(inOut) = thrust::get<1>(inOut).meshID;
+  }
+};
+
 Manifold Halfspace(Box bBox, glm::vec3 normal, float originOffset) {
   normal = glm::normalize(normal);
   Manifold cutter =
@@ -594,9 +600,7 @@ std::vector<int> Manifold::MeshIDs() const {
   VecDH<int> meshIDs(NumTri());
   thrust::for_each_n(
       zip(meshIDs.beginD(), pImpl_->meshRelation_.triBary.beginD()), NumTri(),
-      [](thrust::tuple<int&, BaryRef> inOut) {
-        thrust::get<0>(inOut) = thrust::get<1>(inOut).meshID;
-      });
+      GetMeshID());
 
   thrust::sort(meshIDs.beginD(), meshIDs.endD());
   int n = thrust::unique(meshIDs.beginD(), meshIDs.endD()) - meshIDs.beginD();
