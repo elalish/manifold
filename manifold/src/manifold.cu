@@ -607,9 +607,9 @@ std::vector<int> Manifold::MeshIDs() const {
   return out;
 }
 
-// std::vector<int> Manifold::MeshID2Original() {
-//   return Manifold::Impl::meshID2Original_;
-// }
+std::vector<int> Manifold::MeshID2Original() {
+  return Manifold::Impl::meshID2Original_;
+}
 
 bool Manifold::IsManifold() const { return pImpl_->IsManifold(); }
 

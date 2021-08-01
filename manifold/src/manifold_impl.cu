@@ -1104,7 +1104,7 @@ struct CheckCCW {
 
 namespace manifold {
 
-int Manifold::Impl::nextMeshID_ = 0;
+std::vector<int> Manifold::Impl::meshID2Original_;
 
 /**
  * Create a manifold from an input triangle Mesh. Will throw if the Mesh is not
@@ -1172,7 +1172,21 @@ Manifold::Impl::Impl(Shape shape) {
   Finish();
 }
 
-void Manifold::Impl::DuplicateMeshIDs() {}
+/**
+ * When a manifold is copied, it is given a new unique set of mesh relation IDs,
+ * identifying a particular instance of a copied input mesh. The original mesh
+ * ID can be found using the meshID2Original mapping.
+ */
+void Manifold::Impl::DuplicateMeshIDs() {
+  std::map<int, int> old2new;
+  for (BaryRef& ref : meshRelation_.triBary) {
+    if (old2new.find(ref.meshID) == old2new.end()) {
+      old2new[ref.meshID] = meshID2Original_.size();
+      meshID2Original_.push_back(meshID2Original_[ref.meshID]);
+    }
+    ref.meshID = old2new[ref.meshID];
+  }
+}
 
 /**
  * Create the halfedge_ data structure from an input triVerts array like Mesh.
@@ -1188,8 +1202,10 @@ void Manifold::Impl::CreateHalfedges(const VecDH<glm::ivec3>& triVerts) {
                      LinkHalfedges({halfedge_.ptrD(), edge.cptrD()}));
   if (meshRelation_.triBary.size() != numTri) {
     meshRelation_.triBary.resize(numTri);
+    const int nextMeshID = meshID2Original_.size();
+    meshID2Original_.push_back(nextMeshID);
     thrust::for_each_n(zip(meshRelation_.triBary.beginD(), countAt(0)), numTri,
-                       InitializeBaryRef({Manifold::Impl::nextMeshID_++}));
+                       InitializeBaryRef({nextMeshID}));
   }
 }
 
@@ -1216,8 +1232,10 @@ void Manifold::Impl::CreateAndFixHalfedges(const VecDH<glm::ivec3>& triVerts) {
   thrust::for_each(thrust::host, countAt(1), countAt(halfedge_.size() / 2),
                    SwapHalfedges({halfedge_.ptrH(), edge.cptrH()}));
   meshRelation_.triBary.resize(numTri);
+  const int nextMeshID = meshID2Original_.size();
+  meshID2Original_.push_back(nextMeshID);
   thrust::for_each_n(zip(meshRelation_.triBary.begin(), countAt(0)), numTri,
-                     InitializeBaryRef({Manifold::Impl::nextMeshID_++}));
+                     InitializeBaryRef({nextMeshID}));
 }
 
 /**

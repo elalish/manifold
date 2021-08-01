@@ -37,13 +37,17 @@ void Identical(const Mesh& mesh1, const Mesh& mesh2) {
     ASSERT_EQ(mesh1.triVerts[i], mesh2.triVerts[i]);
 }
 
-void Related(const Manifold& out, const std::vector<Mesh>& input) {
+void Related(const Manifold& out, const std::vector<Mesh>& input,
+             const std::map<int, int>& meshID2idx) {
+  std::vector<int> meshID2Original = Manifold::MeshID2Original();
   Mesh output = out.Extract();
   MeshRelation relation = out.GetMeshRelation();
   for (int i = 0; i < out.NumTri(); ++i) {
     int meshID = relation.triBary[i].meshID;
-    ASSERT_LT(meshID, input.size());
-    const Mesh& inMesh = input[meshID];
+    ASSERT_LT(meshID, meshID2Original.size());
+    int meshIdx = meshID2idx.at(meshID2Original[meshID]);
+    ASSERT_LT(meshIdx, input.size());
+    const Mesh& inMesh = input[meshIdx];
     int inTri = relation.triBary[i].tri;
     ASSERT_LT(inTri, inMesh.triVerts.size());
     for (int j : {0, 1, 2}) {
@@ -388,13 +392,18 @@ TEST(Manifold, Transform) {
 
 TEST(Manifold, MeshRelation) {
   std::vector<Mesh> input;
+  std::map<int, int> meshID2idx;
+
   input.push_back(ImportMesh("data/Csaszar.ply"));
   Manifold csaszar(input[0]);
+
   std::vector<int> meshIDs = csaszar.MeshIDs();
   EXPECT_EQ(meshIDs.size(), 1);
-  Related(csaszar, input);
+  meshID2idx[meshIDs[0]] = input.size() - 1;
+
+  Related(csaszar, input, meshID2idx);
   csaszar.Refine(4);
-  Related(csaszar, input);
+  Related(csaszar, input, meshID2idx);
 }
 
 /**
