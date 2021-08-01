@@ -205,8 +205,12 @@ struct InteriorVerts {
   __host__ __device__ void operator()(thrust::tuple<int, BaryRef> in) {
     const int tri = thrust::get<0>(in);
     const BaryRef baryOld = thrust::get<1>(in);
-    glm::mat3 uvwOldTri;
-    for (int i : {0, 1, 2}) uvwOldTri[i] = uvwOld[baryOld.vertBary[i]];
+
+    // When vertBary == -1, it is an original vert and the initial value of the
+    // column from the identity matrix is already correct.
+    glm::mat3 uvwOldTri(1.0f);
+    for (int i : {0, 1, 2})
+      if (baryOld.vertBary[i] >= 0) uvwOldTri[i] = uvwOld[baryOld.vertBary[i]];
 
     const float invTotal = 1.0f / n;
     int posTri = tri * n * n;

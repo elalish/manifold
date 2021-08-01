@@ -387,9 +387,8 @@ TEST(Manifold, MeshRelation) {
   Mesh input = ImportMesh("data/Csaszar.ply");
   Manifold csaszar(input);
   Related(csaszar, input);
-  Mesh sortedInput = csaszar.Extract();
   csaszar.Refine(4);
-  Related(csaszar, sortedInput);
+  Related(csaszar, input);
 }
 
 /**
