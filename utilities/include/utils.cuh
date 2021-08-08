@@ -112,6 +112,18 @@ __host__ __device__ T AtomicAdd(T& target, T add) {
 #endif
 }
 
+__host__ __device__ inline glm::vec3 UVW(int vertBary,
+                                         const glm::vec3* barycentric) {
+  glm::vec3 uvw(0.0f);
+  if (vertBary < 0) {
+    vertBary += 3;
+    uvw[vertBary] = 1;
+  } else {
+    uvw = barycentric[vertBary];
+  }
+  return uvw;
+}
+
 // Copied from
 // https://github.com/thrust/thrust/blob/master/examples/strided_range.cu
 template <typename Iterator>

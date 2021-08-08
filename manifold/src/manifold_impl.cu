@@ -206,11 +206,8 @@ struct InteriorVerts {
     const int tri = thrust::get<0>(in);
     const BaryRef baryOld = thrust::get<1>(in);
 
-    // When vertBary == -1, it is an original vert and the initial value of the
-    // column from the identity matrix is already correct.
-    glm::mat3 uvwOldTri(1.0f);
-    for (int i : {0, 1, 2})
-      if (baryOld.vertBary[i] >= 0) uvwOldTri[i] = uvwOld[baryOld.vertBary[i]];
+    glm::mat3 uvwOldTri;
+    for (int i : {0, 1, 2}) uvwOldTri[i] = UVW(baryOld.vertBary[i], uvwOld);
 
     const float invTotal = 1.0f / n;
     int posTri = tri * n * n;
@@ -856,7 +853,7 @@ struct InitializeBaryRef {
 
     baryRef.meshID = meshID;
     baryRef.tri = tri;
-    baryRef.vertBary = {-1, -1, -1};
+    baryRef.vertBary = {-3, -2, -1};
   }
 };
 
