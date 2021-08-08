@@ -158,6 +158,18 @@ struct BaryRef {
 struct MeshRelation {
   std::vector<glm::vec3> barycentric;
   std::vector<BaryRef> triBary;
+
+  inline glm::vec3 UVW(int tri, int vert) {
+    int idx = triBary[tri].vertBary[vert];
+    glm::vec3 uvw(0.0f);
+    if (idx < 0) {
+      idx += 3;
+      uvw[idx] = 1;
+    } else {
+      uvw = barycentric[idx];
+    }
+    return uvw;
+  }
 };
 
 struct Box {
