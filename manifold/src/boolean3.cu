@@ -872,10 +872,14 @@ struct DuplicateHalfedges {
     halfedge.face = faceP2R[faceLeftP];
     const int faceRightP = halfedgesP[halfedge.pairedHalfedge].face;
     const int faceRight = faceP2R[faceRightP];
+    // Negative inclusion means the halfedges are reversed, which means our
+    // reference is now to the endVert instead of the startVert, which is one
+    // position advanced CCW.
     const Ref forwardRef = {forward ? 0 : 1, faceLeftP,
-                            edgeP - 3 * faceLeftP - 3};
-    const Ref backwardRef = {forward ? 0 : 1, faceRightP,
-                             halfedge.pairedHalfedge - 3 * faceRightP - 3};
+                            ((edgeP + (inclusion < 0 ? 1 : 0)) % 3) - 3};
+    const Ref backwardRef = {
+        forward ? 0 : 1, faceRightP,
+        ((halfedge.pairedHalfedge + (inclusion < 0 ? 1 : 0)) % 3) - 3};
 
     for (int i = 0; i < glm::abs(inclusion); ++i) {
       int forwardEdge = AtomicAdd(facePtr[halfedge.face], 1);
