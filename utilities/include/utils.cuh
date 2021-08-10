@@ -112,6 +112,12 @@ __host__ __device__ T AtomicAdd(T& target, T add) {
 #endif
 }
 
+__host__ __device__ inline int NextHalfedge(int current) {
+  ++current;
+  if (current % 3 == 0) current -= 3;
+  return current;
+}
+
 __host__ __device__ inline glm::vec3 UVW(int vertBary,
                                          const glm::vec3* barycentric) {
   glm::vec3 uvw(0.0f);

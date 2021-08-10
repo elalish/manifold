@@ -44,12 +44,6 @@ __host__ __device__ glm::vec3 OrthogonalTo(glm::vec3 in, glm::vec3 ref) {
   return in;
 }
 
-__host__ __device__ int NextHalfedge(int current) {
-  ++current;
-  if (current % 3 == 0) current -= 3;
-  return current;
-}
-
 /**
  * The total number of verts if a triangle is subdivided naturally such that
  * each edge has edgeVerts verts along it (edgeVerts >= -1).
