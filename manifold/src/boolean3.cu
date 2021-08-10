@@ -707,6 +707,11 @@ struct Ref {
   int meshID, tri, bary;
 };
 
+std::ostream &operator<<(std::ostream &stream, const Ref &ref) {
+  return stream << "meshID = " << ref.meshID << ", tri = " << ref.tri
+                << ", bary = " << ref.bary;
+}
+
 void AppendPartialEdges(Manifold::Impl &outR, VecH<bool> &wholeHalfedgeP,
                         VecH<int> &facePtrR,
                         std::map<int, std::vector<EdgePos>> &edgesP,
@@ -765,9 +770,9 @@ void AppendPartialEdges(Manifold::Impl &outR, VecH<bool> &wholeHalfedgeP,
     const int faceRightP = halfedgeP[halfedge.pairedHalfedge].face;
     const int faceRight = faceP2R[faceRightP];
     const Ref forwardRef = {forward ? 0 : 1, faceLeftP,
-                            3 * edgeP - faceLeftP - 3};
+                            edgeP - 3 * faceLeftP - 3};
     const Ref backwardRef = {forward ? 0 : 1, faceRightP,
-                             3 * halfedge.pairedHalfedge - faceRightP - 3};
+                             halfedge.pairedHalfedge - 3 * faceRightP - 3};
     for (Halfedge e : edges) {
       const int forwardEdge = facePtrR[faceLeft]++;
       const int backwardEdge = facePtrR[faceRight]++;
@@ -868,9 +873,9 @@ struct DuplicateHalfedges {
     const int faceRightP = halfedgesP[halfedge.pairedHalfedge].face;
     const int faceRight = faceP2R[faceRightP];
     const Ref forwardRef = {forward ? 0 : 1, faceLeftP,
-                            3 * edgeP - faceLeftP - 3};
+                            edgeP - 3 * faceLeftP - 3};
     const Ref backwardRef = {forward ? 0 : 1, faceRightP,
-                             3 * halfedge.pairedHalfedge - faceRightP - 3};
+                             halfedge.pairedHalfedge - 3 * faceRightP - 3};
 
     for (int i = 0; i < glm::abs(inclusion); ++i) {
       int forwardEdge = AtomicAdd(facePtr[halfedge.face], 1);
@@ -892,13 +897,14 @@ struct DuplicateHalfedges {
 void AppendWholeEdges(Manifold::Impl &outR, VecDH<int> &facePtrR,
                       VecDH<Ref> &halfedgeRef, const Manifold::Impl &inP,
                       const VecDH<bool> wholeHalfedgeP, const VecDH<int> &i03,
-                      const VecDH<int> &vP2R, const int *faceP2R) {
+                      const VecDH<int> &vP2R, const int *faceP2R,
+                      bool forward) {
   thrust::for_each_n(
       zip(wholeHalfedgeP.beginD(), inP.halfedge_.beginD(), countAt(0)),
       inP.halfedge_.size(),
       DuplicateHalfedges({outR.halfedge_.ptrD(), halfedgeRef.ptrD(),
                           facePtrR.ptrD(), inP.halfedge_.cptrD(), i03.cptrD(),
-                          vP2R.cptrD(), faceP2R}));
+                          vP2R.cptrD(), faceP2R, forward}));
 }
 
 struct CreateBarycentric {
@@ -1207,11 +1213,9 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
   // Intersected halfedges are marked false.
   VecDH<bool> wholeHalfedgeP(inP_.halfedge_.size(), true);
   VecDH<bool> wholeHalfedgeQ(inQ_.halfedge_.size(), true);
-
-  // TODO:
+  // The halfedgeRef contains the data that will become triBary once the faces
+  // are triangulated.
   VecDH<Ref> halfedgeRef(2 * outR.NumEdge());
-  // Populate this in these functions, where meshID 0 is P, 1 is Q, for
-  // startVert of halfedge. Bary is incremented for new verts, -1 for retained.
 
   AppendPartialEdges(outR, wholeHalfedgeP.H(), facePtrR.H(), edgesP,
                      halfedgeRef.H(), inP_, i03.H(), vP2R.H(), facePQ2R.begin(),
@@ -1224,9 +1228,9 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
                  inP_.NumTri());
 
   AppendWholeEdges(outR, facePtrR, halfedgeRef, inP_, wholeHalfedgeP, i03, vP2R,
-                   facePQ2R.cptrD());
+                   facePQ2R.cptrD(), true);
   AppendWholeEdges(outR, facePtrR, halfedgeRef, inQ_, wholeHalfedgeQ, i30, vQ2R,
-                   facePQ2R.cptrD() + inP_.NumTri());
+                   facePQ2R.cptrD() + inP_.NumTri(), false);
 
   CalculateMeshRelation(halfedgeRef, outR, inP_, inQ_, nPv + nQv);
 
