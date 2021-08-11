@@ -1378,7 +1378,8 @@ void Manifold::Impl::ApplyTransform() {
  * represents the mesh as a set of triangles as usual. In this process the
  * faceNormal_ values are retained, repeated as necessary.
  */
-void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge) {
+void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge,
+                              const VecDH<Ref>& halfedgeRef) {
   VecDH<glm::ivec3> triVertsOut;
   VecDH<glm::vec3> triNormalOut;
 
@@ -1395,6 +1396,12 @@ void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge) {
     const int numEdge = lastEdge - edge;
     ALWAYS_ASSERT(numEdge >= 3, topologyErr, "face has less than three edges.");
     const glm::vec3 normal = faceNormal[i];
+
+    std::map<int, Ref> vertRef;
+    for (int j = edge; j < lastEdge; ++j)
+      vertRef[halfedge[j].startVert] = halfedgeRef.H()[j];
+    meshRelation_.triBary.resize(0);
+    const int startTri = triVerts.size();
 
     if (numEdge == 3) {  // Single triangle
       glm::ivec3 tri(halfedge[edge].startVert, halfedge[edge + 1].startVert,
@@ -1473,6 +1480,14 @@ void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge) {
         triVerts.push_back(tri);
         triNormal.push_back(normal);
       }
+    }
+
+    const Ref first = vertRef[triVerts[startTri][0]];
+    for (int j = startTri; j < triVerts.size(); ++j) {
+      glm::ivec3 vertBary;
+      for (int k : {0, 1, 2}) vertBary[k] = vertRef[triVerts[j][k]].bary;
+
+      meshRelation_.triBary.H().push_back({first.meshID, first.tri, vertBary});
     }
   }
   faceNormal_ = triNormalOut;

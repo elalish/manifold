@@ -57,10 +57,11 @@
 // TODO: make this runtime configurable for quicker debug
 constexpr bool kVerbose = false;
 
+using namespace manifold;
 using namespace thrust::placeholders;
+using Ref = Manifold::Impl::Ref;
 
 namespace {
-using namespace manifold;
 
 // These two functions (Interpolate and Intersect) are the only places where
 // floating-point operations take place in the whole Boolean function. These are
@@ -703,15 +704,6 @@ std::vector<Halfedge> PairUp(std::vector<EdgePos> &edgePos) {
   return edges;
 }
 
-struct Ref {
-  int meshID, tri, bary;
-};
-
-std::ostream &operator<<(std::ostream &stream, const Ref &ref) {
-  return stream << "meshID = " << ref.meshID << ", tri = " << ref.tri
-                << ", bary = " << ref.bary;
-}
-
 void AppendPartialEdges(Manifold::Impl &outR, VecH<bool> &wholeHalfedgeP,
                         VecH<int> &facePtrR,
                         std::map<int, std::vector<EdgePos>> &edgesP,
@@ -1249,7 +1241,7 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
 
   // TODO: pass in halfedgeRef and use this to create meshRelation_.triBary.
   // Skip initialization in CreateAndFixHalfedges().
-  outR.Face2Tri(faceEdge);
+  outR.Face2Tri(faceEdge, halfedgeRef);
 
   // TODO: pass meshRelation_ through this function. Only remove long edges with
   // consistent meshID/tri.
