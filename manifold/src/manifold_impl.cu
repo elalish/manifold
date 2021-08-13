@@ -1222,11 +1222,13 @@ void Manifold::Impl::CreateAndFixHalfedges(const VecDH<glm::ivec3>& triVerts) {
                      LinkHalfedges({halfedge_.ptrH(), edge.cptrH()}));
   thrust::for_each(thrust::host, countAt(1), countAt(halfedge_.size() / 2),
                    SwapHalfedges({halfedge_.ptrH(), edge.cptrH()}));
-  meshRelation_.triBary.resize(numTri);
-  const int nextMeshID = meshID2Original_.size();
-  meshID2Original_.push_back(nextMeshID);
-  thrust::for_each_n(zip(meshRelation_.triBary.begin(), countAt(0)), numTri,
-                     InitializeBaryRef({nextMeshID}));
+  if (meshRelation_.triBary.size() != numTri) {
+    meshRelation_.triBary.resize(numTri);
+    const int nextMeshID = meshID2Original_.size();
+    meshID2Original_.push_back(nextMeshID);
+    thrust::for_each_n(zip(meshRelation_.triBary.begin(), countAt(0)), numTri,
+                       InitializeBaryRef({nextMeshID}));
+  }
 }
 
 /**
