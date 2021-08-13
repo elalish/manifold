@@ -1239,12 +1239,9 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
   // Create the manifold's data structures.
   outR.precision_ = glm::max(inP_.precision_, inQ_.precision_);
 
-  // TODO: pass in halfedgeRef and use this to create meshRelation_.triBary.
-  // Skip initialization in CreateAndFixHalfedges().
   outR.Face2Tri(faceEdge, halfedgeRef);
 
-  // TODO: pass meshRelation_ through this function. Only remove long edges with
-  // consistent meshID/tri.
+  // TODO: Only remove long edges with consistent meshID/tri.
   outR.CollapseDegenerates();
 
   triangulate.Stop();
