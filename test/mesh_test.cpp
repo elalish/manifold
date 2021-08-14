@@ -39,30 +39,21 @@ void Identical(const Mesh& mesh1, const Mesh& mesh2) {
 
 void Related(const Manifold& out, const std::vector<Mesh>& input,
              const std::map<int, int>& meshID2idx) {
-  std::vector<int> meshID2Original = Manifold::MeshID2Original();
   Mesh output = out.Extract();
   MeshRelation relation = out.GetMeshRelation();
   for (int i = 0; i < out.NumTri(); ++i) {
     int meshID = relation.triBary[i].meshID;
-    ASSERT_LT(meshID, meshID2Original.size());
-    int meshIdx = meshID2idx.at(meshID2Original[meshID]);
+    int meshIdx = meshID2idx.at(meshID);
     ASSERT_LT(meshIdx, input.size());
     const Mesh& inMesh = input[meshIdx];
     int inTri = relation.triBary[i].tri;
     ASSERT_LT(inTri, inMesh.triVerts.size());
     for (int j : {0, 1, 2}) {
-      int v = relation.triBary[i].vertBary[j];
-      if (v < 0) {
-        Identical(output.vertPos[output.triVerts[i][j]],
-                  inMesh.vertPos[inMesh.triVerts[inTri][j]]);
-      } else {
-        ASSERT_LT(v, relation.barycentric.size());
-        glm::vec3 uvw = relation.barycentric[v];
-        glm::vec3 vPos = uvw[0] * inMesh.vertPos[inMesh.triVerts[inTri][0]] +
-                         uvw[1] * inMesh.vertPos[inMesh.triVerts[inTri][1]] +
-                         uvw[2] * inMesh.vertPos[inMesh.triVerts[inTri][2]];
-        Identical(output.vertPos[output.triVerts[i][j]], vPos);
-      }
+      glm::mat3 triangle = {inMesh.vertPos[inMesh.triVerts[inTri][0]],
+                            inMesh.vertPos[inMesh.triVerts[inTri][1]],
+                            inMesh.vertPos[inMesh.triVerts[inTri][2]]};
+      glm::vec3 vPos = triangle * relation.UVW(i, j);
+      Identical(output.vertPos[output.triVerts[i][j]], vPos);
     }
   }
 }
@@ -418,6 +409,21 @@ TEST(Boolean, Tetra) {
   Manifold result = tetra2 - tetra;
 
   ExpectMeshes(result, {{8, 12}});
+
+  std::vector<Mesh> input;
+  std::map<int, int> meshID2idx;
+
+  std::vector<int> meshIDs = tetra.MeshIDs();
+  EXPECT_EQ(meshIDs.size(), 1);
+  meshID2idx[meshIDs[0]] = input.size();
+  input.push_back(tetra.Extract());
+
+  meshIDs = tetra2.MeshIDs();
+  EXPECT_EQ(meshIDs.size(), 1);
+  meshID2idx[meshIDs[0]] = input.size();
+  input.push_back(tetra2.Extract());
+
+  Related(result, input, meshID2idx);
 }
 
 /**

@@ -737,6 +737,7 @@ void AppendPartialEdges(Manifold::Impl &outR, VecH<bool> &wholeHalfedgeP,
     }
 
     int inclusion = i03[vStart];
+    bool reversed = inclusion < 0;
     EdgePos edgePos = {vP2R[vStart],
                        glm::dot(outR.vertPos_.H()[vP2R[vStart]], edgeVec),
                        inclusion > 0};
@@ -746,6 +747,7 @@ void AppendPartialEdges(Manifold::Impl &outR, VecH<bool> &wholeHalfedgeP,
     }
 
     inclusion = i03[vEnd];
+    reversed |= inclusion < 0;
     edgePos = {vP2R[vEnd], glm::dot(outR.vertPos_.H()[vP2R[vEnd]], edgeVec),
                inclusion < 0};
     for (int j = 0; j < glm::abs(inclusion); ++j) {
@@ -761,10 +763,15 @@ void AppendPartialEdges(Manifold::Impl &outR, VecH<bool> &wholeHalfedgeP,
     const int faceLeft = faceP2R[faceLeftP];
     const int faceRightP = halfedgeP[halfedge.pairedHalfedge].face;
     const int faceRight = faceP2R[faceRightP];
+    // Negative inclusion means the halfedges are reversed, which means our
+    // reference is now to the endVert instead of the startVert, which is one
+    // position advanced CCW.
     const Ref forwardRef = {forward ? 0 : 1, faceLeftP,
-                            edgeP - 3 * faceLeftP - 3};
-    const Ref backwardRef = {forward ? 0 : 1, faceRightP,
-                             halfedge.pairedHalfedge - 3 * faceRightP - 3};
+                            ((edgeP + (reversed ? 1 : 0)) % 3) - 3};
+    const Ref backwardRef = {
+        forward ? 0 : 1, faceRightP,
+        ((halfedge.pairedHalfedge + (reversed ? 1 : 0)) % 3) - 3};
+
     for (Halfedge e : edges) {
       const int forwardEdge = facePtrR[faceLeft]++;
       const int backwardEdge = facePtrR[faceRight]++;
