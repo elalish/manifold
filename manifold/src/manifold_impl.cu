@@ -219,16 +219,16 @@ struct InteriorVerts {
         ++posBary;
         if (j == n - i) continue;
 
-        // The three retained verts are denoted -1. uvw entries are added for
-        // them out of laziness of indexing only.
-        const int a = (k == n) ? -1 : first;
+        // The three retained verts are denoted by their index - 3. uvw entries
+        // are added for them out of laziness of indexing only.
+        const int a = (k == n) ? -2 : first;
         const int b = (i == n - 1) ? -1 : first + n - i + 1;
-        const int c = (j == n - 1) ? -1 : first + 1;
+        const int c = (j == n - 1) ? -3 : first + 1;
         glm::ivec3 vertBary(c, a, b);
         triBary[posTri] = {-1, tri, vertBary};
         triBaryNew[posTri++] = {baryOld.meshID, baryOld.tri, vertBary};
         if (j < n - 1 - i) {
-          int d = b + 1;
+          int d = b + 1;  // d cannot be a retained vert
           vertBary = {b, d, c};
           triBary[posTri] = {-1, tri, vertBary};
           triBaryNew[posTri++] = {baryOld.meshID, baryOld.tri, vertBary};
@@ -1391,6 +1391,7 @@ void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge,
   const VecH<int>& face = faceEdge.H();
   const VecH<Halfedge>& halfedge = halfedge_.H();
   const VecH<glm::vec3>& faceNormal = faceNormal_.H();
+  meshRelation_.triBary.resize(0);
 
   for (int i = 0; i < face.size() - 1; ++i) {
     const int edge = face[i];
@@ -1402,7 +1403,6 @@ void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge,
     std::map<int, Ref> vertRef;
     for (int j = edge; j < lastEdge; ++j)
       vertRef[halfedge[j].startVert] = halfedgeRef.H()[j];
-    meshRelation_.triBary.resize(0);
     const int startTri = triVerts.size();
 
     if (numEdge == 3) {  // Single triangle
