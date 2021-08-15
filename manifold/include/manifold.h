@@ -50,7 +50,7 @@ class Manifold {
   static int GetCircularSegments(float radius);
 
   // Information
-  Mesh Extract() const;
+  Mesh GetMesh() const;
   bool IsEmpty() const;
   int NumVert() const;
   int NumEdge() const;
@@ -61,7 +61,7 @@ class Manifold {
   Properties GetProperties() const;
   Curvature GetCurvature() const;
   MeshRelation GetMeshRelation() const;
-  std::vector<int> MeshIDs() const;
+  std::vector<int> GetMeshIDs() const;
   int SetAsOriginal();
   static std::vector<int> MeshID2Original();
 

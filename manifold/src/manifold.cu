@@ -504,7 +504,7 @@ std::vector<Manifold> Manifold::Decompose() const {
  * This returns a Mesh of simple vectors of vertices and triangles suitable for
  * saving or other operations outside of the context of this library.
  */
-Mesh Manifold::Extract() const {
+Mesh Manifold::GetMesh() const {
   pImpl_->ApplyTransform();
 
   Mesh result;
@@ -627,7 +627,7 @@ MeshRelation Manifold::GetMeshRelation() const {
  * only be a single meshID, which can be associated with the input mesh for
  * future reference.
  */
-std::vector<int> Manifold::MeshIDs() const {
+std::vector<int> Manifold::GetMeshIDs() const {
   VecDH<int> meshIDs(NumTri());
   thrust::for_each_n(
       zip(meshIDs.beginD(), pImpl_->meshRelation_.triBary.beginD()), NumTri(),
