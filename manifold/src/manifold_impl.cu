@@ -25,7 +25,6 @@
 #include <map>
 #include <set>
 
-#include "connected_components.cuh"
 #include "manifold_impl.cuh"
 #include "polygon.h"
 
