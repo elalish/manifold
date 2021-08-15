@@ -61,6 +61,9 @@ class Manifold {
   Properties GetProperties() const;
   Curvature GetCurvature() const;
   MeshRelation GetMeshRelation() const;
+  std::vector<int> MeshIDs() const;
+  int SetAsOriginal();
+  static std::vector<int> MeshID2Original();
 
   // Modification
   Manifold& Translate(glm::vec3);
@@ -102,8 +105,8 @@ class Manifold {
 
  private:
   std::unique_ptr<Impl> pImpl_;
-  static int circularSegments;
-  static float circularAngle;
-  static float circularEdgeLength;
+  static int circularSegments_;
+  static float circularAngle_;
+  static float circularEdgeLength_;
 };
 }  // namespace manifold

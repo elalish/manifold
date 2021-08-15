@@ -37,25 +37,26 @@ void Identical(const Mesh& mesh1, const Mesh& mesh2) {
     ASSERT_EQ(mesh1.triVerts[i], mesh2.triVerts[i]);
 }
 
-void Related(const Manifold& out, const Mesh& input) {
+void Related(const Manifold& out, const std::vector<Mesh>& input,
+             const std::map<int, int>& meshID2idx) {
   Mesh output = out.Extract();
   MeshRelation relation = out.GetMeshRelation();
+  std::vector<int> meshID2Original = Manifold::MeshID2Original();
   for (int i = 0; i < out.NumTri(); ++i) {
+    int meshID = relation.triBary[i].meshID;
+    int meshIdx = meshID2idx.find(meshID) != meshID2idx.end()
+                      ? meshID2idx.at(meshID)
+                      : meshID2idx.at(meshID2Original[meshID]);
+    ASSERT_LT(meshIdx, input.size());
+    const Mesh& inMesh = input[meshIdx];
     int inTri = relation.triBary[i].tri;
-    ASSERT_LT(inTri, input.triVerts.size());
+    ASSERT_LT(inTri, inMesh.triVerts.size());
     for (int j : {0, 1, 2}) {
-      int v = relation.triBary[i].vertBary[j];
-      if (v < 0) {
-        Identical(output.vertPos[output.triVerts[i][j]],
-                  input.vertPos[input.triVerts[inTri][j]]);
-      } else {
-        ASSERT_LT(v, relation.barycentric.size());
-        glm::vec3 uvw = relation.barycentric[v];
-        glm::vec3 vPos = uvw[0] * input.vertPos[input.triVerts[inTri][0]] +
-                         uvw[1] * input.vertPos[input.triVerts[inTri][1]] +
-                         uvw[2] * input.vertPos[input.triVerts[inTri][2]];
-        Identical(output.vertPos[output.triVerts[i][j]], vPos);
-      }
+      glm::mat3 triangle = {inMesh.vertPos[inMesh.triVerts[inTri][0]],
+                            inMesh.vertPos[inMesh.triVerts[inTri][1]],
+                            inMesh.vertPos[inMesh.triVerts[inTri][2]]};
+      glm::vec3 vPos = triangle * relation.UVW(i, j);
+      Identical(output.vertPos[output.triVerts[i][j]], vPos);
     }
   }
 }
@@ -136,13 +137,25 @@ TEST(Manifold, Regression) {
  * decompose are inverse operations.
  */
 TEST(Manifold, Decompose) {
-  std::vector<Manifold> meshList;
-  meshList.push_back(Manifold::Tetrahedron());
-  meshList.push_back(Manifold::Cube());
-  meshList.push_back(Manifold::Sphere(1, 4));
-  Manifold meshes = Manifold::Compose(meshList);
+  std::vector<Manifold> manifoldList;
+  manifoldList.push_back(Manifold::Tetrahedron());
+  manifoldList.push_back(Manifold::Cube());
+  manifoldList.push_back(Manifold::Sphere(1, 4));
+  Manifold manifolds = Manifold::Compose(manifoldList);
 
-  ExpectMeshes(meshes, {{8, 12}, {6, 8}, {4, 4}});
+  ExpectMeshes(manifolds, {{8, 12}, {6, 8}, {4, 4}});
+
+  std::vector<Mesh> input;
+  std::map<int, int> meshID2idx;
+
+  for (const Manifold& manifold : manifoldList) {
+    std::vector<int> meshIDs = manifold.MeshIDs();
+    EXPECT_EQ(meshIDs.size(), 1);
+    meshID2idx[meshIDs[0]] = input.size();
+    input.push_back(manifold.Extract());
+  }
+
+  Related(manifolds, input, meshID2idx);
 }
 
 /**
@@ -384,12 +397,19 @@ TEST(Manifold, Transform) {
 }
 
 TEST(Manifold, MeshRelation) {
-  Mesh input = ImportMesh("data/Csaszar.ply");
-  Manifold csaszar(input);
-  Related(csaszar, input);
-  Mesh sortedInput = csaszar.Extract();
+  std::vector<Mesh> input;
+  std::map<int, int> meshID2idx;
+
+  input.push_back(ImportMesh("data/Csaszar.ply"));
+  Manifold csaszar(input[0]);
+
+  std::vector<int> meshIDs = csaszar.MeshIDs();
+  EXPECT_EQ(meshIDs.size(), 1);
+  meshID2idx[meshIDs[0]] = input.size() - 1;
+
+  Related(csaszar, input, meshID2idx);
   csaszar.Refine(4);
-  Related(csaszar, sortedInput);
+  Related(csaszar, input, meshID2idx);
 }
 
 /**
@@ -404,6 +424,21 @@ TEST(Boolean, Tetra) {
   Manifold result = tetra2 - tetra;
 
   ExpectMeshes(result, {{8, 12}});
+
+  std::vector<Mesh> input;
+  std::map<int, int> meshID2idx;
+
+  std::vector<int> meshIDs = tetra.MeshIDs();
+  EXPECT_EQ(meshIDs.size(), 1);
+  meshID2idx[meshIDs[0]] = input.size();
+  input.push_back(tetra.Extract());
+
+  meshIDs = tetra2.MeshIDs();
+  EXPECT_EQ(meshIDs.size(), 1);
+  meshID2idx[meshIDs[0]] = input.size();
+  input.push_back(tetra2.Extract());
+
+  Related(result, input, meshID2idx);
 }
 
 /**

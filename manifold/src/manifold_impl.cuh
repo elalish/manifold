@@ -26,6 +26,9 @@ struct Manifold::Impl {
     VecDH<glm::vec3> barycentric;
     VecDH<BaryRef> triBary;
   };
+  struct Ref {
+    int meshID, tri, bary;
+  };
 
   Box bBox_;
   float precision_ = -1;
@@ -38,11 +41,16 @@ struct Manifold::Impl {
   Collider collider_;
   glm::mat4x3 transform_ = glm::mat4x3(1.0f);
 
+  static std::vector<int> meshID2Original_;
+
   Impl() {}
   Impl(const Mesh&);
   enum class Shape { TETRAHEDRON, CUBE, OCTAHEDRON };
   Impl(Shape);
 
+  void DuplicateMeshIDs();
+  void ReinitializeReference(int meshID = -1);
+  int InitializeNewReference();
   void CreateHalfedges(const VecDH<glm::ivec3>& triVerts);
   void CreateAndFixHalfedges(const VecDH<glm::ivec3>& triVerts);
   void CollapseDegenerates();
@@ -51,7 +59,7 @@ struct Manifold::Impl {
   void ApplyTransform() const;
   void ApplyTransform();
   void CreateTangents(const std::vector<Smoothness>&);
-  void Subdivide(int n);
+  MeshRelationD Subdivide(int n);
   void Refine(int n);
 
   bool IsEmpty() const { return NumVert() == 0; }
@@ -71,7 +79,7 @@ struct Manifold::Impl {
   void GatherFaces(const VecDH<int>& faceNew2Old);
   void GatherFaces(const Impl& old, const VecDH<int>& faceNew2Old);
   void CalculateNormals();
-  void Face2Tri(const VecDH<int>& faceEdge);
+  void Face2Tri(const VecDH<int>& faceEdge, const VecDH<Ref>& halfedgeRef);
 
   SparseIndices EdgeCollisions(const Impl& B) const;
   SparseIndices VertexCollisionsZ(const VecDH<glm::vec3>& vertsIn) const;
@@ -79,4 +87,10 @@ struct Manifold::Impl {
   Polygons Face2Polygons(int face, glm::mat3x2 projection,
                          const VecH<int>& faceEdge) const;
 };
+
+inline std::ostream& operator<<(std::ostream& stream,
+                                const Manifold::Impl::Ref& ref) {
+  return stream << "meshID = " << ref.meshID << ", tri = " << ref.tri
+                << ", bary = " << ref.bary;
+}
 }  // namespace manifold
