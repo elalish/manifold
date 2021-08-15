@@ -13,7 +13,7 @@
 // limitations under the License.
 
 #pragma once
-#include "manifold_impl.cuh"
+#include "impl.cuh"
 
 namespace manifold {
 

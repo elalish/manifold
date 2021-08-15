@@ -25,7 +25,7 @@
 #include <map>
 #include <set>
 
-#include "manifold_impl.cuh"
+#include "impl.cuh"
 #include "polygon.h"
 
 namespace {
