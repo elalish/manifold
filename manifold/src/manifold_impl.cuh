@@ -49,6 +49,8 @@ struct Manifold::Impl {
   Impl(Shape);
 
   void DuplicateMeshIDs();
+  void ReinitializeReference(int meshID = -1);
+  int InitializeNewReference();
   void CreateHalfedges(const VecDH<glm::ivec3>& triVerts);
   void CreateAndFixHalfedges(const VecDH<glm::ivec3>& triVerts);
   void CollapseDegenerates();

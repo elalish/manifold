@@ -221,6 +221,8 @@ Manifold Manifold::Sphere(float radius, int circularSegments) {
   thrust::for_each_n(sphere.pImpl_->vertPos_.beginD(), sphere.NumVert(),
                      ToSphere({radius}));
   sphere.pImpl_->Finish();
+  // Ignore preceding octahedron.
+  sphere.pImpl_->ReinitializeReference();
   return sphere;
 }
 
@@ -290,6 +292,7 @@ Manifold Manifold::Extrude(Polygons crossSection, float height, int nDivisions,
 
   extrusion.pImpl_->CreateHalfedges(triVertsDH);
   extrusion.pImpl_->Finish();
+  extrusion.pImpl_->ReinitializeReference();
   return extrusion;
 }
 
@@ -384,6 +387,7 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments) {
 
   revoloid.pImpl_->CreateHalfedges(triVertsDH);
   revoloid.pImpl_->Finish();
+  revoloid.pImpl_->ReinitializeReference();
   return revoloid;
 }
 
@@ -604,11 +608,8 @@ Curvature Manifold::GetCurvature() const { return pImpl_->GetCurvature(); }
  * BaryRef.vertBary gives an index for each vertex into the barycentric vector,
  * if that vertex is >= 0, indicating it is a new vertex. The barycentric
  * coordinates are relative to the original verts of the corresponding input
- * tri. If the index is -1, this indicates it is the original vertex.
- *
- * TODO: After a Boolean operation, we can refer to triangles from two input
- * meshes. Store these using negative tri indicies and add helper methods to
- * separate the bool and the index.
+ * tri. If the index is < 0, this indicates it is an original vertex of the
+ * triangle, found as index + 3.
  */
 MeshRelation Manifold::GetMeshRelation() const {
   MeshRelation out;
@@ -620,6 +621,12 @@ MeshRelation Manifold::GetMeshRelation() const {
   return out;
 }
 
+/**
+ * Returns a vector of unique meshIDs that are referenced by this manifold's
+ * meshRelation. If this manifold has been newly constructed then there will
+ * only be a single meshID, which can be associated with the input mesh for
+ * future reference.
+ */
 std::vector<int> Manifold::MeshIDs() const {
   VecDH<int> meshIDs(NumTri());
   thrust::for_each_n(
@@ -635,21 +642,17 @@ std::vector<int> Manifold::MeshIDs() const {
   return out;
 }
 
-std::vector<int> Manifold::MeshID2Original() {
-  return Manifold::Impl::meshID2Original_;
-}
-
 /**
  * If you copy a manifold, but you want this new copy to have new properties
- * (e.g. a different UV mapping), you can set this meshID as an original,
+ * (e.g. a different UV mapping), you can reset its meshID as an original,
  * meaning it will now be referenced by its descendents instead of the mesh it
  * was copied from, allowing you to differentiate the copies when applying your
- * properties to the final result.
+ * properties to the final result. Its new meshID is returned.
  */
-void Manifold::SetAsOriginal(int meshID) {
-  ALWAYS_ASSERT(meshID < Manifold::Impl::meshID2Original_.size(), userErr,
-                "This meshID has not been defined yet!");
-  Manifold::Impl::meshID2Original_[meshID] = meshID;
+int Manifold::SetAsOriginal() { return pImpl_->InitializeNewReference(); }
+
+std::vector<int> Manifold::MeshID2Original() {
+  return Manifold::Impl::meshID2Original_;
 }
 
 bool Manifold::IsManifold() const { return pImpl_->IsManifold(); }

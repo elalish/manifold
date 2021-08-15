@@ -62,8 +62,8 @@ class Manifold {
   Curvature GetCurvature() const;
   MeshRelation GetMeshRelation() const;
   std::vector<int> MeshIDs() const;
+  int SetAsOriginal();
   static std::vector<int> MeshID2Original();
-  static void SetAsOriginal(int meshID);
 
   // Modification
   Manifold& Translate(glm::vec3);

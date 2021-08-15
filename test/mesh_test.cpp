@@ -41,9 +41,12 @@ void Related(const Manifold& out, const std::vector<Mesh>& input,
              const std::map<int, int>& meshID2idx) {
   Mesh output = out.Extract();
   MeshRelation relation = out.GetMeshRelation();
+  std::vector<int> meshID2Original = Manifold::MeshID2Original();
   for (int i = 0; i < out.NumTri(); ++i) {
     int meshID = relation.triBary[i].meshID;
-    int meshIdx = meshID2idx.at(meshID);
+    int meshIdx = meshID2idx.find(meshID) != meshID2idx.end()
+                      ? meshID2idx.at(meshID)
+                      : meshID2idx.at(meshID2Original[meshID]);
     ASSERT_LT(meshIdx, input.size());
     const Mesh& inMesh = input[meshIdx];
     int inTri = relation.triBary[i].tri;
@@ -134,13 +137,25 @@ TEST(Manifold, Regression) {
  * decompose are inverse operations.
  */
 TEST(Manifold, Decompose) {
-  std::vector<Manifold> meshList;
-  meshList.push_back(Manifold::Tetrahedron());
-  meshList.push_back(Manifold::Cube());
-  meshList.push_back(Manifold::Sphere(1, 4));
-  Manifold meshes = Manifold::Compose(meshList);
+  std::vector<Manifold> manifoldList;
+  manifoldList.push_back(Manifold::Tetrahedron());
+  manifoldList.push_back(Manifold::Cube());
+  manifoldList.push_back(Manifold::Sphere(1, 4));
+  Manifold manifolds = Manifold::Compose(manifoldList);
 
-  ExpectMeshes(meshes, {{8, 12}, {6, 8}, {4, 4}});
+  ExpectMeshes(manifolds, {{8, 12}, {6, 8}, {4, 4}});
+
+  std::vector<Mesh> input;
+  std::map<int, int> meshID2idx;
+
+  for (const Manifold& manifold : manifoldList) {
+    std::vector<int> meshIDs = manifold.MeshIDs();
+    EXPECT_EQ(meshIDs.size(), 1);
+    meshID2idx[meshIDs[0]] = input.size();
+    input.push_back(manifold.Extract());
+  }
+
+  Related(manifolds, input, meshID2idx);
 }
 
 /**

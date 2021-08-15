@@ -845,7 +845,8 @@ struct InitializeBaryRef {
     BaryRef& baryRef = thrust::get<0>(inOut);
     int tri = thrust::get<1>(inOut);
 
-    baryRef.meshID = meshID;
+    // Leave existing meshID if input is negative
+    if (meshID >= 0) baryRef.meshID = meshID;
     baryRef.tri = tri;
     baryRef.vertBary = {-3, -2, -1};
   }
@@ -1161,6 +1162,7 @@ Manifold::Impl::Impl(Shape shape) {
   vertPos_ = vertPos;
   CreateAndFixHalfedges(triVerts);
   Finish();
+  ReinitializeReference();
 }
 
 /**
@@ -1179,6 +1181,19 @@ void Manifold::Impl::DuplicateMeshIDs() {
   }
 }
 
+void Manifold::Impl::ReinitializeReference(int meshID) {
+  thrust::for_each_n(zip(meshRelation_.triBary.beginD(), countAt(0)), NumTri(),
+                     InitializeBaryRef({meshID}));
+}
+
+int Manifold::Impl::InitializeNewReference() {
+  meshRelation_.triBary.resize(NumTri());
+  const int nextMeshID = meshID2Original_.size();
+  meshID2Original_.push_back(nextMeshID);
+  ReinitializeReference(nextMeshID);
+  return nextMeshID;
+}
+
 /**
  * Create the halfedge_ data structure from an input triVerts array like Mesh.
  */
@@ -1191,13 +1206,7 @@ void Manifold::Impl::CreateHalfedges(const VecDH<glm::ivec3>& triVerts) {
   thrust::sort(edge.beginD(), edge.endD());
   thrust::for_each_n(countAt(0), halfedge_.size() / 2,
                      LinkHalfedges({halfedge_.ptrD(), edge.cptrD()}));
-  if (meshRelation_.triBary.size() != numTri) {
-    meshRelation_.triBary.resize(numTri);
-    const int nextMeshID = meshID2Original_.size();
-    meshID2Original_.push_back(nextMeshID);
-    thrust::for_each_n(zip(meshRelation_.triBary.beginD(), countAt(0)), numTri,
-                       InitializeBaryRef({nextMeshID}));
-  }
+  if (meshRelation_.triBary.size() != numTri) InitializeNewReference();
 }
 
 /**
@@ -1222,13 +1231,7 @@ void Manifold::Impl::CreateAndFixHalfedges(const VecDH<glm::ivec3>& triVerts) {
                      LinkHalfedges({halfedge_.ptrH(), edge.cptrH()}));
   thrust::for_each(thrust::host, countAt(1), countAt(halfedge_.size() / 2),
                    SwapHalfedges({halfedge_.ptrH(), edge.cptrH()}));
-  if (meshRelation_.triBary.size() != numTri) {
-    meshRelation_.triBary.resize(numTri);
-    const int nextMeshID = meshID2Original_.size();
-    meshID2Original_.push_back(nextMeshID);
-    thrust::for_each_n(zip(meshRelation_.triBary.begin(), countAt(0)), numTri,
-                       InitializeBaryRef({nextMeshID}));
-  }
+  if (meshRelation_.triBary.size() != numTri) InitializeNewReference();
 }
 
 /**
