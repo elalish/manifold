@@ -39,7 +39,7 @@ void Identical(const Mesh& mesh1, const Mesh& mesh2) {
 
 void Related(const Manifold& out, const std::vector<Mesh>& input,
              const std::map<int, int>& meshID2idx) {
-  Mesh output = out.Extract();
+  Mesh output = out.GetMesh();
   MeshRelation relation = out.GetMeshRelation();
   std::vector<int> meshID2Original = Manifold::MeshID2Original();
   for (int i = 0; i < out.NumTri(); ++i) {
@@ -109,11 +109,11 @@ TEST(MeshIO, ReadWrite) {
  * This tests that turning a mesh into a manifold and returning it to a mesh
  * produces a consistent result.
  */
-TEST(Manifold, Extract) {
+TEST(Manifold, GetMesh) {
   Manifold manifold = Manifold::Sphere(1);
-  Mesh mesh_out = manifold.Extract();
+  Mesh mesh_out = manifold.GetMesh();
   Manifold mesh2(mesh_out);
-  Mesh mesh_out2 = mesh2.Extract();
+  Mesh mesh_out2 = mesh2.GetMesh();
   Identical(mesh_out, mesh_out2);
 }
 
@@ -126,9 +126,9 @@ TEST(Manifold, Regression) {
   int num_overlaps = manifold.NumOverlaps(mesh1);
   ASSERT_EQ(num_overlaps, 222653);
 
-  Mesh mesh_out = manifold.Extract();
+  Mesh mesh_out = manifold.GetMesh();
   Manifold mesh2(mesh_out);
-  Mesh mesh_out2 = mesh2.Extract();
+  Mesh mesh_out2 = mesh2.GetMesh();
   Identical(mesh_out, mesh_out2);
 }
 
@@ -149,10 +149,10 @@ TEST(Manifold, Decompose) {
   std::map<int, int> meshID2idx;
 
   for (const Manifold& manifold : manifoldList) {
-    std::vector<int> meshIDs = manifold.MeshIDs();
+    std::vector<int> meshIDs = manifold.GetMeshIDs();
     EXPECT_EQ(meshIDs.size(), 1);
     meshID2idx[meshIDs[0]] = input.size();
-    input.push_back(manifold.Extract());
+    input.push_back(manifold.GetMesh());
   }
 
   Related(manifolds, input, meshID2idx);
@@ -169,7 +169,7 @@ TEST(Manifold, Sphere) {
 }
 
 TEST(Manifold, Normals) {
-  Mesh cube = Manifold::Cube(glm::vec3(1), true).Extract();
+  Mesh cube = Manifold::Cube(glm::vec3(1), true).GetMesh();
   const int nVert = cube.vertPos.size();
   for (int i = 0; i < nVert; ++i) {
     glm::vec3 v = glm::normalize(cube.vertPos[i]);
@@ -220,13 +220,13 @@ TEST(Manifold, Revolve2) {
 
 TEST(Manifold, Smooth) {
   Manifold tet = Manifold::Tetrahedron();
-  Manifold smooth = Manifold::Smooth(tet.Extract());
+  Manifold smooth = Manifold::Smooth(tet.GetMesh());
   smooth.Refine(100);
   ExpectMeshes(smooth, {{20002, 40000}});
   auto prop = smooth.GetProperties();
   EXPECT_NEAR(prop.volume, 17.38, 0.1);
   EXPECT_NEAR(prop.surfaceArea, 33.38, 0.1);
-  // ExportMesh("smoothTet.gltf", smooth.Extract());
+  // ExportMesh("smoothTet.gltf", smooth.GetMesh());
 }
 
 TEST(Manifold, SmoothSphere) {
@@ -235,8 +235,8 @@ TEST(Manifold, SmoothSphere) {
   for (int i = 0; i < 5; ++i) {
     Manifold sphere = Manifold::Sphere(1, n[i]);
     // Refine(odd) puts a center point in the triangle, which is the worst case.
-    Manifold smoothed = Manifold::Smooth(sphere.Extract()).Refine(7);
-    Mesh out = smoothed.Extract();
+    Manifold smoothed = Manifold::Smooth(sphere.GetMesh()).Refine(7);
+    Mesh out = smoothed.GetMesh();
     auto bounds =
         std::minmax_element(out.vertPos.begin(), out.vertPos.end(),
                             [](const glm::vec3& a, const glm::vec3& b) {
@@ -251,8 +251,8 @@ TEST(Manifold, SmoothSphere) {
 
 TEST(Manifold, ManualSmooth) {
   // Unit Octahedron
-  const Mesh oct = Manifold::Sphere(1, 4).Extract();
-  Mesh smooth = Manifold::Smooth(oct).Extract();
+  const Mesh oct = Manifold::Sphere(1, 4).GetMesh();
+  Mesh smooth = Manifold::Smooth(oct).GetMesh();
   // Sharpen the edge from vert 4 to 5
   smooth.halfedgeTangent[6] = {0, 0, 0, 1};
   smooth.halfedgeTangent[22] = {0, 0, 0, 1};
@@ -266,7 +266,7 @@ TEST(Manifold, ManualSmooth) {
   EXPECT_NEAR(prop.volume, 3.53, 0.01);
   EXPECT_NEAR(prop.surfaceArea, 11.39, 0.01);
 
-  const Mesh out = interp.Extract();
+  const Mesh out = interp.GetMesh();
   ExportOptions options;
   options.faceted = false;
   options.mat.roughness = 0.1;
@@ -294,7 +294,7 @@ TEST(Manifold, Csaszar) {
   EXPECT_NEAR(prop.volume, 84699, 10);
   EXPECT_NEAR(prop.surfaceArea, 14796, 10);
 
-  // const Mesh out = csaszar.Extract();
+  // const Mesh out = csaszar.GetMesh();
   // ExportOptions options;
   // options.faceted = false;
   // options.mat.roughness = 0.1;
@@ -393,7 +393,7 @@ TEST(Manifold, Transform) {
   transform[3] = glm::vec3(1, 2, 3);
   cube2.Transform(transform);
 
-  Identical(cube.Extract(), cube2.Extract());
+  Identical(cube.GetMesh(), cube2.GetMesh());
 }
 
 TEST(Manifold, MeshRelation) {
@@ -403,7 +403,7 @@ TEST(Manifold, MeshRelation) {
   input.push_back(ImportMesh("data/Csaszar.ply"));
   Manifold csaszar(input[0]);
 
-  std::vector<int> meshIDs = csaszar.MeshIDs();
+  std::vector<int> meshIDs = csaszar.GetMeshIDs();
   EXPECT_EQ(meshIDs.size(), 1);
   meshID2idx[meshIDs[0]] = input.size() - 1;
 
@@ -428,15 +428,15 @@ TEST(Boolean, Tetra) {
   std::vector<Mesh> input;
   std::map<int, int> meshID2idx;
 
-  std::vector<int> meshIDs = tetra.MeshIDs();
+  std::vector<int> meshIDs = tetra.GetMeshIDs();
   EXPECT_EQ(meshIDs.size(), 1);
   meshID2idx[meshIDs[0]] = input.size();
-  input.push_back(tetra.Extract());
+  input.push_back(tetra.GetMesh());
 
-  meshIDs = tetra2.MeshIDs();
+  meshIDs = tetra2.GetMeshIDs();
   EXPECT_EQ(meshIDs.size(), 1);
   meshID2idx[meshIDs[0]] = input.size();
-  input.push_back(tetra2.Extract());
+  input.push_back(tetra2.GetMesh());
 
   Related(result, input, meshID2idx);
 }
@@ -480,7 +480,7 @@ TEST(Boolean, Coplanar) {
                             .Translate({0.25f, 0.25f, 0.0f});
   ExpectMeshes(out, {{32, 64}});
   EXPECT_EQ(out.Genus(), 1);
-  // ExportMesh("coplanar.gltf", out.Extract());
+  // ExportMesh("coplanar.gltf", out.GetMesh());
 }
 
 TEST(Boolean, MultiCoplanar) {
@@ -508,7 +508,7 @@ TEST(Boolean, FaceUnion) {
   auto prop = cubes.GetProperties();
   EXPECT_NEAR(prop.volume, 2, 1e-5);
   EXPECT_NEAR(prop.surfaceArea, 10, 1e-5);
-  // ExportMesh("faceUnion.gltf", cubes.Extract(), {});
+  // ExportMesh("faceUnion.gltf", cubes.GetMesh(), {});
 }
 
 TEST(Boolean, EdgeUnion) {
@@ -689,7 +689,7 @@ TEST(Boolean, Gyroid) {
   Manifold gyroid2 = gyroid;
   gyroid2.Translate(glm::vec3(5.0f));
   Manifold result = gyroid + gyroid2;
-  // ExportMesh("gyroidUnion.gltf", result.Extract(), {});
+  // ExportMesh("gyroidUnion.gltf", result.GetMesh(), {});
 
   EXPECT_TRUE(result.IsManifold());
   EXPECT_TRUE(result.MatchesTriNormals());
