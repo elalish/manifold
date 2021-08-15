@@ -13,7 +13,7 @@
 // limitations under the License.
 
 #include "boolean3.cuh"
-#include "manifold_impl.cuh"
+#include "impl.cuh"
 
 namespace {
 using namespace manifold;

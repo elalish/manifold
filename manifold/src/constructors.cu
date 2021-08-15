@@ -18,7 +18,7 @@
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/graph/connected_components.hpp>
 
-#include "manifold_impl.cuh"
+#include "impl.cuh"
 #include "polygon.h"
 
 namespace {
