@@ -33,6 +33,15 @@ struct ToSphere {
   }
 };
 
+struct UpdateTriBary {
+  const int nextBary;
+
+  __host__ __device__ BaryRef operator()(BaryRef ref) {
+    ref.vertBary += nextBary;
+    return ref;
+  }
+};
+
 struct UpdateHalfedge {
   const int nextVert;
   const int nextEdge;
@@ -75,6 +84,12 @@ struct MakeTri {
   }
 };
 
+struct GetMeshID {
+  __host__ __device__ void operator()(thrust::tuple<int&, BaryRef> inOut) {
+    thrust::get<0>(inOut) = thrust::get<1>(inOut).meshID;
+  }
+};
+
 Manifold Halfspace(Box bBox, glm::vec3 normal, float originOffset) {
   normal = glm::normalize(normal);
   Manifold cutter =
@@ -96,11 +111,14 @@ Manifold::~Manifold() = default;
 Manifold::Manifold(Manifold&&) noexcept = default;
 Manifold& Manifold::operator=(Manifold&&) noexcept = default;
 
-Manifold::Manifold(const Manifold& other) : pImpl_(new Impl(*other.pImpl_)) {}
+Manifold::Manifold(const Manifold& other) : pImpl_(new Impl(*other.pImpl_)) {
+  pImpl_->DuplicateMeshIDs();
+}
 
 Manifold& Manifold::operator=(const Manifold& other) {
   if (this != &other) {
     pImpl_.reset(new Impl(*other.pImpl_));
+    pImpl_->DuplicateMeshIDs();
   }
   return *this;
 }
@@ -203,6 +221,8 @@ Manifold Manifold::Sphere(float radius, int circularSegments) {
   thrust::for_each_n(sphere.pImpl_->vertPos_.beginD(), sphere.NumVert(),
                      ToSphere({radius}));
   sphere.pImpl_->Finish();
+  // Ignore preceding octahedron.
+  sphere.pImpl_->ReinitializeReference();
   return sphere;
 }
 
@@ -272,6 +292,7 @@ Manifold Manifold::Extrude(Polygons crossSection, float height, int nDivisions,
 
   extrusion.pImpl_->CreateHalfedges(triVertsDH);
   extrusion.pImpl_->Finish();
+  extrusion.pImpl_->ReinitializeReference();
   return extrusion;
 }
 
@@ -366,6 +387,7 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments) {
 
   revoloid.pImpl_->CreateHalfedges(triVertsDH);
   revoloid.pImpl_->Finish();
+  revoloid.pImpl_->ReinitializeReference();
   return revoloid;
 }
 
@@ -377,22 +399,28 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments) {
 Manifold Manifold::Compose(const std::vector<Manifold>& manifolds) {
   int numVert = 0;
   int numEdge = 0;
-  int NumTri = 0;
+  int numTri = 0;
+  int numBary = 0;
   for (const Manifold& manifold : manifolds) {
     numVert += manifold.NumVert();
     numEdge += manifold.NumEdge();
-    NumTri += manifold.NumTri();
+    numTri += manifold.NumTri();
+    numBary += manifold.pImpl_->meshRelation_.barycentric.size();
   }
 
   Manifold out;
   Impl& combined = *(out.pImpl_);
   combined.vertPos_.resize(numVert);
   combined.halfedge_.resize(2 * numEdge);
-  combined.faceNormal_.resize(NumTri);
+  combined.faceNormal_.resize(numTri);
+  combined.halfedgeTangent_.resize(2 * numEdge);
+  combined.meshRelation_.barycentric.resize(numBary);
+  combined.meshRelation_.triBary.resize(numTri);
 
   int nextVert = 0;
   int nextEdge = 0;
-  int nextFace = 0;
+  int nextTri = 0;
+  int nextBary = 0;
   for (const Manifold& manifold : manifolds) {
     const Impl& impl = *(manifold.pImpl_);
     impl.ApplyTransform();
@@ -400,18 +428,27 @@ Manifold Manifold::Compose(const std::vector<Manifold>& manifolds) {
     thrust::copy(impl.vertPos_.beginD(), impl.vertPos_.endD(),
                  combined.vertPos_.beginD() + nextVert);
     thrust::copy(impl.faceNormal_.beginD(), impl.faceNormal_.endD(),
-                 combined.faceNormal_.beginD() + nextFace);
+                 combined.faceNormal_.beginD() + nextTri);
+    thrust::copy(impl.halfedgeTangent_.beginD(), impl.halfedgeTangent_.endD(),
+                 combined.halfedgeTangent_.beginD() + nextEdge);
+    thrust::copy(impl.meshRelation_.barycentric.beginD(),
+                 impl.meshRelation_.barycentric.endD(),
+                 combined.meshRelation_.barycentric.beginD() + nextBary);
+    thrust::transform(impl.meshRelation_.triBary.beginD(),
+                      impl.meshRelation_.triBary.endD(),
+                      combined.meshRelation_.triBary.beginD() + nextTri,
+                      UpdateTriBary({nextBary}));
     thrust::transform(impl.halfedge_.beginD(), impl.halfedge_.endD(),
                       combined.halfedge_.beginD() + nextEdge,
-                      UpdateHalfedge({nextVert, nextEdge, nextFace}));
+                      UpdateHalfedge({nextVert, nextEdge, nextTri}));
 
     nextVert += manifold.NumVert();
     nextEdge += 2 * manifold.NumEdge();
-    nextFace += manifold.NumTri();
+    nextTri += manifold.NumTri();
+    nextBary += impl.meshRelation_.barycentric.size();
   }
 
-  // TODO: populate this properly
-  combined.meshRelation_.triBary.resize(combined.NumTri());
+  combined.DuplicateMeshIDs();
   combined.Finish();
   return out;
 }
@@ -493,30 +530,30 @@ Mesh Manifold::Extract() const {
  * edge length and angle, rounded up to the nearest multiple of four. To get
  * numbers not divisible by four, circularSegements must be specified.
  */
-int Manifold::circularSegments = 0;
-float Manifold::circularAngle = 10.0f;
-float Manifold::circularEdgeLength = 1.0f;
+int Manifold::circularSegments_ = 0;
+float Manifold::circularAngle_ = 10.0f;
+float Manifold::circularEdgeLength_ = 1.0f;
 
 void Manifold::SetMinCircularAngle(float angle) {
   ALWAYS_ASSERT(angle > 0.0f, userErr, "angle must be positive!");
-  Manifold::circularAngle = angle;
+  Manifold::circularAngle_ = angle;
 }
 
 void Manifold::SetMinCircularEdgeLength(float length) {
   ALWAYS_ASSERT(length > 0.0f, userErr, "length must be positive!");
-  Manifold::circularEdgeLength = length;
+  Manifold::circularEdgeLength_ = length;
 }
 
 void Manifold::SetCircularSegments(int number) {
   ALWAYS_ASSERT(number > 2 || number == 0, userErr,
                 "must have at least three segments in circle!");
-  Manifold::circularSegments = number;
+  Manifold::circularSegments_ = number;
 }
 
 int Manifold::GetCircularSegments(float radius) {
-  if (Manifold::circularSegments > 0) return Manifold::circularSegments;
-  int nSegA = 360.0f / Manifold::circularAngle;
-  int nSegL = 2.0f * radius * glm::pi<float>() / Manifold::circularEdgeLength;
+  if (Manifold::circularSegments_ > 0) return Manifold::circularSegments_;
+  int nSegA = 360.0f / Manifold::circularAngle_;
+  int nSegL = 2.0f * radius * glm::pi<float>() / Manifold::circularEdgeLength_;
   int nSeg = min(nSegA, nSegL) + 3;
   nSeg -= nSeg % 4;
   return nSeg;
@@ -571,11 +608,8 @@ Curvature Manifold::GetCurvature() const { return pImpl_->GetCurvature(); }
  * BaryRef.vertBary gives an index for each vertex into the barycentric vector,
  * if that vertex is >= 0, indicating it is a new vertex. The barycentric
  * coordinates are relative to the original verts of the corresponding input
- * tri. If the index is -1, this indicates it is the original vertex.
- *
- * TODO: After a Boolean operation, we can refer to triangles from two input
- * meshes. Store these using negative tri indicies and add helper methods to
- * separate the bool and the index.
+ * tri. If the index is < 0, this indicates it is an original vertex of the
+ * triangle, found as index + 3.
  */
 MeshRelation Manifold::GetMeshRelation() const {
   MeshRelation out;
@@ -585,6 +619,40 @@ MeshRelation Manifold::GetMeshRelation() const {
   out.barycentric.insert(out.barycentric.end(), relation.barycentric.begin(),
                          relation.barycentric.end());
   return out;
+}
+
+/**
+ * Returns a vector of unique meshIDs that are referenced by this manifold's
+ * meshRelation. If this manifold has been newly constructed then there will
+ * only be a single meshID, which can be associated with the input mesh for
+ * future reference.
+ */
+std::vector<int> Manifold::MeshIDs() const {
+  VecDH<int> meshIDs(NumTri());
+  thrust::for_each_n(
+      zip(meshIDs.beginD(), pImpl_->meshRelation_.triBary.beginD()), NumTri(),
+      GetMeshID());
+
+  thrust::sort(meshIDs.beginD(), meshIDs.endD());
+  int n = thrust::unique(meshIDs.beginD(), meshIDs.endD()) - meshIDs.beginD();
+  meshIDs.resize(n);
+
+  std::vector<int> out;
+  out.insert(out.end(), meshIDs.begin(), meshIDs.end());
+  return out;
+}
+
+/**
+ * If you copy a manifold, but you want this new copy to have new properties
+ * (e.g. a different UV mapping), you can reset its meshID as an original,
+ * meaning it will now be referenced by its descendents instead of the mesh it
+ * was copied from, allowing you to differentiate the copies when applying your
+ * properties to the final result. Its new meshID is returned.
+ */
+int Manifold::SetAsOriginal() { return pImpl_->InitializeNewReference(); }
+
+std::vector<int> Manifold::MeshID2Original() {
+  return Manifold::Impl::meshID2Original_;
 }
 
 bool Manifold::IsManifold() const { return pImpl_->IsManifold(); }
