@@ -859,19 +859,6 @@ struct SwapHalfedges {
   }
 };
 
-struct ShortEdge {
-  const Halfedge* halfedge;
-  const glm::vec3* vertPos;
-  const float precision;
-
-  __host__ __device__ bool operator()(int edge) {
-    if (halfedge[edge].pairedHalfedge < 0) return false;
-    const glm::vec3 delta =
-        vertPos[halfedge[edge].endVert] - vertPos[halfedge[edge].startVert];
-    return glm::dot(delta, delta) < precision * precision;
-  }
-};
-
 struct InitializeBaryRef {
   const int meshID;
 
@@ -883,6 +870,34 @@ struct InitializeBaryRef {
     if (meshID >= 0) baryRef.meshID = meshID;
     baryRef.tri = tri;
     baryRef.vertBary = {-3, -2, -1};
+  }
+};
+
+struct FlagEdge {
+  const Halfedge* halfedge;
+  const glm::vec3* vertPos;
+  const float precision;
+  const BaryRef* triBary;
+
+  __host__ __device__ bool operator()(int edge) {
+    if (halfedge[edge].pairedHalfedge < 0) return false;
+    // Flag short edges
+    const glm::vec3 delta =
+        vertPos[halfedge[edge].endVert] - vertPos[halfedge[edge].startVert];
+    if (glm::dot(delta, delta) < precision * precision) return true;
+    // Flag redundant edges - those where the startVert is surrounded by only
+    // two original triangles.
+    const BaryRef ref0 = triBary[edge / 3];
+    int current = NextHalfedge(halfedge[edge].pairedHalfedge);
+    const BaryRef ref1 = triBary[current / 3];
+    while (current != edge) {
+      current = NextHalfedge(halfedge[current].pairedHalfedge);
+      const BaryRef ref = triBary[current / 3];
+      if ((ref.meshID != ref0.meshID || ref.tri != ref0.tri) &&
+          (ref.meshID != ref1.meshID || ref.tri != ref1.tri))
+        return false;
+    }
+    return true;
   }
 };
 
@@ -1130,22 +1145,25 @@ void Manifold::Impl::CreateAndFixHalfedges(const VecDH<glm::ivec3>& triVerts) {
  * Collapses degenerate triangles by removing edges shorter than precision_ and
  * edges that are colinear whose collapse does not generate a geometric change.
  * Rather than actually removing them, this step merely marks them for removal,
- * by setting vertPos to NaN and halfedge to -1.
+ * by setting vertPos to NaN and halfedge to {-1, -1, -1, -1}.
  *
  * TODO: remove colinear edge collapse, since this could easily conflict with
  * mesh property junctions; consider test Boolean.FaceUnion if the two cubes
  * were different colors - we are losing the verts that denote the boundary.
  */
 void Manifold::Impl::CollapseDegenerates() {
-  VecDH<int> shortEdges(halfedge_.size());
-  int numShort =
-      thrust::copy_if(
-          countAt(0), countAt(halfedge_.size()), shortEdges.beginD(),
-          ShortEdge({halfedge_.cptrD(), vertPos_.cptrD(), precision_})) -
-      shortEdges.beginD();
-  shortEdges.resize(numShort);
+  VecDH<int> flaggedEdges(halfedge_.size());
+  int numFlagged =
+      thrust::copy_if(countAt(0), countAt(halfedge_.size()),
+                      flaggedEdges.beginD(),
+                      FlagEdge({halfedge_.cptrD(), vertPos_.cptrD(), precision_,
+                                meshRelation_.triBary.cptrD()})) -
+      flaggedEdges.beginD();
+  flaggedEdges.resize(numFlagged);
 
-  for (const int edge : shortEdges.H()) CollapseEdge(edge);
+  for (const int edge : flaggedEdges.H()) CollapseEdge(edge);
+
+  ALWAYS_ASSERT(MatchesTriNormals(), geometryErr, "inverted a triangle");
 
   VecDH<int> colinearTris(NumTri());
   int numColinear =
@@ -1160,13 +1178,15 @@ void Manifold::Impl::CollapseDegenerates() {
 
   for (const int tri : colinearTris.H()) SwapTri(tri);
 
-  // shortEdges.resize(halfedge_.size());
-  // numShort = thrust::copy_if(
-  //                countAt(0), countAt(halfedge_.size()), shortEdges.beginD(),
-  //                ShortEdge({halfedge_.cptrD(), vertPos_.cptrD(),
-  //                precision_})) -
-  //            shortEdges.beginD();
-  // std::cout << numShort << " remaining short edges" << std::endl;
+  ALWAYS_ASSERT(MatchesTriNormals(), geometryErr, "inverted a triangle");
+
+  // flaggedEdges.resize(halfedge_.size());
+  // numFlagged = thrust::copy_if(
+  //                countAt(0), countAt(halfedge_.size()),
+  //                flaggedEdges.beginD(), FlagEdge({halfedge_.cptrD(),
+  //                vertPos_.cptrD(), precision_})) -
+  //            flaggedEdges.beginD();
+  // std::cout << numFlagged << " remaining short edges" << std::endl;
 
   // if (!IsManifold()) std::cout << __LINE__ << std::endl;
 }
@@ -1963,16 +1983,25 @@ void Manifold::Impl::CollapseEdge(int edge) {
   VecH<Halfedge>& halfedge = halfedge_.H();
   VecH<glm::vec3>& vertPos = vertPos_.H();
   VecH<glm::vec3>& triNormal = faceNormal_.H();
+  VecH<BaryRef>& triBary = meshRelation_.triBary.H();
 
   const Halfedge toRemove = halfedge[edge];
   if (toRemove.pairedHalfedge < 0) return;
 
+  const int endVert = toRemove.endVert;
   const glm::ivec3 tri0edge = TriOf(edge);
   const glm::ivec3 tri1edge = TriOf(toRemove.pairedHalfedge);
 
-  const int endVert = toRemove.endVert;
+  const glm::vec3 delta = vertPos[endVert] - vertPos[toRemove.startVert];
+  const bool shortEdge = glm::dot(delta, delta) < precision_ * precision_;
+
+  auto CCW2Normal = [](const glm::vec3& a, const glm::vec3& b,
+                       const glm::vec3& normal) {
+    return glm::dot(glm::cross(a, b), normal) >= 0;
+  };
 
   std::vector<int> edges;
+  // Orbit endVert
   int current = halfedge[tri0edge[1]].pairedHalfedge;
   while (current != tri1edge[2]) {
     current = NextHalfedge(current);
@@ -1980,12 +2009,38 @@ void Manifold::Impl::CollapseEdge(int edge) {
     current = halfedge[current].pairedHalfedge;
   }
 
+  // Orbit startVert
   int start = halfedge[tri1edge[1]].pairedHalfedge;
+  if (!shortEdge) {
+    const BaryRef ref0 = triBary[edge / 3];
+    const BaryRef ref1 = triBary[toRemove.pairedHalfedge / 3];
+    current = start;
+    glm::vec3 lastEdge =
+        vertPos[halfedge[tri1edge[1]].endVert] - vertPos[endVert];
+    while (current != tri0edge[2]) {
+      current = NextHalfedge(current);
+      const BaryRef ref = triBary[current / 3];
+      // Don't collapse if the edge is not redundant (this may have changed due
+      // to the collapse of neighbors).
+      if ((ref.meshID != ref0.meshID || ref.tri != ref0.tri) &&
+          (ref.meshID != ref1.meshID || ref.tri != ref1.tri))
+        return;
+
+      glm::vec3 thisEdge =
+          vertPos[halfedge[current].endVert] - vertPos[endVert];
+      const int tri = current / 3;
+      // Don't collapse edge if it would cause a triangle to invert.
+      if (!CCW2Normal(thisEdge, lastEdge, triNormal[tri])) return;
+      lastEdge = thisEdge;
+      current = halfedge[current].pairedHalfedge;
+    }
+  }
 
   // Remove toRemove.startVert and replace with endVert.
   vertPos[toRemove.startVert] = glm::vec3(0.0f / 0.0f);
   CollapseTri(tri1edge);
 
+  // Orbit startVert
   current = start;
   while (current != tri0edge[2]) {
     current = NextHalfedge(current);
