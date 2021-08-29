@@ -88,8 +88,7 @@ struct Manifold::Impl {
                          const VecH<int>& faceEdge) const;
 
   void CollapseEdge(int edge);
-  void SwapTri(int tri);
-  bool SwapEdge(int edge);
+  void RecursiveEdgeSwap(int edge);
   void RemoveIfFolded(int edge);
   void PairUp(int edge0, int edge1);
   void UpdateVert(int vert, int startEdge, int endEdge);
