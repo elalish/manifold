@@ -1245,7 +1245,8 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
 
   outR.Face2Tri(faceEdge, halfedgeRef);
 
-  // TODO: Only remove long edges with consistent meshID/tri.
+  outR.DuplicateMeshIDs();
+
   outR.CollapseDegenerates();
 
   triangulate.Stop();

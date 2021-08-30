@@ -421,6 +421,7 @@ TEST(Boolean, Tetra) {
 
   Manifold tetra2 = tetra;
   tetra2.Translate(glm::vec3(0.5f));
+  tetra2.SetAsOriginal();
   Manifold result = tetra2 - tetra;
 
   ExpectMeshes(result, {{8, 12}});
