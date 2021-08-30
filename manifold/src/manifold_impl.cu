@@ -918,18 +918,21 @@ struct SwappableEdge {
     if (halfedge[edge].pairedHalfedge < 0) return false;
 
     int tri = halfedge[edge].face;
+    glm::ivec3 triedge = TriOf(edge);
     glm::mat3x2 projection = GetAxisAlignedProjection(triNormal[tri]);
     glm::vec2 v[3];
     for (int i : {0, 1, 2})
-      v[i] = projection * vertPos[halfedge[3 * tri + i].startVert];
+      v[i] = projection * vertPos[halfedge[triedge[i]].startVert];
     if (CCW(v[0], v[1], v[2], precision) != 0 || !Is01Longest(v[0], v[1], v[2]))
       return false;
 
     // Switch to neighbor's projection.
-    tri = halfedge[halfedge[edge].pairedHalfedge].face;
+    edge = halfedge[edge].pairedHalfedge;
+    tri = halfedge[edge].face;
+    triedge = TriOf(edge);
     projection = GetAxisAlignedProjection(triNormal[tri]);
     for (int i : {0, 1, 2})
-      v[i] = projection * vertPos[halfedge[3 * tri + i].startVert];
+      v[i] = projection * vertPos[halfedge[triedge[i]].startVert];
     return CCW(v[0], v[1], v[2], precision) != 0 ||
            Is01Longest(v[0], v[1], v[2]);
   }
@@ -990,8 +993,8 @@ struct CheckCCW {
     glm::vec2 v[3];
     for (int i : {0, 1, 2})
       v[i] = projection * vertPos[halfedges[3 * face + i].startVert];
-    int ccw = CCW(v[0], v[1], v[2], 2 * precision);
-    if (ccw <= 0) {
+    int ccw = CCW(v[0], v[1], v[2], precision / 2);
+    if (ccw < 0) {
       glm::vec2 v1 = v[1] - v[0];
       glm::vec2 v2 = v[2] - v[0];
       float area = v1.x * v2.y - v1.y * v2.x;
@@ -1010,7 +1013,7 @@ struct CheckCCW {
           base2 * precision * precision, triNormal[face].x, triNormal[face].y,
           triNormal[face].z, norm.x, norm.y, norm.z);
     }
-    return ccw > 0;
+    return ccw >= 0;
   }
 };
 
@@ -1178,8 +1181,6 @@ void Manifold::Impl::CollapseDegenerates() {
   flaggedEdges.resize(numFlagged);
 
   for (const int edge : flaggedEdges.H()) CollapseEdge(edge);
-
-  // ALWAYS_ASSERT(MatchesTriNormals(), geometryErr, "inverted a triangle");
 
   VecDH<int> swappableEdges(halfedge_.size());
   int numColinear =
@@ -2166,6 +2167,7 @@ void Manifold::Impl::RecursiveEdgeSwap(const int edge) {
       RecursiveEdgeSwap(tri1edge[0]);
       RecursiveEdgeSwap(tri1edge[1]);
     }
+    return;
   } else if (CCW(v[0], v[3], v[2], precision_) <= 0 ||
              CCW(v[1], v[2], v[3], precision_) <= 0)
     return;
