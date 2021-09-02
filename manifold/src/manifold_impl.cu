@@ -923,7 +923,8 @@ struct SwappableEdge {
     glm::vec2 v[3];
     for (int i : {0, 1, 2})
       v[i] = projection * vertPos[halfedge[triedge[i]].startVert];
-    if (CCW(v[0], v[1], v[2], precision) != 0 || !Is01Longest(v[0], v[1], v[2]))
+    if (CCW(v[0], v[1], v[2], precision) < 0) printf("tri %d is CW!\n", tri);
+    if (CCW(v[0], v[1], v[2], precision) > 0 || !Is01Longest(v[0], v[1], v[2]))
       return false;
 
     // Switch to neighbor's projection.
@@ -933,7 +934,7 @@ struct SwappableEdge {
     projection = GetAxisAlignedProjection(triNormal[tri]);
     for (int i : {0, 1, 2})
       v[i] = projection * vertPos[halfedge[triedge[i]].startVert];
-    return CCW(v[0], v[1], v[2], precision) != 0 ||
+    return CCW(v[0], v[1], v[2], precision) > 0 ||
            Is01Longest(v[0], v[1], v[2]);
   }
 };
@@ -984,7 +985,7 @@ struct CheckCCW {
   const Halfedge* halfedges;
   const glm::vec3* vertPos;
   const glm::vec3* triNormal;
-  const float precision;
+  const float tol;
 
   __host__ __device__ bool operator()(int face) {
     if (halfedges[3 * face].pairedHalfedge < 0) return true;
@@ -993,8 +994,11 @@ struct CheckCCW {
     glm::vec2 v[3];
     for (int i : {0, 1, 2})
       v[i] = projection * vertPos[halfedges[3 * face + i].startVert];
-    int ccw = CCW(v[0], v[1], v[2], precision / 2);
-    if (ccw < 0) {
+
+    int ccw = CCW(v[0], v[1], v[2], glm::abs(tol));
+    bool good = tol > 0 ? ccw >= 0 : ccw > 0;
+
+    if (!good) {
       glm::vec2 v1 = v[1] - v[0];
       glm::vec2 v2 = v[2] - v[0];
       float area = v1.x * v2.y - v1.y * v2.x;
@@ -1006,14 +1010,14 @@ struct CheckCCW {
       glm::vec3 norm = glm::cross(V1 - V0, V2 - V0);
       printf(
           "Tri %d does not match normal, height = %g, base = %g\n"
-          "precision = %g, area2 = %g, base2*tol2 = %g\n"
+          "tol = %g, area2 = %g, base2*tol2 = %g\n"
           "normal = %g, %g, %g\n"
           "norm = %g, %g, %g\n",
-          face, area / base, base, precision, area * area,
-          base2 * precision * precision, triNormal[face].x, triNormal[face].y,
-          triNormal[face].z, norm.x, norm.y, norm.z);
+          face, area / base, base, tol, area * area, base2 * tol * tol,
+          triNormal[face].x, triNormal[face].y, triNormal[face].z, norm.x,
+          norm.y, norm.z);
     }
-    return ccw >= 0;
+    return good;
   }
 };
 
@@ -1171,6 +1175,8 @@ void Manifold::Impl::CreateAndFixHalfedges(const VecDH<glm::ivec3>& triVerts) {
  * were different colors - we are losing the verts that denote the boundary.
  */
 void Manifold::Impl::CollapseDegenerates() {
+  std::cout << "collapse degenerates" << std::endl;
+
   VecDH<int> flaggedEdges(halfedge_.size());
   int numFlagged =
       thrust::copy_if(countAt(0), countAt(halfedge_.size()),
@@ -1182,21 +1188,25 @@ void Manifold::Impl::CollapseDegenerates() {
 
   for (const int edge : flaggedEdges.H()) CollapseEdge(edge);
 
-  VecDH<int> swappableEdges(halfedge_.size());
-  int numColinear =
-      thrust::copy_if(countAt(0), countAt(halfedge_.size()),
-                      swappableEdges.beginD(),
-                      SwappableEdge({halfedge_.cptrD(), vertPos_.cptrD(),
-                                     faceNormal_.cptrD(), precision_})) -
-      swappableEdges.beginD();
-  swappableEdges.resize(numColinear);
+  ALWAYS_ASSERT(MatchesTriNormals(), geometryErr, "inverted a triangle!");
 
-  // swappableEdges.Dump();
-  // std::cout << numColinear << " colinear tris" << std::endl;
+  flaggedEdges.resize(halfedge_.size());
+  numFlagged = thrust::copy_if(
+                   countAt(0), countAt(halfedge_.size()), flaggedEdges.beginD(),
+                   SwappableEdge({halfedge_.cptrD(), vertPos_.cptrD(),
+                                  faceNormal_.cptrD(), precision_})) -
+               flaggedEdges.beginD();
+  flaggedEdges.resize(numFlagged);
 
-  for (const int edge : swappableEdges.H()) RecursiveEdgeSwap(edge);
+  // flaggedEdges.Dump();
+  // std::cout << numFlagged << " colinear tris" << std::endl;
 
-  ALWAYS_ASSERT(MatchesTriNormals(), geometryErr, "inverted a triangle");
+  for (const int edge : flaggedEdges.H()) {
+    // std::cout << "--------------- swapping edge " << edge << std::endl;
+    RecursiveEdgeSwap(edge);
+  }
+
+  ALWAYS_ASSERT(MatchesTriNormals(), geometryErr, "degenerate triangle!");
 
   // flaggedEdges.resize(halfedge_.size());
   // numFlagged = thrust::copy_if(
@@ -1631,7 +1641,17 @@ bool Manifold::Impl::MatchesTriNormals() const {
   if (halfedge_.size() == 0 || faceNormal_.size() != NumTri()) return true;
   return thrust::all_of(thrust::device, countAt(0), countAt(NumTri()),
                         CheckCCW({halfedge_.cptrD(), vertPos_.cptrD(),
-                                  faceNormal_.cptrD(), precision_}));
+                                  faceNormal_.cptrD(), 2 * precision_}));
+}
+
+/**
+ * Returns true if all triangles are CCW relative to their triNormals_.
+ */
+bool Manifold::Impl::StrictlyMatchesTriNormals() const {
+  if (halfedge_.size() == 0 || faceNormal_.size() != NumTri()) return true;
+  return thrust::all_of(thrust::device, countAt(0), countAt(NumTri()),
+                        CheckCCW({halfedge_.cptrD(), vertPos_.cptrD(),
+                                  faceNormal_.cptrD(), -1 * precision_ / 2}));
 }
 
 Properties Manifold::Impl::GetProperties() const {
@@ -2095,9 +2115,15 @@ void Manifold::Impl::RecursiveEdgeSwap(const int edge) {
   glm::vec2 v[4];
   for (int i : {0, 1, 2})
     v[i] = projection * vertPos[halfedge[tri0edge[i]].startVert];
-  // Only operate on a the long edge of a degenerate triangle.
-  if (CCW(v[0], v[1], v[2], precision_) != 0 || !Is01Longest(v[0], v[1], v[2]))
+  // Only operate on the long edge of a degenerate triangle.
+  if (CCW(v[0], v[1], v[2], precision_) > 0 || !Is01Longest(v[0], v[1], v[2])) {
+    // std::cout << ", CCW0: " << CCW(v[0], v[1], v[2], precision_)
+    //           << ", CCW1: " << CCW(v[1], v[2], v[0], precision_)
+    //           << ", CCW2: " << CCW(v[2], v[0], v[1], precision_)
+    //           << ", is longest: " << Is01Longest(v[0], v[1], v[2])
+    //           << std::endl;
     return;
+  }
 
   auto SwapEdge = [&]() {
     // The 0-verts are swapped to the opposite 2-verts.
@@ -2154,7 +2180,7 @@ void Manifold::Impl::RecursiveEdgeSwap(const int edge) {
   v[3] = projection * vertPos[halfedge[tri1edge[2]].startVert];
 
   // Only operate if the other triangles are not degenerate.
-  if (CCW(v[1], v[0], v[3], precision_) == 0) {
+  if (CCW(v[1], v[0], v[3], precision_) <= 0) {
     if (!Is01Longest(v[1], v[0], v[3])) return;
     // Two facing, long-edge degenerates can swap.
     SwapEdge();
@@ -2169,11 +2195,13 @@ void Manifold::Impl::RecursiveEdgeSwap(const int edge) {
     }
     return;
   } else if (CCW(v[0], v[3], v[2], precision_) <= 0 ||
-             CCW(v[1], v[2], v[3], precision_) <= 0)
+             CCW(v[1], v[2], v[3], precision_) <= 0) {
+    std::cout << "cannot swap edge " << edge << std::endl;
     return;
+  }
   // Normal path
   SwapEdge();
-  RecursiveEdgeSwap(tri0edge[1]);
-  RecursiveEdgeSwap(tri1edge[1]);
+  RecursiveEdgeSwap(halfedge[tri0edge[1]].pairedHalfedge);
+  RecursiveEdgeSwap(halfedge[tri1edge[0]].pairedHalfedge);
 }
 }  // namespace manifold
