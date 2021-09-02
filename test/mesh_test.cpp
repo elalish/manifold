@@ -64,7 +64,7 @@ void Related(const Manifold& out, const std::vector<Mesh>& input,
 void ExpectMeshes(const Manifold& manifold,
                   const std::vector<std::pair<int, int>>& numVertTri) {
   EXPECT_TRUE(manifold.IsManifold());
-  EXPECT_TRUE(manifold.MatchesTriNormals());
+  EXPECT_TRUE(manifold.StrictlyMatchesTriNormals());
   std::vector<Manifold> meshes = manifold.Decompose();
   ASSERT_EQ(meshes.size(), numVertTri.size());
   std::sort(meshes.begin(), meshes.end(),
@@ -491,7 +491,7 @@ TEST(Boolean, MultiCoplanar) {
   cube.Translate({-0.3f, -0.3f, 0.0f});
   Manifold out = first - cube;
   EXPECT_TRUE(out.IsManifold());
-  EXPECT_TRUE(out.MatchesTriNormals());
+  EXPECT_TRUE(out.StrictlyMatchesTriNormals());
   EXPECT_EQ(out.Genus(), -1);
   auto prop = out.GetProperties();
   EXPECT_NEAR(prop.volume, 0.18, 1e-5);
@@ -542,9 +542,9 @@ TEST(Boolean, Split) {
   oct.Translate(glm::vec3(0.0f, 0.0f, 1.0f));
   std::pair<Manifold, Manifold> splits = cube.Split(oct);
   EXPECT_TRUE(splits.first.IsManifold());
-  EXPECT_TRUE(splits.first.MatchesTriNormals());
+  EXPECT_TRUE(splits.first.StrictlyMatchesTriNormals());
   EXPECT_TRUE(splits.second.IsManifold());
-  EXPECT_TRUE(splits.second.MatchesTriNormals());
+  EXPECT_TRUE(splits.second.StrictlyMatchesTriNormals());
   EXPECT_FLOAT_EQ(splits.first.GetProperties().volume +
                       splits.second.GetProperties().volume,
                   cube.GetProperties().volume);
@@ -557,9 +557,9 @@ TEST(Boolean, SplitByPlane) {
   std::pair<Manifold, Manifold> splits =
       cube.SplitByPlane({0.0f, 0.0f, 1.0f}, 1.0f);
   EXPECT_TRUE(splits.first.IsManifold());
-  EXPECT_TRUE(splits.first.MatchesTriNormals());
+  EXPECT_TRUE(splits.first.StrictlyMatchesTriNormals());
   EXPECT_TRUE(splits.second.IsManifold());
-  EXPECT_TRUE(splits.second.MatchesTriNormals());
+  EXPECT_TRUE(splits.second.StrictlyMatchesTriNormals());
   EXPECT_NEAR(splits.first.GetProperties().volume,
               splits.second.GetProperties().volume, 1e-5);
 
@@ -579,9 +579,9 @@ TEST(Boolean, SplitByPlane60) {
   std::pair<Manifold, Manifold> splits =
       cube.SplitByPlane({sind(phi), -cosd(phi), 0.0f}, 1.0f);
   EXPECT_TRUE(splits.first.IsManifold());
-  EXPECT_TRUE(splits.first.MatchesTriNormals());
+  EXPECT_TRUE(splits.first.StrictlyMatchesTriNormals());
   EXPECT_TRUE(splits.second.IsManifold());
-  EXPECT_TRUE(splits.second.MatchesTriNormals());
+  EXPECT_TRUE(splits.second.StrictlyMatchesTriNormals());
   EXPECT_NEAR(splits.first.GetProperties().volume,
               splits.second.GetProperties().volume, 1e-5);
 }
@@ -597,7 +597,7 @@ TEST(Boolean, Vug) {
 
   Manifold half = vug.SplitByPlane({0.0f, 0.0f, 1.0f}, -1.0f).first;
   EXPECT_TRUE(half.IsManifold());
-  EXPECT_TRUE(half.MatchesTriNormals());
+  EXPECT_TRUE(half.StrictlyMatchesTriNormals());
   EXPECT_EQ(half.Genus(), -1);
 
   auto prop = half.GetProperties();
@@ -683,7 +683,7 @@ TEST(Boolean, Sphere) {
 TEST(Boolean, Gyroid) {
   Manifold gyroid(ImportMesh("data/gyroidpuzzle.ply"));
   EXPECT_TRUE(gyroid.IsManifold());
-  EXPECT_TRUE(gyroid.MatchesTriNormals());
+  EXPECT_TRUE(gyroid.StrictlyMatchesTriNormals());
   ExportMesh("gyroidpuzzle1.gltf", gyroid.Extract(), {});
   Manifold gyroid2 = gyroid;
   gyroid2.Translate(glm::vec3(5.0f));
@@ -691,7 +691,7 @@ TEST(Boolean, Gyroid) {
   // ExportMesh("gyroidUnion.gltf", result.Extract(), {});
 
   EXPECT_TRUE(result.IsManifold());
-  EXPECT_TRUE(result.MatchesTriNormals());
+  EXPECT_TRUE(result.StrictlyMatchesTriNormals());
   EXPECT_EQ(result.Decompose().size(), 1);
   auto prop = result.GetProperties();
   EXPECT_NEAR(prop.volume, 7692, 1);
