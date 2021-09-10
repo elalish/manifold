@@ -109,10 +109,7 @@ struct Barycentric {
 };
 
 struct Normalize {
-  __host__ __device__ void operator()(glm::vec3& v) {
-    v = glm::normalize(v);
-    if (isnan(v.x)) v = glm::vec3(0.0);
-  }
+  __host__ __device__ void operator()(glm::vec3& v) { v = SafeNormalize(v); }
 };
 
 /**
@@ -754,24 +751,10 @@ struct AssignNormals {
     for (int i : {0, 1, 2}) triVerts[i] = halfedges[3 * face + i].startVert;
 
     glm::vec3 edge[3];
-    glm::vec3 edgeLength;
-    float perimeter = 0;
     for (int i : {0, 1, 2}) {
       const int j = (i + 1) % 3;
-      edge[i] = vertPos[triVerts[j]] - vertPos[triVerts[i]];
-      edgeLength[i] = glm::length(edge[i]);
-      perimeter += edgeLength[i];
+      edge[i] = glm::normalize(vertPos[triVerts[j]] - vertPos[triVerts[i]]);
     }
-
-    // glm::vec3 crossP = glm::cross(edge[0], edge[1]);
-    // const bool isDegenerate = glm::length(crossP) <= perimeter * precision;
-
-    // if (calculateTriNormal ||
-    //     (triNormal.x == 0 && triNormal.y == 0 && triNormal.z == 0)) {
-    //   triNormal = isDegenerate ? glm::vec3(0)
-    //                            : glm::normalize(glm::cross(edge[0],
-    //                            edge[1]));
-    // }
 
     if (calculateTriNormal) {
       triNormal = glm::normalize(glm::cross(edge[0], edge[1]));
@@ -780,14 +763,11 @@ struct AssignNormals {
 
     // corner angles
     glm::vec3 phi;
-    // if (isDegenerate) {
-    //   phi = glm::vec3(kTolerance);
-    // } else {
-    for (int i : {0, 1, 2}) edge[i] /= edgeLength[i];
-    phi[0] = glm::acos(-glm::dot(edge[2], edge[0]));
-    phi[1] = glm::acos(-glm::dot(edge[0], edge[1]));
+    float dot = -glm::dot(edge[2], edge[0]);
+    phi[0] = dot >= 1 ? 0 : (dot <= -1 ? glm::pi<float>() : glm::acos(dot));
+    dot = -glm::dot(edge[0], edge[1]);
+    phi[1] = dot >= 1 ? 0 : (dot <= -1 ? glm::pi<float>() : glm::acos(dot));
     phi[2] = glm::pi<float>() - phi[0] - phi[1];
-    // }
 
     // assign weighted sum
     for (int i : {0, 1, 2}) {
@@ -923,7 +903,7 @@ struct SwappableEdge {
     glm::vec2 v[3];
     for (int i : {0, 1, 2})
       v[i] = projection * vertPos[halfedge[triedge[i]].startVert];
-    if (CCW(v[0], v[1], v[2], precision) < 0) printf("tri %d is CW!\n", tri);
+    // if (CCW(v[0], v[1], v[2], precision) < 0) printf("tri %d is CW!\n", tri);
     if (CCW(v[0], v[1], v[2], precision) > 0 || !Is01Longest(v[0], v[1], v[2]))
       return false;
 
@@ -1009,13 +989,14 @@ struct CheckCCW {
       glm::vec3 V2 = vertPos[halfedges[3 * face + 2].startVert];
       glm::vec3 norm = glm::cross(V1 - V0, V2 - V0);
       printf(
-          "Tri %d does not match normal, height = %g, base = %g\n"
+          "Tri %d does not match normal, approx height = %g, base = %g\n"
           "tol = %g, area2 = %g, base2*tol2 = %g\n"
           "normal = %g, %g, %g\n"
-          "norm = %g, %g, %g\n",
+          "norm = %g, %g, %g\nverts: %d, %d, %d\n",
           face, area / base, base, tol, area * area, base2 * tol * tol,
           triNormal[face].x, triNormal[face].y, triNormal[face].z, norm.x,
-          norm.y, norm.z);
+          norm.y, norm.z, halfedges[3 * face].startVert,
+          halfedges[3 * face + 1].startVert, halfedges[3 * face + 2].startVert);
     }
     return good;
   }
@@ -1175,7 +1156,7 @@ void Manifold::Impl::CreateAndFixHalfedges(const VecDH<glm::ivec3>& triVerts) {
  * were different colors - we are losing the verts that denote the boundary.
  */
 void Manifold::Impl::CollapseDegenerates() {
-  std::cout << "collapse degenerates" << std::endl;
+  // std::cout << "collapse degenerates" << std::endl;
 
   VecDH<int> flaggedEdges(halfedge_.size());
   int numFlagged =
@@ -2196,7 +2177,7 @@ void Manifold::Impl::RecursiveEdgeSwap(const int edge) {
     return;
   } else if (CCW(v[0], v[3], v[2], precision_) <= 0 ||
              CCW(v[1], v[2], v[3], precision_) <= 0) {
-    std::cout << "cannot swap edge " << edge << std::endl;
+    // std::cout << "cannot swap edge " << edge << std::endl;
     return;
   }
   // Normal path
