@@ -65,17 +65,21 @@ void ExpectMeshes(const Manifold& manifold,
                   const std::vector<std::pair<int, int>>& numVertTri) {
   EXPECT_TRUE(manifold.IsManifold());
   EXPECT_TRUE(manifold.StrictlyMatchesTriNormals());
-  std::vector<Manifold> meshes = manifold.Decompose();
-  ASSERT_EQ(meshes.size(), numVertTri.size());
-  std::sort(meshes.begin(), meshes.end(),
+  std::vector<Manifold> manifolds = manifold.Decompose();
+  ASSERT_EQ(manifolds.size(), numVertTri.size());
+  std::sort(manifolds.begin(), manifolds.end(),
             [](const Manifold& a, const Manifold& b) {
               return a.NumVert() != b.NumVert() ? a.NumVert() > b.NumVert()
                                                 : a.NumTri() > b.NumTri();
             });
-  for (int i = 0; i < meshes.size(); ++i) {
-    EXPECT_TRUE(meshes[i].IsManifold());
-    EXPECT_EQ(meshes[i].NumVert(), numVertTri[i].first);
-    EXPECT_EQ(meshes[i].NumTri(), numVertTri[i].second);
+  for (int i = 0; i < manifolds.size(); ++i) {
+    EXPECT_TRUE(manifolds[i].IsManifold());
+    EXPECT_EQ(manifolds[i].NumVert(), numVertTri[i].first);
+    EXPECT_EQ(manifolds[i].NumTri(), numVertTri[i].second);
+    const Mesh mesh = manifolds[i].Extract();
+    for (const glm::vec3& normal : mesh.vertNormal) {
+      ASSERT_NEAR(glm::length(normal), 1, 0.0001);
+    }
   }
 }
 
