@@ -59,7 +59,6 @@ constexpr bool kVerbose = false;
 
 using namespace manifold;
 using namespace thrust::placeholders;
-using Ref = Manifold::Impl::Ref;
 
 namespace {
 
@@ -701,6 +700,18 @@ std::vector<Halfedge> PairUp(std::vector<EdgePos> &edgePos) {
   return edges;
 }
 
+// A Ref carries the reference of a halfedge's startVert back to the input
+// manifolds. PQ is 0 if the halfedge comes from triangle tri of P, and 1 for Q.
+// vert is 0, 1, or 2 to denote which vertex of tri it is, and -1 if it is new.
+struct Ref {
+  int PQ, tri, vert;
+};
+
+std::ostream &operator<<(std::ostream &stream, const Ref &ref) {
+  return stream << "PQ = " << ref.PQ << ", tri = " << ref.tri
+                << ", vert = " << ref.vert;
+}
+
 void AppendPartialEdges(Manifold::Impl &outR, VecH<bool> &wholeHalfedgeP,
                         VecH<int> &facePtrR,
                         std::map<int, std::vector<EdgePos>> &edgesP,
@@ -764,10 +775,10 @@ void AppendPartialEdges(Manifold::Impl &outR, VecH<bool> &wholeHalfedgeP,
     // reference is now to the endVert instead of the startVert, which is one
     // position advanced CCW.
     const Ref forwardRef = {forward ? 0 : 1, faceLeftP,
-                            ((edgeP + (reversed ? 1 : 0)) % 3) - 3};
+                            (edgeP + (reversed ? 1 : 0)) % 3};
     const Ref backwardRef = {
         forward ? 0 : 1, faceRightP,
-        ((halfedge.pairedHalfedge + (reversed ? 1 : 0)) % 3) - 3};
+        (halfedge.pairedHalfedge + (reversed ? 1 : 0)) % 3};
 
     for (Halfedge e : edges) {
       const int forwardEdge = facePtrR[faceLeft]++;
@@ -819,8 +830,8 @@ void AppendNewEdges(
     // add halfedges to result
     const int faceLeft = facePQ2R[faceP];
     const int faceRight = facePQ2R[numFaceP + faceQ];
-    const Ref forwardRef = {0, faceP, -4};
-    const Ref backwardRef = {1, faceQ, -4};
+    const Ref forwardRef = {0, faceP, -1};
+    const Ref backwardRef = {1, faceQ, -1};
     for (Halfedge e : edges) {
       const int forwardEdge = facePtrR[faceLeft]++;
       const int backwardEdge = facePtrR[faceRight]++;
@@ -872,10 +883,10 @@ struct DuplicateHalfedges {
     // reference is now to the endVert instead of the startVert, which is one
     // position advanced CCW.
     const Ref forwardRef = {forward ? 0 : 1, faceLeftP,
-                            ((edgeP + (inclusion < 0 ? 1 : 0)) % 3) - 3};
+                            (edgeP + (inclusion < 0 ? 1 : 0)) % 3};
     const Ref backwardRef = {
         forward ? 0 : 1, faceRightP,
-        ((halfedge.pairedHalfedge + (inclusion < 0 ? 1 : 0)) % 3) - 3};
+        (halfedge.pairedHalfedge + (inclusion < 0 ? 1 : 0)) % 3};
 
     for (int i = 0; i < glm::abs(inclusion); ++i) {
       int forwardEdge = AtomicAdd(facePtr[halfedge.face], 1);
@@ -909,6 +920,7 @@ void AppendWholeEdges(Manifold::Impl &outR, VecDH<int> &facePtrR,
 
 struct CreateBarycentric {
   glm::vec3 *barycentricR;
+  BaryRef *faceRef;
   int *idx;
   const int firstNewVert;
   const glm::vec3 *vertPosR;
@@ -921,66 +933,70 @@ struct CreateBarycentric {
   const glm::vec3 *barycentricP;
   const glm::vec3 *barycentricQ;
 
-  __host__ __device__ void operator()(thrust::tuple<Ref &, Halfedge> inOut) {
-    Ref &halfedgeRef = thrust::get<0>(inOut);
-    const Halfedge halfedgeR = thrust::get<1>(inOut);
+  __host__ __device__ void operator()(
+      thrust::tuple<int &, Ref, Halfedge> inOut) {
+    int &halfedgeBary = thrust::get<0>(inOut);
+    const Ref halfedgeRef = thrust::get<1>(inOut);
+    const Halfedge halfedgeR = thrust::get<2>(inOut);
 
     const glm::vec3 *barycentric =
-        halfedgeRef.meshID == 0 ? barycentricP : barycentricQ;
+        halfedgeRef.PQ == 0 ? barycentricP : barycentricQ;
     const int tri = halfedgeRef.tri;
-    const BaryRef oldRef =
-        halfedgeRef.meshID == 0 ? triBaryP[tri] : triBaryQ[tri];
+    const BaryRef oldRef = halfedgeRef.PQ == 0 ? triBaryP[tri] : triBaryQ[tri];
+
+    faceRef[halfedgeR.face] = oldRef;
 
     if (halfedgeR.startVert < firstNewVert) {  // retained vert
-      const int i = halfedgeRef.bary + 3;
+      const int i = halfedgeRef.vert;
       const int bary = oldRef.vertBary[i];
       if (bary < 0) {
-        halfedgeRef.bary = bary;
+        halfedgeBary = bary;
       } else {
-        halfedgeRef.bary = AtomicAdd(*idx, 1);
-        barycentricR[halfedgeRef.bary] = barycentric[bary];
+        halfedgeBary = AtomicAdd(*idx, 1);
+        barycentricR[halfedgeBary] = barycentric[bary];
       }
     } else {  // new vert
-      halfedgeRef.bary = AtomicAdd(*idx, 1);
+      halfedgeBary = AtomicAdd(*idx, 1);
 
-      const glm::vec3 *vertPos = halfedgeRef.meshID == 0 ? vertPosP : vertPosQ;
-      const Halfedge *halfedge =
-          halfedgeRef.meshID == 0 ? halfedgeP : halfedgeQ;
+      const glm::vec3 *vertPos = halfedgeRef.PQ == 0 ? vertPosP : vertPosQ;
+      const Halfedge *halfedge = halfedgeRef.PQ == 0 ? halfedgeP : halfedgeQ;
 
       glm::mat3 triPos;
       for (int i : {0, 1, 2})
         triPos[i] = vertPos[halfedge[3 * tri + i].startVert];
 
       glm::mat3 uvwOldTri;
-      for (int i : {0, 1, 2})
-        uvwOldTri[i] = UVW(oldRef.vertBary[i], barycentric);
+      for (int i : {0, 1, 2}) uvwOldTri[i] = UVW(oldRef, i, barycentric);
 
       // TODO: robustify this inverse
       const glm::vec3 uvw =
           glm::inverse(triPos) * vertPosR[halfedgeR.startVert];
-      barycentricR[halfedgeRef.bary] = uvwOldTri * uvw;
+      barycentricR[halfedgeBary] = uvwOldTri * uvw;
     }
-
-    halfedgeRef.meshID = oldRef.meshID;
-    halfedgeRef.tri = oldRef.tri;
   }
 };
 
-void CalculateMeshRelation(VecDH<Ref> &halfedgeRef, Manifold::Impl &outR,
-                           const Manifold::Impl &inP, const Manifold::Impl &inQ,
-                           int firstNewVert) {
+std::pair<VecDH<BaryRef>, VecDH<int>> CalculateMeshRelation(
+    Manifold::Impl &outR, const VecDH<Ref> &halfedgeRef,
+    const Manifold::Impl &inP, const Manifold::Impl &inQ, int firstNewVert,
+    int numFaceR) {
   outR.meshRelation_.barycentric.resize(outR.halfedge_.size());
+  VecDH<BaryRef> faceRef(numFaceR);
+  VecDH<int> halfedgeBary(halfedgeRef.size());
   VecDH<int> idx(1, 0);
   thrust::for_each_n(
-      zip(halfedgeRef.beginD(), outR.halfedge_.cbeginD()), halfedgeRef.size(),
+      zip(halfedgeBary.beginD(), halfedgeRef.beginD(),
+          outR.halfedge_.cbeginD()),
+      halfedgeRef.size(),
       CreateBarycentric(
-          {outR.meshRelation_.barycentric.ptrD(), idx.ptrD(), firstNewVert,
-           outR.vertPos_.cptrD(), inP.vertPos_.cptrD(), inQ.vertPos_.cptrD(),
-           inP.halfedge_.cptrD(), inQ.halfedge_.cptrD(),
+          {outR.meshRelation_.barycentric.ptrD(), faceRef.ptrD(), idx.ptrD(),
+           firstNewVert, outR.vertPos_.cptrD(), inP.vertPos_.cptrD(),
+           inQ.vertPos_.cptrD(), inP.halfedge_.cptrD(), inQ.halfedge_.cptrD(),
            inP.meshRelation_.triBary.cptrD(), inQ.meshRelation_.triBary.cptrD(),
            inP.meshRelation_.barycentric.cptrD(),
            inQ.meshRelation_.barycentric.cptrD()}));
   outR.meshRelation_.barycentric.resize(idx.H()[0]);
+  return std::make_pair(faceRef, halfedgeBary);
 }
 }  // namespace
 
@@ -1207,6 +1223,7 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
       SizeOutput(outR, inP_, inQ_, i03, i30, i12, i21, p1q2_, p2q1_,
                  op == Manifold::OpType::SUBTRACT);
 
+  const int numFaceR = faceEdge.size() - 1;
   // This gets incremented for each halfedge that's added to a face so that the
   // next one knows where to slot in.
   VecDH<int> facePtrR = faceEdge;
@@ -1232,7 +1249,10 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
   AppendWholeEdges(outR, facePtrR, halfedgeRef, inQ_, wholeHalfedgeQ, i30, vQ2R,
                    facePQ2R.cptrD() + inP_.NumTri(), false);
 
-  CalculateMeshRelation(halfedgeRef, outR, inP_, inQ_, nPv + nQv);
+  VecDH<BaryRef> faceRef;
+  VecDH<int> halfedgeBary;
+  std::tie(faceRef, halfedgeBary) =
+      CalculateMeshRelation(outR, halfedgeRef, inP_, inQ_, nPv + nQv, numFaceR);
 
   assemble.Stop();
   Timer triangulate;
@@ -1243,7 +1263,7 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
   // Create the manifold's data structures.
   outR.precision_ = glm::max(inP_.precision_, inQ_.precision_);
 
-  outR.Face2Tri(faceEdge, halfedgeRef);
+  outR.Face2Tri(faceEdge, faceRef, halfedgeBary);
 
   outR.DuplicateMeshIDs();
 

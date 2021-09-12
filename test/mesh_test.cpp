@@ -42,21 +42,20 @@ void Related(const Manifold& out, const std::vector<Mesh>& input,
   Mesh output = out.Extract();
   MeshRelation relation = out.GetMeshRelation();
   std::vector<int> meshID2Original = Manifold::MeshID2Original();
-  for (int i = 0; i < out.NumTri(); ++i) {
-    int meshID = relation.triBary[i].meshID;
+  for (int tri = 0; tri < out.NumTri(); ++tri) {
+    int meshID = relation.triBary[tri].meshID;
     int meshIdx = meshID2idx.find(meshID) != meshID2idx.end()
                       ? meshID2idx.at(meshID)
                       : meshID2idx.at(meshID2Original[meshID]);
     ASSERT_LT(meshIdx, input.size());
     const Mesh& inMesh = input[meshIdx];
-    int inTri = relation.triBary[i].tri;
-    ASSERT_LT(inTri, inMesh.triVerts.size());
+    const glm::ivec3 triVerts = relation.triBary[tri].verts;
     for (int j : {0, 1, 2}) {
-      glm::mat3 triangle = {inMesh.vertPos[inMesh.triVerts[inTri][0]],
-                            inMesh.vertPos[inMesh.triVerts[inTri][1]],
-                            inMesh.vertPos[inMesh.triVerts[inTri][2]]};
-      glm::vec3 vPos = triangle * relation.UVW(i, j);
-      Identical(output.vertPos[output.triVerts[i][j]], vPos);
+      glm::mat3 triangle = {inMesh.vertPos[triVerts[0]],
+                            inMesh.vertPos[triVerts[1]],
+                            inMesh.vertPos[triVerts[2]]};
+      glm::vec3 vPos = triangle * relation.UVW(tri, j);
+      Identical(output.vertPos[output.triVerts[tri][j]], vPos);
     }
   }
 }

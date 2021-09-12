@@ -118,14 +118,14 @@ __host__ __device__ inline int NextHalfedge(int current) {
   return current;
 }
 
-__host__ __device__ inline glm::vec3 UVW(int vertBary,
+__host__ __device__ inline glm::vec3 UVW(const BaryRef& baryRef, int vert,
                                          const glm::vec3* barycentric) {
   glm::vec3 uvw(0.0f);
-  if (vertBary < 0) {
-    vertBary += 3;
-    uvw[vertBary] = 1;
+  const int bary = baryRef.vertBary[vert];
+  if (bary < 0) {
+    uvw[vert] = 1;
   } else {
-    uvw = barycentric[vertBary];
+    uvw = barycentric[bary];
   }
   return uvw;
 }
