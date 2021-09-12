@@ -151,8 +151,8 @@ struct Curvature {
 };
 
 struct BaryRef {
-  int meshID, tri;
-  glm::ivec3 vertBary;
+  int meshID, face;
+  glm::ivec3 verts, vertBary;
 };
 
 struct MeshRelation {
@@ -160,11 +160,10 @@ struct MeshRelation {
   std::vector<BaryRef> triBary;
 
   inline glm::vec3 UVW(int tri, int vert) {
-    int idx = triBary[tri].vertBary[vert];
     glm::vec3 uvw(0.0f);
+    int idx = triBary[tri].vertBary[vert];
     if (idx < 0) {
-      idx += 3;
-      uvw[idx] = 1;
+      uvw[vert] = 1;
     } else {
       uvw = barycentric[idx];
     }
@@ -307,7 +306,7 @@ inline std::ostream& operator<<(std::ostream& stream, const glm::mat4x3& mat) {
 }
 
 inline std::ostream& operator<<(std::ostream& stream, const BaryRef& ref) {
-  return stream << "meshID: " << ref.meshID << ", tri: " << ref.tri
+  return stream << "meshID: " << ref.meshID << ", face: " << ref.face
                 << ", uvw idx: " << ref.vertBary;
 }
 }  // namespace manifold

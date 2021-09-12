@@ -604,12 +604,13 @@ Curvature Manifold::GetCurvature() const { return pImpl_->GetCurvature(); }
 /**
  * Gets the relationship to the previous mesh, for the purpose of assinging
  * properties like texture coordinates. The triBary vector is the same length as
- * Mesh.triVerts and BaryRef.tri gives the index into the input triVerts vector.
- * BaryRef.vertBary gives an index for each vertex into the barycentric vector,
- * if that vertex is >= 0, indicating it is a new vertex. The barycentric
- * coordinates are relative to the original verts of the corresponding input
- * tri. If the index is < 0, this indicates it is an original vertex of the
- * triangle, found as index + 3.
+ * Mesh.triVerts and BaryRef.face gives a unique identifier of the original mesh
+ * face to which this triangle belongs. BaryRef.verts gives the three original
+ * mesh vertex indices to which its barycentric coordinates refer.
+ * BaryRef.vertBary gives an index for each vertex into the barycentric vector
+ * if that vertex is >= 0, indicating it is a new vertex. If the index is < 0,
+ * this indicates it is an original vertex of the triangle, found as the
+ * corresponding element of BaryRef.verts.
  */
 MeshRelation Manifold::GetMeshRelation() const {
   MeshRelation out;

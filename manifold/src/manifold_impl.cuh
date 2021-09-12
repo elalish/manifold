@@ -26,9 +26,6 @@ struct Manifold::Impl {
     VecDH<glm::vec3> barycentric;
     VecDH<BaryRef> triBary;
   };
-  struct Ref {
-    int meshID, tri, bary;
-  };
 
   Box bBox_;
   float precision_ = -1;
@@ -80,7 +77,8 @@ struct Manifold::Impl {
   void GatherFaces(const VecDH<int>& faceNew2Old);
   void GatherFaces(const Impl& old, const VecDH<int>& faceNew2Old);
   void CalculateNormals();
-  void Face2Tri(const VecDH<int>& faceEdge, const VecDH<Ref>& halfedgeRef);
+  void Face2Tri(const VecDH<int>& faceEdge, const VecDH<BaryRef>& faceRef,
+                const VecDH<int>& halfedgeBary);
 
   SparseIndices EdgeCollisions(const Impl& B) const;
   SparseIndices VertexCollisionsZ(const VecDH<glm::vec3>& vertsIn) const;
@@ -96,10 +94,4 @@ struct Manifold::Impl {
   void FormLoop(int current, int end);
   void CollapseTri(const glm::ivec3& triEdge);
 };
-
-inline std::ostream& operator<<(std::ostream& stream,
-                                const Manifold::Impl::Ref& ref) {
-  return stream << "meshID = " << ref.meshID << ", tri = " << ref.tri
-                << ", bary = " << ref.bary;
-}
 }  // namespace manifold
