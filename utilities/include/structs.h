@@ -307,7 +307,7 @@ inline std::ostream& operator<<(std::ostream& stream, const glm::mat4x3& mat) {
 
 inline std::ostream& operator<<(std::ostream& stream, const BaryRef& ref) {
   return stream << "meshID: " << ref.meshID << ", face: " << ref.face
-                << ", uvw idx: " << ref.vertBary;
+                << ", verts: " << ref.verts << ", uvw idx: " << ref.vertBary;
 }
 }  // namespace manifold
 
