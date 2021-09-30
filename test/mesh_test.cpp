@@ -50,10 +50,17 @@ void Related(const Manifold& out, const std::vector<Mesh>& input,
     ASSERT_LT(meshIdx, input.size());
     const Mesh& inMesh = input[meshIdx];
     const glm::ivec3 triVerts = relation.triBary[tri].verts;
+    glm::mat3 triangle = {inMesh.vertPos[triVerts[0]],
+                          inMesh.vertPos[triVerts[1]],
+                          inMesh.vertPos[triVerts[2]]};
+    // std::cout << tri << std::endl;
     for (int j : {0, 1, 2}) {
-      glm::mat3 triangle = {inMesh.vertPos[triVerts[0]],
-                            inMesh.vertPos[triVerts[1]],
-                            inMesh.vertPos[triVerts[2]]};
+      // std::cout << triangle[0] << std::endl;
+      // std::cout << triangle[1] << std::endl;
+      // std::cout << triangle[2] << std::endl;
+      // std::cout << relation.UVW(tri, j) << std::endl;
+      // std::cout << output.vertPos[output.triVerts[tri][j]] << std::endl
+      //           << std::endl;
       glm::vec3 vPos = triangle * relation.UVW(tri, j);
       Identical(output.vertPos[output.triVerts[tri][j]], vPos);
     }
@@ -441,6 +448,8 @@ TEST(Boolean, Tetra) {
   EXPECT_EQ(meshIDs.size(), 1);
   meshID2idx[meshIDs[0]] = input.size();
   input.push_back(tetra2.Extract());
+
+  ExportMesh("tetra.gltf", result.Extract(), {});
 
   Related(result, input, meshID2idx);
 }

@@ -108,6 +108,16 @@ struct Barycentric {
   glm::vec3 uvw;
 };
 
+template <typename T>
+void circShift(glm::tvec3<T>& v, int shift) {
+  glm::tvec3<T> in = v;
+  for (int k : {0, 1, 2}) {
+    int j = k + shift;
+    if (j >= 3) j -= 3;
+    v[k] = in[j];
+  }
+}
+
 struct Normalize {
   __host__ __device__ void operator()(glm::vec3& v) { v = SafeNormalize(v); }
 };
@@ -211,6 +221,10 @@ struct InteriorVerts {
     const int tri = thrust::get<0>(in);
     const BaryRef baryOld = thrust::get<1>(in);
 
+    const glm::ivec3 verts(halfedge[3 * tri].startVert,
+                           halfedge[3 * tri + 1].startVert,
+                           halfedge[3 * tri + 2].startVert);
+
     glm::mat3 uvwOldTri;
     for (int i : {0, 1, 2}) uvwOldTri[i] = UVW(baryOld, i, uvwOld);
 
@@ -236,22 +250,22 @@ struct InteriorVerts {
         const int b = (i == n - 1) ? -1 : first + n - i + 1;
         const int c = (j == n - 1) ? -1 : first + 1;
         glm::ivec3 vertBary(c, a, b);
-        triBary[posTri] = {-1, tri, vertBary};
+        triBary[posTri] = {-1, tri, verts, vertBary};
         triBaryNew[posTri++] = {baryOld.meshID, baryOld.face, baryOld.verts,
                                 vertBary};
         if (j < n - 1 - i) {
           int d = b + 1;  // d cannot be a retained vert
           vertBary = {b, d, c};
-          triBary[posTri] = {-1, tri, vertBary};
+          triBary[posTri] = {-1, tri, verts, vertBary};
           triBaryNew[posTri++] = {baryOld.meshID, baryOld.face, baryOld.verts,
                                   vertBary};
         }
 
         if (i == 0 || j == 0 || k == 0) continue;
 
-        vertPos[pos++] = u * vertPos[halfedge[3 * tri].startVert] +      //
-                         v * vertPos[halfedge[3 * tri + 1].startVert] +  //
-                         w * vertPos[halfedge[3 * tri + 2].startVert];
+        vertPos[pos++] = u * vertPos[verts[0]] +  //
+                         v * vertPos[verts[1]] +  //
+                         w * vertPos[verts[2]];
       }
     }
   }
@@ -1415,10 +1429,22 @@ void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge,
       }
     }
 
-    for (int j = startTri; j < triVerts.size(); ++j) {
+    for (int tri = startTri; tri < triVerts.size(); ++tri) {
       meshRelation_.triBary.H().push_back(faceRef.H()[face]);
-      for (int k : {0, 1, 2})
-        meshRelation_.triBary.H().back().vertBary[k] = vertBary[triVerts[j][k]];
+      int shift = 0;
+      for (int k : {0, 1, 2}) {
+        int bary = vertBary[triVerts[tri][k]];
+        if (bary < 0) {
+          shift = k - (bary + 3);
+          bary = -1;
+        }
+        meshRelation_.triBary.H().back().vertBary[k] = bary;
+      }
+      if (shift != 0) {
+        if (shift < 0) shift += 3;
+        circShift(triVerts[tri], shift);
+        circShift(meshRelation_.triBary.H().back().vertBary, shift);
+      }
     }
   }
   faceNormal_ = triNormalOut;
