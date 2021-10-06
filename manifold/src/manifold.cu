@@ -292,7 +292,8 @@ Manifold Manifold::Extrude(Polygons crossSection, float height, int nDivisions,
 
   extrusion.pImpl_->CreateHalfedges(triVertsDH);
   extrusion.pImpl_->Finish();
-  extrusion.pImpl_->ReinitializeReference();
+  extrusion.pImpl_->InitializeNewReference();
+  extrusion.pImpl_->MergeCoplanarRelations();
   return extrusion;
 }
 
@@ -387,7 +388,8 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments) {
 
   revoloid.pImpl_->CreateHalfedges(triVertsDH);
   revoloid.pImpl_->Finish();
-  revoloid.pImpl_->ReinitializeReference();
+  revoloid.pImpl_->InitializeNewReference();
+  revoloid.pImpl_->MergeCoplanarRelations();
   return revoloid;
 }
 
@@ -650,7 +652,11 @@ std::vector<int> Manifold::MeshIDs() const {
  * was copied from, allowing you to differentiate the copies when applying your
  * properties to the final result. Its new meshID is returned.
  */
-int Manifold::SetAsOriginal() { return pImpl_->InitializeNewReference(); }
+int Manifold::SetAsOriginal(bool mergeCoplanarRelations) {
+  int meshID = pImpl_->InitializeNewReference();
+  if (mergeCoplanarRelations) pImpl_->MergeCoplanarRelations();
+  return meshID;
+}
 
 std::vector<int> Manifold::MeshID2Original() {
   return Manifold::Impl::meshID2Original_;
