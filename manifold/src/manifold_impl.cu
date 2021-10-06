@@ -23,6 +23,7 @@
 
 #include <algorithm>
 #include <map>
+#include <stack>
 
 #include "connected_components.cuh"
 #include "manifold_impl.cuh"
@@ -874,6 +875,55 @@ struct InitializeBaryRef {
   }
 };
 
+struct CoplanarEdge {
+  BaryRef* triBary;
+  const Halfedge* halfedge;
+  const glm::vec3* vertPos;
+  const float precision;
+
+  __host__ __device__ void operator()(int edgeIdx) {
+    const Halfedge edge = halfedge[edgeIdx];
+    if (!edge.IsForward()) return;
+    const Halfedge pair = halfedge[edge.pairedHalfedge];
+    const glm::vec3 base = vertPos[edge.startVert];
+
+    const glm::vec3 jointVec = vertPos[edge.endVert] - base;
+    const glm::vec3 edgeVec =
+        vertPos[halfedge[NextHalfedge(edgeIdx)].endVert] - base;
+    const glm::vec3 pairVec =
+        vertPos[halfedge[NextHalfedge(edge.pairedHalfedge)].endVert] - base;
+
+    const glm::vec3 cross = glm::cross(jointVec, edgeVec);
+    const float area = glm::length(cross);
+    const float areaPair = glm::length(glm::cross(pairVec, jointVec));
+    const float volume = glm::abs(glm::dot(cross, pairVec));
+    const float height = volume / glm::max(area, areaPair);
+    // Only operate on coplanar triangles
+    if (height > precision) return;
+
+    const float length = glm::max(glm::length(edgeVec), glm::length(jointVec));
+    const float lengthPair =
+        glm::max(glm::length(pairVec), glm::length(jointVec));
+    const bool edgeColinear = area < length * precision;
+    const bool pairColinear = areaPair < lengthPair * precision;
+
+    int& edgeFace = triBary[edge.face].face;
+    int& pairFace = triBary[pair.face].face;
+    // Point toward non-degenerate triangle
+    if (edgeColinear && !pairColinear)
+      edgeFace = pairFace;
+    else if (pairColinear && !edgeColinear)
+      pairFace = edgeFace;
+    else {
+      // Point toward lower index
+      if (edgeFace < pairFace)
+        pairFace = edgeFace;
+      else
+        edgeFace = pairFace;
+    }
+  }
+};
+
 struct FlagEdge {
   const Halfedge* halfedge;
   const glm::vec3* vertPos;
@@ -1032,6 +1082,7 @@ Manifold::Impl::Impl(const Mesh& mesh)
   CalculateBBox();
   SetPrecision();
   CreateAndFixHalfedges(mesh.triVerts);
+  InitializeNewReference();
   CalculateNormals();
   CollapseDegenerates();
   // MatchesTriNormals();
@@ -1085,9 +1136,10 @@ Manifold::Impl::Impl(Shape shape) {
       throw userErr("Unrecognized shape!");
   }
   vertPos_ = vertPos;
-  CreateAndFixHalfedges(triVerts);
+  CreateHalfedges(triVerts);
   Finish();
-  ReinitializeReference();
+  InitializeNewReference();
+  MergeCoplanarRelations();
 }
 
 /**
@@ -1119,6 +1171,27 @@ int Manifold::Impl::InitializeNewReference() {
   return nextMeshID;
 }
 
+void Manifold::Impl::MergeCoplanarRelations() {
+  thrust::for_each_n(
+      countAt(0), halfedge_.size(),
+      CoplanarEdge({meshRelation_.triBary.ptrD(), halfedge_.cptrD(),
+                    vertPos_.cptrD(), precision_}));
+
+  VecH<BaryRef>& triBary = meshRelation_.triBary.H();
+  std::stack<int> stack;
+  for (int tri = 0; tri < NumTri(); ++tri) {
+    int thisTri = tri;
+    while (triBary[thisTri].face != thisTri) {
+      stack.push(thisTri);
+      thisTri = triBary[thisTri].face;
+    }
+    while (!stack.empty()) {
+      triBary[stack.top()].face = thisTri;
+      stack.pop();
+    }
+  }
+}
+
 /**
  * Create the halfedge_ data structure from an input triVerts array like Mesh.
  */
@@ -1131,7 +1204,6 @@ void Manifold::Impl::CreateHalfedges(const VecDH<glm::ivec3>& triVerts) {
   thrust::sort(edge.beginD(), edge.endD());
   thrust::for_each_n(countAt(0), halfedge_.size() / 2,
                      LinkHalfedges({halfedge_.ptrD(), edge.cptrD()}));
-  if (meshRelation_.triBary.size() != numTri) InitializeNewReference();
 }
 
 /**
@@ -1156,7 +1228,6 @@ void Manifold::Impl::CreateAndFixHalfedges(const VecDH<glm::ivec3>& triVerts) {
                      LinkHalfedges({halfedge_.ptrH(), edge.cptrH()}));
   thrust::for_each(thrust::host, countAt(1), countAt(halfedge_.size() / 2),
                    SwapHalfedges({halfedge_.ptrH(), edge.cptrH()}));
-  if (meshRelation_.triBary.size() != numTri) InitializeNewReference();
 }
 
 /**
@@ -1813,7 +1884,8 @@ void Manifold::Impl::SortFaces(VecDH<Box>& faceBox,
  */
 void Manifold::Impl::GatherFaces(const VecDH<int>& faceNew2Old) {
   const int numTri = faceNew2Old.size();
-  Permute(meshRelation_.triBary, faceNew2Old);
+  if (meshRelation_.triBary.size() == NumTri())
+    Permute(meshRelation_.triBary, faceNew2Old);
 
   if (faceNormal_.size() == NumTri()) Permute(faceNormal_, faceNew2Old);
 
