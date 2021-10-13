@@ -104,6 +104,16 @@ __host__ __device__ glm::mat3x2 GetAxisAlignedProjection(glm::vec3 normal) {
   return glm::transpose(projection);
 }
 
+__host__ __device__ bool IsDegenerate(const glm::vec3& p0, const glm::vec3& p1,
+                                      const glm::vec3& p2, float precision) {
+  glm::vec3 v1 = p1 - p0;
+  glm::vec3 v2 = p2 - p0;
+  glm::vec3 cross = glm::cross(v1, v2);
+  float area2 = glm::dot(cross, cross);
+  float base2 = glm::max(glm::dot(v1, v1), glm::dot(v2, v2));
+  return area2 <= base2 * precision * precision;
+}
+
 struct Barycentric {
   int tri;
   glm::vec3 uvw;
@@ -924,18 +934,43 @@ struct CoplanarEdge {
   }
 };
 
-struct FlagEdge {
+struct DegenerateTri {
   const Halfedge* halfedge;
   const glm::vec3* vertPos;
   const float precision;
-  const BaryRef* triBary;
+
+  __host__ __device__ void operator()(thrust::tuple<bool&, int> inOut) {
+    bool& degenerate = thrust::get<0>(inOut);
+    const int tri = thrust::get<1>(inOut);
+
+    degenerate =
+        IsDegenerate(vertPos[halfedge[3 * tri].startVert],
+                     vertPos[halfedge[3 * tri + 1].startVert],
+                     vertPos[halfedge[3 * tri + 2].startVert], precision);
+  }
+};
+
+struct ShortEdge {
+  const Halfedge* halfedge;
+  const glm::vec3* vertPos;
+  const float precision;
 
   __host__ __device__ bool operator()(int edge) {
     if (halfedge[edge].pairedHalfedge < 0) return false;
     // Flag short edges
     const glm::vec3 delta =
         vertPos[halfedge[edge].endVert] - vertPos[halfedge[edge].startVert];
-    if (glm::dot(delta, delta) < precision * precision) return true;
+    return glm::dot(delta, delta) < precision * precision;
+  }
+};
+
+struct FlagEdge {
+  const Halfedge* halfedge;
+  const BaryRef* triBary;
+  const bool* triDegenerate;
+
+  __host__ __device__ bool operator()(int edge) {
+    if (halfedge[edge].pairedHalfedge < 0) return false;
     // Flag redundant edges - those where the startVert is surrounded by only
     // two original triangles.
     const BaryRef ref0 = triBary[edge / 3];
@@ -943,7 +978,9 @@ struct FlagEdge {
     const BaryRef ref1 = triBary[current / 3];
     while (current != edge) {
       current = NextHalfedge(halfedge[current].pairedHalfedge);
-      const BaryRef ref = triBary[current / 3];
+      int tri = current / 3;
+      if (triDegenerate[tri]) continue;
+      const BaryRef ref = triBary[tri];
       if ((ref.meshID != ref0.meshID || ref.face != ref0.face) &&
           (ref.meshID != ref1.meshID || ref.face != ref1.face))
         return false;
@@ -1240,15 +1277,27 @@ void Manifold::Impl::CreateAndFixHalfedges(const VecDH<glm::ivec3>& triVerts) {
  * removal, by setting vertPos to NaN and halfedge to {-1, -1, -1, -1}.
  */
 void Manifold::Impl::CollapseDegenerates() {
-  // std::cout << "collapse degenerates" << std::endl;
+  VecDH<bool> triDegenerate(NumTri(), false);
+  thrust::for_each_n(
+      zip(triDegenerate.beginD(), countAt(0)), NumTri(),
+      DegenerateTri({halfedge_.cptrD(), vertPos_.cptrD(), precision_}));
 
   VecDH<int> flaggedEdges(halfedge_.size());
   int numFlagged =
-      thrust::copy_if(countAt(0), countAt(halfedge_.size()),
-                      flaggedEdges.beginD(),
-                      FlagEdge({halfedge_.cptrD(), vertPos_.cptrD(), precision_,
-                                meshRelation_.triBary.cptrD()})) -
+      thrust::copy_if(
+          countAt(0), countAt(halfedge_.size()), flaggedEdges.beginD(),
+          ShortEdge({halfedge_.cptrD(), vertPos_.cptrD(), precision_})) -
       flaggedEdges.beginD();
+  flaggedEdges.resize(numFlagged);
+
+  for (const int edge : flaggedEdges.H()) CollapseEdge(edge);
+
+  flaggedEdges.resize(halfedge_.size());
+  numFlagged = thrust::copy_if(
+                   countAt(0), countAt(halfedge_.size()), flaggedEdges.beginD(),
+                   FlagEdge({halfedge_.cptrD(), meshRelation_.triBary.cptrD(),
+                             triDegenerate.cptrD()})) -
+               flaggedEdges.beginD();
   flaggedEdges.resize(numFlagged);
 
   for (const int edge : flaggedEdges.H()) CollapseEdge(edge);
@@ -2110,12 +2159,16 @@ void Manifold::Impl::CollapseEdge(int edge) {
   const glm::ivec3 tri0edge = TriOf(edge);
   const glm::ivec3 tri1edge = TriOf(toRemove.pairedHalfedge);
 
-  const glm::vec3 delta = vertPos[endVert] - vertPos[toRemove.startVert];
+  const glm::vec3 p0 = vertPos[endVert];
+  const glm::vec3 delta = p0 - vertPos[toRemove.startVert];
   const bool shortEdge = glm::dot(delta, delta) < precision_ * precision_;
 
-  auto CCW2Normal = [](const glm::vec3& a, const glm::vec3& b,
-                       const glm::vec3& normal) {
-    return glm::dot(glm::cross(a, b), normal) >= 0;
+  auto CW2Normal = [](const glm::vec3& p0, const glm::vec3& p1,
+                      const glm::vec3& p2, const glm::vec3& normal,
+                      float precision) {
+    glm::mat3x2 projection = GetAxisAlignedProjection(normal);
+    return CCW(projection * p0, projection * p1, projection * p2, precision) <
+           0;
   };
 
   std::vector<int> edges;
@@ -2133,23 +2186,23 @@ void Manifold::Impl::CollapseEdge(int edge) {
     const BaryRef ref0 = triBary[edge / 3];
     const BaryRef ref1 = triBary[toRemove.pairedHalfedge / 3];
     current = start;
-    glm::vec3 lastEdge =
-        vertPos[halfedge[tri1edge[1]].endVert] - vertPos[endVert];
+    glm::vec3 p1 = vertPos[halfedge[tri1edge[1]].endVert];
     while (current != tri0edge[2]) {
       current = NextHalfedge(current);
-      const BaryRef ref = triBary[current / 3];
+      glm::vec3 p2 = vertPos[halfedge[current].endVert];
+      const int tri = current / 3;
+      const BaryRef ref = triBary[tri];
       // Don't collapse if the edge is not redundant (this may have changed due
       // to the collapse of neighbors).
-      if ((ref.meshID != ref0.meshID || ref.face != ref0.face) &&
+      if (!IsDegenerate(p0, p1, p2, precision_) &&
+          (ref.meshID != ref0.meshID || ref.face != ref0.face) &&
           (ref.meshID != ref1.meshID || ref.face != ref1.face))
         return;
 
-      glm::vec3 thisEdge =
-          vertPos[halfedge[current].endVert] - vertPos[endVert];
-      const int tri = current / 3;
       // Don't collapse edge if it would cause a triangle to invert.
-      if (!CCW2Normal(thisEdge, lastEdge, triNormal[tri])) return;
-      lastEdge = thisEdge;
+      if (CW2Normal(p2, p1, p0, triNormal[tri], precision_)) return;
+
+      p1 = p2;
       current = halfedge[current].pairedHalfedge;
     }
   }
