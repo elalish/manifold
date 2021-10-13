@@ -44,9 +44,7 @@ Manifold MengerSponge(int n) {
   Manifold hole = Manifold::Compose(holes);
 
   result -= hole;
-  result.SetAsOriginal(true);
   result -= hole.Rotate(90);
-  result.SetAsOriginal(true);
   result -= hole.Rotate(0, 0, 90);
   result.SetAsOriginal(true);
   return result;

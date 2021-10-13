@@ -142,7 +142,7 @@ TEST(Samples, Sponge1) {
   Manifold sponge = MengerSponge(1);
   CheckManifold(sponge);
   EXPECT_EQ(sponge.Genus(), 5);
-  // ExportMesh("mengerSponge1.gltf", sponge.Extract(), {});
+  ExportMesh("mengerSponge1.gltf", sponge.Extract(), {});
 }
 
 // A fractal with many degenerate intersections, which also tests exact 90
@@ -151,7 +151,7 @@ TEST(Samples, Sponge4) {
   Manifold sponge = MengerSponge(4);
   CheckManifold(sponge);
   EXPECT_EQ(sponge.Genus(), 26433);  // should be 1:5, 2:81, 3:1409, 4:26433
-  // ExportMesh("mengerSponge.gltf", sponge.Extract(), {});
+  ExportMesh("mengerSponge.gltf", sponge.Extract(), {});
   std::pair<Manifold, Manifold> cutSponge = sponge.SplitByPlane({1, 1, 1}, 0);
   EXPECT_TRUE(cutSponge.first.IsManifold());
   EXPECT_EQ(cutSponge.first.Genus(), 13394);
