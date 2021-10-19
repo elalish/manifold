@@ -85,30 +85,7 @@ TEST(Samples, TetPuzzle) {
   puzzle2.Rotate(0, 0, 180);
   EXPECT_TRUE((puzzle ^ puzzle2).IsEmpty());
   puzzle.Transform(RotateUp({1, -1, -1}));
-
-  // const Mesh out = puzzle.Extract();
-  // ExportOptions options;
-  // options.faceted = false;
-  // options.mat.vertColor.resize(puzzle.NumVert());
-  // for (const glm::ivec3 tri : out.triVerts) {
-  //   glm::vec3 v1 = out.vertPos[tri[1]] - out.vertPos[tri[0]];
-  //   glm::vec3 v2 = out.vertPos[tri[2]] - out.vertPos[tri[0]];
-  //   glm::vec3 crossP = glm::cross(v1, v2);
-  //   float area2 = glm::dot(crossP, crossP);
-  //   float base2 = glm::max(glm::dot(v1, v1), glm::dot(v2, v2));
-  //   if (area2 < base2 * puzzle.Precision() * puzzle.Precision()) {
-  //     std::cout << glm::normalize(crossP) << std::endl;
-  //     for (int i : {0, 1, 2})
-  //       std::cout << tri[i] << ", " << out.vertPos[tri[i]] << std::endl;
-  //   }
-  //   for (int i : {0, 1, 2}) {
-  //     options.mat.vertColor[tri[i]] =
-  //         area2 < base2 * puzzle.Precision() * puzzle.Precision()
-  //             ? glm::vec4(1, 0, 0, 1)
-  //             : glm::vec4(0, 1, 1, 1);
-  //   }
-  // }
-  // ExportMesh("tetPuzzle.gltf", out, options);
+  // ExportMesh("tetPuzzle.gltf", puzzle.Extract(), {});
 }
 
 TEST(Samples, FrameReduced) {
