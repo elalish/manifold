@@ -67,6 +67,23 @@ void Related(const Manifold& out, const std::vector<Mesh>& input,
   }
 }
 
+void RelatedOp(const Manifold& inP, const Manifold& inQ, const Manifold& outR) {
+  std::vector<Mesh> input;
+  std::map<int, int> meshID2idx;
+
+  std::vector<int> meshIDs = inP.MeshIDs();
+  EXPECT_EQ(meshIDs.size(), 1);
+  meshID2idx[meshIDs[0]] = input.size();
+  input.push_back(inP.Extract());
+
+  meshIDs = inQ.MeshIDs();
+  EXPECT_EQ(meshIDs.size(), 1);
+  meshID2idx[meshIDs[0]] = input.size();
+  input.push_back(inQ.Extract());
+
+  Related(outR, input, meshID2idx);
+}
+
 void ExpectMeshes(const Manifold& manifold,
                   const std::vector<std::pair<int, int>>& numVertTri) {
   EXPECT_TRUE(manifold.IsManifold());
@@ -442,22 +459,7 @@ TEST(Boolean, Tetra) {
 
   ExpectMeshes(result, {{8, 12}});
 
-  std::vector<Mesh> input;
-  std::map<int, int> meshID2idx;
-
-  std::vector<int> meshIDs = tetra.MeshIDs();
-  EXPECT_EQ(meshIDs.size(), 1);
-  meshID2idx[meshIDs[0]] = input.size();
-  input.push_back(tetra.Extract());
-
-  meshIDs = tetra2.MeshIDs();
-  EXPECT_EQ(meshIDs.size(), 1);
-  meshID2idx[meshIDs[0]] = input.size();
-  input.push_back(tetra2.Extract());
-
-  // ExportMesh("tetra.gltf", result.Extract(), {});
-
-  Related(result, input, meshID2idx);
+  RelatedOp(tetra, tetra2, result);
 }
 
 /**
@@ -492,15 +494,17 @@ TEST(Boolean, Perturb) {
 }
 
 TEST(Boolean, Coplanar) {
-  Manifold cube = Manifold::Cylinder(1.0f, 1.0f);
-  Manifold cube2 = cube;
-  Manifold out = cube - cube2.Scale({0.5f, 0.5f, 1.0f})
-                            .Rotate(0, 0, 15)
-                            .Translate({0.25f, 0.25f, 0.0f});
+  Manifold cylinder = Manifold::Cylinder(1.0f, 1.0f);
+  Manifold cylinder2 = cylinder;
+  Manifold out = cylinder - cylinder2.Scale({0.5f, 0.5f, 1.0f})
+                                .Rotate(0, 0, 15)
+                                .Translate({0.25f, 0.25f, 0.0f});
   ExpectMeshes(out, {{33, 66}});
   EXPECT_EQ(out.NumDegenerateTris(), 0);
   EXPECT_EQ(out.Genus(), 1);
   // ExportMesh("coplanar.gltf", out.Extract());
+
+  // RelatedOp(cylinder, cylinder2, out);
 }
 
 TEST(Boolean, MultiCoplanar) {
@@ -525,7 +529,6 @@ TEST(Boolean, FaceUnion) {
   auto prop = cubes.GetProperties();
   EXPECT_NEAR(prop.volume, 2, 1e-5);
   EXPECT_NEAR(prop.surfaceArea, 10, 1e-5);
-  // ExportMesh("faceUnion.gltf", cubes.Extract(), {});
 }
 
 TEST(Boolean, EdgeUnion) {
@@ -686,10 +689,13 @@ TEST(Boolean, Sphere) {
   Manifold sphere = Manifold::Sphere(1.0f, 12);
   Manifold sphere2 = sphere;
   sphere2.Translate(glm::vec3(0.5));
+  sphere2.SetAsOriginal();
   Manifold result = sphere - sphere2;
 
   ExpectMeshes(result, {{74, 144}});
   EXPECT_EQ(result.NumDegenerateTris(), 0);
+
+  RelatedOp(sphere, sphere2, result);
 }
 
 TEST(Boolean, Gyroid) {
@@ -700,6 +706,7 @@ TEST(Boolean, Gyroid) {
   // ExportMesh("gyroidpuzzle1.gltf", gyroid.Extract(), {});
   Manifold gyroid2 = gyroid;
   gyroid2.Translate(glm::vec3(5.0f));
+  gyroid2.SetAsOriginal();
   Manifold result = gyroid + gyroid2;
   // ExportMesh("gyroidUnion.gltf", result.Extract(), {});
 
@@ -710,4 +717,6 @@ TEST(Boolean, Gyroid) {
   auto prop = result.GetProperties();
   EXPECT_NEAR(prop.volume, 7692, 1);
   EXPECT_NEAR(prop.surfaceArea, 9642, 1);
+
+  // RelatedOp(gyroid, gyroid2, result);
 }
