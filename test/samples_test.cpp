@@ -22,7 +22,7 @@ using namespace manifold;
 
 void CheckManifold(const Manifold& manifold) {
   EXPECT_TRUE(manifold.IsManifold());
-  EXPECT_TRUE(manifold.StrictlyMatchesTriNormals());
+  EXPECT_TRUE(manifold.MatchesTriNormals());
   for (const glm::vec3& normal : manifold.Extract().vertNormal) {
     ASSERT_NEAR(glm::length(normal), 1, 0.0001);
   }
@@ -33,7 +33,7 @@ void CheckManifold(const Manifold& manifold) {
 TEST(Samples, Knot13) {
   Manifold knot13 = TorusKnot(1, 3, 25, 10, 3.75);
   //   ExportMesh("knot13.stl", knot13.Extract(), {});
-  EXPECT_TRUE(knot13.IsManifold());
+  CheckManifold(knot13);
   EXPECT_EQ(knot13.Genus(), 1);
   auto prop = knot13.GetProperties();
   EXPECT_NEAR(prop.volume, 20786, 1);
@@ -80,6 +80,7 @@ TEST(Samples, Scallop) {
 TEST(Samples, TetPuzzle) {
   Manifold puzzle = TetPuzzle(50, 0.2, 50);
   CheckManifold(puzzle);
+  EXPECT_LE(puzzle.NumDegenerateTris(), 2);
   Manifold puzzle2 = puzzle;
   puzzle2.Rotate(0, 0, 180);
   EXPECT_TRUE((puzzle ^ puzzle2).IsEmpty());
@@ -114,6 +115,7 @@ TEST(Samples, FrameReduced) {
   Manifold::SetCircularSegments(4);
   Manifold frame = RoundedFrame(100, 10);
   CheckManifold(frame);
+  EXPECT_EQ(frame.NumDegenerateTris(), 0);
   Manifold::SetCircularSegments(0);
   EXPECT_EQ(frame.Genus(), 5);
   auto prop = frame.GetProperties();
@@ -125,6 +127,7 @@ TEST(Samples, FrameReduced) {
 TEST(Samples, Frame) {
   Manifold frame = RoundedFrame(100, 10);
   CheckManifold(frame);
+  EXPECT_EQ(frame.NumDegenerateTris(), 0);
   EXPECT_EQ(frame.Genus(), 5);
   // ExportMesh("roundedFrame.ply", frame.Extract(), {});
 }
@@ -134,6 +137,7 @@ TEST(Samples, Frame) {
 TEST(Samples, Bracelet) {
   Manifold bracelet = StretchyBracelet();
   CheckManifold(bracelet);
+  EXPECT_LE(bracelet.NumDegenerateTris(), 5);
   EXPECT_EQ(bracelet.Genus(), 1);
   // ExportMesh("bracelet.ply", bracelet.Extract(), {});
 }
@@ -141,8 +145,10 @@ TEST(Samples, Bracelet) {
 TEST(Samples, Sponge1) {
   Manifold sponge = MengerSponge(1);
   CheckManifold(sponge);
+  EXPECT_EQ(sponge.NumDegenerateTris(), 0);
+  EXPECT_EQ(sponge.NumVert(), 40);
   EXPECT_EQ(sponge.Genus(), 5);
-  ExportMesh("mengerSponge1.gltf", sponge.Extract(), {});
+  // ExportMesh("mengerSponge1.gltf", sponge.Extract(), {});
 }
 
 // A fractal with many degenerate intersections, which also tests exact 90
@@ -150,8 +156,9 @@ TEST(Samples, Sponge1) {
 TEST(Samples, Sponge4) {
   Manifold sponge = MengerSponge(4);
   CheckManifold(sponge);
+  EXPECT_EQ(sponge.NumDegenerateTris(), 0);
   EXPECT_EQ(sponge.Genus(), 26433);  // should be 1:5, 2:81, 3:1409, 4:26433
-  ExportMesh("mengerSponge.gltf", sponge.Extract(), {});
+  // ExportMesh("mengerSponge.gltf", sponge.Extract(), {});
   std::pair<Manifold, Manifold> cutSponge = sponge.SplitByPlane({1, 1, 1}, 0);
   EXPECT_TRUE(cutSponge.first.IsManifold());
   EXPECT_EQ(cutSponge.first.Genus(), 13394);
