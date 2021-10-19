@@ -1122,7 +1122,6 @@ Manifold::Impl::Impl(const Mesh& mesh)
   InitializeNewReference();
   CalculateNormals();
   CollapseDegenerates();
-  // MatchesTriNormals();
   Finish();
 }
 
@@ -2119,7 +2118,6 @@ void Manifold::Impl::RemoveIfFolded(int edge) {
   const glm::ivec3 tri0edge = TriOf(edge);
   const glm::ivec3 tri1edge = TriOf(halfedge[edge].pairedHalfedge);
   if (halfedge[tri0edge[1]].endVert == halfedge[tri1edge[1]].endVert) {
-    // std::cout << "edge " << edge << " is folded, removing" << std::endl;
     for (int i : {0, 1, 2}) {
       vertPos[halfedge[tri0edge[i]].startVert] = glm::vec3(0.0f / 0.0f);
       halfedge[tri0edge[i]] = {-1, -1, -1, -1};
@@ -2231,14 +2229,8 @@ void Manifold::Impl::RecursiveEdgeSwap(const int edge) {
   for (int i : {0, 1, 2})
     v[i] = projection * vertPos[halfedge[tri0edge[i]].startVert];
   // Only operate on the long edge of a degenerate triangle.
-  if (CCW(v[0], v[1], v[2], precision_) > 0 || !Is01Longest(v[0], v[1], v[2])) {
-    // std::cout << ", CCW0: " << CCW(v[0], v[1], v[2], precision_)
-    //           << ", CCW1: " << CCW(v[1], v[2], v[0], precision_)
-    //           << ", CCW2: " << CCW(v[2], v[0], v[1], precision_)
-    //           << ", is longest: " << Is01Longest(v[0], v[1], v[2])
-    //           << std::endl;
+  if (CCW(v[0], v[1], v[2], precision_) > 0 || !Is01Longest(v[0], v[1], v[2]))
     return;
-  }
 
   auto SwapEdge = [&]() {
     // The 0-verts are swapped to the opposite 2-verts.
@@ -2281,7 +2273,6 @@ void Manifold::Impl::RecursiveEdgeSwap(const int edge) {
       if (halfedge[current].endVert == endVert) {
         FormLoop(tri0edge[2], current);
         RemoveIfFolded(tri0edge[2]);
-        // std::cout << "formed loop" << std::endl;
         return;
       }
       current = halfedge[current].pairedHalfedge;
@@ -2311,7 +2302,6 @@ void Manifold::Impl::RecursiveEdgeSwap(const int edge) {
     return;
   } else if (CCW(v[0], v[3], v[2], precision_) <= 0 ||
              CCW(v[1], v[2], v[3], precision_) <= 0) {
-    // std::cout << "cannot swap edge " << edge << std::endl;
     return;
   }
   // Normal path
