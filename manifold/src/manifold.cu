@@ -666,9 +666,7 @@ bool Manifold::IsManifold() const { return pImpl_->IsManifold(); }
 
 bool Manifold::MatchesTriNormals() const { return pImpl_->MatchesTriNormals(); }
 
-bool Manifold::StrictlyMatchesTriNormals() const {
-  return pImpl_->StrictlyMatchesTriNormals();
-}
+int Manifold::NumDegenerateTris() const { return pImpl_->NumDegenerateTris(); }
 
 Manifold& Manifold::Translate(glm::vec3 v) {
   pImpl_->transform_[3] += v;

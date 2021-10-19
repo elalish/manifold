@@ -1077,9 +1077,9 @@ struct CheckCCW {
       v[i] = projection * vertPos[halfedges[3 * face + i].startVert];
 
     int ccw = CCW(v[0], v[1], v[2], glm::abs(tol));
-    bool good = tol > 0 ? ccw >= 0 : ccw > 0;
+    bool check = tol > 0 ? ccw >= 0 : ccw == 0;
 
-    if (!good) {
+    if (tol > 0 && !check) {
       glm::vec2 v1 = v[1] - v[0];
       glm::vec2 v2 = v[2] - v[0];
       float area = v1.x * v2.y - v1.y * v2.x;
@@ -1099,7 +1099,7 @@ struct CheckCCW {
           norm.y, norm.z, halfedges[3 * face].startVert,
           halfedges[3 * face + 1].startVert, halfedges[3 * face + 2].startVert);
     }
-    return good;
+    return check;
   }
 };
 
@@ -1277,11 +1277,6 @@ void Manifold::Impl::CreateAndFixHalfedges(const VecDH<glm::ivec3>& triVerts) {
  * removal, by setting vertPos to NaN and halfedge to {-1, -1, -1, -1}.
  */
 void Manifold::Impl::CollapseDegenerates() {
-  VecDH<bool> triDegenerate(NumTri(), false);
-  thrust::for_each_n(
-      zip(triDegenerate.beginD(), countAt(0)), NumTri(),
-      DegenerateTri({halfedge_.cptrD(), vertPos_.cptrD(), precision_}));
-
   VecDH<int> flaggedEdges(halfedge_.size());
   int numFlagged =
       thrust::copy_if(
@@ -1291,6 +1286,11 @@ void Manifold::Impl::CollapseDegenerates() {
   flaggedEdges.resize(numFlagged);
 
   for (const int edge : flaggedEdges.H()) CollapseEdge(edge);
+
+  VecDH<bool> triDegenerate(NumTri(), false);
+  thrust::for_each_n(
+      zip(triDegenerate.beginD(), countAt(0)), NumTri(),
+      DegenerateTri({halfedge_.cptrD(), vertPos_.cptrD(), precision_}));
 
   flaggedEdges.resize(halfedge_.size());
   numFlagged = thrust::copy_if(
@@ -1302,8 +1302,6 @@ void Manifold::Impl::CollapseDegenerates() {
 
   for (const int edge : flaggedEdges.H()) CollapseEdge(edge);
 
-  ALWAYS_ASSERT(MatchesTriNormals(), geometryErr, "inverted a triangle!");
-
   flaggedEdges.resize(halfedge_.size());
   numFlagged = thrust::copy_if(
                    countAt(0), countAt(halfedge_.size()), flaggedEdges.beginD(),
@@ -1312,25 +1310,9 @@ void Manifold::Impl::CollapseDegenerates() {
                flaggedEdges.beginD();
   flaggedEdges.resize(numFlagged);
 
-  // flaggedEdges.Dump();
-  // std::cout << numFlagged << " colinear tris" << std::endl;
-
   for (const int edge : flaggedEdges.H()) {
-    // std::cout << "--------------- swapping edge " << edge << std::endl;
     RecursiveEdgeSwap(edge);
   }
-
-  ALWAYS_ASSERT(MatchesTriNormals(), geometryErr, "degenerate triangle!");
-
-  // flaggedEdges.resize(halfedge_.size());
-  // numFlagged = thrust::copy_if(
-  //                countAt(0), countAt(halfedge_.size()),
-  //                flaggedEdges.beginD(), FlagEdge({halfedge_.cptrD(),
-  //                vertPos_.cptrD(), precision_})) -
-  //            flaggedEdges.beginD();
-  // std::cout << numFlagged << " remaining short edges" << std::endl;
-
-  // if (!IsManifold()) std::cout << __LINE__ << std::endl;
 }
 
 /**
@@ -1773,13 +1755,13 @@ bool Manifold::Impl::MatchesTriNormals() const {
 }
 
 /**
- * Returns true if all triangles are CCW relative to their triNormals_.
+ * Returns the number of triangles that are colinear within precision_.
  */
-bool Manifold::Impl::StrictlyMatchesTriNormals() const {
+int Manifold::Impl::NumDegenerateTris() const {
   if (halfedge_.size() == 0 || faceNormal_.size() != NumTri()) return true;
-  return thrust::all_of(thrust::device, countAt(0), countAt(NumTri()),
-                        CheckCCW({halfedge_.cptrD(), vertPos_.cptrD(),
-                                  faceNormal_.cptrD(), -1 * precision_ / 2}));
+  return thrust::count_if(thrust::device, countAt(0), countAt(NumTri()),
+                          CheckCCW({halfedge_.cptrD(), vertPos_.cptrD(),
+                                    faceNormal_.cptrD(), -1 * precision_ / 2}));
 }
 
 Properties Manifold::Impl::GetProperties() const {

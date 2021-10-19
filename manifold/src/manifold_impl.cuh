@@ -70,7 +70,7 @@ struct Manifold::Impl {
   void SetPrecision(float minPrecision = -1);
   bool IsManifold() const;
   bool MatchesTriNormals() const;
-  bool StrictlyMatchesTriNormals() const;
+  int NumDegenerateTris() const;
 
   void SortVerts();
   void ReindexVerts(const VecDH<int>& vertNew2Old, int numOldVert);

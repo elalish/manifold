@@ -96,7 +96,7 @@ class Manifold {
   // Testing hooks
   bool IsManifold() const;
   bool MatchesTriNormals() const;
-  bool StrictlyMatchesTriNormals() const;
+  int NumDegenerateTris() const;
   int NumOverlaps(const Manifold& second) const;
 
   ~Manifold();
