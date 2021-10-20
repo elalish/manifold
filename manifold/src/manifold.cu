@@ -292,7 +292,8 @@ Manifold Manifold::Extrude(Polygons crossSection, float height, int nDivisions,
 
   extrusion.pImpl_->CreateHalfedges(triVertsDH);
   extrusion.pImpl_->Finish();
-  extrusion.pImpl_->ReinitializeReference();
+  extrusion.pImpl_->InitializeNewReference();
+  extrusion.pImpl_->MergeCoplanarRelations();
   return extrusion;
 }
 
@@ -387,7 +388,8 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments) {
 
   revoloid.pImpl_->CreateHalfedges(triVertsDH);
   revoloid.pImpl_->Finish();
-  revoloid.pImpl_->ReinitializeReference();
+  revoloid.pImpl_->InitializeNewReference();
+  revoloid.pImpl_->MergeCoplanarRelations();
   return revoloid;
 }
 
@@ -604,12 +606,13 @@ Curvature Manifold::GetCurvature() const { return pImpl_->GetCurvature(); }
 /**
  * Gets the relationship to the previous mesh, for the purpose of assinging
  * properties like texture coordinates. The triBary vector is the same length as
- * Mesh.triVerts and BaryRef.tri gives the index into the input triVerts vector.
- * BaryRef.vertBary gives an index for each vertex into the barycentric vector,
- * if that vertex is >= 0, indicating it is a new vertex. The barycentric
- * coordinates are relative to the original verts of the corresponding input
- * tri. If the index is < 0, this indicates it is an original vertex of the
- * triangle, found as index + 3.
+ * Mesh.triVerts and BaryRef.face gives a unique identifier of the original mesh
+ * face to which this triangle belongs. BaryRef.verts gives the three original
+ * mesh vertex indices to which its barycentric coordinates refer.
+ * BaryRef.vertBary gives an index for each vertex into the barycentric vector
+ * if that vertex is >= 0, indicating it is a new vertex. If the index is < 0,
+ * this indicates it is an original vertex of the triangle, found as the
+ * corresponding element of BaryRef.verts.
  */
 MeshRelation Manifold::GetMeshRelation() const {
   MeshRelation out;
@@ -649,7 +652,11 @@ std::vector<int> Manifold::MeshIDs() const {
  * was copied from, allowing you to differentiate the copies when applying your
  * properties to the final result. Its new meshID is returned.
  */
-int Manifold::SetAsOriginal() { return pImpl_->InitializeNewReference(); }
+int Manifold::SetAsOriginal(bool mergeCoplanarRelations) {
+  int meshID = pImpl_->InitializeNewReference();
+  if (mergeCoplanarRelations) pImpl_->MergeCoplanarRelations();
+  return meshID;
+}
 
 std::vector<int> Manifold::MeshID2Original() {
   return Manifold::Impl::meshID2Original_;
@@ -658,6 +665,8 @@ std::vector<int> Manifold::MeshID2Original() {
 bool Manifold::IsManifold() const { return pImpl_->IsManifold(); }
 
 bool Manifold::MatchesTriNormals() const { return pImpl_->MatchesTriNormals(); }
+
+int Manifold::NumDegenerateTris() const { return pImpl_->NumDegenerateTris(); }
 
 Manifold& Manifold::Translate(glm::vec3 v) {
   pImpl_->transform_[3] += v;

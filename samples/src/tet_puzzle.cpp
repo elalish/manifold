@@ -17,7 +17,9 @@
 namespace manifold {
 
 Manifold TetPuzzle(float edgeLength, float gap, int nDivisions) {
-  Manifold tet = Manifold::Tetrahedron();
+  const glm::vec3 scale(edgeLength / (2 * sqrt(2)));
+
+  Manifold tet = Manifold::Tetrahedron().Scale(scale);
 
   Polygons box;
   box.push_back({{glm::vec2(2, -2), 0}, {glm::vec2(2, 2), 1}});
@@ -28,7 +30,8 @@ Manifold TetPuzzle(float edgeLength, float gap, int nDivisions) {
 
   Manifold screw = Manifold::Extrude(box, 2, nDivisions, 270)
                        .Rotate(0, 0, -45)
-                       .Translate({0, 0, -1});
+                       .Translate({0, 0, -1})
+                       .Scale(scale);
 
   return tet ^ screw;
 }

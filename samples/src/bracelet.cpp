@@ -51,7 +51,10 @@ Manifold Base(float width, float radius, float decorRadius, float twistRadius,
     stretch[0].push_back({glm::rotate(p0, dPhiRad * i), 0});
   }
 
-  return Manifold::Extrude(stretch, width) ^ base;
+  base = Manifold::Extrude(stretch, width) ^ base;
+  base.SetAsOriginal(true);
+
+  return base;
 }
 }  // namespace
 

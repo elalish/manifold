@@ -60,9 +60,11 @@ class Manifold {
   int Genus() const;
   Properties GetProperties() const;
   Curvature GetCurvature() const;
+
+  // Relation
   MeshRelation GetMeshRelation() const;
   std::vector<int> MeshIDs() const;
-  int SetAsOriginal();
+  int SetAsOriginal(bool mergeCoplanarRelations = false);
   static std::vector<int> MeshID2Original();
 
   // Modification
@@ -94,6 +96,7 @@ class Manifold {
   // Testing hooks
   bool IsManifold() const;
   bool MatchesTriNormals() const;
+  int NumDegenerateTris() const;
   int NumOverlaps(const Manifold& second) const;
 
   ~Manifold();
