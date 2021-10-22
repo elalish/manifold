@@ -51,20 +51,11 @@ struct Manifold::Impl {
   void MergeCoplanarRelations();
   void CreateHalfedges(const VecDH<glm::ivec3>& triVerts);
   void CreateAndFixHalfedges(const VecDH<glm::ivec3>& triVerts);
+  void CalculateNormals();
 
-  void Finish();
   void Update();
   void ApplyTransform() const;
   void ApplyTransform();
-
-  void SortVerts();
-  void ReindexVerts(const VecDH<int>& vertNew2Old, int numOldVert);
-  void GetFaceBoxMorton(VecDH<Box>& faceBox, VecDH<uint32_t>& faceMorton) const;
-  void SortFaces(VecDH<Box>& faceBox, VecDH<uint32_t>& faceMorton);
-  void GatherFaces(const VecDH<int>& faceNew2Old);
-  void GatherFaces(const Impl& old, const VecDH<int>& faceNew2Old);
-  void CalculateNormals();
-
   SparseIndices EdgeCollisions(const Impl& B) const;
   SparseIndices VertexCollisionsZ(const VecDH<glm::vec3>& vertsIn) const;
 
@@ -80,6 +71,15 @@ struct Manifold::Impl {
   bool IsManifold() const;
   bool MatchesTriNormals() const;
   int NumDegenerateTris() const;
+
+  // sort.cu
+  void Finish();
+  void SortVerts();
+  void ReindexVerts(const VecDH<int>& vertNew2Old, int numOldVert);
+  void GetFaceBoxMorton(VecDH<Box>& faceBox, VecDH<uint32_t>& faceMorton) const;
+  void SortFaces(VecDH<Box>& faceBox, VecDH<uint32_t>& faceMorton);
+  void GatherFaces(const VecDH<int>& faceNew2Old);
+  void GatherFaces(const Impl& old, const VecDH<int>& faceNew2Old);
 
   // face_op.cu
   void Face2Tri(const VecDH<int>& faceEdge, const VecDH<BaryRef>& faceRef,
