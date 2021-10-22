@@ -130,6 +130,32 @@ __host__ __device__ inline glm::vec3 UVW(const BaryRef& baryRef, int vert,
   return uvw;
 }
 
+/**
+ * By using the closest axis-aligned projection to the normal instead of a
+ * projection along the normal, we avoid introducing any rounding error.
+ */
+__host__ __device__ inline glm::mat3x2 GetAxisAlignedProjection(
+    glm::vec3 normal) {
+  glm::vec3 absNormal = glm::abs(normal);
+  float xyzMax;
+  glm::mat2x3 projection;
+  if (absNormal.z > absNormal.x && absNormal.z > absNormal.y) {
+    projection = glm::mat2x3(1.0f, 0.0f, 0.0f,  //
+                             0.0f, 1.0f, 0.0f);
+    xyzMax = normal.z;
+  } else if (absNormal.y > absNormal.x) {
+    projection = glm::mat2x3(0.0f, 0.0f, 1.0f,  //
+                             1.0f, 0.0f, 0.0f);
+    xyzMax = normal.y;
+  } else {
+    projection = glm::mat2x3(0.0f, 1.0f, 0.0f,  //
+                             0.0f, 0.0f, 1.0f);
+    xyzMax = normal.x;
+  }
+  if (xyzMax < 0) projection[0] *= -1.0f;
+  return glm::transpose(projection);
+}
+
 // Copied from
 // https://github.com/thrust/thrust/blob/master/examples/strided_range.cu
 template <typename Iterator>

@@ -51,7 +51,7 @@ struct Manifold::Impl {
   void MergeCoplanarRelations();
   void CreateHalfedges(const VecDH<glm::ivec3>& triVerts);
   void CreateAndFixHalfedges(const VecDH<glm::ivec3>& triVerts);
-  void CollapseDegenerates();
+
   void Finish();
   void Update();
   void ApplyTransform() const;
@@ -87,6 +87,7 @@ struct Manifold::Impl {
   Polygons Face2Polygons(int face, glm::mat3x2 projection,
                          const VecH<int>& faceEdge) const;
 
+  void CollapseDegenerates();
   void CollapseEdge(int edge);
   void RecursiveEdgeSwap(int edge);
   void RemoveIfFolded(int edge);
