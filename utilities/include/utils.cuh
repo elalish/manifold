@@ -22,6 +22,8 @@
 
 #include <iostream>
 
+#include "vec_dh.cuh"
+
 namespace manifold {
 
 inline void MemUsage() {
@@ -112,6 +114,11 @@ __host__ __device__ T AtomicAdd(T& target, T add) {
 #endif
 }
 
+__host__ __device__ inline glm::vec3 SafeNormalize(glm::vec3 v) {
+  v = glm::normalize(v);
+  return isfinite(v.x) ? v : glm::vec3(0);
+}
+
 __host__ __device__ inline int NextHalfedge(int current) {
   ++current;
   if (current % 3 == 0) current -= 3;
@@ -129,6 +136,87 @@ __host__ __device__ inline glm::vec3 UVW(const BaryRef& baryRef, int vert,
   }
   return uvw;
 }
+
+/**
+ * By using the closest axis-aligned projection to the normal instead of a
+ * projection along the normal, we avoid introducing any rounding error.
+ */
+__host__ __device__ inline glm::mat3x2 GetAxisAlignedProjection(
+    glm::vec3 normal) {
+  glm::vec3 absNormal = glm::abs(normal);
+  float xyzMax;
+  glm::mat2x3 projection;
+  if (absNormal.z > absNormal.x && absNormal.z > absNormal.y) {
+    projection = glm::mat2x3(1.0f, 0.0f, 0.0f,  //
+                             0.0f, 1.0f, 0.0f);
+    xyzMax = normal.z;
+  } else if (absNormal.y > absNormal.x) {
+    projection = glm::mat2x3(0.0f, 0.0f, 1.0f,  //
+                             1.0f, 0.0f, 0.0f);
+    xyzMax = normal.y;
+  } else {
+    projection = glm::mat2x3(0.0f, 1.0f, 0.0f,  //
+                             0.0f, 0.0f, 1.0f);
+    xyzMax = normal.x;
+  }
+  if (xyzMax < 0) projection[0] *= -1.0f;
+  return glm::transpose(projection);
+}
+
+/**
+ * This is a temporary edge strcture which only stores edges forward and
+ * references the halfedge it was created from.
+ */
+struct TmpEdge {
+  int first, second, halfedgeIdx;
+
+  __host__ __device__ TmpEdge() {}
+  __host__ __device__ TmpEdge(int start, int end, int idx) {
+    first = glm::min(start, end);
+    second = glm::max(start, end);
+    halfedgeIdx = idx;
+  }
+
+  __host__ __device__ bool operator<(const TmpEdge& other) const {
+    return first == other.first ? second < other.second : first < other.first;
+  }
+};
+
+struct Halfedge2Tmp {
+  __host__ __device__ void operator()(
+      thrust::tuple<TmpEdge&, const Halfedge&, int> inout) {
+    const Halfedge& halfedge = thrust::get<1>(inout);
+    int idx = thrust::get<2>(inout);
+    if (!halfedge.IsForward()) idx = -1;
+
+    thrust::get<0>(inout) = TmpEdge(halfedge.startVert, halfedge.endVert, idx);
+  }
+};
+
+struct TmpInvalid {
+  __host__ __device__ bool operator()(const TmpEdge& edge) {
+    return edge.halfedgeIdx < 0;
+  }
+};
+
+VecDH<TmpEdge> inline CreateTmpEdges(const VecDH<Halfedge>& halfedge) {
+  VecDH<TmpEdge> edges(halfedge.size());
+  thrust::for_each_n(zip(edges.beginD(), halfedge.beginD(), countAt(0)),
+                     edges.size(), Halfedge2Tmp());
+  int numEdge = thrust::remove_if(edges.beginD(), edges.endD(), TmpInvalid()) -
+                edges.beginD();
+  ALWAYS_ASSERT(numEdge == halfedge.size() / 2, topologyErr, "Not oriented!");
+  edges.resize(numEdge);
+  return edges;
+}
+
+struct ReindexEdge {
+  const TmpEdge* edges;
+
+  __host__ __device__ void operator()(int& edge) {
+    edge = edges[edge].halfedgeIdx;
+  }
+};
 
 // Copied from
 // https://github.com/thrust/thrust/blob/master/examples/strided_range.cu
