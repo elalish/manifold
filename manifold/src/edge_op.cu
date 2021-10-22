@@ -12,16 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-/**
- * Collapses degenerate triangles by removing edges shorter than precision_ and
- * any edge that is preceeded by an edge that joins the same two face relations.
- * It also performs edge swaps on the long edges of degenerate triangles, though
- * there are some configurations of degenerates that cannot be removed this way.
- *
- * Rather than actually removing the edges, this step merely marks them for
- * removal, by setting vertPos to NaN and halfedge to {-1, -1, -1, -1}.
- */
-
 #include "impl.cuh"
 
 namespace {
@@ -141,6 +131,15 @@ struct SwappableEdge {
 
 namespace manifold {
 
+/**
+ * Collapses degenerate triangles by removing edges shorter than precision_ and
+ * any edge that is preceeded by an edge that joins the same two face relations.
+ * It also performs edge swaps on the long edges of degenerate triangles, though
+ * there are some configurations of degenerates that cannot be removed this way.
+ *
+ * Rather than actually removing the edges, this step merely marks them for
+ * removal, by setting vertPos to NaN and halfedge to {-1, -1, -1, -1}.
+ */
 void Manifold::Impl::CollapseDegenerates() {
   VecDH<int> flaggedEdges(halfedge_.size());
   int numFlagged =
