@@ -56,9 +56,6 @@ struct Manifold::Impl {
   void Update();
   void ApplyTransform() const;
   void ApplyTransform();
-  void CreateTangents(const std::vector<Smoothness>&);
-  MeshRelationD Subdivide(int n);
-  void Refine(int n);
 
   bool IsEmpty() const { return NumVert() == 0; }
   int NumVert() const { return vertPos_.size(); }
@@ -87,6 +84,11 @@ struct Manifold::Impl {
   Polygons Face2Polygons(int face, glm::mat3x2 projection,
                          const VecH<int>& faceEdge) const;
 
+  void CreateTangents(const std::vector<Smoothness>&);
+  MeshRelationD Subdivide(int n);
+  void Refine(int n);
+
+  // edge_op.cu
   void CollapseDegenerates();
   void CollapseEdge(int edge);
   void RecursiveEdgeSwap(int edge);
