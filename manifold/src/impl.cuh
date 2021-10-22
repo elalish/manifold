@@ -57,10 +57,22 @@ struct Manifold::Impl {
   void ApplyTransform() const;
   void ApplyTransform();
 
+  void SortVerts();
+  void ReindexVerts(const VecDH<int>& vertNew2Old, int numOldVert);
+  void GetFaceBoxMorton(VecDH<Box>& faceBox, VecDH<uint32_t>& faceMorton) const;
+  void SortFaces(VecDH<Box>& faceBox, VecDH<uint32_t>& faceMorton);
+  void GatherFaces(const VecDH<int>& faceNew2Old);
+  void GatherFaces(const Impl& old, const VecDH<int>& faceNew2Old);
+  void CalculateNormals();
+
+  SparseIndices EdgeCollisions(const Impl& B) const;
+  SparseIndices VertexCollisionsZ(const VecDH<glm::vec3>& vertsIn) const;
+
   bool IsEmpty() const { return NumVert() == 0; }
   int NumVert() const { return vertPos_.size(); }
   int NumEdge() const { return halfedge_.size() / 2; }
   int NumTri() const { return halfedge_.size() / 3; }
+  // properties.cu
   Properties GetProperties() const;
   Curvature GetCurvature() const;
   void CalculateBBox();
@@ -69,24 +81,11 @@ struct Manifold::Impl {
   bool MatchesTriNormals() const;
   int NumDegenerateTris() const;
 
-  void SortVerts();
-  void ReindexVerts(const VecDH<int>& vertNew2Old, int numOldVert);
-  void SortFaces(VecDH<Box>& faceBox, VecDH<uint32_t>& faceMorton);
-  void GatherFaces(const VecDH<int>& faceNew2Old);
-  void GatherFaces(const Impl& old, const VecDH<int>& faceNew2Old);
-  void CalculateNormals();
+  // face_op.cu
   void Face2Tri(const VecDH<int>& faceEdge, const VecDH<BaryRef>& faceRef,
                 const VecDH<int>& halfedgeBary);
-
-  SparseIndices EdgeCollisions(const Impl& B) const;
-  SparseIndices VertexCollisionsZ(const VecDH<glm::vec3>& vertsIn) const;
-  void GetFaceBoxMorton(VecDH<Box>& faceBox, VecDH<uint32_t>& faceMorton) const;
   Polygons Face2Polygons(int face, glm::mat3x2 projection,
                          const VecH<int>& faceEdge) const;
-
-  void CreateTangents(const std::vector<Smoothness>&);
-  MeshRelationD Subdivide(int n);
-  void Refine(int n);
 
   // edge_op.cu
   void CollapseDegenerates();
@@ -97,5 +96,10 @@ struct Manifold::Impl {
   void UpdateVert(int vert, int startEdge, int endEdge);
   void FormLoop(int current, int end);
   void CollapseTri(const glm::ivec3& triEdge);
+
+  // smoothing.cu
+  void CreateTangents(const std::vector<Smoothness>&);
+  MeshRelationD Subdivide(int n);
+  void Refine(int n);
 };
 }  // namespace manifold
