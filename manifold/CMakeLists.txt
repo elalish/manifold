@@ -2,7 +2,7 @@ project (manifold)
 
 find_package(Boost COMPONENTS graph REQUIRED)
 
-add_library(${PROJECT_NAME} src/manifold.cu src/impl.cu src/properties.cu src/sort.cu src/edge_op.cu src/face_op.cu src/smoothing.cu src/boolean3.cu src/constructors.cu)
+add_library(${PROJECT_NAME} src/manifold.cu src/constructors.cu src/impl.cu src/properties.cu src/sort.cu src/edge_op.cu src/face_op.cu src/smoothing.cu src/boolean3.cu src/boolean_result.cu)
 
 set_property(TARGET ${PROJECT_NAME} PROPERTY CUDA_ARCHITECTURES 61)
 

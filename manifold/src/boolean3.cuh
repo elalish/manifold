@@ -15,6 +15,26 @@
 #pragma once
 #include "impl.cuh"
 
+/**
+ * The notation in these files is abbreviated due to the complexity of the
+ * functions involved. The key is that the input manifolds are P and Q, while
+ * the output is R, and these letters in both upper and lower case refer to
+ * these objects. Operations are based on dimensionality: vert: 0, edge: 1,
+ * face: 2, solid: 3. X denotes a winding-number type quantity from the source
+ * paper of this algorithm, while S is closely related but includes only the
+ * subset of X values which "shadow" (are on the correct side of).
+ *
+ * Nearly everything here are sparse arrays, where for instance each pair in
+ * p2q1 refers to a face index of P interacting with a halfedge index of Q.
+ * Adjacent arrays like x21 refer to the values of X corresponding to each
+ * sparse index pair.
+ *
+ * Note many functions are designed to work symmetrically, for instance for both
+ * p2q1 and p1q2. Inside of these functions P and Q are marked as though the
+ * funtion is forwards, but it may include a Boolean "reverse" that indicates P
+ * and Q have been swapped.
+ */
+
 namespace manifold {
 
 class Boolean3 {
