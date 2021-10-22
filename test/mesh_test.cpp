@@ -42,41 +42,67 @@ void Related(const Manifold& out, const std::vector<Mesh>& input,
   Mesh output = out.GetMesh();
   MeshRelation relation = out.GetMeshRelation();
   std::vector<int> meshID2Original = Manifold::MeshID2Original();
-  for (int i = 0; i < out.NumTri(); ++i) {
-    int meshID = relation.triBary[i].meshID;
+  for (int tri = 0; tri < out.NumTri(); ++tri) {
+    int meshID = relation.triBary[tri].meshID;
     int meshIdx = meshID2idx.find(meshID) != meshID2idx.end()
                       ? meshID2idx.at(meshID)
                       : meshID2idx.at(meshID2Original[meshID]);
     ASSERT_LT(meshIdx, input.size());
     const Mesh& inMesh = input[meshIdx];
-    int inTri = relation.triBary[i].tri;
-    ASSERT_LT(inTri, inMesh.triVerts.size());
+    const glm::ivec3 triVerts = relation.triBary[tri].verts;
+    glm::mat3 triangle = {inMesh.vertPos[triVerts[0]],
+                          inMesh.vertPos[triVerts[1]],
+                          inMesh.vertPos[triVerts[2]]};
     for (int j : {0, 1, 2}) {
-      glm::mat3 triangle = {inMesh.vertPos[inMesh.triVerts[inTri][0]],
-                            inMesh.vertPos[inMesh.triVerts[inTri][1]],
-                            inMesh.vertPos[inMesh.triVerts[inTri][2]]};
-      glm::vec3 vPos = triangle * relation.UVW(i, j);
-      Identical(output.vertPos[output.triVerts[i][j]], vPos);
+      glm::vec3 vPos = triangle * relation.UVW(tri, j);
+      Identical(output.vertPos[output.triVerts[tri][j]], vPos);
     }
   }
+}
+
+void RelatedOp(const Manifold& inP, const Manifold& inQ, const Manifold& outR) {
+  std::vector<Mesh> input;
+  std::map<int, int> meshID2idx;
+
+  std::vector<int> meshIDs = inP.GetMeshIDs();
+  EXPECT_EQ(meshIDs.size(), 1);
+  meshID2idx[meshIDs[0]] = input.size();
+  input.push_back(inP.GetMesh());
+
+  meshIDs = inQ.GetMeshIDs();
+  EXPECT_EQ(meshIDs.size(), 1);
+  meshID2idx[meshIDs[0]] = input.size();
+  input.push_back(inQ.GetMesh());
+
+  Related(outR, input, meshID2idx);
 }
 
 void ExpectMeshes(const Manifold& manifold,
                   const std::vector<std::pair<int, int>>& numVertTri) {
   EXPECT_TRUE(manifold.IsManifold());
   EXPECT_TRUE(manifold.MatchesTriNormals());
-  std::vector<Manifold> meshes = manifold.Decompose();
-  ASSERT_EQ(meshes.size(), numVertTri.size());
-  std::sort(meshes.begin(), meshes.end(),
+  std::vector<Manifold> manifolds = manifold.Decompose();
+  ASSERT_EQ(manifolds.size(), numVertTri.size());
+  std::sort(manifolds.begin(), manifolds.end(),
             [](const Manifold& a, const Manifold& b) {
               return a.NumVert() != b.NumVert() ? a.NumVert() > b.NumVert()
                                                 : a.NumTri() > b.NumTri();
             });
-  for (int i = 0; i < meshes.size(); ++i) {
-    EXPECT_TRUE(meshes[i].IsManifold());
-    EXPECT_EQ(meshes[i].NumVert(), numVertTri[i].first);
-    EXPECT_EQ(meshes[i].NumTri(), numVertTri[i].second);
+  for (int i = 0; i < manifolds.size(); ++i) {
+    EXPECT_TRUE(manifolds[i].IsManifold());
+    EXPECT_EQ(manifolds[i].NumVert(), numVertTri[i].first);
+    EXPECT_EQ(manifolds[i].NumTri(), numVertTri[i].second);
+    const Mesh mesh = manifolds[i].GetMesh();
+    for (const glm::vec3& normal : mesh.vertNormal) {
+      ASSERT_NEAR(glm::length(normal), 1, 0.0001);
+    }
   }
+}
+
+void CheckStrictly(const Manifold& manifold) {
+  EXPECT_TRUE(manifold.IsManifold());
+  EXPECT_TRUE(manifold.MatchesTriNormals());
+  EXPECT_EQ(manifold.NumDegenerateTris(), 0);
 }
 
 Polygons SquareHole(float xOffset = 0.0) {
@@ -124,7 +150,7 @@ TEST(Manifold, Regression) {
   Manifold mesh1 = manifold;
   mesh1.Translate(glm::vec3(5.0f));
   int num_overlaps = manifold.NumOverlaps(mesh1);
-  ASSERT_EQ(num_overlaps, 222653);
+  ASSERT_EQ(num_overlaps, 237668);
 
   Mesh mesh_out = manifold.GetMesh();
   Manifold mesh2(mesh_out);
@@ -421,24 +447,12 @@ TEST(Boolean, Tetra) {
 
   Manifold tetra2 = tetra;
   tetra2.Translate(glm::vec3(0.5f));
+  tetra2.SetAsOriginal();
   Manifold result = tetra2 - tetra;
 
   ExpectMeshes(result, {{8, 12}});
 
-  std::vector<Mesh> input;
-  std::map<int, int> meshID2idx;
-
-  std::vector<int> meshIDs = tetra.GetMeshIDs();
-  EXPECT_EQ(meshIDs.size(), 1);
-  meshID2idx[meshIDs[0]] = input.size();
-  input.push_back(tetra.GetMesh());
-
-  meshIDs = tetra2.GetMeshIDs();
-  EXPECT_EQ(meshIDs.size(), 1);
-  meshID2idx[meshIDs[0]] = input.size();
-  input.push_back(tetra2.GetMesh());
-
-  Related(result, input, meshID2idx);
+  RelatedOp(tetra, tetra2, result);
 }
 
 /**
@@ -473,14 +487,17 @@ TEST(Boolean, Perturb) {
 }
 
 TEST(Boolean, Coplanar) {
-  Manifold cube = Manifold::Cylinder(1.0f, 1.0f);
-  Manifold cube2 = cube;
-  Manifold out = cube - cube2.Scale({0.5f, 0.5f, 1.0f})
-                            .Rotate(0, 0, 15)
-                            .Translate({0.25f, 0.25f, 0.0f});
-  ExpectMeshes(out, {{32, 64}});
+  Manifold cylinder = Manifold::Cylinder(1.0f, 1.0f);
+  Manifold cylinder2 = cylinder;
+  Manifold out = cylinder - cylinder2.Scale({0.5f, 0.5f, 1.0f})
+                                .Rotate(0, 0, 15)
+                                .Translate({0.25f, 0.25f, 0.0f});
+  ExpectMeshes(out, {{33, 66}});
+  EXPECT_EQ(out.NumDegenerateTris(), 0);
   EXPECT_EQ(out.Genus(), 1);
   // ExportMesh("coplanar.gltf", out.GetMesh());
+
+  // RelatedOp(cylinder, cylinder2, out);
 }
 
 TEST(Boolean, MultiCoplanar) {
@@ -489,8 +506,7 @@ TEST(Boolean, MultiCoplanar) {
   Manifold first = cube - cube2.Translate({0.3f, 0.3f, 0.0f});
   cube.Translate({-0.3f, -0.3f, 0.0f});
   Manifold out = first - cube;
-  EXPECT_TRUE(out.IsManifold());
-  EXPECT_TRUE(out.MatchesTriNormals());
+  CheckStrictly(out);
   EXPECT_EQ(out.Genus(), -1);
   auto prop = out.GetProperties();
   EXPECT_NEAR(prop.volume, 0.18, 1e-5);
@@ -502,9 +518,7 @@ TEST(Boolean, FaceUnion) {
   Manifold cube2 = cubes;
   cubes += cube2.Translate({1, 0, 0});
   EXPECT_EQ(cubes.Genus(), 0);
-  // TODO: This should be {12, 20} once CollapseDegenerates is restricted to
-  // only degenerate triangles.
-  ExpectMeshes(cubes, {{8, 12}});
+  ExpectMeshes(cubes, {{12, 20}});
   auto prop = cubes.GetProperties();
   EXPECT_NEAR(prop.volume, 2, 1e-5);
   EXPECT_NEAR(prop.surfaceArea, 10, 1e-5);
@@ -542,10 +556,8 @@ TEST(Boolean, Split) {
   Manifold oct = Manifold::Sphere(1, 4);
   oct.Translate(glm::vec3(0.0f, 0.0f, 1.0f));
   std::pair<Manifold, Manifold> splits = cube.Split(oct);
-  EXPECT_TRUE(splits.first.IsManifold());
-  EXPECT_TRUE(splits.first.MatchesTriNormals());
-  EXPECT_TRUE(splits.second.IsManifold());
-  EXPECT_TRUE(splits.second.MatchesTriNormals());
+  CheckStrictly(splits.first);
+  CheckStrictly(splits.second);
   EXPECT_FLOAT_EQ(splits.first.GetProperties().volume +
                       splits.second.GetProperties().volume,
                   cube.GetProperties().volume);
@@ -557,10 +569,8 @@ TEST(Boolean, SplitByPlane) {
   cube.Rotate(90.0f, 0.0f, 0.0f);
   std::pair<Manifold, Manifold> splits =
       cube.SplitByPlane({0.0f, 0.0f, 1.0f}, 1.0f);
-  EXPECT_TRUE(splits.first.IsManifold());
-  EXPECT_TRUE(splits.first.MatchesTriNormals());
-  EXPECT_TRUE(splits.second.IsManifold());
-  EXPECT_TRUE(splits.second.MatchesTriNormals());
+  CheckStrictly(splits.first);
+  CheckStrictly(splits.second);
   EXPECT_NEAR(splits.first.GetProperties().volume,
               splits.second.GetProperties().volume, 1e-5);
 
@@ -579,10 +589,8 @@ TEST(Boolean, SplitByPlane60) {
   float phi = 30.0f;
   std::pair<Manifold, Manifold> splits =
       cube.SplitByPlane({sind(phi), -cosd(phi), 0.0f}, 1.0f);
-  EXPECT_TRUE(splits.first.IsManifold());
-  EXPECT_TRUE(splits.first.MatchesTriNormals());
-  EXPECT_TRUE(splits.second.IsManifold());
-  EXPECT_TRUE(splits.second.MatchesTriNormals());
+  CheckStrictly(splits.first);
+  CheckStrictly(splits.second);
   EXPECT_NEAR(splits.first.GetProperties().volume,
               splits.second.GetProperties().volume, 1e-5);
 }
@@ -597,8 +605,7 @@ TEST(Boolean, Vug) {
   EXPECT_EQ(vug.Genus(), -1);
 
   Manifold half = vug.SplitByPlane({0.0f, 0.0f, 1.0f}, -1.0f).first;
-  EXPECT_TRUE(half.IsManifold());
-  EXPECT_TRUE(half.MatchesTriNormals());
+  CheckStrictly(half);
   EXPECT_EQ(half.Genus(), -1);
 
   auto prop = half.GetProperties();
@@ -676,25 +683,34 @@ TEST(Boolean, Sphere) {
   Manifold sphere = Manifold::Sphere(1.0f, 12);
   Manifold sphere2 = sphere;
   sphere2.Translate(glm::vec3(0.5));
+  sphere2.SetAsOriginal();
   Manifold result = sphere - sphere2;
 
   ExpectMeshes(result, {{74, 144}});
+  EXPECT_EQ(result.NumDegenerateTris(), 0);
+
+  RelatedOp(sphere, sphere2, result);
 }
 
 TEST(Boolean, Gyroid) {
   Manifold gyroid(ImportMesh("data/gyroidpuzzle.ply"));
   EXPECT_TRUE(gyroid.IsManifold());
   EXPECT_TRUE(gyroid.MatchesTriNormals());
-
+  EXPECT_LE(gyroid.NumDegenerateTris(), 12);
+  // ExportMesh("gyroidpuzzle1.gltf", gyroid.Extract(), {});
   Manifold gyroid2 = gyroid;
   gyroid2.Translate(glm::vec3(5.0f));
+  gyroid2.SetAsOriginal();
   Manifold result = gyroid + gyroid2;
   // ExportMesh("gyroidUnion.gltf", result.GetMesh(), {});
 
   EXPECT_TRUE(result.IsManifold());
   EXPECT_TRUE(result.MatchesTriNormals());
+  EXPECT_LE(result.NumDegenerateTris(), 164);
   EXPECT_EQ(result.Decompose().size(), 1);
   auto prop = result.GetProperties();
   EXPECT_NEAR(prop.volume, 7692, 1);
   EXPECT_NEAR(prop.surfaceArea, 9642, 1);
+
+  // RelatedOp(gyroid, gyroid2, result);
 }

@@ -20,12 +20,20 @@
 
 using namespace manifold;
 
+void CheckManifold(const Manifold& manifold) {
+  EXPECT_TRUE(manifold.IsManifold());
+  EXPECT_TRUE(manifold.MatchesTriNormals());
+  for (const glm::vec3& normal : manifold.GetMesh().vertNormal) {
+    ASSERT_NEAR(glm::length(normal), 1, 0.0001);
+  }
+}
+
 // If you print this knot (with support), you can snap a half-inch marble into
 // it and it'll roll around (dimensions in mm).
 TEST(Samples, Knot13) {
   Manifold knot13 = TorusKnot(1, 3, 25, 10, 3.75);
   //   ExportMesh("knot13.stl", knot13.GetMesh(), {});
-  EXPECT_TRUE(knot13.IsManifold());
+  CheckManifold(knot13);
   EXPECT_EQ(knot13.Genus(), 1);
   auto prop = knot13.GetProperties();
   EXPECT_NEAR(prop.volume, 20786, 1);
@@ -36,8 +44,7 @@ TEST(Samples, Knot13) {
 TEST(Samples, Knot42) {
   Manifold knot42 = TorusKnot(4, 2, 15, 6, 5);
   //   ExportMesh("knot42.stl", knot42.GetMesh(), {});
-  EXPECT_TRUE(knot42.IsManifold());
-  EXPECT_TRUE(knot42.MatchesTriNormals());
+  CheckManifold(knot42);
   std::vector<Manifold> knots = knot42.Decompose();
   ASSERT_EQ(knots.size(), 2);
   EXPECT_EQ(knots[0].Genus(), 1);
@@ -51,6 +58,7 @@ TEST(Samples, Knot42) {
 TEST(Samples, Scallop) {
   Manifold scallop = Scallop();
   scallop.Refine(100);
+  CheckManifold(scallop);
   auto prop = scallop.GetProperties();
   EXPECT_NEAR(prop.volume, 41.3, 0.1);
   EXPECT_NEAR(prop.surfaceArea, 81.2, 0.1);
@@ -70,9 +78,9 @@ TEST(Samples, Scallop) {
 }
 
 TEST(Samples, TetPuzzle) {
-  Manifold puzzle = TetPuzzle(50, 0.2, 100);
-  EXPECT_TRUE(puzzle.IsManifold());
-  EXPECT_TRUE(puzzle.MatchesTriNormals());
+  Manifold puzzle = TetPuzzle(50, 0.2, 50);
+  CheckManifold(puzzle);
+  EXPECT_LE(puzzle.NumDegenerateTris(), 2);
   Manifold puzzle2 = puzzle;
   puzzle2.Rotate(0, 0, 180);
   EXPECT_TRUE((puzzle ^ puzzle2).IsEmpty());
@@ -83,8 +91,8 @@ TEST(Samples, TetPuzzle) {
 TEST(Samples, FrameReduced) {
   Manifold::SetCircularSegments(4);
   Manifold frame = RoundedFrame(100, 10);
-  EXPECT_TRUE(frame.IsManifold());
-  EXPECT_TRUE(frame.MatchesTriNormals());
+  CheckManifold(frame);
+  EXPECT_EQ(frame.NumDegenerateTris(), 0);
   Manifold::SetCircularSegments(0);
   EXPECT_EQ(frame.Genus(), 5);
   auto prop = frame.GetProperties();
@@ -95,8 +103,8 @@ TEST(Samples, FrameReduced) {
 
 TEST(Samples, Frame) {
   Manifold frame = RoundedFrame(100, 10);
-  EXPECT_TRUE(frame.IsManifold());
-  EXPECT_TRUE(frame.MatchesTriNormals());
+  CheckManifold(frame);
+  EXPECT_EQ(frame.NumDegenerateTris(), 0);
   EXPECT_EQ(frame.Genus(), 5);
   // ExportMesh("roundedFrame.ply", frame.GetMesh(), {});
 }
@@ -105,16 +113,17 @@ TEST(Samples, Frame) {
 // that are not in general position, e.g. coplanar faces.
 TEST(Samples, Bracelet) {
   Manifold bracelet = StretchyBracelet();
-  EXPECT_TRUE(bracelet.IsManifold());
-  EXPECT_TRUE(bracelet.MatchesTriNormals());
+  CheckManifold(bracelet);
+  EXPECT_LE(bracelet.NumDegenerateTris(), 5);
   EXPECT_EQ(bracelet.Genus(), 1);
   // ExportMesh("bracelet.ply", bracelet.GetMesh(), {});
 }
 
 TEST(Samples, Sponge1) {
   Manifold sponge = MengerSponge(1);
-  EXPECT_TRUE(sponge.IsManifold());
-  EXPECT_TRUE(sponge.MatchesTriNormals());
+  CheckManifold(sponge);
+  EXPECT_EQ(sponge.NumDegenerateTris(), 0);
+  EXPECT_EQ(sponge.NumVert(), 40);
   EXPECT_EQ(sponge.Genus(), 5);
   // ExportMesh("mengerSponge1.gltf", sponge.GetMesh(), {});
 }
@@ -123,8 +132,8 @@ TEST(Samples, Sponge1) {
 // degree rotations.
 TEST(Samples, Sponge4) {
   Manifold sponge = MengerSponge(4);
-  EXPECT_TRUE(sponge.IsManifold());
-  EXPECT_TRUE(sponge.MatchesTriNormals());
+  CheckManifold(sponge);
+  EXPECT_EQ(sponge.NumDegenerateTris(), 0);
   EXPECT_EQ(sponge.Genus(), 26433);  // should be 1:5, 2:81, 3:1409, 4:26433
   // ExportMesh("mengerSponge.gltf", sponge.GetMesh(), {});
   std::pair<Manifold, Manifold> cutSponge = sponge.SplitByPlane({1, 1, 1}, 0);
