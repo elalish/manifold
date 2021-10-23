@@ -51,6 +51,8 @@ struct DegenerateTri {
     bool& degenerate = thrust::get<0>(inOut);
     const int tri = thrust::get<1>(inOut);
 
+    if (halfedge[3 * tri].pairedHalfedge < 0) return;
+
     degenerate =
         IsDegenerate(vertPos[halfedge[3 * tri].startVert],
                      vertPos[halfedge[3 * tri + 1].startVert],
