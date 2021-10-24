@@ -497,7 +497,7 @@ TEST(Boolean, Coplanar) {
   EXPECT_EQ(out.Genus(), 1);
   // ExportMesh("coplanar.gltf", out.GetMesh());
 
-  // RelatedOp(cylinder, cylinder2, out);
+  RelatedOp(cylinder, cylinder2, out);
 }
 
 TEST(Boolean, MultiCoplanar) {
