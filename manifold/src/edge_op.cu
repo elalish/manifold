@@ -32,34 +32,6 @@ __host__ __device__ bool Is01Longest(glm::vec2 v0, glm::vec2 v1, glm::vec2 v2) {
   return l[0] > l[1] && l[0] > l[2];
 }
 
-__host__ __device__ bool IsDegenerate(const glm::vec3& p0, const glm::vec3& p1,
-                                      const glm::vec3& p2, float precision) {
-  glm::vec3 v1 = p1 - p0;
-  glm::vec3 v2 = p2 - p0;
-  glm::vec3 cross = glm::cross(v1, v2);
-  float area2 = glm::dot(cross, cross);
-  float base2 = glm::max(glm::dot(v1, v1), glm::dot(v2, v2));
-  return area2 <= base2 * precision * precision;
-}
-
-struct DegenerateTri {
-  const Halfedge* halfedge;
-  const glm::vec3* vertPos;
-  const float precision;
-
-  __host__ __device__ void operator()(thrust::tuple<bool&, int> inOut) {
-    bool& degenerate = thrust::get<0>(inOut);
-    const int tri = thrust::get<1>(inOut);
-
-    if (halfedge[3 * tri].pairedHalfedge < 0) return;
-
-    degenerate =
-        IsDegenerate(vertPos[halfedge[3 * tri].startVert],
-                     vertPos[halfedge[3 * tri + 1].startVert],
-                     vertPos[halfedge[3 * tri + 2].startVert], precision);
-  }
-};
-
 struct ShortEdge {
   const Halfedge* halfedge;
   const glm::vec3* vertPos;
@@ -77,7 +49,6 @@ struct ShortEdge {
 struct FlagEdge {
   const Halfedge* halfedge;
   const BaryRef* triBary;
-  const bool* triDegenerate;
 
   __host__ __device__ bool operator()(int edge) {
     if (halfedge[edge].pairedHalfedge < 0) return false;
@@ -89,7 +60,6 @@ struct FlagEdge {
     while (current != edge) {
       current = NextHalfedge(halfedge[current].pairedHalfedge);
       int tri = current / 3;
-      if (triDegenerate[tri]) continue;
       const BaryRef ref = triBary[tri];
       if ((ref.meshID != ref0.meshID || ref.face != ref0.face) &&
           (ref.meshID != ref1.meshID || ref.face != ref1.face))
@@ -153,17 +123,12 @@ void Manifold::Impl::CollapseDegenerates() {
 
   for (const int edge : flaggedEdges.H()) CollapseEdge(edge);
 
-  VecDH<bool> triDegenerate(NumTri(), false);
-  thrust::for_each_n(
-      zip(triDegenerate.beginD(), countAt(0)), NumTri(),
-      DegenerateTri({halfedge_.cptrD(), vertPos_.cptrD(), precision_}));
-
   flaggedEdges.resize(halfedge_.size());
-  numFlagged = thrust::copy_if(
-                   countAt(0), countAt(halfedge_.size()), flaggedEdges.beginD(),
-                   FlagEdge({halfedge_.cptrD(), meshRelation_.triBary.cptrD(),
-                             triDegenerate.cptrD()})) -
-               flaggedEdges.beginD();
+  numFlagged =
+      thrust::copy_if(
+          countAt(0), countAt(halfedge_.size()), flaggedEdges.beginD(),
+          FlagEdge({halfedge_.cptrD(), meshRelation_.triBary.cptrD()})) -
+      flaggedEdges.beginD();
   flaggedEdges.resize(numFlagged);
 
   for (const int edge : flaggedEdges.H()) CollapseEdge(edge);
@@ -299,8 +264,7 @@ void Manifold::Impl::CollapseEdge(int edge) {
       const BaryRef ref = triBary[tri];
       // Don't collapse if the edge is not redundant (this may have changed due
       // to the collapse of neighbors).
-      if (!IsDegenerate(p0, p1, p2, precision_) &&
-          (ref.meshID != ref0.meshID || ref.face != ref0.face) &&
+      if ((ref.meshID != ref0.meshID || ref.face != ref0.face) &&
           (ref.meshID != ref1.meshID || ref.face != ref1.face))
         return;
 
