@@ -221,6 +221,7 @@ void Manifold::Impl::CollapseEdge(int edge) {
   VecH<glm::vec3>& vertPos = vertPos_.H();
   VecH<glm::vec3>& triNormal = faceNormal_.H();
   VecH<BaryRef>& triBary = meshRelation_.triBary.H();
+  VecH<glm::vec3>& barycentric = meshRelation_.barycentric.H();
 
   const Halfedge toRemove = halfedge[edge];
   if (toRemove.pairedHalfedge < 0) return;
@@ -229,17 +230,10 @@ void Manifold::Impl::CollapseEdge(int edge) {
   const glm::ivec3 tri0edge = TriOf(edge);
   const glm::ivec3 tri1edge = TriOf(toRemove.pairedHalfedge);
 
-  const glm::vec3 p0 = vertPos[endVert];
-  const glm::vec3 delta = p0 - vertPos[toRemove.startVert];
+  const glm::vec3 pNew = vertPos[endVert];
+  const glm::vec3 pOld = vertPos[toRemove.startVert];
+  const glm::vec3 delta = pNew - pOld;
   const bool shortEdge = glm::dot(delta, delta) < precision_ * precision_;
-
-  auto CW2Normal = [](const glm::vec3& p0, const glm::vec3& p1,
-                      const glm::vec3& p2, const glm::vec3& normal,
-                      float precision) {
-    glm::mat3x2 projection = GetAxisAlignedProjection(normal);
-    return CCW(projection * p0, projection * p1, projection * p2, precision) <
-           0;
-  };
 
   std::vector<int> edges;
   // Orbit endVert
@@ -256,10 +250,10 @@ void Manifold::Impl::CollapseEdge(int edge) {
     const BaryRef ref0 = triBary[edge / 3];
     const BaryRef ref1 = triBary[toRemove.pairedHalfedge / 3];
     current = start;
-    glm::vec3 p1 = vertPos[halfedge[tri1edge[1]].endVert];
+    glm::vec3 pLast = vertPos[halfedge[tri1edge[1]].endVert];
     while (current != tri0edge[2]) {
       current = NextHalfedge(current);
-      glm::vec3 p2 = vertPos[halfedge[current].endVert];
+      glm::vec3 pNext = vertPos[halfedge[current].endVert];
       const int tri = current / 3;
       const BaryRef ref = triBary[tri];
       // Don't collapse if the edge is not redundant (this may have changed due
@@ -269,9 +263,12 @@ void Manifold::Impl::CollapseEdge(int edge) {
         return;
 
       // Don't collapse edge if it would cause a triangle to invert.
-      if (CW2Normal(p2, p1, p0, triNormal[tri], precision_)) return;
+      const glm::mat3x2 projection = GetAxisAlignedProjection(triNormal[tri]);
+      if (CCW(projection * pNext, projection * pLast, projection * pNew,
+              precision_) < 0)
+        return;
 
-      p1 = p2;
+      pLast = pNext;
       current = halfedge[current].pairedHalfedge;
     }
   }
@@ -279,6 +276,19 @@ void Manifold::Impl::CollapseEdge(int edge) {
   // Remove toRemove.startVert and replace with endVert.
   vertPos[toRemove.startVert] = glm::vec3(0.0f / 0.0f);
   CollapseTri(tri1edge);
+
+  if (!shortEdge) {
+    // Update triBary
+    current = start;
+    while (current != tri0edge[2]) {
+      current = NextHalfedge(current);
+      // Recalculate uvw for shifted vert in terms of original BaryRef.verts
+      // (okay to be outside of referenced triangle, as this is an arbitrary
+      // subset of the orginal face)
+
+      current = halfedge[current].pairedHalfedge;
+    }
+  }
 
   // Orbit startVert
   current = start;

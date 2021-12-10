@@ -179,7 +179,7 @@ Curvature Manifold::GetCurvature() const { return pImpl_->GetCurvature(); }
  * face to which this triangle belongs. BaryRef.verts gives the three original
  * mesh vertex indices to which its barycentric coordinates refer.
  * BaryRef.vertBary gives an index for each vertex into the barycentric vector
- * if that vertex is >= 0, indicating it is a new vertex. If the index is < 0,
+ * if that index is >= 0, indicating it is a new vertex. If the index is < 0,
  * this indicates it is an original vertex of the triangle, found as the
  * corresponding element of BaryRef.verts.
  */

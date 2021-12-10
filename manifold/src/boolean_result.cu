@@ -435,37 +435,6 @@ struct CreateBarycentric {
   const bool invertQ;
   const float precision;
 
-  __host__ __device__ glm::vec3 GetBarycentric(const glm::vec3 &v,
-                                               const glm::mat3 &triPos) {
-    const glm::mat3 edges(triPos[1] - triPos[0], triPos[2] - triPos[1],
-                          triPos[0] - triPos[2]);
-    const glm::vec3 d2(glm::dot(edges[0], edges[0]),
-                       glm::dot(edges[1], edges[1]),
-                       glm::dot(edges[2], edges[2]));
-    int longside = d2[0] > d2[1] && d2[0] > d2[2] ? 0 : d2[1] > d2[2] ? 1 : 2;
-    const glm::vec3 crossP = glm::cross(edges[0], edges[1]);
-    const float area2 = glm::dot(crossP, crossP);
-    const float tol2 = precision * precision;
-    if (d2[longside] < tol2) {  // point
-      return glm::vec3(1, 0, 0);
-    } else if (area2 > d2[longside] * tol2) {  // triangle
-      const glm::mat3x4 A(glm::vec4(triPos[0], 1), glm::vec4(triPos[1], 1),
-                          glm::vec4(triPos[2], 1));
-      return glm::inverse(glm::transpose(A) * A) * glm::transpose(A) *
-             glm::vec4(v, 1);
-    } else {  // line
-      const float alpha =
-          glm::length(v - triPos[longside]) * glm::inversesqrt(d2[longside]);
-      glm::vec3 uvw(0);
-      uvw[longside++] = 1 - alpha;
-      if (longside > 2) longside -= 3;
-      uvw[longside++] = alpha;
-      if (longside > 2) longside -= 3;
-      uvw[longside] = 0;
-      return uvw;
-    }
-  }
-
   __host__ __device__ void operator()(
       thrust::tuple<int &, Ref, Halfedge> inOut) {
     int &halfedgeBary = thrust::get<0>(inOut);
@@ -511,7 +480,8 @@ struct CreateBarycentric {
       for (int i : {0, 1, 2}) uvwOldTri[i] = UVW(oldRef, i, barycentric);
 
       const glm::vec3 uvw =
-          uvwOldTri * GetBarycentric(vertPosR[halfedgeR.startVert], triPos);
+          uvwOldTri *
+          GetBarycentric(vertPosR[halfedgeR.startVert], triPos, precision);
       barycentricR[halfedgeBary] =
           (halfedgeRef.PQ == 1 && invertQ) ? swapVec3(uvw) : uvw;
     }

@@ -15,6 +15,7 @@
 #pragma once
 #include "collider.cuh"
 #include "manifold.h"
+#include "shared.cuh"
 #include "sparse.cuh"
 #include "utils.cuh"
 #include "vec_dh.cuh"
