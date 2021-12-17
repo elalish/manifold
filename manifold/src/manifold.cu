@@ -54,7 +54,12 @@ Manifold Halfspace(Box bBox, glm::vec3 normal, float originOffset) {
 namespace manifold {
 
 Manifold::Manifold() : pImpl_{std::make_unique<Impl>()} {}
-Manifold::Manifold(const Mesh& mesh) : pImpl_{std::make_unique<Impl>(mesh)} {}
+Manifold::Manifold(const Mesh& mesh,
+                   const std::vector<glm::ivec3>& triProperties,
+                   const std::vector<float>& properties,
+                   const std::vector<float>& propertyTolerance)
+    : pImpl_{std::make_unique<Impl>(mesh, triProperties, properties,
+                                    propertyTolerance)} {}
 Manifold::~Manifold() = default;
 Manifold::Manifold(Manifold&&) noexcept = default;
 Manifold& Manifold::operator=(Manifold&&) noexcept = default;

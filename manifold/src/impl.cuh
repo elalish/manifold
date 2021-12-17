@@ -42,14 +42,22 @@ struct Manifold::Impl {
   static std::vector<int> meshID2Original_;
 
   Impl() {}
-  Impl(const Mesh&);
   enum class Shape { TETRAHEDRON, CUBE, OCTAHEDRON };
   Impl(Shape);
+
+  Impl(const Mesh&,
+       const std::vector<glm::ivec3>& triProperties = std::vector<glm::ivec3>(),
+       const std::vector<float>& properties = std::vector<float>(),
+       const std::vector<float>& propertyTolerance = std::vector<float>());
+
+  void MergeCoplanarRelations(
+      const std::vector<glm::ivec3>& triProperties = std::vector<glm::ivec3>(),
+      const std::vector<float>& properties = std::vector<float>(),
+      const std::vector<float>& propertyTolerance = std::vector<float>());
 
   void DuplicateMeshIDs();
   void ReinitializeReference(int meshID = -1);
   int InitializeNewReference();
-  void MergeCoplanarRelations();
   void CreateHalfedges(const VecDH<glm::ivec3>& triVerts);
   void CreateAndFixHalfedges(const VecDH<glm::ivec3>& triVerts);
   void CalculateNormals();
