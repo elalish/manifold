@@ -24,7 +24,13 @@ class Manifold {
  public:
   // Creation
   Manifold();
-  Manifold(const Mesh&);
+
+  Manifold(
+      const Mesh&,
+      const std::vector<glm::ivec3>& triProperties = std::vector<glm::ivec3>(),
+      const std::vector<float>& properties = std::vector<float>(),
+      const std::vector<float>& propertyTolerance = std::vector<float>());
+
   static Manifold Smooth(const Mesh&,
                          const std::vector<Smoothness>& sharpenedEdges = {});
   static Manifold Tetrahedron();

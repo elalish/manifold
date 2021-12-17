@@ -479,9 +479,10 @@ struct CreateBarycentric {
       glm::mat3 uvwOldTri;
       for (int i : {0, 1, 2}) uvwOldTri[i] = UVW(oldRef, i, barycentric);
 
+      std::function<glm::vec3(glm::vec3)> getBarycentric =
+          GetBarycentric(triPos, precision);
       const glm::vec3 uvw =
-          uvwOldTri *
-          GetBarycentric(vertPosR[halfedgeR.startVert], triPos, precision);
+          uvwOldTri * getBarycentric(vertPosR[halfedgeR.startVert]);
       barycentricR[halfedgeBary] =
           (halfedgeRef.PQ == 1 && invertQ) ? swapVec3(uvw) : uvw;
     }
