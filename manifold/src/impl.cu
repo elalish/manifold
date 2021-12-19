@@ -185,6 +185,16 @@ struct InitializeBaryRef {
   }
 };
 
+struct CheckProperties {
+  const int numSets;
+
+  __host__ __device__ bool operator()(glm::ivec3 triProp) {
+    bool good = true;
+    for (int i : {0, 1, 2}) good &= (triProp[i] >= 0 && triProp[i] < numSets);
+    return good;
+  }
+};
+
 struct CoplanarEdge {
   BaryRef* triBary;
   const Halfedge* halfedge;
@@ -403,12 +413,7 @@ void Manifold::Impl::MergeCoplanarRelations(
 
     const int numSets = properties.size() / numProps;
     ALWAYS_ASSERT(thrust::all_of(triPropertiesD.beginD(), triPropertiesD.endD(),
-                                 [numSets](const glm::ivec3& tri) {
-                                   bool good = true;
-                                   for (int i : {0, 1, 2})
-                                     good &= (tri[i] >= 0 && tri[i] < numSets);
-                                   return good;
-                                 }),
+                                 CheckProperties({numSets})),
                   userErr,
                   "triProperties value is outside the properties range.");
   }
@@ -430,19 +435,23 @@ void Manifold::Impl::MergeCoplanarRelations(
       thisTri = triBary[thisTri].face;
     }
 
-    // glm::mat3 triPos;
-    // for (int i : {0, 1, 2})
-    //   triPos[i] = vertPos_.H()[halfedge_.H()[3 * thisTri + i].startVert];
+    glm::mat3 triPos;
+    for (int i : {0, 1, 2})
+      triPos[i] = vertPos_.H()[halfedge_.H()[3 * thisTri + i].startVert];
+    auto getBarycentric = GetBarycentric(triPos, precision_);
 
     while (!stack.empty()) {
-      BaryRef& ref = triBary[stack.top()];
+      const int aTri = stack.top();
+      BaryRef& ref = triBary[aTri];
       stack.pop();
       if (ref.face == thisTri && (ref.vertBary[0] >= 0 ||
                                   ref.vertBary[1] >= 0 || ref.vertBary[2] >= 0))
         continue;
       ref.face = thisTri;
-      // for (int i : {0, 1, 2}) {
-      //   meshRelation_.barycentric.H().push_back(GetBarycentric());
+      for (int i : {0, 1, 2}) {
+        meshRelation_.barycentric.H().push_back(getBarycentric(
+            vertPos_.H()[halfedge_.H()[3 * aTri + i].startVert]));
+      }
     }
   }
 }
