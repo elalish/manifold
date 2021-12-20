@@ -14,6 +14,8 @@
 
 #pragma once
 
+#include <nvfunctional>
+
 #include "vec_dh.cuh"
 
 namespace manifold {
@@ -67,7 +69,7 @@ __host__ __device__ inline glm::mat3x2 GetAxisAlignedProjection(
   return glm::transpose(projection);
 }
 
-__host__ __device__ inline std::function<glm::vec3(glm::vec3)> GetBarycentric(
+__host__ __device__ inline nvstd::function<glm::vec3(glm::vec3)> GetBarycentric(
     const glm::mat3& triPos, float precision) {
   const glm::mat3 edges(triPos[1] - triPos[0], triPos[2] - triPos[1],
                         triPos[0] - triPos[2]);
@@ -79,19 +81,21 @@ __host__ __device__ inline std::function<glm::vec3(glm::vec3)> GetBarycentric(
   const float tol2 = precision * precision;
   if (d2[longside] < tol2) {  // point
 
-    return [](glm::vec3 v) { return glm::vec3(1, 0, 0); };
+    return [] __host__ __device__(glm::vec3 v) { return glm::vec3(1, 0, 0); };
   } else if (area2 > d2[longside] * tol2) {  // triangle
     const glm::mat3x4 A(glm::vec4(triPos[0], 1), glm::vec4(triPos[1], 1),
                         glm::vec4(triPos[2], 1));
     const glm::mat4x3 Ainv =
         glm::inverse(glm::transpose(A) * A) * glm::transpose(A);
 
-    return [Ainv](glm::vec3 v) { return Ainv * glm::vec4(v, 1); };
+    return [Ainv] __host__ __device__(glm::vec3 v) {
+      return Ainv * glm::vec4(v, 1);
+    };
   } else {  // line
     const glm::vec3 base = triPos[longside];
     const float lengthInv = glm::inversesqrt(d2[longside]);
 
-    return [base, lengthInv, longside](glm::vec3 v) {
+    return [base, lengthInv, longside] __host__ __device__(glm::vec3 v) {
       const float alpha = glm::length(v - base) * lengthInv;
       int i = longside;
       glm::vec3 uvw(0);
