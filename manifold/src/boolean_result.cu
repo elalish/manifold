@@ -14,6 +14,7 @@
 
 #include <algorithm>
 #include <map>
+#include <nvfunctional>
 
 #include "boolean3.cuh"
 #include "polygon.h"
@@ -479,7 +480,7 @@ struct CreateBarycentric {
       glm::mat3 uvwOldTri;
       for (int i : {0, 1, 2}) uvwOldTri[i] = UVW(oldRef, i, barycentric);
 
-      std::function<glm::vec3(glm::vec3)> getBarycentric =
+      nvstd::function<glm::vec3(glm::vec3)> getBarycentric =
           GetBarycentric(triPos, precision);
       const glm::vec3 uvw =
           uvwOldTri * getBarycentric(vertPosR[halfedgeR.startVert]);
