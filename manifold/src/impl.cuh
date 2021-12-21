@@ -50,14 +50,13 @@ struct Manifold::Impl {
        const std::vector<float>& properties = std::vector<float>(),
        const std::vector<float>& propertyTolerance = std::vector<float>());
 
-  void MergeCoplanarRelations(
+  int InitializeNewReference(
       const std::vector<glm::ivec3>& triProperties = std::vector<glm::ivec3>(),
       const std::vector<float>& properties = std::vector<float>(),
       const std::vector<float>& propertyTolerance = std::vector<float>());
 
   void DuplicateMeshIDs();
   void ReinitializeReference(int meshID = -1);
-  int InitializeNewReference();
   void CreateHalfedges(const VecDH<glm::ivec3>& triVerts);
   void CreateAndFixHalfedges(const VecDH<glm::ivec3>& triVerts);
   void CalculateNormals();
