@@ -226,9 +226,8 @@ std::vector<int> Manifold::GetMeshIDs() const {
  * was copied from, allowing you to differentiate the copies when applying your
  * properties to the final result. Its new meshID is returned.
  */
-int Manifold::SetAsOriginal(bool mergeCoplanarRelations) {
+int Manifold::SetAsOriginal() {
   int meshID = pImpl_->InitializeNewReference();
-  if (mergeCoplanarRelations) pImpl_->MergeCoplanarRelations();
   return meshID;
 }
 

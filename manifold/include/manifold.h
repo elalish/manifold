@@ -70,7 +70,7 @@ class Manifold {
   // Relation
   MeshRelation GetMeshRelation() const;
   std::vector<int> GetMeshIDs() const;
-  int SetAsOriginal(bool mergeCoplanarRelations = false);
+  int SetAsOriginal();
   static std::vector<int> MeshID2Original();
 
   // Modification

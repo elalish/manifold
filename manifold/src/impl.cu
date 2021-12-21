@@ -304,9 +304,8 @@ Manifold::Impl::Impl(const Mesh& mesh,
   CalculateBBox();
   SetPrecision();
   CreateAndFixHalfedges(mesh.triVerts);
-  InitializeNewReference();
   CalculateNormals();
-  MergeCoplanarRelations(triProperties, properties, propertyTolerance);
+  InitializeNewReference(triProperties, properties, propertyTolerance);
   CollapseDegenerates();
   Finish();
 }
@@ -361,7 +360,6 @@ Manifold::Impl::Impl(Shape shape) {
   CreateHalfedges(triVerts);
   Finish();
   InitializeNewReference();
-  MergeCoplanarRelations();
 }
 
 /**
@@ -385,18 +383,14 @@ void Manifold::Impl::ReinitializeReference(int meshID) {
                      InitializeBaryRef({meshID, halfedge_.cptrD()}));
 }
 
-int Manifold::Impl::InitializeNewReference() {
-  meshRelation_.triBary.resize(NumTri());
-  const int nextMeshID = meshID2Original_.size();
-  meshID2Original_.push_back(nextMeshID);
-  ReinitializeReference(nextMeshID);
-  return nextMeshID;
-}
-
-void Manifold::Impl::MergeCoplanarRelations(
+int Manifold::Impl::InitializeNewReference(
     const std::vector<glm::ivec3>& triProperties,
     const std::vector<float>& properties,
     const std::vector<float>& propertyTolerance) {
+  meshRelation_.triBary.resize(NumTri());
+  const int nextMeshID = meshID2Original_.size();
+  meshID2Original_.push_back(nextMeshID);
+
   const int numProps = propertyTolerance.size();
 
   VecDH<glm::ivec3> triPropertiesD(triProperties);
@@ -426,34 +420,46 @@ void Manifold::Impl::MergeCoplanarRelations(
                     precision_}));
 
   VecH<BaryRef>& triBary = meshRelation_.triBary.H();
-  // std::map<int, int> vert2bary;
+  std::map<int, std::function<glm::vec3(glm::vec3)>> tri2func;
+  std::map<std::pair<int, int>, int> triVert2bary;
   std::stack<int> stack;
   for (int tri = 0; tri < NumTri(); ++tri) {
-    int thisTri = tri;
-    while (triBary[thisTri].face != thisTri) {
-      stack.push(thisTri);
-      thisTri = triBary[thisTri].face;
+    int refTri = tri;
+    while (triBary[refTri].face != refTri) {
+      stack.push(refTri);
+      refTri = triBary[refTri].face;
     }
+    if (stack.empty()) continue;
 
-    glm::mat3 triPos;
-    for (int i : {0, 1, 2})
-      triPos[i] = vertPos_.H()[halfedge_.H()[3 * thisTri + i].startVert];
-    auto getBarycentric = GetBarycentric(triPos, precision_);
+    if (tri2func.find(refTri) == tri2func.end()) {
+      glm::mat3 triPos;
+      for (int i : {0, 1, 2}) {
+        const int vert = halfedge_.H()[3 * refTri + i].startVert;
+        triPos[i] = vertPos_.H()[vert];
+        triVert2bary[{refTri, vert}] = -1;
+      }
+      tri2func.emplace(
+          std::make_pair(refTri, GetBarycentric(triPos, precision_)));
+    }
+    const auto& getBarycentric = tri2func[refTri];
 
     while (!stack.empty()) {
-      const int aTri = stack.top();
-      BaryRef& ref = triBary[aTri];
+      const int thisTri = stack.top();
+      BaryRef& ref = triBary[thisTri];
       stack.pop();
-      if (ref.face == thisTri && (ref.vertBary[0] >= 0 ||
-                                  ref.vertBary[1] >= 0 || ref.vertBary[2] >= 0))
-        continue;
-      ref.face = thisTri;
+      ref.face = refTri;
       for (int i : {0, 1, 2}) {
-        meshRelation_.barycentric.H().push_back(getBarycentric(
-            vertPos_.H()[halfedge_.H()[3 * aTri + i].startVert]));
+        const int vert = halfedge_.H()[3 * thisTri + i].startVert;
+        if (triVert2bary.find({refTri, vert}) == triVert2bary.end()) {
+          triVert2bary[{refTri, vert}] = meshRelation_.barycentric.size();
+          meshRelation_.barycentric.H().push_back(
+              getBarycentric(vertPos_.H()[vert]));
+        }
+        ref.vertBary[i] = triVert2bary[{refTri, vert}];
       }
     }
   }
+  return nextMeshID;
 }
 
 /**

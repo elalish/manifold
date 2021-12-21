@@ -46,7 +46,7 @@ Manifold MengerSponge(int n) {
   result -= hole;
   result -= hole.Rotate(90);
   result -= hole.Rotate(0, 0, 90);
-  result.SetAsOriginal(true);
+  result.SetAsOriginal();
   return result;
 }
 }  // namespace manifold
