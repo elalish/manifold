@@ -351,9 +351,9 @@ void Manifold::Impl::RecursiveEdgeSwap(const int edge) {
     triBary[tri0].vertBary[0] = triBary[tri1].vertBary[2];
     // Calculate a new barycentric coordinate for the split triangle.
     const glm::vec3 uvw0 =
-        UVW(triBary[tri1], 0, meshRelation_.barycentric.cptrH());
+        UVW(triBary[tri1].vertBary[0], meshRelation_.barycentric.cptrH());
     const glm::vec3 uvw1 =
-        UVW(triBary[tri1], 1, meshRelation_.barycentric.cptrH());
+        UVW(triBary[tri1].vertBary[1], meshRelation_.barycentric.cptrH());
     const float l01 = glm::length(v[1] - v[0]);
     const float l02 = glm::length(v[2] - v[0]);
     const float a = glm::max(0.0f, glm::min(1.0f, l02 / l01));

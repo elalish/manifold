@@ -413,11 +413,6 @@ void AppendWholeEdges(Manifold::Impl &outR, VecDH<int> &facePtrR,
                           vP2R.cptrD(), faceP2R, forward}));
 }
 
-template <typename T>
-__host__ __device__ glm::tvec3<T> swapVec3(const glm::tvec3<T> v) {
-  return glm::tvec3<T>(v[0], v[2], v[1]);
-}
-
 struct CreateBarycentric {
   glm::vec3 *barycentricR;
   BaryRef *faceRef;
@@ -448,23 +443,14 @@ struct CreateBarycentric {
 
     faceRef[halfedgeR.face] = oldRef;
 
-    if (halfedgeRef.PQ == 1 && invertQ)
-      faceRef[halfedgeR.face].verts = swapVec3(oldRef.verts);
-
     if (halfedgeR.startVert < firstNewVert) {  // retained vert
       int i = halfedgeRef.vert;
       const int bary = oldRef.vertBary[i];
       if (bary < 0) {
-        if (halfedgeRef.PQ == 1 && invertQ) {
-          const glm::ivec3 permute(0, 2, 1);
-          i = permute[i];
-        }
-        halfedgeBary = i - 3;
+        halfedgeBary = bary;
       } else {
         halfedgeBary = AtomicAdd(*idx, 1);
-        barycentricR[halfedgeBary] = (halfedgeRef.PQ == 1 && invertQ)
-                                         ? swapVec3(barycentric[bary])
-                                         : barycentric[bary];
+        barycentricR[halfedgeBary] = barycentric[bary];
       }
     } else {  // new vert
       halfedgeBary = AtomicAdd(*idx, 1);
@@ -477,13 +463,12 @@ struct CreateBarycentric {
         triPos[i] = vertPos[halfedge[3 * tri + i].startVert];
 
       glm::mat3 uvwOldTri;
-      for (int i : {0, 1, 2}) uvwOldTri[i] = UVW(oldRef, i, barycentric);
+      for (int i : {0, 1, 2})
+        uvwOldTri[i] = UVW(oldRef.vertBary[i], barycentric);
 
       const glm::vec3 uvw =
-          uvwOldTri *
           GetBarycentric(vertPosR[halfedgeR.startVert], triPos, precision);
-      barycentricR[halfedgeBary] =
-          (halfedgeRef.PQ == 1 && invertQ) ? swapVec3(uvw) : uvw;
+      barycentricR[halfedgeBary] = uvwOldTri * uvw;
     }
   }
 };

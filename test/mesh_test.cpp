@@ -49,10 +49,11 @@ void Related(const Manifold& out, const std::vector<Mesh>& input,
                       : meshID2idx.at(meshID2Original[meshID]);
     ASSERT_LT(meshIdx, input.size());
     const Mesh& inMesh = input[meshIdx];
-    const glm::ivec3 triVerts = relation.triBary[tri].verts;
-    glm::mat3 triangle = {inMesh.vertPos[triVerts[0]],
-                          inMesh.vertPos[triVerts[1]],
-                          inMesh.vertPos[triVerts[2]]};
+    int inTri = relation.triBary[tri].face;
+    ASSERT_LT(inTri, inMesh.triVerts.size());
+    glm::mat3 triangle = {inMesh.vertPos[inMesh.triVerts[inTri][0]],
+                          inMesh.vertPos[inMesh.triVerts[inTri][1]],
+                          inMesh.vertPos[inMesh.triVerts[inTri][2]]};
     for (int j : {0, 1, 2}) {
       glm::vec3 vPos = triangle * relation.UVW(tri, j);
       Identical(output.vertPos[output.triVerts[tri][j]], vPos);

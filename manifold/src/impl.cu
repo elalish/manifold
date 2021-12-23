@@ -178,10 +178,7 @@ struct InitializeBaryRef {
     // Leave existing meshID if input is negative
     if (meshID >= 0) baryRef.meshID = meshID;
     baryRef.face = tri;
-    glm::ivec3 triVerts(0.0f);
-    for (int i : {0, 1, 2}) triVerts[i] = halfedge[3 * tri + i].startVert;
-    baryRef.verts = triVerts;
-    baryRef.vertBary = {-1, -1, -1};
+    baryRef.vertBary = {-3, -2, -1};
   }
 };
 
@@ -390,6 +387,7 @@ int Manifold::Impl::InitializeNewReference(
   meshRelation_.triBary.resize(NumTri());
   const int nextMeshID = meshID2Original_.size();
   meshID2Original_.push_back(nextMeshID);
+  ReinitializeReference(nextMeshID);
 
   const int numProps = propertyTolerance.size();
 
@@ -436,7 +434,7 @@ int Manifold::Impl::InitializeNewReference(
       for (int i : {0, 1, 2}) {
         const int vert = halfedge_.H()[3 * refTri + i].startVert;
         triPos[i] = vertPos_.H()[vert];
-        triVert2bary[{refTri, vert}] = -1;
+        triVert2bary[{refTri, vert}] = i - 3;
       }
       tri2func.emplace(
           std::make_pair(refTri, GetBarycentric(triPos, precision_)));
