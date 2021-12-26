@@ -490,10 +490,11 @@ TEST(Boolean, Perturb) {
 TEST(Boolean, Coplanar) {
   Manifold cylinder = Manifold::Cylinder(1.0f, 1.0f);
   Manifold cylinder2 = cylinder;
+  cylinder2.SetAsOriginal();
   Manifold out = cylinder - cylinder2.Scale({0.5f, 0.5f, 1.0f})
                                 .Rotate(0, 0, 15)
                                 .Translate({0.25f, 0.25f, 0.0f});
-  ExpectMeshes(out, {{33, 66}});
+  ExpectMeshes(out, {{32, 64}});
   EXPECT_EQ(out.NumDegenerateTris(), 0);
   EXPECT_EQ(out.Genus(), 1);
   // ExportMesh("coplanar.gltf", out.GetMesh());
