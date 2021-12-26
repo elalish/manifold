@@ -216,12 +216,11 @@ void Manifold::Impl::RemoveIfFolded(int edge) {
   }
 }
 
-void Manifold::Impl::CollapseEdge(int edge) {
+void Manifold::Impl::CollapseEdge(const int edge) {
   VecH<Halfedge>& halfedge = halfedge_.H();
   VecH<glm::vec3>& vertPos = vertPos_.H();
   VecH<glm::vec3>& triNormal = faceNormal_.H();
   VecH<BaryRef>& triBary = meshRelation_.triBary.H();
-  VecH<glm::vec3>& barycentric = meshRelation_.barycentric.H();
 
   const Halfedge toRemove = halfedge[edge];
   if (toRemove.pairedHalfedge < 0) return;
@@ -246,9 +245,9 @@ void Manifold::Impl::CollapseEdge(int edge) {
 
   // Orbit startVert
   int start = halfedge[tri1edge[1]].pairedHalfedge;
+  const BaryRef ref0 = triBary[edge / 3];
+  const BaryRef ref1 = triBary[toRemove.pairedHalfedge / 3];
   if (!shortEdge) {
-    const BaryRef ref0 = triBary[edge / 3];
-    const BaryRef ref1 = triBary[toRemove.pairedHalfedge / 3];
     current = start;
     glm::vec3 pLast = vertPos[halfedge[tri1edge[1]].endVert];
     while (current != tri0edge[2]) {
@@ -277,23 +276,21 @@ void Manifold::Impl::CollapseEdge(int edge) {
   vertPos[toRemove.startVert] = glm::vec3(0.0f / 0.0f);
   CollapseTri(tri1edge);
 
-  if (!shortEdge) {
-    // Update triBary
-    current = start;
-    while (current != tri0edge[2]) {
-      current = NextHalfedge(current);
-      // Recalculate uvw for shifted vert in terms of original BaryRef.verts
-      // (okay to be outside of referenced triangle, as this is an arbitrary
-      // subset of the orginal face)
-
-      current = halfedge[current].pairedHalfedge;
-    }
-  }
-
   // Orbit startVert
   current = start;
   while (current != tri0edge[2]) {
     current = NextHalfedge(current);
+
+    if (!shortEdge) {
+      // Update the shifted triangles to the vertBary of endVert
+      const int tri = current / 3;
+      const int vIdx = current - 3 * tri;
+      triBary[tri].vertBary[vIdx] =
+          (ref0.meshID == triBary[tri].meshID && ref0.face == triBary[tri].face)
+              ? ref0.vertBary[(edge + 1) % 3]
+              : ref1.vertBary[toRemove.pairedHalfedge % 3];
+    }
+
     const int vert = halfedge[current].endVert;
     const int next = halfedge[current].pairedHalfedge;
     for (int i = 0; i < edges.size(); ++i) {
