@@ -17,20 +17,6 @@
 #include "impl.cuh"
 #include "polygon.h"
 
-namespace {
-using namespace manifold;
-
-template <typename T>
-void circShift(glm::tvec3<T>& v, int shift) {
-  glm::tvec3<T> in = v;
-  for (int k : {0, 1, 2}) {
-    int j = k + shift;
-    if (j >= 3) j -= 3;
-    v[k] = in[j];
-  }
-}
-}  // namespace
-
 namespace manifold {
 
 /**
@@ -153,19 +139,9 @@ void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge,
 
     for (int tri = startTri; tri < triVerts.size(); ++tri) {
       meshRelation_.triBary.H().push_back(faceRef.H()[face]);
-      int shift = 0;
       for (int k : {0, 1, 2}) {
-        int bary = vertBary[triVerts[tri][k]];
-        if (bary < 0) {
-          shift = k - (bary + 3);
-          bary = -1;
-        }
-        meshRelation_.triBary.H().back().vertBary[k] = bary;
-      }
-      if (shift != 0) {
-        if (shift < 0) shift += 3;
-        circShift(triVerts[tri], shift);
-        circShift(meshRelation_.triBary.H().back().vertBary, shift);
+        meshRelation_.triBary.H().back().vertBary[k] =
+            vertBary[triVerts[tri][k]];
       }
     }
   }
