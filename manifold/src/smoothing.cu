@@ -104,7 +104,7 @@ struct InteriorVerts {
         // are added for them out of laziness of indexing only.
         const int a = (k == n) ? -2 : first;
         const int b = (i == n - 1) ? -1 : first + n - i + 1;
-        const int c = (j == n - 1) ? -2 : first + 1;
+        const int c = (j == n - 1) ? -3 : first + 1;
         glm::ivec3 vertBary(c, a, b);
         triBary[posTri] = {-1, tri, vertBary};
         triBaryNew[posTri++] = {baryOld.meshID, baryOld.face, vertBary};
@@ -458,6 +458,7 @@ void Manifold::Impl::CreateTangents(
  * refinement (smoothing).
  */
 Manifold::Impl::MeshRelationD Manifold::Impl::Subdivide(int n) {
+  if (n < 2) return meshRelation_;
   int numVert = NumVert();
   int numEdge = NumEdge();
   int numTri = NumTri();

@@ -38,7 +38,8 @@ struct UpdateTriBary {
   const int nextBary;
 
   __host__ __device__ BaryRef operator()(BaryRef ref) {
-    ref.vertBary += nextBary;
+    for (int i : {0, 1, 2})
+      if (ref.vertBary[i] >= 0) ref.vertBary[i] += nextBary;
     return ref;
   }
 };
