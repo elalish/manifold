@@ -223,6 +223,12 @@ std::vector<int> Manifold::GetMeshIDs() const {
  * meaning it will now be referenced by its descendents instead of the mesh it
  * was copied from, allowing you to differentiate the copies when applying your
  * properties to the final result. Its new meshID is returned.
+ *
+ * This function also condenses all coplanar faces in the relation, allowing
+ * these edges to be collapsed. If you plan to have inconsistent properties
+ * across these faces, meaning you want to preserve some of these edges, you
+ * should instead call GetMesh(), calculate your properties and use these to
+ * construct a new manifold.
  */
 int Manifold::SetAsOriginal() {
   int meshID = pImpl_->InitializeNewReference();
