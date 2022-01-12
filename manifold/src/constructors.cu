@@ -38,7 +38,8 @@ struct UpdateTriBary {
   const int nextBary;
 
   __host__ __device__ BaryRef operator()(BaryRef ref) {
-    ref.vertBary += nextBary;
+    for (int i : {0, 1, 2})
+      if (ref.vertBary[i] >= 0) ref.vertBary[i] += nextBary;
     return ref;
   }
 };
@@ -259,7 +260,6 @@ Manifold Manifold::Extrude(Polygons crossSection, float height, int nDivisions,
   extrusion.pImpl_->CreateHalfedges(triVertsDH);
   extrusion.pImpl_->Finish();
   extrusion.pImpl_->InitializeNewReference();
-  extrusion.pImpl_->MergeCoplanarRelations();
   return extrusion;
 }
 
@@ -355,7 +355,6 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments) {
   revoloid.pImpl_->CreateHalfedges(triVertsDH);
   revoloid.pImpl_->Finish();
   revoloid.pImpl_->InitializeNewReference();
-  revoloid.pImpl_->MergeCoplanarRelations();
   return revoloid;
 }
 

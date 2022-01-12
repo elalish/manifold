@@ -32,32 +32,6 @@ __host__ __device__ bool Is01Longest(glm::vec2 v0, glm::vec2 v1, glm::vec2 v2) {
   return l[0] > l[1] && l[0] > l[2];
 }
 
-__host__ __device__ bool IsDegenerate(const glm::vec3& p0, const glm::vec3& p1,
-                                      const glm::vec3& p2, float precision) {
-  glm::vec3 v1 = p1 - p0;
-  glm::vec3 v2 = p2 - p0;
-  glm::vec3 cross = glm::cross(v1, v2);
-  float area2 = glm::dot(cross, cross);
-  float base2 = glm::max(glm::dot(v1, v1), glm::dot(v2, v2));
-  return area2 <= base2 * precision * precision;
-}
-
-struct DegenerateTri {
-  const Halfedge* halfedge;
-  const glm::vec3* vertPos;
-  const float precision;
-
-  __host__ __device__ void operator()(thrust::tuple<bool&, int> inOut) {
-    bool& degenerate = thrust::get<0>(inOut);
-    const int tri = thrust::get<1>(inOut);
-
-    degenerate =
-        IsDegenerate(vertPos[halfedge[3 * tri].startVert],
-                     vertPos[halfedge[3 * tri + 1].startVert],
-                     vertPos[halfedge[3 * tri + 2].startVert], precision);
-  }
-};
-
 struct ShortEdge {
   const Halfedge* halfedge;
   const glm::vec3* vertPos;
@@ -75,7 +49,6 @@ struct ShortEdge {
 struct FlagEdge {
   const Halfedge* halfedge;
   const BaryRef* triBary;
-  const bool* triDegenerate;
 
   __host__ __device__ bool operator()(int edge) {
     if (halfedge[edge].pairedHalfedge < 0) return false;
@@ -87,7 +60,6 @@ struct FlagEdge {
     while (current != edge) {
       current = NextHalfedge(halfedge[current].pairedHalfedge);
       int tri = current / 3;
-      if (triDegenerate[tri]) continue;
       const BaryRef ref = triBary[tri];
       if ((ref.meshID != ref0.meshID || ref.face != ref0.face) &&
           (ref.meshID != ref1.meshID || ref.face != ref1.face))
@@ -151,17 +123,12 @@ void Manifold::Impl::CollapseDegenerates() {
 
   for (const int edge : flaggedEdges.H()) CollapseEdge(edge);
 
-  VecDH<bool> triDegenerate(NumTri(), false);
-  thrust::for_each_n(
-      zip(triDegenerate.beginD(), countAt(0)), NumTri(),
-      DegenerateTri({halfedge_.cptrD(), vertPos_.cptrD(), precision_}));
-
   flaggedEdges.resize(halfedge_.size());
-  numFlagged = thrust::copy_if(
-                   countAt(0), countAt(halfedge_.size()), flaggedEdges.beginD(),
-                   FlagEdge({halfedge_.cptrD(), meshRelation_.triBary.cptrD(),
-                             triDegenerate.cptrD()})) -
-               flaggedEdges.beginD();
+  numFlagged =
+      thrust::copy_if(
+          countAt(0), countAt(halfedge_.size()), flaggedEdges.beginD(),
+          FlagEdge({halfedge_.cptrD(), meshRelation_.triBary.cptrD()})) -
+      flaggedEdges.beginD();
   flaggedEdges.resize(numFlagged);
 
   for (const int edge : flaggedEdges.H()) CollapseEdge(edge);
@@ -249,7 +216,7 @@ void Manifold::Impl::RemoveIfFolded(int edge) {
   }
 }
 
-void Manifold::Impl::CollapseEdge(int edge) {
+void Manifold::Impl::CollapseEdge(const int edge) {
   VecH<Halfedge>& halfedge = halfedge_.H();
   VecH<glm::vec3>& vertPos = vertPos_.H();
   VecH<glm::vec3>& triNormal = faceNormal_.H();
@@ -262,17 +229,10 @@ void Manifold::Impl::CollapseEdge(int edge) {
   const glm::ivec3 tri0edge = TriOf(edge);
   const glm::ivec3 tri1edge = TriOf(toRemove.pairedHalfedge);
 
-  const glm::vec3 p0 = vertPos[endVert];
-  const glm::vec3 delta = p0 - vertPos[toRemove.startVert];
+  const glm::vec3 pNew = vertPos[endVert];
+  const glm::vec3 pOld = vertPos[toRemove.startVert];
+  const glm::vec3 delta = pNew - pOld;
   const bool shortEdge = glm::dot(delta, delta) < precision_ * precision_;
-
-  auto CW2Normal = [](const glm::vec3& p0, const glm::vec3& p1,
-                      const glm::vec3& p2, const glm::vec3& normal,
-                      float precision) {
-    glm::mat3x2 projection = GetAxisAlignedProjection(normal);
-    return CCW(projection * p0, projection * p1, projection * p2, precision) <
-           0;
-  };
 
   std::vector<int> edges;
   // Orbit endVert
@@ -285,27 +245,29 @@ void Manifold::Impl::CollapseEdge(int edge) {
 
   // Orbit startVert
   int start = halfedge[tri1edge[1]].pairedHalfedge;
+  const BaryRef ref0 = triBary[edge / 3];
+  const BaryRef ref1 = triBary[toRemove.pairedHalfedge / 3];
   if (!shortEdge) {
-    const BaryRef ref0 = triBary[edge / 3];
-    const BaryRef ref1 = triBary[toRemove.pairedHalfedge / 3];
     current = start;
-    glm::vec3 p1 = vertPos[halfedge[tri1edge[1]].endVert];
+    glm::vec3 pLast = vertPos[halfedge[tri1edge[1]].endVert];
     while (current != tri0edge[2]) {
       current = NextHalfedge(current);
-      glm::vec3 p2 = vertPos[halfedge[current].endVert];
+      glm::vec3 pNext = vertPos[halfedge[current].endVert];
       const int tri = current / 3;
       const BaryRef ref = triBary[tri];
       // Don't collapse if the edge is not redundant (this may have changed due
       // to the collapse of neighbors).
-      if (!IsDegenerate(p0, p1, p2, precision_) &&
-          (ref.meshID != ref0.meshID || ref.face != ref0.face) &&
+      if ((ref.meshID != ref0.meshID || ref.face != ref0.face) &&
           (ref.meshID != ref1.meshID || ref.face != ref1.face))
         return;
 
       // Don't collapse edge if it would cause a triangle to invert.
-      if (CW2Normal(p2, p1, p0, triNormal[tri], precision_)) return;
+      const glm::mat3x2 projection = GetAxisAlignedProjection(triNormal[tri]);
+      if (CCW(projection * pNext, projection * pLast, projection * pNew,
+              precision_) < 0)
+        return;
 
-      p1 = p2;
+      pLast = pNext;
       current = halfedge[current].pairedHalfedge;
     }
   }
@@ -318,6 +280,17 @@ void Manifold::Impl::CollapseEdge(int edge) {
   current = start;
   while (current != tri0edge[2]) {
     current = NextHalfedge(current);
+
+    if (!shortEdge) {
+      // Update the shifted triangles to the vertBary of endVert
+      const int tri = current / 3;
+      const int vIdx = current - 3 * tri;
+      triBary[tri].vertBary[vIdx] =
+          (ref0.meshID == triBary[tri].meshID && ref0.face == triBary[tri].face)
+              ? ref0.vertBary[(edge + 1) % 3]
+              : ref1.vertBary[toRemove.pairedHalfedge % 3];
+    }
+
     const int vert = halfedge[current].endVert;
     const int next = halfedge[current].pairedHalfedge;
     for (int i = 0; i < edges.size(); ++i) {
@@ -375,9 +348,9 @@ void Manifold::Impl::RecursiveEdgeSwap(const int edge) {
     triBary[tri0].vertBary[0] = triBary[tri1].vertBary[2];
     // Calculate a new barycentric coordinate for the split triangle.
     const glm::vec3 uvw0 =
-        UVW(triBary[tri1], 0, meshRelation_.barycentric.cptrH());
+        UVW(triBary[tri1].vertBary[0], meshRelation_.barycentric.cptrH());
     const glm::vec3 uvw1 =
-        UVW(triBary[tri1], 1, meshRelation_.barycentric.cptrH());
+        UVW(triBary[tri1].vertBary[1], meshRelation_.barycentric.cptrH());
     const float l01 = glm::length(v[1] - v[0]);
     const float l02 = glm::length(v[2] - v[0]);
     const float a = glm::max(0.0f, glm::min(1.0f, l02 / l01));
