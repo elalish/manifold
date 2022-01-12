@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <thrust/execution_policy.h>
+#include <thrust/logical.h>
 
 #include <algorithm>
 #include <map>
@@ -177,10 +178,17 @@ struct InitializeBaryRef {
     // Leave existing meshID if input is negative
     if (meshID >= 0) baryRef.meshID = meshID;
     baryRef.face = tri;
-    glm::ivec3 triVerts(0.0f);
-    for (int i : {0, 1, 2}) triVerts[i] = halfedge[3 * tri + i].startVert;
-    baryRef.verts = triVerts;
-    baryRef.vertBary = {-1, -1, -1};
+    baryRef.vertBary = {-3, -2, -1};
+  }
+};
+
+struct CheckProperties {
+  const int numSets;
+
+  __host__ __device__ bool operator()(glm::ivec3 triProp) {
+    bool good = true;
+    for (int i : {0, 1, 2}) good &= (triProp[i] >= 0 && triProp[i] < numSets);
+    return good;
   }
 };
 
@@ -188,6 +196,10 @@ struct CoplanarEdge {
   BaryRef* triBary;
   const Halfedge* halfedge;
   const glm::vec3* vertPos;
+  const glm::ivec3* triProp;
+  const float* prop;
+  const float* propTol;
+  const int numProp;
   const float precision;
 
   __host__ __device__ void operator()(int edgeIdx) {
@@ -196,40 +208,68 @@ struct CoplanarEdge {
     const Halfedge pair = halfedge[edge.pairedHalfedge];
     const glm::vec3 base = vertPos[edge.startVert];
 
-    const glm::vec3 jointVec = vertPos[edge.endVert] - base;
-    const glm::vec3 edgeVec =
-        vertPos[halfedge[NextHalfedge(edgeIdx)].endVert] - base;
-    const glm::vec3 pairVec =
-        vertPos[halfedge[NextHalfedge(edge.pairedHalfedge)].endVert] - base;
+    const int baseNum = edgeIdx - 3 * edge.face;
+    const int jointNum = edge.pairedHalfedge - 3 * pair.face;
+    const int edgeNum = baseNum == 0 ? 2 : baseNum - 1;
+    const int pairNum = jointNum == 0 ? 2 : jointNum - 1;
 
-    const glm::vec3 cross = glm::cross(jointVec, edgeVec);
-    const float area = glm::length(cross);
+    const glm::vec3 jointVec = vertPos[pair.startVert] - base;
+    const glm::vec3 edgeVec =
+        vertPos[halfedge[3 * edge.face + edgeNum].startVert] - base;
+    const glm::vec3 pairVec =
+        vertPos[halfedge[3 * pair.face + pairNum].startVert] - base;
+
+    glm::vec3 normal = glm::cross(jointVec, edgeVec);
+    const float area = glm::length(normal);
     const float areaPair = glm::length(glm::cross(pairVec, jointVec));
-    const float volume = glm::abs(glm::dot(cross, pairVec));
+    const float volume = glm::abs(glm::dot(normal, pairVec));
     const float height = volume / glm::max(area, areaPair);
     // Only operate on coplanar triangles
     if (height > precision) return;
 
-    const float length = glm::max(glm::length(edgeVec), glm::length(jointVec));
-    const float lengthPair =
-        glm::max(glm::length(pairVec), glm::length(jointVec));
-    const bool edgeColinear = area < length * precision;
-    const bool pairColinear = areaPair < lengthPair * precision;
+    // Check property linearity
+    if (area > 0) {
+      normal /= area;
+      for (int i = 0; i < numProp; ++i) {
+        const float scale = precision / propTol[i];
+
+        const float baseProp = prop[numProp * triProp[edge.face][baseNum] + i];
+        const float jointProp =
+            prop[numProp * triProp[pair.face][jointNum] + i];
+        const float edgeProp = prop[numProp * triProp[edge.face][edgeNum] + i];
+        const float pairProp = prop[numProp * triProp[pair.face][pairNum] + i];
+
+        const glm::vec3 iJointVec =
+            jointVec + normal * scale * (jointProp - baseProp);
+        const glm::vec3 iEdgeVec =
+            edgeVec + normal * scale * (edgeProp - baseProp);
+        const glm::vec3 iPairVec =
+            pairVec + normal * scale * (pairProp - baseProp);
+
+        glm::vec3 cross = glm::cross(iJointVec, iEdgeVec);
+        const float area = glm::max(
+            glm::length(cross), glm::length(glm::cross(iPairVec, iJointVec)));
+        const float volume = glm::abs(glm::dot(cross, iPairVec));
+        const float height = volume / area;
+        // Only operate on consistent triangles
+        if (height > precision) return;
+      }
+    }
 
     int& edgeFace = triBary[edge.face].face;
     int& pairFace = triBary[pair.face].face;
-    // Point toward non-degenerate triangle
-    if (edgeColinear && !pairColinear)
-      edgeFace = pairFace;
-    else if (pairColinear && !edgeColinear)
+
+    // Point toward larger triangle, but fall back to index before floating
+    // point error can cause graph cycles.
+    const float p2 = precision * precision;
+    const bool forward =
+        area < areaPair * (1 + p2) && area > areaPair * (1 - p2)
+            ? edgeFace < pairFace
+            : area > areaPair;
+    if (forward)
       pairFace = edgeFace;
-    else {
-      // Point toward lower index
-      if (edgeFace < pairFace)
-        pairFace = edgeFace;
-      else
-        edgeFace = pairFace;
-    }
+    else
+      edgeFace = pairFace;
   }
 };
 
@@ -252,14 +292,17 @@ std::vector<int> Manifold::Impl::meshID2Original_;
  * Create a manifold from an input triangle Mesh. Will throw if the Mesh is not
  * manifold. TODO: update halfedgeTangent during CollapseDegenerates.
  */
-Manifold::Impl::Impl(const Mesh& mesh)
+Manifold::Impl::Impl(const Mesh& mesh,
+                     const std::vector<glm::ivec3>& triProperties,
+                     const std::vector<float>& properties,
+                     const std::vector<float>& propertyTolerance)
     : vertPos_(mesh.vertPos), halfedgeTangent_(mesh.halfedgeTangent) {
   CheckDevice();
   CalculateBBox();
   SetPrecision();
   CreateAndFixHalfedges(mesh.triVerts);
-  InitializeNewReference();
   CalculateNormals();
+  InitializeNewReference(triProperties, properties, propertyTolerance);
   CollapseDegenerates();
   Finish();
 }
@@ -314,7 +357,6 @@ Manifold::Impl::Impl(Shape shape) {
   CreateHalfedges(triVerts);
   Finish();
   InitializeNewReference();
-  MergeCoplanarRelations();
 }
 
 /**
@@ -338,33 +380,84 @@ void Manifold::Impl::ReinitializeReference(int meshID) {
                      InitializeBaryRef({meshID, halfedge_.cptrD()}));
 }
 
-int Manifold::Impl::InitializeNewReference() {
+int Manifold::Impl::InitializeNewReference(
+    const std::vector<glm::ivec3>& triProperties,
+    const std::vector<float>& properties,
+    const std::vector<float>& propertyTolerance) {
   meshRelation_.triBary.resize(NumTri());
   const int nextMeshID = meshID2Original_.size();
   meshID2Original_.push_back(nextMeshID);
   ReinitializeReference(nextMeshID);
-  return nextMeshID;
-}
 
-void Manifold::Impl::MergeCoplanarRelations() {
+  const int numProps = propertyTolerance.size();
+
+  VecDH<glm::ivec3> triPropertiesD(triProperties);
+  VecDH<float> propertiesD(properties);
+  VecDH<float> propertyToleranceD(propertyTolerance);
+
+  if (numProps > 0) {
+    ALWAYS_ASSERT(
+        triProperties.size() == NumTri() || triProperties.size() == 0, userErr,
+        "If specified, triProperties vector length must match NumTri().");
+    ALWAYS_ASSERT(properties.size() % numProps == 0, userErr,
+                  "properties vector must be a multiple of the size of "
+                  "propertyTolerance.");
+
+    const int numSets = properties.size() / numProps;
+    ALWAYS_ASSERT(thrust::all_of(triPropertiesD.beginD(), triPropertiesD.endD(),
+                                 CheckProperties({numSets})),
+                  userErr,
+                  "triProperties value is outside the properties range.");
+  }
+
   thrust::for_each_n(
       countAt(0), halfedge_.size(),
       CoplanarEdge({meshRelation_.triBary.ptrD(), halfedge_.cptrD(),
-                    vertPos_.cptrD(), precision_}));
+                    vertPos_.cptrD(), triPropertiesD.cptrD(),
+                    propertiesD.cptrD(), propertyToleranceD.cptrD(), numProps,
+                    precision_}));
 
   VecH<BaryRef>& triBary = meshRelation_.triBary.H();
+  std::map<int, std::function<glm::vec3(glm::vec3)>> tri2func;
+  std::map<std::pair<int, int>, int> triVert2bary;
   std::stack<int> stack;
   for (int tri = 0; tri < NumTri(); ++tri) {
-    int thisTri = tri;
-    while (triBary[thisTri].face != thisTri) {
-      stack.push(thisTri);
-      thisTri = triBary[thisTri].face;
+    int refTri = tri;
+    while (triBary[refTri].face != refTri) {
+      stack.push(refTri);
+      refTri = triBary[refTri].face;
     }
+    if (stack.empty()) continue;
+
+    if (tri2func.find(refTri) == tri2func.end()) {
+      glm::mat3 triPos;
+      for (int i : {0, 1, 2}) {
+        const int vert = halfedge_.H()[3 * refTri + i].startVert;
+        triPos[i] = vertPos_.H()[vert];
+        triVert2bary[{refTri, vert}] = i - 3;
+      }
+      tri2func.emplace(
+          std::make_pair(refTri, GetBarycentric(triPos, precision_)));
+    }
+    const auto& getBarycentric = tri2func[refTri];
+
     while (!stack.empty()) {
-      triBary[stack.top()].face = thisTri;
+      const int thisTri = stack.top();
+      BaryRef& ref = triBary[thisTri];
       stack.pop();
+      ref.face = refTri;
+      for (int i : {0, 1, 2}) {
+        const int vert = halfedge_.H()[3 * thisTri + i].startVert;
+        if (triVert2bary.find({refTri, vert}) == triVert2bary.end()) {
+          triVert2bary[{refTri, vert}] = meshRelation_.barycentric.size();
+          meshRelation_.barycentric.H().push_back(
+              getBarycentric(vertPos_.H()[vert]));
+        }
+        ref.vertBary[i] = triVert2bary[{refTri, vert}];
+      }
     }
   }
+  return nextMeshID;
 }
 
 /**

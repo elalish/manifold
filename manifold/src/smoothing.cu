@@ -81,12 +81,8 @@ struct InteriorVerts {
     const int tri = thrust::get<0>(in);
     const BaryRef baryOld = thrust::get<1>(in);
 
-    const glm::ivec3 verts(halfedge[3 * tri].startVert,
-                           halfedge[3 * tri + 1].startVert,
-                           halfedge[3 * tri + 2].startVert);
-
     glm::mat3 uvwOldTri;
-    for (int i : {0, 1, 2}) uvwOldTri[i] = UVW(baryOld, i, uvwOld);
+    for (int i : {0, 1, 2}) uvwOldTri[i] = UVW(baryOld.vertBary[i], uvwOld);
 
     const float invTotal = 1.0f / n;
     int posTri = tri * n * n;
@@ -104,28 +100,26 @@ struct InteriorVerts {
         ++posBary;
         if (j == n - i) continue;
 
-        // The three retained verts are denoted by -1. uvw entries
+        // The three retained verts are denoted by their index - 3. uvw entries
         // are added for them out of laziness of indexing only.
-        const int a = (k == n) ? -1 : first;
+        const int a = (k == n) ? -2 : first;
         const int b = (i == n - 1) ? -1 : first + n - i + 1;
-        const int c = (j == n - 1) ? -1 : first + 1;
+        const int c = (j == n - 1) ? -3 : first + 1;
         glm::ivec3 vertBary(c, a, b);
-        triBary[posTri] = {-1, tri, verts, vertBary};
-        triBaryNew[posTri++] = {baryOld.meshID, baryOld.face, baryOld.verts,
-                                vertBary};
+        triBary[posTri] = {-1, tri, vertBary};
+        triBaryNew[posTri++] = {baryOld.meshID, baryOld.face, vertBary};
         if (j < n - 1 - i) {
           int d = b + 1;  // d cannot be a retained vert
           vertBary = {b, d, c};
-          triBary[posTri] = {-1, tri, verts, vertBary};
-          triBaryNew[posTri++] = {baryOld.meshID, baryOld.face, baryOld.verts,
-                                  vertBary};
+          triBary[posTri] = {-1, tri, vertBary};
+          triBaryNew[posTri++] = {baryOld.meshID, baryOld.face, vertBary};
         }
 
         if (i == 0 || j == 0 || k == 0) continue;
 
-        vertPos[pos++] = u * vertPos[verts[0]] +  //
-                         v * vertPos[verts[1]] +  //
-                         w * vertPos[verts[2]];
+        vertPos[pos++] = u * vertPos[halfedge[3 * tri].startVert] +      //
+                         v * vertPos[halfedge[3 * tri + 1].startVert] +  //
+                         w * vertPos[halfedge[3 * tri + 2].startVert];
       }
     }
   }
@@ -238,7 +232,7 @@ struct TriBary2Vert {
     for (int i : {0, 1, 2}) {
       int vert = halfedge[3 * tri + i].startVert;
       if (AtomicAdd(lock[vert], 1) != 0) continue;
-      vertBary[vert] = {baryRef.face, UVW(baryRef, i, uvw)};
+      vertBary[vert] = {baryRef.face, UVW(baryRef.vertBary[i], uvw)};
     }
   }
 };
@@ -464,6 +458,7 @@ void Manifold::Impl::CreateTangents(
  * refinement (smoothing).
  */
 Manifold::Impl::MeshRelationD Manifold::Impl::Subdivide(int n) {
+  if (n < 2) return meshRelation_;
   int numVert = NumVert();
   int numEdge = NumEdge();
   int numTri = NumTri();

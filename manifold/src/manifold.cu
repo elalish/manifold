@@ -54,7 +54,12 @@ Manifold Halfspace(Box bBox, glm::vec3 normal, float originOffset) {
 namespace manifold {
 
 Manifold::Manifold() : pImpl_{std::make_unique<Impl>()} {}
-Manifold::Manifold(const Mesh& mesh) : pImpl_{std::make_unique<Impl>(mesh)} {}
+Manifold::Manifold(const Mesh& mesh,
+                   const std::vector<glm::ivec3>& triProperties,
+                   const std::vector<float>& properties,
+                   const std::vector<float>& propertyTolerance)
+    : pImpl_{std::make_unique<Impl>(mesh, triProperties, properties,
+                                    propertyTolerance)} {}
 Manifold::~Manifold() = default;
 Manifold::Manifold(Manifold&&) noexcept = default;
 Manifold& Manifold::operator=(Manifold&&) noexcept = default;
@@ -176,12 +181,10 @@ Curvature Manifold::GetCurvature() const { return pImpl_->GetCurvature(); }
  * Gets the relationship to the previous mesh, for the purpose of assinging
  * properties like texture coordinates. The triBary vector is the same length as
  * Mesh.triVerts and BaryRef.face gives a unique identifier of the original mesh
- * face to which this triangle belongs. BaryRef.verts gives the three original
- * mesh vertex indices to which its barycentric coordinates refer.
- * BaryRef.vertBary gives an index for each vertex into the barycentric vector
- * if that vertex is >= 0, indicating it is a new vertex. If the index is < 0,
- * this indicates it is an original vertex of the triangle, found as the
- * corresponding element of BaryRef.verts.
+ * face to which this triangle belongs. BaryRef.vertBary gives an index for each
+ * vertex into the barycentric vector if that index is >= 0, indicating it is a
+ * new vertex. If the index is < 0, this indicates it is an original vertex, the
+ * index + 3 vert of the referenced triangle.
  */
 MeshRelation Manifold::GetMeshRelation() const {
   MeshRelation out;
@@ -220,10 +223,15 @@ std::vector<int> Manifold::GetMeshIDs() const {
  * meaning it will now be referenced by its descendents instead of the mesh it
  * was copied from, allowing you to differentiate the copies when applying your
  * properties to the final result. Its new meshID is returned.
+ *
+ * This function also condenses all coplanar faces in the relation, allowing
+ * these edges to be collapsed. If you plan to have inconsistent properties
+ * across these faces, meaning you want to preserve some of these edges, you
+ * should instead call GetMesh(), calculate your properties and use these to
+ * construct a new manifold.
  */
-int Manifold::SetAsOriginal(bool mergeCoplanarRelations) {
+int Manifold::SetAsOriginal() {
   int meshID = pImpl_->InitializeNewReference();
-  if (mergeCoplanarRelations) pImpl_->MergeCoplanarRelations();
   return meshID;
 }
 
