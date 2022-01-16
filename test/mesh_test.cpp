@@ -139,8 +139,8 @@ TEST(MeshIO, ReadWrite) {
 TEST(Manifold, GetMesh) {
   Manifold manifold = Manifold::Sphere(1);
   Mesh mesh_out = manifold.GetMesh();
-  Manifold mesh2(mesh_out);
-  Mesh mesh_out2 = mesh2.GetMesh();
+  Manifold manifold2(mesh_out);
+  Mesh mesh_out2 = manifold2.GetMesh();
   Identical(mesh_out, mesh_out2);
 }
 

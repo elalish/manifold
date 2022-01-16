@@ -16,8 +16,10 @@
 #include <thrust/logical.h>
 
 #include <algorithm>
+#include <boost/config.hpp>
+#include <boost/graph/adjacency_list.hpp>
+#include <boost/graph/connected_components.hpp>
 #include <map>
-#include <stack>
 
 #include "impl.cuh"
 
@@ -193,7 +195,7 @@ struct CheckProperties {
 };
 
 struct CoplanarEdge {
-  BaryRef* triBary;
+  float* triArea;
   const Halfedge* halfedge;
   const glm::vec3* vertPos;
   const glm::ivec3* triProp;
@@ -202,7 +204,11 @@ struct CoplanarEdge {
   const int numProp;
   const float precision;
 
-  __host__ __device__ void operator()(int edgeIdx) {
+  __host__ __device__ void operator()(
+      thrust::tuple<thrust::pair<int, int>&, int> inOut) {
+    thrust::pair<int, int>& face2face = thrust::get<0>(inOut);
+    const int edgeIdx = thrust::get<1>(inOut);
+
     const Halfedge edge = halfedge[edgeIdx];
     if (!edge.IsForward()) return;
     const Halfedge pair = halfedge[edge.pairedHalfedge];
@@ -219,13 +225,18 @@ struct CoplanarEdge {
     const glm::vec3 pairVec =
         vertPos[halfedge[3 * pair.face + pairNum].startVert] - base;
 
+    const float length = glm::max(glm::length(jointVec), glm::length(edgeVec));
+    const float lengthPair =
+        glm::max(glm::length(jointVec), glm::length(pairVec));
     glm::vec3 normal = glm::cross(jointVec, edgeVec);
     const float area = glm::length(normal);
     const float areaPair = glm::length(glm::cross(pairVec, jointVec));
+    // Don't link degenerate triangles
+    if (area < length * precision || areaPair < lengthPair * precision) return;
+
     const float volume = glm::abs(glm::dot(normal, pairVec));
-    const float height = volume / glm::max(area, areaPair);
     // Only operate on coplanar triangles
-    if (height > precision) return;
+    if (volume > glm::max(area, areaPair) * precision) return;
 
     // Check property linearity
     if (area > 0) {
@@ -250,26 +261,15 @@ struct CoplanarEdge {
         const float area = glm::max(
             glm::length(cross), glm::length(glm::cross(iPairVec, iJointVec)));
         const float volume = glm::abs(glm::dot(cross, iPairVec));
-        const float height = volume / area;
         // Only operate on consistent triangles
-        if (height > precision) return;
+        if (volume > area * precision) return;
       }
     }
 
-    int& edgeFace = triBary[edge.face].face;
-    int& pairFace = triBary[pair.face].face;
-
-    // Point toward larger triangle, but fall back to index before floating
-    // point error can cause graph cycles.
-    const float p2 = precision * precision;
-    const bool forward =
-        area < areaPair * (1 + p2) && area > areaPair * (1 - p2)
-            ? edgeFace < pairFace
-            : area > areaPair;
-    if (forward)
-      pairFace = edgeFace;
-    else
-      edgeFace = pairFace;
+    triArea[edge.face] = area;
+    triArea[pair.face] = areaPair;
+    face2face.first = edge.face;
+    face2face.second = pair.face;
   }
 };
 
@@ -410,24 +410,44 @@ int Manifold::Impl::InitializeNewReference(
                   "triProperties value is outside the properties range.");
   }
 
+  VecDH<thrust::pair<int, int>> face2face(halfedge_.size(), {-1, -1});
+  VecDH<float> triArea(NumTri());
   thrust::for_each_n(
-      countAt(0), halfedge_.size(),
-      CoplanarEdge({meshRelation_.triBary.ptrD(), halfedge_.cptrD(),
-                    vertPos_.cptrD(), triPropertiesD.cptrD(),
-                    propertiesD.cptrD(), propertyToleranceD.cptrD(), numProps,
-                    precision_}));
+      zip(face2face.beginD(), countAt(0)), halfedge_.size(),
+      CoplanarEdge({triArea.ptrD(), halfedge_.cptrD(), vertPos_.cptrD(),
+                    triPropertiesD.cptrD(), propertiesD.cptrD(),
+                    propertyToleranceD.cptrD(), numProps, precision_}));
+
+  boost::adjacency_list<boost::vecS, boost::vecS, boost::undirectedS> graph(
+      NumTri());
+  for (int i = 0; i < face2face.size(); ++i) {
+    const thrust::pair<int, int> edge = face2face.H()[i];
+    if (edge.first < 0) continue;
+    boost::add_edge(edge.first, edge.second, graph);
+  }
+  std::vector<int> components(NumTri());
+  const int numComponent =
+      boost::connected_components(graph, components.data());
+
+  std::vector<int> comp2tri(numComponent, -1);
+  for (int tri = 0; tri < NumTri(); ++tri) {
+    const int comp = components[tri];
+    const int current = comp2tri[comp];
+    if (current < 0 || triArea.H()[tri] > triArea.H()[current]) {
+      comp2tri[comp] = tri;
+      triArea.H()[comp] = triArea.H()[tri];
+    }
+  }
 
   VecH<BaryRef>& triBary = meshRelation_.triBary.H();
   std::map<int, std::function<glm::vec3(glm::vec3)>> tri2func;
   std::map<std::pair<int, int>, int> triVert2bary;
-  std::stack<int> stack;
+
   for (int tri = 0; tri < NumTri(); ++tri) {
-    int refTri = tri;
-    while (triBary[refTri].face != refTri) {
-      stack.push(refTri);
-      refTri = triBary[refTri].face;
-    }
-    if (stack.empty()) continue;
+    const int refTri = comp2tri[components[tri]];
+    BaryRef& ref = triBary[tri];
+    ref.face = refTri;
+    if (refTri == tri) continue;
 
     if (tri2func.find(refTri) == tri2func.end()) {
       glm::mat3 triPos;
@@ -441,22 +461,17 @@ int Manifold::Impl::InitializeNewReference(
     }
     const auto& getBarycentric = tri2func[refTri];
 
-    while (!stack.empty()) {
-      const int thisTri = stack.top();
-      BaryRef& ref = triBary[thisTri];
-      stack.pop();
-      ref.face = refTri;
-      for (int i : {0, 1, 2}) {
-        const int vert = halfedge_.H()[3 * thisTri + i].startVert;
-        if (triVert2bary.find({refTri, vert}) == triVert2bary.end()) {
-          triVert2bary[{refTri, vert}] = meshRelation_.barycentric.size();
-          meshRelation_.barycentric.H().push_back(
-              getBarycentric(vertPos_.H()[vert]));
-        }
-        ref.vertBary[i] = triVert2bary[{refTri, vert}];
+    for (int i : {0, 1, 2}) {
+      const int vert = halfedge_.H()[3 * tri + i].startVert;
+      if (triVert2bary.find({refTri, vert}) == triVert2bary.end()) {
+        triVert2bary[{refTri, vert}] = meshRelation_.barycentric.size();
+        meshRelation_.barycentric.H().push_back(
+            getBarycentric(vertPos_.H()[vert]));
       }
+      ref.vertBary[i] = triVert2bary[{refTri, vert}];
     }
   }
+
   return nextMeshID;
 }
 
