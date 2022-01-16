@@ -30,7 +30,8 @@ void Identical(glm::vec3 v0, glm::vec3 v1) {
 void Identical(const Mesh& mesh1, const Mesh& mesh2) {
   ASSERT_EQ(mesh1.vertPos.size(), mesh2.vertPos.size());
   for (int i = 0; i < mesh1.vertPos.size(); ++i)
-    Identical(mesh1.vertPos[i], mesh2.vertPos[i]);
+    for (int j : {0, 1, 2})
+      ASSERT_NEAR(mesh1.vertPos[i][j], mesh2.vertPos[i][j], 0.0001);
 
   ASSERT_EQ(mesh1.triVerts.size(), mesh2.triVerts.size());
   for (int i = 0; i < mesh1.triVerts.size(); ++i)
@@ -56,7 +57,9 @@ void Related(const Manifold& out, const std::vector<Mesh>& input,
                           inMesh.vertPos[inMesh.triVerts[inTri][2]]};
     for (int j : {0, 1, 2}) {
       glm::vec3 vPos = triangle * relation.UVW(tri, j);
-      Identical(output.vertPos[output.triVerts[tri][j]], vPos);
+      for (int k : {0, 1, 2})
+        ASSERT_NEAR(output.vertPos[output.triVerts[tri][j]][k], vPos[k],
+                    0.0001);
     }
   }
 }
@@ -151,7 +154,7 @@ TEST(Manifold, Regression) {
   Manifold manifold1 = manifold;
   manifold1.Translate(glm::vec3(5.0f));
   int num_overlaps = manifold.NumOverlaps(manifold1);
-  ASSERT_EQ(num_overlaps, 234313);
+  ASSERT_EQ(num_overlaps, 224264);
 
   Mesh mesh_out = manifold.GetMesh();
   Manifold manifold2(mesh_out);
