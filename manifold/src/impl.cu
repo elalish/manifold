@@ -440,35 +440,40 @@ int Manifold::Impl::InitializeNewReference(
   }
 
   VecH<BaryRef>& triBary = meshRelation_.triBary.H();
-  std::map<int, std::function<glm::vec3(glm::vec3)>> tri2func;
   std::map<std::pair<int, int>, int> triVert2bary;
 
   for (int tri = 0; tri < NumTri(); ++tri) {
     const int refTri = comp2tri[components[tri]];
-    BaryRef& ref = triBary[tri];
-    ref.face = refTri;
     if (refTri == tri) continue;
 
-    if (tri2func.find(refTri) == tri2func.end()) {
-      glm::mat3 triPos;
-      for (int i : {0, 1, 2}) {
-        const int vert = halfedge_.H()[3 * refTri + i].startVert;
-        triPos[i] = vertPos_.H()[vert];
-        triVert2bary[{refTri, vert}] = i - 3;
-      }
-      tri2func.emplace(
-          std::make_pair(refTri, GetBarycentric(triPos, precision_)));
+    glm::mat3 triPos;
+    for (int i : {0, 1, 2}) {
+      const int vert = halfedge_.H()[3 * refTri + i].startVert;
+      triPos[i] = vertPos_.H()[vert];
+      triVert2bary[{refTri, vert}] = i - 3;
     }
-    const auto& getBarycentric = tri2func[refTri];
 
+    glm::ivec3 vertBary;
+    bool coplanar = true;
     for (int i : {0, 1, 2}) {
       const int vert = halfedge_.H()[3 * tri + i].startVert;
       if (triVert2bary.find({refTri, vert}) == triVert2bary.end()) {
+        const glm::vec3 uvw =
+            GetBarycentric(vertPos_.H()[vert], triPos, precision_);
+        if (isnan(uvw[0])) {
+          coplanar = false;
+          break;
+        }
         triVert2bary[{refTri, vert}] = meshRelation_.barycentric.size();
-        meshRelation_.barycentric.H().push_back(
-            getBarycentric(vertPos_.H()[vert]));
+        meshRelation_.barycentric.H().push_back(uvw);
       }
-      ref.vertBary[i] = triVert2bary[{refTri, vert}];
+      vertBary[i] = triVert2bary[{refTri, vert}];
+    }
+
+    if (coplanar) {
+      BaryRef& ref = triBary[tri];
+      ref.face = refTri;
+      ref.vertBary = vertBary;
     }
   }
 

@@ -66,76 +66,41 @@ __host__ __device__ inline glm::mat3x2 GetAxisAlignedProjection(
   return glm::transpose(projection);
 }
 
-inline std::function<glm::vec3(glm::vec3)> GetBarycentric(
-    const glm::mat3& triPos, float precision) {
-  const glm::mat3 edges(triPos[1] - triPos[0], triPos[2] - triPos[1],
-                        triPos[0] - triPos[2]);
-  const glm::vec3 d2(glm::dot(edges[0], edges[0]), glm::dot(edges[1], edges[1]),
-                     glm::dot(edges[2], edges[2]));
-  int longside = d2[0] > d2[1] && d2[0] > d2[2] ? 0 : d2[1] > d2[2] ? 1 : 2;
-  const glm::vec3 crossP = glm::cross(edges[0], edges[1]);
-  const float area2 = glm::dot(crossP, crossP);
-  const float tol2 = precision * precision;
-  if (d2[longside] < tol2) {  // point
-
-    return [](glm::vec3 v) { return glm::vec3(1, 0, 0); };
-  } else if (area2 > d2[longside] * tol2) {  // triangle
-    const glm::mat3x4 A(glm::vec4(triPos[0], 1), glm::vec4(triPos[1], 1),
-                        glm::vec4(triPos[2], 1));
-    const glm::mat4x3 Ainv =
-        glm::inverse(glm::transpose(A) * A) * glm::transpose(A);
-
-    return [Ainv](glm::vec3 v) { return Ainv * glm::vec4(v, 1); };
-  } else {  // line
-    const glm::vec3 base = triPos[longside];
-    const float lengthInv = glm::inversesqrt(d2[longside]);
-
-    return [base, lengthInv, longside](glm::vec3 v) {
-      const float alpha = glm::length(v - base) * lengthInv;
-      int i = longside;
-      glm::vec3 uvw(0);
-      uvw[i++] = 1 - alpha;
-      if (i > 2) i -= 3;
-      uvw[i++] = alpha;
-      if (i > 2) i -= 3;
-      uvw[i] = 0;
-      return uvw;
-    };
-  }
-}
-
-/**
- * This duplication of the above function is necessary because nvstd::function
- * fails on the host where std::function succeeds, saying it's using an
- * uninitialized value and segfaulting in the function constructor.
- */
 __host__ __device__ inline glm::vec3 GetBarycentric(const glm::vec3& v,
                                                     const glm::mat3& triPos,
                                                     float precision) {
-  const glm::mat3 edges(triPos[1] - triPos[0], triPos[2] - triPos[1],
-                        triPos[0] - triPos[2]);
+  const glm::mat3 edges(triPos[2] - triPos[1], triPos[0] - triPos[2],
+                        triPos[1] - triPos[0]);
   const glm::vec3 d2(glm::dot(edges[0], edges[0]), glm::dot(edges[1], edges[1]),
                      glm::dot(edges[2], edges[2]));
   int longside = d2[0] > d2[1] && d2[0] > d2[2] ? 0 : d2[1] > d2[2] ? 1 : 2;
   const glm::vec3 crossP = glm::cross(edges[0], edges[1]);
   const float area2 = glm::dot(crossP, crossP);
   const float tol2 = precision * precision;
+  const float vol = glm::dot(crossP, v - triPos[2]);
+  if (vol * vol > area2 * tol2) return glm::vec3(0.0f / 0.0f);
+
   if (d2[longside] < tol2) {  // point
     return glm::vec3(1, 0, 0);
   } else if (area2 > d2[longside] * tol2) {  // triangle
-    const glm::mat3x4 A(glm::vec4(triPos[0], 1), glm::vec4(triPos[1], 1),
-                        glm::vec4(triPos[2], 1));
-    return glm::inverse(glm::transpose(A) * A) * glm::transpose(A) *
-           glm::vec4(v, 1);
-  } else {  // line
-    const float alpha =
-        glm::length(v - triPos[longside]) * glm::inversesqrt(d2[longside]);
     glm::vec3 uvw(0);
-    uvw[longside++] = 1 - alpha;
-    if (longside > 2) longside -= 3;
-    uvw[longside++] = alpha;
-    if (longside > 2) longside -= 3;
+    for (int i : {0, 1, 2}) {
+      int j = i + 1;
+      if (j > 2) j -= 3;
+      uvw[i] = glm::dot(glm::cross(edges[i], v - triPos[j]), crossP);
+    }
+    uvw /= (uvw[0] + uvw[1] + uvw[2]);
+    return uvw;
+  } else {  // line
+    int nextside = longside + 1;
+    if (nextside > 2) nextside -= 3;
+    const float alpha =
+        glm::dot(v - triPos[nextside], edges[longside]) / d2[longside];
+    glm::vec3 uvw(0);
     uvw[longside] = 0;
+    uvw[nextside++] = 1 - alpha;
+    if (nextside > 2) nextside -= 3;
+    uvw[nextside] = alpha;
     return uvw;
   }
 }
