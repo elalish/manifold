@@ -351,7 +351,6 @@ void Manifold::Impl::RecursiveEdgeSwap(const int edge) {
     // Both triangles are now subsets of the neighboring triangle.
     const int tri0 = halfedge[tri0edge[0]].face;
     const int tri1 = halfedge[tri1edge[0]].face;
-    for (int i : {0, 1, 2}) halfedge[tri0edge[i]].face = tri1;
     triNormal[tri0] = triNormal[tri1];
     triBary[tri0] = triBary[tri1];
     triBary[tri0].vertBary[perm0[1]] = triBary[tri1].vertBary[perm1[0]];

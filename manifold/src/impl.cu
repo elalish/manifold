@@ -462,12 +462,18 @@ int Manifold::Impl::InitializeNewReference(
             GetBarycentric(vertPos_.H()[vert], triPos, precision_);
         if (isnan(uvw[0])) {
           coplanar = false;
+          triVert2bary[{refTri, vert}] = -4;
           break;
         }
         triVert2bary[{refTri, vert}] = meshRelation_.barycentric.size();
         meshRelation_.barycentric.H().push_back(uvw);
       }
-      vertBary[i] = triVert2bary[{refTri, vert}];
+      const int bary = triVert2bary[{refTri, vert}];
+      if (bary < -3) {
+        coplanar = false;
+        break;
+      }
+      vertBary[i] = bary;
     }
 
     if (coplanar) {

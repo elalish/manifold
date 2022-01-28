@@ -51,18 +51,13 @@ void Related(const Manifold& out, const std::vector<Mesh>& input,
     glm::mat3 inTriangle = {inMesh.vertPos[inMesh.triVerts[inTri][0]],
                             inMesh.vertPos[inMesh.triVerts[inTri][1]],
                             inMesh.vertPos[inMesh.triVerts[inTri][2]]};
-    // for (int j : {0, 1, 2}) std::cout << inTriangle[j] << std::endl;
     for (int j : {0, 1, 2}) {
-      // std::cout << relation.triBary[tri] << std::endl;
-      // std::cout << relation.UVW(tri, j) << std::endl;
       glm::vec3 vPos = output.vertPos[output.triVerts[tri][j]];
       glm::vec3 uvw = relation.UVW(tri, j);
       ASSERT_NEAR(uvw[0] + uvw[1] + uvw[2], 1, 0.0001);
       glm::vec3 vRelation = inTriangle * uvw;
-
-      // std::cout << vPos << ", " << vRelation << std::endl;
       for (int k : {0, 1, 2})
-        ASSERT_NEAR(vPos[k], vRelation[k], 100 * out.Precision());
+        ASSERT_NEAR(vPos[k], vRelation[k], 4 * out.Precision());
     }
   }
 }
