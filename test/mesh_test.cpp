@@ -23,14 +23,11 @@ namespace {
 
 using namespace manifold;
 
-void Identical(glm::vec3 v0, glm::vec3 v1) {
-  for (int j : {0, 1, 2}) ASSERT_NEAR(v0[j], v1[j], 0.0001);
-}
-
 void Identical(const Mesh& mesh1, const Mesh& mesh2) {
   ASSERT_EQ(mesh1.vertPos.size(), mesh2.vertPos.size());
   for (int i = 0; i < mesh1.vertPos.size(); ++i)
-    Identical(mesh1.vertPos[i], mesh2.vertPos[i]);
+    for (int j : {0, 1, 2})
+      ASSERT_NEAR(mesh1.vertPos[i][j], mesh2.vertPos[i][j], 0.0001);
 
   ASSERT_EQ(mesh1.triVerts.size(), mesh2.triVerts.size());
   for (int i = 0; i < mesh1.triVerts.size(); ++i)
@@ -49,14 +46,18 @@ void Related(const Manifold& out, const std::vector<Mesh>& input,
                       : meshID2idx.at(meshID2Original[meshID]);
     ASSERT_LT(meshIdx, input.size());
     const Mesh& inMesh = input[meshIdx];
-    int inTri = relation.triBary[tri].face;
+    int inTri = relation.triBary[tri].tri;
     ASSERT_LT(inTri, inMesh.triVerts.size());
-    glm::mat3 triangle = {inMesh.vertPos[inMesh.triVerts[inTri][0]],
-                          inMesh.vertPos[inMesh.triVerts[inTri][1]],
-                          inMesh.vertPos[inMesh.triVerts[inTri][2]]};
+    glm::mat3 inTriangle = {inMesh.vertPos[inMesh.triVerts[inTri][0]],
+                            inMesh.vertPos[inMesh.triVerts[inTri][1]],
+                            inMesh.vertPos[inMesh.triVerts[inTri][2]]};
     for (int j : {0, 1, 2}) {
-      glm::vec3 vPos = triangle * relation.UVW(tri, j);
-      Identical(output.vertPos[output.triVerts[tri][j]], vPos);
+      glm::vec3 vPos = output.vertPos[output.triVerts[tri][j]];
+      glm::vec3 uvw = relation.UVW(tri, j);
+      ASSERT_NEAR(uvw[0] + uvw[1] + uvw[2], 1, 0.0001);
+      glm::vec3 vRelation = inTriangle * uvw;
+      for (int k : {0, 1, 2})
+        ASSERT_NEAR(vPos[k], vRelation[k], 4 * out.Precision());
     }
   }
 }
@@ -139,8 +140,8 @@ TEST(MeshIO, ReadWrite) {
 TEST(Manifold, GetMesh) {
   Manifold manifold = Manifold::Sphere(1);
   Mesh mesh_out = manifold.GetMesh();
-  Manifold mesh2(mesh_out);
-  Mesh mesh_out2 = mesh2.GetMesh();
+  Manifold manifold2(mesh_out);
+  Mesh mesh_out2 = manifold2.GetMesh();
   Identical(mesh_out, mesh_out2);
 }
 
@@ -151,7 +152,7 @@ TEST(Manifold, Regression) {
   Manifold manifold1 = manifold;
   manifold1.Translate(glm::vec3(5.0f));
   int num_overlaps = manifold.NumOverlaps(manifold1);
-  ASSERT_EQ(num_overlaps, 234313);
+  ASSERT_EQ(num_overlaps, 228677);
 
   Mesh mesh_out = manifold.GetMesh();
   Manifold manifold2(mesh_out);
@@ -427,6 +428,20 @@ TEST(Manifold, MeshRelation) {
   std::vector<Mesh> input;
   std::map<int, int> meshID2idx;
 
+  input.push_back(ImportMesh("data/gyroidpuzzle.ply"));
+  Manifold gyroid(input[0]);
+
+  std::vector<int> meshIDs = gyroid.GetMeshIDs();
+  EXPECT_EQ(meshIDs.size(), 1);
+  meshID2idx[meshIDs[0]] = input.size() - 1;
+
+  Related(gyroid, input, meshID2idx);
+}
+
+TEST(Manifold, MeshRelationRefine) {
+  std::vector<Mesh> input;
+  std::map<int, int> meshID2idx;
+
   input.push_back(ImportMesh("data/Csaszar.ply"));
   Manifold csaszar(input[0]);
 
@@ -695,24 +710,42 @@ TEST(Boolean, Sphere) {
 }
 
 TEST(Boolean, Gyroid) {
-  Manifold gyroid(ImportMesh("data/gyroidpuzzle.ply"));
+  Mesh gyroidpuzzle = ImportMesh("data/gyroidpuzzle.ply");
+  Manifold gyroid(gyroidpuzzle);
+
+  Mesh gyroidpuzzle2 = gyroidpuzzle;
+  std::transform(gyroidpuzzle.vertPos.begin(), gyroidpuzzle.vertPos.end(),
+                 gyroidpuzzle2.vertPos.begin(),
+                 [](const glm::vec3& v) { return v + glm::vec3(5.0f); });
+  Manifold gyroid2(gyroidpuzzle2);
+
   EXPECT_TRUE(gyroid.IsManifold());
   EXPECT_TRUE(gyroid.MatchesTriNormals());
   EXPECT_LE(gyroid.NumDegenerateTris(), 12);
   // ExportMesh("gyroidpuzzle1.gltf", gyroid.Extract(), {});
-  Manifold gyroid2 = gyroid;
-  gyroid2.Translate(glm::vec3(5.0f));
-  gyroid2.SetAsOriginal();
   Manifold result = gyroid + gyroid2;
-  // ExportMesh("gyroidUnion.gltf", result.GetMesh(), {});
+  ExportMesh("gyroidUnion.gltf", result.GetMesh(), {});
 
   EXPECT_TRUE(result.IsManifold());
   EXPECT_TRUE(result.MatchesTriNormals());
-  EXPECT_LE(result.NumDegenerateTris(), 164);
+  EXPECT_LE(result.NumDegenerateTris(), 33);
   EXPECT_EQ(result.Decompose().size(), 1);
   auto prop = result.GetProperties();
   EXPECT_NEAR(prop.volume, 7692, 1);
   EXPECT_NEAR(prop.surfaceArea, 9642, 1);
 
-  // RelatedOp(gyroid, gyroid2, result);
+  std::vector<Mesh> input;
+  std::map<int, int> meshID2idx;
+
+  std::vector<int> meshIDs = gyroid.GetMeshIDs();
+  EXPECT_EQ(meshIDs.size(), 1);
+  meshID2idx[meshIDs[0]] = input.size();
+  input.push_back(gyroidpuzzle);
+
+  meshIDs = gyroid2.GetMeshIDs();
+  EXPECT_EQ(meshIDs.size(), 1);
+  meshID2idx[meshIDs[0]] = input.size();
+  input.push_back(gyroidpuzzle2);
+
+  Related(result, input, meshID2idx);
 }

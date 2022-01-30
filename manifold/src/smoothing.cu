@@ -107,12 +107,12 @@ struct InteriorVerts {
         const int c = (j == n - 1) ? -3 : first + 1;
         glm::ivec3 vertBary(c, a, b);
         triBary[posTri] = {-1, tri, vertBary};
-        triBaryNew[posTri++] = {baryOld.meshID, baryOld.face, vertBary};
+        triBaryNew[posTri++] = {baryOld.meshID, baryOld.tri, vertBary};
         if (j < n - 1 - i) {
           int d = b + 1;  // d cannot be a retained vert
           vertBary = {b, d, c};
           triBary[posTri] = {-1, tri, vertBary};
-          triBaryNew[posTri++] = {baryOld.meshID, baryOld.face, vertBary};
+          triBaryNew[posTri++] = {baryOld.meshID, baryOld.tri, vertBary};
         }
 
         if (i == 0 || j == 0 || k == 0) continue;
@@ -232,7 +232,7 @@ struct TriBary2Vert {
     for (int i : {0, 1, 2}) {
       int vert = halfedge[3 * tri + i].startVert;
       if (AtomicAdd(lock[vert], 1) != 0) continue;
-      vertBary[vert] = {baryRef.face, UVW(baryRef.vertBary[i], uvw)};
+      vertBary[vert] = {baryRef.tri, UVW(baryRef.vertBary[i], uvw)};
     }
   }
 };
@@ -370,7 +370,7 @@ void Manifold::Impl::CreateTangents(
     // meshRelation_.
     std::vector<int> oldHalfedge2New(halfedge.size());
     for (int tri = 0; tri < NumTri(); ++tri) {
-      int oldTri = triBary[tri].face;
+      int oldTri = triBary[tri].tri;
       for (int i : {0, 1, 2}) oldHalfedge2New[3 * oldTri + i] = 3 * tri + i;
     }
 
