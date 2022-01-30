@@ -61,8 +61,8 @@ struct FlagEdge {
       current = NextHalfedge(halfedge[current].pairedHalfedge);
       int tri = current / 3;
       const BaryRef ref = triBary[tri];
-      if ((ref.meshID != ref0.meshID || ref.face != ref0.face) &&
-          (ref.meshID != ref1.meshID || ref.face != ref1.face))
+      if ((ref.meshID != ref0.meshID || ref.tri != ref0.tri) &&
+          (ref.meshID != ref1.meshID || ref.tri != ref1.tri))
         return false;
     }
     return true;
@@ -257,8 +257,8 @@ void Manifold::Impl::CollapseEdge(const int edge) {
       const BaryRef ref = triBary[tri];
       // Don't collapse if the edge is not redundant (this may have changed due
       // to the collapse of neighbors).
-      if ((ref.meshID != ref0.meshID || ref.face != ref0.face) &&
-          (ref.meshID != ref1.meshID || ref.face != ref1.face))
+      if ((ref.meshID != ref0.meshID || ref.tri != ref0.tri) &&
+          (ref.meshID != ref1.meshID || ref.tri != ref1.tri))
         return;
 
       // Don't collapse edge if it would cause a triangle to invert.
@@ -286,7 +286,7 @@ void Manifold::Impl::CollapseEdge(const int edge) {
       const int tri = current / 3;
       const int vIdx = current - 3 * tri;
       triBary[tri].vertBary[vIdx] =
-          (ref0.meshID == triBary[tri].meshID && ref0.face == triBary[tri].face)
+          (ref0.meshID == triBary[tri].meshID && ref0.tri == triBary[tri].tri)
               ? ref0.vertBary[(edge + 1) % 3]
               : ref1.vertBary[toRemove.pairedHalfedge % 3];
     }
@@ -317,8 +317,11 @@ void Manifold::Impl::RecursiveEdgeSwap(const int edge) {
 
   if (halfedge[edge].pairedHalfedge < 0) return;
 
+  const int pair = halfedge[edge].pairedHalfedge;
   const glm::ivec3 tri0edge = TriOf(edge);
-  const glm::ivec3 tri1edge = TriOf(halfedge[edge].pairedHalfedge);
+  const glm::ivec3 tri1edge = TriOf(pair);
+  const glm::ivec3 perm0 = TriOf(edge % 3);
+  const glm::ivec3 perm1 = TriOf(pair % 3);
 
   glm::mat3x2 projection = GetAxisAlignedProjection(triNormal[edge / 3]);
   glm::vec2 v[4];
@@ -328,10 +331,16 @@ void Manifold::Impl::RecursiveEdgeSwap(const int edge) {
   if (CCW(v[0], v[1], v[2], precision_) > 0 || !Is01Longest(v[0], v[1], v[2]))
     return;
 
+  // Switch to neighbor's projection.
+  projection = GetAxisAlignedProjection(triNormal[halfedge[pair].face]);
+  for (int i : {0, 1, 2})
+    v[i] = projection * vertPos[halfedge[tri0edge[i]].startVert];
+  v[3] = projection * vertPos[halfedge[tri1edge[2]].startVert];
+
   auto SwapEdge = [&]() {
     // The 0-verts are swapped to the opposite 2-verts.
-    const int v0 = halfedge[tri0edge[1]].endVert;
-    const int v1 = halfedge[tri1edge[1]].endVert;
+    const int v0 = halfedge[tri0edge[2]].startVert;
+    const int v1 = halfedge[tri1edge[2]].startVert;
     halfedge[tri0edge[0]].startVert = v1;
     halfedge[tri0edge[2]].endVert = v1;
     halfedge[tri1edge[0]].startVert = v0;
@@ -344,22 +353,22 @@ void Manifold::Impl::RecursiveEdgeSwap(const int edge) {
     const int tri1 = halfedge[tri1edge[0]].face;
     triNormal[tri0] = triNormal[tri1];
     triBary[tri0] = triBary[tri1];
-    triBary[tri0].vertBary[1] = triBary[tri1].vertBary[0];
-    triBary[tri0].vertBary[0] = triBary[tri1].vertBary[2];
+    triBary[tri0].vertBary[perm0[1]] = triBary[tri1].vertBary[perm1[0]];
+    triBary[tri0].vertBary[perm0[0]] = triBary[tri1].vertBary[perm1[2]];
     // Calculate a new barycentric coordinate for the split triangle.
-    const glm::vec3 uvw0 =
-        UVW(triBary[tri1].vertBary[0], meshRelation_.barycentric.cptrH());
-    const glm::vec3 uvw1 =
-        UVW(triBary[tri1].vertBary[1], meshRelation_.barycentric.cptrH());
+    const glm::vec3 uvw0 = UVW(triBary[tri1].vertBary[perm1[0]],
+                               meshRelation_.barycentric.cptrH());
+    const glm::vec3 uvw1 = UVW(triBary[tri1].vertBary[perm1[1]],
+                               meshRelation_.barycentric.cptrH());
     const float l01 = glm::length(v[1] - v[0]);
     const float l02 = glm::length(v[2] - v[0]);
     const float a = glm::max(0.0f, glm::min(1.0f, l02 / l01));
-    const glm::vec3 uvw2 = a * uvw1 + (1 - a) * uvw0;
+    const glm::vec3 uvw2 = a * uvw0 + (1 - a) * uvw1;
     // And assign it.
     const int newBary = meshRelation_.barycentric.size();
     meshRelation_.barycentric.H().push_back(uvw2);
-    triBary[tri1].vertBary[0] = newBary;
-    triBary[tri0].vertBary[2] = newBary;
+    triBary[tri1].vertBary[perm1[0]] = newBary;
+    triBary[tri0].vertBary[perm0[2]] = newBary;
 
     // if the new edge already exists, duplicate the verts and split the mesh.
     int current = halfedge[tri1edge[0]].pairedHalfedge;
@@ -374,12 +383,6 @@ void Manifold::Impl::RecursiveEdgeSwap(const int edge) {
       current = halfedge[current].pairedHalfedge;
     }
   };
-
-  // Switch to neighbor's projection.
-  projection = GetAxisAlignedProjection(triNormal[halfedge[tri1edge[0]].face]);
-  for (int i : {0, 1, 2})
-    v[i] = projection * vertPos[halfedge[tri0edge[i]].startVert];
-  v[3] = projection * vertPos[halfedge[tri1edge[2]].startVert];
 
   // Only operate if the other triangles are not degenerate.
   if (CCW(v[1], v[0], v[3], precision_) <= 0) {

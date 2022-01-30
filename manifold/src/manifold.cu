@@ -180,11 +180,16 @@ Curvature Manifold::GetCurvature() const { return pImpl_->GetCurvature(); }
 /**
  * Gets the relationship to the previous mesh, for the purpose of assinging
  * properties like texture coordinates. The triBary vector is the same length as
- * Mesh.triVerts and BaryRef.face gives a unique identifier of the original mesh
- * face to which this triangle belongs. BaryRef.vertBary gives an index for each
- * vertex into the barycentric vector if that index is >= 0, indicating it is a
- * new vertex. If the index is < 0, this indicates it is an original vertex, the
- * index + 3 vert of the referenced triangle.
+ * Mesh.triVerts and .meshID indicates the mesh instance and .tri is that mesh's
+ * triangle index to which these barycentric coordinates refer. BaryRef.vertBary
+ * gives an index for each vertex into the barycentric vector if that index is
+ * >= 0, indicating it is a new vertex. If the index is < 0, this indicates it
+ * is an original vertex, the index + 3 vert of the referenced triangle.
+ *
+ * Every time a manifold is copied or combined to form a new manifold it gets a
+ * new meshID to indicate that particular instance of the mesh. In order to look
+ * up which input mesh a given instance came from, simply use the
+ * MeshID2Original static vector.
  */
 MeshRelation Manifold::GetMeshRelation() const {
   MeshRelation out;
@@ -220,8 +225,8 @@ std::vector<int> Manifold::GetMeshIDs() const {
 /**
  * If you copy a manifold, but you want this new copy to have new properties
  * (e.g. a different UV mapping), you can reset its meshID as an original,
- * meaning it will now be referenced by its descendents instead of the mesh it
- * was copied from, allowing you to differentiate the copies when applying your
+ * meaning it will now be referenced by its descendents instead of the meshes it
+ * was built from, allowing you to differentiate the copies when applying your
  * properties to the final result. Its new meshID is returned.
  *
  * This function also condenses all coplanar faces in the relation, allowing
