@@ -179,7 +179,7 @@ struct InitializeBaryRef {
 
     // Leave existing meshID if input is negative
     if (meshID >= 0) baryRef.meshID = meshID;
-    baryRef.face = tri;
+    baryRef.tri = tri;
     baryRef.vertBary = {-3, -2, -1};
   }
 };
@@ -478,7 +478,7 @@ int Manifold::Impl::InitializeNewReference(
 
     if (coplanar) {
       BaryRef& ref = triBary[tri];
-      ref.face = refTri;
+      ref.tri = refTri;
       ref.vertBary = vertBary;
     }
   }

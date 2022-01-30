@@ -46,7 +46,7 @@ void Related(const Manifold& out, const std::vector<Mesh>& input,
                       : meshID2idx.at(meshID2Original[meshID]);
     ASSERT_LT(meshIdx, input.size());
     const Mesh& inMesh = input[meshIdx];
-    int inTri = relation.triBary[tri].face;
+    int inTri = relation.triBary[tri].tri;
     ASSERT_LT(inTri, inMesh.triVerts.size());
     glm::mat3 inTriangle = {inMesh.vertPos[inMesh.triVerts[inTri][0]],
                             inMesh.vertPos[inMesh.triVerts[inTri][1]],

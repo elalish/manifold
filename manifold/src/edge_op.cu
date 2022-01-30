@@ -61,8 +61,8 @@ struct FlagEdge {
       current = NextHalfedge(halfedge[current].pairedHalfedge);
       int tri = current / 3;
       const BaryRef ref = triBary[tri];
-      if ((ref.meshID != ref0.meshID || ref.face != ref0.face) &&
-          (ref.meshID != ref1.meshID || ref.face != ref1.face))
+      if ((ref.meshID != ref0.meshID || ref.tri != ref0.tri) &&
+          (ref.meshID != ref1.meshID || ref.tri != ref1.tri))
         return false;
     }
     return true;
@@ -257,8 +257,8 @@ void Manifold::Impl::CollapseEdge(const int edge) {
       const BaryRef ref = triBary[tri];
       // Don't collapse if the edge is not redundant (this may have changed due
       // to the collapse of neighbors).
-      if ((ref.meshID != ref0.meshID || ref.face != ref0.face) &&
-          (ref.meshID != ref1.meshID || ref.face != ref1.face))
+      if ((ref.meshID != ref0.meshID || ref.tri != ref0.tri) &&
+          (ref.meshID != ref1.meshID || ref.tri != ref1.tri))
         return;
 
       // Don't collapse edge if it would cause a triangle to invert.
@@ -286,7 +286,7 @@ void Manifold::Impl::CollapseEdge(const int edge) {
       const int tri = current / 3;
       const int vIdx = current - 3 * tri;
       triBary[tri].vertBary[vIdx] =
-          (ref0.meshID == triBary[tri].meshID && ref0.face == triBary[tri].face)
+          (ref0.meshID == triBary[tri].meshID && ref0.tri == triBary[tri].tri)
               ? ref0.vertBary[(edge + 1) % 3]
               : ref1.vertBary[toRemove.pairedHalfedge % 3];
     }
