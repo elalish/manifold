@@ -1,22 +1,20 @@
 # Manifold
 
-This is a geometry library dedicated to creating and operating on manifold meshes. A [manifold mesh](https://github.com/elalish/manifold/wiki/Manifoldness) is a mesh that represents a solid object, and so is very important in manufacturing, CAD, structural analysis, etc. Further information can be found on the [wiki](https://github.com/elalish/manifold/wiki).
+This is a geometry library dedicated to creating and operating on manifold meshes. A [manifold mesh](https://github.com/elalish/manifold/wiki/Manifold-Library#manifoldness) is a mesh that represents a solid object, and so is very important in manufacturing, CAD, structural analysis, etc. Further information can be found on the [wiki](https://github.com/elalish/manifold/wiki/Manifold-Library).
 
 ## What's here
 
-This library is intended to be fast with guaranteed manifold output. As such you need manifold meshes to start, which can be hard to come by since it doesn't matter at all for 3D graphics. This library can create simple primitive meshes but also links in Assimp, which will import many kinds of 3D files, but you'll get an error if the imported mesh isn't manifold. Various automated repair tools exist online for fixing non manifold models, usually for 3D printing. 
+This library is intended to be fast with guaranteed manifold output. As such you need manifold meshes as input, which can be hard to come by since most 3D graphics meshes are not. This library can create simple primitive meshes but also links in Assimp, which will import many kinds of 3D files, but you'll get an error if the imported mesh isn't manifold. Various automated repair tools exist online for fixing non manifold models, usually for 3D printing. 
 
-The most significant contribution here is a guaranteed manifold mesh Boolean algorithm, which I believe is the first of its kind. If anyone knows of another, please tell me. Likewise, if the Boolean here ever fails you, please submit an issue! This Boolean forms the basis of CAD kernel, as it allows simple shapes to be combined into more complex ones.
+The most significant contribution here is a guaranteed manifold [mesh Boolean](https://github.com/elalish/manifold/wiki/Manifold-Library#mesh-boolean) algorithm, which I believe is the first of its kind. If anyone knows of another, please tell me. Likewise, if the Boolean here ever fails you, please submit an issue! This Boolean forms the basis of a CAD kernel, as it allows simple shapes to be combined into more complex ones.
 
-To aid in speed, this library makes extensive use of parallelization, generally through Nvidia's thrust library. You can switch between the CUDA, OMP and serial C++ backends by setting a CMake flag. 
+To aid in speed, this library makes extensive use of parallelization, generally through Nvidia's Thrust library. You can switch between the CUDA, OMP and serial C++ backends by setting a CMake flag. Not everything is so parallelizable, for instance a [polygon triangulation](https://github.com/elalish/manifold/wiki/Manifold-Library#polygon-triangulation) algorithm is included which is serial. 
 
-Not everything is so parallelizable, for instance a polygon triangulation algorithm is included which is serial. 
+Look in the [samples](https://github.com/elalish/manifold/tree/master/samples) directory for examples of how to use this library to make interesting 3D models. You may notice that some of these examples bare a certain resemblance to my OpenSCAD designs on [Thingiverse](https://www.thingiverse.com/emmett), which is no accident. Much as I love OpenSCAD, my library is dramatically faster and the code is more flexible, though it could be improved even more with JS or Python bindings to avoid the syntax and compiling of C++. 
 
 ## Building
 
-The canonical build instructions are in the [.travis.yml file](https://github.com/elalish/manifold/blob/master/.travis.yml), as that is what this project's continuous integration server uses to build and test. I only build under Ubuntu Linux; I used to build in OSX too, but a combination of iffy CUDA and OMP support made me abandon it for the moment. 
-
-Look in the [tools](https://github.com/elalish/manifold/tree/master/tools) directory for examples of how to use this library in your own code.
+The canonical build instructions are in the [manifold.yml](https://github.com/elalish/manifold/blob/master/.github/workflows/manifold.yml) file, as that is what this project's continuous integration server uses to build and test. I have only built under Ubuntu Linux, and the CI uses Nvidia's Cuda 11 Docker image. Part of my [road map](https://github.com/elalish/manifold/wiki/Manifold-Library#road-map) is to migrate from Thrust to C++20 parallel algorithms, which will alleviate the need to install the Cuda Developer Kit to build.
 
 ## Contributing
 
@@ -24,4 +22,4 @@ Contributions are welcome! A lower barrier contribution is to simply make a PR t
 
 ## About the author
 
-This library is by [Emmett Lalish](https://www.thingiverse.com/emmett). I am currently a Google employee, but this is not a Google project. At my day job I work on [\<model-viewer\>](https://github.com/GoogleWebComponents/model-viewer). I was the first employee at a 3D video startup, [Omnivor](https://www.omnivor.io/), and before that I worked on 3D printing at Microsoft, including [3D Builder](https://www.microsoft.com/en-us/p/3d-builder/9wzdncrfj3t6?activetab=pivot%3Aoverviewtab). Originally an aerospace engineer, I started at a small DARPA contractor doing seedling projects, one of which became [Sea Hunter](https://en.wikipedia.org/wiki/Sea_Hunter). I earned my doctorate from the University of Washington in control theory and published some [papers](https://www.researchgate.net/scientific-contributions/75011026_Emmett_Lalish).
+This library is by [Emmett Lalish](https://elalish.blogspot.com/). I am currently a Google employee, but this is not a Google project. At my day job I'm the maintainer of [\<model-viewer\>](https://modelviewer.dev/). I was the first employee at a 3D video startup, [Omnivor](https://www.omnivor.io/), and before that I worked on 3D printing at Microsoft, including [3D Builder](https://www.microsoft.com/en-us/p/3d-builder/9wzdncrfj3t6?activetab=pivot%3Aoverviewtab). Originally an aerospace engineer, I started at a small DARPA contractor doing seedling projects, one of which became [Sea Hunter](https://en.wikipedia.org/wiki/Sea_Hunter). I earned my doctorate from the University of Washington in control theory and published some [papers](https://www.researchgate.net/scientific-contributions/75011026_Emmett_Lalish).
