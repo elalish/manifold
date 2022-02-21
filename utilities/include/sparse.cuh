@@ -23,7 +23,7 @@
 #include "utils.cuh"
 #include "vec_dh.cuh"
 
-namespace manifold {
+namespace manifold::internal {
 
 class SparseIndices {
   // COO-style sparse matrix storage. Values corresponding to these indicies are

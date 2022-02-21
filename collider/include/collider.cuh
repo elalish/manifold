@@ -17,7 +17,7 @@
 #include "structs.h"
 #include "vec_dh.cuh"
 
-namespace manifold {
+namespace manifold::internal {
 
 class Collider {
  public:
