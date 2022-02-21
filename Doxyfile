@@ -409,7 +409,7 @@ GROUP_NESTED_COMPOUNDS = NO
 # \nosubgrouping command.
 # The default value is: YES.
 
-SUBGROUPING            = YES
+SUBGROUPING            = NO
 
 # When the INLINE_GROUPED_CLASSES tag is set to YES, classes, structs and unions
 # are shown inside the group in which they are included (e.g. using \ingroup)
@@ -430,7 +430,7 @@ INLINE_GROUPED_CLASSES = NO
 # Man pages) or section (for LaTeX and RTF).
 # The default value is: NO.
 
-INLINE_SIMPLE_STRUCTS  = NO
+INLINE_SIMPLE_STRUCTS  = YES
 
 # When TYPEDEF_HIDES_STRUCT tag is enabled, a typedef of a struct, union, or
 # enum is documented as struct, union, or enum with the name of the typedef. So
@@ -1031,7 +1031,7 @@ FILTER_SOURCE_PATTERNS =
 # (index.html). This can be useful if you have a project on for instance GitHub
 # and want to reuse the introduction page also for the doxygen output.
 
-USE_MDFILE_AS_MAINPAGE =
+USE_MDFILE_AS_MAINPAGE = README.md
 
 #---------------------------------------------------------------------------
 # Configuration options related to source browsing

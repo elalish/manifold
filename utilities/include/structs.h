@@ -42,7 +42,7 @@ struct geometryErr : public virtual std::runtime_error {
   using std::runtime_error::runtime_error;
 };
 using logicErr = std::logic_error;
-/** @} */  // end of errors
+/** @} */
 
 /** @defgroup Common
  *  Common structs and utilities
@@ -319,7 +319,7 @@ inline std::ostream& operator<<(std::ostream& stream,
   return stream << "meshID: " << ref.meshID << ", tri: " << ref.tri
                 << ", uvw idx: " << ref.vertBary;
 }
-/** @} */  // end of Common
+/** @} */
 }  // namespace manifold
 
 #undef HOST_DEVICE
