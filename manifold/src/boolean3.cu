@@ -487,7 +487,7 @@ VecDH<int> Winding03(const Manifold::Impl &inP, SparseIndices &p0q2,
 };
 }  // namespace
 
-namespace manifold {
+namespace manifold::internal {
 Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ,
                    Manifold::OpType op)
     : inP_(inP), inQ_(inQ), expandP_(op == Manifold::OpType::ADD ? 1.0 : -1.0) {

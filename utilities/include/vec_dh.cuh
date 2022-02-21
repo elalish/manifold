@@ -16,7 +16,7 @@
 #include <thrust/device_vector.h>
 #include <thrust/host_vector.h>
 
-namespace manifold {
+namespace manifold::internal {
 
 template <typename T>
 using VecH = thrust::host_vector<T>;

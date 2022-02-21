@@ -88,7 +88,6 @@
         "random": "cpp",
         "variant": "cpp"
     },
-    "C_Cpp.clang_format_style": "google",
     "C_Cpp.clang_format_fallbackStyle": "google",
     "editor.formatOnSave": true,
     "cmake.configureArgs": [

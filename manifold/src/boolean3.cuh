@@ -35,7 +35,7 @@
  * and Q have been swapped.
  */
 
-namespace manifold {
+namespace manifold::internal {
 
 class Boolean3 {
  public:
