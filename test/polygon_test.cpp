@@ -22,6 +22,7 @@
 namespace {
 
 using namespace manifold;
+using namespace manifold::internal;
 
 void StandardizePoly(SimplePolygon &p) {
   auto start = std::min_element(

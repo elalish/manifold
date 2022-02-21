@@ -150,12 +150,12 @@ struct Curvature {
   std::vector<float> vertMeanCurvature, vertGaussianCurvature;
 };
 
-struct BaryRef {
-  int meshID, tri;
-  glm::ivec3 vertBary;
-};
-
 struct MeshRelation {
+  struct BaryRef {
+    int meshID, tri;
+    glm::ivec3 vertBary;
+  };
+
   std::vector<glm::vec3> barycentric;
   std::vector<BaryRef> triBary;
 
@@ -305,7 +305,8 @@ inline std::ostream& operator<<(std::ostream& stream, const glm::mat4x3& mat) {
                 << tam[2] << std::endl;
 }
 
-inline std::ostream& operator<<(std::ostream& stream, const BaryRef& ref) {
+inline std::ostream& operator<<(std::ostream& stream,
+                                const MeshRelation::BaryRef& ref) {
   return stream << "meshID: " << ref.meshID << ", tri: " << ref.tri
                 << ", uvw idx: " << ref.vertBary;
 }

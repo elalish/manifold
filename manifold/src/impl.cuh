@@ -23,6 +23,7 @@
 namespace manifold {
 
 using namespace internal;
+using BaryRef = MeshRelation::BaryRef;
 
 struct Manifold::Impl {
   struct MeshRelationD {
