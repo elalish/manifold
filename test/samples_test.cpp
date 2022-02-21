@@ -135,11 +135,21 @@ TEST(Samples, Sponge4) {
   CheckManifold(sponge);
   EXPECT_EQ(sponge.NumDegenerateTris(), 0);
   EXPECT_EQ(sponge.Genus(), 26433);  // should be 1:5, 2:81, 3:1409, 4:26433
-  // ExportMesh("mengerSponge.gltf", sponge.GetMesh(), {});
+
   std::pair<Manifold, Manifold> cutSponge = sponge.SplitByPlane({1, 1, 1}, 0);
   EXPECT_TRUE(cutSponge.first.IsManifold());
   EXPECT_EQ(cutSponge.first.Genus(), 13394);
   EXPECT_TRUE(cutSponge.second.IsManifold());
   EXPECT_EQ(cutSponge.second.Genus(), 13394);
-  // ExportMesh("mengerSponge.ply", cutSponge.first.GetMesh(), {});
+  // ExportMesh("mengerHalf.gltf", cutSponge.first.GetMesh(), {});
+
+  // const Mesh out = sponge.GetMesh();
+  // ExportOptions options;
+  // options.faceted = true;
+  // options.mat.roughness = 0.2;
+  // options.mat.metalness = 1.0;
+  // for (const glm::vec3 pos : out.vertPos) {
+  //   options.mat.vertColor.push_back(glm::vec4(0.5f * (pos + 0.5f), 1.0f));
+  // }
+  // ExportMesh("mengerSponge.gltf", out, options);
 }
