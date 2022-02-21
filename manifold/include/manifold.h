@@ -18,6 +18,10 @@
 
 #include "structs.h"
 
+/**
+ * @brief Main namespace containing the whole library's API.
+ *
+ */
 namespace manifold {
 
 class Manifold {
