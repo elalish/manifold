@@ -25,7 +25,6 @@
 
 namespace {
 using namespace manifold;
-using namespace manifold::internal;
 
 ExecutionParams params;
 
@@ -810,7 +809,7 @@ void PrintFailure(const std::exception &e, const Polygons &polys,
 }
 }  // namespace
 
-namespace manifold::internal {
+namespace manifold {
 
 /**
  * @brief Triangulates a set of /epsilon-valid polygons.

@@ -28,6 +28,10 @@ namespace manifold {
 
 constexpr float kTolerance = 1e-5;
 
+/** @defgroup Errors
+ *  Custom errors
+ *  @{
+ */
 struct userErr : public virtual std::runtime_error {
   using std::runtime_error::runtime_error;
 };
@@ -38,7 +42,12 @@ struct geometryErr : public virtual std::runtime_error {
   using std::runtime_error::runtime_error;
 };
 using logicErr = std::logic_error;
+/** @} */  // end of errors
 
+/** @defgroup Common
+ *  Common structs and utilities
+ *  @{
+ */
 template <typename Ex>
 void AlwaysAssert(bool condition, const char* file, int line,
                   const std::string& cond, const std::string& msg) {
@@ -310,6 +319,7 @@ inline std::ostream& operator<<(std::ostream& stream,
   return stream << "meshID: " << ref.meshID << ", tri: " << ref.tri
                 << ", uvw idx: " << ref.vertBary;
 }
+/** @} */  // end of Common
 }  // namespace manifold
 
 #undef HOST_DEVICE

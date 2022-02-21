@@ -17,7 +17,6 @@
 
 namespace {
 using namespace manifold;
-using namespace manifold::internal;
 using namespace thrust::placeholders;
 
 struct MakeTri {

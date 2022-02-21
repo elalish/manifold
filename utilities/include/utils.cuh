@@ -22,7 +22,7 @@
 
 #include <iostream>
 
-namespace manifold::internal {
+namespace manifold {
 
 inline void MemUsage() {
 #if THRUST_DEVICE_SYSTEM == THRUST_DEVICE_SYSTEM_CUDA
