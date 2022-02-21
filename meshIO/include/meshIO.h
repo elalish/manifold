@@ -17,6 +17,9 @@
 
 namespace manifold {
 
+/** @addtogroup Core
+ *  @{
+ */
 struct ExportOptions {
   struct Material {
     float roughness = 1;
@@ -31,5 +34,5 @@ struct ExportOptions {
 
 Mesh ImportMesh(const std::string& filename);
 void ExportMesh(const std::string& filename, const Mesh&, const ExportOptions&);
-
+/** @} */
 }  // namespace manifold
