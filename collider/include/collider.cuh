@@ -19,6 +19,7 @@
 
 namespace manifold {
 
+/** @ingroup Private */
 class Collider {
  public:
   Collider() {}
