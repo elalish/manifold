@@ -16,7 +16,7 @@
 
 #include "vec_dh.cuh"
 
-namespace manifold::internal {
+namespace manifold {
 
 __host__ __device__ inline glm::vec3 SafeNormalize(glm::vec3 v) {
   v = glm::normalize(v);

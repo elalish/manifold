@@ -23,7 +23,6 @@ constexpr int kRoot = 1;
 
 namespace {
 using namespace manifold;
-using namespace manifold::internal;
 
 __host__ __device__ bool IsLeaf(int node) { return node % 2 == 0; }
 __host__ __device__ bool IsInternal(int node) { return node % 2 == 1; }

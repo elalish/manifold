@@ -17,7 +17,7 @@
 
 #include "structs.h"
 
-namespace manifold::internal {
+namespace manifold {
 
 std::vector<glm::ivec3> Triangulate(const Polygons &polys,
                                     float precision = -1);

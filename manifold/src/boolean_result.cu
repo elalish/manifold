@@ -497,7 +497,7 @@ std::pair<VecDH<BaryRef>, VecDH<int>> CalculateMeshRelation(
 }
 }  // namespace
 
-namespace manifold::internal {
+namespace manifold {
 
 Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
   Timer assemble;

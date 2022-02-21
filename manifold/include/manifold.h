@@ -24,6 +24,10 @@
  */
 namespace manifold {
 
+/** @defgroup Core
+ *  The central classes of the library
+ *  @{
+ */
 class Manifold {
  public:
   // Creation
@@ -122,4 +126,5 @@ class Manifold {
   static float circularAngle_;
   static float circularEdgeLength_;
 };
+/** @} */  // end of Manifold
 }  // namespace manifold
