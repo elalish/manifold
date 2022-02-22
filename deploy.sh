@@ -23,7 +23,7 @@ DEPLOYABLE_STATIC_FILES=( \
 )
 
 PACKAGE_ROOT=`pwd`
-DEPLOY_ROOT=$PACKAGE_ROOT/dist
+DEPLOY_ROOT=$PACKAGE_ROOT/docs/html
 
 function copyToDeployRoot {
   path=$1
@@ -66,8 +66,6 @@ set -x
 git log -n 1 > $DEPLOY_ROOT/VERSION
 
 git status --ignored
-
-popd
 
 set +e
 set +x
