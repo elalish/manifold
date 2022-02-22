@@ -18,6 +18,9 @@
 
 namespace manifold {
 
+/** @addtogroup Private
+ *  @{
+ */
 __host__ __device__ inline glm::vec3 SafeNormalize(glm::vec3 v) {
   v = glm::normalize(v);
   return isfinite(v.x) ? v : glm::vec3(0);
@@ -159,4 +162,5 @@ struct ReindexEdge {
     edge = edges[edge].halfedgeIdx;
   }
 };
+/** @} */
 }  // namespace manifold

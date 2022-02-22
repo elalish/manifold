@@ -18,6 +18,9 @@
 
 namespace manifold {
 
+/** @addtogroup Private
+ *  @{
+ */
 template <typename T>
 using VecH = thrust::host_vector<T>;
 
@@ -197,5 +200,5 @@ class VecD {
   T const* const ptr_;
   const int size_;
 };
-
+/** @} */
 }  // namespace manifold

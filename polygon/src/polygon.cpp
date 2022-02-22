@@ -811,6 +811,16 @@ void PrintFailure(const std::exception &e, const Polygons &polys,
 
 namespace manifold {
 
+/**
+ * @brief Triangulates a set of /epsilon-valid polygons.
+ *
+ * @param polys The set of polygons, wound CCW and representing multiple
+ * polygons and/or holes. These have 2D-projected positions as well as
+ * references back to the original vertices
+ * @param precision The value of epsilon, bounding the uncertainty of the input
+ * @return std::vector<glm::ivec3> The triangles, referencing the original
+ * vertex indicies.
+ */
 std::vector<glm::ivec3> Triangulate(const Polygons &polys, float precision) {
   std::vector<glm::ivec3> triangles;
   try {
