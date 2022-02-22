@@ -20,9 +20,13 @@
 
 namespace manifold {
 
+/** @ingroup Core */
 class Manifold {
  public:
-  // Creation
+  /** @name Creation
+   *  Constructors
+   */
+  ///@{
   Manifold();
 
   Manifold(
@@ -44,18 +48,35 @@ class Manifold {
                           glm::vec2 scaleTop = glm::vec2(1.0f));
   static Manifold Revolve(const Polygons& crossSection,
                           int circularSegments = 0);
+  ///@}
 
-  // Topological
+  /** @name Topological
+   *  No geometric calculations.
+   */
+  ///@{
   static Manifold Compose(const std::vector<Manifold>&);
   std::vector<Manifold> Decompose() const;
+  ///@}
 
-  // Defaults for construction
+  /** @name Defaults
+   * These static properties control how circular shapes are quantized by
+   * default on construction. If circularSegments is specified, it takes
+   * precedence. If it is zero, then instead the minimum is used of the segments
+   * calculated based on edge length and angle, rounded up to the nearest
+   * multiple of four. To get numbers not divisible by four, circularSegements
+   * must be specified.
+   */
+  ///@{
   static void SetMinCircularAngle(float degrees);
   static void SetMinCircularEdgeLength(float length);
   static void SetCircularSegments(int number);
   static int GetCircularSegments(float radius);
+  ///@}
 
-  // Information
+  /** @name Information
+   *  Details of the manifold
+   */
+  ///@{
   Mesh GetMesh() const;
   bool IsEmpty() const;
   int NumVert() const;
@@ -66,14 +87,23 @@ class Manifold {
   int Genus() const;
   Properties GetProperties() const;
   Curvature GetCurvature() const;
+  ///@}
 
-  // Relation
+  /** @name Relation
+   *  Details of the manifold's relation to its input meshes, for the purposes
+   * of reapplying mesh properties.
+   */
+  ///@{
   MeshRelation GetMeshRelation() const;
   std::vector<int> GetMeshIDs() const;
   int SetAsOriginal();
   static std::vector<int> MeshID2Original();
+  ///@}
 
-  // Modification
+  /** @name Modification
+   *  Change this manifold in-place.
+   */
+  ///@{
   Manifold& Translate(glm::vec3);
   Manifold& Scale(glm::vec3);
   Manifold& Rotate(float xDegrees, float yDegrees = 0.0f,
@@ -83,8 +113,12 @@ class Manifold {
   Manifold& Refine(int);
   // Manifold RefineToLength(float);
   // Manifold RefineToPrecision(float);
+  ///@}
 
-  // Boolean
+  /** @name Boolean
+   *  Combine two manifolds
+   */
+  ///@{
   enum class OpType { ADD, SUBTRACT, INTERSECT };
   Manifold Boolean(const Manifold& second, OpType op) const;
   // Boolean operation shorthand
@@ -98,12 +132,17 @@ class Manifold {
   std::pair<Manifold, Manifold> SplitByPlane(glm::vec3 normal,
                                              float originOffset) const;
   Manifold TrimByPlane(glm::vec3 normal, float originOffset) const;
+  ///@}
 
-  // Testing hooks
+  /** @name Testing hooks
+   *  These are just for internal testing.
+   */
+  ///@{
   bool IsManifold() const;
   bool MatchesTriNormals() const;
   int NumDegenerateTris() const;
   int NumOverlaps(const Manifold& second) const;
+  ///@}
 
   ~Manifold();
   Manifold(const Manifold& other);

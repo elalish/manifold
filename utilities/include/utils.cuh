@@ -24,6 +24,10 @@
 
 namespace manifold {
 
+/** @defgroup Private
+ *  Internal classes of the library; not currently part of the public API
+ *  @{
+ */
 inline void MemUsage() {
 #if THRUST_DEVICE_SYSTEM == THRUST_DEVICE_SYSTEM_CUDA
   size_t free, total;
@@ -159,5 +163,5 @@ class strided_range {
   Iterator last;
   difference_type stride;
 };
-
+/** @} */
 }  // namespace manifold

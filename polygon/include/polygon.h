@@ -19,6 +19,9 @@
 
 namespace manifold {
 
+/** @addtogroup Private
+ *  @{
+ */
 std::vector<glm::ivec3> Triangulate(const Polygons &polys,
                                     float precision = -1);
 
@@ -31,5 +34,5 @@ void CheckGeometry(const std::vector<glm::ivec3> &triangles,
                    const Polygons &polys, float precision);
 void Dump(const Polygons &polys);
 ExecutionParams &PolygonParams();
-
+/** @} */
 }  // namespace manifold

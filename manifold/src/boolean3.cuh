@@ -37,6 +37,7 @@
 
 namespace manifold {
 
+/** @ingroup Private */
 class Boolean3 {
  public:
   Boolean3(const Manifold::Impl& inP, const Manifold::Impl& inQ,

@@ -28,6 +28,10 @@ namespace manifold {
 
 constexpr float kTolerance = 1e-5;
 
+/** @defgroup Errors
+ *  Custom errors
+ *  @{
+ */
 struct userErr : public virtual std::runtime_error {
   using std::runtime_error::runtime_error;
 };
@@ -38,7 +42,12 @@ struct geometryErr : public virtual std::runtime_error {
   using std::runtime_error::runtime_error;
 };
 using logicErr = std::logic_error;
+/** @} */
 
+/** @defgroup Common
+ *  Common structs and utilities
+ *  @{
+ */
 template <typename Ex>
 void AlwaysAssert(bool condition, const char* file, int line,
                   const std::string& cond, const std::string& msg) {
@@ -150,12 +159,12 @@ struct Curvature {
   std::vector<float> vertMeanCurvature, vertGaussianCurvature;
 };
 
-struct BaryRef {
-  int meshID, tri;
-  glm::ivec3 vertBary;
-};
-
 struct MeshRelation {
+  struct BaryRef {
+    int meshID, tri;
+    glm::ivec3 vertBary;
+  };
+
   std::vector<glm::vec3> barycentric;
   std::vector<BaryRef> triBary;
 
@@ -305,10 +314,12 @@ inline std::ostream& operator<<(std::ostream& stream, const glm::mat4x3& mat) {
                 << tam[2] << std::endl;
 }
 
-inline std::ostream& operator<<(std::ostream& stream, const BaryRef& ref) {
+inline std::ostream& operator<<(std::ostream& stream,
+                                const MeshRelation::BaryRef& ref) {
   return stream << "meshID: " << ref.meshID << ", tri: " << ref.tri
                 << ", uvw idx: " << ref.vertBary;
 }
+/** @} */
 }  // namespace manifold
 
 #undef HOST_DEVICE

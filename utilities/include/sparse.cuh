@@ -25,6 +25,7 @@
 
 namespace manifold {
 
+/** @ingroup Private */
 class SparseIndices {
   // COO-style sparse matrix storage. Values corresponding to these indicies are
   // stored in vectors separate from this class, but having the same length.

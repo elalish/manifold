@@ -22,6 +22,9 @@
 
 namespace manifold {
 
+using BaryRef = MeshRelation::BaryRef;
+
+/** @ingroup Private */
 struct Manifold::Impl {
   struct MeshRelationD {
     VecDH<glm::vec3> barycentric;

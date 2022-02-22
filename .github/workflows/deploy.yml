@@ -1,0 +1,30 @@
+name: Deploy documentation 
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  deploy_github_pages:
+    runs-on: ubuntu-20.04
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Doxygen Action
+      uses: mattnotmitt/doxygen-action@v1.1.0
+      with:
+        doxyfile-path: "./Doxyfile" 
+        working-directory: "." 
+    
+    - name: Copy models
+      run: ./deploy.sh
+
+    - name: Deploy to Github Pages
+      uses: peaceiris/actions-gh-pages@v3
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_branch: gh-pages
+        force_orphan: true
+        publish_dir: ./docs/html
