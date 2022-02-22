@@ -59,7 +59,12 @@ class Manifold {
   ///@}
 
   /** @name Defaults
-   *  Defaults for construction
+   * These static properties control how circular shapes are quantized by
+   * default on construction. If circularSegments is specified, it takes
+   * precedence. If it is zero, then instead the minimum is used of the segments
+   * calculated based on edge length and angle, rounded up to the nearest
+   * multiple of four. To get numbers not divisible by four, circularSegements
+   * must be specified.
    */
   ///@{
   static void SetMinCircularAngle(float degrees);
