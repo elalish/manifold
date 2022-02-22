@@ -12,14 +12,14 @@ jobs:
     steps:
     - uses: actions/checkout@v2
 
+    - name: Copy models
+      run: ./deploy.sh
+
     - name: Doxygen Action
       uses: mattnotmitt/doxygen-action@v1.1.0
       with:
         doxyfile-path: "./Doxyfile" 
         working-directory: "." 
-    
-    - name: Copy models
-      run: ./deploy.sh
 
     - name: Deploy to Github Pages
       uses: peaceiris/actions-gh-pages@v3
