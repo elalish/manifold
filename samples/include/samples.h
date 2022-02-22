@@ -15,7 +15,9 @@
 #pragma once
 #include "manifold.h"
 
-/**
+namespace manifold {
+
+/** @defgroup Samples
  * @brief Examples of usage and interesting designs.
  *
  * These are mostly 3D-printable designs I've invented over the years,
@@ -29,14 +31,9 @@
  * https://creativecommons.org/licenses/by-sa/2.0/, which means you're welcome
  * to print and sell them, so long as you attribute the design to Emmett Lalish
  * and share any derivative works under the same license.
- *
- */
-namespace manifold {
-
-/** @defgroup Samples
- *  Usage examples and interesting models
  *  @{
  */
+
 /**
  * p is the number of times the thread passes through the donut hole and q is
  * the number of times the thread circles the donut. If p and q have a common
@@ -50,7 +47,7 @@ Manifold TorusKnot(int p, int q, float majorRadius, float minorRadius,
                    int linearSegments = 0);
 
 /**
- *The overall size is given by radius; the radius left for your wrist is
+ * The overall size is given by radius; the radius left for your wrist is
  * roughly radius - height. Its length along your arm (the height of the print)
  * is given by width. The thickness parameter is the width of the material,
  * which should be equal to your printer's nozzle diameter. The number of twisty
