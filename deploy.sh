@@ -23,7 +23,7 @@ DEPLOYABLE_STATIC_FILES=( \
 )
 
 PACKAGE_ROOT=`pwd`
-DEPLOY_ROOT=$PACKAGE_ROOT/docs/html/dist
+DEPLOY_ROOT=$PACKAGE_ROOT/docs/html
 
 function copyToDeployRoot {
   path=$1
