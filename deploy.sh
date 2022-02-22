@@ -18,9 +18,6 @@
 set -e
 set -x
 
-# Switch to the package root
-pushd $(dirname $0)/..
-
 DEPLOYABLE_STATIC_FILES=( \
   samples/models \
 )
