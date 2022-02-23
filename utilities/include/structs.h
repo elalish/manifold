@@ -28,8 +28,8 @@ namespace manifold {
 
 constexpr float kTolerance = 1e-5;
 
-/** @defgroup Errors
- *  Custom errors
+/** @defgroup Exceptions
+ *  @brief Custom exceptions
  *  @{
  */
 struct userErr : public virtual std::runtime_error {
@@ -45,7 +45,7 @@ using logicErr = std::logic_error;
 /** @} */
 
 /** @defgroup Common
- *  Common structs and utilities
+ *  @brief Common structs and utilities
  *  @{
  */
 template <typename Ex>
