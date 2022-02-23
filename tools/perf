@@ -1,63 +1,22 @@
-2020-12-27
-CPU: 
-nTri = 512, time = 0.0177404 sec
-nTri = 2048, time = 0.020182 sec
-nTri = 8192, time = 0.0350801 sec
-nTri = 32768, time = 0.090847 sec
-nTri = 131072, time = 0.335753 sec
-nTri = 524288, time = 1.17349 sec
-nTri = 2097152, time = 4.96713 sec
-nTri = 8388608, time = 20.4223 sec
-
-GPU:
-nTri = 512, time = 0.00922685 sec
-nTri = 2048, time = 0.012492 sec
-nTri = 8192, time = 0.0244057 sec
-nTri = 32768, time = 0.0681854 sec
-nTri = 131072, time = 0.24731 sec
-nTri = 524288, time = 0.925412 sec
-nTri = 2097152, time = 3.58953 sec
-nTri = 8388608, time = 14.0618 sec
-
-2020-12-30
+2022-02-22
 CPU:
-nTri = 512, time = 0.0219515 sec
-nTri = 2048, time = 0.0193104 sec
-nTri = 8192, time = 0.0330518 sec
-nTri = 32768, time = 0.0836589 sec
-nTri = 131072, time = 0.300644 sec
-nTri = 524288, time = 1.04015 sec
-nTri = 2097152, time = 4.95156 sec
-nTri = 8388608, time = 22.3659 sec
+nTri = 512, time = 0.0176101 sec
+nTri = 2048, time = 0.0196583 sec
+nTri = 8192, time = 0.0355035 sec
+nTri = 32768, time = 0.0999017 sec
+nTri = 131072, time = 0.334987 sec
+nTri = 524288, time = 1.25136 sec
+nTri = 2097152, time = 5.81453 sec
+nTri = 8388608, time = 26.987 sec
 
 GPU:
-nTri = 512, time = 0.00790592 sec
-nTri = 2048, time = 0.00983821 sec
-nTri = 8192, time = 0.016407 sec
-nTri = 32768, time = 0.037048 sec
-nTri = 131072, time = 0.107055 sec
-nTri = 524288, time = 0.388469 sec
-nTri = 2097152, time = 1.44631 sec
-nTri = 8388608, time = 5.5323 sec
+nTri = 512, time = 0.00846689 sec
+nTri = 2048, time = 0.0115478 sec
+nTri = 8192, time = 0.0222773 sec
+nTri = 32768, time = 0.0560136 sec
+nTri = 131072, time = 0.176548 sec
+nTri = 524288, time = 0.670403 sec
+nTri = 2097152, time = 2.60109 sec
+nTri = 8388608, time = 10.5697 sec
 
-2021-01-03
-CPU:
-nTri = 512, time = 0.0199636 sec
-nTri = 2048, time = 0.0189914 sec
-nTri = 8192, time = 0.0318973 sec
-nTri = 32768, time = 0.0800193 sec
-nTri = 131072, time = 0.289744 sec
-nTri = 524288, time = 1.022 sec
-nTri = 2097152, time = 4.82382 sec
-nTri = 8388608, time = 21.6896 sec
-
-GPU:
-nTri = 512, time = 0.0072105 sec
-nTri = 2048, time = 0.00880571 sec
-nTri = 8192, time = 0.0144722 sec
-nTri = 32768, time = 0.0313637 sec
-nTri = 131072, time = 0.0924161 sec
-nTri = 524288, time = 0.334457 sec
-nTri = 2097152, time = 1.22776 sec
-nTri = 8388608, time = 4.8952 sec
 

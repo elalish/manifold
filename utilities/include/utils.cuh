@@ -25,7 +25,7 @@
 namespace manifold {
 
 /** @defgroup Private
- *  Internal classes of the library; not currently part of the public API
+ *  @brief Internal classes of the library; not currently part of the public API
  *  @{
  */
 inline void MemUsage() {

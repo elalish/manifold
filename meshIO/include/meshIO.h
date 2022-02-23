@@ -18,7 +18,7 @@
 namespace manifold {
 
 /** @defgroup Core
- *  The central classes of the library
+ *  @brief The central classes of the library
  *  @{
  */
 struct ExportOptions {
