@@ -18,7 +18,7 @@
 namespace manifold {
 
 /** @defgroup Samples
- * @brief Examples of usage and interesting designs.
+ * @brief Examples of usage and interesting designs
  *
  * These are mostly 3D-printable designs I've invented over the years,
  * translated from their original OpenSCAD to C++ to demonstrate the usage of
