@@ -44,8 +44,7 @@ struct geometryErr : public virtual std::runtime_error {
 using logicErr = std::logic_error;
 /** @} */
 
-/** @defgroup Common
- *  @brief Common structs and utilities
+/** @addtogroup Private
  *  @{
  */
 template <typename Ex>
@@ -70,28 +69,6 @@ void AlwaysAssert(bool condition, const char* file, int line,
 
 inline HOST_DEVICE int Signum(float val) { return (val > 0) - (val < 0); }
 
-// Use sind and cosd for inputs in degrees so that multiples of 90 degrees come
-// out exact.
-inline HOST_DEVICE float sind(float x) {
-  if (!std::isfinite(x)) return sin(x);
-  if (x < 0.0f) return -sind(-x);
-  int quo;
-  x = remquo(fabs(x), 90.0f, &quo);
-  switch (quo % 4) {
-    case 0:
-      return sin(glm::radians(x));
-    case 1:
-      return cos(glm::radians(x));
-    case 2:
-      return -sin(glm::radians(x));
-    case 3:
-      return -cos(glm::radians(x));
-  }
-  return 0.0f;
-}
-
-inline HOST_DEVICE float cosd(float x) { return sind(x + 90.0f); }
-
 inline HOST_DEVICE int CCW(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2,
                            float tol) {
   glm::vec2 v1 = p1 - p0;
@@ -102,14 +79,6 @@ inline HOST_DEVICE int CCW(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2,
     return 0;
   else
     return area > 0 ? 1 : -1;
-}
-
-inline HOST_DEVICE glm::mat4x3 RotateUp(glm::vec3 up) {
-  up = glm::normalize(up);
-  glm::vec3 axis = glm::cross(up, {0, 0, 1});
-  float angle = glm::asin(glm::length(axis));
-  if (glm::dot(up, {0, 0, 1}) < 0) angle = glm::pi<float>() - angle;
-  return glm::mat4x3(glm::rotate(glm::mat4(1), angle, axis));
 }
 
 struct ExecutionParams {
@@ -128,6 +97,56 @@ struct Halfedge {
                                         : startVert < other.startVert;
   }
 };
+/** @} */
+
+/** @defgroup Connections
+ *  @brief Move data in and out of the Manifold class.
+ *  @{
+ */
+
+/**
+ * @brief Sin degrees
+ *
+ * Use for inputs in degrees so that multiples of 90 degrees come out exact.
+ */
+inline HOST_DEVICE float sind(float x) {
+  if (!std::isfinite(x)) return sin(x);
+  if (x < 0.0f) return -sind(-x);
+  int quo;
+  x = remquo(fabs(x), 90.0f, &quo);
+  switch (quo % 4) {
+    case 0:
+      return sin(glm::radians(x));
+    case 1:
+      return cos(glm::radians(x));
+    case 2:
+      return -sin(glm::radians(x));
+    case 3:
+      return -cos(glm::radians(x));
+  }
+  return 0.0f;
+}
+
+/**
+ * @brief Cos degrees
+ *
+ * Use inputs in degrees so that multiples of 90 degrees come out exact.
+ */
+inline HOST_DEVICE float cosd(float x) { return sind(x + 90.0f); }
+
+/**
+ * @brief Transform to point the given vector up (0, 0, 1)
+ *
+ * This 4x3 matrix can be used as an input to Manifold.Transform() to turn an
+ * object. Turns along the shortest path from given up-vector to (0, 0, 1).
+ */
+inline HOST_DEVICE glm::mat4x3 RotateUp(glm::vec3 up) {
+  up = glm::normalize(up);
+  glm::vec3 axis = glm::cross(up, {0, 0, 1});
+  float angle = glm::asin(glm::length(axis));
+  if (glm::dot(up, {0, 0, 1}) < 0) angle = glm::pi<float>() - angle;
+  return glm::mat4x3(glm::rotate(glm::mat4(1), angle, axis));
+}
 
 struct PolyVert {
   glm::vec2 pos;
@@ -159,12 +178,12 @@ struct Curvature {
   std::vector<float> vertMeanCurvature, vertGaussianCurvature;
 };
 
-struct MeshRelation {
-  struct BaryRef {
-    int meshID, tri;
-    glm::ivec3 vertBary;
-  };
+struct BaryRef {
+  int meshID, tri;
+  glm::ivec3 vertBary;
+};
 
+struct MeshRelation {
   std::vector<glm::vec3> barycentric;
   std::vector<BaryRef> triBary;
 
@@ -314,8 +333,7 @@ inline std::ostream& operator<<(std::ostream& stream, const glm::mat4x3& mat) {
                 << tam[2] << std::endl;
 }
 
-inline std::ostream& operator<<(std::ostream& stream,
-                                const MeshRelation::BaryRef& ref) {
+inline std::ostream& operator<<(std::ostream& stream, const BaryRef& ref) {
   return stream << "meshID: " << ref.meshID << ", tri: " << ref.tri
                 << ", uvw idx: " << ref.vertBary;
 }
