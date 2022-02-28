@@ -199,35 +199,64 @@ struct MeshRelation {
   }
 };
 
+/**
+ * Axis-aligned bounding box
+ */
 struct Box {
   glm::vec3 min = glm::vec3(1.0f / 0.0f);
   glm::vec3 max = glm::vec3(-1.0f / 0.0f);
 
+  /**
+   * Default constructor is an infinite box that contains all space.
+   */
   HOST_DEVICE Box() {}
+
+  /**
+   * Creates a box that contains the two given points.
+   */
   HOST_DEVICE Box(const glm::vec3 p1, const glm::vec3 p2) {
     min = glm::min(p1, p2);
     max = glm::max(p1, p2);
   }
 
+  /**
+   * Returns the dimensions of the Box.
+   */
   HOST_DEVICE glm::vec3 Size() const { return max - min; }
 
+  /**
+   * Returns the center point of the Box.
+   */
   HOST_DEVICE glm::vec3 Center() const { return 0.5f * (max + min); }
 
+  /**
+   * Returns the absolute-largest coordinate value of any contained
+   * point.
+   */
   HOST_DEVICE float Scale() const {
     glm::vec3 absMax = glm::max(glm::abs(min), glm::abs(max));
     return glm::max(absMax.x, glm::max(absMax.y, absMax.z));
   }
 
+  /**
+   * Does this box contain (includes equal) the given box?
+   */
   HOST_DEVICE bool Contains(const Box& box) const {
     return glm::all(glm::greaterThanEqual(box.min, min)) &&
            glm::all(glm::greaterThanEqual(max, box.max));
   }
 
+  /**
+   * Expand this box to include the given point.
+   */
   HOST_DEVICE void Union(const glm::vec3 p) {
     min = glm::min(min, p);
     max = glm::max(max, p);
   }
 
+  /**
+   * Expand this box to include the given box.
+   */
   HOST_DEVICE Box Union(const Box& box) const {
     Box out;
     out.min = glm::min(min, box.min);
@@ -235,9 +264,13 @@ struct Box {
     return out;
   }
 
-  // Ensure the transform passed in is axis-aligned (rotations are all multiples
-  // of 90 degrees), or else the resulting bounding box will no longer bound
-  // properly.
+  /**
+   * Transform the given box by the given axis-aligned affine transform.
+   *
+   * Ensure the transform passed in is axis-aligned (rotations are all
+   * multiples of 90 degrees), or else the resulting bounding box will no longer
+   * bound properly.
+   */
   HOST_DEVICE Box Transform(const glm::mat4x3& transform) const {
     Box out;
     glm::vec3 minT = transform * glm::vec4(min, 1.0f);
@@ -247,6 +280,9 @@ struct Box {
     return out;
   }
 
+  /**
+   * Shift this box by the given vector.
+   */
   HOST_DEVICE Box operator+(glm::vec3 shift) const {
     Box out;
     out.min = min + shift;
@@ -254,12 +290,18 @@ struct Box {
     return out;
   }
 
+  /**
+   * Shift this box in-place by the given vector.
+   */
   HOST_DEVICE Box& operator+=(glm::vec3 shift) {
     min += shift;
     max += shift;
     return *this;
   }
 
+  /**
+   * Scale this box by the given vector.
+   */
   HOST_DEVICE Box operator*(glm::vec3 scale) const {
     Box out;
     out.min = min * scale;
@@ -267,26 +309,42 @@ struct Box {
     return out;
   }
 
+  /**
+   * Scale this box in-place by the given vector.
+   */
   HOST_DEVICE Box& operator*=(glm::vec3 scale) {
     min *= scale;
     max *= scale;
     return *this;
   }
 
+  /**
+   * Does this box overlap the one given (including equality)?
+   */
   HOST_DEVICE bool DoesOverlap(const Box& box) const {
     return min.x <= box.max.x && min.y <= box.max.y && min.z <= box.max.z &&
            max.x >= box.min.x && max.y >= box.min.y && max.z >= box.min.z;
   }
 
+  /**
+   * Does the given point project within the XY extent of this box
+   * (including equality)?
+   */
   HOST_DEVICE bool DoesOverlap(glm::vec3 p) const {  // projected in z
     return p.x <= max.x && p.x >= min.x && p.y <= max.y && p.y >= min.y;
   }
 
+  /**
+   * Does this box have finite bounds?
+   */
   HOST_DEVICE bool isFinite() const {
     return glm::all(glm::isfinite(min)) && glm::all(glm::isfinite(max));
   }
 };
 
+/**
+ * Print the contents of this vector to standard output.
+ */
 template <typename T>
 void Dump(const std::vector<T>& vec) {
   std::cout << "Vec = " << std::endl;
