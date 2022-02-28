@@ -1,14 +1,14 @@
 # Manifold
 
-This is a geometry library dedicated to creating and operating on manifold meshes. A [manifold mesh](https://github.com/elalish/manifold/wiki/Manifold-Library#manifoldness) is a mesh that represents a solid object, and so is very important in manufacturing, CAD, structural analysis, etc. Further information can be found on the [wiki](https://github.com/elalish/manifold/wiki/Manifold-Library).
+[Manifold](https://github.com/elalish/manifold) is a geometry library dedicated to creating and operating on manifold meshes. A [manifold mesh](https://github.com/elalish/manifold/wiki/Manifold-Library#manifoldness) is a mesh that represents a solid object, and so is very important in manufacturing, CAD, structural analysis, etc. Further information can be found on the [wiki](https://github.com/elalish/manifold/wiki/Manifold-Library).
 
 ## What's here
 
 This library is intended to be fast with guaranteed manifold output. As such you need manifold meshes as input, which can be hard to come by since most 3D graphics meshes are not. This library can create simple primitive meshes but also links in Assimp, which will import many kinds of 3D files, but you'll get an error if the imported mesh isn't manifold. Various automated repair tools exist online for fixing non manifold models, usually for 3D printing. 
 
-The most significant contribution here is a guaranteed manifold [mesh Boolean](https://github.com/elalish/manifold/wiki/Manifold-Library#mesh-boolean) algorithm, which I believe is the first of its kind. If anyone knows of another, please tell me. Likewise, if the Boolean here ever fails you, please submit an issue! This Boolean forms the basis of a CAD kernel, as it allows simple shapes to be combined into more complex ones.
+The most significant contribution here is a guaranteed-manifold [mesh Boolean](https://github.com/elalish/manifold/wiki/Manifold-Library#mesh-boolean) algorithm, which I believe is the first of its kind. If anyone knows of another, please tell me. Likewise, if the Boolean here ever fails you, please submit an issue! This Boolean forms the basis of a CAD kernel, as it allows simple shapes to be combined into more complex ones.
 
-[Documentation](https://elalish.github.io/manifold/modules.html) is available through Doxygen of all of this library's classes and functions. Expect more detail to be added as time goes on.
+[Documentation](https://elalish.github.io/manifold/modules.html) is available through Doxygen for all of this library's classes and functions. Expect more detail to be added as time goes on.
 
 To aid in speed, this library makes extensive use of parallelization, generally through Nvidia's Thrust library. You can switch between the CUDA, OMP and serial C++ backends by setting a CMake flag. Not everything is so parallelizable, for instance a [polygon triangulation](https://github.com/elalish/manifold/wiki/Manifold-Library#polygon-triangulation) algorithm is included which is serial. 
 

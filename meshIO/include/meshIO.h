@@ -17,18 +17,17 @@
 
 namespace manifold {
 
-/** @defgroup Core
- *  @brief The central classes of the library
+/** @addtogroup Connections
  *  @{
  */
-struct ExportOptions {
-  struct Material {
-    float roughness = 1;
-    float metalness = 0;
-    glm::vec4 color = glm::vec4(1.0f);
-    std::vector<glm::vec4> vertColor;
-  };
+struct Material {
+  float roughness = 1;
+  float metalness = 0;
+  glm::vec4 color = glm::vec4(1.0f);
+  std::vector<glm::vec4> vertColor;
+};
 
+struct ExportOptions {
   bool faceted = true;
   Material mat = {};
 };
