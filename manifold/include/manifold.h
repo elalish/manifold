@@ -20,7 +20,10 @@
 
 namespace manifold {
 
-/** @ingroup Core */
+/** @defgroup Core
+ *  @brief The central classes of the library
+ *  @{
+ */
 class Manifold {
  public:
   /** @name Creation
@@ -157,4 +160,5 @@ class Manifold {
   static float circularAngle_;
   static float circularEdgeLength_;
 };
+/** @} */
 }  // namespace manifold
