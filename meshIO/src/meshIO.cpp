@@ -86,13 +86,15 @@ Mesh ImportMesh(const std::string& filename, bool forceCleanup) {
 }
 
 /**
+ *
  * Saves the Mesh to the desired file type, determined from the extension
  * specified. In the case of .glb/.gltf, this will save in version 2.0.
  *
- * @param filename Supports any format the Assimp library supports.
- * @param mesh Mesh to save.
- * @param options Only applies to .glb/.gltf output to set material properties.
- * Pass {} to ignore.
+ * @param filename The file extension must be one that Assimp supports for
+ * export. GLB & 3MF are recommended.
+ * @param mesh The mesh to export, likely from Manifold.GetMesh().
+ * @param options The options currently only affect an exported GLB's material.
+ * Pass {} for defaults.
  */
 void ExportMesh(const std::string& filename, const Mesh& mesh,
                 const ExportOptions& options) {
