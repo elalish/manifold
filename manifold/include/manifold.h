@@ -31,9 +31,14 @@ class Manifold {
    */
   ///@{
   Manifold();
+  ~Manifold();
+  Manifold(const Manifold& other);
+  Manifold& operator=(const Manifold& other);
+  Manifold(Manifold&&) noexcept;
+  Manifold& operator=(Manifold&&) noexcept;
 
   Manifold(
-      const Mesh&,
+      const Mesh& mesh,
       const std::vector<glm::ivec3>& triProperties = std::vector<glm::ivec3>(),
       const std::vector<float>& properties = std::vector<float>(),
       const std::vector<float>& propertyTolerance = std::vector<float>());
@@ -147,11 +152,6 @@ class Manifold {
   int NumOverlaps(const Manifold& second) const;
   ///@}
 
-  ~Manifold();
-  Manifold(const Manifold& other);
-  Manifold& operator=(const Manifold& other);
-  Manifold(Manifold&&) noexcept;
-  Manifold& operator=(Manifold&&) noexcept;
   struct Impl;
 
  private:

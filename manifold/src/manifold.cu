@@ -53,13 +53,11 @@ Manifold Halfspace(Box bBox, glm::vec3 normal, float originOffset) {
 
 namespace manifold {
 
+/**
+ * Construct an empty Manifold.
+ *
+ */
 Manifold::Manifold() : pImpl_{std::make_unique<Impl>()} {}
-Manifold::Manifold(const Mesh& mesh,
-                   const std::vector<glm::ivec3>& triProperties,
-                   const std::vector<float>& properties,
-                   const std::vector<float>& propertyTolerance)
-    : pImpl_{std::make_unique<Impl>(mesh, triProperties, properties,
-                                    propertyTolerance)} {}
 Manifold::~Manifold() = default;
 Manifold::Manifold(Manifold&&) noexcept = default;
 Manifold& Manifold::operator=(Manifold&&) noexcept = default;
@@ -75,6 +73,39 @@ Manifold& Manifold::operator=(const Manifold& other) {
   }
   return *this;
 }
+
+/**
+ * Convert a Mesh into a Manifold. Will throw a topologyErr exception if the
+ * input is not an oriented 2-manifold. Will collapse degenerate triangles and
+ * unnecessary vertices.
+ *
+ * The three optional inputs should all be specified if any are. These define
+ * any properties you may have on this mesh. These properties are not saved in
+ * the Manifold, but rather used to determine which coplanar triangles can be
+ * safely merged due to all properties being colinear. Any edges that define
+ * property boundaries will be retained in the output of arbitrary Boolean
+ * operations so that these properties can be properly reapplied to the result
+ * using the MeshRelation.
+ *
+ * @param mesh The input Mesh.
+ * @param triProperties A vector of the same length as triVerts, filled with
+ * references to the properties index. Note the same vertex can have different
+ * properties in different triangles.
+ * @param properties A vector whose length is the largest index in
+ * triProperties times the length of propertyTolerance (the number of
+ * properties). Think of it as a propery matrix indexed as [index *
+ * numProperties + propertyNum].
+ * @param propertyTolerance A vector of precision values for each property.
+ * This is the amount of interpolation error allowed before two neighboring
+ * triangles are considered not coplanar. A good place to start is 1e-5 times
+ * the largest value you expect this property to take.
+ */
+Manifold::Manifold(const Mesh& mesh,
+                   const std::vector<glm::ivec3>& triProperties,
+                   const std::vector<float>& properties,
+                   const std::vector<float>& propertyTolerance)
+    : pImpl_{std::make_unique<Impl>(mesh, triProperties, properties,
+                                    propertyTolerance)} {}
 
 /**
  * This returns a Mesh of simple vectors of vertices and triangles suitable for
