@@ -38,7 +38,7 @@ struct ExportOptions {
  * @param filename Handles any files the Assimp library can import.
  * @return Mesh The mesh should be checked for manifoldness.
  */
-Mesh ImportMesh(const std::string& filename);
+Mesh ImportMesh(const std::string& filename, bool forceCleanup = false);
 
 /**
  *
