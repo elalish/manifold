@@ -24,7 +24,18 @@
 
 namespace manifold {
 
-Mesh ImportMesh(const std::string& filename) {
+/**
+ * Imports the given file as a Mesh structure, which can be converted to a
+ * Manifold if the mesh is a proper oriented 2-manifold. Any supported polygon
+ * format will be automatically triangulated.
+ *
+ * @param filename Supports any format the Assimp library supports.
+ * @param forceCleanup This merges identical vertices, which can break
+ * manifoldness. However it is always done for STLs, as they cannot possibly be
+ * manifold without this step.
+ * @return Mesh
+ */
+Mesh ImportMesh(const std::string& filename, bool forceCleanup) {
   std::string ext = filename.substr(filename.find_last_of(".") + 1);
   const bool isYup = ext == "glb" || ext == "gltf";
 
@@ -42,14 +53,16 @@ Mesh ImportMesh(const std::string& filename) {
                                   aiComponent_MATERIALS);
   importer.SetPropertyInteger(AI_CONFIG_PP_SBP_REMOVE,
                               aiPrimitiveType_POINT | aiPrimitiveType_LINE);
-  const aiScene* scene =
-      importer.ReadFile(filename,                             //
-                        aiProcess_JoinIdenticalVertices |     //
-                            aiProcess_Triangulate |           //
-                            aiProcess_RemoveComponent |       //
-                            aiProcess_PreTransformVertices |  //
-                            aiProcess_SortByPType |           //
-                            aiProcess_OptimizeMeshes);
+
+  unsigned int flags = aiProcess_Triangulate |           //
+                       aiProcess_RemoveComponent |       //
+                       aiProcess_PreTransformVertices |  //
+                       aiProcess_SortByPType;
+  if (forceCleanup || ext == "stl") {
+    flags = flags | aiProcess_JoinIdenticalVertices | aiProcess_OptimizeMeshes;
+  }
+
+  const aiScene* scene = importer.ReadFile(filename, flags);
 
   ALWAYS_ASSERT(scene, userErr, importer.GetErrorString());
 
@@ -72,6 +85,17 @@ Mesh ImportMesh(const std::string& filename) {
   return mesh_out;
 }
 
+/**
+ *
+ * Saves the Mesh to the desired file type, determined from the extension
+ * specified. In the case of .glb/.gltf, this will save in version 2.0.
+ *
+ * @param filename The file extension must be one that Assimp supports for
+ * export. GLB & 3MF are recommended.
+ * @param mesh The mesh to export, likely from Manifold.GetMesh().
+ * @param options The options currently only affect an exported GLB's material.
+ * Pass {} for defaults.
+ */
 void ExportMesh(const std::string& filename, const Mesh& mesh,
                 const ExportOptions& options) {
   if (mesh.triVerts.size() == 0) {
