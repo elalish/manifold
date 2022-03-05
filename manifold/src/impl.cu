@@ -125,10 +125,6 @@ struct LinkHalfedges {
     const int j = i + 1;
     const int pair0 = edges[i].halfedgeIdx;
     const int pair1 = edges[j].halfedgeIdx;
-    if (halfedges[pair0].startVert != halfedges[pair1].endVert ||
-        halfedges[pair0].endVert != halfedges[pair1].startVert ||
-        halfedges[pair0].face == halfedges[pair1].face)
-      printf("Not manifold!\n");
     halfedges[pair0].pairedHalfedge = pair1;
     halfedges[pair1].pairedHalfedge = pair0;
   }
@@ -301,6 +297,7 @@ Manifold::Impl::Impl(const Mesh& mesh,
   CalculateBBox();
   SetPrecision();
   CreateAndFixHalfedges(mesh.triVerts);
+  ALWAYS_ASSERT(IsManifold(), topologyErr, "Input mesh is not manifold!");
   CalculateNormals();
   InitializeNewReference(triProperties, properties, propertyTolerance);
   CollapseDegenerates();
