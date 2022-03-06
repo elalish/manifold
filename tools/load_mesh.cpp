@@ -20,12 +20,20 @@
 using namespace manifold;
 
 int main(int argc, char **argv) {
-  std::string filename = "../test/data/Csaszar.ply";
-  if (argc > 1) filename = argv[1];
+  ALWAYS_ASSERT(argc > 1, userErr, "No filename given!");
+  std::string filename = argv[1];
 
   Mesh mesh = ImportMesh(filename);
+
+  std::cout << mesh.vertPos.size() << " vertices input" << std::endl;
+  std::cout << mesh.triVerts.size() << " triangles input" << std::endl;
+
   Manifold manifold(mesh);
-  std::cout << "Manifold is ";
-  if (!manifold.IsManifold()) std::cout << "NOT ";
-  std::cout << "valid" << std::endl;
+
+  std::cout << "Manifold is valid" << std::endl;
+  std::cout << manifold.NumVert() << " vertices now" << std::endl;
+  std::cout << manifold.NumTri() << " triangles now" << std::endl;
+  std::cout << "Genus = " << manifold.Genus() << std::endl;
+  std::cout << manifold.NumDegenerateTris() << " degenerate triangles"
+            << std::endl;
 }

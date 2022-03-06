@@ -32,24 +32,8 @@ struct ExportOptions {
   Material mat = {};
 };
 
-/**
- * @brief Read mesh file.
- *
- * @param filename Handles any files the Assimp library can import.
- * @return Mesh The mesh should be checked for manifoldness.
- */
-Mesh ImportMesh(const std::string& filename);
+Mesh ImportMesh(const std::string& filename, bool forceCleanup = false);
 
-/**
- *
- * @brief Write mesh file.
- *
- * @param filename The file extension must be one that Assimp supports for
- * export. GLB & 3MF are recommended.
- * @param mesh The mesh to export, likely from Manifold.GetMesh().
- * @param options The options currently only affect an exported GLB's material.
- * Pass {} for defaults.
- */
 void ExportMesh(const std::string& filename, const Mesh& mesh,
                 const ExportOptions& options);
 /** @} */
