@@ -90,22 +90,24 @@ struct RemoveFace {
 }  // namespace
 
 namespace manifold {
-/*
+/**
  * Constructs a smooth version of the input mesh by creating tangents; this
  * method will throw if you have supplied tangnets with your mesh already. The
  * actual triangle resolution is unchanged; use the Refine() method to
  * interpolate to a higher-resolution curve.
  *
  * By default, every edge is calculated for maximum smoothness (very much
- * approximately), attempting to minimize the maximum mean curvature magnitude.
+ * approximately), attempting to minimize the maximum mean Curvature magnitude.
  * No higher-order derivatives are considered, as the interpolation is
  * independent per triangle, only sharing constraints on their boundaries.
  *
- * If desired, you can supply a vector of sharpened halfedges, which should in
- * general be a small subset of all halfedges. Order of entries doesn't matter,
- * as each one specifies the desired smoothness (between zero and one, with one
- * the default for all unspecified halfedges) and the halfedge index (3 *
- * triangle index + [0,1,2] where 0 is the edge between triVert 0 and 1, etc).
+ * @param mesh input Mesh.
+ * @param sharpenedEdges If desired, you can supply a vector of sharpened
+ * halfedges, which should in general be a small subset of all halfedges. Order
+ * of entries doesn't matter, as each one specifies the desired smoothness
+ * (between zero and one, with one the default for all unspecified halfedges)
+ * and the halfedge index (3 * triangle index + [0,1,2] where 0 is the edge
+ * between triVert 0 and 1, etc).
  *
  * At a smoothness value of zero, a sharp crease is made. The smoothness is
  * interpolated along each edge, so the specified value should be thought of as
@@ -140,8 +142,10 @@ Manifold Manifold::Tetrahedron() {
 
 /**
  * Constructs a unit cube (edge lengths all one), by default in the first
- * octant, touching the origin. Set center to true to shift the center to the
- * origin.
+ * octant, touching the origin.
+ *
+ * @param size The X, Y, and Z dimensions of the box.
+ * @param center Set to true to shift the center to the origin.
  */
 Manifold Manifold::Cube(glm::vec3 size, bool center) {
   Manifold cube;
@@ -153,8 +157,16 @@ Manifold Manifold::Cube(glm::vec3 size, bool center) {
 
 /**
  * A convenience constructor for the common case of extruding a circle. Can also
- * form cones if both radii are specified. Set center to true to center the
- * manifold vertically on the origin (default places the bottom on the origin).
+ * form cones if both radii are specified.
+ *
+ * @param height Z-extent
+ * @param radiusLow Radius of bottom circle. Must be positive.
+ * @param radiusHigh Radius of top circle. Can equal zero. Default is equal to
+ * radiusLow.
+ * @param circularSegments How many line segments to use around the circle.
+ * Default is calculated by the static Defaults.
+ * @param center Set to true to shift the center to the origin. Default is
+ * origin at the bottom.
  */
 Manifold Manifold::Cylinder(float height, float radiusLow, float radiusHigh,
                             int circularSegments, bool center) {
@@ -174,10 +186,14 @@ Manifold Manifold::Cylinder(float height, float radiusLow, float radiusHigh,
 }
 
 /**
- * Constructs a sphere of a given radius and number of segments along its
+ * Constructs a geodesic sphere of a given radius.
+ *
+ * @param radius Radius of the sphere. Must be positive.
+ * @param circularSegments Number of segments along its
  * diameter. This number will always be rounded up to the nearest factor of
  * four, as this sphere is constructed by refining an octahedron. This means
- * there are a circle of vertices on all three of the axis planes.
+ * there are a circle of vertices on all three of the axis planes. Default is
+ * calculated by the static Defaults.
  */
 Manifold Manifold::Sphere(float radius, int circularSegments) {
   int n = circularSegments > 0 ? (circularSegments + 3) / 4
@@ -195,11 +211,18 @@ Manifold Manifold::Sphere(float radius, int circularSegments) {
 
 /**
  * Constructs a manifold from a set of polygons by extruding them along the
- * Z-axis. The overall height and the scale at the top (X and Y independently)
- * can be specified, as can a twist, to be applied linearly. In the case of
- * twist, it can also be helpful to specify nDivisions, which specifies the
- * quantization of the triangles vertically. If the scale is {0,0}, a pure cone
- * is formed with only a single vertex at the top.
+ * Z-axis.
+ *
+ * @param crossSection A set of non-overlapping polygons to extrude.
+ * @param height Z-extent of extrusion.
+ * @param nDivisions Number of extra copies of the crossSection to insert into
+ * the shape vertically; especially useful in combnation with twistDegrees to
+ * avoid interpolation artifacts. Default is none.
+ * @param twistDegrees Amount to twist the top crossSection relative to the
+ * bottom, interpolated linearly for the divisions in between.
+ * @param scaleTop Amount to scale the top (independently in X and Y). If the
+ * scale is {0, 0}, a pure cone is formed with only a single vertex at the top.
+ * Default {1, 1}.
  */
 Manifold Manifold::Extrude(Polygons crossSection, float height, int nDivisions,
                            float twistDegrees, glm::vec2 scaleTop) {
@@ -269,6 +292,10 @@ Manifold Manifold::Extrude(Polygons crossSection, float height, int nDivisions,
  * manifold. If the polygons cross the Y-axis, only the part on the positive X
  * side is used. Geometrically valid input will result in geometrically valid
  * output.
+ *
+ * @param crossSection A set of non-overlapping polygons to revolve.
+ * @param circularSegments Number of segments along its diameter. Default is
+ * calculated by the static Defaults.
  */
 Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments) {
   float radius = 0.0f;
@@ -361,7 +388,9 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments) {
 /**
  * Constructs a new manifold from a vector of other manifolds. This is a purely
  * topological operation, so care should be taken to avoid creating
- * geometrically-invalid results.
+ * overlapping results. It is the inverse operation of Decompose().
+ *
+ * @param manifolds A vector of Manifolds to lazy-union together.
  */
 Manifold Manifold::Compose(const std::vector<Manifold>& manifolds) {
   int numVert = 0;
@@ -421,8 +450,9 @@ Manifold Manifold::Compose(const std::vector<Manifold>& manifolds) {
 }
 
 /**
- * This operation returns a copy of this manifold, but as a vector of meshes
- * that are topologically disconnected.
+ * This operation returns a vector of Manifolds that are topologically
+ * disconnected. If everything is connected, the vector is length one,
+ * containing a copy of the original. It is the inverse operation of Compose().
  */
 std::vector<Manifold> Manifold::Decompose() const {
   VecDH<int> vertLabel;
