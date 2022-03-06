@@ -38,7 +38,7 @@ class Manifold {
   Manifold& operator=(Manifold&&) noexcept;
 
   Manifold(
-      const Mesh& mesh,
+      const Mesh&,
       const std::vector<glm::ivec3>& triProperties = std::vector<glm::ivec3>(),
       const std::vector<float>& properties = std::vector<float>(),
       const std::vector<float>& propertyTolerance = std::vector<float>());
@@ -127,6 +127,9 @@ class Manifold {
    *  Combine two manifolds
    */
   ///@{
+  /**
+   * Boolean operation type: ADD (Union), SUBTRACT (Difference), and INTERSECT.
+   */
   enum class OpType { ADD, SUBTRACT, INTERSECT };
   Manifold Boolean(const Manifold& second, OpType op) const;
   // Boolean operation shorthand

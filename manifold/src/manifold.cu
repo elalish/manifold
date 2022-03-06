@@ -134,22 +134,54 @@ int Manifold::circularSegments_ = 0;
 float Manifold::circularAngle_ = 10.0f;
 float Manifold::circularEdgeLength_ = 1.0f;
 
+/**
+ * Sets an angle constraint the default number of circular segments for the
+ * Cylinder(), Sphere(), and Revolve() constructors. The number of segments will
+ * be rounded up to the nearest factor of four.
+ *
+ * @param angle The minimum angle in degrees between consecutive segments. The
+ * angle will increase if the the segments hit the minimum edge length. Default
+ * is 10 degrees.
+ */
 void Manifold::SetMinCircularAngle(float angle) {
   ALWAYS_ASSERT(angle > 0.0f, userErr, "angle must be positive!");
   Manifold::circularAngle_ = angle;
 }
 
+/**
+ * Sets a length constraint the default number of circular segments for the
+ * Cylinder(), Sphere(), and Revolve() constructors. The number of segments will
+ * be rounded up to the nearest factor of four.
+ *
+ * @param length The minimum length of segments. The length will
+ * increase if the the segments hit the minimum angle. Default is 1.0.
+ */
 void Manifold::SetMinCircularEdgeLength(float length) {
   ALWAYS_ASSERT(length > 0.0f, userErr, "length must be positive!");
   Manifold::circularEdgeLength_ = length;
 }
 
+/**
+ * Sets the default number of circular segments for the
+ * Cylinder(), Sphere(), and Revolve() constructors. Overrides the edge length
+ * and angle constraints and sets the number of segements to exactly this value.
+ *
+ * @param number Number of circular segments. Default is -1, meaning no
+ * constraint is applied.
+ */
 void Manifold::SetCircularSegments(int number) {
   ALWAYS_ASSERT(number > 2 || number == 0, userErr,
                 "must have at least three segments in circle!");
   Manifold::circularSegments_ = number;
 }
 
+/**
+ * Determine the result of the SetMinCircularAngle(),
+ * SetMinCircularEdgeLength(), and SetCircularSegments() defaults.
+ *
+ * @param radius For a given radius of circle, determine how many default
+ * segments there will be.
+ */
 int Manifold::GetCircularSegments(float radius) {
   if (Manifold::circularSegments_ > 0) return Manifold::circularSegments_;
   int nSegA = 360.0f / Manifold::circularAngle_;
@@ -159,15 +191,36 @@ int Manifold::GetCircularSegments(float radius) {
   return nSeg;
 }
 
+/**
+ * Does the Manifold have any triangles?
+ */
 bool Manifold::IsEmpty() const { return pImpl_->IsEmpty(); }
+/**
+ * The number of vertices in the Manifold.
+ */
 int Manifold::NumVert() const { return pImpl_->NumVert(); }
+/**
+ * The number of edges in the Manifold.
+ */
 int Manifold::NumEdge() const { return pImpl_->NumEdge(); }
+/**
+ * The number of triangles in the Manifold.
+ */
 int Manifold::NumTri() const { return pImpl_->NumTri(); }
 
+/**
+ * Returns the axis-aligned bounding box of all the Manifold's vertices.
+ */
 Box Manifold::BoundingBox() const {
   return pImpl_->bBox_.Transform(pImpl_->transform_);
 }
 
+/**
+ * Returns the precision of this Manifold's vertices, which tracks the
+ * approximate rounding error over all the transforms and operations that have
+ * led to this state. Any triangles that are colinear within this precision are
+ * considered degenerate and removed.
+ */
 float Manifold::Precision() const {
   pImpl_->ApplyTransform();
   return pImpl_->precision_;
@@ -184,10 +237,10 @@ int Manifold::Genus() const {
 }
 
 /**
- * Returns the surface area and volume of the manifold in a Properties
- * structure. These properties are clamped to zero for a given face if they are
- * within rounding tolerance. This means degenerate manifolds can by identified
- * by testing these properties as == 0.
+ * Returns the surface area and volume of the manifold. These properties are
+ * clamped to zero for a given face if they are within the Precision(). This
+ * means degenerate manifolds can by identified by testing these properties as
+ * == 0.
  */
 Properties Manifold::GetProperties() const { return pImpl_->GetProperties(); }
 
@@ -213,7 +266,7 @@ Curvature Manifold::GetCurvature() const { return pImpl_->GetCurvature(); }
  * Every time a manifold is copied or combined to form a new manifold it gets a
  * new meshID to indicate that particular instance of the mesh. In order to look
  * up which input mesh a given instance came from, simply use the
- * MeshID2Original static vector.
+ * MeshID2Original() static vector.
  */
 MeshRelation Manifold::GetMeshRelation() const {
   MeshRelation out;
@@ -258,27 +311,76 @@ std::vector<int> Manifold::GetMeshIDs() const {
  * across these faces, meaning you want to preserve some of these edges, you
  * should instead call GetMesh(), calculate your properties and use these to
  * construct a new manifold.
+ *
+ * @returns New MeshID
  */
 int Manifold::SetAsOriginal() {
   int meshID = pImpl_->InitializeNewReference();
   return meshID;
 }
 
+/**
+ * Returns a vector that maps a given unique MeshID to the MeshID of the
+ * original Mesh it came from, to easily identify separate copies of the same
+ * thing.
+ */
 std::vector<int> Manifold::MeshID2Original() {
   return Manifold::Impl::meshID2Original_;
 }
 
+/**
+ * Should always be true. Also checks saneness of the internal data structures.
+ */
 bool Manifold::IsManifold() const { return pImpl_->IsManifold(); }
 
+/**
+ * The triangle normal vectors are saved over the course of operations rather
+ * than recalculated to avoid rounding error. This checks that triangles still
+ * match their normal vectors within Precision().
+ */
 bool Manifold::MatchesTriNormals() const { return pImpl_->MatchesTriNormals(); }
 
+/**
+ * The number of triangles that are colinear within Precision(). This library
+ * attempts to remove all of these, but it cannot always remove all of them
+ * without changing the mesh by too much.
+ */
 int Manifold::NumDegenerateTris() const { return pImpl_->NumDegenerateTris(); }
 
+/**
+ * This is a checksum-style verification of the collider, simply returning the
+ * total number of edge-face bounding box overlaps between this and other.
+ *
+ * @param other A Manifold to overlap with.
+ */
+int Manifold::NumOverlaps(const Manifold& other) const {
+  pImpl_->ApplyTransform();
+  other.pImpl_->ApplyTransform();
+
+  SparseIndices overlaps = pImpl_->EdgeCollisions(*other.pImpl_);
+  int num_overlaps = overlaps.size();
+
+  overlaps = other.pImpl_->EdgeCollisions(*pImpl_);
+  return num_overlaps += overlaps.size();
+}
+
+/**
+ * Move this Manifold in space. This operation can be chained. Transforms are
+ * combined and applied lazily.
+ *
+ * @param v The vector to add to every vertex.
+ */
 Manifold& Manifold::Translate(glm::vec3 v) {
   pImpl_->transform_[3] += v;
   return *this;
 }
 
+/**
+ * Scale this Manifold in space. This operation can be chained. Transforms are
+ * combined and applied lazily.
+ *
+ * @param v The vector to multiply every vertex by per component.
+ */
 Manifold& Manifold::Scale(glm::vec3 v) {
   glm::mat3 s(1.0f);
   for (int i : {0, 1, 2}) s[i] *= v;
@@ -291,7 +393,12 @@ Manifold& Manifold::Scale(glm::vec3 v) {
  * Y, then Z, in degrees. We use degrees so that we can minimize rounding error,
  * and elimiate it completely for any multiples of 90 degrees. Addtionally, more
  * efficient code paths are used to update the manifold when the transforms only
- * rotate by multiples of 90 degrees.
+ * rotate by multiples of 90 degrees. This operation can be chained. Transforms
+ * are combined and applied lazily.
+ *
+ * @param xDegrees First rotation, degrees about the X-axis.
+ * @param yDegrees Second rotation, degrees about the Y-axis.
+ * @param zDegrees Third rotation, degrees about the Z-axis.
  */
 Manifold& Manifold::Rotate(float xDegrees, float yDegrees, float zDegrees) {
   glm::mat3 rX(1.0f, 0.0f, 0.0f,                      //
@@ -307,6 +414,13 @@ Manifold& Manifold::Rotate(float xDegrees, float yDegrees, float zDegrees) {
   return *this;
 }
 
+/**
+ * Transform this Manifold in space. The first three columns form a 3x3 matrix
+ * transform and the last is a translation vector. This operation can be
+ * chained. Transforms are combined and applied lazily.
+ *
+ * @param m The affine transform matrix to apply to all the vertices.
+ */
 Manifold& Manifold::Transform(const glm::mat4x3& m) {
   glm::mat4 old(pImpl_->transform_);
   pImpl_->transform_ = m * old;
@@ -316,9 +430,11 @@ Manifold& Manifold::Transform(const glm::mat4x3& m) {
 /**
  * This function does not change the topology, but allows the vertices to be
  * moved according to any arbitrary input function. It is easy to create a
- * function that warps a geometrically valid object into one with is not, but
+ * function that warps a geometrically valid object into one which overlaps, but
  * that is not checked here, so it is up to the user to choose their function
  * with discretion.
+ *
+ * @param warpFunc A function that modifies a given vertex position.
  */
 Manifold& Manifold::Warp(std::function<void(glm::vec3&)> warpFunc) {
   pImpl_->ApplyTransform();
@@ -330,26 +446,30 @@ Manifold& Manifold::Warp(std::function<void(glm::vec3&)> warpFunc) {
   return *this;
 }
 
+/**
+ * Increase the density of the mesh by splitting every edge into n pieces. For
+ * instance, with n = 2, each triangle will be split into 4 triangles. These
+ * will all be coplanar (and will not be immediately collapsed) unless the
+ * Mesh/Manifold has halfedgeTangents specified (e.g. from the Smooth()
+ * constructor), in which case the new vertices will be moved to the
+ * interpolated surface according to their barycentric coordinates.
+ *
+ * @param n The number of pieces to split every edge into. Must be > 1.
+ */
 Manifold& Manifold::Refine(int n) {
   pImpl_->Refine(n);
   return *this;
 }
 
 /**
- * This is a checksum-style verification of the collider, simply returning the
- * total number of edge-face bounding box overlaps between this and other.
+ * The central operation of this library: the Boolean combines two manifolds
+ * into another by calculating their intersections and removing the unused
+ * portions. Non-self-overlapping inputs will produce non-overlapping output.
+ * Self-overlapping input may fail triangulation.
+ *
+ * @param second The other Manifold.
+ * @param op The type of operation to perform.
  */
-int Manifold::NumOverlaps(const Manifold& other) const {
-  pImpl_->ApplyTransform();
-  other.pImpl_->ApplyTransform();
-
-  SparseIndices overlaps = pImpl_->EdgeCollisions(*other.pImpl_);
-  int num_overlaps = overlaps.size();
-
-  overlaps = other.pImpl_->EdgeCollisions(*pImpl_);
-  return num_overlaps += overlaps.size();
-}
-
 Manifold Manifold::Boolean(const Manifold& second, OpType op) const {
   pImpl_->ApplyTransform();
   second.pImpl_->ApplyTransform();
@@ -359,37 +479,57 @@ Manifold Manifold::Boolean(const Manifold& second, OpType op) const {
   return result;
 }
 
+/**
+ * Shorthand for Boolean Union.
+ */
 Manifold Manifold::operator+(const Manifold& Q) const {
   return Boolean(Q, OpType::ADD);
 }
 
+/**
+ * Shorthand for Boolean Union assignment.
+ */
 Manifold& Manifold::operator+=(const Manifold& Q) {
   *this = *this + Q;
   return *this;
 }
 
+/**
+ * Shorthand for Boolean Difference.
+ */
 Manifold Manifold::operator-(const Manifold& Q) const {
   return Boolean(Q, OpType::SUBTRACT);
 }
 
+/**
+ * Shorthand for Boolean Difference assignment.
+ */
 Manifold& Manifold::operator-=(const Manifold& Q) {
   *this = *this - Q;
   return *this;
 }
 
+/**
+ * Shorthand for Boolean Intersection.
+ */
 Manifold Manifold::operator^(const Manifold& Q) const {
   return Boolean(Q, OpType::INTERSECT);
 }
 
+/**
+ * Shorthand for Boolean Intersection assignment.
+ */
 Manifold& Manifold::operator^=(const Manifold& Q) {
   *this = *this ^ Q;
   return *this;
 }
 
 /**
- * Split cuts this manifold in two using the input manifold. The first result is
- * the intersection, second is the difference. This is more efficient than doing
- * them separately.
+ * Split cuts this manifold in two using the cutter manifold. The first result
+ * is the intersection, second is the difference. This is more efficient than
+ * doing them separately.
+ *
+ * @param cutter
  */
 std::pair<Manifold, Manifold> Manifold::Split(const Manifold& cutter) const {
   pImpl_->ApplyTransform();
@@ -404,10 +544,13 @@ std::pair<Manifold, Manifold> Manifold::Split(const Manifold& cutter) const {
 }
 
 /**
- * Convient version of Split for a half-space. The first result is in the
- * direction of the normal, second is opposite. Origin offset is the distance of
- * the plane from the origin in the direction of the normal vector. The length
- * of the normal is not important, as it is normalized internally.
+ * Convient version of Split() for a half-space.
+ *
+ * @param normal This vector is normal to the cutting plane and its length does
+ * not matter. The first result is in the direction of this vector, the second
+ * result is on the opposite side.
+ * @param originOffset The distance of the plane from the origin in the
+ * direction of the normal vector.
  */
 std::pair<Manifold, Manifold> Manifold::SplitByPlane(glm::vec3 normal,
                                                      float originOffset) const {
@@ -415,8 +558,13 @@ std::pair<Manifold, Manifold> Manifold::SplitByPlane(glm::vec3 normal,
 }
 
 /**
- * Identical to SplitbyPlane, but calculating and returning only the first
+ * Identical to SplitByPlane(), but calculating and returning only the first
  * result.
+ *
+ * @param normal This vector is normal to the cutting plane and its length does
+ * not matter. The result is in the direction of this vector from the plane.
+ * @param originOffset The distance of the plane from the origin in the
+ * direction of the normal vector.
  */
 Manifold Manifold::TrimByPlane(glm::vec3 normal, float originOffset) const {
   pImpl_->ApplyTransform();
