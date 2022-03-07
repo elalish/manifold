@@ -20,15 +20,32 @@ namespace manifold {
 /** @addtogroup Connections
  *  @{
  */
+
+/**
+ * PBR material properties for GLB/glTF files.
+ */
 struct Material {
+  /// Roughness value between 0 (shiny) and 1 (matte).
   float roughness = 1;
+  /// Metalness value, generally either 0 (dielectric) or 1 (metal).
   float metalness = 0;
+  /// Color (RGBA) multiplier to apply to the whole mesh (each value between 0
+  /// and 1).
   glm::vec4 color = glm::vec4(1.0f);
+  /// Optional: If non-empty, must match Mesh.vertPos. Provides an RGBA color
+  /// for each vertex, linearly interpolated across triangles. Colors are
+  /// linear, not sRGB.
   std::vector<glm::vec4> vertColor;
 };
 
+/**
+ * These options only currently affect .glb and .gltf files.
+ */
 struct ExportOptions {
+  /// When false, vertex normals are exported, causing the mesh to appear smooth
+  /// through normal interpolation.
   bool faceted = true;
+  /// PBR material properties.
   Material mat = {};
 };
 

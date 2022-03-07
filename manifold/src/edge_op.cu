@@ -109,10 +109,15 @@ namespace manifold {
  * It also performs edge swaps on the long edges of degenerate triangles, though
  * there are some configurations of degenerates that cannot be removed this way.
  *
+ * Note when an edge collapse would result in something non-manifold, the
+ * vertices are duplicated in such a way as to remove handles or separate
+ * meshes, thus decreasing the Genus(). It only increases when meshes that have
+ * collapsed to just a pair of triangles are removed entirely.
+ *
  * Rather than actually removing the edges, this step merely marks them for
  * removal, by setting vertPos to NaN and halfedge to {-1, -1, -1, -1}.
  */
-void Manifold::Impl::CollapseDegenerates() {
+void Manifold::Impl::SimplifyTopology() {
   VecDH<int> flaggedEdges(halfedge_.size());
   int numFlagged =
       thrust::copy_if(

@@ -495,8 +495,8 @@ Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ,
   // Union -> expand inP
   // Difference, Intersection -> contract inP
 
-  Timer filter;
-  filter.Start();
+  Timer broad;
+  broad.Start();
 
   if (inP.IsEmpty() || inQ.IsEmpty() || !inP.bBox_.DoesOverlap(inQ.bBox_)) {
     if (kVerbose) std::cout << "No overlap, early out" << std::endl;
@@ -531,9 +531,9 @@ Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ,
   SparseIndices p1q1 = Filter11(inP_, inQ_, p1q2_, p2q1_);
   if (kVerbose) std::cout << "p1q1 size = " << p1q1.size() << std::endl;
 
-  filter.Stop();
-  Timer levels;
-  levels.Start();
+  broad.Stop();
+  Timer intersections;
+  intersections.Start();
 
   // Level 2
   // Build up XY-projection intersection of two edges, including the z-value for
@@ -572,11 +572,11 @@ Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ,
 
   w30_ = Winding03(inQ, p2q0, s20, true);
 
-  levels.Stop();
+  intersections.Stop();
 
   if (kVerbose) {
-    filter.Print("Filter");
-    levels.Print("Levels 1-3");
+    broad.Print("Broad phase");
+    intersections.Print("Intersections");
     MemUsage();
   }
 }

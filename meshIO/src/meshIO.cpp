@@ -29,11 +29,15 @@ namespace manifold {
  * Manifold if the mesh is a proper oriented 2-manifold. Any supported polygon
  * format will be automatically triangulated.
  *
+ * This is a very simple import function and is intended primarily as a
+ * demonstration. Generally users of this library will need to modify this to
+ * read all the important properties for their application and set up any custom
+ * data structures.
+ *
  * @param filename Supports any format the Assimp library supports.
  * @param forceCleanup This merges identical vertices, which can break
  * manifoldness. However it is always done for STLs, as they cannot possibly be
  * manifold without this step.
- * @return Mesh
  */
 Mesh ImportMesh(const std::string& filename, bool forceCleanup) {
   std::string ext = filename.substr(filename.find_last_of(".") + 1);
@@ -86,9 +90,13 @@ Mesh ImportMesh(const std::string& filename, bool forceCleanup) {
 }
 
 /**
- *
  * Saves the Mesh to the desired file type, determined from the extension
  * specified. In the case of .glb/.gltf, this will save in version 2.0.
+ *
+ * This is a very simple export function and is intended primarily as a
+ * demonstration. Generally users of this library will need to modify this to
+ * write all the important properties for their application and read any custom
+ * data structures.
  *
  * @param filename The file extension must be one that Assimp supports for
  * export. GLB & 3MF are recommended.

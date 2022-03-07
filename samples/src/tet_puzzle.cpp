@@ -16,6 +16,15 @@
 
 namespace manifold {
 
+/**
+ * A tetrahedron cut into two identical halves that can screw together as a
+ * puzzle. This only outputs one of the halves. This demonstrates how redundant
+ * points along a polygon can be used to make twisted extrusions smoother.
+ *
+ * @param edgeLength Length of each edge of the overall tetrahedron.
+ * @param gap Spacing between the two halves to allow sliding.
+ * @param nDivisions Number of divisions (both ways) in the screw surface.
+ */
 Manifold TetPuzzle(float edgeLength, float gap, int nDivisions) {
   const glm::vec3 scale(edgeLength / (2 * sqrt(2)));
 
