@@ -60,6 +60,22 @@ Manifold Base(float width, float radius, float decorRadius, float twistRadius,
 
 namespace manifold {
 
+/**
+ * My Stretchy Bracelet: this is one of my most popular designs, largely because
+ * it's quick and easy to 3D print. The defaults are picked to work well; change
+ * the radius to fit your wrist. Changing the other values too much may break
+ * the design.
+ *
+ * @param radius The overall size; the radius left for your wrist is roughly
+ * radius - height.
+ * @param height Thickness of the bracelet around your wrist.
+ * @param width The length along your arm (the height of the print).
+ * @param thickness The width of the material, which should be equal to your
+ * printer's nozzle diameter.
+ * @param nDecor The number of twisty shapes around the outside.
+ * @param nCut The number of cuts that enable stretching.
+ * @param nDivision the number of divisions along the width.
+ */
 Manifold StretchyBracelet(float radius, float height, float width,
                           float thickness, int nDecor, int nCut,
                           int nDivision) {

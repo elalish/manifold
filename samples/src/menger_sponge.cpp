@@ -35,6 +35,12 @@ void Fractal(std::vector<Manifold>& holes, Manifold& hole, float w,
 
 namespace manifold {
 
+/**
+ * The classic cubic fractal.
+ *
+ * @param n Fractal depth. Warning: scales exponentially, n = 4 has almost
+ * 400,000 triangles!
+ */
 Manifold MengerSponge(int n) {
   Manifold result = Manifold::Cube(glm::vec3(1.0f), true);
 
