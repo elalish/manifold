@@ -105,9 +105,9 @@ struct Halfedge {
  */
 
 /**
- * @brief Sin degrees
+ * Sine function where multiples of 90 degrees come out exact.
  *
- * Use for inputs in degrees so that multiples of 90 degrees come out exact.
+ * @param x Angle in degrees.
  */
 inline HOST_DEVICE float sind(float x) {
   if (!std::isfinite(x)) return sin(x);
@@ -128,17 +128,17 @@ inline HOST_DEVICE float sind(float x) {
 }
 
 /**
- * @brief Cos degrees
+ * Cosine function where multiples of 90 degrees come out exact.
  *
- * Use inputs in degrees so that multiples of 90 degrees come out exact.
+ * @param x Angle in degrees.
  */
 inline HOST_DEVICE float cosd(float x) { return sind(x + 90.0f); }
 
 /**
- * @brief Transform to point the given vector up (0, 0, 1)
- *
  * This 4x3 matrix can be used as an input to Manifold.Transform() to turn an
  * object. Turns along the shortest path from given up-vector to (0, 0, 1).
+ *
+ * @param up The vector to be turned to point upwards. Length does not matter.
  */
 inline HOST_DEVICE glm::mat4x3 RotateUp(glm::vec3 up) {
   up = glm::normalize(up);
@@ -148,45 +148,116 @@ inline HOST_DEVICE glm::mat4x3 RotateUp(glm::vec3 up) {
   return glm::mat4x3(glm::rotate(glm::mat4(1), angle, axis));
 }
 
+/**
+ * Polygon vertex.
+ */
 struct PolyVert {
+  /// X-Y position
   glm::vec2 pos;
+  /// ID or index into another vertex vector
   int idx;
 };
 
+/**
+ * Single polygon contour, wound CCW. First and last point are implicitly
+ * connected. Should ensure all input is
+ * [&epsilon;-valid](https://github.com/elalish/manifold/wiki/Manifold-Library#definition-of-%CE%B5-valid).
+ */
 using SimplePolygon = std::vector<PolyVert>;
+
+/**
+ * Set of polygons with holes. Order of contours is arbitrary. Can contain any
+ * depth of nested holes and any number of separate polygons. Should ensure all
+ * input is
+ * [&epsilon;-valid](https://github.com/elalish/manifold/wiki/Manifold-Library#definition-of-%CE%B5-valid).
+ */
 using Polygons = std::vector<SimplePolygon>;
 
+/**
+ * The triangle-mesh input and output of this library.
+ */
 struct Mesh {
+  /// Required: The X-Y-Z positions of all vertices.
   std::vector<glm::vec3> vertPos;
-  std::vector<glm::vec3> vertNormal;
+  /// Required: The vertex indices of the three triangle corners in CCW (from
+  /// the outside) order, for each triangle.
   std::vector<glm::ivec3> triVerts;
+  /// Optional: The X-Y-Z normal vectors of each vertex. If non-empty, must have
+  /// the same length as vertPos. If empty, these will be calculated
+  /// automatically.
+  std::vector<glm::vec3> vertNormal;
+  /// Optional: The X-Y-Z-W weighted tangent vectors for smooth Refine(). If
+  /// non-empty, must be exactly three times as long as Mesh.triVerts. Indexed
+  /// as 3 * tri + i, representing the tangent from Mesh.triVerts[tri][i] along
+  /// the CCW edge. If empty, mesh is faceted.
   std::vector<glm::vec4> halfedgeTangent;
 };
 
+/**
+ * Defines which edges to sharpen and how much for the Manifold.Smooth()
+ * constructor.
+ */
 struct Smoothness {
+  /// The halfedge index = 3 * tri + i, referring to Mesh.triVerts[tri][i].
   int halfedge;
+  /// A value between 0 and 1, where 0 is sharp and 1 is the default and the
+  /// curvature is interpolated between these values. The two paired halfedges
+  /// can have different values while maintaining C-1 continuity (except for 0).
   float smoothness;
 };
 
+/**
+ * Geometric properties of the manifold, created with Manifold.GetProperties().
+ */
 struct Properties {
   float surfaceArea, volume;
 };
 
+/**
+ * Discrete curvature of a manifold calculated at every vertex. See
+ * Manifold.GetCurvature() for details.
+ */
 struct Curvature {
   float maxMeanCurvature, minMeanCurvature;
   float maxGaussianCurvature, minGaussianCurvature;
   std::vector<float> vertMeanCurvature, vertGaussianCurvature;
 };
 
+/**
+ * Part of MeshRelation - represents a single triangle relation to an original
+ * Mesh.
+ */
 struct BaryRef {
-  int meshID, tri;
+  /// Reference to original Mesh, matching Manifold.GetMeshIDs().
+  int meshID;
+  /// The triangle index of the original triangle this was part of:
+  /// Mesh.triVerts[tri].
+  int tri;
+  /// For the three corners of the output triangle, new (intersection) vertices
+  /// store an index to the MeshRelation.barycentric vector, while original
+  /// vertices have negative values referring to Mesh.triVerts[tri][i + 3].
   glm::ivec3 vertBary;
 };
 
+/**
+ * Represents the relationship of this output Mesh to all input Meshes that
+ * eventually led to it, see Manifold.GetMeshRelation().
+ */
 struct MeshRelation {
+  /// A vector of shared barycentric coordinates representing the position of a
+  /// vertex relative to its original triangle.
   std::vector<glm::vec3> barycentric;
+  /// A vector matching Mesh.triVerts that contains the relation of each output
+  /// triangle to a single input triangle.
   std::vector<BaryRef> triBary;
 
+  /**
+   * A convenience function to get the barycentric coordinates of a given
+   * corner.
+   *
+   * @param tri A valid triangle index of Mesh.triVerts.
+   * @param vert The corner of the triangle: 0, 1, or 2.
+   */
   inline glm::vec3 UVW(int tri, int vert) {
     glm::vec3 uvw(0.0f);
     const int idx = triBary[tri].vertBary[vert];

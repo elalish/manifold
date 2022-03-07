@@ -16,6 +16,10 @@
 
 namespace manifold {
 
+/**
+ * A smoothed manifold demonstrating selective edge sharpening with
+ * Manifold.Smooth(). Use Manifold.Refine() before export to see the curvature.
+ */
 Manifold Scallop() {
   constexpr float height = 1;
   constexpr float radius = 3;

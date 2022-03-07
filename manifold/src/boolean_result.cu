@@ -671,25 +671,25 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
   outR.Face2Tri(faceEdge, faceRef, halfedgeBary);
 
   triangulate.Stop();
-  Timer collapse;
-  collapse.Start();
+  Timer simplify;
+  simplify.Start();
 
   outR.DuplicateMeshIDs();
 
-  outR.CollapseDegenerates();
+  outR.SimplifyTopology();
 
-  collapse.Stop();
-  Timer finish;
-  finish.Start();
+  simplify.Stop();
+  Timer sort;
+  sort.Start();
 
   outR.Finish();
 
-  finish.Stop();
+  sort.Stop();
   if (kVerbose) {
     assemble.Print("Assembly");
     triangulate.Print("Triangulation");
-    collapse.Print("Collapse Degenerates");
-    finish.Print("Finishing the manifold");
+    simplify.Print("Simplification");
+    sort.Print("Sorting");
     std::cout << outR.NumVert() << " verts and " << outR.NumTri() << " tris"
               << std::endl;
   }

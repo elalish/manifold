@@ -97,7 +97,7 @@ struct Manifold::Impl {
                          const VecH<int>& faceEdge) const;
 
   // edge_op.cu
-  void CollapseDegenerates();
+  void SimplifyTopology();
   void CollapseEdge(int edge);
   void RecursiveEdgeSwap(int edge);
   void RemoveIfFolded(int edge);

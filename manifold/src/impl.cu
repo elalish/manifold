@@ -286,7 +286,7 @@ std::vector<int> Manifold::Impl::meshID2Original_;
 
 /**
  * Create a manifold from an input triangle Mesh. Will throw if the Mesh is not
- * manifold. TODO: update halfedgeTangent during CollapseDegenerates.
+ * manifold. TODO: update halfedgeTangent during SimplifyTopology.
  */
 Manifold::Impl::Impl(const Mesh& mesh,
                      const std::vector<glm::ivec3>& triProperties,
@@ -300,7 +300,7 @@ Manifold::Impl::Impl(const Mesh& mesh,
   ALWAYS_ASSERT(IsManifold(), topologyErr, "Input mesh is not manifold!");
   CalculateNormals();
   InitializeNewReference(triProperties, properties, propertyTolerance);
-  CollapseDegenerates();
+  SimplifyTopology();
   Finish();
 }
 
