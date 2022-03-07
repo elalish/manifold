@@ -89,11 +89,9 @@ TEST(Samples, TetPuzzle) {
 }
 
 TEST(Samples, FrameReduced) {
-  Manifold::SetCircularSegments(4);
-  Manifold frame = RoundedFrame(100, 10);
+  Manifold frame = RoundedFrame(100, 10, 4);
   CheckManifold(frame);
   EXPECT_EQ(frame.NumDegenerateTris(), 0);
-  Manifold::SetCircularSegments(0);
   EXPECT_EQ(frame.Genus(), 5);
   auto prop = frame.GetProperties();
   EXPECT_NEAR(prop.volume, 227333, 10);

@@ -16,9 +16,19 @@
 
 namespace manifold {
 
-Manifold RoundedFrame(float edgeLength, float radius) {
-  Manifold edge = Manifold::Cylinder(edgeLength, radius);
-  Manifold corner = Manifold::Sphere(radius);
+/**
+ * A cubic frame with cylinders for edges and spheres at the corners.
+ * Demonstrates how at 90-degree intersections, the sphere and cylinder facets
+ * match up perfectly.
+ *
+ * @param edgeLength Distance between the corners.
+ * @param radius Radius of the frame members.
+ * @param circularSegments Number of segements in the cylinders and spheres.
+ * Defaults to Manifold.GetCircularSegments().
+ */
+Manifold RoundedFrame(float edgeLength, float radius, int circularSegments) {
+  Manifold edge = Manifold::Cylinder(edgeLength, radius, -1, circularSegments);
+  Manifold corner = Manifold::Sphere(radius, circularSegments);
 
   Manifold edge1 = corner + edge;
   edge1.Rotate(-90).Translate({-edgeLength / 2, -edgeLength / 2, 0});
