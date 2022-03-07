@@ -219,7 +219,8 @@ Box Manifold::BoundingBox() const {
  * Returns the precision of this Manifold's vertices, which tracks the
  * approximate rounding error over all the transforms and operations that have
  * led to this state. Any triangles that are colinear within this precision are
- * considered degenerate and removed.
+ * considered degenerate and removed. This is the value of &epsilon; defining
+ * [&epsilon;-valid](https://github.com/elalish/manifold/wiki/Manifold-Library#definition-of-%CE%B5-valid).
  */
 float Manifold::Precision() const {
   pImpl_->ApplyTransform();
@@ -464,8 +465,13 @@ Manifold& Manifold::Refine(int n) {
 /**
  * The central operation of this library: the Boolean combines two manifolds
  * into another by calculating their intersections and removing the unused
- * portions. Non-self-overlapping inputs will produce non-overlapping output.
- * Self-overlapping input may fail triangulation.
+ * portions.
+ * [&epsilon;-valid](https://github.com/elalish/manifold/wiki/Manifold-Library#definition-of-%CE%B5-valid)
+ * inputs will produce &epsilon;-valid output. &epsilon;-invalid input may fail
+ * triangulation.
+ *
+ * These operations are optimized to produce nearly-instant results if either
+ * input is empty or their bounding boxes do not overlap.
  *
  * @param second The other Manifold.
  * @param op The type of operation to perform.

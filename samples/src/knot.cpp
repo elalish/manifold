@@ -35,7 +35,7 @@ namespace manifold {
  * @param minorRadius Radius of the small cross-section of the imaginary donut.
  * @param threadRadius Radius of the small cross-section of the actual object.
  * @param circularSegments Number of linear segments making up the threadRadius
- * circle. Default is GetCircularSegments().
+ * circle. Default is Manifold.GetCircularSegments().
  * @param linearSegments Number of segments along the length of the knot.
  * Default makes roughly square facets.
  */
