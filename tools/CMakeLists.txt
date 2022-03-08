@@ -12,6 +12,9 @@ target_link_libraries(perfTest manifold)
 target_compile_options(perfTest PRIVATE ${MANIFOLD_FLAGS})
 target_compile_features(perfTest PUBLIC cxx_std_14)
 
+add_executable(perfTestCGAL perf_test_cgal.cpp)
+find_package(CGAL REQUIRED COMPONENTS Core)
+target_compile_definitions(perfTestCGAL PRIVATE CGAL_USE_GMPXX)
 # add_executable(playground playground.cpp)
 # target_link_libraries(playground manifold meshIO samples)
 
