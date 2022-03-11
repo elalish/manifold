@@ -39,6 +39,7 @@ IF(MANIFOLD_USE_CPP)
 ENDIF(MANIFOLD_USE_CPP)
 
 add_subdirectory(utilities)
+add_subdirectory(sdf)
 add_subdirectory(collider)
 add_subdirectory(polygon)
 add_subdirectory(manifold)

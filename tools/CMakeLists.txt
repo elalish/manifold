@@ -22,7 +22,13 @@ target_compile_options(perfTestCGAL PRIVATE ${MANIFOLD_FLAGS})
 target_compile_features(perfTestCGAL PUBLIC cxx_std_14)
 
 # add_executable(playground playground.cpp)
-# target_link_libraries(playground manifold meshIO samples)
+# target_link_libraries(playground manifold meshIO samples sdf)
 
 # target_compile_options(playground PRIVATE ${MANIFOLD_FLAGS})
 # target_compile_features(playground PUBLIC cxx_std_14)
+
+add_executable(sdfTest sdfTest.cu)
+target_link_libraries(sdfTest manifold meshIO samples sdf)
+
+target_compile_options(sdfTest PRIVATE ${MANIFOLD_FLAGS})
+target_compile_features(sdfTest PUBLIC cxx_std_14)
