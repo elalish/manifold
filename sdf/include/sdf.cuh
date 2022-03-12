@@ -21,17 +21,79 @@
 namespace {
 using namespace manifold;
 
-template <typename Func>
-struct Compute {
-  const Func func;
+constexpr kOpen = std::numeric_limits<uint64_t>::max();
 
-  __host__ __device__ void operator()(
-      thrust::tuple<float&, glm::vec3> inOut) const {
-    float& value = thrust::get<0>(inOut);
-    const glm::vec3 vert = thrust::get<1>(inOut);
+struct GridVert {
+  uint64_t key = kOpen;
+  float distance = 0.0f / 0.0f;
+  int edgeIndex = -1;
+  glm::vec3[7] edgeIntersections;
+};
 
-    value = func(vert);
+class HashTable {
+ public:
+  HashTable(uint32_t sizeExp = 20, uint32_t step = 127)
+      : size_{1 << sizeExp}, step_{step}, table_{1 << sizeExp} {}
+
+  int Entries() const { return used_.H()[0]; }
+
+  float FilledFraction() const {
+    return static_cast<float>(used_.H()[0]) / size_;
   }
+
+  __device__ __host__ bool Insert(const GridVert& vert) {
+    uint32_t idx = vert.key & (size_ - 1);
+    while (1) {
+      const uint64_t found =
+          AtomicCAS(&table_.ptrD()[idx].key, kOpen, vert.key);
+      if (found == kOpen) {
+        if (AtomicAdd(&used_.ptrD()[0], 1) * 2 > size_) {
+          return true;
+        }
+        table_.ptrD()[idx] = vert;
+        return false;
+      }
+      if (found == vert.key) return false;
+      idx = (idx + step_) & (size_ - 1);
+    }
+  }
+
+  __device__ __host__ GridVert operator[](uint64_t key) const {
+    uint32_t idx = key & (size_ - 1);
+    while (1) {
+      const GridVert found = table_.ptrD()[idx];
+      if (found.key == key) return found;
+      if (found.key == kOpen) return GridVert();
+      idx = (idx + step_) & (size_ - 1);
+    }
+  }
+
+ private:
+  const uint32_t size_;
+  const uint32_t step_;
+  VecDH<GridVert> table_;
+  VecDH<uint32_t> used_(1, 0);
+};
+
+template <typename Func>
+struct ComputeVerts {
+  HashTable gridVerts;
+  const Func func;
+  const glm::vec3 origin;
+  const float spacing;
+
+  __host__ __device__ void operator()(uint64_t mortonCode) const {
+    GridVert gridVert;
+    const glm::ivec3 gridIndex = DecodeMorton(mortonCode);
+    const glm::vec3 position = origin + spacing * gridIndex;
+    value = func(position);
+  }
+};
+
+struct BuildTris {
+  uint64_t* halfedgeCodes;
+  uint64_t* index;
+  const HashTable gridVerts;
 };
 }  // namespace
 
@@ -42,7 +104,7 @@ namespace manifold {
 template <typename Func>
 class SDF {
  public:
-  SDF(Func sdf) : sdf_{sdf} {};
+  SDF(Func sdf) : sdf_{sdf} {}
 
   inline __host__ __device__ float operator()(glm::vec3 point) const {
     return sdf_(point);
@@ -50,14 +112,27 @@ class SDF {
 
   inline Mesh LevelSet(Box bounds, float edgeLength, float level = 0) const {
     Mesh out;
-    int size = 10;
-    VecDH<glm::vec3> verts(size);
-    VecDH<float> values(size);
-    thrust::fill(verts.beginD(), verts.endD(), glm::vec3(1.0f, 2.0f, 3.0f));
-    thrust::for_each_n(zip(values.beginD(), verts.beginD()), size,
-                       Compute<Func>({sdf_}));
-    verts.Dump();
-    values.Dump();
+    HashTable gridVerts(10);
+    glm::vec3 dim = bounds.Size();
+    // Need to create a new MortonCode function that spreads when needed instead
+    // of always by 3, to make non-cubic domains efficient.
+    float maxDim = std::max(dim[0], std::max(dim[1], dim[2]));
+    int n = maxDim / edgeLength;
+    float spacing = maxDim / n;
+    int maxMorton = MortonCode(glm::ivec3(n));
+
+    thrust::for_each_n(
+        countAt(0), maxMorton,
+        ComputeVerts<Func>({gridVerts, sdf_, bounds.Min(), spacing}));
+
+    VecDH<uint64_t> halfedgeCodes(gridVerts.Entries() * 6);
+    VecDH<int> index(1, 0);
+
+    thrust::for_each_n(
+        countAt(0), maxMorton,
+        BuildTris({halfedgeCodes.ptrD(), index.ptrD(), gridVerts}));
+
+    // turn halfedgeCodes into out.triVerts and gridVerts into out.vertPos
     return out;
   }
 
