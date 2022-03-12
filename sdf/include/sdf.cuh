@@ -26,8 +26,9 @@ constexpr kOpen = std::numeric_limits<uint64_t>::max();
 struct GridVert {
   uint64_t key = kOpen;
   float distance = 0.0f / 0.0f;
+  int vertKey = -1;
   int edgeIndex = -1;
-  glm::vec3[7] edgeIntersections;
+  int[7] edgeVerts;
 };
 
 class HashTable {
@@ -77,6 +78,8 @@ class HashTable {
 
 template <typename Func>
 struct ComputeVerts {
+  glm::vec3* vertPos;
+  int* vertIndex;
   HashTable gridVerts;
   const Func func;
   const glm::vec3 origin;
@@ -91,9 +94,11 @@ struct ComputeVerts {
 };
 
 struct BuildTris {
-  uint64_t* halfedgeCodes;
+  glm::ivec3* triVerts;
   uint64_t* index;
   const HashTable gridVerts;
+
+  __host__ __device__ void operator()(uint64_t mortonCode) const {}
 };
 }  // namespace
 
@@ -121,18 +126,24 @@ class SDF {
     float spacing = maxDim / n;
     int maxMorton = MortonCode(glm::ivec3(n));
 
-    thrust::for_each_n(
-        countAt(0), maxMorton,
-        ComputeVerts<Func>({gridVerts, sdf_, bounds.Min(), spacing}));
-
-    VecDH<uint64_t> halfedgeCodes(gridVerts.Entries() * 6);
+    VecDH<glm::vec3> vertPos(gridVerts.Size() * 7);
     VecDH<int> index(1, 0);
 
     thrust::for_each_n(
         countAt(0), maxMorton,
-        BuildTris({halfedgeCodes.ptrD(), index.ptrD(), gridVerts}));
+        ComputeVerts<Func>({vertPos.ptrD(), index.ptrD(), gridVerts, sdf_,
+                            bounds.Min(), spacing}));
 
-    // turn halfedgeCodes into out.triVerts and gridVerts into out.vertPos
+    vertPos.Resize(index.H()[0]);
+    VecDH<uint64_t> triVerts(gridVerts.Entries() * 6);
+    index.H()[0] = 0;
+
+    thrust::for_each_n(countAt(0), maxMorton,
+                       BuildTris({triVerts.ptrD(), index.ptrD(), gridVerts}));
+    triVerts.Resize(index.H()[0]);
+
+    out.vertPos = vertPos.H();
+    out.triVerts = triVerts.H();
     return out;
   }
 
