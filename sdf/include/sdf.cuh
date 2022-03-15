@@ -26,7 +26,6 @@ constexpr kOpen = std::numeric_limits<uint64_t>::max();
 struct GridVert {
   uint64_t key = kOpen;
   float distance = 0.0f / 0.0f;
-  int vertKey = -1;
   int edgeIndex = -1;
   int[7] edgeVerts;
 };
@@ -81,15 +80,41 @@ struct ComputeVerts {
   glm::vec3* vertPos;
   int* vertIndex;
   HashTable gridVerts;
-  const Func func;
+  const Func sdf;
   const glm::vec3 origin;
   const float spacing;
+  const glm::vec3[7] edgeVec = {{0.5f, 0.5f, 0.5f},  {1.0f, 0.0f, 0.0f},
+                                {0.0f, 1.0f, 0.0f},  {0.0f, 0.0f, 1.0f},
+                                {-0.5f, 0.5f, 0.5f}, {0.5f, -0.5f, 0.5f},
+                                {0.5f, 0.5f, -0.5f}};
 
-  __host__ __device__ void operator()(uint64_t mortonCode) const {
+  inline __host__ __device__ void operator()(uint64_t mortonCode) {
     GridVert gridVert;
+    gridVert.key = mortonCode;
     const glm::ivec3 gridIndex = DecodeMorton(mortonCode);
     const glm::vec3 position = origin + spacing * gridIndex;
-    value = func(position);
+    gridVert.distance = sdf(position);
+    float minDist2 = 0.25 * 0.25;
+    for (int i = 0; i < 14; ++i) {
+      const int j = i < 7 ? i : i - 7;
+      const float val = sdf(position + (i < 7 ? 1 : -1) * spacing * edgeVec[j]);
+      if (val * gridVert.distance > 0 || (val == 0 && gridVert.distance == 0))
+        continue;
+
+      const glm::vec3 delta =
+          edgeVec[j] * (1 - val / (val - gridVert.distance));
+      const float dist2 = glm::dot(delta, delta);
+      if (dist2 < minDist2) {
+        gridVert.edgeIndex = i;
+        minDist2 = dist2;
+      }
+      if (i < 7) {
+        const int idx = AtomicAdd(vertIndex, 1);
+        vertPos[idx] = position + spacing * delta;
+        gridVert.edgeVerts[i] = idx;
+      }
+    }
+    gridVerts.Insert(gridVert);
   }
 };
 
@@ -98,7 +123,7 @@ struct BuildTris {
   uint64_t* index;
   const HashTable gridVerts;
 
-  __host__ __device__ void operator()(uint64_t mortonCode) const {}
+  __host__ __device__ void operator()(uint64_t mortonCode) {}
 };
 }  // namespace
 
