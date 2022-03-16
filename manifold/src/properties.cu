@@ -16,6 +16,7 @@
 #include <thrust/execution_policy.h>
 #include <thrust/logical.h>
 #include <thrust/transform_reduce.h>
+#include <limits>
 
 #include "impl.cuh"
 
@@ -273,16 +274,16 @@ Curvature Manifold::Impl::GetCurvature() const {
       NumVert(), NormalizeCurvature());
   result.minMeanCurvature =
       thrust::reduce(vertMeanCurvature.beginD(), vertMeanCurvature.endD(),
-                     1.0f / 0.0f, thrust::minimum<float>());
+                     std::numeric_limits<float>::infinity(), thrust::minimum<float>());
   result.maxMeanCurvature =
       thrust::reduce(vertMeanCurvature.beginD(), vertMeanCurvature.endD(),
-                     -1.0f / 0.0f, thrust::maximum<float>());
+                     -std::numeric_limits<float>::infinity(), thrust::maximum<float>());
   result.minGaussianCurvature = thrust::reduce(
-      vertGaussianCurvature.beginD(), vertGaussianCurvature.endD(), 1.0f / 0.0f,
+      vertGaussianCurvature.beginD(), vertGaussianCurvature.endD(), std::numeric_limits<float>::infinity(),
       thrust::minimum<float>());
   result.maxGaussianCurvature = thrust::reduce(
       vertGaussianCurvature.beginD(), vertGaussianCurvature.endD(),
-      -1.0f / 0.0f, thrust::maximum<float>());
+      -std::numeric_limits<float>::infinity(), thrust::maximum<float>());
   result.vertMeanCurvature.insert(result.vertMeanCurvature.end(),
                                   vertMeanCurvature.begin(),
                                   vertMeanCurvature.end());
@@ -299,8 +300,8 @@ Curvature Manifold::Impl::GetCurvature() const {
  */
 void Manifold::Impl::CalculateBBox() {
   bBox_.min = thrust::reduce(vertPos_.beginD(), vertPos_.endD(),
-                             glm::vec3(1 / 0.0f), PosMin());
+                             glm::vec3(std::numeric_limits<float>::infinity()), PosMin());
   bBox_.max = thrust::reduce(vertPos_.beginD(), vertPos_.endD(),
-                             glm::vec3(-1 / 0.0f), PosMax());
+                             glm::vec3(-std::numeric_limits<float>::infinity()), PosMax());
 }
 }  // namespace manifold

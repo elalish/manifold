@@ -214,7 +214,7 @@ void Manifold::Impl::RemoveIfFolded(int edge) {
   const glm::ivec3 tri1edge = TriOf(halfedge[edge].pairedHalfedge);
   if (halfedge[tri0edge[1]].endVert == halfedge[tri1edge[1]].endVert) {
     for (int i : {0, 1, 2}) {
-      vertPos[halfedge[tri0edge[i]].startVert] = glm::vec3(0.0f / 0.0f);
+      vertPos[halfedge[tri0edge[i]].startVert] = glm::vec3(NAN);
       halfedge[tri0edge[i]] = {-1, -1, -1, -1};
       halfedge[tri1edge[i]] = {-1, -1, -1, -1};
     }
@@ -278,7 +278,7 @@ void Manifold::Impl::CollapseEdge(const int edge) {
   }
 
   // Remove toRemove.startVert and replace with endVert.
-  vertPos[toRemove.startVert] = glm::vec3(0.0f / 0.0f);
+  vertPos[toRemove.startVert] = glm::vec3(NAN);
   CollapseTri(tri1edge);
 
   // Orbit startVert
