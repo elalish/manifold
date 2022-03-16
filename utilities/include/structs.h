@@ -15,6 +15,7 @@
 #pragma once
 #define GLM_FORCE_EXPLICIT_CTOR
 #include <chrono>
+#include <limits>
 #include <glm/ext/matrix_transform.hpp>
 #include <glm/glm.hpp>
 #include <glm/gtc/constants.hpp>
@@ -274,8 +275,8 @@ struct MeshRelation {
  * Axis-aligned bounding box
  */
 struct Box {
-  glm::vec3 min = glm::vec3(1.0f / 0.0f);
-  glm::vec3 max = glm::vec3(-1.0f / 0.0f);
+  glm::vec3 min = glm::vec3(std::numeric_limits<float>::infinity());
+  glm::vec3 max = glm::vec3(-std::numeric_limits<float>::infinity());
 
   /**
    * Default constructor is an infinite box that contains all space.

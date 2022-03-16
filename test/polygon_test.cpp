@@ -16,6 +16,7 @@
 
 #include <algorithm>
 #include <random>
+#include <limits>
 
 #include "gtest/gtest.h"
 
@@ -60,8 +61,8 @@ Polygons Turn180(Polygons polys) {
 }
 
 Polygons Duplicate(Polygons polys) {
-  float xMin = 1.0 / 0.0;
-  float xMax = -1.0 / 0.0;
+    float xMin = std::numeric_limits<float>::infinity(); 
+  float xMax = -std::numeric_limits<float>::infinity(); 
   int indexMax = 0;
   for (SimplePolygon &poly : polys) {
     for (PolyVert &vert : poly) {

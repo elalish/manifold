@@ -15,11 +15,53 @@
 #include "collider.cuh"
 #include "utils.cuh"
 
+
+#ifdef _MSC_VER
+#include <intrin.h>
+#endif 
+
 // Adjustable parameters
 constexpr int kInitialLength = 128;
 constexpr int kLengthMultiple = 4;
 // Fundamental constants
 constexpr int kRoot = 1;
+
+#ifdef _MSC_VER
+
+#ifndef _WINDEF_
+typedef unsigned long DWORD;
+#endif
+
+uint32_t __inline ctz( uint32_t value )
+{
+    DWORD trailing_zero = 0;
+
+    if ( _BitScanForward( &trailing_zero, value ) )
+    {
+        return trailing_zero;
+    }
+    else
+    {
+        // This is undefined, I better choose 32 than 0
+        return 32;
+    }
+}
+
+uint32_t __inline clz( uint32_t value )
+{
+    DWORD leading_zero = 0;
+
+    if ( _BitScanReverse( &leading_zero, value ) )
+    {
+       return 31 - leading_zero;
+    }
+    else
+    {
+         // Same remarks as above
+         return 32;
+    }
+}
+#endif
 
 namespace {
 using namespace manifold;
@@ -42,7 +84,15 @@ struct CreateRadixTree {
 #ifdef __CUDA_ARCH__
     return __clz(a ^ b);
 #else
+
+#ifdef _MSC_VER
+    //return __lzcnt(a ^ b);
+    return clz(a ^ b);
+#else
+
     return __builtin_clz(a ^ b);
+#endif
+
 #endif
   }
 
