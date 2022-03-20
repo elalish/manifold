@@ -57,24 +57,57 @@ TEST(Samples, Knot42) {
 
 TEST(Samples, Scallop) {
   Manifold scallop = Scallop();
-  scallop.Refine(100);
+
+  Mesh in = scallop.GetMesh();
+  ExportOptions options;
+  const int numVert = scallop.NumVert();
+  const int numHalfedge = 3 * scallop.NumTri();
+  std::vector<int> edgePair(numHalfedge);
+  std::map<std::pair<int, int>, int> halfedgeLink;
+  for (int i = 0; i < numHalfedge; ++i) {
+    std::pair<int, int> key = std::make_pair(in.triVerts[i / 3][i % 3],
+                                             in.triVerts[i / 3][(i + 1) % 3]);
+    if (key.first > key.second) std::swap(key.first, key.second);
+    const auto result = halfedgeLink.emplace(std::make_pair(key, i));
+    if (!result.second) {
+      const int pair = result.first->second;
+      edgePair[pair] = i;
+      edgePair[i] = pair;
+    }
+  }
+  for (int i = 0; i < scallop.NumVert(); ++i) {
+    options.mat.vertColor.push_back({0, 0, 1, 1});
+  }
+  for (int i = 0; i < numHalfedge; ++i) {
+    const int vert = in.triVerts[i / 3][i % 3];
+    in.vertPos.push_back(in.vertPos[vert] + glm::vec3(in.halfedgeTangent[i]) *
+                                                in.halfedgeTangent[i].w);
+    options.mat.vertColor.push_back({1, 1, 0, 1});
+    const int j = edgePair[i % 3 == 0 ? i + 2 : i - 1];
+    in.triVerts.push_back({vert, numVert + i, numVert + j});
+  }
+  options.faceted = true;
+  options.mat.roughness = 0.5;
+  ExportMesh("scallopFacets.glb", in, options);
+
+  scallop.Refine(50);
   CheckManifold(scallop);
   auto prop = scallop.GetProperties();
   EXPECT_NEAR(prop.volume, 41.3, 0.1);
-  EXPECT_NEAR(prop.surfaceArea, 81.2, 0.1);
+  EXPECT_NEAR(prop.surfaceArea, 78.1, 0.1);
 
-  // const Mesh out = scallop.GetMesh();
-  // ExportOptions options;
-  // options.faceted = false;
-  // options.mat.roughness = 0.1;
-  // const glm::vec4 blue(0, 0, 1, 1);
-  // const glm::vec4 red(1, 0, 0, 1);
-  // const float limit = 15;
-  // for (float curvature : scallop.GetCurvature().vertMeanCurvature) {
-  //   options.mat.vertColor.push_back(
-  //       glm::mix(blue, red, glm::smoothstep(-limit, limit, curvature)));
-  // }
-  // ExportMesh("scallop.gltf", out, options);
+  const Mesh out = scallop.GetMesh();
+  ExportOptions options2;
+  options2.faceted = false;
+  options2.mat.roughness = 0.1;
+  const glm::vec4 blue(0, 0, 1, 1);
+  const glm::vec4 red(1, 0, 0, 1);
+  const float limit = 15;
+  for (float curvature : scallop.GetCurvature().vertMeanCurvature) {
+    options2.mat.vertColor.push_back(
+        glm::mix(blue, red, glm::smoothstep(-limit, limit, curvature)));
+  }
+  ExportMesh("scallop.glb", out, options2);
 }
 
 TEST(Samples, TetPuzzle) {
