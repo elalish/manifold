@@ -18,6 +18,8 @@
 #include "meshIO.h"
 #include "polygon.h"
 
+constexpr bool exportModels = false;
+
 using namespace manifold;
 
 void CheckManifold(const Manifold& manifold) {
@@ -32,7 +34,7 @@ void CheckManifold(const Manifold& manifold) {
 // it and it'll roll around (dimensions in mm).
 TEST(Samples, Knot13) {
   Manifold knot13 = TorusKnot(1, 3, 25, 10, 3.75);
-  //   ExportMesh("knot13.stl", knot13.GetMesh(), {});
+  if (exportModels) ExportMesh("knot13.glb", knot13.GetMesh(), {});
   CheckManifold(knot13);
   EXPECT_EQ(knot13.Genus(), 1);
   auto prop = knot13.GetProperties();
@@ -43,7 +45,7 @@ TEST(Samples, Knot13) {
 // This creates two interlinked knots.
 TEST(Samples, Knot42) {
   Manifold knot42 = TorusKnot(4, 2, 15, 6, 5);
-  //   ExportMesh("knot42.stl", knot42.GetMesh(), {});
+  if (exportModels) ExportMesh("knot42.glb", knot42.GetMesh(), {});
   CheckManifold(knot42);
   std::vector<Manifold> knots = knot42.Decompose();
   ASSERT_EQ(knots.size(), 2);
@@ -58,37 +60,39 @@ TEST(Samples, Knot42) {
 TEST(Samples, Scallop) {
   Manifold scallop = Scallop();
 
-  Mesh in = scallop.GetMesh();
-  ExportOptions options;
-  const int numVert = scallop.NumVert();
-  const int numHalfedge = 3 * scallop.NumTri();
-  std::vector<int> edgePair(numHalfedge);
-  std::map<std::pair<int, int>, int> halfedgeLink;
-  for (int i = 0; i < numHalfedge; ++i) {
-    std::pair<int, int> key = std::make_pair(in.triVerts[i / 3][i % 3],
-                                             in.triVerts[i / 3][(i + 1) % 3]);
-    if (key.first > key.second) std::swap(key.first, key.second);
-    const auto result = halfedgeLink.emplace(std::make_pair(key, i));
-    if (!result.second) {
-      const int pair = result.first->second;
-      edgePair[pair] = i;
-      edgePair[i] = pair;
+  if (exportModels) {
+    Mesh in = scallop.GetMesh();
+    ExportOptions options;
+    const int numVert = scallop.NumVert();
+    const int numHalfedge = 3 * scallop.NumTri();
+    std::vector<int> edgePair(numHalfedge);
+    std::map<std::pair<int, int>, int> halfedgeLink;
+    for (int i = 0; i < numHalfedge; ++i) {
+      std::pair<int, int> key = std::make_pair(in.triVerts[i / 3][i % 3],
+                                               in.triVerts[i / 3][(i + 1) % 3]);
+      if (key.first > key.second) std::swap(key.first, key.second);
+      const auto result = halfedgeLink.emplace(std::make_pair(key, i));
+      if (!result.second) {
+        const int pair = result.first->second;
+        edgePair[pair] = i;
+        edgePair[i] = pair;
+      }
     }
+    for (int i = 0; i < scallop.NumVert(); ++i) {
+      options.mat.vertColor.push_back({0, 0, 1, 1});
+    }
+    for (int i = 0; i < numHalfedge; ++i) {
+      const int vert = in.triVerts[i / 3][i % 3];
+      in.vertPos.push_back(in.vertPos[vert] + glm::vec3(in.halfedgeTangent[i]) *
+                                                  in.halfedgeTangent[i].w);
+      options.mat.vertColor.push_back({1, 1, 0, 1});
+      const int j = edgePair[i % 3 == 0 ? i + 2 : i - 1];
+      in.triVerts.push_back({vert, numVert + i, numVert + j});
+    }
+    options.faceted = true;
+    options.mat.roughness = 0.5;
+    ExportMesh("scallopFacets.glb", in, options);
   }
-  for (int i = 0; i < scallop.NumVert(); ++i) {
-    options.mat.vertColor.push_back({0, 0, 1, 1});
-  }
-  for (int i = 0; i < numHalfedge; ++i) {
-    const int vert = in.triVerts[i / 3][i % 3];
-    in.vertPos.push_back(in.vertPos[vert] + glm::vec3(in.halfedgeTangent[i]) *
-                                                in.halfedgeTangent[i].w);
-    options.mat.vertColor.push_back({1, 1, 0, 1});
-    const int j = edgePair[i % 3 == 0 ? i + 2 : i - 1];
-    in.triVerts.push_back({vert, numVert + i, numVert + j});
-  }
-  options.faceted = true;
-  options.mat.roughness = 0.5;
-  ExportMesh("scallopFacets.glb", in, options);
 
   scallop.Refine(50);
   CheckManifold(scallop);
@@ -96,18 +100,20 @@ TEST(Samples, Scallop) {
   EXPECT_NEAR(prop.volume, 41.3, 0.1);
   EXPECT_NEAR(prop.surfaceArea, 78.1, 0.1);
 
-  const Mesh out = scallop.GetMesh();
-  ExportOptions options2;
-  options2.faceted = false;
-  options2.mat.roughness = 0.1;
-  const glm::vec4 blue(0, 0, 1, 1);
-  const glm::vec4 red(1, 0, 0, 1);
-  const float limit = 15;
-  for (float curvature : scallop.GetCurvature().vertMeanCurvature) {
-    options2.mat.vertColor.push_back(
-        glm::mix(blue, red, glm::smoothstep(-limit, limit, curvature)));
+  if (exportModels) {
+    const Mesh out = scallop.GetMesh();
+    ExportOptions options2;
+    options2.faceted = false;
+    options2.mat.roughness = 0.1;
+    const glm::vec4 blue(0, 0, 1, 1);
+    const glm::vec4 red(1, 0, 0, 1);
+    const float limit = 15;
+    for (float curvature : scallop.GetCurvature().vertMeanCurvature) {
+      options2.mat.vertColor.push_back(
+          glm::mix(blue, red, glm::smoothstep(-limit, limit, curvature)));
+    }
+    ExportMesh("scallop.glb", out, options2);
   }
-  ExportMesh("scallop.glb", out, options2);
 }
 
 TEST(Samples, TetPuzzle) {
@@ -118,7 +124,7 @@ TEST(Samples, TetPuzzle) {
   puzzle2.Rotate(0, 0, 180);
   EXPECT_TRUE((puzzle ^ puzzle2).IsEmpty());
   puzzle.Transform(RotateUp({1, -1, -1}));
-  // ExportMesh("tetPuzzle.gltf", puzzle.GetMesh(), {});
+  if (exportModels) ExportMesh("tetPuzzle.glb", puzzle.GetMesh(), {});
 }
 
 TEST(Samples, FrameReduced) {
@@ -129,7 +135,7 @@ TEST(Samples, FrameReduced) {
   auto prop = frame.GetProperties();
   EXPECT_NEAR(prop.volume, 227333, 10);
   EXPECT_NEAR(prop.surfaceArea, 62635, 1);
-  // ExportMesh("roundedFrameReduced.gltf", frame.GetMesh(), {});
+  if (exportModels) ExportMesh("roundedFrameReduced.glb", frame.GetMesh(), {});
 }
 
 TEST(Samples, Frame) {
@@ -137,7 +143,7 @@ TEST(Samples, Frame) {
   CheckManifold(frame);
   EXPECT_EQ(frame.NumDegenerateTris(), 0);
   EXPECT_EQ(frame.Genus(), 5);
-  // ExportMesh("roundedFrame.ply", frame.GetMesh(), {});
+  if (exportModels) ExportMesh("roundedFrame.glb", frame.GetMesh(), {});
 }
 
 // This creates a bracelet sample which involves many operations between shapes
@@ -147,7 +153,7 @@ TEST(Samples, Bracelet) {
   CheckManifold(bracelet);
   EXPECT_LE(bracelet.NumDegenerateTris(), 21);
   EXPECT_EQ(bracelet.Genus(), 1);
-  // ExportMesh("bracelet.ply", bracelet.GetMesh(), {});
+  if (exportModels) ExportMesh("bracelet.glb", bracelet.GetMesh(), {});
 }
 
 TEST(Samples, Sponge1) {
@@ -156,7 +162,7 @@ TEST(Samples, Sponge1) {
   EXPECT_EQ(sponge.NumDegenerateTris(), 0);
   EXPECT_EQ(sponge.NumVert(), 40);
   EXPECT_EQ(sponge.Genus(), 5);
-  // ExportMesh("mengerSponge1.gltf", sponge.GetMesh(), {});
+  if (exportModels) ExportMesh("mengerSponge1.glb", sponge.GetMesh(), {});
 }
 
 // A fractal with many degenerate intersections, which also tests exact 90
@@ -172,15 +178,18 @@ TEST(Samples, Sponge4) {
   EXPECT_EQ(cutSponge.first.Genus(), 13394);
   EXPECT_TRUE(cutSponge.second.IsManifold());
   EXPECT_EQ(cutSponge.second.Genus(), 13394);
-  // ExportMesh("mengerHalf.gltf", cutSponge.first.GetMesh(), {});
 
-  // const Mesh out = sponge.GetMesh();
-  // ExportOptions options;
-  // options.faceted = true;
-  // options.mat.roughness = 0.2;
-  // options.mat.metalness = 1.0;
-  // for (const glm::vec3 pos : out.vertPos) {
-  //   options.mat.vertColor.push_back(glm::vec4(0.5f * (pos + 0.5f), 1.0f));
-  // }
-  // ExportMesh("mengerSponge.gltf", out, options);
+  if (exportModels) {
+    ExportMesh("mengerHalf.glb", cutSponge.first.GetMesh(), {});
+
+    const Mesh out = sponge.GetMesh();
+    ExportOptions options;
+    options.faceted = true;
+    options.mat.roughness = 0.2;
+    options.mat.metalness = 1.0;
+    for (const glm::vec3 pos : out.vertPos) {
+      options.mat.vertColor.push_back(glm::vec4(0.5f * (pos + 0.5f), 1.0f));
+    }
+    ExportMesh("mengerSponge.glb", out, options);
+  }
 }
