@@ -34,7 +34,7 @@ Manifold Scallop() {
   const float delta = glm::pi<float>() / wiggles;
   for (int i = 0; i < 2 * wiggles; ++i) {
     float theta = (i - wiggles) * delta;
-    float amp = 0.5 * height * glm::cos(theta / 2);
+    float amp = 0.5 * height * glm::max(glm::cos(0.8f * theta), 0.0f);
 
     scallop.vertPos.push_back({radius * glm::cos(theta),
                                radius * glm::sin(theta),
