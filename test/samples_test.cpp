@@ -14,11 +14,9 @@
 
 #include "samples.h"
 
-#include "gtest/gtest.h"
 #include "meshIO.h"
 #include "polygon.h"
-
-constexpr bool exportModels = false;
+#include "test.h"
 
 using namespace manifold;
 
@@ -53,7 +51,7 @@ std::vector<int> EdgePairs(const Mesh in) {
 // it and it'll roll around (dimensions in mm).
 TEST(Samples, Knot13) {
   Manifold knot13 = TorusKnot(1, 3, 25, 10, 3.75);
-  if (exportModels) ExportMesh("knot13.glb", knot13.GetMesh(), {});
+  if (options.exportModels) ExportMesh("knot13.glb", knot13.GetMesh(), {});
   CheckManifold(knot13);
   EXPECT_EQ(knot13.Genus(), 1);
   auto prop = knot13.GetProperties();
@@ -64,7 +62,7 @@ TEST(Samples, Knot13) {
 // This creates two interlinked knots.
 TEST(Samples, Knot42) {
   Manifold knot42 = TorusKnot(4, 2, 15, 6, 5);
-  if (exportModels) ExportMesh("knot42.glb", knot42.GetMesh(), {});
+  if (options.exportModels) ExportMesh("knot42.glb", knot42.GetMesh(), {});
   CheckManifold(knot42);
   std::vector<Manifold> knots = knot42.Decompose();
   ASSERT_EQ(knots.size(), 2);
@@ -79,7 +77,7 @@ TEST(Samples, Knot42) {
 TEST(Samples, Scallop) {
   Manifold scallop = Scallop();
 
-  if (exportModels) {
+  if (options.exportModels) {
     Mesh in = scallop.GetMesh();
     std::vector<int> edgePair = EdgePairs(in);
 
@@ -93,7 +91,7 @@ TEST(Samples, Scallop) {
       const int vert = in.triVerts[i / 3][i % 3];
       in.vertPos.push_back(in.vertPos[vert] + glm::vec3(in.halfedgeTangent[i]) *
                                                   in.halfedgeTangent[i].w);
-      options.mat.vertColor.push_back({1, 1, 0, 1});
+      options.mat.vertColor.push_back({0.5, 0.5, 0, 1});
       const int j = edgePair[i % 3 == 0 ? i + 2 : i - 1];
       in.triVerts.push_back({vert, numVert + i, numVert + j});
     }
@@ -108,7 +106,7 @@ TEST(Samples, Scallop) {
   EXPECT_NEAR(prop.volume, 41.3, 0.1);
   EXPECT_NEAR(prop.surfaceArea, 78.1, 0.1);
 
-  if (exportModels) {
+  if (options.exportModels) {
     const Mesh out = scallop.GetMesh();
     ExportOptions options2;
     options2.faceted = false;
@@ -132,7 +130,7 @@ TEST(Samples, TetPuzzle) {
   puzzle2.Rotate(0, 0, 180);
   EXPECT_TRUE((puzzle ^ puzzle2).IsEmpty());
   puzzle.Transform(RotateUp({1, -1, -1}));
-  if (exportModels) ExportMesh("tetPuzzle.glb", puzzle.GetMesh(), {});
+  if (options.exportModels) ExportMesh("tetPuzzle.glb", puzzle.GetMesh(), {});
 }
 
 TEST(Samples, FrameReduced) {
@@ -143,7 +141,8 @@ TEST(Samples, FrameReduced) {
   auto prop = frame.GetProperties();
   EXPECT_NEAR(prop.volume, 227333, 10);
   EXPECT_NEAR(prop.surfaceArea, 62635, 1);
-  if (exportModels) ExportMesh("roundedFrameReduced.glb", frame.GetMesh(), {});
+  if (options.exportModels)
+    ExportMesh("roundedFrameReduced.glb", frame.GetMesh(), {});
 }
 
 TEST(Samples, Frame) {
@@ -151,7 +150,7 @@ TEST(Samples, Frame) {
   CheckManifold(frame);
   EXPECT_EQ(frame.NumDegenerateTris(), 0);
   EXPECT_EQ(frame.Genus(), 5);
-  if (exportModels) ExportMesh("roundedFrame.glb", frame.GetMesh(), {});
+  if (options.exportModels) ExportMesh("roundedFrame.glb", frame.GetMesh(), {});
 }
 
 // This creates a bracelet sample which involves many operations between shapes
@@ -161,7 +160,7 @@ TEST(Samples, Bracelet) {
   CheckManifold(bracelet);
   EXPECT_LE(bracelet.NumDegenerateTris(), 21);
   EXPECT_EQ(bracelet.Genus(), 1);
-  if (exportModels) ExportMesh("bracelet.glb", bracelet.GetMesh(), {});
+  if (options.exportModels) ExportMesh("bracelet.glb", bracelet.GetMesh(), {});
 }
 
 TEST(Samples, Sponge1) {
@@ -170,7 +169,8 @@ TEST(Samples, Sponge1) {
   EXPECT_EQ(sponge.NumDegenerateTris(), 0);
   EXPECT_EQ(sponge.NumVert(), 40);
   EXPECT_EQ(sponge.Genus(), 5);
-  if (exportModels) ExportMesh("mengerSponge1.glb", sponge.GetMesh(), {});
+  if (options.exportModels)
+    ExportMesh("mengerSponge1.glb", sponge.GetMesh(), {});
 }
 
 // A fractal with many degenerate intersections, which also tests exact 90
@@ -187,7 +187,7 @@ TEST(Samples, Sponge4) {
   EXPECT_TRUE(cutSponge.second.IsManifold());
   EXPECT_EQ(cutSponge.second.Genus(), 13394);
 
-  if (exportModels) {
+  if (options.exportModels) {
     ExportMesh("mengerHalf.glb", cutSponge.first.GetMesh(), {});
 
     const Mesh out = sponge.GetMesh();
