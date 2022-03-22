@@ -14,10 +14,9 @@
 
 #include <random>
 
-#include "gtest/gtest.h"
 #include "manifold.h"
 #include "meshIO.h"
-#include "polygon.h"
+#include "test.h"
 
 namespace {
 
