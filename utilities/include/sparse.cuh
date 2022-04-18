@@ -23,6 +23,8 @@
 #include "utils.cuh"
 #include "vec_dh.cuh"
 
+#include <math.h>
+
 namespace manifold {
 
 /** @ingroup Private */
