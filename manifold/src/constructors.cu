@@ -442,7 +442,8 @@ std::vector<Manifold> Manifold::Decompose() const {
     graph.add_nodes(i);
   }
   for (const Halfedge& halfedge : pImpl_->halfedge_) {
-    graph.add_edge(halfedge.startVert, halfedge.endVert);
+    if (halfedge.IsForward())
+      graph.add_edge(halfedge.startVert, halfedge.endVert);
   }
   Components components = ConnectedComponents(graph);
   const int numLabel = components.componentLabels.size();
