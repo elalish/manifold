@@ -9,7 +9,7 @@ set_property(TARGET ${PROJECT_NAME} PROPERTY CUDA_ARCHITECTURES 61)
 target_include_directories( ${PROJECT_NAME} PUBLIC ${PROJECT_SOURCE_DIR}/include )
 target_link_libraries( ${PROJECT_NAME}
     PUBLIC utilities
-    PRIVATE collider polygon ${MANIFOLD_OMP_INCLUDE} Boost::graph 
+    PRIVATE collider polygon ${MANIFOLD_OMP_INCLUDE} Boost::graph graphlite
 )
 
 target_compile_options(${PROJECT_NAME} 
@@ -20,6 +20,6 @@ target_compile_options(${PROJECT_NAME}
 )
 target_compile_features(${PROJECT_NAME} 
     PUBLIC cxx_std_14 
-    PRIVATE cxx_std_14
+    PRIVATE cxx_std_17
 )
 
