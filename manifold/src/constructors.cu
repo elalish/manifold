@@ -153,7 +153,7 @@ Manifold Manifold::Cube(glm::vec3 size, bool center) {
 Manifold Manifold::Cylinder(float height, float radiusLow, float radiusHigh,
                             int circularSegments, bool center) {
   float scale = radiusHigh >= 0.0f ? radiusHigh / radiusLow : 1.0f;
-  float radius = max(radiusLow, radiusHigh);
+  float radius = fmax(radiusLow, radiusHigh);
   int n = circularSegments > 2 ? circularSegments : GetCircularSegments(radius);
   Polygons circle(1);
   float dPhi = 360.0f / n;
@@ -283,7 +283,7 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments) {
   float radius = 0.0f;
   for (const auto& poly : crossSection) {
     for (const auto& vert : poly) {
-      radius = max(radius, vert.pos.x);
+      radius = fmax(radius, vert.pos.x);
     }
   }
   int nDivisions =
