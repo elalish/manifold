@@ -14,10 +14,7 @@
 
 #include <thrust/sequence.h>
 
-#include <boost/config.hpp>
-#include <boost/graph/adjacency_list.hpp>
-#include <boost/graph/connected_components.hpp>
-
+#include "graph.h"
 #include "impl.cuh"
 #include "polygon.h"
 
@@ -57,21 +54,6 @@ struct UpdateHalfedge {
     return edge;
   }
 };
-
-int ConnectedComponents(VecDH<int>& components, int numVert,
-                        const VecDH<Halfedge>& halfedges) {
-  boost::adjacency_list<boost::vecS, boost::vecS, boost::undirectedS> graph(
-      numVert);
-  for (int i = 0; i < halfedges.size(); ++i) {
-    const Halfedge halfedge = halfedges.H()[i];
-    if (halfedge.IsForward()) {
-      boost::add_edge(halfedge.startVert, halfedge.endVert, graph);
-    }
-  }
-  components.resize(numVert);
-  int numComponent = boost::connected_components(graph, components.H().data());
-  return numComponent;
-}
 
 struct Equals {
   int val;
@@ -455,17 +437,26 @@ Manifold Manifold::Compose(const std::vector<Manifold>& manifolds) {
  * containing a copy of the original. It is the inverse operation of Compose().
  */
 std::vector<Manifold> Manifold::Decompose() const {
-  VecDH<int> vertLabel;
-  int numLabel = ConnectedComponents(vertLabel, NumVert(), pImpl_->halfedge_);
+  Graph graph;
+  for (int i = 0; i < NumVert(); ++i) {
+    graph.add_nodes(i);
+  }
+  for (const Halfedge& halfedge : pImpl_->halfedge_) {
+    graph.add_edge(halfedge.startVert, halfedge.endVert);
+  }
+  Components components = ConnectedComponents(graph);
+  const int numLabel = components.componentLabels.size();
 
   if (numLabel == 1) {
     std::vector<Manifold> meshes(1);
     meshes[0] = *this;
     return meshes;
   }
+  VecDH<int> vertLabel(components.nodeLabels);
 
   std::vector<Manifold> meshes(numLabel);
   for (int i = 0; i < numLabel; ++i) {
+    const int component = components.componentLabels[i];
     meshes[i].pImpl_->vertPos_.resize(NumVert());
     VecDH<int> vertNew2Old(NumVert());
     int nVert =
@@ -474,18 +465,17 @@ std::vector<Manifold> Manifold::Decompose() const {
             zip(pImpl_->vertPos_.endD(), countAt(NumVert())),
             vertLabel.beginD(),
             zip(meshes[i].pImpl_->vertPos_.beginD(), vertNew2Old.beginD()),
-            Equals({i})) -
+            Equals({component})) -
         zip(meshes[i].pImpl_->vertPos_.beginD(), countAt(0));
     meshes[i].pImpl_->vertPos_.resize(nVert);
 
     VecDH<int> faceNew2Old(NumTri());
     thrust::sequence(faceNew2Old.beginD(), faceNew2Old.endD());
 
-    int nFace =
-        thrust::remove_if(
-            faceNew2Old.beginD(), faceNew2Old.endD(),
-            RemoveFace({pImpl_->halfedge_.cptrD(), vertLabel.cptrD(), i})) -
-        faceNew2Old.beginD();
+    int nFace = thrust::remove_if(faceNew2Old.beginD(), faceNew2Old.endD(),
+                                  RemoveFace({pImpl_->halfedge_.cptrD(),
+                                              vertLabel.cptrD(), component})) -
+                faceNew2Old.beginD();
     faceNew2Old.resize(nFace);
 
     meshes[i].pImpl_->GatherFaces(*pImpl_, faceNew2Old);
