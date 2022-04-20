@@ -20,6 +20,6 @@ target_compile_options(${PROJECT_NAME}
 )
 target_compile_features(${PROJECT_NAME} 
     PUBLIC cxx_std_14 
-    PRIVATE cxx_std_14
+    PRIVATE cxx_std_17
 )
 

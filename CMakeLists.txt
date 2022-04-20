@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.12)
+cmake_minimum_required(VERSION 3.18)
 if (NOT CMAKE_CUDA_COMPILER)
     set(CMAKE_CUDA_COMPILER "/usr/local/cuda/bin/nvcc")
 endif()
