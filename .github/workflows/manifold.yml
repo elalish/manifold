@@ -29,6 +29,7 @@ jobs:
         DEBIAN_FRONTEND=noninteractive apt install -y software-properties-common lsb-release
         wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | gpg --dearmor - | DEBIAN_FRONTEND=noninteractive tee /etc/apt/trusted.gpg.d/kitware.gpg >/dev/null
         DEBIAN_FRONTEND=noninteractive apt-add-repository "deb https://apt.kitware.com/ubuntu/ $(lsb_release -cs) main"
+        DEBIAN_FRONTEND=noninteractive apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 6AF7F09730B3F0A4
         apt-get -y update
         DEBIAN_FRONTEND=noninteractive apt install -y cmake libglm-dev libassimp-dev libboost-graph-dev libcgal-dev
     - name: Build CUDA
