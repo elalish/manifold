@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "boolean3.cuh"
+#include <limits>
 
 // TODO: make this runtime configurable for quicker debug
 constexpr bool kVerbose = false;
@@ -114,7 +115,7 @@ __host__ __device__ thrust::pair<int, glm::vec2> Shadow01(
                           Shadows(q1ex, p0x, expandP * normalP[q1e].x)
                     : Shadows(p0x, q1ex, expandP * normalP[p0].x) -
                           Shadows(p0x, q1sx, expandP * normalP[p0].x);
-  glm::vec2 yz01(0.0f / 0.0f);
+  glm::vec2 yz01(NAN);
 
   if (s01 != 0) {
     yz01 = Interpolate(vertPosQ[q1s], vertPosQ[q1e], vertPosP[p0].x);
@@ -215,7 +216,7 @@ struct Kernel11 {
     }
 
     if (s11 == 0) {  // No intersection
-      xyzz11 = glm::vec4(0.0f / 0.0f);
+      xyzz11 = glm::vec4(NAN);
     } else {
       // Assert left and right were both found
       if (k != 2) {
@@ -278,7 +279,7 @@ struct Kernel02 {
     // intersection is between the left and right.
     bool shadows;
     int closestVert;
-    float minMetric = 1.0f / 0.0f;
+    float minMetric = std::numeric_limits<float>::infinity();
     s02 = 0;
 
     const glm::vec3 posP = vertPosP[p0];
@@ -312,7 +313,7 @@ struct Kernel02 {
     }
 
     if (s02 == 0) {  // No intersection
-      z02 = 0.0f / 0.0f;
+      z02 = NAN;
     } else {
       // Assert left and right were both found
       if (k != 2) {
@@ -427,7 +428,7 @@ struct Kernel12 {
     }
 
     if (x12 == 0) {  // No intersection
-      v12 = glm::vec3(0.0f / 0.0f);
+      v12 = glm::vec3(NAN);
     } else {
       // Assert left and right were both found
       if (k != 2) {
