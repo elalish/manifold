@@ -22,15 +22,12 @@ jobs:
     steps:
     # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
     - uses: actions/checkout@v2
+    - uses: lukka/get-cmake@latest
     
     - name: Install dependencies
       run: |
-        DEBIAN_FRONTEND=noninteractive apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 6AF7F09730B3F0A4
-        wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | gpg --dearmor - | DEBIAN_FRONTEND=noninteractive tee /etc/apt/trusted.gpg.d/kitware.gpg >/dev/null
         apt-get -y update
-        DEBIAN_FRONTEND=noninteractive apt-add-repository "deb https://apt.kitware.com/ubuntu/ focal main"
-        apt-get -y update
-        DEBIAN_FRONTEND=noninteractive apt install -y cmake libglm-dev libassimp-dev libboost-graph-dev libcgal-dev
+        DEBIAN_FRONTEND=noninteractive apt install -y libglm-dev libassimp-dev libboost-graph-dev libcgal-dev
     - name: Build CUDA
       run: |
         mkdir buildCUDA
