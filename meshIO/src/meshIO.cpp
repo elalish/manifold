@@ -139,7 +139,7 @@ void ExportMesh(const std::string& filename, const Mesh& mesh,
 
   scene->mRootNode = new aiNode();
   scene->mRootNode->mNumMeshes = 1;
-  scene->mRootNode->mMeshes = new uint[scene->mRootNode->mNumMeshes];
+  scene->mRootNode->mMeshes = new glm::uint[scene->mRootNode->mNumMeshes];
   scene->mRootNode->mMeshes[0] = 0;
 
   aiMesh* mesh_out = scene->mMeshes[0];
@@ -180,7 +180,7 @@ void ExportMesh(const std::string& filename, const Mesh& mesh,
   for (int i = 0; i < mesh_out->mNumFaces; ++i) {
     aiFace& face = mesh_out->mFaces[i];
     face.mNumIndices = 3;
-    face.mIndices = new uint[face.mNumIndices];
+    face.mIndices = new glm::uint[face.mNumIndices];
     for (int j : {0, 1, 2}) face.mIndices[j] = mesh.triVerts[i][j];
   }
 
