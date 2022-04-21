@@ -186,7 +186,7 @@ int Manifold::GetCircularSegments(float radius) {
   if (Manifold::circularSegments_ > 0) return Manifold::circularSegments_;
   int nSegA = 360.0f / Manifold::circularAngle_;
   int nSegL = 2.0f * radius * glm::pi<float>() / Manifold::circularEdgeLength_;
-  int nSeg = min(nSegA, nSegL) + 3;
+  int nSeg = fmin(nSegA, nSegL) + 3;
   nSeg -= nSeg % 4;
   return nSeg;
 }
