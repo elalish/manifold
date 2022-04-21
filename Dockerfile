@@ -5,7 +5,6 @@ RUN apt-get -y update && apt-get -y install \
     cmake \
     libglm-dev \
     libassimp-dev \
-    libboost-graph-dev \
     libcgal-dev
 # RUN DEBIAN_FRONTEND=noninteractive apt-get -y install cuda-drivers
 COPY . /usr/src

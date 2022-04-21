@@ -35,22 +35,21 @@ typedef CGAL::Epick Kernel;
 
 typedef CGAL::Point_3<Kernel> Point;
 typedef CGAL::Surface_mesh<Point> TriangleMesh;
+typedef CGAL::SM_Vertex_index Vertex;
 
 void manifoldToCGALSurfaceMesh(Manifold &manifold, TriangleMesh &cgalMesh) {
-  typedef boost::graph_traits<TriangleMesh> GT;
-  typedef typename GT::vertex_descriptor vertex_descriptor;
-
   auto maniMesh = manifold.GetMesh();
 
-  std::unordered_map<size_t, vertex_descriptor> vertices;
-  for (size_t i = 0, n = maniMesh.vertPos.size(); i < n; i++) {
+  const int n = maniMesh.vertPos.size();
+  std::vector<Vertex> vertices(n);
+  for (size_t i = 0; i < n; i++) {
     auto &vert = maniMesh.vertPos[i];
     vertices[i] = cgalMesh.add_vertex(Point(vert.x, vert.y, vert.z));
   }
 
   for (auto &triVert : maniMesh.triVerts) {
-    std::vector<vertex_descriptor> polygon{
-        vertices[triVert[0]], vertices[triVert[1]], vertices[triVert[2]]};
+    std::vector<Vertex> polygon{vertices[triVert[0]], vertices[triVert[1]],
+                                vertices[triVert[2]]};
     cgalMesh.add_face(polygon);
   }
 }

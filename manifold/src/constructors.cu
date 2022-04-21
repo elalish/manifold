@@ -14,10 +14,7 @@
 
 #include <thrust/sequence.h>
 
-#include <boost/config.hpp>
-#include <boost/graph/adjacency_list.hpp>
-#include <boost/graph/connected_components.hpp>
-
+#include "graph.h"
 #include "impl.cuh"
 #include "polygon.h"
 
@@ -57,21 +54,6 @@ struct UpdateHalfedge {
     return edge;
   }
 };
-
-int ConnectedComponents(VecDH<int>& components, int numVert,
-                        const VecDH<Halfedge>& halfedges) {
-  boost::adjacency_list<boost::vecS, boost::vecS, boost::undirectedS> graph(
-      numVert);
-  for (int i = 0; i < halfedges.size(); ++i) {
-    const Halfedge halfedge = halfedges.H()[i];
-    if (halfedge.IsForward()) {
-      boost::add_edge(halfedge.startVert, halfedge.endVert, graph);
-    }
-  }
-  components.resize(numVert);
-  int numComponent = boost::connected_components(graph, components.H().data());
-  return numComponent;
-}
 
 struct Equals {
   int val;
@@ -455,14 +437,23 @@ Manifold Manifold::Compose(const std::vector<Manifold>& manifolds) {
  * containing a copy of the original. It is the inverse operation of Compose().
  */
 std::vector<Manifold> Manifold::Decompose() const {
-  VecDH<int> vertLabel;
-  int numLabel = ConnectedComponents(vertLabel, NumVert(), pImpl_->halfedge_);
+  Graph graph;
+  for (int i = 0; i < NumVert(); ++i) {
+    graph.add_nodes(i);
+  }
+  for (const Halfedge& halfedge : pImpl_->halfedge_) {
+    if (halfedge.IsForward())
+      graph.add_edge(halfedge.startVert, halfedge.endVert);
+  }
+  std::vector<int> components;
+  const int numLabel = ConnectedComponents(components, graph);
 
   if (numLabel == 1) {
     std::vector<Manifold> meshes(1);
     meshes[0] = *this;
     return meshes;
   }
+  VecDH<int> vertLabel(components);
 
   std::vector<Manifold> meshes(numLabel);
   for (int i = 0; i < numLabel; ++i) {
