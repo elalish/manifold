@@ -17,16 +17,11 @@
 
 namespace manifold {
 
-struct Components {
-  std::vector<int> componentLabels;
-  std::vector<int> nodeLabels;
-};
-
 typedef typename graph_lite::Graph<
     int, void, void, graph_lite::EdgeDirection::UNDIRECTED,
     graph_lite::MultiEdge::DISALLOWED, graph_lite::SelfLoop::DISALLOWED,
     graph_lite::Map::UNORDERED_MAP, graph_lite::Container::VEC>
     Graph;
 
-Components ConnectedComponents(const Graph& g);
+int ConnectedComponents(std::vector<int>& components, const Graph& g);
 }  // namespace manifold
