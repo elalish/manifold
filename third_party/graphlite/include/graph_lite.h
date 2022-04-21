@@ -1,3 +1,4 @@
+// From https://github.com/haasdo95/graphlite commit 9cd2815e5d571a87e5b8b8ef3752e04d971f35d4
 #ifndef GSK_GRAPH_LITE_H
 #define GSK_GRAPH_LITE_H
 

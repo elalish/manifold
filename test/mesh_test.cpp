@@ -144,7 +144,7 @@ TEST(Manifold, GetMesh) {
   Identical(mesh_out, mesh_out2);
 }
 
-TEST(Manifold, Regression) {
+TEST(Manifold, Determinism) {
   Manifold manifold(ImportMesh("data/gyroidpuzzle.ply"));
   EXPECT_TRUE(manifold.IsManifold());
 
