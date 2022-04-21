@@ -27,7 +27,7 @@ jobs:
     - name: Install dependencies
       run: |
         apt-get -y update
-        DEBIAN_FRONTEND=noninteractive apt install -y libglm-dev libassimp-dev libboost-graph-dev libcgal-dev
+        DEBIAN_FRONTEND=noninteractive apt install -y libglm-dev libassimp-dev libcgal-dev
     - name: Build CUDA
       run: |
         mkdir buildCUDA
