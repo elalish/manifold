@@ -445,19 +445,18 @@ std::vector<Manifold> Manifold::Decompose() const {
     if (halfedge.IsForward())
       graph.add_edge(halfedge.startVert, halfedge.endVert);
   }
-  Components components = ConnectedComponents(graph);
-  const int numLabel = components.componentLabels.size();
+  std::vector<int> components;
+  const int numLabel = ConnectedComponents(components, graph);
 
   if (numLabel == 1) {
     std::vector<Manifold> meshes(1);
     meshes[0] = *this;
     return meshes;
   }
-  VecDH<int> vertLabel(components.nodeLabels);
+  VecDH<int> vertLabel(components);
 
   std::vector<Manifold> meshes(numLabel);
   for (int i = 0; i < numLabel; ++i) {
-    const int component = components.componentLabels[i];
     meshes[i].pImpl_->vertPos_.resize(NumVert());
     VecDH<int> vertNew2Old(NumVert());
     int nVert =
@@ -466,17 +465,18 @@ std::vector<Manifold> Manifold::Decompose() const {
             zip(pImpl_->vertPos_.endD(), countAt(NumVert())),
             vertLabel.beginD(),
             zip(meshes[i].pImpl_->vertPos_.beginD(), vertNew2Old.beginD()),
-            Equals({component})) -
+            Equals({i})) -
         zip(meshes[i].pImpl_->vertPos_.beginD(), countAt(0));
     meshes[i].pImpl_->vertPos_.resize(nVert);
 
     VecDH<int> faceNew2Old(NumTri());
     thrust::sequence(faceNew2Old.beginD(), faceNew2Old.endD());
 
-    int nFace = thrust::remove_if(faceNew2Old.beginD(), faceNew2Old.endD(),
-                                  RemoveFace({pImpl_->halfedge_.cptrD(),
-                                              vertLabel.cptrD(), component})) -
-                faceNew2Old.beginD();
+    int nFace =
+        thrust::remove_if(
+            faceNew2Old.beginD(), faceNew2Old.endD(),
+            RemoveFace({pImpl_->halfedge_.cptrD(), vertLabel.cptrD(), i})) -
+        faceNew2Old.beginD();
     faceNew2Old.resize(nFace);
 
     meshes[i].pImpl_->GatherFaces(*pImpl_, faceNew2Old);

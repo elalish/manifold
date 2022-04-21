@@ -158,7 +158,7 @@ TEST(Samples, Frame) {
 TEST(Samples, Bracelet) {
   Manifold bracelet = StretchyBracelet();
   CheckManifold(bracelet);
-  EXPECT_LE(bracelet.NumDegenerateTris(), 21);
+  EXPECT_LE(bracelet.NumDegenerateTris(), 22);
   EXPECT_EQ(bracelet.Genus(), 1);
   if (options.exportModels) ExportMesh("bracelet.glb", bracelet.GetMesh(), {});
 }

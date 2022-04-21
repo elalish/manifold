@@ -151,7 +151,7 @@ TEST(Manifold, Regression) {
   Manifold manifold1 = manifold;
   manifold1.Translate(glm::vec3(5.0f));
   int num_overlaps = manifold.NumOverlaps(manifold1);
-  ASSERT_EQ(num_overlaps, 228677);
+  ASSERT_EQ(num_overlaps, 229611);
 
   Mesh mesh_out = manifold.GetMesh();
   Manifold manifold2(mesh_out);
@@ -727,7 +727,7 @@ TEST(Boolean, Gyroid) {
 
   EXPECT_TRUE(result.IsManifold());
   EXPECT_TRUE(result.MatchesTriNormals());
-  EXPECT_LE(result.NumDegenerateTris(), 33);
+  EXPECT_LE(result.NumDegenerateTris(), 42);
   EXPECT_EQ(result.Decompose().size(), 1);
   auto prop = result.GetProperties();
   EXPECT_NEAR(prop.volume, 7692, 1);
