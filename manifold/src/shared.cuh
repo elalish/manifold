@@ -81,7 +81,7 @@ __host__ __device__ inline glm::vec3 GetBarycentric(const glm::vec3& v,
   const float area2 = glm::dot(crossP, crossP);
   const float tol2 = precision * precision;
   const float vol = glm::dot(crossP, v - triPos[2]);
-  if (vol * vol > area2 * tol2) return glm::vec3(0.0f / 0.0f);
+  if (vol * vol > area2 * tol2) return glm::vec3(NAN);
 
   if (d2[longside] < tol2) {  // point
     return glm::vec3(1, 0, 0);

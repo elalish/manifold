@@ -16,8 +16,9 @@
 
 #include <algorithm>
 #include <random>
+#include <limits>
 
-#include "gtest/gtest.h"
+#include "test.h"
 
 namespace {
 
@@ -60,8 +61,8 @@ Polygons Turn180(Polygons polys) {
 }
 
 Polygons Duplicate(Polygons polys) {
-  float xMin = 1.0 / 0.0;
-  float xMax = -1.0 / 0.0;
+    float xMin = std::numeric_limits<float>::infinity(); 
+  float xMax = -std::numeric_limits<float>::infinity(); 
   int indexMax = 0;
   for (SimplePolygon &poly : polys) {
     for (PolyVert &vert : poly) {
@@ -86,7 +87,7 @@ Polygons Duplicate(Polygons polys) {
 }
 
 void TestPoly(const Polygons &polys, int expectedNumTri) {
-  //   PolygonParams().verbose = true;
+  PolygonParams().verbose = options.params.verbose;
   PolygonParams().intermediateChecks = true;
 
   std::vector<glm::ivec3> triangles;
@@ -2837,12 +2838,4 @@ TEST(Polygon, BigSponge) {
       {glm::vec2(0.487654328, 0.450617284), 83865},  //
   });
   TestPoly(polys, 1771);
-}
-
-// void fnExit() { throw std::runtime_error("Someone called Exit()!"); }
-
-int main(int argc, char **argv) {
-  // atexit(fnExit);
-  ::testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
 }

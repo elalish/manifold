@@ -16,11 +16,9 @@
 #include <thrust/logical.h>
 
 #include <algorithm>
-#include <boost/config.hpp>
-#include <boost/graph/adjacency_list.hpp>
-#include <boost/graph/connected_components.hpp>
 #include <map>
 
+#include "graph.h"
 #include "impl.cuh"
 
 namespace {
@@ -415,16 +413,18 @@ int Manifold::Impl::InitializeNewReference(
                     triPropertiesD.cptrD(), propertiesD.cptrD(),
                     propertyToleranceD.cptrD(), numProps, precision_}));
 
-  boost::adjacency_list<boost::vecS, boost::vecS, boost::undirectedS> graph(
-      NumTri());
+  Graph graph;
+  for (int i = 0; i < NumTri(); ++i) {
+    graph.add_nodes(i);
+  }
   for (int i = 0; i < face2face.size(); ++i) {
     const thrust::pair<int, int> edge = face2face.H()[i];
     if (edge.first < 0) continue;
-    boost::add_edge(edge.first, edge.second, graph);
+    graph.add_edge(edge.first, edge.second);
   }
-  std::vector<int> components(NumTri());
-  const int numComponent =
-      boost::connected_components(graph, components.data());
+
+  std::vector<int> components;
+  const int numComponent = ConnectedComponents(components, graph);
 
   std::vector<int> comp2tri(numComponent, -1);
   for (int tri = 0; tri < NumTri(); ++tri) {
