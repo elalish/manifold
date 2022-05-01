@@ -9,6 +9,9 @@ target_compile_features(loadMesh PUBLIC cxx_std_14)
 add_executable(perfTest perf_test.cpp)
 target_link_libraries(perfTest manifold)
 
+add_executable(unionPerfTest union_perf.cpp)
+target_link_libraries(unionPerfTest manifold)
+
 target_compile_options(perfTest PRIVATE ${MANIFOLD_FLAGS})
 target_compile_features(perfTest PUBLIC cxx_std_14)
 
