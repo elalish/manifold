@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <thrust/sequence.h>
+#include <thrust/execution_policy.h>
 
 #include "graph.h"
 #include "impl.cuh"
@@ -266,6 +267,76 @@ Manifold Manifold::Extrude(Polygons crossSection, float height, int nDivisions,
   extrusion.pImpl_->Finish();
   extrusion.pImpl_->InitializeNewReference();
   return extrusion;
+}
+
+Manifold Manifold::Sweep(Polygons crossSection, int steps,
+        std::function<glm::mat4x3(int)> &transform, bool isClosed) {
+  Manifold result;
+  VecDH<glm::ivec3> triVertsDH;
+
+  int nCrossSection = 0;
+  auto& vertPos = result.pImpl_->vertPos_.H();
+  auto& triVerts = triVertsDH.H();
+  int idx = 0;
+  for (auto& poly : crossSection) {
+    nCrossSection += poly.size();
+    for (auto& polyVert : poly) {
+      polyVert.idx = idx++;
+    }
+  }
+  vertPos.resize(nCrossSection * steps);
+  triVerts.resize(nCrossSection * (steps-1)*2);
+
+  auto iter = [&](int i){
+    glm::mat4x3 transformI = transform(i);
+    int idx = 0;
+    for (auto &poly : crossSection) {
+      for (int vert = 0; vert < poly.size(); ++vert) {
+        int offset = idx + nCrossSection * i;
+        int thisVert = vert + offset;
+        int lastVert = (vert == 0? poly.size() : vert) - 1 + offset;
+        glm::vec3 pos = transformI * glm::vec4(
+            poly[vert].pos.x, poly[vert].pos.y, 0.0f, 1.0f);
+        vertPos[thisVert] = pos;
+
+        if (i != 0) {
+          const int index = (thisVert - nCrossSection)*2;
+          triVerts[index] = {thisVert, lastVert, thisVert - nCrossSection};
+          triVerts[index+1] = {lastVert, lastVert - nCrossSection,
+                               thisVert - nCrossSection};
+        }
+      }
+      idx += poly.size();
+    }
+  };
+
+  thrust::for_each_n(thrust::host, countAt(0), steps, iter);
+
+  if (isClosed) {
+    // simply connect the first and last (steps-2) cross section
+    for (auto &poly : crossSection) {
+      for (int vert = 0; vert < poly.size(); ++vert) {
+        int thisVert = vert;
+        int lastVert = (vert == 0? poly.size() : vert) - 1;
+        triVerts.push_back({thisVert, lastVert, thisVert + (steps-1)*nCrossSection});
+        triVerts.push_back(
+            {lastVert, lastVert + (steps-1)*nCrossSection, thisVert + (steps-1)*nCrossSection});
+      }
+    }
+  } else {
+    // linear transformation should probably not change triangulation results?
+    std::vector<glm::ivec3> top = Triangulate(crossSection);
+    triVerts.reserve(top.size() * steps);
+    for (const glm::ivec3& tri : top) {
+      triVerts.push_back({tri[0], tri[2], tri[1]});
+      triVerts.push_back(tri + nCrossSection * (steps-1));
+    }
+  }
+
+  result.pImpl_->CreateHalfedges(triVertsDH);
+  result.pImpl_->Finish();
+  result.pImpl_->InitializeNewReference();
+  return result;
 }
 
 /**

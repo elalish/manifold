@@ -56,6 +56,8 @@ class Manifold {
                           glm::vec2 scaleTop = glm::vec2(1.0f));
   static Manifold Revolve(const Polygons& crossSection,
                           int circularSegments = 0);
+  static Manifold Sweep(Polygons crossSection, int steps,
+                        std::function<glm::mat4x3(int)> &transform, bool closed = false);
   ///@}
 
   /** @name Topological
