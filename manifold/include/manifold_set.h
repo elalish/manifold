@@ -9,8 +9,6 @@ public:
   ManifoldSet(const std::vector<manifold::Manifold> &manifolds);
   ManifoldSet(const manifold::Manifold &manifold);
 
-  ManifoldSet(const ManifoldSet &other);
-
   ManifoldSet operator+(const ManifoldSet &other) const;
 
   ManifoldSet &operator+=(const ManifoldSet &other);

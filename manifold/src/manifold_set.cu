@@ -1,7 +1,7 @@
-#include "manifold_set.h"
 #include <algorithm>
-#include "utils.cuh"
 #include <thrust/execution_policy.h>
+#include "manifold_set.h"
+#include "utils.cuh"
 
 namespace manifold {
 
@@ -14,9 +14,6 @@ ManifoldSet::ManifoldSet(const std::vector<Manifold> &manifolds)
 ManifoldSet::ManifoldSet(const Manifold &manifold)
     : manifolds(std::make_shared<std::vector<Manifold>>(
           std::vector<Manifold>({manifold}))) {}
-
-ManifoldSet::ManifoldSet(const ManifoldSet &other)
-    : transform_(other.transform_), manifolds(other.manifolds) {}
 
 ManifoldSet ManifoldSet::operator+(const ManifoldSet &other) const {
   ManifoldSet result;
@@ -39,7 +36,7 @@ ManifoldSet ManifoldSet::operator+(const ManifoldSet &other) const {
 ManifoldSet &ManifoldSet::operator+=(const ManifoldSet &other) {
   if (manifolds.use_count() != 1) {
     auto old = manifolds;
-    manifolds = std::make_shared<std::vector<Manifold>>(old->size());
+    manifolds = std::make_shared<std::vector<Manifold>>();
     manifolds->insert(manifolds->end(), old->begin(), old->end());
   }
   if (transform_ != glm::mat4x3(1.0f))
@@ -48,11 +45,11 @@ ManifoldSet &ManifoldSet::operator+=(const ManifoldSet &other) {
   transform_ = glm::mat4x3(1.0f);
 
   manifolds->reserve(other.manifolds->size());
-  int index = manifolds->size();
-  manifolds->insert(manifolds->end(), other.manifolds->begin(),
-                    other.manifolds->end());
-  for (int i = index; i < manifolds->size(); i++) {
-    manifolds->at(i).Transform(other.transform_);
+  int end = other.manifolds->size();
+  for (int i = 0; i < end; ++i) {
+    manifolds->push_back(other.manifolds->at(i));
+    if (other.transform_ != glm::mat4x3(1.0f))
+      manifolds->back().Transform(other.transform_);
   }
   return *this;
 }
@@ -63,8 +60,7 @@ ManifoldSet ManifoldSet::operator-(ManifoldSet &other) {
 
 ManifoldSet &ManifoldSet::operator-=(ManifoldSet &other) {
   auto result = this->ToManifold() - other.ToManifold();
-  transform_ = glm::mat4x3(1.0f);
-  manifolds = std::make_shared<std::vector<Manifold>>(1);
+  manifolds = std::make_shared<std::vector<Manifold>>();
   manifolds->push_back(result);
   return *this;
 }
@@ -75,8 +71,7 @@ ManifoldSet ManifoldSet::operator^(ManifoldSet &other) {
 
 ManifoldSet &ManifoldSet::operator^=(ManifoldSet &other) {
   auto result = this->ToManifold() ^ other.ToManifold();
-  transform_ = glm::mat4x3(1.0f);
-  manifolds = std::make_shared<std::vector<Manifold>>(1);
+  manifolds = std::make_shared<std::vector<Manifold>>();
   manifolds->push_back(result);
   return *this;
 }
@@ -94,6 +89,7 @@ Manifold ManifoldSet::ToManifold() {
   }
   std::vector<std::pair<std::vector<size_t>, Box>> disjointSets;
   for (size_t i = 0; i < manifolds->size(); i++) {
+    manifolds->at(i).GetMesh(); // why?
     Box box = manifolds->at(i).BoundingBox();
     auto it =
         std::find_if(disjointSets.begin(), disjointSets.end(),
