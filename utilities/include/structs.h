@@ -15,13 +15,13 @@
 #pragma once
 #define GLM_FORCE_EXPLICIT_CTOR
 #include <chrono>
-#include <limits>
 #include <glm/ext/matrix_transform.hpp>
 #include <glm/glm.hpp>
 #include <glm/gtc/constants.hpp>
 #include <glm/gtx/compatibility.hpp>
 #include <glm/gtx/rotate_vector.hpp>
 #include <iostream>
+#include <limits>
 #include <sstream>
 #include <vector>
 
@@ -67,6 +67,9 @@ void AlwaysAssert(bool condition, const char* file, int line,
 #else
 #define HOST_DEVICE
 #endif
+
+constexpr glm::ivec3 next3(1, 2, 0);
+constexpr glm::ivec3 prev3(2, 0, 1);
 
 inline HOST_DEVICE int Signum(float val) { return (val > 0) - (val < 0); }
 

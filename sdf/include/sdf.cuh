@@ -21,13 +21,57 @@
 namespace {
 using namespace manifold;
 
-constexpr kOpen = std::numeric_limits<uint64_t>::max();
+constexpr uint64_t kOpen = std::numeric_limits<uint64_t>::max();
+
+constexpr glm::ivec3[16] tetTri0 = {{-1, -1, -1},  //
+                                    {0, 3, 4},     //
+                                    {0, 1, 5},     //
+                                    {1, 5, 3},     //
+                                    {1, 4, 2},     //
+                                    {1, 0, 3},     //
+                                    {2, 5, 0},     //
+                                    {5, 3, 2},     //
+                                    {2, 3, 5},     //
+                                    {0, 5, 2},     //
+                                    {3, 0, 1},     //
+                                    {2, 4, 1},     //
+                                    {3, 5, 1},     //
+                                    {5, 1, 0},     //
+                                    {4, 3, 0},     //
+                                    {-1, -1, -1}};
+
+constexpr glm::ivec3[16] tetTri1 = {{-1, -1, -1},  //
+                                    {-1, -1, -1},  //
+                                    {-1, -1, -1},  //
+                                    {3, 4, 1},     //
+                                    {-1, -1, -1},  //
+                                    {3, 2, 1},     //
+                                    {0, 4, 2},     //
+                                    {-1, -1, -1},  //
+                                    {-1, -1, -1},  //
+                                    {2, 4, 0},     //
+                                    {1, 2, 3},     //
+                                    {-1, -1, -1},  //
+                                    {1, 4, 3},     //
+                                    {-1, -1, -1},  //
+                                    {-1, -1, -1},  //
+                                    {-1, -1, -1}};
+
+constexpr glm::vec3[7] edgeVec = {{0.5f, 0.5f, 0.5f},   //
+                                  {1.0f, 0.0f, 0.0f},   //
+                                  {0.0f, 1.0f, 0.0f},   //
+                                  {0.0f, 0.0f, 1.0f},   //
+                                  {-0.5f, 0.5f, 0.5f},  //
+                                  {0.5f, -0.5f, 0.5f},  //
+                                  {0.5f, 0.5f, -0.5f}};
 
 struct GridVert {
   uint64_t key = kOpen;
   float distance = NAN;
   int edgeIndex = -1;
-  int[7] edgeVerts;
+  int[7] edgeVerts = {-1, -1, -1, -1, -1, -1, -1};
+
+  int Inside() const { return edgeIndex == -1 ? (distance >= 0 ? 1 : -1) : 0 }
 };
 
 class HashTableD {
@@ -40,13 +84,12 @@ class HashTableD {
   __device__ __host__ bool Insert(const GridVert& vert) {
     uint32_t idx = vert.key & (size_ - 1);
     while (1) {
-      const uint64_t found =
-          AtomicCAS(&table_.ptrD()[idx].key, kOpen, vert.key);
+      const uint64_t found = AtomicCAS(&table_[idx].key, kOpen, vert.key);
       if (found == kOpen) {
-        if (AtomicAdd(&used_.ptrD()[0], 1) * 2 > size_) {
+        if (AtomicAdd(&used_[0], 1) * 2 > size_) {
           return true;
         }
-        table_.ptrD()[idx] = vert;
+        table_[idx] = vert;
         return false;
       }
       if (found == vert.key) return false;
@@ -57,12 +100,14 @@ class HashTableD {
   __device__ __host__ GridVert operator[](uint64_t key) const {
     uint32_t idx = key & (size_ - 1);
     while (1) {
-      const GridVert found = table_.ptrD()[idx];
+      const GridVert found = table_[idx];
       if (found.key == key) return found;
       if (found.key == kOpen) return GridVert();
       idx = (idx + step_) & (size_ - 1);
     }
   }
+
+  __device__ __host__ GridVert At(int index) const { return table_[idx]; }
 
  private:
   const uint32_t step_;
@@ -100,10 +145,6 @@ struct ComputeVerts {
   const glm::ivec3 gridSize;
   const glm::vec3 origin;
   const glm::vec3 spacing;
-  const glm::vec3[7] edgeVec = {{0.5f, 0.5f, 0.5f},  {1.0f, 0.0f, 0.0f},
-                                {0.0f, 1.0f, 0.0f},  {0.0f, 0.0f, 1.0f},
-                                {-0.5f, 0.5f, 0.5f}, {0.5f, -0.5f, 0.5f},
-                                {0.5f, 0.5f, -0.5f}};
 
   inline __host__ __device__ bool AtBounds(glm::ivec3 gridIndex) const {
     return gridIndex.x == 0 || gridIndex.x == gridSize.x || gridIndex.y == 0 ||
@@ -162,10 +203,76 @@ struct ComputeVerts {
 
 struct BuildTris {
   glm::ivec3* triVerts;
-  int* index;
+  int* triIndex;
   const HashTableD gridVerts;
 
-  __host__ __device__ void operator()(int idx) {}
+  __host__ __device__ void CreateTris(const glm::ivec4& tet,
+                                      const int[6] edges) {
+    const int i = (tet[0] > 0 ? 1 : 0) + (tet[1] > 0 ? 2 : 0) +
+                  (tet[2] > 0 ? 4 : 0) + (tet[3] > 0 ? 8 : 0);
+    glm::vec3 tri = tetTri0[i];
+    if (tri[0] < 0) return;
+    int idx = AtomicAdd(triIndex, 1);
+    triVerts[idx] = {edges[tri[0]], edges[tri[1]], edges[tri[2]]};
+
+    tri = tetTri1[i];
+    if (tri[0] < 0) return;
+    idx = AtomicAdd(triIndex, 1);
+    triVerts[idx] = {edges[tri[0]], edges[tri[1]], edges[tri[2]]};
+  }
+
+  __host__ __device__ void operator()(int idx) {
+    const GridVert& base = gridVerts.At(idx);
+    if (base.key == kOpen) return;
+
+    const glm::ivec4 baseIndex = DecodeMorton(base.key);
+
+    glm::ivec4 leadIndex = baseIndex;
+    if (leadIndex.w == 0)
+      leadIndex.w = 1;
+    else {
+      leadIndex += 1;
+      leadIndex.w = 0;
+    }
+    const GridVert& leadVert = gridVerts[MortonCode(leadIndex)];
+
+    // This GridVert is in charge of the 6 tetrahedra surrounding its edge in
+    // the (1,1,1) direction, attached to leadVert.
+    glm::ivec4 tet(leadVert.Inside(), base.Inside(), -2, -2);
+    glm::ivec4 thisIndex = baseIndex;
+    thisIndex[i] += 1;
+    GridVert& thisVert = gridVerts[MortonCode(thisIndex)];
+    tet[2] = thisVert.Inside();
+    int[6] edges = {base.edgeVerts[0], -1, -1, -1, -1, -1};
+    for (const int i : {0, 1, 2}) {
+      edges[1] = base.edgeVerts[i + 1];
+      edges[4] = thisVert.edgeVerts[i + 4];
+      edges[5] = base.edgeVerts[prev3[i] + 4];
+
+      thisIndex = leadIndex;
+      thisIndex[prev3[i]] -= 1;
+      thisVert = gridVerts[MortonCode(thisIndex)];
+      tet[3] = thisVert.Inside();
+      edges[2] = thisVert.edgeVerts[next3[i] + 4];
+      edges[3] = thisVert.edgeVerts[prev3[i] + 1];
+      CreateTris(tet, edges);
+
+      edges[1] = edges[5];
+      edges[2] = thisVert.edgeVerts[i + 4];
+      edges[4] = edges[3];
+      edges[5] = base.edgeVerts[next3[i] + 1];
+
+      tet[2] = tet[3];
+      glm::ivec4 thisIndex = baseIndex;
+      thisIndex[next3[i]] += 1;
+      thisVert = gridVerts[MortonCode(thisIndex)];
+      tet[3] = thisVert.Inside();
+      edges[3] = thisVert.edgeVerts[next3[i] + 4];
+      CreateTris(tet, edges);
+
+      tet[2] = tet[3];
+    }
+  }
 };
 }  // namespace
 
