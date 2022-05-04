@@ -23,7 +23,7 @@ using namespace manifold;
 
 constexpr uint64_t kOpen = std::numeric_limits<uint64_t>::max();
 
-constexpr glm::ivec3[16] tetTri0 = {{-1, -1, -1},  //
+constexpr glm::ivec3 tetTri0[16] = {{-1, -1, -1},  //
                                     {0, 3, 4},     //
                                     {0, 1, 5},     //
                                     {1, 5, 3},     //
@@ -40,7 +40,7 @@ constexpr glm::ivec3[16] tetTri0 = {{-1, -1, -1},  //
                                     {4, 3, 0},     //
                                     {-1, -1, -1}};
 
-constexpr glm::ivec3[16] tetTri1 = {{-1, -1, -1},  //
+constexpr glm::ivec3 tetTri1[16] = {{-1, -1, -1},  //
                                     {-1, -1, -1},  //
                                     {-1, -1, -1},  //
                                     {3, 4, 1},     //
@@ -57,7 +57,7 @@ constexpr glm::ivec3[16] tetTri1 = {{-1, -1, -1},  //
                                     {-1, -1, -1},  //
                                     {-1, -1, -1}};
 
-constexpr glm::vec3[7] edgeVec = {{0.5f, 0.5f, 0.5f},   //
+constexpr glm::vec3 edgeVec[7] = {{0.5f, 0.5f, 0.5f},   //
                                   {1.0f, 0.0f, 0.0f},   //
                                   {0.0f, 1.0f, 0.0f},   //
                                   {0.0f, 0.0f, 1.0f},   //
@@ -69,70 +69,70 @@ struct GridVert {
   uint64_t key = kOpen;
   float distance = NAN;
   int edgeIndex = -1;
-  int[7] edgeVerts = {-1, -1, -1, -1, -1, -1, -1};
+  int edgeVerts[7] = {-1, -1, -1, -1, -1, -1, -1};
 
-  int Inside() const { return edgeIndex == -1 ? (distance >= 0 ? 1 : -1) : 0 }
+  int Inside() const { return edgeIndex == -1 ? (distance >= 0 ? 1 : -1) : 0; }
 };
 
 class HashTableD {
  public:
-  HashTableD(uint32_t step = 127, VecDH<GridVert>& alloc, VecDH<uint32_t>& used)
+  HashTableD(VecDH<GridVert>& alloc, VecDH<uint32_t>& used, uint32_t step = 127)
       : step_{step}, table_{alloc}, used_{used} {}
 
   __device__ __host__ int Size() const { return table_.size(); }
 
   __device__ __host__ bool Insert(const GridVert& vert) {
-    uint32_t idx = vert.key & (size_ - 1);
+    uint32_t idx = vert.key & (Size() - 1);
     while (1) {
       const uint64_t found = AtomicCAS(&table_[idx].key, kOpen, vert.key);
       if (found == kOpen) {
-        if (AtomicAdd(&used_[0], 1) * 2 > size_) {
+        if (AtomicAdd(&used_[0], 1) * 2 > Size()) {
           return true;
         }
         table_[idx] = vert;
         return false;
       }
       if (found == vert.key) return false;
-      idx = (idx + step_) & (size_ - 1);
+      idx = (idx + step_) & (Size() - 1);
     }
   }
 
   __device__ __host__ GridVert operator[](uint64_t key) const {
-    uint32_t idx = key & (size_ - 1);
+    uint32_t idx = key & (Size() - 1);
     while (1) {
       const GridVert found = table_[idx];
       if (found.key == key) return found;
       if (found.key == kOpen) return GridVert();
-      idx = (idx + step_) & (size_ - 1);
+      idx = (idx + step_) & (Size() - 1);
     }
   }
 
-  __device__ __host__ GridVert At(int index) const { return table_[idx]; }
+  __device__ __host__ GridVert At(int idx) const { return table_[idx]; }
 
  private:
   const uint32_t step_;
   VecD<GridVert> table_;
-  VecD<uint32_t> used_(1, 0);
+  VecD<uint32_t> used_;
 };
 
 class HashTable {
  public:
   HashTable(uint32_t sizeExp = 20, uint32_t step = 127)
-      : alloc_{1 << sizeExp}, table_{step, alloc_, used_} {}
+      : alloc_{1 << sizeExp}, table_{alloc_, used_, step} {}
 
   HashTableD D() { return table_; }
 
   int Entries() const { return used_.H()[0]; }
 
-  int Size() const { return table_.size(); }
+  int Size() const { return table_.Size(); }
 
   float FilledFraction() const {
-    return static_cast<float>(used_.H()[0]) / table_.size();
+    return static_cast<float>(used_.H()[0]) / table_.Size();
   }
 
  private:
   VecDH<GridVert> alloc_;
-  VecDH<uint32_t> used_(1, 0);
+  VecDH<uint32_t> used_ = VecDH<uint32_t>(1, 0);
   HashTableD table_;
 };
 
@@ -207,10 +207,10 @@ struct BuildTris {
   const HashTableD gridVerts;
 
   __host__ __device__ void CreateTris(const glm::ivec4& tet,
-                                      const int[6] edges) {
+                                      const int edges[6]) {
     const int i = (tet[0] > 0 ? 1 : 0) + (tet[1] > 0 ? 2 : 0) +
                   (tet[2] > 0 ? 4 : 0) + (tet[3] > 0 ? 8 : 0);
-    glm::vec3 tri = tetTri0[i];
+    glm::ivec3 tri = tetTri0[i];
     if (tri[0] < 0) return;
     int idx = AtomicAdd(triIndex, 1);
     triVerts[idx] = {edges[tri[0]], edges[tri[1]], edges[tri[2]]};
@@ -240,10 +240,10 @@ struct BuildTris {
     // the (1,1,1) direction, attached to leadVert.
     glm::ivec4 tet(leadVert.Inside(), base.Inside(), -2, -2);
     glm::ivec4 thisIndex = baseIndex;
-    thisIndex[i] += 1;
+    thisIndex[0] += 1;
     GridVert& thisVert = gridVerts[MortonCode(thisIndex)];
     tet[2] = thisVert.Inside();
-    int[6] edges = {base.edgeVerts[0], -1, -1, -1, -1, -1};
+    int edges[6] = {base.edgeVerts[0], -1, -1, -1, -1, -1};
     for (const int i : {0, 1, 2}) {
       edges[1] = base.edgeVerts[i + 1];
       edges[4] = thisVert.edgeVerts[i + 4];
@@ -296,8 +296,8 @@ class SDF {
     // Need to create a new MortonCode function that spreads when needed instead
     // of always by 3, to make non-cubic domains efficient.
     float maxDim = std::max(dim[0], std::max(dim[1], dim[2]));
-    glm::ivec3 gridSize = dim / edgeLength;
-    glm::vec3 spacing = dim / gridSize;
+    glm::ivec3 gridSize(dim / edgeLength);
+    glm::vec3 spacing = dim / glm::vec3(gridSize);
     int maxMorton = MortonCode(gridSize);
 
     HashTable gridVerts(10);  // maxMorton^(2/3)? Some heuristic with ability to
@@ -309,8 +309,8 @@ class SDF {
     thrust::for_each_n(
         countAt(0), maxMorton,
         ComputeVerts<Func>({vertPos.ptrD(), index.ptrD(), gridVerts.D(), sdf_,
-                            gridSize, bounds.Min(), spacing}));
-    vertPos.Resize(index.H()[0]);
+                            gridSize, bounds.min, spacing}));
+    vertPos.resize(index.H()[0]);
 
     VecDH<glm::ivec3> triVerts(gridVerts.Entries() * 12);  // worst case
 
@@ -318,10 +318,10 @@ class SDF {
     thrust::for_each_n(
         countAt(0), gridVerts.Size(),
         BuildTris({triVerts.ptrD(), index.ptrD(), gridVerts.D()}));
-    triVerts.Resize(index.H()[0]);
+    triVerts.resize(index.H()[0]);
 
-    out.vertPos = vertPos.H();
-    out.triVerts = triVerts.H();
+    out.vertPos.insert(out.vertPos.end(), vertPos.begin(), vertPos.end());
+    out.triVerts.insert(out.triVerts.end(), triVerts.begin(), triVerts.end());
     return out;
   }
 
