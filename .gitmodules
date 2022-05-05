@@ -1,0 +1,9 @@
+[submodule "third_party/assimp"]
+	path = third_party/assimp
+	url = https://github.com/assimp/assimp
+[submodule "third_party/thrust"]
+	path = third_party/thrust
+	url = https://github.com/NVIDIA/thrust
+[submodule "third_party/glm"]
+	path = third_party/glm
+	url = https://github.com/g-truc/glm
