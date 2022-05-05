@@ -11,6 +11,11 @@ target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_14)
 add_test(test_all ${PROJECT_NAME})
 
 file(COPY data DESTINATION . FILES_MATCHING PATTERN "*.ply")
+if(EMSCRIPTEN)
+    set_target_properties(${PROJECT_NAME} PROPERTIES LINK_FLAGS 
+        "-s ASSERTIONS=1 -s DEMANGLE_SUPPORT=1 --preload-file data --bind")
+else()
+endif()
 
 if(APPLE)
 #   All executables that link to CUDA need this. If you ever get 
