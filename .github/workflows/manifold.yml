@@ -42,17 +42,17 @@ jobs:
         . ./emsdk_env.sh
         cd ../
         # actual build step
-        emcmake cmake -DCMAKE_BUILD_TYPE=Release .. && emmake make -j
+        emcmake cmake -DCMAKE_BUILD_TYPE=Release .. && emmake make
     - name: Build CPP
       run: |
         mkdir buildCPP
         cd buildCPP
-        cmake -DCMAKE_BUILD_TYPE=Release -DTHRUST_BACKEND=CPP .. && make -j
+        cmake -DCMAKE_BUILD_TYPE=Release -DTHRUST_BACKEND=CPP .. && make
     - name: Build OMP
       run: |
         mkdir buildOMP
         cd buildOMP
-        cmake -DCMAKE_BUILD_TYPE=Release -DTHRUST_BACKEND=OMP .. && make -j
+        cmake -DCMAKE_BUILD_TYPE=Release -DTHRUST_BACKEND=OMP .. && make
     - name: Test WASM
       run: |
         cd buildWASM/test
