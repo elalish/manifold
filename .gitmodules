@@ -7,3 +7,6 @@
 [submodule "third_party/glm"]
 	path = third_party/glm
 	url = https://github.com/g-truc/glm
+[submodule "third_party/google_test"]
+	path = third_party/google_test
+	url = git@github.com:google/googletest.git
