@@ -15,7 +15,7 @@
 #include <thrust/sequence.h>
 
 #include "graph.h"
-#include "impl.cuh"
+#include "impl.h"
 #include "polygon.h"
 
 namespace {

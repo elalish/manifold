@@ -19,7 +19,7 @@
 #include <map>
 
 #include "graph.h"
-#include "impl.cuh"
+#include "impl.h"
 
 namespace {
 using namespace manifold;

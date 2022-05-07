@@ -18,7 +18,7 @@
 #include <thrust/transform_reduce.h>
 #include <limits>
 
-#include "impl.cuh"
+#include "impl.h"
 
 namespace {
 using namespace manifold;

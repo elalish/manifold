@@ -20,8 +20,8 @@
 #include <thrust/unique.h>
 
 #include "structs.h"
-#include "utils.cuh"
-#include "vec_dh.cuh"
+#include "utils.h"
+#include "vec_dh.h"
 
 #include <math.h>
 

@@ -1,13 +1,16 @@
-add_subdirectory(google_test)
 add_subdirectory(graphlite)
 
-if(EMSCRIPTEN)
-    set(BUILD_SHARED_LIBS off)
-    set(ASSIMP_BUILD_ASSIMP_TOOLS off)
-    set(ASSIMP_BUILD_TESTS off)
-    add_subdirectory(assimp)
-endif()
+############################################################################
+#                         BUILD ASSIMP LIBRARY                             #
+############################################################################
+set(BUILD_SHARED_LIBS off)
+set(ASSIMP_BUILD_ASSIMP_TOOLS off)
+set(ASSIMP_BUILD_TESTS off)
+add_subdirectory(assimp)
 
+############################################################################
+#                           Build Google Test                              #
+############################################################################
 # Prevent overriding the parent project's compiler/linker
 # settings on Windows
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
@@ -15,6 +18,7 @@ set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
 set(INSTALL_GMOCK OFF CACHE BOOL "" FORCE)
 
+add_subdirectory(google_test)
 # Add aliases for GTest and GMock libraries
 if(NOT TARGET GTest::GTest)
     add_library(GTest::GTest ALIAS gtest)

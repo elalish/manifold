@@ -16,10 +16,13 @@ if(EMSCRIPTEN)
     message("Building for Emscripten")
     set(CMAKE_EXE_LINKER_FLAGS ${CMAKE_EXE_LINKER_FLAGS} -sALLOW_MEMORY_GROWTH=1)
     set(THRUST_BACKEND "CPP")
-    set(ASSIMP_INC_DIR 
-        ${PROJECT_SOURCE_DIR}/third_party/assimp/include
-        ${CMAKE_BINARY_DIR}/third_party/assimp/include)
 endif()
+
+set(ASSIMP_INC_DIR 
+    ${PROJECT_SOURCE_DIR}/third_party/assimp/include
+    ${CMAKE_BINARY_DIR}/third_party/assimp/include)
+set(GLM_INC_DIR ${PROJECT_SOURCE_DIR}/third_party/glm)
+
 set_property(CACHE THRUST_BACKEND PROPERTY STRINGS CUDA OMP CPP)
 
 if(NOT THRUST_BACKEND STREQUAL "CUDA" AND NOT THRUST_BACKEND STREQUAL "OMP" AND NOT THRUST_BACKEND STREQUAL "CPP")
@@ -32,10 +35,11 @@ set(MANIFOLD_NVCC_RELEASE_FLAGS -O3)
 set(MANIFOLD_NVCC_DEBUG_FLAGS -G)
 
 if(THRUST_BACKEND STREQUAL "CUDA")
+    # we cannot set THRUST_INC_DIR when building with CUDA, otherwise the
+    # compiler will not use the system CUDA headers which causes incompatibility
     enable_language(CUDA)
 else()
     set(THRUST_INC_DIR ${PROJECT_SOURCE_DIR}/third_party/thrust)
-    set(GLM_INC_DIR ${PROJECT_SOURCE_DIR}/third_party/glm)
     if(THRUST_BACKEND STREQUAL "OMP")
         message("------------------------- Using OpenMP instead of CUDA.")
         find_package(OpenMP REQUIRED)
