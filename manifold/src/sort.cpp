@@ -292,8 +292,8 @@ void Manifold::Impl::GatherFaces(const VecDH<int>& faceNew2Old) {
 
   if (faceNormal_.size() == NumTri()) Permute(faceNormal_, faceNew2Old);
 
-  VecDH<Halfedge> oldHalfedge(halfedge_);
-  VecDH<glm::vec4> oldHalfedgeTangent(halfedgeTangent_);
+  VecDH<Halfedge> oldHalfedge(std::move(halfedge_));
+  VecDH<glm::vec4> oldHalfedgeTangent(std::move(halfedgeTangent_));
   VecDH<int> faceOld2New(oldHalfedge.size() / 3);
   thrust::scatter(countAt(0), countAt(numTri), faceNew2Old.beginD(),
                   faceOld2New.beginD());

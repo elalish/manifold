@@ -507,17 +507,19 @@ void Manifold::Impl::CreateHalfedges(const VecDH<glm::ivec3>& triVerts) {
  */
 void Manifold::Impl::CreateAndFixHalfedges(const VecDH<glm::ivec3>& triVerts) {
   const int numTri = triVerts.size();
+  // drop the old value first to avoid copy
+  halfedge_.resize(0);
   halfedge_.resize(3 * numTri);
   VecDH<TmpEdge> edge(3 * numTri);
-  thrust::for_each_n(zip(countAt(0), triVerts.begin()), numTri,
-                     Tri2Halfedges({halfedge_.ptrH(), edge.ptrH()}));
+  thrust::for_each_n(zip(countAt(0), triVerts.beginD()), numTri,
+                     Tri2Halfedges({halfedge_.ptrD(), edge.ptrD()}));
   // Stable sort is required here so that halfedges from the same face are
   // paired together (the triangles were created in face order). In some
   // degenerate situations the triangulator can add the same internal edge in
   // two different faces, causing this edge to not be 2-manifold. We detect this
   // and fix it by swapping one of the identical edges, so it is important that
   // we have the edges paired according to their face.
-  std::stable_sort(edge.begin(), edge.end());
+  thrust::stable_sort(edge.beginD(), edge.endD());
   thrust::for_each_n(thrust::host, countAt(0), halfedge_.size() / 2,
                      LinkHalfedges({halfedge_.ptrH(), edge.cptrH()}));
   thrust::for_each(thrust::host, countAt(1), countAt(halfedge_.size() / 2),
