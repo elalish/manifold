@@ -14,7 +14,7 @@
 
 #include <thrust/sequence.h>
 
-#include "impl.cuh"
+#include "impl.h"
 
 namespace {
 using namespace manifold;
