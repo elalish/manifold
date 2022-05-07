@@ -24,7 +24,7 @@ jobs:
     - name: Install dependencies
       run: |
         apt-get -y update
-        DEBIAN_FRONTEND=noninteractive apt install -y libglm-dev libassimp-dev libcgal-dev libomp-dev nodejs git python3
+        DEBIAN_FRONTEND=noninteractive apt install -y libcgal-dev libomp-dev nodejs git python3
     - uses: actions/checkout@v3
       with:
         submodules: true
@@ -34,12 +34,14 @@ jobs:
         patch third_party/assimp/code/CMakeLists.txt < assimp.diff
         mkdir buildWASM
         cd buildWASM
+        # setup emscripten
         git clone https://github.com/emscripten-core/emsdk.git
         cd emsdk
         ./emsdk install latest
         ./emsdk activate latest
         . ./emsdk_env.sh
         cd ../
+        # actual build step
         emcmake cmake -DCMAKE_BUILD_TYPE=Release .. && emmake make -j
     - name: Build CPP
       run: |
