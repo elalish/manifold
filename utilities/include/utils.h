@@ -105,13 +105,19 @@ template <typename T>
 __host__ __device__ T AtomicAdd(T& target, T add) {
 #ifdef __CUDA_ARCH__
   return atomicAdd(&target, add);
-#else
+#elif defined(_OPENMP)
   T out;
 #pragma omp atomic capture
   {
     out = target;
     target += add;
   }
+  return out;
+#else
+  // else it should be executed on the host with single thread, should be safe
+  T out;
+  out = target;
+  target += add;
   return out;
 #endif
 }

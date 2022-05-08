@@ -654,6 +654,8 @@ class Monotones {
         case END:
           RemovePair(pair);
           break;
+        case SKIP:
+          break;
       }
 
       vert->SetProcessed(true);
@@ -767,6 +769,8 @@ class Monotones {
           }
           break;
         }
+        case SKIP:
+          break;
       }
 
       vert->SetProcessed(true);

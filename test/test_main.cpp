@@ -21,7 +21,6 @@ Options options;
 int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
 
-  char *cvalue = NULL;
   int c;
   opterr = 0;
 

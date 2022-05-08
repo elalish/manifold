@@ -61,8 +61,8 @@ Polygons Turn180(Polygons polys) {
 }
 
 Polygons Duplicate(Polygons polys) {
-    float xMin = std::numeric_limits<float>::infinity(); 
-  float xMax = -std::numeric_limits<float>::infinity(); 
+    float xMin = std::numeric_limits<float>::infinity();
+  float xMax = -std::numeric_limits<float>::infinity();
   int indexMax = 0;
   for (SimplePolygon &poly : polys) {
     for (PolyVert &vert : poly) {

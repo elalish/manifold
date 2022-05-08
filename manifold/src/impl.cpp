@@ -29,8 +29,11 @@ __host__ __device__ void AtomicAddVec3(glm::vec3& target,
   for (int i : {0, 1, 2}) {
 #ifdef __CUDA_ARCH__
     atomicAdd(&target[i], add[i]);
-#else
+#elif defined(_OPENMP)
 #pragma omp atomic
+    target[i] += add[i];
+#else
+    // should be executed with single thread on the host
     target[i] += add[i];
 #endif
   }
