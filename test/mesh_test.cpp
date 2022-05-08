@@ -145,7 +145,7 @@ TEST(Manifold, GetMesh) {
 }
 
 // temporarily disabled for wasm due to test failure
-#ifndef __EMSCRIPTEN__
+#if !DISABLED_DETERMINISM
 TEST(Manifold, Determinism) {
   Manifold manifold(ImportMesh("data/gyroidpuzzle.ply"));
   EXPECT_TRUE(manifold.IsManifold());

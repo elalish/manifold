@@ -12,7 +12,7 @@ target_link_libraries(perfTest manifold)
 target_compile_options(perfTest PRIVATE ${MANIFOLD_FLAGS})
 target_compile_features(perfTest PUBLIC cxx_std_14)
 
-if(NOT DEFINED EMSCRIPTEN)
+if(BUILD_TEST_CGAL)
 add_executable(perfTestCGAL perf_test_cgal.cpp)
 find_package(CGAL REQUIRED COMPONENTS Core)
 target_compile_definitions(perfTestCGAL PRIVATE CGAL_USE_GMPXX)
