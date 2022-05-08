@@ -18,6 +18,7 @@ if(EMSCRIPTEN)
     set(THRUST_BACKEND "CPP")
 endif()
 
+set(BUILD_SHARED_LIBS off)
 set(ASSIMP_INC_DIR 
     ${PROJECT_SOURCE_DIR}/third_party/assimp/include
     ${CMAKE_BINARY_DIR}/third_party/assimp/include)
