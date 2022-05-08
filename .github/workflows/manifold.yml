@@ -10,67 +10,99 @@ on:
   pull_request:
     branches: [ master ]
 
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  # This workflow contains a single job called "build"
   build:
-    # The type of runner that the job will run on
+    strategy:
+      matrix:
+        backend: [CPP, OMP, CUDA]
     runs-on: ubuntu-20.04
     container:
       image: docker://nvidia/cuda:11.6.0-devel-ubuntu20.04
-    # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
-    # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
     - name: Install dependencies
       run: |
         apt-get -y update
-        DEBIAN_FRONTEND=noninteractive apt install -y libcgal-dev libomp-dev nodejs git python3
+        DEBIAN_FRONTEND=noninteractive apt install -y libomp-dev git
     - uses: actions/checkout@v3
       with:
         submodules: true
     - uses: jwlawson/actions-setup-cmake@v1.12
-    - name: Build WASM
+    - name: Build ${{matrix.backend}}
       run: |
+        # patch assimp
         patch third_party/assimp/code/CMakeLists.txt < assimp.diff
-        mkdir buildWASM
-        cd buildWASM
+        mkdir build
+        cd build
+        cmake -DCMAKE_BUILD_TYPE=Release -DTHRUST_BACKEND=${{matrix.backend}} .. && make
+    - name: Test ${{matrix.backend}}
+      if: matrix.backend != 'CUDA'
+      run: |
+        cd build/test
+        ./manifold_test
+
+  build_wasm:
+    runs-on: ubuntu-20.04
+    steps:
+    - name: Install dependencies
+      run: |
+        sudo apt-get -y update
+        DEBIAN_FRONTEND=noninteractive sudo apt install -y python3 nodejs
+    - uses: actions/checkout@v3
+      with:
+        submodules: true
+    - name: Setup WASM
+      run: |
         # setup emscripten
         git clone https://github.com/emscripten-core/emsdk.git
         cd emsdk
         ./emsdk install latest
         ./emsdk activate latest
-        . ./emsdk_env.sh
-        cd ../
-        # actual build step
+    - uses: jwlawson/actions-setup-cmake@v1.12
+    - name: Build WASM
+      run: |
+        source ./emsdk/emsdk_env.sh
+        # patch assimp
+        patch third_party/assimp/code/CMakeLists.txt < assimp.diff
+        mkdir build
+        cd build
         emcmake cmake -DCMAKE_BUILD_TYPE=Release .. && emmake make
-    - name: Build CPP
-      run: |
-        mkdir buildCPP
-        cd buildCPP
-        cmake -DCMAKE_BUILD_TYPE=Release -DTHRUST_BACKEND=CPP .. && make
-    - name: Build OMP
-      run: |
-        mkdir buildOMP
-        cd buildOMP
-        cmake -DCMAKE_BUILD_TYPE=Release -DTHRUST_BACKEND=OMP .. && make
     - name: Test WASM
       run: |
-        cd buildWASM/test
-        node manifold_test.js
-    - name: Test CPP
+        cd build/test
+        node ./manifold_test.js
+
+  build_windows:
+    strategy:
+      matrix:
+        backend: [CPP, CUDA]
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        submodules: true
+    - uses: ilammy/msvc-dev-cmd@v1
+    - name: Install CUDA
+      env: 
+        cuda: "11.3.0"
+        visual_studio: "Visual Studio 16 2019"
+      shell: powershell
       run: |
-        cd buildCPP/test
-        ./manifold_test
-    - name: Test OMP
+        Invoke-RestMethod https://raw.githubusercontent.com/ptheywood/cuda-cmake-github-actions/21811d232fc775fa8d44dddf7f8c5ce2cf8d2b81/scripts/actions/install_cuda_windows.ps1 -OutFile install_cuda_windows.ps1
+        .\install_cuda_windows.ps1
+    - uses: jwlawson/actions-setup-cmake@v1.12
+    - name: Patch assimp
+      shell: bash
+      run: patch third_party/assimp/code/CMakeLists.txt < assimp.diff
+    - name: Build ${{matrix.backend}}
+      shell: powershell
       run: |
-        cd buildOMP/test
-        ./manifold_test
-    - name: Build CUDA
+        cmake -DCMAKE_BUILD_TYPE=Release -B build -DTHRUST_BACKEND=${{matrix.backend}} -A x64
+        cd build
+        cmake --build
+    - name: Test ${{matrix.backend}}
+      if: matrix.backend != 'CUDA'
+      shell: bash
       run: |
-        mkdir buildCUDA
-        cd buildCUDA
-        cmake -DCMAKE_BUILD_TYPE=Release .. && make
-      
-      
-      
-      
+        cd build\test
+        .\manifold_test.exe
+
