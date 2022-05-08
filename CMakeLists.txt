@@ -33,7 +33,7 @@ if(NOT THRUST_BACKEND STREQUAL "CUDA" AND NOT THRUST_BACKEND STREQUAL "OMP" AND 
     message(FATAL_ERROR "Invalid value for THRUST_BACKEND: ${THRUST_BACKEND}. Should be one of \"CUDA\", \"OMP\" or \"CPP\"")
 endif()
 
-set(MAINFOLD_FLAGS -Werror -Wall -Wno-sign-compare -DDISABLED_DETERMINISM=${DISABLED_DETERMINISM})
+set(MANIFOLD_FLAGS -Werror -Wall -Wno-sign-compare -DDISABLED_DETERMINISM=${DISABLED_DETERMINISM})
 set(MANIFOLD_NVCC_FLAGS -Xcudafe --diag_suppress=esa_on_defaulted_function_ignored --extended-lambda)
 set(MANIFOLD_NVCC_RELEASE_FLAGS -O3)
 set(MANIFOLD_NVCC_DEBUG_FLAGS -G)
