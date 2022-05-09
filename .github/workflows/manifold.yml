@@ -10,36 +10,109 @@ on:
   pull_request:
     branches: [ master ]
 
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  # This workflow contains a single job called "build"
   build:
-    # The type of runner that the job will run on
+    strategy:
+      matrix:
+        backend: [CPP, OMP, CUDA]
     runs-on: ubuntu-20.04
     container:
       image: docker://nvidia/cuda:11.6.0-devel-ubuntu20.04
-    # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
-    # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-    - uses: actions/checkout@v2
-    - uses: jwlawson/actions-setup-cmake@v1.12
-    
     - name: Install dependencies
       run: |
         apt-get -y update
-        DEBIAN_FRONTEND=noninteractive apt install -y libglm-dev libassimp-dev libcgal-dev
-    - name: Build CUDA
+        DEBIAN_FRONTEND=noninteractive apt install -y libomp-dev git
+    - uses: actions/checkout@v3
+      with:
+        submodules: true
+    - uses: jwlawson/actions-setup-cmake@v1.12
+    - name: Build ${{matrix.backend}}
       run: |
-        mkdir buildCUDA
-        cd buildCUDA
-        cmake -DCMAKE_BUILD_TYPE=Release .. && make
-    - name: Build CPP
+        # patch assimp
+        patch third_party/assimp/code/CMakeLists.txt < assimp.diff
+        mkdir build
+        cd build
+        cmake -DCMAKE_BUILD_TYPE=Release -DTHRUST_BACKEND=${{matrix.backend}} .. && make
+    - name: Test ${{matrix.backend}}
+      if: matrix.backend != 'CUDA'
       run: |
-        mkdir buildCPP
-        cd buildCPP
-        cmake -DCMAKE_BUILD_TYPE=Release -DMANIFOLD_USE_CPP=ON .. && make
-    - name: Test CPP
-      run: |
-        cd buildCPP/test
+        cd build/test
         ./manifold_test
-      
+
+  build_wasm:
+    runs-on: ubuntu-20.04
+    steps:
+    - name: Install dependencies
+      run: |
+        sudo apt-get -y update
+        DEBIAN_FRONTEND=noninteractive sudo apt install -y python3 nodejs
+    - uses: actions/checkout@v3
+      with:
+        submodules: true
+    - name: Setup WASM
+      run: |
+        # setup emscripten
+        git clone https://github.com/emscripten-core/emsdk.git
+        cd emsdk
+        ./emsdk install latest
+        ./emsdk activate latest
+    - uses: jwlawson/actions-setup-cmake@v1.12
+    - name: Build WASM
+      run: |
+        source ./emsdk/emsdk_env.sh
+        # patch assimp
+        patch third_party/assimp/code/CMakeLists.txt < assimp.diff
+        mkdir build
+        cd build
+        emcmake cmake -DCMAKE_BUILD_TYPE=Release .. && emmake make
+    - name: Test WASM
+      run: |
+        cd build/test
+        node ./manifold_test.js
+
+  # unable to get it working for now
+  # build_windows:
+  #   strategy:
+  #     matrix:
+  #       backend: [CPP, CUDA]
+  #   runs-on: windows-2019
+  #   steps:
+  #   - uses: actions/checkout@v3
+  #     with:
+  #       submodules: true
+  #   - uses: jwlawson/actions-setup-cmake@v1.12
+  #   - name: Patch assimp
+  #     shell: bash
+  #     run: patch third_party/assimp/code/CMakeLists.txt < assimp.diff
+  #   - uses: ilammy/msvc-dev-cmd@v1
+  #   - name: Install CUDA
+  #     if: matrix.backend == 'CUDA'
+  #     env: 
+  #       cuda: "11.3.0"
+  #       visual_studio: "Visual Studio 16 2019"
+  #     shell: powershell
+  #     run: |
+  #       Invoke-RestMethod https://raw.githubusercontent.com/ptheywood/cuda-cmake-github-actions/21811d232fc775fa8d44dddf7f8c5ce2cf8d2b81/scripts/actions/install_cuda_windows.ps1 -OutFile install_cuda_windows.ps1
+  #       .\install_cuda_windows.ps1
+  #   - name: nvcc check
+  #     if: matrix.backend == 'CUDA'
+  #     shell: powershell
+  #     run: |
+  #       nvcc -V
+  #       ls $env:CUDA_PATH
+  #       ls $env:CUDA_PATH\bin
+  #       ls $env:CUDA_PATH\include
+  #   - name: Build ${{matrix.backend}}
+  #     shell: powershell
+  #     run: |
+  #       cmake . -DCMAKE_BUILD_TYPE=Release -B build -DTHRUST_BACKEND=${{matrix.backend}} -A x64 -G "Visual Studio 16 2019"
+  #       cd build
+  #       cmake --build .
+  #   - name: Test ${{matrix.backend}}
+  #     if: matrix.backend != 'CUDA'
+  #     shell: bash
+  #     run: |
+  #       cd build\test
+  #       .\manifold_test.exe
+  #

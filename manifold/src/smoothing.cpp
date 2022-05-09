@@ -14,7 +14,7 @@
 
 #include <map>
 
-#include "impl.cuh"
+#include "impl.h"
 
 namespace {
 using namespace manifold;
@@ -389,7 +389,7 @@ void Manifold::Impl::CreateTangents(
     }
 
     std::map<int, std::vector<Pair>> vertTangents;
-    for (const auto value : edges) {
+    for (const auto &value : edges) {
       const Pair edge = value.second;
       vertTangents[halfedge[edge.first.halfedge].startVert].push_back(edge);
       vertTangents[halfedge[edge.second.halfedge].startVert].push_back(
@@ -433,7 +433,7 @@ void Manifold::Impl::CreateTangents(
 
       } else {  // Sharpen vertex uniformly
         float smoothness = 0;
-        for (const Pair pair : vert) {
+        for (const Pair &pair : vert) {
           smoothness += pair.first.smoothness;
           smoothness += pair.second.smoothness;
         }

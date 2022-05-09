@@ -13,9 +13,9 @@
 // limitations under the License.
 
 #pragma once
-#include "sparse.cuh"
+#include "sparse.h"
 #include "structs.h"
-#include "vec_dh.cuh"
+#include "vec_dh.h"
 
 namespace manifold {
 

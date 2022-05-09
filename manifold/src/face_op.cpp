@@ -14,7 +14,7 @@
 
 #include <map>
 
-#include "impl.cuh"
+#include "impl.h"
 #include "polygon.h"
 
 namespace manifold {

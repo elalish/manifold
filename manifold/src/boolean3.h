@@ -13,7 +13,7 @@
 // limitations under the License.
 
 #pragma once
-#include "impl.cuh"
+#include "impl.h"
 
 /**
  * The notation in these files is abbreviated due to the complexity of the
