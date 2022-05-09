@@ -14,7 +14,7 @@
 
 #pragma once
 
-#include "vec_dh.cuh"
+#include "vec_dh.h"
 
 namespace manifold {
 

@@ -18,7 +18,7 @@
 #include <thrust/transform_reduce.h>
 #include <limits>
 
-#include "impl.cuh"
+#include "impl.h"
 
 namespace {
 using namespace manifold;
@@ -88,7 +88,7 @@ struct CurvatureAngles {
 
   __host__ __device__ void operator()(int tri) {
     glm::vec3 edge[3];
-    glm::vec3 edgeLength;
+    glm::vec3 edgeLength(0.0);
     for (int i : {0, 1, 2}) {
       const int startVert = halfedge[3 * tri + i].startVert;
       const int endVert = halfedge[3 * tri + i].endVert;
