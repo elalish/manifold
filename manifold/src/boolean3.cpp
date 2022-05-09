@@ -325,7 +325,7 @@ struct Kernel02 {
       if (forward) {
         if (!Shadows(vertPos.z, z02, expandP * vertNormalP[p0].z)) s02 = 0;
       } else {
-        ALWAYS_ASSERT(closestVert != -1, topologyErr, "No closest vert");
+        // ALWAYS_ASSERT(closestVert != -1, topologyErr, "No closest vert");
         if (!Shadows(z02, vertPos.z, expandP * vertNormalP[closestVert].z))
           s02 = 0;
       }
