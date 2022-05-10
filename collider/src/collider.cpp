@@ -266,7 +266,7 @@ Collider::Collider(const VecDH<Box>& leafBB,
  */
 template <typename T>
 SparseIndices Collider::Collisions(const VecDH<T>& querriesIn) const {
-  int maxOverlaps = 1 << 20;
+  int maxOverlaps = querriesIn.size() * 4;
   SparseIndices querryTri(maxOverlaps);
   int nOverlaps = 0;
   while (1) {
