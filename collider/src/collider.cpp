@@ -282,7 +282,7 @@ SparseIndices Collider::Collisions(const VecDH<T>& querriesIn) const {
       break;
     else {  // if not enough memory was allocated, guess how much will be needed
       int lastQuery = querryTri.Get(0).H().back();
-      maxOverlaps *= 2 * static_cast<float>(querriesIn.size()) / lastQuery;
+      maxOverlaps *= 2;
       querryTri.Resize(maxOverlaps);
     }
   }
