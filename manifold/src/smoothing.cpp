@@ -470,7 +470,7 @@ Manifold::Impl::MeshRelationD Manifold::Impl::Subdivide(int n) {
   MeshRelationD relation;
   relation.barycentric.resize(numTri * VertsPerTri(n + 1));
   relation.triBary.resize(n * n * numTri);
-  MeshRelationD oldMeshRelation = meshRelation_;
+  MeshRelationD oldMeshRelation = std::move(meshRelation_);
   meshRelation_.barycentric.resize(relation.barycentric.size());
   meshRelation_.triBary.resize(relation.triBary.size());
 
