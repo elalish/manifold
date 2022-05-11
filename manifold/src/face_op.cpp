@@ -42,6 +42,9 @@ void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge,
   const VecH<Halfedge>& halfedge = halfedge_.H();
   const VecH<glm::vec3>& faceNormal = faceNormal_.H();
   meshRelation_.triBary.resize(0);
+  triVerts.reserve(faceEdge.size());
+  triNormal.reserve(faceEdge.size());
+  meshRelation_.triBary.H().reserve(faceEdge.size()*3);
 
   for (int face = 0; face < faceEdgeH.size() - 1; ++face) {
     const int firstEdge = faceEdgeH[face];
@@ -50,12 +53,17 @@ void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge,
     ALWAYS_ASSERT(numEdge >= 3, topologyErr, "face has less than three edges.");
     const glm::vec3 normal = faceNormal[face];
 
-    std::map<int, int> vertBary;
-    for (int j = firstEdge; j < lastEdge; ++j)
-      vertBary[halfedge[j].startVert] = halfedgeBary.H()[j];
-    const int startTri = triVerts.size();
+    auto linearSearch = [](const int* mapping, int value) {
+      int i = 0;
+      while (mapping[i] != value)
+        ++i;
+      return i;
+    };
 
     if (numEdge == 3) {  // Single triangle
+      int mapping[3] = {halfedge[firstEdge].startVert,
+                        halfedge[firstEdge + 1].startVert,
+                        halfedge[firstEdge + 2].startVert};
       glm::ivec3 tri(halfedge[firstEdge].startVert,
                      halfedge[firstEdge + 1].startVert,
                      halfedge[firstEdge + 2].startVert);
@@ -71,7 +79,16 @@ void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge,
 
       triVerts.push_back(tri);
       triNormal.push_back(normal);
+      meshRelation_.triBary.H().push_back(faceRef.H()[face]);
+      for (int k : {0, 1, 2}) {
+        int index = linearSearch(mapping, tri[k]);
+        meshRelation_.triBary.H().back().vertBary[k] = halfedgeBary.H()[firstEdge + index];
+      }
     } else if (numEdge == 4) {  // Pair of triangles
+      int mapping[4] = {halfedge[firstEdge].startVert,
+                        halfedge[firstEdge + 1].startVert,
+                        halfedge[firstEdge + 2].startVert,
+                        halfedge[firstEdge + 3].startVert};
       const glm::mat3x2 projection = GetAxisAlignedProjection(normal);
       auto triCCW = [&projection, &vertPos, this](const glm::ivec3 tri) {
         return CCW(projection * vertPos[tri[0]], projection * vertPos[tri[1]],
@@ -111,12 +128,21 @@ void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge,
         }
       }
 
-      triVerts.push_back(tri0);
-      triNormal.push_back(normal);
-      triVerts.push_back(tri1);
-      triNormal.push_back(normal);
+      for (auto tri : { tri0, tri1 }) {
+        triVerts.push_back(tri);
+        triNormal.push_back(normal);
+        meshRelation_.triBary.H().push_back(faceRef.H()[face]);
+        for (int k : {0, 1, 2}) {
+          int index = linearSearch(mapping, tri[k]);
+          meshRelation_.triBary.H().back().vertBary[k] = halfedgeBary.H()[firstEdge + index];
+        }
+      }
     } else {  // General triangulation
       const glm::mat3x2 projection = GetAxisAlignedProjection(normal);
+
+      std::map<int, int> vertBary;
+      for (int j = firstEdge; j < lastEdge; ++j)
+        vertBary[halfedge[j].startVert] = halfedgeBary.H()[j];
 
       Polygons polys;
       try {
@@ -134,18 +160,15 @@ void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge,
       for (auto tri : newTris) {
         triVerts.push_back(tri);
         triNormal.push_back(normal);
-      }
-    }
-
-    for (int tri = startTri; tri < triVerts.size(); ++tri) {
-      meshRelation_.triBary.H().push_back(faceRef.H()[face]);
-      for (int k : {0, 1, 2}) {
-        meshRelation_.triBary.H().back().vertBary[k] =
-            vertBary[triVerts[tri][k]];
+        meshRelation_.triBary.H().push_back(faceRef.H()[face]);
+        for (int k : {0, 1, 2}) {
+          meshRelation_.triBary.H().back().vertBary[k] =
+              vertBary[tri[k]];
+        }
       }
     }
   }
-  faceNormal_ = triNormalOut;
+  faceNormal_ = std::move(triNormalOut);
   CreateAndFixHalfedges(triVertsOut);
 }
 
