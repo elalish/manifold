@@ -1,4 +1,4 @@
-#include "sdf.cuh"
+#include "sdf.h"
 
 using namespace manifold;
 

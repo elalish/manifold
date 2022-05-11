@@ -15,8 +15,8 @@
 #pragma once
 
 #include "structs.h"
-#include "utils.cuh"
-#include "vec_dh.cuh"
+#include "utils.h"
+#include "vec_dh.h"
 
 namespace {
 using namespace manifold;

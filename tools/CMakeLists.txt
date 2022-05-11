@@ -29,12 +29,26 @@ endif()
 # target_compile_options(playground PRIVATE ${MANIFOLD_FLAGS})
 # target_compile_features(playground PUBLIC cxx_std_14)
 
-add_executable(sdfTest sdfTest.cu)
+add_executable(sdfTest sdfTest.cpp)
 target_link_libraries(sdfTest manifold meshIO samples sdf)
 
-set_property(TARGET sdfTest PROPERTY CUDA_ARCHITECTURES 61)
-target_compile_options(sdfTest PRIVATE ${MANIFOLD_NVCC_FLAGS})
-target_compile_options(sdfTest
-    PRIVATE "$<$<CONFIG:RELEASE>:${MANIFOLD_NVCC_RELEASE_FLAGS}>" "$<$<CONFIG:DEBUG>:${MANIFOLD_NVCC_DEBUG_FLAGS}>"
-)
+if(THRUST_BACKEND STREQUAL "CUDA")
+    set_source_files_properties(
+        sdfTest.cpp
+
+        PROPERTIES LANGUAGE CUDA
+    )
+    set_property(TARGET sdfTest PROPERTY CUDA_ARCHITECTURES 61)
+    target_compile_options(sdfTest
+        PRIVATE ${MANIFOLD_NVCC_FLAGS}
+    )
+    target_compile_options(sdfTest 
+        PRIVATE "$<$<CONFIG:RELEASE>:${MANIFOLD_NVCC_RELEASE_FLAGS}>" "$<$<CONFIG:DEBUG>:${MANIFOLD_NVCC_DEBUG_FLAGS}>"
+    )
+else()
+    target_compile_options(sdfTest 
+        PRIVATE ${MANIFOLD_FLAGS}
+    )
+endif()
+
 target_compile_features(sdfTest PUBLIC cxx_std_14)
