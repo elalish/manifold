@@ -15,7 +15,7 @@
 #include <algorithm>
 #include <map>
 
-#include "boolean3.cuh"
+#include "boolean3.h"
 #include "polygon.h"
 
 // TODO: make this runtime configurable for quicker debug

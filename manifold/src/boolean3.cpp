@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "boolean3.cuh"
+#include "boolean3.h"
 #include <limits>
 
 // TODO: make this runtime configurable for quicker debug
@@ -176,7 +176,7 @@ struct Kernel11 {
     glm::vec3 pRL[2], qRL[2];
     // Either the left or right must shadow, but not both. This ensures the
     // intersection is between the left and right.
-    bool shadows;
+    bool shadows = false;
     s11 = 0;
 
     const int p0[2] = {halfedgeP[p1].startVert, halfedgeP[p1].endVert};
@@ -277,8 +277,8 @@ struct Kernel02 {
     glm::vec3 yzzRL[2];
     // Either the left or right must shadow, but not both. This ensures the
     // intersection is between the left and right.
-    bool shadows;
-    int closestVert;
+    bool shadows = false;
+    int closestVert = -1;
     float minMetric = std::numeric_limits<float>::infinity();
     s02 = 0;
 
@@ -325,6 +325,7 @@ struct Kernel02 {
       if (forward) {
         if (!Shadows(vertPos.z, z02, expandP * vertNormalP[p0].z)) s02 = 0;
       } else {
+        // ALWAYS_ASSERT(closestVert != -1, topologyErr, "No closest vert");
         if (!Shadows(z02, vertPos.z, expandP * vertNormalP[closestVert].z))
           s02 = 0;
       }
@@ -380,7 +381,7 @@ struct Kernel12 {
     glm::vec3 xzyLR1[2];
     // Either the left or right must shadow, but not both. This ensures the
     // intersection is between the left and right.
-    bool shadows;
+    bool shadows = false;
     x12 = 0;
 
     const Halfedge edge = halfedgesP[p1];

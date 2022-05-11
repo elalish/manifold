@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "collider.cuh"
-#include "utils.cuh"
+#include "collider.h"
+#include "utils.h"
 
 #ifdef _MSC_VER
 #include <intrin.h>
@@ -266,7 +266,7 @@ Collider::Collider(const VecDH<Box>& leafBB,
  */
 template <typename T>
 SparseIndices Collider::Collisions(const VecDH<T>& querriesIn) const {
-  int maxOverlaps = 1 << 20;
+  int maxOverlaps = querriesIn.size() * 4;
   SparseIndices querryTri(maxOverlaps);
   int nOverlaps = 0;
   while (1) {
@@ -282,7 +282,11 @@ SparseIndices Collider::Collisions(const VecDH<T>& querriesIn) const {
       break;
     else {  // if not enough memory was allocated, guess how much will be needed
       int lastQuery = querryTri.Get(0).H().back();
-      maxOverlaps *= 2 * static_cast<float>(querriesIn.size()) / lastQuery;
+      float ratio = static_cast<float>(querriesIn.size()) / lastQuery;
+      if (ratio > 1000) // do not trust the ratio if it is too large
+        maxOverlaps *= 2;
+      else
+        maxOverlaps *= 2 * ratio;
       querryTri.Resize(maxOverlaps);
     }
   }

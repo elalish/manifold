@@ -173,6 +173,9 @@ TEST(Samples, Sponge1) {
     ExportMesh("mengerSponge1.glb", sponge.GetMesh(), {});
 }
 
+// This sample needs a lot of memory to run and is therefore disabled for
+// emscripten.
+#ifndef __EMSCRIPTEN__
 // A fractal with many degenerate intersections, which also tests exact 90
 // degree rotations.
 TEST(Samples, Sponge4) {
@@ -201,3 +204,4 @@ TEST(Samples, Sponge4) {
     ExportMesh("mengerSponge.glb", out, options);
   }
 }
+#endif

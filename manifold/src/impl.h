@@ -13,12 +13,12 @@
 // limitations under the License.
 
 #pragma once
-#include "collider.cuh"
+#include "collider.h"
 #include "manifold.h"
-#include "shared.cuh"
-#include "sparse.cuh"
-#include "utils.cuh"
-#include "vec_dh.cuh"
+#include "shared.h"
+#include "sparse.h"
+#include "utils.h"
+#include "vec_dh.h"
 
 namespace manifold {
 
