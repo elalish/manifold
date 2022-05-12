@@ -18,10 +18,10 @@ if(EMSCRIPTEN)
     set(THRUST_BACKEND "CPP")
 endif()
 
-set(BUILD_TEST_CGAL off)
-set(DISABLED_DETERMINISM 1)
+option(BUILD_TEST_CGAL off)
+option(DISABLED_DETERMINISM 1)
 
-set(BUILD_SHARED_LIBS off)
+option(BUILD_SHARED_LIBS off)
 set(ASSIMP_INC_DIR 
     ${PROJECT_SOURCE_DIR}/third_party/assimp/include
     ${CMAKE_BINARY_DIR}/third_party/assimp/include)
@@ -34,7 +34,7 @@ if(NOT THRUST_BACKEND STREQUAL "CUDA" AND NOT THRUST_BACKEND STREQUAL "OMP" AND 
 endif()
 
 if(MSVC)
-    set(MANIFOLD_FLAGS /Wall)
+    set(MANIFOLD_FLAGS /DDISABLED_DETERMINISM=${DISABLED_DETERMINISM})
 else()
     set(MANIFOLD_FLAGS -Werror -Wall -Wno-sign-compare -Wno-unused -DDISABLED_DETERMINISM=${DISABLED_DETERMINISM})
 endif()

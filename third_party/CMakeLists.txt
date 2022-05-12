@@ -3,8 +3,8 @@ add_subdirectory(graphlite)
 ############################################################################
 #                         BUILD ASSIMP LIBRARY                             #
 ############################################################################
-set(ASSIMP_BUILD_ASSIMP_TOOLS off)
-set(ASSIMP_BUILD_TESTS off)
+option(ASSIMP_BUILD_ASSIMP_TOOLS off)
+option(ASSIMP_BUILD_TESTS off)
 add_subdirectory(assimp)
 
 ############################################################################
