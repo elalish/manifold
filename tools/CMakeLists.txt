@@ -23,6 +23,7 @@ target_compile_options(perfTestCGAL PRIVATE ${MANIFOLD_FLAGS})
 target_compile_features(perfTestCGAL PUBLIC cxx_std_14)
 endif()
 
+if(NOT EMSCRIPTEN)
 pybind11_add_module(pymanifold pymanifold.cpp)
 target_link_libraries(pymanifold PRIVATE manifold meshIO)
 target_compile_options(pymanifold PRIVATE ${MANIFOLD_FLAGS})
@@ -30,6 +31,7 @@ target_compile_features(pymanifold PUBLIC cxx_std_14)
 target_include_directories(pymanifold
     PRIVATE ${PYBIND11_DIR}/include
 )
+endif()
 
 # add_executable(playground playground.cpp)
 # target_link_libraries(playground manifold meshIO samples)

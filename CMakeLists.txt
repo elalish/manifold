@@ -20,6 +20,8 @@ if(EMSCRIPTEN)
     set(THRUST_BACKEND "CPP")
 endif()
 
+option(PYBIND11_FINDPYTHON on)
+
 option(BUILD_TEST_CGAL off)
 set(DISABLED_DETERMINISM 1)
 
