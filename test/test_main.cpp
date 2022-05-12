@@ -12,39 +12,45 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <unistd.h>
-
 #include "test.h"
 
 Options options;
+
+void print_usage() {
+  printf("-------------------------------\n");
+  printf("manifold_test specific options:\n");
+  printf("  -h: Print this message\n");
+  printf("  -e: Export sample models\n");
+  printf("  -v: Enable verbose output\n");
+}
 
 int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
 
   int c;
-  opterr = 0;
 
-  while ((c = getopt(argc, argv, "ev")) != -1) switch (c) {
+  for (int i = 1; i < argc; i++) {
+    if (argv[i][0] != '-') {
+      fprintf(stderr, "Unknown option: %s\n", argv[i]);
+      print_usage();
+      return 1;
+    }
+    switch (argv[i][1]) {
+      case 'h':
+        print_usage();
+        return 0;
       case 'e':
         options.exportModels = true;
         break;
       case 'v':
         options.params.verbose = true;
         break;
-        //   case 'c':
-        //     cvalue = optarg;
-        //     break;
-      case '?':
-        // if (optopt == 'c')
-        //   fprintf(stderr, "Option -%c requires an argument.\n", optopt);
-        if (isprint(optopt))
-          fprintf(stderr, "Unknown option `-%c'.\n", optopt);
-        else
-          fprintf(stderr, "Unknown option character `\\x%x'.\n", optopt);
-        return 1;
       default:
-        abort();
+        fprintf(stderr, "Unknown option: %s\n", argv[i]);
+        print_usage();
+        return 1;
     }
+  }
 
   return RUN_ALL_TESTS();
 }

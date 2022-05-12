@@ -69,7 +69,7 @@ struct is_unordered_map<
 template <typename T>
 constexpr bool is_unordered_map_v = is_unordered_map<T>::value;
 template <typename T>
-constexpr bool is_either_map_v = is_map_v<T> or is_unordered_map_v<T>;
+constexpr bool is_either_map_v = is_map_v<T> || is_unordered_map_v<T>;
 
 // CREDIT: https://stackoverflow.com/questions/765148/how-to-remove-constness-of-const-iterator
 template <typename ContainerType, typename ConstIterator>
@@ -172,7 +172,7 @@ auto insert(ContainerType& c, ValueType&& v) {
 // find the first occurrence of a value
 // using different find for efficiency; std::find is always linear
 template <typename ContainerType, typename ValueType,
-          std::enable_if_t<!is_vector_v<ContainerType> and !is_list_v<ContainerType>, bool> = true>
+          std::enable_if_t<!is_vector_v<ContainerType> && !is_list_v<ContainerType>, bool> = true>
 auto find(ContainerType& c, const ValueType& v) {
   return c.find(v);
 }
@@ -222,7 +222,7 @@ auto find(const std::list<FullValueType>& c, const ValueType& v) {
 
 // count the occurrence of a value
 template <typename ContainerType, typename ValueType>
-std::enable_if_t<!is_vector_v<ContainerType> and !is_list_v<ContainerType>, int> count(
+std::enable_if_t<!is_vector_v<ContainerType> && !is_list_v<ContainerType>, int> count(
     const ContainerType& c, const ValueType& v) {
   return c.count(v);
 }
@@ -253,7 +253,7 @@ std::enable_if_t<std::is_convertible_v<ValueType, FullValueType>, int> count(
 // remove all by value
 // erase always erases all with value v; again, std::remove is linear
 template <typename ContainerType, typename ValueType>
-std::enable_if_t<!is_vector_v<ContainerType> and !is_list_v<ContainerType>, int> erase_all(
+std::enable_if_t<!is_vector_v<ContainerType> && !is_list_v<ContainerType>, int> erase_all(
     ContainerType& c, const ValueType& v) {
   static_assert(std::is_same_v<ContainerType, std::remove_const_t<ContainerType>>);
   return c.erase(v);
@@ -294,7 +294,7 @@ int erase_all(std::list<std::pair<ValueType, T>>& c, const ValueType& v) {
 // remove one by value or position; remove AT MOST 1 element
 template <typename ContainerType, typename ValueType>
 int erase_one(ContainerType& c, const ValueType& v) {
-  if constexpr (std::is_same_v<remove_cv_ref_t<ValueType>, typename ContainerType::iterator> or
+  if constexpr (std::is_same_v<remove_cv_ref_t<ValueType>, typename ContainerType::iterator> ||
                 std::is_same_v<remove_cv_ref_t<ValueType>,
                                typename ContainerType::const_iterator>) {  // remove by pos
     c.erase(v);
@@ -505,14 +505,14 @@ struct EdgePropGraphBase {
     // this ensures that no adj list lookup will happen if either is an iterator
     if constexpr (GType::template is_iterator<U>()) {  // I & V or I & I
       auto [found, pos] = find_neighbor_iv();
-      if (not found) {
+      if (!found) {
         throw std::runtime_error(tgt_not_found_msg);
       }
       return pos->second.prop();
     } else {
       // V & I or V & V
       auto [found, pos] = find_neighbor_vi();
-      if (not found) {
+      if (!found) {
         throw std::runtime_error(src_not_found_msg);
       }
       return pos->second.prop();
@@ -525,7 +525,7 @@ struct EdgePropGraphBase {
     auto* self = static_cast<GType*>(this);
     auto src_pos = self->find_by_iter_or_by_value(source_iv);
     auto tgt_pos = self->find_by_iter_or_by_value(target_iv);
-    if (src_pos == self->adj_list.end() or tgt_pos == self->adj_list.end()) {
+    if (src_pos == self->adj_list.end() || tgt_pos == self->adj_list.end()) {
       if (src_pos == self->adj_list.end()) {
         self->print_by_iter_or_by_value(std::cerr << "(add_edge) edge involves non-existent source",
                                         source_iv)
@@ -548,7 +548,7 @@ struct EdgePropGraphBase {
     }
     auto prop_pos = self->insert_edge_prop(std::forward<EPT>(prop)...);
     container::insert(self->get_out_neighbors(src_pos), std::make_pair(tgt_full, prop_pos));
-    if (src_pos != tgt_pos or GType::DIRECTION == EdgeDirection::DIRECTED) {
+    if (src_pos != tgt_pos || GType::DIRECTION == EdgeDirection::DIRECTED) {
       container::insert(self->get_in_neighbors(tgt_pos), std::make_pair(src_full, prop_pos));
     }
     ++self->num_of_edges;
@@ -562,7 +562,7 @@ struct EdgePropGraphBase<GType, void> {
     auto* self = static_cast<GType*>(this);
     auto src_pos = self->find_by_iter_or_by_value(source_iv);
     auto tgt_pos = self->find_by_iter_or_by_value(target_iv);
-    if (src_pos == self->adj_list.end() or tgt_pos == self->adj_list.end()) {
+    if (src_pos == self->adj_list.end() || tgt_pos == self->adj_list.end()) {
       if (src_pos == self->adj_list.end()) {
         self->print_by_iter_or_by_value(std::cerr << "(add_edge) edge involves non-existent source",
                                         source_iv)
@@ -584,7 +584,7 @@ struct EdgePropGraphBase<GType, void> {
       return 0;
     }
     container::insert(self->get_out_neighbors(src_pos), tgt_full);
-    if (src_pos != tgt_pos or GType::DIRECTION == EdgeDirection::DIRECTED) {
+    if (src_pos != tgt_pos || GType::DIRECTION == EdgeDirection::DIRECTED) {
       container::insert(self->get_in_neighbors(tgt_pos), src_full);
     }
     ++self->num_of_edges;
@@ -630,32 +630,32 @@ class Graph : private detail::EdgePropListBase<EdgePropType>,
                 "NodeType should not be a reference");
   static_assert(std::is_same_v<NodeType, std::remove_cv_t<NodeType>>,
                 "NodeType should not be cv-qualified");
-  static_assert(std::is_same_v<NodePropType, std::remove_reference_t<NodePropType>> and
+  static_assert(std::is_same_v<NodePropType, std::remove_reference_t<NodePropType>> &&
                     std::is_same_v<EdgePropType, std::remove_reference_t<EdgePropType>>,
                 "Property types should not be references");
-  static_assert(std::is_same_v<NodePropType, std::remove_cv_t<NodePropType>> and
+  static_assert(std::is_same_v<NodePropType, std::remove_cv_t<NodePropType>> &&
                     std::is_same_v<EdgePropType, std::remove_cv_t<EdgePropType>>,
                 "Property types should not be cv-qualified");
   static_assert(detail::is_eq_comparable_v<NodeType>,
                 "NodeType does not support ==; implement operator==");
   static_assert(detail::is_streamable_v<NodeType>,
                 "NodeType is not streamable; implement operator<<");
-  static_assert(not((neighbors_container_spec == Container::UNORDERED_SET or
-                     neighbors_container_spec == Container::UNORDERED_MULTISET or
-                     adj_list_spec == Map::UNORDERED_MAP) and
+  static_assert(!((neighbors_container_spec == Container::UNORDERED_SET ||
+                     neighbors_container_spec == Container::UNORDERED_MULTISET ||
+                     adj_list_spec == Map::UNORDERED_MAP) &&
                     !detail::is_std_hashable_v<NodeType>),
                 "NodeType is not hashable");
-  static_assert(not((neighbors_container_spec == Container::SET or
-                     neighbors_container_spec == Container::MULTISET or
-                     adj_list_spec == Map::MAP) and
+  static_assert(!((neighbors_container_spec == Container::SET ||
+                     neighbors_container_spec == Container::MULTISET ||
+                     adj_list_spec == Map::MAP) &&
                     !detail::is_comparable_v<NodeType>),
                 "NodeType does not support operator <");
-  static_assert(not(detail::MultiEdgeTraits<neighbors_container_spec>::value ==
-                        MultiEdge::DISALLOWED and
+  static_assert(!(detail::MultiEdgeTraits<neighbors_container_spec>::value ==
+                        MultiEdge::DISALLOWED &&
                     multi_edge == MultiEdge::ALLOWED),
                 "node container does not support multi-edge");
-  static_assert(not((neighbors_container_spec == Container::MULTISET or
-                     neighbors_container_spec == Container::UNORDERED_MULTISET) and
+  static_assert(!((neighbors_container_spec == Container::MULTISET ||
+                     neighbors_container_spec == Container::UNORDERED_MULTISET) &&
                     multi_edge == MultiEdge::DISALLOWED),
                 "disallowing multi-edge yet still using multi-set; use set/unordered_set instead");
 
@@ -818,8 +818,8 @@ class Graph : private detail::EdgePropListBase<EdgePropType>,
       static_assert(std::is_constructible_v<NodePropType, NPT...>);
     }
   };
-  static constexpr bool has_node_prop = not std::is_void_v<NodePropType>;
-  using AdjListValueType = std::conditional_t<not has_node_prop, NeighborsType, PropNode>;
+  static constexpr bool has_node_prop = ! std::is_void_v<NodePropType>;
+  using AdjListValueType = std::conditional_t<!has_node_prop, NeighborsType, PropNode>;
   using AdjListType =
       std::conditional_t<adj_list_spec == Map::MAP, std::map<NodeType, AdjListValueType>,
                          std::unordered_map<NodeType, AdjListValueType>>;
@@ -831,10 +831,10 @@ class Graph : private detail::EdgePropListBase<EdgePropType>,
   template <typename T>
   static constexpr bool can_construct_node =
       std::is_constructible_v<NodeType, detail::remove_cv_ref_t<T>>;
-  static constexpr bool has_edge_prop = not std::is_void_v<EdgePropType>;
+  static constexpr bool has_edge_prop = !std::is_void_v<EdgePropType>;
   static constexpr bool need_pair_iter =
-      has_edge_prop and
-      (neighbors_container_spec == Container::VEC or neighbors_container_spec == Container::LIST);
+      has_edge_prop &&
+      (neighbors_container_spec == Container::VEC || neighbors_container_spec == Container::LIST);
 
  public:
   using NeighborsIterator = std::conditional_t<
@@ -871,7 +871,7 @@ class Graph : private detail::EdgePropListBase<EdgePropType>,
     Iter(AdjIterT it) : it{it} {};
 
     // enables implicit conversion from non-const to const
-    template <bool WasConst, typename = std::enable_if_t<IsConst or !WasConst>>
+    template <bool WasConst, typename = std::enable_if_t<IsConst || !WasConst>>
     Iter(const Iter<WasConst>& other) : it{other.it} {}
 
     Iter& operator++() {  // prefix
@@ -901,7 +901,7 @@ class Graph : private detail::EdgePropListBase<EdgePropType>,
   // END OF iterator support
  private:  // neighbor access helpers
   const NeighborsContainerType& get_out_neighbors(AdjListConstIterType adj_iter) const {
-    if constexpr (not has_node_prop) {
+    if constexpr (!has_node_prop) {
       if constexpr (direction == EdgeDirection::UNDIRECTED) {
         return adj_iter->second;
       } else {
@@ -921,7 +921,7 @@ class Graph : private detail::EdgePropListBase<EdgePropType>,
   }
 
   const NeighborsContainerType& get_in_neighbors(AdjListConstIterType adj_iter) const {
-    if constexpr (not has_node_prop) {
+    if constexpr (!has_node_prop) {
       if constexpr (direction == EdgeDirection::UNDIRECTED) {
         return adj_iter->second;
       } else {
@@ -1031,7 +1031,7 @@ class Graph : private detail::EdgePropListBase<EdgePropType>,
 
   template <typename T>
   static constexpr bool is_iterator() {
-    return std::is_same_v<ConstIterator, detail::remove_cv_ref_t<T>> or
+    return std::is_same_v<ConstIterator, detail::remove_cv_ref_t<T>> ||
            std::is_same_v<Iterator, detail::remove_cv_ref_t<T>>;
   }
 
@@ -1145,7 +1145,7 @@ class Graph : private detail::EdgePropListBase<EdgePropType>,
   int count_edges(const U& source_iv, const V& target_iv) const noexcept {
     AdjListConstIterType src_pos = find_by_iter_or_by_value(source_iv);
     AdjListConstIterType tgt_pos = find_by_iter_or_by_value(target_iv);
-    if (src_pos == adj_list.end() or tgt_pos == adj_list.end()) {
+    if (src_pos == adj_list.end() || tgt_pos == adj_list.end()) {
       if (src_pos == adj_list.end()) {
         print_by_iter_or_by_value(std::cerr << "(count_edges) source node not found", source_iv)
             << "\n";
@@ -1211,27 +1211,27 @@ class Graph : private detail::EdgePropListBase<EdgePropType>,
   NeighborsConstIterator find_tgt_remove_pos(AdjListIterType src_pos,
                                              NeighborsConstIterator src_remove_pos,
                                              NeighborsContainerType& tgt_neighbors) {
-    if constexpr (has_edge_prop and multi_edge == MultiEdge::ALLOWED) {
+    if constexpr (has_edge_prop && multi_edge == MultiEdge::ALLOWED) {
       auto prop_address =
           &(src_remove_pos->second.prop());  // finding the corresponding double entry
       auto prop_finder = [&prop_address](const auto& tgt_nbr) {
         return prop_address == &(tgt_nbr.second.prop());
       };
-      if constexpr (neighbors_container_spec == Container::VEC or
+      if constexpr (neighbors_container_spec == Container::VEC ||
                     neighbors_container_spec == Container::LIST) {
         // NeighborsContainerType is a vector/list of pairs
         // linearly search for the correct entry and remove
         return std::find_if(tgt_neighbors.begin(), tgt_neighbors.end(), prop_finder);
       } else {
         // NeighborsContainerType is a multi_map or unordered_multi_map
-        static_assert(neighbors_container_spec == Container::MULTISET or
+        static_assert(neighbors_container_spec == Container::MULTISET ||
                       neighbors_container_spec == Container::UNORDERED_MULTISET);
         auto [eq_begin, eq_end] =
             tgt_neighbors.equal_range(src_pos->first);  // slightly optimized search
         return std::find_if(eq_begin, eq_end, prop_finder);
       }
     } else {  // either multi edge is disallowed, or we don't differentiate multi-edges
-      static_assert(not has_edge_prop or multi_edge == MultiEdge::DISALLOWED);
+      static_assert(!has_edge_prop || multi_edge == MultiEdge::DISALLOWED);
       return detail::container::find(tgt_neighbors, src_pos->first);
     }
   }
@@ -1240,14 +1240,14 @@ class Graph : private detail::EdgePropListBase<EdgePropType>,
   std::pair<NeighborsConstIterator, NeighborsConstIterator> find_remove_range(
       NeighborsContainerType& neighbors, const NodeType& node) {
     static_assert(has_edge_prop);
-    if constexpr (neighbors_container_spec == Container::VEC or
+    if constexpr (neighbors_container_spec == Container::VEC ||
                   neighbors_container_spec == Container::LIST) {
       NeighborsConstIterator partition_pos =
           std::partition(neighbors.begin(), neighbors.end(),
                          [&node](const auto& src_nbr) { return !(src_nbr.first == node); });
       return {partition_pos, neighbors.end()};
     } else {
-      static_assert(neighbors_container_spec == Container::MULTISET or
+      static_assert(neighbors_container_spec == Container::MULTISET ||
                     neighbors_container_spec == Container::UNORDERED_MULTISET);
       return neighbors.equal_range(node);
     }
@@ -1272,7 +1272,7 @@ class Graph : private detail::EdgePropListBase<EdgePropType>,
       this->edge_prop_list.erase(target_nbr_pos->second.pos);
     }
     detail::container::erase_one(src_neighbors, target_nbr_pos);
-    if (src_pos != tgt_pos or direction == EdgeDirection::DIRECTED) {
+    if (src_pos != tgt_pos || direction == EdgeDirection::DIRECTED) {
       // when src==tgt && UNDIRECTED, there is NO double entry
       detail::container::erase_one(tgt_neighbors, tgt_remove_pos);
     }
@@ -1282,11 +1282,11 @@ class Graph : private detail::EdgePropListBase<EdgePropType>,
 
   // remove all edges between source and target
   template <typename U, typename V>
-  std::enable_if_t<not std::is_convertible_v<V, NeighborsConstIterator>, int> remove_edge(
+  std::enable_if_t<!std::is_convertible_v<V, NeighborsConstIterator>, int> remove_edge(
       const U& source_iv, const V& target_iv) noexcept {
     auto src_pos = find_by_iter_or_by_value(source_iv);
     auto tgt_pos = find_by_iter_or_by_value(target_iv);
-    if (src_pos == adj_list.end() or tgt_pos == adj_list.end()) {
+    if (src_pos == adj_list.end() || tgt_pos == adj_list.end()) {
       if (src_pos == adj_list.end()) {
         print_by_iter_or_by_value(std::cerr << "(remove_edge) edge involves non-existent node",
                                   source_iv)
@@ -1320,7 +1320,7 @@ class Graph : private detail::EdgePropListBase<EdgePropType>,
       return 1;
     } else {  // remove all edges between src and tgt, potentially removing no edge at all
       static_assert(multi_edge == MultiEdge::ALLOWED);
-      static_assert(neighbors_container_spec != Container::SET and
+      static_assert(neighbors_container_spec != Container::SET &&
                     neighbors_container_spec != Container::UNORDERED_SET);
       int num_edges_removed = 0;
       if constexpr (has_edge_prop) {  // remove prop too
@@ -1335,7 +1335,7 @@ class Graph : private detail::EdgePropListBase<EdgePropType>,
       } else {  // simply erase all
         num_edges_removed = detail::container::erase_all(src_neighbors, tgt_full);
       }
-      if (src_pos != tgt_pos or direction == EdgeDirection::DIRECTED) {
+      if (src_pos != tgt_pos || direction == EdgeDirection::DIRECTED) {
         int num_tgt_removed = detail::container::erase_all(get_in_neighbors(tgt_pos), src_full);
         assert(num_edges_removed == num_tgt_removed);
       }
