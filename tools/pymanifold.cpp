@@ -39,7 +39,7 @@ PYBIND11_MODULE(pymanifold, m) {
       }), "Construct manifold as the union of a set of manifolds.")
       .def(py::self + py::self)
       .def(py::self - py::self)
-      .def("__and__", [](Manifold &a, Manifold &b) { return a ^ b; })
+      .def(py::self ^ py::self)
       .def("transform",
            [](Manifold &self, py::array_t<float> &mat) {
              auto mat_view = mat.unchecked<2>();

@@ -37,8 +37,10 @@ jobs:
     - name: Test ${{matrix.backend}}
       if: matrix.backend != 'CUDA'
       run: |
+        export PYTHONHOME=$PYTHONHOME:$(pwd)/build/tools
         cd build/test
         ./manifold_test
+        python3 python/run_all.py
 
   build_wasm:
     runs-on: ubuntu-20.04
