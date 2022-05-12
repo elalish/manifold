@@ -55,10 +55,10 @@ PYBIND11_MODULE(pymanifold, m) {
            })
       .def(
           "translate",
-          [](Manifold self, float x, float y, float z = 0.0f) {
+          [](Manifold self, float x = 0.0f, float y = 0.0f, float z = 0.0f) {
             return self.Translate(glm::vec3(x, y, z));
           },
-          py::arg("x"), py::arg("y"), py::arg("z") = 0.0f)
+          py::arg("x") = 0.0f, py::arg("y") = 0.0f, py::arg("z") = 0.0f)
       .def("scale", static_cast<Manifold (*)(Manifold, float)>(
                         [](Manifold self, float scale) {
                           return self.Scale(glm::vec3(scale));
@@ -73,9 +73,9 @@ PYBIND11_MODULE(pymanifold, m) {
                           return self.Scale(v);
                         }), py::arg("v"))
       .def("rotate",
-           [](Manifold self, float xDegrees, float yDegrees, float zDegrees) {
+           [](Manifold self, float xDegrees = 0.0f, float yDegrees = 0.0f, float zDegrees = 0.0f) {
              return self.Rotate(xDegrees, yDegrees, zDegrees);
-           }, py::arg("xDegrees"), py::arg("yDegrees"), py::arg("zDegrees"))
+           }, py::arg("xDegrees") = 0.0f, py::arg("yDegrees") = 0.0f, py::arg("zDegrees") = 0.0f)
       .def("export",
            [](Manifold &self, std::string name) { exportManifold(self, name); },
         py::arg("filename"),
