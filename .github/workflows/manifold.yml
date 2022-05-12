@@ -74,7 +74,8 @@ jobs:
   build_windows:
     strategy:
       matrix:
-        backend: [CPP, CUDA]
+        backend: [CUDA, CPP]
+      max-parallel: 1
     runs-on: windows-2019
     steps:
     - uses: actions/checkout@v3
@@ -110,8 +111,8 @@ jobs:
         cmake --build . --target ALL_BUILD --config Release
     - name: Test ${{matrix.backend}}
       if: matrix.backend != 'CUDA'
-      shell: powershell
+      shell: bash
       run: |
-        cd build\test
-        .\Release\manifold_test.exe
+        cd build/test
+        ./Release/manifold_test.exe
 
