@@ -65,9 +65,8 @@
               cd build
               emcmake cmake -DCMAKE_BUILD_TYPE=Release ..
             '';
-            enableParallelBuilding = true;
             buildPhase = ''
-              emmake make -j"$buildCores"
+              emmake make
             '';
             checkPhase = ''
               cd test
