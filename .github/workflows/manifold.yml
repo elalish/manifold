@@ -116,3 +116,13 @@ jobs:
         cd build/test
         ./Release/manifold_test.exe
 
+  build_nix:
+    strategy:
+      matrix:
+        variant: [cpp, omp, cuda, js]
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2.4.0
+    - uses: cachix/install-nix-action@v15
+    - run: nix build -L '.?submodules=1#manifold-${{matrix.variant}}'
+
