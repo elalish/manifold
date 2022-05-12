@@ -9,6 +9,8 @@ set(CMAKE_VERBOSE_MAKEFILE ON)
 #         )
 # endif()
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 set(THRUST_BACKEND "CUDA" CACHE STRING
     "Thrust backend, either \"CUDA\", \"OMP\" or \"CPP\"(single-threaded)"
 )
@@ -26,6 +28,7 @@ set(ASSIMP_INC_DIR
     ${PROJECT_SOURCE_DIR}/third_party/assimp/include
     ${CMAKE_BINARY_DIR}/third_party/assimp/include)
 set(GLM_INC_DIR ${PROJECT_SOURCE_DIR}/third_party/glm)
+set(PYBIND11_DIR ${PROJECT_SOURCE_DIR}/third_party/pybind11)
 
 set_property(CACHE THRUST_BACKEND PROPERTY STRINGS CUDA OMP CPP)
 

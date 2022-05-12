@@ -29,3 +29,5 @@ if(NOT TARGET GTest::GMock)
     add_library(GMock::Main ALIAS gmock_main)
 endif()
 
+ add_subdirectory(pybind11)
+
