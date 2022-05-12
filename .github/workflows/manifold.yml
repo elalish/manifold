@@ -74,7 +74,8 @@ jobs:
   build_windows:
     strategy:
       matrix:
-        backend: [CUDA, CPP]
+        # backend: [CUDA, CPP]
+        backend: [CPP]
       max-parallel: 1
     runs-on: windows-2019
     steps:
