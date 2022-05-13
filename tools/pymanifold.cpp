@@ -41,7 +41,7 @@ PYBIND11_MODULE(pymanifold, m) {
       .def(py::self - py::self)
       .def(py::self ^ py::self)
       .def("transform",
-           [](Manifold &self, py::array_t<float> &mat) {
+           [](Manifold self, py::array_t<float> &mat) {
              auto mat_view = mat.unchecked<2>();
              if (mat_view.shape(0) != 3 || mat_view.shape(1) != 4)
                throw std::runtime_error("Invalid matrix shape");
@@ -75,7 +75,7 @@ PYBIND11_MODULE(pymanifold, m) {
       .def("rotate",
            [](Manifold self, float xDegrees = 0.0f, float yDegrees = 0.0f, float zDegrees = 0.0f) {
              return self.Rotate(xDegrees, yDegrees, zDegrees);
-           }, py::arg("xDegrees") = 0.0f, py::arg("yDegrees") = 0.0f, py::arg("zDegrees") = 0.0f)
+           }, py::arg("x_degrees") = 0.0f, py::arg("y_degrees") = 0.0f, py::arg("z_degrees") = 0.0f)
       .def("export",
            [](Manifold &self, std::string name) { exportManifold(self, name); },
         py::arg("filename"),
@@ -90,48 +90,35 @@ PYBIND11_MODULE(pymanifold, m) {
              });
            }, py::arg("f"))
       .def("refine", [](Manifold self, int n) { return self.Refine(n); }, py::arg("n"))
+      .def("to_mesh", &Manifold::GetMesh)
+      .def_static("smooth", Manifold::Smooth)
       .def_static(
-          "FromMesh",
-          [](py::array_t<float> &vertPos, py::array_t<int> &triVerts) {
-            auto vertPos_view = vertPos.unchecked<2>();
-            auto triVerts_view = triVerts.unchecked<2>();
-            if (vertPos_view.shape(1) != 3)
-              throw std::runtime_error("Invalid vertex position shape");
-            if (triVerts_view.shape(1) != 3)
-              throw std::runtime_error("Invalid triangle vertices shape");
-            std::vector<glm::vec3> vertPos_vec(vertPos_view.shape(0));
-            std::vector<glm::ivec3> triVerts_vec(triVerts_view.shape(0));
-            for (int i = 0; i < vertPos_view.shape(0); i++)
-              vertPos_vec[i] = {vertPos_view(i, 0), vertPos_view(i, 1),
-                                vertPos_view(i, 2)};
-            for (int i = 0; i < triVerts_view.shape(0); i++)
-              triVerts_vec[i] = {triVerts_view(i, 0), triVerts_view(i, 1),
-                                 triVerts_view(i, 2)};
-            return Manifold({vertPos_vec, triVerts_vec});
-          }, py::arg("vertPos"), py::arg("triVerts"))
-      .def_static("Tetrahedron", []() { return Manifold::Tetrahedron(); })
+          "from_mesh",
+          [](const Mesh& mesh) {
+            return Manifold(mesh);
+          }, py::arg("mesh"))
+      .def_static("tetrahedron", []() { return Manifold::Tetrahedron(); })
       .def_static(
-          "Cube",
+          "cube",
           [](float x, float y, float z,
              bool center =
                  false) { return Manifold::Cube(glm::vec3(x, y, z), center); },
           py::arg("x"), py::arg("y"), py::arg("z"), py::arg("center") = false)
       .def_static(
-          "Cylinder",
+          "cylinder",
           [](float height, float radiusLow, float radiusHigh = -1.0f,
              int circularSegments = 0) {
             return Manifold::Cylinder(height, radiusLow, radiusHigh,
                                       circularSegments);
           },
-          py::arg("height"), py::arg("radiusLow"),
-          py::arg("radiusHigh") = -1.0f, py::arg("circularSegments") = 0)
+          py::arg("height"), py::arg("radius_low"),
+          py::arg("radius_high") = -1.0f, py::arg("circular_segments") = 0)
       .def_static(
-          "Sphere",
+          "sphere",
           [](float radius,
              int circularSegments =
                  0) { return Manifold::Sphere(radius, circularSegments); },
-          py::arg("radius"), py::arg("circularSegments") = 0);
-  ;
+          py::arg("radius"), py::arg("circular_segments") = 0);
 
   py::class_<PolygonsWrapper>(m, "Polygons")
       .def(py::init([](std::vector<std::vector<Float2>> &polygons) {
@@ -157,13 +144,62 @@ PYBIND11_MODULE(pymanifold, m) {
             return Manifold::Extrude(*self.polygons, height, nDivisions,
                                      twistDegrees, scaleTopVec);
           },
-          py::arg("height"), py::arg("nDivisions") = 0,
-          py::arg("twistDegrees") = 0.0f,
-          py::arg("scaleTop") = std::make_tuple(1.0f, 1.0f))
+          py::arg("height"), py::arg("n_divisions") = 0,
+          py::arg("twist_degrees") = 0.0f,
+          py::arg("scale_top") = std::make_tuple(1.0f, 1.0f))
       .def(
           "revolve",
           [](PolygonsWrapper &self, int circularSegments = 0) {
             return Manifold::Revolve(*self.polygons, circularSegments);
           },
-          py::arg("circularSegments") = 0);
+          py::arg("circular_segments") = 0);
+
+  py::class_<Mesh>(m, "Mesh")
+      .def(py::init([](
+                      py::array_t<float> &vertPos,
+                      py::array_t<int> &triVerts,
+                      py::array_t<float> &vertNormal,
+                      py::array_t<float> &halfedgeTangent) {
+            auto vertPos_view = vertPos.unchecked<2>();
+            auto triVerts_view = triVerts.unchecked<2>();
+            auto vertNormal_view = vertNormal.unchecked<2>();
+            auto halfedgeTangent_view = halfedgeTangent.unchecked<2>();
+            if (vertPos_view.shape(1) != 3)
+              throw std::runtime_error("Invalid vert_pos shape");
+            if (triVerts_view.shape(1) != 3)
+              throw std::runtime_error("Invalid tri_verts shape");
+            if (vertNormal_view.shape(0) != 0) {
+              if (vertNormal_view.shape(1) != 3)
+                throw std::runtime_error("Invalid vert_normal shape");
+              if (vertNormal_view.shape(0) != vertPos_view.shape(0))
+                throw std::runtime_error("vert_normal must have the same length as vert_pos");
+            }
+            if (halfedgeTangent_view.shape(0) != 0) {
+              if (halfedgeTangent_view.shape(1) != 4)
+                throw std::runtime_error("Invalid halfedge_tangent shape");
+              if (halfedgeTangent_view.shape(0) != triVerts_view.shape(0) * 3)
+                throw std::runtime_error("halfedge_tangent must be three times as long as tri_verts");
+            }
+            std::vector<glm::vec3> vertPos_vec(vertPos_view.shape(0));
+            std::vector<glm::ivec3> triVerts_vec(triVerts_view.shape(0));
+            std::vector<glm::vec3> vertNormal_vec(vertNormal_view.shape(0));
+            std::vector<glm::vec4> halfedgeTangent_vec(halfedgeTangent_view.shape(0));
+            for (int i = 0; i < vertPos_view.shape(0); i++)
+              for (int j = 0; j < 3; j++)
+                vertPos_vec[i][j] = vertPos_view(i, j);
+            for (int i = 0; i < triVerts_view.shape(0); i++)
+              for (int j = 0; j < 3; j++)
+                triVerts_vec[i][j] = triVerts_view(i, j);
+            for (int i = 0; i < vertNormal_view.shape(0); i++)
+              for (int j = 0; j < 3; j++)
+                vertNormal_vec[i][j] = vertNormal_view(i, j);
+            for (int i = 0; i < halfedgeTangent_view.shape(0); i++)
+              for (int j = 0; j < 4; j++)
+                halfedgeTangent_vec[i][j] = halfedgeTangent_view(i, j);
+            return Mesh({vertPos_vec, triVerts_vec, vertNormal_vec, halfedgeTangent_vec});
+        }), py::arg("vert_pos"), py::arg("tri_verts"), py::arg("vert_normal"), py::arg("halfedge_tangent"))
+    .def_readwrite("vert_pos", &Mesh::vertPos)
+    .def_readwrite("tri_verts", &Mesh::triVerts)
+    .def_readwrite("vert_normal", &Mesh::vertNormal)
+    .def_readwrite("halfedge_tangent", &Mesh::halfedgeTangent);
 }
