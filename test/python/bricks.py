@@ -12,11 +12,11 @@ mortar_gap = (3/8) * INCHES
 
 
 def brick():
-    return Manifold.Cube(brick_length, brick_depth, brick_height)
+    return Manifold.cube(brick_length, brick_depth, brick_height)
 
 
 def halfbrick():
-    return Manifold.Cube((brick_length - mortar_gap)/2, brick_depth, brick_height)
+    return Manifold.cube((brick_length - mortar_gap)/2, brick_depth, brick_height)
 
 
 def row(length):
