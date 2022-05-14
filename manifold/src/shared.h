@@ -146,9 +146,9 @@ struct TmpInvalid {
 
 VecDH<TmpEdge> inline CreateTmpEdges(const VecDH<Halfedge>& halfedge) {
   VecDH<TmpEdge> edges(halfedge.size());
-  thrust::for_each_n(zip(edges.beginD(), halfedge.beginD(), countAt(0)),
+  thrust::for_each_n(thrust::device, zip(edges.beginD(), halfedge.beginD(), countAt(0)),
                      edges.size(), Halfedge2Tmp());
-  int numEdge = thrust::remove_if(edges.beginD(), edges.endD(), TmpInvalid()) -
+  int numEdge = thrust::remove_if(thrust::device, edges.beginD(), edges.endD(), TmpInvalid()) -
                 edges.beginD();
   ALWAYS_ASSERT(numEdge == halfedge.size() / 2, topologyErr, "Not oriented!");
   edges.resize(numEdge);

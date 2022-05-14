@@ -356,14 +356,14 @@ void Manifold::Impl::CreateTangents(
   const int numHalfedge = halfedge_.size();
   halfedgeTangent_.resize(numHalfedge);
 
-  thrust::for_each_n(zip(halfedgeTangent_.beginD(), halfedge_.cbeginD()),
+  thrust::for_each_n(thrust::device, zip(halfedgeTangent_.beginD(), halfedge_.cbeginD()),
                      numHalfedge,
                      SmoothBezier({vertPos_.cptrD(), faceNormal_.cptrD(),
                                    vertNormal_.cptrD(), halfedge_.cptrD()}));
 
   if (!sharpenedEdges.empty()) {
-    const VecH<Halfedge>& halfedge = halfedge_.H();
-    const VecH<BaryRef>& triBary = meshRelation_.triBary.H();
+    const VecDH<Halfedge>& halfedge = halfedge_;
+    const VecDH<BaryRef>& triBary = meshRelation_.triBary;
 
     // sharpenedEdges are referenced to the input Mesh, but the triangles have
     // been sorted in creating the Manifold, so the indices are converted using
@@ -396,7 +396,7 @@ void Manifold::Impl::CreateTangents(
           {edge.second, edge.first});
     }
 
-    VecH<glm::vec4>& tangent = halfedgeTangent_.H();
+    VecDH<glm::vec4>& tangent = halfedgeTangent_;
     for (const auto& value : vertTangents) {
       const std::vector<Pair>& vert = value.second;
       // Sharp edges that end are smooth at their terminal vert.
@@ -476,12 +476,12 @@ Manifold::Impl::MeshRelationD Manifold::Impl::Subdivide(int n) {
 
   VecDH<TmpEdge> edges = CreateTmpEdges(halfedge_);
   VecDH<int> half2Edge(2 * numEdge);
-  thrust::for_each_n(zip(countAt(0), edges.beginD()), numEdge,
+  thrust::for_each_n(thrust::device, zip(countAt(0), edges.beginD()), numEdge,
                      ReindexHalfedge({half2Edge.ptrD()}));
-  thrust::for_each_n(zip(countAt(0), edges.beginD()), numEdge,
+  thrust::for_each_n(thrust::device, zip(countAt(0), edges.beginD()), numEdge,
                      EdgeVerts({vertPos_.ptrD(), numVert, n}));
   thrust::for_each_n(
-      zip(countAt(0), oldMeshRelation.triBary.beginD()), numTri,
+      thrust::device, zip(countAt(0), oldMeshRelation.triBary.beginD()), numTri,
       InteriorVerts({vertPos_.ptrD(), relation.barycentric.ptrD(),
                      relation.triBary.ptrD(), meshRelation_.barycentric.ptrD(),
                      meshRelation_.triBary.ptrD(),
@@ -489,7 +489,7 @@ Manifold::Impl::MeshRelationD Manifold::Impl::Subdivide(int n) {
                      halfedge_.ptrD()}));
   // Create subtriangles
   VecDH<glm::ivec3> triVerts(n * n * numTri);
-  thrust::for_each_n(countAt(0), numTri,
+  thrust::for_each_n(thrust::device, countAt(0), numTri,
                      SplitTris({triVerts.ptrD(), halfedge_.cptrD(),
                                 half2Edge.cptrD(), numVert, triVertStart, n}));
   CreateHalfedges(triVerts);
@@ -504,12 +504,12 @@ void Manifold::Impl::Refine(int n) {
     VecDH<Barycentric> vertBary(NumVert());
     VecDH<int> lock(NumVert(), 0);
     thrust::for_each_n(
-        zip(relation.triBary.beginD(), countAt(0)), NumTri(),
+        thrust::device, zip(relation.triBary.beginD(), countAt(0)), NumTri(),
         TriBary2Vert({vertBary.ptrD(), lock.ptrD(),
                       relation.barycentric.cptrD(), halfedge_.cptrD()}));
 
     thrust::for_each_n(
-        zip(vertPos_.beginD(), vertBary.beginD()), NumVert(),
+        thrust::device, zip(vertPos_.beginD(), vertBary.beginD()), NumVert(),
         InterpTri({old.halfedge_.cptrD(), old.halfedgeTangent_.cptrD(),
                    old.vertPos_.cptrD()}));
   }

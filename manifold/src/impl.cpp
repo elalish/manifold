@@ -374,7 +374,7 @@ void Manifold::Impl::DuplicateMeshIDs() {
 }
 
 void Manifold::Impl::ReinitializeReference(int meshID) {
-  thrust::for_each_n(zip(meshRelation_.triBary.beginD(), countAt(0)), NumTri(),
+  thrust::for_each_n(thrust::device, zip(meshRelation_.triBary.beginD(), countAt(0)), NumTri(),
                      InitializeBaryRef({meshID, halfedge_.cptrD()}));
 }
 
@@ -402,7 +402,7 @@ int Manifold::Impl::InitializeNewReference(
                   "propertyTolerance.");
 
     const int numSets = properties.size() / numProps;
-    ALWAYS_ASSERT(thrust::all_of(triPropertiesD.beginD(), triPropertiesD.endD(),
+    ALWAYS_ASSERT(thrust::all_of(thrust::device, triPropertiesD.beginD(), triPropertiesD.endD(),
                                  CheckProperties({numSets})),
                   userErr,
                   "triProperties value is outside the properties range.");
@@ -411,7 +411,7 @@ int Manifold::Impl::InitializeNewReference(
   VecDH<thrust::pair<int, int>> face2face(halfedge_.size(), {-1, -1});
   VecDH<float> triArea(NumTri());
   thrust::for_each_n(
-      zip(face2face.beginD(), countAt(0)), halfedge_.size(),
+      thrust::device, zip(face2face.beginD(), countAt(0)), halfedge_.size(),
       CoplanarEdge({triArea.ptrD(), halfedge_.cptrD(), vertPos_.cptrD(),
                     triPropertiesD.cptrD(), propertiesD.cptrD(),
                     propertyToleranceD.cptrD(), numProps, precision_}));
@@ -421,7 +421,7 @@ int Manifold::Impl::InitializeNewReference(
     graph.add_nodes(i);
   }
   for (int i = 0; i < face2face.size(); ++i) {
-    const thrust::pair<int, int> edge = face2face.H()[i];
+    const thrust::pair<int, int> edge = face2face[i];
     if (edge.first < 0) continue;
     graph.add_edge(edge.first, edge.second);
   }
@@ -433,13 +433,13 @@ int Manifold::Impl::InitializeNewReference(
   for (int tri = 0; tri < NumTri(); ++tri) {
     const int comp = components[tri];
     const int current = comp2tri[comp];
-    if (current < 0 || triArea.H()[tri] > triArea.H()[current]) {
+    if (current < 0 || triArea[tri] > triArea[current]) {
       comp2tri[comp] = tri;
-      triArea.H()[comp] = triArea.H()[tri];
+      triArea[comp] = triArea[tri];
     }
   }
 
-  VecH<BaryRef>& triBary = meshRelation_.triBary.H();
+  VecDH<BaryRef>& triBary = meshRelation_.triBary;
   std::map<std::pair<int, int>, int> triVert2bary;
 
   for (int tri = 0; tri < NumTri(); ++tri) {
@@ -448,25 +448,25 @@ int Manifold::Impl::InitializeNewReference(
 
     glm::mat3 triPos;
     for (int i : {0, 1, 2}) {
-      const int vert = halfedge_.H()[3 * refTri + i].startVert;
-      triPos[i] = vertPos_.H()[vert];
+      const int vert = halfedge_[3 * refTri + i].startVert;
+      triPos[i] = vertPos_[vert];
       triVert2bary[{refTri, vert}] = i - 3;
     }
 
     glm::ivec3 vertBary;
     bool coplanar = true;
     for (int i : {0, 1, 2}) {
-      const int vert = halfedge_.H()[3 * tri + i].startVert;
+      const int vert = halfedge_[3 * tri + i].startVert;
       if (triVert2bary.find({refTri, vert}) == triVert2bary.end()) {
         const glm::vec3 uvw =
-            GetBarycentric(vertPos_.H()[vert], triPos, precision_);
+            GetBarycentric(vertPos_[vert], triPos, precision_);
         if (isnan(uvw[0])) {
           coplanar = false;
           triVert2bary[{refTri, vert}] = -4;
           break;
         }
         triVert2bary[{refTri, vert}] = meshRelation_.barycentric.size();
-        meshRelation_.barycentric.H().push_back(uvw);
+        meshRelation_.barycentric.push_back(uvw);
       }
       const int bary = triVert2bary[{refTri, vert}];
       if (bary < -3) {
@@ -493,10 +493,10 @@ void Manifold::Impl::CreateHalfedges(const VecDH<glm::ivec3>& triVerts) {
   const int numTri = triVerts.size();
   halfedge_.resize(3 * numTri);
   VecDH<TmpEdge> edge(3 * numTri);
-  thrust::for_each_n(zip(countAt(0), triVerts.beginD()), numTri,
+  thrust::for_each_n(thrust::device, zip(countAt(0), triVerts.beginD()), numTri,
                      Tri2Halfedges({halfedge_.ptrD(), edge.ptrD()}));
-  thrust::sort(edge.beginD(), edge.endD());
-  thrust::for_each_n(countAt(0), halfedge_.size() / 2,
+  thrust::sort(thrust::device, edge.beginD(), edge.endD());
+  thrust::for_each_n(thrust::device, countAt(0), halfedge_.size() / 2,
                      LinkHalfedges({halfedge_.ptrD(), edge.cptrD()}));
 }
 
@@ -511,7 +511,7 @@ void Manifold::Impl::CreateAndFixHalfedges(const VecDH<glm::ivec3>& triVerts) {
   halfedge_.resize(0);
   halfedge_.resize(3 * numTri);
   VecDH<TmpEdge> edge(3 * numTri);
-  thrust::for_each_n(zip(countAt(0), triVerts.beginD()), numTri,
+  thrust::for_each_n(thrust::device, zip(countAt(0), triVerts.beginD()), numTri,
                      Tri2Halfedges({halfedge_.ptrD(), edge.ptrD()}));
   // Stable sort is required here so that halfedges from the same face are
   // paired together (the triangles were created in face order). In some
@@ -519,7 +519,7 @@ void Manifold::Impl::CreateAndFixHalfedges(const VecDH<glm::ivec3>& triVerts) {
   // two different faces, causing this edge to not be 2-manifold. We detect this
   // and fix it by swapping one of the identical edges, so it is important that
   // we have the edges paired according to their face.
-  thrust::stable_sort(edge.beginD(), edge.endD());
+  thrust::stable_sort(thrust::device, edge.beginD(), edge.endD());
   thrust::for_each_n(thrust::host, countAt(0), halfedge_.size() / 2,
                      LinkHalfedges({halfedge_.ptrH(), edge.cptrH()}));
   thrust::for_each(thrust::host, countAt(1), countAt(halfedge_.size() / 2),
@@ -551,14 +551,14 @@ void Manifold::Impl::ApplyTransform() const {
  */
 void Manifold::Impl::ApplyTransform() {
   if (transform_ == glm::mat4x3(1.0f)) return;
-  thrust::for_each(vertPos_.beginD(), vertPos_.endD(),
+  thrust::for_each(thrust::device, vertPos_.beginD(), vertPos_.endD(),
                    Transform4x3({transform_}));
 
   glm::mat3 normalTransform =
       glm::inverse(glm::transpose(glm::mat3(transform_)));
-  thrust::for_each(faceNormal_.beginD(), faceNormal_.endD(),
+  thrust::for_each(thrust::device, faceNormal_.beginD(), faceNormal_.endD(),
                    TransformNormals({normalTransform}));
-  thrust::for_each(vertNormal_.beginD(), vertNormal_.endD(),
+  thrust::for_each(thrust::device, vertNormal_.beginD(), vertNormal_.endD(),
                    TransformNormals({normalTransform}));
   // This optimization does a cheap collider update if the transform is
   // axis-aligned.
@@ -601,17 +601,17 @@ void Manifold::Impl::SetPrecision(float minPrecision) {
  */
 void Manifold::Impl::CalculateNormals() {
   vertNormal_.resize(NumVert());
-  thrust::fill(vertNormal_.beginD(), vertNormal_.endD(), glm::vec3(0));
+  thrust::fill(thrust::device, vertNormal_.beginD(), vertNormal_.endD(), glm::vec3(0));
   bool calculateTriNormal = false;
   if (faceNormal_.size() != NumTri()) {
     faceNormal_.resize(NumTri());
     calculateTriNormal = true;
   }
   thrust::for_each_n(
-      zip(faceNormal_.beginD(), countAt(0)), NumTri(),
+      thrust::device, zip(faceNormal_.beginD(), countAt(0)), NumTri(),
       AssignNormals({vertNormal_.ptrD(), vertPos_.cptrD(), halfedge_.cptrD(),
                      precision_, calculateTriNormal}));
-  thrust::for_each(vertNormal_.beginD(), vertNormal_.endD(), Normalize());
+  thrust::for_each(thrust::device, vertNormal_.beginD(), vertNormal_.endD(), Normalize());
 }
 
 /**
@@ -623,12 +623,12 @@ SparseIndices Manifold::Impl::EdgeCollisions(const Impl& Q) const {
   VecDH<TmpEdge> edges = CreateTmpEdges(Q.halfedge_);
   const int numEdge = edges.size();
   VecDH<Box> QedgeBB(numEdge);
-  thrust::for_each_n(zip(QedgeBB.beginD(), edges.cbeginD()), numEdge,
+  thrust::for_each_n(thrust::device, zip(QedgeBB.beginD(), edges.cbeginD()), numEdge,
                      EdgeBox({Q.vertPos_.cptrD()}));
 
   SparseIndices q1p2 = collider_.Collisions(QedgeBB);
 
-  thrust::for_each(q1p2.beginD(0), q1p2.endD(0), ReindexEdge({edges.cptrD()}));
+  thrust::for_each(thrust::device, q1p2.beginD(0), q1p2.endD(0), ReindexEdge({edges.cptrD()}));
   return q1p2;
 }
 

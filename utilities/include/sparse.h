@@ -18,6 +18,7 @@
 #include <thrust/remove.h>
 #include <thrust/sort.h>
 #include <thrust/unique.h>
+#include <thrust/execution_policy.h>
 
 #include "structs.h"
 #include "utils.h"
@@ -125,7 +126,7 @@ class SparseIndices {
                   "Different number of values than indicies!");
     auto zBegin = zip(v.beginD(), x.beginD(), beginD(false), beginD(true));
     auto zEnd = zip(v.endD(), x.endD(), endD(false), endD(true));
-    size_t size = thrust::remove_if(zBegin, zEnd, firstNonFinite<T>()) - zBegin;
+    size_t size = thrust::remove_if(thrust::device, zBegin, zEnd, firstNonFinite<T>()) - zBegin;
     v.resize(size);
     x.resize(size, -1);
     p.resize(size, -1);
@@ -140,19 +141,19 @@ class SparseIndices {
                   "Different number of values than indicies!");
     size_t size = pqEnd - pqBegin;
     VecDH<T> result(size);
-    VecDH<bool> found(size);
+    VecDH<char> found(size);
     VecDH<int> temp(size);
-    thrust::fill(result.beginD(), result.endD(), missingVal);
-    thrust::binary_search(beginDpq(), endDpq(), pqBegin, pqEnd, found.beginD());
-    thrust::lower_bound(beginDpq(), endDpq(), pqBegin, pqEnd, temp.beginD());
-    thrust::gather_if(temp.beginD(), temp.endD(), found.beginD(), val.beginD(),
+    thrust::fill(thrust::device, result.beginD(), result.endD(), missingVal);
+    thrust::binary_search(thrust::device, beginDpq(), endDpq(), pqBegin, pqEnd, found.beginD());
+    thrust::lower_bound(thrust::device, beginDpq(), endDpq(), pqBegin, pqEnd, temp.beginD());
+    thrust::gather_if(thrust::device, temp.beginD(), temp.endD(), found.beginD(), val.beginD(),
                       result.beginD());
     return result;
   }
 
   void Dump() const {
-    const auto& p = Get(0).H();
-    const auto& q = Get(1).H();
+    const auto& p = Get(0);
+    const auto& q = Get(1);
     std::cout << "SparseIndices = " << std::endl;
     for (int i = 0; i < size(); ++i) {
       std::cout << i << ", p = " << p[i] << ", q = " << q[i] << std::endl;
