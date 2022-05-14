@@ -16,6 +16,7 @@
 
 #include <algorithm>
 #include <map>
+#include <atomic>
 
 #include "graph.h"
 #include "impl.h"
@@ -28,12 +29,10 @@ __host__ __device__ void AtomicAddVec3(glm::vec3& target,
   for (int i : {0, 1, 2}) {
 #ifdef __CUDA_ARCH__
     atomicAdd(&target[i], add[i]);
-#elif defined(_OPENMP)
-#pragma omp atomic
-    target[i] += add[i];
 #else
-    // should be executed with single thread on the host
-    target[i] += add[i];
+    std::atomic<float> &tar = reinterpret_cast<std::atomic<float>&>(target[i]);
+    float old_val = tar.load();
+    while (!tar.compare_exchange_weak(old_val, old_val + add[i]));
 #endif
   }
 }

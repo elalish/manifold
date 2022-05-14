@@ -28,10 +28,6 @@ set(GLM_INC_DIR ${PROJECT_SOURCE_DIR}/third_party/glm)
 
 set_property(CACHE THRUST_BACKEND PROPERTY STRINGS CUDA OMP CPP)
 
-if(NOT THRUST_BACKEND STREQUAL "CUDA" AND NOT THRUST_BACKEND STREQUAL "OMP" AND NOT THRUST_BACKEND STREQUAL "CPP")
-    message(FATAL_ERROR "Invalid value for THRUST_BACKEND: ${THRUST_BACKEND}. Should be one of \"CUDA\", \"OMP\" or \"CPP\"")
-endif()
-
 if(MSVC)
     set(MANIFOLD_FLAGS)
 else()
@@ -41,21 +37,30 @@ set(MANIFOLD_NVCC_FLAGS -Xcudafe --diag_suppress=esa_on_defaulted_function_ignor
 set(MANIFOLD_NVCC_RELEASE_FLAGS -O3)
 set(MANIFOLD_NVCC_DEBUG_FLAGS -G)
 
-if(THRUST_BACKEND STREQUAL "CUDA")
+set(THRUST_INC_DIR ${PROJECT_SOURCE_DIR}/third_party/thrust)
+
+message("Using ${THRUST_BACKEND} backend")
+if (THRUST_BACKEND STREQUAL "CUDA")
     # we cannot set THRUST_INC_DIR when building with CUDA, otherwise the
     # compiler will not use the system CUDA headers which causes incompatibility
     enable_language(CUDA)
-else()
-    set(THRUST_INC_DIR ${PROJECT_SOURCE_DIR}/third_party/thrust)
-    if(THRUST_BACKEND STREQUAL "OMP")
-        message("------------------------- Using OpenMP instead of CUDA.")
-        find_package(OpenMP REQUIRED)
-        set(MANIFOLD_OMP_INCLUDE OpenMP::OpenMP_CXX)
-        set(MANIFOLD_FLAGS ${MANIFOLD_FLAGS} -DTHRUST_DEVICE_SYSTEM=THRUST_DEVICE_SYSTEM_OMP -fopenmp)
-    else()
-        message("------------------------- Using C++ instead of CUDA.")
-        set(MANIFOLD_FLAGS ${MANIFOLD_FLAGS} -DTHRUST_DEVICE_SYSTEM=THRUST_DEVICE_SYSTEM_CPP)
-    endif()
+    # clear THRUST_INC_DIR, we use the one from nvcc
+    set(THRUST_INC_DIR "")
+elseif (THRUST_BACKEND STREQUAL "OMP")
+    find_package(OpenMP REQUIRED)
+    set(MANIFOLD_INCLUDE OpenMP::OpenMP_CXX)
+    set(MANIFOLD_FLAGS ${MANIFOLD_FLAGS} -DTHRUST_DEVICE_SYSTEM=THRUST_DEVICE_SYSTEM_OMP -fopenmp)
+elseif (THRUST_BACKEND STREQUAL "CPP")
+    set(MANIFOLD_FLAGS ${MANIFOLD_FLAGS} -DTHRUST_DEVICE_SYSTEM=THRUST_DEVICE_SYSTEM_CPP)
+elseif (THRUST_BACKEND STREQUAL "TBB")
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(TBB REQUIRED tbb)
+
+    set(MANIFOLD_INCLUDE ${TBB_LINK_LIBRARIES})
+    set(MANIFOLD_FLAGS ${MANIFOLD_FLAGS} -DTHRUST_DEVICE_SYSTEM=THRUST_DEVICE_SYSTEM_TBB)
+else ()
+    message(FATAL_ERROR "Invalid value for THRUST_BACKEND: ${THRUST_BACKEND}. "
+    "Should be one of \"CUDA\", \"OMP\", \"CPP\" or \"TBB\"")
 endif()
 
 add_subdirectory(utilities)
