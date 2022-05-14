@@ -14,6 +14,7 @@
 
 #include "boolean3.h"
 #include "impl.h"
+#include <thrust/execution_policy.h>
 
 namespace {
 using namespace manifold;
@@ -124,7 +125,7 @@ Mesh Manifold::GetMesh() const {
                                 pImpl_->halfedgeTangent_.end());
 
   result.triVerts.resize(NumTri());
-  thrust::for_each_n(zip(result.triVerts.begin(), countAt(0)), NumTri(),
+  thrust::for_each_n(thrust::host, zip(result.triVerts.begin(), countAt(0)), NumTri(),
                      MakeTri({pImpl_->halfedge_.cptrH()}));
 
   return result;
@@ -288,11 +289,11 @@ MeshRelation Manifold::GetMeshRelation() const {
 std::vector<int> Manifold::GetMeshIDs() const {
   VecDH<int> meshIDs(NumTri());
   thrust::for_each_n(
-      zip(meshIDs.beginD(), pImpl_->meshRelation_.triBary.beginD()), NumTri(),
+      thrust::device, zip(meshIDs.beginD(), pImpl_->meshRelation_.triBary.beginD()), NumTri(),
       GetMeshID());
 
-  thrust::sort(meshIDs.beginD(), meshIDs.endD());
-  int n = thrust::unique(meshIDs.beginD(), meshIDs.endD()) - meshIDs.beginD();
+  thrust::sort(thrust::device, meshIDs.beginD(), meshIDs.endD());
+  int n = thrust::unique(thrust::device, meshIDs.beginD(), meshIDs.endD()) - meshIDs.beginD();
   meshIDs.resize(n);
 
   std::vector<int> out;
@@ -439,7 +440,7 @@ Manifold& Manifold::Transform(const glm::mat4x3& m) {
  */
 Manifold& Manifold::Warp(std::function<void(glm::vec3&)> warpFunc) {
   pImpl_->ApplyTransform();
-  thrust::for_each_n(pImpl_->vertPos_.begin(), NumVert(), warpFunc);
+  thrust::for_each_n(thrust::host, pImpl_->vertPos_.begin(), NumVert(), warpFunc);
   pImpl_->Update();
   pImpl_->faceNormal_.resize(0);  // force recalculation of triNormal
   pImpl_->CalculateNormals();

@@ -414,17 +414,17 @@ struct Box {
   }
 };
 
-/**
- * Print the contents of this vector to standard output.
- */
-template <typename T>
-void Dump(const std::vector<T>& vec) {
-  std::cout << "Vec = " << std::endl;
-  for (int i = 0; i < vec.size(); ++i) {
-    std::cout << i << ", " << vec[i] << ", " << std::endl;
-  }
-  std::cout << std::endl;
-}
+// /**
+//  * Print the contents of this vector to standard output.
+//  */
+// template <typename T>
+// void Dump(const std::vector<T>& vec) {
+//   std::cout << "Vec = " << std::endl;
+//   for (int i = 0; i < vec.size(); ++i) {
+//     std::cout << i << ", " << vec[i] << ", " << std::endl;
+//   }
+//   std::cout << std::endl;
+// }
 
 inline std::ostream& operator<<(std::ostream& stream, const Box& box) {
   return stream << "min: " << box.min.x << ", " << box.min.y << ", "

@@ -187,7 +187,7 @@ void Manifold::Impl::Finish() {
                 "Not an even number of faces after sorting faces!");
   Halfedge extrema = {0, 0, 0, 0};
   extrema =
-      thrust::reduce(halfedge_.beginD(), halfedge_.endD(), extrema, Extrema());
+      thrust::reduce(thrust::device, halfedge_.beginD(), halfedge_.endD(), extrema, Extrema());
 
   ALWAYS_ASSERT(extrema.startVert >= 0, topologyErr,
                 "Vertex index is negative!");
@@ -210,12 +210,12 @@ void Manifold::Impl::Finish() {
  */
 void Manifold::Impl::SortVerts() {
   VecDH<uint32_t> vertMorton(NumVert());
-  thrust::for_each_n(zip(vertMorton.beginD(), vertPos_.cbeginD()), NumVert(),
+  thrust::for_each_n(thrust::device, zip(vertMorton.beginD(), vertPos_.cbeginD()), NumVert(),
                      Morton({bBox_}));
 
   VecDH<int> vertNew2Old(NumVert());
-  thrust::sequence(vertNew2Old.beginD(), vertNew2Old.endD());
-  thrust::sort_by_key(vertMorton.beginD(), vertMorton.endD(),
+  thrust::sequence(thrust::device, vertNew2Old.beginD(), vertNew2Old.endD());
+  thrust::sort_by_key(thrust::device, vertMorton.beginD(), vertMorton.endD(),
                       zip(vertPos_.beginD(), vertNew2Old.beginD()));
 
   ReindexVerts(vertNew2Old, NumVert());
@@ -223,7 +223,7 @@ void Manifold::Impl::SortVerts() {
   // Verts were flagged for removal with NaNs and assigned kNoCode to sort them
   // to the end, which allows them to be removed.
   const int newNumVert =
-      thrust::find(vertMorton.beginD(), vertMorton.endD(), kNoCode) -
+      thrust::find(thrust::device, vertMorton.beginD(), vertMorton.endD(), kNoCode) -
       vertMorton.beginD();
   vertPos_.resize(newNumVert);
 }
@@ -236,9 +236,9 @@ void Manifold::Impl::SortVerts() {
 void Manifold::Impl::ReindexVerts(const VecDH<int>& vertNew2Old,
                                   int oldNumVert) {
   VecDH<int> vertOld2New(oldNumVert);
-  thrust::scatter(countAt(0), countAt(NumVert()), vertNew2Old.beginD(),
+  thrust::scatter(thrust::device, countAt(0), countAt(NumVert()), vertNew2Old.beginD(),
                   vertOld2New.beginD());
-  thrust::for_each(halfedge_.beginD(), halfedge_.endD(),
+  thrust::for_each(thrust::device, halfedge_.beginD(), halfedge_.endD(),
                    Reindex({vertOld2New.cptrD()}));
 }
 
@@ -252,7 +252,7 @@ void Manifold::Impl::GetFaceBoxMorton(VecDH<Box>& faceBox,
   faceBox.resize(NumTri());
   faceMorton.resize(NumTri());
   thrust::for_each_n(
-      zip(faceMorton.beginD(), faceBox.beginD(), countAt(0)), NumTri(),
+      thrust::device, zip(faceMorton.beginD(), faceBox.beginD(), countAt(0)), NumTri(),
       FaceMortonBox({halfedge_.cptrD(), vertPos_.cptrD(), bBox_}));
 }
 
@@ -263,15 +263,15 @@ void Manifold::Impl::GetFaceBoxMorton(VecDH<Box>& faceBox,
 void Manifold::Impl::SortFaces(VecDH<Box>& faceBox,
                                VecDH<uint32_t>& faceMorton) {
   VecDH<int> faceNew2Old(NumTri());
-  thrust::sequence(faceNew2Old.beginD(), faceNew2Old.endD());
+  thrust::sequence(thrust::device, faceNew2Old.beginD(), faceNew2Old.endD());
 
-  thrust::sort_by_key(faceMorton.beginD(), faceMorton.endD(),
+  thrust::sort_by_key(thrust::device, faceMorton.beginD(), faceMorton.endD(),
                       zip(faceBox.beginD(), faceNew2Old.beginD()));
 
   // Tris were flagged for removal with pairedHalfedge = -1 and assigned kNoCode
   // to sort them to the end, which allows them to be removed.
   const int newNumTri =
-      thrust::find(faceMorton.beginD(), faceMorton.endD(), kNoCode) -
+      thrust::find(thrust::device, faceMorton.beginD(), faceMorton.endD(), kNoCode) -
       faceMorton.beginD();
   faceBox.resize(newNumTri);
   faceMorton.resize(newNumTri);
@@ -295,13 +295,13 @@ void Manifold::Impl::GatherFaces(const VecDH<int>& faceNew2Old) {
   VecDH<Halfedge> oldHalfedge(std::move(halfedge_));
   VecDH<glm::vec4> oldHalfedgeTangent(std::move(halfedgeTangent_));
   VecDH<int> faceOld2New(oldHalfedge.size() / 3);
-  thrust::scatter(countAt(0), countAt(numTri), faceNew2Old.beginD(),
+  thrust::scatter(thrust::device, countAt(0), countAt(numTri), faceNew2Old.beginD(),
                   faceOld2New.beginD());
 
   halfedge_.resize(3 * numTri);
   if (oldHalfedgeTangent.size() != 0) halfedgeTangent_.resize(3 * numTri);
   thrust::for_each_n(
-      countAt(0), numTri,
+      thrust::device, countAt(0), numTri,
       ReindexFace({halfedge_.ptrD(), halfedgeTangent_.ptrD(),
                    oldHalfedge.cptrD(), oldHalfedgeTangent.cptrD(),
                    faceNew2Old.cptrD(), faceOld2New.cptrD()}));
@@ -311,7 +311,7 @@ void Manifold::Impl::GatherFaces(const Impl& old,
                                  const VecDH<int>& faceNew2Old) {
   const int numTri = faceNew2Old.size();
   meshRelation_.triBary.resize(numTri);
-  thrust::gather(faceNew2Old.beginD(), faceNew2Old.endD(),
+  thrust::gather(thrust::device, faceNew2Old.beginD(), faceNew2Old.endD(),
                  old.meshRelation_.triBary.beginD(),
                  meshRelation_.triBary.beginD());
   meshRelation_.barycentric = old.meshRelation_.barycentric;
@@ -319,18 +319,18 @@ void Manifold::Impl::GatherFaces(const Impl& old,
 
   if (old.faceNormal_.size() == old.NumTri()) {
     faceNormal_.resize(numTri);
-    thrust::gather(faceNew2Old.beginD(), faceNew2Old.endD(),
+    thrust::gather(thrust::device, faceNew2Old.beginD(), faceNew2Old.endD(),
                    old.faceNormal_.beginD(), faceNormal_.beginD());
   }
 
   VecDH<int> faceOld2New(old.NumTri());
-  thrust::scatter(countAt(0), countAt(numTri), faceNew2Old.beginD(),
+  thrust::scatter(thrust::device, countAt(0), countAt(numTri), faceNew2Old.beginD(),
                   faceOld2New.beginD());
 
   halfedge_.resize(3 * numTri);
   if (old.halfedgeTangent_.size() != 0) halfedgeTangent_.resize(3 * numTri);
   thrust::for_each_n(
-      countAt(0), numTri,
+      thrust::device, countAt(0), numTri,
       ReindexFace({halfedge_.ptrD(), halfedgeTangent_.ptrD(),
                    old.halfedge_.cptrD(), old.halfedgeTangent_.cptrD(),
                    faceNew2Old.cptrD(), faceOld2New.cptrD()}));

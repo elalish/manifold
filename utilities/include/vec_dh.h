@@ -13,8 +13,8 @@
 // limitations under the License.
 
 #pragma once
-#include <thrust/device_vector.h>
-#include <thrust/host_vector.h>
+#include <iostream>
+#include <thrust/universal_vector.h>
 
 namespace manifold {
 
@@ -22,103 +22,196 @@ namespace manifold {
  *  @{
  */
 template <typename T>
-using VecH = thrust::host_vector<T>;
-
-template <typename T>
-void Dump(const VecH<T>& vec) {
-  std::cout << "VecDH = " << std::endl;
+void Dump(const std::vector<T>& vec) {
+  std::cout << "Vec = " << std::endl;
   for (int i = 0; i < vec.size(); ++i) {
     std::cout << i << ", " << vec[i] << ", " << std::endl;
   }
   std::cout << std::endl;
 }
 
+/*
+ * Host and device vector implementation. This uses `thrust::universal_vector` for
+ * storage, so data can be moved by the hardware on demand, allows using more
+ * memory than the available GPU memory, reduce memory overhead and provide
+ * speedup due to less synchronization.
+ *
+ * Due to https://github.com/NVIDIA/thrust/issues/1690 , `push_back` operations
+ * on universal vectors are *VERY* slow, so a `std::vector` is used as a cache.
+ * The cache will be created when we perform `push_back` or `reserve` operations
+ * on the `VecDH`, and destroyed when we try to access device iterator/pointer.
+ * For better performance, please avoid interspersing `push_back` between device
+ * memory accesses, as that will cause repeated synchronization and hurts
+ * performance.
+ * Note that it is *NOT SAFE* to first obtain a host(device) pointer, perform
+ * some device(host) modification, and then read the host(device) pointer again
+ * (on the same vector). The memory will be inconsistent in that case.
+ */
 template <typename T>
 class VecDH {
  public:
-  VecDH() {}
+  VecDH() {
+    impl_ = thrust::universal_vector<T>();
+  }
 
   VecDH(int size, T val = T()) {
-    device_.resize(size, val);
-    host_valid_ = false;
+    impl_.resize(size, val);
+    implModified = true;
+    cacheModified = false;
   }
 
   VecDH(const std::vector<T>& vec) {
-    host_ = vec;
-    device_valid_ = false;
+    cache = vec;
+    cacheModified = true;
+    implModified = false;
   }
 
-  int size() const { return device_valid_ ? device_.size() : host_.size(); }
+  VecDH(const VecDH<T>& other) {
+    if (!other.cacheModified) {
+      if (other.impl_.size() > 0)
+        impl_ = other.impl_;
+      else
+        impl_.clear();
+      implModified = true;
+      cacheModified = false;
+    } else {
+      cache = other.cache;
+      implModified = false;
+      cacheModified = true;
+    }
+  }
+
+  VecDH(VecDH<T>&& other) {
+    if (!other.cacheModified) {
+      if (other.impl_.size() > 0)
+        impl_ = std::move(other.impl_);
+      else
+        impl_.clear();
+      implModified = true;
+      cacheModified = false;
+    } else {
+      cache = std::move(other.cache);
+      cacheModified = true;
+      implModified = false;
+    }
+  }
+
+  VecDH<T>& operator=(const VecDH<T>& other) {
+    if (!other.cacheModified) {
+      if (other.impl_.size() > 0)
+        impl_ = other.impl_;
+      else
+        impl_.clear();
+      implModified = true;
+      cacheModified = false;
+    } else {
+      cache = other.cache;
+      cacheModified = true;
+      implModified = false;
+    }
+    return *this;
+  }
+
+  VecDH<T>& operator=(VecDH<T>&& other) {
+    if (!other.cacheModified) {
+      if (other.impl_.size() > 0)
+        impl_ = std::move(other.impl_);
+      else
+        impl_.clear();
+      implModified = true;
+      cacheModified = false;
+    } else {
+      cache = std::move(other.cache);
+      cacheModified = true;
+      implModified = false;
+    }
+    return *this;
+  }
+
+  int size() const {
+    if (!cacheModified)
+      return impl_.size();
+    return cache.size();
+  }
 
   void resize(int newSize, T val = T()) {
     bool shrink = size() > 2 * newSize;
-    if (device_valid_) {
-      device_.resize(newSize, val);
-      if (shrink) device_.shrink_to_fit();
-    }
-    if (host_valid_) {
-      host_.resize(newSize, val);
-      if (shrink) host_.shrink_to_fit();
+    if (cacheModified) {
+      cache.resize(newSize, val);
+      if (shrink) cache.shrink_to_fit();
+    } else {
+      impl_.resize(newSize, val);
+      if (shrink) impl_.shrink_to_fit();
+      implModified = true;
     }
   }
 
   void swap(VecDH<T>& other) {
-    host_.swap(other.host_);
-    device_.swap(other.device_);
-    thrust::swap(host_valid_, other.host_valid_);
-    thrust::swap(device_valid_, other.device_valid_);
+    if (!cacheModified && !other.cacheModified) {
+      implModified = true;
+      other.implModified = true;
+      impl_.swap(other.impl_);
+    } else {
+      syncCache();
+      other.syncCache();
+      cacheModified = true;
+      implModified = false;
+      other.cacheModified = true;
+      other.implModified = false;
+      cache.swap(other.cache);
+    }
   }
 
-  using IterD = typename thrust::device_vector<T>::iterator;
-  using IterH = typename thrust::host_vector<T>::iterator;
-  using IterDc = typename thrust::device_vector<T>::const_iterator;
-  using IterHc = typename thrust::host_vector<T>::const_iterator;
+  using IterD = typename thrust::universal_vector<T>::iterator;
+  using IterH = typename thrust::universal_vector<T>::iterator;
+  using IterDc = typename thrust::universal_vector<T>::const_iterator;
+  using IterHc = typename thrust::universal_vector<T>::const_iterator;
 
   IterH begin() {
-    RefreshHost();
-    device_valid_ = false;
-    return host_.begin();
+    syncImpl();
+    implModified = true;
+    return impl_.begin();
   }
 
   IterH end() {
-    RefreshHost();
-    device_valid_ = false;
-    return host_.end();
+    syncImpl();
+    implModified = true;
+    return impl_.end();
   }
 
   IterHc cbegin() const {
-    RefreshHost();
-    return host_.cbegin();
+    syncImpl();
+    return impl_.cbegin();
   }
 
   IterHc cend() const {
-    RefreshHost();
-    return host_.cend();
+    syncImpl();
+    return impl_.cend();
   }
 
   IterHc begin() const { return cbegin(); }
   IterHc end() const { return cend(); }
 
   IterD beginD() {
-    RefreshDevice();
-    host_valid_ = false;
-    return device_.begin();
+    syncImpl();
+    implModified = true;
+    return impl_.begin();
   }
 
   IterD endD() {
-    RefreshDevice();
-    host_valid_ = false;
-    return device_.end();
+    syncImpl();
+    implModified = true;
+    return impl_.end();
   }
 
   IterDc cbeginD() const {
-    RefreshDevice();
-    return device_.cbegin();
+    syncImpl();
+    return impl_.cbegin();
   }
 
   IterDc cendD() const {
-    RefreshDevice();
-    return device_.cend();
+    syncImpl();
+    return impl_.cend();
   }
 
   IterDc beginD() const { return cbeginD(); }
@@ -126,65 +219,112 @@ class VecDH {
 
   T* ptrD() {
     if (size() == 0) return nullptr;
-    RefreshDevice();
-    host_valid_ = false;
-    return device_.data().get();
+    syncImpl();
+    implModified = true;
+    return impl_.data().get();
   }
 
   const T* cptrD() const {
     if (size() == 0) return nullptr;
-    RefreshDevice();
-    return device_.data().get();
+    syncImpl();
+    return impl_.data().get();
   }
 
   const T* ptrD() const { return cptrD(); }
 
   T* ptrH() {
     if (size() == 0) return nullptr;
-    RefreshHost();
-    device_valid_ = false;
-    return host_.data();
+    if (cacheModified) {
+      return cache.data();
+    } else {
+      implModified = true;
+      return impl_.data().get();
+    }
   }
 
   const T* cptrH() const {
     if (size() == 0) return nullptr;
-    RefreshHost();
-    return host_.data();
+    if (cacheModified) {
+      return cache.data();
+    } else {
+      return impl_.data().get();
+    }
   }
 
   const T* ptrH() const { return cptrH(); }
 
-  const VecH<T>& H() const {
-    RefreshHost();
-    return host_;
+  T& operator[](int i) {
+    if (!cacheModified) {
+      implModified = true;
+      return impl_[i];
+    } else {
+      cacheModified = true;
+      return cache[i];
+    }
   }
 
-  VecH<T>& H() {
-    RefreshHost();
-    device_valid_ = false;
-    return host_;
+  const T& operator[](int i) const {
+    if (!cacheModified) {
+      return impl_[i];
+    } else {
+      return cache[i];
+    }
   }
 
-  void Dump() const { manifold::Dump(H()); }
+  T& back() {
+    if (!cacheModified) {
+      implModified = true;
+      return impl_.back();
+    } else {
+      return cache.back();
+    }
+  }
+
+  const T& back() const {
+    if (!cacheModified) {
+      return impl_.back();
+    } else {
+      return cache.back();
+    }
+  }
+
+  void push_back(const T& val) {
+    syncCache();
+    cacheModified = true;
+    cache.push_back(val);
+  }
+
+  void reserve(int n) {
+    syncCache();
+    cacheModified = true;
+    cache.reserve(n);
+  }
+
+  void Dump() const { 
+    syncCache();
+    manifold::Dump(cache);
+  }
 
  private:
-  mutable bool host_valid_ = true;
-  mutable bool device_valid_ = true;
-  mutable thrust::host_vector<T> host_;
-  mutable thrust::device_vector<T> device_;
+  mutable thrust::universal_vector<T> impl_;
 
-  void RefreshHost() const {
-    if (!host_valid_) {
-      host_ = device_;
-      host_valid_ = true;
+  mutable bool implModified = false;
+  mutable bool cacheModified = false;
+  mutable std::vector<T> cache;
+
+  void syncImpl() const {
+    if (cacheModified) {
+      impl_ = cache;
+      cache.clear();
     }
+    cacheModified = false;
   }
 
-  void RefreshDevice() const {
-    if (!device_valid_) {
-      device_ = host_;
-      device_valid_ = true;
+  void syncCache() const {
+    if (implModified) {
+      cache = std::vector<T>(impl_.begin(), impl_.end());
     }
+    implModified = false;
   }
 };
 

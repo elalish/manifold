@@ -32,19 +32,22 @@ namespace manifold {
 void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge,
                               const VecDH<BaryRef>& faceRef,
                               const VecDH<int>& halfedgeBary) {
-  VecDH<glm::ivec3> triVertsOut;
-  VecDH<glm::vec3> triNormalOut;
-
-  VecH<glm::ivec3>& triVerts = triVertsOut.H();
-  VecH<glm::vec3>& triNormal = triNormalOut.H();
-  const VecH<glm::vec3>& vertPos = vertPos_.H();
-  const VecH<int>& faceEdgeH = faceEdge.H();
-  const VecH<Halfedge>& halfedge = halfedge_.H();
-  const VecH<glm::vec3>& faceNormal = faceNormal_.H();
-  meshRelation_.triBary.resize(0);
+  VecDH<glm::ivec3> triVerts;
+  VecDH<glm::vec3> triNormal;
+  VecDH<BaryRef> &triBary = meshRelation_.triBary;
+  triBary.resize(0);
   triVerts.reserve(faceEdge.size());
   triNormal.reserve(faceEdge.size());
-  meshRelation_.triBary.H().reserve(faceEdge.size()*3);
+  triBary.reserve(faceEdge.size()*3);
+
+  const VecDH<glm::vec3>& vertPos = vertPos_;
+  const VecDH<int>& faceEdgeH = faceEdge;
+  const VecDH<Halfedge>& halfedge = halfedge_;
+  const VecDH<glm::vec3>& faceNormal = faceNormal_;
+  // meshRelation_.triBary.resize(0);
+  // std::vector<glm::ivec3> triVerts;
+  // std::vector<glm::vec3> triNormal;
+  // std::vector<BaryRef> triBary;
 
   for (int face = 0; face < faceEdgeH.size() - 1; ++face) {
     const int firstEdge = faceEdgeH[face];
@@ -79,10 +82,10 @@ void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge,
 
       triVerts.push_back(tri);
       triNormal.push_back(normal);
-      meshRelation_.triBary.H().push_back(faceRef.H()[face]);
+      triBary.push_back(faceRef[face]);
       for (int k : {0, 1, 2}) {
         int index = linearSearch(mapping, tri[k]);
-        meshRelation_.triBary.H().back().vertBary[k] = halfedgeBary.H()[firstEdge + index];
+        triBary.back().vertBary[k] = halfedgeBary[firstEdge + index];
       }
     } else if (numEdge == 4) {  // Pair of triangles
       int mapping[4] = {halfedge[firstEdge].startVert,
@@ -131,10 +134,10 @@ void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge,
       for (auto tri : { tri0, tri1 }) {
         triVerts.push_back(tri);
         triNormal.push_back(normal);
-        meshRelation_.triBary.H().push_back(faceRef.H()[face]);
+        triBary.push_back(faceRef[face]);
         for (int k : {0, 1, 2}) {
           int index = linearSearch(mapping, tri[k]);
-          meshRelation_.triBary.H().back().vertBary[k] = halfedgeBary.H()[firstEdge + index];
+          triBary.back().vertBary[k] = halfedgeBary[firstEdge + index];
         }
       }
     } else {  // General triangulation
@@ -142,7 +145,7 @@ void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge,
 
       std::map<int, int> vertBary;
       for (int j = firstEdge; j < lastEdge; ++j)
-        vertBary[halfedge[j].startVert] = halfedgeBary.H()[j];
+        vertBary[halfedge[j].startVert] = halfedgeBary[j];
 
       Polygons polys;
       try {
@@ -160,16 +163,16 @@ void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge,
       for (auto tri : newTris) {
         triVerts.push_back(tri);
         triNormal.push_back(normal);
-        meshRelation_.triBary.H().push_back(faceRef.H()[face]);
+        triBary.push_back(faceRef[face]);
         for (int k : {0, 1, 2}) {
-          meshRelation_.triBary.H().back().vertBary[k] =
+          triBary.back().vertBary[k] =
               vertBary[tri[k]];
         }
       }
     }
   }
-  faceNormal_ = std::move(triNormalOut);
-  CreateAndFixHalfedges(triVertsOut);
+  faceNormal_ = std::move(triNormal);
+  CreateAndFixHalfedges(triVerts);
 }
 
 /**
@@ -177,9 +180,9 @@ void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge,
  * projection of the vertices.
  */
 Polygons Manifold::Impl::Face2Polygons(int face, glm::mat3x2 projection,
-                                       const VecH<int>& faceEdge) const {
-  const VecH<glm::vec3>& vertPos = vertPos_.H();
-  const VecH<Halfedge>& halfedge = halfedge_.H();
+                                       const VecDH<int>& faceEdge) const {
+  const VecDH<glm::vec3>& vertPos = vertPos_;
+  const VecDH<Halfedge>& halfedge = halfedge_;
   const int firstEdge = faceEdge[face];
   const int lastEdge = faceEdge[face + 1];
 
