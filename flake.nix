@@ -40,6 +40,7 @@
               clang-tools
               clang_13
               emscripten
+              tbb
             ] ++ additional;
           };
         in
