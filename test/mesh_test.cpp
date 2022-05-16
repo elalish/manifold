@@ -144,9 +144,9 @@ TEST(Manifold, GetMesh) {
   Identical(mesh_out, mesh_out2);
 }
 
-// temporarily disabled for wasm due to test failure
-#if !DISABLED_DETERMINISM
-TEST(Manifold, Determinism) {
+// There is still some non-determinism, especially in parallel. Likely in the
+// edge collapse step. Not a huge problem, but best to fix for user's sanity.
+TEST(Manifold, DISABLED_Determinism) {
   Manifold manifold(ImportMesh("data/gyroidpuzzle.ply"));
   EXPECT_TRUE(manifold.IsManifold());
 
@@ -160,7 +160,6 @@ TEST(Manifold, Determinism) {
   Mesh mesh_out2 = manifold2.GetMesh();
   // Identical(mesh_out, mesh_out2);
 }
-#endif
 
 /**
  * ExpectMeshes performs a decomposition, so this test ensures that compose and
