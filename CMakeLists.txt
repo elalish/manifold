@@ -19,7 +19,6 @@ if(EMSCRIPTEN)
 endif()
 
 option(BUILD_TEST_CGAL off)
-set(DISABLED_DETERMINISM 1)
 
 option(BUILD_SHARED_LIBS off)
 set(GLM_INC_DIR ${PROJECT_SOURCE_DIR}/third_party/glm)
@@ -31,9 +30,9 @@ if(NOT THRUST_BACKEND STREQUAL "CUDA" AND NOT THRUST_BACKEND STREQUAL "OMP" AND 
 endif()
 
 if(MSVC)
-    set(MANIFOLD_FLAGS /DDISABLED_DETERMINISM=${DISABLED_DETERMINISM})
+    set(MANIFOLD_FLAGS)
 else()
-    set(MANIFOLD_FLAGS -Werror -Wall -Wno-sign-compare -Wno-unused -DDISABLED_DETERMINISM=${DISABLED_DETERMINISM})
+    set(MANIFOLD_FLAGS -Werror -Wall -Wno-sign-compare -Wno-unused)
 endif()
 set(MANIFOLD_NVCC_FLAGS -Xcudafe --diag_suppress=esa_on_defaulted_function_ignored --extended-lambda)
 set(MANIFOLD_NVCC_RELEASE_FLAGS -O3)
