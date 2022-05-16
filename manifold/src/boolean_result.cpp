@@ -14,7 +14,6 @@
 
 #include <algorithm>
 #include <map>
-#include <thrust/execution_policy.h>
 
 #include "boolean3.h"
 #include "polygon.h"
@@ -84,46 +83,46 @@ std::tuple<VecDH<int>, VecDH<int>> SizeOutput(
   auto sidesPerFaceP = sidesPerFacePQ.ptrD();
   auto sidesPerFaceQ = sidesPerFacePQ.ptrD() + inP.NumTri();
 
-  thrust::for_each(thrust::device, inP.halfedge_.beginD(), inP.halfedge_.endD(),
+  thrust::for_each(thrust::device, inP.halfedge_.begin(), inP.halfedge_.end(),
                    CountVerts({sidesPerFaceP, i03.cptrD()}));
-  thrust::for_each(thrust::device, inQ.halfedge_.beginD(), inQ.halfedge_.endD(),
+  thrust::for_each(thrust::device, inQ.halfedge_.begin(), inQ.halfedge_.end(),
                    CountVerts({sidesPerFaceQ, i30.cptrD()}));
   thrust::for_each_n(
-      thrust::device, zip(p1q2.beginD(0), p1q2.beginD(1), i12.beginD()), i12.size(),
+      thrust::device, zip(p1q2.begin(0), p1q2.begin(1), i12.begin()), i12.size(),
       CountNewVerts({sidesPerFaceP, sidesPerFaceQ, inP.halfedge_.cptrD()}));
   thrust::for_each_n(
-      thrust::device, zip(p2q1.beginD(1), p2q1.beginD(0), i21.beginD()), i21.size(),
+      thrust::device, zip(p2q1.begin(1), p2q1.begin(0), i21.begin()), i21.size(),
       CountNewVerts({sidesPerFaceQ, sidesPerFaceP, inQ.halfedge_.cptrD()}));
 
   VecDH<int> facePQ2R(inP.NumTri() + inQ.NumTri() + 1);
   auto keepFace =
-      thrust::make_transform_iterator(sidesPerFacePQ.beginD(), NotZero());
+      thrust::make_transform_iterator(sidesPerFacePQ.begin(), NotZero());
   thrust::inclusive_scan(thrust::device, keepFace, keepFace + sidesPerFacePQ.size(),
-                         facePQ2R.beginD() + 1);
+                         facePQ2R.begin() + 1);
   int numFaceR = facePQ2R.back();
   facePQ2R.resize(inP.NumTri() + inQ.NumTri());
 
   outR.faceNormal_.resize(numFaceR);
-  auto next = thrust::copy_if(thrust::device, inP.faceNormal_.beginD(), inP.faceNormal_.endD(),
-                              keepFace, outR.faceNormal_.beginD(),
+  auto next = thrust::copy_if(thrust::device, inP.faceNormal_.begin(), inP.faceNormal_.end(),
+                              keepFace, outR.faceNormal_.begin(),
                               thrust::identity<bool>());
   if (invertQ) {
-    auto start = thrust::make_transform_iterator(inQ.faceNormal_.beginD(),
+    auto start = thrust::make_transform_iterator(inQ.faceNormal_.begin(),
                                                  thrust::negate<glm::vec3>());
-    auto end = thrust::make_transform_iterator(inQ.faceNormal_.endD(),
+    auto end = thrust::make_transform_iterator(inQ.faceNormal_.end(),
                                                thrust::negate<glm::vec3>());
     thrust::copy_if(thrust::device, start, end, keepFace + inP.NumTri(), next,
                     thrust::identity<bool>());
   } else {
-    thrust::copy_if(thrust::device, inQ.faceNormal_.beginD(), inQ.faceNormal_.endD(),
+    thrust::copy_if(thrust::device, inQ.faceNormal_.begin(), inQ.faceNormal_.end(),
                     keepFace + inP.NumTri(), next, thrust::identity<bool>());
   }
 
   auto newEnd =
-      thrust::remove(thrust::device, sidesPerFacePQ.beginD(), sidesPerFacePQ.endD(), 0);
-  VecDH<int> faceEdge(newEnd - sidesPerFacePQ.beginD() + 1);
-  thrust::inclusive_scan(thrust::device, sidesPerFacePQ.beginD(), newEnd,
-                         faceEdge.beginD() + 1);
+      thrust::remove(thrust::device, sidesPerFacePQ.begin(), sidesPerFacePQ.end(), 0);
+  VecDH<int> faceEdge(newEnd - sidesPerFacePQ.begin() + 1);
+  thrust::inclusive_scan(thrust::device, sidesPerFacePQ.begin(), newEnd,
+                         faceEdge.begin() + 1);
   outR.halfedge_.resize(faceEdge.back());
 
   return std::make_tuple(faceEdge, facePQ2R);
@@ -212,7 +211,7 @@ void AppendPartialEdges(Manifold::Impl &outR, VecDH<char> &wholeHalfedgeP,
                         std::map<int, std::vector<EdgePos>> &edgesP,
                         VecDH<Ref> &halfedgeRef, const Manifold::Impl &inP,
                         const VecDH<int> &i03, const VecDH<int> &vP2R,
-                        const VecDH<int>::IterHc faceP2R,
+                        const VecDH<int>::IterC faceP2R,
                         bool forward) {
   // Each edge in the map is partially retained; for each of these, look up
   // their original verts and include them based on their winding number (i03),
@@ -407,7 +406,7 @@ void AppendWholeEdges(Manifold::Impl &outR, VecDH<int> &facePtrR,
                       const VecDH<int> &vP2R, const int *faceP2R,
                       bool forward) {
   thrust::for_each_n(
-      thrust::device, zip(wholeHalfedgeP.beginD(), inP.halfedge_.beginD(), countAt(0)),
+      thrust::device, zip(wholeHalfedgeP.begin(), inP.halfedge_.begin(), countAt(0)),
       inP.halfedge_.size(),
       DuplicateHalfedges({outR.halfedge_.ptrD(), halfedgeRef.ptrD(),
                           facePtrR.ptrD(), inP.halfedge_.cptrD(), i03.cptrD(),
@@ -483,8 +482,8 @@ std::pair<VecDH<BaryRef>, VecDH<int>> CalculateMeshRelation(
   VecDH<int> halfedgeBary(halfedgeRef.size());
   VecDH<int> idx(1, 0);
   thrust::for_each_n(
-      thrust::device, zip(halfedgeBary.beginD(), halfedgeRef.beginD(),
-          outR.halfedge_.cbeginD()),
+      thrust::device, zip(halfedgeBary.begin(), halfedgeRef.begin(),
+          outR.halfedge_.cbegin()),
       halfedgeRef.size(),
       CreateBarycentric(
           {outR.meshRelation_.barycentric.ptrD(), faceRef.ptrD(), idx.ptrD(),
@@ -551,25 +550,25 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
   VecDH<int> i21(x21_.size());
   VecDH<int> i03(w03_.size());
   VecDH<int> i30(w30_.size());
-  thrust::transform(thrust::device, x12_.beginD(), x12_.endD(), i12.beginD(), c3 * _1);
-  thrust::transform(thrust::device, x21_.beginD(), x21_.endD(), i21.beginD(), c3 * _1);
-  thrust::transform(thrust::device, w03_.beginD(), w03_.endD(), i03.beginD(), c1 + c3 * _1);
-  thrust::transform(thrust::device, w30_.beginD(), w30_.endD(), i30.beginD(), c2 + c3 * _1);
+  thrust::transform(thrust::device, x12_.begin(), x12_.end(), i12.begin(), c3 * _1);
+  thrust::transform(thrust::device, x21_.begin(), x21_.end(), i21.begin(), c3 * _1);
+  thrust::transform(thrust::device, w03_.begin(), w03_.end(), i03.begin(), c1 + c3 * _1);
+  thrust::transform(thrust::device, w30_.begin(), w30_.end(), i30.begin(), c2 + c3 * _1);
 
   VecDH<int> vP2R(inP_.NumVert());
-  thrust::exclusive_scan(thrust::device, i03.beginD(), i03.endD(), vP2R.beginD(), 0, AbsSum());
+  thrust::exclusive_scan(thrust::device, i03.begin(), i03.end(), vP2R.begin(), 0, AbsSum());
   int numVertR = AbsSum()(vP2R.back(), i03.back());
   const int nPv = numVertR;
 
   VecDH<int> vQ2R(inQ_.NumVert());
-  thrust::exclusive_scan(thrust::device, i30.beginD(), i30.endD(), vQ2R.beginD(), numVertR,
+  thrust::exclusive_scan(thrust::device, i30.begin(), i30.end(), vQ2R.begin(), numVertR,
                          AbsSum());
   numVertR = AbsSum()(vQ2R.back(), i30.back());
   const int nQv = numVertR - nPv;
 
   VecDH<int> v12R(v12_.size());
   if (v12_.size() > 0) {
-    thrust::exclusive_scan(thrust::device, i12.beginD(), i12.endD(), v12R.beginD(), numVertR,
+    thrust::exclusive_scan(thrust::device, i12.begin(), i12.end(), v12R.begin(), numVertR,
                            AbsSum());
     numVertR = AbsSum()(v12R.back(), i12.back());
   }
@@ -577,7 +576,7 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
 
   VecDH<int> v21R(v21_.size());
   if (v21_.size() > 0) {
-    thrust::exclusive_scan(thrust::device, i21.beginD(), i21.endD(), v21R.beginD(), numVertR,
+    thrust::exclusive_scan(thrust::device, i21.begin(), i21.end(), v21R.begin(), numVertR,
                            AbsSum());
     numVertR = AbsSum()(v21R.back(), i21.back());
   }
@@ -593,14 +592,14 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
   outR.vertPos_.resize(numVertR);
   // Add vertices, duplicating for inclusion numbers not in [-1, 1].
   // Retained vertices from P and Q:
-  thrust::for_each_n(thrust::device, zip(i03.beginD(), vP2R.beginD(), inP_.vertPos_.beginD()),
+  thrust::for_each_n(thrust::device, zip(i03.begin(), vP2R.begin(), inP_.vertPos_.begin()),
                      inP_.NumVert(), DuplicateVerts({outR.vertPos_.ptrD()}));
-  thrust::for_each_n(thrust::device, zip(i30.beginD(), vQ2R.beginD(), inQ_.vertPos_.beginD()),
+  thrust::for_each_n(thrust::device, zip(i30.begin(), vQ2R.begin(), inQ_.vertPos_.begin()),
                      inQ_.NumVert(), DuplicateVerts({outR.vertPos_.ptrD()}));
   // New vertices created from intersections:
-  thrust::for_each_n(thrust::device, zip(i12.beginD(), v12R.beginD(), v12_.beginD()),
+  thrust::for_each_n(thrust::device, zip(i12.begin(), v12R.begin(), v12_.begin()),
                      i12.size(), DuplicateVerts({outR.vertPos_.ptrD()}));
-  thrust::for_each_n(thrust::device, zip(i21.beginD(), v21R.beginD(), v21_.beginD()),
+  thrust::for_each_n(thrust::device, zip(i21.begin(), v21R.begin(), v21_.begin()),
                      i21.size(), DuplicateVerts({outR.vertPos_.ptrD()}));
 
   if (kVerbose) {

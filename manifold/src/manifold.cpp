@@ -14,7 +14,6 @@
 
 #include "boolean3.h"
 #include "impl.h"
-#include <thrust/execution_policy.h>
 
 namespace {
 using namespace manifold;
@@ -289,11 +288,11 @@ MeshRelation Manifold::GetMeshRelation() const {
 std::vector<int> Manifold::GetMeshIDs() const {
   VecDH<int> meshIDs(NumTri());
   thrust::for_each_n(
-      thrust::device, zip(meshIDs.beginD(), pImpl_->meshRelation_.triBary.beginD()), NumTri(),
+      thrust::device, zip(meshIDs.begin(), pImpl_->meshRelation_.triBary.begin()), NumTri(),
       GetMeshID());
 
-  thrust::sort(thrust::device, meshIDs.beginD(), meshIDs.endD());
-  int n = thrust::unique(thrust::device, meshIDs.beginD(), meshIDs.endD()) - meshIDs.beginD();
+  thrust::sort(thrust::device, meshIDs.begin(), meshIDs.end());
+  int n = thrust::unique(thrust::device, meshIDs.begin(), meshIDs.end()) - meshIDs.begin();
   meshIDs.resize(n);
 
   std::vector<int> out;

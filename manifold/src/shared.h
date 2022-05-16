@@ -14,6 +14,9 @@
 
 #pragma once
 
+#include <thrust/remove.h>
+#include <glm/gtx/compatibility.hpp>
+#include "utils.h"
 #include "vec_dh.h"
 
 namespace manifold {
@@ -23,7 +26,7 @@ namespace manifold {
  */
 __host__ __device__ inline glm::vec3 SafeNormalize(glm::vec3 v) {
   v = glm::normalize(v);
-  return isfinite(v.x) ? v : glm::vec3(0);
+  return glm::isfinite(v.x) ? v : glm::vec3(0);
 }
 
 __host__ __device__ inline int NextHalfedge(int current) {
@@ -146,10 +149,10 @@ struct TmpInvalid {
 
 VecDH<TmpEdge> inline CreateTmpEdges(const VecDH<Halfedge>& halfedge) {
   VecDH<TmpEdge> edges(halfedge.size());
-  thrust::for_each_n(thrust::device, zip(edges.beginD(), halfedge.beginD(), countAt(0)),
+  thrust::for_each_n(thrust::device, zip(edges.begin(), halfedge.begin(), countAt(0)),
                      edges.size(), Halfedge2Tmp());
-  int numEdge = thrust::remove_if(thrust::device, edges.beginD(), edges.endD(), TmpInvalid()) -
-                edges.beginD();
+  int numEdge = thrust::remove_if(thrust::device, edges.begin(), edges.end(), TmpInvalid()) -
+                edges.begin();
   ALWAYS_ASSERT(numEdge == halfedge.size() / 2, topologyErr, "Not oriented!");
   edges.resize(numEdge);
   return edges;
