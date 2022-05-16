@@ -22,15 +22,13 @@ jobs:
     - name: Install dependencies
       run: |
         apt-get -y update
-        DEBIAN_FRONTEND=noninteractive apt install -y libomp-dev git
+        DEBIAN_FRONTEND=noninteractive apt install -y libomp-dev libassimp-dev git
     - uses: actions/checkout@v3
       with:
         submodules: true
     - uses: jwlawson/actions-setup-cmake@v1.12
     - name: Build ${{matrix.backend}}
       run: |
-        # patch assimp
-        patch third_party/assimp/code/CMakeLists.txt < assimp.diff
         mkdir build
         cd build
         cmake -DCMAKE_BUILD_TYPE=Release -DTHRUST_BACKEND=${{matrix.backend}} .. && make
@@ -46,7 +44,7 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt-get -y update
-        DEBIAN_FRONTEND=noninteractive sudo apt install -y python3 nodejs
+        DEBIAN_FRONTEND=noninteractive sudo apt install -y python3 nodejs libassimp-dev
     - uses: actions/checkout@v3
       with:
         submodules: true
@@ -61,8 +59,6 @@ jobs:
     - name: Build WASM
       run: |
         source ./emsdk/emsdk_env.sh
-        # patch assimp
-        patch third_party/assimp/code/CMakeLists.txt < assimp.diff
         mkdir build
         cd build
         emcmake cmake -DCMAKE_BUILD_TYPE=Release .. && emmake make
@@ -83,9 +79,6 @@ jobs:
       with:
         submodules: true
     - uses: jwlawson/actions-setup-cmake@v1.12
-    - name: Patch assimp
-      shell: bash
-      run: patch third_party/assimp/code/CMakeLists.txt < assimp.diff
     - uses: ilammy/msvc-dev-cmd@v1
     - name: Install CUDA
       if: matrix.backend == 'CUDA'

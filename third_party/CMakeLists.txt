@@ -1,13 +1,6 @@
 add_subdirectory(graphlite)
 
 ############################################################################
-#                         BUILD ASSIMP LIBRARY                             #
-############################################################################
-option(ASSIMP_BUILD_ASSIMP_TOOLS off)
-option(ASSIMP_BUILD_TESTS off)
-add_subdirectory(assimp)
-
-############################################################################
 #                           Build Google Test                              #
 ############################################################################
 # Prevent overriding the parent project's compiler/linker
