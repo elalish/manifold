@@ -22,9 +22,6 @@ option(BUILD_TEST_CGAL off)
 set(DISABLED_DETERMINISM 1)
 
 option(BUILD_SHARED_LIBS off)
-set(ASSIMP_INC_DIR 
-    ${PROJECT_SOURCE_DIR}/third_party/assimp/include
-    ${CMAKE_BINARY_DIR}/third_party/assimp/include)
 set(GLM_INC_DIR ${PROJECT_SOURCE_DIR}/third_party/glm)
 
 set_property(CACHE THRUST_BACKEND PROPERTY STRINGS CUDA OMP CPP)
