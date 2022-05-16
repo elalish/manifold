@@ -15,7 +15,6 @@
             pname = "manifold-${backend}";
             version = "beta";
             src = self;
-            patches = [ ./assimp.diff ];
             nativeBuildInputs = (with pkgs; [ cmake python38 ]) ++ build-tools;
             buildInputs = runtime;
             cmakeFlags = [ "-DTHRUST_BACKEND=${backend}" ];
@@ -40,6 +39,7 @@
               clang-tools
               clang_13
               emscripten
+              assimp
             ] ++ additional;
           };
         in
@@ -57,7 +57,6 @@
             name = "manifold-js";
             version = "beta";
             src = self;
-            patches = [ ./assimp.diff ];
             nativeBuildInputs = (with pkgs; [ cmake python38 ]);
             buildInputs = [ pkgs.nodejs ];
             configurePhase = ''
