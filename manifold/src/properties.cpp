@@ -13,7 +13,6 @@
 // limitations under the License.
 
 #include <thrust/count.h>
-#include <thrust/execution_policy.h>
 #include <thrust/logical.h>
 #include <thrust/transform_reduce.h>
 #include <limits>
@@ -219,7 +218,7 @@ bool Manifold::Impl::IsManifold() const {
                                    CheckManifold({halfedge_.cptrD()}));
 
   VecDH<Halfedge> halfedge(halfedge_);
-  thrust::sort(thrust::device, halfedge.beginD(), halfedge.endD());
+  thrust::sort(thrust::device, halfedge.begin(), halfedge.end());
   isManifold &= thrust::all_of(thrust::device, countAt(0), countAt(2 * NumEdge() - 1),
                                NoDuplicates({halfedge.cptrD()}));
   return isManifold;
@@ -269,20 +268,20 @@ Curvature Manifold::Impl::GetCurvature() const {
                        vertArea.ptrD(), degree.ptrD(), halfedge_.cptrD(),
                        vertPos_.cptrD(), faceNormal_.cptrD()}));
   thrust::for_each_n(
-      thrust::device, zip(vertMeanCurvature.beginD(), vertGaussianCurvature.beginD(),
-          vertArea.beginD(), degree.beginD()),
+      thrust::device, zip(vertMeanCurvature.begin(), vertGaussianCurvature.begin(),
+          vertArea.begin(), degree.begin()),
       NumVert(), NormalizeCurvature());
   result.minMeanCurvature =
-      thrust::reduce(thrust::device, vertMeanCurvature.beginD(), vertMeanCurvature.endD(),
+      thrust::reduce(thrust::device, vertMeanCurvature.begin(), vertMeanCurvature.end(),
                      std::numeric_limits<float>::infinity(), thrust::minimum<float>());
   result.maxMeanCurvature =
-      thrust::reduce(thrust::device, vertMeanCurvature.beginD(), vertMeanCurvature.endD(),
+      thrust::reduce(thrust::device, vertMeanCurvature.begin(), vertMeanCurvature.end(),
                      -std::numeric_limits<float>::infinity(), thrust::maximum<float>());
   result.minGaussianCurvature = thrust::reduce(
-      thrust::device, vertGaussianCurvature.beginD(), vertGaussianCurvature.endD(), std::numeric_limits<float>::infinity(),
+      thrust::device, vertGaussianCurvature.begin(), vertGaussianCurvature.end(), std::numeric_limits<float>::infinity(),
       thrust::minimum<float>());
   result.maxGaussianCurvature = thrust::reduce(
-      thrust::device, vertGaussianCurvature.beginD(), vertGaussianCurvature.endD(),
+      thrust::device, vertGaussianCurvature.begin(), vertGaussianCurvature.end(),
       -std::numeric_limits<float>::infinity(), thrust::maximum<float>());
   result.vertMeanCurvature.insert(result.vertMeanCurvature.end(),
                                   vertMeanCurvature.begin(),
@@ -299,9 +298,9 @@ Curvature Manifold::Impl::GetCurvature() const {
  * range for Morton code calculation.
  */
 void Manifold::Impl::CalculateBBox() {
-  bBox_.min = thrust::reduce(thrust::device, vertPos_.beginD(), vertPos_.endD(),
+  bBox_.min = thrust::reduce(thrust::device, vertPos_.begin(), vertPos_.end(),
                              glm::vec3(std::numeric_limits<float>::infinity()), PosMin());
-  bBox_.max = thrust::reduce(thrust::device, vertPos_.beginD(), vertPos_.endD(),
+  bBox_.max = thrust::reduce(thrust::device, vertPos_.begin(), vertPos_.end(),
                              glm::vec3(-std::numeric_limits<float>::infinity()), PosMax());
 }
 }  // namespace manifold

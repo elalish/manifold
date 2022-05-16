@@ -15,20 +15,10 @@
 #pragma once
 #include <iostream>
 #include <thrust/universal_vector.h>
+#include <thrust/execution_policy.h>
+#include "structs.h"
 
 namespace manifold {
-
-/** @addtogroup Private
- *  @{
- */
-template <typename T>
-void Dump(const std::vector<T>& vec) {
-  std::cout << "Vec = " << std::endl;
-  for (int i = 0; i < vec.size(); ++i) {
-    std::cout << i << ", " << vec[i] << ", " << std::endl;
-  }
-  std::cout << std::endl;
-}
 
 /*
  * Host and device vector implementation. This uses `thrust::universal_vector` for
@@ -162,60 +152,33 @@ class VecDH {
     }
   }
 
-  using IterD = typename thrust::universal_vector<T>::iterator;
-  using IterH = typename thrust::universal_vector<T>::iterator;
-  using IterDc = typename thrust::universal_vector<T>::const_iterator;
-  using IterHc = typename thrust::universal_vector<T>::const_iterator;
+  using Iter = typename thrust::universal_vector<T>::iterator;
+  using IterC = typename thrust::universal_vector<T>::const_iterator;
 
-  IterH begin() {
+  Iter begin() {
     syncImpl();
     implModified = true;
     return impl_.begin();
   }
 
-  IterH end() {
+  Iter end() {
     syncImpl();
     implModified = true;
     return impl_.end();
   }
 
-  IterHc cbegin() const {
+  IterC cbegin() const {
     syncImpl();
     return impl_.cbegin();
   }
 
-  IterHc cend() const {
+  IterC cend() const {
     syncImpl();
     return impl_.cend();
   }
 
-  IterHc begin() const { return cbegin(); }
-  IterHc end() const { return cend(); }
-
-  IterD beginD() {
-    syncImpl();
-    implModified = true;
-    return impl_.begin();
-  }
-
-  IterD endD() {
-    syncImpl();
-    implModified = true;
-    return impl_.end();
-  }
-
-  IterDc cbeginD() const {
-    syncImpl();
-    return impl_.cbegin();
-  }
-
-  IterDc cendD() const {
-    syncImpl();
-    return impl_.cend();
-  }
-
-  IterDc beginD() const { return cbeginD(); }
-  IterDc endD() const { return cendD(); }
+  IterC begin() const { return cbegin(); }
+  IterC end() const { return cend(); }
 
   T* ptrD() {
     if (size() == 0) return nullptr;

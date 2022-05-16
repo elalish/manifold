@@ -274,7 +274,7 @@ SparseIndices Collider::Collisions(const VecDH<T>& querriesIn) const {
     VecDH<int> nOverlapsD(1, 0);
     // calculate Bounding Box overlaps
     thrust::for_each_n(
-        thrust::device, zip(querriesIn.cbeginD(), countAt(0)), querriesIn.size(),
+        thrust::device, zip(querriesIn.cbegin(), countAt(0)), querriesIn.size(),
         FindCollisions<T>({querryTri.ptrDpq(), nOverlapsD.ptrD(), maxOverlaps,
                            nodeBBox_.ptrD(), internalChildren_.ptrD()}));
     nOverlaps = nOverlapsD[0];
@@ -303,12 +303,12 @@ void Collider::UpdateBoxes(const VecDH<Box>& leafBB) {
   ALWAYS_ASSERT(leafBB.size() == NumLeaves(), userErr,
                 "must have the same number of updated boxes as original");
   // copy in leaf node Boxs
-  strided_range<VecDH<Box>::IterD> leaves(nodeBBox_.beginD(), nodeBBox_.endD(),
+  strided_range<VecDH<Box>::Iter> leaves(nodeBBox_.begin(), nodeBBox_.end(),
                                           2);
-  thrust::copy(thrust::device, leafBB.cbeginD(), leafBB.cendD(), leaves.begin());
+  thrust::copy(thrust::device, leafBB.cbegin(), leafBB.cend(), leaves.begin());
   // create global counters
   VecDH<int> counter(NumInternal());
-  thrust::fill(thrust::device, counter.beginD(), counter.endD(), 0);
+  thrust::fill(thrust::device, counter.begin(), counter.end(), 0);
   // kernel over leaves to save internal Boxs
   thrust::for_each_n(
       thrust::device, countAt(0), NumLeaves(),
@@ -330,7 +330,7 @@ bool Collider::Transform(glm::mat4x3 transform) {
     if (count != 2) axisAligned = false;
   }
   if (axisAligned) {
-    thrust::for_each(thrust::device, nodeBBox_.beginD(), nodeBBox_.endD(),
+    thrust::for_each(thrust::device, nodeBBox_.begin(), nodeBBox_.end(),
                      TransformBox({transform}));
   }
   return axisAligned;
