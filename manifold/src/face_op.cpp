@@ -32,26 +32,20 @@ namespace manifold {
 void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge,
                               const VecDH<BaryRef>& faceRef,
                               const VecDH<int>& halfedgeBary) {
-  VecDH<glm::ivec3> triVertsOut;
-  VecDH<glm::vec3> triNormalOut;
-
-  VecH<glm::ivec3>& triVerts = triVertsOut.H();
-  VecH<glm::vec3>& triNormal = triNormalOut.H();
-  const VecH<glm::vec3>& vertPos = vertPos_.H();
-  const VecH<int>& faceEdgeH = faceEdge.H();
-  const VecH<Halfedge>& halfedge = halfedge_.H();
-  const VecH<glm::vec3>& faceNormal = faceNormal_.H();
-  meshRelation_.triBary.resize(0);
+  VecDH<glm::ivec3> triVerts;
+  VecDH<glm::vec3> triNormal;
+  VecDH<BaryRef> &triBary = meshRelation_.triBary;
+  triBary.resize(0);
   triVerts.reserve(faceEdge.size());
   triNormal.reserve(faceEdge.size());
-  meshRelation_.triBary.H().reserve(faceEdge.size()*3);
+  triBary.reserve(faceEdge.size()*3);
 
-  for (int face = 0; face < faceEdgeH.size() - 1; ++face) {
-    const int firstEdge = faceEdgeH[face];
-    const int lastEdge = faceEdgeH[face + 1];
+  for (int face = 0; face < faceEdge.size() - 1; ++face) {
+    const int firstEdge = faceEdge[face];
+    const int lastEdge = faceEdge[face + 1];
     const int numEdge = lastEdge - firstEdge;
     ALWAYS_ASSERT(numEdge >= 3, topologyErr, "face has less than three edges.");
-    const glm::vec3 normal = faceNormal[face];
+    const glm::vec3 normal = faceNormal_[face];
 
     auto linearSearch = [](const int* mapping, int value) {
       int i = 0;
@@ -61,15 +55,15 @@ void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge,
     };
 
     if (numEdge == 3) {  // Single triangle
-      int mapping[3] = {halfedge[firstEdge].startVert,
-                        halfedge[firstEdge + 1].startVert,
-                        halfedge[firstEdge + 2].startVert};
-      glm::ivec3 tri(halfedge[firstEdge].startVert,
-                     halfedge[firstEdge + 1].startVert,
-                     halfedge[firstEdge + 2].startVert);
-      glm::ivec3 ends(halfedge[firstEdge].endVert,
-                      halfedge[firstEdge + 1].endVert,
-                      halfedge[firstEdge + 2].endVert);
+      int mapping[3] = {halfedge_[firstEdge].startVert,
+                        halfedge_[firstEdge + 1].startVert,
+                        halfedge_[firstEdge + 2].startVert};
+      glm::ivec3 tri(halfedge_[firstEdge].startVert,
+                     halfedge_[firstEdge + 1].startVert,
+                     halfedge_[firstEdge + 2].startVert);
+      glm::ivec3 ends(halfedge_[firstEdge].endVert,
+                      halfedge_[firstEdge + 1].endVert,
+                      halfedge_[firstEdge + 2].endVert);
       if (ends[0] == tri[2]) {
         std::swap(tri[1], tri[2]);
         std::swap(ends[1], ends[2]);
@@ -79,32 +73,32 @@ void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge,
 
       triVerts.push_back(tri);
       triNormal.push_back(normal);
-      meshRelation_.triBary.H().push_back(faceRef.H()[face]);
+      triBary.push_back(faceRef[face]);
       for (int k : {0, 1, 2}) {
         int index = linearSearch(mapping, tri[k]);
-        meshRelation_.triBary.H().back().vertBary[k] = halfedgeBary.H()[firstEdge + index];
+        triBary.back().vertBary[k] = halfedgeBary[firstEdge + index];
       }
     } else if (numEdge == 4) {  // Pair of triangles
-      int mapping[4] = {halfedge[firstEdge].startVert,
-                        halfedge[firstEdge + 1].startVert,
-                        halfedge[firstEdge + 2].startVert,
-                        halfedge[firstEdge + 3].startVert};
+      int mapping[4] = {halfedge_[firstEdge].startVert,
+                        halfedge_[firstEdge + 1].startVert,
+                        halfedge_[firstEdge + 2].startVert,
+                        halfedge_[firstEdge + 3].startVert};
       const glm::mat3x2 projection = GetAxisAlignedProjection(normal);
-      auto triCCW = [&projection, &vertPos, this](const glm::ivec3 tri) {
-        return CCW(projection * vertPos[tri[0]], projection * vertPos[tri[1]],
-                   projection * vertPos[tri[2]], precision_) >= 0;
+      auto triCCW = [&projection, this](const glm::ivec3 tri) {
+        return CCW(projection * this->vertPos_[tri[0]], projection * this->vertPos_[tri[1]],
+                   projection * this->vertPos_[tri[2]], precision_) >= 0;
       };
 
-      glm::ivec3 tri0(halfedge[firstEdge].startVert,
-                      halfedge[firstEdge].endVert, -1);
+      glm::ivec3 tri0(halfedge_[firstEdge].startVert,
+                      halfedge_[firstEdge].endVert, -1);
       glm::ivec3 tri1(-1, -1, tri0[0]);
       for (const int i : {1, 2, 3}) {
-        if (halfedge[firstEdge + i].startVert == tri0[1]) {
-          tri0[2] = halfedge[firstEdge + i].endVert;
+        if (halfedge_[firstEdge + i].startVert == tri0[1]) {
+          tri0[2] = halfedge_[firstEdge + i].endVert;
           tri1[0] = tri0[2];
         }
-        if (halfedge[firstEdge + i].endVert == tri0[0]) {
-          tri1[1] = halfedge[firstEdge + i].startVert;
+        if (halfedge_[firstEdge + i].endVert == tri0[0]) {
+          tri1[1] = halfedge_[firstEdge + i].startVert;
         }
       }
       ALWAYS_ASSERT(glm::all(glm::greaterThanEqual(tri0, glm::ivec3(0))) &&
@@ -119,8 +113,8 @@ void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge,
         tri0[2] = tri1[0];
         tri1[2] = tri0[0];
       } else if (firstValid) {
-        glm::vec3 firstCross = vertPos[tri0[0]] - vertPos[tri1[0]];
-        glm::vec3 secondCross = vertPos[tri0[1]] - vertPos[tri1[1]];
+        glm::vec3 firstCross = vertPos_[tri0[0]] - vertPos_[tri1[0]];
+        glm::vec3 secondCross = vertPos_[tri0[1]] - vertPos_[tri1[1]];
         if (glm::dot(firstCross, firstCross) <
             glm::dot(secondCross, secondCross)) {
           tri0[2] = tri1[0];
@@ -131,10 +125,10 @@ void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge,
       for (auto tri : { tri0, tri1 }) {
         triVerts.push_back(tri);
         triNormal.push_back(normal);
-        meshRelation_.triBary.H().push_back(faceRef.H()[face]);
+        triBary.push_back(faceRef[face]);
         for (int k : {0, 1, 2}) {
           int index = linearSearch(mapping, tri[k]);
-          meshRelation_.triBary.H().back().vertBary[k] = halfedgeBary.H()[firstEdge + index];
+          triBary.back().vertBary[k] = halfedgeBary[firstEdge + index];
         }
       }
     } else {  // General triangulation
@@ -142,15 +136,15 @@ void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge,
 
       std::map<int, int> vertBary;
       for (int j = firstEdge; j < lastEdge; ++j)
-        vertBary[halfedge[j].startVert] = halfedgeBary.H()[j];
+        vertBary[halfedge_[j].startVert] = halfedgeBary[j];
 
       Polygons polys;
       try {
-        polys = Face2Polygons(face, projection, faceEdgeH);
+        polys = Face2Polygons(face, projection, faceEdge);
       } catch (const std::exception& e) {
         std::cout << e.what() << std::endl;
-        for (int edge = faceEdgeH[face]; edge < faceEdgeH[face + 1]; ++edge)
-          std::cout << "halfedge: " << edge << ", " << halfedge[edge]
+        for (int edge = faceEdge[face]; edge < faceEdge[face + 1]; ++edge)
+          std::cout << "halfedge: " << edge << ", " << halfedge_[edge]
                     << std::endl;
         throw;
       }
@@ -160,16 +154,16 @@ void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge,
       for (auto tri : newTris) {
         triVerts.push_back(tri);
         triNormal.push_back(normal);
-        meshRelation_.triBary.H().push_back(faceRef.H()[face]);
+        triBary.push_back(faceRef[face]);
         for (int k : {0, 1, 2}) {
-          meshRelation_.triBary.H().back().vertBary[k] =
+          triBary.back().vertBary[k] =
               vertBary[tri[k]];
         }
       }
     }
   }
-  faceNormal_ = std::move(triNormalOut);
-  CreateAndFixHalfedges(triVertsOut);
+  faceNormal_ = std::move(triNormal);
+  CreateAndFixHalfedges(triVerts);
 }
 
 /**
@@ -177,16 +171,14 @@ void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge,
  * projection of the vertices.
  */
 Polygons Manifold::Impl::Face2Polygons(int face, glm::mat3x2 projection,
-                                       const VecH<int>& faceEdge) const {
-  const VecH<glm::vec3>& vertPos = vertPos_.H();
-  const VecH<Halfedge>& halfedge = halfedge_.H();
+                                       const VecDH<int>& faceEdge) const {
   const int firstEdge = faceEdge[face];
   const int lastEdge = faceEdge[face + 1];
 
   std::map<int, int> vert_edge;
   for (int edge = firstEdge; edge < lastEdge; ++edge) {
     ALWAYS_ASSERT(
-        vert_edge.emplace(std::make_pair(halfedge[edge].startVert, edge))
+        vert_edge.emplace(std::make_pair(halfedge_[edge].startVert, edge))
             .second,
         topologyErr, "face has duplicate vertices.");
   }
@@ -201,9 +193,9 @@ Polygons Manifold::Impl::Face2Polygons(int face, glm::mat3x2 projection,
       thisEdge = startEdge;
       polys.push_back({});
     }
-    int vert = halfedge[thisEdge].startVert;
-    polys.back().push_back({projection * vertPos[vert], vert});
-    const auto result = vert_edge.find(halfedge[thisEdge].endVert);
+    int vert = halfedge_[thisEdge].startVert;
+    polys.back().push_back({projection * vertPos_[vert], vert});
+    const auto result = vert_edge.find(halfedge_[thisEdge].endVert);
     ALWAYS_ASSERT(result != vert_edge.end(), topologyErr, "nonmanifold edge");
     thisEdge = result->second;
     vert_edge.erase(result);

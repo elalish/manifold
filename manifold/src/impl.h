@@ -94,7 +94,7 @@ struct Manifold::Impl {
   void Face2Tri(const VecDH<int>& faceEdge, const VecDH<BaryRef>& faceRef,
                 const VecDH<int>& halfedgeBary);
   Polygons Face2Polygons(int face, glm::mat3x2 projection,
-                         const VecH<int>& faceEdge) const;
+                         const VecDH<int>& faceEdge) const;
 
   // edge_op.cu
   void SimplifyTopology();
