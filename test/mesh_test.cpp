@@ -751,7 +751,7 @@ TEST(Boolean, Gyroid) {
   Related(result, input, meshID2idx);
 }
 
-TEST(Boolean, DISABLED_Cylinders) {
+TEST(Boolean, Cylinders) {
   Manifold rod = Manifold::Cylinder(1.0, 0.4, -1.0, 20);
   float arrays1[][12] = {
       {0, 0, 1, 1,    //
@@ -830,7 +830,7 @@ TEST(Boolean, DISABLED_Cylinders) {
     }
     m2 += Manifold(rod).Transform(mat);
   }
-
+  std::cout << "union 3" << std::endl;
   m1 += m2;
 
   EXPECT_TRUE(m1.IsManifold());
