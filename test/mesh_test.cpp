@@ -22,6 +22,32 @@ namespace {
 
 using namespace manifold;
 
+Mesh Csaszar() {
+  Mesh csaszar;
+  csaszar.vertPos = {{-20, -20, -10},  //
+                     {-20, 20, -15},   //
+                     {-5, -8, 8},      //
+                     {0, 0, 30},       //
+                     {5, 8, 8},        //
+                     {20, -20, -15},   //
+                     {20, 20, -10}};
+  csaszar.triVerts = {{1, 3, 6},  //
+                      {1, 6, 5},  //
+                      {2, 5, 6},  //
+                      {0, 2, 6},  //
+                      {0, 6, 4},  //
+                      {3, 4, 6},  //
+                      {1, 2, 3},  //
+                      {1, 4, 2},  //
+                      {1, 0, 4},  //
+                      {1, 5, 0},  //
+                      {3, 5, 4},  //
+                      {0, 5, 3},  //
+                      {0, 3, 2},  //
+                      {2, 4, 5}};
+  return csaszar;
+}
+
 void Identical(const Mesh& mesh1, const Mesh& mesh2) {
   ASSERT_EQ(mesh1.vertPos.size(), mesh2.vertPos.size());
   for (int i = 0; i < mesh1.vertPos.size(); ++i)
@@ -319,7 +345,7 @@ TEST(Manifold, ManualSmooth) {
 }
 
 TEST(Manifold, Csaszar) {
-  Manifold csaszar = Manifold::Smooth(ImportMesh("data/Csaszar.ply"));
+  Manifold csaszar = Manifold::Smooth(Csaszar());
   csaszar.Refine(100);
   ExpectMeshes(csaszar, {{70000, 140000}});
   auto prop = csaszar.GetProperties();
@@ -448,7 +474,7 @@ TEST(Manifold, MeshRelationRefine) {
   std::vector<Mesh> input;
   std::map<int, int> meshID2idx;
 
-  input.push_back(ImportMesh("data/Csaszar.ply"));
+  input.push_back(Csaszar());
   Manifold csaszar(input[0]);
 
   std::vector<int> meshIDs = csaszar.GetMeshIDs();
