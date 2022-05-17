@@ -306,13 +306,13 @@ TEST(Manifold, ManualSmooth) {
   const glm::vec4 purple(1, 0, 1, 1);
   for (int tri = 0; tri < interp.NumTri(); ++tri) {
     for (int i : {0, 1, 2}) {
-      const glm::vec3& uvw = rel.barycentric[rel.triBary[tri].vertBary[i]];
+      const glm::vec3& uvw = rel.UVW(tri, i);
       const float alpha = glm::min(uvw[0], glm::min(uvw[1], uvw[2]));
       options.mat.vertColor[out.triVerts[tri][i]] =
           glm::mix(purple, red, glm::smoothstep(0.0f, 0.2f, alpha));
     }
   }
-  // ExportMesh("sharpenedSphere.gltf", out, options);
+  ExportMesh("sharpenedSphere.glb", out, options);
 }
 
 TEST(Manifold, Csaszar) {
