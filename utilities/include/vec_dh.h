@@ -284,7 +284,7 @@ class VecDH {
   }
 
   void syncCache() const {
-    if (implModified) {
+    if (implModified || cache.empty()) {
       cache = std::vector<T>(impl_.begin(), impl_.end());
     }
     implModified = false;
