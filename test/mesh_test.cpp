@@ -22,6 +22,32 @@ namespace {
 
 using namespace manifold;
 
+Mesh Csaszar() {
+  Mesh csaszar;
+  csaszar.vertPos = {{-20, -20, -10},  //
+                     {-20, 20, -15},   //
+                     {-5, -8, 8},      //
+                     {0, 0, 30},       //
+                     {5, 8, 8},        //
+                     {20, -20, -15},   //
+                     {20, 20, -10}};
+  csaszar.triVerts = {{1, 3, 6},  //
+                      {1, 6, 5},  //
+                      {2, 5, 6},  //
+                      {0, 2, 6},  //
+                      {0, 6, 4},  //
+                      {3, 4, 6},  //
+                      {1, 2, 3},  //
+                      {1, 4, 2},  //
+                      {1, 0, 4},  //
+                      {1, 5, 0},  //
+                      {3, 5, 4},  //
+                      {0, 5, 3},  //
+                      {0, 3, 2},  //
+                      {2, 4, 5}};
+  return csaszar;
+}
+
 void Identical(const Mesh& mesh1, const Mesh& mesh2) {
   ASSERT_EQ(mesh1.vertPos.size(), mesh2.vertPos.size());
   for (int i = 0; i < mesh1.vertPos.size(); ++i)
@@ -255,7 +281,8 @@ TEST(Manifold, Smooth) {
   auto prop = smooth.GetProperties();
   EXPECT_NEAR(prop.volume, 17.38, 0.1);
   EXPECT_NEAR(prop.surfaceArea, 33.38, 0.1);
-  // ExportMesh("smoothTet.gltf", smooth.GetMesh());
+
+  if (options.exportModels) ExportMesh("smoothTet.glb", smooth.GetMesh(), {});
 }
 
 TEST(Manifold, SmoothSphere) {
@@ -295,52 +322,56 @@ TEST(Manifold, ManualSmooth) {
   EXPECT_NEAR(prop.volume, 3.53, 0.01);
   EXPECT_NEAR(prop.surfaceArea, 11.39, 0.01);
 
-  const Mesh out = interp.GetMesh();
-  ExportOptions options;
-  options.faceted = false;
-  options.mat.roughness = 0.1;
+  if (options.exportModels) {
+    const Mesh out = interp.GetMesh();
+    ExportOptions options;
+    options.faceted = false;
+    options.mat.roughness = 0.1;
 
-  options.mat.vertColor.resize(interp.NumVert());
-  MeshRelation rel = interp.GetMeshRelation();
-  const glm::vec4 red(1, 0, 0, 1);
-  const glm::vec4 purple(1, 0, 1, 1);
-  for (int tri = 0; tri < interp.NumTri(); ++tri) {
-    for (int i : {0, 1, 2}) {
-      const glm::vec3& uvw = rel.barycentric[rel.triBary[tri].vertBary[i]];
-      const float alpha = glm::min(uvw[0], glm::min(uvw[1], uvw[2]));
-      options.mat.vertColor[out.triVerts[tri][i]] =
-          glm::mix(purple, red, glm::smoothstep(0.0f, 0.2f, alpha));
+    options.mat.vertColor.resize(interp.NumVert());
+    MeshRelation rel = interp.GetMeshRelation();
+    const glm::vec4 red(1, 0, 0, 1);
+    const glm::vec4 purple(1, 0, 1, 1);
+    for (int tri = 0; tri < interp.NumTri(); ++tri) {
+      for (int i : {0, 1, 2}) {
+        const glm::vec3& uvw = rel.UVW(tri, i);
+        const float alpha = glm::min(uvw[0], glm::min(uvw[1], uvw[2]));
+        options.mat.vertColor[out.triVerts[tri][i]] =
+            glm::mix(purple, red, glm::smoothstep(0.0f, 0.2f, alpha));
+      }
     }
+    ExportMesh("sharpenedSphere.glb", out, options);
   }
-  // ExportMesh("sharpenedSphere.gltf", out, options);
 }
 
 TEST(Manifold, Csaszar) {
-  Manifold csaszar = Manifold::Smooth(ImportMesh("data/Csaszar.ply"));
+  Manifold csaszar = Manifold::Smooth(Csaszar());
   csaszar.Refine(100);
   ExpectMeshes(csaszar, {{70000, 140000}});
   auto prop = csaszar.GetProperties();
   EXPECT_NEAR(prop.volume, 84699, 10);
   EXPECT_NEAR(prop.surfaceArea, 14796, 10);
 
-  // const Mesh out = csaszar.GetMesh();
-  // ExportOptions options;
-  // options.faceted = false;
-  // options.mat.roughness = 0.1;
+  if (options.exportModels) {
+    const Mesh out = csaszar.GetMesh();
+    ExportOptions options;
+    options.faceted = false;
+    options.mat.roughness = 0.1;
 
-  // options.mat.vertColor.resize(csaszar.NumVert());
-  // MeshRelation rel = csaszar.GetMeshRelation();
-  // const glm::vec4 blue(0, 0, 1, 1);
-  // const glm::vec4 yellow(1, 1, 0, 1);
-  // for (int tri = 0; tri < csaszar.NumTri(); ++tri) {
-  //   for (int i : {0, 1, 2}) {
-  //     const glm::vec3& uvw = rel.barycentric[rel.triBary[tri].vertBary[i]];
-  //     const float alpha = glm::min(uvw[0], glm::min(uvw[1], uvw[2]));
-  //     options.mat.vertColor[out.triVerts[tri][i]] =
-  //         glm::mix(yellow, blue, glm::smoothstep(0.0f, 0.2f, alpha));
-  //   }
-  // }
-  // ExportMesh("smoothCsaszar.gltf", out, options);
+    options.mat.vertColor.resize(csaszar.NumVert());
+    MeshRelation rel = csaszar.GetMeshRelation();
+    const glm::vec4 blue(0, 0, 1, 1);
+    const glm::vec4 yellow(1, 1, 0, 1);
+    for (int tri = 0; tri < csaszar.NumTri(); ++tri) {
+      for (int i : {0, 1, 2}) {
+        const glm::vec3& uvw = rel.barycentric[rel.triBary[tri].vertBary[i]];
+        const float alpha = glm::min(uvw[0], glm::min(uvw[1], uvw[2]));
+        options.mat.vertColor[out.triVerts[tri][i]] =
+            glm::mix(yellow, blue, glm::smoothstep(0.0f, 0.2f, alpha));
+      }
+    }
+    ExportMesh("smoothCsaszar.glb", out, options);
+  }
 }
 
 /**
@@ -443,7 +474,7 @@ TEST(Manifold, MeshRelationRefine) {
   std::vector<Mesh> input;
   std::map<int, int> meshID2idx;
 
-  input.push_back(ImportMesh("data/Csaszar.ply"));
+  input.push_back(Csaszar());
   Manifold csaszar(input[0]);
 
   std::vector<int> meshIDs = csaszar.GetMeshIDs();
@@ -513,7 +544,8 @@ TEST(Boolean, Coplanar) {
   ExpectMeshes(out, {{32, 64}});
   EXPECT_EQ(out.NumDegenerateTris(), 0);
   EXPECT_EQ(out.Genus(), 1);
-  // ExportMesh("coplanar.gltf", out.GetMesh(), {});
+
+  if (options.exportModels) ExportMesh("coplanar.glb", out.GetMesh(), {});
 
   RelatedOp(cylinder, cylinder2, out);
 }
@@ -540,7 +572,8 @@ TEST(Boolean, FaceUnion) {
   auto prop = cubes.GetProperties();
   EXPECT_NEAR(prop.volume, 2, 1e-5);
   EXPECT_NEAR(prop.surfaceArea, 10, 1e-5);
-  // ExportMesh("faceUnion.gltf", cubes.GetMesh(), {});
+
+  if (options.exportModels) ExportMesh("faceUnion.glb", cubes.GetMesh(), {});
 }
 
 TEST(Boolean, EdgeUnion) {
@@ -723,9 +756,9 @@ TEST(Boolean, Gyroid) {
   EXPECT_TRUE(gyroid.IsManifold());
   EXPECT_TRUE(gyroid.MatchesTriNormals());
   EXPECT_LE(gyroid.NumDegenerateTris(), 12);
-  // ExportMesh("gyroidpuzzle1.gltf", gyroid.Extract(), {});
   Manifold result = gyroid + gyroid2;
-  ExportMesh("gyroidUnion.gltf", result.GetMesh(), {});
+
+  if (options.exportModels) ExportMesh("gyroidUnion.glb", result.GetMesh(), {});
 
   EXPECT_TRUE(result.IsManifold());
   EXPECT_TRUE(result.MatchesTriNormals());
