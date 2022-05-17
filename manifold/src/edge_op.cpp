@@ -121,7 +121,8 @@ void Manifold::Impl::SimplifyTopology() {
   VecDH<int> flaggedEdges(halfedge_.size());
   int numFlagged =
       thrust::copy_if(
-          thrust::device, countAt(0), countAt(halfedge_.size()), flaggedEdges.begin(),
+          thrust::device, countAt(0), countAt(halfedge_.size()),
+          flaggedEdges.begin(),
           ShortEdge({halfedge_.cptrD(), vertPos_.cptrD(), precision_})) -
       flaggedEdges.begin();
   flaggedEdges.resize(numFlagged);
@@ -131,7 +132,8 @@ void Manifold::Impl::SimplifyTopology() {
   flaggedEdges.resize(halfedge_.size());
   numFlagged =
       thrust::copy_if(
-          thrust::device, countAt(0), countAt(halfedge_.size()), flaggedEdges.begin(),
+          thrust::device, countAt(0), countAt(halfedge_.size()),
+          flaggedEdges.begin(),
           FlagEdge({halfedge_.cptrD(), meshRelation_.triBary.cptrD()})) -
       flaggedEdges.begin();
   flaggedEdges.resize(numFlagged);
@@ -139,11 +141,12 @@ void Manifold::Impl::SimplifyTopology() {
   for (const int edge : flaggedEdges) CollapseEdge(edge);
 
   flaggedEdges.resize(halfedge_.size());
-  numFlagged = thrust::copy_if(
-                   thrust::device, countAt(0), countAt(halfedge_.size()), flaggedEdges.begin(),
-                   SwappableEdge({halfedge_.cptrD(), vertPos_.cptrD(),
-                                  faceNormal_.cptrD(), precision_})) -
-               flaggedEdges.begin();
+  numFlagged =
+      thrust::copy_if(thrust::device, countAt(0), countAt(halfedge_.size()),
+                      flaggedEdges.begin(),
+                      SwappableEdge({halfedge_.cptrD(), vertPos_.cptrD(),
+                                     faceNormal_.cptrD(), precision_})) -
+      flaggedEdges.begin();
   flaggedEdges.resize(numFlagged);
 
   for (const int edge : flaggedEdges) {
@@ -202,10 +205,14 @@ void Manifold::Impl::CollapseTri(const glm::ivec3& triEdge) {
 }
 
 void Manifold::Impl::RemoveIfFolded(int edge) {
+  const int pair = halfedge_[edge].pairedHalfedge;
+  if (pair < 0) return;
+
   const glm::ivec3 tri0edge = TriOf(edge);
-  const glm::ivec3 tri1edge = TriOf(halfedge_[edge].pairedHalfedge);
+  const glm::ivec3 tri1edge = TriOf(pair);
   if (halfedge_[tri0edge[1]].endVert == halfedge_[tri1edge[1]].endVert) {
     for (int i : {0, 1, 2}) {
+      if (halfedge_[tri0edge[i]].startVert < 0) continue;
       vertPos_[halfedge_[tri0edge[i]].startVert] = glm::vec3(NAN);
       halfedge_[tri0edge[i]] = {-1, -1, -1, -1};
       halfedge_[tri1edge[i]] = {-1, -1, -1, -1};
