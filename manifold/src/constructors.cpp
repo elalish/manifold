@@ -183,7 +183,7 @@ Manifold Manifold::Sphere(float radius, int circularSegments) {
   Manifold sphere;
   sphere.pImpl_ = std::make_unique<Impl>(Impl::Shape::OCTAHEDRON);
   sphere.pImpl_->Subdivide(n);
-  thrust::for_each_n(sphere.pImpl_->vertPos_.beginD(), sphere.NumVert(),
+  thrust::for_each_n(thrust::device, sphere.pImpl_->vertPos_.begin(), sphere.NumVert(),
                      ToSphere({radius}));
   sphere.pImpl_->Finish();
   // Ignore preceding octahedron.
@@ -212,9 +212,9 @@ Manifold Manifold::Extrude(Polygons crossSection, float height, int nDivisions,
                 "scale values cannot be negative");
   Manifold extrusion;
   ++nDivisions;
-  auto& vertPos = extrusion.pImpl_->vertPos_.H();
+  auto& vertPos = extrusion.pImpl_->vertPos_;
   VecDH<glm::ivec3> triVertsDH;
-  auto& triVerts = triVertsDH.H();
+  auto& triVerts = triVertsDH;
   int nCrossSection = 0;
   bool isCone = scaleTop.x == 0.0 && scaleTop.y == 0.0;
   int idx = 0;
@@ -289,9 +289,9 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments) {
   int nDivisions =
       circularSegments > 2 ? circularSegments : GetCircularSegments(radius);
   Manifold revoloid;
-  auto& vertPos = revoloid.pImpl_->vertPos_.H();
+  auto& vertPos = revoloid.pImpl_->vertPos_;
   VecDH<glm::ivec3> triVertsDH;
-  auto& triVerts = triVertsDH.H();
+  auto& triVerts = triVertsDH;
   float dPhi = 360.0f / nDivisions;
   for (const auto& poly : crossSection) {
     int start = -1;
@@ -403,21 +403,21 @@ Manifold Manifold::Compose(const std::vector<Manifold>& manifolds) {
     const Impl& impl = *(manifold.pImpl_);
     impl.ApplyTransform();
 
-    thrust::copy(impl.vertPos_.beginD(), impl.vertPos_.endD(),
-                 combined.vertPos_.beginD() + nextVert);
-    thrust::copy(impl.faceNormal_.beginD(), impl.faceNormal_.endD(),
-                 combined.faceNormal_.beginD() + nextTri);
-    thrust::copy(impl.halfedgeTangent_.beginD(), impl.halfedgeTangent_.endD(),
-                 combined.halfedgeTangent_.beginD() + nextEdge);
-    thrust::copy(impl.meshRelation_.barycentric.beginD(),
-                 impl.meshRelation_.barycentric.endD(),
-                 combined.meshRelation_.barycentric.beginD() + nextBary);
-    thrust::transform(impl.meshRelation_.triBary.beginD(),
-                      impl.meshRelation_.triBary.endD(),
-                      combined.meshRelation_.triBary.beginD() + nextTri,
+    thrust::copy(thrust::device, impl.vertPos_.begin(), impl.vertPos_.end(),
+                 combined.vertPos_.begin() + nextVert);
+    thrust::copy(thrust::device, impl.faceNormal_.begin(), impl.faceNormal_.end(),
+                 combined.faceNormal_.begin() + nextTri);
+    thrust::copy(thrust::device, impl.halfedgeTangent_.begin(), impl.halfedgeTangent_.end(),
+                 combined.halfedgeTangent_.begin() + nextEdge);
+    thrust::copy(thrust::device, impl.meshRelation_.barycentric.begin(),
+                 impl.meshRelation_.barycentric.end(),
+                 combined.meshRelation_.barycentric.begin() + nextBary);
+    thrust::transform(thrust::device, impl.meshRelation_.triBary.begin(),
+                      impl.meshRelation_.triBary.end(),
+                      combined.meshRelation_.triBary.begin() + nextTri,
                       UpdateTriBary({nextBary}));
-    thrust::transform(impl.halfedge_.beginD(), impl.halfedge_.endD(),
-                      combined.halfedge_.beginD() + nextEdge,
+    thrust::transform(thrust::device, impl.halfedge_.begin(), impl.halfedge_.end(),
+                      combined.halfedge_.begin() + nextEdge,
                       UpdateHalfedge({nextVert, nextEdge, nextTri}));
 
     nextVert += manifold.NumVert();
@@ -461,22 +461,22 @@ std::vector<Manifold> Manifold::Decompose() const {
     VecDH<int> vertNew2Old(NumVert());
     int nVert =
         thrust::copy_if(
-            zip(pImpl_->vertPos_.beginD(), countAt(0)),
-            zip(pImpl_->vertPos_.endD(), countAt(NumVert())),
-            vertLabel.beginD(),
-            zip(meshes[i].pImpl_->vertPos_.beginD(), vertNew2Old.beginD()),
+            thrust::device, zip(pImpl_->vertPos_.begin(), countAt(0)),
+            zip(pImpl_->vertPos_.end(), countAt(NumVert())),
+            vertLabel.begin(),
+            zip(meshes[i].pImpl_->vertPos_.begin(), vertNew2Old.begin()),
             Equals({i})) -
-        zip(meshes[i].pImpl_->vertPos_.beginD(), countAt(0));
+        zip(meshes[i].pImpl_->vertPos_.begin(), countAt(0));
     meshes[i].pImpl_->vertPos_.resize(nVert);
 
     VecDH<int> faceNew2Old(NumTri());
-    thrust::sequence(faceNew2Old.beginD(), faceNew2Old.endD());
+    thrust::sequence(thrust::device, faceNew2Old.begin(), faceNew2Old.end());
 
     int nFace =
         thrust::remove_if(
-            faceNew2Old.beginD(), faceNew2Old.endD(),
+            thrust::device, faceNew2Old.begin(), faceNew2Old.end(),
             RemoveFace({pImpl_->halfedge_.cptrD(), vertLabel.cptrD(), i})) -
-        faceNew2Old.beginD();
+        faceNew2Old.begin();
     faceNew2Old.resize(nFace);
 
     meshes[i].pImpl_->GatherFaces(*pImpl_, faceNew2Old);

@@ -18,6 +18,7 @@
 #include <thrust/remove.h>
 #include <thrust/sort.h>
 #include <thrust/unique.h>
+#include <thrust/execution_policy.h>
 
 #include "structs.h"
 #include "utils.h"
@@ -33,12 +34,12 @@ class SparseIndices {
   // stored in vectors separate from this class, but having the same length.
  public:
   SparseIndices(int size = 0) : p(size), q(size) {}
-  typedef typename VecDH<int>::IterD Iter;
+  typedef typename VecDH<int>::Iter Iter;
   typedef typename thrust::zip_iterator<thrust::tuple<Iter, Iter>> Zip;
-  Zip beginDpq() { return zip(p.beginD(), q.beginD()); }
-  Zip endDpq() { return zip(p.endD(), q.endD()); }
-  Iter beginD(bool use_q) { return use_q ? q.beginD() : p.beginD(); }
-  Iter endD(bool use_q) { return use_q ? q.endD() : p.endD(); }
+  Zip beginPQ() { return zip(p.begin(), q.begin()); }
+  Zip endPQ() { return zip(p.end(), q.end()); }
+  Iter begin(bool use_q) { return use_q ? q.begin() : p.begin(); }
+  Iter end(bool use_q) { return use_q ? q.end() : p.end(); }
   int* ptrD(bool use_q) { return use_q ? q.ptrD() : p.ptrD(); }
   thrust::pair<int*, int*> ptrDpq(int idx = 0) {
     return thrust::make_pair(p.ptrD() + idx, q.ptrD() + idx);
@@ -52,23 +53,21 @@ class SparseIndices {
     return out;
   }
 
-  typedef typename VecDH<int>::IterDc IterC;
+  typedef typename VecDH<int>::IterC IterC;
   typedef typename thrust::zip_iterator<thrust::tuple<IterC, IterC>> ZipC;
-  ZipC beginDpq() const { return zip(p.beginD(), q.beginD()); }
-  ZipC endDpq() const { return zip(p.endD(), q.endD()); }
-  IterC beginD(bool use_q) const { return use_q ? q.beginD() : p.beginD(); }
-  IterC endD(bool use_q) const { return use_q ? q.endD() : p.endD(); }
+  ZipC beginPQ() const { return zip(p.begin(), q.begin()); }
+  ZipC endPQ() const { return zip(p.end(), q.end()); }
+  IterC begin(bool use_q) const { return use_q ? q.begin() : p.begin(); }
+  IterC end(bool use_q) const { return use_q ? q.end() : p.end(); }
   const int* ptrD(bool use_q) const { return use_q ? q.ptrD() : p.ptrD(); }
 
-  typedef typename VecDH<int>::IterHc IterHC;
-  typedef typename thrust::zip_iterator<thrust::tuple<IterHC, IterHC>> ZipHC;
-  ZipHC beginHpq() const { return zip(p.begin(), q.begin()); }
-  ZipHC endHpq() const { return zip(p.end(), q.end()); }
+  ZipC beginHpq() const { return zip(p.begin(), q.begin()); }
+  ZipC endHpq() const { return zip(p.end(), q.end()); }
 
   int size() const { return p.size(); }
   void SwapPQ() { p.swap(q); }
 
-  void Sort() { thrust::sort(beginDpq(), endDpq()); }
+  void Sort() { thrust::sort(beginPQ(), endPQ()); }
 
   void Resize(int size) {
     p.resize(size, -1);
@@ -77,7 +76,7 @@ class SparseIndices {
 
   void Unique() {
     Sort();
-    int newSize = thrust::unique(beginDpq(), endDpq()) - beginDpq();
+    int newSize = thrust::unique(beginPQ(), endPQ()) - beginPQ();
     Resize(newSize);
   }
 
@@ -90,8 +89,8 @@ class SparseIndices {
   size_t RemoveZeros(VecDH<int>& S) {
     ALWAYS_ASSERT(S.size() == p.size(), userErr,
                   "Different number of values than indicies!");
-    auto zBegin = zip(S.beginD(), beginD(false), beginD(true));
-    auto zEnd = zip(S.endD(), endD(false), endD(true));
+    auto zBegin = zip(S.begin(), begin(false), begin(true));
+    auto zEnd = zip(S.end(), end(false), end(true));
     size_t size = thrust::remove_if(zBegin, zEnd, firstZero()) - zBegin;
     S.resize(size, -1);
     p.resize(size, -1);
@@ -123,9 +122,9 @@ class SparseIndices {
   size_t KeepFinite(VecDH<T>& v, VecDH<int>& x) {
     ALWAYS_ASSERT(x.size() == p.size(), userErr,
                   "Different number of values than indicies!");
-    auto zBegin = zip(v.beginD(), x.beginD(), beginD(false), beginD(true));
-    auto zEnd = zip(v.endD(), x.endD(), endD(false), endD(true));
-    size_t size = thrust::remove_if(zBegin, zEnd, firstNonFinite<T>()) - zBegin;
+    auto zBegin = zip(v.begin(), x.begin(), begin(false), begin(true));
+    auto zEnd = zip(v.end(), x.end(), end(false), end(true));
+    size_t size = thrust::remove_if(thrust::device, zBegin, zEnd, firstNonFinite<T>()) - zBegin;
     v.resize(size);
     x.resize(size, -1);
     p.resize(size, -1);
@@ -140,19 +139,19 @@ class SparseIndices {
                   "Different number of values than indicies!");
     size_t size = pqEnd - pqBegin;
     VecDH<T> result(size);
-    VecDH<bool> found(size);
+    VecDH<char> found(size);
     VecDH<int> temp(size);
-    thrust::fill(result.beginD(), result.endD(), missingVal);
-    thrust::binary_search(beginDpq(), endDpq(), pqBegin, pqEnd, found.beginD());
-    thrust::lower_bound(beginDpq(), endDpq(), pqBegin, pqEnd, temp.beginD());
-    thrust::gather_if(temp.beginD(), temp.endD(), found.beginD(), val.beginD(),
-                      result.beginD());
+    thrust::fill(thrust::device, result.begin(), result.end(), missingVal);
+    thrust::binary_search(thrust::device, beginPQ(), endPQ(), pqBegin, pqEnd, found.begin());
+    thrust::lower_bound(thrust::device, beginPQ(), endPQ(), pqBegin, pqEnd, temp.begin());
+    thrust::gather_if(thrust::device, temp.begin(), temp.end(), found.begin(), val.begin(),
+                      result.begin());
     return result;
   }
 
   void Dump() const {
-    const auto& p = Get(0).H();
-    const auto& q = Get(1).H();
+    const auto& p = Get(0);
+    const auto& q = Get(1);
     std::cout << "SparseIndices = " << std::endl;
     for (int i = 0; i < size(); ++i) {
       std::cout << i << ", p = " << p[i] << ", q = " << q[i] << std::endl;
