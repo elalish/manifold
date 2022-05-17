@@ -13,18 +13,16 @@
 // limitations under the License.
 
 #pragma once
+#include <math.h>
 #include <thrust/binary_search.h>
 #include <thrust/gather.h>
 #include <thrust/remove.h>
 #include <thrust/sort.h>
 #include <thrust/unique.h>
-#include <thrust/execution_policy.h>
 
 #include "structs.h"
 #include "utils.h"
 #include "vec_dh.h"
-
-#include <math.h>
 
 namespace manifold {
 
@@ -124,7 +122,9 @@ class SparseIndices {
                   "Different number of values than indicies!");
     auto zBegin = zip(v.begin(), x.begin(), begin(false), begin(true));
     auto zEnd = zip(v.end(), x.end(), end(false), end(true));
-    size_t size = thrust::remove_if(thrust::device, zBegin, zEnd, firstNonFinite<T>()) - zBegin;
+    size_t size =
+        thrust::remove_if(thrust::device, zBegin, zEnd, firstNonFinite<T>()) -
+        zBegin;
     v.resize(size);
     x.resize(size, -1);
     p.resize(size, -1);
@@ -142,10 +142,12 @@ class SparseIndices {
     VecDH<char> found(size);
     VecDH<int> temp(size);
     thrust::fill(thrust::device, result.begin(), result.end(), missingVal);
-    thrust::binary_search(thrust::device, beginPQ(), endPQ(), pqBegin, pqEnd, found.begin());
-    thrust::lower_bound(thrust::device, beginPQ(), endPQ(), pqBegin, pqEnd, temp.begin());
-    thrust::gather_if(thrust::device, temp.begin(), temp.end(), found.begin(), val.begin(),
-                      result.begin());
+    thrust::binary_search(thrust::device, beginPQ(), endPQ(), pqBegin, pqEnd,
+                          found.begin());
+    thrust::lower_bound(thrust::device, beginPQ(), endPQ(), pqBegin, pqEnd,
+                        temp.begin());
+    thrust::gather_if(thrust::device, temp.begin(), temp.end(), found.begin(),
+                      val.begin(), result.begin());
     return result;
   }
 

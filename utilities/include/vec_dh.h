@@ -13,17 +13,15 @@
 // limitations under the License.
 
 #pragma once
-#include <iostream>
-#include <thrust/universal_vector.h>
 #include <thrust/execution_policy.h>
-#include "structs.h"
+#include <thrust/universal_vector.h>
 
 namespace manifold {
 
 /*
- * Host and device vector implementation. This uses `thrust::universal_vector` for
- * storage, so data can be moved by the hardware on demand, allows using more
- * memory than the available GPU memory, reduce memory overhead and provide
+ * Host and device vector implementation. This uses `thrust::universal_vector`
+ * for storage, so data can be moved by the hardware on demand, allows using
+ * more memory than the available GPU memory, reduce memory overhead and provide
  * speedup due to less synchronization.
  *
  * Due to https://github.com/NVIDIA/thrust/issues/1690 , `push_back` operations
@@ -40,9 +38,7 @@ namespace manifold {
 template <typename T>
 class VecDH {
  public:
-  VecDH() {
-    impl_ = thrust::universal_vector<T>();
-  }
+  VecDH() { impl_ = thrust::universal_vector<T>(); }
 
   VecDH(int size, T val = T()) {
     impl_.resize(size, val);
@@ -119,8 +115,7 @@ class VecDH {
   }
 
   int size() const {
-    if (!cacheModified)
-      return impl_.size();
+    if (!cacheModified) return impl_.size();
     return cache.size();
   }
 
@@ -263,7 +258,7 @@ class VecDH {
     cache.reserve(n);
   }
 
-  void Dump() const { 
+  void Dump() const {
     syncCache();
     manifold::Dump(cache);
   }
