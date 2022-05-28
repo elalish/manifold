@@ -24,6 +24,7 @@
 #include <iostream>
 #include <sstream>
 #include <vector>
+#include <unordered_map>
 
 namespace manifold {
 
@@ -229,7 +230,11 @@ struct Curvature {
  * Mesh.
  */
 struct BaryRef {
-  /// Reference to original Mesh, matching Manifold.GetMeshIDs().
+  /// identifier of the triangle, can be mapped to the original mesh ID using
+  /// the `originalID` in `MeshRelation`, i.e. `originalID[meshID]`
+  ///
+  /// @note Triangles coming from different manifolds should have different mesh
+  /// ID, otherwise `SimplifyTopology` will not work properly.
   int meshID;
   /// The triangle index of the original triangle this was part of:
   /// Mesh.triVerts[tri].
@@ -251,6 +256,8 @@ struct MeshRelation {
   /// A vector matching Mesh.triVerts that contains the relation of each output
   /// triangle to a single input triangle.
   std::vector<BaryRef> triBary;
+  /// meshID to originalID mapping.
+  std::unordered_map<int, int> originalID;
 
   /**
    * A convenience function to get the barycentric coordinates of a given

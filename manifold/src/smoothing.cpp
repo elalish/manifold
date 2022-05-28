@@ -472,6 +472,7 @@ Manifold::Impl::MeshRelationD Manifold::Impl::Subdivide(int n) {
   MeshRelationD oldMeshRelation = std::move(meshRelation_);
   meshRelation_.barycentric.resize(relation.barycentric.size());
   meshRelation_.triBary.resize(relation.triBary.size());
+  meshRelation_.originalID = oldMeshRelation.originalID;
 
   VecDH<TmpEdge> edges = CreateTmpEdges(halfedge_);
   VecDH<int> half2Edge(2 * numEdge);

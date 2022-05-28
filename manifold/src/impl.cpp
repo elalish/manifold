@@ -173,6 +173,7 @@ struct InitializeBaryRef {
     int tri = thrust::get<1>(inOut);
 
     // Leave existing meshID if input is negative
+    // TODO: Why do we need this?
     if (meshID >= 0) baryRef.meshID = meshID;
     baryRef.tri = tri;
     baryRef.vertBary = {-3, -2, -1};
@@ -281,7 +282,7 @@ struct EdgeBox {
 
 namespace manifold {
 
-std::vector<int> Manifold::Impl::meshID2Original_;
+std::atomic<int> Manifold::Impl::meshIDCounter_(1);
 
 /**
  * Create a manifold from an input triangle Mesh. Will throw if the Mesh is not
@@ -355,25 +356,11 @@ Manifold::Impl::Impl(Shape shape) {
   InitializeNewReference();
 }
 
-/**
- * When a manifold is copied, it is given a new unique set of mesh relation IDs,
- * identifying a particular instance of a copied input mesh. The original mesh
- * ID can be found using the meshID2Original mapping.
- */
-void Manifold::Impl::DuplicateMeshIDs() {
-  std::map<int, int> old2new;
-  for (BaryRef& ref : meshRelation_.triBary) {
-    if (old2new.find(ref.meshID) == old2new.end()) {
-      old2new[ref.meshID] = meshID2Original_.size();
-      meshID2Original_.push_back(meshID2Original_[ref.meshID]);
-    }
-    ref.meshID = old2new[ref.meshID];
-  }
-}
-
 void Manifold::Impl::ReinitializeReference(int meshID) {
   thrust::for_each_n(thrust::device, zip(meshRelation_.triBary.begin(), countAt(0)), NumTri(),
                      InitializeBaryRef({meshID, halfedge_.cptrD()}));
+  meshRelation_.originalID.clear();
+  meshRelation_.originalID[meshID] = meshID;
 }
 
 int Manifold::Impl::InitializeNewReference(
@@ -381,8 +368,7 @@ int Manifold::Impl::InitializeNewReference(
     const std::vector<float>& properties,
     const std::vector<float>& propertyTolerance) {
   meshRelation_.triBary.resize(NumTri());
-  const int nextMeshID = meshID2Original_.size();
-  meshID2Original_.push_back(nextMeshID);
+  const int nextMeshID = meshIDCounter_.fetch_add(1);
   ReinitializeReference(nextMeshID);
 
   const int numProps = propertyTolerance.size();

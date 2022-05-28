@@ -187,7 +187,7 @@ Manifold Manifold::Sphere(float radius, int circularSegments) {
                      ToSphere({radius}));
   sphere.pImpl_->Finish();
   // Ignore preceding octahedron.
-  sphere.pImpl_->ReinitializeReference();
+  sphere.pImpl_->ReinitializeReference(Impl::meshIDCounter_.fetch_add(1));
   return sphere;
 }
 
@@ -420,13 +420,32 @@ Manifold Manifold::Compose(const std::vector<Manifold>& manifolds) {
                       combined.halfedge_.begin() + nextEdge,
                       UpdateHalfedge({nextVert, nextEdge, nextTri}));
 
+    // Assign new IDs to triangles added in this iteration, to differentiate
+    // triangles coming from different manifolds.
+    std::unordered_map<int, int> old2new;
+    thrust::for_each(thrust::host, combined.meshRelation_.triBary.begin() + nextTri,
+                     combined.meshRelation_.triBary.begin() + nextTri +
+                         impl.meshRelation_.triBary.size(),
+                     [&old2new](BaryRef &bary) {
+                       auto entry = old2new.find(bary.meshID);
+                       if (entry == old2new.end()) {
+                         bary.meshID = old2new[bary.meshID] =
+                             Manifold::Impl::meshIDCounter_.fetch_add(1);
+                       } else {
+                         bary.meshID = entry->second;
+                       }
+                     });
+    for (auto &entry : old2new) {
+      int original = impl.meshRelation_.originalID.at(entry.first);
+      combined.meshRelation_.originalID[entry.second] = original;
+    }
+
     nextVert += manifold.NumVert();
     nextEdge += 2 * manifold.NumEdge();
     nextTri += manifold.NumTri();
     nextBary += impl.meshRelation_.barycentric.size();
   }
 
-  combined.DuplicateMeshIDs();
   combined.Finish();
   return out;
 }
@@ -483,6 +502,18 @@ std::vector<Manifold> Manifold::Decompose() const {
     meshes[i].pImpl_->ReindexVerts(vertNew2Old, pImpl_->NumVert());
 
     meshes[i].pImpl_->Finish();
+
+    auto &parentOriginalID = pImpl_->meshRelation_.originalID;
+    auto &originalID = meshes[i].pImpl_->meshRelation_.originalID;
+
+    // Copy the original ID from the original mesh to the decomposed mesh
+    thrust::for_each(thrust::host,
+                     meshes[i].pImpl_->meshRelation_.triBary.begin(),
+                     meshes[i].pImpl_->meshRelation_.triBary.end(),
+                     [&parentOriginalID, &originalID](BaryRef &bary) {
+                       originalID[bary.tri] = parentOriginalID[bary.tri];
+                     });
+
     meshes[i].pImpl_->transform_ = pImpl_->transform_;
   }
   return meshes;
