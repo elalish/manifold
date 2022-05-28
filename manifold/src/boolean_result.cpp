@@ -682,25 +682,44 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
   outR.SimplifyTopology();
 
   // Update meshID
-  std::unordered_map<int, int> old2new;
-  thrust::for_each(thrust::host, outR.meshRelation_.triBary.begin(),
-                   outR.meshRelation_.triBary.end(), [&old2new](BaryRef &b) {
-                     auto entry = old2new.find(b.meshID);
-                     if (entry == old2new.end()) {
-                       b.meshID = old2new[b.meshID] =
-                           Manifold::Impl::meshIDCounter_.fetch_add(1);
-                     } else {
-                       b.meshID = entry->second;
-                     }
+  // we remap them into indices starting from 0. The exact value value is not
+  // important as long as
+  // 1. They are distinct
+  // 2. `originalID[meshID]` is the original mesh ID of the triangle
+  // Index starting from 0 is chosen because I want the kernel part as simple as
+  // possible.
+  VecDH<int> meshIDs;
+  VecDH<int> original;
+  for (auto &entry : inP_.meshRelation_.originalID) {
+    meshIDs.push_back(entry.first | 1 << 30);
+    original.push_back(entry.second);
+  }
+  for (auto &entry : inQ_.meshRelation_.originalID) {
+    meshIDs.push_back(entry.first);
+    original.push_back(entry.second);
+  }
+  // in general, meshIDs should be small
+  thrust::sort_by_key(thrust::host, meshIDs.begin(), meshIDs.end(), original.begin());
+
+  const int numMesh = meshIDs.size();
+  const int* meshIDsPtr = meshIDs.cptrD();
+  int* originalPtr = original.ptrD();
+
+  thrust::for_each(thrust::device, outR.meshRelation_.triBary.begin(),
+                   outR.meshRelation_.triBary.end(),
+                   [=] __host__ __device__(BaryRef &b) {
+                     int index = thrust::lower_bound(meshIDsPtr,
+                                                     meshIDsPtr + numMesh,
+                                                     b.meshID) -
+                                 meshIDsPtr;
+                     b.meshID = index;
+                     originalPtr[index] |= 1 << 30;
                    });
 
-  for (auto &entry : old2new) {
-    // If the 30th bit is set, the triangle comes from P.
-    int original =
-        (entry.first & 1 << 30)
-            ? inP_.meshRelation_.originalID.at(entry.first & ~(1 << 30))
-            : inQ_.meshRelation_.originalID.at(entry.first);
-    outR.meshRelation_.originalID[entry.second] = original;
+  for (int i = 0; i < numMesh; ++i) {
+    if (original[i] & (1 << 30)) {
+      outR.meshRelation_.originalID[i] = original[i] & ~(1 << 30);
+    }
   }
 
   simplify.Stop();
