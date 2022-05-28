@@ -62,14 +62,11 @@ Manifold::~Manifold() = default;
 Manifold::Manifold(Manifold&&) noexcept = default;
 Manifold& Manifold::operator=(Manifold&&) noexcept = default;
 
-Manifold::Manifold(const Manifold& other) : pImpl_(new Impl(*other.pImpl_)) {
-  pImpl_->DuplicateMeshIDs();
-}
+Manifold::Manifold(const Manifold& other) : pImpl_(new Impl(*other.pImpl_)) {}
 
 Manifold& Manifold::operator=(const Manifold& other) {
   if (this != &other) {
     pImpl_.reset(new Impl(*other.pImpl_));
-    pImpl_->DuplicateMeshIDs();
   }
   return *this;
 }
@@ -264,10 +261,9 @@ Curvature Manifold::GetCurvature() const { return pImpl_->GetCurvature(); }
  * >= 0, indicating it is a new vertex. If the index is < 0, this indicates it
  * is an original vertex, the index + 3 vert of the referenced triangle.
  *
- * Every time a manifold is copied or combined to form a new manifold it gets a
- * new meshID to indicate that particular instance of the mesh. In order to look
- * up which input mesh a given instance came from, simply use the
- * MeshID2Original() static vector.
+ * In order to look up which input mesh a given instance come from, use the
+ * `originalID` field, i.e. `originalID[meshID]`. Users should not rely on the
+ * raw value of `meshID`.
  */
 MeshRelation Manifold::GetMeshRelation() const {
   MeshRelation out;
@@ -276,6 +272,7 @@ MeshRelation Manifold::GetMeshRelation() const {
                      relation.triBary.end());
   out.barycentric.insert(out.barycentric.end(), relation.barycentric.begin(),
                          relation.barycentric.end());
+  out.originalID = relation.originalID;
   return out;
 }
 
@@ -318,15 +315,6 @@ std::vector<int> Manifold::GetMeshIDs() const {
 int Manifold::SetAsOriginal() {
   int meshID = pImpl_->InitializeNewReference();
   return meshID;
-}
-
-/**
- * Returns a vector that maps a given unique MeshID to the MeshID of the
- * original Mesh it came from, to easily identify separate copies of the same
- * thing.
- */
-std::vector<int> Manifold::MeshID2Original() {
-  return Manifold::Impl::meshID2Original_;
 }
 
 /**

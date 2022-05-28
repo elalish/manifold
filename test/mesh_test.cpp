@@ -63,12 +63,9 @@ void Related(const Manifold& out, const std::vector<Mesh>& input,
              const std::map<int, int>& meshID2idx) {
   Mesh output = out.GetMesh();
   MeshRelation relation = out.GetMeshRelation();
-  std::vector<int> meshID2Original = Manifold::MeshID2Original();
   for (int tri = 0; tri < out.NumTri(); ++tri) {
     int meshID = relation.triBary[tri].meshID;
-    int meshIdx = meshID2idx.find(meshID) != meshID2idx.end()
-                      ? meshID2idx.at(meshID)
-                      : meshID2idx.at(meshID2Original[meshID]);
+    int meshIdx = meshID2idx.at(relation.originalID[meshID]);
     ASSERT_LT(meshIdx, input.size());
     const Mesh& inMesh = input[meshIdx];
     int inTri = relation.triBary[tri].tri;

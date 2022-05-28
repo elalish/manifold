@@ -442,6 +442,11 @@ struct CreateBarycentric {
     const BaryRef oldRef = halfedgeRef.PQ == 0 ? triBaryP[tri] : triBaryQ[tri];
 
     faceRef[halfedgeR.face] = oldRef;
+    // Mark the meshID as coming from P by flipping the 30th bit.
+    // The 30th bit is used to avoid flipping the sign.
+    if (halfedgeRef.PQ == 0) {
+      faceRef[halfedgeR.face].meshID |= 1 << 30;
+    }
 
     if (halfedgeR.startVert < firstNewVert) {  // retained vert
       int i = halfedgeRef.vert;
@@ -674,9 +679,29 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
   Timer simplify;
   simplify.Start();
 
-  outR.DuplicateMeshIDs();
-
   outR.SimplifyTopology();
+
+  // Update meshID
+  std::unordered_map<int, int> old2new;
+  thrust::for_each(thrust::host, outR.meshRelation_.triBary.begin(),
+                   outR.meshRelation_.triBary.end(), [&old2new](BaryRef &b) {
+                     auto entry = old2new.find(b.meshID);
+                     if (entry == old2new.end()) {
+                       b.meshID = old2new[b.meshID] =
+                           Manifold::Impl::meshIDCounter_.fetch_add(1);
+                     } else {
+                       b.meshID = entry->second;
+                     }
+                   });
+
+  for (auto &entry : old2new) {
+    // If the 30th bit is set, the triangle comes from P.
+    int original =
+        (entry.first & 1 << 30)
+            ? inP_.meshRelation_.originalID.at(entry.first & ~(1 << 30))
+            : inQ_.meshRelation_.originalID.at(entry.first);
+    outR.meshRelation_.originalID[entry.second] = original;
+  }
 
   simplify.Stop();
   Timer sort;

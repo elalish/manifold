@@ -27,6 +27,8 @@ struct Manifold::Impl {
   struct MeshRelationD {
     VecDH<glm::vec3> barycentric;
     VecDH<BaryRef> triBary;
+    /// meshID to originalID mapping.
+    std::unordered_map<int, int> originalID;
   };
 
   Box bBox_;
@@ -40,7 +42,7 @@ struct Manifold::Impl {
   Collider collider_;
   glm::mat4x3 transform_ = glm::mat4x3(1.0f);
 
-  static std::vector<int> meshID2Original_;
+  static std::atomic<int> meshIDCounter_;
 
   Impl() {}
   enum class Shape { TETRAHEDRON, CUBE, OCTAHEDRON };
@@ -56,8 +58,7 @@ struct Manifold::Impl {
       const std::vector<float>& properties = std::vector<float>(),
       const std::vector<float>& propertyTolerance = std::vector<float>());
 
-  void DuplicateMeshIDs();
-  void ReinitializeReference(int meshID = -1);
+  void ReinitializeReference(int meshID);
   void CreateHalfedges(const VecDH<glm::ivec3>& triVerts);
   void CreateAndFixHalfedges(const VecDH<glm::ivec3>& triVerts);
   void CalculateNormals();
