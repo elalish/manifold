@@ -422,22 +422,37 @@ Manifold Manifold::Compose(const std::vector<Manifold>& manifolds) {
 
     // Assign new IDs to triangles added in this iteration, to differentiate
     // triangles coming from different manifolds.
-    std::unordered_map<int, int> old2new;
-    thrust::for_each(thrust::host, combined.meshRelation_.triBary.begin() + nextTri,
+    // See the end of `boolean_result.cpp` for details.
+    VecDH<int> meshIDs;
+    VecDH<int> original;
+    for (auto &entry : impl.meshRelation_.originalID) {
+      meshIDs.push_back(entry.first | 1 << 30);
+      original.push_back(entry.second);
+    }
+    // in general, meshIDs should be small
+    thrust::sort_by_key(thrust::host, meshIDs.begin(), meshIDs.end(), original.begin());
+
+    const int numMesh = meshIDs.size();
+    const int* meshIDsPtr = meshIDs.cptrD();
+    int* originalPtr = original.ptrD();
+    int meshIDStart = combined.meshRelation_.originalID.size();
+
+    thrust::for_each(thrust::device, combined.meshRelation_.triBary.begin() + nextTri,
                      combined.meshRelation_.triBary.begin() + nextTri +
                          impl.meshRelation_.triBary.size(),
-                     [&old2new](BaryRef &bary) {
-                       auto entry = old2new.find(bary.meshID);
-                       if (entry == old2new.end()) {
-                         bary.meshID = old2new[bary.meshID] =
-                             Manifold::Impl::meshIDCounter_.fetch_add(1);
-                       } else {
-                         bary.meshID = entry->second;
-                       }
+                     [=] __host__ __device__(BaryRef &b) {
+                       int index = thrust::lower_bound(meshIDsPtr,
+                                                       meshIDsPtr + numMesh,
+                                                       b.meshID) -
+                                   meshIDsPtr;
+                       b.meshID = index + meshIDStart;
+                       originalPtr[index] |= 1 << 30;
                      });
-    for (auto &entry : old2new) {
-      int original = impl.meshRelation_.originalID.at(entry.first);
-      combined.meshRelation_.originalID[entry.second] = original;
+
+    for (int i = 0; i < numMesh; ++i) {
+      if (original[i] & (1 << 30)) {
+        combined.meshRelation_.originalID[i+meshIDStart] = original[i] & ~(1 << 30);
+      }
     }
 
     nextVert += manifold.NumVert();

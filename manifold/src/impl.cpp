@@ -357,10 +357,12 @@ Manifold::Impl::Impl(Shape shape) {
 }
 
 void Manifold::Impl::ReinitializeReference(int meshID) {
+  // instead of storing the meshID, we store 0 and set the mapping to
+  // 0 -> meshID, because the meshID after boolean operation also starts from 0.
   thrust::for_each_n(thrust::device, zip(meshRelation_.triBary.begin(), countAt(0)), NumTri(),
-                     InitializeBaryRef({meshID, halfedge_.cptrD()}));
+                     InitializeBaryRef({0, halfedge_.cptrD()}));
   meshRelation_.originalID.clear();
-  meshRelation_.originalID[meshID] = meshID;
+  meshRelation_.originalID[0] = meshID;
 }
 
 int Manifold::Impl::InitializeNewReference(

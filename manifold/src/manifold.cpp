@@ -270,9 +270,11 @@ MeshRelation Manifold::GetMeshRelation() const {
   const auto& relation = pImpl_->meshRelation_;
   out.triBary.insert(out.triBary.end(), relation.triBary.begin(),
                      relation.triBary.end());
+  for (auto &bary : out.triBary) {
+    bary.meshID = relation.originalID.at(bary.meshID);
+  }
   out.barycentric.insert(out.barycentric.end(), relation.barycentric.begin(),
                          relation.barycentric.end());
-  out.originalID = relation.originalID;
   return out;
 }
 
@@ -283,17 +285,11 @@ MeshRelation Manifold::GetMeshRelation() const {
  * future reference.
  */
 std::vector<int> Manifold::GetMeshIDs() const {
-  VecDH<int> meshIDs(NumTri());
-  thrust::for_each_n(
-      thrust::device, zip(meshIDs.begin(), pImpl_->meshRelation_.triBary.begin()), NumTri(),
-      GetMeshID());
-
-  thrust::sort(thrust::device, meshIDs.begin(), meshIDs.end());
-  int n = thrust::unique(thrust::device, meshIDs.begin(), meshIDs.end()) - meshIDs.begin();
-  meshIDs.resize(n);
-
   std::vector<int> out;
-  out.insert(out.end(), meshIDs.begin(), meshIDs.end());
+  out.reserve(pImpl_->meshRelation_.originalID.size());
+  for (auto &entry : pImpl_->meshRelation_.originalID) {
+    out.push_back(entry.second);
+  }
   return out;
 }
 
