@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "impl.h"
+#include "par.h"
 
 namespace {
 using namespace manifold;
@@ -119,9 +120,10 @@ namespace manifold {
  */
 void Manifold::Impl::SimplifyTopology() {
   VecDH<int> flaggedEdges(halfedge_.size());
+  auto policy = autoPolicy(halfedge_.size());
   int numFlagged =
-      thrust::copy_if(
-          thrust::device, countAt(0), countAt(halfedge_.size()), flaggedEdges.begin(),
+      copy_if<decltype(flaggedEdges.begin())>(
+          policy, countAt(0), countAt(halfedge_.size()), flaggedEdges.begin(),
           ShortEdge({halfedge_.cptrD(), vertPos_.cptrD(), precision_})) -
       flaggedEdges.begin();
   flaggedEdges.resize(numFlagged);
@@ -130,8 +132,8 @@ void Manifold::Impl::SimplifyTopology() {
 
   flaggedEdges.resize(halfedge_.size());
   numFlagged =
-      thrust::copy_if(
-          thrust::device, countAt(0), countAt(halfedge_.size()), flaggedEdges.begin(),
+      copy_if<decltype(flaggedEdges.begin())>(
+          policy, countAt(0), countAt(halfedge_.size()), flaggedEdges.begin(),
           FlagEdge({halfedge_.cptrD(), meshRelation_.triBary.cptrD()})) -
       flaggedEdges.begin();
   flaggedEdges.resize(numFlagged);
@@ -139,8 +141,8 @@ void Manifold::Impl::SimplifyTopology() {
   for (const int edge : flaggedEdges) CollapseEdge(edge);
 
   flaggedEdges.resize(halfedge_.size());
-  numFlagged = thrust::copy_if(
-                   thrust::device, countAt(0), countAt(halfedge_.size()), flaggedEdges.begin(),
+  numFlagged = copy_if<decltype(flaggedEdges.begin())>(
+                   policy, countAt(0), countAt(halfedge_.size()), flaggedEdges.begin(),
                    SwappableEdge({halfedge_.cptrD(), vertPos_.cptrD(),
                                   faceNormal_.cptrD(), precision_})) -
                flaggedEdges.begin();
