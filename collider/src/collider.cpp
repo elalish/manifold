@@ -14,6 +14,7 @@
 
 #include "collider.h"
 #include "utils.h"
+#include "par.h"
 
 #ifdef _MSC_VER
 #include <intrin.h>
@@ -252,7 +253,7 @@ Collider::Collider(const VecDH<Box>& leafBB,
   nodeParent_.resize(num_nodes, -1);
   internalChildren_.resize(leafBB.size() - 1, thrust::make_pair(-1, -1));
   // organize tree
-  thrust::for_each_n(thrust::device, countAt(0), NumInternal(),
+  for_each_n(autoPolicy(NumInternal()), countAt(0), NumInternal(),
                      CreateRadixTree({nodeParent_.ptrD(),
                                       internalChildren_.ptrD(), leafMorton}));
   UpdateBoxes(leafBB);
@@ -273,8 +274,8 @@ SparseIndices Collider::Collisions(const VecDH<T>& querriesIn) const {
     // scalar number of overlaps found
     VecDH<int> nOverlapsD(1, 0);
     // calculate Bounding Box overlaps
-    thrust::for_each_n(
-        thrust::device, zip(querriesIn.cbegin(), countAt(0)), querriesIn.size(),
+    for_each_n(
+        autoPolicy(querriesIn.size()), zip(querriesIn.cbegin(), countAt(0)), querriesIn.size(),
         FindCollisions<T>({querryTri.ptrDpq(), nOverlapsD.ptrD(), maxOverlaps,
                            nodeBBox_.ptrD(), internalChildren_.ptrD()}));
     nOverlaps = nOverlapsD[0];
@@ -305,13 +306,13 @@ void Collider::UpdateBoxes(const VecDH<Box>& leafBB) {
   // copy in leaf node Boxs
   strided_range<VecDH<Box>::Iter> leaves(nodeBBox_.begin(), nodeBBox_.end(),
                                           2);
-  thrust::copy(thrust::device, leafBB.cbegin(), leafBB.cend(), leaves.begin());
+  auto policy = autoPolicy(NumInternal());
+  copy(policy, leafBB.cbegin(), leafBB.cend(), leaves.begin());
   // create global counters
-  VecDH<int> counter(NumInternal());
-  thrust::fill(thrust::device, counter.begin(), counter.end(), 0);
+  VecDH<int> counter(NumInternal(), 0);
   // kernel over leaves to save internal Boxs
-  thrust::for_each_n(
-      thrust::device, countAt(0), NumLeaves(),
+  for_each_n(
+      policy, countAt(0), NumLeaves(),
       BuildInternalBoxes({nodeBBox_.ptrD(), counter.ptrD(), nodeParent_.ptrD(),
                           internalChildren_.ptrD()}));
 }
@@ -330,7 +331,7 @@ bool Collider::Transform(glm::mat4x3 transform) {
     if (count != 2) axisAligned = false;
   }
   if (axisAligned) {
-    thrust::for_each(thrust::device, nodeBBox_.begin(), nodeBBox_.end(),
+    for_each(autoPolicy(nodeBBox_.size()), nodeBBox_.begin(), nodeBBox_.end(),
                      TransformBox({transform}));
   }
   return axisAligned;

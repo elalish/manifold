@@ -14,6 +14,7 @@
 
 #include "boolean3.h"
 #include "impl.h"
+#include "par.h"
 
 namespace {
 using namespace manifold;
@@ -124,6 +125,7 @@ Mesh Manifold::GetMesh() const {
                                 pImpl_->halfedgeTangent_.end());
 
   result.triVerts.resize(NumTri());
+  // note that `triVerts` is `std::vector`, so we cannot use thrust::device
   thrust::for_each_n(thrust::host, zip(result.triVerts.begin(), countAt(0)), NumTri(),
                      MakeTri({pImpl_->halfedge_.cptrH()}));
 
@@ -287,12 +289,13 @@ MeshRelation Manifold::GetMeshRelation() const {
  */
 std::vector<int> Manifold::GetMeshIDs() const {
   VecDH<int> meshIDs(NumTri());
-  thrust::for_each_n(
-      thrust::device, zip(meshIDs.begin(), pImpl_->meshRelation_.triBary.begin()), NumTri(),
+  auto policy = autoPolicy(NumTri());
+  for_each_n(
+      policy, zip(meshIDs.begin(), pImpl_->meshRelation_.triBary.begin()), NumTri(),
       GetMeshID());
 
-  thrust::sort(thrust::device, meshIDs.begin(), meshIDs.end());
-  int n = thrust::unique(thrust::device, meshIDs.begin(), meshIDs.end()) - meshIDs.begin();
+  sort(policy, meshIDs.begin(), meshIDs.end());
+  int n = unique<decltype(meshIDs.begin())>(policy, meshIDs.begin(), meshIDs.end()) - meshIDs.begin();
   meshIDs.resize(n);
 
   std::vector<int> out;

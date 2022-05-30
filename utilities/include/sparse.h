@@ -23,6 +23,7 @@
 #include "structs.h"
 #include "utils.h"
 #include "vec_dh.h"
+#include "par.h"
 
 namespace manifold {
 
@@ -65,7 +66,7 @@ class SparseIndices {
   int size() const { return p.size(); }
   void SwapPQ() { p.swap(q); }
 
-  void Sort() { thrust::sort(beginPQ(), endPQ()); }
+  void Sort() { sort(autoPolicy(size()), beginPQ(), endPQ()); }
 
   void Resize(int size) {
     p.resize(size, -1);
@@ -74,7 +75,7 @@ class SparseIndices {
 
   void Unique() {
     Sort();
-    int newSize = thrust::unique(beginPQ(), endPQ()) - beginPQ();
+    int newSize = unique<decltype(beginPQ())>(autoPolicy(size()), beginPQ(), endPQ()) - beginPQ();
     Resize(newSize);
   }
 
@@ -89,7 +90,7 @@ class SparseIndices {
                   "Different number of values than indicies!");
     auto zBegin = zip(S.begin(), begin(false), begin(true));
     auto zEnd = zip(S.end(), end(false), end(true));
-    size_t size = thrust::remove_if(zBegin, zEnd, firstZero()) - zBegin;
+    size_t size = remove_if<decltype(zBegin)>(autoPolicy(S.size()), zBegin, zEnd, firstZero()) - zBegin;
     S.resize(size, -1);
     p.resize(size, -1);
     q.resize(size, -1);
@@ -122,9 +123,7 @@ class SparseIndices {
                   "Different number of values than indicies!");
     auto zBegin = zip(v.begin(), x.begin(), begin(false), begin(true));
     auto zEnd = zip(v.end(), x.end(), end(false), end(true));
-    size_t size =
-        thrust::remove_if(thrust::device, zBegin, zEnd, firstNonFinite<T>()) -
-        zBegin;
+    size_t size = remove_if<decltype(zBegin)>(autoPolicy(v.size()), zBegin, zEnd, firstNonFinite<T>()) - zBegin;
     v.resize(size);
     x.resize(size, -1);
     p.resize(size, -1);
@@ -141,13 +140,12 @@ class SparseIndices {
     VecDH<T> result(size);
     VecDH<char> found(size);
     VecDH<int> temp(size);
-    thrust::fill(thrust::device, result.begin(), result.end(), missingVal);
-    thrust::binary_search(thrust::device, beginPQ(), endPQ(), pqBegin, pqEnd,
-                          found.begin());
-    thrust::lower_bound(thrust::device, beginPQ(), endPQ(), pqBegin, pqEnd,
-                        temp.begin());
-    thrust::gather_if(thrust::device, temp.begin(), temp.end(), found.begin(),
-                      val.begin(), result.begin());
+    auto policy = autoPolicy(size);
+    fill(policy, result.begin(), result.end(), missingVal);
+    binary_search(policy, beginPQ(), endPQ(), pqBegin, pqEnd, found.begin());
+    lower_bound(policy, beginPQ(), endPQ(), pqBegin, pqEnd, temp.begin());
+    gather_if(policy, temp.begin(), temp.end(), found.begin(), val.begin(),
+                      result.begin());
     return result;
   }
 

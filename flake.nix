@@ -48,10 +48,10 @@
           packages.manifold-omp = manifold { backend = "OMP"; runtime = [ pkgs.llvmPackages.openmp ]; };
           packages.manifold-cuda = manifold {
             backend = "CUDA";
-            runtime = [
-              pkgs.cudaPackages.cudatoolkit_11
+            runtime = with pkgs; [
+              llvmPackages.openmp
+              cudaPackages.cudatoolkit_11
             ];
-            doCheck = false;
           };
           packages.manifold-js = pkgs.buildEmscriptenPackage {
             name = "manifold-js";
