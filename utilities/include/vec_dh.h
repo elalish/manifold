@@ -14,7 +14,9 @@
 
 #pragma once
 #include <chrono>
+#if THRUST_DEVICE_SYSTEM == THRUST_DEVICE_SYSTEM_CUDA
 #include <cuda.h>
+#endif
 #include <iostream>
 #include <thrust/execution_policy.h>
 #include <thrust/uninitialized_copy.h>

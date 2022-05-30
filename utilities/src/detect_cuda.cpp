@@ -1,3 +1,4 @@
+#include "thrust/execution_policy.h"
 #if THRUST_DEVICE_SYSTEM == THRUST_DEVICE_SYSTEM_CUDA
 #include <cuda_runtime.h>
 
@@ -10,5 +11,7 @@ void check_cuda_available() {
 }
 }
 #else
-void manifold::check_cuda_available() {}
+namespace manifold {
+void check_cuda_available() {}
+}
 #endif
