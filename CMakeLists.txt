@@ -44,11 +44,13 @@ if (THRUST_BACKEND STREQUAL "CUDA")
     # we cannot set THRUST_INC_DIR when building with CUDA, otherwise the
     # compiler will not use the system CUDA headers which causes incompatibility
     enable_language(CUDA)
+    find_package(CUDA  REQUIRED)
     # clear THRUST_INC_DIR, we use the one from nvcc
     set(THRUST_INC_DIR "")
     # OpenMP also required
     find_package(OpenMP REQUIRED)
     set(MANIFOLD_INCLUDE OpenMP::OpenMP_CXX)
+    set(MANIFOLD_FLAGS ${MANIFOLD_FLAGS} -DTHRUST_DEVICE_SYSTEM=THRUST_DEVICE_SYSTEM_CUDA)
     set(MANIFOLD_NVCC_FLAGS ${MANIFOLD_NVCC_FLAGS} -fopenmp)
 elseif (THRUST_BACKEND STREQUAL "OMP")
     find_package(OpenMP REQUIRED)
@@ -56,8 +58,9 @@ elseif (THRUST_BACKEND STREQUAL "OMP")
     set(MANIFOLD_FLAGS ${MANIFOLD_FLAGS} -DTHRUST_DEVICE_SYSTEM=THRUST_DEVICE_SYSTEM_OMP -fopenmp)
 elseif (THRUST_BACKEND STREQUAL "CPP")
     set(MANIFOLD_FLAGS ${MANIFOLD_FLAGS} -DTHRUST_DEVICE_SYSTEM=THRUST_DEVICE_SYSTEM_CPP)
+else ()
     message(FATAL_ERROR "Invalid value for THRUST_BACKEND: ${THRUST_BACKEND}. "
-    "Should be one of \"CUDA\", \"OMP\", \"CPP\" or \"TBB\"")
+    "Should be one of \"CUDA\", \"OMP\", \"CPP\"")
 endif()
 
 add_subdirectory(utilities)
