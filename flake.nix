@@ -40,12 +40,14 @@
               clang-tools
               clang_13
               emscripten
+              tbb
             ] ++ additional;
           };
         in
         {
           packages.manifold-cpp = manifold { };
           packages.manifold-omp = manifold { backend = "OMP"; runtime = [ pkgs.llvmPackages.openmp ]; };
+          packages.manifold-tbb = manifold { backend = "TBB"; runtime = [ pkgs.tbb pkgs.pkg-config ]; };
           packages.manifold-cuda = manifold {
             backend = "CUDA";
             runtime = [
