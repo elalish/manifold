@@ -260,10 +260,6 @@ Curvature Manifold::GetCurvature() const { return pImpl_->GetCurvature(); }
  * gives an index for each vertex into the barycentric vector if that index is
  * >= 0, indicating it is a new vertex. If the index is < 0, this indicates it
  * is an original vertex, the index + 3 vert of the referenced triangle.
- *
- * In order to look up which input mesh a given instance come from, use the
- * `originalID` field, i.e. `originalID[meshID]`. Users should not rely on the
- * raw value of `meshID`.
  */
 MeshRelation Manifold::GetMeshRelation() const {
   MeshRelation out;
