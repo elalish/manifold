@@ -426,34 +426,11 @@ Manifold Manifold::Compose(const std::vector<Manifold>& manifolds) {
     VecDH<int> meshIDs;
     VecDH<int> original;
     for (auto &entry : impl.meshRelation_.originalID) {
-      meshIDs.push_back(entry.first | 1 << 30);
+      meshIDs.push_back(entry.first);
       original.push_back(entry.second);
     }
-    // in general, meshIDs should be small
-    thrust::sort_by_key(thrust::host, meshIDs.begin(), meshIDs.end(), original.begin());
-
-    const int numMesh = meshIDs.size();
-    const int* meshIDsPtr = meshIDs.cptrD();
-    int* originalPtr = original.ptrD();
     int meshIDStart = combined.meshRelation_.originalID.size();
-
-    thrust::for_each(thrust::device, combined.meshRelation_.triBary.begin() + nextTri,
-                     combined.meshRelation_.triBary.begin() + nextTri +
-                         impl.meshRelation_.triBary.size(),
-                     [=] __host__ __device__(BaryRef &b) {
-                       int index = thrust::lower_bound(meshIDsPtr,
-                                                       meshIDsPtr + numMesh,
-                                                       b.meshID) -
-                                   meshIDsPtr;
-                       b.meshID = index + meshIDStart;
-                       originalPtr[index] |= 1 << 30;
-                     });
-
-    for (int i = 0; i < numMesh; ++i) {
-      if (original[i] & (1 << 30)) {
-        combined.meshRelation_.originalID[i+meshIDStart] = original[i] & ~(1 << 30);
-      }
-    }
+    combined.UpdateMeshIDs(meshIDs, original, nextTri, impl.meshRelation_.triBary.size(), meshIDStart);
 
     nextVert += manifold.NumVert();
     nextEdge += 2 * manifold.NumEdge();
@@ -488,6 +465,13 @@ std::vector<Manifold> Manifold::Decompose() const {
     return meshes;
   }
   VecDH<int> vertLabel(components);
+  // meshID mapping for UpdateMeshIDs
+  VecDH<int> meshIDs;
+  VecDH<int> original;
+  for (auto &entry : pImpl_->meshRelation_.originalID) {
+    meshIDs.push_back(entry.first);
+    original.push_back(entry.second);
+  }
 
   std::vector<Manifold> meshes(numLabel);
   for (int i = 0; i < numLabel; ++i) {
@@ -518,16 +502,9 @@ std::vector<Manifold> Manifold::Decompose() const {
 
     meshes[i].pImpl_->Finish();
 
-    auto &parentOriginalID = pImpl_->meshRelation_.originalID;
-    auto &originalID = meshes[i].pImpl_->meshRelation_.originalID;
-
-    // Copy the original ID from the original mesh to the decomposed mesh
-    thrust::for_each(thrust::host,
-                     meshes[i].pImpl_->meshRelation_.triBary.begin(),
-                     meshes[i].pImpl_->meshRelation_.triBary.end(),
-                     [&parentOriginalID, &originalID](BaryRef &bary) {
-                       originalID[bary.tri] = parentOriginalID[bary.tri];
-                     });
+    // meshIDs and original will only be sorted after successful updates, so we
+    // can keep using the old one.
+    meshes[i].pImpl_->UpdateMeshIDs(meshIDs, original);
 
     meshes[i].pImpl_->transform_ = pImpl_->transform_;
   }
