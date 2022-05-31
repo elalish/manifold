@@ -172,9 +172,7 @@ struct InitializeBaryRef {
     BaryRef& baryRef = thrust::get<0>(inOut);
     int tri = thrust::get<1>(inOut);
 
-    // Leave existing meshID if input is negative
-    // TODO: Why do we need this?
-    if (meshID >= 0) baryRef.meshID = meshID;
+    baryRef.meshID = meshID;
     baryRef.tri = tri;
     baryRef.vertBary = {-3, -2, -1};
   }
