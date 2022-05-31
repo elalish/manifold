@@ -19,6 +19,7 @@
 #include <thrust/iterator/permutation_iterator.h>
 #include <thrust/iterator/zip_iterator.h>
 #include <thrust/tuple.h>
+#include <atomic>
 
 #include <iostream>
 
@@ -105,20 +106,22 @@ template <typename T>
 __host__ __device__ T AtomicAdd(T& target, T add) {
 #ifdef __CUDA_ARCH__
   return atomicAdd(&target, add);
-#elif defined(_OPENMP)
-  T out;
-#pragma omp atomic capture
-  {
-    out = target;
-    target += add;
-  }
-  return out;
 #else
-  // else it should be executed on the host with single thread, should be safe
-  T out;
-  out = target;
-  target += add;
-  return out;
+  std::atomic<T> &tar = reinterpret_cast<std::atomic<T>&>(target);
+  T old_val = tar.load();
+  while (!tar.compare_exchange_weak(old_val, old_val + add));
+  return old_val;
+#endif
+}
+
+template <>
+inline __host__ __device__ int AtomicAdd(int& target, int add) {
+#ifdef __CUDA_ARCH__
+  return atomicAdd(&target, add);
+#else
+  std::atomic<int> &tar = reinterpret_cast<std::atomic<int>&>(target);
+  int old_val = tar.fetch_add(add);
+  return old_val;
 #endif
 }
 

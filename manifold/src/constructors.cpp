@@ -187,7 +187,7 @@ Manifold Manifold::Sphere(float radius, int circularSegments) {
                      ToSphere({radius}));
   sphere.pImpl_->Finish();
   // Ignore preceding octahedron.
-  sphere.pImpl_->ReinitializeReference();
+  sphere.pImpl_->ReinitializeReference(Impl::meshIDCounter_.fetch_add(1));
   return sphere;
 }
 
@@ -420,13 +420,24 @@ Manifold Manifold::Compose(const std::vector<Manifold>& manifolds) {
                       combined.halfedge_.begin() + nextEdge,
                       UpdateHalfedge({nextVert, nextEdge, nextTri}));
 
+    // Assign new IDs to triangles added in this iteration, to differentiate
+    // triangles coming from different manifolds.
+    // See the end of `boolean_result.cpp` for details.
+    VecDH<int> meshIDs;
+    VecDH<int> original;
+    for (auto &entry : impl.meshRelation_.originalID) {
+      meshIDs.push_back(entry.first);
+      original.push_back(entry.second);
+    }
+    int meshIDStart = combined.meshRelation_.originalID.size();
+    combined.UpdateMeshIDs(meshIDs, original, nextTri, impl.meshRelation_.triBary.size(), meshIDStart);
+
     nextVert += manifold.NumVert();
     nextEdge += 2 * manifold.NumEdge();
     nextTri += manifold.NumTri();
     nextBary += impl.meshRelation_.barycentric.size();
   }
 
-  combined.DuplicateMeshIDs();
   combined.Finish();
   return out;
 }
@@ -454,6 +465,13 @@ std::vector<Manifold> Manifold::Decompose() const {
     return meshes;
   }
   VecDH<int> vertLabel(components);
+  // meshID mapping for UpdateMeshIDs
+  VecDH<int> meshIDs;
+  VecDH<int> original;
+  for (auto &entry : pImpl_->meshRelation_.originalID) {
+    meshIDs.push_back(entry.first);
+    original.push_back(entry.second);
+  }
 
   std::vector<Manifold> meshes(numLabel);
   for (int i = 0; i < numLabel; ++i) {
@@ -483,6 +501,11 @@ std::vector<Manifold> Manifold::Decompose() const {
     meshes[i].pImpl_->ReindexVerts(vertNew2Old, pImpl_->NumVert());
 
     meshes[i].pImpl_->Finish();
+
+    // meshIDs and original will only be sorted after successful updates, so we
+    // can keep using the old one.
+    meshes[i].pImpl_->UpdateMeshIDs(meshIDs, original);
+
     meshes[i].pImpl_->transform_ = pImpl_->transform_;
   }
   return meshes;

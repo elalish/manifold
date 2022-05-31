@@ -16,6 +16,7 @@
 
 #include <algorithm>
 #include <map>
+#include <atomic>
 
 #include "graph.h"
 #include "impl.h"
@@ -28,12 +29,10 @@ __host__ __device__ void AtomicAddVec3(glm::vec3& target,
   for (int i : {0, 1, 2}) {
 #ifdef __CUDA_ARCH__
     atomicAdd(&target[i], add[i]);
-#elif defined(_OPENMP)
-#pragma omp atomic
-    target[i] += add[i];
 #else
-    // should be executed with single thread on the host
-    target[i] += add[i];
+    std::atomic<float> &tar = reinterpret_cast<std::atomic<float>&>(target[i]);
+    float old_val = tar.load();
+    while (!tar.compare_exchange_weak(old_val, old_val + add[i]));
 #endif
   }
 }
@@ -173,8 +172,7 @@ struct InitializeBaryRef {
     BaryRef& baryRef = thrust::get<0>(inOut);
     int tri = thrust::get<1>(inOut);
 
-    // Leave existing meshID if input is negative
-    if (meshID >= 0) baryRef.meshID = meshID;
+    baryRef.meshID = meshID;
     baryRef.tri = tri;
     baryRef.vertBary = {-3, -2, -1};
   }
@@ -282,7 +280,7 @@ struct EdgeBox {
 
 namespace manifold {
 
-std::vector<int> Manifold::Impl::meshID2Original_;
+std::atomic<int> Manifold::Impl::meshIDCounter_(1);
 
 /**
  * Create a manifold from an input triangle Mesh. Will throw if the Mesh is not
@@ -356,25 +354,13 @@ Manifold::Impl::Impl(Shape shape) {
   InitializeNewReference();
 }
 
-/**
- * When a manifold is copied, it is given a new unique set of mesh relation IDs,
- * identifying a particular instance of a copied input mesh. The original mesh
- * ID can be found using the meshID2Original mapping.
- */
-void Manifold::Impl::DuplicateMeshIDs() {
-  std::map<int, int> old2new;
-  for (BaryRef& ref : meshRelation_.triBary) {
-    if (old2new.find(ref.meshID) == old2new.end()) {
-      old2new[ref.meshID] = meshID2Original_.size();
-      meshID2Original_.push_back(meshID2Original_[ref.meshID]);
-    }
-    ref.meshID = old2new[ref.meshID];
-  }
-}
-
 void Manifold::Impl::ReinitializeReference(int meshID) {
+  // instead of storing the meshID, we store 0 and set the mapping to
+  // 0 -> meshID, because the meshID after boolean operation also starts from 0.
   thrust::for_each_n(thrust::device, zip(meshRelation_.triBary.begin(), countAt(0)), NumTri(),
-                     InitializeBaryRef({meshID, halfedge_.cptrD()}));
+                     InitializeBaryRef({0, halfedge_.cptrD()}));
+  meshRelation_.originalID.clear();
+  meshRelation_.originalID[0] = meshID;
 }
 
 int Manifold::Impl::InitializeNewReference(
@@ -382,8 +368,7 @@ int Manifold::Impl::InitializeNewReference(
     const std::vector<float>& properties,
     const std::vector<float>& propertyTolerance) {
   meshRelation_.triBary.resize(NumTri());
-  const int nextMeshID = meshID2Original_.size();
-  meshID2Original_.push_back(nextMeshID);
+  const int nextMeshID = meshIDCounter_.fetch_add(1);
   ReinitializeReference(nextMeshID);
 
   const int numProps = propertyTolerance.size();
@@ -611,6 +596,62 @@ void Manifold::Impl::CalculateNormals() {
       AssignNormals({vertNormal_.ptrD(), vertPos_.cptrD(), halfedge_.cptrD(),
                      precision_, calculateTriNormal}));
   thrust::for_each(thrust::device, vertNormal_.begin(), vertNormal_.end(), Normalize());
+}
+
+/**
+ * Update meshID and originalID in meshRelation_.triBary[startTri..startTri+n]
+ * according to meshIDs -> originalIDs mapping. The updated meshID will start
+ * from startID.
+ * Will raise an exception if meshRelation_.triBary[startTri..startTri+n]
+ * contains a meshID not in meshIDs.
+ *
+ * We remap them into indices starting from startID. The exact value value is not
+ * important as long as
+ * 1. They are distinct
+ * 2. `originalID[meshID]` is the original mesh ID of the triangle
+ *
+ * Use this when the mesh is a combination of several meshes or a subset of a
+ * larger mesh, e.g. after performing boolean operations, compose or decompose.
+ */
+void Manifold::Impl::UpdateMeshIDs(VecDH<int> &meshIDs, VecDH<int> &originalIDs,
+                                   int startTri, int n, int startID) {
+  if (n == -1)
+    n = meshRelation_.triBary.size();
+  thrust::sort_by_key(thrust::host, meshIDs.begin(), meshIDs.end(),
+                      originalIDs.begin());
+  constexpr int kOccurred = 1 << 30;
+  VecDH<int> error(1, -1);
+  const int numMesh = meshIDs.size();
+  const int *meshIDsPtr = meshIDs.cptrD();
+  int *originalPtr = originalIDs.ptrD();
+  int *errorPtr = error.ptrD();
+  thrust::for_each(thrust::device,
+                   meshRelation_.triBary.begin() + startTri,
+                   meshRelation_.triBary.begin() + startTri + n,
+                   [=] __host__ __device__(BaryRef & b) {
+                     int index =
+                         thrust::lower_bound(meshIDsPtr, meshIDsPtr + numMesh,
+                                             b.meshID) -
+                         meshIDsPtr;
+                     if (index >= numMesh || meshIDsPtr[index] != b.meshID) {
+                       *errorPtr = b.meshID;
+                     }
+                     b.meshID = index + startID;
+                     originalPtr[index] |= kOccurred;
+                   });
+
+  if (error[0] != -1) {
+    std::stringstream ss;
+    ss << "Manifold::UpdateMeshIDs: meshID " << error[0]
+       << " not found in meshIDs.";
+    throw std::runtime_error(ss.str());
+  }
+  for (int i = 0; i < numMesh; ++i) {
+    if (originalIDs[i] & kOccurred) {
+      originalIDs[i] &= ~kOccurred;
+      meshRelation_.originalID[i + startID] = originalIDs[i];
+    }
+  }
 }
 
 /**

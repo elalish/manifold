@@ -30,7 +30,7 @@ endif()
 target_include_directories( ${PROJECT_NAME} PUBLIC ${PROJECT_SOURCE_DIR}/include )
 target_link_libraries( ${PROJECT_NAME}
     PUBLIC utilities
-    PRIVATE collider polygon ${MANIFOLD_OMP_INCLUDE} graphlite
+    PRIVATE collider polygon ${MANIFOLD_INCLUDE} graphlite
 )
 
 target_compile_features(${PROJECT_NAME} 
