@@ -249,7 +249,6 @@ int Manifold::Impl::NumDegenerateTris() const {
 
 Properties Manifold::Impl::GetProperties() const {
   if (IsEmpty()) return {0, 0};
-  ApplyTransform();
   auto areaVolume = transform_reduce<thrust::pair<float, float>>(
       autoPolicy(NumTri()), countAt(0), countAt(NumTri()),
       FaceAreaVolume({halfedge_.cptrD(), vertPos_.cptrD(), precision_}),
@@ -260,7 +259,6 @@ Properties Manifold::Impl::GetProperties() const {
 Curvature Manifold::Impl::GetCurvature() const {
   Curvature result;
   if (IsEmpty()) return result;
-  ApplyTransform();
   VecDH<float> vertMeanCurvature(NumVert(), 0);
   VecDH<float> vertGaussianCurvature(NumVert(), glm::two_pi<float>());
   VecDH<float> vertArea(NumVert(), 0);

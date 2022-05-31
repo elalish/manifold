@@ -528,42 +528,30 @@ void Manifold::Impl::Update() {
   collider_.UpdateBoxes(faceBox);
 }
 
-void Manifold::Impl::ApplyTransform() const {
-  // This const_cast is here because these operations cancel out, leaving the
-  // state conceptually unchanged. This enables lazy transformation evaluation.
-  const_cast<Impl*>(this)->ApplyTransform();
-}
-
 /**
- * Bake the manifold's transform into its vertices. This function allows lazy
- * evaluation, which is important because often several transforms are applied
- * between operations.
+ * Bake the manifold's transform into its vertices.
  */
-void Manifold::Impl::ApplyTransform() {
-  if (transform_ == glm::mat4x3(1.0f)) return;
-  auto policy = autoPolicy(vertPos_.size());
+void Manifold::Impl::ApplyTransform(const glm::mat4x3 &transform) {
+  if (transform == glm::mat4x3(1.0f)) return;
+  auto policy = autoPolicy(NumVert());
   for_each(policy, vertPos_.begin(), vertPos_.end(),
-           Transform4x3({transform_}));
+                   Transform4x3({transform}));
 
   glm::mat3 normalTransform =
-      glm::inverse(glm::transpose(glm::mat3(transform_)));
+      glm::inverse(glm::transpose(glm::mat3(transform)));
   for_each(policy, faceNormal_.begin(), faceNormal_.end(),
            TransformNormals({normalTransform}));
   for_each(policy, vertNormal_.begin(), vertNormal_.end(),
            TransformNormals({normalTransform}));
   // This optimization does a cheap collider update if the transform is
   // axis-aligned.
-  if (!collider_.Transform(transform_)) Update();
+  if (!collider_.Transform(transform)) Update();
 
   const float oldScale = bBox_.Scale();
-  transform_ = glm::mat4x3(1.0f);
   CalculateBBox();
 
   const float newScale = bBox_.Scale();
-  precision_ *= glm::max(1.0f, newScale / oldScale) *
-                glm::max(glm::length(transform_[0]),
-                         glm::max(glm::length(transform_[1]),
-                                  glm::length(transform_[2])));
+  precision_ *= glm::max(1.0f, newScale / oldScale);
 
   // Maximum of inherited precision loss and translational precision loss.
   SetPrecision(precision_);

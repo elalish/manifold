@@ -63,11 +63,12 @@ Manifold::~Manifold() = default;
 Manifold::Manifold(Manifold&&) noexcept = default;
 Manifold& Manifold::operator=(Manifold&&) noexcept = default;
 
-Manifold::Manifold(const Manifold& other) : pImpl_(new Impl(*other.pImpl_)) {}
+Manifold::Manifold(const Manifold& other) : pImpl_(new Impl(*other.pImpl_)), transform_(other.transform_) {}
 
 Manifold& Manifold::operator=(const Manifold& other) {
   if (this != &other) {
     pImpl_.reset(new Impl(*other.pImpl_));
+    transform_ = other.transform_;
   }
   return *this;
 }
@@ -110,7 +111,7 @@ Manifold::Manifold(const Mesh& mesh,
  * saving or other operations outside of the context of this library.
  */
 Mesh Manifold::GetMesh() const {
-  pImpl_->ApplyTransform();
+  ApplyTransform();
 
   Mesh result;
   result.vertPos.insert(result.vertPos.end(), pImpl_->vertPos_.begin(),
@@ -211,7 +212,7 @@ int Manifold::NumTri() const { return pImpl_->NumTri(); }
  * Returns the axis-aligned bounding box of all the Manifold's vertices.
  */
 Box Manifold::BoundingBox() const {
-  return pImpl_->bBox_.Transform(pImpl_->transform_);
+  return pImpl_->bBox_.Transform(transform_);
 }
 
 /**
@@ -222,7 +223,7 @@ Box Manifold::BoundingBox() const {
  * [&epsilon;-valid](https://github.com/elalish/manifold/wiki/Manifold-Library#definition-of-%CE%B5-valid).
  */
 float Manifold::Precision() const {
-  pImpl_->ApplyTransform();
+  ApplyTransform();
   return pImpl_->precision_;
 }
 
@@ -242,7 +243,10 @@ int Manifold::Genus() const {
  * means degenerate manifolds can by identified by testing these properties as
  * == 0.
  */
-Properties Manifold::GetProperties() const { return pImpl_->GetProperties(); }
+Properties Manifold::GetProperties() const {
+  ApplyTransform();
+  return pImpl_->GetProperties();
+}
 
 /**
  * Curvature is the inverse of the radius of curvature, and signed such that
@@ -252,7 +256,10 @@ Properties Manifold::GetProperties() const { return pImpl_->GetProperties(); }
  * curvature is their sum. This approximates them for every vertex (returned as
  * vectors in the structure) and also returns their minimum and maximum values.
  */
-Curvature Manifold::GetCurvature() const { return pImpl_->GetCurvature(); }
+Curvature Manifold::GetCurvature() const {
+  ApplyTransform();
+  return pImpl_->GetCurvature();
+}
 
 /**
  * Gets the relationship to the previous mesh, for the purpose of assinging
@@ -337,8 +344,8 @@ int Manifold::NumDegenerateTris() const { return pImpl_->NumDegenerateTris(); }
  * @param other A Manifold to overlap with.
  */
 int Manifold::NumOverlaps(const Manifold& other) const {
-  pImpl_->ApplyTransform();
-  other.pImpl_->ApplyTransform();
+  ApplyTransform();
+  other.ApplyTransform();
 
   SparseIndices overlaps = pImpl_->EdgeCollisions(*other.pImpl_);
   int num_overlaps = overlaps.size();
@@ -354,7 +361,7 @@ int Manifold::NumOverlaps(const Manifold& other) const {
  * @param v The vector to add to every vertex.
  */
 Manifold& Manifold::Translate(glm::vec3 v) {
-  pImpl_->transform_[3] += v;
+  transform_[3] += v;
   return *this;
 }
 
@@ -367,7 +374,7 @@ Manifold& Manifold::Translate(glm::vec3 v) {
 Manifold& Manifold::Scale(glm::vec3 v) {
   glm::mat3 s(1.0f);
   for (int i : {0, 1, 2}) s[i] *= v;
-  pImpl_->transform_ = s * pImpl_->transform_;
+  transform_ = s * transform_;
   return *this;
 }
 
@@ -393,7 +400,7 @@ Manifold& Manifold::Rotate(float xDegrees, float yDegrees, float zDegrees) {
   glm::mat3 rZ(cosd(zDegrees), sind(zDegrees), 0.0f,   //
                -sind(zDegrees), cosd(zDegrees), 0.0f,  //
                0.0f, 0.0f, 1.0f);
-  pImpl_->transform_ = rZ * rY * rX * pImpl_->transform_;
+  transform_ = rZ * rY * rX * transform_;
   return *this;
 }
 
@@ -405,8 +412,8 @@ Manifold& Manifold::Rotate(float xDegrees, float yDegrees, float zDegrees) {
  * @param m The affine transform matrix to apply to all the vertices.
  */
 Manifold& Manifold::Transform(const glm::mat4x3& m) {
-  glm::mat4 old(pImpl_->transform_);
-  pImpl_->transform_ = m * old;
+  glm::mat4 old(transform_);
+  transform_ = m * old;
   return *this;
 }
 
@@ -420,9 +427,8 @@ Manifold& Manifold::Transform(const glm::mat4x3& m) {
  * @param warpFunc A function that modifies a given vertex position.
  */
 Manifold& Manifold::Warp(std::function<void(glm::vec3&)> warpFunc) {
-  pImpl_->ApplyTransform();
-  thrust::for_each_n(thrust::host, pImpl_->vertPos_.begin(), NumVert(),
-                     warpFunc);
+  ApplyTransform();
+  thrust::for_each_n(thrust::host, pImpl_->vertPos_.begin(), NumVert(), warpFunc);
   pImpl_->Update();
   pImpl_->faceNormal_.resize(0);  // force recalculation of triNormal
   pImpl_->CalculateNormals();
@@ -460,8 +466,8 @@ Manifold& Manifold::Refine(int n) {
  * @param op The type of operation to perform.
  */
 Manifold Manifold::Boolean(const Manifold& second, OpType op) const {
-  pImpl_->ApplyTransform();
-  second.pImpl_->ApplyTransform();
+  ApplyTransform();
+  second.ApplyTransform();
   Boolean3 boolean(*pImpl_, *second.pImpl_, op);
   Manifold result;
   result.pImpl_ = std::make_unique<Impl>(boolean.Result(op));
@@ -521,8 +527,8 @@ Manifold& Manifold::operator^=(const Manifold& Q) {
  * @param cutter
  */
 std::pair<Manifold, Manifold> Manifold::Split(const Manifold& cutter) const {
-  pImpl_->ApplyTransform();
-  cutter.pImpl_->ApplyTransform();
+  ApplyTransform();
+  cutter.ApplyTransform();
   Boolean3 boolean(*pImpl_, *cutter.pImpl_, OpType::SUBTRACT);
   std::pair<Manifold, Manifold> result;
   result.first.pImpl_ =
@@ -556,7 +562,13 @@ std::pair<Manifold, Manifold> Manifold::SplitByPlane(glm::vec3 normal,
  * direction of the normal vector.
  */
 Manifold Manifold::TrimByPlane(glm::vec3 normal, float originOffset) const {
-  pImpl_->ApplyTransform();
+  ApplyTransform();
   return *this ^ Halfspace(BoundingBox(), normal, originOffset);
 }
+
+void Manifold::ApplyTransform() const {
+  pImpl_->ApplyTransform(transform_);
+  transform_ = glm::mat4x3(1.0f);
+}
+
 }  // namespace manifold

@@ -158,6 +158,8 @@ class Manifold {
 
  private:
   std::unique_ptr<Impl> pImpl_;
+  mutable glm::mat4x3 transform_ = glm::mat4x3(1.0f);
+  void ApplyTransform() const;
   static int circularSegments_;
   static float circularAngle_;
   static float circularEdgeLength_;

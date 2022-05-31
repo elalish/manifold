@@ -402,8 +402,8 @@ Manifold Manifold::Compose(const std::vector<Manifold>& manifolds) {
   int nextTri = 0;
   int nextBary = 0;
   for (const Manifold& manifold : manifolds) {
+    manifold.ApplyTransform();
     const Impl& impl = *(manifold.pImpl_);
-    impl.ApplyTransform();
 
     copy(policy, impl.vertPos_.begin(), impl.vertPos_.end(),
          combined.vertPos_.begin() + nextVert);
@@ -510,7 +510,7 @@ std::vector<Manifold> Manifold::Decompose() const {
     // can keep using the old one.
     meshes[i].pImpl_->UpdateMeshIDs(meshIDs, original);
 
-    meshes[i].pImpl_->transform_ = pImpl_->transform_;
+    meshes[i].transform_ = transform_;
   }
   return meshes;
 }
