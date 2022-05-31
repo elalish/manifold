@@ -26,6 +26,14 @@ namespace manifold {
 struct Manifold::Impl {
   struct MeshRelationD {
     VecDH<glm::vec3> barycentric;
+    /// meshID in BaryRef has different meaning in MeshRelation and
+    /// MeshRelationD:
+    /// - In `MeshRelation`: The original mesh triangle index.
+    /// - In `MeshRelationD`: The original mesh triangle index =
+    /// `originalID[meshID]`
+    ///
+    /// @note Triangles coming from different manifolds should have different mesh
+    /// ID, otherwise `SimplifyTopology` will not work properly.
     VecDH<BaryRef> triBary;
     /// meshID to originalID mapping.
     std::unordered_map<int, int> originalID;

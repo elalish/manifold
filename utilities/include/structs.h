@@ -230,13 +230,7 @@ struct Curvature {
  * Mesh.
  */
 struct BaryRef {
-  /// Identifier of the triangle, can be mapped to the original mesh ID.
-  /// - In `MeshRelation`: The original mesh triangle index.
-  /// - In `MeshRelationD`: The original mesh triangle index =
-  /// `originalID[meshID]`
-  ///
-  /// @note Triangles coming from different manifolds should have different mesh
-  /// ID, otherwise `SimplifyTopology` will not work properly.
+  /// The original mesh triangle index.
   int meshID;
   /// The triangle index of the original triangle this was part of:
   /// Mesh.triVerts[tri].
