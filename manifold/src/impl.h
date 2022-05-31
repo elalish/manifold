@@ -74,6 +74,7 @@ struct Manifold::Impl {
 
   void Update();
   void ApplyTransform(const glm::mat4x3 &transform);
+  Impl Transform(const glm::mat4x3 &transform) const;
   SparseIndices EdgeCollisions(const Impl& B) const;
   SparseIndices VertexCollisionsZ(const VecDH<glm::vec3>& vertsIn) const;
 

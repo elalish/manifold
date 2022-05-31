@@ -1,0 +1,421 @@
+#include "csg_tree.h"
+
+#include "boolean3.h"
+#include "impl.h"
+#include "par.h"
+
+namespace {
+using namespace manifold;
+struct Transform4x3 {
+  const glm::mat4x3 transform;
+
+  __host__ __device__ glm::vec3 operator()(glm::vec3 position) {
+    return transform * glm::vec4(position, 1.0f);
+  }
+};
+
+struct TransformNormals {
+  const glm::mat3 transform;
+
+  __host__ __device__ glm::vec3 operator()(glm::vec3 normal) {
+    normal = glm::normalize(transform * normal);
+    if (isnan(normal.x)) normal = glm::vec3(0.0f);
+    return normal;
+  }
+};
+
+struct UpdateTriBary {
+  const int nextBary;
+
+  __host__ __device__ BaryRef operator()(BaryRef ref) {
+    for (int i : {0, 1, 2})
+      if (ref.vertBary[i] >= 0) ref.vertBary[i] += nextBary;
+    return ref;
+  }
+};
+
+struct UpdateHalfedge {
+  const int nextVert;
+  const int nextEdge;
+  const int nextFace;
+
+  __host__ __device__ Halfedge operator()(Halfedge edge) {
+    edge.startVert += nextVert;
+    edge.endVert += nextVert;
+    edge.pairedHalfedge += nextEdge;
+    edge.face += nextFace;
+    return edge;
+  }
+};
+}  // namespace
+namespace manifold {
+
+std::shared_ptr<CsgNode> CsgNode::Translate(const glm::vec3 &t) const {
+  glm::mat4x3 transform(1.0f);
+  transform[3] += t;
+  return Transform(transform);
+}
+
+std::shared_ptr<CsgNode> CsgNode::Scale(const glm::vec3 &v) const {
+  glm::mat4x3 transform(1.0f);
+  for (int i : {0, 1, 2}) transform[i] *= v;
+  return Transform(transform);
+}
+
+std::shared_ptr<CsgNode> CsgNode::Rotate(float xDegrees, float yDegrees,
+                                         float zDegrees) const {
+  glm::mat3 rX(1.0f, 0.0f, 0.0f,                      //
+               0.0f, cosd(xDegrees), sind(xDegrees),  //
+               0.0f, -sind(xDegrees), cosd(xDegrees));
+  glm::mat3 rY(cosd(yDegrees), 0.0f, -sind(yDegrees),  //
+               0.0f, 1.0f, 0.0f,                       //
+               sind(yDegrees), 0.0f, cosd(yDegrees));
+  glm::mat3 rZ(cosd(zDegrees), sind(zDegrees), 0.0f,   //
+               -sind(zDegrees), cosd(zDegrees), 0.0f,  //
+               0.0f, 0.0f, 1.0f);
+  glm::mat4x3 transform(rZ * rY * rX);
+  return Transform(transform);
+}
+
+CsgLeafNode::CsgLeafNode() : pImpl_(std::make_shared<Manifold::Impl>()) {}
+
+CsgLeafNode::CsgLeafNode(std::shared_ptr<const Manifold::Impl> pImpl_)
+    : pImpl_(pImpl_) {}
+
+CsgLeafNode::CsgLeafNode(std::shared_ptr<const Manifold::Impl> pImpl_,
+                         glm::mat4x3 transform_)
+    : pImpl_(pImpl_), transform_(transform_) {}
+
+std::shared_ptr<const Manifold::Impl> CsgLeafNode::GetImpl() const {
+  if (transform_ == glm::mat4x3(1.0f)) return pImpl_;
+  pImpl_ =
+      std::make_shared<const Manifold::Impl>(pImpl_->Transform(transform_));
+  transform_ = glm::mat4x3(1.0f);
+  return pImpl_;
+}
+
+glm::mat4x3 CsgLeafNode::GetTransform() const { return transform_; }
+
+Box CsgLeafNode::GetBoundingBox() const {
+  return pImpl_->bBox_.Transform(transform_);
+}
+
+std::shared_ptr<CsgLeafNode> CsgLeafNode::ToLeafNode() const {
+  return std::make_shared<CsgLeafNode>(*this);
+}
+
+std::shared_ptr<CsgNode> CsgLeafNode::Transform(const glm::mat4x3 &m) const {
+  return std::make_shared<CsgLeafNode>(pImpl_, m * glm::mat4(transform_));
+}
+
+CsgNodeType CsgLeafNode::GetNodeType() const { return CsgNodeType::LEAF; }
+
+/**
+ * Efficient union of a set of pairwise disjoint meshes.
+ */
+Manifold::Impl CsgLeafNode::Compose(
+    const std::vector<std::shared_ptr<CsgLeafNode>> &nodes) {
+  int numVert = 0;
+  int numEdge = 0;
+  int numTri = 0;
+  int numBary = 0;
+  for (auto &node : nodes) {
+    numVert += node->pImpl_->NumVert();
+    numEdge += node->pImpl_->NumEdge();
+    numTri += node->pImpl_->NumTri();
+    numBary += node->pImpl_->meshRelation_.barycentric.size();
+  }
+
+  Manifold::Impl combined;
+  combined.vertPos_.resize(numVert);
+  combined.halfedge_.resize(2 * numEdge);
+  combined.faceNormal_.resize(numTri);
+  combined.halfedgeTangent_.resize(2 * numEdge);
+  combined.meshRelation_.barycentric.resize(numBary);
+  combined.meshRelation_.triBary.resize(numTri);
+  auto policy = autoPolicy(numTri);
+
+  int nextVert = 0;
+  int nextEdge = 0;
+  int nextTri = 0;
+  int nextBary = 0;
+  for (auto &node : nodes) {
+    if (node->transform_ == glm::mat4x3(1.0f)) {
+      copy(policy, node->pImpl_->vertPos_.begin(), node->pImpl_->vertPos_.end(),
+           combined.vertPos_.begin() + nextVert);
+      copy(policy, node->pImpl_->faceNormal_.begin(),
+           node->pImpl_->faceNormal_.end(),
+           combined.faceNormal_.begin() + nextTri);
+    } else {
+      // no need to apply the transform to the node, just copy the vertices and
+      // face normals and apply transform on the fly
+      auto vertPosBegin = thrust::make_transform_iterator(
+          node->pImpl_->vertPos_.begin(), Transform4x3({node->transform_}));
+      glm::mat3 normalTransform =
+          glm::inverse(glm::transpose(glm::mat3(node->transform_)));
+      auto faceNormalBegin =
+          thrust::make_transform_iterator(node->pImpl_->faceNormal_.begin(),
+                                          TransformNormals({normalTransform}));
+      copy_n(policy, vertPosBegin, node->pImpl_->vertPos_.size(),
+             combined.vertPos_.begin() + nextVert);
+      copy_n(policy, faceNormalBegin, node->pImpl_->faceNormal_.size(),
+             combined.faceNormal_.begin() + nextTri);
+    }
+    copy(policy, node->pImpl_->halfedgeTangent_.begin(),
+         node->pImpl_->halfedgeTangent_.end(),
+         combined.halfedgeTangent_.begin() + nextEdge);
+    copy(policy, node->pImpl_->meshRelation_.barycentric.begin(),
+         node->pImpl_->meshRelation_.barycentric.end(),
+         combined.meshRelation_.barycentric.begin() + nextBary);
+    transform(policy, node->pImpl_->meshRelation_.triBary.begin(),
+              node->pImpl_->meshRelation_.triBary.end(),
+              combined.meshRelation_.triBary.begin() + nextTri,
+              UpdateTriBary({nextBary}));
+    transform(policy, node->pImpl_->halfedge_.begin(),
+              node->pImpl_->halfedge_.end(),
+              combined.halfedge_.begin() + nextEdge,
+              UpdateHalfedge({nextVert, nextEdge, nextTri}));
+
+    // Assign new IDs to triangles added in this iteration, to differentiate
+    // triangles coming from different manifolds.
+    VecDH<int> meshIDs;
+    VecDH<int> original;
+    for (auto &entry : node->pImpl_->meshRelation_.originalID) {
+      meshIDs.push_back(entry.first);
+      original.push_back(entry.second);
+    }
+    int meshIDStart = combined.meshRelation_.originalID.size();
+    combined.UpdateMeshIDs(meshIDs, original, nextTri,
+                           node->pImpl_->meshRelation_.triBary.size(),
+                           meshIDStart);
+
+    nextVert += node->pImpl_->NumVert();
+    nextEdge += 2 * node->pImpl_->NumEdge();
+    nextTri += node->pImpl_->NumTri();
+    nextBary += node->pImpl_->meshRelation_.barycentric.size();
+  }
+  combined.Finish();
+  return combined;
+}
+
+CsgOpNode::CsgOpNode() {}
+
+CsgOpNode::CsgOpNode(const std::vector<std::shared_ptr<CsgNode>> &children,
+                     Manifold::OpType op)
+    : children_(children) {
+  SetOp(op);
+}
+
+CsgOpNode::CsgOpNode(std::vector<std::shared_ptr<CsgNode>> &&children,
+                     Manifold::OpType op)
+    : children_(children) {
+  SetOp(op);
+}
+
+std::shared_ptr<CsgNode> CsgOpNode::Transform(const glm::mat4x3 &m) const {
+  auto node = std::make_shared<CsgOpNode>();
+  node->children_ = children_;
+  node->op_ = op_;
+  node->transform_ = m * glm::mat4(transform_);
+  node->simplified = simplified;
+  return node;
+}
+
+std::shared_ptr<CsgLeafNode> CsgOpNode::ToLeafNode() const {
+  if (cache_ != nullptr) return cache_;
+  if (children_.empty()) return nullptr;
+  // turn the children into leaf nodes
+  GetChildren();
+  switch (op_) {
+    case CsgNodeType::UNION:
+      BatchUnion();
+      break;
+    case CsgNodeType::INTERSECTION: {
+      std::vector<std::shared_ptr<const Manifold::Impl>> impls;
+      for (auto &child : children_) {
+        impls.push_back(
+            std::dynamic_pointer_cast<CsgLeafNode>(child)->GetImpl());
+      }
+      BatchBoolean(Manifold::OpType::INTERSECT, impls);
+      children_.clear();
+      children_.push_back(std::make_shared<CsgLeafNode>(impls.front()));
+      break;
+    };
+    case CsgNodeType::DIFFERENCE: {
+      // take the lhs out and treat the remaining nodes as the rhs, perform
+      // union optimization for them
+      auto lhs = std::dynamic_pointer_cast<CsgLeafNode>(children_.front());
+      children_.erase(children_.begin());
+      BatchUnion();
+      auto rhs = std::dynamic_pointer_cast<CsgLeafNode>(children_.front());
+      children_.clear();
+      Boolean3 boolean(*lhs->GetImpl(), *rhs->GetImpl(),
+                       Manifold::OpType::SUBTRACT);
+      children_.push_back(
+          std::make_shared<CsgLeafNode>(std::make_shared<Manifold::Impl>(
+              boolean.Result(Manifold::OpType::SUBTRACT))));
+    };
+    case CsgNodeType::LEAF:
+      // unreachable
+      break;
+  }
+  // children_ must contain only one CsgLeafNode now, and its Transform will
+  // give CsgLeafNode as well
+  cache_ = std::dynamic_pointer_cast<CsgLeafNode>(
+      children_.front()->Transform(transform_));
+  return cache_;
+}
+
+/**
+ * Efficient boolean operation on a set of nodes utilizing commutativity of the
+ * operation. Only supports union and intersection.
+ */
+void CsgOpNode::BatchBoolean(
+    Manifold::OpType operation,
+    std::vector<std::shared_ptr<const Manifold::Impl>> &results) {
+  assert(operation != Manifold::OpType::SUBTRACT);
+  auto cmpFn = [](std::shared_ptr<const Manifold::Impl> a,
+                  std::shared_ptr<const Manifold::Impl> b) {
+    // invert the order because we want a min heap
+    return a->NumVert() > b->NumVert();
+  };
+
+  // apply boolean operations starting from smaller meshes
+  // the assumption is that boolean operations on smaller meshes is faster,
+  // due to less data being copied and processed
+  std::make_heap(results.begin(), results.end(), cmpFn);
+  while (results.size() > 1) {
+    std::pop_heap(results.begin(), results.end(), cmpFn);
+    auto a = std::move(results.back());
+    results.pop_back();
+    std::pop_heap(results.begin(), results.end(), cmpFn);
+    auto b = std::move(results.back());
+    results.pop_back();
+    // boolean operation
+    Boolean3 boolean(*a, *b, operation);
+    results.push_back(
+        std::make_shared<const Manifold::Impl>(boolean.Result(operation)));
+    std::push_heap(results.begin(), results.end(), cmpFn);
+  }
+}
+
+/**
+ * Efficient union operation on a set of nodes by doing Compose as much as
+ * possible.
+ */
+void CsgOpNode::BatchUnion() const {
+  // INVARIANT: children_ is a vector of leaf nodes
+  // this kMaxUnionSize is a heuristic to avoid the pairwise disjoint check
+  // with O(n^2) complexity to take too long.
+  // If the number of children exceeded this limit, we will operate on chunks
+  // with size kMaxUnionSize.
+  constexpr int kMaxUnionSize = 1000;
+  while (children_.size() > 1) {
+    int start;
+    if (children_.size() > kMaxUnionSize) {
+      start = children_.size() - kMaxUnionSize;
+    } else {
+      start = 0;
+    }
+    VecDH<Box> boxes;
+    boxes.reserve(children_.size() - start);
+    for (int i = start; i < children_.size(); i++) {
+      boxes.push_back(std::dynamic_pointer_cast<CsgLeafNode>(children_[i])
+                          ->GetBoundingBox());
+    }
+    const Box *boxesD = boxes.cptrD();
+    // partition the children into a set of disjoint sets
+    // each set contains a set of children that are pairwise disjoint
+    std::vector<VecDH<size_t>> disjointSets;
+    for (size_t i = 0; i < boxes.size(); i++) {
+      auto lambda = [boxesD, i](const VecDH<size_t> &set) {
+        return find_if<decltype(set.end())>(
+                   autoPolicy(set.size()), set.begin(), set.end(),
+                   [&boxesD, i](size_t j) {
+                     return boxesD[i].DoesOverlap(boxesD[j]);
+                   }) == set.end();
+      };
+      auto it = std::find_if(disjointSets.begin(), disjointSets.end(), lambda);
+      if (it == disjointSets.end()) {
+        disjointSets.push_back(std::vector<size_t>{i});
+      } else {
+        it->push_back(i);
+      }
+    }
+    // compose each set of disjoint children
+    std::vector<std::shared_ptr<const Manifold::Impl>> impls;
+    for (const auto &set : disjointSets) {
+      if (set.size() == 1) {
+        impls.push_back(
+            std::dynamic_pointer_cast<CsgLeafNode>(children_[start + set[0]])
+                ->GetImpl());
+      } else {
+        std::vector<std::shared_ptr<CsgLeafNode>> tmp;
+        for (size_t j : set) {
+          tmp.push_back(
+              std::dynamic_pointer_cast<CsgLeafNode>(children_[start + j]));
+        }
+        impls.push_back(
+            std::make_shared<const Manifold::Impl>(CsgLeafNode::Compose(tmp)));
+      }
+    }
+    BatchBoolean(Manifold::OpType::ADD, impls);
+    children_.erase(children_.begin() + start, children_.end());
+    children_.push_back(std::make_shared<CsgLeafNode>(impls.back()));
+    // move it to the front as we process from the back, and the newly added
+    // child should be quite complicated
+    std::swap(children_.front(), children_.back());
+  }
+}
+
+/**
+ * Flatten the children to a list of leaf nodes and return them.
+ * Note that this function will not apply the transform to children, as they may
+ * be shared with other nodes.
+ */
+std::vector<std::shared_ptr<CsgNode>> &CsgOpNode::GetChildren() const {
+  if (children_.empty() || simplified) return children_;
+  simplified = true;
+  std::vector<std::shared_ptr<CsgNode>> newChildren;
+
+  CsgNodeType op = op_;
+  for (auto &child : children_) {
+    if (child->GetNodeType() == op) {
+      auto grandchildren =
+          std::dynamic_pointer_cast<CsgOpNode>(child)->GetChildren();
+      int start = children_.size();
+      for (auto &grandchild : grandchildren) {
+        newChildren.push_back(grandchild->Transform(child->GetTransform()));
+      }
+    } else {
+      if (child->GetNodeType() == CsgNodeType::LEAF) {
+        newChildren.push_back(child);
+      } else {
+        newChildren.push_back(child->ToLeafNode());
+      }
+    }
+    // special handling for difference: we treat it as first - (second + third +
+    // ...) so op = UNION after the first node
+    if (op == CsgNodeType::DIFFERENCE) op = CsgNodeType::UNION;
+  }
+  children_ = newChildren;
+  return children_;
+}
+
+void CsgOpNode::SetOp(Manifold::OpType op) {
+  switch (op) {
+    case Manifold::OpType::ADD:
+      op_ = CsgNodeType::UNION;
+      break;
+    case Manifold::OpType::SUBTRACT:
+      op_ = CsgNodeType::DIFFERENCE;
+      break;
+    case Manifold::OpType::INTERSECT:
+      op_ = CsgNodeType::INTERSECTION;
+      break;
+  }
+}
+
+glm::mat4x3 CsgOpNode::GetTransform() const { return transform_; }
+
+}  // namespace manifold
