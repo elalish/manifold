@@ -601,6 +601,62 @@ void Manifold::Impl::CalculateNormals() {
 }
 
 /**
+ * Update meshID and originalID in meshRelation_.triBary[startTri..startTri+n]
+ * according to meshIDs -> originalIDs mapping. The updated meshID will start
+ * from startID.
+ * Will raise an exception if meshRelation_.triBary[startTri..startTri+n]
+ * contains a meshID not in meshIDs.
+ *
+ * We remap them into indices starting from startID. The exact value value is not
+ * important as long as
+ * 1. They are distinct
+ * 2. `originalID[meshID]` is the original mesh ID of the triangle
+ *
+ * Use this when the mesh is a combination of several meshes or a subset of a
+ * larger mesh, e.g. after performing boolean operations, compose or decompose.
+ */
+void Manifold::Impl::UpdateMeshIDs(VecDH<int> &meshIDs, VecDH<int> &originalIDs,
+                                   int startTri, int n, int startID) {
+  if (n == -1)
+    n = meshRelation_.triBary.size();
+  thrust::sort_by_key(thrust::host, meshIDs.begin(), meshIDs.end(),
+                      originalIDs.begin());
+  constexpr int kOccurred = 1 << 30;
+  VecDH<int> error(1, -1);
+  const int numMesh = meshIDs.size();
+  const int *meshIDsPtr = meshIDs.cptrD();
+  int *originalPtr = originalIDs.ptrD();
+  int *errorPtr = error.ptrD();
+  thrust::for_each(thrust::device,
+                   meshRelation_.triBary.begin() + startTri,
+                   meshRelation_.triBary.begin() + startTri + n,
+                   [=] __host__ __device__(BaryRef & b) {
+                     int index =
+                         thrust::lower_bound(meshIDsPtr, meshIDsPtr + numMesh,
+                                             b.meshID) -
+                         meshIDsPtr;
+                     if (index >= numMesh || meshIDsPtr[index] != b.meshID) {
+                       *errorPtr = b.meshID;
+                     }
+                     b.meshID = index + startID;
+                     originalPtr[index] |= kOccurred;
+                   });
+
+  if (error[0] != -1) {
+    std::stringstream ss;
+    ss << "Manifold::UpdateMeshIDs: meshID " << error[0]
+       << " not found in meshIDs.";
+    throw std::runtime_error(ss.str());
+  }
+  for (int i = 0; i < numMesh; ++i) {
+    if (originalIDs[i] & kOccurred) {
+      originalIDs[i] &= ~kOccurred;
+      meshRelation_.originalID[i + startID] = originalIDs[i];
+    }
+  }
+}
+
+/**
  * Returns a sparse array of the bounding box overlaps between the edges of the
  * input manifold, Q and the faces of this manifold. Returned indices only
  * point to forward halfedges.

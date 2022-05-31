@@ -21,6 +21,10 @@
 // TODO: make this runtime configurable for quicker debug
 constexpr bool kVerbose = false;
 
+// Mark the meshID as coming from P by flipping the 30th bit.
+// The 30th bit is used to avoid flipping the sign.
+constexpr int kFromP = 1 << 30;
+
 using namespace manifold;
 using namespace thrust::placeholders;
 
@@ -442,10 +446,9 @@ struct CreateBarycentric {
     const BaryRef oldRef = halfedgeRef.PQ == 0 ? triBaryP[tri] : triBaryQ[tri];
 
     faceRef[halfedgeR.face] = oldRef;
-    // Mark the meshID as coming from P by flipping the 30th bit.
-    // The 30th bit is used to avoid flipping the sign.
     if (halfedgeRef.PQ == 0) {
-      faceRef[halfedgeR.face].meshID |= 1 << 30;
+      // Mark the meshID as coming from P
+      faceRef[halfedgeR.face].meshID |= kFromP;
     }
 
     if (halfedgeR.startVert < firstNewVert) {  // retained vert
@@ -681,46 +684,19 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
 
   outR.SimplifyTopology();
 
-  // Update meshID
-  // we remap them into indices starting from 0. The exact value value is not
-  // important as long as
-  // 1. They are distinct
-  // 2. `originalID[meshID]` is the original mesh ID of the triangle
   // Index starting from 0 is chosen because I want the kernel part as simple as
   // possible.
   VecDH<int> meshIDs;
   VecDH<int> original;
   for (auto &entry : inP_.meshRelation_.originalID) {
-    meshIDs.push_back(entry.first | 1 << 30);
+    meshIDs.push_back(entry.first | kFromP);
     original.push_back(entry.second);
   }
   for (auto &entry : inQ_.meshRelation_.originalID) {
     meshIDs.push_back(entry.first);
     original.push_back(entry.second);
   }
-  // in general, meshIDs should be small
-  thrust::sort_by_key(thrust::host, meshIDs.begin(), meshIDs.end(), original.begin());
-
-  const int numMesh = meshIDs.size();
-  const int* meshIDsPtr = meshIDs.cptrD();
-  int* originalPtr = original.ptrD();
-
-  thrust::for_each(thrust::device, outR.meshRelation_.triBary.begin(),
-                   outR.meshRelation_.triBary.end(),
-                   [=] __host__ __device__(BaryRef &b) {
-                     int index = thrust::lower_bound(meshIDsPtr,
-                                                     meshIDsPtr + numMesh,
-                                                     b.meshID) -
-                                 meshIDsPtr;
-                     b.meshID = index;
-                     originalPtr[index] |= 1 << 30;
-                   });
-
-  for (int i = 0; i < numMesh; ++i) {
-    if (original[i] & (1 << 30)) {
-      outR.meshRelation_.originalID[i] = original[i] & ~(1 << 30);
-    }
-  }
+  outR.UpdateMeshIDs(meshIDs, original);
 
   simplify.Stop();
   Timer sort;
