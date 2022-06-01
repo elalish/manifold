@@ -1,5 +1,6 @@
 #pragma once
 #include <thrust/binary_search.h>
+#include <thrust/count.h>
 #include <thrust/gather.h>
 #include <thrust/logical.h>
 #include <thrust/remove.h>
@@ -7,18 +8,28 @@
 #include <thrust/sort.h>
 #include <thrust/uninitialized_copy.h>
 #include <thrust/unique.h>
+#include <thrust/execution_policy.h>
 
 #include <thrust/system/cpp/execution_policy.h>
-#include <thrust/system/omp/execution_policy.h>
 
-#if THRUST_DEVICE_SYSTEM == THRUST_DEVICE_SYSTEM_CUDA
+#if MANIFOLD_PAR == 'O'
+#include <thrust/system/omp/execution_policy.h>
+#define MANIFOLD_PAR_NS omp
+#elif MANIFOLD_PAR == 'T'
+#include <thrust/system/tbb/execution_policy.h>
+#define MANIFOLD_PAR_NS tbb
+#else
+#define MANIFOLD_PAR_NS cpp
+#endif
+
+#ifdef MANIFOLD_USE_CUDA
 #include <thrust/system/cuda/execution_policy.h>
 #endif
 
 namespace manifold {
 
 void check_cuda_available();
-#if THRUST_DEVICE_SYSTEM == THRUST_DEVICE_SYSTEM_CUDA
+#ifdef MANIFOLD_USE_CUDA
 extern int CUDA_ENABLED;
 #else
 constexpr int CUDA_ENABLED = 0;
@@ -49,19 +60,19 @@ inline ExecutionPolicy autoPolicy(int size) {
   return ParUnseq;
 }
 
-#if THRUST_DEVICE_SYSTEM == THRUST_DEVICE_SYSTEM_CUDA
-#define THRUST_DYNAMIC_BACKEND_VOID(NAME, SUFFIX)                              \
+#ifdef MANIFOLD_USE_CUDA
+#define THRUST_DYNAMIC_BACKEND_VOID(NAME)                                      \
   template <typename... Args>                                                  \
-  void NAME##SUFFIX(ExecutionPolicy policy, Args... args) {                    \
+  void NAME(ExecutionPolicy policy, Args... args) {                            \
     switch (policy) {                                                          \
     case ExecutionPolicy::ParUnseq:                                            \
       thrust::NAME(thrust::cuda::par, args...);                                \
       break;                                                                   \
     case ExecutionPolicy::Par:                                                 \
-      thrust::NAME(thrust::omp::par, args...);                                 \
+      thrust::NAME(thrust::MANIFOLD_PAR_NS::par, args...);                     \
       break;                                                                   \
     case ExecutionPolicy::Seq:                                                 \
-      thrust::NAME(thrust::host, args...);                                     \
+      thrust::NAME(thrust::cpp::par, args...);                                 \
       break;                                                                   \
     }                                                                          \
   }
@@ -72,74 +83,59 @@ inline ExecutionPolicy autoPolicy(int size) {
     case ExecutionPolicy::ParUnseq:                                            \
       return thrust::NAME(thrust::cuda::par, args...);                         \
     case ExecutionPolicy::Par:                                                 \
-      return thrust::NAME(thrust::omp::par, args...);                          \
+      return thrust::NAME(thrust::MANIFOLD_PAR_NS::par, args...);              \
     case ExecutionPolicy::Seq:                                                 \
-      return thrust::NAME(thrust::host, args...);                              \
-    }                                                                          \
-    __builtin_unreachable();                                                   \
-  }
-#elif THRUST_DEVICE_SYSTEM == THRUST_DEVICE_SYSTEM_OMP
-#define THRUST_DYNAMIC_BACKEND_VOID(NAME, SUFFIX)                              \
-  template <typename... Args>                                                  \
-  void NAME##SUFFIX(ExecutionPolicy policy, Args... args) {                    \
-    switch (policy) {                                                          \
-    case ExecutionPolicy::ParUnseq:                                            \
-    case ExecutionPolicy::Par:                                                 \
-      thrust::NAME(thrust::omp::par, args...);                                 \
-      break;                                                                   \
-    case ExecutionPolicy::Seq:                                                 \
-      thrust::NAME(thrust::host, args...);                                     \
-      break;                                                                   \
-    }                                                                          \
-  }
-
-#define THRUST_DYNAMIC_BACKEND(NAME, RET)                                      \
-  template <typename Ret = RET, typename... Args>                              \
-  Ret NAME(ExecutionPolicy policy, Args... args) {                             \
-    switch (policy) {                                                          \
-    case ExecutionPolicy::ParUnseq:                                            \
-    case ExecutionPolicy::Par:                                                 \
-      return thrust::NAME(thrust::omp::par, args...);                          \
-    case ExecutionPolicy::Seq:                                                 \
-      return thrust::NAME(thrust::host, args...);                              \
+      return thrust::NAME(thrust::cpp::par, args...);                          \
     }                                                                          \
     __builtin_unreachable();                                                   \
   }
 #else
-#define THRUST_DYNAMIC_BACKEND_VOID(NAME, SUFFIX)                              \
+#define THRUST_DYNAMIC_BACKEND_VOID(NAME)                                      \
   template <typename... Args>                                                  \
-  void NAME##SUFFIX(ExecutionPolicy policy, Args... args) {                    \
-    thrust::NAME(thrust::host, args...);                                       \
+  void NAME(ExecutionPolicy policy, Args... args) {                            \
+    switch (policy) {                                                          \
+    case ExecutionPolicy::ParUnseq:                                            \
+    case ExecutionPolicy::Par:                                                 \
+      thrust::NAME(thrust::MANIFOLD_PAR_NS::par, args...);                     \
+      break;                                                                   \
+    case ExecutionPolicy::Seq:                                                 \
+      thrust::NAME(thrust::cpp::par, args...);                                 \
+      break;                                                                   \
+    }                                                                          \
   }
 
 #define THRUST_DYNAMIC_BACKEND(NAME, RET)                                      \
   template <typename Ret = RET, typename... Args>                              \
   Ret NAME(ExecutionPolicy policy, Args... args) {                             \
-    return thrust::NAME(thrust::host, args...);                                \
+    switch (policy) {                                                          \
+    case ExecutionPolicy::ParUnseq:                                            \
+    case ExecutionPolicy::Par:                                                 \
+      return thrust::NAME(thrust::MANIFOLD_PAR_NS::par, args...);              \
+    case ExecutionPolicy::Seq:                                                 \
+      return thrust::NAME(thrust::cpp::par, args...);                          \
+    }                                                                          \
+    __builtin_unreachable();                                                   \
   }
 #endif
 
-THRUST_DYNAMIC_BACKEND_VOID(gather, )
-THRUST_DYNAMIC_BACKEND_VOID(gather_if, )
-THRUST_DYNAMIC_BACKEND_VOID(remove_if, _void)
-THRUST_DYNAMIC_BACKEND_VOID(unique, _void)
-THRUST_DYNAMIC_BACKEND_VOID(scatter, )
-THRUST_DYNAMIC_BACKEND_VOID(for_each, )
-THRUST_DYNAMIC_BACKEND_VOID(for_each_n, )
-THRUST_DYNAMIC_BACKEND_VOID(sort, )
-THRUST_DYNAMIC_BACKEND_VOID(stable_sort, )
-THRUST_DYNAMIC_BACKEND_VOID(fill, )
-THRUST_DYNAMIC_BACKEND_VOID(binary_search, )
-THRUST_DYNAMIC_BACKEND_VOID(lower_bound, )
-THRUST_DYNAMIC_BACKEND_VOID(sequence, )
-THRUST_DYNAMIC_BACKEND_VOID(sort_by_key, )
-THRUST_DYNAMIC_BACKEND_VOID(copy, )
-THRUST_DYNAMIC_BACKEND_VOID(transform, )
-THRUST_DYNAMIC_BACKEND_VOID(inclusive_scan, )
-THRUST_DYNAMIC_BACKEND_VOID(exclusive_scan, )
-THRUST_DYNAMIC_BACKEND_VOID(uninitialized_fill, )
-THRUST_DYNAMIC_BACKEND_VOID(uninitialized_copy, )
-THRUST_DYNAMIC_BACKEND_VOID(copy_if, _void)
+THRUST_DYNAMIC_BACKEND_VOID(gather)
+THRUST_DYNAMIC_BACKEND_VOID(gather_if)
+THRUST_DYNAMIC_BACKEND_VOID(scatter)
+THRUST_DYNAMIC_BACKEND_VOID(for_each)
+THRUST_DYNAMIC_BACKEND_VOID(for_each_n)
+THRUST_DYNAMIC_BACKEND_VOID(sort)
+THRUST_DYNAMIC_BACKEND_VOID(stable_sort)
+THRUST_DYNAMIC_BACKEND_VOID(fill)
+THRUST_DYNAMIC_BACKEND_VOID(binary_search)
+THRUST_DYNAMIC_BACKEND_VOID(lower_bound)
+THRUST_DYNAMIC_BACKEND_VOID(sequence)
+THRUST_DYNAMIC_BACKEND_VOID(sort_by_key)
+THRUST_DYNAMIC_BACKEND_VOID(copy)
+THRUST_DYNAMIC_BACKEND_VOID(transform)
+THRUST_DYNAMIC_BACKEND_VOID(inclusive_scan)
+THRUST_DYNAMIC_BACKEND_VOID(exclusive_scan)
+THRUST_DYNAMIC_BACKEND_VOID(uninitialized_fill)
+THRUST_DYNAMIC_BACKEND_VOID(uninitialized_copy)
 
 THRUST_DYNAMIC_BACKEND(remove, void)
 THRUST_DYNAMIC_BACKEND(copy_if, void)

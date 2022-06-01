@@ -3,7 +3,7 @@ project (utilities)
 add_library(${PROJECT_NAME} src/detect_cuda.cpp)
 
 target_include_directories(${PROJECT_NAME} PUBLIC ${THRUST_INC_DIR} ${GLM_INC_DIR})
-if(THRUST_BACKEND STREQUAL "CUDA")
+if(MANIFOLD_USE_CUDA)
     set_source_files_properties(src/detect_cuda.cpp PROPERTIES LANGUAGE CUDA)
     set_property(TARGET ${PROJECT_NAME} PROPERTY CUDA_ARCHITECTURES 61)
     target_compile_options(${PROJECT_NAME} 

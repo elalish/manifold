@@ -1,5 +1,4 @@
-#include "thrust/execution_policy.h"
-#if THRUST_DEVICE_SYSTEM == THRUST_DEVICE_SYSTEM_CUDA
+#ifdef MANIFOLD_USE_CUDA
 #include <cuda_runtime.h>
 
 namespace manifold {

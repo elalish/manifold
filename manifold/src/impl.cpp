@@ -622,28 +622,27 @@ void Manifold::Impl::UpdateMeshIDs(VecDH<int> &meshIDs, VecDH<int> &originalIDs,
                                    int startTri, int n, int startID) {
   if (n == -1)
     n = meshRelation_.triBary.size();
-  thrust::sort_by_key(thrust::host, meshIDs.begin(), meshIDs.end(),
-                      originalIDs.begin());
+  sort_by_key(autoPolicy(n), meshIDs.begin(), meshIDs.end(), originalIDs.begin());
   constexpr int kOccurred = 1 << 30;
   VecDH<int> error(1, -1);
   const int numMesh = meshIDs.size();
   const int *meshIDsPtr = meshIDs.cptrD();
   int *originalPtr = originalIDs.ptrD();
   int *errorPtr = error.ptrD();
-  thrust::for_each(thrust::device,
-                   meshRelation_.triBary.begin() + startTri,
-                   meshRelation_.triBary.begin() + startTri + n,
-                   [=] __host__ __device__(BaryRef & b) {
-                     int index =
-                         thrust::lower_bound(meshIDsPtr, meshIDsPtr + numMesh,
-                                             b.meshID) -
-                         meshIDsPtr;
-                     if (index >= numMesh || meshIDsPtr[index] != b.meshID) {
-                       *errorPtr = b.meshID;
-                     }
-                     b.meshID = index + startID;
-                     originalPtr[index] |= kOccurred;
-                   });
+  for_each(autoPolicy(n),
+           meshRelation_.triBary.begin() + startTri,
+           meshRelation_.triBary.begin() + startTri + n,
+           [=] __host__ __device__(BaryRef & b) {
+             int index =
+                 thrust::lower_bound(meshIDsPtr, meshIDsPtr + numMesh,
+                                     b.meshID) -
+                 meshIDsPtr;
+             if (index >= numMesh || meshIDsPtr[index] != b.meshID) {
+               *errorPtr = b.meshID;
+             }
+             b.meshID = index + startID;
+             originalPtr[index] |= kOccurred;
+           });
 
   if (error[0] != -1) {
     std::stringstream ss;
