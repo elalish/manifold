@@ -248,7 +248,7 @@ private:
 
   static void mallocManaged(T **ptr, size_t bytes) {
 #ifdef MANIFOLD_USE_CUDA
-    if (__builtin_expect(CUDA_ENABLED == -1, 0))
+    if (CUDA_ENABLED == -1)
       check_cuda_available();
     if (CUDA_ENABLED)
       cudaMallocManaged(reinterpret_cast<void**>(ptr), bytes);

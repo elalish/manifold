@@ -85,9 +85,9 @@ inline ExecutionPolicy autoPolicy(int size) {
     case ExecutionPolicy::Par:                                                 \
       return thrust::NAME(thrust::MANIFOLD_PAR_NS::par, args...);              \
     case ExecutionPolicy::Seq:                                                 \
-      return thrust::NAME(thrust::cpp::par, args...);                          \
+      break;                                                                   \
     }                                                                          \
-    __builtin_unreachable();                                                   \
+    return thrust::NAME(thrust::cpp::par, args...);                            \
   }
 #else
 #define THRUST_DYNAMIC_BACKEND_VOID(NAME)                                      \
@@ -112,9 +112,9 @@ inline ExecutionPolicy autoPolicy(int size) {
     case ExecutionPolicy::Par:                                                 \
       return thrust::NAME(thrust::MANIFOLD_PAR_NS::par, args...);              \
     case ExecutionPolicy::Seq:                                                 \
-      return thrust::NAME(thrust::cpp::par, args...);                          \
+      break;                                                                   \
     }                                                                          \
-    __builtin_unreachable();                                                   \
+    return thrust::NAME(thrust::cpp::par, args...);                            \
   }
 #endif
 
