@@ -26,7 +26,17 @@ namespace manifold {
 struct Manifold::Impl {
   struct MeshRelationD {
     VecDH<glm::vec3> barycentric;
+    /// meshID in BaryRef has different meaning in MeshRelation and
+    /// MeshRelationD:
+    /// - In `MeshRelation`: The original mesh triangle index.
+    /// - In `MeshRelationD`: The original mesh triangle index =
+    /// `originalID[meshID]`
+    ///
+    /// @note Triangles coming from different manifolds should have different mesh
+    /// ID, otherwise `SimplifyTopology` will not work properly.
     VecDH<BaryRef> triBary;
+    /// meshID to originalID mapping.
+    std::unordered_map<int, int> originalID;
   };
 
   Box bBox_;
@@ -40,7 +50,7 @@ struct Manifold::Impl {
   Collider collider_;
   glm::mat4x3 transform_ = glm::mat4x3(1.0f);
 
-  static std::vector<int> meshID2Original_;
+  static std::atomic<int> meshIDCounter_;
 
   Impl() {}
   enum class Shape { TETRAHEDRON, CUBE, OCTAHEDRON };
@@ -56,11 +66,11 @@ struct Manifold::Impl {
       const std::vector<float>& properties = std::vector<float>(),
       const std::vector<float>& propertyTolerance = std::vector<float>());
 
-  void DuplicateMeshIDs();
-  void ReinitializeReference(int meshID = -1);
+  void ReinitializeReference(int meshID);
   void CreateHalfedges(const VecDH<glm::ivec3>& triVerts);
   void CreateAndFixHalfedges(const VecDH<glm::ivec3>& triVerts);
   void CalculateNormals();
+  void UpdateMeshIDs(VecDH<int> &meshIDs, VecDH<int> &originalIDs, int startTri=0, int n=-1, int startID=0);
 
   void Update();
   void ApplyTransform() const;
