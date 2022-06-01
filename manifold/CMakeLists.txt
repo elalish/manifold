@@ -5,7 +5,7 @@ add_library(${PROJECT_NAME} src/manifold.cpp src/constructors.cpp src/impl.cpp
     src/smoothing.cpp src/boolean3.cpp src/boolean_result.cpp
 )
 
-if(THRUST_BACKEND STREQUAL "CUDA")
+if(MANIFOLD_USE_CUDA)
     set_source_files_properties(
         src/manifold.cpp src/constructors.cpp src/impl.cpp
         src/properties.cpp src/sort.cpp src/edge_op.cpp src/face_op.cpp

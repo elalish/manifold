@@ -14,12 +14,10 @@
 
 #pragma once
 #include <chrono>
-#if THRUST_DEVICE_SYSTEM == THRUST_DEVICE_SYSTEM_CUDA
+#ifdef MANIFOLD_USE_CUDA
 #include <cuda.h>
 #endif
 #include <iostream>
-#include <thrust/execution_policy.h>
-#include <thrust/uninitialized_copy.h>
 
 #include "par.h"
 #include "structs.h"
@@ -249,18 +247,18 @@ private:
   static constexpr int DEVICE_MAX_BYTES = 1 << 16;
 
   static void mallocManaged(T **ptr, size_t bytes) {
-#if THRUST_DEVICE_SYSTEM == THRUST_DEVICE_SYSTEM_CUDA
+#ifdef MANIFOLD_USE_CUDA
     if (__builtin_expect(CUDA_ENABLED == -1, 0))
       check_cuda_available();
     if (CUDA_ENABLED)
-      cudaMallocManaged(ptr, bytes);
+      cudaMallocManaged(reinterpret_cast<void**>(ptr), bytes);
     else
 #endif
       *ptr = reinterpret_cast<T *>(malloc(bytes));
   }
 
   static void freeManaged(T *ptr) {
-#if THRUST_DEVICE_SYSTEM == THRUST_DEVICE_SYSTEM_CUDA
+#ifdef MANIFOLD_USE_CUDA
     if (CUDA_ENABLED)
       cudaFree(ptr);
     else
@@ -269,7 +267,7 @@ private:
   }
 
   static void prefetch(T *ptr, int bytes, bool onHost) {
-#if THRUST_DEVICE_SYSTEM == THRUST_DEVICE_SYSTEM_CUDA
+#ifdef MANIFOLD_USE_CUDA
     if (bytes > 0 && CUDA_ENABLED)
       cudaMemPrefetchAsync(ptr, std::min(bytes, DEVICE_MAX_BYTES),
                            onHost ? cudaCpuDeviceId : 0);
@@ -282,16 +280,14 @@ private:
     prefetch(dst, n * sizeof(T), policy != ExecutionPolicy::ParUnseq);
     switch (policy) {
     case ExecutionPolicy::ParUnseq:
-#if THRUST_DEVICE_SYSTEM == THRUST_DEVICE_SYSTEM_CUDA
+#ifdef MANIFOLD_USE_CUDA
       cudaMemcpy(dst, src, n * sizeof(T), cudaMemcpyHostToDevice);
 #endif
     case ExecutionPolicy::Par:
-#if THRUST_DEVICE_SYSTEM != THRUST_DEVICE_SYSTEM_CPP
-      thrust::uninitialized_copy_n(thrust::omp::par, src, n, dst);
+      thrust::uninitialized_copy_n(thrust::MANIFOLD_PAR_NS::par, src, n, dst);
       break;
-#endif
     case ExecutionPolicy::Seq:
-      thrust::uninitialized_copy_n(thrust::host, src, n, dst);
+      thrust::uninitialized_copy_n(thrust::cpp::par, src, n, dst);
       break;
     }
   }
