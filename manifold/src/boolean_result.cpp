@@ -22,6 +22,10 @@
 // TODO: make this runtime configurable for quicker debug
 constexpr bool kVerbose = false;
 
+// Mark the meshID as coming from P by flipping the 30th bit.
+// The 30th bit is used to avoid flipping the sign.
+constexpr int kFromP = 1 << 30;
+
 using namespace manifold;
 using namespace thrust::placeholders;
 
@@ -445,6 +449,10 @@ struct CreateBarycentric {
     const BaryRef oldRef = halfedgeRef.PQ == 0 ? triBaryP[tri] : triBaryQ[tri];
 
     faceRef[halfedgeR.face] = oldRef;
+    if (halfedgeRef.PQ == 0) {
+      // Mark the meshID as coming from P
+      faceRef[halfedgeR.face].meshID |= kFromP;
+    }
 
     if (halfedgeR.startVert < firstNewVert) {  // retained vert
       int i = halfedgeRef.vert;
@@ -679,9 +687,21 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
   Timer simplify;
   simplify.Start();
 
-  outR.DuplicateMeshIDs();
-
   outR.SimplifyTopology();
+
+  // Index starting from 0 is chosen because I want the kernel part as simple as
+  // possible.
+  VecDH<int> meshIDs;
+  VecDH<int> original;
+  for (auto &entry : inP_.meshRelation_.originalID) {
+    meshIDs.push_back(entry.first | kFromP);
+    original.push_back(entry.second);
+  }
+  for (auto &entry : inQ_.meshRelation_.originalID) {
+    meshIDs.push_back(entry.first);
+    original.push_back(entry.second);
+  }
+  outR.UpdateMeshIDs(meshIDs, original);
 
   simplify.Stop();
   Timer sort;
