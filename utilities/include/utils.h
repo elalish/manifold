@@ -42,7 +42,7 @@ inline void MemUsage() {
 
 inline void CheckDevice() {
 #if THRUST_DEVICE_SYSTEM == THRUST_DEVICE_SYSTEM_CUDA
-  if (__builtin_expect(CUDA_ENABLED == -1, 0))
+  if (CUDA_ENABLED == -1)
     check_cuda_available();
   if (CUDA_ENABLED) {
     cudaError_t error = cudaGetLastError();
