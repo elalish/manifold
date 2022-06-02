@@ -14,7 +14,7 @@ jobs:
   build:
     strategy:
       matrix:
-        backend: [CPP, OMP, CUDA]
+        backend: [CPP, OMP, TBB, CUDA]
     runs-on: ubuntu-20.04
     container:
       image: docker://nvidia/cuda:11.6.0-devel-ubuntu20.04
@@ -22,7 +22,7 @@ jobs:
     - name: Install dependencies
       run: |
         apt-get -y update
-        DEBIAN_FRONTEND=noninteractive apt install -y libomp-dev git
+        DEBIAN_FRONTEND=noninteractive apt install -y libomp-dev git libtbb-dev pkg-config
     - uses: actions/checkout@v3
       with:
         submodules: true
@@ -120,7 +120,7 @@ jobs:
   build_nix:
     strategy:
       matrix:
-        variant: [cpp, omp, cuda, js]
+        variant: [cpp, omp, cuda, js, tbb]
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2.4.0
