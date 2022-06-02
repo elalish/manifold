@@ -119,15 +119,12 @@ inline ExecutionPolicy autoPolicy(int size) {
 #endif
 
 THRUST_DYNAMIC_BACKEND_VOID(gather)
-THRUST_DYNAMIC_BACKEND_VOID(gather_if)
 THRUST_DYNAMIC_BACKEND_VOID(scatter)
 THRUST_DYNAMIC_BACKEND_VOID(for_each)
 THRUST_DYNAMIC_BACKEND_VOID(for_each_n)
 THRUST_DYNAMIC_BACKEND_VOID(sort)
 THRUST_DYNAMIC_BACKEND_VOID(stable_sort)
 THRUST_DYNAMIC_BACKEND_VOID(fill)
-THRUST_DYNAMIC_BACKEND_VOID(binary_search)
-THRUST_DYNAMIC_BACKEND_VOID(lower_bound)
 THRUST_DYNAMIC_BACKEND_VOID(sequence)
 THRUST_DYNAMIC_BACKEND_VOID(sort_by_key)
 THRUST_DYNAMIC_BACKEND_VOID(copy)
@@ -137,16 +134,21 @@ THRUST_DYNAMIC_BACKEND_VOID(exclusive_scan)
 THRUST_DYNAMIC_BACKEND_VOID(uninitialized_fill)
 THRUST_DYNAMIC_BACKEND_VOID(uninitialized_copy)
 
+THRUST_DYNAMIC_BACKEND(all_of, bool)
+THRUST_DYNAMIC_BACKEND(is_sorted, bool)
+THRUST_DYNAMIC_BACKEND(reduce, void)
+THRUST_DYNAMIC_BACKEND(count_if, int)
+THRUST_DYNAMIC_BACKEND(binary_search, bool)
+// void implies that the user have to specify the return type in the template
+// argument, as we are unable to deduce it
 THRUST_DYNAMIC_BACKEND(remove, void)
 THRUST_DYNAMIC_BACKEND(copy_if, void)
 THRUST_DYNAMIC_BACKEND(remove_if, void)
 THRUST_DYNAMIC_BACKEND(unique, void)
-THRUST_DYNAMIC_BACKEND(all_of, bool)
-THRUST_DYNAMIC_BACKEND(is_sorted, bool)
-THRUST_DYNAMIC_BACKEND(reduce, void)
-THRUST_DYNAMIC_BACKEND(reduce_by_key, void)
 THRUST_DYNAMIC_BACKEND(find, void)
-THRUST_DYNAMIC_BACKEND(count_if, int)
+THRUST_DYNAMIC_BACKEND(reduce_by_key, void)
 THRUST_DYNAMIC_BACKEND(transform_reduce, void)
+THRUST_DYNAMIC_BACKEND(lower_bound, void)
+THRUST_DYNAMIC_BACKEND(gather_if, void)
 
 } // namespace manifold
