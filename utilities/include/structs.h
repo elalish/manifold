@@ -24,6 +24,7 @@
 #include <iostream>
 #include <sstream>
 #include <vector>
+#include <unordered_map>
 
 namespace manifold {
 
@@ -229,7 +230,7 @@ struct Curvature {
  * Mesh.
  */
 struct BaryRef {
-  /// Reference to original Mesh, matching Manifold.GetMeshIDs().
+  /// The original mesh triangle index.
   int meshID;
   /// The triangle index of the original triangle this was part of:
   /// Mesh.triVerts[tri].
