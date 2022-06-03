@@ -11,19 +11,19 @@ set(CMAKE_VERBOSE_MAKEFILE ON)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-set(THRUST_BACKEND "CUDA" CACHE STRING
-    "Thrust backend, either \"CUDA\", \"OMP\" or \"CPP\"(single-threaded)"
-)
+option(MANIFOLD_USE_CUDA on)
+set(MANIFOLD_PAR "TBB" CACHE STRING "Parallel backend, either \"TBB\" or \"OpenMP\" or \"NONE\"")
+
 if(EMSCRIPTEN)
     message("Building for Emscripten")
     set(CMAKE_EXE_LINKER_FLAGS ${CMAKE_EXE_LINKER_FLAGS} -sALLOW_MEMORY_GROWTH=1)
-    set(THRUST_BACKEND "CPP")
+    set(MANIFOLD_USE_CUDA OFF)
+    set(MANIFOLD_PAR "NONE")
 endif()
 
 option(PYBIND11_FINDPYTHON on)
 
 option(BUILD_TEST_CGAL off)
-set(DISABLED_DETERMINISM 1)
 
 option(BUILD_SHARED_LIBS off)
 set(ASSIMP_INC_DIR 
@@ -32,36 +32,60 @@ set(ASSIMP_INC_DIR
 set(GLM_INC_DIR ${PROJECT_SOURCE_DIR}/third_party/glm)
 set(PYBIND11_DIR ${PROJECT_SOURCE_DIR}/third_party/pybind11)
 
-set_property(CACHE THRUST_BACKEND PROPERTY STRINGS CUDA OMP CPP)
-
-if(NOT THRUST_BACKEND STREQUAL "CUDA" AND NOT THRUST_BACKEND STREQUAL "OMP" AND NOT THRUST_BACKEND STREQUAL "CPP")
-    message(FATAL_ERROR "Invalid value for THRUST_BACKEND: ${THRUST_BACKEND}. Should be one of \"CUDA\", \"OMP\" or \"CPP\"")
+option(ASSIMP_FAST_BUILD "build ASSIMP just for tests" ON)
+if(ASSIMP_FAST_BUILD)
+    option(ASSIMP_INSTALL FALSE)
+    option(ASSIMP_BUILD_ALL_IMPORTERS_BY_DEFAULT FALSE)
+    option(ASSIMP_BUILD_ALL_EXPORTERS_BY_DEFAULT FALSE)
+    foreach(FMT OBJ;PLY;STL;GLTF)
+        set(ASSIMP_BUILD_${FMT}_IMPORTER TRUE)
+        set(ASSIMP_BUILD_${FMT}_EXPORTER TRUE)
+    endforeach()
 endif()
 
-if(MSVC)
-    set(MANIFOLD_FLAGS /DDISABLED_DETERMINISM=${DISABLED_DETERMINISM})
-else()
-    set(MANIFOLD_FLAGS -Werror -Wall -Wno-sign-compare -Wno-unused -DDISABLED_DETERMINISM=${DISABLED_DETERMINISM})
-endif()
 set(MANIFOLD_NVCC_FLAGS -Xcudafe --diag_suppress=esa_on_defaulted_function_ignored --extended-lambda)
 set(MANIFOLD_NVCC_RELEASE_FLAGS -O3)
 set(MANIFOLD_NVCC_DEBUG_FLAGS -G)
 
-if(THRUST_BACKEND STREQUAL "CUDA")
+set(THRUST_INC_DIR ${PROJECT_SOURCE_DIR}/third_party/thrust)
+
+message("CUDA Support: ${MANIFOLD_USE_CUDA}")
+message("Parallel Backend: ${MANIFOLD_PAR}")
+
+if (MANIFOLD_PAR STREQUAL "OMP")
+    find_package(OpenMP REQUIRED)
+    set(MANIFOLD_INCLUDE OpenMP::OpenMP_CXX)
+    set(MANIFOLD_FLAGS ${MANIFOLD_FLAGS} -fopenmp -DMANIFOLD_PAR='O')
+elseif (MANIFOLD_PAR STREQUAL "TBB")
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(TBB REQUIRED tbb)
+    set(MANIFOLD_INCLUDE ${TBB_LINK_LIBRARIES})
+    set(MANIFOLD_FLAGS ${MANIFOLD_FLAGS} -DMANIFOLD_PAR='T')
+elseif (MANIFOLD_PAR STREQUAL "NONE")
+    set(MANIFOLD_FLAGS ${MANIFOLD_FLAGS})
+    set(MANIFOLD_PAR "CPP")
+else ()
+    message(FATAL_ERROR "Invalid value for MANIFOLD_PAR: ${MANIFOLD_PAR}. "
+    "Should be one of \"TBB\", \"OMP\", \"CPP\"")
+endif()
+
+if (MANIFOLD_USE_CUDA)
+    enable_language(CUDA)
+    find_package(CUDA  REQUIRED)
     # we cannot set THRUST_INC_DIR when building with CUDA, otherwise the
     # compiler will not use the system CUDA headers which causes incompatibility
-    enable_language(CUDA)
+    # clear THRUST_INC_DIR, we use the one from nvcc
+    set(THRUST_INC_DIR "")
+    set(MANIFOLD_FLAGS ${MANIFOLD_FLAGS} -DMANIFOLD_USE_CUDA)
+    set(MANIFOLD_NVCC_FLAGS ${MANIFOLD_NVCC_FLAGS} ${MANIFOLD_FLAGS})
+else ()
+    set(MANIFOLD_FLAGS ${MANIFOLD_FLAGS} -DTHRUST_DEVICE_SYSTEM=THRUST_DEVICE_SYSTEM_${MANIFOLD_PAR})
+endif()
+
+if(MSVC)
+    set(MANIFOLD_FLAGS ${MANIFOLD_FLAGS})
 else()
-    set(THRUST_INC_DIR ${PROJECT_SOURCE_DIR}/third_party/thrust)
-    if(THRUST_BACKEND STREQUAL "OMP")
-        message("------------------------- Using OpenMP instead of CUDA.")
-        find_package(OpenMP REQUIRED)
-        set(MANIFOLD_OMP_INCLUDE OpenMP::OpenMP_CXX)
-        set(MANIFOLD_FLAGS ${MANIFOLD_FLAGS} -DTHRUST_DEVICE_SYSTEM=THRUST_DEVICE_SYSTEM_OMP -fopenmp)
-    else()
-        message("------------------------- Using C++ instead of CUDA.")
-        set(MANIFOLD_FLAGS ${MANIFOLD_FLAGS} -DTHRUST_DEVICE_SYSTEM=THRUST_DEVICE_SYSTEM_CPP)
-    endif()
+    set(MANIFOLD_FLAGS ${MANIFOLD_FLAGS} -Werror -Wall -Wno-sign-compare -Wno-unused)
 endif()
 
 add_subdirectory(utilities)
