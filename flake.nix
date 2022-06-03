@@ -35,7 +35,9 @@
               checkPhase = ''
                 cd test
                 ./manifold_test
-                cd ../
+                cd ../../
+                PYTHONPATH=$PYTHONPATH:$(pwd)/build/tools python3 test/python/run_all.py
+                cd build
               '';
               installPhase = ''
                 mkdir -p $out
@@ -43,6 +45,7 @@
                 cp meshIO/libmeshIO.a $out/
                 cp tools/loadMesh $out
                 cp tools/perfTest $out
+                cp tools/pymanifold* $out
               '';
             };
           parallelBackends = [

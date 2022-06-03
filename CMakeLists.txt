@@ -9,6 +9,8 @@ set(CMAKE_VERBOSE_MAKEFILE ON)
 #         )
 # endif()
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 option(MANIFOLD_USE_CUDA on)
 set(MANIFOLD_PAR "TBB" CACHE STRING "Parallel backend, either \"TBB\" or \"OpenMP\" or \"NONE\"")
 
@@ -19,6 +21,8 @@ if(EMSCRIPTEN)
     set(MANIFOLD_PAR "NONE")
 endif()
 
+option(PYBIND11_FINDPYTHON on)
+
 option(BUILD_TEST_CGAL off)
 
 option(BUILD_SHARED_LIBS off)
@@ -26,6 +30,7 @@ set(ASSIMP_INC_DIR
     ${PROJECT_SOURCE_DIR}/third_party/assimp/include
     ${CMAKE_BINARY_DIR}/third_party/assimp/include)
 set(GLM_INC_DIR ${PROJECT_SOURCE_DIR}/third_party/glm)
+set(PYBIND11_DIR ${PROJECT_SOURCE_DIR}/third_party/pybind11)
 
 option(ASSIMP_FAST_BUILD "build ASSIMP just for tests" ON)
 if(ASSIMP_FAST_BUILD)
