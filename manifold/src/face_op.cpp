@@ -34,11 +34,11 @@ void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge,
                               const VecDH<int>& halfedgeBary) {
   VecDH<glm::ivec3> triVerts;
   VecDH<glm::vec3> triNormal;
-  VecDH<BaryRef> &triBary = meshRelation_.triBary;
+  VecDH<BaryRef>& triBary = meshRelation_.triBary;
   triBary.resize(0);
   triVerts.reserve(faceEdge.size());
   triNormal.reserve(faceEdge.size());
-  triBary.reserve(faceEdge.size()*3);
+  triBary.reserve(faceEdge.size() * 3);
 
   for (int face = 0; face < faceEdge.size() - 1; ++face) {
     const int firstEdge = faceEdge[face];
@@ -49,8 +49,7 @@ void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge,
 
     auto linearSearch = [](const int* mapping, int value) {
       int i = 0;
-      while (mapping[i] != value)
-        ++i;
+      while (mapping[i] != value) ++i;
       return i;
     };
 
@@ -85,7 +84,8 @@ void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge,
                         halfedge_[firstEdge + 3].startVert};
       const glm::mat3x2 projection = GetAxisAlignedProjection(normal);
       auto triCCW = [&projection, this](const glm::ivec3 tri) {
-        return CCW(projection * this->vertPos_[tri[0]], projection * this->vertPos_[tri[1]],
+        return CCW(projection * this->vertPos_[tri[0]],
+                   projection * this->vertPos_[tri[1]],
                    projection * this->vertPos_[tri[2]], precision_) >= 0;
       };
 
@@ -122,7 +122,7 @@ void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge,
         }
       }
 
-      for (auto tri : { tri0, tri1 }) {
+      for (auto tri : {tri0, tri1}) {
         triVerts.push_back(tri);
         triNormal.push_back(normal);
         triBary.push_back(faceRef[face]);
@@ -156,14 +156,13 @@ void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge,
         triNormal.push_back(normal);
         triBary.push_back(faceRef[face]);
         for (int k : {0, 1, 2}) {
-          triBary.back().vertBary[k] =
-              vertBary[tri[k]];
+          triBary.back().vertBary[k] = vertBary[tri[k]];
         }
       }
     }
   }
   faceNormal_ = std::move(triNormal);
-  CreateAndFixHalfedges(triVerts);
+  CreateHalfedges(triVerts);
 }
 
 /**
