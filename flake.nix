@@ -10,33 +10,65 @@
             inherit system;
             config.allowUnfree = true;
           };
-          manifold = { backend ? "CPP", doCheck ? true, build-tools ? [ ], runtime ? [ ] }: pkgs.stdenv.mkDerivation {
-            inherit doCheck;
-            pname = "manifold-${backend}";
-            version = "beta";
-            src = self;
-            patches = [ ./assimp.diff ];
-            nativeBuildInputs = (with pkgs; [ cmake python38 ]) ++ build-tools;
-            buildInputs = runtime;
-            cmakeFlags = [ "-DTHRUST_BACKEND=${backend}" ];
-            checkPhase = ''
-              cd test
-              ./manifold_test
-              cd ../
-            '';
-            installPhase = ''
-              mkdir -p $out
-              cp manifold/libmanifold.a $out/
-              cp meshIO/libmeshIO.a $out/
-              cp tools/loadMesh $out
-              cp tools/perfTest $out
-            '';
-          };
+          manifold =
+            { parallel-backend ? "none"
+            , cuda-support ? false
+            , doCheck ? true
+            , build-tools ? [ ]
+            , ...
+            }: pkgs.stdenv.mkDerivation {
+              inherit doCheck;
+              pname =
+                if cuda-support then
+                  "manifold-${parallel-backend}-cuda"
+                else
+                  "manifold-${parallel-backend}";
+              version = "beta";
+              src = self;
+              patches = [ ./assimp.diff ];
+              nativeBuildInputs = (with pkgs; [ cmake python38 ]) ++ build-tools ++
+                (if cuda-support then [ pkgs.cudatoolkit_11_5 pkgs.addOpenGLRunpath ] else [ ]);
+              cmakeFlags = [
+                "-DMANIFOLD_PAR=${pkgs.lib.strings.toUpper parallel-backend}"
+                "-DMANIFOLD_USE_CUDA=${if cuda-support then "ON" else "OFF"}"
+              ];
+              checkPhase = ''
+                cd test
+                ./manifold_test
+                cd ../
+              '';
+              installPhase = ''
+                mkdir -p $out
+                cp manifold/libmanifold.a $out/
+                cp meshIO/libmeshIO.a $out/
+                cp tools/loadMesh $out
+                cp tools/perfTest $out
+              '';
+            };
+          parallelBackends = [
+            { parallel-backend = "none"; }
+            {
+              parallel-backend = "omp";
+              build-tools = [ pkgs.llvmPackages_13.openmp ];
+            }
+            {
+              parallel-backend = "tbb";
+              build-tools = with pkgs; [ tbb pkg-config ];
+            }
+          ];
+          buildMatrix = with pkgs; with lib; lists.flatten (map
+            (env: map
+              (x: x // env)
+              parallelBackends) [
+            { cuda-support = false; }
+            {
+              cuda-support = true;
+            }
+          ]);
           devShell = { additional ? [ ] }: pkgs.mkShell {
             buildInputs = with pkgs; [
               cmake
-              ccls
-              llvmPackages.openmp
+              llvmPackages_13.openmp
               clang-tools
               clang_13
               emscripten
@@ -45,48 +77,45 @@
           };
         in
         {
-          packages.manifold-cpp = manifold { };
-          packages.manifold-omp = manifold { backend = "OMP"; runtime = [ pkgs.llvmPackages.openmp ]; };
-          packages.manifold-tbb = manifold { backend = "TBB"; runtime = [ pkgs.tbb pkgs.pkg-config ]; };
-          packages.manifold-cuda = manifold {
-            backend = "CUDA";
-            runtime = [
-              pkgs.cudaPackages.cudatoolkit_11
-            ];
-            doCheck = false;
-          };
-          packages.manifold-js = pkgs.buildEmscriptenPackage {
-            name = "manifold-js";
-            version = "beta";
-            src = self;
-            patches = [ ./assimp.diff ];
-            nativeBuildInputs = (with pkgs; [ cmake python38 ]);
-            buildInputs = [ pkgs.nodejs ];
-            configurePhase = ''
-              mkdir build
-              cd build
-              emcmake cmake -DCMAKE_BUILD_TYPE=Release ..
-            '';
-            buildPhase = ''
-              emmake make
-            '';
-            checkPhase = ''
-              cd test
-              node manifold_test.js
-              cd ../
-            '';
-            installPhase = ''
-              mkdir -p $out
-              cd tools
-              cp *.js $out/
-              cp *.wasm $out/
-            '';
+          packages = (builtins.listToAttrs
+            (map
+              (x: {
+                name = "manifold-" + x.parallel-backend + (if
+                  x.cuda-support then "-cuda" else "");
+                value = manifold x;
+              })
+              buildMatrix)) // {
+            manifold-js = pkgs.buildEmscriptenPackage {
+              name = "manifold-js";
+              version = "beta";
+              src = self;
+              patches = [ ./assimp.diff ];
+              nativeBuildInputs = (with pkgs; [ cmake python38 ]);
+              buildInputs = [ pkgs.nodejs ];
+              configurePhase = ''
+                mkdir build
+                cd build
+                emcmake cmake -DCMAKE_BUILD_TYPE=Release ..
+              '';
+              buildPhase = ''
+                emmake make
+              '';
+              checkPhase = ''
+                cd test
+                node manifold_test.js
+                cd ../
+              '';
+              installPhase = ''
+                mkdir -p $out
+                cd tools
+                cp *.js $out/
+                cp *.wasm $out/
+              '';
+            };
           };
           devShell = devShell { };
           devShells.cuda = devShell {
-            additional = [
-              pkgs.cudaPackages.cudatoolkit_11
-            ];
+            additional = [ pkgs.cudatoolkit_11_5 ];
           };
         }
       );

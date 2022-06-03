@@ -23,6 +23,8 @@
 
 #include <iostream>
 
+#include "par.h"
+
 namespace manifold {
 
 /** @defgroup Private
@@ -40,8 +42,12 @@ inline void MemUsage() {
 
 inline void CheckDevice() {
 #if THRUST_DEVICE_SYSTEM == THRUST_DEVICE_SYSTEM_CUDA
-  cudaError_t error = cudaGetLastError();
-  if (error != cudaSuccess) throw std::runtime_error(cudaGetErrorString(error));
+  if (CUDA_ENABLED == -1)
+    check_cuda_available();
+  if (CUDA_ENABLED) {
+    cudaError_t error = cudaGetLastError();
+    if (error != cudaSuccess) throw std::runtime_error(cudaGetErrorString(error));
+  }
 #endif
 }
 

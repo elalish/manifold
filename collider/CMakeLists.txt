@@ -2,7 +2,7 @@ project (collider)
 
 add_library(${PROJECT_NAME} src/collider.cpp)
 
-if(THRUST_BACKEND STREQUAL "CUDA")
+if(MANIFOLD_USE_CUDA)
     set_source_files_properties(src/collider.cpp PROPERTIES LANGUAGE CUDA)
     set_property(TARGET ${PROJECT_NAME} PROPERTY CUDA_ARCHITECTURES 61)
     target_compile_options(${PROJECT_NAME} 
