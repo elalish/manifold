@@ -14,6 +14,7 @@
 
 #include "boolean3.h"
 #include "impl.h"
+#include "par.h"
 
 namespace {
 using namespace manifold;
@@ -62,14 +63,11 @@ Manifold::~Manifold() = default;
 Manifold::Manifold(Manifold&&) noexcept = default;
 Manifold& Manifold::operator=(Manifold&&) noexcept = default;
 
-Manifold::Manifold(const Manifold& other) : pImpl_(new Impl(*other.pImpl_)) {
-  pImpl_->DuplicateMeshIDs();
-}
+Manifold::Manifold(const Manifold& other) : pImpl_(new Impl(*other.pImpl_)) {}
 
 Manifold& Manifold::operator=(const Manifold& other) {
   if (this != &other) {
     pImpl_.reset(new Impl(*other.pImpl_));
-    pImpl_->DuplicateMeshIDs();
   }
   return *this;
 }
@@ -124,7 +122,8 @@ Mesh Manifold::GetMesh() const {
                                 pImpl_->halfedgeTangent_.end());
 
   result.triVerts.resize(NumTri());
-  thrust::for_each_n(zip(result.triVerts.begin(), countAt(0)), NumTri(),
+  // note that `triVerts` is `std::vector`, so we cannot use thrust::device
+  thrust::for_each_n(thrust::host, zip(result.triVerts.begin(), countAt(0)), NumTri(),
                      MakeTri({pImpl_->halfedge_.cptrH()}));
 
   return result;
@@ -263,17 +262,15 @@ Curvature Manifold::GetCurvature() const { return pImpl_->GetCurvature(); }
  * gives an index for each vertex into the barycentric vector if that index is
  * >= 0, indicating it is a new vertex. If the index is < 0, this indicates it
  * is an original vertex, the index + 3 vert of the referenced triangle.
- *
- * Every time a manifold is copied or combined to form a new manifold it gets a
- * new meshID to indicate that particular instance of the mesh. In order to look
- * up which input mesh a given instance came from, simply use the
- * MeshID2Original() static vector.
  */
 MeshRelation Manifold::GetMeshRelation() const {
   MeshRelation out;
   const auto& relation = pImpl_->meshRelation_;
   out.triBary.insert(out.triBary.end(), relation.triBary.begin(),
                      relation.triBary.end());
+  for (auto &bary : out.triBary) {
+    bary.meshID = relation.originalID.at(bary.meshID);
+  }
   out.barycentric.insert(out.barycentric.end(), relation.barycentric.begin(),
                          relation.barycentric.end());
   return out;
@@ -286,17 +283,11 @@ MeshRelation Manifold::GetMeshRelation() const {
  * future reference.
  */
 std::vector<int> Manifold::GetMeshIDs() const {
-  VecDH<int> meshIDs(NumTri());
-  thrust::for_each_n(
-      zip(meshIDs.beginD(), pImpl_->meshRelation_.triBary.beginD()), NumTri(),
-      GetMeshID());
-
-  thrust::sort(meshIDs.beginD(), meshIDs.endD());
-  int n = thrust::unique(meshIDs.beginD(), meshIDs.endD()) - meshIDs.beginD();
-  meshIDs.resize(n);
-
   std::vector<int> out;
-  out.insert(out.end(), meshIDs.begin(), meshIDs.end());
+  out.reserve(pImpl_->meshRelation_.originalID.size());
+  for (auto &entry : pImpl_->meshRelation_.originalID) {
+    out.push_back(entry.second);
+  }
   return out;
 }
 
@@ -318,15 +309,6 @@ std::vector<int> Manifold::GetMeshIDs() const {
 int Manifold::SetAsOriginal() {
   int meshID = pImpl_->InitializeNewReference();
   return meshID;
-}
-
-/**
- * Returns a vector that maps a given unique MeshID to the MeshID of the
- * original Mesh it came from, to easily identify separate copies of the same
- * thing.
- */
-std::vector<int> Manifold::MeshID2Original() {
-  return Manifold::Impl::meshID2Original_;
 }
 
 /**
@@ -439,7 +421,7 @@ Manifold& Manifold::Transform(const glm::mat4x3& m) {
  */
 Manifold& Manifold::Warp(std::function<void(glm::vec3&)> warpFunc) {
   pImpl_->ApplyTransform();
-  thrust::for_each_n(pImpl_->vertPos_.begin(), NumVert(), warpFunc);
+  thrust::for_each_n(thrust::host, pImpl_->vertPos_.begin(), NumVert(), warpFunc);
   pImpl_->Update();
   pImpl_->faceNormal_.resize(0);  // force recalculation of triNormal
   pImpl_->CalculateNormals();

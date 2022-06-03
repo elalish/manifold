@@ -15,6 +15,7 @@
 #include <map>
 
 #include "impl.h"
+#include "par.h"
 
 namespace {
 using namespace manifold;
@@ -356,19 +357,18 @@ void Manifold::Impl::CreateTangents(
   const int numHalfedge = halfedge_.size();
   halfedgeTangent_.resize(numHalfedge);
 
-  thrust::for_each_n(zip(halfedgeTangent_.beginD(), halfedge_.cbeginD()),
+  for_each_n(autoPolicy(numHalfedge), zip(halfedgeTangent_.begin(), halfedge_.cbegin()),
                      numHalfedge,
                      SmoothBezier({vertPos_.cptrD(), faceNormal_.cptrD(),
                                    vertNormal_.cptrD(), halfedge_.cptrD()}));
 
   if (!sharpenedEdges.empty()) {
-    const VecH<Halfedge>& halfedge = halfedge_.H();
-    const VecH<BaryRef>& triBary = meshRelation_.triBary.H();
+    const VecDH<BaryRef>& triBary = meshRelation_.triBary;
 
     // sharpenedEdges are referenced to the input Mesh, but the triangles have
     // been sorted in creating the Manifold, so the indices are converted using
     // meshRelation_.
-    std::vector<int> oldHalfedge2New(halfedge.size());
+    std::vector<int> oldHalfedge2New(halfedge_.size());
     for (int tri = 0; tri < NumTri(); ++tri) {
       int oldTri = triBary[tri].tri;
       for (int i : {0, 1, 2}) oldHalfedge2New[3 * oldTri + i] = 3 * tri + i;
@@ -380,7 +380,7 @@ void Manifold::Impl::CreateTangents(
     for (Smoothness edge : sharpenedEdges) {
       if (edge.smoothness == 1) continue;
       edge.halfedge = oldHalfedge2New[edge.halfedge];
-      int pair = halfedge[edge.halfedge].pairedHalfedge;
+      int pair = halfedge_[edge.halfedge].pairedHalfedge;
       if (edges.find(pair) == edges.end()) {
         edges[edge.halfedge] = {edge, {pair, 1}};
       } else {
@@ -391,12 +391,12 @@ void Manifold::Impl::CreateTangents(
     std::map<int, std::vector<Pair>> vertTangents;
     for (const auto &value : edges) {
       const Pair edge = value.second;
-      vertTangents[halfedge[edge.first.halfedge].startVert].push_back(edge);
-      vertTangents[halfedge[edge.second.halfedge].startVert].push_back(
+      vertTangents[halfedge_[edge.first.halfedge].startVert].push_back(edge);
+      vertTangents[halfedge_[edge.second.halfedge].startVert].push_back(
           {edge.second, edge.first});
     }
 
-    VecH<glm::vec4>& tangent = halfedgeTangent_.H();
+    VecDH<glm::vec4>& tangent = halfedgeTangent_;
     for (const auto& value : vertTangents) {
       const std::vector<Pair>& vert = value.second;
       // Sharp edges that end are smooth at their terminal vert.
@@ -414,7 +414,7 @@ void Manifold::Impl::CreateTangents(
                       tangent[second].w);
 
         auto SmoothHalf = [&](int first, int last, float smoothness) {
-          int current = NextHalfedge(halfedge[first].pairedHalfedge);
+          int current = NextHalfedge(halfedge_[first].pairedHalfedge);
           while (current != last) {
             const float cosBeta = glm::dot(
                 newTangent, glm::normalize(glm::vec3(tangent[current])));
@@ -422,7 +422,7 @@ void Manifold::Impl::CreateTangents(
                 (1 - smoothness) * cosBeta * cosBeta + smoothness;
             tangent[current] = glm::vec4(factor * glm::vec3(tangent[current]),
                                          tangent[current].w);
-            current = NextHalfedge(halfedge[current].pairedHalfedge);
+            current = NextHalfedge(halfedge_[current].pairedHalfedge);
           }
         };
 
@@ -444,7 +444,7 @@ void Manifold::Impl::CreateTangents(
         do {
           tangent[current] = glm::vec4(smoothness * glm::vec3(tangent[current]),
                                        tangent[current].w);
-          current = NextHalfedge(halfedge[current].pairedHalfedge);
+          current = NextHalfedge(halfedge_[current].pairedHalfedge);
         } while (current != start);
       }
     }
@@ -473,15 +473,17 @@ Manifold::Impl::MeshRelationD Manifold::Impl::Subdivide(int n) {
   MeshRelationD oldMeshRelation = std::move(meshRelation_);
   meshRelation_.barycentric.resize(relation.barycentric.size());
   meshRelation_.triBary.resize(relation.triBary.size());
+  meshRelation_.originalID = oldMeshRelation.originalID;
 
   VecDH<TmpEdge> edges = CreateTmpEdges(halfedge_);
   VecDH<int> half2Edge(2 * numEdge);
-  thrust::for_each_n(zip(countAt(0), edges.beginD()), numEdge,
+  auto policy = autoPolicy(numEdge);
+  for_each_n(policy, zip(countAt(0), edges.begin()), numEdge,
                      ReindexHalfedge({half2Edge.ptrD()}));
-  thrust::for_each_n(zip(countAt(0), edges.beginD()), numEdge,
+  for_each_n(policy, zip(countAt(0), edges.begin()), numEdge,
                      EdgeVerts({vertPos_.ptrD(), numVert, n}));
-  thrust::for_each_n(
-      zip(countAt(0), oldMeshRelation.triBary.beginD()), numTri,
+  for_each_n(
+      policy, zip(countAt(0), oldMeshRelation.triBary.begin()), numTri,
       InteriorVerts({vertPos_.ptrD(), relation.barycentric.ptrD(),
                      relation.triBary.ptrD(), meshRelation_.barycentric.ptrD(),
                      meshRelation_.triBary.ptrD(),
@@ -489,7 +491,7 @@ Manifold::Impl::MeshRelationD Manifold::Impl::Subdivide(int n) {
                      halfedge_.ptrD()}));
   // Create subtriangles
   VecDH<glm::ivec3> triVerts(n * n * numTri);
-  thrust::for_each_n(countAt(0), numTri,
+  for_each_n(policy, countAt(0), numTri,
                      SplitTris({triVerts.ptrD(), halfedge_.cptrD(),
                                 half2Edge.cptrD(), numVert, triVertStart, n}));
   CreateHalfedges(triVerts);
@@ -503,13 +505,14 @@ void Manifold::Impl::Refine(int n) {
   if (old.halfedgeTangent_.size() == old.halfedge_.size()) {
     VecDH<Barycentric> vertBary(NumVert());
     VecDH<int> lock(NumVert(), 0);
-    thrust::for_each_n(
-        zip(relation.triBary.beginD(), countAt(0)), NumTri(),
+    auto policy = autoPolicy(NumTri());
+    for_each_n(
+        policy, zip(relation.triBary.begin(), countAt(0)), NumTri(),
         TriBary2Vert({vertBary.ptrD(), lock.ptrD(),
                       relation.barycentric.cptrD(), halfedge_.cptrD()}));
 
-    thrust::for_each_n(
-        zip(vertPos_.beginD(), vertBary.beginD()), NumVert(),
+    for_each_n(
+        policy, zip(vertPos_.begin(), vertBary.begin()), NumVert(),
         InterpTri({old.halfedge_.cptrD(), old.halfedgeTangent_.cptrD(),
                    old.vertPos_.cptrD()}));
   }

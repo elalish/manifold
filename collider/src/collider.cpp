@@ -14,6 +14,7 @@
 
 #include "collider.h"
 #include "utils.h"
+#include "par.h"
 
 #ifdef _MSC_VER
 #include <intrin.h>
@@ -252,7 +253,7 @@ Collider::Collider(const VecDH<Box>& leafBB,
   nodeParent_.resize(num_nodes, -1);
   internalChildren_.resize(leafBB.size() - 1, thrust::make_pair(-1, -1));
   // organize tree
-  thrust::for_each_n(countAt(0), NumInternal(),
+  for_each_n(autoPolicy(NumInternal()), countAt(0), NumInternal(),
                      CreateRadixTree({nodeParent_.ptrD(),
                                       internalChildren_.ptrD(), leafMorton}));
   UpdateBoxes(leafBB);
@@ -273,15 +274,15 @@ SparseIndices Collider::Collisions(const VecDH<T>& querriesIn) const {
     // scalar number of overlaps found
     VecDH<int> nOverlapsD(1, 0);
     // calculate Bounding Box overlaps
-    thrust::for_each_n(
-        zip(querriesIn.cbeginD(), countAt(0)), querriesIn.size(),
+    for_each_n(
+        autoPolicy(querriesIn.size()), zip(querriesIn.cbegin(), countAt(0)), querriesIn.size(),
         FindCollisions<T>({querryTri.ptrDpq(), nOverlapsD.ptrD(), maxOverlaps,
                            nodeBBox_.ptrD(), internalChildren_.ptrD()}));
-    nOverlaps = nOverlapsD.H()[0];
+    nOverlaps = nOverlapsD[0];
     if (nOverlaps <= maxOverlaps)
       break;
     else {  // if not enough memory was allocated, guess how much will be needed
-      int lastQuery = querryTri.Get(0).H().back();
+      int lastQuery = querryTri.Get(0).back();
       float ratio = static_cast<float>(querriesIn.size()) / lastQuery;
       if (ratio > 1000) // do not trust the ratio if it is too large
         maxOverlaps *= 2;
@@ -303,15 +304,15 @@ void Collider::UpdateBoxes(const VecDH<Box>& leafBB) {
   ALWAYS_ASSERT(leafBB.size() == NumLeaves(), userErr,
                 "must have the same number of updated boxes as original");
   // copy in leaf node Boxs
-  strided_range<VecDH<Box>::IterD> leaves(nodeBBox_.beginD(), nodeBBox_.endD(),
+  strided_range<VecDH<Box>::Iter> leaves(nodeBBox_.begin(), nodeBBox_.end(),
                                           2);
-  thrust::copy(leafBB.cbeginD(), leafBB.cendD(), leaves.begin());
+  auto policy = autoPolicy(NumInternal());
+  copy(policy, leafBB.cbegin(), leafBB.cend(), leaves.begin());
   // create global counters
-  VecDH<int> counter(NumInternal());
-  thrust::fill(counter.beginD(), counter.endD(), 0);
+  VecDH<int> counter(NumInternal(), 0);
   // kernel over leaves to save internal Boxs
-  thrust::for_each_n(
-      countAt(0), NumLeaves(),
+  for_each_n(
+      policy, countAt(0), NumLeaves(),
       BuildInternalBoxes({nodeBBox_.ptrD(), counter.ptrD(), nodeParent_.ptrD(),
                           internalChildren_.ptrD()}));
 }
@@ -330,7 +331,7 @@ bool Collider::Transform(glm::mat4x3 transform) {
     if (count != 2) axisAligned = false;
   }
   if (axisAligned) {
-    thrust::for_each(nodeBBox_.beginD(), nodeBBox_.endD(),
+    for_each(autoPolicy(nodeBBox_.size()), nodeBBox_.begin(), nodeBBox_.end(),
                      TransformBox({transform}));
   }
   return axisAligned;

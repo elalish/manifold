@@ -5,7 +5,7 @@ add_library(${PROJECT_NAME} src/manifold.cpp src/constructors.cpp src/impl.cpp
     src/smoothing.cpp src/boolean3.cpp src/boolean_result.cpp
 )
 
-if(THRUST_BACKEND STREQUAL "CUDA")
+if(MANIFOLD_USE_CUDA)
     set_source_files_properties(
         src/manifold.cpp src/constructors.cpp src/impl.cpp
         src/properties.cpp src/sort.cpp src/edge_op.cpp src/face_op.cpp
@@ -30,7 +30,7 @@ endif()
 target_include_directories( ${PROJECT_NAME} PUBLIC ${PROJECT_SOURCE_DIR}/include )
 target_link_libraries( ${PROJECT_NAME}
     PUBLIC utilities
-    PRIVATE collider polygon ${MANIFOLD_OMP_INCLUDE} graphlite
+    PRIVATE collider polygon ${MANIFOLD_INCLUDE} graphlite
 )
 
 target_compile_features(${PROJECT_NAME} 
