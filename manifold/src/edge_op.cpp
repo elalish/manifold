@@ -32,6 +32,17 @@ __host__ __device__ bool Is01Longest(glm::vec2 v0, glm::vec2 v1, glm::vec2 v2) {
   return l[0] > l[1] && l[0] > l[2];
 }
 
+struct DuplicateEdge {
+  const Halfedge* sortedHalfedge;
+
+  __host__ __device__ bool operator()(int edge) {
+    const Halfedge& halfedge = sortedHalfedge[edge];
+    const Halfedge& nextHalfedge = sortedHalfedge[edge + 1];
+    return halfedge.startVert == nextHalfedge.startVert &&
+           halfedge.endVert == nextHalfedge.endVert;
+  }
+};
+
 struct ShortEdge {
   const Halfedge* halfedge;
   const glm::vec3* vertPos;
@@ -118,8 +129,20 @@ namespace manifold {
  * removal, by setting vertPos to NaN and halfedge to {-1, -1, -1, -1}.
  */
 void Manifold::Impl::SimplifyTopology() {
+  VecDH<Halfedge> halfedge(halfedge_);
+  thrust::sort(thrust::device, halfedge.begin(), halfedge.end());
+  // FIX: copy halfedge index, not sorted index.
   VecDH<int> flaggedEdges(halfedge_.size());
   int numFlagged =
+      thrust::copy_if(thrust::device, countAt(0), countAt(halfedge_.size() - 1),
+                      flaggedEdges.begin(), DuplicateEdge({halfedge.cptrD()})) -
+      flaggedEdges.begin();
+  flaggedEdges.resize(numFlagged);
+
+  for (const int edge : flaggedEdges) SplitEdge(edge);
+
+  flaggedEdges.resize(halfedge_.size());
+  numFlagged =
       thrust::copy_if(
           thrust::device, countAt(0), countAt(halfedge_.size()),
           flaggedEdges.begin(),
@@ -218,6 +241,18 @@ void Manifold::Impl::RemoveIfFolded(int edge) {
       halfedge_[tri1edge[i]] = {-1, -1, -1, -1};
     }
   }
+}
+
+void Manifold::Impl::SplitEdge(const int current) {
+  int startVert = vertPos_.size();
+  vertPos_.push_back(vertPos_[halfedge_[current].startVert]);
+  int endVert = vertPos_.size();
+  vertPos_.push_back(vertPos_[halfedge_[current].endVert]);
+
+  int pair = halfedge_[current].pairedHalfedge;
+
+  UpdateVert(startVert, pair, NextHalfedge(NextHalfedge(current)));
+  UpdateVert(endVert, current, NextHalfedge(NextHalfedge(pair)));
 }
 
 void Manifold::Impl::CollapseEdge(const int edge) {

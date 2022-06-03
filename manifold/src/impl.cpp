@@ -12,14 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "impl.h"
+
 #include <thrust/logical.h>
 
 #include <algorithm>
-#include <map>
 #include <atomic>
+#include <map>
 
 #include "graph.h"
-#include "impl.h"
 
 namespace {
 using namespace manifold;
@@ -30,9 +31,10 @@ __host__ __device__ void AtomicAddVec3(glm::vec3& target,
 #ifdef __CUDA_ARCH__
     atomicAdd(&target[i], add[i]);
 #else
-    std::atomic<float> &tar = reinterpret_cast<std::atomic<float>&>(target[i]);
+    std::atomic<float>& tar = reinterpret_cast<std::atomic<float>&>(target[i]);
     float old_val = tar.load();
-    while (!tar.compare_exchange_weak(old_val, old_val + add[i]));
+    while (!tar.compare_exchange_weak(old_val, old_val + add[i]))
+      ;
 #endif
   }
 }
@@ -126,41 +128,6 @@ struct LinkHalfedges {
     const int pair1 = edges[j].halfedgeIdx;
     halfedges[pair0].pairedHalfedge = pair1;
     halfedges[pair1].pairedHalfedge = pair0;
-  }
-};
-
-struct SwapHalfedges {
-  Halfedge* halfedges;
-  const TmpEdge* edges;
-
-  __host__ void operator()(int k) {
-    const int i = 2 * k;
-    const int j = i - 2;
-    const TmpEdge thisEdge = edges[i];
-    const TmpEdge lastEdge = edges[j];
-    if (thisEdge.first == lastEdge.first &&
-        thisEdge.second == lastEdge.second) {
-      const int swap0idx = thisEdge.halfedgeIdx;
-      Halfedge& swap0 = halfedges[swap0idx];
-      const int swap1idx = swap0.pairedHalfedge;
-      Halfedge& swap1 = halfedges[swap1idx];
-
-      const int next0idx = swap0idx + ((swap0idx + 1) % 3 == 0 ? -2 : 1);
-      const int next1idx = swap1idx + ((swap1idx + 1) % 3 == 0 ? -2 : 1);
-      Halfedge& next0 = halfedges[next0idx];
-      Halfedge& next1 = halfedges[next1idx];
-
-      next0.startVert = swap0.endVert = next1.endVert;
-      swap0.pairedHalfedge = next1.pairedHalfedge;
-      halfedges[swap0.pairedHalfedge].pairedHalfedge = swap0idx;
-
-      next1.startVert = swap1.endVert = next0.endVert;
-      swap1.pairedHalfedge = next0.pairedHalfedge;
-      halfedges[swap1.pairedHalfedge].pairedHalfedge = swap1idx;
-
-      next0.pairedHalfedge = next1idx;
-      next1.pairedHalfedge = next0idx;
-    }
   }
 };
 
@@ -294,7 +261,7 @@ Manifold::Impl::Impl(const Mesh& mesh,
   CheckDevice();
   CalculateBBox();
   SetPrecision();
-  CreateAndFixHalfedges(mesh.triVerts);
+  CreateHalfedges(mesh.triVerts);
   ALWAYS_ASSERT(IsManifold(), topologyErr, "Input mesh is not manifold!");
   CalculateNormals();
   InitializeNewReference(triProperties, properties, propertyTolerance);
@@ -357,7 +324,8 @@ Manifold::Impl::Impl(Shape shape) {
 void Manifold::Impl::ReinitializeReference(int meshID) {
   // instead of storing the meshID, we store 0 and set the mapping to
   // 0 -> meshID, because the meshID after boolean operation also starts from 0.
-  thrust::for_each_n(thrust::device, zip(meshRelation_.triBary.begin(), countAt(0)), NumTri(),
+  thrust::for_each_n(thrust::device,
+                     zip(meshRelation_.triBary.begin(), countAt(0)), NumTri(),
                      InitializeBaryRef({0, halfedge_.cptrD()}));
   meshRelation_.originalID.clear();
   meshRelation_.originalID[0] = meshID;
@@ -386,10 +354,10 @@ int Manifold::Impl::InitializeNewReference(
                   "propertyTolerance.");
 
     const int numSets = properties.size() / numProps;
-    ALWAYS_ASSERT(thrust::all_of(thrust::device, triPropertiesD.begin(), triPropertiesD.end(),
-                                 CheckProperties({numSets})),
-                  userErr,
-                  "triProperties value is outside the properties range.");
+    ALWAYS_ASSERT(
+        thrust::all_of(thrust::device, triPropertiesD.begin(),
+                       triPropertiesD.end(), CheckProperties({numSets})),
+        userErr, "triProperties value is outside the properties range.");
   }
 
   VecDH<thrust::pair<int, int>> face2face(halfedge_.size(), {-1, -1});
@@ -475,22 +443,6 @@ int Manifold::Impl::InitializeNewReference(
  */
 void Manifold::Impl::CreateHalfedges(const VecDH<glm::ivec3>& triVerts) {
   const int numTri = triVerts.size();
-  halfedge_.resize(3 * numTri);
-  VecDH<TmpEdge> edge(3 * numTri);
-  thrust::for_each_n(thrust::device, zip(countAt(0), triVerts.begin()), numTri,
-                     Tri2Halfedges({halfedge_.ptrD(), edge.ptrD()}));
-  thrust::sort(thrust::device, edge.begin(), edge.end());
-  thrust::for_each_n(thrust::device, countAt(0), halfedge_.size() / 2,
-                     LinkHalfedges({halfedge_.ptrD(), edge.cptrD()}));
-}
-
-/**
- * Create the halfedge_ data structure from an input triVerts array like Mesh.
- * Check that the input is an even-manifold, and if it is not 2-manifold,
- * perform edge swaps until it is. This is a host function.
- */
-void Manifold::Impl::CreateAndFixHalfedges(const VecDH<glm::ivec3>& triVerts) {
-  const int numTri = triVerts.size();
   // drop the old value first to avoid copy
   halfedge_.resize(0);
   halfedge_.resize(3 * numTri);
@@ -500,14 +452,11 @@ void Manifold::Impl::CreateAndFixHalfedges(const VecDH<glm::ivec3>& triVerts) {
   // Stable sort is required here so that halfedges from the same face are
   // paired together (the triangles were created in face order). In some
   // degenerate situations the triangulator can add the same internal edge in
-  // two different faces, causing this edge to not be 2-manifold. We detect this
-  // and fix it by swapping one of the identical edges, so it is important that
-  // we have the edges paired according to their face.
+  // two different faces, causing this edge to not be 2-manifold. These are
+  // fixed by duplicating verts in SimplifyTopology.
   thrust::stable_sort(thrust::device, edge.begin(), edge.end());
   thrust::for_each_n(thrust::host, countAt(0), halfedge_.size() / 2,
                      LinkHalfedges({halfedge_.ptrH(), edge.cptrH()}));
-  thrust::for_each(thrust::host, countAt(1), countAt(halfedge_.size() / 2),
-                   SwapHalfedges({halfedge_.ptrH(), edge.cptrH()}));
 }
 
 /**
@@ -585,7 +534,8 @@ void Manifold::Impl::SetPrecision(float minPrecision) {
  */
 void Manifold::Impl::CalculateNormals() {
   vertNormal_.resize(NumVert());
-  thrust::fill(thrust::device, vertNormal_.begin(), vertNormal_.end(), glm::vec3(0));
+  thrust::fill(thrust::device, vertNormal_.begin(), vertNormal_.end(),
+               glm::vec3(0));
   bool calculateTriNormal = false;
   if (faceNormal_.size() != NumTri()) {
     faceNormal_.resize(NumTri());
@@ -595,7 +545,8 @@ void Manifold::Impl::CalculateNormals() {
       thrust::device, zip(faceNormal_.begin(), countAt(0)), NumTri(),
       AssignNormals({vertNormal_.ptrD(), vertPos_.cptrD(), halfedge_.cptrD(),
                      precision_, calculateTriNormal}));
-  thrust::for_each(thrust::device, vertNormal_.begin(), vertNormal_.end(), Normalize());
+  thrust::for_each(thrust::device, vertNormal_.begin(), vertNormal_.end(),
+                   Normalize());
 }
 
 /**
@@ -605,28 +556,26 @@ void Manifold::Impl::CalculateNormals() {
  * Will raise an exception if meshRelation_.triBary[startTri..startTri+n]
  * contains a meshID not in meshIDs.
  *
- * We remap them into indices starting from startID. The exact value value is not
- * important as long as
+ * We remap them into indices starting from startID. The exact value value is
+ * not important as long as
  * 1. They are distinct
  * 2. `originalID[meshID]` is the original mesh ID of the triangle
  *
  * Use this when the mesh is a combination of several meshes or a subset of a
  * larger mesh, e.g. after performing boolean operations, compose or decompose.
  */
-void Manifold::Impl::UpdateMeshIDs(VecDH<int> &meshIDs, VecDH<int> &originalIDs,
+void Manifold::Impl::UpdateMeshIDs(VecDH<int>& meshIDs, VecDH<int>& originalIDs,
                                    int startTri, int n, int startID) {
-  if (n == -1)
-    n = meshRelation_.triBary.size();
+  if (n == -1) n = meshRelation_.triBary.size();
   thrust::sort_by_key(thrust::host, meshIDs.begin(), meshIDs.end(),
                       originalIDs.begin());
   constexpr int kOccurred = 1 << 30;
   VecDH<int> error(1, -1);
   const int numMesh = meshIDs.size();
-  const int *meshIDsPtr = meshIDs.cptrD();
-  int *originalPtr = originalIDs.ptrD();
-  int *errorPtr = error.ptrD();
-  thrust::for_each(thrust::device,
-                   meshRelation_.triBary.begin() + startTri,
+  const int* meshIDsPtr = meshIDs.cptrD();
+  int* originalPtr = originalIDs.ptrD();
+  int* errorPtr = error.ptrD();
+  thrust::for_each(thrust::device, meshRelation_.triBary.begin() + startTri,
                    meshRelation_.triBary.begin() + startTri + n,
                    [=] __host__ __device__(BaryRef & b) {
                      int index =
@@ -663,12 +612,13 @@ SparseIndices Manifold::Impl::EdgeCollisions(const Impl& Q) const {
   VecDH<TmpEdge> edges = CreateTmpEdges(Q.halfedge_);
   const int numEdge = edges.size();
   VecDH<Box> QedgeBB(numEdge);
-  thrust::for_each_n(thrust::device, zip(QedgeBB.begin(), edges.cbegin()), numEdge,
-                     EdgeBox({Q.vertPos_.cptrD()}));
+  thrust::for_each_n(thrust::device, zip(QedgeBB.begin(), edges.cbegin()),
+                     numEdge, EdgeBox({Q.vertPos_.cptrD()}));
 
   SparseIndices q1p2 = collider_.Collisions(QedgeBB);
 
-  thrust::for_each(thrust::device, q1p2.begin(0), q1p2.end(0), ReindexEdge({edges.cptrD()}));
+  thrust::for_each(thrust::device, q1p2.begin(0), q1p2.end(0),
+                   ReindexEdge({edges.cptrD()}));
   return q1p2;
 }
 
