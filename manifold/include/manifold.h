@@ -20,6 +20,9 @@
 
 namespace manifold {
 
+class CsgNode;
+class CsgLeafNode;
+
 /** @defgroup Core
  *  @brief The central classes of the library
  *  @{
@@ -104,20 +107,19 @@ class Manifold {
   ///@{
   MeshRelation GetMeshRelation() const;
   std::vector<int> GetMeshIDs() const;
-  int SetAsOriginal();
+  std::pair<int, Manifold> SetAsOriginal() const;
   ///@}
 
   /** @name Modification
-   *  Change this manifold in-place.
    */
   ///@{
-  Manifold& Translate(glm::vec3);
-  Manifold& Scale(glm::vec3);
-  Manifold& Rotate(float xDegrees, float yDegrees = 0.0f,
-                   float zDegrees = 0.0f);
-  Manifold& Transform(const glm::mat4x3&);
-  Manifold& Warp(std::function<void(glm::vec3&)>);
-  Manifold& Refine(int);
+  Manifold Translate(glm::vec3) const;
+  Manifold Scale(glm::vec3) const;
+  Manifold Rotate(float xDegrees, float yDegrees = 0.0f,
+                  float zDegrees = 0.0f) const;
+  Manifold Transform(const glm::mat4x3&) const;
+  Manifold Warp(std::function<void(glm::vec3&)>) const;
+  Manifold Refine(int) const;
   // Manifold RefineToLength(float);
   // Manifold RefineToPrecision(float);
   ///@}
@@ -157,9 +159,13 @@ class Manifold {
   struct Impl;
 
  private:
-  std::unique_ptr<Impl> pImpl_;
-  mutable glm::mat4x3 transform_ = glm::mat4x3(1.0f);
-  void ApplyTransform() const;
+  Manifold(std::shared_ptr<CsgNode> pNode_);
+  Manifold(std::shared_ptr<Impl> pImpl_);
+
+  mutable std::shared_ptr<CsgNode> pNode_;
+
+  CsgLeafNode& GetCsgLeafNode() const;
+
   static int circularSegments_;
   static float circularAngle_;
   static float circularEdgeLength_;
