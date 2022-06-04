@@ -12,14 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "impl.h"
+
 #include <thrust/logical.h>
 
 #include <algorithm>
-#include <map>
 #include <atomic>
+#include <map>
 
 #include "graph.h"
-#include "impl.h"
 #include "par.h"
 
 namespace {
@@ -31,9 +32,10 @@ __host__ __device__ void AtomicAddVec3(glm::vec3& target,
 #ifdef __CUDA_ARCH__
     atomicAdd(&target[i], add[i]);
 #else
-    std::atomic<float> &tar = reinterpret_cast<std::atomic<float>&>(target[i]);
+    std::atomic<float>& tar = reinterpret_cast<std::atomic<float>&>(target[i]);
     float old_val = tar.load();
-    while (!tar.compare_exchange_weak(old_val, old_val + add[i]));
+    while (!tar.compare_exchange_weak(old_val, old_val + add[i]))
+      ;
 #endif
   }
 }
@@ -358,8 +360,9 @@ Manifold::Impl::Impl(Shape shape) {
 void Manifold::Impl::ReinitializeReference(int meshID) {
   // instead of storing the meshID, we store 0 and set the mapping to
   // 0 -> meshID, because the meshID after boolean operation also starts from 0.
-  for_each_n(autoPolicy(NumTri()), zip(meshRelation_.triBary.begin(), countAt(0)), NumTri(),
-                     InitializeBaryRef({0, halfedge_.cptrD()}));
+  for_each_n(autoPolicy(NumTri()),
+             zip(meshRelation_.triBary.begin(), countAt(0)), NumTri(),
+             InitializeBaryRef({0, halfedge_.cptrD()}));
   meshRelation_.originalID.clear();
   meshRelation_.originalID[0] = meshID;
 }
@@ -387,19 +390,19 @@ int Manifold::Impl::InitializeNewReference(
                   "propertyTolerance.");
 
     const int numSets = properties.size() / numProps;
-    ALWAYS_ASSERT(all_of(autoPolicy(triProperties.size()), triPropertiesD.begin(), triPropertiesD.end(),
-                                 CheckProperties({numSets})),
-                  userErr,
-                  "triProperties value is outside the properties range.");
+    ALWAYS_ASSERT(
+        all_of(autoPolicy(triProperties.size()), triPropertiesD.begin(),
+               triPropertiesD.end(), CheckProperties({numSets})),
+        userErr, "triProperties value is outside the properties range.");
   }
 
   VecDH<thrust::pair<int, int>> face2face(halfedge_.size(), {-1, -1});
   VecDH<float> triArea(NumTri());
-  for_each_n(
-      autoPolicy(halfedge_.size()), zip(face2face.begin(), countAt(0)), halfedge_.size(),
-      CoplanarEdge({triArea.ptrD(), halfedge_.cptrD(), vertPos_.cptrD(),
-                    triPropertiesD.cptrD(), propertiesD.cptrD(),
-                    propertyToleranceD.cptrD(), numProps, precision_}));
+  for_each_n(autoPolicy(halfedge_.size()), zip(face2face.begin(), countAt(0)),
+             halfedge_.size(),
+             CoplanarEdge({triArea.ptrD(), halfedge_.cptrD(), vertPos_.cptrD(),
+                           triPropertiesD.cptrD(), propertiesD.cptrD(),
+                           propertyToleranceD.cptrD(), numProps, precision_}));
 
   Graph graph;
   for (int i = 0; i < NumTri(); ++i) {
@@ -480,10 +483,10 @@ void Manifold::Impl::CreateHalfedges(const VecDH<glm::ivec3>& triVerts) {
   VecDH<TmpEdge> edge(3 * numTri);
   auto policy = autoPolicy(numTri);
   for_each_n(policy, zip(countAt(0), triVerts.begin()), numTri,
-                     Tri2Halfedges({halfedge_.ptrD(), edge.ptrD()}));
+             Tri2Halfedges({halfedge_.ptrD(), edge.ptrD()}));
   sort(policy, edge.begin(), edge.end());
   for_each_n(policy, countAt(0), halfedge_.size() / 2,
-                     LinkHalfedges({halfedge_.ptrD(), edge.cptrD()}));
+             LinkHalfedges({halfedge_.ptrD(), edge.cptrD()}));
 }
 
 /**
@@ -499,7 +502,7 @@ void Manifold::Impl::CreateAndFixHalfedges(const VecDH<glm::ivec3>& triVerts) {
   VecDH<TmpEdge> edge(3 * numTri);
   auto policy = autoPolicy(numTri);
   for_each_n(policy, zip(countAt(0), triVerts.begin()), numTri,
-                     Tri2Halfedges({halfedge_.ptrD(), edge.ptrD()}));
+             Tri2Halfedges({halfedge_.ptrD(), edge.ptrD()}));
   // Stable sort is required here so that halfedges from the same face are
   // paired together (the triangles were created in face order). In some
   // degenerate situations the triangulator can add the same internal edge in
@@ -540,14 +543,14 @@ void Manifold::Impl::ApplyTransform() {
   if (transform_ == glm::mat4x3(1.0f)) return;
   auto policy = autoPolicy(vertPos_.size());
   for_each(policy, vertPos_.begin(), vertPos_.end(),
-                   Transform4x3({transform_}));
+           Transform4x3({transform_}));
 
   glm::mat3 normalTransform =
       glm::inverse(glm::transpose(glm::mat3(transform_)));
   for_each(policy, faceNormal_.begin(), faceNormal_.end(),
-                   TransformNormals({normalTransform}));
+           TransformNormals({normalTransform}));
   for_each(policy, vertNormal_.begin(), vertNormal_.end(),
-                   TransformNormals({normalTransform}));
+           TransformNormals({normalTransform}));
   // This optimization does a cheap collider update if the transform is
   // axis-aligned.
   if (!collider_.Transform(transform_)) Update();
@@ -610,33 +613,31 @@ void Manifold::Impl::CalculateNormals() {
  * Will raise an exception if meshRelation_.triBary[startTri..startTri+n]
  * contains a meshID not in meshIDs.
  *
- * We remap them into indices starting from startID. The exact value value is not
- * important as long as
+ * We remap them into indices starting from startID. The exact value value is
+ * not important as long as
  * 1. They are distinct
  * 2. `originalID[meshID]` is the original mesh ID of the triangle
  *
  * Use this when the mesh is a combination of several meshes or a subset of a
  * larger mesh, e.g. after performing boolean operations, compose or decompose.
  */
-void Manifold::Impl::UpdateMeshIDs(VecDH<int> &meshIDs, VecDH<int> &originalIDs,
+void Manifold::Impl::UpdateMeshIDs(VecDH<int>& meshIDs, VecDH<int>& originalIDs,
                                    int startTri, int n, int startID) {
-  if (n == -1)
-    n = meshRelation_.triBary.size();
-  sort_by_key(autoPolicy(n), meshIDs.begin(), meshIDs.end(), originalIDs.begin());
+  if (n == -1) n = meshRelation_.triBary.size();
+  sort_by_key(autoPolicy(n), meshIDs.begin(), meshIDs.end(),
+              originalIDs.begin());
   constexpr int kOccurred = 1 << 30;
   VecDH<int> error(1, -1);
   const int numMesh = meshIDs.size();
-  const int *meshIDsPtr = meshIDs.cptrD();
-  int *originalPtr = originalIDs.ptrD();
-  int *errorPtr = error.ptrD();
-  for_each(autoPolicy(n),
-           meshRelation_.triBary.begin() + startTri,
+  const int* meshIDsPtr = meshIDs.cptrD();
+  int* originalPtr = originalIDs.ptrD();
+  int* errorPtr = error.ptrD();
+  for_each(autoPolicy(n), meshRelation_.triBary.begin() + startTri,
            meshRelation_.triBary.begin() + startTri + n,
            [=] __host__ __device__(BaryRef & b) {
-             int index =
-                 thrust::lower_bound(meshIDsPtr, meshIDsPtr + numMesh,
-                                     b.meshID) -
-                 meshIDsPtr;
+             int index = thrust::lower_bound(meshIDsPtr, meshIDsPtr + numMesh,
+                                             b.meshID) -
+                         meshIDsPtr;
              if (index >= numMesh || meshIDsPtr[index] != b.meshID) {
                *errorPtr = b.meshID;
              }
@@ -669,7 +670,7 @@ SparseIndices Manifold::Impl::EdgeCollisions(const Impl& Q) const {
   VecDH<Box> QedgeBB(numEdge);
   auto policy = autoPolicy(numEdge);
   for_each_n(policy, zip(QedgeBB.begin(), edges.cbegin()), numEdge,
-                     EdgeBox({Q.vertPos_.cptrD()}));
+             EdgeBox({Q.vertPos_.cptrD()}));
 
   SparseIndices q1p2 = collider_.Collisions(QedgeBB);
 

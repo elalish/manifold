@@ -123,8 +123,8 @@ template <typename T>
 void Permute(VecDH<T>& inOut, const VecDH<int>& new2Old) {
   VecDH<T> tmp(std::move(inOut));
   inOut.resize(new2Old.size());
-  gather(autoPolicy(new2Old.size()), new2Old.begin(), new2Old.end(), tmp.begin(),
-                 inOut.begin());
+  gather(autoPolicy(new2Old.size()), new2Old.begin(), new2Old.end(),
+         tmp.begin(), inOut.begin());
 }
 
 template void Permute<BaryRef>(VecDH<BaryRef>&, const VecDH<int>&);
@@ -187,8 +187,8 @@ void Manifold::Impl::Finish() {
   ALWAYS_ASSERT(halfedge_.size() % 6 == 0, topologyErr,
                 "Not an even number of faces after sorting faces!");
   Halfedge extrema = {0, 0, 0, 0};
-  extrema =
-      reduce<Halfedge>(autoPolicy(halfedge_.size()), halfedge_.begin(), halfedge_.end(), extrema, Extrema());
+  extrema = reduce<Halfedge>(autoPolicy(halfedge_.size()), halfedge_.begin(),
+                             halfedge_.end(), extrema, Extrema());
 
   ALWAYS_ASSERT(extrema.startVert >= 0, topologyErr,
                 "Vertex index is negative!");
@@ -213,19 +213,20 @@ void Manifold::Impl::SortVerts() {
   VecDH<uint32_t> vertMorton(NumVert());
   auto policy = autoPolicy(NumVert());
   for_each_n(policy, zip(vertMorton.begin(), vertPos_.cbegin()), NumVert(),
-                     Morton({bBox_}));
+             Morton({bBox_}));
 
   VecDH<int> vertNew2Old(NumVert());
   sequence(policy, vertNew2Old.begin(), vertNew2Old.end());
   sort_by_key(policy, vertMorton.begin(), vertMorton.end(),
-                      zip(vertPos_.begin(), vertNew2Old.begin()));
+              zip(vertPos_.begin(), vertNew2Old.begin()));
 
   ReindexVerts(vertNew2Old, NumVert());
 
   // Verts were flagged for removal with NaNs and assigned kNoCode to sort them
   // to the end, which allows them to be removed.
   const int newNumVert =
-      find<decltype(vertMorton.begin())>(policy, vertMorton.begin(), vertMorton.end(), kNoCode) -
+      find<decltype(vertMorton.begin())>(policy, vertMorton.begin(),
+                                         vertMorton.end(), kNoCode) -
       vertMorton.begin();
   vertPos_.resize(newNumVert);
 }
@@ -238,10 +239,10 @@ void Manifold::Impl::SortVerts() {
 void Manifold::Impl::ReindexVerts(const VecDH<int>& vertNew2Old,
                                   int oldNumVert) {
   VecDH<int> vertOld2New(oldNumVert);
-  scatter(autoPolicy(oldNumVert), countAt(0), countAt(NumVert()), vertNew2Old.begin(),
-                  vertOld2New.begin());
+  scatter(autoPolicy(oldNumVert), countAt(0), countAt(NumVert()),
+          vertNew2Old.begin(), vertOld2New.begin());
   for_each(autoPolicy(oldNumVert), halfedge_.begin(), halfedge_.end(),
-                   Reindex({vertOld2New.cptrD()}));
+           Reindex({vertOld2New.cptrD()}));
 }
 
 /**
@@ -253,9 +254,9 @@ void Manifold::Impl::GetFaceBoxMorton(VecDH<Box>& faceBox,
                                       VecDH<uint32_t>& faceMorton) const {
   faceBox.resize(NumTri());
   faceMorton.resize(NumTri());
-  for_each_n(
-      autoPolicy(NumTri()), zip(faceMorton.begin(), faceBox.begin(), countAt(0)), NumTri(),
-      FaceMortonBox({halfedge_.cptrD(), vertPos_.cptrD(), bBox_}));
+  for_each_n(autoPolicy(NumTri()),
+             zip(faceMorton.begin(), faceBox.begin(), countAt(0)), NumTri(),
+             FaceMortonBox({halfedge_.cptrD(), vertPos_.cptrD(), bBox_}));
 }
 
 /**
@@ -269,12 +270,13 @@ void Manifold::Impl::SortFaces(VecDH<Box>& faceBox,
   sequence(policy, faceNew2Old.begin(), faceNew2Old.end());
 
   sort_by_key(policy, faceMorton.begin(), faceMorton.end(),
-                      zip(faceBox.begin(), faceNew2Old.begin()));
+              zip(faceBox.begin(), faceNew2Old.begin()));
 
   // Tris were flagged for removal with pairedHalfedge = -1 and assigned kNoCode
   // to sort them to the end, which allows them to be removed.
   const int newNumTri =
-      find<decltype(faceMorton.begin())>(policy, faceMorton.begin(), faceMorton.end(), kNoCode) -
+      find<decltype(faceMorton.begin())>(policy, faceMorton.begin(),
+                                         faceMorton.end(), kNoCode) -
       faceMorton.begin();
   faceBox.resize(newNumTri);
   faceMorton.resize(newNumTri);
@@ -300,15 +302,14 @@ void Manifold::Impl::GatherFaces(const VecDH<int>& faceNew2Old) {
   VecDH<int> faceOld2New(oldHalfedge.size() / 3);
   auto policy = autoPolicy(numTri);
   scatter(policy, countAt(0), countAt(numTri), faceNew2Old.begin(),
-                  faceOld2New.begin());
+          faceOld2New.begin());
 
   halfedge_.resize(3 * numTri);
   if (oldHalfedgeTangent.size() != 0) halfedgeTangent_.resize(3 * numTri);
-  for_each_n(
-      policy, countAt(0), numTri,
-      ReindexFace({halfedge_.ptrD(), halfedgeTangent_.ptrD(),
-                   oldHalfedge.cptrD(), oldHalfedgeTangent.cptrD(),
-                   faceNew2Old.cptrD(), faceOld2New.cptrD()}));
+  for_each_n(policy, countAt(0), numTri,
+             ReindexFace({halfedge_.ptrD(), halfedgeTangent_.ptrD(),
+                          oldHalfedge.cptrD(), oldHalfedgeTangent.cptrD(),
+                          faceNew2Old.cptrD(), faceOld2New.cptrD()}));
 }
 
 void Manifold::Impl::GatherFaces(const Impl& old,
@@ -317,26 +318,24 @@ void Manifold::Impl::GatherFaces(const Impl& old,
   meshRelation_.triBary.resize(numTri);
   auto policy = autoPolicy(numTri);
   gather(policy, faceNew2Old.begin(), faceNew2Old.end(),
-                 old.meshRelation_.triBary.begin(),
-                 meshRelation_.triBary.begin());
+         old.meshRelation_.triBary.begin(), meshRelation_.triBary.begin());
   meshRelation_.barycentric = old.meshRelation_.barycentric;
 
   if (old.faceNormal_.size() == old.NumTri()) {
     faceNormal_.resize(numTri);
     gather(policy, faceNew2Old.begin(), faceNew2Old.end(),
-                   old.faceNormal_.begin(), faceNormal_.begin());
+           old.faceNormal_.begin(), faceNormal_.begin());
   }
 
   VecDH<int> faceOld2New(old.NumTri());
   scatter(policy, countAt(0), countAt(numTri), faceNew2Old.begin(),
-                  faceOld2New.begin());
+          faceOld2New.begin());
 
   halfedge_.resize(3 * numTri);
   if (old.halfedgeTangent_.size() != 0) halfedgeTangent_.resize(3 * numTri);
-  for_each_n(
-      policy, countAt(0), numTri,
-      ReindexFace({halfedge_.ptrD(), halfedgeTangent_.ptrD(),
-                   old.halfedge_.cptrD(), old.halfedgeTangent_.cptrD(),
-                   faceNew2Old.cptrD(), faceOld2New.cptrD()}));
+  for_each_n(policy, countAt(0), numTri,
+             ReindexFace({halfedge_.ptrD(), halfedgeTangent_.ptrD(),
+                          old.halfedge_.cptrD(), old.halfedgeTangent_.cptrD(),
+                          faceNew2Old.cptrD(), faceOld2New.cptrD()}));
 }
 }  // namespace manifold

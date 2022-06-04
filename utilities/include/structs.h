@@ -15,16 +15,16 @@
 #pragma once
 #define GLM_FORCE_EXPLICIT_CTOR
 #include <chrono>
-#include <limits>
 #include <glm/ext/matrix_transform.hpp>
 #include <glm/glm.hpp>
 #include <glm/gtc/constants.hpp>
 #include <glm/gtx/compatibility.hpp>
 #include <glm/gtx/rotate_vector.hpp>
 #include <iostream>
+#include <limits>
 #include <sstream>
-#include <vector>
 #include <unordered_map>
+#include <vector>
 
 namespace manifold {
 

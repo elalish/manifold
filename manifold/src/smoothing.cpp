@@ -357,10 +357,10 @@ void Manifold::Impl::CreateTangents(
   const int numHalfedge = halfedge_.size();
   halfedgeTangent_.resize(numHalfedge);
 
-  for_each_n(autoPolicy(numHalfedge), zip(halfedgeTangent_.begin(), halfedge_.cbegin()),
-                     numHalfedge,
-                     SmoothBezier({vertPos_.cptrD(), faceNormal_.cptrD(),
-                                   vertNormal_.cptrD(), halfedge_.cptrD()}));
+  for_each_n(autoPolicy(numHalfedge),
+             zip(halfedgeTangent_.begin(), halfedge_.cbegin()), numHalfedge,
+             SmoothBezier({vertPos_.cptrD(), faceNormal_.cptrD(),
+                           vertNormal_.cptrD(), halfedge_.cptrD()}));
 
   if (!sharpenedEdges.empty()) {
     const VecDH<BaryRef>& triBary = meshRelation_.triBary;
@@ -389,7 +389,7 @@ void Manifold::Impl::CreateTangents(
     }
 
     std::map<int, std::vector<Pair>> vertTangents;
-    for (const auto &value : edges) {
+    for (const auto& value : edges) {
       const Pair edge = value.second;
       vertTangents[halfedge_[edge.first.halfedge].startVert].push_back(edge);
       vertTangents[halfedge_[edge.second.halfedge].startVert].push_back(
@@ -433,7 +433,7 @@ void Manifold::Impl::CreateTangents(
 
       } else {  // Sharpen vertex uniformly
         float smoothness = 0;
-        for (const Pair &pair : vert) {
+        for (const Pair& pair : vert) {
           smoothness += pair.first.smoothness;
           smoothness += pair.second.smoothness;
         }
@@ -479,9 +479,9 @@ Manifold::Impl::MeshRelationD Manifold::Impl::Subdivide(int n) {
   VecDH<int> half2Edge(2 * numEdge);
   auto policy = autoPolicy(numEdge);
   for_each_n(policy, zip(countAt(0), edges.begin()), numEdge,
-                     ReindexHalfedge({half2Edge.ptrD()}));
+             ReindexHalfedge({half2Edge.ptrD()}));
   for_each_n(policy, zip(countAt(0), edges.begin()), numEdge,
-                     EdgeVerts({vertPos_.ptrD(), numVert, n}));
+             EdgeVerts({vertPos_.ptrD(), numVert, n}));
   for_each_n(
       policy, zip(countAt(0), oldMeshRelation.triBary.begin()), numTri,
       InteriorVerts({vertPos_.ptrD(), relation.barycentric.ptrD(),
@@ -492,8 +492,8 @@ Manifold::Impl::MeshRelationD Manifold::Impl::Subdivide(int n) {
   // Create subtriangles
   VecDH<glm::ivec3> triVerts(n * n * numTri);
   for_each_n(policy, countAt(0), numTri,
-                     SplitTris({triVerts.ptrD(), halfedge_.cptrD(),
-                                half2Edge.cptrD(), numVert, triVertStart, n}));
+             SplitTris({triVerts.ptrD(), halfedge_.cptrD(), half2Edge.cptrD(),
+                        numVert, triVertStart, n}));
   CreateHalfedges(triVerts);
   return relation;
 }
@@ -506,15 +506,13 @@ void Manifold::Impl::Refine(int n) {
     VecDH<Barycentric> vertBary(NumVert());
     VecDH<int> lock(NumVert(), 0);
     auto policy = autoPolicy(NumTri());
-    for_each_n(
-        policy, zip(relation.triBary.begin(), countAt(0)), NumTri(),
-        TriBary2Vert({vertBary.ptrD(), lock.ptrD(),
-                      relation.barycentric.cptrD(), halfedge_.cptrD()}));
+    for_each_n(policy, zip(relation.triBary.begin(), countAt(0)), NumTri(),
+               TriBary2Vert({vertBary.ptrD(), lock.ptrD(),
+                             relation.barycentric.cptrD(), halfedge_.cptrD()}));
 
-    for_each_n(
-        policy, zip(vertPos_.begin(), vertBary.begin()), NumVert(),
-        InterpTri({old.halfedge_.cptrD(), old.halfedgeTangent_.cptrD(),
-                   old.vertPos_.cptrD()}));
+    for_each_n(policy, zip(vertPos_.begin(), vertBary.begin()), NumVert(),
+               InterpTri({old.halfedge_.cptrD(), old.halfedgeTangent_.cptrD(),
+                          old.vertPos_.cptrD()}));
   }
 
   halfedgeTangent_.resize(0);

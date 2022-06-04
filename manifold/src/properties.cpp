@@ -15,6 +15,7 @@
 #include <thrust/count.h>
 #include <thrust/logical.h>
 #include <thrust/transform_reduce.h>
+
 #include <limits>
 
 #include "impl.h"
@@ -217,12 +218,12 @@ bool Manifold::Impl::IsManifold() const {
   if (halfedge_.size() == 0) return true;
   auto policy = autoPolicy(halfedge_.size());
   bool isManifold = all_of(policy, countAt(0), countAt(halfedge_.size()),
-                                   CheckManifold({halfedge_.cptrD()}));
+                           CheckManifold({halfedge_.cptrD()}));
 
   VecDH<Halfedge> halfedge(halfedge_);
   sort(policy, halfedge.begin(), halfedge.end());
   isManifold &= all_of(policy, countAt(0), countAt(2 * NumEdge() - 1),
-                               NoDuplicates({halfedge.cptrD()}));
+                       NoDuplicates({halfedge.cptrD()}));
   return isManifold;
 }
 
@@ -232,8 +233,8 @@ bool Manifold::Impl::IsManifold() const {
 bool Manifold::Impl::MatchesTriNormals() const {
   if (halfedge_.size() == 0 || faceNormal_.size() != NumTri()) return true;
   return all_of(autoPolicy(NumTri()), countAt(0), countAt(NumTri()),
-                        CheckCCW({halfedge_.cptrD(), vertPos_.cptrD(),
-                                  faceNormal_.cptrD(), 2 * precision_}));
+                CheckCCW({halfedge_.cptrD(), vertPos_.cptrD(),
+                          faceNormal_.cptrD(), 2 * precision_}));
 }
 
 /**
@@ -242,8 +243,8 @@ bool Manifold::Impl::MatchesTriNormals() const {
 int Manifold::Impl::NumDegenerateTris() const {
   if (halfedge_.size() == 0 || faceNormal_.size() != NumTri()) return true;
   return count_if(autoPolicy(NumTri()), countAt(0), countAt(NumTri()),
-                          CheckCCW({halfedge_.cptrD(), vertPos_.cptrD(),
-                                    faceNormal_.cptrD(), -1 * precision_ / 2}));
+                  CheckCCW({halfedge_.cptrD(), vertPos_.cptrD(),
+                            faceNormal_.cptrD(), -1 * precision_ / 2}));
 }
 
 Properties Manifold::Impl::GetProperties() const {
@@ -270,19 +271,19 @@ Curvature Manifold::Impl::GetCurvature() const {
       CurvatureAngles({vertMeanCurvature.ptrD(), vertGaussianCurvature.ptrD(),
                        vertArea.ptrD(), degree.ptrD(), halfedge_.cptrD(),
                        vertPos_.cptrD(), faceNormal_.cptrD()}));
-  for_each_n(
-      policy, zip(vertMeanCurvature.begin(), vertGaussianCurvature.begin(),
-          vertArea.begin(), degree.begin()),
-      NumVert(), NormalizeCurvature());
-  result.minMeanCurvature =
-      reduce<float>(policy, vertMeanCurvature.begin(), vertMeanCurvature.end(),
-                     std::numeric_limits<float>::infinity(), thrust::minimum<float>());
-  result.maxMeanCurvature =
-      reduce<float>(policy, vertMeanCurvature.begin(), vertMeanCurvature.end(),
-                     -std::numeric_limits<float>::infinity(), thrust::maximum<float>());
+  for_each_n(policy,
+             zip(vertMeanCurvature.begin(), vertGaussianCurvature.begin(),
+                 vertArea.begin(), degree.begin()),
+             NumVert(), NormalizeCurvature());
+  result.minMeanCurvature = reduce<float>(
+      policy, vertMeanCurvature.begin(), vertMeanCurvature.end(),
+      std::numeric_limits<float>::infinity(), thrust::minimum<float>());
+  result.maxMeanCurvature = reduce<float>(
+      policy, vertMeanCurvature.begin(), vertMeanCurvature.end(),
+      -std::numeric_limits<float>::infinity(), thrust::maximum<float>());
   result.minGaussianCurvature = reduce<float>(
-      policy, vertGaussianCurvature.begin(), vertGaussianCurvature.end(), std::numeric_limits<float>::infinity(),
-      thrust::minimum<float>());
+      policy, vertGaussianCurvature.begin(), vertGaussianCurvature.end(),
+      std::numeric_limits<float>::infinity(), thrust::minimum<float>());
   result.maxGaussianCurvature = reduce<float>(
       policy, vertGaussianCurvature.begin(), vertGaussianCurvature.end(),
       -std::numeric_limits<float>::infinity(), thrust::maximum<float>());
@@ -302,9 +303,11 @@ Curvature Manifold::Impl::GetCurvature() const {
  */
 void Manifold::Impl::CalculateBBox() {
   auto policy = autoPolicy(NumVert());
-  bBox_.min = reduce<glm::vec3>(policy, vertPos_.begin(), vertPos_.end(),
-                             glm::vec3(std::numeric_limits<float>::infinity()), PosMin());
-  bBox_.max = reduce<glm::vec3>(policy, vertPos_.begin(), vertPos_.end(),
-                             glm::vec3(-std::numeric_limits<float>::infinity()), PosMax());
+  bBox_.min = reduce<glm::vec3>(
+      policy, vertPos_.begin(), vertPos_.end(),
+      glm::vec3(std::numeric_limits<float>::infinity()), PosMin());
+  bBox_.max = reduce<glm::vec3>(
+      policy, vertPos_.begin(), vertPos_.end(),
+      glm::vec3(-std::numeric_limits<float>::infinity()), PosMax());
 }
 }  // namespace manifold
