@@ -141,11 +141,12 @@ void Manifold::Impl::SimplifyTopology() {
   for (const int edge : flaggedEdges) CollapseEdge(edge);
 
   flaggedEdges.resize(halfedge_.size());
-  numFlagged = copy_if<decltype(flaggedEdges.begin())>(
-                   policy, countAt(0), countAt(halfedge_.size()), flaggedEdges.begin(),
-                   SwappableEdge({halfedge_.cptrD(), vertPos_.cptrD(),
-                                  faceNormal_.cptrD(), precision_})) -
-               flaggedEdges.begin();
+  numFlagged =
+      copy_if<decltype(flaggedEdges.begin())>(
+          policy, countAt(0), countAt(halfedge_.size()), flaggedEdges.begin(),
+          SwappableEdge({halfedge_.cptrD(), vertPos_.cptrD(),
+                         faceNormal_.cptrD(), precision_})) -
+      flaggedEdges.begin();
   flaggedEdges.resize(numFlagged);
 
   for (const int edge : flaggedEdges) {

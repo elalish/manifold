@@ -8,9 +8,9 @@ void check_cuda_available() {
   cudaError_t error = cudaGetDeviceCount(&device_count);
   CUDA_ENABLED = device_count != 0;
 }
-}
+}  // namespace manifold
 #else
 namespace manifold {
 void check_cuda_available() {}
-}
+}  // namespace manifold
 #endif

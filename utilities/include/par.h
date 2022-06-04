@@ -1,16 +1,15 @@
 #pragma once
 #include <thrust/binary_search.h>
 #include <thrust/count.h>
+#include <thrust/execution_policy.h>
 #include <thrust/gather.h>
 #include <thrust/logical.h>
 #include <thrust/remove.h>
 #include <thrust/sequence.h>
 #include <thrust/sort.h>
+#include <thrust/system/cpp/execution_policy.h>
 #include <thrust/uninitialized_copy.h>
 #include <thrust/unique.h>
-#include <thrust/execution_policy.h>
-
-#include <thrust/system/cpp/execution_policy.h>
 
 #if MANIFOLD_PAR == 'O'
 #include <thrust/system/omp/execution_policy.h>
@@ -61,60 +60,60 @@ inline ExecutionPolicy autoPolicy(int size) {
 }
 
 #ifdef MANIFOLD_USE_CUDA
-#define THRUST_DYNAMIC_BACKEND_VOID(NAME)                                      \
-  template <typename... Args>                                                  \
-  void NAME(ExecutionPolicy policy, Args... args) {                            \
-    switch (policy) {                                                          \
-    case ExecutionPolicy::ParUnseq:                                            \
-      thrust::NAME(thrust::cuda::par, args...);                                \
-      break;                                                                   \
-    case ExecutionPolicy::Par:                                                 \
-      thrust::NAME(thrust::MANIFOLD_PAR_NS::par, args...);                     \
-      break;                                                                   \
-    case ExecutionPolicy::Seq:                                                 \
-      thrust::NAME(thrust::cpp::par, args...);                                 \
-      break;                                                                   \
-    }                                                                          \
+#define THRUST_DYNAMIC_BACKEND_VOID(NAME)                    \
+  template <typename... Args>                                \
+  void NAME(ExecutionPolicy policy, Args... args) {          \
+    switch (policy) {                                        \
+      case ExecutionPolicy::ParUnseq:                        \
+        thrust::NAME(thrust::cuda::par, args...);            \
+        break;                                               \
+      case ExecutionPolicy::Par:                             \
+        thrust::NAME(thrust::MANIFOLD_PAR_NS::par, args...); \
+        break;                                               \
+      case ExecutionPolicy::Seq:                             \
+        thrust::NAME(thrust::cpp::par, args...);             \
+        break;                                               \
+    }                                                        \
   }
-#define THRUST_DYNAMIC_BACKEND(NAME, RET)                                      \
-  template <typename Ret = RET, typename... Args>                              \
-  Ret NAME(ExecutionPolicy policy, Args... args) {                             \
-    switch (policy) {                                                          \
-    case ExecutionPolicy::ParUnseq:                                            \
-      return thrust::NAME(thrust::cuda::par, args...);                         \
-    case ExecutionPolicy::Par:                                                 \
-      return thrust::NAME(thrust::MANIFOLD_PAR_NS::par, args...);              \
-    case ExecutionPolicy::Seq:                                                 \
-      break;                                                                   \
-    }                                                                          \
-    return thrust::NAME(thrust::cpp::par, args...);                            \
+#define THRUST_DYNAMIC_BACKEND(NAME, RET)                           \
+  template <typename Ret = RET, typename... Args>                   \
+  Ret NAME(ExecutionPolicy policy, Args... args) {                  \
+    switch (policy) {                                               \
+      case ExecutionPolicy::ParUnseq:                               \
+        return thrust::NAME(thrust::cuda::par, args...);            \
+      case ExecutionPolicy::Par:                                    \
+        return thrust::NAME(thrust::MANIFOLD_PAR_NS::par, args...); \
+      case ExecutionPolicy::Seq:                                    \
+        break;                                                      \
+    }                                                               \
+    return thrust::NAME(thrust::cpp::par, args...);                 \
   }
 #else
-#define THRUST_DYNAMIC_BACKEND_VOID(NAME)                                      \
-  template <typename... Args>                                                  \
-  void NAME(ExecutionPolicy policy, Args... args) {                            \
-    switch (policy) {                                                          \
-    case ExecutionPolicy::ParUnseq:                                            \
-    case ExecutionPolicy::Par:                                                 \
-      thrust::NAME(thrust::MANIFOLD_PAR_NS::par, args...);                     \
-      break;                                                                   \
-    case ExecutionPolicy::Seq:                                                 \
-      thrust::NAME(thrust::cpp::par, args...);                                 \
-      break;                                                                   \
-    }                                                                          \
+#define THRUST_DYNAMIC_BACKEND_VOID(NAME)                    \
+  template <typename... Args>                                \
+  void NAME(ExecutionPolicy policy, Args... args) {          \
+    switch (policy) {                                        \
+      case ExecutionPolicy::ParUnseq:                        \
+      case ExecutionPolicy::Par:                             \
+        thrust::NAME(thrust::MANIFOLD_PAR_NS::par, args...); \
+        break;                                               \
+      case ExecutionPolicy::Seq:                             \
+        thrust::NAME(thrust::cpp::par, args...);             \
+        break;                                               \
+    }                                                        \
   }
 
-#define THRUST_DYNAMIC_BACKEND(NAME, RET)                                      \
-  template <typename Ret = RET, typename... Args>                              \
-  Ret NAME(ExecutionPolicy policy, Args... args) {                             \
-    switch (policy) {                                                          \
-    case ExecutionPolicy::ParUnseq:                                            \
-    case ExecutionPolicy::Par:                                                 \
-      return thrust::NAME(thrust::MANIFOLD_PAR_NS::par, args...);              \
-    case ExecutionPolicy::Seq:                                                 \
-      break;                                                                   \
-    }                                                                          \
-    return thrust::NAME(thrust::cpp::par, args...);                            \
+#define THRUST_DYNAMIC_BACKEND(NAME, RET)                           \
+  template <typename Ret = RET, typename... Args>                   \
+  Ret NAME(ExecutionPolicy policy, Args... args) {                  \
+    switch (policy) {                                               \
+      case ExecutionPolicy::ParUnseq:                               \
+      case ExecutionPolicy::Par:                                    \
+        return thrust::NAME(thrust::MANIFOLD_PAR_NS::par, args...); \
+      case ExecutionPolicy::Seq:                                    \
+        break;                                                      \
+    }                                                               \
+    return thrust::NAME(thrust::cpp::par, args...);                 \
   }
 #endif
 
@@ -151,4 +150,4 @@ THRUST_DYNAMIC_BACKEND(transform_reduce, void)
 THRUST_DYNAMIC_BACKEND(lower_bound, void)
 THRUST_DYNAMIC_BACKEND(gather_if, void)
 
-} // namespace manifold
+}  // namespace manifold
