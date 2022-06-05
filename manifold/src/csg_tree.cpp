@@ -115,11 +115,20 @@ CsgNodeType CsgLeafNode::GetNodeType() const { return CsgNodeType::LEAF; }
  */
 Manifold::Impl CsgLeafNode::Compose(
     const std::vector<std::shared_ptr<CsgLeafNode>> &nodes) {
+  float precision = -1;
   int numVert = 0;
   int numEdge = 0;
   int numTri = 0;
   int numBary = 0;
   for (auto &node : nodes) {
+    float nodeOldScale = node->pImpl_->bBox_.Scale();
+    float nodeNewScale = node->GetBoundingBox().Scale();
+    float nodePrecision = node->pImpl_->precision_;
+    nodePrecision *= glm::max(1.0f, nodeNewScale / nodeOldScale);
+    nodePrecision = glm::max(nodePrecision, kTolerance * nodeNewScale);
+    if (!glm::isfinite(nodePrecision)) nodePrecision = -1;
+    precision = glm::max(precision, nodePrecision);
+
     numVert += node->pImpl_->NumVert();
     numEdge += node->pImpl_->NumEdge();
     numTri += node->pImpl_->NumTri();
@@ -127,6 +136,7 @@ Manifold::Impl CsgLeafNode::Compose(
   }
 
   Manifold::Impl combined;
+  combined.precision_ = precision;
   combined.vertPos_.resize(numVert);
   combined.halfedge_.resize(2 * numEdge);
   combined.faceNormal_.resize(numTri);
@@ -194,6 +204,8 @@ Manifold::Impl CsgLeafNode::Compose(
     nextTri += node->pImpl_->NumTri();
     nextBary += node->pImpl_->meshRelation_.barycentric.size();
   }
+  // required to remove parts that are smaller than the precision
+  combined.SimplifyTopology();
   combined.Finish();
   return combined;
 }

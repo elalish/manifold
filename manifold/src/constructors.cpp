@@ -416,6 +416,8 @@ std::vector<Manifold> Manifold::Decompose() const {
   std::vector<Manifold> meshes;
   for (int i = 0; i < numLabel; ++i) {
     auto impl = std::make_shared<Impl>();
+    // inherit original object's precision
+    impl->precision_ = pImpl_->precision_;
     impl->vertPos_.resize(NumVert());
     VecDH<int> vertNew2Old(NumVert());
     auto policy = autoPolicy(NumVert());
