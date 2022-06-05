@@ -216,12 +216,16 @@ CsgOpNode::CsgOpNode(const std::vector<std::shared_ptr<CsgNode>> &children,
                      Manifold::OpType op)
     : children_(children) {
   SetOp(op);
+  // opportunisticly flatten the tree without costly evaluation
+  GetChildren(false);
 }
 
 CsgOpNode::CsgOpNode(std::vector<std::shared_ptr<CsgNode>> &&children,
                      Manifold::OpType op)
     : children_(children) {
   SetOp(op);
+  // opportunisticly flatten the tree without costly evaluation
+  GetChildren(false);
 }
 
 std::shared_ptr<CsgNode> CsgOpNode::Transform(const glm::mat4x3 &m) const {
@@ -230,6 +234,7 @@ std::shared_ptr<CsgNode> CsgOpNode::Transform(const glm::mat4x3 &m) const {
   node->op_ = op_;
   node->transform_ = m * glm::mat4(transform_);
   node->simplified = simplified;
+  node->flattened = flattened;
   return node;
 }
 
@@ -382,25 +387,30 @@ void CsgOpNode::BatchUnion() const {
 
 /**
  * Flatten the children to a list of leaf nodes and return them.
+ * If finalize is true, the list will be guaranteed to be a list of leaf nodes
+ * (i.e. no ops). Otherwise, the list may contain ops.
  * Note that this function will not apply the transform to children, as they may
  * be shared with other nodes.
  */
-std::vector<std::shared_ptr<CsgNode>> &CsgOpNode::GetChildren() const {
-  if (children_.empty() || simplified) return children_;
+std::vector<std::shared_ptr<CsgNode>> &CsgOpNode::GetChildren(
+    bool finalize) const {
+  if (children_.empty() || (simplified && !finalize) || flattened)
+    return children_;
   simplified = true;
+  flattened = finalize;
   std::vector<std::shared_ptr<CsgNode>> newChildren;
 
   CsgNodeType op = op_;
   for (auto &child : children_) {
     if (child->GetNodeType() == op) {
       auto grandchildren =
-          std::dynamic_pointer_cast<CsgOpNode>(child)->GetChildren();
+          std::dynamic_pointer_cast<CsgOpNode>(child)->GetChildren(finalize);
       int start = children_.size();
       for (auto &grandchild : grandchildren) {
         newChildren.push_back(grandchild->Transform(child->GetTransform()));
       }
     } else {
-      if (child->GetNodeType() == CsgNodeType::LEAF) {
+      if (!finalize || child->GetNodeType() == CsgNodeType::LEAF) {
         newChildren.push_back(child);
       } else {
         newChildren.push_back(child->ToLeafNode());
