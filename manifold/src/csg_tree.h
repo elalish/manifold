@@ -72,6 +72,7 @@ class CsgOpNode final : public CsgNode {
   mutable std::vector<std::shared_ptr<CsgNode>> children_;
   mutable std::shared_ptr<CsgLeafNode> cache_ = nullptr;
   mutable bool simplified = false;
+  mutable bool flattened = false;
 
   void SetOp(Manifold::OpType);
 
@@ -81,7 +82,8 @@ class CsgOpNode final : public CsgNode {
 
   void BatchUnion() const;
 
-  std::vector<std::shared_ptr<CsgNode>> &GetChildren() const;
+  std::vector<std::shared_ptr<CsgNode>> &GetChildren(
+      bool finalize = true) const;
 };
 
 }  // namespace manifold
