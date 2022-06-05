@@ -219,12 +219,14 @@ bool Manifold::Impl::IsManifold() const {
   auto policy = autoPolicy(halfedge_.size());
   bool isManifold = all_of(policy, countAt(0), countAt(halfedge_.size()),
                            CheckManifold({halfedge_.cptrD()}));
+  // std::cout << (isManifold ? "" : "Not ") << "Manifold" << std::endl;
 
   VecDH<Halfedge> halfedge(halfedge_);
   sort(policy, halfedge.begin(), halfedge.end());
-  isManifold &= all_of(policy, countAt(0), countAt(2 * NumEdge() - 1),
-                       NoDuplicates({halfedge.cptrD()}));
-  return isManifold;
+  bool noDupes = all_of(policy, countAt(0), countAt(2 * NumEdge() - 1),
+                        NoDuplicates({halfedge.cptrD()}));
+  // std::cout << (noDupes ? "" : "Not ") << "2-Manifold" << std::endl;
+  return isManifold && noDupes;
 }
 
 /**

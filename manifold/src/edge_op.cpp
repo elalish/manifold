@@ -33,6 +33,17 @@ __host__ __device__ bool Is01Longest(glm::vec2 v0, glm::vec2 v1, glm::vec2 v2) {
   return l[0] > l[1] && l[0] > l[2];
 }
 
+struct DuplicateEdge {
+  const Halfedge* sortedHalfedge;
+
+  __host__ __device__ bool operator()(int edge) {
+    const Halfedge& halfedge = sortedHalfedge[edge];
+    const Halfedge& nextHalfedge = sortedHalfedge[edge + 1];
+    return halfedge.startVert == nextHalfedge.startVert &&
+           halfedge.endVert == nextHalfedge.endVert;
+  }
+};
+
 struct ShortEdge {
   const Halfedge* halfedge;
   const glm::vec3* vertPos;
@@ -110,6 +121,11 @@ namespace manifold {
  * It also performs edge swaps on the long edges of degenerate triangles, though
  * there are some configurations of degenerates that cannot be removed this way.
  *
+ * Before collapsing edges, the mesh is checked for duplicate edges (more than
+ * one pair of triangles sharing the same edge), which are removed by
+ * duplicating one vert and adding two triangles. These degenerate triangles are
+ * likely to be collapsed again in the subsequent simplification.
+ *
  * Note when an edge collapse would result in something non-manifold, the
  * vertices are duplicated in such a way as to remove handles or separate
  * meshes, thus decreasing the Genus(). It only increases when meshes that have
@@ -119,9 +135,26 @@ namespace manifold {
  * removal, by setting vertPos to NaN and halfedge to {-1, -1, -1, -1}.
  */
 void Manifold::Impl::SimplifyTopology() {
-  VecDH<int> flaggedEdges(halfedge_.size());
   auto policy = autoPolicy(halfedge_.size());
+
+  VecDH<Halfedge> halfedge(halfedge_);
+  VecDH<int> idx(halfedge_.size());
+  sequence(policy, idx.begin(), idx.end());
+  sort_by_key(policy, halfedge.begin(), halfedge.end(), idx.begin());
+
+  VecDH<int> flaggedEdges(halfedge_.size());
+
   int numFlagged =
+      copy_if<decltype(flaggedEdges.begin())>(
+          policy, idx.begin(), idx.end() - 1, countAt(0), flaggedEdges.begin(),
+          DuplicateEdge({halfedge.cptrD()})) -
+      flaggedEdges.begin();
+  flaggedEdges.resize(numFlagged);
+
+  for (const int edge : flaggedEdges) DedupeEdge(edge);
+
+  flaggedEdges.resize(halfedge_.size());
+  numFlagged =
       copy_if<decltype(flaggedEdges.begin())>(
           policy, countAt(0), countAt(halfedge_.size()), flaggedEdges.begin(),
           ShortEdge({halfedge_.cptrD(), vertPos_.cptrD(), precision_})) -
@@ -151,6 +184,47 @@ void Manifold::Impl::SimplifyTopology() {
 
   for (const int edge : flaggedEdges) {
     RecursiveEdgeSwap(edge);
+  }
+}
+
+void Manifold::Impl::DedupeEdge(const int edge) {
+  // Orbit endVert
+  const int startVert = halfedge_[edge].startVert;
+  const int endVert = halfedge_[edge].endVert;
+  int current = halfedge_[NextHalfedge(edge)].pairedHalfedge;
+  while (current != edge) {
+    const int vert = halfedge_[current].startVert;
+    if (vert == startVert) {
+      int newVert = vertPos_.size();
+      vertPos_.push_back(vertPos_[endVert]);
+      current = halfedge_[NextHalfedge(current)].pairedHalfedge;
+      int opposite = halfedge_[NextHalfedge(edge)].pairedHalfedge;
+
+      UpdateVert(newVert, current, opposite);
+
+      int newHalfedge = halfedge_.size();
+      int newFace = newHalfedge / 3;
+      int outsideVert = halfedge_[current].startVert;
+      halfedge_.push_back({endVert, newVert, -1, newFace});
+      halfedge_.push_back({newVert, outsideVert, -1, newFace});
+      halfedge_.push_back({outsideVert, endVert, -1, newFace});
+      PairUp(newHalfedge + 2, halfedge_[current].pairedHalfedge);
+      PairUp(newHalfedge + 1, current);
+
+      newHalfedge += 3;
+      ++newFace;
+      outsideVert = halfedge_[opposite].startVert;
+      halfedge_.push_back({newVert, endVert, -1, newFace});
+      halfedge_.push_back({endVert, outsideVert, -1, newFace});
+      halfedge_.push_back({outsideVert, newVert, -1, newFace});
+      PairUp(newHalfedge + 2, halfedge_[opposite].pairedHalfedge);
+      PairUp(newHalfedge + 1, opposite);
+      PairUp(newHalfedge, newHalfedge - 3);
+
+      break;
+    }
+
+    current = halfedge_[NextHalfedge(current)].pairedHalfedge;
   }
 }
 
