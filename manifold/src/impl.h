@@ -68,7 +68,6 @@ struct Manifold::Impl {
 
   void ReinitializeReference(int meshID);
   void CreateHalfedges(const VecDH<glm::ivec3>& triVerts);
-  void CreateAndFixHalfedges(const VecDH<glm::ivec3>& triVerts);
   void CalculateNormals();
   void UpdateMeshIDs(VecDH<int>& meshIDs, VecDH<int>& originalIDs,
                      int startTri = 0, int n = -1, int startID = 0);
@@ -109,6 +108,7 @@ struct Manifold::Impl {
 
   // edge_op.cu
   void SimplifyTopology();
+  void DedupeEdge(int edge);
   void CollapseEdge(int edge);
   void RecursiveEdgeSwap(int edge);
   void RemoveIfFolded(int edge);

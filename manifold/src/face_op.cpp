@@ -162,7 +162,7 @@ void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge,
     }
   }
   faceNormal_ = std::move(triNormal);
-  CreateAndFixHalfedges(triVerts);
+  CreateHalfedges(triVerts);
 }
 
 /**

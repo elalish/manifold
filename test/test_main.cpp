@@ -27,8 +27,6 @@ void print_usage() {
 int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
 
-  int c;
-
   for (int i = 1; i < argc; i++) {
     if (argv[i][0] != '-') {
       fprintf(stderr, "Unknown option: %s\n", argv[i]);
