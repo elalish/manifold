@@ -13,7 +13,10 @@
 // limitations under the License.
 
 #include "boolean3.h"
+
 #include <limits>
+
+#include "par.h"
 
 // TODO: make this runtime configurable for quicker debug
 constexpr bool kVerbose = false;
@@ -85,14 +88,14 @@ struct CopyFaceEdges {
 SparseIndices Filter11(const Manifold::Impl &inP, const Manifold::Impl &inQ,
                        const SparseIndices &p1q2, const SparseIndices &p2q1) {
   SparseIndices p1q1(3 * p1q2.size() + 3 * p2q1.size());
-  thrust::for_each_n(thrust::device, zip(countAt(0), p1q2.begin(0), p1q2.begin(1)),
-                     p1q2.size(),
-                     CopyFaceEdges({p1q1.ptrDpq(), inQ.halfedge_.cptrD()}));
+  auto policy = autoPolicy(p1q2.size());
+  for_each_n(policy, zip(countAt(0), p1q2.begin(0), p1q2.begin(1)), p1q2.size(),
+             CopyFaceEdges({p1q1.ptrDpq(), inQ.halfedge_.cptrD()}));
 
   p1q1.SwapPQ();
-  thrust::for_each_n(thrust::device, zip(countAt(p1q2.size()), p2q1.begin(1), p2q1.begin(0)),
-                     p2q1.size(),
-                     CopyFaceEdges({p1q1.ptrDpq(), inP.halfedge_.cptrD()}));
+  for_each_n(policy, zip(countAt(p1q2.size()), p2q1.begin(1), p2q1.begin(0)),
+             p2q1.size(),
+             CopyFaceEdges({p1q1.ptrDpq(), inP.halfedge_.cptrD()}));
   p1q1.SwapPQ();
   p1q1.Unique();
   return p1q1;
@@ -245,12 +248,12 @@ std::tuple<VecDH<int>, VecDH<glm::vec4>> Shadow11(SparseIndices &p1q1,
   VecDH<int> s11(p1q1.size());
   VecDH<glm::vec4> xyzz11(p1q1.size());
 
-  thrust::for_each_n(
-      thrust::device, zip(xyzz11.begin(), s11.begin(), p1q1.begin(0), p1q1.begin(1)),
-      p1q1.size(),
-      Kernel11({inP.vertPos_.cptrD(), inQ.vertPos_.cptrD(),
-                inP.halfedge_.cptrD(), inQ.halfedge_.cptrD(), expandP,
-                inP.vertNormal_.cptrD()}));
+  for_each_n(autoPolicy(p1q1.size()),
+             zip(xyzz11.begin(), s11.begin(), p1q1.begin(0), p1q1.begin(1)),
+             p1q1.size(),
+             Kernel11({inP.vertPos_.cptrD(), inQ.vertPos_.cptrD(),
+                       inP.halfedge_.cptrD(), inQ.halfedge_.cptrD(), expandP,
+                       inP.vertNormal_.cptrD()}));
 
   p1q1.KeepFinite(xyzz11, s11);
 
@@ -342,9 +345,9 @@ std::tuple<VecDH<int>, VecDH<float>> Shadow02(const Manifold::Impl &inP,
 
   auto vertNormalP =
       forward ? inP.vertNormal_.cptrD() : inQ.vertNormal_.cptrD();
-  thrust::for_each_n(
-      thrust::device, zip(s02.begin(), z02.begin(), p0q2.begin(!forward),
-          p0q2.begin(forward)),
+  for_each_n(
+      autoPolicy(p0q2.size()),
+      zip(s02.begin(), z02.begin(), p0q2.begin(!forward), p0q2.begin(forward)),
       p0q2.size(),
       Kernel02({inP.vertPos_.cptrD(), inQ.halfedge_.cptrD(),
                 inQ.vertPos_.cptrD(), forward, expandP, vertNormalP}));
@@ -452,9 +455,9 @@ std::tuple<VecDH<int>, VecDH<glm::vec3>> Intersect12(
   VecDH<int> x12(p1q2.size());
   VecDH<glm::vec3> v12(p1q2.size());
 
-  thrust::for_each_n(
-      thrust::device, zip(x12.begin(), v12.begin(), p1q2.begin(!forward),
-          p1q2.begin(forward)),
+  for_each_n(
+      autoPolicy(p1q2.size()),
+      zip(x12.begin(), v12.begin(), p1q2.begin(!forward), p1q2.begin(forward)),
       p1q2.size(),
       Kernel12({p0q2.ptrDpq(), s02.ptrD(), z02.cptrD(), p0q2.size(),
                 p1q1.ptrDpq(), s11.ptrD(), xyzz11.cptrD(), p1q1.size(),
@@ -471,20 +474,22 @@ VecDH<int> Winding03(const Manifold::Impl &inP, SparseIndices &p0q2,
   // verts that are not shadowed (not in p0q2) have winding number zero.
   VecDH<int> w03(inP.NumVert(), 0);
 
-  if (!thrust::is_sorted(thrust::device, p0q2.begin(reverse), p0q2.end(reverse)))
-    thrust::sort_by_key(thrust::device, p0q2.begin(reverse), p0q2.end(reverse), s02.begin());
+  auto policy = autoPolicy(p0q2.size());
+  if (!is_sorted(policy, p0q2.begin(reverse), p0q2.end(reverse)))
+    sort_by_key(policy, p0q2.begin(reverse), p0q2.end(reverse), s02.begin());
   VecDH<int> w03val(w03.size());
   VecDH<int> w03vert(w03.size());
   // sum known s02 values into w03 (winding number)
-  auto endPair =
-      thrust::reduce_by_key(thrust::device, p0q2.begin(reverse), p0q2.end(reverse),
-                            s02.begin(), w03vert.begin(), w03val.begin());
-  thrust::scatter(thrust::device, w03val.begin(), endPair.second, w03vert.begin(),
-                  w03.begin());
+  auto endPair = reduce_by_key<
+      thrust::pair<decltype(w03val.begin()), decltype(w03val.begin())>>(
+      policy, p0q2.begin(reverse), p0q2.end(reverse), s02.begin(),
+      w03vert.begin(), w03val.begin());
+  scatter(autoPolicy(endPair.second - w03val.begin()), w03val.begin(),
+          endPair.second, w03vert.begin(), w03.begin());
 
   if (reverse)
-    thrust::transform(thrust::device, w03.begin(), w03.end(), w03.begin(),
-                      thrust::negate<int>());
+    transform(autoPolicy(w03.size()), w03.begin(), w03.end(), w03.begin(),
+              thrust::negate<int>());
   return w03;
 };
 }  // namespace

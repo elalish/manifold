@@ -15,7 +15,10 @@
 #pragma once
 
 #include <thrust/remove.h>
+
 #include <glm/gtx/compatibility.hpp>
+
+#include "par.h"
 #include "utils.h"
 #include "vec_dh.h"
 
@@ -149,10 +152,13 @@ struct TmpInvalid {
 
 VecDH<TmpEdge> inline CreateTmpEdges(const VecDH<Halfedge>& halfedge) {
   VecDH<TmpEdge> edges(halfedge.size());
-  thrust::for_each_n(thrust::device, zip(edges.begin(), halfedge.begin(), countAt(0)),
-                     edges.size(), Halfedge2Tmp());
-  int numEdge = thrust::remove_if(thrust::device, edges.begin(), edges.end(), TmpInvalid()) -
-                edges.begin();
+  for_each_n(autoPolicy(edges.size()),
+             zip(edges.begin(), halfedge.begin(), countAt(0)), edges.size(),
+             Halfedge2Tmp());
+  int numEdge =
+      remove_if<decltype(edges.begin())>(
+          autoPolicy(edges.size()), edges.begin(), edges.end(), TmpInvalid()) -
+      edges.begin();
   ALWAYS_ASSERT(numEdge == halfedge.size() / 2, topologyErr, "Not oriented!");
   edges.resize(numEdge);
   return edges;

@@ -29,3 +29,7 @@ if(NOT TARGET GTest::GMock)
     add_library(GMock::Main ALIAS gmock_main)
 endif()
 
+if(NOT EMSCRIPTEN)
+ add_subdirectory(pybind11)
+endif()
+

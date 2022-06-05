@@ -17,8 +17,8 @@
 #include <algorithm>
 
 #include "assimp/Exporter.hpp"
-#include "assimp/Importer.hpp"
 #include "assimp/GltfMaterial.h"
+#include "assimp/Importer.hpp"
 #include "assimp/postprocess.h"
 #include "assimp/scene.h"
 
@@ -124,10 +124,8 @@ void ExportMesh(const std::string& filename, const Mesh& mesh,
   scene->mMaterials[0] = new aiMaterial();
 
   aiMaterial* material = scene->mMaterials[0];
-  material->AddProperty(&options.mat.roughness, 1,
-                        AI_MATKEY_ROUGHNESS_FACTOR);
-  material->AddProperty(&options.mat.metalness, 1,
-                        AI_MATKEY_METALLIC_FACTOR);
+  material->AddProperty(&options.mat.roughness, 1, AI_MATKEY_ROUGHNESS_FACTOR);
+  material->AddProperty(&options.mat.metalness, 1, AI_MATKEY_METALLIC_FACTOR);
   const glm::vec4& color = options.mat.color;
   aiColor4D baseColor(color.r, color.g, color.b, color.a);
   material->AddProperty(&baseColor, 1, AI_MATKEY_COLOR_DIFFUSE);
