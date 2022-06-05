@@ -564,7 +564,7 @@ Manifold::Impl Manifold::Impl::Transform(const glm::mat4x3& transform_) const {
   result.precision_ *= glm::max(1.0f, newScale / oldScale);
 
   // Maximum of inherited precision loss and translational precision loss.
-  result.SetPrecision(precision_);
+  result.SetPrecision(result.precision_);
   return result;
 }
 
