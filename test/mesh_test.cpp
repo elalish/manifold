@@ -862,8 +862,6 @@ TEST(Boolean, Cylinders) {
     }
     m2 += Manifold(rod).Transform(mat);
   }
-  // ExportMesh("m2a.glb", m2.GetMesh(), {});
-  std::cout << "union 3" << std::endl;
   m1 += m2;
 
   EXPECT_TRUE(m1.IsManifold());

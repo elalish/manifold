@@ -108,7 +108,7 @@ struct Manifold::Impl {
 
   // edge_op.cu
   void SimplifyTopology();
-  void SplitEdge(int edge);
+  void DedupeEdge(int edge);
   void CollapseEdge(int edge);
   void RecursiveEdgeSwap(int edge);
   void RemoveIfFolded(int edge);
