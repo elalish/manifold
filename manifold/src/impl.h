@@ -73,8 +73,7 @@ struct Manifold::Impl {
                      int startTri = 0, int n = -1, int startID = 0);
 
   void Update();
-  void ApplyTransform(const glm::mat4x3 &transform);
-  Impl Transform(const glm::mat4x3 &transform) const;
+  Impl Transform(const glm::mat4x3& transform) const;
   SparseIndices EdgeCollisions(const Impl& B) const;
   SparseIndices VertexCollisionsZ(const VecDH<glm::vec3>& vertsIn) const;
 

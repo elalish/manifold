@@ -359,7 +359,6 @@ Manifold::Impl::Impl(Shape shape) {
   InitializeNewReference();
 }
 
-
 void Manifold::Impl::ReinitializeReference(int meshID) {
   // instead of storing the meshID, we store 0 and set the mapping to
   // 0 -> meshID, because the meshID after boolean operation also starts from 0.
@@ -531,36 +530,7 @@ void Manifold::Impl::Update() {
   collider_.UpdateBoxes(faceBox);
 }
 
-/**
- * Bake the manifold's transform into its vertices.
- */
-void Manifold::Impl::ApplyTransform(const glm::mat4x3 &transform_) {
-  if (transform_ == glm::mat4x3(1.0f)) return;
-  auto policy = autoPolicy(NumVert());
-  transform(policy, vertPos_.begin(), vertPos_.end(), vertPos_.begin(),
-            Transform4x3({transform_}));
-
-  glm::mat3 normalTransform =
-      glm::inverse(glm::transpose(glm::mat3(transform_)));
-  transform(policy, faceNormal_.begin(), faceNormal_.end(), faceNormal_.begin(),
-            TransformNormals({normalTransform}));
-  transform(policy, vertNormal_.begin(), vertNormal_.end(), vertNormal_.begin(),
-            TransformNormals({normalTransform}));
-  // This optimization does a cheap collider update if the transform is
-  // axis-aligned.
-  if (!collider_.Transform(transform_)) Update();
-
-  const float oldScale = bBox_.Scale();
-  CalculateBBox();
-
-  const float newScale = bBox_.Scale();
-  precision_ *= glm::max(1.0f, newScale / oldScale);
-
-  // Maximum of inherited precision loss and translational precision loss.
-  SetPrecision(precision_);
-}
-
-Manifold::Impl Manifold::Impl::Transform(const glm::mat4x3 &transform_) const {
+Manifold::Impl Manifold::Impl::Transform(const glm::mat4x3& transform_) const {
   if (transform_ == glm::mat4x3(1.0f)) return *this;
   auto policy = autoPolicy(NumVert());
   Impl result;
@@ -574,14 +544,15 @@ Manifold::Impl Manifold::Impl::Transform(const glm::mat4x3 &transform_) const {
   result.vertPos_.resize(NumVert());
   result.faceNormal_.resize(faceNormal_.size());
   result.vertNormal_.resize(vertNormal_.size());
-  transform(policy, vertPos_.begin(), vertPos_.end(), result.vertPos_.begin(), Transform4x3({transform_}));
+  transform(policy, vertPos_.begin(), vertPos_.end(), result.vertPos_.begin(),
+            Transform4x3({transform_}));
 
   glm::mat3 normalTransform =
       glm::inverse(glm::transpose(glm::mat3(transform_)));
-  transform(policy, faceNormal_.begin(), faceNormal_.end(), result.faceNormal_.begin(),
-                   TransformNormals({normalTransform}));
-  transform(policy, vertNormal_.begin(), vertNormal_.end(), result.vertNormal_.begin(),
-                   TransformNormals({normalTransform}));
+  transform(policy, faceNormal_.begin(), faceNormal_.end(),
+            result.faceNormal_.begin(), TransformNormals({normalTransform}));
+  transform(policy, vertNormal_.begin(), vertNormal_.end(),
+            result.vertNormal_.begin(), TransformNormals({normalTransform}));
   // This optimization does a cheap collider update if the transform is
   // axis-aligned.
   if (!result.collider_.Transform(transform_)) result.Update();
