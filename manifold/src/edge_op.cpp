@@ -279,14 +279,10 @@ void Manifold::Impl::CollapseTri(const glm::ivec3& triEdge) {
 }
 
 void Manifold::Impl::RemoveIfFolded(int edge) {
-  const int pair = halfedge_[edge].pairedHalfedge;
-  if (pair < 0) return;
-
   const glm::ivec3 tri0edge = TriOf(edge);
-  const glm::ivec3 tri1edge = TriOf(pair);
+  const glm::ivec3 tri1edge = TriOf(halfedge_[edge].pairedHalfedge);
   if (halfedge_[tri0edge[1]].endVert == halfedge_[tri1edge[1]].endVert) {
     for (int i : {0, 1, 2}) {
-      if (halfedge_[tri0edge[i]].startVert < 0) continue;
       vertPos_[halfedge_[tri0edge[i]].startVert] = glm::vec3(NAN);
       halfedge_[tri0edge[i]] = {-1, -1, -1, -1};
       halfedge_[tri1edge[i]] = {-1, -1, -1, -1};
