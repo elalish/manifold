@@ -121,6 +121,11 @@ namespace manifold {
  * It also performs edge swaps on the long edges of degenerate triangles, though
  * there are some configurations of degenerates that cannot be removed this way.
  *
+ * Before collapsing edges, the mesh is checked for duplicate edges (more than
+ * one pair of triangles sharing the same edge), which are removed by
+ * duplicating one vert and adding two triangles. These degenerate triangles are
+ * likely to be collapsed again in the subsequent simplification.
+ *
  * Note when an edge collapse would result in something non-manifold, the
  * vertices are duplicated in such a way as to remove handles or separate
  * meshes, thus decreasing the Genus(). It only increases when meshes that have
