@@ -52,7 +52,7 @@ Manifold Base(float width, float radius, float decorRadius, float twistRadius,
   }
 
   base = Manifold::Extrude(stretch, width) ^ base;
-  base = base.SetAsOriginal().second;
+  base = base.AsOriginal().second;
 
   return base;
 }

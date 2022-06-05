@@ -320,7 +320,7 @@ std::vector<int> Manifold::GetMeshIDs() const {
  *
  * @returns New MeshID
  */
-std::pair<int, Manifold> Manifold::SetAsOriginal() const {
+std::pair<int, Manifold> Manifold::AsOriginal() const {
   auto newImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
   int meshID = newImpl->InitializeNewReference();
   return std::make_pair(meshID,

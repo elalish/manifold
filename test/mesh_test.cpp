@@ -490,7 +490,7 @@ TEST(Boolean, Tetra) {
   EXPECT_TRUE(tetra.IsManifold());
 
   Manifold tetra2 = tetra;
-  tetra2 = tetra2.Translate(glm::vec3(0.5f)).SetAsOriginal().second;
+  tetra2 = tetra2.Translate(glm::vec3(0.5f)).AsOriginal().second;
   Manifold result = tetra2 - tetra;
 
   ExpectMeshes(result, {{8, 12}});
@@ -531,7 +531,7 @@ TEST(Boolean, Perturb) {
 
 TEST(Boolean, Coplanar) {
   Manifold cylinder = Manifold::Cylinder(1.0f, 1.0f);
-  Manifold cylinder2 = cylinder.SetAsOriginal().second;
+  Manifold cylinder2 = cylinder.AsOriginal().second;
   cylinder2 = cylinder2.Scale({0.5f, 0.5f, 1.0f})
                   .Rotate(0, 0, 15)
                   .Translate({0.25f, 0.25f, 0.0f});
@@ -723,7 +723,7 @@ TEST(Boolean, Sphere) {
   Manifold sphere = Manifold::Sphere(1.0f, 12);
   Manifold sphere2 = sphere;
   sphere2 = sphere2.Translate(glm::vec3(0.5));
-  sphere2 = sphere2.SetAsOriginal().second;
+  sphere2 = sphere2.AsOriginal().second;
   Manifold result = sphere - sphere2;
 
   ExpectMeshes(result, {{74, 144}});
