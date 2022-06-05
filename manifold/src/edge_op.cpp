@@ -130,19 +130,23 @@ namespace manifold {
  * removal, by setting vertPos to NaN and halfedge to {-1, -1, -1, -1}.
  */
 void Manifold::Impl::SimplifyTopology() {
-  VecDH<Halfedge> halfedge(halfedge_);
-  thrust::sort(thrust::device, halfedge.begin(), halfedge.end());
-  // FIX: copy halfedge index, not sorted index.
-  VecDH<int> flaggedEdges(halfedge_.size());
   auto policy = autoPolicy(halfedge_.size());
+
+  VecDH<Halfedge> halfedge(halfedge_);
+  VecDH<int> idx(halfedge_.size());
+  sequence(policy, idx.begin(), idx.end());
+  sort_by_key(policy, halfedge.begin(), halfedge.end(), idx.begin());
+
+  VecDH<int> flaggedEdges(halfedge_.size());
+
   int numFlagged =
       copy_if<decltype(flaggedEdges.begin())>(
-          policy, countAt(0), countAt(halfedge_.size()), flaggedEdges.begin(),
+          policy, idx.begin(), idx.end() - 1, countAt(0), flaggedEdges.begin(),
           DuplicateEdge({halfedge.cptrD()})) -
       flaggedEdges.begin();
   flaggedEdges.resize(numFlagged);
 
-  for (const int edge : flaggedEdges) SplitEdge(edge);
+  for (const int edge : flaggedEdges) DedupeEdge(edge);
 
   flaggedEdges.resize(halfedge_.size());
   numFlagged =
@@ -175,6 +179,47 @@ void Manifold::Impl::SimplifyTopology() {
 
   for (const int edge : flaggedEdges) {
     RecursiveEdgeSwap(edge);
+  }
+}
+
+void Manifold::Impl::DedupeEdge(const int edge) {
+  // Orbit endVert
+  const int startVert = halfedge_[edge].startVert;
+  const int endVert = halfedge_[edge].endVert;
+  int current = halfedge_[NextHalfedge(edge)].pairedHalfedge;
+  while (current != edge) {
+    const int vert = halfedge_[current].startVert;
+    if (vert == startVert) {
+      int newVert = vertPos_.size();
+      vertPos_.push_back(vertPos_[endVert]);
+      current = halfedge_[NextHalfedge(current)].pairedHalfedge;
+      int opposite = halfedge_[NextHalfedge(edge)].pairedHalfedge;
+
+      UpdateVert(newVert, current, opposite);
+
+      int newHalfedge = halfedge_.size();
+      int newFace = newHalfedge / 3;
+      int outsideVert = halfedge_[current].startVert;
+      halfedge_.push_back({endVert, newVert, -1, newFace});
+      halfedge_.push_back({newVert, outsideVert, -1, newFace});
+      halfedge_.push_back({outsideVert, endVert, -1, newFace});
+      PairUp(newHalfedge + 2, halfedge_[current].pairedHalfedge);
+      PairUp(newHalfedge + 1, current);
+
+      newHalfedge += 3;
+      ++newFace;
+      outsideVert = halfedge_[opposite].startVert;
+      halfedge_.push_back({newVert, endVert, -1, newFace});
+      halfedge_.push_back({endVert, outsideVert, -1, newFace});
+      halfedge_.push_back({outsideVert, newVert, -1, newFace});
+      PairUp(newHalfedge + 2, halfedge_[opposite].pairedHalfedge);
+      PairUp(newHalfedge + 1, opposite);
+      PairUp(newHalfedge, newHalfedge - 3);
+
+      break;
+    }
+
+    current = halfedge_[NextHalfedge(current)].pairedHalfedge;
   }
 }
 
@@ -242,18 +287,6 @@ void Manifold::Impl::RemoveIfFolded(int edge) {
       halfedge_[tri1edge[i]] = {-1, -1, -1, -1};
     }
   }
-}
-
-void Manifold::Impl::SplitEdge(const int current) {
-  int startVert = vertPos_.size();
-  vertPos_.push_back(vertPos_[halfedge_[current].startVert]);
-  int endVert = vertPos_.size();
-  vertPos_.push_back(vertPos_[halfedge_[current].endVert]);
-
-  int pair = halfedge_[current].pairedHalfedge;
-
-  UpdateVert(startVert, pair, NextHalfedge(NextHalfedge(current)));
-  UpdateVert(endVert, current, NextHalfedge(NextHalfedge(pair)));
 }
 
 void Manifold::Impl::CollapseEdge(const int edge) {
