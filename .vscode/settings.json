@@ -86,11 +86,18 @@
         "set": "cpp",
         "memory_resource": "cpp",
         "random": "cpp",
-        "variant": "cpp"
+        "variant": "cpp",
+        "hash_map": "cpp",
+        "hash_set": "cpp",
+        "codecvt": "cpp",
+        "regex": "cpp",
+        "future": "cpp",
+        "shared_mutex": "cpp"
     },
     "C_Cpp.clang_format_fallbackStyle": "google",
     "editor.formatOnSave": true,
     "cmake.configureArgs": [
-        "-DTHRUST_BACKEND=CPP"
+        "-DMANIFOLD_USE_CUDA=OFF",
+        "-DMANIFOLD_PAR=NONE"
     ],
 }
