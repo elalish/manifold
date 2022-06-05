@@ -20,10 +20,10 @@
 #include <thrust/sort.h>
 #include <thrust/unique.h>
 
+#include "par.h"
 #include "structs.h"
 #include "utils.h"
 #include "vec_dh.h"
-#include "par.h"
 
 namespace manifold {
 
@@ -75,7 +75,9 @@ class SparseIndices {
 
   void Unique() {
     Sort();
-    int newSize = unique<decltype(beginPQ())>(autoPolicy(size()), beginPQ(), endPQ()) - beginPQ();
+    int newSize =
+        unique<decltype(beginPQ())>(autoPolicy(size()), beginPQ(), endPQ()) -
+        beginPQ();
     Resize(newSize);
   }
 
@@ -90,7 +92,9 @@ class SparseIndices {
                   "Different number of values than indicies!");
     auto zBegin = zip(S.begin(), begin(false), begin(true));
     auto zEnd = zip(S.end(), end(false), end(true));
-    size_t size = remove_if<decltype(zBegin)>(autoPolicy(S.size()), zBegin, zEnd, firstZero()) - zBegin;
+    size_t size = remove_if<decltype(zBegin)>(autoPolicy(S.size()), zBegin,
+                                              zEnd, firstZero()) -
+                  zBegin;
     S.resize(size, -1);
     p.resize(size, -1);
     q.resize(size, -1);
@@ -123,7 +127,9 @@ class SparseIndices {
                   "Different number of values than indicies!");
     auto zBegin = zip(v.begin(), x.begin(), begin(false), begin(true));
     auto zEnd = zip(v.end(), x.end(), end(false), end(true));
-    size_t size = remove_if<decltype(zBegin)>(autoPolicy(v.size()), zBegin, zEnd, firstNonFinite<T>()) - zBegin;
+    size_t size = remove_if<decltype(zBegin)>(autoPolicy(v.size()), zBegin,
+                                              zEnd, firstNonFinite<T>()) -
+                  zBegin;
     v.resize(size);
     x.resize(size, -1);
     p.resize(size, -1);
@@ -145,7 +151,7 @@ class SparseIndices {
     binary_search(policy, beginPQ(), endPQ(), pqBegin, pqEnd, found.begin());
     lower_bound(policy, beginPQ(), endPQ(), pqBegin, pqEnd, temp.begin());
     gather_if(policy, temp.begin(), temp.end(), found.begin(), val.begin(),
-                      result.begin());
+              result.begin());
     return result;
   }
 

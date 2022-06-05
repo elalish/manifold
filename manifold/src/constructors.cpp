@@ -16,8 +16,8 @@
 
 #include "graph.h"
 #include "impl.h"
-#include "polygon.h"
 #include "par.h"
+#include "polygon.h"
 
 namespace {
 using namespace manifold;
@@ -184,8 +184,8 @@ Manifold Manifold::Sphere(float radius, int circularSegments) {
   Manifold sphere;
   sphere.pImpl_ = std::make_unique<Impl>(Impl::Shape::OCTAHEDRON);
   sphere.pImpl_->Subdivide(n);
-  for_each_n(autoPolicy(sphere.NumVert()), sphere.pImpl_->vertPos_.begin(), sphere.NumVert(),
-                     ToSphere({radius}));
+  for_each_n(autoPolicy(sphere.NumVert()), sphere.pImpl_->vertPos_.begin(),
+             sphere.NumVert(), ToSphere({radius}));
   sphere.pImpl_->Finish();
   // Ignore preceding octahedron.
   sphere.pImpl_->ReinitializeReference(Impl::meshIDCounter_.fetch_add(1));
@@ -406,33 +406,34 @@ Manifold Manifold::Compose(const std::vector<Manifold>& manifolds) {
     impl.ApplyTransform();
 
     copy(policy, impl.vertPos_.begin(), impl.vertPos_.end(),
-                 combined.vertPos_.begin() + nextVert);
+         combined.vertPos_.begin() + nextVert);
     copy(policy, impl.faceNormal_.begin(), impl.faceNormal_.end(),
-                 combined.faceNormal_.begin() + nextTri);
+         combined.faceNormal_.begin() + nextTri);
     copy(policy, impl.halfedgeTangent_.begin(), impl.halfedgeTangent_.end(),
-                 combined.halfedgeTangent_.begin() + nextEdge);
+         combined.halfedgeTangent_.begin() + nextEdge);
     copy(policy, impl.meshRelation_.barycentric.begin(),
-                 impl.meshRelation_.barycentric.end(),
-                 combined.meshRelation_.barycentric.begin() + nextBary);
+         impl.meshRelation_.barycentric.end(),
+         combined.meshRelation_.barycentric.begin() + nextBary);
     transform(policy, impl.meshRelation_.triBary.begin(),
-                      impl.meshRelation_.triBary.end(),
-                      combined.meshRelation_.triBary.begin() + nextTri,
-                      UpdateTriBary({nextBary}));
+              impl.meshRelation_.triBary.end(),
+              combined.meshRelation_.triBary.begin() + nextTri,
+              UpdateTriBary({nextBary}));
     transform(policy, impl.halfedge_.begin(), impl.halfedge_.end(),
-                      combined.halfedge_.begin() + nextEdge,
-                      UpdateHalfedge({nextVert, nextEdge, nextTri}));
+              combined.halfedge_.begin() + nextEdge,
+              UpdateHalfedge({nextVert, nextEdge, nextTri}));
 
     // Assign new IDs to triangles added in this iteration, to differentiate
     // triangles coming from different manifolds.
     // See the end of `boolean_result.cpp` for details.
     VecDH<int> meshIDs;
     VecDH<int> original;
-    for (auto &entry : impl.meshRelation_.originalID) {
+    for (auto& entry : impl.meshRelation_.originalID) {
       meshIDs.push_back(entry.first);
       original.push_back(entry.second);
     }
     int meshIDStart = combined.meshRelation_.originalID.size();
-    combined.UpdateMeshIDs(meshIDs, original, nextTri, impl.meshRelation_.triBary.size(), meshIDStart);
+    combined.UpdateMeshIDs(meshIDs, original, nextTri,
+                           impl.meshRelation_.triBary.size(), meshIDStart);
 
     nextVert += manifold.NumVert();
     nextEdge += 2 * manifold.NumEdge();
@@ -470,7 +471,7 @@ std::vector<Manifold> Manifold::Decompose() const {
   // meshID mapping for UpdateMeshIDs
   VecDH<int> meshIDs;
   VecDH<int> original;
-  for (auto &entry : pImpl_->meshRelation_.originalID) {
+  for (auto& entry : pImpl_->meshRelation_.originalID) {
     meshIDs.push_back(entry.first);
     original.push_back(entry.second);
   }
@@ -484,8 +485,7 @@ std::vector<Manifold> Manifold::Decompose() const {
     int nVert =
         copy_if<decltype(start)>(
             policy, zip(pImpl_->vertPos_.begin(), countAt(0)),
-            zip(pImpl_->vertPos_.end(), countAt(NumVert())),
-            vertLabel.begin(),
+            zip(pImpl_->vertPos_.end(), countAt(NumVert())), vertLabel.begin(),
             zip(meshes[i].pImpl_->vertPos_.begin(), vertNew2Old.begin()),
             Equals({i})) -
         start;

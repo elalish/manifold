@@ -33,8 +33,9 @@ namespace manifold {
 // if the parameter val is not set. Also, this implementation is a toy
 // implementation that did not consider things like non-trivial
 // constructor/destructor, please keep T trivial.
-template <typename T> class ManagedVec {
-public:
+template <typename T>
+class ManagedVec {
+ public:
   typedef T *Iter;
   typedef const T *IterC;
 
@@ -49,16 +50,14 @@ public:
     size_ = n;
     capacity_ = n;
     onHost = autoPolicy(n) != ExecutionPolicy::ParUnseq;
-    if (n == 0)
-      return;
+    if (n == 0) return;
     mallocManaged(&ptr_, size_ * sizeof(T));
   }
 
   ManagedVec(size_t n, const T &val) {
     size_ = n;
     capacity_ = n;
-    if (n == 0)
-      return;
+    if (n == 0) return;
     auto policy = autoPolicy(n);
     onHost = policy != ExecutionPolicy::ParUnseq;
     mallocManaged(&ptr_, size_ * sizeof(T));
@@ -67,8 +66,7 @@ public:
   }
 
   ~ManagedVec() {
-    if (ptr_ != nullptr)
-      freeManaged(ptr_);
+    if (ptr_ != nullptr) freeManaged(ptr_);
     ptr_ = nullptr;
     size_ = 0;
     capacity_ = 0;
@@ -108,10 +106,8 @@ public:
   }
 
   ManagedVec &operator=(const ManagedVec<T> &vec) {
-    if (&vec == this)
-      return *this;
-    if (ptr_ != nullptr)
-      freeManaged(ptr_);
+    if (&vec == this) return *this;
+    if (ptr_ != nullptr) freeManaged(ptr_);
     size_ = vec.size_;
     capacity_ = vec.size_;
     auto policy = autoPolicy(size_);
@@ -125,10 +121,8 @@ public:
   }
 
   ManagedVec &operator=(ManagedVec<T> &&vec) {
-    if (&vec == this)
-      return *this;
-    if (ptr_ != nullptr)
-      freeManaged(ptr_);
+    if (&vec == this) return *this;
+    if (ptr_ != nullptr) freeManaged(ptr_);
     onHost = vec.onHost;
     size_ = vec.size_;
     capacity_ = vec.capacity_;
@@ -160,8 +154,7 @@ public:
       if (size_ > 0) {
         uninitialized_copy(autoPolicy(size_), ptr_, ptr_ + size_, newBuffer);
       }
-      if (ptr_ != nullptr)
-        freeManaged(ptr_);
+      if (ptr_ != nullptr) freeManaged(ptr_);
       ptr_ = newBuffer;
       capacity_ = n;
     }
@@ -199,8 +192,7 @@ public:
   }
 
   void prefetch_to(bool toHost) const {
-    if (toHost != onHost)
-      prefetch(ptr_, size_ * sizeof(T), toHost);
+    if (toHost != onHost) prefetch(ptr_, size_ * sizeof(T), toHost);
     onHost = toHost;
   }
 
@@ -238,7 +230,7 @@ public:
 
   bool empty() const { return size_ == 0; }
 
-private:
+ private:
   T *ptr_ = nullptr;
   size_t size_ = 0;
   size_t capacity_ = 0;
@@ -248,10 +240,9 @@ private:
 
   static void mallocManaged(T **ptr, size_t bytes) {
 #ifdef MANIFOLD_USE_CUDA
-    if (CUDA_ENABLED == -1)
-      check_cuda_available();
+    if (CUDA_ENABLED == -1) check_cuda_available();
     if (CUDA_ENABLED)
-      cudaMallocManaged(reinterpret_cast<void**>(ptr), bytes);
+      cudaMallocManaged(reinterpret_cast<void **>(ptr), bytes);
     else
 #endif
       *ptr = reinterpret_cast<T *>(malloc(bytes));
@@ -279,16 +270,16 @@ private:
                                     ExecutionPolicy policy) {
     prefetch(dst, n * sizeof(T), policy != ExecutionPolicy::ParUnseq);
     switch (policy) {
-    case ExecutionPolicy::ParUnseq:
+      case ExecutionPolicy::ParUnseq:
 #ifdef MANIFOLD_USE_CUDA
-      cudaMemcpy(dst, src, n * sizeof(T), cudaMemcpyHostToDevice);
+        cudaMemcpy(dst, src, n * sizeof(T), cudaMemcpyHostToDevice);
 #endif
-    case ExecutionPolicy::Par:
-      thrust::uninitialized_copy_n(thrust::MANIFOLD_PAR_NS::par, src, n, dst);
-      break;
-    case ExecutionPolicy::Seq:
-      thrust::uninitialized_copy_n(thrust::cpp::par, src, n, dst);
-      break;
+      case ExecutionPolicy::Par:
+        thrust::uninitialized_copy_n(thrust::MANIFOLD_PAR_NS::par, src, n, dst);
+        break;
+      case ExecutionPolicy::Seq:
+        thrust::uninitialized_copy_n(thrust::cpp::par, src, n, dst);
+        break;
     }
   }
 };
@@ -310,8 +301,9 @@ private:
  * some device(host) modification, and then read the host(device) pointer again
  * (on the same vector). The memory will be inconsistent in that case.
  */
-template <typename T> class VecDH {
-public:
+template <typename T>
+class VecDH {
+ public:
   VecDH() {}
 
   // Note that the vector constructed with this constructor will contain
@@ -342,8 +334,7 @@ public:
   void resize(int newSize, T val = T()) {
     bool shrink = size() > 2 * newSize;
     impl_.resize(newSize, val);
-    if (shrink)
-      impl_.shrink_to_fit();
+    if (shrink) impl_.shrink_to_fit();
   }
 
   void swap(VecDH<T> &other) { impl_.swap(other.impl_); }
@@ -369,15 +360,13 @@ public:
   IterC end() const { return cend(); }
 
   T *ptrD() {
-    if (size() == 0)
-      return nullptr;
+    if (size() == 0) return nullptr;
     impl_.prefetch_to(autoPolicy(size()) != ExecutionPolicy::ParUnseq);
     return impl_.data();
   }
 
   const T *cptrD() const {
-    if (size() == 0)
-      return nullptr;
+    if (size() == 0) return nullptr;
     impl_.prefetch_to(autoPolicy(size()) != ExecutionPolicy::ParUnseq);
     return impl_.data();
   }
@@ -385,15 +374,13 @@ public:
   const T *ptrD() const { return cptrD(); }
 
   T *ptrH() {
-    if (size() == 0)
-      return nullptr;
+    if (size() == 0) return nullptr;
     impl_.prefetch_to(true);
     return impl_.data();
   }
 
   const T *cptrH() const {
-    if (size() == 0)
-      return nullptr;
+    if (size() == 0) return nullptr;
     impl_.prefetch_to(true);
     return impl_.data();
   }
@@ -426,20 +413,21 @@ public:
     std::cout << std::endl;
   }
 
-private:
+ private:
   ManagedVec<T> impl_;
 };
 
-template <typename T> class VecD {
-public:
+template <typename T>
+class VecD {
+ public:
   VecD(const VecDH<T> &vec) : ptr_(vec.ptrD()), size_(vec.size()) {}
 
   __host__ __device__ const T &operator[](int i) const { return ptr_[i]; }
   __host__ __device__ int size() const { return size_; }
 
-private:
+ private:
   T const *const ptr_;
   const int size_;
 };
 /** @} */
-} // namespace manifold
+}  // namespace manifold
