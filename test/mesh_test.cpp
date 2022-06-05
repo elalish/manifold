@@ -773,9 +773,16 @@ TEST(Boolean, Gyroid) {
   Related(result, input, meshID2idx);
 }
 
-TEST(Boolean, DISABLED_Cylinders) {
-  Manifold rod = Manifold::Cylinder(1.0, 0.4, -1.0, 20);
+TEST(Boolean, Cylinders) {
+  Manifold rod = Manifold::Cylinder(1.0, 0.4, -1.0, 12);
   float arrays1[][12] = {
+      {0, 0, 1, 3,    //
+       -1, 0, 0, 3,   //
+       0, -1, 0, 6},  //
+      {0, 0, 1, 2,    //
+       -1, 0, 0, 3,   //
+       0, -1, 0, 8},  //
+
       {0, 0, 1, 1,    //
        -1, 0, 0, 2,   //
        0, -1, 0, 7},  //
@@ -784,13 +791,7 @@ TEST(Boolean, DISABLED_Cylinders) {
        0, 0, 1, 6},   //
       {0, 0, 1, 3,    //
        -1, 0, 0, 3,   //
-       0, -1, 0, 6},  //
-      {0, 0, 1, 3,    //
-       -1, 0, 0, 3,   //
        0, -1, 0, 7},  //
-      {0, 0, 1, 2,    //
-       -1, 0, 0, 3,   //
-       0, -1, 0, 8},  //
       {0, 0, 1, 1,    //
        -1, 0, 0, 3,   //
        0, -1, 0, 7},  //
@@ -802,15 +803,16 @@ TEST(Boolean, DISABLED_Cylinders) {
        0, -1, 0, 6},  //
   };
   float arrays2[][12] = {
-      {0, 0, 1, 2,    //
-       -1, 0, 0, 2,   //
-       0, -1, 0, 7},  //
       {1, 0, 0, 3,    //
        0, 0, 1, 2,    //
        0, -1, 0, 6},  //
       {1, 0, 0, 4,    //
        0, 1, 0, 3,    //
        0, 0, 1, 6},   //
+
+      {0, 0, 1, 2,    //
+       -1, 0, 0, 2,   //
+       0, -1, 0, 7},  //
       {1, 0, 0, 3,    //
        0, 1, 0, 3,    //
        0, 0, 1, 7},   //
@@ -852,10 +854,24 @@ TEST(Boolean, DISABLED_Cylinders) {
     }
     m2 += rod.Transform(mat);
   }
-
   m1 += m2;
 
   EXPECT_TRUE(m1.IsManifold());
   EXPECT_TRUE(m1.MatchesTriNormals());
   EXPECT_LE(m1.NumDegenerateTris(), 12);
+}
+
+TEST(Boolean, Cubes) {
+  Manifold result = Manifold::Cube({1.2, 1, 1}, true).Translate({0, -0.5, 0.5});
+  result += Manifold::Cube({1, 0.8, 0.5}).Translate({-0.5, 0, 0.5});
+  result += Manifold::Cube({1.2, 0.1, 0.5}).Translate({-0.6, -0.1, 0});
+
+  EXPECT_TRUE(result.IsManifold());
+  EXPECT_TRUE(result.MatchesTriNormals());
+  EXPECT_LE(result.NumDegenerateTris(), 0);
+  auto prop = result.GetProperties();
+  EXPECT_NEAR(prop.volume, 1.6, 0.001);
+  EXPECT_NEAR(prop.surfaceArea, 9.2, 0.01);
+
+  if (options.exportModels) ExportMesh("cubes.glb", result.GetMesh(), {});
 }
