@@ -21,6 +21,7 @@
 #include <map>
 
 #include "graph.h"
+#include "par.h"
 
 namespace {
 using namespace manifold;
@@ -324,9 +325,9 @@ Manifold::Impl::Impl(Shape shape) {
 void Manifold::Impl::ReinitializeReference(int meshID) {
   // instead of storing the meshID, we store 0 and set the mapping to
   // 0 -> meshID, because the meshID after boolean operation also starts from 0.
-  thrust::for_each_n(thrust::device,
-                     zip(meshRelation_.triBary.begin(), countAt(0)), NumTri(),
-                     InitializeBaryRef({0, halfedge_.cptrD()}));
+  for_each_n(autoPolicy(NumTri()),
+             zip(meshRelation_.triBary.begin(), countAt(0)), NumTri(),
+             InitializeBaryRef({0, halfedge_.cptrD()}));
   meshRelation_.originalID.clear();
   meshRelation_.originalID[0] = meshID;
 }
@@ -355,18 +356,18 @@ int Manifold::Impl::InitializeNewReference(
 
     const int numSets = properties.size() / numProps;
     ALWAYS_ASSERT(
-        thrust::all_of(thrust::device, triPropertiesD.begin(),
-                       triPropertiesD.end(), CheckProperties({numSets})),
+        all_of(autoPolicy(triProperties.size()), triPropertiesD.begin(),
+               triPropertiesD.end(), CheckProperties({numSets})),
         userErr, "triProperties value is outside the properties range.");
   }
 
   VecDH<thrust::pair<int, int>> face2face(halfedge_.size(), {-1, -1});
   VecDH<float> triArea(NumTri());
-  thrust::for_each_n(
-      thrust::device, zip(face2face.begin(), countAt(0)), halfedge_.size(),
-      CoplanarEdge({triArea.ptrD(), halfedge_.cptrD(), vertPos_.cptrD(),
-                    triPropertiesD.cptrD(), propertiesD.cptrD(),
-                    propertyToleranceD.cptrD(), numProps, precision_}));
+  for_each_n(autoPolicy(halfedge_.size()), zip(face2face.begin(), countAt(0)),
+             halfedge_.size(),
+             CoplanarEdge({triArea.ptrD(), halfedge_.cptrD(), vertPos_.cptrD(),
+                           triPropertiesD.cptrD(), propertiesD.cptrD(),
+                           propertyToleranceD.cptrD(), numProps, precision_}));
 
   Graph graph;
   for (int i = 0; i < NumTri(); ++i) {
@@ -447,14 +448,15 @@ void Manifold::Impl::CreateHalfedges(const VecDH<glm::ivec3>& triVerts) {
   halfedge_.resize(0);
   halfedge_.resize(3 * numTri);
   VecDH<TmpEdge> edge(3 * numTri);
-  thrust::for_each_n(thrust::device, zip(countAt(0), triVerts.begin()), numTri,
-                     Tri2Halfedges({halfedge_.ptrD(), edge.ptrD()}));
+  auto policy = autoPolicy(numTri);
+  for_each_n(policy, zip(countAt(0), triVerts.begin()), numTri,
+             Tri2Halfedges({halfedge_.ptrD(), edge.ptrD()}));
   // Stable sort is required here so that halfedges from the same face are
   // paired together (the triangles were created in face order). In some
   // degenerate situations the triangulator can add the same internal edge in
   // two different faces, causing this edge to not be 2-manifold. These are
   // fixed by duplicating verts in SimplifyTopology.
-  thrust::stable_sort(thrust::device, edge.begin(), edge.end());
+  stable_sort(policy, edge.begin(), edge.end());
   thrust::for_each_n(thrust::host, countAt(0), halfedge_.size() / 2,
                      LinkHalfedges({halfedge_.ptrH(), edge.cptrH()}));
 }
@@ -484,15 +486,16 @@ void Manifold::Impl::ApplyTransform() const {
  */
 void Manifold::Impl::ApplyTransform() {
   if (transform_ == glm::mat4x3(1.0f)) return;
-  thrust::for_each(thrust::device, vertPos_.begin(), vertPos_.end(),
-                   Transform4x3({transform_}));
+  auto policy = autoPolicy(vertPos_.size());
+  for_each(policy, vertPos_.begin(), vertPos_.end(),
+           Transform4x3({transform_}));
 
   glm::mat3 normalTransform =
       glm::inverse(glm::transpose(glm::mat3(transform_)));
-  thrust::for_each(thrust::device, faceNormal_.begin(), faceNormal_.end(),
-                   TransformNormals({normalTransform}));
-  thrust::for_each(thrust::device, vertNormal_.begin(), vertNormal_.end(),
-                   TransformNormals({normalTransform}));
+  for_each(policy, faceNormal_.begin(), faceNormal_.end(),
+           TransformNormals({normalTransform}));
+  for_each(policy, vertNormal_.begin(), vertNormal_.end(),
+           TransformNormals({normalTransform}));
   // This optimization does a cheap collider update if the transform is
   // axis-aligned.
   if (!collider_.Transform(transform_)) Update();
@@ -534,19 +537,18 @@ void Manifold::Impl::SetPrecision(float minPrecision) {
  */
 void Manifold::Impl::CalculateNormals() {
   vertNormal_.resize(NumVert());
-  thrust::fill(thrust::device, vertNormal_.begin(), vertNormal_.end(),
-               glm::vec3(0));
+  auto policy = autoPolicy(NumTri());
+  fill(policy, vertNormal_.begin(), vertNormal_.end(), glm::vec3(0));
   bool calculateTriNormal = false;
   if (faceNormal_.size() != NumTri()) {
     faceNormal_.resize(NumTri());
     calculateTriNormal = true;
   }
-  thrust::for_each_n(
-      thrust::device, zip(faceNormal_.begin(), countAt(0)), NumTri(),
+  for_each_n(
+      policy, zip(faceNormal_.begin(), countAt(0)), NumTri(),
       AssignNormals({vertNormal_.ptrD(), vertPos_.cptrD(), halfedge_.cptrD(),
                      precision_, calculateTriNormal}));
-  thrust::for_each(thrust::device, vertNormal_.begin(), vertNormal_.end(),
-                   Normalize());
+  for_each(policy, vertNormal_.begin(), vertNormal_.end(), Normalize());
 }
 
 /**
@@ -567,27 +569,26 @@ void Manifold::Impl::CalculateNormals() {
 void Manifold::Impl::UpdateMeshIDs(VecDH<int>& meshIDs, VecDH<int>& originalIDs,
                                    int startTri, int n, int startID) {
   if (n == -1) n = meshRelation_.triBary.size();
-  thrust::sort_by_key(thrust::host, meshIDs.begin(), meshIDs.end(),
-                      originalIDs.begin());
+  sort_by_key(autoPolicy(n), meshIDs.begin(), meshIDs.end(),
+              originalIDs.begin());
   constexpr int kOccurred = 1 << 30;
   VecDH<int> error(1, -1);
   const int numMesh = meshIDs.size();
   const int* meshIDsPtr = meshIDs.cptrD();
   int* originalPtr = originalIDs.ptrD();
   int* errorPtr = error.ptrD();
-  thrust::for_each(thrust::device, meshRelation_.triBary.begin() + startTri,
-                   meshRelation_.triBary.begin() + startTri + n,
-                   [=] __host__ __device__(BaryRef & b) {
-                     int index =
-                         thrust::lower_bound(meshIDsPtr, meshIDsPtr + numMesh,
+  for_each(autoPolicy(n), meshRelation_.triBary.begin() + startTri,
+           meshRelation_.triBary.begin() + startTri + n,
+           [=] __host__ __device__(BaryRef & b) {
+             int index = thrust::lower_bound(meshIDsPtr, meshIDsPtr + numMesh,
                                              b.meshID) -
                          meshIDsPtr;
-                     if (index >= numMesh || meshIDsPtr[index] != b.meshID) {
-                       *errorPtr = b.meshID;
-                     }
-                     b.meshID = index + startID;
-                     originalPtr[index] |= kOccurred;
-                   });
+             if (index >= numMesh || meshIDsPtr[index] != b.meshID) {
+               *errorPtr = b.meshID;
+             }
+             b.meshID = index + startID;
+             originalPtr[index] |= kOccurred;
+           });
 
   if (error[0] != -1) {
     std::stringstream ss;
@@ -612,13 +613,13 @@ SparseIndices Manifold::Impl::EdgeCollisions(const Impl& Q) const {
   VecDH<TmpEdge> edges = CreateTmpEdges(Q.halfedge_);
   const int numEdge = edges.size();
   VecDH<Box> QedgeBB(numEdge);
-  thrust::for_each_n(thrust::device, zip(QedgeBB.begin(), edges.cbegin()),
-                     numEdge, EdgeBox({Q.vertPos_.cptrD()}));
+  auto policy = autoPolicy(numEdge);
+  for_each_n(policy, zip(QedgeBB.begin(), edges.cbegin()), numEdge,
+             EdgeBox({Q.vertPos_.cptrD()}));
 
   SparseIndices q1p2 = collider_.Collisions(QedgeBB);
 
-  thrust::for_each(thrust::device, q1p2.begin(0), q1p2.end(0),
-                   ReindexEdge({edges.cptrD()}));
+  for_each(policy, q1p2.begin(0), q1p2.end(0), ReindexEdge({edges.cptrD()}));
   return q1p2;
 }
 

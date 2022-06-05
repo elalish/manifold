@@ -16,6 +16,7 @@
 #include <map>
 
 #include "boolean3.h"
+#include "par.h"
 #include "polygon.h"
 
 // TODO: make this runtime configurable for quicker debug
@@ -83,50 +84,54 @@ std::tuple<VecDH<int>, VecDH<int>> SizeOutput(
     const VecDH<int> &i03, const VecDH<int> &i30, const VecDH<int> &i12,
     const VecDH<int> &i21, const SparseIndices &p1q2, const SparseIndices &p2q1,
     bool invertQ) {
-  VecDH<int> sidesPerFacePQ(inP.NumTri() + inQ.NumTri());
+  VecDH<int> sidesPerFacePQ(inP.NumTri() + inQ.NumTri(), 0);
   auto sidesPerFaceP = sidesPerFacePQ.ptrD();
   auto sidesPerFaceQ = sidesPerFacePQ.ptrD() + inP.NumTri();
 
-  thrust::for_each(thrust::device, inP.halfedge_.begin(), inP.halfedge_.end(),
-                   CountVerts({sidesPerFaceP, i03.cptrD()}));
-  thrust::for_each(thrust::device, inQ.halfedge_.begin(), inQ.halfedge_.end(),
-                   CountVerts({sidesPerFaceQ, i30.cptrD()}));
-  thrust::for_each_n(
-      thrust::device, zip(p1q2.begin(0), p1q2.begin(1), i12.begin()), i12.size(),
+  auto policy =
+      autoPolicy(std::max(inP.halfedge_.size(), inQ.halfedge_.size()));
+
+  for_each(policy, inP.halfedge_.begin(), inP.halfedge_.end(),
+           CountVerts({sidesPerFaceP, i03.cptrD()}));
+  for_each(policy, inQ.halfedge_.begin(), inQ.halfedge_.end(),
+           CountVerts({sidesPerFaceQ, i30.cptrD()}));
+  for_each_n(
+      policy, zip(p1q2.begin(0), p1q2.begin(1), i12.begin()), i12.size(),
       CountNewVerts({sidesPerFaceP, sidesPerFaceQ, inP.halfedge_.cptrD()}));
-  thrust::for_each_n(
-      thrust::device, zip(p2q1.begin(1), p2q1.begin(0), i21.begin()), i21.size(),
+  for_each_n(
+      policy, zip(p2q1.begin(1), p2q1.begin(0), i21.begin()), i21.size(),
       CountNewVerts({sidesPerFaceQ, sidesPerFaceP, inQ.halfedge_.cptrD()}));
 
-  VecDH<int> facePQ2R(inP.NumTri() + inQ.NumTri() + 1);
+  VecDH<int> facePQ2R(inP.NumTri() + inQ.NumTri() + 1, 0);
   auto keepFace =
       thrust::make_transform_iterator(sidesPerFacePQ.begin(), NotZero());
-  thrust::inclusive_scan(thrust::device, keepFace, keepFace + sidesPerFacePQ.size(),
-                         facePQ2R.begin() + 1);
+  inclusive_scan(policy, keepFace, keepFace + sidesPerFacePQ.size(),
+                 facePQ2R.begin() + 1);
   int numFaceR = facePQ2R.back();
   facePQ2R.resize(inP.NumTri() + inQ.NumTri());
 
   outR.faceNormal_.resize(numFaceR);
-  auto next = thrust::copy_if(thrust::device, inP.faceNormal_.begin(), inP.faceNormal_.end(),
-                              keepFace, outR.faceNormal_.begin(),
-                              thrust::identity<bool>());
+  auto next = copy_if<decltype(outR.faceNormal_.begin())>(
+      policy, inP.faceNormal_.begin(), inP.faceNormal_.end(), keepFace,
+      outR.faceNormal_.begin(), thrust::identity<bool>());
   if (invertQ) {
     auto start = thrust::make_transform_iterator(inQ.faceNormal_.begin(),
                                                  thrust::negate<glm::vec3>());
     auto end = thrust::make_transform_iterator(inQ.faceNormal_.end(),
                                                thrust::negate<glm::vec3>());
-    thrust::copy_if(thrust::device, start, end, keepFace + inP.NumTri(), next,
-                    thrust::identity<bool>());
+    copy_if<decltype(inQ.faceNormal_.begin())>(policy, start, end,
+                                               keepFace + inP.NumTri(), next,
+                                               thrust::identity<bool>());
   } else {
-    thrust::copy_if(thrust::device, inQ.faceNormal_.begin(), inQ.faceNormal_.end(),
-                    keepFace + inP.NumTri(), next, thrust::identity<bool>());
+    copy_if<decltype(inQ.faceNormal_.begin())>(
+        policy, inQ.faceNormal_.begin(), inQ.faceNormal_.end(),
+        keepFace + inP.NumTri(), next, thrust::identity<bool>());
   }
 
-  auto newEnd =
-      thrust::remove(thrust::device, sidesPerFacePQ.begin(), sidesPerFacePQ.end(), 0);
-  VecDH<int> faceEdge(newEnd - sidesPerFacePQ.begin() + 1);
-  thrust::inclusive_scan(thrust::device, sidesPerFacePQ.begin(), newEnd,
-                         faceEdge.begin() + 1);
+  auto newEnd = remove<decltype(sidesPerFacePQ.begin())>(
+      policy, sidesPerFacePQ.begin(), sidesPerFacePQ.end(), 0);
+  VecDH<int> faceEdge(newEnd - sidesPerFacePQ.begin() + 1, 0);
+  inclusive_scan(policy, sidesPerFacePQ.begin(), newEnd, faceEdge.begin() + 1);
   outR.halfedge_.resize(faceEdge.back());
 
   return std::make_tuple(faceEdge, facePQ2R);
@@ -215,8 +220,7 @@ void AppendPartialEdges(Manifold::Impl &outR, VecDH<char> &wholeHalfedgeP,
                         std::map<int, std::vector<EdgePos>> &edgesP,
                         VecDH<Ref> &halfedgeRef, const Manifold::Impl &inP,
                         const VecDH<int> &i03, const VecDH<int> &vP2R,
-                        const VecDH<int>::IterC faceP2R,
-                        bool forward) {
+                        const VecDH<int>::IterC faceP2R, bool forward) {
   // Each edge in the map is partially retained; for each of these, look up
   // their original verts and include them based on their winding number (i03),
   // while remaping them to the output using vP2R. Use the verts position
@@ -409,12 +413,12 @@ void AppendWholeEdges(Manifold::Impl &outR, VecDH<int> &facePtrR,
                       const VecDH<char> wholeHalfedgeP, const VecDH<int> &i03,
                       const VecDH<int> &vP2R, const int *faceP2R,
                       bool forward) {
-  thrust::for_each_n(
-      thrust::device, zip(wholeHalfedgeP.begin(), inP.halfedge_.begin(), countAt(0)),
-      inP.halfedge_.size(),
-      DuplicateHalfedges({outR.halfedge_.ptrD(), halfedgeRef.ptrD(),
-                          facePtrR.ptrD(), inP.halfedge_.cptrD(), i03.cptrD(),
-                          vP2R.cptrD(), faceP2R, forward}));
+  for_each_n(autoPolicy(inP.halfedge_.size()),
+             zip(wholeHalfedgeP.begin(), inP.halfedge_.begin(), countAt(0)),
+             inP.halfedge_.size(),
+             DuplicateHalfedges({outR.halfedge_.ptrD(), halfedgeRef.ptrD(),
+                                 facePtrR.ptrD(), inP.halfedge_.cptrD(),
+                                 i03.cptrD(), vP2R.cptrD(), faceP2R, forward}));
 }
 
 struct CreateBarycentric {
@@ -489,9 +493,9 @@ std::pair<VecDH<BaryRef>, VecDH<int>> CalculateMeshRelation(
   VecDH<BaryRef> faceRef(numFaceR);
   VecDH<int> halfedgeBary(halfedgeRef.size());
   VecDH<int> idx(1, 0);
-  thrust::for_each_n(
-      thrust::device, zip(halfedgeBary.begin(), halfedgeRef.begin(),
-          outR.halfedge_.cbegin()),
+  for_each_n(
+      autoPolicy(halfedgeRef.size()),
+      zip(halfedgeBary.begin(), halfedgeRef.begin(), outR.halfedge_.cbegin()),
       halfedgeRef.size(),
       CreateBarycentric(
           {outR.meshRelation_.barycentric.ptrD(), faceRef.ptrD(), idx.ptrD(),
@@ -558,34 +562,37 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
   VecDH<int> i21(x21_.size());
   VecDH<int> i03(w03_.size());
   VecDH<int> i30(w30_.size());
-  thrust::transform(thrust::device, x12_.begin(), x12_.end(), i12.begin(), c3 * _1);
-  thrust::transform(thrust::device, x21_.begin(), x21_.end(), i21.begin(), c3 * _1);
-  thrust::transform(thrust::device, w03_.begin(), w03_.end(), i03.begin(), c1 + c3 * _1);
-  thrust::transform(thrust::device, w30_.begin(), w30_.end(), i30.begin(), c2 + c3 * _1);
+  auto policy = autoPolicy(std::max(std::max(x12_.size(), x21_.size()),
+                                    std::max(w03_.size(), w30_.size())));
+
+  transform(policy, x12_.begin(), x12_.end(), i12.begin(), c3 * _1);
+  transform(policy, x21_.begin(), x21_.end(), i21.begin(), c3 * _1);
+  transform(policy, w03_.begin(), w03_.end(), i03.begin(), c1 + c3 * _1);
+  transform(policy, w30_.begin(), w30_.end(), i30.begin(), c2 + c3 * _1);
 
   VecDH<int> vP2R(inP_.NumVert());
-  thrust::exclusive_scan(thrust::device, i03.begin(), i03.end(), vP2R.begin(), 0, AbsSum());
+  exclusive_scan(policy, i03.begin(), i03.end(), vP2R.begin(), 0, AbsSum());
   int numVertR = AbsSum()(vP2R.back(), i03.back());
   const int nPv = numVertR;
 
   VecDH<int> vQ2R(inQ_.NumVert());
-  thrust::exclusive_scan(thrust::device, i30.begin(), i30.end(), vQ2R.begin(), numVertR,
-                         AbsSum());
+  exclusive_scan(policy, i30.begin(), i30.end(), vQ2R.begin(), numVertR,
+                 AbsSum());
   numVertR = AbsSum()(vQ2R.back(), i30.back());
   const int nQv = numVertR - nPv;
 
   VecDH<int> v12R(v12_.size());
   if (v12_.size() > 0) {
-    thrust::exclusive_scan(thrust::device, i12.begin(), i12.end(), v12R.begin(), numVertR,
-                           AbsSum());
+    exclusive_scan(policy, i12.begin(), i12.end(), v12R.begin(), numVertR,
+                   AbsSum());
     numVertR = AbsSum()(v12R.back(), i12.back());
   }
   const int n12 = numVertR - nPv - nQv;
 
   VecDH<int> v21R(v21_.size());
   if (v21_.size() > 0) {
-    thrust::exclusive_scan(thrust::device, i21.begin(), i21.end(), v21R.begin(), numVertR,
-                           AbsSum());
+    exclusive_scan(policy, i21.begin(), i21.end(), v21R.begin(), numVertR,
+                   AbsSum());
     numVertR = AbsSum()(v21R.back(), i21.back());
   }
   const int n21 = numVertR - nPv - nQv - n12;
@@ -600,15 +607,15 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
   outR.vertPos_.resize(numVertR);
   // Add vertices, duplicating for inclusion numbers not in [-1, 1].
   // Retained vertices from P and Q:
-  thrust::for_each_n(thrust::device, zip(i03.begin(), vP2R.begin(), inP_.vertPos_.begin()),
-                     inP_.NumVert(), DuplicateVerts({outR.vertPos_.ptrD()}));
-  thrust::for_each_n(thrust::device, zip(i30.begin(), vQ2R.begin(), inQ_.vertPos_.begin()),
-                     inQ_.NumVert(), DuplicateVerts({outR.vertPos_.ptrD()}));
+  for_each_n(policy, zip(i03.begin(), vP2R.begin(), inP_.vertPos_.begin()),
+             inP_.NumVert(), DuplicateVerts({outR.vertPos_.ptrD()}));
+  for_each_n(policy, zip(i30.begin(), vQ2R.begin(), inQ_.vertPos_.begin()),
+             inQ_.NumVert(), DuplicateVerts({outR.vertPos_.ptrD()}));
   // New vertices created from intersections:
-  thrust::for_each_n(thrust::device, zip(i12.begin(), v12R.begin(), v12_.begin()),
-                     i12.size(), DuplicateVerts({outR.vertPos_.ptrD()}));
-  thrust::for_each_n(thrust::device, zip(i21.begin(), v21R.begin(), v21_.begin()),
-                     i21.size(), DuplicateVerts({outR.vertPos_.ptrD()}));
+  for_each_n(policy, zip(i12.begin(), v12R.begin(), v12_.begin()), i12.size(),
+             DuplicateVerts({outR.vertPos_.ptrD()}));
+  for_each_n(policy, zip(i21.begin(), v21R.begin(), v21_.begin()), i21.size(),
+             DuplicateVerts({outR.vertPos_.ptrD()}));
 
   if (kVerbose) {
     std::cout << nPv << " verts from inP" << std::endl;
@@ -628,10 +635,8 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
   // This key is the face index of <P, Q>
   std::map<std::pair<int, int>, std::vector<EdgePos>> edgesNew;
 
-  AddNewEdgeVerts(edgesP, edgesNew, p1q2_, i12, v12R,
-                  inP_.halfedge_, true);
-  AddNewEdgeVerts(edgesQ, edgesNew, p2q1_, i21, v21R,
-                  inQ_.halfedge_, false);
+  AddNewEdgeVerts(edgesP, edgesNew, p1q2_, i12, v12R, inP_.halfedge_, true);
+  AddNewEdgeVerts(edgesQ, edgesNew, p2q1_, i21, v21R, inQ_.halfedge_, false);
 
   // Level 4
   VecDH<int> faceEdge;
@@ -650,12 +655,10 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
   // are triangulated.
   VecDH<Ref> halfedgeRef(2 * outR.NumEdge());
 
-  AppendPartialEdges(outR, wholeHalfedgeP, facePtrR, edgesP,
-                     halfedgeRef, inP_, i03, vP2R, facePQ2R.begin(),
-                     true);
-  AppendPartialEdges(outR, wholeHalfedgeQ, facePtrR, edgesQ,
-                     halfedgeRef, inQ_, i30, vQ2R,
-                     facePQ2R.begin() + inP_.NumTri(), false);
+  AppendPartialEdges(outR, wholeHalfedgeP, facePtrR, edgesP, halfedgeRef, inP_,
+                     i03, vP2R, facePQ2R.begin(), true);
+  AppendPartialEdges(outR, wholeHalfedgeQ, facePtrR, edgesQ, halfedgeRef, inQ_,
+                     i30, vQ2R, facePQ2R.begin() + inP_.NumTri(), false);
 
   AppendNewEdges(outR, facePtrR, edgesNew, halfedgeRef, facePQ2R,
                  inP_.NumTri());

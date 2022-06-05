@@ -22,6 +22,23 @@ Look in the [samples](https://github.com/elalish/manifold/tree/master/samples) d
 
 The canonical build instructions are in the [manifold.yml](https://github.com/elalish/manifold/blob/master/.github/workflows/manifold.yml) file, as that is what this project's continuous integration server uses to build and test. I have only built under Ubuntu Linux, and the CI uses Nvidia's Cuda 11 Docker image. Part of my [road map](https://github.com/elalish/manifold/wiki/Manifold-Library#road-map) is to migrate from Thrust to C++20 parallel algorithms, which will alleviate the need to install the Cuda Developer Kit to build.
 
+## Python binding
+
+> Note: This is still a WIP
+
+The CMake script will build the python binding `pymanifold` automatically. To
+use the extension, please add `$BUILD_DIR/tools` to your `PYTHONPATH`, where
+`$BUILD_DIR` is the build directory for CMake. Examples using the python binding
+can be found in `test/python`. Run the following code in the interpreter for
+python binding documentation:
+
+```
+>>> import pymanifold
+>>> help(manifold)
+```
+
+For more detailed documentation, please refer to the C++ API.
+
 ## Contributing
 
 Contributions are welcome! A lower barrier contribution is to simply make a PR that adds a test, especially if it repros an issue you've found. Simply name it prepended with DISABLED_, so that it passes the CI. That will be a very strong signal to me to fix your issue. However, if you know how to fix it yourself, then including the fix in your PR would be much appreciated!
