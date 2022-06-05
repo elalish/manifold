@@ -123,8 +123,8 @@ Mesh Manifold::GetMesh() const {
 
   result.triVerts.resize(NumTri());
   // note that `triVerts` is `std::vector`, so we cannot use thrust::device
-  thrust::for_each_n(thrust::host, zip(result.triVerts.begin(), countAt(0)), NumTri(),
-                     MakeTri({pImpl_->halfedge_.cptrH()}));
+  thrust::for_each_n(thrust::host, zip(result.triVerts.begin(), countAt(0)),
+                     NumTri(), MakeTri({pImpl_->halfedge_.cptrH()}));
 
   return result;
 }
@@ -268,7 +268,7 @@ MeshRelation Manifold::GetMeshRelation() const {
   const auto& relation = pImpl_->meshRelation_;
   out.triBary.insert(out.triBary.end(), relation.triBary.begin(),
                      relation.triBary.end());
-  for (auto &bary : out.triBary) {
+  for (auto& bary : out.triBary) {
     bary.meshID = relation.originalID.at(bary.meshID);
   }
   out.barycentric.insert(out.barycentric.end(), relation.barycentric.begin(),
@@ -285,7 +285,7 @@ MeshRelation Manifold::GetMeshRelation() const {
 std::vector<int> Manifold::GetMeshIDs() const {
   std::vector<int> out;
   out.reserve(pImpl_->meshRelation_.originalID.size());
-  for (auto &entry : pImpl_->meshRelation_.originalID) {
+  for (auto& entry : pImpl_->meshRelation_.originalID) {
     out.push_back(entry.second);
   }
   return out;
@@ -421,7 +421,8 @@ Manifold& Manifold::Transform(const glm::mat4x3& m) {
  */
 Manifold& Manifold::Warp(std::function<void(glm::vec3&)> warpFunc) {
   pImpl_->ApplyTransform();
-  thrust::for_each_n(thrust::host, pImpl_->vertPos_.begin(), NumVert(), warpFunc);
+  thrust::for_each_n(thrust::host, pImpl_->vertPos_.begin(), NumVert(),
+                     warpFunc);
   pImpl_->Update();
   pImpl_->faceNormal_.resize(0);  // force recalculation of triNormal
   pImpl_->CalculateNormals();

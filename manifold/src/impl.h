@@ -32,8 +32,8 @@ struct Manifold::Impl {
     /// - In `MeshRelationD`: The original mesh triangle index =
     /// `originalID[meshID]`
     ///
-    /// @note Triangles coming from different manifolds should have different mesh
-    /// ID, otherwise `SimplifyTopology` will not work properly.
+    /// @note Triangles coming from different manifolds should have different
+    /// mesh ID, otherwise `SimplifyTopology` will not work properly.
     VecDH<BaryRef> triBary;
     /// meshID to originalID mapping.
     std::unordered_map<int, int> originalID;
@@ -70,7 +70,8 @@ struct Manifold::Impl {
   void CreateHalfedges(const VecDH<glm::ivec3>& triVerts);
   void CreateAndFixHalfedges(const VecDH<glm::ivec3>& triVerts);
   void CalculateNormals();
-  void UpdateMeshIDs(VecDH<int> &meshIDs, VecDH<int> &originalIDs, int startTri=0, int n=-1, int startID=0);
+  void UpdateMeshIDs(VecDH<int>& meshIDs, VecDH<int>& originalIDs,
+                     int startTri = 0, int n = -1, int startID = 0);
 
   void Update();
   void ApplyTransform() const;
