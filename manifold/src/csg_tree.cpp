@@ -14,6 +14,8 @@
 
 #include "csg_tree.h"
 
+#include <algorithm>
+
 #include "boolean3.h"
 #include "impl.h"
 #include "par.h"
@@ -59,6 +61,14 @@ struct UpdateHalfedge {
     edge.pairedHalfedge += nextEdge;
     edge.face += nextFace;
     return edge;
+  }
+};
+
+struct CheckOverlap {
+  const Box *boxes;
+  const size_t i;
+  __host__ __device__ bool operator()(int j) {
+    return boxes[i].DoesOverlap(boxes[j]);
   }
 };
 }  // namespace
@@ -352,11 +362,10 @@ void CsgOpNode::BatchUnion() const {
       auto lambda = [boxesD, i](const VecDH<size_t> &set) {
         return find_if<decltype(set.end())>(
                    autoPolicy(set.size()), set.begin(), set.end(),
-                   [&boxesD, i](size_t j) {
-                     return boxesD[i].DoesOverlap(boxesD[j]);
-                   }) == set.end();
+                   CheckOverlap({boxesD, i})) == set.end();
       };
-      auto it = std::find_if(disjointSets.begin(), disjointSets.end(), lambda);
+      decltype(disjointSets.end()) it =
+          std::find_if(disjointSets.begin(), disjointSets.end(), lambda);
       if (it == disjointSets.end()) {
         disjointSets.push_back(std::vector<size_t>{i});
       } else {

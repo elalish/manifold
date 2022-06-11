@@ -33,30 +33,6 @@ struct ToSphere {
   }
 };
 
-struct UpdateTriBary {
-  const int nextBary;
-
-  __host__ __device__ BaryRef operator()(BaryRef ref) {
-    for (int i : {0, 1, 2})
-      if (ref.vertBary[i] >= 0) ref.vertBary[i] += nextBary;
-    return ref;
-  }
-};
-
-struct UpdateHalfedge {
-  const int nextVert;
-  const int nextEdge;
-  const int nextFace;
-
-  __host__ __device__ Halfedge operator()(Halfedge edge) {
-    edge.startVert += nextVert;
-    edge.endVert += nextVert;
-    edge.pairedHalfedge += nextEdge;
-    edge.face += nextFace;
-    return edge;
-  }
-};
-
 struct Equals {
   int val;
   __host__ __device__ bool operator()(int x) { return x == val; }
