@@ -257,39 +257,29 @@ std::shared_ptr<CsgLeafNode> CsgOpNode::ToLeafNode() const {
   if (children_.empty()) return nullptr;
   // turn the children into leaf nodes
   GetChildren();
+  Manifold::OpType op;
   switch (op_) {
     case CsgNodeType::UNION:
-      BatchUnion();
+      op = Manifold::OpType::ADD;
       break;
-    case CsgNodeType::INTERSECTION: {
-      std::vector<std::shared_ptr<const Manifold::Impl>> impls;
-      for (auto &child : children_) {
-        impls.push_back(
-            std::dynamic_pointer_cast<CsgLeafNode>(child)->GetImpl());
-      }
-      BatchBoolean(Manifold::OpType::INTERSECT, impls);
-      children_.clear();
-      children_.push_back(std::make_shared<CsgLeafNode>(impls.front()));
+    case CsgNodeType::DIFFERENCE:
+      op = Manifold::OpType::SUBTRACT;
       break;
-    };
-    case CsgNodeType::DIFFERENCE: {
-      // take the lhs out and treat the remaining nodes as the rhs, perform
-      // union optimization for them
-      auto lhs = std::dynamic_pointer_cast<CsgLeafNode>(children_.front());
-      children_.erase(children_.begin());
-      BatchUnion();
-      auto rhs = std::dynamic_pointer_cast<CsgLeafNode>(children_.front());
-      children_.clear();
-      Boolean3 boolean(*lhs->GetImpl(), *rhs->GetImpl(),
-                       Manifold::OpType::SUBTRACT);
-      children_.push_back(
-          std::make_shared<CsgLeafNode>(std::make_shared<Manifold::Impl>(
-              boolean.Result(Manifold::OpType::SUBTRACT))));
-    };
-    case CsgNodeType::LEAF:
-      // unreachable
+    case CsgNodeType::INTERSECTION:
+      op = Manifold::OpType::INTERSECT;
+      break;
+    default:
+      throw std::runtime_error("unreachable CSG operation");
       break;
   }
+  auto a = std::static_pointer_cast<CsgLeafNode>(children_[0])->GetImpl();
+  for (int i = 1; i < children_.size(); i++) {
+    auto b = std::static_pointer_cast<CsgLeafNode>(children_[i])->GetImpl();
+    Boolean3 boolean(*a, *b, op);
+    a = std::make_shared<Manifold::Impl>(boolean.Result(op));
+  }
+  children_.clear();
+  children_.push_back(std::make_shared<CsgLeafNode>(a));
   // children_ must contain only one CsgLeafNode now, and its Transform will
   // give CsgLeafNode as well
   cache_ = std::dynamic_pointer_cast<CsgLeafNode>(
@@ -416,19 +406,10 @@ std::vector<std::shared_ptr<CsgNode>> &CsgOpNode::GetChildren(
 
   CsgNodeType op = op_;
   for (auto &child : children_) {
-    if (child->GetNodeType() == op) {
-      auto grandchildren =
-          std::dynamic_pointer_cast<CsgOpNode>(child)->GetChildren(finalize);
-      int start = children_.size();
-      for (auto &grandchild : grandchildren) {
-        newChildren.push_back(grandchild->Transform(child->GetTransform()));
-      }
+    if (!finalize || child->GetNodeType() == CsgNodeType::LEAF) {
+      newChildren.push_back(child);
     } else {
-      if (!finalize || child->GetNodeType() == CsgNodeType::LEAF) {
-        newChildren.push_back(child);
-      } else {
-        newChildren.push_back(child->ToLeafNode());
-      }
+      newChildren.push_back(child->ToLeafNode());
     }
     // special handling for difference: we treat it as first - (second + third +
     // ...) so op = UNION after the first node
