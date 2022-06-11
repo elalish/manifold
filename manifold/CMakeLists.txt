@@ -10,7 +10,7 @@ if(MANIFOLD_USE_CUDA)
         src/manifold.cpp src/constructors.cpp src/impl.cpp
         src/properties.cpp src/sort.cpp src/edge_op.cpp src/face_op.cpp
         src/smoothing.cpp src/boolean3.cpp src/boolean_result.cpp
-        src/manifold_set.cpp
+        src/manifold_set.cpp src/csg_tree.cpp
 
         PROPERTIES LANGUAGE CUDA
     )
