@@ -257,8 +257,8 @@ std::shared_ptr<CsgNode> CsgOpNode::Transform(const glm::mat4x3 &m) const {
   node->children_ = children_;
   node->op_ = op_;
   node->transform_ = m * glm::mat4(transform_);
-  node->simplified = simplified;
-  node->flattened = flattened;
+  node->simplified_ = simplified_;
+  node->flattened_ = flattened_;
   return node;
 }
 
@@ -407,10 +407,10 @@ void CsgOpNode::BatchUnion() const {
  */
 std::vector<std::shared_ptr<CsgNode>> &CsgOpNode::GetChildren(
     bool finalize) const {
-  if (children_.empty() || (simplified && !finalize) || flattened)
+  if (children_.empty() || (simplified_ && !finalize) || flattened_)
     return children_;
-  simplified = true;
-  flattened = finalize;
+  simplified_ = true;
+  flattened_ = finalize;
   std::vector<std::shared_ptr<CsgNode>> newChildren;
 
   CsgNodeType op = op_;

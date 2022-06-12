@@ -318,13 +318,12 @@ std::vector<int> Manifold::GetMeshIDs() const {
  * should instead call GetMesh(), calculate your properties and use these to
  * construct a new manifold.
  *
- * @returns New MeshID
+ * @returns New Mesh
  */
-std::pair<int, Manifold> Manifold::AsOriginal() const {
+Manifold Manifold::AsOriginal() const {
   auto newImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
-  int meshID = newImpl->InitializeNewReference();
-  return std::make_pair(meshID,
-                        Manifold(std::make_shared<CsgLeafNode>(newImpl)));
+  newImpl->InitializeNewReference();
+  return Manifold(std::make_shared<CsgLeafNode>(newImpl));
 }
 
 /**

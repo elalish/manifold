@@ -71,8 +71,8 @@ class CsgOpNode final : public CsgNode {
   // the following fields are for lazy evaluation, so they are mutable
   mutable std::vector<std::shared_ptr<CsgNode>> children_;
   mutable std::shared_ptr<CsgLeafNode> cache_ = nullptr;
-  mutable bool simplified = false;
-  mutable bool flattened = false;
+  mutable bool simplified_ = false;
+  mutable bool flattened_ = false;
 
   void SetOp(Manifold::OpType);
 
