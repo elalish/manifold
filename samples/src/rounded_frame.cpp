@@ -31,19 +31,17 @@ Manifold RoundedFrame(float edgeLength, float radius, int circularSegments) {
   Manifold corner = Manifold::Sphere(radius, circularSegments);
 
   Manifold edge1 = corner + edge;
-  edge1.Rotate(-90).Translate({-edgeLength / 2, -edgeLength / 2, 0});
+  edge1 = edge1.Rotate(-90).Translate({-edgeLength / 2, -edgeLength / 2, 0});
 
-  Manifold edge2 = edge1;
-  edge2.Rotate(0, 0, 180);
+  Manifold edge2 = edge1.Rotate(0, 0, 180);
   edge2 += edge1;
   edge2 += edge.Translate({-edgeLength / 2, -edgeLength / 2, 0});
 
-  Manifold edge4 = edge2;
-  edge4.Rotate(0, 0, 90);
+  Manifold edge4 = edge2.Rotate(0, 0, 90);
   edge4 += edge2;
 
   Manifold frame = edge4.Translate({0, 0, -edgeLength / 2});
-  frame += edge4.Rotate(180);
+  frame += frame.Rotate(180);
 
   return frame;
 }

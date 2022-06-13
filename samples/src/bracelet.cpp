@@ -31,12 +31,12 @@ Manifold Base(float width, float radius, float decorRadius, float twistRadius,
                    decorRadius * sind(dPhiDeg * i)),
          0});
   }
-  Manifold decor = std::move(Manifold::Extrude(circle, width, nDivision, 180)
-                                 .Scale({1.0f, 0.5f, 1.0f})
-                                 .Translate({0.0f, radius, 0.0f}));
+  Manifold decor = Manifold::Extrude(circle, width, nDivision, 180)
+                       .Scale({1.0f, 0.5f, 1.0f})
+                       .Translate({0.0f, radius, 0.0f});
 
   for (int i = 0; i < nDecor; ++i) {
-    base += decor.Rotate(0, 0, 360.0f / nDecor);
+    base += decor.Rotate(0, 0, (360.0f / nDecor) * i);
   }
 
   Polygons stretch(1);
@@ -52,7 +52,7 @@ Manifold Base(float width, float radius, float decorRadius, float twistRadius,
   }
 
   base = Manifold::Extrude(stretch, width) ^ base;
-  base.SetAsOriginal();
+  base = base.AsOriginal();
 
   return base;
 }

@@ -100,7 +100,7 @@ TEST(Samples, Scallop) {
     ExportMesh("scallopFacets.glb", in, options);
   }
 
-  scallop.Refine(50);
+  scallop = scallop.Refine(50);
   CheckManifold(scallop);
   auto prop = scallop.GetProperties();
   EXPECT_NEAR(prop.volume, 41.3, 0.1);
@@ -126,10 +126,9 @@ TEST(Samples, TetPuzzle) {
   Manifold puzzle = TetPuzzle(50, 0.2, 50);
   CheckManifold(puzzle);
   EXPECT_LE(puzzle.NumDegenerateTris(), 2);
-  Manifold puzzle2 = puzzle;
-  puzzle2.Rotate(0, 0, 180);
+  Manifold puzzle2 = puzzle.Rotate(0, 0, 180);
   EXPECT_TRUE((puzzle ^ puzzle2).IsEmpty());
-  puzzle.Transform(RotateUp({1, -1, -1}));
+  puzzle = puzzle.Transform(RotateUp({1, -1, -1}));
   if (options.exportModels) ExportMesh("tetPuzzle.glb", puzzle.GetMesh(), {});
 }
 

@@ -14,11 +14,6 @@
 
 #pragma once
 #include <math.h>
-#include <thrust/binary_search.h>
-#include <thrust/gather.h>
-#include <thrust/remove.h>
-#include <thrust/sort.h>
-#include <thrust/unique.h>
 
 #include "par.h"
 #include "structs.h"

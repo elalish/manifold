@@ -21,8 +21,8 @@ using namespace manifold;
 void Fractal(std::vector<Manifold>& holes, Manifold& hole, float w,
              glm::vec2 position, int depth, int maxDepth) {
   w /= 3;
-  holes.emplace_back(hole);
-  holes.back().Scale({w, w, 1.0f}).Translate(glm::vec3(position, 0.0f));
+  holes.push_back(
+      hole.Scale({w, w, 1.0f}).Translate(glm::vec3(position, 0.0f)));
   if (depth == maxDepth) return;
 
   glm::vec2 offsets[8] = {{-w, -w}, {-w, 0.0f}, {-w, w}, {0.0f, w},
@@ -50,9 +50,11 @@ Manifold MengerSponge(int n) {
   Manifold hole = Manifold::Compose(holes);
 
   result -= hole;
-  result -= hole.Rotate(90);
-  result -= hole.Rotate(0, 0, 90);
-  result.SetAsOriginal();
+  hole = hole.Rotate(90);
+  result -= hole;
+  hole = hole.Rotate(0, 0, 90);
+  result -= hole;
+  result = result.AsOriginal();
   return result;
 }
 }  // namespace manifold
