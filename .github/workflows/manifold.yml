@@ -17,6 +17,7 @@ jobs:
         cuda_support: [ON, OFF]
         parallel_backend: [NONE, OMP, TBB]
     runs-on: ubuntu-20.04
+    if: github.event.pull_request.draft == false
     container:
       image: docker://nvidia/cuda:11.6.0-devel-ubuntu20.04
     steps:
@@ -47,6 +48,7 @@ jobs:
 
   build_wasm:
     runs-on: ubuntu-20.04
+    if: github.event.pull_request.draft == false
     steps:
     - name: Install dependencies
       run: |
@@ -83,6 +85,7 @@ jobs:
         cuda_support: [OFF]
       max-parallel: 1
     runs-on: windows-2019
+    if: github.event.pull_request.draft == false
     steps:
     - uses: actions/checkout@v3
       with:
@@ -126,6 +129,7 @@ jobs:
       matrix:
         variant: [none, omp, tbb, none-cuda, omp-cuda, tbb-cuda, js]
     runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
     steps:
     - uses: actions/checkout@v2.4.0
     - uses: cachix/install-nix-action@v15

@@ -48,7 +48,6 @@ struct Manifold::Impl {
   VecDH<glm::vec4> halfedgeTangent_;
   MeshRelationD meshRelation_;
   Collider collider_;
-  glm::mat4x3 transform_ = glm::mat4x3(1.0f);
 
   static std::atomic<int> meshIDCounter_;
 
@@ -73,8 +72,7 @@ struct Manifold::Impl {
                      int startTri = 0, int n = -1, int startID = 0);
 
   void Update();
-  void ApplyTransform() const;
-  void ApplyTransform();
+  Impl Transform(const glm::mat4x3& transform) const;
   SparseIndices EdgeCollisions(const Impl& B) const;
   SparseIndices VertexCollisionsZ(const VecDH<glm::vec3>& vertsIn) const;
 

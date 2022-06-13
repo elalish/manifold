@@ -47,17 +47,18 @@ struct Normalize {
 struct Transform4x3 {
   const glm::mat4x3 transform;
 
-  __host__ __device__ void operator()(glm::vec3& position) {
-    position = transform * glm::vec4(position, 1.0f);
+  __host__ __device__ glm::vec3 operator()(glm::vec3 position) {
+    return transform * glm::vec4(position, 1.0f);
   }
 };
 
 struct TransformNormals {
   const glm::mat3 transform;
 
-  __host__ __device__ void operator()(glm::vec3& normal) {
+  __host__ __device__ glm::vec3 operator()(glm::vec3 normal) {
     normal = glm::normalize(transform * normal);
     if (isnan(normal.x)) normal = glm::vec3(0.0f);
+    return normal;
   }
 };
 
@@ -244,6 +245,7 @@ struct EdgeBox {
     thrust::get<0>(inout) = Box(vertPos[edge.first], vertPos[edge.second]);
   }
 };
+
 }  // namespace
 
 namespace manifold {
@@ -473,45 +475,42 @@ void Manifold::Impl::Update() {
   collider_.UpdateBoxes(faceBox);
 }
 
-void Manifold::Impl::ApplyTransform() const {
-  // This const_cast is here because these operations cancel out, leaving the
-  // state conceptually unchanged. This enables lazy transformation evaluation.
-  const_cast<Impl*>(this)->ApplyTransform();
-}
+Manifold::Impl Manifold::Impl::Transform(const glm::mat4x3& transform_) const {
+  if (transform_ == glm::mat4x3(1.0f)) return *this;
+  auto policy = autoPolicy(NumVert());
+  Impl result;
+  result.collider_ = collider_;
+  result.meshRelation_ = meshRelation_;
+  result.precision_ = precision_;
+  result.bBox_ = bBox_;
+  result.halfedge_ = halfedge_;
+  result.halfedgeTangent_ = halfedgeTangent_;
 
-/**
- * Bake the manifold's transform into its vertices. This function allows lazy
- * evaluation, which is important because often several transforms are applied
- * between operations.
- */
-void Manifold::Impl::ApplyTransform() {
-  if (transform_ == glm::mat4x3(1.0f)) return;
-  auto policy = autoPolicy(vertPos_.size());
-  for_each(policy, vertPos_.begin(), vertPos_.end(),
-           Transform4x3({transform_}));
+  result.vertPos_.resize(NumVert());
+  result.faceNormal_.resize(faceNormal_.size());
+  result.vertNormal_.resize(vertNormal_.size());
+  transform(policy, vertPos_.begin(), vertPos_.end(), result.vertPos_.begin(),
+            Transform4x3({transform_}));
 
   glm::mat3 normalTransform =
       glm::inverse(glm::transpose(glm::mat3(transform_)));
-  for_each(policy, faceNormal_.begin(), faceNormal_.end(),
-           TransformNormals({normalTransform}));
-  for_each(policy, vertNormal_.begin(), vertNormal_.end(),
-           TransformNormals({normalTransform}));
+  transform(policy, faceNormal_.begin(), faceNormal_.end(),
+            result.faceNormal_.begin(), TransformNormals({normalTransform}));
+  transform(policy, vertNormal_.begin(), vertNormal_.end(),
+            result.vertNormal_.begin(), TransformNormals({normalTransform}));
   // This optimization does a cheap collider update if the transform is
   // axis-aligned.
-  if (!collider_.Transform(transform_)) Update();
+  if (!result.collider_.Transform(transform_)) result.Update();
 
-  const float oldScale = bBox_.Scale();
-  transform_ = glm::mat4x3(1.0f);
-  CalculateBBox();
+  const float oldScale = result.bBox_.Scale();
+  result.CalculateBBox();
 
-  const float newScale = bBox_.Scale();
-  precision_ *= glm::max(1.0f, newScale / oldScale) *
-                glm::max(glm::length(transform_[0]),
-                         glm::max(glm::length(transform_[1]),
-                                  glm::length(transform_[2])));
+  const float newScale = result.bBox_.Scale();
+  result.precision_ *= glm::max(1.0f, newScale / oldScale);
 
   // Maximum of inherited precision loss and translational precision loss.
-  SetPrecision(precision_);
+  result.SetPrecision(result.precision_);
+  return result;
 }
 
 /**
