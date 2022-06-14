@@ -418,15 +418,28 @@ class VecDH {
 };
 
 template <typename T>
-class VecD {
+class VecDc {
  public:
-  VecD(const VecDH<T> &vec) : ptr_(vec.ptrD()), size_(vec.size()) {}
+  VecDc(const VecDH<T> &vec) : ptr_(vec.ptrD()), size_(vec.size()) {}
 
   __host__ __device__ const T &operator[](int i) const { return ptr_[i]; }
   __host__ __device__ int size() const { return size_; }
 
  private:
   T const *const ptr_;
+  const int size_;
+};
+
+template <typename T>
+class VecD {
+ public:
+  VecD(VecDH<T> &vec) : ptr_(vec.ptrD()), size_(vec.size()) {}
+
+  __host__ __device__ T &operator[](int i) const { return ptr_[i]; }
+  __host__ __device__ int size() const { return size_; }
+
+ private:
+  T *ptr_;
   const int size_;
 };
 /** @} */

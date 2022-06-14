@@ -86,7 +86,7 @@ class HashTableD {
     while (1) {
       const uint64_t found = AtomicCAS(&table_[idx].key, kOpen, vert.key);
       if (found == kOpen) {
-        if (AtomicAdd(&used_[0], 1) * 2 > Size()) {
+        if (AtomicAdd(used_[0], 1) * 2 > Size()) {
           return true;
         }
         table_[idx] = vert;
@@ -122,12 +122,12 @@ class HashTable {
 
   HashTableD D() { return table_; }
 
-  int Entries() const { return used_.H()[0]; }
+  int Entries() const { return used_[0]; }
 
   int Size() const { return table_.Size(); }
 
   float FilledFraction() const {
-    return static_cast<float>(used_.H()[0]) / table_.Size();
+    return static_cast<float>(used_[0]) / table_.Size();
   }
 
  private:
@@ -140,7 +140,7 @@ template <typename Func>
 struct ComputeVerts {
   glm::vec3* vertPos;
   int* vertIndex;
-  HashTable gridVerts;
+  HashTableD gridVerts;
   const Func sdf;
   const glm::ivec3 gridSize;
   const glm::vec3 origin;
@@ -153,7 +153,8 @@ struct ComputeVerts {
   }
 
   inline __host__ __device__ float Sdf(glm::vec3 base, int i) const {
-    sdf(base + (i < 7 ? 1 : -1) * spacing * edgeVec[j])
+    return sdf(base +
+               (i < 7 ? 1.0f : -1.0f) * spacing * edgeVec[i < 7 ? i : i - 7]);
   }
 
   // inline __host__ __device__ float BoundedSdf(glm::vec3 base, int i) const {}
@@ -161,7 +162,7 @@ struct ComputeVerts {
   inline __host__ __device__ void operator()(uint64_t mortonCode) {
     GridVert gridVert;
     gridVert.key = mortonCode;
-    const glm::ivec3 gridIndex = DecodeMorton(mortonCode);
+    const glm::vec3 gridIndex = DecodeMorton(mortonCode);
 
     // const auto sdfFunc =
     //     AtBounds(gridIndex) ? &ComputeVerts::BoundedSdf : &ComputeVerts::Sdf;
@@ -192,7 +193,7 @@ struct ComputeVerts {
       // These seven edges are uniquely owned by this gridVert; any of them
       // which intersect the surface create a vert.
       if (i < 7) {
-        const int idx = AtomicAdd(vertIndex, 1);
+        const int idx = AtomicAdd(*vertIndex, 1);
         vertPos[idx] = position + spacing * delta;
         gridVert.edgeVerts[i] = idx;
       }
@@ -212,12 +213,12 @@ struct BuildTris {
                   (tet[2] > 0 ? 4 : 0) + (tet[3] > 0 ? 8 : 0);
     glm::ivec3 tri = tetTri0[i];
     if (tri[0] < 0) return;
-    int idx = AtomicAdd(triIndex, 1);
+    int idx = AtomicAdd(*triIndex, 1);
     triVerts[idx] = {edges[tri[0]], edges[tri[1]], edges[tri[2]]};
 
     tri = tetTri1[i];
     if (tri[0] < 0) return;
-    idx = AtomicAdd(triIndex, 1);
+    idx = AtomicAdd(*triIndex, 1);
     triVerts[idx] = {edges[tri[0]], edges[tri[1]], edges[tri[2]]};
   }
 
@@ -310,15 +311,15 @@ class SDF {
         countAt(0), maxMorton,
         ComputeVerts<Func>({vertPos.ptrD(), index.ptrD(), gridVerts.D(), sdf_,
                             gridSize, bounds.min, spacing}));
-    vertPos.resize(index.H()[0]);
+    vertPos.resize(index[0]);
 
     VecDH<glm::ivec3> triVerts(gridVerts.Entries() * 12);  // worst case
 
-    index.H()[0] = 0;
+    index[0] = 0;
     thrust::for_each_n(
         countAt(0), gridVerts.Size(),
         BuildTris({triVerts.ptrD(), index.ptrD(), gridVerts.D()}));
-    triVerts.resize(index.H()[0]);
+    triVerts.resize(index[0]);
 
     out.vertPos.insert(out.vertPos.end(), vertPos.begin(), vertPos.end());
     out.triVerts.insert(out.triVerts.end(), triVerts.begin(), triVerts.end());
