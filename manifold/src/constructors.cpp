@@ -14,8 +14,10 @@
 
 #include <thrust/sequence.h>
 
+#include "csg_tree.h"
 #include "graph.h"
 #include "impl.h"
+#include "par.h"
 #include "polygon.h"
 
 namespace {
@@ -28,30 +30,6 @@ struct ToSphere {
     v = glm::cos(glm::half_pi<float>() * (1.0f - v));
     v = length * glm::normalize(v);
     if (isnan(v.x)) v = glm::vec3(0.0);
-  }
-};
-
-struct UpdateTriBary {
-  const int nextBary;
-
-  __host__ __device__ BaryRef operator()(BaryRef ref) {
-    for (int i : {0, 1, 2})
-      if (ref.vertBary[i] >= 0) ref.vertBary[i] += nextBary;
-    return ref;
-  }
-};
-
-struct UpdateHalfedge {
-  const int nextVert;
-  const int nextEdge;
-  const int nextFace;
-
-  __host__ __device__ Halfedge operator()(Halfedge edge) {
-    edge.startVert += nextVert;
-    edge.endVert += nextVert;
-    edge.pairedHalfedge += nextEdge;
-    edge.face += nextFace;
-    return edge;
   }
 };
 
@@ -107,9 +85,9 @@ Manifold Manifold::Smooth(const Mesh& mesh,
       "when supplying tangents, the normal constructor should be used "
       "rather than Smooth().");
 
-  Manifold manifold(mesh);
-  manifold.pImpl_->CreateTangents(sharpenedEdges);
-  return manifold;
+  std::shared_ptr<Impl> impl = std::make_shared<Impl>(mesh);
+  impl->CreateTangents(sharpenedEdges);
+  return Manifold(impl);
 }
 
 /**
@@ -117,9 +95,7 @@ Manifold Manifold::Smooth(const Mesh& mesh,
  * and the rest at similarly symmetric points.
  */
 Manifold Manifold::Tetrahedron() {
-  Manifold tetrahedron;
-  tetrahedron.pImpl_ = std::make_unique<Impl>(Impl::Shape::TETRAHEDRON);
-  return tetrahedron;
+  return Manifold(std::make_shared<Impl>(Impl::Shape::TETRAHEDRON));
 }
 
 /**
@@ -130,10 +106,9 @@ Manifold Manifold::Tetrahedron() {
  * @param center Set to true to shift the center to the origin.
  */
 Manifold Manifold::Cube(glm::vec3 size, bool center) {
-  Manifold cube;
-  cube.pImpl_ = std::make_unique<Impl>(Impl::Shape::CUBE);
-  cube.Scale(size);
-  if (center) cube.Translate(-size / 2.0f);
+  auto cube = Manifold(std::make_shared<Impl>(Impl::Shape::CUBE));
+  cube = cube.Scale(size);
+  if (center) cube = cube.Translate(-size / 2.0f);
   return cube;
 }
 
@@ -163,7 +138,8 @@ Manifold Manifold::Cylinder(float height, float radiusLow, float radiusHigh,
   }
   Manifold cylinder =
       Manifold::Extrude(circle, height, 0, 0.0f, glm::vec2(scale));
-  if (center) cylinder.Translate(glm::vec3(0.0f, 0.0f, -height / 2.0f));
+  if (center)
+    cylinder = cylinder.Translate(glm::vec3(0.0f, 0.0f, -height / 2.0f));
   return cylinder;
 }
 
@@ -180,15 +156,14 @@ Manifold Manifold::Cylinder(float height, float radiusLow, float radiusHigh,
 Manifold Manifold::Sphere(float radius, int circularSegments) {
   int n = circularSegments > 0 ? (circularSegments + 3) / 4
                                : GetCircularSegments(radius) / 4;
-  Manifold sphere;
-  sphere.pImpl_ = std::make_unique<Impl>(Impl::Shape::OCTAHEDRON);
-  sphere.pImpl_->Subdivide(n);
-  thrust::for_each_n(sphere.pImpl_->vertPos_.beginD(), sphere.NumVert(),
-                     ToSphere({radius}));
-  sphere.pImpl_->Finish();
+  auto pImpl_ = std::make_shared<Impl>(Impl::Shape::OCTAHEDRON);
+  pImpl_->Subdivide(n);
+  for_each_n(autoPolicy(pImpl_->NumVert()), pImpl_->vertPos_.begin(),
+             pImpl_->NumVert(), ToSphere({radius}));
+  pImpl_->Finish();
   // Ignore preceding octahedron.
-  sphere.pImpl_->ReinitializeReference();
-  return sphere;
+  pImpl_->ReinitializeReference(Impl::meshIDCounter_.fetch_add(1));
+  return Manifold(pImpl_);
 }
 
 /**
@@ -210,11 +185,11 @@ Manifold Manifold::Extrude(Polygons crossSection, float height, int nDivisions,
                            float twistDegrees, glm::vec2 scaleTop) {
   ALWAYS_ASSERT(scaleTop.x >= 0 && scaleTop.y >= 0, userErr,
                 "scale values cannot be negative");
-  Manifold extrusion;
+  auto pImpl_ = std::make_shared<Impl>();
   ++nDivisions;
-  auto& vertPos = extrusion.pImpl_->vertPos_.H();
+  auto& vertPos = pImpl_->vertPos_;
   VecDH<glm::ivec3> triVertsDH;
-  auto& triVerts = triVertsDH.H();
+  auto& triVerts = triVertsDH;
   int nCrossSection = 0;
   bool isCone = scaleTop.x == 0.0 && scaleTop.y == 0.0;
   int idx = 0;
@@ -262,10 +237,10 @@ Manifold Manifold::Extrude(Polygons crossSection, float height, int nDivisions,
     if (!isCone) triVerts.push_back(tri + nCrossSection * nDivisions);
   }
 
-  extrusion.pImpl_->CreateHalfedges(triVertsDH);
-  extrusion.pImpl_->Finish();
-  extrusion.pImpl_->InitializeNewReference();
-  return extrusion;
+  pImpl_->CreateHalfedges(triVertsDH);
+  pImpl_->Finish();
+  pImpl_->InitializeNewReference();
+  return Manifold(pImpl_);
 }
 
 /**
@@ -288,10 +263,10 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments) {
   }
   int nDivisions =
       circularSegments > 2 ? circularSegments : GetCircularSegments(radius);
-  Manifold revoloid;
-  auto& vertPos = revoloid.pImpl_->vertPos_.H();
+  auto pImpl_ = std::make_shared<Impl>();
+  auto& vertPos = pImpl_->vertPos_;
   VecDH<glm::ivec3> triVertsDH;
-  auto& triVerts = triVertsDH.H();
+  auto& triVerts = triVertsDH;
   float dPhi = 360.0f / nDivisions;
   for (const auto& poly : crossSection) {
     int start = -1;
@@ -361,10 +336,10 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments) {
     }
   }
 
-  revoloid.pImpl_->CreateHalfedges(triVertsDH);
-  revoloid.pImpl_->Finish();
-  revoloid.pImpl_->InitializeNewReference();
-  return revoloid;
+  pImpl_->CreateHalfedges(triVertsDH);
+  pImpl_->Finish();
+  pImpl_->InitializeNewReference();
+  return Manifold(pImpl_);
 }
 
 /**
@@ -375,60 +350,11 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments) {
  * @param manifolds A vector of Manifolds to lazy-union together.
  */
 Manifold Manifold::Compose(const std::vector<Manifold>& manifolds) {
-  int numVert = 0;
-  int numEdge = 0;
-  int numTri = 0;
-  int numBary = 0;
-  for (const Manifold& manifold : manifolds) {
-    numVert += manifold.NumVert();
-    numEdge += manifold.NumEdge();
-    numTri += manifold.NumTri();
-    numBary += manifold.pImpl_->meshRelation_.barycentric.size();
+  std::vector<std::shared_ptr<CsgLeafNode>> children;
+  for (const auto& manifold : manifolds) {
+    children.push_back(manifold.pNode_->ToLeafNode());
   }
-
-  Manifold out;
-  Impl& combined = *(out.pImpl_);
-  combined.vertPos_.resize(numVert);
-  combined.halfedge_.resize(2 * numEdge);
-  combined.faceNormal_.resize(numTri);
-  combined.halfedgeTangent_.resize(2 * numEdge);
-  combined.meshRelation_.barycentric.resize(numBary);
-  combined.meshRelation_.triBary.resize(numTri);
-
-  int nextVert = 0;
-  int nextEdge = 0;
-  int nextTri = 0;
-  int nextBary = 0;
-  for (const Manifold& manifold : manifolds) {
-    const Impl& impl = *(manifold.pImpl_);
-    impl.ApplyTransform();
-
-    thrust::copy(impl.vertPos_.beginD(), impl.vertPos_.endD(),
-                 combined.vertPos_.beginD() + nextVert);
-    thrust::copy(impl.faceNormal_.beginD(), impl.faceNormal_.endD(),
-                 combined.faceNormal_.beginD() + nextTri);
-    thrust::copy(impl.halfedgeTangent_.beginD(), impl.halfedgeTangent_.endD(),
-                 combined.halfedgeTangent_.beginD() + nextEdge);
-    thrust::copy(impl.meshRelation_.barycentric.beginD(),
-                 impl.meshRelation_.barycentric.endD(),
-                 combined.meshRelation_.barycentric.beginD() + nextBary);
-    thrust::transform(impl.meshRelation_.triBary.beginD(),
-                      impl.meshRelation_.triBary.endD(),
-                      combined.meshRelation_.triBary.beginD() + nextTri,
-                      UpdateTriBary({nextBary}));
-    thrust::transform(impl.halfedge_.beginD(), impl.halfedge_.endD(),
-                      combined.halfedge_.beginD() + nextEdge,
-                      UpdateHalfedge({nextVert, nextEdge, nextTri}));
-
-    nextVert += manifold.NumVert();
-    nextEdge += 2 * manifold.NumEdge();
-    nextTri += manifold.NumTri();
-    nextBary += impl.meshRelation_.barycentric.size();
-  }
-
-  combined.DuplicateMeshIDs();
-  combined.Finish();
-  return out;
+  return Manifold(std::make_shared<Impl>(CsgLeafNode::Compose(children)));
 }
 
 /**
@@ -438,6 +364,7 @@ Manifold Manifold::Compose(const std::vector<Manifold>& manifolds) {
  */
 std::vector<Manifold> Manifold::Decompose() const {
   Graph graph;
+  auto pImpl_ = GetCsgLeafNode().GetImpl();
   for (int i = 0; i < NumVert(); ++i) {
     graph.add_nodes(i);
   }
@@ -454,36 +381,50 @@ std::vector<Manifold> Manifold::Decompose() const {
     return meshes;
   }
   VecDH<int> vertLabel(components);
+  // meshID mapping for UpdateMeshIDs
+  VecDH<int> meshIDs;
+  VecDH<int> original;
+  for (auto& entry : pImpl_->meshRelation_.originalID) {
+    meshIDs.push_back(entry.first);
+    original.push_back(entry.second);
+  }
 
-  std::vector<Manifold> meshes(numLabel);
+  std::vector<Manifold> meshes;
   for (int i = 0; i < numLabel; ++i) {
-    meshes[i].pImpl_->vertPos_.resize(NumVert());
+    auto impl = std::make_shared<Impl>();
+    // inherit original object's precision
+    impl->precision_ = pImpl_->precision_;
+    impl->vertPos_.resize(NumVert());
     VecDH<int> vertNew2Old(NumVert());
+    auto policy = autoPolicy(NumVert());
+    auto start = zip(impl->vertPos_.begin(), vertNew2Old.begin());
     int nVert =
-        thrust::copy_if(
-            zip(pImpl_->vertPos_.beginD(), countAt(0)),
-            zip(pImpl_->vertPos_.endD(), countAt(NumVert())),
-            vertLabel.beginD(),
-            zip(meshes[i].pImpl_->vertPos_.beginD(), vertNew2Old.beginD()),
-            Equals({i})) -
-        zip(meshes[i].pImpl_->vertPos_.beginD(), countAt(0));
-    meshes[i].pImpl_->vertPos_.resize(nVert);
+        copy_if<decltype(start)>(
+            policy, zip(pImpl_->vertPos_.begin(), countAt(0)),
+            zip(pImpl_->vertPos_.end(), countAt(NumVert())), vertLabel.begin(),
+            zip(impl->vertPos_.begin(), vertNew2Old.begin()), Equals({i})) -
+        start;
+    impl->vertPos_.resize(nVert);
 
     VecDH<int> faceNew2Old(NumTri());
-    thrust::sequence(faceNew2Old.beginD(), faceNew2Old.endD());
+    sequence(policy, faceNew2Old.begin(), faceNew2Old.end());
 
     int nFace =
-        thrust::remove_if(
-            faceNew2Old.beginD(), faceNew2Old.endD(),
+        remove_if<decltype(faceNew2Old.begin())>(
+            policy, faceNew2Old.begin(), faceNew2Old.end(),
             RemoveFace({pImpl_->halfedge_.cptrD(), vertLabel.cptrD(), i})) -
-        faceNew2Old.beginD();
+        faceNew2Old.begin();
     faceNew2Old.resize(nFace);
 
-    meshes[i].pImpl_->GatherFaces(*pImpl_, faceNew2Old);
-    meshes[i].pImpl_->ReindexVerts(vertNew2Old, pImpl_->NumVert());
+    impl->GatherFaces(*pImpl_, faceNew2Old);
+    impl->ReindexVerts(vertNew2Old, pImpl_->NumVert());
 
-    meshes[i].pImpl_->Finish();
-    meshes[i].pImpl_->transform_ = pImpl_->transform_;
+    impl->Finish();
+
+    // meshIDs and original will only be sorted after successful updates, so we
+    // can keep using the old one.
+    impl->UpdateMeshIDs(meshIDs, original);
+    meshes.push_back(Manifold(impl));
   }
   return meshes;
 }

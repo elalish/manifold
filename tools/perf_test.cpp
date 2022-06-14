@@ -22,10 +22,10 @@ using namespace manifold;
 int main(int argc, char **argv) {
   for (int i = 0; i < 8; ++i) {
     Manifold sphere = Manifold::Sphere(1, (8 << i) * 4);
-    Manifold sphere2 = sphere;
-    sphere2.Translate(glm::vec3(0.5));
+    Manifold sphere2 = sphere.Translate(glm::vec3(0.5));
     auto start = std::chrono::high_resolution_clock::now();
     Manifold diff = sphere - sphere2;
+    diff.NumTri();
     auto end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsed = end - start;
     std::cout << "nTri = " << sphere.NumTri() << ", time = " << elapsed.count()

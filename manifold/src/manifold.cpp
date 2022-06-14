@@ -13,7 +13,9 @@
 // limitations under the License.
 
 #include "boolean3.h"
+#include "csg_tree.h"
 #include "impl.h"
+#include "par.h"
 
 namespace {
 using namespace manifold;
@@ -44,7 +46,7 @@ Manifold Halfspace(Box bBox, glm::vec3 normal, float originOffset) {
       Manifold::Cube(glm::vec3(2.0f), true).Translate({1.0f, 0.0f, 0.0f});
   float size = glm::length(bBox.Center() - normal * originOffset) +
                0.5f * glm::length(bBox.Size());
-  cutter.Scale(glm::vec3(size)).Translate({originOffset, 0.0f, 0.0f});
+  cutter = cutter.Scale(glm::vec3(size)).Translate({originOffset, 0.0f, 0.0f});
   float yDeg = glm::degrees(-glm::asin(normal.z));
   float zDeg = glm::degrees(glm::atan(normal.y, normal.x));
   return cutter.Rotate(0.0f, yDeg, zDeg);
@@ -57,21 +59,30 @@ namespace manifold {
  * Construct an empty Manifold.
  *
  */
-Manifold::Manifold() : pImpl_{std::make_unique<Impl>()} {}
+Manifold::Manifold() : pNode_{std::make_shared<CsgLeafNode>()} {}
 Manifold::~Manifold() = default;
 Manifold::Manifold(Manifold&&) noexcept = default;
 Manifold& Manifold::operator=(Manifold&&) noexcept = default;
 
-Manifold::Manifold(const Manifold& other) : pImpl_(new Impl(*other.pImpl_)) {
-  pImpl_->DuplicateMeshIDs();
-}
+Manifold::Manifold(const Manifold& other) : pNode_(other.pNode_) {}
+
+Manifold::Manifold(std::shared_ptr<CsgNode> pNode) : pNode_(pNode) {}
+
+Manifold::Manifold(std::shared_ptr<Impl> pImpl_)
+    : pNode_(std::make_shared<CsgLeafNode>(pImpl_)) {}
 
 Manifold& Manifold::operator=(const Manifold& other) {
   if (this != &other) {
-    pImpl_.reset(new Impl(*other.pImpl_));
-    pImpl_->DuplicateMeshIDs();
+    pNode_ = other.pNode_;
   }
   return *this;
+}
+
+CsgLeafNode& Manifold::GetCsgLeafNode() const {
+  if (pNode_->GetNodeType() != CsgNodeType::LEAF) {
+    pNode_ = pNode_->ToLeafNode();
+  }
+  return *std::static_pointer_cast<CsgLeafNode>(pNode_);
 }
 
 /**
@@ -104,28 +115,29 @@ Manifold::Manifold(const Mesh& mesh,
                    const std::vector<glm::ivec3>& triProperties,
                    const std::vector<float>& properties,
                    const std::vector<float>& propertyTolerance)
-    : pImpl_{std::make_unique<Impl>(mesh, triProperties, properties,
-                                    propertyTolerance)} {}
+    : pNode_(std::make_shared<CsgLeafNode>(std::make_shared<Impl>(
+          mesh, triProperties, properties, propertyTolerance))) {}
 
 /**
  * This returns a Mesh of simple vectors of vertices and triangles suitable for
  * saving or other operations outside of the context of this library.
  */
 Mesh Manifold::GetMesh() const {
-  pImpl_->ApplyTransform();
+  const Impl& impl = *GetCsgLeafNode().GetImpl();
 
   Mesh result;
-  result.vertPos.insert(result.vertPos.end(), pImpl_->vertPos_.begin(),
-                        pImpl_->vertPos_.end());
-  result.vertNormal.insert(result.vertNormal.end(), pImpl_->vertNormal_.begin(),
-                           pImpl_->vertNormal_.end());
+  result.vertPos.insert(result.vertPos.end(), impl.vertPos_.begin(),
+                        impl.vertPos_.end());
+  result.vertNormal.insert(result.vertNormal.end(), impl.vertNormal_.begin(),
+                           impl.vertNormal_.end());
   result.halfedgeTangent.insert(result.halfedgeTangent.end(),
-                                pImpl_->halfedgeTangent_.begin(),
-                                pImpl_->halfedgeTangent_.end());
+                                impl.halfedgeTangent_.begin(),
+                                impl.halfedgeTangent_.end());
 
   result.triVerts.resize(NumTri());
-  thrust::for_each_n(zip(result.triVerts.begin(), countAt(0)), NumTri(),
-                     MakeTri({pImpl_->halfedge_.cptrH()}));
+  // note that `triVerts` is `std::vector`, so we cannot use thrust::device
+  thrust::for_each_n(thrust::host, zip(result.triVerts.begin(), countAt(0)),
+                     NumTri(), MakeTri({impl.halfedge_.cptrH()}));
 
   return result;
 }
@@ -194,26 +206,24 @@ int Manifold::GetCircularSegments(float radius) {
 /**
  * Does the Manifold have any triangles?
  */
-bool Manifold::IsEmpty() const { return pImpl_->IsEmpty(); }
+bool Manifold::IsEmpty() const { return GetCsgLeafNode().GetImpl()->IsEmpty(); }
 /**
  * The number of vertices in the Manifold.
  */
-int Manifold::NumVert() const { return pImpl_->NumVert(); }
+int Manifold::NumVert() const { return GetCsgLeafNode().GetImpl()->NumVert(); }
 /**
  * The number of edges in the Manifold.
  */
-int Manifold::NumEdge() const { return pImpl_->NumEdge(); }
+int Manifold::NumEdge() const { return GetCsgLeafNode().GetImpl()->NumEdge(); }
 /**
  * The number of triangles in the Manifold.
  */
-int Manifold::NumTri() const { return pImpl_->NumTri(); }
+int Manifold::NumTri() const { return GetCsgLeafNode().GetImpl()->NumTri(); }
 
 /**
  * Returns the axis-aligned bounding box of all the Manifold's vertices.
  */
-Box Manifold::BoundingBox() const {
-  return pImpl_->bBox_.Transform(pImpl_->transform_);
-}
+Box Manifold::BoundingBox() const { return GetCsgLeafNode().GetBoundingBox(); }
 
 /**
  * Returns the precision of this Manifold's vertices, which tracks the
@@ -223,8 +233,7 @@ Box Manifold::BoundingBox() const {
  * [&epsilon;-valid](https://github.com/elalish/manifold/wiki/Manifold-Library#definition-of-%CE%B5-valid).
  */
 float Manifold::Precision() const {
-  pImpl_->ApplyTransform();
-  return pImpl_->precision_;
+  return GetCsgLeafNode().GetImpl()->precision_;
 }
 
 /**
@@ -243,7 +252,9 @@ int Manifold::Genus() const {
  * means degenerate manifolds can by identified by testing these properties as
  * == 0.
  */
-Properties Manifold::GetProperties() const { return pImpl_->GetProperties(); }
+Properties Manifold::GetProperties() const {
+  return GetCsgLeafNode().GetImpl()->GetProperties();
+}
 
 /**
  * Curvature is the inverse of the radius of curvature, and signed such that
@@ -253,7 +264,9 @@ Properties Manifold::GetProperties() const { return pImpl_->GetProperties(); }
  * curvature is their sum. This approximates them for every vertex (returned as
  * vectors in the structure) and also returns their minimum and maximum values.
  */
-Curvature Manifold::GetCurvature() const { return pImpl_->GetCurvature(); }
+Curvature Manifold::GetCurvature() const {
+  return GetCsgLeafNode().GetImpl()->GetCurvature();
+}
 
 /**
  * Gets the relationship to the previous mesh, for the purpose of assinging
@@ -263,17 +276,15 @@ Curvature Manifold::GetCurvature() const { return pImpl_->GetCurvature(); }
  * gives an index for each vertex into the barycentric vector if that index is
  * >= 0, indicating it is a new vertex. If the index is < 0, this indicates it
  * is an original vertex, the index + 3 vert of the referenced triangle.
- *
- * Every time a manifold is copied or combined to form a new manifold it gets a
- * new meshID to indicate that particular instance of the mesh. In order to look
- * up which input mesh a given instance came from, simply use the
- * MeshID2Original() static vector.
  */
 MeshRelation Manifold::GetMeshRelation() const {
   MeshRelation out;
-  const auto& relation = pImpl_->meshRelation_;
+  const auto& relation = GetCsgLeafNode().GetImpl()->meshRelation_;
   out.triBary.insert(out.triBary.end(), relation.triBary.begin(),
                      relation.triBary.end());
+  for (auto& bary : out.triBary) {
+    bary.meshID = relation.originalID.at(bary.meshID);
+  }
   out.barycentric.insert(out.barycentric.end(), relation.barycentric.begin(),
                          relation.barycentric.end());
   return out;
@@ -286,17 +297,11 @@ MeshRelation Manifold::GetMeshRelation() const {
  * future reference.
  */
 std::vector<int> Manifold::GetMeshIDs() const {
-  VecDH<int> meshIDs(NumTri());
-  thrust::for_each_n(
-      zip(meshIDs.beginD(), pImpl_->meshRelation_.triBary.beginD()), NumTri(),
-      GetMeshID());
-
-  thrust::sort(meshIDs.beginD(), meshIDs.endD());
-  int n = thrust::unique(meshIDs.beginD(), meshIDs.endD()) - meshIDs.beginD();
-  meshIDs.resize(n);
-
   std::vector<int> out;
-  out.insert(out.end(), meshIDs.begin(), meshIDs.end());
+  out.reserve(GetCsgLeafNode().GetImpl()->meshRelation_.originalID.size());
+  for (auto& entry : GetCsgLeafNode().GetImpl()->meshRelation_.originalID) {
+    out.push_back(entry.second);
+  }
   return out;
 }
 
@@ -313,40 +318,38 @@ std::vector<int> Manifold::GetMeshIDs() const {
  * should instead call GetMesh(), calculate your properties and use these to
  * construct a new manifold.
  *
- * @returns New MeshID
+ * @returns New Mesh
  */
-int Manifold::SetAsOriginal() {
-  int meshID = pImpl_->InitializeNewReference();
-  return meshID;
-}
-
-/**
- * Returns a vector that maps a given unique MeshID to the MeshID of the
- * original Mesh it came from, to easily identify separate copies of the same
- * thing.
- */
-std::vector<int> Manifold::MeshID2Original() {
-  return Manifold::Impl::meshID2Original_;
+Manifold Manifold::AsOriginal() const {
+  auto newImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
+  newImpl->InitializeNewReference();
+  return Manifold(std::make_shared<CsgLeafNode>(newImpl));
 }
 
 /**
  * Should always be true. Also checks saneness of the internal data structures.
  */
-bool Manifold::IsManifold() const { return pImpl_->IsManifold(); }
+bool Manifold::IsManifold() const {
+  return GetCsgLeafNode().GetImpl()->IsManifold();
+}
 
 /**
  * The triangle normal vectors are saved over the course of operations rather
  * than recalculated to avoid rounding error. This checks that triangles still
  * match their normal vectors within Precision().
  */
-bool Manifold::MatchesTriNormals() const { return pImpl_->MatchesTriNormals(); }
+bool Manifold::MatchesTriNormals() const {
+  return GetCsgLeafNode().GetImpl()->MatchesTriNormals();
+}
 
 /**
  * The number of triangles that are colinear within Precision(). This library
  * attempts to remove all of these, but it cannot always remove all of them
  * without changing the mesh by too much.
  */
-int Manifold::NumDegenerateTris() const { return pImpl_->NumDegenerateTris(); }
+int Manifold::NumDegenerateTris() const {
+  return GetCsgLeafNode().GetImpl()->NumDegenerateTris();
+}
 
 /**
  * This is a checksum-style verification of the collider, simply returning the
@@ -355,13 +358,12 @@ int Manifold::NumDegenerateTris() const { return pImpl_->NumDegenerateTris(); }
  * @param other A Manifold to overlap with.
  */
 int Manifold::NumOverlaps(const Manifold& other) const {
-  pImpl_->ApplyTransform();
-  other.pImpl_->ApplyTransform();
-
-  SparseIndices overlaps = pImpl_->EdgeCollisions(*other.pImpl_);
+  SparseIndices overlaps = GetCsgLeafNode().GetImpl()->EdgeCollisions(
+      *other.GetCsgLeafNode().GetImpl());
   int num_overlaps = overlaps.size();
 
-  overlaps = other.pImpl_->EdgeCollisions(*pImpl_);
+  overlaps = other.GetCsgLeafNode().GetImpl()->EdgeCollisions(
+      *GetCsgLeafNode().GetImpl());
   return num_overlaps += overlaps.size();
 }
 
@@ -371,9 +373,8 @@ int Manifold::NumOverlaps(const Manifold& other) const {
  *
  * @param v The vector to add to every vertex.
  */
-Manifold& Manifold::Translate(glm::vec3 v) {
-  pImpl_->transform_[3] += v;
-  return *this;
+Manifold Manifold::Translate(glm::vec3 v) const {
+  return Manifold(pNode_->Translate(v));
 }
 
 /**
@@ -382,11 +383,8 @@ Manifold& Manifold::Translate(glm::vec3 v) {
  *
  * @param v The vector to multiply every vertex by per component.
  */
-Manifold& Manifold::Scale(glm::vec3 v) {
-  glm::mat3 s(1.0f);
-  for (int i : {0, 1, 2}) s[i] *= v;
-  pImpl_->transform_ = s * pImpl_->transform_;
-  return *this;
+Manifold Manifold::Scale(glm::vec3 v) const {
+  return Manifold(pNode_->Scale(v));
 }
 
 /**
@@ -401,18 +399,9 @@ Manifold& Manifold::Scale(glm::vec3 v) {
  * @param yDegrees Second rotation, degrees about the Y-axis.
  * @param zDegrees Third rotation, degrees about the Z-axis.
  */
-Manifold& Manifold::Rotate(float xDegrees, float yDegrees, float zDegrees) {
-  glm::mat3 rX(1.0f, 0.0f, 0.0f,                      //
-               0.0f, cosd(xDegrees), sind(xDegrees),  //
-               0.0f, -sind(xDegrees), cosd(xDegrees));
-  glm::mat3 rY(cosd(yDegrees), 0.0f, -sind(yDegrees),  //
-               0.0f, 1.0f, 0.0f,                       //
-               sind(yDegrees), 0.0f, cosd(yDegrees));
-  glm::mat3 rZ(cosd(zDegrees), sind(zDegrees), 0.0f,   //
-               -sind(zDegrees), cosd(zDegrees), 0.0f,  //
-               0.0f, 0.0f, 1.0f);
-  pImpl_->transform_ = rZ * rY * rX * pImpl_->transform_;
-  return *this;
+Manifold Manifold::Rotate(float xDegrees, float yDegrees,
+                          float zDegrees) const {
+  return Manifold(pNode_->Rotate(xDegrees, yDegrees, zDegrees));
 }
 
 /**
@@ -422,10 +411,8 @@ Manifold& Manifold::Rotate(float xDegrees, float yDegrees, float zDegrees) {
  *
  * @param m The affine transform matrix to apply to all the vertices.
  */
-Manifold& Manifold::Transform(const glm::mat4x3& m) {
-  glm::mat4 old(pImpl_->transform_);
-  pImpl_->transform_ = m * old;
-  return *this;
+Manifold Manifold::Transform(const glm::mat4x3& m) const {
+  return Manifold(pNode_->Transform(m));
 }
 
 /**
@@ -437,14 +424,15 @@ Manifold& Manifold::Transform(const glm::mat4x3& m) {
  *
  * @param warpFunc A function that modifies a given vertex position.
  */
-Manifold& Manifold::Warp(std::function<void(glm::vec3&)> warpFunc) {
-  pImpl_->ApplyTransform();
-  thrust::for_each_n(pImpl_->vertPos_.begin(), NumVert(), warpFunc);
-  pImpl_->Update();
-  pImpl_->faceNormal_.resize(0);  // force recalculation of triNormal
-  pImpl_->CalculateNormals();
-  pImpl_->SetPrecision();
-  return *this;
+Manifold Manifold::Warp(std::function<void(glm::vec3&)> warpFunc) const {
+  auto pImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
+  thrust::for_each_n(thrust::host, pImpl->vertPos_.begin(), NumVert(),
+                     warpFunc);
+  pImpl->Update();
+  pImpl->faceNormal_.resize(0);  // force recalculation of triNormal
+  pImpl->CalculateNormals();
+  pImpl->SetPrecision();
+  return Manifold(std::make_shared<CsgLeafNode>(pImpl));
 }
 
 /**
@@ -457,9 +445,10 @@ Manifold& Manifold::Warp(std::function<void(glm::vec3&)> warpFunc) {
  *
  * @param n The number of pieces to split every edge into. Must be > 1.
  */
-Manifold& Manifold::Refine(int n) {
-  pImpl_->Refine(n);
-  return *this;
+Manifold Manifold::Refine(int n) const {
+  auto pImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
+  pImpl->Refine(n);
+  return Manifold(std::make_shared<CsgLeafNode>(pImpl));
 }
 
 /**
@@ -477,12 +466,8 @@ Manifold& Manifold::Refine(int n) {
  * @param op The type of operation to perform.
  */
 Manifold Manifold::Boolean(const Manifold& second, OpType op) const {
-  pImpl_->ApplyTransform();
-  second.pImpl_->ApplyTransform();
-  Boolean3 boolean(*pImpl_, *second.pImpl_, op);
-  Manifold result;
-  result.pImpl_ = std::make_unique<Impl>(boolean.Result(op));
-  return result;
+  std::vector<std::shared_ptr<CsgNode>> children({pNode_, second.pNode_});
+  return Manifold(std::make_shared<CsgOpNode>(children, op));
 }
 
 /**
@@ -538,15 +523,15 @@ Manifold& Manifold::operator^=(const Manifold& Q) {
  * @param cutter
  */
 std::pair<Manifold, Manifold> Manifold::Split(const Manifold& cutter) const {
-  pImpl_->ApplyTransform();
-  cutter.pImpl_->ApplyTransform();
-  Boolean3 boolean(*pImpl_, *cutter.pImpl_, OpType::SUBTRACT);
-  std::pair<Manifold, Manifold> result;
-  result.first.pImpl_ =
-      std::make_unique<Impl>(boolean.Result(OpType::INTERSECT));
-  result.second.pImpl_ =
-      std::make_unique<Impl>(boolean.Result(OpType::SUBTRACT));
-  return result;
+  auto impl1 = GetCsgLeafNode().GetImpl();
+  auto impl2 = cutter.GetCsgLeafNode().GetImpl();
+
+  Boolean3 boolean(*impl1, *impl2, OpType::SUBTRACT);
+  auto result1 = std::make_shared<CsgLeafNode>(
+      std::make_unique<Impl>(boolean.Result(OpType::INTERSECT)));
+  auto result2 = std::make_shared<CsgLeafNode>(
+      std::make_unique<Impl>(boolean.Result(OpType::SUBTRACT)));
+  return std::make_pair(Manifold(result1), Manifold(result2));
 }
 
 /**
@@ -573,7 +558,7 @@ std::pair<Manifold, Manifold> Manifold::SplitByPlane(glm::vec3 normal,
  * direction of the normal vector.
  */
 Manifold Manifold::TrimByPlane(glm::vec3 normal, float originOffset) const {
-  pImpl_->ApplyTransform();
   return *this ^ Halfspace(BoundingBox(), normal, originOffset);
 }
+
 }  // namespace manifold

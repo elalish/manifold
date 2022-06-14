@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "impl.h"
+#include "par.h"
 
 namespace {
 using namespace manifold;
@@ -31,6 +32,17 @@ __host__ __device__ bool Is01Longest(glm::vec2 v0, glm::vec2 v1, glm::vec2 v2) {
   for (int i : {0, 1, 2}) l[i] = glm::dot(e[i], e[i]);
   return l[0] > l[1] && l[0] > l[2];
 }
+
+struct DuplicateEdge {
+  const Halfedge* sortedHalfedge;
+
+  __host__ __device__ bool operator()(int edge) {
+    const Halfedge& halfedge = sortedHalfedge[edge];
+    const Halfedge& nextHalfedge = sortedHalfedge[edge + 1];
+    return halfedge.startVert == nextHalfedge.startVert &&
+           halfedge.endVert == nextHalfedge.endVert;
+  }
+};
 
 struct ShortEdge {
   const Halfedge* halfedge;
@@ -109,6 +121,11 @@ namespace manifold {
  * It also performs edge swaps on the long edges of degenerate triangles, though
  * there are some configurations of degenerates that cannot be removed this way.
  *
+ * Before collapsing edges, the mesh is checked for duplicate edges (more than
+ * one pair of triangles sharing the same edge), which are removed by
+ * duplicating one vert and adding two triangles. These degenerate triangles are
+ * likely to be collapsed again in the subsequent simplification.
+ *
  * Note when an edge collapse would result in something non-manifold, the
  * vertices are duplicated in such a way as to remove handles or separate
  * meshes, thus decreasing the Genus(). It only increases when meshes that have
@@ -118,55 +135,113 @@ namespace manifold {
  * removal, by setting vertPos to NaN and halfedge to {-1, -1, -1, -1}.
  */
 void Manifold::Impl::SimplifyTopology() {
+  auto policy = autoPolicy(halfedge_.size());
+
+  VecDH<Halfedge> halfedge(halfedge_);
+  VecDH<int> idx(halfedge_.size());
+  sequence(policy, idx.begin(), idx.end());
+  sort_by_key(policy, halfedge.begin(), halfedge.end(), idx.begin());
+
   VecDH<int> flaggedEdges(halfedge_.size());
+
   int numFlagged =
-      thrust::copy_if(
-          countAt(0), countAt(halfedge_.size()), flaggedEdges.beginD(),
-          ShortEdge({halfedge_.cptrD(), vertPos_.cptrD(), precision_})) -
-      flaggedEdges.beginD();
+      copy_if<decltype(flaggedEdges.begin())>(
+          policy, idx.begin(), idx.end() - 1, countAt(0), flaggedEdges.begin(),
+          DuplicateEdge({halfedge.cptrD()})) -
+      flaggedEdges.begin();
   flaggedEdges.resize(numFlagged);
 
-  for (const int edge : flaggedEdges.H()) CollapseEdge(edge);
+  for (const int edge : flaggedEdges) DedupeEdge(edge);
 
   flaggedEdges.resize(halfedge_.size());
   numFlagged =
-      thrust::copy_if(
-          countAt(0), countAt(halfedge_.size()), flaggedEdges.beginD(),
-          FlagEdge({halfedge_.cptrD(), meshRelation_.triBary.cptrD()})) -
-      flaggedEdges.beginD();
+      copy_if<decltype(flaggedEdges.begin())>(
+          policy, countAt(0), countAt(halfedge_.size()), flaggedEdges.begin(),
+          ShortEdge({halfedge_.cptrD(), vertPos_.cptrD(), precision_})) -
+      flaggedEdges.begin();
   flaggedEdges.resize(numFlagged);
 
-  for (const int edge : flaggedEdges.H()) CollapseEdge(edge);
+  for (const int edge : flaggedEdges) CollapseEdge(edge);
 
   flaggedEdges.resize(halfedge_.size());
-  numFlagged = thrust::copy_if(
-                   countAt(0), countAt(halfedge_.size()), flaggedEdges.beginD(),
-                   SwappableEdge({halfedge_.cptrD(), vertPos_.cptrD(),
-                                  faceNormal_.cptrD(), precision_})) -
-               flaggedEdges.beginD();
+  numFlagged =
+      copy_if<decltype(flaggedEdges.begin())>(
+          policy, countAt(0), countAt(halfedge_.size()), flaggedEdges.begin(),
+          FlagEdge({halfedge_.cptrD(), meshRelation_.triBary.cptrD()})) -
+      flaggedEdges.begin();
   flaggedEdges.resize(numFlagged);
 
-  for (const int edge : flaggedEdges.H()) {
+  for (const int edge : flaggedEdges) CollapseEdge(edge);
+
+  flaggedEdges.resize(halfedge_.size());
+  numFlagged =
+      copy_if<decltype(flaggedEdges.begin())>(
+          policy, countAt(0), countAt(halfedge_.size()), flaggedEdges.begin(),
+          SwappableEdge({halfedge_.cptrD(), vertPos_.cptrD(),
+                         faceNormal_.cptrD(), precision_})) -
+      flaggedEdges.begin();
+  flaggedEdges.resize(numFlagged);
+
+  for (const int edge : flaggedEdges) {
     RecursiveEdgeSwap(edge);
   }
 }
 
+void Manifold::Impl::DedupeEdge(const int edge) {
+  // Orbit endVert
+  const int startVert = halfedge_[edge].startVert;
+  const int endVert = halfedge_[edge].endVert;
+  int current = halfedge_[NextHalfedge(edge)].pairedHalfedge;
+  while (current != edge) {
+    const int vert = halfedge_[current].startVert;
+    if (vert == startVert) {
+      int newVert = vertPos_.size();
+      vertPos_.push_back(vertPos_[endVert]);
+      current = halfedge_[NextHalfedge(current)].pairedHalfedge;
+      int opposite = halfedge_[NextHalfedge(edge)].pairedHalfedge;
+
+      UpdateVert(newVert, current, opposite);
+
+      int newHalfedge = halfedge_.size();
+      int newFace = newHalfedge / 3;
+      int outsideVert = halfedge_[current].startVert;
+      halfedge_.push_back({endVert, newVert, -1, newFace});
+      halfedge_.push_back({newVert, outsideVert, -1, newFace});
+      halfedge_.push_back({outsideVert, endVert, -1, newFace});
+      PairUp(newHalfedge + 2, halfedge_[current].pairedHalfedge);
+      PairUp(newHalfedge + 1, current);
+
+      newHalfedge += 3;
+      ++newFace;
+      outsideVert = halfedge_[opposite].startVert;
+      halfedge_.push_back({newVert, endVert, -1, newFace});
+      halfedge_.push_back({endVert, outsideVert, -1, newFace});
+      halfedge_.push_back({outsideVert, newVert, -1, newFace});
+      PairUp(newHalfedge + 2, halfedge_[opposite].pairedHalfedge);
+      PairUp(newHalfedge + 1, opposite);
+      PairUp(newHalfedge, newHalfedge - 3);
+
+      break;
+    }
+
+    current = halfedge_[NextHalfedge(current)].pairedHalfedge;
+  }
+}
+
 void Manifold::Impl::PairUp(int edge0, int edge1) {
-  VecH<Halfedge>& halfedge = halfedge_.H();
-  halfedge[edge0].pairedHalfedge = edge1;
-  halfedge[edge1].pairedHalfedge = edge0;
+  halfedge_[edge0].pairedHalfedge = edge1;
+  halfedge_[edge1].pairedHalfedge = edge0;
 }
 
 // Traverses CW around startEdge.endVert from startEdge to endEdge
 // (edgeEdge.endVert must == startEdge.endVert), updating each edge to point
 // to vert instead.
 void Manifold::Impl::UpdateVert(int vert, int startEdge, int endEdge) {
-  VecH<Halfedge>& halfedge = halfedge_.H();
   while (startEdge != endEdge) {
-    halfedge[startEdge].endVert = vert;
+    halfedge_[startEdge].endVert = vert;
     startEdge = NextHalfedge(startEdge);
-    halfedge[startEdge].startVert = vert;
-    startEdge = halfedge[startEdge].pairedHalfedge;
+    halfedge_[startEdge].startVert = vert;
+    startEdge = halfedge_[startEdge].pairedHalfedge;
   }
 }
 
@@ -174,90 +249,81 @@ void Manifold::Impl::UpdateVert(int vert, int startEdge, int endEdge) {
 // instead we duplicate the two verts and attach the manifolds the other way
 // across this edge.
 void Manifold::Impl::FormLoop(int current, int end) {
-  VecH<Halfedge>& halfedge = halfedge_.H();
-  VecH<glm::vec3>& vertPos = vertPos_.H();
+  int startVert = vertPos_.size();
+  vertPos_.push_back(vertPos_[halfedge_[current].startVert]);
+  int endVert = vertPos_.size();
+  vertPos_.push_back(vertPos_[halfedge_[current].endVert]);
 
-  int startVert = vertPos.size();
-  vertPos.push_back(vertPos[halfedge[current].startVert]);
-  int endVert = vertPos.size();
-  vertPos.push_back(vertPos[halfedge[current].endVert]);
-
-  int oldMatch = halfedge[current].pairedHalfedge;
-  int newMatch = halfedge[end].pairedHalfedge;
+  int oldMatch = halfedge_[current].pairedHalfedge;
+  int newMatch = halfedge_[end].pairedHalfedge;
 
   UpdateVert(startVert, oldMatch, newMatch);
   UpdateVert(endVert, end, current);
 
-  halfedge[current].pairedHalfedge = newMatch;
-  halfedge[newMatch].pairedHalfedge = current;
-  halfedge[end].pairedHalfedge = oldMatch;
-  halfedge[oldMatch].pairedHalfedge = end;
+  halfedge_[current].pairedHalfedge = newMatch;
+  halfedge_[newMatch].pairedHalfedge = current;
+  halfedge_[end].pairedHalfedge = oldMatch;
+  halfedge_[oldMatch].pairedHalfedge = end;
 
   RemoveIfFolded(end);
 }
 
 void Manifold::Impl::CollapseTri(const glm::ivec3& triEdge) {
-  VecH<Halfedge>& halfedge = halfedge_.H();
-  int pair1 = halfedge[triEdge[1]].pairedHalfedge;
-  int pair2 = halfedge[triEdge[2]].pairedHalfedge;
-  halfedge[pair1].pairedHalfedge = pair2;
-  halfedge[pair2].pairedHalfedge = pair1;
+  int pair1 = halfedge_[triEdge[1]].pairedHalfedge;
+  int pair2 = halfedge_[triEdge[2]].pairedHalfedge;
+  halfedge_[pair1].pairedHalfedge = pair2;
+  halfedge_[pair2].pairedHalfedge = pair1;
   for (int i : {0, 1, 2}) {
-    halfedge[triEdge[i]] = {-1, -1, -1, -1};
+    halfedge_[triEdge[i]] = {-1, -1, -1, -1};
   }
 }
 
 void Manifold::Impl::RemoveIfFolded(int edge) {
-  VecH<Halfedge>& halfedge = halfedge_.H();
-  VecH<glm::vec3>& vertPos = vertPos_.H();
   const glm::ivec3 tri0edge = TriOf(edge);
-  const glm::ivec3 tri1edge = TriOf(halfedge[edge].pairedHalfedge);
-  if (halfedge[tri0edge[1]].endVert == halfedge[tri1edge[1]].endVert) {
+  const glm::ivec3 tri1edge = TriOf(halfedge_[edge].pairedHalfedge);
+  if (halfedge_[tri0edge[1]].endVert == halfedge_[tri1edge[1]].endVert) {
     for (int i : {0, 1, 2}) {
-      vertPos[halfedge[tri0edge[i]].startVert] = glm::vec3(NAN);
-      halfedge[tri0edge[i]] = {-1, -1, -1, -1};
-      halfedge[tri1edge[i]] = {-1, -1, -1, -1};
+      vertPos_[halfedge_[tri0edge[i]].startVert] = glm::vec3(NAN);
+      halfedge_[tri0edge[i]] = {-1, -1, -1, -1};
+      halfedge_[tri1edge[i]] = {-1, -1, -1, -1};
     }
   }
 }
 
 void Manifold::Impl::CollapseEdge(const int edge) {
-  VecH<Halfedge>& halfedge = halfedge_.H();
-  VecH<glm::vec3>& vertPos = vertPos_.H();
-  VecH<glm::vec3>& triNormal = faceNormal_.H();
-  VecH<BaryRef>& triBary = meshRelation_.triBary.H();
+  VecDH<BaryRef>& triBary = meshRelation_.triBary;
 
-  const Halfedge toRemove = halfedge[edge];
+  const Halfedge toRemove = halfedge_[edge];
   if (toRemove.pairedHalfedge < 0) return;
 
   const int endVert = toRemove.endVert;
   const glm::ivec3 tri0edge = TriOf(edge);
   const glm::ivec3 tri1edge = TriOf(toRemove.pairedHalfedge);
 
-  const glm::vec3 pNew = vertPos[endVert];
-  const glm::vec3 pOld = vertPos[toRemove.startVert];
+  const glm::vec3 pNew = vertPos_[endVert];
+  const glm::vec3 pOld = vertPos_[toRemove.startVert];
   const glm::vec3 delta = pNew - pOld;
   const bool shortEdge = glm::dot(delta, delta) < precision_ * precision_;
 
   std::vector<int> edges;
   // Orbit endVert
-  int current = halfedge[tri0edge[1]].pairedHalfedge;
+  int current = halfedge_[tri0edge[1]].pairedHalfedge;
   while (current != tri1edge[2]) {
     current = NextHalfedge(current);
     edges.push_back(current);
-    current = halfedge[current].pairedHalfedge;
+    current = halfedge_[current].pairedHalfedge;
   }
 
   // Orbit startVert
-  int start = halfedge[tri1edge[1]].pairedHalfedge;
+  int start = halfedge_[tri1edge[1]].pairedHalfedge;
   const BaryRef ref0 = triBary[edge / 3];
   const BaryRef ref1 = triBary[toRemove.pairedHalfedge / 3];
   if (!shortEdge) {
     current = start;
-    glm::vec3 pLast = vertPos[halfedge[tri1edge[1]].endVert];
+    glm::vec3 pLast = vertPos_[halfedge_[tri1edge[1]].endVert];
     while (current != tri0edge[2]) {
       current = NextHalfedge(current);
-      glm::vec3 pNext = vertPos[halfedge[current].endVert];
+      glm::vec3 pNext = vertPos_[halfedge_[current].endVert];
       const int tri = current / 3;
       const BaryRef ref = triBary[tri];
       // Don't collapse if the edge is not redundant (this may have changed due
@@ -267,18 +333,18 @@ void Manifold::Impl::CollapseEdge(const int edge) {
         return;
 
       // Don't collapse edge if it would cause a triangle to invert.
-      const glm::mat3x2 projection = GetAxisAlignedProjection(triNormal[tri]);
+      const glm::mat3x2 projection = GetAxisAlignedProjection(faceNormal_[tri]);
       if (CCW(projection * pNext, projection * pLast, projection * pNew,
               precision_) < 0)
         return;
 
       pLast = pNext;
-      current = halfedge[current].pairedHalfedge;
+      current = halfedge_[current].pairedHalfedge;
     }
   }
 
   // Remove toRemove.startVert and replace with endVert.
-  vertPos[toRemove.startVert] = glm::vec3(NAN);
+  vertPos_[toRemove.startVert] = glm::vec3(NAN);
   CollapseTri(tri1edge);
 
   // Orbit startVert
@@ -296,10 +362,10 @@ void Manifold::Impl::CollapseEdge(const int edge) {
               : ref1.vertBary[toRemove.pairedHalfedge % 3];
     }
 
-    const int vert = halfedge[current].endVert;
-    const int next = halfedge[current].pairedHalfedge;
+    const int vert = halfedge_[current].endVert;
+    const int next = halfedge_[current].pairedHalfedge;
     for (int i = 0; i < edges.size(); ++i) {
-      if (vert == halfedge[edges[i]].endVert) {
+      if (vert == halfedge_[edges[i]].endVert) {
         FormLoop(edges[i], current);
         start = next;
         edges.resize(i);
@@ -315,48 +381,45 @@ void Manifold::Impl::CollapseEdge(const int edge) {
 }
 
 void Manifold::Impl::RecursiveEdgeSwap(const int edge) {
-  const VecH<glm::vec3>& vertPos = vertPos_.H();
-  VecH<Halfedge>& halfedge = halfedge_.H();
-  VecH<glm::vec3>& triNormal = faceNormal_.H();
-  VecH<BaryRef>& triBary = meshRelation_.triBary.H();
+  VecDH<BaryRef>& triBary = meshRelation_.triBary;
 
-  if (halfedge[edge].pairedHalfedge < 0) return;
+  if (halfedge_[edge].pairedHalfedge < 0) return;
 
-  const int pair = halfedge[edge].pairedHalfedge;
+  const int pair = halfedge_[edge].pairedHalfedge;
   const glm::ivec3 tri0edge = TriOf(edge);
   const glm::ivec3 tri1edge = TriOf(pair);
   const glm::ivec3 perm0 = TriOf(edge % 3);
   const glm::ivec3 perm1 = TriOf(pair % 3);
 
-  glm::mat3x2 projection = GetAxisAlignedProjection(triNormal[edge / 3]);
+  glm::mat3x2 projection = GetAxisAlignedProjection(faceNormal_[edge / 3]);
   glm::vec2 v[4];
   for (int i : {0, 1, 2})
-    v[i] = projection * vertPos[halfedge[tri0edge[i]].startVert];
+    v[i] = projection * vertPos_[halfedge_[tri0edge[i]].startVert];
   // Only operate on the long edge of a degenerate triangle.
   if (CCW(v[0], v[1], v[2], precision_) > 0 || !Is01Longest(v[0], v[1], v[2]))
     return;
 
   // Switch to neighbor's projection.
-  projection = GetAxisAlignedProjection(triNormal[halfedge[pair].face]);
+  projection = GetAxisAlignedProjection(faceNormal_[halfedge_[pair].face]);
   for (int i : {0, 1, 2})
-    v[i] = projection * vertPos[halfedge[tri0edge[i]].startVert];
-  v[3] = projection * vertPos[halfedge[tri1edge[2]].startVert];
+    v[i] = projection * vertPos_[halfedge_[tri0edge[i]].startVert];
+  v[3] = projection * vertPos_[halfedge_[tri1edge[2]].startVert];
 
   auto SwapEdge = [&]() {
     // The 0-verts are swapped to the opposite 2-verts.
-    const int v0 = halfedge[tri0edge[2]].startVert;
-    const int v1 = halfedge[tri1edge[2]].startVert;
-    halfedge[tri0edge[0]].startVert = v1;
-    halfedge[tri0edge[2]].endVert = v1;
-    halfedge[tri1edge[0]].startVert = v0;
-    halfedge[tri1edge[2]].endVert = v0;
-    PairUp(tri0edge[0], halfedge[tri1edge[2]].pairedHalfedge);
-    PairUp(tri1edge[0], halfedge[tri0edge[2]].pairedHalfedge);
+    const int v0 = halfedge_[tri0edge[2]].startVert;
+    const int v1 = halfedge_[tri1edge[2]].startVert;
+    halfedge_[tri0edge[0]].startVert = v1;
+    halfedge_[tri0edge[2]].endVert = v1;
+    halfedge_[tri1edge[0]].startVert = v0;
+    halfedge_[tri1edge[2]].endVert = v0;
+    PairUp(tri0edge[0], halfedge_[tri1edge[2]].pairedHalfedge);
+    PairUp(tri1edge[0], halfedge_[tri0edge[2]].pairedHalfedge);
     PairUp(tri0edge[2], tri1edge[2]);
     // Both triangles are now subsets of the neighboring triangle.
-    const int tri0 = halfedge[tri0edge[0]].face;
-    const int tri1 = halfedge[tri1edge[0]].face;
-    triNormal[tri0] = triNormal[tri1];
+    const int tri0 = halfedge_[tri0edge[0]].face;
+    const int tri1 = halfedge_[tri1edge[0]].face;
+    faceNormal_[tri0] = faceNormal_[tri1];
     triBary[tri0] = triBary[tri1];
     triBary[tri0].vertBary[perm0[1]] = triBary[tri1].vertBary[perm1[0]];
     triBary[tri0].vertBary[perm0[0]] = triBary[tri1].vertBary[perm1[2]];
@@ -371,21 +434,21 @@ void Manifold::Impl::RecursiveEdgeSwap(const int edge) {
     const glm::vec3 uvw2 = a * uvw0 + (1 - a) * uvw1;
     // And assign it.
     const int newBary = meshRelation_.barycentric.size();
-    meshRelation_.barycentric.H().push_back(uvw2);
+    meshRelation_.barycentric.push_back(uvw2);
     triBary[tri1].vertBary[perm1[0]] = newBary;
     triBary[tri0].vertBary[perm0[2]] = newBary;
 
     // if the new edge already exists, duplicate the verts and split the mesh.
-    int current = halfedge[tri1edge[0]].pairedHalfedge;
-    const int endVert = halfedge[tri1edge[1]].endVert;
+    int current = halfedge_[tri1edge[0]].pairedHalfedge;
+    const int endVert = halfedge_[tri1edge[1]].endVert;
     while (current != tri0edge[1]) {
       current = NextHalfedge(current);
-      if (halfedge[current].endVert == endVert) {
+      if (halfedge_[current].endVert == endVert) {
         FormLoop(tri0edge[2], current);
         RemoveIfFolded(tri0edge[2]);
         return;
       }
-      current = halfedge[current].pairedHalfedge;
+      current = halfedge_[current].pairedHalfedge;
     }
   };
 
@@ -410,7 +473,7 @@ void Manifold::Impl::RecursiveEdgeSwap(const int edge) {
   }
   // Normal path
   SwapEdge();
-  RecursiveEdgeSwap(halfedge[tri0edge[1]].pairedHalfedge);
-  RecursiveEdgeSwap(halfedge[tri1edge[0]].pairedHalfedge);
+  RecursiveEdgeSwap(halfedge_[tri0edge[1]].pairedHalfedge);
+  RecursiveEdgeSwap(halfedge_[tri1edge[0]].pairedHalfedge);
 }
 }  // namespace manifold

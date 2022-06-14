@@ -2,7 +2,7 @@ project (collider)
 
 add_library(${PROJECT_NAME} src/collider.cpp)
 
-if(THRUST_BACKEND STREQUAL "CUDA")
+if(MANIFOLD_USE_CUDA)
     set_source_files_properties(src/collider.cpp PROPERTIES LANGUAGE CUDA)
     set_property(TARGET ${PROJECT_NAME} PROPERTY CUDA_ARCHITECTURES 61)
     target_compile_options(${PROJECT_NAME} 
@@ -22,7 +22,7 @@ target_include_directories( ${PROJECT_NAME}
 )
 target_link_libraries( ${PROJECT_NAME}
     PUBLIC utilities
-    PRIVATE ${MANIFOLD_OMP_INCLUDE}
+    PRIVATE ${MANIFOLD_INCLUDE}
 )
 
 target_compile_features(${PROJECT_NAME} 

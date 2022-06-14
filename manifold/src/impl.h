@@ -26,7 +26,17 @@ namespace manifold {
 struct Manifold::Impl {
   struct MeshRelationD {
     VecDH<glm::vec3> barycentric;
+    /// meshID in BaryRef has different meaning in MeshRelation and
+    /// MeshRelationD:
+    /// - In `MeshRelation`: The original mesh triangle index.
+    /// - In `MeshRelationD`: The original mesh triangle index =
+    /// `originalID[meshID]`
+    ///
+    /// @note Triangles coming from different manifolds should have different
+    /// mesh ID, otherwise `SimplifyTopology` will not work properly.
     VecDH<BaryRef> triBary;
+    /// meshID to originalID mapping.
+    std::unordered_map<int, int> originalID;
   };
 
   Box bBox_;
@@ -38,9 +48,8 @@ struct Manifold::Impl {
   VecDH<glm::vec4> halfedgeTangent_;
   MeshRelationD meshRelation_;
   Collider collider_;
-  glm::mat4x3 transform_ = glm::mat4x3(1.0f);
 
-  static std::vector<int> meshID2Original_;
+  static std::atomic<int> meshIDCounter_;
 
   Impl() {}
   enum class Shape { TETRAHEDRON, CUBE, OCTAHEDRON };
@@ -56,15 +65,14 @@ struct Manifold::Impl {
       const std::vector<float>& properties = std::vector<float>(),
       const std::vector<float>& propertyTolerance = std::vector<float>());
 
-  void DuplicateMeshIDs();
-  void ReinitializeReference(int meshID = -1);
+  void ReinitializeReference(int meshID);
   void CreateHalfedges(const VecDH<glm::ivec3>& triVerts);
-  void CreateAndFixHalfedges(const VecDH<glm::ivec3>& triVerts);
   void CalculateNormals();
+  void UpdateMeshIDs(VecDH<int>& meshIDs, VecDH<int>& originalIDs,
+                     int startTri = 0, int n = -1, int startID = 0);
 
   void Update();
-  void ApplyTransform() const;
-  void ApplyTransform();
+  Impl Transform(const glm::mat4x3& transform) const;
   SparseIndices EdgeCollisions(const Impl& B) const;
   SparseIndices VertexCollisionsZ(const VecDH<glm::vec3>& vertsIn) const;
 
@@ -94,10 +102,11 @@ struct Manifold::Impl {
   void Face2Tri(const VecDH<int>& faceEdge, const VecDH<BaryRef>& faceRef,
                 const VecDH<int>& halfedgeBary);
   Polygons Face2Polygons(int face, glm::mat3x2 projection,
-                         const VecH<int>& faceEdge) const;
+                         const VecDH<int>& faceEdge) const;
 
   // edge_op.cu
   void SimplifyTopology();
+  void DedupeEdge(int edge);
   void CollapseEdge(int edge);
   void RecursiveEdgeSwap(int edge);
   void RemoveIfFolded(int edge);

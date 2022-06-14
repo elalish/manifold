@@ -23,6 +23,7 @@
 #include <iostream>
 #include <limits>
 #include <sstream>
+#include <unordered_map>
 #include <vector>
 
 namespace manifold {
@@ -232,7 +233,7 @@ struct Curvature {
  * Mesh.
  */
 struct BaryRef {
-  /// Reference to original Mesh, matching Manifold.GetMeshIDs().
+  /// The original mesh triangle index.
   int meshID;
   /// The triangle index of the original triangle this was part of:
   /// Mesh.triVerts[tri].
@@ -417,18 +418,6 @@ struct Box {
   }
 };
 
-/**
- * Print the contents of this vector to standard output.
- */
-template <typename T>
-void Dump(const std::vector<T>& vec) {
-  std::cout << "Vec = " << std::endl;
-  for (int i = 0; i < vec.size(); ++i) {
-    std::cout << i << ", " << vec[i] << ", " << std::endl;
-  }
-  std::cout << std::endl;
-}
-
 inline std::ostream& operator<<(std::ostream& stream, const Box& box) {
   return stream << "min: " << box.min.x << ", " << box.min.y << ", "
                 << box.min.z << ", "
@@ -469,6 +458,18 @@ inline std::ostream& operator<<(std::ostream& stream, const glm::mat4x3& mat) {
 inline std::ostream& operator<<(std::ostream& stream, const BaryRef& ref) {
   return stream << "meshID: " << ref.meshID << ", tri: " << ref.tri
                 << ", uvw idx: " << ref.vertBary;
+}
+
+/**
+ * Print the contents of this vector to standard output.
+ */
+template <typename T>
+void Dump(const std::vector<T>& vec) {
+  std::cout << "Vec = " << std::endl;
+  for (int i = 0; i < vec.size(); ++i) {
+    std::cout << i << ", " << vec[i] << ", " << std::endl;
+  }
+  std::cout << std::endl;
 }
 /** @} */
 }  // namespace manifold
