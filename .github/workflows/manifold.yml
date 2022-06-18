@@ -49,11 +49,9 @@ jobs:
         lcov --directory ./manifold --directory collider --directory polygon --directory utilities --capture --output-file ./code_coverage.info -rc lcov_branch_coverage=1
     - uses: codecov/codecov-action@v2
       with:
-        dry_run: true
         files: build/code_coverage.info
         fail_ci_if_error: true
         name: ${{matrix.parallel_backend}}-${{matrix.cuda_support}}
-        verbose: true
 
   build_wasm:
     runs-on: ubuntu-20.04
