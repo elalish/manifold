@@ -35,7 +35,7 @@ jobs:
         patch third_party/assimp/code/CMakeLists.txt < assimp.diff
         mkdir build
         cd build
-        cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DMANIFOLD_PAR=${{matrix.parallel_backend}} -DMANIFOLD_USE_CUDA=${{matrix.cuda_support}} -DCODE_COVERAGE=ON .. && make
+        cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DMANIFOLD_PAR=${{matrix.parallel_backend}} -DMANIFOLD_USE_CUDA=${{matrix.cuda_support}} .. && make
     - name: Test ${{matrix.parallel_backend}} with CUDA ${{matrix.cuda_support}}
       # note that the test for CUDA backend does not really test CUDA, as we
       # don't have CUDA GPU on GitHub Action
@@ -45,9 +45,20 @@ jobs:
         ./manifold_test
         cd ../../
         python3 test/python/run_all.py
+    - name: Coverage Report
+      # only do code coverage for default sequential backend, it seems that TBB
+      # backend will cause failure
+      # perhaps issue related to invalid memory access?
+      if: matrix.parallel_backend == 'NONE'
+      run: |
         cd build
+        cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DMANIFOLD_PAR=${{matrix.parallel_backend}} -DMANIFOLD_USE_CUDA=${{matrix.cuda_support}} -DCODE_COVERAGE=ON .. && make
+        cd test
+        ./manifold_test
+        cd ../
         lcov --directory ./manifold --directory collider --directory polygon --directory utilities --capture --output-file ./code_coverage.info -rc lcov_branch_coverage=1
     - uses: codecov/codecov-action@v2
+      if: matrix.parallel_backend == 'NONE'
       with:
         files: build/code_coverage.info
         fail_ci_if_error: true
