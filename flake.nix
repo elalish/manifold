@@ -76,6 +76,7 @@
               clang_13
               emscripten
               tbb
+              lcov
             ] ++ additional;
           };
         in
@@ -116,7 +117,7 @@
               '';
             };
           };
-          devShell = devShell { };
+          devShell = devShell { additional = [ pkgs.cudatoolkit_11_4 ]; };
           devShells.cuda = devShell {
             additional = [ pkgs.cudatoolkit_11_5 ];
           };
