@@ -2,7 +2,8 @@ project (manifold_test)
 
 enable_testing()
 
-add_executable(${PROJECT_NAME} test_main.cpp polygon_test.cpp mesh_test.cpp samples_test.cpp)
+file(GLOB_RECURSE SOURCE_FILES CONFIGURE_DEPENDS *.cpp)
+add_executable(${PROJECT_NAME} ${SOURCE_FILES})
 target_link_libraries(${PROJECT_NAME} polygon GTest::GTest manifold meshIO samples)
 
 target_compile_options(${PROJECT_NAME} PRIVATE ${MANIFOLD_FLAGS})
