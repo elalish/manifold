@@ -53,10 +53,13 @@ jobs:
       run: |
         cd build
         cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DMANIFOLD_PAR=${{matrix.parallel_backend}} -DMANIFOLD_USE_CUDA=${{matrix.cuda_support}} -DCODE_COVERAGE=ON .. && make
+        lcov --no-external --capture --initial --directory . --output-file ./code_coverage_init.info
         cd test
         ./manifold_test
         cd ../
-        lcov --directory ./manifold --directory collider --directory polygon --directory utilities --capture --output-file ./code_coverage.info
+        lcov --no-external --capture --directory . --output-file ./code_coverage_test.info
+        lcov --add-tracefile ./code_coverage_init.info --add-tracefile ./code_coverage_test.info --output-file ./code_coverage_total.info
+        lcov --remove ./code_coverage_total.info './third_party/*' './test/*' './tools/*' --output-file ./code_coverage.info
     - uses: codecov/codecov-action@v2
       if: matrix.parallel_backend == 'NONE'
       with:
