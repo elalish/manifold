@@ -56,7 +56,7 @@ jobs:
         cd test
         ./manifold_test
         cd ../
-        lcov --directory ./manifold --directory collider --directory polygon --directory utilities --capture --output-file ./code_coverage.info -rc lcov_branch_coverage=1
+        lcov --directory ./manifold --directory collider --directory polygon --directory utilities --capture --output-file ./code_coverage.info
     - uses: codecov/codecov-action@v2
       if: matrix.parallel_backend == 'NONE'
       with:
