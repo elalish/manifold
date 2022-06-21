@@ -19,17 +19,19 @@ option(PYBIND11_FINDPYTHON on)
 option(BUILD_TEST_CGAL off)
 
 option(BUILD_SHARED_LIBS off)
-set(ASSIMP_INC_DIR 
+set(ASSIMP_INC_DIR
     ${PROJECT_SOURCE_DIR}/third_party/assimp/include
     ${CMAKE_BINARY_DIR}/third_party/assimp/include)
 set(GLM_INC_DIR ${PROJECT_SOURCE_DIR}/third_party/glm)
 set(PYBIND11_DIR ${PROJECT_SOURCE_DIR}/third_party/pybind11)
 
 option(ASSIMP_FAST_BUILD "build ASSIMP just for tests" ON)
+
 if(ASSIMP_FAST_BUILD)
     option(ASSIMP_INSTALL FALSE)
     option(ASSIMP_BUILD_ALL_IMPORTERS_BY_DEFAULT FALSE)
     option(ASSIMP_BUILD_ALL_EXPORTERS_BY_DEFAULT FALSE)
+
     foreach(FMT OBJ;PLY;STL;GLTF)
         set(ASSIMP_BUILD_${FMT}_IMPORTER TRUE)
         set(ASSIMP_BUILD_${FMT}_EXPORTER TRUE)
@@ -38,9 +40,10 @@ endif()
 
 set(THRUST_INC_DIR ${PROJECT_SOURCE_DIR}/third_party/thrust)
 
-if (MANIFOLD_USE_CUDA)
+if(MANIFOLD_USE_CUDA)
     enable_language(CUDA)
     find_package(CUDA REQUIRED)
+
     # we cannot set THRUST_INC_DIR when building with CUDA, otherwise the
     # compiler will not use the system CUDA headers which causes incompatibility
     # clear THRUST_INC_DIR, we use the one from nvcc
@@ -48,8 +51,8 @@ if (MANIFOLD_USE_CUDA)
     set(MANIFOLD_NVCC_RELEASE_FLAGS -O3 -lineinfo)
     set(MANIFOLD_NVCC_DEBUG_FLAGS -G)
     set(MANIFOLD_NVCC_FLAGS -Xcudafe --diag_suppress=esa_on_defaulted_function_ignored --extended-lambda
-            "$<$<CONFIG:RELEASE>:${MANIFOLD_NVCC_RELEASE_FLAGS}>"
-            "$<$<CONFIG:DEBUG>:${MANIFOLD_NVCC_DEBUG_FLAGS}>")
+        "$<$<CONFIG:RELEASE>:${MANIFOLD_NVCC_RELEASE_FLAGS}>"
+        "$<$<CONFIG:DEBUG>:${MANIFOLD_NVCC_DEBUG_FLAGS}>")
 endif()
 
 if(NOT MSVC)
@@ -58,6 +61,7 @@ if(NOT MSVC)
         "$<$<COMPILE_LANGUAGE:CXX>:${WARNING_FLAGS}>"
         "$<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=${WARNING_FLAGS}>")
 endif()
+
 if(CODE_COVERAGE AND NOT MSVC)
     add_compile_options(
         "$<$<COMPILE_LANGUAGE:CXX>:-coverage>"
