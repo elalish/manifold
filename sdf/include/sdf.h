@@ -65,6 +65,43 @@ constexpr glm::vec3 edgeVec[7] = {{0.5f, 0.5f, 0.5f},   //
                                   {0.5f, -0.5f, 0.5f},  //
                                   {0.5f, 0.5f, -0.5f}};
 
+__host__ __device__ uint64_t SpreadBits3(uint64_t v) {
+  v = v & 0x1fffff;
+  v = (v | v << 32) & 0x1f00000000ffff;
+  v = (v | v << 16) & 0x1f0000ff0000ff;
+  v = (v | v << 8) & 0x100f00f00f00f00f;
+  v = (v | v << 4) & 0x10c30c30c30c30c3;
+  v = (v | v << 2) & 0x1249249249249249;
+  return v;
+}
+
+__host__ __device__ uint64_t SqeezeBits3(uint64_t v) {
+  v = v & 0x1249249249249249;
+  v = (v ^ (v >> 2)) & 0x10c30c30c30c30c3;
+  v = (v ^ (v >> 4)) & 0x100f00f00f00f00f;
+  v = (v ^ (v >> 8)) & 0x1f0000ff0000ff;
+  v = (v ^ (v >> 16)) & 0x1f00000000ffff;
+  v = (v ^ (v >> 32)) & 0x1fffff;
+  return v;
+}
+
+// This is a modified 3D MortonCode, where the xyz code is shifted by one bit
+// and the w bit is added as the least significant. This allows 21 bits per x,
+// y, and z channel and 1 for w, filling the 64 bit total.
+__device__ __host__ uint64_t MortonCode(const glm::ivec4& index) {
+  return static_cast<uint64_t>(index.w) | (SpreadBits3(index.x) << 1) |
+         (SpreadBits3(index.y) << 2) | (SpreadBits3(index.z) << 3);
+}
+
+__device__ __host__ glm::ivec4 DecodeMorton(uint64_t code) {
+  glm::ivec4 index;
+  index.x = SqeezeBits3(code >> 1);
+  index.y = SqeezeBits3(code >> 2);
+  index.z = SqeezeBits3(code >> 3);
+  index.w = code & 0x1u;
+  return index;
+}
+
 struct GridVert {
   uint64_t key = kOpen;
   float distance = NAN;
@@ -84,9 +121,9 @@ class HashTableD {
   __device__ __host__ bool Insert(const GridVert& vert) {
     uint32_t idx = vert.key & (Size() - 1);
     while (1) {
-      const uint64_t found = AtomicCAS(&table_[idx].key, kOpen, vert.key);
+      const uint64_t found = AtomicCAS(table_[idx].key, kOpen, vert.key);
       if (found == kOpen) {
-        if (AtomicAdd(used_[0], 1) * 2 > Size()) {
+        if (AtomicAdd(used_[0], 0x1u) * 2 > Size()) {
           return true;
         }
         table_[idx] = vert;
@@ -162,12 +199,12 @@ struct ComputeVerts {
   inline __host__ __device__ void operator()(uint64_t mortonCode) {
     GridVert gridVert;
     gridVert.key = mortonCode;
-    const glm::vec3 gridIndex = DecodeMorton(mortonCode);
+    const glm::ivec4 gridIndex = DecodeMorton(mortonCode);
 
     // const auto sdfFunc =
     //     AtBounds(gridIndex) ? &ComputeVerts::BoundedSdf : &ComputeVerts::Sdf;
 
-    const glm::vec3 position = origin + spacing * gridIndex;
+    const glm::vec3 position = origin + spacing * glm::vec3(gridIndex);
     gridVert.distance = sdf(position);
 
     bool keep = false;
@@ -242,7 +279,7 @@ struct BuildTris {
     glm::ivec4 tet(leadVert.Inside(), base.Inside(), -2, -2);
     glm::ivec4 thisIndex = baseIndex;
     thisIndex[0] += 1;
-    GridVert& thisVert = gridVerts[MortonCode(thisIndex)];
+    GridVert thisVert = gridVerts[MortonCode(thisIndex)];
     tet[2] = thisVert.Inside();
     int edges[6] = {base.edgeVerts[0], -1, -1, -1, -1, -1};
     for (const int i : {0, 1, 2}) {
@@ -294,12 +331,10 @@ class SDF {
     Mesh out;
 
     glm::vec3 dim = bounds.Size();
-    // Need to create a new MortonCode function that spreads when needed instead
-    // of always by 3, to make non-cubic domains efficient.
     float maxDim = std::max(dim[0], std::max(dim[1], dim[2]));
     glm::ivec3 gridSize(dim / edgeLength);
     glm::vec3 spacing = dim / glm::vec3(gridSize);
-    int maxMorton = MortonCode(gridSize);
+    int maxMorton = MortonCode(glm::ivec4(gridSize, 1));
 
     HashTable gridVerts(10);  // maxMorton^(2/3)? Some heuristic with ability to
                               // enlarge if it gets too full.

@@ -109,6 +109,18 @@ thrust::counting_iterator<T> countAt(T i) {
 }
 
 template <typename T>
+__host__ __device__ T AtomicCAS(T& target, T compare, T val) {
+#ifdef __CUDA_ARCH__
+  return atomicCAS(&target, compare, val);
+#else
+  std::atomic<T>& tar = reinterpret_cast<std::atomic<T>&>(target);
+  T old_val = tar.load();
+  tar.compare_exchange_weak(compare, val);
+  return old_val;
+#endif
+}
+
+template <typename T>
 __host__ __device__ T AtomicAdd(T& target, T add) {
 #ifdef __CUDA_ARCH__
   return atomicAdd(&target, add);
