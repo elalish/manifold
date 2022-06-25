@@ -1,6 +1,7 @@
 project (samples)
 
-add_library(${PROJECT_NAME} src/knot.cpp src/bracelet.cpp src/menger_sponge.cpp src/rounded_frame.cpp src/tet_puzzle.cpp src/scallop.cpp)
+file(GLOB_RECURSE SOURCE_FILES CONFIGURE_DEPENDS *.cpp)
+add_library(${PROJECT_NAME} ${SOURCE_FILES})
 
 target_include_directories( ${PROJECT_NAME}
     PUBLIC ${PROJECT_SOURCE_DIR}/include
