@@ -13,8 +13,8 @@ int main(int argc, char **argv) {
   Test func;
   SDF<Test> a(func);
   Box box({-1, -1, -1}, {1, 1, 1});
-  Mesh b = a.LevelSet(box, 1, 0.1);
-  Dump(b.vertPos);
-  Dump(b.triVerts);
+  Mesh b = a.LevelSet(box, 0.5, 0.6);
+  // Dump(b.vertPos);
+  // Dump(b.triVerts);
   ExportMesh("sdf.gltf", b, {});
 }
