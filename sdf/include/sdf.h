@@ -108,7 +108,7 @@ struct GridVert {
   int edgeIndex = -1;
   int edgeVerts[7] = {-1, -1, -1, -1, -1, -1, -1};
 
-  int Inside() const { return edgeIndex == -1 ? (distance >= 0 ? 1 : -1) : 0; }
+  int Inside() const { return edgeIndex == -1 ? (distance > 0 ? 1 : -1) : 0; }
 };
 
 class HashTableD {
@@ -178,46 +178,44 @@ struct ComputeVerts {
   int* vertIndex;
   HashTableD gridVerts;
   const Func sdf;
-  const glm::ivec3 gridSize;
-  const glm::vec3 origin;
+  const Box bounds;
+  const Box innerBounds;
+  const Box outerBounds;
   const glm::vec3 spacing;
   const float level;
 
-  inline __host__ __device__ bool AtBounds(glm::ivec3 gridIndex) const {
-    return gridIndex.x == 0 || gridIndex.x == gridSize.x || gridIndex.y == 0 ||
-           gridIndex.y == gridSize.y || gridIndex.z == 0 ||
-           gridIndex.z == gridSize.z;
+  inline __host__ __device__ float BoundedSDF(glm::vec3 pos) const {
+    const float d = sdf(pos) - level;
+    return innerBounds.Contains(pos) ? d : glm::min(d, 0.0f);
   }
 
-  inline __host__ __device__ float Sdf(glm::vec3 base, int i) const {
-    return sdf(base +
-               (i < 7 ? 1.0f : -1.0f) * spacing * edgeVec[i < 7 ? i : i - 7]);
+  inline __host__ __device__ float AdjacentSDF(glm::vec3 base, int i) const {
+    return BoundedSDF(base + (i < 7 ? 1.0f : -1.0f) * spacing *
+                                 edgeVec[i < 7 ? i : i - 7]);
   }
-
-  // inline __host__ __device__ float BoundedSdf(glm::vec3 base, int i) const {}
 
   inline __host__ __device__ void operator()(uint64_t mortonCode) {
     const glm::ivec4 gridIndex = DecodeMorton(mortonCode);
-    if (gridIndex.x > gridSize.x || gridIndex.y > gridSize.y ||
-        gridIndex.z > gridSize.z)
-      return;
-
-    GridVert gridVert;
-    gridVert.key = mortonCode;
 
     // const auto sdfFunc =
     //     AtBounds(gridIndex) ? &ComputeVerts::BoundedSdf : &ComputeVerts::Sdf;
 
     const glm::vec3 position =
-        origin + spacing * (glm::vec3(gridIndex) +
-                            (gridIndex.w == 1 ? 0.5f : 0.0f) * glm::vec3(1));
-    gridVert.distance = sdf(position) - level;
+        bounds.min +
+        spacing * (-0.5f + glm::vec3(gridIndex) +
+                   (gridIndex.w == 1 ? 0.5f : 0.0f) * glm::vec3(1));
+
+    if (!outerBounds.Contains(position)) return;
+
+    GridVert gridVert;
+    gridVert.key = mortonCode;
+    gridVert.distance = BoundedSDF(position);
 
     bool keep = false;
     float minDist2 = 0.25 * 0.25;
     for (int i = 0; i < 14; ++i) {
       const int j = i < 7 ? i : i - 7;
-      const float val = Sdf(position, i) - level;
+      const float val = AdjacentSDF(position, i);
       if (val * gridVert.distance > 0 || (val == 0 && gridVert.distance == 0))
         continue;
       keep = true;
@@ -229,7 +227,7 @@ struct ComputeVerts {
           edgeVec[j] * (1 - val / (val - gridVert.distance));
       const float dist2 = glm::dot(delta, delta);
       if (dist2 < minDist2) {
-        gridVert.edgeIndex = i;
+        // gridVert.edgeIndex = i;
         minDist2 = dist2;
       }
 
@@ -250,19 +248,19 @@ struct BuildTris {
   int* triIndex;
   const HashTableD gridVerts;
 
+  __host__ __device__ void CreateTri(const glm::ivec3& tri,
+                                     const int edges[6]) {
+    if (tri[0] < 0) return;
+    int idx = AtomicAdd(*triIndex, 1);
+    triVerts[idx] = {edges[tri[0]], edges[tri[1]], edges[tri[2]]};
+  }
+
   __host__ __device__ void CreateTris(const glm::ivec4& tet,
                                       const int edges[6]) {
     const int i = (tet[0] > 0 ? 1 : 0) + (tet[1] > 0 ? 2 : 0) +
                   (tet[2] > 0 ? 4 : 0) + (tet[3] > 0 ? 8 : 0);
-    glm::ivec3 tri = tetTri0[i];
-    if (tri[0] < 0) return;
-    int idx = AtomicAdd(*triIndex, 1);
-    triVerts[idx] = {edges[tri[0]], edges[tri[1]], edges[tri[2]]};
-
-    tri = tetTri1[i];
-    if (tri[0] < 0) return;
-    idx = AtomicAdd(*triIndex, 1);
-    triVerts[idx] = {edges[tri[0]], edges[tri[1]], edges[tri[2]]};
+    CreateTri(tetTri0[i], edges);
+    CreateTri(tetTri1[i], edges);
   }
 
   __host__ __device__ void operator()(int idx) {
@@ -349,14 +347,18 @@ class SDF {
 
     const glm::vec3 dim = bounds.Size();
     const float maxDim = std::max(dim[0], std::max(dim[1], dim[2]));
-    const glm::ivec3 gridSize(dim / edgeLength);            // + 1.0f);
-    const glm::vec3 spacing = dim / (glm::vec3(gridSize));  // - 0.5f);
+    const glm::ivec3 gridSize(dim / edgeLength);
+    const glm::vec3 spacing = dim / (glm::vec3(gridSize));
 
-    const glm::vec3 origin = bounds.min;  // - 0.5f * spacing;
-    std::cout << spacing << ", " << origin << ", "
-              << origin + glm::vec3(gridSize) * spacing + 0.5f * spacing
-              << std::endl;
-    const int maxMorton = MortonCode(glm::ivec4(gridSize, 1));
+    const Box innerBounds(bounds.min + 0.25f * spacing,
+                          bounds.max - 0.25f * spacing);
+    const Box outerBounds(bounds.min - 0.75f * spacing,
+                          bounds.max + 0.75f * spacing);
+
+    const int maxMorton = MortonCode(glm::ivec4(gridSize + 1, 0));
+    // const int maxSize = glm::max(gridSize.x, glm::max(gridSize.y,
+    // gridSize.z)); const int maxMorton =
+    // MortonCode(glm::ivec4(glm::ivec3(maxSize + 1), 0));
 
     HashTable gridVerts(10);  // maxMorton^(2/3)? Some heuristic with ability to
     // enlarge if it gets too full.
@@ -365,9 +367,9 @@ class SDF {
     VecDH<int> index(1, 0);
 
     thrust::for_each_n(
-        countAt(0), maxMorton,
+        countAt(0), maxMorton + 1,
         ComputeVerts<Func>({vertPos.ptrD(), index.ptrD(), gridVerts.D(), sdf_,
-                            gridSize, origin, spacing, level}));
+                            bounds, innerBounds, outerBounds, spacing, level}));
     vertPos.resize(index[0]);
 
     VecDH<glm::ivec3> triVerts(gridVerts.Entries() * 12);  // worst case
