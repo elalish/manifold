@@ -138,8 +138,7 @@ class HashTableD {
     uint32_t idx = key & (Size() - 1);
     while (1) {
       const GridVert found = table_[idx];
-      if (found.key == key) return found;
-      if (found.key == kOpen) return GridVert();
+      if (found.key == key || found.key == kOpen) return found;
       idx = (idx + step_) & (Size() - 1);
     }
   }
@@ -155,7 +154,7 @@ class HashTableD {
 class HashTable {
  public:
   HashTable(uint32_t sizeExp = 20, uint32_t step = 127)
-      : alloc_{1 << sizeExp}, table_{alloc_, used_, step} {}
+      : alloc_{1 << sizeExp, {}}, table_{alloc_, used_, step} {}
 
   HashTableD D() { return table_; }
 
@@ -182,6 +181,7 @@ struct ComputeVerts {
   const glm::ivec3 gridSize;
   const glm::vec3 origin;
   const glm::vec3 spacing;
+  const float level;
 
   inline __host__ __device__ bool AtBounds(glm::ivec3 gridIndex) const {
     return gridIndex.x == 0 || gridIndex.x == gridSize.x || gridIndex.y == 0 ||
@@ -191,7 +191,8 @@ struct ComputeVerts {
 
   inline __host__ __device__ float Sdf(glm::vec3 base, int i) const {
     return sdf(base +
-               (i < 7 ? 1.0f : -1.0f) * spacing * edgeVec[i < 7 ? i : i - 7]);
+               (i < 7 ? 1.0f : -1.0f) * spacing * edgeVec[i < 7 ? i : i - 7]) -
+           level;
   }
 
   // inline __host__ __device__ float BoundedSdf(glm::vec3 base, int i) const {}
@@ -204,8 +205,9 @@ struct ComputeVerts {
     // const auto sdfFunc =
     //     AtBounds(gridIndex) ? &ComputeVerts::BoundedSdf : &ComputeVerts::Sdf;
 
-    const glm::vec3 position = origin + spacing * glm::vec3(gridIndex);
-    gridVert.distance = sdf(position);
+    const glm::vec3 position = origin + spacing * glm::vec3(gridIndex) +
+                               (gridIndex.w == 1 ? 0.5f : 0.0f) * glm::vec3(1);
+    gridVert.distance = sdf(position) - level;
 
     bool keep = false;
     float minDist2 = 0.25 * 0.25;
@@ -250,11 +252,15 @@ struct BuildTris {
                   (tet[2] > 0 ? 4 : 0) + (tet[3] > 0 ? 8 : 0);
     glm::ivec3 tri = tetTri0[i];
     if (tri[0] < 0) return;
+    // for (int i : {0, 1, 2})
+    //   if (edges[tri[i]] < 0) return;
     int idx = AtomicAdd(*triIndex, 1);
     triVerts[idx] = {edges[tri[0]], edges[tri[1]], edges[tri[2]]};
 
     tri = tetTri1[i];
     if (tri[0] < 0) return;
+    // for (int i : {0, 1, 2})
+    //   if (edges[tri[i]] < 0) return;
     idx = AtomicAdd(*triIndex, 1);
     triVerts[idx] = {edges[tri[0]], edges[tri[1]], edges[tri[2]]};
   }
@@ -272,14 +278,19 @@ struct BuildTris {
       leadIndex += 1;
       leadIndex.w = 0;
     }
+
     const GridVert& leadVert = gridVerts[MortonCode(leadIndex)];
+    if (leadVert.key == kOpen) return;
 
     // This GridVert is in charge of the 6 tetrahedra surrounding its edge in
     // the (1,1,1) direction, attached to leadVert.
     glm::ivec4 tet(leadVert.Inside(), base.Inside(), -2, -2);
     glm::ivec4 thisIndex = baseIndex;
-    thisIndex[0] += 1;
+    thisIndex.x += 1;
+
     GridVert thisVert = gridVerts[MortonCode(thisIndex)];
+    bool skipTet = thisVert.key == kOpen;
+
     tet[2] = thisVert.Inside();
     int edges[6] = {base.edgeVerts[0], -1, -1, -1, -1, -1};
     for (const int i : {0, 1, 2}) {
@@ -290,23 +301,29 @@ struct BuildTris {
       thisIndex = leadIndex;
       thisIndex[prev3[i]] -= 1;
       thisVert = gridVerts[MortonCode(thisIndex)];
+
       tet[3] = thisVert.Inside();
       edges[2] = thisVert.edgeVerts[next3[i] + 4];
       edges[3] = thisVert.edgeVerts[prev3[i] + 1];
-      CreateTris(tet, edges);
 
+      if (!skipTet && thisVert.key != kOpen) CreateTris(tet, edges);
+      skipTet = thisVert.key == kOpen;
+
+      tet[2] = tet[3];
       edges[1] = edges[5];
       edges[2] = thisVert.edgeVerts[i + 4];
       edges[4] = edges[3];
       edges[5] = base.edgeVerts[next3[i] + 1];
 
-      tet[2] = tet[3];
       glm::ivec4 thisIndex = baseIndex;
       thisIndex[next3[i]] += 1;
       thisVert = gridVerts[MortonCode(thisIndex)];
+
       tet[3] = thisVert.Inside();
       edges[3] = thisVert.edgeVerts[next3[i] + 4];
-      CreateTris(tet, edges);
+
+      if (!skipTet && thisVert.key != kOpen) CreateTris(tet, edges);
+      skipTet = thisVert.key == kOpen;
 
       tet[2] = tet[3];
     }
@@ -337,7 +354,7 @@ class SDF {
     int maxMorton = MortonCode(glm::ivec4(gridSize, 1));
 
     HashTable gridVerts(10);  // maxMorton^(2/3)? Some heuristic with ability to
-                              // enlarge if it gets too full.
+    // enlarge if it gets too full.
 
     VecDH<glm::vec3> vertPos(gridVerts.Size() * 7);
     VecDH<int> index(1, 0);
@@ -345,7 +362,7 @@ class SDF {
     thrust::for_each_n(
         countAt(0), maxMorton,
         ComputeVerts<Func>({vertPos.ptrD(), index.ptrD(), gridVerts.D(), sdf_,
-                            gridSize, bounds.min, spacing}));
+                            gridSize, bounds.min, spacing, level}));
     vertPos.resize(index[0]);
 
     VecDH<glm::ivec3> triVerts(gridVerts.Entries() * 12);  // worst case

@@ -1,3 +1,4 @@
+#include "meshIO.h"
 #include "sdf.h"
 
 using namespace manifold;
@@ -11,6 +12,9 @@ struct Test {
 int main(int argc, char **argv) {
   Test func;
   SDF<Test> a(func);
-  Box box;
-  Mesh b = a.LevelSet(box, 1);
+  Box box({-1, -1, -1}, {1, 1, 1});
+  Mesh b = a.LevelSet(box, 1, 0.1);
+  Dump(b.vertPos);
+  Dump(b.triVerts);
+  ExportMesh("sdf.gltf", b, {});
 }
