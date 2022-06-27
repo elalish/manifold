@@ -239,7 +239,9 @@ struct ComputeVerts {
         gridVert.edgeVerts[i] = idx;
       }
     }
-    if (keep) gridVerts.Insert(gridVert);
+
+    if (keep && gridVerts.Insert(gridVert))
+      std::cout << "out of space!" << std::endl;
   }
 };
 
@@ -355,13 +357,13 @@ class SDF {
     const Box outerBounds(bounds.min - 0.75f * spacing,
                           bounds.max + 0.75f * spacing);
 
-    const int maxMorton = MortonCode(glm::ivec4(gridSize + 1, 0));
-    // const int maxSize = glm::max(gridSize.x, glm::max(gridSize.y,
-    // gridSize.z)); const int maxMorton =
-    // MortonCode(glm::ivec4(glm::ivec3(maxSize + 1), 0));
+    const int maxMorton = MortonCode(glm::ivec4(gridSize + 1, 1));
 
-    HashTable gridVerts(10);  // maxMorton^(2/3)? Some heuristic with ability to
-    // enlarge if it gets too full.
+    const int tableSize =
+        glm::min(maxMorton, static_cast<int>(100 * glm::pow(maxMorton, 0.667)));
+    std::cout << "maxMorton: " << maxMorton
+              << ", hash table size: " << tableSize << std::endl;
+    HashTable gridVerts(tableSize);
 
     VecDH<glm::vec3> vertPos(gridVerts.Size() * 7);
     VecDH<int> index(1, 0);

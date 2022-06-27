@@ -12,7 +12,7 @@ struct Test {
 int main(int argc, char **argv) {
   Test func;
   SDF<Test> a(func);
-  Box box({-1, -1, -1}, {1, 2, 1});
+  Box box({-1, -1, -1}, {1, 2, 3});
   Mesh b = a.LevelSet(box, 0.5, -0.1);
   // Dump(b.vertPos);
   // Dump(b.triVerts);
