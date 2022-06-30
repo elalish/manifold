@@ -1,0 +1,106 @@
+<!doctype html>
+<html>
+  <script src="https://unpkg.com/three@0.142.0/build/three.js"></script>
+  <script src="https://unpkg.com/three@0.142.0/examples/js/utils/BufferGeometryUtils.js"></script>
+  <script>
+    var Module = {
+      onRuntimeInitialized: function() {
+        // we have manifold module, let's do some three.js
+        const camera = new THREE.PerspectiveCamera(30, 0.75, 0.01, 10);
+        camera.position.z = 1;
+
+        const scene = new THREE.Scene();
+
+        const geometry_1 = simplify(new THREE.BoxGeometry(0.2, 0.2, 0.2));
+        const geometry_2 = simplify(new THREE.IcosahedronGeometry(0.16));
+
+        const wasm_mesh_1 = geometry2mesh(geometry_1);
+        const wasm_manifold_1 =
+          // use this if your input mesh is guaranteed to have no issues
+          // new Module.Manifold(wasm_mesh_1);
+          // use this if you want this code to survive the exception
+          Module.makeManifoldFromMesh(wasm_mesh_1);
+
+        const wasm_mesh_2 = geometry2mesh(geometry_2);
+        const wasm_manifold_2 = new Module.Manifold(wasm_mesh_2);
+
+        wasm_manifold_1.subtract(wasm_manifold_2);
+        const wasm_mesh =
+          // use this if your output mesh is guaranteed to have no issues
+          // wasm_manifold_1.GetMesh();
+          // use this if you want this code to survive the exception
+          Module.makeMeshFromManifold(wasm_manifold_1);
+
+        const geometry = mesh2geometry(wasm_mesh);
+        const material = new THREE.MeshNormalMaterial();
+
+        const mesh = new THREE.Mesh(geometry, material);
+        scene.add(mesh);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        document.body.appendChild(renderer.domElement);
+        renderer.setSize(300, 400);
+        renderer.setAnimationLoop(function(time) {
+          mesh.rotation.x = time / 2000;
+        	mesh.rotation.y = time / 1000;
+        	renderer.render(scene, camera);
+        });
+
+      }
+    };
+
+    // functions to convert between three.js and wasm
+    function geometry2mesh(geometry) {
+      const mesh = Module.makeEmptyMesh();
+      const temp = new THREE.Vector3();
+      const face = [0, 0, 0];
+      const p = geometry.attributes.position;
+      const n = geometry.attributes.normal;
+      const x = geometry.index;
+      for(let i = 0; i < p.count; i++) {
+        temp.fromBufferAttribute(p, i);
+        mesh.vertPos.push_back(temp);
+        temp.fromBufferAttribute(n, i);
+        mesh.vertNormal.push_back(temp);
+      }
+      for(let i = 0; i < x.count; i+=3) {
+        face[0] = x.array[i];
+        face[1] = x.array[i + 1];
+        face[2] = x.array[i + 2];
+        mesh.triVerts.push_back(face);
+      }
+      return mesh;
+    }
+
+    function mesh2geometry(mesh) {
+      const geometry = new THREE.BufferGeometry();
+      const p = [], n = [], x = [];
+      let i, s, v;
+      for(i = 0, s = mesh.vertPos.size(); i < s; i++) {
+        v = mesh.vertPos.get(i);
+        p.push(v.x, v.y, v.z);
+        v = mesh.vertNormal.get(i);
+        n.push(v.x, v.y, v.z);
+      }
+      for(i = 0, s = mesh.triVerts.size(); i < s; i++) {
+        v = mesh.triVerts.get(i);
+        x.push(v[0], v[1], v[2]);
+      }
+      geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(p), 3));
+      geometry.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(n), 3));
+      geometry.setIndex(new THREE.BufferAttribute(new Uint8Array(x), 1));
+      return geometry;
+    }
+
+    // most of three.js geometries arent manifolds, so...
+    function simplify(geometry) {
+      delete geometry.attributes.normal;
+      delete geometry.attributes.uv;
+      const simplified = THREE.BufferGeometryUtils.mergeVertices(geometry);
+      simplified.computeVertexNormals();
+      return simplified;
+    }
+  </script>
+  <script src="manifold.js"></script>
+  <body />
+</html>
