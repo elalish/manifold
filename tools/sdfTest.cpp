@@ -5,7 +5,7 @@ using namespace manifold;
 
 struct Test {
   __host__ __device__ float operator()(glm::vec3 point) const {
-    return glm::dot(point, {1, 1, 1});
+    return glm::dot(point, {1, 1, 2});
   }
 };
 

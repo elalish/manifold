@@ -57,13 +57,20 @@ constexpr glm::ivec3 tetTri1[16] = {{-1, -1, -1},  //
                                     {-1, -1, -1},  //
                                     {-1, -1, -1}};
 
-constexpr glm::vec3 edgeVec[7] = {{0.5f, 0.5f, 0.5f},   //
-                                  {1.0f, 0.0f, 0.0f},   //
-                                  {0.0f, 1.0f, 0.0f},   //
-                                  {0.0f, 0.0f, 1.0f},   //
-                                  {-0.5f, 0.5f, 0.5f},  //
-                                  {0.5f, -0.5f, 0.5f},  //
-                                  {0.5f, 0.5f, -0.5f}};
+constexpr glm::ivec4 neighbors[14] = {{0, 0, 0, 1},     //
+                                      {1, 0, 0, 0},     //
+                                      {0, 1, 0, 0},     //
+                                      {0, 0, 1, 0},     //
+                                      {-1, 0, 0, 1},    //
+                                      {0, -1, 0, 1},    //
+                                      {0, 0, -1, 1},    //
+                                      {-1, -1, -1, 1},  //
+                                      {-1, 0, 0, 0},    //
+                                      {0, -1, 0, 0},    //
+                                      {0, 0, -1, 0},    //
+                                      {0, -1, -1, 1},   //
+                                      {-1, 0, -1, 1},   //
+                                      {-1, -1, 0, 1}};
 
 __host__ __device__ uint64_t SpreadBits3(uint64_t v) {
   v = v & 0x1fffff;
@@ -77,11 +84,11 @@ __host__ __device__ uint64_t SpreadBits3(uint64_t v) {
 
 __host__ __device__ uint64_t SqeezeBits3(uint64_t v) {
   v = v & 0x1249249249249249;
-  v = (v ^ (v >> 2)) & 0x10c30c30c30c30c3;
-  v = (v ^ (v >> 4)) & 0x100f00f00f00f00f;
-  v = (v ^ (v >> 8)) & 0x1f0000ff0000ff;
-  v = (v ^ (v >> 16)) & 0x1f00000000ffff;
-  v = (v ^ (v >> 32)) & 0x1fffff;
+  v = (v ^ v >> 2) & 0x10c30c30c30c30c3;
+  v = (v ^ v >> 4) & 0x100f00f00f00f00f;
+  v = (v ^ v >> 8) & 0x1f0000ff0000ff;
+  v = (v ^ v >> 16) & 0x1f00000000ffff;
+  v = (v ^ v >> 32) & 0x1fffff;
   return v;
 }
 
@@ -153,8 +160,8 @@ class HashTableD {
 
 class HashTable {
  public:
-  HashTable(uint32_t sizeExp = 20, uint32_t step = 127)
-      : alloc_{1 << sizeExp, {}}, table_{alloc_, used_, step} {}
+  HashTable(uint32_t size, uint32_t step = 127)
+      : alloc_{1 << (int)ceil(log2(size)), {}}, table_{alloc_, used_, step} {}
 
   HashTableD D() { return table_; }
 
@@ -178,44 +185,79 @@ struct ComputeVerts {
   int* vertIndex;
   HashTableD gridVerts;
   const Func sdf;
-  const Box bounds;
-  const Box innerBounds;
-  const Box outerBounds;
+  const glm::vec3 origin;
+  const glm::ivec3 gridSize;
   const glm::vec3 spacing;
   const float level;
 
-  inline __host__ __device__ float BoundedSDF(glm::vec3 pos) const {
-    const float d = sdf(pos) - level;
-    return innerBounds.Contains(pos) ? d : glm::min(d, 0.0f);
+  inline __host__ __device__ glm::vec3 Position(glm::ivec4 gridIndex) const {
+    return origin + spacing * (-0.5f + glm::vec3(gridIndex) +
+                               (gridIndex.w == 1 ? 0.5f : 0.0f) * glm::vec3(1));
   }
 
-  inline __host__ __device__ float AdjacentSDF(glm::vec3 base, int i) const {
-    return BoundedSDF(base + (i < 7 ? 1.0f : -1.0f) * spacing *
-                                 edgeVec[i < 7 ? i : i - 7]);
+  inline __host__ __device__ float BoundedSDF(glm::ivec4 gridIndex) const {
+    glm::vec3 pos = Position(gridIndex);
+
+    const float d = sdf(pos) - level;
+
+    if (gridIndex.w == 1) {
+      if (d > 0) {
+        const glm::ivec3 xyz(gridIndex);
+        if (glm::any(glm::equal(xyz, glm::ivec3(0))) ||
+            glm::any(glm::equal(xyz, gridSize - 1)))
+          return 0.0f;
+        else if (glm::any(glm::equal(xyz, gridSize)))
+          return -1.0f;
+      }
+    } else {
+      bool mirror = true;
+      if (gridIndex.x == 0)
+        pos.x += spacing.x;
+      else if (gridIndex.y == 0)
+        pos.y += spacing.y;
+      else if (gridIndex.z == 0)
+        pos.z += spacing.z;
+      else if (gridIndex.x == gridSize.x)
+        pos.x -= spacing.x;
+      else if (gridIndex.y == gridSize.y)
+        pos.y -= spacing.y;
+      else if (gridIndex.z == gridSize.z)
+        pos.z -= spacing.z;
+      else
+        mirror = false;
+      if (mirror) {
+        const float dMirror = sdf(pos) - level;
+        return dMirror > 0 ? glm::min(d, -dMirror) : -1.0f;
+      }
+    }
+    return d;
   }
 
   inline __host__ __device__ void operator()(uint64_t mortonCode) {
     const glm::ivec4 gridIndex = DecodeMorton(mortonCode);
 
+    if (glm::any(glm::greaterThan(glm::ivec3(gridIndex), gridSize))) return;
+
     // const auto sdfFunc =
     //     AtBounds(gridIndex) ? &ComputeVerts::BoundedSdf : &ComputeVerts::Sdf;
 
-    const glm::vec3 position =
-        bounds.min +
-        spacing * (-0.5f + glm::vec3(gridIndex) +
-                   (gridIndex.w == 1 ? 0.5f : 0.0f) * glm::vec3(1));
-
-    if (!outerBounds.Contains(position)) return;
+    const glm::vec3 position = Position(gridIndex);
 
     GridVert gridVert;
     gridVert.key = mortonCode;
-    gridVert.distance = BoundedSDF(position);
+    gridVert.distance = BoundedSDF(gridIndex);
 
     bool keep = false;
     float minDist2 = 0.25 * 0.25;
     for (int i = 0; i < 14; ++i) {
       const int j = i < 7 ? i : i - 7;
-      const float val = AdjacentSDF(position, i);
+      glm::ivec4 neighborIndex = gridIndex + neighbors[i];
+      if (neighborIndex.w == 2) {
+        neighborIndex += 1;
+        neighborIndex.w = 0;
+      }
+      const glm::vec3 iPos = Position(neighborIndex);
+      const float val = BoundedSDF(neighborIndex);
       if (val * gridVert.distance > 0 || (val == 0 && gridVert.distance == 0))
         continue;
       keep = true;
@@ -223,8 +265,9 @@ struct ComputeVerts {
       // Record the nearest intersection of all 14 edges, only if it is close
       // enough to allow this gridVert to safely move to it without inverting
       // any tetrahedra.
-      const glm::vec3 delta =
-          edgeVec[j] * (1 - val / (val - gridVert.distance));
+      const glm::vec3 interp = (val * position - gridVert.distance * iPos) /
+                               (val - gridVert.distance);
+      const glm::vec3 delta = interp - position;
       const float dist2 = glm::dot(delta, delta);
       if (dist2 < minDist2) {
         // gridVert.edgeIndex = i;
@@ -235,7 +278,7 @@ struct ComputeVerts {
       // which intersect the surface create a vert.
       if (i < 7) {
         const int idx = AtomicAdd(*vertIndex, 1);
-        vertPos[idx] = position + spacing * delta;
+        vertPos[idx] = interp;
         gridVert.edgeVerts[i] = idx;
       }
     }
@@ -352,15 +395,10 @@ class SDF {
     const glm::ivec3 gridSize(dim / edgeLength);
     const glm::vec3 spacing = dim / (glm::vec3(gridSize));
 
-    const Box innerBounds(bounds.min + 0.25f * spacing,
-                          bounds.max - 0.25f * spacing);
-    const Box outerBounds(bounds.min - 0.75f * spacing,
-                          bounds.max + 0.75f * spacing);
-
     const int maxMorton = MortonCode(glm::ivec4(gridSize + 1, 1));
 
-    const int tableSize =
-        glm::min(maxMorton, static_cast<int>(100 * glm::pow(maxMorton, 0.667)));
+    const int tableSize = glm::min(
+        2 * maxMorton, static_cast<int>(100 * glm::pow(maxMorton, 0.667)));
     std::cout << "maxMorton: " << maxMorton
               << ", hash table size: " << tableSize << std::endl;
     HashTable gridVerts(tableSize);
@@ -371,7 +409,7 @@ class SDF {
     thrust::for_each_n(
         countAt(0), maxMorton + 1,
         ComputeVerts<Func>({vertPos.ptrD(), index.ptrD(), gridVerts.D(), sdf_,
-                            bounds, innerBounds, outerBounds, spacing, level}));
+                            bounds.min, gridSize + 1, spacing, level}));
     vertPos.resize(index[0]);
 
     VecDH<glm::ivec3> triVerts(gridVerts.Entries() * 12);  // worst case
