@@ -383,9 +383,10 @@ void Manifold::Impl::CollapseEdge(const int edge) {
 void Manifold::Impl::RecursiveEdgeSwap(const int edge) {
   VecDH<BaryRef>& triBary = meshRelation_.triBary;
 
-  if (halfedge_[edge].pairedHalfedge < 0) return;
-
+  if (edge < 0) return;
   const int pair = halfedge_[edge].pairedHalfedge;
+  if (pair < 0) return;
+
   const glm::ivec3 tri0edge = TriOf(edge);
   const glm::ivec3 tri1edge = TriOf(pair);
   const glm::ivec3 perm0 = TriOf(edge % 3);
