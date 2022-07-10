@@ -27,7 +27,7 @@
               src = self;
               patches = [ ./assimp.diff ];
               nativeBuildInputs = (with pkgs; [ cmake python38 ]) ++ build-tools ++
-                (if cuda-support then [ pkgs.cudaPackages_11_5.cudatoolkit pkgs.addOpenGLRunpath ] else [ ]);
+                (if cuda-support then with pkgs.cudaPackages; [ cuda_nvcc cuda_cudart cuda_cccl pkgs.addOpenGLRunpath ] else [ ]);
               cmakeFlags = [
                 "-DMANIFOLD_PAR=${pkgs.lib.strings.toUpper parallel-backend}"
                 "-DMANIFOLD_USE_CUDA=${if cuda-support then "ON" else "OFF"}"
@@ -120,7 +120,11 @@
           };
           devShell = devShell { };
           devShells.cuda = devShell {
-            additional = [ pkgs.cudaPackages_11_5.cudatoolkit ];
+            additional = with pkgs.cudaPackages; [
+              cuda_nvcc
+              cuda_cudart
+              cuda_cccl
+            ];
           };
         }
       );
