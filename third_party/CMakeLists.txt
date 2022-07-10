@@ -1,5 +1,6 @@
 add_subdirectory(graphlite)
 
+if(NOT EMSCRIPTEN)
 ############################################################################
 #                         BUILD ASSIMP LIBRARY                             #
 ############################################################################
@@ -29,7 +30,6 @@ if(NOT TARGET GTest::GMock)
     add_library(GMock::Main ALIAS gmock_main)
 endif()
 
-if(NOT EMSCRIPTEN)
  add_subdirectory(pybind11)
 endif()
 
