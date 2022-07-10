@@ -1,6 +1,6 @@
 {
   inputs.flake-utils.url = "github:numtide/flake-utils";
-  inputs.nixpkgs.url = "nixpkgs/nixos-21.11";
+  inputs.nixpkgs.url = "nixpkgs/nixos-22.05";
 
   outputs = { self, nixpkgs, flake-utils }:
     flake-utils.lib.eachDefaultSystem
@@ -118,7 +118,7 @@
               '';
             };
           };
-          devShell = devShell { additional = [ pkgs.cudatoolkit_11_4 ]; };
+          devShell = devShell { };
           devShells.cuda = devShell {
             additional = [ pkgs.cudatoolkit_11_5 ];
           };
