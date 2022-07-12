@@ -99,6 +99,8 @@
               configurePhase = ''
                 mkdir build
                 cd build
+                mkdir cache
+                export EM_CACHE=$(pwd)/cache
                 emcmake cmake -DCMAKE_BUILD_TYPE=Release ..
               '';
               buildPhase = ''
