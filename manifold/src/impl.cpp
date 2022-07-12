@@ -34,7 +34,8 @@ __host__ __device__ void AtomicAddVec3(glm::vec3& target,
 #else
     std::atomic<float>& tar = reinterpret_cast<std::atomic<float>&>(target[i]);
     float old_val = tar.load(std::memory_order_relaxed);
-    while (!tar.compare_exchange_weak(old_val, old_val + add[i], std::memory_order_relaxed))
+    while (!tar.compare_exchange_weak(old_val, old_val + add[i],
+                                      std::memory_order_relaxed))
       ;
 #endif
   }
@@ -114,7 +115,8 @@ struct Tri2Halfedges {
       const int j = (i + 1) % 3;
       const int edge = 3 * tri + i;
       halfedges[edge] = {triVerts[i], triVerts[j], -1, tri};
-      edges[edge] = ((glm::uint64_t)glm::min(triVerts[i], triVerts[j])) <<32 | glm::max(triVerts[i], triVerts[j]);
+      edges[edge] = ((glm::uint64_t)glm::min(triVerts[i], triVerts[j])) << 32 |
+                    glm::max(triVerts[i], triVerts[j]);
     }
   }
 };
@@ -450,7 +452,7 @@ void Manifold::Impl::CreateHalfedges(const VecDH<glm::ivec3>& triVerts) {
   halfedge_.resize(0);
   halfedge_.resize(3 * numTri);
   VecDH<uint64_t> edge(3 * numTri);
-  VecDH<int> ids(3*numTri);
+  VecDH<int> ids(3 * numTri);
   auto policy = autoPolicy(numTri);
   sequence(policy, ids.begin(), ids.end());
   for_each_n(policy, zip(countAt(0), triVerts.begin()), numTri,
@@ -462,7 +464,7 @@ void Manifold::Impl::CreateHalfedges(const VecDH<glm::ivec3>& triVerts) {
   // fixed by duplicating verts in SimplifyTopology.
   stable_sort_by_key(policy, edge.begin(), edge.end(), ids.begin());
   for_each_n(policy, countAt(0), halfedge_.size() / 2,
-                     LinkHalfedges({halfedge_.ptrD(), ids.ptrD()}));
+             LinkHalfedges({halfedge_.ptrD(), ids.ptrD()}));
 }
 
 /**
