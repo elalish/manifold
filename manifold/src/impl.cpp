@@ -33,8 +33,9 @@ __host__ __device__ void AtomicAddVec3(glm::vec3& target,
     atomicAdd(&target[i], add[i]);
 #else
     std::atomic<float>& tar = reinterpret_cast<std::atomic<float>&>(target[i]);
-    float old_val = tar.load();
-    while (!tar.compare_exchange_weak(old_val, old_val + add[i]))
+    float old_val = tar.load(std::memory_order_relaxed);
+    while (!tar.compare_exchange_weak(old_val, old_val + add[i],
+                                      std::memory_order_relaxed))
       ;
 #endif
   }
@@ -104,7 +105,7 @@ struct AssignNormals {
 
 struct Tri2Halfedges {
   Halfedge* halfedges;
-  TmpEdge* edges;
+  glm::uint64_t* edges;
 
   __host__ __device__ void operator()(
       thrust::tuple<int, const glm::ivec3&> in) {
@@ -114,20 +115,21 @@ struct Tri2Halfedges {
       const int j = (i + 1) % 3;
       const int edge = 3 * tri + i;
       halfedges[edge] = {triVerts[i], triVerts[j], -1, tri};
-      edges[edge] = TmpEdge(triVerts[i], triVerts[j], edge);
+      edges[edge] = ((glm::uint64_t)glm::min(triVerts[i], triVerts[j])) << 32 |
+                    glm::max(triVerts[i], triVerts[j]);
     }
   }
 };
 
 struct LinkHalfedges {
   Halfedge* halfedges;
-  const TmpEdge* edges;
+  const int* ids;
 
   __host__ __device__ void operator()(int k) {
     const int i = 2 * k;
     const int j = i + 1;
-    const int pair0 = edges[i].halfedgeIdx;
-    const int pair1 = edges[j].halfedgeIdx;
+    const int pair0 = ids[i];
+    const int pair1 = ids[j];
     halfedges[pair0].pairedHalfedge = pair1;
     halfedges[pair1].pairedHalfedge = pair0;
   }
@@ -339,7 +341,7 @@ int Manifold::Impl::InitializeNewReference(
     const std::vector<float>& properties,
     const std::vector<float>& propertyTolerance) {
   meshRelation_.triBary.resize(NumTri());
-  const int nextMeshID = meshIDCounter_.fetch_add(1);
+  const int nextMeshID = meshIDCounter_.fetch_add(1, std::memory_order_relaxed);
   ReinitializeReference(nextMeshID);
 
   const int numProps = propertyTolerance.size();
@@ -449,8 +451,10 @@ void Manifold::Impl::CreateHalfedges(const VecDH<glm::ivec3>& triVerts) {
   // drop the old value first to avoid copy
   halfedge_.resize(0);
   halfedge_.resize(3 * numTri);
-  VecDH<TmpEdge> edge(3 * numTri);
+  VecDH<uint64_t> edge(3 * numTri);
+  VecDH<int> ids(3 * numTri);
   auto policy = autoPolicy(numTri);
+  sequence(policy, ids.begin(), ids.end());
   for_each_n(policy, zip(countAt(0), triVerts.begin()), numTri,
              Tri2Halfedges({halfedge_.ptrD(), edge.ptrD()}));
   // Stable sort is required here so that halfedges from the same face are
@@ -458,9 +462,9 @@ void Manifold::Impl::CreateHalfedges(const VecDH<glm::ivec3>& triVerts) {
   // degenerate situations the triangulator can add the same internal edge in
   // two different faces, causing this edge to not be 2-manifold. These are
   // fixed by duplicating verts in SimplifyTopology.
-  stable_sort(policy, edge.begin(), edge.end());
-  thrust::for_each_n(thrust::host, countAt(0), halfedge_.size() / 2,
-                     LinkHalfedges({halfedge_.ptrH(), edge.cptrH()}));
+  stable_sort_by_key(policy, edge.begin(), edge.end(), ids.begin());
+  for_each_n(policy, countAt(0), halfedge_.size() / 2,
+             LinkHalfedges({halfedge_.ptrD(), ids.ptrD()}));
 }
 
 /**
