@@ -395,6 +395,12 @@ TEST(Manifold, Precision) {
   EXPECT_FLOAT_EQ(cube.Precision(), 100 * kTolerance);
 }
 
+TEST(Manifold, Precision2) {
+  Manifold cube = Manifold::Cube();
+  cube = cube.Translate({-0.5, 0, 0}).Scale({2, 1, 1});
+  EXPECT_FLOAT_EQ(cube.Precision(), 2 * kTolerance);
+}
+
 /**
  * Curvature is the inverse of the radius of curvature, and signed such that
  * positive is convex and negative is concave. There are two orthogonal
