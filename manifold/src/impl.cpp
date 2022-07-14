@@ -506,12 +506,12 @@ Manifold::Impl Manifold::Impl::Transform(const glm::mat4x3& transform_) const {
   // axis-aligned.
   if (!result.collider_.Transform(transform_)) result.Update();
 
-  const float oldScale = result.bBox_.Scale();
   result.CalculateBBox();
-
-  const float newScale = result.bBox_.Scale();
-  result.precision_ *= glm::max(1.0f, newScale / oldScale);
-
+  float scale = 0;
+  for (int i : {0, 1, 2})
+    scale =
+        glm::max(scale, transform_[0][i] + transform_[1][i] + transform_[2][i]);
+  result.precision_ *= scale;
   // Maximum of inherited precision loss and translational precision loss.
   result.SetPrecision(result.precision_);
   return result;
