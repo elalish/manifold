@@ -86,18 +86,19 @@ Polygons Duplicate(Polygons polys) {
   return polys;
 }
 
-void TestPoly(const Polygons &polys, int expectedNumTri) {
+void TestPoly(const Polygons &polys, int expectedNumTri,
+              float precision = -1.0f) {
   PolygonParams().verbose = options.params.verbose;
   PolygonParams().intermediateChecks = true;
 
   std::vector<glm::ivec3> triangles;
-  EXPECT_NO_THROW(triangles = Triangulate(polys));
+  EXPECT_NO_THROW(triangles = Triangulate(polys, precision));
   EXPECT_EQ(triangles.size(), expectedNumTri) << "Basic";
 
-  EXPECT_NO_THROW(triangles = Triangulate(Turn180(polys)));
+  EXPECT_NO_THROW(triangles = Triangulate(Turn180(polys), precision));
   EXPECT_EQ(triangles.size(), expectedNumTri) << "Turn 180";
 
-  EXPECT_NO_THROW(triangles = Triangulate(Duplicate(polys)));
+  EXPECT_NO_THROW(triangles = Triangulate(Duplicate(polys), precision));
   EXPECT_EQ(triangles.size(), 2 * expectedNumTri) << "Duplicate";
 
   PolygonParams().intermediateChecks = false;
@@ -696,6 +697,20 @@ TEST(Polygon, SharedEdge) {
   });
   TestPoly(polys, 4);
 }
+
+TEST(Polygon, Precision) {
+  Polygons polys;
+  polys.push_back({
+      {glm::vec2(-0.98486793, -0.492948532), 0},   //
+      {glm::vec2(-0.984859049, -0.492013603), 1},  //
+      {glm::vec2(-0.984966695, -0.489926398), 2},  //
+      {glm::vec2(-0.984955609, -0.490281343), 3},  //
+      {glm::vec2(-0.985008538, -0.489676297), 4},  //
+      {glm::vec2(-0.98491329, -0.491925418), 5},   //
+      {glm::vec2(-0.984878719, -0.492937535), 6},  //
+  });
+  TestPoly(polys, 5, 0.0001);
+};
 
 TEST(Polygon, Comb) {
   Polygons polys;
