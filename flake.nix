@@ -1,6 +1,6 @@
 {
   inputs.flake-utils.url = "github:numtide/flake-utils";
-  inputs.nixpkgs.url = "nixpkgs/nixos-21.11";
+  inputs.nixpkgs.url = "nixpkgs/nixos-22.05";
 
   outputs = { self, nixpkgs, flake-utils }:
     flake-utils.lib.eachDefaultSystem
@@ -27,7 +27,7 @@
               src = self;
               patches = [ ./assimp.diff ];
               nativeBuildInputs = (with pkgs; [ cmake python38 ]) ++ build-tools ++
-                (if cuda-support then [ pkgs.cudatoolkit_11_5 pkgs.addOpenGLRunpath ] else [ ]);
+                (if cuda-support then with pkgs.cudaPackages; [ cuda_nvcc cuda_cudart cuda_cccl pkgs.addOpenGLRunpath ] else [ ]);
               cmakeFlags = [
                 "-DMANIFOLD_PAR=${pkgs.lib.strings.toUpper parallel-backend}"
                 "-DMANIFOLD_USE_CUDA=${if cuda-support then "ON" else "OFF"}"
@@ -99,6 +99,8 @@
               configurePhase = ''
                 mkdir build
                 cd build
+                mkdir cache
+                export EM_CACHE=$(pwd)/cache
                 emcmake cmake -DCMAKE_BUILD_TYPE=Release ..
               '';
               buildPhase = ''
@@ -117,9 +119,13 @@
               '';
             };
           };
-          devShell = devShell { additional = [ pkgs.cudatoolkit_11_4 ]; };
+          devShell = devShell { };
           devShells.cuda = devShell {
-            additional = [ pkgs.cudatoolkit_11_5 ];
+            additional = with pkgs.cudaPackages; [
+              cuda_nvcc
+              cuda_cudart
+              cuda_cccl
+            ];
           };
         }
       );
