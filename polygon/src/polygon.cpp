@@ -167,7 +167,11 @@ class Monotones {
     PairItr eastPair, westPair;
 
     bool Processed() const { return index < 0; }
-    void SetProcessed(bool processed) { index = processed ? -1 : 0; }
+    void SetSkip() { index = -2; }
+    void SetProcessed(bool processed) {
+      if (index == -2) return;
+      index = processed ? -1 : 0;
+    }
     bool IsStart() const {
       return (left->pos.y >= pos.y && right->pos.y > pos.y) ||
              (left->pos.y == pos.y && right->pos.y == pos.y &&
@@ -397,9 +401,12 @@ class Monotones {
    * When vert is a START, this determines if it is backwards (forming a void or
    * hole). Usually the first return is adequate, but if it is degenerate, the
    * function will continue to search up the neighbors until the degeneracy is
-   * broken and a certain answer is returned.
+   * broken and a certain answer is returned. Like CCW, this function returns 1
+   * for a hole, -1 for a start, and 0 only if the entire polygon degenerates to
+   * a line, in which case no monotone splitting will be attempted and the
+   * degenerate polygon will be triangulated arbitrarily.
    */
-  bool IsHole(VertItr vert) const {
+  int IsHole(VertItr vert) const {
     VertItr left = vert->left;
     VertItr right = vert->right;
     VertItr center = vert;
@@ -426,7 +433,7 @@ class Monotones {
         isHole += CCW(left->pos, center->pos, vert->pos, precision_) +
                   CCW(vert->pos, center->pos, right->pos, precision_);
       }
-      if (isHole != 0) return isHole > 0;
+      if (isHole != 0) return isHole;
 
       glm::vec2 edgeLeft = left->pos - center->pos;
       glm::vec2 edgeRight = right->pos - center->pos;
@@ -446,7 +453,7 @@ class Monotones {
         }
       }
     }
-    return false;
+    return 0;
   }
 
   /**
@@ -586,6 +593,9 @@ class Monotones {
         // Create a new pair with the next vert from the sorted list of starts.
         vert = starts.back();
         starts.pop_back();
+      } else {
+        vert->SetSkip();
+        ++insertAt;
       }
 
       if (params.verbose)
@@ -608,7 +618,17 @@ class Monotones {
                                    activePairs_.end(), false, false, false});
         SetVWest(newPair, vert);
         SetVEast(newPair, vert);
-        isHole = IsHole(vert);
+        const int hole = IsHole(vert);
+        if (hole == 0) {
+          // Skip entire degenerate polygon
+          vert->SetSkip();
+          VertItr right = vert->right;
+          while (right != vert) {
+            right->SetSkip();
+            right = right->right;
+          }
+        }
+        isHole = hole > 0;
       }
 
       const PairItr pair = GetPair(vert, type);
@@ -708,6 +728,7 @@ class Monotones {
    */
   bool SweepBack() {
     for (auto &vert : monotones_) vert.SetProcessed(false);
+
     VertItr vert = monotones_.end();
     while (vert != monotones_.begin()) {
       --vert;
@@ -800,9 +821,9 @@ class Monotones {
 };  // namespace
 
 void PrintFailure(const std::exception &e, const Polygons &polys,
-                  std::vector<glm::ivec3> &triangles) {
+                  std::vector<glm::ivec3> &triangles, float precision) {
   std::cout << "-----------------------------------" << std::endl;
-  std::cout << "Triangulation failed!" << std::endl;
+  std::cout << "Triangulation failed! Precision = " << precision << std::endl;
   std::cout << e.what() << std::endl;
   Dump(polys);
   std::cout << "produced this triangulation:" << std::endl;
@@ -836,11 +857,11 @@ std::vector<glm::ivec3> Triangulate(const Polygons &polys, float precision) {
     }
   } catch (const geometryErr &e) {
     if (!params.suppressErrors) {
-      PrintFailure(e, polys, triangles);
+      PrintFailure(e, polys, triangles, precision);
     }
     throw;
   } catch (const std::exception &e) {
-    PrintFailure(e, polys, triangles);
+    PrintFailure(e, polys, triangles, precision);
     throw;
   }
   return triangles;
