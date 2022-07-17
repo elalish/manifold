@@ -403,8 +403,7 @@ class Monotones {
    * function will continue to search up the neighbors until the degeneracy is
    * broken and a certain answer is returned. Like CCW, this function returns 1
    * for a hole, -1 for a start, and 0 only if the entire polygon degenerates to
-   * a line, in which case no monotone splitting will be attempted and the
-   * degenerate polygon will be triangulated arbitrarily.
+   * a polyline.
    */
   int IsHole(VertItr vert) const {
     VertItr left = vert->left;
@@ -456,6 +455,11 @@ class Monotones {
     return 0;
   }
 
+  /**
+   * If the simple polygon connected to the input vert degenerates to a single
+   * line (more strict than IsHole==0), then any triangulation is admissible,
+   * since every possible triangle will be degenerate.
+   */
   bool IsColinearPoly(const VertItr start) const {
     VertItr vert = start;
     VertItr left = start;
@@ -482,6 +486,11 @@ class Monotones {
     return true;
   }
 
+  /**
+   * Causes the verts of the simple polygon attached to the input vert to be
+   * skipped during the forward and backward sweeps, causing this polygon to be
+   * triangulated as though it is monotone.
+   */
   void SkipPoly(VertItr vert) {
     vert->SetSkip();
     VertItr right = vert->right;
