@@ -89,7 +89,6 @@ Polygons Duplicate(Polygons polys) {
 void TestPoly(const Polygons &polys, int expectedNumTri,
               float precision = -1.0f) {
   PolygonParams().verbose = options.params.verbose;
-  PolygonParams().intermediateChecks = true;
 
   std::vector<glm::ivec3> triangles;
   EXPECT_NO_THROW(triangles = Triangulate(polys, precision));
@@ -100,8 +99,6 @@ void TestPoly(const Polygons &polys, int expectedNumTri,
 
   EXPECT_NO_THROW(triangles = Triangulate(Duplicate(polys), precision));
   EXPECT_EQ(triangles.size(), 2 * expectedNumTri) << "Duplicate";
-
-  PolygonParams().intermediateChecks = false;
 }
 }  // namespace
 
@@ -408,6 +405,19 @@ TEST(Polygon, Sliver5) {
       {glm::vec2(-50, 0), 45},               //
   });
   TestPoly(polys, 5);
+}
+
+TEST(Polygon, Sliver6) {
+  Polygons polys;
+  polys.push_back({
+      {glm::vec2(10, 0), 5},                //
+      {glm::vec2(0, 10), 9},                //
+      {glm::vec2(-10, 0), 10},              //
+      {glm::vec2(-10, 0), 18},              //
+      {glm::vec2(4.37113897e-07, 10), 15},  //
+      {glm::vec2(10, 0), 17},               //
+  });
+  TestPoly(polys, 4);
 }
 
 TEST(Polygon, Colinear2) {

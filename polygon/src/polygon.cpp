@@ -456,6 +456,41 @@ class Monotones {
     return 0;
   }
 
+  bool IsColinearPoly(const VertItr start) const {
+    VertItr vert = start;
+    VertItr left = start;
+    VertItr right = left->right;
+    // Find the longest edge to improve error
+    float length2 = 0;
+    while (right != start) {
+      glm::vec2 edge = left->pos - right->pos;
+      const float l2 = glm::dot(edge, edge);
+      if (l2 > length2) {
+        length2 = l2;
+        vert = left;
+      }
+      left = right;
+      right = right->right;
+    }
+
+    right = vert->right;
+    left = vert->left;
+    while (left != vert) {
+      if (CCW(left->pos, vert->pos, right->pos, precision_) != 0) return false;
+      left = left->left;
+    }
+    return true;
+  }
+
+  void SkipPoly(VertItr vert) {
+    vert->SetSkip();
+    VertItr right = vert->right;
+    while (right != vert) {
+      right->SetSkip();
+      right = right->right;
+    }
+  }
+
   /**
    * A backwards pair (hole) must be interior to a forwards pair for geometric
    * validity. In this situation, this function is used to swap their east edges
@@ -619,14 +654,8 @@ class Monotones {
         SetVWest(newPair, vert);
         SetVEast(newPair, vert);
         const int hole = IsHole(vert);
-        if (hole == 0) {
-          // Skip entire degenerate polygon
-          vert->SetSkip();
-          VertItr right = vert->right;
-          while (right != vert) {
-            right->SetSkip();
-            right = right->right;
-          }
+        if (hole == 0 && IsColinearPoly(vert)) {
+          SkipPoly(vert);
         }
         isHole = hole > 0;
       }
