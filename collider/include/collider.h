@@ -36,7 +36,7 @@ class Collider {
   VecDH<Box> nodeBBox_;
   VecDH<int> nodeParent_;
   // even nodes are leaves, odd nodes are internal, root is 1
-  VecDH<thrust::pair<int, int>> internalChildren_;
+  VecDH<std::pair<int, int>> internalChildren_;
 
   int NumInternal() const { return internalChildren_.size(); };
   int NumLeaves() const { return NumInternal() + 1; };
