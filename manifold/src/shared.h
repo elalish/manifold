@@ -14,10 +14,6 @@
 
 #pragma once
 
-#include <thrust/remove.h>
-
-#include <glm/gtx/compatibility.hpp>
-
 #include "par.h"
 #include "utils.h"
 #include "vec_dh.h"

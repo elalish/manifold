@@ -116,9 +116,9 @@ std::tuple<VecDH<int>, VecDH<int>> SizeOutput(
       outR.faceNormal_.begin(), thrust::identity<bool>());
   if (invertQ) {
     auto start = thrust::make_transform_iterator(inQ.faceNormal_.begin(),
-                                                 thrust::negate<glm::vec3>());
+                                                 std::negate<glm::vec3>());
     auto end = thrust::make_transform_iterator(inQ.faceNormal_.end(),
-                                               thrust::negate<glm::vec3>());
+                                               std::negate<glm::vec3>());
     copy_if<decltype(inQ.faceNormal_.begin())>(policy, start, end,
                                                keepFace + inP.NumTri(), next,
                                                thrust::identity<bool>());

@@ -25,7 +25,7 @@
                   "manifold-${parallel-backend}";
               version = "beta";
               src = self;
-              patches = [ ./assimp.diff ];
+              patches = [ ./assimp.diff ./thrust.diff ];
               nativeBuildInputs = (with pkgs; [ cmake python38 ]) ++ build-tools ++
                 (if cuda-support then with pkgs.cudaPackages; [ cuda_nvcc cuda_cudart cuda_cccl pkgs.addOpenGLRunpath ] else [ ]);
               cmakeFlags = [
@@ -104,7 +104,7 @@
                 emcmake cmake -DCMAKE_BUILD_TYPE=Release ..
               '';
               buildPhase = ''
-                emmake make
+                emmake make -j''${NIX_BUILD_CORES}
               '';
               checkPhase = ''
                 cd test
