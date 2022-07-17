@@ -910,7 +910,7 @@ TEST(Boolean, Subtract) {
   first.GetMesh();
 }
 
-TEST(Boolean, Close) {
+TEST(Boolean, DISABLED_Close) {
   Manifold a = Manifold::Sphere(10, 256);
   Manifold result = a;
   for (int i = 0; i < 10; i++) {
