@@ -50,7 +50,7 @@ if(MANIFOLD_USE_CUDA)
     set(THRUST_INC_DIR "")
     set(MANIFOLD_NVCC_RELEASE_FLAGS -O3 -lineinfo)
     set(MANIFOLD_NVCC_DEBUG_FLAGS -G)
-    set(MANIFOLD_NVCC_FLAGS -Xcudafe --diag_suppress=esa_on_defaulted_function_ignored --extended-lambda
+    set(MANIFOLD_NVCC_FLAGS -Xcudafe --diag_suppress=esa_on_defaulted_function_ignored --extended-lambda --expt-relaxed-constexpr
         "$<$<CONFIG:RELEASE>:${MANIFOLD_NVCC_RELEASE_FLAGS}>"
         "$<$<CONFIG:DEBUG>:${MANIFOLD_NVCC_DEBUG_FLAGS}>")
 endif()
