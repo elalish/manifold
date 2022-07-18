@@ -459,6 +459,8 @@ void Manifold::Impl::CreateTangents(
  */
 Manifold::Impl::MeshRelationD Manifold::Impl::Subdivide(int n) {
   if (n < 2) return meshRelation_;
+  faceNormal_.resize(0);
+  vertNormal_.resize(0);
   int numVert = NumVert();
   int numEdge = NumEdge();
   int numTri = NumTri();
