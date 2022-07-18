@@ -97,6 +97,8 @@
               nativeBuildInputs = (with pkgs; [ cmake python38 ]);
               buildInputs = [ pkgs.nodejs ];
               configurePhase = ''
+                mkdir -p .emscriptencache
+                export EM_CACHE=$(pwd)/.emscriptencache
                 mkdir build
                 cd build
                 mkdir cache
@@ -113,9 +115,8 @@
               '';
               installPhase = ''
                 mkdir -p $out
-                cd tools
-                cp *.js $out/
-                cp *.wasm $out/
+                cp {tools,wasm}/*.js $out/
+                cp {tools,wasm}/*.wasm $out/
               '';
             };
           };

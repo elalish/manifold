@@ -78,3 +78,7 @@ add_subdirectory(meshIO)
 add_subdirectory(samples)
 add_subdirectory(test)
 add_subdirectory(tools)
+
+if(EMSCRIPTEN)
+add_subdirectory(wasm)
+endif()
