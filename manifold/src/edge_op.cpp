@@ -195,24 +195,30 @@ void Manifold::Impl::DedupeEdge(const int edge) {
   while (current != edge) {
     const int vert = halfedge_[current].startVert;
     if (vert == startVert) {
-      int newVert = vertPos_.size();
+      const int newVert = vertPos_.size();
       vertPos_.push_back(vertPos_[endVert]);
+      if (vertNormal_.size() > 0) vertNormal_.push_back(vertNormal_[endVert]);
       current = halfedge_[NextHalfedge(current)].pairedHalfedge;
-      int opposite = halfedge_[NextHalfedge(edge)].pairedHalfedge;
+      const int opposite = halfedge_[NextHalfedge(edge)].pairedHalfedge;
 
       UpdateVert(newVert, current, opposite);
 
       int newHalfedge = halfedge_.size();
       int newFace = newHalfedge / 3;
+      int oldFace = halfedge_[current].face;
       int outsideVert = halfedge_[current].startVert;
       halfedge_.push_back({endVert, newVert, -1, newFace});
       halfedge_.push_back({newVert, outsideVert, -1, newFace});
       halfedge_.push_back({outsideVert, endVert, -1, newFace});
       PairUp(newHalfedge + 2, halfedge_[current].pairedHalfedge);
       PairUp(newHalfedge + 1, current);
+      if (meshRelation_.triBary.size() > 0)
+        meshRelation_.triBary.push_back(meshRelation_.triBary[oldFace]);
+      if (faceNormal_.size() > 0) faceNormal_.push_back(faceNormal_[oldFace]);
 
       newHalfedge += 3;
       ++newFace;
+      oldFace = halfedge_[opposite].face;
       outsideVert = halfedge_[opposite].startVert;
       halfedge_.push_back({newVert, endVert, -1, newFace});
       halfedge_.push_back({endVert, outsideVert, -1, newFace});
@@ -220,6 +226,9 @@ void Manifold::Impl::DedupeEdge(const int edge) {
       PairUp(newHalfedge + 2, halfedge_[opposite].pairedHalfedge);
       PairUp(newHalfedge + 1, opposite);
       PairUp(newHalfedge, newHalfedge - 3);
+      if (meshRelation_.triBary.size() > 0)
+        meshRelation_.triBary.push_back(meshRelation_.triBary[oldFace]);
+      if (faceNormal_.size() > 0) faceNormal_.push_back(faceNormal_[oldFace]);
 
       break;
     }
@@ -383,9 +392,10 @@ void Manifold::Impl::CollapseEdge(const int edge) {
 void Manifold::Impl::RecursiveEdgeSwap(const int edge) {
   VecDH<BaryRef>& triBary = meshRelation_.triBary;
 
-  if (halfedge_[edge].pairedHalfedge < 0) return;
-
+  if (edge < 0) return;
   const int pair = halfedge_[edge].pairedHalfedge;
+  if (pair < 0) return;
+
   const glm::ivec3 tri0edge = TriOf(edge);
   const glm::ivec3 tri1edge = TriOf(pair);
   const glm::ivec3 perm0 = TriOf(edge % 3);

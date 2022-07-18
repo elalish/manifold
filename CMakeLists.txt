@@ -9,6 +9,7 @@ set(MANIFOLD_PAR "TBB" CACHE STRING "Parallel backend, either \"TBB\" or \"OpenM
 
 if(EMSCRIPTEN)
     message("Building for Emscripten")
+    set(MANIFOLD_FLAGS -fexceptions)
     set(CMAKE_EXE_LINKER_FLAGS ${CMAKE_EXE_LINKER_FLAGS} -sALLOW_MEMORY_GROWTH=1)
     set(MANIFOLD_USE_CUDA OFF)
     set(MANIFOLD_PAR "NONE")
@@ -50,7 +51,7 @@ if(MANIFOLD_USE_CUDA)
     set(THRUST_INC_DIR "")
     set(MANIFOLD_NVCC_RELEASE_FLAGS -O3 -lineinfo)
     set(MANIFOLD_NVCC_DEBUG_FLAGS -G)
-    set(MANIFOLD_NVCC_FLAGS -Xcudafe --diag_suppress=esa_on_defaulted_function_ignored --extended-lambda
+    set(MANIFOLD_NVCC_FLAGS -Xcudafe --diag_suppress=esa_on_defaulted_function_ignored --extended-lambda --expt-relaxed-constexpr
         "$<$<CONFIG:RELEASE>:${MANIFOLD_NVCC_RELEASE_FLAGS}>"
         "$<$<CONFIG:DEBUG>:${MANIFOLD_NVCC_DEBUG_FLAGS}>")
 endif()
@@ -79,3 +80,7 @@ add_subdirectory(meshIO)
 add_subdirectory(samples)
 add_subdirectory(test)
 add_subdirectory(tools)
+
+if(EMSCRIPTEN)
+add_subdirectory(wasm)
+endif()

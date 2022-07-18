@@ -1,6 +1,6 @@
 {
   inputs.flake-utils.url = "github:numtide/flake-utils";
-  inputs.nixpkgs.url = "nixpkgs/nixos-21.11";
+  inputs.nixpkgs.url = "nixpkgs/nixos-22.05";
 
   outputs = { self, nixpkgs, flake-utils }:
     flake-utils.lib.eachDefaultSystem
@@ -25,9 +25,9 @@
                   "manifold-${parallel-backend}";
               version = "beta";
               src = self;
-              patches = [ ./assimp.diff ];
+              patches = [ ./assimp.diff ./thrust.diff ];
               nativeBuildInputs = (with pkgs; [ cmake python38 ]) ++ build-tools ++
-                (if cuda-support then [ pkgs.cudatoolkit_11_5 pkgs.addOpenGLRunpath ] else [ ]);
+                (if cuda-support then with pkgs.cudaPackages; [ cuda_nvcc cuda_cudart cuda_cccl pkgs.addOpenGLRunpath ] else [ ]);
               cmakeFlags = [
                 "-DMANIFOLD_PAR=${pkgs.lib.strings.toUpper parallel-backend}"
                 "-DMANIFOLD_USE_CUDA=${if cuda-support then "ON" else "OFF"}"
@@ -97,12 +97,16 @@
               nativeBuildInputs = (with pkgs; [ cmake python38 ]);
               buildInputs = [ pkgs.nodejs ];
               configurePhase = ''
+                mkdir -p .emscriptencache
+                export EM_CACHE=$(pwd)/.emscriptencache
                 mkdir build
                 cd build
+                mkdir cache
+                export EM_CACHE=$(pwd)/cache
                 emcmake cmake -DCMAKE_BUILD_TYPE=Release ..
               '';
               buildPhase = ''
-                emmake make
+                emmake make -j''${NIX_BUILD_CORES}
               '';
               checkPhase = ''
                 cd test
@@ -111,15 +115,18 @@
               '';
               installPhase = ''
                 mkdir -p $out
-                cd tools
-                cp *.js $out/
-                cp *.wasm $out/
+                cp {tools,wasm}/*.js $out/
+                cp {tools,wasm}/*.wasm $out/
               '';
             };
           };
-          devShell = devShell { additional = [ pkgs.cudatoolkit_11_4 ]; };
+          devShell = devShell { };
           devShells.cuda = devShell {
-            additional = [ pkgs.cudatoolkit_11_5 ];
+            additional = with pkgs.cudaPackages; [
+              cuda_nvcc
+              cuda_cudart
+              cuda_cccl
+            ];
           };
         }
       );

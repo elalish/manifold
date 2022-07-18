@@ -395,6 +395,12 @@ TEST(Manifold, Precision) {
   EXPECT_FLOAT_EQ(cube.Precision(), 100 * kTolerance);
 }
 
+TEST(Manifold, Precision2) {
+  Manifold cube = Manifold::Cube();
+  cube = cube.Translate({-0.5, 0, 0}).Scale({2, 1, 1});
+  EXPECT_FLOAT_EQ(cube.Precision(), 2 * kTolerance);
+}
+
 /**
  * Curvature is the inverse of the radius of curvature, and signed such that
  * positive is convex and negative is concave. There are two orthogonal
@@ -874,4 +880,43 @@ TEST(Boolean, Cubes) {
   EXPECT_NEAR(prop.surfaceArea, 9.2, 0.01);
 
   if (options.exportModels) ExportMesh("cubes.glb", result.GetMesh(), {});
+}
+
+TEST(Boolean, Subtract) {
+  Mesh firstMesh;
+  firstMesh.vertPos = {{0, 0, 0},           {1540, 0, 0},
+                       {1540, 70, 0},       {0, 70, 0},
+                       {0, 0, -278.282},    {1540, 70, -278.282},
+                       {1540, 0, -278.282}, {0, 70, -278.282}};
+  firstMesh.triVerts = {
+      {0, 1, 2}, {2, 3, 0}, {4, 5, 6}, {5, 4, 7}, {6, 2, 1}, {6, 5, 2},
+      {5, 3, 2}, {5, 7, 3}, {7, 0, 3}, {7, 4, 0}, {4, 1, 0}, {4, 6, 1},
+  };
+
+  Mesh secondMesh;
+  secondMesh.vertPos = {
+      {2.04636e-12, 70, 50000},       {2.04636e-12, -1.27898e-13, 50000},
+      {1470, -1.27898e-13, 50000},    {1540, 70, 50000},
+      {2.04636e-12, 70, -28.2818},    {1470, -1.27898e-13, 0},
+      {2.04636e-12, -1.27898e-13, 0}, {1540, 70, -28.2818}};
+  secondMesh.triVerts = {{0, 1, 2}, {2, 3, 0}, {4, 5, 6}, {5, 4, 7},
+                         {6, 2, 1}, {6, 5, 2}, {5, 3, 2}, {5, 7, 3},
+                         {7, 0, 3}, {7, 4, 0}, {4, 1, 0}, {4, 6, 1}};
+
+  Manifold first(firstMesh);
+  Manifold second(secondMesh);
+
+  first -= second;
+  first.GetMesh();
+}
+
+TEST(Boolean, DISABLED_Close) {
+  Manifold a = Manifold::Sphere(10, 256);
+  Manifold result = a;
+  for (int i = 0; i < 10; i++) {
+    std::cout << i << std::endl;
+    result ^= a.Translate({a.Precision() / 10 * i, 0.0, 0.0});
+    EXPECT_TRUE(result.IsManifold());
+    EXPECT_TRUE(result.MatchesTriNormals());
+  }
 }

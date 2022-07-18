@@ -36,9 +36,9 @@ void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge,
   VecDH<glm::vec3> triNormal;
   VecDH<BaryRef>& triBary = meshRelation_.triBary;
   triBary.resize(0);
-  triVerts.reserve(faceEdge.size());
-  triNormal.reserve(faceEdge.size());
-  triBary.reserve(faceEdge.size() * 3);
+  triVerts.reserve(halfedge_.size());
+  triNormal.reserve(halfedge_.size());
+  triBary.reserve(halfedge_.size());
 
   for (int face = 0; face < faceEdge.size() - 1; ++face) {
     const int firstEdge = faceEdge[face];
