@@ -909,3 +909,14 @@ TEST(Boolean, Subtract) {
   first -= second;
   first.GetMesh();
 }
+
+TEST(Boolean, DISABLED_Close) {
+  Manifold a = Manifold::Sphere(10, 256);
+  Manifold result = a;
+  for (int i = 0; i < 10; i++) {
+    std::cout << i << std::endl;
+    result ^= a.Translate({a.Precision() / 10 * i, 0.0, 0.0});
+    EXPECT_TRUE(result.IsManifold());
+    EXPECT_TRUE(result.MatchesTriNormals());
+  }
+}
