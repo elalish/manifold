@@ -10,7 +10,9 @@
         camera.position.z = 1;
 
         const scene = new THREE.Scene();
-        const mesh = new THREE.Mesh(undefined, new THREE.MeshNormalMaterial());
+        const mesh = new THREE.Mesh(undefined, new THREE.MeshNormalMaterial({
+          flatShading: true
+        }));
         scene.add(mesh);
 
         const geometry_1 = simplify(new THREE.BoxGeometry(0.2, 0.2, 0.2));
