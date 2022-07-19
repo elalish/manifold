@@ -1,0 +1,5 @@
+add_subdirectory(utilities)
+add_subdirectory(third_party)
+add_subdirectory(collider)
+add_subdirectory(polygon)
+add_subdirectory(manifold)
