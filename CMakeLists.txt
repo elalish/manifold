@@ -21,10 +21,10 @@ option(BUILD_TEST_CGAL off)
 
 option(BUILD_SHARED_LIBS off)
 set(ASSIMP_INC_DIR
-    ${PROJECT_SOURCE_DIR}/third_party/assimp/include
-    ${CMAKE_BINARY_DIR}/third_party/assimp/include)
-set(GLM_INC_DIR ${PROJECT_SOURCE_DIR}/third_party/glm)
-set(PYBIND11_DIR ${PROJECT_SOURCE_DIR}/third_party/pybind11)
+    ${PROJECT_SOURCE_DIR}/test/third_party/assimp/include
+    ${CMAKE_BINARY_DIR}/test/third_party/assimp/include)
+set(GLM_INC_DIR ${PROJECT_SOURCE_DIR}/src/third_party/glm)
+set(PYBIND11_DIR ${PROJECT_SOURCE_DIR}/bindings/python/third_party/pybind11)
 
 option(ASSIMP_FAST_BUILD "build ASSIMP just for tests" ON)
 
@@ -39,7 +39,7 @@ if(ASSIMP_FAST_BUILD)
     endforeach()
 endif()
 
-set(THRUST_INC_DIR ${PROJECT_SOURCE_DIR}/third_party/thrust)
+set(THRUST_INC_DIR ${PROJECT_SOURCE_DIR}/src/third_party/thrust)
 
 if(MANIFOLD_USE_CUDA)
     enable_language(CUDA)

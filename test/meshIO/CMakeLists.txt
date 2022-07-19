@@ -1,12 +1,12 @@
-project (meshIO)
+project(meshIO)
 
 add_library(${PROJECT_NAME} src/meshIO.cpp)
 
-target_include_directories( ${PROJECT_NAME}
+target_include_directories(${PROJECT_NAME}
     PUBLIC ${PROJECT_SOURCE_DIR}/include ${ASSIMP_INC_DIR}
 )
 
-target_link_libraries( ${PROJECT_NAME}
+target_link_libraries(${PROJECT_NAME}
     PUBLIC utilities
     PRIVATE assimp
 )
