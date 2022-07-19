@@ -1,5 +1,6 @@
 project(manifold_test)
 
+add_subdirectory(third_party)
 add_subdirectory(meshIO)
 
 enable_testing()
