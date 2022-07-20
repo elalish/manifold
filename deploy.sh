@@ -20,6 +20,7 @@ set -x
 
 DEPLOYABLE_STATIC_FILES=( \
   samples/models \
+  bindings/wasm/examples \
 )
 
 PACKAGE_ROOT=`pwd`

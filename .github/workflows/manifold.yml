@@ -32,7 +32,7 @@ jobs:
     - name: Build ${{matrix.backend}}
       run: |
         # patch assimp
-        patch third_party/assimp/code/CMakeLists.txt < assimp.diff
+        patch test/third_party/assimp/code/CMakeLists.txt < assimp.diff
         git apply thrust.diff
         mkdir build
         cd build
@@ -41,11 +41,11 @@ jobs:
       # note that the test for CUDA backend does not really test CUDA, as we
       # don't have CUDA GPU on GitHub Action
       run: |
-        export PYTHONPATH=$PYTHONPATH:$(pwd)/build/tools
+        export PYTHONPATH=$PYTHONPATH:$(pwd)/build/bindings/python
         cd build/test
         ./manifold_test
         cd ../../
-        python3 test/python/run_all.py
+        python3 bindings/python/examples/run_all.py
     - name: Coverage Report
       # only do code coverage for default sequential backend, it seems that TBB
       # backend will cause failure
@@ -60,7 +60,7 @@ jobs:
         cd ../
         lcov --capture --directory . --output-file ./code_coverage_test.info
         lcov --add-tracefile ./code_coverage_init.info --add-tracefile ./code_coverage_test.info --output-file ./code_coverage_total.info
-        lcov --remove ./code_coverage_total.info '/usr/*' '*/third_party/*' '*/test/*' '*/tools/*' --output-file ./code_coverage.info
+        lcov --remove ./code_coverage_total.info '/usr/*' '*/third_party/*' '*/test/*' '*/extras/*' '*/bindings/*' --output-file ./code_coverage.info
     - uses: codecov/codecov-action@v2
       if: matrix.parallel_backend == 'NONE' && matrix.cuda_support == 'OFF'
       with:
@@ -91,7 +91,7 @@ jobs:
       run: |
         source ./emsdk/emsdk_env.sh
         # patch assimp
-        patch third_party/assimp/code/CMakeLists.txt < assimp.diff
+        patch test/third_party/assimp/code/CMakeLists.txt < assimp.diff
         git apply thrust.diff
         mkdir build
         cd build
@@ -116,7 +116,7 @@ jobs:
     - uses: jwlawson/actions-setup-cmake@v1.12
     - name: Patch assimp
       shell: bash
-      run: patch third_party/assimp/code/CMakeLists.txt < assimp.diff
+      run: patch test/third_party/assimp/code/CMakeLists.txt < assimp.diff
     - uses: ilammy/msvc-dev-cmd@v1
     - name: Install CUDA
       if: matrix.backend == 'CUDA'

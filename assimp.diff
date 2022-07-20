@@ -1,6 +1,6 @@
-diff a/third_party/assimp/code/CMakeLists.txt b/third_party/assimp/code/CMakeLists.txt
---- a/third_party/assimp/code/CMakeLists.txt
-+++ b/third_party/assimp/code/CMakeLists.txt
+diff a/test/third_party/assimp/code/CMakeLists.txt b/test/third_party/assimp/code/CMakeLists.txt
+--- a/test/third_party/assimp/code/CMakeLists.txt
++++ b/test/third_party/assimp/code/CMakeLists.txt
 @@ -1176,13 +1176,6 @@ ADD_LIBRARY(assimp::assimp ALIAS assimp)
  
  TARGET_USE_COMMON_OUTPUT_DIRECTORY(assimp)
