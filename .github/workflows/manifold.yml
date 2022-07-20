@@ -41,11 +41,11 @@ jobs:
       # note that the test for CUDA backend does not really test CUDA, as we
       # don't have CUDA GPU on GitHub Action
       run: |
-        export PYTHONPATH=$PYTHONPATH:$(pwd)/build/tools
+        export PYTHONPATH=$PYTHONPATH:$(pwd)/build/bindings/python
         cd build/test
         ./manifold_test
         cd ../../
-        python3 test/python/run_all.py
+        python3 bindings/python/examples/run_all.py
     - name: Coverage Report
       # only do code coverage for default sequential backend, it seems that TBB
       # backend will cause failure
