@@ -1,7 +1,7 @@
-diff --git a/third_party/thrust/thrust/detail/type_traits.h b/third_party/thrust/thrust/detail/type_traits.h
+diff --git a/src/third_party/thrust/thrust/detail/type_traits.h b/src/third_party/thrust/thrust/detail/type_traits.h
 index d147f832..60b57654 100644
---- a/third_party/thrust/thrust/detail/type_traits.h
-+++ b/third_party/thrust/thrust/detail/type_traits.h
+--- a/src/third_party/thrust/thrust/detail/type_traits.h
++++ b/src/third_party/thrust/thrust/detail/type_traits.h
 @@ -144,11 +144,11 @@ template<typename T> struct has_trivial_constructor
        is_pod<T>::value
  #if THRUST_HOST_COMPILER == THRUST_HOST_COMPILER_MSVC || \
@@ -30,10 +30,10 @@ index d147f832..60b57654 100644
  #endif // GCC VERSION
  #endif // THRUST_HOST_COMPILER
      >
-diff --git a/third_party/thrust/thrust/detail/type_traits/has_trivial_assign.h b/third_party/thrust/thrust/detail/type_traits/has_trivial_assign.h
+diff --git a/src/third_party/thrust/thrust/detail/type_traits/has_trivial_assign.h b/src/third_party/thrust/thrust/detail/type_traits/has_trivial_assign.h
 index 8aa55165..73c8f776 100644
---- a/third_party/thrust/thrust/detail/type_traits/has_trivial_assign.h
-+++ b/third_party/thrust/thrust/detail/type_traits/has_trivial_assign.h
+--- a/src/third_party/thrust/thrust/detail/type_traits/has_trivial_assign.h
++++ b/src/third_party/thrust/thrust/detail/type_traits/has_trivial_assign.h
 @@ -39,10 +39,10 @@ template<typename T> struct has_trivial_assign
  #elif THRUST_HOST_COMPILER == THRUST_HOST_COMPILER_GCC
  // only use the intrinsic for >= 4.3
