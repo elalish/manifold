@@ -71,7 +71,7 @@ if(CODE_COVERAGE AND NOT MSVC)
 endif()
 
 add_subdirectory(src)
-add_subdirectory(examples)
+add_subdirectory(samples)
 add_subdirectory(test)
 add_subdirectory(extras)
 add_subdirectory(bindings)
