@@ -201,6 +201,17 @@ void Manifold::Impl::Finish() {
                 "Halfedge index is negative!");
   ALWAYS_ASSERT(extrema.pairedHalfedge < 2 * NumEdge(), topologyErr,
                 "Halfedge index exceeds number of halfedges!");
+  ALWAYS_ASSERT(meshRelation_.triBary.size() == NumTri() ||
+                    meshRelation_.triBary.size() == 0,
+                logicErr, "Mesh Relation doesn't fit!");
+  ALWAYS_ASSERT(faceNormal_.size() == NumTri() || faceNormal_.size() == 0,
+                logicErr,
+                "faceNormal size = " + std::to_string(faceNormal_.size()) +
+                    ", NumTri = " + std::to_string(NumTri()));
+  ALWAYS_ASSERT(vertNormal_.size() == NumVert() || vertNormal_.size() == 0,
+                logicErr,
+                "vertNormal size = " + std::to_string(vertNormal_.size()) +
+                    ", NumVert = " + std::to_string(NumVert()));
 
   CalculateNormals();
   collider_ = Collider(faceBox, faceMorton);
@@ -210,25 +221,30 @@ void Manifold::Impl::Finish() {
  * Sorts the vertices according to their Morton code.
  */
 void Manifold::Impl::SortVerts() {
-  VecDH<uint32_t> vertMorton(NumVert());
-  auto policy = autoPolicy(NumVert());
-  for_each_n(policy, zip(vertMorton.begin(), vertPos_.cbegin()), NumVert(),
+  const int numVert = NumVert();
+  VecDH<uint32_t> vertMorton(numVert);
+  auto policy = autoPolicy(numVert);
+  for_each_n(policy, zip(vertMorton.begin(), vertPos_.cbegin()), numVert,
              Morton({bBox_}));
 
-  VecDH<int> vertNew2Old(NumVert());
+  VecDH<int> vertNew2Old(numVert);
   sequence(policy, vertNew2Old.begin(), vertNew2Old.end());
   sort_by_key(policy, vertMorton.begin(), vertMorton.end(),
               zip(vertPos_.begin(), vertNew2Old.begin()));
 
-  ReindexVerts(vertNew2Old, NumVert());
+  ReindexVerts(vertNew2Old, numVert);
 
-  // Verts were flagged for removal with NaNs and assigned kNoCode to sort them
-  // to the end, which allows them to be removed.
+  // Verts were flagged for removal with NaNs and assigned kNoCode to sort
+  // them to the end, which allows them to be removed.
   const int newNumVert =
       find<decltype(vertMorton.begin())>(policy, vertMorton.begin(),
                                          vertMorton.end(), kNoCode) -
       vertMorton.begin();
   vertPos_.resize(newNumVert);
+  if (vertNormal_.size() == numVert) {
+    Permute(vertNormal_, vertNew2Old);
+    vertNormal_.resize(newNumVert);
+  }
 }
 
 /**
