@@ -23,6 +23,7 @@ set(MANIFOLD_PAR "TBB" CACHE STRING "Parallel backend, either \"TBB\" or \"OpenM
 
 if(EMSCRIPTEN)
     message("Building for Emscripten")
+    set(MANIFOLD_FLAGS -fexceptions)
     set(CMAKE_EXE_LINKER_FLAGS ${CMAKE_EXE_LINKER_FLAGS} -sALLOW_MEMORY_GROWTH=1)
     set(MANIFOLD_USE_CUDA OFF)
     set(MANIFOLD_PAR "NONE")
@@ -34,10 +35,10 @@ option(BUILD_TEST_CGAL off)
 
 option(BUILD_SHARED_LIBS off)
 set(ASSIMP_INC_DIR
-    ${PROJECT_SOURCE_DIR}/third_party/assimp/include
-    ${CMAKE_BINARY_DIR}/third_party/assimp/include)
-set(GLM_INC_DIR ${PROJECT_SOURCE_DIR}/third_party/glm)
-set(PYBIND11_DIR ${PROJECT_SOURCE_DIR}/third_party/pybind11)
+    ${PROJECT_SOURCE_DIR}/test/third_party/assimp/include
+    ${CMAKE_BINARY_DIR}/test/third_party/assimp/include)
+set(GLM_INC_DIR ${PROJECT_SOURCE_DIR}/src/third_party/glm)
+set(PYBIND11_DIR ${PROJECT_SOURCE_DIR}/bindings/python/third_party/pybind11)
 
 option(ASSIMP_FAST_BUILD "build ASSIMP just for tests" ON)
 
@@ -52,7 +53,7 @@ if(ASSIMP_FAST_BUILD)
     endforeach()
 endif()
 
-set(THRUST_INC_DIR ${PROJECT_SOURCE_DIR}/third_party/thrust)
+set(THRUST_INC_DIR ${PROJECT_SOURCE_DIR}/src/third_party/thrust)
 
 if(MANIFOLD_USE_CUDA)
     enable_language(CUDA)
@@ -83,12 +84,8 @@ if(CODE_COVERAGE AND NOT MSVC)
     add_link_options("-coverage")
 endif()
 
-add_subdirectory(utilities)
-add_subdirectory(third_party)
-add_subdirectory(collider)
-add_subdirectory(polygon)
-add_subdirectory(manifold)
-add_subdirectory(meshIO)
+add_subdirectory(src)
 add_subdirectory(samples)
 add_subdirectory(test)
-add_subdirectory(tools)
+add_subdirectory(extras)
+add_subdirectory(bindings)

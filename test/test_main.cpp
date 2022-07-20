@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "polygon.h"
 #include "test.h"
 
 Options options;
@@ -49,6 +50,8 @@ int main(int argc, char **argv) {
         return 1;
     }
   }
+
+  manifold::PolygonParams().intermediateChecks = true;
 
   return RUN_ALL_TESTS();
 }

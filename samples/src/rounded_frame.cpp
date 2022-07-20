@@ -32,10 +32,12 @@ Manifold RoundedFrame(float edgeLength, float radius, int circularSegments) {
 
   Manifold edge1 = corner + edge;
   edge1 = edge1.Rotate(-90).Translate({-edgeLength / 2, -edgeLength / 2, 0});
+  edge1.NumVert();  // Force caching
 
   Manifold edge2 = edge1.Rotate(0, 0, 180);
   edge2 += edge1;
   edge2 += edge.Translate({-edgeLength / 2, -edgeLength / 2, 0});
+  edge2.NumVert();
 
   Manifold edge4 = edge2.Rotate(0, 0, 90);
   edge4 += edge2;
