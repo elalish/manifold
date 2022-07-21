@@ -392,7 +392,6 @@ class Monotones {
    * of using geometry.
    */
   void RemovePair(PairItr pair) {
-    ALWAYS_ASSERT(pair != activePairs_.end(), logicErr, "No pair to remove!");
     pair->nextPair = std::next(pair);
     inactivePairs_.splice(inactivePairs_.end(), activePairs_, pair);
   }
@@ -531,9 +530,6 @@ class Monotones {
    */
   bool ShiftEast(const VertItr vert, const PairItr inputPair,
                  const bool isHole) {
-    ALWAYS_ASSERT(inputPair != activePairs_.end(), logicErr,
-                  "input pair is not defined!");
-
     if (inputPair->eastCertain) return false;
 
     PairItr potentialPair = std::next(inputPair);
@@ -568,9 +564,6 @@ class Monotones {
    */
   bool ShiftWest(const VertItr vert, const PairItr inputPair,
                  const bool isHole) {
-    ALWAYS_ASSERT(inputPair != activePairs_.end(), logicErr,
-                  "input pair is not defined!");
-
     if (inputPair->westCertain) return false;
 
     PairItr potentialPair = inputPair;
@@ -670,6 +663,9 @@ class Monotones {
       }
 
       const PairItr pair = GetPair(vert, type);
+      ALWAYS_ASSERT(type == SKIP || pair != activePairs_.end(), logicErr,
+                    "No active pair!");
+
       if (type != SKIP && ShiftEast(vert, pair, isHole)) type = SKIP;
       if (type != SKIP && ShiftWest(vert, pair, isHole)) type = SKIP;
 
@@ -781,6 +777,9 @@ class Monotones {
                     "SKIP should not happen on reverse sweep!");
 
       PairItr westPair = GetPair(vert, type);
+      ALWAYS_ASSERT(westPair != activePairs_.end(), logicErr,
+                    "No active pair!");
+
       switch (type) {
         case MERGE: {
           PairItr eastPair = std::next(westPair);
