@@ -87,6 +87,7 @@ struct ExecutionParams {
   bool intermediateChecks = false;
   bool verbose = false;
   bool suppressErrors = false;
+  bool processOverlaps = false;
 };
 
 struct Halfedge {

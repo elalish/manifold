@@ -28,6 +28,36 @@ using namespace manifold;
 
 ExecutionParams params;
 
+bool OverlapAssert(bool condition, const char *file, int line,
+                   const std::string &cond, const std::string &msg) {
+  if (!params.processOverlaps && !condition) {
+    std::ostringstream output;
+    output << "Error in file: " << file << " (" << line << "): \'" << cond
+           << "\' is false: " << msg;
+    throw geometryErr(output.str());
+  }
+  return condition;
+}
+
+/**
+ * Only use directly inside of the SweepForward() and SweepBack() functions! If
+ * the asserted condition is false, it implies the monotone subdivision has
+ * failed. This is most likely due to the input polygons being overlapped by
+ * more than the input precision, but if not, then it indicates a bug. Either
+ * way subdivision processing stops: if params.processOvelaps is false, then an
+ * exception is thrown. Otherwise this returns true from the sweep function,
+ * causing polygons to be left in their original state.
+ *
+ * The input polygons are then triangulated by the monotone triangulator, which
+ * is robust enough to create a manifold triangulation for all input, but it
+ * will not be geometrically-valid in this case. It may create inverted
+ * triangles which are significantly larger than precision, but it depends on
+ * the nature of the overlap.
+ */
+#define OVERLAP_ASSERT(condition, msg)                                \
+  if (!OverlapAssert(condition, __FILE__, __LINE__, #condition, msg)) \
+    return true;
+
 /**
  * The class first turns input polygons into monotone polygons, then
  * triangulates them using the above class.
@@ -392,7 +422,6 @@ class Monotones {
    * of using geometry.
    */
   void RemovePair(PairItr pair) {
-    ALWAYS_ASSERT(pair != activePairs_.end(), logicErr, "No pair to remove!");
     pair->nextPair = std::next(pair);
     inactivePairs_.splice(inactivePairs_.end(), activePairs_, pair);
   }
@@ -531,9 +560,6 @@ class Monotones {
    */
   bool ShiftEast(const VertItr vert, const PairItr inputPair,
                  const bool isHole) {
-    ALWAYS_ASSERT(inputPair != activePairs_.end(), logicErr,
-                  "input pair is not defined!");
-
     if (inputPair->eastCertain) return false;
 
     PairItr potentialPair = std::next(inputPair);
@@ -568,9 +594,6 @@ class Monotones {
    */
   bool ShiftWest(const VertItr vert, const PairItr inputPair,
                  const bool isHole) {
-    ALWAYS_ASSERT(inputPair != activePairs_.end(), logicErr,
-                  "input pair is not defined!");
-
     if (inputPair->westCertain) return false;
 
     PairItr potentialPair = inputPair;
@@ -647,9 +670,8 @@ class Monotones {
 
       if (vert->Processed()) continue;
 
-      ALWAYS_ASSERT(
+      OVERLAP_ASSERT(
           skipped.empty() || !vert->IsPast(skipped.back(), precision_),
-          geometryErr,
           "Not Geometrically Valid! None of the skipped verts is valid.");
 
       VertType type = ProcessVert(vert);
@@ -670,14 +692,17 @@ class Monotones {
       }
 
       const PairItr pair = GetPair(vert, type);
+      OVERLAP_ASSERT(type == SKIP || pair != activePairs_.end(),
+                     "No active pair!");
+
       if (type != SKIP && ShiftEast(vert, pair, isHole)) type = SKIP;
       if (type != SKIP && ShiftWest(vert, pair, isHole)) type = SKIP;
 
       if (type == SKIP) {
-        ALWAYS_ASSERT(std::next(insertAt) != monotones_.end(), geometryErr,
-                      "Not Geometrically Valid! Tried to skip final vert.");
-        ALWAYS_ASSERT(
-            !nextAttached.empty() || !starts.empty(), geometryErr,
+        OVERLAP_ASSERT(std::next(insertAt) != monotones_.end(),
+                       "Not Geometrically Valid! Tried to skip final vert.");
+        OVERLAP_ASSERT(
+            !nextAttached.empty() || !starts.empty(),
             "Not Geometrically Valid! Tried to skip last queued vert.");
         skipped.push_back(vert);
         if (params.verbose) std::cout << "Skipping vert" << std::endl;
@@ -777,10 +802,11 @@ class Monotones {
       if (vert->Processed()) continue;
 
       VertType type = ProcessVert(vert);
-      ALWAYS_ASSERT(type != SKIP, logicErr,
-                    "SKIP should not happen on reverse sweep!");
+      OVERLAP_ASSERT(type != SKIP, "SKIP should not happen on reverse sweep!");
 
       PairItr westPair = GetPair(vert, type);
+      OVERLAP_ASSERT(westPair != activePairs_.end(), "No active pair!");
+
       switch (type) {
         case MERGE: {
           PairItr eastPair = std::next(westPair);
