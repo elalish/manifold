@@ -100,7 +100,7 @@ jobs:
       run: |
         cd build/test
         node ./manifold_test.js
-    - name: 'Upload WASM files'
+    - name: Upload WASM files
       uses: actions/upload-artifact@v3
       with:
         name: wasm
