@@ -15,10 +15,11 @@ jobs:
     - name: Copy models
       run: ./deploy.sh
 
-    - uses: actions/download-artifact@v3
+    - name: Download WASM files
+      uses: actions/download-artifact@v3
       with:
         name: wasm
-        path: ./docs/html/bindings/wasm/examples
+        path: docs/html/bindings/wasm/examples
 
     - name: Doxygen Action
       uses: mattnotmitt/doxygen-action@v1.1.0
