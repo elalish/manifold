@@ -16,8 +16,10 @@ jobs:
       run: ./deploy.sh
 
     - name: Download WASM files
-      uses: actions/download-artifact@v3
+      uses: dawidd6/action-download-artifact@v2
       with:
+        workflow: manifold.yml
+        pr: ${{github.event.pull_request.number}}
         name: wasm
         path: docs/html/bindings/wasm/examples
 
