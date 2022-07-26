@@ -722,6 +722,38 @@ TEST(Polygon, Precision) {
   TestPoly(polys, 5, 0.0001);
 };
 
+TEST(Polygon, Precision2) {
+  PolygonParams().processOverlaps = true;
+  const bool intermediateChecks = PolygonParams().intermediateChecks;
+  PolygonParams().intermediateChecks = false;
+
+  Polygons polys;
+  polys.push_back({
+      {glm::vec2(4.98093176, -0.247938812), 11113},   //
+      {glm::vec2(4.94630527, -0.0826399028), 22736},  //
+      {glm::vec2(4.98092985, -0.247938812), 22735},   //
+  });
+  polys.push_back({
+      {glm::vec2(4.76215458, -0.247848436), 17566},  //
+      {glm::vec2(4.76215267, -0.247860417), 22640},  //
+      {glm::vec2(4.76215553, -0.247860417), 22639},  //
+  });
+  polys.push_back({
+      {glm::vec2(4.95041943, -0.241741896), 17815},  //
+      {glm::vec2(4.85906506, -0.223121181), 17816},  //
+      {glm::vec2(4.90268326, -0.152885556), 17824},  //
+      {glm::vec2(4.82208872, -0.18590945), 17823},   //
+      {glm::vec2(4.79133606, -0.247870877), 22638},  //
+      {glm::vec2(4.98092985, -0.247938812), 22733},  //
+      {glm::vec2(4.90268326, -0.152885556), 17822},  //
+      {glm::vec2(4.95041943, -0.241741896), 17819},  //
+  });
+  TestPoly(polys, 8);
+
+  PolygonParams().processOverlaps = false;
+  PolygonParams().intermediateChecks = intermediateChecks;
+};
+
 TEST(Polygon, Comb) {
   Polygons polys;
   polys.push_back({
