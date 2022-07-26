@@ -661,7 +661,6 @@ class Monotones {
         vert = starts.back();
         starts.pop_back();
       } else {
-        vert->SetSkip();
         ++insertAt;
       }
 

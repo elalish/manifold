@@ -916,13 +916,19 @@ TEST(Boolean, Close) {
   const bool intermediateChecks = PolygonParams().intermediateChecks;
   PolygonParams().intermediateChecks = false;
 
-  Manifold a = Manifold::Sphere(10, 256);
+  const float r = 10;
+  Manifold a = Manifold::Sphere(r, 256);
   Manifold result = a;
-  for (int i = 0; i < 6; i++) {
+  for (int i = 0; i < 10; i++) {
     // std::cout << i << std::endl;
     result ^= a.Translate({a.Precision() / 10 * i, 0.0, 0.0});
     EXPECT_TRUE(result.IsManifold());
   }
+  auto prop = result.GetProperties();
+  const float tol = 0.002;
+  EXPECT_NEAR(prop.volume, (4.0f / 3.0f) * glm::pi<float>() * r * r * r,
+              tol * r * r * r);
+  EXPECT_NEAR(prop.surfaceArea, 4 * glm::pi<float>() * r * r, tol * r * r);
 
   if (options.exportModels) ExportMesh("close.glb", result.GetMesh(), {});
 
