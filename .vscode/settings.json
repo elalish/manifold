@@ -100,6 +100,7 @@
         "-DBUILD_SHARED_LIBS=ON",
         "-DMANIFOLD_USE_CUDA=OFF",
         "-DMANIFOLD_PAR=NONE",
-        "-DCODE_COVERAGE=OFF"
+        "-DCODE_COVERAGE=OFF",
+        "-DCMAKE_CXX_FLAGS=''" //'-fsanitize=address,undefined'"
     ],
 }
