@@ -18,9 +18,6 @@
 
 #include "par.h"
 
-// TODO: make this runtime configurable for quicker debug
-constexpr bool kVerbose = false;
-
 using namespace manifold;
 
 namespace {

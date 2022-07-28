@@ -33,6 +33,7 @@ namespace manifold {
 
 constexpr float kTolerance = 1e-5;
 
+#ifdef MANIFOLD_DEBUG
 /** @defgroup Exceptions
  *  @brief Custom exceptions
  *  @{
@@ -52,7 +53,6 @@ using logicErr = std::logic_error;
 /** @addtogroup Private
  *  @{
  */
-#ifdef MANIFOLD_DEBUG
 template <typename Ex>
 void Assert(bool condition, const char* file, int line, const std::string& cond,
             const std::string& msg) {

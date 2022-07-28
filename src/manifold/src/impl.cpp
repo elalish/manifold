@@ -319,8 +319,6 @@ Manifold::Impl::Impl(Shape shape) {
                   {1, 3, 4}, {0, 5, 2},  //
                   {3, 0, 4}, {2, 5, 1}};
       break;
-    default:
-      throw userErr("Unrecognized shape!");
   }
   vertPos_ = vertPos;
   CreateHalfedges(triVerts);
