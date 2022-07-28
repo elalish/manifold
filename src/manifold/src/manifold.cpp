@@ -21,6 +21,8 @@ namespace {
 using namespace manifold;
 using namespace thrust::placeholders;
 
+ExecutionParams params;
+
 struct MakeTri {
   const Halfedge* halfedges;
 
@@ -156,7 +158,7 @@ float Manifold::circularEdgeLength_ = 1.0f;
  * is 10 degrees.
  */
 void Manifold::SetMinCircularAngle(float angle) {
-  ALWAYS_ASSERT(angle > 0.0f, userErr, "angle must be positive!");
+  ASSERT(angle > 0.0f, userErr, "angle must be positive!");
   Manifold::circularAngle_ = angle;
 }
 
@@ -169,7 +171,7 @@ void Manifold::SetMinCircularAngle(float angle) {
  * increase if the the segments hit the minimum angle. Default is 1.0.
  */
 void Manifold::SetMinCircularEdgeLength(float length) {
-  ALWAYS_ASSERT(length > 0.0f, userErr, "length must be positive!");
+  ASSERT(length > 0.0f, userErr, "length must be positive!");
   Manifold::circularEdgeLength_ = length;
 }
 
@@ -182,8 +184,8 @@ void Manifold::SetMinCircularEdgeLength(float length) {
  * constraint is applied.
  */
 void Manifold::SetCircularSegments(int number) {
-  ALWAYS_ASSERT(number > 2 || number == 0, userErr,
-                "must have at least three segments in circle!");
+  ASSERT(number > 2 || number == 0, userErr,
+         "must have at least three segments in circle!");
   Manifold::circularSegments_ = number;
 }
 
@@ -561,4 +563,5 @@ Manifold Manifold::TrimByPlane(glm::vec3 normal, float originOffset) const {
   return *this ^ Halfspace(BoundingBox(), normal, originOffset);
 }
 
+ExecutionParams& ManifoldParams() { return params; }
 }  // namespace manifold

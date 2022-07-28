@@ -21,7 +21,11 @@
 #include <thrust/tuple.h>
 
 #include <atomic>
+
+#ifdef MANIFOLD_DEBUG
+#include <chrono>
 #include <iostream>
+#endif
 
 #include "par.h"
 
@@ -31,6 +35,7 @@ namespace manifold {
  *  @brief Internal classes of the library; not currently part of the public API
  *  @{
  */
+#ifdef MANIFOLD_DEBUG
 inline void MemUsage() {
 #if THRUST_DEVICE_SYSTEM == THRUST_DEVICE_SYSTEM_CUDA
   size_t free, total;
@@ -92,6 +97,7 @@ struct Timer {
               << message << std::endl;
   }
 };
+#endif
 
 template <typename... Iters>
 thrust::zip_iterator<thrust::tuple<Iters...>> zip(Iters... iters) {

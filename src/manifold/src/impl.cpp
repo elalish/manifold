@@ -263,11 +263,13 @@ Manifold::Impl::Impl(const Mesh& mesh,
                      const std::vector<float>& properties,
                      const std::vector<float>& propertyTolerance)
     : vertPos_(mesh.vertPos), halfedgeTangent_(mesh.halfedgeTangent) {
+#ifdef MANIFOLD_DEBUG
   CheckDevice();
+#endif
   CalculateBBox();
   SetPrecision();
   CreateHalfedges(mesh.triVerts);
-  ALWAYS_ASSERT(IsManifold(), topologyErr, "Input mesh is not manifold!");
+  ASSERT(IsManifold(), topologyErr, "Input mesh is not manifold!");
   CalculateNormals();
   InitializeNewReference(triProperties, properties, propertyTolerance);
   SimplifyTopology();
@@ -351,18 +353,17 @@ int Manifold::Impl::InitializeNewReference(
   VecDH<float> propertyToleranceD(propertyTolerance);
 
   if (numProps > 0) {
-    ALWAYS_ASSERT(
-        triProperties.size() == NumTri() || triProperties.size() == 0, userErr,
-        "If specified, triProperties vector length must match NumTri().");
-    ALWAYS_ASSERT(properties.size() % numProps == 0, userErr,
-                  "properties vector must be a multiple of the size of "
-                  "propertyTolerance.");
+    ASSERT(triProperties.size() == NumTri() || triProperties.size() == 0,
+           userErr,
+           "If specified, triProperties vector length must match NumTri().");
+    ASSERT(properties.size() % numProps == 0, userErr,
+           "properties vector must be a multiple of the size of "
+           "propertyTolerance.");
 
     const int numSets = properties.size() / numProps;
-    ALWAYS_ASSERT(
-        all_of(autoPolicy(triProperties.size()), triPropertiesD.begin(),
-               triPropertiesD.end(), CheckProperties({numSets})),
-        userErr, "triProperties value is outside the properties range.");
+    ASSERT(all_of(autoPolicy(triProperties.size()), triPropertiesD.begin(),
+                  triPropertiesD.end(), CheckProperties({numSets})),
+           userErr, "triProperties value is outside the properties range.");
   }
 
   VecDH<thrust::pair<int, int>> face2face(halfedge_.size(), {-1, -1});
@@ -593,12 +594,9 @@ void Manifold::Impl::UpdateMeshIDs(VecDH<int>& meshIDs, VecDH<int>& originalIDs,
              originalPtr[index] |= kOccurred;
            });
 
-  if (error[0] != -1) {
-    std::stringstream ss;
-    ss << "Manifold::UpdateMeshIDs: meshID " << error[0]
-       << " not found in meshIDs.";
-    throw std::runtime_error(ss.str());
-  }
+  ASSERT(error[0] == -1, logicErr,
+         "Manifold::UpdateMeshIDs: meshID " + std::to_string(error[0]) +
+             " not found in meshIDs.");
   for (int i = 0; i < numMesh; ++i) {
     if (originalIDs[i] & kOccurred) {
       originalIDs[i] &= ~kOccurred;

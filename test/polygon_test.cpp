@@ -99,6 +99,8 @@ void TestPoly(const Polygons &polys, int expectedNumTri,
 
   EXPECT_NO_THROW(triangles = Triangulate(Duplicate(polys), precision));
   EXPECT_EQ(triangles.size(), 2 * expectedNumTri) << "Duplicate";
+
+  PolygonParams().verbose = false;
 }
 }  // namespace
 

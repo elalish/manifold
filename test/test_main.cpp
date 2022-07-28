@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "manifold.h"
 #include "polygon.h"
 #include "test.h"
 
@@ -43,6 +44,7 @@ int main(int argc, char **argv) {
         break;
       case 'v':
         options.params.verbose = true;
+        manifold::ManifoldParams().verbose = true;
         break;
       default:
         fprintf(stderr, "Unknown option: %s\n", argv[i]);

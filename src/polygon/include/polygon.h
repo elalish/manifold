@@ -25,14 +25,6 @@ namespace manifold {
 std::vector<glm::ivec3> Triangulate(const Polygons &polys,
                                     float precision = -1);
 
-std::vector<Halfedge> Polygons2Edges(const Polygons &polys);
-std::vector<Halfedge> Triangles2Edges(const std::vector<glm::ivec3> &triangles);
-void CheckTopology(const std::vector<Halfedge> &halfedges);
-void CheckTopology(const std::vector<glm::ivec3> &triangles,
-                   const Polygons &polys);
-void CheckGeometry(const std::vector<glm::ivec3> &triangles,
-                   const Polygons &polys, float precision);
-void Dump(const Polygons &polys);
 ExecutionParams &PolygonParams();
 /** @} */
 }  // namespace manifold
