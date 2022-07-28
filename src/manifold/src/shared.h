@@ -155,7 +155,7 @@ VecDH<TmpEdge> inline CreateTmpEdges(const VecDH<Halfedge>& halfedge) {
       remove_if<decltype(edges.begin())>(
           autoPolicy(edges.size()), edges.begin(), edges.end(), TmpInvalid()) -
       edges.begin();
-  ALWAYS_ASSERT(numEdge == halfedge.size() / 2, topologyErr, "Not oriented!");
+  ASSERT(numEdge == halfedge.size() / 2, topologyErr, "Not oriented!");
   edges.resize(numEdge);
   return edges;
 }

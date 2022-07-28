@@ -14,17 +14,20 @@
 
 #pragma once
 #define GLM_FORCE_EXPLICIT_CTOR
-#include <chrono>
 #include <glm/ext/matrix_transform.hpp>
 #include <glm/glm.hpp>
 #include <glm/gtc/constants.hpp>
 #include <glm/gtx/compatibility.hpp>
 #include <glm/gtx/rotate_vector.hpp>
-#include <iostream>
 #include <limits>
-#include <sstream>
 #include <unordered_map>
 #include <vector>
+
+#ifdef MANIFOLD_DEBUG
+#include <iomanip>
+#include <iostream>
+#include <sstream>
+#endif
 
 namespace manifold {
 
@@ -49,9 +52,10 @@ using logicErr = std::logic_error;
 /** @addtogroup Private
  *  @{
  */
+#ifdef MANIFOLD_DEBUG
 template <typename Ex>
-void AlwaysAssert(bool condition, const char* file, int line,
-                  const std::string& cond, const std::string& msg) {
+void Assert(bool condition, const char* file, int line, const std::string& cond,
+            const std::string& msg) {
   if (!condition) {
     std::ostringstream output;
     output << "Error in file: " << file << " (" << line << "): \'" << cond
@@ -59,9 +63,11 @@ void AlwaysAssert(bool condition, const char* file, int line,
     throw Ex(output.str());
   }
 }
-
-#define ALWAYS_ASSERT(condition, EX, msg) \
-  AlwaysAssert<EX>(condition, __FILE__, __LINE__, #condition, msg);
+#define ASSERT(condition, EX, msg) \
+  Assert<EX>(condition, __FILE__, __LINE__, #condition, msg);
+#else
+#define ASSERT(condition, EX, msg)
+#endif
 
 #ifdef __CUDACC__
 #define HOST_DEVICE __host__ __device__
@@ -416,6 +422,7 @@ struct Box {
   }
 };
 
+#ifdef MANIFOLD_DEBUG
 inline std::ostream& operator<<(std::ostream& stream, const Box& box) {
   return stream << "min: " << box.min.x << ", " << box.min.y << ", "
                 << box.min.z << ", "
@@ -470,6 +477,7 @@ void Dump(const std::vector<T>& vec) {
   std::cout << std::endl;
 }
 /** @} */
+#endif
 }  // namespace manifold
 
 #undef HOST_DEVICE

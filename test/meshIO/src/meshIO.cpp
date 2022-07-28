@@ -15,6 +15,7 @@
 #include "meshIO.h"
 
 #include <algorithm>
+#include <iostream>
 
 #include "assimp/Exporter.hpp"
 #include "assimp/GltfMaterial.h"
@@ -68,7 +69,7 @@ Mesh ImportMesh(const std::string& filename, bool forceCleanup) {
 
   const aiScene* scene = importer.ReadFile(filename, flags);
 
-  ALWAYS_ASSERT(scene, userErr, importer.GetErrorString());
+  ASSERT(scene, userErr, importer.GetErrorString());
 
   Mesh mesh_out;
   for (int i = 0; i < scene->mNumMeshes; ++i) {
@@ -80,8 +81,8 @@ Mesh ImportMesh(const std::string& filename, bool forceCleanup) {
     }
     for (int j = 0; j < mesh_i->mNumFaces; ++j) {
       const aiFace face = mesh_i->mFaces[j];
-      ALWAYS_ASSERT(face.mNumIndices == 3, userErr,
-                    "Non-triangular face in " + filename);
+      ASSERT(face.mNumIndices == 3, userErr,
+             "Non-triangular face in " + filename);
       mesh_out.triVerts.emplace_back(face.mIndices[0], face.mIndices[1],
                                      face.mIndices[2]);
     }
@@ -146,14 +147,14 @@ void ExportMesh(const std::string& filename, const Mesh& mesh,
   mesh_out->mNumVertices = mesh.vertPos.size();
   mesh_out->mVertices = new aiVector3D[mesh_out->mNumVertices];
   if (!options.faceted) {
-    ALWAYS_ASSERT(
+    ASSERT(
         mesh.vertNormal.size() == mesh.vertPos.size(), userErr,
         "vertNormal must be the same length as vertPos when faceted is false.");
     mesh_out->mNormals = new aiVector3D[mesh_out->mNumVertices];
   }
   if (!options.mat.vertColor.empty()) {
-    ALWAYS_ASSERT(mesh.vertPos.size() == options.mat.vertColor.size(), userErr,
-                  "If present, vertColor must be the same length as vertPos.");
+    ASSERT(mesh.vertPos.size() == options.mat.vertColor.size(), userErr,
+           "If present, vertColor must be the same length as vertPos.");
     mesh_out->mColors[0] = new aiColor4D[mesh_out->mNumVertices];
   }
 
@@ -195,7 +196,7 @@ void ExportMesh(const std::string& filename, const Mesh& mesh,
 
   delete scene;
 
-  ALWAYS_ASSERT(result == AI_SUCCESS, userErr, exporter.GetErrorString());
+  ASSERT(result == AI_SUCCESS, userErr, exporter.GetErrorString());
 }
 
 }  // namespace manifold

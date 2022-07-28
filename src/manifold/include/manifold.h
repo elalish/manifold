@@ -20,6 +20,8 @@
 
 namespace manifold {
 
+ExecutionParams& ManifoldParams();
+
 class CsgNode;
 class CsgLeafNode;
 
