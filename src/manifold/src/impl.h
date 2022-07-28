@@ -15,6 +15,7 @@
 #pragma once
 #include "collider.h"
 #include "manifold.h"
+#include "optional_assert.h"
 #include "shared.h"
 #include "sparse.h"
 #include "utils.h"

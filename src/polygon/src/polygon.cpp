@@ -21,6 +21,8 @@
 #include <set>
 #include <stack>
 
+#include "optional_assert.h"
+
 namespace {
 using namespace manifold;
 

@@ -33,6 +33,12 @@ namespace manifold {
 
 constexpr float kTolerance = 1e-5;
 
+#ifdef __CUDACC__
+#define HOST_DEVICE __host__ __device__
+#else
+#define HOST_DEVICE
+#endif
+
 #ifdef MANIFOLD_DEBUG
 /** @defgroup Exceptions
  *  @brief Custom exceptions
@@ -49,32 +55,11 @@ struct geometryErr : public virtual std::runtime_error {
 };
 using logicErr = std::logic_error;
 /** @} */
+#endif
 
 /** @addtogroup Private
  *  @{
  */
-template <typename Ex>
-void Assert(bool condition, const char* file, int line, const std::string& cond,
-            const std::string& msg) {
-  if (!condition) {
-    std::ostringstream output;
-    output << "Error in file: " << file << " (" << line << "): \'" << cond
-           << "\' is false: " << msg;
-    throw Ex(output.str());
-  }
-}
-#define ASSERT(condition, EX, msg) \
-  Assert<EX>(condition, __FILE__, __LINE__, #condition, msg);
-#else
-#define ASSERT(condition, EX, msg)
-#endif
-
-#ifdef __CUDACC__
-#define HOST_DEVICE __host__ __device__
-#else
-#define HOST_DEVICE
-#endif
-
 inline HOST_DEVICE int Signum(float val) { return (val > 0) - (val < 0); }
 
 inline HOST_DEVICE int CCW(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2,

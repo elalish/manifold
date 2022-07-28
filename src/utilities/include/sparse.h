@@ -15,6 +15,7 @@
 #pragma once
 #include <math.h>
 
+#include "optional_assert.h"
 #include "par.h"
 #include "structs.h"
 #include "utils.h"
