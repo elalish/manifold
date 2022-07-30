@@ -77,7 +77,7 @@ void Related(const Manifold& out, const std::vector<Mesh>& input,
     for (int j : {0, 1, 2}) {
       glm::vec3 vPos = output.vertPos[output.triVerts[tri][j]];
       glm::vec3 uvw = relation.UVW(tri, j);
-      ASSERT_NEAR(uvw[0] + uvw[1] + uvw[2], 1, 0.0001);
+      ASSERT_NEAR(uvw[0] + uvw[1] + uvw[2], 1, 0.0002);
       glm::vec3 vRelation = inTriangle * uvw;
       for (int k : {0, 1, 2})
         ASSERT_NEAR(vPos[k], vRelation[k], 10 * out.Precision());
