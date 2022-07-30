@@ -16,7 +16,6 @@
 
 #include <algorithm>
 #include <iostream>
-#include <string>
 
 #include "assimp/Exporter.hpp"
 #include "assimp/GltfMaterial.h"
