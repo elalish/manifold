@@ -25,7 +25,7 @@ void print_usage() {
   printf("  -e: Export GLB models of samples\n");
   printf(
       "  -v: Enable verbose output (only works if compiled with MANIFOLD_DEBUG "
-      "compile flag)\n");
+      "flag)\n");
 }
 
 int main(int argc, char **argv) {
