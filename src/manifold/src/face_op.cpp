@@ -167,9 +167,9 @@ Polygons Manifold::Impl::Face2Polygons(int face, glm::mat3x2 projection,
 
   std::map<int, int> vert_edge;
   for (int edge = firstEdge; edge < lastEdge; ++edge) {
-    ASSERT(vert_edge.emplace(std::make_pair(halfedge_[edge].startVert, edge))
-               .second,
-           topologyErr, "face has duplicate vertices.");
+    const auto check =
+        vert_edge.emplace(std::make_pair(halfedge_[edge].startVert, edge));
+    ASSERT(check.second, topologyErr, "face has duplicate vertices.");
   }
 
   Polygons polys;
