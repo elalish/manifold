@@ -22,8 +22,10 @@ void print_usage() {
   printf("-------------------------------\n");
   printf("manifold_test specific options:\n");
   printf("  -h: Print this message\n");
-  printf("  -e: Export sample models\n");
-  printf("  -v: Enable verbose output\n");
+  printf("  -e: Export GLB models of samples\n");
+  printf(
+      "  -v: Enable verbose output (only works if compiled with MANIFOLD_DEBUG "
+      "compile flag)\n");
 }
 
 int main(int argc, char **argv) {
