@@ -92,6 +92,14 @@ class Manifold {
   ///@{
   Mesh GetMesh() const;
   bool IsEmpty() const;
+  enum class Error {
+    NO_ERROR,
+    ODD_NUMBER_OF_TRIANGLES,
+    NEGATIVE_VERTEX_INDEX,
+    VERTEX_INDEX_OUT_OF_BOUNDS,
+
+  };
+  Error Status() const { return Error::NO_ERROR; };
   int NumVert() const;
   int NumEdge() const;
   int NumTri() const;
