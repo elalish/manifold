@@ -42,6 +42,7 @@ struct Manifold::Impl {
 
   Box bBox_;
   float precision_ = -1;
+  Error status_ = Error::NO_ERROR;
   VecDH<glm::vec3> vertPos_;
   VecDH<Halfedge> halfedge_;
   VecDH<glm::vec3> vertNormal_;
@@ -73,6 +74,7 @@ struct Manifold::Impl {
                      int startTri = 0, int n = -1, int startID = 0);
 
   void Update();
+  void MarkFailure(Error status);
   Impl Transform(const glm::mat4x3& transform) const;
   SparseIndices EdgeCollisions(const Impl& B) const;
   SparseIndices VertexCollisionsZ(const VecDH<glm::vec3>& vertsIn) const;

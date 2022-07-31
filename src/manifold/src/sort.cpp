@@ -171,9 +171,7 @@ void Manifold::Impl::Finish() {
   CalculateBBox();
   SetPrecision(precision_);
   if (!bBox_.isFinite()) {
-    vertPos_.resize(0);
-    halfedge_.resize(0);
-    faceNormal_.resize(0);
+    MarkFailure(Error::NON_FINITE_VERTEX);
     return;
   }
 
@@ -184,15 +182,23 @@ void Manifold::Impl::Finish() {
   SortFaces(faceBox, faceMorton);
   if (halfedge_.size() == 0) return;
 
-  ASSERT(halfedge_.size() % 6 == 0, topologyErr,
-         "Not an even number of faces after sorting faces!");
+  if (halfedge_.size() % 6 != 0) {
+    MarkFailure(Error::ODD_NUMBER_OF_TRIANGLES);
+    return;
+  }
+
   Halfedge extrema = {0, 0, 0, 0};
   extrema = reduce<Halfedge>(autoPolicy(halfedge_.size()), halfedge_.begin(),
                              halfedge_.end(), extrema, Extrema());
 
-  ASSERT(extrema.startVert >= 0, topologyErr, "Vertex index is negative!");
-  ASSERT(extrema.endVert < NumVert(), topologyErr,
-         "Vertex index exceeds number of verts!");
+  if (extrema.startVert < 0) {
+    MarkFailure(Error::NEGATIVE_VERTEX_INDEX);
+    return;
+  }
+  if (extrema.endVert >= NumVert()) {
+    MarkFailure(Error::VERTEX_INDEX_OUT_OF_BOUNDS);
+    return;
+  }
   ASSERT(extrema.face >= 0, topologyErr, "Face index is negative!");
   ASSERT(extrema.face < NumTri(), topologyErr,
          "Face index exceeds number of faces!");

@@ -478,6 +478,17 @@ void Manifold::Impl::Update() {
   collider_.UpdateBoxes(faceBox);
 }
 
+void Manifold::Impl::MarkFailure(Error status) {
+  bBox_ = Box();
+  vertPos_.resize(0);
+  halfedge_.resize(0);
+  vertNormal_.resize(0);
+  faceNormal_.resize(0);
+  halfedgeTangent_.resize(0);
+  meshRelation_ = MeshRelationD();
+  status_ = status;
+}
+
 Manifold::Impl Manifold::Impl::Transform(const glm::mat4x3& transform_) const {
   if (transform_ == glm::mat4x3(1.0f)) return *this;
   auto policy = autoPolicy(NumVert());

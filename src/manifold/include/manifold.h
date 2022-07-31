@@ -94,12 +94,13 @@ class Manifold {
   bool IsEmpty() const;
   enum class Error {
     NO_ERROR,
+    NON_FINITE_VERTEX,
     ODD_NUMBER_OF_TRIANGLES,
     NEGATIVE_VERTEX_INDEX,
     VERTEX_INDEX_OUT_OF_BOUNDS,
 
   };
-  Error Status() const { return Error::NO_ERROR; };
+  Error Status() const;
   int NumVert() const;
   int NumEdge() const;
   int NumTri() const;

@@ -210,6 +210,17 @@ int Manifold::GetCircularSegments(float radius) {
  */
 bool Manifold::IsEmpty() const { return GetCsgLeafNode().GetImpl()->IsEmpty(); }
 /**
+ * Returns the reason for an input Mesh producing an empty Manifold. This Status
+ * only applies to Manifolds newly-created from an input Mesh - once they are
+ * combined into a new Manifold via operations, the status reverts to NO_ERROR,
+ * simply processing the problem mesh as empty. Likewise, empty meshes may still
+ * show NO_ERROR, for instance if they are small enough relative to their
+ * precision to be collapsed to nothing.
+ */
+Manifold::Error Manifold::Status() const {
+  return GetCsgLeafNode().GetImpl()->status_;
+}
+/**
  * The number of vertices in the Manifold.
  */
 int Manifold::NumVert() const { return GetCsgLeafNode().GetImpl()->NumVert(); }
