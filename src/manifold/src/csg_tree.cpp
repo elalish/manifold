@@ -304,7 +304,8 @@ std::shared_ptr<CsgLeafNode> CsgOpNode::ToLeafNode() const {
 void CsgOpNode::BatchBoolean(
     Manifold::OpType operation,
     std::vector<std::shared_ptr<const Manifold::Impl>> &results) {
-  assert(operation != Manifold::OpType::SUBTRACT);
+  ASSERT(operation != Manifold::OpType::SUBTRACT, logicErr,
+         "BatchBoolean doesn't support Difference.");
   auto cmpFn = [](std::shared_ptr<const Manifold::Impl> a,
                   std::shared_ptr<const Manifold::Impl> b) {
     // invert the order because we want a min heap
