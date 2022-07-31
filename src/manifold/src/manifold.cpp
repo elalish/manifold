@@ -158,7 +158,7 @@ float Manifold::circularEdgeLength_ = 1.0f;
  * is 10 degrees.
  */
 void Manifold::SetMinCircularAngle(float angle) {
-  ASSERT(angle > 0.0f, userErr, "angle must be positive!");
+  if (angle <= 0) return;
   Manifold::circularAngle_ = angle;
 }
 
@@ -171,7 +171,7 @@ void Manifold::SetMinCircularAngle(float angle) {
  * increase if the the segments hit the minimum angle. Default is 1.0.
  */
 void Manifold::SetMinCircularEdgeLength(float length) {
-  ASSERT(length > 0.0f, userErr, "length must be positive!");
+  if (length <= 0) return;
   Manifold::circularEdgeLength_ = length;
 }
 
@@ -180,12 +180,11 @@ void Manifold::SetMinCircularEdgeLength(float length) {
  * Cylinder(), Sphere(), and Revolve() constructors. Overrides the edge length
  * and angle constraints and sets the number of segements to exactly this value.
  *
- * @param number Number of circular segments. Default is -1, meaning no
+ * @param number Number of circular segments. Default is 0, meaning no
  * constraint is applied.
  */
 void Manifold::SetCircularSegments(int number) {
-  ASSERT(number > 2 || number == 0, userErr,
-         "must have at least three segments in circle!");
+  if (number < 3 && number != 0) return;
   Manifold::circularSegments_ = number;
 }
 
