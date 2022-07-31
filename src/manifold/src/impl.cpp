@@ -269,7 +269,10 @@ Manifold::Impl::Impl(const Mesh& mesh,
   CalculateBBox();
   SetPrecision();
   CreateHalfedges(mesh.triVerts);
-  ASSERT(IsManifold(), topologyErr, "Input mesh is not manifold!");
+  if (!IsManifold()) {
+    MarkFailure(Error::NOT_MANIFOLD);
+    return;
+  }
   CalculateNormals();
   InitializeNewReference(triProperties, properties, propertyTolerance);
   SimplifyTopology();
@@ -351,17 +354,21 @@ int Manifold::Impl::InitializeNewReference(
   VecDH<float> propertyToleranceD(propertyTolerance);
 
   if (numProps > 0) {
-    ASSERT(triProperties.size() == NumTri() || triProperties.size() == 0,
-           userErr,
-           "If specified, triProperties vector length must match NumTri().");
-    ASSERT(properties.size() % numProps == 0, userErr,
-           "properties vector must be a multiple of the size of "
-           "propertyTolerance.");
+    if (triProperties.size() != NumTri() && triProperties.size() != 0) {
+      MarkFailure(Error::TRI_PROPERTIES_WRONG_LENGTH);
+      return nextMeshID;
+    };
+    if (properties.size() % numProps != 0) {
+      MarkFailure(Error::PROPERTIES_WRONG_LENGTH);
+      return nextMeshID;
+    };
 
     const int numSets = properties.size() / numProps;
-    ASSERT(all_of(autoPolicy(triProperties.size()), triPropertiesD.begin(),
-                  triPropertiesD.end(), CheckProperties({numSets})),
-           userErr, "triProperties value is outside the properties range.");
+    if (all_of(autoPolicy(triProperties.size()), triPropertiesD.begin(),
+               triPropertiesD.end(), CheckProperties({numSets}))) {
+      MarkFailure(Error::TRI_PROPERTIES_OUT_OF_BOUNDS);
+      return nextMeshID;
+    };
   }
 
   VecDH<thrust::pair<int, int>> face2face(halfedge_.size(), {-1, -1});

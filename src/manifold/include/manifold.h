@@ -95,10 +95,13 @@ class Manifold {
   enum class Error {
     NO_ERROR,
     NON_FINITE_VERTEX,
-    ODD_NUMBER_OF_TRIANGLES,
+    NOT_MANIFOLD,
     NEGATIVE_VERTEX_INDEX,
     VERTEX_INDEX_OUT_OF_BOUNDS,
-
+    PROPERTIES_WRONG_LENGTH,
+    TRI_PROPERTIES_WRONG_LENGTH,
+    TRI_PROPERTIES_OUT_OF_BOUNDS,
+    INTERNAL_ERROR,
   };
   Error Status() const;
   int NumVert() const;
