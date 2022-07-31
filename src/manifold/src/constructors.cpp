@@ -182,8 +182,9 @@ Manifold Manifold::Sphere(float radius, int circularSegments) {
  */
 Manifold Manifold::Extrude(Polygons crossSection, float height, int nDivisions,
                            float twistDegrees, glm::vec2 scaleTop) {
-  ASSERT(scaleTop.x >= 0 && scaleTop.y >= 0, userErr,
-         "scale values cannot be negative");
+  scaleTop.x = glm::max(scaleTop.x, 0.0f);
+  scaleTop.y = glm::max(scaleTop.y, 0.0f);
+
   auto pImpl_ = std::make_shared<Impl>();
   ++nDivisions;
   auto& vertPos = pImpl_->vertPos_;
