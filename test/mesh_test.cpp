@@ -195,7 +195,11 @@ TEST(Manifold, DISABLED_Determinism) {
 }
 
 TEST(Manifold, ValidInput) {
-  Manifold tet(Tet());
+  std::vector<float> propTol = {0.1, 0.2};
+  std::vector<float> prop = {0, 0, 1, -1, 2, -2, 3, -3, 4, -4, 5, -5, 6, -6};
+  std::vector<glm::ivec3> triProp = {
+      {2, 0, 1}, {0, 3, 1}, {2, 3, 0}, {6, 5, 4}};
+  Manifold tet(Tet(), triProp, prop, propTol);
   EXPECT_FALSE(tet.IsEmpty());
   EXPECT_EQ(tet.Status(), Manifold::Error::NO_ERROR);
   EXPECT_TRUE(tet.IsManifold());
@@ -242,6 +246,38 @@ TEST(Manifold, InvalidInput4) {
   Manifold tet(in);
   EXPECT_TRUE(tet.IsEmpty());
   EXPECT_EQ(tet.Status(), Manifold::Error::VERTEX_INDEX_OUT_OF_BOUNDS);
+  EXPECT_TRUE(tet.IsManifold());
+}
+
+TEST(Manifold, InvalidInput5) {
+  std::vector<float> propTol = {0.1, 0.2};
+  std::vector<float> prop = {0, 0, 1, -1, 2, -2, 3, -3, 4, -4, 5, -5, 6};
+  std::vector<glm::ivec3> triProp = {
+      {2, 0, 1}, {0, 3, 1}, {2, 3, 0}, {6, 5, 4}};
+  Manifold tet(Tet(), triProp, prop, propTol);
+  EXPECT_TRUE(tet.IsEmpty());
+  EXPECT_EQ(tet.Status(), Manifold::Error::PROPERTIES_WRONG_LENGTH);
+  EXPECT_TRUE(tet.IsManifold());
+}
+
+TEST(Manifold, InvalidInput6) {
+  std::vector<float> propTol = {0.1, 0.2};
+  std::vector<float> prop = {0, 0, 1, -1, 2, -2, 3, -3, 4, -4, 5, -5, 6, -6};
+  std::vector<glm::ivec3> triProp = {{2, 0, 1}, {0, 3, 1}, {2, 3, 0}};
+  Manifold tet(Tet(), triProp, prop, propTol);
+  EXPECT_TRUE(tet.IsEmpty());
+  EXPECT_EQ(tet.Status(), Manifold::Error::TRI_PROPERTIES_WRONG_LENGTH);
+  EXPECT_TRUE(tet.IsManifold());
+}
+
+TEST(Manifold, InvalidInput7) {
+  std::vector<float> propTol = {0.1, 0.2};
+  std::vector<float> prop = {0, 0, 1, -1, 2, -2, 3, -3, 4, -4, 5, -5, 6, -6};
+  std::vector<glm::ivec3> triProp = {
+      {2, 0, 1}, {0, 3, 1}, {2, 3, 0}, {6, 5, 7}};
+  Manifold tet(Tet(), triProp, prop, propTol);
+  EXPECT_TRUE(tet.IsEmpty());
+  EXPECT_EQ(tet.Status(), Manifold::Error::TRI_PROPERTIES_OUT_OF_BOUNDS);
   EXPECT_TRUE(tet.IsManifold());
 }
 

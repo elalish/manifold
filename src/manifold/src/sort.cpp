@@ -171,7 +171,8 @@ void Manifold::Impl::Finish() {
   CalculateBBox();
   SetPrecision(precision_);
   if (!bBox_.IsFinite()) {
-    MarkFailure(Error::NON_FINITE_VERTEX);
+    // Decimated out of existance - early out.
+    MarkFailure(Error::NO_ERROR);
     return;
   }
 
@@ -182,41 +183,34 @@ void Manifold::Impl::Finish() {
   SortFaces(faceBox, faceMorton);
   if (halfedge_.size() == 0) return;
 
-  if (halfedge_.size() % 6 != 0) {
-    MarkFailure(Error::NOT_MANIFOLD);
-    return;
-  }
+  ASSERT(halfedge_.size() % 6 == 0, topologyErr,
+         "Not an even number of faces after sorting faces!");
 
+#ifdef MANIFOLD_DEBUG
   Halfedge extrema = {0, 0, 0, 0};
   extrema = reduce<Halfedge>(autoPolicy(halfedge_.size()), halfedge_.begin(),
                              halfedge_.end(), extrema, Extrema());
+#endif
 
-  if (extrema.startVert < 0) {
-    MarkFailure(Error::VERTEX_INDEX_OUT_OF_BOUNDS);
-    return;
-  }
-  if (extrema.endVert >= NumVert()) {
-    MarkFailure(Error::VERTEX_INDEX_OUT_OF_BOUNDS);
-    return;
-  }
-  if (extrema.face < 0 || extrema.face >= NumTri() ||
-      extrema.pairedHalfedge < 0 || extrema.pairedHalfedge >= 2 * NumEdge()) {
-    MarkFailure(Error::INTERNAL_ERROR);
-    return;
-  }
-  if (meshRelation_.triBary.size() != NumTri() &&
-      meshRelation_.triBary.size() != 0) {
-    MarkFailure(Error::INTERNAL_ERROR);
-    return;
-  }
-  if (faceNormal_.size() != NumTri() && faceNormal_.size() != 0) {
-    MarkFailure(Error::INTERNAL_ERROR);
-    return;
-  }
-  if (vertNormal_.size() != NumVert() && vertNormal_.size() != 0) {
-    MarkFailure(Error::INTERNAL_ERROR);
-    return;
-  }
+  ASSERT(extrema.startVert >= 0, topologyErr, "Vertex index is negative!");
+  ASSERT(extrema.endVert < NumVert(), topologyErr,
+         "Vertex index exceeds number of verts!");
+  ASSERT(extrema.face >= 0, topologyErr, "Face index is negative!");
+  ASSERT(extrema.face < NumTri(), topologyErr,
+         "Face index exceeds number of faces!");
+  ASSERT(extrema.pairedHalfedge >= 0, topologyErr,
+         "Halfedge index is negative!");
+  ASSERT(extrema.pairedHalfedge < 2 * NumEdge(), topologyErr,
+         "Halfedge index exceeds number of halfedges!");
+  ASSERT(meshRelation_.triBary.size() == NumTri() ||
+             meshRelation_.triBary.size() == 0,
+         logicErr, "Mesh Relation doesn't fit!");
+  ASSERT(faceNormal_.size() == NumTri() || faceNormal_.size() == 0, logicErr,
+         "faceNormal size = " + std::to_string(faceNormal_.size()) +
+             ", NumTri = " + std::to_string(NumTri()));
+  ASSERT(vertNormal_.size() == NumVert() || vertNormal_.size() == 0, logicErr,
+         "vertNormal size = " + std::to_string(vertNormal_.size()) +
+             ", NumVert = " + std::to_string(NumVert()));
 
   CalculateNormals();
   collider_ = Collider(faceBox, faceMorton);
