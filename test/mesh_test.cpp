@@ -207,7 +207,7 @@ TEST(Manifold, ValidInput) {
 
 TEST(Manifold, InvalidInput1) {
   Mesh in = Tet();
-  in.vertPos[2][1] = 0.0f / 0.0f;
+  in.vertPos[2][1] = NAN;
   Manifold tet(in);
   EXPECT_TRUE(tet.IsEmpty());
   EXPECT_EQ(tet.Status(), Manifold::Error::NON_FINITE_VERTEX);
