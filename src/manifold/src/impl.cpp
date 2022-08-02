@@ -267,8 +267,19 @@ Manifold::Impl::Impl(const Mesh& mesh,
   CheckDevice();
 #endif
   CalculateBBox();
+  if (!IsFinite()) {
+    MarkFailure(Error::NON_FINITE_VERTEX);
+    return;
+  }
   SetPrecision();
-  CreateHalfedges(mesh.triVerts);
+
+  VecDH<glm::ivec3> triVerts = mesh.triVerts;
+  if (!IsIndexInBounds(triVerts)) {
+    MarkFailure(Error::VERTEX_INDEX_OUT_OF_BOUNDS);
+    return;
+  }
+
+  CreateHalfedges(triVerts);
   if (!IsManifold()) {
     MarkFailure(Error::NOT_MANIFOLD);
     return;

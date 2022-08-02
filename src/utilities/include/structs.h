@@ -402,7 +402,7 @@ struct Box {
   /**
    * Does this box have finite bounds?
    */
-  HOST_DEVICE bool isFinite() const {
+  HOST_DEVICE bool IsFinite() const {
     return glm::all(glm::isfinite(min)) && glm::all(glm::isfinite(max));
   }
 };

@@ -83,10 +83,13 @@ struct Manifold::Impl {
   int NumVert() const { return vertPos_.size(); }
   int NumEdge() const { return halfedge_.size() / 2; }
   int NumTri() const { return halfedge_.size() / 3; }
+
   // properties.cu
   Properties GetProperties() const;
   Curvature GetCurvature() const;
   void CalculateBBox();
+  bool IsFinite() const;
+  bool IsIndexInBounds(const VecDH<glm::ivec3>& triVerts) const;
   void SetPrecision(float minPrecision = -1);
   bool IsManifold() const;
   bool MatchesTriNormals() const;
