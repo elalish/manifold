@@ -170,7 +170,7 @@ void Manifold::Impl::Finish() {
 
   CalculateBBox();
   SetPrecision(precision_);
-  if (!bBox_.isFinite()) {
+  if (!bBox_.IsFinite()) {
     MarkFailure(Error::NON_FINITE_VERTEX);
     return;
   }
@@ -192,7 +192,7 @@ void Manifold::Impl::Finish() {
                              halfedge_.end(), extrema, Extrema());
 
   if (extrema.startVert < 0) {
-    MarkFailure(Error::NEGATIVE_VERTEX_INDEX);
+    MarkFailure(Error::VERTEX_INDEX_OUT_OF_BOUNDS);
     return;
   }
   if (extrema.endVert >= NumVert()) {

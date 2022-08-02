@@ -49,6 +49,16 @@ Mesh Csaszar() {
   return csaszar;
 }
 
+Mesh Tet() {
+  Mesh tet;
+  tet.vertPos = {{-1.0f, -1.0f, 1.0f},
+                 {-1.0f, 1.0f, -1.0f},
+                 {1.0f, -1.0f, -1.0f},
+                 {1.0f, 1.0f, 1.0f}};
+  tet.triVerts = {{2, 0, 1}, {0, 3, 1}, {2, 3, 0}, {3, 2, 1}};
+  return tet;
+}
+
 void Identical(const Mesh& mesh1, const Mesh& mesh2) {
   ASSERT_EQ(mesh1.vertPos.size(), mesh2.vertPos.size());
   for (int i = 0; i < mesh1.vertPos.size(); ++i)
@@ -182,6 +192,57 @@ TEST(Manifold, DISABLED_Determinism) {
   Manifold manifold2(mesh_out);
   Mesh mesh_out2 = manifold2.GetMesh();
   // Identical(mesh_out, mesh_out2);
+}
+
+TEST(Manifold, ValidInput) {
+  Manifold tet(Tet());
+  EXPECT_FALSE(tet.IsEmpty());
+  EXPECT_EQ(tet.Status(), Manifold::Error::NO_ERROR);
+  EXPECT_TRUE(tet.IsManifold());
+}
+
+TEST(Manifold, InvalidInput1) {
+  Mesh in = Tet();
+  in.vertPos[2][1] = 0.0f / 0.0f;
+  Manifold tet(in);
+  EXPECT_TRUE(tet.IsEmpty());
+  EXPECT_EQ(tet.Status(), Manifold::Error::NON_FINITE_VERTEX);
+  EXPECT_TRUE(tet.IsManifold());
+}
+
+TEST(Manifold, InvalidInput2) {
+  Mesh in = Tet();
+  std::swap(in.triVerts[2][1], in.triVerts[2][2]);
+  Manifold tet(in);
+  EXPECT_TRUE(tet.IsEmpty());
+  EXPECT_EQ(tet.Status(), Manifold::Error::NOT_MANIFOLD);
+  EXPECT_TRUE(tet.IsManifold());
+}
+
+TEST(Manifold, InvalidInput3) {
+  Mesh in = Tet();
+  for (glm::ivec3& tri : in.triVerts) {
+    for (int i : {0, 1, 2}) {
+      if (tri[i] == 2) tri[i] = -2;
+    }
+  }
+  Manifold tet(in);
+  EXPECT_TRUE(tet.IsEmpty());
+  EXPECT_EQ(tet.Status(), Manifold::Error::VERTEX_INDEX_OUT_OF_BOUNDS);
+  EXPECT_TRUE(tet.IsManifold());
+}
+
+TEST(Manifold, InvalidInput4) {
+  Mesh in = Tet();
+  for (glm::ivec3& tri : in.triVerts) {
+    for (int i : {0, 1, 2}) {
+      if (tri[i] == 2) tri[i] = 4;
+    }
+  }
+  Manifold tet(in);
+  EXPECT_TRUE(tet.IsEmpty());
+  EXPECT_EQ(tet.Status(), Manifold::Error::VERTEX_INDEX_OUT_OF_BOUNDS);
+  EXPECT_TRUE(tet.IsManifold());
 }
 
 /**
