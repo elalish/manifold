@@ -100,7 +100,6 @@ class Manifold {
     PROPERTIES_WRONG_LENGTH,
     TRI_PROPERTIES_WRONG_LENGTH,
     TRI_PROPERTIES_OUT_OF_BOUNDS,
-    INTERNAL_ERROR,
   };
   Error Status() const;
   int NumVert() const;

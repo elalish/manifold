@@ -286,6 +286,8 @@ Manifold::Impl::Impl(const Mesh& mesh,
   }
   CalculateNormals();
   InitializeNewReference(triProperties, properties, propertyTolerance);
+  if (status_ != Error::NO_ERROR) return;
+
   SimplifyTopology();
   Finish();
 }
@@ -375,8 +377,8 @@ int Manifold::Impl::InitializeNewReference(
     };
 
     const int numSets = properties.size() / numProps;
-    if (all_of(autoPolicy(triProperties.size()), triPropertiesD.begin(),
-               triPropertiesD.end(), CheckProperties({numSets}))) {
+    if (!all_of(autoPolicy(triProperties.size()), triPropertiesD.begin(),
+                triPropertiesD.end(), CheckProperties({numSets}))) {
       MarkFailure(Error::TRI_PROPERTIES_OUT_OF_BOUNDS);
       return nextMeshID;
     };
