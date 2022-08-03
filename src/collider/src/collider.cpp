@@ -246,8 +246,8 @@ namespace manifold {
  */
 Collider::Collider(const VecDH<Box>& leafBB,
                    const VecDH<uint32_t>& leafMorton) {
-  ALWAYS_ASSERT(leafBB.size() == leafMorton.size(), userErr,
-                "vectors must be the same length");
+  ASSERT(leafBB.size() == leafMorton.size(), userErr,
+         "vectors must be the same length");
   int num_nodes = 2 * leafBB.size() - 1;
   // assign and allocate members
   nodeBBox_.resize(num_nodes);
@@ -303,8 +303,8 @@ SparseIndices Collider::Collisions(const VecDH<T>& querriesIn) const {
  * hierarchy.
  */
 void Collider::UpdateBoxes(const VecDH<Box>& leafBB) {
-  ALWAYS_ASSERT(leafBB.size() == NumLeaves(), userErr,
-                "must have the same number of updated boxes as original");
+  ASSERT(leafBB.size() == NumLeaves(), userErr,
+         "must have the same number of updated boxes as original");
   // copy in leaf node Boxs
   strided_range<VecDH<Box>::Iter> leaves(nodeBBox_.begin(), nodeBBox_.end(), 2);
   auto policy = autoPolicy(NumInternal());

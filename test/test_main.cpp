@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "manifold.h"
 #include "polygon.h"
 #include "test.h"
 
@@ -21,8 +22,10 @@ void print_usage() {
   printf("-------------------------------\n");
   printf("manifold_test specific options:\n");
   printf("  -h: Print this message\n");
-  printf("  -e: Export sample models\n");
-  printf("  -v: Enable verbose output\n");
+  printf("  -e: Export GLB models of samples\n");
+  printf(
+      "  -v: Enable verbose output (only works if compiled with MANIFOLD_DEBUG "
+      "flag)\n");
 }
 
 int main(int argc, char **argv) {
@@ -43,6 +46,7 @@ int main(int argc, char **argv) {
         break;
       case 'v':
         options.params.verbose = true;
+        manifold::ManifoldParams().verbose = true;
         break;
       default:
         fprintf(stderr, "Unknown option: %s\n", argv[i]);

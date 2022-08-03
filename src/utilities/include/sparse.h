@@ -15,6 +15,7 @@
 #pragma once
 #include <math.h>
 
+#include "optional_assert.h"
 #include "par.h"
 #include "structs.h"
 #include "utils.h"
@@ -83,8 +84,8 @@ class SparseIndices {
   };
 
   size_t RemoveZeros(VecDH<int>& S) {
-    ALWAYS_ASSERT(S.size() == p.size(), userErr,
-                  "Different number of values than indicies!");
+    ASSERT(S.size() == p.size(), userErr,
+           "Different number of values than indicies!");
     auto zBegin = zip(S.begin(), begin(false), begin(true));
     auto zEnd = zip(S.end(), end(false), end(true));
     size_t size = remove_if<decltype(zBegin)>(autoPolicy(S.size()), zBegin,
@@ -118,8 +119,8 @@ class SparseIndices {
 
   template <typename T>
   size_t KeepFinite(VecDH<T>& v, VecDH<int>& x) {
-    ALWAYS_ASSERT(x.size() == p.size(), userErr,
-                  "Different number of values than indicies!");
+    ASSERT(x.size() == p.size(), userErr,
+           "Different number of values than indicies!");
     auto zBegin = zip(v.begin(), x.begin(), begin(false), begin(true));
     auto zEnd = zip(v.end(), x.end(), end(false), end(true));
     size_t size = remove_if<decltype(zBegin)>(autoPolicy(v.size()), zBegin,
@@ -135,8 +136,8 @@ class SparseIndices {
   template <typename Iter, typename T>
   VecDH<T> Gather(const VecDH<T>& val, const Iter pqBegin, const Iter pqEnd,
                   T missingVal) const {
-    ALWAYS_ASSERT(val.size() == p.size(), userErr,
-                  "Different number of values than indicies!");
+    ASSERT(val.size() == p.size(), userErr,
+           "Different number of values than indicies!");
     size_t size = pqEnd - pqBegin;
     VecDH<T> result(size);
     VecDH<char> found(size);
@@ -150,6 +151,7 @@ class SparseIndices {
     return result;
   }
 
+#ifdef MANIFOLD_DEBUG
   void Dump() const {
     const auto& p = Get(0);
     const auto& q = Get(1);
@@ -159,6 +161,7 @@ class SparseIndices {
     }
     std::cout << std::endl;
   }
+#endif
 
  private:
   VecDH<int> p, q;

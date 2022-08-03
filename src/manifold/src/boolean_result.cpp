@@ -19,9 +19,6 @@
 #include "par.h"
 #include "polygon.h"
 
-// TODO: make this runtime configurable for quicker debug
-constexpr bool kVerbose = false;
-
 // Mark the meshID as coming from P by flipping the 30th bit.
 // The 30th bit is used to avoid flipping the sign.
 constexpr int kFromP = 1 << 30;
@@ -192,13 +189,12 @@ std::vector<Halfedge> PairUp(std::vector<EdgePos> &edgePos) {
   // geometrically valid. If the order does not go start-end-start-end... then
   // the input and output are not geometrically valid and this algorithm becomes
   // a heuristic.
-  ALWAYS_ASSERT(edgePos.size() % 2 == 0, topologyErr,
-                "Non-manifold edge! Not an even number of points.");
+  ASSERT(edgePos.size() % 2 == 0, topologyErr,
+         "Non-manifold edge! Not an even number of points.");
   int nEdges = edgePos.size() / 2;
   auto middle = std::partition(edgePos.begin(), edgePos.end(),
                                [](EdgePos x) { return x.isStart; });
-  ALWAYS_ASSERT(middle - edgePos.begin() == nEdges, topologyErr,
-                "Non-manifold edge!");
+  ASSERT(middle - edgePos.begin() == nEdges, topologyErr, "Non-manifold edge!");
   auto cmp = [](EdgePos a, EdgePos b) { return a.edgePos < b.edgePos; };
   std::sort(edgePos.begin(), middle, cmp);
   std::sort(middle, edgePos.end(), cmp);
@@ -512,36 +508,16 @@ std::pair<VecDH<BaryRef>, VecDH<int>> CalculateMeshRelation(
 namespace manifold {
 
 Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
+#ifdef MANIFOLD_DEBUG
   Timer assemble;
   assemble.Start();
+#endif
 
-  if ((expandP_ > 0) != (op == Manifold::OpType::ADD))
-    std::cout << "Warning! Result op type not compatible with constructor op "
-                 "type: coplanar faces may have incorrect results."
-              << std::endl;
-  int c1, c2, c3;
-  switch (op) {
-    case Manifold::OpType::ADD:
-      c1 = 1;
-      c2 = 1;
-      c3 = -1;
-      if (kVerbose) std::cout << "ADD" << std::endl;
-      break;
-    case Manifold::OpType::SUBTRACT:
-      c1 = 1;
-      c2 = 0;
-      c3 = -1;
-      if (kVerbose) std::cout << "SUBTRACT" << std::endl;
-      break;
-    case Manifold::OpType::INTERSECT:
-      c1 = 0;
-      c2 = 0;
-      c3 = 1;
-      if (kVerbose) std::cout << "INTERSECT" << std::endl;
-      break;
-    default:
-      throw std::invalid_argument("invalid enum: OpType.");
-  }
+  ASSERT((expandP_ > 0) == (op == Manifold::OpType::ADD), logicErr,
+         "Result op type not compatible with constructor op type.");
+  const int c1 = op == Manifold::OpType::INTERSECT ? 0 : 1;
+  const int c2 = op == Manifold::OpType::ADD ? 1 : 0;
+  const int c3 = op == Manifold::OpType::INTERSECT ? 1 : -1;
 
   if (w03_.size() == 0) {
     if (w30_.size() != 0 && op == Manifold::OpType::ADD) {
@@ -617,12 +593,10 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
   for_each_n(policy, zip(i21.begin(), v21R.begin(), v21_.begin()), i21.size(),
              DuplicateVerts({outR.vertPos_.ptrD()}));
 
-  if (kVerbose) {
-    std::cout << nPv << " verts from inP" << std::endl;
-    std::cout << nQv << " verts from inQ" << std::endl;
-    std::cout << n12 << " new verts from edgesP -> facesQ" << std::endl;
-    std::cout << n21 << " new verts from facesP -> edgesQ" << std::endl;
-  }
+  PRINT(nPv << " verts from inP");
+  PRINT(nQv << " verts from inQ");
+  PRINT(n12 << " new verts from edgesP -> facesQ");
+  PRINT(n21 << " new verts from facesP -> edgesQ");
 
   // Build up new polygonal faces from triangle intersections. At this point the
   // calculation switches from parallel to serial.
@@ -673,17 +647,21 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
   std::tie(faceRef, halfedgeBary) = CalculateMeshRelation(
       outR, halfedgeRef, inP_, inQ_, nPv + nQv, numFaceR, invertQ);
 
+#ifdef MANIFOLD_DEBUG
   assemble.Stop();
   Timer triangulate;
   triangulate.Start();
+#endif
 
   // Level 6
 
   outR.Face2Tri(faceEdge, faceRef, halfedgeBary);
 
+#ifdef MANIFOLD_DEBUG
   triangulate.Stop();
   Timer simplify;
   simplify.Start();
+#endif
 
   outR.SimplifyTopology();
 
@@ -701,14 +679,17 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
   }
   outR.UpdateMeshIDs(meshIDs, original);
 
+#ifdef MANIFOLD_DEBUG
   simplify.Stop();
   Timer sort;
   sort.Start();
+#endif
 
   outR.Finish();
 
+#ifdef MANIFOLD_DEBUG
   sort.Stop();
-  if (kVerbose) {
+  if (ManifoldParams().verbose) {
     assemble.Print("Assembly");
     triangulate.Print("Triangulation");
     simplify.Print("Simplification");
@@ -716,6 +697,7 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
     std::cout << outR.NumVert() << " verts and " << outR.NumTri() << " tris"
               << std::endl;
   }
+#endif
 
   return outR;
 }

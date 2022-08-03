@@ -18,9 +18,6 @@
 
 #include "par.h"
 
-// TODO: make this runtime configurable for quicker debug
-constexpr bool kVerbose = false;
-
 using namespace manifold;
 
 namespace {
@@ -328,7 +325,7 @@ struct Kernel02 {
       if (forward) {
         if (!Shadows(vertPos.z, z02, expandP * vertNormalP[p0].z)) s02 = 0;
       } else {
-        // ALWAYS_ASSERT(closestVert != -1, topologyErr, "No closest vert");
+        // ASSERT(closestVert != -1, topologyErr, "No closest vert");
         if (!Shadows(z02, vertPos.z, expandP * vertNormalP[closestVert].z))
           s02 = 0;
       }
@@ -502,11 +499,13 @@ Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ,
   // Union -> expand inP
   // Difference, Intersection -> contract inP
 
+#ifdef MANIFOLD_DEBUG
   Timer broad;
   broad.Start();
+#endif
 
   if (inP.IsEmpty() || inQ.IsEmpty() || !inP.bBox_.DoesOverlap(inQ.bBox_)) {
-    if (kVerbose) std::cout << "No overlap, early out" << std::endl;
+    PRINT("No overlap, early out");
     w03_.resize(inP.NumVert(), 0);
     w30_.resize(inQ.NumVert(), 0);
     return;
@@ -516,31 +515,33 @@ Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ,
   // Find edge-triangle overlaps (broad phase)
   p1q2_ = inQ_.EdgeCollisions(inP_);
   p1q2_.Sort();
-  if (kVerbose) std::cout << "p1q2 size = " << p1q2_.size() << std::endl;
+  PRINT("p1q2 size = " << p1q2_.size());
 
   p2q1_ = inP_.EdgeCollisions(inQ_);
   p2q1_.SwapPQ();
   p2q1_.Sort();
-  if (kVerbose) std::cout << "p2q1 size = " << p2q1_.size() << std::endl;
+  PRINT("p2q1 size = " << p2q1_.size());
 
   // Level 2
   // Find vertices that overlap faces in XY-projection
   SparseIndices p0q2 = inQ.VertexCollisionsZ(inP.vertPos_);
   p0q2.Sort();
-  if (kVerbose) std::cout << "p0q2 size = " << p0q2.size() << std::endl;
+  PRINT("p0q2 size = " << p0q2.size());
 
   SparseIndices p2q0 = inP.VertexCollisionsZ(inQ.vertPos_);
   p2q0.SwapPQ();
   p2q0.Sort();
-  if (kVerbose) std::cout << "p2q0 size = " << p2q0.size() << std::endl;
+  PRINT("p2q0 size = " << p2q0.size());
 
   // Find involved edge pairs from Level 3
   SparseIndices p1q1 = Filter11(inP_, inQ_, p1q2_, p2q1_);
-  if (kVerbose) std::cout << "p1q1 size = " << p1q1.size() << std::endl;
+  PRINT("p1q1 size = " << p1q1.size());
 
+#ifdef MANIFOLD_DEBUG
   broad.Stop();
   Timer intersections;
   intersections.Start();
+#endif
 
   // Level 2
   // Build up XY-projection intersection of two edges, including the z-value for
@@ -548,19 +549,19 @@ Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ,
   VecDH<int> s11;
   VecDH<glm::vec4> xyzz11;
   std::tie(s11, xyzz11) = Shadow11(p1q1, inP, inQ, expandP_);
-  if (kVerbose) std::cout << "s11 size = " << s11.size() << std::endl;
+  PRINT("s11 size = " << s11.size());
 
   // Build up Z-projection of vertices onto triangles, keeping only those that
   // fall inside the triangle.
   VecDH<int> s02;
   VecDH<float> z02;
   std::tie(s02, z02) = Shadow02(inP, inQ, p0q2, true, expandP_);
-  if (kVerbose) std::cout << "s02 size = " << s02.size() << std::endl;
+  PRINT("s02 size = " << s02.size());
 
   VecDH<int> s20;
   VecDH<float> z20;
   std::tie(s20, z20) = Shadow02(inQ, inP, p2q0, false, expandP_);
-  if (kVerbose) std::cout << "s20 size = " << s20.size() << std::endl;
+  PRINT("s20 size = " << s20.size());
 
   // Level 3
   // Build up the intersection of the edges and triangles, keeping only those
@@ -568,23 +569,25 @@ Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ,
   // triangle.
   std::tie(x12_, v12_) =
       Intersect12(inP, inQ, s02, p0q2, s11, p1q1, z02, xyzz11, p1q2_, true);
-  if (kVerbose) std::cout << "x12 size = " << x12_.size() << std::endl;
+  PRINT("x12 size = " << x12_.size());
 
   std::tie(x21_, v21_) =
       Intersect12(inQ, inP, s20, p2q0, s11, p1q1, z20, xyzz11, p2q1_, false);
-  if (kVerbose) std::cout << "x21 size = " << x21_.size() << std::endl;
+  PRINT("x21 size = " << x21_.size());
 
   // Sum up the winding numbers of all vertices.
   w03_ = Winding03(inP, p0q2, s02, false);
 
   w30_ = Winding03(inQ, p2q0, s20, true);
 
+#ifdef MANIFOLD_DEBUG
   intersections.Stop();
 
-  if (kVerbose) {
+  if (ManifoldParams().verbose) {
     broad.Print("Broad phase");
     intersections.Print("Intersections");
     MemUsage();
   }
+#endif
 }
 }  // namespace manifold

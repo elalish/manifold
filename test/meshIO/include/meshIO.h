@@ -13,6 +13,8 @@
 // limitations under the License.
 
 #pragma once
+#include <string>
+
 #include "structs.h"
 
 namespace manifold {

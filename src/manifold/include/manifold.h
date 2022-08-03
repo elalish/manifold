@@ -20,6 +20,8 @@
 
 namespace manifold {
 
+ExecutionParams& ManifoldParams();
+
 class CsgNode;
 class CsgLeafNode;
 
@@ -90,6 +92,16 @@ class Manifold {
   ///@{
   Mesh GetMesh() const;
   bool IsEmpty() const;
+  enum class Error {
+    NO_ERROR,
+    NON_FINITE_VERTEX,
+    NOT_MANIFOLD,
+    VERTEX_INDEX_OUT_OF_BOUNDS,
+    PROPERTIES_WRONG_LENGTH,
+    TRI_PROPERTIES_WRONG_LENGTH,
+    TRI_PROPERTIES_OUT_OF_BOUNDS,
+  };
+  Error Status() const;
   int NumVert() const;
   int NumEdge() const;
   int NumTri() const;

@@ -15,6 +15,13 @@
 #pragma once
 #include "impl.h"
 
+#ifdef MANIFOLD_DEBUG
+#define PRINT(msg) \
+  if (ManifoldParams().verbose) std::cout << msg << std::endl;
+#else
+#define PRINT(msg)
+#endif
+
 /**
  * The notation in these files is abbreviated due to the complexity of the
  * functions involved. The key is that the input manifolds are P and Q, while

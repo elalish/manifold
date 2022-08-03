@@ -80,10 +80,9 @@ namespace manifold {
  */
 Manifold Manifold::Smooth(const Mesh& mesh,
                           const std::vector<Smoothness>& sharpenedEdges) {
-  ALWAYS_ASSERT(
-      mesh.halfedgeTangent.empty(), std::runtime_error,
-      "when supplying tangents, the normal constructor should be used "
-      "rather than Smooth().");
+  ASSERT(mesh.halfedgeTangent.empty(), std::runtime_error,
+         "when supplying tangents, the normal constructor should be used "
+         "rather than Smooth().");
 
   std::shared_ptr<Impl> impl = std::make_shared<Impl>(mesh);
   impl->CreateTangents(sharpenedEdges);
@@ -183,8 +182,9 @@ Manifold Manifold::Sphere(float radius, int circularSegments) {
  */
 Manifold Manifold::Extrude(Polygons crossSection, float height, int nDivisions,
                            float twistDegrees, glm::vec2 scaleTop) {
-  ALWAYS_ASSERT(scaleTop.x >= 0 && scaleTop.y >= 0, userErr,
-                "scale values cannot be negative");
+  scaleTop.x = glm::max(scaleTop.x, 0.0f);
+  scaleTop.y = glm::max(scaleTop.y, 0.0f);
+
   auto pImpl_ = std::make_shared<Impl>();
   ++nDivisions;
   auto& vertPos = pImpl_->vertPos_;
