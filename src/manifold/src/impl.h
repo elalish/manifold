@@ -15,6 +15,7 @@
 #pragma once
 #include "collider.h"
 #include "manifold.h"
+#include "optional_assert.h"
 #include "shared.h"
 #include "sparse.h"
 #include "utils.h"
@@ -41,6 +42,7 @@ struct Manifold::Impl {
 
   Box bBox_;
   float precision_ = -1;
+  Error status_ = Error::NO_ERROR;
   VecDH<glm::vec3> vertPos_;
   VecDH<Halfedge> halfedge_;
   VecDH<glm::vec3> vertNormal_;
@@ -72,6 +74,7 @@ struct Manifold::Impl {
                      int startTri = 0, int n = -1, int startID = 0);
 
   void Update();
+  void MarkFailure(Error status);
   Impl Transform(const glm::mat4x3& transform) const;
   SparseIndices EdgeCollisions(const Impl& B) const;
   SparseIndices VertexCollisionsZ(const VecDH<glm::vec3>& vertsIn) const;
@@ -80,10 +83,13 @@ struct Manifold::Impl {
   int NumVert() const { return vertPos_.size(); }
   int NumEdge() const { return halfedge_.size() / 2; }
   int NumTri() const { return halfedge_.size() / 3; }
+
   // properties.cu
   Properties GetProperties() const;
   Curvature GetCurvature() const;
   void CalculateBBox();
+  bool IsFinite() const;
+  bool IsIndexInBounds(const VecDH<glm::ivec3>& triVerts) const;
   void SetPrecision(float minPrecision = -1);
   bool IsManifold() const;
   bool MatchesTriNormals() const;

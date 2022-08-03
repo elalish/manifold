@@ -14,22 +14,32 @@
 
 #pragma once
 #define GLM_FORCE_EXPLICIT_CTOR
-#include <chrono>
 #include <glm/ext/matrix_transform.hpp>
 #include <glm/glm.hpp>
 #include <glm/gtc/constants.hpp>
 #include <glm/gtx/compatibility.hpp>
 #include <glm/gtx/rotate_vector.hpp>
-#include <iostream>
 #include <limits>
-#include <sstream>
 #include <unordered_map>
 #include <vector>
+
+#ifdef MANIFOLD_DEBUG
+#include <iomanip>
+#include <iostream>
+#include <sstream>
+#endif
 
 namespace manifold {
 
 constexpr float kTolerance = 1e-5;
 
+#ifdef __CUDACC__
+#define HOST_DEVICE __host__ __device__
+#else
+#define HOST_DEVICE
+#endif
+
+#ifdef MANIFOLD_DEBUG
 /** @defgroup Exceptions
  *  @brief Custom exceptions
  *  @{
@@ -45,30 +55,11 @@ struct geometryErr : public virtual std::runtime_error {
 };
 using logicErr = std::logic_error;
 /** @} */
+#endif
 
 /** @addtogroup Private
  *  @{
  */
-template <typename Ex>
-void AlwaysAssert(bool condition, const char* file, int line,
-                  const std::string& cond, const std::string& msg) {
-  if (!condition) {
-    std::ostringstream output;
-    output << "Error in file: " << file << " (" << line << "): \'" << cond
-           << "\' is false: " << msg;
-    throw Ex(output.str());
-  }
-}
-
-#define ALWAYS_ASSERT(condition, EX, msg) \
-  AlwaysAssert<EX>(condition, __FILE__, __LINE__, #condition, msg);
-
-#ifdef __CUDACC__
-#define HOST_DEVICE __host__ __device__
-#else
-#define HOST_DEVICE
-#endif
-
 inline HOST_DEVICE int Signum(float val) { return (val > 0) - (val < 0); }
 
 inline HOST_DEVICE int CCW(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2,
@@ -411,11 +402,12 @@ struct Box {
   /**
    * Does this box have finite bounds?
    */
-  HOST_DEVICE bool isFinite() const {
+  HOST_DEVICE bool IsFinite() const {
     return glm::all(glm::isfinite(min)) && glm::all(glm::isfinite(max));
   }
 };
 
+#ifdef MANIFOLD_DEBUG
 inline std::ostream& operator<<(std::ostream& stream, const Box& box) {
   return stream << "min: " << box.min.x << ", " << box.min.y << ", "
                 << box.min.z << ", "
@@ -470,6 +462,7 @@ void Dump(const std::vector<T>& vec) {
   std::cout << std::endl;
 }
 /** @} */
+#endif
 }  // namespace manifold
 
 #undef HOST_DEVICE

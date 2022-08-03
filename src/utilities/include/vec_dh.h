@@ -13,11 +13,9 @@
 // limitations under the License.
 
 #pragma once
-#include <chrono>
 #ifdef MANIFOLD_USE_CUDA
 #include <cuda.h>
 #endif
-#include <iostream>
 
 #include "par.h"
 #include "structs.h"
@@ -405,6 +403,7 @@ class VecDH {
 
   void reserve(int n) { impl_.reserve(n); }
 
+#ifdef MANIFOLD_DEBUG
   void Dump() const {
     std::cout << "VecDH = " << std::endl;
     for (int i = 0; i < impl_.size(); ++i) {
@@ -412,6 +411,7 @@ class VecDH {
     }
     std::cout << std::endl;
   }
+#endif
 
  private:
   ManagedVec<T> impl_;

@@ -21,6 +21,8 @@ namespace {
 using namespace manifold;
 using namespace thrust::placeholders;
 
+ExecutionParams params;
+
 struct MakeTri {
   const Halfedge* halfedges;
 
@@ -156,7 +158,7 @@ float Manifold::circularEdgeLength_ = 1.0f;
  * is 10 degrees.
  */
 void Manifold::SetMinCircularAngle(float angle) {
-  ALWAYS_ASSERT(angle > 0.0f, userErr, "angle must be positive!");
+  if (angle <= 0) return;
   Manifold::circularAngle_ = angle;
 }
 
@@ -169,7 +171,7 @@ void Manifold::SetMinCircularAngle(float angle) {
  * increase if the the segments hit the minimum angle. Default is 1.0.
  */
 void Manifold::SetMinCircularEdgeLength(float length) {
-  ALWAYS_ASSERT(length > 0.0f, userErr, "length must be positive!");
+  if (length <= 0) return;
   Manifold::circularEdgeLength_ = length;
 }
 
@@ -178,12 +180,11 @@ void Manifold::SetMinCircularEdgeLength(float length) {
  * Cylinder(), Sphere(), and Revolve() constructors. Overrides the edge length
  * and angle constraints and sets the number of segements to exactly this value.
  *
- * @param number Number of circular segments. Default is -1, meaning no
+ * @param number Number of circular segments. Default is 0, meaning no
  * constraint is applied.
  */
 void Manifold::SetCircularSegments(int number) {
-  ALWAYS_ASSERT(number > 2 || number == 0, userErr,
-                "must have at least three segments in circle!");
+  if (number < 3 && number != 0) return;
   Manifold::circularSegments_ = number;
 }
 
@@ -207,6 +208,17 @@ int Manifold::GetCircularSegments(float radius) {
  * Does the Manifold have any triangles?
  */
 bool Manifold::IsEmpty() const { return GetCsgLeafNode().GetImpl()->IsEmpty(); }
+/**
+ * Returns the reason for an input Mesh producing an empty Manifold. This Status
+ * only applies to Manifolds newly-created from an input Mesh - once they are
+ * combined into a new Manifold via operations, the status reverts to NO_ERROR,
+ * simply processing the problem mesh as empty. Likewise, empty meshes may still
+ * show NO_ERROR, for instance if they are small enough relative to their
+ * precision to be collapsed to nothing.
+ */
+Manifold::Error Manifold::Status() const {
+  return GetCsgLeafNode().GetImpl()->status_;
+}
 /**
  * The number of vertices in the Manifold.
  */
@@ -561,4 +573,5 @@ Manifold Manifold::TrimByPlane(glm::vec3 normal, float originOffset) const {
   return *this ^ Halfspace(BoundingBox(), normal, originOffset);
 }
 
+ExecutionParams& ManifoldParams() { return params; }
 }  // namespace manifold

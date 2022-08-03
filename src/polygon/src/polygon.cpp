@@ -15,19 +15,20 @@
 #include "polygon.h"
 
 #include <algorithm>
-#include <iomanip>
-#include <iostream>
 #include <list>
 #include <map>
 #include <queue>
 #include <set>
 #include <stack>
 
+#include "optional_assert.h"
+
 namespace {
 using namespace manifold;
 
 ExecutionParams params;
 
+#ifdef MANIFOLD_DEBUG
 bool OverlapAssert(bool condition, const char *file, int line,
                    const std::string &cond, const std::string &msg) {
   if (!params.processOverlaps && !condition) {
@@ -57,6 +58,133 @@ bool OverlapAssert(bool condition, const char *file, int line,
 #define OVERLAP_ASSERT(condition, msg)                                \
   if (!OverlapAssert(condition, __FILE__, __LINE__, #condition, msg)) \
     return true;
+
+#define PRINT(msg) \
+  if (params.verbose) std::cout << msg << std::endl;
+
+std::vector<Halfedge> Polygons2Edges(const Polygons &polys) {
+  std::vector<Halfedge> halfedges;
+  for (const auto &poly : polys) {
+    for (int i = 1; i < poly.size(); ++i) {
+      halfedges.push_back({poly[i - 1].idx, poly[i].idx, -1});
+    }
+    halfedges.push_back({poly.back().idx, poly[0].idx, -1});
+  }
+  return halfedges;
+}
+
+std::vector<Halfedge> Triangles2Edges(
+    const std::vector<glm::ivec3> &triangles) {
+  std::vector<Halfedge> halfedges;
+  for (const glm::ivec3 &tri : triangles) {
+    halfedges.push_back({tri[0], tri[1], -1});
+    halfedges.push_back({tri[1], tri[2], -1});
+    halfedges.push_back({tri[2], tri[0], -1});
+  }
+  return halfedges;
+}
+
+void CheckTopology(const std::vector<Halfedge> &halfedges) {
+  ASSERT(halfedges.size() % 2 == 0, topologyErr, "Odd number of halfedges.");
+  size_t n_edges = halfedges.size() / 2;
+  std::vector<Halfedge> forward(halfedges.size()), backward(halfedges.size());
+
+  auto end = std::copy_if(halfedges.begin(), halfedges.end(), forward.begin(),
+                          [](Halfedge e) { return e.endVert > e.startVert; });
+  ASSERT(std::distance(forward.begin(), end) == n_edges, topologyErr,
+         "Half of halfedges should be forward.");
+  forward.resize(n_edges);
+
+  end = std::copy_if(halfedges.begin(), halfedges.end(), backward.begin(),
+                     [](Halfedge e) { return e.endVert < e.startVert; });
+  ASSERT(std::distance(backward.begin(), end) == n_edges, topologyErr,
+         "Half of halfedges should be backward.");
+  backward.resize(n_edges);
+
+  std::for_each(backward.begin(), backward.end(),
+                [](Halfedge &e) { std::swap(e.startVert, e.endVert); });
+  auto cmp = [](const Halfedge &a, const Halfedge &b) {
+    return a.startVert < b.startVert ||
+           (a.startVert == b.startVert && a.endVert < b.endVert);
+  };
+  std::sort(forward.begin(), forward.end(), cmp);
+  std::sort(backward.begin(), backward.end(), cmp);
+  for (int i = 0; i < n_edges; ++i) {
+    ASSERT(forward[i].startVert == backward[i].startVert &&
+               forward[i].endVert == backward[i].endVert,
+           topologyErr, "Forward and backward edge do not match.");
+    if (i > 0) {
+      ASSERT(forward[i - 1].startVert != forward[i].startVert ||
+                 forward[i - 1].endVert != forward[i].endVert,
+             topologyErr, "Not a 2-manifold.");
+      ASSERT(backward[i - 1].startVert != backward[i].startVert ||
+                 backward[i - 1].endVert != backward[i].endVert,
+             topologyErr, "Not a 2-manifold.");
+    }
+  }
+}
+
+void CheckTopology(const std::vector<glm::ivec3> &triangles,
+                   const Polygons &polys) {
+  std::vector<Halfedge> halfedges = Triangles2Edges(triangles);
+  std::vector<Halfedge> openEdges = Polygons2Edges(polys);
+  for (Halfedge e : openEdges) {
+    halfedges.push_back({e.endVert, e.startVert, -1, e.face});
+  }
+  CheckTopology(halfedges);
+}
+
+void CheckGeometry(const std::vector<glm::ivec3> &triangles,
+                   const Polygons &polys, float precision) {
+  std::map<int, glm::vec2> vertPos;
+  for (const auto &poly : polys) {
+    for (int i = 0; i < poly.size(); ++i) {
+      vertPos[poly[i].idx] = poly[i].pos;
+    }
+  }
+  ASSERT(std::all_of(triangles.begin(), triangles.end(),
+                     [&vertPos, precision](const glm::ivec3 &tri) {
+                       return CCW(vertPos[tri[0]], vertPos[tri[1]],
+                                  vertPos[tri[2]], precision) >= 0;
+                     }),
+         geometryErr, "triangulation is not entirely CCW!");
+}
+
+void Dump(const Polygons &polys) {
+  for (auto poly : polys) {
+    std::cout << "polys.push_back({" << std::setprecision(9) << std::endl;
+    for (auto v : poly) {
+      std::cout << "    {glm::vec2(" << v.pos.x << ", " << v.pos.y << "), "
+                << v.idx << "},  //" << std::endl;
+    }
+    std::cout << "});" << std::endl;
+  }
+  for (auto poly : polys) {
+    std::cout << "array([" << std::endl;
+    for (auto v : poly) {
+      std::cout << "  [" << v.pos.x << ", " << v.pos.y << "]," << std::endl;
+    }
+    std::cout << "])" << std::endl;
+  }
+}
+
+void PrintFailure(const std::exception &e, const Polygons &polys,
+                  std::vector<glm::ivec3> &triangles, float precision) {
+  std::cout << "-----------------------------------" << std::endl;
+  std::cout << "Triangulation failed! Precision = " << precision << std::endl;
+  std::cout << e.what() << std::endl;
+  Dump(polys);
+  std::cout << "produced this triangulation:" << std::endl;
+  for (int j = 0; j < triangles.size(); ++j) {
+    std::cout << triangles[j][0] << ", " << triangles[j][1] << ", "
+              << triangles[j][2] << std::endl;
+  }
+}
+#else
+#define OVERLAP_ASSERT(condition, msg) \
+  if (!(condition)) return true;
+#define PRINT(msg)
+#endif
 
 /**
  * The class first turns input polygons into monotone polygons, then
@@ -104,7 +232,7 @@ class Monotones {
     int triangles_left = monotones_.size();
     VertItr start = monotones_.begin();
     while (start != monotones_.end()) {
-      if (params.verbose) std::cout << start->mesh_idx << std::endl;
+      PRINT(start->mesh_idx);
       Triangulator triangulator(start, precision_);
       start->SetProcessed(true);
       VertItr vR = start->right;
@@ -112,62 +240,62 @@ class Monotones {
       while (vR != vL) {
         // Process the neighbor vert that is next in the sweep-line.
         if (vR->index < vL->index) {
-          if (params.verbose) std::cout << vR->mesh_idx << std::endl;
+          PRINT(vR->mesh_idx);
           triangulator.ProcessVert(vR, true, false, triangles);
           vR->SetProcessed(true);
           vR = vR->right;
         } else {
-          if (params.verbose) std::cout << vL->mesh_idx << std::endl;
+          PRINT(vL->mesh_idx);
           triangulator.ProcessVert(vL, false, false, triangles);
           vL->SetProcessed(true);
           vL = vL->left;
         }
       }
-      if (params.verbose) std::cout << vR->mesh_idx << std::endl;
+      PRINT(vR->mesh_idx);
       triangulator.ProcessVert(vR, true, true, triangles);
       vR->SetProcessed(true);
       // validation
-      ALWAYS_ASSERT(triangulator.NumTriangles() > 0, topologyErr,
-                    "Monotone produced no triangles.");
+      ASSERT(triangulator.NumTriangles() > 0, topologyErr,
+             "Monotone produced no triangles.");
       triangles_left -= 2 + triangulator.NumTriangles();
       // Find next monotone
       start = std::find_if(monotones_.begin(), monotones_.end(),
                            [](const VertAdj &v) { return !v.Processed(); });
     }
-    ALWAYS_ASSERT(triangles_left == 0, topologyErr,
-                  "Triangulation produced wrong number of triangles.");
+    ASSERT(triangles_left == 0, topologyErr,
+           "Triangulation produced wrong number of triangles.");
   }
 
   // A variety of sanity checks on the data structure. Expensive checks are only
   // performed if params.intermediateChecks = true.
   void Check() {
+#ifdef MANIFOLD_DEBUG
     if (!params.intermediateChecks) return;
     std::vector<Halfedge> edges;
     for (VertItr vert = monotones_.begin(); vert != monotones_.end(); vert++) {
       vert->SetProcessed(false);
       edges.push_back({vert->mesh_idx, vert->right->mesh_idx});
-      ALWAYS_ASSERT(vert->right->right != vert, topologyErr,
-                    "two-edge monotone!");
-      ALWAYS_ASSERT(vert->left->right == vert, topologyErr,
-                    "monotone vert neighbors don't agree!");
+      ASSERT(vert->right->right != vert, topologyErr, "two-edge monotone!");
+      ASSERT(vert->left->right == vert, topologyErr,
+             "monotone vert neighbors don't agree!");
     }
     if (params.verbose) {
       VertItr start = monotones_.begin();
       while (start != monotones_.end()) {
         start->SetProcessed(true);
-        std::cout << "monotone start: " << start->mesh_idx << ", "
-                  << start->pos.y << std::endl;
+        PRINT("monotone start: " << start->mesh_idx << ", " << start->pos.y);
         VertItr v = start->right;
         while (v != start) {
-          std::cout << v->mesh_idx << ", " << v->pos.y << std::endl;
+          PRINT(v->mesh_idx << ", " << v->pos.y);
           v->SetProcessed(true);
           v = v->right;
         }
-        std::cout << std::endl;
+        PRINT("");
         start = std::find_if(monotones_.begin(), monotones_.end(),
                              [](const VertAdj &v) { return !v.Processed(); });
       }
     }
+#endif
   }
 
  private:
@@ -287,7 +415,7 @@ class Monotones {
       if (onRight_ == onRight && !last) {
         // This only creates enough triangles to ensure the reflex chain is
         // still reflex.
-        if (params.verbose) std::cout << "same chain" << std::endl;
+        PRINT("same chain");
         int ccw = CCW(vi->pos, vj->pos, v_top->pos, precision_);
         while (ccw == (onRight_ ? 1 : -1) || ccw == 0) {
           AddTriangle(triangles, vi, vj, v_top);
@@ -303,7 +431,7 @@ class Monotones {
         // This branch empties the reflex chain and switches sides. It must be
         // used for the last point, as it will output all the triangles
         // regardless of geometry.
-        if (params.verbose) std::cout << "different chain" << std::endl;
+        PRINT("different chain");
         onRight_ = !onRight_;
         VertItr v_last = v_top;
         while (!reflex_chain_.empty()) {
@@ -330,7 +458,7 @@ class Monotones {
       if (!onRight_) std::swap(v1, v2);
       triangles.emplace_back(v0->mesh_idx, v1->mesh_idx, v2->mesh_idx);
       ++triangles_output_;
-      if (params.verbose) std::cout << triangles.back() << std::endl;
+      PRINT(triangles.back());
     }
   };
 
@@ -384,33 +512,33 @@ class Monotones {
       if (vert->left->Processed()) {
         if (westPair == eastPair) {
           // facing in
-          if (params.verbose) std::cout << "END" << std::endl;
+          PRINT("END");
           CloseEnd(vert);
           return END;
         } else if (westPair != activePairs_.end() &&
                    std::next(westPair) == eastPair) {
           // facing out
-          if (params.verbose) std::cout << "MERGE" << std::endl;
+          PRINT("MERGE");
           CloseEnd(vert);
           // westPair will be removed and eastPair takes over.
           SetVWest(eastPair, westPair->vWest);
           return MERGE;
         } else {  // not neighbors
-          if (params.verbose) std::cout << "SKIP" << std::endl;
+          PRINT("SKIP");
           return SKIP;
         }
       } else {
         SetVWest(eastPair, vert);
-        if (params.verbose) std::cout << "WESTSIDE" << std::endl;
+        PRINT("WESTSIDE");
         return WESTSIDE;
       }
     } else {
       if (vert->left->Processed()) {
         SetVEast(westPair, vert);
-        if (params.verbose) std::cout << "EASTSIDE" << std::endl;
+        PRINT("EASTSIDE");
         return EASTSIDE;
       } else {
-        if (params.verbose) std::cout << "START" << std::endl;
+        PRINT("START");
         return START;
       }
     }
@@ -664,8 +792,7 @@ class Monotones {
         ++insertAt;
       }
 
-      if (params.verbose)
-        std::cout << "mesh_idx = " << vert->mesh_idx << std::endl;
+      PRINT("mesh_idx = " << vert->mesh_idx);
 
       if (vert->Processed()) continue;
 
@@ -704,7 +831,7 @@ class Monotones {
             !nextAttached.empty() || !starts.empty(),
             "Not Geometrically Valid! Tried to skip last queued vert.");
         skipped.push_back(vert);
-        if (params.verbose) std::cout << "Skipping vert" << std::endl;
+        PRINT("Skipping vert");
         // If a new pair was added, remove it.
         if (newPair != activePairs_.end()) {
           activePairs_.erase(newPair);
@@ -747,8 +874,9 @@ class Monotones {
         skipped.pop_back();
       }
 
-      // Debug
+#ifdef MANIFOLD_DEBUG
       if (params.verbose) ListPairs();
+#endif
     }
     return false;
   }  // namespace
@@ -761,9 +889,7 @@ class Monotones {
    */
   VertItr SplitVerts(VertItr north, VertItr south) {
     // at split events, add duplicate vertices to end of list and reconnect
-    if (params.verbose)
-      std::cout << "split from " << north->mesh_idx << " to " << south->mesh_idx
-                << std::endl;
+    PRINT("split from " << north->mesh_idx << " to " << south->mesh_idx);
 
     VertItr northEast = monotones_.insert(north, *north);
     Link(north->left, northEast);
@@ -795,8 +921,7 @@ class Monotones {
     while (vert != monotones_.begin()) {
       --vert;
 
-      if (params.verbose)
-        std::cout << "mesh_idx = " << vert->mesh_idx << std::endl;
+      PRINT("mesh_idx = " << vert->mesh_idx);
 
       if (vert->Processed()) continue;
 
@@ -859,12 +984,14 @@ class Monotones {
 
       vert->SetProcessed(true);
 
-      // Debug
+#ifdef MANIFOLD_DEBUG
       if (params.verbose) ListPairs();
+#endif
     }
     return false;
   }
 
+#ifdef MANIFOLD_DEBUG
   void ListPairs() const {
     std::cout << "active edges:" << std::endl;
     for (const EdgePair &pair : activePairs_) {
@@ -881,20 +1008,8 @@ class Monotones {
         std::cout << "east does not point back!" << std::endl;
     }
   }
-};  // namespace
-
-void PrintFailure(const std::exception &e, const Polygons &polys,
-                  std::vector<glm::ivec3> &triangles, float precision) {
-  std::cout << "-----------------------------------" << std::endl;
-  std::cout << "Triangulation failed! Precision = " << precision << std::endl;
-  std::cout << e.what() << std::endl;
-  Dump(polys);
-  std::cout << "produced this triangulation:" << std::endl;
-  for (int j = 0; j < triangles.size(); ++j) {
-    std::cout << triangles[j][0] << ", " << triangles[j][1] << ", "
-              << triangles[j][2] << std::endl;
-  }
-}
+#endif
+};
 }  // namespace
 
 namespace manifold {
@@ -914,6 +1029,7 @@ std::vector<glm::ivec3> Triangulate(const Polygons &polys, float precision) {
   try {
     Monotones monotones(polys, precision);
     monotones.Triangulate(triangles);
+#ifdef MANIFOLD_DEBUG
     if (params.intermediateChecks) {
       CheckTopology(triangles, polys);
       CheckGeometry(triangles, polys, precision);
@@ -926,115 +1042,11 @@ std::vector<glm::ivec3> Triangulate(const Polygons &polys, float precision) {
   } catch (const std::exception &e) {
     PrintFailure(e, polys, triangles, precision);
     throw;
+#else
+  } catch (const std::exception &e) {
+#endif
   }
   return triangles;
-}
-
-std::vector<Halfedge> Polygons2Edges(const Polygons &polys) {
-  std::vector<Halfedge> halfedges;
-  for (const auto &poly : polys) {
-    for (int i = 1; i < poly.size(); ++i) {
-      halfedges.push_back({poly[i - 1].idx, poly[i].idx, -1});
-    }
-    halfedges.push_back({poly.back().idx, poly[0].idx, -1});
-  }
-  return halfedges;
-}
-
-std::vector<Halfedge> Triangles2Edges(
-    const std::vector<glm::ivec3> &triangles) {
-  std::vector<Halfedge> halfedges;
-  for (const glm::ivec3 &tri : triangles) {
-    halfedges.push_back({tri[0], tri[1], -1});
-    halfedges.push_back({tri[1], tri[2], -1});
-    halfedges.push_back({tri[2], tri[0], -1});
-  }
-  return halfedges;
-}
-
-void CheckTopology(const std::vector<Halfedge> &halfedges) {
-  ALWAYS_ASSERT(halfedges.size() % 2 == 0, topologyErr,
-                "Odd number of halfedges.");
-  size_t n_edges = halfedges.size() / 2;
-  std::vector<Halfedge> forward(halfedges.size()), backward(halfedges.size());
-
-  auto end = std::copy_if(halfedges.begin(), halfedges.end(), forward.begin(),
-                          [](Halfedge e) { return e.endVert > e.startVert; });
-  ALWAYS_ASSERT(std::distance(forward.begin(), end) == n_edges, topologyErr,
-                "Half of halfedges should be forward.");
-  forward.resize(n_edges);
-
-  end = std::copy_if(halfedges.begin(), halfedges.end(), backward.begin(),
-                     [](Halfedge e) { return e.endVert < e.startVert; });
-  ALWAYS_ASSERT(std::distance(backward.begin(), end) == n_edges, topologyErr,
-                "Half of halfedges should be backward.");
-  backward.resize(n_edges);
-
-  std::for_each(backward.begin(), backward.end(),
-                [](Halfedge &e) { std::swap(e.startVert, e.endVert); });
-  auto cmp = [](const Halfedge &a, const Halfedge &b) {
-    return a.startVert < b.startVert ||
-           (a.startVert == b.startVert && a.endVert < b.endVert);
-  };
-  std::sort(forward.begin(), forward.end(), cmp);
-  std::sort(backward.begin(), backward.end(), cmp);
-  for (int i = 0; i < n_edges; ++i) {
-    ALWAYS_ASSERT(forward[i].startVert == backward[i].startVert &&
-                      forward[i].endVert == backward[i].endVert,
-                  topologyErr, "Forward and backward edge do not match.");
-    if (i > 0) {
-      ALWAYS_ASSERT(forward[i - 1].startVert != forward[i].startVert ||
-                        forward[i - 1].endVert != forward[i].endVert,
-                    topologyErr, "Not a 2-manifold.");
-      ALWAYS_ASSERT(backward[i - 1].startVert != backward[i].startVert ||
-                        backward[i - 1].endVert != backward[i].endVert,
-                    topologyErr, "Not a 2-manifold.");
-    }
-  }
-}
-
-void CheckTopology(const std::vector<glm::ivec3> &triangles,
-                   const Polygons &polys) {
-  std::vector<Halfedge> halfedges = Triangles2Edges(triangles);
-  std::vector<Halfedge> openEdges = Polygons2Edges(polys);
-  for (Halfedge e : openEdges) {
-    halfedges.push_back({e.endVert, e.startVert, -1, e.face});
-  }
-  CheckTopology(halfedges);
-}
-
-void CheckGeometry(const std::vector<glm::ivec3> &triangles,
-                   const Polygons &polys, float precision) {
-  std::map<int, glm::vec2> vertPos;
-  for (const auto &poly : polys) {
-    for (int i = 0; i < poly.size(); ++i) {
-      vertPos[poly[i].idx] = poly[i].pos;
-    }
-  }
-  ALWAYS_ASSERT(std::all_of(triangles.begin(), triangles.end(),
-                            [&vertPos, precision](const glm::ivec3 &tri) {
-                              return CCW(vertPos[tri[0]], vertPos[tri[1]],
-                                         vertPos[tri[2]], precision) >= 0;
-                            }),
-                geometryErr, "triangulation is not entirely CCW!");
-}
-
-void Dump(const Polygons &polys) {
-  for (auto poly : polys) {
-    std::cout << "polys.push_back({" << std::setprecision(9) << std::endl;
-    for (auto v : poly) {
-      std::cout << "    {glm::vec2(" << v.pos.x << ", " << v.pos.y << "), "
-                << v.idx << "},  //" << std::endl;
-    }
-    std::cout << "});" << std::endl;
-  }
-  for (auto poly : polys) {
-    std::cout << "array([" << std::endl;
-    for (auto v : poly) {
-      std::cout << "  [" << v.pos.x << ", " << v.pos.y << "]," << std::endl;
-    }
-    std::cout << "])" << std::endl;
-  }
 }
 
 ExecutionParams &PolygonParams() { return params; }

@@ -44,7 +44,7 @@ void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge,
     const int firstEdge = faceEdge[face];
     const int lastEdge = faceEdge[face + 1];
     const int numEdge = lastEdge - firstEdge;
-    ALWAYS_ASSERT(numEdge >= 3, topologyErr, "face has less than three edges.");
+    ASSERT(numEdge >= 3, topologyErr, "face has less than three edges.");
     const glm::vec3 normal = faceNormal_[face];
 
     auto linearSearch = [](const int* mapping, int value) {
@@ -67,8 +67,8 @@ void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge,
         std::swap(tri[1], tri[2]);
         std::swap(ends[1], ends[2]);
       }
-      ALWAYS_ASSERT(ends[0] == tri[1] && ends[1] == tri[2] && ends[2] == tri[0],
-                    topologyErr, "These 3 edges do not form a triangle!");
+      ASSERT(ends[0] == tri[1] && ends[1] == tri[2] && ends[2] == tri[0],
+             topologyErr, "These 3 edges do not form a triangle!");
 
       triVerts.push_back(tri);
       triNormal.push_back(normal);
@@ -101,9 +101,9 @@ void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge,
           tri1[1] = halfedge_[firstEdge + i].startVert;
         }
       }
-      ALWAYS_ASSERT(glm::all(glm::greaterThanEqual(tri0, glm::ivec3(0))) &&
-                        glm::all(glm::greaterThanEqual(tri1, glm::ivec3(0))),
-                    topologyErr, "non-manifold quad!");
+      ASSERT(glm::all(glm::greaterThanEqual(tri0, glm::ivec3(0))) &&
+                 glm::all(glm::greaterThanEqual(tri1, glm::ivec3(0))),
+             topologyErr, "non-manifold quad!");
       bool firstValid = triCCW(tri0) && triCCW(tri1);
       tri0[2] = tri1[1];
       tri1[2] = tri0[1];
@@ -138,16 +138,7 @@ void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge,
       for (int j = firstEdge; j < lastEdge; ++j)
         vertBary[halfedge_[j].startVert] = halfedgeBary[j];
 
-      Polygons polys;
-      try {
-        polys = Face2Polygons(face, projection, faceEdge);
-      } catch (const std::exception& e) {
-        std::cout << e.what() << std::endl;
-        for (int edge = faceEdge[face]; edge < faceEdge[face + 1]; ++edge)
-          std::cout << "halfedge: " << edge << ", " << halfedge_[edge]
-                    << std::endl;
-        throw;
-      }
+      const Polygons polys = Face2Polygons(face, projection, faceEdge);
 
       std::vector<glm::ivec3> newTris = Triangulate(polys, precision_);
 
@@ -176,10 +167,10 @@ Polygons Manifold::Impl::Face2Polygons(int face, glm::mat3x2 projection,
 
   std::map<int, int> vert_edge;
   for (int edge = firstEdge; edge < lastEdge; ++edge) {
-    ALWAYS_ASSERT(
+    const bool inserted =
         vert_edge.emplace(std::make_pair(halfedge_[edge].startVert, edge))
-            .second,
-        topologyErr, "face has duplicate vertices.");
+            .second;
+    ASSERT(inserted, topologyErr, "face has duplicate vertices.");
   }
 
   Polygons polys;
@@ -195,7 +186,7 @@ Polygons Manifold::Impl::Face2Polygons(int face, glm::mat3x2 projection,
     int vert = halfedge_[thisEdge].startVert;
     polys.back().push_back({projection * vertPos_[vert], vert});
     const auto result = vert_edge.find(halfedge_[thisEdge].endVert);
-    ALWAYS_ASSERT(result != vert_edge.end(), topologyErr, "nonmanifold edge");
+    ASSERT(result != vert_edge.end(), topologyErr, "nonmanifold edge");
     thisEdge = result->second;
     vert_edge.erase(result);
   }

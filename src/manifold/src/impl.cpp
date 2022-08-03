@@ -263,13 +263,31 @@ Manifold::Impl::Impl(const Mesh& mesh,
                      const std::vector<float>& properties,
                      const std::vector<float>& propertyTolerance)
     : vertPos_(mesh.vertPos), halfedgeTangent_(mesh.halfedgeTangent) {
+#ifdef MANIFOLD_DEBUG
   CheckDevice();
+#endif
   CalculateBBox();
+  if (!IsFinite()) {
+    MarkFailure(Error::NON_FINITE_VERTEX);
+    return;
+  }
   SetPrecision();
-  CreateHalfedges(mesh.triVerts);
-  ALWAYS_ASSERT(IsManifold(), topologyErr, "Input mesh is not manifold!");
+
+  VecDH<glm::ivec3> triVerts = mesh.triVerts;
+  if (!IsIndexInBounds(triVerts)) {
+    MarkFailure(Error::VERTEX_INDEX_OUT_OF_BOUNDS);
+    return;
+  }
+
+  CreateHalfedges(triVerts);
+  if (!IsManifold()) {
+    MarkFailure(Error::NOT_MANIFOLD);
+    return;
+  }
   CalculateNormals();
   InitializeNewReference(triProperties, properties, propertyTolerance);
+  if (status_ != Error::NO_ERROR) return;
+
   SimplifyTopology();
   Finish();
 }
@@ -317,8 +335,6 @@ Manifold::Impl::Impl(Shape shape) {
                   {1, 3, 4}, {0, 5, 2},  //
                   {3, 0, 4}, {2, 5, 1}};
       break;
-    default:
-      throw userErr("Unrecognized shape!");
   }
   vertPos_ = vertPos;
   CreateHalfedges(triVerts);
@@ -351,18 +367,21 @@ int Manifold::Impl::InitializeNewReference(
   VecDH<float> propertyToleranceD(propertyTolerance);
 
   if (numProps > 0) {
-    ALWAYS_ASSERT(
-        triProperties.size() == NumTri() || triProperties.size() == 0, userErr,
-        "If specified, triProperties vector length must match NumTri().");
-    ALWAYS_ASSERT(properties.size() % numProps == 0, userErr,
-                  "properties vector must be a multiple of the size of "
-                  "propertyTolerance.");
+    if (triProperties.size() != NumTri() && triProperties.size() != 0) {
+      MarkFailure(Error::TRI_PROPERTIES_WRONG_LENGTH);
+      return nextMeshID;
+    };
+    if (properties.size() % numProps != 0) {
+      MarkFailure(Error::PROPERTIES_WRONG_LENGTH);
+      return nextMeshID;
+    };
 
     const int numSets = properties.size() / numProps;
-    ALWAYS_ASSERT(
-        all_of(autoPolicy(triProperties.size()), triPropertiesD.begin(),
-               triPropertiesD.end(), CheckProperties({numSets})),
-        userErr, "triProperties value is outside the properties range.");
+    if (!all_of(autoPolicy(triProperties.size()), triPropertiesD.begin(),
+                triPropertiesD.end(), CheckProperties({numSets}))) {
+      MarkFailure(Error::TRI_PROPERTIES_OUT_OF_BOUNDS);
+      return nextMeshID;
+    };
   }
 
   VecDH<thrust::pair<int, int>> face2face(halfedge_.size(), {-1, -1});
@@ -479,6 +498,17 @@ void Manifold::Impl::Update() {
   collider_.UpdateBoxes(faceBox);
 }
 
+void Manifold::Impl::MarkFailure(Error status) {
+  bBox_ = Box();
+  vertPos_.resize(0);
+  halfedge_.resize(0);
+  vertNormal_.resize(0);
+  faceNormal_.resize(0);
+  halfedgeTangent_.resize(0);
+  meshRelation_ = MeshRelationD();
+  status_ = status;
+}
+
 Manifold::Impl Manifold::Impl::Transform(const glm::mat4x3& transform_) const {
   if (transform_ == glm::mat4x3(1.0f)) return *this;
   auto policy = autoPolicy(NumVert());
@@ -593,12 +623,9 @@ void Manifold::Impl::UpdateMeshIDs(VecDH<int>& meshIDs, VecDH<int>& originalIDs,
              originalPtr[index] |= kOccurred;
            });
 
-  if (error[0] != -1) {
-    std::stringstream ss;
-    ss << "Manifold::UpdateMeshIDs: meshID " << error[0]
-       << " not found in meshIDs.";
-    throw std::runtime_error(ss.str());
-  }
+  ASSERT(error[0] == -1, logicErr,
+         "Manifold::UpdateMeshIDs: meshID " + std::to_string(error[0]) +
+             " not found in meshIDs.");
   for (int i = 0; i < numMesh; ++i) {
     if (originalIDs[i] & kOccurred) {
       originalIDs[i] &= ~kOccurred;
