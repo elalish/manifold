@@ -65,7 +65,7 @@ __host__ __device__ glm::vec4 Intersect(const glm::vec3 &pL,
 
 struct CopyFaceEdges {
   // x can be either vert or edge (0 or 1).
-  std::pair<int *, int *> pXq1;
+  thrust::pair<int *, int *> pXq1;
   const Halfedge *halfedgesQ;
 
   __host__ __device__ void operator()(thrust::tuple<int, int, int> in) {
@@ -102,7 +102,7 @@ __host__ __device__ bool Shadows(float p, float q, float dir) {
   return p == q ? dir < 0 : p < q;
 }
 
-__host__ __device__ std::pair<int, glm::vec2> Shadow01(
+__host__ __device__ thrust::pair<int, glm::vec2> Shadow01(
     const int p0, const int q1, const glm::vec3 *vertPosP,
     const glm::vec3 *vertPosQ, const Halfedge *halfedgeQ, const float expandP,
     const glm::vec3 *normalP, const bool reverse) {
@@ -130,7 +130,7 @@ __host__ __device__ std::pair<int, glm::vec2> Shadow01(
       if (!Shadows(vertPosP[p0].y, yz01[0], expandP * normalP[p0].y)) s01 = 0;
     }
   }
-  return std::make_pair(s01, yz01);
+  return thrust::make_pair(s01, yz01);
 }
 
 __host__ __device__ int BinarySearch(
@@ -388,7 +388,7 @@ struct Kernel12 {
 
     for (int vert : {edge.startVert, edge.endVert}) {
       const auto key =
-          forward ? std::make_pair(vert, q2) : std::make_pair(q2, vert);
+          forward ? thrust::make_pair(vert, q2) : thrust::make_pair(q2, vert);
       const int idx = BinarySearch(p0q2, size02, key);
       if (idx != -1) {
         const int s = s02[idx];
@@ -396,7 +396,7 @@ struct Kernel12 {
         if (k < 2 && (k == 0 || (s != 0) != shadows)) {
           shadows = s != 0;
           xzyLR0[k] = vertPosP[vert];
-          std::swap(xzyLR0[k].y, xzyLR0[k].z);
+          thrust::swap(xzyLR0[k].y, xzyLR0[k].z);
           xzyLR1[k] = xzyLR0[k];
           xzyLR1[k][1] = z02[idx];
           k++;
@@ -409,7 +409,7 @@ struct Kernel12 {
       const Halfedge edge = halfedgesQ[q1];
       const int q1F = edge.IsForward() ? q1 : edge.pairedHalfedge;
       const auto key =
-          forward ? std::make_pair(p1, q1F) : std::make_pair(q1F, p1);
+          forward ? thrust::make_pair(p1, q1F) : thrust::make_pair(q1F, p1);
       const int idx = BinarySearch(p1q1, size11, key);
       if (idx != -1) {  // s is implicitly zero for anything not found
         const int s = s11[idx];
@@ -422,7 +422,7 @@ struct Kernel12 {
           xzyLR0[k][2] = xyzz.y;
           xzyLR1[k] = xzyLR0[k];
           xzyLR1[k][1] = xyzz.w;
-          if (!forward) std::swap(xzyLR0[k][1], xzyLR1[k][1]);
+          if (!forward) thrust::swap(xzyLR0[k][1], xzyLR1[k][1]);
           k++;
         }
       }
@@ -486,7 +486,7 @@ VecDH<int> Winding03(const Manifold::Impl &inP, SparseIndices &p0q2,
 
   if (reverse)
     transform(autoPolicy(w03.size()), w03.begin(), w03.end(), w03.begin(),
-              std::negate<int>());
+              thrust::negate<int>());
   return w03;
 };
 }  // namespace

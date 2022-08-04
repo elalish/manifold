@@ -36,11 +36,11 @@ class SparseIndices {
   Iter begin(bool use_q) { return use_q ? q.begin() : p.begin(); }
   Iter end(bool use_q) { return use_q ? q.end() : p.end(); }
   int* ptrD(bool use_q) { return use_q ? q.ptrD() : p.ptrD(); }
-  std::pair<int*, int*> ptrDpq(int idx = 0) {
-    return std::make_pair(p.ptrD() + idx, q.ptrD() + idx);
+  thrust::pair<int*, int*> ptrDpq(int idx = 0) {
+    return thrust::make_pair(p.ptrD() + idx, q.ptrD() + idx);
   }
-  const std::pair<const int*, const int*> ptrDpq(int idx = 0) const {
-    return std::make_pair(p.ptrD() + idx, q.ptrD() + idx);
+  const thrust::pair<const int*, const int*> ptrDpq(int idx = 0) const {
+    return thrust::make_pair(p.ptrD() + idx, q.ptrD() + idx);
   }
   const VecDH<int>& Get(bool use_q) const { return use_q ? q : p; }
   VecDH<int> Copy(bool use_q) const {

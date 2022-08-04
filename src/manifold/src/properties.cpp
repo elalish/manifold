@@ -29,7 +29,7 @@ struct FaceAreaVolume {
   const glm::vec3* vertPos;
   const float precision;
 
-  __host__ __device__ std::pair<float, float> operator()(int face) {
+  __host__ __device__ thrust::pair<float, float> operator()(int face) {
     float perimeter = 0;
     glm::vec3 edge[3];
     for (int i : {0, 1, 2}) {
@@ -44,8 +44,8 @@ struct FaceAreaVolume {
     float volume = glm::dot(crossP, vertPos[halfedges[3 * face].startVert]);
 
     return area > perimeter * precision
-               ? std::make_pair(area / 2.0f, volume / 6.0f)
-               : std::make_pair(0.0f, 0.0f);
+               ? thrust::make_pair(area / 2.0f, volume / 6.0f)
+               : thrust::make_pair(0.0f, 0.0f);
   }
 };
 
