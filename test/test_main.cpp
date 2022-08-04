@@ -47,6 +47,7 @@ int main(int argc, char **argv) {
       case 'v':
         options.params.verbose = true;
         manifold::ManifoldParams().verbose = true;
+        manifold::ManifoldParams().intermediateChecks = true;
         break;
       default:
         fprintf(stderr, "Unknown option: %s\n", argv[i]);

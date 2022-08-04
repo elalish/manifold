@@ -92,6 +92,7 @@ struct Manifold::Impl {
   bool IsIndexInBounds(const VecDH<glm::ivec3>& triVerts) const;
   void SetPrecision(float minPrecision = -1);
   bool IsManifold() const;
+  bool Is2Manifold() const;
   bool MatchesTriNormals() const;
   int NumDegenerateTris() const;
 

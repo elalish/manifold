@@ -655,6 +655,9 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
 
   // Level 6
 
+  if (ManifoldParams().intermediateChecks)
+    ASSERT(outR.IsManifold(), logicErr, "polygon mesh is not manifold!");
+
   outR.Face2Tri(faceEdge, faceRef, halfedgeBary);
 
 #ifdef MANIFOLD_DEBUG
@@ -663,7 +666,13 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
   simplify.Start();
 #endif
 
+  if (ManifoldParams().intermediateChecks)
+    ASSERT(outR.IsManifold(), logicErr, "triangulated mesh is not manifold!");
+
   outR.SimplifyTopology();
+
+  if (ManifoldParams().intermediateChecks)
+    ASSERT(outR.Is2Manifold(), logicErr, "simplified mesh is not 2-manifold!");
 
   // Index starting from 0 is chosen because I want the kernel part as simple as
   // possible.

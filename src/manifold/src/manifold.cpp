@@ -342,7 +342,7 @@ Manifold Manifold::AsOriginal() const {
  * Should always be true. Also checks saneness of the internal data structures.
  */
 bool Manifold::IsManifold() const {
-  return GetCsgLeafNode().GetImpl()->IsManifold();
+  return GetCsgLeafNode().GetImpl()->Is2Manifold();
 }
 
 /**
