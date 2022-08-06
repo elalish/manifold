@@ -115,7 +115,10 @@ struct Tri2Halfedges {
       const int j = (i + 1) % 3;
       const int edge = 3 * tri + i;
       halfedges[edge] = {triVerts[i], triVerts[j], -1, tri};
-      edges[edge] = ((glm::uint64_t)glm::min(triVerts[i], triVerts[j])) << 32 |
+      // Sort the forward halfedges in front of the backward ones by setting the
+      // highest-order bit.
+      edges[edge] = glm::uint64_t(triVerts[i] < triVerts[j] ? 1 : 0) << 63 |
+                    ((glm::uint64_t)glm::min(triVerts[i], triVerts[j])) << 32 |
                     glm::max(triVerts[i], triVerts[j]);
     }
   }
@@ -124,12 +127,11 @@ struct Tri2Halfedges {
 struct LinkHalfedges {
   Halfedge* halfedges;
   const int* ids;
+  const int numEdge;
 
-  __host__ __device__ void operator()(int k) {
-    const int i = 2 * k;
-    const int j = i + 1;
+  __host__ __device__ void operator()(int i) {
     const int pair0 = ids[i];
-    const int pair1 = ids[j];
+    const int pair1 = ids[i + numEdge];
     halfedges[pair0].pairedHalfedge = pair1;
     halfedges[pair1].pairedHalfedge = pair0;
   }
@@ -467,11 +469,12 @@ int Manifold::Impl::InitializeNewReference(
  */
 void Manifold::Impl::CreateHalfedges(const VecDH<glm::ivec3>& triVerts) {
   const int numTri = triVerts.size();
+  const int numEdge = 3 * numTri / 2;
   // drop the old value first to avoid copy
   halfedge_.resize(0);
-  halfedge_.resize(3 * numTri);
-  VecDH<uint64_t> edge(3 * numTri);
-  VecDH<int> ids(3 * numTri);
+  halfedge_.resize(2 * numEdge);
+  VecDH<uint64_t> edge(2 * numEdge);
+  VecDH<int> ids(2 * numEdge);
   auto policy = autoPolicy(numTri);
   sequence(policy, ids.begin(), ids.end());
   for_each_n(policy, zip(countAt(0), triVerts.begin()), numTri,
@@ -482,8 +485,11 @@ void Manifold::Impl::CreateHalfedges(const VecDH<glm::ivec3>& triVerts) {
   // two different faces, causing this edge to not be 2-manifold. These are
   // fixed by duplicating verts in SimplifyTopology.
   stable_sort_by_key(policy, edge.begin(), edge.end(), ids.begin());
-  for_each_n(policy, countAt(0), halfedge_.size() / 2,
-             LinkHalfedges({halfedge_.ptrD(), ids.ptrD()}));
+  // Once sorted, the first half of the range is the forward halfedges, which
+  // correspond to their backward pair at the same offset in the second half
+  // of the range.
+  for_each_n(policy, countAt(0), numEdge,
+             LinkHalfedges({halfedge_.ptrD(), ids.ptrD(), numEdge}));
 }
 
 /**

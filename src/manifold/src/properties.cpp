@@ -233,22 +233,32 @@ struct CheckCCW {
 namespace manifold {
 
 /**
- * Returns true if this manifold is in fact an oriented 2-manifold and all of
+ * Returns true if this manifold is in fact an oriented even manifold and all of
  * the data structures are consistent.
  */
 bool Manifold::Impl::IsManifold() const {
   if (halfedge_.size() == 0) return true;
   auto policy = autoPolicy(halfedge_.size());
-  bool isManifold = all_of(policy, countAt(0), countAt(halfedge_.size()),
-                           CheckManifold({halfedge_.cptrD()}));
-  // std::cout << (isManifold ? "" : "Not ") << "Manifold" << std::endl;
+
+  return all_of(policy, countAt(0), countAt(halfedge_.size()),
+                CheckManifold({halfedge_.cptrD()}));
+}
+
+/**
+ * Returns true if this manifold is in fact an oriented 2-manifold and all of
+ * the data structures are consistent.
+ */
+bool Manifold::Impl::Is2Manifold() const {
+  if (halfedge_.size() == 0) return true;
+  auto policy = autoPolicy(halfedge_.size());
+
+  if (!IsManifold()) return false;
 
   VecDH<Halfedge> halfedge(halfedge_);
   sort(policy, halfedge.begin(), halfedge.end());
-  bool noDupes = all_of(policy, countAt(0), countAt(2 * NumEdge() - 1),
-                        NoDuplicates({halfedge.cptrD()}));
-  // std::cout << (noDupes ? "" : "Not ") << "2-Manifold" << std::endl;
-  return isManifold && noDupes;
+
+  return all_of(policy, countAt(0), countAt(2 * NumEdge() - 1),
+                NoDuplicates({halfedge.cptrD()}));
 }
 
 /**
