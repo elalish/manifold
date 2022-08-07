@@ -1010,8 +1010,6 @@ TEST(Boolean, Subtract) {
 
 TEST(Boolean, Close) {
   PolygonParams().processOverlaps = true;
-  const bool intermediateChecks = PolygonParams().intermediateChecks;
-  PolygonParams().intermediateChecks = false;
 
   const float r = 10;
   Manifold a = Manifold::Sphere(r, 256);
@@ -1022,7 +1020,7 @@ TEST(Boolean, Close) {
     EXPECT_TRUE(result.IsManifold());
   }
   auto prop = result.GetProperties();
-  const float tol = 0.002;
+  const float tol = 0.004;
   EXPECT_NEAR(prop.volume, (4.0f / 3.0f) * glm::pi<float>() * r * r * r,
               tol * r * r * r);
   EXPECT_NEAR(prop.surfaceArea, 4 * glm::pi<float>() * r * r, tol * r * r);
@@ -1030,5 +1028,4 @@ TEST(Boolean, Close) {
   if (options.exportModels) ExportMesh("close.glb", result.GetMesh(), {});
 
   PolygonParams().processOverlaps = false;
-  PolygonParams().intermediateChecks = intermediateChecks;
 }

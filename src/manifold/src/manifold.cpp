@@ -36,12 +36,6 @@ struct MakeTri {
   }
 };
 
-struct GetMeshID {
-  __host__ __device__ void operator()(thrust::tuple<int&, BaryRef> inOut) {
-    thrust::get<0>(inOut) = thrust::get<1>(inOut).meshID;
-  }
-};
-
 Manifold Halfspace(Box bBox, glm::vec3 normal, float originOffset) {
   normal = glm::normalize(normal);
   Manifold cutter =
