@@ -298,6 +298,8 @@ class Monotones {
 #endif
   }
 
+  float GetPrecision() const { return precision_; }
+
  private:
   struct VertAdj;
   typedef std::list<VertAdj>::iterator VertItr;
@@ -812,7 +814,10 @@ class Monotones {
         SetVEast(newPair, vert);
         const int hole = IsHole(vert);
         if (hole == 0 && IsColinearPoly(vert)) {
+          PRINT("Skip colinear polygon");
           SkipPoly(vert);
+          activePairs_.erase(newPair);
+          continue;
         }
         isHole = hole > 0;
       }
@@ -1032,7 +1037,9 @@ std::vector<glm::ivec3> Triangulate(const Polygons &polys, float precision) {
 #ifdef MANIFOLD_DEBUG
     if (params.intermediateChecks) {
       CheckTopology(triangles, polys);
-      CheckGeometry(triangles, polys, precision);
+      if (!params.processOverlaps) {
+        CheckGeometry(triangles, polys, 2 * monotones.GetPrecision());
+      }
     }
   } catch (const geometryErr &e) {
     if (!params.suppressErrors) {
