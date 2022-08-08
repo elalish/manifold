@@ -530,12 +530,24 @@ class Monotones {
           return SKIP;
         }
       } else {
+        if (!eastPair->vEast->right->IsPast(vert, precision_) &&
+            vert->IsPast(eastPair->vEast, precision_) &&
+            vert->pos.x > eastPair->vEast->right->pos.x + precision_) {
+          PRINT("SKIP WEST");
+          return SKIP;
+        }
         SetVWest(eastPair, vert);
         PRINT("WESTSIDE");
         return WESTSIDE;
       }
     } else {
       if (vert->left->Processed()) {
+        if (!westPair->vWest->left->IsPast(vert, precision_) &&
+            vert->IsPast(westPair->vWest, precision_) &&
+            vert->pos.x < westPair->vWest->left->pos.x - precision_) {
+          PRINT("SKIP EAST");
+          return SKIP;
+        }
         SetVEast(westPair, vert);
         PRINT("EASTSIDE");
         return EASTSIDE;
