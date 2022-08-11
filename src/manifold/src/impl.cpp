@@ -146,8 +146,26 @@ struct InitializeBaryRef {
     int tri = thrust::get<1>(inOut);
 
     baryRef.meshID = meshID;
+    baryRef.originalID = meshID;
     baryRef.tri = tri;
     baryRef.vertBary = {-3, -2, -1};
+  }
+};
+
+struct MarkMeshID {
+  int* includesMeshID;
+
+  __host__ __device__ void operator()(BaryRef& ref) {
+    includesMeshID[ref.meshID] = 1;
+  }
+};
+
+struct UpdateMeshID {
+  const int* meshIDold2new;
+  const int meshIDoffset;
+
+  __host__ __device__ void operator()(BaryRef& ref) {
+    ref.meshID = meshIDold2new[ref.meshID] + meshIDoffset;
   }
 };
 
@@ -349,9 +367,8 @@ void Manifold::Impl::ReinitializeReference(int meshID) {
   // 0 -> meshID, because the meshID after boolean operation also starts from 0.
   for_each_n(autoPolicy(NumTri()),
              zip(meshRelation_.triBary.begin(), countAt(0)), NumTri(),
-             InitializeBaryRef({0, halfedge_.cptrD()}));
-  meshRelation_.originalID.clear();
-  meshRelation_.originalID[0] = meshID;
+             InitializeBaryRef({meshID, halfedge_.cptrD()}));
+  meshRelation_.originalID = meshID;
 }
 
 int Manifold::Impl::InitializeNewReference(
@@ -591,53 +608,29 @@ void Manifold::Impl::CalculateNormals() {
 }
 
 /**
- * Update meshID and originalID in meshRelation_.triBary[startTri..startTri+n]
- * according to meshIDs -> originalIDs mapping. The updated meshID will start
- * from startID.
- * Will raise an exception if meshRelation_.triBary[startTri..startTri+n]
- * contains a meshID not in meshIDs.
- *
- * We remap them into indices starting from startID. The exact value value is
- * not important as long as
- * 1. They are distinct
- * 2. `originalID[meshID]` is the original mesh ID of the triangle
- *
- * Use this when the mesh is a combination of several meshes or a subset of a
- * larger mesh, e.g. after performing boolean operations, compose or decompose.
+ * Remaps all the contained meshIDs to new unique values to represent new
+ * instances of these meshes.
  */
-void Manifold::Impl::UpdateMeshIDs(VecDH<int>& meshIDs, VecDH<int>& originalIDs,
-                                   int startTri, int n, int startID) {
-  if (n == -1) n = meshRelation_.triBary.size();
-  sort_by_key(autoPolicy(n), meshIDs.begin(), meshIDs.end(),
-              originalIDs.begin());
-  constexpr int kOccurred = 1 << 30;
-  VecDH<int> error(1, -1);
-  const int numMesh = meshIDs.size();
-  const int* meshIDsPtr = meshIDs.cptrD();
-  int* originalPtr = originalIDs.ptrD();
-  int* errorPtr = error.ptrD();
-  for_each(autoPolicy(n), meshRelation_.triBary.begin() + startTri,
-           meshRelation_.triBary.begin() + startTri + n,
-           [=] __host__ __device__(BaryRef & b) {
-             int index = thrust::lower_bound(meshIDsPtr, meshIDsPtr + numMesh,
-                                             b.meshID) -
-                         meshIDsPtr;
-             if (index >= numMesh || meshIDsPtr[index] != b.meshID) {
-               *errorPtr = b.meshID;
-             }
-             b.meshID = index + startID;
-             originalPtr[index] |= kOccurred;
-           });
+void Manifold::Impl::IncrementMeshIDs() {
+  VecDH<BaryRef>& triBary = meshRelation_.triBary;
+  const auto policy = autoPolicy(triBary.size());
+  // Use double the space since the Boolean has P and Q instances.
+  VecDH<int> includesMeshID(2 * Manifold::Impl::meshIDCounter_, 0);
 
-  ASSERT(error[0] == -1, logicErr,
-         "Manifold::UpdateMeshIDs: meshID " + std::to_string(error[0]) +
-             " not found in meshIDs.");
-  for (int i = 0; i < numMesh; ++i) {
-    if (originalIDs[i] & kOccurred) {
-      originalIDs[i] &= ~kOccurred;
-      meshRelation_.originalID[i + startID] = originalIDs[i];
-    }
-  }
+  for_each(policy, triBary.begin(), triBary.end(),
+           MarkMeshID({includesMeshID.ptrD()}));
+
+  inclusive_scan(autoPolicy(includesMeshID.size()), includesMeshID.begin(),
+                 includesMeshID.end(), includesMeshID.begin());
+
+  const int numMeshIDs = includesMeshID[includesMeshID.size() - 1];
+  const int meshIDstart = Manifold::Impl::meshIDCounter_.fetch_add(
+      numMeshIDs, std::memory_order_relaxed);
+
+  // We do start - 1 because the inclusive scan makes our first index 1 instead
+  // of 0.
+  for_each(policy, triBary.begin(), triBary.end(),
+           UpdateMeshID({includesMeshID.cptrD(), meshIDstart - 1}));
 }
 
 /**

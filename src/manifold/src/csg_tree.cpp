@@ -210,19 +210,6 @@ Manifold::Impl CsgLeafNode::Compose(
               combined.halfedge_.begin() + nextEdge,
               UpdateHalfedge({nextVert, nextEdge, nextTri}));
 
-    // Assign new IDs to triangles added in this iteration, to differentiate
-    // triangles coming from different manifolds.
-    VecDH<int> meshIDs;
-    VecDH<int> original;
-    for (auto &entry : node->pImpl_->meshRelation_.originalID) {
-      meshIDs.push_back(entry.first);
-      original.push_back(entry.second);
-    }
-    int meshIDStart = combined.meshRelation_.originalID.size();
-    combined.UpdateMeshIDs(meshIDs, original, nextTri,
-                           node->pImpl_->meshRelation_.triBary.size(),
-                           meshIDStart);
-
     nextVert += node->pImpl_->NumVert();
     nextEdge += 2 * node->pImpl_->NumEdge();
     nextTri += node->pImpl_->NumTri();
@@ -230,6 +217,7 @@ Manifold::Impl CsgLeafNode::Compose(
   }
   // required to remove parts that are smaller than the precision
   combined.SimplifyTopology();
+  combined.IncrementMeshIDs();
   combined.Finish();
   return combined;
 }

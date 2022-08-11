@@ -288,27 +288,18 @@ MeshRelation Manifold::GetMeshRelation() const {
   const auto& relation = GetCsgLeafNode().GetImpl()->meshRelation_;
   out.triBary.insert(out.triBary.end(), relation.triBary.begin(),
                      relation.triBary.end());
-  for (auto& bary : out.triBary) {
-    bary.meshID = relation.originalID.at(bary.meshID);
-  }
   out.barycentric.insert(out.barycentric.end(), relation.barycentric.begin(),
                          relation.barycentric.end());
   return out;
 }
 
 /**
- * Returns a vector of unique meshIDs that are referenced by this manifold's
- * meshRelation. If this manifold has been newly constructed then there will
- * only be a single meshID, which can be associated with the input mesh for
- * future reference.
+ * If this mesh is an original, this returns its meshID that can be referenced
+ * by product manifolds' MeshRelation. If this manifold is a product, this
+ * returns -1.
  */
-std::vector<int> Manifold::GetMeshIDs() const {
-  std::vector<int> out;
-  out.reserve(GetCsgLeafNode().GetImpl()->meshRelation_.originalID.size());
-  for (auto& entry : GetCsgLeafNode().GetImpl()->meshRelation_.originalID) {
-    out.push_back(entry.second);
-  }
-  return out;
+int Manifold::OriginalID() const {
+  return GetCsgLeafNode().GetImpl()->meshRelation_.originalID;
 }
 
 /**

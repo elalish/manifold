@@ -49,15 +49,16 @@ Manifold MengerSponge(int n) {
 
   Manifold hole = Manifold::Compose(holes);
 
-  // result -= hole;
-  // hole = hole.Rotate(90);
-  // result -= hole;
-  // hole = hole.Rotate(0, 0, 90);
-  // result -= hole;
+  result -= hole;
+  hole = hole.Rotate(90);
+  result -= hole;
+  hole = hole.Rotate(0, 0, 90);
+  result -= hole;
 
-  Manifold tmp1 = hole.Rotate(90) + hole.Rotate(90).Rotate(0, 0, 90);
-  Manifold tmp2 = hole + tmp1;
-  result = result - tmp2;
+  // Alternative order causes degenerate triangles
+  // Manifold tmp1 = hole.Rotate(90) + hole.Rotate(90).Rotate(0, 0, 90);
+  // Manifold tmp2 = hole + tmp1;
+  // result = result - tmp2;
 
   result = result.AsOriginal();
   return result;
