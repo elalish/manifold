@@ -197,7 +197,6 @@ void Manifold::Impl::DedupeEdge(const int edge) {
     if (vert == startVert) {
       const int newVert = vertPos_.size();
       vertPos_.push_back(vertPos_[endVert]);
-      if (vertNormal_.size() > 0) vertNormal_.push_back(vertNormal_[endVert]);
       current = halfedge_[NextHalfedge(current)].pairedHalfedge;
       const int opposite = halfedge_[NextHalfedge(edge)].pairedHalfedge;
 

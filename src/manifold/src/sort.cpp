@@ -208,9 +208,6 @@ void Manifold::Impl::Finish() {
   ASSERT(faceNormal_.size() == NumTri() || faceNormal_.size() == 0, logicErr,
          "faceNormal size = " + std::to_string(faceNormal_.size()) +
              ", NumTri = " + std::to_string(NumTri()));
-  ASSERT(vertNormal_.size() == NumVert() || vertNormal_.size() == 0, logicErr,
-         "vertNormal size = " + std::to_string(vertNormal_.size()) +
-             ", NumVert = " + std::to_string(NumVert()));
 
   CalculateNormals();
   collider_ = Collider(faceBox, faceMorton);
@@ -240,10 +237,6 @@ void Manifold::Impl::SortVerts() {
                                          vertMorton.end(), kNoCode) -
       vertMorton.begin();
   vertPos_.resize(newNumVert);
-  if (vertNormal_.size() == numVert) {
-    Permute(vertNormal_, vertNew2Old);
-    vertNormal_.resize(newNumVert);
-  }
 }
 
 /**
