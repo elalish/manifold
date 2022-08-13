@@ -320,6 +320,8 @@ int Manifold::OriginalID() const {
 Manifold Manifold::AsOriginal() const {
   auto newImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
   newImpl->InitializeNewReference();
+  newImpl->SimplifyTopology();
+  newImpl->Finish();
   return Manifold(std::make_shared<CsgLeafNode>(newImpl));
 }
 

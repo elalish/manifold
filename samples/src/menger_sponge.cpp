@@ -60,7 +60,6 @@ Manifold MengerSponge(int n) {
   // Manifold tmp2 = hole + tmp1;
   // result = result - tmp2;
 
-  result = result.AsOriginal();
   return result;
 }
 }  // namespace manifold

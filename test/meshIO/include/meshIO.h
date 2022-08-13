@@ -28,9 +28,9 @@ namespace manifold {
  */
 struct Material {
   /// Roughness value between 0 (shiny) and 1 (matte).
-  float roughness = 1;
+  float roughness = 0.2;
   /// Metalness value, generally either 0 (dielectric) or 1 (metal).
-  float metalness = 0;
+  float metalness = 1;
   /// Color (RGBA) multiplier to apply to the whole mesh (each value between 0
   /// and 1).
   glm::vec4 color = glm::vec4(1.0f);
