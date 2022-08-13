@@ -611,14 +611,18 @@ void Manifold::Impl::CalculateNormals() {
  * Remaps all the contained meshIDs to new unique values to represent new
  * instances of these meshes.
  */
-void Manifold::Impl::IncrementMeshIDs() {
+void Manifold::Impl::IncrementMeshIDs(int start, int length) {
   VecDH<BaryRef>& triBary = meshRelation_.triBary;
-  const auto policy = autoPolicy(triBary.size());
+  ASSERT(start >= 0 && length >= 0 && start + length <= triBary.size(),
+         logicErr, "out of bounds");
+  const auto policy = autoPolicy(length);
   // Use double the space since the Boolean has P and Q instances.
   VecDH<int> includesMeshID(2 * Manifold::Impl::meshIDCounter_, 0);
 
-  for_each(policy, triBary.begin(), triBary.end(),
-           MarkMeshID({includesMeshID.ptrD()}));
+  auto begin = triBary.begin() + start;
+  auto end = begin + length;
+
+  for_each(policy, begin, end, MarkMeshID({includesMeshID.ptrD()}));
 
   inclusive_scan(autoPolicy(includesMeshID.size()), includesMeshID.begin(),
                  includesMeshID.end(), includesMeshID.begin());
@@ -629,7 +633,7 @@ void Manifold::Impl::IncrementMeshIDs() {
 
   // We do start - 1 because the inclusive scan makes our first index 1 instead
   // of 0.
-  for_each(policy, triBary.begin(), triBary.end(),
+  for_each(policy, begin, end,
            UpdateMeshID({includesMeshID.cptrD(), meshIDstart - 1}));
 }
 

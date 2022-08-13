@@ -210,6 +210,11 @@ Manifold::Impl CsgLeafNode::Compose(
               combined.halfedge_.begin() + nextEdge,
               UpdateHalfedge({nextVert, nextEdge, nextTri}));
 
+    // Since the nodes may be copies containing the same meshIDs, it is
+    // important to increment them separately so that each node instance gets
+    // unique meshIDs.
+    combined.IncrementMeshIDs(nextTri, node->pImpl_->NumTri());
+
     nextVert += node->pImpl_->NumVert();
     nextEdge += 2 * node->pImpl_->NumEdge();
     nextTri += node->pImpl_->NumTri();
@@ -217,7 +222,6 @@ Manifold::Impl CsgLeafNode::Compose(
   }
   // required to remove parts that are smaller than the precision
   combined.SimplifyTopology();
-  combined.IncrementMeshIDs();
   combined.Finish();
   return combined;
 }

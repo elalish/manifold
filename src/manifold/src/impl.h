@@ -62,7 +62,7 @@ struct Manifold::Impl {
   void ReinitializeReference(int meshID);
   void CreateHalfedges(const VecDH<glm::ivec3>& triVerts);
   void CalculateNormals();
-  void IncrementMeshIDs();
+  void IncrementMeshIDs(int start, int length);
 
   void Update();
   void MarkFailure(Error status);

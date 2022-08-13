@@ -676,7 +676,7 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
   if (ManifoldParams().intermediateChecks)
     ASSERT(outR.Is2Manifold(), logicErr, "simplified mesh is not 2-manifold!");
 
-  outR.IncrementMeshIDs();
+  outR.IncrementMeshIDs(0, outR.NumTri());
 
 #ifdef MANIFOLD_DEBUG
   simplify.Stop();
