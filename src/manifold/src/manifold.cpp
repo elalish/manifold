@@ -275,13 +275,18 @@ Curvature Manifold::GetCurvature() const {
 }
 
 /**
- * Gets the relationship to the previous mesh, for the purpose of assinging
+ * Gets the relationship to the previous meshes, for the purpose of assinging
  * properties like texture coordinates. The triBary vector is the same length as
- * Mesh.triVerts and .meshID indicates the mesh instance and .tri is that mesh's
- * triangle index to which these barycentric coordinates refer. BaryRef.vertBary
- * gives an index for each vertex into the barycentric vector if that index is
- * >= 0, indicating it is a new vertex. If the index is < 0, this indicates it
- * is an original vertex, the index + 3 vert of the referenced triangle.
+ * Mesh.triVerts: BaryRef.originalID indicates the source mesh and BaryRef.tri
+ * is that mesh's triangle index to which these barycentric coordinates refer.
+ * BaryRef.vertBary gives an index for each vertex into the barycentric vector
+ * if that index is >= 0, indicating it is a new vertex. If the index is < 0,
+ * this indicates it is an original vertex, the index + 3 vert of the referenced
+ * triangle.
+ *
+ * BaryRef.meshID is a unique ID to the particular instance of a given mesh. For
+ * instance, if you want to convert the triangle mesh to a polygon mesh, all the
+ * triangles from a given face will have the same .meshID and .tri values.
  */
 MeshRelation Manifold::GetMeshRelation() const {
   MeshRelation out;
@@ -304,18 +309,16 @@ int Manifold::OriginalID() const {
 
 /**
  * If you copy a manifold, but you want this new copy to have new properties
- * (e.g. a different UV mapping), you can reset its meshID as an original,
+ * (e.g. a different UV mapping), you can reset its meshIDs to a new original,
  * meaning it will now be referenced by its descendents instead of the meshes it
  * was built from, allowing you to differentiate the copies when applying your
- * properties to the final result. Its new meshID is returned.
+ * properties to the final result.
  *
- * This function also condenses all coplanar faces in the relation, allowing
- * these edges to be collapsed. If you plan to have inconsistent properties
- * across these faces, meaning you want to preserve some of these edges, you
- * should instead call GetMesh(), calculate your properties and use these to
- * construct a new manifold.
- *
- * @returns New Mesh
+ * This function also condenses all coplanar faces in the relation, and
+ * collapses those edges. If you want to have inconsistent properties across
+ * these faces, meaning you want to preserve some of these edges, you should
+ * instead call GetMesh(), calculate your properties and use these to construct
+ * a new manifold.
  */
 Manifold Manifold::AsOriginal() const {
   auto newImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
