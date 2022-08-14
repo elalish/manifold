@@ -1,9 +1,24 @@
+# Copyright 2020 The Manifold Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 cmake_minimum_required(VERSION 3.18)
 project(manifold LANGUAGES CXX)
 
 set(CMAKE_VERBOSE_MAKEFILE ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+option(MANIFOLD_DEBUG off)
 option(MANIFOLD_USE_CUDA on)
 set(MANIFOLD_PAR "TBB" CACHE STRING "Parallel backend, either \"TBB\" or \"OpenMP\" or \"NONE\"")
 
@@ -21,10 +36,10 @@ option(BUILD_TEST_CGAL off)
 
 option(BUILD_SHARED_LIBS off)
 set(ASSIMP_INC_DIR
-    ${PROJECT_SOURCE_DIR}/third_party/assimp/include
-    ${CMAKE_BINARY_DIR}/third_party/assimp/include)
-set(GLM_INC_DIR ${PROJECT_SOURCE_DIR}/third_party/glm)
-set(PYBIND11_DIR ${PROJECT_SOURCE_DIR}/third_party/pybind11)
+    ${PROJECT_SOURCE_DIR}/test/third_party/assimp/include
+    ${CMAKE_BINARY_DIR}/test/third_party/assimp/include)
+set(GLM_INC_DIR ${PROJECT_SOURCE_DIR}/src/third_party/glm)
+set(PYBIND11_DIR ${PROJECT_SOURCE_DIR}/bindings/python/third_party/pybind11)
 
 option(ASSIMP_FAST_BUILD "build ASSIMP just for tests" ON)
 
@@ -39,7 +54,7 @@ if(ASSIMP_FAST_BUILD)
     endforeach()
 endif()
 
-set(THRUST_INC_DIR ${PROJECT_SOURCE_DIR}/third_party/thrust)
+set(THRUST_INC_DIR ${PROJECT_SOURCE_DIR}/src/third_party/thrust)
 
 if(MANIFOLD_USE_CUDA)
     enable_language(CUDA)
@@ -70,17 +85,8 @@ if(CODE_COVERAGE AND NOT MSVC)
     add_link_options("-coverage")
 endif()
 
-add_subdirectory(utilities)
-add_subdirectory(third_party)
-add_subdirectory(sdf)
-add_subdirectory(collider)
-add_subdirectory(polygon)
-add_subdirectory(manifold)
-add_subdirectory(meshIO)
+add_subdirectory(src)
 add_subdirectory(samples)
 add_subdirectory(test)
-add_subdirectory(tools)
-
-if(EMSCRIPTEN)
-add_subdirectory(wasm)
-endif()
+add_subdirectory(extras)
+add_subdirectory(bindings)

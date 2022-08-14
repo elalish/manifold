@@ -36,16 +36,15 @@
                 cd test
                 ./manifold_test
                 cd ../../
-                PYTHONPATH=$PYTHONPATH:$(pwd)/build/tools python3 test/python/run_all.py
+                PYTHONPATH=$PYTHONPATH:$(pwd)/build/bindings/python python3 bindings/python/examples/run_all.py
                 cd build
               '';
               installPhase = ''
                 mkdir -p $out
-                cp manifold/libmanifold.a $out/
-                cp meshIO/libmeshIO.a $out/
-                cp tools/loadMesh $out
-                cp tools/perfTest $out
-                cp tools/pymanifold* $out
+                cp src/manifold/libmanifold.a $out/
+                cp test/meshIO/libmeshIO.a $out/
+                cp extras/perfTest $out
+                cp bindings/python/pymanifold* $out
               '';
             };
           parallelBackends = [
@@ -115,8 +114,8 @@
               '';
               installPhase = ''
                 mkdir -p $out
-                cp {tools,wasm}/*.js $out/
-                cp {tools,wasm}/*.wasm $out/
+                cp {extras,wasm}/*.js $out/
+                cp {extras,wasm}/*.wasm $out/
               '';
             };
           };

@@ -32,20 +32,20 @@ jobs:
     - name: Build ${{matrix.backend}}
       run: |
         # patch assimp
-        patch third_party/assimp/code/CMakeLists.txt < assimp.diff
+        patch test/third_party/assimp/code/CMakeLists.txt < assimp.diff
         git apply thrust.diff
         mkdir build
         cd build
-        cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DMANIFOLD_PAR=${{matrix.parallel_backend}} -DMANIFOLD_USE_CUDA=${{matrix.cuda_support}} .. && make
+        cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DMANIFOLD_DEBUG=ON -DMANIFOLD_PAR=${{matrix.parallel_backend}} -DMANIFOLD_USE_CUDA=${{matrix.cuda_support}} .. && make
     - name: Test ${{matrix.parallel_backend}} with CUDA ${{matrix.cuda_support}}
       # note that the test for CUDA backend does not really test CUDA, as we
       # don't have CUDA GPU on GitHub Action
       run: |
-        export PYTHONPATH=$PYTHONPATH:$(pwd)/build/tools
+        export PYTHONPATH=$PYTHONPATH:$(pwd)/build/bindings/python
         cd build/test
         ./manifold_test
         cd ../../
-        python3 test/python/run_all.py
+        python3 bindings/python/examples/run_all.py
     - name: Coverage Report
       # only do code coverage for default sequential backend, it seems that TBB
       # backend will cause failure
@@ -53,19 +53,19 @@ jobs:
       if: matrix.parallel_backend == 'NONE' && matrix.cuda_support == 'OFF'
       run: |
         cd build
-        cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DMANIFOLD_PAR=${{matrix.parallel_backend}} -DMANIFOLD_USE_CUDA=${{matrix.cuda_support}} -DCODE_COVERAGE=ON .. && make
+        cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DMANIFOLD_DEBUG=OFF -DMANIFOLD_PAR=${{matrix.parallel_backend}} -DMANIFOLD_USE_CUDA=${{matrix.cuda_support}} -DCODE_COVERAGE=ON .. && make
         lcov --capture --initial --directory . --output-file ./code_coverage_init.info
         cd test
         ./manifold_test
         cd ../
         lcov --capture --directory . --output-file ./code_coverage_test.info
         lcov --add-tracefile ./code_coverage_init.info --add-tracefile ./code_coverage_test.info --output-file ./code_coverage_total.info
-        lcov --remove ./code_coverage_total.info '/usr/*' '*/third_party/*' '*/test/*' '*/tools/*' --output-file ./code_coverage.info
+        lcov --remove ./code_coverage_total.info '/usr/*' '*/third_party/*' '*/test/*' '*/extras/*' '*/bindings/*' --output-file ./code_coverage.info
     - uses: codecov/codecov-action@v2
       if: matrix.parallel_backend == 'NONE' && matrix.cuda_support == 'OFF'
       with:
         files: build/code_coverage.info
-        fail_ci_if_error: true
+        fail_ci_if_error: false
         name: ${{matrix.parallel_backend}}-${{matrix.cuda_support}}
 
   build_wasm:
@@ -91,7 +91,7 @@ jobs:
       run: |
         source ./emsdk/emsdk_env.sh
         # patch assimp
-        patch third_party/assimp/code/CMakeLists.txt < assimp.diff
+        patch test/third_party/assimp/code/CMakeLists.txt < assimp.diff
         git apply thrust.diff
         mkdir build
         cd build
@@ -100,6 +100,14 @@ jobs:
       run: |
         cd build/test
         node ./manifold_test.js
+    - name: Upload WASM files
+      uses: actions/upload-artifact@v3
+      with:
+        name: wasm
+        path: |
+          build/bindings/wasm/manifold.js
+          build/bindings/wasm/manifold.wasm
+        retention-days: 1
 
   build_windows:
     strategy:
@@ -116,7 +124,7 @@ jobs:
     - uses: jwlawson/actions-setup-cmake@v1.12
     - name: Patch assimp
       shell: bash
-      run: patch third_party/assimp/code/CMakeLists.txt < assimp.diff
+      run: patch test/third_party/assimp/code/CMakeLists.txt < assimp.diff
     - uses: ilammy/msvc-dev-cmd@v1
     - name: Install CUDA
       if: matrix.backend == 'CUDA'
@@ -138,7 +146,7 @@ jobs:
     - name: Build ${{matrix.backend}}
       shell: powershell
       run: |
-        cmake . -DCMAKE_BUILD_TYPE=Release -B build -DMANIFOLD_PAR=${{matrix.parallel_backend}} -DMANIFOLD_USE_CUDA=${{matrix.cuda_support}} -A x64
+        cmake . -DCMAKE_BUILD_TYPE=Release -B build -DMANIFOLD_DEBUG=ON -DMANIFOLD_PAR=${{matrix.parallel_backend}} -DMANIFOLD_USE_CUDA=${{matrix.cuda_support}} -A x64
         cd build
         cmake --build . --target ALL_BUILD --config Release
     - name: Test ${{matrix.parallel_backend}} with CUDA ${{matrix.cuda_support}}
