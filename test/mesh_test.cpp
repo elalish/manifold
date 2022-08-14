@@ -855,7 +855,7 @@ TEST(Boolean, Gyroid) {
 
   EXPECT_TRUE(result.IsManifold());
   EXPECT_TRUE(result.MatchesTriNormals());
-  EXPECT_LE(result.NumDegenerateTris(), 43);
+  EXPECT_LE(result.NumDegenerateTris(), 50);
   EXPECT_EQ(result.Decompose().size(), 1);
   auto prop = result.GetProperties();
   EXPECT_NEAR(prop.volume, 7692, 1);
