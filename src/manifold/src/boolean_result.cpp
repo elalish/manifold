@@ -19,10 +19,6 @@
 #include "par.h"
 #include "polygon.h"
 
-// Mark the meshID as coming from P by flipping the 30th bit.
-// The 30th bit is used to avoid flipping the sign.
-constexpr int kFromP = 1 << 30;
-
 using namespace manifold;
 using namespace thrust::placeholders;
 
@@ -421,6 +417,8 @@ struct CreateBarycentric {
   glm::vec3 *barycentricR;
   BaryRef *faceRef;
   int *idx;
+
+  const int offsetQ;
   const int firstNewVert;
   const glm::vec3 *vertPosR;
   const glm::vec3 *vertPosP;
@@ -446,9 +444,10 @@ struct CreateBarycentric {
     const BaryRef oldRef = halfedgeRef.PQ == 0 ? triBaryP[tri] : triBaryQ[tri];
 
     faceRef[halfedgeR.face] = oldRef;
-    if (halfedgeRef.PQ == 0) {
-      // Mark the meshID as coming from P
-      faceRef[halfedgeR.face].meshID |= kFromP;
+
+    if (halfedgeRef.PQ == 1) {
+      // Mark the meshID as coming from Q
+      faceRef[halfedgeR.face].meshID += offsetQ;
     }
 
     if (halfedgeR.startVert < firstNewVert) {  // retained vert
@@ -488,6 +487,8 @@ std::pair<VecDH<BaryRef>, VecDH<int>> CalculateMeshRelation(
   outR.meshRelation_.barycentric.resize(outR.halfedge_.size());
   VecDH<BaryRef> faceRef(numFaceR);
   VecDH<int> halfedgeBary(halfedgeRef.size());
+
+  const int offsetQ = Manifold::Impl::meshIDCounter_;
   VecDH<int> idx(1, 0);
   for_each_n(
       autoPolicy(halfedgeRef.size()),
@@ -495,12 +496,13 @@ std::pair<VecDH<BaryRef>, VecDH<int>> CalculateMeshRelation(
       halfedgeRef.size(),
       CreateBarycentric(
           {outR.meshRelation_.barycentric.ptrD(), faceRef.ptrD(), idx.ptrD(),
-           firstNewVert, outR.vertPos_.cptrD(), inP.vertPos_.cptrD(),
+           offsetQ, firstNewVert, outR.vertPos_.cptrD(), inP.vertPos_.cptrD(),
            inQ.vertPos_.cptrD(), inP.halfedge_.cptrD(), inQ.halfedge_.cptrD(),
            inP.meshRelation_.triBary.cptrD(), inQ.meshRelation_.triBary.cptrD(),
            inP.meshRelation_.barycentric.cptrD(),
            inQ.meshRelation_.barycentric.cptrD(), invertQ, outR.precision_}));
   outR.meshRelation_.barycentric.resize(idx[0]);
+
   return std::make_pair(faceRef, halfedgeBary);
 }
 }  // namespace
@@ -674,19 +676,7 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
   if (ManifoldParams().intermediateChecks)
     ASSERT(outR.Is2Manifold(), logicErr, "simplified mesh is not 2-manifold!");
 
-  // Index starting from 0 is chosen because I want the kernel part as simple as
-  // possible.
-  VecDH<int> meshIDs;
-  VecDH<int> original;
-  for (auto &entry : inP_.meshRelation_.originalID) {
-    meshIDs.push_back(entry.first | kFromP);
-    original.push_back(entry.second);
-  }
-  for (auto &entry : inQ_.meshRelation_.originalID) {
-    meshIDs.push_back(entry.first);
-    original.push_back(entry.second);
-  }
-  outR.UpdateMeshIDs(meshIDs, original);
+  outR.IncrementMeshIDs(0, outR.NumTri());
 
 #ifdef MANIFOLD_DEBUG
   simplify.Stop();

@@ -381,13 +381,6 @@ std::vector<Manifold> Manifold::Decompose() const {
     return meshes;
   }
   VecDH<int> vertLabel(components);
-  // meshID mapping for UpdateMeshIDs
-  VecDH<int> meshIDs;
-  VecDH<int> original;
-  for (auto& entry : pImpl_->meshRelation_.originalID) {
-    meshIDs.push_back(entry.first);
-    original.push_back(entry.second);
-  }
 
   std::vector<Manifold> meshes;
   for (int i = 0; i < numLabel; ++i) {
@@ -421,9 +414,6 @@ std::vector<Manifold> Manifold::Decompose() const {
 
     impl->Finish();
 
-    // meshIDs and original will only be sorted after successful updates, so we
-    // can keep using the old one.
-    impl->UpdateMeshIDs(meshIDs, original);
     meshes.push_back(Manifold(impl));
   }
   return meshes;
