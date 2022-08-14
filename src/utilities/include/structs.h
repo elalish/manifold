@@ -222,8 +222,13 @@ struct Curvature {
  * Mesh.
  */
 struct BaryRef {
-  /// The original mesh triangle index.
+  /// The unique ID of the mesh instance of this triangle. If .meshID and .tri
+  /// match for two triangles, then they are coplanar and came from the same
+  /// face.
   int meshID;
+  /// The OriginalID of the mesh this triangle came from. This ID is ideal for
+  /// reapplying properties like UV coordinates to the output mesh.
+  int originalID;
   /// The triangle index of the original triangle this was part of:
   /// Mesh.triVerts[tri].
   int tri;
@@ -446,7 +451,8 @@ inline std::ostream& operator<<(std::ostream& stream, const glm::mat4x3& mat) {
 }
 
 inline std::ostream& operator<<(std::ostream& stream, const BaryRef& ref) {
-  return stream << "meshID: " << ref.meshID << ", tri: " << ref.tri
+  return stream << "meshID: " << ref.meshID
+                << ", originalID: " << ref.originalID << ", tri: " << ref.tri
                 << ", uvw idx: " << ref.vertBary;
 }
 

@@ -75,7 +75,7 @@ void Related(const Manifold& out, const std::vector<Mesh>& input,
   Mesh output = out.GetMesh();
   MeshRelation relation = out.GetMeshRelation();
   for (int tri = 0; tri < out.NumTri(); ++tri) {
-    int meshID = relation.triBary[tri].meshID;
+    int meshID = relation.triBary[tri].originalID;
     int meshIdx = meshID2idx.at(meshID);
     ASSERT_LT(meshIdx, input.size());
     const Mesh& inMesh = input[meshIdx];
@@ -99,14 +99,14 @@ void RelatedOp(const Manifold& inP, const Manifold& inQ, const Manifold& outR) {
   std::vector<Mesh> input;
   std::map<int, int> meshID2idx;
 
-  std::vector<int> meshIDs = inP.GetMeshIDs();
-  EXPECT_EQ(meshIDs.size(), 1);
-  meshID2idx[meshIDs[0]] = input.size();
+  int meshID = inP.OriginalID();
+  EXPECT_GE(meshID, 0);
+  meshID2idx[meshID] = input.size();
   input.push_back(inP.GetMesh());
 
-  meshIDs = inQ.GetMeshIDs();
-  EXPECT_EQ(meshIDs.size(), 1);
-  meshID2idx[meshIDs[0]] = input.size();
+  meshID = inQ.OriginalID();
+  EXPECT_GE(meshID, 0);
+  meshID2idx[meshID] = input.size();
   input.push_back(inQ.GetMesh());
 
   Related(outR, input, meshID2idx);
@@ -298,9 +298,9 @@ TEST(Manifold, Decompose) {
   std::map<int, int> meshID2idx;
 
   for (const Manifold& manifold : manifoldList) {
-    std::vector<int> meshIDs = manifold.GetMeshIDs();
-    EXPECT_EQ(meshIDs.size(), 1);
-    meshID2idx[meshIDs[0]] = input.size();
+    int meshID = manifold.OriginalID();
+    EXPECT_GE(meshID, 0);
+    meshID2idx[meshID] = input.size();
     input.push_back(manifold.GetMesh());
   }
 
@@ -563,9 +563,9 @@ TEST(Manifold, MeshRelation) {
   input.push_back(ImportMesh("data/gyroidpuzzle.ply"));
   Manifold gyroid(input[0]);
 
-  std::vector<int> meshIDs = gyroid.GetMeshIDs();
-  EXPECT_EQ(meshIDs.size(), 1);
-  meshID2idx[meshIDs[0]] = input.size() - 1;
+  int meshID = gyroid.OriginalID();
+  EXPECT_GE(meshID, 0);
+  meshID2idx[meshID] = input.size() - 1;
 
   Related(gyroid, input, meshID2idx);
 }
@@ -577,9 +577,9 @@ TEST(Manifold, MeshRelationRefine) {
   input.push_back(Csaszar());
   Manifold csaszar(input[0]);
 
-  std::vector<int> meshIDs = csaszar.GetMeshIDs();
-  EXPECT_EQ(meshIDs.size(), 1);
-  meshID2idx[meshIDs[0]] = input.size() - 1;
+  int meshID = csaszar.OriginalID();
+  EXPECT_GE(meshID, 0);
+  meshID2idx[meshID] = input.size() - 1;
 
   Related(csaszar, input, meshID2idx);
   csaszar.Refine(4);
@@ -864,14 +864,14 @@ TEST(Boolean, Gyroid) {
   std::vector<Mesh> input;
   std::map<int, int> meshID2idx;
 
-  std::vector<int> meshIDs = gyroid.GetMeshIDs();
-  EXPECT_EQ(meshIDs.size(), 1);
-  meshID2idx[meshIDs[0]] = input.size();
+  int meshID = gyroid.OriginalID();
+  EXPECT_GE(meshID, 0);
+  meshID2idx[meshID] = input.size();
   input.push_back(gyroidpuzzle);
 
-  meshIDs = gyroid2.GetMeshIDs();
-  EXPECT_EQ(meshIDs.size(), 1);
-  meshID2idx[meshIDs[0]] = input.size();
+  meshID = gyroid2.OriginalID();
+  EXPECT_GE(meshID, 0);
+  meshID2idx[meshID] = input.size();
   input.push_back(gyroidpuzzle2);
 
   Related(result, input, meshID2idx);

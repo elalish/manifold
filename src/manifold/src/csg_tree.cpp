@@ -210,18 +210,10 @@ Manifold::Impl CsgLeafNode::Compose(
               combined.halfedge_.begin() + nextEdge,
               UpdateHalfedge({nextVert, nextEdge, nextTri}));
 
-    // Assign new IDs to triangles added in this iteration, to differentiate
-    // triangles coming from different manifolds.
-    VecDH<int> meshIDs;
-    VecDH<int> original;
-    for (auto &entry : node->pImpl_->meshRelation_.originalID) {
-      meshIDs.push_back(entry.first);
-      original.push_back(entry.second);
-    }
-    int meshIDStart = combined.meshRelation_.originalID.size();
-    combined.UpdateMeshIDs(meshIDs, original, nextTri,
-                           node->pImpl_->meshRelation_.triBary.size(),
-                           meshIDStart);
+    // Since the nodes may be copies containing the same meshIDs, it is
+    // important to increment them separately so that each node instance gets
+    // unique meshIDs.
+    combined.IncrementMeshIDs(nextTri, node->pImpl_->NumTri());
 
     nextVert += node->pImpl_->NumVert();
     nextEdge += 2 * node->pImpl_->NumEdge();

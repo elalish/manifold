@@ -118,7 +118,7 @@ class Manifold {
    */
   ///@{
   MeshRelation GetMeshRelation() const;
-  std::vector<int> GetMeshIDs() const;
+  int OriginalID() const;
   Manifold AsOriginal() const;
   ///@}
 
