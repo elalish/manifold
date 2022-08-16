@@ -33,7 +33,7 @@ if(BUILD_TEST_CGAL)
 endif()
 
 add_executable(sdfTest sdfTest.cpp)
-target_link_libraries(sdfTest manifold meshIO samples sdf)
+target_link_libraries(sdfTest manifold meshIO samples)
 
 if(MANIFOLD_USE_CUDA)
     set_source_files_properties(sdfTest.cpp PROPERTIES LANGUAGE CUDA)
