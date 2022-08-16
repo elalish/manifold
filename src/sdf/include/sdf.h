@@ -14,7 +14,7 @@
 
 #pragma once
 
-#include "manifold.h"
+#include "structs.h"
 #include "utils.h"
 #include "vec_dh.h"
 
