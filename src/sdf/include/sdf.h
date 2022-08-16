@@ -115,7 +115,7 @@ struct GridVert {
   int edgeIndex = -1;
   int edgeVerts[7] = {-1, -1, -1, -1, -1, -1, -1};
 
-  int Inside() const { return edgeIndex == -1 ? (distance > 0 ? 1 : -1) : 0; }
+  int Inside() const { return distance > 0 ? 1 : -1; }
 };
 
 class HashTableD {
@@ -196,40 +196,15 @@ struct ComputeVerts {
   }
 
   inline __host__ __device__ float BoundedSDF(glm::ivec4 gridIndex) const {
-    glm::vec3 pos = Position(gridIndex);
+    const float d = sdf(Position(gridIndex)) - level;
 
-    const float d = sdf(pos) - level;
+    const glm::ivec3 xyz(gridIndex);
+    if (glm::any(glm::equal(xyz, glm::ivec3(0))) ||
+        glm::any(glm::greaterThanEqual(xyz, gridSize)) ||
+        (gridIndex.w == 1 &&
+         glm::any(glm::greaterThanEqual(xyz, gridSize - 1))))
+      return glm::min(d, 0.0f);
 
-    if (gridIndex.w == 1) {
-      if (d > 0) {
-        const glm::ivec3 xyz(gridIndex);
-        if (glm::any(glm::equal(xyz, glm::ivec3(0))) ||
-            glm::any(glm::equal(xyz, gridSize - 1)))
-          return 0.0f;
-        else if (glm::any(glm::equal(xyz, gridSize)))
-          return -1.0f;
-      }
-    } else {
-      bool mirror = true;
-      if (gridIndex.x == 0)
-        pos.x += spacing.x;
-      else if (gridIndex.y == 0)
-        pos.y += spacing.y;
-      else if (gridIndex.z == 0)
-        pos.z += spacing.z;
-      else if (gridIndex.x == gridSize.x)
-        pos.x -= spacing.x;
-      else if (gridIndex.y == gridSize.y)
-        pos.y -= spacing.y;
-      else if (gridIndex.z == gridSize.z)
-        pos.z -= spacing.z;
-      else
-        mirror = false;
-      if (mirror) {
-        const float dMirror = sdf(pos) - level;
-        return dMirror > 0 ? glm::min(d, -dMirror) : -1.0f;
-      }
-    }
     return d;
   }
 
@@ -283,8 +258,8 @@ struct ComputeVerts {
       }
     }
 
-    // if (keep && gridVerts.Insert(gridVert))
-    //   std::cout << "out of space!" << std::endl;
+    if (keep && gridVerts.Insert(gridVert))
+      std::cout << "out of space!" << std::endl;
   }
 };
 
@@ -395,7 +370,7 @@ class SDF {
     const glm::ivec3 gridSize(dim / edgeLength);
     const glm::vec3 spacing = dim / (glm::vec3(gridSize));
 
-    const int maxMorton = MortonCode(glm::ivec4(gridSize + 1, 1));
+    const int maxMorton = MortonCode(glm::ivec4(gridSize - 1, 1));
 
     const int tableSize = glm::min(
         2 * maxMorton, static_cast<int>(100 * glm::pow(maxMorton, 0.667)));
@@ -409,7 +384,7 @@ class SDF {
     thrust::for_each_n(
         countAt(0), maxMorton + 1,
         ComputeVerts<Func>({vertPos.ptrD(), index.ptrD(), gridVerts.D(), sdf_,
-                            bounds.min, gridSize + 1, spacing, level}));
+                            bounds.min, gridSize - 1, spacing, level}));
     vertPos.resize(index[0]);
 
     VecDH<glm::ivec3> triVerts(gridVerts.Entries() * 12);  // worst case
