@@ -49,5 +49,7 @@ Manifold RoundedFrame(float edgeLength, float radius, int circularSegments = 0);
 Manifold TetPuzzle(float edgeLength, float gap, int nDivisions);
 
 Manifold Scallop();
+
+Manifold GyroidModule(int n);
 /** @} */  // end of Samples
 }  // namespace manifold

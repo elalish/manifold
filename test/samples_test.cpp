@@ -162,6 +162,14 @@ TEST(Samples, Bracelet) {
   if (options.exportModels) ExportMesh("bracelet.glb", bracelet.GetMesh(), {});
 }
 
+TEST(Samples, GyroidModule) {
+  Manifold gyroid = GyroidModule(50);
+  CheckManifold(gyroid);
+  EXPECT_LE(gyroid.NumDegenerateTris(), 0);
+  EXPECT_EQ(gyroid.Genus(), 1);
+  if (options.exportModels) ExportMesh("gyroid.gltf", gyroid.GetMesh(), {});
+}
+
 TEST(Samples, Sponge1) {
   Manifold sponge = MengerSponge(1);
   CheckManifold(sponge);
