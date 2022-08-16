@@ -163,7 +163,7 @@ TEST(Samples, Bracelet) {
 }
 
 TEST(Samples, GyroidModule) {
-  Manifold gyroid = GyroidModule(50);
+  Manifold gyroid = GyroidModule(20);
   CheckManifold(gyroid);
   EXPECT_LE(gyroid.NumDegenerateTris(), 0);
   EXPECT_EQ(gyroid.Genus(), 1);

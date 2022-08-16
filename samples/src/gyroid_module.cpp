@@ -19,6 +19,7 @@ namespace {
 
 struct Gyroid {
   __host__ __device__ float operator()(glm::vec3 p) const {
+    p -= glm::pi<float>() / 4;
     return cos(p.x) * sin(p.y) + cos(p.y) * sin(p.z) + cos(p.z) * sin(p.x);
   }
 };
@@ -35,7 +36,7 @@ Manifold GyroidModule(int n) {
 
   const float size = glm::two_pi<float>();
   Manifold gyroid(
-      gyroidSDF.LevelSet({glm::vec3(-size), glm::vec3(size)}, size / n));
+      gyroidSDF.LevelSet({glm::vec3(-size), glm::vec3(size)}, size / n, 0.5));
   return gyroid;
 }
-}
+}  // namespace manifold
