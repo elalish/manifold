@@ -32,8 +32,6 @@
 namespace manifold {
 
 constexpr float kTolerance = 1e-5;
-constexpr glm::ivec3 next3(1, 2, 0);
-constexpr glm::ivec3 prev3(2, 0, 1);
 
 #ifdef __CUDACC__
 #define HOST_DEVICE __host__ __device__

@@ -21,58 +21,91 @@
 namespace {
 using namespace manifold;
 
-constexpr uint64_t kOpen = std::numeric_limits<uint64_t>::max();
+typedef unsigned long long int Uint64;
 
-constexpr glm::ivec3 tetTri0[16] = {{-1, -1, -1},  //
-                                    {0, 3, 4},     //
-                                    {0, 1, 5},     //
-                                    {1, 5, 3},     //
-                                    {1, 4, 2},     //
-                                    {1, 0, 3},     //
-                                    {2, 5, 0},     //
-                                    {5, 3, 2},     //
-                                    {2, 3, 5},     //
-                                    {0, 5, 2},     //
-                                    {3, 0, 1},     //
-                                    {2, 4, 1},     //
-                                    {3, 5, 1},     //
-                                    {5, 1, 0},     //
-                                    {4, 3, 0},     //
-                                    {-1, -1, -1}};
+constexpr Uint64 kOpen = std::numeric_limits<Uint64>::max();
 
-constexpr glm::ivec3 tetTri1[16] = {{-1, -1, -1},  //
-                                    {-1, -1, -1},  //
-                                    {-1, -1, -1},  //
-                                    {3, 4, 1},     //
-                                    {-1, -1, -1},  //
-                                    {3, 2, 1},     //
-                                    {0, 4, 2},     //
-                                    {-1, -1, -1},  //
-                                    {-1, -1, -1},  //
-                                    {2, 4, 0},     //
-                                    {1, 2, 3},     //
-                                    {-1, -1, -1},  //
-                                    {1, 4, 3},     //
-                                    {-1, -1, -1},  //
-                                    {-1, -1, -1},  //
-                                    {-1, -1, -1}};
+__host__ __device__ Uint64 AtomicCAS(Uint64& target, Uint64 compare,
+                                     Uint64 val) {
+#ifdef __CUDA_ARCH__
+  return atomicCAS(&target, compare, val);
+#else
+  std::atomic<Uint64>& tar = reinterpret_cast<std::atomic<Uint64>&>(target);
+  Uint64 old_val = tar.load();
+  tar.compare_exchange_weak(compare, val);
+  return old_val;
+#endif
+}
 
-constexpr glm::ivec4 neighbors[14] = {{0, 0, 0, 1},     //
-                                      {1, 0, 0, 0},     //
-                                      {0, 1, 0, 0},     //
-                                      {0, 0, 1, 0},     //
-                                      {-1, 0, 0, 1},    //
-                                      {0, -1, 0, 1},    //
-                                      {0, 0, -1, 1},    //
-                                      {-1, -1, -1, 1},  //
-                                      {-1, 0, 0, 0},    //
-                                      {0, -1, 0, 0},    //
-                                      {0, 0, -1, 0},    //
-                                      {0, -1, -1, 1},   //
-                                      {-1, 0, -1, 1},   //
-                                      {-1, -1, 0, 1}};
+__host__ __device__ int Next3(int i) {
+  constexpr glm::ivec3 next3(1, 2, 0);
+  return next3[i];
+}
 
-__host__ __device__ uint64_t SpreadBits3(uint64_t v) {
+__host__ __device__ int Prev3(int i) {
+  constexpr glm::ivec3 prev3(2, 0, 1);
+  return prev3[i];
+}
+
+__host__ __device__ glm::ivec3 TetTri0(int i) {
+  constexpr glm::ivec3 tetTri0[16] = {{-1, -1, -1},  //
+                                      {0, 3, 4},     //
+                                      {0, 1, 5},     //
+                                      {1, 5, 3},     //
+                                      {1, 4, 2},     //
+                                      {1, 0, 3},     //
+                                      {2, 5, 0},     //
+                                      {5, 3, 2},     //
+                                      {2, 3, 5},     //
+                                      {0, 5, 2},     //
+                                      {3, 0, 1},     //
+                                      {2, 4, 1},     //
+                                      {3, 5, 1},     //
+                                      {5, 1, 0},     //
+                                      {4, 3, 0},     //
+                                      {-1, -1, -1}};
+  return tetTri0[i];
+}
+
+__host__ __device__ glm::ivec3 TetTri1(int i) {
+  constexpr glm::ivec3 tetTri1[16] = {{-1, -1, -1},  //
+                                      {-1, -1, -1},  //
+                                      {-1, -1, -1},  //
+                                      {3, 4, 1},     //
+                                      {-1, -1, -1},  //
+                                      {3, 2, 1},     //
+                                      {0, 4, 2},     //
+                                      {-1, -1, -1},  //
+                                      {-1, -1, -1},  //
+                                      {2, 4, 0},     //
+                                      {1, 2, 3},     //
+                                      {-1, -1, -1},  //
+                                      {1, 4, 3},     //
+                                      {-1, -1, -1},  //
+                                      {-1, -1, -1},  //
+                                      {-1, -1, -1}};
+  return tetTri1[i];
+}
+
+__host__ __device__ glm::ivec4 Neighbors(int i) {
+  constexpr glm::ivec4 neighbors[14] = {{0, 0, 0, 1},     //
+                                        {1, 0, 0, 0},     //
+                                        {0, 1, 0, 0},     //
+                                        {0, 0, 1, 0},     //
+                                        {-1, 0, 0, 1},    //
+                                        {0, -1, 0, 1},    //
+                                        {0, 0, -1, 1},    //
+                                        {-1, -1, -1, 1},  //
+                                        {-1, 0, 0, 0},    //
+                                        {0, -1, 0, 0},    //
+                                        {0, 0, -1, 0},    //
+                                        {0, -1, -1, 1},   //
+                                        {-1, 0, -1, 1},   //
+                                        {-1, -1, 0, 1}};
+  return neighbors[i];
+}
+
+__host__ __device__ Uint64 SpreadBits3(Uint64 v) {
   v = v & 0x1fffff;
   v = (v | v << 32) & 0x1f00000000ffff;
   v = (v | v << 16) & 0x1f0000ff0000ff;
@@ -82,7 +115,7 @@ __host__ __device__ uint64_t SpreadBits3(uint64_t v) {
   return v;
 }
 
-__host__ __device__ uint64_t SqeezeBits3(uint64_t v) {
+__host__ __device__ Uint64 SqeezeBits3(Uint64 v) {
   v = v & 0x1249249249249249;
   v = (v ^ v >> 2) & 0x10c30c30c30c30c3;
   v = (v ^ v >> 4) & 0x100f00f00f00f00f;
@@ -95,12 +128,12 @@ __host__ __device__ uint64_t SqeezeBits3(uint64_t v) {
 // This is a modified 3D MortonCode, where the xyz code is shifted by one bit
 // and the w bit is added as the least significant. This allows 21 bits per x,
 // y, and z channel and 1 for w, filling the 64 bit total.
-__device__ __host__ uint64_t MortonCode(const glm::ivec4& index) {
-  return static_cast<uint64_t>(index.w) | (SpreadBits3(index.x) << 1) |
+__host__ __device__ Uint64 MortonCode(const glm::ivec4& index) {
+  return static_cast<Uint64>(index.w) | (SpreadBits3(index.x) << 1) |
          (SpreadBits3(index.y) << 2) | (SpreadBits3(index.z) << 3);
 }
 
-__device__ __host__ glm::ivec4 DecodeMorton(uint64_t code) {
+__host__ __device__ glm::ivec4 DecodeMorton(Uint64 code) {
   glm::ivec4 index;
   index.x = SqeezeBits3(code >> 1);
   index.y = SqeezeBits3(code >> 2);
@@ -110,12 +143,12 @@ __device__ __host__ glm::ivec4 DecodeMorton(uint64_t code) {
 }
 
 struct GridVert {
-  uint64_t key = kOpen;
+  Uint64 key = kOpen;
   float distance = NAN;
   int edgeIndex = -1;
   int edgeVerts[7] = {-1, -1, -1, -1, -1, -1, -1};
 
-  int Inside() const { return distance > 0 ? 1 : -1; }
+  __host__ __device__ int Inside() const { return distance > 0 ? 1 : -1; }
 };
 
 class HashTableD {
@@ -123,12 +156,13 @@ class HashTableD {
   HashTableD(VecDH<GridVert>& alloc, VecDH<uint32_t>& used, uint32_t step = 127)
       : step_{step}, table_{alloc}, used_{used} {}
 
-  __device__ __host__ int Size() const { return table_.size(); }
+  __host__ __device__ int Size() const { return table_.size(); }
 
-  __device__ __host__ bool Insert(const GridVert& vert) {
+  __host__ __device__ bool Insert(const GridVert& vert) {
     uint32_t idx = vert.key & (Size() - 1);
     while (1) {
-      const uint64_t found = AtomicCAS(table_[idx].key, kOpen, vert.key);
+      Uint64& key = table_[idx].key;
+      const Uint64 found = AtomicCAS(key, kOpen, vert.key);
       if (found == kOpen) {
         if (AtomicAdd(used_[0], 0x1u) * 2 > Size()) {
           return true;
@@ -141,7 +175,7 @@ class HashTableD {
     }
   }
 
-  __device__ __host__ GridVert operator[](uint64_t key) const {
+  __host__ __device__ GridVert operator[](Uint64 key) const {
     uint32_t idx = key & (Size() - 1);
     while (1) {
       const GridVert found = table_[idx];
@@ -150,7 +184,7 @@ class HashTableD {
     }
   }
 
-  __device__ __host__ GridVert At(int idx) const { return table_[idx]; }
+  __host__ __device__ GridVert At(int idx) const { return table_[idx]; }
 
  private:
   const uint32_t step_;
@@ -208,7 +242,7 @@ struct ComputeVerts {
     return d;
   }
 
-  inline __host__ __device__ void operator()(uint64_t mortonCode) {
+  inline __host__ __device__ void operator()(Uint64 mortonCode) {
     const glm::ivec4 gridIndex = DecodeMorton(mortonCode);
 
     if (glm::any(glm::greaterThan(glm::ivec3(gridIndex), gridSize))) return;
@@ -225,8 +259,7 @@ struct ComputeVerts {
     bool keep = false;
     float minDist2 = 0.25 * 0.25;
     for (int i = 0; i < 14; ++i) {
-      const int j = i < 7 ? i : i - 7;
-      glm::ivec4 neighborIndex = gridIndex + neighbors[i];
+      glm::ivec4 neighborIndex = gridIndex + Neighbors(i);
       if (neighborIndex.w == 2) {
         neighborIndex += 1;
         neighborIndex.w = 0;
@@ -258,8 +291,7 @@ struct ComputeVerts {
       }
     }
 
-    if (keep && gridVerts.Insert(gridVert))
-      std::cout << "out of space!" << std::endl;
+    if (keep && gridVerts.Insert(gridVert)) printf("out of space!\n");
   }
 };
 
@@ -279,8 +311,8 @@ struct BuildTris {
                                       const int edges[6]) {
     const int i = (tet[0] > 0 ? 1 : 0) + (tet[1] > 0 ? 2 : 0) +
                   (tet[2] > 0 ? 4 : 0) + (tet[3] > 0 ? 8 : 0);
-    CreateTri(tetTri0[i], edges);
-    CreateTri(tetTri1[i], edges);
+    CreateTri(TetTri0(i), edges);
+    CreateTri(TetTri1(i), edges);
   }
 
   __host__ __device__ void operator()(int idx) {
@@ -314,15 +346,15 @@ struct BuildTris {
     for (const int i : {0, 1, 2}) {
       edges[1] = base.edgeVerts[i + 1];
       edges[4] = thisVert.edgeVerts[i + 4];
-      edges[5] = base.edgeVerts[prev3[i] + 4];
+      edges[5] = base.edgeVerts[Prev3(i) + 4];
 
       thisIndex = leadIndex;
-      thisIndex[prev3[i]] -= 1;
+      thisIndex[Prev3(i)] -= 1;
       thisVert = gridVerts[MortonCode(thisIndex)];
 
       tet[3] = thisVert.Inside();
-      edges[2] = thisVert.edgeVerts[next3[i] + 4];
-      edges[3] = thisVert.edgeVerts[prev3[i] + 1];
+      edges[2] = thisVert.edgeVerts[Next3(i) + 4];
+      edges[3] = thisVert.edgeVerts[Prev3(i) + 1];
 
       if (!skipTet && thisVert.key != kOpen) CreateTris(tet, edges);
       skipTet = thisVert.key == kOpen;
@@ -331,14 +363,14 @@ struct BuildTris {
       edges[1] = edges[5];
       edges[2] = thisVert.edgeVerts[i + 4];
       edges[4] = edges[3];
-      edges[5] = base.edgeVerts[next3[i] + 1];
+      edges[5] = base.edgeVerts[Next3(i) + 1];
 
       thisIndex = baseIndex;
-      thisIndex[next3[i]] += 1;
+      thisIndex[Next3(i)] += 1;
       thisVert = gridVerts[MortonCode(thisIndex)];
 
       tet[3] = thisVert.Inside();
-      edges[3] = thisVert.edgeVerts[next3[i] + 4];
+      edges[3] = thisVert.edgeVerts[Next3(i) + 4];
 
       if (!skipTet && thisVert.key != kOpen) CreateTris(tet, edges);
       skipTet = thisVert.key == kOpen;
