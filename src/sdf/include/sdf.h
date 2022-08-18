@@ -389,12 +389,46 @@ void RemoveUnreferencedVerts(VecDH<glm::vec3>& vertPos,
 template <typename Func>
 class SDF {
  public:
+  /**
+   * Create a signed-distance function object, which can produce Manifold level
+   * sets.
+   *
+   * @param sdf The signed-distance functor, containing this function signature:
+   * __host__ __device__ float operator()(glm::vec3 point), which returns the
+   * signed distance of a given point in R^3. Positive values are inside,
+   * negative outside. The __host__ __device__ is only needed if you compile for
+   * CUDA. If you are using a large grid, the advantage of a GPU speedup is
+   * quite significant.
+   */
   SDF(Func sdf) : sdf_{sdf} {}
 
+  /**
+   * A convenience function for calling the given SDF on a single point.
+   *
+   * @param point
+   */
   inline __host__ __device__ float operator()(glm::vec3 point) const {
     return sdf_(point);
   }
 
+  /**
+   * Constructs a level-set Mesh from the SDF. This uses a form of Marching
+   * Tetrahedra (akin to Marching Cubes, but better for manifoldness). Instead
+   * of using a cubic grid, it uses a body-centered cubic grid (two shifted
+   * cubic grids). This means if your function's interior exceeds the given
+   * bounds, you will see a kind of egg-crate shape closing off the manifold,
+   * which is due to the underlying grid.
+   *
+   * @param bounds An axis-aligned box that defines the extent of the grid.
+   * @param edgeLength Approximate maximum edge length of the triangles in the
+   * final result. This affects grid spacing, and hence has a strong effect on
+   * performance.
+   * @param level You can inset your Mesh by using a positive value, or outset
+   * it with a negative value.
+   * @return Mesh This class does not depend on Manifold, so it just returns a
+   * Mesh, but it is guaranteed to be manifold and so can always be used as
+   * input to the Manifold contructor for further operations.
+   */
   inline Mesh LevelSet(Box bounds, float edgeLength, float level = 0) const {
     Mesh out;
 

@@ -36,7 +36,11 @@ Manifold RhombicDodecahedron(float size) {
 namespace manifold {
 
 /**
- * Creates a
+ * Creates a rhombic dodecahedral module of a gyroid manifold, which can be
+ * assembled together to tile space continuously. This one is designed to be
+ * 3D-printable, as it is oriented with minimal overhangs. This sample
+ * demonstrates the use of a Signed Distance Function (SDF) to create smooth,
+ * complex manifolds.
  */
 Manifold GyroidModule(float size, int n) {
   Gyroid func;
