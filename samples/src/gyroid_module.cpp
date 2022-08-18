@@ -23,6 +23,14 @@ struct Gyroid {
     return cos(p.x) * sin(p.y) + cos(p.y) * sin(p.z) + cos(p.z) * sin(p.x);
   }
 };
+
+Manifold RhombicDodecahedron(float size) {
+  Manifold box =
+      Manifold::Cube(size * glm::sqrt(2.0f) * glm::vec3(1, 1, 2), true);
+  Manifold result = box.Rotate(45) ^ box.Rotate(0, 45);
+  return result ^ box.Rotate(90, 0, 45);
+}
+
 }  // namespace
 
 namespace manifold {
@@ -30,13 +38,19 @@ namespace manifold {
 /**
  * Creates a
  */
-Manifold GyroidModule(int n) {
+Manifold GyroidModule(float size, int n) {
   Gyroid func;
   const SDF<Gyroid> gyroidSDF(func);
 
-  const float size = glm::two_pi<float>();
-  Manifold gyroid(
-      gyroidSDF.LevelSet({glm::vec3(-size), glm::vec3(size)}, size / n, 0.5));
-  return gyroid;
+  auto gyroid = [&](float level) {
+    const float period = glm::two_pi<float>();
+    return Manifold(gyroidSDF.LevelSet({glm::vec3(-period), glm::vec3(period)},
+                                       period / n, level))
+        .Scale(glm::vec3(size / period));
+  };
+
+  Manifold result = (RhombicDodecahedron(size) ^ gyroid(-0.5)) - gyroid(0.5);
+
+  return result.Rotate(-45, 0, 90).Translate({0, 0, size / glm::sqrt(2.0f)});
 }
 }  // namespace manifold

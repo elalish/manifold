@@ -50,6 +50,6 @@ Manifold TetPuzzle(float edgeLength, float gap, int nDivisions);
 
 Manifold Scallop();
 
-Manifold GyroidModule(int n);
+Manifold GyroidModule(float size = 20, int n = 20);
 /** @} */  // end of Samples
 }  // namespace manifold
