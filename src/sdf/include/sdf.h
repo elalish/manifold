@@ -247,9 +247,6 @@ struct ComputeVerts {
 
     if (glm::any(glm::greaterThan(glm::ivec3(gridIndex), gridSize))) return;
 
-    // const auto sdfFunc =
-    //     AtBounds(gridIndex) ? &ComputeVerts::BoundedSdf : &ComputeVerts::Sdf;
-
     const glm::vec3 position = Position(gridIndex);
 
     GridVert gridVert;
@@ -382,6 +379,10 @@ struct BuildTris {
 }  // namespace
 
 namespace manifold {
+
+void RemoveUnreferencedVerts(VecDH<glm::vec3>& vertPos,
+                             VecDH<glm::ivec3>& triVerts);
+
 /** @addtogroup Core
  *  @{
  */
@@ -427,6 +428,8 @@ class SDF {
         BuildTris({triVerts.ptrD(), index.ptrD(), gridVerts.D()}));
     triVerts.resize(index[0]);
 
+    RemoveUnreferencedVerts(vertPos, triVerts);
+
     out.vertPos.insert(out.vertPos.end(), vertPos.begin(), vertPos.end());
     out.triVerts.insert(out.triVerts.end(), triVerts.begin(), triVerts.end());
     return out;
@@ -435,6 +438,5 @@ class SDF {
  private:
   const Func sdf_;
 };
-
 /** @} */
 }  // namespace manifold

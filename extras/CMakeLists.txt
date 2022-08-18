@@ -31,13 +31,3 @@ if(BUILD_TEST_CGAL)
     target_compile_options(perfTestCGAL PRIVATE ${MANIFOLD_FLAGS})
     target_compile_features(perfTestCGAL PUBLIC cxx_std_14)
 endif()
-
-add_executable(sdfTest sdfTest.cpp)
-target_link_libraries(sdfTest manifold meshIO sdf)
-
-if(MANIFOLD_USE_CUDA)
-    set_source_files_properties(sdfTest.cpp PROPERTIES LANGUAGE CUDA)
-    set_property(TARGET sdfTest PROPERTY CUDA_ARCHITECTURES 61)
-endif()
-
-target_compile_features(sdfTest PUBLIC cxx_std_14)

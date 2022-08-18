@@ -23,12 +23,26 @@ using namespace manifold;
 struct CubeVoid {
   __host__ __device__ float operator()(glm::vec3 p) const {
     const glm::vec3 min = glm::vec3(1) - p;
-    const glm::vec3 max = p - glm::vec3(1);
-    const float min3 = glm::max(min.x, glm::max(min.y, min.z));
-    const float max3 = glm::max(max.x, glm::max(max.y, max.z));
-    return glm::max(min3, max3);
+    const glm::vec3 max = p + glm::vec3(1);
+    const float min3 = glm::min(min.x, glm::min(min.y, min.z));
+    const float max3 = glm::min(max.x, glm::min(max.y, max.z));
+    return -1.0f * glm::min(min3, max3);
   }
 };
+
+TEST(SDF, CubeVoid) {
+  CubeVoid func;
+  const SDF<CubeVoid> voidSDF(func);
+
+  EXPECT_EQ(voidSDF({0, 0, 0}), -1);
+  EXPECT_EQ(voidSDF({0, 0, 1}), 0);
+  EXPECT_EQ(voidSDF({0, 1, 1}), 0);
+  EXPECT_EQ(voidSDF({-1, 0, 0}), 0);
+  EXPECT_EQ(voidSDF({1, 1, -1}), 0);
+  EXPECT_EQ(voidSDF({2, 0, 0}), 1);
+  EXPECT_EQ(voidSDF({2, -2, 0}), 1);
+  EXPECT_EQ(voidSDF({-2, 2, 2}), 1);
+}
 
 TEST(SDF, Position) {
   CubeVoid func;
@@ -44,10 +58,10 @@ TEST(SDF, Position) {
 
   EXPECT_TRUE(cubeVoid.IsManifold());
   EXPECT_EQ(cubeVoid.Genus(), -1);
-  EXPECT_NEAR(bounds.min.x, -1 - edgeLength / 2, 0.001);
-  EXPECT_NEAR(bounds.min.y, -1 - edgeLength / 2, 0.001);
-  EXPECT_NEAR(bounds.min.z, -1 - edgeLength / 2, 0.001);
-  EXPECT_NEAR(bounds.max.x, 1 + edgeLength / 2, 0.001);
-  EXPECT_NEAR(bounds.max.y, 1 + edgeLength / 2, 0.001);
-  EXPECT_NEAR(bounds.max.z, 1 + edgeLength / 2, 0.001);
+  EXPECT_NEAR(bounds.min.x, -size / 2 - edgeLength / 2, 0.001);
+  EXPECT_NEAR(bounds.min.y, -size / 2 - edgeLength / 2, 0.001);
+  EXPECT_NEAR(bounds.min.z, -size / 2 - edgeLength / 2, 0.001);
+  EXPECT_NEAR(bounds.max.x, size / 2 + edgeLength / 2, 0.001);
+  EXPECT_NEAR(bounds.max.y, size / 2 + edgeLength / 2, 0.001);
+  EXPECT_NEAR(bounds.max.z, size / 2 + edgeLength / 2, 0.001);
 }
