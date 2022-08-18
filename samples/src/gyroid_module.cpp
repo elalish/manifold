@@ -27,8 +27,8 @@ struct Gyroid {
 Manifold RhombicDodecahedron(float size) {
   Manifold box =
       Manifold::Cube(size * glm::sqrt(2.0f) * glm::vec3(1, 1, 2), true);
-  Manifold result = box.Rotate(45) ^ box.Rotate(0, 45);
-  return result ^ box.Rotate(90, 0, 45);
+  Manifold result = box.Rotate(90, 45) ^ box.Rotate(90, 45, 90);
+  return result ^ box.Rotate(0, 0, 45);
 }
 
 }  // namespace
@@ -49,7 +49,7 @@ Manifold GyroidModule(float size, int n) {
         .Scale(glm::vec3(size / period));
   };
 
-  Manifold result = (RhombicDodecahedron(size) ^ gyroid(-0.5)) - gyroid(0.5);
+  Manifold result = (RhombicDodecahedron(size) ^ gyroid(-0.4)) - gyroid(0.4);
 
   return result.Rotate(-45, 0, 90).Translate({0, 0, size / glm::sqrt(2.0f)});
 }

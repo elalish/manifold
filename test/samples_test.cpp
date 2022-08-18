@@ -163,11 +163,18 @@ TEST(Samples, Bracelet) {
 }
 
 TEST(Samples, GyroidModule) {
-  Manifold gyroid = GyroidModule(20);
+  const float size = 20;
+  Manifold gyroid = GyroidModule(size);
   CheckManifold(gyroid);
-  EXPECT_LE(gyroid.NumDegenerateTris(), 0);
-  EXPECT_EQ(gyroid.Genus(), 1);
-  if (options.exportModels) ExportMesh("gyroid.gltf", gyroid.GetMesh(), {});
+  EXPECT_LE(gyroid.NumDegenerateTris(), 2);
+  EXPECT_EQ(gyroid.Genus(), 15);
+
+  const Box bounds = gyroid.BoundingBox();
+  const float precision = gyroid.Precision();
+  EXPECT_NEAR(bounds.min.z, 0, precision);
+  EXPECT_NEAR(bounds.max.z, size * glm::sqrt(2.0f), precision);
+  if (options.exportModels)
+    ExportMesh("gyroidModule.gltf", gyroid.GetMesh(), {});
 }
 
 TEST(Samples, Sponge1) {
