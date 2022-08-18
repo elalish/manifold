@@ -403,12 +403,10 @@ class SDF {
     const glm::ivec3 gridSize(dim / edgeLength);
     const glm::vec3 spacing = dim / (glm::vec3(gridSize));
 
-    const int maxMorton = MortonCode(glm::ivec4(gridSize - 1, 1));
+    const int maxMorton = MortonCode(glm::ivec4(gridSize + 1, 1));
 
     const int tableSize = glm::min(
         2 * maxMorton, static_cast<int>(100 * glm::pow(maxMorton, 0.667)));
-    std::cout << "maxMorton: " << maxMorton
-              << ", hash table size: " << tableSize << std::endl;
     HashTable gridVerts(tableSize);
 
     VecDH<glm::vec3> vertPos(gridVerts.Size() * 7);
@@ -417,7 +415,7 @@ class SDF {
     thrust::for_each_n(
         countAt(0), maxMorton + 1,
         ComputeVerts<Func>({vertPos.ptrD(), index.ptrD(), gridVerts.D(), sdf_,
-                            bounds.min, gridSize - 1, spacing, level}));
+                            bounds.min, gridSize + 1, spacing, level}));
     vertPos.resize(index[0]);
 
     VecDH<glm::ivec3> triVerts(gridVerts.Entries() * 12);  // worst case

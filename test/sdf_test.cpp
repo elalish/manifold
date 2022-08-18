@@ -44,7 +44,7 @@ TEST(SDF, CubeVoid) {
   EXPECT_EQ(voidSDF({-2, 2, 2}), 1);
 }
 
-TEST(SDF, Position) {
+TEST(SDF, Bounds) {
   CubeVoid func;
   const SDF<CubeVoid> voidSDF(func);
 
@@ -54,14 +54,45 @@ TEST(SDF, Position) {
   Manifold cubeVoid(voidSDF.LevelSet(
       {glm::vec3(-size / 2), glm::vec3(size / 2)}, edgeLength));
   Box bounds = cubeVoid.BoundingBox();
+  const float precision = cubeVoid.Precision();
   if (options.exportModels) ExportMesh("cubeVoid.gltf", cubeVoid.GetMesh(), {});
 
   EXPECT_TRUE(cubeVoid.IsManifold());
   EXPECT_EQ(cubeVoid.Genus(), -1);
-  EXPECT_NEAR(bounds.min.x, -size / 2 - edgeLength / 2, 0.001);
-  EXPECT_NEAR(bounds.min.y, -size / 2 - edgeLength / 2, 0.001);
-  EXPECT_NEAR(bounds.min.z, -size / 2 - edgeLength / 2, 0.001);
-  EXPECT_NEAR(bounds.max.x, size / 2 + edgeLength / 2, 0.001);
-  EXPECT_NEAR(bounds.max.y, size / 2 + edgeLength / 2, 0.001);
-  EXPECT_NEAR(bounds.max.z, size / 2 + edgeLength / 2, 0.001);
+  const float outerBound = size / 2 + edgeLength / 2;
+  EXPECT_NEAR(bounds.min.x, -outerBound, precision);
+  EXPECT_NEAR(bounds.min.y, -outerBound, precision);
+  EXPECT_NEAR(bounds.min.z, -outerBound, precision);
+  EXPECT_NEAR(bounds.max.x, outerBound, precision);
+  EXPECT_NEAR(bounds.max.y, outerBound, precision);
+  EXPECT_NEAR(bounds.max.z, outerBound, precision);
+}
+
+TEST(SDF, Surface) {
+  CubeVoid func;
+  const SDF<CubeVoid> voidSDF(func);
+
+  const float size = 4;
+  const float edgeLength = 0.5;
+
+  Manifold cubeVoid(voidSDF.LevelSet(
+      {glm::vec3(-size / 2), glm::vec3(size / 2)}, edgeLength));
+
+  Manifold cube = Manifold::Cube(glm::vec3(size), true);
+  cube -= cubeVoid;
+  Box bounds = cube.BoundingBox();
+  const float precision = cube.Precision();
+  if (options.exportModels) ExportMesh("cube.gltf", cube.GetMesh(), {});
+
+  EXPECT_TRUE(cube.IsManifold());
+  EXPECT_EQ(cube.Genus(), 0);
+  auto prop = cube.GetProperties();
+  EXPECT_NEAR(prop.volume, 8, 0.001);
+  EXPECT_NEAR(prop.surfaceArea, 24, 0.001);
+  EXPECT_NEAR(bounds.min.x, -1, precision);
+  EXPECT_NEAR(bounds.min.y, -1, precision);
+  EXPECT_NEAR(bounds.min.z, -1, precision);
+  EXPECT_NEAR(bounds.max.x, 1, precision);
+  EXPECT_NEAR(bounds.max.y, 1, precision);
+  EXPECT_NEAR(bounds.max.z, 1, precision);
 }
