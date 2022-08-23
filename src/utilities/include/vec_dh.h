@@ -238,8 +238,7 @@ class ManagedVec {
 
   static void mallocManaged(T **ptr, size_t bytes) {
 #ifdef MANIFOLD_USE_CUDA
-    if (CUDA_ENABLED == -1) check_cuda_available();
-    if (CUDA_ENABLED)
+    if (CudaEnabled())
       cudaMallocManaged(reinterpret_cast<void **>(ptr), bytes);
     else
 #endif
@@ -248,7 +247,7 @@ class ManagedVec {
 
   static void freeManaged(T *ptr) {
 #ifdef MANIFOLD_USE_CUDA
-    if (CUDA_ENABLED)
+    if (CudaEnabled())
       cudaFree(ptr);
     else
 #endif
@@ -257,7 +256,7 @@ class ManagedVec {
 
   static void prefetch(T *ptr, int bytes, bool onHost) {
 #ifdef MANIFOLD_USE_CUDA
-    if (bytes > 0 && CUDA_ENABLED)
+    if (bytes > 0 && CudaEnabled())
       cudaMemPrefetchAsync(ptr, std::min(bytes, DEVICE_MAX_BYTES),
                            onHost ? cudaCpuDeviceId : 0);
 #endif
