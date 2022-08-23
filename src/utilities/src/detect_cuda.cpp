@@ -21,6 +21,10 @@ void check_cuda_available() {
   int device_count = 0;
   cudaError_t error = cudaGetDeviceCount(&device_count);
   CUDA_ENABLED = device_count != 0;
+  if (CUDA_ENABLED) {
+    cudaError_t error = cudaGetLastError();
+    CUDA_ENABLED = error == cudaSuccess;
+  }
 }
 }  // namespace manifold
 #else

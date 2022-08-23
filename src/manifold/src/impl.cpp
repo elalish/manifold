@@ -283,9 +283,6 @@ Manifold::Impl::Impl(const Mesh& mesh,
                      const std::vector<float>& properties,
                      const std::vector<float>& propertyTolerance)
     : vertPos_(mesh.vertPos), halfedgeTangent_(mesh.halfedgeTangent) {
-#ifdef MANIFOLD_DEBUG
-  CheckDevice();
-#endif
   CalculateBBox();
   if (!IsFinite()) {
     MarkFailure(Error::NON_FINITE_VERTEX);

@@ -45,17 +45,6 @@ inline void MemUsage() {
 #endif
 }
 
-inline void CheckDevice() {
-#if THRUST_DEVICE_SYSTEM == THRUST_DEVICE_SYSTEM_CUDA
-  if (CUDA_ENABLED == -1) check_cuda_available();
-  if (CUDA_ENABLED) {
-    cudaError_t error = cudaGetLastError();
-    if (error != cudaSuccess)
-      throw std::runtime_error(cudaGetErrorString(error));
-  }
-#endif
-}
-
 struct Timer {
 #if THRUST_DEVICE_SYSTEM == THRUST_DEVICE_SYSTEM_CUDA
   cudaEvent_t start, end;

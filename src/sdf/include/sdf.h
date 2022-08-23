@@ -423,6 +423,7 @@ class SDF {
     const glm::vec3 spacing = dim / (glm::vec3(gridSize));
 
     const int maxMorton = MortonCode(glm::ivec4(gridSize + 1, 1));
+    const auto policy = autoPolicy(maxMorton);
 
     const int tableSize = glm::min(
         2 * maxMorton, static_cast<int>(100 * glm::pow(maxMorton, 0.667)));
@@ -432,7 +433,7 @@ class SDF {
     VecDH<int> index(1, 0);
 
     for_each_n(
-        autoPolicy(maxMorton), countAt(0), maxMorton + 1,
+        policy, countAt(0), maxMorton + 1,
         ComputeVerts<Func>({vertPos.ptrD(), index.ptrD(), gridVerts.D(), sdf_,
                             bounds.min, gridSize + 1, spacing, level}));
     vertPos.resize(index[0]);
@@ -440,7 +441,7 @@ class SDF {
     VecDH<glm::ivec3> triVerts(gridVerts.Entries() * 12);  // worst case
 
     index[0] = 0;
-    for_each_n(autoPolicy(gridVerts.Size()), countAt(0), gridVerts.Size(),
+    for_each_n(policy, countAt(0), gridVerts.Size(),
                BuildTris({triVerts.ptrD(), index.ptrD(), gridVerts.D()}));
     triVerts.resize(index[0]);
 
