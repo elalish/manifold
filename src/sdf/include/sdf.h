@@ -31,9 +31,8 @@ __host__ __device__ Uint64 AtomicCAS(Uint64& target, Uint64 compare,
   return atomicCAS(&target, compare, val);
 #else
   std::atomic<Uint64>& tar = reinterpret_cast<std::atomic<Uint64>&>(target);
-  Uint64 old_val = tar.load();
-  tar.compare_exchange_weak(compare, val);
-  return old_val;
+  tar.compare_exchange_strong(compare, val);
+  return compare;
 #endif
 }
 
@@ -145,7 +144,6 @@ __host__ __device__ glm::ivec4 DecodeMorton(Uint64 code) {
 struct GridVert {
   Uint64 key = kOpen;
   float distance = NAN;
-  int edgeIndex = -1;
   int edgeVerts[7] = {-1, -1, -1, -1, -1, -1, -1};
 
   __host__ __device__ int Inside() const { return distance > 0 ? 1 : -1; }
@@ -225,19 +223,19 @@ struct ComputeVerts {
   const float level;
 
   inline __host__ __device__ glm::vec3 Position(glm::ivec4 gridIndex) const {
-    return origin + spacing * (-0.5f + glm::vec3(gridIndex) +
-                               (gridIndex.w == 1 ? 0.5f : 0.0f) * glm::vec3(1));
+    return origin +
+           spacing * (glm::vec3(gridIndex) + (gridIndex.w == 1 ? 0.0f : -0.5f));
   }
 
   inline __host__ __device__ float BoundedSDF(glm::ivec4 gridIndex) const {
     const float d = sdf(Position(gridIndex)) - level;
 
     const glm::ivec3 xyz(gridIndex);
-    if (glm::any(glm::equal(xyz, glm::ivec3(0))) ||
-        glm::any(glm::greaterThanEqual(xyz, gridSize)) ||
-        (gridIndex.w == 1 &&
-         glm::any(glm::greaterThanEqual(xyz, gridSize - 1))))
-      return glm::min(d, 0.0f);
+    const bool onLowerBound = glm::any(glm::equal(xyz, glm::ivec3(0)));
+    const bool onUpperBound = glm::any(glm::greaterThanEqual(xyz, gridSize));
+    const bool onHalfBound =
+        gridIndex.w == 1 && glm::any(glm::greaterThanEqual(xyz, gridSize - 1));
+    if (onLowerBound || onUpperBound || onHalfBound) return glm::min(d, 0.0f);
 
     return d;
   }
@@ -254,36 +252,23 @@ struct ComputeVerts {
     gridVert.distance = BoundedSDF(gridIndex);
 
     bool keep = false;
-    float minDist2 = 0.25 * 0.25;
     for (int i = 0; i < 14; ++i) {
       glm::ivec4 neighborIndex = gridIndex + Neighbors(i);
       if (neighborIndex.w == 2) {
         neighborIndex += 1;
         neighborIndex.w = 0;
       }
-      const glm::vec3 iPos = Position(neighborIndex);
       const float val = BoundedSDF(neighborIndex);
-      if (val * gridVert.distance > 0 || (val == 0 && gridVert.distance == 0))
-        continue;
+      if ((val > 0) == (gridVert.distance > 0)) continue;
       keep = true;
-
-      // Record the nearest intersection of all 14 edges, only if it is close
-      // enough to allow this gridVert to safely move to it without inverting
-      // any tetrahedra.
-      const glm::vec3 interp = (val * position - gridVert.distance * iPos) /
-                               (val - gridVert.distance);
-      const glm::vec3 delta = interp - position;
-      const float dist2 = glm::dot(delta, delta);
-      if (dist2 < minDist2) {
-        // gridVert.edgeIndex = i;
-        minDist2 = dist2;
-      }
 
       // These seven edges are uniquely owned by this gridVert; any of them
       // which intersect the surface create a vert.
       if (i < 7) {
         const int idx = AtomicAdd(*vertIndex, 1);
-        vertPos[idx] = interp;
+        vertPos[idx] =
+            (val * position - gridVert.distance * Position(neighborIndex)) /
+            (val - gridVert.distance);
         gridVert.edgeVerts[i] = idx;
       }
     }
@@ -446,8 +431,8 @@ class SDF {
     VecDH<glm::vec3> vertPos(gridVerts.Size() * 7);
     VecDH<int> index(1, 0);
 
-    thrust::for_each_n(
-        countAt(0), maxMorton + 1,
+    for_each_n(
+        autoPolicy(maxMorton), countAt(0), maxMorton + 1,
         ComputeVerts<Func>({vertPos.ptrD(), index.ptrD(), gridVerts.D(), sdf_,
                             bounds.min, gridSize + 1, spacing, level}));
     vertPos.resize(index[0]);
@@ -455,9 +440,8 @@ class SDF {
     VecDH<glm::ivec3> triVerts(gridVerts.Entries() * 12);  // worst case
 
     index[0] = 0;
-    thrust::for_each_n(
-        countAt(0), gridVerts.Size(),
-        BuildTris({triVerts.ptrD(), index.ptrD(), gridVerts.D()}));
+    for_each_n(autoPolicy(gridVerts.Size()), countAt(0), gridVerts.Size(),
+               BuildTris({triVerts.ptrD(), index.ptrD(), gridVerts.D()}));
     triVerts.resize(index[0]);
 
     RemoveUnreferencedVerts(vertPos, triVerts);
