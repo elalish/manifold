@@ -147,6 +147,10 @@ struct GridVert {
   int edgeVerts[7] = {-1, -1, -1, -1, -1, -1, -1};
 
   __host__ __device__ int Inside() const { return distance > 0 ? 1 : -1; }
+
+  __host__ __device__ int NeighborInside(int i) const {
+    return Inside() * (edgeVerts[i] < 0 ? 1 : -1);
+  }
 };
 
 class HashTableD {
@@ -311,24 +315,21 @@ struct BuildTris {
       leadIndex.w = 0;
     }
 
-    const GridVert& leadVert = gridVerts[MortonCode(leadIndex)];
-    if (leadVert.key == kOpen) return;
-
     // This GridVert is in charge of the 6 tetrahedra surrounding its edge in
-    // the (1,1,1) direction, attached to leadVert.
-    glm::ivec4 tet(leadVert.Inside(), base.Inside(), -2, -2);
+    // the (1,1,1) direction (edge 0).
+    glm::ivec4 tet(base.NeighborInside(0), base.Inside(), -2, -2);
     glm::ivec4 thisIndex = baseIndex;
     thisIndex.x += 1;
 
     GridVert thisVert = gridVerts[MortonCode(thisIndex)];
     bool skipTet = thisVert.key == kOpen;
 
-    tet[2] = thisVert.Inside();
+    tet[2] = base.NeighborInside(1);
     for (const int i : {0, 1, 2}) {
       thisIndex = leadIndex;
       thisIndex[Prev3(i)] -= 1;
       GridVert nextVert = gridVerts[MortonCode(thisIndex)];
-      tet[3] = nextVert.Inside();
+      tet[3] = base.NeighborInside(Prev3(i) + 4);
 
       const int edges1[6] = {base.edgeVerts[0],
                              base.edgeVerts[i + 1],
@@ -344,7 +345,7 @@ struct BuildTris {
       thisIndex[Next3(i)] += 1;
       nextVert = gridVerts[MortonCode(thisIndex)];
       tet[2] = tet[3];
-      tet[3] = nextVert.Inside();
+      tet[3] = base.NeighborInside(Next3(i) + 1);
 
       const int edges2[6] = {base.edgeVerts[0],
                              edges1[5],
