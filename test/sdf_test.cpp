@@ -31,8 +31,7 @@ struct CubeVoid {
 };
 
 TEST(SDF, CubeVoid) {
-  CubeVoid func;
-  const SDF<CubeVoid> voidSDF(func);
+  CubeVoid voidSDF;
 
   EXPECT_EQ(voidSDF({0, 0, 0}), -1);
   EXPECT_EQ(voidSDF({0, 0, 1}), 0);
@@ -45,14 +44,11 @@ TEST(SDF, CubeVoid) {
 }
 
 TEST(SDF, Bounds) {
-  CubeVoid func;
-  const SDF<CubeVoid> voidSDF(func);
-
   const float size = 4;
   const float edgeLength = 0.5;
 
-  Manifold cubeVoid(voidSDF.LevelSet(
-      {glm::vec3(-size / 2), glm::vec3(size / 2)}, edgeLength));
+  Manifold cubeVoid(LevelSet(
+      CubeVoid(), {glm::vec3(-size / 2), glm::vec3(size / 2)}, edgeLength));
   Box bounds = cubeVoid.BoundingBox();
   const float precision = cubeVoid.Precision();
   if (options.exportModels) ExportMesh("cubeVoid.gltf", cubeVoid.GetMesh(), {});
@@ -69,14 +65,11 @@ TEST(SDF, Bounds) {
 }
 
 TEST(SDF, Surface) {
-  CubeVoid func;
-  const SDF<CubeVoid> voidSDF(func);
-
   const float size = 4;
   const float edgeLength = 0.5;
 
-  Manifold cubeVoid(voidSDF.LevelSet(
-      {glm::vec3(-size / 2), glm::vec3(size / 2)}, edgeLength));
+  Manifold cubeVoid(LevelSet(
+      CubeVoid(), {glm::vec3(-size / 2), glm::vec3(size / 2)}, edgeLength));
 
   Manifold cube = Manifold::Cube(glm::vec3(size), true);
   cube -= cubeVoid;

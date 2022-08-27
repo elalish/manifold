@@ -43,13 +43,10 @@ namespace manifold {
  * complex manifolds.
  */
 Manifold GyroidModule(float size, int n) {
-  Gyroid func;
-  const SDF<Gyroid> gyroidSDF(func);
-
   auto gyroid = [&](float level) {
     const float period = glm::two_pi<float>();
-    return Manifold(gyroidSDF.LevelSet({glm::vec3(-period), glm::vec3(period)},
-                                       period / n, level))
+    return Manifold(LevelSet(Gyroid(), {glm::vec3(-period), glm::vec3(period)},
+                             period / n, level))
         .Scale(glm::vec3(size / period));
   };
 

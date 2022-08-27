@@ -371,89 +371,68 @@ void RemoveUnreferencedVerts(VecDH<glm::vec3>& vertPos,
 /** @addtogroup Core
  *  @{
  */
+
+/**
+ * Constructs a level-set Mesh from the input Signed-Distance Function (SDF).
+ * This uses a form of Marching Tetrahedra (akin to Marching Cubes, but better
+ * for manifoldness). Instead of using a cubic grid, it uses a body-centered
+ * cubic grid (two shifted cubic grids). This means if your function's interior
+ * exceeds the given bounds, you will see a kind of egg-crate shape closing off
+ * the manifold, which is due to the underlying grid.
+ *
+ * @param sdf The signed-distance functor, containing this function signature:
+ * __host__ __device__ float operator()(glm::vec3 point), which returns the
+ * signed distance of a given point in R^3. Positive values are inside,
+ * negative outside. The __host__ __device__ is only needed if you compile for
+ * CUDA. If you are using a large grid, the advantage of a GPU speedup is
+ * quite significant.
+ * @param bounds An axis-aligned box that defines the extent of the grid.
+ * @param edgeLength Approximate maximum edge length of the triangles in the
+ * final result. This affects grid spacing, and hence has a strong effect on
+ * performance.
+ * @param level You can inset your Mesh by using a positive value, or outset
+ * it with a negative value.
+ * @return Mesh This class does not depend on Manifold, so it just returns a
+ * Mesh, but it is guaranteed to be manifold and so can always be used as
+ * input to the Manifold contructor for further operations.
+ */
 template <typename Func>
-class SDF {
- public:
-  /**
-   * Create a signed-distance function object, which can produce Manifold level
-   * sets.
-   *
-   * @param sdf The signed-distance functor, containing this function signature:
-   * __host__ __device__ float operator()(glm::vec3 point), which returns the
-   * signed distance of a given point in R^3. Positive values are inside,
-   * negative outside. The __host__ __device__ is only needed if you compile for
-   * CUDA. If you are using a large grid, the advantage of a GPU speedup is
-   * quite significant.
-   */
-  SDF(Func sdf) : sdf_{sdf} {}
+inline Mesh LevelSet(Func sdf, Box bounds, float edgeLength, float level = 0) {
+  Mesh out;
 
-  /**
-   * A convenience function for calling the given SDF on a single point.
-   *
-   * @param point
-   */
-  inline __host__ __device__ float operator()(glm::vec3 point) const {
-    return sdf_(point);
-  }
+  const glm::vec3 dim = bounds.Size();
+  const float maxDim = std::max(dim[0], std::max(dim[1], dim[2]));
+  const glm::ivec3 gridSize(dim / edgeLength);
+  const glm::vec3 spacing = dim / (glm::vec3(gridSize));
 
-  /**
-   * Constructs a level-set Mesh from the SDF. This uses a form of Marching
-   * Tetrahedra (akin to Marching Cubes, but better for manifoldness). Instead
-   * of using a cubic grid, it uses a body-centered cubic grid (two shifted
-   * cubic grids). This means if your function's interior exceeds the given
-   * bounds, you will see a kind of egg-crate shape closing off the manifold,
-   * which is due to the underlying grid.
-   *
-   * @param bounds An axis-aligned box that defines the extent of the grid.
-   * @param edgeLength Approximate maximum edge length of the triangles in the
-   * final result. This affects grid spacing, and hence has a strong effect on
-   * performance.
-   * @param level You can inset your Mesh by using a positive value, or outset
-   * it with a negative value.
-   * @return Mesh This class does not depend on Manifold, so it just returns a
-   * Mesh, but it is guaranteed to be manifold and so can always be used as
-   * input to the Manifold contructor for further operations.
-   */
-  inline Mesh LevelSet(Box bounds, float edgeLength, float level = 0) const {
-    Mesh out;
+  const int maxMorton = MortonCode(glm::ivec4(gridSize + 1, 1));
+  const auto policy = autoPolicy(maxMorton);
 
-    const glm::vec3 dim = bounds.Size();
-    const float maxDim = std::max(dim[0], std::max(dim[1], dim[2]));
-    const glm::ivec3 gridSize(dim / edgeLength);
-    const glm::vec3 spacing = dim / (glm::vec3(gridSize));
+  const int tableSize = glm::min(
+      2 * maxMorton, static_cast<int>(100 * glm::pow(maxMorton, 0.667)));
+  HashTable gridVerts(tableSize);
 
-    const int maxMorton = MortonCode(glm::ivec4(gridSize + 1, 1));
-    const auto policy = autoPolicy(maxMorton);
+  VecDH<glm::vec3> vertPos(gridVerts.Size() * 7);
+  VecDH<int> index(1, 0);
 
-    const int tableSize = glm::min(
-        2 * maxMorton, static_cast<int>(100 * glm::pow(maxMorton, 0.667)));
-    HashTable gridVerts(tableSize);
+  for_each_n(
+      policy, countAt(0), maxMorton + 1,
+      ComputeVerts<Func>({vertPos.ptrD(), index.ptrD(), gridVerts.D(), sdf,
+                          bounds.min, gridSize + 1, spacing, level}));
+  vertPos.resize(index[0]);
 
-    VecDH<glm::vec3> vertPos(gridVerts.Size() * 7);
-    VecDH<int> index(1, 0);
+  VecDH<glm::ivec3> triVerts(gridVerts.Entries() * 12);  // worst case
 
-    for_each_n(
-        policy, countAt(0), maxMorton + 1,
-        ComputeVerts<Func>({vertPos.ptrD(), index.ptrD(), gridVerts.D(), sdf_,
-                            bounds.min, gridSize + 1, spacing, level}));
-    vertPos.resize(index[0]);
+  index[0] = 0;
+  for_each_n(policy, countAt(0), gridVerts.Size(),
+             BuildTris({triVerts.ptrD(), index.ptrD(), gridVerts.D()}));
+  triVerts.resize(index[0]);
 
-    VecDH<glm::ivec3> triVerts(gridVerts.Entries() * 12);  // worst case
+  RemoveUnreferencedVerts(vertPos, triVerts);
 
-    index[0] = 0;
-    for_each_n(policy, countAt(0), gridVerts.Size(),
-               BuildTris({triVerts.ptrD(), index.ptrD(), gridVerts.D()}));
-    triVerts.resize(index[0]);
-
-    RemoveUnreferencedVerts(vertPos, triVerts);
-
-    out.vertPos.insert(out.vertPos.end(), vertPos.begin(), vertPos.end());
-    out.triVerts.insert(out.triVerts.end(), triVerts.begin(), triVerts.end());
-    return out;
-  }
-
- private:
-  const Func sdf_;
-};
+  out.vertPos.insert(out.vertPos.end(), vertPos.begin(), vertPos.end());
+  out.triVerts.insert(out.triVerts.end(), triVerts.begin(), triVerts.end());
+  return out;
+}
 /** @} */
 }  // namespace manifold
