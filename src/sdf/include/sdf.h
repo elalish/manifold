@@ -324,38 +324,37 @@ struct BuildTris {
     bool skipTet = thisVert.key == kOpen;
 
     tet[2] = thisVert.Inside();
-    int edges[6] = {base.edgeVerts[0], -1, -1, -1, -1, -1};
     for (const int i : {0, 1, 2}) {
-      edges[1] = base.edgeVerts[i + 1];
-      edges[4] = thisVert.edgeVerts[i + 4];
-      edges[5] = base.edgeVerts[Prev3(i) + 4];
-
       thisIndex = leadIndex;
       thisIndex[Prev3(i)] -= 1;
-      thisVert = gridVerts[MortonCode(thisIndex)];
+      GridVert nextVert = gridVerts[MortonCode(thisIndex)];
+      tet[3] = nextVert.Inside();
 
-      tet[3] = thisVert.Inside();
-      edges[2] = thisVert.edgeVerts[Next3(i) + 4];
-      edges[3] = thisVert.edgeVerts[Prev3(i) + 1];
-
-      if (!skipTet && thisVert.key != kOpen) CreateTris(tet, edges);
-      skipTet = thisVert.key == kOpen;
-
-      tet[2] = tet[3];
-      edges[1] = edges[5];
-      edges[2] = thisVert.edgeVerts[i + 4];
-      edges[4] = edges[3];
-      edges[5] = base.edgeVerts[Next3(i) + 1];
+      const int edges1[6] = {base.edgeVerts[0],
+                             base.edgeVerts[i + 1],
+                             nextVert.edgeVerts[Next3(i) + 4],
+                             nextVert.edgeVerts[Prev3(i) + 1],
+                             thisVert.edgeVerts[i + 4],
+                             base.edgeVerts[Prev3(i) + 4]};
+      thisVert = nextVert;
+      if (!skipTet && nextVert.key != kOpen) CreateTris(tet, edges1);
+      skipTet = nextVert.key == kOpen;
 
       thisIndex = baseIndex;
       thisIndex[Next3(i)] += 1;
-      thisVert = gridVerts[MortonCode(thisIndex)];
+      nextVert = gridVerts[MortonCode(thisIndex)];
+      tet[2] = tet[3];
+      tet[3] = nextVert.Inside();
 
-      tet[3] = thisVert.Inside();
-      edges[3] = thisVert.edgeVerts[Next3(i) + 4];
-
-      if (!skipTet && thisVert.key != kOpen) CreateTris(tet, edges);
-      skipTet = thisVert.key == kOpen;
+      const int edges2[6] = {base.edgeVerts[0],
+                             edges1[5],
+                             thisVert.edgeVerts[i + 4],
+                             nextVert.edgeVerts[Next3(i) + 4],
+                             edges1[3],
+                             base.edgeVerts[Next3(i) + 1]};
+      thisVert = nextVert;
+      if (!skipTet && nextVert.key != kOpen) CreateTris(tet, edges2);
+      skipTet = nextVert.key == kOpen;
 
       tet[2] = tet[3];
     }
