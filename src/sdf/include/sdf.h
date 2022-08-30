@@ -87,20 +87,13 @@ __host__ __device__ glm::ivec3 TetTri1(int i) {
 }
 
 __host__ __device__ glm::ivec4 Neighbors(int i) {
-  constexpr glm::ivec4 neighbors[14] = {{0, 0, 0, 1},     //
-                                        {1, 0, 0, 0},     //
-                                        {0, 1, 0, 0},     //
-                                        {0, 0, 1, 0},     //
-                                        {-1, 0, 0, 1},    //
-                                        {0, -1, 0, 1},    //
-                                        {0, 0, -1, 1},    //
-                                        {-1, -1, -1, 1},  //
-                                        {-1, 0, 0, 0},    //
-                                        {0, -1, 0, 0},    //
-                                        {0, 0, -1, 0},    //
-                                        {0, -1, -1, 1},   //
-                                        {-1, 0, -1, 1},   //
-                                        {-1, -1, 0, 1}};
+  constexpr glm::ivec4 neighbors[7] = {{0, 0, 0, 1},   //
+                                       {1, 0, 0, 0},   //
+                                       {0, 1, 0, 0},   //
+                                       {0, 0, 1, 0},   //
+                                       {-1, 0, 0, 1},  //
+                                       {0, -1, 0, 1},  //
+                                       {0, 0, -1, 1}};
   return neighbors[i];
 }
 
@@ -235,7 +228,7 @@ struct ComputeVerts {
     const float d = sdf(Position(gridIndex)) - level;
 
     const glm::ivec3 xyz(gridIndex);
-    const bool onLowerBound = glm::any(glm::equal(xyz, glm::ivec3(0)));
+    const bool onLowerBound = glm::any(glm::lessThanEqual(xyz, glm::ivec3(0)));
     const bool onUpperBound = glm::any(glm::greaterThanEqual(xyz, gridSize));
     const bool onHalfBound =
         gridIndex.w == 1 && glm::any(glm::greaterThanEqual(xyz, gridSize - 1));
@@ -256,7 +249,9 @@ struct ComputeVerts {
     gridVert.distance = BoundedSDF(gridIndex);
 
     bool keep = false;
-    for (int i = 0; i < 14; ++i) {
+    // These seven edges are uniquely owned by this gridVert; any of them
+    // which intersect the surface create a vert.
+    for (int i = 0; i < 7; ++i) {
       glm::ivec4 neighborIndex = gridIndex + Neighbors(i);
       if (neighborIndex.w == 2) {
         neighborIndex += 1;
@@ -266,15 +261,11 @@ struct ComputeVerts {
       if ((val > 0) == (gridVert.distance > 0)) continue;
       keep = true;
 
-      // These seven edges are uniquely owned by this gridVert; any of them
-      // which intersect the surface create a vert.
-      if (i < 7) {
-        const int idx = AtomicAdd(*vertIndex, 1);
-        vertPos[idx] =
-            (val * position - gridVert.distance * Position(neighborIndex)) /
-            (val - gridVert.distance);
-        gridVert.edgeVerts[i] = idx;
-      }
+      const int idx = AtomicAdd(*vertIndex, 1);
+      vertPos[idx] =
+          (val * position - gridVert.distance * Position(neighborIndex)) /
+          (val - gridVert.distance);
+      gridVert.edgeVerts[i] = idx;
     }
 
     if (keep && gridVerts.Insert(gridVert)) printf("out of space!\n");
@@ -322,13 +313,16 @@ struct BuildTris {
     thisIndex.x += 1;
 
     GridVert thisVert = gridVerts[MortonCode(thisIndex)];
-    bool skipTet = thisVert.key == kOpen;
 
     tet[2] = base.NeighborInside(1);
     for (const int i : {0, 1, 2}) {
       thisIndex = leadIndex;
-      thisIndex[Prev3(i)] -= 1;
-      GridVert nextVert = gridVerts[MortonCode(thisIndex)];
+      --thisIndex[Prev3(i)];
+      // MortonCodes take unsigned input, so check for negatives, given the
+      // decrement.
+      GridVert nextVert = thisIndex[Prev3(i)] < 0
+                              ? GridVert()
+                              : gridVerts[MortonCode(thisIndex)];
       tet[3] = base.NeighborInside(Prev3(i) + 4);
 
       const int edges1[6] = {base.edgeVerts[0],
@@ -338,11 +332,10 @@ struct BuildTris {
                              thisVert.edgeVerts[i + 4],
                              base.edgeVerts[Prev3(i) + 4]};
       thisVert = nextVert;
-      if (!skipTet && nextVert.key != kOpen) CreateTris(tet, edges1);
-      skipTet = nextVert.key == kOpen;
+      CreateTris(tet, edges1);
 
       thisIndex = baseIndex;
-      thisIndex[Next3(i)] += 1;
+      ++thisIndex[Next3(i)];
       nextVert = gridVerts[MortonCode(thisIndex)];
       tet[2] = tet[3];
       tet[3] = base.NeighborInside(Next3(i) + 1);
@@ -354,8 +347,7 @@ struct BuildTris {
                              edges1[3],
                              base.edgeVerts[Next3(i) + 1]};
       thisVert = nextVert;
-      if (!skipTet && nextVert.key != kOpen) CreateTris(tet, edges2);
-      skipTet = nextVert.key == kOpen;
+      CreateTris(tet, edges2);
 
       tet[2] = tet[3];
     }
@@ -427,8 +419,6 @@ inline Mesh LevelSet(Func sdf, Box bounds, float edgeLength, float level = 0) {
   for_each_n(policy, countAt(0), gridVerts.Size(),
              BuildTris({triVerts.ptrD(), index.ptrD(), gridVerts.D()}));
   triVerts.resize(index[0]);
-
-  RemoveUnreferencedVerts(vertPos, triVerts);
 
   out.vertPos.insert(out.vertPos.end(), vertPos.begin(), vertPos.end());
   out.triVerts.insert(out.triVerts.end(), triVerts.begin(), triVerts.end());

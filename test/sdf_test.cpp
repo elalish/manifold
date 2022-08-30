@@ -47,13 +47,14 @@ TEST(SDF, Bounds) {
   const float size = 4;
   const float edgeLength = 0.5;
 
-  Manifold cubeVoid(LevelSet(
-      CubeVoid(), {glm::vec3(-size / 2), glm::vec3(size / 2)}, edgeLength));
+  Mesh levelSet = LevelSet(
+      CubeVoid(), {glm::vec3(-size / 2), glm::vec3(size / 2)}, edgeLength);
+  Manifold cubeVoid(levelSet);
   Box bounds = cubeVoid.BoundingBox();
   const float precision = cubeVoid.Precision();
-  if (options.exportModels) ExportMesh("cubeVoid.gltf", cubeVoid.GetMesh(), {});
+  if (options.exportModels) ExportMesh("cubeVoid.gltf", levelSet, {});
 
-  EXPECT_TRUE(cubeVoid.IsManifold());
+  EXPECT_EQ(cubeVoid.Status(), Manifold::Error::NO_ERROR);
   EXPECT_EQ(cubeVoid.Genus(), -1);
   const float outerBound = size / 2 + edgeLength / 2;
   EXPECT_NEAR(bounds.min.x, -outerBound, precision);
@@ -77,7 +78,7 @@ TEST(SDF, Surface) {
   const float precision = cube.Precision();
   if (options.exportModels) ExportMesh("cube.gltf", cube.GetMesh(), {});
 
-  EXPECT_TRUE(cube.IsManifold());
+  EXPECT_EQ(cubeVoid.Status(), Manifold::Error::NO_ERROR);
   EXPECT_EQ(cube.Genus(), 0);
   auto prop = cube.GetProperties();
   EXPECT_NEAR(prop.volume, 8, 0.001);
