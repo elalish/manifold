@@ -153,19 +153,19 @@ class HashTableD {
 
   __host__ __device__ int Size() const { return table_.size(); }
 
-  __host__ __device__ bool Insert(const GridVert& vert) {
+  __host__ __device__ bool Full() const { return used_[0] * 2 > Size(); }
+
+  __host__ __device__ void Insert(const GridVert& vert) {
     uint32_t idx = vert.key & (Size() - 1);
     while (1) {
       Uint64& key = table_[idx].key;
       const Uint64 found = AtomicCAS(key, kOpen, vert.key);
       if (found == kOpen) {
-        if (AtomicAdd(used_[0], 0x1u) * 2 > Size()) {
-          return true;
-        }
+        AtomicAdd(used_[0], 0x1u);
         table_[idx] = vert;
-        return false;
+        return;
       }
-      if (found == vert.key) return false;
+      if (found == vert.key) return;
       idx = (idx + step_) & (Size() - 1);
     }
   }
@@ -182,7 +182,7 @@ class HashTableD {
   __host__ __device__ GridVert At(int idx) const { return table_[idx]; }
 
  private:
-  const uint32_t step_;
+  uint32_t step_;
   VecD<GridVert> table_;
   VecD<uint32_t> used_;
 };
@@ -198,9 +198,9 @@ class HashTable {
 
   int Size() const { return table_.Size(); }
 
-  float FilledFraction() const {
-    return static_cast<float>(used_[0]) / table_.Size();
-  }
+  bool Full() const { return used_[0] * 2 > Size(); }
+
+  float FilledFraction() const { return static_cast<float>(used_[0]) / Size(); }
 
  private:
   VecDH<GridVert> alloc_;
@@ -238,6 +238,8 @@ struct ComputeVerts {
   }
 
   inline __host__ __device__ void operator()(Uint64 mortonCode) {
+    if (gridVerts.Full()) return;
+
     const glm::ivec4 gridIndex = DecodeMorton(mortonCode);
 
     if (glm::any(glm::greaterThan(glm::ivec3(gridIndex), gridSize))) return;
@@ -268,7 +270,7 @@ struct ComputeVerts {
       gridVert.edgeVerts[i] = idx;
     }
 
-    if (keep && gridVerts.Insert(gridVert)) printf("out of space!\n");
+    if (keep) gridVerts.Insert(gridVert);
   }
 };
 
@@ -394,25 +396,41 @@ inline Mesh LevelSet(Func sdf, Box bounds, float edgeLength, float level = 0) {
   const glm::ivec3 gridSize(dim / edgeLength);
   const glm::vec3 spacing = dim / (glm::vec3(gridSize));
 
-  const int maxMorton = MortonCode(glm::ivec4(gridSize + 1, 1));
+  const Uint64 maxMorton = MortonCode(glm::ivec4(gridSize + 1, 1));
   const auto policy = autoPolicy(maxMorton);
 
-  const int tableSize = glm::min(
-      2 * maxMorton, static_cast<int>(100 * glm::pow(maxMorton, 0.667)));
+  int tableSize = glm::min(
+      2 * maxMorton, static_cast<Uint64>(100 * glm::pow(maxMorton, 0.667)));
   HashTable gridVerts(tableSize);
-
   VecDH<glm::vec3> vertPos(gridVerts.Size() * 7);
-  VecDH<int> index(1, 0);
 
-  for_each_n(
-      policy, countAt(0), maxMorton + 1,
-      ComputeVerts<Func>({vertPos.ptrD(), index.ptrD(), gridVerts.D(), sdf,
-                          bounds.min, gridSize + 1, spacing, level}));
-  vertPos.resize(index[0]);
+  while (1) {
+    VecDH<int> index(1, 0);
+    for_each_n(
+        policy, countAt(0), maxMorton + 1,
+        ComputeVerts<Func>({vertPos.ptrD(), index.ptrD(), gridVerts.D(), sdf,
+                            bounds.min, gridSize + 1, spacing, level}));
+
+    if (gridVerts.Full()) {  // Resize HashTable
+      const glm::vec3 lastVert = vertPos[index[0] - 1];
+      const Uint64 lastMorton =
+          MortonCode(glm::ivec4((lastVert - bounds.min) / spacing, 1));
+      const float ratio = static_cast<float>(maxMorton) / lastMorton;
+      if (ratio > 1000)  // do not trust the ratio if it is too large
+        tableSize *= 2;
+      else
+        tableSize *= 2 * ratio;
+      gridVerts = HashTable(tableSize);
+      vertPos = VecDH<glm::vec3>(gridVerts.Size() * 7);
+    } else {  // Success
+      vertPos.resize(index[0]);
+      break;
+    }
+  }
 
   VecDH<glm::ivec3> triVerts(gridVerts.Entries() * 12);  // worst case
 
-  index[0] = 0;
+  VecDH<int> index(1, 0);
   for_each_n(policy, countAt(0), gridVerts.Size(),
              BuildTris({triVerts.ptrD(), index.ptrD(), gridVerts.D()}));
   triVerts.resize(index[0]);

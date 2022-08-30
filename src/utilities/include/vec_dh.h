@@ -439,7 +439,7 @@ class VecD {
 
  private:
   T *ptr_;
-  const int size_;
+  int size_;
 };
 /** @} */
 }  // namespace manifold
