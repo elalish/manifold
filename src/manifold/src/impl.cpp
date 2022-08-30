@@ -295,8 +295,9 @@ namespace manifold {
 std::atomic<int> Manifold::Impl::meshIDCounter_(1);
 
 /**
- * Create a manifold from an input triangle Mesh. Will throw if the Mesh is not
- * manifold. TODO: update halfedgeTangent during SimplifyTopology.
+ * Create a manifold from an input triangle Mesh. Will return an empty Manifold
+ * and set an Error Status if the Mesh is not manifold or otherwise invalid.
+ * TODO: update halfedgeTangent during SimplifyTopology.
  */
 Manifold::Impl::Impl(const Mesh& mesh,
                      const std::vector<glm::ivec3>& triProperties,

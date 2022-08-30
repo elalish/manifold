@@ -96,7 +96,6 @@ struct SwappableEdge {
     glm::vec2 v[3];
     for (int i : {0, 1, 2})
       v[i] = projection * vertPos[halfedge[triedge[i]].startVert];
-    // if (CCW(v[0], v[1], v[2], precision) < 0) printf("tri %d is CW!\n", tri);
     if (CCW(v[0], v[1], v[2], precision) > 0 || !Is01Longest(v[0], v[1], v[2]))
       return false;
 

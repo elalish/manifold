@@ -30,7 +30,9 @@ namespace {
 __host__ __device__ glm::vec2 Interpolate(glm::vec3 pL, glm::vec3 pR, float x) {
   float dxL = x - pL.x;
   float dxR = x - pR.x;
+#ifdef MANIFOLD_DEBUG
   if (dxL * dxR > 0) printf("Not in domain!\n");
+#endif
   bool useL = fabs(dxL) < fabs(dxR);
   float lambda = (useL ? dxL : dxR) / (pR.x - pL.x);
   if (!isfinite(lambda)) return glm::vec2(pL.y, pL.z);
@@ -46,7 +48,9 @@ __host__ __device__ glm::vec4 Intersect(const glm::vec3 &pL,
                                         const glm::vec3 &qR) {
   float dyL = qL.y - pL.y;
   float dyR = qR.y - pR.y;
+#ifdef MANIFOLD_DEBUG
   if (dyL * dyR > 0) printf("No intersection!\n");
+#endif
   bool useL = fabs(dyL) < fabs(dyR);
   float dx = pR.x - pL.x;
   float lambda = (useL ? dyL : dyR) / (dyL - dyR);
@@ -102,6 +106,17 @@ __host__ __device__ bool Shadows(float p, float q, float dir) {
   return p == q ? dir < 0 : p < q;
 }
 
+/**
+ * Since this function is called from two different places, it is necessary that
+ * it returns identical results for identical input to keep consistency.
+ * Normally this is trivial as computers make floating-point errors, but are
+ * at least deterministic. However, in the case of CUDA, these functions can be
+ * compiled by two different compilers (for the CPU and GPU). We have found that
+ * the different compilers can cause slightly different rounding errors, so it
+ * is critical that the two places this function is called both use the same
+ * compiled function (they must agree on CPU or GPU). This is now taken care of
+ * by the shared policy_ member.
+ */
 __host__ __device__ thrust::pair<int, glm::vec2> Shadow01(
     const int p0, const int q1, const glm::vec3 *vertPosP,
     const glm::vec3 *vertPosQ, const Halfedge *halfedgeQ, const float expandP,
@@ -218,11 +233,12 @@ struct Kernel11 {
     if (s11 == 0) {  // No intersection
       xyzz11 = glm::vec4(NAN);
     } else {
+#ifdef MANIFOLD_DEBUG
       // Assert left and right were both found
       if (k != 2) {
         printf("k = %d\n", k);
       }
-
+#endif
       xyzz11 = Intersect(pRL[0], pRL[1], qRL[0], qRL[1]);
 
       const int p1s = halfedgeP[p1].startVert;
@@ -316,11 +332,12 @@ struct Kernel02 {
     if (s02 == 0) {  // No intersection
       z02 = NAN;
     } else {
+#ifdef MANIFOLD_DEBUG
       // Assert left and right were both found
       if (k != 2) {
         printf("k = %d\n", k);
       }
-
+#endif
       glm::vec3 vertPos = vertPosP[p0];
       z02 = Interpolate(yzzRL[0], yzzRL[1], vertPos.y)[1];
       if (forward) {
@@ -433,10 +450,12 @@ struct Kernel12 {
     if (x12 == 0) {  // No intersection
       v12 = glm::vec3(NAN);
     } else {
+#ifdef MANIFOLD_DEBUG
       // Assert left and right were both found
       if (k != 2) {
         printf("k = %d\n", k);
       }
+#endif
       const glm::vec4 xzyy =
           Intersect(xzyLR0[0], xzyLR0[1], xzyLR1[0], xzyLR1[1]);
       v12.x = xzyy[0];
