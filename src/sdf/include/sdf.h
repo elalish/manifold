@@ -357,9 +357,6 @@ struct BuildTris {
 
 namespace manifold {
 
-void RemoveUnreferencedVerts(VecDH<glm::vec3>& vertPos,
-                             VecDH<glm::ivec3>& triVerts);
-
 /** @addtogroup Core
  *  @{
  */

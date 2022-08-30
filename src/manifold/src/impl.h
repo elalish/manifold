@@ -59,6 +59,7 @@ struct Manifold::Impl {
       const std::vector<float>& properties = std::vector<float>(),
       const std::vector<float>& propertyTolerance = std::vector<float>());
 
+  void RemoveUnreferencedVerts(VecDH<glm::ivec3>& triVerts);
   void ReinitializeReference(int meshID);
   void CreateHalfedges(const VecDH<glm::ivec3>& triVerts);
   void CalculateNormals();

@@ -14,18 +14,11 @@
 
 project(sdf)
 
-file(GLOB_RECURSE SOURCE_FILES CONFIGURE_DEPENDS *.cpp)
-add_library(${PROJECT_NAME} ${SOURCE_FILES})
+add_library(${PROJECT_NAME} INTERFACE)
 
-if(MANIFOLD_USE_CUDA)
-    set_source_files_properties(${SOURCE_FILES} PROPERTIES LANGUAGE CUDA)
-    set_property(TARGET ${PROJECT_NAME} PROPERTY CUDA_ARCHITECTURES 61)
-endif()
-
-target_include_directories(${PROJECT_NAME} PUBLIC ${PROJECT_SOURCE_DIR}/include)
-target_link_libraries(${PROJECT_NAME} PUBLIC utilities)
-
-target_compile_features(${PROJECT_NAME}
-    PUBLIC cxx_std_14
-    PRIVATE cxx_std_17
+target_include_directories(${PROJECT_NAME}
+    INTERFACE
+    ${PROJECT_SOURCE_DIR}/include
 )
+
+target_link_libraries(${PROJECT_NAME} INTERFACE utilities)
