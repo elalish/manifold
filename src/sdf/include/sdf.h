@@ -400,7 +400,7 @@ inline Mesh LevelSet(Func sdf, Box bounds, float edgeLength, float level = 0) {
   const auto policy = autoPolicy(maxMorton);
 
   int tableSize = glm::min(
-      2 * maxMorton, static_cast<Uint64>(100 * glm::pow(maxMorton, 0.667)));
+      2 * maxMorton, static_cast<Uint64>(10 * glm::pow(maxMorton, 0.667)));
   HashTable gridVerts(tableSize);
   VecDH<glm::vec3> vertPos(gridVerts.Size() * 7);
 
@@ -419,7 +419,7 @@ inline Mesh LevelSet(Func sdf, Box bounds, float edgeLength, float level = 0) {
       if (ratio > 1000)  // do not trust the ratio if it is too large
         tableSize *= 2;
       else
-        tableSize *= 2 * ratio;
+        tableSize *= ratio;
       gridVerts = HashTable(tableSize);
       vertPos = VecDH<glm::vec3>(gridVerts.Size() * 7);
     } else {  // Success

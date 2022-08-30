@@ -30,6 +30,13 @@ struct CubeVoid {
   }
 };
 
+struct Layers {
+  __host__ __device__ float operator()(glm::vec3 p) const {
+    int a = glm::mod(glm::round(2 * p.z), 4.0f);
+    return a == 0 ? 1 : (a == 2 ? -1 : 0);
+  }
+};
+
 TEST(SDF, CubeVoid) {
   CubeVoid voidSDF;
 
@@ -89,4 +96,13 @@ TEST(SDF, Surface) {
   EXPECT_NEAR(bounds.max.x, 1, precision);
   EXPECT_NEAR(bounds.max.y, 1, precision);
   EXPECT_NEAR(bounds.max.z, 1, precision);
+}
+
+TEST(SDF, Resize) {
+  const float size = 20;
+  Manifold layers(LevelSet(Layers(), {glm::vec3(0), glm::vec3(size)}, 1));
+  if (options.exportModels) ExportMesh("layers.gltf", layers.GetMesh(), {});
+
+  EXPECT_EQ(layers.Status(), Manifold::Error::NO_ERROR);
+  EXPECT_EQ(layers.Genus(), -8);
 }
