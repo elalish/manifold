@@ -82,9 +82,9 @@ CsgLeafNode& Manifold::GetCsgLeafNode() const {
 }
 
 /**
- * Convert a Mesh into a Manifold. Will throw a topologyErr exception if the
- * input is not an oriented 2-manifold. Will collapse degenerate triangles and
- * unnecessary vertices.
+ * Convert a Mesh into a Manifold. Will return an empty Manifold
+ * and set an Error Status if the Mesh is not an oriented 2-manifold. Will
+ * collapse degenerate triangles and unnecessary vertices.
  *
  * The three optional inputs should all be specified if any are. These define
  * any properties you may have on this mesh. These properties are not saved in

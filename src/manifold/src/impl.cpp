@@ -137,6 +137,26 @@ struct LinkHalfedges {
   }
 };
 
+struct MarkVerts {
+  int* vert;
+
+  __host__ __device__ void operator()(glm::ivec3 triVerts) {
+    for (int i : {0, 1, 2}) {
+      vert[triVerts[i]] = 1;
+    }
+  }
+};
+
+struct ReindexTriVerts {
+  const int* old2new;
+
+  __host__ __device__ void operator()(glm::ivec3& triVerts) {
+    for (int i : {0, 1, 2}) {
+      triVerts[i] = old2new[triVerts[i]];
+    }
+  }
+};
+
 struct InitializeBaryRef {
   const int meshID;
   const Halfedge* halfedge;
@@ -275,29 +295,28 @@ namespace manifold {
 std::atomic<int> Manifold::Impl::meshIDCounter_(1);
 
 /**
- * Create a manifold from an input triangle Mesh. Will throw if the Mesh is not
- * manifold. TODO: update halfedgeTangent during SimplifyTopology.
+ * Create a manifold from an input triangle Mesh. Will return an empty Manifold
+ * and set an Error Status if the Mesh is not manifold or otherwise invalid.
+ * TODO: update halfedgeTangent during SimplifyTopology.
  */
 Manifold::Impl::Impl(const Mesh& mesh,
                      const std::vector<glm::ivec3>& triProperties,
                      const std::vector<float>& properties,
                      const std::vector<float>& propertyTolerance)
     : vertPos_(mesh.vertPos), halfedgeTangent_(mesh.halfedgeTangent) {
-#ifdef MANIFOLD_DEBUG
-  CheckDevice();
-#endif
+  VecDH<glm::ivec3> triVerts = mesh.triVerts;
+  if (!IsIndexInBounds(triVerts)) {
+    MarkFailure(Error::VERTEX_INDEX_OUT_OF_BOUNDS);
+    return;
+  }
+  RemoveUnreferencedVerts(triVerts);
+
   CalculateBBox();
   if (!IsFinite()) {
     MarkFailure(Error::NON_FINITE_VERTEX);
     return;
   }
   SetPrecision();
-
-  VecDH<glm::ivec3> triVerts = mesh.triVerts;
-  if (!IsIndexInBounds(triVerts)) {
-    MarkFailure(Error::VERTEX_INDEX_OUT_OF_BOUNDS);
-    return;
-  }
 
   CreateHalfedges(triVerts);
   if (!IsManifold()) {
@@ -360,6 +379,26 @@ Manifold::Impl::Impl(Shape shape) {
   CreateHalfedges(triVerts);
   Finish();
   InitializeNewReference();
+}
+
+void Manifold::Impl::RemoveUnreferencedVerts(VecDH<glm::ivec3>& triVerts) {
+  VecDH<int> vertOld2New(NumVert() + 1, 0);
+  auto policy = autoPolicy(NumVert());
+  for_each(policy, triVerts.cbegin(), triVerts.cend(),
+           MarkVerts({vertOld2New.ptrD() + 1}));
+
+  const VecDH<glm::vec3> oldVertPos = vertPos_;
+  vertPos_.resize(copy_if<decltype(vertPos_.begin())>(
+                      policy, oldVertPos.cbegin(), oldVertPos.cend(),
+                      vertOld2New.cbegin() + 1, vertPos_.begin(),
+                      thrust::identity<int>()) -
+                  vertPos_.begin());
+
+  inclusive_scan(policy, vertOld2New.begin() + 1, vertOld2New.end(),
+                 vertOld2New.begin() + 1);
+
+  for_each(policy, triVerts.begin(), triVerts.end(),
+           ReindexTriVerts({vertOld2New.cptrD()}));
 }
 
 void Manifold::Impl::ReinitializeReference(int meshID) {

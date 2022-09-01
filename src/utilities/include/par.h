@@ -41,12 +41,7 @@
 
 namespace manifold {
 
-void check_cuda_available();
-#ifdef MANIFOLD_USE_CUDA
-extern int CUDA_ENABLED;
-#else
-constexpr int CUDA_ENABLED = 0;
-#endif
+bool CudaEnabled();
 
 enum class ExecutionPolicy {
   ParUnseq,
@@ -67,7 +62,7 @@ inline ExecutionPolicy autoPolicy(int size) {
   if (size <= (1 << 12)) {
     return Seq;
   }
-  if (size <= (1 << 16) || CUDA_ENABLED != 1) {
+  if (size <= (1 << 16) || !CudaEnabled()) {
     return Par;
   }
   return ParUnseq;

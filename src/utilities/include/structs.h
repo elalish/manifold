@@ -309,6 +309,14 @@ struct Box {
   }
 
   /**
+   * Does this box contain (includes equal) the given point?
+   */
+  HOST_DEVICE bool Contains(const glm::vec3& p) const {
+    return glm::all(glm::greaterThanEqual(p, min)) &&
+           glm::all(glm::greaterThanEqual(max, p));
+  }
+
+  /**
    * Does this box contain (includes equal) the given box?
    */
   HOST_DEVICE bool Contains(const Box& box) const {

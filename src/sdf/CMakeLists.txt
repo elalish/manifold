@@ -12,9 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_subdirectory(third_party)
-add_subdirectory(utilities)
-add_subdirectory(collider)
-add_subdirectory(polygon)
-add_subdirectory(manifold)
-add_subdirectory(sdf)
+project(sdf)
+
+add_library(${PROJECT_NAME} INTERFACE)
+
+target_include_directories(${PROJECT_NAME}
+    INTERFACE
+    ${PROJECT_SOURCE_DIR}/include
+)
+
+target_link_libraries(${PROJECT_NAME} INTERFACE utilities)

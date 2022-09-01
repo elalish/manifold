@@ -69,7 +69,7 @@ __host__ __device__ int Leaf2Node(int leaf) { return leaf * 2; }
 struct CreateRadixTree {
   int* nodeParent_;
   thrust::pair<int, int>* internalChildren_;
-  const VecD<uint32_t> leafMorton_;
+  const VecDc<uint32_t> leafMorton_;
 
   __host__ __device__ int PrefixLength(uint32_t a, uint32_t b) const {
 // count-leading-zeros is used to find the number of identical highest-order
