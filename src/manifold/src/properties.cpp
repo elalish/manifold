@@ -205,6 +205,7 @@ struct CheckCCW {
     int ccw = CCW(v[0], v[1], v[2], glm::abs(tol));
     bool check = tol > 0 ? ccw >= 0 : ccw == 0;
 
+#ifdef MANIFOLD_DEBUG
     if (tol > 0 && !check) {
       glm::vec2 v1 = v[1] - v[0];
       glm::vec2 v2 = v[2] - v[0];
@@ -225,6 +226,7 @@ struct CheckCCW {
           norm.y, norm.z, halfedges[3 * face].startVert,
           halfedges[3 * face + 1].startVert, halfedges[3 * face + 2].startVert);
     }
+#endif
     return check;
   }
 };

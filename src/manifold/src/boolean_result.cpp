@@ -76,13 +76,10 @@ std::tuple<VecDH<int>, VecDH<int>> SizeOutput(
     Manifold::Impl &outR, const Manifold::Impl &inP, const Manifold::Impl &inQ,
     const VecDH<int> &i03, const VecDH<int> &i30, const VecDH<int> &i12,
     const VecDH<int> &i21, const SparseIndices &p1q2, const SparseIndices &p2q1,
-    bool invertQ) {
+    bool invertQ, ExecutionPolicy policy) {
   VecDH<int> sidesPerFacePQ(inP.NumTri() + inQ.NumTri(), 0);
   auto sidesPerFaceP = sidesPerFacePQ.ptrD();
   auto sidesPerFaceQ = sidesPerFacePQ.ptrD() + inP.NumTri();
-
-  auto policy =
-      autoPolicy(std::max(inP.halfedge_.size(), inQ.halfedge_.size()));
 
   for_each(policy, inP.halfedge_.begin(), inP.halfedge_.end(),
            CountVerts({sidesPerFaceP, i03.cptrD()}));
@@ -403,9 +400,9 @@ struct DuplicateHalfedges {
 void AppendWholeEdges(Manifold::Impl &outR, VecDH<int> &facePtrR,
                       VecDH<Ref> &halfedgeRef, const Manifold::Impl &inP,
                       const VecDH<char> wholeHalfedgeP, const VecDH<int> &i03,
-                      const VecDH<int> &vP2R, const int *faceP2R,
-                      bool forward) {
-  for_each_n(autoPolicy(inP.halfedge_.size()),
+                      const VecDH<int> &vP2R, const int *faceP2R, bool forward,
+                      ExecutionPolicy policy) {
+  for_each_n(policy,
              zip(wholeHalfedgeP.begin(), inP.halfedge_.begin(), countAt(0)),
              inP.halfedge_.size(),
              DuplicateHalfedges({outR.halfedge_.ptrD(), halfedgeRef.ptrD(),
@@ -483,7 +480,7 @@ struct CreateBarycentric {
 std::pair<VecDH<BaryRef>, VecDH<int>> CalculateMeshRelation(
     Manifold::Impl &outR, const VecDH<Ref> &halfedgeRef,
     const Manifold::Impl &inP, const Manifold::Impl &inQ, int firstNewVert,
-    int numFaceR, bool invertQ) {
+    int numFaceR, bool invertQ, ExecutionPolicy policy) {
   outR.meshRelation_.barycentric.resize(outR.halfedge_.size());
   VecDH<BaryRef> faceRef(numFaceR);
   VecDH<int> halfedgeBary(halfedgeRef.size());
@@ -491,7 +488,7 @@ std::pair<VecDH<BaryRef>, VecDH<int>> CalculateMeshRelation(
   const int offsetQ = Manifold::Impl::meshIDCounter_;
   VecDH<int> idx(1, 0);
   for_each_n(
-      autoPolicy(halfedgeRef.size()),
+      policy,
       zip(halfedgeBary.begin(), halfedgeRef.begin(), outR.halfedge_.cbegin()),
       halfedgeRef.size(),
       CreateBarycentric(
@@ -540,28 +537,26 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
   VecDH<int> i21(x21_.size());
   VecDH<int> i03(w03_.size());
   VecDH<int> i30(w30_.size());
-  auto policy = autoPolicy(std::max(std::max(x12_.size(), x21_.size()),
-                                    std::max(w03_.size(), w30_.size())));
 
-  transform(policy, x12_.begin(), x12_.end(), i12.begin(), c3 * _1);
-  transform(policy, x21_.begin(), x21_.end(), i21.begin(), c3 * _1);
-  transform(policy, w03_.begin(), w03_.end(), i03.begin(), c1 + c3 * _1);
-  transform(policy, w30_.begin(), w30_.end(), i30.begin(), c2 + c3 * _1);
+  transform(policy_, x12_.begin(), x12_.end(), i12.begin(), c3 * _1);
+  transform(policy_, x21_.begin(), x21_.end(), i21.begin(), c3 * _1);
+  transform(policy_, w03_.begin(), w03_.end(), i03.begin(), c1 + c3 * _1);
+  transform(policy_, w30_.begin(), w30_.end(), i30.begin(), c2 + c3 * _1);
 
   VecDH<int> vP2R(inP_.NumVert());
-  exclusive_scan(policy, i03.begin(), i03.end(), vP2R.begin(), 0, AbsSum());
+  exclusive_scan(policy_, i03.begin(), i03.end(), vP2R.begin(), 0, AbsSum());
   int numVertR = AbsSum()(vP2R.back(), i03.back());
   const int nPv = numVertR;
 
   VecDH<int> vQ2R(inQ_.NumVert());
-  exclusive_scan(policy, i30.begin(), i30.end(), vQ2R.begin(), numVertR,
+  exclusive_scan(policy_, i30.begin(), i30.end(), vQ2R.begin(), numVertR,
                  AbsSum());
   numVertR = AbsSum()(vQ2R.back(), i30.back());
   const int nQv = numVertR - nPv;
 
   VecDH<int> v12R(v12_.size());
   if (v12_.size() > 0) {
-    exclusive_scan(policy, i12.begin(), i12.end(), v12R.begin(), numVertR,
+    exclusive_scan(policy_, i12.begin(), i12.end(), v12R.begin(), numVertR,
                    AbsSum());
     numVertR = AbsSum()(v12R.back(), i12.back());
   }
@@ -569,7 +564,7 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
 
   VecDH<int> v21R(v21_.size());
   if (v21_.size() > 0) {
-    exclusive_scan(policy, i21.begin(), i21.end(), v21R.begin(), numVertR,
+    exclusive_scan(policy_, i21.begin(), i21.end(), v21R.begin(), numVertR,
                    AbsSum());
     numVertR = AbsSum()(v21R.back(), i21.back());
   }
@@ -585,14 +580,14 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
   outR.vertPos_.resize(numVertR);
   // Add vertices, duplicating for inclusion numbers not in [-1, 1].
   // Retained vertices from P and Q:
-  for_each_n(policy, zip(i03.begin(), vP2R.begin(), inP_.vertPos_.begin()),
+  for_each_n(policy_, zip(i03.begin(), vP2R.begin(), inP_.vertPos_.begin()),
              inP_.NumVert(), DuplicateVerts({outR.vertPos_.ptrD()}));
-  for_each_n(policy, zip(i30.begin(), vQ2R.begin(), inQ_.vertPos_.begin()),
+  for_each_n(policy_, zip(i30.begin(), vQ2R.begin(), inQ_.vertPos_.begin()),
              inQ_.NumVert(), DuplicateVerts({outR.vertPos_.ptrD()}));
   // New vertices created from intersections:
-  for_each_n(policy, zip(i12.begin(), v12R.begin(), v12_.begin()), i12.size(),
+  for_each_n(policy_, zip(i12.begin(), v12R.begin(), v12_.begin()), i12.size(),
              DuplicateVerts({outR.vertPos_.ptrD()}));
-  for_each_n(policy, zip(i21.begin(), v21R.begin(), v21_.begin()), i21.size(),
+  for_each_n(policy_, zip(i21.begin(), v21R.begin(), v21_.begin()), i21.size(),
              DuplicateVerts({outR.vertPos_.ptrD()}));
 
   PRINT(nPv << " verts from inP");
@@ -617,8 +612,8 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
   // Level 4
   VecDH<int> faceEdge;
   VecDH<int> facePQ2R;
-  std::tie(faceEdge, facePQ2R) =
-      SizeOutput(outR, inP_, inQ_, i03, i30, i12, i21, p1q2_, p2q1_, invertQ);
+  std::tie(faceEdge, facePQ2R) = SizeOutput(
+      outR, inP_, inQ_, i03, i30, i12, i21, p1q2_, p2q1_, invertQ, policy_);
 
   const int numFaceR = faceEdge.size() - 1;
   // This gets incremented for each halfedge that's added to a face so that the
@@ -640,14 +635,14 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
                  inP_.NumTri());
 
   AppendWholeEdges(outR, facePtrR, halfedgeRef, inP_, wholeHalfedgeP, i03, vP2R,
-                   facePQ2R.cptrD(), true);
+                   facePQ2R.cptrD(), true, policy_);
   AppendWholeEdges(outR, facePtrR, halfedgeRef, inQ_, wholeHalfedgeQ, i30, vQ2R,
-                   facePQ2R.cptrD() + inP_.NumTri(), false);
+                   facePQ2R.cptrD() + inP_.NumTri(), false, policy_);
 
   VecDH<BaryRef> faceRef;
   VecDH<int> halfedgeBary;
   std::tie(faceRef, halfedgeBary) = CalculateMeshRelation(
-      outR, halfedgeRef, inP_, inQ_, nPv + nQv, numFaceR, invertQ);
+      outR, halfedgeRef, inP_, inQ_, nPv + nQv, numFaceR, invertQ, policy_);
 
 #ifdef MANIFOLD_DEBUG
   assemble.Stop();
