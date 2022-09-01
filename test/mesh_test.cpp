@@ -15,10 +15,13 @@
 #include <random>
 
 #include "manifold.h"
-#include "meshIO.h"
 #include "polygon.h"
 #include "sdf.h"
 #include "test.h"
+
+#ifdef MANIFOLD_EXPORT
+#include "meshIO.h"
+#endif
 
 namespace {
 
@@ -376,7 +379,9 @@ TEST(Manifold, Smooth) {
   EXPECT_NEAR(prop.volume, 17.38, 0.1);
   EXPECT_NEAR(prop.surfaceArea, 33.38, 0.1);
 
+#ifdef MANIFOLD_EXPORT
   if (options.exportModels) ExportMesh("smoothTet.glb", smooth.GetMesh(), {});
+#endif
 }
 
 TEST(Manifold, SmoothSphere) {
@@ -416,6 +421,7 @@ TEST(Manifold, ManualSmooth) {
   EXPECT_NEAR(prop.volume, 3.53, 0.01);
   EXPECT_NEAR(prop.surfaceArea, 11.39, 0.01);
 
+#ifdef MANIFOLD_EXPORT
   if (options.exportModels) {
     const Mesh out = interp.GetMesh();
     ExportOptions options;
@@ -436,6 +442,7 @@ TEST(Manifold, ManualSmooth) {
     }
     ExportMesh("sharpenedSphere.glb", out, options);
   }
+#endif
 }
 
 TEST(Manifold, Csaszar) {
@@ -446,6 +453,7 @@ TEST(Manifold, Csaszar) {
   EXPECT_NEAR(prop.volume, 84699, 10);
   EXPECT_NEAR(prop.surfaceArea, 14796, 10);
 
+#ifdef MANIFOLD_EXPORT
   if (options.exportModels) {
     const Mesh out = csaszar.GetMesh();
     ExportOptions options;
@@ -466,6 +474,7 @@ TEST(Manifold, Csaszar) {
     }
     ExportMesh("smoothCsaszar.glb", out, options);
   }
+#endif
 }
 
 /**
@@ -567,7 +576,9 @@ TEST(Manifold, MeshRelation) {
   input.push_back(gyroidMesh);
   Manifold gyroid(input[0]);
 
+#ifdef MANIFOLD_EXPORT
   if (options.exportModels) ExportMesh("gyroid.glb", gyroid.GetMesh(), {});
+#endif
 
   int meshID = gyroid.OriginalID();
   EXPECT_GE(meshID, 0);
@@ -650,7 +661,9 @@ TEST(Boolean, Coplanar) {
   EXPECT_EQ(out.NumDegenerateTris(), 0);
   EXPECT_EQ(out.Genus(), 1);
 
+#ifdef MANIFOLD_EXPORT
   if (options.exportModels) ExportMesh("coplanar.glb", out.GetMesh(), {});
+#endif
 
   RelatedOp(cylinder, cylinder2, out);
 }
@@ -676,7 +689,9 @@ TEST(Boolean, FaceUnion) {
   EXPECT_NEAR(prop.volume, 2, 1e-5);
   EXPECT_NEAR(prop.surfaceArea, 10, 1e-5);
 
+#ifdef MANIFOLD_EXPORT
   if (options.exportModels) ExportMesh("faceUnion.glb", cubes.GetMesh(), {});
+#endif
 }
 
 TEST(Boolean, EdgeUnion) {
@@ -859,7 +874,9 @@ TEST(Boolean, MeshRelation) {
   EXPECT_LE(gyroid.NumDegenerateTris(), 0);
   Manifold result = gyroid + gyroid2;
 
+#ifdef MANIFOLD_EXPORT
   if (options.exportModels) ExportMesh("gyroidUnion.glb", result.GetMesh(), {});
+#endif
 
   EXPECT_TRUE(result.IsManifold());
   EXPECT_TRUE(result.MatchesTriNormals());
@@ -985,7 +1002,9 @@ TEST(Boolean, Cubes) {
   EXPECT_NEAR(prop.volume, 1.6, 0.001);
   EXPECT_NEAR(prop.surfaceArea, 9.2, 0.01);
 
+#ifdef MANIFOLD_EXPORT
   if (options.exportModels) ExportMesh("cubes.glb", result.GetMesh(), {});
+#endif
 }
 
 TEST(Boolean, Subtract) {
@@ -1033,7 +1052,9 @@ TEST(Boolean, Close) {
               tol * r * r * r);
   EXPECT_NEAR(prop.surfaceArea, 4 * glm::pi<float>() * r * r, tol * r * r);
 
+#ifdef MANIFOLD_EXPORT
   if (options.exportModels) ExportMesh("close.glb", result.GetMesh(), {});
+#endif
 
   PolygonParams().processOverlaps = false;
 }

@@ -21,7 +21,12 @@ enable_testing()
 
 set(SOURCE_FILES polygon_test.cpp mesh_test.cpp sdf_test.cpp samples_test.cpp test_main.cpp)
 add_executable(${PROJECT_NAME} ${SOURCE_FILES})
-target_link_libraries(${PROJECT_NAME} polygon GTest::GTest manifold meshIO samples samplesGPU)
+target_link_libraries(${PROJECT_NAME} polygon GTest::GTest manifold samples samplesGPU)
+
+if(MANIFOLD_EXPORT)
+  target_link_libraries(${PROJECT_NAME} meshIO)
+  target_compile_options(${PROJECT_NAME} PUBLIC -DMANIFOLD_EXPORT)
+endif()
 
 if(MANIFOLD_USE_CUDA)
   set_source_files_properties(mesh_test.cpp sdf_test.cpp PROPERTIES LANGUAGE CUDA)

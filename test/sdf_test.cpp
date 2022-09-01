@@ -15,8 +15,11 @@
 #include "sdf.h"
 
 #include "manifold.h"
-#include "meshIO.h"
 #include "test.h"
+
+#ifdef MANIFOLD_EXPORT
+#include "meshIO.h"
+#endif
 
 using namespace manifold;
 
@@ -59,7 +62,9 @@ TEST(SDF, Bounds) {
   Manifold cubeVoid(levelSet);
   Box bounds = cubeVoid.BoundingBox();
   const float precision = cubeVoid.Precision();
+#ifdef MANIFOLD_EXPORT
   if (options.exportModels) ExportMesh("cubeVoid.gltf", levelSet, {});
+#endif
 
   EXPECT_EQ(cubeVoid.Status(), Manifold::Error::NO_ERROR);
   EXPECT_EQ(cubeVoid.Genus(), -1);
@@ -83,7 +88,9 @@ TEST(SDF, Surface) {
   cube -= cubeVoid;
   Box bounds = cube.BoundingBox();
   const float precision = cube.Precision();
+#ifdef MANIFOLD_EXPORT
   if (options.exportModels) ExportMesh("cube.gltf", cube.GetMesh(), {});
+#endif
 
   EXPECT_EQ(cubeVoid.Status(), Manifold::Error::NO_ERROR);
   EXPECT_EQ(cube.Genus(), 0);
@@ -101,7 +108,9 @@ TEST(SDF, Surface) {
 TEST(SDF, Resize) {
   const float size = 20;
   Manifold layers(LevelSet(Layers(), {glm::vec3(0), glm::vec3(size)}, 1));
+#ifdef MANIFOLD_EXPORT
   if (options.exportModels) ExportMesh("layers.gltf", layers.GetMesh(), {});
+#endif
 
   EXPECT_EQ(layers.Status(), Manifold::Error::NO_ERROR);
   EXPECT_EQ(layers.Genus(), -8);
