@@ -13,7 +13,6 @@
 // limitations under the License.
 
 #include "manifold.h"
-#include "meshIO.h"
 #include "pybind11/functional.h"
 #include "pybind11/numpy.h"
 #include "pybind11/operators.h"
@@ -23,15 +22,6 @@
 namespace py = pybind11;
 
 using namespace manifold;
-
-void exportManifold(Manifold &m, std::string name) {
-  Mesh out = m.GetMesh();
-  manifold::ExportOptions options;
-  options.faceted = true;
-  options.mat.roughness = 0.2;
-  options.mat.metalness = 0.0;
-  manifold::ExportMesh(name, out, options);
-};
 
 typedef std::tuple<float, float> Float2;
 typedef std::tuple<float, float, float> Float3;
@@ -100,12 +90,6 @@ PYBIND11_MODULE(pymanifold, m) {
           },
           py::arg("x_degrees") = 0.0f, py::arg("y_degrees") = 0.0f,
           py::arg("z_degrees") = 0.0f)
-      .def(
-          "export",
-          [](Manifold &self, std::string name) { exportManifold(self, name); },
-          py::arg("filename"),
-          "Export the manifold object to file, where the file type is "
-          "determined from file extension.")
       .def(
           "warp",
           [](Manifold self, const std::function<Float3(Float3)> &f) {

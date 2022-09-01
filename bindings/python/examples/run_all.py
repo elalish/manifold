@@ -33,7 +33,6 @@ if __name__ == "__main__":
         t0 = time()
         model = module.run()
         if export_models:
-            # model.export(f'{f}.glb')
             mesh = model.to_mesh()
             cells = [("triangle", mesh.tri_verts)]
             meshio.write_points_cells(f'{f}.ply', mesh.vert_pos, cells)
