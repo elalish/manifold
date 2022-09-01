@@ -17,6 +17,7 @@
 import pathlib
 import sys
 import importlib
+import meshio
 from time import time
 
 if __name__ == "__main__":
@@ -32,7 +33,10 @@ if __name__ == "__main__":
         t0 = time()
         model = module.run()
         if export_models:
-            model.export(f'{f}.glb')
+            # model.export(f'{f}.glb')
+            mesh = model.to_mesh()
+            cells = [("triangle", mesh.tri_verts)]
+            meshio.write_points_cells(f'{f}.ply', mesh.vert_pos, cells)
             print(f'Exported model to {f}.glb')
         t1 = time()
         print(f'Took {(t1-t0)*1000:.1f}ms for {f}')
