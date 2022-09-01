@@ -22,8 +22,8 @@ using namespace manifold;
 
 struct CubeVoid {
   __host__ __device__ float operator()(glm::vec3 p) const {
-    const glm::vec3 min = glm::vec3(1) - p;
-    const glm::vec3 max = p + glm::vec3(1);
+    const glm::vec3 min = p + glm::vec3(1);
+    const glm::vec3 max = glm::vec3(1) - p;
     const float min3 = glm::min(min.x, glm::min(min.y, min.z));
     const float max3 = glm::min(max.x, glm::min(max.y, max.z));
     return -1.0f * glm::min(min3, max3);

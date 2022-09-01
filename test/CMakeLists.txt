@@ -24,7 +24,7 @@ add_executable(${PROJECT_NAME} ${SOURCE_FILES})
 target_link_libraries(${PROJECT_NAME} polygon GTest::GTest manifold meshIO samples samplesGPU)
 
 if(MANIFOLD_USE_CUDA)
-  set_source_files_properties(sdf_test.cpp PROPERTIES LANGUAGE CUDA)
+  set_source_files_properties(mesh_test.cpp sdf_test.cpp PROPERTIES LANGUAGE CUDA)
   set_property(TARGET ${PROJECT_NAME} PROPERTY CUDA_ARCHITECTURES 61)
 endif()
 
@@ -32,8 +32,6 @@ target_compile_options(${PROJECT_NAME} PRIVATE ${MANIFOLD_FLAGS})
 target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_14)
 
 add_test(test_all ${PROJECT_NAME})
-
-file(COPY data DESTINATION . FILES_MATCHING PATTERN "*.ply")
 
 if(EMSCRIPTEN)
   set_target_properties(${PROJECT_NAME} PROPERTIES LINK_FLAGS

@@ -134,6 +134,8 @@ namespace manifold {
  * removal, by setting vertPos to NaN and halfedge to {-1, -1, -1, -1}.
  */
 void Manifold::Impl::SimplifyTopology() {
+  if (!halfedge_.size()) return;
+
   auto policy = autoPolicy(halfedge_.size());
 
   VecDH<Halfedge> halfedge(halfedge_);

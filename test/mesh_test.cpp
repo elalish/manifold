@@ -17,6 +17,7 @@
 #include "manifold.h"
 #include "meshIO.h"
 #include "polygon.h"
+#include "sdf.h"
 #include "test.h"
 
 namespace {
@@ -157,14 +158,20 @@ Polygons SquareHole(float xOffset = 0.0) {
   return polys;
 }
 
-}  // namespace
+struct Gyroid {
+  __host__ __device__ float operator()(glm::vec3 p) const {
+    const glm::vec3 min = p;
+    const glm::vec3 max = glm::vec3(glm::two_pi<float>()) - p;
+    const float min3 = glm::min(min.x, glm::min(min.y, min.z));
+    const float max3 = glm::min(max.x, glm::min(max.y, max.z));
+    const float bound = glm::min(min3, max3);
+    const float gyroid =
+        cos(p.x) * sin(p.y) + cos(p.y) * sin(p.z) + cos(p.z) * sin(p.x);
+    return glm::min(gyroid, bound);
+  }
+};
 
-TEST(MeshIO, ReadWrite) {
-  Mesh mesh = ImportMesh("data/gyroidpuzzle.ply");
-  ExportMesh("data/gyroidpuzzle1.ply", mesh, {});
-  Mesh mesh_out = ImportMesh("data/gyroidpuzzle1.ply");
-  Identical(mesh, mesh_out);
-}
+}  // namespace
 
 /**
  * This tests that turning a mesh into a manifold and returning it to a mesh
@@ -178,20 +185,13 @@ TEST(Manifold, GetMesh) {
   Identical(mesh_out, mesh_out2);
 }
 
-// There is still some non-determinism, especially in parallel. Likely in the
-// edge collapse step. Not a huge problem, but best to fix for user's sanity.
-TEST(Manifold, DISABLED_Determinism) {
-  Manifold manifold(ImportMesh("data/gyroidpuzzle.ply"));
-  EXPECT_TRUE(manifold.IsManifold());
+TEST(Manifold, Empty) {
+  Mesh emptyMesh;
+  Manifold empty(emptyMesh);
 
-  Manifold manifold1 = manifold.Translate(glm::vec3(5.0f));
-  int num_overlaps = manifold.NumOverlaps(manifold1);
-  ASSERT_EQ(num_overlaps, 229611);
-
-  Mesh mesh_out = manifold.GetMesh();
-  Manifold manifold2(mesh_out);
-  Mesh mesh_out2 = manifold2.GetMesh();
-  // Identical(mesh_out, mesh_out2);
+  EXPECT_TRUE(empty.IsEmpty());
+  EXPECT_EQ(empty.Status(), Manifold::Error::NO_ERROR);
+  EXPECT_TRUE(empty.IsManifold());
 }
 
 TEST(Manifold, ValidInput) {
@@ -557,11 +557,17 @@ TEST(Manifold, Transform) {
 }
 
 TEST(Manifold, MeshRelation) {
+  const float period = glm::two_pi<float>();
+
+  Mesh gyroidMesh = LevelSet(Gyroid(), {glm::vec3(0), glm::vec3(period)}, 0.5);
+
   std::vector<Mesh> input;
   std::map<int, int> meshID2idx;
 
-  input.push_back(ImportMesh("data/gyroidpuzzle.ply"));
+  input.push_back(gyroidMesh);
   Manifold gyroid(input[0]);
+
+  if (options.exportModels) ExportMesh("gyroid.glb", gyroid.GetMesh(), {});
 
   int meshID = gyroid.OriginalID();
   EXPECT_GE(meshID, 0);
@@ -836,30 +842,32 @@ TEST(Boolean, Sphere) {
   RelatedOp(sphere, sphere2, result);
 }
 
-TEST(Boolean, Gyroid) {
-  Mesh gyroidpuzzle = ImportMesh("data/gyroidpuzzle.ply");
-  Manifold gyroid(gyroidpuzzle);
+TEST(Boolean, MeshRelation) {
+  const float period = glm::two_pi<float>();
 
-  Mesh gyroidpuzzle2 = gyroidpuzzle;
-  std::transform(gyroidpuzzle.vertPos.begin(), gyroidpuzzle.vertPos.end(),
-                 gyroidpuzzle2.vertPos.begin(),
-                 [](const glm::vec3& v) { return v + glm::vec3(5.0f); });
-  Manifold gyroid2(gyroidpuzzle2);
+  Mesh gyroidMesh = LevelSet(Gyroid(), {glm::vec3(0), glm::vec3(period)}, 0.5);
+  Manifold gyroid(gyroidMesh);
+
+  Mesh gyroidMesh2 = gyroidMesh;
+  std::transform(gyroidMesh.vertPos.begin(), gyroidMesh.vertPos.end(),
+                 gyroidMesh2.vertPos.begin(),
+                 [](const glm::vec3& v) { return v + glm::vec3(2.0f); });
+  Manifold gyroid2(gyroidMesh2);
 
   EXPECT_TRUE(gyroid.IsManifold());
   EXPECT_TRUE(gyroid.MatchesTriNormals());
-  EXPECT_LE(gyroid.NumDegenerateTris(), 12);
+  EXPECT_LE(gyroid.NumDegenerateTris(), 0);
   Manifold result = gyroid + gyroid2;
 
   if (options.exportModels) ExportMesh("gyroidUnion.glb", result.GetMesh(), {});
 
   EXPECT_TRUE(result.IsManifold());
   EXPECT_TRUE(result.MatchesTriNormals());
-  EXPECT_LE(result.NumDegenerateTris(), 50);
+  EXPECT_LE(result.NumDegenerateTris(), 1);
   EXPECT_EQ(result.Decompose().size(), 1);
   auto prop = result.GetProperties();
-  EXPECT_NEAR(prop.volume, 7692, 1);
-  EXPECT_NEAR(prop.surfaceArea, 9642, 1);
+  EXPECT_NEAR(prop.volume, 226, 1);
+  EXPECT_NEAR(prop.surfaceArea, 387, 1);
 
   std::vector<Mesh> input;
   std::map<int, int> meshID2idx;
@@ -867,12 +875,12 @@ TEST(Boolean, Gyroid) {
   int meshID = gyroid.OriginalID();
   EXPECT_GE(meshID, 0);
   meshID2idx[meshID] = input.size();
-  input.push_back(gyroidpuzzle);
+  input.push_back(gyroidMesh);
 
   meshID = gyroid2.OriginalID();
   EXPECT_GE(meshID, 0);
   meshID2idx[meshID] = input.size();
-  input.push_back(gyroidpuzzle2);
+  input.push_back(gyroidMesh2);
 
   Related(result, input, meshID2idx);
 }
