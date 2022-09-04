@@ -40,6 +40,6 @@ add_test(test_all ${PROJECT_NAME})
 
 if(EMSCRIPTEN)
   set_target_properties(${PROJECT_NAME} PROPERTIES LINK_FLAGS
-    "-s ASSERTIONS=1 -s DEMANGLE_SUPPORT=1 --preload-file data --bind")
+    "-s ASSERTIONS=1 -s DEMANGLE_SUPPORT=1 --bind")
 else()
 endif()
