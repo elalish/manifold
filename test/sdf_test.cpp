@@ -15,15 +15,18 @@
 #include "sdf.h"
 
 #include "manifold.h"
-#include "meshIO.h"
 #include "test.h"
+
+#ifdef MANIFOLD_EXPORT
+#include "meshIO.h"
+#endif
 
 using namespace manifold;
 
 struct CubeVoid {
   __host__ __device__ float operator()(glm::vec3 p) const {
-    const glm::vec3 min = glm::vec3(1) - p;
-    const glm::vec3 max = p + glm::vec3(1);
+    const glm::vec3 min = p + glm::vec3(1);
+    const glm::vec3 max = glm::vec3(1) - p;
     const float min3 = glm::min(min.x, glm::min(min.y, min.z));
     const float max3 = glm::min(max.x, glm::min(max.y, max.z));
     return -1.0f * glm::min(min3, max3);
@@ -59,7 +62,9 @@ TEST(SDF, Bounds) {
   Manifold cubeVoid(levelSet);
   Box bounds = cubeVoid.BoundingBox();
   const float precision = cubeVoid.Precision();
+#ifdef MANIFOLD_EXPORT
   if (options.exportModels) ExportMesh("cubeVoid.gltf", levelSet, {});
+#endif
 
   EXPECT_EQ(cubeVoid.Status(), Manifold::Error::NO_ERROR);
   EXPECT_EQ(cubeVoid.Genus(), -1);
@@ -83,7 +88,9 @@ TEST(SDF, Surface) {
   cube -= cubeVoid;
   Box bounds = cube.BoundingBox();
   const float precision = cube.Precision();
+#ifdef MANIFOLD_EXPORT
   if (options.exportModels) ExportMesh("cube.gltf", cube.GetMesh(), {});
+#endif
 
   EXPECT_EQ(cubeVoid.Status(), Manifold::Error::NO_ERROR);
   EXPECT_EQ(cube.Genus(), 0);
@@ -101,7 +108,9 @@ TEST(SDF, Surface) {
 TEST(SDF, Resize) {
   const float size = 20;
   Manifold layers(LevelSet(Layers(), {glm::vec3(0), glm::vec3(size)}, 1));
+#ifdef MANIFOLD_EXPORT
   if (options.exportModels) ExportMesh("layers.gltf", layers.GetMesh(), {});
+#endif
 
   EXPECT_EQ(layers.Status(), Manifold::Error::NO_ERROR);
   EXPECT_EQ(layers.Genus(), -8);

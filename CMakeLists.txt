@@ -18,6 +18,7 @@ project(manifold LANGUAGES CXX)
 set(CMAKE_VERBOSE_MAKEFILE ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+option(MANIFOLD_EXPORT off)
 option(MANIFOLD_DEBUG off)
 option(MANIFOLD_USE_CUDA on)
 set(MANIFOLD_PAR "TBB" CACHE STRING "Parallel backend, either \"TBB\" or \"OpenMP\" or \"NONE\"")
