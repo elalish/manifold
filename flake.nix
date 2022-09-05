@@ -26,7 +26,7 @@
               version = "beta";
               src = self;
               patches = [ ./assimp.diff ./thrust.diff ];
-              nativeBuildInputs = (with pkgs; [ cmake python38 ]) ++ build-tools ++
+              nativeBuildInputs = (with pkgs; [ cmake (python38.withPackages(meshio)) ]) ++ build-tools ++
                 (if cuda-support then with pkgs.cudaPackages; [ cuda_nvcc cuda_cudart cuda_cccl pkgs.addOpenGLRunpath ] else [ ]);
               cmakeFlags = [
                 "-DMANIFOLD_PAR=${pkgs.lib.strings.toUpper parallel-backend}"
