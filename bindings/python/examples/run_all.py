@@ -36,6 +36,6 @@ if __name__ == "__main__":
             mesh = model.to_mesh()
             cells = [("triangle", mesh.tri_verts)]
             meshio.write_points_cells(f'{f}.ply', mesh.vert_pos, cells)
-            print(f'Exported model to {f}.glb')
+            print(f'Exported model to {f}.ply')
         t1 = time()
         print(f'Took {(t1-t0)*1000:.1f}ms for {f}')
