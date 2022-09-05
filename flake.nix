@@ -26,7 +26,7 @@
               version = "beta";
               src = self;
               patches = [ ./assimp.diff ./thrust.diff ];
-              nativeBuildInputs = (with pkgs; [ cmake (python38.withPackages(meshio)) ]) ++ build-tools ++
+              nativeBuildInputs = (with pkgs; [ cmake (python39.withPackages(ps: with ps; [meshio])) ]) ++ build-tools ++
                 (if cuda-support then with pkgs.cudaPackages; [ cuda_nvcc cuda_cudart cuda_cccl pkgs.addOpenGLRunpath ] else [ ]);
               cmakeFlags = [
                 "-DMANIFOLD_PAR=${pkgs.lib.strings.toUpper parallel-backend}"
@@ -93,7 +93,7 @@
               version = "beta";
               src = self;
               patches = [ ./assimp.diff ];
-              nativeBuildInputs = (with pkgs; [ cmake python38 ]);
+              nativeBuildInputs = (with pkgs; [ cmake python39 ]);
               buildInputs = [ pkgs.nodejs ];
               configurePhase = ''
                 mkdir -p .emscriptencache
