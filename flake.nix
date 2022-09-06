@@ -42,7 +42,6 @@
               installPhase = ''
                 mkdir -p $out
                 cp src/manifold/libmanifold.a $out/
-                cp test/meshIO/libmeshIO.a $out/
                 cp extras/perfTest $out
                 cp bindings/python/pymanifold* $out
               '';
