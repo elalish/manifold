@@ -1,4 +1,4 @@
-# Copyright 2020 The Manifold Authors.
+# Copyright 2022 The Manifold Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,18 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-project(meshIO)
+project(sdf)
 
-add_library(${PROJECT_NAME} src/meshIO.cpp)
+add_library(${PROJECT_NAME} INTERFACE)
 
 target_include_directories(${PROJECT_NAME}
-    PUBLIC ${PROJECT_SOURCE_DIR}/include
+    INTERFACE
+    ${PROJECT_SOURCE_DIR}/include
 )
 
-target_link_libraries(${PROJECT_NAME}
-    PUBLIC utilities
-    PRIVATE assimp
-)
-
-target_compile_options(${PROJECT_NAME} PRIVATE ${MANIFOLD_FLAGS})
-target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_14)
+target_link_libraries(${PROJECT_NAME} INTERFACE utilities)

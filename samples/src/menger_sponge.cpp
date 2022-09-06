@@ -54,7 +54,12 @@ Manifold MengerSponge(int n) {
   result -= hole;
   hole = hole.Rotate(0, 0, 90);
   result -= hole;
-  result = result.AsOriginal();
+
+  // Alternative order causes degenerate triangles
+  // Manifold tmp1 = hole.Rotate(90) + hole.Rotate(90).Rotate(0, 0, 90);
+  // Manifold tmp2 = hole + tmp1;
+  // result = result - tmp2;
+
   return result;
 }
 }  // namespace manifold

@@ -137,6 +137,26 @@ struct LinkHalfedges {
   }
 };
 
+struct MarkVerts {
+  int* vert;
+
+  __host__ __device__ void operator()(glm::ivec3 triVerts) {
+    for (int i : {0, 1, 2}) {
+      vert[triVerts[i]] = 1;
+    }
+  }
+};
+
+struct ReindexTriVerts {
+  const int* old2new;
+
+  __host__ __device__ void operator()(glm::ivec3& triVerts) {
+    for (int i : {0, 1, 2}) {
+      triVerts[i] = old2new[triVerts[i]];
+    }
+  }
+};
+
 struct InitializeBaryRef {
   const int meshID;
   const Halfedge* halfedge;
@@ -146,8 +166,26 @@ struct InitializeBaryRef {
     int tri = thrust::get<1>(inOut);
 
     baryRef.meshID = meshID;
+    baryRef.originalID = meshID;
     baryRef.tri = tri;
     baryRef.vertBary = {-3, -2, -1};
+  }
+};
+
+struct MarkMeshID {
+  int* includesMeshID;
+
+  __host__ __device__ void operator()(BaryRef& ref) {
+    includesMeshID[ref.meshID] = 1;
+  }
+};
+
+struct UpdateMeshID {
+  const int* meshIDold2new;
+  const int meshIDoffset;
+
+  __host__ __device__ void operator()(BaryRef& ref) {
+    ref.meshID = meshIDold2new[ref.meshID] + meshIDoffset;
   }
 };
 
@@ -257,29 +295,28 @@ namespace manifold {
 std::atomic<int> Manifold::Impl::meshIDCounter_(1);
 
 /**
- * Create a manifold from an input triangle Mesh. Will throw if the Mesh is not
- * manifold. TODO: update halfedgeTangent during SimplifyTopology.
+ * Create a manifold from an input triangle Mesh. Will return an empty Manifold
+ * and set an Error Status if the Mesh is not manifold or otherwise invalid.
+ * TODO: update halfedgeTangent during SimplifyTopology.
  */
 Manifold::Impl::Impl(const Mesh& mesh,
                      const std::vector<glm::ivec3>& triProperties,
                      const std::vector<float>& properties,
                      const std::vector<float>& propertyTolerance)
     : vertPos_(mesh.vertPos), halfedgeTangent_(mesh.halfedgeTangent) {
-#ifdef MANIFOLD_DEBUG
-  CheckDevice();
-#endif
+  VecDH<glm::ivec3> triVerts = mesh.triVerts;
+  if (!IsIndexInBounds(triVerts)) {
+    MarkFailure(Error::VERTEX_INDEX_OUT_OF_BOUNDS);
+    return;
+  }
+  RemoveUnreferencedVerts(triVerts);
+
   CalculateBBox();
   if (!IsFinite()) {
     MarkFailure(Error::NON_FINITE_VERTEX);
     return;
   }
   SetPrecision();
-
-  VecDH<glm::ivec3> triVerts = mesh.triVerts;
-  if (!IsIndexInBounds(triVerts)) {
-    MarkFailure(Error::VERTEX_INDEX_OUT_OF_BOUNDS);
-    return;
-  }
 
   CreateHalfedges(triVerts);
   if (!IsManifold()) {
@@ -344,14 +381,33 @@ Manifold::Impl::Impl(Shape shape) {
   InitializeNewReference();
 }
 
+void Manifold::Impl::RemoveUnreferencedVerts(VecDH<glm::ivec3>& triVerts) {
+  VecDH<int> vertOld2New(NumVert() + 1, 0);
+  auto policy = autoPolicy(NumVert());
+  for_each(policy, triVerts.cbegin(), triVerts.cend(),
+           MarkVerts({vertOld2New.ptrD() + 1}));
+
+  const VecDH<glm::vec3> oldVertPos = vertPos_;
+  vertPos_.resize(copy_if<decltype(vertPos_.begin())>(
+                      policy, oldVertPos.cbegin(), oldVertPos.cend(),
+                      vertOld2New.cbegin() + 1, vertPos_.begin(),
+                      thrust::identity<int>()) -
+                  vertPos_.begin());
+
+  inclusive_scan(policy, vertOld2New.begin() + 1, vertOld2New.end(),
+                 vertOld2New.begin() + 1);
+
+  for_each(policy, triVerts.begin(), triVerts.end(),
+           ReindexTriVerts({vertOld2New.cptrD()}));
+}
+
 void Manifold::Impl::ReinitializeReference(int meshID) {
   // instead of storing the meshID, we store 0 and set the mapping to
   // 0 -> meshID, because the meshID after boolean operation also starts from 0.
   for_each_n(autoPolicy(NumTri()),
              zip(meshRelation_.triBary.begin(), countAt(0)), NumTri(),
-             InitializeBaryRef({0, halfedge_.cptrD()}));
-  meshRelation_.originalID.clear();
-  meshRelation_.originalID[0] = meshID;
+             InitializeBaryRef({meshID, halfedge_.cptrD()}));
+  meshRelation_.originalID = meshID;
 }
 
 int Manifold::Impl::InitializeNewReference(
@@ -591,53 +647,33 @@ void Manifold::Impl::CalculateNormals() {
 }
 
 /**
- * Update meshID and originalID in meshRelation_.triBary[startTri..startTri+n]
- * according to meshIDs -> originalIDs mapping. The updated meshID will start
- * from startID.
- * Will raise an exception if meshRelation_.triBary[startTri..startTri+n]
- * contains a meshID not in meshIDs.
- *
- * We remap them into indices starting from startID. The exact value value is
- * not important as long as
- * 1. They are distinct
- * 2. `originalID[meshID]` is the original mesh ID of the triangle
- *
- * Use this when the mesh is a combination of several meshes or a subset of a
- * larger mesh, e.g. after performing boolean operations, compose or decompose.
+ * Remaps all the contained meshIDs to new unique values to represent new
+ * instances of these meshes.
  */
-void Manifold::Impl::UpdateMeshIDs(VecDH<int>& meshIDs, VecDH<int>& originalIDs,
-                                   int startTri, int n, int startID) {
-  if (n == -1) n = meshRelation_.triBary.size();
-  sort_by_key(autoPolicy(n), meshIDs.begin(), meshIDs.end(),
-              originalIDs.begin());
-  constexpr int kOccurred = 1 << 30;
-  VecDH<int> error(1, -1);
-  const int numMesh = meshIDs.size();
-  const int* meshIDsPtr = meshIDs.cptrD();
-  int* originalPtr = originalIDs.ptrD();
-  int* errorPtr = error.ptrD();
-  for_each(autoPolicy(n), meshRelation_.triBary.begin() + startTri,
-           meshRelation_.triBary.begin() + startTri + n,
-           [=] __host__ __device__(BaryRef & b) {
-             int index = thrust::lower_bound(meshIDsPtr, meshIDsPtr + numMesh,
-                                             b.meshID) -
-                         meshIDsPtr;
-             if (index >= numMesh || meshIDsPtr[index] != b.meshID) {
-               *errorPtr = b.meshID;
-             }
-             b.meshID = index + startID;
-             originalPtr[index] |= kOccurred;
-           });
+void Manifold::Impl::IncrementMeshIDs(int start, int length) {
+  VecDH<BaryRef>& triBary = meshRelation_.triBary;
+  ASSERT(start >= 0 && length >= 0 && start + length <= triBary.size(),
+         logicErr, "out of bounds");
+  const auto policy = autoPolicy(length);
+  // Use double the space since the Boolean has P and Q instances.
+  VecDH<int> includesMeshID(2 * Manifold::Impl::meshIDCounter_, 0);
 
-  ASSERT(error[0] == -1, logicErr,
-         "Manifold::UpdateMeshIDs: meshID " + std::to_string(error[0]) +
-             " not found in meshIDs.");
-  for (int i = 0; i < numMesh; ++i) {
-    if (originalIDs[i] & kOccurred) {
-      originalIDs[i] &= ~kOccurred;
-      meshRelation_.originalID[i + startID] = originalIDs[i];
-    }
-  }
+  auto begin = triBary.begin() + start;
+  auto end = begin + length;
+
+  for_each(policy, begin, end, MarkMeshID({includesMeshID.ptrD()}));
+
+  inclusive_scan(autoPolicy(includesMeshID.size()), includesMeshID.begin(),
+                 includesMeshID.end(), includesMeshID.begin());
+
+  const int numMeshIDs = includesMeshID[includesMeshID.size() - 1];
+  const int meshIDstart = Manifold::Impl::meshIDCounter_.fetch_add(
+      numMeshIDs, std::memory_order_relaxed);
+
+  // We do start - 1 because the inclusive scan makes our first index 1 instead
+  // of 0.
+  for_each(policy, begin, end,
+           UpdateMeshID({includesMeshID.cptrD(), meshIDstart - 1}));
 }
 
 /**

@@ -107,13 +107,15 @@ struct InteriorVerts {
         const int b = (i == n - 1) ? -1 : first + n - i + 1;
         const int c = (j == n - 1) ? -3 : first + 1;
         glm::ivec3 vertBary(c, a, b);
-        triBary[posTri] = {-1, tri, vertBary};
-        triBaryNew[posTri++] = {baryOld.meshID, baryOld.tri, vertBary};
+        triBary[posTri] = {-1, -1, tri, vertBary};
+        triBaryNew[posTri++] = {baryOld.meshID, baryOld.originalID, baryOld.tri,
+                                vertBary};
         if (j < n - 1 - i) {
           int d = b + 1;  // d cannot be a retained vert
           vertBary = {b, d, c};
-          triBary[posTri] = {-1, tri, vertBary};
-          triBaryNew[posTri++] = {baryOld.meshID, baryOld.tri, vertBary};
+          triBary[posTri] = {-1, -1, tri, vertBary};
+          triBaryNew[posTri++] = {baryOld.meshID, baryOld.originalID,
+                                  baryOld.tri, vertBary};
         }
 
         if (i == 0 || j == 0 || k == 0) continue;

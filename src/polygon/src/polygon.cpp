@@ -298,6 +298,8 @@ class Monotones {
 #endif
   }
 
+  float GetPrecision() const { return precision_; }
+
  private:
   struct VertAdj;
   typedef std::list<VertAdj>::iterator VertItr;
@@ -528,12 +530,24 @@ class Monotones {
           return SKIP;
         }
       } else {
+        if (!eastPair->vEast->right->IsPast(vert, precision_) &&
+            vert->IsPast(eastPair->vEast, precision_) &&
+            vert->pos.x > eastPair->vEast->right->pos.x + precision_) {
+          PRINT("SKIP WEST");
+          return SKIP;
+        }
         SetVWest(eastPair, vert);
         PRINT("WESTSIDE");
         return WESTSIDE;
       }
     } else {
       if (vert->left->Processed()) {
+        if (!westPair->vWest->left->IsPast(vert, precision_) &&
+            vert->IsPast(westPair->vWest, precision_) &&
+            vert->pos.x < westPair->vWest->left->pos.x - precision_) {
+          PRINT("SKIP EAST");
+          return SKIP;
+        }
         SetVEast(westPair, vert);
         PRINT("EASTSIDE");
         return EASTSIDE;
@@ -812,7 +826,10 @@ class Monotones {
         SetVEast(newPair, vert);
         const int hole = IsHole(vert);
         if (hole == 0 && IsColinearPoly(vert)) {
+          PRINT("Skip colinear polygon");
           SkipPoly(vert);
+          activePairs_.erase(newPair);
+          continue;
         }
         isHole = hole > 0;
       }
@@ -1032,7 +1049,9 @@ std::vector<glm::ivec3> Triangulate(const Polygons &polys, float precision) {
 #ifdef MANIFOLD_DEBUG
     if (params.intermediateChecks) {
       CheckTopology(triangles, polys);
-      CheckGeometry(triangles, polys, precision);
+      if (!params.processOverlaps) {
+        CheckGeometry(triangles, polys, 2 * monotones.GetPrecision());
+      }
     }
   } catch (const geometryErr &e) {
     if (!params.suppressErrors) {

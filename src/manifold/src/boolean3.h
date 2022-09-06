@@ -57,5 +57,6 @@ class Boolean3 {
   SparseIndices p1q2_, p2q1_;
   VecDH<int> x12_, x21_, w03_, w30_;
   VecDH<glm::vec3> v12_, v21_;
+  ExecutionPolicy policy_;
 };
 }  // namespace manifold

@@ -62,18 +62,17 @@ class SparseIndices {
   int size() const { return p.size(); }
   void SwapPQ() { p.swap(q); }
 
-  void Sort() { sort(autoPolicy(size()), beginPQ(), endPQ()); }
+  void Sort(ExecutionPolicy policy) { sort(policy, beginPQ(), endPQ()); }
 
   void Resize(int size) {
     p.resize(size, -1);
     q.resize(size, -1);
   }
 
-  void Unique() {
-    Sort();
+  void Unique(ExecutionPolicy policy) {
+    Sort(policy);
     int newSize =
-        unique<decltype(beginPQ())>(autoPolicy(size()), beginPQ(), endPQ()) -
-        beginPQ();
+        unique<decltype(beginPQ())>(policy, beginPQ(), endPQ()) - beginPQ();
     Resize(newSize);
   }
 

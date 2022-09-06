@@ -13,7 +13,6 @@
 // limitations under the License.
 
 #include "manifold.h"
-#include "meshIO.h"
 #include "pybind11/functional.h"
 #include "pybind11/numpy.h"
 #include "pybind11/operators.h"
@@ -23,15 +22,6 @@
 namespace py = pybind11;
 
 using namespace manifold;
-
-void exportManifold(Manifold &m, std::string name) {
-  Mesh out = m.GetMesh();
-  manifold::ExportOptions options;
-  options.faceted = true;
-  options.mat.roughness = 0.2;
-  options.mat.metalness = 0.0;
-  manifold::ExportMesh(name, out, options);
-};
 
 typedef std::tuple<float, float> Float2;
 typedef std::tuple<float, float, float> Float3;
@@ -82,16 +72,16 @@ PYBIND11_MODULE(pymanifold, m) {
                  return self.Scale(glm::vec3(scale));
                }),
            py::arg("scale"))
-      .def("scale",
-           static_cast<Manifold (*)(Manifold, py::array_t<float> &)>(
-               [](Manifold self, py::array_t<float> &scale) {
-                 auto scale_view = scale.unchecked<1>();
-                 if (scale_view.shape(0) != 3)
-                   throw std::runtime_error("Invalid vector shape");
-                 glm::vec3 v(scale_view(0), scale_view(1), scale_view(2));
-                 return self.Scale(v);
-               }),
-           py::arg("v"))
+      .def(
+          "scale",
+          [](Manifold self, py::array_t<float> &scale) {
+            auto scale_view = scale.unchecked<1>();
+            if (scale_view.shape(0) != 3)
+              throw std::runtime_error("Invalid vector shape");
+            glm::vec3 v(scale_view(0), scale_view(1), scale_view(2));
+            return self.Scale(v);
+          },
+          py::arg("v"))
       .def(
           "rotate",
           [](Manifold self, float xDegrees = 0.0f, float yDegrees = 0.0f,
@@ -100,12 +90,6 @@ PYBIND11_MODULE(pymanifold, m) {
           },
           py::arg("x_degrees") = 0.0f, py::arg("y_degrees") = 0.0f,
           py::arg("z_degrees") = 0.0f)
-      .def(
-          "export",
-          [](Manifold &self, std::string name) { exportManifold(self, name); },
-          py::arg("filename"),
-          "Export the manifold object to file, where the file type is "
-          "determined from file extension.")
       .def(
           "warp",
           [](Manifold self, const std::function<Float3(Float3)> &f) {
@@ -217,24 +201,66 @@ PYBIND11_MODULE(pymanifold, m) {
              std::vector<glm::vec4> halfedgeTangent_vec(
                  halfedgeTangent_view.shape(0));
              for (int i = 0; i < vertPos_view.shape(0); i++)
-               for (int j = 0; j < 3; j++)
+               for (const int j : {0, 1, 2})
                  vertPos_vec[i][j] = vertPos_view(i, j);
              for (int i = 0; i < triVerts_view.shape(0); i++)
-               for (int j = 0; j < 3; j++)
+               for (const int j : {0, 1, 2})
                  triVerts_vec[i][j] = triVerts_view(i, j);
              for (int i = 0; i < vertNormal_view.shape(0); i++)
-               for (int j = 0; j < 3; j++)
+               for (const int j : {0, 1, 2})
                  vertNormal_vec[i][j] = vertNormal_view(i, j);
              for (int i = 0; i < halfedgeTangent_view.shape(0); i++)
-               for (int j = 0; j < 4; j++)
+               for (const int j : {0, 1, 2, 3})
                  halfedgeTangent_vec[i][j] = halfedgeTangent_view(i, j);
              return Mesh({vertPos_vec, triVerts_vec, vertNormal_vec,
                           halfedgeTangent_vec});
            }),
            py::arg("vert_pos"), py::arg("tri_verts"), py::arg("vert_normal"),
            py::arg("halfedge_tangent"))
-      .def_readwrite("vert_pos", &Mesh::vertPos)
-      .def_readwrite("tri_verts", &Mesh::triVerts)
-      .def_readwrite("vert_normal", &Mesh::vertNormal)
-      .def_readwrite("halfedge_tangent", &Mesh::halfedgeTangent);
+      .def_property_readonly("vert_pos",
+                             [](Mesh &self) {
+                               const int numVert = self.vertPos.size();
+                               py::array_t<float> vert_pos({numVert, 3});
+                               auto vert_pos_view =
+                                   vert_pos.mutable_unchecked<2>();
+
+                               for (int i = 0; i < numVert; ++i)
+                                 for (const int j : {0, 1, 2})
+                                   vert_pos_view(i, j) = self.vertPos[i][j];
+                               return vert_pos;
+                             })
+      .def_property_readonly("tri_verts",
+                             [](Mesh &self) {
+                               const int numTri = self.triVerts.size();
+                               py::array_t<int> tri_verts({numTri, 3});
+                               auto tri_verts_view =
+                                   tri_verts.mutable_unchecked<2>();
+
+                               for (int i = 0; i < numTri; ++i)
+                                 for (const int j : {0, 1, 2})
+                                   tri_verts_view(i, j) = self.triVerts[i][j];
+                               return tri_verts;
+                             })
+      .def_property_readonly(
+          "vert_normal",
+          [](Mesh &self) {
+            const int numVert = self.vertNormal.size();
+            py::array_t<float> vert_normal({numVert, 3});
+            auto vert_normal_view = vert_normal.mutable_unchecked<2>();
+
+            for (int i = 0; i < numVert; ++i)
+              for (const int j : {0, 1, 2})
+                vert_normal_view(i, j) = self.vertNormal[i][j];
+            return vert_normal;
+          })
+      .def_property_readonly("halfedge_tangent", [](Mesh &self) {
+        const int numEdge = self.halfedgeTangent.size();
+        py::array_t<float> halfedge_tangent({numEdge, 4});
+        auto halfedge_tangent_view = halfedge_tangent.mutable_unchecked<2>();
+
+        for (int i = 0; i < numEdge; ++i)
+          for (const int j : {0, 1, 2, 3})
+            halfedge_tangent_view(i, j) = self.halfedgeTangent[i][j];
+        return halfedge_tangent;
+      });
 }

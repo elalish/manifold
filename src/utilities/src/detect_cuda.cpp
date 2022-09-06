@@ -15,16 +15,22 @@
 #ifdef MANIFOLD_USE_CUDA
 #include <cuda_runtime.h>
 
+namespace {
+int CUDA_DEVICES = -1;
+}
 namespace manifold {
-int CUDA_ENABLED = -1;
-void check_cuda_available() {
-  int device_count = 0;
-  cudaError_t error = cudaGetDeviceCount(&device_count);
-  CUDA_ENABLED = device_count != 0;
+
+bool CudaEnabled() {
+  if (CUDA_DEVICES >= 0) return CUDA_DEVICES > 0;
+
+  cudaError_t error = cudaGetDeviceCount(&CUDA_DEVICES);
+  if (error != cudaSuccess) CUDA_DEVICES = 0;
+
+  return CUDA_DEVICES > 0;
 }
 }  // namespace manifold
 #else
 namespace manifold {
-void check_cuda_available() {}
+bool CudaEnabled() { return false; }
 }  // namespace manifold
 #endif

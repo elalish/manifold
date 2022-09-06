@@ -27,17 +27,9 @@ namespace manifold {
 struct Manifold::Impl {
   struct MeshRelationD {
     VecDH<glm::vec3> barycentric;
-    /// meshID in BaryRef has different meaning in MeshRelation and
-    /// MeshRelationD:
-    /// - In `MeshRelation`: The original mesh triangle index.
-    /// - In `MeshRelationD`: The original mesh triangle index =
-    /// `originalID[meshID]`
-    ///
-    /// @note Triangles coming from different manifolds should have different
-    /// mesh ID, otherwise `SimplifyTopology` will not work properly.
     VecDH<BaryRef> triBary;
-    /// meshID to originalID mapping.
-    std::unordered_map<int, int> originalID;
+    /// The meshID of this Manifold if it is an original; -1 otherwise.
+    int originalID = -1;
   };
 
   Box bBox_;
@@ -67,11 +59,11 @@ struct Manifold::Impl {
       const std::vector<float>& properties = std::vector<float>(),
       const std::vector<float>& propertyTolerance = std::vector<float>());
 
+  void RemoveUnreferencedVerts(VecDH<glm::ivec3>& triVerts);
   void ReinitializeReference(int meshID);
   void CreateHalfedges(const VecDH<glm::ivec3>& triVerts);
   void CalculateNormals();
-  void UpdateMeshIDs(VecDH<int>& meshIDs, VecDH<int>& originalIDs,
-                     int startTri = 0, int n = -1, int startID = 0);
+  void IncrementMeshIDs(int start, int length);
 
   void Update();
   void MarkFailure(Error status);

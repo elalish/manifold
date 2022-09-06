@@ -30,7 +30,9 @@ namespace {
 __host__ __device__ glm::vec2 Interpolate(glm::vec3 pL, glm::vec3 pR, float x) {
   float dxL = x - pL.x;
   float dxR = x - pR.x;
+#ifdef MANIFOLD_DEBUG
   if (dxL * dxR > 0) printf("Not in domain!\n");
+#endif
   bool useL = fabs(dxL) < fabs(dxR);
   float lambda = (useL ? dxL : dxR) / (pR.x - pL.x);
   if (!isfinite(lambda)) return glm::vec2(pL.y, pL.z);
@@ -46,7 +48,9 @@ __host__ __device__ glm::vec4 Intersect(const glm::vec3 &pL,
                                         const glm::vec3 &qR) {
   float dyL = qL.y - pL.y;
   float dyR = qR.y - pR.y;
+#ifdef MANIFOLD_DEBUG
   if (dyL * dyR > 0) printf("No intersection!\n");
+#endif
   bool useL = fabs(dyL) < fabs(dyR);
   float dx = pR.x - pL.x;
   float lambda = (useL ? dyL : dyR) / (dyL - dyR);
@@ -83,9 +87,9 @@ struct CopyFaceEdges {
 };
 
 SparseIndices Filter11(const Manifold::Impl &inP, const Manifold::Impl &inQ,
-                       const SparseIndices &p1q2, const SparseIndices &p2q1) {
+                       const SparseIndices &p1q2, const SparseIndices &p2q1,
+                       ExecutionPolicy policy) {
   SparseIndices p1q1(3 * p1q2.size() + 3 * p2q1.size());
-  auto policy = autoPolicy(p1q2.size());
   for_each_n(policy, zip(countAt(0), p1q2.begin(0), p1q2.begin(1)), p1q2.size(),
              CopyFaceEdges({p1q1.ptrDpq(), inQ.halfedge_.cptrD()}));
 
@@ -94,7 +98,7 @@ SparseIndices Filter11(const Manifold::Impl &inP, const Manifold::Impl &inQ,
              p2q1.size(),
              CopyFaceEdges({p1q1.ptrDpq(), inP.halfedge_.cptrD()}));
   p1q1.SwapPQ();
-  p1q1.Unique();
+  p1q1.Unique(policy);
   return p1q1;
 }
 
@@ -102,6 +106,17 @@ __host__ __device__ bool Shadows(float p, float q, float dir) {
   return p == q ? dir < 0 : p < q;
 }
 
+/**
+ * Since this function is called from two different places, it is necessary that
+ * it returns identical results for identical input to keep consistency.
+ * Normally this is trivial as computers make floating-point errors, but are
+ * at least deterministic. However, in the case of CUDA, these functions can be
+ * compiled by two different compilers (for the CPU and GPU). We have found that
+ * the different compilers can cause slightly different rounding errors, so it
+ * is critical that the two places this function is called both use the same
+ * compiled function (they must agree on CPU or GPU). This is now taken care of
+ * by the shared policy_ member.
+ */
 __host__ __device__ thrust::pair<int, glm::vec2> Shadow01(
     const int p0, const int q1, const glm::vec3 *vertPosP,
     const glm::vec3 *vertPosQ, const Halfedge *halfedgeQ, const float expandP,
@@ -218,11 +233,12 @@ struct Kernel11 {
     if (s11 == 0) {  // No intersection
       xyzz11 = glm::vec4(NAN);
     } else {
+#ifdef MANIFOLD_DEBUG
       // Assert left and right were both found
       if (k != 2) {
         printf("k = %d\n", k);
       }
-
+#endif
       xyzz11 = Intersect(pRL[0], pRL[1], qRL[0], qRL[1]);
 
       const int p1s = halfedgeP[p1].startVert;
@@ -241,11 +257,12 @@ struct Kernel11 {
 std::tuple<VecDH<int>, VecDH<glm::vec4>> Shadow11(SparseIndices &p1q1,
                                                   const Manifold::Impl &inP,
                                                   const Manifold::Impl &inQ,
-                                                  float expandP) {
+                                                  float expandP,
+                                                  ExecutionPolicy policy) {
   VecDH<int> s11(p1q1.size());
   VecDH<glm::vec4> xyzz11(p1q1.size());
 
-  for_each_n(autoPolicy(p1q1.size()),
+  for_each_n(policy,
              zip(xyzz11.begin(), s11.begin(), p1q1.begin(0), p1q1.begin(1)),
              p1q1.size(),
              Kernel11({inP.vertPos_.cptrD(), inQ.vertPos_.cptrD(),
@@ -315,11 +332,12 @@ struct Kernel02 {
     if (s02 == 0) {  // No intersection
       z02 = NAN;
     } else {
+#ifdef MANIFOLD_DEBUG
       // Assert left and right were both found
       if (k != 2) {
         printf("k = %d\n", k);
       }
-
+#endif
       glm::vec3 vertPos = vertPosP[p0];
       z02 = Interpolate(yzzRL[0], yzzRL[1], vertPos.y)[1];
       if (forward) {
@@ -336,14 +354,15 @@ struct Kernel02 {
 std::tuple<VecDH<int>, VecDH<float>> Shadow02(const Manifold::Impl &inP,
                                               const Manifold::Impl &inQ,
                                               SparseIndices &p0q2, bool forward,
-                                              float expandP) {
+                                              float expandP,
+                                              ExecutionPolicy policy) {
   VecDH<int> s02(p0q2.size());
   VecDH<float> z02(p0q2.size());
 
   auto vertNormalP =
       forward ? inP.vertNormal_.cptrD() : inQ.vertNormal_.cptrD();
   for_each_n(
-      autoPolicy(p0q2.size()),
+      policy,
       zip(s02.begin(), z02.begin(), p0q2.begin(!forward), p0q2.begin(forward)),
       p0q2.size(),
       Kernel02({inP.vertPos_.cptrD(), inQ.halfedge_.cptrD(),
@@ -431,10 +450,12 @@ struct Kernel12 {
     if (x12 == 0) {  // No intersection
       v12 = glm::vec3(NAN);
     } else {
+#ifdef MANIFOLD_DEBUG
       // Assert left and right were both found
       if (k != 2) {
         printf("k = %d\n", k);
       }
+#endif
       const glm::vec4 xzyy =
           Intersect(xzyLR0[0], xzyLR0[1], xzyLR1[0], xzyLR1[1]);
       v12.x = xzyy[0];
@@ -448,12 +469,12 @@ std::tuple<VecDH<int>, VecDH<glm::vec3>> Intersect12(
     const Manifold::Impl &inP, const Manifold::Impl &inQ, const VecDH<int> &s02,
     const SparseIndices &p0q2, const VecDH<int> &s11, const SparseIndices &p1q1,
     const VecDH<float> &z02, const VecDH<glm::vec4> &xyzz11,
-    SparseIndices &p1q2, bool forward) {
+    SparseIndices &p1q2, bool forward, ExecutionPolicy policy) {
   VecDH<int> x12(p1q2.size());
   VecDH<glm::vec3> v12(p1q2.size());
 
   for_each_n(
-      autoPolicy(p1q2.size()),
+      policy,
       zip(x12.begin(), v12.begin(), p1q2.begin(!forward), p1q2.begin(forward)),
       p1q2.size(),
       Kernel12({p0q2.ptrDpq(), s02.ptrD(), z02.cptrD(), p0q2.size(),
@@ -467,11 +488,10 @@ std::tuple<VecDH<int>, VecDH<glm::vec3>> Intersect12(
 };
 
 VecDH<int> Winding03(const Manifold::Impl &inP, SparseIndices &p0q2,
-                     VecDH<int> &s02, bool reverse) {
+                     VecDH<int> &s02, bool reverse, ExecutionPolicy policy) {
   // verts that are not shadowed (not in p0q2) have winding number zero.
   VecDH<int> w03(inP.NumVert(), 0);
 
-  auto policy = autoPolicy(p0q2.size());
   if (!is_sorted(policy, p0q2.begin(reverse), p0q2.end(reverse)))
     sort_by_key(policy, p0q2.begin(reverse), p0q2.end(reverse), s02.begin());
   VecDH<int> w03val(w03.size());
@@ -481,11 +501,10 @@ VecDH<int> Winding03(const Manifold::Impl &inP, SparseIndices &p0q2,
       thrust::pair<decltype(w03val.begin()), decltype(w03val.begin())>>(
       policy, p0q2.begin(reverse), p0q2.end(reverse), s02.begin(),
       w03vert.begin(), w03val.begin());
-  scatter(autoPolicy(endPair.second - w03val.begin()), w03val.begin(),
-          endPair.second, w03vert.begin(), w03.begin());
+  scatter(policy, w03val.begin(), endPair.second, w03vert.begin(), w03.begin());
 
   if (reverse)
-    transform(autoPolicy(w03.size()), w03.begin(), w03.end(), w03.begin(),
+    transform(policy, w03.begin(), w03.end(), w03.begin(),
               thrust::negate<int>());
   return w03;
 };
@@ -494,7 +513,10 @@ VecDH<int> Winding03(const Manifold::Impl &inP, SparseIndices &p0q2,
 namespace manifold {
 Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ,
                    Manifold::OpType op)
-    : inP_(inP), inQ_(inQ), expandP_(op == Manifold::OpType::ADD ? 1.0 : -1.0) {
+    : inP_(inP),
+      inQ_(inQ),
+      expandP_(op == Manifold::OpType::ADD ? 1.0 : -1.0),
+      policy_(autoPolicy(glm::max(inP.NumEdge(), inQ.NumEdge()))) {
   // Symbolic perturbation:
   // Union -> expand inP
   // Difference, Intersection -> contract inP
@@ -514,27 +536,29 @@ Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ,
   // Level 3
   // Find edge-triangle overlaps (broad phase)
   p1q2_ = inQ_.EdgeCollisions(inP_);
-  p1q2_.Sort();
+  p2q1_ = inP_.EdgeCollisions(inQ_);
+
+  policy_ = autoPolicy(glm::max(p1q2_.size(), p2q1_.size()));
+  p1q2_.Sort(policy_);
   PRINT("p1q2 size = " << p1q2_.size());
 
-  p2q1_ = inP_.EdgeCollisions(inQ_);
   p2q1_.SwapPQ();
-  p2q1_.Sort();
+  p2q1_.Sort(policy_);
   PRINT("p2q1 size = " << p2q1_.size());
 
   // Level 2
   // Find vertices that overlap faces in XY-projection
   SparseIndices p0q2 = inQ.VertexCollisionsZ(inP.vertPos_);
-  p0q2.Sort();
+  p0q2.Sort(policy_);
   PRINT("p0q2 size = " << p0q2.size());
 
   SparseIndices p2q0 = inP.VertexCollisionsZ(inQ.vertPos_);
   p2q0.SwapPQ();
-  p2q0.Sort();
+  p2q0.Sort(policy_);
   PRINT("p2q0 size = " << p2q0.size());
 
   // Find involved edge pairs from Level 3
-  SparseIndices p1q1 = Filter11(inP_, inQ_, p1q2_, p2q1_);
+  SparseIndices p1q1 = Filter11(inP_, inQ_, p1q2_, p2q1_, policy_);
   PRINT("p1q1 size = " << p1q1.size());
 
 #ifdef MANIFOLD_DEBUG
@@ -548,37 +572,37 @@ Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ,
   // each edge, keeping only those whose intersection exists.
   VecDH<int> s11;
   VecDH<glm::vec4> xyzz11;
-  std::tie(s11, xyzz11) = Shadow11(p1q1, inP, inQ, expandP_);
+  std::tie(s11, xyzz11) = Shadow11(p1q1, inP, inQ, expandP_, policy_);
   PRINT("s11 size = " << s11.size());
 
   // Build up Z-projection of vertices onto triangles, keeping only those that
   // fall inside the triangle.
   VecDH<int> s02;
   VecDH<float> z02;
-  std::tie(s02, z02) = Shadow02(inP, inQ, p0q2, true, expandP_);
+  std::tie(s02, z02) = Shadow02(inP, inQ, p0q2, true, expandP_, policy_);
   PRINT("s02 size = " << s02.size());
 
   VecDH<int> s20;
   VecDH<float> z20;
-  std::tie(s20, z20) = Shadow02(inQ, inP, p2q0, false, expandP_);
+  std::tie(s20, z20) = Shadow02(inQ, inP, p2q0, false, expandP_, policy_);
   PRINT("s20 size = " << s20.size());
 
   // Level 3
   // Build up the intersection of the edges and triangles, keeping only those
   // that intersect, and record the direction the edge is passing through the
   // triangle.
-  std::tie(x12_, v12_) =
-      Intersect12(inP, inQ, s02, p0q2, s11, p1q1, z02, xyzz11, p1q2_, true);
+  std::tie(x12_, v12_) = Intersect12(inP, inQ, s02, p0q2, s11, p1q1, z02,
+                                     xyzz11, p1q2_, true, policy_);
   PRINT("x12 size = " << x12_.size());
 
-  std::tie(x21_, v21_) =
-      Intersect12(inQ, inP, s20, p2q0, s11, p1q1, z20, xyzz11, p2q1_, false);
+  std::tie(x21_, v21_) = Intersect12(inQ, inP, s20, p2q0, s11, p1q1, z20,
+                                     xyzz11, p2q1_, false, policy_);
   PRINT("x21 size = " << x21_.size());
 
   // Sum up the winding numbers of all vertices.
-  w03_ = Winding03(inP, p0q2, s02, false);
+  w03_ = Winding03(inP, p0q2, s02, false, policy_);
 
-  w30_ = Winding03(inQ, p2q0, s20, true);
+  w30_ = Winding03(inQ, p2q0, s20, true, policy_);
 
 #ifdef MANIFOLD_DEBUG
   intersections.Stop();
