@@ -15,7 +15,6 @@
 project(manifold_test)
 
 add_subdirectory(third_party)
-add_subdirectory(meshIO)
 
 enable_testing()
 
@@ -24,6 +23,7 @@ add_executable(${PROJECT_NAME} ${SOURCE_FILES})
 target_link_libraries(${PROJECT_NAME} polygon GTest::GTest manifold samples samplesGPU)
 
 if(MANIFOLD_EXPORT)
+  add_subdirectory(meshIO)
   target_link_libraries(${PROJECT_NAME} meshIO)
   target_compile_options(${PROJECT_NAME} PUBLIC -DMANIFOLD_EXPORT)
 endif()

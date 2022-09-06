@@ -36,25 +36,8 @@ option(PYBIND11_FINDPYTHON on)
 option(BUILD_TEST_CGAL off)
 
 option(BUILD_SHARED_LIBS off)
-set(ASSIMP_INC_DIR
-    ${PROJECT_SOURCE_DIR}/test/third_party/assimp/include
-    ${CMAKE_BINARY_DIR}/test/third_party/assimp/include)
 set(GLM_INC_DIR ${PROJECT_SOURCE_DIR}/src/third_party/glm)
 set(PYBIND11_DIR ${PROJECT_SOURCE_DIR}/bindings/python/third_party/pybind11)
-
-option(ASSIMP_FAST_BUILD "build ASSIMP just for tests" ON)
-
-if(ASSIMP_FAST_BUILD)
-    option(ASSIMP_INSTALL FALSE)
-    option(ASSIMP_BUILD_ALL_IMPORTERS_BY_DEFAULT FALSE)
-    option(ASSIMP_BUILD_ALL_EXPORTERS_BY_DEFAULT FALSE)
-
-    foreach(FMT OBJ;PLY;STL;GLTF)
-        set(ASSIMP_BUILD_${FMT}_IMPORTER TRUE)
-        set(ASSIMP_BUILD_${FMT}_EXPORTER TRUE)
-    endforeach()
-endif()
-
 set(THRUST_INC_DIR ${PROJECT_SOURCE_DIR}/src/third_party/thrust)
 
 if(MANIFOLD_USE_CUDA)
