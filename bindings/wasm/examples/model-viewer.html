@@ -3,13 +3,14 @@
 <meta name="viewport">
 
 <body>
-  Back to <a href="index.html">basics</a>.
+  This example demonstrates feeding Manifold's output into <a href="https://modelviewer.dev/">&lt;model-viewer&gt;</a>
+  via the three.js GLTFExporter. The most basic three.js example is <a href="index.html">here</a>.<br />
   <select>
     <option value="Difference" selected>Difference</option>
     <option value="Intersection">Intersection</option>
     <option value="Union">Union</option>
   </select>
-  <model-viewer camera-controls shadow-intensity="1"></model-viewer>
+  <model-viewer camera-controls shadow-intensity="1" alt="Output of mesh Boolean operation"></model-viewer>
 </body>
 
 <style>
@@ -25,18 +26,11 @@
 <script>
   var Module = {
     onRuntimeInitialized: function () {
-      // we have manifold module, let's do some three.js
-      const camera = new THREE.PerspectiveCamera(30, 0.75, 0.01, 10);
-      camera.position.z = 1;
-
-      const scene = new THREE.Scene();
       const mesh = new THREE.Mesh(undefined, new THREE.MeshStandardMaterial({
         color: 'yellow',
-        flatShading: true,
         metalness: 1,
         roughness: 0.2
       }));
-      scene.add(mesh);
 
       const geometry_1 = simplify(new THREE.BoxGeometry(0.2, 0.2, 0.2));
       const geometry_2 = simplify(new THREE.IcosahedronGeometry(0.16));
@@ -49,7 +43,7 @@
         mesh.geometry = mesh2geometry(
           Module[operation](manifold_1, manifold_2).GetMesh()
         );
-        exportGLTF(mesh);
+        push2MV(mesh);
       };
 
       document.querySelector('select').onchange = function (event) {
@@ -64,7 +58,7 @@
   let objectURL = null;
   const exporter = new THREE.GLTFExporter();
 
-  function exportGLTF(mesh) {
+  function push2MV(mesh) {
     exporter.parse(
       mesh,
       (gltf) => {
@@ -73,7 +67,7 @@
         objectURL = URL.createObjectURL(blob);
         mv.src = objectURL;
       },
-      () => console.log('export failed!'),
+      () => console.log('GLTF export failed!'),
       { binary: true }
     );
   }
@@ -131,7 +125,7 @@
     return simplified;
   }
 </script>
-<script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
 <script src="manifold.js"></script>
+<script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
 
 </html>
