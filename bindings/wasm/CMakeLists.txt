@@ -4,7 +4,7 @@
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     https://www.apache.org/licenses/LICENSE-2.0
+# https://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -20,4 +20,6 @@ target_compile_options(manifoldjs PRIVATE ${MANIFOLD_FLAGS} -fexceptions)
 target_link_options(manifoldjs PUBLIC --bind)
 target_compile_features(manifoldjs PUBLIC cxx_std_14)
 set_target_properties(manifoldjs PROPERTIES OUTPUT_NAME "manifold")
-file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/examples/index.html DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+
+file(GLOB_RECURSE WEB_FILES CONFIGURE_DEPENDS *.html)
+file(COPY ${WEB_FILES} DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
