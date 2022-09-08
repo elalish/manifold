@@ -1,7 +1,27 @@
 <!doctype html>
 <html>
-<script src="https://unpkg.com/three@0.142.0/build/three.js"></script>
-<script src="https://unpkg.com/three@0.142.0/examples/js/utils/BufferGeometryUtils.js"></script>
+<meta name="viewport">
+
+<body>
+  Back to <a href="index.html">basics</a>.
+  <select>
+    <option value="Difference" selected>Difference</option>
+    <option value="Intersection">Intersection</option>
+    <option value="Union">Union</option>
+  </select>
+  <model-viewer camera-controls shadow-intensity="1"></model-viewer>
+</body>
+
+<style>
+  model-viewer {
+    width: 600px;
+    height: 600px;
+  }
+</style>
+
+<script src="https://unpkg.com/three@0.144.0/build/three.js"></script>
+<script src="https://unpkg.com/three@0.144.0/examples/js/utils/BufferGeometryUtils.js"></script>
+<script src="https://unpkg.com/three@0.144.0/examples/js/exporters/GLTFExporter.js"></script>
 <script>
   var Module = {
     onRuntimeInitialized: function () {
@@ -10,8 +30,11 @@
       camera.position.z = 1;
 
       const scene = new THREE.Scene();
-      const mesh = new THREE.Mesh(undefined, new THREE.MeshNormalMaterial({
-        flatShading: true
+      const mesh = new THREE.Mesh(undefined, new THREE.MeshStandardMaterial({
+        color: 'yellow',
+        flatShading: true,
+        metalness: 1,
+        roughness: 0.2
       }));
       scene.add(mesh);
 
@@ -26,6 +49,7 @@
         mesh.geometry = mesh2geometry(
           Module[operation](manifold_1, manifold_2).GetMesh()
         );
+        exportGLTF(mesh);
       };
 
       document.querySelector('select').onchange = function (event) {
@@ -33,18 +57,26 @@
       };
 
       csg('Difference');
-
-      const renderer = new THREE.WebGLRenderer({ antialias: true });
-      document.body.appendChild(renderer.domElement);
-      renderer.setSize(300, 400);
-      renderer.setAnimationLoop(function (time) {
-        mesh.rotation.x = time / 2000;
-        mesh.rotation.y = time / 1000;
-        renderer.render(scene, camera);
-      });
-
     }
   };
+
+  const mv = document.querySelector('model-viewer');
+  let objectURL = null;
+  const exporter = new THREE.GLTFExporter();
+
+  function exportGLTF(mesh) {
+    exporter.parse(
+      mesh,
+      (gltf) => {
+        const blob = new Blob([gltf], { type: 'application/octet-stream' });
+        URL.revokeObjectURL(objectURL);
+        objectURL = URL.createObjectURL(blob);
+        mv.src = objectURL;
+      },
+      () => console.log('export failed!'),
+      { binary: true }
+    );
+  }
 
   // functions to convert between three.js and wasm
   function geometry2mesh(geometry) {
@@ -56,13 +88,13 @@
     };
     const temp = new THREE.Vector3();
     const p = geometry.attributes.position;
-    const n = geometry.attributes.normal;
+    // const n = geometry.attributes.normal;
     const x = geometry.index;
     for (let i = 0; i < p.count; i++) {
       temp.fromBufferAttribute(p, i);
       mesh.vertPos.push_back(temp);
-      temp.fromBufferAttribute(n, i);
-      mesh.vertNormal.push_back(temp);
+      // temp.fromBufferAttribute(n, i);
+      // mesh.vertNormal.push_back(temp);
     }
     for (let i = 0; i < x.count; i += 3) {
       mesh.triVerts.push_back(x.array.subarray(i, i + 3));
@@ -77,15 +109,15 @@
     for (i = 0, s = mesh.vertPos.size(); i < s; i++) {
       v = mesh.vertPos.get(i);
       p.push(v.x, v.y, v.z);
-      v = mesh.vertNormal.get(i);
-      n.push(v.x, v.y, v.z);
+      // v = mesh.vertNormal.get(i);
+      // n.push(v.x, v.y, v.z);
     }
     for (i = 0, s = mesh.triVerts.size(); i < s; i++) {
       v = mesh.triVerts.get(i);
       x.push(v[0], v[1], v[2]);
     }
     geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(p), 3));
-    geometry.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(n), 3));
+    // geometry.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(n), 3));
     geometry.setIndex(new THREE.BufferAttribute(new Uint8Array(x), 1));
     return geometry;
   }
@@ -99,15 +131,7 @@
     return simplified;
   }
 </script>
+<script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
 <script src="manifold.js"></script>
-
-<body>
-  Back to <a href="index.html">basics</a>.
-  <select>
-    <option value="Difference" selected>Difference</option>
-    <option value="Intersection">Intersection</option>
-    <option value="Union">Union</option>
-  </select>
-</body>
 
 </html>
