@@ -143,6 +143,7 @@ struct TmpEdge {
     return first == other.first ? second < other.second : first < other.first;
   }
 };
+/** @} */
 
 struct Halfedge2Tmp {
   __host__ __device__ void operator()(
@@ -191,5 +192,4 @@ inline std::ostream& operator<<(std::ostream& stream, const Halfedge& edge) {
                 << ", face = " << edge.face;
 }
 #endif
-/** @} */
 }  // namespace manifold

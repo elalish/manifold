@@ -19,7 +19,7 @@
 
 namespace manifold {
 
-/** @addtogroup Connections
+/** @addtogroup Debug
  *  @{
  */
 

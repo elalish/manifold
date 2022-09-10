@@ -20,6 +20,13 @@
 
 namespace manifold {
 
+/**
+ * @ingroup Debug
+ *
+ * Allows modification of the assertions checked in MANIFOLD_DEBUG mode.
+ *
+ * @return ExecutionParams&
+ */
 ExecutionParams& ManifoldParams();
 
 class CsgNode;

@@ -39,27 +39,6 @@ constexpr float kTolerance = 1e-5;
 #define HOST_DEVICE
 #endif
 
-#ifdef MANIFOLD_DEBUG
-/** @defgroup Exceptions
- *  @brief Custom exceptions
- * These exceptions are only thrown if the library is compiled with the
- * MANIFOLD_EXCEPTIONS flag. Most of these are also assertions, and will only be
- * checked if the MANIFOLD_DEBUG flag is set.
- *  @{
- */
-struct userErr : public virtual std::runtime_error {
-  using std::runtime_error::runtime_error;
-};
-struct topologyErr : public virtual std::runtime_error {
-  using std::runtime_error::runtime_error;
-};
-struct geometryErr : public virtual std::runtime_error {
-  using std::runtime_error::runtime_error;
-};
-using logicErr = std::logic_error;
-/** @} */
-#endif
-
 /** @defgroup Connections
  *  @brief Move data in and out of the Manifold class.
  *  @{
@@ -136,25 +115,6 @@ inline HOST_DEVICE int CCW(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2,
   else
     return area > 0 ? 1 : -1;
 }
-
-/**
- * Global parameters that control debugging output. Only has an
- * effect when compiled with the MANIFOLD_DEBUG flag.
- */
-struct ExecutionParams {
-  /// Perform extra sanity checks and assertions on the intermediate data
-  /// structures.
-  bool intermediateChecks = false;
-  /// Verbose output primarily of the Boolean, including timing info and vector
-  /// sizes.
-  bool verbose = false;
-  /// If processOverlaps is false, a geometric check will be performed to assert
-  /// all triangles are CCW.
-  bool processOverlaps = false;
-  /// Suppresses printed errors regarding CW triangles. Has no effect if
-  /// processOverlaps is true.
-  bool suppressErrors = false;
-};
 
 /**
  * Polygon vertex.
@@ -436,6 +396,55 @@ struct Box {
     return glm::all(glm::isfinite(min)) && glm::all(glm::isfinite(max));
   }
 };
+
+/** @defgroup Debug
+ *  @brief Debugging features
+ *
+ * The features require compiler flags to be enabled. Assertions are enabled
+ * with the MANIFOLD_DEBUG flag and then controlled with ExecutionParams.
+ * Exceptions are only thrown if the MANIFOLD_EXCEPTIONS flag is set. Import and
+ * Export of 3D models is only supported with the MANIFOLD_EXPORT flag, which
+ * also requires linking in the Assimp dependency.
+ *  @{
+ */
+
+/** @defgroup Exceptions
+ *  @brief Custom Exceptions
+ * @{
+ */
+#ifdef MANIFOLD_DEBUG
+struct userErr : public virtual std::runtime_error {
+  using std::runtime_error::runtime_error;
+};
+struct topologyErr : public virtual std::runtime_error {
+  using std::runtime_error::runtime_error;
+};
+struct geometryErr : public virtual std::runtime_error {
+  using std::runtime_error::runtime_error;
+};
+using logicErr = std::logic_error;
+#endif
+/** @} */
+
+/**
+ * Global parameters that control debugging output. Only has an
+ * effect when compiled with the MANIFOLD_DEBUG flag.
+ */
+struct ExecutionParams {
+  /// Perform extra sanity checks and assertions on the intermediate data
+  /// structures.
+  bool intermediateChecks = false;
+  /// Verbose output primarily of the Boolean, including timing info and vector
+  /// sizes.
+  bool verbose = false;
+  /// If processOverlaps is false, a geometric check will be performed to assert
+  /// all triangles are CCW.
+  bool processOverlaps = false;
+  /// Suppresses printed errors regarding CW triangles. Has no effect if
+  /// processOverlaps is true.
+  bool suppressErrors = false;
+};
+/** @} */
 
 #ifdef MANIFOLD_DEBUG
 inline std::ostream& operator<<(std::ostream& stream, const Box& box) {
