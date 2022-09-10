@@ -111,6 +111,21 @@ __host__ __device__ inline glm::vec3 GetBarycentric(const glm::vec3& v,
 }
 
 /**
+ * The fundamental component of the halfedge data structure used for storing and
+ * operating on the Manifold.
+ */
+struct Halfedge {
+  int startVert, endVert;
+  int pairedHalfedge;
+  int face;
+  __host__ __device__ bool IsForward() const { return startVert < endVert; }
+  __host__ __device__ bool operator<(const Halfedge& other) const {
+    return startVert == other.startVert ? endVert < other.endVert
+                                        : startVert < other.startVert;
+  }
+};
+
+/**
  * This is a temporary edge strcture which only stores edges forward and
  * references the halfedge it was created from.
  */
@@ -128,6 +143,7 @@ struct TmpEdge {
     return first == other.first ? second < other.second : first < other.first;
   }
 };
+/** @} */
 
 struct Halfedge2Tmp {
   __host__ __device__ void operator()(
@@ -167,5 +183,13 @@ struct ReindexEdge {
     edge = edges[edge].halfedgeIdx;
   }
 };
-/** @} */
+
+#ifdef MANIFOLD_DEBUG
+inline std::ostream& operator<<(std::ostream& stream, const Halfedge& edge) {
+  return stream << "startVert = " << edge.startVert
+                << ", endVert = " << edge.endVert
+                << ", pairedHalfedge = " << edge.pairedHalfedge
+                << ", face = " << edge.face;
+}
+#endif
 }  // namespace manifold

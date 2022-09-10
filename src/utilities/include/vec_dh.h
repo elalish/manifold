@@ -18,9 +18,13 @@
 #endif
 
 #include "par.h"
-#include "structs.h"
+#include "public.h"
 
 namespace manifold {
+
+/** @addtogroup Private
+ *  @{
+ */
 
 // Vector implementation optimized for managed memory, will perform memory
 // prefetching to minimize page faults and use parallel/GPU copy/fill depending

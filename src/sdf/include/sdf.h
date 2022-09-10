@@ -14,7 +14,7 @@
 
 #pragma once
 
-#include "structs.h"
+#include "public.h"
 #include "utils.h"
 #include "vec_dh.h"
 
@@ -372,9 +372,9 @@ namespace manifold {
  * the manifold, which is due to the underlying grid.
  *
  * @param sdf The signed-distance functor, containing this function signature:
- * __host__ __device__ float operator()(glm::vec3 point), which returns the
+ * `__host__ __device__ float operator()(glm::vec3 point)`, which returns the
  * signed distance of a given point in R^3. Positive values are inside,
- * negative outside. The __host__ __device__ is only needed if you compile for
+ * negative outside. The `__host__ __device__` is only needed if you compile for
  * CUDA. If you are using a large grid, the advantage of a GPU speedup is
  * quite significant.
  * @param bounds An axis-aligned box that defines the extent of the grid.

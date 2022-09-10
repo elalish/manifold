@@ -15,12 +15,17 @@
 #pragma once
 #include <string>
 
-#include "structs.h"
+#include "public.h"
 
 namespace manifold {
 
-/** @addtogroup Connections
+/** @addtogroup Debug
  *  @{
+ */
+
+/** @defgroup MeshIO
+ *  @brief 3D model file I/O based on Assimp
+ * @{
  */
 
 /**
@@ -55,5 +60,6 @@ Mesh ImportMesh(const std::string& filename, bool forceCleanup = false);
 
 void ExportMesh(const std::string& filename, const Mesh& mesh,
                 const ExportOptions& options);
+/** @} */
 /** @} */
 }  // namespace manifold

@@ -14,7 +14,7 @@
 
 #pragma once
 #include "gtest/gtest.h"
-#include "structs.h"
+#include "public.h"
 
 struct Options {
   bool exportModels = false;
