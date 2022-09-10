@@ -29,6 +29,10 @@ using namespace manifold;
 ExecutionParams params;
 
 #ifdef MANIFOLD_DEBUG
+struct Polyedge {
+  int startVert, endVert;
+};
+
 bool OverlapAssert(bool condition, const char *file, int line,
                    const std::string &cond, const std::string &msg) {
   if (!params.processOverlaps && !condition) {
@@ -62,48 +66,48 @@ bool OverlapAssert(bool condition, const char *file, int line,
 #define PRINT(msg) \
   if (params.verbose) std::cout << msg << std::endl;
 
-std::vector<Halfedge> Polygons2Edges(const Polygons &polys) {
-  std::vector<Halfedge> halfedges;
+std::vector<Polyedge> Polygons2Edges(const Polygons &polys) {
+  std::vector<Polyedge> halfedges;
   for (const auto &poly : polys) {
     for (int i = 1; i < poly.size(); ++i) {
-      halfedges.push_back({poly[i - 1].idx, poly[i].idx, -1});
+      halfedges.push_back({poly[i - 1].idx, poly[i].idx});
     }
-    halfedges.push_back({poly.back().idx, poly[0].idx, -1});
+    halfedges.push_back({poly.back().idx, poly[0].idx});
   }
   return halfedges;
 }
 
-std::vector<Halfedge> Triangles2Edges(
+std::vector<Polyedge> Triangles2Edges(
     const std::vector<glm::ivec3> &triangles) {
-  std::vector<Halfedge> halfedges;
+  std::vector<Polyedge> halfedges;
   for (const glm::ivec3 &tri : triangles) {
-    halfedges.push_back({tri[0], tri[1], -1});
-    halfedges.push_back({tri[1], tri[2], -1});
-    halfedges.push_back({tri[2], tri[0], -1});
+    halfedges.push_back({tri[0], tri[1]});
+    halfedges.push_back({tri[1], tri[2]});
+    halfedges.push_back({tri[2], tri[0]});
   }
   return halfedges;
 }
 
-void CheckTopology(const std::vector<Halfedge> &halfedges) {
+void CheckTopology(const std::vector<Polyedge> &halfedges) {
   ASSERT(halfedges.size() % 2 == 0, topologyErr, "Odd number of halfedges.");
   size_t n_edges = halfedges.size() / 2;
-  std::vector<Halfedge> forward(halfedges.size()), backward(halfedges.size());
+  std::vector<Polyedge> forward(halfedges.size()), backward(halfedges.size());
 
   auto end = std::copy_if(halfedges.begin(), halfedges.end(), forward.begin(),
-                          [](Halfedge e) { return e.endVert > e.startVert; });
+                          [](Polyedge e) { return e.endVert > e.startVert; });
   ASSERT(std::distance(forward.begin(), end) == n_edges, topologyErr,
          "Half of halfedges should be forward.");
   forward.resize(n_edges);
 
   end = std::copy_if(halfedges.begin(), halfedges.end(), backward.begin(),
-                     [](Halfedge e) { return e.endVert < e.startVert; });
+                     [](Polyedge e) { return e.endVert < e.startVert; });
   ASSERT(std::distance(backward.begin(), end) == n_edges, topologyErr,
          "Half of halfedges should be backward.");
   backward.resize(n_edges);
 
   std::for_each(backward.begin(), backward.end(),
-                [](Halfedge &e) { std::swap(e.startVert, e.endVert); });
-  auto cmp = [](const Halfedge &a, const Halfedge &b) {
+                [](Polyedge &e) { std::swap(e.startVert, e.endVert); });
+  auto cmp = [](const Polyedge &a, const Polyedge &b) {
     return a.startVert < b.startVert ||
            (a.startVert == b.startVert && a.endVert < b.endVert);
   };
@@ -126,10 +130,10 @@ void CheckTopology(const std::vector<Halfedge> &halfedges) {
 
 void CheckTopology(const std::vector<glm::ivec3> &triangles,
                    const Polygons &polys) {
-  std::vector<Halfedge> halfedges = Triangles2Edges(triangles);
-  std::vector<Halfedge> openEdges = Polygons2Edges(polys);
-  for (Halfedge e : openEdges) {
-    halfedges.push_back({e.endVert, e.startVert, -1, e.face});
+  std::vector<Polyedge> halfedges = Triangles2Edges(triangles);
+  std::vector<Polyedge> openEdges = Polygons2Edges(polys);
+  for (Polyedge e : openEdges) {
+    halfedges.push_back({e.endVert, e.startVert});
   }
   CheckTopology(halfedges);
 }
@@ -271,7 +275,7 @@ class Monotones {
   void Check() {
 #ifdef MANIFOLD_DEBUG
     if (!params.intermediateChecks) return;
-    std::vector<Halfedge> edges;
+    std::vector<Polyedge> edges;
     for (VertItr vert = monotones_.begin(); vert != monotones_.end(); vert++) {
       vert->SetProcessed(false);
       edges.push_back({vert->mesh_idx, vert->right->mesh_idx});

@@ -39,60 +39,6 @@ constexpr float kTolerance = 1e-5;
 #define HOST_DEVICE
 #endif
 
-#ifdef MANIFOLD_DEBUG
-/** @defgroup Exceptions
- *  @brief Custom exceptions
- *  @{
- */
-struct userErr : public virtual std::runtime_error {
-  using std::runtime_error::runtime_error;
-};
-struct topologyErr : public virtual std::runtime_error {
-  using std::runtime_error::runtime_error;
-};
-struct geometryErr : public virtual std::runtime_error {
-  using std::runtime_error::runtime_error;
-};
-using logicErr = std::logic_error;
-/** @} */
-#endif
-
-/** @addtogroup Private
- *  @{
- */
-inline HOST_DEVICE int Signum(float val) { return (val > 0) - (val < 0); }
-
-inline HOST_DEVICE int CCW(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2,
-                           float tol) {
-  glm::vec2 v1 = p1 - p0;
-  glm::vec2 v2 = p2 - p0;
-  float area = v1.x * v2.y - v1.y * v2.x;
-  float base2 = glm::max(glm::dot(v1, v1), glm::dot(v2, v2));
-  if (area * area <= base2 * tol * tol)
-    return 0;
-  else
-    return area > 0 ? 1 : -1;
-}
-
-struct ExecutionParams {
-  bool intermediateChecks = false;
-  bool verbose = false;
-  bool suppressErrors = false;
-  bool processOverlaps = false;
-};
-
-struct Halfedge {
-  int startVert, endVert;
-  int pairedHalfedge;
-  int face;
-  HOST_DEVICE bool IsForward() const { return startVert < endVert; }
-  HOST_DEVICE bool operator<(const Halfedge& other) const {
-    return startVert == other.startVert ? endVert < other.endVert
-                                        : startVert < other.startVert;
-  }
-};
-/** @} */
-
 /** @defgroup Connections
  *  @brief Move data in and out of the Manifold class.
  *  @{
@@ -143,6 +89,39 @@ inline HOST_DEVICE glm::mat4x3 RotateUp(glm::vec3 up) {
 }
 
 /**
+ * Returns 1 for positive values, -1 for negative, and 0 for exactly zero.
+ */
+inline HOST_DEVICE int Signum(float val) { return (val > 0) - (val < 0); }
+
+/**
+ * Determines if the three points are wound counter-clockwise, clockwise, or
+ * colinear within the specified tolerance.
+ *
+ * @param p0 First point
+ * @param p1 Second point
+ * @param p2 Third point
+ * @param tol Tolerance value for colinearity
+ * @return int, like Signum, this returns 1 for CCW, -1 for CW, and 0 if within
+ * tol of colinear.
+ */
+inline HOST_DEVICE int CCW(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2,
+                           float tol) {
+  glm::vec2 v1 = p1 - p0;
+  glm::vec2 v2 = p2 - p0;
+  float area = v1.x * v2.y - v1.y * v2.x;
+  float base2 = glm::max(glm::dot(v1, v1), glm::dot(v2, v2));
+  if (area * area <= base2 * tol * tol)
+    return 0;
+  else
+    return area > 0 ? 1 : -1;
+}
+
+/** @defgroup Polygon
+ *  @brief Polygon data structures
+ * @{
+ */
+
+/**
  * Polygon vertex.
  */
 struct PolyVert {
@@ -166,6 +145,7 @@ using SimplePolygon = std::vector<PolyVert>;
  * [&epsilon;-valid](https://github.com/elalish/manifold/wiki/Manifold-Library#definition-of-%CE%B5-valid).
  */
 using Polygons = std::vector<SimplePolygon>;
+/** @} */
 
 /**
  * The triangle-mesh input and output of this library.
@@ -237,9 +217,11 @@ struct BaryRef {
   /// vertices have negative values referring to Mesh.triVerts[tri][i + 3].
   glm::ivec3 vertBary;
 };
+/** @} */
 
 /**
- * Represents the relationship of this output Mesh to all input Meshes that
+ *  @ingroup Connections
+ *  Represents the relationship of this output Mesh to all input Meshes that
  * eventually led to it, see Manifold.GetMeshRelation().
  */
 struct MeshRelation {
@@ -270,6 +252,7 @@ struct MeshRelation {
 };
 
 /**
+ * @ingroup Connections
  * Axis-aligned bounding box
  */
 struct Box {
@@ -420,19 +403,74 @@ struct Box {
   }
 };
 
+/** @defgroup Debug
+ *  @brief Debugging features
+ *
+ * The features require compiler flags to be enabled. Assertions are enabled
+ * with the MANIFOLD_DEBUG flag and then controlled with ExecutionParams.
+ * Exceptions are only thrown if the MANIFOLD_EXCEPTIONS flag is set. Import and
+ * Export of 3D models is only supported with the MANIFOLD_EXPORT flag, which
+ * also requires linking in the Assimp dependency.
+ *  @{
+ */
+
+/** @defgroup Exceptions
+ *  @brief Custom Exceptions
+ * @{
+ */
 #ifdef MANIFOLD_DEBUG
+struct userErr : public virtual std::runtime_error {
+  using std::runtime_error::runtime_error;
+};
+struct topologyErr : public virtual std::runtime_error {
+  using std::runtime_error::runtime_error;
+};
+struct geometryErr : public virtual std::runtime_error {
+  using std::runtime_error::runtime_error;
+};
+using logicErr = std::logic_error;
+#endif
+/** @} */
+
+/**
+ * Global parameters that control debugging output. Only has an
+ * effect when compiled with the MANIFOLD_DEBUG flag.
+ */
+struct ExecutionParams {
+  /// Perform extra sanity checks and assertions on the intermediate data
+  /// structures.
+  bool intermediateChecks = false;
+  /// Verbose output primarily of the Boolean, including timing info and vector
+  /// sizes.
+  bool verbose = false;
+  /// If processOverlaps is false, a geometric check will be performed to assert
+  /// all triangles are CCW.
+  bool processOverlaps = false;
+  /// Suppresses printed errors regarding CW triangles. Has no effect if
+  /// processOverlaps is true.
+  bool suppressErrors = false;
+};
+
+#ifdef MANIFOLD_DEBUG
+/**
+ * Print the contents of this vector to standard output. Only exists if compiled
+ * with MANIFOLD_DEBUG flag.
+ */
+template <typename T>
+void Dump(const std::vector<T>& vec) {
+  std::cout << "Vec = " << std::endl;
+  for (int i = 0; i < vec.size(); ++i) {
+    std::cout << i << ", " << vec[i] << ", " << std::endl;
+  }
+  std::cout << std::endl;
+}
+/** @} */
+
 inline std::ostream& operator<<(std::ostream& stream, const Box& box) {
   return stream << "min: " << box.min.x << ", " << box.min.y << ", "
                 << box.min.z << ", "
                 << "max: " << box.max.x << ", " << box.max.y << ", "
                 << box.max.z;
-}
-
-inline std::ostream& operator<<(std::ostream& stream, const Halfedge& edge) {
-  return stream << "startVert = " << edge.startVert
-                << ", endVert = " << edge.endVert
-                << ", pairedHalfedge = " << edge.pairedHalfedge
-                << ", face = " << edge.face;
 }
 
 template <typename T>
@@ -463,19 +501,6 @@ inline std::ostream& operator<<(std::ostream& stream, const BaryRef& ref) {
                 << ", originalID: " << ref.originalID << ", tri: " << ref.tri
                 << ", uvw idx: " << ref.vertBary;
 }
-
-/**
- * Print the contents of this vector to standard output.
- */
-template <typename T>
-void Dump(const std::vector<T>& vec) {
-  std::cout << "Vec = " << std::endl;
-  for (int i = 0; i < vec.size(); ++i) {
-    std::cout << i << ", " << vec[i] << ", " << std::endl;
-  }
-  std::cout << std::endl;
-}
-/** @} */
 #endif
 }  // namespace manifold
 

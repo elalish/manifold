@@ -17,7 +17,7 @@
 
 #include "optional_assert.h"
 #include "par.h"
-#include "structs.h"
+#include "public.h"
 #include "utils.h"
 #include "vec_dh.h"
 
