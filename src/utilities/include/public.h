@@ -116,6 +116,11 @@ inline HOST_DEVICE int CCW(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2,
     return area > 0 ? 1 : -1;
 }
 
+/** @defgroup Polygon
+ *  @brief Polygon data structures
+ * @{
+ */
+
 /**
  * Polygon vertex.
  */
@@ -140,6 +145,7 @@ using SimplePolygon = std::vector<PolyVert>;
  * [&epsilon;-valid](https://github.com/elalish/manifold/wiki/Manifold-Library#definition-of-%CE%B5-valid).
  */
 using Polygons = std::vector<SimplePolygon>;
+/** @} */
 
 /**
  * The triangle-mesh input and output of this library.
@@ -444,9 +450,22 @@ struct ExecutionParams {
   /// processOverlaps is true.
   bool suppressErrors = false;
 };
-/** @} */
 
 #ifdef MANIFOLD_DEBUG
+/**
+ * Print the contents of this vector to standard output. Only exists if compiled
+ * with MANIFOLD_DEBUG flag.
+ */
+template <typename T>
+void Dump(const std::vector<T>& vec) {
+  std::cout << "Vec = " << std::endl;
+  for (int i = 0; i < vec.size(); ++i) {
+    std::cout << i << ", " << vec[i] << ", " << std::endl;
+  }
+  std::cout << std::endl;
+}
+/** @} */
+
 inline std::ostream& operator<<(std::ostream& stream, const Box& box) {
   return stream << "min: " << box.min.x << ", " << box.min.y << ", "
                 << box.min.z << ", "
@@ -481,18 +500,6 @@ inline std::ostream& operator<<(std::ostream& stream, const BaryRef& ref) {
   return stream << "meshID: " << ref.meshID
                 << ", originalID: " << ref.originalID << ", tri: " << ref.tri
                 << ", uvw idx: " << ref.vertBary;
-}
-
-/**
- * Print the contents of this vector to standard output.
- */
-template <typename T>
-void Dump(const std::vector<T>& vec) {
-  std::cout << "Vec = " << std::endl;
-  for (int i = 0; i < vec.size(); ++i) {
-    std::cout << i << ", " << vec[i] << ", " << std::endl;
-  }
-  std::cout << std::endl;
 }
 #endif
 }  // namespace manifold

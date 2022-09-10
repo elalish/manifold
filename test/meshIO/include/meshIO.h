@@ -23,6 +23,11 @@ namespace manifold {
  *  @{
  */
 
+/** @defgroup MeshIO
+ *  @brief 3D model file I/O based on Assimp
+ * @{
+ */
+
 /**
  * PBR material properties for GLB/glTF files.
  */
@@ -55,5 +60,6 @@ Mesh ImportMesh(const std::string& filename, bool forceCleanup = false);
 
 void ExportMesh(const std::string& filename, const Mesh& mesh,
                 const ExportOptions& options);
+/** @} */
 /** @} */
 }  // namespace manifold
