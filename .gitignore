@@ -106,5 +106,7 @@ Temporary Items
 # End of https://www.gitignore.io/api/osx,c++,cuda,linux,cmake
 
 build
+buildWASM
+docs/html
 __pycache__
 .vscode/c_cpp_properties.json
