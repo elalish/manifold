@@ -16,7 +16,7 @@
 #include <functional>
 #include <memory>
 
-#include "structs.h"
+#include "public.h"
 
 namespace manifold {
 

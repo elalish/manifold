@@ -15,7 +15,7 @@
 
 #pragma once
 
-#include "structs.h"
+#include "public.h"
 
 #ifdef MANIFOLD_DEBUG
 #include <iostream>

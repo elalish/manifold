@@ -18,7 +18,7 @@
 #endif
 
 #include "par.h"
-#include "structs.h"
+#include "public.h"
 
 namespace manifold {
 

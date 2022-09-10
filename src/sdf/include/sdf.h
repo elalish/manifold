@@ -14,7 +14,7 @@
 
 #pragma once
 
-#include "structs.h"
+#include "public.h"
 #include "utils.h"
 #include "vec_dh.h"
 

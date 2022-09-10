@@ -15,7 +15,7 @@
 #pragma once
 #include <functional>
 
-#include "structs.h"
+#include "public.h"
 
 namespace manifold {
 
