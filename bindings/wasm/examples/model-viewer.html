@@ -6,9 +6,9 @@
   This example demonstrates feeding Manifold's output into <a href="https://modelviewer.dev/">&lt;model-viewer&gt;</a>
   via the three.js GLTFExporter. The most basic three.js example is <a href="index.html">here</a>.<br />
   <select>
-    <option value="Difference" selected>Difference</option>
-    <option value="Intersection">Intersection</option>
-    <option value="Union">Union</option>
+    <option value="difference" selected>Difference</option>
+    <option value="intersection">Intersection</option>
+    <option value="union">Union</option>
   </select>
   <model-viewer camera-controls shadow-intensity="1" alt="Output of mesh Boolean operation"></model-viewer>
 </body>
@@ -26,23 +26,23 @@
 <script>
   var Module = {
     onRuntimeInitialized: function () {
+      Module.setup();
       const mesh = new THREE.Mesh(undefined, new THREE.MeshStandardMaterial({
         color: 'yellow',
         metalness: 1,
         roughness: 0.2
       }));
 
-      const geometry_1 = simplify(new THREE.BoxGeometry(0.2, 0.2, 0.2));
-      const geometry_2 = simplify(new THREE.IcosahedronGeometry(0.16));
-
-      const manifold_1 = new Module.Manifold(geometry2mesh(geometry_1));
-      const manifold_2 = new Module.Manifold(geometry2mesh(geometry_2));
+      const icosahedron = simplify(new THREE.IcosahedronGeometry(0.16));
+      const manifold_1 = Module.cube(0.2, 0.2, 0.2, true);
+      // const manifold_1 = Module
+      //   .revolve([[[0.1, 0.1], [0.2, 0.1], [0.1, 0.2]]], 64)
+      //   .translate(0, 0, -0.1);
+      const manifold_2 = new Module.Manifold(geometry2mesh(icosahedron));
 
       const csg = function (operation) {
         mesh.geometry?.dispose();
-        mesh.geometry = mesh2geometry(
-          Module[operation](manifold_1, manifold_2).GetMesh()
-        );
+        mesh.geometry = mesh2geometry(Module[operation](manifold_1, manifold_2).getMesh());
         push2MV(mesh);
       };
 
@@ -50,7 +50,7 @@
         csg(event.target.value);
       };
 
-      csg('Difference');
+      csg('difference');
     }
   };
 
