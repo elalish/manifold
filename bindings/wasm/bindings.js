@@ -19,51 +19,6 @@ Module.setup = function() {
         }));
   }
 
-  Module.geometry2mesh = function(geometry) {
-    const mesh = {
-      vertPos: new Module.Vector_vec3(),
-      vertNormal: new Module.Vector_vec3(),
-      triVerts: new Module.Vector_ivec3(),
-      halfedgeTangent: new Module.Vector_vec4()
-    };
-    const temp = new THREE.Vector3();
-    const p = geometry.attributes.position;
-    const n = geometry.attributes.normal;
-    const x = geometry.index;
-    for (let i = 0; i < p.count; i++) {
-      temp.fromBufferAttribute(p, i);
-      mesh.vertPos.push_back(temp);
-      temp.fromBufferAttribute(n, i);
-      mesh.vertNormal.push_back(temp);
-    }
-    for (let i = 0; i < x.count; i += 3) {
-      mesh.triVerts.push_back(x.array.subarray(i, i + 3));
-    }
-    return mesh;
-  };
-
-  function mesh2geometry(mesh) {
-    const geometry = new THREE.BufferGeometry();
-    const p = [], n = [], x = [];
-    let i, s, v;
-    for (i = 0, s = mesh.vertPos.size(); i < s; i++) {
-      v = mesh.vertPos.get(i);
-      p.push(v.x, v.y, v.z);
-      v = mesh.vertNormal.get(i);
-      n.push(v.x, v.y, v.z);
-    }
-    for (i = 0, s = mesh.triVerts.size(); i < s; i++) {
-      v = mesh.triVerts.get(i);
-      x.push(v[0], v[1], v[2]);
-    }
-    geometry.setAttribute(
-        'position', new THREE.BufferAttribute(new Float32Array(p), 3));
-    geometry.setAttribute(
-        'normal', new THREE.BufferAttribute(new Float32Array(n), 3));
-    geometry.setIndex(new THREE.BufferAttribute(new Uint8Array(x), 1));
-    return geometry;
-  }
-
   function vararg2vec(vec) {
     if (vec[0] instanceof Array)
       return {x: vec[0][0], y: vec[0][1], z: vec[0][2]};
@@ -80,6 +35,7 @@ Module.setup = function() {
     return geometry;
   };
 
+  // note that the matrix is using column major (same as glm)
   Module.Manifold.prototype.transform = function(mat) {
     console.assert(mat.length == 4, 'expects a 4x3 matrix');
     let vec = new Module.Vector_f32();

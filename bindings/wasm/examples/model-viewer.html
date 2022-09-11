@@ -38,11 +38,11 @@
       // const manifold_1 = Module
       //   .revolve([[[0.1, 0.1], [0.2, 0.1], [0.1, 0.2]]], 64)
       //   .translate(0, 0, -0.1);
-      const manifold_2 = new Module.Manifold(Module.geometry2mesh(icosahedron));
+      const manifold_2 = new Module.Manifold(geometry2mesh(icosahedron));
 
       const csg = function (operation) {
         mesh.geometry?.dispose();
-        mesh.geometry = Module[operation](manifold_1, manifold_2).getGeometry();
+        mesh.geometry = mesh2geometry(Module[operation](manifold_1, manifold_2).getMesh());
         push2MV(mesh);
       };
 
