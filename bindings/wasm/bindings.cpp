@@ -29,7 +29,42 @@ void Subtract(Manifold& a, Manifold& b) { a -= b; }
 Manifold Intersection(Manifold& a, Manifold& b) { return a ^ b; }
 void Intersect(Manifold& a, Manifold& b) { a ^= b; }
 
+std::vector<SimplePolygon> ToPolygon(
+    std::vector<std::vector<glm::vec2>>& polygons) {
+  std::vector<SimplePolygon> simplePolygons(polygons.size());
+  for (int i = 0; i < polygons.size(); i++) {
+    std::vector<PolyVert> vertices(polygons[i].size());
+    for (int j = 0; j < polygons[i].size(); j++) {
+      vertices[j] = {polygons[i][j], j};
+    }
+    simplePolygons[i] = {vertices};
+  }
+  return simplePolygons;
+}
+
+Manifold Extrude(std::vector<std::vector<glm::vec2>>& polygons, float height,
+                 int nDivisions, float twistDegrees, glm::vec2 scaleTop) {
+  return Manifold::Extrude(ToPolygon(polygons), height, nDivisions,
+                           twistDegrees, scaleTop);
+}
+
+Manifold Revolve(std::vector<std::vector<glm::vec2>>& polygons,
+                 int circularSegments) {
+  return Manifold::Revolve(ToPolygon(polygons), circularSegments);
+}
+
+Manifold Transform(Manifold& manifold, std::vector<float>& mat) {
+  glm::mat4x3 matrix;
+  for (int i = 0; i < 4; i++)
+    for (int j = 0; j < 3; j++) matrix[i][j] = mat[i * 3 + j];
+  return manifold.Transform(matrix);
+}
+
 EMSCRIPTEN_BINDINGS(whatever) {
+  value_object<glm::vec2>("vec2")
+      .field("x", &glm::vec2::x)
+      .field("y", &glm::vec2::y);
+
   value_object<glm::ivec3>("ivec3")
       .field("0", &glm::ivec3::x)
       .field("1", &glm::ivec3::y)
@@ -43,6 +78,9 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .field("z", &glm::vec3::z);
 
   register_vector<glm::vec3>("Vector_vec3");
+  register_vector<glm::vec2>("Vector_vec2");
+  register_vector<std::vector<glm::vec2>>("Vector2_vec2");
+  register_vector<float>("Vector_f32");
 
   value_object<glm::vec4>("vec4")
       .field("x", &glm::vec4::x)
@@ -60,12 +98,23 @@ EMSCRIPTEN_BINDINGS(whatever) {
 
   class_<Manifold>("Manifold")
       .constructor<Mesh>()
-      .function("Add", &Add)
-      .function("Subtract", &Subtract)
-      .function("Intersect", &Intersect)
-      .function("GetMesh", &Manifold::GetMesh);
+      .function("add", &Add)
+      .function("subtract", &Subtract)
+      .function("intersect", &Intersect)
+      .function("getMesh", &Manifold::GetMesh)
+      .function("refine", &Manifold::Refine)
+      .function("_Transform", &Transform)
+      .function("_Translate", &Manifold::Translate)
+      .function("_Rotate", &Manifold::Rotate)
+      .function("_Scale", &Manifold::Scale);
 
-  function("Union", &Union);
-  function("Difference", &Difference);
-  function("Intersection", &Intersection);
+  function("_Cube", &Manifold::Cube);
+  function("_Cylinder", &Manifold::Cylinder);
+  function("_Sphere", &Manifold::Sphere);
+  function("_Extrude", &Extrude);
+  function("_Revolve", &Revolve);
+
+  function("union", &Union);
+  function("difference", &Difference);
+  function("intersection", &Intersection);
 }
