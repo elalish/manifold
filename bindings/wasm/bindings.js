@@ -28,13 +28,6 @@ Module.setup = function() {
     return vec[0];
   }
 
-  Module.Manifold.prototype.getGeometry = function() {
-    let mesh = this.getMesh();
-    let geometry = mesh2geometry(mesh);
-    for (let name in mesh) mesh[name].delete();
-    return geometry;
-  };
-
   // note that the matrix is using column major (same as glm)
   Module.Manifold.prototype.transform = function(mat) {
     console.assert(mat.length == 4, 'expects a 4x3 matrix');
