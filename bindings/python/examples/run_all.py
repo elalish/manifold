@@ -17,7 +17,7 @@
 import pathlib
 import sys
 import importlib
-import meshio
+import trimesh
 from time import time
 
 if __name__ == "__main__":
@@ -34,8 +34,9 @@ if __name__ == "__main__":
         model = module.run()
         if export_models:
             mesh = model.to_mesh()
-            cells = [("triangle", mesh.tri_verts)]
-            meshio.write_points_cells(f'{f}.ply', mesh.vert_pos, cells)
-            print(f'Exported model to {f}.ply')
+            meshOut = trimesh.Trimesh(
+                vertices=mesh.vert_pos, faces=mesh.tri_verts)
+            trimesh.exchange.export.export_mesh(meshOut, f'{f}.glb', 'glb')
+            print(f'Exported model to {f}.glb')
         t1 = time()
         print(f'Took {(t1-t0)*1000:.1f}ms for {f}')
