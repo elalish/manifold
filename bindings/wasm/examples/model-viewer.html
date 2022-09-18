@@ -1,10 +1,44 @@
 <!doctype html>
-<html>
-<meta name="viewport">
+<html lang="en">
+
+<head>
+  <title>Manifold - <code></code>&lt;model-viewer&gt;</code> Example</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <style>
+    body {
+      margin: 0;
+      background-color: #f7f7f7;
+      font-family: 'Rubik', sans-serif;
+      font-size: 16px;
+      line-height: 24px;
+      color: rgba(0, 0, 0, .87);
+      font-weight: 400;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    p {
+      max-width: 700px;
+      margin: 1em;
+      text-align: left;
+    }
+
+    model-viewer {
+      display: block;
+      width: 100vw;
+      height: 100vw;
+      max-width: 600px;
+      max-height: 600px;
+    }
+  </style>
+</head>
 
 <body>
-  This example demonstrates feeding Manifold's output into <a href="https://modelviewer.dev/">&lt;model-viewer&gt;</a>
-  via the three.js GLTFExporter. The most basic three.js example is <a href="index.html">here</a>.<br />
+  <p>This example demonstrates feeding Manifold's output into <a
+      href="https://modelviewer.dev/">&lt;model-viewer&gt;</a>
+    via the three.js GLTFExporter. The most basic three.js example is <a href="index.html">here</a>.
+  </p>
   <select>
     <option value="difference" selected>Difference</option>
     <option value="intersection">Intersection</option>
@@ -12,13 +46,6 @@
   </select>
   <model-viewer camera-controls shadow-intensity="1" alt="Output of mesh Boolean operation"></model-viewer>
 </body>
-
-<style>
-  model-viewer {
-    width: 600px;
-    height: 600px;
-  }
-</style>
 
 <script src="https://unpkg.com/three@0.144.0/build/three.js"></script>
 <script src="https://unpkg.com/three@0.144.0/examples/js/utils/BufferGeometryUtils.js"></script>
@@ -98,21 +125,29 @@
 
   function mesh2geometry(mesh) {
     const geometry = new THREE.BufferGeometry();
-    const p = [], n = [], x = [];
-    let i, s, v;
-    for (i = 0, s = mesh.vertPos.size(); i < s; i++) {
-      v = mesh.vertPos.get(i);
-      p.push(v.x, v.y, v.z);
-      // v = mesh.vertNormal.get(i);
-      // n.push(v.x, v.y, v.z);
+
+    const numVert = mesh.vertPos.size();
+    const vert = new Float32Array(3 * numVert);
+    for (let i = 0; i < numVert; i++) {
+      const v = mesh.vertPos.get(i);
+      const idx = 3 * i;
+      vert[idx] = v.x;
+      vert[idx + 1] = v.y;
+      vert[idx + 2] = v.z;
     }
-    for (i = 0, s = mesh.triVerts.size(); i < s; i++) {
-      v = mesh.triVerts.get(i);
-      x.push(v[0], v[1], v[2]);
+
+    const numTri = mesh.triVerts.size();
+    const tri = new Uint32Array(3 * numTri);
+    for (let i = 0; i < numTri; i++) {
+      const v = mesh.triVerts.get(i);
+      const idx = 3 * i;
+      tri[idx] = v[0];
+      tri[idx + 1] = v[1];
+      tri[idx + 2] = v[2];
     }
-    geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(p), 3));
-    // geometry.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(n), 3));
-    geometry.setIndex(new THREE.BufferAttribute(new Uint8Array(x), 1));
+
+    geometry.setAttribute('position', new THREE.BufferAttribute(vert, 3));
+    geometry.setIndex(new THREE.BufferAttribute(tri, 1));
     return geometry;
   }
 
