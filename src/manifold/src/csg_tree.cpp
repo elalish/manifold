@@ -230,7 +230,8 @@ CsgOpNode::CsgOpNode() {}
 
 CsgOpNode::CsgOpNode(const std::vector<std::shared_ptr<CsgNode>> &children,
                      Manifold::OpType op)
-    : children_(children) {
+    : impl_(std::make_shared<Impl>()) {
+  impl_->children_ = children;
   SetOp(op);
   // opportunisticly flatten the tree without costly evaluation
   GetChildren(false);
@@ -238,7 +239,8 @@ CsgOpNode::CsgOpNode(const std::vector<std::shared_ptr<CsgNode>> &children,
 
 CsgOpNode::CsgOpNode(std::vector<std::shared_ptr<CsgNode>> &&children,
                      Manifold::OpType op)
-    : children_(children) {
+    : impl_(std::make_shared<Impl>()) {
+  impl_->children_ = children;
   SetOp(op);
   // opportunisticly flatten the tree without costly evaluation
   GetChildren(false);
@@ -246,20 +248,18 @@ CsgOpNode::CsgOpNode(std::vector<std::shared_ptr<CsgNode>> &&children,
 
 std::shared_ptr<CsgNode> CsgOpNode::Transform(const glm::mat4x3 &m) const {
   auto node = std::make_shared<CsgOpNode>();
-  node->children_ = children_;
-  node->op_ = op_;
+  node->impl_ = impl_;
   node->transform_ = m * glm::mat4(transform_);
-  node->simplified_ = simplified_;
-  node->flattened_ = flattened_;
   return node;
 }
 
 std::shared_ptr<CsgLeafNode> CsgOpNode::ToLeafNode() const {
   if (cache_ != nullptr) return cache_;
-  if (children_.empty()) return nullptr;
+  if (impl_->children_.empty()) return nullptr;
   // turn the children into leaf nodes
   GetChildren();
-  switch (op_) {
+  auto &children_ = impl_->children_;
+  switch (impl_->op_) {
     case CsgNodeType::UNION:
       BatchUnion();
       break;
@@ -341,6 +341,7 @@ void CsgOpNode::BatchBoolean(
  */
 void CsgOpNode::BatchUnion() const {
   std::vector<std::shared_ptr<const Manifold::Impl>> impls;
+  auto &children_ = impl_->children_;
   for (auto &child : children_) {
     impls.push_back(std::dynamic_pointer_cast<CsgLeafNode>(child)->GetImpl());
   }
@@ -358,15 +359,18 @@ void CsgOpNode::BatchUnion() const {
  */
 std::vector<std::shared_ptr<CsgNode>> &CsgOpNode::GetChildren(
     bool finalize) const {
-  if (children_.empty() || (simplified_ && !finalize) || flattened_)
+  auto &children_ = impl_->children_;
+  if (children_.empty() || (impl_->simplified_ && !finalize) ||
+      impl_->flattened_)
     return children_;
-  simplified_ = true;
-  flattened_ = finalize;
+  impl_->simplified_ = true;
+  impl_->flattened_ = finalize;
   std::vector<std::shared_ptr<CsgNode>> newChildren;
 
-  CsgNodeType op = op_;
+  CsgNodeType op = impl_->op_;
   for (auto &child : children_) {
-    if (child->GetNodeType() == op) {
+    if (child->GetNodeType() == op && child.use_count() == 1 &&
+        std::dynamic_pointer_cast<CsgOpNode>(child)->impl_.use_count() == 1) {
       auto grandchildren =
           std::dynamic_pointer_cast<CsgOpNode>(child)->GetChildren(finalize);
       int start = children_.size();
@@ -391,13 +395,13 @@ std::vector<std::shared_ptr<CsgNode>> &CsgOpNode::GetChildren(
 void CsgOpNode::SetOp(Manifold::OpType op) {
   switch (op) {
     case Manifold::OpType::ADD:
-      op_ = CsgNodeType::UNION;
+      impl_->op_ = CsgNodeType::UNION;
       break;
     case Manifold::OpType::SUBTRACT:
-      op_ = CsgNodeType::DIFFERENCE;
+      impl_->op_ = CsgNodeType::DIFFERENCE;
       break;
     case Manifold::OpType::INTERSECT:
-      op_ = CsgNodeType::INTERSECTION;
+      impl_->op_ = CsgNodeType::INTERSECTION;
       break;
   }
 }

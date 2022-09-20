@@ -75,18 +75,21 @@ class CsgOpNode final : public CsgNode {
 
   std::shared_ptr<CsgLeafNode> ToLeafNode() const override;
 
-  CsgNodeType GetNodeType() const override { return op_; }
+  CsgNodeType GetNodeType() const override { return impl_->op_; }
 
   glm::mat4x3 GetTransform() const override;
 
  private:
-  CsgNodeType op_;
+  struct Impl {
+    CsgNodeType op_;
+    mutable std::vector<std::shared_ptr<CsgNode>> children_;
+    mutable bool simplified_ = false;
+    mutable bool flattened_ = false;
+  };
+  std::shared_ptr<Impl> impl_ = nullptr;
   glm::mat4x3 transform_ = glm::mat4x3(1.0f);
   // the following fields are for lazy evaluation, so they are mutable
-  mutable std::vector<std::shared_ptr<CsgNode>> children_;
   mutable std::shared_ptr<CsgLeafNode> cache_ = nullptr;
-  mutable bool simplified_ = false;
-  mutable bool flattened_ = false;
 
   void SetOp(Manifold::OpType);
 
