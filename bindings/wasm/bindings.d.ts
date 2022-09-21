@@ -1,17 +1,14 @@
-type Matrix1x3 = [number, number, number];
-type Matrix4x3 = [Matrix1x3, Matrix1x3, Matrix1x3, Matrix1x3];
 type Vec3 = [number, number, number];
-type Vec3Fun = (v: Vec3) => Manifold;
+type Matrix4x3 = [Vec3, Vec3, Vec3, Vec3];
 type Vec2 = [number, number];
 type SimplePolygon = Vec2[];
 type Polygons = SimplePolygon[];
 
 declare class Manifold {
   transform(matrix: Matrix4x3): Manifold;
-
-  translate: Vec3Fun;
-  rotate: Vec3Fun;
-  scale: Vec3Fun;
+  translate(v: Vec3): Manifold;
+  rotate(v: Vec3): Manifold;
+  scale(v: Vec3): Manifold;
   add(other: Manifold): Manifold;
   subtract(other: Manifold): Manifold;
   intersect(other: Manifold): Manifold;
@@ -19,7 +16,6 @@ declare class Manifold {
 }
 
 declare function cube(size: Vec3, center?: boolean): Manifold;
-declare function cube(size?: number, center?: boolean): Manifold;
 
 declare function cylinder(
     height: number, radiusLow: number, radiusHigh?: number,
