@@ -25,6 +25,6 @@ target_link_options(manifoldjs PUBLIC --pre-js ${CMAKE_CURRENT_SOURCE_DIR}/bindi
 target_compile_features(manifoldjs PUBLIC cxx_std_14)
 set_target_properties(manifoldjs PROPERTIES OUTPUT_NAME "manifold")
 
-file(GLOB_RECURSE WEB_FILES CONFIGURE_DEPENDS *.html)
+file(GLOB_RECURSE WEB_FILES CONFIGURE_DEPENDS *.html *.ts)
 file(COPY ${WEB_FILES} DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${WEB_FILES})
