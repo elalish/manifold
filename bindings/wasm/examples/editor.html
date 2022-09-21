@@ -25,6 +25,7 @@
     button {
       margin: 1em;
       padding: 0 1em;
+      cursor: pointer;
       height: 36px;
       border: none;
       border-radius: 18px;
@@ -61,17 +62,17 @@
 
 <body>
   <div class="page">
-    <div class="container" style="background-color: #ccc;">
+    <div class="container" style="background-color: rgb(162 136 179);">
       <p style="flex: 2;">Manifold serverless CAD
       </p>
-      <button type="button" id="compile">Run</button>
-      <button type="button" id="download">Download GLB</button>
+      <button type="button" id="compile" style="background-color: rgb(131, 255, 131);">Run</button>
+      <button type="button" id="download" style="background-color: rgb(148, 221, 255);">Download GLB</button>
     </div>
     <div class="container" style="flex: 2;">
       <div id="editor" class="col">
       </div>
       <model-viewer class="col" style="background-color: #eee;" camera-controls shadow-intensity="1"
-        alt="Editor 3D output">
+        interaction-prompt="none" alt="Editor 3D output">
       </model-viewer>
     </div>
   </div>
@@ -89,6 +90,7 @@
   crossorigin="anonymous" referrerpolicy="no-referrer" />
 <script>
   let editor = undefined;
+  let worker = undefined;
   var Module = {
     onRuntimeInitialized: function () {
       Module.setup();
@@ -98,9 +100,7 @@
         roughness: 0.2
       }));
       document.querySelector('#compile').onclick = async function (e) {
-        const worker = await monaco.languages.typescript.getTypeScriptWorker();
-        const w = await worker(editor.getModel().uri);
-        const output = await w.getEmitOutput(editor.getModel().uri.toString());
+        const output = await worker.getEmitOutput(editor.getModel().uri.toString());
         const content = output.outputFiles[0].text;
         const exposedFunctions = [
           'cube', 'cylinder', 'sphere', 'extrude', 'revolve',
@@ -221,6 +221,8 @@
       language: 'typescript',
       automaticLayout: true
     });
+    const w = await monaco.languages.typescript.getTypeScriptWorker();
+    worker = await w(editor.getModel().uri);
     document.querySelector('#compile').click()
   });
 </script>
