@@ -55,7 +55,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.34.0/min/vs/loader.min.js" integrity="sha512-6bIYsGqvLpAiEBXPdRQeFf5cueeBECtAKJjIHer3BhBZNTV3WLcLA8Tm3pDfxUwTMIS+kAZwTUvJ1IrMdX8C5w==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.34.0/min/vs/editor/editor.main.min.css" integrity="sha512-iQEIc0rsSDujsfjtD+lfyJ1W23Bh/lbgriubKDAym6VlEIDRj9rrbSIyJRyshOrl8s0yRcQ0+gyrZfSLyjJGWQ==" crossorigin="anonymous" referrerpolicy="no-referrer" />
 <script>
-  var editor = undefined;
+  let editor = undefined;
   var Module = {
     onRuntimeInitialized: function () {
       Module.setup();
@@ -64,25 +64,23 @@
         metalness: 1,
         roughness: 0.2
       }));
-      document.querySelector('#compile').onclick = function (e) {
-        monaco.languages.typescript.getTypeScriptWorker().then(worker => {
-          worker(editor.getModel().uri).then(w => {
-            w.getEmitOutput(editor.getModel().uri.toString()).then(output => {
-              const content = output.outputFiles[0].text;
-              const f = new Function('cube', 'cylinder', 'sphere', 'extrude', 'revolve',
-                'union', 'difference', 'intersection', 'THREE', 'geometry2mesh', 'show', content);
-              f(Module.cube, Module.cylinder, Module.sphere, Module.extrude,
-                Module.revolve, Module.union, Module.difference,
-                Module.intersection, THREE, 
-                geometry => new Module.Manifold(geometry2mesh(simplify(geometry))),
-                function(m) {
-                  mesh.geometry?.dispose();
-                  mesh.geometry = mesh2geometry(m.getMesh());
-                  push2MV(mesh);
-                })
-            })
+      document.querySelector('#compile').onclick = async function (e) {
+        let worker = await monaco.languages.typescript.getTypeScriptWorker();
+        let w = await worker(editor.getModel().uri);
+        let output = await w.getEmitOutput(editor.getModel().uri.toString())
+        const content = output.outputFiles[0].text;
+        const exposedFunctions = [
+          'cube', 'cylinder', 'sphere', 'extrude', 'revolve',
+          'union', 'difference', 'intersection', 
+        ];
+        const f = new Function(...exposedFunctions, 'THREE', 'geometry2mesh', 'show', content);
+        f(...exposedFunctions.map(name => Module[name]), THREE, 
+          geometry => new Module.Manifold(geometry2mesh(simplify(geometry))),
+          function(m) {
+            mesh.geometry?.dispose();
+            mesh.geometry = mesh2geometry(m.getMesh());
+            push2MV(mesh);
           })
-        });
       }
     }
   };
@@ -167,23 +165,22 @@
   }
 
   require.config({ paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.34.0/min/vs' } });
-    require(['vs/editor/editor.main'], function () {
-      fetch('bindings.d.ts').then(response => response.text()).then(content => {
-        monaco.languages.typescript.typescriptDefaults.addExtraLib(content + [
-        'declare function geometry2mesh(geometry: any): Manifold;',
-        'declare function show(m: Manifold): void;'
-        ].join('\n'));
-        editor = monaco.editor.create(document.getElementById('editor'), {
-          value: [
-            'const icosahedron = new THREE.IcosahedronGeometry(0.16)',
-            'const manifold_1 = cube([0.2, 0.2, 0.2], true)',
-            'const manifold_2 = geometry2mesh(icosahedron)',
-            'show(union(manifold_1, manifold_2))',
-          ].join('\n'),
-          language: 'typescript'
-        });
-        document.querySelector('#compile').click()
-      })
+  require(['vs/editor/editor.main'], async function () {
+    const content = await fetch('bindings.d.ts').then(response => response.text());
+    monaco.languages.typescript.typescriptDefaults.addExtraLib(content + [
+    'declare function geometry2mesh(geometry: any): Manifold;',
+    'declare function show(m: Manifold): void;'
+    ].join('\n'));
+    editor = monaco.editor.create(document.getElementById('editor'), {
+      value: [
+        'const icosahedron = new THREE.IcosahedronGeometry(0.16)',
+        'const manifold_1 = cube([0.2, 0.2, 0.2], true)',
+        'const manifold_2 = geometry2mesh(icosahedron)',
+        'show(union(manifold_1, manifold_2))',
+      ].join('\n'),
+      language: 'typescript'
+    });
+    document.querySelector('#compile').click()
   });
 </script>
 <script src="manifold.js"></script>
