@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <title>Manifold - <code></code>&lt;model-viewer&gt;</code> Example</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <style>
+    body {
+      margin: 0;
+      background-color: #f7f7f7;
+      font-family: 'Rubik', sans-serif;
+      font-size: 16px;
+      line-height: 24px;
+      color: rgba(0, 0, 0, .87);
+      font-weight: 400;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    p {
+      max-width: 700px;
+      margin: 1em;
+      text-align: left;
+    }
+
+    .container {
+      display: flex;
+      height: 80vh;
+    }
+
+    .col {
+      flex: 1;
+      height: 100%;
+    }
+  </style>
+</head>
+
+<body>
+  <p>This example demonstrates feeding Manifold's output into <a
+      href="https://modelviewer.dev/">&lt;model-viewer&gt;</a>
+    via the three.js GLTFExporter. The most basic three.js example is <a href="index.html">here</a>.
+  </p>
+  <button type="button" id="compile">Compile</button>
+  <div class="container">
+    <model-viewer class="col" camera-controls shadow-intensity="1" alt="Output of mesh Boolean operation"></model-viewer>
+    <div id="editor" class="col">
+    </div>
+  </div>
+</body>
+
+<script src="https://unpkg.com/three@0.144.0/build/three.js"></script>
+<script src="https://unpkg.com/three@0.144.0/examples/js/utils/BufferGeometryUtils.js"></script>
+<script src="https://unpkg.com/three@0.144.0/examples/js/exporters/GLTFExporter.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.34.0/min/vs/loader.min.js" integrity="sha512-6bIYsGqvLpAiEBXPdRQeFf5cueeBECtAKJjIHer3BhBZNTV3WLcLA8Tm3pDfxUwTMIS+kAZwTUvJ1IrMdX8C5w==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.34.0/min/vs/editor/editor.main.min.css" integrity="sha512-iQEIc0rsSDujsfjtD+lfyJ1W23Bh/lbgriubKDAym6VlEIDRj9rrbSIyJRyshOrl8s0yRcQ0+gyrZfSLyjJGWQ==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+<script>
+  let editor = undefined;
+  var Module = {
+    onRuntimeInitialized: function () {
+      Module.setup();
+      const mesh = new THREE.Mesh(undefined, new THREE.MeshStandardMaterial({
+        color: 'yellow',
+        metalness: 1,
+        roughness: 0.2
+      }));
+      document.querySelector('#compile').onclick = async function (e) {
+        let worker = await monaco.languages.typescript.getTypeScriptWorker();
+        let w = await worker(editor.getModel().uri);
+        let output = await w.getEmitOutput(editor.getModel().uri.toString())
+        const content = output.outputFiles[0].text;
+        const exposedFunctions = [
+          'cube', 'cylinder', 'sphere', 'extrude', 'revolve',
+          'union', 'difference', 'intersection', 
+        ];
+        const f = new Function(...exposedFunctions, 'THREE', 'geometry2mesh', 'show', content);
+        f(...exposedFunctions.map(name => Module[name]), THREE, 
+          geometry => new Module.Manifold(geometry2mesh(simplify(geometry))),
+          function(m) {
+            mesh.geometry?.dispose();
+            mesh.geometry = mesh2geometry(m.getMesh());
+            push2MV(mesh);
+          })
+      }
+    }
+  };
+
+  const mv = document.querySelector('model-viewer');
+  let objectURL = null;
+  const exporter = new THREE.GLTFExporter();
+
+  function push2MV(mesh) {
+    exporter.parse(
+      mesh,
+      (gltf) => {
+        const blob = new Blob([gltf], { type: 'application/octet-stream' });
+        URL.revokeObjectURL(objectURL);
+        objectURL = URL.createObjectURL(blob);
+        mv.src = objectURL;
+      },
+      () => console.log('GLTF export failed!'),
+      { binary: true }
+    );
+  }
+
+  // functions to convert between three.js and wasm
+  function geometry2mesh(geometry) {
+    const mesh = {
+      vertPos: new Module.Vector_vec3(),
+      vertNormal: new Module.Vector_vec3(),
+      triVerts: new Module.Vector_ivec3(),
+      halfedgeTangent: new Module.Vector_vec4()
+    };
+    const temp = new THREE.Vector3();
+    const p = geometry.attributes.position;
+    // const n = geometry.attributes.normal;
+    const x = geometry.index;
+    for (let i = 0; i < p.count; i++) {
+      temp.fromBufferAttribute(p, i);
+      mesh.vertPos.push_back(temp);
+      // temp.fromBufferAttribute(n, i);
+      // mesh.vertNormal.push_back(temp);
+    }
+    for (let i = 0; i < x.count; i += 3) {
+      mesh.triVerts.push_back(x.array.subarray(i, i + 3));
+    }
+    return mesh;
+  }
+
+  function mesh2geometry(mesh) {
+    const geometry = new THREE.BufferGeometry();
+
+    const numVert = mesh.vertPos.size();
+    const vert = new Float32Array(3 * numVert);
+    for (let i = 0; i < numVert; i++) {
+      const v = mesh.vertPos.get(i);
+      const idx = 3 * i;
+      vert[idx] = v.x;
+      vert[idx + 1] = v.y;
+      vert[idx + 2] = v.z;
+    }
+
+    const numTri = mesh.triVerts.size();
+    const tri = new Uint32Array(3 * numTri);
+    for (let i = 0; i < numTri; i++) {
+      const v = mesh.triVerts.get(i);
+      const idx = 3 * i;
+      tri[idx] = v[0];
+      tri[idx + 1] = v[1];
+      tri[idx + 2] = v[2];
+    }
+
+    geometry.setAttribute('position', new THREE.BufferAttribute(vert, 3));
+    geometry.setIndex(new THREE.BufferAttribute(tri, 1));
+    return geometry;
+  }
+
+  // most of three.js geometries arent manifolds, so...
+  function simplify(geometry) {
+    delete geometry.attributes.normal;
+    delete geometry.attributes.uv;
+    const simplified = THREE.BufferGeometryUtils.mergeVertices(geometry);
+    simplified.computeVertexNormals();
+    return simplified;
+  }
+
+  require.config({ paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.34.0/min/vs' } });
+  require(['vs/editor/editor.main'], async function () {
+    const content = await fetch('bindings.d.ts').then(response => response.text());
+    monaco.languages.typescript.typescriptDefaults.addExtraLib(content + [
+    'declare function geometry2mesh(geometry: any): Manifold;',
+    'declare function show(m: Manifold): void;'
+    ].join('\n'));
+    editor = monaco.editor.create(document.getElementById('editor'), {
+      value: [
+        'const icosahedron = new THREE.IcosahedronGeometry(0.16)',
+        'const manifold_1 = cube([0.2, 0.2, 0.2], true)',
+        'const manifold_2 = geometry2mesh(icosahedron)',
+        'show(union(manifold_1, manifold_2))',
+      ].join('\n'),
+      language: 'typescript'
+    });
+    document.querySelector('#compile').click()
+  });
+</script>
+<script src="manifold.js"></script>
+<script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
+
+</html>

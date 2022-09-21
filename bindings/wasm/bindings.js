@@ -46,7 +46,7 @@ Module.setup = function() {
   };
 
   Module.Manifold.prototype.rotate = function(...vec) {
-    return this._Rotate(vararg2vec(vec));
+    return this._Rotate(...vararg2vec(vec));
   };
 
   Module.Manifold.prototype.scale = function(...vec) {
@@ -54,8 +54,14 @@ Module.setup = function() {
   };
 
   Module.cube = function(...args) {
-    const size = vararg2vec(args);
-    const center = args[3] || false;
+    let size = undefined;
+    if (args.length == 0)
+      size = {x: 1, y: 1, z: 1};
+    else if (typeof args[0] == 'number')
+      size = {x: args[0], y: args[0], z: args[0]};
+    else
+      size = vararg2vec(args);
+    const center = args[1] || false;
     return Module._Cube(size, center);
   };
 
