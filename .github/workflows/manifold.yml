@@ -104,7 +104,7 @@ jobs:
         path: |
           build/bindings/wasm/manifold.js
           build/bindings/wasm/manifold.wasm
-          bindings/wasm/bindings.d.ts
+          build/bindings/wasm/bindings.d.ts
         retention-days: 7
 
   build_windows:
