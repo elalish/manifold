@@ -37,6 +37,18 @@
       -webkit-font-smoothing: antialiased;
     }
 
+    a:link,
+    a:visited {
+      color: black;
+      text-decoration: none;
+    }
+
+    a:hover,
+    a:active {
+      color: black;
+      text-decoration: underline;
+    }
+
     button:disabled {
       background-color: #eee !important;
       cursor: auto;
@@ -62,13 +74,24 @@
       height: 100%;
       width: 50vw;
     }
+
+    @media only screen and (max-width: 600px) {
+      .container {
+        flex-direction: column;
+        width: 100%;
+      }
+
+      .col {
+        width: 100%;
+      }
+    }
   </style>
 </head>
 
 <body>
   <div class="page">
     <div class="container" style="background-color: rgb(162 136 179);">
-      <p style="flex: 2;">Manifold serverless CAD
+      <p style="flex: 2;"><a href="https://github.com/elalish/manifold">Manifold</a> serverless CAD
       </p>
       <button type="button" id="compile" style="background-color: rgb(131, 255, 131);">Run</button>
       <button type="button" id="download" style="background-color: rgb(148, 221, 255);">Download GLB</button>
@@ -235,6 +258,10 @@
     editor.onDidChangeModelContent(e => {
       runButton.disabled = false;
     });
+
+    window.onresize = () => {
+      editor.layout({});
+    };
   });
 </script>
 <script src="manifold.js"></script>
