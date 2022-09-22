@@ -37,6 +37,11 @@
       -webkit-font-smoothing: antialiased;
     }
 
+    button:disabled {
+      background-color: #eee !important;
+      cursor: auto;
+    }
+
     p {
       margin: 1em;
       text-align: left;
@@ -91,6 +96,7 @@
 <script>
   let editor = undefined;
   let worker = undefined;
+  const runButton = document.querySelector('#compile');
   var Module = {
     onRuntimeInitialized: function () {
       Module.setup();
@@ -99,7 +105,7 @@
         metalness: 1,
         roughness: 0.2
       }));
-      document.querySelector('#compile').onclick = async function (e) {
+      runButton.onclick = async function (e) {
         const output = await worker.getEmitOutput(editor.getModel().uri.toString());
         const content = output.outputFiles[0].text;
         const exposedFunctions = [
@@ -114,6 +120,7 @@
             mesh.geometry = mesh2geometry(m.getMesh());
             push2MV(mesh);
           });
+        runButton.disabled = true;
       };
     }
   };
@@ -213,17 +220,21 @@
     ].join('\n'));
     editor = monaco.editor.create(document.getElementById('editor'), {
       value: [
-        'const icosahedron = new THREE.IcosahedronGeometry(0.16)',
-        'const manifold_1 = cube([0.2, 0.2, 0.2], true)',
-        'const manifold_2 = geometry2mesh(icosahedron)',
-        'show(union(manifold_1, manifold_2))',
+        'const manifold_1 = cube([0.2, 0.2, 0.2], true);',
+        'const manifold_2 = sphere(0.12, 100);',
+        'show(difference(manifold_1, manifold_2));',
       ].join('\n'),
       language: 'typescript',
       automaticLayout: true
     });
     const w = await monaco.languages.typescript.getTypeScriptWorker();
     worker = await w(editor.getModel().uri);
-    document.querySelector('#compile').click()
+
+    document.querySelector('#compile').click();
+
+    editor.onDidChangeModelContent(e => {
+      runButton.disabled = false;
+    });
   });
 </script>
 <script src="manifold.js"></script>
