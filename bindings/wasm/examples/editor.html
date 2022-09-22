@@ -2,49 +2,106 @@
 <html lang="en">
 
 <head>
-  <title>Manifold - <code></code>&lt;model-viewer&gt;</code> Example</title>
+  <title>Manifold Editor</title>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
   <style>
+    html {
+      height: 100%;
+    }
+
     body {
       margin: 0;
-      background-color: #f7f7f7;
+      height: 100%;
+      font-family: 'Rubik', sans-serif;
+      font-size: 24px;
+      line-height: 24px;
+      color: rgba(0, 0, 0, .87);
+      font-weight: 800;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    button {
+      margin: 1em;
+      padding: 0 1em;
+      cursor: pointer;
+      height: 36px;
+      border: none;
+      border-radius: 18px;
       font-family: 'Rubik', sans-serif;
       font-size: 16px;
       line-height: 24px;
       color: rgba(0, 0, 0, .87);
-      font-weight: 400;
+      font-weight: 800;
       -webkit-font-smoothing: antialiased;
     }
 
+    a:link,
+    a:visited {
+      color: black;
+      text-decoration: none;
+    }
+
+    a:hover,
+    a:active {
+      color: black;
+      text-decoration: underline;
+    }
+
+    button:disabled {
+      background-color: #eee !important;
+      cursor: auto;
+    }
+
     p {
-      max-width: 700px;
       margin: 1em;
       text-align: left;
     }
 
+    .page {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+    }
+
     .container {
       display: flex;
-      height: 80vh;
     }
 
     .col {
       flex: 1;
       height: 100%;
+      width: 50vw;
+    }
+
+    @media only screen and (max-width: 600px) {
+      .container {
+        flex-direction: column;
+        width: 100%;
+      }
+
+      .col {
+        width: 100%;
+      }
     }
   </style>
 </head>
 
 <body>
-  <p>This example demonstrates feeding Manifold's output into <a
-      href="https://modelviewer.dev/">&lt;model-viewer&gt;</a>
-    via the three.js GLTFExporter. The most basic three.js example is <a href="index.html">here</a>.
-  </p>
-  <button type="button" id="compile">Compile</button>
-  <div class="container">
-    <model-viewer class="col" camera-controls shadow-intensity="1" alt="Output of mesh Boolean operation"></model-viewer>
-    <div id="editor" class="col">
+  <div class="page">
+    <div class="container" style="background-color: rgb(162 136 179);">
+      <p style="flex: 2;"><a href="https://github.com/elalish/manifold">Manifold</a> serverless CAD
+      </p>
+      <button type="button" id="compile" style="background-color: rgb(131, 255, 131);">Run</button>
+      <button type="button" id="download" style="background-color: rgb(148, 221, 255);">Download GLB</button>
+    </div>
+    <div class="container" style="flex: 2;">
+      <div id="editor" class="col">
+      </div>
+      <model-viewer class="col" style="background-color: #eee;" camera-controls shadow-intensity="1"
+        interaction-prompt="none" alt="Editor 3D output">
+      </model-viewer>
     </div>
   </div>
 </body>
@@ -52,10 +109,17 @@
 <script src="https://unpkg.com/three@0.144.0/build/three.js"></script>
 <script src="https://unpkg.com/three@0.144.0/examples/js/utils/BufferGeometryUtils.js"></script>
 <script src="https://unpkg.com/three@0.144.0/examples/js/exporters/GLTFExporter.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.34.0/min/vs/loader.min.js" integrity="sha512-6bIYsGqvLpAiEBXPdRQeFf5cueeBECtAKJjIHer3BhBZNTV3WLcLA8Tm3pDfxUwTMIS+kAZwTUvJ1IrMdX8C5w==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.34.0/min/vs/editor/editor.main.min.css" integrity="sha512-iQEIc0rsSDujsfjtD+lfyJ1W23Bh/lbgriubKDAym6VlEIDRj9rrbSIyJRyshOrl8s0yRcQ0+gyrZfSLyjJGWQ==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.34.0/min/vs/loader.min.js"
+  integrity="sha512-6bIYsGqvLpAiEBXPdRQeFf5cueeBECtAKJjIHer3BhBZNTV3WLcLA8Tm3pDfxUwTMIS+kAZwTUvJ1IrMdX8C5w=="
+  crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<link rel="stylesheet"
+  href="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.34.0/min/vs/editor/editor.main.min.css"
+  integrity="sha512-iQEIc0rsSDujsfjtD+lfyJ1W23Bh/lbgriubKDAym6VlEIDRj9rrbSIyJRyshOrl8s0yRcQ0+gyrZfSLyjJGWQ=="
+  crossorigin="anonymous" referrerpolicy="no-referrer" />
 <script>
   let editor = undefined;
+  let worker = undefined;
+  const runButton = document.querySelector('#compile');
   var Module = {
     onRuntimeInitialized: function () {
       Module.setup();
@@ -64,24 +128,23 @@
         metalness: 1,
         roughness: 0.2
       }));
-      document.querySelector('#compile').onclick = async function (e) {
-        let worker = await monaco.languages.typescript.getTypeScriptWorker();
-        let w = await worker(editor.getModel().uri);
-        let output = await w.getEmitOutput(editor.getModel().uri.toString())
+      runButton.onclick = async function (e) {
+        const output = await worker.getEmitOutput(editor.getModel().uri.toString());
         const content = output.outputFiles[0].text;
         const exposedFunctions = [
           'cube', 'cylinder', 'sphere', 'extrude', 'revolve',
-          'union', 'difference', 'intersection', 
+          'union', 'difference', 'intersection',
         ];
         const f = new Function(...exposedFunctions, 'THREE', 'geometry2mesh', 'show', content);
-        f(...exposedFunctions.map(name => Module[name]), THREE, 
+        f(...exposedFunctions.map(name => Module[name]), THREE,
           geometry => new Module.Manifold(geometry2mesh(simplify(geometry))),
-          function(m) {
+          function (m) {
             mesh.geometry?.dispose();
             mesh.geometry = mesh2geometry(m.getMesh());
             push2MV(mesh);
-          })
-      }
+          });
+        runButton.disabled = true;
+      };
     }
   };
 
@@ -102,6 +165,13 @@
       { binary: true }
     );
   }
+
+  document.querySelector('#download').onclick = function () {
+    const link = document.createElement("a");
+    link.download = "manifold.glb";
+    link.href = objectURL;
+    link.click();
+  };
 
   // functions to convert between three.js and wasm
   function geometry2mesh(geometry) {
@@ -168,19 +238,30 @@
   require(['vs/editor/editor.main'], async function () {
     const content = await fetch('bindings.d.ts').then(response => response.text());
     monaco.languages.typescript.typescriptDefaults.addExtraLib(content + [
-    'declare function geometry2mesh(geometry: any): Manifold;',
-    'declare function show(m: Manifold): void;'
+      'declare function geometry2mesh(geometry: any): Manifold;',
+      'declare function show(m: Manifold): void;'
     ].join('\n'));
     editor = monaco.editor.create(document.getElementById('editor'), {
       value: [
-        'const icosahedron = new THREE.IcosahedronGeometry(0.16)',
-        'const manifold_1 = cube([0.2, 0.2, 0.2], true)',
-        'const manifold_2 = geometry2mesh(icosahedron)',
-        'show(union(manifold_1, manifold_2))',
+        'const manifold_1 = cube([0.2, 0.2, 0.2], true);',
+        'const manifold_2 = sphere(0.12, 100);',
+        'show(difference(manifold_1, manifold_2));',
       ].join('\n'),
-      language: 'typescript'
+      language: 'typescript',
+      automaticLayout: true
     });
-    document.querySelector('#compile').click()
+    const w = await monaco.languages.typescript.getTypeScriptWorker();
+    worker = await w(editor.getModel().uri);
+
+    document.querySelector('#compile').click();
+
+    editor.onDidChangeModelContent(e => {
+      runButton.disabled = false;
+    });
+
+    window.onresize = () => {
+      editor.layout({});
+    };
   });
 </script>
 <script src="manifold.js"></script>
