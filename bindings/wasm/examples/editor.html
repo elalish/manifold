@@ -204,9 +204,11 @@
     monaco.languages.typescript.typescriptDefaults.addExtraLib(content);
     editor = monaco.editor.create(document.getElementById('editor'), {
       value: [
-        'const manifold_1 = cube([100, 100, 100], true);',
-        'const manifold_2 = sphere(60, 100);',
-        'const result = difference(manifold_1, manifold_2);',
+        '// Work in mm to get a GLB in true scale',
+        'const box = cube([100, 100, 100], true);',
+        'const ball = sphere(60, 100);',
+        '// You must name your final output "result"',
+        'const result = box.subtract(ball);',
       ].join('\n'),
       language: 'typescript',
       automaticLayout: true
