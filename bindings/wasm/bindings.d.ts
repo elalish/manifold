@@ -1,5 +1,5 @@
 type Vec3 = [number, number, number];
-type Matrix4x3 = [Vec3, Vec3, Vec3, Vec3];
+type Matrix3x4 = [Vec3, Vec3, Vec3, Vec3];
 type Vec2 = [number, number];
 type SimplePolygon = Vec2[];
 type Polygons = SimplePolygon[];
@@ -12,7 +12,7 @@ declare class Manifold {
    *
    * @param m The affine transform matrix to apply to all the vertices.
    */
-  transform(m: Matrix4x3): Manifold;
+  transform(m: Matrix3x4): Manifold;
 
   /** 
    * Move this Manifold in space. This operation can be chained. Transforms are

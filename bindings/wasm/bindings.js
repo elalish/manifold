@@ -30,11 +30,11 @@ Module.setup = function () {
 
   // note that the matrix is using column major (same as glm)
   Module.Manifold.prototype.transform = function (mat) {
-    console.assert(mat.length == 4, 'expects a 4x3 matrix');
+    console.assert(mat.length == 4, 'expects a 3x4 matrix');
     let vec = new Module.Vector_f32();
-    for (let row of mat) {
-      console.assert(row.length == 3, 'expects a 4x3 matrix');
-      for (let x of row) mat.push_back(x);
+    for (let col of mat) {
+      console.assert(col.length == 3, 'expects a 3x4 matrix');
+      for (let x of col) mat.push_back(x);
     }
     const result = this._Transform(vec);
     vec.delete();
