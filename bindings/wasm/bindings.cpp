@@ -20,14 +20,11 @@ using namespace emscripten;
 
 using namespace manifold;
 
-Manifold Union(Manifold& a, Manifold& b) { return a + b; }
-void Add(Manifold& a, Manifold& b) { a += b; }
+Manifold Union(const Manifold& a, const Manifold& b) { return a + b; }
 
-Manifold Difference(Manifold& a, Manifold& b) { return a - b; }
-void Subtract(Manifold& a, Manifold& b) { a -= b; }
+Manifold Difference(const Manifold& a, const Manifold& b) { return a - b; }
 
-Manifold Intersection(Manifold& a, Manifold& b) { return a ^ b; }
-void Intersect(Manifold& a, Manifold& b) { a ^= b; }
+Manifold Intersection(const Manifold& a, const Manifold& b) { return a ^ b; }
 
 std::vector<SimplePolygon> ToPolygon(
     std::vector<std::vector<glm::vec2>>& polygons) {
@@ -98,9 +95,9 @@ EMSCRIPTEN_BINDINGS(whatever) {
 
   class_<Manifold>("Manifold")
       .constructor<Mesh>()
-      .function("add", &Add)
-      .function("subtract", &Subtract)
-      .function("intersect", &Intersect)
+      .function("add", &Union)
+      .function("subtract", &Difference)
+      .function("intersect", &Intersection)
       .function("getMesh", &Manifold::GetMesh)
       .function("refine", &Manifold::Refine)
       .function("_Transform", &Transform)
