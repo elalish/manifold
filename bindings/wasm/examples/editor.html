@@ -41,13 +41,13 @@
     a:link,
     a:visited {
       color: black;
-      text-decoration: none;
+      text-decoration: underline;
     }
 
     a:hover,
     a:active {
       color: black;
-      text-decoration: underline;
+      text-decoration: none;
     }
 
     button:disabled {
@@ -95,7 +95,7 @@
       <p style="flex: 2;"><a href="https://github.com/elalish/manifold">Manifold</a> serverless CAD
       </p>
       <button type="button" id="compile" style="background-color: rgb(131, 255, 131);">Run</button>
-      <button type="button" id="download" style="background-color: rgb(148, 221, 255);">Download GLB</button>
+      <button type="button" id="download" style="background-color: rgb(148, 221, 255);">Save GLB</button>
     </div>
     <div class="container" style="flex: 2;">
       <div id="editor" class="col">
@@ -107,9 +107,8 @@
   </div>
 </body>
 
-<script src="https://unpkg.com/three@0.144.0/build/three.js"></script>
-<script src="https://unpkg.com/three@0.144.0/examples/js/utils/BufferGeometryUtils.js"></script>
-<script src="https://unpkg.com/three@0.144.0/examples/js/exporters/GLTFExporter.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.144.0/build/three.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.144.0/examples/js/exporters/GLTFExporter.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.34.0/min/vs/loader.min.js"
   integrity="sha512-6bIYsGqvLpAiEBXPdRQeFf5cueeBECtAKJjIHer3BhBZNTV3WLcLA8Tm3pDfxUwTMIS+kAZwTUvJ1IrMdX8C5w=="
   crossorigin="anonymous" referrerpolicy="no-referrer"></script>
@@ -120,30 +119,25 @@
 <script>
   let editor = undefined;
   let worker = undefined;
+  const mesh = new THREE.Mesh(undefined, new THREE.MeshStandardMaterial({
+    color: 'yellow',
+    metalness: 1,
+    roughness: 0.2
+  }));
+  mesh.scale.setScalar(0.001);
   const runButton = document.querySelector('#compile');
   var Module = {
     onRuntimeInitialized: function () {
       Module.setup();
-      const mesh = new THREE.Mesh(undefined, new THREE.MeshStandardMaterial({
-        color: 'yellow',
-        metalness: 1,
-        roughness: 0.2
-      }));
       runButton.onclick = async function (e) {
         const output = await worker.getEmitOutput(editor.getModel().uri.toString());
-        const content = output.outputFiles[0].text;
+        const content = output.outputFiles[0].text + 'push2MV(result);';
         const exposedFunctions = [
           'cube', 'cylinder', 'sphere', 'extrude', 'revolve',
           'union', 'difference', 'intersection',
         ];
-        const f = new Function(...exposedFunctions, 'THREE', 'geometry2mesh', 'show', content);
-        f(...exposedFunctions.map(name => Module[name]), THREE,
-          geometry => new Module.Manifold(geometry2mesh(simplify(geometry))),
-          function (m) {
-            mesh.geometry?.dispose();
-            mesh.geometry = mesh2geometry(m.getMesh());
-            push2MV(mesh);
-          });
+        const f = new Function(...exposedFunctions, content);
+        f(...exposedFunctions.map(name => Module[name]));
         runButton.disabled = true;
       };
     }
@@ -153,7 +147,9 @@
   let objectURL = null;
   const exporter = new THREE.GLTFExporter();
 
-  function push2MV(mesh) {
+  function push2MV(manifold) {
+    mesh.geometry?.dispose();
+    mesh.geometry = mesh2geometry(manifold.getMesh());
     exporter.parse(
       mesh,
       (gltf) => {
@@ -173,30 +169,6 @@
     link.href = objectURL;
     link.click();
   };
-
-  // functions to convert between three.js and wasm
-  function geometry2mesh(geometry) {
-    const mesh = {
-      vertPos: new Module.Vector_vec3(),
-      vertNormal: new Module.Vector_vec3(),
-      triVerts: new Module.Vector_ivec3(),
-      halfedgeTangent: new Module.Vector_vec4()
-    };
-    const temp = new THREE.Vector3();
-    const p = geometry.attributes.position;
-    // const n = geometry.attributes.normal;
-    const x = geometry.index;
-    for (let i = 0; i < p.count; i++) {
-      temp.fromBufferAttribute(p, i);
-      mesh.vertPos.push_back(temp);
-      // temp.fromBufferAttribute(n, i);
-      // mesh.vertNormal.push_back(temp);
-    }
-    for (let i = 0; i < x.count; i += 3) {
-      mesh.triVerts.push_back(x.array.subarray(i, i + 3));
-    }
-    return mesh;
-  }
 
   function mesh2geometry(mesh) {
     const geometry = new THREE.BufferGeometry();
@@ -226,27 +198,15 @@
     return geometry;
   }
 
-  // most of three.js geometries arent manifolds, so...
-  function simplify(geometry) {
-    delete geometry.attributes.normal;
-    delete geometry.attributes.uv;
-    const simplified = THREE.BufferGeometryUtils.mergeVertices(geometry);
-    simplified.computeVertexNormals();
-    return simplified;
-  }
-
   require.config({ paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.34.0/min/vs' } });
   require(['vs/editor/editor.main'], async function () {
     const content = await fetch('bindings.d.ts').then(response => response.text());
-    monaco.languages.typescript.typescriptDefaults.addExtraLib(content + [
-      'declare function geometry2mesh(geometry: any): Manifold;',
-      'declare function show(m: Manifold): void;'
-    ].join('\n'));
+    monaco.languages.typescript.typescriptDefaults.addExtraLib(content);
     editor = monaco.editor.create(document.getElementById('editor'), {
       value: [
-        'const manifold_1 = cube([0.2, 0.2, 0.2], true);',
-        'const manifold_2 = sphere(0.12, 100);',
-        'show(difference(manifold_1, manifold_2));',
+        'const manifold_1 = cube([100, 100, 100], true);',
+        'const manifold_2 = sphere(60, 100);',
+        'const result = difference(manifold_1, manifold_2);',
       ].join('\n'),
       language: 'typescript',
       automaticLayout: true
@@ -266,6 +226,6 @@
   });
 </script>
 <script src="manifold.js"></script>
-<script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
+<script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/2.0.1/model-viewer.min.js"></script>
 
 </html>
