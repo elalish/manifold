@@ -129,6 +129,42 @@
   var Module = {
     onRuntimeInitialized: function () {
       Module.setup();
+      // Setup memory management, such that users don't have to care about
+      // calling `delete` manually.
+      // Note that this only fixes memory leak across different runs: the memory
+      // will only be freed when the compilation finishes.
+
+      let manifoldRegistry = [];
+      for (const name of
+               ['add', 'subtract', 'intersect', 'refine', 'transform', 'translate',
+                'rotate', 'scale']) {
+        const originalFn = Module.Manifold.prototype[name];
+        Module.Manifold.prototype["_" + name] = originalFn;
+        Module.Manifold.prototype[name] = function(...args) {
+          const result = this["_" + name](...args);
+          manifoldRegistry.push(result);
+          return result;
+        }
+      }
+
+      for (const name
+               of ['cube', 'cylinder', 'sphere', 'extrude', 'revolve', 'union',
+                   'difference', 'intersection']) {
+        const originalFn = Module[name];
+        Module[name] = function(...args) {
+          const result = originalFn(...args);
+          manifoldRegistry.push(result);
+          return result;
+        }
+      }
+
+      Module.cleanup = function() {
+        for (const obj of manifoldRegistry) {
+          obj.delete();
+        }
+        manifoldRegistry = [];
+      }
+
       runButton.onclick = async function (e) {
         const output = await worker.getEmitOutput(editor.getModel().uri.toString());
         const content = output.outputFiles[0].text + 'push2MV(result);';
@@ -138,6 +174,7 @@
         ];
         const f = new Function(...exposedFunctions, content);
         f(...exposedFunctions.map(name => Module[name]));
+        Module.cleanup();
         runButton.disabled = true;
       };
     }
@@ -192,6 +229,11 @@
       tri[idx + 1] = v[1];
       tri[idx + 2] = v[2];
     }
+
+    mesh.vertPos.delete();
+    mesh.triVerts.delete();
+    mesh.vertNormal.delete();
+    mesh.halfedgeTangent.delete();
 
     geometry.setAttribute('position', new THREE.BufferAttribute(vert, 3));
     geometry.setIndex(new THREE.BufferAttribute(tri, 1));
