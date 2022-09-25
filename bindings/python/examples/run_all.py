@@ -32,8 +32,8 @@ if __name__ == "__main__":
         module = importlib.import_module(f)
         t0 = time()
         model = module.run()
+        mesh = model.to_mesh()
         if export_models:
-            mesh = model.to_mesh()
             meshOut = trimesh.Trimesh(
                 vertices=mesh.vert_pos, faces=mesh.tri_verts)
             trimesh.exchange.export.export_mesh(meshOut, f'{f}.glb', 'glb')

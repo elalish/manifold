@@ -229,7 +229,7 @@ int Manifold::NumTri() const { return GetCsgLeafNode().GetImpl()->NumTri(); }
 /**
  * Returns the axis-aligned bounding box of all the Manifold's vertices.
  */
-Box Manifold::BoundingBox() const { return GetCsgLeafNode().GetBoundingBox(); }
+Box Manifold::BoundingBox() const { return GetCsgLeafNode().GetImpl()->bBox_; }
 
 /**
  * Returns the precision of this Manifold's vertices, which tracks the

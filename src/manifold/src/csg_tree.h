@@ -43,8 +43,6 @@ class CsgLeafNode final : public CsgNode {
 
   std::shared_ptr<const Manifold::Impl> GetImpl() const;
 
-  Box GetBoundingBox() const;
-
   std::shared_ptr<CsgLeafNode> ToLeafNode() const override;
 
   std::shared_ptr<CsgNode> Transform(const glm::mat4x3 &m) const override;
