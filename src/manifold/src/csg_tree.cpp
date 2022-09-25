@@ -142,7 +142,8 @@ Manifold::Impl CsgLeafNode::Compose(
   int numBary = 0;
   for (auto &node : nodes) {
     float nodeOldScale = node->pImpl_->bBox_.Scale();
-    float nodeNewScale = node->pImpl_->bBox_.Transform(node->transform_).Scale();
+    float nodeNewScale =
+        node->pImpl_->bBox_.Transform(node->transform_).Scale();
     float nodePrecision = node->pImpl_->precision_;
     nodePrecision *= glm::max(1.0f, nodeNewScale / nodeOldScale);
     nodePrecision = glm::max(nodePrecision, kTolerance * nodeNewScale);
@@ -344,24 +345,15 @@ void CsgOpNode::BatchUnion() const {
   constexpr int kMaxUnionSize = 1000;
   auto &children_ = impl_->children_;
   while (children_.size() > 1) {
-    int start;
-    if (children_.size() > kMaxUnionSize) {
-      start = children_.size() - kMaxUnionSize;
-    } else {
-      start = 0;
-    }
+    const int start = (children_.size() > kMaxUnionSize)
+                          ? (children_.size() - kMaxUnionSize)
+                          : 0;
     VecDH<Box> boxes;
     boxes.reserve(children_.size() - start);
     for (int i = start; i < children_.size(); i++) {
       boxes.push_back(std::dynamic_pointer_cast<CsgLeafNode>(children_[i])
                           ->GetImpl()
                           ->bBox_);
-      const float precision =
-          std::dynamic_pointer_cast<CsgLeafNode>(children_[i])
-              ->GetImpl()
-              ->precision_;
-      boxes.back().max += glm::vec3(precision);
-      boxes.back().min -= glm::vec3(precision);
     }
     const Box *boxesD = boxes.cptrD();
     // partition the children into a set of disjoint sets
@@ -371,9 +363,7 @@ void CsgOpNode::BatchUnion() const {
       auto lambda = [boxesD, i](const VecDH<size_t> &set) {
         return find_if<decltype(set.end())>(
                    autoPolicy(set.size()), set.begin(), set.end(),
-                   [&boxesD, i](size_t j) {
-                     return boxesD[i].DoesOverlap(boxesD[j]);
-                   }) == set.end();
+                   CheckOverlap({boxesD, i})) == set.end();
       };
       auto it = std::find_if(disjointSets.begin(), disjointSets.end(), lambda);
       if (it == disjointSets.end()) {
