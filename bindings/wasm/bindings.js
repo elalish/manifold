@@ -95,4 +95,21 @@ Module.setup = function () {
     polygonsVec.delete();
     return result;
   };
+
+  function batchbool(name) {
+    return function(...args) {
+      if (args.length == 1)
+        args = args[0];
+      let v = new Module.Vector_manifold();
+      for (const m of args)
+        v.push_back(m);
+      const result = Module['_' + name + 'N'](v);
+      v.delete();
+    return result;
+    }
+  }
+
+  Module.union = batchbool('union');
+  Module.difference = batchbool('difference');
+  Module.intersection = batchbool('intersection');
 };
