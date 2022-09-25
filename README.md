@@ -36,7 +36,7 @@ python binding documentation:
 
 ```
 >>> import pymanifold
->>> help(manifold)
+>>> help(pymanifold)
 ```
 
 For more detailed documentation, please refer to the C++ API.
