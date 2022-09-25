@@ -120,10 +120,6 @@ std::shared_ptr<const Manifold::Impl> CsgLeafNode::GetImpl() const {
 
 glm::mat4x3 CsgLeafNode::GetTransform() const { return transform_; }
 
-Box CsgLeafNode::GetBoundingBox() const {
-  return pImpl_->bBox_.Transform(transform_);
-}
-
 std::shared_ptr<CsgLeafNode> CsgLeafNode::ToLeafNode() const {
   return std::make_shared<CsgLeafNode>(*this);
 }
@@ -146,7 +142,8 @@ Manifold::Impl CsgLeafNode::Compose(
   int numBary = 0;
   for (auto &node : nodes) {
     float nodeOldScale = node->pImpl_->bBox_.Scale();
-    float nodeNewScale = node->GetBoundingBox().Scale();
+    float nodeNewScale =
+        node->pImpl_->bBox_.Transform(node->transform_).Scale();
     float nodePrecision = node->pImpl_->precision_;
     nodePrecision *= glm::max(1.0f, nodeNewScale / nodeOldScale);
     nodePrecision = glm::max(nodePrecision, kTolerance * nodeNewScale);
@@ -340,14 +337,65 @@ void CsgOpNode::BatchBoolean(
  * `BatchBoolean` instead of using `Compose` for non-intersecting manifolds.
  */
 void CsgOpNode::BatchUnion() const {
-  std::vector<std::shared_ptr<const Manifold::Impl>> impls;
+  // INVARIANT: children_ is a vector of leaf nodes
+  // this kMaxUnionSize is a heuristic to avoid the pairwise disjoint check
+  // with O(n^2) complexity to take too long.
+  // If the number of children exceeded this limit, we will operate on chunks
+  // with size kMaxUnionSize.
+  constexpr int kMaxUnionSize = 1000;
   auto &children_ = impl_->children_;
-  for (auto &child : children_) {
-    impls.push_back(std::dynamic_pointer_cast<CsgLeafNode>(child)->GetImpl());
+  while (children_.size() > 1) {
+    const int start = (children_.size() > kMaxUnionSize)
+                          ? (children_.size() - kMaxUnionSize)
+                          : 0;
+    VecDH<Box> boxes;
+    boxes.reserve(children_.size() - start);
+    for (int i = start; i < children_.size(); i++) {
+      boxes.push_back(std::dynamic_pointer_cast<CsgLeafNode>(children_[i])
+                          ->GetImpl()
+                          ->bBox_);
+    }
+    const Box *boxesD = boxes.cptrD();
+    // partition the children into a set of disjoint sets
+    // each set contains a set of children that are pairwise disjoint
+    std::vector<VecDH<size_t>> disjointSets;
+    for (size_t i = 0; i < boxes.size(); i++) {
+      auto lambda = [boxesD, i](const VecDH<size_t> &set) {
+        return find_if<decltype(set.end())>(
+                   autoPolicy(set.size()), set.begin(), set.end(),
+                   CheckOverlap({boxesD, i})) == set.end();
+      };
+      auto it = std::find_if(disjointSets.begin(), disjointSets.end(), lambda);
+      if (it == disjointSets.end()) {
+        disjointSets.push_back(std::vector<size_t>{i});
+      } else {
+        it->push_back(i);
+      }
+    }
+    // compose each set of disjoint children
+    std::vector<std::shared_ptr<const Manifold::Impl>> impls;
+    for (const auto &set : disjointSets) {
+      if (set.size() == 1) {
+        impls.push_back(
+            std::dynamic_pointer_cast<CsgLeafNode>(children_[start + set[0]])
+                ->GetImpl());
+      } else {
+        std::vector<std::shared_ptr<CsgLeafNode>> tmp;
+        for (size_t j : set) {
+          tmp.push_back(
+              std::dynamic_pointer_cast<CsgLeafNode>(children_[start + j]));
+        }
+        impls.push_back(
+            std::make_shared<const Manifold::Impl>(CsgLeafNode::Compose(tmp)));
+      }
+    }
+    BatchBoolean(Manifold::OpType::ADD, impls);
+    children_.erase(children_.begin() + start, children_.end());
+    children_.push_back(std::make_shared<CsgLeafNode>(impls.back()));
+    // move it to the front as we process from the back, and the newly added
+    // child should be quite complicated
+    std::swap(children_.front(), children_.back());
   }
-  BatchBoolean(Manifold::OpType::ADD, impls);
-  children_.clear();
-  children_.push_back(std::make_shared<CsgLeafNode>(impls.front()));
 }
 
 /**
