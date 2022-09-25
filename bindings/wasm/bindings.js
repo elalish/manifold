@@ -45,8 +45,8 @@ Module.setup = function () {
     return this._Translate(vararg2vec(vec));
   };
 
-  Module.Manifold.prototype.rotate = function (...vec) {
-    return this._Rotate(...vararg2vec(vec));
+  Module.Manifold.prototype.rotate = function(vec) {
+    return this._Rotate(...vec);
   };
 
   Module.Manifold.prototype.scale = function (...vec) {
