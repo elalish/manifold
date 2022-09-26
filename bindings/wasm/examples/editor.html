@@ -173,8 +173,11 @@
           'union', 'difference', 'intersection',
         ];
         const f = new Function(...exposedFunctions, content);
+        const t0 = performance.now();
         f(...exposedFunctions.map(name => Module[name]));
         Module.cleanup();
+        const t1 = performance.now();
+        console.log(`took ${t1 - t0}ms`);
         runButton.disabled = true;
       };
     }

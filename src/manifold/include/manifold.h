@@ -152,6 +152,8 @@ class Manifold {
    */
   enum class OpType { ADD, SUBTRACT, INTERSECT };
   Manifold Boolean(const Manifold& second, OpType op) const;
+  static Manifold BatchBoolean(const std::vector<Manifold>& manifolds,
+                               OpType op);
   // Boolean operation shorthand
   Manifold operator+(const Manifold&) const;  // ADD (Union)
   Manifold& operator+=(const Manifold&);

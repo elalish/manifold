@@ -26,6 +26,21 @@ Manifold Difference(const Manifold& a, const Manifold& b) { return a - b; }
 
 Manifold Intersection(const Manifold& a, const Manifold& b) { return a ^ b; }
 
+Manifold UnionN(const std::vector<Manifold>& manifolds) {
+  return Manifold::BatchBoolean(manifolds, Manifold::OpType::ADD);
+  ;
+}
+
+Manifold DifferenceN(const std::vector<Manifold>& manifolds) {
+  return Manifold::BatchBoolean(manifolds, Manifold::OpType::SUBTRACT);
+  ;
+}
+
+Manifold IntersectionN(const std::vector<Manifold>& manifolds) {
+  return Manifold::BatchBoolean(manifolds, Manifold::OpType::INTERSECT);
+  ;
+}
+
 std::vector<SimplePolygon> ToPolygon(
     std::vector<std::vector<glm::vec2>>& polygons) {
   std::vector<SimplePolygon> simplePolygons(polygons.size());
@@ -78,6 +93,7 @@ EMSCRIPTEN_BINDINGS(whatever) {
   register_vector<glm::vec2>("Vector_vec2");
   register_vector<std::vector<glm::vec2>>("Vector2_vec2");
   register_vector<float>("Vector_f32");
+  register_vector<Manifold>("Vector_manifold");
 
   value_object<glm::vec4>("vec4")
       .field("x", &glm::vec4::x)
@@ -111,7 +127,7 @@ EMSCRIPTEN_BINDINGS(whatever) {
   function("_Extrude", &Extrude);
   function("_Revolve", &Revolve);
 
-  function("union", &Union);
-  function("difference", &Difference);
-  function("intersection", &Intersection);
+  function("_unionN", &UnionN);
+  function("_differenceN", &DifferenceN);
+  function("_intersectionN", &IntersectionN);
 }

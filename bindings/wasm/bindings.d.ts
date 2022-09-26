@@ -14,7 +14,7 @@ declare class Manifold {
    */
   transform(m: Matrix3x4): Manifold;
 
-  /** 
+  /**
    * Move this Manifold in space. This operation can be chained. Transforms are
    * combined and applied lazily.
    *
@@ -144,3 +144,6 @@ declare function union(a: Manifold, b: Manifold): Manifold;
 declare function difference(a: Manifold, b: Manifold): Manifold;
 declare function intersection(a: Manifold, b: Manifold): Manifold;
 
+declare function union(manifolds: Manifold[]): Manifold;
+declare function difference(manifolds: Manifold[]): Manifold;
+declare function intersection(manifolds: Manifold[]): Manifold;
