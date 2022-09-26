@@ -472,6 +472,14 @@ Manifold Manifold::Boolean(const Manifold& second, OpType op) const {
   return Manifold(std::make_shared<CsgOpNode>(children, op));
 }
 
+Manifold Manifold::BatchBoolean(const std::vector<Manifold>& manifolds,
+                                OpType op) {
+  std::vector<std::shared_ptr<CsgNode>> children;
+  children.reserve(manifolds.size());
+  for (const auto& m : manifolds) children.push_back(m.pNode_);
+  return Manifold(std::make_shared<CsgOpNode>(children, op));
+}
+
 /**
  * Shorthand for Boolean Union.
  */
