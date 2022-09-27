@@ -68,6 +68,17 @@ declare class Manifold {
    * @param n The number of pieces to split every edge into. Must be > 1.
    */
   refine(n: number): Manifold;
+
+  /**
+   * This function does not change the topology, but allows the vertices to be
+   * moved according to any arbitrary input function. It is easy to create a
+   * function that warps a geometrically valid object into one which overlaps, but
+   * that is not checked here, so it is up to the user to choose their function
+   * with discretion.
+   *
+   * @param warpFunc A function that modifies a given vertex position.
+   */
+  warp(warpFunc: (vert: Vec3) => void): Manifold;
 }
 
 /**
