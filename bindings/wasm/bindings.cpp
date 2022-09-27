@@ -73,7 +73,7 @@ Manifold Transform(Manifold& manifold, std::vector<float>& mat) {
   return manifold.Transform(matrix);
 }
 
-Manifold Warp(Manifold& manifold, void* funcPtr) {
+Manifold Warp(Manifold& manifold, uintptr_t funcPtr) {
   void (*f)(glm::vec3&) = reinterpret_cast<void (*)(glm::vec3&)>(funcPtr);
   Manifold out = manifold.Warp(f);
   EM_ASM({removeFunction($0)}, f);
