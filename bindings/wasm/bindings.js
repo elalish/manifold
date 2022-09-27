@@ -39,7 +39,9 @@ Module.setup = function () {
       setValue(vec3Ptr + 1, vert[1], 'float');
       setValue(vec3Ptr + 2, vert[2], 'float');
     }, 'vi');
-    return this._Warp(wasmFuncPtr);
+    const out = this._Warp(wasmFuncPtr);
+    removeFunction(wasmFuncPtr);
+    return out;
   };
 
   // note that the matrix is using column major (same as glm)

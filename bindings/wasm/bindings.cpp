@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <emscripten.h>
 #include <emscripten/bind.h>
 
 using namespace emscripten;
@@ -75,9 +74,7 @@ Manifold Transform(Manifold& manifold, std::vector<float>& mat) {
 
 Manifold Warp(Manifold& manifold, uintptr_t funcPtr) {
   void (*f)(glm::vec3&) = reinterpret_cast<void (*)(glm::vec3&)>(funcPtr);
-  Manifold out = manifold.Warp(f);
-  EM_ASM({removeFunction($0)}, f);
-  return out;
+  return manifold.Warp(f);
 }
 
 EMSCRIPTEN_BINDINGS(whatever) {
