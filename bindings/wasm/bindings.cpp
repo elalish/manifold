@@ -72,6 +72,11 @@ Manifold Transform(Manifold& manifold, std::vector<float>& mat) {
   return manifold.Transform(matrix);
 }
 
+Manifold Warp(Manifold& manifold, uintptr_t funcPtr) {
+  void (*f)(glm::vec3&) = reinterpret_cast<void (*)(glm::vec3&)>(funcPtr);
+  return manifold.Warp(f);
+}
+
 EMSCRIPTEN_BINDINGS(whatever) {
   value_object<glm::vec2>("vec2")
       .field("x", &glm::vec2::x)
@@ -116,6 +121,7 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .function("intersect", &Intersection)
       .function("getMesh", &Manifold::GetMesh)
       .function("refine", &Manifold::Refine)
+      .function("_Warp", &Warp, allow_raw_pointers())
       .function("_Transform", &Transform)
       .function("_Translate", &Manifold::Translate)
       .function("_Rotate", &Manifold::Rotate)
