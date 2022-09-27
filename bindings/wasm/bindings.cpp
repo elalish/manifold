@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <emscripten.h>
 #include <emscripten/bind.h>
 
 using namespace emscripten;
@@ -72,6 +73,13 @@ Manifold Transform(Manifold& manifold, std::vector<float>& mat) {
   return manifold.Transform(matrix);
 }
 
+Manifold Warp(Manifold& manifold, void* funcPtr) {
+  void (*f)(glm::vec3&) = reinterpret_cast<void (*)(glm::vec3&)>(funcPtr);
+  Manifold out = manifold.Warp(f);
+  EM_ASM({removeFunction($0)}, f);
+  return out;
+}
+
 EMSCRIPTEN_BINDINGS(whatever) {
   value_object<glm::vec2>("vec2")
       .field("x", &glm::vec2::x)
@@ -116,6 +124,7 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .function("intersect", &Intersection)
       .function("getMesh", &Manifold::GetMesh)
       .function("refine", &Manifold::Refine)
+      .function("_Warp", &Warp, allow_raw_pointers())
       .function("_Transform", &Transform)
       .function("_Translate", &Manifold::Translate)
       .function("_Rotate", &Manifold::Rotate)

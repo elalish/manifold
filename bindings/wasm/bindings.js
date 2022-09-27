@@ -28,6 +28,20 @@ Module.setup = function () {
     return vec[0];
   }
 
+  Module.Manifold.prototype.warp = function (func) {
+    const wasmFuncPtr = addFunction(function (vec3Ptr) {
+      const x = getValue(vec3Ptr, 'float');
+      const y = getValue(vec3Ptr + 1, 'float');
+      const z = getValue(vec3Ptr + 2, 'float');
+      const vert = [x, y, z];
+      func(vert);
+      setValue(vec3Ptr, vert[0], 'float');
+      setValue(vec3Ptr + 1, vert[1], 'float');
+      setValue(vec3Ptr + 2, vert[2], 'float');
+    }, 'vi');
+    return this._Warp(wasmFuncPtr);
+  };
+
   // note that the matrix is using column major (same as glm)
   Module.Manifold.prototype.transform = function (mat) {
     console.assert(mat.length == 4, 'expects a 3x4 matrix');
@@ -45,7 +59,7 @@ Module.setup = function () {
     return this._Translate(vararg2vec(vec));
   };
 
-  Module.Manifold.prototype.rotate = function(vec) {
+  Module.Manifold.prototype.rotate = function (vec) {
     return this._Rotate(...vec);
   };
 
@@ -97,7 +111,7 @@ Module.setup = function () {
   };
 
   function batchbool(name) {
-    return function(...args) {
+    return function (...args) {
       if (args.length == 1)
         args = args[0];
       let v = new Module.Vector_manifold();
@@ -105,7 +119,7 @@ Module.setup = function () {
         v.push_back(m);
       const result = Module['_' + name + 'N'](v);
       v.delete();
-    return result;
+      return result;
     }
   }
 
