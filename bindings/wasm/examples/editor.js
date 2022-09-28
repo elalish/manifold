@@ -91,6 +91,14 @@ document.querySelector('#download').onclick = function () {
   link.click();
 };
 
+const fileButton = document.querySelector('#file');
+const arrow = document.querySelector('.uparrow');
+const dropdown = document.querySelector('.dropdown');
+fileButton.onclick = function () {
+  dropdown.classList.toggle('show');
+  arrow.classList.toggle('down');
+};
+
 function mesh2geometry(mesh) {
   const geometry = new THREE.BufferGeometry();
 
