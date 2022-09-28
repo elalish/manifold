@@ -1,3 +1,23 @@
+const examples = new Map();
+
+examples.set('Intro', `
+// Write code in TypeScript and this editor will show the API docs.
+// Manifold constructors include "cube", "cylinder", "sphere", "extrude", "revolve".
+// Type e.g. "box." to see the Manifold API.
+// Work in mm to get a GLB in true scale.
+const box = cube([100, 100, 100], true);
+const ball = sphere(60, 100);
+// You must name your final output "result".
+const result = box.subtract(ball);`);
+
+examples.set('Warp', `
+const ball = sphere(60, 100);
+const func = (v: Vec3) => {
+  v[2] /= 2;
+};
+const result = ball.warp(func);`);
+
+
 let editor = undefined;
 let worker = undefined;
 const mesh = new THREE.Mesh(undefined, new THREE.MeshStandardMaterial({
@@ -92,12 +112,30 @@ document.querySelector('#download').onclick = function () {
 };
 
 const fileButton = document.querySelector('#file');
+const currentName = document.querySelector('#current');
 const arrow = document.querySelector('.uparrow');
 const dropdown = document.querySelector('.dropdown');
-fileButton.onclick = function () {
+const toggleDropdown = function () {
   dropdown.classList.toggle('show');
   arrow.classList.toggle('down');
 };
+fileButton.onclick = toggleDropdown;
+
+// Populate dropdown with examples
+for (const [name, code] of examples) {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.classList.add('blue', 'item');
+  button.textContent = name;
+  dropdown.appendChild(button);
+  button.onclick = function () {
+    if (editor) {
+      editor.setValue(code);
+      toggleDropdown();
+      currentName.textContent = name;
+    }
+  };
+}
 
 function mesh2geometry(mesh) {
   const geometry = new THREE.BufferGeometry();
@@ -137,16 +175,7 @@ require(['vs/editor/editor.main'], async function () {
   const content = await fetch('bindings.d.ts').then(response => response.text());
   monaco.languages.typescript.typescriptDefaults.addExtraLib(content);
   editor = monaco.editor.create(document.getElementById('editor'), {
-    value: [
-      '// Write code in TypeScript and this editor will show the API docs.',
-      '// Manifold constructors include "cube", "cylinder", "sphere", "extrude", "revolve".',
-      '// Type e.g. "box." to see the Manifold API.',
-      '// Work in mm to get a GLB in true scale.',
-      'const box = cube([100, 100, 100], true);',
-      'const ball = sphere(60, 100);',
-      '// You must name your final output "result".',
-      'const result = box.subtract(ball);',
-    ].join('\n'),
+    value: examples.get('Intro'),
     language: 'typescript',
     automaticLayout: true
   });
