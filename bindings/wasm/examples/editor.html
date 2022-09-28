@@ -2,7 +2,7 @@
 <html lang="en">
 
 <head>
-  <title>Manifold Editor</title>
+  <title>ManifoldCAD</title>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="shortcut icon" type="image/png" href="https://elalish.github.io/manifold/samples/models/favicon.png" />
@@ -12,7 +12,7 @@
 <body>
   <div class="page">
     <div class="container" style="background-color: rgb(162 136 179);">
-      <p style="flex: 2;"><a href="https://github.com/elalish/manifold">Manifold</a> serverless CAD
+      <p style="flex: 2;"><a href="https://github.com/elalish/manifold">Manifold</a>CAD
       </p>
       <button type="button" id="compile" style="background-color: rgb(131, 255, 131);">Run</button>
       <button type="button" id="download" style="background-color: rgb(148, 221, 255);">Save GLB</button>
@@ -22,6 +22,14 @@
       </div>
       <model-viewer class="col" style="background-color: #eee;" camera-controls shadow-intensity="1"
         interaction-prompt="none" alt="Editor 3D output">
+        <div class="center" slot="poster">
+          <p style="text-align: center;">
+            Loading<br /><br />
+            Monaco<br /><br />
+            Editor<br /><br />
+            (VSCode)
+          </p>
+        </div>
       </model-viewer>
     </div>
   </div>

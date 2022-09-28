@@ -61,9 +61,16 @@ p {
 }
 
 .col {
-  flex: 1;
+  position: relative;
   height: 100%;
   width: 50vw;
+}
+
+.center {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate3d(-50%, -50%, 0);
 }
 
 @media only screen and (max-width: 600px) {
