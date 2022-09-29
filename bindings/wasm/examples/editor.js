@@ -19,13 +19,138 @@ const result = ball.warp(func);`);
 
 
 let editor = undefined;
+
+// UI
+const fileButton = document.querySelector('#file');
+const currentElement = document.querySelector('#current');
+const arrow = document.querySelector('.uparrow');
+const dropdown = document.querySelector('.dropdown');
+
+const hideDropdown = function () {
+  dropdown.classList.remove('show');
+  arrow.classList.remove('down');
+};
+const toggleDropdown = function () {
+  dropdown.classList.toggle('show');
+  arrow.classList.toggle('down');
+};
+fileButton.onclick = toggleDropdown;
+
+const prefix = 'ManifoldCAD';
+function getScript(name) {
+  return window.localStorage.getItem(prefix + name);
+}
+function setScript(name, code) {
+  window.localStorage.setItem(prefix + name, code);
+}
+function nthKey(n) {
+  if (n >= window.localStorage.length) return;
+  const key = window.localStorage.key(n);
+  if (key.startsWith(prefix)) {
+    return key.slice(prefix.length);
+  }
+}
+
+function saveCurrent() {
+  if (editor) {
+    const currentName = currentElement.textContent;
+    if (!examples.get(currentName)) {
+      setScript(currentName, editor.getValue());
+    }
+  }
+};
+
+window.onpagehide = saveCurrent;
+
+let switching = false;
+let isExample = true;
+function switchTo(scriptName) {
+  saveCurrent();
+  if (editor) {
+    switching = true;
+    hideDropdown();
+    currentElement.textContent = scriptName;
+    setScript('currentName', scriptName);
+    const code = examples.get(scriptName) ?? getScript(scriptName) ?? '';
+    isExample = examples.get(scriptName) != null;
+    editor.setValue(code);
+  }
+}
+
+function appendDropdownItem(name) {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.classList.add('blue', 'item');
+  button.textContent = name;
+  dropdown.appendChild(button);
+  button.onclick = function () { switchTo(button.textContent); };
+  return button;
+}
+
+function newItem(code) {
+  let num = 1;
+  let name = 'New Script ' + num++;
+  while (getScript(name) != null) {
+    name = 'New Script ' + num++;
+  }
+  setScript(name, code);
+  const nextButton = appendDropdownItem(name);
+  nextButton.click();
+};
+
+const newButton = document.querySelector('#new');
+newButton.onclick = function () { newItem(''); };
+
+// Editor
 let worker = undefined;
-const mesh = new THREE.Mesh(undefined, new THREE.MeshStandardMaterial({
-  color: 'yellow',
-  metalness: 1,
-  roughness: 0.2
-}));
-mesh.scale.setScalar(0.001);
+require.config({ paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.34.0/min/vs' } });
+require(['vs/editor/editor.main'], async function () {
+  const content = await fetch('bindings.d.ts').then(response => response.text());
+  monaco.languages.typescript.typescriptDefaults.addExtraLib(content);
+  editor = monaco.editor.create(document.getElementById('editor'), {
+    language: 'typescript',
+    automaticLayout: true
+  });
+  const w = await monaco.languages.typescript.getTypeScriptWorker();
+  worker = await w(editor.getModel().uri);
+
+  for (const [name] of examples) {
+    appendDropdownItem(name);
+  }
+
+  let currentName = currentElement.textContent;
+  for (let i = 0; i < window.localStorage.length; i++) {
+    const key = nthKey(i);
+    if (!key) continue;
+    if (key === 'currentName') {
+      currentName = getScript(key);
+    } else {
+      appendDropdownItem(key);
+    }
+  }
+  switchTo(currentName);
+
+  document.querySelector('#compile').click();
+
+  editor.onDidChangeModelContent(e => {
+    runButton.disabled = false;
+    if (switching) {
+      switching = false;
+      return;
+    }
+    if (isExample) {
+      const cursor = editor.getPosition();
+      newItem(editor.getValue());
+      editor.setPosition(cursor);
+    }
+  });
+
+  window.onresize = () => {
+    editor.layout({});
+  };
+});
+
+// Execution
 const runButton = document.querySelector('#compile');
 var Module = {
   onRuntimeInitialized: function () {
@@ -75,14 +200,46 @@ var Module = {
       ];
       const f = new Function(...exposedFunctions, content);
       const t0 = performance.now();
-      f(...exposedFunctions.map(name => Module[name]));
-      Module.cleanup();
-      const t1 = performance.now();
-      console.log(`took ${t1 - t0}ms`);
-      runButton.disabled = true;
+      try {
+        f(...exposedFunctions.map(name => Module[name]));
+      } catch (error) {
+        console.log(error);
+      } finally {
+        Module.cleanup();
+        const t1 = performance.now();
+        console.log(`took ${t1 - t0}ms`);
+        runButton.disabled = true;
+      }
     };
   }
 };
+
+// Export & Rendering
+const mv = document.querySelector('model-viewer');
+const mesh = new THREE.Mesh(undefined, new THREE.MeshStandardMaterial({
+  color: 'yellow',
+  metalness: 1,
+  roughness: 0.2
+}));
+mesh.scale.setScalar(0.001);
+let objectURL = null;
+const exporter = new THREE.GLTFExporter();
+
+function push2MV(manifold) {
+  mesh.geometry?.dispose();
+  mesh.geometry = mesh2geometry(manifold.getMesh());
+  exporter.parse(
+    mesh,
+    (gltf) => {
+      const blob = new Blob([gltf], { type: 'application/octet-stream' });
+      URL.revokeObjectURL(objectURL);
+      objectURL = URL.createObjectURL(blob);
+      mv.src = objectURL;
+    },
+    () => console.log('GLTF export failed!'),
+    { binary: true }
+  );
+}
 
 function mesh2geometry(mesh) {
   const geometry = new THREE.BufferGeometry();
@@ -117,147 +274,9 @@ function mesh2geometry(mesh) {
   return geometry;
 }
 
-const mv = document.querySelector('model-viewer');
-let objectURL = null;
-const exporter = new THREE.GLTFExporter();
-
-function push2MV(manifold) {
-  mesh.geometry?.dispose();
-  mesh.geometry = mesh2geometry(manifold.getMesh());
-  exporter.parse(
-    mesh,
-    (gltf) => {
-      const blob = new Blob([gltf], { type: 'application/octet-stream' });
-      URL.revokeObjectURL(objectURL);
-      objectURL = URL.createObjectURL(blob);
-      mv.src = objectURL;
-    },
-    () => console.log('GLTF export failed!'),
-    { binary: true }
-  );
-}
-
 document.querySelector('#download').onclick = function () {
   const link = document.createElement("a");
   link.download = "manifold.glb";
   link.href = objectURL;
   link.click();
 };
-
-const fileButton = document.querySelector('#file');
-const currentElement = document.querySelector('#current');
-const arrow = document.querySelector('.uparrow');
-const dropdown = document.querySelector('.dropdown');
-
-const hideDropdown = function () {
-  dropdown.classList.remove('show');
-  arrow.classList.remove('down');
-};
-const toggleDropdown = function () {
-  dropdown.classList.toggle('show');
-  arrow.classList.toggle('down');
-};
-fileButton.onclick = toggleDropdown;
-
-const prefix = 'ManifoldCAD';
-function getScript(name) {
-  return window.localStorage.getItem(prefix + name);
-}
-function setScript(name, code) {
-  window.localStorage.setItem(prefix + name, code);
-}
-function nthKey(n) {
-  if (n >= window.localStorage.length) return;
-  const key = window.localStorage.key(n);
-  if (key.startsWith(prefix)) {
-    return key.slice(prefix.length);
-  }
-}
-
-let switching = false;
-let isExample = true;
-function switchTo(scriptName) {
-  if (editor) {
-    const currentName = currentElement.textContent;
-    if (!examples.get(currentName)) {
-      setScript(currentName, editor.getValue());
-    }
-    switching = true;
-    hideDropdown();
-    currentElement.textContent = scriptName;
-    setScript('currentName', scriptName);
-    const code = examples.get(scriptName) ?? getScript(scriptName) ?? '';
-    isExample = examples.get(scriptName) != null;
-    editor.setValue(code);
-  }
-}
-
-function appendDropdownItem(name) {
-  const button = document.createElement('button');
-  button.type = 'button';
-  button.classList.add('blue', 'item');
-  button.textContent = name;
-  dropdown.appendChild(button);
-  button.onclick = function () { switchTo(button.textContent); };
-  return button;
-}
-
-function newItem(code) {
-  let num = 1;
-  let name = 'New Script ' + num++;
-  while (getScript(name) != null) {
-    name = 'New Script ' + num++;
-  }
-  setScript(name, code);
-  const nextButton = appendDropdownItem(name);
-  nextButton.click();
-};
-
-const newButton = document.querySelector('#new');
-newButton.onclick = function () { newItem(''); };
-
-require.config({ paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.34.0/min/vs' } });
-require(['vs/editor/editor.main'], async function () {
-  const content = await fetch('bindings.d.ts').then(response => response.text());
-  monaco.languages.typescript.typescriptDefaults.addExtraLib(content);
-  editor = monaco.editor.create(document.getElementById('editor'), {
-    value: examples.get('Intro'),
-    language: 'typescript',
-    automaticLayout: true
-  });
-  const w = await monaco.languages.typescript.getTypeScriptWorker();
-  worker = await w(editor.getModel().uri);
-
-  for (const [name] of examples) {
-    appendDropdownItem(name);
-  }
-
-  for (let i = 0; i < window.localStorage.length; i++) {
-    const name = nthKey(i);
-    if (!name) continue;
-    if (name === 'currentName') {
-      switchTo(getScript(name));
-    } else {
-      appendDropdownItem(name);
-    }
-  }
-
-  document.querySelector('#compile').click();
-
-  editor.onDidChangeModelContent(e => {
-    runButton.disabled = false;
-    if (switching) {
-      switching = false;
-      return;
-    }
-    if (isExample) {
-      const cursor = editor.getPosition();
-      newItem(editor.getValue());
-      editor.setPosition(cursor);
-    }
-  });
-
-  window.onresize = () => {
-    editor.layout({});
-  };
-});
