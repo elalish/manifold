@@ -84,87 +84,6 @@ var Module = {
   }
 };
 
-const mv = document.querySelector('model-viewer');
-let objectURL = null;
-const exporter = new THREE.GLTFExporter();
-
-function push2MV(manifold) {
-  mesh.geometry?.dispose();
-  mesh.geometry = mesh2geometry(manifold.getMesh());
-  exporter.parse(
-    mesh,
-    (gltf) => {
-      const blob = new Blob([gltf], { type: 'application/octet-stream' });
-      URL.revokeObjectURL(objectURL);
-      objectURL = URL.createObjectURL(blob);
-      mv.src = objectURL;
-    },
-    () => console.log('GLTF export failed!'),
-    { binary: true }
-  );
-}
-
-document.querySelector('#download').onclick = function () {
-  const link = document.createElement("a");
-  link.download = "manifold.glb";
-  link.href = objectURL;
-  link.click();
-};
-
-const fileButton = document.querySelector('#file');
-const arrow = document.querySelector('.uparrow');
-const dropdown = document.querySelector('.dropdown');
-const hideDropdown = function () {
-  dropdown.classList.remove('show');
-  arrow.classList.remove('down');
-};
-const toggleDropdown = function () {
-  dropdown.classList.toggle('show');
-  arrow.classList.toggle('down');
-};
-fileButton.onclick = toggleDropdown;
-
-// State
-const currentName = document.querySelector('#current');
-let nextNum = 1;
-let switching = false;
-
-function appendDropdownItem(name) {
-  const button = document.createElement('button');
-  button.type = 'button';
-  button.classList.add('blue', 'item');
-  button.textContent = name;
-  dropdown.appendChild(button);
-  button.onclick = function () {
-    if (editor) {
-      if (!examples.get(currentName.textContent)) {
-        window.localStorage.setItem(currentName.textContent, editor.getValue());
-      }
-      switching = true;
-      hideDropdown();
-      const scriptName = button.textContent;
-      currentName.textContent = scriptName;
-      const code = examples.get(scriptName) ?? window.localStorage.getItem(scriptName) ?? '';
-      editor.setValue(code);
-    }
-  };
-  return button;
-}
-
-for (const [name] of examples) {
-  appendDropdownItem(name);
-}
-
-function newItem(code) {
-  const name = 'New Script ' + nextNum++;
-  window.localStorage.setItem(name, code);
-  const nextButton = appendDropdownItem(name);
-  nextButton.click();
-};
-
-const newButton = document.querySelector('#new');
-newButton.onclick = function () { newItem(''); };
-
 function mesh2geometry(mesh) {
   const geometry = new THREE.BufferGeometry();
 
@@ -198,6 +117,105 @@ function mesh2geometry(mesh) {
   return geometry;
 }
 
+const mv = document.querySelector('model-viewer');
+let objectURL = null;
+const exporter = new THREE.GLTFExporter();
+
+function push2MV(manifold) {
+  mesh.geometry?.dispose();
+  mesh.geometry = mesh2geometry(manifold.getMesh());
+  exporter.parse(
+    mesh,
+    (gltf) => {
+      const blob = new Blob([gltf], { type: 'application/octet-stream' });
+      URL.revokeObjectURL(objectURL);
+      objectURL = URL.createObjectURL(blob);
+      mv.src = objectURL;
+    },
+    () => console.log('GLTF export failed!'),
+    { binary: true }
+  );
+}
+
+document.querySelector('#download').onclick = function () {
+  const link = document.createElement("a");
+  link.download = "manifold.glb";
+  link.href = objectURL;
+  link.click();
+};
+
+const fileButton = document.querySelector('#file');
+const currentElement = document.querySelector('#current');
+const arrow = document.querySelector('.uparrow');
+const dropdown = document.querySelector('.dropdown');
+
+const hideDropdown = function () {
+  dropdown.classList.remove('show');
+  arrow.classList.remove('down');
+};
+const toggleDropdown = function () {
+  dropdown.classList.toggle('show');
+  arrow.classList.toggle('down');
+};
+fileButton.onclick = toggleDropdown;
+
+const prefix = 'ManifoldCAD';
+function getScript(name) {
+  return window.localStorage.getItem(prefix + name);
+}
+function setScript(name, code) {
+  window.localStorage.setItem(prefix + name, code);
+}
+function nthKey(n) {
+  if (n >= window.localStorage.length) return;
+  const key = window.localStorage.key(n);
+  if (key.startsWith(prefix)) {
+    return key.slice(prefix.length);
+  }
+}
+
+let switching = false;
+let isExample = true;
+function switchTo(scriptName) {
+  if (editor) {
+    const currentName = currentElement.textContent;
+    if (!examples.get(currentName)) {
+      setScript(currentName, editor.getValue());
+    }
+    switching = true;
+    hideDropdown();
+    currentElement.textContent = scriptName;
+    setScript('currentName', scriptName);
+    const code = examples.get(scriptName) ?? getScript(scriptName) ?? '';
+    isExample = examples.get(scriptName) != null;
+    editor.setValue(code);
+  }
+}
+
+function appendDropdownItem(name) {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.classList.add('blue', 'item');
+  button.textContent = name;
+  dropdown.appendChild(button);
+  button.onclick = function () { switchTo(button.textContent); };
+  return button;
+}
+
+function newItem(code) {
+  let num = 1;
+  let name = 'New Script ' + num++;
+  while (getScript(name) != null) {
+    name = 'New Script ' + num++;
+  }
+  setScript(name, code);
+  const nextButton = appendDropdownItem(name);
+  nextButton.click();
+};
+
+const newButton = document.querySelector('#new');
+newButton.onclick = function () { newItem(''); };
+
 require.config({ paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.34.0/min/vs' } });
 require(['vs/editor/editor.main'], async function () {
   const content = await fetch('bindings.d.ts').then(response => response.text());
@@ -210,6 +228,20 @@ require(['vs/editor/editor.main'], async function () {
   const w = await monaco.languages.typescript.getTypeScriptWorker();
   worker = await w(editor.getModel().uri);
 
+  for (const [name] of examples) {
+    appendDropdownItem(name);
+  }
+
+  for (let i = 0; i < window.localStorage.length; i++) {
+    const name = nthKey(i);
+    if (!name) continue;
+    if (name === 'currentName') {
+      switchTo(getScript(name));
+    } else {
+      appendDropdownItem(name);
+    }
+  }
+
   document.querySelector('#compile').click();
 
   editor.onDidChangeModelContent(e => {
@@ -218,7 +250,7 @@ require(['vs/editor/editor.main'], async function () {
       switching = false;
       return;
     }
-    if (examples.get(currentName.textContent)) {
+    if (isExample) {
       const cursor = editor.getPosition();
       newItem(editor.getValue());
       editor.setPosition(cursor);
