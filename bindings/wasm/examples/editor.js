@@ -112,17 +112,24 @@ document.querySelector('#download').onclick = function () {
 };
 
 const fileButton = document.querySelector('#file');
-const currentName = document.querySelector('#current');
 const arrow = document.querySelector('.uparrow');
 const dropdown = document.querySelector('.dropdown');
+const hideDropdown = function () {
+  dropdown.classList.remove('show');
+  arrow.classList.remove('down');
+};
 const toggleDropdown = function () {
   dropdown.classList.toggle('show');
   arrow.classList.toggle('down');
 };
 fileButton.onclick = toggleDropdown;
 
-// Populate dropdown with examples
-for (const [name, code] of examples) {
+// State
+const currentName = document.querySelector('#current');
+let nextNum = 1;
+let switching = false;
+
+function appendDropdownItem(name) {
   const button = document.createElement('button');
   button.type = 'button';
   button.classList.add('blue', 'item');
@@ -130,12 +137,33 @@ for (const [name, code] of examples) {
   dropdown.appendChild(button);
   button.onclick = function () {
     if (editor) {
+      if (!examples.get(currentName.textContent)) {
+        window.localStorage.setItem(currentName.textContent, editor.getValue());
+      }
+      switching = true;
+      hideDropdown();
+      const scriptName = button.textContent;
+      currentName.textContent = scriptName;
+      const code = examples.get(scriptName) ?? window.localStorage.getItem(scriptName) ?? '';
       editor.setValue(code);
-      toggleDropdown();
-      currentName.textContent = name;
     }
   };
+  return button;
 }
+
+for (const [name] of examples) {
+  appendDropdownItem(name);
+}
+
+function newItem(code) {
+  const name = 'New Script ' + nextNum++;
+  window.localStorage.setItem(name, code);
+  const nextButton = appendDropdownItem(name);
+  nextButton.click();
+};
+
+const newButton = document.querySelector('#new');
+newButton.onclick = function () { newItem(''); };
 
 function mesh2geometry(mesh) {
   const geometry = new THREE.BufferGeometry();
@@ -186,6 +214,15 @@ require(['vs/editor/editor.main'], async function () {
 
   editor.onDidChangeModelContent(e => {
     runButton.disabled = false;
+    if (switching) {
+      switching = false;
+      return;
+    }
+    if (examples.get(currentName.textContent)) {
+      const cursor = editor.getPosition();
+      newItem(editor.getValue());
+      editor.setPosition(cursor);
+    }
   });
 
   window.onresize = () => {
