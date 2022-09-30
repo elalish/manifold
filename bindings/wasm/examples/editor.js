@@ -89,12 +89,14 @@ function appendDropdownItem(name) {
   const button = document.createElement('button');
   button.type = 'button';
   button.classList.add('blue', 'item');
-  button.textContent = name;
+  const label = document.createElement('span');
+  button.appendChild(label);
+  label.textContent = name;
   dropdown.appendChild(button);
 
   button.onclick = function () {
     saveCurrent();
-    switchTo(button.textContent);
+    switchTo(label.textContent);
   };
   return button;
 }
@@ -107,13 +109,42 @@ function addIcon(button) {
 }
 
 function addEdit(button) {
+  const label = button.firstChild;
   const edit = addIcon(button);
   edit.style.backgroundImage = 'url(pencil.png)';
   edit.style.right = '30px';
 
-  edit.onclick = function () {
-    const code = getScript(button.textContent);
+  edit.onclick = function (event) {
+    event.stopPropagation();
+    const oldName = label.textContent;
+    const code = getScript(oldName);
+    const form = document.createElement('form');
+    const inputElement = document.createElement('input');
+    inputElement.value = oldName;
+    label.textContent = '';
+    button.appendChild(form);
+    form.appendChild(inputElement);
+    inputElement.focus();
+    inputElement.setSelectionRange(0, oldName.length);
 
+    function rename() {
+      const newName = inputElement.value;
+      inputElement.blur();
+      label.textContent = newName;
+      if (currentElement.textContent == oldName) {
+        currentElement.textContent = newName;
+      }
+      removeScript(oldName);
+      setScript(newName, code);
+    }
+
+    form.onsubmit = rename;
+    inputElement.onclick = function (event) { event.stopPropagation(); };
+
+    inputElement.onblur = function () {
+      button.removeChild(form);
+      label.textContent = oldName;
+    };
   };
 
   const trash = addIcon(button);
@@ -132,7 +163,7 @@ function addEdit(button) {
         button.classList.remove('red');
       }, { once: true });
     } else if (performance.now() - lastClick > 500) {
-      removeScript(button.textContent);
+      removeScript(label.textContent);
       button.parentElement.removeChild(button);
       switchTo('Intro');
     }

@@ -46,7 +46,23 @@ button:disabled {
 }
 
 button:hover {
-  filter: brightness(0.8);
+  filter: brightness(0.9);
+}
+
+input {
+  border: none;
+  height: 36px;
+  background-color: transparent;
+  font-family: 'Rubik', sans-serif;
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 800;
+  text-align: left;
+  -webkit-font-smoothing: antialiased;
+}
+
+input:focus {
+  outline: none;
 }
 
 p {
