@@ -134,6 +134,10 @@ p {
   background-color: rgb(131, 255, 131);
 }
 
+.red {
+  background-color: rgb(255, 177, 177);
+}
+
 @media only screen and (max-width: 600px) {
   .container {
     flex-direction: column;

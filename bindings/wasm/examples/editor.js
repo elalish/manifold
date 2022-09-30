@@ -30,14 +30,13 @@ const hideDropdown = function () {
   dropdown.classList.remove('show');
   arrow.classList.remove('down');
 };
-const showDropdown = function () {
-  dropdown.classList.add('show');
-  arrow.classList.add('down');
-  setTimeout(() => {
-    document.body.addEventListener('click', hideDropdown, { once: true });
-  }, 0);
+const toggleDropdown = function (event) {
+  event.stopPropagation();
+  dropdown.classList.toggle('show');
+  arrow.classList.toggle('down');
 };
-fileButton.onclick = showDropdown;
+fileButton.onclick = toggleDropdown;
+document.body.onclick = hideDropdown;
 
 const prefix = 'ManifoldCAD';
 function getScript(name) {
@@ -45,6 +44,9 @@ function getScript(name) {
 }
 function setScript(name, code) {
   window.localStorage.setItem(prefix + name, code);
+}
+function removeScript(name) {
+  window.localStorage.removeItem(prefix + name);
 }
 function nthKey(n) {
   if (n >= window.localStorage.length) return;
@@ -68,10 +70,8 @@ window.onpagehide = saveCurrent;
 let switching = false;
 let isExample = true;
 function switchTo(scriptName) {
-  saveCurrent();
   if (editor) {
     switching = true;
-    hideDropdown();
     currentElement.textContent = scriptName;
     setScript('currentName', scriptName);
     const code = examples.get(scriptName) ?? getScript(scriptName) ?? '';
@@ -80,13 +80,22 @@ function switchTo(scriptName) {
   }
 }
 
+function renameScript(oldName, newName) {
+  const code = getScript(oldName);
+  setScript(newName, code);
+}
+
 function appendDropdownItem(name) {
   const button = document.createElement('button');
   button.type = 'button';
   button.classList.add('blue', 'item');
   button.textContent = name;
   dropdown.appendChild(button);
-  button.onclick = function () { switchTo(button.textContent); };
+
+  button.onclick = function () {
+    saveCurrent();
+    switchTo(button.textContent);
+  };
   return button;
 }
 
@@ -102,9 +111,32 @@ function addEdit(button) {
   edit.style.backgroundImage = 'url(pencil.png)';
   edit.style.right = '30px';
 
+  edit.onclick = function () {
+    const code = getScript(button.textContent);
+
+  };
+
   const trash = addIcon(button);
   trash.style.backgroundImage = 'url(trash.png)';
   trash.style.right = '0px';
+  let lastClick = 0;
+
+  trash.onclick = function (event) {
+    event.stopPropagation();
+    if (button.classList.contains('blue')) {
+      lastClick = performance.now();
+      button.classList.remove('blue');
+      button.classList.add('red');
+      document.body.addEventListener('click', function () {
+        button.classList.add('blue');
+        button.classList.remove('red');
+      }, { once: true });
+    } else if (performance.now() - lastClick > 500) {
+      removeScript(button.textContent);
+      button.parentElement.removeChild(button);
+      switchTo('Intro');
+    }
+  };
 }
 
 function newItem(code) {
