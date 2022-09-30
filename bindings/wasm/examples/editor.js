@@ -20,7 +20,7 @@ const result = ball.warp(func);`);
 
 let editor = undefined;
 
-// UI
+// File UI ------------------------------------------------------------
 const fileButton = document.querySelector('#file');
 const currentElement = document.querySelector('#current');
 const arrow = document.querySelector('.uparrow');
@@ -30,11 +30,14 @@ const hideDropdown = function () {
   dropdown.classList.remove('show');
   arrow.classList.remove('down');
 };
-const toggleDropdown = function () {
-  dropdown.classList.toggle('show');
-  arrow.classList.toggle('down');
+const showDropdown = function () {
+  dropdown.classList.add('show');
+  arrow.classList.add('down');
+  setTimeout(() => {
+    document.body.addEventListener('click', hideDropdown, { once: true });
+  }, 0);
 };
-fileButton.onclick = toggleDropdown;
+fileButton.onclick = showDropdown;
 
 const prefix = 'ManifoldCAD';
 function getScript(name) {
@@ -87,6 +90,23 @@ function appendDropdownItem(name) {
   return button;
 }
 
+function addIcon(button) {
+  const icon = document.createElement('button');
+  icon.classList.add('icon');
+  button.appendChild(icon);
+  return icon;
+}
+
+function addEdit(button) {
+  const edit = addIcon(button);
+  edit.style.backgroundImage = 'url(pencil.png)';
+  edit.style.right = '30px';
+
+  const trash = addIcon(button);
+  trash.style.backgroundImage = 'url(trash.png)';
+  trash.style.right = '0px';
+}
+
 function newItem(code) {
   let num = 1;
   let name = 'New Script ' + num++;
@@ -95,13 +115,14 @@ function newItem(code) {
   }
   setScript(name, code);
   const nextButton = appendDropdownItem(name);
+  addEdit(nextButton);
   nextButton.click();
 };
 
 const newButton = document.querySelector('#new');
 newButton.onclick = function () { newItem(''); };
 
-// Editor
+// Editor ------------------------------------------------------------
 let worker = undefined;
 require.config({ paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.34.0/min/vs' } });
 require(['vs/editor/editor.main'], async function () {
@@ -125,7 +146,8 @@ require(['vs/editor/editor.main'], async function () {
     if (key === 'currentName') {
       currentName = getScript(key);
     } else {
-      appendDropdownItem(key);
+      const button = appendDropdownItem(key);
+      addEdit(button);
     }
   }
   switchTo(currentName);
@@ -150,7 +172,7 @@ require(['vs/editor/editor.main'], async function () {
   };
 });
 
-// Execution
+// Execution ------------------------------------------------------------
 const runButton = document.querySelector('#compile');
 var Module = {
   onRuntimeInitialized: function () {
@@ -214,7 +236,7 @@ var Module = {
   }
 };
 
-// Export & Rendering
+// Export & Rendering ------------------------------------------------------------
 const mv = document.querySelector('model-viewer');
 const mesh = new THREE.Mesh(undefined, new THREE.MeshStandardMaterial({
   color: 'yellow',

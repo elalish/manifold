@@ -8,7 +8,6 @@ body {
   font-family: 'Rubik', sans-serif;
   font-size: 24px;
   line-height: 24px;
-  color: rgba(0, 0, 0, .87);
   font-weight: 800;
   -webkit-font-smoothing: antialiased;
 }
@@ -23,7 +22,6 @@ button {
   font-family: 'Rubik', sans-serif;
   font-size: 16px;
   line-height: 24px;
-  color: rgba(0, 0, 0, .87);
   font-weight: 800;
   text-align: left;
   -webkit-font-smoothing: antialiased;
@@ -42,8 +40,13 @@ a:active {
 }
 
 button:disabled {
+  color:black;
   background-color: #eee !important;
   cursor: auto;
+}
+
+button:hover {
+  filter: brightness(0.8);
 }
 
 p {
@@ -92,6 +95,7 @@ p {
 
 .uparrow {
   display: inline-block;
+  position: relative;
   border: solid black;
   border-width: 0 3px 3px 0;
   padding: 3px;
@@ -104,6 +108,22 @@ p {
 
 .item {
   width: 100%;
+  position: relative;
+}
+
+.icon {
+  display: inline-block;
+  background-color: transparent;
+  position: absolute;
+  width: 36px;
+  top: 0px;
+  background-size: 20px;
+  background-repeat: no-repeat;
+  background-position: center;
+}
+
+.icon:hover {
+  background-color: rgba(0,0,0,0.2);
 }
 
 .blue {
