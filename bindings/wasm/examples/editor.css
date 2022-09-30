@@ -1,0 +1,166 @@
+html {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  height: 100%;
+  font-family: 'Rubik', sans-serif;
+  font-size: 24px;
+  line-height: 24px;
+  font-weight: 800;
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  display: block;
+  padding: 0 1em;
+  cursor: pointer;
+  height: 36px;
+  border: none;
+  border-radius: 18px;
+  font-family: 'Rubik', sans-serif;
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 800;
+  text-align: left;
+  -webkit-font-smoothing: antialiased;
+}
+
+a:link,
+a:visited {
+  color: black;
+  text-decoration: underline;
+}
+
+a:hover,
+a:active {
+  color: black;
+  text-decoration: none;
+}
+
+button:disabled {
+  color:black;
+  background-color: #eee !important;
+  cursor: auto;
+}
+
+button:hover {
+  filter: brightness(0.9);
+}
+
+input {
+  border: none;
+  height: 36px;
+  background-color: transparent;
+  font-family: 'Rubik', sans-serif;
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 800;
+  text-align: left;
+  -webkit-font-smoothing: antialiased;
+}
+
+input:focus {
+  outline: none;
+}
+
+p {
+  margin: 1em;
+  text-align: left;
+}
+
+.page {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.container {
+  display: flex;
+}
+
+.col {
+  position: relative;
+  height: 100%;
+  width: 50vw;
+}
+
+.center {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate3d(-50%, -50%, 0);
+}
+
+.margin {
+  font-size: 16px;
+  margin: 1em;
+}
+
+.dropdown {
+  display: none;
+  position: absolute;
+  z-index: 1;
+  width: 200px;
+}
+
+.show {
+  display: block;
+}
+
+.uparrow {
+  display: inline-block;
+  position: relative;
+  border: solid black;
+  border-width: 0 3px 3px 0;
+  padding: 3px;
+  transform: rotate(-135deg);
+}
+
+.down {
+  transform: rotate(45deg);
+}
+
+.item {
+  width: 100%;
+  position: relative;
+}
+
+.icon {
+  display: inline-block;
+  background-color: transparent;
+  position: absolute;
+  width: 36px;
+  top: 0px;
+  background-size: 20px;
+  background-repeat: no-repeat;
+  background-position: center;
+}
+
+.icon:hover {
+  background-color: rgba(0,0,0,0.2);
+}
+
+.blue {
+  background-color: rgb(148, 221, 255);
+}
+
+.green {
+  background-color: rgb(131, 255, 131);
+}
+
+.red {
+  background-color: rgb(255, 177, 177);
+}
+
+@media only screen and (max-width: 600px) {
+  .container {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .col {
+    width: 100%;
+  }
+}
