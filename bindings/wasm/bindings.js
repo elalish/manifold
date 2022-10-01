@@ -39,13 +39,13 @@ Module.setup = function () {
   Module.Manifold.prototype.warp = function (func) {
     const wasmFuncPtr = addFunction(function (vec3Ptr) {
       const x = getValue(vec3Ptr, 'float');
-      const y = getValue(vec3Ptr + 1, 'float');
-      const z = getValue(vec3Ptr + 2, 'float');
+      const y = getValue(vec3Ptr + 4, 'float');
+      const z = getValue(vec3Ptr + 8, 'float');
       const vert = [x, y, z];
       func(vert);
       setValue(vec3Ptr, vert[0], 'float');
-      setValue(vec3Ptr + 1, vert[1], 'float');
-      setValue(vec3Ptr + 2, vert[2], 'float');
+      setValue(vec3Ptr + 4, vert[1], 'float');
+      setValue(vec3Ptr + 8, vert[2], 'float');
     }, 'vi');
     const out = this._Warp(wasmFuncPtr);
     removeFunction(wasmFuncPtr);
@@ -189,8 +189,8 @@ Module.setup = function () {
     };
     const wasmFuncPtr = addFunction(function (vec3Ptr) {
       const x = getValue(vec3Ptr, 'float');
-      const y = getValue(vec3Ptr + 1, 'float');
-      const z = getValue(vec3Ptr + 2, 'float');
+      const y = getValue(vec3Ptr + 4, 'float');
+      const z = getValue(vec3Ptr + 8, 'float');
       const vert = [x, y, z];
       return sdf(vert);
     }, 'fi');

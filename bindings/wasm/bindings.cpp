@@ -79,8 +79,9 @@ Manifold Warp(Manifold& manifold, uintptr_t funcPtr) {
 }
 
 Manifold LevelSetJs(uintptr_t funcPtr, Box bounds, float edgeLength,
-                    float level = 0) {
-  float (*f)(glm::vec3) = reinterpret_cast<float (*)(glm::vec3)>(funcPtr);
+                    float level) {
+  float (*f)(const glm::vec3&) =
+      reinterpret_cast<float (*)(const glm::vec3&)>(funcPtr);
   Mesh m = LevelSet(f, bounds, edgeLength, level);
   return Manifold(m);
 }
