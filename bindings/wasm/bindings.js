@@ -10,6 +10,14 @@ Module.setup = function () {
     return vec;
   }
 
+  function fromVec(vec, f = x => x) {
+    let result = [];
+    const size = vec.size();
+    for (let i = 0; i < size; i++)
+      result.push(f(vec.get(i)));
+    return result;
+  }
+
   function polygons2vec(polygons) {
     return toVec(
       new Module.Vector2_vec2(), polygons,
@@ -69,6 +77,60 @@ Module.setup = function () {
     return this._Scale(vararg2vec(vec));
   };
 
+  Module.Manifold.prototype.smooth = function (sharpenedEdges = []) {
+    let vec = new Module.Vector_smoothness();
+    toVec(vec, sharpenedEdges);
+    const result = this._Smooth(vec);
+    vec.delete();
+    return result;
+  };
+
+  Module.Manifold.prototype.decompose = function () {
+    const vec = this._Decompose();
+    const result = fromVec(vec);
+    vec.delete();
+    return result;
+  };
+
+  Module.Manifold.prototype.getCurvature = function () {
+    let result = this._getCurvature();
+    let oldMeanCurvature = result.vertMeanCurvature;
+    let oldGaussianCurvature = result.vertGaussianCurvature;
+    result.vertMeanCurvature = fromVec(oldMeanCurvature);
+    result.vertGaussianCurvature = fromVec(oldGaussianCurvature);
+    oldMeanCurvature.delete();
+    oldGaussianCurvature.delete();
+    return result;
+  };
+
+  Module.Manifold.prototype.getMeshRelation = function () {
+    let result = this._getMeshRelation();
+    let oldBarycentric = result.barycentric;
+    let oldTriBary = result.triBary;
+    let conversion1 = v => ['x', 'y', 'z'].map(f => v[f]);
+    let conversion2 = v => {
+      return {
+        meshID: v.meshID,
+        originalID: v.originalID,
+        tri: v.tri,
+        vertBary: conversion1(v.vertBary)
+      };
+    };
+    result.barycentric = fromVec(oldBarycentric, conversion1);
+    result.triBary = fromVec(oldTriBary, conversion2);
+    oldBarycentric.delete();
+    oldTriBary.delete();
+    return result;
+  };
+
+  Module.Manifold.prototype.boundingBox = function () {
+    const result = this._boundingBox();
+    return {
+      min: ['x', 'y', 'z'].map(f => result.min[f]),
+      max: ['x', 'y', 'z'].map(f => result.max[f]),
+    };
+  };
+
   Module.cube = function (...args) {
     let size = undefined;
     if (args.length == 0)
@@ -111,6 +173,31 @@ Module.setup = function () {
     polygonsVec.delete();
     return result;
   };
+
+  Module.compose = function (manifolds) {
+    let vec = new Module.Vector_manifold();
+    toVec(vec, manifolds);
+    const result = Module._Compose(vec);
+    vec.delete();
+    return result;
+  };
+
+  Module.levelSet = function (sdf, bounds, edgeLength, level = 0) {
+    let bounds2 = {
+      min: { x: bounds.min[0], y: bounds.min[1], z: bounds.min[2] },
+      max: { x: bounds.max[0], y: bounds.max[1], z: bounds.max[2] },
+    };
+    const wasmFuncPtr = addFunction(function (vec3Ptr) {
+      const x = getValue(vec3Ptr, 'float');
+      const y = getValue(vec3Ptr + 1, 'float');
+      const z = getValue(vec3Ptr + 2, 'float');
+      const vert = [x, y, z];
+      return sdf(vert);
+    }, 'fi');
+    const out = Module._LevelSet(wasmFuncPtr, bounds2, edgeLength, level);
+    removeFunction(wasmFuncPtr);
+    return out;
+  }
 
   function batchbool(name) {
     return function (...args) {

@@ -248,7 +248,7 @@ var Module = {
     let manifoldRegistry = [];
     for (const name of
       ['add', 'subtract', 'intersect', 'refine', 'transform', 'translate',
-        'rotate', 'scale']) {
+       'rotate', 'scale', 'asOriginal', 'smooth', 'decompose']) {
       const originalFn = Module.Manifold.prototype[name];
       Module.Manifold.prototype["_" + name] = originalFn;
       Module.Manifold.prototype[name] = function (...args) {
@@ -259,8 +259,8 @@ var Module = {
     }
 
     for (const name
-      of ['cube', 'cylinder', 'sphere', 'extrude', 'revolve', 'union',
-        'difference', 'intersection']) {
+      of ['cube', 'cylinder', 'sphere', 'tetrahedron', 'extrude', 'revolve', 'union',
+          'difference', 'intersection', 'compose', 'levelSet']) {
       const originalFn = Module[name];
       Module[name] = function (...args) {
         const result = originalFn(...args);
@@ -271,7 +271,12 @@ var Module = {
 
     Module.cleanup = function () {
       for (const obj of manifoldRegistry) {
-        obj.delete();
+        // decompose result is an array of manifolds
+        if (obj instanceof Array)
+          for (const elem of obj)
+            elem.delete();
+        else
+          obj.delete();
       }
       manifoldRegistry = [];
     }
@@ -280,8 +285,10 @@ var Module = {
       const output = await worker.getEmitOutput(editor.getModel().uri.toString());
       const content = output.outputFiles[0].text + 'push2MV(result);';
       const exposedFunctions = [
-        'cube', 'cylinder', 'sphere', 'extrude', 'revolve',
-        'union', 'difference', 'intersection',
+        'cube', 'cylinder', 'sphere', 'tetrahedron', 'extrude', 'revolve',
+        'union', 'difference', 'intersection', 'compose', 'levelSet',
+        'setMinCircularAngle', 'setMinCircularEdgeLength', 'setCircularSegments',
+        'getCircularSegments'
       ];
       const f = new Function(...exposedFunctions, content);
       const t0 = performance.now();
