@@ -474,6 +474,10 @@ Manifold Manifold::Boolean(const Manifold& second, OpType op) const {
 
 Manifold Manifold::BatchBoolean(const std::vector<Manifold>& manifolds,
                                 OpType op) {
+  if (manifolds.size() == 0)
+    return Manifold();
+  else if (manifolds.size() == 1)
+    return manifolds[0];
   std::vector<std::shared_ptr<CsgNode>> children;
   children.reserve(manifolds.size());
   for (const auto& m : manifolds) children.push_back(m.pNode_);

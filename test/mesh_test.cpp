@@ -1058,3 +1058,11 @@ TEST(Boolean, Close) {
 
   PolygonParams().processOverlaps = false;
 }
+
+TEST(Boolean, UnionDifference) {
+  Manifold block = Manifold::Cube({1, 1, 1}, true) - Manifold::Cylinder(1, 0.5);
+  Manifold result = block + block.Translate({0, 0, 1});
+  float resultsize = result.GetProperties().volume;
+  float blocksize = block.GetProperties().volume;
+  EXPECT_NEAR(resultsize, blocksize * 2, 0.0001);
+}
