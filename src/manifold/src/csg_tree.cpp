@@ -256,38 +256,40 @@ std::shared_ptr<CsgLeafNode> CsgOpNode::ToLeafNode() const {
   // turn the children into leaf nodes
   GetChildren();
   auto &children_ = impl_->children_;
-  switch (impl_->op_) {
-    case CsgNodeType::UNION:
-      BatchUnion();
-      break;
-    case CsgNodeType::INTERSECTION: {
-      std::vector<std::shared_ptr<const Manifold::Impl>> impls;
-      for (auto &child : children_) {
-        impls.push_back(
-            std::dynamic_pointer_cast<CsgLeafNode>(child)->GetImpl());
-      }
-      BatchBoolean(Manifold::OpType::INTERSECT, impls);
-      children_.clear();
-      children_.push_back(std::make_shared<CsgLeafNode>(impls.front()));
-      break;
-    };
-    case CsgNodeType::DIFFERENCE: {
-      // take the lhs out and treat the remaining nodes as the rhs, perform
-      // union optimization for them
-      auto lhs = std::dynamic_pointer_cast<CsgLeafNode>(children_.front());
-      children_.erase(children_.begin());
-      BatchUnion();
-      auto rhs = std::dynamic_pointer_cast<CsgLeafNode>(children_.front());
-      children_.clear();
-      Boolean3 boolean(*lhs->GetImpl(), *rhs->GetImpl(),
-                       Manifold::OpType::SUBTRACT);
-      children_.push_back(
-          std::make_shared<CsgLeafNode>(std::make_shared<Manifold::Impl>(
-              boolean.Result(Manifold::OpType::SUBTRACT))));
-    };
-    case CsgNodeType::LEAF:
-      // unreachable
-      break;
+  if (children_.size() > 1) {
+    switch (impl_->op_) {
+      case CsgNodeType::UNION:
+        BatchUnion();
+        break;
+      case CsgNodeType::INTERSECTION: {
+        std::vector<std::shared_ptr<const Manifold::Impl>> impls;
+        for (auto &child : children_) {
+          impls.push_back(
+              std::dynamic_pointer_cast<CsgLeafNode>(child)->GetImpl());
+        }
+        BatchBoolean(Manifold::OpType::INTERSECT, impls);
+        children_.clear();
+        children_.push_back(std::make_shared<CsgLeafNode>(impls.front()));
+        break;
+      };
+      case CsgNodeType::DIFFERENCE: {
+        // take the lhs out and treat the remaining nodes as the rhs, perform
+        // union optimization for them
+        auto lhs = std::dynamic_pointer_cast<CsgLeafNode>(children_.front());
+        children_.erase(children_.begin());
+        BatchUnion();
+        auto rhs = std::dynamic_pointer_cast<CsgLeafNode>(children_.front());
+        children_.clear();
+        Boolean3 boolean(*lhs->GetImpl(), *rhs->GetImpl(),
+                         Manifold::OpType::SUBTRACT);
+        children_.push_back(
+            std::make_shared<CsgLeafNode>(std::make_shared<Manifold::Impl>(
+                boolean.Result(Manifold::OpType::SUBTRACT))));
+      };
+      case CsgNodeType::LEAF:
+        // unreachable
+        break;
+    }
   }
   // children_ must contain only one CsgLeafNode now, and its Transform will
   // give CsgLeafNode as well
