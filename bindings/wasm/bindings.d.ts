@@ -3,6 +3,36 @@ type Matrix3x4 = [Vec3, Vec3, Vec3, Vec3];
 type Vec2 = [number, number];
 type SimplePolygon = Vec2[];
 type Polygons = SimplePolygon[];
+type Box = {
+  min: Vec3,
+  max: Vec3
+};
+type Smoothness = {
+  halfedge: number,
+  smoothness: number
+};
+type Properties = {
+  surfaceArea: number,
+  volume: number
+};
+type BaryRef = {
+  meshID: number,
+  originalID: number,
+  tri: number,
+  vertBary: Vec3
+};
+type Curvature = {
+  maxMeanCurvature: number,
+  minMeanCurvature: number,
+  maxGaussianCurvature: number,
+  minGaussianCurvature: number,
+  vertMeanCurvature: number[],
+  vertGaussianCurvature: number[]
+};
+type MeshRelation = {
+  barycentric: Vec3[],
+  triBary: BaryRef[],
+};
 
 declare class Manifold {
   /**
@@ -23,12 +53,12 @@ declare class Manifold {
   translate(v: Vec3): Manifold;
 
   /**
-   * Applys an Euler angle rotation to the manifold, first about the X axis, then
-   * Y, then Z, in degrees. We use degrees so that we can minimize rounding error,
-   * and elimiate it completely for any multiples of 90 degrees. Addtionally, more
-   * efficient code paths are used to update the manifold when the transforms only
-   * rotate by multiples of 90 degrees. This operation can be chained. Transforms
-   * are combined and applied lazily.
+   * Applys an Euler angle rotation to the manifold, first about the X axis,
+   * then Y, then Z, in degrees. We use degrees so that we can minimize rounding
+   * error, and elimiate it completely for any multiples of 90 degrees.
+   * Addtionally, more efficient code paths are used to update the manifold when
+   * the transforms only rotate by multiples of 90 degrees. This operation can
+   * be chained. Transforms are combined and applied lazily.
    *
    * @param v [X, Y, Z] rotation in degrees.
    */
@@ -72,13 +102,150 @@ declare class Manifold {
   /**
    * This function does not change the topology, but allows the vertices to be
    * moved according to any arbitrary input function. It is easy to create a
-   * function that warps a geometrically valid object into one which overlaps, but
-   * that is not checked here, so it is up to the user to choose their function
-   * with discretion.
+   * function that warps a geometrically valid object into one which overlaps,
+   * but that is not checked here, so it is up to the user to choose their
+   * function with discretion.
    *
    * @param warpFunc A function that modifies a given vertex position.
    */
   warp(warpFunc: (vert: Vec3) => void): Manifold;
+
+  /**
+   * This operation returns a vector of Manifolds that are topologically
+   * disconnected. If everything is connected, the vector is length one,
+   * containing a copy of the original. It is the inverse operation of
+   * Compose().
+   */
+  decompose(): Manifold[];
+
+  /**
+   * Does the Manifold have any triangles?
+   */
+  isEmpty(): boolean;
+
+  /**
+   * The number of vertices in the Manifold.
+   */
+  numVert(): number;
+
+  /**
+   * The number of triangles in the Manifold.
+   */
+  numTri(): number;
+
+  /**
+   * The number of edges in the Manifold.
+   */
+  numEdge(): number;
+
+  /**
+   * Returns the axis-aligned bounding box of all the Manifold's vertices.
+   */
+  boundingBox(): Box;
+
+  /**
+   * Returns the precision of this Manifold's vertices, which tracks the
+   * approximate rounding error over all the transforms and operations that have
+   * led to this state. Any triangles that are colinear within this precision
+   * are considered degenerate and removed. This is the value of &epsilon;
+   * defining
+   * [&epsilon;-valid](https://github.com/elalish/manifold/wiki/Manifold-Library#definition-of-%CE%B5-valid).
+   */
+  precision(): number;
+
+  /**
+   * The genus is a topological property of the manifold, representing the
+   * number of "handles". A sphere is 0, torus 1, etc. It is only meaningful for
+   * a single mesh, so it is best to call Decompose() first.
+   */
+  genus(): number;
+
+  /**
+   * Returns the surface area and volume of the manifold. These properties are
+   * clamped to zero for a given face if they are within the Precision(). This
+   * means degenerate manifolds can by identified by testing these properties as
+   * == 0.
+   */
+  getProperties(): Properties;
+
+  /**
+   * Curvature is the inverse of the radius of curvature, and signed such that
+   * positive is convex and negative is concave. There are two orthogonal
+   * principal curvatures at any point on a manifold, with one maximum and the
+   * other minimum. Gaussian curvature is their product, while mean
+   * curvature is their sum. This approximates them for every vertex (returned
+   * as vectors in the structure) and also returns their minimum and maximum
+   * values.
+   */
+  getCurvature(): Curvature;
+
+  /**
+   * Gets the relationship to the previous meshes, for the purpose of assinging
+   * properties like texture coordinates. The triBary vector is the same length
+   * as Mesh.triVerts: BaryRef.originalID indicates the source mesh and
+   * BaryRef.tri is that mesh's triangle index to which these barycentric
+   * coordinates refer. BaryRef.vertBary gives an index for each vertex into the
+   * barycentric vector if that index is >= 0, indicating it is a new vertex. If
+   * the index is < 0, this indicates it is an original vertex, the index + 3
+   * vert of the referenced triangle.
+   *
+   * BaryRef.meshID is a unique ID to the particular instance of a given mesh.
+   * For instance, if you want to convert the triangle mesh to a polygon mesh,
+   * all the triangles from a given face will have the same .meshID and .tri
+   * values.
+   */
+  getMeshRelation(): MeshRelation;
+
+  /**
+   * If you copy a manifold, but you want this new copy to have new properties
+   * (e.g. a different UV mapping), you can reset its meshIDs to a new original,
+   * meaning it will now be referenced by its descendents instead of the meshes
+   * it was built from, allowing you to differentiate the copies when applying
+   * your properties to the final result.
+   *
+   * This function also condenses all coplanar faces in the relation, and
+   * collapses those edges. If you want to have inconsistent properties across
+   * these faces, meaning you want to preserve some of these edges, you should
+   * instead call GetMesh(), calculate your properties and use these to
+   * construct a new manifold.
+   */
+  asOriginal(): Manifold;
+
+  /**
+   * If this mesh is an original, this returns its meshID that can be referenced
+   * by product manifolds' MeshRelation. If this manifold is a product, this
+   * returns -1.
+   */
+  originalID(): number;
+
+  /**
+   * Constructs a smooth version of the input mesh by creating tangents; this
+   * method will throw if you have supplied tangnets with your mesh already. The
+   * actual triangle resolution is unchanged; use the Refine() method to
+   * interpolate to a higher-resolution curve.
+   *
+   * By default, every edge is calculated for maximum smoothness (very much
+   * approximately), attempting to minimize the maximum mean Curvature magnitude.
+   * No higher-order derivatives are considered, as the interpolation is
+   * independent per triangle, only sharing constraints on their boundaries.
+   *
+   * @param sharpenedEdges If desired, you can supply a vector of sharpened
+   * halfedges, which should in general be a small subset of all halfedges. Order
+   * of entries doesn't matter, as each one specifies the desired smoothness
+   * (between zero and one, with one the default for all unspecified halfedges)
+   * and the halfedge index (3 * triangle index + [0,1,2] where 0 is the edge
+   * between triVert 0 and 1, etc).
+   *
+   * At a smoothness value of zero, a sharp crease is made. The smoothness is
+   * interpolated along each edge, so the specified value should be thought of as
+   * an average. Where exactly two sharpened edges meet at a vertex, their
+   * tangents are rotated to be colinear so that the sharpened edge can be
+   * continuous. Vertices with only one sharpened edge are completely smooth,
+   * allowing sharpened edges to smoothly vanish at termination. A single vertex
+   * can be sharpened by sharping all edges that are incident on it, allowing
+   * cones to be formed.
+   */
+  smooth(sharpenedEdges?: Smoothness[]): Manifold;
 }
 
 /**
@@ -104,20 +271,26 @@ declare function cube(size?: Vec3, center?: boolean): Manifold;
  * origin at the bottom.
  */
 declare function cylinder(
-  height: number, radiusLow: number, radiusHigh?: number,
-  circularSegments?: number, center?: boolean): Manifold;
+    height: number, radiusLow: number, radiusHigh?: number,
+    circularSegments?: number, center?: boolean): Manifold;
 
 /**
-* Constructs a geodesic sphere of a given radius.
-*
-* @param radius Radius of the sphere. Must be positive.
-* @param circularSegments Number of segments along its
-* diameter. This number will always be rounded up to the nearest factor of
-* four, as this sphere is constructed by refining an octahedron. This means
-* there are a circle of vertices on all three of the axis planes. Default is
-* calculated by the static Defaults.
-*/
+ * Constructs a geodesic sphere of a given radius.
+ *
+ * @param radius Radius of the sphere. Must be positive.
+ * @param circularSegments Number of segments along its
+ * diameter. This number will always be rounded up to the nearest factor of
+ * four, as this sphere is constructed by refining an octahedron. This means
+ * there are a circle of vertices on all three of the axis planes. Default is
+ * calculated by the static Defaults.
+ */
 declare function sphere(radius: number, circularSegments?: number): Manifold;
+
+/**
+ * Constructs a tetrahedron centered at the origin with one vertex at (1,1,1)
+ * and the rest at similarly symmetric points.
+ */
+declare function tetrahedron(): Manifold;
 
 /**
  * Constructs a manifold from a set of polygons by extruding them along the
@@ -135,21 +308,22 @@ declare function sphere(radius: number, circularSegments?: number): Manifold;
  * Default {1, 1}.
  */
 declare function extrude(
-  crossSection: Polygons, height: number, nDivisions?: number,
-  twistDegrees?: number, scaleTop?: Vec2): Manifold;
+    crossSection: Polygons, height: number, nDivisions?: number,
+    twistDegrees?: number, scaleTop?: Vec2): Manifold;
 
 /**
-* Constructs a manifold from a set of polygons by revolving this cross-section
-* around its Y-axis and then setting this as the Z-axis of the resulting
-* manifold. If the polygons cross the Y-axis, only the part on the positive X
-* side is used. Geometrically valid input will result in geometrically valid
-* output.
-*
-* @param crossSection A set of non-overlapping polygons to revolve.
-* @param circularSegments Number of segments along its diameter. Default is
-* calculated by the static Defaults.
-*/
-declare function revolve(crossSection: Polygons, circularSegments?: number): Manifold;
+ * Constructs a manifold from a set of polygons by revolving this cross-section
+ * around its Y-axis and then setting this as the Z-axis of the resulting
+ * manifold. If the polygons cross the Y-axis, only the part on the positive X
+ * side is used. Geometrically valid input will result in geometrically valid
+ * output.
+ *
+ * @param crossSection A set of non-overlapping polygons to revolve.
+ * @param circularSegments Number of segments along its diameter. Default is
+ * calculated by the static Defaults.
+ */
+declare function revolve(
+    crossSection: Polygons, circularSegments?: number): Manifold;
 
 declare function union(a: Manifold, b: Manifold): Manifold;
 declare function difference(a: Manifold, b: Manifold): Manifold;
@@ -158,3 +332,49 @@ declare function intersection(a: Manifold, b: Manifold): Manifold;
 declare function union(manifolds: Manifold[]): Manifold;
 declare function difference(manifolds: Manifold[]): Manifold;
 declare function intersection(manifolds: Manifold[]): Manifold;
+
+/**
+ * Constructs a new manifold from a list of other manifolds. This is a purely
+ * topological operation, so care should be taken to avoid creating
+ * overlapping results. It is the inverse operation of Decompose().
+ *
+ * @param manifolds A list of Manifolds to lazy-union together.
+ */
+declare function compose(manifolds: Manifold[]): Manifold;
+
+/**
+ * Constructs a level-set Mesh from the input Signed-Distance Function (SDF).
+ * This uses a form of Marching Tetrahedra (akin to Marching Cubes, but better
+ * for manifoldness). Instead of using a cubic grid, it uses a body-centered
+ * cubic grid (two shifted cubic grids). This means if your function's interior
+ * exceeds the given bounds, you will see a kind of egg-crate shape closing off
+ * the manifold, which is due to the underlying grid.
+ *
+ * @param sdf The signed-distance function which returns the signed distance of
+ * a given point in R^3. Positive values are inside, negative outside.
+ * @param bounds An axis-aligned box that defines the extent of the grid.
+ * @param edgeLength Approximate maximum edge length of the triangles in the
+ * final result. This affects grid spacing, and hence has a strong effect on
+ * performance.
+ * @param level You can inset your Mesh by using a positive value, or outset
+ * it with a negative value.
+ */
+declare function levelSet(
+    sdf: (point: Vec3) => number, bounds: Box, edgeLength: number,
+    level?: number): Manifold;
+
+/**
+ * @name Defaults
+ * These static properties control how circular shapes are quantized by
+ * default on construction. If circularSegments is specified, it takes
+ * precedence. If it is zero, then instead the minimum is used of the segments
+ * calculated based on edge length and angle, rounded up to the nearest
+ * multiple of four. To get numbers not divisible by four, circularSegements
+ * must be specified.
+ */
+///@{
+declare function setMinCircularAngle(angle: number): void;
+declare function setMinCircularEdgeLength(length: number): void;
+declare function setCircularSegments(segments: number): void;
+declare function getCircularSegments(radius: number): number;
+///@}

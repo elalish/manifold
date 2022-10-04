@@ -245,10 +245,23 @@ var Module = {
     // Note that this only fixes memory leak across different runs: the memory
     // will only be freed when the compilation finishes.
 
+    // manifold member functions that returns a new manifold
+    const memberFunctions = [
+      'add', 'subtract', 'intersect', 'refine', 'transform', 'translate', 'rotate',
+      'scale', 'asOriginal', 'smooth', 'decompose'
+    ];
+    // top level functions that constructs a new manifold
+    const constructors = [
+      'cube', 'cylinder', 'sphere', 'tetrahedron', 'extrude', 'revolve', 'union',
+      'difference', 'intersection', 'compose', 'levelSet'
+    ];
+    const utils = [
+      'setMinCircularAngle', 'setMinCircularEdgeLength', 'setCircularSegments',
+      'getCircularSegments'
+    ];
+
     let manifoldRegistry = [];
-    for (const name of
-      ['add', 'subtract', 'intersect', 'refine', 'transform', 'translate',
-        'rotate', 'scale']) {
+    for (const name of memberFunctions) {
       const originalFn = Module.Manifold.prototype[name];
       Module.Manifold.prototype["_" + name] = originalFn;
       Module.Manifold.prototype[name] = function (...args) {
@@ -258,9 +271,7 @@ var Module = {
       }
     }
 
-    for (const name
-      of ['cube', 'cylinder', 'sphere', 'extrude', 'revolve', 'union',
-        'difference', 'intersection']) {
+    for (const name of constructors) {
       const originalFn = Module[name];
       Module[name] = function (...args) {
         const result = originalFn(...args);
@@ -271,7 +282,12 @@ var Module = {
 
     Module.cleanup = function () {
       for (const obj of manifoldRegistry) {
-        obj.delete();
+        // decompose result is an array of manifolds
+        if (obj instanceof Array)
+          for (const elem of obj)
+            elem.delete();
+        else
+          obj.delete();
       }
       manifoldRegistry = [];
     }
@@ -279,10 +295,7 @@ var Module = {
     runButton.onclick = async function (e) {
       const output = await worker.getEmitOutput(editor.getModel().uri.toString());
       const content = output.outputFiles[0].text + 'push2MV(result);';
-      const exposedFunctions = [
-        'cube', 'cylinder', 'sphere', 'extrude', 'revolve',
-        'union', 'difference', 'intersection',
-      ];
+      const exposedFunctions = constructors.concat(utils);
       const f = new Function(...exposedFunctions, content);
       const t0 = performance.now();
       try {

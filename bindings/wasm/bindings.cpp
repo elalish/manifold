@@ -17,6 +17,7 @@
 using namespace emscripten;
 
 #include <manifold.h>
+#include <sdf.h>
 
 using namespace manifold;
 
@@ -77,6 +78,19 @@ Manifold Warp(Manifold& manifold, uintptr_t funcPtr) {
   return manifold.Warp(f);
 }
 
+Manifold LevelSetJs(uintptr_t funcPtr, Box bounds, float edgeLength,
+                    float level) {
+  float (*f)(const glm::vec3&) =
+      reinterpret_cast<float (*)(const glm::vec3&)>(funcPtr);
+  Mesh m = LevelSet(f, bounds, edgeLength, level);
+  return Manifold(m);
+}
+
+Manifold Smooth(Manifold& manifold,
+                const std::vector<Smoothness>& sharpenedEdges) {
+  return Manifold::Smooth(manifold.GetMesh(), sharpenedEdges);
+}
+
 EMSCRIPTEN_BINDINGS(whatever) {
   value_object<glm::vec2>("vec2")
       .field("x", &glm::vec2::x)
@@ -87,18 +101,60 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .field("1", &glm::ivec3::y)
       .field("2", &glm::ivec3::z);
 
-  register_vector<glm::ivec3>("Vector_ivec3");
+  enum_<Manifold::Error>("status")
+      .value("NO_ERROR", Manifold::Error::NO_ERROR)
+      .value("NON_FINITE_VERTEX", Manifold::Error::NON_FINITE_VERTEX)
+      .value("NOT_MANIFOLD", Manifold::Error::NOT_MANIFOLD)
+      .value("VERTEX_INDEX_OUT_OF_BOUNDS",
+             Manifold::Error::VERTEX_INDEX_OUT_OF_BOUNDS)
+      .value("PROPERTIES_WRONG_LENGTH",
+             Manifold::Error::PROPERTIES_WRONG_LENGTH)
+      .value("TRI_PROPERTIES_WRONG_LENGTH",
+             Manifold::Error::TRI_PROPERTIES_WRONG_LENGTH)
+      .value("TRI_PROPERTIES_OUT_OF_BOUNDS",
+             Manifold::Error::TRI_PROPERTIES_OUT_OF_BOUNDS);
+
+  value_object<Box>("box").field("min", &Box::min).field("max", &Box::max);
+
+  value_object<Smoothness>("smoothness")
+      .field("hafledge", &Smoothness::halfedge)
+      .field("smoothness", &Smoothness::smoothness);
+
+  value_object<Properties>("properties")
+      .field("surfaceArea", &Properties::surfaceArea)
+      .field("volume", &Properties::volume);
+
+  value_object<BaryRef>("baryRef")
+      .field("meshID", &BaryRef::meshID)
+      .field("originalID", &BaryRef::originalID)
+      .field("tri", &BaryRef::tri)
+      .field("vertBary", &BaryRef::vertBary);
+
+  value_object<MeshRelation>("meshRelation")
+      .field("barycentric", &MeshRelation::barycentric)
+      .field("triBary", &MeshRelation::triBary);
+
+  value_object<Curvature>("curvature")
+      .field("maxMeanCurvature", &Curvature::maxMeanCurvature)
+      .field("minMeanCurvature", &Curvature::minMeanCurvature)
+      .field("maxGaussianCurvature", &Curvature::maxGaussianCurvature)
+      .field("minGaussianCurvature", &Curvature::minGaussianCurvature)
+      .field("vertMeanCurvature", &Curvature::vertMeanCurvature)
+      .field("vertGaussianCurvature", &Curvature::vertGaussianCurvature);
 
   value_object<glm::vec3>("vec3")
       .field("x", &glm::vec3::x)
       .field("y", &glm::vec3::y)
       .field("z", &glm::vec3::z);
 
+  register_vector<glm::ivec3>("Vector_ivec3");
   register_vector<glm::vec3>("Vector_vec3");
   register_vector<glm::vec2>("Vector_vec2");
   register_vector<std::vector<glm::vec2>>("Vector2_vec2");
   register_vector<float>("Vector_f32");
   register_vector<Manifold>("Vector_manifold");
+  register_vector<Smoothness>("Vector_smoothness");
+  register_vector<BaryRef>("Vector_baryRef");
 
   value_object<glm::vec4>("vec4")
       .field("x", &glm::vec4::x)
@@ -125,15 +181,38 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .function("_Transform", &Transform)
       .function("_Translate", &Manifold::Translate)
       .function("_Rotate", &Manifold::Rotate)
-      .function("_Scale", &Manifold::Scale);
+      .function("_Scale", &Manifold::Scale)
+      .function("_Smooth", &Smooth)
+      .function("_Decompose", &Manifold::Decompose)
+      .function("isEmpty", &Manifold::IsEmpty)
+      .function("status", &Manifold::Status)
+      .function("numVert", &Manifold::NumVert)
+      .function("numEdge", &Manifold::NumEdge)
+      .function("numTri", &Manifold::NumTri)
+      .function("_boundingBox", &Manifold::BoundingBox)
+      .function("precision", &Manifold::Precision)
+      .function("genus", &Manifold::Genus)
+      .function("getProperties", &Manifold::GetProperties)
+      .function("_getCurvature", &Manifold::GetCurvature)
+      .function("originalID", &Manifold::OriginalID)
+      .function("asOriginal", &Manifold::AsOriginal)
+      .function("_getMeshRelation", &Manifold::GetMeshRelation);
 
   function("_Cube", &Manifold::Cube);
   function("_Cylinder", &Manifold::Cylinder);
   function("_Sphere", &Manifold::Sphere);
+  function("tetrahedron", &Manifold::Tetrahedron);
   function("_Extrude", &Extrude);
   function("_Revolve", &Revolve);
+  function("_LevelSet", &LevelSetJs);
 
   function("_unionN", &UnionN);
   function("_differenceN", &DifferenceN);
   function("_intersectionN", &IntersectionN);
+  function("_Compose", &Manifold::Compose);
+
+  function("setMinCircularAngle", &Manifold::SetMinCircularAngle);
+  function("setMinCircularEdgeLength", &Manifold::SetMinCircularEdgeLength);
+  function("setCircularSegments", &Manifold::SetCircularSegments);
+  function("getCircularSegments", &Manifold::GetCircularSegments);
 }
