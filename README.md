@@ -8,30 +8,74 @@
 
 [Manifold](https://github.com/elalish/manifold) is a geometry library dedicated to creating and operating on manifold triangle meshes. A [manifold mesh](https://github.com/elalish/manifold/wiki/Manifold-Library#manifoldness) is a mesh that represents a solid object, and so is very important in manufacturing, CAD, structural analysis, etc. Further information can be found on the [wiki](https://github.com/elalish/manifold/wiki/Manifold-Library).
 
+This is a modern C++ library that Github's CI verifies builds and runs on a variety of platforms. Additionally, we build Python and JavaScript (WASM) bindings to make this library more portable and easy to use. We have only three dependencies (all built-in header-only libraries): graphlite provides a connected components algorithm, GLM is a compact vector library, and Thrust is Nvidia's parallel algorithms library (basically a superset of C++17 std::parallel_algorithms). We make use of submodules to ensure compatibility. 
+
 ## What's here
 
-This library is intended to be fast with guaranteed manifold output. As such you need manifold meshes as input, which can be hard to come by since most 3D graphics meshes are not. This library can create simple primitive meshes but also links in Assimp, which will import many kinds of 3D files, but you'll get an error if the imported mesh isn't manifold. Various automated repair tools exist online for fixing non manifold models, usually for 3D printing. 
+This library is fast with guaranteed manifold output. As such you need manifold meshes as input, which this library can create using constructors inspired by the OpenSCAD API, as well as more advanced features like smoothing and signed-distance function (SDF) level sets. You can also pass in your own mesh data, but you'll get an error status if the imported mesh isn't manifold. Various automated repair tools exist online for fixing non manifold models, usually for 3D printing. 
 
-The most significant contribution here is a guaranteed-manifold [mesh Boolean](https://github.com/elalish/manifold/wiki/Manifold-Library#mesh-boolean) algorithm, which I believe is the first of its kind. If anyone knows of another, please tell me. Likewise, if the Boolean here ever fails you, please submit an issue! This Boolean forms the basis of a CAD kernel, as it allows simple shapes to be combined into more complex ones.
+The most significant contribution here is a guaranteed-manifold [mesh Boolean](https://github.com/elalish/manifold/wiki/Manifold-Library#mesh-boolean) algorithm, which I believe is the first of its kind. If you know of another, please open a discussion - a mesh Boolean alorithm robust to edge cases has been an open problem for many years. Likewise, if the Boolean here ever fails you, please submit an issue! This Boolean forms the basis of a CAD kernel, as it allows simple shapes to be combined into more complex ones.
 
-[Documentation](https://elalish.github.io/manifold/modules.html) is available through Doxygen for all of this library's classes and functions. Expect more detail to be added as time goes on.
+To aid in speed, this library makes extensive use of parallelization, generally through Nvidia's Thrust library. You can switch between the CUDA, OMP and serial C++ backends by setting a CMake flag. Not everything is so parallelizable, for instance a [polygon triangulation](https://github.com/elalish/manifold/wiki/Manifold-Library#polygon-triangulation) algorithm is included which is serial. Even if compiled for CUDA, the code will still run without a GPU, falling back to the serial version of the algorithms. The WASM build is serial-only for now, but still fast.
 
-To aid in speed, this library makes extensive use of parallelization, generally through Nvidia's Thrust library. You can switch between the CUDA, OMP and serial C++ backends by setting a CMake flag. Not everything is so parallelizable, for instance a [polygon triangulation](https://github.com/elalish/manifold/wiki/Manifold-Library#polygon-triangulation) algorithm is included which is serial. 
-
-Look in the [samples](https://github.com/elalish/manifold/tree/master/samples) directory for examples of how to use this library to make interesting 3D models. You may notice that some of these examples bare a certain resemblance to my OpenSCAD designs on [Thingiverse](https://www.thingiverse.com/emmett), which is no accident. Much as I love OpenSCAD, my library is dramatically faster and the code is more flexible, though it could be improved even more with JS or Python bindings to avoid the syntax and compiling of C++. 
+Look in the [samples](https://github.com/elalish/manifold/tree/master/samples) directory for examples of how to use this library to make interesting 3D models. You may notice that some of these examples bare a certain resemblance to my OpenSCAD designs on [Thingiverse](https://www.thingiverse.com/emmett), which is no accident. Much as I love OpenSCAD, my library is dramatically faster and the code is more flexible.
 
 ## Building
 
-The canonical build instructions are in the [manifold.yml](https://github.com/elalish/manifold/blob/master/.github/workflows/manifold.yml) file, as that is what this project's continuous integration server uses to build and test. I have only built under Ubuntu Linux, and the CI uses Nvidia's Cuda 11 Docker image. Part of my [road map](https://github.com/elalish/manifold/wiki/Manifold-Library#road-map) is to migrate from Thrust to C++20 parallel algorithms, which will alleviate the need to install the Cuda Developer Kit to build.
+Only CMake and a C++ compiler are required to be installed and set up to build this library (it has been tested with GCC, LLVM, MSVC). However, a variety of optional dependencies can bring in more functionality. The CUDA Toolkit (providing nvcc) is required to get Nvidia GPU parallelization. On e.g. Ubuntu, the `libomp-dev` and `libtbb-dev` packages provide other levels of parallelization, which can be used in concert with CUDA or separately. 
 
-## Python binding
+Build and test (Ubuntu or similar):
+```
+git clone --recurse-submodules https://github.com/elalish/manifold.git
+cd manifold
+git apply thrust.diff
+mkdir build
+cd build
+cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON .. && make
+test/manifold_test
+```
 
-> Note: This is still a WIP
+CMake flags (usage e.g. `-DMANIFOLD_USE_CUDA=ON`):
+- `MANIFOLD_USE_CUDA=[<OFF>, ON]`: Provides Nvidia GPU parallelization, requires CUDA Toolkit and its nvcc compiler.
+- `MANIFOLD_PAR=[<NONE>, OMP, TBB]`: Provides multi-thread parallelization, requires `libomp-dev` or `libtbb-dev`.
+- `MANIFOLD_EXPORT=[<OFF>, ON]`: Enables GLB export of 3D models from the tests, requires `libassimp-dev`.
+- `MANIFOLD_DEBUG=[<OFF>, ON]`: Enables internal assertions and exceptions.
+
+The build instructions used by our CI are in [manifold.yml](https://github.com/elalish/manifold/blob/master/.github/workflows/manifold.yml), which is a good source to check if something goes wrong and for instructions specific to other platforms, like Windows.
+
+### WASM
+To build the JS WASM library, first install NodeJS and set up emscripten:
+```
+sudo apt install nodejs
+git clone https://github.com/emscripten-core/emsdk.git
+cd emsdk
+./emsdk install latest
+./emsdk activate latest
+source ./emsdk/emsdk_env.sh
+```
+Then build:
+```
+cd manifold
+mkdir build
+cd build
+emcmake cmake -DCMAKE_BUILD_TYPE=Release .. && emmake make
+cd build/test
+node ./manifold_test.js
+```
+
+### Python
 
 The CMake script will build the python binding `pymanifold` automatically. To
 use the extension, please add `$BUILD_DIR/tools` to your `PYTHONPATH`, where
 `$BUILD_DIR` is the build directory for CMake. Examples using the python binding
-can be found in `test/python`. Run the following code in the interpreter for
+can be found in `bindings/python/examples`. To see exported samples, run:
+```
+sudo apt install pkg-config libpython3-dev python3 python3-distutils python3-pip
+pip install trimesh
+python3 run_all.py -e
+```
+
+Run the following code in the interpreter for
 python binding documentation:
 
 ```
@@ -47,4 +91,4 @@ Contributions are welcome! A lower barrier contribution is to simply make a PR t
 
 ## About the author
 
-This library is by [Emmett Lalish](https://elalish.blogspot.com/). I am currently a Google employee and this is my 20% project, not an official Google project. At my day job I'm the maintainer of [\<model-viewer\>](https://modelviewer.dev/). I was the first employee at a 3D video startup, [Omnivor](https://www.omnivor.io/), and before that I worked on 3D printing at Microsoft, including [3D Builder](https://www.microsoft.com/en-us/p/3d-builder/9wzdncrfj3t6?activetab=pivot%3Aoverviewtab). Originally an aerospace engineer, I started at a small DARPA contractor doing seedling projects, one of which became [Sea Hunter](https://en.wikipedia.org/wiki/Sea_Hunter). I earned my doctorate from the University of Washington in control theory and published some [papers](https://www.researchgate.net/scientific-contributions/75011026_Emmett_Lalish).
+This library was started by [Emmett Lalish](https://elalish.blogspot.com/). I am currently a Google employee and this is my 20% project, not an official Google project. At my day job I'm the maintainer of [\<model-viewer\>](https://modelviewer.dev/). I was the first employee at a 3D video startup, [Omnivor](https://www.omnivor.io/), and before that I worked on 3D printing at Microsoft, including [3D Builder](https://www.microsoft.com/en-us/p/3d-builder/9wzdncrfj3t6?activetab=pivot%3Aoverviewtab). Originally an aerospace engineer, I started at a small DARPA contractor doing seedling projects, one of which became [Sea Hunter](https://en.wikipedia.org/wiki/Sea_Hunter). I earned my doctorate from the University of Washington in control theory and published some [papers](https://www.researchgate.net/scientific-contributions/75011026_Emmett_Lalish).
