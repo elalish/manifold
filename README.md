@@ -22,7 +22,7 @@ Look in the [samples](https://github.com/elalish/manifold/tree/master/samples) d
 
 ## Building
 
-Only CMake and a C++ compiler are required to be installed and set up to build this library (it has been tested with GCC, LLVM, MSVC). However, a variety of optional dependencies can bring in more functionality. The CUDA Toolkit (providing nvcc) is required to get Nvidia GPU parallelization. On e.g. Ubuntu, the `libomp-dev` and `libtbb-dev` packages provide other levels of parallelization, which can be used in concert with CUDA or separately. 
+Only CMake and a C++ compiler are required to be installed and set up to build this library (it has been tested with GCC, LLVM, MSVC). However, a variety of optional dependencies can bring in more functionality, see below. 
 
 Build and test (Ubuntu or similar):
 ```
@@ -40,6 +40,7 @@ CMake flags (usage e.g. `-DMANIFOLD_USE_CUDA=ON`):
 - `MANIFOLD_PAR=[<NONE>, OMP, TBB]`: Provides multi-thread parallelization, requires `libomp-dev` or `libtbb-dev`.
 - `MANIFOLD_EXPORT=[<OFF>, ON]`: Enables GLB export of 3D models from the tests, requires `libassimp-dev`.
 - `MANIFOLD_DEBUG=[<OFF>, ON]`: Enables internal assertions and exceptions.
+- `BUILD_TEST_CGAL=[<OFF>, ON]`: Builds a CGAL-based performance [comparison](https://github.com/elalish/manifold/tree/master/extras), requires `libcgal-dev`.
 
 The build instructions used by our CI are in [manifold.yml](https://github.com/elalish/manifold/blob/master/.github/workflows/manifold.yml), which is a good source to check if something goes wrong and for instructions specific to other platforms, like Windows.
 
