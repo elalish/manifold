@@ -4,7 +4,8 @@ examples.set('Intro', `
 // Write code in TypeScript and this editor will show the API docs.
 // Manifold constructors include "cube", "cylinder", "sphere", "extrude", "revolve".
 // Type e.g. "box." to see the Manifold API.
-// Work in mm to get a GLB in true scale.
+// Use console.log() to print output (lower-right).
+// This editor defines Z as up and units of mm.
 const box = cube([100, 100, 100], true);
 const ball = sphere(60, 100);
 // You must name your final output "result".
@@ -237,6 +238,18 @@ require(['vs/editor/editor.main'], async function () {
 
 // Execution ------------------------------------------------------------
 const runButton = document.querySelector('#compile');
+const consoleElement = document.querySelector('#console');
+
+const oldLog = console.log;
+console.log = function (message) {
+  consoleElement.textContent += message + '\r\n';
+  oldLog(message);
+};
+
+function clearConsole() {
+  consoleElement.textContent = '';
+}
+
 var Module = {
   onRuntimeInitialized: function () {
     Module.setup();
@@ -259,6 +272,7 @@ var Module = {
       'setMinCircularAngle', 'setMinCircularEdgeLength', 'setCircularSegments',
       'getCircularSegments'
     ];
+    const exposedFunctions = constructors.concat(utils);
 
     let manifoldRegistry = [];
     for (const name of memberFunctions) {
@@ -293,19 +307,19 @@ var Module = {
     }
 
     runButton.onclick = async function (e) {
+      clearConsole();
       const output = await worker.getEmitOutput(editor.getModel().uri.toString());
       const content = output.outputFiles[0].text + 'push2MV(result);';
-      const exposedFunctions = constructors.concat(utils);
-      const f = new Function(...exposedFunctions, content);
-      const t0 = performance.now();
       try {
+        const f = new Function(...exposedFunctions, content);
+        const t0 = performance.now();
         f(...exposedFunctions.map(name => Module[name]));
+        const t1 = performance.now();
+        console.log(`Took ${Math.round(t1 - t0)} ms`);
       } catch (error) {
         console.log(error);
       } finally {
         Module.cleanup();
-        const t1 = performance.now();
-        console.log(`took ${t1 - t0}ms`);
         runButton.disabled = true;
       }
     };
@@ -319,11 +333,25 @@ const mesh = new THREE.Mesh(undefined, new THREE.MeshStandardMaterial({
   metalness: 1,
   roughness: 0.2
 }));
-mesh.scale.setScalar(0.001);
+const rotation = new THREE.Matrix4();
+rotation.set(
+  1, 0, 0, 0,
+  0, 0, 1, 0,
+  0, -1, 0, 0,
+  0, 0, 0, 1);
+mesh.setRotationFromMatrix(rotation); // Z-up -> Y-up
+mesh.scale.setScalar(0.001); // mm -> m
+
 let objectURL = null;
 const exporter = new THREE.GLTFExporter();
 
 function push2MV(manifold) {
+  const box = manifold.boundingBox();
+  const size = [0, 0, 0];
+  for (let i = 0; i < 3; i++) {
+    size[i] = box.max[i] - box.min[i];
+  }
+  console.log(`Bounding Box: X = ${size[0]} mm, Y = ${size[1]} mm, Z = ${size[2]} mm`);
   mesh.geometry?.dispose();
   mesh.geometry = mesh2geometry(manifold.getMesh());
   exporter.parse(
@@ -334,7 +362,7 @@ function push2MV(manifold) {
       objectURL = URL.createObjectURL(blob);
       mv.src = objectURL;
     },
-    () => console.log('GLTF export failed!'),
+    () => console.log('glTF export failed!'),
     { binary: true }
   );
 }
