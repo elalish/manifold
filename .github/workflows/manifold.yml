@@ -153,7 +153,7 @@ jobs:
   build_mac:
     strategy:
       matrix:
-        parallel_backend: [NONE, OMP, TBB]
+        parallel_backend: [NONE, TBB]
     runs-on: macos-latest
     if: github.event.pull_request.draft == false
     steps:
