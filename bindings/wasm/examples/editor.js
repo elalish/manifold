@@ -4,6 +4,7 @@ examples.set('Intro', `
 // Write code in TypeScript and this editor will show the API docs.
 // Manifold constructors include "cube", "cylinder", "sphere", "extrude", "revolve".
 // Type e.g. "box." to see the Manifold API.
+// Use console.log() to print output (lower-right).
 // This editor defines Z as up and units of mm.
 const box = cube([100, 100, 100], true);
 const ball = sphere(60, 100);
