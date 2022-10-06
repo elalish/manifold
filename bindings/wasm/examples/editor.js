@@ -271,6 +271,7 @@ var Module = {
       'setMinCircularAngle', 'setMinCircularEdgeLength', 'setCircularSegments',
       'getCircularSegments'
     ];
+    const exposedFunctions = constructors.concat(utils);
 
     let manifoldRegistry = [];
     for (const name of memberFunctions) {
@@ -308,17 +309,16 @@ var Module = {
       clearConsole();
       const output = await worker.getEmitOutput(editor.getModel().uri.toString());
       const content = output.outputFiles[0].text + 'push2MV(result);';
-      const exposedFunctions = constructors.concat(utils);
-      const f = new Function(...exposedFunctions, content);
-      const t0 = performance.now();
       try {
+        const f = new Function(...exposedFunctions, content);
+        const t0 = performance.now();
         f(...exposedFunctions.map(name => Module[name]));
+        const t1 = performance.now();
+        console.log(`Took ${Math.round(t1 - t0)} ms`);
       } catch (error) {
         console.log(error);
       } finally {
         Module.cleanup();
-        const t1 = performance.now();
-        console.log(`Took ${Math.round(t1 - t0)} ms`);
         runButton.disabled = true;
       }
     };
