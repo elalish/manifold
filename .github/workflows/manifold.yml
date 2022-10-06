@@ -150,6 +150,25 @@ jobs:
         cd build/test
         ./Release/manifold_test.exe
 
+  build_mac:
+    runs-on: macos-latest
+    if: github.event.pull_request.draft == false
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        submodules: true
+    - uses: jwlawson/actions-setup-cmake@v1.12
+    - name: Build
+      run: |
+        git apply thrust.diff
+        mkdir build
+        cd build
+        cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DMANIFOLD_DEBUG=ON -DMANIFOLD_PAR=NONE -DMANIFOLD_USE_CUDA=OFF .. && make
+    - name: Test
+      run: |
+        cd build/test
+        ./manifold_test
+
   build_nix:
     strategy:
       matrix:
