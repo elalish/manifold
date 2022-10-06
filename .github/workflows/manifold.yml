@@ -151,9 +151,18 @@ jobs:
         ./Release/manifold_test.exe
 
   build_mac:
+    strategy:
+      matrix:
+        parallel_backend: [NONE, OMP, TBB]
     runs-on: macos-latest
     if: github.event.pull_request.draft == false
     steps:
+    - name: Install OpenMP
+      if: matrix.parallel_backend == 'OMP'
+      run: brew install libomp
+    - name: Install TBB
+      if: matrix.parallel_backend == 'TBB'
+      run: brew install tbb
     - uses: actions/checkout@v3
       with:
         submodules: true
@@ -163,7 +172,7 @@ jobs:
         git apply thrust.diff
         mkdir build
         cd build
-        cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DMANIFOLD_DEBUG=ON -DMANIFOLD_PAR=NONE -DMANIFOLD_USE_CUDA=OFF .. && make
+        cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DMANIFOLD_DEBUG=ON -DMANIFOLD_PAR=${{matrix.parallel_backend}} .. && make
     - name: Test
       run: |
         cd build/test
