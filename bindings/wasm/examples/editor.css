@@ -70,6 +70,21 @@ p {
   text-align: left;
 }
 
+model-viewer {
+  position: relative; 
+  flex: 3; 
+  width: 100%; 
+  background-color: #ddd;
+}
+
+#console {
+  white-space: pre-line;
+  font-size: 14px;
+  font-weight: 100;
+  line-height: 20px;
+  padding: 8px;
+}
+
 .page {
   height: 100%;
   display: flex;
