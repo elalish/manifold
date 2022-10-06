@@ -1,24 +1,3 @@
-const examples = new Map();
-
-examples.set('Intro', `
-// Write code in TypeScript and this editor will show the API docs.
-// Manifold constructors include "cube", "cylinder", "sphere", "extrude", "revolve".
-// Type e.g. "box." to see the Manifold API.
-// Use console.log() to print output (lower-right).
-// This editor defines Z as up and units of mm.
-const box = cube([100, 100, 100], true);
-const ball = sphere(60, 100);
-// You must name your final output "result".
-const result = box.subtract(ball);`);
-
-examples.set('Warp', `
-const ball = sphere(60, 100);
-const func = (v: Vec3) => {
-  v[2] /= 2;
-};
-const result = ball.warp(func);`);
-
-
 let editor = undefined;
 
 // File UI ------------------------------------------------------------
