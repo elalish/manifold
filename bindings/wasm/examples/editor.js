@@ -332,13 +332,25 @@ const mesh = new THREE.Mesh(undefined, new THREE.MeshStandardMaterial({
   metalness: 1,
   roughness: 0.2
 }));
-mesh.scale.setScalar(0.001);
+const rotation = new THREE.Matrix4();
+rotation.set(
+  1, 0, 0, 0,
+  0, 0, 1, 0,
+  0, -1, 0, 0,
+  0, 0, 0, 1);
+mesh.setRotationFromMatrix(rotation); // Z-up -> Y-up
+mesh.scale.setScalar(0.001); // mm -> m
+
 let objectURL = null;
 const exporter = new THREE.GLTFExporter();
 
 function push2MV(manifold) {
   const box = manifold.boundingBox();
-  console.log(`Bounding Box: X = ${box.max.x - box.min.x} mm, Y = ${box.max.y - box.min.y} mm, Z = ${box.max.z - box.min.z} mm`);
+  const size = [0, 0, 0];
+  for (let i = 0; i < 3; i++) {
+    size[i] = box.max[i] - box.min[i];
+  }
+  console.log(`Bounding Box: X = ${size[0]} mm, Y = ${size[1]} mm, Z = ${size[2]} mm`);
   mesh.geometry?.dispose();
   mesh.geometry = mesh2geometry(manifold.getMesh());
   exporter.parse(
@@ -349,7 +361,7 @@ function push2MV(manifold) {
       objectURL = URL.createObjectURL(blob);
       mv.src = objectURL;
     },
-    () => console.log('GLTF export failed!'),
+    () => console.log('glTF export failed!'),
     { binary: true }
   );
 }
