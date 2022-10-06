@@ -20,15 +20,13 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 option(MANIFOLD_EXPORT off)
 option(MANIFOLD_DEBUG off)
-option(MANIFOLD_USE_CUDA on)
-set(MANIFOLD_PAR "TBB" CACHE STRING "Parallel backend, either \"TBB\" or \"OpenMP\" or \"NONE\"")
+option(MANIFOLD_USE_CUDA off)
+set(MANIFOLD_PAR "NONE" CACHE STRING "Parallel backend, either \"TBB\" or \"OpenMP\" or \"NONE\"")
 
 if(EMSCRIPTEN)
-    message("Building for Emscripten")
-    set(MANIFOLD_FLAGS -fexceptions)
-    set(CMAKE_EXE_LINKER_FLAGS ${CMAKE_EXE_LINKER_FLAGS} -sALLOW_MEMORY_GROWTH=1)
-    set(MANIFOLD_USE_CUDA OFF)
-    set(MANIFOLD_PAR "NONE")
+  message("Building for Emscripten")
+  set(MANIFOLD_FLAGS -fexceptions)
+  set(CMAKE_EXE_LINKER_FLAGS ${CMAKE_EXE_LINKER_FLAGS} -sALLOW_MEMORY_GROWTH=1)
 endif()
 
 option(PYBIND11_FINDPYTHON on)
@@ -41,33 +39,33 @@ set(PYBIND11_DIR ${PROJECT_SOURCE_DIR}/bindings/python/third_party/pybind11)
 set(THRUST_INC_DIR ${PROJECT_SOURCE_DIR}/src/third_party/thrust)
 
 if(MANIFOLD_USE_CUDA)
-    enable_language(CUDA)
-    find_package(CUDA REQUIRED)
+  enable_language(CUDA)
+  find_package(CUDA REQUIRED)
 
-    # we cannot set THRUST_INC_DIR when building with CUDA, otherwise the
-    # compiler will not use the system CUDA headers which causes incompatibility
-    # clear THRUST_INC_DIR, we use the one from nvcc
-    set(THRUST_INC_DIR "")
-    set(MANIFOLD_NVCC_RELEASE_FLAGS -O3 -lineinfo)
-    set(MANIFOLD_NVCC_DEBUG_FLAGS -G)
-    set(MANIFOLD_NVCC_FLAGS -Xcudafe --diag_suppress=esa_on_defaulted_function_ignored --extended-lambda --expt-relaxed-constexpr
-        "$<$<CONFIG:RELEASE>:${MANIFOLD_NVCC_RELEASE_FLAGS}>"
-        "$<$<CONFIG:DEBUG>:${MANIFOLD_NVCC_DEBUG_FLAGS}>")
+  # we cannot set THRUST_INC_DIR when building with CUDA, otherwise the
+  # compiler will not use the system CUDA headers which causes incompatibility
+  # clear THRUST_INC_DIR, we use the one from nvcc
+  set(THRUST_INC_DIR "")
+  set(MANIFOLD_NVCC_RELEASE_FLAGS -O3 -lineinfo)
+  set(MANIFOLD_NVCC_DEBUG_FLAGS -G)
+  set(MANIFOLD_NVCC_FLAGS -Xcudafe --diag_suppress=esa_on_defaulted_function_ignored --extended-lambda --expt-relaxed-constexpr
+    "$<$<CONFIG:RELEASE>:${MANIFOLD_NVCC_RELEASE_FLAGS}>"
+    "$<$<CONFIG:DEBUG>:${MANIFOLD_NVCC_DEBUG_FLAGS}>")
 endif()
 
 if(NOT MSVC)
-    set(WARNING_FLAGS -Werror -Wall -Wno-sign-compare -Wno-unused)
-    add_compile_options(
-        "$<$<COMPILE_LANGUAGE:CXX>:${WARNING_FLAGS}>"
-        "$<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=${WARNING_FLAGS}>")
+  set(WARNING_FLAGS -Werror -Wall -Wno-sign-compare -Wno-unused)
+  add_compile_options(
+    "$<$<COMPILE_LANGUAGE:CXX>:${WARNING_FLAGS}>"
+    "$<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=${WARNING_FLAGS}>")
 endif()
 
 if(CODE_COVERAGE AND NOT MSVC)
-    set(COVERAGE_FLAGS -coverage -fno-inline-small-functions -fkeep-inline-functions -fkeep-static-functions)
-    add_compile_options(
-        "$<$<COMPILE_LANGUAGE:CXX>:${COVERAGE_FLAGS}>"
-        "$<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=-coverage>")
-    add_link_options("-coverage")
+  set(COVERAGE_FLAGS -coverage -fno-inline-small-functions -fkeep-inline-functions -fkeep-static-functions)
+  add_compile_options(
+    "$<$<COMPILE_LANGUAGE:CXX>:${COVERAGE_FLAGS}>"
+    "$<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=-coverage>")
+  add_link_options("-coverage")
 endif()
 
 add_subdirectory(src)
