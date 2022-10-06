@@ -74,7 +74,7 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt-get -y update
-        DEBIAN_FRONTEND=noninteractive sudo apt install -y python3 nodejs
+        DEBIAN_FRONTEND=noninteractive sudo apt install -y nodejs
     - uses: actions/checkout@v3
       with:
         submodules: true
