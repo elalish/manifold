@@ -286,7 +286,9 @@ var Module = {
     }
 
     runButton.onclick = async function (e) {
+      runButton.disabled = true;
       clearConsole();
+      console.log('Running...');
       const output = await worker.getEmitOutput(editor.getModel().uri.toString());
       const content = output.outputFiles[0].text + 'push2MV(result);';
       try {
@@ -299,7 +301,6 @@ var Module = {
         console.log(error);
       } finally {
         Module.cleanup();
-        runButton.disabled = true;
       }
     };
   }
@@ -325,10 +326,11 @@ let objectURL = null;
 const exporter = new THREE.GLTFExporter();
 
 function push2MV(manifold) {
+  clearConsole();
   const box = manifold.boundingBox();
   const size = [0, 0, 0];
   for (let i = 0; i < 3; i++) {
-    size[i] = box.max[i] - box.min[i];
+    size[i] = Math.round((box.max[i] - box.min[i]) * 10) / 10;
   }
   console.log(`Bounding Box: X = ${size[0]} mm, Y = ${size[1]} mm, Z = ${size[2]} mm`);
   mesh.geometry?.dispose();
