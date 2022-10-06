@@ -237,6 +237,18 @@ require(['vs/editor/editor.main'], async function () {
 
 // Execution ------------------------------------------------------------
 const runButton = document.querySelector('#compile');
+const consoleElement = document.querySelector('#console');
+
+const oldLog = console.log;
+console.log = function (message) {
+  consoleElement.textContent += message + '\r\n';
+  oldLog(message);
+};
+
+function clearConsole() {
+  consoleElement.textContent = '';
+}
+
 var Module = {
   onRuntimeInitialized: function () {
     Module.setup();
@@ -293,6 +305,7 @@ var Module = {
     }
 
     runButton.onclick = async function (e) {
+      clearConsole();
       const output = await worker.getEmitOutput(editor.getModel().uri.toString());
       const content = output.outputFiles[0].text + 'push2MV(result);';
       const exposedFunctions = constructors.concat(utils);
@@ -305,7 +318,7 @@ var Module = {
       } finally {
         Module.cleanup();
         const t1 = performance.now();
-        console.log(`took ${t1 - t0}ms`);
+        console.log(`Took ${Math.round(t1 - t0)} ms`);
         runButton.disabled = true;
       }
     };
@@ -324,6 +337,8 @@ let objectURL = null;
 const exporter = new THREE.GLTFExporter();
 
 function push2MV(manifold) {
+  const box = manifold.boundingBox();
+  console.log(`Bounding Box: X = ${box.max.x - box.min.x} mm, Y = ${box.max.y - box.min.y} mm, Z = ${box.max.z - box.min.z} mm`);
   mesh.geometry?.dispose();
   mesh.geometry = mesh2geometry(manifold.getMesh());
   exporter.parse(
