@@ -1,24 +1,3 @@
-const examples = new Map();
-
-examples.set('Intro', `
-// Write code in TypeScript and this editor will show the API docs.
-// Manifold constructors include "cube", "cylinder", "sphere", "extrude", "revolve".
-// Type e.g. "box." to see the Manifold API.
-// Use console.log() to print output (lower-right).
-// This editor defines Z as up and units of mm.
-const box = cube([100, 100, 100], true);
-const ball = sphere(60, 100);
-// You must name your final output "result".
-const result = box.subtract(ball);`);
-
-examples.set('Warp', `
-const ball = sphere(60, 100);
-const func = (v: Vec3) => {
-  v[2] /= 2;
-};
-const result = ball.warp(func);`);
-
-
 let editor = undefined;
 
 // File UI ------------------------------------------------------------
@@ -307,7 +286,9 @@ var Module = {
     }
 
     runButton.onclick = async function (e) {
+      runButton.disabled = true;
       clearConsole();
+      console.log('Running...');
       const output = await worker.getEmitOutput(editor.getModel().uri.toString());
       const content = output.outputFiles[0].text + 'push2MV(result);';
       try {
@@ -320,7 +301,6 @@ var Module = {
         console.log(error);
       } finally {
         Module.cleanup();
-        runButton.disabled = true;
       }
     };
   }
@@ -346,10 +326,11 @@ let objectURL = null;
 const exporter = new THREE.GLTFExporter();
 
 function push2MV(manifold) {
+  clearConsole();
   const box = manifold.boundingBox();
   const size = [0, 0, 0];
   for (let i = 0; i < 3; i++) {
-    size[i] = box.max[i] - box.min[i];
+    size[i] = Math.round((box.max[i] - box.min[i]) * 10) / 10;
   }
   console.log(`Bounding Box: X = ${size[0]} mm, Y = ${size[1]} mm, Z = ${size[2]} mm`);
   mesh.geometry?.dispose();
