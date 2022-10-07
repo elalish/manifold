@@ -183,11 +183,14 @@ require(['vs/editor/editor.main'], async function () {
   }
 
   let currentName = currentElement.textContent;
+  let safe2Execute = false;
   for (let i = 0; i < window.localStorage.length; i++) {
     const key = nthKey(i);
     if (!key) continue;
     if (key === 'currentName') {
       currentName = getScript(key);
+    } else if (key === 'safe') {
+      safe2Execute = getScript(key) !== 'false';
     } else {
       const button = appendDropdownItem(key);
       addEdit(button);
@@ -195,7 +198,7 @@ require(['vs/editor/editor.main'], async function () {
   }
   switchTo(currentName);
 
-  document.querySelector('#compile').click();
+  if (safe2Execute) { document.querySelector('#compile').click(); }
 
   editor.onDidChangeModelContent(e => {
     runButton.disabled = false;
@@ -221,7 +224,8 @@ const consoleElement = document.querySelector('#console');
 
 const oldLog = console.log;
 console.log = function (message) {
-  consoleElement.textContent += message + '\r\n';
+  consoleElement.textContent += message.toString() + '\r\n';
+  consoleElement.scrollTop = consoleElement.scrollHeight;
   oldLog(message);
 };
 
@@ -286,6 +290,7 @@ var Module = {
     }
 
     runButton.onclick = async function (e) {
+      setScript('safe', 'false');
       runButton.disabled = true;
       clearConsole();
       console.log('Running...');
@@ -297,6 +302,7 @@ var Module = {
         f(...exposedFunctions.map(name => Module[name]));
         const t1 = performance.now();
         console.log(`Took ${Math.round(t1 - t0)} ms`);
+        setScript('safe', 'true');
       } catch (error) {
         console.log(error);
       } finally {
@@ -326,7 +332,6 @@ let objectURL = null;
 const exporter = new THREE.GLTFExporter();
 
 function push2MV(manifold) {
-  clearConsole();
   const box = manifold.boundingBox();
   const size = [0, 0, 0];
   for (let i = 0; i < 3; i++) {
