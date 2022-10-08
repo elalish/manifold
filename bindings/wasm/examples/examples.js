@@ -12,46 +12,6 @@ const exampleFunctions = {
     return result;
   },
 
-  Heart: function () {
-    const func = (v) => {
-      const ct2 = v[0] * v[0];
-      const st2 = v[1] * v[1];
-      const sp = v[2];
-      const sp2 = sp * sp;
-      const cp2 = 1 - sp2;
-      const a = cp2 * (ct2 + 9 / 4 * st2) + sp2;
-      const b = (sp * sp2 * cp2) * (ct2 + 9 / 80 * st2);
-      const a2 = a * a;
-      const a3 = a * a2;
-      const f = (r) => {
-        const r2 = r * r;
-        const r4 = r2 * r2;
-        return a3 * r4 * r2 - b * r4 * r - 3 * a2 * r4 + 3 * a * r2 - 1;
-      };
-      const df = (r) => {
-        const r2 = r * r;
-        const r4 = r2 * r2;
-        return 6 * a3 * r4 * r - 5 * b * r4 - 12 * a2 * r2 * r + 6 * a * r;
-      };
-      let r = 1.5;
-      let dr = 1;
-      const maxStep = 0.5;
-      for (let i = 0; i < 20; i++) {
-        dr = f(r) / df(r);
-        if (!(Math.abs(dr) > 0.001))
-          break;
-        r -= Math.max(Math.min(dr, maxStep), -maxStep);
-      }
-      v[0] *= r;
-      v[1] *= r;
-      v[2] *= r;
-    };
-
-    const ball = sphere(1, 50);
-    const result = ball.warp(func);
-    return result;
-  },
-
   RoundedFrame: function () {
     function roundedFrame(edgeLength, radius, circularSegments = 0) {
       const edge = cylinder(edgeLength, radius, -1, circularSegments);
@@ -76,6 +36,47 @@ const exampleFunctions = {
     setMinCircularAngle(3);
     setMinCircularEdgeLength(0.5);
     const result = roundedFrame(100, 10);
+    return result;
+  },
+
+  Heart: function () {
+    const func = (v) => {
+      const x2 = v[0] * v[0];
+      const y2 = v[1] * v[1];
+      const z = v[2];
+      const z2 = z * z;
+      const a = x2 + 9 / 4 * y2 + z2;
+      const b = z * z2 * (x2 + 9 / 80 * y2);
+      const a2 = a * a;
+      const a3 = a * a2;
+
+      const step = (r) => {
+        const r2 = r * r;
+        const r4 = r2 * r2;
+        // Taubin's function: https://mathworld.wolfram.com/HeartSurface.html
+        const f = a3 * r4 * r2 - b * r4 * r - 3 * a2 * r4 + 3 * a * r2 - 1;
+        // Derivative
+        const df = 6 * a3 * r4 * r - 5 * b * r4 - 12 * a2 * r2 * r + 6 * a * r;
+        return f / df;
+      };
+      // Newton's method for root finding
+      let r = 1.5;
+      let dr = 1;
+      while (Math.abs(dr) > 0.0001) {
+        dr = step(r);
+        r -= dr;
+      }
+      // Update radius
+      v[0] *= r;
+      v[1] *= r;
+      v[2] *= r;
+    };
+
+    const ball = sphere(1, 200);
+    const heart = ball.warp(func);
+    const box = heart.boundingBox();
+    const s = 100 / (box.max[0] - box.min[0]);
+    const result = heart.scale([s, s, s]);
     return result;
   },
 
