@@ -186,8 +186,8 @@ const exampleFunctions = {
 
 const examples = new Map();
 
-for (const [name, func] of Object.entries(exampleFunctions)) {
-  const whole = func.toString();
+for (const [func, code] of Object.entries(exampleFunctions)) {
+  const whole = code.toString();
   const lines = whole.split('\n');
   lines.splice(0, 1);// remove first line
   lines.splice(-2, 2);// remove last two lines
@@ -196,6 +196,6 @@ for (const [name, func] of Object.entries(exampleFunctions)) {
   }
   const body = '\n' + lines.join('\n');
 
-  name.replace(/([A-Z])/g, " $1");// Add spaces between words
+  const name = func.replace(/([a-z])([A-Z])/g, '$1 $2');// Add spaces between words
   examples.set(name, body);
 };

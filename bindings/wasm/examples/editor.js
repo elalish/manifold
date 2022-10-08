@@ -46,6 +46,7 @@ function saveCurrent() {
 };
 
 window.onpagehide = saveCurrent;
+window.beforeunload = saveCurrent;
 
 let switching = false;
 let isExample = true;
@@ -290,6 +291,7 @@ var Module = {
     }
 
     runButton.onclick = async function (e) {
+      saveCurrent();
       setScript('safe', 'false');
       runButton.disabled = true;
       clearConsole();
@@ -301,6 +303,9 @@ var Module = {
         const t0 = performance.now();
         f(...exposedFunctions.map(name => Module[name]));
         const t1 = performance.now();
+        const log = consoleElement.textContent;
+        // Remove "Running..."
+        consoleElement.textContent = log.substring(log.indexOf("\n") + 1);
         console.log(`Took ${Math.round(t1 - t0)} ms`);
         setScript('safe', 'true');
       } catch (error) {

@@ -81,7 +81,7 @@ model-viewer {
   flex: 1;
   min-height: 0;
   max-height: 25vh;
-  overflow: scroll;
+  overflow-y: scroll;
   background-color: #eee;
   white-space: pre-line;
   font-size: 14px;
