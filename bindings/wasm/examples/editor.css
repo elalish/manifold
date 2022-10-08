@@ -117,11 +117,15 @@ model-viewer {
   margin: 1em;
 }
 
+#file {
+  width: 250px;
+}
+
 .dropdown {
   display: none;
   position: absolute;
   z-index: 1;
-  width: 200px;
+  width: 250px;
 }
 
 .show {
