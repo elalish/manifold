@@ -61,11 +61,6 @@ function switchTo(scriptName) {
   }
 }
 
-function renameScript(oldName, newName) {
-  const code = getScript(oldName);
-  setScript(newName, code);
-}
-
 function appendDropdownItem(name) {
   const button = document.createElement('button');
   button.type = 'button';
@@ -89,6 +84,15 @@ function addIcon(button) {
   return icon;
 }
 
+function uniqueName(name) {
+  let num = 1;
+  let newName = name;
+  while (getScript(newName) != null || examples.get(newName) != null) {
+    newName = name + ' ' + num++;
+  }
+  return newName;
+}
+
 function addEdit(button) {
   const label = button.firstChild;
   const edit = addIcon(button);
@@ -109,8 +113,10 @@ function addEdit(button) {
     inputElement.setSelectionRange(0, oldName.length);
 
     function rename() {
-      const newName = inputElement.value;
+      const input = inputElement.value;
       inputElement.blur();
+      if (!input) return;
+      const newName = uniqueName(input);
       label.textContent = newName;
       if (currentElement.textContent == oldName) {
         currentElement.textContent = newName;
@@ -152,11 +158,7 @@ function addEdit(button) {
 }
 
 function newItem(code) {
-  let num = 1;
-  let name = 'New Script ' + num++;
-  while (getScript(name) != null) {
-    name = 'New Script ' + num++;
-  }
+  const name = uniqueName('New Script');
   setScript(name, code);
   const nextButton = appendDropdownItem(name);
   addEdit(nextButton);
