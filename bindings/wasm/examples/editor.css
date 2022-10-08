@@ -78,6 +78,11 @@ model-viewer {
 }
 
 #console {
+  flex: 1;
+  min-height: 0;
+  max-height: 25vh;
+  overflow-y: scroll;
+  background-color: #eee;
   white-space: pre-line;
   font-size: 14px;
   font-weight: 100;
@@ -86,7 +91,7 @@ model-viewer {
 }
 
 .page {
-  height: 100%;
+  height: 100vh;
   display: flex;
   flex-direction: column;
 }
@@ -97,7 +102,6 @@ model-viewer {
 
 .col {
   position: relative;
-  height: 100%;
   width: 50vw;
 }
 
@@ -113,11 +117,15 @@ model-viewer {
   margin: 1em;
 }
 
+#file {
+  width: 250px;
+}
+
 .dropdown {
   display: none;
   position: absolute;
   z-index: 1;
-  width: 200px;
+  width: 250px;
 }
 
 .show {

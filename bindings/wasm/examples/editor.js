@@ -46,6 +46,7 @@ function saveCurrent() {
 };
 
 window.onpagehide = saveCurrent;
+window.beforeunload = saveCurrent;
 
 let switching = false;
 let isExample = true;
@@ -58,11 +59,6 @@ function switchTo(scriptName) {
     isExample = examples.get(scriptName) != null;
     editor.setValue(code);
   }
-}
-
-function renameScript(oldName, newName) {
-  const code = getScript(oldName);
-  setScript(newName, code);
 }
 
 function appendDropdownItem(name) {
@@ -88,6 +84,15 @@ function addIcon(button) {
   return icon;
 }
 
+function uniqueName(name) {
+  let num = 1;
+  let newName = name;
+  while (getScript(newName) != null || examples.get(newName) != null) {
+    newName = name + ' ' + num++;
+  }
+  return newName;
+}
+
 function addEdit(button) {
   const label = button.firstChild;
   const edit = addIcon(button);
@@ -108,8 +113,10 @@ function addEdit(button) {
     inputElement.setSelectionRange(0, oldName.length);
 
     function rename() {
-      const newName = inputElement.value;
+      const input = inputElement.value;
       inputElement.blur();
+      if (!input) return;
+      const newName = uniqueName(input);
       label.textContent = newName;
       if (currentElement.textContent == oldName) {
         currentElement.textContent = newName;
@@ -151,11 +158,7 @@ function addEdit(button) {
 }
 
 function newItem(code) {
-  let num = 1;
-  let name = 'New Script ' + num++;
-  while (getScript(name) != null) {
-    name = 'New Script ' + num++;
-  }
+  const name = uniqueName('New Script');
   setScript(name, code);
   const nextButton = appendDropdownItem(name);
   addEdit(nextButton);
@@ -183,11 +186,14 @@ require(['vs/editor/editor.main'], async function () {
   }
 
   let currentName = currentElement.textContent;
+  let safe2Execute = false;
   for (let i = 0; i < window.localStorage.length; i++) {
     const key = nthKey(i);
     if (!key) continue;
     if (key === 'currentName') {
       currentName = getScript(key);
+    } else if (key === 'safe') {
+      safe2Execute = getScript(key) !== 'false';
     } else {
       const button = appendDropdownItem(key);
       addEdit(button);
@@ -195,7 +201,7 @@ require(['vs/editor/editor.main'], async function () {
   }
   switchTo(currentName);
 
-  document.querySelector('#compile').click();
+  if (safe2Execute) { document.querySelector('#compile').click(); }
 
   editor.onDidChangeModelContent(e => {
     runButton.disabled = false;
@@ -221,7 +227,8 @@ const consoleElement = document.querySelector('#console');
 
 const oldLog = console.log;
 console.log = function (message) {
-  consoleElement.textContent += message + '\r\n';
+  consoleElement.textContent += message.toString() + '\r\n';
+  consoleElement.scrollTop = consoleElement.scrollHeight;
   oldLog(message);
 };
 
@@ -286,6 +293,8 @@ var Module = {
     }
 
     runButton.onclick = async function (e) {
+      saveCurrent();
+      setScript('safe', 'false');
       runButton.disabled = true;
       clearConsole();
       console.log('Running...');
@@ -296,7 +305,11 @@ var Module = {
         const t0 = performance.now();
         f(...exposedFunctions.map(name => Module[name]));
         const t1 = performance.now();
+        const log = consoleElement.textContent;
+        // Remove "Running..."
+        consoleElement.textContent = log.substring(log.indexOf("\n") + 1);
         console.log(`Took ${Math.round(t1 - t0)} ms`);
+        setScript('safe', 'true');
       } catch (error) {
         console.log(error);
       } finally {
@@ -326,7 +339,6 @@ let objectURL = null;
 const exporter = new THREE.GLTFExporter();
 
 function push2MV(manifold) {
-  clearConsole();
   const box = manifold.boundingBox();
   const size = [0, 0, 0];
   for (let i = 0; i < 3; i++) {
