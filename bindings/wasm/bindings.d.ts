@@ -271,8 +271,8 @@ declare function cube(size?: Vec3, center?: boolean): Manifold;
  * origin at the bottom.
  */
 declare function cylinder(
-    height: number, radiusLow: number, radiusHigh?: number,
-    circularSegments?: number, center?: boolean): Manifold;
+  height: number, radiusLow: number, radiusHigh?: number,
+  circularSegments?: number, center?: boolean): Manifold;
 
 /**
  * Constructs a geodesic sphere of a given radius.
@@ -308,8 +308,8 @@ declare function tetrahedron(): Manifold;
  * Default {1, 1}.
  */
 declare function extrude(
-    crossSection: Polygons, height: number, nDivisions?: number,
-    twistDegrees?: number, scaleTop?: Vec2): Manifold;
+  crossSection: Polygons, height: number, nDivisions?: number,
+  twistDegrees?: number, scaleTop?: Vec2): Manifold;
 
 /**
  * Constructs a manifold from a set of polygons by revolving this cross-section
@@ -323,7 +323,7 @@ declare function extrude(
  * calculated by the static Defaults.
  */
 declare function revolve(
-    crossSection: Polygons, circularSegments?: number): Manifold;
+  crossSection: Polygons, circularSegments?: number): Manifold;
 
 declare function union(a: Manifold, b: Manifold): Manifold;
 declare function difference(a: Manifold, b: Manifold): Manifold;
@@ -360,8 +360,8 @@ declare function compose(manifolds: Manifold[]): Manifold;
  * it with a negative value.
  */
 declare function levelSet(
-    sdf: (point: Vec3) => number, bounds: Box, edgeLength: number,
-    level?: number): Manifold;
+  sdf: (point: Vec3) => number, bounds: Box, edgeLength: number,
+  level?: number): Manifold;
 
 /**
  * @name Defaults
@@ -378,3 +378,23 @@ declare function setMinCircularEdgeLength(length: number): void;
 declare function setCircularSegments(segments: number): void;
 declare function getCircularSegments(radius: number): number;
 ///@}
+
+declare interface ManifoldStatic {
+  cube: typeof cube;
+  cylinder: typeof cylinder;
+  sphere: typeof sphere;
+  tetrahedron: typeof tetrahedron;
+  extrude: typeof extrude;
+  revolve: typeof revolve;
+  union: typeof union;
+  difference: typeof difference;
+  intersection: typeof intersection;
+  compose: typeof compose;
+  levelSet: typeof levelSet;
+  setMinCircularAngle: typeof setMinCircularAngle;
+  setMinCircularEdgeLength: typeof setMinCircularEdgeLength;
+  setCircularSegments: typeof setCircularSegments;
+  getCircularSegments: typeof getCircularSegments;
+}
+
+declare const Module: ManifoldStatic;
