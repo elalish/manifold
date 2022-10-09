@@ -106,11 +106,14 @@ thrust::counting_iterator<T> countAt(T i) {
 template <typename T>
 __host__ __device__ T AtomicAdd(T& target, T add) {
 #ifdef __CUDA_ARCH__
+  // required for synchronization
+  __threadfence();
   return atomicAdd(&target, add);
 #else
   std::atomic<T>& tar = reinterpret_cast<std::atomic<T>&>(target);
   T old_val = tar.load();
-  while (!tar.compare_exchange_weak(old_val, old_val + add))
+  while (!tar.compare_exchange_weak(old_val, old_val + add,
+                                    std::memory_order_seq_cst))
     ;
   return old_val;
 #endif
@@ -119,10 +122,12 @@ __host__ __device__ T AtomicAdd(T& target, T add) {
 template <>
 inline __host__ __device__ int AtomicAdd(int& target, int add) {
 #ifdef __CUDA_ARCH__
+  // required for synchronization
+  __threadfence();
   return atomicAdd(&target, add);
 #else
   std::atomic<int>& tar = reinterpret_cast<std::atomic<int>&>(target);
-  int old_val = tar.fetch_add(add);
+  int old_val = tar.fetch_add(add, std::memory_order_seq_cst);
   return old_val;
 #endif
 }
