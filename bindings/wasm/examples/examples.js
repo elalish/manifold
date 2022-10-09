@@ -1,8 +1,8 @@
 const exampleFunctions = {
   Intro: function () {
     // Write code in JavaScript or TypeScript and this editor will show the API docs.
-    // Manifold constructors include "cube", "cylinder", "sphere", "extrude", "revolve".
     // Type e.g. "box." to see the Manifold API.
+    // Type "Module." to see the static API - these functions can also be used bare.
     // Use console.log() to print output (lower-right).
     // This editor defines Z as up and units of mm.
     const box = cube([100, 100, 100], true);
