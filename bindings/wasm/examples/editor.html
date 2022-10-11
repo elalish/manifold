@@ -21,13 +21,14 @@
           <button type="button" class="green item" id="new">New</button>
         </div>
       </div>
-      <button type="button" id="compile" class="margin green">Run</button>
+      <button type="button" id="compile" class="margin green" disabled><span>Run</span></button>
       <button type="button" id="download" class="blue margin">Save GLB</button>
     </div>
     <div class="container" style="flex: 2;">
       <div id="editor" class="col"></div>
       <div class="col container" style="flex-direction: column;">
-        <model-viewer camera-controls shadow-intensity="1" interaction-prompt="none" alt="Editor 3D output">
+        <model-viewer camera-controls min-camera-orbit="auto 0deg auto" max-camera-orbit="auto 180deg auto"
+          shadow-intensity="1" interaction-prompt="none" alt="Editor 3D output">
           <div class="center" slot="poster">
             <p style="text-align: center;">
               Loading<br /><br />
@@ -43,8 +44,6 @@
   </div>
 </body>
 
-<script src="https://cdn.jsdelivr.net/npm/three@0.144.0/build/three.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.144.0/examples/js/exporters/GLTFExporter.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.34.0/min/vs/loader.min.js"
   integrity="sha512-6bIYsGqvLpAiEBXPdRQeFf5cueeBECtAKJjIHer3BhBZNTV3WLcLA8Tm3pDfxUwTMIS+kAZwTUvJ1IrMdX8C5w=="
   crossorigin="anonymous" referrerpolicy="no-referrer"></script>
@@ -55,7 +54,6 @@
 
 <script src="examples.js"></script>
 <script src="editor.js"></script>
-<script src="manifold.js"></script>
 <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/2.0.1/model-viewer.min.js"></script>
 
 </html>
