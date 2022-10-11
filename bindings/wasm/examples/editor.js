@@ -253,46 +253,82 @@ function clearConsole() {
 
 let t0 = performance.now();
 
-runButton.onclick = async function () {
+function enableCancel() {
+  runButton.firstChild.style.visibility = 'hidden';
+  runButton.classList.add('red', 'cancel');
+}
+
+function disableCancel() {
+  runButton.firstChild.style.visibility = 'visible';
+  runButton.classList.remove('red', 'cancel');
+}
+
+const mv = document.querySelector('model-viewer');
+let objectURL = null;
+
+function createWorker() {
+  manifoldWorker = new Worker('worker.js');
+  manifoldWorker.onmessage = function (e) {
+    if (e.data == null) {
+      manifoldInitialized = true;
+      if (tsWorker != null) {
+        initializeRun();
+      }
+      return;
+    }
+
+    if (e.data.log != null) {
+      consoleElement.textContent += e.data.log + '\r\n';
+      consoleElement.scrollTop = consoleElement.scrollHeight;
+      return;
+    }
+
+    finishRun();
+    runButton.disabled = true;
+    setScript('safe', 'true');
+
+    URL.revokeObjectURL(objectURL);
+    objectURL = e.data.objectURL;
+    mv.src = objectURL;
+  }
+}
+
+createWorker();
+
+async function run() {
   saveCurrent();
   setScript('safe', 'false');
-  runButton.disabled = true;
+  enableCancel();
   clearConsole();
   console.log('Running...');
   const output = await tsWorker.getEmitOutput(editor.getModel().uri.toString());
   manifoldWorker.postMessage(output.outputFiles[0].text);
   t0 = performance.now();
-};
+}
 
-const mv = document.querySelector('model-viewer');
-let objectURL = null;
-
-manifoldWorker.onmessage = function (e) {
-  if (e.data == null) {
-    manifoldInitialized = true;
-    if (tsWorker != null) {
-      initializeRun();
-    }
-    return;
-  }
-
-  if (e.data.log != null) {
-    consoleElement.textContent += e.data.log + '\r\n';
-    consoleElement.scrollTop = consoleElement.scrollHeight;
-    return;
-  }
-
+function finishRun() {
+  disableCancel();
   const t1 = performance.now();
   const log = consoleElement.textContent;
   // Remove "Running..."
   consoleElement.textContent = log.substring(log.indexOf("\n") + 1);
   console.log(`Took ${Math.round(t1 - t0)} ms`);
-  setScript('safe', 'true');
-
-  URL.revokeObjectURL(objectURL);
-  objectURL = e.data.objectURL;
-  mv.src = objectURL;
 }
+
+function cancel() {
+  manifoldWorker.terminate();
+  createWorker();
+  finishRun();
+  console.log('Run canceled');
+}
+
+runButton.onclick = function () {
+  if (runButton.classList.contains('cancel')) {
+    cancel();
+  } else {
+    run();
+  }
+};
 
 const downloadButton = document.querySelector('#download');
 downloadButton.onclick = function () {
