@@ -1,5 +1,4 @@
 let editor = undefined;
-let manifoldWorker = new Worker('worker.js');
 
 // File UI ------------------------------------------------------------
 const fileButton = document.querySelector('#file');
@@ -251,8 +250,6 @@ function clearConsole() {
   consoleElement.textContent = '';
 }
 
-let t0 = performance.now();
-
 function enableCancel() {
   runButton.firstChild.style.visibility = 'hidden';
   runButton.classList.add('red', 'cancel');
@@ -263,17 +260,29 @@ function disableCancel() {
   runButton.classList.remove('red', 'cancel');
 }
 
+let t0 = performance.now();
+
+function finishRun() {
+  disableCancel();
+  const t1 = performance.now();
+  const log = consoleElement.textContent;
+  // Remove "Running..."
+  consoleElement.textContent = log.substring(log.indexOf("\n") + 1);
+  console.log(`Took ${Math.round(t1 - t0)} ms`);
+}
+
 const mv = document.querySelector('model-viewer');
 let objectURL = null;
+let manifoldWorker = null;
 
 function createWorker() {
   manifoldWorker = new Worker('worker.js');
   manifoldWorker.onmessage = function (e) {
     if (e.data == null) {
-      manifoldInitialized = true;
-      if (tsWorker != null) {
+      if (tsWorker != null && !manifoldInitialized) {
         initializeRun();
       }
+      manifoldInitialized = true;
       return;
     }
 
@@ -304,15 +313,6 @@ async function run() {
   const output = await tsWorker.getEmitOutput(editor.getModel().uri.toString());
   manifoldWorker.postMessage(output.outputFiles[0].text);
   t0 = performance.now();
-}
-
-function finishRun() {
-  disableCancel();
-  const t1 = performance.now();
-  const log = consoleElement.textContent;
-  // Remove "Running..."
-  consoleElement.textContent = log.substring(log.indexOf("\n") + 1);
-  console.log(`Took ${Math.round(t1 - t0)} ms`);
 }
 
 function cancel() {
