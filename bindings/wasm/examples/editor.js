@@ -173,6 +173,14 @@ const runButton = document.querySelector('#compile');
 const downloadButton = document.querySelector('#download');
 const consoleElement = document.querySelector('#console');
 let manifoldInitialized = false;
+let autoExecute = false;
+
+function initializeRun() {
+  runButton.disabled = false;
+  if (autoExecute) {
+    runButton.click();
+  }
+}
 
 // Editor ------------------------------------------------------------
 let tsWorker = undefined;
@@ -192,14 +200,14 @@ require(['vs/editor/editor.main'], async function () {
   }
 
   let currentName = currentElement.textContent;
-  let safe2Execute = false;
+
   for (let i = 0; i < window.localStorage.length; i++) {
     const key = nthKey(i);
     if (!key) continue;
     if (key === 'currentName') {
       currentName = getScript(key);
     } else if (key === 'safe') {
-      safe2Execute = getScript(key) !== 'false';
+      autoExecute = getScript(key) !== 'false';
     } else {
       const button = appendDropdownItem(key);
       addEdit(button);
@@ -207,9 +215,8 @@ require(['vs/editor/editor.main'], async function () {
   }
   switchTo(currentName);
 
-  if (safe2Execute && manifoldInitialized) {
-    runButton.disabled = false;
-    runButton.click();
+  if (manifoldInitialized) {
+    initializeRun();
   }
 
   editor.onDidChangeModelContent(e => {
@@ -264,8 +271,7 @@ manifoldWorker.onmessage = function (e) {
   if (e.data == null) {
     manifoldInitialized = true;
     if (tsWorker != null) {
-      runButton.disabled = false;
-      runButton.click();
+      initializeRun();
     }
     return;
   }
