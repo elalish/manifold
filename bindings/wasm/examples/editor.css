@@ -161,6 +161,13 @@ model-viewer {
   background-position: center;
 }
 
+.cancel {
+  background-image: url(close.png);
+  background-size: 20px;
+  background-repeat: no-repeat;
+  background-position: center;
+}
+
 .icon:hover {
   background-color: rgba(0,0,0,0.2);
 }
