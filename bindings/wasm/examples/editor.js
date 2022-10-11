@@ -63,13 +63,16 @@ function switchTo(scriptName) {
 }
 
 function appendDropdownItem(name) {
+  const container = document.createElement('div');
+  container.classList.add('item');
   const button = document.createElement('button');
+  container.appendChild(button);
   button.type = 'button';
   button.classList.add('blue', 'item');
   const label = document.createElement('span');
   button.appendChild(label);
   label.textContent = name;
-  dropdown.appendChild(button);
+  dropdown.appendChild(container);
 
   button.onclick = function () {
     saveCurrent();
@@ -81,7 +84,7 @@ function appendDropdownItem(name) {
 function addIcon(button) {
   const icon = document.createElement('button');
   icon.classList.add('icon');
-  button.appendChild(icon);
+  button.parentElement.appendChild(icon);
   return icon;
 }
 
@@ -170,8 +173,6 @@ const newButton = document.querySelector('#new');
 newButton.onclick = function () { newItem(''); };
 
 const runButton = document.querySelector('#compile');
-const downloadButton = document.querySelector('#download');
-const consoleElement = document.querySelector('#console');
 let manifoldInitialized = false;
 let autoExecute = false;
 
@@ -238,8 +239,7 @@ require(['vs/editor/editor.main'], async function () {
 });
 
 // Execution ------------------------------------------------------------
-
-
+const consoleElement = document.querySelector('#console');
 const oldLog = console.log;
 console.log = function (message) {
   consoleElement.textContent += message.toString() + '\r\n';
@@ -294,6 +294,7 @@ manifoldWorker.onmessage = function (e) {
   mv.src = objectURL;
 }
 
+const downloadButton = document.querySelector('#download');
 downloadButton.onclick = function () {
   const link = document.createElement("a");
   link.download = "manifold.glb";
