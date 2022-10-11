@@ -261,12 +261,19 @@ const mv = document.querySelector('model-viewer');
 let objectURL = null;
 
 manifoldWorker.onmessage = function (e) {
-  if (e.data == null && !manifoldInitialized) {
+  if (e.data == null) {
     manifoldInitialized = true;
     if (tsWorker != null) {
       runButton.disabled = false;
       runButton.click();
     }
+    return;
+  }
+
+  if (e.data.log != null) {
+    consoleElement.textContent += e.data.log + '\r\n';
+    consoleElement.scrollTop = consoleElement.scrollHeight;
+    return;
   }
 
   const t1 = performance.now();
@@ -277,7 +284,7 @@ manifoldWorker.onmessage = function (e) {
   setScript('safe', 'true');
 
   URL.revokeObjectURL(objectURL);
-  objectURL = e.data;
+  objectURL = e.data.objectURL;
   mv.src = objectURL;
 }
 

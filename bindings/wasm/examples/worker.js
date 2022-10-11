@@ -62,19 +62,17 @@ var Module = {
 const threePath = 'https://cdn.jsdelivr.net/npm/three@0.144.0/';
 importScripts('manifold.js', threePath + 'build/three.js', threePath + 'examples/js/exporters/GLTFExporter.js');
 
+const oldLog = console.log;
+console.log = function (message) {
+  postMessage({ log: message.toString() });
+  oldLog(message);
+};
 
 onmessage = (e) => {
   const content = e.data + '\nexportGLB(result);\n';
   try {
     const f = new Function(...exposedFunctions, content);
-    const t0 = performance.now();
     f(...exposedFunctions.map(name => Module[name]));
-    const t1 = performance.now();
-    const log = consoleElement.textContent;
-    // Remove "Running..."
-    consoleElement.textContent = log.substring(log.indexOf("\n") + 1);
-    console.log(`Took ${Math.round(t1 - t0)} ms`);
-    setScript('safe', 'true');
   } catch (error) {
     console.log(error);
   } finally {
@@ -112,11 +110,11 @@ function exportGLB(manifold) {
     mesh,
     (gltf) => {
       const blob = new Blob([gltf], { type: 'application/octet-stream' });
-      postMessage(URL.createObjectURL(blob));
+      postMessage({ objectURL: URL.createObjectURL(blob) });
     },
     () => {
       console.log('glTF export failed!');
-      postMessage(null);
+      postMessage({ objectURL: null });
     },
     { binary: true }
   );
