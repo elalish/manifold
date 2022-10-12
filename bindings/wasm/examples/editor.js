@@ -268,7 +268,7 @@ function finishRun() {
   const log = consoleElement.textContent;
   // Remove "Running..."
   consoleElement.textContent = log.substring(log.indexOf("\n") + 1);
-  console.log(`Took ${Math.round(t1 - t0)} ms`);
+  console.log(`Took ${(Math.round(t1 - t0) / 1000).toLocaleString()} seconds`);
 }
 
 const mv = document.querySelector('model-viewer');
