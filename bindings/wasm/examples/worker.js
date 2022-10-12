@@ -98,12 +98,16 @@ mesh.scale.setScalar(0.001); // mm -> m
 const exporter = new THREE.GLTFExporter();
 
 function exportGLB(manifold) {
+  console.log(`Triangles: ${manifold.numTri().toLocaleString()}`);
   const box = manifold.boundingBox();
   const size = [0, 0, 0];
   for (let i = 0; i < 3; i++) {
     size[i] = Math.round((box.max[i] - box.min[i]) * 10) / 10;
   }
-  console.log(`Bounding Box: X = ${size[0]} mm, Y = ${size[1]} mm, Z = ${size[2]} mm`);
+  console.log(`Bounding Box: X = ${size[0].toLocaleString()} mm, Y = ${size[1].toLocaleString()} mm, Z = ${size[2].toLocaleString()} mm`);
+  const volume = Math.round(manifold.getProperties().volume);
+  console.log(`Genus: ${manifold.genus().toLocaleString()}, Volume: ${(volume / 1000).toLocaleString()} cm^3`);
+
   mesh.geometry?.dispose();
   mesh.geometry = mesh2geometry(manifold.getMesh());
   exporter.parse(
