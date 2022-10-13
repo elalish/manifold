@@ -172,6 +172,7 @@ const newButton = document.querySelector('#new');
 newButton.onclick = function () { newItem(''); };
 
 const runButton = document.querySelector('#compile');
+const poster = document.querySelector('#poster');
 let manifoldInitialized = false;
 let autoExecute = false;
 
@@ -179,6 +180,8 @@ function initializeRun() {
   runButton.disabled = false;
   if (autoExecute) {
     runButton.click();
+  } else {
+    poster.textContent = 'Auto-run disabled due to prior failure';
   }
 }
 
@@ -268,7 +271,7 @@ function finishRun() {
   const log = consoleElement.textContent;
   // Remove "Running..."
   consoleElement.textContent = log.substring(log.indexOf("\n") + 1);
-  console.log(`Took ${(Math.round(t1 - t0) / 1000).toLocaleString()} seconds`);
+  console.log(`Took ${(Math.round((t1 - t0) / 10) / 100).toLocaleString()} seconds`);
 }
 
 const mv = document.querySelector('model-viewer');
@@ -299,6 +302,10 @@ function createWorker() {
     URL.revokeObjectURL(objectURL);
     objectURL = e.data.objectURL;
     mv.src = objectURL;
+    if (objectURL == null) {
+      mv.showPoster();
+      poster.textContent = 'Error';
+    }
   }
 }
 

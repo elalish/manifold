@@ -2,7 +2,7 @@ type Vec3 = [number, number, number];
 type Matrix3x4 = [Vec3, Vec3, Vec3, Vec3];
 type Vec2 = [number, number];
 type SimplePolygon = Vec2[];
-type Polygons = SimplePolygon[];
+type Polygons = SimplePolygon | SimplePolygon[];
 type Box = {
   min: Vec3,
   max: Vec3

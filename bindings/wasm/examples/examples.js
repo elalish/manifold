@@ -9,6 +9,11 @@ const exampleFunctions = {
     const ball = sphere(60, 100);
     // You must name your final output "result".
     const result = box.subtract(ball);
+
+    // All changes are automatically saved and restored between sessions. 
+    // This app is purely local - there is no server communication.
+    // This means it will work equally well offline once loaded.
+    // To share your code with another browser/device, simply copy the text to a file.
     return result;
   },
 
@@ -128,10 +133,10 @@ const exampleFunctions = {
       }
 
       let b = cylinder(width, radius + twistRadius / 2);
-      const circle = [[]];
+      const circle = [];
       const dPhiDeg = 180 / nDivision;
       for (let i = 0; i < 2 * nDivision; ++i) {
-        circle[0].push([
+        circle.push([
           decorRadius * Math.cos(dPhiDeg * i * Math.PI / 180) + twistRadius,
           decorRadius * Math.sin(dPhiDeg * i * Math.PI / 180)
         ]);
@@ -142,17 +147,17 @@ const exampleFunctions = {
         ]);
       for (let i = 0; i < nDecor; i++)
         b = b.add(decor.rotate([0, 0, (360.0 / nDecor) * i]));
-      const stretch = [[]];
+      const stretch = [];
       const dPhiRad = 2 * Math.PI / nCut;
 
       const p0 = [outerRadius, 0];
       const p1 = [innerRadius, -cut];
       const p2 = [innerRadius, cut];
       for (let i = 0; i < nCut; ++i) {
-        stretch[0].push(rotate(p0, dPhiRad * i));
-        stretch[0].push(rotate(p1, dPhiRad * i));
-        stretch[0].push(rotate(p2, dPhiRad * i));
-        stretch[0].push(rotate(p0, dPhiRad * i));
+        stretch.push(rotate(p0, dPhiRad * i));
+        stretch.push(rotate(p1, dPhiRad * i));
+        stretch.push(rotate(p2, dPhiRad * i));
+        stretch.push(rotate(p0, dPhiRad * i));
       }
       b = intersection(extrude(stretch, width), b);
       return b;

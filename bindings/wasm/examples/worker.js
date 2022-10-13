@@ -75,6 +75,7 @@ onmessage = (e) => {
     f(...exposedFunctions.map(name => Module[name]));
   } catch (error) {
     console.log(error);
+    postMessage({ objectURL: null });
   } finally {
     Module.cleanup();
   }
@@ -105,8 +106,8 @@ function exportGLB(manifold) {
     size[i] = Math.round((box.max[i] - box.min[i]) * 10) / 10;
   }
   console.log(`Bounding Box: X = ${size[0].toLocaleString()} mm, Y = ${size[1].toLocaleString()} mm, Z = ${size[2].toLocaleString()} mm`);
-  const volume = Math.round(manifold.getProperties().volume);
-  console.log(`Genus: ${manifold.genus().toLocaleString()}, Volume: ${(volume / 1000).toLocaleString()} cm^3`);
+  const volume = Math.round(manifold.getProperties().volume / 10);
+  console.log(`Genus: ${manifold.genus().toLocaleString()}, Volume: ${(volume / 100).toLocaleString()} cm^3`);
 
   mesh.geometry?.dispose();
   mesh.geometry = mesh2geometry(manifold.getMesh());

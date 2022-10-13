@@ -19,6 +19,9 @@ Module.setup = function () {
   }
 
   function polygons2vec(polygons) {
+    if (polygons[0].length < 3) {
+      polygons = [polygons];
+    }
     return toVec(
       new Module.Vector2_vec2(), polygons,
       poly => toVec(new Module.Vector_vec2(), poly, p => {
