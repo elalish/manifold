@@ -154,8 +154,11 @@ function addEdit(button) {
       }, { once: true });
     } else if (performance.now() - lastClick > 500) {
       removeScript(label.textContent);
-      button.parentElement.removeChild(button);
-      switchTo('Intro');
+      if (currentElement.textContent == label.textContent) {
+        switchTo('Intro');
+      }
+      const container = button.parentElement;
+      container.parentElement.removeChild(container);
     }
   };
 }
