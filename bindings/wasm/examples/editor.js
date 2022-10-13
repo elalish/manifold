@@ -244,7 +244,7 @@ require(['vs/editor/editor.main'], async function () {
 const consoleElement = document.querySelector('#console');
 const oldLog = console.log;
 console.log = function (message) {
-  consoleElement.textContent += message.toString() + '\r\n';
+  consoleElement.textContent += message + '\r\n';
   consoleElement.scrollTop = consoleElement.scrollHeight;
   oldLog(message);
 };

@@ -63,9 +63,17 @@ const threePath = 'https://cdn.jsdelivr.net/npm/three@0.144.0/';
 importScripts('manifold.js', threePath + 'build/three.js', threePath + 'examples/js/exporters/GLTFExporter.js');
 
 const oldLog = console.log;
-console.log = function (message) {
-  postMessage({ log: message.toString() });
-  oldLog(message);
+console.log = function (...args) {
+  let message = '';
+  for (const arg of args) {
+    if (typeof arg == "string") {
+      message += arg;
+    } else {
+      message += JSON.stringify(arg, null, 4);
+    }
+  }
+  postMessage({ log: message });
+  oldLog(...args);
 };
 
 onmessage = (e) => {
