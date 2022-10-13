@@ -66,10 +66,11 @@ const oldLog = console.log;
 console.log = function (...args) {
   let message = '';
   for (const arg of args) {
-    if (typeof arg == "string") {
-      message += arg;
-    } else {
+    oldLog(typeof arg);
+    if (typeof arg == "object") {
       message += JSON.stringify(arg, null, 4);
+    } else {
+      message += arg.toString();
     }
   }
   postMessage({ log: message });
@@ -82,7 +83,7 @@ onmessage = (e) => {
     const f = new Function(...exposedFunctions, content);
     f(...exposedFunctions.map(name => Module[name]));
   } catch (error) {
-    console.log(error);
+    console.log(error.toString());
     postMessage({ objectURL: null });
   } finally {
     Module.cleanup();

@@ -70,7 +70,7 @@ declare class Manifold {
    *
    * @param v The vector to multiply every vertex by per component.
    */
-  scale(v: Vec3): Manifold;
+  scale(v: Vec3 | number): Manifold;
 
   /**
    * Boolean union
@@ -255,7 +255,7 @@ declare class Manifold {
  * @param size The X, Y, and Z dimensions of the box.
  * @param center Set to true to shift the center to the origin.
  */
-declare function cube(size?: Vec3, center?: boolean): Manifold;
+declare function cube(size?: Vec3 | number, center?: boolean): Manifold;
 
 /**
  * A convenience constructor for the common case of extruding a circle. Can also

@@ -76,8 +76,11 @@ Module.setup = function () {
     return this._Rotate(...vec);
   };
 
-  Module.Manifold.prototype.scale = function (...vec) {
-    return this._Scale(vararg2vec(vec));
+  Module.Manifold.prototype.scale = function (vec) {
+    if (typeof vec == 'number') {
+      return this._Scale({ x: vec, y: vec, z: vec });
+    }
+    return this._Scale(vararg2vec([vec]));
   };
 
   Module.Manifold.prototype.smooth = function (sharpenedEdges = []) {

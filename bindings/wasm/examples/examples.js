@@ -80,8 +80,7 @@ const exampleFunctions = {
     const ball = sphere(1, 200);
     const heart = ball.warp(func);
     const box = heart.boundingBox();
-    const s = 100 / (box.max[0] - box.min[0]);
-    const result = heart.scale([s, s, s]);
+    const result = heart.scale(100 / (box.max[0] - box.min[0]));
     return result;
   },
 
@@ -116,7 +115,7 @@ const exampleFunctions = {
       return result;
     }
 
-    const result = mengerSponge(3).scale([100, 100, 100]);
+    const result = mengerSponge(3).scale(100);
     return result;
   },
 
@@ -186,6 +185,48 @@ const exampleFunctions = {
 
     const result = stretchyBracelet();
     return result;
+  },
+
+  GyroidModule: function () {
+    /**
+     * Creates a rhombic dodecahedral module of a gyroid manifold, which can be
+     * assembled together to tile space continuously. This one is designed to be
+     * 3D-printable, as it is oriented with minimal overhangs. This sample
+     * demonstrates the use of a Signed Distance Function (SDF) to create smooth,
+     * complex manifolds.
+     */
+    const size = 20;
+    const n = 20;
+    const pi = 3.14159;
+
+    function gyroid(p) {
+      const x = p[0] - pi / 4;
+      const y = p[1] - pi / 4;
+      const z = p[2] - pi / 4;
+      return Math.cos(x) * Math.sin(y)
+        + Math.cos(y) * Math.sin(z)
+        + Math.cos(z) * Math.sin(x);
+    }
+
+    function gyroidOffset(level) {
+      const period = 2 * pi;
+      const box = {
+        min: [-period, -period, -period],
+        max: [period, period, period]
+      };
+      return levelSet(gyroid, box, period / n, level).scale(size / period);
+    };
+
+    function rhombicDodecahedron() {
+      const box = cube([1, 1, 2], true).scale(size * Math.sqrt(2));
+      const result = box.rotate([90, 45, 0]).intersect(box.rotate([90, 45, 90]));
+      return result.intersect(box.rotate([0, 0, 45]));
+    }
+
+    let result = rhombicDodecahedron().intersect(gyroidOffset(-0.4))
+    result = result.subtract(gyroidOffset(0.4));
+    result = result.rotate([-45, 0, 90]).translate([0, 0, size / Math.sqrt(2)]);
+    return result;
   }
 };
 
@@ -196,10 +237,8 @@ for (const [func, code] of Object.entries(exampleFunctions)) {
   const lines = whole.split('\n');
   lines.splice(0, 1);// remove first line
   lines.splice(-2, 2);// remove last two lines
-  for (const line of lines) {
-    line.substring(2);// remove first two leading spaces
-  }
-  const body = '\n' + lines.join('\n');
+  // remove first four leading spaces
+  const body = '\n' + lines.map(l => l.slice(4)).join('\n');
 
   const name = func.replace(/([a-z])([A-Z])/g, '$1 $2');// Add spaces between words
   examples.set(name, body);
