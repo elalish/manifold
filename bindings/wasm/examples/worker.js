@@ -63,9 +63,18 @@ const threePath = 'https://cdn.jsdelivr.net/npm/three@0.144.0/';
 importScripts('manifold.js', threePath + 'build/three.js', threePath + 'examples/js/exporters/GLTFExporter.js');
 
 const oldLog = console.log;
-console.log = function (message) {
-  postMessage({ log: message.toString() });
-  oldLog(message);
+console.log = function (...args) {
+  let message = '';
+  for (const arg of args) {
+    oldLog(typeof arg);
+    if (typeof arg == "object") {
+      message += JSON.stringify(arg, null, 4);
+    } else {
+      message += arg.toString();
+    }
+  }
+  postMessage({ log: message });
+  oldLog(...args);
 };
 
 onmessage = (e) => {
@@ -74,7 +83,8 @@ onmessage = (e) => {
     const f = new Function(...exposedFunctions, content);
     f(...exposedFunctions.map(name => Module[name]));
   } catch (error) {
-    console.log(error);
+    console.log(error.toString());
+    postMessage({ objectURL: null });
   } finally {
     Module.cleanup();
   }
@@ -105,8 +115,8 @@ function exportGLB(manifold) {
     size[i] = Math.round((box.max[i] - box.min[i]) * 10) / 10;
   }
   console.log(`Bounding Box: X = ${size[0].toLocaleString()} mm, Y = ${size[1].toLocaleString()} mm, Z = ${size[2].toLocaleString()} mm`);
-  const volume = Math.round(manifold.getProperties().volume);
-  console.log(`Genus: ${manifold.genus().toLocaleString()}, Volume: ${(volume / 1000).toLocaleString()} cm^3`);
+  const volume = Math.round(manifold.getProperties().volume / 10);
+  console.log(`Genus: ${manifold.genus().toLocaleString()}, Volume: ${(volume / 100).toLocaleString()} cm^3`);
 
   mesh.geometry?.dispose();
   mesh.geometry = mesh2geometry(manifold.getMesh());

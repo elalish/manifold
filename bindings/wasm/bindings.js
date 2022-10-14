@@ -19,6 +19,9 @@ Module.setup = function () {
   }
 
   function polygons2vec(polygons) {
+    if (polygons[0].length < 3) {
+      polygons = [polygons];
+    }
     return toVec(
       new Module.Vector2_vec2(), polygons,
       poly => toVec(new Module.Vector_vec2(), poly, p => {
@@ -73,8 +76,11 @@ Module.setup = function () {
     return this._Rotate(...vec);
   };
 
-  Module.Manifold.prototype.scale = function (...vec) {
-    return this._Scale(vararg2vec(vec));
+  Module.Manifold.prototype.scale = function (vec) {
+    if (typeof vec == 'number') {
+      return this._Scale({ x: vec, y: vec, z: vec });
+    }
+    return this._Scale(vararg2vec([vec]));
   };
 
   Module.Manifold.prototype.smooth = function (sharpenedEdges = []) {
