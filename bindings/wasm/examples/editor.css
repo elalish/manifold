@@ -83,7 +83,7 @@ model-viewer {
   max-height: 25vh;
   overflow-y: scroll;
   background-color: #eee;
-  white-space: pre-line;
+  white-space: pre-wrap;
   font-size: 14px;
   font-weight: 100;
   line-height: 20px;
