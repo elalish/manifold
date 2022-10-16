@@ -30,20 +30,20 @@ function copyToDeployRoot {
 
   echo "Copying $path"
 
-  if [ -d "$path" ]; then
-    directory="$path"
-  else
-    directory="`dirname $path`"
-  fi
+  # if [ -d "$path" ]; then
+  #   directory="$path"
+  # else
+  #   directory="`dirname $path`"
+  # fi
 
-  echo "Creating $DEPLOY_ROOT/$directory"
-  mkdir -p "$DEPLOY_ROOT/$directory"
+  # echo "Creating $DEPLOY_ROOT/$directory"
+  # mkdir -p "$DEPLOY_ROOT/$directory"
 
   if [ -d "${path}" ]; then
-    cp -r $path/* "$DEPLOY_ROOT/$path"
+    cp -r $path/* "$DEPLOY_ROOT"
   else
     if [ -f "${path}" ]; then
-      cp $path "$DEPLOY_ROOT/$path"
+      cp $path "$DEPLOY_ROOT"
     else
       echo "Path not found: $path"
       exit 1
