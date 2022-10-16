@@ -2,7 +2,7 @@
 <html lang="en">
 
 <head>
-  <title>Manifold - <code></code>&lt;model-viewer&gt;</code> Example</title>
+  <title>Manifold - three.js Example</title>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="shortcut icon" type="image/png" href="https://elalish.github.io/manifold/samples/models/favicon.png" />
@@ -25,7 +25,7 @@
       text-align: left;
     }
 
-    model-viewer {
+    canvas {
       display: block;
       width: 100vw;
       height: 100vw;
@@ -36,32 +36,35 @@
 </head>
 
 <body>
-  <p>This example demonstrates feeding Manifold's output into <a
-      href="https://modelviewer.dev/">&lt;model-viewer&gt;</a>
-    via the three.js GLTFExporter. The most basic three.js example is <a href="three.html">here</a>.
+  <p>This demonstrates the minimum code to connect Manifold to a three.js rendering. A slightly more complex example
+    involving GLTF export and &lt;model-viewer&gt; can be found <a href="model-viewer.html">here</a>.
   </p>
   <select>
     <option value="difference" selected>Difference</option>
     <option value="intersection">Intersection</option>
     <option value="union">Union</option>
-  </select>
-  <model-viewer camera-controls shadow-intensity="1" alt="Output of mesh Boolean operation"></model-viewer>
+  </select><br />
+  <canvas id="output"></canvas>
 </body>
 
-<script src="https://unpkg.com/three@0.144.0/build/three.js"></script>
-<script src="https://unpkg.com/three@0.144.0/examples/js/utils/BufferGeometryUtils.js"></script>
-<script src="https://unpkg.com/three@0.144.0/examples/js/exporters/GLTFExporter.js"></script>
+<script src="https://unpkg.com/three@0.142.0/build/three.js"></script>
+<script src="https://unpkg.com/three@0.142.0/examples/js/utils/BufferGeometryUtils.js"></script>
 <script>
   var Module = {
     onRuntimeInitialized: function () {
+      // we have manifold module, let's do some three.js
+      const camera = new THREE.PerspectiveCamera(30, 1, 0.01, 10);
+      camera.position.z = 1;
+
       Module.setup();
-      const mesh = new THREE.Mesh(undefined, new THREE.MeshStandardMaterial({
-        color: 'yellow',
-        metalness: 1,
-        roughness: 0.2
+      const scene = new THREE.Scene();
+      const mesh = new THREE.Mesh(undefined, new THREE.MeshNormalMaterial({
+        flatShading: true
       }));
+      scene.add(mesh);
 
       const icosahedron = simplify(new THREE.IcosahedronGeometry(0.16));
+
       const manifold_1 = Module.cube(0.2, 0.2, 0.2, true);
       // const manifold_1 = Module
       //   .revolve([[[0.1, 0.1], [0.2, 0.1], [0.1, 0.2]]], 64)
@@ -71,7 +74,6 @@
       const csg = function (operation) {
         mesh.geometry?.dispose();
         mesh.geometry = mesh2geometry(Module[operation](manifold_1, manifold_2).getMesh());
-        push2MV(mesh);
       };
 
       document.querySelector('select').onchange = function (event) {
@@ -79,26 +81,19 @@
       };
 
       csg('difference');
+
+      const output = document.querySelector("#output");
+      const renderer = new THREE.WebGLRenderer({ canvas: output, antialias: true });
+      const dim = output.getBoundingClientRect();
+      renderer.setSize(dim.width, dim.height);
+      renderer.setAnimationLoop(function (time) {
+        mesh.rotation.x = time / 2000;
+        mesh.rotation.y = time / 1000;
+        renderer.render(scene, camera);
+      });
+
     }
   };
-
-  const mv = document.querySelector('model-viewer');
-  let objectURL = null;
-  const exporter = new THREE.GLTFExporter();
-
-  function push2MV(mesh) {
-    exporter.parse(
-      mesh,
-      (gltf) => {
-        const blob = new Blob([gltf], { type: 'application/octet-stream' });
-        URL.revokeObjectURL(objectURL);
-        objectURL = URL.createObjectURL(blob);
-        mv.src = objectURL;
-      },
-      () => console.log('GLTF export failed!'),
-      { binary: true }
-    );
-  }
 
   // functions to convert between three.js and wasm
   function geometry2mesh(geometry) {
@@ -110,13 +105,13 @@
     };
     const temp = new THREE.Vector3();
     const p = geometry.attributes.position;
-    // const n = geometry.attributes.normal;
+    const n = geometry.attributes.normal;
     const x = geometry.index;
     for (let i = 0; i < p.count; i++) {
       temp.fromBufferAttribute(p, i);
       mesh.vertPos.push_back(temp);
-      // temp.fromBufferAttribute(n, i);
-      // mesh.vertNormal.push_back(temp);
+      temp.fromBufferAttribute(n, i);
+      mesh.vertNormal.push_back(temp);
     }
     for (let i = 0; i < x.count; i += 3) {
       mesh.triVerts.push_back(x.array.subarray(i, i + 3));
@@ -129,12 +124,17 @@
 
     const numVert = mesh.vertPos.size();
     const vert = new Float32Array(3 * numVert);
+    const norm = new Float32Array(3 * numVert);
     for (let i = 0; i < numVert; i++) {
       const v = mesh.vertPos.get(i);
+      const n = mesh.vertNormal.get(i);
       const idx = 3 * i;
       vert[idx] = v.x;
       vert[idx + 1] = v.y;
       vert[idx + 2] = v.z;
+      norm[idx] = n.x;
+      norm[idx + 1] = n.y;
+      norm[idx + 2] = n.z;
     }
 
     const numTri = mesh.triVerts.size();
@@ -148,6 +148,7 @@
     }
 
     geometry.setAttribute('position', new THREE.BufferAttribute(vert, 3));
+    geometry.setAttribute('normal', new THREE.BufferAttribute(norm, 3));
     geometry.setIndex(new THREE.BufferAttribute(tri, 1));
     return geometry;
   }
@@ -162,6 +163,5 @@
   }
 </script>
 <script src="manifold.js"></script>
-<script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
 
 </html>
