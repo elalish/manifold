@@ -21,7 +21,7 @@ jobs:
         workflow: manifold.yml
         pr: ${{github.event.pull_request.number}}
         name: wasm
-        path: docs/html/bindings/wasm/examples
+        path: ./
 
     - name: Doxygen Action
       uses: mattnotmitt/doxygen-action@v1.1.0
@@ -35,4 +35,4 @@ jobs:
         github_token: ${{ secrets.GITHUB_TOKEN }}
         publish_branch: gh-pages
         force_orphan: true
-        publish_dir: ./docs/html
+        publish_dir: ./

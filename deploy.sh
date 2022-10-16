@@ -19,12 +19,11 @@ set -e
 set -x
 
 DEPLOYABLE_STATIC_FILES=( \
-  samples/models \
   bindings/wasm/examples \
 )
 
 PACKAGE_ROOT=`pwd`
-DEPLOY_ROOT=$PACKAGE_ROOT/docs/html
+DEPLOY_ROOT=$PACKAGE_ROOT
 
 function copyToDeployRoot {
   path=$1
