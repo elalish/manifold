@@ -2,166 +2,55 @@
 <html lang="en">
 
 <head>
-  <title>Manifold - three.js Example</title>
+  <title>ManifoldCAD</title>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="shortcut icon" type="image/png" href="https://elalish.github.io/manifold/samples/models/favicon.png" />
-
-  <style>
-    body {
-      margin: 0;
-      background-color: #f7f7f7;
-      font-family: 'Rubik', sans-serif;
-      font-size: 16px;
-      line-height: 24px;
-      color: rgba(0, 0, 0, .87);
-      font-weight: 400;
-      -webkit-font-smoothing: antialiased;
-    }
-
-    p {
-      max-width: 700px;
-      margin: 1em;
-      text-align: left;
-    }
-
-    canvas {
-      display: block;
-      width: 100vw;
-      height: 100vw;
-      max-width: 600px;
-      max-height: 600px;
-    }
-  </style>
+  <link type="text/css" href="editor.css" rel="stylesheet" />
 </head>
 
 <body>
-  <p>This demonstrates the minimum code to connect Manifold to a three.js rendering. A slightly more complex example
-    involving GLTF export and &lt;model-viewer&gt; can be found <a href="model-viewer.html">here</a>.
-  </p>
-  <select>
-    <option value="difference" selected>Difference</option>
-    <option value="intersection">Intersection</option>
-    <option value="union">Union</option>
-  </select><br />
-  <canvas id="output"></canvas>
+  <div class="page">
+    <div class="container" style="background-color: rgb(162 136 179);">
+      <p style="flex: 2;"><a href="https://github.com/elalish/manifold">Manifold</a>CAD
+      </p>
+      <div class="margin" style="position: relative;">
+        <button type="button" id="file" class="blue"><b class="uparrow"></b>&nbsp;&nbsp;<span
+            id="current">Intro</span></button>
+        <div class="dropdown">
+          <button type="button" class="green item" id="new">New</button>
+        </div>
+      </div>
+      <button type="button" id="compile" class="margin green" disabled><span>Run</span></button>
+      <button type="button" id="download" class="blue margin">Save GLB</button>
+    </div>
+    <div class="container" style="flex: 2;">
+      <div id="editor" class="col"></div>
+      <div class="col container" style="flex-direction: column;">
+        <model-viewer camera-controls min-camera-orbit="auto 0deg auto" max-camera-orbit="auto 180deg auto"
+          shadow-intensity="1" interaction-prompt="none" alt="Editor 3D output">
+          <div class="center" slot="poster">
+            <p id="poster" style="text-align: center; line-height: 36px;">
+              Loading...
+            </p>
+          </div>
+        </model-viewer>
+        <div id="console"></div>
+      </div>
+    </div>
+  </div>
 </body>
 
-<script src="https://unpkg.com/three@0.142.0/build/three.js"></script>
-<script src="https://unpkg.com/three@0.142.0/examples/js/utils/BufferGeometryUtils.js"></script>
-<script>
-  var Module = {
-    onRuntimeInitialized: function () {
-      // we have manifold module, let's do some three.js
-      const camera = new THREE.PerspectiveCamera(30, 1, 0.01, 10);
-      camera.position.z = 1;
+<script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.34.0/min/vs/loader.min.js"
+  integrity="sha512-6bIYsGqvLpAiEBXPdRQeFf5cueeBECtAKJjIHer3BhBZNTV3WLcLA8Tm3pDfxUwTMIS+kAZwTUvJ1IrMdX8C5w=="
+  crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<link rel="stylesheet"
+  href="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.34.0/min/vs/editor/editor.main.min.css"
+  integrity="sha512-iQEIc0rsSDujsfjtD+lfyJ1W23Bh/lbgriubKDAym6VlEIDRj9rrbSIyJRyshOrl8s0yRcQ0+gyrZfSLyjJGWQ=="
+  crossorigin="anonymous" referrerpolicy="no-referrer" />
 
-      Module.setup();
-      const scene = new THREE.Scene();
-      const mesh = new THREE.Mesh(undefined, new THREE.MeshNormalMaterial({
-        flatShading: true
-      }));
-      scene.add(mesh);
-
-      const icosahedron = simplify(new THREE.IcosahedronGeometry(0.16));
-
-      const manifold_1 = Module.cube(0.2, 0.2, 0.2, true);
-      // const manifold_1 = Module
-      //   .revolve([[[0.1, 0.1], [0.2, 0.1], [0.1, 0.2]]], 64)
-      //   .translate(0, 0, -0.1);
-      const manifold_2 = new Module.Manifold(geometry2mesh(icosahedron));
-
-      const csg = function (operation) {
-        mesh.geometry?.dispose();
-        mesh.geometry = mesh2geometry(Module[operation](manifold_1, manifold_2).getMesh());
-      };
-
-      document.querySelector('select').onchange = function (event) {
-        csg(event.target.value);
-      };
-
-      csg('difference');
-
-      const output = document.querySelector("#output");
-      const renderer = new THREE.WebGLRenderer({ canvas: output, antialias: true });
-      const dim = output.getBoundingClientRect();
-      renderer.setSize(dim.width, dim.height);
-      renderer.setAnimationLoop(function (time) {
-        mesh.rotation.x = time / 2000;
-        mesh.rotation.y = time / 1000;
-        renderer.render(scene, camera);
-      });
-
-    }
-  };
-
-  // functions to convert between three.js and wasm
-  function geometry2mesh(geometry) {
-    const mesh = {
-      vertPos: new Module.Vector_vec3(),
-      vertNormal: new Module.Vector_vec3(),
-      triVerts: new Module.Vector_ivec3(),
-      halfedgeTangent: new Module.Vector_vec4()
-    };
-    const temp = new THREE.Vector3();
-    const p = geometry.attributes.position;
-    const n = geometry.attributes.normal;
-    const x = geometry.index;
-    for (let i = 0; i < p.count; i++) {
-      temp.fromBufferAttribute(p, i);
-      mesh.vertPos.push_back(temp);
-      temp.fromBufferAttribute(n, i);
-      mesh.vertNormal.push_back(temp);
-    }
-    for (let i = 0; i < x.count; i += 3) {
-      mesh.triVerts.push_back(x.array.subarray(i, i + 3));
-    }
-    return mesh;
-  }
-
-  function mesh2geometry(mesh) {
-    const geometry = new THREE.BufferGeometry();
-
-    const numVert = mesh.vertPos.size();
-    const vert = new Float32Array(3 * numVert);
-    const norm = new Float32Array(3 * numVert);
-    for (let i = 0; i < numVert; i++) {
-      const v = mesh.vertPos.get(i);
-      const n = mesh.vertNormal.get(i);
-      const idx = 3 * i;
-      vert[idx] = v.x;
-      vert[idx + 1] = v.y;
-      vert[idx + 2] = v.z;
-      norm[idx] = n.x;
-      norm[idx + 1] = n.y;
-      norm[idx + 2] = n.z;
-    }
-
-    const numTri = mesh.triVerts.size();
-    const tri = new Uint32Array(3 * numTri);
-    for (let i = 0; i < numTri; i++) {
-      const v = mesh.triVerts.get(i);
-      const idx = 3 * i;
-      tri[idx] = v[0];
-      tri[idx + 1] = v[1];
-      tri[idx + 2] = v[2];
-    }
-
-    geometry.setAttribute('position', new THREE.BufferAttribute(vert, 3));
-    geometry.setAttribute('normal', new THREE.BufferAttribute(norm, 3));
-    geometry.setIndex(new THREE.BufferAttribute(tri, 1));
-    return geometry;
-  }
-
-  // most of three.js geometries arent manifolds, so...
-  function simplify(geometry) {
-    delete geometry.attributes.normal;
-    delete geometry.attributes.uv;
-    const simplified = THREE.BufferGeometryUtils.mergeVertices(geometry);
-    simplified.computeVertexNormals();
-    return simplified;
-  }
-</script>
-<script src="manifold.js"></script>
+<script src="examples.js"></script>
+<script src="editor.js"></script>
+<script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/2.0.1/model-viewer.min.js"></script>
 
 </html>
