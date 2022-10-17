@@ -12,8 +12,12 @@ jobs:
     steps:
     - uses: actions/checkout@v3
 
-    - name: Move editor to root
-      run: ./deploy.sh
+    - name: Move deployables
+      run: |
+        mkdir public
+        mv ./samples ./public
+        mv ./docs ./public
+        mv ./bindings/wasm/examples/* ./public
 
     - name: Download WASM files
       uses: dawidd6/action-download-artifact@v2
@@ -21,7 +25,7 @@ jobs:
         workflow: manifold.yml
         pr: ${{github.event.pull_request.number}}
         name: wasm
-        path: ./
+        path: ./public
 
     - name: Doxygen Action
       uses: mattnotmitt/doxygen-action@v1
@@ -32,4 +36,5 @@ jobs:
         github_token: ${{ secrets.GITHUB_TOKEN }}
         publish_branch: gh-pages
         force_orphan: true
-        publish_dir: ./
+        cname: manifoldcad.org
+        publish_dir: ./public
