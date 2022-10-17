@@ -10,9 +10,9 @@ jobs:
     runs-on: ubuntu-20.04
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
 
-    - name: Copy deployables
+    - name: Move deployables
       run: |
         mkdir public
         mv ./samples ./public
@@ -28,10 +28,7 @@ jobs:
         path: ./public
 
     - name: Doxygen Action
-      uses: mattnotmitt/doxygen-action@v1.1.0
-      with:
-        doxyfile-path: "./Doxyfile" 
-        working-directory: "." 
+      uses: mattnotmitt/doxygen-action@v1
 
     - name: Deploy to Github Pages
       uses: peaceiris/actions-gh-pages@v3
