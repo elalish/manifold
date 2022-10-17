@@ -84,6 +84,82 @@ const exampleFunctions = {
     return result;
   },
 
+  TorusKnot: function () {
+    /**
+     * Creates a classic torus knot, defined as a string wrapping peroidically
+     * around the surface of an imaginary donut. If p and q have a common factor
+     * then you will get multiple separate, interwoven knots. This is an example of
+     * using the Manifold.Warp() method, thus avoiding any handling of triangles.
+     *
+     * @param p The number of times the thread passes through the donut hole.
+     * @param q The number of times the thread circles the donut.
+     * @param majorRadius Radius of the interior of the imaginary donut.
+     * @param minorRadius Radius of the small cross-section of the imaginary donut.
+     * @param threadRadius Radius of the small cross-section of the actual object.
+     * @param circularSegments Number of linear segments making up the threadRadius
+     * circle. Default is Manifold.GetCircularSegments().
+     * @param linearSegments Number of segments along the length of the knot.
+     * Default makes roughly square facets.
+     */
+    function torusKnot(p, q, majorRadius, minorRadius,
+      threadRadius, circularSegments = 0,
+      linearSegments = 0) {
+      function gcd(a, b) {
+        return b == 0 ? a : gcd(b, a % b);
+      }
+
+      const kLoops = gcd(p, q);
+      p /= kLoops;
+      q /= kLoops;
+      const n = circularSegments > 2 ? circularSegments :
+        getCircularSegments(threadRadius);
+      const m = linearSegments > 2 ? linearSegments :
+        n * q * majorRadius / threadRadius;
+
+      const circle = [];
+      const dPhi = 2 * 3.14159 / n;
+      const offset = 2;
+      for (let i = 0; i < n; ++i) {
+        circle.push([Math.cos(dPhi * i) + offset, Math.sin(dPhi * i)]);
+      }
+
+      const point = new THREE.Vector3();
+      const axis = new THREE.Vector3();
+
+      const func = (v) => {
+        const psi = q * Math.atan2(v[0], v[1]);
+        const theta = psi * p / q;
+        const x1 = Math.sqrt(v[0] * v[0] + v[1] * v[1]);
+        const phi = Math.atan2(x1 - offset, v[2]);
+        point.set(Math.cos(phi), 0, Math.sin(phi)).multiplyScalar(threadRadius);
+        const r = majorRadius + minorRadius * Math.cos(theta);
+        point.applyAxisAngle(axis.set(1, 0, 0), -Math.atan2(p * minorRadius, q * r));
+        point.x += minorRadius;
+        point.applyAxisAngle(axis.set(0, 1, 0), theta);
+        point.x += majorRadius;
+        point.applyAxisAngle(axis.set(0, 0, 1), psi);
+        v[0] = point.x;
+        v[1] = point.y;
+        v[2] = point.z;
+      }
+
+      let knot = revolve(circle, m).warp(func);
+
+      if (kLoops > 1) {
+        const knots = []
+        for (let k = 0; k < kLoops; ++k) {
+          knots.push(knot.rotate([0, 0, 360 * (k / kLoops) * (q / p)]));
+        }
+        knot = compose(knots);
+      }
+
+      return knot;
+    }
+
+    const result = torusKnot(1, 3, 25, 10, 3.75);
+    return result;
+  },
+
   MengerSponge: function () {
     function vec2add(a, b) {
       return [a[0] + b[0], a[1] + b[1]];
