@@ -89,7 +89,7 @@ const exampleFunctions = {
      * Creates a classic torus knot, defined as a string wrapping peroidically
      * around the surface of an imaginary donut. If p and q have a common factor
      * then you will get multiple separate, interwoven knots. This is an example of
-     * using the Manifold.Warp() method, thus avoiding any handling of triangles.
+     * using the warp() method, thus avoiding any direct handling of triangles.
      *
      * @param p The number of times the thread passes through the donut hole.
      * @param q The number of times the thread circles the donut.
@@ -97,7 +97,7 @@ const exampleFunctions = {
      * @param minorRadius Radius of the small cross-section of the imaginary donut.
      * @param threadRadius Radius of the small cross-section of the actual object.
      * @param circularSegments Number of linear segments making up the threadRadius
-     * circle. Default is Manifold.GetCircularSegments().
+     * circle. Default is getCircularSegments(threadRadius).
      * @param linearSegments Number of segments along the length of the knot.
      * Default makes roughly square facets.
      */
