@@ -12,11 +12,12 @@ jobs:
     steps:
     - uses: actions/checkout@v2
 
-    - name: Copy models
+    - name: Copy deployables
       run: |
         mkdir public
-        mv 
-        mv ./index.html ./dist ./public
+        mv ./samples ./public
+        mv ./docs ./public
+        mv ./bindings/wasm/examples/* ./public
 
     - name: Download WASM files
       uses: dawidd6/action-download-artifact@v2
