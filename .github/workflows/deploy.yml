@@ -12,6 +12,9 @@ jobs:
     steps:
     - uses: actions/checkout@v3
 
+    - name: Doxygen Action
+      uses: mattnotmitt/doxygen-action@v1
+
     - name: Move deployables
       run: |
         mkdir public
@@ -26,9 +29,6 @@ jobs:
         pr: ${{github.event.pull_request.number}}
         name: wasm
         path: ./public
-
-    - name: Doxygen Action
-      uses: mattnotmitt/doxygen-action@v1
 
     - name: Deploy to Github Pages
       uses: peaceiris/actions-gh-pages@v3
