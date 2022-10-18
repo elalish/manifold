@@ -17,6 +17,34 @@ const exampleFunctions = {
     return result;
   },
 
+  TetrahedronPuzzle: function () {
+    // A tetrahedron cut into two identical halves that can screw together as a
+    // puzzle. This only outputs one of the halves. This demonstrates how redundant
+    // points along a polygon can be used to make twisted extrusions smoother.
+
+    const edgeLength = 50;// Length of each edge of the overall tetrahedron.
+    const gap = 0.2;// Spacing between the two halves to allow sliding.
+    const nDivisions = 50;// Number of divisions (both ways) in the screw surface.
+
+    const scale = edgeLength / (2 * Math.sqrt(2));
+
+    const tet = tetrahedron().scale(scale);
+
+    const box = [];
+    box.push([2, -2], [2, 2]);
+    for (let i = 0; i <= nDivisions; ++i) {
+      box.push([gap / (2 * scale), 2 - i * 4 / nDivisions]);
+    }
+
+    const screw = extrude(box, 2, nDivisions, 270)
+      .rotate([0, 0, -45])
+      .translate([0, 0, -1])
+      .scale(scale);
+
+    const result = tet.intersect(screw);
+    return result;
+  },
+
   RoundedFrame: function () {
     function roundedFrame(edgeLength, radius, circularSegments = 0) {
       const edge = cylinder(edgeLength, radius, -1, circularSegments);
