@@ -112,6 +112,49 @@ const exampleFunctions = {
     return result;
   },
 
+  Scallop: function () {
+    // A smoothed manifold demonstrating selective edge sharpening with
+    // Manifold.Smooth(). Use Manifold.Refine() before export to see the curvature.
+
+    const height = 10;
+    const radius = 30;
+    const offset = 20;
+    const wiggles = 12;
+    const sharpness = 0.8;
+    const n = 50;
+
+    const scallop = {
+      vertPos: [],
+      triVerts: []
+    };
+    scallop.vertPos.push([-offset, 0, height], [-offset, 0, -height]);
+    const sharpenedEdges = [];
+
+    const delta = 3.14159 / wiggles;
+    for (let i = 0; i < 2 * wiggles; ++i) {
+      const theta = (i - wiggles) * delta;
+      const amp = 0.5 * height * Math.max(Math.cos(0.8 * theta), 0);
+
+      scallop.vertPos.push([radius * Math.cos(theta),
+      radius * Math.sin(theta),
+      amp * (i % 2 == 0 ? 1 : -1)]);
+      let j = i + 1;
+      if (j == 2 * wiggles) j = 0;
+
+      const smoothness = 1 - sharpness * Math.cos((theta + delta / 2) / 2);
+      let halfedge = 3 * scallop.triVerts.length + 1;
+      sharpenedEdges.push({ halfedge, smoothness });
+      scallop.triVerts.push([0, 2 + i, 2 + j]);
+
+      halfedge = 3 * scallop.triVerts.length + 1;
+      sharpenedEdges.push({ halfedge, smoothness });
+      scallop.triVerts.push([1, 2 + j, 2 + i]);
+    }
+
+    const result = smooth(scallop, sharpenedEdges).refine(n);
+    return result;
+  },
+
   TorusKnot: function () {
     /**
      * Creates a classic torus knot, defined as a string wrapping peroidically

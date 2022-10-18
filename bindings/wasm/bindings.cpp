@@ -86,11 +86,6 @@ Manifold LevelSetJs(uintptr_t funcPtr, Box bounds, float edgeLength,
   return Manifold(m);
 }
 
-Manifold Smooth(Manifold& manifold,
-                const std::vector<Smoothness>& sharpenedEdges) {
-  return Manifold::Smooth(manifold.GetMesh(), sharpenedEdges);
-}
-
 EMSCRIPTEN_BINDINGS(whatever) {
   value_object<glm::vec2>("vec2")
       .field("x", &glm::vec2::x)
@@ -100,6 +95,17 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .field("0", &glm::ivec3::x)
       .field("1", &glm::ivec3::y)
       .field("2", &glm::ivec3::z);
+
+  value_object<glm::vec3>("vec3")
+      .field("x", &glm::vec3::x)
+      .field("y", &glm::vec3::y)
+      .field("z", &glm::vec3::z);
+
+  value_object<glm::vec4>("vec4")
+      .field("x", &glm::vec4::x)
+      .field("y", &glm::vec4::y)
+      .field("z", &glm::vec4::z)
+      .field("w", &glm::vec4::w);
 
   enum_<Manifold::Error>("status")
       .value("NO_ERROR", Manifold::Error::NO_ERROR)
@@ -117,7 +123,7 @@ EMSCRIPTEN_BINDINGS(whatever) {
   value_object<Box>("box").field("min", &Box::min).field("max", &Box::max);
 
   value_object<Smoothness>("smoothness")
-      .field("hafledge", &Smoothness::halfedge)
+      .field("halfedge", &Smoothness::halfedge)
       .field("smoothness", &Smoothness::smoothness);
 
   value_object<Properties>("properties")
@@ -142,11 +148,6 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .field("vertMeanCurvature", &Curvature::vertMeanCurvature)
       .field("vertGaussianCurvature", &Curvature::vertGaussianCurvature);
 
-  value_object<glm::vec3>("vec3")
-      .field("x", &glm::vec3::x)
-      .field("y", &glm::vec3::y)
-      .field("z", &glm::vec3::z);
-
   register_vector<glm::ivec3>("Vector_ivec3");
   register_vector<glm::vec3>("Vector_vec3");
   register_vector<glm::vec2>("Vector_vec2");
@@ -155,13 +156,6 @@ EMSCRIPTEN_BINDINGS(whatever) {
   register_vector<Manifold>("Vector_manifold");
   register_vector<Smoothness>("Vector_smoothness");
   register_vector<BaryRef>("Vector_baryRef");
-
-  value_object<glm::vec4>("vec4")
-      .field("x", &glm::vec4::x)
-      .field("y", &glm::vec4::y)
-      .field("z", &glm::vec4::z)
-      .field("w", &glm::vec4::w);
-
   register_vector<glm::vec4>("Vector_vec4");
 
   value_object<Mesh>("Mesh")
@@ -182,7 +176,6 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .function("_Translate", &Manifold::Translate)
       .function("_Rotate", &Manifold::Rotate)
       .function("_Scale", &Manifold::Scale)
-      .function("_Smooth", &Smooth)
       .function("_Decompose", &Manifold::Decompose)
       .function("isEmpty", &Manifold::IsEmpty)
       .function("status", &Manifold::Status)
@@ -202,6 +195,7 @@ EMSCRIPTEN_BINDINGS(whatever) {
   function("_Cylinder", &Manifold::Cylinder);
   function("_Sphere", &Manifold::Sphere);
   function("tetrahedron", &Manifold::Tetrahedron);
+  function("_Smooth", &Manifold::Smooth);
   function("_Extrude", &Extrude);
   function("_Revolve", &Revolve);
   function("_LevelSet", &LevelSetJs);
