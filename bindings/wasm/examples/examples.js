@@ -17,6 +17,34 @@ const exampleFunctions = {
     return result;
   },
 
+  TetrahedronPuzzle: function () {
+    // A tetrahedron cut into two identical halves that can screw together as a
+    // puzzle. This only outputs one of the halves. This demonstrates how redundant
+    // points along a polygon can be used to make twisted extrusions smoother.
+
+    const edgeLength = 50;// Length of each edge of the overall tetrahedron.
+    const gap = 0.2;// Spacing between the two halves to allow sliding.
+    const nDivisions = 50;// Number of divisions (both ways) in the screw surface.
+
+    const scale = edgeLength / (2 * Math.sqrt(2));
+
+    const tet = tetrahedron().scale(scale);
+
+    const box = [];
+    box.push([2, -2], [2, 2]);
+    for (let i = 0; i <= nDivisions; ++i) {
+      box.push([gap / (2 * scale), 2 - i * 4 / nDivisions]);
+    }
+
+    const screw = extrude(box, 2, nDivisions, 270)
+      .rotate([0, 0, -45])
+      .translate([0, 0, -1])
+      .scale(scale);
+
+    const result = tet.intersect(screw);
+    return result;
+  },
+
   RoundedFrame: function () {
     function roundedFrame(edgeLength, radius, circularSegments = 0) {
       const edge = cylinder(edgeLength, radius, -1, circularSegments);
@@ -81,6 +109,49 @@ const exampleFunctions = {
     const heart = ball.warp(func);
     const box = heart.boundingBox();
     const result = heart.scale(100 / (box.max[0] - box.min[0]));
+    return result;
+  },
+
+  Scallop: function () {
+    // A smoothed manifold demonstrating selective edge sharpening with
+    // Manifold.Smooth(). Use Manifold.Refine() before export to see the curvature.
+
+    const height = 10;
+    const radius = 30;
+    const offset = 20;
+    const wiggles = 12;
+    const sharpness = 0.8;
+    const n = 50;
+
+    const scallop = {
+      vertPos: [],
+      triVerts: []
+    };
+    scallop.vertPos.push([-offset, 0, height], [-offset, 0, -height]);
+    const sharpenedEdges = [];
+
+    const delta = 3.14159 / wiggles;
+    for (let i = 0; i < 2 * wiggles; ++i) {
+      const theta = (i - wiggles) * delta;
+      const amp = 0.5 * height * Math.max(Math.cos(0.8 * theta), 0);
+
+      scallop.vertPos.push([radius * Math.cos(theta),
+      radius * Math.sin(theta),
+      amp * (i % 2 == 0 ? 1 : -1)]);
+      let j = i + 1;
+      if (j == 2 * wiggles) j = 0;
+
+      const smoothness = 1 - sharpness * Math.cos((theta + delta / 2) / 2);
+      let halfedge = 3 * scallop.triVerts.length + 1;
+      sharpenedEdges.push({ halfedge, smoothness });
+      scallop.triVerts.push([0, 2 + i, 2 + j]);
+
+      halfedge = 3 * scallop.triVerts.length + 1;
+      sharpenedEdges.push({ halfedge, smoothness });
+      scallop.triVerts.push([1, 2 + j, 2 + i]);
+    }
+
+    const result = smooth(scallop, sharpenedEdges).refine(n);
     return result;
   },
 

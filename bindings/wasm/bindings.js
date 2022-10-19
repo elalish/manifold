@@ -4,14 +4,16 @@ Module.setup = function () {
   _ManifoldInitialized = true;
 
   function toVec(vec, list, f = x => x) {
-    for (let x of list) {
-      vec.push_back(f(x));
+    if (list != null) {
+      for (let x of list) {
+        vec.push_back(f(x));
+      }
     }
     return vec;
   }
 
   function fromVec(vec, f = x => x) {
-    let result = [];
+    const result = [];
     const size = vec.size();
     for (let i = 0; i < size; i++)
       result.push(f(vec.get(i)));
@@ -28,6 +30,32 @@ Module.setup = function () {
         if (p instanceof Array) return { x: p[0], y: p[1] };
         return p;
       }));
+  }
+
+  function disposePolygons(polygonsVec) {
+    for (let i = 0; i < polygonsVec.size(); i++) polygonsVec.get(i).delete();
+    polygonsVec.delete();
+  }
+
+  function mesh2vec(mesh) {
+    const vertPos = toVec(new Module.Vector_vec3, mesh.vertPos, p => {
+      return { x: p[0], y: p[1], z: p[2] }
+    });
+    const triVerts = toVec(new Module.Vector_ivec3, mesh.triVerts);
+    const vertNormal = toVec(new Module.Vector_vec3, mesh.vertNormal, p => {
+      return { x: p[0], y: p[1], z: p[2] }
+    });
+    const halfedgeTangent = toVec(new Module.Vector_vec4, mesh.halfedgeTangent, p => {
+      return { x: p[0], y: p[1], z: p[2], w: p[3] }
+    });
+    return { vertPos, triVerts, vertNormal, halfedgeTangent };
+  }
+
+  function disposeMesh(meshVec) {
+    meshVec.vertPos.delete();
+    meshVec.triVerts.delete();
+    meshVec.vertNormal.delete();
+    meshVec.halfedgeTangent.delete();
   }
 
   function vararg2vec(vec) {
@@ -58,7 +86,7 @@ Module.setup = function () {
   // note that the matrix is using column major (same as glm)
   Module.Manifold.prototype.transform = function (mat) {
     console.assert(mat.length == 4, 'expects a 3x4 matrix');
-    let vec = new Module.Vector_f32();
+    const vec = new Module.Vector_f32();
     for (let col of mat) {
       console.assert(col.length == 3, 'expects a 3x4 matrix');
       for (let x of col) mat.push_back(x);
@@ -83,14 +111,6 @@ Module.setup = function () {
     return this._Scale(vararg2vec([vec]));
   };
 
-  Module.Manifold.prototype.smooth = function (sharpenedEdges = []) {
-    let vec = new Module.Vector_smoothness();
-    toVec(vec, sharpenedEdges);
-    const result = this._Smooth(vec);
-    vec.delete();
-    return result;
-  };
-
   Module.Manifold.prototype.decompose = function () {
     const vec = this._Decompose();
     const result = fromVec(vec);
@@ -99,9 +119,9 @@ Module.setup = function () {
   };
 
   Module.Manifold.prototype.getCurvature = function () {
-    let result = this._getCurvature();
-    let oldMeanCurvature = result.vertMeanCurvature;
-    let oldGaussianCurvature = result.vertGaussianCurvature;
+    const result = this._getCurvature();
+    const oldMeanCurvature = result.vertMeanCurvature;
+    const oldGaussianCurvature = result.vertGaussianCurvature;
     result.vertMeanCurvature = fromVec(oldMeanCurvature);
     result.vertGaussianCurvature = fromVec(oldGaussianCurvature);
     oldMeanCurvature.delete();
@@ -110,11 +130,11 @@ Module.setup = function () {
   };
 
   Module.Manifold.prototype.getMeshRelation = function () {
-    let result = this._getMeshRelation();
-    let oldBarycentric = result.barycentric;
-    let oldTriBary = result.triBary;
-    let conversion1 = v => ['x', 'y', 'z'].map(f => v[f]);
-    let conversion2 = v => {
+    const result = this._getMeshRelation();
+    const oldBarycentric = result.barycentric;
+    const oldTriBary = result.triBary;
+    const conversion1 = v => ['x', 'y', 'z'].map(f => v[f]);
+    const conversion2 = v => {
       return {
         meshID: v.meshID,
         originalID: v.originalID,
@@ -160,6 +180,16 @@ Module.setup = function () {
     return Module._Sphere(radius, circularSegments);
   };
 
+  Module.smooth = function (mesh, sharpenedEdges = []) {
+    const meshVec = mesh2vec(mesh);
+    const sharp = new Module.Vector_smoothness();
+    toVec(sharp, sharpenedEdges);
+    const result = Module._Smooth(meshVec, sharp);
+    sharp.delete();
+    disposeMesh(meshVec);
+    return result;
+  };
+
   Module.extrude = function (
     polygons, height, nDivisions = 0, twistDegrees = 0.0,
     scaleTop = [1.0, 1.0]) {
@@ -167,21 +197,19 @@ Module.setup = function () {
     const polygonsVec = polygons2vec(polygons);
     const result = Module._Extrude(
       polygonsVec, height, nDivisions, twistDegrees, scaleTop);
-    for (let i = 0; i < polygonsVec.size(); i++) polygonsVec.get(i).delete();
-    polygonsVec.delete();
+    disposePolygons(polygonsVec);
     return result;
   };
 
   Module.revolve = function (polygons, circularSegments = 0) {
     const polygonsVec = polygons2vec(polygons);
     const result = Module._Revolve(polygonsVec, circularSegments);
-    for (let i = 0; i < polygonsVec.size(); i++) polygonsVec.get(i).delete();
-    polygonsVec.delete();
+    disposePolygons(polygonsVec);
     return result;
   };
 
   Module.compose = function (manifolds) {
-    let vec = new Module.Vector_manifold();
+    const vec = new Module.Vector_manifold();
     toVec(vec, manifolds);
     const result = Module._Compose(vec);
     vec.delete();
@@ -189,7 +217,7 @@ Module.setup = function () {
   };
 
   Module.levelSet = function (sdf, bounds, edgeLength, level = 0) {
-    let bounds2 = {
+    const bounds2 = {
       min: { x: bounds.min[0], y: bounds.min[1], z: bounds.min[2] },
       max: { x: bounds.max[0], y: bounds.max[1], z: bounds.max[2] },
     };
@@ -209,7 +237,7 @@ Module.setup = function () {
     return function (...args) {
       if (args.length == 1)
         args = args[0];
-      let v = new Module.Vector_manifold();
+      const v = new Module.Vector_manifold();
       for (const m of args)
         v.push_back(m);
       const result = Module['_' + name + 'N'](v);

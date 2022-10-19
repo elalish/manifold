@@ -61,7 +61,7 @@ function switchTo(scriptName) {
   }
 }
 
-function appendDropdownItem(name) {
+function createDropdownItem(name) {
   const container = document.createElement('div');
   container.classList.add('item');
   const button = document.createElement('button');
@@ -71,7 +71,6 @@ function appendDropdownItem(name) {
   const label = document.createElement('span');
   button.appendChild(label);
   label.textContent = name;
-  dropdown.appendChild(container);
 
   button.onclick = function () {
     saveCurrent();
@@ -163,15 +162,15 @@ function addEdit(button) {
   };
 }
 
+const newButton = document.querySelector('#new');
 function newItem(code) {
   const name = uniqueName('New Script');
   setScript(name, code);
-  const nextButton = appendDropdownItem(name);
+  const nextButton = createDropdownItem(name);
+  newButton.insertAdjacentElement('afterend', nextButton.parentElement);
   addEdit(nextButton);
   nextButton.click();
 };
-
-const newButton = document.querySelector('#new');
 newButton.onclick = function () { newItem(''); };
 
 const runButton = document.querySelector('#compile');
@@ -202,7 +201,8 @@ require(['vs/editor/editor.main'], async function () {
   tsWorker = await w(editor.getModel().uri);
 
   for (const [name] of examples) {
-    appendDropdownItem(name);
+    const button = createDropdownItem(name);
+    dropdown.appendChild(button.parentElement);
   }
 
   let currentName = currentElement.textContent;
@@ -215,7 +215,8 @@ require(['vs/editor/editor.main'], async function () {
     } else if (key === 'safe') {
       autoExecute = getScript(key) !== 'false';
     } else {
-      const button = appendDropdownItem(key);
+      const button = createDropdownItem(key);
+      newButton.insertAdjacentElement('afterend', button.parentElement);
       addEdit(button);
     }
   }
