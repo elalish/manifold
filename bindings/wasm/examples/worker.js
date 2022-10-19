@@ -2,12 +2,12 @@
 // manifold member functions that returns a new manifold
 const memberFunctions = [
   'add', 'subtract', 'intersect', 'refine', 'transform', 'translate', 'rotate',
-  'scale', 'asOriginal', 'smooth', 'decompose'
+  'scale', 'asOriginal', 'decompose'
 ];
 // top level functions that constructs a new manifold
 const constructors = [
   'cube', 'cylinder', 'sphere', 'tetrahedron', 'extrude', 'revolve', 'union',
-  'difference', 'intersection', 'compose', 'levelSet'
+  'difference', 'intersection', 'compose', 'levelSet', 'smooth'
 ];
 const utils = [
   'setMinCircularAngle', 'setMinCircularEdgeLength', 'setCircularSegments',
@@ -66,7 +66,6 @@ const oldLog = console.log;
 console.log = function (...args) {
   let message = '';
   for (const arg of args) {
-    oldLog(typeof arg);
     if (typeof arg == "object") {
       message += JSON.stringify(arg, null, 4);
     } else {
