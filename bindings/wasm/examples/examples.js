@@ -1,3 +1,17 @@
+// Copyright 2022 The Manifold Authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 const exampleFunctions = {
   Intro: function () {
     // Write code in JavaScript or TypeScript and this editor will show the API docs.
@@ -5,6 +19,7 @@ const exampleFunctions = {
     // Type "Module." to see the static API - these functions can also be used bare.
     // Use console.log() to print output (lower-right).
     // This editor defines Z as up and units of mm.
+
     const box = cube([100, 100, 100], true);
     const ball = sphere(60, 100);
     // You must name your final output "result".
@@ -19,8 +34,10 @@ const exampleFunctions = {
 
   TetrahedronPuzzle: function () {
     // A tetrahedron cut into two identical halves that can screw together as a
-    // puzzle. This only outputs one of the halves. This demonstrates how redundant
-    // points along a polygon can be used to make twisted extrusions smoother.
+    // puzzle. This only outputs one of the halves. This demonstrates how
+    // redundant points along a polygon can be used to make twisted extrusions
+    // smoother. Based on the screw puzzle by George Hart:
+    // https://www.thingiverse.com/thing:186372
 
     const edgeLength = 50;// Length of each edge of the overall tetrahedron.
     const gap = 0.2;// Spacing between the two halves to allow sliding.
@@ -46,6 +63,9 @@ const exampleFunctions = {
   },
 
   RoundedFrame: function () {
+    // Demonstrates how at 90-degree intersections, the sphere and cylinder facets
+    // match up perfectly, for any choice of global resolution parameters.
+
     function roundedFrame(edgeLength, radius, circularSegments = 0) {
       const edge = cylinder(edgeLength, radius, -1, circularSegments);
       const corner = sphere(radius, circularSegments);
@@ -73,6 +93,10 @@ const exampleFunctions = {
   },
 
   Heart: function () {
+    // Smooth, complex manifolds can be created using the warp() function. This
+    // example recreates the Expoitable Heart by Emmett Lalish:
+    // https://www.thingiverse.com/thing:6190
+
     const func = (v) => {
       const x2 = v[0] * v[0];
       const y2 = v[1] * v[1];
@@ -113,8 +137,9 @@ const exampleFunctions = {
   },
 
   Scallop: function () {
-    // A smoothed manifold demonstrating selective edge sharpening with
-    // Manifold.Smooth(). Use Manifold.Refine() before export to see the curvature.
+    // A smoothed manifold demonstrating selective edge sharpening with smooth()
+    // and refine(), see more details at:
+    // https://elalish.blogspot.com/2022/03/smoothing-triangle-meshes.html
 
     const height = 10;
     const radius = 30;
@@ -156,22 +181,21 @@ const exampleFunctions = {
   },
 
   TorusKnot: function () {
-    /**
-     * Creates a classic torus knot, defined as a string wrapping peroidically
-     * around the surface of an imaginary donut. If p and q have a common factor
-     * then you will get multiple separate, interwoven knots. This is an example of
-     * using the warp() method, thus avoiding any direct handling of triangles.
-     *
-     * @param p The number of times the thread passes through the donut hole.
-     * @param q The number of times the thread circles the donut.
-     * @param majorRadius Radius of the interior of the imaginary donut.
-     * @param minorRadius Radius of the small cross-section of the imaginary donut.
-     * @param threadRadius Radius of the small cross-section of the actual object.
-     * @param circularSegments Number of linear segments making up the threadRadius
-     * circle. Default is getCircularSegments(threadRadius).
-     * @param linearSegments Number of segments along the length of the knot.
-     * Default makes roughly square facets.
-     */
+    // Creates a classic torus knot, defined as a string wrapping peroidically
+    // around the surface of an imaginary donut. If p and q have a common factor
+    // then you will get multiple separate, interwoven knots. This is an example of
+    // using the warp() method, thus avoiding any direct handling of triangles.
+
+    // @param p The number of times the thread passes through the donut hole.
+    // @param q The number of times the thread circles the donut.
+    // @param majorRadius Radius of the interior of the imaginary donut.
+    // @param minorRadius Radius of the small cross-section of the imaginary donut.
+    // @param threadRadius Radius of the small cross-section of the actual object.
+    // @param circularSegments Number of linear segments making up the threadRadius
+    //   circle. Default is getCircularSegments(threadRadius).
+    // @param linearSegments Number of segments along the length of the knot.
+    //   Default makes roughly square facets.
+
     function torusKnot(p, q, majorRadius, minorRadius,
       threadRadius, circularSegments = 0,
       linearSegments = 0) {
@@ -227,11 +251,17 @@ const exampleFunctions = {
       return knot;
     }
 
+    // This recreates Matlab Knot by Emmett Lalish:
+    // https://www.thingiverse.com/thing:7080
+
     const result = torusKnot(1, 3, 25, 10, 3.75);
     return result;
   },
 
   MengerSponge: function () {
+    // This example demonstrates how symbolic perturbation correctly creates
+    // holes even though the subtracted objects are exactly coplanar.
+
     function vec2add(a, b) {
       return [a[0] + b[0], a[1] + b[1]];
     }
@@ -267,6 +297,9 @@ const exampleFunctions = {
   },
 
   StretchyBracelet: function () {
+    // Recreates Stretchy Bracelet by Emmett Lalish:
+    // https://www.thingiverse.com/thing:13505
+
     function base(
       width, radius, decorRadius, twistRadius,
       nDecor, innerRadius, outerRadius, cut,
@@ -335,13 +368,10 @@ const exampleFunctions = {
   },
 
   GyroidModule: function () {
-    /**
-     * Creates a rhombic dodecahedral module of a gyroid manifold, which can be
-     * assembled together to tile space continuously. This one is designed to be
-     * 3D-printable, as it is oriented with minimal overhangs. This sample
-     * demonstrates the use of a Signed Distance Function (SDF) to create smooth,
-     * complex manifolds.
-     */
+    // Recreates Modular Gyroid Puzzle by Emmett Lalish:
+    // https://www.thingiverse.com/thing:25477. This sample demonstrates the use
+    // of a Signed Distance Function (SDF) to create smooth, complex manifolds.
+
     const size = 20;
     const n = 20;
     const pi = 3.14159;
