@@ -187,6 +187,12 @@ declare class Manifold {
   getCurvature(): Curvature;
 
   /**
+   * This returns a Mesh of simple vectors of vertices and triangles suitable for
+   * saving or other operations outside of the context of this library.
+   */
+  getMesh(): Mesh;
+
+  /**
    * Gets the relationship to the previous meshes, for the purpose of assinging
    * properties like texture coordinates. The triBary vector is the same length
    * as Mesh.triVerts: BaryRef.originalID indicates the source mesh and
