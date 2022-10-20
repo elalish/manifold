@@ -129,6 +129,25 @@ Module.setup = function () {
     return result;
   };
 
+  Module.Manifold.prototype.getMesh = function () {
+    const result = this._GetMesh();
+    const oldVertPos = result.vertPos;
+    const oldTriVerts = result.triVerts;
+    const oldVertNormal = result.vertNormal;
+    const oldHalfedgeTangent = result.halfedgeTangent;
+    const conversion1 = v => ['x', 'y', 'z'].map(f => v[f]);
+    const conversion2 = v => ['x', 'y', 'z', 'w'].map(f => v[f]);
+    result.vertPos = fromVec(oldVertPos, conversion1);
+    result.triVerts = fromVec(oldTriVerts);
+    result.vertNormal = fromVec(oldVertNormal, conversion1);
+    result.halfedgeTangent = fromVec(oldHalfedgeTangent, conversion2);
+    oldVertPos.delete();
+    oldTriVerts.delete();
+    oldVertNormal.delete();
+    oldHalfedgeTangent.delete();
+    return result;
+  };
+
   Module.Manifold.prototype.getMeshRelation = function () {
     const result = this._getMeshRelation();
     const oldBarycentric = result.barycentric;
