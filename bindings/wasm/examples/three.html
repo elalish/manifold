@@ -122,25 +122,25 @@
   function mesh2geometry(mesh) {
     const geometry = new THREE.BufferGeometry();
 
-    const numVert = mesh.vertPos.size();
+    const numVert = mesh.vertPos.length;
     const vert = new Float32Array(3 * numVert);
     const norm = new Float32Array(3 * numVert);
     for (let i = 0; i < numVert; i++) {
-      const v = mesh.vertPos.get(i);
-      const n = mesh.vertNormal.get(i);
+      const v = mesh.vertPos[i];
+      const n = mesh.vertNormal[i];
       const idx = 3 * i;
-      vert[idx] = v.x;
-      vert[idx + 1] = v.y;
-      vert[idx + 2] = v.z;
-      norm[idx] = n.x;
-      norm[idx + 1] = n.y;
-      norm[idx + 2] = n.z;
+      vert[idx] = v[0];
+      vert[idx + 1] = v[1];
+      vert[idx + 2] = v[2];
+      norm[idx] = n[0];
+      norm[idx + 1] = n[1];
+      norm[idx + 2] = n[2];
     }
 
-    const numTri = mesh.triVerts.size();
+    const numTri = mesh.triVerts.length;
     const tri = new Uint32Array(3 * numTri);
     for (let i = 0; i < numTri; i++) {
-      const v = mesh.triVerts.get(i);
+      const v = mesh.triVerts[i];
       const idx = 3 * i;
       tri[idx] = v[0];
       tri[idx + 1] = v[1];
