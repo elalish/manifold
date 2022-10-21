@@ -94,7 +94,7 @@ const exampleFunctions = {
 
   Heart: function () {
     // Smooth, complex manifolds can be created using the warp() function. This
-    // example recreates the Expoitable Heart by Emmett Lalish:
+    // example recreates the Exploitable Heart by Emmett Lalish:
     // https://www.thingiverse.com/thing:6190
 
     const func = (v) => {
@@ -181,7 +181,7 @@ const exampleFunctions = {
   },
 
   TorusKnot: function () {
-    // Creates a classic torus knot, defined as a string wrapping peroidically
+    // Creates a classic torus knot, defined as a string wrapping periodically
     // around the surface of an imaginary donut. If p and q have a common factor
     // then you will get multiple separate, interwoven knots. This is an example of
     // using the warp() method, thus avoiding any direct handling of triangles.

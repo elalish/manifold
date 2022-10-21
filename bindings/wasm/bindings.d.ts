@@ -74,10 +74,10 @@ declare class Manifold {
   translate(v: Vec3): Manifold;
 
   /**
-   * Applys an Euler angle rotation to the manifold, first about the X axis,
+   * Applies an Euler angle rotation to the manifold, first about the X axis,
    * then Y, then Z, in degrees. We use degrees so that we can minimize rounding
-   * error, and elimiate it completely for any multiples of 90 degrees.
-   * Addtionally, more efficient code paths are used to update the manifold when
+   * error, and eliminate it completely for any multiples of 90 degrees.
+   * Additionally, more efficient code paths are used to update the manifold when
    * the transforms only rotate by multiples of 90 degrees. This operation can
    * be chained. Transforms are combined and applied lazily.
    *
@@ -207,7 +207,7 @@ declare class Manifold {
   getMesh(): Mesh;
 
   /**
-   * Gets the relationship to the previous meshes, for the purpose of assinging
+   * Gets the relationship to the previous meshes, for the purpose of assigning
    * properties like texture coordinates. The triBary vector is the same length
    * as Mesh.triVerts: BaryRef.originalID indicates the source mesh and
    * BaryRef.tri is that mesh's triangle index to which these barycentric
@@ -226,7 +226,7 @@ declare class Manifold {
   /**
    * If you copy a manifold, but you want this new copy to have new properties
    * (e.g. a different UV mapping), you can reset its meshIDs to a new original,
-   * meaning it will now be referenced by its descendents instead of the meshes
+   * meaning it will now be referenced by its descendants instead of the meshes
    * it was built from, allowing you to differentiate the copies when applying
    * your properties to the final result.
    *
@@ -328,7 +328,7 @@ declare function tetrahedron(): Manifold;
  * @param crossSection A set of non-overlapping polygons to extrude.
  * @param height Z-extent of extrusion.
  * @param nDivisions Number of extra copies of the crossSection to insert into
- * the shape vertically; especially useful in combnation with twistDegrees to
+ * the shape vertically; especially useful in combination with twistDegrees to
  * avoid interpolation artifacts. Default is none.
  * @param twistDegrees Amount to twist the top crossSection relative to the
  * bottom, interpolated linearly for the divisions in between.
@@ -398,7 +398,7 @@ declare function levelSet(
  * default on construction. If circularSegments is specified, it takes
  * precedence. If it is zero, then instead the minimum is used of the segments
  * calculated based on edge length and angle, rounded up to the nearest
- * multiple of four. To get numbers not divisible by four, circularSegements
+ * multiple of four. To get numbers not divisible by four, circularSegments
  * must be specified.
  */
 ///@{

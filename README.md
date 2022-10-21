@@ -1,5 +1,9 @@
 [![codecov](https://codecov.io/github/elalish/manifold/branch/master/graph/badge.svg?token=IIA8G5HVS7)](https://codecov.io/github/elalish/manifold)
 
+## [ManifoldCAD.org](https://manifoldcad.org)
+
+If you like OpenSCAD / OpenJSCAD, you might also like ManifoldCAD - our own solid modelling web app. The operations are not GPU-accelerated, but it's still pretty fast and a good way to test out our Manifold library.
+
 ![A metallic Menger sponge](https://elalish.github.io/manifold/samples/models/mengerSponge3.webp "A metallic Menger sponge")
 
 # Manifold
@@ -14,7 +18,7 @@ This is a modern C++ library that Github's CI verifies builds and runs on a vari
 
 This library is fast with guaranteed manifold output. As such you need manifold meshes as input, which this library can create using constructors inspired by the OpenSCAD API, as well as more advanced features like smoothing and signed-distance function (SDF) level sets. You can also pass in your own mesh data, but you'll get an error status if the imported mesh isn't manifold. Various automated repair tools exist online for fixing non manifold models, usually for 3D printing. 
 
-The most significant contribution here is a guaranteed-manifold [mesh Boolean](https://github.com/elalish/manifold/wiki/Manifold-Library#mesh-boolean) algorithm, which I believe is the first of its kind. If you know of another, please open a discussion - a mesh Boolean alorithm robust to edge cases has been an open problem for many years. Likewise, if the Boolean here ever fails you, please submit an issue! This Boolean forms the basis of a CAD kernel, as it allows simple shapes to be combined into more complex ones.
+The most significant contribution here is a guaranteed-manifold [mesh Boolean](https://github.com/elalish/manifold/wiki/Manifold-Library#mesh-boolean) algorithm, which I believe is the first of its kind. If you know of another, please open a discussion - a mesh Boolean algorithm robust to edge cases has been an open problem for many years. Likewise, if the Boolean here ever fails you, please submit an issue! This Boolean forms the basis of a CAD kernel, as it allows simple shapes to be combined into more complex ones.
 
 To aid in speed, this library makes extensive use of parallelization, generally through Nvidia's Thrust library. You can switch between the CUDA, OMP and serial C++ backends by setting a CMake flag. Not everything is so parallelizable, for instance a [polygon triangulation](https://github.com/elalish/manifold/wiki/Manifold-Library#polygon-triangulation) algorithm is included which is serial. Even if compiled for CUDA, the code will still run without a GPU, falling back to the serial version of the algorithms. The WASM build is serial-only for now, but still fast.
 
@@ -22,7 +26,7 @@ Look in the [samples](https://github.com/elalish/manifold/tree/master/samples) d
 
 ## Building
 
-Only CMake and a C++ compiler are required to be installed and set up to build this library (it has been tested with GCC, LLVM, MSVC). However, a variety of optional dependencies can bring in more functionality, see below. 
+Only CMake, a C++ compiler, and Python are required to be installed and set up to build this library (it has been tested with GCC, LLVM, MSVC). However, a variety of optional dependencies can bring in more functionality, see below. 
 
 Build and test (Ubuntu or similar):
 ```
@@ -46,6 +50,13 @@ The build instructions used by our CI are in [manifold.yml](https://github.com/e
 
 ### WASM
 To build the JS WASM library, first install NodeJS and set up emscripten:
+
+(on Mac):
+```
+brew install nodejs
+brew install emscripten
+```
+(on Linux):
 ```
 sudo apt install nodejs
 git clone https://github.com/emscripten-core/emsdk.git
@@ -57,11 +68,10 @@ source ./emsdk/emsdk_env.sh
 Then build:
 ```
 cd manifold
-mkdir build
-cd build
+mkdir buildWASM
+cd buildWASM
 emcmake cmake -DCMAKE_BUILD_TYPE=Release .. && emmake make
-cd build/test
-node ./manifold_test.js
+node test/manifold_test.js
 ```
 
 ### Python
