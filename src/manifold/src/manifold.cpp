@@ -138,6 +138,50 @@ Mesh Manifold::GetMesh() const {
   return result;
 }
 
+int Manifold::GetMeshBuffer(int which) const {
+    const Impl& impl = *GetCsgLeafNode().GetImpl();
+
+    int nv = NumVert();
+    int nt = NumTri();
+
+    int ms = (sizeof(int) * nt * 3) + (sizeof(int) * 6);
+    int *x = (int *)malloc(ms);
+    float *f = (float *)x;
+
+    // int p = 0;
+    // for (int i = 0; i < nv; i++) {
+    //     const glm::vec3 v = impl.vertPos_[i];
+    //     f[p++] = v.x;
+    //     f[p++] = v.y;
+    //     f[p++] = v.z;
+    // }
+    int p = 9;
+    for (int i = 0; i < nt * 3; i++) {
+        x[p++] = impl.halfedge_[i].startVert;
+    }
+
+    // int ds = (int)&(impl.halfedge_[0].startVert) - (int)impl.halfedge_.begin();
+    // int dr = (int)&(impl.halfedge_[1].startVert) - (int)&(impl.halfedge_[0].startVert);
+    // int dr2 = (int)&(impl.halfedge_[2].startVert) - (int)&(impl.halfedge_[1].startVert);
+
+    x[0] = (int)impl.vertPos_.begin();
+    x[1] = (int)impl.vertPos_.end();
+    x[2] = nv;
+    x[3] = (int)impl.halfedge_.begin();
+    x[4] = (int)impl.halfedge_.end();
+    x[5] = nt;
+    // x[6] = ds;
+    // x[7] = dr;
+    // x[8] = dr2;
+
+    return (int)x;
+}
+
+int Manifold::FreeMeshBuffer(int ptr) const {
+    free((int *)ptr);
+    return 2;
+}
+
 int Manifold::circularSegments_ = 0;
 float Manifold::circularAngle_ = 10.0f;
 float Manifold::circularEdgeLength_ = 1.0f;

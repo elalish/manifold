@@ -162,6 +162,16 @@ Module.setup = function () {
     return result;
   };
 
+  Module.Manifold.prototype.getMeshBuffer = function (w) {
+      const result = this._GetMeshBuffer(w);
+      return result;
+  };
+
+  Module.Manifold.prototype.freeMeshBuffer = function (p) {
+      const result = this._FreeMeshBuffer(p);
+      return result;
+  };
+
   Module.Manifold.prototype.getMeshRelation = function () {
     const result = this._getMeshRelation();
     const oldBarycentric = result.barycentric;

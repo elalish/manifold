@@ -98,6 +98,8 @@ class Manifold {
    */
   ///@{
   Mesh GetMesh() const;
+  int GetMeshBuffer(int) const;
+  int FreeMeshBuffer(int) const;
   bool IsEmpty() const;
   enum class Error {
     NO_ERROR,
