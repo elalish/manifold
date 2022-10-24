@@ -170,7 +170,7 @@ Module.setup = function () {
     return result;
   };
 
-  Module.Manifold.prototype.getMeshDirect = function(opt = { mode: 0 }) {
+  Module.Manifold.prototype.getMeshDirect = function(opt = { mode: 1 }) {
     const mode = opt.mode || 0;
     const vertexFactory = opt.vertexTarget || float32factory;
     const indexFactory = opt.indexTarget || uint32factory;

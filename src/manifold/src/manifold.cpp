@@ -139,54 +139,57 @@ Mesh Manifold::GetMesh() const {
 }
 
 size_t Manifold::GetMeshDirect(int mode) const {
-    const Impl& impl = *GetCsgLeafNode().GetImpl();
+  const Impl& impl = *GetCsgLeafNode().GetImpl();
 
-    int nv = NumVert();
-    int nt = NumTri();
+  int nv = NumVert();
+  int nt = NumTri();
 
-    int recs = 6;
-    switch (mode) {
-        // return just the header with pointers to data in wasm memory
-        case 0: break;
-        // return flattened index array after header
-        case 1: recs += (nt * 3); break;
-        // return unrolled and flattened vertex array after header
-        case 2: recs += (nt * 9); break;
+  int recs = 6;
+  switch (mode) {
+    // return just the header with pointers to data in wasm memory
+    case 0:
+      break;
+    // return flattened index array after header
+    case 1:
+      recs += (nt * 3);
+      break;
+    // return unrolled and flattened vertex array after header
+    case 2:
+      recs += (nt * 9);
+      break;
+  }
+
+  int ms = sizeof(size_t) * recs;
+  size_t* x = (size_t*)malloc(ms);
+  float* f = (float*)x;
+
+  int rp = 0;
+
+  // fixed header
+  x[rp++] = (size_t)impl.vertPos_.begin();
+  x[rp++] = (size_t)impl.vertPos_.end();
+  x[rp++] = nv;
+  x[rp++] = (size_t)impl.halfedge_.begin();
+  x[rp++] = (size_t)impl.halfedge_.end();
+  x[rp++] = nt;
+
+  if (mode == 1) {
+    for (int i = 0; i < nt * 3; i++) {
+      x[rp++] = impl.halfedge_[i].startVert;
     }
-
-    int ms = sizeof(size_t) * recs;
-    size_t *x = (size_t *)malloc(ms);
-    float *f = (float *)x;
-
-    int rp = 0;
-
-    // fixed header
-    x[rp++] = (size_t)impl.vertPos_.begin();
-    x[rp++] = (size_t)impl.vertPos_.end();
-    x[rp++] = nv;
-    x[rp++] = (size_t)impl.halfedge_.begin();
-    x[rp++] = (size_t)impl.halfedge_.end();
-    x[rp++] = nt;
-
-    if (mode == 1) {
-        for (int i = 0; i < nt * 3; i++) {
-            x[rp++] = impl.halfedge_[i].startVert;
-        }
-    } else if (mode == 2) {
-        for (int i = 0; i < nt * 3; i++) {
-            const glm::vec3 v = impl.vertPos_[ impl.halfedge_[i].startVert ];
-            f[rp++] = v.x;
-            f[rp++] = v.y;
-            f[rp++] = v.z;
-        }
+  } else if (mode == 2) {
+    for (int i = 0; i < nt * 3; i++) {
+      const glm::vec3 v = impl.vertPos_[impl.halfedge_[i].startVert];
+      f[rp++] = v.x;
+      f[rp++] = v.y;
+      f[rp++] = v.z;
     }
+  }
 
-    return (size_t)x;
+  return (size_t)x;
 }
 
-void Manifold::FreeMeshDirect(size_t ptr) const {
-    free((size_t *)ptr);
-}
+void Manifold::FreeMeshDirect(size_t ptr) const { free((size_t*)ptr); }
 
 int Manifold::circularSegments_ = 0;
 float Manifold::circularAngle_ = 10.0f;
