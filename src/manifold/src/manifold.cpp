@@ -141,7 +141,7 @@ Mesh Manifold::GetMesh() const {
 size_t Manifold::GetMeshDirect(int mode) const {
   const Impl& impl = *GetCsgLeafNode().GetImpl();
 
-  int recs = 6;
+  int recs = 8;
   int nv = NumVert();
   int nt = NumTri();
 
@@ -163,6 +163,8 @@ size_t Manifold::GetMeshDirect(int mode) const {
   x[rp++] = (size_t)impl.halfedge_.begin();
   x[rp++] = (size_t)impl.halfedge_.end();
   x[rp++] = nt;
+  x[rp++] = (size_t)impl.vertNormal_.begin();
+  x[rp++] = (size_t)impl.vertNormal_.end();
 
   if (mode == 1) {
     // return flattened index array after header
