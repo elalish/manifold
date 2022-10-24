@@ -1,4 +1,5 @@
 [![codecov](https://codecov.io/github/elalish/manifold/branch/master/graph/badge.svg?token=IIA8G5HVS7)](https://codecov.io/github/elalish/manifold)
+[![twitter](https://img.shields.io/twitter/follow/manifoldcad?style=social&logo=twitter)](https://twitter.com/intent/follow?screen_name=manifoldcad)
 
 ## [ManifoldCAD.org](https://manifoldcad.org)
 
@@ -12,7 +13,7 @@ If you like OpenSCAD / OpenJSCAD, you might also like ManifoldCAD - our own soli
 
 [Manifold](https://github.com/elalish/manifold) is a geometry library dedicated to creating and operating on manifold triangle meshes. A [manifold mesh](https://github.com/elalish/manifold/wiki/Manifold-Library#manifoldness) is a mesh that represents a solid object, and so is very important in manufacturing, CAD, structural analysis, etc. Further information can be found on the [wiki](https://github.com/elalish/manifold/wiki/Manifold-Library).
 
-This is a modern C++ library that Github's CI verifies builds and runs on a variety of platforms. Additionally, we build Python and JavaScript (WASM) bindings to make this library more portable and easy to use. We have only three dependencies (all built-in header-only libraries): graphlite provides a connected components algorithm, GLM is a compact vector library, and Thrust is Nvidia's parallel algorithms library (basically a superset of C++17 std::parallel_algorithms). We make use of submodules to ensure compatibility. 
+This is a modern C++ library that Github's CI verifies builds and runs on a variety of platforms. Additionally, we build bindings for JavaScript ([manifold-3d](https://www.npmjs.com/package/manifold-3d) on npm) and Python to make this library more portable and easy to use. We have only three dependencies (all built-in header-only libraries): graphlite provides a connected components algorithm, GLM is a compact vector library, and Thrust is Nvidia's parallel algorithms library (basically a superset of C++17 std::parallel_algorithms). We make use of submodules to ensure compatibility. 
 
 ## What's here
 
