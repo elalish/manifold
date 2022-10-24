@@ -138,7 +138,7 @@ Mesh Manifold::GetMesh() const {
   return result;
 }
 
-int Manifold::GetMeshDirect(int mode) const {
+size_t Manifold::GetMeshDirect(int mode) const {
     const Impl& impl = *GetCsgLeafNode().GetImpl();
 
     int nv = NumVert();
@@ -154,18 +154,18 @@ int Manifold::GetMeshDirect(int mode) const {
         case 2: recs += (nt * 9); break;
     }
 
-    int ms = sizeof(int) * recs;
-    int *x = (int *)malloc(ms);
+    int ms = sizeof(size_t) * recs;
+    size_t *x = (size_t *)malloc(ms);
     float *f = (float *)x;
 
     int rp = 0;
 
     // fixed header
-    x[rp++] = (int)impl.vertPos_.begin();
-    x[rp++] = (int)impl.vertPos_.end();
+    x[rp++] = (size_t)impl.vertPos_.begin();
+    x[rp++] = (size_t)impl.vertPos_.end();
     x[rp++] = nv;
-    x[rp++] = (int)impl.halfedge_.begin();
-    x[rp++] = (int)impl.halfedge_.end();
+    x[rp++] = (size_t)impl.halfedge_.begin();
+    x[rp++] = (size_t)impl.halfedge_.end();
     x[rp++] = nt;
 
     if (mode == 1) {
@@ -181,11 +181,11 @@ int Manifold::GetMeshDirect(int mode) const {
         }
     }
 
-    return (int)x;
+    return (size_t)x;
 }
 
-void Manifold::FreeMeshDirect(int ptr) const {
-    free((int *)ptr);
+void Manifold::FreeMeshDirect(size_t ptr) const {
+    free((size_t *)ptr);
 }
 
 int Manifold::circularSegments_ = 0;
