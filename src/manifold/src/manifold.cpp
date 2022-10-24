@@ -138,48 +138,54 @@ Mesh Manifold::GetMesh() const {
   return result;
 }
 
-int Manifold::GetMeshBuffer(int which) const {
+int Manifold::GetMeshDirect(int mode) const {
     const Impl& impl = *GetCsgLeafNode().GetImpl();
 
     int nv = NumVert();
     int nt = NumTri();
 
-    int ms = (sizeof(int) * nt * 3) + (sizeof(int) * 6);
+    int recs = 6;
+    switch (mode) {
+        // return just the header with pointers to data in wasm memory
+        case 0: break;
+        // return flattened index array after header
+        case 1: recs += (nt * 3); break;
+        // return unrolled and flattened vertex array after header
+        case 2: recs += (nt * 9); break;
+    }
+
+    int ms = sizeof(int) * recs;
     int *x = (int *)malloc(ms);
     float *f = (float *)x;
 
-    // int p = 0;
-    // for (int i = 0; i < nv; i++) {
-    //     const glm::vec3 v = impl.vertPos_[i];
-    //     f[p++] = v.x;
-    //     f[p++] = v.y;
-    //     f[p++] = v.z;
-    // }
-    int p = 9;
-    for (int i = 0; i < nt * 3; i++) {
-        x[p++] = impl.halfedge_[i].startVert;
+    int rp = 0;
+
+    // fixed header
+    x[rp++] = (int)impl.vertPos_.begin();
+    x[rp++] = (int)impl.vertPos_.end();
+    x[rp++] = nv;
+    x[rp++] = (int)impl.halfedge_.begin();
+    x[rp++] = (int)impl.halfedge_.end();
+    x[rp++] = nt;
+
+    if (mode == 1) {
+        for (int i = 0; i < nt * 3; i++) {
+            x[rp++] = impl.halfedge_[i].startVert;
+        }
+    } else if (mode == 2) {
+        for (int i = 0; i < nt * 3; i++) {
+            const glm::vec3 v = impl.vertPos_[ impl.halfedge_[i].startVert ];
+            f[rp++] = v.x;
+            f[rp++] = v.y;
+            f[rp++] = v.z;
+        }
     }
-
-    // int ds = (int)&(impl.halfedge_[0].startVert) - (int)impl.halfedge_.begin();
-    // int dr = (int)&(impl.halfedge_[1].startVert) - (int)&(impl.halfedge_[0].startVert);
-    // int dr2 = (int)&(impl.halfedge_[2].startVert) - (int)&(impl.halfedge_[1].startVert);
-
-    x[0] = (int)impl.vertPos_.begin();
-    x[1] = (int)impl.vertPos_.end();
-    x[2] = nv;
-    x[3] = (int)impl.halfedge_.begin();
-    x[4] = (int)impl.halfedge_.end();
-    x[5] = nt;
-    // x[6] = ds;
-    // x[7] = dr;
-    // x[8] = dr2;
 
     return (int)x;
 }
 
-int Manifold::FreeMeshBuffer(int ptr) const {
+void Manifold::FreeMeshDirect(int ptr) const {
     free((int *)ptr);
-    return 2;
 }
 
 int Manifold::circularSegments_ = 0;

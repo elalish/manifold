@@ -17,6 +17,14 @@ Module.setup = function () {
   if (_ManifoldInitialized) return;
   _ManifoldInitialized = true;
 
+  function float32factory(size) {
+      return new Float32Array(size);
+  }
+
+  function uint32factory(size) {
+      return new Uint32Array(size);
+  }
+
   function toVec(vec, list, f = x => x) {
     if (list != null) {
       for (let x of list) {
@@ -162,14 +170,49 @@ Module.setup = function () {
     return result;
   };
 
-  Module.Manifold.prototype.getMeshBuffer = function (w) {
-      const result = this._GetMeshBuffer(w);
-      return result;
-  };
+  Module.Manifold.prototype.getMeshDirect = function (opt = { mode: 0 }) {
+      const mode = opt.mode || 0;
+      const vertexFactory = opt.vertexTarget || float32factory;
+      const indexFactory = opt.indexTarget || uint32factory;
+      const mempos = this._GetMeshDirect(mode) / 4;
+      const umem = Module.HEAPU32;
+      const fmem = Module.HEAPF32;
+      const head = umem.subarray(mempos, mempos + 6);
+      const vS = head[0]; // vert start
+      const vE = head[1]; // vert end
+      const vR = head[2]; // num vertex records
+      const eS = head[3]; // index start
+      const eE = head[4]; // index end
+      const eR = head[5]; // num index records
+      const vert = fmem.subarray(vS / 4, vE / 4); // vertex data (direct)
+      const indx = umem.subarray(eS / 4, eE / 4); // index data (direct / interleaved)
+      const vertex = vertexFactory(mode === 2 ? eR * 9 : vR * 3);
+      const index = mode != 2 ? indexFactory(eR * 3) : undefined;
+      console.log({ mempos, head });
+      console.log({ vert, indx });
+      console.log({ vertex, index });
+      console.log({ vS, vE, span: vE - vS });
+      console.log({ eS, eE, span: eE - eS });
+      switch (mode) {
+          case 0:
+            vertex.set(vert);
+            index.set(indx.filter( (v,i) => i % 4 === 0));
+            break;
+          case 1:
+            vertex.set(vert);
+            const suba = umem.subarray(mempos + 6, mempos + 6 + eR * 3);
+            console.log({suba});
+            index.set(suba);
+            break;
+          case 2:
+            const subb = fmem.subarray(mempos + 6, mempos + 6 + eR * 9);
+            console.log({subb});
+            vertex.set(subb);
+            break;
+      }
+      this._FreeMeshDirect(mempos);
 
-  Module.Manifold.prototype.freeMeshBuffer = function (p) {
-      const result = this._FreeMeshBuffer(p);
-      return result;
+      return { vertex, index, vert, indx };
   };
 
   Module.Manifold.prototype.getMeshRelation = function () {
