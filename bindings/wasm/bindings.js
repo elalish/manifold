@@ -188,31 +188,26 @@ Module.setup = function () {
       const indx = umem.subarray(eS / 4, eE / 4); // index data (direct / interleaved)
       const vertex = vertexFactory(mode === 2 ? eR * 9 : vR * 3);
       const index = mode != 2 ? indexFactory(eR * 3) : undefined;
-      console.log({ mempos, head });
-      console.log({ vert, indx });
-      console.log({ vertex, index });
-      console.log({ vS, vE, span: vE - vS });
-      console.log({ eS, eE, span: eE - eS });
       switch (mode) {
           case 0:
             vertex.set(vert);
-            index.set(indx.filter( (v,i) => i % 4 === 0));
+            // 30x slower than for let
+            // index.set(indx.filter( (v,i) => i % 4 === 0));
+            for (let p=0, i=0, l=indx.length; i<l; i += 4) {
+                index[p++] = indx[i];
+            }
             break;
           case 1:
             vertex.set(vert);
-            const suba = umem.subarray(mempos + 6, mempos + 6 + eR * 3);
-            console.log({suba});
-            index.set(suba);
+            index.set(umem.subarray(mempos + 6, mempos + 6 + eR * 3));
             break;
           case 2:
-            const subb = fmem.subarray(mempos + 6, mempos + 6 + eR * 9);
-            console.log({subb});
-            vertex.set(subb);
+            vertex.set(fmem.subarray(mempos + 6, mempos + 6 + eR * 9));
             break;
       }
       this._FreeMeshDirect(mempos);
 
-      return { vertex, index, vert, indx };
+      return { vertex, index };
   };
 
   Module.Manifold.prototype.getMeshRelation = function () {
