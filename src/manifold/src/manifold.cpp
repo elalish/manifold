@@ -141,22 +141,14 @@ Mesh Manifold::GetMesh() const {
 size_t Manifold::GetMeshDirect(int mode) const {
   const Impl& impl = *GetCsgLeafNode().GetImpl();
 
+  int recs = 6;
   int nv = NumVert();
   int nt = NumTri();
 
-  int recs = 6;
-  switch (mode) {
-    // return just the header with pointers to data in wasm memory
-    case 0:
-      break;
-    // return flattened index array after header
-    case 1:
-      recs += (nt * 3);
-      break;
-    // return unrolled and flattened vertex array after header
-    case 2:
-      recs += (nt * 9);
-      break;
+  if (mode == 1) {
+    recs += (nt * 3);
+  } else if (mode == 2) {
+    recs += (nt * 9);
   }
 
   int ms = sizeof(size_t) * recs;
@@ -164,7 +156,6 @@ size_t Manifold::GetMeshDirect(int mode) const {
   float* f = (float*)x;
 
   int rp = 0;
-
   // fixed header
   x[rp++] = (size_t)impl.vertPos_.begin();
   x[rp++] = (size_t)impl.vertPos_.end();
@@ -174,10 +165,12 @@ size_t Manifold::GetMeshDirect(int mode) const {
   x[rp++] = nt;
 
   if (mode == 1) {
+    // return flattened index array after header
     for (int i = 0; i < nt * 3; i++) {
       x[rp++] = impl.halfedge_[i].startVert;
     }
   } else if (mode == 2) {
+    // return unrolled and flattened vertex array after header
     for (int i = 0; i < nt * 3; i++) {
       const glm::vec3 v = impl.vertPos_[impl.halfedge_[i].startVert];
       f[rp++] = v.x;
@@ -188,8 +181,6 @@ size_t Manifold::GetMeshDirect(int mode) const {
 
   return (size_t)x;
 }
-
-void Manifold::FreeMeshDirect(size_t ptr) const { free((size_t*)ptr); }
 
 int Manifold::circularSegments_ = 0;
 float Manifold::circularAngle_ = 10.0f;

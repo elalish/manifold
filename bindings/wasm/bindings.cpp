@@ -171,7 +171,6 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .function("intersect", &Intersection)
       .function("_GetMesh", &Manifold::GetMesh)
       .function("_GetMeshDirect", &Manifold::GetMeshDirect)
-      .function("_FreeMeshDirect", &Manifold::FreeMeshDirect)
       .function("refine", &Manifold::Refine)
       .function("_Warp", &Warp)
       .function("_Transform", &Transform)

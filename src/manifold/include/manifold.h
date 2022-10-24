@@ -99,7 +99,6 @@ class Manifold {
   ///@{
   Mesh GetMesh() const;
   size_t GetMeshDirect(int) const;
-  void FreeMeshDirect(size_t) const;
   bool IsEmpty() const;
   enum class Error {
     NO_ERROR,
