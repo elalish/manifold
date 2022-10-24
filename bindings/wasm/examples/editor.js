@@ -205,7 +205,7 @@ function initializeRun() {
 let tsWorker = undefined;
 require.config({ paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.34.0/min/vs' } });
 require(['vs/editor/editor.main'], async function () {
-  const content = await fetch('bindings.d.ts').then(response => response.text());
+  const content = await fetch('manifold.d.ts').then(response => response.text());
   monaco.languages.typescript.typescriptDefaults.addExtraLib(content);
   editor = monaco.editor.create(document.getElementById('editor'), {
     language: 'typescript',
