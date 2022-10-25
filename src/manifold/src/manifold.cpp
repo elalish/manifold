@@ -138,50 +138,27 @@ Mesh Manifold::GetMesh() const {
   return result;
 }
 
-size_t Manifold::GetMeshDirect(int mode) const {
+size_t Manifold::GetMeshDirect() const {
   const Impl& impl = *GetCsgLeafNode().GetImpl();
 
-  int recs = 8;
-  int nv = NumVert();
-  int nt = NumTri();
-
-  if (mode == 1) {
-    recs += (nt * 3);
-  } else if (mode == 2) {
-    recs += (nt * 9);
-  }
-
-  int ms = sizeof(size_t) * recs;
-  size_t* x = (size_t*)malloc(ms);
-  float* f = (float*)x;
+  int recs = 6 + (NumTri() * 3);
+  size_t* u = (size_t*)malloc(sizeof(size_t) * recs);
+  float* f = (float*)u;
 
   int rp = 0;
-  // fixed header
-  x[rp++] = (size_t)impl.vertPos_.begin();
-  x[rp++] = (size_t)impl.vertPos_.end();
-  x[rp++] = nv;
-  x[rp++] = (size_t)impl.halfedge_.begin();
-  x[rp++] = (size_t)impl.halfedge_.end();
-  x[rp++] = nt;
-  x[rp++] = (size_t)impl.vertNormal_.begin();
-  x[rp++] = (size_t)impl.vertNormal_.end();
-
-  if (mode == 1) {
-    // return flattened index array after header
-    for (int i = 0; i < nt * 3; i++) {
-      x[rp++] = impl.halfedge_[i].startVert;
-    }
-  } else if (mode == 2) {
-    // return unrolled and flattened vertex array after header
-    for (int i = 0; i < nt * 3; i++) {
-      const glm::vec3 v = impl.vertPos_[impl.halfedge_[i].startVert];
-      f[rp++] = v.x;
-      f[rp++] = v.y;
-      f[rp++] = v.z;
-    }
+  // header
+  u[rp++] = NumVert();
+  u[rp++] = NumTri();
+  u[rp++] = (size_t)impl.vertPos_.begin();
+  u[rp++] = (size_t)impl.vertPos_.end();
+  u[rp++] = (size_t)impl.vertNormal_.begin();
+  u[rp++] = (size_t)impl.vertNormal_.end();
+  // extracted & flattened index array
+  for (int i = 0, l = NumTri() * 3; i < l; i++) {
+    u[rp++] = impl.halfedge_[i].startVert;
   }
 
-  return (size_t)x;
+  return (size_t)u;
 }
 
 int Manifold::circularSegments_ = 0;

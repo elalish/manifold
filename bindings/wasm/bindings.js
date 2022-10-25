@@ -153,55 +153,32 @@ Module.setup = function () {
 
   Module.Manifold.prototype.getMesh = function (opt) {
     if (opt) {
-      // direct heap access to underlying mesh vector data > 100x faster
-      const mode = opt.mode >= 0 ? opt.mode : 1;
+      // direct heap access to underlying mesh data > 100x faster
       const vertexFactory = opt.vertex || float32factory;
       const indexFactory = opt.index || uint32factory;
       const normalFactory = opt.normal === true ? float32factory : opt.normal;
-      const mempos = this._GetMeshDirect(mode) / 4;
+      const mempos = this._GetMeshDirect() / 4;
       const umem = Module.HEAPU32;
       const fmem = Module.HEAPF32;
       const hlen = 8;
       const head = umem.subarray(mempos, mempos + hlen);
-      const vS = head[0]; // vertex vector start
-      const vE = head[1]; // vertex vector end
-      const vR = head[2]; // num vertex records
-      const eS = head[3]; // halfedge vector start
-      const eE = head[4]; // halfedge vector end
-      const eR = head[5]; // num halfedge records
-      const nS = head[6]; // normals vector start
-      const nE = head[7]; // normals vector end
-      const vertex = vertexFactory(mode === 2 ? eR * 9 : vR * 3);
-      const index = mode != 2 ? indexFactory(eR * 3) : undefined;
-      // helper does not unroll vertices and normals. use mode 0 or 1 and do manually
-      const normal = normalFactory && mode !== 2 ? normalFactory(vertex.length) : undefined;
-      switch (mode) {
-        case 0:
-          vertex.set(fmem.subarray(vS / 4, vE / 4));
-          // 30x slower than for let
-          // index.set(indx.filter( (v,i) => i % 4 === 0));
-          const indx = umem.subarray(eS / 4, eE / 4);
-          for (let p = 0, i = 0, l = indx.length; i < l; i += 4) {
-              index[p++] = indx[i];
-          }
-          break;
-        case 1:
-          // letting WASM compact the index array is another speed boost
-          vertex.set(fmem.subarray(vS / 4, vE / 4));
-          index.set(umem.subarray(mempos + hlen, mempos + hlen + eR * 3));
-          break;
-        case 2:
-          // in some cases, we want the unrolled vertex array (non-indexed)
-          // doing this work in WASM is substantially faster
-          vertex.set(fmem.subarray(mempos + hlen, mempos + hlen + eR * 9));
-          break;
-      }
+      const vR = head[0]; // num vertex records
+      const iR = head[1]; // num index records
+      const vS = head[2]; // vertex vector start
+      const vE = head[3]; // vertex vector end
+      const nS = head[4]; // normals vector start
+      const nE = head[5]; // normals vector end
+      const vertex = vertexFactory(vR * 3);
+      const index = indexFactory(iR * 3);
+      const normal = normalFactory ? normalFactory(vertex.length) : undefined;
+      vertex.set(fmem.subarray(vS / 4, vE / 4));
+      index.set(umem.subarray(mempos + hlen, mempos + hlen + iR * 3));
       Module._free(mempos * 4);
       if (normal) {
           normal.set(fmem.subarray(nS / 4, nE / 4));
           return { vertex, index, normal };
       }
-      return mode === 2 ? { vertex } : { vertex, index };
+      return { vertex, index };
     }
     const result = this._GetMesh();
     const oldVertPos = result.vertPos;
