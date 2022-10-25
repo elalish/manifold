@@ -385,7 +385,7 @@ namespace manifold {
  * it with a negative value.
  * @return Mesh This class does not depend on Manifold, so it just returns a
  * Mesh, but it is guaranteed to be manifold and so can always be used as
- * input to the Manifold contructor for further operations.
+ * input to the Manifold constructor for further operations.
  */
 template <typename Func>
 inline Mesh LevelSet(Func sdf, Box bounds, float edgeLength, float level = 0) {

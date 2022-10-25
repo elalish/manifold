@@ -212,7 +212,7 @@ void AppendPartialEdges(Manifold::Impl &outR, VecDH<char> &wholeHalfedgeP,
                         const VecDH<int>::IterC faceP2R, bool forward) {
   // Each edge in the map is partially retained; for each of these, look up
   // their original verts and include them based on their winding number (i03),
-  // while remaping them to the output using vP2R. Use the verts position
+  // while remapping them to the output using vP2R. Use the verts position
   // projected along the edge vector to pair them up, then distribute these
   // edges to their faces.
   VecDH<Halfedge> &halfedgeR = outR.halfedge_;

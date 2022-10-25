@@ -332,7 +332,7 @@ Manifold::Impl::Impl(const Mesh& mesh,
 }
 
 /**
- * Create eiter a unit tetrahedron, cube or octahedron. The cube is in the first
+ * Create either a unit tetrahedron, cube or octahedron. The cube is in the first
  * octant, while the others are symmetric about the origin.
  */
 Manifold::Impl::Impl(Shape shape) {

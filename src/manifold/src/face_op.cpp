@@ -23,7 +23,7 @@ namespace manifold {
  * Triangulates the faces. In this case, the halfedge_ vector is not yet a set
  * of triangles as required by this data structure, but is instead a set of
  * general faces with the input faceEdge vector having length of the number of
- * faces + 1. The values are indicies into the halfedge_ vector for the first
+ * faces + 1. The values are indices into the halfedge_ vector for the first
  * edge of each face, with the final value being the length of the halfedge_
  * vector itself. Upon return, halfedge_ has been lengthened and properly
  * represents the mesh as a set of triangles as usual. In this process the

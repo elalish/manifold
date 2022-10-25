@@ -29,7 +29,7 @@ namespace manifold {
 // Vector implementation optimized for managed memory, will perform memory
 // prefetching to minimize page faults and use parallel/GPU copy/fill depending
 // on data size. This will also handle builds without CUDA or builds with CUDA
-// but runned without CUDA GPU properly.
+// but are run without CUDA GPU properly.
 //
 // Note that the constructor and resize function will not perform initialization
 // if the parameter val is not set. Also, this implementation is a toy

@@ -100,7 +100,7 @@ CsgLeafNode& Manifold::GetCsgLeafNode() const {
  * properties in different triangles.
  * @param properties A vector whose length is the largest index in
  * triProperties times the length of propertyTolerance (the number of
- * properties). Think of it as a propery matrix indexed as [index *
+ * properties). Think of it as a property matrix indexed as [index *
  * numProperties + propertyNum].
  * @param propertyTolerance A vector of precision values for each property.
  * This is the amount of interpolation error allowed before two neighboring
@@ -172,7 +172,7 @@ void Manifold::SetMinCircularEdgeLength(float length) {
 /**
  * Sets the default number of circular segments for the
  * Cylinder(), Sphere(), and Revolve() constructors. Overrides the edge length
- * and angle constraints and sets the number of segements to exactly this value.
+ * and angle constraints and sets the number of segments to exactly this value.
  *
  * @param number Number of circular segments. Default is 0, meaning no
  * constraint is applied.
@@ -275,7 +275,7 @@ Curvature Manifold::GetCurvature() const {
 }
 
 /**
- * Gets the relationship to the previous meshes, for the purpose of assinging
+ * Gets the relationship to the previous meshes, for the purpose of assigning
  * properties like texture coordinates. The triBary vector is the same length as
  * Mesh.triVerts: BaryRef.originalID indicates the source mesh and BaryRef.tri
  * is that mesh's triangle index to which these barycentric coordinates refer.
@@ -390,9 +390,9 @@ Manifold Manifold::Scale(glm::vec3 v) const {
 }
 
 /**
- * Applys an Euler angle rotation to the manifold, first about the X axis, then
+ * Applies an Euler angle rotation to the manifold, first about the X axis, then
  * Y, then Z, in degrees. We use degrees so that we can minimize rounding error,
- * and elimiate it completely for any multiples of 90 degrees. Addtionally, more
+ * and eliminate it completely for any multiples of 90 degrees. Additionally, more
  * efficient code paths are used to update the manifold when the transforms only
  * rotate by multiples of 90 degrees. This operation can be chained. Transforms
  * are combined and applied lazily.
@@ -549,7 +549,7 @@ std::pair<Manifold, Manifold> Manifold::Split(const Manifold& cutter) const {
 }
 
 /**
- * Convient version of Split() for a half-space.
+ * Convenient version of Split() for a half-space.
  *
  * @param normal This vector is normal to the cutting plane and its length does
  * not matter. The first result is in the direction of this vector, the second

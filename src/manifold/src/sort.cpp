@@ -171,7 +171,7 @@ void Manifold::Impl::Finish() {
   CalculateBBox();
   SetPrecision(precision_);
   if (!bBox_.IsFinite()) {
-    // Decimated out of existance - early out.
+    // Decimated out of existence - early out.
     MarkFailure(Error::NO_ERROR);
     return;
   }

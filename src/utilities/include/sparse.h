@@ -25,7 +25,7 @@ namespace manifold {
 
 /** @ingroup Private */
 class SparseIndices {
-  // COO-style sparse matrix storage. Values corresponding to these indicies are
+  // COO-style sparse matrix storage. Values corresponding to these indices are
   // stored in vectors separate from this class, but having the same length.
  public:
   SparseIndices(int size = 0) : p(size), q(size) {}
@@ -84,7 +84,7 @@ class SparseIndices {
 
   size_t RemoveZeros(VecDH<int>& S) {
     ASSERT(S.size() == p.size(), userErr,
-           "Different number of values than indicies!");
+           "Different number of values than indices!");
     auto zBegin = zip(S.begin(), begin(false), begin(true));
     auto zEnd = zip(S.end(), end(false), end(true));
     size_t size = remove_if<decltype(zBegin)>(autoPolicy(S.size()), zBegin,
@@ -119,7 +119,7 @@ class SparseIndices {
   template <typename T>
   size_t KeepFinite(VecDH<T>& v, VecDH<int>& x) {
     ASSERT(x.size() == p.size(), userErr,
-           "Different number of values than indicies!");
+           "Different number of values than indices!");
     auto zBegin = zip(v.begin(), x.begin(), begin(false), begin(true));
     auto zEnd = zip(v.end(), x.end(), end(false), end(true));
     size_t size = remove_if<decltype(zBegin)>(autoPolicy(v.size()), zBegin,
@@ -136,7 +136,7 @@ class SparseIndices {
   VecDH<T> Gather(const VecDH<T>& val, const Iter pqBegin, const Iter pqEnd,
                   T missingVal) const {
     ASSERT(val.size() == p.size(), userErr,
-           "Different number of values than indicies!");
+           "Different number of values than indices!");
     size_t size = pqEnd - pqBegin;
     VecDH<T> result(size);
     VecDH<char> found(size);

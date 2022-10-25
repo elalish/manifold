@@ -116,7 +116,7 @@ namespace manifold {
 
 /**
  * Collapses degenerate triangles by removing edges shorter than precision_ and
- * any edge that is preceeded by an edge that joins the same two face relations.
+ * any edge that is preceded by an edge that joins the same two face relations.
  * It also performs edge swaps on the long edges of degenerate triangles, though
  * there are some configurations of degenerates that cannot be removed this way.
  *
