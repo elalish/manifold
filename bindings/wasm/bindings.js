@@ -156,29 +156,21 @@ Module.setup = function () {
       // direct heap access to underlying mesh data > 100x faster
       const vertexFactory = opt.vertex || float32factory;
       const indexFactory = opt.index || uint32factory;
-      const normalFactory = opt.normal === true ? float32factory : opt.normal;
+      const normalFactory = opt.normal || float32factory;
       const mempos = this._GetMeshDirect() / 4;
       const umem = Module.HEAPU32;
       const fmem = Module.HEAPF32;
-      const hlen = 8;
+      const hlen = 6;
       const head = umem.subarray(mempos, mempos + hlen);
-      const vR = head[0]; // num vertex records
-      const iR = head[1]; // num index records
-      const vS = head[2]; // vertex vector start
-      const vE = head[3]; // vertex vector end
-      const nS = head[4]; // normals vector start
-      const nE = head[5]; // normals vector end
-      const vertex = vertexFactory(vR * 3);
-      const index = indexFactory(iR * 3);
+      const [ vR, iR, vS, vE, nS, nE ] = head;
+      const vertex = vertexFactory ? vertexFactory(vR * 3) : undefined;
+      const index = indexFactory ? indexFactory(iR * 3) : undefined;
       const normal = normalFactory ? normalFactory(vertex.length) : undefined;
-      vertex.set(fmem.subarray(vS / 4, vE / 4));
-      index.set(umem.subarray(mempos + hlen, mempos + hlen + iR * 3));
+      if (vertex) vertex.set(fmem.subarray(vS / 4, vE / 4));
+      if (index) index.set(umem.subarray(mempos + hlen, mempos + hlen + iR * 3));
+      if (normal) normal.set(fmem.subarray(nS / 4, nE / 4));
       Module._free(mempos * 4);
-      if (normal) {
-          normal.set(fmem.subarray(nS / 4, nE / 4));
-          return { vertex, index, normal };
-      }
-      return { vertex, index };
+      return { vertex, index, normal };
     }
     const result = this._GetMesh();
     const oldVertPos = result.vertPos;
