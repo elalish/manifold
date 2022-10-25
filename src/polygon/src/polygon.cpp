@@ -320,8 +320,8 @@ class Monotones {
    * This is the data structure of the polygons themselves. They are stored as a
    * list in sweep-line order. The left and right pointers form the polygons,
    * while the mesh_idx describes the input indices that will be transferred to
-   * the output triangulation. The edgeRight value represents an extra constraint
-   * from the mesh Boolean algorithm.
+   * the output triangulation. The edgeRight value represents an extra
+   * constraint from the mesh Boolean algorithm.
    */
   struct VertAdj {
     glm::vec2 pos;

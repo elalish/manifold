@@ -392,10 +392,10 @@ Manifold Manifold::Scale(glm::vec3 v) const {
 /**
  * Applies an Euler angle rotation to the manifold, first about the X axis, then
  * Y, then Z, in degrees. We use degrees so that we can minimize rounding error,
- * and eliminate it completely for any multiples of 90 degrees. Additionally, more
- * efficient code paths are used to update the manifold when the transforms only
- * rotate by multiples of 90 degrees. This operation can be chained. Transforms
- * are combined and applied lazily.
+ * and eliminate it completely for any multiples of 90 degrees. Additionally,
+ * more efficient code paths are used to update the manifold when the transforms
+ * only rotate by multiples of 90 degrees. This operation can be chained.
+ * Transforms are combined and applied lazily.
  *
  * @param xDegrees First rotation, degrees about the X-axis.
  * @param yDegrees Second rotation, degrees about the Y-axis.

@@ -332,8 +332,8 @@ Manifold::Impl::Impl(const Mesh& mesh,
 }
 
 /**
- * Create either a unit tetrahedron, cube or octahedron. The cube is in the first
- * octant, while the others are symmetric about the origin.
+ * Create either a unit tetrahedron, cube or octahedron. The cube is in the
+ * first octant, while the others are symmetric about the origin.
  */
 Manifold::Impl::Impl(Shape shape) {
   std::vector<glm::vec3> vertPos;
