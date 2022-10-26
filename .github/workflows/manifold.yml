@@ -95,16 +95,20 @@ jobs:
         emcmake cmake -DCMAKE_BUILD_TYPE=Release .. && emmake make
     - name: Test WASM
       run: |
+        mv bindings/wasm/manifold.* ../bindings/wasm/
         cd build/test
         node ./manifold_test.js
+        cd ../bindings/wasm
+        npm install
+        npm test
     - name: Upload WASM files
       uses: actions/upload-artifact@v3
       with:
         name: wasm
         path: |
-          build/bindings/wasm/manifold.js
-          build/bindings/wasm/manifold.wasm
-          build/bindings/wasm/manifold.d.ts
+          bindings/wasm/manifold.js
+          bindings/wasm/manifold.wasm
+          bindings/wasm/manifold.d.ts
         retention-days: 7
 
   build_windows:
