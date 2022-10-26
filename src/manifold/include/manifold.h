@@ -98,7 +98,7 @@ class Manifold {
    */
   ///@{
   Mesh GetMesh() const;
-  size_t GetMeshDirect() const;
+  MeshGL GetMeshDirect() const;
   bool IsEmpty() const;
   enum class Error {
     NO_ERROR,

@@ -138,27 +138,33 @@ Mesh Manifold::GetMesh() const {
   return result;
 }
 
-size_t Manifold::GetMeshDirect() const {
+MeshGL Manifold::GetMeshDirect() const {
   const Impl& impl = *GetCsgLeafNode().GetImpl();
 
-  int recs = 6 + (NumTri() * 3);
-  size_t* u = (size_t*)malloc(sizeof(size_t) * recs);
-  float* f = (float*)u;
+  int numVert = NumVert();
+  int numTri = NumTri();
 
-  int rp = 0;
-  // header
-  u[rp++] = NumVert();
-  u[rp++] = NumTri();
-  u[rp++] = (size_t)impl.vertPos_.begin();
-  u[rp++] = (size_t)impl.vertPos_.end();
-  u[rp++] = (size_t)impl.vertNormal_.begin();
-  u[rp++] = (size_t)impl.vertNormal_.end();
-  // extracted & flattened index array
-  for (int i = 0, l = NumTri() * 3; i < l; i++) {
-    u[rp++] = impl.halfedge_[i].startVert;
+  MeshGL out;
+  out.vertPos = std::make_unique<float[]>(3*numVert);
+  for(int i = 0; i < numVert; ++i) {
+    glm::vec3 v = impl.vertPos_[i];
+    out.vertPos[3*i] = v.x;
+    out.vertPos[3*i + 1] = v.y;
+    out.vertPos[3*i + 2] = v.z;
+  }
+  out.vertNormal = std::make_unique<float[]>(3*numVert);
+  for(int i = 0; i < numVert; ++i) {
+    glm::vec3 v = impl.vertNormal_[i];
+    out.vertNormal[3*i] = v.x;
+    out.vertNormal[3*i + 1] = v.y;
+    out.vertNormal[3*i + 2] = v.z;
+  }
+  out.triVerts = std::make_unique<uint32_t[]>(3*numTri);
+  for(int i = 0; i < numTri * 3; ++i) {
+    out.triVerts[i] = impl.halfedge_[i].startVert;
   }
 
-  return (size_t)u;
+  return out;
 }
 
 int Manifold::circularSegments_ = 0;

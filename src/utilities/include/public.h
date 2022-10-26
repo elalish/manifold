@@ -167,6 +167,13 @@ struct Mesh {
   std::vector<glm::vec4> halfedgeTangent;
 };
 
+struct MeshGL {
+  int numVert, numTri;
+  std::unique_ptr<float[]> vertPos;
+  std::unique_ptr<float[]> vertNormal;
+  std::unique_ptr<uint32_t[]> triVerts;
+};
+
 /**
  * Defines which edges to sharpen and how much for the Manifold.Smooth()
  * constructor.

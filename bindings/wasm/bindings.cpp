@@ -164,6 +164,13 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .field("vertNormal", &Mesh::vertNormal)
       .field("halfedgeTangent", &Mesh::halfedgeTangent);
 
+  value_object<MeshGL>("MeshGL")
+      .field("numVert", &MeshGL::numVert)
+      .field("numTri", &MeshGL::numTri)
+      .field("vertPos", &MeshGL::vertPos)
+      .field("triVerts", &MeshGL::triVerts)
+      .field("vertNormal", &MeshGL::vertNormal);
+
   class_<Manifold>("Manifold")
       .constructor<Mesh>()
       .function("add", &Union)
