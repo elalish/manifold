@@ -13,8 +13,9 @@
 // limitations under the License.
 
 const expect = require('chai').expect;
+const wasm = require('../manifold.js');
 const examples = require('../examples/examples');
-
+const THREE = require('three');
 
 // manifold member functions that returns a new manifold
 const memberFunctions = [
@@ -32,7 +33,6 @@ const utils = [
 ];
 const exposedFunctions = constructors.concat(utils);
 
-const wasm = require('../manifold.js');
 wasm().then(function (Module) {
   Module.setup();
   // Setup memory management, such that users don't have to care about
@@ -75,8 +75,8 @@ wasm().then(function (Module) {
   function runExample(name) {
     try {
       const content = examples.functionBodies.get(name) + '\nreturn result;\n';;
-      const f = new Function(...exposedFunctions, content);
-      const manifold = f(...exposedFunctions.map(name => Module[name]));
+      const f = new Function(...exposedFunctions, 'THREE', content);
+      const manifold = f(...exposedFunctions.map(name => Module[name]), THREE);
       const prop = manifold.getProperties();
       const genus = manifold.genus();
       return { ...prop, genus };
@@ -121,12 +121,11 @@ wasm().then(function (Module) {
       expect(result.surfaceArea).to.be.closeTo(7810, 1, 'Surface Area');
     });
 
-    // This example uses Three.js
-    test.skip('Torus Knot', () => {
+    test('Torus Knot', () => {
       const result = runExample('Torus Knot');
       expect(result.genus).to.equal(1, 'Genus');
-      expect(result.volume).to.be.closeTo(20, 0.1, 'Volume');
-      expect(result.surfaceArea).to.be.closeTo(62046, 1, 'Surface Area');
+      expect(result.volume).to.be.closeTo(20960, 1, 'Volume');
+      expect(result.surfaceArea).to.be.closeTo(11202, 1, 'Surface Area');
     });
 
     test('Menger Sponge', () => {
