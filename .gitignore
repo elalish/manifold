@@ -108,5 +108,6 @@ Temporary Items
 build
 buildWASM
 docs/html
+node_modules/
 __pycache__
 .vscode/c_cpp_properties.json
