@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+const exampleFunctions = examples.functionBodies;
+
 let editor = undefined;
 
 // File UI ------------------------------------------------------------
@@ -53,7 +55,7 @@ function nthKey(n) {
 function saveCurrent() {
   if (editor) {
     const currentName = currentElement.textContent;
-    if (!examples.get(currentName)) {
+    if (!exampleFunctions.get(currentName)) {
       setScript(currentName, editor.getValue());
     }
   }
@@ -69,8 +71,8 @@ function switchTo(scriptName) {
     switching = true;
     currentElement.textContent = scriptName;
     setScript('currentName', scriptName);
-    const code = examples.get(scriptName) ?? getScript(scriptName) ?? '';
-    isExample = examples.get(scriptName) != null;
+    const code = exampleFunctions.get(scriptName) ?? getScript(scriptName) ?? '';
+    isExample = exampleFunctions.get(scriptName) != null;
     editor.setValue(code);
   }
 }
@@ -103,7 +105,7 @@ function addIcon(button) {
 function uniqueName(name) {
   let num = 1;
   let newName = name;
-  while (getScript(newName) != null || examples.get(newName) != null) {
+  while (getScript(newName) != null || exampleFunctions.get(newName) != null) {
     newName = name + ' ' + num++;
   }
   return newName;
@@ -214,7 +216,7 @@ require(['vs/editor/editor.main'], async function () {
   const w = await monaco.languages.typescript.getTypeScriptWorker();
   tsWorker = await w(editor.getModel().uri);
 
-  for (const [name] of examples) {
+  for (const [name] of exampleFunctions) {
     const button = createDropdownItem(name);
     dropdown.appendChild(button.parentElement);
   }
