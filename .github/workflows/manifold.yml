@@ -95,7 +95,6 @@ jobs:
         emcmake cmake -DCMAKE_BUILD_TYPE=Release .. && emmake make
     - name: Test WASM
       run: |
-        mv build/bindings/wasm/manifold.* bindings/wasm/
         cd build/test
         node ./manifold_test.js
         cd ../bindings/wasm
@@ -106,9 +105,9 @@ jobs:
       with:
         name: wasm
         path: |
-          bindings/wasm/manifold.js
-          bindings/wasm/manifold.wasm
-          bindings/wasm/manifold.d.ts
+          build/bindings/wasm/manifold.js
+          build/bindings/wasm/manifold.wasm
+          build/bindings/wasm/manifold.d.ts
         retention-days: 7
 
   build_windows:
