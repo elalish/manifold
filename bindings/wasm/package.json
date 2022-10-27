@@ -34,7 +34,7 @@
   },
   "homepage": "https://github.com/elalish/manifold#readme",
   "scripts": {
-    "test": "mocha -u tdd"
+    "test": "mocha -u tdd -t 30000"
   },
   "devDependencies": {
     "chai": "*",

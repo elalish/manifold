@@ -80,8 +80,6 @@ wasm().then(function (Module) {
       const prop = manifold.getProperties();
       const genus = manifold.genus();
       return { ...prop, genus };
-    } catch (error) {
-      console.log(error.toString());
     } finally {
       Module.cleanup();
     }
@@ -100,6 +98,56 @@ wasm().then(function (Module) {
       expect(result.genus).to.equal(0, 'Genus');
       expect(result.volume).to.be.closeTo(7297, 1, 'Volume');
       expect(result.surfaceArea).to.be.closeTo(3303, 1, 'Surface Area');
+    });
+
+    test('Rounded Frame', () => {
+      const result = runExample('Rounded Frame');
+      expect(result.genus).to.equal(5, 'Genus');
+      expect(result.volume).to.be.closeTo(353706, 1, 'Volume');
+      expect(result.surfaceArea).to.be.closeTo(68454, 1, 'Surface Area');
+    });
+
+    test('Heart', () => {
+      const result = runExample('Heart');
+      expect(result.genus).to.equal(0, 'Genus');
+      expect(result.volume).to.be.closeTo(282743, 1, 'Volume');
+      expect(result.surfaceArea).to.be.closeTo(22187, 1, 'Surface Area');
+    });
+
+    test('Scallop', () => {
+      const result = runExample('Scallop');
+      expect(result.genus).to.equal(0, 'Genus');
+      expect(result.volume).to.be.closeTo(41284, 1, 'Volume');
+      expect(result.surfaceArea).to.be.closeTo(7810, 1, 'Surface Area');
+    });
+
+    // This example uses Three.js
+    test.skip('Torus Knot', () => {
+      const result = runExample('Torus Knot');
+      expect(result.genus).to.equal(1, 'Genus');
+      expect(result.volume).to.be.closeTo(20, 0.1, 'Volume');
+      expect(result.surfaceArea).to.be.closeTo(62046, 1, 'Surface Area');
+    });
+
+    test('Menger Sponge', () => {
+      const result = runExample('Menger Sponge');
+      expect(result.genus).to.equal(1409, 'Genus');
+      expect(result.volume).to.be.closeTo(406457, 1, 'Volume');
+      expect(result.surfaceArea).to.be.closeTo(247590, 1, 'Surface Area');
+    });
+
+    test('Stretchy Bracelet', () => {
+      const result = runExample('Stretchy Bracelet');
+      expect(result.genus).to.equal(1, 'Genus');
+      expect(result.volume).to.be.closeTo(3992, 1, 'Volume');
+      expect(result.surfaceArea).to.be.closeTo(22267, 1, 'Surface Area');
+    });
+
+    test('Gyroid Module', () => {
+      const result = runExample('Gyroid Module');
+      expect(result.genus).to.equal(15, 'Genus');
+      expect(result.volume).to.be.closeTo(4167, 1, 'Volume');
+      expect(result.surfaceArea).to.be.closeTo(5642, 1, 'Surface Area');
     });
   });
 });
