@@ -57,6 +57,10 @@ type MeshRelation = {
 
 declare class Manifold {
   /**
+   * Create a Manifold from a Mesh object.
+   */
+  constructor(mesh: Mesh);
+  /**
    * Transform this Manifold in space. The first three columns form a 3x3 matrix
    * transform and the last is a translation vector. This operation can be
    * chained. Transforms are combined and applied lazily.
@@ -424,6 +428,8 @@ declare interface ManifoldStatic {
   setMinCircularEdgeLength: typeof setMinCircularEdgeLength;
   setCircularSegments: typeof setCircularSegments;
   getCircularSegments: typeof getCircularSegments;
+  Manifold: typeof Manifold;
+  setup: function(): void;
 }
 
-declare const Module: ManifoldStatic;
+declare function Module(): Promise<ManifoldStatic>;
