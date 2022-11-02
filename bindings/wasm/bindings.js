@@ -18,7 +18,7 @@ Module.setup = function () {
   _ManifoldInitialized = true;
 
   function toVec(vec, list, f = x => x) {
-    if (list != null) {
+    if (list) {
       for (let x of list) {
         vec.push_back(f(x));
       }
@@ -189,6 +189,63 @@ Module.setup = function () {
       max: ['x', 'y', 'z'].map(f => result.max[f]),
     };
   };
+
+  Module.ManifoldError = function ManifoldError(code, ...args) {
+    let message = 'Unknown error';
+    switch (code) {
+      case Module.status.NON_FINITE_VERTEX.value:
+        message = 'Non-infinite vertex';
+        break;
+      case Module.status.NOT_MANIFOLD.value:
+        message = 'Not manifold';
+        break;
+      case Module.status.VERTEX_INDEX_OUT_OF_BOUNDS.value:
+        message = 'Vertex index out of bounds';
+        break;
+      case Module.status.PROPERTIES_WRONG_LENGTH.value:
+        message = 'Properties have wrong length';
+        break;
+      case Module.status.TRI_PROPERTIES_WRONG_LENGTH.value:
+        message = 'Tri properties have wrong length';
+        break;
+      case Module.status.TRI_PROPERTIES_OUT_OF_BOUNDS.value:
+        message = 'Tri properties out of bounds';
+    }
+
+    const base = Error.apply(this, [message, ...args]);
+    base.name = this.name = 'ManifoldError';
+    this.message = base.message;
+    this.stack = base.stack;
+    this.code = code;
+  }
+
+  Module.ManifoldError.prototype = Object.create(Error.prototype, {
+    constructor: {
+      value: Module.ManifoldError,
+      writable: true,
+      configurable: true
+    }
+  });
+
+  const ManifoldCtor = Module.Manifold;
+  Module.ManifoldFromMeshVec = function(meshVec) {
+    const manifold = new ManifoldCtor(meshVec);
+
+    const status = manifold.status();
+    if (status.value !== 0) {
+      throw new Module.ManifoldError(status.value);
+    }
+
+    return manifold;
+  }
+
+  Module.Manifold = function Manifold(mesh) {
+    const meshVec = mesh2vec(mesh);
+    const manifold = Module.ManifoldFromMeshVec(meshVec);
+    disposeMesh(meshVec);
+    return manifold;
+  }
+  Module.Manifold.prototype = Object.create(ManifoldCtor.prototype);
 
   Module.cube = function (...args) {
     let size = undefined;
