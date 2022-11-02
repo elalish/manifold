@@ -166,17 +166,18 @@ Module.setup = function () {
     const result = this._getMeshRelation();
     const oldBarycentric = result.barycentric;
     const oldTriBary = result.triBary;
-    const conversion1 = v => ['x', 'y', 'z'].map(f => v[f]);
-    const conversion2 = v => {
+    const conversion1 = v => [v.x, v.y, v.z];
+    const conversion2 = v => [v[0], v[1], v[2]];
+    const conversion3 = v => {
       return {
         meshID: v.meshID,
         originalID: v.originalID,
         tri: v.tri,
-        vertBary: conversion1(v.vertBary)
+        vertBary: conversion2(v.vertBary)
       };
     };
     result.barycentric = fromVec(oldBarycentric, conversion1);
-    result.triBary = fromVec(oldTriBary, conversion2);
+    result.triBary = fromVec(oldTriBary, conversion3);
     oldBarycentric.delete();
     oldTriBary.delete();
     return result;
