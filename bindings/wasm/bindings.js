@@ -194,7 +194,7 @@ Module.setup = function () {
     let message = 'Unknown error';
     switch (code) {
       case Module.status.NON_FINITE_VERTEX.value:
-        message = 'Non-infinite vertex';
+        message = 'Non-finite vertex';
         break;
       case Module.status.NOT_MANIFOLD.value:
         message = 'Not manifold';
