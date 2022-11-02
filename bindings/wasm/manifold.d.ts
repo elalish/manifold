@@ -412,6 +412,7 @@ declare interface ManifoldStatic {
   cube: typeof cube;
   cylinder: typeof cylinder;
   sphere: typeof sphere;
+  smooth: typeof smooth;
   tetrahedron: typeof tetrahedron;
   extrude: typeof extrude;
   revolve: typeof revolve;
