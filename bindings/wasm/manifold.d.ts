@@ -24,6 +24,32 @@ type Mesh = {
   vertNormal?: Vec3[],
   halfedgeTangent?: Vec4[]
 };
+type SerializedVec3 = {
+  x: number,
+  y: number,
+  z: number,
+};
+type SerializedVec4 = {
+  x: number,
+  y: number,
+  z: number,
+  w: number,
+};
+interface Vector<T> {
+  get(idx: number): T;
+  push_back(value: T): void;
+  resize(count: number, value: T): void;
+  set(idx: number, value: T): void;
+  size(): number;
+}
+class Vector_vec3 implements Vector<SerializedVec3>{};
+class Vector_vec4 implements Vector<SerializedVec4>{};
+type MeshVec = {
+  vertPos: Vector_vec3,
+  triVerts: Vector_vec3,
+  vertNormal: Vector_vec3,
+  halfedgeTangent: Vector_vec4
+};
 type Box = {
   min: Vec3,
   max: Vec3
@@ -56,6 +82,10 @@ type MeshRelation = {
 };
 
 declare class Manifold {
+  /**
+   * Create a Manifold from a Mesh object.
+   */
+  constructor(mesh: Mesh);
   /**
    * Transform this Manifold in space. The first three columns form a 3x3 matrix
    * transform and the last is a translation vector. This operation can be
@@ -408,6 +438,14 @@ declare function setCircularSegments(segments: number): void;
 declare function getCircularSegments(radius: number): number;
 ///@}
 
+/**
+ * Create a Manifold from a serialized Mesh object (MeshVec). Unlike the
+ * constructor, this method does not dispose the Mesh after using it.
+ *
+ * @param meshVec The serialized Mesh object to convert into a Manifold.
+ */
+declare function ManifoldFromMeshVec(meshVec: MeshVec): Manifold;
+
 declare interface ManifoldStatic {
   cube: typeof cube;
   cylinder: typeof cylinder;
@@ -425,6 +463,11 @@ declare interface ManifoldStatic {
   setMinCircularEdgeLength: typeof setMinCircularEdgeLength;
   setCircularSegments: typeof setCircularSegments;
   getCircularSegments: typeof getCircularSegments;
+  ManifoldFromMeshVec: typeof ManifoldFromMeshVec;
+  Manifold: typeof Manifold;
+  Vector_vec3: typeof Vector_vec3;
+  Vector_vec4: typeof Vector_vec4;
+  setup: function(): void;
 }
 
-declare const Module: ManifoldStatic;
+declare function Module(): Promise<ManifoldStatic>;

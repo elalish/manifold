@@ -18,7 +18,7 @@ Module.setup = function() {
   _ManifoldInitialized = true;
 
   function toVec(vec, list, f = x => x) {
-    if (list != null) {
+    if (list) {
       for (let x of list) {
         vec.push_back(f(x));
       }
@@ -172,17 +172,18 @@ Module.setup = function() {
     const result = this._getMeshRelation();
     const oldBarycentric = result.barycentric;
     const oldTriBary = result.triBary;
-    const conversion1 = v => ['x', 'y', 'z'].map(f => v[f]);
-    const conversion2 = v => {
+    const conversion1 = v => [v.x, v.y, v.z];
+    const conversion2 = v => [v[0], v[1], v[2]];
+    const conversion3 = v => {
       return {
         meshID: v.meshID,
         originalID: v.originalID,
         tri: v.tri,
-        vertBary: conversion1(v.vertBary)
+        vertBary: conversion2(v.vertBary)
       };
     };
     result.barycentric = fromVec(oldBarycentric, conversion1);
-    result.triBary = fromVec(oldTriBary, conversion2);
+    result.triBary = fromVec(oldTriBary, conversion3);
     oldBarycentric.delete();
     oldTriBary.delete();
     return result;
@@ -195,6 +196,61 @@ Module.setup = function() {
       max: ['x', 'y', 'z'].map(f => result.max[f]),
     };
   };
+
+  Module.ManifoldError = function ManifoldError(code, ...args) {
+    let message = 'Unknown error';
+    switch (code) {
+      case Module.status.NON_FINITE_VERTEX.value:
+        message = 'Non-finite vertex';
+        break;
+      case Module.status.NOT_MANIFOLD.value:
+        message = 'Not manifold';
+        break;
+      case Module.status.VERTEX_INDEX_OUT_OF_BOUNDS.value:
+        message = 'Vertex index out of bounds';
+        break;
+      case Module.status.PROPERTIES_WRONG_LENGTH.value:
+        message = 'Properties have wrong length';
+        break;
+      case Module.status.TRI_PROPERTIES_WRONG_LENGTH.value:
+        message = 'Tri properties have wrong length';
+        break;
+      case Module.status.TRI_PROPERTIES_OUT_OF_BOUNDS.value:
+        message = 'Tri properties out of bounds';
+    }
+
+    const base = Error.apply(this, [message, ...args]);
+    base.name = this.name = 'ManifoldError';
+    this.message = base.message;
+    this.stack = base.stack;
+    this.code = code;
+  };
+
+  Module.ManifoldError.prototype = Object.create(Error.prototype, {
+    constructor:
+        {value: Module.ManifoldError, writable: true, configurable: true}
+  });
+
+  const ManifoldCtor = Module.Manifold;
+  Module.ManifoldFromMeshVec = function(meshVec) {
+    const manifold = new ManifoldCtor(meshVec);
+
+    const status = manifold.status();
+    if (status.value !== 0) {
+      throw new Module.ManifoldError(status.value);
+    }
+
+    return manifold;
+  };
+
+  Module.Manifold = function Manifold(mesh) {
+    const meshVec = mesh2vec(mesh);
+    const manifold = Module.ManifoldFromMeshVec(meshVec);
+    disposeMesh(meshVec);
+    return manifold;
+  };
+
+  Module.Manifold.prototype = Object.create(ManifoldCtor.prototype);
 
   Module.cube = function(...args) {
     let size = undefined;
