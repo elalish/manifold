@@ -178,7 +178,6 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .function("_Scale", &Manifold::Scale)
       .function("_Decompose", &Manifold::Decompose)
       .function("isEmpty", &Manifold::IsEmpty)
-      .function("isManifold", &Manifold::IsEmpty)
       .function("status", &Manifold::Status)
       .function("numVert", &Manifold::NumVert)
       .function("numEdge", &Manifold::NumEdge)
