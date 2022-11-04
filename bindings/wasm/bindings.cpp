@@ -178,7 +178,7 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .function("subtract", &Difference)
       .function("intersect", &Intersection)
       .function("_GetMesh", &Manifold::GetMesh)
-      .function("_GetMeshDirect", &Manifold::GetMeshDirect)
+      .function("_GetMeshGL", &Manifold::GetMeshGL)
       .function("refine", &Manifold::Refine)
       .function("_Warp", &Warp)
       .function("_Transform", &Transform)
