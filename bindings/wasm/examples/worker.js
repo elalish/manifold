@@ -12,6 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+const threePath = 'https://cdn.jsdelivr.net/npm/three@0.144.0/';
+importScripts('manifold.js', threePath + 'build/three.js', threePath + 'examples/js/exporters/GLTFExporter.js');
+
 // manifold member functions that returns a new manifold
 const memberFunctions = [
   'add', 'subtract', 'intersect', 'refine', 'transform', 'translate', 'rotate',
@@ -28,52 +31,49 @@ const utils = [
 ];
 const exposedFunctions = constructors.concat(utils);
 
-var Module = {
-  onRuntimeInitialized: function () {
-    Module.setup();
-    // Setup memory management, such that users don't have to care about
-    // calling `delete` manually.
-    // Note that this only fixes memory leak across different runs: the memory
-    // will only be freed when the compilation finishes.
+let wasm;
+Module().then(function (tmp) {
+  wasm = tmp;
+  wasm.setup();
+  // Setup memory management, such that users don't have to care about
+  // calling `delete` manually.
+  // Note that this only fixes memory leak across different runs: the memory
+  // will only be freed when the compilation finishes.
 
-    let manifoldRegistry = [];
-    for (const name of memberFunctions) {
-      const originalFn = Module.Manifold.prototype[name];
-      Module.Manifold.prototype["_" + name] = originalFn;
-      Module.Manifold.prototype[name] = function (...args) {
-        const result = this["_" + name](...args);
-        manifoldRegistry.push(result);
-        return result;
-      }
+  let manifoldRegistry = [];
+  for (const name of memberFunctions) {
+    const originalFn = wasm.Manifold.prototype[name];
+    wasm.Manifold.prototype["_" + name] = originalFn;
+    wasm.Manifold.prototype[name] = function (...args) {
+      const result = this["_" + name](...args);
+      manifoldRegistry.push(result);
+      return result;
     }
-
-    for (const name of constructors) {
-      const originalFn = Module[name];
-      Module[name] = function (...args) {
-        const result = originalFn(...args);
-        manifoldRegistry.push(result);
-        return result;
-      }
-    }
-
-    Module.cleanup = function () {
-      for (const obj of manifoldRegistry) {
-        // decompose result is an array of manifolds
-        if (obj instanceof Array)
-          for (const elem of obj)
-            elem.delete();
-        else
-          obj.delete();
-      }
-      manifoldRegistry = [];
-    }
-
-    postMessage(null);
   }
-};
 
-const threePath = 'https://cdn.jsdelivr.net/npm/three@0.144.0/';
-importScripts('manifold.js', threePath + 'build/three.js', threePath + 'examples/js/exporters/GLTFExporter.js');
+  for (const name of constructors) {
+    const originalFn = wasm[name];
+    wasm[name] = function (...args) {
+      const result = originalFn(...args);
+      manifoldRegistry.push(result);
+      return result;
+    }
+  }
+
+  wasm.cleanup = function () {
+    for (const obj of manifoldRegistry) {
+      // decompose result is an array of manifolds
+      if (obj instanceof Array)
+        for (const elem of obj)
+          elem.delete();
+      else
+        obj.delete();
+    }
+    manifoldRegistry = [];
+  }
+
+  postMessage(null);
+});
 
 const oldLog = console.log;
 console.log = function (...args) {
@@ -93,12 +93,12 @@ onmessage = (e) => {
   const content = e.data + '\nexportGLB(result);\n';
   try {
     const f = new Function(...exposedFunctions, content);
-    f(...exposedFunctions.map(name => Module[name]));
+    f(...exposedFunctions.map(name => wasm[name]));
   } catch (error) {
     console.log(error.toString());
     postMessage({ objectURL: null });
   } finally {
-    Module.cleanup();
+    wasm.cleanup();
   }
 }
 

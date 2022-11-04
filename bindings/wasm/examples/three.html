@@ -49,59 +49,59 @@
 
 <script src="https://unpkg.com/three@0.142.0/build/three.js"></script>
 <script src="https://unpkg.com/three@0.142.0/examples/js/utils/BufferGeometryUtils.js"></script>
+<script src="manifold.js"></script>
 <script>
-  var Module = {
-    onRuntimeInitialized: function () {
-      // we have manifold module, let's do some three.js
-      const camera = new THREE.PerspectiveCamera(30, 1, 0.01, 10);
-      camera.position.z = 1;
+  let wasm;
+  Module().then(function (tmp) {
+    wasm = tmp;
+    // we have manifold module, let's do some three.js
+    const camera = new THREE.PerspectiveCamera(30, 1, 0.01, 10);
+    camera.position.z = 1;
 
-      Module.setup();
-      const scene = new THREE.Scene();
-      const mesh = new THREE.Mesh(undefined, new THREE.MeshNormalMaterial({
-        flatShading: true
-      }));
-      scene.add(mesh);
+    wasm.setup();
+    const scene = new THREE.Scene();
+    const mesh = new THREE.Mesh(undefined, new THREE.MeshNormalMaterial({
+      flatShading: true
+    }));
+    scene.add(mesh);
 
-      const icosahedron = simplify(new THREE.IcosahedronGeometry(0.16));
+    const icosahedron = simplify(new THREE.IcosahedronGeometry(0.16));
 
-      const manifold_1 = Module.cube(0.2, 0.2, 0.2, true);
-      // const manifold_1 = Module
-      //   .revolve([[[0.1, 0.1], [0.2, 0.1], [0.1, 0.2]]], 64)
-      //   .translate(0, 0, -0.1);
-      const manifold_2 = new Module.Manifold(geometry2mesh(icosahedron));
+    const manifold_1 = wasm.cube(0.2, 0.2, 0.2, true);
+    // const manifold_1 = wasm
+    //   .revolve([[[0.1, 0.1], [0.2, 0.1], [0.1, 0.2]]], 64)
+    //   .translate(0, 0, -0.1);
+    const manifold_2 = new wasm.Manifold(geometry2mesh(icosahedron));
 
-      const csg = function (operation) {
-        mesh.geometry?.dispose();
-        mesh.geometry = mesh2geometry(Module[operation](manifold_1, manifold_2).getMesh());
-      };
+    const csg = function (operation) {
+      mesh.geometry?.dispose();
+      mesh.geometry = mesh2geometry(wasm[operation](manifold_1, manifold_2).getMesh());
+    };
 
-      document.querySelector('select').onchange = function (event) {
-        csg(event.target.value);
-      };
+    document.querySelector('select').onchange = function (event) {
+      csg(event.target.value);
+    };
 
-      csg('difference');
+    csg('difference');
 
-      const output = document.querySelector("#output");
-      const renderer = new THREE.WebGLRenderer({ canvas: output, antialias: true });
-      const dim = output.getBoundingClientRect();
-      renderer.setSize(dim.width, dim.height);
-      renderer.setAnimationLoop(function (time) {
-        mesh.rotation.x = time / 2000;
-        mesh.rotation.y = time / 1000;
-        renderer.render(scene, camera);
-      });
-
-    }
-  };
+    const output = document.querySelector("#output");
+    const renderer = new THREE.WebGLRenderer({ canvas: output, antialias: true });
+    const dim = output.getBoundingClientRect();
+    renderer.setSize(dim.width, dim.height);
+    renderer.setAnimationLoop(function (time) {
+      mesh.rotation.x = time / 2000;
+      mesh.rotation.y = time / 1000;
+      renderer.render(scene, camera);
+    });
+  });
 
   // functions to convert between three.js and wasm
   function geometry2mesh(geometry) {
     const mesh = {
-      vertPos: new Module.Vector_vec3(),
-      vertNormal: new Module.Vector_vec3(),
-      triVerts: new Module.Vector_ivec3(),
-      halfedgeTangent: new Module.Vector_vec4()
+      vertPos: new wasm.Vector_vec3(),
+      vertNormal: new wasm.Vector_vec3(),
+      triVerts: new wasm.Vector_ivec3(),
+      halfedgeTangent: new wasm.Vector_vec4()
     };
     const temp = new THREE.Vector3();
     const p = geometry.attributes.position;
@@ -162,6 +162,5 @@
     return simplified;
   }
 </script>
-<script src="manifold.js"></script>
 
 </html>
