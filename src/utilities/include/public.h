@@ -167,11 +167,25 @@ struct Mesh {
   std::vector<glm::vec4> halfedgeTangent;
 };
 
-struct MeshGL {
-  int numVert, numTri;
-  std::unique_ptr<float[]> vertPos;
-  std::unique_ptr<float[]> vertNormal;
-  std::unique_ptr<uint32_t[]> triVerts;
+class MeshGL {
+ public:
+  MeshGL(int _numVert, int _numTri)
+      : numVert(_numVert),
+        numTri(_numTri),
+        vertPos_(std::make_unique<float[]>(3 * _numVert)),
+        vertNormal_(std::make_unique<float[]>(3 * _numVert)),
+        triVerts_(std::make_unique<uint32_t[]>(3 * _numTri)) {}
+
+  float* vertPos() const { return this->vertPos_.get(); }
+  float* vertNormal() const { return this->vertNormal_.get(); }
+  uint32_t* triVerts() const { return this->triVerts_.get(); }
+
+  const int numVert, numTri;
+
+ private:
+  std::unique_ptr<float[]> vertPos_;
+  std::unique_ptr<float[]> vertNormal_;
+  std::unique_ptr<uint32_t[]> triVerts_;
 };
 
 /**

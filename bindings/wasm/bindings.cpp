@@ -164,12 +164,13 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .field("vertNormal", &Mesh::vertNormal)
       .field("halfedgeTangent", &Mesh::halfedgeTangent);
 
-  value_object<MeshGL>("MeshGL")
-      .field("numVert", &MeshGL::numVert)
-      .field("numTri", &MeshGL::numTri)
-      .field("vertPos", &MeshGL::vertPos)
-      .field("triVerts", &MeshGL::triVerts)
-      .field("vertNormal", &MeshGL::vertNormal);
+  class_<MeshGL>("MeshGL")
+      .constructor<int, int>()
+      .property("numVert", &MeshGL::numVert)
+      .property("numTri", &MeshGL::numTri)
+      .function("vertPos", &MeshGL::vertPos, allow_raw_pointers())
+      .function("triVerts", &MeshGL::triVerts, allow_raw_pointers())
+      .function("vertNormal", &MeshGL::vertNormal, allow_raw_pointers());
 
   class_<Manifold>("Manifold")
       .constructor<Mesh>()
