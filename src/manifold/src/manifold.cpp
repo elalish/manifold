@@ -138,6 +138,32 @@ Mesh Manifold::GetMesh() const {
   return result;
 }
 
+MeshGL Manifold::GetMeshGL() const {
+  const Impl& impl = *GetCsgLeafNode().GetImpl();
+
+  int numVert = NumVert();
+  int numTri = NumTri();
+
+  MeshGL out(numVert, numTri);
+  for (int i = 0; i < numVert; ++i) {
+    glm::vec3 v = impl.vertPos_[i];
+    out.vertPos()[3 * i] = v.x;
+    out.vertPos()[3 * i + 1] = v.y;
+    out.vertPos()[3 * i + 2] = v.z;
+  }
+  for (int i = 0; i < numVert; ++i) {
+    glm::vec3 v = impl.vertNormal_[i];
+    out.vertNormal()[3 * i] = v.x;
+    out.vertNormal()[3 * i + 1] = v.y;
+    out.vertNormal()[3 * i + 2] = v.z;
+  }
+  for (int i = 0; i < numTri * 3; ++i) {
+    out.triVerts()[i] = impl.halfedge_[i].startVert;
+  }
+
+  return out;
+}
+
 int Manifold::circularSegments_ = 0;
 float Manifold::circularAngle_ = 10.0f;
 float Manifold::circularEdgeLength_ = 1.0f;
