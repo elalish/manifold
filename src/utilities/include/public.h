@@ -20,6 +20,7 @@
 #include <glm/gtx/compatibility.hpp>
 #include <glm/gtx/rotate_vector.hpp>
 #include <limits>
+#include <memory>
 #include <unordered_map>
 #include <vector>
 
@@ -165,6 +166,36 @@ struct Mesh {
   /// as 3 * tri + i, representing the tangent from Mesh.triVerts[tri][i] along
   /// the CCW edge. If empty, mesh is faceted.
   std::vector<glm::vec4> halfedgeTangent;
+};
+
+/**
+ * An alternative to Mesh for output suitable for pushing into graphics
+ * libraries directly.
+ */
+class MeshGL {
+ public:
+  MeshGL(int _numVert, int _numTri)
+      : numVert(_numVert),
+        numTri(_numTri),
+        vertPos_(std::make_unique<float[]>(3 * _numVert)),
+        vertNormal_(std::make_unique<float[]>(3 * _numVert)),
+        triVerts_(std::make_unique<uint32_t[]>(3 * _numTri)) {}
+
+  /// A flat buffer of positions, length 3 * numVert [x, y, z, x, y, z, ...].
+  float* vertPos() const { return this->vertPos_.get(); }
+  /// A flat buffer of normals, length 3 * numVert [x, y, z, x, y, z, ...].
+  float* vertNormal() const { return this->vertNormal_.get(); }
+  /// A flat buffer of verts, length 3 * numTri [0, 1, 2, 0, 1, 2, ...].
+  uint32_t* triVerts() const { return this->triVerts_.get(); }
+  /// Number of vertices
+  const int numVert;
+  /// Number of triangles
+  const int numTri;
+
+ private:
+  std::unique_ptr<float[]> vertPos_;
+  std::unique_ptr<float[]> vertNormal_;
+  std::unique_ptr<uint32_t[]> triVerts_;
 };
 
 /**

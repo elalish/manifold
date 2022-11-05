@@ -188,6 +188,24 @@ TEST(Manifold, GetMesh) {
   Identical(mesh_out, mesh_out2);
 }
 
+TEST(Manifold, GetMeshGL) {
+  Manifold manifold = Manifold::Sphere(1);
+  Mesh mesh_out = manifold.GetMesh();
+  MeshGL meshGL_out = manifold.GetMeshGL();
+  ASSERT_EQ(meshGL_out.numVert, mesh_out.vertPos.size());
+  ASSERT_EQ(meshGL_out.numTri, mesh_out.triVerts.size());
+  for (int i = 0; i < meshGL_out.numVert; ++i) {
+    for (const int j : {0, 1, 2}) {
+      ASSERT_EQ(meshGL_out.vertPos()[3 * i + j], mesh_out.vertPos[i][j]);
+      ASSERT_EQ(meshGL_out.vertNormal()[3 * i + j], mesh_out.vertNormal[i][j]);
+    }
+  }
+  for (int i = 0; i < meshGL_out.numTri; ++i) {
+    for (const int j : {0, 1, 2})
+      ASSERT_EQ(meshGL_out.triVerts()[3 * i + j], mesh_out.triVerts[i][j]);
+  }
+}
+
 TEST(Manifold, Empty) {
   Mesh emptyMesh;
   Manifold empty(emptyMesh);
