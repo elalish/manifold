@@ -23,7 +23,7 @@ namespace manifold {
  *
  * @param edgeLength Distance between the corners.
  * @param radius Radius of the frame members.
- * @param circularSegments Number of segements in the cylinders and spheres.
+ * @param circularSegments Number of segments in the cylinders and spheres.
  * Defaults to Manifold.GetCircularSegments().
  */
 Manifold RoundedFrame(float edgeLength, float radius, int circularSegments) {

@@ -107,7 +107,7 @@ __host__ __device__ Uint64 SpreadBits3(Uint64 v) {
   return v;
 }
 
-__host__ __device__ Uint64 SqeezeBits3(Uint64 v) {
+__host__ __device__ Uint64 SqueezeBits3(Uint64 v) {
   v = v & 0x1249249249249249;
   v = (v ^ v >> 2) & 0x10c30c30c30c30c3;
   v = (v ^ v >> 4) & 0x100f00f00f00f00f;
@@ -127,9 +127,9 @@ __host__ __device__ Uint64 MortonCode(const glm::ivec4& index) {
 
 __host__ __device__ glm::ivec4 DecodeMorton(Uint64 code) {
   glm::ivec4 index;
-  index.x = SqeezeBits3(code >> 1);
-  index.y = SqeezeBits3(code >> 2);
-  index.z = SqeezeBits3(code >> 3);
+  index.x = SqueezeBits3(code >> 1);
+  index.y = SqueezeBits3(code >> 2);
+  index.z = SqueezeBits3(code >> 3);
   index.w = code & 0x1u;
   return index;
 }
@@ -385,7 +385,7 @@ namespace manifold {
  * it with a negative value.
  * @return Mesh This class does not depend on Manifold, so it just returns a
  * Mesh, but it is guaranteed to be manifold and so can always be used as
- * input to the Manifold contructor for further operations.
+ * input to the Manifold constructor for further operations.
  */
 template <typename Func>
 inline Mesh LevelSet(Func sdf, Box bounds, float edgeLength, float level = 0) {

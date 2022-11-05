@@ -159,7 +159,7 @@ struct CreateRadixTree {
 
 template <typename T, const bool allocateOnly>
 struct FindCollisions {
-  thrust::pair<int*, int*> querryTri_;
+  thrust::pair<int*, int*> queryTri_;
   int* counts;
   const Box* nodeBBox_;
   const thrust::pair<int, int>* internalChildren_;
@@ -176,8 +176,8 @@ struct FindCollisions {
         count++;
       } else {
         int pos = count++;
-        querryTri_.first[pos] = queryIdx;
-        querryTri_.second[pos] = Node2Leaf(node);
+        queryTri_.first[pos] = queryIdx;
+        queryTri_.second[pos] = Node2Leaf(node);
       }
     }
     return overlaps && IsInternal(node);  // Should traverse into node
@@ -264,32 +264,32 @@ Collider::Collider(const VecDH<Box>& leafBB,
 }
 
 /**
- * For a vector of querry objects, this returns a sparse array of overlaps
- * between the querries and the bounding boxes of the collider. Querries are
+ * For a vector of query objects, this returns a sparse array of overlaps
+ * between the queries and the bounding boxes of the collider. Queries are
  * normally axis-aligned bounding boxes. Points can also be used, and this case
  * overlaps are defined as lying in the XY projection of the bounding box.
  */
 template <typename T>
-SparseIndices Collider::Collisions(const VecDH<T>& querriesIn) const {
+SparseIndices Collider::Collisions(const VecDH<T>& queriesIn) const {
   // note that the length is 1 larger than the number of queries so the last
   // element can store the sum when using exclusive scan
-  VecDH<int> counts(querriesIn.size() + 1, 0);
-  auto policy = autoPolicy(querriesIn.size());
+  VecDH<int> counts(queriesIn.size() + 1, 0);
+  auto policy = autoPolicy(queriesIn.size());
   // compute the number of collisions to determine the size for allocation and
   // offset, this avoids the need for atomic
-  for_each_n(policy, zip(querriesIn.cbegin(), countAt(0)), querriesIn.size(),
+  for_each_n(policy, zip(queriesIn.cbegin(), countAt(0)), queriesIn.size(),
              FindCollisions<T, true>(
                  {thrust::pair<int*, int*>(nullptr, nullptr), counts.ptrD(),
                   nodeBBox_.ptrD(), internalChildren_.ptrD()}));
   // compute start index for each query and total count
   exclusive_scan(policy, counts.begin(), counts.end(), counts.begin());
-  SparseIndices querryTri(counts.back());
+  SparseIndices queryTri(counts.back());
   // actually recording collisions
   for_each_n(
-      policy, zip(querriesIn.cbegin(), countAt(0)), querriesIn.size(),
-      FindCollisions<T, false>({querryTri.ptrDpq(), counts.ptrD(),
+      policy, zip(queriesIn.cbegin(), countAt(0)), queriesIn.size(),
+      FindCollisions<T, false>({queryTri.ptrDpq(), counts.ptrD(),
                                 nodeBBox_.ptrD(), internalChildren_.ptrD()}));
-  return querryTri;
+  return queryTri;
 }
 
 /**
@@ -299,13 +299,13 @@ SparseIndices Collider::Collisions(const VecDH<T>& querriesIn) const {
 void Collider::UpdateBoxes(const VecDH<Box>& leafBB) {
   ASSERT(leafBB.size() == NumLeaves(), userErr,
          "must have the same number of updated boxes as original");
-  // copy in leaf node Boxs
+  // copy in leaf node Boxes
   strided_range<VecDH<Box>::Iter> leaves(nodeBBox_.begin(), nodeBBox_.end(), 2);
   auto policy = autoPolicy(NumInternal());
   copy(policy, leafBB.cbegin(), leafBB.cend(), leaves.begin());
   // create global counters
   VecDH<int> counter(NumInternal(), 0);
-  // kernel over leaves to save internal Boxs
+  // kernel over leaves to save internal Boxes
   for_each_n(
       policy, countAt(0), NumLeaves(),
       BuildInternalBoxes({nodeBBox_.ptrD(), counter.ptrD(), nodeParent_.ptrD(),

@@ -493,7 +493,7 @@ Manifold::Impl::MeshRelationD Manifold::Impl::Subdivide(int n) {
                      meshRelation_.triBary.ptrD(),
                      oldMeshRelation.barycentric.cptrD(), triVertStart, n,
                      halfedge_.ptrD()}));
-  // Create subtriangles
+  // Create sub-triangles
   VecDH<glm::ivec3> triVerts(n * n * numTri);
   for_each_n(policy, countAt(0), numTri,
              SplitTris({triVerts.ptrD(), halfedge_.cptrD(), half2Edge.cptrD(),
