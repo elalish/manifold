@@ -157,8 +157,9 @@ Module.setup = function() {
     const oldHalfedgeTangent = result.halfedgeTangent;
     const conversion1 = v => ['x', 'y', 'z'].map(f => v[f]);
     const conversion2 = v => ['x', 'y', 'z', 'w'].map(f => v[f]);
+    const conversion3 = v => [v[0], v[1], v[2]];
     result.vertPos = fromVec(oldVertPos, conversion1);
-    result.triVerts = fromVec(oldTriVerts);
+    result.triVerts = fromVec(oldTriVerts, conversion3);
     result.vertNormal = fromVec(oldVertNormal, conversion1);
     result.halfedgeTangent = fromVec(oldHalfedgeTangent, conversion2);
     oldVertPos.delete();
