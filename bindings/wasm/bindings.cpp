@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <emscripten/bind.h>
+#include <emscripten/val.h>
 
 using namespace emscripten;
 
@@ -53,6 +54,22 @@ std::vector<SimplePolygon> ToPolygon(
     simplePolygons[i] = {vertices};
   }
   return simplePolygons;
+}
+
+val GetMeshJS(const Manifold& manifold) {
+  MeshGL mesh = manifold.GetMeshGL();
+  val meshJS = val::object();
+
+  meshJS.set("triVerts",
+             val(typed_memory_view(3 * mesh.numTri, mesh.triVerts()))
+                 .call<val>("slice"));
+  meshJS.set("vertPos", val(typed_memory_view(3 * mesh.numVert, mesh.vertPos()))
+                            .call<val>("slice"));
+  meshJS.set("vertNormal",
+             val(typed_memory_view(3 * mesh.numVert, mesh.vertNormal()))
+                 .call<val>("slice"));
+
+  return meshJS;
 }
 
 Manifold Extrude(std::vector<std::vector<glm::vec2>>& polygons, float height,
@@ -164,21 +181,12 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .field("vertNormal", &Mesh::vertNormal)
       .field("halfedgeTangent", &Mesh::halfedgeTangent);
 
-  class_<MeshGL>("MeshGL")
-      .constructor<int, int>()
-      .property("numVert", &MeshGL::numVert)
-      .property("numTri", &MeshGL::numTri)
-      .function("vertPos", &MeshGL::vertPos, allow_raw_pointers())
-      .function("triVerts", &MeshGL::triVerts, allow_raw_pointers())
-      .function("vertNormal", &MeshGL::vertNormal, allow_raw_pointers());
-
   class_<Manifold>("Manifold")
       .constructor<Mesh>()
       .function("add", &Union)
       .function("subtract", &Difference)
       .function("intersect", &Intersection)
-      .function("_GetMesh", &Manifold::GetMesh)
-      .function("_GetMeshGL", &Manifold::GetMeshGL)
+      .function("_GetMeshJS", &GetMeshJS)
       .function("refine", &Manifold::Refine)
       .function("_Warp", &Warp)
       .function("_Transform", &Transform)

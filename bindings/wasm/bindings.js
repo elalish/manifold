@@ -149,23 +149,36 @@ Module.setup = function() {
     return result;
   };
 
+  class Mesh {
+    constructor({triVerts, vertPos, vertNormal}) {
+      this.triVerts = triVerts;
+      this.vertPos = vertPos;
+      this.vertNormal = vertNormal;
+    }
+
+    get numTri() {
+      return result.triVerts.length / 3;
+    }
+
+    get numVert() {
+      return result.vertPos.length / 3;
+    }
+
+    verts(tri) {
+      return this.triVerts.subarray(3 * tri, 3 * (tri + 1));
+    }
+
+    position(vert) {
+      return this.vertPos.subarray(3 * vert, 3 * (vert + 1));
+    }
+
+    normal(vert) {
+      return this.vertNormal.subarray(3 * vert, 3 * (vert + 1));
+    }
+  }
+
   Module.Manifold.prototype.getMesh = function() {
-    const result = this._GetMesh();
-    const oldVertPos = result.vertPos;
-    const oldTriVerts = result.triVerts;
-    const oldVertNormal = result.vertNormal;
-    const oldHalfedgeTangent = result.halfedgeTangent;
-    const conversion1 = v => ['x', 'y', 'z'].map(f => v[f]);
-    const conversion2 = v => ['x', 'y', 'z', 'w'].map(f => v[f]);
-    result.vertPos = fromVec(oldVertPos, conversion1);
-    result.triVerts = fromVec(oldTriVerts);
-    result.vertNormal = fromVec(oldVertNormal, conversion1);
-    result.halfedgeTangent = fromVec(oldHalfedgeTangent, conversion2);
-    oldVertPos.delete();
-    oldTriVerts.delete();
-    oldVertNormal.delete();
-    oldHalfedgeTangent.delete();
-    return result;
+    return new Mesh(this._GetMeshJS());
   };
 
   Module.Manifold.prototype.getMeshRelation = function() {

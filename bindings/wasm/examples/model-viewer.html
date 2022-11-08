@@ -66,10 +66,7 @@
 
     const icosahedron = simplify(new THREE.IcosahedronGeometry(0.16));
     const manifold_1 = wasm.cube(0.2, 0.2, 0.2, true);
-    // const manifold_1 = wasm
-    //   .revolve([[[0.1, 0.1], [0.2, 0.1], [0.1, 0.2]]], 64)
-    //   .translate(0, 0, -0.1);
-    const manifold_2 = new wasm.Manifold(geometry2mesh(icosahedron));
+    const manifold_2 = new wasm.ManifoldFromMeshVec(geometry2mesh(icosahedron));
 
     const csg = function (operation) {
       mesh.geometry?.dispose();
@@ -128,29 +125,8 @@
 
   function mesh2geometry(mesh) {
     const geometry = new THREE.BufferGeometry();
-
-    const numVert = mesh.vertPos.length;
-    const vert = new Float32Array(3 * numVert);
-    for (let i = 0; i < numVert; i++) {
-      const v = mesh.vertPos[i];
-      const idx = 3 * i;
-      vert[idx] = v[0];
-      vert[idx + 1] = v[1];
-      vert[idx + 2] = v[2];
-    }
-
-    const numTri = mesh.triVerts.length;
-    const tri = new Uint32Array(3 * numTri);
-    for (let i = 0; i < numTri; i++) {
-      const v = mesh.triVerts[i];
-      const idx = 3 * i;
-      tri[idx] = v[0];
-      tri[idx + 1] = v[1];
-      tri[idx + 2] = v[2];
-    }
-
-    geometry.setAttribute('position', new THREE.BufferAttribute(vert, 3));
-    geometry.setIndex(new THREE.BufferAttribute(tri, 1));
+    geometry.setAttribute('position', new THREE.BufferAttribute(mesh.vertPos, 3));
+    geometry.setIndex(new THREE.BufferAttribute(mesh.triVerts, 1));
     return geometry;
   }
 
