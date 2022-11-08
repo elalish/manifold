@@ -230,7 +230,7 @@ CsgOpNode::CsgOpNode(const std::vector<std::shared_ptr<CsgNode>> &children,
     : impl_(std::make_shared<Impl>()) {
   impl_->children_ = children;
   SetOp(op);
-  // opportunisticly flatten the tree without costly evaluation
+  // opportunistically flatten the tree without costly evaluation
   GetChildren(false);
 }
 
@@ -239,7 +239,7 @@ CsgOpNode::CsgOpNode(std::vector<std::shared_ptr<CsgNode>> &&children,
     : impl_(std::make_shared<Impl>()) {
   impl_->children_ = children;
   SetOp(op);
-  // opportunisticly flatten the tree without costly evaluation
+  // opportunistically flatten the tree without costly evaluation
   GetChildren(false);
 }
 

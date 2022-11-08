@@ -52,7 +52,7 @@ struct RemoveFace {
 namespace manifold {
 /**
  * Constructs a smooth version of the input mesh by creating tangents; this
- * method will throw if you have supplied tangnets with your mesh already. The
+ * method will throw if you have supplied tangents with your mesh already. The
  * actual triangle resolution is unchanged; use the Refine() method to
  * interpolate to a higher-resolution curve.
  *
@@ -172,7 +172,7 @@ Manifold Manifold::Sphere(float radius, int circularSegments) {
  * @param crossSection A set of non-overlapping polygons to extrude.
  * @param height Z-extent of extrusion.
  * @param nDivisions Number of extra copies of the crossSection to insert into
- * the shape vertically; especially useful in combnation with twistDegrees to
+ * the shape vertically; especially useful in combination with twistDegrees to
  * avoid interpolation artifacts. Default is none.
  * @param twistDegrees Amount to twist the top crossSection relative to the
  * bottom, interpolated linearly for the divisions in between.

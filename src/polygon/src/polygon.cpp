@@ -49,7 +49,7 @@ bool OverlapAssert(bool condition, const char *file, int line,
  * the asserted condition is false, it implies the monotone subdivision has
  * failed. This is most likely due to the input polygons being overlapped by
  * more than the input precision, but if not, then it indicates a bug. Either
- * way subdivision processing stops: if params.processOvelaps is false, then an
+ * way subdivision processing stops: if params.processOverlaps is false, then an
  * exception is thrown. Otherwise this returns true from the sweep function,
  * causing polygons to be left in their original state.
  *
@@ -319,7 +319,7 @@ class Monotones {
   /**
    * This is the data structure of the polygons themselves. They are stored as a
    * list in sweep-line order. The left and right pointers form the polygons,
-   * while the mesh_idx describes the input indices that will be tranfered to
+   * while the mesh_idx describes the input indices that will be transferred to
    * the output triangulation. The edgeRight value represents an extra contraint
    * from the mesh Boolean algorithm.
    */
@@ -772,8 +772,8 @@ class Monotones {
   /**
    * This function sweeps forward (South to North) keeping track of the
    * monotones and reordering degenerates (monotone ordering in the x-direction
-   * and sweep line ordering in the y-direction). The input polygons (montones_)
-   * is not changed during this process.
+   * and sweep line ordering in the y-direction). The input polygons
+   * (monotones_) is not changed during this process.
    */
   bool SweepForward() {
     // Reversed so that minimum element is at queue.top() / vector.back().

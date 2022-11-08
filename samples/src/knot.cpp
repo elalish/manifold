@@ -22,7 +22,7 @@ int gcd(int a, int b) { return b == 0 ? a : gcd(b, a % b); }
 namespace manifold {
 
 /**
- * Creates a classic torus knot, defined as a string wrapping peroidically
+ * Creates a classic torus knot, defined as a string wrapping periodically
  * around the surface of an imaginary donut. If p and q have a common factor
  * then you will get multiple separate, interwoven knots. This is an example of
  * using the Manifold.Warp() method, thus avoiding any handling of triangles.

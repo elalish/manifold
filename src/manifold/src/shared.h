@@ -126,7 +126,7 @@ struct Halfedge {
 };
 
 /**
- * This is a temporary edge strcture which only stores edges forward and
+ * This is a temporary edge structure which only stores edges forward and
  * references the halfedge it was created from.
  */
 struct TmpEdge {
