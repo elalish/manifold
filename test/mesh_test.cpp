@@ -192,17 +192,17 @@ TEST(Manifold, GetMeshGL) {
   Manifold manifold = Manifold::Sphere(1);
   Mesh mesh_out = manifold.GetMesh();
   MeshGL meshGL_out = manifold.GetMeshGL();
-  ASSERT_EQ(meshGL_out.numVert, mesh_out.vertPos.size());
-  ASSERT_EQ(meshGL_out.numTri, mesh_out.triVerts.size());
-  for (int i = 0; i < meshGL_out.numVert; ++i) {
+  ASSERT_EQ(meshGL_out.NumVert(), mesh_out.vertPos.size());
+  ASSERT_EQ(meshGL_out.NumTri(), mesh_out.triVerts.size());
+  for (int i = 0; i < meshGL_out.NumVert(); ++i) {
     for (const int j : {0, 1, 2}) {
-      ASSERT_EQ(meshGL_out.vertPos()[3 * i + j], mesh_out.vertPos[i][j]);
-      ASSERT_EQ(meshGL_out.vertNormal()[3 * i + j], mesh_out.vertNormal[i][j]);
+      ASSERT_EQ(meshGL_out.vertPos[3 * i + j], mesh_out.vertPos[i][j]);
+      ASSERT_EQ(meshGL_out.vertNormal[3 * i + j], mesh_out.vertNormal[i][j]);
     }
   }
-  for (int i = 0; i < meshGL_out.numTri; ++i) {
+  for (int i = 0; i < meshGL_out.NumTri(); ++i) {
     for (const int j : {0, 1, 2})
-      ASSERT_EQ(meshGL_out.triVerts()[3 * i + j], mesh_out.triVerts[i][j]);
+      ASSERT_EQ(meshGL_out.triVerts[3 * i + j], mesh_out.triVerts[i][j]);
   }
 }
 

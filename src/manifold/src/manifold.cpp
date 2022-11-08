@@ -144,21 +144,24 @@ MeshGL Manifold::GetMeshGL() const {
   int numVert = NumVert();
   int numTri = NumTri();
 
-  MeshGL out(numVert, numTri);
+  MeshGL out;
+  out.vertPos.resize(3 * numVert);
+  out.vertNormal.resize(3 * numVert);
+  out.triVerts.resize(3 * numTri);
   for (int i = 0; i < numVert; ++i) {
     glm::vec3 v = impl.vertPos_[i];
-    out.vertPos()[3 * i] = v.x;
-    out.vertPos()[3 * i + 1] = v.y;
-    out.vertPos()[3 * i + 2] = v.z;
+    out.vertPos[3 * i] = v.x;
+    out.vertPos[3 * i + 1] = v.y;
+    out.vertPos[3 * i + 2] = v.z;
   }
   for (int i = 0; i < numVert; ++i) {
     glm::vec3 v = impl.vertNormal_[i];
-    out.vertNormal()[3 * i] = v.x;
-    out.vertNormal()[3 * i + 1] = v.y;
-    out.vertNormal()[3 * i + 2] = v.z;
+    out.vertNormal[3 * i] = v.x;
+    out.vertNormal[3 * i + 1] = v.y;
+    out.vertNormal[3 * i + 2] = v.z;
   }
   for (int i = 0; i < numTri * 3; ++i) {
-    out.triVerts()[i] = impl.halfedge_[i].startVert;
+    out.triVerts[i] = impl.halfedge_[i].startVert;
   }
 
   return out;

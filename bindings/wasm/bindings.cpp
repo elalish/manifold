@@ -61,13 +61,14 @@ val GetMeshJS(const Manifold& manifold) {
   val meshJS = val::object();
 
   meshJS.set("triVerts",
-             val(typed_memory_view(3 * mesh.numTri, mesh.triVerts()))
+             val(typed_memory_view(mesh.triVerts.size(), mesh.triVerts.data()))
                  .call<val>("slice"));
-  meshJS.set("vertPos", val(typed_memory_view(3 * mesh.numVert, mesh.vertPos()))
-                            .call<val>("slice"));
-  meshJS.set("vertNormal",
-             val(typed_memory_view(3 * mesh.numVert, mesh.vertNormal()))
+  meshJS.set("vertPos",
+             val(typed_memory_view(mesh.vertPos.size(), mesh.vertPos.data()))
                  .call<val>("slice"));
+  meshJS.set("vertNormal", val(typed_memory_view(mesh.vertNormal.size(),
+                                                 mesh.vertNormal.data()))
+                               .call<val>("slice"));
 
   return meshJS;
 }
