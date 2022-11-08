@@ -29,3 +29,10 @@ set_target_properties(manifoldjs PROPERTIES OUTPUT_NAME "manifold")
 
 file(COPY examples;test;. DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS examples;test)
+
+add_custom_command(
+        TARGET manifoldjs POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy
+                ${CMAKE_CURRENT_BINARY_DIR}/manifold.*
+                ${CMAKE_CURRENT_BINARY_DIR}/examples/)
+                

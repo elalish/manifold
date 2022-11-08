@@ -27,10 +27,10 @@ class Collider {
   // Aborts and returns false if transform is not axis aligned.
   bool Transform(glm::mat4x3);
   void UpdateBoxes(const VecDH<Box>& leafBB);
-  // Collisions returns a sparse result, where i is the querry index and j is
+  // Collisions returns a sparse result, where i is the query index and j is
   // the leaf index where their bounding boxes overlap.
   template <typename T>
-  SparseIndices Collisions(const VecDH<T>& querriesIn) const;
+  SparseIndices Collisions(const VecDH<T>& queriesIn) const;
 
  private:
   VecDH<Box> nodeBBox_;

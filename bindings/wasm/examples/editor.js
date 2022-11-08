@@ -22,11 +22,11 @@ const currentElement = document.querySelector('#current');
 const arrow = document.querySelector('.uparrow');
 const dropdown = document.querySelector('.dropdown');
 
-const hideDropdown = function () {
+const hideDropdown = function() {
   dropdown.classList.remove('show');
   arrow.classList.remove('down');
 };
-const toggleDropdown = function (event) {
+const toggleDropdown = function(event) {
   event.stopPropagation();
   dropdown.classList.toggle('show');
   arrow.classList.toggle('down');
@@ -71,7 +71,8 @@ function switchTo(scriptName) {
     switching = true;
     currentElement.textContent = scriptName;
     setScript('currentName', scriptName);
-    const code = exampleFunctions.get(scriptName) ?? getScript(scriptName) ?? '';
+    const code =
+        exampleFunctions.get(scriptName) ?? getScript(scriptName) ?? '';
     isExample = exampleFunctions.get(scriptName) != null;
     editor.setValue(code);
   }
@@ -88,7 +89,7 @@ function createDropdownItem(name) {
   button.appendChild(label);
   label.textContent = name;
 
-  button.onclick = function () {
+  button.onclick = function() {
     saveCurrent();
     switchTo(label.textContent);
   };
@@ -117,7 +118,7 @@ function addEdit(button) {
   edit.style.backgroundImage = 'url(pencil.png)';
   edit.style.right = '30px';
 
-  edit.onclick = function (event) {
+  edit.onclick = function(event) {
     event.stopPropagation();
     const oldName = label.textContent;
     const code = getScript(oldName);
@@ -144,9 +145,11 @@ function addEdit(button) {
     }
 
     form.onsubmit = rename;
-    inputElement.onclick = function (event) { event.stopPropagation(); };
+    inputElement.onclick = function(event) {
+      event.stopPropagation();
+    };
 
-    inputElement.onblur = function () {
+    inputElement.onblur = function() {
       button.removeChild(form);
       label.textContent = oldName;
     };
@@ -157,16 +160,16 @@ function addEdit(button) {
   trash.style.right = '0px';
   let lastClick = 0;
 
-  trash.onclick = function (event) {
+  trash.onclick = function(event) {
     event.stopPropagation();
     if (button.classList.contains('blue')) {
       lastClick = performance.now();
       button.classList.remove('blue');
       button.classList.add('red');
-      document.body.addEventListener('click', function () {
+      document.body.addEventListener('click', function() {
         button.classList.add('blue');
         button.classList.remove('red');
-      }, { once: true });
+      }, {once: true});
     } else if (performance.now() - lastClick > 500) {
       removeScript(label.textContent);
       if (currentElement.textContent == label.textContent) {
@@ -187,7 +190,9 @@ function newItem(code) {
   addEdit(nextButton);
   nextButton.click();
 };
-newButton.onclick = function () { newItem(''); };
+newButton.onclick = function() {
+  newItem('');
+};
 
 const runButton = document.querySelector('#compile');
 const poster = document.querySelector('#poster');
@@ -205,14 +210,17 @@ function initializeRun() {
 
 // Editor ------------------------------------------------------------
 let tsWorker = undefined;
-require.config({ paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.34.0/min/vs' } });
-require(['vs/editor/editor.main'], async function () {
-  const content = await fetch('manifold.d.ts').then(response => response.text());
+require.config({
+  paths:
+      {vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.34.0/min/vs'}
+});
+require(['vs/editor/editor.main'], async function() {
+  const content =
+      await fetch('manifold.d.ts').then(response => response.text());
   monaco.languages.typescript.typescriptDefaults.addExtraLib(content);
-  editor = monaco.editor.create(document.getElementById('editor'), {
-    language: 'typescript',
-    automaticLayout: true
-  });
+  editor = monaco.editor.create(
+      document.getElementById('editor'),
+      {language: 'typescript', automaticLayout: true});
   const w = await monaco.languages.typescript.getTypeScriptWorker();
   tsWorker = await w(editor.getModel().uri);
 
@@ -263,7 +271,7 @@ require(['vs/editor/editor.main'], async function () {
 // Execution ------------------------------------------------------------
 const consoleElement = document.querySelector('#console');
 const oldLog = console.log;
-console.log = function (message) {
+console.log = function(message) {
   consoleElement.textContent += message + '\r\n';
   consoleElement.scrollTop = consoleElement.scrollHeight;
   oldLog(message);
@@ -290,8 +298,9 @@ function finishRun() {
   const t1 = performance.now();
   const log = consoleElement.textContent;
   // Remove "Running..."
-  consoleElement.textContent = log.substring(log.indexOf("\n") + 1);
-  console.log(`Took ${(Math.round((t1 - t0) / 10) / 100).toLocaleString()} seconds`);
+  consoleElement.textContent = log.substring(log.indexOf('\n') + 1);
+  console.log(
+      `Took ${(Math.round((t1 - t0) / 10) / 100).toLocaleString()} seconds`);
 }
 
 const mv = document.querySelector('model-viewer');
@@ -300,7 +309,7 @@ let manifoldWorker = null;
 
 function createWorker() {
   manifoldWorker = new Worker('worker.js');
-  manifoldWorker.onmessage = function (e) {
+  manifoldWorker.onmessage = function(e) {
     if (e.data == null) {
       if (tsWorker != null && !manifoldInitialized) {
         initializeRun();
@@ -349,7 +358,7 @@ function cancel() {
   console.log('Run canceled');
 }
 
-runButton.onclick = function () {
+runButton.onclick = function() {
   if (runButton.classList.contains('cancel')) {
     cancel();
   } else {
@@ -358,9 +367,9 @@ runButton.onclick = function () {
 };
 
 const downloadButton = document.querySelector('#download');
-downloadButton.onclick = function () {
-  const link = document.createElement("a");
-  link.download = "manifold.glb";
+downloadButton.onclick = function() {
+  const link = document.createElement('a');
+  link.download = 'manifold.glb';
   link.href = objectURL;
   link.click();
 };

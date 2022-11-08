@@ -38,7 +38,7 @@
  *
  * Note many functions are designed to work symmetrically, for instance for both
  * p2q1 and p1q2. Inside of these functions P and Q are marked as though the
- * funtion is forwards, but it may include a Boolean "reverse" that indicates P
+ * function is forwards, but it may include a Boolean "reverse" that indicates P
  * and Q have been swapped.
  */
 

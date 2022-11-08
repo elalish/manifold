@@ -132,12 +132,12 @@ PYBIND11_MODULE(pymanifold, m) {
             return self.Rotate(v_view(0), v_view(1), v_view(2));
           },
           py::arg("v"),
-          "Applys an Euler angle rotation to the manifold, first about the X "
+          "Applies an Euler angle rotation to the manifold, first about the X "
           "axis, then\n"
           "Y, then Z, in degrees. We use degrees so that we can minimize "
           "rounding error,\n"
-          "and elimiate it completely for any multiples of 90 degrees. "
-          "Addtionally, more\n"
+          "and eliminate it completely for any multiples of 90 degrees. "
+          "Additionally, more\n"
           "efficient code paths are used to update the manifold when the "
           "transforms only\n"
           "rotate by multiples of 90 degrees. This operation can be chained. "
@@ -153,12 +153,12 @@ PYBIND11_MODULE(pymanifold, m) {
           },
           py::arg("x_degrees") = 0.0f, py::arg("y_degrees") = 0.0f,
           py::arg("z_degrees") = 0.0f,
-          "Applys an Euler angle rotation to the manifold, first about the X "
+          "Applies an Euler angle rotation to the manifold, first about the X "
           "axis, then\n"
           "Y, then Z, in degrees. We use degrees so that we can minimize "
           "rounding error,\n"
-          "and elimiate it completely for any multiples of 90 degrees. "
-          "Addtionally, more\n"
+          "and eliminate it completely for any multiples of 90 degrees. "
+          "Additionally, more\n"
           "efficient code paths are used to update the manifold when the "
           "transforms only\n"
           "rotate by multiples of 90 degrees. This operation can be chained. "
@@ -200,7 +200,7 @@ PYBIND11_MODULE(pymanifold, m) {
 
                   "Constructs a smooth version of the input mesh by creating "
                   "tangents; this\n"
-                  "method will throw if you have supplied tangnets with your "
+                  "method will throw if you have supplied tangents with your "
                   "mesh already. The\n"
                   "actual triangle resolution is unchanged; use the Refine() "
                   "method to\n"
@@ -375,7 +375,7 @@ PYBIND11_MODULE(pymanifold, m) {
           ":param height: Z-extent of extrusion.\n"
           ":param nDivisions: Number of extra copies of the crossSection to "
           "insert into\n"
-          "the shape vertically; especially useful in combnation with "
+          "the shape vertically; especially useful in combination with "
           "twistDegrees to\n"
           "avoid interpolation artifacts. Default is none.\n"
           ":param twistDegrees: Amount to twist the top crossSection relative "

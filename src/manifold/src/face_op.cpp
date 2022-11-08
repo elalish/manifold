@@ -186,7 +186,7 @@ Polygons Manifold::Impl::Face2Polygons(int face, glm::mat3x2 projection,
     int vert = halfedge_[thisEdge].startVert;
     polys.back().push_back({projection * vertPos_[vert], vert});
     const auto result = vert_edge.find(halfedge_[thisEdge].endVert);
-    ASSERT(result != vert_edge.end(), topologyErr, "nonmanifold edge");
+    ASSERT(result != vert_edge.end(), topologyErr, "non-manifold edge");
     thisEdge = result->second;
     vert_edge.erase(result);
   }
