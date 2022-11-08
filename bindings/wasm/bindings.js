@@ -157,11 +157,11 @@ Module.setup = function() {
     }
 
     get numTri() {
-      return result.triVerts.length / 3;
+      return this.triVerts.length / 3;
     }
 
     get numVert() {
-      return result.vertPos.length / 3;
+      return this.vertPos.length / 3;
     }
 
     verts(tri) {
