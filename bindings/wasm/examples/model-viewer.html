@@ -101,11 +101,10 @@
 
   // functions to convert between three.js and wasm
   function geometry2mesh(geometry) {
-    const mesh = {};//new Mesh();
-    mesh.vertPos = geometry.attributes.position.array;
-    mesh.vertNormal = geometry.attributes.normal.array;
-    mesh.triVerts = geometry.index.array;
-    return mesh;
+    const vertPos = geometry.attributes.position.array;
+    const vertNormal = geometry.attributes.normal.array;
+    const triVerts = geometry.index.array;
+    return new wasm.Mesh({vertPos, vertNormal, triVerts});
   }
 
   function mesh2geometry(mesh) {

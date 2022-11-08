@@ -177,6 +177,8 @@ Module.setup = function() {
     }
   }
 
+  Module.Mesh = Mesh;
+
   Module.Manifold.prototype.getMesh = function() {
     return new Mesh(this._GetMeshJS());
   };

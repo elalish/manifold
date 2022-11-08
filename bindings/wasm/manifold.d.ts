@@ -18,12 +18,16 @@ type Vec4 = [number, number, number, number];
 type Matrix3x4 = [Vec3, Vec3, Vec3, Vec3];
 type SimplePolygon = Vec2[];
 type Polygons = SimplePolygon|SimplePolygon[];
-type Mesh = {
-  vertPos: Vec3[],
-  triVerts: Vec3[],
-  vertNormal?: Vec3[],
-  halfedgeTangent?: Vec4[]
-};
+interface Mesh {
+  vertPos: Float32Array;
+  triVerts: Uint32Array;
+  vertNormal?: Float32Array;
+  get numTri(): number;
+  get numVert(): number;
+  verts(tri: number): Uint32Array<3>;
+  position(vert: number): Float32Array<3>;
+  normal(vert: number): Float32Array<3>;
+}
 type SerializedVec3 = {
   x: number,
   y: number,
@@ -44,12 +48,6 @@ interface Vector<T> {
 }
 type Vector_vec3 = Vector<SerializedVec3>;
 type Vector_vec4 = Vector<SerializedVec4>;
-type MeshVec = {
-  vertPos: Vector_vec3,
-  triVerts: Vector_vec3,
-  vertNormal: Vector_vec3,
-  halfedgeTangent: Vector_vec4
-};
 type Box = {
   min: Vec3,
   max: Vec3
