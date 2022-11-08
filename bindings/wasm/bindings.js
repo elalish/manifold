@@ -245,21 +245,14 @@ Module.setup = function() {
   });
 
   const ManifoldCtor = Module.Manifold;
-  Module.ManifoldFromMeshVec = function(meshVec) {
-    const manifold = new ManifoldCtor(meshVec);
+  Module.Manifold = function(mesh) {
+    const manifold = new ManifoldCtor(mesh);
 
     const status = manifold.status();
     if (status.value !== 0) {
       throw new Module.ManifoldError(status.value);
     }
 
-    return manifold;
-  };
-
-  Module.Manifold = function Manifold(mesh) {
-    const meshVec = mesh2vec(mesh);
-    const manifold = Module.ManifoldFromMeshVec(meshVec);
-    disposeMesh(meshVec);
     return manifold;
   };
 

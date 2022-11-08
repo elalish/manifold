@@ -68,7 +68,7 @@
     const icosahedron = simplify(new THREE.IcosahedronGeometry(0.16));
 
     const manifold_1 = wasm.cube(0.2, 0.2, 0.2, true);
-    const manifold_2 = new wasm.ManifoldFromMeshVec(geometry2mesh(icosahedron));
+    const manifold_2 = new wasm.Manifold(geometry2mesh(icosahedron));
 
     const csg = function (operation) {
       mesh.geometry?.dispose();
@@ -94,25 +94,10 @@
 
   // functions to convert between three.js and wasm
   function geometry2mesh(geometry) {
-    const mesh = {
-      vertPos: new wasm.Vector_vec3(),
-      vertNormal: new wasm.Vector_vec3(),
-      triVerts: new wasm.Vector_ivec3(),
-      halfedgeTangent: new wasm.Vector_vec4()
-    };
-    const temp = new THREE.Vector3();
-    const p = geometry.attributes.position;
-    const n = geometry.attributes.normal;
-    const x = geometry.index;
-    for (let i = 0; i < p.count; i++) {
-      temp.fromBufferAttribute(p, i);
-      mesh.vertPos.push_back(temp);
-      temp.fromBufferAttribute(n, i);
-      mesh.vertNormal.push_back(temp);
-    }
-    for (let i = 0; i < x.count; i += 3) {
-      mesh.triVerts.push_back(x.array.subarray(i, i + 3));
-    }
+    const mesh = {};//new Mesh();
+    mesh.vertPos = geometry.attributes.position.array;
+    mesh.vertNormal = geometry.attributes.normal.array;
+    mesh.triVerts = geometry.index.array;
     return mesh;
   }
 

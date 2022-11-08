@@ -73,6 +73,14 @@ val GetMeshJS(const Manifold& manifold) {
   return meshJS;
 }
 
+Manifold FromMeshJS(const val& mesh) {
+  MeshGL input;
+  input.vertPos = convertJSArrayToNumberVector<float>(mesh["vertPos"]);
+  input.vertNormal = convertJSArrayToNumberVector<float>(mesh["vertNormal"]);
+  input.triVerts = convertJSArrayToNumberVector<uint32_t>(mesh["triVerts"]);
+  return Manifold(input);
+}
+
 Manifold Extrude(std::vector<std::vector<glm::vec2>>& polygons, float height,
                  int nDivisions, float twistDegrees, glm::vec2 scaleTop) {
   return Manifold::Extrude(ToPolygon(polygons), height, nDivisions,
@@ -176,14 +184,8 @@ EMSCRIPTEN_BINDINGS(whatever) {
   register_vector<BaryRef>("Vector_baryRef");
   register_vector<glm::vec4>("Vector_vec4");
 
-  value_object<Mesh>("Mesh")
-      .field("vertPos", &Mesh::vertPos)
-      .field("triVerts", &Mesh::triVerts)
-      .field("vertNormal", &Mesh::vertNormal)
-      .field("halfedgeTangent", &Mesh::halfedgeTangent);
-
   class_<Manifold>("Manifold")
-      .constructor<Mesh>()
+      .constructor(&FromMeshJS)
       .function("add", &Union)
       .function("subtract", &Difference)
       .function("intersect", &Intersection)
