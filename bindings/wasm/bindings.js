@@ -50,34 +50,6 @@ Module.setup = function() {
     polygonsVec.delete();
   }
 
-  function mesh2vec(mesh) {
-    const vertPos = toVec(new Module.Vector_vec3, mesh.vertPos, p => {
-      return {
-        x: p[0], y: p[1], z: p[2]
-      }
-    });
-    const triVerts = toVec(new Module.Vector_ivec3, mesh.triVerts);
-    const vertNormal = toVec(new Module.Vector_vec3, mesh.vertNormal, p => {
-      return {
-        x: p[0], y: p[1], z: p[2]
-      }
-    });
-    const halfedgeTangent =
-        toVec(new Module.Vector_vec4, mesh.halfedgeTangent, p => {
-          return {
-            x: p[0], y: p[1], z: p[2], w: p[3]
-          }
-        });
-    return {vertPos, triVerts, vertNormal, halfedgeTangent};
-  }
-
-  function disposeMesh(meshVec) {
-    meshVec.vertPos.delete();
-    meshVec.triVerts.delete();
-    meshVec.vertNormal.delete();
-    meshVec.halfedgeTangent.delete();
-  }
-
   function vararg2vec(vec) {
     if (vec[0] instanceof Array)
       return {x: vec[0][0], y: vec[0][1], z: vec[0][2]};
@@ -149,23 +121,48 @@ Module.setup = function() {
     return result;
   };
 
+  class Mesh {
+    constructor({
+      triVerts = new Uint32Array(),
+      vertPos = new Float32Array(),
+      vertNormal,
+      halfedgeTangent
+    } = {}) {
+      this.triVerts = triVerts;
+      this.vertPos = vertPos;
+      this.vertNormal = vertNormal;
+      this.halfedgeTangent = halfedgeTangent;
+    }
+
+    get numTri() {
+      return this.triVerts.length / 3;
+    }
+
+    get numVert() {
+      return this.vertPos.length / 3;
+    }
+
+    verts(tri) {
+      return this.triVerts.subarray(3 * tri, 3 * (tri + 1));
+    }
+
+    position(vert) {
+      return this.vertPos.subarray(3 * vert, 3 * (vert + 1));
+    }
+
+    normal(vert) {
+      return this.vertNormal.subarray(3 * vert, 3 * (vert + 1));
+    }
+
+    tangent(halfedge) {
+      return this.halfedgeTangent.subarray(4 * halfedge, 4 * (halfedge + 1));
+    }
+  }
+
+  Module.Mesh = Mesh;
+
   Module.Manifold.prototype.getMesh = function() {
-    const result = this._GetMesh();
-    const oldVertPos = result.vertPos;
-    const oldTriVerts = result.triVerts;
-    const oldVertNormal = result.vertNormal;
-    const oldHalfedgeTangent = result.halfedgeTangent;
-    const conversion1 = v => ['x', 'y', 'z'].map(f => v[f]);
-    const conversion2 = v => ['x', 'y', 'z', 'w'].map(f => v[f]);
-    result.vertPos = fromVec(oldVertPos, conversion1);
-    result.triVerts = fromVec(oldTriVerts);
-    result.vertNormal = fromVec(oldVertNormal, conversion1);
-    result.halfedgeTangent = fromVec(oldHalfedgeTangent, conversion2);
-    oldVertPos.delete();
-    oldTriVerts.delete();
-    oldVertNormal.delete();
-    oldHalfedgeTangent.delete();
-    return result;
+    return new Mesh(this._GetMeshJS());
   };
 
   Module.Manifold.prototype.getMeshRelation = function() {
@@ -232,21 +229,14 @@ Module.setup = function() {
   });
 
   const ManifoldCtor = Module.Manifold;
-  Module.ManifoldFromMeshVec = function(meshVec) {
-    const manifold = new ManifoldCtor(meshVec);
+  Module.Manifold = function(mesh) {
+    const manifold = new ManifoldCtor(mesh);
 
     const status = manifold.status();
     if (status.value !== 0) {
       throw new Module.ManifoldError(status.value);
     }
 
-    return manifold;
-  };
-
-  Module.Manifold = function Manifold(mesh) {
-    const meshVec = mesh2vec(mesh);
-    const manifold = Module.ManifoldFromMeshVec(meshVec);
-    disposeMesh(meshVec);
     return manifold;
   };
 
@@ -276,12 +266,10 @@ Module.setup = function() {
   };
 
   Module.smooth = function(mesh, sharpenedEdges = []) {
-    const meshVec = mesh2vec(mesh);
     const sharp = new Module.Vector_smoothness();
     toVec(sharp, sharpenedEdges);
-    const result = Module._Smooth(meshVec, sharp);
+    const result = Module._Smooth(mesh, sharp);
     sharp.delete();
-    disposeMesh(meshVec);
     return result;
   };
 

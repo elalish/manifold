@@ -68,9 +68,6 @@
     const icosahedron = simplify(new THREE.IcosahedronGeometry(0.16));
 
     const manifold_1 = wasm.cube(0.2, 0.2, 0.2, true);
-    // const manifold_1 = wasm
-    //   .revolve([[[0.1, 0.1], [0.2, 0.1], [0.1, 0.2]]], 64)
-    //   .translate(0, 0, -0.1);
     const manifold_2 = new wasm.Manifold(geometry2mesh(icosahedron));
 
     const csg = function (operation) {
@@ -97,59 +94,17 @@
 
   // functions to convert between three.js and wasm
   function geometry2mesh(geometry) {
-    const mesh = {
-      vertPos: new wasm.Vector_vec3(),
-      vertNormal: new wasm.Vector_vec3(),
-      triVerts: new wasm.Vector_ivec3(),
-      halfedgeTangent: new wasm.Vector_vec4()
-    };
-    const temp = new THREE.Vector3();
-    const p = geometry.attributes.position;
-    const n = geometry.attributes.normal;
-    const x = geometry.index;
-    for (let i = 0; i < p.count; i++) {
-      temp.fromBufferAttribute(p, i);
-      mesh.vertPos.push_back(temp);
-      temp.fromBufferAttribute(n, i);
-      mesh.vertNormal.push_back(temp);
-    }
-    for (let i = 0; i < x.count; i += 3) {
-      mesh.triVerts.push_back(x.array.subarray(i, i + 3));
-    }
-    return mesh;
+    const vertPos = geometry.attributes.position.array;
+    const vertNormal = geometry.attributes.normal.array;
+    const triVerts = geometry.index.array;
+    return new wasm.Mesh({vertPos, vertNormal, triVerts});
   }
 
   function mesh2geometry(mesh) {
     const geometry = new THREE.BufferGeometry();
-
-    const numVert = mesh.vertPos.length;
-    const vert = new Float32Array(3 * numVert);
-    const norm = new Float32Array(3 * numVert);
-    for (let i = 0; i < numVert; i++) {
-      const v = mesh.vertPos[i];
-      const n = mesh.vertNormal[i];
-      const idx = 3 * i;
-      vert[idx] = v[0];
-      vert[idx + 1] = v[1];
-      vert[idx + 2] = v[2];
-      norm[idx] = n[0];
-      norm[idx + 1] = n[1];
-      norm[idx + 2] = n[2];
-    }
-
-    const numTri = mesh.triVerts.length;
-    const tri = new Uint32Array(3 * numTri);
-    for (let i = 0; i < numTri; i++) {
-      const v = mesh.triVerts[i];
-      const idx = 3 * i;
-      tri[idx] = v[0];
-      tri[idx + 1] = v[1];
-      tri[idx + 2] = v[2];
-    }
-
-    geometry.setAttribute('position', new THREE.BufferAttribute(vert, 3));
-    geometry.setAttribute('normal', new THREE.BufferAttribute(norm, 3));
-    geometry.setIndex(new THREE.BufferAttribute(tri, 1));
+    geometry.setAttribute('position', new THREE.BufferAttribute(mesh.vertPos, 3));
+    geometry.setAttribute('normal', new THREE.BufferAttribute(mesh.vertNormal, 3));
+    geometry.setIndex(new THREE.BufferAttribute(mesh.triVerts, 1));
     return geometry;
   }
 
