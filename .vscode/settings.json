@@ -92,7 +92,13 @@
     "codecvt": "cpp",
     "regex": "cpp",
     "future": "cpp",
-    "shared_mutex": "cpp"
+    "shared_mutex": "cpp",
+    "__bits": "cpp",
+    "compare": "cpp",
+    "concepts": "cpp",
+    "queue": "cpp",
+    "stack": "cpp",
+    "__hash_table": "cpp"
   },
   "C_Cpp.clang_format_fallbackStyle": "google",
   "editor.formatOnSave": true,

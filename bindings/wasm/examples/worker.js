@@ -29,7 +29,7 @@ const constructors = [
 ];
 const utils = [
   'setMinCircularAngle', 'setMinCircularEdgeLength', 'setCircularSegments',
-  'getCircularSegments'
+  'getCircularSegments', 'Mesh'
 ];
 const exposedFunctions = constructors.concat(utils);
 
@@ -148,28 +148,7 @@ function exportGLB(manifold) {
 
 function mesh2geometry(mesh) {
   const geometry = new THREE.BufferGeometry();
-
-  const numVert = mesh.vertPos.length;
-  const vert = new Float32Array(3 * numVert);
-  for (let i = 0; i < numVert; i++) {
-    const v = mesh.vertPos[i];
-    const idx = 3 * i;
-    vert[idx] = v[0];
-    vert[idx + 1] = v[1];
-    vert[idx + 2] = v[2];
-  }
-
-  const numTri = mesh.triVerts.length;
-  const tri = new Uint32Array(3 * numTri);
-  for (let i = 0; i < numTri; i++) {
-    const v = mesh.triVerts[i];
-    const idx = 3 * i;
-    tri[idx] = v[0];
-    tri[idx + 1] = v[1];
-    tri[idx + 2] = v[2];
-  }
-
-  geometry.setAttribute('position', new THREE.BufferAttribute(vert, 3));
-  geometry.setIndex(new THREE.BufferAttribute(tri, 1));
+  geometry.setAttribute('position', new THREE.BufferAttribute(mesh.vertPos, 3));
+  geometry.setIndex(new THREE.BufferAttribute(mesh.triVerts, 1));
   return geometry;
 }

@@ -29,11 +29,11 @@ const constructors = [
 ];
 const utils = [
   'setMinCircularAngle', 'setMinCircularEdgeLength', 'setCircularSegments',
-  'getCircularSegments'
+  'getCircularSegments', 'Mesh'
 ];
 const exposedFunctions = constructors.concat(utils);
 
-wasm().then(function (Module) {
+wasm().then(function(Module) {
   Module.setup();
   // Setup memory management, such that users don't have to care about
   // calling `delete` manually.
@@ -43,9 +43,9 @@ wasm().then(function (Module) {
   let manifoldRegistry = [];
   for (const name of memberFunctions) {
     const originalFn = Module.Manifold.prototype[name];
-    Module.Manifold.prototype["_" + name] = originalFn;
-    Module.Manifold.prototype[name] = function (...args) {
-      const result = this["_" + name](...args);
+    Module.Manifold.prototype['_' + name] = originalFn;
+    Module.Manifold.prototype[name] = function(...args) {
+      const result = this['_' + name](...args);
       manifoldRegistry.push(result);
       return result;
     }
@@ -53,19 +53,19 @@ wasm().then(function (Module) {
 
   for (const name of constructors) {
     const originalFn = Module[name];
-    Module[name] = function (...args) {
+    Module[name] = function(...args) {
       const result = originalFn(...args);
       manifoldRegistry.push(result);
       return result;
     }
   }
 
-  Module.cleanup = function () {
+  Module.cleanup =
+      function() {
     for (const obj of manifoldRegistry) {
       // decompose result is an array of manifolds
       if (obj instanceof Array)
-        for (const elem of obj)
-          elem.delete();
+        for (const elem of obj) elem.delete();
       else
         obj.delete();
     }
@@ -74,12 +74,13 @@ wasm().then(function (Module) {
 
   function runExample(name) {
     try {
-      const content = examples.functionBodies.get(name) + '\nreturn result;\n';;
+      const content = examples.functionBodies.get(name) + '\nreturn result;\n';
+      ;
       const f = new Function(...exposedFunctions, 'THREE', content);
       const manifold = f(...exposedFunctions.map(name => Module[name]), THREE);
       const prop = manifold.getProperties();
       const genus = manifold.genus();
-      return { ...prop, genus };
+      return {...prop, genus};
     } finally {
       Module.cleanup();
     }

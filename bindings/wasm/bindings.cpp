@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <emscripten/bind.h>
+#include <emscripten/val.h>
 
 using namespace emscripten;
 
@@ -53,6 +54,48 @@ std::vector<SimplePolygon> ToPolygon(
     simplePolygons[i] = {vertices};
   }
   return simplePolygons;
+}
+
+val GetMeshJS(const Manifold& manifold) {
+  MeshGL mesh = manifold.GetMeshGL();
+  val meshJS = val::object();
+
+  meshJS.set("triVerts",
+             val(typed_memory_view(mesh.triVerts.size(), mesh.triVerts.data()))
+                 .call<val>("slice"));
+  meshJS.set("vertPos",
+             val(typed_memory_view(mesh.vertPos.size(), mesh.vertPos.data()))
+                 .call<val>("slice"));
+  meshJS.set("vertNormal", val(typed_memory_view(mesh.vertNormal.size(),
+                                                 mesh.vertNormal.data()))
+                               .call<val>("slice"));
+  meshJS.set("halfedgeTangent",
+             val(typed_memory_view(mesh.halfedgeTangent.size(),
+                                   mesh.halfedgeTangent.data()))
+                 .call<val>("slice"));
+
+  return meshJS;
+}
+
+MeshGL MeshJS2GL(const val& mesh) {
+  MeshGL out;
+  out.triVerts = convertJSArrayToNumberVector<uint32_t>(mesh["triVerts"]);
+  out.vertPos = convertJSArrayToNumberVector<float>(mesh["vertPos"]);
+  if (mesh["vertNormal"] != val::undefined()) {
+    out.vertNormal = convertJSArrayToNumberVector<float>(mesh["vertNormal"]);
+  }
+  if (mesh["halfedgeTangent"] != val::undefined()) {
+    out.halfedgeTangent =
+        convertJSArrayToNumberVector<float>(mesh["halfedgeTangent"]);
+  }
+  return out;
+}
+
+Manifold FromMeshJS(const val& mesh) { return Manifold(MeshJS2GL(mesh)); }
+
+Manifold Smooth(const val& mesh,
+                const std::vector<Smoothness>& sharpenedEdges = {}) {
+  return Manifold::Smooth(MeshJS2GL(mesh), sharpenedEdges);
 }
 
 Manifold Extrude(std::vector<std::vector<glm::vec2>>& polygons, float height,
@@ -158,27 +201,12 @@ EMSCRIPTEN_BINDINGS(whatever) {
   register_vector<BaryRef>("Vector_baryRef");
   register_vector<glm::vec4>("Vector_vec4");
 
-  value_object<Mesh>("Mesh")
-      .field("vertPos", &Mesh::vertPos)
-      .field("triVerts", &Mesh::triVerts)
-      .field("vertNormal", &Mesh::vertNormal)
-      .field("halfedgeTangent", &Mesh::halfedgeTangent);
-
-  class_<MeshGL>("MeshGL")
-      .constructor<int, int>()
-      .property("numVert", &MeshGL::numVert)
-      .property("numTri", &MeshGL::numTri)
-      .function("vertPos", &MeshGL::vertPos, allow_raw_pointers())
-      .function("triVerts", &MeshGL::triVerts, allow_raw_pointers())
-      .function("vertNormal", &MeshGL::vertNormal, allow_raw_pointers());
-
   class_<Manifold>("Manifold")
-      .constructor<Mesh>()
+      .constructor(&FromMeshJS)
       .function("add", &Union)
       .function("subtract", &Difference)
       .function("intersect", &Intersection)
-      .function("_GetMesh", &Manifold::GetMesh)
-      .function("_GetMeshGL", &Manifold::GetMeshGL)
+      .function("_GetMeshJS", &GetMeshJS)
       .function("refine", &Manifold::Refine)
       .function("_Warp", &Warp)
       .function("_Transform", &Transform)
@@ -204,7 +232,7 @@ EMSCRIPTEN_BINDINGS(whatever) {
   function("_Cylinder", &Manifold::Cylinder);
   function("_Sphere", &Manifold::Sphere);
   function("tetrahedron", &Manifold::Tetrahedron);
-  function("_Smooth", &Manifold::Smooth);
+  function("_Smooth", &Smooth);
   function("_Extrude", &Extrude);
   function("_Revolve", &Revolve);
   function("_LevelSet", &LevelSetJs);

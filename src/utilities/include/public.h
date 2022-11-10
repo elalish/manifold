@@ -149,6 +149,22 @@ using Polygons = std::vector<SimplePolygon>;
 /** @} */
 
 /**
+ * An alternative to Mesh for output suitable for pushing into graphics
+ * libraries directly.
+ */
+struct MeshGL {
+  /// Number of vertices
+  int NumVert() const { return this->vertPos.size() / 3; };
+  /// Number of triangles
+  int NumTri() const { return this->triVerts.size() / 3; };
+
+  std::vector<float> vertPos;
+  std::vector<float> vertNormal;
+  std::vector<uint32_t> triVerts;
+  std::vector<float> halfedgeTangent;
+};
+
+/**
  * The triangle-mesh input and output of this library.
  */
 struct Mesh {
@@ -166,36 +182,47 @@ struct Mesh {
   /// as 3 * tri + i, representing the tangent from Mesh.triVerts[tri][i] along
   /// the CCW edge. If empty, mesh is faceted.
   std::vector<glm::vec4> halfedgeTangent;
-};
 
-/**
- * An alternative to Mesh for output suitable for pushing into graphics
- * libraries directly.
- */
-class MeshGL {
- public:
-  MeshGL(int _numVert, int _numTri)
-      : numVert(_numVert),
-        numTri(_numTri),
-        vertPos_(std::make_unique<float[]>(3 * _numVert)),
-        vertNormal_(std::make_unique<float[]>(3 * _numVert)),
-        triVerts_(std::make_unique<uint32_t[]>(3 * _numTri)) {}
+  Mesh() = default;
+  Mesh(const std::vector<glm::vec3>& vertPos_,
+       const std::vector<glm::ivec3>& triVerts_,
+       const std::vector<glm::vec3>& vertNormal_ = {},
+       const std::vector<glm::vec4>& halfedgeTangent_ = {})
+      : vertPos(vertPos_),
+        triVerts(triVerts_),
+        vertNormal(vertNormal_),
+        halfedgeTangent(halfedgeTangent_) {}
 
-  /// A flat buffer of positions, length 3 * numVert [x, y, z, x, y, z, ...].
-  float* vertPos() const { return this->vertPos_.get(); }
-  /// A flat buffer of normals, length 3 * numVert [x, y, z, x, y, z, ...].
-  float* vertNormal() const { return this->vertNormal_.get(); }
-  /// A flat buffer of verts, length 3 * numTri [0, 1, 2, 0, 1, 2, ...].
-  uint32_t* triVerts() const { return this->triVerts_.get(); }
-  /// Number of vertices
-  const int numVert;
-  /// Number of triangles
-  const int numTri;
+  Mesh(const MeshGL& in) {
+    const int numTri = in.NumTri();
+    const int numVert = in.NumVert();
+    triVerts.resize(numTri);
+    vertPos.resize(numVert);
+    if (!in.vertNormal.empty()) {
+      vertNormal.resize(numVert);
+    }
 
- private:
-  std::unique_ptr<float[]> vertPos_;
-  std::unique_ptr<float[]> vertNormal_;
-  std::unique_ptr<uint32_t[]> triVerts_;
+    for (int i = 0; i < numVert; ++i) {
+      vertPos[i] = {in.vertPos[3 * i], in.vertPos[3 * i + 1],
+                    in.vertPos[3 * i + 2]};
+      if (!in.vertNormal.empty()) {
+        vertNormal[i] = {in.vertNormal[3 * i], in.vertNormal[3 * i + 1],
+                         in.vertNormal[3 * i + 2]};
+      }
+    }
+    for (int i = 0; i < numTri; ++i) {
+      triVerts[i] = {in.triVerts[3 * i], in.triVerts[3 * i + 1],
+                     in.triVerts[3 * i + 2]};
+      if (!in.halfedgeTangent.empty()) {
+        for (const int j : {0, 1, 2})
+          halfedgeTangent[3 * i + j] = {
+              in.halfedgeTangent[4 * (3 * i + j)],
+              in.halfedgeTangent[4 * (3 * i + j) + 1],
+              in.halfedgeTangent[4 * (3 * i + j) + 2],
+              in.halfedgeTangent[4 * (3 * i + j) + 3]};
+      }
+    }
+  }
 };
 
 /**
@@ -483,19 +510,6 @@ struct ExecutionParams {
 };
 
 #ifdef MANIFOLD_DEBUG
-/**
- * Print the contents of this vector to standard output. Only exists if compiled
- * with MANIFOLD_DEBUG flag.
- */
-template <typename T>
-void Dump(const std::vector<T>& vec) {
-  std::cout << "Vec = " << std::endl;
-  for (int i = 0; i < vec.size(); ++i) {
-    std::cout << i << ", " << vec[i] << ", " << std::endl;
-  }
-  std::cout << std::endl;
-}
-/** @} */
 
 inline std::ostream& operator<<(std::ostream& stream, const Box& box) {
   return stream << "min: " << box.min.x << ", " << box.min.y << ", "
@@ -532,6 +546,20 @@ inline std::ostream& operator<<(std::ostream& stream, const BaryRef& ref) {
                 << ", originalID: " << ref.originalID << ", tri: " << ref.tri
                 << ", uvw idx: " << ref.vertBary;
 }
+
+/**
+ * Print the contents of this vector to standard output. Only exists if compiled
+ * with MANIFOLD_DEBUG flag.
+ */
+template <typename T>
+void Dump(const std::vector<T>& vec) {
+  std::cout << "Vec = " << std::endl;
+  for (int i = 0; i < vec.size(); ++i) {
+    std::cout << i << ", " << vec[i] << ", " << std::endl;
+  }
+  std::cout << std::endl;
+}
+/** @} */
 #endif
 }  // namespace manifold
 
