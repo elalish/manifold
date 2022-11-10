@@ -153,11 +153,13 @@ Module.setup = function() {
     constructor({
       triVerts = new Uint32Array(),
       vertPos = new Float32Array(),
-      vertNormal
+      vertNormal,
+      halfedgeTangent
     } = {}) {
       this.triVerts = triVerts;
       this.vertPos = vertPos;
       this.vertNormal = vertNormal;
+      this.halfedgeTangent = halfedgeTangent;
     }
 
     get numTri() {
@@ -178,6 +180,10 @@ Module.setup = function() {
 
     normal(vert) {
       return this.vertNormal.subarray(3 * vert, 3 * (vert + 1));
+    }
+
+    tangent(halfedge) {
+      return this.halfedgeTangent.subarray(4 * halfedge, 4 * (halfedge + 1));
     }
   }
 

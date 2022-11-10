@@ -80,6 +80,10 @@ MeshGL MeshJS2GL(const val& mesh) {
   if (mesh["vertNormal"] != val::undefined()) {
     out.vertNormal = convertJSArrayToNumberVector<float>(mesh["vertNormal"]);
   }
+  if (mesh["halfedgeTangent"] != val::undefined()) {
+    out.halfedgeTangent =
+        convertJSArrayToNumberVector<float>(mesh["halfedgeTangent"]);
+  }
   return out;
 }
 

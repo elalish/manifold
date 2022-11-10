@@ -161,6 +161,7 @@ struct MeshGL {
   std::vector<float> vertPos;
   std::vector<float> vertNormal;
   std::vector<uint32_t> triVerts;
+  std::vector<float> halfedgeTangent;
 };
 
 /**
@@ -212,6 +213,14 @@ struct Mesh {
     for (int i = 0; i < numTri; ++i) {
       triVerts[i] = {in.triVerts[3 * i], in.triVerts[3 * i + 1],
                      in.triVerts[3 * i + 2]};
+      if (!in.halfedgeTangent.empty()) {
+        for (const int j : {0, 1, 2})
+          halfedgeTangent[3 * i + j] = {
+              in.halfedgeTangent[4 * (3 * i + j)],
+              in.halfedgeTangent[4 * (3 * i + j) + 1],
+              in.halfedgeTangent[4 * (3 * i + j) + 2],
+              in.halfedgeTangent[4 * (3 * i + j) + 3]};
+      }
     }
   }
 };

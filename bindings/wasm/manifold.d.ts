@@ -22,11 +22,13 @@ declare class Mesh {
   vertPos: Float32Array;
   triVerts: Uint32Array;
   vertNormal?: Float32Array;
+  halfedgeTangent?: Float32Array;
   get numTri(): number;
   get numVert(): number;
   verts(tri: number): Uint32Array<3>;
   position(vert: number): Float32Array<3>;
   normal(vert: number): Float32Array<3>;
+  tangent(halfedge: number): Float32Array<4>;
 }
 type SerializedVec3 = {
   x: number,
