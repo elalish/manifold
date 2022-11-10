@@ -149,6 +149,21 @@ using Polygons = std::vector<SimplePolygon>;
 /** @} */
 
 /**
+ * An alternative to Mesh for output suitable for pushing into graphics
+ * libraries directly.
+ */
+struct MeshGL {
+  /// Number of vertices
+  int NumVert() const { return this->vertPos.size() / 3; };
+  /// Number of triangles
+  int NumTri() const { return this->triVerts.size() / 3; };
+
+  std::vector<float> vertPos;
+  std::vector<float> vertNormal;
+  std::vector<uint32_t> triVerts;
+};
+
+/**
  * The triangle-mesh input and output of this library.
  */
 struct Mesh {
@@ -166,21 +181,30 @@ struct Mesh {
   /// as 3 * tri + i, representing the tangent from Mesh.triVerts[tri][i] along
   /// the CCW edge. If empty, mesh is faceted.
   std::vector<glm::vec4> halfedgeTangent;
-};
 
-/**
- * An alternative to Mesh for output suitable for pushing into graphics
- * libraries directly.
- */
-struct MeshGL {
-  /// Number of vertices
-  int NumVert() const { return this->vertPos.size() / 3; };
-  /// Number of triangles
-  int NumTri() const { return this->triVerts.size() / 3; };
+  Mesh() {}
+  Mesh(const MeshGL& in) {
+    const int numTri = in.NumTri();
+    const int numVert = in.NumVert();
+    triVerts.resize(numTri);
+    vertPos.resize(numVert);
+    if (!in.vertNormal.empty()) {
+      vertNormal.resize(numVert);
+    }
 
-  std::vector<float> vertPos;
-  std::vector<float> vertNormal;
-  std::vector<uint32_t> triVerts;
+    for (int i = 0; i < numVert; ++i) {
+      vertPos[i] = {in.vertPos[3 * i], in.vertPos[3 * i + 1],
+                    in.vertPos[3 * i + 2]};
+      if (!in.vertNormal.empty()) {
+        vertNormal[i] = {in.vertNormal[3 * i], in.vertNormal[3 * i + 1],
+                         in.vertNormal[3 * i + 2]};
+      }
+    }
+    for (int i = 0; i < numTri; ++i) {
+      triVerts[i] = {in.triVerts[3 * i], in.triVerts[3 * i + 1],
+                     in.triVerts[3 * i + 2]};
+    }
+  }
 };
 
 /**

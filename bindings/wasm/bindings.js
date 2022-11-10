@@ -150,7 +150,11 @@ Module.setup = function() {
   };
 
   class Mesh {
-    constructor({triVerts, vertPos, vertNormal}) {
+    constructor({
+      triVerts = new Uint32Array(),
+      vertPos = new Float32Array(),
+      vertNormal = new Float32Array()
+    } = {}) {
       this.triVerts = triVerts;
       this.vertPos = vertPos;
       this.vertNormal = vertNormal;
@@ -284,12 +288,10 @@ Module.setup = function() {
   };
 
   Module.smooth = function(mesh, sharpenedEdges = []) {
-    const meshVec = mesh2vec(mesh);
     const sharp = new Module.Vector_smoothness();
     toVec(sharp, sharpenedEdges);
-    const result = Module._Smooth(meshVec, sharp);
+    const result = Module._Smooth(mesh, sharp);
     sharp.delete();
-    disposeMesh(meshVec);
     return result;
   };
 

@@ -73,12 +73,19 @@ val GetMeshJS(const Manifold& manifold) {
   return meshJS;
 }
 
-Manifold FromMeshJS(const val& mesh) {
-  MeshGL input;
-  input.vertPos = convertJSArrayToNumberVector<float>(mesh["vertPos"]);
-  input.vertNormal = convertJSArrayToNumberVector<float>(mesh["vertNormal"]);
-  input.triVerts = convertJSArrayToNumberVector<uint32_t>(mesh["triVerts"]);
-  return Manifold(input);
+MeshGL MeshJS2GL(const val& mesh) {
+  MeshGL out;
+  out.vertPos = convertJSArrayToNumberVector<float>(mesh["vertPos"]);
+  out.vertNormal = convertJSArrayToNumberVector<float>(mesh["vertNormal"]);
+  out.triVerts = convertJSArrayToNumberVector<uint32_t>(mesh["triVerts"]);
+  return out;
+}
+
+Manifold FromMeshJS(const val& mesh) { return Manifold(MeshJS2GL(mesh)); }
+
+Manifold Smooth(const val& mesh,
+                const std::vector<Smoothness>& sharpenedEdges = {}) {
+  return Manifold::Smooth(MeshJS2GL(mesh), sharpenedEdges);
 }
 
 Manifold Extrude(std::vector<std::vector<glm::vec2>>& polygons, float height,
@@ -215,7 +222,7 @@ EMSCRIPTEN_BINDINGS(whatever) {
   function("_Cylinder", &Manifold::Cylinder);
   function("_Sphere", &Manifold::Sphere);
   function("tetrahedron", &Manifold::Tetrahedron);
-  function("_Smooth", &Manifold::Smooth);
+  function("_Smooth", &Smooth);
   function("_Extrude", &Extrude);
   function("_Revolve", &Revolve);
   function("_LevelSet", &LevelSetJs);

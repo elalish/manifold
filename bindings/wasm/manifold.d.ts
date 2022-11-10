@@ -18,7 +18,7 @@ type Vec4 = [number, number, number, number];
 type Matrix3x4 = [Vec3, Vec3, Vec3, Vec3];
 type SimplePolygon = Vec2[];
 type Polygons = SimplePolygon|SimplePolygon[];
-interface Mesh {
+declare class Mesh {
   vertPos: Float32Array;
   triVerts: Uint32Array;
   vertNormal?: Float32Array;

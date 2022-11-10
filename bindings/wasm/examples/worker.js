@@ -29,7 +29,7 @@ const constructors = [
 ];
 const utils = [
   'setMinCircularAngle', 'setMinCircularEdgeLength', 'setCircularSegments',
-  'getCircularSegments'
+  'getCircularSegments', 'Mesh'
 ];
 const exposedFunctions = constructors.concat(utils);
 

@@ -115,34 +115,6 @@ Manifold::Manifold(const Mesh& mesh,
           mesh, triProperties, properties, propertyTolerance))) {}
 
 /**
- * Same as the Mesh constructor, but allowing GL-style flat-buffers instead
- * using MeshGL.
- */
-Manifold::Manifold(const MeshGL& mesh,
-                   const std::vector<glm::ivec3>& triProperties,
-                   const std::vector<float>& properties,
-                   const std::vector<float>& propertyTolerance) {
-  Mesh input;
-  const int numVert = mesh.NumVert();
-  const int numTri = mesh.NumTri();
-  input.vertPos.resize(numVert);
-  input.vertNormal.resize(numVert);
-  input.triVerts.resize(numTri);
-  for (int i = 0; i < numVert; ++i) {
-    input.vertPos[i] = {mesh.vertPos[3 * i], mesh.vertPos[3 * i + 1],
-                        mesh.vertPos[3 * i + 2]};
-    input.vertNormal[i] = {mesh.vertNormal[3 * i], mesh.vertNormal[3 * i + 1],
-                           mesh.vertNormal[3 * i + 2]};
-  }
-  for (int i = 0; i < numTri; ++i) {
-    input.triVerts[i] = {mesh.triVerts[3 * i], mesh.triVerts[3 * i + 1],
-                         mesh.triVerts[3 * i + 2]};
-  }
-  pNode_ = std::make_shared<CsgLeafNode>(std::make_shared<Impl>(
-      input, triProperties, properties, propertyTolerance));
-}
-
-/**
  * This returns a Mesh of simple vectors of vertices and triangles suitable for
  * saving or other operations outside of the context of this library.
  */

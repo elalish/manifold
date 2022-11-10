@@ -155,8 +155,9 @@ exports.functions = {
     const sharpness = 0.8;
     const n = 50;
 
-    const scallop = {vertPos: [], triVerts: []};
-    scallop.vertPos.push([-offset, 0, height], [-offset, 0, -height]);
+    const vertPos = [];
+    const triVerts = [];
+    vertPos.push(-offset, 0, height, -offset, 0, -height);
     const sharpenedEdges = [];
 
     const delta = 3.14159 / wiggles;
@@ -164,23 +165,25 @@ exports.functions = {
       const theta = (i - wiggles) * delta;
       const amp = 0.5 * height * Math.max(Math.cos(0.8 * theta), 0);
 
-      scallop.vertPos.push([
-        radius * Math.cos(theta), radius * Math.sin(theta),
-        amp * (i % 2 == 0 ? 1 : -1)
-      ]);
+      vertPos.push(
+          radius * Math.cos(theta), radius * Math.sin(theta),
+          amp * (i % 2 == 0 ? 1 : -1));
       let j = i + 1;
       if (j == 2 * wiggles) j = 0;
 
       const smoothness = 1 - sharpness * Math.cos((theta + delta / 2) / 2);
-      let halfedge = 3 * scallop.triVerts.length + 1;
+      let halfedge = triVerts.length + 1;
       sharpenedEdges.push({halfedge, smoothness});
-      scallop.triVerts.push([0, 2 + i, 2 + j]);
+      triVerts.push(0, 2 + i, 2 + j);
 
-      halfedge = 3 * scallop.triVerts.length + 1;
+      halfedge = triVerts.length + 1;
       sharpenedEdges.push({halfedge, smoothness});
-      scallop.triVerts.push([1, 2 + j, 2 + i]);
+      triVerts.push(1, 2 + j, 2 + i);
     }
 
+    const scallop = new Mesh();
+    scallop.triVerts = Uint32Array.from(triVerts);
+    scallop.vertPos = Float32Array.from(vertPos);
     const result = smooth(scallop, sharpenedEdges).refine(n);
     return result;
   },
