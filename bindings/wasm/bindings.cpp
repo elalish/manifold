@@ -69,6 +69,10 @@ val GetMeshJS(const Manifold& manifold) {
   meshJS.set("vertNormal", val(typed_memory_view(mesh.vertNormal.size(),
                                                  mesh.vertNormal.data()))
                                .call<val>("slice"));
+  meshJS.set("halfedgeTangent",
+             val(typed_memory_view(mesh.halfedgeTangent.size(),
+                                   mesh.halfedgeTangent.data()))
+                 .call<val>("slice"));
 
   return meshJS;
 }

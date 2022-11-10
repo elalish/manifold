@@ -141,27 +141,34 @@ Mesh Manifold::GetMesh() const {
 MeshGL Manifold::GetMeshGL() const {
   const Impl& impl = *GetCsgLeafNode().GetImpl();
 
-  int numVert = NumVert();
-  int numTri = NumTri();
+  const int numVert = NumVert();
+  const int numTri = NumTri();
 
   MeshGL out;
   out.vertPos.resize(3 * numVert);
   out.vertNormal.resize(3 * numVert);
   out.triVerts.resize(3 * numTri);
   for (int i = 0; i < numVert; ++i) {
-    glm::vec3 v = impl.vertPos_[i];
+    const glm::vec3 v = impl.vertPos_[i];
     out.vertPos[3 * i] = v.x;
     out.vertPos[3 * i + 1] = v.y;
     out.vertPos[3 * i + 2] = v.z;
-  }
-  for (int i = 0; i < numVert; ++i) {
-    glm::vec3 v = impl.vertNormal_[i];
-    out.vertNormal[3 * i] = v.x;
-    out.vertNormal[3 * i + 1] = v.y;
-    out.vertNormal[3 * i + 2] = v.z;
+    const glm::vec3 n = impl.vertNormal_[i];
+    out.vertNormal[3 * i] = n.x;
+    out.vertNormal[3 * i + 1] = n.y;
+    out.vertNormal[3 * i + 2] = n.z;
   }
   for (int i = 0; i < numTri * 3; ++i) {
     out.triVerts[i] = impl.halfedge_[i].startVert;
+  }
+  const int numHalfedge = impl.halfedgeTangent_.size();
+  out.halfedgeTangent.resize(4 * numHalfedge);
+  for (int i = 0; i < numHalfedge; ++i) {
+    const glm::vec4 t = impl.halfedgeTangent_[i];
+    out.halfedgeTangent[4 * i] = t.x;
+    out.halfedgeTangent[4 * i + 1] = t.y;
+    out.halfedgeTangent[4 * i + 2] = t.z;
+    out.halfedgeTangent[4 * i + 3] = t.w;
   }
 
   return out;

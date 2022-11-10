@@ -50,34 +50,6 @@ Module.setup = function() {
     polygonsVec.delete();
   }
 
-  function mesh2vec(mesh) {
-    const vertPos = toVec(new Module.Vector_vec3, mesh.vertPos, p => {
-      return {
-        x: p[0], y: p[1], z: p[2]
-      }
-    });
-    const triVerts = toVec(new Module.Vector_ivec3, mesh.triVerts);
-    const vertNormal = toVec(new Module.Vector_vec3, mesh.vertNormal, p => {
-      return {
-        x: p[0], y: p[1], z: p[2]
-      }
-    });
-    const halfedgeTangent =
-        toVec(new Module.Vector_vec4, mesh.halfedgeTangent, p => {
-          return {
-            x: p[0], y: p[1], z: p[2], w: p[3]
-          }
-        });
-    return {vertPos, triVerts, vertNormal, halfedgeTangent};
-  }
-
-  function disposeMesh(meshVec) {
-    meshVec.vertPos.delete();
-    meshVec.triVerts.delete();
-    meshVec.vertNormal.delete();
-    meshVec.halfedgeTangent.delete();
-  }
-
   function vararg2vec(vec) {
     if (vec[0] instanceof Array)
       return {x: vec[0][0], y: vec[0][1], z: vec[0][2]};

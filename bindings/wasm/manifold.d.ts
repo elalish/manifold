@@ -18,38 +18,6 @@ type Vec4 = [number, number, number, number];
 type Matrix3x4 = [Vec3, Vec3, Vec3, Vec3];
 type SimplePolygon = Vec2[];
 type Polygons = SimplePolygon|SimplePolygon[];
-declare class Mesh {
-  vertPos: Float32Array;
-  triVerts: Uint32Array;
-  vertNormal?: Float32Array;
-  halfedgeTangent?: Float32Array;
-  get numTri(): number;
-  get numVert(): number;
-  verts(tri: number): Uint32Array<3>;
-  position(vert: number): Float32Array<3>;
-  normal(vert: number): Float32Array<3>;
-  tangent(halfedge: number): Float32Array<4>;
-}
-type SerializedVec3 = {
-  x: number,
-  y: number,
-  z: number,
-};
-type SerializedVec4 = {
-  x: number,
-  y: number,
-  z: number,
-  w: number,
-};
-interface Vector<T> {
-  get(idx: number): T;
-  push_back(value: T): void;
-  resize(count: number, value: T): void;
-  set(idx: number, value: T): void;
-  size(): number;
-}
-type Vector_vec3 = Vector<SerializedVec3>;
-type Vector_vec4 = Vector<SerializedVec4>;
 type Box = {
   min: Vec3,
   max: Vec3
@@ -80,6 +48,19 @@ type MeshRelation = {
   barycentric: Vec3[],
   triBary: BaryRef[],
 };
+
+declare class Mesh {
+  vertPos: Float32Array;
+  triVerts: Uint32Array;
+  vertNormal?: Float32Array;
+  halfedgeTangent?: Float32Array;
+  get numTri(): number;
+  get numVert(): number;
+  verts(tri: number): Uint32Array<3>;
+  position(vert: number): Float32Array<3>;
+  normal(vert: number): Float32Array<3>;
+  tangent(halfedge: number): Float32Array<4>;
+}
 
 declare class Manifold {
   /**
