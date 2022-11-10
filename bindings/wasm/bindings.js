@@ -153,7 +153,7 @@ Module.setup = function() {
     constructor({
       triVerts = new Uint32Array(),
       vertPos = new Float32Array(),
-      vertNormal = new Float32Array()
+      vertNormal
     } = {}) {
       this.triVerts = triVerts;
       this.vertPos = vertPos;

@@ -75,9 +75,11 @@ val GetMeshJS(const Manifold& manifold) {
 
 MeshGL MeshJS2GL(const val& mesh) {
   MeshGL out;
-  out.vertPos = convertJSArrayToNumberVector<float>(mesh["vertPos"]);
-  out.vertNormal = convertJSArrayToNumberVector<float>(mesh["vertNormal"]);
   out.triVerts = convertJSArrayToNumberVector<uint32_t>(mesh["triVerts"]);
+  out.vertPos = convertJSArrayToNumberVector<float>(mesh["vertPos"]);
+  if (mesh["vertNormal"] != val::undefined()) {
+    out.vertNormal = convertJSArrayToNumberVector<float>(mesh["vertNormal"]);
+  }
   return out;
 }
 
