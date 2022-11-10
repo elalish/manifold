@@ -182,7 +182,16 @@ struct Mesh {
   /// the CCW edge. If empty, mesh is faceted.
   std::vector<glm::vec4> halfedgeTangent;
 
-  Mesh() {}
+  Mesh() = default;
+  Mesh(const std::vector<glm::vec3>& vertPos_,
+       const std::vector<glm::ivec3>& triVerts_,
+       const std::vector<glm::vec3>& vertNormal_ = {},
+       const std::vector<glm::vec4>& halfedgeTangent_ = {})
+      : vertPos(vertPos_),
+        triVerts(triVerts_),
+        vertNormal(vertNormal_),
+        halfedgeTangent(halfedgeTangent_) {}
+
   Mesh(const MeshGL& in) {
     const int numTri = in.NumTri();
     const int numVert = in.NumVert();
