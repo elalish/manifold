@@ -21,6 +21,7 @@
 #include <map>
 
 #include "graph.h"
+#include "hashtable.h"
 #include "par.h"
 
 namespace {
@@ -173,15 +174,16 @@ struct InitializeBaryRef {
 };
 
 struct MarkMeshID {
-  int* includesMeshID;
+  HashTableD<uint32_t> table;
 
   __host__ __device__ void operator()(BaryRef& ref) {
-    includesMeshID[ref.meshID] = 1;
+    if (table.Full()) return;
+    table.Insert(ref.meshID, 1);
   }
 };
 
 struct UpdateMeshID {
-  const int* meshIDold2new;
+  const HashTableD<uint32_t> meshIDold2new;
   const int meshIDoffset;
 
   __host__ __device__ void operator()(BaryRef& ref) {
@@ -303,7 +305,9 @@ Manifold::Impl::Impl(const Mesh& mesh,
                      const std::vector<glm::ivec3>& triProperties,
                      const std::vector<float>& properties,
                      const std::vector<float>& propertyTolerance)
-    : vertPos_(mesh.vertPos), halfedgeTangent_(mesh.halfedgeTangent) {
+    : vertPos_(mesh.vertPos),
+      halfedgeTangent_(mesh.halfedgeTangent),
+      meshids(1) {
   VecDH<glm::ivec3> triVerts = mesh.triVerts;
   if (!IsIndexInBounds(triVerts)) {
     MarkFailure(Error::VERTEX_INDEX_OUT_OF_BOUNDS);
@@ -335,7 +339,7 @@ Manifold::Impl::Impl(const Mesh& mesh,
  * Create either a unit tetrahedron, cube or octahedron. The cube is in the
  * first octant, while the others are symmetric about the origin.
  */
-Manifold::Impl::Impl(Shape shape) {
+Manifold::Impl::Impl(Shape shape) : meshids(1) {
   std::vector<glm::vec3> vertPos;
   std::vector<glm::ivec3> triVerts;
   switch (shape) {
@@ -408,6 +412,7 @@ void Manifold::Impl::ReinitializeReference(int meshID) {
              zip(meshRelation_.triBary.begin(), countAt(0)), NumTri(),
              InitializeBaryRef({meshID, halfedge_.cptrD()}));
   meshRelation_.originalID = meshID;
+  meshids = 1;
 }
 
 int Manifold::Impl::InitializeNewReference(
@@ -575,6 +580,7 @@ Manifold::Impl Manifold::Impl::Transform(const glm::mat4x3& transform_) const {
   if (transform_ == glm::mat4x3(1.0f)) return *this;
   auto policy = autoPolicy(NumVert());
   Impl result;
+  result.meshids = meshids;
   result.collider_ = collider_;
   result.meshRelation_ = meshRelation_;
   result.precision_ = precision_;
@@ -655,25 +661,24 @@ void Manifold::Impl::IncrementMeshIDs(int start, int length) {
   ASSERT(start >= 0 && length >= 0 && start + length <= triBary.size(),
          logicErr, "out of bounds");
   const auto policy = autoPolicy(length);
-  // Use double the space since the Boolean has P and Q instances.
-  VecDH<int> includesMeshID(2 * Manifold::Impl::meshIDCounter_, 0);
+  HashTable<uint32_t> meshidTable(std::max(16u, meshids));
 
   auto begin = triBary.begin() + start;
   auto end = begin + length;
-
-  for_each(policy, begin, end, MarkMeshID({includesMeshID.ptrD()}));
-
-  inclusive_scan(autoPolicy(includesMeshID.size()), includesMeshID.begin(),
-                 includesMeshID.end(), includesMeshID.begin());
-
-  const int numMeshIDs = includesMeshID[includesMeshID.size() - 1];
+  while (1) {
+    for_each(policy, begin, end, MarkMeshID({meshidTable.D()}));
+    if (!meshidTable.Full()) break;
+    meshidTable = HashTable<uint32_t>(meshidTable.Size() * 2);
+  }
+  inclusive_scan(
+      autoPolicy(meshidTable.Size()), meshidTable.GetValueStore().begin(),
+      meshidTable.GetValueStore().end(), meshidTable.GetValueStore().begin());
+  const int numMeshIDs = meshidTable.GetValueStore().back();
   const int meshIDstart = Manifold::Impl::meshIDCounter_.fetch_add(
       numMeshIDs, std::memory_order_relaxed);
-
   // We do start - 1 because the inclusive scan makes our first index 1 instead
   // of 0.
-  for_each(policy, begin, end,
-           UpdateMeshID({includesMeshID.cptrD(), meshIDstart - 1}));
+  for_each(policy, begin, end, UpdateMeshID({meshidTable.D(), meshIDstart}));
 }
 
 /**

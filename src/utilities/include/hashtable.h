@@ -37,10 +37,10 @@ __host__ __device__ T AtomicCAS(T& target, T compare, T val) {
 
 // https://stackoverflow.com/questions/664014/what-integer-hash-function-are-good-that-accepts-an-integer-hash-key
 __host__ __device__ inline Uint64 hash64bit(Uint64 x) {
-    x = (x ^ (x >> 30)) * 0xbf58476d1ce4e5b9ull;
-    x = (x ^ (x >> 27)) * 0x94d049bb133111ebull;
-    x = x ^ (x >> 31);
-    return x;
+  x = (x ^ (x >> 30)) * 0xbf58476d1ce4e5b9ull;
+  x = (x ^ (x >> 27)) * 0x94d049bb133111ebull;
+  x = x ^ (x >> 31);
+  return x;
 }
 }  // namespace
 
@@ -63,7 +63,7 @@ class HashTableD {
   __host__ __device__ void Insert(Uint64 key, const V& val) {
     uint32_t idx = hash64bit(key) & (Size() - 1);
     while (1) {
-      Uint64 &k = keys_[idx];
+      Uint64& k = keys_[idx];
       const Uint64 found = AtomicCAS(k, kOpen, key);
       if (found == kOpen) {
         AtomicAdd(used_[0], 0x1u);

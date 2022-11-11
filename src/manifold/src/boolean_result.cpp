@@ -572,6 +572,7 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
 
   // Create the output Manifold
   Manifold::Impl outR;
+  outR.meshids = inP_.meshids + inQ_.meshids;
 
   if (numVertR == 0) return outR;
 

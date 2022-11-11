@@ -14,10 +14,10 @@
 
 #pragma once
 
+#include "hashtable.h"
 #include "public.h"
 #include "utils.h"
 #include "vec_dh.h"
-#include "hashtable.h"
 
 namespace {
 using namespace manifold;
