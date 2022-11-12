@@ -53,7 +53,7 @@ template <typename V>
 class HashTableD {
  public:
   HashTableD(VecDH<Uint64>& keys, VecDH<V>& values, VecDH<uint32_t>& used,
-             uint32_t step = 127)
+             uint32_t step = 1)
       : step_{step}, keys_{keys}, values_{values}, used_{used} {}
 
   __host__ __device__ int Size() const { return keys_.size(); }
@@ -96,7 +96,7 @@ class HashTableD {
 template <typename V>
 class HashTable {
  public:
-  HashTable(uint32_t size, uint32_t step = 127)
+  HashTable(uint32_t size, uint32_t step = 1)
       : keys_{1 << (int)ceil(log2(size)), kOpen},
         values_{1 << (int)ceil(log2(size)), {}},
         table_{keys_, values_, used_, step} {}

@@ -661,7 +661,7 @@ void Manifold::Impl::IncrementMeshIDs(int start, int length) {
   ASSERT(start >= 0 && length >= 0 && start + length <= triBary.size(),
          logicErr, "out of bounds");
   const auto policy = autoPolicy(length);
-  HashTable<uint32_t> meshidTable(std::max(16u, meshids));
+  HashTable<uint32_t> meshidTable(std::max(16u, meshids * 2));
 
   auto begin = triBary.begin() + start;
   auto end = begin + length;
