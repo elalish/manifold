@@ -31,6 +31,8 @@ exports.functions = {
     // This means it will work equally well offline once loaded.
     // To share your code with another browser/device, simply copy the text to a
     // file.
+
+    // See the script drop-down above ("Intro") for usage examples.
     return result;
   },
 
