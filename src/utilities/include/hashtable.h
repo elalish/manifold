@@ -49,7 +49,7 @@ namespace manifold {
  *  @{
  */
 
-template <typename V>
+template <typename V, auto H = hash64bit>
 class HashTableD {
  public:
   HashTableD(VecDH<Uint64>& keys, VecDH<V>& values, VecDH<uint32_t>& used,
@@ -61,7 +61,7 @@ class HashTableD {
   __host__ __device__ bool Full() const { return used_[0] * 2 > Size(); }
 
   __host__ __device__ void Insert(Uint64 key, const V& val) {
-    uint32_t idx = hash64bit(key) & (Size() - 1);
+    uint32_t idx = H(key) & (Size() - 1);
     while (1) {
       Uint64& k = keys_[idx];
       const Uint64 found = AtomicCAS(k, kOpen, key);
@@ -76,7 +76,7 @@ class HashTableD {
   }
 
   __host__ __device__ V& operator[](Uint64 key) const {
-    uint32_t idx = hash64bit(key) & (Size() - 1);
+    uint32_t idx = H(key) & (Size() - 1);
     while (1) {
       if (keys_[idx] == key || keys_[idx] == kOpen) return values_[idx];
       idx = (idx + step_) & (Size() - 1);
@@ -93,7 +93,7 @@ class HashTableD {
   VecD<uint32_t> used_;
 };
 
-template <typename V>
+template <typename V, auto H = hash64bit>
 class HashTable {
  public:
   HashTable(uint32_t size, uint32_t step = 1)
@@ -101,7 +101,7 @@ class HashTable {
         values_{1 << (int)ceil(log2(size)), {}},
         table_{keys_, values_, used_, step} {}
 
-  HashTableD<V> D() { return table_; }
+  HashTableD<V, H> D() { return table_; }
 
   int Entries() const { return used_[0]; }
 
@@ -117,7 +117,7 @@ class HashTable {
   VecDH<Uint64> keys_;
   VecDH<V> values_;
   VecDH<uint32_t> used_ = VecDH<uint32_t>(1, 0);
-  HashTableD<V> table_;
+  HashTableD<V, H> table_;
 };
 
 /** @} */

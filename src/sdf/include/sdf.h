@@ -21,6 +21,8 @@
 
 namespace {
 using namespace manifold;
+__host__ __device__ Uint64 identity(Uint64 x) { return x; }
+
 __host__ __device__ int Next3(int i) {
   constexpr glm::ivec3 next3(1, 2, 0);
   return next3[i];
@@ -134,7 +136,7 @@ template <typename Func>
 struct ComputeVerts {
   glm::vec3* vertPos;
   int* vertIndex;
-  HashTableD<GridVert> gridVerts;
+  HashTableD<GridVert, identity> gridVerts;
   const Func sdf;
   const glm::vec3 origin;
   const glm::ivec3 gridSize;
@@ -198,7 +200,7 @@ struct ComputeVerts {
 struct BuildTris {
   glm::ivec3* triVerts;
   int* triIndex;
-  const HashTableD<GridVert> gridVerts;
+  const HashTableD<GridVert, identity> gridVerts;
 
   __host__ __device__ void CreateTri(const glm::ivec3& tri,
                                      const int edges[6]) {
@@ -323,7 +325,7 @@ inline Mesh LevelSet(Func sdf, Box bounds, float edgeLength, float level = 0) {
 
   int tableSize = glm::min(
       2 * maxMorton, static_cast<Uint64>(10 * glm::pow(maxMorton, 0.667)));
-  HashTable<GridVert> gridVerts(tableSize);
+  HashTable<GridVert, identity> gridVerts(tableSize);
   VecDH<glm::vec3> vertPos(gridVerts.Size() * 7);
 
   while (1) {
@@ -342,7 +344,7 @@ inline Mesh LevelSet(Func sdf, Box bounds, float edgeLength, float level = 0) {
         tableSize *= 2;
       else
         tableSize *= ratio;
-      gridVerts = HashTable<GridVert>(tableSize);
+      gridVerts = HashTable<GridVert, identity>(tableSize);
       vertPos = VecDH<glm::vec3>(gridVerts.Size() * 7);
     } else {  // Success
       vertPos.resize(index[0]);
