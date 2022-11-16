@@ -22,6 +22,7 @@
 
 namespace {
 typedef unsigned long long int Uint64;
+typedef Uint64 (*hash_fun_t)(Uint64);
 constexpr Uint64 kOpen = std::numeric_limits<Uint64>::max();
 
 template <typename T>
@@ -49,7 +50,7 @@ namespace manifold {
  *  @{
  */
 
-template <typename V, auto H = hash64bit>
+template <typename V, hash_fun_t H = hash64bit>
 class HashTableD {
  public:
   HashTableD(VecDH<Uint64>& keys, VecDH<V>& values, VecDH<uint32_t>& used,
@@ -93,7 +94,7 @@ class HashTableD {
   VecD<uint32_t> used_;
 };
 
-template <typename V, auto H = hash64bit>
+template <typename V, hash_fun_t H = hash64bit>
 class HashTable {
  public:
   HashTable(uint32_t size, uint32_t step = 1)
