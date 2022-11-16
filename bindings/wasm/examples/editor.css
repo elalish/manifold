@@ -56,7 +56,7 @@ a:active {
 }
 
 button:disabled {
-  color:black;
+  color: black;
   background-color: #eee !important;
   cursor: auto;
 }
@@ -87,9 +87,9 @@ p {
 }
 
 model-viewer {
-  position: relative; 
-  flex: 3; 
-  width: 100%; 
+  position: relative;
+  flex: 3;
+  width: 100%;
   background-color: #ddd;
 }
 
@@ -180,14 +180,14 @@ model-viewer {
 }
 
 .cancel {
-  background-image: url(close.png);
+  background-image: url(icons/close.png);
   background-size: 20px;
   background-repeat: no-repeat;
   background-position: center;
 }
 
 .icon:hover {
-  background-color: rgba(0,0,0,0.2);
+  background-color: rgba(0, 0, 0, 0.2);
 }
 
 .blue {

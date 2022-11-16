@@ -115,7 +115,7 @@ function uniqueName(name) {
 function addEdit(button) {
   const label = button.firstChild;
   const edit = addIcon(button);
-  edit.style.backgroundImage = 'url(pencil.png)';
+  edit.style.backgroundImage = 'url(icons/pencil.png)';
   edit.style.right = '30px';
 
   edit.onclick = function(event) {
@@ -156,7 +156,7 @@ function addEdit(button) {
   };
 
   const trash = addIcon(button);
-  trash.style.backgroundImage = 'url(trash.png)';
+  trash.style.backgroundImage = 'url(icons/trash.png)';
   trash.style.right = '0px';
   let lastClick = 0;
 
@@ -197,7 +197,7 @@ newButton.onclick = function() {
 const runButton = document.querySelector('#compile');
 const poster = document.querySelector('#poster');
 let manifoldInitialized = false;
-let autoExecute = false;
+let autoExecute = true;
 
 function initializeRun() {
   runButton.disabled = false;
@@ -223,6 +223,7 @@ require(['vs/editor/editor.main'], async function() {
       {language: 'typescript', automaticLayout: true});
   const w = await monaco.languages.typescript.getTypeScriptWorker();
   tsWorker = await w(editor.getModel().uri);
+  editor.getModel().updateOptions({tabSize: 2});
 
   for (const [name] of exampleFunctions) {
     const button = createDropdownItem(name);
