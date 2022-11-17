@@ -42,6 +42,7 @@ struct Manifold::Impl {
   VecDH<glm::vec4> halfedgeTangent_;
   MeshRelationD meshRelation_;
   Collider collider_;
+  unsigned int meshids = 1;
 
   static std::atomic<int> meshIDCounter_;
 
