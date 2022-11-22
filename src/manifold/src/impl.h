@@ -28,6 +28,8 @@ struct Manifold::Impl {
   struct MeshRelationD {
     VecDH<glm::vec3> barycentric;
     VecDH<BaryRef> triBary;
+    VecDH<glm::ivec3> triProperties;
+    VecDH<float> properties;
     /// The meshID of this Manifold if it is an original; -1 otherwise.
     int originalID = -1;
   };
@@ -100,7 +102,7 @@ struct Manifold::Impl {
 
   // face_op.cu
   void Face2Tri(const VecDH<int>& faceEdge, const VecDH<BaryRef>& faceRef,
-                const VecDH<int>& halfedgeBary);
+                const VecDH<int>& halfedgeBary, const VecDH<int>& halfedgeProp);
   Polygons Face2Polygons(int face, glm::mat3x2 projection,
                          const VecDH<int>& faceEdge) const;
 

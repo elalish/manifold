@@ -502,6 +502,143 @@ std::pair<VecDH<BaryRef>, VecDH<int>> CalculateMeshRelation(
 
   return std::make_pair(faceRef, halfedgeBary);
 }
+
+struct PropertiesIncluded {
+  int *vPropKeepP;
+  int *vPropKeepQ;
+
+  const glm::ivec3 *triPropP;
+  const glm::ivec3 *triPropQ;
+  const int firstNewVert;
+
+  __host__ __device__ void operator()(thrust::tuple<Ref, Halfedge> in) {
+    const Ref halfedgeRef = thrust::get<0>(in);
+    const Halfedge halfedgeR = thrust::get<1>(in);
+
+    int *vPropKeep = halfedgeRef.PQ == 0 ? vPropKeepP : vPropKeepQ;
+    const int tri = halfedgeRef.tri;
+    const glm::ivec3 triProp =
+        halfedgeRef.PQ == 0 ? triPropP[tri] : triPropQ[tri];
+
+    if (halfedgeR.startVert < firstNewVert) {  // retained verts only
+      const int prop = triProp[halfedgeRef.vert];
+      vPropKeep[prop] = 1;
+    }
+  }
+};
+
+struct WriteProperties {
+  float *properties;
+  int *idx;
+
+  const Ref *halfedgeRef;
+  const glm::vec3 *barycentric;
+  const int numPropR;
+  const int numPropP;
+  const int numPropQ;
+  const int *vPropP2R;
+  const int *vPropQ2R;
+  const glm::ivec3 *triPropP;
+  const glm::ivec3 *triPropQ;
+  const float *propP;
+  const float *propQ;
+  const int firstNewVert;
+
+  __host__ __device__ void operator()(
+      thrust::tuple<int &, Ref, Halfedge, int> inOut) {
+    int &halfedgeProp = thrust::get<0>(inOut);
+    const Ref thisRef = thrust::get<1>(inOut);
+    const Halfedge halfedgeR = thrust::get<2>(inOut);
+    const int halfedgeBary = thrust::get<3>(inOut);
+
+    const int *vProp2R = thisRef.PQ == 0 ? vPropP2R : vPropQ2R;
+    const glm::ivec3 *triProp = thisRef.PQ == 0 ? triPropP : triPropQ;
+    const float *prop = thisRef.PQ == 0 ? propP : propQ;
+    const int numProp = thisRef.PQ == 0 ? numPropP : numPropQ;
+
+    const int oldProp = triProp[thisRef.tri][thisRef.vert];
+    if (halfedgeR.startVert < firstNewVert) {  // retained vert
+      halfedgeProp = vProp2R[oldProp];
+      for (int i = 0; i < numProp; ++i) {
+        properties[numPropR * halfedgeProp + i] = prop[numProp * oldProp + i];
+      }
+    } else {  // new vert
+      const Ref pairRef = halfedgeRef[halfedgeR.pairedHalfedge];
+      // might be inverted, so check both possible edge pairings
+      const bool continuous =
+          (oldProp == triProp[pairRef.tri][(pairRef.vert + 1) % 3] &&
+           triProp[pairRef.tri][pairRef.vert] ==
+               triProp[thisRef.tri][(thisRef.vert + 1) % 3]) ||
+          (oldProp == triProp[pairRef.tri][(pairRef.vert - 1) % 3] &&
+           triProp[pairRef.tri][pairRef.vert] ==
+               triProp[thisRef.tri][(thisRef.vert - 1) % 3]);
+      if (thisRef.PQ != pairRef.PQ || !continuous) {
+        halfedgeProp = AtomicAdd(*idx, 1);
+        // barycentric interpolation
+        // TODO: we can't use barycentric here - it points back to the original
+        // meshids, when we just want the relation to P and Q. What we want is
+        // the uvw from GetBarycentric(), which means this function needs to be
+        // combined with CreateBarycentric above where that is calculated.
+        const glm::vec3 uvw = barycentric[halfedgeBary];  // this is wrong
+        for (int p = 0; p < numProp; ++p) {
+          glm::vec3 oldProps;
+          for (const int i : {0, 1, 2})
+            oldProps[i] = prop[numProp * triProp[thisRef.tri][i] + p];
+          properties[numPropR * halfedgeProp + p] = glm::dot(uvw, oldProps);
+        }
+      }
+    }
+  }
+};
+
+VecDH<int> CalculateProperties(Manifold::Impl &outR,
+                               const VecDH<Ref> &halfedgeRef,
+                               const VecDH<int> &halfedgeBary,
+                               const Manifold::Impl &inP,
+                               const Manifold::Impl &inQ, int firstNewVert,
+                               ExecutionPolicy policy) {
+  const int numPropP = inP.meshRelation_.properties.size() / inP.NumTri();
+  const int numPropQ = inQ.meshRelation_.properties.size() / inQ.NumTri();
+  const int numPropR = glm::max(numPropP, numPropQ);
+  if (numPropR == 0) return VecDH<int>(0);
+
+  VecDH<int> vPropKeepP(inP.meshRelation_.properties.size(), 0);
+  VecDH<int> vPropKeepQ(inQ.meshRelation_.properties.size(), 0);
+  for_each_n(policy, zip(halfedgeRef.cbegin(), outR.halfedge_.cbegin()),
+             halfedgeRef.size(),
+             PropertiesIncluded({vPropKeepP.ptrD(), vPropKeepQ.ptrD(),
+                                 inP.meshRelation_.triProperties.cptrD(),
+                                 inQ.meshRelation_.triProperties.cptrD(),
+                                 firstNewVert}));
+  VecDH<int> vPropP2R(vPropKeepP.size());
+  VecDH<int> vPropQ2R(vPropKeepQ.size());
+  exclusive_scan(policy, vPropKeepP.begin(), vPropKeepP.end(), vPropP2R.begin(),
+                 0);
+  exclusive_scan(policy, vPropKeepQ.begin(), vPropKeepQ.end(), vPropQ2R.begin(),
+                 vPropP2R.back() + vPropKeepP.back());
+
+  VecDH<int> halfedgeProp(halfedgeRef.size());
+  const int numRetainedProp =
+      vPropP2R.back() + vPropKeepP.back() + vPropQ2R.back() + vPropKeepQ.back();
+  const int numNewVerts = outR.NumVert() - firstNewVert;
+  outR.meshRelation_.properties.resize(
+      (numRetainedProp + 3 * numNewVerts) * numPropR, NAN);
+  VecDH<int> idx(1, numRetainedProp);
+  for_each_n(policy,
+             zip(halfedgeProp.begin(), halfedgeRef.cbegin(),
+                 outR.halfedge_.cbegin(), halfedgeBary.cbegin()),
+             halfedgeRef.size(),
+             WriteProperties(
+                 {outR.meshRelation_.properties.ptrD(), idx.ptrD(),
+                  halfedgeRef.cptrD(), outR.meshRelation_.barycentric.cptrD(),
+                  numPropR, numPropP, numPropQ, vPropP2R.cptrD(),
+                  vPropQ2R.cptrD(), inP.meshRelation_.triProperties.cptrD(),
+                  inQ.meshRelation_.triProperties.cptrD(),
+                  inP.meshRelation_.properties.cptrD(),
+                  inQ.meshRelation_.properties.cptrD(), firstNewVert}));
+  outR.meshRelation_.properties.resize(numPropR * idx[0]);
+  return halfedgeProp;
+}
 }  // namespace
 
 namespace manifold {
@@ -645,6 +782,9 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
   std::tie(faceRef, halfedgeBary) = CalculateMeshRelation(
       outR, halfedgeRef, inP_, inQ_, nPv + nQv, numFaceR, invertQ, policy_);
 
+  VecDH<int> halfedgeProp = CalculateProperties(outR, halfedgeRef, halfedgeBary,
+                                                inP_, inQ_, nPv + nQv, policy_);
+
 #ifdef MANIFOLD_DEBUG
   assemble.Stop();
   Timer triangulate;
@@ -656,7 +796,7 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
   if (ManifoldParams().intermediateChecks)
     ASSERT(outR.IsManifold(), logicErr, "polygon mesh is not manifold!");
 
-  outR.Face2Tri(faceEdge, faceRef, halfedgeBary);
+  outR.Face2Tri(faceEdge, faceRef, halfedgeBary, halfedgeProp);
 
 #ifdef MANIFOLD_DEBUG
   triangulate.Stop();

@@ -215,6 +215,9 @@ void Manifold::Impl::DedupeEdge(const int edge) {
       PairUp(newHalfedge + 1, current);
       if (meshRelation_.triBary.size() > 0)
         meshRelation_.triBary.push_back(meshRelation_.triBary[oldFace]);
+      if (meshRelation_.triProperties.size() > 0)
+        meshRelation_.triProperties.push_back(
+            meshRelation_.triProperties[oldFace]);
       if (faceNormal_.size() > 0) faceNormal_.push_back(faceNormal_[oldFace]);
 
       newHalfedge += 3;
@@ -229,6 +232,9 @@ void Manifold::Impl::DedupeEdge(const int edge) {
       PairUp(newHalfedge, newHalfedge - 3);
       if (meshRelation_.triBary.size() > 0)
         meshRelation_.triBary.push_back(meshRelation_.triBary[oldFace]);
+      if (meshRelation_.triProperties.size() > 0)
+        meshRelation_.triProperties.push_back(
+            meshRelation_.triProperties[oldFace]);
       if (faceNormal_.size() > 0) faceNormal_.push_back(faceNormal_[oldFace]);
 
       break;
@@ -302,6 +308,7 @@ void Manifold::Impl::RemoveIfFolded(int edge) {
 
 void Manifold::Impl::CollapseEdge(const int edge) {
   VecDH<BaryRef>& triBary = meshRelation_.triBary;
+  VecDH<glm::ivec3>& triProp = meshRelation_.triProperties;
 
   const Halfedge toRemove = halfedge_[edge];
   if (toRemove.pairedHalfedge < 0) return;
@@ -366,10 +373,15 @@ void Manifold::Impl::CollapseEdge(const int edge) {
       // Update the shifted triangles to the vertBary of endVert
       const int tri = current / 3;
       const int vIdx = current - 3 * tri;
+      const bool use0 =
+          ref0.meshID == triBary[tri].meshID && ref0.tri == triBary[tri].tri;
       triBary[tri].vertBary[vIdx] =
-          (ref0.meshID == triBary[tri].meshID && ref0.tri == triBary[tri].tri)
-              ? ref0.vertBary[(edge + 1) % 3]
-              : ref1.vertBary[toRemove.pairedHalfedge % 3];
+          use0 ? ref0.vertBary[(edge + 1) % 3]
+               : ref1.vertBary[toRemove.pairedHalfedge % 3];
+      if (triProp.size() > 0)
+        triProp[tri][vIdx] =
+            use0 ? triProp[ref0.tri][(edge + 1) % 3]
+                 : triProp[ref1.tri][toRemove.pairedHalfedge % 3];
     }
 
     const int vert = halfedge_[current].endVert;
@@ -448,6 +460,13 @@ void Manifold::Impl::RecursiveEdgeSwap(const int edge) {
     meshRelation_.barycentric.push_back(uvw2);
     triBary[tri1].vertBary[perm1[0]] = newBary;
     triBary[tri0].vertBary[perm0[2]] = newBary;
+    // Update properties if applicable
+    if (meshRelation_.triProperties.size() > 0) {
+      VecDH<glm::ivec3>& triProp = meshRelation_.triProperties;
+      triProp[tri0] = triProp[tri1];
+      triProp[tri0][perm0[1]] = triProp[tri1][perm1[0]];
+      triProp[tri0][perm0[0]] = triProp[tri1][perm1[2]];
+    }
 
     // if the new edge already exists, duplicate the verts and split the mesh.
     int current = halfedge_[tri1edge[0]].pairedHalfedge;

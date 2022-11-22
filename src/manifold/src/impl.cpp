@@ -425,8 +425,8 @@ int Manifold::Impl::InitializeNewReference(
 
   const int numProps = propertyTolerance.size();
 
-  VecDH<glm::ivec3> triPropertiesD(triProperties);
-  VecDH<float> propertiesD(properties);
+  meshRelation_.triProperties = triProperties;
+  meshRelation_.properties = properties;
   VecDH<float> propertyToleranceD(propertyTolerance);
 
   if (numProps > 0) {
@@ -440,8 +440,10 @@ int Manifold::Impl::InitializeNewReference(
     };
 
     const int numSets = properties.size() / numProps;
-    if (!all_of(autoPolicy(triProperties.size()), triPropertiesD.begin(),
-                triPropertiesD.end(), CheckProperties({numSets}))) {
+    if (!all_of(autoPolicy(triProperties.size()),
+                meshRelation_.triProperties.begin(),
+                meshRelation_.triProperties.end(),
+                CheckProperties({numSets}))) {
       MarkFailure(Error::TRI_PROPERTIES_OUT_OF_BOUNDS);
       return nextMeshID;
     };
@@ -452,7 +454,8 @@ int Manifold::Impl::InitializeNewReference(
   for_each_n(autoPolicy(halfedge_.size()), zip(face2face.begin(), countAt(0)),
              halfedge_.size(),
              CoplanarEdge({triArea.ptrD(), halfedge_.cptrD(), vertPos_.cptrD(),
-                           triPropertiesD.cptrD(), propertiesD.cptrD(),
+                           meshRelation_.triProperties.cptrD(),
+                           meshRelation_.properties.cptrD(),
                            propertyToleranceD.cptrD(), numProps, precision_}));
 
   Graph graph;
