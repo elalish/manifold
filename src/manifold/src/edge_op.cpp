@@ -463,9 +463,20 @@ void Manifold::Impl::RecursiveEdgeSwap(const int edge) {
     // Update properties if applicable
     if (meshRelation_.triProperties.size() > 0) {
       VecDH<glm::ivec3>& triProp = meshRelation_.triProperties;
+      VecDH<float>& prop = meshRelation_.properties;
       triProp[tri0] = triProp[tri1];
       triProp[tri0][perm0[1]] = triProp[tri1][perm1[0]];
       triProp[tri0][perm0[0]] = triProp[tri1][perm1[2]];
+      const int numProp = NumProp();
+      const int newProp = prop.size() / numProp;
+      const int propIdx0 = triProp[tri1][perm1[0]];
+      const int propIdx1 = triProp[tri1][perm1[1]];
+      for (int p = 0; p < numProp; ++p) {
+        prop.push_back(a * prop[numProp * propIdx0 + p] +
+                       (1 - a) * prop[numProp * propIdx1 + p]);
+      }
+      triProp[tri1][perm1[0]] = newProp;
+      triProp[tri0][perm0[2]] = newProp;
     }
 
     // if the new edge already exists, duplicate the verts and split the mesh.

@@ -556,8 +556,8 @@ std::tuple<VecDH<BaryRef>, VecDH<int>, VecDH<int>> CalculateMeshRelation(
     Manifold::Impl &outR, const VecDH<Ref> &halfedgeRef,
     const Manifold::Impl &inP, const Manifold::Impl &inQ, int firstNewVert,
     int numFaceR, bool invertQ, ExecutionPolicy policy) {
-  const int numPropP = inP.meshRelation_.properties.size() / inP.NumTri();
-  const int numPropQ = inQ.meshRelation_.properties.size() / inQ.NumTri();
+  const int numPropP = inP.NumProp();
+  const int numPropQ = inQ.NumProp();
   const int numPropR = glm::max(numPropP, numPropQ);
   VecDH<int> vPropP2R;
   VecDH<int> vPropQ2R;

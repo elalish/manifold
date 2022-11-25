@@ -78,6 +78,7 @@ struct Manifold::Impl {
   int NumVert() const { return vertPos_.size(); }
   int NumEdge() const { return halfedge_.size() / 2; }
   int NumTri() const { return halfedge_.size() / 3; }
+  int NumProp() const { return meshRelation_.properties.size() / NumTri(); }
 
   // properties.cu
   Properties GetProperties() const;
