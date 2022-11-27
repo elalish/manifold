@@ -312,7 +312,8 @@ void Manifold::Impl::GatherFaces(const VecDH<int>& faceNew2Old) {
   const int numTri = faceNew2Old.size();
   if (meshRelation_.triBary.size() == NumTri())
     Permute(meshRelation_.triBary, faceNew2Old);
-
+  if (meshRelation_.triProperties.size() == NumTri())
+    Permute(meshRelation_.triProperties, faceNew2Old);
   if (faceNormal_.size() == NumTri()) Permute(faceNormal_, faceNew2Old);
 
   VecDH<Halfedge> oldHalfedge(std::move(halfedge_));
@@ -333,11 +334,20 @@ void Manifold::Impl::GatherFaces(const VecDH<int>& faceNew2Old) {
 void Manifold::Impl::GatherFaces(const Impl& old,
                                  const VecDH<int>& faceNew2Old) {
   const int numTri = faceNew2Old.size();
-  meshRelation_.triBary.resize(numTri);
   auto policy = autoPolicy(numTri);
+
+  meshRelation_.triBary.resize(numTri);
   gather(policy, faceNew2Old.begin(), faceNew2Old.end(),
          old.meshRelation_.triBary.begin(), meshRelation_.triBary.begin());
   meshRelation_.barycentric = old.meshRelation_.barycentric;
+
+  if (old.meshRelation_.triProperties.size() > 0) {
+    meshRelation_.triProperties.resize(numTri);
+    gather(policy, faceNew2Old.begin(), faceNew2Old.end(),
+           old.meshRelation_.triProperties.begin(),
+           meshRelation_.triProperties.begin());
+    meshRelation_.properties = old.meshRelation_.properties;
+  }
 
   if (old.faceNormal_.size() == old.NumTri()) {
     faceNormal_.resize(numTri);
