@@ -30,6 +30,7 @@ struct Manifold::Impl {
     VecDH<BaryRef> triBary;
     VecDH<glm::ivec3> triProperties;
     VecDH<float> properties;
+    int numProp;
     /// The meshID of this Manifold if it is an original; -1 otherwise.
     int originalID = -1;
   };
@@ -78,7 +79,7 @@ struct Manifold::Impl {
   int NumVert() const { return vertPos_.size(); }
   int NumEdge() const { return halfedge_.size() / 2; }
   int NumTri() const { return halfedge_.size() / 3; }
-  int NumProp() const { return meshRelation_.properties.size() / NumTri(); }
+  int NumProp() const { return meshRelation_.numProp; }
 
   // properties.cu
   Properties GetProperties() const;

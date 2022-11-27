@@ -427,6 +427,7 @@ int Manifold::Impl::InitializeNewReference(
 
   meshRelation_.triProperties = triProperties;
   meshRelation_.properties = properties;
+  meshRelation_.numProp = numProps;
   VecDH<float> propertyToleranceD(propertyTolerance);
 
   if (numProps > 0) {

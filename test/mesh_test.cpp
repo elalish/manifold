@@ -196,8 +196,7 @@ TEST(Manifold, GetMeshGL) {
   ASSERT_EQ(meshGL_out.NumTri(), mesh_out.triVerts.size());
   for (int i = 0; i < meshGL_out.NumVert(); ++i) {
     for (const int j : {0, 1, 2}) {
-      ASSERT_EQ(meshGL_out.vertPos[3 * i + j], mesh_out.vertPos[i][j]);
-      ASSERT_EQ(meshGL_out.vertNormal[3 * i + j], mesh_out.vertNormal[i][j]);
+      ASSERT_EQ(meshGL_out.vertProperties[3 * i + j], mesh_out.vertPos[i][j]);
     }
   }
   for (int i = 0; i < meshGL_out.NumTri(); ++i) {

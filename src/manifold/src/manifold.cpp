@@ -141,26 +141,15 @@ Mesh Manifold::GetMesh() const {
 MeshGL Manifold::GetMeshGL() const {
   const Impl& impl = *GetCsgLeafNode().GetImpl();
 
-  const int numVert = NumVert();
+  const int numProp = impl.NumProp();
+  const int numVert = impl.meshRelation_.properties.size() / numProp;
   const int numTri = NumTri();
 
   MeshGL out;
-  out.vertPos.resize(3 * numVert);
-  out.vertNormal.resize(3 * numVert);
+  out.numProp = numProp;
+  out.vertProperties.resize((3 + numProp) * numVert);
   out.triVerts.resize(3 * numTri);
-  for (int i = 0; i < numVert; ++i) {
-    const glm::vec3 v = impl.vertPos_[i];
-    out.vertPos[3 * i] = v.x;
-    out.vertPos[3 * i + 1] = v.y;
-    out.vertPos[3 * i + 2] = v.z;
-    const glm::vec3 n = impl.vertNormal_[i];
-    out.vertNormal[3 * i] = n.x;
-    out.vertNormal[3 * i + 1] = n.y;
-    out.vertNormal[3 * i + 2] = n.z;
-  }
-  for (int i = 0; i < numTri * 3; ++i) {
-    out.triVerts[i] = impl.halfedge_[i].startVert;
-  }
+
   const int numHalfedge = impl.halfedgeTangent_.size();
   out.halfedgeTangent.resize(4 * numHalfedge);
   for (int i = 0; i < numHalfedge; ++i) {
@@ -169,6 +158,44 @@ MeshGL Manifold::GetMeshGL() const {
     out.halfedgeTangent[4 * i + 1] = t.y;
     out.halfedgeTangent[4 * i + 2] = t.z;
     out.halfedgeTangent[4 * i + 3] = t.w;
+  }
+
+  if (numProp == 0) {
+    for (int i = 0; i < numVert; ++i) {
+      const glm::vec3 v = impl.vertPos_[i];
+      out.vertProperties[3 * i] = v.x;
+      out.vertProperties[3 * i + 1] = v.y;
+      out.vertProperties[3 * i + 2] = v.z;
+    }
+    for (int i = 0; i < numTri * 3; ++i) {
+      out.triVerts[i] = impl.halfedge_[i].startVert;
+    }
+    return out;
+  }
+
+  std::vector<int> vert2prop(impl.NumVert(), -1);
+
+  for (int tri = 0; tri < numTri; ++tri) {
+    const glm::ivec3 triProp = impl.meshRelation_.triProperties[tri];
+    for (const int i : {0, 1, 2}) {
+      const int prop = triProp[i];
+      out.triVerts[3 * tri + i] = prop;
+      const int vert = impl.halfedge_[3 * tri + i].startVert;
+      if (vert2prop[vert] == prop) continue;
+      for (int p : {0, 1, 2}) {
+        out.vertProperties[prop * (3 + numProp) + p] = impl.vertPos_[vert][p];
+      }
+      for (int p = 3; p < 3 + numProp; ++p) {
+        out.vertProperties[prop * (3 + numProp) + p] =
+            impl.meshRelation_.properties[prop * numProp + p];
+      }
+      if (vert2prop[vert] == -1) {
+        vert2prop[vert] = prop;
+      } else {
+        out.mergeFromVert.push_back(prop);
+        out.mergeToVert.push_back(vert2prop[vert]);
+      }
+    }
   }
 
   return out;

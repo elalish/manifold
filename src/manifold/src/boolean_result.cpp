@@ -559,6 +559,7 @@ std::tuple<VecDH<BaryRef>, VecDH<int>, VecDH<int>> CalculateMeshRelation(
   const int numPropP = inP.NumProp();
   const int numPropQ = inQ.NumProp();
   const int numPropR = glm::max(numPropP, numPropQ);
+  outR.meshRelation_.numProp = numPropR;
   VecDH<int> vPropP2R;
   VecDH<int> vPropQ2R;
   VecDH<int> propIdx(1);
