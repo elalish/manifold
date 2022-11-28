@@ -91,7 +91,32 @@ MeshGL MeshJS2GL(const val& mesh) {
   return out;
 }
 
-Manifold FromMeshJS(const val& mesh) { return Manifold(MeshJS2GL(mesh)); }
+Manifold FromMeshJS(const val& mesh, const val& inTriProperties, const val& inProperties, const val& inPropertyTolerance) {
+  const MeshGL meshGL = MeshJS2GL(mesh);
+  const int numTri = meshGL.NumTri();
+  std::vector<glm::ivec3> triProperties;
+  std::vector<float> properties, propertyTolerance;
+
+  if (inTriProperties != val::undefined()) {
+    triProperties.resize(numTri);
+    const auto flatTriProperties = convertJSArrayToNumberVector<uint32_t>(inTriProperties);
+    for (int i = 0; i < numTri; ++i) {
+      triProperties[i] = {flatTriProperties[3 * i],
+                          flatTriProperties[3 * i + 1],
+                          flatTriProperties[3 * i + 2]};
+    }
+  }
+
+  if (inProperties != val::undefined()) {
+    properties = convertJSArrayToNumberVector<float>(inProperties);
+  }
+
+  if (inPropertyTolerance != val::undefined()) {
+    propertyTolerance = convertJSArrayToNumberVector<float>(inPropertyTolerance);
+  }
+
+  return Manifold(meshGL, triProperties, properties, propertyTolerance);
+}
 
 Manifold Smooth(const val& mesh,
                 const std::vector<Smoothness>& sharpenedEdges = {}) {

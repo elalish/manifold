@@ -229,8 +229,8 @@ Module.setup = function() {
   });
 
   const ManifoldCtor = Module.Manifold;
-  Module.Manifold = function(mesh) {
-    const manifold = new ManifoldCtor(mesh);
+  Module.Manifold = function(mesh, triProperties, properties, propertyTolerance) {
+    const manifold = new ManifoldCtor(mesh, triProperties, properties, propertyTolerance);
 
     const status = manifold.status();
     if (status.value !== 0) {

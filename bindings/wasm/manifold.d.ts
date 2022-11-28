@@ -65,8 +65,12 @@ declare class Mesh {
 declare class Manifold {
   /**
    * Create a Manifold from a Mesh object.
+   *
+   * @param triProperties An array of the same length as mesh.triVerts, filled with references to the properties index. Note the same vertex can have different properties in different triangles.
+   * @param properties An array whose length is the largest index in triProperties times the length of propertyTolerance (the number of properties). Think of it as a property matrix indexed as [index * numProperties + propertyNum].
+   * @param propertyTolerance An array of precision values for each property. This is the amount of interpolation error allowed before two neighboring triangles are considered not coplanar. A good place to start is 1e-5 times the largest value you expect this property to take.
    */
-  constructor(mesh: Mesh);
+  constructor(mesh: Mesh, triProperties?: Uint32Array, properties?: Float32Array, propertyTolerance?: Float32Array);
   /**
    * Transform this Manifold in space. The first three columns form a 3x3 matrix
    * transform and the last is a translation vector. This operation can be
