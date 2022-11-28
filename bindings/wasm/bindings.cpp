@@ -91,7 +91,8 @@ MeshGL MeshJS2GL(const val& mesh) {
   return out;
 }
 
-Manifold FromMeshJS(const val& mesh, const val& inTriProperties, const val& inProperties, const val& inPropertyTolerance) {
+Manifold FromMeshJS(const val& mesh, const val& inTriProperties,
+                    const val& inProperties, const val& inPropertyTolerance) {
   const MeshGL meshGL = MeshJS2GL(mesh);
   const int numTri = meshGL.NumTri();
   std::vector<glm::ivec3> triProperties;
@@ -99,7 +100,8 @@ Manifold FromMeshJS(const val& mesh, const val& inTriProperties, const val& inPr
 
   if (inTriProperties != val::undefined()) {
     triProperties.resize(numTri);
-    const auto flatTriProperties = convertJSArrayToNumberVector<uint32_t>(inTriProperties);
+    const auto flatTriProperties =
+        convertJSArrayToNumberVector<uint32_t>(inTriProperties);
     for (int i = 0; i < numTri; ++i) {
       triProperties[i] = {flatTriProperties[3 * i],
                           flatTriProperties[3 * i + 1],
@@ -112,7 +114,8 @@ Manifold FromMeshJS(const val& mesh, const val& inTriProperties, const val& inPr
   }
 
   if (inPropertyTolerance != val::undefined()) {
-    propertyTolerance = convertJSArrayToNumberVector<float>(inPropertyTolerance);
+    propertyTolerance =
+        convertJSArrayToNumberVector<float>(inPropertyTolerance);
   }
 
   return Manifold(meshGL, triProperties, properties, propertyTolerance);
