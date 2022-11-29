@@ -82,6 +82,26 @@ CsgLeafNode& Manifold::GetCsgLeafNode() const {
 }
 
 /**
+ * Convert a MeshGL into a Manifold, retaining its properties and merging only
+ * the positions according to the merge vectors. Will return an empty Manifold
+ * and set an Error Status if the result is not an oriented 2-manifold. Will
+ * collapse degenerate triangles and unnecessary vertices.
+ *
+ * @param meshGL The input MeshGL.
+ * @param propertyTolerance A vector of precision values for each property
+ * beyond position. The propertyTolerance vector must be specified if the MeshGL
+ * has numProp > 3 and must have size = numProp - 3. This is the amount of
+ * interpolation error allowed before two neighboring triangles are considered
+ * to be on a property boundary edge. Property boundary edges will be retained
+ * across operations even if the triangles are coplanar. A good place to start
+ * is 1e-5 times the largest value you expect this property to take.
+ */
+Manifold::Manifold(const MeshGL& meshGL,
+                   const std::vector<float>& propertyTolerance)
+    : pNode_(std::make_shared<CsgLeafNode>(
+          std::make_shared<Impl>(meshGL, propertyTolerance))) {}
+
+/**
  * Convert a Mesh into a Manifold. Will return an empty Manifold
  * and set an Error Status if the Mesh is not an oriented 2-manifold. Will
  * collapse degenerate triangles and unnecessary vertices.

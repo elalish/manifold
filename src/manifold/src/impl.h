@@ -53,6 +53,8 @@ struct Manifold::Impl {
   enum class Shape { TETRAHEDRON, CUBE, OCTAHEDRON };
   Impl(Shape);
 
+  Impl(const MeshGL&,
+       const std::vector<float>& propertyTolerance = std::vector<float>());
   Impl(const Mesh&,
        const std::vector<glm::ivec3>& triProperties = std::vector<glm::ivec3>(),
        const std::vector<float>& properties = std::vector<float>(),

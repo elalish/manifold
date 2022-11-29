@@ -19,6 +19,7 @@
 #include <algorithm>
 #include <atomic>
 #include <map>
+#include <numeric>
 
 #include "graph.h"
 #include "hashtable.h"
@@ -295,6 +296,48 @@ struct EdgeBox {
 namespace manifold {
 
 std::atomic<int> Manifold::Impl::meshIDCounter_(1);
+
+Manifold::Impl::Impl(const MeshGL& meshGL,
+                     const std::vector<float>& propertyTolerance) {
+  Mesh mesh;
+  std::vector<glm::ivec3> triProperties(meshGL.NumTri());
+  mesh.triVerts.resize(meshGL.NumTri());
+
+  std::vector<int> prop2vert(meshGL.NumVert());
+  std::iota(prop2vert.begin(), prop2vert.end(), 0);
+  for (int i = 0; i < meshGL.mergeFromVert.size(); ++i) {
+    prop2vert[meshGL.mergeFromVert[i]] = meshGL.mergeToVert[i];
+  }
+
+  for (int i = 0; i < meshGL.NumTri(); ++i) {
+    for (const int j : {0, 1, 2}) {
+      triProperties[i][j] = meshGL.triVerts[3 * i + j];
+      mesh.triVerts[i][j] = prop2vert[triProperties[i][j]];
+    }
+  }
+
+  const int numProp = meshGL.numProp - 3;
+  std::vector<float> properties(meshGL.NumVert() * numProp);
+  // This will have unreferenced duplicate positions that will be removed by
+  // Impl::RemoveUnreferencedVerts().
+  mesh.vertPos.resize(meshGL.NumVert());
+
+  for (int i = 0; i < meshGL.NumVert(); ++i) {
+    for (const int j : {0, 1, 2})
+      mesh.vertPos[i][j] = meshGL.vertProperties[meshGL.numProp * i + j];
+    for (int j = 0; j < numProp; ++j)
+      properties[i * numProp + j] =
+          meshGL.vertProperties[meshGL.numProp * i + 3 + j];
+  }
+
+  mesh.halfedgeTangent.resize(meshGL.halfedgeTangent.size() / 4);
+  for (int i = 0; i < mesh.halfedgeTangent.size(); ++i) {
+    for (const int j : {0, 1, 2, 3})
+      mesh.halfedgeTangent[i][j] = meshGL.halfedgeTangent[4 * i + j];
+  }
+
+  *this = Impl(mesh, triProperties, properties, propertyTolerance);
+}
 
 /**
  * Create a manifold from an input triangle Mesh. Will return an empty Manifold
