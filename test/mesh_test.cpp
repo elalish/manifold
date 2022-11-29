@@ -63,6 +63,21 @@ Mesh Tet() {
   return tet;
 }
 
+MeshGL WithColors(const Mesh& in) {
+  MeshGL inGL(in);
+  const int numVert = in.vertPos.size();
+  inGL.numProp = 6;
+  inGL.vertProperties.resize(6 * numVert);
+  for (int i = 0; i < numVert; ++i) {
+    for (int j : {0, 1, 2}) inGL.vertProperties[6 * i + j] = in.vertPos[i][j];
+    // vertex colors
+    inGL.vertProperties[6 * i + 3] = i / numVert;
+    inGL.vertProperties[6 * i + 4] = 0.5;
+    inGL.vertProperties[6 * i + 5] = 1 - i / numVert;
+  }
+  return inGL;
+}
+
 void Identical(const Mesh& mesh1, const Mesh& mesh2) {
   ASSERT_EQ(mesh1.vertPos.size(), mesh2.vertPos.size());
   for (int i = 0; i < mesh1.vertPos.size(); ++i)
@@ -649,17 +664,7 @@ TEST(Manifold, MeshRelationRefine) {
   std::map<int, int> meshID2idx;
 
   const Mesh in = Csaszar();
-  MeshGL inGL(in);
-  const int numVert = in.vertPos.size();
-  inGL.numProp = 6;
-  inGL.vertProperties.resize(6 * numVert);
-  for (int i = 0; i < numVert; ++i) {
-    for (int j : {0, 1, 2}) inGL.vertProperties[6 * i + j] = in.vertPos[i][j];
-    // vertex colors
-    inGL.vertProperties[6 * i + 3] = i / numVert;
-    inGL.vertProperties[6 * i + 4] = 0.5;
-    inGL.vertProperties[6 * i + 5] = 1 - i / numVert;
-  }
+  MeshGL inGL = WithColors(in);
 
   input.push_back(in);
   inputGL.push_back(inGL);
@@ -934,13 +939,15 @@ TEST(Boolean, MeshRelation) {
   const float period = glm::two_pi<float>();
 
   Mesh gyroidMesh = LevelSet(Gyroid(), {glm::vec3(0), glm::vec3(period)}, 0.5);
-  Manifold gyroid(gyroidMesh);
+  MeshGL gyroidMeshGL = WithColors(gyroidMesh);
+  Manifold gyroid(gyroidMeshGL);
 
   Mesh gyroidMesh2 = gyroidMesh;
   std::transform(gyroidMesh.vertPos.begin(), gyroidMesh.vertPos.end(),
                  gyroidMesh2.vertPos.begin(),
                  [](const glm::vec3& v) { return v + glm::vec3(2.0f); });
-  Manifold gyroid2(gyroidMesh2);
+  MeshGL gyroidMeshGL2 = WithColors(gyroidMesh2);
+  Manifold gyroid2(gyroidMeshGL2);
 
   EXPECT_TRUE(gyroid.IsManifold());
   EXPECT_TRUE(gyroid.MatchesTriNormals());
@@ -967,13 +974,13 @@ TEST(Boolean, MeshRelation) {
   EXPECT_GE(meshID, 0);
   meshID2idx[meshID] = input.size();
   input.push_back(gyroidMesh);
-  inputGL.push_back(gyroidMesh);
+  inputGL.push_back(gyroidMeshGL);
 
   meshID = gyroid2.OriginalID();
   EXPECT_GE(meshID, 0);
   meshID2idx[meshID] = input.size();
   input.push_back(gyroidMesh2);
-  inputGL.push_back(gyroidMesh2);
+  inputGL.push_back(gyroidMeshGL2);
 
   Related(result, input, meshID2idx);
   RelatedGL(result, inputGL, meshID2idx);
