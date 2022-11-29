@@ -155,7 +155,7 @@ using Polygons = std::vector<SimplePolygon>;
  * store this missing information, allowing the manifold to be reconstructed.
  */
 struct MeshGL {
-  /// Number of vertices
+  /// Number of property vertices
   int NumVert() const { return vertProperties.size() / numProp; };
   /// Number of triangles
   int NumTri() const { return triVerts.size() / 3; };
