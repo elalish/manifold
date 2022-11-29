@@ -162,12 +162,13 @@ MeshGL Manifold::GetMeshGL() const {
   const Impl& impl = *GetCsgLeafNode().GetImpl();
 
   const int numProp = impl.NumProp();
-  const int numVert = impl.meshRelation_.properties.size() / numProp;
+  const int numVert = glm::max(
+      impl.NumVert(), impl.meshRelation_.properties.size() / impl.NumProp());
   const int numTri = NumTri();
 
   MeshGL out;
-  out.numProp = numProp;
-  out.vertProperties.resize((3 + numProp) * numVert);
+  out.numProp = 3 + numProp;
+  out.vertProperties.resize(out.numProp * numVert);
   out.triVerts.resize(3 * numTri);
 
   const int numHalfedge = impl.halfedgeTangent_.size();
@@ -203,10 +204,10 @@ MeshGL Manifold::GetMeshGL() const {
       const int vert = impl.halfedge_[3 * tri + i].startVert;
       if (vert2prop[vert] == prop) continue;
       for (int p : {0, 1, 2}) {
-        out.vertProperties[prop * (3 + numProp) + p] = impl.vertPos_[vert][p];
+        out.vertProperties[prop * out.numProp + p] = impl.vertPos_[vert][p];
       }
-      for (int p = 3; p < 3 + numProp; ++p) {
-        out.vertProperties[prop * (3 + numProp) + p] =
+      for (int p = 3; p < out.numProp; ++p) {
+        out.vertProperties[prop * out.numProp + p] =
             impl.meshRelation_.properties[prop * numProp + p];
       }
       if (vert2prop[vert] == -1) {

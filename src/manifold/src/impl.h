@@ -30,7 +30,7 @@ struct Manifold::Impl {
     VecDH<BaryRef> triBary;
     VecDH<glm::ivec3> triProperties;
     VecDH<float> properties;
-    int numProp;
+    int numProp = 0;
     /// The meshID of this Manifold if it is an original; -1 otherwise.
     int originalID = -1;
   };
