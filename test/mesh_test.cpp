@@ -99,21 +99,57 @@ void Related(const Manifold& out, const std::vector<Mesh>& input,
   }
 }
 
+void RelatedGL(const Manifold& out, const std::vector<MeshGL>& input,
+               const std::map<int, int>& meshID2idx) {
+  MeshGL output = out.GetMeshGL();
+  MeshRelation relation = out.GetMeshRelation();
+  for (int tri = 0; tri < out.NumTri(); ++tri) {
+    int meshID = relation.triBary[tri].originalID;
+    int meshIdx = meshID2idx.at(meshID);
+    ASSERT_LT(meshIdx, input.size());
+    const MeshGL& inMesh = input[meshIdx];
+    int inTri = relation.triBary[tri].tri;
+    ASSERT_LT(inTri, inMesh.triVerts.size());
+    glm::ivec3 inTriangle = {inMesh.triVerts[3 * inTri],
+                             inMesh.triVerts[3 * inTri + 1],
+                             inMesh.triVerts[3 * inTri + 2]};
+    inTriangle *= inMesh.numProp;
+    for (int j : {0, 1, 2}) {
+      glm::vec3 uvw = relation.UVW(tri, j);
+      ASSERT_NEAR(uvw[0] + uvw[1] + uvw[2], 1, 0.0002);
+      const int vert = output.triVerts[3 * tri + j];
+      for (int p = 0; p < output.numProp; ++p) {
+        const float propOut = output.vertProperties[vert * output.numProp + p];
+
+        glm::vec3 inProp = {inMesh.vertProperties[inTriangle[0] + p],
+                            inMesh.vertProperties[inTriangle[1] + p],
+                            inMesh.vertProperties[inTriangle[2] + p]};
+
+        ASSERT_NEAR(propOut, glm::dot(inProp, uvw), 10 * out.Precision());
+      }
+    }
+  }
+}
+
 void RelatedOp(const Manifold& inP, const Manifold& inQ, const Manifold& outR) {
   std::vector<Mesh> input;
+  std::vector<MeshGL> inputGL;
   std::map<int, int> meshID2idx;
 
   int meshID = inP.OriginalID();
   EXPECT_GE(meshID, 0);
   meshID2idx[meshID] = input.size();
   input.push_back(inP.GetMesh());
+  inputGL.push_back(inP.GetMeshGL());
 
   meshID = inQ.OriginalID();
   EXPECT_GE(meshID, 0);
   meshID2idx[meshID] = input.size();
   input.push_back(inQ.GetMesh());
+  inputGL.push_back(inQ.GetMeshGL());
 
   Related(outR, input, meshID2idx);
+  RelatedGL(outR, inputGL, meshID2idx);
 }
 
 void ExpectMeshes(const Manifold& manifold,
@@ -588,9 +624,11 @@ TEST(Manifold, MeshRelation) {
   Mesh gyroidMesh = LevelSet(Gyroid(), {glm::vec3(0), glm::vec3(period)}, 0.5);
 
   std::vector<Mesh> input;
+  std::vector<MeshGL> inputGL;
   std::map<int, int> meshID2idx;
 
   input.push_back(gyroidMesh);
+  inputGL.push_back(gyroidMesh);
   Manifold gyroid(input[0]);
 
 #ifdef MANIFOLD_EXPORT
@@ -602,13 +640,16 @@ TEST(Manifold, MeshRelation) {
   meshID2idx[meshID] = input.size() - 1;
 
   Related(gyroid, input, meshID2idx);
+  RelatedGL(gyroid, inputGL, meshID2idx);
 }
 
 TEST(Manifold, MeshRelationRefine) {
   std::vector<Mesh> input;
+  std::vector<MeshGL> inputGL;
   std::map<int, int> meshID2idx;
 
   input.push_back(Csaszar());
+  inputGL.push_back(Csaszar());
   Manifold csaszar(input[0]);
 
   int meshID = csaszar.OriginalID();
@@ -616,8 +657,10 @@ TEST(Manifold, MeshRelationRefine) {
   meshID2idx[meshID] = input.size() - 1;
 
   Related(csaszar, input, meshID2idx);
+  RelatedGL(csaszar, inputGL, meshID2idx);
   csaszar.Refine(4);
   Related(csaszar, input, meshID2idx);
+  RelatedGL(csaszar, inputGL, meshID2idx);
 }
 
 /**
@@ -904,19 +947,23 @@ TEST(Boolean, MeshRelation) {
   EXPECT_NEAR(prop.surfaceArea, 387, 1);
 
   std::vector<Mesh> input;
+  std::vector<MeshGL> inputGL;
   std::map<int, int> meshID2idx;
 
   int meshID = gyroid.OriginalID();
   EXPECT_GE(meshID, 0);
   meshID2idx[meshID] = input.size();
   input.push_back(gyroidMesh);
+  inputGL.push_back(gyroidMesh);
 
   meshID = gyroid2.OriginalID();
   EXPECT_GE(meshID, 0);
   meshID2idx[meshID] = input.size();
   input.push_back(gyroidMesh2);
+  inputGL.push_back(gyroidMesh2);
 
   Related(result, input, meshID2idx);
+  RelatedGL(result, inputGL, meshID2idx);
 }
 
 TEST(Boolean, Cylinders) {
