@@ -162,8 +162,10 @@ MeshGL Manifold::GetMeshGL() const {
   const Impl& impl = *GetCsgLeafNode().GetImpl();
 
   const int numProp = impl.NumProp();
-  const int numVert = glm::max(
-      impl.NumVert(), impl.meshRelation_.properties.size() / impl.NumProp());
+  const int numVert =
+      impl.NumProp() == 0
+          ? impl.NumVert()
+          : impl.meshRelation_.properties.size() / impl.NumProp();
   const int numTri = NumTri();
 
   MeshGL out;
