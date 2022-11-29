@@ -204,15 +204,19 @@ struct MeshGL {
 
   MeshGL() = default;
   MeshGL(const Mesh& mesh) {
-    for (int i = 0; i < mesh.halfedgeTangent.size(); ++i) {
-      for (int j : {0, 1, 2, 3})
-        halfedgeTangent[4 * i + j] = mesh.halfedgeTangent[i][j];
-    }
+    numProp = 3;
+    vertProperties.resize(numProp * mesh.vertPos.size());
     for (int i = 0; i < mesh.vertPos.size(); ++i) {
       for (int j : {0, 1, 2}) vertProperties[3 * i + j] = mesh.vertPos[i][j];
     }
+    triVerts.resize(3 * mesh.triVerts.size());
     for (int i = 0; i < mesh.triVerts.size(); ++i) {
       for (int j : {0, 1, 2}) triVerts[3 * i + j] = mesh.triVerts[i][j];
+    }
+    halfedgeTangent.resize(4 * mesh.halfedgeTangent.size());
+    for (int i = 0; i < mesh.halfedgeTangent.size(); ++i) {
+      for (int j : {0, 1, 2, 3})
+        halfedgeTangent[4 * i + j] = mesh.halfedgeTangent[i][j];
     }
   }
 };
