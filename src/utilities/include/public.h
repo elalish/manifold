@@ -149,6 +149,26 @@ using Polygons = std::vector<SimplePolygon>;
 /** @} */
 
 /**
+ * The triangle-mesh input and output of this library.
+ */
+struct Mesh {
+  /// Required: The X-Y-Z positions of all vertices.
+  std::vector<glm::vec3> vertPos;
+  /// Required: The vertex indices of the three triangle corners in CCW (from
+  /// the outside) order, for each triangle.
+  std::vector<glm::ivec3> triVerts;
+  /// Optional: The X-Y-Z normal vectors of each vertex. If non-empty, must have
+  /// the same length as vertPos. If empty, these will be calculated
+  /// automatically.
+  std::vector<glm::vec3> vertNormal;
+  /// Optional: The X-Y-Z-W weighted tangent vectors for smooth Refine(). If
+  /// non-empty, must be exactly three times as long as Mesh.triVerts. Indexed
+  /// as 3 * tri + i, representing the tangent from Mesh.triVerts[tri][i] along
+  /// the CCW edge. If empty, mesh is faceted.
+  std::vector<glm::vec4> halfedgeTangent;
+};
+
+/**
  * An alternative to Mesh for output suitable for pushing into graphics
  * libraries directly. This may not be manifold since the verts are duplicated
  * along property boundaries that do not match. The additional merge vectors
@@ -161,7 +181,7 @@ struct MeshGL {
   int NumTri() const { return triVerts.size() / 3; };
 
   /// Number of properties per vertex, always >= 3.
-  int numProp;
+  int numProp = 3;
   /// Flat, GL-style list of all vertex properties: propVal =
   /// vertProperties[vert * numProp + propIdx]. The first three properties are
   /// always the position x, y, z.
@@ -181,26 +201,20 @@ struct MeshGL {
   /// as 4 * (3 * tri + i) + j, i < 3, j < 4, representing the tangent value
   /// Mesh.triVerts[tri][i] along the CCW edge. If empty, mesh is faceted.
   std::vector<float> halfedgeTangent;
-};
 
-/**
- * The triangle-mesh input and output of this library.
- */
-struct Mesh {
-  /// Required: The X-Y-Z positions of all vertices.
-  std::vector<glm::vec3> vertPos;
-  /// Required: The vertex indices of the three triangle corners in CCW (from
-  /// the outside) order, for each triangle.
-  std::vector<glm::ivec3> triVerts;
-  /// Optional: The X-Y-Z normal vectors of each vertex. If non-empty, must have
-  /// the same length as vertPos. If empty, these will be calculated
-  /// automatically.
-  std::vector<glm::vec3> vertNormal;
-  /// Optional: The X-Y-Z-W weighted tangent vectors for smooth Refine(). If
-  /// non-empty, must be exactly three times as long as Mesh.triVerts. Indexed
-  /// as 3 * tri + i, representing the tangent from Mesh.triVerts[tri][i] along
-  /// the CCW edge. If empty, mesh is faceted.
-  std::vector<glm::vec4> halfedgeTangent;
+  MeshGL() = default;
+  MeshGL(const Mesh& mesh) {
+    for (int i = 0; i < mesh.halfedgeTangent.size(); ++i) {
+      for (int j : {0, 1, 2, 3})
+        halfedgeTangent[4 * i + j] = mesh.halfedgeTangent[i][j];
+    }
+    for (int i = 0; i < mesh.vertPos.size(); ++i) {
+      for (int j : {0, 1, 2}) vertProperties[3 * i + j] = mesh.vertPos[i][j];
+    }
+    for (int i = 0; i < mesh.triVerts.size(); ++i) {
+      for (int j : {0, 1, 2}) triVerts[3 * i + j] = mesh.triVerts[i][j];
+    }
+  }
 };
 
 /**
