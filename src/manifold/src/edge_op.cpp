@@ -461,7 +461,7 @@ void Manifold::Impl::RecursiveEdgeSwap(const int edge) {
     triBary[tri1].vertBary[perm1[0]] = newBary;
     triBary[tri0].vertBary[perm0[2]] = newBary;
     // Update properties if applicable
-    if (meshRelation_.triProperties.size() > 0) {
+    if (meshRelation_.properties.size() > 0) {
       VecDH<glm::ivec3>& triProp = meshRelation_.triProperties;
       VecDH<float>& prop = meshRelation_.properties;
       triProp[tri0] = triProp[tri1];
