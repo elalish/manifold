@@ -473,12 +473,12 @@ int Manifold::Impl::InitializeNewReference(
   meshRelation_.numProp = numProps;
   VecDH<float> propertyToleranceD(propertyTolerance);
 
-  if (numProps > 0) {
+  if (triProperties.size() > 0) {
     if (triProperties.size() != NumTri() && triProperties.size() != 0) {
       MarkFailure(Error::TRI_PROPERTIES_WRONG_LENGTH);
       return nextMeshID;
     };
-    if (properties.size() % numProps != 0) {
+    if (numProps == 0 || properties.size() % numProps != 0) {
       MarkFailure(Error::PROPERTIES_WRONG_LENGTH);
       return nextMeshID;
     };

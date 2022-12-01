@@ -91,6 +91,7 @@ void Identical(const Mesh& mesh1, const Mesh& mesh2) {
 
 void Related(const Manifold& out, const std::vector<Mesh>& input,
              const std::map<int, int>& meshID2idx) {
+  ASSERT_FALSE(out.IsEmpty());
   Mesh output = out.GetMesh();
   MeshRelation relation = out.GetMeshRelation();
   for (int tri = 0; tri < out.NumTri(); ++tri) {
@@ -116,6 +117,7 @@ void Related(const Manifold& out, const std::vector<Mesh>& input,
 
 void RelatedGL(const Manifold& out, const std::vector<MeshGL>& input,
                const std::map<int, int>& meshID2idx) {
+  ASSERT_FALSE(out.IsEmpty());
   MeshGL output = out.GetMeshGL();
   MeshRelation relation = out.GetMeshRelation();
   for (int tri = 0; tri < out.NumTri(); ++tri) {
@@ -169,6 +171,7 @@ void RelatedOp(const Manifold& inP, const Manifold& inQ, const Manifold& outR) {
 
 void ExpectMeshes(const Manifold& manifold,
                   const std::vector<std::pair<int, int>>& numVertTri) {
+  EXPECT_FALSE(manifold.IsEmpty());
   EXPECT_TRUE(manifold.IsManifold());
   EXPECT_TRUE(manifold.MatchesTriNormals());
   std::vector<Manifold> manifolds = manifold.Decompose();
@@ -668,7 +671,9 @@ TEST(Manifold, MeshRelationRefine) {
 
   input.push_back(in);
   inputGL.push_back(inGL);
-  Manifold csaszar(inGL);
+  std::vector<float> tol(3);
+  std::fill(tol.begin(), tol.end(), 0);
+  Manifold csaszar(inGL, tol);
 
   int meshID = csaszar.OriginalID();
   EXPECT_GE(meshID, 0);
@@ -940,15 +945,18 @@ TEST(Boolean, MeshRelation) {
 
   Mesh gyroidMesh = LevelSet(Gyroid(), {glm::vec3(0), glm::vec3(period)}, 0.5);
   MeshGL gyroidMeshGL = WithColors(gyroidMesh);
-  Manifold gyroid(gyroidMeshGL);
+  std::vector<float> tol(3);
+  std::fill(tol.begin(), tol.end(), 0.01);
+  Manifold gyroid(gyroidMeshGL, tol);
 
   Mesh gyroidMesh2 = gyroidMesh;
   std::transform(gyroidMesh.vertPos.begin(), gyroidMesh.vertPos.end(),
                  gyroidMesh2.vertPos.begin(),
                  [](const glm::vec3& v) { return v + glm::vec3(2.0f); });
   MeshGL gyroidMeshGL2 = WithColors(gyroidMesh2);
-  Manifold gyroid2(gyroidMeshGL2);
+  Manifold gyroid2(gyroidMeshGL2, tol);
 
+  EXPECT_FALSE(gyroid.IsEmpty());
   EXPECT_TRUE(gyroid.IsManifold());
   EXPECT_TRUE(gyroid.MatchesTriNormals());
   EXPECT_LE(gyroid.NumDegenerateTris(), 0);
