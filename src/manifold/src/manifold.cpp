@@ -208,8 +208,8 @@ MeshGL Manifold::GetMeshGL() const {
       for (int p : {0, 1, 2}) {
         out.vertProperties[prop * out.numProp + p] = impl.vertPos_[vert][p];
       }
-      for (int p = 3; p < out.numProp; ++p) {
-        out.vertProperties[prop * out.numProp + p] =
+      for (int p = 0; p < numProp; ++p) {
+        out.vertProperties[prop * out.numProp + p + 3] =
             impl.meshRelation_.properties[prop * numProp + p];
       }
       if (vert2prop[vert] == -1) {
