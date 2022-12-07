@@ -468,10 +468,13 @@ int Manifold::Impl::InitializeNewReference(
 
   const int numProps = propertyTolerance.size();
 
-  meshRelation_.triProperties = triProperties;
-  meshRelation_.properties = properties;
-  meshRelation_.numProp = numProps;
-  VecDH<float> propertyToleranceD(propertyTolerance);
+  VecDH<float> propertyToleranceD(numProps, -1);
+  if (meshRelation_.numProp == 0) {
+    meshRelation_.triProperties = triProperties;
+    meshRelation_.properties = properties;
+    meshRelation_.numProp = numProps;
+    propertyToleranceD = propertyTolerance;
+  }
 
   if (triProperties.size() > 0) {
     if (triProperties.size() != NumTri() && triProperties.size() != 0) {

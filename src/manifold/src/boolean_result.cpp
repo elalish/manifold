@@ -422,12 +422,12 @@ struct PropertiesIncluded {
     const Ref halfedgeRef = thrust::get<0>(in);
     const Halfedge halfedgeR = thrust::get<1>(in);
 
-    int *vPropKeep = halfedgeRef.PQ == 0 ? vPropKeepP : vPropKeepQ;
-    const int tri = halfedgeRef.tri;
-    const glm::ivec3 triProp =
-        halfedgeRef.PQ == 0 ? triPropP[tri] : triPropQ[tri];
-
     if (halfedgeR.startVert < firstNewVert) {  // retained verts only
+      int *vPropKeep = halfedgeRef.PQ == 0 ? vPropKeepP : vPropKeepQ;
+      const int tri = halfedgeRef.tri;
+      const glm::ivec3 triProp =
+          halfedgeRef.PQ == 0 ? triPropP[tri] : triPropQ[tri];
+
       const int prop = triProp[halfedgeRef.vert];
       vPropKeep[prop] = 1;
     }
@@ -579,9 +579,7 @@ std::tuple<VecDH<BaryRef>, VecDH<int>, VecDH<int>> CalculateMeshRelation(
                    vPropP2R.begin(), 0);
     exclusive_scan(policy, vPropKeepQ.begin(), vPropKeepQ.end(),
                    vPropQ2R.begin(), vPropP2R.back() + vPropKeepP.back());
-
-    const int numRetainedProp = vPropP2R.back() + vPropKeepP.back() +
-                                vPropQ2R.back() + vPropKeepQ.back();
+    const int numRetainedProp = vPropQ2R.back() + vPropKeepQ.back();
     const int numNewVerts = outR.NumVert() - firstNewVert;
     outR.meshRelation_.properties.resize(
         (numRetainedProp + 3 * numNewVerts) * numPropR, NAN);

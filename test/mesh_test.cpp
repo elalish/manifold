@@ -671,8 +671,7 @@ TEST(Manifold, MeshRelationRefine) {
 
   input.push_back(in);
   inputGL.push_back(inGL);
-  std::vector<float> tol(3);
-  std::fill(tol.begin(), tol.end(), 0);
+  std::vector<float> tol(3, 0);
   Manifold csaszar(inGL, tol);
 
   int meshID = csaszar.OriginalID();
@@ -681,9 +680,9 @@ TEST(Manifold, MeshRelationRefine) {
 
   Related(csaszar, input, meshID2idx);
   RelatedGL(csaszar, inputGL, meshID2idx);
-  // csaszar.Refine(4);
-  // Related(csaszar, input, meshID2idx);
-  // RelatedGL(csaszar, inputGL, meshID2idx);
+  csaszar.Refine(4);
+  Related(csaszar, input, meshID2idx);
+  RelatedGL(csaszar, inputGL, meshID2idx);
 }
 
 /**
@@ -691,7 +690,10 @@ TEST(Manifold, MeshRelationRefine) {
  */
 TEST(Boolean, Tetra) {
   Manifold tetra = Manifold::Tetrahedron();
-  EXPECT_TRUE(tetra.IsManifold());
+  MeshGL tetraGL = WithColors(tetra.GetMesh());
+  std::vector<float> tol(3, 0.01);
+  tetra = Manifold(tetraGL, tol);
+  EXPECT_TRUE(!tetra.IsEmpty());
 
   Manifold tetra2 = tetra;
   tetra2 = tetra2.Translate(glm::vec3(0.5f)).AsOriginal();
@@ -945,8 +947,7 @@ TEST(Boolean, MeshRelation) {
 
   Mesh gyroidMesh = LevelSet(Gyroid(), {glm::vec3(0), glm::vec3(period)}, 0.5);
   MeshGL gyroidMeshGL = WithColors(gyroidMesh);
-  std::vector<float> tol(3);
-  std::fill(tol.begin(), tol.end(), 0.01);
+  std::vector<float> tol(3, 0.01);
   Manifold gyroid(gyroidMeshGL, tol);
 
   Mesh gyroidMesh2 = gyroidMesh;
