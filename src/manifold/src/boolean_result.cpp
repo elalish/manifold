@@ -529,15 +529,16 @@ struct CreateBarycentric {
       if (numProp > 0) {
         const int oldProp = triProp[thisRef.tri][thisRef.vert];
         const Ref pairRef = halfedgeRef[halfedgeR.pairedHalfedge];
-        // might be inverted, so check both possible edge pairings
-        const bool continuous =
-            (oldProp == triProp[pairRef.tri][(pairRef.vert + 1) % 3] &&
-             triProp[pairRef.tri][pairRef.vert] ==
-                 triProp[thisRef.tri][(thisRef.vert + 1) % 3]) ||
-            (oldProp == triProp[pairRef.tri][(pairRef.vert - 1) % 3] &&
-             triProp[pairRef.tri][pairRef.vert] ==
-                 triProp[thisRef.tri][(thisRef.vert - 1) % 3]);
-        if (thisRef.PQ != pairRef.PQ || !continuous) {
+        // Add a vert only if the meshes don't match or if there is an existing
+        // property discontinuity. triProp is only valid if the meshes match.
+        // The mesh might be inverted, so check both possible edge pairings.
+        if (thisRef.PQ != pairRef.PQ ||
+            ((oldProp != triProp[pairRef.tri][Next3(pairRef.vert)] ||
+              triProp[pairRef.tri][pairRef.vert] !=
+                  triProp[thisRef.tri][Next3(thisRef.vert)]) &&
+             (oldProp != triProp[pairRef.tri][Prev3(pairRef.vert)] ||
+              triProp[pairRef.tri][pairRef.vert] !=
+                  triProp[thisRef.tri][Prev3(thisRef.vert)]))) {
           halfedgeProp = AtomicAdd(*propIdx, 1);
           // barycentric interpolation
           for (int p = 0; p < numProp; ++p) {
