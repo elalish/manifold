@@ -590,7 +590,7 @@ std::tuple<VecDH<BaryRef>, VecDH<int>, VecDH<int>> CalculateMeshRelation(
   outR.meshRelation_.barycentric.resize(outR.halfedge_.size());
   VecDH<BaryRef> faceRef(numFaceR);
   VecDH<int> halfedgeBary(halfedgeRef.size());
-  VecDH<int> halfedgeProp(halfedgeRef.size());
+  VecDH<int> halfedgeProp(halfedgeRef.size(), -1);
 
   const int offsetQ = Manifold::Impl::meshIDCounter_;
   VecDH<int> baryIdx(1, 0);
@@ -633,6 +633,24 @@ std::tuple<VecDH<BaryRef>, VecDH<int>, VecDH<int>> CalculateMeshRelation(
 
   return std::make_tuple(faceRef, halfedgeBary, halfedgeProp);
 }
+
+struct SetSharedProperties {
+  glm::ivec3 *triProperties;
+
+  __host__ __device__ void operator()(thrust::tuple<int, Halfedge> in) {
+    const int halfedge = thrust::get<0>(in);
+    const Halfedge halfedgeR = thrust::get<1>(in);
+
+    const int tri = halfedge / 3;
+    const int vert = halfedge % 3;
+    if (triProperties[tri][vert] >= 0) return;
+
+    const int pair = halfedgeR.pairedHalfedge;
+    const int triPair = pair / 3;
+    const int vertNext = (pair + 1) % 3;
+    triProperties[tri][vert] = triProperties[triPair][vertNext];
+  }
+};
 }  // namespace
 
 namespace manifold {
@@ -789,6 +807,13 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
     ASSERT(outR.IsManifold(), logicErr, "polygon mesh is not manifold!");
 
   outR.Face2Tri(faceEdge, faceRef, halfedgeBary, halfedgeProp);
+
+  // CalculateMeshRelation misses a few shared values in triProperties, marking
+  // them as -1. Fill those in here now that the connectivity information is
+  // available.
+  for_each_n(policy_, zip(countAt(0), outR.halfedge_.cbegin()),
+             outR.halfedge_.size(),
+             SetSharedProperties({outR.meshRelation_.triProperties.ptrD()}));
 
 #ifdef MANIFOLD_DEBUG
   triangulate.Stop();
