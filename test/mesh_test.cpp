@@ -63,7 +63,7 @@ Mesh Tet() {
   return tet;
 }
 
-MeshGL WithColors(const Mesh& in) {
+MeshGL WithIndexColors(const Mesh& in) {
   MeshGL inGL(in);
   const int numVert = in.vertPos.size();
   inGL.numProp = 6;
@@ -72,8 +72,26 @@ MeshGL WithColors(const Mesh& in) {
     for (int j : {0, 1, 2}) inGL.vertProperties[6 * i + j] = in.vertPos[i][j];
     // vertex colors
     inGL.vertProperties[6 * i + 3] = (float)i / numVert;
-    inGL.vertProperties[6 * i + 4] = 0.5;
+    inGL.vertProperties[6 * i + 4] = 0;
     inGL.vertProperties[6 * i + 5] = 1 - (float)i / numVert;
+  }
+  return inGL;
+}
+
+MeshGL WithPositionColors(const Manifold& in) {
+  MeshGL inGL = in.GetMeshGL();
+  const int numVert = in.NumVert();
+  const Box bbox = in.BoundingBox();
+  const glm::vec3 size = bbox.Size();
+  const std::vector<float> oldProp = inGL.vertProperties;
+  inGL.numProp = 6;
+  inGL.vertProperties.resize(6 * numVert);
+  for (int i = 0; i < numVert; ++i) {
+    for (int j : {0, 1, 2}) inGL.vertProperties[6 * i + j] = oldProp[3 * i + j];
+    // vertex colors
+    inGL.vertProperties[6 * i + 3] = (oldProp[3 * i] - bbox.min.x) / size.x;
+    inGL.vertProperties[6 * i + 4] = (oldProp[3 * i + 1] - bbox.min.y) / size.y;
+    inGL.vertProperties[6 * i + 5] = (oldProp[3 * i + 2] - bbox.min.z) / size.z;
   }
   return inGL;
 }
@@ -667,7 +685,7 @@ TEST(Manifold, MeshRelationRefine) {
   std::map<int, int> meshID2idx;
 
   const Mesh in = Csaszar();
-  MeshGL inGL = WithColors(in);
+  MeshGL inGL = WithIndexColors(in);
 
   input.push_back(in);
   inputGL.push_back(inGL);
@@ -690,7 +708,7 @@ TEST(Manifold, MeshRelationRefine) {
  */
 TEST(Boolean, Tetra) {
   Manifold tetra = Manifold::Tetrahedron();
-  MeshGL tetraGL = WithColors(tetra.GetMesh());
+  MeshGL tetraGL = WithPositionColors(tetra);
   std::vector<float> tol(3, 0.01);
   tetra = Manifold(tetraGL, tol);
   EXPECT_TRUE(!tetra.IsEmpty());
@@ -737,12 +755,41 @@ TEST(Boolean, Perturb) {
 
 TEST(Boolean, Coplanar) {
   Manifold cylinder = Manifold::Cylinder(1.0f, 1.0f);
+  MeshGL cylinderGL = WithPositionColors(cylinder);
+  std::vector<float> tol(3, 0.01);
+  cylinder = Manifold(cylinderGL, tol);
+
   Manifold cylinder2 = cylinder.AsOriginal();
   cylinder2 = cylinder2.Scale({0.5f, 0.5f, 1.0f})
                   .Rotate(0, 0, 15)
                   .Translate({0.25f, 0.25f, 0.0f});
   Manifold out = cylinder - cylinder2;
   ExpectMeshes(out, {{32, 64}});
+  EXPECT_EQ(out.NumDegenerateTris(), 0);
+  EXPECT_EQ(out.Genus(), 1);
+
+#ifdef MANIFOLD_EXPORT
+  if (options.exportModels) ExportMesh("coplanar.glb", out.GetMesh(), {});
+#endif
+
+  RelatedOp(cylinder, cylinder2, out);
+}
+
+/**
+ * Colinear edges are not collapsed like above due to non-coplanar properties.
+ */
+TEST(Boolean, CoplanarProp) {
+  Manifold cylinder = Manifold::Cylinder(1.0f, 1.0f);
+  MeshGL cylinderGL = WithIndexColors(cylinder.GetMesh());
+  std::vector<float> tol(3, 0.01);
+  cylinder = Manifold(cylinderGL, tol);
+
+  Manifold cylinder2 = cylinder.AsOriginal();
+  cylinder2 = cylinder2.Scale({0.5f, 0.5f, 1.0f})
+                  .Rotate(0, 0, 15)
+                  .Translate({0.25f, 0.25f, 0.0f});
+  Manifold out = cylinder - cylinder2;
+  ExpectMeshes(out, {{42, 84}});
   EXPECT_EQ(out.NumDegenerateTris(), 0);
   EXPECT_EQ(out.Genus(), 1);
 
@@ -931,6 +978,10 @@ TEST(Boolean, Precision2) {
  */
 TEST(Boolean, Sphere) {
   Manifold sphere = Manifold::Sphere(1.0f, 12);
+  MeshGL sphereGL = WithPositionColors(sphere);
+  std::vector<float> tol(3, 0.01);
+  sphere = Manifold(sphereGL, tol);
+
   Manifold sphere2 = sphere;
   sphere2 = sphere2.Translate(glm::vec3(0.5));
   sphere2 = sphere2.AsOriginal();
@@ -946,15 +997,15 @@ TEST(Boolean, MeshRelation) {
   const float period = glm::two_pi<float>();
 
   Mesh gyroidMesh = LevelSet(Gyroid(), {glm::vec3(0), glm::vec3(period)}, 0.5);
-  MeshGL gyroidMeshGL = WithColors(gyroidMesh);
-  std::vector<float> tol(3, 0.01);
+  MeshGL gyroidMeshGL = WithIndexColors(gyroidMesh);
+  std::vector<float> tol(3, 0.0001);
   Manifold gyroid(gyroidMeshGL, tol);
 
   Mesh gyroidMesh2 = gyroidMesh;
   std::transform(gyroidMesh.vertPos.begin(), gyroidMesh.vertPos.end(),
                  gyroidMesh2.vertPos.begin(),
                  [](const glm::vec3& v) { return v + glm::vec3(2.0f); });
-  MeshGL gyroidMeshGL2 = WithColors(gyroidMesh2);
+  MeshGL gyroidMeshGL2 = WithIndexColors(gyroidMesh2);
   Manifold gyroid2(gyroidMeshGL2, tol);
 
   EXPECT_FALSE(gyroid.IsEmpty());
