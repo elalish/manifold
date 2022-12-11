@@ -15,6 +15,8 @@
 #pragma once
 
 #include "hashtable.h"
+#include "optional"
+#include "par.h"
 #include "public.h"
 #include "utils.h"
 #include "vec_dh.h"
@@ -279,6 +281,20 @@ struct BuildTris {
     }
   }
 };
+
+template <typename Func>
+void for_each_n_wrapper(ExecutionPolicy policy, int morton,
+                        ComputeVerts<Func> cv) {
+  for_each_n(policy, countAt(0), morton, cv);
+}
+template <>
+void for_each_n_wrapper<std::function<float(glm::vec3)>>(
+    ExecutionPolicy policy, int morton,
+    ComputeVerts<std::function<float(glm::vec3)>> cv) {
+  const auto pol = policy == ParUnseq ? Par : policy;
+  for_each_n(pol, countAt(0), morton, cv);
+}
+
 }  // namespace
 
 namespace manifold {
@@ -312,7 +328,8 @@ namespace manifold {
  * input to the Manifold constructor for further operations.
  */
 template <typename Func>
-inline Mesh LevelSet(Func sdf, Box bounds, float edgeLength, float level = 0) {
+inline Mesh LevelSet(Func sdf, Box bounds, float edgeLength, float level = 0,
+                     std::optional<ExecutionPolicy> policy = std::nullopt) {
   Mesh out;
 
   const glm::vec3 dim = bounds.Size();
@@ -321,7 +338,15 @@ inline Mesh LevelSet(Func sdf, Box bounds, float edgeLength, float level = 0) {
   const glm::vec3 spacing = dim / (glm::vec3(gridSize));
 
   const Uint64 maxMorton = MortonCode(glm::ivec4(gridSize + 1, 1));
-  const auto policy = autoPolicy(maxMorton);
+
+  // Parallel policies violate will crash language runtimes with runtime locks
+  // that expect to not be called back by unregistered threads. This allows
+  // bindings use LevelSet despite being compiled with MANIFOLD_PAR
+  // active (CUDA is already avoided when Func is a function ptr).
+  const auto pol =
+      (!policy.has_value() || policy.value() == ParUnseq && !CudaEnabled())
+          ? autoPolicy(maxMorton)
+          : policy.value();
 
   int tableSize = glm::min(
       2 * maxMorton, static_cast<Uint64>(10 * glm::pow(maxMorton, 0.667)));
@@ -330,8 +355,9 @@ inline Mesh LevelSet(Func sdf, Box bounds, float edgeLength, float level = 0) {
 
   while (1) {
     VecDH<int> index(1, 0);
-    for_each_n(
-        policy, countAt(0), maxMorton + 1,
+    // avoid handing dynamic function pointers to CUDA
+    for_each_n_wrapper<Func>(
+        pol, maxMorton + 1,
         ComputeVerts<Func>({vertPos.ptrD(), index.ptrD(), gridVerts.D(), sdf,
                             bounds.min, gridSize + 1, spacing, level}));
 
@@ -355,7 +381,7 @@ inline Mesh LevelSet(Func sdf, Box bounds, float edgeLength, float level = 0) {
   VecDH<glm::ivec3> triVerts(gridVerts.Entries() * 12);  // worst case
 
   VecDH<int> index(1, 0);
-  for_each_n(policy, countAt(0), gridVerts.Size(),
+  for_each_n(pol, countAt(0), gridVerts.Size(),
              BuildTris({triVerts.ptrD(), index.ptrD(), gridVerts.D()}));
   triVerts.resize(index[0]);
 

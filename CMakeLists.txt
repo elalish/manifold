@@ -21,6 +21,8 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 option(MANIFOLD_EXPORT off)
 option(MANIFOLD_DEBUG off)
 option(MANIFOLD_USE_CUDA off)
+option(MANIFOLD_PYBIND on)
+option(MANIFOLD_CBIND off)
 set(MANIFOLD_PAR "NONE" CACHE STRING "Parallel backend, either \"TBB\" or \"OpenMP\" or \"NONE\"")
 
 if(EMSCRIPTEN)
@@ -37,6 +39,14 @@ option(BUILD_SHARED_LIBS off)
 set(GLM_INC_DIR ${PROJECT_SOURCE_DIR}/src/third_party/glm)
 set(PYBIND11_DIR ${PROJECT_SOURCE_DIR}/bindings/python/third_party/pybind11)
 set(THRUST_INC_DIR ${PROJECT_SOURCE_DIR}/src/third_party/thrust)
+
+if((MANIFOLD_USE_CUDA AND BUILD_SHARED_LIBS) OR MANIFOLD_CBIND)
+  # required when using CUDA due to relocation of OBJECT libraries
+  # not sure how much of a hit in perf there really would be of fPIC on
+  # this library, but could be motivation to move the offending sub-libraries
+  # into the manifold lib directory
+  add_compile_options(-fPIC)
+endif()
 
 if(MANIFOLD_USE_CUDA)
   enable_language(CUDA)

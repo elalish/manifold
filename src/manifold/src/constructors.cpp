@@ -14,6 +14,10 @@
 
 #include <thrust/sequence.h>
 
+#include <memory>
+#include <tuple>
+#include <vector>
+
 #include "csg_tree.h"
 #include "graph.h"
 #include "impl.h"
@@ -357,12 +361,7 @@ Manifold Manifold::Compose(const std::vector<Manifold>& manifolds) {
   return Manifold(std::make_shared<Impl>(CsgLeafNode::Compose(children)));
 }
 
-/**
- * This operation returns a vector of Manifolds that are topologically
- * disconnected. If everything is connected, the vector is length one,
- * containing a copy of the original. It is the inverse operation of Compose().
- */
-std::vector<Manifold> Manifold::Decompose() const {
+Components Manifold::GetComponents() const {
   Graph graph;
   auto pImpl_ = GetCsgLeafNode().GetImpl();
   for (int i = 0; i < NumVert(); ++i) {
@@ -374,16 +373,15 @@ std::vector<Manifold> Manifold::Decompose() const {
   }
   std::vector<int> components;
   const int numLabel = ConnectedComponents(components, graph);
+  return {components, numLabel};
+}
 
-  if (numLabel == 1) {
-    std::vector<Manifold> meshes(1);
-    meshes[0] = *this;
-    return meshes;
-  }
-  VecDH<int> vertLabel(components);
+std::vector<Manifold> Manifold::Decompose(Components components) const {
+  auto pImpl_ = GetCsgLeafNode().GetImpl();
+  VecDH<int> vertLabel(components.indices);
 
   std::vector<Manifold> meshes;
-  for (int i = 0; i < numLabel; ++i) {
+  for (int i = 0; i < components.discrete; ++i) {
     auto impl = std::make_shared<Impl>();
     // inherit original object's precision
     impl->precision_ = pImpl_->precision_;
@@ -417,5 +415,14 @@ std::vector<Manifold> Manifold::Decompose() const {
     meshes.push_back(Manifold(impl));
   }
   return meshes;
+}
+
+/**
+ * This operation returns a vector of Manifolds that are topologically
+ * disconnected. If everything is connected, the vector is length one,
+ * containing a copy of the original. It is the inverse operation of Compose().
+ */
+std::vector<Manifold> Manifold::Decompose() const {
+  return Decompose(GetComponents());
 }
 }  // namespace manifold
