@@ -441,6 +441,8 @@ struct CreateBarycentric {
 
   float *properties;
   int *propIdx;
+  int *newVert2propP;
+  int *newVert2propQ;
 
   const int offsetQ;
   const int firstNewVert;
@@ -540,6 +542,10 @@ struct CreateBarycentric {
               triProp[pairRef.tri][pairRef.vert] !=
                   triProp[thisRef.tri][Prev3(thisRef.vert)]))) {
           halfedgeProp = AtomicAdd(*propIdx, 1);
+          // Record the vert2prop relationship in case any are shared (did not
+          // enter this branch).
+          int *newVert2prop = thisRef.PQ == 0 ? newVert2propP : newVert2propQ;
+          newVert2prop[halfedgeR.startVert - firstNewVert] = halfedgeProp;
           // barycentric interpolation
           for (int p = 0; p < numProp; ++p) {
             glm::vec3 oldProps;
@@ -553,6 +559,24 @@ struct CreateBarycentric {
   }
 };
 
+struct SetSharedProperties {
+  const int *newVert2propP;
+  const int *newVert2propQ;
+  const int firstNewVert;
+
+  __host__ __device__ void operator()(
+      thrust::tuple<int &, Ref, Halfedge> inOut) {
+    int &halfedgeProp = thrust::get<0>(inOut);
+    const Ref halfedgeRef = thrust::get<1>(inOut);
+    const Halfedge halfedgeR = thrust::get<2>(inOut);
+    if (halfedgeProp >= 0) return;
+
+    const int *newVert2prop =
+        halfedgeRef.PQ == 0 ? newVert2propP : newVert2propQ;
+    halfedgeProp = newVert2prop[halfedgeR.startVert - firstNewVert];
+  }
+};
+
 std::tuple<VecDH<BaryRef>, VecDH<int>, VecDH<int>> CalculateMeshRelation(
     Manifold::Impl &outR, const VecDH<Ref> &halfedgeRef,
     const Manifold::Impl &inP, const Manifold::Impl &inQ, int firstNewVert,
@@ -560,6 +584,7 @@ std::tuple<VecDH<BaryRef>, VecDH<int>, VecDH<int>> CalculateMeshRelation(
   const int numPropP = inP.NumProp();
   const int numPropQ = inQ.NumProp();
   const int numPropR = glm::max(numPropP, numPropQ);
+  const int numNewVerts = outR.NumVert() - firstNewVert;
   outR.meshRelation_.numProp = numPropR;
   VecDH<int> vPropP2R;
   VecDH<int> vPropQ2R;
@@ -581,7 +606,6 @@ std::tuple<VecDH<BaryRef>, VecDH<int>, VecDH<int>> CalculateMeshRelation(
     exclusive_scan(policy, vPropKeepQ.begin(), vPropKeepQ.end(),
                    vPropQ2R.begin(), vPropP2R.back() + vPropKeepP.back());
     const int numRetainedProp = vPropQ2R.back() + vPropKeepQ.back();
-    const int numNewVerts = outR.NumVert() - firstNewVert;
     outR.meshRelation_.properties.resize(
         (numRetainedProp + 3 * numNewVerts) * numPropR, NAN);
     propIdx[0] = numRetainedProp;
@@ -591,6 +615,8 @@ std::tuple<VecDH<BaryRef>, VecDH<int>, VecDH<int>> CalculateMeshRelation(
   VecDH<BaryRef> faceRef(numFaceR);
   VecDH<int> halfedgeBary(halfedgeRef.size());
   VecDH<int> halfedgeProp(halfedgeRef.size(), -1);
+  VecDH<int> newVert2propP(numNewVerts, -1);
+  VecDH<int> newVert2propQ(numNewVerts, -1);
 
   const int offsetQ = Manifold::Impl::meshIDCounter_;
   VecDH<int> baryIdx(1, 0);
@@ -603,6 +629,8 @@ std::tuple<VecDH<BaryRef>, VecDH<int>, VecDH<int>> CalculateMeshRelation(
                                 baryIdx.ptrD(),
                                 outR.meshRelation_.properties.ptrD(),
                                 propIdx.ptrD(),
+                                newVert2propP.ptrD(),
+                                newVert2propQ.ptrD(),
                                 offsetQ,
                                 firstNewVert,
                                 outR.vertPos_.cptrD(),
@@ -629,28 +657,16 @@ std::tuple<VecDH<BaryRef>, VecDH<int>, VecDH<int>> CalculateMeshRelation(
   outR.meshRelation_.barycentric.resize(baryIdx[0]);
   if (numPropR > 0) {
     outR.meshRelation_.properties.resize(numPropR * propIdx[0]);
+    for_each_n(policy,
+               zip(halfedgeProp.begin(), halfedgeRef.cbegin(),
+                   outR.halfedge_.cbegin()),
+               halfedgeProp.size(),
+               SetSharedProperties({newVert2propP.cptrD(),
+                                    newVert2propQ.cptrD(), firstNewVert}));
   }
 
   return std::make_tuple(faceRef, halfedgeBary, halfedgeProp);
 }
-
-struct SetSharedProperties {
-  glm::ivec3 *triProperties;
-
-  __host__ __device__ void operator()(thrust::tuple<int, Halfedge> in) {
-    const int halfedge = thrust::get<0>(in);
-    const Halfedge halfedgeR = thrust::get<1>(in);
-
-    const int tri = halfedge / 3;
-    const int vert = halfedge % 3;
-    if (triProperties[tri][vert] >= 0) return;
-
-    const int pair = halfedgeR.pairedHalfedge;
-    const int triPair = pair / 3;
-    const int vertNext = (pair + 1) % 3;
-    triProperties[tri][vert] = triProperties[triPair][vertNext];
-  }
-};
 }  // namespace
 
 namespace manifold {
@@ -807,13 +823,6 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
     ASSERT(outR.IsManifold(), logicErr, "polygon mesh is not manifold!");
 
   outR.Face2Tri(faceEdge, faceRef, halfedgeBary, halfedgeProp);
-
-  // CalculateMeshRelation misses a few shared values in triProperties, marking
-  // them as -1. Fill those in here now that the connectivity information is
-  // available.
-  for_each_n(policy_, zip(countAt(0), outR.halfedge_.cbegin()),
-             outR.halfedge_.size(),
-             SetSharedProperties({outR.meshRelation_.triProperties.ptrD()}));
 
 #ifdef MANIFOLD_DEBUG
   triangulate.Stop();
