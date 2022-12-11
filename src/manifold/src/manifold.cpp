@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <set>
+
 #include "boolean3.h"
 #include "csg_tree.h"
 #include "impl.h"
@@ -197,6 +199,7 @@ MeshGL Manifold::GetMeshGL() const {
   }
 
   std::vector<int> vert2prop(impl.NumVert(), -1);
+  std::set<std::pair<int, int>> vertPropPair;
 
   for (int tri = 0; tri < numTri; ++tri) {
     const glm::ivec3 triProp = impl.meshRelation_.triProperties[tri];
@@ -204,7 +207,8 @@ MeshGL Manifold::GetMeshGL() const {
       const int prop = triProp[i];
       out.triVerts[3 * tri + i] = prop;
       const int vert = impl.halfedge_[3 * tri + i].startVert;
-      if (vert2prop[vert] == prop) continue;
+      if (vertPropPair.find({vert, prop}) != vertPropPair.end()) continue;
+      std::cout << vert << ", " << prop << ", " << vert2prop[vert] << std::endl;
       for (int p : {0, 1, 2}) {
         out.vertProperties[prop * out.numProp + p] = impl.vertPos_[vert][p];
       }
@@ -212,6 +216,7 @@ MeshGL Manifold::GetMeshGL() const {
         out.vertProperties[prop * out.numProp + p + 3] =
             impl.meshRelation_.properties[prop * numProp + p];
       }
+      vertPropPair.insert({vert, prop});
       if (vert2prop[vert] == -1) {
         vert2prop[vert] = prop;
       } else {
