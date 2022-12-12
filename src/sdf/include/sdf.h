@@ -344,7 +344,7 @@ inline Mesh LevelSet(Func sdf, Box bounds, float edgeLength, float level = 0,
   // bindings use LevelSet despite being compiled with MANIFOLD_PAR
   // active (CUDA is already avoided when Func is a function ptr).
   const auto pol =
-      (!policy.has_value() || policy.value() == ParUnseq && !CudaEnabled())
+      (!policy.has_value() || (policy.value() == ParUnseq && !CudaEnabled()))
           ? autoPolicy(maxMorton)
           : policy.value();
 
