@@ -215,8 +215,8 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .function("_Translate", &Manifold::Translate)
       .function("_Rotate", &Manifold::Rotate)
       .function("_Scale", &Manifold::Scale)
-      .function("_Decompose",
-                select_overload<std::vector<Manifold>()>(&Manifold::Decompose))
+      .function("_Decompose", select_overload<std::vector<Manifold>() const>(
+                                  &Manifold::Decompose))
       .function("isEmpty", &Manifold::IsEmpty)
       .function("status", &Manifold::Status)
       .function("numVert", &Manifold::NumVert)
