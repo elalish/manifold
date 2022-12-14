@@ -14,9 +14,6 @@
 
 #include <thrust/sequence.h>
 
-#include <memory>
-#include <vector>
-
 #include "csg_tree.h"
 #include "graph.h"
 #include "impl.h"
