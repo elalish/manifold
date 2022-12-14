@@ -25,7 +25,7 @@ target_link_libraries(samples
 )
 
 target_compile_options(samples PRIVATE ${MANIFOLD_FLAGS})
-target_compile_features(samples PUBLIC cxx_std_14)
+target_compile_features(samples PUBLIC cxx_std_17)
 
 project(samplesGPU)
 
@@ -45,7 +45,4 @@ target_link_libraries(samplesGPU
 )
 
 target_compile_options(samplesGPU PRIVATE ${MANIFOLD_FLAGS})
-target_compile_features(samplesGPU
-    PUBLIC cxx_std_14
-    PRIVATE cxx_std_17
-)
+target_compile_features(samplesGPU PUBLIC cxx_std_17)
