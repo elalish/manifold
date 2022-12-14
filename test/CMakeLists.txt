@@ -34,7 +34,7 @@ if(MANIFOLD_USE_CUDA)
 endif()
 
 target_compile_options(${PROJECT_NAME} PRIVATE ${MANIFOLD_FLAGS})
-target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_14)
+target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_17)
 
 add_test(test_all ${PROJECT_NAME})
 
