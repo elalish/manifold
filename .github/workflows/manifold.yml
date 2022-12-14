@@ -16,7 +16,7 @@ jobs:
       matrix:
         cuda_support: [ON, OFF]
         parallel_backend: [NONE, OMP, TBB]
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     if: github.event.pull_request.draft == false
     container:
       image: docker://nvidia/cuda:11.6.0-devel-ubuntu20.04
