@@ -18,11 +18,11 @@ project(manifold LANGUAGES CXX)
 set(CMAKE_VERBOSE_MAKEFILE ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-option(MANIFOLD_EXPORT off)
-option(MANIFOLD_DEBUG off)
-option(MANIFOLD_USE_CUDA off)
+option(MANIFOLD_EXPORT OFF)
+option(MANIFOLD_DEBUG OFF)
+option(MANIFOLD_USE_CUDA OFF)
 option(MANIFOLD_PYBIND ON)
-option(MANIFOLD_CBIND off)
+option(MANIFOLD_CBIND OFF)
 set(MANIFOLD_PAR "NONE" CACHE STRING "Parallel backend, either \"TBB\" or \"OpenMP\" or \"NONE\"")
 
 if(EMSCRIPTEN)
@@ -33,9 +33,9 @@ endif()
 
 option(PYBIND11_FINDPYTHON ON)
 
-option(BUILD_TEST_CGAL off)
+option(BUILD_TEST_CGAL OFF)
 
-option(BUILD_SHARED_LIBS off)
+option(BUILD_SHARED_LIBS OFF)
 set(GLM_INC_DIR ${PROJECT_SOURCE_DIR}/src/third_party/glm)
 set(PYBIND11_DIR ${PROJECT_SOURCE_DIR}/bindings/python/third_party/pybind11)
 set(THRUST_INC_DIR ${PROJECT_SOURCE_DIR}/src/third_party/thrust)
