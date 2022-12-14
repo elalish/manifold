@@ -28,6 +28,7 @@ ManifoldMesh *manifold_mesh_w_normals_tangents(
 
 ManifoldMesh *manifold_mesh_copy(void *mem, ManifoldMesh *m);
 
+// SDF
 ManifoldMesh *manifold_level_set(void *mem, float (*sdf)(float, float, float),
                                  ManifoldBox *bounds, float edge_length,
                                  float level);
@@ -64,7 +65,6 @@ ManifoldManifold *manifold_transform(void *mem, ManifoldManifold *m, float x1,
                                      float y1, float z1, float x2, float y2,
                                      float z2, float x3, float y3, float z3,
                                      float x4, float y4, float z4);
-
 ManifoldManifold *manifold_warp(void *mem, ManifoldManifold *m,
                                 ManifoldVec3 (*fun)(float, float, float));
 ManifoldManifold *manifold_refine(void *mem, ManifoldManifold *m, int refine);
@@ -104,21 +104,6 @@ ManifoldManifold **manifold_decompose(void **mem, ManifoldManifold *m,
                                       ManifoldComponents *cs);
 ManifoldManifold *manifold_as_original(void *mem, ManifoldManifold *m);
 
-// Mesh Relation
-ManifoldMeshRelation *manifold_get_mesh_relation(void *mem,
-                                                 ManifoldManifold *m);
-size_t manifold_mesh_relation_barycentric_length(ManifoldMeshRelation *m);
-ManifoldVec3 *manifold_mesh_relation_barycentric(void *mem,
-                                                 ManifoldMeshRelation *m);
-size_t manifold_mesh_relation_tri_bary_length(ManifoldMeshRelation *m);
-ManifoldBaryRef *manifold_mesh_relation_tri_bary(void *mem,
-                                                 ManifoldMeshRelation *m);
-
-// Static Quality Globals
-void manifold_set_min_circular_angle(float degrees);
-void manifold_set_min_circular_edge_length(float length);
-void manifold_set_circular_segments(int number);
-
 // Manifold Info
 int manifold_is_empty(ManifoldManifold *m);
 ManifoldError manifold_status(ManifoldManifold *m);
@@ -136,6 +121,16 @@ float *manifold_curvature_vert_mean(void *mem, ManifoldCurvature *curv);
 float *manifold_curvature_vert_gaussian(void *mem, ManifoldCurvature *curv);
 int manifold_get_circular_segments(float radius);
 int manifold_original_id(ManifoldManifold *m);
+
+// Mesh Relation
+ManifoldMeshRelation *manifold_get_mesh_relation(void *mem,
+                                                 ManifoldManifold *m);
+size_t manifold_mesh_relation_barycentric_length(ManifoldMeshRelation *m);
+ManifoldVec3 *manifold_mesh_relation_barycentric(void *mem,
+                                                 ManifoldMeshRelation *m);
+size_t manifold_mesh_relation_tri_bary_length(ManifoldMeshRelation *m);
+ManifoldBaryRef *manifold_mesh_relation_tri_bary(void *mem,
+                                                 ManifoldMeshRelation *m);
 
 // Bounding Box
 ManifoldBox *manifold_box(void *mem, float x1, float y1, float z1, float x2,
@@ -161,21 +156,12 @@ int manifold_box_does_overlap_pt(ManifoldBox *b, float x, float y, float z);
 int manifold_box_does_overlap_box(ManifoldBox *a, ManifoldBox *b);
 int manifold_box_is_finite(ManifoldBox *b);
 
-// Mesh Export
-ManifoldMaterial *manifold_material(void *mem);
-void manifold_material_set_roughness(ManifoldMaterial *mat, float roughness);
-void manifold_material_set_metalness(ManifoldMaterial *mat, float metalness);
-void manifold_material_set_color(ManifoldMaterial *mat, ManifoldVec4 color);
-void manifold_material_set_vert_color(ManifoldMaterial *mat,
-                                      ManifoldVec4 *vert_color, size_t n_vert);
+// Static Quality Globals
+void manifold_set_min_circular_angle(float degrees);
+void manifold_set_min_circular_edge_length(float length);
+void manifold_set_circular_segments(int number);
 
-ManifoldExportOptions *manifold_export_options(void *mem);
-
-void manifold_export_options_set_faceted(ManifoldExportOptions *options,
-                                         int faceted);
-void manifold_export_options_set_material(ManifoldExportOptions *options,
-                                          ManifoldMaterial *mat);
-
+// Manifold Mesh Extraction
 ManifoldMesh *manifold_get_mesh(void *mem, ManifoldManifold *m);
 size_t manifold_mesh_vert_length(ManifoldMesh *m);
 size_t manifold_mesh_tri_length(ManifoldMesh *m);
@@ -197,6 +183,18 @@ uint32_t *manifold_meshgl_tri_verts(void *mem, ManifoldMeshGL *m);
 float *manifold_meshgl_vert_normal(void *mem, ManifoldMeshGL *m);
 float *manifold_meshgl_halfedge_tangent(void *mem, ManifoldMeshGL *m);
 
+// MeshIO / Export
+ManifoldMaterial *manifold_material(void *mem);
+void manifold_material_set_roughness(ManifoldMaterial *mat, float roughness);
+void manifold_material_set_metalness(ManifoldMaterial *mat, float metalness);
+void manifold_material_set_color(ManifoldMaterial *mat, ManifoldVec4 color);
+void manifold_material_set_vert_color(ManifoldMaterial *mat,
+                                      ManifoldVec4 *vert_color, size_t n_vert);
+ManifoldExportOptions *manifold_export_options(void *mem);
+void manifold_export_options_set_faceted(ManifoldExportOptions *options,
+                                         int faceted);
+void manifold_export_options_set_material(ManifoldExportOptions *options,
+                                          ManifoldMaterial *mat);
 void manifold_export_mesh(char *filename, ManifoldMesh *mesh,
                           ManifoldExportOptions *options);
 
