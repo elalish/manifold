@@ -15,7 +15,6 @@
 #include <thrust/sequence.h>
 
 #include <memory>
-#include <tuple>
 #include <vector>
 
 #include "csg_tree.h"
