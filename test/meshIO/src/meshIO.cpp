@@ -19,11 +19,18 @@
 
 #include "assimp/Exporter.hpp"
 #include "assimp/Importer.hpp"
-// #include "assimp/pbrmaterial.h"
 #include "assimp/material.h"
 #include "assimp/postprocess.h"
 #include "assimp/scene.h"
 #include "optional_assert.h"
+
+#ifndef AI_MATKEY_ROUGHNESS_FACTOR
+#include "assimp/pbrmaterial.h"
+#define AI_MATKEY_METALLIC_FACTOR \
+  AI_MATKEY_GLTF_PBRMETALLICROUGHNESS_METALLIC_FACTOR
+#define AI_MATKEY_ROUGHNESS_FACTOR \
+  AI_MATKEY_GLTF_PBRMETALLICROUGHNESS_ROUGHNESS_FACTOR
+#endif
 
 namespace manifold {
 
