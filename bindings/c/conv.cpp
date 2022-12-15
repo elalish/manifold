@@ -1,8 +1,8 @@
+#include <conv.h>
 #include <manifold.h>
 #include <meshIO.h>
 #include <sdf.h>
 
-#include <conv.hh>
 #include <vector>
 
 #include "include/types.h"

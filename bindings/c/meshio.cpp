@@ -1,6 +1,6 @@
 #include "meshIO.h"
 
-#include <conv.hh>
+#include <conv.h>
 
 #ifdef __cplusplus
 extern "C" {

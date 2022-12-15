@@ -1,3 +1,4 @@
+#include <conv.h>
 #include <manifold.h>
 #include <manifoldc.h>
 #include <meshIO.h>
@@ -5,7 +6,6 @@
 #include <sdf.h>
 
 #include <algorithm>
-#include <conv.hh>
 #include <cstddef>
 #include <cstring>
 #include <functional>
@@ -17,7 +17,7 @@
 #include "glm/ext/matrix_float4x3.hpp"
 #include "glm/ext/vector_float3.hpp"
 #include "glm/ext/vector_int3.hpp"
-#include "include/conv.hh"
+#include "include/conv.h"
 #include "include/types.h"
 #include "meshio.cpp"
 #include "types.h"

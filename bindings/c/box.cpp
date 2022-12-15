@@ -1,8 +1,8 @@
+#include <conv.h>
 #include <manifold.h>
 #include <public.h>
 
 #include <algorithm>
-#include <conv.hh>
 #include <vector>
 
 #include "types.h"
