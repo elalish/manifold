@@ -29,6 +29,12 @@ ManifoldMesh *manifold_mesh_w_normals_tangents(
 ManifoldMesh *manifold_mesh_copy(void *mem, ManifoldMesh *m);
 
 // SDF
+// By default, the execution policy (sequential or parallel) of
+// manifold_level_set will be chosen automatically depending on the size of the
+// job and whether Manifold has been compiled with a PAR backend. If you are
+// using these bindings from a language that has a runtime lock preventing the
+// parallel execution of closures, then you should use manifold_level_set_seq to
+// force sequential execution.
 ManifoldMesh *manifold_level_set(void *mem, float (*sdf)(float, float, float),
                                  ManifoldBox *bounds, float edge_length,
                                  float level);
