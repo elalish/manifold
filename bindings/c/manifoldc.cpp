@@ -319,7 +319,7 @@ ManifoldManifold **manifold_decompose(void **mem, ManifoldManifold *m,
   auto components = *from_c(cs);
   auto manifolds = from_c(m)->Decompose(components);
   ManifoldManifold **ms = reinterpret_cast<ManifoldManifold **>(mem);
-  for (int i = 0; i < components.discrete; ++i) {
+  for (int i = 0; i < components.numComponents; ++i) {
     ms[i] = to_c(new (mem[i]) Manifold(manifolds[i]));
   }
   return ms;
