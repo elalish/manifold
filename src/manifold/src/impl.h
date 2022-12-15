@@ -82,6 +82,10 @@ struct Manifold::Impl {
   int NumEdge() const { return halfedge_.size() / 2; }
   int NumTri() const { return halfedge_.size() / 3; }
   int NumProp() const { return meshRelation_.numProp; }
+  int NumPropVert() const {
+    return NumProp() == 0 ? NumVert()
+                          : meshRelation_.properties.size() / NumProp();
+  }
 
   // properties.cu
   Properties GetProperties() const;
@@ -99,6 +103,7 @@ struct Manifold::Impl {
   void Finish();
   void SortVerts();
   void ReindexVerts(const VecDH<int>& vertNew2Old, int numOldVert);
+  void CompactProps();
   void GetFaceBoxMorton(VecDH<Box>& faceBox, VecDH<uint32_t>& faceMorton) const;
   void SortFaces(VecDH<Box>& faceBox, VecDH<uint32_t>& faceMorton);
   void GatherFaces(const VecDH<int>& faceNew2Old);

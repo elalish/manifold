@@ -187,8 +187,14 @@ void RelatedOp(const Manifold& inP, const Manifold& inQ, const Manifold& outR) {
   RelatedGL(outR, inputGL, meshID2idx);
 }
 
+struct MeshSize {
+  int numVert, numTri;
+  int numProp = 0;
+  int numPropVert = numVert;
+};
+
 void ExpectMeshes(const Manifold& manifold,
-                  const std::vector<std::pair<int, int>>& numVertTri) {
+                  const std::vector<MeshSize>& numVertTri) {
   EXPECT_FALSE(manifold.IsEmpty());
   EXPECT_TRUE(manifold.IsManifold());
   EXPECT_TRUE(manifold.MatchesTriNormals());
@@ -201,8 +207,10 @@ void ExpectMeshes(const Manifold& manifold,
             });
   for (int i = 0; i < manifolds.size(); ++i) {
     EXPECT_TRUE(manifolds[i].IsManifold());
-    EXPECT_EQ(manifolds[i].NumVert(), numVertTri[i].first);
-    EXPECT_EQ(manifolds[i].NumTri(), numVertTri[i].second);
+    EXPECT_EQ(manifolds[i].NumVert(), numVertTri[i].numVert);
+    EXPECT_EQ(manifolds[i].NumTri(), numVertTri[i].numTri);
+    EXPECT_EQ(manifolds[i].NumProp(), numVertTri[i].numProp);
+    EXPECT_EQ(manifolds[i].NumPropVert(), numVertTri[i].numPropVert);
     const Mesh mesh = manifolds[i].GetMesh();
     for (const glm::vec3& normal : mesh.vertNormal) {
       ASSERT_NEAR(glm::length(normal), 1, 0.0001);
@@ -717,7 +725,7 @@ TEST(Boolean, Tetra) {
   tetra2 = tetra2.Translate(glm::vec3(0.5f)).AsOriginal();
   Manifold result = tetra2 - tetra;
 
-  ExpectMeshes(result, {{8, 12}});
+  ExpectMeshes(result, {{8, 12, 3, 11}});
 
   RelatedOp(tetra, tetra2, result);
 }
@@ -764,7 +772,7 @@ TEST(Boolean, Coplanar) {
                   .Rotate(0, 0, 15)
                   .Translate({0.25f, 0.25f, 0.0f});
   Manifold out = cylinder - cylinder2;
-  ExpectMeshes(out, {{32, 64}});
+  ExpectMeshes(out, {{32, 64, 3, 48}});
   EXPECT_EQ(out.NumDegenerateTris(), 0);
   EXPECT_EQ(out.Genus(), 1);
 
@@ -789,7 +797,7 @@ TEST(Boolean, CoplanarProp) {
                   .Rotate(0, 0, 15)
                   .Translate({0.25f, 0.25f, 0.0f});
   Manifold out = cylinder - cylinder2;
-  ExpectMeshes(out, {{42, 84}});
+  ExpectMeshes(out, {{42, 84, 3, 68}});
   EXPECT_EQ(out.NumDegenerateTris(), 0);
   EXPECT_EQ(out.Genus(), 1);
 
@@ -987,7 +995,7 @@ TEST(Boolean, Sphere) {
   sphere2 = sphere2.AsOriginal();
   Manifold result = sphere - sphere2;
 
-  ExpectMeshes(result, {{74, 144}});
+  ExpectMeshes(result, {{74, 144, 3, 110}});
   EXPECT_EQ(result.NumDegenerateTris(), 0);
 
   RelatedOp(sphere, sphere2, result);

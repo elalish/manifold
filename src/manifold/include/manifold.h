@@ -117,6 +117,8 @@ class Manifold {
   int NumVert() const;
   int NumEdge() const;
   int NumTri() const;
+  int NumProp() const;
+  int NumPropVert() const;
   Box BoundingBox() const;
   float Precision() const;
   int Genus() const;

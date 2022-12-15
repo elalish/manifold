@@ -365,6 +365,8 @@ void Manifold::Impl::CollapseEdge(const int edge) {
   CollapseTri(tri1edge);
 
   // Orbit startVert
+  const int triVert0 = (edge + 1) % 3;
+  const int triVert1 = toRemove.pairedHalfedge % 3;
   current = start;
   while (current != tri0edge[2]) {
     current = NextHalfedge(current);
@@ -376,12 +378,10 @@ void Manifold::Impl::CollapseEdge(const int edge) {
       const bool use0 =
           ref0.meshID == triBary[tri].meshID && ref0.tri == triBary[tri].tri;
       triBary[tri].vertBary[vIdx] =
-          use0 ? ref0.vertBary[(edge + 1) % 3]
-               : ref1.vertBary[toRemove.pairedHalfedge % 3];
+          use0 ? ref0.vertBary[triVert0] : ref1.vertBary[triVert1];
       if (triProp.size() > 0)
         triProp[tri][vIdx] =
-            use0 ? triProp[ref0.tri][(edge + 1) % 3]
-                 : triProp[ref1.tri][toRemove.pairedHalfedge % 3];
+            use0 ? triProp[ref0.tri][triVert0] : triProp[ref1.tri][triVert1];
     }
 
     const int vert = halfedge_[current].endVert;

@@ -492,13 +492,23 @@ Manifold::Impl::MeshRelationD Manifold::Impl::Subdivide(int n) {
                      relation.triBary.ptrD(), meshRelation_.barycentric.ptrD(),
                      meshRelation_.triBary.ptrD(),
                      oldMeshRelation.barycentric.cptrD(), triVertStart, n,
-                     halfedge_.ptrD()}));
+                     halfedge_.cptrD()}));
   // Create sub-triangles
   VecDH<glm::ivec3> triVerts(n * n * numTri);
   for_each_n(policy, countAt(0), numTri,
              SplitTris({triVerts.ptrD(), halfedge_.cptrD(), half2Edge.cptrD(),
                         numVert, triVertStart, n}));
   CreateHalfedges(triVerts);
+
+  if (meshRelation_.numProp > 0) {
+    meshRelation_.properties.resize(meshRelation_.numProp *
+                                    relation.barycentric.size());
+    meshRelation_.triProperties.resize(relation.triBary.size());
+    // Fill properties according to barycentric.
+    // Set triProp to share properties on continuous edges.
+    // Duplicate properties will be removed during sorting.
+  }
+
   return relation;
 }
 

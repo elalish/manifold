@@ -119,6 +119,40 @@ struct Reindex {
   }
 };
 
+struct MarkProp {
+  int* keep;
+
+  __host__ __device__ void operator()(glm::ivec3 triProp) {
+    for (const int i : {0, 1, 2}) {
+      keep[triProp[i]] = 1;
+    }
+  }
+};
+
+struct GatherProps {
+  float* properties;
+  const float* oldProperties;
+  const int numProp;
+
+  __host__ __device__ void operator()(thrust::tuple<int, int> in) {
+    const int oldIdx = thrust::get<0>(in);
+    const int newIdx = thrust::get<1>(in);
+    for (int p = 0; p < numProp; ++p) {
+      properties[newIdx * numProp + p] = oldProperties[oldIdx * numProp + p];
+    }
+  }
+};
+
+struct ReindexProps {
+  const int* old2new;
+
+  __host__ __device__ void operator()(glm::ivec3& triProp) {
+    for (const int i : {0, 1, 2}) {
+      triProp[i] = old2new[triProp[i]];
+    }
+  }
+};
+
 template <typename T>
 void Permute(VecDH<T>& inOut, const VecDH<int>& new2Old) {
   VecDH<T> tmp(std::move(inOut));
@@ -182,6 +216,7 @@ void Manifold::Impl::Finish() {
   GetFaceBoxMorton(faceBox, faceMorton);
   SortFaces(faceBox, faceMorton);
   if (halfedge_.size() == 0) return;
+  CompactProps();
 
   ASSERT(halfedge_.size() % 6 == 0, topologyErr,
          "Not an even number of faces after sorting faces!");
@@ -261,6 +296,32 @@ void Manifold::Impl::ReindexVerts(const VecDH<int>& vertNew2Old,
           vertNew2Old.begin(), vertOld2New.begin());
   for_each(autoPolicy(oldNumVert), halfedge_.begin(), halfedge_.end(),
            Reindex({vertOld2New.cptrD()}));
+}
+
+/**
+ * Removes unreferenced property verts and reindexes triProperties.
+ */
+void Manifold::Impl::CompactProps() {
+  if (meshRelation_.numProp == 0) return;
+
+  const int numVerts = meshRelation_.properties.size() / meshRelation_.numProp;
+  VecDH<int> propOld2New(numVerts, 0);
+  auto policy = autoPolicy(numVerts);
+
+  for_each(policy, meshRelation_.triProperties.cbegin(),
+           meshRelation_.triProperties.cend(), MarkProp({propOld2New.ptrD()}));
+  const int last = propOld2New[numVerts - 1];
+  exclusive_scan(policy, propOld2New.begin(), propOld2New.end(),
+                 propOld2New.begin());
+
+  VecDH<float> oldProp = meshRelation_.properties;
+  meshRelation_.properties.resize(meshRelation_.numProp *
+                                  (propOld2New[numVerts - 1] + last));
+  for_each_n(policy, zip(countAt(0), propOld2New.cbegin()), numVerts,
+             GatherProps({meshRelation_.properties.ptrD(), oldProp.cptrD(),
+                          meshRelation_.numProp}));
+  for_each_n(policy, meshRelation_.triProperties.begin(), NumTri(),
+             ReindexProps({propOld2New.cptrD()}));
 }
 
 /**

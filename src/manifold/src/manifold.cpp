@@ -163,11 +163,8 @@ Mesh Manifold::GetMesh() const {
 MeshGL Manifold::GetMeshGL() const {
   const Impl& impl = *GetCsgLeafNode().GetImpl();
 
-  const int numProp = impl.NumProp();
-  const int numVert =
-      impl.NumProp() == 0
-          ? impl.NumVert()
-          : impl.meshRelation_.properties.size() / impl.NumProp();
+  const int numProp = NumProp();
+  const int numVert = NumPropVert();
   const int numTri = NumTri();
 
   MeshGL out;
@@ -208,7 +205,6 @@ MeshGL Manifold::GetMeshGL() const {
       out.triVerts[3 * tri + i] = prop;
       const int vert = impl.halfedge_[3 * tri + i].startVert;
       if (vertPropPair.find({vert, prop}) != vertPropPair.end()) continue;
-      std::cout << vert << ", " << prop << ", " << vert2prop[vert] << std::endl;
       for (int p : {0, 1, 2}) {
         out.vertProperties[prop * out.numProp + p] = impl.vertPos_[vert][p];
       }
@@ -316,6 +312,18 @@ int Manifold::NumEdge() const { return GetCsgLeafNode().GetImpl()->NumEdge(); }
  * The number of triangles in the Manifold.
  */
 int Manifold::NumTri() const { return GetCsgLeafNode().GetImpl()->NumTri(); }
+/**
+ * The number of properties per vertex in the Manifold.
+ */
+int Manifold::NumProp() const { return GetCsgLeafNode().GetImpl()->NumProp(); }
+/**
+ * The number of property vertices in the Manifold. This will always be >=
+ * NumVert, as some physical vertices may be duplicated to account for different
+ * properties on different neighboring triangles.
+ */
+int Manifold::NumPropVert() const {
+  return GetCsgLeafNode().GetImpl()->NumPropVert();
+}
 
 /**
  * Returns the axis-aligned bounding box of all the Manifold's vertices.
