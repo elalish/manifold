@@ -261,7 +261,7 @@ struct Curvature {
  */
 struct Components {
   std::vector<int> indices;
-  int discrete;
+  int numComponents;
 };
 
 /**

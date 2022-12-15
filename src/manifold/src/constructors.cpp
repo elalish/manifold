@@ -374,10 +374,16 @@ Components Manifold::GetComponents() const {
 
 std::vector<Manifold> Manifold::Decompose(Components components) const {
   auto pImpl_ = GetCsgLeafNode().GetImpl();
+
+  if (components.numComponents == 1) {
+    std::vector<Manifold> meshes(1);
+    meshes[0] = *this;
+    return meshes;
+  }
   VecDH<int> vertLabel(components.indices);
 
   std::vector<Manifold> meshes;
-  for (int i = 0; i < components.discrete; ++i) {
+  for (int i = 0; i < components.numComponents; ++i) {
     auto impl = std::make_shared<Impl>();
     // inherit original object's precision
     impl->precision_ = pImpl_->precision_;
