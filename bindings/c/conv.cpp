@@ -3,8 +3,6 @@
 #include <meshIO.h>
 #include <sdf.h>
 
-#include <vector>
-
 #include "include/types.h"
 #include "public.h"
 #include "types.h"

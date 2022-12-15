@@ -4,11 +4,6 @@
 #include <public.h>
 #include <sdf.h>
 #include <types.h>
-
-#include <vector>
-
-#include "glm/ext/matrix_float4x3.hpp"
-
 ManifoldManifold *to_c(manifold::Manifold *m);
 ManifoldSimplePolygon *to_c(manifold::SimplePolygon *p);
 ManifoldPolygons *to_c(manifold::Polygons *ps);

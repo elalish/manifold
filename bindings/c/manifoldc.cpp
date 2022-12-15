@@ -5,18 +5,7 @@
 #include <public.h>
 #include <sdf.h>
 
-#include <algorithm>
-#include <cstddef>
-#include <cstring>
-#include <functional>
-#include <optional>
-#include <vector>
-
 #include "box.cpp"
-#include "glm/ext/matrix_float3x3.hpp"
-#include "glm/ext/matrix_float4x3.hpp"
-#include "glm/ext/vector_float3.hpp"
-#include "glm/ext/vector_int3.hpp"
 #include "include/conv.h"
 #include "include/types.h"
 #include "meshio.cpp"
