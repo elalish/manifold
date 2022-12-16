@@ -40,6 +40,10 @@ set(GLM_INC_DIR ${PROJECT_SOURCE_DIR}/src/third_party/glm)
 set(PYBIND11_DIR ${PROJECT_SOURCE_DIR}/bindings/python/third_party/pybind11)
 set(THRUST_INC_DIR ${PROJECT_SOURCE_DIR}/src/third_party/thrust)
 
+if(MANIFOLD_CBIND)
+  set(MANIFOLD_EXPORT ON)
+endif()
+
 if(BUILD_SHARED_LIBS OR MANIFOLD_CBIND)
   # Allow shared libraries to be relocatable (add Place Independent Code flag).
   # Also include when statically linking C bindings to avoid issues with bundling
