@@ -41,7 +41,7 @@ void manifold_export_options_set_material(ManifoldExportOptions *options,
   from_c(options)->mat = *from_c(mat);
 }
 
-void manifold_export_mesh(char *filename, ManifoldMesh *mesh,
+void manifold_export_mesh(const char *filename, ManifoldMesh *mesh,
                           ManifoldExportOptions *options) {
   manifold::ExportMesh(std::string(filename), *from_c(mesh), *from_c(options));
 }

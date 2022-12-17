@@ -201,7 +201,7 @@ void manifold_export_options_set_faceted(ManifoldExportOptions *options,
                                          int faceted);
 void manifold_export_options_set_material(ManifoldExportOptions *options,
                                           ManifoldMaterial *mat);
-void manifold_export_mesh(char *filename, ManifoldMesh *mesh,
+void manifold_export_mesh(const char *filename, ManifoldMesh *mesh,
                           ManifoldExportOptions *options);
 
 // memory size
