@@ -93,8 +93,6 @@ jobs:
       run: |
         cd build/test
         ./manifold_test --gtest_filter=CBIND.*
-      with: |
-        fail_ci_if_error: false
 
   build_wasm:
     runs-on: ubuntu-20.04
