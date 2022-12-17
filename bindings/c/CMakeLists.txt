@@ -15,9 +15,4 @@ target_link_libraries(
 
 target_include_directories(manifoldc PUBLIC ${PROJECT_SOURCE_DIR}/include)
 target_compile_options(manifoldc PRIVATE ${MANIFOLD_FLAGS})
-target_compile_features(manifoldc PUBLIC cxx_std_17)
-
-add_executable(testc testc.c)
-target_include_directories(testc PRIVATE include)
-target_link_libraries(testc manifoldc m)
-target_compile_options(testc PRIVATE ${MANIFOLD_FLAGS})
+target_compile_features(manifoldc PRIVATE cxx_std_17)
