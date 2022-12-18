@@ -19,8 +19,17 @@ add_subdirectory(third_party)
 enable_testing()
 
 set(SOURCE_FILES polygon_test.cpp mesh_test.cpp sdf_test.cpp samples_test.cpp test_main.cpp)
+
+if(MANIFOLD_CBIND)
+  list(APPEND SOURCE_FILES manifoldc_test.cpp)
+endif()
+
 add_executable(${PROJECT_NAME} ${SOURCE_FILES})
 target_link_libraries(${PROJECT_NAME} polygon GTest::GTest manifold samples samplesGPU)
+
+if(MANIFOLD_CBIND)
+  target_link_libraries(${PROJECT_NAME} manifoldc)
+endif()
 
 if(MANIFOLD_EXPORT)
   add_subdirectory(meshIO)
@@ -29,12 +38,17 @@ if(MANIFOLD_EXPORT)
 endif()
 
 if(MANIFOLD_USE_CUDA)
-  set_source_files_properties(mesh_test.cpp sdf_test.cpp PROPERTIES LANGUAGE CUDA)
+  set(CUDA_FILES mesh_test.cpp sdf_test.cpp)
+  if(MANIFOLD_CBIND)
+    list(APPEND CUDA_FILES manifoldc_test.cpp)
+  endif()
+
+  set_source_files_properties(${CUDA_FILES} PROPERTIES LANGUAGE CUDA)
   set_property(TARGET ${PROJECT_NAME} PROPERTY CUDA_ARCHITECTURES 61)
 endif()
 
 target_compile_options(${PROJECT_NAME} PRIVATE ${MANIFOLD_FLAGS})
-target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_14)
+target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_17)
 
 add_test(test_all ${PROJECT_NAME})
 

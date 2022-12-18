@@ -18,7 +18,7 @@ add_executable(perfTest perf_test.cpp)
 target_link_libraries(perfTest manifold)
 
 target_compile_options(perfTest PRIVATE ${MANIFOLD_FLAGS})
-target_compile_features(perfTest PUBLIC cxx_std_14)
+target_compile_features(perfTest PUBLIC cxx_std_17)
 
 if(BUILD_TEST_CGAL)
     add_executable(perfTestCGAL perf_test_cgal.cpp)
@@ -29,5 +29,5 @@ if(BUILD_TEST_CGAL)
     target_link_libraries(perfTestCGAL manifold CGAL::CGAL CGAL::CGAL_Core)
 
     target_compile_options(perfTestCGAL PRIVATE ${MANIFOLD_FLAGS})
-    target_compile_features(perfTestCGAL PUBLIC cxx_std_14)
+    target_compile_features(perfTestCGAL PUBLIC cxx_std_17)
 endif()

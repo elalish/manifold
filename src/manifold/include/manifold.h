@@ -75,6 +75,9 @@ class Manifold {
    */
   ///@{
   static Manifold Compose(const std::vector<Manifold>&);
+
+  Components GetComponents() const;
+  std::vector<Manifold> Decompose(Components components) const;
   std::vector<Manifold> Decompose() const;
   ///@}
 
