@@ -19,10 +19,18 @@
 
 #include "assimp/Exporter.hpp"
 #include "assimp/Importer.hpp"
-#include "assimp/pbrmaterial.h"
+#include "assimp/material.h"
 #include "assimp/postprocess.h"
 #include "assimp/scene.h"
 #include "optional_assert.h"
+
+#ifndef AI_MATKEY_ROUGHNESS_FACTOR
+#include "assimp/pbrmaterial.h"
+#define AI_MATKEY_METALLIC_FACTOR \
+  AI_MATKEY_GLTF_PBRMETALLICROUGHNESS_METALLIC_FACTOR
+#define AI_MATKEY_ROUGHNESS_FACTOR \
+  AI_MATKEY_GLTF_PBRMETALLICROUGHNESS_ROUGHNESS_FACTOR
+#endif
 
 namespace manifold {
 
@@ -126,10 +134,8 @@ void ExportMesh(const std::string& filename, const Mesh& mesh,
   scene->mMaterials[0] = new aiMaterial();
 
   aiMaterial* material = scene->mMaterials[0];
-  material->AddProperty(&options.mat.roughness, 1,
-                        AI_MATKEY_GLTF_PBRMETALLICROUGHNESS_ROUGHNESS_FACTOR);
-  material->AddProperty(&options.mat.metalness, 1,
-                        AI_MATKEY_GLTF_PBRMETALLICROUGHNESS_METALLIC_FACTOR);
+  material->AddProperty(&options.mat.roughness, 1, AI_MATKEY_ROUGHNESS_FACTOR);
+  material->AddProperty(&options.mat.metalness, 1, AI_MATKEY_METALLIC_FACTOR);
   const glm::vec4& color = options.mat.color;
   aiColor4D baseColor(color.r, color.g, color.b, color.a);
   material->AddProperty(&baseColor, 1, AI_MATKEY_COLOR_DIFFUSE);

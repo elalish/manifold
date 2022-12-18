@@ -12,7 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-if(NOT EMSCRIPTEN)
+if(NOT EMSCRIPTEN AND MANIFOLD_CBIND)
+    add_subdirectory(c)
+endif()
+
+if(NOT EMSCRIPTEN AND MANIFOLD_PYBIND)
     add_subdirectory(python)
 endif()
 
