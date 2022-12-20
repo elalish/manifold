@@ -194,12 +194,12 @@ struct MeshSize {
 };
 
 void ExpectMeshes(const Manifold& manifold,
-                  const std::vector<MeshSize>& numVertTri) {
+                  const std::vector<MeshSize>& meshSize) {
   EXPECT_FALSE(manifold.IsEmpty());
   EXPECT_TRUE(manifold.IsManifold());
   EXPECT_TRUE(manifold.MatchesTriNormals());
   std::vector<Manifold> manifolds = manifold.Decompose();
-  ASSERT_EQ(manifolds.size(), numVertTri.size());
+  ASSERT_EQ(manifolds.size(), meshSize.size());
   std::sort(manifolds.begin(), manifolds.end(),
             [](const Manifold& a, const Manifold& b) {
               return a.NumVert() != b.NumVert() ? a.NumVert() > b.NumVert()
@@ -207,10 +207,14 @@ void ExpectMeshes(const Manifold& manifold,
             });
   for (int i = 0; i < manifolds.size(); ++i) {
     EXPECT_TRUE(manifolds[i].IsManifold());
-    EXPECT_EQ(manifolds[i].NumVert(), numVertTri[i].numVert);
-    EXPECT_EQ(manifolds[i].NumTri(), numVertTri[i].numTri);
-    EXPECT_EQ(manifolds[i].NumProp(), numVertTri[i].numProp);
-    EXPECT_EQ(manifolds[i].NumPropVert(), numVertTri[i].numPropVert);
+    EXPECT_EQ(manifolds[i].NumVert(), meshSize[i].numVert);
+    EXPECT_EQ(manifolds[i].NumTri(), meshSize[i].numTri);
+    EXPECT_EQ(manifolds[i].NumProp(), meshSize[i].numProp);
+    EXPECT_EQ(manifolds[i].NumPropVert(), meshSize[i].numPropVert);
+    const MeshGL meshGL = manifolds[i].GetMeshGL();
+    EXPECT_EQ(meshGL.mergeFromVert.size(), meshGL.mergeToVert.size());
+    EXPECT_EQ(meshGL.mergeFromVert.size(),
+              meshGL.NumVert() - manifolds[i].NumVert());
     const Mesh mesh = manifolds[i].GetMesh();
     for (const glm::vec3& normal : mesh.vertNormal) {
       ASSERT_NEAR(glm::length(normal), 1, 0.0001);

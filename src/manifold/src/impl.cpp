@@ -469,6 +469,7 @@ int Manifold::Impl::InitializeNewReference(
   const int numProps = propertyTolerance.size();
 
   VecDH<float> propertyToleranceD(numProps, -1);
+  // Don't clear values when AsOriginal() is called.
   if (meshRelation_.numProp == 0) {
     meshRelation_.triProperties = triProperties;
     meshRelation_.properties = properties;
