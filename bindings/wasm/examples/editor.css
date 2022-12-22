@@ -128,7 +128,7 @@ model-viewer {
   transform: translate3d(-50%, -50%, 0);
 }
 
-.margin {
+.header .margin {
   font-size: 16px;
   margin: 1em;
 }
