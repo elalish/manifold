@@ -128,3 +128,31 @@ TEST(CBIND, extrude) {
   manifold_delete_simple_polygon(sq[0]);
   manifold_delete_polygons(polys);
 }
+
+TEST(CBIND, compose_decompose) {
+  size_t sz = manifold_manifold_size();
+
+  ManifoldManifold *s1 = manifold_sphere(malloc(sz), 1.0f, 100);
+  ManifoldManifold *s2 = manifold_translate(malloc(sz), s1, 2., 2., 2.);
+  ManifoldManifold *ss[] = {s1, s2};
+  ManifoldManifold *composed = manifold_compose(malloc(sz), ss, 2);
+
+  ManifoldComponents *cs =
+      manifold_get_components(malloc(manifold_components_size()), composed);
+  size_t len = manifold_components_length(cs);
+  void *bufs[len];
+  for (int i = 0; i < len; ++i) {
+    bufs[i] = malloc(sz);
+  }
+  ManifoldManifold **decomposed = manifold_decompose(bufs, composed, cs);
+
+  EXPECT_EQ(len, 2);
+
+  manifold_delete_manifold(s1);
+  manifold_delete_manifold(s2);
+  manifold_delete_manifold(composed);
+  manifold_delete_components(cs);
+  for (int i = 0; i < len; ++i) {
+    manifold_delete_manifold(decomposed[i]);
+  }
+}

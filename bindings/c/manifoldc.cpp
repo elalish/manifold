@@ -300,7 +300,7 @@ ManifoldComponents *manifold_get_components(void *mem, ManifoldManifold *m) {
 }
 
 size_t manifold_components_length(ManifoldComponents *components) {
-  return from_c(components)->indices.size();
+  return from_c(components)->numComponents;
 }
 
 ManifoldManifold **manifold_decompose(void **mem, ManifoldManifold *m,
