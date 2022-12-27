@@ -78,13 +78,13 @@ struct TransformTangents {
 
   __host__ __device__ void operator()(thrust::tuple<glm::vec4&, int> inOut) {
     glm::vec4& tangent = thrust::get<0>(inOut);
-    const int edge = thrust::get<1>(inOut);
-
+    int edge = thrust::get<1>(inOut);
     if (invert) {
-      tangent = oldTangents[halfedge[FlipHalfedge(edge)].pairedHalfedge];
+      edge = halfedge[FlipHalfedge(edge)].pairedHalfedge;
     }
 
-    tangent = glm::vec4(transform * glm::vec3(tangent), tangent.w);
+    tangent = glm::vec4(transform * glm::vec3(oldTangents[edge]),
+                        oldTangents[edge].w);
   }
 };
 
@@ -629,7 +629,7 @@ Manifold::Impl Manifold::Impl::Transform(const glm::mat4x3& transform_) const {
   result.precision_ = precision_;
   result.bBox_ = bBox_;
   result.halfedge_ = halfedge_;
-  result.halfedgeTangent_ = halfedgeTangent_;
+  result.halfedgeTangent_.resize(halfedgeTangent_.size());
 
   result.vertPos_.resize(NumVert());
   result.faceNormal_.resize(faceNormal_.size());
@@ -645,10 +645,14 @@ Manifold::Impl Manifold::Impl::Transform(const glm::mat4x3& transform_) const {
             result.vertNormal_.begin(), TransformNormals({normalTransform}));
 
   const bool invert = glm::determinant(glm::mat3(transform_)) < 0;
-  for_each_n(policy, zip(result.halfedgeTangent_.begin(), countAt(0)),
-             halfedgeTangent_.size(),
-             TransformTangents({glm::mat3(transform_), invert,
-                                halfedgeTangent_.cptrD(), halfedge_.cptrD()}));
+
+  if (halfedgeTangent_.size() > 0) {
+    for_each_n(
+        policy, zip(result.halfedgeTangent_.begin(), countAt(0)),
+        halfedgeTangent_.size(),
+        TransformTangents({glm::mat3(transform_), invert,
+                           halfedgeTangent_.cptrD(), halfedge_.cptrD()}));
+  }
 
   if (invert) {
     for_each_n(policy, zip(result.meshRelation_.triBary.begin(), countAt(0)),
