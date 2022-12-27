@@ -118,4 +118,10 @@
   },
   "editor.tabSize": 2,
   "editor.detectIndentation": false,
+  "cSpell.words": [
+    "Bary",
+    "halfedge",
+    "halfedges",
+    "Verts"
+  ],
 }
