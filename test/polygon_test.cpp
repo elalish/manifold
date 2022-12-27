@@ -94,11 +94,11 @@ void TestPoly(const Polygons &polys, int expectedNumTri,
   EXPECT_NO_THROW(triangles = Triangulate(polys, precision));
   EXPECT_EQ(triangles.size(), expectedNumTri) << "Basic";
 
-  //   EXPECT_NO_THROW(triangles = Triangulate(Turn180(polys), precision));
-  //   EXPECT_EQ(triangles.size(), expectedNumTri) << "Turn 180";
+  EXPECT_NO_THROW(triangles = Triangulate(Turn180(polys), precision));
+  EXPECT_EQ(triangles.size(), expectedNumTri) << "Turn 180";
 
-  //   EXPECT_NO_THROW(triangles = Triangulate(Duplicate(polys), precision));
-  //   EXPECT_EQ(triangles.size(), 2 * expectedNumTri) << "Duplicate";
+  EXPECT_NO_THROW(triangles = Triangulate(Duplicate(polys), precision));
+  EXPECT_EQ(triangles.size(), 2 * expectedNumTri) << "Duplicate";
 
   PolygonParams().verbose = false;
 }
