@@ -637,6 +637,21 @@ TEST(Boolean, Tetra) {
   RelatedOp(tetra, tetra2, result);
 }
 
+TEST(Boolean, Mirrored) {
+  Manifold cube = Manifold::Cube(glm::vec3(1)).Scale({1, -1, 1});
+  EXPECT_TRUE(cube.IsManifold());
+  EXPECT_TRUE(cube.MatchesTriNormals());
+
+  Manifold cube2 = Manifold::Cube(glm::vec3(1)).Scale({0.5, -1, 0.5});
+  Manifold result = cube - cube2;
+
+  ExpectMeshes(result, {{12, 20}});
+
+  auto prop = result.GetProperties();
+  EXPECT_FLOAT_EQ(prop.volume, 0.75);
+  EXPECT_FLOAT_EQ(prop.surfaceArea, 5.5);
+}
+
 /**
  * These tests check Boolean operations on coplanar faces.
  */
@@ -1054,7 +1069,7 @@ TEST(Boolean, Subtract) {
 }
 
 // FIXME: test is failing on Mac CI (passing on others)
-TEST(Boolean, DISABLED_Close) {
+TEST(Boolean, Close) {
   PolygonParams().processOverlaps = true;
 
   const float r = 10;

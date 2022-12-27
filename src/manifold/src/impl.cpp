@@ -64,6 +64,28 @@ struct TransformNormals {
   }
 };
 
+struct FlipTris {
+  Halfedge* halfedge;
+
+  __host__ __device__ void operator()(thrust::tuple<BaryRef&, int> inOut) {
+    BaryRef& bary = thrust::get<0>(inOut);
+    const int tri = thrust::get<1>(inOut);
+
+    thrust::swap(bary.vertBary[0], bary.vertBary[2]);
+    thrust::swap(halfedge[3 * tri], halfedge[3 * tri + 2]);
+
+    for (const int i : {0, 1, 2}) {
+      thrust::swap(halfedge[3 * tri + i].startVert,
+                   halfedge[3 * tri + i].endVert);
+
+      const int pair = halfedge[3 * tri + i].pairedHalfedge;
+      const int pairTri = pair / 3;
+      const int vert = 2 - (pair - 3 * pairTri);
+      halfedge[3 * tri + i].pairedHalfedge = 3 * pairTri + vert;
+    }
+  }
+};
+
 struct AssignNormals {
   glm::vec3* vertNormal;
   const glm::vec3* vertPos;
@@ -600,6 +622,12 @@ Manifold::Impl Manifold::Impl::Transform(const glm::mat4x3& transform_) const {
             result.faceNormal_.begin(), TransformNormals({normalTransform}));
   transform(policy, vertNormal_.begin(), vertNormal_.end(),
             result.vertNormal_.begin(), TransformNormals({normalTransform}));
+
+  if (glm::determinant(glm::mat3(transform_)) < 0) {
+    for_each_n(policy, zip(result.meshRelation_.triBary.begin(), countAt(0)),
+               result.NumTri(), FlipTris({result.halfedge_.ptrD()}));
+  }
+
   // This optimization does a cheap collider update if the transform is
   // axis-aligned.
   if (!result.collider_.Transform(transform_)) result.Update();
