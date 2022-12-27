@@ -329,6 +329,7 @@ class Monotones {
     int index;
     VertItr left, right;
     PairItr eastPair, westPair;
+    int insertionID = 0;
 
     bool Processed() const { return index < 0; }
     void SetSkip() { index = -2; }
@@ -344,7 +345,10 @@ class Monotones {
     bool IsPast(const VertItr other, float precision) const {
       return pos.y > other->pos.y + precision;
     }
-    bool operator<(const VertAdj &other) const { return pos.y < other.pos.y; }
+    bool operator<(const VertAdj &other) const {
+      return pos.y < other.pos.y ||
+             (pos.y == other.pos.y && insertionID < other.insertionID);
+    }
   };
 
   /**
@@ -781,6 +785,8 @@ class Monotones {
     std::priority_queue<VertItr, std::vector<VertItr>, decltype(cmp)>
         nextAttached(cmp);
 
+    int insertionID = 0;
+
     std::vector<VertItr> starts;
     for (VertItr v = monotones_.begin(); v != monotones_.end(); v++) {
       if (v->IsStart()) {
@@ -869,12 +875,16 @@ class Monotones {
 
       switch (type) {
         case WESTSIDE:
+          vert->left->insertionID = insertionID++;
           nextAttached.push(vert->left);
           break;
         case EASTSIDE:
+          vert->right->insertionID = insertionID++;
           nextAttached.push(vert->right);
           break;
         case START:
+          vert->left->insertionID = insertionID++;
+          vert->right->insertionID = insertionID++;
           nextAttached.push(vert->left);
           nextAttached.push(vert->right);
           break;

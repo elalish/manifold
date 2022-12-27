@@ -3007,3 +3007,17 @@ TEST(Polygon, BigSponge) {
   });
   TestPoly(polys, 1771);
 }
+
+TEST(Polygon, DupVert) {
+  Polygons polys;
+  polys.push_back({
+      {glm::vec2(27.9279995, 4.9749999), 4},  //
+      {glm::vec2(31.0610008, 2.32299995), 6},  //
+      {glm::vec2(31.0610008, 2.32299995), 18},  //
+      {glm::vec2(27.9279995, 4.9749999), 16},  //
+      {glm::vec2(27.9279995, 4.9749999), 15},  //
+      {glm::vec2(31.0610008, 2.32299995), 28},  //
+      {glm::vec2(30.4400005, 5.34100008), 17},  //
+  });
+  TestPoly(polys, 5);
+}
