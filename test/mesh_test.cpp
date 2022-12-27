@@ -463,6 +463,18 @@ TEST(Manifold, ManualSmooth) {
 #endif
 }
 
+TEST(Manifold, SmoothMirrored) {
+  const Mesh tet = Manifold::Tetrahedron().GetMesh();
+  Manifold smooth = Manifold::Smooth(tet);
+  Manifold mirror = smooth.Scale({-1, 1, 2}).Refine(10);
+  smooth = smooth.Refine(10).Scale({1, 1, 2});
+
+  auto prop0 = smooth.GetProperties();
+  auto prop1 = mirror.GetProperties();
+  EXPECT_NEAR(prop0.volume, prop1.volume, 0.1);
+  EXPECT_NEAR(prop0.surfaceArea, prop1.surfaceArea, 0.1);
+}
+
 TEST(Manifold, Csaszar) {
   Manifold csaszar = Manifold::Smooth(Csaszar());
   csaszar = csaszar.Refine(100);

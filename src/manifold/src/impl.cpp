@@ -42,6 +42,12 @@ __host__ __device__ void AtomicAddVec3(glm::vec3& target,
   }
 }
 
+__host__ __device__ int FlipHalfedge(int halfedge) {
+  const int tri = halfedge / 3;
+  const int vert = 2 - (halfedge - 3 * tri);
+  return 3 * tri + vert;
+}
+
 struct Normalize {
   __host__ __device__ void operator()(glm::vec3& v) { v = SafeNormalize(v); }
 };
@@ -64,6 +70,24 @@ struct TransformNormals {
   }
 };
 
+struct TransformTangents {
+  const glm::mat3 transform;
+  const bool invert;
+  const glm::vec4* oldTangents;
+  const Halfedge* halfedge;
+
+  __host__ __device__ void operator()(thrust::tuple<glm::vec4&, int> inOut) {
+    glm::vec4& tangent = thrust::get<0>(inOut);
+    const int edge = thrust::get<1>(inOut);
+
+    if (invert) {
+      tangent = oldTangents[halfedge[FlipHalfedge(edge)].pairedHalfedge];
+    }
+
+    tangent = glm::vec4(transform * glm::vec3(tangent), tangent.w);
+  }
+};
+
 struct FlipTris {
   Halfedge* halfedge;
 
@@ -77,11 +101,8 @@ struct FlipTris {
     for (const int i : {0, 1, 2}) {
       thrust::swap(halfedge[3 * tri + i].startVert,
                    halfedge[3 * tri + i].endVert);
-
-      const int pair = halfedge[3 * tri + i].pairedHalfedge;
-      const int pairTri = pair / 3;
-      const int vert = 2 - (pair - 3 * pairTri);
-      halfedge[3 * tri + i].pairedHalfedge = 3 * pairTri + vert;
+      halfedge[3 * tri + i].pairedHalfedge =
+          FlipHalfedge(halfedge[3 * tri + i].pairedHalfedge);
     }
   }
 };
@@ -623,7 +644,13 @@ Manifold::Impl Manifold::Impl::Transform(const glm::mat4x3& transform_) const {
   transform(policy, vertNormal_.begin(), vertNormal_.end(),
             result.vertNormal_.begin(), TransformNormals({normalTransform}));
 
-  if (glm::determinant(glm::mat3(transform_)) < 0) {
+  const bool invert = glm::determinant(glm::mat3(transform_)) < 0;
+  for_each_n(policy, zip(result.halfedgeTangent_.begin(), countAt(0)),
+             halfedgeTangent_.size(),
+             TransformTangents({glm::mat3(transform_), invert,
+                                halfedgeTangent_.cptrD(), halfedge_.cptrD()}));
+
+  if (invert) {
     for_each_n(policy, zip(result.meshRelation_.triBary.begin(), countAt(0)),
                result.NumTri(), FlipTris({result.halfedge_.ptrD()}));
   }
