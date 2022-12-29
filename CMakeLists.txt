@@ -18,9 +18,11 @@ project(manifold LANGUAGES CXX)
 set(CMAKE_VERBOSE_MAKEFILE ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-option(MANIFOLD_EXPORT off)
-option(MANIFOLD_DEBUG off)
-option(MANIFOLD_USE_CUDA off)
+option(MANIFOLD_EXPORT OFF)
+option(MANIFOLD_DEBUG OFF)
+option(MANIFOLD_USE_CUDA OFF)
+option(MANIFOLD_PYBIND ON)
+option(MANIFOLD_CBIND OFF)
 set(MANIFOLD_PAR "NONE" CACHE STRING "Parallel backend, either \"TBB\" or \"OpenMP\" or \"NONE\"")
 
 if(EMSCRIPTEN)
@@ -29,14 +31,25 @@ if(EMSCRIPTEN)
   set(CMAKE_EXE_LINKER_FLAGS ${CMAKE_EXE_LINKER_FLAGS} -sALLOW_MEMORY_GROWTH=1)
 endif()
 
-option(PYBIND11_FINDPYTHON on)
+option(PYBIND11_FINDPYTHON ON)
 
-option(BUILD_TEST_CGAL off)
+option(BUILD_TEST_CGAL OFF)
 
-option(BUILD_SHARED_LIBS off)
+option(BUILD_SHARED_LIBS OFF)
 set(GLM_INC_DIR ${PROJECT_SOURCE_DIR}/src/third_party/glm)
 set(PYBIND11_DIR ${PROJECT_SOURCE_DIR}/bindings/python/third_party/pybind11)
 set(THRUST_INC_DIR ${PROJECT_SOURCE_DIR}/src/third_party/thrust)
+
+if(MANIFOLD_CBIND)
+  set(MANIFOLD_EXPORT ON)
+endif()
+
+if(BUILD_SHARED_LIBS OR MANIFOLD_CBIND)
+  # Allow shared libraries to be relocatable (add Place Independent Code flag).
+  # Also include when statically linking C bindings to avoid issues with bundling
+  # artefacts in host languages using them for FFI.
+  add_compile_options(-fPIC)
+endif()
 
 if(MANIFOLD_USE_CUDA)
   enable_language(CUDA)

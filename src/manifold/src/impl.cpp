@@ -43,6 +43,12 @@ __host__ __device__ void AtomicAddVec3(glm::vec3& target,
   }
 }
 
+__host__ __device__ int FlipHalfedge(int halfedge) {
+  const int tri = halfedge / 3;
+  const int vert = 2 - (halfedge - 3 * tri);
+  return 3 * tri + vert;
+}
+
 struct Normalize {
   __host__ __device__ void operator()(glm::vec3& v) { v = SafeNormalize(v); }
 };
@@ -62,6 +68,43 @@ struct TransformNormals {
     normal = glm::normalize(transform * normal);
     if (isnan(normal.x)) normal = glm::vec3(0.0f);
     return normal;
+  }
+};
+
+struct TransformTangents {
+  const glm::mat3 transform;
+  const bool invert;
+  const glm::vec4* oldTangents;
+  const Halfedge* halfedge;
+
+  __host__ __device__ void operator()(thrust::tuple<glm::vec4&, int> inOut) {
+    glm::vec4& tangent = thrust::get<0>(inOut);
+    int edge = thrust::get<1>(inOut);
+    if (invert) {
+      edge = halfedge[FlipHalfedge(edge)].pairedHalfedge;
+    }
+
+    tangent = glm::vec4(transform * glm::vec3(oldTangents[edge]),
+                        oldTangents[edge].w);
+  }
+};
+
+struct FlipTris {
+  Halfedge* halfedge;
+
+  __host__ __device__ void operator()(thrust::tuple<BaryRef&, int> inOut) {
+    BaryRef& bary = thrust::get<0>(inOut);
+    const int tri = thrust::get<1>(inOut);
+
+    thrust::swap(bary.vertBary[0], bary.vertBary[2]);
+    thrust::swap(halfedge[3 * tri], halfedge[3 * tri + 2]);
+
+    for (const int i : {0, 1, 2}) {
+      thrust::swap(halfedge[3 * tri + i].startVert,
+                   halfedge[3 * tri + i].endVert);
+      halfedge[3 * tri + i].pairedHalfedge =
+          FlipHalfedge(halfedge[3 * tri + i].pairedHalfedge);
+    }
   }
 };
 
@@ -637,7 +680,7 @@ Manifold::Impl Manifold::Impl::Transform(const glm::mat4x3& transform_) const {
   result.precision_ = precision_;
   result.bBox_ = bBox_;
   result.halfedge_ = halfedge_;
-  result.halfedgeTangent_ = halfedgeTangent_;
+  result.halfedgeTangent_.resize(halfedgeTangent_.size());
 
   result.vertPos_.resize(NumVert());
   result.faceNormal_.resize(faceNormal_.size());
@@ -651,6 +694,22 @@ Manifold::Impl Manifold::Impl::Transform(const glm::mat4x3& transform_) const {
             result.faceNormal_.begin(), TransformNormals({normalTransform}));
   transform(policy, vertNormal_.begin(), vertNormal_.end(),
             result.vertNormal_.begin(), TransformNormals({normalTransform}));
+
+  const bool invert = glm::determinant(glm::mat3(transform_)) < 0;
+
+  if (halfedgeTangent_.size() > 0) {
+    for_each_n(
+        policy, zip(result.halfedgeTangent_.begin(), countAt(0)),
+        halfedgeTangent_.size(),
+        TransformTangents({glm::mat3(transform_), invert,
+                           halfedgeTangent_.cptrD(), halfedge_.cptrD()}));
+  }
+
+  if (invert) {
+    for_each_n(policy, zip(result.meshRelation_.triBary.begin(), countAt(0)),
+               result.NumTri(), FlipTris({result.halfedge_.ptrD()}));
+  }
+
   // This optimization does a cheap collider update if the transform is
   // axis-aligned.
   if (!result.collider_.Transform(transform_)) result.Update();

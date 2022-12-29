@@ -252,6 +252,15 @@ struct Curvature {
 };
 
 /**
+ * Connected component indices and number of discrete components. Intermediate
+ * step for Manifold.Decompose(), completed by Manifold.GetComponents()
+ */
+struct Components {
+  std::vector<int> indices;
+  int numComponents;
+};
+
+/**
  * Part of MeshRelation - represents a single triangle relation to an original
  * Mesh.
  */

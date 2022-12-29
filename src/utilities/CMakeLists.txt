@@ -15,7 +15,7 @@
 project(utilities)
 
 file(GLOB_RECURSE SOURCE_FILES CONFIGURE_DEPENDS *.cpp)
-add_library(${PROJECT_NAME} ${SOURCE_FILES})
+add_library(${PROJECT_NAME} OBJECT ${SOURCE_FILES})
 
 message("CUDA Support: ${MANIFOLD_USE_CUDA}")
 message("Parallel Backend: ${MANIFOLD_PAR}")

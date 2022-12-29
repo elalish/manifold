@@ -1,6 +1,6 @@
 project (graphlite)
 
-add_library(${PROJECT_NAME} src/connected_components.cpp)
+add_library(${PROJECT_NAME} OBJECT src/connected_components.cpp)
 
 target_include_directories(${PROJECT_NAME}
     PUBLIC ${PROJECT_SOURCE_DIR}/include

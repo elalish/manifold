@@ -29,6 +29,7 @@
               nativeBuildInputs = (with pkgs; [ cmake (python39.withPackages(ps: with ps; [trimesh])) ]) ++ build-tools ++
                 (if cuda-support then with pkgs.cudaPackages; [ cuda_nvcc cuda_cudart cuda_cccl pkgs.addOpenGLRunpath ] else [ ]);
               cmakeFlags = [
+                "-DMANIFOLD_PYBIND=ON"
                 "-DMANIFOLD_PAR=${pkgs.lib.strings.toUpper parallel-backend}"
                 "-DMANIFOLD_USE_CUDA=${if cuda-support then "ON" else "OFF"}"
               ];
