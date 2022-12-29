@@ -78,7 +78,7 @@ TEST(CBIND, level_set) {
     float xs = x / xscale;
     float ys = y / yscale;
     float zs = z / zscale;
-    return radius - sqrt(xs * xs + ys * ys + zs * zs);
+    return radius - sqrtf(xs * xs + ys * ys + zs * zs);
   };
 
   const float bb = 30;  // (radius * 2)
