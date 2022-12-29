@@ -833,7 +833,10 @@ TEST(Boolean, CoplanarProp) {
   EXPECT_EQ(out.Genus(), 1);
 
 #ifdef MANIFOLD_EXPORT
-  if (options.exportModels) ExportMesh("coplanar.glb", out.GetMesh(), {});
+  ExportOptions opt;
+  opt.mat.roughness = 1;
+  opt.mat.colorChannels = glm::ivec4(3, 4, 5, -1);
+  if (options.exportModels) ExportMesh("coplanar.glb", out.GetMeshGL(), opt);
 #endif
 
   RelatedOp(cylinder, cylinder2, out);

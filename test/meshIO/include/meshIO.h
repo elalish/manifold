@@ -41,8 +41,14 @@ struct Material {
   glm::vec4 color = glm::vec4(1.0f);
   /// Optional: If non-empty, must match Mesh.vertPos. Provides an RGBA color
   /// for each vertex, linearly interpolated across triangles. Colors are
-  /// linear, not sRGB.
+  /// linear, not sRGB. Only used with Mesh export, not MeshGL.
   std::vector<glm::vec4> vertColor;
+  /// For MeshGL export, gives the property indicies where the normal channels
+  /// can be found. Must be >= 3, since the first three are position.
+  glm::ivec3 normalChannels = glm::ivec3(-1);
+  /// For MeshGL export, gives the property indicies where the color channels
+  /// can be found. Any index < 0 will output all 1.0 for that channel.
+  glm::ivec4 colorChannels = glm::ivec4(-1);
 };
 
 /**
@@ -59,6 +65,9 @@ struct ExportOptions {
 Mesh ImportMesh(const std::string& filename, bool forceCleanup = false);
 
 void ExportMesh(const std::string& filename, const Mesh& mesh,
+                const ExportOptions& options);
+
+void ExportMesh(const std::string& filename, const MeshGL& mesh,
                 const ExportOptions& options);
 /** @} */
 /** @} */
