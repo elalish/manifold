@@ -134,9 +134,11 @@ struct GatherProps {
   const float* oldProperties;
   const int numProp;
 
-  __host__ __device__ void operator()(thrust::tuple<int, int> in) {
+  __host__ __device__ void operator()(thrust::tuple<int, int, int> in) {
     const int oldIdx = thrust::get<0>(in);
     const int newIdx = thrust::get<1>(in);
+    const int keep = thrust::get<2>(in);
+    if (keep == 0) return;
     for (int p = 0; p < numProp; ++p) {
       properties[newIdx * numProp + p] = oldProperties[oldIdx * numProp + p];
     }
@@ -305,19 +307,19 @@ void Manifold::Impl::CompactProps() {
   if (meshRelation_.numProp == 0) return;
 
   const int numVerts = meshRelation_.properties.size() / meshRelation_.numProp;
-  VecDH<int> propOld2New(numVerts, 0);
+  VecDH<int> keep(numVerts, 0);
   auto policy = autoPolicy(numVerts);
 
   for_each(policy, meshRelation_.triProperties.cbegin(),
-           meshRelation_.triProperties.cend(), MarkProp({propOld2New.ptrD()}));
-  const int last = propOld2New[numVerts - 1];
-  exclusive_scan(policy, propOld2New.begin(), propOld2New.end(),
-                 propOld2New.begin());
+           meshRelation_.triProperties.cend(), MarkProp({keep.ptrD()}));
+  VecDH<int> propOld2New(numVerts + 1, 0);
+  inclusive_scan(policy, keep.begin(), keep.end(), propOld2New.begin() + 1);
 
   VecDH<float> oldProp = meshRelation_.properties;
-  meshRelation_.properties.resize(meshRelation_.numProp *
-                                  (propOld2New[numVerts - 1] + last));
-  for_each_n(policy, zip(countAt(0), propOld2New.cbegin()), numVerts,
+  const int numVertsNew = propOld2New[numVerts];
+  meshRelation_.properties.resize(meshRelation_.numProp * numVertsNew);
+  for_each_n(policy, zip(countAt(0), propOld2New.cbegin(), keep.cbegin()),
+             numVerts,
              GatherProps({meshRelation_.properties.ptrD(), oldProp.cptrD(),
                           meshRelation_.numProp}));
   for_each_n(policy, meshRelation_.triProperties.begin(), NumTri(),

@@ -369,21 +369,30 @@ void Manifold::Impl::CollapseEdge(const int edge) {
   const int tri1 = toRemove.pairedHalfedge / 3;
   const int triVert0 = (edge + 1) % 3;
   const int triVert1 = toRemove.pairedHalfedge % 3;
+  const int prop0 = triProp.size() > 0 ? triProp[tri0][edge % 3] : -1;
+  const int prop1 = triProp.size() > 0
+                        ? triProp[tri1][(toRemove.pairedHalfedge + 1) % 3]
+                        : -1;
   current = start;
   while (current != tri0edge[2]) {
     current = NextHalfedge(current);
 
+    // Update the shifted triangles to the vertBary of endVert
+    const int tri = current / 3;
+    const int vIdx = current - 3 * tri;
+
     if (!shortEdge) {
-      // Update the shifted triangles to the vertBary of endVert
-      const int tri = current / 3;
-      const int vIdx = current - 3 * tri;
       const bool use0 =
           ref0.meshID == triBary[tri].meshID && ref0.tri == triBary[tri].tri;
       triBary[tri].vertBary[vIdx] =
           use0 ? ref0.vertBary[triVert0] : ref1.vertBary[triVert1];
-      if (triProp.size() > 0) {
-        triProp[tri][vIdx] =
-            use0 ? triProp[tri0][triVert0] : triProp[tri1][triVert1];
+    }
+
+    if (triProp.size() > 0) {
+      if (triProp[tri][vIdx] == prop0) {
+        triProp[tri][vIdx] = triProp[tri0][triVert0];
+      } else if (triProp[tri][vIdx] == prop1) {
+        triProp[tri][vIdx] = triProp[tri1][triVert1];
       }
     }
 
