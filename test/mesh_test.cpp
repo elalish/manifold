@@ -71,9 +71,10 @@ MeshGL WithIndexColors(const Mesh& in) {
   for (int i = 0; i < numVert; ++i) {
     for (int j : {0, 1, 2}) inGL.vertProperties[6 * i + j] = in.vertPos[i][j];
     // vertex colors
-    inGL.vertProperties[6 * i + 3] = (float)i / numVert;
-    inGL.vertProperties[6 * i + 4] = 0;
-    inGL.vertProperties[6 * i + 5] = 1 - (float)i / numVert;
+    double a;
+    inGL.vertProperties[6 * i + 3] = powf(modf(i * sqrt(2.0), &a), 2.2);
+    inGL.vertProperties[6 * i + 4] = powf(modf(i * sqrt(3.0), &a), 2.2);
+    inGL.vertProperties[6 * i + 5] = powf(modf(i * sqrt(5.0), &a), 2.2);
   }
   return inGL;
 }
@@ -795,10 +796,10 @@ TEST(Boolean, Perturb) {
 TEST(Boolean, Coplanar) {
   Manifold cylinder = Manifold::Cylinder(1.0f, 1.0f);
   MeshGL cylinderGL = WithPositionColors(cylinder);
-  std::vector<float> tol(3, 0.01);
+  std::vector<float> tol(3, 0.0001);
   cylinder = Manifold(cylinderGL, tol);
 
-  Manifold cylinder2 = cylinder.AsOriginal();
+  Manifold cylinder2 = Manifold(cylinderGL, tol);
   cylinder2 = cylinder2.Scale({0.5f, 0.5f, 1.0f})
                   .Rotate(0, 0, 15)
                   .Translate({0.25f, 0.25f, 0.0f});
@@ -808,7 +809,10 @@ TEST(Boolean, Coplanar) {
   EXPECT_EQ(out.Genus(), 1);
 
 #ifdef MANIFOLD_EXPORT
-  if (options.exportModels) ExportMesh("coplanar.glb", out.GetMesh(), {});
+  ExportOptions opt;
+  opt.mat.roughness = 1;
+  opt.mat.colorChannels = glm::ivec4(3, 4, 5, -1);
+  if (options.exportModels) ExportMesh("coplanar.glb", out.GetMeshGL(), opt);
 #endif
 
   RelatedOp(cylinder, cylinder2, out);
@@ -820,10 +824,10 @@ TEST(Boolean, Coplanar) {
 TEST(Boolean, CoplanarProp) {
   Manifold cylinder = Manifold::Cylinder(1.0f, 1.0f);
   MeshGL cylinderGL = WithIndexColors(cylinder.GetMesh());
-  std::vector<float> tol(3, 0.01);
+  std::vector<float> tol(3, 0.0001);
   cylinder = Manifold(cylinderGL, tol);
 
-  Manifold cylinder2 = cylinder.AsOriginal();
+  Manifold cylinder2 = Manifold(cylinderGL, tol);
   cylinder2 = cylinder2.Scale({0.5f, 0.5f, 1.0f})
                   .Rotate(0, 0, 15)
                   .Translate({0.25f, 0.25f, 0.0f});
@@ -1057,7 +1061,11 @@ TEST(Boolean, MeshRelation) {
   Manifold result = gyroid + gyroid2;
 
 #ifdef MANIFOLD_EXPORT
-  if (options.exportModels) ExportMesh("gyroidUnion.glb", result.GetMesh(), {});
+  ExportOptions opt;
+  opt.mat.roughness = 1;
+  opt.mat.colorChannels = glm::ivec4(3, 4, 5, -1);
+  if (options.exportModels)
+    ExportMesh("gyroidUnion.glb", result.GetMeshGL(), opt);
 #endif
 
   EXPECT_TRUE(result.IsManifold());

@@ -282,6 +282,8 @@ struct CoplanarEdge {
     glm::vec3 normal = glm::cross(jointVec, edgeVec);
     const float area = glm::length(normal);
     const float areaPair = glm::length(glm::cross(pairVec, jointVec));
+    triArea[edge.face] = area;
+    triArea[pair.face] = areaPair;
     // Don't link degenerate triangles
     if (area < length * precision || areaPair < lengthPair * precision) return;
 
@@ -309,16 +311,14 @@ struct CoplanarEdge {
             pairVec + normal * scale * (pairProp - baseProp);
 
         glm::vec3 cross = glm::cross(iJointVec, iEdgeVec);
-        const float area = glm::max(
+        const float areaP = glm::max(
             glm::length(cross), glm::length(glm::cross(iPairVec, iJointVec)));
-        const float volume = glm::abs(glm::dot(cross, iPairVec));
+        const float volumeP = glm::abs(glm::dot(cross, iPairVec));
         // Only operate on consistent triangles
-        if (volume > area * precision) return;
+        if (volumeP > areaP * precision) return;
       }
     }
 
-    triArea[edge.face] = area;
-    triArea[pair.face] = areaPair;
     face2face.first = edge.face;
     face2face.second = pair.face;
   }
