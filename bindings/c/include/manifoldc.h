@@ -180,13 +180,18 @@ ManifoldVec4 *manifold_mesh_halfedge_tangent(void *mem, ManifoldMesh *m);
 
 ManifoldMeshGL *manifold_get_meshgl(void *mem, ManifoldManifold *m);
 ManifoldMeshGL *manifold_meshgl_copy(void *mem, ManifoldMeshGL *m);
-size_t manifold_meshgl_vert_length(ManifoldMeshGL *m);
+int manifold_meshgl_num_prop(ManifoldMeshGL *m);
+int manifold_meshgl_num_vert(ManifoldMeshGL *m);
+int manifold_meshgl_num_tri(ManifoldMeshGL *m);
+size_t manifold_meshgl_vert_properties_length(ManifoldMeshGL *m);
 size_t manifold_meshgl_tri_length(ManifoldMeshGL *m);
-size_t manifold_meshgl_normal_length(ManifoldMeshGL *m);
+size_t manifold_meshgl_merge_length(ManifoldMeshGL *m);
 size_t manifold_meshgl_tangent_length(ManifoldMeshGL *m);
-float *manifold_meshgl_vert_pos(void *mem, ManifoldMeshGL *m);
+float *manifold_meshgl_vert_properties(void *mem, ManifoldMeshGL *m);
 uint32_t *manifold_meshgl_tri_verts(void *mem, ManifoldMeshGL *m);
 float *manifold_meshgl_vert_normal(void *mem, ManifoldMeshGL *m);
+int *manifold_meshgl_merge_from_vert(void *mem, ManifoldMeshGL *m);
+int *manifold_meshgl_merge_to_vert(void *mem, ManifoldMeshGL *m);
 float *manifold_meshgl_halfedge_tangent(void *mem, ManifoldMeshGL *m);
 
 // MeshIO / Export
