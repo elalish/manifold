@@ -71,44 +71,6 @@ __host__ __device__ inline glm::mat3x2 GetAxisAlignedProjection(
   return glm::transpose(projection);
 }
 
-__host__ __device__ inline glm::vec3 GetBarycentric(const glm::vec3& v,
-                                                    const glm::mat3& triPos,
-                                                    float precision) {
-  const glm::mat3 edges(triPos[2] - triPos[1], triPos[0] - triPos[2],
-                        triPos[1] - triPos[0]);
-  const glm::vec3 d2(glm::dot(edges[0], edges[0]), glm::dot(edges[1], edges[1]),
-                     glm::dot(edges[2], edges[2]));
-  int longSide = d2[0] > d2[1] && d2[0] > d2[2] ? 0 : d2[1] > d2[2] ? 1 : 2;
-  const glm::vec3 crossP = glm::cross(edges[0], edges[1]);
-  const float area2 = glm::dot(crossP, crossP);
-  const float tol2 = precision * precision;
-  const float vol = glm::dot(crossP, v - triPos[2]);
-  if (vol * vol > area2 * tol2) return glm::vec3(NAN);
-
-  if (d2[longSide] < tol2) {  // point
-    return glm::vec3(1, 0, 0);
-  } else if (area2 > d2[longSide] * tol2) {  // triangle
-    glm::vec3 uvw(0);
-    for (int i : {0, 1, 2}) {
-      int j = i + 1;
-      if (j > 2) j -= 3;
-      uvw[i] = glm::dot(glm::cross(edges[i], v - triPos[j]), crossP);
-    }
-    uvw /= (uvw[0] + uvw[1] + uvw[2]);
-    return uvw;
-  } else {  // line
-    int nextSide = Next3(longSide);
-    const float alpha =
-        glm::dot(v - triPos[nextSide], edges[longSide]) / d2[longSide];
-    glm::vec3 uvw(0);
-    uvw[longSide] = 0;
-    uvw[nextSide++] = 1 - alpha;
-    nextSide = Next3(nextSide);
-    uvw[nextSide] = alpha;
-    return uvw;
-  }
-}
-
 /**
  * The fundamental component of the halfedge data structure used for storing and
  * operating on the Manifold.
