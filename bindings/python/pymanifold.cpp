@@ -40,8 +40,16 @@ PYBIND11_MODULE(pymanifold, m) {
       .def(py::init<>())
       .def(py::init([](std::vector<Manifold> &manifolds) {
              Manifold result;
-             for (Manifold &manifold : manifolds) result += manifold;
-             return result;
+             if (manifolds.size() >= 1) {
+               // for some reason using Manifold() as the initial object
+               // will cause failure for python specifically
+               // unable to reproduce with c++ directly
+               Manifold first = manifolds[0];
+               for (int i = 1; i < manifolds.size(); i++) first += manifolds[i];
+               return first;
+             } else {
+               return Manifold();
+             }
            }),
            "Construct manifold as the union of a set of manifolds.")
       .def(py::self + py::self, "Boolean union.")
