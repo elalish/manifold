@@ -45,8 +45,7 @@ PYBIND11_MODULE(pymanifold, m) {
                // will cause failure for python specifically
                // unable to reproduce with c++ directly
                Manifold first = manifolds[0];
-               for (int i = 1; i < manifolds.size(); i++)
-                 first += manifolds[i];
+               for (int i = 1; i < manifolds.size(); i++) first += manifolds[i];
                return first;
              } else {
                return Manifold();
