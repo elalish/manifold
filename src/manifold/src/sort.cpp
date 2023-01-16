@@ -402,7 +402,6 @@ void Manifold::Impl::GatherFaces(const Impl& old,
   meshRelation_.triBary.resize(numTri);
   gather(policy, faceNew2Old.begin(), faceNew2Old.end(),
          old.meshRelation_.triBary.begin(), meshRelation_.triBary.begin());
-  meshRelation_.barycentric = old.meshRelation_.barycentric;
 
   if (old.meshRelation_.triProperties.size() > 0) {
     meshRelation_.triProperties.resize(numTri);

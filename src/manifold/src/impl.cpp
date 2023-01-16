@@ -96,7 +96,6 @@ struct FlipTris {
     BaryRef& bary = thrust::get<0>(inOut);
     const int tri = thrust::get<1>(inOut);
 
-    thrust::swap(bary.vertBary[0], bary.vertBary[2]);
     thrust::swap(halfedge[3 * tri], halfedge[3 * tri + 2]);
 
     for (const int i : {0, 1, 2}) {
@@ -213,7 +212,6 @@ struct InitializeBaryRef {
     baryRef.meshID = meshID;
     baryRef.originalID = meshID;
     baryRef.tri = tri;
-    baryRef.vertBary = {-3, -2, -1};
   }
 };
 
@@ -617,46 +615,8 @@ int Manifold::Impl::InitializeNewReference(
   VecDH<BaryRef>& triBary = meshRelation_.triBary;
   std::map<std::pair<int, int>, int> triVert2bary;
 
-  for (int tri = 0; tri < NumTri(); ++tri) {
-    const int refTri = comp2tri[components[tri]];
-    if (refTri == tri) continue;
-
-    glm::mat3 triPos;
-    for (int i : {0, 1, 2}) {
-      const int vert = halfedge_[3 * refTri + i].startVert;
-      triPos[i] = vertPos_[vert];
-      triVert2bary[{refTri, vert}] = i - 3;
-    }
-
-    glm::ivec3 vertBary;
-    bool coplanar = true;
-    for (int i : {0, 1, 2}) {
-      const int vert = halfedge_[3 * tri + i].startVert;
-      if (triVert2bary.find({refTri, vert}) == triVert2bary.end()) {
-        const glm::vec3 uvw =
-            GetBarycentric(vertPos_[vert], triPos, precision_);
-        if (isnan(uvw[0])) {
-          coplanar = false;
-          triVert2bary[{refTri, vert}] = -4;
-          break;
-        }
-        triVert2bary[{refTri, vert}] = meshRelation_.barycentric.size();
-        meshRelation_.barycentric.push_back(uvw);
-      }
-      const int bary = triVert2bary[{refTri, vert}];
-      if (bary < -3) {
-        coplanar = false;
-        break;
-      }
-      vertBary[i] = bary;
-    }
-
-    if (coplanar) {
-      BaryRef& ref = triBary[tri];
-      ref.tri = refTri;
-      ref.vertBary = vertBary;
-    }
-  }
+  for (int tri = 0; tri < NumTri(); ++tri)
+    triBary[tri].tri = comp2tri[components[tri]];
 
   return nextMeshID;
 }

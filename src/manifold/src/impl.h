@@ -26,7 +26,6 @@ namespace manifold {
 /** @ingroup Private */
 struct Manifold::Impl {
   struct MeshRelationD {
-    VecDH<glm::vec3> barycentric;
     VecDH<BaryRef> triBary;
     VecDH<glm::ivec3> triProperties;
     VecDH<float> properties;
@@ -111,7 +110,7 @@ struct Manifold::Impl {
 
   // face_op.cu
   void Face2Tri(const VecDH<int>& faceEdge, const VecDH<BaryRef>& faceRef,
-                const VecDH<int>& halfedgeBary, const VecDH<int>& halfedgeProp);
+                const VecDH<int>& halfedgeProp);
   Polygons Face2Polygons(int face, glm::mat3x2 projection,
                          const VecDH<int>& faceEdge) const;
 
@@ -128,7 +127,7 @@ struct Manifold::Impl {
 
   // smoothing.cu
   void CreateTangents(const std::vector<Smoothness>&);
-  MeshRelationD Subdivide(int n);
+  VecDH<Barycentric> Subdivide(int n);
   void Refine(int n);
 };
 }  // namespace manifold

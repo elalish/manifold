@@ -322,10 +322,6 @@ struct BaryRef {
   /// The triangle index of the original triangle this was part of:
   /// Mesh.triVerts[tri].
   int tri;
-  /// For the three corners of the output triangle, new (intersection) vertices
-  /// store an index to the MeshRelation.barycentric vector, while original
-  /// vertices have negative values referring to Mesh.triVerts[tri][i + 3].
-  glm::ivec3 vertBary;
 };
 /** @} */
 
@@ -335,30 +331,9 @@ struct BaryRef {
  * eventually led to it, see Manifold.GetMeshRelation().
  */
 struct MeshRelation {
-  /// A vector of shared barycentric coordinates representing the position of a
-  /// vertex relative to its original triangle.
-  std::vector<glm::vec3> barycentric;
   /// A vector matching Mesh.triVerts that contains the relation of each output
   /// triangle to a single input triangle.
   std::vector<BaryRef> triBary;
-
-  /**
-   * A convenience function to get the barycentric coordinates of a given
-   * corner.
-   *
-   * @param tri A valid triangle index of Mesh.triVerts.
-   * @param vert The corner of the triangle: 0, 1, or 2.
-   */
-  inline glm::vec3 UVW(int tri, int vert) {
-    glm::vec3 uvw(0.0f);
-    const int idx = triBary[tri].vertBary[vert];
-    if (idx < 0) {
-      uvw[idx + 3] = 1;
-    } else {
-      uvw = barycentric[idx];
-    }
-    return uvw;
-  }
 };
 
 /**
@@ -595,8 +570,7 @@ inline std::ostream& operator<<(std::ostream& stream, const glm::mat4x3& mat) {
 
 inline std::ostream& operator<<(std::ostream& stream, const BaryRef& ref) {
   return stream << "meshID: " << ref.meshID
-                << ", originalID: " << ref.originalID << ", tri: " << ref.tri
-                << ", uvw idx: " << ref.vertBary;
+                << ", originalID: " << ref.originalID << ", tri: " << ref.tri;
 }
 
 /**

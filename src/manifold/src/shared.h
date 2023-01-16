@@ -86,6 +86,11 @@ struct Halfedge {
   }
 };
 
+struct Barycentric {
+  int tri;
+  glm::vec3 uvw;
+};
+
 /**
  * This is a temporary edge structure which only stores edges forward and
  * references the halfedge it was created from.
@@ -151,6 +156,10 @@ inline std::ostream& operator<<(std::ostream& stream, const Halfedge& edge) {
                 << ", endVert = " << edge.endVert
                 << ", pairedHalfedge = " << edge.pairedHalfedge
                 << ", face = " << edge.face;
+}
+
+inline std::ostream& operator<<(std::ostream& stream, const Barycentric& bary) {
+  return stream << "tri = " << bary.tri << ", uvw = " << bary.uvw;
 }
 #endif
 }  // namespace manifold

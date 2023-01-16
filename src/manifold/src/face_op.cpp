@@ -31,7 +31,6 @@ namespace manifold {
  */
 void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge,
                               const VecDH<BaryRef>& faceRef,
-                              const VecDH<int>& halfedgeBary,
                               const VecDH<int>& halfedgeProp) {
   VecDH<glm::ivec3> triVerts;
   VecDH<glm::vec3> triNormal;
@@ -77,12 +76,12 @@ void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge,
       triVerts.push_back(tri);
       triNormal.push_back(normal);
       triBary.push_back(faceRef[face]);
-      if (halfedgeProp.size() > 0) triProp.push_back({});
-      for (int k : {0, 1, 2}) {
-        int index = linearSearch(mapping, tri[k]);
-        triBary.back().vertBary[k] = halfedgeBary[firstEdge + index];
-        if (halfedgeProp.size() > 0)
+      if (halfedgeProp.size() > 0) {
+        triProp.push_back({});
+        for (int k : {0, 1, 2}) {
+          int index = linearSearch(mapping, tri[k]);
           triProp.back()[k] = halfedgeProp[firstEdge + index];
+        }
       }
     } else if (numEdge == 4) {  // Pair of triangles
       int mapping[4] = {halfedge_[firstEdge].startVert,
@@ -133,22 +132,21 @@ void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge,
         triVerts.push_back(tri);
         triNormal.push_back(normal);
         triBary.push_back(faceRef[face]);
-        if (halfedgeProp.size() > 0) triProp.push_back({});
-        for (int k : {0, 1, 2}) {
-          int index = linearSearch(mapping, tri[k]);
-          triBary.back().vertBary[k] = halfedgeBary[firstEdge + index];
-          if (halfedgeProp.size() > 0)
+        if (halfedgeProp.size() > 0) {
+          triProp.push_back({});
+          for (int k : {0, 1, 2}) {
+            int index = linearSearch(mapping, tri[k]);
             triProp.back()[k] = halfedgeProp[firstEdge + index];
+          }
         }
       }
     } else {  // General triangulation
       const glm::mat3x2 projection = GetAxisAlignedProjection(normal);
 
-      std::map<int, std::pair<int, int>> vertBaryProp;
+      std::map<int, int> vertProp;
       for (int j = firstEdge; j < lastEdge; ++j) {
         const int prop = halfedgeProp.size() > 0 ? halfedgeProp[j] : 0;
-        vertBaryProp[halfedge_[j].startVert] =
-            std::make_pair(halfedgeBary[j], prop);
+        vertProp[halfedge_[j].startVert] = prop;
       }
 
       const Polygons polys = Face2Polygons(face, projection, faceEdge);
@@ -159,11 +157,9 @@ void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge,
         triVerts.push_back(tri);
         triNormal.push_back(normal);
         triBary.push_back(faceRef[face]);
-        if (halfedgeProp.size() > 0) triProp.push_back({});
-        for (int k : {0, 1, 2}) {
-          triBary.back().vertBary[k] = vertBaryProp[tri[k]].first;
-          if (halfedgeProp.size() > 0)
-            triProp.back()[k] = vertBaryProp[tri[k]].second;
+        if (halfedgeProp.size() > 0) {
+          triProp.push_back({});
+          for (int k : {0, 1, 2}) triProp.back()[k] = vertProp[tri[k]];
         }
       }
     }

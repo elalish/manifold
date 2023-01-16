@@ -382,10 +382,6 @@ void Manifold::Impl::CollapseEdge(const int edge) {
     const int vIdx = current - 3 * tri;
 
     if (!shortEdge) {
-      const bool use0 =
-          ref0.meshID == triBary[tri].meshID && ref0.tri == triBary[tri].tri;
-      triBary[tri].vertBary[vIdx] =
-          use0 ? ref0.vertBary[triVert0] : ref1.vertBary[triVert1];
       if (triProp.size() > 0) {
         if (triProp[tri][vIdx] == prop0) {
           triProp[tri][vIdx] = triProp[tri0][triVert0];
@@ -455,22 +451,9 @@ void Manifold::Impl::RecursiveEdgeSwap(const int edge) {
     const int tri1 = halfedge_[tri1edge[0]].face;
     faceNormal_[tri0] = faceNormal_[tri1];
     triBary[tri0] = triBary[tri1];
-    triBary[tri0].vertBary[perm0[1]] = triBary[tri1].vertBary[perm1[0]];
-    triBary[tri0].vertBary[perm0[0]] = triBary[tri1].vertBary[perm1[2]];
-    // Calculate a new barycentric coordinate for the split triangle.
-    const glm::vec3 uvw0 = UVW(triBary[tri1].vertBary[perm1[0]],
-                               meshRelation_.barycentric.cptrH());
-    const glm::vec3 uvw1 = UVW(triBary[tri1].vertBary[perm1[1]],
-                               meshRelation_.barycentric.cptrH());
     const float l01 = glm::length(v[1] - v[0]);
     const float l02 = glm::length(v[2] - v[0]);
     const float a = glm::max(0.0f, glm::min(1.0f, l02 / l01));
-    const glm::vec3 uvw2 = a * uvw0 + (1 - a) * uvw1;
-    // And assign it.
-    const int newBary = meshRelation_.barycentric.size();
-    meshRelation_.barycentric.push_back(uvw2);
-    triBary[tri1].vertBary[perm1[0]] = newBary;
-    triBary[tri0].vertBary[perm0[2]] = newBary;
     // Update properties if applicable
     if (meshRelation_.properties.size() > 0) {
       VecDH<glm::ivec3>& triProp = meshRelation_.triProperties;

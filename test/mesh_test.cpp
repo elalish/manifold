@@ -524,7 +524,7 @@ TEST(Manifold, ManualSmooth) {
     const glm::vec4 purple(1, 0, 1, 1);
     for (int tri = 0; tri < interp.NumTri(); ++tri) {
       for (int i : {0, 1, 2}) {
-        const glm::vec3& uvw = rel.UVW(tri, i);
+        const glm::vec3& uvw = {0.5, 0.5, 0.0};
         const float alpha = glm::min(uvw[0], glm::min(uvw[1], uvw[2]));
         options.mat.vertColor[out.triVerts[tri][i]] =
             glm::mix(purple, red, glm::smoothstep(0.0f, 0.2f, alpha));
@@ -568,7 +568,7 @@ TEST(Manifold, Csaszar) {
     const glm::vec4 yellow(1, 1, 0, 1);
     for (int tri = 0; tri < csaszar.NumTri(); ++tri) {
       for (int i : {0, 1, 2}) {
-        const glm::vec3& uvw = rel.barycentric[rel.triBary[tri].vertBary[i]];
+        const glm::vec3& uvw = {0.5, 0.5, 0.0};
         const float alpha = glm::min(uvw[0], glm::min(uvw[1], uvw[2]));
         options.mat.vertColor[out.triVerts[tri][i]] =
             glm::mix(yellow, blue, glm::smoothstep(0.0f, 0.2f, alpha));
