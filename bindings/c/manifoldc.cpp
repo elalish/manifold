@@ -463,14 +463,14 @@ ManifoldVec3 *manifold_mesh_relation_barycentric(void *mem,
 }
 
 size_t manifold_mesh_relation_tri_bary_length(ManifoldMeshRelation *m) {
-  return from_c(m)->triBary.size();
+  return from_c(m)->triRef.size();
 }
 
-ManifoldBaryRef *manifold_mesh_relation_tri_bary(void *mem,
-                                                 ManifoldMeshRelation *m) {
-  auto tri_bary = from_c(m)->triBary;
+ManifoldTriRef *manifold_mesh_relation_tri_bary(void *mem,
+                                                ManifoldMeshRelation *m) {
+  auto tri_bary = from_c(m)->triRef;
   auto len = tri_bary.size();
-  ManifoldBaryRef *brs = reinterpret_cast<ManifoldBaryRef *>(mem);
+  ManifoldTriRef *brs = reinterpret_cast<ManifoldTriRef *>(mem);
   for (int i = 0; i < len; ++i) {
     auto tb = tri_bary[i];
     auto vb = tb.vertBary;

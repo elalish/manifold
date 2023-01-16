@@ -92,8 +92,8 @@ struct TransformTangents {
 struct FlipTris {
   Halfedge* halfedge;
 
-  __host__ __device__ void operator()(thrust::tuple<BaryRef&, int> inOut) {
-    BaryRef& bary = thrust::get<0>(inOut);
+  __host__ __device__ void operator()(thrust::tuple<TriRef&, int> inOut) {
+    TriRef& bary = thrust::get<0>(inOut);
     const int tri = thrust::get<1>(inOut);
 
     thrust::swap(halfedge[3 * tri], halfedge[3 * tri + 2]);
@@ -201,12 +201,12 @@ struct ReindexTriVerts {
   }
 };
 
-struct InitializeBaryRef {
+struct InitializeTriRef {
   const int meshID;
   const Halfedge* halfedge;
 
-  __host__ __device__ void operator()(thrust::tuple<BaryRef&, int> inOut) {
-    BaryRef& baryRef = thrust::get<0>(inOut);
+  __host__ __device__ void operator()(thrust::tuple<TriRef&, int> inOut) {
+    TriRef& baryRef = thrust::get<0>(inOut);
     int tri = thrust::get<1>(inOut);
 
     baryRef.meshID = meshID;
@@ -218,7 +218,7 @@ struct InitializeBaryRef {
 struct MarkMeshID {
   HashTableD<uint32_t> table;
 
-  __host__ __device__ void operator()(BaryRef& ref) {
+  __host__ __device__ void operator()(TriRef& ref) {
     if (table.Full()) return;
     table.Insert(ref.meshID, 1);
   }
@@ -228,7 +228,7 @@ struct UpdateMeshID {
   const HashTableD<uint32_t> meshIDold2new;
   const int meshIDoffset;
 
-  __host__ __device__ void operator()(BaryRef& ref) {
+  __host__ __device__ void operator()(TriRef& ref) {
     ref.meshID = meshIDold2new[ref.meshID] + meshIDoffset;
   }
 };
@@ -541,8 +541,8 @@ void Manifold::Impl::ReinitializeReference(int meshID) {
   // instead of storing the meshID, we store 0 and set the mapping to
   // 0 -> meshID, because the meshID after boolean operation also starts from 0.
   for_each_n(autoPolicy(NumTri()),
-             zip(meshRelation_.triBary.begin(), countAt(0)), NumTri(),
-             InitializeBaryRef({meshID, halfedge_.cptrD()}));
+             zip(meshRelation_.triRef.begin(), countAt(0)), NumTri(),
+             InitializeTriRef({meshID, halfedge_.cptrD()}));
   meshRelation_.originalID = meshID;
   meshids = 1;
 }
@@ -551,7 +551,7 @@ int Manifold::Impl::InitializeNewReference(
     const std::vector<glm::ivec3>& triProperties,
     const std::vector<float>& properties,
     const std::vector<float>& propertyTolerance) {
-  meshRelation_.triBary.resize(NumTri());
+  meshRelation_.triRef.resize(NumTri());
   const int nextMeshID = meshIDCounter_.fetch_add(1, std::memory_order_relaxed);
   ReinitializeReference(nextMeshID);
 
@@ -612,11 +612,11 @@ int Manifold::Impl::InitializeNewReference(
     }
   }
 
-  VecDH<BaryRef>& triBary = meshRelation_.triBary;
+  VecDH<TriRef>& triRef = meshRelation_.triRef;
   std::map<std::pair<int, int>, int> triVert2bary;
 
   for (int tri = 0; tri < NumTri(); ++tri)
-    triBary[tri].tri = comp2tri[components[tri]];
+    triRef[tri].tri = comp2tri[components[tri]];
 
   return nextMeshID;
 }
@@ -708,7 +708,7 @@ Manifold::Impl Manifold::Impl::Transform(const glm::mat4x3& transform_) const {
   }
 
   if (invert) {
-    for_each_n(policy, zip(result.meshRelation_.triBary.begin(), countAt(0)),
+    for_each_n(policy, zip(result.meshRelation_.triRef.begin(), countAt(0)),
                result.NumTri(), FlipTris({result.halfedge_.ptrD()}));
   }
 
@@ -769,13 +769,13 @@ void Manifold::Impl::CalculateNormals() {
  * instances of these meshes.
  */
 void Manifold::Impl::IncrementMeshIDs(int start, int length) {
-  VecDH<BaryRef>& triBary = meshRelation_.triBary;
-  ASSERT(start >= 0 && length >= 0 && start + length <= triBary.size(),
-         logicErr, "out of bounds");
+  VecDH<TriRef>& triRef = meshRelation_.triRef;
+  ASSERT(start >= 0 && length >= 0 && start + length <= triRef.size(), logicErr,
+         "out of bounds");
   const auto policy = autoPolicy(length);
   HashTable<uint32_t> meshidTable(std::max(16u, meshids * 2));
 
-  auto begin = triBary.begin() + start;
+  auto begin = triRef.begin() + start;
   auto end = begin + length;
   while (1) {
     for_each(policy, begin, end, MarkMeshID({meshidTable.D()}));

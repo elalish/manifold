@@ -383,19 +383,19 @@ Curvature Manifold::GetCurvature() const {
 
 /**
  * Gets the relationship to the previous meshes, for the purpose of assigning
- * properties like texture coordinates. The triBary vector is the same length as
- * Mesh.triVerts: BaryRef.originalID indicates the source mesh and BaryRef.tri
+ * properties like texture coordinates. The triRef vector is the same length as
+ * Mesh.triVerts: TriRef.originalID indicates the source mesh and TriRef.tri
  * is that mesh's triangle index of which this triangle is a part.
  *
- * BaryRef.meshID is a unique ID to the particular instance of a given mesh. For
+ * TriRef.meshID is a unique ID to the particular instance of a given mesh. For
  * instance, if you want to convert the triangle mesh to a polygon mesh, all the
  * triangles from a given face will have the same .meshID and .tri values.
  */
 MeshRelation Manifold::GetMeshRelation() const {
   MeshRelation out;
   const auto& relation = GetCsgLeafNode().GetImpl()->meshRelation_;
-  out.triBary.insert(out.triBary.end(), relation.triBary.begin(),
-                     relation.triBary.end());
+  out.triRef.insert(out.triRef.end(), relation.triRef.begin(),
+                    relation.triRef.end());
   return out;
 }
 

@@ -453,7 +453,7 @@ struct PropertiesIncluded {
 };
 
 struct CreateBarycentric {
-  BaryRef *faceRef;
+  TriRef *faceRef;
 
   float *properties;
   int *propIdx;
@@ -467,8 +467,8 @@ struct CreateBarycentric {
   const glm::vec3 *vertPosQ;
   const Halfedge *halfedgeP;
   const Halfedge *halfedgeQ;
-  const BaryRef *triBaryP;
-  const BaryRef *triBaryQ;
+  const TriRef *triRefP;
+  const TriRef *triRefQ;
   const bool invertQ;
   const float precision;
 
@@ -490,7 +490,7 @@ struct CreateBarycentric {
     const Halfedge halfedgeR = thrust::get<2>(inOut);
 
     const int tri = thisRef.tri;
-    const BaryRef oldRef = thisRef.PQ == 0 ? triBaryP[tri] : triBaryQ[tri];
+    const TriRef oldRef = thisRef.PQ == 0 ? triRefP[tri] : triRefQ[tri];
 
     const int *vProp2R = thisRef.PQ == 0 ? vPropP2R : vPropQ2R;
     const glm::ivec3 *triProp = thisRef.PQ == 0 ? triPropP : triPropQ;
@@ -586,7 +586,7 @@ struct SetSharedProperties {
   }
 };
 
-std::tuple<VecDH<BaryRef>, VecDH<int>> CalculateMeshRelation(
+std::tuple<VecDH<TriRef>, VecDH<int>> CalculateMeshRelation(
     Manifold::Impl &outR, const VecDH<Ref> &halfedgeRef,
     const Manifold::Impl &inP, const Manifold::Impl &inQ, int firstNewVert,
     int numFaceR, bool invertQ, ExecutionPolicy policy) {
@@ -623,7 +623,7 @@ std::tuple<VecDH<BaryRef>, VecDH<int>> CalculateMeshRelation(
     propIdx[0] = numRetainedProp;
   }
 
-  VecDH<BaryRef> faceRef(numFaceR);
+  VecDH<TriRef> faceRef(numFaceR);
   VecDH<int> halfedgeProp(halfedgeRef.size(), -1);
   VecDH<int> newVert2propP(numNewVerts, -1);
   VecDH<int> newVert2propQ(numNewVerts, -1);
@@ -645,8 +645,8 @@ std::tuple<VecDH<BaryRef>, VecDH<int>> CalculateMeshRelation(
                          inQ.vertPos_.cptrD(),
                          inP.halfedge_.cptrD(),
                          inQ.halfedge_.cptrD(),
-                         inP.meshRelation_.triBary.cptrD(),
-                         inQ.meshRelation_.triBary.cptrD(),
+                         inP.meshRelation_.triRef.cptrD(),
+                         inQ.meshRelation_.triRef.cptrD(),
                          invertQ,
                          outR.precision_,
                          halfedgeRef.cptrD(),
@@ -792,7 +792,7 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
   // Intersected halfedges are marked false.
   VecDH<char> wholeHalfedgeP(inP_.halfedge_.size(), true);
   VecDH<char> wholeHalfedgeQ(inQ_.halfedge_.size(), true);
-  // The halfedgeRef contains the data that will become triBary once the faces
+  // The halfedgeRef contains the data that will become triRef once the faces
   // are triangulated.
   VecDH<Ref> halfedgeRef(2 * outR.NumEdge());
 
@@ -809,7 +809,7 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
   AppendWholeEdges(outR, facePtrR, halfedgeRef, inQ_, wholeHalfedgeQ, i30, vQ2R,
                    facePQ2R.cptrD() + inP_.NumTri(), false, policy_);
 
-  VecDH<BaryRef> faceRef;
+  VecDH<TriRef> faceRef;
   VecDH<int> halfedgeProp;
   std::tie(faceRef, halfedgeProp) = CalculateMeshRelation(
       outR, halfedgeRef, inP_, inQ_, nPv + nQv, numFaceR, invertQ, policy_);

@@ -114,11 +114,11 @@ void RelatedGL(const Manifold& out, const std::vector<MeshGL>& input,
   MeshGL output = out.GetMeshGL();
   MeshRelation relation = out.GetMeshRelation();
   for (int tri = 0; tri < out.NumTri(); ++tri) {
-    int meshID = relation.triBary[tri].originalID;
+    int meshID = relation.triRef[tri].originalID;
     int meshIdx = meshID2idx.at(meshID);
     ASSERT_LT(meshIdx, input.size());
     const MeshGL& inMesh = input[meshIdx];
-    int inTri = relation.triBary[tri].tri;
+    int inTri = relation.triRef[tri].tri;
     ASSERT_LT(inTri, inMesh.triVerts.size());
     glm::ivec3 inTriangle = {inMesh.triVerts[3 * inTri],
                              inMesh.triVerts[3 * inTri + 1],

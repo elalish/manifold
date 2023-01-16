@@ -311,7 +311,7 @@ struct Components {
  * Part of MeshRelation - represents a single triangle relation to an original
  * Mesh.
  */
-struct BaryRef {
+struct TriRef {
   /// The unique ID of the mesh instance of this triangle. If .meshID and .tri
   /// match for two triangles, then they are coplanar and came from the same
   /// face.
@@ -333,7 +333,7 @@ struct BaryRef {
 struct MeshRelation {
   /// A vector matching Mesh.triVerts that contains the relation of each output
   /// triangle to a single input triangle.
-  std::vector<BaryRef> triBary;
+  std::vector<TriRef> triRef;
 };
 
 /**
@@ -568,7 +568,7 @@ inline std::ostream& operator<<(std::ostream& stream, const glm::mat4x3& mat) {
                 << tam[2] << std::endl;
 }
 
-inline std::ostream& operator<<(std::ostream& stream, const BaryRef& ref) {
+inline std::ostream& operator<<(std::ostream& stream, const TriRef& ref) {
   return stream << "meshID: " << ref.meshID
                 << ", originalID: " << ref.originalID << ", tri: " << ref.tri;
 }

@@ -175,15 +175,15 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .field("surfaceArea", &Properties::surfaceArea)
       .field("volume", &Properties::volume);
 
-  value_object<BaryRef>("baryRef")
-      .field("meshID", &BaryRef::meshID)
-      .field("originalID", &BaryRef::originalID)
-      .field("tri", &BaryRef::tri)
-      .field("vertBary", &BaryRef::vertBary);
+  value_object<TriRef>("baryRef")
+      .field("meshID", &TriRef::meshID)
+      .field("originalID", &TriRef::originalID)
+      .field("tri", &TriRef::tri)
+      .field("vertBary", &TriRef::vertBary);
 
   value_object<MeshRelation>("meshRelation")
       .field("barycentric", &MeshRelation::barycentric)
-      .field("triBary", &MeshRelation::triBary);
+      .field("triRef", &MeshRelation::triRef);
 
   value_object<Curvature>("curvature")
       .field("maxMeanCurvature", &Curvature::maxMeanCurvature)
@@ -200,7 +200,7 @@ EMSCRIPTEN_BINDINGS(whatever) {
   register_vector<float>("Vector_f32");
   register_vector<Manifold>("Vector_manifold");
   register_vector<Smoothness>("Vector_smoothness");
-  register_vector<BaryRef>("Vector_baryRef");
+  register_vector<TriRef>("Vector_baryRef");
   register_vector<glm::vec4>("Vector_vec4");
 
   class_<Manifold>("Manifold")

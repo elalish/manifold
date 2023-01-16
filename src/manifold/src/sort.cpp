@@ -163,7 +163,7 @@ void Permute(VecDH<T>& inOut, const VecDH<int>& new2Old) {
          tmp.begin(), inOut.begin());
 }
 
-template void Permute<BaryRef>(VecDH<BaryRef>&, const VecDH<int>&);
+template void Permute<TriRef>(VecDH<TriRef>&, const VecDH<int>&);
 template void Permute<glm::vec3>(VecDH<glm::vec3>&, const VecDH<int>&);
 
 struct ReindexFace {
@@ -239,8 +239,8 @@ void Manifold::Impl::Finish() {
          "Halfedge index is negative!");
   ASSERT(extrema.pairedHalfedge < 2 * NumEdge(), topologyErr,
          "Halfedge index exceeds number of halfedges!");
-  ASSERT(meshRelation_.triBary.size() == NumTri() ||
-             meshRelation_.triBary.size() == 0,
+  ASSERT(meshRelation_.triRef.size() == NumTri() ||
+             meshRelation_.triRef.size() == 0,
          logicErr, "Mesh Relation doesn't fit!");
   ASSERT(faceNormal_.size() == NumTri() || faceNormal_.size() == 0, logicErr,
          "faceNormal size = " + std::to_string(faceNormal_.size()) +
@@ -373,8 +373,8 @@ void Manifold::Impl::SortFaces(VecDH<Box>& faceBox,
  */
 void Manifold::Impl::GatherFaces(const VecDH<int>& faceNew2Old) {
   const int numTri = faceNew2Old.size();
-  if (meshRelation_.triBary.size() == NumTri())
-    Permute(meshRelation_.triBary, faceNew2Old);
+  if (meshRelation_.triRef.size() == NumTri())
+    Permute(meshRelation_.triRef, faceNew2Old);
   if (meshRelation_.triProperties.size() == NumTri())
     Permute(meshRelation_.triProperties, faceNew2Old);
   if (faceNormal_.size() == NumTri()) Permute(faceNormal_, faceNew2Old);
@@ -399,9 +399,9 @@ void Manifold::Impl::GatherFaces(const Impl& old,
   const int numTri = faceNew2Old.size();
   auto policy = autoPolicy(numTri);
 
-  meshRelation_.triBary.resize(numTri);
+  meshRelation_.triRef.resize(numTri);
   gather(policy, faceNew2Old.begin(), faceNew2Old.end(),
-         old.meshRelation_.triBary.begin(), meshRelation_.triBary.begin());
+         old.meshRelation_.triRef.begin(), meshRelation_.triRef.begin());
 
   if (old.meshRelation_.triProperties.size() > 0) {
     meshRelation_.triProperties.resize(numTri);

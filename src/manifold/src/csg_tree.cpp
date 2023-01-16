@@ -153,7 +153,7 @@ Manifold::Impl CsgLeafNode::Compose(
   combined.halfedge_.resize(2 * numEdge);
   combined.faceNormal_.resize(numTri);
   combined.halfedgeTangent_.resize(2 * numEdge);
-  combined.meshRelation_.triBary.resize(numTri);
+  combined.meshRelation_.triRef.resize(numTri);
   auto policy = autoPolicy(numTri);
 
   int nextVert = 0;
@@ -185,9 +185,9 @@ Manifold::Impl CsgLeafNode::Compose(
     copy(policy, node->pImpl_->halfedgeTangent_.begin(),
          node->pImpl_->halfedgeTangent_.end(),
          combined.halfedgeTangent_.begin() + nextEdge);
-    copy(policy, node->pImpl_->meshRelation_.triBary.begin(),
-         node->pImpl_->meshRelation_.triBary.end(),
-         combined.meshRelation_.triBary.begin() + nextTri);
+    copy(policy, node->pImpl_->meshRelation_.triRef.begin(),
+         node->pImpl_->meshRelation_.triRef.end(),
+         combined.meshRelation_.triRef.begin() + nextTri);
     transform(policy, node->pImpl_->halfedge_.begin(),
               node->pImpl_->halfedge_.end(),
               combined.halfedge_.begin() + nextEdge,

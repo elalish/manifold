@@ -60,19 +60,19 @@ struct ShortEdge {
 
 struct FlagEdge {
   const Halfedge* halfedge;
-  const BaryRef* triBary;
+  const TriRef* triRef;
 
   __host__ __device__ bool operator()(int edge) {
     if (halfedge[edge].pairedHalfedge < 0) return false;
     // Flag redundant edges - those where the startVert is surrounded by only
     // two original triangles.
-    const BaryRef ref0 = triBary[edge / 3];
+    const TriRef ref0 = triRef[edge / 3];
     int current = NextHalfedge(halfedge[edge].pairedHalfedge);
-    const BaryRef ref1 = triBary[current / 3];
+    const TriRef ref1 = triRef[current / 3];
     while (current != edge) {
       current = NextHalfedge(halfedge[current].pairedHalfedge);
       int tri = current / 3;
-      const BaryRef ref = triBary[tri];
+      const TriRef ref = triRef[tri];
       if ((ref.meshID != ref0.meshID || ref.tri != ref0.tri) &&
           (ref.meshID != ref1.meshID || ref.tri != ref1.tri))
         return false;
@@ -168,7 +168,7 @@ void Manifold::Impl::SimplifyTopology() {
   numFlagged =
       copy_if<decltype(flaggedEdges.begin())>(
           policy, countAt(0), countAt(halfedge_.size()), flaggedEdges.begin(),
-          FlagEdge({halfedge_.cptrD(), meshRelation_.triBary.cptrD()})) -
+          FlagEdge({halfedge_.cptrD(), meshRelation_.triRef.cptrD()})) -
       flaggedEdges.begin();
   flaggedEdges.resize(numFlagged);
 
@@ -213,8 +213,8 @@ void Manifold::Impl::DedupeEdge(const int edge) {
       halfedge_.push_back({outsideVert, endVert, -1, newFace});
       PairUp(newHalfedge + 2, halfedge_[current].pairedHalfedge);
       PairUp(newHalfedge + 1, current);
-      if (meshRelation_.triBary.size() > 0)
-        meshRelation_.triBary.push_back(meshRelation_.triBary[oldFace]);
+      if (meshRelation_.triRef.size() > 0)
+        meshRelation_.triRef.push_back(meshRelation_.triRef[oldFace]);
       if (meshRelation_.triProperties.size() > 0)
         meshRelation_.triProperties.push_back(
             meshRelation_.triProperties[oldFace]);
@@ -230,8 +230,8 @@ void Manifold::Impl::DedupeEdge(const int edge) {
       PairUp(newHalfedge + 2, halfedge_[opposite].pairedHalfedge);
       PairUp(newHalfedge + 1, opposite);
       PairUp(newHalfedge, newHalfedge - 3);
-      if (meshRelation_.triBary.size() > 0)
-        meshRelation_.triBary.push_back(meshRelation_.triBary[oldFace]);
+      if (meshRelation_.triRef.size() > 0)
+        meshRelation_.triRef.push_back(meshRelation_.triRef[oldFace]);
       if (meshRelation_.triProperties.size() > 0)
         meshRelation_.triProperties.push_back(
             meshRelation_.triProperties[oldFace]);
@@ -307,7 +307,7 @@ void Manifold::Impl::RemoveIfFolded(int edge) {
 }
 
 void Manifold::Impl::CollapseEdge(const int edge) {
-  VecDH<BaryRef>& triBary = meshRelation_.triBary;
+  VecDH<TriRef>& triRef = meshRelation_.triRef;
   VecDH<glm::ivec3>& triProp = meshRelation_.triProperties;
 
   const Halfedge toRemove = halfedge_[edge];
@@ -333,8 +333,8 @@ void Manifold::Impl::CollapseEdge(const int edge) {
 
   // Orbit startVert
   int start = halfedge_[tri1edge[1]].pairedHalfedge;
-  const BaryRef ref0 = triBary[edge / 3];
-  const BaryRef ref1 = triBary[toRemove.pairedHalfedge / 3];
+  const TriRef ref0 = triRef[edge / 3];
+  const TriRef ref1 = triRef[toRemove.pairedHalfedge / 3];
   if (!shortEdge) {
     current = start;
     glm::vec3 pLast = vertPos_[halfedge_[tri1edge[1]].endVert];
@@ -342,7 +342,7 @@ void Manifold::Impl::CollapseEdge(const int edge) {
       current = NextHalfedge(current);
       glm::vec3 pNext = vertPos_[halfedge_[current].endVert];
       const int tri = current / 3;
-      const BaryRef ref = triBary[tri];
+      const TriRef ref = triRef[tri];
       // Don't collapse if the edge is not redundant (this may have changed due
       // to the collapse of neighbors).
       if ((ref.meshID != ref0.meshID || ref.tri != ref0.tri) &&
@@ -410,7 +410,7 @@ void Manifold::Impl::CollapseEdge(const int edge) {
 }
 
 void Manifold::Impl::RecursiveEdgeSwap(const int edge) {
-  VecDH<BaryRef>& triBary = meshRelation_.triBary;
+  VecDH<TriRef>& triRef = meshRelation_.triRef;
 
   if (edge < 0) return;
   const int pair = halfedge_[edge].pairedHalfedge;
@@ -450,7 +450,7 @@ void Manifold::Impl::RecursiveEdgeSwap(const int edge) {
     const int tri0 = halfedge_[tri0edge[0]].face;
     const int tri1 = halfedge_[tri1edge[0]].face;
     faceNormal_[tri0] = faceNormal_[tri1];
-    triBary[tri0] = triBary[tri1];
+    triRef[tri0] = triRef[tri1];
     const float l01 = glm::length(v[1] - v[0]);
     const float l02 = glm::length(v[2] - v[0]);
     const float a = glm::max(0.0f, glm::min(1.0f, l02 / l01));

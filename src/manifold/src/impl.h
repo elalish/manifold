@@ -26,7 +26,7 @@ namespace manifold {
 /** @ingroup Private */
 struct Manifold::Impl {
   struct MeshRelationD {
-    VecDH<BaryRef> triBary;
+    VecDH<TriRef> triRef;
     VecDH<glm::ivec3> triProperties;
     VecDH<float> properties;
     int numProp = 0;
@@ -109,7 +109,7 @@ struct Manifold::Impl {
   void GatherFaces(const Impl& old, const VecDH<int>& faceNew2Old);
 
   // face_op.cu
-  void Face2Tri(const VecDH<int>& faceEdge, const VecDH<BaryRef>& faceRef,
+  void Face2Tri(const VecDH<int>& faceEdge, const VecDH<TriRef>& faceRef,
                 const VecDH<int>& halfedgeProp);
   Polygons Face2Polygons(int face, glm::mat3x2 projection,
                          const VecDH<int>& faceEdge) const;

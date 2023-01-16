@@ -30,17 +30,17 @@ namespace manifold {
  * faceNormal_ values are retained, repeated as necessary.
  */
 void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge,
-                              const VecDH<BaryRef>& faceRef,
+                              const VecDH<TriRef>& faceRef,
                               const VecDH<int>& halfedgeProp) {
   VecDH<glm::ivec3> triVerts;
   VecDH<glm::vec3> triNormal;
-  VecDH<BaryRef>& triBary = meshRelation_.triBary;
+  VecDH<TriRef>& triRef = meshRelation_.triRef;
   VecDH<glm::ivec3>& triProp = meshRelation_.triProperties;
-  triBary.resize(0);
+  triRef.resize(0);
   triProp.resize(0);
   triVerts.reserve(halfedge_.size());
   triNormal.reserve(halfedge_.size());
-  triBary.reserve(halfedge_.size());
+  triRef.reserve(halfedge_.size());
   triProp.reserve(halfedgeProp.size());
 
   for (int face = 0; face < faceEdge.size() - 1; ++face) {
@@ -75,7 +75,7 @@ void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge,
 
       triVerts.push_back(tri);
       triNormal.push_back(normal);
-      triBary.push_back(faceRef[face]);
+      triRef.push_back(faceRef[face]);
       if (halfedgeProp.size() > 0) {
         triProp.push_back({});
         for (int k : {0, 1, 2}) {
@@ -131,7 +131,7 @@ void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge,
       for (auto tri : {tri0, tri1}) {
         triVerts.push_back(tri);
         triNormal.push_back(normal);
-        triBary.push_back(faceRef[face]);
+        triRef.push_back(faceRef[face]);
         if (halfedgeProp.size() > 0) {
           triProp.push_back({});
           for (int k : {0, 1, 2}) {
@@ -156,7 +156,7 @@ void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge,
       for (auto tri : newTris) {
         triVerts.push_back(tri);
         triNormal.push_back(normal);
-        triBary.push_back(faceRef[face]);
+        triRef.push_back(faceRef[face]);
         if (halfedgeProp.size() > 0) {
           triProp.push_back({});
           for (int k : {0, 1, 2}) triProp.back()[k] = vertProp[tri[k]];

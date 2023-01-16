@@ -53,12 +53,12 @@ typedef struct ManifoldPolyVert {
 
 } ManifoldPolyVert;
 
-typedef struct ManifoldBaryRef {
+typedef struct ManifoldTriRef {
   int mesh_id;
   int original_id;
   int tri;
   ManifoldIVec3 vert_bary;
-} ManifoldBaryRef;
+} ManifoldTriRef;
 
 typedef struct ManifoldCurvatureBounds {
   float max_mean_curvature;
