@@ -386,13 +386,12 @@ void Manifold::Impl::CollapseEdge(const int edge) {
           ref0.meshID == triBary[tri].meshID && ref0.tri == triBary[tri].tri;
       triBary[tri].vertBary[vIdx] =
           use0 ? ref0.vertBary[triVert0] : ref1.vertBary[triVert1];
-    }
-
-    if (triProp.size() > 0) {
-      if (triProp[tri][vIdx] == prop0) {
-        triProp[tri][vIdx] = triProp[tri0][triVert0];
-      } else if (triProp[tri][vIdx] == prop1) {
-        triProp[tri][vIdx] = triProp[tri1][triVert1];
+      if (triProp.size() > 0) {
+        if (triProp[tri][vIdx] == prop0) {
+          triProp[tri][vIdx] = triProp[tri0][triVert0];
+        } else if (triProp[tri][vIdx] == prop1) {
+          triProp[tri][vIdx] = triProp[tri1][triVert1];
+        }
       }
     }
 

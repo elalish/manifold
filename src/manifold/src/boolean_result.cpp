@@ -416,20 +416,38 @@ struct PropertiesIncluded {
 
   const glm::ivec3 *triPropP;
   const glm::ivec3 *triPropQ;
+  const glm::vec3 *vertPosR;
+  const glm::vec3 *vertPosP;
+  const glm::vec3 *vertPosQ;
+  const Halfedge *halfedgeP;
+  const Halfedge *halfedgeQ;
   const int firstNewVert;
+  const float precision;
 
   __host__ __device__ void operator()(thrust::tuple<Ref, Halfedge> in) {
     const Ref halfedgeRef = thrust::get<0>(in);
     const Halfedge halfedgeR = thrust::get<1>(in);
+    int *vPropKeep = halfedgeRef.PQ == 0 ? vPropKeepP : vPropKeepQ;
 
-    if (halfedgeR.startVert < firstNewVert) {  // retained verts only
-      int *vPropKeep = halfedgeRef.PQ == 0 ? vPropKeepP : vPropKeepQ;
-      const int tri = halfedgeRef.tri;
-      const glm::ivec3 triProp =
-          halfedgeRef.PQ == 0 ? triPropP[tri] : triPropQ[tri];
+    const int tri = halfedgeRef.tri;
+    const glm::vec3 *vertPos = halfedgeRef.PQ == 0 ? vertPosP : vertPosQ;
+    const Halfedge *halfedge = halfedgeRef.PQ == 0 ? halfedgeP : halfedgeQ;
+    const glm::ivec3 triProp =
+        halfedgeRef.PQ == 0 ? triPropP[tri] : triPropQ[tri];
 
+    if (halfedgeR.startVert < firstNewVert) {  // retained verts
       const int prop = triProp[halfedgeRef.vert];
       vPropKeep[prop] = 1;
+    } else {  // retain vert that would otherwise be duplicated
+      for (int i : {0, 1, 2}) {
+        const int prop = triProp[i];
+        const glm::vec3 delta = vertPosR[halfedgeR.startVert] -
+                                vertPos[halfedge[3 * tri + i].startVert];
+        if (glm::dot(delta, delta) < precision * precision) {
+          vPropKeep[prop] = 1;
+          return;
+        }
+      }
     }
   }
 };
@@ -529,6 +547,20 @@ struct CreateBarycentric {
       barycentricR[halfedgeBary] = uvwOldTri * uvw;
 
       if (numProp > 0) {
+        for (int i : {0, 1, 2}) {
+          // Don't make duplicate property verts.
+          const int olProp = triProp[tri][i];
+          const glm::vec3 delta = vertPosR[halfedgeR.startVert] - triPos[i];
+          if (glm::dot(delta, delta) < precision * precision) {
+            halfedgeProp = vProp2R[olProp];
+            for (int i = 0; i < numProp; ++i) {
+              properties[numPropR * halfedgeProp + i] =
+                  prop[numProp * olProp + i];
+            }
+            return;
+          }
+        }
+
         const int oldProp = triProp[thisRef.tri][thisRef.vert];
         const Ref pairRef = halfedgeRef[halfedgeR.pairedHalfedge];
         // Add a vert only if the meshes don't match or if there is an existing
@@ -591,14 +623,17 @@ std::tuple<VecDH<BaryRef>, VecDH<int>, VecDH<int>> CalculateMeshRelation(
   VecDH<int> propIdx(1);
 
   if (numPropR > 0) {
-    VecDH<int> vPropKeepP(inP.meshRelation_.properties.size(), 0);
-    VecDH<int> vPropKeepQ(inQ.meshRelation_.properties.size(), 0);
-    for_each_n(policy, zip(halfedgeRef.cbegin(), outR.halfedge_.cbegin()),
-               halfedgeRef.size(),
-               PropertiesIncluded({vPropKeepP.ptrD(), vPropKeepQ.ptrD(),
-                                   inP.meshRelation_.triProperties.cptrD(),
-                                   inQ.meshRelation_.triProperties.cptrD(),
-                                   firstNewVert}));
+    VecDH<int> vPropKeepP(inP.NumPropVert(), 0);
+    VecDH<int> vPropKeepQ(inQ.NumPropVert(), 0);
+    for_each_n(
+        policy, zip(halfedgeRef.cbegin(), outR.halfedge_.cbegin()),
+        halfedgeRef.size(),
+        PropertiesIncluded(
+            {vPropKeepP.ptrD(), vPropKeepQ.ptrD(),
+             inP.meshRelation_.triProperties.cptrD(),
+             inQ.meshRelation_.triProperties.cptrD(), outR.vertPos_.cptrD(),
+             inP.vertPos_.cptrD(), inQ.vertPos_.cptrD(), inP.halfedge_.cptrD(),
+             inQ.halfedge_.cptrD(), firstNewVert, outR.precision_}));
     vPropP2R.resize(vPropKeepP.size());
     vPropQ2R.resize(vPropKeepQ.size());
     exclusive_scan(policy, vPropKeepP.begin(), vPropKeepP.end(),

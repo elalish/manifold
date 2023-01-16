@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <set>
+#include <map>
 
 #include "boolean3.h"
 #include "csg_tree.h"
@@ -169,7 +169,6 @@ MeshGL Manifold::GetMeshGL() const {
 
   MeshGL out;
   out.numProp = 3 + numProp;
-  out.vertProperties.resize(out.numProp * numVert);
   out.triVerts.resize(3 * numTri);
 
   const int numHalfedge = impl.halfedgeTangent_.size();
@@ -183,6 +182,7 @@ MeshGL Manifold::GetMeshGL() const {
   }
 
   if (numProp == 0) {
+    out.vertProperties.resize(out.numProp * numVert);
     for (int i = 0; i < numVert; ++i) {
       const glm::vec3 v = impl.vertPos_[i];
       out.vertProperties[3 * i] = v.x;
@@ -196,23 +196,31 @@ MeshGL Manifold::GetMeshGL() const {
   }
 
   std::vector<int> vert2prop(impl.NumVert(), -1);
-  std::set<std::pair<int, int>> vertPropPair;
+  std::map<std::pair<int, int>, int> vertPropPair;
 
   for (int tri = 0; tri < numTri; ++tri) {
     const glm::ivec3 triProp = impl.meshRelation_.triProperties[tri];
     for (const int i : {0, 1, 2}) {
       const int prop = triProp[i];
-      out.triVerts[3 * tri + i] = prop;
       const int vert = impl.halfedge_[3 * tri + i].startVert;
-      if (vertPropPair.find({vert, prop}) != vertPropPair.end()) continue;
+
+      const auto it = vertPropPair.find({vert, prop});
+      if (it != vertPropPair.end()) {
+        out.triVerts[3 * tri + i] = it->second;
+        continue;
+      }
+      const int idx = out.vertProperties.size() / out.numProp;
+      vertPropPair.insert({{vert, prop}, idx});
+      out.triVerts[3 * tri + i] = idx;
+
       for (int p : {0, 1, 2}) {
-        out.vertProperties[prop * out.numProp + p] = impl.vertPos_[vert][p];
+        out.vertProperties.push_back(impl.vertPos_[vert][p]);
       }
       for (int p = 0; p < numProp; ++p) {
-        out.vertProperties[prop * out.numProp + p + 3] =
-            impl.meshRelation_.properties[prop * numProp + p];
+        out.vertProperties.push_back(
+            impl.meshRelation_.properties[prop * numProp + p]);
       }
-      vertPropPair.insert({vert, prop});
+
       if (vert2prop[vert] == -1) {
         vert2prop[vert] = prop;
       } else {

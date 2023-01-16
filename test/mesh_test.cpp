@@ -128,23 +128,32 @@ void RelatedGL(const Manifold& out, const std::vector<MeshGL>& input,
     for (int j : {0, 1, 2})
       for (int k : {0, 1, 2})
         inTriPos[j][k] = inMesh.vertProperties[inTriangle[j] + k];
+    glm::vec3 normal =
+        glm::cross(inTriPos[1] - inTriPos[0], inTriPos[2] - inTriPos[0]);
+    const float area = glm::length(normal);
+    if (area == 0) continue;
+    normal /= area;
 
     for (int j : {0, 1, 2}) {
       const int vert = output.triVerts[3 * tri + j];
       glm::vec3 outPos;
       for (int k : {0, 1, 2})
         outPos[k] = output.vertProperties[vert * output.numProp + k];
-      glm::vec3 uvw = GetBarycentric(outPos, inTriPos, out.Precision());
-      ASSERT_EQ(uvw[0], uvw[0]);
 
-      for (int p = 0; p < output.numProp; ++p) {
+      for (int p = 3; p < output.numProp; ++p) {
         const float propOut = output.vertProperties[vert * output.numProp + p];
 
         glm::vec3 inProp = {inMesh.vertProperties[inTriangle[0] + p],
                             inMesh.vertProperties[inTriangle[1] + p],
                             inMesh.vertProperties[inTriangle[2] + p]};
+        glm::vec3 edges[3];
+        for (int k : {0, 1, 2}) {
+          edges[k] =
+              inTriPos[k] + normal * inProp[k] - (outPos + normal * propOut);
+        }
+        const float volume = glm::dot(edges[0], glm::cross(edges[1], edges[2]));
 
-        ASSERT_NEAR(propOut, glm::dot(inProp, uvw), 10 * out.Precision());
+        ASSERT_LE(volume, area * 10 * out.Precision());
       }
     }
   }
@@ -661,7 +670,7 @@ TEST(Manifold, Transform) {
 TEST(Manifold, MeshRelation) {
   const float period = glm::two_pi<float>();
 
-  Mesh gyroidMesh = LevelSet(Gyroid(), {glm::vec3(0), glm::vec3(period)}, 0.5);
+  Mesh gyroidMesh = LevelSet(Gyroid(), {glm::vec3(0), glm::vec3(period)}, 3);
   MeshGL gyroidMeshGL = WithIndexColors(gyroidMesh);
   std::vector<float> tol(3, 0.0001);
   Manifold gyroid(gyroidMeshGL, tol);
@@ -670,7 +679,10 @@ TEST(Manifold, MeshRelation) {
   std::map<int, int> meshID2idx;
 
 #ifdef MANIFOLD_EXPORT
-  if (options.exportModels) ExportMesh("gyroid.glb", gyroid.GetMesh(), {});
+  ExportOptions opt;
+  opt.mat.roughness = 1;
+  opt.mat.colorChannels = glm::ivec4(3, 4, 5, -1);
+  if (options.exportModels) ExportMesh("gyroid.glb", gyroid.GetMeshGL(), opt);
 #endif
 
   int meshID = gyroid.OriginalID();

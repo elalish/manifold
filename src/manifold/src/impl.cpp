@@ -256,9 +256,11 @@ struct CoplanarEdge {
   const float precision;
 
   __host__ __device__ void operator()(
-      thrust::tuple<thrust::pair<int, int>&, int> inOut) {
+      thrust::tuple<thrust::pair<int, int>&, thrust::pair<int, int>&, int>
+          inOut) {
     thrust::pair<int, int>& face2face = thrust::get<0>(inOut);
-    const int edgeIdx = thrust::get<1>(inOut);
+    thrust::pair<int, int>& vert2vert = thrust::get<1>(inOut);
+    const int edgeIdx = thrust::get<2>(inOut);
 
     const Halfedge edge = halfedge[edgeIdx];
     if (!edge.IsForward()) return;
@@ -269,6 +271,23 @@ struct CoplanarEdge {
     const int jointNum = edge.pairedHalfedge - 3 * pair.face;
     const int edgeNum = baseNum == 0 ? 2 : baseNum - 1;
     const int pairNum = jointNum == 0 ? 2 : jointNum - 1;
+
+    if (numProp > 0) {
+      const int prop0 = triProp[edge.face][baseNum];
+      const int prop1 = triProp[edge.face][edgeNum];
+      bool propEqual = true;
+      for (int p = 0; p < numProp; ++p) {
+        if (glm::abs(prop[numProp * prop0 + p] - prop[numProp * prop1 + p]) >
+            propTol[p]) {
+          propEqual = false;
+          break;
+        }
+      }
+      if (propEqual) {
+        vert2vert.first = prop0;
+        vert2vert.second = prop1;
+      }
+    }
 
     const glm::vec3 jointVec = vertPos[pair.startVert] - base;
     const glm::vec3 edgeVec =
@@ -334,6 +353,35 @@ struct EdgeBox {
   }
 };
 
+int GetLabels(std::vector<int>& components,
+              const VecDH<thrust::pair<int, int>>& edges, int numNodes) {
+  Graph graph;
+  for (int i = 0; i < numNodes; ++i) {
+    graph.add_nodes(i);
+  }
+  for (int i = 0; i < edges.size(); ++i) {
+    const thrust::pair<int, int> edge = edges[i];
+    if (edge.first < 0) continue;
+    graph.add_edge(edge.first, edge.second);
+  }
+
+  return ConnectedComponents(components, graph);
+}
+
+void DedupePropVerts(manifold::VecDH<glm::ivec3>& triProp,
+                     const VecDH<thrust::pair<int, int>>& vert2vert) {
+  std::vector<int> vertLabels;
+  const int numLabels = GetLabels(vertLabels, vert2vert, vert2vert.size());
+
+  std::vector<int> label2vert(numLabels);
+  for (int v = 0; v < vert2vert.size(); ++v) {
+    label2vert[vertLabels[v]] = v;
+  }
+  for (int tri = 0; tri < triProp.size(); ++tri) {
+    for (int i : {0, 1, 2})
+      triProp[tri][i] = label2vert[vertLabels[triProp[tri][i]]];
+  }
+}
 }  // namespace
 
 namespace manifold {
@@ -541,26 +589,20 @@ int Manifold::Impl::InitializeNewReference(
   }
 
   VecDH<thrust::pair<int, int>> face2face(halfedge_.size(), {-1, -1});
+  VecDH<thrust::pair<int, int>> vert2vert(halfedge_.size(), {-1, -1});
   VecDH<float> triArea(NumTri());
-  for_each_n(autoPolicy(halfedge_.size()), zip(face2face.begin(), countAt(0)),
+  for_each_n(autoPolicy(halfedge_.size()),
+             zip(face2face.begin(), vert2vert.begin(), countAt(0)),
              halfedge_.size(),
              CoplanarEdge({triArea.ptrD(), halfedge_.cptrD(), vertPos_.cptrD(),
                            meshRelation_.triProperties.cptrD(),
                            meshRelation_.properties.cptrD(),
                            propertyToleranceD.cptrD(), numProps, precision_}));
 
-  Graph graph;
-  for (int i = 0; i < NumTri(); ++i) {
-    graph.add_nodes(i);
-  }
-  for (int i = 0; i < face2face.size(); ++i) {
-    const thrust::pair<int, int> edge = face2face[i];
-    if (edge.first < 0) continue;
-    graph.add_edge(edge.first, edge.second);
-  }
+  DedupePropVerts(meshRelation_.triProperties, vert2vert);
 
   std::vector<int> components;
-  const int numComponent = ConnectedComponents(components, graph);
+  const int numComponent = GetLabels(components, face2face, NumTri());
 
   std::vector<int> comp2tri(numComponent, -1);
   for (int tri = 0; tri < NumTri(); ++tri) {
