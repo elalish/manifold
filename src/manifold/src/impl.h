@@ -109,8 +109,7 @@ struct Manifold::Impl {
   void GatherFaces(const Impl& old, const VecDH<int>& faceNew2Old);
 
   // face_op.cu
-  void Face2Tri(const VecDH<int>& faceEdge, const VecDH<TriRef>& faceRef,
-                const VecDH<int>& halfedgeProp);
+  void Face2Tri(const VecDH<int>& faceEdge, const VecDH<TriRef>& halfedgeRef);
   Polygons Face2Polygons(int face, glm::mat3x2 projection,
                          const VecDH<int>& faceEdge) const;
 

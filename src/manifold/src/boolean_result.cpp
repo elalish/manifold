@@ -197,17 +197,10 @@ std::vector<Halfedge> PairUp(std::vector<EdgePos> &edgePos) {
   return edges;
 }
 
-// A Ref carries the reference of a halfedge's startVert back to the input
-// manifolds. PQ is 0 if the halfedge comes from triangle tri of P, and 1 for Q.
-// vert is 0, 1, or 2 to denote which vertex of tri it is, and -1 if it is new.
-struct Ref {
-  int PQ, tri, vert;
-};
-
 void AppendPartialEdges(Manifold::Impl &outR, VecDH<char> &wholeHalfedgeP,
                         VecDH<int> &facePtrR,
                         std::map<int, std::vector<EdgePos>> &edgesP,
-                        VecDH<Ref> &halfedgeRef, const Manifold::Impl &inP,
+                        VecDH<TriRef> &halfedgeRef, const Manifold::Impl &inP,
                         const VecDH<int> &i03, const VecDH<int> &vP2R,
                         const VecDH<int>::IterC faceP2R, bool forward) {
   // Each edge in the map is partially retained; for each of these, look up
@@ -266,11 +259,8 @@ void AppendPartialEdges(Manifold::Impl &outR, VecDH<char> &wholeHalfedgeP,
     // reference is now to the endVert instead of the startVert, which is one
     // position advanced CCW. This is only valid if this is a retained vert; it
     // will be ignored later if the vert is new.
-    const Ref forwardRef = {forward ? 0 : 1, faceLeftP,
-                            (edgeP + (reversed ? 1 : 0)) % 3};
-    const Ref backwardRef = {
-        forward ? 0 : 1, faceRightP,
-        (halfedge.pairedHalfedge + (reversed ? 1 : 0)) % 3};
+    const TriRef forwardRef = {forward ? 0 : 1, -1, faceLeftP};
+    const TriRef backwardRef = {forward ? 0 : 1, -1, faceRightP};
 
     for (Halfedge e : edges) {
       const int forwardEdge = facePtrR[faceLeft]++;
@@ -293,7 +283,8 @@ void AppendPartialEdges(Manifold::Impl &outR, VecDH<char> &wholeHalfedgeP,
 void AppendNewEdges(
     Manifold::Impl &outR, VecDH<int> &facePtrR,
     std::map<std::pair<int, int>, std::vector<EdgePos>> &edgesNew,
-    VecDH<Ref> &halfedgeRef, const VecDH<int> &facePQ2R, const int numFaceP) {
+    VecDH<TriRef> &halfedgeRef, const VecDH<int> &facePQ2R,
+    const int numFaceP) {
   // Pair up each edge's verts and distribute to faces based on indices in key.
   VecDH<Halfedge> &halfedgeR = outR.halfedge_;
   VecDH<glm::vec3> &vertPosR = outR.vertPos_;
@@ -322,8 +313,8 @@ void AppendNewEdges(
     // add halfedges to result
     const int faceLeft = facePQ2R[faceP];
     const int faceRight = facePQ2R[numFaceP + faceQ];
-    const Ref forwardRef = {0, faceP, -4};
-    const Ref backwardRef = {1, faceQ, -4};
+    const TriRef forwardRef = {0, -1, faceP};
+    const TriRef backwardRef = {1, -1, faceQ};
     for (Halfedge e : edges) {
       const int forwardEdge = facePtrR[faceLeft]++;
       const int backwardEdge = facePtrR[faceRight]++;
@@ -344,7 +335,7 @@ void AppendNewEdges(
 
 struct DuplicateHalfedges {
   Halfedge *halfedgesR;
-  Ref *halfedgeRef;
+  TriRef *halfedgeRef;
   int *facePtr;
   const Halfedge *halfedgesP;
   const int *i03;
@@ -374,11 +365,8 @@ struct DuplicateHalfedges {
     // Negative inclusion means the halfedges are reversed, which means our
     // reference is now to the endVert instead of the startVert, which is one
     // position advanced CCW.
-    const Ref forwardRef = {forward ? 0 : 1, faceLeftP,
-                            (edgeP + (inclusion < 0 ? 1 : 0)) % 3};
-    const Ref backwardRef = {
-        forward ? 0 : 1, faceRightP,
-        (halfedge.pairedHalfedge + (inclusion < 0 ? 1 : 0)) % 3};
+    const TriRef forwardRef = {forward ? 0 : 1, -1, faceLeftP};
+    const TriRef backwardRef = {forward ? 0 : 1, -1, faceRightP};
 
     for (int i = 0; i < glm::abs(inclusion); ++i) {
       int forwardEdge = AtomicAdd(facePtr[halfedge.face], 1);
@@ -398,7 +386,7 @@ struct DuplicateHalfedges {
 };
 
 void AppendWholeEdges(Manifold::Impl &outR, VecDH<int> &facePtrR,
-                      VecDH<Ref> &halfedgeRef, const Manifold::Impl &inP,
+                      VecDH<TriRef> &halfedgeRef, const Manifold::Impl &inP,
                       const VecDH<char> wholeHalfedgeP, const VecDH<int> &i03,
                       const VecDH<int> &vP2R, const int *faceP2R, bool forward,
                       ExecutionPolicy policy) {
@@ -410,266 +398,87 @@ void AppendWholeEdges(Manifold::Impl &outR, VecDH<int> &facePtrR,
                                  i03.cptrD(), vP2R.cptrD(), faceP2R, forward}));
 }
 
-struct PropertiesIncluded {
-  int *vPropKeepP;
-  int *vPropKeepQ;
-
-  const glm::ivec3 *triPropP;
-  const glm::ivec3 *triPropQ;
-  const glm::vec3 *vertPosR;
-  const glm::vec3 *vertPosP;
-  const glm::vec3 *vertPosQ;
-  const Halfedge *halfedgeP;
-  const Halfedge *halfedgeQ;
-  const int firstNewVert;
-  const float precision;
-
-  __host__ __device__ void operator()(thrust::tuple<Ref, Halfedge> in) {
-    const Ref halfedgeRef = thrust::get<0>(in);
-    const Halfedge halfedgeR = thrust::get<1>(in);
-    int *vPropKeep = halfedgeRef.PQ == 0 ? vPropKeepP : vPropKeepQ;
-
-    const int tri = halfedgeRef.tri;
-    const glm::vec3 *vertPos = halfedgeRef.PQ == 0 ? vertPosP : vertPosQ;
-    const Halfedge *halfedge = halfedgeRef.PQ == 0 ? halfedgeP : halfedgeQ;
-    const glm::ivec3 triProp =
-        halfedgeRef.PQ == 0 ? triPropP[tri] : triPropQ[tri];
-
-    if (halfedgeR.startVert < firstNewVert) {  // retained verts
-      const int prop = triProp[halfedgeRef.vert];
-      vPropKeep[prop] = 1;
-    } else {  // retain vert that would otherwise be duplicated
-      for (int i : {0, 1, 2}) {
-        const int prop = triProp[i];
-        const glm::vec3 delta = vertPosR[halfedgeR.startVert] -
-                                vertPos[halfedge[3 * tri + i].startVert];
-        if (glm::dot(delta, delta) < precision * precision) {
-          vPropKeep[prop] = 1;
-          return;
-        }
-      }
-    }
-  }
-};
-
-struct CreateBarycentric {
-  TriRef *faceRef;
-
-  float *properties;
-  int *propIdx;
-  int *newVert2propP;
-  int *newVert2propQ;
-
-  const int offsetQ;
-  const int firstNewVert;
-  const glm::vec3 *vertPosR;
-  const glm::vec3 *vertPosP;
-  const glm::vec3 *vertPosQ;
-  const Halfedge *halfedgeP;
-  const Halfedge *halfedgeQ;
+struct MapTriRef {
   const TriRef *triRefP;
   const TriRef *triRefQ;
-  const bool invertQ;
-  const float precision;
+  const int offsetQ;
 
-  const Ref *halfedgeRef;
-  const int numPropR;
-  const int numPropP;
-  const int numPropQ;
-  const int *vPropP2R;
-  const int *vPropQ2R;
-  const glm::ivec3 *triPropP;
-  const glm::ivec3 *triPropQ;
-  const float *propP;
-  const float *propQ;
-
-  __host__ __device__ void operator()(
-      thrust::tuple<int &, Ref, Halfedge> inOut) {
-    int &halfedgeProp = thrust::get<0>(inOut);
-    const Ref thisRef = thrust::get<1>(inOut);
-    const Halfedge halfedgeR = thrust::get<2>(inOut);
-
-    const int tri = thisRef.tri;
-    const TriRef oldRef = thisRef.PQ == 0 ? triRefP[tri] : triRefQ[tri];
-
-    const int *vProp2R = thisRef.PQ == 0 ? vPropP2R : vPropQ2R;
-    const glm::ivec3 *triProp = thisRef.PQ == 0 ? triPropP : triPropQ;
-    const float *prop = thisRef.PQ == 0 ? propP : propQ;
-    const int numProp = thisRef.PQ == 0 ? numPropP : numPropQ;
-
-    faceRef[halfedgeR.face] = oldRef;
-
-    if (thisRef.PQ == 1) {
-      // Mark the meshID as coming from Q
-      faceRef[halfedgeR.face].meshID += offsetQ;
-    }
-
-    if (halfedgeR.startVert < firstNewVert) {  // retained vert
-      if (numProp > 0) {
-        const int oldProp = triProp[thisRef.tri][thisRef.vert];
-        halfedgeProp = vProp2R[oldProp];
-        for (int i = 0; i < numProp; ++i) {
-          properties[numPropR * halfedgeProp + i] = prop[numProp * oldProp + i];
-        }
-      }
-    } else {  // new vert
-      const glm::vec3 *vertPos = thisRef.PQ == 0 ? vertPosP : vertPosQ;
-      const Halfedge *halfedge = thisRef.PQ == 0 ? halfedgeP : halfedgeQ;
-
-      glm::mat3 triPos;
-      for (int i : {0, 1, 2})
-        triPos[i] = vertPos[halfedge[3 * tri + i].startVert];
-
-      const glm::vec3 uvw =
-          GetBarycentric(vertPosR[halfedgeR.startVert], triPos, precision);
-
-      if (numProp > 0) {
-        for (int i : {0, 1, 2}) {
-          // Don't make duplicate property verts.
-          const int olProp = triProp[tri][i];
-          const glm::vec3 delta = vertPosR[halfedgeR.startVert] - triPos[i];
-          if (glm::dot(delta, delta) < precision * precision) {
-            halfedgeProp = vProp2R[olProp];
-            for (int i = 0; i < numProp; ++i) {
-              properties[numPropR * halfedgeProp + i] =
-                  prop[numProp * olProp + i];
-            }
-            return;
-          }
-        }
-
-        const int oldProp = triProp[thisRef.tri][thisRef.vert];
-        const Ref pairRef = halfedgeRef[halfedgeR.pairedHalfedge];
-        // Add a vert only if the meshes don't match or if there is an existing
-        // property discontinuity. triProp is only valid if the meshes match.
-        // The mesh might be inverted, so check both possible edge pairings.
-        if (thisRef.PQ != pairRef.PQ ||
-            ((oldProp != triProp[pairRef.tri][Next3(pairRef.vert)] ||
-              triProp[pairRef.tri][pairRef.vert] !=
-                  triProp[thisRef.tri][Next3(thisRef.vert)]) &&
-             (oldProp != triProp[pairRef.tri][Prev3(pairRef.vert)] ||
-              triProp[pairRef.tri][pairRef.vert] !=
-                  triProp[thisRef.tri][Prev3(thisRef.vert)]))) {
-          halfedgeProp = AtomicAdd(*propIdx, 1);
-          // Record the vert2prop relationship in case any are shared (did not
-          // enter this branch).
-          int *newVert2prop = thisRef.PQ == 0 ? newVert2propP : newVert2propQ;
-          newVert2prop[halfedgeR.startVert - firstNewVert] = halfedgeProp;
-          // barycentric interpolation
-          for (int p = 0; p < numProp; ++p) {
-            glm::vec3 oldProps;
-            for (const int i : {0, 1, 2})
-              oldProps[i] = prop[numProp * triProp[thisRef.tri][i] + p];
-            properties[numPropR * halfedgeProp + p] = glm::dot(uvw, oldProps);
-          }
-        }
-      }
-    }
+  __host__ __device__ void operator()(TriRef &triRef) {
+    const int tri = triRef.tri;
+    const bool PQ = triRef.meshID == 0;
+    triRef = PQ ? triRefP[tri] : triRefQ[tri];
+    if (!PQ) triRef.meshID += offsetQ;
   }
 };
 
-struct SetSharedProperties {
-  const int *newVert2propP;
-  const int *newVert2propQ;
-  const int firstNewVert;
+VecDH<TriRef> UpdateReference(Manifold::Impl &outR, const Manifold::Impl &inP,
+                              const Manifold::Impl &inQ,
+                              ExecutionPolicy policy) {
+  VecDH<TriRef> refPQ = outR.meshRelation_.triRef;
+  const int offsetQ = Manifold::Impl::meshIDCounter_;
+  for_each_n(policy, outR.meshRelation_.triRef.begin(), outR.NumTri(),
+             MapTriRef({inP.meshRelation_.triRef.cptrD(),
+                        inQ.meshRelation_.triRef.cptrD(), offsetQ}));
+  return refPQ;
+}
 
-  __host__ __device__ void operator()(
-      thrust::tuple<int &, Ref, Halfedge> inOut) {
-    int &halfedgeProp = thrust::get<0>(inOut);
-    const Ref halfedgeRef = thrust::get<1>(inOut);
-    const Halfedge halfedgeR = thrust::get<2>(inOut);
-    if (halfedgeProp >= 0) return;
-
-    const int *newVert2prop =
-        halfedgeRef.PQ == 0 ? newVert2propP : newVert2propQ;
-    halfedgeProp = newVert2prop[halfedgeR.startVert - firstNewVert];
-  }
-};
-
-std::tuple<VecDH<TriRef>, VecDH<int>> CalculateMeshRelation(
-    Manifold::Impl &outR, const VecDH<Ref> &halfedgeRef,
-    const Manifold::Impl &inP, const Manifold::Impl &inQ, int firstNewVert,
-    int numFaceR, bool invertQ, ExecutionPolicy policy) {
+void CreateProperties(Manifold::Impl &outR, const VecDH<TriRef> &refPQ,
+                      const Manifold::Impl &inP, const Manifold::Impl &inQ) {
   const int numPropP = inP.NumProp();
   const int numPropQ = inQ.NumProp();
-  const int numPropR = glm::max(numPropP, numPropQ);
-  const int numNewVerts = outR.NumVert() - firstNewVert;
-  outR.meshRelation_.numProp = numPropR;
-  VecDH<int> vPropP2R;
-  VecDH<int> vPropQ2R;
-  VecDH<int> propIdx(1);
+  const int numProp = glm::max(numPropP, numPropQ);
+  outR.meshRelation_.numProp = numProp;
+  if (numProp == 0) return;
 
-  if (numPropR > 0) {
-    VecDH<int> vPropKeepP(inP.NumPropVert(), 0);
-    VecDH<int> vPropKeepQ(inQ.NumPropVert(), 0);
-    for_each_n(
-        policy, zip(halfedgeRef.cbegin(), outR.halfedge_.cbegin()),
-        halfedgeRef.size(),
-        PropertiesIncluded(
-            {vPropKeepP.ptrD(), vPropKeepQ.ptrD(),
-             inP.meshRelation_.triProperties.cptrD(),
-             inQ.meshRelation_.triProperties.cptrD(), outR.vertPos_.cptrD(),
-             inP.vertPos_.cptrD(), inQ.vertPos_.cptrD(), inP.halfedge_.cptrD(),
-             inQ.halfedge_.cptrD(), firstNewVert, outR.precision_}));
-    vPropP2R.resize(vPropKeepP.size());
-    vPropQ2R.resize(vPropKeepQ.size());
-    exclusive_scan(policy, vPropKeepP.begin(), vPropKeepP.end(),
-                   vPropP2R.begin(), 0);
-    exclusive_scan(policy, vPropKeepQ.begin(), vPropKeepQ.end(),
-                   vPropQ2R.begin(), vPropP2R.back() + vPropKeepP.back());
-    const int numRetainedProp = vPropQ2R.back() + vPropKeepQ.back();
-    outR.meshRelation_.properties.resize(
-        (numRetainedProp + 3 * numNewVerts) * numPropR, NAN);
-    propIdx[0] = numRetainedProp;
+  const int numTri = outR.NumTri();
+  outR.meshRelation_.triProperties.resize(numTri);
+
+  std::map<std::tuple<int, int>, int> propIdx;
+  int idx = 0;
+
+  for (int tri = 0; tri < numTri; ++tri) {
+    // Skip collapsed triangles
+    if (outR.halfedge_[3 * tri].startVert < 0) continue;
+
+    const int triPQ = refPQ[tri].tri;
+    const bool PQ = refPQ[tri].meshID == 0;
+    const auto &vertPos = PQ ? inP.vertPos_ : inQ.vertPos_;
+    const auto &halfedge = PQ ? inP.halfedge_ : inQ.halfedge_;
+    const auto &properties =
+        PQ ? inP.meshRelation_.properties : inQ.meshRelation_.properties;
+    const auto &triProp = PQ ? inP.meshRelation_.triProperties[triPQ]
+                             : inQ.meshRelation_.triProperties[triPQ];
+
+    glm::mat3 triPos;
+    for (const int j : {0, 1, 2})
+      triPos[j] = vertPos[halfedge[3 * triPQ + j].startVert];
+
+    for (const int i : {0, 1, 2}) {
+      const TriRef triRef = outR.meshRelation_.triRef[tri];
+      const int vert = outR.halfedge_[3 * tri + i].startVert;
+      // TODO: This isn't enough - different triangles pointing to the same vert
+      // for the same meshID may have different incoming propVerts.
+      const auto key = std::make_tuple(triRef.meshID, vert);
+
+      const auto it = propIdx.find(key);
+      if (it != propIdx.end()) {
+        outR.meshRelation_.triProperties[tri][i] = it->second;
+        continue;
+      }
+      outR.meshRelation_.triProperties[tri][i] = idx;
+      propIdx.insert({key, idx++});
+
+      const glm::vec3 uvw =
+          GetBarycentric(outR.vertPos_[vert], triPos, outR.precision_);
+
+      for (int p = 0; p < numProp; ++p) {
+        glm::vec3 oldProps;
+        for (const int j : {0, 1, 2})
+          oldProps[j] = properties[numProp * triProp[j] + p];
+        outR.meshRelation_.properties.push_back(glm::dot(uvw, oldProps));
+      }
+    }
   }
-
-  VecDH<TriRef> faceRef(numFaceR);
-  VecDH<int> halfedgeProp(halfedgeRef.size(), -1);
-  VecDH<int> newVert2propP(numNewVerts, -1);
-  VecDH<int> newVert2propQ(numNewVerts, -1);
-
-  const int offsetQ = Manifold::Impl::meshIDCounter_;
-  for_each_n(
-      policy,
-      zip(halfedgeProp.begin(), halfedgeRef.cbegin(), outR.halfedge_.cbegin()),
-      halfedgeRef.size(),
-      CreateBarycentric({faceRef.ptrD(),
-                         outR.meshRelation_.properties.ptrD(),
-                         propIdx.ptrD(),
-                         newVert2propP.ptrD(),
-                         newVert2propQ.ptrD(),
-                         offsetQ,
-                         firstNewVert,
-                         outR.vertPos_.cptrD(),
-                         inP.vertPos_.cptrD(),
-                         inQ.vertPos_.cptrD(),
-                         inP.halfedge_.cptrD(),
-                         inQ.halfedge_.cptrD(),
-                         inP.meshRelation_.triRef.cptrD(),
-                         inQ.meshRelation_.triRef.cptrD(),
-                         invertQ,
-                         outR.precision_,
-                         halfedgeRef.cptrD(),
-                         numPropR,
-                         numPropP,
-                         numPropQ,
-                         vPropP2R.cptrD(),
-                         vPropQ2R.cptrD(),
-                         inP.meshRelation_.triProperties.cptrD(),
-                         inQ.meshRelation_.triProperties.cptrD(),
-                         inP.meshRelation_.properties.cptrD(),
-                         inQ.meshRelation_.properties.cptrD()}));
-  if (numPropR > 0) {
-    outR.meshRelation_.properties.resize(numPropR * propIdx[0]);
-    for_each_n(policy,
-               zip(halfedgeProp.begin(), halfedgeRef.cbegin(),
-                   outR.halfedge_.cbegin()),
-               halfedgeProp.size(),
-               SetSharedProperties({newVert2propP.cptrD(),
-                                    newVert2propQ.cptrD(), firstNewVert}));
-  }
-
-  return std::make_tuple(faceRef, halfedgeProp);
 }
 }  // namespace
 
@@ -794,7 +603,7 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
   VecDH<char> wholeHalfedgeQ(inQ_.halfedge_.size(), true);
   // The halfedgeRef contains the data that will become triRef once the faces
   // are triangulated.
-  VecDH<Ref> halfedgeRef(2 * outR.NumEdge());
+  VecDH<TriRef> halfedgeRef(2 * outR.NumEdge());
 
   AppendPartialEdges(outR, wholeHalfedgeP, facePtrR, edgesP, halfedgeRef, inP_,
                      i03, vP2R, facePQ2R.begin(), true);
@@ -809,11 +618,6 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
   AppendWholeEdges(outR, facePtrR, halfedgeRef, inQ_, wholeHalfedgeQ, i30, vQ2R,
                    facePQ2R.cptrD() + inP_.NumTri(), false, policy_);
 
-  VecDH<TriRef> faceRef;
-  VecDH<int> halfedgeProp;
-  std::tie(faceRef, halfedgeProp) = CalculateMeshRelation(
-      outR, halfedgeRef, inP_, inQ_, nPv + nQv, numFaceR, invertQ, policy_);
-
 #ifdef MANIFOLD_DEBUG
   assemble.Stop();
   Timer triangulate;
@@ -825,7 +629,7 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
   if (ManifoldParams().intermediateChecks)
     ASSERT(outR.IsManifold(), logicErr, "polygon mesh is not manifold!");
 
-  outR.Face2Tri(faceEdge, faceRef, halfedgeProp);
+  outR.Face2Tri(faceEdge, halfedgeRef);
 
 #ifdef MANIFOLD_DEBUG
   triangulate.Stop();
@@ -836,7 +640,11 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
   if (ManifoldParams().intermediateChecks)
     ASSERT(outR.IsManifold(), logicErr, "triangulated mesh is not manifold!");
 
+  VecDH<TriRef> refPQ = UpdateReference(outR, inP_, inQ_, policy_);
+
   outR.SimplifyTopology();
+
+  CreateProperties(outR, refPQ, inP_, inQ_);
 
   if (ManifoldParams().intermediateChecks)
     ASSERT(outR.Is2Manifold(), logicErr, "simplified mesh is not 2-manifold!");
