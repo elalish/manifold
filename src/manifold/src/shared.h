@@ -85,15 +85,30 @@ __host__ __device__ inline glm::vec3 GetBarycentric(const glm::vec3& v,
   const float area2 = glm::dot(crossP, crossP);
   const float tol2 = precision * precision;
   const float vol = glm::dot(crossP, v - triPos[2]);
-  if (vol * vol > area2 * tol2) return glm::vec3(NAN);
+  if (vol * vol > area2 * tol2) {
+    // The point v is not coplanar with triangle triPos.
+    return glm::vec3(NAN);
+  }
+
+  glm::vec3 uvw(0);
+  for (const int i : {0, 1, 2}) {
+    const glm::vec3 dv = v - triPos[i];
+    if (glm::dot(dv, dv) < tol2) {
+      // Return exactly equal if within tolerance of vert.
+      uvw[i] = 1;
+      return uvw;
+    }
+  }
 
   if (d2[longSide] < tol2) {  // point
-    return glm::vec3(1, 0, 0);
+    return glm::vec3(NAN);
   } else if (area2 > d2[longSide] * tol2) {  // triangle
-    glm::vec3 uvw(0);
     for (const int i : {0, 1, 2}) {
       const int j = Next3(i);
-      uvw[i] = glm::dot(glm::cross(edges[i], v - triPos[j]), crossP);
+      const glm::vec3 crossPv = glm::cross(edges[i], v - triPos[j]);
+      const float area2v = glm::dot(crossPv, crossPv);
+      // Return exactly equal if within tolerance of edge.
+      uvw[i] = area2v < d2[i] * tol2 ? 0 : glm::dot(crossPv, crossP);
     }
     uvw /= (uvw[0] + uvw[1] + uvw[2]);
     return uvw;
@@ -101,7 +116,6 @@ __host__ __device__ inline glm::vec3 GetBarycentric(const glm::vec3& v,
     const int nextV = Next3(longSide);
     const float alpha =
         glm::dot(v - triPos[nextV], edges[longSide]) / d2[longSide];
-    glm::vec3 uvw(0);
     uvw[longSide] = 0;
     uvw[nextV] = 1 - alpha;
     const int lastV = Next3(nextV);

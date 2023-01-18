@@ -422,8 +422,40 @@ VecDH<TriRef> UpdateReference(Manifold::Impl &outR, const Manifold::Impl &inP,
   return refPQ;
 }
 
+struct Barycentric {
+  glm::vec3 *uvw;
+  const glm::vec3 *vertPosP;
+  const glm::vec3 *vertPosQ;
+  const glm::vec3 *vertPosR;
+  const Halfedge *halfedgeP;
+  const Halfedge *halfedgeQ;
+  const Halfedge *halfedgeR;
+  const float precision;
+
+  __host__ __device__ void operator()(thrust::tuple<int, TriRef> in) {
+    const int tri = thrust::get<0>(in);
+    const TriRef refPQ = thrust::get<1>(in);
+    if (halfedgeR[3 * tri].startVert < 0) return;
+
+    const int triPQ = refPQ.tri;
+    const bool PQ = refPQ.meshID == 0;
+    const auto &vertPos = PQ ? vertPosP : vertPosQ;
+    const auto &halfedge = PQ ? halfedgeP : halfedgeQ;
+
+    glm::mat3 triPos;
+    for (const int j : {0, 1, 2})
+      triPos[j] = vertPos[halfedge[3 * triPQ + j].startVert];
+
+    for (const int i : {0, 1, 2}) {
+      const int vert = halfedgeR[3 * tri + i].startVert;
+      uvw[3 * tri + i] = GetBarycentric(vertPosR[vert], triPos, 2 * precision);
+    }
+  }
+};
+
 void CreateProperties(Manifold::Impl &outR, const VecDH<TriRef> &refPQ,
-                      const Manifold::Impl &inP, const Manifold::Impl &inQ) {
+                      const Manifold::Impl &inP, const Manifold::Impl &inQ,
+                      ExecutionPolicy policy) {
   const int numPropP = inP.NumProp();
   const int numPropQ = inQ.NumProp();
   const int numProp = glm::max(numPropP, numPropQ);
@@ -433,7 +465,14 @@ void CreateProperties(Manifold::Impl &outR, const VecDH<TriRef> &refPQ,
   const int numTri = outR.NumTri();
   outR.meshRelation_.triProperties.resize(numTri);
 
-  std::map<std::tuple<int, int>, int> propIdx;
+  VecDH<glm::vec3> bary(outR.halfedge_.size());
+  for_each_n(policy, zip(countAt(0), refPQ.cbegin()), numTri,
+             Barycentric({bary.ptrD(), inP.vertPos_.cptrD(),
+                          inQ.vertPos_.cptrD(), outR.vertPos_.cptrD(),
+                          inP.halfedge_.cptrD(), inQ.halfedge_.cptrD(),
+                          outR.halfedge_.cptrD(), outR.precision_}));
+
+  std::map<std::tuple<int, int, int, int>, int> propIdx;
   int idx = 0;
 
   for (int tri = 0; tri < numTri; ++tri) {
@@ -442,23 +481,33 @@ void CreateProperties(Manifold::Impl &outR, const VecDH<TriRef> &refPQ,
 
     const int triPQ = refPQ[tri].tri;
     const bool PQ = refPQ[tri].meshID == 0;
-    const auto &vertPos = PQ ? inP.vertPos_ : inQ.vertPos_;
-    const auto &halfedge = PQ ? inP.halfedge_ : inQ.halfedge_;
     const auto &properties =
         PQ ? inP.meshRelation_.properties : inQ.meshRelation_.properties;
     const auto &triProp = PQ ? inP.meshRelation_.triProperties[triPQ]
                              : inQ.meshRelation_.triProperties[triPQ];
 
-    glm::mat3 triPos;
-    for (const int j : {0, 1, 2})
-      triPos[j] = vertPos[halfedge[3 * triPQ + j].startVert];
-
     for (const int i : {0, 1, 2}) {
-      const TriRef triRef = outR.meshRelation_.triRef[tri];
       const int vert = outR.halfedge_[3 * tri + i].startVert;
-      // TODO: This isn't enough - different triangles pointing to the same vert
-      // for the same meshID may have different incoming propVerts.
-      const auto key = std::make_tuple(triRef.meshID, vert);
+      const glm::vec3 uvw = bary[3 * tri + i];
+
+      auto key = std::make_tuple(PQ, vert, -1, -1);
+      int edge = -1;
+      for (const int j : {0, 1, 2}) {
+        if (uvw[j] == 1) {
+          // On a retained vert, the propVert must also match
+          std::get<2>(key) = triProp[j];
+          edge = -1;
+          break;
+        }
+        if (uvw[j] == 0) edge = j;
+      }
+      if (edge >= 0) {
+        // On an edge, both propVerts must match
+        const int p0 = triProp[Next3(edge)];
+        const int p1 = triProp[Prev3(edge)];
+        std::get<2>(key) = glm::min(p0, p1);
+        std::get<3>(key) = glm::max(p0, p1);
+      }
 
       const auto it = propIdx.find(key);
       if (it != propIdx.end()) {
@@ -467,9 +516,6 @@ void CreateProperties(Manifold::Impl &outR, const VecDH<TriRef> &refPQ,
       }
       outR.meshRelation_.triProperties[tri][i] = idx;
       propIdx.insert({key, idx++});
-
-      const glm::vec3 uvw =
-          GetBarycentric(outR.vertPos_[vert], triPos, outR.precision_);
 
       for (int p = 0; p < numProp; ++p) {
         glm::vec3 oldProps;
@@ -644,7 +690,7 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
 
   outR.SimplifyTopology();
 
-  CreateProperties(outR, refPQ, inP_, inQ_);
+  CreateProperties(outR, refPQ, inP_, inQ_, policy_);
 
   if (ManifoldParams().intermediateChecks)
     ASSERT(outR.Is2Manifold(), logicErr, "simplified mesh is not 2-manifold!");
