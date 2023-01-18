@@ -57,7 +57,6 @@ typedef struct ManifoldTriRef {
   int mesh_id;
   int original_id;
   int tri;
-  ManifoldIVec3 vert_bary;
 } ManifoldTriRef;
 
 typedef struct ManifoldCurvatureBounds {

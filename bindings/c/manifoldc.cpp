@@ -459,36 +459,19 @@ ManifoldMeshRelation *manifold_get_mesh_relation(void *mem,
   return to_c(new (mem) MeshRelation(relation));
 }
 
-size_t manifold_mesh_relation_barycentric_length(ManifoldMeshRelation *m) {
-  return from_c(m)->barycentric.size();
-}
-
-ManifoldVec3 *manifold_mesh_relation_barycentric(void *mem,
-                                                 ManifoldMeshRelation *m) {
-  auto barycentric = from_c(m)->barycentric;
-  auto len = barycentric.size();
-  ManifoldVec3 *vs = reinterpret_cast<ManifoldVec3 *>(mem);
-  for (int i = 0; i < len; ++i) {
-    vs[i] = {barycentric[i].x, barycentric[i].y, barycentric[i].z};
-  }
-  return vs;
-}
-
-size_t manifold_mesh_relation_tri_bary_length(ManifoldMeshRelation *m) {
+size_t manifold_mesh_relation_tri_ref_length(ManifoldMeshRelation *m) {
   return from_c(m)->triRef.size();
 }
 
-ManifoldTriRef *manifold_mesh_relation_tri_bary(void *mem,
-                                                ManifoldMeshRelation *m) {
-  auto tri_bary = from_c(m)->triRef;
-  auto len = tri_bary.size();
-  ManifoldTriRef *brs = reinterpret_cast<ManifoldTriRef *>(mem);
+ManifoldTriRef *manifold_mesh_relation_tri_ref(void *mem,
+                                               ManifoldMeshRelation *m) {
+  auto tri_ref = from_c(m)->triRef;
+  auto len = tri_ref.size();
+  ManifoldTriRef *ts = reinterpret_cast<ManifoldTriRef *>(mem);
   for (int i = 0; i < len; ++i) {
-    auto tb = tri_bary[i];
-    auto vb = tb.vertBary;
-    brs[i] = {tb.meshID, tb.originalID, tb.tri, {vb.x, vb.y, vb.z}};
+    ts[i] = {tri_ref[i].meshID, tri_ref[i].originalID, tri_ref[i].tri};
   }
-  return brs;
+  return ts;
 }
 
 int manifold_is_empty(ManifoldManifold *m) { return from_c(m)->IsEmpty(); }

@@ -131,12 +131,9 @@ int manifold_original_id(ManifoldManifold *m);
 // Mesh Relation
 ManifoldMeshRelation *manifold_get_mesh_relation(void *mem,
                                                  ManifoldManifold *m);
-size_t manifold_mesh_relation_barycentric_length(ManifoldMeshRelation *m);
-ManifoldVec3 *manifold_mesh_relation_barycentric(void *mem,
-                                                 ManifoldMeshRelation *m);
-size_t manifold_mesh_relation_tri_bary_length(ManifoldMeshRelation *m);
-ManifoldTriRef *manifold_mesh_relation_tri_bary(void *mem,
-                                                ManifoldMeshRelation *m);
+size_t manifold_mesh_relation_tri_ref_length(ManifoldMeshRelation *m);
+ManifoldTriRef *manifold_mesh_relation_tri_ref(void *mem,
+                                               ManifoldMeshRelation *m);
 
 // Bounding Box
 ManifoldBox *manifold_box(void *mem, float x1, float y1, float z1, float x2,
