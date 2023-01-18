@@ -84,11 +84,6 @@ __host__ __device__ inline glm::vec3 GetBarycentric(const glm::vec3& v,
   const glm::vec3 crossP = glm::cross(edges[0], edges[1]);
   const float area2 = glm::dot(crossP, crossP);
   const float tol2 = precision * precision;
-  const float vol = glm::dot(crossP, v - triPos[2]);
-  if (vol * vol > area2 * tol2) {
-    // The point v is not coplanar with triangle triPos.
-    return glm::vec3(1, 0, 0);
-  }
 
   glm::vec3 uvw(0);
   for (const int i : {0, 1, 2}) {

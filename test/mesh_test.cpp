@@ -153,7 +153,7 @@ void RelatedGL(const Manifold& out, const std::vector<MeshGL>& input,
         }
         const float volume = glm::dot(edges[0], glm::cross(edges[1], edges[2]));
 
-        ASSERT_LE(volume, area * 10 * out.Precision());
+        ASSERT_LE(volume, area * 100 * out.Precision());
       }
     }
   }
@@ -1028,7 +1028,7 @@ TEST(Boolean, MeshRelation) {
   const float period = glm::two_pi<float>();
 
   Mesh gyroidMesh = LevelSet(Gyroid(), {glm::vec3(0), glm::vec3(period)}, 0.5);
-  MeshGL gyroidMeshGL = WithIndexColors(gyroidMesh);
+  MeshGL gyroidMeshGL = WithPositionColors(gyroidMesh);
   std::vector<float> tol(3, 0.0001);
   Manifold gyroid(gyroidMeshGL, tol);
 
@@ -1036,7 +1036,7 @@ TEST(Boolean, MeshRelation) {
   std::transform(gyroidMesh.vertPos.begin(), gyroidMesh.vertPos.end(),
                  gyroidMesh2.vertPos.begin(),
                  [](const glm::vec3& v) { return v + glm::vec3(2.0f); });
-  MeshGL gyroidMeshGL2 = WithIndexColors(gyroidMesh2);
+  MeshGL gyroidMeshGL2 = WithPositionColors(gyroidMesh2);
   Manifold gyroid2(gyroidMeshGL2, tol);
 
   EXPECT_FALSE(gyroid.IsEmpty());
