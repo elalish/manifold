@@ -448,7 +448,7 @@ struct Barycentric {
 
     for (const int i : {0, 1, 2}) {
       const int vert = halfedgeR[3 * tri + i].startVert;
-      uvw[3 * tri + i] = GetBarycentric(vertPosR[vert], triPos, 2 * precision);
+      uvw[3 * tri + i] = GetBarycentric(vertPosR[vert], triPos, precision);
     }
   }
 };
