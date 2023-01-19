@@ -131,12 +131,9 @@ int manifold_original_id(ManifoldManifold *m);
 // Mesh Relation
 ManifoldMeshRelation *manifold_get_mesh_relation(void *mem,
                                                  ManifoldManifold *m);
-size_t manifold_mesh_relation_barycentric_length(ManifoldMeshRelation *m);
-ManifoldVec3 *manifold_mesh_relation_barycentric(void *mem,
-                                                 ManifoldMeshRelation *m);
-size_t manifold_mesh_relation_tri_bary_length(ManifoldMeshRelation *m);
-ManifoldTriRef *manifold_mesh_relation_tri_bary(void *mem,
-                                                ManifoldMeshRelation *m);
+size_t manifold_mesh_relation_tri_ref_length(ManifoldMeshRelation *m);
+ManifoldTriRef *manifold_mesh_relation_tri_ref(void *mem,
+                                               ManifoldMeshRelation *m);
 
 // Bounding Box
 ManifoldBox *manifold_box(void *mem, float x1, float y1, float z1, float x2,
@@ -180,13 +177,18 @@ ManifoldVec4 *manifold_mesh_halfedge_tangent(void *mem, ManifoldMesh *m);
 
 ManifoldMeshGL *manifold_get_meshgl(void *mem, ManifoldManifold *m);
 ManifoldMeshGL *manifold_meshgl_copy(void *mem, ManifoldMeshGL *m);
-size_t manifold_meshgl_vert_length(ManifoldMeshGL *m);
+int manifold_meshgl_num_prop(ManifoldMeshGL *m);
+int manifold_meshgl_num_vert(ManifoldMeshGL *m);
+int manifold_meshgl_num_tri(ManifoldMeshGL *m);
+size_t manifold_meshgl_vert_properties_length(ManifoldMeshGL *m);
 size_t manifold_meshgl_tri_length(ManifoldMeshGL *m);
-size_t manifold_meshgl_normal_length(ManifoldMeshGL *m);
+size_t manifold_meshgl_merge_length(ManifoldMeshGL *m);
 size_t manifold_meshgl_tangent_length(ManifoldMeshGL *m);
-float *manifold_meshgl_vert_pos(void *mem, ManifoldMeshGL *m);
+float *manifold_meshgl_vert_properties(void *mem, ManifoldMeshGL *m);
 uint32_t *manifold_meshgl_tri_verts(void *mem, ManifoldMeshGL *m);
 float *manifold_meshgl_vert_normal(void *mem, ManifoldMeshGL *m);
+int *manifold_meshgl_merge_from_vert(void *mem, ManifoldMeshGL *m);
+int *manifold_meshgl_merge_to_vert(void *mem, ManifoldMeshGL *m);
 float *manifold_meshgl_halfedge_tangent(void *mem, ManifoldMeshGL *m);
 
 // MeshIO / Export

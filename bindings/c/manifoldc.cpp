@@ -384,27 +384,31 @@ ManifoldMeshGL *manifold_meshgl_copy(void *mem, ManifoldMeshGL *m) {
   return to_c(new (mem) MeshGL(*from_c(m)));
 }
 
-size_t manifold_meshgl_vert_length(ManifoldMeshGL *m) {
-  return from_c(m)->vertPos.size();
+int manifold_meshgl_num_prop(ManifoldMeshGL *m) { return from_c(m)->numProp; }
+int manifold_meshgl_num_vert(ManifoldMeshGL *m) { return from_c(m)->NumVert(); }
+int manifold_meshgl_num_tri(ManifoldMeshGL *m) { return from_c(m)->NumTri(); }
+
+size_t manifold_meshgl_vert_properties_length(ManifoldMeshGL *m) {
+  return from_c(m)->vertProperties.size();
 }
 
 size_t manifold_meshgl_tri_length(ManifoldMeshGL *m) {
   return from_c(m)->triVerts.size();
 }
 
-size_t manifold_meshgl_normal_length(ManifoldMeshGL *m) {
-  return from_c(m)->vertNormal.size();
+size_t manifold_meshgl_merge_length(ManifoldMeshGL *m) {
+  return from_c(m)->mergeFromVert.size();
 }
 
 size_t manifold_meshgl_tangent_length(ManifoldMeshGL *m) {
   return from_c(m)->halfedgeTangent.size();
 }
 
-float *manifold_meshgl_vert_pos(void *mem, ManifoldMeshGL *m) {
-  auto vert_pos = from_c(m)->vertPos;
-  auto len = vert_pos.size();
+float *manifold_meshgl_vert_properties(void *mem, ManifoldMeshGL *m) {
+  auto vert_props = from_c(m)->vertProperties;
+  auto len = vert_props.size();
   float *vs = reinterpret_cast<float *>(mem);
-  memcpy(vs, vert_pos.data(), sizeof(float) * len);
+  memcpy(vs, vert_props.data(), sizeof(float) * len);
   return vs;
 }
 
@@ -416,12 +420,20 @@ uint32_t *manifold_meshgl_tri_verts(void *mem, ManifoldMeshGL *m) {
   return tris;
 }
 
-float *manifold_meshgl_vert_normal(void *mem, ManifoldMeshGL *m) {
-  auto vert_normal = from_c(m)->vertNormal;
-  auto len = vert_normal.size();
-  float *ns = reinterpret_cast<float *>(mem);
-  memcpy(ns, vert_normal.data(), sizeof(float) * len);
-  return ns;
+int *manifold_meshgl_merge_from_vert(void *mem, ManifoldMeshGL *m) {
+  auto merge = from_c(m)->mergeFromVert;
+  auto len = merge.size();
+  int *ms = reinterpret_cast<int *>(mem);
+  memcpy(ms, merge.data(), sizeof(int) * len);
+  return ms;
+}
+
+int *manifold_meshgl_merge_to_vert(void *mem, ManifoldMeshGL *m) {
+  auto merge = from_c(m)->mergeToVert;
+  auto len = merge.size();
+  int *ms = reinterpret_cast<int *>(mem);
+  memcpy(ms, merge.data(), sizeof(int) * len);
+  return ms;
 }
 
 float *manifold_meshgl_halfedge_tangent(void *mem, ManifoldMeshGL *m) {
@@ -447,36 +459,19 @@ ManifoldMeshRelation *manifold_get_mesh_relation(void *mem,
   return to_c(new (mem) MeshRelation(relation));
 }
 
-size_t manifold_mesh_relation_barycentric_length(ManifoldMeshRelation *m) {
-  return from_c(m)->barycentric.size();
-}
-
-ManifoldVec3 *manifold_mesh_relation_barycentric(void *mem,
-                                                 ManifoldMeshRelation *m) {
-  auto barycentric = from_c(m)->barycentric;
-  auto len = barycentric.size();
-  ManifoldVec3 *vs = reinterpret_cast<ManifoldVec3 *>(mem);
-  for (int i = 0; i < len; ++i) {
-    vs[i] = {barycentric[i].x, barycentric[i].y, barycentric[i].z};
-  }
-  return vs;
-}
-
-size_t manifold_mesh_relation_tri_bary_length(ManifoldMeshRelation *m) {
+size_t manifold_mesh_relation_tri_ref_length(ManifoldMeshRelation *m) {
   return from_c(m)->triRef.size();
 }
 
-ManifoldTriRef *manifold_mesh_relation_tri_bary(void *mem,
-                                                ManifoldMeshRelation *m) {
-  auto tri_bary = from_c(m)->triRef;
-  auto len = tri_bary.size();
-  ManifoldTriRef *brs = reinterpret_cast<ManifoldTriRef *>(mem);
+ManifoldTriRef *manifold_mesh_relation_tri_ref(void *mem,
+                                               ManifoldMeshRelation *m) {
+  auto tri_ref = from_c(m)->triRef;
+  auto len = tri_ref.size();
+  ManifoldTriRef *ts = reinterpret_cast<ManifoldTriRef *>(mem);
   for (int i = 0; i < len; ++i) {
-    auto tb = tri_bary[i];
-    auto vb = tb.vertBary;
-    brs[i] = {tb.meshID, tb.originalID, tb.tri, {vb.x, vb.y, vb.z}};
+    ts[i] = {tri_ref[i].meshID, tri_ref[i].originalID, tri_ref[i].tri};
   }
-  return brs;
+  return ts;
 }
 
 int manifold_is_empty(ManifoldManifold *m) { return from_c(m)->IsEmpty(); }
