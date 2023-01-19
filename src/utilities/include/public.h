@@ -186,11 +186,11 @@ struct MeshGL {
   std::vector<uint32_t> triVerts;
   /// A list of only the vertex indicies that need to be merged to reconstruct
   /// the manifold.
-  std::vector<int> mergeFromVert;
+  std::vector<uint32_t> mergeFromVert;
   // The same length as mergeFromVert, and the corresponding value contains the
   // vertex to merge with. It will have an identical position, but the other
   // properties may differ.
-  std::vector<int> mergeToVert;
+  std::vector<uint32_t> mergeToVert;
   /// Optional: The X-Y-Z-W weighted tangent vectors for smooth Refine(). If
   /// non-empty, must be exactly four times as long as Mesh.triVerts. Indexed
   /// as 4 * (3 * tri + i) + j, i < 3, j < 4, representing the tangent value

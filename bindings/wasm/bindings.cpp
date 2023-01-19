@@ -62,15 +62,20 @@ val GetMeshJS(const Manifold& manifold) {
   MeshGL mesh = manifold.GetMeshGL();
   val meshJS = val::object();
 
+  meshJS.set("numProp", mesh.numProp);
   meshJS.set("triVerts",
              val(typed_memory_view(mesh.triVerts.size(), mesh.triVerts.data()))
                  .call<val>("slice"));
-  meshJS.set("vertPos",
-             val(typed_memory_view(mesh.vertPos.size(), mesh.vertPos.data()))
+  meshJS.set("vertProperties",
+             val(typed_memory_view(mesh.vertProperties.size(),
+                                   mesh.vertProperties.data()))
                  .call<val>("slice"));
-  meshJS.set("vertNormal", val(typed_memory_view(mesh.vertNormal.size(),
-                                                 mesh.vertNormal.data()))
-                               .call<val>("slice"));
+  meshJS.set("mergeFromVert", val(typed_memory_view(mesh.mergeFromVert.size(),
+                                                    mesh.mergeFromVert.data()))
+                                  .call<val>("slice"));
+  meshJS.set("mergeToVert", val(typed_memory_view(mesh.mergeToVert.size(),
+                                                  mesh.mergeToVert.data()))
+                                .call<val>("slice"));
   meshJS.set("halfedgeTangent",
              val(typed_memory_view(mesh.halfedgeTangent.size(),
                                    mesh.halfedgeTangent.data()))
@@ -81,10 +86,17 @@ val GetMeshJS(const Manifold& manifold) {
 
 MeshGL MeshJS2GL(const val& mesh) {
   MeshGL out;
+  out.numProp = mesh["numProp"].as<int>();
   out.triVerts = convertJSArrayToNumberVector<uint32_t>(mesh["triVerts"]);
-  out.vertPos = convertJSArrayToNumberVector<float>(mesh["vertPos"]);
-  if (mesh["vertNormal"] != val::undefined()) {
-    out.vertNormal = convertJSArrayToNumberVector<float>(mesh["vertNormal"]);
+  out.vertProperties =
+      convertJSArrayToNumberVector<float>(mesh["vertProperties"]);
+  if (mesh["mergeFromVert"] != val::undefined()) {
+    out.mergeFromVert =
+        convertJSArrayToNumberVector<uint32_t>(mesh["mergeFromVert"]);
+  }
+  if (mesh["mergeToVert"] != val::undefined()) {
+    out.mergeToVert =
+        convertJSArrayToNumberVector<uint32_t>(mesh["mergeToVert"]);
   }
   if (mesh["halfedgeTangent"] != val::undefined()) {
     out.halfedgeTangent =
@@ -178,11 +190,9 @@ EMSCRIPTEN_BINDINGS(whatever) {
   value_object<TriRef>("baryRef")
       .field("meshID", &TriRef::meshID)
       .field("originalID", &TriRef::originalID)
-      .field("tri", &TriRef::tri)
-      .field("vertBary", &TriRef::vertBary);
+      .field("tri", &TriRef::tri);
 
   value_object<MeshRelation>("meshRelation")
-      .field("barycentric", &MeshRelation::barycentric)
       .field("triRef", &MeshRelation::triRef);
 
   value_object<Curvature>("curvature")

@@ -420,19 +420,19 @@ uint32_t *manifold_meshgl_tri_verts(void *mem, ManifoldMeshGL *m) {
   return tris;
 }
 
-int *manifold_meshgl_merge_from_vert(void *mem, ManifoldMeshGL *m) {
+uint32_t *manifold_meshgl_merge_from_vert(void *mem, ManifoldMeshGL *m) {
   auto merge = from_c(m)->mergeFromVert;
   auto len = merge.size();
-  int *ms = reinterpret_cast<int *>(mem);
-  memcpy(ms, merge.data(), sizeof(int) * len);
+  uint32_t *ms = reinterpret_cast<uint32_t *>(mem);
+  memcpy(ms, merge.data(), sizeof(uint32_t) * len);
   return ms;
 }
 
-int *manifold_meshgl_merge_to_vert(void *mem, ManifoldMeshGL *m) {
+uint32_t *manifold_meshgl_merge_to_vert(void *mem, ManifoldMeshGL *m) {
   auto merge = from_c(m)->mergeToVert;
   auto len = merge.size();
-  int *ms = reinterpret_cast<int *>(mem);
-  memcpy(ms, merge.data(), sizeof(int) * len);
+  uint32_t *ms = reinterpret_cast<uint32_t *>(mem);
+  memcpy(ms, merge.data(), sizeof(uint32_t) * len);
   return ms;
 }
 

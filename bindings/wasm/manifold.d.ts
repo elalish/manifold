@@ -33,8 +33,7 @@ type Properties = {
 type TriRef = {
   meshID: number,
   originalID: number,
-  tri: number,
-  vertBary: Vec3
+  tri: number
 };
 type Curvature = {
   maxMeanCurvature: number,
@@ -45,20 +44,21 @@ type Curvature = {
   vertGaussianCurvature: number[]
 };
 type MeshRelation = {
-  barycentric: Vec3[],
-  triRef: TriRef[],
+  triRef: TriRef[]
 };
 
 declare class Mesh {
-  vertPos: Float32Array;
+  numProp: number;
+  vertProperties: Float32Array;
   triVerts: Uint32Array;
-  vertNormal?: Float32Array;
+  mergeFromVert?: Uint32Array;
+  mergeToVert?: Uint32Array;
   halfedgeTangent?: Float32Array;
   get numTri(): number;
   get numVert(): number;
   verts(tri: number): Uint32Array<3>;
   position(vert: number): Float32Array<3>;
-  normal(vert: number): Float32Array<3>;
+  extras(vert: number): Float32Array;
   tangent(halfedge: number): Float32Array<4>;
 }
 

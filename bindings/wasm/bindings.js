@@ -123,14 +123,18 @@ Module.setup = function () {
 
   class Mesh {
     constructor({
+      numProp = 3,
       triVerts = new Uint32Array(),
-      vertPos = new Float32Array(),
-      vertNormal,
+      vertProperties = new Float32Array(),
+      mergeFromVert,
+      mergeToVert,
       halfedgeTangent
     } = {}) {
+      this.numProp = numProp;
       this.triVerts = triVerts;
-      this.vertPos = vertPos;
-      this.vertNormal = vertNormal;
+      this.vertProperties = vertProperties;
+      this.mergeFromVert = mergeFromVert;
+      this.mergeToVert = mergeToVert;
       this.halfedgeTangent = halfedgeTangent;
     }
 
@@ -139,7 +143,7 @@ Module.setup = function () {
     }
 
     get numVert() {
-      return this.vertPos.length / 3;
+      return this.vertProperties.length / this.numProp;
     }
 
     verts(tri) {
@@ -147,11 +151,11 @@ Module.setup = function () {
     }
 
     position(vert) {
-      return this.vertPos.subarray(3 * vert, 3 * (vert + 1));
+      return this.vertProperties.subarray(numProp * vert, numProp * vert + 3);
     }
 
-    normal(vert) {
-      return this.vertNormal.subarray(3 * vert, 3 * (vert + 1));
+    extras(vert) {
+      return this.vertProperties.subarray(numProp * vert + 3, numProp * (vert + 1));
     }
 
     tangent(halfedge) {
@@ -167,21 +171,15 @@ Module.setup = function () {
 
   Module.Manifold.prototype.getMeshRelation = function () {
     const result = this._getMeshRelation();
-    const oldBarycentric = result.barycentric;
     const oldTriBary = result.triRef;
-    const conversion1 = v => [v.x, v.y, v.z];
-    const conversion2 = v => [v[0], v[1], v[2]];
     const conversion3 = v => {
       return {
         meshID: v.meshID,
         originalID: v.originalID,
-        tri: v.tri,
-        vertBary: conversion2(v.vertBary)
+        tri: v.tri
       };
     };
-    result.barycentric = fromVec(oldBarycentric, conversion1);
     result.triRef = fromVec(oldTriBary, conversion3);
-    oldBarycentric.delete();
     oldTriBary.delete();
     return result;
   };
