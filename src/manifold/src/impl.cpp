@@ -389,7 +389,6 @@ std::atomic<int> Manifold::Impl::meshIDCounter_(1);
 Manifold::Impl::Impl(const MeshGL& meshGL,
                      const std::vector<float>& propertyTolerance) {
   Mesh mesh;
-  std::vector<glm::ivec3> triProperties(meshGL.NumTri());
   mesh.triVerts.resize(meshGL.NumTri());
 
   std::vector<int> prop2vert(meshGL.NumVert());
@@ -397,11 +396,19 @@ Manifold::Impl::Impl(const MeshGL& meshGL,
   for (int i = 0; i < meshGL.mergeFromVert.size(); ++i) {
     prop2vert[meshGL.mergeFromVert[i]] = meshGL.mergeToVert[i];
   }
-
   for (int i = 0; i < meshGL.NumTri(); ++i) {
     for (const int j : {0, 1, 2}) {
-      triProperties[i][j] = meshGL.triVerts[3 * i + j];
-      mesh.triVerts[i][j] = prop2vert[triProperties[i][j]];
+      mesh.triVerts[i][j] = prop2vert[meshGL.triVerts[3 * i + j]];
+    }
+  }
+
+  std::vector<glm::ivec3> triProperties;
+  if (meshGL.numProp > 3) {
+    triProperties.resize(meshGL.NumTri());
+    for (int i = 0; i < meshGL.NumTri(); ++i) {
+      for (const int j : {0, 1, 2}) {
+        triProperties[i][j] = meshGL.triVerts[3 * i + j];
+      }
     }
   }
 
