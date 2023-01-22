@@ -103,6 +103,16 @@ thrust::counting_iterator<T> countAt(T i) {
   return thrust::make_counting_iterator(i);
 }
 
+inline __host__ __device__ int Next3(int i) {
+  constexpr glm::ivec3 next3(1, 2, 0);
+  return next3[i];
+}
+
+inline __host__ __device__ int Prev3(int i) {
+  constexpr glm::ivec3 prev3(2, 0, 1);
+  return prev3[i];
+}
+
 template <typename T>
 __host__ __device__ T AtomicAdd(T& target, T add) {
 #ifdef __CUDA_ARCH__

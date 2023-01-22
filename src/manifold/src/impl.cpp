@@ -19,6 +19,7 @@
 #include <algorithm>
 #include <atomic>
 #include <map>
+#include <numeric>
 
 #include "graph.h"
 #include "hashtable.h"
@@ -91,11 +92,10 @@ struct TransformTangents {
 struct FlipTris {
   Halfedge* halfedge;
 
-  __host__ __device__ void operator()(thrust::tuple<BaryRef&, int> inOut) {
-    BaryRef& bary = thrust::get<0>(inOut);
+  __host__ __device__ void operator()(thrust::tuple<TriRef&, int> inOut) {
+    TriRef& bary = thrust::get<0>(inOut);
     const int tri = thrust::get<1>(inOut);
 
-    thrust::swap(bary.vertBary[0], bary.vertBary[2]);
     thrust::swap(halfedge[3 * tri], halfedge[3 * tri + 2]);
 
     for (const int i : {0, 1, 2}) {
@@ -201,25 +201,24 @@ struct ReindexTriVerts {
   }
 };
 
-struct InitializeBaryRef {
+struct InitializeTriRef {
   const int meshID;
   const Halfedge* halfedge;
 
-  __host__ __device__ void operator()(thrust::tuple<BaryRef&, int> inOut) {
-    BaryRef& baryRef = thrust::get<0>(inOut);
+  __host__ __device__ void operator()(thrust::tuple<TriRef&, int> inOut) {
+    TriRef& baryRef = thrust::get<0>(inOut);
     int tri = thrust::get<1>(inOut);
 
     baryRef.meshID = meshID;
     baryRef.originalID = meshID;
     baryRef.tri = tri;
-    baryRef.vertBary = {-3, -2, -1};
   }
 };
 
 struct MarkMeshID {
   HashTableD<uint32_t> table;
 
-  __host__ __device__ void operator()(BaryRef& ref) {
+  __host__ __device__ void operator()(TriRef& ref) {
     if (table.Full()) return;
     table.Insert(ref.meshID, 1);
   }
@@ -229,7 +228,7 @@ struct UpdateMeshID {
   const HashTableD<uint32_t> meshIDold2new;
   const int meshIDoffset;
 
-  __host__ __device__ void operator()(BaryRef& ref) {
+  __host__ __device__ void operator()(TriRef& ref) {
     ref.meshID = meshIDold2new[ref.meshID] + meshIDoffset;
   }
 };
@@ -255,9 +254,11 @@ struct CoplanarEdge {
   const float precision;
 
   __host__ __device__ void operator()(
-      thrust::tuple<thrust::pair<int, int>&, int> inOut) {
+      thrust::tuple<thrust::pair<int, int>&, thrust::pair<int, int>&, int>
+          inOut) {
     thrust::pair<int, int>& face2face = thrust::get<0>(inOut);
-    const int edgeIdx = thrust::get<1>(inOut);
+    thrust::pair<int, int>& vert2vert = thrust::get<1>(inOut);
+    const int edgeIdx = thrust::get<2>(inOut);
 
     const Halfedge edge = halfedge[edgeIdx];
     if (!edge.IsForward()) return;
@@ -268,6 +269,23 @@ struct CoplanarEdge {
     const int jointNum = edge.pairedHalfedge - 3 * pair.face;
     const int edgeNum = baseNum == 0 ? 2 : baseNum - 1;
     const int pairNum = jointNum == 0 ? 2 : jointNum - 1;
+
+    if (numProp > 0) {
+      const int prop0 = triProp[edge.face][baseNum];
+      const int prop1 = triProp[edge.face][edgeNum];
+      bool propEqual = true;
+      for (int p = 0; p < numProp; ++p) {
+        if (glm::abs(prop[numProp * prop0 + p] - prop[numProp * prop1 + p]) >
+            propTol[p]) {
+          propEqual = false;
+          break;
+        }
+      }
+      if (propEqual) {
+        vert2vert.first = prop0;
+        vert2vert.second = prop1;
+      }
+    }
 
     const glm::vec3 jointVec = vertPos[pair.startVert] - base;
     const glm::vec3 edgeVec =
@@ -281,6 +299,8 @@ struct CoplanarEdge {
     glm::vec3 normal = glm::cross(jointVec, edgeVec);
     const float area = glm::length(normal);
     const float areaPair = glm::length(glm::cross(pairVec, jointVec));
+    triArea[edge.face] = area;
+    triArea[pair.face] = areaPair;
     // Don't link degenerate triangles
     if (area < length * precision || areaPair < lengthPair * precision) return;
 
@@ -308,16 +328,14 @@ struct CoplanarEdge {
             pairVec + normal * scale * (pairProp - baseProp);
 
         glm::vec3 cross = glm::cross(iJointVec, iEdgeVec);
-        const float area = glm::max(
+        const float areaP = glm::max(
             glm::length(cross), glm::length(glm::cross(iPairVec, iJointVec)));
-        const float volume = glm::abs(glm::dot(cross, iPairVec));
+        const float volumeP = glm::abs(glm::dot(cross, iPairVec));
         // Only operate on consistent triangles
-        if (volume > area * precision) return;
+        if (volumeP > areaP * precision) return;
       }
     }
 
-    triArea[edge.face] = area;
-    triArea[pair.face] = areaPair;
     face2face.first = edge.face;
     face2face.second = pair.face;
   }
@@ -333,11 +351,89 @@ struct EdgeBox {
   }
 };
 
+int GetLabels(std::vector<int>& components,
+              const VecDH<thrust::pair<int, int>>& edges, int numNodes) {
+  Graph graph;
+  for (int i = 0; i < numNodes; ++i) {
+    graph.add_nodes(i);
+  }
+  for (int i = 0; i < edges.size(); ++i) {
+    const thrust::pair<int, int> edge = edges[i];
+    if (edge.first < 0) continue;
+    graph.add_edge(edge.first, edge.second);
+  }
+
+  return ConnectedComponents(components, graph);
+}
+
+void DedupePropVerts(manifold::VecDH<glm::ivec3>& triProp,
+                     const VecDH<thrust::pair<int, int>>& vert2vert) {
+  std::vector<int> vertLabels;
+  const int numLabels = GetLabels(vertLabels, vert2vert, vert2vert.size());
+
+  std::vector<int> label2vert(numLabels);
+  for (int v = 0; v < vert2vert.size(); ++v) {
+    label2vert[vertLabels[v]] = v;
+  }
+  for (int tri = 0; tri < triProp.size(); ++tri) {
+    for (int i : {0, 1, 2})
+      triProp[tri][i] = label2vert[vertLabels[triProp[tri][i]]];
+  }
+}
 }  // namespace
 
 namespace manifold {
 
 std::atomic<int> Manifold::Impl::meshIDCounter_(1);
+
+Manifold::Impl::Impl(const MeshGL& meshGL,
+                     const std::vector<float>& propertyTolerance) {
+  Mesh mesh;
+  mesh.triVerts.resize(meshGL.NumTri());
+
+  std::vector<int> prop2vert(meshGL.NumVert());
+  std::iota(prop2vert.begin(), prop2vert.end(), 0);
+  for (int i = 0; i < meshGL.mergeFromVert.size(); ++i) {
+    prop2vert[meshGL.mergeFromVert[i]] = meshGL.mergeToVert[i];
+  }
+  for (int i = 0; i < meshGL.NumTri(); ++i) {
+    for (const int j : {0, 1, 2}) {
+      mesh.triVerts[i][j] = prop2vert[meshGL.triVerts[3 * i + j]];
+    }
+  }
+
+  std::vector<glm::ivec3> triProperties;
+  if (meshGL.numProp > 3) {
+    triProperties.resize(meshGL.NumTri());
+    for (int i = 0; i < meshGL.NumTri(); ++i) {
+      for (const int j : {0, 1, 2}) {
+        triProperties[i][j] = meshGL.triVerts[3 * i + j];
+      }
+    }
+  }
+
+  const int numProp = meshGL.numProp - 3;
+  std::vector<float> properties(meshGL.NumVert() * numProp);
+  // This will have unreferenced duplicate positions that will be removed by
+  // Impl::RemoveUnreferencedVerts().
+  mesh.vertPos.resize(meshGL.NumVert());
+
+  for (int i = 0; i < meshGL.NumVert(); ++i) {
+    for (const int j : {0, 1, 2})
+      mesh.vertPos[i][j] = meshGL.vertProperties[meshGL.numProp * i + j];
+    for (int j = 0; j < numProp; ++j)
+      properties[i * numProp + j] =
+          meshGL.vertProperties[meshGL.numProp * i + 3 + j];
+  }
+
+  mesh.halfedgeTangent.resize(meshGL.halfedgeTangent.size() / 4);
+  for (int i = 0; i < mesh.halfedgeTangent.size(); ++i) {
+    for (const int j : {0, 1, 2, 3})
+      mesh.halfedgeTangent[i][j] = meshGL.halfedgeTangent[4 * i + j];
+  }
+
+  *this = Impl(mesh, triProperties, properties, propertyTolerance);
+}
 
 /**
  * Create a manifold from an input triangle Mesh. Will return an empty Manifold
@@ -452,8 +548,8 @@ void Manifold::Impl::ReinitializeReference(int meshID) {
   // instead of storing the meshID, we store 0 and set the mapping to
   // 0 -> meshID, because the meshID after boolean operation also starts from 0.
   for_each_n(autoPolicy(NumTri()),
-             zip(meshRelation_.triBary.begin(), countAt(0)), NumTri(),
-             InitializeBaryRef({meshID, halfedge_.cptrD()}));
+             zip(meshRelation_.triRef.begin(), countAt(0)), NumTri(),
+             InitializeTriRef({meshID, halfedge_.cptrD()}));
   meshRelation_.originalID = meshID;
   meshids = 1;
 }
@@ -462,54 +558,56 @@ int Manifold::Impl::InitializeNewReference(
     const std::vector<glm::ivec3>& triProperties,
     const std::vector<float>& properties,
     const std::vector<float>& propertyTolerance) {
-  meshRelation_.triBary.resize(NumTri());
+  meshRelation_.triRef.resize(NumTri());
   const int nextMeshID = meshIDCounter_.fetch_add(1, std::memory_order_relaxed);
   ReinitializeReference(nextMeshID);
 
   const int numProps = propertyTolerance.size();
 
-  VecDH<glm::ivec3> triPropertiesD(triProperties);
-  VecDH<float> propertiesD(properties);
-  VecDH<float> propertyToleranceD(propertyTolerance);
+  VecDH<float> propertyToleranceD(numProps, -1);
+  // Don't clear values when AsOriginal() is called.
+  if (meshRelation_.numProp == 0) {
+    meshRelation_.triProperties = triProperties;
+    meshRelation_.properties = properties;
+    meshRelation_.numProp = numProps;
+    propertyToleranceD = propertyTolerance;
+  }
 
-  if (numProps > 0) {
+  if (triProperties.size() > 0) {
     if (triProperties.size() != NumTri() && triProperties.size() != 0) {
       MarkFailure(Error::TRI_PROPERTIES_WRONG_LENGTH);
       return nextMeshID;
     };
-    if (properties.size() % numProps != 0) {
+    if (numProps == 0 || properties.size() % numProps != 0) {
       MarkFailure(Error::PROPERTIES_WRONG_LENGTH);
       return nextMeshID;
     };
 
     const int numSets = properties.size() / numProps;
-    if (!all_of(autoPolicy(triProperties.size()), triPropertiesD.begin(),
-                triPropertiesD.end(), CheckProperties({numSets}))) {
+    if (!all_of(autoPolicy(triProperties.size()),
+                meshRelation_.triProperties.begin(),
+                meshRelation_.triProperties.end(),
+                CheckProperties({numSets}))) {
       MarkFailure(Error::TRI_PROPERTIES_OUT_OF_BOUNDS);
       return nextMeshID;
     };
   }
 
   VecDH<thrust::pair<int, int>> face2face(halfedge_.size(), {-1, -1});
+  VecDH<thrust::pair<int, int>> vert2vert(halfedge_.size(), {-1, -1});
   VecDH<float> triArea(NumTri());
-  for_each_n(autoPolicy(halfedge_.size()), zip(face2face.begin(), countAt(0)),
+  for_each_n(autoPolicy(halfedge_.size()),
+             zip(face2face.begin(), vert2vert.begin(), countAt(0)),
              halfedge_.size(),
              CoplanarEdge({triArea.ptrD(), halfedge_.cptrD(), vertPos_.cptrD(),
-                           triPropertiesD.cptrD(), propertiesD.cptrD(),
+                           meshRelation_.triProperties.cptrD(),
+                           meshRelation_.properties.cptrD(),
                            propertyToleranceD.cptrD(), numProps, precision_}));
 
-  Graph graph;
-  for (int i = 0; i < NumTri(); ++i) {
-    graph.add_nodes(i);
-  }
-  for (int i = 0; i < face2face.size(); ++i) {
-    const thrust::pair<int, int> edge = face2face[i];
-    if (edge.first < 0) continue;
-    graph.add_edge(edge.first, edge.second);
-  }
+  DedupePropVerts(meshRelation_.triProperties, vert2vert);
 
   std::vector<int> components;
-  const int numComponent = ConnectedComponents(components, graph);
+  const int numComponent = GetLabels(components, face2face, NumTri());
 
   std::vector<int> comp2tri(numComponent, -1);
   for (int tri = 0; tri < NumTri(); ++tri) {
@@ -521,49 +619,11 @@ int Manifold::Impl::InitializeNewReference(
     }
   }
 
-  VecDH<BaryRef>& triBary = meshRelation_.triBary;
+  VecDH<TriRef>& triRef = meshRelation_.triRef;
   std::map<std::pair<int, int>, int> triVert2bary;
 
-  for (int tri = 0; tri < NumTri(); ++tri) {
-    const int refTri = comp2tri[components[tri]];
-    if (refTri == tri) continue;
-
-    glm::mat3 triPos;
-    for (int i : {0, 1, 2}) {
-      const int vert = halfedge_[3 * refTri + i].startVert;
-      triPos[i] = vertPos_[vert];
-      triVert2bary[{refTri, vert}] = i - 3;
-    }
-
-    glm::ivec3 vertBary;
-    bool coplanar = true;
-    for (int i : {0, 1, 2}) {
-      const int vert = halfedge_[3 * tri + i].startVert;
-      if (triVert2bary.find({refTri, vert}) == triVert2bary.end()) {
-        const glm::vec3 uvw =
-            GetBarycentric(vertPos_[vert], triPos, precision_);
-        if (isnan(uvw[0])) {
-          coplanar = false;
-          triVert2bary[{refTri, vert}] = -4;
-          break;
-        }
-        triVert2bary[{refTri, vert}] = meshRelation_.barycentric.size();
-        meshRelation_.barycentric.push_back(uvw);
-      }
-      const int bary = triVert2bary[{refTri, vert}];
-      if (bary < -3) {
-        coplanar = false;
-        break;
-      }
-      vertBary[i] = bary;
-    }
-
-    if (coplanar) {
-      BaryRef& ref = triBary[tri];
-      ref.tri = refTri;
-      ref.vertBary = vertBary;
-    }
-  }
+  for (int tri = 0; tri < NumTri(); ++tri)
+    triRef[tri].tri = comp2tri[components[tri]];
 
   return nextMeshID;
 }
@@ -655,7 +715,7 @@ Manifold::Impl Manifold::Impl::Transform(const glm::mat4x3& transform_) const {
   }
 
   if (invert) {
-    for_each_n(policy, zip(result.meshRelation_.triBary.begin(), countAt(0)),
+    for_each_n(policy, zip(result.meshRelation_.triRef.begin(), countAt(0)),
                result.NumTri(), FlipTris({result.halfedge_.ptrD()}));
   }
 
@@ -716,13 +776,13 @@ void Manifold::Impl::CalculateNormals() {
  * instances of these meshes.
  */
 void Manifold::Impl::IncrementMeshIDs(int start, int length) {
-  VecDH<BaryRef>& triBary = meshRelation_.triBary;
-  ASSERT(start >= 0 && length >= 0 && start + length <= triBary.size(),
-         logicErr, "out of bounds");
+  VecDH<TriRef>& triRef = meshRelation_.triRef;
+  ASSERT(start >= 0 && length >= 0 && start + length <= triRef.size(), logicErr,
+         "out of bounds");
   const auto policy = autoPolicy(length);
   HashTable<uint32_t> meshidTable(std::max(16u, meshids * 2));
 
-  auto begin = triBary.begin() + start;
+  auto begin = triRef.begin() + start;
   auto end = begin + length;
   while (1) {
     for_each(policy, begin, end, MarkMeshID({meshidTable.D()}));

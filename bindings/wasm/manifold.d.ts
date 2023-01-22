@@ -17,7 +17,7 @@ type Vec3 = [number, number, number];
 type Vec4 = [number, number, number, number];
 type Matrix3x4 = [Vec3, Vec3, Vec3, Vec3];
 type SimplePolygon = Vec2[];
-type Polygons = SimplePolygon|SimplePolygon[];
+type Polygons = SimplePolygon | SimplePolygon[];
 type Box = {
   min: Vec3,
   max: Vec3
@@ -30,11 +30,10 @@ type Properties = {
   surfaceArea: number,
   volume: number
 };
-type BaryRef = {
+type TriRef = {
   meshID: number,
   originalID: number,
-  tri: number,
-  vertBary: Vec3
+  tri: number
 };
 type Curvature = {
   maxMeanCurvature: number,
@@ -45,20 +44,21 @@ type Curvature = {
   vertGaussianCurvature: number[]
 };
 type MeshRelation = {
-  barycentric: Vec3[],
-  triBary: BaryRef[],
+  triRef: TriRef[]
 };
 
 declare class Mesh {
-  vertPos: Float32Array;
+  numProp: number;
+  vertProperties: Float32Array;
   triVerts: Uint32Array;
-  vertNormal?: Float32Array;
+  mergeFromVert?: Uint32Array;
+  mergeToVert?: Uint32Array;
   halfedgeTangent?: Float32Array;
   get numTri(): number;
   get numVert(): number;
   verts(tri: number): Uint32Array<3>;
   position(vert: number): Float32Array<3>;
-  normal(vert: number): Float32Array<3>;
+  extras(vert: number): Float32Array;
   tangent(halfedge: number): Float32Array<4>;
 }
 
@@ -102,7 +102,7 @@ declare class Manifold {
    *
    * @param v The vector to multiply every vertex by per component.
    */
-  scale(v: Vec3|number): Manifold;
+  scale(v: Vec3 | number): Manifold;
 
   /**
    * Boolean union
@@ -219,15 +219,15 @@ declare class Manifold {
 
   /**
    * Gets the relationship to the previous meshes, for the purpose of assigning
-   * properties like texture coordinates. The triBary vector is the same length
-   * as Mesh.triVerts: BaryRef.originalID indicates the source mesh and
-   * BaryRef.tri is that mesh's triangle index to which these barycentric
-   * coordinates refer. BaryRef.vertBary gives an index for each vertex into the
+   * properties like texture coordinates. The triRef vector is the same length
+   * as Mesh.triVerts: TriRef.originalID indicates the source mesh and
+   * TriRef.tri is that mesh's triangle index to which these barycentric
+   * coordinates refer. TriRef.vertBary gives an index for each vertex into the
    * barycentric vector if that index is >= 0, indicating it is a new vertex. If
    * the index is < 0, this indicates it is an original vertex, the index + 3
    * vert of the referenced triangle.
    *
-   * BaryRef.meshID is a unique ID to the particular instance of a given mesh.
+   * TriRef.meshID is a unique ID to the particular instance of a given mesh.
    * For instance, if you want to convert the triangle mesh to a polygon mesh,
    * all the triangles from a given face will have the same .meshID and .tri
    * values.
@@ -264,7 +264,7 @@ declare class Manifold {
  * @param size The X, Y, and Z dimensions of the box.
  * @param center Set to true to shift the center to the origin.
  */
-declare function cube(size?: Vec3|number, center?: boolean): Manifold;
+declare function cube(size?: Vec3 | number, center?: boolean): Manifold;
 
 /**
  * A convenience constructor for the common case of extruding a circle. Can also
@@ -280,8 +280,8 @@ declare function cube(size?: Vec3|number, center?: boolean): Manifold;
  * origin at the bottom.
  */
 declare function cylinder(
-    height: number, radiusLow: number, radiusHigh?: number,
-    circularSegments?: number, center?: boolean): Manifold;
+  height: number, radiusLow: number, radiusHigh?: number,
+  circularSegments?: number, center?: boolean): Manifold;
 
 /**
  * Constructs a geodesic sphere of a given radius.
@@ -348,8 +348,8 @@ declare function tetrahedron(): Manifold;
  * Default {1, 1}.
  */
 declare function extrude(
-    crossSection: Polygons, height: number, nDivisions?: number,
-    twistDegrees?: number, scaleTop?: Vec2): Manifold;
+  crossSection: Polygons, height: number, nDivisions?: number,
+  twistDegrees?: number, scaleTop?: Vec2): Manifold;
 
 /**
  * Constructs a manifold from a set of polygons by revolving this cross-section
@@ -363,7 +363,7 @@ declare function extrude(
  * calculated by the static Defaults.
  */
 declare function revolve(
-    crossSection: Polygons, circularSegments?: number): Manifold;
+  crossSection: Polygons, circularSegments?: number): Manifold;
 
 declare function union(a: Manifold, b: Manifold): Manifold;
 declare function difference(a: Manifold, b: Manifold): Manifold;
@@ -400,8 +400,8 @@ declare function compose(manifolds: Manifold[]): Manifold;
  * it with a negative value.
  */
 declare function levelSet(
-    sdf: (point: Vec3) => number, bounds: Box, edgeLength: number,
-    level?: number): Manifold;
+  sdf: (point: Vec3) => number, bounds: Box, edgeLength: number,
+  level?: number): Manifold;
 
 /**
  * @name Defaults

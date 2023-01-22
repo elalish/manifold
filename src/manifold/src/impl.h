@@ -26,8 +26,10 @@ namespace manifold {
 /** @ingroup Private */
 struct Manifold::Impl {
   struct MeshRelationD {
-    VecDH<glm::vec3> barycentric;
-    VecDH<BaryRef> triBary;
+    VecDH<TriRef> triRef;
+    VecDH<glm::ivec3> triProperties;
+    VecDH<float> properties;
+    int numProp = 0;
     /// The meshID of this Manifold if it is an original; -1 otherwise.
     int originalID = -1;
   };
@@ -50,6 +52,8 @@ struct Manifold::Impl {
   enum class Shape { TETRAHEDRON, CUBE, OCTAHEDRON };
   Impl(Shape);
 
+  Impl(const MeshGL&,
+       const std::vector<float>& propertyTolerance = std::vector<float>());
   Impl(const Mesh&,
        const std::vector<glm::ivec3>& triProperties = std::vector<glm::ivec3>(),
        const std::vector<float>& properties = std::vector<float>(),
@@ -76,6 +80,11 @@ struct Manifold::Impl {
   int NumVert() const { return vertPos_.size(); }
   int NumEdge() const { return halfedge_.size() / 2; }
   int NumTri() const { return halfedge_.size() / 3; }
+  int NumProp() const { return meshRelation_.numProp; }
+  int NumPropVert() const {
+    return NumProp() == 0 ? NumVert()
+                          : meshRelation_.properties.size() / NumProp();
+  }
 
   // properties.cu
   Properties GetProperties() const;
@@ -93,14 +102,14 @@ struct Manifold::Impl {
   void Finish();
   void SortVerts();
   void ReindexVerts(const VecDH<int>& vertNew2Old, int numOldVert);
+  void CompactProps();
   void GetFaceBoxMorton(VecDH<Box>& faceBox, VecDH<uint32_t>& faceMorton) const;
   void SortFaces(VecDH<Box>& faceBox, VecDH<uint32_t>& faceMorton);
   void GatherFaces(const VecDH<int>& faceNew2Old);
   void GatherFaces(const Impl& old, const VecDH<int>& faceNew2Old);
 
   // face_op.cu
-  void Face2Tri(const VecDH<int>& faceEdge, const VecDH<BaryRef>& faceRef,
-                const VecDH<int>& halfedgeBary);
+  void Face2Tri(const VecDH<int>& faceEdge, const VecDH<TriRef>& halfedgeRef);
   Polygons Face2Polygons(int face, glm::mat3x2 projection,
                          const VecDH<int>& faceEdge) const;
 
@@ -117,7 +126,7 @@ struct Manifold::Impl {
 
   // smoothing.cu
   void CreateTangents(const std::vector<Smoothness>&);
-  MeshRelationD Subdivide(int n);
+  VecDH<Barycentric> Subdivide(int n);
   void Refine(int n);
 };
 }  // namespace manifold
