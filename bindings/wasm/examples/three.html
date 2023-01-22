@@ -47,8 +47,8 @@
   <canvas id="output"></canvas>
 </body>
 
-<script src="https://unpkg.com/three@0.142.0/build/three.js"></script>
-<script src="https://unpkg.com/three@0.142.0/examples/js/utils/BufferGeometryUtils.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.144.0/build/three.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.144.0/examples/js/utils/BufferGeometryUtils.js"></script>
 <script src="manifold.js"></script>
 <script>
   let wasm;
@@ -94,16 +94,14 @@
 
   // functions to convert between three.js and wasm
   function geometry2mesh(geometry) {
-    const vertPos = geometry.attributes.position.array;
-    const vertNormal = geometry.attributes.normal.array;
+    const vertProperties = geometry.attributes.position.array;
     const triVerts = geometry.index.array;
-    return new wasm.Mesh({vertPos, vertNormal, triVerts});
+    return new wasm.Mesh({ numProp: 3, vertProperties, triVerts });
   }
 
   function mesh2geometry(mesh) {
     const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute('position', new THREE.BufferAttribute(mesh.vertPos, 3));
-    geometry.setAttribute('normal', new THREE.BufferAttribute(mesh.vertNormal, 3));
+    geometry.setAttribute('position', new THREE.BufferAttribute(mesh.vertProperties, 3));
     geometry.setIndex(new THREE.BufferAttribute(mesh.triVerts, 1));
     return geometry;
   }

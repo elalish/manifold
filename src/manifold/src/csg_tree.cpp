@@ -40,16 +40,6 @@ struct TransformNormals {
   }
 };
 
-struct UpdateTriBary {
-  const int nextBary;
-
-  __host__ __device__ BaryRef operator()(BaryRef ref) {
-    for (int i : {0, 1, 2})
-      if (ref.vertBary[i] >= 0) ref.vertBary[i] += nextBary;
-    return ref;
-  }
-};
-
 struct UpdateHalfedge {
   const int nextVert;
   const int nextEdge;
@@ -139,7 +129,6 @@ Manifold::Impl CsgLeafNode::Compose(
   int numVert = 0;
   int numEdge = 0;
   int numTri = 0;
-  int numBary = 0;
   int meshids = 0;
   for (auto &node : nodes) {
     meshids += node->pImpl_->meshids;
@@ -155,7 +144,6 @@ Manifold::Impl CsgLeafNode::Compose(
     numVert += node->pImpl_->NumVert();
     numEdge += node->pImpl_->NumEdge();
     numTri += node->pImpl_->NumTri();
-    numBary += node->pImpl_->meshRelation_.barycentric.size();
   }
 
   Manifold::Impl combined;
@@ -165,8 +153,7 @@ Manifold::Impl CsgLeafNode::Compose(
   combined.halfedge_.resize(2 * numEdge);
   combined.faceNormal_.resize(numTri);
   combined.halfedgeTangent_.resize(2 * numEdge);
-  combined.meshRelation_.barycentric.resize(numBary);
-  combined.meshRelation_.triBary.resize(numTri);
+  combined.meshRelation_.triRef.resize(numTri);
   auto policy = autoPolicy(numTri);
 
   int nextVert = 0;
@@ -198,13 +185,9 @@ Manifold::Impl CsgLeafNode::Compose(
     copy(policy, node->pImpl_->halfedgeTangent_.begin(),
          node->pImpl_->halfedgeTangent_.end(),
          combined.halfedgeTangent_.begin() + nextEdge);
-    copy(policy, node->pImpl_->meshRelation_.barycentric.begin(),
-         node->pImpl_->meshRelation_.barycentric.end(),
-         combined.meshRelation_.barycentric.begin() + nextBary);
-    transform(policy, node->pImpl_->meshRelation_.triBary.begin(),
-              node->pImpl_->meshRelation_.triBary.end(),
-              combined.meshRelation_.triBary.begin() + nextTri,
-              UpdateTriBary({nextBary}));
+    copy(policy, node->pImpl_->meshRelation_.triRef.begin(),
+         node->pImpl_->meshRelation_.triRef.end(),
+         combined.meshRelation_.triRef.begin() + nextTri);
     transform(policy, node->pImpl_->halfedge_.begin(),
               node->pImpl_->halfedge_.end(),
               combined.halfedge_.begin() + nextEdge,
@@ -218,7 +201,6 @@ Manifold::Impl CsgLeafNode::Compose(
     nextVert += node->pImpl_->NumVert();
     nextEdge += 2 * node->pImpl_->NumEdge();
     nextTri += node->pImpl_->NumTri();
-    nextBary += node->pImpl_->meshRelation_.barycentric.size();
   }
   // required to remove parts that are smaller than the precision
   combined.SimplifyTopology();

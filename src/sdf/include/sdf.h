@@ -25,16 +25,6 @@ namespace {
 using namespace manifold;
 __host__ __device__ Uint64 identity(Uint64 x) { return x; }
 
-__host__ __device__ int Next3(int i) {
-  constexpr glm::ivec3 next3(1, 2, 0);
-  return next3[i];
-}
-
-__host__ __device__ int Prev3(int i) {
-  constexpr glm::ivec3 prev3(2, 0, 1);
-  return prev3[i];
-}
-
 __host__ __device__ glm::ivec3 TetTri0(int i) {
   constexpr glm::ivec3 tetTri0[16] = {{-1, -1, -1},  //
                                       {0, 3, 4},     //

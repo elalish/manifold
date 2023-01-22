@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <map>
+
 #include "boolean3.h"
 #include "csg_tree.h"
 #include "impl.h"
@@ -82,6 +84,26 @@ CsgLeafNode& Manifold::GetCsgLeafNode() const {
 }
 
 /**
+ * Convert a MeshGL into a Manifold, retaining its properties and merging only
+ * the positions according to the merge vectors. Will return an empty Manifold
+ * and set an Error Status if the result is not an oriented 2-manifold. Will
+ * collapse degenerate triangles and unnecessary vertices.
+ *
+ * @param meshGL The input MeshGL.
+ * @param propertyTolerance A vector of precision values for each property
+ * beyond position. The propertyTolerance vector must be specified if the MeshGL
+ * has numProp > 3 and must have size = numProp - 3. This is the amount of
+ * interpolation error allowed before two neighboring triangles are considered
+ * to be on a property boundary edge. Property boundary edges will be retained
+ * across operations even if the triangles are coplanar. A good place to start
+ * is 1e-5 times the largest value you expect this property to take.
+ */
+Manifold::Manifold(const MeshGL& meshGL,
+                   const std::vector<float>& propertyTolerance)
+    : pNode_(std::make_shared<CsgLeafNode>(
+          std::make_shared<Impl>(meshGL, propertyTolerance))) {}
+
+/**
  * Convert a Mesh into a Manifold. Will return an empty Manifold
  * and set an Error Status if the Mesh is not an oriented 2-manifold. Will
  * collapse degenerate triangles and unnecessary vertices.
@@ -141,26 +163,14 @@ Mesh Manifold::GetMesh() const {
 MeshGL Manifold::GetMeshGL() const {
   const Impl& impl = *GetCsgLeafNode().GetImpl();
 
-  const int numVert = NumVert();
+  const int numProp = NumProp();
+  const int numVert = NumPropVert();
   const int numTri = NumTri();
 
   MeshGL out;
-  out.vertPos.resize(3 * numVert);
-  out.vertNormal.resize(3 * numVert);
+  out.numProp = 3 + numProp;
   out.triVerts.resize(3 * numTri);
-  for (int i = 0; i < numVert; ++i) {
-    const glm::vec3 v = impl.vertPos_[i];
-    out.vertPos[3 * i] = v.x;
-    out.vertPos[3 * i + 1] = v.y;
-    out.vertPos[3 * i + 2] = v.z;
-    const glm::vec3 n = impl.vertNormal_[i];
-    out.vertNormal[3 * i] = n.x;
-    out.vertNormal[3 * i + 1] = n.y;
-    out.vertNormal[3 * i + 2] = n.z;
-  }
-  for (int i = 0; i < numTri * 3; ++i) {
-    out.triVerts[i] = impl.halfedge_[i].startVert;
-  }
+
   const int numHalfedge = impl.halfedgeTangent_.size();
   out.halfedgeTangent.resize(4 * numHalfedge);
   for (int i = 0; i < numHalfedge; ++i) {
@@ -169,6 +179,55 @@ MeshGL Manifold::GetMeshGL() const {
     out.halfedgeTangent[4 * i + 1] = t.y;
     out.halfedgeTangent[4 * i + 2] = t.z;
     out.halfedgeTangent[4 * i + 3] = t.w;
+  }
+
+  if (numProp == 0) {
+    out.vertProperties.resize(out.numProp * numVert);
+    for (int i = 0; i < numVert; ++i) {
+      const glm::vec3 v = impl.vertPos_[i];
+      out.vertProperties[3 * i] = v.x;
+      out.vertProperties[3 * i + 1] = v.y;
+      out.vertProperties[3 * i + 2] = v.z;
+    }
+    for (int i = 0; i < numTri * 3; ++i) {
+      out.triVerts[i] = impl.halfedge_[i].startVert;
+    }
+    return out;
+  }
+
+  std::vector<int> vert2prop(impl.NumVert(), -1);
+  std::map<std::pair<int, int>, int> vertPropPair;
+
+  for (int tri = 0; tri < numTri; ++tri) {
+    const glm::ivec3 triProp = impl.meshRelation_.triProperties[tri];
+    for (const int i : {0, 1, 2}) {
+      const int prop = triProp[i];
+      const int vert = impl.halfedge_[3 * tri + i].startVert;
+
+      const auto it = vertPropPair.find({vert, prop});
+      if (it != vertPropPair.end()) {
+        out.triVerts[3 * tri + i] = it->second;
+        continue;
+      }
+      const int idx = out.vertProperties.size() / out.numProp;
+      vertPropPair.insert({{vert, prop}, idx});
+      out.triVerts[3 * tri + i] = idx;
+
+      for (int p : {0, 1, 2}) {
+        out.vertProperties.push_back(impl.vertPos_[vert][p]);
+      }
+      for (int p = 0; p < numProp; ++p) {
+        out.vertProperties.push_back(
+            impl.meshRelation_.properties[prop * numProp + p]);
+      }
+
+      if (vert2prop[vert] == -1) {
+        vert2prop[vert] = prop;
+      } else {
+        out.mergeFromVert.push_back(prop);
+        out.mergeToVert.push_back(vert2prop[vert]);
+      }
+    }
   }
 
   return out;
@@ -261,6 +320,18 @@ int Manifold::NumEdge() const { return GetCsgLeafNode().GetImpl()->NumEdge(); }
  * The number of triangles in the Manifold.
  */
 int Manifold::NumTri() const { return GetCsgLeafNode().GetImpl()->NumTri(); }
+/**
+ * The number of properties per vertex in the Manifold.
+ */
+int Manifold::NumProp() const { return GetCsgLeafNode().GetImpl()->NumProp(); }
+/**
+ * The number of property vertices in the Manifold. This will always be >=
+ * NumVert, as some physical vertices may be duplicated to account for different
+ * properties on different neighboring triangles.
+ */
+int Manifold::NumPropVert() const {
+  return GetCsgLeafNode().GetImpl()->NumPropVert();
+}
 
 /**
  * Returns the axis-aligned bounding box of all the Manifold's vertices.
@@ -312,25 +383,19 @@ Curvature Manifold::GetCurvature() const {
 
 /**
  * Gets the relationship to the previous meshes, for the purpose of assigning
- * properties like texture coordinates. The triBary vector is the same length as
- * Mesh.triVerts: BaryRef.originalID indicates the source mesh and BaryRef.tri
- * is that mesh's triangle index to which these barycentric coordinates refer.
- * BaryRef.vertBary gives an index for each vertex into the barycentric vector
- * if that index is >= 0, indicating it is a new vertex. If the index is < 0,
- * this indicates it is an original vertex, the index + 3 vert of the referenced
- * triangle.
+ * properties like texture coordinates. The triRef vector is the same length as
+ * Mesh.triVerts: TriRef.originalID indicates the source mesh and TriRef.tri
+ * is that mesh's triangle index of which this triangle is a part.
  *
- * BaryRef.meshID is a unique ID to the particular instance of a given mesh. For
+ * TriRef.meshID is a unique ID to the particular instance of a given mesh. For
  * instance, if you want to convert the triangle mesh to a polygon mesh, all the
  * triangles from a given face will have the same .meshID and .tri values.
  */
 MeshRelation Manifold::GetMeshRelation() const {
   MeshRelation out;
   const auto& relation = GetCsgLeafNode().GetImpl()->meshRelation_;
-  out.triBary.insert(out.triBary.end(), relation.triBary.begin(),
-                     relation.triBary.end());
-  out.barycentric.insert(out.barycentric.end(), relation.barycentric.begin(),
-                         relation.barycentric.end());
+  out.triRef.insert(out.triRef.end(), relation.triRef.begin(),
+                    relation.triRef.end());
   return out;
 }
 

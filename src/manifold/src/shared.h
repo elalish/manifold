@@ -78,34 +78,43 @@ __host__ __device__ inline glm::vec3 GetBarycentric(const glm::vec3& v,
                         triPos[1] - triPos[0]);
   const glm::vec3 d2(glm::dot(edges[0], edges[0]), glm::dot(edges[1], edges[1]),
                      glm::dot(edges[2], edges[2]));
-  int longside = d2[0] > d2[1] && d2[0] > d2[2] ? 0 : d2[1] > d2[2] ? 1 : 2;
+  const int longSide = d2[0] > d2[1] && d2[0] > d2[2] ? 0
+                       : d2[1] > d2[2]                ? 1
+                                                      : 2;
   const glm::vec3 crossP = glm::cross(edges[0], edges[1]);
   const float area2 = glm::dot(crossP, crossP);
   const float tol2 = precision * precision;
-  const float vol = glm::dot(crossP, v - triPos[2]);
-  if (vol * vol > area2 * tol2) return glm::vec3(NAN);
 
-  if (d2[longside] < tol2) {  // point
+  glm::vec3 uvw(0);
+  for (const int i : {0, 1, 2}) {
+    const glm::vec3 dv = v - triPos[i];
+    if (glm::dot(dv, dv) < tol2) {
+      // Return exactly equal if within tolerance of vert.
+      uvw[i] = 1;
+      return uvw;
+    }
+  }
+
+  if (d2[longSide] < tol2) {  // point
     return glm::vec3(1, 0, 0);
-  } else if (area2 > d2[longside] * tol2) {  // triangle
-    glm::vec3 uvw(0);
-    for (int i : {0, 1, 2}) {
-      int j = i + 1;
-      if (j > 2) j -= 3;
-      uvw[i] = glm::dot(glm::cross(edges[i], v - triPos[j]), crossP);
+  } else if (area2 > d2[longSide] * tol2) {  // triangle
+    for (const int i : {0, 1, 2}) {
+      const int j = Next3(i);
+      const glm::vec3 crossPv = glm::cross(edges[i], v - triPos[j]);
+      const float area2v = glm::dot(crossPv, crossPv);
+      // Return exactly equal if within tolerance of edge.
+      uvw[i] = area2v < d2[i] * tol2 ? 0 : glm::dot(crossPv, crossP);
     }
     uvw /= (uvw[0] + uvw[1] + uvw[2]);
     return uvw;
   } else {  // line
-    int nextside = longside + 1;
-    if (nextside > 2) nextside -= 3;
+    const int nextV = Next3(longSide);
     const float alpha =
-        glm::dot(v - triPos[nextside], edges[longside]) / d2[longside];
-    glm::vec3 uvw(0);
-    uvw[longside] = 0;
-    uvw[nextside++] = 1 - alpha;
-    if (nextside > 2) nextside -= 3;
-    uvw[nextside] = alpha;
+        glm::dot(v - triPos[nextV], edges[longSide]) / d2[longSide];
+    uvw[longSide] = 0;
+    uvw[nextV] = 1 - alpha;
+    const int lastV = Next3(nextV);
+    uvw[lastV] = alpha;
     return uvw;
   }
 }
@@ -123,6 +132,11 @@ struct Halfedge {
     return startVert == other.startVert ? endVert < other.endVert
                                         : startVert < other.startVert;
   }
+};
+
+struct Barycentric {
+  int tri;
+  glm::vec3 uvw;
 };
 
 /**
@@ -190,6 +204,10 @@ inline std::ostream& operator<<(std::ostream& stream, const Halfedge& edge) {
                 << ", endVert = " << edge.endVert
                 << ", pairedHalfedge = " << edge.pairedHalfedge
                 << ", face = " << edge.face;
+}
+
+inline std::ostream& operator<<(std::ostream& stream, const Barycentric& bary) {
+  return stream << "tri = " << bary.tri << ", uvw = " << bary.uvw;
 }
 #endif
 }  // namespace manifold

@@ -4,6 +4,7 @@
 #include <public.h>
 #include <sdf.h>
 #include <types.h>
+
 ManifoldManifold *to_c(manifold::Manifold *m);
 ManifoldSimplePolygon *to_c(manifold::SimplePolygon *p);
 ManifoldPolygons *to_c(manifold::Polygons *ps);
