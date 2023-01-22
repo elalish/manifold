@@ -49,27 +49,34 @@
 </body>
 
 <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/2.0.1/model-viewer.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.144.0/build/three.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.144.0/examples/js/exporters/GLTFExporter.js"></script>
 <script src="manifold.js"></script>
-<script>
+<script type="module">
+  import { Accessor, Document, WebIO } from 'https://cdn.skypack.dev/@gltf-transform/core';
+
+  const io = new WebIO();
+  const doc = new Document();
+
+  const buffer = doc.createBuffer();
+  const indices = doc.createAccessor().setBuffer(buffer).setType(Accessor.Type.SCALAR);
+  const position = doc.createAccessor().setBuffer(buffer).setType(Accessor.Type.VEC3);
+  const material = doc.createMaterial('gold').setMetallicFactor(1)
+    .setRoughnessFactor(0.2).setBaseColorFactor([1, 1, 0, 1]);
+  const primitive = doc.createPrimitive().setMaterial(material)
+    .setIndices(indices).setAttribute('POSITION', position);
+  const mesh = doc.createMesh('result').addPrimitive(primitive);
+  const node = doc.createNode().setMesh(mesh);
+  const scene = doc.createScene().addChild(node);
+
   let wasm;
   Module().then(function (tmp) {
     wasm = tmp;
     wasm.setup();
-    const mesh = new THREE.Mesh(undefined, new THREE.MeshStandardMaterial({
-      color: 'yellow',
-      metalness: 1,
-      roughness: 0.2
-    }));
 
     const manifold_1 = wasm.cube(100, true);
     const manifold_2 = wasm.sphere(60, 100);
 
     const csg = function (operation) {
-      mesh.geometry?.dispose();
-      mesh.geometry = mesh2geometry(wasm[operation](manifold_1, manifold_2).getMesh());
-      push2MV(mesh);
+      push2MV(wasm[operation](manifold_1, manifold_2).getMesh());
     };
 
     document.querySelector('select').onchange = function (event) {
@@ -81,27 +88,17 @@
 
   const mv = document.querySelector('model-viewer');
   let objectURL = null;
-  const exporter = new THREE.GLTFExporter();
 
-  function push2MV(mesh) {
-    exporter.parse(
-      mesh,
-      (gltf) => {
-        const blob = new Blob([gltf], { type: 'application/octet-stream' });
-        URL.revokeObjectURL(objectURL);
-        objectURL = URL.createObjectURL(blob);
-        mv.src = objectURL;
-      },
-      () => console.log('GLTF export failed!'),
-      { binary: true }
-    );
-  }
+  async function push2MV(mesh) {
+    indices.setArray(mesh.triVerts);
+    position.setArray(mesh.vertProperties);
 
-  function mesh2geometry(mesh) {
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute('position', new THREE.BufferAttribute(mesh.vertProperties, 3));
-    geometry.setIndex(new THREE.BufferAttribute(mesh.triVerts, 1));
-    return geometry;
+    const glb = await io.writeBinary(doc);
+
+    const blob = new Blob([glb], { type: 'application/octet-stream' });
+    URL.revokeObjectURL(objectURL);
+    objectURL = URL.createObjectURL(blob);
+    mv.src = objectURL;
   }
 </script>
 
