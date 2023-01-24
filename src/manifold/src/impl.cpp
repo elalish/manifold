@@ -387,7 +387,7 @@ namespace manifold {
 std::atomic<int> Manifold::Impl::meshIDCounter_(1);
 
 Manifold::Impl::Impl(const MeshGL& meshGL,
-                     const std::vector<float>& propertyTolerance) {
+                     std::vector<float> propertyTolerance) {
   Mesh mesh;
   mesh.triVerts.resize(meshGL.NumTri());
 
@@ -430,6 +430,10 @@ Manifold::Impl::Impl(const MeshGL& meshGL,
   for (int i = 0; i < mesh.halfedgeTangent.size(); ++i) {
     for (const int j : {0, 1, 2, 3})
       mesh.halfedgeTangent[i][j] = meshGL.halfedgeTangent[4 * i + j];
+  }
+
+  if (numProp > 0 && propertyTolerance.empty()) {
+    propertyTolerance.resize(numProp, kTolerance);
   }
 
   *this = Impl(mesh, triProperties, properties, propertyTolerance);

@@ -59,10 +59,11 @@
   const buffer = doc.createBuffer();
   const indices = doc.createAccessor().setBuffer(buffer).setType(Accessor.Type.SCALAR);
   const position = doc.createAccessor().setBuffer(buffer).setType(Accessor.Type.VEC3);
-  const material = doc.createMaterial('gold').setMetallicFactor(1)
-    .setRoughnessFactor(0.2).setBaseColorFactor([1, 1, 0, 1]);
+  const uv = doc.createAccessor().setBuffer(buffer).setType(Accessor.Type.VEC2);
+  const moonTexture = doc.createTexture('moon');
+  const material = doc.createMaterial('moon').setBaseColorTexture(moonTexture);
   const primitive = doc.createPrimitive().setMaterial(material)
-    .setIndices(indices).setAttribute('POSITION', position);
+    .setIndices(indices).setAttribute('POSITION', position).setAttribute('TEXCOORD_0', uv);
   const mesh = doc.createMesh('result').addPrimitive(primitive);
   const node = doc.createNode().setMesh(mesh);
   const scene = doc.createScene().addChild(node);
@@ -75,23 +76,46 @@
     const manifold_1 = wasm.cube(100, true);
     const manifold_2 = wasm.sphere(60, 100);
 
-    const csg = function (operation) {
-      push2MV(wasm[operation](manifold_1, manifold_2).getMesh());
-    };
+    push2MV(sphereUV().getMesh());
 
-    document.querySelector('select').onchange = function (event) {
-      csg(event.target.value);
-    };
+    // const csg = function (operation) {
+    //   push2MV(wasm[operation](manifold_1, manifold_2).getMesh());
+    // };
 
-    csg('difference');
+    // document.querySelector('select').onchange = function (event) {
+    //   csg(event.target.value);
+    // };
+
+    // csg('difference');
   });
 
   const mv = document.querySelector('model-viewer');
   let objectURL = null;
 
+  async function setMoon() {
+    const response = await fetch('./moonAltitude.jpg');
+    const blob = await response.blob();
+    moonTexture.setMimeType(blob.type);
+    moonTexture.setImage(new Uint8Array(await blob.arrayBuffer()));
+  }
+
   async function push2MV(mesh) {
     indices.setArray(mesh.triVerts);
-    position.setArray(mesh.vertProperties);
+    const numVert = mesh.numVert;
+    const numProp = mesh.numProp;
+    const posArray = new Float32Array(3 * numVert);
+    const uvArray = new Float32Array(2 * numVert);
+    for (let i = 0; i < numVert; ++i) {
+      posArray[3 * i] = mesh.vertProperties[numProp * i];
+      posArray[3 * i + 1] = mesh.vertProperties[numProp * i + 1];
+      posArray[3 * i + 2] = mesh.vertProperties[numProp * i + 2];
+      uvArray[2 * i] = mesh.vertProperties[numProp * i + 3];
+      uvArray[2 * i + 1] = mesh.vertProperties[numProp * i + 4];
+    }
+    position.setArray(posArray);
+    uv.setArray(uvArray);
+
+    await setMoon();
 
     const glb = await io.writeBinary(doc);
 
@@ -99,6 +123,68 @@
     URL.revokeObjectURL(objectURL);
     objectURL = URL.createObjectURL(blob);
     mv.src = objectURL;
+  }
+
+  function sphereUV() {
+    const n = 100;
+    const tol = 1 / (2 * n);
+    const mesh = wasm.sphere(1, n).getMesh();
+    const nMerge = n / 2 - 1;
+    const numVert = mesh.numVert;
+    const numTri = mesh.numTri;
+    const numPropIn = mesh.numProp;
+    const numProp = 5;
+    const triVerts = new Uint32Array(3 * numTri);
+    const vertProperties = new Float32Array(numProp * (numVert + nMerge));
+    const mergeFromVert = new Uint32Array(nMerge);
+    const mergeToVert = new Uint32Array(nMerge);
+    const meshUV = new wasm.Mesh({ numProp, triVerts, vertProperties, mergeFromVert, mergeToVert });
+    const vert2vert = new Uint32Array(numVert);
+    let idx = 0;
+    for (let i = 0; i < numVert; ++i) {
+      const x = mesh.vertProperties[numPropIn * i];
+      const y = mesh.vertProperties[numPropIn * i + 1];
+      const z = mesh.vertProperties[numPropIn * i + 2];
+      vertProperties[numProp * i] = x;
+      vertProperties[numProp * i + 1] = y;
+      vertProperties[numProp * i + 2] = z;
+      const u = Math.atan2(y, x) / (2 * Math.PI) + 0.5;
+      const v = Math.acos(-z) / Math.PI;
+      vertProperties[numProp * i + 4] = v;
+      if (Math.abs(y) < tol && x < -tol) {// Seam
+        const iNew = numVert + idx;
+        mergeFromVert[idx] = iNew;
+        mergeToVert[idx] = i;
+        vert2vert[i] = iNew;
+        vertProperties[numProp * iNew] = x;
+        vertProperties[numProp * iNew + 1] = y;
+        vertProperties[numProp * iNew + 2] = z;
+        vertProperties[numProp * iNew + 3] = 1;
+        vertProperties[numProp * iNew + 4] = v;
+        vertProperties[numProp * i + 3] = 0;
+        ++idx;
+      } else {
+        vert2vert[i] = i;
+        vertProperties[numProp * i + 3] = u;
+      }
+    }
+    for (let tri = 0; tri < numTri; ++tri) {
+      const v0 = mesh.triVerts[3 * tri];
+      const v1 = mesh.triVerts[3 * tri + 1];
+      const v2 = mesh.triVerts[3 * tri + 2];
+      if ((vert2vert[v0] !== v0 || vert2vert[v1] !== v1 || vert2vert[v2] !== v2) &&
+        (vertProperties[numProp * v0 + 1] > tol || vertProperties[numProp * v1 + 1] > tol ||
+          vertProperties[numProp * v2 + 1] > tol)) {
+        triVerts[3 * tri] = vert2vert[v0];
+        triVerts[3 * tri + 1] = vert2vert[v1];
+        triVerts[3 * tri + 2] = vert2vert[v2];
+      } else {
+        triVerts[3 * tri] = v0;
+        triVerts[3 * tri + 1] = v1;
+        triVerts[3 * tri + 2] = v2;
+      }
+    }
+    return wasm.Manifold(meshUV);
   }
 </script>
 
