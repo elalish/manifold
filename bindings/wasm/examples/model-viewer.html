@@ -68,6 +68,15 @@
   const node = doc.createNode().setMesh(mesh);
   const scene = doc.createScene().addChild(node);
 
+  async function loadTextures() {
+    const response = await fetch('./moonAltitude.jpg');
+    const blob = await response.blob();
+    moonTexture.setMimeType(blob.type);
+    moonTexture.setImage(new Uint8Array(await blob.arrayBuffer()));
+  }
+
+  const texturesLoad = loadTextures();
+
   let wasm;
   Module().then(function (tmp) {
     wasm = tmp;
@@ -76,10 +85,10 @@
     const manifold_1 = wasm.cube(100, true);
     const manifold_2 = wasm.sphere(60, 100);
 
-    push2MV(sphereUV().getMesh());
+    push2MV(cubeUV());
 
     // const csg = function (operation) {
-    //   push2MV(wasm[operation](manifold_1, manifold_2).getMesh());
+    //   push2MV(wasm[operation](manifold_1, manifold_2));
     // };
 
     // document.querySelector('select').onchange = function (event) {
@@ -92,14 +101,9 @@
   const mv = document.querySelector('model-viewer');
   let objectURL = null;
 
-  async function setMoon() {
-    const response = await fetch('./moonAltitude.jpg');
-    const blob = await response.blob();
-    moonTexture.setMimeType(blob.type);
-    moonTexture.setImage(new Uint8Array(await blob.arrayBuffer()));
-  }
-
-  async function push2MV(mesh) {
+  async function push2MV(manifold) {
+    // From Z-up to Y-up (glTF)
+    const mesh = manifold.rotate([-90, 0, 0]).getMesh();
     indices.setArray(mesh.triVerts);
     const numVert = mesh.numVert;
     const numProp = mesh.numProp;
@@ -115,7 +119,7 @@
     position.setArray(posArray);
     uv.setArray(uvArray);
 
-    await setMoon();
+    await texturesLoad;
 
     const glb = await io.writeBinary(doc);
 
@@ -123,6 +127,60 @@
     URL.revokeObjectURL(objectURL);
     objectURL = URL.createObjectURL(blob);
     mv.src = objectURL;
+  }
+
+  function cubeUV() {
+    const numProp = 5;
+    const numTri = 12;
+    const numVert = 8;
+    const numPropVert = 24;
+    const vertPos =
+      [-1, -1, -1,
+        1, -1, -1,
+        1, 1, -1,
+      -1, 1, -1,
+      -1, -1, 1,
+        1, -1, 1,
+        1, 1, 1,
+      -1, 1, 1];
+    const uvs = [0, 0, 0, 1, 1, 1, 1, 0];
+    const triVerts = new Uint32Array(
+      [0, 3, 2, 0, 2, 1,
+        4, 5, 6, 4, 6, 7,
+        0, 1, 5, 0, 5, 4,
+        1, 2, 6, 1, 6, 5,
+        2, 3, 7, 2, 7, 6,
+        3, 0, 4, 3, 4, 7]);
+    const v4 = [0, 1, 2, 5];
+    const v6 = [0, 1, 2, 0, 2, 3];
+    const vertProperties = new Float32Array(numProp * numPropVert);
+    const mergeFromVert = new Uint32Array(numPropVert - numVert);
+    const mergeToVert = new Uint32Array(numPropVert - numVert);
+    const meshUV = new wasm.Mesh({ numProp, triVerts, vertProperties, mergeFromVert, mergeToVert });
+    const vert2vert = [-1, -1, -1, -1, -1, -1, -1, -1];
+    let idx = 0;
+    for (let face = 0; face < 6; ++face) {
+      for (let v = 0; v < 4; ++v) {
+        const vIdx = 4 * face + v;
+        const vOld = triVerts[6 * face + v4[v]];
+        if (vert2vert[vOld] === -1) {
+          vert2vert[vOld] = vIdx;
+        } else {
+          mergeFromVert[idx] = vIdx;
+          mergeToVert[idx] = vert2vert[vOld];
+          ++idx;
+        }
+        for (let i = 0; i < 3; ++i) {
+          vertProperties[numProp * vIdx + i] = vertPos[3 * vOld + i];
+        }
+        vertProperties[numProp * vIdx + 3] = uvs[2 * v];
+        vertProperties[numProp * vIdx + 4] = uvs[2 * v + 1];
+      }
+      for (let i = 0; i < 6; ++i) {
+        triVerts[6 * face + i] = 4 * face + v6[i];
+      }
+    }
+    return wasm.Manifold(meshUV);
   }
 
   function sphereUV() {
@@ -149,7 +207,7 @@
       vertProperties[numProp * i + 1] = y;
       vertProperties[numProp * i + 2] = z;
       const u = Math.atan2(y, x) / (2 * Math.PI) + 0.5;
-      const v = Math.acos(-z) / Math.PI;
+      const v = Math.acos(z) / Math.PI;
       vertProperties[numProp * i + 4] = v;
       if (Math.abs(y) < tol && x < -tol) {// Seam
         const iNew = numVert + idx;
