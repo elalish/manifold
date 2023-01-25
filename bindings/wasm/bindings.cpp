@@ -76,6 +76,15 @@ val GetMeshJS(const Manifold& manifold) {
   meshJS.set("mergeToVert", val(typed_memory_view(mesh.mergeToVert.size(),
                                                   mesh.mergeToVert.data()))
                                 .call<val>("slice"));
+  meshJS.set("runIndex",
+             val(typed_memory_view(mesh.runIndex.size(), mesh.runIndex.data()))
+                 .call<val>("slice"));
+  meshJS.set("originalID", val(typed_memory_view(mesh.originalID.size(),
+                                                 mesh.originalID.data()))
+                               .call<val>("slice"));
+  meshJS.set("meshID",
+             val(typed_memory_view(mesh.meshID.size(), mesh.meshID.data()))
+                 .call<val>("slice"));
   meshJS.set("halfedgeTangent",
              val(typed_memory_view(mesh.halfedgeTangent.size(),
                                    mesh.halfedgeTangent.data()))
@@ -97,6 +106,15 @@ MeshGL MeshJS2GL(const val& mesh) {
   if (mesh["mergeToVert"] != val::undefined()) {
     out.mergeToVert =
         convertJSArrayToNumberVector<uint32_t>(mesh["mergeToVert"]);
+  }
+  if (mesh["runIndex"] != val::undefined()) {
+    out.runIndex = convertJSArrayToNumberVector<uint32_t>(mesh["runIndex"]);
+  }
+  if (mesh["originalID"] != val::undefined()) {
+    out.originalID = convertJSArrayToNumberVector<uint32_t>(mesh["originalID"]);
+  }
+  if (mesh["meshID"] != val::undefined()) {
+    out.meshID = convertJSArrayToNumberVector<uint32_t>(mesh["meshID"]);
   }
   if (mesh["halfedgeTangent"] != val::undefined()) {
     out.halfedgeTangent =

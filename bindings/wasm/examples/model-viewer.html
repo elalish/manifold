@@ -61,18 +61,26 @@
   const position = doc.createAccessor().setBuffer(buffer).setType(Accessor.Type.VEC3);
   const uv = doc.createAccessor().setBuffer(buffer).setType(Accessor.Type.VEC2);
   const moonTexture = doc.createTexture('moon');
-  const material = doc.createMaterial('moon').setBaseColorTexture(moonTexture);
-  const primitive = doc.createPrimitive().setMaterial(material)
+  const spaceTexture = doc.createTexture('space');
+  const moonMaterial = doc.createMaterial('moon').setBaseColorTexture(moonTexture);
+  const spaceMaterial = doc.createMaterial('moon').setBaseColorTexture(spaceTexture);
+  const primitive = doc.createPrimitive().setMaterial(spaceMaterial)
     .setIndices(indices).setAttribute('POSITION', position).setAttribute('TEXCOORD_0', uv);
   const mesh = doc.createMesh('result').addPrimitive(primitive);
   const node = doc.createNode().setMesh(mesh);
   const scene = doc.createScene().addChild(node);
 
-  async function loadTextures() {
-    const response = await fetch('./moonAltitude.jpg');
+  async function loadTexture(texture, uri) {
+    const response = await fetch(uri);
     const blob = await response.blob();
-    moonTexture.setMimeType(blob.type);
-    moonTexture.setImage(new Uint8Array(await blob.arrayBuffer()));
+    texture.setMimeType(blob.type);
+    texture.setImage(new Uint8Array(await blob.arrayBuffer()));
+  }
+
+  async function loadTextures() {
+    const moonLoads = loadTexture(moonTexture, './moonAltitude.jpg');
+    const spaceLoads = loadTexture(spaceTexture, './hubbleDeepField.jpg');
+    await Promise.all([moonLoads, spaceLoads]);
   }
 
   const texturesLoad = loadTextures();

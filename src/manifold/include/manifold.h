@@ -137,6 +137,7 @@ class Manifold {
   MeshRelation GetMeshRelation() const;
   int OriginalID() const;
   Manifold AsOriginal() const;
+  static int ReserveIDs(int);
   ///@}
 
   /** @name Modification

@@ -53,6 +53,9 @@ declare class Mesh {
   triVerts: Uint32Array;
   mergeFromVert?: Uint32Array;
   mergeToVert?: Uint32Array;
+  runIndex?: Uint32Array;
+  originalID?: Uint32Array;
+  meshID?: Uint32Array;
   halfedgeTangent?: Float32Array;
   get numTri(): number;
   get numVert(): number;

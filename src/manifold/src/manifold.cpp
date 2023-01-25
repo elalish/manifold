@@ -230,6 +230,27 @@ MeshGL Manifold::GetMeshGL() const {
     }
   }
 
+  std::vector<std::tuple<int, int, int>> meshIDs(numTri);
+  for (int tri = 0; tri < numTri; ++tri) {
+    const TriRef ref = impl.meshRelation_.triRef[tri];
+    meshIDs[tri] = std::make_tuple(ref.originalID, ref.meshID, tri);
+  }
+  std::sort(meshIDs.begin(), meshIDs.end());
+  const std::vector<uint32_t> triVertsOld = out.triVerts;
+  int lastID = -1;
+  for (int tri = 0; tri < numTri; ++tri) {
+    const int meshID = std::get<1>(meshIDs[tri]);
+    if (meshID != lastID) {
+      out.originalID.push_back(std::get<0>(meshIDs[tri]));
+      out.meshID.push_back(meshID);
+      out.runIndex.push_back(3 * tri);
+    }
+    const int oldTri = std::get<2>(meshIDs[tri]);
+    for (const int i : {0, 1, 2})
+      out.triVerts[3 * tri + i] = triVertsOld[3 * oldTri + i];
+  }
+  out.runIndex.push_back(3 * numTri);
+
   return out;
 }
 
@@ -427,6 +448,15 @@ Manifold Manifold::AsOriginal() const {
   newImpl->SimplifyTopology();
   newImpl->Finish();
   return Manifold(std::make_shared<CsgLeafNode>(newImpl));
+}
+
+/**
+ * Returns the first of n sequential new unique meshIDs for marking sets of
+ * triangles that can be looked up after further operations. Assign to
+ * MeshGL.meshID vector.
+ */
+int Manifold::ReserveIDs(int n) {
+  return Manifold::Impl::meshIDCounter_.fetch_add(n, std::memory_order_relaxed);
 }
 
 /**

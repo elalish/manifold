@@ -128,6 +128,9 @@ Module.setup = function () {
       vertProperties = new Float32Array(),
       mergeFromVert,
       mergeToVert,
+      runIndex,
+      originalID,
+      meshID,
       halfedgeTangent
     } = {}) {
       this.numProp = numProp;
@@ -135,6 +138,9 @@ Module.setup = function () {
       this.vertProperties = vertProperties;
       this.mergeFromVert = mergeFromVert;
       this.mergeToVert = mergeToVert;
+      this.runIndex = runIndex;
+      this.originalID = originalID;
+      this.meshID = meshID;
       this.halfedgeTangent = halfedgeTangent;
     }
 
@@ -322,7 +328,7 @@ Module.setup = function () {
       const result = Module['_' + name + 'N'](v);
       v.delete();
       return result;
-    }
+    };
   }
 
   Module.union = batchbool('union');

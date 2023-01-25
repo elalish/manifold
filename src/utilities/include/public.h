@@ -177,7 +177,7 @@ struct MeshGL {
 
   /// Number of properties per vertex, always >= 3.
   int numProp = 3;
-  /// Flat, GL-style list of all vertex properties: propVal =
+  /// Flat, GL-style interleaved list of all vertex properties: propVal =
   /// vertProperties[vert * numProp + propIdx]. The first three properties are
   /// always the position x, y, z.
   std::vector<float> vertProperties;
@@ -191,6 +191,16 @@ struct MeshGL {
   // vertex to merge with. It will have an identical position, but the other
   // properties may differ.
   std::vector<uint32_t> mergeToVert;
+  /// Indicates runs of triangles that correspond to a particular meshID. The
+  /// runs encompass all of triVerts and are sorted lexicographically by
+  /// originalID, then meshID. Run i begins at triVerts[runIndex[i]] and ends at
+  /// triVerts[runIndex[i+1]].
+  std::vector<uint32_t> runIndex;
+  /// The OriginalID of the mesh this triangle run came from. This ID is ideal
+  /// for reapplying materials to the output mesh.
+  std::vector<uint32_t> originalID;
+  /// The unique ID of the mesh instance of this triangle run.
+  std::vector<uint32_t> meshID;
   /// Optional: The X-Y-Z-W weighted tangent vectors for smooth Refine(). If
   /// non-empty, must be exactly four times as long as Mesh.triVerts. Indexed
   /// as 4 * (3 * tri + i) + j, i < 3, j < 4, representing the tangent value
