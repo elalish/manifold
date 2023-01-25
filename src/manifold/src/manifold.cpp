@@ -244,6 +244,7 @@ MeshGL Manifold::GetMeshGL() const {
       out.originalID.push_back(std::get<0>(meshIDs[tri]));
       out.meshID.push_back(meshID);
       out.runIndex.push_back(3 * tri);
+      lastID = meshID;
     }
     const int oldTri = std::get<2>(meshIDs[tri]);
     for (const int i : {0, 1, 2})
