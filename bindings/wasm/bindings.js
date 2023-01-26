@@ -177,21 +177,6 @@ Module.setup = function () {
     return new Mesh(this._GetMeshJS());
   };
 
-  Module.Manifold.prototype.getMeshRelation = function () {
-    const result = this._getMeshRelation();
-    const oldTriBary = result.triRef;
-    const conversion3 = v => {
-      return {
-        meshID: v.meshID,
-        originalID: v.originalID,
-        tri: v.tri
-      };
-    };
-    result.triRef = fromVec(oldTriBary, conversion3);
-    oldTriBary.delete();
-    return result;
-  };
-
   Module.Manifold.prototype.boundingBox = function () {
     const result = this._boundingBox();
     return {

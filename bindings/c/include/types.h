@@ -8,7 +8,6 @@ typedef struct ManifoldMesh ManifoldMesh;
 typedef struct ManifoldMeshGL ManifoldMeshGL;
 typedef struct ManifoldCurvature ManifoldCurvature;
 typedef struct ManifoldComponents ManifoldComponents;
-typedef struct ManifoldMeshRelation ManifoldMeshRelation;
 typedef struct ManifoldBox ManifoldBox;
 typedef struct ManifoldMaterial ManifoldMaterial;
 typedef struct ManifoldExportOptions ManifoldExportOptions;

@@ -542,9 +542,6 @@ void manifold_delete_polygons(ManifoldPolygons *p) { delete from_c(p); }
 void manifold_delete_manifold(ManifoldManifold *m) { delete from_c(m); }
 void manifold_delete_mesh(ManifoldMesh *m) { delete from_c(m); }
 void manifold_delete_meshgl(ManifoldMeshGL *m) { delete from_c(m); }
-void manifold_delete_mesh_relation(ManifoldMeshRelation *m) {
-  delete from_c(m);
-}
 void manifold_delete_box(ManifoldBox *b) { delete from_c(b); }
 void manifold_delete_curvature(ManifoldCurvature *c) { delete from_c(c); }
 void manifold_delete_components(ManifoldComponents *c) { delete from_c(c); }
