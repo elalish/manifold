@@ -56,6 +56,7 @@ declare class Mesh {
   runIndex?: Uint32Array;
   originalID?: Uint32Array;
   meshID?: Uint32Array;
+  faceID?: Uint32Array;
   halfedgeTangent?: Float32Array;
   get numTri(): number;
   get numVert(): number;

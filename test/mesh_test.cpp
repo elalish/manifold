@@ -112,48 +112,51 @@ void RelatedGL(const Manifold& out, const std::vector<MeshGL>& input,
                const std::map<int, int>& meshID2idx) {
   ASSERT_FALSE(out.IsEmpty());
   MeshGL output = out.GetMeshGL();
-  MeshRelation relation = out.GetMeshRelation();
-  for (int tri = 0; tri < out.NumTri(); ++tri) {
-    int meshID = relation.triRef[tri].originalID;
-    int meshIdx = meshID2idx.at(meshID);
+  for (int run = 0; run < output.originalID.size(); ++run) {
+    const int meshIdx = meshID2idx.at(output.originalID[run]);
     ASSERT_LT(meshIdx, input.size());
     const MeshGL& inMesh = input[meshIdx];
-    int inTri = relation.triRef[tri].tri;
-    ASSERT_LT(inTri, inMesh.triVerts.size());
-    glm::ivec3 inTriangle = {inMesh.triVerts[3 * inTri],
-                             inMesh.triVerts[3 * inTri + 1],
-                             inMesh.triVerts[3 * inTri + 2]};
-    inTriangle *= inMesh.numProp;
-    glm::mat3 inTriPos;
-    for (int j : {0, 1, 2})
-      for (int k : {0, 1, 2})
-        inTriPos[j][k] = inMesh.vertProperties[inTriangle[j] + k];
-    glm::vec3 normal =
-        glm::cross(inTriPos[1] - inTriPos[0], inTriPos[2] - inTriPos[0]);
-    const float area = glm::length(normal);
-    if (area == 0) continue;
-    normal /= area;
+    for (int tri = output.runIndex[run] / 3; tri < output.runIndex[run + 1] / 3;
+         ++tri) {
+      const int inTri = output.faceID[tri];
+      ASSERT_LT(inTri, inMesh.triVerts.size());
+      glm::ivec3 inTriangle = {inMesh.triVerts[3 * inTri],
+                               inMesh.triVerts[3 * inTri + 1],
+                               inMesh.triVerts[3 * inTri + 2]};
+      inTriangle *= inMesh.numProp;
+      glm::mat3 inTriPos;
+      for (int j : {0, 1, 2})
+        for (int k : {0, 1, 2})
+          inTriPos[j][k] = inMesh.vertProperties[inTriangle[j] + k];
+      glm::vec3 normal =
+          glm::cross(inTriPos[1] - inTriPos[0], inTriPos[2] - inTriPos[0]);
+      const float area = glm::length(normal);
+      if (area == 0) continue;
+      normal /= area;
 
-    for (int j : {0, 1, 2}) {
-      const int vert = output.triVerts[3 * tri + j];
-      glm::vec3 outPos;
-      for (int k : {0, 1, 2})
-        outPos[k] = output.vertProperties[vert * output.numProp + k];
+      for (int j : {0, 1, 2}) {
+        const int vert = output.triVerts[3 * tri + j];
+        glm::vec3 outPos;
+        for (int k : {0, 1, 2})
+          outPos[k] = output.vertProperties[vert * output.numProp + k];
 
-      for (int p = 3; p < output.numProp; ++p) {
-        const float propOut = output.vertProperties[vert * output.numProp + p];
+        for (int p = 3; p < output.numProp; ++p) {
+          const float propOut =
+              output.vertProperties[vert * output.numProp + p];
 
-        glm::vec3 inProp = {inMesh.vertProperties[inTriangle[0] + p],
-                            inMesh.vertProperties[inTriangle[1] + p],
-                            inMesh.vertProperties[inTriangle[2] + p]};
-        glm::vec3 edges[3];
-        for (int k : {0, 1, 2}) {
-          edges[k] =
-              inTriPos[k] + normal * inProp[k] - (outPos + normal * propOut);
+          glm::vec3 inProp = {inMesh.vertProperties[inTriangle[0] + p],
+                              inMesh.vertProperties[inTriangle[1] + p],
+                              inMesh.vertProperties[inTriangle[2] + p]};
+          glm::vec3 edges[3];
+          for (int k : {0, 1, 2}) {
+            edges[k] =
+                inTriPos[k] + normal * inProp[k] - (outPos + normal * propOut);
+          }
+          const float volume =
+              glm::dot(edges[0], glm::cross(edges[1], edges[2]));
+
+          ASSERT_LE(volume, area * 100 * out.Precision());
         }
-        const float volume = glm::dot(edges[0], glm::cross(edges[1], edges[2]));
-
-        ASSERT_LE(volume, area * 100 * out.Precision());
       }
     }
   }

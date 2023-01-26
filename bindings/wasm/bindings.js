@@ -131,6 +131,7 @@ Module.setup = function () {
       runIndex,
       originalID,
       meshID,
+      faceID,
       halfedgeTangent
     } = {}) {
       this.numProp = numProp;
@@ -141,6 +142,7 @@ Module.setup = function () {
       this.runIndex = runIndex;
       this.originalID = originalID;
       this.meshID = meshID;
+      this.faceID = faceID;
       this.halfedgeTangent = halfedgeTangent;
     }
 

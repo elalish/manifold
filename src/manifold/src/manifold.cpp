@@ -230,23 +230,26 @@ MeshGL Manifold::GetMeshGL() const {
     }
   }
 
-  std::vector<std::tuple<int, int, int>> meshIDs(numTri);
+  out.faceID.resize(numTri);
+  std::vector<std::tuple<int, int, int, int>> meshIDs(numTri);
   for (int tri = 0; tri < numTri; ++tri) {
     const TriRef ref = impl.meshRelation_.triRef[tri];
-    meshIDs[tri] = std::make_tuple(ref.originalID, ref.meshID, tri);
+    meshIDs[tri] = std::make_tuple(ref.originalID, ref.meshID, tri, ref.tri);
   }
   std::sort(meshIDs.begin(), meshIDs.end());
   const std::vector<uint32_t> triVertsOld = out.triVerts;
   int lastID = -1;
   for (int tri = 0; tri < numTri; ++tri) {
-    const int meshID = std::get<1>(meshIDs[tri]);
+    const auto ref = meshIDs[tri];
+    const int meshID = std::get<1>(ref);
     if (meshID != lastID) {
-      out.originalID.push_back(std::get<0>(meshIDs[tri]));
+      out.originalID.push_back(std::get<0>(ref));
       out.meshID.push_back(meshID);
       out.runIndex.push_back(3 * tri);
       lastID = meshID;
     }
-    const int oldTri = std::get<2>(meshIDs[tri]);
+    out.faceID[tri] = std::get<3>(ref);
+    const int oldTri = std::get<2>(ref);
     for (const int i : {0, 1, 2})
       out.triVerts[3 * tri + i] = triVertsOld[3 * oldTri + i];
   }

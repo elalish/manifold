@@ -184,23 +184,28 @@ struct MeshGL {
   /// The vertex indices of the three triangle corners in CCW (from the outside)
   /// order, for each triangle.
   std::vector<uint32_t> triVerts;
-  /// A list of only the vertex indicies that need to be merged to reconstruct
-  /// the manifold.
+  /// Optional: A list of only the vertex indicies that need to be merged to
+  /// reconstruct the manifold.
   std::vector<uint32_t> mergeFromVert;
-  // The same length as mergeFromVert, and the corresponding value contains the
-  // vertex to merge with. It will have an identical position, but the other
-  // properties may differ.
+  /// Optional: The same length as mergeFromVert, and the corresponding value
+  /// contains the vertex to merge with. It will have an identical position, but
+  /// the other properties may differ.
   std::vector<uint32_t> mergeToVert;
-  /// Indicates runs of triangles that correspond to a particular meshID. The
-  /// runs encompass all of triVerts and are sorted lexicographically by
-  /// originalID, then meshID. Run i begins at triVerts[runIndex[i]] and ends at
-  /// triVerts[runIndex[i+1]].
+  /// Optional: Indicates runs of triangles that correspond to a particular
+  /// meshID. The runs encompass all of triVerts and are sorted
+  /// lexicographically by originalID, then meshID. Run i begins at
+  /// triVerts[runIndex[i]] and ends at triVerts[runIndex[i+1]].
   std::vector<uint32_t> runIndex;
-  /// The OriginalID of the mesh this triangle run came from. This ID is ideal
-  /// for reapplying materials to the output mesh.
+  /// Optional: The OriginalID of the mesh this triangle run came from. This ID
+  /// is ideal for reapplying materials to the output mesh.
   std::vector<uint32_t> originalID;
-  /// The unique ID of the mesh instance of this triangle run.
+  /// Optional: The unique ID of the mesh instance of this triangle run.
   std::vector<uint32_t> meshID;
+  /// Optional: Length NumTri, contains an ID of the source face this triangle
+  /// comes from. When auto-generated, this ID will be a triangle index into the
+  /// original mesh. All neighboring coplanar triangles from that input mesh
+  /// will refer to a single triangle of that group as the faceID.
+  std::vector<uint32_t> faceID;
   /// Optional: The X-Y-Z-W weighted tangent vectors for smooth Refine(). If
   /// non-empty, must be exactly four times as long as Mesh.triVerts. Indexed
   /// as 4 * (3 * tri + i) + j, i < 3, j < 4, representing the tangent value
