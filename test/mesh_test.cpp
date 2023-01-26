@@ -522,7 +522,6 @@ TEST(Manifold, ManualSmooth) {
     options.mat.roughness = 0.1;
 
     options.mat.vertColor.resize(interp.NumVert());
-    MeshRelation rel = interp.GetMeshRelation();
     const glm::vec4 red(1, 0, 0, 1);
     const glm::vec4 purple(1, 0, 1, 1);
     for (int tri = 0; tri < interp.NumTri(); ++tri) {
@@ -566,7 +565,6 @@ TEST(Manifold, Csaszar) {
     options.mat.roughness = 0.1;
 
     options.mat.vertColor.resize(csaszar.NumVert());
-    MeshRelation rel = csaszar.GetMeshRelation();
     const glm::vec4 blue(0, 0, 1, 1);
     const glm::vec4 yellow(1, 1, 0, 1);
     for (int tri = 0; tri < csaszar.NumTri(); ++tri) {

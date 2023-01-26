@@ -52,17 +52,14 @@ struct Manifold::Impl {
   enum class Shape { TETRAHEDRON, CUBE, OCTAHEDRON };
   Impl(Shape);
 
-  Impl(const MeshGL&,
-       std::vector<float> propertyTolerance = std::vector<float>());
-  Impl(const Mesh&,
-       const std::vector<glm::ivec3>& triProperties = std::vector<glm::ivec3>(),
-       const std::vector<float>& properties = std::vector<float>(),
-       const std::vector<float>& propertyTolerance = std::vector<float>());
+  Impl(const MeshGL&, std::vector<float> propertyTolerance = {});
+  Impl(const Mesh&, const std::vector<glm::ivec3>& triProperties = {},
+       const std::vector<float>& properties = {},
+       const std::vector<float>& propertyTolerance = {});
 
-  int InitializeNewReference(
-      const std::vector<glm::ivec3>& triProperties = std::vector<glm::ivec3>(),
-      const std::vector<float>& properties = std::vector<float>(),
-      const std::vector<float>& propertyTolerance = std::vector<float>());
+  int InitializeNewReference(const std::vector<glm::ivec3>& triProperties = {},
+                             const std::vector<float>& properties = {},
+                             const std::vector<float>& propertyTolerance = {});
 
   void RemoveUnreferencedVerts(VecDH<glm::ivec3>& triVerts);
   void ReinitializeReference(int meshID);

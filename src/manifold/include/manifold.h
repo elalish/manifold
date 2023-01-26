@@ -49,8 +49,7 @@ class Manifold {
   Manifold(Manifold&&) noexcept;
   Manifold& operator=(Manifold&&) noexcept;
 
-  Manifold(const MeshGL&,
-           const std::vector<float>& propertyTolerance = std::vector<float>());
+  Manifold(const MeshGL&, const std::vector<float>& propertyTolerance = {});
   Manifold(
       const Mesh&,
       const std::vector<glm::ivec3>& triProperties = std::vector<glm::ivec3>(),
@@ -58,8 +57,6 @@ class Manifold {
       const std::vector<float>& propertyTolerance = std::vector<float>());
 
   static Manifold Smooth(const MeshGL&,
-                         const std::vector<Smoothness>& sharpenedEdges = {});
-  static Manifold Smooth(const Mesh&,
                          const std::vector<Smoothness>& sharpenedEdges = {});
   static Manifold Tetrahedron();
   static Manifold Cube(glm::vec3 size = glm::vec3(1.0f), bool center = false);
@@ -129,12 +126,11 @@ class Manifold {
   Curvature GetCurvature() const;
   ///@}
 
-  /** @name Relation
+  /** @name Mesh ID
    *  Details of the manifold's relation to its input meshes, for the purposes
    * of reapplying mesh properties.
    */
   ///@{
-  MeshRelation GetMeshRelation() const;
   int OriginalID() const;
   Manifold AsOriginal() const;
   static int ReserveIDs(int);

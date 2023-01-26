@@ -453,27 +453,6 @@ int manifold_original_id(ManifoldManifold *m) {
   return from_c(m)->OriginalID();
 }
 
-ManifoldMeshRelation *manifold_get_mesh_relation(void *mem,
-                                                 ManifoldManifold *m) {
-  auto relation = from_c(m)->GetMeshRelation();
-  return to_c(new (mem) MeshRelation(relation));
-}
-
-size_t manifold_mesh_relation_tri_ref_length(ManifoldMeshRelation *m) {
-  return from_c(m)->triRef.size();
-}
-
-ManifoldTriRef *manifold_mesh_relation_tri_ref(void *mem,
-                                               ManifoldMeshRelation *m) {
-  auto tri_ref = from_c(m)->triRef;
-  auto len = tri_ref.size();
-  ManifoldTriRef *ts = reinterpret_cast<ManifoldTriRef *>(mem);
-  for (int i = 0; i < len; ++i) {
-    ts[i] = {tri_ref[i].meshID, tri_ref[i].originalID, tri_ref[i].tri};
-  }
-  return ts;
-}
-
 int manifold_is_empty(ManifoldManifold *m) { return from_c(m)->IsEmpty(); }
 
 ManifoldError manifold_status(ManifoldManifold *m) {
@@ -554,7 +533,6 @@ size_t manifold_meshgl_size() { return sizeof(MeshGL); }
 size_t manifold_box_size() { return sizeof(Box); }
 size_t manifold_curvature_size() { return sizeof(Curvature); }
 size_t manifold_components_size() { return sizeof(Components); }
-size_t manifold_mesh_relation_size() { return sizeof(MeshRelation); }
 
 // pointer free + destruction
 void manifold_delete_simple_polygon(ManifoldSimplePolygon *p) {
@@ -579,9 +557,6 @@ void manifold_destruct_polygons(ManifoldPolygons *p) { from_c(p)->~Polygons(); }
 void manifold_destruct_manifold(ManifoldManifold *m) { from_c(m)->~Manifold(); }
 void manifold_destruct_mesh(ManifoldMesh *m) { from_c(m)->~Mesh(); }
 void manifold_destruct_meshgl(ManifoldMeshGL *m) { from_c(m)->~MeshGL(); }
-void manifold_destruct_mesh_relation(ManifoldMeshRelation *m) {
-  from_c(m)->~MeshRelation();
-}
 void manifold_destruct_box(ManifoldBox *b) { from_c(b)->~Box(); }
 void manifold_destruct_curvature(ManifoldCurvature *c) {
   from_c(c)->~Curvature();

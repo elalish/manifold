@@ -211,14 +211,6 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .field("surfaceArea", &Properties::surfaceArea)
       .field("volume", &Properties::volume);
 
-  value_object<TriRef>("baryRef")
-      .field("meshID", &TriRef::meshID)
-      .field("originalID", &TriRef::originalID)
-      .field("tri", &TriRef::tri);
-
-  value_object<MeshRelation>("meshRelation")
-      .field("triRef", &MeshRelation::triRef);
-
   value_object<Curvature>("curvature")
       .field("maxMeanCurvature", &Curvature::maxMeanCurvature)
       .field("minMeanCurvature", &Curvature::minMeanCurvature)
@@ -234,7 +226,6 @@ EMSCRIPTEN_BINDINGS(whatever) {
   register_vector<float>("Vector_f32");
   register_vector<Manifold>("Vector_manifold");
   register_vector<Smoothness>("Vector_smoothness");
-  register_vector<TriRef>("Vector_baryRef");
   register_vector<glm::vec4>("Vector_vec4");
 
   class_<Manifold>("Manifold")
@@ -262,8 +253,7 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .function("getProperties", &Manifold::GetProperties)
       .function("_getCurvature", &Manifold::GetCurvature)
       .function("originalID", &Manifold::OriginalID)
-      .function("asOriginal", &Manifold::AsOriginal)
-      .function("_getMeshRelation", &Manifold::GetMeshRelation);
+      .function("asOriginal", &Manifold::AsOriginal);
 
   function("_Cube", &Manifold::Cube);
   function("_Cylinder", &Manifold::Cylinder);

@@ -67,10 +67,6 @@ ManifoldBox *to_c(manifold::Box *m) {
   return reinterpret_cast<ManifoldBox *>(m);
 }
 
-ManifoldMeshRelation *to_c(manifold::MeshRelation *m) {
-  return reinterpret_cast<ManifoldMeshRelation *>(m);
-}
-
 ManifoldMaterial *to_c(manifold::Material *m) {
   return reinterpret_cast<ManifoldMaterial *>(m);
 }
@@ -117,10 +113,6 @@ const manifold::Components *from_c(ManifoldComponents *components) {
 
 const manifold::Box *from_c(ManifoldBox *m) {
   return reinterpret_cast<manifold::Box const *>(m);
-}
-
-const manifold::MeshRelation *from_c(ManifoldMeshRelation *m) {
-  return reinterpret_cast<manifold::MeshRelation const *>(m);
 }
 
 manifold::Material *from_c(ManifoldMaterial *mat) {
