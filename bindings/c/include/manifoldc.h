@@ -186,7 +186,6 @@ size_t manifold_meshgl_merge_length(ManifoldMeshGL *m);
 size_t manifold_meshgl_tangent_length(ManifoldMeshGL *m);
 float *manifold_meshgl_vert_properties(void *mem, ManifoldMeshGL *m);
 uint32_t *manifold_meshgl_tri_verts(void *mem, ManifoldMeshGL *m);
-float *manifold_meshgl_vert_normal(void *mem, ManifoldMeshGL *m);
 uint32_t *manifold_meshgl_merge_from_vert(void *mem, ManifoldMeshGL *m);
 uint32_t *manifold_meshgl_merge_to_vert(void *mem, ManifoldMeshGL *m);
 float *manifold_meshgl_halfedge_tangent(void *mem, ManifoldMeshGL *m);
