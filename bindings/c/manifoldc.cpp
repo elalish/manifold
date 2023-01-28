@@ -400,6 +400,22 @@ size_t manifold_meshgl_merge_length(ManifoldMeshGL *m) {
   return from_c(m)->mergeFromVert.size();
 }
 
+size_t manifold_meshgl_run_index_length(ManifoldMeshGL *m) {
+  return from_c(m)->runIndex.size();
+}
+
+size_t manifold_meshgl_original_id_length(ManifoldMeshGL *m) {
+  return from_c(m)->originalID.size();
+}
+
+size_t manifold_meshgl_mesh_id_length(ManifoldMeshGL *m) {
+  return from_c(m)->meshID.size();
+}
+
+size_t manifold_meshgl_face_id_length(ManifoldMeshGL *m) {
+  return from_c(m)->faceID.size();
+}
+
 size_t manifold_meshgl_tangent_length(ManifoldMeshGL *m) {
   return from_c(m)->halfedgeTangent.size();
 }
@@ -434,6 +450,38 @@ uint32_t *manifold_meshgl_merge_to_vert(void *mem, ManifoldMeshGL *m) {
   uint32_t *ms = reinterpret_cast<uint32_t *>(mem);
   memcpy(ms, merge.data(), sizeof(uint32_t) * len);
   return ms;
+}
+
+uint32_t *manifold_meshgl_run_index(void *mem, ManifoldMeshGL *m) {
+  auto run_index = from_c(m)->runIndex;
+  auto len = run_index.size();
+  uint32_t *rs = reinterpret_cast<uint32_t *>(mem);
+  memcpy(rs, run_index.data(), sizeof(uint32_t) * len);
+  return rs;
+}
+
+uint32_t *manifold_meshgl_original_id(void *mem, ManifoldMeshGL *m) {
+  auto original_id = from_c(m)->originalID;
+  auto len = original_id.size();
+  uint32_t *ids = reinterpret_cast<uint32_t *>(mem);
+  memcpy(ids, original_id.data(), sizeof(uint32_t) * len);
+  return ids;
+}
+
+uint32_t *manifold_meshgl_mesh_id(void *mem, ManifoldMeshGL *m) {
+  auto mesh_id = from_c(m)->meshID;
+  auto len = mesh_id.size();
+  uint32_t *ids = reinterpret_cast<uint32_t *>(mem);
+  memcpy(ids, mesh_id.data(), sizeof(uint32_t) * len);
+  return ids;
+}
+
+uint32_t *manifold_meshgl_face_id(void *mem, ManifoldMeshGL *m) {
+  auto face_id = from_c(m)->faceID;
+  auto len = face_id.size();
+  uint32_t *ids = reinterpret_cast<uint32_t *>(mem);
+  memcpy(ids, face_id.data(), sizeof(uint32_t) * len);
+  return ids;
 }
 
 float *manifold_meshgl_halfedge_tangent(void *mem, ManifoldMeshGL *m) {
