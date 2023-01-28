@@ -38,3 +38,10 @@ std::vector<float> vector_of_array(float *fs, size_t length);
 std::vector<glm::vec3> vector_of_array(ManifoldVec3 *vs, size_t length);
 std::vector<glm::ivec3> vector_of_array(ManifoldIVec3 *vs, size_t length);
 std::vector<glm::vec4> vector_of_array(ManifoldVec4 *vs, size_t length);
+
+template <typename T>
+T *copy_data(void *mem, std::vector<T> v) {
+  T *ts = reinterpret_cast<T *>(mem);
+  memcpy(ts, v.data(), sizeof(T) * v.size());
+  return ts;
+}

@@ -421,75 +421,39 @@ size_t manifold_meshgl_tangent_length(ManifoldMeshGL *m) {
 }
 
 float *manifold_meshgl_vert_properties(void *mem, ManifoldMeshGL *m) {
-  auto vert_props = from_c(m)->vertProperties;
-  auto len = vert_props.size();
-  float *vs = reinterpret_cast<float *>(mem);
-  memcpy(vs, vert_props.data(), sizeof(float) * len);
-  return vs;
+  return copy_data(mem, from_c(m)->vertProperties);
 }
 
 uint32_t *manifold_meshgl_tri_verts(void *mem, ManifoldMeshGL *m) {
-  auto tri_verts = from_c(m)->triVerts;
-  auto len = tri_verts.size();
-  uint32_t *tris = reinterpret_cast<uint32_t *>(mem);
-  memcpy(tris, tri_verts.data(), sizeof(uint32_t) * len);
-  return tris;
+  return copy_data(mem, from_c(m)->triVerts);
 }
 
 uint32_t *manifold_meshgl_merge_from_vert(void *mem, ManifoldMeshGL *m) {
-  auto merge = from_c(m)->mergeFromVert;
-  auto len = merge.size();
-  uint32_t *ms = reinterpret_cast<uint32_t *>(mem);
-  memcpy(ms, merge.data(), sizeof(uint32_t) * len);
-  return ms;
+  return copy_data(mem, from_c(m)->mergeFromVert);
 }
 
 uint32_t *manifold_meshgl_merge_to_vert(void *mem, ManifoldMeshGL *m) {
-  auto merge = from_c(m)->mergeToVert;
-  auto len = merge.size();
-  uint32_t *ms = reinterpret_cast<uint32_t *>(mem);
-  memcpy(ms, merge.data(), sizeof(uint32_t) * len);
-  return ms;
+  return copy_data(mem, from_c(m)->mergeToVert);
 }
 
 uint32_t *manifold_meshgl_run_index(void *mem, ManifoldMeshGL *m) {
-  auto run_index = from_c(m)->runIndex;
-  auto len = run_index.size();
-  uint32_t *rs = reinterpret_cast<uint32_t *>(mem);
-  memcpy(rs, run_index.data(), sizeof(uint32_t) * len);
-  return rs;
+  return copy_data(mem, from_c(m)->runIndex);
 }
 
 uint32_t *manifold_meshgl_original_id(void *mem, ManifoldMeshGL *m) {
-  auto original_id = from_c(m)->originalID;
-  auto len = original_id.size();
-  uint32_t *ids = reinterpret_cast<uint32_t *>(mem);
-  memcpy(ids, original_id.data(), sizeof(uint32_t) * len);
-  return ids;
+  return copy_data(mem, from_c(m)->originalID);
 }
 
 uint32_t *manifold_meshgl_mesh_id(void *mem, ManifoldMeshGL *m) {
-  auto mesh_id = from_c(m)->meshID;
-  auto len = mesh_id.size();
-  uint32_t *ids = reinterpret_cast<uint32_t *>(mem);
-  memcpy(ids, mesh_id.data(), sizeof(uint32_t) * len);
-  return ids;
+  return copy_data(mem, from_c(m)->meshID);
 }
 
 uint32_t *manifold_meshgl_face_id(void *mem, ManifoldMeshGL *m) {
-  auto face_id = from_c(m)->faceID;
-  auto len = face_id.size();
-  uint32_t *ids = reinterpret_cast<uint32_t *>(mem);
-  memcpy(ids, face_id.data(), sizeof(uint32_t) * len);
-  return ids;
+  return copy_data(mem, from_c(m)->faceID);
 }
 
 float *manifold_meshgl_halfedge_tangent(void *mem, ManifoldMeshGL *m) {
-  auto tangents = from_c(m)->halfedgeTangent;
-  auto len = tangents.size();
-  float *ts = reinterpret_cast<float *>(mem);
-  memcpy(ts, tangents.data(), sizeof(float) * len);
-  return ts;
+  return copy_data(mem, from_c(m)->halfedgeTangent);
 }
 
 ManifoldManifold *manifold_as_original(void *mem, ManifoldManifold *m) {
@@ -539,19 +503,11 @@ size_t manifold_curvature_vert_length(ManifoldCurvature *curv) {
 }
 
 float *manifold_curvature_vert_mean(void *mem, ManifoldCurvature *curv) {
-  auto verts = from_c(curv)->vertMeanCurvature;
-  auto len = verts.size();
-  float *vs = reinterpret_cast<float *>(mem);
-  memcpy(vs, verts.data(), sizeof(float) * len);
-  return vs;
+  return copy_data(mem, from_c(curv)->vertMeanCurvature);
 }
 
 float *manifold_curvature_vert_gaussian(void *mem, ManifoldCurvature *curv) {
-  auto verts = from_c(curv)->vertGaussianCurvature;
-  auto len = verts.size();
-  float *vs = reinterpret_cast<float *>(mem);
-  memcpy(vs, verts.data(), sizeof(float) * len);
-  return vs;
+  return copy_data(mem, from_c(curv)->vertGaussianCurvature);
 }
 
 // Static Quality Globals
