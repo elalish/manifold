@@ -108,8 +108,7 @@ void Identical(const Mesh& mesh1, const Mesh& mesh2) {
     ASSERT_EQ(mesh1.triVerts[i], mesh2.triVerts[i]);
 }
 
-void RelatedGL(const Manifold& out, const std::vector<MeshGL>& input,
-               const std::map<int, int>& meshID2idx) {
+void RelatedGL(const Manifold& out, const std::vector<MeshGL>& input) {
   ASSERT_FALSE(out.IsEmpty());
   MeshGL output = out.GetMeshGL();
   ASSERT_EQ(output.meshID.size(), input.size());
@@ -167,20 +166,12 @@ void RelatedGL(const Manifold& out, const std::vector<MeshGL>& input,
 }
 
 void RelatedOp(const Manifold& inP, const Manifold& inQ, const Manifold& outR) {
+  EXPECT_GE(inP.OriginalID(), 0);
+  EXPECT_GE(inQ.OriginalID(), 0);
   std::vector<MeshGL> inputGL;
-  std::map<int, int> meshID2idx;
-
-  int meshID = inP.OriginalID();
-  EXPECT_GE(meshID, 0);
-  meshID2idx[meshID] = inputGL.size();
-  inputGL.push_back(inP.GetMeshGL());
-
-  meshID = inQ.OriginalID();
-  EXPECT_GE(meshID, 0);
-  meshID2idx[meshID] = inputGL.size();
-  inputGL.push_back(inQ.GetMeshGL());
-
-  RelatedGL(outR, inputGL, meshID2idx);
+  inputGL.emplace_back(inP.GetMeshGL());
+  inputGL.emplace_back(inQ.GetMeshGL());
+  RelatedGL(outR, inputGL);
 }
 
 struct MeshSize {
@@ -387,24 +378,21 @@ TEST(Manifold, InvalidInput7) {
  */
 TEST(Manifold, Decompose) {
   std::vector<Manifold> manifoldList;
-  manifoldList.push_back(Manifold::Tetrahedron());
-  manifoldList.push_back(Manifold::Cube());
-  manifoldList.push_back(Manifold::Sphere(1, 4));
+  manifoldList.emplace_back(Manifold::Tetrahedron());
+  manifoldList.emplace_back(Manifold::Cube());
+  manifoldList.emplace_back(Manifold::Sphere(1, 4));
   Manifold manifolds = Manifold::Compose(manifoldList);
 
   ExpectMeshes(manifolds, {{8, 12}, {6, 8}, {4, 4}});
 
   std::vector<MeshGL> input;
-  std::map<int, int> meshID2idx;
 
   for (const Manifold& manifold : manifoldList) {
-    int meshID = manifold.OriginalID();
-    EXPECT_GE(meshID, 0);
-    meshID2idx[meshID] = input.size();
-    input.push_back(manifold.GetMeshGL());
+    EXPECT_GE(manifold.OriginalID(), 0);
+    input.emplace_back(manifold.GetMeshGL());
   }
 
-  RelatedGL(manifolds, input, meshID2idx);
+  RelatedGL(manifolds, input);
 }
 
 /**
@@ -681,7 +669,6 @@ TEST(Manifold, MeshRelation) {
   Manifold gyroid(gyroidMeshGL, tol);
 
   std::vector<MeshGL> inputGL;
-  std::map<int, int> meshID2idx;
 
 #ifdef MANIFOLD_EXPORT
   ExportOptions opt;
@@ -690,32 +677,28 @@ TEST(Manifold, MeshRelation) {
   if (options.exportModels) ExportMesh("gyroid.glb", gyroid.GetMeshGL(), opt);
 #endif
 
-  int meshID = gyroid.OriginalID();
-  EXPECT_GE(meshID, 0);
-  meshID2idx[meshID] = inputGL.size();
-  inputGL.push_back(gyroidMeshGL);
+  EXPECT_GE(gyroid.OriginalID(), 0);
+  inputGL.emplace_back(gyroidMeshGL);
 
-  RelatedGL(gyroid, inputGL, meshID2idx);
+  RelatedGL(gyroid, inputGL);
 }
 
 TEST(Manifold, MeshRelationRefine) {
   std::vector<MeshGL> inputGL;
-  std::map<int, int> meshID2idx;
 
   const Mesh in = Csaszar();
   MeshGL inGL = WithIndexColors(in);
 
-  inputGL.push_back(inGL);
+  inputGL.emplace_back(inGL);
   std::vector<float> tol(3, 0);
   Manifold csaszar(inGL, tol);
 
   int meshID = csaszar.OriginalID();
   EXPECT_GE(meshID, 0);
-  meshID2idx[meshID] = inputGL.size() - 1;
 
-  RelatedGL(csaszar, inputGL, meshID2idx);
+  RelatedGL(csaszar, inputGL);
   csaszar.Refine(4);
-  RelatedGL(csaszar, inputGL, meshID2idx);
+  RelatedGL(csaszar, inputGL);
 }
 
 /**
@@ -960,8 +943,8 @@ TEST(Boolean, Empty) {
 
 TEST(Boolean, Winding) {
   std::vector<Manifold> cubes;
-  cubes.push_back(Manifold::Cube(glm::vec3(3.0f), true));
-  cubes.push_back(Manifold::Cube(glm::vec3(2.0f), true));
+  cubes.emplace_back(Manifold::Cube(glm::vec3(3.0f), true));
+  cubes.emplace_back(Manifold::Cube(glm::vec3(2.0f), true));
   Manifold doubled = Manifold::Compose(cubes);
 
   Manifold cube = Manifold::Cube(glm::vec3(1.0f), true);
@@ -1067,19 +1050,14 @@ TEST(Boolean, MeshRelation) {
   EXPECT_NEAR(prop.surfaceArea, 387, 1);
 
   std::vector<MeshGL> inputGL;
-  std::map<int, int> meshID2idx;
 
-  int meshID = gyroid.OriginalID();
-  EXPECT_GE(meshID, 0);
-  meshID2idx[meshID] = inputGL.size();
-  inputGL.push_back(gyroidMeshGL);
+  EXPECT_GE(gyroid.OriginalID(), 0);
+  inputGL.emplace_back(gyroidMeshGL);
 
-  meshID = gyroid2.OriginalID();
-  EXPECT_GE(meshID, 0);
-  meshID2idx[meshID] = inputGL.size();
-  inputGL.push_back(gyroidMeshGL2);
+  EXPECT_GE(gyroid2.OriginalID(), 0);
+  inputGL.emplace_back(gyroidMeshGL2);
 
-  RelatedGL(result, inputGL, meshID2idx);
+  RelatedGL(result, inputGL);
 }
 
 TEST(Boolean, Cylinders) {
