@@ -93,6 +93,45 @@ Manifold Manifold::Smooth(const MeshGL& meshGL,
 }
 
 /**
+ * Constructs a smooth version of the input mesh by creating tangents; this
+ * method will throw if you have supplied tangents with your mesh already. The
+ * actual triangle resolution is unchanged; use the Refine() method to
+ * interpolate to a higher-resolution curve.
+ *
+ * By default, every edge is calculated for maximum smoothness (very much
+ * approximately), attempting to minimize the maximum mean Curvature magnitude.
+ * No higher-order derivatives are considered, as the interpolation is
+ * independent per triangle, only sharing constraints on their boundaries.
+ *
+ * @param mesh input Mesh.
+ * @param sharpenedEdges If desired, you can supply a vector of sharpened
+ * halfedges, which should in general be a small subset of all halfedges. Order
+ * of entries doesn't matter, as each one specifies the desired smoothness
+ * (between zero and one, with one the default for all unspecified halfedges)
+ * and the halfedge index (3 * triangle index + [0,1,2] where 0 is the edge
+ * between triVert 0 and 1, etc).
+ *
+ * At a smoothness value of zero, a sharp crease is made. The smoothness is
+ * interpolated along each edge, so the specified value should be thought of as
+ * an average. Where exactly two sharpened edges meet at a vertex, their
+ * tangents are rotated to be colinear so that the sharpened edge can be
+ * continuous. Vertices with only one sharpened edge are completely smooth,
+ * allowing sharpened edges to smoothly vanish at termination. A single vertex
+ * can be sharpened by sharping all edges that are incident on it, allowing
+ * cones to be formed.
+ */
+Manifold Manifold::Smooth(const Mesh& mesh,
+                          const std::vector<Smoothness>& sharpenedEdges) {
+  ASSERT(mesh.halfedgeTangent.empty(), std::runtime_error,
+         "when supplying tangents, the normal constructor should be used "
+         "rather than Smooth().");
+
+  std::shared_ptr<Impl> impl = std::make_shared<Impl>(mesh);
+  impl->CreateTangents(sharpenedEdges);
+  return Manifold(impl);
+}
+
+/**
  * Constructs a tetrahedron centered at the origin with one vertex at (1,1,1)
  * and the rest at similarly symmetric points.
  */

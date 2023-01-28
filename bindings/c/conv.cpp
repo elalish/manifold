@@ -53,11 +53,14 @@ ManifoldError to_c(manifold::Manifold::Error error) {
     case Manifold::Error::PROPERTIES_WRONG_LENGTH:
       e = PROPERTIES_WRONG_LENGTH;
       break;
-    case Manifold::Error::TRI_PROPERTIES_WRONG_LENGTH:
-      e = TRI_PROPERTIES_WRONG_LENGTH;
+    case Manifold::Error::MISSING_POSITION_PROPERTIES:
+      e = MISSING_POSITION_PROPERTIES;
       break;
-    case Manifold::Error::TRI_PROPERTIES_OUT_OF_BOUNDS:
-      e = TRI_PROPERTIES_OUT_OF_BOUNDS;
+    case Manifold::Error::MERGE_VECTORS_DIFFERENT_LENGTHS:
+      e = MERGE_VECTORS_DIFFERENT_LENGTHS;
+      break;
+    case Manifold::Error::MERGE_INDEX_OUT_OF_BOUNDS:
+      e = MERGE_INDEX_OUT_OF_BOUNDS;
       break;
   };
   return e;

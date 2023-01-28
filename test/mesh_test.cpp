@@ -63,6 +63,22 @@ Mesh Tet() {
   return tet;
 }
 
+MeshGL TetGL() {
+  MeshGL tet;
+  tet.numProp = 5;
+  tet.vertProperties = {-1, -1, 1,  0, 0,   //
+                        -1, 1,  -1, 1, -1,  //
+                        1,  -1, -1, 2, -2,  //
+                        1,  1,  1,  3, -3,  //
+                        -1, 1,  -1, 4, -4,  //
+                        1,  -1, -1, 5, -5,  //
+                        1,  1,  1,  6, -6};
+  tet.triVerts = {2, 0, 1, 0, 3, 1, 2, 3, 0, 6, 5, 4};
+  tet.mergeFromVert = {4, 5, 6};
+  tet.mergeToVert = {1, 2, 3};
+  return tet;
+}
+
 MeshGL WithIndexColors(const Mesh& in) {
   MeshGL inGL(in);
   const int numVert = in.vertPos.size();
@@ -287,10 +303,7 @@ TEST(Manifold, Empty) {
 
 TEST(Manifold, ValidInput) {
   std::vector<float> propTol = {0.1, 0.2};
-  std::vector<float> prop = {0, 0, 1, -1, 2, -2, 3, -3, 4, -4, 5, -5, 6, -6};
-  std::vector<glm::ivec3> triProp = {
-      {2, 0, 1}, {0, 3, 1}, {2, 3, 0}, {6, 5, 4}};
-  Manifold tet(Tet(), triProp, prop, propTol);
+  Manifold tet(TetGL(), propTol);
   EXPECT_FALSE(tet.IsEmpty());
   EXPECT_EQ(tet.Status(), Manifold::Error::NO_ERROR);
   EXPECT_TRUE(tet.IsManifold());
@@ -341,34 +354,20 @@ TEST(Manifold, InvalidInput4) {
 }
 
 TEST(Manifold, InvalidInput5) {
-  std::vector<float> propTol = {0.1, 0.2};
-  std::vector<float> prop = {0, 0, 1, -1, 2, -2, 3, -3, 4, -4, 5, -5, 6};
-  std::vector<glm::ivec3> triProp = {
-      {2, 0, 1}, {0, 3, 1}, {2, 3, 0}, {6, 5, 4}};
-  Manifold tet(Tet(), triProp, prop, propTol);
+  MeshGL tetGL = TetGL();
+  tetGL.mergeFromVert[tetGL.mergeFromVert.size() - 1] = 7;
+  Manifold tet(tetGL);
   EXPECT_TRUE(tet.IsEmpty());
-  EXPECT_EQ(tet.Status(), Manifold::Error::PROPERTIES_WRONG_LENGTH);
-  EXPECT_TRUE(tet.IsManifold());
-}
-
-TEST(Manifold, InvalidInput6) {
-  std::vector<float> propTol = {0.1, 0.2};
-  std::vector<float> prop = {0, 0, 1, -1, 2, -2, 3, -3, 4, -4, 5, -5, 6, -6};
-  std::vector<glm::ivec3> triProp = {{2, 0, 1}, {0, 3, 1}, {2, 3, 0}};
-  Manifold tet(Tet(), triProp, prop, propTol);
-  EXPECT_TRUE(tet.IsEmpty());
-  EXPECT_EQ(tet.Status(), Manifold::Error::TRI_PROPERTIES_WRONG_LENGTH);
+  EXPECT_EQ(tet.Status(), Manifold::Error::MERGE_INDEX_OUT_OF_BOUNDS);
   EXPECT_TRUE(tet.IsManifold());
 }
 
 TEST(Manifold, InvalidInput7) {
-  std::vector<float> propTol = {0.1, 0.2};
-  std::vector<float> prop = {0, 0, 1, -1, 2, -2, 3, -3, 4, -4, 5, -5, 6, -6};
-  std::vector<glm::ivec3> triProp = {
-      {2, 0, 1}, {0, 3, 1}, {2, 3, 0}, {6, 5, 7}};
-  Manifold tet(Tet(), triProp, prop, propTol);
+  MeshGL tetGL = TetGL();
+  tetGL.triVerts[tetGL.triVerts.size() - 1] = 7;
+  Manifold tet(tetGL);
   EXPECT_TRUE(tet.IsEmpty());
-  EXPECT_EQ(tet.Status(), Manifold::Error::TRI_PROPERTIES_OUT_OF_BOUNDS);
+  EXPECT_EQ(tet.Status(), Manifold::Error::VERTEX_INDEX_OUT_OF_BOUNDS);
   EXPECT_TRUE(tet.IsManifold());
 }
 

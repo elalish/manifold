@@ -190,10 +190,12 @@ EMSCRIPTEN_BINDINGS(whatever) {
              Manifold::Error::VERTEX_INDEX_OUT_OF_BOUNDS)
       .value("PROPERTIES_WRONG_LENGTH",
              Manifold::Error::PROPERTIES_WRONG_LENGTH)
-      .value("TRI_PROPERTIES_WRONG_LENGTH",
-             Manifold::Error::TRI_PROPERTIES_WRONG_LENGTH)
-      .value("TRI_PROPERTIES_OUT_OF_BOUNDS",
-             Manifold::Error::TRI_PROPERTIES_OUT_OF_BOUNDS);
+      .value("MISSING_POSITION_PROPERTIES",
+             Manifold::Error::MISSING_POSITION_PROPERTIES)
+      .value("MERGE_VECTORS_DIFFERENT_LENGTHS",
+             Manifold::Error::MERGE_VECTORS_DIFFERENT_LENGTHS)
+      .value("MERGE_INDEX_OUT_OF_BOUNDS",
+             Manifold::Error::MERGE_INDEX_OUT_OF_BOUNDS);
 
   value_object<Box>("box").field("min", &Box::min).field("max", &Box::max);
 

@@ -198,11 +198,14 @@ Module.setup = function () {
       case Module.status.PROPERTIES_WRONG_LENGTH.value:
         message = 'Properties have wrong length';
         break;
-      case Module.status.TRI_PROPERTIES_WRONG_LENGTH.value:
-        message = 'Tri properties have wrong length';
+      case Module.status.MISSING_POSITION_PROPERTIES.value:
+        message = 'Less than three properties';
         break;
-      case Module.status.TRI_PROPERTIES_OUT_OF_BOUNDS.value:
-        message = 'Tri properties out of bounds';
+      case Module.status.MERGE_VECTORS_DIFFERENT_LENGTHS.value:
+        message = 'Merge vectors have different lengths';
+        break;
+      case Module.status.MERGE_INDEX_OUT_OF_BOUNDS.value:
+        message = 'Merge index out of bounds';
     }
 
     const base = Error.apply(this, [message, ...args]);

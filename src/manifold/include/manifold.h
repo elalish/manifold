@@ -50,13 +50,11 @@ class Manifold {
   Manifold& operator=(Manifold&&) noexcept;
 
   Manifold(const MeshGL&, const std::vector<float>& propertyTolerance = {});
-  Manifold(
-      const Mesh&,
-      const std::vector<glm::ivec3>& triProperties = std::vector<glm::ivec3>(),
-      const std::vector<float>& properties = std::vector<float>(),
-      const std::vector<float>& propertyTolerance = std::vector<float>());
+  Manifold(const Mesh&);
 
   static Manifold Smooth(const MeshGL&,
+                         const std::vector<Smoothness>& sharpenedEdges = {});
+  static Manifold Smooth(const Mesh&,
                          const std::vector<Smoothness>& sharpenedEdges = {});
   static Manifold Tetrahedron();
   static Manifold Cube(glm::vec3 size = glm::vec3(1.0f), bool center = false);
@@ -110,8 +108,9 @@ class Manifold {
     NOT_MANIFOLD,
     VERTEX_INDEX_OUT_OF_BOUNDS,
     PROPERTIES_WRONG_LENGTH,
-    TRI_PROPERTIES_WRONG_LENGTH,
-    TRI_PROPERTIES_OUT_OF_BOUNDS,
+    MISSING_POSITION_PROPERTIES,
+    MERGE_VECTORS_DIFFERENT_LENGTHS,
+    MERGE_INDEX_OUT_OF_BOUNDS,
   };
   Error Status() const;
   int NumVert() const;

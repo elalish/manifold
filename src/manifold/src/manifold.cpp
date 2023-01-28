@@ -119,24 +119,9 @@ Manifold::Manifold(const MeshGL& meshGL,
  * using the MeshRelation.
  *
  * @param mesh The input Mesh.
- * @param triProperties A vector of the same length as triVerts, filled with
- * references to the properties index. Note the same vertex can have different
- * properties in different triangles.
- * @param properties A vector whose length is the largest index in
- * triProperties times the length of propertyTolerance (the number of
- * properties). Think of it as a property matrix indexed as [index *
- * numProperties + propertyNum].
- * @param propertyTolerance A vector of precision values for each property.
- * This is the amount of interpolation error allowed before two neighboring
- * triangles are considered not coplanar. A good place to start is 1e-5 times
- * the largest value you expect this property to take.
  */
-Manifold::Manifold(const Mesh& mesh,
-                   const std::vector<glm::ivec3>& triProperties,
-                   const std::vector<float>& properties,
-                   const std::vector<float>& propertyTolerance)
-    : pNode_(std::make_shared<CsgLeafNode>(std::make_shared<Impl>(
-          mesh, triProperties, properties, propertyTolerance))) {}
+Manifold::Manifold(const Mesh& mesh)
+    : pNode_(std::make_shared<CsgLeafNode>(std::make_shared<Impl>(mesh))) {}
 
 /**
  * This returns a Mesh of simple vectors of vertices and triangles suitable for

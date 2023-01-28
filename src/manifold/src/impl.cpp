@@ -389,16 +389,38 @@ std::atomic<int> Manifold::Impl::meshIDCounter_(1);
 Manifold::Impl::Impl(const MeshGL& meshGL,
                      std::vector<float> propertyTolerance) {
   Mesh mesh;
-  mesh.triVerts.resize(meshGL.NumTri());
+  const int numVert = meshGL.NumVert();
 
-  std::vector<int> prop2vert(meshGL.NumVert());
+  if (meshGL.numProp < 3) {
+    MarkFailure(Error::MISSING_POSITION_PROPERTIES);
+    return;
+  }
+
+  mesh.triVerts.resize(meshGL.NumTri());
+  if (meshGL.mergeFromVert.size() != meshGL.mergeToVert.size()) {
+    MarkFailure(Error::MERGE_VECTORS_DIFFERENT_LENGTHS);
+    return;
+  }
+
+  std::vector<int> prop2vert(numVert);
   std::iota(prop2vert.begin(), prop2vert.end(), 0);
   for (int i = 0; i < meshGL.mergeFromVert.size(); ++i) {
-    prop2vert[meshGL.mergeFromVert[i]] = meshGL.mergeToVert[i];
+    const int from = meshGL.mergeFromVert[i];
+    const int to = meshGL.mergeToVert[i];
+    if (from >= numVert || to >= numVert) {
+      MarkFailure(Error::MERGE_INDEX_OUT_OF_BOUNDS);
+      return;
+    }
+    prop2vert[from] = to;
   }
   for (int i = 0; i < meshGL.NumTri(); ++i) {
     for (const int j : {0, 1, 2}) {
-      mesh.triVerts[i][j] = prop2vert[meshGL.triVerts[3 * i + j]];
+      const int vert = meshGL.triVerts[3 * i + j];
+      if (vert < 0 || vert >= numVert) {
+        MarkFailure(Error::VERTEX_INDEX_OUT_OF_BOUNDS);
+        return;
+      }
+      mesh.triVerts[i][j] = prop2vert[vert];
     }
   }
 
@@ -578,23 +600,10 @@ int Manifold::Impl::InitializeNewReference(
   }
 
   if (triProperties.size() > 0) {
-    if (triProperties.size() != NumTri() && triProperties.size() != 0) {
-      MarkFailure(Error::TRI_PROPERTIES_WRONG_LENGTH);
-      return nextMeshID;
-    };
-    if (numProps == 0 || properties.size() % numProps != 0) {
-      MarkFailure(Error::PROPERTIES_WRONG_LENGTH);
-      return nextMeshID;
-    };
-
-    const int numSets = properties.size() / numProps;
-    if (!all_of(autoPolicy(triProperties.size()),
-                meshRelation_.triProperties.begin(),
-                meshRelation_.triProperties.end(),
-                CheckProperties({numSets}))) {
-      MarkFailure(Error::TRI_PROPERTIES_OUT_OF_BOUNDS);
-      return nextMeshID;
-    };
+    ASSERT(triProperties.size() == NumTri(), logicErr,
+           "triProperties wrong length");
+    ASSERT(numProps > 0 && properties.size() % numProps == 0, logicErr,
+           "properties wrong length");
   }
 
   VecDH<thrust::pair<int, int>> face2face(halfedge_.size(), {-1, -1});
