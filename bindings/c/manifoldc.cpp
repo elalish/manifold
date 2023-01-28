@@ -245,28 +245,6 @@ ManifoldManifold *manifold_of_mesh(void *mem, ManifoldMesh *mesh) {
   return to_c(new (mem) Manifold(m));
 }
 
-ManifoldManifold *manifold_of_mesh_props(void *mem, ManifoldMesh *mesh,
-                                         ManifoldIVec3 *tri_properties,
-                                         float *properties,
-                                         float *property_tolerance,
-                                         size_t n_props) {
-  auto msh = *from_c(mesh);
-  size_t n_tri = msh.triVerts.size();
-
-  auto tri_props = vector_of_array(tri_properties, n_tri);
-
-  int max_idx = 0;
-  for (glm::ivec3 v : tri_props) {
-    auto i = std::max(std::max(v.x, v.y), v.z);
-    max_idx = std::max(i, max_idx);
-  }
-
-  auto props = vector_of_array(properties, n_props * max_idx);
-  auto prop_tol = vector_of_array(property_tolerance, n_props);
-  auto m = Manifold(msh, tri_props, props, prop_tol);
-  return to_c(new (mem) Manifold(m));
-}
-
 ManifoldManifold *manifold_extrude(void *mem, ManifoldPolygons *polygons,
                                    float height, int slices,
                                    float twist_degrees, float scale_x,
@@ -400,6 +378,18 @@ size_t manifold_meshgl_merge_length(ManifoldMeshGL *m) {
   return from_c(m)->mergeFromVert.size();
 }
 
+size_t manifold_meshgl_run_index_length(ManifoldMeshGL *m) {
+  return from_c(m)->runIndex.size();
+}
+
+size_t manifold_meshgl_original_id_length(ManifoldMeshGL *m) {
+  return from_c(m)->originalID.size();
+}
+
+size_t manifold_meshgl_face_id_length(ManifoldMeshGL *m) {
+  return from_c(m)->faceID.size();
+}
+
 size_t manifold_meshgl_tangent_length(ManifoldMeshGL *m) {
   return from_c(m)->halfedgeTangent.size();
 }
@@ -436,6 +426,30 @@ uint32_t *manifold_meshgl_merge_to_vert(void *mem, ManifoldMeshGL *m) {
   return ms;
 }
 
+uint32_t *manifold_meshgl_run_index(void *mem, ManifoldMeshGL *m) {
+  auto run_index = from_c(m)->runIndex;
+  auto len = run_index.size();
+  uint32_t *rs = reinterpret_cast<uint32_t *>(mem);
+  memcpy(rs, run_index.data(), sizeof(uint32_t) * len);
+  return rs;
+}
+
+uint32_t *manifold_meshgl_original_id(void *mem, ManifoldMeshGL *m) {
+  auto original_id = from_c(m)->originalID;
+  auto len = original_id.size();
+  uint32_t *ids = reinterpret_cast<uint32_t *>(mem);
+  memcpy(ids, original_id.data(), sizeof(uint32_t) * len);
+  return ids;
+}
+
+uint32_t *manifold_meshgl_face_id(void *mem, ManifoldMeshGL *m) {
+  auto face_id = from_c(m)->faceID;
+  auto len = face_id.size();
+  uint32_t *ids = reinterpret_cast<uint32_t *>(mem);
+  memcpy(ids, face_id.data(), sizeof(uint32_t) * len);
+  return ids;
+}
+
 float *manifold_meshgl_halfedge_tangent(void *mem, ManifoldMeshGL *m) {
   auto tangents = from_c(m)->halfedgeTangent;
   auto len = tangents.size();
@@ -451,27 +465,6 @@ ManifoldManifold *manifold_as_original(void *mem, ManifoldManifold *m) {
 
 int manifold_original_id(ManifoldManifold *m) {
   return from_c(m)->OriginalID();
-}
-
-ManifoldMeshRelation *manifold_get_mesh_relation(void *mem,
-                                                 ManifoldManifold *m) {
-  auto relation = from_c(m)->GetMeshRelation();
-  return to_c(new (mem) MeshRelation(relation));
-}
-
-size_t manifold_mesh_relation_tri_ref_length(ManifoldMeshRelation *m) {
-  return from_c(m)->triRef.size();
-}
-
-ManifoldTriRef *manifold_mesh_relation_tri_ref(void *mem,
-                                               ManifoldMeshRelation *m) {
-  auto tri_ref = from_c(m)->triRef;
-  auto len = tri_ref.size();
-  ManifoldTriRef *ts = reinterpret_cast<ManifoldTriRef *>(mem);
-  for (int i = 0; i < len; ++i) {
-    ts[i] = {tri_ref[i].meshID, tri_ref[i].originalID, tri_ref[i].tri};
-  }
-  return ts;
 }
 
 int manifold_is_empty(ManifoldManifold *m) { return from_c(m)->IsEmpty(); }
@@ -554,7 +547,6 @@ size_t manifold_meshgl_size() { return sizeof(MeshGL); }
 size_t manifold_box_size() { return sizeof(Box); }
 size_t manifold_curvature_size() { return sizeof(Curvature); }
 size_t manifold_components_size() { return sizeof(Components); }
-size_t manifold_mesh_relation_size() { return sizeof(MeshRelation); }
 
 // pointer free + destruction
 void manifold_delete_simple_polygon(ManifoldSimplePolygon *p) {
@@ -564,9 +556,6 @@ void manifold_delete_polygons(ManifoldPolygons *p) { delete from_c(p); }
 void manifold_delete_manifold(ManifoldManifold *m) { delete from_c(m); }
 void manifold_delete_mesh(ManifoldMesh *m) { delete from_c(m); }
 void manifold_delete_meshgl(ManifoldMeshGL *m) { delete from_c(m); }
-void manifold_delete_mesh_relation(ManifoldMeshRelation *m) {
-  delete from_c(m);
-}
 void manifold_delete_box(ManifoldBox *b) { delete from_c(b); }
 void manifold_delete_curvature(ManifoldCurvature *c) { delete from_c(c); }
 void manifold_delete_components(ManifoldComponents *c) { delete from_c(c); }
@@ -579,9 +568,6 @@ void manifold_destruct_polygons(ManifoldPolygons *p) { from_c(p)->~Polygons(); }
 void manifold_destruct_manifold(ManifoldManifold *m) { from_c(m)->~Manifold(); }
 void manifold_destruct_mesh(ManifoldMesh *m) { from_c(m)->~Mesh(); }
 void manifold_destruct_meshgl(ManifoldMeshGL *m) { from_c(m)->~MeshGL(); }
-void manifold_destruct_mesh_relation(ManifoldMeshRelation *m) {
-  from_c(m)->~MeshRelation();
-}
 void manifold_destruct_box(ManifoldBox *b) { from_c(b)->~Box(); }
 void manifold_destruct_curvature(ManifoldCurvature *c) {
   from_c(c)->~Curvature();

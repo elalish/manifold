@@ -139,6 +139,19 @@ struct Barycentric {
   glm::vec3 uvw;
 };
 
+struct TriRef {
+  /// The unique ID of the mesh instance of this triangle. If .meshID and .tri
+  /// match for two triangles, then they are coplanar and came from the same
+  /// face.
+  int meshID;
+  /// The OriginalID of the mesh this triangle came from. This ID is ideal for
+  /// reapplying properties like UV coordinates to the output mesh.
+  int originalID;
+  /// The triangle index of the original triangle this was part of:
+  /// Mesh.triVerts[tri].
+  int tri;
+};
+
 /**
  * This is a temporary edge structure which only stores edges forward and
  * references the halfedge it was created from.
@@ -208,6 +221,11 @@ inline std::ostream& operator<<(std::ostream& stream, const Halfedge& edge) {
 
 inline std::ostream& operator<<(std::ostream& stream, const Barycentric& bary) {
   return stream << "tri = " << bary.tri << ", uvw = " << bary.uvw;
+}
+
+inline std::ostream& operator<<(std::ostream& stream, const TriRef& ref) {
+  return stream << "meshID: " << ref.meshID
+                << ", originalID: " << ref.originalID << ", tri: " << ref.tri;
 }
 #endif
 }  // namespace manifold

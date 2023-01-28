@@ -128,6 +128,9 @@ Module.setup = function () {
       vertProperties = new Float32Array(),
       mergeFromVert,
       mergeToVert,
+      runIndex,
+      originalID,
+      faceID,
       halfedgeTangent
     } = {}) {
       this.numProp = numProp;
@@ -135,6 +138,9 @@ Module.setup = function () {
       this.vertProperties = vertProperties;
       this.mergeFromVert = mergeFromVert;
       this.mergeToVert = mergeToVert;
+      this.runIndex = runIndex;
+      this.originalID = originalID;
+      this.faceID = faceID;
       this.halfedgeTangent = halfedgeTangent;
     }
 
@@ -169,21 +175,6 @@ Module.setup = function () {
     return new Mesh(this._GetMeshJS());
   };
 
-  Module.Manifold.prototype.getMeshRelation = function () {
-    const result = this._getMeshRelation();
-    const oldTriBary = result.triRef;
-    const conversion3 = v => {
-      return {
-        meshID: v.meshID,
-        originalID: v.originalID,
-        tri: v.tri
-      };
-    };
-    result.triRef = fromVec(oldTriBary, conversion3);
-    oldTriBary.delete();
-    return result;
-  };
-
   Module.Manifold.prototype.boundingBox = function () {
     const result = this._boundingBox();
     return {
@@ -207,11 +198,14 @@ Module.setup = function () {
       case Module.status.PROPERTIES_WRONG_LENGTH.value:
         message = 'Properties have wrong length';
         break;
-      case Module.status.TRI_PROPERTIES_WRONG_LENGTH.value:
-        message = 'Tri properties have wrong length';
+      case Module.status.MISSING_POSITION_PROPERTIES.value:
+        message = 'Less than three properties';
         break;
-      case Module.status.TRI_PROPERTIES_OUT_OF_BOUNDS.value:
-        message = 'Tri properties out of bounds';
+      case Module.status.MERGE_VECTORS_DIFFERENT_LENGTHS.value:
+        message = 'Merge vectors have different lengths';
+        break;
+      case Module.status.MERGE_INDEX_OUT_OF_BOUNDS.value:
+        message = 'Merge index out of bounds';
     }
 
     const base = Error.apply(this, [message, ...args]);
@@ -322,7 +316,7 @@ Module.setup = function () {
       const result = Module['_' + name + 'N'](v);
       v.delete();
       return result;
-    }
+    };
   }
 
   Module.union = batchbool('union');

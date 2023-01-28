@@ -12,7 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <algorithm>
 #include <map>
+#include <numeric>
 
 #include "boolean3.h"
 #include "csg_tree.h"
@@ -117,24 +119,9 @@ Manifold::Manifold(const MeshGL& meshGL,
  * using the MeshRelation.
  *
  * @param mesh The input Mesh.
- * @param triProperties A vector of the same length as triVerts, filled with
- * references to the properties index. Note the same vertex can have different
- * properties in different triangles.
- * @param properties A vector whose length is the largest index in
- * triProperties times the length of propertyTolerance (the number of
- * properties). Think of it as a property matrix indexed as [index *
- * numProperties + propertyNum].
- * @param propertyTolerance A vector of precision values for each property.
- * This is the amount of interpolation error allowed before two neighboring
- * triangles are considered not coplanar. A good place to start is 1e-5 times
- * the largest value you expect this property to take.
  */
-Manifold::Manifold(const Mesh& mesh,
-                   const std::vector<glm::ivec3>& triProperties,
-                   const std::vector<float>& properties,
-                   const std::vector<float>& propertyTolerance)
-    : pNode_(std::make_shared<CsgLeafNode>(std::make_shared<Impl>(
-          mesh, triProperties, properties, propertyTolerance))) {}
+Manifold::Manifold(const Mesh& mesh)
+    : pNode_(std::make_shared<CsgLeafNode>(std::make_shared<Impl>(mesh))) {}
 
 /**
  * This returns a Mesh of simple vectors of vertices and triangles suitable for
@@ -181,28 +168,56 @@ MeshGL Manifold::GetMeshGL() const {
     out.halfedgeTangent[4 * i + 3] = t.w;
   }
 
+  // Sort the triangles into runs
+  out.faceID.resize(numTri);
+  std::vector<int> triNew2Old(numTri);
+  std::iota(triNew2Old.begin(), triNew2Old.end(), 0);
+  const auto& triRef = impl.meshRelation_.triRef;
+  // Don't sort originals - keep them in order
+  if (impl.meshRelation_.originalID < 0) {
+    std::sort(triNew2Old.begin(), triNew2Old.end(), [&triRef](int a, int b) {
+      return triRef[a].originalID == triRef[b].originalID
+                 ? triRef[a].meshID < triRef[b].meshID
+                 : triRef[a].originalID < triRef[b].originalID;
+    });
+  }
+  int lastID = -1;
+  for (int tri = 0; tri < numTri; ++tri) {
+    const int oldTri = triNew2Old[tri];
+    const auto ref = triRef[oldTri];
+    const int meshID = ref.meshID;
+    if (meshID != lastID) {
+      out.originalID.push_back(ref.originalID);
+      out.runIndex.push_back(3 * tri);
+      lastID = meshID;
+    }
+    out.faceID[tri] = ref.tri;
+    for (const int i : {0, 1, 2})
+      out.triVerts[3 * tri + i] = impl.halfedge_[3 * oldTri + i].startVert;
+  }
+  out.runIndex.push_back(3 * numTri);
+
+  // Early return for no props
   if (numProp == 0) {
-    out.vertProperties.resize(out.numProp * numVert);
+    out.vertProperties.resize(3 * numVert);
     for (int i = 0; i < numVert; ++i) {
       const glm::vec3 v = impl.vertPos_[i];
       out.vertProperties[3 * i] = v.x;
       out.vertProperties[3 * i + 1] = v.y;
       out.vertProperties[3 * i + 2] = v.z;
     }
-    for (int i = 0; i < numTri * 3; ++i) {
-      out.triVerts[i] = impl.halfedge_[i].startVert;
-    }
     return out;
   }
 
-  std::vector<int> vert2prop(impl.NumVert(), -1);
+  // Duplicate verts with different props
+  std::vector<int> vert2idx(impl.NumVert(), -1);
   std::map<std::pair<int, int>, int> vertPropPair;
-
   for (int tri = 0; tri < numTri; ++tri) {
-    const glm::ivec3 triProp = impl.meshRelation_.triProperties[tri];
+    const glm::ivec3 triProp =
+        impl.meshRelation_.triProperties[triNew2Old[tri]];
     for (const int i : {0, 1, 2}) {
       const int prop = triProp[i];
-      const int vert = impl.halfedge_[3 * tri + i].startVert;
+      const int vert = out.triVerts[3 * tri + i];
 
       const auto it = vertPropPair.find({vert, prop});
       if (it != vertPropPair.end()) {
@@ -221,15 +236,14 @@ MeshGL Manifold::GetMeshGL() const {
             impl.meshRelation_.properties[prop * numProp + p]);
       }
 
-      if (vert2prop[vert] == -1) {
-        vert2prop[vert] = prop;
+      if (vert2idx[vert] == -1) {
+        vert2idx[vert] = idx;
       } else {
-        out.mergeFromVert.push_back(prop);
-        out.mergeToVert.push_back(vert2prop[vert]);
+        out.mergeFromVert.push_back(idx);
+        out.mergeToVert.push_back(vert2idx[vert]);
       }
     }
   }
-
   return out;
 }
 
@@ -382,24 +396,6 @@ Curvature Manifold::GetCurvature() const {
 }
 
 /**
- * Gets the relationship to the previous meshes, for the purpose of assigning
- * properties like texture coordinates. The triRef vector is the same length as
- * Mesh.triVerts: TriRef.originalID indicates the source mesh and TriRef.tri
- * is that mesh's triangle index of which this triangle is a part.
- *
- * TriRef.meshID is a unique ID to the particular instance of a given mesh. For
- * instance, if you want to convert the triangle mesh to a polygon mesh, all the
- * triangles from a given face will have the same .meshID and .tri values.
- */
-MeshRelation Manifold::GetMeshRelation() const {
-  MeshRelation out;
-  const auto& relation = GetCsgLeafNode().GetImpl()->meshRelation_;
-  out.triRef.insert(out.triRef.end(), relation.triRef.begin(),
-                    relation.triRef.end());
-  return out;
-}
-
-/**
  * If this mesh is an original, this returns its meshID that can be referenced
  * by product manifolds' MeshRelation. If this manifold is a product, this
  * returns -1.
@@ -427,6 +423,15 @@ Manifold Manifold::AsOriginal() const {
   newImpl->SimplifyTopology();
   newImpl->Finish();
   return Manifold(std::make_shared<CsgLeafNode>(newImpl));
+}
+
+/**
+ * Returns the first of n sequential new unique meshIDs for marking sets of
+ * triangles that can be looked up after further operations. Assign to
+ * MeshGL.meshID vector.
+ */
+int Manifold::ReserveIDs(int n) {
+  return Manifold::Impl::meshIDCounter_.fetch_add(n, std::memory_order_relaxed);
 }
 
 /**

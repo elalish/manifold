@@ -8,7 +8,6 @@ typedef struct ManifoldMesh ManifoldMesh;
 typedef struct ManifoldMeshGL ManifoldMeshGL;
 typedef struct ManifoldCurvature ManifoldCurvature;
 typedef struct ManifoldComponents ManifoldComponents;
-typedef struct ManifoldMeshRelation ManifoldMeshRelation;
 typedef struct ManifoldBox ManifoldBox;
 typedef struct ManifoldMaterial ManifoldMaterial;
 typedef struct ManifoldExportOptions ManifoldExportOptions;
@@ -53,12 +52,6 @@ typedef struct ManifoldPolyVert {
 
 } ManifoldPolyVert;
 
-typedef struct ManifoldTriRef {
-  int mesh_id;
-  int original_id;
-  int tri;
-} ManifoldTriRef;
-
 typedef struct ManifoldCurvatureBounds {
   float max_mean_curvature;
   float min_mean_curvature;
@@ -72,6 +65,7 @@ typedef enum ManifoldError {
   NOT_MANIFOLD,
   VERTEX_INDEX_OUT_OF_BOUNDS,
   PROPERTIES_WRONG_LENGTH,
-  TRI_PROPERTIES_WRONG_LENGTH,
-  TRI_PROPERTIES_OUT_OF_BOUNDS,
+  MISSING_POSITION_PROPERTIES,
+  MERGE_VECTORS_DIFFERENT_LENGTHS,
+  MERGE_INDEX_OUT_OF_BOUNDS,
 } ManifoldError;
