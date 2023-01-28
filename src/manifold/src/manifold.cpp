@@ -203,7 +203,6 @@ MeshGL Manifold::GetMeshGL() const {
     const int meshID = ref.meshID;
     if (meshID != lastID) {
       out.originalID.push_back(ref.originalID);
-      out.meshID.push_back(meshID);
       out.runIndex.push_back(3 * tri);
       lastID = meshID;
     }

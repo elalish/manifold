@@ -82,9 +82,6 @@ val GetMeshJS(const Manifold& manifold) {
   meshJS.set("originalID", val(typed_memory_view(mesh.originalID.size(),
                                                  mesh.originalID.data()))
                                .call<val>("slice"));
-  meshJS.set("meshID",
-             val(typed_memory_view(mesh.meshID.size(), mesh.meshID.data()))
-                 .call<val>("slice"));
   meshJS.set("faceID",
              val(typed_memory_view(mesh.faceID.size(), mesh.faceID.data()))
                  .call<val>("slice"));
@@ -115,9 +112,6 @@ MeshGL MeshJS2GL(const val& mesh) {
   }
   if (mesh["originalID"] != val::undefined()) {
     out.originalID = convertJSArrayToNumberVector<uint32_t>(mesh["originalID"]);
-  }
-  if (mesh["meshID"] != val::undefined()) {
-    out.meshID = convertJSArrayToNumberVector<uint32_t>(mesh["meshID"]);
   }
   if (mesh["faceID"] != val::undefined()) {
     out.faceID = convertJSArrayToNumberVector<uint32_t>(mesh["faceID"]);

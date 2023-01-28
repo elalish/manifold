@@ -192,16 +192,14 @@ struct MeshGL {
   /// the other properties may differ.
   std::vector<uint32_t> mergeToVert;
   /// Optional: Indicates runs of triangles that correspond to a particular
-  /// meshID. The runs encompass all of triVerts and are sorted
-  /// lexicographically by originalID, then meshID. Run i begins at
+  /// input mesh instance. The runs encompass all of triVerts and are sorted
+  /// by originalID. Run i begins at
   /// triVerts[runIndex[i]] and ends at triVerts[runIndex[i+1]]. All runIndex
   /// values are divisible by 3.
   std::vector<uint32_t> runIndex;
   /// Optional: The OriginalID of the mesh this triangle run came from. This ID
   /// is ideal for reapplying materials to the output mesh.
   std::vector<uint32_t> originalID;
-  /// Optional: The unique ID of the mesh instance of this triangle run.
-  std::vector<uint32_t> meshID;
   /// Optional: Length NumTri, contains an ID of the source face this triangle
   /// comes from. When auto-generated, this ID will be a triangle index into the
   /// original mesh. All neighboring coplanar triangles from that input mesh

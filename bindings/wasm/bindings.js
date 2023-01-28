@@ -130,7 +130,6 @@ Module.setup = function () {
       mergeToVert,
       runIndex,
       originalID,
-      meshID,
       faceID,
       halfedgeTangent
     } = {}) {
@@ -141,7 +140,6 @@ Module.setup = function () {
       this.mergeToVert = mergeToVert;
       this.runIndex = runIndex;
       this.originalID = originalID;
-      this.meshID = meshID;
       this.faceID = faceID;
       this.halfedgeTangent = halfedgeTangent;
     }

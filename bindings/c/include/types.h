@@ -52,12 +52,6 @@ typedef struct ManifoldPolyVert {
 
 } ManifoldPolyVert;
 
-typedef struct ManifoldTriRef {
-  int mesh_id;
-  int original_id;
-  int tri;
-} ManifoldTriRef;
-
 typedef struct ManifoldCurvatureBounds {
   float max_mean_curvature;
   float min_mean_curvature;

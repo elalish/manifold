@@ -408,10 +408,6 @@ size_t manifold_meshgl_original_id_length(ManifoldMeshGL *m) {
   return from_c(m)->originalID.size();
 }
 
-size_t manifold_meshgl_mesh_id_length(ManifoldMeshGL *m) {
-  return from_c(m)->meshID.size();
-}
-
 size_t manifold_meshgl_face_id_length(ManifoldMeshGL *m) {
   return from_c(m)->faceID.size();
 }
@@ -465,14 +461,6 @@ uint32_t *manifold_meshgl_original_id(void *mem, ManifoldMeshGL *m) {
   auto len = original_id.size();
   uint32_t *ids = reinterpret_cast<uint32_t *>(mem);
   memcpy(ids, original_id.data(), sizeof(uint32_t) * len);
-  return ids;
-}
-
-uint32_t *manifold_meshgl_mesh_id(void *mem, ManifoldMeshGL *m) {
-  auto mesh_id = from_c(m)->meshID;
-  auto len = mesh_id.size();
-  uint32_t *ids = reinterpret_cast<uint32_t *>(mem);
-  memcpy(ids, mesh_id.data(), sizeof(uint32_t) * len);
   return ids;
 }
 

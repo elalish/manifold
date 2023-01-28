@@ -111,7 +111,7 @@ void Identical(const Mesh& mesh1, const Mesh& mesh2) {
 void RelatedGL(const Manifold& out, const std::vector<MeshGL>& input) {
   ASSERT_FALSE(out.IsEmpty());
   MeshGL output = out.GetMeshGL();
-  ASSERT_EQ(output.meshID.size(), input.size());
+  ASSERT_EQ(output.originalID.size(), input.size());
   for (int run = 0; run < output.originalID.size(); ++run) {
     const MeshGL& inMesh = input[run];
     for (int tri = output.runIndex[run] / 3; tri < output.runIndex[run + 1] / 3;

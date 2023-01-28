@@ -47,7 +47,6 @@ declare class Mesh {
   mergeToVert?: Uint32Array;
   runIndex?: Uint32Array;
   originalID?: Uint32Array;
-  meshID?: Uint32Array;
   faceID?: Uint32Array;
   halfedgeTangent?: Float32Array;
   get numTri(): number;
@@ -215,7 +214,7 @@ declare class Manifold {
 
   /**
    * If you copy a manifold, but you want this new copy to have new properties
-   * (e.g. a different UV mapping), you can reset its meshIDs to a new original,
+   * (e.g. a different UV mapping), you can reset its IDs to a new original,
    * meaning it will now be referenced by its descendants instead of the meshes
    * it was built from, allowing you to differentiate the copies when applying
    * your properties to the final result.
@@ -229,7 +228,7 @@ declare class Manifold {
   asOriginal(): Manifold;
 
   /**
-   * If this mesh is an original, this returns its meshID that can be referenced
+   * If this mesh is an original, this returns its ID that can be referenced
    * by product manifolds. If this manifold is a product, this
    * returns -1.
    */
