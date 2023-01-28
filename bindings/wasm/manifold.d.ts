@@ -30,11 +30,6 @@ type Properties = {
   surfaceArea: number,
   volume: number
 };
-type TriRef = {
-  meshID: number,
-  originalID: number,
-  tri: number
-};
 type Curvature = {
   maxMeanCurvature: number,
   minMeanCurvature: number,
@@ -43,9 +38,6 @@ type Curvature = {
   vertMeanCurvature: number[],
   vertGaussianCurvature: number[]
 };
-type MeshRelation = {
-  triRef: TriRef[]
-};
 
 declare class Mesh {
   numProp: number;
@@ -53,6 +45,9 @@ declare class Mesh {
   triVerts: Uint32Array;
   mergeFromVert?: Uint32Array;
   mergeToVert?: Uint32Array;
+  runIndex?: Uint32Array;
+  originalID?: Uint32Array;
+  faceID?: Uint32Array;
   halfedgeTangent?: Float32Array;
   get numTri(): number;
   get numVert(): number;
@@ -218,25 +213,8 @@ declare class Manifold {
   getMesh(): Mesh;
 
   /**
-   * Gets the relationship to the previous meshes, for the purpose of assigning
-   * properties like texture coordinates. The triRef vector is the same length
-   * as Mesh.triVerts: TriRef.originalID indicates the source mesh and
-   * TriRef.tri is that mesh's triangle index to which these barycentric
-   * coordinates refer. TriRef.vertBary gives an index for each vertex into the
-   * barycentric vector if that index is >= 0, indicating it is a new vertex. If
-   * the index is < 0, this indicates it is an original vertex, the index + 3
-   * vert of the referenced triangle.
-   *
-   * TriRef.meshID is a unique ID to the particular instance of a given mesh.
-   * For instance, if you want to convert the triangle mesh to a polygon mesh,
-   * all the triangles from a given face will have the same .meshID and .tri
-   * values.
-   */
-  getMeshRelation(): MeshRelation;
-
-  /**
    * If you copy a manifold, but you want this new copy to have new properties
-   * (e.g. a different UV mapping), you can reset its meshIDs to a new original,
+   * (e.g. a different UV mapping), you can reset its IDs to a new original,
    * meaning it will now be referenced by its descendants instead of the meshes
    * it was built from, allowing you to differentiate the copies when applying
    * your properties to the final result.
@@ -250,8 +228,8 @@ declare class Manifold {
   asOriginal(): Manifold;
 
   /**
-   * If this mesh is an original, this returns its meshID that can be referenced
-   * by product manifolds' MeshRelation. If this manifold is a product, this
+   * If this mesh is an original, this returns its ID that can be referenced
+   * by product manifolds. If this manifold is a product, this
    * returns -1.
    */
   originalID(): number;

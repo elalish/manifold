@@ -177,20 +177,34 @@ struct MeshGL {
 
   /// Number of properties per vertex, always >= 3.
   int numProp = 3;
-  /// Flat, GL-style list of all vertex properties: propVal =
+  /// Flat, GL-style interleaved list of all vertex properties: propVal =
   /// vertProperties[vert * numProp + propIdx]. The first three properties are
   /// always the position x, y, z.
   std::vector<float> vertProperties;
   /// The vertex indices of the three triangle corners in CCW (from the outside)
   /// order, for each triangle.
   std::vector<uint32_t> triVerts;
-  /// A list of only the vertex indicies that need to be merged to reconstruct
-  /// the manifold.
+  /// Optional: A list of only the vertex indicies that need to be merged to
+  /// reconstruct the manifold.
   std::vector<uint32_t> mergeFromVert;
-  // The same length as mergeFromVert, and the corresponding value contains the
-  // vertex to merge with. It will have an identical position, but the other
-  // properties may differ.
+  /// Optional: The same length as mergeFromVert, and the corresponding value
+  /// contains the vertex to merge with. It will have an identical position, but
+  /// the other properties may differ.
   std::vector<uint32_t> mergeToVert;
+  /// Optional: Indicates runs of triangles that correspond to a particular
+  /// input mesh instance. The runs encompass all of triVerts and are sorted
+  /// by originalID. Run i begins at
+  /// triVerts[runIndex[i]] and ends at triVerts[runIndex[i+1]]. All runIndex
+  /// values are divisible by 3.
+  std::vector<uint32_t> runIndex;
+  /// Optional: The OriginalID of the mesh this triangle run came from. This ID
+  /// is ideal for reapplying materials to the output mesh.
+  std::vector<uint32_t> originalID;
+  /// Optional: Length NumTri, contains an ID of the source face this triangle
+  /// comes from. When auto-generated, this ID will be a triangle index into the
+  /// original mesh. All neighboring coplanar triangles from that input mesh
+  /// will refer to a single triangle of that group as the faceID.
+  std::vector<uint32_t> faceID;
   /// Optional: The X-Y-Z-W weighted tangent vectors for smooth Refine(). If
   /// non-empty, must be exactly four times as long as Mesh.triVerts. Indexed
   /// as 4 * (3 * tri + i) + j, i < 3, j < 4, representing the tangent value
@@ -254,35 +268,7 @@ struct Components {
   std::vector<int> indices;
   int numComponents;
 };
-
-/**
- * Part of MeshRelation - represents a single triangle relation to an original
- * Mesh.
- */
-struct TriRef {
-  /// The unique ID of the mesh instance of this triangle. If .meshID and .tri
-  /// match for two triangles, then they are coplanar and came from the same
-  /// face.
-  int meshID;
-  /// The OriginalID of the mesh this triangle came from. This ID is ideal for
-  /// reapplying properties like UV coordinates to the output mesh.
-  int originalID;
-  /// The triangle index of the original triangle this was part of:
-  /// Mesh.triVerts[tri].
-  int tri;
-};
 /** @} */
-
-/**
- *  @ingroup Connections
- *  Represents the relationship of this output Mesh to all input Meshes that
- * eventually led to it, see Manifold.GetMeshRelation().
- */
-struct MeshRelation {
-  /// A vector matching Mesh.triVerts that contains the relation of each output
-  /// triangle to a single input triangle.
-  std::vector<TriRef> triRef;
-};
 
 /**
  * @ingroup Connections
@@ -514,11 +500,6 @@ inline std::ostream& operator<<(std::ostream& stream, const glm::mat4x3& mat) {
   return stream << tam[0] << std::endl
                 << tam[1] << std::endl
                 << tam[2] << std::endl;
-}
-
-inline std::ostream& operator<<(std::ostream& stream, const TriRef& ref) {
-  return stream << "meshID: " << ref.meshID
-                << ", originalID: " << ref.originalID << ", tri: " << ref.tri;
 }
 
 /**

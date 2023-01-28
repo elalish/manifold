@@ -53,11 +53,14 @@ ManifoldError to_c(manifold::Manifold::Error error) {
     case Manifold::Error::PROPERTIES_WRONG_LENGTH:
       e = PROPERTIES_WRONG_LENGTH;
       break;
-    case Manifold::Error::TRI_PROPERTIES_WRONG_LENGTH:
-      e = TRI_PROPERTIES_WRONG_LENGTH;
+    case Manifold::Error::MISSING_POSITION_PROPERTIES:
+      e = MISSING_POSITION_PROPERTIES;
       break;
-    case Manifold::Error::TRI_PROPERTIES_OUT_OF_BOUNDS:
-      e = TRI_PROPERTIES_OUT_OF_BOUNDS;
+    case Manifold::Error::MERGE_VECTORS_DIFFERENT_LENGTHS:
+      e = MERGE_VECTORS_DIFFERENT_LENGTHS;
+      break;
+    case Manifold::Error::MERGE_INDEX_OUT_OF_BOUNDS:
+      e = MERGE_INDEX_OUT_OF_BOUNDS;
       break;
   };
   return e;
@@ -65,10 +68,6 @@ ManifoldError to_c(manifold::Manifold::Error error) {
 
 ManifoldBox *to_c(manifold::Box *m) {
   return reinterpret_cast<ManifoldBox *>(m);
-}
-
-ManifoldMeshRelation *to_c(manifold::MeshRelation *m) {
-  return reinterpret_cast<ManifoldMeshRelation *>(m);
 }
 
 ManifoldMaterial *to_c(manifold::Material *m) {
@@ -117,10 +116,6 @@ const manifold::Components *from_c(ManifoldComponents *components) {
 
 const manifold::Box *from_c(ManifoldBox *m) {
   return reinterpret_cast<manifold::Box const *>(m);
-}
-
-const manifold::MeshRelation *from_c(ManifoldMeshRelation *m) {
-  return reinterpret_cast<manifold::MeshRelation const *>(m);
 }
 
 manifold::Material *from_c(ManifoldMaterial *mat) {

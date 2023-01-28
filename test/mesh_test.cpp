@@ -63,6 +63,22 @@ Mesh Tet() {
   return tet;
 }
 
+MeshGL TetGL() {
+  MeshGL tet;
+  tet.numProp = 5;
+  tet.vertProperties = {-1, -1, 1,  0, 0,   //
+                        -1, 1,  -1, 1, -1,  //
+                        1,  -1, -1, 2, -2,  //
+                        1,  1,  1,  3, -3,  //
+                        -1, 1,  -1, 4, -4,  //
+                        1,  -1, -1, 5, -5,  //
+                        1,  1,  1,  6, -6};
+  tet.triVerts = {2, 0, 1, 0, 3, 1, 2, 3, 0, 6, 5, 4};
+  tet.mergeFromVert = {4, 5, 6};
+  tet.mergeToVert = {1, 2, 3};
+  return tet;
+}
+
 MeshGL WithIndexColors(const Mesh& in) {
   MeshGL inGL(in);
   const int numVert = in.vertPos.size();
@@ -108,72 +124,70 @@ void Identical(const Mesh& mesh1, const Mesh& mesh2) {
     ASSERT_EQ(mesh1.triVerts[i], mesh2.triVerts[i]);
 }
 
-void RelatedGL(const Manifold& out, const std::vector<MeshGL>& input,
-               const std::map<int, int>& meshID2idx) {
+void RelatedGL(const Manifold& out, const std::vector<MeshGL>& input) {
   ASSERT_FALSE(out.IsEmpty());
   MeshGL output = out.GetMeshGL();
-  MeshRelation relation = out.GetMeshRelation();
-  for (int tri = 0; tri < out.NumTri(); ++tri) {
-    int meshID = relation.triRef[tri].originalID;
-    int meshIdx = meshID2idx.at(meshID);
-    ASSERT_LT(meshIdx, input.size());
-    const MeshGL& inMesh = input[meshIdx];
-    int inTri = relation.triRef[tri].tri;
-    ASSERT_LT(inTri, inMesh.triVerts.size());
-    glm::ivec3 inTriangle = {inMesh.triVerts[3 * inTri],
-                             inMesh.triVerts[3 * inTri + 1],
-                             inMesh.triVerts[3 * inTri + 2]};
-    inTriangle *= inMesh.numProp;
-    glm::mat3 inTriPos;
-    for (int j : {0, 1, 2})
-      for (int k : {0, 1, 2})
-        inTriPos[j][k] = inMesh.vertProperties[inTriangle[j] + k];
-    glm::vec3 normal =
-        glm::cross(inTriPos[1] - inTriPos[0], inTriPos[2] - inTriPos[0]);
-    const float area = glm::length(normal);
-    if (area == 0) continue;
-    normal /= area;
+  ASSERT_EQ(output.originalID.size(), input.size());
+  for (int run = 0; run < output.originalID.size(); ++run) {
+    const MeshGL& inMesh = input[run];
+    for (int tri = output.runIndex[run] / 3; tri < output.runIndex[run + 1] / 3;
+         ++tri) {
+      ASSERT_LT(tri, output.faceID.size());
+      const int inTri = output.faceID[tri];
+      ASSERT_LT(inTri, inMesh.triVerts.size());
+      glm::ivec3 inTriangle = {inMesh.triVerts[3 * inTri],
+                               inMesh.triVerts[3 * inTri + 1],
+                               inMesh.triVerts[3 * inTri + 2]};
+      inTriangle *= inMesh.numProp;
+      glm::mat3 inTriPos;
+      for (int j : {0, 1, 2})
+        for (int k : {0, 1, 2})
+          inTriPos[j][k] = inMesh.vertProperties[inTriangle[j] + k];
+      glm::vec3 normal =
+          glm::cross(inTriPos[1] - inTriPos[0], inTriPos[2] - inTriPos[0]);
+      const float area = glm::length(normal);
+      if (area == 0) continue;
+      normal /= area;
 
-    for (int j : {0, 1, 2}) {
-      const int vert = output.triVerts[3 * tri + j];
-      glm::vec3 outPos;
-      for (int k : {0, 1, 2})
-        outPos[k] = output.vertProperties[vert * output.numProp + k];
+      for (int j : {0, 1, 2}) {
+        const int vert = output.triVerts[3 * tri + j];
+        glm::vec3 outPos;
+        for (int k : {0, 1, 2})
+          outPos[k] = output.vertProperties[vert * output.numProp + k];
 
-      for (int p = 3; p < output.numProp; ++p) {
-        const float propOut = output.vertProperties[vert * output.numProp + p];
-
-        glm::vec3 inProp = {inMesh.vertProperties[inTriangle[0] + p],
-                            inMesh.vertProperties[inTriangle[1] + p],
-                            inMesh.vertProperties[inTriangle[2] + p]};
         glm::vec3 edges[3];
-        for (int k : {0, 1, 2}) {
-          edges[k] =
-              inTriPos[k] + normal * inProp[k] - (outPos + normal * propOut);
-        }
+        for (int k : {0, 1, 2}) edges[k] = inTriPos[k] - outPos;
         const float volume = glm::dot(edges[0], glm::cross(edges[1], edges[2]));
-
         ASSERT_LE(volume, area * 100 * out.Precision());
+
+        for (int p = 3; p < output.numProp; ++p) {
+          const float propOut =
+              output.vertProperties[vert * output.numProp + p];
+
+          glm::vec3 inProp = {inMesh.vertProperties[inTriangle[0] + p],
+                              inMesh.vertProperties[inTriangle[1] + p],
+                              inMesh.vertProperties[inTriangle[2] + p]};
+          glm::vec3 edgesP[3];
+          for (int k : {0, 1, 2}) {
+            edgesP[k] = edges[k] + normal * inProp[k] - normal * propOut;
+          }
+          const float volumeP =
+              glm::dot(edgesP[0], glm::cross(edgesP[1], edgesP[2]));
+
+          ASSERT_LE(volumeP, area * 100 * out.Precision());
+        }
       }
     }
   }
 }
 
 void RelatedOp(const Manifold& inP, const Manifold& inQ, const Manifold& outR) {
+  EXPECT_GE(inP.OriginalID(), 0);
+  EXPECT_GE(inQ.OriginalID(), 0);
   std::vector<MeshGL> inputGL;
-  std::map<int, int> meshID2idx;
-
-  int meshID = inP.OriginalID();
-  EXPECT_GE(meshID, 0);
-  meshID2idx[meshID] = inputGL.size();
-  inputGL.push_back(inP.GetMeshGL());
-
-  meshID = inQ.OriginalID();
-  EXPECT_GE(meshID, 0);
-  meshID2idx[meshID] = inputGL.size();
-  inputGL.push_back(inQ.GetMeshGL());
-
-  RelatedGL(outR, inputGL, meshID2idx);
+  inputGL.emplace_back(inP.GetMeshGL());
+  inputGL.emplace_back(inQ.GetMeshGL());
+  RelatedGL(outR, inputGL);
 }
 
 struct MeshSize {
@@ -289,10 +303,7 @@ TEST(Manifold, Empty) {
 
 TEST(Manifold, ValidInput) {
   std::vector<float> propTol = {0.1, 0.2};
-  std::vector<float> prop = {0, 0, 1, -1, 2, -2, 3, -3, 4, -4, 5, -5, 6, -6};
-  std::vector<glm::ivec3> triProp = {
-      {2, 0, 1}, {0, 3, 1}, {2, 3, 0}, {6, 5, 4}};
-  Manifold tet(Tet(), triProp, prop, propTol);
+  Manifold tet(TetGL(), propTol);
   EXPECT_FALSE(tet.IsEmpty());
   EXPECT_EQ(tet.Status(), Manifold::Error::NO_ERROR);
   EXPECT_TRUE(tet.IsManifold());
@@ -343,34 +354,20 @@ TEST(Manifold, InvalidInput4) {
 }
 
 TEST(Manifold, InvalidInput5) {
-  std::vector<float> propTol = {0.1, 0.2};
-  std::vector<float> prop = {0, 0, 1, -1, 2, -2, 3, -3, 4, -4, 5, -5, 6};
-  std::vector<glm::ivec3> triProp = {
-      {2, 0, 1}, {0, 3, 1}, {2, 3, 0}, {6, 5, 4}};
-  Manifold tet(Tet(), triProp, prop, propTol);
+  MeshGL tetGL = TetGL();
+  tetGL.mergeFromVert[tetGL.mergeFromVert.size() - 1] = 7;
+  Manifold tet(tetGL);
   EXPECT_TRUE(tet.IsEmpty());
-  EXPECT_EQ(tet.Status(), Manifold::Error::PROPERTIES_WRONG_LENGTH);
-  EXPECT_TRUE(tet.IsManifold());
-}
-
-TEST(Manifold, InvalidInput6) {
-  std::vector<float> propTol = {0.1, 0.2};
-  std::vector<float> prop = {0, 0, 1, -1, 2, -2, 3, -3, 4, -4, 5, -5, 6, -6};
-  std::vector<glm::ivec3> triProp = {{2, 0, 1}, {0, 3, 1}, {2, 3, 0}};
-  Manifold tet(Tet(), triProp, prop, propTol);
-  EXPECT_TRUE(tet.IsEmpty());
-  EXPECT_EQ(tet.Status(), Manifold::Error::TRI_PROPERTIES_WRONG_LENGTH);
+  EXPECT_EQ(tet.Status(), Manifold::Error::MERGE_INDEX_OUT_OF_BOUNDS);
   EXPECT_TRUE(tet.IsManifold());
 }
 
 TEST(Manifold, InvalidInput7) {
-  std::vector<float> propTol = {0.1, 0.2};
-  std::vector<float> prop = {0, 0, 1, -1, 2, -2, 3, -3, 4, -4, 5, -5, 6, -6};
-  std::vector<glm::ivec3> triProp = {
-      {2, 0, 1}, {0, 3, 1}, {2, 3, 0}, {6, 5, 7}};
-  Manifold tet(Tet(), triProp, prop, propTol);
+  MeshGL tetGL = TetGL();
+  tetGL.triVerts[tetGL.triVerts.size() - 1] = 7;
+  Manifold tet(tetGL);
   EXPECT_TRUE(tet.IsEmpty());
-  EXPECT_EQ(tet.Status(), Manifold::Error::TRI_PROPERTIES_OUT_OF_BOUNDS);
+  EXPECT_EQ(tet.Status(), Manifold::Error::VERTEX_INDEX_OUT_OF_BOUNDS);
   EXPECT_TRUE(tet.IsManifold());
 }
 
@@ -380,24 +377,21 @@ TEST(Manifold, InvalidInput7) {
  */
 TEST(Manifold, Decompose) {
   std::vector<Manifold> manifoldList;
-  manifoldList.push_back(Manifold::Tetrahedron());
-  manifoldList.push_back(Manifold::Cube());
-  manifoldList.push_back(Manifold::Sphere(1, 4));
+  manifoldList.emplace_back(Manifold::Tetrahedron());
+  manifoldList.emplace_back(Manifold::Cube());
+  manifoldList.emplace_back(Manifold::Sphere(1, 4));
   Manifold manifolds = Manifold::Compose(manifoldList);
 
   ExpectMeshes(manifolds, {{8, 12}, {6, 8}, {4, 4}});
 
   std::vector<MeshGL> input;
-  std::map<int, int> meshID2idx;
 
   for (const Manifold& manifold : manifoldList) {
-    int meshID = manifold.OriginalID();
-    EXPECT_GE(meshID, 0);
-    meshID2idx[meshID] = input.size();
-    input.push_back(manifold.GetMeshGL());
+    EXPECT_GE(manifold.OriginalID(), 0);
+    input.emplace_back(manifold.GetMeshGL());
   }
 
-  RelatedGL(manifolds, input, meshID2idx);
+  RelatedGL(manifolds, input);
 }
 
 /**
@@ -519,7 +513,6 @@ TEST(Manifold, ManualSmooth) {
     options.mat.roughness = 0.1;
 
     options.mat.vertColor.resize(interp.NumVert());
-    MeshRelation rel = interp.GetMeshRelation();
     const glm::vec4 red(1, 0, 0, 1);
     const glm::vec4 purple(1, 0, 1, 1);
     for (int tri = 0; tri < interp.NumTri(); ++tri) {
@@ -563,7 +556,6 @@ TEST(Manifold, Csaszar) {
     options.mat.roughness = 0.1;
 
     options.mat.vertColor.resize(csaszar.NumVert());
-    MeshRelation rel = csaszar.GetMeshRelation();
     const glm::vec4 blue(0, 0, 1, 1);
     const glm::vec4 yellow(1, 1, 0, 1);
     for (int tri = 0; tri < csaszar.NumTri(); ++tri) {
@@ -676,7 +668,6 @@ TEST(Manifold, MeshRelation) {
   Manifold gyroid(gyroidMeshGL, tol);
 
   std::vector<MeshGL> inputGL;
-  std::map<int, int> meshID2idx;
 
 #ifdef MANIFOLD_EXPORT
   ExportOptions opt;
@@ -685,32 +676,28 @@ TEST(Manifold, MeshRelation) {
   if (options.exportModels) ExportMesh("gyroid.glb", gyroid.GetMeshGL(), opt);
 #endif
 
-  int meshID = gyroid.OriginalID();
-  EXPECT_GE(meshID, 0);
-  meshID2idx[meshID] = inputGL.size();
-  inputGL.push_back(gyroidMeshGL);
+  EXPECT_GE(gyroid.OriginalID(), 0);
+  inputGL.emplace_back(gyroidMeshGL);
 
-  RelatedGL(gyroid, inputGL, meshID2idx);
+  RelatedGL(gyroid, inputGL);
 }
 
 TEST(Manifold, MeshRelationRefine) {
   std::vector<MeshGL> inputGL;
-  std::map<int, int> meshID2idx;
 
   const Mesh in = Csaszar();
   MeshGL inGL = WithIndexColors(in);
 
-  inputGL.push_back(inGL);
+  inputGL.emplace_back(inGL);
   std::vector<float> tol(3, 0);
   Manifold csaszar(inGL, tol);
 
   int meshID = csaszar.OriginalID();
   EXPECT_GE(meshID, 0);
-  meshID2idx[meshID] = inputGL.size() - 1;
 
-  RelatedGL(csaszar, inputGL, meshID2idx);
+  RelatedGL(csaszar, inputGL);
   csaszar.Refine(4);
-  RelatedGL(csaszar, inputGL, meshID2idx);
+  RelatedGL(csaszar, inputGL);
 }
 
 /**
@@ -955,8 +942,8 @@ TEST(Boolean, Empty) {
 
 TEST(Boolean, Winding) {
   std::vector<Manifold> cubes;
-  cubes.push_back(Manifold::Cube(glm::vec3(3.0f), true));
-  cubes.push_back(Manifold::Cube(glm::vec3(2.0f), true));
+  cubes.emplace_back(Manifold::Cube(glm::vec3(3.0f), true));
+  cubes.emplace_back(Manifold::Cube(glm::vec3(2.0f), true));
   Manifold doubled = Manifold::Compose(cubes);
 
   Manifold cube = Manifold::Cube(glm::vec3(1.0f), true);
@@ -1062,19 +1049,14 @@ TEST(Boolean, MeshRelation) {
   EXPECT_NEAR(prop.surfaceArea, 387, 1);
 
   std::vector<MeshGL> inputGL;
-  std::map<int, int> meshID2idx;
 
-  int meshID = gyroid.OriginalID();
-  EXPECT_GE(meshID, 0);
-  meshID2idx[meshID] = inputGL.size();
-  inputGL.push_back(gyroidMeshGL);
+  EXPECT_GE(gyroid.OriginalID(), 0);
+  inputGL.emplace_back(gyroidMeshGL);
 
-  meshID = gyroid2.OriginalID();
-  EXPECT_GE(meshID, 0);
-  meshID2idx[meshID] = inputGL.size();
-  inputGL.push_back(gyroidMeshGL2);
+  EXPECT_GE(gyroid2.OriginalID(), 0);
+  inputGL.emplace_back(gyroidMeshGL2);
 
-  RelatedGL(result, inputGL, meshID2idx);
+  RelatedGL(result, inputGL);
 }
 
 TEST(Boolean, Cylinders) {
