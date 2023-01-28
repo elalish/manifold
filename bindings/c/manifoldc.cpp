@@ -245,28 +245,6 @@ ManifoldManifold *manifold_of_mesh(void *mem, ManifoldMesh *mesh) {
   return to_c(new (mem) Manifold(m));
 }
 
-ManifoldManifold *manifold_of_mesh_props(void *mem, ManifoldMesh *mesh,
-                                         ManifoldIVec3 *tri_properties,
-                                         float *properties,
-                                         float *property_tolerance,
-                                         size_t n_props) {
-  auto msh = *from_c(mesh);
-  size_t n_tri = msh.triVerts.size();
-
-  auto tri_props = vector_of_array(tri_properties, n_tri);
-
-  int max_idx = 0;
-  for (glm::ivec3 v : tri_props) {
-    auto i = std::max(std::max(v.x, v.y), v.z);
-    max_idx = std::max(i, max_idx);
-  }
-
-  auto props = vector_of_array(properties, n_props * max_idx);
-  auto prop_tol = vector_of_array(property_tolerance, n_props);
-  auto m = Manifold(msh, tri_props, props, prop_tol);
-  return to_c(new (mem) Manifold(m));
-}
-
 ManifoldManifold *manifold_extrude(void *mem, ManifoldPolygons *polygons,
                                    float height, int slices,
                                    float twist_degrees, float scale_x,

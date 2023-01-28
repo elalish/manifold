@@ -87,11 +87,6 @@ ManifoldManifold *manifold_cylinder(void *mem, float height, float radius_low,
 ManifoldManifold *manifold_sphere(void *mem, float radius,
                                   int circular_segments);
 ManifoldManifold *manifold_of_mesh(void *mem, ManifoldMesh *mesh);
-ManifoldManifold *manifold_of_mesh_props(void *mem, ManifoldMesh *mesh,
-                                         ManifoldIVec3 *tri_properties,
-                                         float *properties,
-                                         float *property_tolerance,
-                                         size_t n_props);
 ManifoldManifold *manifold_smooth(void *mem, ManifoldMesh *mesh,
                                   int *half_edges, float *smoothness,
                                   int n_idxs);
