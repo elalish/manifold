@@ -112,12 +112,12 @@ void RelatedGL(const Manifold& out, const std::vector<MeshGL>& input,
                const std::map<int, int>& meshID2idx) {
   ASSERT_FALSE(out.IsEmpty());
   MeshGL output = out.GetMeshGL();
+  ASSERT_EQ(output.meshID.size(), input.size());
   for (int run = 0; run < output.originalID.size(); ++run) {
-    const int meshIdx = meshID2idx.at(output.originalID[run]);
-    ASSERT_LT(meshIdx, input.size());
-    const MeshGL& inMesh = input[meshIdx];
+    const MeshGL& inMesh = input[run];
     for (int tri = output.runIndex[run] / 3; tri < output.runIndex[run + 1] / 3;
          ++tri) {
+      ASSERT_LT(tri, output.faceID.size());
       const int inTri = output.faceID[tri];
       ASSERT_LT(inTri, inMesh.triVerts.size());
       glm::ivec3 inTriangle = {inMesh.triVerts[3 * inTri],
@@ -140,6 +140,11 @@ void RelatedGL(const Manifold& out, const std::vector<MeshGL>& input,
         for (int k : {0, 1, 2})
           outPos[k] = output.vertProperties[vert * output.numProp + k];
 
+        glm::vec3 edges[3];
+        for (int k : {0, 1, 2}) edges[k] = inTriPos[k] - outPos;
+        const float volume = glm::dot(edges[0], glm::cross(edges[1], edges[2]));
+        ASSERT_LE(volume, area * 100 * out.Precision());
+
         for (int p = 3; p < output.numProp; ++p) {
           const float propOut =
               output.vertProperties[vert * output.numProp + p];
@@ -147,15 +152,14 @@ void RelatedGL(const Manifold& out, const std::vector<MeshGL>& input,
           glm::vec3 inProp = {inMesh.vertProperties[inTriangle[0] + p],
                               inMesh.vertProperties[inTriangle[1] + p],
                               inMesh.vertProperties[inTriangle[2] + p]};
-          glm::vec3 edges[3];
+          glm::vec3 edgesP[3];
           for (int k : {0, 1, 2}) {
-            edges[k] =
-                inTriPos[k] + normal * inProp[k] - (outPos + normal * propOut);
+            edgesP[k] = edges[k] + normal * inProp[k] - normal * propOut;
           }
-          const float volume =
-              glm::dot(edges[0], glm::cross(edges[1], edges[2]));
+          const float volumeP =
+              glm::dot(edgesP[0], glm::cross(edgesP[1], edgesP[2]));
 
-          ASSERT_LE(volume, area * 100 * out.Precision());
+          ASSERT_LE(volumeP, area * 100 * out.Precision());
         }
       }
     }

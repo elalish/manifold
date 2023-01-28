@@ -14,6 +14,7 @@
 
 #include <algorithm>
 #include <map>
+#include <numeric>
 
 #include "boolean3.h"
 #include "csg_tree.h"
@@ -182,28 +183,57 @@ MeshGL Manifold::GetMeshGL() const {
     out.halfedgeTangent[4 * i + 3] = t.w;
   }
 
+  // Sort the triangles into runs
+  out.faceID.resize(numTri);
+  std::vector<int> triNew2Old(numTri);
+  std::iota(triNew2Old.begin(), triNew2Old.end(), 0);
+  const auto& triRef = impl.meshRelation_.triRef;
+  // Don't sort originals - keep them in order
+  if (impl.meshRelation_.originalID < 0) {
+    std::sort(triNew2Old.begin(), triNew2Old.end(), [&triRef](int a, int b) {
+      return triRef[a].originalID == triRef[b].originalID
+                 ? triRef[a].meshID < triRef[b].meshID
+                 : triRef[a].originalID < triRef[b].originalID;
+    });
+  }
+  int lastID = -1;
+  for (int tri = 0; tri < numTri; ++tri) {
+    const int oldTri = triNew2Old[tri];
+    const auto ref = triRef[oldTri];
+    const int meshID = ref.meshID;
+    if (meshID != lastID) {
+      out.originalID.push_back(ref.originalID);
+      out.meshID.push_back(meshID);
+      out.runIndex.push_back(3 * tri);
+      lastID = meshID;
+    }
+    out.faceID[tri] = ref.tri;
+    for (const int i : {0, 1, 2})
+      out.triVerts[3 * tri + i] = impl.halfedge_[3 * oldTri + i].startVert;
+  }
+  out.runIndex.push_back(3 * numTri);
+
+  // Early return for no props
   if (numProp == 0) {
-    out.vertProperties.resize(out.numProp * numVert);
+    out.vertProperties.resize(3 * numVert);
     for (int i = 0; i < numVert; ++i) {
       const glm::vec3 v = impl.vertPos_[i];
       out.vertProperties[3 * i] = v.x;
       out.vertProperties[3 * i + 1] = v.y;
       out.vertProperties[3 * i + 2] = v.z;
     }
-    for (int i = 0; i < numTri * 3; ++i) {
-      out.triVerts[i] = impl.halfedge_[i].startVert;
-    }
     return out;
   }
 
-  std::vector<int> vert2prop(impl.NumVert(), -1);
+  // Duplicate verts with different props
+  std::vector<int> vert2idx(impl.NumVert(), -1);
   std::map<std::pair<int, int>, int> vertPropPair;
-
   for (int tri = 0; tri < numTri; ++tri) {
-    const glm::ivec3 triProp = impl.meshRelation_.triProperties[tri];
+    const glm::ivec3 triProp =
+        impl.meshRelation_.triProperties[triNew2Old[tri]];
     for (const int i : {0, 1, 2}) {
       const int prop = triProp[i];
-      const int vert = impl.halfedge_[3 * tri + i].startVert;
+      const int vert = out.triVerts[3 * tri + i];
 
       const auto it = vertPropPair.find({vert, prop});
       if (it != vertPropPair.end()) {
@@ -222,40 +252,14 @@ MeshGL Manifold::GetMeshGL() const {
             impl.meshRelation_.properties[prop * numProp + p]);
       }
 
-      if (vert2prop[vert] == -1) {
-        vert2prop[vert] = prop;
+      if (vert2idx[vert] == -1) {
+        vert2idx[vert] = idx;
       } else {
-        out.mergeFromVert.push_back(prop);
-        out.mergeToVert.push_back(vert2prop[vert]);
+        out.mergeFromVert.push_back(idx);
+        out.mergeToVert.push_back(vert2idx[vert]);
       }
     }
   }
-
-  out.faceID.resize(numTri);
-  std::vector<std::tuple<int, int, int, int>> meshIDs(numTri);
-  for (int tri = 0; tri < numTri; ++tri) {
-    const TriRef ref = impl.meshRelation_.triRef[tri];
-    meshIDs[tri] = std::make_tuple(ref.originalID, ref.meshID, tri, ref.tri);
-  }
-  std::sort(meshIDs.begin(), meshIDs.end());
-  const std::vector<uint32_t> triVertsOld = out.triVerts;
-  int lastID = -1;
-  for (int tri = 0; tri < numTri; ++tri) {
-    const auto ref = meshIDs[tri];
-    const int meshID = std::get<1>(ref);
-    if (meshID != lastID) {
-      out.originalID.push_back(std::get<0>(ref));
-      out.meshID.push_back(meshID);
-      out.runIndex.push_back(3 * tri);
-      lastID = meshID;
-    }
-    out.faceID[tri] = std::get<3>(ref);
-    const int oldTri = std::get<2>(ref);
-    for (const int i : {0, 1, 2})
-      out.triVerts[3 * tri + i] = triVertsOld[3 * oldTri + i];
-  }
-  out.runIndex.push_back(3 * numTri);
-
   return out;
 }
 
