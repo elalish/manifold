@@ -11,13 +11,9 @@
 
 float eps = 0.000001;
 
-bool approx_vec3(ManifoldVec3 &a, ManifoldVec3 &b) {
-  return abs(a.x - b.x) < eps && abs(a.y - b.y) < eps && abs(a.z - b.z) < eps;
-}
-
-bool approx_vec3_array(ManifoldVec3 *a, ManifoldVec3 *b, size_t len) {
+bool approx_float_array(float *a, float *b, size_t len) {
   for (int i = 0; i < len; ++i) {
-    if (!approx_vec3(a[i], b[i])) {
+    if (abs(a[i] - b[i]) > eps) {
       return false;
     };
   }
@@ -45,26 +41,26 @@ TEST(CBIND, warp_translation) {
   ManifoldManifold *trans = manifold_translate(malloc(sz), sphere, 15., 0., 0.);
   ManifoldManifold *warped = manifold_warp(malloc(sz), sphere, warp);
 
-  ManifoldMesh *trans_mesh =
-      manifold_get_mesh(malloc(manifold_mesh_size()), trans);
-  ManifoldMesh *warped_mesh =
-      manifold_get_mesh(malloc(manifold_mesh_size()), warped);
+  ManifoldMeshGL *trans_mesh =
+      manifold_get_meshgl(malloc(manifold_meshgl_size()), trans);
+  ManifoldMeshGL *warped_mesh =
+      manifold_get_meshgl(malloc(manifold_meshgl_size()), warped);
 
-  size_t n_verts = manifold_mesh_vert_length(trans_mesh);
-  ManifoldVec3 *trans_verts = manifold_mesh_vert_pos(
-      malloc(sizeof(ManifoldVec3) * n_verts), trans_mesh);
-  ManifoldVec3 *warped_verts = manifold_mesh_vert_pos(
-      malloc(sizeof(ManifoldVec3) * n_verts), warped_mesh);
+  size_t len_props = manifold_meshgl_vert_properties_length(trans_mesh);
+  float *trans_props = manifold_meshgl_vert_properties(
+      malloc(sizeof(float) * len_props), trans_mesh);
+  float *warped_props = manifold_meshgl_vert_properties(
+      malloc(sizeof(float) * len_props), warped_mesh);
 
-  EXPECT_TRUE(approx_vec3_array(trans_verts, warped_verts, n_verts));
+  EXPECT_TRUE(approx_float_array(trans_props, warped_props, len_props));
 
   manifold_delete_manifold(sphere);
   manifold_delete_manifold(trans);
   manifold_delete_manifold(warped);
-  manifold_delete_mesh(trans_mesh);
-  manifold_delete_mesh(warped_mesh);
-  delete trans_verts;
-  delete warped_verts;
+  manifold_delete_meshgl(trans_mesh);
+  manifold_delete_meshgl(warped_mesh);
+  delete trans_props;
+  delete warped_props;
 }
 
 TEST(CBIND, level_set) {
@@ -85,21 +81,21 @@ TEST(CBIND, level_set) {
   // bounding box scaled according to factors used in *sdf
   ManifoldBox *bounds = manifold_box(malloc(manifold_box_size()), -bb * 3,
                                      -bb * 1, -bb * 1, bb * 3, bb * 1, bb * 1);
-  ManifoldMesh *sdf_mesh =
-      manifold_level_set(malloc(manifold_mesh_size()), sdf, bounds, 0.5, 0);
-  ManifoldManifold *sdf_man = manifold_of_mesh(malloc(sz), sdf_mesh);
+  ManifoldMeshGL *sdf_mesh =
+      manifold_level_set(malloc(manifold_meshgl_size()), sdf, bounds, 0.5, 0);
+  ManifoldManifold *sdf_man = manifold_of_meshgl(malloc(sz), sdf_mesh);
 
 #ifdef MANIFOLD_EXPORT
   ManifoldExportOptions *options =
       manifold_export_options(malloc(manifold_export_options_size()));
   const char *name = "cbind_sdf_test.stl";
-  manifold_export_mesh(name, sdf_mesh, options);
+  manifold_export_meshgl(name, sdf_mesh, options);
   manifold_delete_export_options(options);
 #endif
 
   EXPECT_EQ(manifold_status(sdf_man), NO_ERROR);
 
-  manifold_delete_mesh(sdf_mesh);
+  manifold_delete_meshgl(sdf_mesh);
   manifold_delete_manifold(sdf_man);
   manifold_delete_box(bounds);
 }
