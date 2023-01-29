@@ -24,7 +24,7 @@ void manifold_material_set_color(ManifoldMaterial *mat, ManifoldVec4 color) {
 
 void manifold_material_set_vert_color(ManifoldMaterial *mat,
                                       ManifoldVec4 *vert_color, size_t n_vert) {
-  from_c(mat)->vertColor = vector_of_array(vert_color, n_vert);
+  from_c(mat)->vertColor = vector_of_vec_array(vert_color, n_vert);
 }
 
 ManifoldExportOptions *manifold_export_options(void *mem) {
@@ -41,8 +41,8 @@ void manifold_export_options_set_material(ManifoldExportOptions *options,
   from_c(options)->mat = *from_c(mat);
 }
 
-void manifold_export_mesh(const char *filename, ManifoldMesh *mesh,
-                          ManifoldExportOptions *options) {
+void manifold_export_meshgl(const char *filename, ManifoldMeshGL *mesh,
+                            ManifoldExportOptions *options) {
   manifold::ExportMesh(std::string(filename), *from_c(mesh), *from_c(options));
 }
 

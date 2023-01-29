@@ -34,7 +34,22 @@ glm::vec3 from_c(ManifoldVec3 v);
 glm::ivec3 from_c(ManifoldIVec3 v);
 glm::vec4 from_c(ManifoldVec4 v);
 
-std::vector<float> vector_of_array(float *fs, size_t length);
-std::vector<glm::vec3> vector_of_array(ManifoldVec3 *vs, size_t length);
-std::vector<glm::ivec3> vector_of_array(ManifoldIVec3 *vs, size_t length);
-std::vector<glm::vec4> vector_of_array(ManifoldVec4 *vs, size_t length);
+std::vector<glm::vec3> vector_of_vec_array(ManifoldVec3 *vs, size_t length);
+std::vector<glm::ivec3> vector_of_vec_array(ManifoldIVec3 *vs, size_t length);
+std::vector<glm::vec4> vector_of_vec_array(ManifoldVec4 *vs, size_t length);
+
+template <typename T>
+std::vector<T> vector_of_array(T *ts, size_t length) {
+  auto vec = std::vector<T>();
+  for (int i = 0; i < length; ++i) {
+    vec.push_back(ts[i]);
+  }
+  return vec;
+}
+
+template <typename T>
+T *copy_data(void *mem, std::vector<T> v) {
+  T *ts = reinterpret_cast<T *>(mem);
+  memcpy(ts, v.data(), sizeof(T) * v.size());
+  return ts;
+}
