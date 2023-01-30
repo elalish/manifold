@@ -129,9 +129,7 @@ Manifold::Impl CsgLeafNode::Compose(
   int numVert = 0;
   int numEdge = 0;
   int numTri = 0;
-  int meshids = 0;
   for (auto &node : nodes) {
-    meshids += node->pImpl_->meshids;
     float nodeOldScale = node->pImpl_->bBox_.Scale();
     float nodeNewScale =
         node->pImpl_->bBox_.Transform(node->transform_).Scale();
@@ -147,7 +145,6 @@ Manifold::Impl CsgLeafNode::Compose(
   }
 
   Manifold::Impl combined;
-  combined.meshids = meshids;
   combined.precision_ = precision;
   combined.vertPos_.resize(numVert);
   combined.halfedge_.resize(2 * numEdge);

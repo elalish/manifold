@@ -470,9 +470,7 @@ Manifold::Impl::Impl(const Mesh& mesh,
                      const std::vector<glm::ivec3>& triProperties,
                      const std::vector<float>& properties,
                      const std::vector<float>& propertyTolerance)
-    : vertPos_(mesh.vertPos),
-      halfedgeTangent_(mesh.halfedgeTangent),
-      meshids(1) {
+    : vertPos_(mesh.vertPos), halfedgeTangent_(mesh.halfedgeTangent) {
   VecDH<glm::ivec3> triVerts = mesh.triVerts;
   if (!IsIndexInBounds(triVerts)) {
     MarkFailure(Error::VERTEX_INDEX_OUT_OF_BOUNDS);
@@ -504,7 +502,7 @@ Manifold::Impl::Impl(const Mesh& mesh,
  * Create either a unit tetrahedron, cube or octahedron. The cube is in the
  * first octant, while the others are symmetric about the origin.
  */
-Manifold::Impl::Impl(Shape shape) : meshids(1) {
+Manifold::Impl::Impl(Shape shape) {
   std::vector<glm::vec3> vertPos;
   std::vector<glm::ivec3> triVerts;
   switch (shape) {
@@ -581,7 +579,6 @@ void Manifold::Impl::ReinitializeReference() {
   meshRelation_.originalID = meshID;
   meshRelation_.meshIDtransform.clear();
   meshRelation_.meshIDtransform[meshID] = glm::mat4x3(1);
-  meshids = 1;
 }
 
 int Manifold::Impl::InitializeNewReference(
@@ -698,7 +695,6 @@ Manifold::Impl Manifold::Impl::Transform(const glm::mat4x3& transform_) const {
   if (transform_ == glm::mat4x3(1.0f)) return *this;
   auto policy = autoPolicy(NumVert());
   Impl result;
-  result.meshids = meshids;
   result.collider_ = collider_;
   result.meshRelation_ = meshRelation_;
   result.precision_ = precision_;
@@ -797,7 +793,7 @@ void Manifold::Impl::CalculateNormals() {
 void Manifold::Impl::IncrementMeshIDs() {
   const int numTri = NumTri();
   const auto policy = autoPolicy(numTri);
-  HashTable<uint32_t> meshIDold2new(std::max(16u, meshids * 2));
+  HashTable<uint32_t> meshIDold2new(meshRelation_.meshIDtransform.size() * 2);
 
   while (1) {
     for_each_n(policy, meshRelation_.triRef.begin(), numTri,
