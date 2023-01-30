@@ -100,7 +100,7 @@ class Manifold {
    */
   ///@{
   Mesh GetMesh() const;
-  MeshGL GetMeshGL() const;
+  MeshGL GetMeshGL(glm::ivec3 normalIdx = {}) const;
   bool IsEmpty() const;
   enum class Error {
     NO_ERROR,

@@ -419,6 +419,13 @@ VecDH<TriRef> UpdateReference(Manifold::Impl &outR, const Manifold::Impl &inP,
   for_each_n(policy, outR.meshRelation_.triRef.begin(), outR.NumTri(),
              MapTriRef({inP.meshRelation_.triRef.cptrD(),
                         inQ.meshRelation_.triRef.cptrD(), offsetQ}));
+
+  for (const auto &pair : inP.meshRelation_.meshIDtransform) {
+    outR.meshRelation_.meshIDtransform[pair.first] = pair.second;
+  }
+  for (const auto &pair : inQ.meshRelation_.meshIDtransform) {
+    outR.meshRelation_.meshIDtransform[pair.first + offsetQ] = pair.second;
+  }
   return refPQ;
 }
 
@@ -695,8 +702,6 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
   if (ManifoldParams().intermediateChecks)
     ASSERT(outR.Is2Manifold(), logicErr, "simplified mesh is not 2-manifold!");
 
-  outR.IncrementMeshIDs(0, outR.NumTri());
-
 #ifdef MANIFOLD_DEBUG
   simplify.Stop();
   Timer sort;
@@ -704,6 +709,7 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
 #endif
 
   outR.Finish();
+  outR.IncrementMeshIDs();
 
 #ifdef MANIFOLD_DEBUG
   sort.Stop();

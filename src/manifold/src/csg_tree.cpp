@@ -160,6 +160,7 @@ Manifold::Impl CsgLeafNode::Compose(
   int nextEdge = 0;
   int nextTri = 0;
   int nextBary = 0;
+  int i = 0;
   for (auto &node : nodes) {
     if (node->transform_ == glm::mat4x3(1.0f)) {
       copy(policy, node->pImpl_->vertPos_.begin(), node->pImpl_->vertPos_.end(),
@@ -185,26 +186,31 @@ Manifold::Impl CsgLeafNode::Compose(
     copy(policy, node->pImpl_->halfedgeTangent_.begin(),
          node->pImpl_->halfedgeTangent_.end(),
          combined.halfedgeTangent_.begin() + nextEdge);
-    copy(policy, node->pImpl_->meshRelation_.triRef.begin(),
-         node->pImpl_->meshRelation_.triRef.end(),
-         combined.meshRelation_.triRef.begin() + nextTri);
     transform(policy, node->pImpl_->halfedge_.begin(),
               node->pImpl_->halfedge_.end(),
               combined.halfedge_.begin() + nextEdge,
               UpdateHalfedge({nextVert, nextEdge, nextTri}));
-
     // Since the nodes may be copies containing the same meshIDs, it is
-    // important to increment them separately so that each node instance gets
+    // important to add an offset so that each node instance gets
     // unique meshIDs.
-    combined.IncrementMeshIDs(nextTri, node->pImpl_->NumTri());
+    const int offset = i++ * Manifold::Impl::meshIDCounter_;
+    transform(policy, node->pImpl_->meshRelation_.triRef.begin(),
+              node->pImpl_->meshRelation_.triRef.end(),
+              combined.meshRelation_.triRef.begin() + nextTri,
+              [offset](TriRef ref) {
+                ref.meshID += offset;
+                return ref;
+              });
 
     nextVert += node->pImpl_->NumVert();
     nextEdge += 2 * node->pImpl_->NumEdge();
     nextTri += node->pImpl_->NumTri();
   }
+
   // required to remove parts that are smaller than the precision
   combined.SimplifyTopology();
   combined.Finish();
+  combined.IncrementMeshIDs();
   return combined;
 }
 

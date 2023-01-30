@@ -570,13 +570,17 @@ void Manifold::Impl::RemoveUnreferencedVerts(VecDH<glm::ivec3>& triVerts) {
            ReindexTriVerts({vertOld2New.cptrD()}));
 }
 
-void Manifold::Impl::ReinitializeReference(int meshID) {
+void Manifold::Impl::ReinitializeReference() {
+  meshRelation_.triRef.resize(NumTri());
+  const int meshID = meshIDCounter_.fetch_add(1, std::memory_order_relaxed);
   // instead of storing the meshID, we store 0 and set the mapping to
   // 0 -> meshID, because the meshID after boolean operation also starts from 0.
   for_each_n(autoPolicy(NumTri()),
              zip(meshRelation_.triRef.begin(), countAt(0)), NumTri(),
              InitializeTriRef({meshID, halfedge_.cptrD()}));
   meshRelation_.originalID = meshID;
+  meshRelation_.meshIDtransform.clear();
+  meshRelation_.meshIDtransform[meshID] = glm::mat4x3(1);
   meshids = 1;
 }
 
@@ -584,9 +588,7 @@ int Manifold::Impl::InitializeNewReference(
     const std::vector<glm::ivec3>& triProperties,
     const std::vector<float>& properties,
     const std::vector<float>& propertyTolerance) {
-  meshRelation_.triRef.resize(NumTri());
-  const int nextMeshID = meshIDCounter_.fetch_add(1, std::memory_order_relaxed);
-  ReinitializeReference(nextMeshID);
+  ReinitializeReference();
 
   const int numProps = propertyTolerance.size();
 
@@ -638,7 +640,7 @@ int Manifold::Impl::InitializeNewReference(
   for (int tri = 0; tri < NumTri(); ++tri)
     triRef[tri].tri = comp2tri[components[tri]];
 
-  return nextMeshID;
+  return meshRelation_.originalID;
 }
 
 /**
@@ -703,6 +705,10 @@ Manifold::Impl Manifold::Impl::Transform(const glm::mat4x3& transform_) const {
   result.bBox_ = bBox_;
   result.halfedge_ = halfedge_;
   result.halfedgeTangent_.resize(halfedgeTangent_.size());
+
+  for (auto& m : result.meshRelation_.meshIDtransform) {
+    m.second = transform_ * glm::mat4(m.second);
+  }
 
   result.vertPos_.resize(NumVert());
   result.faceNormal_.resize(faceNormal_.size());
@@ -788,29 +794,39 @@ void Manifold::Impl::CalculateNormals() {
  * Remaps all the contained meshIDs to new unique values to represent new
  * instances of these meshes.
  */
-void Manifold::Impl::IncrementMeshIDs(int start, int length) {
-  VecDH<TriRef>& triRef = meshRelation_.triRef;
-  ASSERT(start >= 0 && length >= 0 && start + length <= triRef.size(), logicErr,
-         "out of bounds");
-  const auto policy = autoPolicy(length);
-  HashTable<uint32_t> meshidTable(std::max(16u, meshids * 2));
+void Manifold::Impl::IncrementMeshIDs() {
+  const int numTri = NumTri();
+  const auto policy = autoPolicy(numTri);
+  HashTable<uint32_t> meshIDold2new(std::max(16u, meshids * 2));
 
-  auto begin = triRef.begin() + start;
-  auto end = begin + length;
   while (1) {
-    for_each(policy, begin, end, MarkMeshID({meshidTable.D()}));
-    if (!meshidTable.Full()) break;
-    meshidTable = HashTable<uint32_t>(meshidTable.Size() * 2);
+    for_each_n(policy, meshRelation_.triRef.begin(), numTri,
+               MarkMeshID({meshIDold2new.D()}));
+    if (!meshIDold2new.Full()) break;
+    meshIDold2new = HashTable<uint32_t>(meshIDold2new.Size() * 2);
   }
-  inclusive_scan(
-      autoPolicy(meshidTable.Size()), meshidTable.GetValueStore().begin(),
-      meshidTable.GetValueStore().end(), meshidTable.GetValueStore().begin());
-  const int numMeshIDs = meshidTable.GetValueStore().back();
+  inclusive_scan(autoPolicy(meshIDold2new.Size()),
+                 meshIDold2new.GetValueStore().begin(),
+                 meshIDold2new.GetValueStore().end(),
+                 meshIDold2new.GetValueStore().begin());
+  const int numMeshIDs = meshIDold2new.GetValueStore().back();
   const int meshIDstart = Manifold::Impl::meshIDCounter_.fetch_add(
       numMeshIDs, std::memory_order_relaxed);
   // We do start - 1 because the inclusive scan makes our first index 1 instead
   // of 0.
-  for_each(policy, begin, end, UpdateMeshID({meshidTable.D(), meshIDstart}));
+  for_each_n(policy, meshRelation_.triRef.begin(), numTri,
+             UpdateMeshID({meshIDold2new.D(), meshIDstart}));
+  // Update keys of the transform map
+  std::map<int, glm::mat4x3> oldTransforms;
+  std::swap(meshRelation_.meshIDtransform, oldTransforms);
+  const int tableSize = meshIDold2new.Size();
+  for (int i = 0; i < tableSize; ++i) {
+    const auto oldID = meshIDold2new.D().KeyAt(i);
+    if (oldID != HashTable<uint32_t>::Open()) {
+      meshRelation_.meshIDtransform[meshIDold2new.D().At(i) + meshIDstart] =
+          oldTransforms[oldID];
+    }
+  }
 }
 
 /**

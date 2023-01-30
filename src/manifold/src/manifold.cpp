@@ -147,7 +147,7 @@ Mesh Manifold::GetMesh() const {
   return result;
 }
 
-MeshGL Manifold::GetMeshGL() const {
+MeshGL Manifold::GetMeshGL(glm::ivec3 normalIdx) const {
   const Impl& impl = *GetCsgLeafNode().GetImpl();
 
   const int numProp = NumProp();
@@ -187,8 +187,14 @@ MeshGL Manifold::GetMeshGL() const {
     const auto ref = triRef[oldTri];
     const int meshID = ref.meshID;
     if (meshID != lastID) {
-      out.originalID.push_back(ref.originalID);
       out.runIndex.push_back(3 * tri);
+      out.originalID.push_back(ref.originalID);
+      const glm::mat4x3& m = impl.meshRelation_.meshIDtransform.at(meshID);
+      for (const int col : {0, 1, 2, 3}) {
+        for (const int row : {0, 1, 2}) {
+          out.transform.push_back(m[col][row]);
+        }
+      }
       lastID = meshID;
     }
     out.faceID[tri] = ref.tri;

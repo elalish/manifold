@@ -13,6 +13,8 @@
 // limitations under the License.
 
 #pragma once
+#include <map>
+
 #include "collider.h"
 #include "manifold.h"
 #include "optional_assert.h"
@@ -30,8 +32,9 @@ struct Manifold::Impl {
     VecDH<glm::ivec3> triProperties;
     VecDH<float> properties;
     int numProp = 0;
-    /// The meshID of this Manifold if it is an original; -1 otherwise.
+    /// The originalID of this Manifold if it is an original; -1 otherwise.
     int originalID = -1;
+    std::map<int, glm::mat4x3> meshIDtransform;
   };
 
   Box bBox_;
@@ -62,10 +65,10 @@ struct Manifold::Impl {
                              const std::vector<float>& propertyTolerance = {});
 
   void RemoveUnreferencedVerts(VecDH<glm::ivec3>& triVerts);
-  void ReinitializeReference(int meshID);
+  void ReinitializeReference();
   void CreateHalfedges(const VecDH<glm::ivec3>& triVerts);
   void CalculateNormals();
-  void IncrementMeshIDs(int start, int length);
+  void IncrementMeshIDs();
 
   void Update();
   void MarkFailure(Error status);

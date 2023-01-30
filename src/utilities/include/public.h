@@ -200,6 +200,11 @@ struct MeshGL {
   /// Optional: The OriginalID of the mesh this triangle run came from. This ID
   /// is ideal for reapplying materials to the output mesh.
   std::vector<uint32_t> originalID;
+  /// Optional: For each run, a 3x4 transform is stored representing how the
+  /// corresponding original mesh was transformed to create this triangle run.
+  /// This matrix is stored in column-major order and the length of the overall
+  /// vector is 12 * originalID.size().
+  std::vector<float> transform;
   /// Optional: Length NumTri, contains an ID of the source face this triangle
   /// comes from. When auto-generated, this ID will be a triangle index into the
   /// original mesh. All neighboring coplanar triangles from that input mesh

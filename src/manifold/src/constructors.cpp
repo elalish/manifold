@@ -203,7 +203,7 @@ Manifold Manifold::Sphere(float radius, int circularSegments) {
              pImpl_->NumVert(), ToSphere({radius}));
   pImpl_->Finish();
   // Ignore preceding octahedron.
-  pImpl_->ReinitializeReference(Impl::meshIDCounter_.fetch_add(1));
+  pImpl_->ReinitializeReference();
   return Manifold(pImpl_);
 }
 
