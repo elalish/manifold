@@ -14,9 +14,9 @@
 using namespace manifold;
 
 namespace {
-ManifoldMesh *level_set(void *mem, float (*sdf)(float, float, float),
-                        ManifoldBox *bounds, float edge_length, float level,
-                        bool seq) {
+ManifoldMeshGL *level_set(void *mem, float (*sdf)(float, float, float),
+                          ManifoldBox *bounds, float edge_length, float level,
+                          bool seq) {
   // typing with std::function rather than auto compiles when CUDA is on,
   // passing it into GPU (and crashing) is avoided dynamically in `sdf.h`
   std::function<float(glm::vec3)> fun = [sdf](glm::vec3 v) {
@@ -24,7 +24,7 @@ ManifoldMesh *level_set(void *mem, float (*sdf)(float, float, float),
   };
   auto pol = seq ? std::make_optional(Seq) : std::nullopt;
   auto mesh = LevelSet(fun, *from_c(bounds), edge_length, level, pol);
-  return to_c(new (mem) Mesh(mesh));
+  return to_c(new (mem) MeshGL(mesh));
 }
 }  // namespace
 
@@ -132,16 +132,16 @@ ManifoldManifold *manifold_warp(void *mem, ManifoldManifold *m,
   return to_c(new (mem) Manifold(warped));
 }
 
-ManifoldMesh *manifold_level_set(void *mem, float (*sdf)(float, float, float),
-                                 ManifoldBox *bounds, float edge_length,
-                                 float level) {
+ManifoldMeshGL *manifold_level_set(void *mem, float (*sdf)(float, float, float),
+                                   ManifoldBox *bounds, float edge_length,
+                                   float level) {
   return level_set(mem, sdf, bounds, edge_length, level, false);
 }
 
-ManifoldMesh *manifold_level_set_seq(void *mem,
-                                     float (*sdf)(float, float, float),
-                                     ManifoldBox *bounds, float edge_length,
-                                     float level) {
+ManifoldMeshGL *manifold_level_set_seq(void *mem,
+                                       float (*sdf)(float, float, float),
+                                       ManifoldBox *bounds, float edge_length,
+                                       float level) {
   return level_set(mem, sdf, bounds, edge_length, level, true);
 }
 
@@ -184,52 +184,29 @@ ManifoldManifold *manifold_sphere(void *mem, float radius,
   return to_c(new (mem) Manifold(m));
 }
 
-ManifoldMesh *manifold_mesh(void *mem, ManifoldVec3 *vert_pos, size_t n_verts,
-                            ManifoldIVec3 *tri_verts, size_t n_tris) {
-  auto mesh = new (mem) Mesh();
-  mesh->vertPos = vector_of_array(vert_pos, n_verts);
-  mesh->triVerts = vector_of_array(tri_verts, n_tris);
+ManifoldMeshGL *manifold_meshgl(void *mem, float *vert_props, size_t n_verts,
+                                size_t n_props, uint32_t *tri_verts,
+                                size_t n_tris) {
+  auto mesh = new (mem) MeshGL();
+  mesh->numProp = n_props;
+  mesh->vertProperties = vector_of_array(vert_props, n_verts * n_props);
+  mesh->triVerts = vector_of_array(tri_verts, n_tris * 3);
   return to_c(mesh);
 }
 
-ManifoldMesh *manifold_mesh_w_normals(void *mem, ManifoldVec3 *vert_pos,
-                                      size_t n_verts, ManifoldIVec3 *tri_verts,
-                                      size_t n_tris,
-                                      ManifoldVec3 *vert_normal) {
-  auto mesh = new (mem) Mesh();
-  mesh->vertPos = vector_of_array(vert_pos, n_verts);
-  mesh->triVerts = vector_of_array(tri_verts, n_tris);
-  mesh->vertNormal = vector_of_array(vert_normal, n_verts);
+ManifoldMeshGL *manifold_meshgl_w_tangents(void *mem, float *vert_props,
+                                           size_t n_verts, size_t n_props,
+                                           uint32_t *tri_verts, size_t n_tris,
+                                           float *halfedge_tangent) {
+  auto mesh = new (mem) MeshGL();
+  mesh->numProp = n_props;
+  mesh->vertProperties = vector_of_array(vert_props, n_verts * n_props);
+  mesh->triVerts = vector_of_array(tri_verts, n_tris * 3);
+  mesh->halfedgeTangent = vector_of_array(halfedge_tangent, n_tris * 3 * 4);
   return to_c(mesh);
 }
 
-ManifoldMesh *manifold_mesh_w_tangents(void *mem, ManifoldVec3 *vert_pos,
-                                       size_t n_verts, ManifoldIVec3 *tri_verts,
-                                       size_t n_tris,
-                                       ManifoldVec4 *halfedge_tangent) {
-  auto mesh = new (mem) Mesh();
-  mesh->vertPos = vector_of_array(vert_pos, n_verts);
-  mesh->triVerts = vector_of_array(tri_verts, n_tris);
-  mesh->halfedgeTangent = vector_of_array(halfedge_tangent, n_tris * 3);
-  return to_c(mesh);
-}
-
-ManifoldMesh *manifold_mesh_w_normals_tangents(
-    void *mem, ManifoldVec3 *vert_pos, size_t n_verts, ManifoldIVec3 *tri_verts,
-    size_t n_tris, ManifoldVec3 *vert_normal, ManifoldVec4 *halfedge_tangent) {
-  auto mesh = new (mem) Mesh();
-  mesh->vertPos = vector_of_array(vert_pos, n_verts);
-  mesh->triVerts = vector_of_array(tri_verts, n_tris);
-  mesh->vertNormal = vector_of_array(vert_normal, n_verts);
-  mesh->halfedgeTangent = vector_of_array(halfedge_tangent, n_tris * 3);
-  return to_c(mesh);
-}
-
-ManifoldMesh *manifold_mesh_copy(void *mem, ManifoldMesh *m) {
-  return to_c(new (mem) Mesh(*from_c(m)));
-}
-
-ManifoldManifold *manifold_smooth(void *mem, ManifoldMesh *mesh,
+ManifoldManifold *manifold_smooth(void *mem, ManifoldMeshGL *mesh,
                                   int *half_edges, float *smoothness,
                                   int n_edges) {
   auto smooth = std::vector<Smoothness>();
@@ -240,7 +217,7 @@ ManifoldManifold *manifold_smooth(void *mem, ManifoldMesh *mesh,
   return to_c(new (mem) Manifold(m));
 }
 
-ManifoldManifold *manifold_of_mesh(void *mem, ManifoldMesh *mesh) {
+ManifoldManifold *manifold_of_meshgl(void *mem, ManifoldMeshGL *mesh) {
   auto m = Manifold(*from_c(mesh));
   return to_c(new (mem) Manifold(m));
 }
@@ -292,67 +269,6 @@ ManifoldManifold **manifold_decompose(void **mem, ManifoldManifold *m,
   return ms;
 }
 
-ManifoldMesh *manifold_get_mesh(void *mem, ManifoldManifold *m) {
-  auto mesh = from_c(m)->GetMesh();
-  return to_c(new (mem) Mesh(mesh));
-}
-
-size_t manifold_mesh_vert_length(ManifoldMesh *m) {
-  return from_c(m)->vertPos.size();
-}
-
-size_t manifold_mesh_tri_length(ManifoldMesh *m) {
-  return from_c(m)->triVerts.size();
-}
-
-size_t manifold_mesh_normal_length(ManifoldMesh *m) {
-  return from_c(m)->vertNormal.size();
-}
-
-size_t manifold_mesh_tangent_length(ManifoldMesh *m) {
-  return from_c(m)->halfedgeTangent.size();
-}
-
-ManifoldVec3 *manifold_mesh_vert_pos(void *mem, ManifoldMesh *m) {
-  auto vert_pos = from_c(m)->vertPos;
-  auto len = vert_pos.size();
-  ManifoldVec3 *vs = reinterpret_cast<ManifoldVec3 *>(mem);
-  for (int i = 0; i < len; ++i) {
-    vs[i] = {vert_pos[i].x, vert_pos[i].y, vert_pos[i].z};
-  }
-  return vs;
-}
-
-ManifoldIVec3 *manifold_mesh_tri_verts(void *mem, ManifoldMesh *m) {
-  auto tri_verts = from_c(m)->triVerts;
-  auto len = tri_verts.size();
-  ManifoldIVec3 *tris = reinterpret_cast<ManifoldIVec3 *>(mem);
-  for (int i = 0; i < len; ++i) {
-    tris[i] = {tri_verts[i].x, tri_verts[i].y, tri_verts[i].z};
-  }
-  return tris;
-}
-
-ManifoldVec3 *manifold_mesh_vert_normal(void *mem, ManifoldMesh *m) {
-  auto vert_normal = from_c(m)->vertNormal;
-  auto len = vert_normal.size();
-  ManifoldVec3 *ns = reinterpret_cast<ManifoldVec3 *>(mem);
-  for (int i = 0; i < len; ++i) {
-    ns[0] = {vert_normal[i].x, vert_normal[i].y, vert_normal[i].z};
-  }
-  return ns;
-}
-
-ManifoldVec4 *manifold_mesh_halfedge_tangent(void *mem, ManifoldMesh *m) {
-  auto tangents = from_c(m)->halfedgeTangent;
-  auto len = tangents.size();
-  ManifoldVec4 *ts = reinterpret_cast<ManifoldVec4 *>(mem);
-  for (int i = 0; i < len; ++i) {
-    ts[i] = {tangents[i].x, tangents[i].y, tangents[i].z, tangents[i].w};
-  }
-  return ts;
-}
-
 ManifoldMeshGL *manifold_get_meshgl(void *mem, ManifoldManifold *m) {
   auto mesh = from_c(m)->GetMeshGL();
   return to_c(new (mem) MeshGL(mesh));
@@ -395,67 +311,35 @@ size_t manifold_meshgl_tangent_length(ManifoldMeshGL *m) {
 }
 
 float *manifold_meshgl_vert_properties(void *mem, ManifoldMeshGL *m) {
-  auto vert_props = from_c(m)->vertProperties;
-  auto len = vert_props.size();
-  float *vs = reinterpret_cast<float *>(mem);
-  memcpy(vs, vert_props.data(), sizeof(float) * len);
-  return vs;
+  return copy_data(mem, from_c(m)->vertProperties);
 }
 
 uint32_t *manifold_meshgl_tri_verts(void *mem, ManifoldMeshGL *m) {
-  auto tri_verts = from_c(m)->triVerts;
-  auto len = tri_verts.size();
-  uint32_t *tris = reinterpret_cast<uint32_t *>(mem);
-  memcpy(tris, tri_verts.data(), sizeof(uint32_t) * len);
-  return tris;
+  return copy_data(mem, from_c(m)->triVerts);
 }
 
 uint32_t *manifold_meshgl_merge_from_vert(void *mem, ManifoldMeshGL *m) {
-  auto merge = from_c(m)->mergeFromVert;
-  auto len = merge.size();
-  uint32_t *ms = reinterpret_cast<uint32_t *>(mem);
-  memcpy(ms, merge.data(), sizeof(uint32_t) * len);
-  return ms;
+  return copy_data(mem, from_c(m)->mergeFromVert);
 }
 
 uint32_t *manifold_meshgl_merge_to_vert(void *mem, ManifoldMeshGL *m) {
-  auto merge = from_c(m)->mergeToVert;
-  auto len = merge.size();
-  uint32_t *ms = reinterpret_cast<uint32_t *>(mem);
-  memcpy(ms, merge.data(), sizeof(uint32_t) * len);
-  return ms;
+  return copy_data(mem, from_c(m)->mergeToVert);
 }
 
 uint32_t *manifold_meshgl_run_index(void *mem, ManifoldMeshGL *m) {
-  auto run_index = from_c(m)->runIndex;
-  auto len = run_index.size();
-  uint32_t *rs = reinterpret_cast<uint32_t *>(mem);
-  memcpy(rs, run_index.data(), sizeof(uint32_t) * len);
-  return rs;
+  return copy_data(mem, from_c(m)->runIndex);
 }
 
 uint32_t *manifold_meshgl_original_id(void *mem, ManifoldMeshGL *m) {
-  auto original_id = from_c(m)->originalID;
-  auto len = original_id.size();
-  uint32_t *ids = reinterpret_cast<uint32_t *>(mem);
-  memcpy(ids, original_id.data(), sizeof(uint32_t) * len);
-  return ids;
+  return copy_data(mem, from_c(m)->originalID);
 }
 
 uint32_t *manifold_meshgl_face_id(void *mem, ManifoldMeshGL *m) {
-  auto face_id = from_c(m)->faceID;
-  auto len = face_id.size();
-  uint32_t *ids = reinterpret_cast<uint32_t *>(mem);
-  memcpy(ids, face_id.data(), sizeof(uint32_t) * len);
-  return ids;
+  return copy_data(mem, from_c(m)->faceID);
 }
 
 float *manifold_meshgl_halfedge_tangent(void *mem, ManifoldMeshGL *m) {
-  auto tangents = from_c(m)->halfedgeTangent;
-  auto len = tangents.size();
-  float *ts = reinterpret_cast<float *>(mem);
-  memcpy(ts, tangents.data(), sizeof(float) * len);
-  return ts;
+  return copy_data(mem, from_c(m)->halfedgeTangent);
 }
 
 ManifoldManifold *manifold_as_original(void *mem, ManifoldManifold *m) {
@@ -505,19 +389,11 @@ size_t manifold_curvature_vert_length(ManifoldCurvature *curv) {
 }
 
 float *manifold_curvature_vert_mean(void *mem, ManifoldCurvature *curv) {
-  auto verts = from_c(curv)->vertMeanCurvature;
-  auto len = verts.size();
-  float *vs = reinterpret_cast<float *>(mem);
-  memcpy(vs, verts.data(), sizeof(float) * len);
-  return vs;
+  return copy_data(mem, from_c(curv)->vertMeanCurvature);
 }
 
 float *manifold_curvature_vert_gaussian(void *mem, ManifoldCurvature *curv) {
-  auto verts = from_c(curv)->vertGaussianCurvature;
-  auto len = verts.size();
-  float *vs = reinterpret_cast<float *>(mem);
-  memcpy(vs, verts.data(), sizeof(float) * len);
-  return vs;
+  return copy_data(mem, from_c(curv)->vertGaussianCurvature);
 }
 
 // Static Quality Globals
@@ -542,7 +418,6 @@ size_t manifold_simple_polygon_size() { return sizeof(SimplePolygon); }
 size_t manifold_polygons_size() { return sizeof(Polygons); }
 size_t manifold_manifold_size() { return sizeof(Manifold); }
 size_t manifold_manifold_pair_size() { return sizeof(ManifoldManifoldPair); }
-size_t manifold_mesh_size() { return sizeof(Mesh); }
 size_t manifold_meshgl_size() { return sizeof(MeshGL); }
 size_t manifold_box_size() { return sizeof(Box); }
 size_t manifold_curvature_size() { return sizeof(Curvature); }
@@ -554,7 +429,6 @@ void manifold_delete_simple_polygon(ManifoldSimplePolygon *p) {
 }
 void manifold_delete_polygons(ManifoldPolygons *p) { delete from_c(p); }
 void manifold_delete_manifold(ManifoldManifold *m) { delete from_c(m); }
-void manifold_delete_mesh(ManifoldMesh *m) { delete from_c(m); }
 void manifold_delete_meshgl(ManifoldMeshGL *m) { delete from_c(m); }
 void manifold_delete_box(ManifoldBox *b) { delete from_c(b); }
 void manifold_delete_curvature(ManifoldCurvature *c) { delete from_c(c); }
@@ -566,7 +440,6 @@ void manifold_destruct_simple_polygon(ManifoldSimplePolygon *p) {
 }
 void manifold_destruct_polygons(ManifoldPolygons *p) { from_c(p)->~Polygons(); }
 void manifold_destruct_manifold(ManifoldManifold *m) { from_c(m)->~Manifold(); }
-void manifold_destruct_mesh(ManifoldMesh *m) { from_c(m)->~Mesh(); }
 void manifold_destruct_meshgl(ManifoldMeshGL *m) { from_c(m)->~MeshGL(); }
 void manifold_destruct_box(ManifoldBox *b) { from_c(b)->~Box(); }
 void manifold_destruct_curvature(ManifoldCurvature *c) {
