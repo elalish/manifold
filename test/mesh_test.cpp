@@ -92,6 +92,9 @@ MeshGL WithIndexColors(const Mesh& in) {
     inGL.vertProperties[6 * i + 4] = powf(modf(i * sqrt(3.0), &a), 2.2);
     inGL.vertProperties[6 * i + 5] = powf(modf(i * sqrt(5.0), &a), 2.2);
   }
+  inGL.runIndex = {0, 3u * inGL.NumTri()};
+  inGL.originalID.push_back(Manifold::ReserveIDs(1));
+  inGL.transform = {1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0};
   return inGL;
 }
 
@@ -124,25 +127,38 @@ void Identical(const Mesh& mesh1, const Mesh& mesh2) {
     ASSERT_EQ(mesh1.triVerts[i], mesh2.triVerts[i]);
 }
 
-void RelatedGL(const Manifold& out, const std::vector<MeshGL>& input) {
+void RelatedGL(const Manifold& out, const std::vector<MeshGL>& originals) {
   ASSERT_FALSE(out.IsEmpty());
   MeshGL output = out.GetMeshGL();
-  ASSERT_EQ(output.originalID.size(), input.size());
   for (int run = 0; run < output.originalID.size(); ++run) {
-    const MeshGL& inMesh = input[run];
+    const float* m = output.transform.data() + 12 * run;
+    const glm::mat4x3 transform(m[0], m[1], m[2], m[3], m[4], m[5], m[6], m[7],
+                                m[8], m[9], m[10], m[11]);
+    int i = 0;
+    for (; i < originals.size(); ++i) {
+      ASSERT_EQ(originals[i].originalID.size(), 1);
+      if (originals[i].originalID[0] == output.originalID[run]) break;
+    }
+    ASSERT_LT(i, originals.size());
+    const MeshGL& inMesh = originals[i];
     for (int tri = output.runIndex[run] / 3; tri < output.runIndex[run + 1] / 3;
          ++tri) {
       ASSERT_LT(tri, output.faceID.size());
       const int inTri = output.faceID[tri];
-      ASSERT_LT(inTri, inMesh.triVerts.size());
+      ASSERT_LT(inTri, inMesh.triVerts.size() / 3);
       glm::ivec3 inTriangle = {inMesh.triVerts[3 * inTri],
                                inMesh.triVerts[3 * inTri + 1],
                                inMesh.triVerts[3 * inTri + 2]};
       inTriangle *= inMesh.numProp;
+
       glm::mat3 inTriPos;
-      for (int j : {0, 1, 2})
+      for (int j : {0, 1, 2}) {
+        glm::vec4 pos;
         for (int k : {0, 1, 2})
-          inTriPos[j][k] = inMesh.vertProperties[inTriangle[j] + k];
+          pos[k] = inMesh.vertProperties[inTriangle[j] + k];
+        pos[3] = 1;
+        inTriPos[j] = transform * pos;
+      }
       glm::vec3 normal =
           glm::cross(inTriPos[1] - inTriPos[0], inTriPos[2] - inTriPos[0]);
       const float area = glm::length(normal);
@@ -787,7 +803,7 @@ TEST(Boolean, Coplanar) {
   if (options.exportModels) ExportMesh("coplanar.glb", out.GetMeshGL(), opt);
 #endif
 
-  RelatedOp(cylinder, cylinder2, out);
+  RelatedGL(out, {cylinderGL});
 }
 
 /**

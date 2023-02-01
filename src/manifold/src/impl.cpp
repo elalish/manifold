@@ -390,13 +390,14 @@ Manifold::Impl::Impl(const MeshGL& meshGL,
                      std::vector<float> propertyTolerance) {
   Mesh mesh;
   const int numVert = meshGL.NumVert();
+  const int numTri = meshGL.NumTri();
 
   if (meshGL.numProp < 3) {
     MarkFailure(Error::MISSING_POSITION_PROPERTIES);
     return;
   }
 
-  mesh.triVerts.resize(meshGL.NumTri());
+  mesh.triVerts.resize(numTri);
   if (meshGL.mergeFromVert.size() != meshGL.mergeToVert.size()) {
     MarkFailure(Error::MERGE_VECTORS_DIFFERENT_LENGTHS);
     return;
@@ -413,7 +414,7 @@ Manifold::Impl::Impl(const MeshGL& meshGL,
     }
     prop2vert[from] = to;
   }
-  for (int i = 0; i < meshGL.NumTri(); ++i) {
+  for (int i = 0; i < numTri; ++i) {
     for (const int j : {0, 1, 2}) {
       const int vert = meshGL.triVerts[3 * i + j];
       if (vert < 0 || vert >= numVert) {
@@ -426,8 +427,8 @@ Manifold::Impl::Impl(const MeshGL& meshGL,
 
   std::vector<glm::ivec3> triProperties;
   if (meshGL.numProp > 3) {
-    triProperties.resize(meshGL.NumTri());
-    for (int i = 0; i < meshGL.NumTri(); ++i) {
+    triProperties.resize(numTri);
+    for (int i = 0; i < numTri; ++i) {
       for (const int j : {0, 1, 2}) {
         triProperties[i][j] = meshGL.triVerts[3 * i + j];
       }
@@ -459,6 +460,33 @@ Manifold::Impl::Impl(const MeshGL& meshGL,
   }
 
   *this = Impl(mesh, triProperties, properties, propertyTolerance);
+
+  // Reference triangle runs if present
+  if (!meshGL.originalID.empty()) {
+    meshRelation_.originalID =
+        meshGL.originalID.size() == 1 ? meshGL.originalID[0] : -1;
+    if (!meshGL.transform.empty()) {
+      meshRelation_.meshIDtransform.clear();
+    }
+
+    VecDH<uint32_t> originalIDs(numTri);
+    for (int i = 0; i < meshGL.originalID.size(); ++i) {
+      const int id = meshGL.originalID[i];
+      fill(autoPolicy(numTri), originalIDs.begin() + meshGL.runIndex[i] / 3,
+           originalIDs.begin() + meshGL.runIndex[i + 1] / 3, id);
+      if (!meshGL.transform.empty()) {
+        const float* m = meshGL.transform.data() + 12 * i;
+        meshRelation_.meshIDtransform[id] = {m[0], m[1], m[2],  m[3],
+                                             m[4], m[5], m[6],  m[7],
+                                             m[8], m[9], m[10], m[11]};
+      }
+    }
+    const uint32_t* tri2original = originalIDs.cptrD();
+    for_each_n(autoPolicy(numTri), meshRelation_.triRef.begin(), NumTri(),
+               [tri2original](TriRef& ref) {
+                 ref.meshID = ref.originalID = tri2original[ref.tri];
+               });
+  }
 }
 
 /**
@@ -571,8 +599,6 @@ void Manifold::Impl::RemoveUnreferencedVerts(VecDH<glm::ivec3>& triVerts) {
 void Manifold::Impl::ReinitializeReference() {
   meshRelation_.triRef.resize(NumTri());
   const int meshID = meshIDCounter_.fetch_add(1, std::memory_order_relaxed);
-  // instead of storing the meshID, we store 0 and set the mapping to
-  // 0 -> meshID, because the meshID after boolean operation also starts from 0.
   for_each_n(autoPolicy(NumTri()),
              zip(meshRelation_.triRef.begin(), countAt(0)), NumTri(),
              InitializeTriRef({meshID, halfedge_.cptrD()}));
