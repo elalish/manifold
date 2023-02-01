@@ -233,16 +233,6 @@ struct UpdateMeshID {
   }
 };
 
-struct CheckProperties {
-  const int numSets;
-
-  __host__ __device__ bool operator()(glm::ivec3 triProp) {
-    bool good = true;
-    for (int i : {0, 1, 2}) good &= (triProp[i] >= 0 && triProp[i] < numSets);
-    return good;
-  }
-};
-
 struct CoplanarEdge {
   float* triArea;
   const Halfedge* halfedge;
@@ -615,7 +605,7 @@ int Manifold::Impl::InitializeNewReference(
 
   const int numProps = propertyTolerance.size();
 
-  VecDH<float> propertyToleranceD(numProps, -1);
+  VecDH<float> propertyToleranceD(numProps, kTolerance);
   // Don't clear values when AsOriginal() is called.
   if (meshRelation_.numProp == 0) {
     meshRelation_.triProperties = triProperties;

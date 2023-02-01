@@ -99,7 +99,6 @@ struct InteriorVerts {
 
   __host__ __device__ void operator()(int tri) {
     const float invTotal = 1.0f / n;
-    int posTri = tri * n * n;
     int pos = startIdx + tri * VertsPerTri(n - 2);
     for (int i = 0; i <= n; ++i) {
       for (int j = 0; j <= n - i; ++j) {

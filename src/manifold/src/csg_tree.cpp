@@ -156,7 +156,6 @@ Manifold::Impl CsgLeafNode::Compose(
   int nextVert = 0;
   int nextEdge = 0;
   int nextTri = 0;
-  int nextBary = 0;
   int i = 0;
   for (auto &node : nodes) {
     if (node->transform_ == glm::mat4x3(1.0f)) {

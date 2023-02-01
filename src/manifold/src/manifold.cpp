@@ -147,6 +147,12 @@ Mesh Manifold::GetMesh() const {
   return result;
 }
 
+/**
+ * The most complete output of this library, returning a MeshGL that is designed
+ * to easily push into a renderer, including all interleaved vertex properties
+ * that may have been input. It also includes relations to all the input meshes
+ * that form a part of this result and the transforms applied to each.
+ */
 MeshGL Manifold::GetMeshGL(glm::ivec3 normalIdx) const {
   const Impl& impl = *GetCsgLeafNode().GetImpl();
 
@@ -172,10 +178,10 @@ MeshGL Manifold::GetMeshGL(glm::ivec3 normalIdx) const {
   out.faceID.resize(numTri);
   std::vector<int> triNew2Old(numTri);
   std::iota(triNew2Old.begin(), triNew2Old.end(), 0);
-  const auto& triRef = impl.meshRelation_.triRef;
+  const TriRef* triRef = impl.meshRelation_.triRef.cptrD();
   // Don't sort originals - keep them in order
   if (impl.meshRelation_.originalID < 0) {
-    std::sort(triNew2Old.begin(), triNew2Old.end(), [&triRef](int a, int b) {
+    std::sort(triNew2Old.begin(), triNew2Old.end(), [triRef](int a, int b) {
       return triRef[a].originalID == triRef[b].originalID
                  ? triRef[a].meshID < triRef[b].meshID
                  : triRef[a].originalID < triRef[b].originalID;
@@ -411,17 +417,10 @@ int Manifold::OriginalID() const {
 }
 
 /**
- * If you copy a manifold, but you want this new copy to have new properties
- * (e.g. a different UV mapping), you can reset its meshIDs to a new original,
- * meaning it will now be referenced by its descendents instead of the meshes it
- * was built from, allowing you to differentiate the copies when applying your
- * properties to the final result.
- *
- * This function also condenses all coplanar faces in the relation, and
- * collapses those edges. If you want to have inconsistent properties across
- * these faces, meaning you want to preserve some of these edges, you should
- * instead call GetMesh(), calculate your properties and use these to construct
- * a new manifold.
+ * This function condenses all coplanar faces in the relation, and
+ * collapses those edges. In the process the relation to ancestor meshes is lost
+ * and this new Manifold is marked an original. Properties are preserved, so if
+ * they do not match across an edge, that edge will be kept.
  */
 Manifold Manifold::AsOriginal() const {
   auto newImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
@@ -432,9 +431,9 @@ Manifold Manifold::AsOriginal() const {
 }
 
 /**
- * Returns the first of n sequential new unique meshIDs for marking sets of
+ * Returns the first of n sequential new unique mesh IDs for marking sets of
  * triangles that can be looked up after further operations. Assign to
- * MeshGL.meshID vector.
+ * MeshGL.originalID vector.
  */
 int Manifold::ReserveIDs(int n) {
   return Manifold::Impl::meshIDCounter_.fetch_add(n, std::memory_order_relaxed);

@@ -197,15 +197,6 @@ void RelatedGL(const Manifold& out, const std::vector<MeshGL>& originals) {
   }
 }
 
-void RelatedOp(const Manifold& inP, const Manifold& inQ, const Manifold& outR) {
-  EXPECT_GE(inP.OriginalID(), 0);
-  EXPECT_GE(inQ.OriginalID(), 0);
-  std::vector<MeshGL> inputGL;
-  inputGL.emplace_back(inP.GetMeshGL());
-  inputGL.emplace_back(inQ.GetMeshGL());
-  RelatedGL(outR, inputGL);
-}
-
 struct MeshSize {
   int numVert, numTri;
   int numProp = 0;
@@ -680,8 +671,7 @@ TEST(Manifold, MeshRelation) {
 
   Mesh gyroidMesh = LevelSet(Gyroid(), {glm::vec3(0), glm::vec3(period)}, 3);
   MeshGL gyroidMeshGL = WithIndexColors(gyroidMesh);
-  std::vector<float> tol(3, 0.0001);
-  Manifold gyroid(gyroidMeshGL, tol);
+  Manifold gyroid(gyroidMeshGL);
 
   std::vector<MeshGL> inputGL;
 
@@ -705,8 +695,7 @@ TEST(Manifold, MeshRelationRefine) {
   MeshGL inGL = WithIndexColors(in);
 
   inputGL.emplace_back(inGL);
-  std::vector<float> tol(3, 0);
-  Manifold csaszar(inGL, tol);
+  Manifold csaszar(inGL);
 
   int meshID = csaszar.OriginalID();
   EXPECT_GE(meshID, 0);
@@ -722,17 +711,15 @@ TEST(Manifold, MeshRelationRefine) {
 TEST(Boolean, Tetra) {
   Manifold tetra = Manifold::Tetrahedron();
   MeshGL tetraGL = WithPositionColors(tetra);
-  std::vector<float> tol(3, 0.01);
-  tetra = Manifold(tetraGL, tol);
+  tetra = Manifold(tetraGL);
   EXPECT_TRUE(!tetra.IsEmpty());
 
-  Manifold tetra2 = tetra;
-  tetra2 = tetra2.Translate(glm::vec3(0.5f)).AsOriginal();
+  Manifold tetra2 = tetra.Translate(glm::vec3(0.5f));
   Manifold result = tetra2 - tetra;
 
   ExpectMeshes(result, {{8, 12, 3, 11}});
 
-  RelatedOp(tetra, tetra2, result);
+  RelatedGL(result, {tetraGL});
 }
 
 TEST(Boolean, Mirrored) {
@@ -784,13 +771,11 @@ TEST(Boolean, Perturb) {
 TEST(Boolean, Coplanar) {
   Manifold cylinder = Manifold::Cylinder(1.0f, 1.0f);
   MeshGL cylinderGL = WithPositionColors(cylinder);
-  std::vector<float> tol(3, 0.0001);
-  cylinder = Manifold(cylinderGL, tol);
+  cylinder = Manifold(cylinderGL);
 
-  Manifold cylinder2 = Manifold(cylinderGL, tol);
-  cylinder2 = cylinder2.Scale({0.5f, 0.5f, 1.0f})
-                  .Rotate(0, 0, 15)
-                  .Translate({0.25f, 0.25f, 0.0f});
+  Manifold cylinder2 = cylinder.Scale({0.5f, 0.5f, 1.0f})
+                           .Rotate(0, 0, 15)
+                           .Translate({0.25f, 0.25f, 0.0f});
   Manifold out = cylinder - cylinder2;
   ExpectMeshes(out, {{32, 64, 3, 49}});
   EXPECT_EQ(out.NumDegenerateTris(), 0);
@@ -812,13 +797,11 @@ TEST(Boolean, Coplanar) {
 TEST(Boolean, CoplanarProp) {
   Manifold cylinder = Manifold::Cylinder(1.0f, 1.0f);
   MeshGL cylinderGL = WithIndexColors(cylinder.GetMesh());
-  std::vector<float> tol(3, 0.0001);
-  cylinder = Manifold(cylinderGL, tol);
+  cylinder = Manifold(cylinderGL);
 
-  Manifold cylinder2 = Manifold(cylinderGL, tol);
-  cylinder2 = cylinder2.Scale({0.5f, 0.5f, 1.0f})
-                  .Rotate(0, 0, 15)
-                  .Translate({0.25f, 0.25f, 0.0f});
+  Manifold cylinder2 = cylinder.Scale({0.5f, 0.5f, 1.0f})
+                           .Rotate(0, 0, 15)
+                           .Translate({0.25f, 0.25f, 0.0f});
   Manifold out = cylinder - cylinder2;
   ExpectMeshes(out, {{42, 84, 3, 68}});
   EXPECT_EQ(out.NumDegenerateTris(), 0);
@@ -831,7 +814,7 @@ TEST(Boolean, CoplanarProp) {
   if (options.exportModels) ExportMesh("coplanar.glb", out.GetMeshGL(), opt);
 #endif
 
-  RelatedOp(cylinder, cylinder2, out);
+  RelatedGL(out, {cylinderGL});
 }
 
 TEST(Boolean, MultiCoplanar) {
@@ -1013,18 +996,15 @@ TEST(Boolean, Precision2) {
 TEST(Boolean, Sphere) {
   Manifold sphere = Manifold::Sphere(1.0f, 12);
   MeshGL sphereGL = WithPositionColors(sphere);
-  std::vector<float> tol(3, 0.01);
-  sphere = Manifold(sphereGL, tol);
+  sphere = Manifold(sphereGL);
 
-  Manifold sphere2 = sphere;
-  sphere2 = sphere2.Translate(glm::vec3(0.5));
-  sphere2 = sphere2.AsOriginal();
+  Manifold sphere2 = sphere.Translate(glm::vec3(0.5));
   Manifold result = sphere - sphere2;
 
   ExpectMeshes(result, {{74, 144, 3, 110}});
   EXPECT_EQ(result.NumDegenerateTris(), 0);
 
-  RelatedOp(sphere, sphere2, result);
+  RelatedGL(result, {sphereGL});
 }
 
 TEST(Boolean, MeshRelation) {
@@ -1032,15 +1012,9 @@ TEST(Boolean, MeshRelation) {
 
   Mesh gyroidMesh = LevelSet(Gyroid(), {glm::vec3(0), glm::vec3(period)}, 0.5);
   MeshGL gyroidMeshGL = WithPositionColors(gyroidMesh);
-  std::vector<float> tol(3, 0.0001);
-  Manifold gyroid(gyroidMeshGL, tol);
+  Manifold gyroid(gyroidMeshGL);
 
-  Mesh gyroidMesh2 = gyroidMesh;
-  std::transform(gyroidMesh.vertPos.begin(), gyroidMesh.vertPos.end(),
-                 gyroidMesh2.vertPos.begin(),
-                 [](const glm::vec3& v) { return v + glm::vec3(2.0f); });
-  MeshGL gyroidMeshGL2 = WithPositionColors(gyroidMesh2);
-  Manifold gyroid2(gyroidMeshGL2, tol);
+  Manifold gyroid2 = gyroid.Translate(glm::vec3(2.0f));
 
   EXPECT_FALSE(gyroid.IsEmpty());
   EXPECT_TRUE(gyroid.IsManifold());
@@ -1064,15 +1038,7 @@ TEST(Boolean, MeshRelation) {
   EXPECT_NEAR(prop.volume, 226, 1);
   EXPECT_NEAR(prop.surfaceArea, 387, 1);
 
-  std::vector<MeshGL> inputGL;
-
-  EXPECT_GE(gyroid.OriginalID(), 0);
-  inputGL.emplace_back(gyroidMeshGL);
-
-  EXPECT_GE(gyroid2.OriginalID(), 0);
-  inputGL.emplace_back(gyroidMeshGL2);
-
-  RelatedGL(result, inputGL);
+  RelatedGL(result, {gyroidMeshGL});
 }
 
 TEST(Boolean, Cylinders) {
