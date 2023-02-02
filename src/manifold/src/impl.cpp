@@ -49,6 +49,14 @@ __host__ __device__ int FlipHalfedge(int halfedge) {
   return 3 * tri + vert;
 }
 
+struct UpdateMeshIDs {
+  const int* tri2original;
+
+  __host__ __device__ void operator()(TriRef& ref) {
+    ref.meshID = ref.originalID = tri2original[ref.tri];
+  }
+};
+
 struct Normalize {
   __host__ __device__ void operator()(glm::vec3& v) { v = SafeNormalize(v); }
 };
@@ -459,7 +467,7 @@ Manifold::Impl::Impl(const MeshGL& meshGL,
       meshRelation_.meshIDtransform.clear();
     }
 
-    VecDH<uint32_t> originalIDs(numTri);
+    VecDH<int> originalIDs(numTri);
     for (int i = 0; i < meshGL.originalID.size(); ++i) {
       const int id = meshGL.originalID[i];
       fill(autoPolicy(numTri), originalIDs.begin() + meshGL.runIndex[i] / 3,
@@ -471,11 +479,8 @@ Manifold::Impl::Impl(const MeshGL& meshGL,
                                              m[8], m[9], m[10], m[11]};
       }
     }
-    const uint32_t* tri2original = originalIDs.cptrD();
     for_each_n(autoPolicy(numTri), meshRelation_.triRef.begin(), NumTri(),
-               [tri2original](TriRef& ref) {
-                 ref.meshID = ref.originalID = tri2original[ref.tri];
-               });
+               UpdateMeshIDs({originalIDs.cptrD()}));
   }
 }
 

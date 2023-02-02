@@ -54,6 +54,15 @@ struct UpdateHalfedge {
   }
 };
 
+struct UpdateMeshIDs {
+  const int offset;
+
+  __host__ __device__ TriRef operator()(TriRef ref) {
+    ref.meshID += offset;
+    return ref;
+  }
+};
+
 struct CheckOverlap {
   const Box *boxes;
   const size_t i;
@@ -193,10 +202,7 @@ Manifold::Impl CsgLeafNode::Compose(
     transform(policy, node->pImpl_->meshRelation_.triRef.begin(),
               node->pImpl_->meshRelation_.triRef.end(),
               combined.meshRelation_.triRef.begin() + nextTri,
-              [offset](TriRef ref) {
-                ref.meshID += offset;
-                return ref;
-              });
+              UpdateMeshIDs({offset}));
 
     nextVert += node->pImpl_->NumVert();
     nextEdge += 2 * node->pImpl_->NumEdge();
