@@ -436,7 +436,8 @@ Manifold Manifold::AsOriginal() const {
  * MeshGL.originalID vector.
  */
 int Manifold::ReserveIDs(int n) {
-  return Manifold::Impl::meshIDCounter_.fetch_add(n, std::memory_order_relaxed);
+  if (n < 1) return -1;
+  return Manifold::Impl::ReserveIDs(n);
 }
 
 /**

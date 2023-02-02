@@ -384,6 +384,10 @@ namespace manifold {
 
 std::atomic<int> Manifold::Impl::meshIDCounter_(1);
 
+int Manifold::Impl::ReserveIDs(int n) {
+  return Manifold::Impl::meshIDCounter_.fetch_add(n, std::memory_order_relaxed);
+}
+
 Manifold::Impl::Impl(const MeshGL& meshGL,
                      std::vector<float> propertyTolerance) {
   Mesh mesh;
@@ -593,7 +597,7 @@ void Manifold::Impl::RemoveUnreferencedVerts(VecDH<glm::ivec3>& triVerts) {
 
 void Manifold::Impl::ReinitializeReference() {
   meshRelation_.triRef.resize(NumTri());
-  const int meshID = meshIDCounter_.fetch_add(1, std::memory_order_relaxed);
+  const int meshID = ReserveIDs(1);
   for_each_n(autoPolicy(NumTri()),
              zip(meshRelation_.triRef.begin(), countAt(0)), NumTri(),
              InitializeTriRef({meshID, halfedge_.cptrD()}));
@@ -827,8 +831,7 @@ void Manifold::Impl::IncrementMeshIDs() {
                  meshIDold2new.GetValueStore().end(),
                  meshIDold2new.GetValueStore().begin());
   const int numMeshIDs = meshIDold2new.GetValueStore().back();
-  const int meshIDstart = Manifold::Impl::meshIDCounter_.fetch_add(
-      numMeshIDs, std::memory_order_relaxed);
+  const int meshIDstart = ReserveIDs(numMeshIDs);
   // We do start - 1 because the inclusive scan makes our first index 1 instead
   // of 0.
   for_each_n(policy, meshRelation_.triRef.begin(), numTri,
