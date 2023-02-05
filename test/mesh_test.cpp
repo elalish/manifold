@@ -700,6 +700,19 @@ TEST(Manifold, MeshRelationRefine) {
   RelatedGL(csaszar, {inGL});
 }
 
+TEST(Manifold, MeshGLRoundTrip) {
+  const Manifold cylinder = Manifold::Cylinder(2, 1);
+  MeshGL inGL = cylinder.GetMeshGL();
+  const Manifold cylinder2(inGL);
+  const MeshGL outGL = cylinder2.GetMeshGL();
+
+  ASSERT_EQ(inGL.originalID.size(), 1);
+  ASSERT_EQ(outGL.originalID.size(), 1);
+  ASSERT_EQ(outGL.originalID[0], inGL.originalID[0]);
+
+  RelatedGL(cylinder2, {inGL});
+}
+
 /**
  * The very simplest Boolean operation test.
  */

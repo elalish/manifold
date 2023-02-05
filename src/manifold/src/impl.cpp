@@ -472,21 +472,22 @@ Manifold::Impl::Impl(MeshGL& meshGL, std::vector<float> propertyTolerance) {
     meshGL.originalID.push_back(relation.originalID);
     meshGL.runIndex = {0, meshGL.NumTri()};
   } else {
-    meshRelation_.triRef.resize(meshGL.NumTri());
+    relation.triRef.resize(meshGL.NumTri());
     for (int i = 0; i < meshGL.originalID.size(); ++i) {
       const int id = meshGL.originalID[i];
       for (int tri = meshGL.runIndex[i] / 3; tri < meshGL.runIndex[i + 1] / 3;
            ++tri) {
-        TriRef& ref = meshRelation_.triRef[tri];
+        TriRef& ref = relation.triRef[tri];
         ref.meshID = ref.originalID = id;
         ref.tri = meshGL.faceID.empty() ? tri : meshGL.faceID[tri];
       }
 
-      if (!meshGL.transform.empty()) {
+      if (meshGL.transform.empty()) {
+        relation.meshIDtransform[id] = glm::mat4x3(1);
+      } else {
         const float* m = meshGL.transform.data() + 12 * i;
-        meshRelation_.meshIDtransform[id] = {m[0], m[1], m[2],  m[3],
-                                             m[4], m[5], m[6],  m[7],
-                                             m[8], m[9], m[10], m[11]};
+        relation.meshIDtransform[id] = {m[0], m[1], m[2], m[3], m[4],  m[5],
+                                        m[6], m[7], m[8], m[9], m[10], m[11]};
       }
     }
   }
@@ -639,7 +640,9 @@ void Manifold::Impl::CreateFaces(const std::vector<float>& propertyTolerance) {
                            propertyToleranceD.cptrD(), meshRelation_.numProp,
                            precision_}));
 
-  DedupePropVerts(meshRelation_.triProperties, vert2vert);
+  if (meshRelation_.triProperties.size() > 0) {
+    DedupePropVerts(meshRelation_.triProperties, vert2vert);
+  }
 
   std::vector<int> components;
   const int numComponent = GetLabels(components, face2face, NumTri());
