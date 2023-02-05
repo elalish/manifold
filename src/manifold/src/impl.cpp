@@ -237,6 +237,7 @@ struct CoplanarEdge {
   float* triArea;
   const Halfedge* halfedge;
   const glm::vec3* vertPos;
+  const TriRef* triRef;
   const glm::ivec3* triProp;
   const float* prop;
   const float* propTol;
@@ -253,6 +254,8 @@ struct CoplanarEdge {
     const Halfedge edge = halfedge[edgeIdx];
     if (!edge.IsForward()) return;
     const Halfedge pair = halfedge[edge.pairedHalfedge];
+    if (triRef[edge.face].meshID != triRef[pair.face].meshID) return;
+
     const glm::vec3 base = vertPos[edge.startVert];
 
     const int baseNum = edgeIdx - 3 * edge.face;
@@ -473,21 +476,25 @@ Manifold::Impl::Impl(MeshGL& meshGL, std::vector<float> propertyTolerance) {
     meshGL.runIndex = {0, meshGL.NumTri()};
   } else {
     relation.triRef.resize(meshGL.NumTri());
+    const int startID = Impl::ReserveIDs(meshGL.originalID.size());
     for (int i = 0; i < meshGL.originalID.size(); ++i) {
-      const int id = meshGL.originalID[i];
+      const int meshID = startID + i;
+      const int originalID = meshGL.originalID[i];
       for (int tri = meshGL.runIndex[i] / 3; tri < meshGL.runIndex[i + 1] / 3;
            ++tri) {
         TriRef& ref = relation.triRef[tri];
-        ref.meshID = ref.originalID = id;
+        ref.meshID = meshID;
+        ref.originalID = originalID;
         ref.tri = meshGL.faceID.empty() ? tri : meshGL.faceID[tri];
       }
 
       if (meshGL.transform.empty()) {
-        relation.meshIDtransform[id] = glm::mat4x3(1);
+        relation.meshIDtransform[meshID] = glm::mat4x3(1);
       } else {
         const float* m = meshGL.transform.data() + 12 * i;
-        relation.meshIDtransform[id] = {m[0], m[1], m[2], m[3], m[4],  m[5],
-                                        m[6], m[7], m[8], m[9], m[10], m[11]};
+        relation.meshIDtransform[meshID] = {m[0], m[1], m[2],  m[3],
+                                            m[4], m[5], m[6],  m[7],
+                                            m[8], m[9], m[10], m[11]};
       }
     }
   }
@@ -631,14 +638,14 @@ void Manifold::Impl::CreateFaces(const std::vector<float>& propertyTolerance) {
   VecDH<thrust::pair<int, int>> face2face(halfedge_.size(), {-1, -1});
   VecDH<thrust::pair<int, int>> vert2vert(halfedge_.size(), {-1, -1});
   VecDH<float> triArea(NumTri());
-  for_each_n(autoPolicy(halfedge_.size()),
-             zip(face2face.begin(), vert2vert.begin(), countAt(0)),
-             halfedge_.size(),
-             CoplanarEdge({triArea.ptrD(), halfedge_.cptrD(), vertPos_.cptrD(),
-                           meshRelation_.triProperties.cptrD(),
-                           meshRelation_.properties.cptrD(),
-                           propertyToleranceD.cptrD(), meshRelation_.numProp,
-                           precision_}));
+  for_each_n(
+      autoPolicy(halfedge_.size()),
+      zip(face2face.begin(), vert2vert.begin(), countAt(0)), halfedge_.size(),
+      CoplanarEdge(
+          {triArea.ptrD(), halfedge_.cptrD(), vertPos_.cptrD(),
+           meshRelation_.triRef.cptrD(), meshRelation_.triProperties.cptrD(),
+           meshRelation_.properties.cptrD(), propertyToleranceD.cptrD(),
+           meshRelation_.numProp, precision_}));
 
   if (meshRelation_.triProperties.size() > 0) {
     DedupePropVerts(meshRelation_.triProperties, vert2vert);
@@ -647,18 +654,16 @@ void Manifold::Impl::CreateFaces(const std::vector<float>& propertyTolerance) {
   std::vector<int> components;
   const int numComponent = GetLabels(components, face2face, NumTri());
 
+  VecDH<TriRef>& triRef = meshRelation_.triRef;
   std::vector<int> comp2tri(numComponent, -1);
   for (int tri = 0; tri < NumTri(); ++tri) {
     const int comp = components[tri];
     const int current = comp2tri[comp];
     if (current < 0 || triArea[tri] > triArea[current]) {
-      comp2tri[comp] = tri;
+      comp2tri[comp] = triRef[tri].tri;
       triArea[comp] = triArea[tri];
     }
   }
-
-  VecDH<TriRef>& triRef = meshRelation_.triRef;
-  std::map<std::pair<int, int>, int> triVert2bary;
 
   for (int tri = 0; tri < NumTri(); ++tri)
     triRef[tri].tri = comp2tri[components[tri]];

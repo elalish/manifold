@@ -702,6 +702,7 @@ TEST(Manifold, MeshRelationRefine) {
 
 TEST(Manifold, MeshGLRoundTrip) {
   const Manifold cylinder = Manifold::Cylinder(2, 1);
+  ASSERT_GE(cylinder.OriginalID(), 0);
   MeshGL inGL = cylinder.GetMeshGL();
   const Manifold cylinder2(inGL);
   const MeshGL outGL = cylinder2.GetMeshGL();
@@ -728,6 +729,29 @@ TEST(Boolean, Tetra) {
   ExpectMeshes(result, {{8, 12, 3, 11}});
 
   RelatedGL(result, {tetraGL});
+}
+
+TEST(Boolean, MeshGLRoundTrip) {
+  Manifold cube = Manifold::Cube(glm::vec3(2));
+  ASSERT_GE(cube.OriginalID(), 0);
+  const MeshGL original = cube.GetMeshGL();
+
+  Manifold result = cube + cube.Translate({1, 1, 0});
+
+  ASSERT_LT(result.OriginalID(), 0);
+  ExpectMeshes(result, {{18, 32}});
+  RelatedGL(result, {original});
+
+  MeshGL inGL = result.GetMeshGL();
+  ASSERT_EQ(inGL.originalID.size(), 2);
+  const Manifold result2(inGL);
+
+  ASSERT_LT(result2.OriginalID(), 0);
+  ExpectMeshes(result2, {{18, 32}});
+  RelatedGL(result2, {original});
+
+  const MeshGL outGL = result2.GetMeshGL();
+  ASSERT_EQ(outGL.originalID.size(), 2);
 }
 
 TEST(Boolean, Mirrored) {
