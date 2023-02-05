@@ -465,7 +465,10 @@ VecDH<Barycentric> Manifold::Impl::Subdivide(int n) {
              SplitTris({triVerts.ptrD(), halfedge_.cptrD(), half2Edge.cptrD(),
                         numVert, triVertStart, n}));
   CreateHalfedges(triVerts);
-  ReinitializeReference();
+  // Make original since the subdivided faces are intended to be warped into
+  // being non-coplanar, and hence not being related to the original faces.
+  meshRelation_.originalID = ReserveIDs(1);
+  InitializeOriginal();
 
   if (meshRelation_.numProp > 0) {
     meshRelation_.properties.resize(meshRelation_.numProp * numVert);

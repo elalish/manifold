@@ -28,12 +28,12 @@ namespace manifold {
 /** @ingroup Private */
 struct Manifold::Impl {
   struct MeshRelationD {
+    /// The originalID of this Manifold if it is an original; -1 otherwise.
+    int originalID = -1;
+    int numProp = 0;
     VecDH<TriRef> triRef;
     VecDH<glm::ivec3> triProperties;
     VecDH<float> properties;
-    int numProp = 0;
-    /// The originalID of this Manifold if it is an original; -1 otherwise.
-    int originalID = -1;
     std::map<int, glm::mat4x3> meshIDtransform;
   };
 
@@ -55,17 +55,13 @@ struct Manifold::Impl {
   enum class Shape { TETRAHEDRON, CUBE, OCTAHEDRON };
   Impl(Shape);
 
-  Impl(const MeshGL&, std::vector<float> propertyTolerance = {});
-  Impl(const Mesh&, const std::vector<glm::ivec3>& triProperties = {},
-       const std::vector<float>& properties = {},
+  Impl(MeshGL&, std::vector<float> propertyTolerance = {});
+  Impl(const Mesh&, const MeshRelationD& relation,
        const std::vector<float>& propertyTolerance = {});
 
-  int InitializeNewReference(const std::vector<glm::ivec3>& triProperties = {},
-                             const std::vector<float>& properties = {},
-                             const std::vector<float>& propertyTolerance = {});
-
+  void CreateFaces(const std::vector<float>& propertyTolerance = {});
   void RemoveUnreferencedVerts(VecDH<glm::ivec3>& triVerts);
-  void ReinitializeReference();
+  void InitializeOriginal();
   void CreateHalfedges(const VecDH<glm::ivec3>& triVerts);
   void CalculateNormals();
   void IncrementMeshIDs();

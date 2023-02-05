@@ -171,12 +171,12 @@ struct Mesh {
  */
 struct MeshGL {
   /// Number of property vertices
-  int NumVert() const { return vertProperties.size() / numProp; };
+  uint32_t NumVert() const { return vertProperties.size() / numProp; };
   /// Number of triangles
-  int NumTri() const { return triVerts.size() / 3; };
+  uint32_t NumTri() const { return triVerts.size() / 3; };
 
   /// Number of properties per vertex, always >= 3.
-  int numProp = 3;
+  uint32_t numProp = 3;
   /// Flat, GL-style interleaved list of all vertex properties: propVal =
   /// vertProperties[vert * numProp + propIdx]. The first three properties are
   /// always the position x, y, z.

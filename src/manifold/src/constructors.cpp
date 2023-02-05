@@ -78,7 +78,7 @@ namespace manifold {
  * can be sharpened by sharping all edges that are incident on it, allowing
  * cones to be formed.
  */
-Manifold Manifold::Smooth(const MeshGL& meshGL,
+Manifold Manifold::Smooth(MeshGL& meshGL,
                           const std::vector<Smoothness>& sharpenedEdges) {
   ASSERT(meshGL.halfedgeTangent.empty(), std::runtime_error,
          "when supplying tangents, the normal constructor should be used "
@@ -126,7 +126,8 @@ Manifold Manifold::Smooth(const Mesh& mesh,
          "when supplying tangents, the normal constructor should be used "
          "rather than Smooth().");
 
-  std::shared_ptr<Impl> impl = std::make_shared<Impl>(mesh);
+  Impl::MeshRelationD relation = {ReserveIDs(1)};
+  std::shared_ptr<Impl> impl = std::make_shared<Impl>(mesh, relation);
   impl->CreateTangents(sharpenedEdges);
   return Manifold(impl);
 }
@@ -203,7 +204,7 @@ Manifold Manifold::Sphere(float radius, int circularSegments) {
              pImpl_->NumVert(), ToSphere({radius}));
   pImpl_->Finish();
   // Ignore preceding octahedron.
-  pImpl_->ReinitializeReference();
+  pImpl_->InitializeOriginal();
   return Manifold(pImpl_);
 }
 
@@ -281,7 +282,9 @@ Manifold Manifold::Extrude(Polygons crossSection, float height, int nDivisions,
 
   pImpl_->CreateHalfedges(triVertsDH);
   pImpl_->Finish();
-  pImpl_->InitializeNewReference();
+  pImpl_->meshRelation_.originalID = ReserveIDs(1);
+  pImpl_->InitializeOriginal();
+  pImpl_->CreateFaces();
   return Manifold(pImpl_);
 }
 
@@ -380,7 +383,9 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments) {
 
   pImpl_->CreateHalfedges(triVertsDH);
   pImpl_->Finish();
-  pImpl_->InitializeNewReference();
+  pImpl_->meshRelation_.originalID = ReserveIDs(1);
+  pImpl_->InitializeOriginal();
+  pImpl_->CreateFaces();
   return Manifold(pImpl_);
 }
 

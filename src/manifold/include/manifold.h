@@ -49,10 +49,10 @@ class Manifold {
   Manifold(Manifold&&) noexcept;
   Manifold& operator=(Manifold&&) noexcept;
 
-  Manifold(const MeshGL&, const std::vector<float>& propertyTolerance = {});
+  Manifold(MeshGL&, const std::vector<float>& propertyTolerance = {});
   Manifold(const Mesh&);
 
-  static Manifold Smooth(const MeshGL&,
+  static Manifold Smooth(MeshGL&,
                          const std::vector<Smoothness>& sharpenedEdges = {});
   static Manifold Smooth(const Mesh&,
                          const std::vector<Smoothness>& sharpenedEdges = {});
@@ -111,6 +111,9 @@ class Manifold {
     MISSING_POSITION_PROPERTIES,
     MERGE_VECTORS_DIFFERENT_LENGTHS,
     MERGE_INDEX_OUT_OF_BOUNDS,
+    TRANSFORM_WRONG_LENGTH,
+    RUN_INDEX_WRONG_LENGTH,
+    FACE_ID_WRONG_LENGTH,
   };
   Error Status() const;
   int NumVert() const;

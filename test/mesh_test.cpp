@@ -92,14 +92,15 @@ MeshGL WithIndexColors(const Mesh& in) {
     inGL.vertProperties[6 * i + 4] = powf(modf(i * sqrt(3.0), &a), 2.2);
     inGL.vertProperties[6 * i + 5] = powf(modf(i * sqrt(5.0), &a), 2.2);
   }
-  inGL.runIndex = {0, 3u * inGL.NumTri()};
-  inGL.originalID.push_back(Manifold::ReserveIDs(1));
-  inGL.transform = {1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0};
   return inGL;
 }
 
 MeshGL WithPositionColors(const Manifold& in) {
   MeshGL inGL = in.GetMeshGL();
+  inGL.runIndex.clear();
+  inGL.originalID.clear();
+  inGL.transform.clear();
+  inGL.faceID.clear();
   const int numVert = in.NumVert();
   const Box bbox = in.BoundingBox();
   const glm::vec3 size = bbox.Size();
@@ -132,8 +133,11 @@ void RelatedGL(const Manifold& out, const std::vector<MeshGL>& originals) {
   MeshGL output = out.GetMeshGL();
   for (int run = 0; run < output.originalID.size(); ++run) {
     const float* m = output.transform.data() + 12 * run;
-    const glm::mat4x3 transform(m[0], m[1], m[2], m[3], m[4], m[5], m[6], m[7],
-                                m[8], m[9], m[10], m[11]);
+    const glm::mat4x3 transform =
+        output.transform.empty()
+            ? glm::mat4x3(1.0f)
+            : glm::mat4x3(m[0], m[1], m[2], m[3], m[4], m[5], m[6], m[7], m[8],
+                          m[9], m[10], m[11]);
     int i = 0;
     for (; i < originals.size(); ++i) {
       ASSERT_EQ(originals[i].originalID.size(), 1);
@@ -143,8 +147,10 @@ void RelatedGL(const Manifold& out, const std::vector<MeshGL>& originals) {
     const MeshGL& inMesh = originals[i];
     for (int tri = output.runIndex[run] / 3; tri < output.runIndex[run + 1] / 3;
          ++tri) {
-      ASSERT_LT(tri, output.faceID.size());
-      const int inTri = output.faceID[tri];
+      if (!output.faceID.empty()) {
+        ASSERT_LT(tri, output.faceID.size());
+      }
+      const int inTri = output.faceID.empty() ? tri : output.faceID[tri];
       ASSERT_LT(inTri, inMesh.triVerts.size() / 3);
       glm::ivec3 inTriangle = {inMesh.triVerts[3 * inTri],
                                inMesh.triVerts[3 * inTri + 1],
@@ -310,7 +316,8 @@ TEST(Manifold, Empty) {
 
 TEST(Manifold, ValidInput) {
   std::vector<float> propTol = {0.1, 0.2};
-  Manifold tet(TetGL(), propTol);
+  MeshGL tetGL = TetGL();
+  Manifold tet(tetGL, propTol);
   EXPECT_FALSE(tet.IsEmpty());
   EXPECT_EQ(tet.Status(), Manifold::Error::NO_ERROR);
   EXPECT_TRUE(tet.IsManifold());
@@ -673,8 +680,6 @@ TEST(Manifold, MeshRelation) {
   MeshGL gyroidMeshGL = WithIndexColors(gyroidMesh);
   Manifold gyroid(gyroidMeshGL);
 
-  std::vector<MeshGL> inputGL;
-
 #ifdef MANIFOLD_EXPORT
   ExportOptions opt;
   opt.mat.roughness = 1;
@@ -682,27 +687,17 @@ TEST(Manifold, MeshRelation) {
   if (options.exportModels) ExportMesh("gyroid.glb", gyroid.GetMeshGL(), opt);
 #endif
 
-  EXPECT_GE(gyroid.OriginalID(), 0);
-  inputGL.emplace_back(gyroidMeshGL);
-
-  RelatedGL(gyroid, inputGL);
+  RelatedGL(gyroid, {gyroidMeshGL});
 }
 
 TEST(Manifold, MeshRelationRefine) {
-  std::vector<MeshGL> inputGL;
-
   const Mesh in = Csaszar();
   MeshGL inGL = WithIndexColors(in);
-
-  inputGL.emplace_back(inGL);
   Manifold csaszar(inGL);
 
-  int meshID = csaszar.OriginalID();
-  EXPECT_GE(meshID, 0);
-
-  RelatedGL(csaszar, inputGL);
+  RelatedGL(csaszar, {inGL});
   csaszar.Refine(4);
-  RelatedGL(csaszar, inputGL);
+  RelatedGL(csaszar, {inGL});
 }
 
 /**

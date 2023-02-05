@@ -100,8 +100,7 @@ CsgLeafNode& Manifold::GetCsgLeafNode() const {
  * across operations even if the triangles are coplanar. A good place to start
  * is 1e-5 times the largest value you expect this property to take.
  */
-Manifold::Manifold(const MeshGL& meshGL,
-                   const std::vector<float>& propertyTolerance)
+Manifold::Manifold(MeshGL& meshGL, const std::vector<float>& propertyTolerance)
     : pNode_(std::make_shared<CsgLeafNode>(
           std::make_shared<Impl>(meshGL, propertyTolerance))) {}
 
@@ -120,8 +119,11 @@ Manifold::Manifold(const MeshGL& meshGL,
  *
  * @param mesh The input Mesh.
  */
-Manifold::Manifold(const Mesh& mesh)
-    : pNode_(std::make_shared<CsgLeafNode>(std::make_shared<Impl>(mesh))) {}
+Manifold::Manifold(const Mesh& mesh) {
+  Impl::MeshRelationD relation = {ReserveIDs(1)};
+  pNode_ =
+      std::make_shared<CsgLeafNode>(std::make_shared<Impl>(mesh, relation));
+}
 
 /**
  * This returns a Mesh of simple vectors of vertices and triangles suitable for
@@ -175,12 +177,12 @@ MeshGL Manifold::GetMeshGL(glm::ivec3 normalIdx) const {
   }
 
   // Sort the triangles into runs
-  out.faceID.resize(numTri);
   std::vector<int> triNew2Old(numTri);
   std::iota(triNew2Old.begin(), triNew2Old.end(), 0);
   const TriRef* triRef = impl.meshRelation_.triRef.cptrD();
   // Don't sort originals - keep them in order
   if (impl.meshRelation_.originalID < 0) {
+    out.faceID.resize(numTri);
     std::sort(triNew2Old.begin(), triNew2Old.end(), [triRef](int a, int b) {
       return triRef[a].originalID == triRef[b].originalID
                  ? triRef[a].meshID < triRef[b].meshID
@@ -195,15 +197,17 @@ MeshGL Manifold::GetMeshGL(glm::ivec3 normalIdx) const {
     if (meshID != lastID) {
       out.runIndex.push_back(3 * tri);
       out.originalID.push_back(ref.originalID);
-      const glm::mat4x3& m = impl.meshRelation_.meshIDtransform.at(meshID);
-      for (const int col : {0, 1, 2, 3}) {
-        for (const int row : {0, 1, 2}) {
-          out.transform.push_back(m[col][row]);
+      if (impl.meshRelation_.originalID < 0) {
+        const glm::mat4x3& m = impl.meshRelation_.meshIDtransform.at(meshID);
+        for (const int col : {0, 1, 2, 3}) {
+          for (const int row : {0, 1, 2}) {
+            out.transform.push_back(m[col][row]);
+          }
         }
       }
       lastID = meshID;
     }
-    out.faceID[tri] = ref.tri;
+    if (impl.meshRelation_.originalID < 0) out.faceID[tri] = ref.tri;
     for (const int i : {0, 1, 2})
       out.triVerts[3 * tri + i] = impl.halfedge_[3 * oldTri + i].startVert;
   }
@@ -424,7 +428,9 @@ int Manifold::OriginalID() const {
  */
 Manifold Manifold::AsOriginal() const {
   auto newImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
-  newImpl->InitializeNewReference();
+  newImpl->meshRelation_.originalID = ReserveIDs(1);
+  newImpl->InitializeOriginal();
+  newImpl->CreateFaces();
   newImpl->SimplifyTopology();
   newImpl->Finish();
   return Manifold(std::make_shared<CsgLeafNode>(newImpl));
