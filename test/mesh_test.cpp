@@ -128,6 +128,15 @@ void Identical(const Mesh& mesh1, const Mesh& mesh2) {
     ASSERT_EQ(mesh1.triVerts[i], mesh2.triVerts[i]);
 }
 
+template <typename T>
+int NumUnique(const std::vector<T>& in) {
+  std::set<int> unique;
+  for (const T& v : in) {
+    unique.emplace(v);
+  }
+  return unique.size();
+}
+
 void RelatedGL(const Manifold& out, const std::vector<MeshGL>& originals) {
   ASSERT_FALSE(out.IsEmpty());
   MeshGL output = out.GetMeshGL();
@@ -712,6 +721,18 @@ TEST(Manifold, MeshGLRoundTrip) {
   ASSERT_EQ(outGL.originalID[0], inGL.originalID[0]);
 
   RelatedGL(cylinder2, {inGL});
+}
+
+TEST(Manifold, FaceIDRoundTrip) {
+  const Manifold cube = Manifold::Cube();
+  ASSERT_GE(cube.OriginalID(), 0);
+  MeshGL inGL = cube.GetMeshGL();
+  ASSERT_EQ(NumUnique(inGL.faceID), 6);
+  inGL.faceID = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11};
+
+  const Manifold cube2(inGL);
+  const MeshGL outGL = cube2.GetMeshGL();
+  ASSERT_EQ(NumUnique(outGL.faceID), 12);
 }
 
 /**

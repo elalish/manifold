@@ -499,7 +499,7 @@ Manifold::Impl::Impl(MeshGL& meshGL, std::vector<float> propertyTolerance) {
     }
   }
 
-  *this = Impl(mesh, relation, propertyTolerance);
+  *this = Impl(mesh, relation, propertyTolerance, !meshGL.faceID.empty());
 
   // A Manifold created from an input mesh is never an original - the input is
   // the original.
@@ -512,7 +512,8 @@ Manifold::Impl::Impl(MeshGL& meshGL, std::vector<float> propertyTolerance) {
  * TODO: update halfedgeTangent during SimplifyTopology.
  */
 Manifold::Impl::Impl(const Mesh& mesh, const MeshRelationD& relation,
-                     const std::vector<float>& propertyTolerance)
+                     const std::vector<float>& propertyTolerance,
+                     bool hasFaceIDs)
     : vertPos_(mesh.vertPos),
       halfedgeTangent_(mesh.halfedgeTangent),
       meshRelation_(relation) {
@@ -538,8 +539,9 @@ Manifold::Impl::Impl(const Mesh& mesh, const MeshRelationD& relation,
   CalculateNormals();
 
   InitializeOriginal();
-  CreateFaces(propertyTolerance);
-  if (status_ != Error::NO_ERROR) return;
+  if (!hasFaceIDs) {
+    CreateFaces(propertyTolerance);
+  }
 
   SimplifyTopology();
   Finish();
@@ -654,17 +656,17 @@ void Manifold::Impl::CreateFaces(const std::vector<float>& propertyTolerance) {
   std::vector<int> components;
   const int numComponent = GetLabels(components, face2face, NumTri());
 
-  VecDH<TriRef>& triRef = meshRelation_.triRef;
   std::vector<int> comp2tri(numComponent, -1);
   for (int tri = 0; tri < NumTri(); ++tri) {
     const int comp = components[tri];
     const int current = comp2tri[comp];
     if (current < 0 || triArea[tri] > triArea[current]) {
-      comp2tri[comp] = triRef[tri].tri;
+      comp2tri[comp] = tri;
       triArea[comp] = triArea[tri];
     }
   }
 
+  VecDH<TriRef>& triRef = meshRelation_.triRef;
   for (int tri = 0; tri < NumTri(); ++tri)
     triRef[tri].tri = comp2tri[components[tri]];
 }

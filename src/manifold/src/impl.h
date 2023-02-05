@@ -57,7 +57,8 @@ struct Manifold::Impl {
 
   Impl(MeshGL&, std::vector<float> propertyTolerance = {});
   Impl(const Mesh&, const MeshRelationD& relation,
-       const std::vector<float>& propertyTolerance = {});
+       const std::vector<float>& propertyTolerance = {},
+       bool hasFaceIDs = false);
 
   void CreateFaces(const std::vector<float>& propertyTolerance = {});
   void RemoveUnreferencedVerts(VecDH<glm::ivec3>& triVerts);

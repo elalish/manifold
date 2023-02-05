@@ -177,12 +177,12 @@ MeshGL Manifold::GetMeshGL(glm::ivec3 normalIdx) const {
   }
 
   // Sort the triangles into runs
+  out.faceID.resize(numTri);
   std::vector<int> triNew2Old(numTri);
   std::iota(triNew2Old.begin(), triNew2Old.end(), 0);
   const TriRef* triRef = impl.meshRelation_.triRef.cptrD();
   // Don't sort originals - keep them in order
   if (impl.meshRelation_.originalID < 0) {
-    out.faceID.resize(numTri);
     std::sort(triNew2Old.begin(), triNew2Old.end(), [triRef](int a, int b) {
       return triRef[a].originalID == triRef[b].originalID
                  ? triRef[a].meshID < triRef[b].meshID
@@ -207,7 +207,7 @@ MeshGL Manifold::GetMeshGL(glm::ivec3 normalIdx) const {
       }
       lastID = meshID;
     }
-    if (impl.meshRelation_.originalID < 0) out.faceID[tri] = ref.tri;
+    out.faceID[tri] = ref.tri;
     for (const int i : {0, 1, 2})
       out.triVerts[3 * tri + i] = impl.halfedge_[3 * oldTri + i].startVert;
   }
