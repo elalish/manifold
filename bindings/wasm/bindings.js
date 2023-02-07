@@ -206,6 +206,15 @@ Module.setup = function () {
         break;
       case Module.status.MERGE_INDEX_OUT_OF_BOUNDS.value:
         message = 'Merge index out of bounds';
+        break;
+      case Module.status.TRANSFORM_WRONG_LENGTH.value:
+        message = 'Transform vector has wrong length';
+        break;
+      case Module.status.RUN_INDEX_WRONG_LENGTH.value:
+        message = 'Run index vector has wrong length';
+        break;
+      case Module.status.FACE_ID_WRONG_LENGTH.value:
+        message = 'Face ID vector has wrong length';
     }
 
     const base = Error.apply(this, [message, ...args]);
