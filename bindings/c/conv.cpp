@@ -62,6 +62,15 @@ ManifoldError to_c(manifold::Manifold::Error error) {
     case Manifold::Error::MERGE_INDEX_OUT_OF_BOUNDS:
       e = MERGE_INDEX_OUT_OF_BOUNDS;
       break;
+    case Manifold::Error::TRANSFORM_WRONG_LENGTH:
+      e = TRANSFORM_WRONG_LENGTH;
+      break;
+    case Manifold::Error::RUN_INDEX_WRONG_LENGTH:
+      e = RUN_INDEX_WRONG_LENGTH;
+      break;
+    case Manifold::Error::FACE_ID_WRONG_LENGTH:
+      e = FACE_ID_WRONG_LENGTH;
+      break;
   };
   return e;
 }

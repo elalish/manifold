@@ -333,24 +333,32 @@ void Manifold::Impl::CollapseEdge(const int edge) {
 
   // Orbit startVert
   int start = halfedge_[tri1edge[1]].pairedHalfedge;
-  const TriRef ref0 = triRef[edge / 3];
-  const TriRef ref1 = triRef[toRemove.pairedHalfedge / 3];
   if (!shortEdge) {
     current = start;
+    TriRef refCheck = triRef[toRemove.pairedHalfedge / 3];
     glm::vec3 pLast = vertPos_[halfedge_[tri1edge[1]].endVert];
     while (current != tri0edge[2]) {
       current = NextHalfedge(current);
       glm::vec3 pNext = vertPos_[halfedge_[current].endVert];
       const int tri = current / 3;
       const TriRef ref = triRef[tri];
+      const glm::mat3x2 projection = GetAxisAlignedProjection(faceNormal_[tri]);
       // Don't collapse if the edge is not redundant (this may have changed due
       // to the collapse of neighbors).
-      if ((ref.meshID != ref0.meshID || ref.tri != ref0.tri) &&
-          (ref.meshID != ref1.meshID || ref.tri != ref1.tri))
-        return;
+      if (ref.meshID != refCheck.meshID || ref.tri != refCheck.tri) {
+        refCheck = triRef[edge / 3];
+        if (ref.meshID != refCheck.meshID || ref.tri != refCheck.tri) {
+          return;
+        } else {
+          // Don't collapse if the edges separating the faces are not colinear
+          // (can happen when the two faces are coplanar).
+          if (CCW(projection * pOld, projection * pLast, projection * pNew,
+                  precision_) != 0)
+            return;
+        }
+      }
 
       // Don't collapse edge if it would cause a triangle to invert.
-      const glm::mat3x2 projection = GetAxisAlignedProjection(faceNormal_[tri]);
       if (CCW(projection * pNext, projection * pLast, projection * pNew,
               precision_) < 0)
         return;

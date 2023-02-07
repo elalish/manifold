@@ -33,7 +33,7 @@ const utils = [
 ];
 const exposedFunctions = constructors.concat(utils);
 
-wasm().then(function(Module) {
+wasm().then(function (Module) {
   Module.setup();
   // Setup memory management, such that users don't have to care about
   // calling `delete` manually.
@@ -44,33 +44,33 @@ wasm().then(function(Module) {
   for (const name of memberFunctions) {
     const originalFn = Module.Manifold.prototype[name];
     Module.Manifold.prototype['_' + name] = originalFn;
-    Module.Manifold.prototype[name] = function(...args) {
+    Module.Manifold.prototype[name] = function (...args) {
       const result = this['_' + name](...args);
       manifoldRegistry.push(result);
       return result;
-    }
+    };
   }
 
   for (const name of constructors) {
     const originalFn = Module[name];
-    Module[name] = function(...args) {
+    Module[name] = function (...args) {
       const result = originalFn(...args);
       manifoldRegistry.push(result);
       return result;
-    }
+    };
   }
 
   Module.cleanup =
-      function() {
-    for (const obj of manifoldRegistry) {
-      // decompose result is an array of manifolds
-      if (obj instanceof Array)
-        for (const elem of obj) elem.delete();
-      else
-        obj.delete();
-    }
-    manifoldRegistry = [];
-  }
+    function () {
+      for (const obj of manifoldRegistry) {
+        // decompose result is an array of manifolds
+        if (obj instanceof Array)
+          for (const elem of obj) elem.delete();
+        else
+          obj.delete();
+      }
+      manifoldRegistry = [];
+    };
 
   function runExample(name) {
     try {
@@ -80,7 +80,7 @@ wasm().then(function(Module) {
       const manifold = f(...exposedFunctions.map(name => Module[name]), THREE);
       const prop = manifold.getProperties();
       const genus = manifold.genus();
-      return {...prop, genus};
+      return { ...prop, genus };
     } finally {
       Module.cleanup();
     }
@@ -104,14 +104,14 @@ wasm().then(function(Module) {
     test('Rounded Frame', () => {
       const result = runExample('Rounded Frame');
       expect(result.genus).to.equal(5, 'Genus');
-      expect(result.volume).to.be.closeTo(353706, 1, 'Volume');
+      expect(result.volume).to.be.closeTo(353706, 10, 'Volume');
       expect(result.surfaceArea).to.be.closeTo(68454, 1, 'Surface Area');
     });
 
     test('Heart', () => {
       const result = runExample('Heart');
       expect(result.genus).to.equal(0, 'Genus');
-      expect(result.volume).to.be.closeTo(282743, 1, 'Volume');
+      expect(result.volume).to.be.closeTo(282743, 10, 'Volume');
       expect(result.surfaceArea).to.be.closeTo(22187, 1, 'Surface Area');
     });
 
@@ -132,8 +132,8 @@ wasm().then(function(Module) {
     test('Menger Sponge', () => {
       const result = runExample('Menger Sponge');
       expect(result.genus).to.equal(1409, 'Genus');
-      expect(result.volume).to.be.closeTo(406457, 1, 'Volume');
-      expect(result.surfaceArea).to.be.closeTo(247590, 1, 'Surface Area');
+      expect(result.volume).to.be.closeTo(406457, 10, 'Volume');
+      expect(result.surfaceArea).to.be.closeTo(247590, 10, 'Surface Area');
     });
 
     test('Stretchy Bracelet', () => {

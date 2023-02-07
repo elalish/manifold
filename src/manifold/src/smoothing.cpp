@@ -93,17 +93,12 @@ struct EdgeVerts {
 struct InteriorVerts {
   glm::vec3* vertPos;
   Barycentric* vertBary;
-  TriRef* triRefNew;
   const int startIdx;
   const int n;
   const Halfedge* halfedge;
 
-  __host__ __device__ void operator()(thrust::tuple<int, TriRef> in) {
-    const int tri = thrust::get<0>(in);
-    const TriRef baryOld = thrust::get<1>(in);
-
+  __host__ __device__ void operator()(int tri) {
     const float invTotal = 1.0f / n;
-    int posTri = tri * n * n;
     int pos = startIdx + tri * VertsPerTri(n - 2);
     for (int i = 0; i <= n; ++i) {
       for (int j = 0; j <= n - i; ++j) {
@@ -111,15 +106,7 @@ struct InteriorVerts {
         const float u = invTotal * j;
         const float v = invTotal * k;
         const float w = invTotal * i;
-        if (j == n - i) continue;
-
-        triRefNew[posTri++] = {baryOld.meshID, baryOld.originalID, baryOld.tri};
-        if (j < n - 1 - i) {
-          triRefNew[posTri++] = {baryOld.meshID, baryOld.originalID,
-                                 baryOld.tri};
-        }
-
-        if (i == 0 || j == 0 || k == 0) continue;
+        if (i == 0 || j == 0 || k == 0 || j == n - i) continue;
 
         vertPos[pos] = u * vertPos[halfedge[3 * tri].startVert] +      //
                        v * vertPos[halfedge[3 * tri + 1].startVert] +  //
@@ -469,9 +456,8 @@ VecDH<Barycentric> Manifold::Impl::Subdivide(int n) {
              ReindexHalfedge({half2Edge.ptrD()}));
   for_each_n(policy, zip(countAt(0), edges.begin()), numEdge,
              EdgeVerts({vertPos_.ptrD(), vertBary.ptrD(), numVert, n}));
-  for_each_n(policy, zip(countAt(0), oldMeshRelation.triRef.begin()), numTri,
-             InteriorVerts({vertPos_.ptrD(), vertBary.ptrD(),
-                            meshRelation_.triRef.ptrD(), triVertStart, n,
+  for_each_n(policy, countAt(0), numTri,
+             InteriorVerts({vertPos_.ptrD(), vertBary.ptrD(), triVertStart, n,
                             halfedge_.cptrD()}));
   // Create sub-triangles
   VecDH<glm::ivec3> triVerts(n * n * numTri);
@@ -479,6 +465,10 @@ VecDH<Barycentric> Manifold::Impl::Subdivide(int n) {
              SplitTris({triVerts.ptrD(), halfedge_.cptrD(), half2Edge.cptrD(),
                         numVert, triVertStart, n}));
   CreateHalfedges(triVerts);
+  // Make original since the subdivided faces are intended to be warped into
+  // being non-coplanar, and hence not being related to the original faces.
+  meshRelation_.originalID = ReserveIDs(1);
+  InitializeOriginal();
 
   if (meshRelation_.numProp > 0) {
     meshRelation_.properties.resize(meshRelation_.numProp * numVert);

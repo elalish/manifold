@@ -403,6 +403,10 @@ void Manifold::Impl::GatherFaces(const Impl& old,
   gather(policy, faceNew2Old.begin(), faceNew2Old.end(),
          old.meshRelation_.triRef.begin(), meshRelation_.triRef.begin());
 
+  for (const auto& pair : old.meshRelation_.meshIDtransform) {
+    meshRelation_.meshIDtransform[pair.first] = pair.second;
+  }
+
   if (old.meshRelation_.triProperties.size() > 0) {
     meshRelation_.triProperties.resize(numTri);
     gather(policy, faceNew2Old.begin(), faceNew2Old.end(),

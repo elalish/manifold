@@ -13,6 +13,8 @@
 // limitations under the License.
 
 #pragma once
+#include <map>
+
 #include "collider.h"
 #include "manifold.h"
 #include "optional_assert.h"
@@ -26,12 +28,13 @@ namespace manifold {
 /** @ingroup Private */
 struct Manifold::Impl {
   struct MeshRelationD {
+    /// The originalID of this Manifold if it is an original; -1 otherwise.
+    int originalID = -1;
+    int numProp = 0;
     VecDH<TriRef> triRef;
     VecDH<glm::ivec3> triProperties;
     VecDH<float> properties;
-    int numProp = 0;
-    /// The meshID of this Manifold if it is an original; -1 otherwise.
-    int originalID = -1;
+    std::map<int, glm::mat4x3> meshIDtransform;
   };
 
   Box bBox_;
@@ -44,28 +47,25 @@ struct Manifold::Impl {
   VecDH<glm::vec4> halfedgeTangent_;
   MeshRelationD meshRelation_;
   Collider collider_;
-  unsigned int meshids = 1;
 
-  static std::atomic<int> meshIDCounter_;
+  static std::atomic<uint32_t> meshIDCounter_;
+  static uint32_t ReserveIDs(uint32_t);
 
   Impl() {}
   enum class Shape { TETRAHEDRON, CUBE, OCTAHEDRON };
   Impl(Shape);
 
   Impl(const MeshGL&, std::vector<float> propertyTolerance = {});
-  Impl(const Mesh&, const std::vector<glm::ivec3>& triProperties = {},
-       const std::vector<float>& properties = {},
-       const std::vector<float>& propertyTolerance = {});
+  Impl(const Mesh&, const MeshRelationD& relation,
+       const std::vector<float>& propertyTolerance = {},
+       bool hasFaceIDs = false);
 
-  int InitializeNewReference(const std::vector<glm::ivec3>& triProperties = {},
-                             const std::vector<float>& properties = {},
-                             const std::vector<float>& propertyTolerance = {});
-
+  void CreateFaces(const std::vector<float>& propertyTolerance = {});
   void RemoveUnreferencedVerts(VecDH<glm::ivec3>& triVerts);
-  void ReinitializeReference(int meshID);
+  void InitializeOriginal();
   void CreateHalfedges(const VecDH<glm::ivec3>& triVerts);
   void CalculateNormals();
-  void IncrementMeshIDs(int start, int length);
+  void IncrementMeshIDs();
 
   void Update();
   void MarkFailure(Error status);

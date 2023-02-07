@@ -12,6 +12,7 @@ on:
 
 jobs:
   build:
+    timeout-minutes: 30
     strategy:
       matrix:
         cuda_support: [ON, OFF]
@@ -68,6 +69,7 @@ jobs:
         name: ${{matrix.parallel_backend}}-${{matrix.cuda_support}}
 
   build_cbind:
+    timeout-minutes: 30
     runs-on: ubuntu-22.04
     if: github.event.pull_request.draft == false
     container:
@@ -95,6 +97,7 @@ jobs:
         ./manifold_test --gtest_filter=CBIND.*
 
   build_wasm:
+    timeout-minutes: 30
     runs-on: ubuntu-20.04
     if: github.event.pull_request.draft == false
     steps:
@@ -138,6 +141,7 @@ jobs:
         retention-days: 7
 
   build_windows:
+    timeout-minutes: 30
     strategy:
       matrix:
         parallel_backend: [NONE]
@@ -181,6 +185,7 @@ jobs:
         ./Release/manifold_test.exe
 
   build_mac:
+    timeout-minutes: 30
     strategy:
       matrix:
         parallel_backend: [NONE, TBB]
@@ -209,6 +214,7 @@ jobs:
         ./manifold_test
 
   build_nix:
+    timeout-minutes: 30
     strategy:
       matrix:
         variant: [none, omp, tbb, none-cuda, omp-cuda, tbb-cuda, js]
