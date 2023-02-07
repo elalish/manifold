@@ -91,14 +91,19 @@ CsgLeafNode& Manifold::GetCsgLeafNode() const {
  * and set an Error Status if the result is not an oriented 2-manifold. Will
  * collapse degenerate triangles and unnecessary vertices.
  *
+ * All fields are read, making this structure suitable for a lossless round-trip
+ * of data from GetMeshGL. For multi-material input, use ReserveIDs to set a
+ * unique originalID for each material, and sort the materials into triangle
+ * runs.
+ *
  * @param meshGL The input MeshGL.
  * @param propertyTolerance A vector of precision values for each property
- * beyond position. The propertyTolerance vector must be specified if the MeshGL
- * has numProp > 3 and must have size = numProp - 3. This is the amount of
- * interpolation error allowed before two neighboring triangles are considered
- * to be on a property boundary edge. Property boundary edges will be retained
- * across operations even if the triangles are coplanar. A good place to start
- * is 1e-5 times the largest value you expect this property to take.
+ * beyond position. If specified, the propertyTolerance vector must have size =
+ * numProp - 3. This is the amount of interpolation error allowed before two
+ * neighboring triangles are considered to be on a property boundary edge.
+ * Property boundary edges will be retained across operations even if the
+ * triangles are coplanar. Defaults to 1e-5, which works well for most
+ * properties in the [-1, 1] range.
  */
 Manifold::Manifold(const MeshGL& meshGL,
                    const std::vector<float>& propertyTolerance)
@@ -110,18 +115,13 @@ Manifold::Manifold(const MeshGL& meshGL,
  * and set an Error Status if the Mesh is not an oriented 2-manifold. Will
  * collapse degenerate triangles and unnecessary vertices.
  *
- * The three optional inputs should all be specified if any are. These define
- * any properties you may have on this mesh. These properties are not saved in
- * the Manifold, but rather used to determine which coplanar triangles can be
- * safely merged due to all properties being colinear. Any edges that define
- * property boundaries will be retained in the output of arbitrary Boolean
- * operations so that these properties can be properly reapplied to the result
- * using the MeshRelation.
- *
  * @param mesh The input Mesh.
  */
-Manifold::Manifold(const Mesh& mesh)
-    : pNode_(std::make_shared<CsgLeafNode>(std::make_shared<Impl>(mesh))) {}
+Manifold::Manifold(const Mesh& mesh) {
+  Impl::MeshRelationD relation = {(int)ReserveIDs(1)};
+  pNode_ =
+      std::make_shared<CsgLeafNode>(std::make_shared<Impl>(mesh, relation));
+}
 
 /**
  * This returns a Mesh of simple vectors of vertices and triangles suitable for
@@ -147,6 +147,12 @@ Mesh Manifold::GetMesh() const {
   return result;
 }
 
+/**
+ * The most complete output of this library, returning a MeshGL that is designed
+ * to easily push into a renderer, including all interleaved vertex properties
+ * that may have been input. It also includes relations to all the input meshes
+ * that form a part of this result and the transforms applied to each.
+ */
 MeshGL Manifold::GetMeshGL() const {
   const Impl& impl = *GetCsgLeafNode().GetImpl();
 
@@ -172,10 +178,10 @@ MeshGL Manifold::GetMeshGL() const {
   out.faceID.resize(numTri);
   std::vector<int> triNew2Old(numTri);
   std::iota(triNew2Old.begin(), triNew2Old.end(), 0);
-  const auto& triRef = impl.meshRelation_.triRef;
+  const TriRef* triRef = impl.meshRelation_.triRef.cptrD();
   // Don't sort originals - keep them in order
   if (impl.meshRelation_.originalID < 0) {
-    std::sort(triNew2Old.begin(), triNew2Old.end(), [&triRef](int a, int b) {
+    std::sort(triNew2Old.begin(), triNew2Old.end(), [triRef](int a, int b) {
       return triRef[a].originalID == triRef[b].originalID
                  ? triRef[a].meshID < triRef[b].meshID
                  : triRef[a].originalID < triRef[b].originalID;
@@ -187,8 +193,16 @@ MeshGL Manifold::GetMeshGL() const {
     const auto ref = triRef[oldTri];
     const int meshID = ref.meshID;
     if (meshID != lastID) {
-      out.originalID.push_back(ref.originalID);
       out.runIndex.push_back(3 * tri);
+      out.originalID.push_back(ref.originalID);
+      if (impl.meshRelation_.originalID < 0) {
+        const glm::mat4x3& m = impl.meshRelation_.meshIDtransform.at(meshID);
+        for (const int col : {0, 1, 2, 3}) {
+          for (const int row : {0, 1, 2}) {
+            out.transform.push_back(m[col][row]);
+          }
+        }
+      }
       lastID = meshID;
     }
     out.faceID[tri] = ref.tri;
@@ -405,33 +419,28 @@ int Manifold::OriginalID() const {
 }
 
 /**
- * If you copy a manifold, but you want this new copy to have new properties
- * (e.g. a different UV mapping), you can reset its meshIDs to a new original,
- * meaning it will now be referenced by its descendents instead of the meshes it
- * was built from, allowing you to differentiate the copies when applying your
- * properties to the final result.
- *
- * This function also condenses all coplanar faces in the relation, and
- * collapses those edges. If you want to have inconsistent properties across
- * these faces, meaning you want to preserve some of these edges, you should
- * instead call GetMesh(), calculate your properties and use these to construct
- * a new manifold.
+ * This function condenses all coplanar faces in the relation, and
+ * collapses those edges. In the process the relation to ancestor meshes is lost
+ * and this new Manifold is marked an original. Properties are preserved, so if
+ * they do not match across an edge, that edge will be kept.
  */
 Manifold Manifold::AsOriginal() const {
   auto newImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
-  newImpl->InitializeNewReference();
+  newImpl->meshRelation_.originalID = ReserveIDs(1);
+  newImpl->InitializeOriginal();
+  newImpl->CreateFaces();
   newImpl->SimplifyTopology();
   newImpl->Finish();
   return Manifold(std::make_shared<CsgLeafNode>(newImpl));
 }
 
 /**
- * Returns the first of n sequential new unique meshIDs for marking sets of
+ * Returns the first of n sequential new unique mesh IDs for marking sets of
  * triangles that can be looked up after further operations. Assign to
- * MeshGL.meshID vector.
+ * MeshGL.originalID vector.
  */
-int Manifold::ReserveIDs(int n) {
-  return Manifold::Impl::meshIDCounter_.fetch_add(n, std::memory_order_relaxed);
+uint32_t Manifold::ReserveIDs(uint32_t n) {
+  return Manifold::Impl::ReserveIDs(n);
 }
 
 /**

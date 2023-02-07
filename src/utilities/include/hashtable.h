@@ -114,6 +114,8 @@ class HashTable {
 
   VecDH<V>& GetValueStore() { return values_; }
 
+  static Uint64 Open() { return kOpen; }
+
  private:
   VecDH<Uint64> keys_;
   VecDH<V> values_;

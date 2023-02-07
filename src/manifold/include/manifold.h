@@ -111,6 +111,9 @@ class Manifold {
     MISSING_POSITION_PROPERTIES,
     MERGE_VECTORS_DIFFERENT_LENGTHS,
     MERGE_INDEX_OUT_OF_BOUNDS,
+    TRANSFORM_WRONG_LENGTH,
+    RUN_INDEX_WRONG_LENGTH,
+    FACE_ID_WRONG_LENGTH,
   };
   Error Status() const;
   int NumVert() const;
@@ -132,7 +135,7 @@ class Manifold {
   ///@{
   int OriginalID() const;
   Manifold AsOriginal() const;
-  static int ReserveIDs(int);
+  static uint32_t ReserveIDs(uint32_t);
   ///@}
 
   /** @name Modification

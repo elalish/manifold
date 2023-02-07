@@ -126,7 +126,8 @@ Manifold Manifold::Smooth(const Mesh& mesh,
          "when supplying tangents, the normal constructor should be used "
          "rather than Smooth().");
 
-  std::shared_ptr<Impl> impl = std::make_shared<Impl>(mesh);
+  Impl::MeshRelationD relation = {(int)ReserveIDs(1)};
+  std::shared_ptr<Impl> impl = std::make_shared<Impl>(mesh, relation);
   impl->CreateTangents(sharpenedEdges);
   return Manifold(impl);
 }
@@ -150,7 +151,7 @@ Manifold Manifold::Cube(glm::vec3 size, bool center) {
   auto cube = Manifold(std::make_shared<Impl>(Impl::Shape::CUBE));
   cube = cube.Scale(size);
   if (center) cube = cube.Translate(-size / 2.0f);
-  return cube;
+  return cube.AsOriginal();
 }
 
 /**
@@ -180,7 +181,8 @@ Manifold Manifold::Cylinder(float height, float radiusLow, float radiusHigh,
   Manifold cylinder =
       Manifold::Extrude(circle, height, 0, 0.0f, glm::vec2(scale));
   if (center)
-    cylinder = cylinder.Translate(glm::vec3(0.0f, 0.0f, -height / 2.0f));
+    cylinder =
+        cylinder.Translate(glm::vec3(0.0f, 0.0f, -height / 2.0f)).AsOriginal();
   return cylinder;
 }
 
@@ -203,7 +205,7 @@ Manifold Manifold::Sphere(float radius, int circularSegments) {
              pImpl_->NumVert(), ToSphere({radius}));
   pImpl_->Finish();
   // Ignore preceding octahedron.
-  pImpl_->ReinitializeReference(Impl::meshIDCounter_.fetch_add(1));
+  pImpl_->InitializeOriginal();
   return Manifold(pImpl_);
 }
 
@@ -281,7 +283,9 @@ Manifold Manifold::Extrude(Polygons crossSection, float height, int nDivisions,
 
   pImpl_->CreateHalfedges(triVertsDH);
   pImpl_->Finish();
-  pImpl_->InitializeNewReference();
+  pImpl_->meshRelation_.originalID = ReserveIDs(1);
+  pImpl_->InitializeOriginal();
+  pImpl_->CreateFaces();
   return Manifold(pImpl_);
 }
 
@@ -380,7 +384,9 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments) {
 
   pImpl_->CreateHalfedges(triVertsDH);
   pImpl_->Finish();
-  pImpl_->InitializeNewReference();
+  pImpl_->meshRelation_.originalID = ReserveIDs(1);
+  pImpl_->InitializeOriginal();
+  pImpl_->CreateFaces();
   return Manifold(pImpl_);
 }
 

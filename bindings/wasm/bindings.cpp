@@ -195,7 +195,10 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .value("MERGE_VECTORS_DIFFERENT_LENGTHS",
              Manifold::Error::MERGE_VECTORS_DIFFERENT_LENGTHS)
       .value("MERGE_INDEX_OUT_OF_BOUNDS",
-             Manifold::Error::MERGE_INDEX_OUT_OF_BOUNDS);
+             Manifold::Error::MERGE_INDEX_OUT_OF_BOUNDS)
+      .value("TRANSFORM_WRONG_LENGTH", Manifold::Error::TRANSFORM_WRONG_LENGTH)
+      .value("RUN_INDEX_WRONG_LENGTH", Manifold::Error::RUN_INDEX_WRONG_LENGTH)
+      .value("FACE_ID_WRONG_LENGTH", Manifold::Error::FACE_ID_WRONG_LENGTH);
 
   value_object<Box>("box").field("min", &Box::min).field("max", &Box::max);
 
