@@ -100,7 +100,8 @@ CsgLeafNode& Manifold::GetCsgLeafNode() const {
  * across operations even if the triangles are coplanar. A good place to start
  * is 1e-5 times the largest value you expect this property to take.
  */
-Manifold::Manifold(MeshGL& meshGL, const std::vector<float>& propertyTolerance)
+Manifold::Manifold(const MeshGL& meshGL,
+                   const std::vector<float>& propertyTolerance)
     : pNode_(std::make_shared<CsgLeafNode>(
           std::make_shared<Impl>(meshGL, propertyTolerance))) {}
 
@@ -120,7 +121,7 @@ Manifold::Manifold(MeshGL& meshGL, const std::vector<float>& propertyTolerance)
  * @param mesh The input Mesh.
  */
 Manifold::Manifold(const Mesh& mesh) {
-  Impl::MeshRelationD relation = {ReserveIDs(1)};
+  Impl::MeshRelationD relation = {(int)ReserveIDs(1)};
   pNode_ =
       std::make_shared<CsgLeafNode>(std::make_shared<Impl>(mesh, relation));
 }
@@ -155,7 +156,7 @@ Mesh Manifold::GetMesh() const {
  * that may have been input. It also includes relations to all the input meshes
  * that form a part of this result and the transforms applied to each.
  */
-MeshGL Manifold::GetMeshGL(glm::ivec3 normalIdx) const {
+MeshGL Manifold::GetMeshGL() const {
   const Impl& impl = *GetCsgLeafNode().GetImpl();
 
   const int numProp = NumProp();
@@ -441,8 +442,7 @@ Manifold Manifold::AsOriginal() const {
  * triangles that can be looked up after further operations. Assign to
  * MeshGL.originalID vector.
  */
-int Manifold::ReserveIDs(int n) {
-  if (n < 1) return -1;
+uint32_t Manifold::ReserveIDs(uint32_t n) {
   return Manifold::Impl::ReserveIDs(n);
 }
 

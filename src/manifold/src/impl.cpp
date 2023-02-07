@@ -377,13 +377,14 @@ void DedupePropVerts(manifold::VecDH<glm::ivec3>& triProp,
 
 namespace manifold {
 
-std::atomic<int> Manifold::Impl::meshIDCounter_(1);
+std::atomic<uint32_t> Manifold::Impl::meshIDCounter_(1);
 
-int Manifold::Impl::ReserveIDs(int n) {
+uint32_t Manifold::Impl::ReserveIDs(uint32_t n) {
   return Manifold::Impl::meshIDCounter_.fetch_add(n, std::memory_order_relaxed);
 }
 
-Manifold::Impl::Impl(MeshGL& meshGL, std::vector<float> propertyTolerance) {
+Manifold::Impl::Impl(const MeshGL& meshGL,
+                     std::vector<float> propertyTolerance) {
   Mesh mesh;
   const int numVert = meshGL.NumVert();
   const int numTri = meshGL.NumTri();
@@ -405,7 +406,7 @@ Manifold::Impl::Impl(MeshGL& meshGL, std::vector<float> propertyTolerance) {
     return;
   }
 
-  if ((!meshGL.originalID.empty() || !meshGL.runIndex.empty()) &&
+  if (!meshGL.originalID.empty() && !meshGL.runIndex.empty() &&
       meshGL.originalID.size() + 1 != meshGL.runIndex.size()) {
     MarkFailure(Error::RUN_INDEX_WRONG_LENGTH);
     return;
@@ -472,16 +473,17 @@ Manifold::Impl::Impl(MeshGL& meshGL, std::vector<float> propertyTolerance) {
 
   if (meshGL.originalID.empty()) {
     relation.originalID = Impl::ReserveIDs(1);
-    meshGL.originalID.push_back(relation.originalID);
-    meshGL.runIndex = {0, meshGL.NumTri()};
   } else {
+    std::vector<uint32_t> runIndex = meshGL.runIndex;
+    if (runIndex.empty()) {
+      runIndex = {0, 3 * meshGL.NumTri()};
+    }
     relation.triRef.resize(meshGL.NumTri());
     const int startID = Impl::ReserveIDs(meshGL.originalID.size());
     for (int i = 0; i < meshGL.originalID.size(); ++i) {
       const int meshID = startID + i;
       const int originalID = meshGL.originalID[i];
-      for (int tri = meshGL.runIndex[i] / 3; tri < meshGL.runIndex[i + 1] / 3;
-           ++tri) {
+      for (int tri = runIndex[i] / 3; tri < runIndex[i + 1] / 3; ++tri) {
         TriRef& ref = relation.triRef[tri];
         ref.meshID = meshID;
         ref.originalID = originalID;
@@ -700,8 +702,8 @@ void Manifold::Impl::CreateHalfedges(const VecDH<glm::ivec3>& triVerts) {
 }
 
 /**
- * Does a full recalculation of the face bounding boxes, including updating the
- * collider, but does not resort the faces.
+ * Does a full recalculation of the face bounding boxes, including updating
+ * the collider, but does not resort the faces.
  */
 void Manifold::Impl::Update() {
   CalculateBBox();
@@ -781,8 +783,8 @@ Manifold::Impl Manifold::Impl::Transform(const glm::mat4x3& transform_) const {
 }
 
 /**
- * Sets the precision based on the bounding box, and limits its minimum value by
- * the optional input.
+ * Sets the precision based on the bounding box, and limits its minimum value
+ * by the optional input.
  */
 void Manifold::Impl::SetPrecision(float minPrecision) {
   precision_ = glm::max(minPrecision, kTolerance * bBox_.Scale());
@@ -792,13 +794,13 @@ void Manifold::Impl::SetPrecision(float minPrecision) {
 /**
  * If face normals are already present, this function uses them to compute
  * vertex normals (angle-weighted pseudo-normals); otherwise it also computes
- * the face normals. Face normals are only calculated when needed because nearly
- * degenerate faces will accrue rounding error, while the Boolean can retain
- * their original normal, which is more accurate and can help with merging
- * coplanar faces.
+ * the face normals. Face normals are only calculated when needed because
+ * nearly degenerate faces will accrue rounding error, while the Boolean can
+ * retain their original normal, which is more accurate and can help with
+ * merging coplanar faces.
  *
- * If the face normals have been invalidated by an operation like Warp(), ensure
- * you do faceNormal_.resize(0) before calling this function to force
+ * If the face normals have been invalidated by an operation like Warp(),
+ * ensure you do faceNormal_.resize(0) before calling this function to force
  * recalculation.
  */
 void Manifold::Impl::CalculateNormals() {
@@ -838,8 +840,8 @@ void Manifold::Impl::IncrementMeshIDs() {
                  meshIDold2new.GetValueStore().begin());
   const int numMeshIDs = meshIDold2new.GetValueStore().back();
   const int meshIDstart = ReserveIDs(numMeshIDs);
-  // We do start - 1 because the inclusive scan makes our first index 1 instead
-  // of 0.
+  // We do start - 1 because the inclusive scan makes our first index 1
+  // instead of 0.
   for_each_n(policy, meshRelation_.triRef.begin(), numTri,
              UpdateMeshID({meshIDold2new.D(), meshIDstart}));
   // Update keys of the transform map
@@ -856,8 +858,8 @@ void Manifold::Impl::IncrementMeshIDs() {
 }
 
 /**
- * Returns a sparse array of the bounding box overlaps between the edges of the
- * input manifold, Q and the faces of this manifold. Returned indices only
+ * Returns a sparse array of the bounding box overlaps between the edges of
+ * the input manifold, Q and the faces of this manifold. Returned indices only
  * point to forward halfedges.
  */
 SparseIndices Manifold::Impl::EdgeCollisions(const Impl& Q) const {

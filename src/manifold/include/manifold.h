@@ -49,10 +49,10 @@ class Manifold {
   Manifold(Manifold&&) noexcept;
   Manifold& operator=(Manifold&&) noexcept;
 
-  Manifold(MeshGL&, const std::vector<float>& propertyTolerance = {});
+  Manifold(const MeshGL&, const std::vector<float>& propertyTolerance = {});
   Manifold(const Mesh&);
 
-  static Manifold Smooth(MeshGL&,
+  static Manifold Smooth(const MeshGL&,
                          const std::vector<Smoothness>& sharpenedEdges = {});
   static Manifold Smooth(const Mesh&,
                          const std::vector<Smoothness>& sharpenedEdges = {});
@@ -100,7 +100,7 @@ class Manifold {
    */
   ///@{
   Mesh GetMesh() const;
-  MeshGL GetMeshGL(glm::ivec3 normalIdx = {}) const;
+  MeshGL GetMeshGL() const;
   bool IsEmpty() const;
   enum class Error {
     NO_ERROR,
@@ -135,7 +135,7 @@ class Manifold {
   ///@{
   int OriginalID() const;
   Manifold AsOriginal() const;
-  static int ReserveIDs(int);
+  static uint32_t ReserveIDs(uint32_t);
   ///@}
 
   /** @name Modification

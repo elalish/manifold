@@ -48,14 +48,14 @@ struct Manifold::Impl {
   MeshRelationD meshRelation_;
   Collider collider_;
 
-  static std::atomic<int> meshIDCounter_;
-  static int ReserveIDs(int);
+  static std::atomic<uint32_t> meshIDCounter_;
+  static uint32_t ReserveIDs(uint32_t);
 
   Impl() {}
   enum class Shape { TETRAHEDRON, CUBE, OCTAHEDRON };
   Impl(Shape);
 
-  Impl(MeshGL&, std::vector<float> propertyTolerance = {});
+  Impl(const MeshGL&, std::vector<float> propertyTolerance = {});
   Impl(const Mesh&, const MeshRelationD& relation,
        const std::vector<float>& propertyTolerance = {},
        bool hasFaceIDs = false);

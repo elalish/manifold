@@ -81,6 +81,7 @@ MeshGL TetGL() {
 
 MeshGL WithIndexColors(const Mesh& in) {
   MeshGL inGL(in);
+  inGL.originalID = {Manifold::ReserveIDs(1)};
   const int numVert = in.vertPos.size();
   inGL.numProp = 6;
   inGL.vertProperties.resize(6 * numVert);
@@ -101,6 +102,7 @@ MeshGL WithPositionColors(const Manifold& in) {
   inGL.originalID.clear();
   inGL.transform.clear();
   inGL.faceID.clear();
+  inGL.originalID = {Manifold::ReserveIDs(1)};
   const int numVert = in.NumVert();
   const Box bbox = in.BoundingBox();
   const glm::vec3 size = bbox.Size();

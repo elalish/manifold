@@ -78,7 +78,7 @@ namespace manifold {
  * can be sharpened by sharping all edges that are incident on it, allowing
  * cones to be formed.
  */
-Manifold Manifold::Smooth(MeshGL& meshGL,
+Manifold Manifold::Smooth(const MeshGL& meshGL,
                           const std::vector<Smoothness>& sharpenedEdges) {
   ASSERT(meshGL.halfedgeTangent.empty(), std::runtime_error,
          "when supplying tangents, the normal constructor should be used "
@@ -126,7 +126,7 @@ Manifold Manifold::Smooth(const Mesh& mesh,
          "when supplying tangents, the normal constructor should be used "
          "rather than Smooth().");
 
-  Impl::MeshRelationD relation = {ReserveIDs(1)};
+  Impl::MeshRelationD relation = {(int)ReserveIDs(1)};
   std::shared_ptr<Impl> impl = std::make_shared<Impl>(mesh, relation);
   impl->CreateTangents(sharpenedEdges);
   return Manifold(impl);
