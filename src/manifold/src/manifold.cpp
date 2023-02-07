@@ -91,14 +91,19 @@ CsgLeafNode& Manifold::GetCsgLeafNode() const {
  * and set an Error Status if the result is not an oriented 2-manifold. Will
  * collapse degenerate triangles and unnecessary vertices.
  *
+ * All fields are read, making this structure suitable for a lossless round-trip
+ * of data from GetMeshGL. For multi-material input, use ReserveIDs to set a
+ * unique originalID for each material, and sort the materials into triangle
+ * runs.
+ *
  * @param meshGL The input MeshGL.
  * @param propertyTolerance A vector of precision values for each property
- * beyond position. The propertyTolerance vector must be specified if the MeshGL
- * has numProp > 3 and must have size = numProp - 3. This is the amount of
- * interpolation error allowed before two neighboring triangles are considered
- * to be on a property boundary edge. Property boundary edges will be retained
- * across operations even if the triangles are coplanar. A good place to start
- * is 1e-5 times the largest value you expect this property to take.
+ * beyond position. If specified, the propertyTolerance vector must have size =
+ * numProp - 3. This is the amount of interpolation error allowed before two
+ * neighboring triangles are considered to be on a property boundary edge.
+ * Property boundary edges will be retained across operations even if the
+ * triangles are coplanar. Defaults to 1e-5, which works well for most
+ * properties in the [-1, 1] range.
  */
 Manifold::Manifold(const MeshGL& meshGL,
                    const std::vector<float>& propertyTolerance)
@@ -109,14 +114,6 @@ Manifold::Manifold(const MeshGL& meshGL,
  * Convert a Mesh into a Manifold. Will return an empty Manifold
  * and set an Error Status if the Mesh is not an oriented 2-manifold. Will
  * collapse degenerate triangles and unnecessary vertices.
- *
- * The three optional inputs should all be specified if any are. These define
- * any properties you may have on this mesh. These properties are not saved in
- * the Manifold, but rather used to determine which coplanar triangles can be
- * safely merged due to all properties being colinear. Any edges that define
- * property boundaries will be retained in the output of arbitrary Boolean
- * operations so that these properties can be properly reapplied to the result
- * using the MeshRelation.
  *
  * @param mesh The input Mesh.
  */
