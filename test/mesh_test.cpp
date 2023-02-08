@@ -202,11 +202,13 @@ void RelatedGL(const Manifold& out, const std::vector<MeshGL>& originals,
         pos[3] = 1;
         inTriPos[j] = transform * pos;
       }
-      glm::vec3 normal =
+      glm::vec3 outNormal =
           glm::cross(outTriPos[1] - outTriPos[0], outTriPos[2] - outTriPos[0]);
-      const float area = glm::length(normal);
+      glm::vec3 inNormal =
+          glm::cross(inTriPos[1] - inTriPos[0], inTriPos[2] - inTriPos[0]);
+      const float area = glm::length(inNormal);
       if (area == 0) continue;
-      normal /= area;
+      inNormal /= area;
 
       for (int j : {0, 1, 2}) {
         const int vert = output.triVerts[3 * tri + j];
@@ -216,11 +218,11 @@ void RelatedGL(const Manifold& out, const std::vector<MeshGL>& originals,
         ASSERT_LE(volume, area * 100 * out.Precision());
 
         if (checkNormals) {
-          glm::vec3 outNormal;
+          glm::vec3 normal;
           for (int k : {0, 1, 2})
-            outNormal[k] =
+            normal[k] =
                 output.vertProperties[vert * output.numProp + normalIdx[k]];
-          ASSERT_GT(glm::dot(outNormal, normal), 0);
+          ASSERT_GT(glm::dot(normal, outNormal), 0);
         } else {
           for (int p = 3; p < output.numProp; ++p) {
             const float propOut =
@@ -231,7 +233,7 @@ void RelatedGL(const Manifold& out, const std::vector<MeshGL>& originals,
                                 inMesh.vertProperties[inTriangle[2] + p]};
             glm::vec3 edgesP[3];
             for (int k : {0, 1, 2}) {
-              edgesP[k] = edges[k] + normal * inProp[k] - normal * propOut;
+              edgesP[k] = edges[k] + inNormal * inProp[k] - inNormal * propOut;
             }
             const float volumeP =
                 glm::dot(edgesP[0], glm::cross(edgesP[1], edgesP[2]));
