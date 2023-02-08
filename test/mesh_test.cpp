@@ -222,6 +222,7 @@ void RelatedGL(const Manifold& out, const std::vector<MeshGL>& originals,
           for (int k : {0, 1, 2})
             normal[k] =
                 output.vertProperties[vert * output.numProp + normalIdx[k]];
+          ASSERT_NEAR(glm::length(normal), 1, 0.0001);
           ASSERT_GT(glm::dot(normal, outNormal), 0);
         } else {
           for (int p = 3; p < output.numProp; ++p) {

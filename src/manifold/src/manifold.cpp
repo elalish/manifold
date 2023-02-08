@@ -273,7 +273,7 @@ MeshGL Manifold::GetMeshGL(glm::ivec3 normalIdx) const {
           for (int i : {0, 1, 2}) {
             normal[i] = out.vertProperties[start + normalIdx[i]];
           }
-          normal = runNormalTransform[run] * normal;
+          normal = glm::normalize(runNormalTransform[run] * normal);
           for (int i : {0, 1, 2}) {
             out.vertProperties[start + normalIdx[i]] = normal[i];
           }
