@@ -808,25 +808,27 @@ TEST(Boolean, MeshGLRoundTrip) {
 }
 
 TEST(Boolean, Normals) {
-  const MeshGL cubeGL = WithNormals(Manifold::Cube(glm::vec3(100), true));
-  const Manifold cube(cubeGL);
+  const MeshGL boxGL = WithNormals(Manifold::Cube({200, 200, 100}, true));
+  const Manifold box(boxGL);
   const MeshGL sphereGL = WithNormals(Manifold::Sphere(60));
   const Manifold sphere(sphereGL);
 
-  Manifold result = cube.Rotate(90, 180) -
-                    (sphere.Rotate(180) -
-                     sphere.Scale(glm::vec3(0.5)).Translate({40, 40, 40}));
+  Manifold cube = box ^ box.Rotate(90) ^ box.Rotate(0, 90);
 
-// cube should not use shared normals
+  Manifold result =
+      cube - (sphere.Rotate(180) -
+              sphere.Scale(glm::vec3(0.5)).Rotate(90).Translate({40, 40, 40}));
+
 #ifdef MANIFOLD_EXPORT
   ExportOptions opt;
   opt.faceted = false;
   opt.mat.roughness = 0;
   opt.mat.normalChannels = {3, 4, 5};
-  if (options.exportModels) ExportMesh("normals.glb", result.GetMeshGL(), opt);
+  if (options.exportModels)
+    ExportMesh("normals.glb", result.GetMeshGL({3, 4, 5}), opt);
 #endif
 
-  RelatedGL(result, {cubeGL, sphereGL}, true);
+  RelatedGL(result, {boxGL, sphereGL}, true);
 }
 
 TEST(Boolean, Mirrored) {
