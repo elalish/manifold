@@ -491,12 +491,12 @@ Manifold::Impl::Impl(const MeshGL& meshGL,
       }
 
       if (meshGL.transform.empty()) {
-        relation.meshIDtransform[meshID] = glm::mat4x3(1);
+        relation.meshIDtransform[meshID] = {};
       } else {
         const float* m = meshGL.transform.data() + 12 * i;
-        relation.meshIDtransform[meshID] = {m[0], m[1], m[2],  m[3],
-                                            m[4], m[5], m[6],  m[7],
-                                            m[8], m[9], m[10], m[11]};
+        relation.meshIDtransform[meshID] = {{m[0], m[1], m[2], m[3], m[4], m[5],
+                                             m[6], m[7], m[8], m[9], m[10],
+                                             m[11]}};
       }
     }
   }
@@ -630,7 +630,7 @@ void Manifold::Impl::InitializeOriginal() {
              zip(meshRelation_.triRef.begin(), countAt(0)), NumTri(),
              InitializeTriRef({meshID, halfedge_.cptrD()}));
   meshRelation_.meshIDtransform.clear();
-  meshRelation_.meshIDtransform[meshID] = glm::mat4x3(1);
+  meshRelation_.meshIDtransform[meshID] = {};
 }
 
 void Manifold::Impl::CreateFaces(const std::vector<float>& propertyTolerance) {
@@ -736,7 +736,7 @@ Manifold::Impl Manifold::Impl::Transform(const glm::mat4x3& transform_) const {
   result.halfedgeTangent_.resize(halfedgeTangent_.size());
 
   for (auto& m : result.meshRelation_.meshIDtransform) {
-    m.second = transform_ * glm::mat4(m.second);
+    m.second.transform = transform_ * glm::mat4(m.second.transform);
   }
 
   result.vertPos_.resize(NumVert());
@@ -745,8 +745,7 @@ Manifold::Impl Manifold::Impl::Transform(const glm::mat4x3& transform_) const {
   transform(policy, vertPos_.begin(), vertPos_.end(), result.vertPos_.begin(),
             Transform4x3({transform_}));
 
-  glm::mat3 normalTransform =
-      glm::inverse(glm::transpose(glm::mat3(transform_)));
+  glm::mat3 normalTransform = NormalTransform(transform_);
   transform(policy, faceNormal_.begin(), faceNormal_.end(),
             result.faceNormal_.begin(), TransformNormals({normalTransform}));
   transform(policy, vertNormal_.begin(), vertNormal_.end(),
@@ -845,7 +844,7 @@ void Manifold::Impl::IncrementMeshIDs() {
   for_each_n(policy, meshRelation_.triRef.begin(), numTri,
              UpdateMeshID({meshIDold2new.D(), meshIDstart}));
   // Update keys of the transform map
-  std::map<int, glm::mat4x3> oldTransforms;
+  std::map<int, Relation> oldTransforms;
   std::swap(meshRelation_.meshIDtransform, oldTransforms);
   const int tableSize = meshIDold2new.Size();
   for (int i = 0; i < tableSize; ++i) {
