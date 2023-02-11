@@ -190,7 +190,7 @@ void ExportMesh(const std::string& filename, const MeshGL& mesh,
     bool validChannels = true;
     for (int i : {0, 1, 2}) {
       int c = options.mat.normalChannels[i];
-      validChannels &= c >= 3 && c < mesh.numProp;
+      validChannels &= c >= 3 && c < (int)mesh.numProp;
     }
     ASSERT(validChannels, userErr,
            "When faceted is false, valid normalChannels must be supplied.");
@@ -201,7 +201,7 @@ void ExportMesh(const std::string& filename, const MeshGL& mesh,
   bool hasColor = false;
   for (int i : {0, 1, 2, 3}) {
     int c = options.mat.colorChannels[i];
-    validChannels &= c < mesh.numProp;
+    validChannels &= c < (int)mesh.numProp;
     hasColor |= c >= 0;
   }
   ASSERT(validChannels, userErr, "Invalid colorChannels.");

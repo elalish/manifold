@@ -412,7 +412,7 @@ struct MapTriRef {
 };
 
 VecDH<TriRef> UpdateReference(Manifold::Impl &outR, const Manifold::Impl &inP,
-                              const Manifold::Impl &inQ,
+                              const Manifold::Impl &inQ, bool invertQ,
                               ExecutionPolicy policy) {
   VecDH<TriRef> refPQ = outR.meshRelation_.triRef;
   const int offsetQ = Manifold::Impl::meshIDCounter_;
@@ -425,6 +425,8 @@ VecDH<TriRef> UpdateReference(Manifold::Impl &outR, const Manifold::Impl &inP,
   }
   for (const auto &pair : inQ.meshRelation_.meshIDtransform) {
     outR.meshRelation_.meshIDtransform[pair.first + offsetQ] = pair.second;
+    outR.meshRelation_.meshIDtransform[pair.first + offsetQ].backSide ^=
+        invertQ;
   }
   return refPQ;
 }
@@ -692,7 +694,7 @@ Manifold::Impl Boolean3::Result(Manifold::OpType op) const {
   if (ManifoldParams().intermediateChecks)
     ASSERT(outR.IsManifold(), logicErr, "triangulated mesh is not manifold!");
 
-  VecDH<TriRef> refPQ = UpdateReference(outR, inP_, inQ_, policy_);
+  VecDH<TriRef> refPQ = UpdateReference(outR, inP_, inQ_, invertQ, policy_);
 
   outR.SimplifyTopology();
 
