@@ -152,13 +152,23 @@ Mesh Manifold::GetMesh() const {
  * to easily push into a renderer, including all interleaved vertex properties
  * that may have been input. It also includes relations to all the input meshes
  * that form a part of this result and the transforms applied to each.
+ *
+ * @param normalIdx If the original MeshGL inputs that formed this manifold had
+ * properties corresponding to normal vectors, you can specify which property
+ * channels these are (x, y, z), which will cause this output MeshGL to
+ * automatically update these normals according to the applied transforms and
+ * front/back side. Each channel must be >= 3 and < numProp, and all original
+ * MeshGLs must use the same channels for their normals.
  */
-MeshGL Manifold::GetMeshGL() const {
+MeshGL Manifold::GetMeshGL(glm::ivec3 normalIdx) const {
   const Impl& impl = *GetCsgLeafNode().GetImpl();
 
   const int numProp = NumProp();
   const int numVert = NumPropVert();
   const int numTri = NumTri();
+
+  const bool updateNormals =
+      glm::all(glm::greaterThan(normalIdx, glm::ivec3(2)));
 
   MeshGL out;
   out.numProp = 3 + numProp;
@@ -187,6 +197,8 @@ MeshGL Manifold::GetMeshGL() const {
                  : triRef[a].originalID < triRef[b].originalID;
     });
   }
+
+  std::vector<glm::mat3> runNormalTransform;
   int lastID = -1;
   for (int tri = 0; tri < numTri; ++tri) {
     const int oldTri = triNew2Old[tri];
@@ -195,11 +207,15 @@ MeshGL Manifold::GetMeshGL() const {
     if (meshID != lastID) {
       out.runIndex.push_back(3 * tri);
       out.originalID.push_back(ref.originalID);
+      const Impl::Relation& m = impl.meshRelation_.meshIDtransform.at(meshID);
+      if (updateNormals) {
+        runNormalTransform.push_back(NormalTransform(m.transform) *
+                                     (m.backSide ? -1.0f : 1.0f));
+      }
       if (impl.meshRelation_.originalID < 0) {
-        const glm::mat4x3& m = impl.meshRelation_.meshIDtransform.at(meshID);
         for (const int col : {0, 1, 2, 3}) {
           for (const int row : {0, 1, 2}) {
-            out.transform.push_back(m[col][row]);
+            out.transform.push_back(m.transform[col][row]);
           }
         }
       }
@@ -226,35 +242,49 @@ MeshGL Manifold::GetMeshGL() const {
   // Duplicate verts with different props
   std::vector<int> vert2idx(impl.NumVert(), -1);
   std::map<std::pair<int, int>, int> vertPropPair;
-  for (int tri = 0; tri < numTri; ++tri) {
-    const glm::ivec3 triProp =
-        impl.meshRelation_.triProperties[triNew2Old[tri]];
-    for (const int i : {0, 1, 2}) {
-      const int prop = triProp[i];
-      const int vert = out.triVerts[3 * tri + i];
+  for (int run = 0; run < out.originalID.size(); ++run) {
+    for (int tri = out.runIndex[run] / 3; tri < out.runIndex[run + 1] / 3;
+         ++tri) {
+      const glm::ivec3 triProp =
+          impl.meshRelation_.triProperties[triNew2Old[tri]];
+      for (const int i : {0, 1, 2}) {
+        const int prop = triProp[i];
+        const int vert = out.triVerts[3 * tri + i];
 
-      const auto it = vertPropPair.find({vert, prop});
-      if (it != vertPropPair.end()) {
-        out.triVerts[3 * tri + i] = it->second;
-        continue;
-      }
-      const int idx = out.vertProperties.size() / out.numProp;
-      vertPropPair.insert({{vert, prop}, idx});
-      out.triVerts[3 * tri + i] = idx;
+        const auto it = vertPropPair.find({vert, prop});
+        if (it != vertPropPair.end()) {
+          out.triVerts[3 * tri + i] = it->second;
+          continue;
+        }
+        const int idx = out.vertProperties.size() / out.numProp;
+        vertPropPair.insert({{vert, prop}, idx});
+        out.triVerts[3 * tri + i] = idx;
 
-      for (int p : {0, 1, 2}) {
-        out.vertProperties.push_back(impl.vertPos_[vert][p]);
-      }
-      for (int p = 0; p < numProp; ++p) {
-        out.vertProperties.push_back(
-            impl.meshRelation_.properties[prop * numProp + p]);
-      }
+        for (int p : {0, 1, 2}) {
+          out.vertProperties.push_back(impl.vertPos_[vert][p]);
+        }
+        for (int p = 0; p < numProp; ++p) {
+          out.vertProperties.push_back(
+              impl.meshRelation_.properties[prop * numProp + p]);
+        }
+        if (updateNormals) {
+          glm::vec3 normal;
+          const int start = out.vertProperties.size() - out.numProp;
+          for (int i : {0, 1, 2}) {
+            normal[i] = out.vertProperties[start + normalIdx[i]];
+          }
+          normal = glm::normalize(runNormalTransform[run] * normal);
+          for (int i : {0, 1, 2}) {
+            out.vertProperties[start + normalIdx[i]] = normal[i];
+          }
+        }
 
-      if (vert2idx[vert] == -1) {
-        vert2idx[vert] = idx;
-      } else {
-        out.mergeFromVert.push_back(idx);
-        out.mergeToVert.push_back(vert2idx[vert]);
+        if (vert2idx[vert] == -1) {
+          vert2idx[vert] = idx;
+        } else {
+          out.mergeFromVert.push_back(idx);
+          out.mergeToVert.push_back(vert2idx[vert]);
+        }
       }
     }
   }

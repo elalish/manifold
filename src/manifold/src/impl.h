@@ -27,6 +27,10 @@ namespace manifold {
 
 /** @ingroup Private */
 struct Manifold::Impl {
+  struct Relation {
+    glm::mat4x3 transform = glm::mat4x3(1);
+    bool backSide = false;
+  };
   struct MeshRelationD {
     /// The originalID of this Manifold if it is an original; -1 otherwise.
     int originalID = -1;
@@ -34,7 +38,7 @@ struct Manifold::Impl {
     VecDH<TriRef> triRef;
     VecDH<glm::ivec3> triProperties;
     VecDH<float> properties;
-    std::map<int, glm::mat4x3> meshIDtransform;
+    std::map<int, Relation> meshIDtransform;
   };
 
   Box bBox_;

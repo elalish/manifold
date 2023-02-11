@@ -119,6 +119,25 @@ MeshGL WithPositionColors(const Manifold& in) {
   return inGL;
 }
 
+MeshGL WithNormals(const Manifold& in) {
+  const Mesh mesh = in.GetMesh();
+  MeshGL out;
+  out.originalID = {Manifold::ReserveIDs(1)};
+  out.numProp = 6;
+  out.vertProperties.resize(out.numProp * mesh.vertPos.size());
+  for (int i = 0; i < mesh.vertPos.size(); ++i) {
+    for (int j : {0, 1, 2}) {
+      out.vertProperties[6 * i + j] = mesh.vertPos[i][j];
+      out.vertProperties[6 * i + 3 + j] = mesh.vertNormal[i][j];
+    }
+  }
+  out.triVerts.resize(3 * mesh.triVerts.size());
+  for (int i = 0; i < mesh.triVerts.size(); ++i) {
+    for (int j : {0, 1, 2}) out.triVerts[3 * i + j] = mesh.triVerts[i][j];
+  }
+  return out;
+}
+
 void Identical(const Mesh& mesh1, const Mesh& mesh2) {
   ASSERT_EQ(mesh1.vertPos.size(), mesh2.vertPos.size());
   for (int i = 0; i < mesh1.vertPos.size(); ++i)
@@ -139,9 +158,12 @@ int NumUnique(const std::vector<T>& in) {
   return unique.size();
 }
 
-void RelatedGL(const Manifold& out, const std::vector<MeshGL>& originals) {
+void RelatedGL(const Manifold& out, const std::vector<MeshGL>& originals,
+               bool checkNormals = false) {
   ASSERT_FALSE(out.IsEmpty());
-  MeshGL output = out.GetMeshGL();
+  const glm::ivec3 normalIdx =
+      checkNormals ? glm::ivec3(3, 4, 5) : glm::ivec3(0);
+  MeshGL output = out.GetMeshGL(normalIdx);
   for (int run = 0; run < output.originalID.size(); ++run) {
     const float* m = output.transform.data() + 12 * run;
     const glm::mat4x3 transform =
@@ -169,45 +191,56 @@ void RelatedGL(const Manifold& out, const std::vector<MeshGL>& originals) {
       inTriangle *= inMesh.numProp;
 
       glm::mat3 inTriPos;
+      glm::mat3 outTriPos;
       for (int j : {0, 1, 2}) {
+        const int vert = output.triVerts[3 * tri + j];
         glm::vec4 pos;
-        for (int k : {0, 1, 2})
+        for (int k : {0, 1, 2}) {
           pos[k] = inMesh.vertProperties[inTriangle[j] + k];
+          outTriPos[j][k] = output.vertProperties[vert * output.numProp + k];
+        }
         pos[3] = 1;
         inTriPos[j] = transform * pos;
       }
-      glm::vec3 normal =
+      glm::vec3 outNormal =
+          glm::cross(outTriPos[1] - outTriPos[0], outTriPos[2] - outTriPos[0]);
+      glm::vec3 inNormal =
           glm::cross(inTriPos[1] - inTriPos[0], inTriPos[2] - inTriPos[0]);
-      const float area = glm::length(normal);
+      const float area = glm::length(inNormal);
       if (area == 0) continue;
-      normal /= area;
+      inNormal /= area;
 
       for (int j : {0, 1, 2}) {
         const int vert = output.triVerts[3 * tri + j];
-        glm::vec3 outPos;
-        for (int k : {0, 1, 2})
-          outPos[k] = output.vertProperties[vert * output.numProp + k];
-
         glm::vec3 edges[3];
-        for (int k : {0, 1, 2}) edges[k] = inTriPos[k] - outPos;
+        for (int k : {0, 1, 2}) edges[k] = inTriPos[k] - outTriPos[j];
         const float volume = glm::dot(edges[0], glm::cross(edges[1], edges[2]));
         ASSERT_LE(volume, area * 100 * out.Precision());
 
-        for (int p = 3; p < output.numProp; ++p) {
-          const float propOut =
-              output.vertProperties[vert * output.numProp + p];
+        if (checkNormals) {
+          glm::vec3 normal;
+          for (int k : {0, 1, 2})
+            normal[k] =
+                output.vertProperties[vert * output.numProp + normalIdx[k]];
+          ASSERT_NEAR(glm::length(normal), 1, 0.0001);
+          ASSERT_GT(glm::dot(normal, outNormal), 0);
+        } else {
+          for (int p = 3; p < output.numProp; ++p) {
+            const float propOut =
+                output.vertProperties[vert * output.numProp + p];
 
-          glm::vec3 inProp = {inMesh.vertProperties[inTriangle[0] + p],
-                              inMesh.vertProperties[inTriangle[1] + p],
-                              inMesh.vertProperties[inTriangle[2] + p]};
-          glm::vec3 edgesP[3];
-          for (int k : {0, 1, 2}) {
-            edgesP[k] = edges[k] + normal * inProp[k] - normal * propOut;
+            glm::vec3 inProp = {inMesh.vertProperties[inTriangle[0] + p],
+                                inMesh.vertProperties[inTriangle[1] + p],
+                                inMesh.vertProperties[inTriangle[2] + p]};
+            glm::vec3 edgesP[3];
+            for (int k : {0, 1, 2}) {
+              edgesP[k] = edges[k] + inNormal * inProp[k] - inNormal * propOut;
+            }
+            const float volumeP =
+                glm::dot(edgesP[0], glm::cross(edgesP[1], edgesP[2]));
+
+            ASSERT_LE(volumeP, area * 100 * out.Precision());
           }
-          const float volumeP =
-              glm::dot(edgesP[0], glm::cross(edgesP[1], edgesP[2]));
-
-          ASSERT_LE(volumeP, area * 100 * out.Precision());
         }
       }
     }
@@ -775,6 +808,30 @@ TEST(Boolean, MeshGLRoundTrip) {
 
   const MeshGL outGL = result2.GetMeshGL();
   ASSERT_EQ(outGL.originalID.size(), 2);
+}
+
+TEST(Boolean, Normals) {
+  const MeshGL boxGL = WithNormals(Manifold::Cube({200, 200, 100}, true));
+  const Manifold box(boxGL);
+  const MeshGL sphereGL = WithNormals(Manifold::Sphere(60));
+  const Manifold sphere(sphereGL);
+
+  Manifold cube = box ^ box.Rotate(90) ^ box.Rotate(0, 90);
+
+  Manifold result =
+      cube - (sphere.Rotate(180) -
+              sphere.Scale(glm::vec3(0.5)).Rotate(90).Translate({40, 40, 40}));
+
+#ifdef MANIFOLD_EXPORT
+  ExportOptions opt;
+  opt.faceted = false;
+  opt.mat.roughness = 0;
+  opt.mat.normalChannels = {3, 4, 5};
+  if (options.exportModels)
+    ExportMesh("normals.glb", result.GetMeshGL({3, 4, 5}), opt);
+#endif
+
+  RelatedGL(result, {boxGL, sphereGL}, true);
 }
 
 TEST(Boolean, Mirrored) {

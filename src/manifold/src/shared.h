@@ -45,6 +45,11 @@ __host__ __device__ inline glm::vec3 UVW(int vert,
   return uvw;
 }
 
+__host__ __device__ inline glm::mat3 NormalTransform(
+    const glm::mat4x3& transform) {
+  return glm::inverse(glm::transpose(glm::mat3(transform)));
+}
+
 /**
  * By using the closest axis-aligned projection to the normal instead of a
  * projection along the normal, we avoid introducing any rounding error.
