@@ -131,7 +131,8 @@ Module.setup = function () {
       runIndex,
       originalID,
       faceID,
-      halfedgeTangent
+      halfedgeTangent,
+      transform
     } = {}) {
       this.numProp = numProp;
       this.triVerts = triVerts;
@@ -142,6 +143,7 @@ Module.setup = function () {
       this.originalID = originalID;
       this.faceID = faceID;
       this.halfedgeTangent = halfedgeTangent;
+      this.transform = transform;
     }
 
     get numTri() {
@@ -150,6 +152,10 @@ Module.setup = function () {
 
     get numVert() {
       return this.vertProperties.length / this.numProp;
+    }
+
+    get numMatrix() {
+      return this.transform.length / 12;
     }
 
     verts(tri) {
@@ -166,6 +172,10 @@ Module.setup = function () {
 
     tangent(halfedge) {
       return this.halfedgeTangent.subarray(4 * halfedge, 4 * (halfedge + 1));
+    }
+
+    matrix(index) {
+      return this.transform.subarray(12 * index, 12 * (index + 1));
     }
   }
 

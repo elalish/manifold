@@ -89,6 +89,10 @@ val GetMeshJS(const Manifold& manifold) {
              val(typed_memory_view(mesh.halfedgeTangent.size(),
                                    mesh.halfedgeTangent.data()))
                  .call<val>("slice"));
+  meshJS.set("transform",
+             val(typed_memory_view(mesh.transform.size(),
+                                   mesh.transform.data()))
+                 .call<val>("slice"));
 
   return meshJS;
 }
@@ -119,6 +123,10 @@ MeshGL MeshJS2GL(const val& mesh) {
   if (mesh["halfedgeTangent"] != val::undefined()) {
     out.halfedgeTangent =
         convertJSArrayToNumberVector<float>(mesh["halfedgeTangent"]);
+  }
+  if (mesh["transform"] != val::undefined()) {
+    out.transform =
+        convertJSArrayToNumberVector<float>(mesh["transform"]);
   }
   return out;
 }

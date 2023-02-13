@@ -12,6 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+interface SealedUint32Array<N extends number> extends Uint32Array {
+  length: N;
+}
+
+interface SealedFloat32Array<N extends number> extends Float32Array {
+  length: N;
+}
+
 type Vec2 = [number, number];
 type Vec3 = [number, number, number];
 type Vec4 = [number, number, number, number];
@@ -40,6 +48,18 @@ type Curvature = {
 };
 
 declare class Mesh {
+  constructor(options: {
+    numProp?: number,
+    triVerts?: Uint32Array,
+    vertProperties?: Float32Array,
+    mergeFromVert?: Uint32Array,
+    mergeToVert?: Uint32Array,
+    runIndex?: Uint32Array,
+    originalID?: Uint32Array,
+    faceID?: Uint32Array,
+    halfedgeTangent?: Float32Array,
+    transform?: Float32Array
+  });
   numProp: number;
   vertProperties: Float32Array;
   triVerts: Uint32Array;
@@ -49,12 +69,15 @@ declare class Mesh {
   originalID?: Uint32Array;
   faceID?: Uint32Array;
   halfedgeTangent?: Float32Array;
+  transform?: Float32Array;
   get numTri(): number;
   get numVert(): number;
-  verts(tri: number): Uint32Array<3>;
-  position(vert: number): Float32Array<3>;
+  get numMatrix(): number;
+  verts(tri: number): SealedUint32Array<3>;
+  position(vert: number): SealedFloat32Array<3>;
   extras(vert: number): Float32Array;
-  tangent(halfedge: number): Float32Array<4>;
+  tangent(halfedge: number): SealedFloat32Array<4>;
+  matrix(index: number): SealedFloat32Array<12>;
 }
 
 declare class Manifold {
@@ -397,14 +420,6 @@ declare function setCircularSegments(segments: number): void;
 declare function getCircularSegments(radius: number): number;
 ///@}
 
-/**
- * Create a Manifold from a serialized Mesh object (MeshVec). Unlike the
- * constructor, this method does not dispose the Mesh after using it.
- *
- * @param meshVec The serialized Mesh object to convert into a Manifold.
- */
-declare function ManifoldFromMeshVec(meshVec: MeshVec): Manifold;
-
 declare interface ManifoldStatic {
   cube: typeof cube;
   cylinder: typeof cylinder;
@@ -422,7 +437,7 @@ declare interface ManifoldStatic {
   setMinCircularEdgeLength: typeof setMinCircularEdgeLength;
   setCircularSegments: typeof setCircularSegments;
   getCircularSegments: typeof getCircularSegments;
-  ManifoldFromMeshVec: typeof ManifoldFromMeshVec;
+  Mesh: typeof Mesh;
   Manifold: typeof Manifold;
   setup: () => void;
 }
