@@ -49,9 +49,9 @@ type Curvature = {
 
 declare class Mesh {
   constructor(options: {
-    numProp?: number,
-    triVerts?: Uint32Array,
-    vertProperties?: Float32Array,
+    numProp: number,
+    vertProperties: Float32Array,
+    triVerts: Uint32Array,
     mergeFromVert?: Uint32Array,
     mergeToVert?: Uint32Array,
     runIndex?: Uint32Array,
