@@ -80,8 +80,8 @@ val GetMeshJS(const Manifold& manifold) {
              val(typed_memory_view(mesh.runIndex.size(), mesh.runIndex.data()))
                  .call<val>("slice"));
   meshJS.set("runOriginalID", val(typed_memory_view(mesh.runOriginalID.size(),
-                                                 mesh.runOriginalID.data()))
-                               .call<val>("slice"));
+                                                    mesh.runOriginalID.data()))
+                                  .call<val>("slice"));
   meshJS.set("faceID",
              val(typed_memory_view(mesh.faceID.size(), mesh.faceID.data()))
                  .call<val>("slice"));
@@ -90,8 +90,8 @@ val GetMeshJS(const Manifold& manifold) {
                                    mesh.halfedgeTangent.data()))
                  .call<val>("slice"));
   meshJS.set("runTransform", val(typed_memory_view(mesh.runTransform.size(),
-                                                mesh.runTransform.data()))
-                              .call<val>("slice"));
+                                                   mesh.runTransform.data()))
+                                 .call<val>("slice"));
 
   return meshJS;
 }
@@ -114,7 +114,8 @@ MeshGL MeshJS2GL(const val& mesh) {
     out.runIndex = convertJSArrayToNumberVector<uint32_t>(mesh["runIndex"]);
   }
   if (mesh["runOriginalID"] != val::undefined()) {
-    out.runOriginalID = convertJSArrayToNumberVector<uint32_t>(mesh["runOriginalID"]);
+    out.runOriginalID =
+        convertJSArrayToNumberVector<uint32_t>(mesh["runOriginalID"]);
   }
   if (mesh["faceID"] != val::undefined()) {
     out.faceID = convertJSArrayToNumberVector<uint32_t>(mesh["faceID"]);
@@ -124,7 +125,8 @@ MeshGL MeshJS2GL(const val& mesh) {
         convertJSArrayToNumberVector<float>(mesh["halfedgeTangent"]);
   }
   if (mesh["runTransform"] != val::undefined()) {
-    out.runTransform = convertJSArrayToNumberVector<float>(mesh["runTransform"]);
+    out.runTransform =
+        convertJSArrayToNumberVector<float>(mesh["runTransform"]);
   }
   return out;
 }
