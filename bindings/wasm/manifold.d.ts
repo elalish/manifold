@@ -55,10 +55,10 @@ declare class Mesh {
     mergeFromVert?: Uint32Array,
     mergeToVert?: Uint32Array,
     runIndex?: Uint32Array,
-    originalID?: Uint32Array,
+    runOriginalID?: Uint32Array,
     faceID?: Uint32Array,
     halfedgeTangent?: Float32Array,
-    transform?: Float32Array
+    runTransform?: Float32Array
   });
   numProp: number;
   vertProperties: Float32Array;
@@ -66,10 +66,10 @@ declare class Mesh {
   mergeFromVert?: Uint32Array;
   mergeToVert?: Uint32Array;
   runIndex?: Uint32Array;
-  originalID?: Uint32Array;
+  runOriginalID?: Uint32Array;
   faceID?: Uint32Array;
   halfedgeTangent?: Float32Array;
-  transform?: Float32Array;
+  runTransform?: Float32Array;
   get numTri(): number;
   get numVert(): number;
   get numMatrix(): number;
@@ -423,7 +423,7 @@ declare function getCircularSegments(radius: number): number;
 /**
  * Returns the first of n sequential new unique mesh IDs for marking sets of
  * triangles that can be looked up after further operations. Assign to
- * Mesh.originalID vector.
+ * Mesh.runOriginalID vector.
  */
 declare function reserveIDs(count: number): number;
 

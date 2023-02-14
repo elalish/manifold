@@ -79,8 +79,8 @@ val GetMeshJS(const Manifold& manifold) {
   meshJS.set("runIndex",
              val(typed_memory_view(mesh.runIndex.size(), mesh.runIndex.data()))
                  .call<val>("slice"));
-  meshJS.set("originalID", val(typed_memory_view(mesh.originalID.size(),
-                                                 mesh.originalID.data()))
+  meshJS.set("runOriginalID", val(typed_memory_view(mesh.runOriginalID.size(),
+                                                 mesh.runOriginalID.data()))
                                .call<val>("slice"));
   meshJS.set("faceID",
              val(typed_memory_view(mesh.faceID.size(), mesh.faceID.data()))
@@ -89,8 +89,8 @@ val GetMeshJS(const Manifold& manifold) {
              val(typed_memory_view(mesh.halfedgeTangent.size(),
                                    mesh.halfedgeTangent.data()))
                  .call<val>("slice"));
-  meshJS.set("transform", val(typed_memory_view(mesh.transform.size(),
-                                                mesh.transform.data()))
+  meshJS.set("runTransform", val(typed_memory_view(mesh.runTransform.size(),
+                                                mesh.runTransform.data()))
                               .call<val>("slice"));
 
   return meshJS;
@@ -113,8 +113,8 @@ MeshGL MeshJS2GL(const val& mesh) {
   if (mesh["runIndex"] != val::undefined()) {
     out.runIndex = convertJSArrayToNumberVector<uint32_t>(mesh["runIndex"]);
   }
-  if (mesh["originalID"] != val::undefined()) {
-    out.originalID = convertJSArrayToNumberVector<uint32_t>(mesh["originalID"]);
+  if (mesh["runOriginalID"] != val::undefined()) {
+    out.runOriginalID = convertJSArrayToNumberVector<uint32_t>(mesh["runOriginalID"]);
   }
   if (mesh["faceID"] != val::undefined()) {
     out.faceID = convertJSArrayToNumberVector<uint32_t>(mesh["faceID"]);
@@ -123,8 +123,8 @@ MeshGL MeshJS2GL(const val& mesh) {
     out.halfedgeTangent =
         convertJSArrayToNumberVector<float>(mesh["halfedgeTangent"]);
   }
-  if (mesh["transform"] != val::undefined()) {
-    out.transform = convertJSArrayToNumberVector<float>(mesh["transform"]);
+  if (mesh["runTransform"] != val::undefined()) {
+    out.runTransform = convertJSArrayToNumberVector<float>(mesh["runTransform"]);
   }
   return out;
 }

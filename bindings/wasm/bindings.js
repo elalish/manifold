@@ -129,10 +129,10 @@ Module.setup = function () {
       mergeFromVert,
       mergeToVert,
       runIndex,
-      originalID,
+      runOriginalID,
       faceID,
       halfedgeTangent,
-      transform
+      runTransform
     } = {}) {
       this.numProp = numProp;
       this.triVerts = triVerts;
@@ -140,10 +140,10 @@ Module.setup = function () {
       this.mergeFromVert = mergeFromVert;
       this.mergeToVert = mergeToVert;
       this.runIndex = runIndex;
-      this.originalID = originalID;
+      this.runOriginalID = runOriginalID;
       this.faceID = faceID;
       this.halfedgeTangent = halfedgeTangent;
-      this.transform = transform;
+      this.runTransform = runTransform;
     }
 
     get numTri() {
@@ -155,7 +155,7 @@ Module.setup = function () {
     }
 
     get numRun() {
-      return this.originalID.length;
+      return this.runOriginalID.length;
     }
 
     verts(tri) {
@@ -174,8 +174,8 @@ Module.setup = function () {
       return this.halfedgeTangent.subarray(4 * halfedge, 4 * (halfedge + 1));
     }
 
-    matrix(index) {
-      return this.transform.subarray(12 * index, 12 * (index + 1));
+    transform(index) {
+      return this.runTransform.subarray(12 * index, 12 * (index + 1));
     }
   }
 
