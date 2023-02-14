@@ -278,4 +278,5 @@ EMSCRIPTEN_BINDINGS(whatever) {
   function("setMinCircularEdgeLength", &Manifold::SetMinCircularEdgeLength);
   function("setCircularSegments", &Manifold::SetCircularSegments);
   function("getCircularSegments", &Manifold::GetCircularSegments);
+  function("reserveIDs", &Manifold::ReserveIDs);
 }

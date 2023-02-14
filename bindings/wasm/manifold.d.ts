@@ -420,6 +420,13 @@ declare function setCircularSegments(segments: number): void;
 declare function getCircularSegments(radius: number): number;
 ///@}
 
+/**
+ * Returns the first of n sequential new unique mesh IDs for marking sets of
+ * triangles that can be looked up after further operations. Assign to
+ * Mesh.originalID vector.
+ */
+declare function reserveIDs(count: number): number;
+
 declare interface ManifoldStatic {
   cube: typeof cube;
   cylinder: typeof cylinder;
@@ -437,6 +444,7 @@ declare interface ManifoldStatic {
   setMinCircularEdgeLength: typeof setMinCircularEdgeLength;
   setCircularSegments: typeof setCircularSegments;
   getCircularSegments: typeof getCircularSegments;
+  reserveIDs: typeof reserveIDs;
   Mesh: typeof Mesh;
   Manifold: typeof Manifold;
   setup: () => void;
