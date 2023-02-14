@@ -154,8 +154,8 @@ Module.setup = function () {
       return this.vertProperties.length / this.numProp;
     }
 
-    get numMatrix() {
-      return this.transform.length / 12;
+    get numRun() {
+      return this.originalID.length;
     }
 
     verts(tri) {
