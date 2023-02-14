@@ -72,7 +72,7 @@ declare class Mesh {
   runTransform?: Float32Array;
   get numTri(): number;
   get numVert(): number;
-  get numMatrix(): number;
+  get numRun(): number;
   verts(tri: number): SealedUint32Array<3>;
   position(vert: number): SealedFloat32Array<3>;
   extras(vert: number): Float32Array;
