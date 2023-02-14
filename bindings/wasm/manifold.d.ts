@@ -77,7 +77,7 @@ declare class Mesh {
   position(vert: number): SealedFloat32Array<3>;
   extras(vert: number): Float32Array;
   tangent(halfedge: number): SealedFloat32Array<4>;
-  matrix(index: number): SealedFloat32Array<12>;
+  transform(run: number): SealedFloat32Array<12>;
 }
 
 declare class Manifold {
