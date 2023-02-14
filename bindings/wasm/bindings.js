@@ -174,8 +174,8 @@ Module.setup = function () {
       return this.halfedgeTangent.subarray(4 * halfedge, 4 * (halfedge + 1));
     }
 
-    transform(index) {
-      return this.runTransform.subarray(12 * index, 12 * (index + 1));
+    transform(run) {
+      return this.runTransform.subarray(12 * run, 12 * (run + 1));
     }
   }
 
