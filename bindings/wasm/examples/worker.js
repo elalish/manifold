@@ -12,15 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-console.log('starting worker');
-const threePath = 'https://cdn.jsdelivr.net/npm/three@0.144.0/';
-// importScripts(
-//     'manifold.js', threePath + 'build/three.js',
-//     threePath + 'examples/js/exporters/GLTFExporter.js');
-
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.149.0/build/three.module.js';
-// import {GLTFExporter} from
-// 'https://cdn.jsdelivr.net/npm/three@0.149.0/examples/jsm/exporters/GLTFExporter.js';
+import {Accessor, Document, WebIO} from 'https://cdn.skypack.dev/@gltf-transform/core';
+
 import Module from '../manifold.js';
 
 // manifold member functions that returns a new manifold
@@ -41,7 +35,6 @@ const exposedFunctions = constructors.concat(utils);
 
 let wasm;
 Module().then(function(tmp) {
-  console.log('initialize wasm');
   wasm = tmp;
   wasm.setup();
   // Setup memory management, such that users don't have to care about
@@ -110,20 +103,29 @@ onmessage = (e) => {
   }
 };
 
-// Export & Rendering
+// Export
 // ------------------------------------------------------------
-const mesh = new THREE.Mesh(
-    undefined,
-    new THREE.MeshStandardMaterial(
-        {color: 'yellow', metalness: 1, roughness: 0.2}));
-const rotation = new THREE.Matrix4();
-rotation.set(1, 0, 0, 0, 0, 0, 1, 0, 0, -1, 0, 0, 0, 0, 0, 1);
-mesh.setRotationFromMatrix(rotation);  // Z-up -> Y-up
-mesh.scale.setScalar(0.001);           // mm -> m
+const io = new WebIO();
+const doc = new Document();
 
-const exporter = new GLTFExporter();
+const buffer = doc.createBuffer();
+const position =
+    doc.createAccessor().setBuffer(buffer).setType(Accessor.Type.VEC3);
+const indices =
+    doc.createAccessor().setBuffer(buffer).setType(Accessor.Type.SCALAR);
+const material = doc.createMaterial()
+                     .setBaseColorFactor([1, 1, 0, 1])
+                     .setMetallicFactor(1)
+                     .setRoughnessFactor(0.2);
+const primitive = doc.createPrimitive()
+                      .setMaterial(material)
+                      .setIndices(indices)
+                      .setAttribute('POSITION', position);
+const mesh = doc.createMesh('result').addPrimitive(primitive);
+const node = doc.createNode().setMesh(mesh);
+const scene = doc.createScene().addChild(node);
 
-function exportGLB(manifold) {
+async function exportGLB(manifold) {
   console.log(`Triangles: ${manifold.numTri().toLocaleString()}`);
   const box = manifold.boundingBox();
   const size = [0, 0, 0];
@@ -136,25 +138,23 @@ function exportGLB(manifold) {
   console.log(`Genus: ${manifold.genus().toLocaleString()}, Volume: ${
       (volume / 100).toLocaleString()} cm^3`);
 
-  mesh.geometry?.dispose();
-  mesh.geometry = mesh2geometry(manifold.getMesh());
-  exporter.parse(
-      mesh,
-      (gltf) => {
-        const blob = new Blob([gltf], {type: 'application/octet-stream'});
-        postMessage({objectURL: URL.createObjectURL(blob)});
-      },
-      () => {
-        console.log('glTF export failed!');
-        postMessage({objectURL: null});
-      },
-      {binary: true});
-}
+  // From Z-up to Y-up (glTF)
+  const mesh = manifold.rotate([-90, 0, 0]).getMesh();
 
-function mesh2geometry(mesh) {
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute(
-      'position', new THREE.BufferAttribute(mesh.vertProperties, 3));
-  geometry.setIndex(new THREE.BufferAttribute(mesh.triVerts, 1));
-  return geometry;
+  indices.setArray(mesh.triVerts);
+
+  const numVert = mesh.numVert;
+  const numProp = mesh.numProp;
+  const posArray = new Float32Array(3 * numVert);
+  for (let i = 0; i < numVert; ++i) {
+    posArray[3 * i] = mesh.vertProperties[numProp * i];
+    posArray[3 * i + 1] = mesh.vertProperties[numProp * i + 1];
+    posArray[3 * i + 2] = mesh.vertProperties[numProp * i + 2];
+  }
+  position.setArray(posArray);
+
+  const glb = await io.writeBinary(doc);
+
+  const blob = new Blob([glb], {type: 'application/octet-stream'});
+  postMessage({objectURL: URL.createObjectURL(blob)});
 }
