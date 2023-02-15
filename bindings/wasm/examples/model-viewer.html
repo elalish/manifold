@@ -97,10 +97,11 @@
     wasm = tmp;
     wasm.setup();
 
-    const space = cubeUV().scale(50);
-    const moon = sphereUV().scale(60);
-    materialMap.set(space.originalID(), spaceIndices);
-    materialMap.set(moon.originalID(), moonIndices);
+    const firstID = wasm.reserveIDs(2);
+    const space = cubeUV(firstID).scale(50);
+    const moon = sphereUV(firstID+1).scale(60);
+    materialMap.set(firstID, spaceIndices);
+    materialMap.set(firstID+1, moonIndices);
 
     const csg = function (operation) {
       push2MV(wasm[operation](space, moon));
@@ -120,7 +121,7 @@
     // From Z-up to Y-up (glTF)
     const mesh = manifold.rotate([-90, 0, 0]).getMesh();
 
-    for (const [i, id] of mesh.originalID.entries()) {
+    for (const [i, id] of mesh.runOriginalID.entries()) {
       const indices = materialMap.get(id);
       indices.setArray(mesh.triVerts.subarray(mesh.runIndex[i], mesh.runIndex[i + 1]));
     }
@@ -149,7 +150,7 @@
     mv.src = objectURL;
   }
 
-  function cubeUV() {
+  function cubeUV(id) {
     const numProp = 5;
     const numTri = 12;
     const numVert = 8;
@@ -176,7 +177,9 @@
     const vertProperties = new Float32Array(numProp * numPropVert);
     const mergeFromVert = new Uint32Array(numPropVert - numVert);
     const mergeToVert = new Uint32Array(numPropVert - numVert);
-    const meshUV = new wasm.Mesh({ numProp, triVerts, vertProperties, mergeFromVert, mergeToVert });
+    const runOriginalID = new Uint32Array(1);
+    const meshUV = new wasm.Mesh({ numProp, triVerts, vertProperties, mergeFromVert, mergeToVert, runOriginalID });
+    runOriginalID[0]=id;
     const vert2vert = [-1, -1, -1, -1, -1, -1, -1, -1];
     let idx = 0;
     for (let face = 0; face < 6; ++face) {
@@ -203,7 +206,7 @@
     return wasm.Manifold(meshUV);
   }
 
-  function sphereUV() {
+  function sphereUV(id) {
     const n = 100;
     const tol = 1 / (2 * n);
     const mesh = wasm.sphere(1, n).getMesh();
@@ -216,7 +219,9 @@
     const vertProperties = new Float32Array(numProp * (numVert + nMerge));
     const mergeFromVert = new Uint32Array(nMerge);
     const mergeToVert = new Uint32Array(nMerge);
-    const meshUV = new wasm.Mesh({ numProp, triVerts, vertProperties, mergeFromVert, mergeToVert });
+    const runOriginalID = new Uint32Array(1);
+    const meshUV = new wasm.Mesh({ numProp, triVerts, vertProperties, mergeFromVert, mergeToVert, runOriginalID });
+    runOriginalID[0]=id;
     const vert2vert = new Uint32Array(numVert);
     let idx = 0;
     for (let i = 0; i < numVert; ++i) {
