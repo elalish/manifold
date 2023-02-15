@@ -12,10 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-const expect = require('chai').expect;
-const wasm = require('../manifold.js');
-const examples = require('../examples/examples');
-const THREE = require('three');
+import {expect} from 'chai';
+import * as THREE from 'three';
+
+import {examples} from '../examples/examples.js';
+import wasm from '../manifold.js';
 
 // manifold member functions that returns a new manifold
 const memberFunctions = [
@@ -33,7 +34,7 @@ const utils = [
 ];
 const exposedFunctions = constructors.concat(utils);
 
-wasm().then(function (Module) {
+wasm().then(function(Module) {
   Module.setup();
   // Setup memory management, such that users don't have to care about
   // calling `delete` manually.
@@ -44,7 +45,7 @@ wasm().then(function (Module) {
   for (const name of memberFunctions) {
     const originalFn = Module.Manifold.prototype[name];
     Module.Manifold.prototype['_' + name] = originalFn;
-    Module.Manifold.prototype[name] = function (...args) {
+    Module.Manifold.prototype[name] = function(...args) {
       const result = this['_' + name](...args);
       manifoldRegistry.push(result);
       return result;
@@ -53,24 +54,23 @@ wasm().then(function (Module) {
 
   for (const name of constructors) {
     const originalFn = Module[name];
-    Module[name] = function (...args) {
+    Module[name] = function(...args) {
       const result = originalFn(...args);
       manifoldRegistry.push(result);
       return result;
     };
   }
 
-  Module.cleanup =
-    function () {
-      for (const obj of manifoldRegistry) {
-        // decompose result is an array of manifolds
-        if (obj instanceof Array)
-          for (const elem of obj) elem.delete();
-        else
-          obj.delete();
-      }
-      manifoldRegistry = [];
-    };
+  Module.cleanup = function() {
+    for (const obj of manifoldRegistry) {
+      // decompose result is an array of manifolds
+      if (obj instanceof Array)
+        for (const elem of obj) elem.delete();
+      else
+        obj.delete();
+    }
+    manifoldRegistry = [];
+  };
 
   function runExample(name) {
     try {
@@ -80,7 +80,7 @@ wasm().then(function (Module) {
       const manifold = f(...exposedFunctions.map(name => Module[name]), THREE);
       const prop = manifold.getProperties();
       const genus = manifold.genus();
-      return { ...prop, genus };
+      return {...prop, genus};
     } finally {
       Module.cleanup();
     }

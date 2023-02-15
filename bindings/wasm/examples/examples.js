@@ -12,14 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-(function (exports) {
-
-  exports.functions = {
-    Intro: function () {
-      // Write code in JavaScript or TypeScript and this editor will show the API
-      // docs. Type e.g. "box." to see the Manifold API. Type "Module." to see the
-      // static API - these functions can also be used bare. Use console.log() to
-      // print output (lower-right). This editor defines Z as up and units of mm.
+export const examples = {
+  functions: {
+    Intro: function() {
+      // Write code in JavaScript or TypeScript and this editor will show the
+      // API docs. Type e.g. "box." to see the Manifold API. Type "Module." to
+      // see the static API - these functions can also be used bare. Use
+      // console.log() to print output (lower-right). This editor defines Z as
+      // up and units of mm.
 
       const box = cube([100, 100, 100], true);
       const ball = sphere(60, 100);
@@ -29,24 +29,24 @@
       // All changes are automatically saved and restored between sessions.
       // This app is purely local - there is no server communication.
       // This means it will work equally well offline once loaded.
-      // To share your code with another browser/device, simply copy the text to a
-      // file.
+      // To share your code with another browser/device, simply copy the text to
+      // a file.
 
       // See the script drop-down above ("Intro") for usage examples.
       return result;
     },
 
-    TetrahedronPuzzle: function () {
-      // A tetrahedron cut into two identical halves that can screw together as a
-      // puzzle. This only outputs one of the halves. This demonstrates how
+    TetrahedronPuzzle: function() {
+      // A tetrahedron cut into two identical halves that can screw together as
+      // a puzzle. This only outputs one of the halves. This demonstrates how
       // redundant points along a polygon can be used to make twisted extrusions
       // smoother. Based on the screw puzzle by George Hart:
       // https://www.thingiverse.com/thing:186372
 
       const edgeLength = 50;  // Length of each edge of the overall tetrahedron.
-      const gap = 0.2;        // Spacing between the two halves to allow sliding.
+      const gap = 0.2;  // Spacing between the two halves to allow sliding.
       const nDivisions =
-        50;  // Number of divisions (both ways) in the screw surface.
+          50;  // Number of divisions (both ways) in the screw surface.
 
       const scale = edgeLength / (2 * Math.sqrt(2));
 
@@ -59,15 +59,15 @@
       }
 
       const screw = extrude(box, 2, nDivisions, 270)
-        .rotate([0, 0, -45])
-        .translate([0, 0, -1])
-        .scale(scale);
+                        .rotate([0, 0, -45])
+                        .translate([0, 0, -1])
+                        .scale(scale);
 
       const result = tet.intersect(screw);
       return result;
     },
 
-    RoundedFrame: function () {
+    RoundedFrame: function() {
       // Demonstrates how at 90-degree intersections, the sphere and cylinder
       // facets match up perfectly, for any choice of global resolution
       // parameters.
@@ -84,7 +84,7 @@
         let edge2 = edge1.rotate([0, 0, 180]);
         edge2 = union(edge2, edge1);
         edge2 =
-          union(edge2, edge.translate([-edgeLength / 2, -edgeLength / 2, 0]));
+            union(edge2, edge.translate([-edgeLength / 2, -edgeLength / 2, 0]));
 
         let edge4 = edge2.rotate([0, 0, 90]);
         edge4 = union(edge4, edge2);
@@ -101,9 +101,9 @@
       return result;
     },
 
-    Heart: function () {
-      // Smooth, complex manifolds can be created using the warp() function. This
-      // example recreates the Exploitable Heart by Emmett Lalish:
+    Heart: function() {
+      // Smooth, complex manifolds can be created using the warp() function.
+      // This example recreates the Exploitable Heart by Emmett Lalish:
       // https://www.thingiverse.com/thing:6190
 
       const func = (v) => {
@@ -122,7 +122,8 @@
           // Taubin's function: https://mathworld.wolfram.com/HeartSurface.html
           const f = a3 * r4 * r2 - b * r4 * r - 3 * a2 * r4 + 3 * a * r2 - 1;
           // Derivative
-          const df = 6 * a3 * r4 * r - 5 * b * r4 - 12 * a2 * r2 * r + 6 * a * r;
+          const df =
+              6 * a3 * r4 * r - 5 * b * r4 - 12 * a2 * r2 * r + 6 * a * r;
           return f / df;
         };
         // Newton's method for root finding
@@ -145,9 +146,9 @@
       return result;
     },
 
-    Scallop: function () {
-      // A smoothed manifold demonstrating selective edge sharpening with smooth()
-      // and refine(), see more details at:
+    Scallop: function() {
+      // A smoothed manifold demonstrating selective edge sharpening with
+      // smooth() and refine(), see more details at:
       // https://elalish.blogspot.com/2022/03/smoothing-triangle-meshes.html
 
       const height = 10;
@@ -168,18 +169,18 @@
         const amp = 0.5 * height * Math.max(Math.cos(0.8 * theta), 0);
 
         vertPos.push(
-          radius * Math.cos(theta), radius * Math.sin(theta),
-          amp * (i % 2 == 0 ? 1 : -1));
+            radius * Math.cos(theta), radius * Math.sin(theta),
+            amp * (i % 2 == 0 ? 1 : -1));
         let j = i + 1;
         if (j == 2 * wiggles) j = 0;
 
         const smoothness = 1 - sharpness * Math.cos((theta + delta / 2) / 2);
         let halfedge = triVerts.length + 1;
-        sharpenedEdges.push({ halfedge, smoothness });
+        sharpenedEdges.push({halfedge, smoothness});
         triVerts.push(0, 2 + i, 2 + j);
 
         halfedge = triVerts.length + 1;
-        sharpenedEdges.push({ halfedge, smoothness });
+        sharpenedEdges.push({halfedge, smoothness});
         triVerts.push(1, 2 + j, 2 + i);
       }
 
@@ -190,12 +191,12 @@
       return result;
     },
 
-    TorusKnot: function () {
+    TorusKnot: function() {
       // Creates a classic torus knot, defined as a string wrapping periodically
-      // around the surface of an imaginary donut. If p and q have a common factor
-      // then you will get multiple separate, interwoven knots. This is an example
-      // of using the warp() method, thus avoiding any direct handling of
-      // triangles.
+      // around the surface of an imaginary donut. If p and q have a common
+      // factor then you will get multiple separate, interwoven knots. This is
+      // an example of using the warp() method, thus avoiding any direct
+      // handling of triangles.
 
       // @param p The number of times the thread passes through the donut hole.
       // @param q The number of times the thread circles the donut.
@@ -210,8 +211,8 @@
       //   Default makes roughly square facets.
 
       function torusKnot(
-        p, q, majorRadius, minorRadius, threadRadius, circularSegments = 0,
-        linearSegments = 0) {
+          p, q, majorRadius, minorRadius, threadRadius, circularSegments = 0,
+          linearSegments = 0) {
         function gcd(a, b) {
           return b == 0 ? a : gcd(b, a % b);
         }
@@ -220,9 +221,9 @@
         p /= kLoops;
         q /= kLoops;
         const n = circularSegments > 2 ? circularSegments :
-          getCircularSegments(threadRadius);
+                                         getCircularSegments(threadRadius);
         const m = linearSegments > 2 ? linearSegments :
-          n * q * majorRadius / threadRadius;
+                                       n * q * majorRadius / threadRadius;
 
         const circle = [];
         const dPhi = 2 * 3.14159 / n;
@@ -234,25 +235,24 @@
         const point = new THREE.Vector3();
         const axis = new THREE.Vector3();
 
-        const func =
-          (v) => {
-            const psi = q * Math.atan2(v[0], v[1]);
-            const theta = psi * p / q;
-            const x1 = Math.sqrt(v[0] * v[0] + v[1] * v[1]);
-            const phi = Math.atan2(x1 - offset, v[2]);
-            point.set(Math.cos(phi), 0, Math.sin(phi))
+        const func = (v) => {
+          const psi = q * Math.atan2(v[0], v[1]);
+          const theta = psi * p / q;
+          const x1 = Math.sqrt(v[0] * v[0] + v[1] * v[1]);
+          const phi = Math.atan2(x1 - offset, v[2]);
+          point.set(Math.cos(phi), 0, Math.sin(phi))
               .multiplyScalar(threadRadius);
-            const r = majorRadius + minorRadius * Math.cos(theta);
-            point.applyAxisAngle(
+          const r = majorRadius + minorRadius * Math.cos(theta);
+          point.applyAxisAngle(
               axis.set(1, 0, 0), -Math.atan2(p * minorRadius, q * r));
-            point.x += minorRadius;
-            point.applyAxisAngle(axis.set(0, 1, 0), theta);
-            point.x += majorRadius;
-            point.applyAxisAngle(axis.set(0, 0, 1), psi);
-            v[0] = point.x;
-            v[1] = point.y;
-            v[2] = point.z;
-          };
+          point.x += minorRadius;
+          point.applyAxisAngle(axis.set(0, 1, 0), theta);
+          point.x += majorRadius;
+          point.applyAxisAngle(axis.set(0, 0, 1), psi);
+          v[0] = point.x;
+          v[1] = point.y;
+          v[2] = point.z;
+        };
 
         let knot = revolve(circle, m).warp(func);
 
@@ -274,7 +274,7 @@
       return result;
     },
 
-    MengerSponge: function () {
+    MengerSponge: function() {
       // This example demonstrates how symbolic perturbation correctly creates
       // holes even though the subtracted objects are exactly coplanar.
 
@@ -285,14 +285,15 @@
       function fractal(holes, hole, w, position, depth, maxDepth) {
         w /= 3;
         holes.push(
-          hole.scale([w, w, 1.0]).translate([position[0], position[1], 0.0]));
+            hole.scale([w, w, 1.0]).translate([position[0], position[1], 0.0]));
         if (depth == maxDepth) return;
         const offsets = [
           [-w, -w], [-w, 0.0], [-w, w], [0.0, w], [w, w], [w, 0.0], [w, -w],
           [0.0, -w]
         ];
         for (let offset of offsets)
-          fractal(holes, hole, w, vec2add(position, offset), depth + 1, maxDepth);
+          fractal(
+              holes, hole, w, vec2add(position, offset), depth + 1, maxDepth);
       }
 
       function mengerSponge(n) {
@@ -313,13 +314,13 @@
       return result;
     },
 
-    StretchyBracelet: function () {
+    StretchyBracelet: function() {
       // Recreates Stretchy Bracelet by Emmett Lalish:
       // https://www.thingiverse.com/thing:13505
 
       function base(
-        width, radius, decorRadius, twistRadius, nDecor, innerRadius,
-        outerRadius, cut, nCut, nDivision) {
+          width, radius, decorRadius, twistRadius, nDecor, innerRadius,
+          outerRadius, cut, nCut, nDivision) {
         function rotate(v, theta) {
           return [
             v[0] * Math.cos(theta) - v[1] * Math.sin(theta),
@@ -336,10 +337,9 @@
             decorRadius * Math.sin(dPhiDeg * i * Math.PI / 180)
           ]);
         }
-        let decor =
-          extrude(circle, width, nDivision, 180).scale([1, 0.5, 1]).translate([
-            0, radius, 0
-          ]);
+        let decor = extrude(circle, width, nDivision, 180)
+                        .scale([1, 0.5, 1])
+                        .translate([0, radius, 0]);
         for (let i = 0; i < nDecor; i++)
           b = b.add(decor.rotate([0, 0, (360.0 / nDecor) * i]));
         const stretch = [];
@@ -359,8 +359,8 @@
       }
 
       function stretchyBracelet(
-        radius = 30, height = 8, width = 15, thickness = 0.4, nDecor = 20,
-        nCut = 27, nDivision = 30) {
+          radius = 30, height = 8, width = 15, thickness = 0.4, nDecor = 20,
+          nCut = 27, nDivision = 30) {
         const twistRadius = Math.PI * radius / nDecor;
         const decorRadius = twistRadius * 1.5;
         const outerRadius = radius + (decorRadius + twistRadius) * 0.5;
@@ -369,24 +369,25 @@
         const adjThickness = 0.5 * thickness * height / cut;
 
         return difference(
-          base(
-            width, radius, decorRadius, twistRadius, nDecor,
-            innerRadius + thickness, outerRadius + adjThickness,
-            cut - adjThickness, nCut, nDivision),
-          base(
-            width, radius - thickness, decorRadius, twistRadius, nDecor,
-            innerRadius, outerRadius + 3 * adjThickness, cut, nCut,
-            nDivision));
+            base(
+                width, radius, decorRadius, twistRadius, nDecor,
+                innerRadius + thickness, outerRadius + adjThickness,
+                cut - adjThickness, nCut, nDivision),
+            base(
+                width, radius - thickness, decorRadius, twistRadius, nDecor,
+                innerRadius, outerRadius + 3 * adjThickness, cut, nCut,
+                nDivision));
       }
 
       const result = stretchyBracelet();
       return result;
     },
 
-    GyroidModule: function () {
+    GyroidModule: function() {
       // Recreates Modular Gyroid Puzzle by Emmett Lalish:
-      // https://www.thingiverse.com/thing:25477. This sample demonstrates the use
-      // of a Signed Distance Function (SDF) to create smooth, complex manifolds.
+      // https://www.thingiverse.com/thing:25477. This sample demonstrates the
+      // use of a Signed Distance Function (SDF) to create smooth, complex
+      // manifolds.
 
       const size = 20;
       const n = 20;
@@ -397,7 +398,7 @@
         const y = p[1] - pi / 4;
         const z = p[2] - pi / 4;
         return Math.cos(x) * Math.sin(y) + Math.cos(y) * Math.sin(z) +
-          Math.cos(z) * Math.sin(x);
+            Math.cos(z) * Math.sin(x);
       }
 
       function gyroidOffset(level) {
@@ -412,29 +413,30 @@
       function rhombicDodecahedron() {
         const box = cube([1, 1, 2], true).scale(size * Math.sqrt(2));
         const result =
-          box.rotate([90, 45, 0]).intersect(box.rotate([90, 45, 90]));
+            box.rotate([90, 45, 0]).intersect(box.rotate([90, 45, 90]));
         return result.intersect(box.rotate([0, 0, 45]));
       }
 
       let result = rhombicDodecahedron().intersect(gyroidOffset(-0.4));
       result = result.subtract(gyroidOffset(0.4));
-      result = result.rotate([-45, 0, 90]).translate([0, 0, size / Math.sqrt(2)]);
+      result =
+          result.rotate([-45, 0, 90]).translate([0, 0, size / Math.sqrt(2)]);
       return result;
     }
-  };
+  },
 
-  exports.functionBodies = new Map();
+  functionBodies: new Map()
+};
 
-  for (const [func, code] of Object.entries(exports.functions)) {
-    const whole = code.toString();
-    const lines = whole.split('\n');
-    lines.splice(0, 1);   // remove first line
-    lines.splice(-2, 2);  // remove last two lines
-    // remove first six leading spaces
-    const body = '\n' + lines.map(l => l.slice(6)).join('\n');
+for (const [func, code] of Object.entries(examples.functions)) {
+  const whole = code.toString();
+  const lines = whole.split('\n');
+  lines.splice(0, 1);   // remove first line
+  lines.splice(-2, 2);  // remove last two lines
+  // remove first six leading spaces
+  const body = '\n' + lines.map(l => l.slice(6)).join('\n');
 
-    const name =
+  const name =
       func.replace(/([a-z])([A-Z])/g, '$1 $2');  // Add spaces between words
-    exports.functionBodies.set(name, body);
-  };
-})(typeof exports == 'undefined' ? this['examples'] = {} : exports);
+  examples.functionBodies.set(name, body);
+};
