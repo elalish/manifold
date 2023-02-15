@@ -206,7 +206,7 @@ MeshGL Manifold::GetMeshGL(glm::ivec3 normalIdx) const {
     const int meshID = ref.meshID;
     if (meshID != lastID) {
       out.runIndex.push_back(3 * tri);
-      out.originalID.push_back(ref.originalID);
+      out.runOriginalID.push_back(ref.originalID);
       const Impl::Relation& m = impl.meshRelation_.meshIDtransform.at(meshID);
       if (updateNormals) {
         runNormalTransform.push_back(NormalTransform(m.transform) *
@@ -215,7 +215,7 @@ MeshGL Manifold::GetMeshGL(glm::ivec3 normalIdx) const {
       if (impl.meshRelation_.originalID < 0) {
         for (const int col : {0, 1, 2, 3}) {
           for (const int row : {0, 1, 2}) {
-            out.transform.push_back(m.transform[col][row]);
+            out.runTransform.push_back(m.transform[col][row]);
           }
         }
       }
@@ -242,7 +242,7 @@ MeshGL Manifold::GetMeshGL(glm::ivec3 normalIdx) const {
   // Duplicate verts with different props
   std::vector<int> vert2idx(impl.NumVert(), -1);
   std::map<std::pair<int, int>, int> vertPropPair;
-  for (int run = 0; run < out.originalID.size(); ++run) {
+  for (int run = 0; run < out.runOriginalID.size(); ++run) {
     for (int tri = out.runIndex[run] / 3; tri < out.runIndex[run + 1] / 3;
          ++tri) {
       const glm::ivec3 triProp =
@@ -467,7 +467,7 @@ Manifold Manifold::AsOriginal() const {
 /**
  * Returns the first of n sequential new unique mesh IDs for marking sets of
  * triangles that can be looked up after further operations. Assign to
- * MeshGL.originalID vector.
+ * MeshGL.runOriginalID vector.
  */
 uint32_t Manifold::ReserveIDs(uint32_t n) {
   return Manifold::Impl::ReserveIDs(n);

@@ -193,7 +193,7 @@ struct MeshGL {
   std::vector<uint32_t> mergeToVert;
   /// Optional: Indicates runs of triangles that correspond to a particular
   /// input mesh instance. The runs encompass all of triVerts and are sorted
-  /// by originalID. Run i begins at triVerts[runIndex[i]] and ends at
+  /// by runOriginalID. Run i begins at triVerts[runIndex[i]] and ends at
   /// triVerts[runIndex[i+1]]. All runIndex values are divisible by 3.
   std::vector<uint32_t> runIndex;
   /// Optional: The OriginalID of the mesh this triangle run came from. This ID
@@ -201,12 +201,12 @@ struct MeshGL {
   /// have the same ID, e.g. representing different copies of the same input
   /// mesh. If you create an input MeshGL that you want to be able to reference
   /// as one or more originals, be sure to set unique values from ReserveIDs().
-  std::vector<uint32_t> originalID;
+  std::vector<uint32_t> runOriginalID;
   /// Optional: For each run, a 3x4 transform is stored representing how the
   /// corresponding original mesh was transformed to create this triangle run.
   /// This matrix is stored in column-major order and the length of the overall
-  /// vector is 12 * originalID.size().
-  std::vector<float> transform;
+  /// vector is 12 * runOriginalID.size().
+  std::vector<float> runTransform;
   /// Optional: Length NumTri, contains an ID of the source face this triangle
   /// comes from. When auto-generated, this ID will be a triangle index into the
   /// original mesh. All neighboring coplanar triangles from that input mesh

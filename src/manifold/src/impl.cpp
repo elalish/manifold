@@ -400,14 +400,14 @@ Manifold::Impl::Impl(const MeshGL& meshGL,
     return;
   }
 
-  if (!meshGL.transform.empty() &&
-      12 * meshGL.originalID.size() != meshGL.transform.size()) {
+  if (!meshGL.runTransform.empty() &&
+      12 * meshGL.runOriginalID.size() != meshGL.runTransform.size()) {
     MarkFailure(Error::TRANSFORM_WRONG_LENGTH);
     return;
   }
 
-  if (!meshGL.originalID.empty() && !meshGL.runIndex.empty() &&
-      meshGL.originalID.size() + 1 != meshGL.runIndex.size()) {
+  if (!meshGL.runOriginalID.empty() && !meshGL.runIndex.empty() &&
+      meshGL.runOriginalID.size() + 1 != meshGL.runIndex.size()) {
     MarkFailure(Error::RUN_INDEX_WRONG_LENGTH);
     return;
   }
@@ -471,7 +471,7 @@ Manifold::Impl::Impl(const MeshGL& meshGL,
       mesh.halfedgeTangent[i][j] = meshGL.halfedgeTangent[4 * i + j];
   }
 
-  if (meshGL.originalID.empty()) {
+  if (meshGL.runOriginalID.empty()) {
     relation.originalID = Impl::ReserveIDs(1);
   } else {
     std::vector<uint32_t> runIndex = meshGL.runIndex;
@@ -479,10 +479,10 @@ Manifold::Impl::Impl(const MeshGL& meshGL,
       runIndex = {0, 3 * meshGL.NumTri()};
     }
     relation.triRef.resize(meshGL.NumTri());
-    const int startID = Impl::ReserveIDs(meshGL.originalID.size());
-    for (int i = 0; i < meshGL.originalID.size(); ++i) {
+    const int startID = Impl::ReserveIDs(meshGL.runOriginalID.size());
+    for (int i = 0; i < meshGL.runOriginalID.size(); ++i) {
       const int meshID = startID + i;
-      const int originalID = meshGL.originalID[i];
+      const int originalID = meshGL.runOriginalID[i];
       for (int tri = runIndex[i] / 3; tri < runIndex[i + 1] / 3; ++tri) {
         TriRef& ref = relation.triRef[tri];
         ref.meshID = meshID;
@@ -490,10 +490,10 @@ Manifold::Impl::Impl(const MeshGL& meshGL,
         ref.tri = meshGL.faceID.empty() ? tri : meshGL.faceID[tri];
       }
 
-      if (meshGL.transform.empty()) {
+      if (meshGL.runTransform.empty()) {
         relation.meshIDtransform[meshID] = {};
       } else {
-        const float* m = meshGL.transform.data() + 12 * i;
+        const float* m = meshGL.runTransform.data() + 12 * i;
         relation.meshIDtransform[meshID] = {{m[0], m[1], m[2], m[3], m[4], m[5],
                                              m[6], m[7], m[8], m[9], m[10],
                                              m[11]}};
