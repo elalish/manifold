@@ -47,10 +47,18 @@
   <canvas id="output"></canvas>
 </body>
 
-<script src="https://cdn.jsdelivr.net/npm/three@0.144.0/build/three.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.144.0/examples/js/utils/BufferGeometryUtils.js"></script>
-<script src="manifold.js"></script>
-<script>
+<script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.149.0/build/three.module.js"
+    }
+  }
+</script>
+<script type="module">
+  import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.149.0/build/three.module.js';
+  import {mergeVertices} from 'https://cdn.jsdelivr.net/npm/three@0.149.0/examples/jsm/utils/BufferGeometryUtils.js';
+  import Module from '../manifold.js';
+
   let wasm;
   Module().then(function (tmp) {
     wasm = tmp;
@@ -110,7 +118,7 @@
   function simplify(geometry) {
     delete geometry.attributes.normal;
     delete geometry.attributes.uv;
-    const simplified = THREE.BufferGeometryUtils.mergeVertices(geometry);
+    const simplified = mergeVertices(geometry);
     simplified.computeVertexNormals();
     return simplified;
   }
