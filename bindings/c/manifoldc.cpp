@@ -298,8 +298,12 @@ size_t manifold_meshgl_run_index_length(ManifoldMeshGL *m) {
   return from_c(m)->runIndex.size();
 }
 
-size_t manifold_meshgl_original_id_length(ManifoldMeshGL *m) {
-  return from_c(m)->originalID.size();
+size_t manifold_meshgl_run_original_id_length(ManifoldMeshGL *m) {
+  return from_c(m)->runOriginalID.size();
+}
+
+size_t manifold_meshgl_run_transform_length(ManifoldMeshGL *m) {
+  return from_c(m)->runTransform.size();
 }
 
 size_t manifold_meshgl_face_id_length(ManifoldMeshGL *m) {
@@ -330,8 +334,12 @@ uint32_t *manifold_meshgl_run_index(void *mem, ManifoldMeshGL *m) {
   return copy_data(mem, from_c(m)->runIndex);
 }
 
-uint32_t *manifold_meshgl_original_id(void *mem, ManifoldMeshGL *m) {
-  return copy_data(mem, from_c(m)->originalID);
+uint32_t *manifold_meshgl_run_original_id(void *mem, ManifoldMeshGL *m) {
+  return copy_data(mem, from_c(m)->runOriginalID);
+}
+
+float *manifold_meshgl_run_transform(void *mem, ManifoldMeshGL *m) {
+  return copy_data(mem, from_c(m)->runTransform);
 }
 
 uint32_t *manifold_meshgl_face_id(void *mem, ManifoldMeshGL *m) {
