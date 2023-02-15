@@ -81,7 +81,7 @@ MeshGL TetGL() {
 
 MeshGL WithIndexColors(const Mesh& in) {
   MeshGL inGL(in);
-  inGL.originalID = {Manifold::ReserveIDs(1)};
+  inGL.runOriginalID = {Manifold::ReserveIDs(1)};
   const int numVert = in.vertPos.size();
   inGL.numProp = 6;
   inGL.vertProperties.resize(6 * numVert);
@@ -99,10 +99,10 @@ MeshGL WithIndexColors(const Mesh& in) {
 MeshGL WithPositionColors(const Manifold& in) {
   MeshGL inGL = in.GetMeshGL();
   inGL.runIndex.clear();
-  inGL.originalID.clear();
-  inGL.transform.clear();
+  inGL.runOriginalID.clear();
+  inGL.runTransform.clear();
   inGL.faceID.clear();
-  inGL.originalID = {Manifold::ReserveIDs(1)};
+  inGL.runOriginalID = {Manifold::ReserveIDs(1)};
   const int numVert = in.NumVert();
   const Box bbox = in.BoundingBox();
   const glm::vec3 size = bbox.Size();
@@ -122,7 +122,7 @@ MeshGL WithPositionColors(const Manifold& in) {
 MeshGL WithNormals(const Manifold& in) {
   const Mesh mesh = in.GetMesh();
   MeshGL out;
-  out.originalID = {Manifold::ReserveIDs(1)};
+  out.runOriginalID = {Manifold::ReserveIDs(1)};
   out.numProp = 6;
   out.vertProperties.resize(out.numProp * mesh.vertPos.size());
   for (int i = 0; i < mesh.vertPos.size(); ++i) {
@@ -164,17 +164,17 @@ void RelatedGL(const Manifold& out, const std::vector<MeshGL>& originals,
   const glm::ivec3 normalIdx =
       checkNormals ? glm::ivec3(3, 4, 5) : glm::ivec3(0);
   MeshGL output = out.GetMeshGL(normalIdx);
-  for (int run = 0; run < output.originalID.size(); ++run) {
-    const float* m = output.transform.data() + 12 * run;
+  for (int run = 0; run < output.runOriginalID.size(); ++run) {
+    const float* m = output.runTransform.data() + 12 * run;
     const glm::mat4x3 transform =
-        output.transform.empty()
+        output.runTransform.empty()
             ? glm::mat4x3(1.0f)
             : glm::mat4x3(m[0], m[1], m[2], m[3], m[4], m[5], m[6], m[7], m[8],
                           m[9], m[10], m[11]);
     int i = 0;
     for (; i < originals.size(); ++i) {
-      ASSERT_EQ(originals[i].originalID.size(), 1);
-      if (originals[i].originalID[0] == output.originalID[run]) break;
+      ASSERT_EQ(originals[i].runOriginalID.size(), 1);
+      if (originals[i].runOriginalID[0] == output.runOriginalID[run]) break;
     }
     ASSERT_LT(i, originals.size());
     const MeshGL& inMesh = originals[i];
@@ -759,9 +759,9 @@ TEST(Manifold, MeshGLRoundTrip) {
   const Manifold cylinder2(inGL);
   const MeshGL outGL = cylinder2.GetMeshGL();
 
-  ASSERT_EQ(inGL.originalID.size(), 1);
-  ASSERT_EQ(outGL.originalID.size(), 1);
-  ASSERT_EQ(outGL.originalID[0], inGL.originalID[0]);
+  ASSERT_EQ(inGL.runOriginalID.size(), 1);
+  ASSERT_EQ(outGL.runOriginalID.size(), 1);
+  ASSERT_EQ(outGL.runOriginalID[0], inGL.runOriginalID[0]);
 
   RelatedGL(cylinder2, {inGL});
 }
@@ -807,7 +807,7 @@ TEST(Boolean, MeshGLRoundTrip) {
   RelatedGL(result, {original});
 
   MeshGL inGL = result.GetMeshGL();
-  ASSERT_EQ(inGL.originalID.size(), 2);
+  ASSERT_EQ(inGL.runOriginalID.size(), 2);
   const Manifold result2(inGL);
 
   ASSERT_LT(result2.OriginalID(), 0);
@@ -815,7 +815,7 @@ TEST(Boolean, MeshGLRoundTrip) {
   RelatedGL(result2, {original});
 
   const MeshGL outGL = result2.GetMeshGL();
-  ASSERT_EQ(outGL.originalID.size(), 2);
+  ASSERT_EQ(outGL.runOriginalID.size(), 2);
 }
 
 TEST(Boolean, Normals) {
