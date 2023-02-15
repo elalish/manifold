@@ -735,6 +735,7 @@ Manifold::Impl Manifold::Impl::Transform(const glm::mat4x3& transform_) const {
   result.halfedge_ = halfedge_;
   result.halfedgeTangent_.resize(halfedgeTangent_.size());
 
+  result.meshRelation_.originalID = -1;
   for (auto& m : result.meshRelation_.meshIDtransform) {
     m.second.transform = transform_ * glm::mat4(m.second.transform);
   }
