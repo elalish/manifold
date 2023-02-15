@@ -734,6 +734,14 @@ TEST(Manifold, MeshRelation) {
   RelatedGL(gyroid, {gyroidMeshGL});
 }
 
+TEST(Manifold, MeshRelationTransform) {
+  const Manifold cube = Manifold::Cube();
+  const MeshGL cubeGL = cube.GetMeshGL();
+  const Manifold turned = cube.Rotate(45, 90);
+
+  RelatedGL(turned, {cubeGL});
+}
+
 TEST(Manifold, MeshRelationRefine) {
   const Mesh in = Csaszar();
   MeshGL inGL = WithIndexColors(in);
