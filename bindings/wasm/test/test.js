@@ -15,7 +15,10 @@
 import {expect} from 'chai';
 
 import {examples} from '../examples/examples.js';
-import wasm from '../manifold.js';
+import Module from '../manifold.js';
+
+const wasm = await Module();
+wasm.setup();
 
 // manifold member functions that returns a new manifold
 const memberFunctions = [
@@ -33,120 +36,117 @@ const utils = [
 ];
 const exposedFunctions = constructors.concat(utils);
 
-wasm().then(function(Module) {
-  Module.setup();
-  // Setup memory management, such that users don't have to care about
-  // calling `delete` manually.
-  // Note that this only fixes memory leak across different runs: the memory
-  // will only be freed when the compilation finishes.
+// Setup memory management, such that users don't have to care about
+// calling `delete` manually.
+// Note that this only fixes memory leak across different runs: the memory
+// will only be freed when the compilation finishes.
 
-  let manifoldRegistry = [];
-  for (const name of memberFunctions) {
-    const originalFn = Module.Manifold.prototype[name];
-    Module.Manifold.prototype['_' + name] = originalFn;
-    Module.Manifold.prototype[name] = function(...args) {
-      const result = this['_' + name](...args);
-      manifoldRegistry.push(result);
-      return result;
-    };
-  }
-
-  for (const name of constructors) {
-    const originalFn = Module[name];
-    Module[name] = function(...args) {
-      const result = originalFn(...args);
-      manifoldRegistry.push(result);
-      return result;
-    };
-  }
-
-  Module.cleanup = function() {
-    for (const obj of manifoldRegistry) {
-      // decompose result is an array of manifolds
-      if (obj instanceof Array)
-        for (const elem of obj) elem.delete();
-      else
-        obj.delete();
-    }
-    manifoldRegistry = [];
+let manifoldRegistry = [];
+for (const name of memberFunctions) {
+  const originalFn = wasm.Manifold.prototype[name];
+  wasm.Manifold.prototype['_' + name] = originalFn;
+  wasm.Manifold.prototype[name] = function(...args) {
+    const result = this['_' + name](...args);
+    manifoldRegistry.push(result);
+    return result;
   };
+}
 
-  function runExample(name) {
-    try {
-      const content = examples.functionBodies.get(name) + '\nreturn result;\n';
-      ;
-      const f = new Function(...exposedFunctions, content);
-      const manifold = f(...exposedFunctions.map(name => Module[name]));
-      const prop = manifold.getProperties();
-      const genus = manifold.genus();
-      return {...prop, genus};
-    } finally {
-      Module.cleanup();
-    }
+for (const name of constructors) {
+  const originalFn = wasm[name];
+  wasm[name] = function(...args) {
+    const result = originalFn(...args);
+    manifoldRegistry.push(result);
+    return result;
+  };
+}
+
+wasm.cleanup = function() {
+  for (const obj of manifoldRegistry) {
+    // decompose result is an array of manifolds
+    if (obj instanceof Array)
+      for (const elem of obj) elem.delete();
+    else
+      obj.delete();
   }
+  manifoldRegistry = [];
+};
 
-  suite('Examples', () => {
-    test('Intro', () => {
-      const result = runExample('Intro');
-      expect(result.genus).to.equal(5, 'Genus');
-      expect(result.volume).to.be.closeTo(203164, 1, 'Volume');
-      expect(result.surfaceArea).to.be.closeTo(62046, 1, 'Surface Area');
-    });
+function runExample(name) {
+  try {
+    const content = examples.functionBodies.get(name) + '\nreturn result;\n';
+    ;
+    const f = new Function(...exposedFunctions, content);
+    const manifold = f(...exposedFunctions.map(name => wasm[name]));
+    const prop = manifold.getProperties();
+    const genus = manifold.genus();
+    return {...prop, genus};
+  } finally {
+    wasm.cleanup();
+  }
+}
 
-    test('Tetrahedron Puzzle', () => {
-      const result = runExample('Tetrahedron Puzzle');
-      expect(result.genus).to.equal(0, 'Genus');
-      expect(result.volume).to.be.closeTo(7297, 1, 'Volume');
-      expect(result.surfaceArea).to.be.closeTo(3303, 1, 'Surface Area');
-    });
+suite('Examples', () => {
+  test('Intro', () => {
+    const result = runExample('Intro');
+    expect(result.genus).to.equal(5, 'Genus');
+    expect(result.volume).to.be.closeTo(203164, 1, 'Volume');
+    expect(result.surfaceArea).to.be.closeTo(62046, 1, 'Surface Area');
+  });
 
-    test('Rounded Frame', () => {
-      const result = runExample('Rounded Frame');
-      expect(result.genus).to.equal(5, 'Genus');
-      expect(result.volume).to.be.closeTo(353706, 10, 'Volume');
-      expect(result.surfaceArea).to.be.closeTo(68454, 1, 'Surface Area');
-    });
+  test('Tetrahedron Puzzle', () => {
+    const result = runExample('Tetrahedron Puzzle');
+    expect(result.genus).to.equal(0, 'Genus');
+    expect(result.volume).to.be.closeTo(7297, 1, 'Volume');
+    expect(result.surfaceArea).to.be.closeTo(3303, 1, 'Surface Area');
+  });
 
-    test('Heart', () => {
-      const result = runExample('Heart');
-      expect(result.genus).to.equal(0, 'Genus');
-      expect(result.volume).to.be.closeTo(282743, 10, 'Volume');
-      expect(result.surfaceArea).to.be.closeTo(22187, 1, 'Surface Area');
-    });
+  test('Rounded Frame', () => {
+    const result = runExample('Rounded Frame');
+    expect(result.genus).to.equal(5, 'Genus');
+    expect(result.volume).to.be.closeTo(353706, 10, 'Volume');
+    expect(result.surfaceArea).to.be.closeTo(68454, 1, 'Surface Area');
+  });
 
-    test('Scallop', () => {
-      const result = runExample('Scallop');
-      expect(result.genus).to.equal(0, 'Genus');
-      expect(result.volume).to.be.closeTo(41284, 1, 'Volume');
-      expect(result.surfaceArea).to.be.closeTo(7810, 1, 'Surface Area');
-    });
+  test('Heart', () => {
+    const result = runExample('Heart');
+    expect(result.genus).to.equal(0, 'Genus');
+    expect(result.volume).to.be.closeTo(282743, 10, 'Volume');
+    expect(result.surfaceArea).to.be.closeTo(22187, 1, 'Surface Area');
+  });
 
-    test('Torus Knot', () => {
-      const result = runExample('Torus Knot');
-      expect(result.genus).to.equal(1, 'Genus');
-      expect(result.volume).to.be.closeTo(20960, 1, 'Volume');
-      expect(result.surfaceArea).to.be.closeTo(11202, 1, 'Surface Area');
-    });
+  test('Scallop', () => {
+    const result = runExample('Scallop');
+    expect(result.genus).to.equal(0, 'Genus');
+    expect(result.volume).to.be.closeTo(41284, 1, 'Volume');
+    expect(result.surfaceArea).to.be.closeTo(7810, 1, 'Surface Area');
+  });
 
-    test('Menger Sponge', () => {
-      const result = runExample('Menger Sponge');
-      expect(result.genus).to.equal(1409, 'Genus');
-      expect(result.volume).to.be.closeTo(406457, 10, 'Volume');
-      expect(result.surfaceArea).to.be.closeTo(247590, 10, 'Surface Area');
-    });
+  test('Torus Knot', () => {
+    const result = runExample('Torus Knot');
+    expect(result.genus).to.equal(1, 'Genus');
+    expect(result.volume).to.be.closeTo(20960, 1, 'Volume');
+    expect(result.surfaceArea).to.be.closeTo(11202, 1, 'Surface Area');
+  });
 
-    test('Stretchy Bracelet', () => {
-      const result = runExample('Stretchy Bracelet');
-      expect(result.genus).to.equal(1, 'Genus');
-      expect(result.volume).to.be.closeTo(3992, 1, 'Volume');
-      expect(result.surfaceArea).to.be.closeTo(22267, 1, 'Surface Area');
-    });
+  test('Menger Sponge', () => {
+    const result = runExample('Menger Sponge');
+    expect(result.genus).to.equal(1409, 'Genus');
+    expect(result.volume).to.be.closeTo(406457, 10, 'Volume');
+    expect(result.surfaceArea).to.be.closeTo(247590, 10, 'Surface Area');
+  });
 
-    test('Gyroid Module', () => {
-      const result = runExample('Gyroid Module');
-      expect(result.genus).to.equal(15, 'Genus');
-      expect(result.volume).to.be.closeTo(4167, 1, 'Volume');
-      expect(result.surfaceArea).to.be.closeTo(5642, 1, 'Surface Area');
-    });
+  test('Stretchy Bracelet', () => {
+    const result = runExample('Stretchy Bracelet');
+    expect(result.genus).to.equal(1, 'Genus');
+    expect(result.volume).to.be.closeTo(3992, 1, 'Volume');
+    expect(result.surfaceArea).to.be.closeTo(22267, 1, 'Surface Area');
+  });
+
+  test('Gyroid Module', () => {
+    const result = runExample('Gyroid Module');
+    expect(result.genus).to.equal(15, 'Genus');
+    expect(result.volume).to.be.closeTo(4167, 1, 'Volume');
+    expect(result.surfaceArea).to.be.closeTo(5642, 1, 'Surface Area');
   });
 });
