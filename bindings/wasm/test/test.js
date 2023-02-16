@@ -13,7 +13,6 @@
 // limitations under the License.
 
 import {expect} from 'chai';
-import * as THREE from 'three';
 
 import {examples} from '../examples/examples.js';
 import wasm from '../manifold.js';
@@ -76,8 +75,8 @@ wasm().then(function(Module) {
     try {
       const content = examples.functionBodies.get(name) + '\nreturn result;\n';
       ;
-      const f = new Function(...exposedFunctions, 'THREE', content);
-      const manifold = f(...exposedFunctions.map(name => Module[name]), THREE);
+      const f = new Function(...exposedFunctions, content);
+      const manifold = f(...exposedFunctions.map(name => Module[name]));
       const prop = manifold.getProperties();
       const genus = manifold.genus();
       return {...prop, genus};

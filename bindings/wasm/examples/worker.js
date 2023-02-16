@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.149.0/build/three.module.js';
 import {Accessor, Document, WebIO} from 'https://cdn.skypack.dev/@gltf-transform/core';
 
 import Module from '../manifold.js';
@@ -93,8 +92,8 @@ console.log = function(...args) {
 onmessage = (e) => {
   const content = e.data + '\nexportGLB(result);\n';
   try {
-    const f = new Function(...exposedFunctions, content);
-    f(...exposedFunctions.map(name => wasm[name]));
+    const f = new Function('exportGLB', ...exposedFunctions, content);
+    f(exportGLB, ...exposedFunctions.map(name => wasm[name]));
   } catch (error) {
     console.log(error.toString());
     postMessage({objectURL: null});
@@ -123,7 +122,7 @@ const primitive = doc.createPrimitive()
                       .setAttribute('POSITION', position);
 const mesh = doc.createMesh('result').addPrimitive(primitive);
 const node = doc.createNode().setMesh(mesh);
-const scene = doc.createScene().addChild(node);
+doc.createScene().addChild(node);
 
 async function exportGLB(manifold) {
   console.log(`Triangles: ${manifold.numTri().toLocaleString()}`);
