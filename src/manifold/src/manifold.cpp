@@ -79,7 +79,7 @@ Manifold& Manifold::operator=(const Manifold& other) {
 }
 
 CsgLeafNode& Manifold::GetCsgLeafNode() const {
-  if (pNode_->GetNodeType() != CsgNodeType::LEAF) {
+  if (pNode_->GetNodeType() != CsgNodeType::Leaf) {
     pNode_ = pNode_->ToLeafNode();
   }
   return *std::static_pointer_cast<CsgLeafNode>(pNode_);
@@ -358,9 +358,9 @@ bool Manifold::IsEmpty() const { return GetCsgLeafNode().GetImpl()->IsEmpty(); }
 /**
  * Returns the reason for an input Mesh producing an empty Manifold. This Status
  * only applies to Manifolds newly-created from an input Mesh - once they are
- * combined into a new Manifold via operations, the status reverts to NO_ERROR,
+ * combined into a new Manifold via operations, the status reverts to NoError,
  * simply processing the problem mesh as empty. Likewise, empty meshes may still
- * show NO_ERROR, for instance if they are small enough relative to their
+ * show NoError, for instance if they are small enough relative to their
  * precision to be collapsed to nothing.
  */
 Manifold::Error Manifold::Status() const {
@@ -633,7 +633,7 @@ Manifold Manifold::BatchBoolean(const std::vector<Manifold>& manifolds,
  * Shorthand for Boolean Union.
  */
 Manifold Manifold::operator+(const Manifold& Q) const {
-  return Boolean(Q, OpType::ADD);
+  return Boolean(Q, OpType::Add);
 }
 
 /**
@@ -648,7 +648,7 @@ Manifold& Manifold::operator+=(const Manifold& Q) {
  * Shorthand for Boolean Difference.
  */
 Manifold Manifold::operator-(const Manifold& Q) const {
-  return Boolean(Q, OpType::SUBTRACT);
+  return Boolean(Q, OpType::Subtract);
 }
 
 /**
@@ -663,7 +663,7 @@ Manifold& Manifold::operator-=(const Manifold& Q) {
  * Shorthand for Boolean Intersection.
  */
 Manifold Manifold::operator^(const Manifold& Q) const {
-  return Boolean(Q, OpType::INTERSECT);
+  return Boolean(Q, OpType::Intersect);
 }
 
 /**
@@ -685,11 +685,11 @@ std::pair<Manifold, Manifold> Manifold::Split(const Manifold& cutter) const {
   auto impl1 = GetCsgLeafNode().GetImpl();
   auto impl2 = cutter.GetCsgLeafNode().GetImpl();
 
-  Boolean3 boolean(*impl1, *impl2, OpType::SUBTRACT);
+  Boolean3 boolean(*impl1, *impl2, OpType::Subtract);
   auto result1 = std::make_shared<CsgLeafNode>(
-      std::make_unique<Impl>(boolean.Result(OpType::INTERSECT)));
+      std::make_unique<Impl>(boolean.Result(OpType::Intersect)));
   auto result2 = std::make_shared<CsgLeafNode>(
-      std::make_unique<Impl>(boolean.Result(OpType::SUBTRACT)));
+      std::make_unique<Impl>(boolean.Result(OpType::Subtract)));
   return std::make_pair(Manifold(result1), Manifold(result2));
 }
 
