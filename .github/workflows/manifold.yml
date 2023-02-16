@@ -138,7 +138,7 @@ jobs:
           build/bindings/wasm/manifold.js
           build/bindings/wasm/manifold.wasm
           build/bindings/wasm/manifold.d.ts
-        retention-days: 7
+        retention-days: 90
 
   build_windows:
     timeout-minutes: 30
