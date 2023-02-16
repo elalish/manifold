@@ -25,7 +25,7 @@ type Vec3 = [number, number, number];
 type Vec4 = [number, number, number, number];
 type Matrix3x4 = [Vec3, Vec3, Vec3, Vec3];
 type SimplePolygon = Vec2[];
-type Polygons = SimplePolygon | SimplePolygon[];
+type Polygons = SimplePolygon|SimplePolygon[];
 type Box = {
   min: Vec3,
   max: Vec3
@@ -120,7 +120,7 @@ declare class Manifold {
    *
    * @param v The vector to multiply every vertex by per component.
    */
-  scale(v: Vec3 | number): Manifold;
+  scale(v: Vec3|number): Manifold;
 
   /**
    * Boolean union
@@ -230,10 +230,19 @@ declare class Manifold {
   getCurvature(): Curvature;
 
   /**
-   * This returns a Mesh of simple vectors of vertices and triangles suitable
-   * for saving or other operations outside of the context of this library.
+   * Returns a Mesh that is designed to easily push into a renderer, including
+   * all interleaved vertex properties that may have been input. It also
+   * includes relations to all the input meshes that form a part of this result
+   * and the transforms applied to each.
+   *
+   * @param normalIdx If the original Mesh inputs that formed this manifold had
+   * properties corresponding to normal vectors, you can specify which property
+   * channels these are (x, y, z), which will cause this output Mesh to
+   * automatically update these normals according to the applied transforms and
+   * front/back side. Each channel must be >= 3 and < numProp, and all original
+   * Meshes must use the same channels for their normals.
    */
-  getMesh(): Mesh;
+  getMesh(normalIdx?: Vec3): Mesh;
 
   /**
    * If you copy a manifold, but you want this new copy to have new properties
@@ -265,7 +274,7 @@ declare class Manifold {
  * @param size The X, Y, and Z dimensions of the box.
  * @param center Set to true to shift the center to the origin.
  */
-declare function cube(size?: Vec3 | number, center?: boolean): Manifold;
+declare function cube(size?: Vec3|number, center?: boolean): Manifold;
 
 /**
  * A convenience constructor for the common case of extruding a circle. Can also
@@ -281,8 +290,8 @@ declare function cube(size?: Vec3 | number, center?: boolean): Manifold;
  * origin at the bottom.
  */
 declare function cylinder(
-  height: number, radiusLow: number, radiusHigh?: number,
-  circularSegments?: number, center?: boolean): Manifold;
+    height: number, radiusLow: number, radiusHigh?: number,
+    circularSegments?: number, center?: boolean): Manifold;
 
 /**
  * Constructs a geodesic sphere of a given radius.
@@ -349,8 +358,8 @@ declare function tetrahedron(): Manifold;
  * Default {1, 1}.
  */
 declare function extrude(
-  crossSection: Polygons, height: number, nDivisions?: number,
-  twistDegrees?: number, scaleTop?: Vec2): Manifold;
+    crossSection: Polygons, height: number, nDivisions?: number,
+    twistDegrees?: number, scaleTop?: Vec2): Manifold;
 
 /**
  * Constructs a manifold from a set of polygons by revolving this cross-section
@@ -364,7 +373,7 @@ declare function extrude(
  * calculated by the static Defaults.
  */
 declare function revolve(
-  crossSection: Polygons, circularSegments?: number): Manifold;
+    crossSection: Polygons, circularSegments?: number): Manifold;
 
 declare function union(a: Manifold, b: Manifold): Manifold;
 declare function difference(a: Manifold, b: Manifold): Manifold;
@@ -401,8 +410,8 @@ declare function compose(manifolds: Manifold[]): Manifold;
  * it with a negative value.
  */
 declare function levelSet(
-  sdf: (point: Vec3) => number, bounds: Box, edgeLength: number,
-  level?: number): Manifold;
+    sdf: (point: Vec3) => number, bounds: Box, edgeLength: number,
+    level?: number): Manifold;
 
 /**
  * @name Defaults

@@ -104,8 +104,8 @@
   "editor.formatOnSave": true,
   "cmake.configureArgs": [
     "-DBUILD_SHARED_LIBS=ON",
-    "-DMANIFOLD_EXPORT=ON",
-    "-DMANIFOLD_DEBUG=ON",
+    "-DMANIFOLD_EXPORT=OFF",
+    "-DMANIFOLD_DEBUG=OFF",
     "-DMANIFOLD_USE_CUDA=OFF",
     "-DMANIFOLD_PAR=NONE",
     "-DCODE_COVERAGE=OFF",

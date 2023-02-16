@@ -12,6 +12,7 @@
   ],
   "typings": "manifold.d.ts",
   "types": "manifold.d.ts",
+  "type": "module",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/elalish/manifold.git"
