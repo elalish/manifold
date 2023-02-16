@@ -309,7 +309,7 @@ class Monotones {
   typedef std::list<VertAdj>::iterator VertItr;
   struct EdgePair;
   typedef std::list<EdgePair>::iterator PairItr;
-  enum VertType { START, WESTSIDE, EASTSIDE, MERGE, END, SKIP };
+  enum VertType { Start, Westside, Eastside, Merge, End, Skip };
 
   std::list<VertAdj> monotones_;     // sweep-line list of verts
   std::list<EdgePair> activePairs_;  // west to east list of monotone edge pairs
@@ -489,8 +489,8 @@ class Monotones {
   }
 
   PairItr GetPair(VertItr vert, VertType type) const {
-    // MERGE returns westPair, as this is the one that will be removed.
-    return type == WESTSIDE ? vert->eastPair : vert->westPair;
+    // Merge returns westPair, as this is the one that will be removed.
+    return type == Westside ? vert->eastPair : vert->westPair;
   }
 
   bool Coincident(glm::vec2 p0, glm::vec2 p1) const {
@@ -518,46 +518,46 @@ class Monotones {
       if (vert->left->Processed()) {
         if (westPair == eastPair) {
           // facing in
-          PRINT("END");
+          PRINT("End");
           CloseEnd(vert);
-          return END;
+          return End;
         } else if (westPair != activePairs_.end() &&
                    std::next(westPair) == eastPair) {
           // facing out
-          PRINT("MERGE");
+          PRINT("Merge");
           CloseEnd(vert);
           // westPair will be removed and eastPair takes over.
           SetVWest(eastPair, westPair->vWest);
-          return MERGE;
+          return Merge;
         } else {  // not neighbors
-          PRINT("SKIP");
-          return SKIP;
+          PRINT("Skip");
+          return Skip;
         }
       } else {
         if (!eastPair->vEast->right->IsPast(vert, precision_) &&
             vert->IsPast(eastPair->vEast, precision_) &&
             vert->pos.x > eastPair->vEast->right->pos.x + precision_) {
-          PRINT("SKIP WEST");
-          return SKIP;
+          PRINT("Skip WEST");
+          return Skip;
         }
         SetVWest(eastPair, vert);
-        PRINT("WESTSIDE");
-        return WESTSIDE;
+        PRINT("Westside");
+        return Westside;
       }
     } else {
       if (vert->left->Processed()) {
         if (!westPair->vWest->left->IsPast(vert, precision_) &&
             vert->IsPast(westPair->vWest, precision_) &&
             vert->pos.x < westPair->vWest->left->pos.x - precision_) {
-          PRINT("SKIP EAST");
-          return SKIP;
+          PRINT("Skip EAST");
+          return Skip;
         }
         SetVEast(westPair, vert);
-        PRINT("EASTSIDE");
-        return EASTSIDE;
+        PRINT("Eastside");
+        return Eastside;
       } else {
-        PRINT("START");
-        return START;
+        PRINT("Start");
+        return Start;
       }
     }
   }
@@ -573,7 +573,7 @@ class Monotones {
   }
 
   /**
-   * When vert is a START, this determines if it is backwards (forming a void or
+   * When vert is a Start, this determines if it is backwards (forming a void or
    * hole). Usually the first return is adequate, but if it is degenerate, the
    * function will continue to search up the neighbors until the degeneracy is
    * broken and a certain answer is returned. Like CCW, this function returns 1
@@ -822,7 +822,7 @@ class Monotones {
 
       PairItr newPair = activePairs_.end();
       bool isHole = false;
-      if (type == START) {
+      if (type == Start) {
         newPair = activePairs_.insert(
             activePairs_.begin(), {vert, vert, monotones_.end(),
                                    activePairs_.end(), false, false, false});
@@ -839,13 +839,13 @@ class Monotones {
       }
 
       const PairItr pair = GetPair(vert, type);
-      OVERLAP_ASSERT(type == SKIP || pair != activePairs_.end(),
+      OVERLAP_ASSERT(type == Skip || pair != activePairs_.end(),
                      "No active pair!");
 
-      if (type != SKIP && ShiftEast(vert, pair, isHole)) type = SKIP;
-      if (type != SKIP && ShiftWest(vert, pair, isHole)) type = SKIP;
+      if (type != Skip && ShiftEast(vert, pair, isHole)) type = Skip;
+      if (type != Skip && ShiftWest(vert, pair, isHole)) type = Skip;
 
-      if (type == SKIP) {
+      if (type == Skip) {
         OVERLAP_ASSERT(std::next(insertAt) != monotones_.end(),
                        "Not Geometrically Valid! Tried to skip final vert.");
         OVERLAP_ASSERT(
@@ -868,23 +868,23 @@ class Monotones {
         monotones_.splice(insertAt, monotones_, vert);
 
       switch (type) {
-        case WESTSIDE:
+        case Westside:
           nextAttached.push(vert->left);
           break;
-        case EASTSIDE:
+        case Eastside:
           nextAttached.push(vert->right);
           break;
-        case START:
+        case Start:
           nextAttached.push(vert->left);
           nextAttached.push(vert->right);
           break;
-        case MERGE:
+        case Merge:
           // Mark merge as hole for sweep-back.
           pair->vMerge = vert;
-        case END:
+        case End:
           RemovePair(pair);
           break;
-        case SKIP:
+        case Skip:
           break;
       }
 
@@ -947,29 +947,29 @@ class Monotones {
       if (vert->Processed()) continue;
 
       VertType type = ProcessVert(vert);
-      OVERLAP_ASSERT(type != SKIP, "SKIP should not happen on reverse sweep!");
+      OVERLAP_ASSERT(type != Skip, "Skip should not happen on reverse sweep!");
 
       PairItr westPair = GetPair(vert, type);
       OVERLAP_ASSERT(westPair != activePairs_.end(), "No active pair!");
 
       switch (type) {
-        case MERGE: {
+        case Merge: {
           PairItr eastPair = std::next(westPair);
           if (eastPair->vMerge != monotones_.end())
             vert = SplitVerts(vert, eastPair->vMerge);
           eastPair->vMerge = vert;
         }
-        case END:
+        case End:
           RemovePair(westPair);
-        case WESTSIDE:
-        case EASTSIDE:
+        case Westside:
+        case Eastside:
           if (westPair->vMerge != monotones_.end()) {
             VertItr eastVert = SplitVerts(vert, westPair->vMerge);
-            if (type == WESTSIDE) westPair->vWest = eastVert;
+            if (type == Westside) westPair->vWest = eastVert;
             westPair->vMerge = monotones_.end();
           }
           break;
-        case START: {
+        case Start: {
           // Due to sweeping in the opposite direction, east and west are
           // swapped and what was the next pair is now the previous pair and
           // begin and end are swapped.
@@ -999,7 +999,7 @@ class Monotones {
           }
           break;
         }
-        case SKIP:
+        case Skip:
           break;
       }
 

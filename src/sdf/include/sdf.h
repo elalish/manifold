@@ -281,7 +281,8 @@ template <>
 void for_each_n_wrapper<std::function<float(glm::vec3)>>(
     ExecutionPolicy policy, int morton,
     ComputeVerts<std::function<float(glm::vec3)>> cv) {
-  const auto pol = policy == ParUnseq ? Par : policy;
+  const auto pol =
+      policy == ExecutionPolicy::ParUnseq ? ExecutionPolicy::Par : policy;
   for_each_n(pol, countAt(0), morton, cv);
 }
 
@@ -334,7 +335,8 @@ inline Mesh LevelSet(Func sdf, Box bounds, float edgeLength, float level = 0,
   // bindings use LevelSet despite being compiled with MANIFOLD_PAR
   // active (CUDA is already avoided when Func is a function ptr).
   const auto pol =
-      (!policy.has_value() || (policy.value() == ParUnseq && !CudaEnabled()))
+      (!policy.has_value() ||
+       (policy.value() == ExecutionPolicy::ParUnseq && !CudaEnabled()))
           ? autoPolicy(maxMorton)
           : policy.value();
 

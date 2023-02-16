@@ -390,30 +390,30 @@ Manifold::Impl::Impl(const MeshGL& meshGL,
   const int numTri = meshGL.NumTri();
 
   if (meshGL.numProp < 3) {
-    MarkFailure(Error::MISSING_POSITION_PROPERTIES);
+    MarkFailure(Error::MissingPositionProperties);
     return;
   }
 
   mesh.triVerts.resize(numTri);
   if (meshGL.mergeFromVert.size() != meshGL.mergeToVert.size()) {
-    MarkFailure(Error::MERGE_VECTORS_DIFFERENT_LENGTHS);
+    MarkFailure(Error::MergeVectorsDifferentLengths);
     return;
   }
 
   if (!meshGL.runTransform.empty() &&
       12 * meshGL.runOriginalID.size() != meshGL.runTransform.size()) {
-    MarkFailure(Error::TRANSFORM_WRONG_LENGTH);
+    MarkFailure(Error::TransformWrongLength);
     return;
   }
 
   if (!meshGL.runOriginalID.empty() && !meshGL.runIndex.empty() &&
       meshGL.runOriginalID.size() + 1 != meshGL.runIndex.size()) {
-    MarkFailure(Error::RUN_INDEX_WRONG_LENGTH);
+    MarkFailure(Error::RunIndexWrongLength);
     return;
   }
 
   if (!meshGL.faceID.empty() && meshGL.faceID.size() != meshGL.NumTri()) {
-    MarkFailure(Error::FACE_ID_WRONG_LENGTH);
+    MarkFailure(Error::FaceIDWrongLength);
     return;
   }
 
@@ -423,7 +423,7 @@ Manifold::Impl::Impl(const MeshGL& meshGL,
     const int from = meshGL.mergeFromVert[i];
     const int to = meshGL.mergeToVert[i];
     if (from >= numVert || to >= numVert) {
-      MarkFailure(Error::MERGE_INDEX_OUT_OF_BOUNDS);
+      MarkFailure(Error::MergeIndexOutOfBounds);
       return;
     }
     prop2vert[from] = to;
@@ -432,7 +432,7 @@ Manifold::Impl::Impl(const MeshGL& meshGL,
     for (const int j : {0, 1, 2}) {
       const int vert = meshGL.triVerts[3 * i + j];
       if (vert < 0 || vert >= numVert) {
-        MarkFailure(Error::VERTEX_INDEX_OUT_OF_BOUNDS);
+        MarkFailure(Error::VertexOutOfBounds);
         return;
       }
       mesh.triVerts[i][j] = prop2vert[vert];
@@ -521,21 +521,21 @@ Manifold::Impl::Impl(const Mesh& mesh, const MeshRelationD& relation,
       meshRelation_(relation) {
   VecDH<glm::ivec3> triVerts = mesh.triVerts;
   if (!IsIndexInBounds(triVerts)) {
-    MarkFailure(Error::VERTEX_INDEX_OUT_OF_BOUNDS);
+    MarkFailure(Error::VertexOutOfBounds);
     return;
   }
   RemoveUnreferencedVerts(triVerts);
 
   CalculateBBox();
   if (!IsFinite()) {
-    MarkFailure(Error::NON_FINITE_VERTEX);
+    MarkFailure(Error::NonFiniteVertex);
     return;
   }
   SetPrecision();
 
   CreateHalfedges(triVerts);
   if (!IsManifold()) {
-    MarkFailure(Error::NOT_MANIFOLD);
+    MarkFailure(Error::NotManifold);
     return;
   }
   CalculateNormals();
@@ -557,14 +557,14 @@ Manifold::Impl::Impl(Shape shape) {
   std::vector<glm::vec3> vertPos;
   std::vector<glm::ivec3> triVerts;
   switch (shape) {
-    case Shape::TETRAHEDRON:
+    case Shape::Tetrahedron:
       vertPos = {{-1.0f, -1.0f, 1.0f},
                  {-1.0f, 1.0f, -1.0f},
                  {1.0f, -1.0f, -1.0f},
                  {1.0f, 1.0f, 1.0f}};
       triVerts = {{2, 0, 1}, {0, 3, 1}, {2, 3, 0}, {3, 2, 1}};
       break;
-    case Shape::CUBE:
+    case Shape::Cube:
       vertPos = {{0.0f, 0.0f, 0.0f},  //
                  {1.0f, 0.0f, 0.0f},  //
                  {1.0f, 1.0f, 0.0f},  //
@@ -580,7 +580,7 @@ Manifold::Impl::Impl(Shape shape) {
                   {2, 3, 7}, {2, 7, 6},  //
                   {3, 0, 4}, {3, 4, 7}};
       break;
-    case Shape::OCTAHEDRON:
+    case Shape::Octahedron:
       vertPos = {{1.0f, 0.0f, 0.0f},   //
                  {-1.0f, 0.0f, 0.0f},  //
                  {0.0f, 1.0f, 0.0f},   //

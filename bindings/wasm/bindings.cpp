@@ -31,17 +31,17 @@ Manifold Difference(const Manifold& a, const Manifold& b) { return a - b; }
 Manifold Intersection(const Manifold& a, const Manifold& b) { return a ^ b; }
 
 Manifold UnionN(const std::vector<Manifold>& manifolds) {
-  return Manifold::BatchBoolean(manifolds, Manifold::OpType::ADD);
+  return Manifold::BatchBoolean(manifolds, Manifold::OpType::Add);
   ;
 }
 
 Manifold DifferenceN(const std::vector<Manifold>& manifolds) {
-  return Manifold::BatchBoolean(manifolds, Manifold::OpType::SUBTRACT);
+  return Manifold::BatchBoolean(manifolds, Manifold::OpType::Subtract);
   ;
 }
 
 Manifold IntersectionN(const std::vector<Manifold>& manifolds) {
-  return Manifold::BatchBoolean(manifolds, Manifold::OpType::INTERSECT);
+  return Manifold::BatchBoolean(manifolds, Manifold::OpType::Intersect);
   ;
 }
 
@@ -191,22 +191,19 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .field("w", &glm::vec4::w);
 
   enum_<Manifold::Error>("status")
-      .value("NO_ERROR", Manifold::Error::NO_ERROR)
-      .value("NON_FINITE_VERTEX", Manifold::Error::NON_FINITE_VERTEX)
-      .value("NOT_MANIFOLD", Manifold::Error::NOT_MANIFOLD)
-      .value("VERTEX_INDEX_OUT_OF_BOUNDS",
-             Manifold::Error::VERTEX_INDEX_OUT_OF_BOUNDS)
-      .value("PROPERTIES_WRONG_LENGTH",
-             Manifold::Error::PROPERTIES_WRONG_LENGTH)
-      .value("MISSING_POSITION_PROPERTIES",
-             Manifold::Error::MISSING_POSITION_PROPERTIES)
-      .value("MERGE_VECTORS_DIFFERENT_LENGTHS",
-             Manifold::Error::MERGE_VECTORS_DIFFERENT_LENGTHS)
-      .value("MERGE_INDEX_OUT_OF_BOUNDS",
-             Manifold::Error::MERGE_INDEX_OUT_OF_BOUNDS)
-      .value("TRANSFORM_WRONG_LENGTH", Manifold::Error::TRANSFORM_WRONG_LENGTH)
-      .value("RUN_INDEX_WRONG_LENGTH", Manifold::Error::RUN_INDEX_WRONG_LENGTH)
-      .value("FACE_ID_WRONG_LENGTH", Manifold::Error::FACE_ID_WRONG_LENGTH);
+      .value("NoError", Manifold::Error::NoError)
+      .value("NonFiniteVertex", Manifold::Error::NonFiniteVertex)
+      .value("NotManifold", Manifold::Error::NotManifold)
+      .value("VertexOutOfBounds", Manifold::Error::VertexOutOfBounds)
+      .value("PropertiesWrongLength", Manifold::Error::PropertiesWrongLength)
+      .value("MissingPositionProperties",
+             Manifold::Error::MissingPositionProperties)
+      .value("MergeVectorsDifferentLengths",
+             Manifold::Error::MergeVectorsDifferentLengths)
+      .value("MergeIndexOutOfBounds", Manifold::Error::MergeIndexOutOfBounds)
+      .value("TransformWrongLength", Manifold::Error::TransformWrongLength)
+      .value("RunIndexWrongLength", Manifold::Error::RunIndexWrongLength)
+      .value("FaceIDWrongLength", Manifold::Error::FaceIDWrongLength);
 
   value_object<Box>("box").field("min", &Box::min).field("max", &Box::max);
 

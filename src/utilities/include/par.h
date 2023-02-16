@@ -49,10 +49,6 @@ enum class ExecutionPolicy {
   Seq,
 };
 
-constexpr ExecutionPolicy ParUnseq = ExecutionPolicy::ParUnseq;
-constexpr ExecutionPolicy Par = ExecutionPolicy::Par;
-constexpr ExecutionPolicy Seq = ExecutionPolicy::Seq;
-
 // ExecutionPolicy:
 // - Sequential for small workload,
 // - Parallel (CPU) for medium workload,
@@ -60,12 +56,12 @@ constexpr ExecutionPolicy Seq = ExecutionPolicy::Seq;
 inline ExecutionPolicy autoPolicy(int size) {
   // some random numbers
   if (size <= (1 << 12)) {
-    return Seq;
+    return ExecutionPolicy::Seq;
   }
   if (size <= (1 << 16) || !CudaEnabled()) {
-    return Par;
+    return ExecutionPolicy::Par;
   }
-  return ParUnseq;
+  return ExecutionPolicy::ParUnseq;
 }
 
 #ifdef MANIFOLD_USE_CUDA

@@ -17,7 +17,7 @@
 
 namespace manifold {
 
-enum class CsgNodeType { UNION, INTERSECTION, DIFFERENCE, LEAF };
+enum class CsgNodeType { Union, Intersection, Difference, Leaf };
 
 class CsgLeafNode;
 

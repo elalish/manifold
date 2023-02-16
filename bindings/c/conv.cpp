@@ -36,40 +36,40 @@ ManifoldComponents *to_c(manifold::Components *components) {
 }
 
 ManifoldError to_c(manifold::Manifold::Error error) {
-  ManifoldError e = NO_ERROR;
+  ManifoldError e = MANIFOLD_NO_ERROR;
   switch (error) {
-    case Manifold::Error::NO_ERROR:
-      e = NO_ERROR;
+    case Manifold::Error::NoError:
+      e = MANIFOLD_NO_ERROR;
       break;
-    case Manifold::Error::NON_FINITE_VERTEX:
-      e = NON_FINITE_VERTEX;
+    case Manifold::Error::NonFiniteVertex:
+      e = MANIFOLD_NON_FINITE_VERTEX;
       break;
-    case Manifold::Error::NOT_MANIFOLD:
-      e = NOT_MANIFOLD;
+    case Manifold::Error::NotManifold:
+      e = MANIFOLD_NOT_MANIFOLD;
       break;
-    case Manifold::Error::VERTEX_INDEX_OUT_OF_BOUNDS:
-      e = VERTEX_INDEX_OUT_OF_BOUNDS;
+    case Manifold::Error::VertexOutOfBounds:
+      e = MANIFOLD_VERTEX_INDEX_OUT_OF_BOUNDS;
       break;
-    case Manifold::Error::PROPERTIES_WRONG_LENGTH:
-      e = PROPERTIES_WRONG_LENGTH;
+    case Manifold::Error::PropertiesWrongLength:
+      e = MANIFOLD_PROPERTIES_WRONG_LENGTH;
       break;
-    case Manifold::Error::MISSING_POSITION_PROPERTIES:
-      e = MISSING_POSITION_PROPERTIES;
+    case Manifold::Error::MissingPositionProperties:
+      e = MANIFOLD_MISSING_POSITION_PROPERTIES;
       break;
-    case Manifold::Error::MERGE_VECTORS_DIFFERENT_LENGTHS:
-      e = MERGE_VECTORS_DIFFERENT_LENGTHS;
+    case Manifold::Error::MergeVectorsDifferentLengths:
+      e = MANIFOLD_MERGE_VECTORS_DIFFERENT_LENGTHS;
       break;
-    case Manifold::Error::MERGE_INDEX_OUT_OF_BOUNDS:
-      e = MERGE_INDEX_OUT_OF_BOUNDS;
+    case Manifold::Error::MergeIndexOutOfBounds:
+      e = MANIFOLD_MERGE_INDEX_OUT_OF_BOUNDS;
       break;
-    case Manifold::Error::TRANSFORM_WRONG_LENGTH:
-      e = TRANSFORM_WRONG_LENGTH;
+    case Manifold::Error::TransformWrongLength:
+      e = MANIFOLD_TRANSFORM_WRONG_LENGTH;
       break;
-    case Manifold::Error::RUN_INDEX_WRONG_LENGTH:
-      e = RUN_INDEX_WRONG_LENGTH;
+    case Manifold::Error::RunIndexWrongLength:
+      e = MANIFOLD_RUN_INDEX_WRONG_LENGTH;
       break;
-    case Manifold::Error::FACE_ID_WRONG_LENGTH:
-      e = FACE_ID_WRONG_LENGTH;
+    case Manifold::Error::FaceIDWrongLength:
+      e = MANIFOLD_FACE_ID_WRONG_LENGTH;
       break;
   };
   return e;

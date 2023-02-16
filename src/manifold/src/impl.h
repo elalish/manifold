@@ -43,7 +43,7 @@ struct Manifold::Impl {
 
   Box bBox_;
   float precision_ = -1;
-  Error status_ = Error::NO_ERROR;
+  Error status_ = Error::NoError;
   VecDH<glm::vec3> vertPos_;
   VecDH<Halfedge> halfedge_;
   VecDH<glm::vec3> vertNormal_;
@@ -56,7 +56,7 @@ struct Manifold::Impl {
   static uint32_t ReserveIDs(uint32_t);
 
   Impl() {}
-  enum class Shape { TETRAHEDRON, CUBE, OCTAHEDRON };
+  enum class Shape { Tetrahedron, Cube, Octahedron };
   Impl(Shape);
 
   Impl(const MeshGL&, std::vector<float> propertyTolerance = {});

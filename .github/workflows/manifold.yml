@@ -192,6 +192,8 @@ jobs:
     runs-on: macos-latest
     if: github.event.pull_request.draft == false
     steps:
+    - name: Install common dependencies
+      run: brew install pkg-config
     - name: Install OpenMP
       if: matrix.parallel_backend == 'OMP'
       run: brew install libomp
