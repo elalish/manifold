@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {Accessor, Document, WebIO} from 'https://cdn.skypack.dev/@gltf-transform/core';
+import {Accessor, Document, WebIO} from 'https://cdn.skypack.dev/pin/@gltf-transform/core@v3.0.0-SfbIFhNPTRdr1UE2VSan/mode=imports,min/optimized/@gltf-transform/core.js';
 
 import Module from '../manifold.js';
 
