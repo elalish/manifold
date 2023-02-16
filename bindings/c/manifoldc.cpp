@@ -22,7 +22,7 @@ ManifoldMeshGL *level_set(void *mem, float (*sdf)(float, float, float),
   std::function<float(glm::vec3)> fun = [sdf](glm::vec3 v) {
     return (sdf(v.x, v.y, v.z));
   };
-  auto pol = seq ? std::make_optional(Seq) : std::nullopt;
+  auto pol = seq ? std::make_optional(ExecutionPolicy::Seq) : std::nullopt;
   auto mesh = LevelSet(fun, *from_c(bounds), edge_length, level, pol);
   return to_c(new (mem) MeshGL(mesh));
 }

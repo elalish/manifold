@@ -60,15 +60,15 @@ typedef struct ManifoldCurvatureBounds {
 } ManifoldCurvatureBounds;
 
 typedef enum ManifoldError {
-  NoError,
-  NonFiniteVertex,
-  NotManifold,
-  VertexOutOfBounds,
-  PropertiesWrongLength,
-  MissingPositionProperties,
-  MergeVectorsDifferentLengths,
-  MergeIndexOutOfBounds,
-  TransformWrongLength,
-  RunIndexWrongLength,
-  FaceIDWrongLength,
+  MANIFOLD_NO_ERROR,
+  MANIFOLD_NON_FINITE_VERTEX,
+  MANIFOLD_NOT_MANIFOLD,
+  MANIFOLD_VERTEX_INDEX_OUT_OF_BOUNDS,
+  MANIFOLD_PROPERTIES_WRONG_LENGTH,
+  MANIFOLD_MISSING_POSITION_PROPERTIES,
+  MANIFOLD_MERGE_VECTORS_DIFFERENT_LENGTHS,
+  MANIFOLD_MERGE_INDEX_OUT_OF_BOUNDS,
+  MANIFOLD_TRANSFORM_WRONG_LENGTH,
+  MANIFOLD_RUN_INDEX_WRONG_LENGTH,
+  MANIFOLD_FACE_ID_WRONG_LENGTH,
 } ManifoldError;
