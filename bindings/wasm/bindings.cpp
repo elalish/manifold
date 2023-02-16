@@ -58,8 +58,8 @@ std::vector<SimplePolygon> ToPolygon(
   return simplePolygons;
 }
 
-val GetMeshJS(const Manifold& manifold) {
-  MeshGL mesh = manifold.GetMeshGL();
+val GetMeshJS(const Manifold& manifold, const glm::ivec3& normalIdx) {
+  MeshGL mesh = manifold.GetMeshGL(normalIdx);
   val meshJS = val::object();
 
   meshJS.set("numProp", mesh.numProp);

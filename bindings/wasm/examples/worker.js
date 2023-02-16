@@ -12,10 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-const threePath = 'https://cdn.jsdelivr.net/npm/three@0.144.0/';
-importScripts(
-  'manifold.js', threePath + 'build/three.js',
-  threePath + 'examples/js/exporters/GLTFExporter.js');
+import {Accessor, Document, WebIO} from 'https://cdn.skypack.dev/@gltf-transform/core';
+
+import Module from '../manifold.js';
+
+const wasm = await Module();
+wasm.setup();
 
 // manifold member functions that returns a new manifold
 const memberFunctions = [
@@ -33,52 +35,47 @@ const utils = [
 ];
 const exposedFunctions = constructors.concat(utils);
 
-let wasm;
-Module().then(function (tmp) {
-  wasm = tmp;
-  wasm.setup();
-  // Setup memory management, such that users don't have to care about
-  // calling `delete` manually.
-  // Note that this only fixes memory leak across different runs: the memory
-  // will only be freed when the compilation finishes.
+// Setup memory management, such that users don't have to care about
+// calling `delete` manually.
+// Note that this only fixes memory leak across different runs: the memory
+// will only be freed when the compilation finishes.
 
-  let manifoldRegistry = [];
-  for (const name of memberFunctions) {
-    const originalFn = wasm.Manifold.prototype[name];
-    wasm.Manifold.prototype['_' + name] = originalFn;
-    wasm.Manifold.prototype[name] = function (...args) {
-      const result = this['_' + name](...args);
-      manifoldRegistry.push(result);
-      return result;
-    };
+let manifoldRegistry = [];
+for (const name of memberFunctions) {
+  const originalFn = wasm.Manifold.prototype[name];
+  wasm.Manifold.prototype['_' + name] = originalFn;
+  wasm.Manifold.prototype[name] = function(...args) {
+    const result = this['_' + name](...args);
+    manifoldRegistry.push(result);
+    return result;
+  };
+}
+
+for (const name of constructors) {
+  const originalFn = wasm[name];
+  wasm[name] = function(...args) {
+    const result = originalFn(...args);
+    manifoldRegistry.push(result);
+    return result;
+  };
+}
+
+wasm.cleanup = function() {
+  for (const obj of manifoldRegistry) {
+    // decompose result is an array of manifolds
+    if (obj instanceof Array)
+      for (const elem of obj) elem.delete();
+    else
+      obj.delete();
   }
+  manifoldRegistry = [];
+};
 
-  for (const name of constructors) {
-    const originalFn = wasm[name];
-    wasm[name] = function (...args) {
-      const result = originalFn(...args);
-      manifoldRegistry.push(result);
-      return result;
-    };
-  }
-
-  wasm.cleanup =
-    function () {
-      for (const obj of manifoldRegistry) {
-        // decompose result is an array of manifolds
-        if (obj instanceof Array)
-          for (const elem of obj) elem.delete();
-        else
-          obj.delete();
-      }
-      manifoldRegistry = [];
-    };
-
-  postMessage(null);
-});
+// Setup complete
+postMessage(null);
 
 const oldLog = console.log;
-console.log = function (...args) {
+console.log = function(...args) {
   let message = '';
   for (const arg of args) {
     if (typeof arg == 'object') {
@@ -87,69 +84,75 @@ console.log = function (...args) {
       message += arg.toString();
     }
   }
-  postMessage({ log: message });
+  postMessage({log: message});
   oldLog(...args);
 };
 
-onmessage =
-  (e) => {
-    const content = e.data + '\nexportGLB(result);\n';
-    try {
-      const f = new Function(...exposedFunctions, content);
-      f(...exposedFunctions.map(name => wasm[name]));
-    } catch (error) {
-      console.log(error.toString());
-      postMessage({ objectURL: null });
-    } finally {
-      wasm.cleanup();
-    }
-  };
+onmessage = (e) => {
+  const content = e.data + '\nexportGLB(result);\n';
+  try {
+    const f = new Function('exportGLB', ...exposedFunctions, content);
+    f(exportGLB, ...exposedFunctions.map(name => wasm[name]));
+  } catch (error) {
+    console.log(error.toString());
+    postMessage({objectURL: null});
+  } finally {
+    wasm.cleanup();
+  }
+};
 
-// Export & Rendering
+// Export
 // ------------------------------------------------------------
-const mesh = new THREE.Mesh(
-  undefined,
-  new THREE.MeshStandardMaterial(
-    { color: 'yellow', metalness: 1, roughness: 0.2 }));
-const rotation = new THREE.Matrix4();
-rotation.set(1, 0, 0, 0, 0, 0, 1, 0, 0, -1, 0, 0, 0, 0, 0, 1);
-mesh.setRotationFromMatrix(rotation);  // Z-up -> Y-up
-mesh.scale.setScalar(0.001);           // mm -> m
+const io = new WebIO();
+const doc = new Document();
 
-const exporter = new THREE.GLTFExporter();
+const buffer = doc.createBuffer();
+const position =
+    doc.createAccessor().setBuffer(buffer).setType(Accessor.Type.VEC3);
+const indices =
+    doc.createAccessor().setBuffer(buffer).setType(Accessor.Type.SCALAR);
+const material = doc.createMaterial()
+                     .setBaseColorFactor([1, 1, 0, 1])
+                     .setMetallicFactor(1)
+                     .setRoughnessFactor(0.2);
+const primitive = doc.createPrimitive()
+                      .setMaterial(material)
+                      .setIndices(indices)
+                      .setAttribute('POSITION', position);
+const mesh = doc.createMesh('result').addPrimitive(primitive);
+const node = doc.createNode().setMesh(mesh);
+doc.createScene().addChild(node);
 
-function exportGLB(manifold) {
+async function exportGLB(manifold) {
   console.log(`Triangles: ${manifold.numTri().toLocaleString()}`);
   const box = manifold.boundingBox();
   const size = [0, 0, 0];
   for (let i = 0; i < 3; i++) {
     size[i] = Math.round((box.max[i] - box.min[i]) * 10) / 10;
   }
-  console.log(`Bounding Box: X = ${size[0].toLocaleString()
-    } mm, Y = ${size[1].toLocaleString()
-    } mm, Z = ${size[2].toLocaleString()} mm`);
+  console.log(`Bounding Box: X = ${size[0].toLocaleString()} mm, Y = ${
+      size[1].toLocaleString()} mm, Z = ${size[2].toLocaleString()} mm`);
   const volume = Math.round(manifold.getProperties().volume / 10);
-  console.log(`Genus: ${manifold.genus().toLocaleString()
-    }, Volume: ${(volume / 100).toLocaleString()} cm^3`);
+  console.log(`Genus: ${manifold.genus().toLocaleString()}, Volume: ${
+      (volume / 100).toLocaleString()} cm^3`);
 
-  mesh.geometry?.dispose();
-  mesh.geometry = mesh2geometry(manifold.getMesh());
-  exporter.parse(
-    mesh,
-    (gltf) => {
-      const blob = new Blob([gltf], { type: 'application/octet-stream' });
-      postMessage({ objectURL: URL.createObjectURL(blob) });
-    },
-    () => {
-      console.log('glTF export failed!');
-      postMessage({ objectURL: null });
-    },
-    { binary: true });
-}
+  // From Z-up to Y-up (glTF)
+  const mesh = manifold.rotate([-90, 0, 0]).getMesh();
 
-function mesh2geometry(mesh) {
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute('position', new THREE.BufferAttribute(mesh.vertProperties, 3));
-  geometry.setIndex(new THREE.BufferAttribute(mesh.triVerts, 1));
-  return geometry;
+  indices.setArray(mesh.triVerts);
+
+  const numVert = mesh.numVert;
+  const numProp = mesh.numProp;
+  const posArray = new Float32Array(3 * numVert);
+  for (let i = 0; i < numVert; ++i) {
+    posArray[3 * i] = mesh.vertProperties[numProp * i];
+    posArray[3 * i + 1] = mesh.vertProperties[numProp * i + 1];
+    posArray[3 * i + 2] = mesh.vertProperties[numProp * i + 2];
+  }
+  position.setArray(posArray);
+
+  const glb = await io.writeBinary(doc);
+
+  const blob = new Blob([glb], {type: 'application/octet-stream'});
+  postMessage({objectURL: URL.createObjectURL(blob)});
 }

@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import {examples} from './examples.js';
 const exampleFunctions = examples.functionBodies;
 
 let editor = undefined;
@@ -309,7 +310,7 @@ let objectURL = null;
 let manifoldWorker = null;
 
 function createWorker() {
-  manifoldWorker = new Worker('worker.js');
+  manifoldWorker = new Worker('worker.js', {type: 'module'});
   manifoldWorker.onmessage = function(e) {
     if (e.data == null) {
       if (tsWorker != null && !manifoldInitialized) {
