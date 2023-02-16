@@ -36,7 +36,7 @@ ManifoldComponents *to_c(manifold::Components *components) {
 }
 
 ManifoldError to_c(manifold::Manifold::Error error) {
-  ManifoldError e = NoError;
+  ManifoldError e = MANIFOLD_NO_ERROR;
   switch (error) {
     case Manifold::Error::NoError:
       e = MANIFOLD_NO_ERROR;
