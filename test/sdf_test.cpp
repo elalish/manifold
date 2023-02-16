@@ -66,7 +66,7 @@ TEST(SDF, Bounds) {
   if (options.exportModels) ExportMesh("cubeVoid.gltf", levelSet, {});
 #endif
 
-  EXPECT_EQ(cubeVoid.Status(), Manifold::Error::NO_ERROR);
+  EXPECT_EQ(cubeVoid.Status(), Manifold::Error::NoError);
   EXPECT_EQ(cubeVoid.Genus(), -1);
   const float outerBound = size / 2 + edgeLength / 2;
   EXPECT_NEAR(bounds.min.x, -outerBound, precision);
@@ -92,7 +92,7 @@ TEST(SDF, Surface) {
   if (options.exportModels) ExportMesh("cube.gltf", cube.GetMesh(), {});
 #endif
 
-  EXPECT_EQ(cubeVoid.Status(), Manifold::Error::NO_ERROR);
+  EXPECT_EQ(cubeVoid.Status(), Manifold::Error::NoError);
   EXPECT_EQ(cube.Genus(), 0);
   auto prop = cube.GetProperties();
   EXPECT_NEAR(prop.volume, 8, 0.001);
@@ -112,6 +112,6 @@ TEST(SDF, Resize) {
   if (options.exportModels) ExportMesh("layers.gltf", layers.GetMesh(), {});
 #endif
 
-  EXPECT_EQ(layers.Status(), Manifold::Error::NO_ERROR);
+  EXPECT_EQ(layers.Status(), Manifold::Error::NoError);
   EXPECT_EQ(layers.Genus(), -8);
 }

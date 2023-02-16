@@ -354,7 +354,7 @@ TEST(Manifold, Empty) {
   Manifold empty(emptyMesh);
 
   EXPECT_TRUE(empty.IsEmpty());
-  EXPECT_EQ(empty.Status(), Manifold::Error::NO_ERROR);
+  EXPECT_EQ(empty.Status(), Manifold::Error::NoError);
   EXPECT_TRUE(empty.IsManifold());
 }
 
@@ -363,7 +363,7 @@ TEST(Manifold, ValidInput) {
   MeshGL tetGL = TetGL();
   Manifold tet(tetGL, propTol);
   EXPECT_FALSE(tet.IsEmpty());
-  EXPECT_EQ(tet.Status(), Manifold::Error::NO_ERROR);
+  EXPECT_EQ(tet.Status(), Manifold::Error::NoError);
   EXPECT_TRUE(tet.IsManifold());
 }
 
@@ -372,7 +372,7 @@ TEST(Manifold, InvalidInput1) {
   in.vertPos[2][1] = NAN;
   Manifold tet(in);
   EXPECT_TRUE(tet.IsEmpty());
-  EXPECT_EQ(tet.Status(), Manifold::Error::NON_FINITE_VERTEX);
+  EXPECT_EQ(tet.Status(), Manifold::Error::NonFiniteVertex);
   EXPECT_TRUE(tet.IsManifold());
 }
 
@@ -381,7 +381,7 @@ TEST(Manifold, InvalidInput2) {
   std::swap(in.triVerts[2][1], in.triVerts[2][2]);
   Manifold tet(in);
   EXPECT_TRUE(tet.IsEmpty());
-  EXPECT_EQ(tet.Status(), Manifold::Error::NOT_MANIFOLD);
+  EXPECT_EQ(tet.Status(), Manifold::Error::NotManifold);
   EXPECT_TRUE(tet.IsManifold());
 }
 
@@ -394,7 +394,7 @@ TEST(Manifold, InvalidInput3) {
   }
   Manifold tet(in);
   EXPECT_TRUE(tet.IsEmpty());
-  EXPECT_EQ(tet.Status(), Manifold::Error::VERTEX_INDEX_OUT_OF_BOUNDS);
+  EXPECT_EQ(tet.Status(), Manifold::Error::VertexOutOfBounds);
   EXPECT_TRUE(tet.IsManifold());
 }
 
@@ -407,7 +407,7 @@ TEST(Manifold, InvalidInput4) {
   }
   Manifold tet(in);
   EXPECT_TRUE(tet.IsEmpty());
-  EXPECT_EQ(tet.Status(), Manifold::Error::VERTEX_INDEX_OUT_OF_BOUNDS);
+  EXPECT_EQ(tet.Status(), Manifold::Error::VertexOutOfBounds);
   EXPECT_TRUE(tet.IsManifold());
 }
 
@@ -416,7 +416,7 @@ TEST(Manifold, InvalidInput5) {
   tetGL.mergeFromVert[tetGL.mergeFromVert.size() - 1] = 7;
   Manifold tet(tetGL);
   EXPECT_TRUE(tet.IsEmpty());
-  EXPECT_EQ(tet.Status(), Manifold::Error::MERGE_INDEX_OUT_OF_BOUNDS);
+  EXPECT_EQ(tet.Status(), Manifold::Error::MergeIndexOutOfBounds);
   EXPECT_TRUE(tet.IsManifold());
 }
 
@@ -425,7 +425,7 @@ TEST(Manifold, InvalidInput7) {
   tetGL.triVerts[tetGL.triVerts.size() - 1] = 7;
   Manifold tet(tetGL);
   EXPECT_TRUE(tet.IsEmpty());
-  EXPECT_EQ(tet.Status(), Manifold::Error::VERTEX_INDEX_OUT_OF_BOUNDS);
+  EXPECT_EQ(tet.Status(), Manifold::Error::VertexOutOfBounds);
   EXPECT_TRUE(tet.IsManifold());
 }
 

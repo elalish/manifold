@@ -25,7 +25,7 @@ TEST(CBIND, sphere) {
   size_t sz = manifold_manifold_size();
   ManifoldManifold *sphere = manifold_sphere(malloc(sz), 1.0f, 4 * n);
 
-  EXPECT_EQ(manifold_status(sphere), NO_ERROR);
+  EXPECT_EQ(manifold_status(sphere), NoError);
   EXPECT_EQ(manifold_num_tri(sphere), n * n * 8);
 
   manifold_delete_manifold(sphere);
@@ -93,7 +93,7 @@ TEST(CBIND, level_set) {
   manifold_delete_export_options(options);
 #endif
 
-  EXPECT_EQ(manifold_status(sdf_man), NO_ERROR);
+  EXPECT_EQ(manifold_status(sdf_man), NoError);
 
   manifold_delete_meshgl(sdf_mesh);
   manifold_delete_manifold(sdf_man);

@@ -199,34 +199,34 @@ Module.setup = function() {
   Module.ManifoldError = function ManifoldError(code, ...args) {
     let message = 'Unknown error';
     switch (code) {
-      case Module.status.NON_FINITE_VERTEX.value:
+      case Module.status.NonFiniteVertex.value:
         message = 'Non-finite vertex';
         break;
-      case Module.status.NOT_MANIFOLD.value:
+      case Module.status.NotManifold.value:
         message = 'Not manifold';
         break;
-      case Module.status.VERTEX_INDEX_OUT_OF_BOUNDS.value:
+      case Module.status.VertexOutOfBounds.value:
         message = 'Vertex index out of bounds';
         break;
-      case Module.status.PROPERTIES_WRONG_LENGTH.value:
+      case Module.status.PropertiesWrongLength.value:
         message = 'Properties have wrong length';
         break;
-      case Module.status.MISSING_POSITION_PROPERTIES.value:
+      case Module.status.MissingPositionProperties.value:
         message = 'Less than three properties';
         break;
-      case Module.status.MERGE_VECTORS_DIFFERENT_LENGTHS.value:
+      case Module.status.MergeVectorsDifferentLengths.value:
         message = 'Merge vectors have different lengths';
         break;
-      case Module.status.MERGE_INDEX_OUT_OF_BOUNDS.value:
+      case Module.status.MergeIndexOutOfBounds.value:
         message = 'Merge index out of bounds';
         break;
-      case Module.status.TRANSFORM_WRONG_LENGTH.value:
+      case Module.status.TransformWrongLength.value:
         message = 'Transform vector has wrong length';
         break;
-      case Module.status.RUN_INDEX_WRONG_LENGTH.value:
+      case Module.status.RunIndexWrongLength.value:
         message = 'Run index vector has wrong length';
         break;
-      case Module.status.FACE_ID_WRONG_LENGTH.value:
+      case Module.status.FaceIDWrongLength.value:
         message = 'Face ID vector has wrong length';
     }
 

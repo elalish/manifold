@@ -137,7 +137,7 @@ Manifold Manifold::Smooth(const Mesh& mesh,
  * and the rest at similarly symmetric points.
  */
 Manifold Manifold::Tetrahedron() {
-  return Manifold(std::make_shared<Impl>(Impl::Shape::TETRAHEDRON));
+  return Manifold(std::make_shared<Impl>(Impl::Shape::Tetrahedron));
 }
 
 /**
@@ -148,7 +148,7 @@ Manifold Manifold::Tetrahedron() {
  * @param center Set to true to shift the center to the origin.
  */
 Manifold Manifold::Cube(glm::vec3 size, bool center) {
-  auto cube = Manifold(std::make_shared<Impl>(Impl::Shape::CUBE));
+  auto cube = Manifold(std::make_shared<Impl>(Impl::Shape::Cube));
   cube = cube.Scale(size);
   if (center) cube = cube.Translate(-size / 2.0f);
   return cube.AsOriginal();
@@ -199,7 +199,7 @@ Manifold Manifold::Cylinder(float height, float radiusLow, float radiusHigh,
 Manifold Manifold::Sphere(float radius, int circularSegments) {
   int n = circularSegments > 0 ? (circularSegments + 3) / 4
                                : GetCircularSegments(radius) / 4;
-  auto pImpl_ = std::make_shared<Impl>(Impl::Shape::OCTAHEDRON);
+  auto pImpl_ = std::make_shared<Impl>(Impl::Shape::Octahedron);
   pImpl_->Subdivide(n);
   for_each_n(autoPolicy(pImpl_->NumVert()), pImpl_->vertPos_.begin(),
              pImpl_->NumVert(), ToSphere({radius}));
