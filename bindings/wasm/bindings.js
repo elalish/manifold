@@ -77,11 +77,19 @@ Module.setup = function() {
 
   // note that the matrix is using column major (same as glm)
   Module.Manifold.prototype.transform = function(mat) {
-    console.assert(mat.length == 4, 'expects a 3x4 matrix');
     const vec = new Module.Vector_f32();
-    for (let col of mat) {
-      console.assert(col.length == 3, 'expects a 3x4 matrix');
-      for (let x of col) mat.push_back(x);
+    if (mat.length == 16) {
+      // assuming glMatrix format (column major)
+      // skip the last row
+      for (let i = 0; i < 16; i++)
+        if (i % 4 != 3)
+          vec.push_back(mat[i]);
+    } else {
+      console.assert(mat.length == 4, 'expects a 3x4 matrix');
+      for (let col of mat) {
+        console.assert(col.length == 3, 'expects a 3x4 matrix');
+        for (let x of col) vec.push_back(x);
+      }
     }
     const result = this._Transform(vec);
     vec.delete();
