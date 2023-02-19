@@ -27,7 +27,7 @@ const memberFunctions = [
 // top level functions that constructs a new manifold
 const constructors = [
   'cube', 'cylinder', 'sphere', 'tetrahedron', 'extrude', 'revolve', 'union',
-  'difference', 'intersection', 'compose', 'levelSet', 'smooth'
+  'difference', 'intersection', 'compose', 'levelSet', 'smooth', 'show'
 ];
 const utils = [
   'setMinCircularAngle', 'setMinCircularEdgeLength', 'setCircularSegments',
@@ -35,12 +35,19 @@ const utils = [
 ];
 const exposedFunctions = constructors.concat(utils);
 
+const shown = new Map();
+wasm.show = (manifold) => {
+  const result = manifold.asOriginal();
+  shown.set(result.originalID(), result.getMesh());
+  return result;
+};
+
 // Setup memory management, such that users don't have to care about
 // calling `delete` manually.
 // Note that this only fixes memory leak across different runs: the memory
 // will only be freed when the compilation finishes.
 
-let manifoldRegistry = [];
+const manifoldRegistry = [];
 for (const name of memberFunctions) {
   const originalFn = wasm.Manifold.prototype[name];
   wasm.Manifold.prototype['_' + name] = originalFn;
@@ -61,6 +68,7 @@ for (const name of constructors) {
 }
 
 wasm.cleanup = function() {
+  shown.clear();
   for (const obj of manifoldRegistry) {
     // decompose result is an array of manifolds
     if (obj instanceof Array)
@@ -68,7 +76,7 @@ wasm.cleanup = function() {
     else
       obj.delete();
   }
-  manifoldRegistry = [];
+  manifoldRegistry.clear();
 };
 
 // Setup complete
@@ -150,6 +158,13 @@ async function exportGLB(manifold) {
     posArray[3 * i + 2] = mesh.vertProperties[numProp * i + 2];
   }
   position.setArray(posArray);
+
+  // for (const [i, id] of mesh.originalID.entries()) {
+  //   const inputMesh = shown.get(id);
+  //   if (inputMesh == null) {
+  //     continue;
+  //   }
+  // }
 
   const glb = await io.writeBinary(doc);
 
