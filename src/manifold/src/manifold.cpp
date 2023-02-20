@@ -219,9 +219,8 @@ MeshGL Manifold::GetMeshGL(glm::ivec3 normalIdx) const {
     }
   };
 
-  auto rel = impl.meshRelation_.meshIDtransform.begin();
-  addRun(out, runNormalTransform, 0, triRef[triNew2Old[0]].originalID,
-         rel->second);
+  auto meshIDtransform = impl.meshRelation_.meshIDtransform;
+  int lastID = -1;
   for (int tri = 0; tri < numTri; ++tri) {
     const int oldTri = triNew2Old[tri];
     const auto ref = triRef[oldTri];
@@ -231,10 +230,16 @@ MeshGL Manifold::GetMeshGL(glm::ivec3 normalIdx) const {
     for (const int i : {0, 1, 2})
       out.triVerts[3 * tri + i] = impl.halfedge_[3 * oldTri + i].startVert;
 
-    while (meshID != rel->first) {
-      rel++;
-      addRun(out, runNormalTransform, tri, ref.originalID, rel->second);
+    if (meshID != lastID) {
+      addRun(out, runNormalTransform, tri, ref.originalID,
+             meshIDtransform.at(meshID));
+      meshIDtransform.erase(meshID);
+      lastID = meshID;
     }
+  }
+  for (const auto& pair : meshIDtransform) {
+    addRun(out, runNormalTransform, numTri, pair.first,
+           pair.second);  // Need original ID, not meshID
   }
   out.runIndex.push_back(3 * numTri);
 
