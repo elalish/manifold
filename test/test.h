@@ -14,7 +14,10 @@
 
 #pragma once
 #include "gtest/gtest.h"
+#include "manifold.h"
 #include "public.h"
+
+using namespace manifold;
 
 struct Options {
   bool exportModels = false;
@@ -22,3 +25,24 @@ struct Options {
 };
 
 extern Options options;
+
+struct MeshSize {
+  int numVert, numTri;
+  int numProp = 0;
+  int numPropVert = numVert;
+};
+
+Mesh Csaszar();
+Mesh Tet();
+Mesh Gyroid();
+MeshGL TetGL();
+MeshGL WithIndexColors(const Mesh& in);
+MeshGL WithPositionColors(const Manifold& in);
+MeshGL WithNormals(const Manifold& in);
+void Identical(const Mesh& mesh1, const Mesh& mesh2);
+void RelatedGL(const Manifold& out, const std::vector<MeshGL>& originals,
+               bool checkNormals = false);
+void ExpectMeshes(const Manifold& manifold,
+                  const std::vector<MeshSize>& meshSize);
+void CheckStrictly(const Manifold& manifold);
+Polygons SquareHole(float xOffset = 0.0);
