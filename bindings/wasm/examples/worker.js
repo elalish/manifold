@@ -136,11 +136,11 @@ console.log = function(...args) {
   oldLog(...args);
 };
 
-onmessage = (e) => {
-  const content = e.data + '\nexportGLB(result);\n';
+onmessage = async (e) => {
+  const content = e.data + '\nreturn exportGLB(result);\n';
   try {
     const f = new Function('exportGLB', ...exposedFunctions, content);
-    f(exportGLB, ...exposedFunctions.map(name => wasm[name]));
+    await f(exportGLB, ...exposedFunctions.map(name => wasm[name]));
   } catch (error) {
     console.log(error.toString());
     postMessage({objectURL: null});
