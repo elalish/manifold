@@ -38,7 +38,7 @@ if(MANIFOLD_EXPORT)
 endif()
 
 if(MANIFOLD_USE_CUDA)
-  set(CUDA_FILES mesh_test.cpp sdf_test.cpp)
+  set(CUDA_FILES test_main.cpp sdf_test.cpp)
   if(MANIFOLD_CBIND)
     list(APPEND CUDA_FILES manifoldc_test.cpp)
   endif()
