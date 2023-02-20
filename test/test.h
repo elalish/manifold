@@ -32,9 +32,10 @@ struct MeshSize {
   int numPropVert = numVert;
 };
 
+Polygons SquareHole(float xOffset = 0.0);
 Mesh Csaszar();
-Mesh Tet();
 Mesh Gyroid();
+Mesh Tet();
 MeshGL TetGL();
 MeshGL WithIndexColors(const Mesh& in);
 MeshGL WithPositionColors(const Manifold& in);
@@ -44,5 +45,5 @@ void RelatedGL(const Manifold& out, const std::vector<MeshGL>& originals,
                bool checkNormals = false);
 void ExpectMeshes(const Manifold& manifold,
                   const std::vector<MeshSize>& meshSize);
+void CheckManifold(const Manifold& manifold);
 void CheckStrictly(const Manifold& manifold);
-Polygons SquareHole(float xOffset = 0.0);

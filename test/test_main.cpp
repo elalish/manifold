@@ -69,6 +69,23 @@ int main(int argc, char** argv) {
   return RUN_ALL_TESTS();
 }
 
+Polygons SquareHole(float xOffset) {
+  Polygons polys;
+  polys.push_back({
+      {glm::vec2(2 + xOffset, 2), 0},    //
+      {glm::vec2(-2 + xOffset, 2), 0},   //
+      {glm::vec2(-2 + xOffset, -2), 0},  //
+      {glm::vec2(2 + xOffset, -2), 0},   //
+  });
+  polys.push_back({
+      {glm::vec2(-1 + xOffset, 1), 0},   //
+      {glm::vec2(1 + xOffset, 1), 0},    //
+      {glm::vec2(1 + xOffset, -1), 0},   //
+      {glm::vec2(-1 + xOffset, -1), 0},  //
+  });
+  return polys;
+}
+
 Mesh Csaszar() {
   Mesh csaszar;
   csaszar.vertPos = {{-20, -20, -10},  //
@@ -93,6 +110,24 @@ Mesh Csaszar() {
                       {0, 3, 2},  //
                       {2, 4, 5}};
   return csaszar;
+}
+
+struct GyroidSDF {
+  __host__ __device__ float operator()(glm::vec3 p) const {
+    const glm::vec3 min = p;
+    const glm::vec3 max = glm::vec3(glm::two_pi<float>()) - p;
+    const float min3 = glm::min(min.x, glm::min(min.y, min.z));
+    const float max3 = glm::min(max.x, glm::min(max.y, max.z));
+    const float bound = glm::min(min3, max3);
+    const float gyroid =
+        cos(p.x) * sin(p.y) + cos(p.y) * sin(p.z) + cos(p.z) * sin(p.x);
+    return glm::min(gyroid, bound);
+  }
+};
+
+Mesh Gyroid() {
+  const float period = glm::two_pi<float>();
+  return LevelSet(GyroidSDF(), {glm::vec3(0), glm::vec3(period)}, 0.5);
 }
 
 Mesh Tet() {
@@ -309,43 +344,16 @@ void ExpectMeshes(const Manifold& manifold,
   }
 }
 
+void CheckManifold(const Manifold& manifold) {
+  EXPECT_TRUE(manifold.IsManifold());
+  EXPECT_TRUE(manifold.MatchesTriNormals());
+  for (const glm::vec3& normal : manifold.GetMesh().vertNormal) {
+    ASSERT_NEAR(glm::length(normal), 1, 0.0001);
+  }
+}
+
 void CheckStrictly(const Manifold& manifold) {
   EXPECT_TRUE(manifold.IsManifold());
   EXPECT_TRUE(manifold.MatchesTriNormals());
   EXPECT_EQ(manifold.NumDegenerateTris(), 0);
-}
-
-Polygons SquareHole(float xOffset) {
-  Polygons polys;
-  polys.push_back({
-      {glm::vec2(2 + xOffset, 2), 0},    //
-      {glm::vec2(-2 + xOffset, 2), 0},   //
-      {glm::vec2(-2 + xOffset, -2), 0},  //
-      {glm::vec2(2 + xOffset, -2), 0},   //
-  });
-  polys.push_back({
-      {glm::vec2(-1 + xOffset, 1), 0},   //
-      {glm::vec2(1 + xOffset, 1), 0},    //
-      {glm::vec2(1 + xOffset, -1), 0},   //
-      {glm::vec2(-1 + xOffset, -1), 0},  //
-  });
-  return polys;
-}
-
-struct GyroidSDF {
-  __host__ __device__ float operator()(glm::vec3 p) const {
-    const glm::vec3 min = p;
-    const glm::vec3 max = glm::vec3(glm::two_pi<float>()) - p;
-    const float min3 = glm::min(min.x, glm::min(min.y, min.z));
-    const float max3 = glm::min(max.x, glm::min(max.y, max.z));
-    const float bound = glm::min(min3, max3);
-    const float gyroid =
-        cos(p.x) * sin(p.y) + cos(p.y) * sin(p.z) + cos(p.z) * sin(p.x);
-    return glm::min(gyroid, bound);
-  }
-};
-
-Mesh Gyroid() {
-  const float period = glm::two_pi<float>();
-  return LevelSet(GyroidSDF(), {glm::vec3(0), glm::vec3(period)}, 0.5);
 }

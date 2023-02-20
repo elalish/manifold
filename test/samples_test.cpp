@@ -23,33 +23,6 @@
 
 using namespace manifold;
 
-void CheckManifold(const Manifold& manifold) {
-  EXPECT_TRUE(manifold.IsManifold());
-  EXPECT_TRUE(manifold.MatchesTriNormals());
-  for (const glm::vec3& normal : manifold.GetMesh().vertNormal) {
-    ASSERT_NEAR(glm::length(normal), 1, 0.0001);
-  }
-}
-
-std::vector<int> EdgePairs(const Mesh in) {
-  const int numHalfedge = 3 * in.triVerts.size();
-  std::vector<int> edgePair(numHalfedge);
-
-  std::map<std::pair<int, int>, int> halfedgeLink;
-  for (int i = 0; i < numHalfedge; ++i) {
-    std::pair<int, int> key = std::make_pair(in.triVerts[i / 3][i % 3],
-                                             in.triVerts[i / 3][(i + 1) % 3]);
-    if (key.first > key.second) std::swap(key.first, key.second);
-    const auto result = halfedgeLink.emplace(std::make_pair(key, i));
-    if (!result.second) {
-      const int pair = result.first->second;
-      edgePair[pair] = i;
-      edgePair[i] = pair;
-    }
-  }
-  return edgePair;
-}
-
 // If you print this knot (with support), you can snap a half-inch marble into
 // it and it'll roll around (dimensions in mm).
 TEST(Samples, Knot13) {
