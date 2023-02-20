@@ -86,6 +86,23 @@ TEST(Boolean, Normals) {
   RelatedGL(result, {boxGL, sphereGL}, true);
 }
 
+TEST(Boolean, EmptyOriginal) {
+  const Manifold cube = Manifold::Cube();
+  const Manifold tet = Manifold::Tetrahedron();
+  const Manifold result = tet - cube.Translate({3, 4, 5});
+  const MeshGL mesh = result.GetMeshGL();
+  ASSERT_EQ(mesh.runOriginalID.size(), 2);
+  EXPECT_EQ(mesh.runOriginalID[0], tet.OriginalID());
+  EXPECT_EQ(mesh.runOriginalID[1], cube.OriginalID());
+  ASSERT_EQ(mesh.runTransform.size(), 24);
+  EXPECT_EQ(mesh.runTransform[9], 0);
+  EXPECT_EQ(mesh.runTransform[10], 0);
+  EXPECT_EQ(mesh.runTransform[11], 0);
+  EXPECT_EQ(mesh.runTransform[12 + 9], 3);
+  EXPECT_EQ(mesh.runTransform[12 + 10], 4);
+  EXPECT_EQ(mesh.runTransform[12 + 11], 5);
+}
+
 TEST(Boolean, Mirrored) {
   Manifold cube = Manifold::Cube(glm::vec3(1)).Scale({1, -1, 1});
   EXPECT_TRUE(cube.IsManifold());

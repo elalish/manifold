@@ -481,12 +481,13 @@ Manifold::Impl::Impl(const MeshGL& meshGL,
       }
 
       if (meshGL.runTransform.empty()) {
-        relation.meshIDtransform[meshID] = {};
+        relation.meshIDtransform[meshID] = {originalID};
       } else {
         const float* m = meshGL.runTransform.data() + 12 * i;
-        relation.meshIDtransform[meshID] = {{m[0], m[1], m[2], m[3], m[4], m[5],
-                                             m[6], m[7], m[8], m[9], m[10],
-                                             m[11]}};
+        relation.meshIDtransform[meshID] = {
+            originalID,
+            {m[0], m[1], m[2], m[3], m[4], m[5], m[6], m[7], m[8], m[9], m[10],
+             m[11]}};
       }
     }
   }
@@ -620,7 +621,7 @@ void Manifold::Impl::InitializeOriginal() {
              zip(meshRelation_.triRef.begin(), countAt(0)), NumTri(),
              InitializeTriRef({meshID, halfedge_.cptrD()}));
   meshRelation_.meshIDtransform.clear();
-  meshRelation_.meshIDtransform[meshID] = {};
+  meshRelation_.meshIDtransform[meshID] = {meshID};
 }
 
 void Manifold::Impl::CreateFaces(const std::vector<float>& propertyTolerance) {

@@ -203,9 +203,9 @@ MeshGL Manifold::GetMeshGL(glm::ivec3 normalIdx) const {
 
   auto addRun = [updateNormals, isOriginal](
                     MeshGL& out, std::vector<glm::mat3>& runNormalTransform,
-                    int tri, int id, const Impl::Relation& rel) {
+                    int tri, const Impl::Relation& rel) {
     out.runIndex.push_back(3 * tri);
-    out.runOriginalID.push_back(id);
+    out.runOriginalID.push_back(rel.originalID);
     if (updateNormals) {
       runNormalTransform.push_back(NormalTransform(rel.transform) *
                                    (rel.backSide ? -1.0f : 1.0f));
@@ -231,15 +231,14 @@ MeshGL Manifold::GetMeshGL(glm::ivec3 normalIdx) const {
       out.triVerts[3 * tri + i] = impl.halfedge_[3 * oldTri + i].startVert;
 
     if (meshID != lastID) {
-      addRun(out, runNormalTransform, tri, ref.originalID,
-             meshIDtransform.at(meshID));
+      addRun(out, runNormalTransform, tri, meshIDtransform.at(meshID));
       meshIDtransform.erase(meshID);
       lastID = meshID;
     }
   }
+  // Add runs for originals that did not contribute any faces to the output
   for (const auto& pair : meshIDtransform) {
-    addRun(out, runNormalTransform, numTri, pair.first,
-           pair.second);  // Need original ID, not meshID
+    addRun(out, runNormalTransform, numTri, pair.second);
   }
   out.runIndex.push_back(3 * numTri);
 
