@@ -32,17 +32,14 @@ Manifold Intersection(const Manifold& a, const Manifold& b) { return a ^ b; }
 
 Manifold UnionN(const std::vector<Manifold>& manifolds) {
   return Manifold::BatchBoolean(manifolds, Manifold::OpType::Add);
-  ;
 }
 
 Manifold DifferenceN(const std::vector<Manifold>& manifolds) {
   return Manifold::BatchBoolean(manifolds, Manifold::OpType::Subtract);
-  ;
 }
 
 Manifold IntersectionN(const std::vector<Manifold>& manifolds) {
   return Manifold::BatchBoolean(manifolds, Manifold::OpType::Intersect);
-  ;
 }
 
 std::vector<SimplePolygon> ToPolygon(
