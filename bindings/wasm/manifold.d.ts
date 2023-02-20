@@ -92,7 +92,7 @@ declare class Manifold {
    *
    * @param m The affine transform matrix to apply to all the vertices.
    */
-  transform(m: Matrix3x4): Manifold;
+  transform(m: Matrix3x4 | number[16]): Manifold;
 
   /**
    * Move this Manifold in space. This operation can be chained. Transforms are
