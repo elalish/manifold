@@ -91,6 +91,10 @@ TEST(Boolean, EmptyOriginal) {
   const Manifold tet = Manifold::Tetrahedron();
   const Manifold result = tet - cube.Translate({3, 4, 5});
   const MeshGL mesh = result.GetMeshGL();
+  ASSERT_EQ(mesh.runIndex.size(), 3);
+  EXPECT_EQ(mesh.runIndex[0], 0);
+  EXPECT_EQ(mesh.runIndex[1], mesh.triVerts.size());
+  EXPECT_EQ(mesh.runIndex[2], mesh.triVerts.size());
   ASSERT_EQ(mesh.runOriginalID.size(), 2);
   EXPECT_EQ(mesh.runOriginalID[0], tet.OriginalID());
   EXPECT_EQ(mesh.runOriginalID[1], cube.OriginalID());

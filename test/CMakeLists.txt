@@ -25,7 +25,7 @@ if(MANIFOLD_CBIND)
 endif()
 
 add_executable(${PROJECT_NAME} ${SOURCE_FILES})
-target_link_libraries(${PROJECT_NAME} polygon GTest::GTest manifold samples samplesGPU)
+target_link_libraries(${PROJECT_NAME} polygon GTest::GTest manifold sdf samples samplesGPU)
 
 if(MANIFOLD_CBIND)
   target_link_libraries(${PROJECT_NAME} manifoldc)
