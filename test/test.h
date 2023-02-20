@@ -47,3 +47,4 @@ void ExpectMeshes(const Manifold& manifold,
                   const std::vector<MeshSize>& meshSize);
 void CheckManifold(const Manifold& manifold);
 void CheckStrictly(const Manifold& manifold);
+void CheckGL(const Manifold& manifold);

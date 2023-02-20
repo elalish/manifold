@@ -357,3 +357,16 @@ void CheckStrictly(const Manifold& manifold) {
   EXPECT_TRUE(manifold.MatchesTriNormals());
   EXPECT_EQ(manifold.NumDegenerateTris(), 0);
 }
+
+void CheckGL(const Manifold& manifold) {
+  ASSERT_FALSE(manifold.IsEmpty());
+  const MeshGL meshGL = manifold.GetMeshGL();
+  EXPECT_EQ(meshGL.mergeFromVert.size(), meshGL.mergeToVert.size());
+  EXPECT_EQ(meshGL.mergeFromVert.size(), meshGL.NumVert() - manifold.NumVert());
+  EXPECT_EQ(meshGL.runIndex.size(), meshGL.runOriginalID.size() + 1);
+  EXPECT_EQ(meshGL.runIndex.front(), 0);
+  EXPECT_EQ(meshGL.runIndex.back(), 3 * meshGL.NumTri());
+  if (!meshGL.runTransform.empty())
+    EXPECT_EQ(meshGL.runTransform.size(), 12 * meshGL.runOriginalID.size());
+  EXPECT_EQ(meshGL.faceID.size(), meshGL.NumTri());
+}
