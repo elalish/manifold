@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import * as glMatrix from 'https://cdn.jsdelivr.net/npm/gl-matrix@3.4.3/+esm';
 import {Accessor, Document, Material, WebIO} from 'https://cdn.skypack.dev/pin/@gltf-transform/core@v3.0.0-SfbIFhNPTRdr1UE2VSan/mode=imports,min/optimized/@gltf-transform/core.js';
 
 import Module from '../manifold.js';
@@ -139,8 +140,9 @@ console.log = function(...args) {
 onmessage = async (e) => {
   const content = e.data + '\nreturn exportGLB(result);\n';
   try {
-    const f = new Function('exportGLB', ...exposedFunctions, content);
-    await f(exportGLB, ...exposedFunctions.map(name => wasm[name]));
+    const f =
+        new Function('exportGLB', 'glMatrix', ...exposedFunctions, content);
+    await f(exportGLB, glMatrix, ...exposedFunctions.map(name => wasm[name]));
   } catch (error) {
     console.log(error.toString());
     postMessage({objectURL: null});

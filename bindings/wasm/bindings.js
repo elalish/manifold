@@ -163,10 +163,10 @@ Module.setup = function() {
     }
 
     transform(run) {
-      const mat4 = new Float32Array(16);
+      const mat4 = new Array(16);
       for (const col of [0, 1, 2, 3]) {
         for (const row of [0, 1, 2]) {
-          mat4[4 * col + row] = transform[12 * run + 3 * col + row];
+          mat4[4 * col + row] = this.runTransform[12 * run + 3 * col + row];
         }
       }
       mat4[15] = 1;

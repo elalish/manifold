@@ -13,6 +13,7 @@
 // limitations under the License.
 
 import {expect} from 'chai';
+import glMatrix from 'gl-matrix';
 
 import {examples} from '../examples/examples.js';
 import Module from '../manifold.js';
@@ -75,8 +76,8 @@ wasm.cleanup = function() {
 function runExample(name) {
   try {
     const content = examples.functionBodies.get(name) + '\nreturn result;\n';
-    const f = new Function(...exposedFunctions, content);
-    const manifold = f(...exposedFunctions.map(name => wasm[name]));
+    const f = new Function(...exposedFunctions, 'glMatrix', content);
+    const manifold = f(...exposedFunctions.map(name => wasm[name]), glMatrix);
 
     const mesh = manifold.getMesh();
     expect(mesh.mergeFromVert.length).to.equal(mesh.mergeToVert.length);

@@ -41,6 +41,7 @@
   },
   "devDependencies": {
     "chai": "*",
-    "mocha": "*"
+    "mocha": "*",
+    "gl-matrix": "3.4.3"
   }
 }

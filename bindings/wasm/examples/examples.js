@@ -215,6 +215,8 @@ export const examples = {
       function torusKnot(
           p, q, majorRadius, minorRadius, threadRadius, circularSegments = 0,
           linearSegments = 0) {
+        const {vec3} = glMatrix;
+
         function gcd(a, b) {
           return b == 0 ? a : gcd(b, a % b);
         }
@@ -234,42 +236,20 @@ export const examples = {
           circle.push([Math.cos(dPhi * i) + offset, Math.sin(dPhi * i)]);
         }
 
-        function rotateVector(v, axis, angle) {
-          const cos = Math.cos(angle);
-          const sin = Math.sin(angle);
-          const c = (1 - cos) * (v.x * axis.x + v.y * axis.y + v.z * axis.z);
-
-          const x =
-              cos * v.x + sin * (axis.y * v.z - axis.z * v.y) + c * axis.x;
-          const y =
-              cos * v.y + sin * (axis.z * v.x - axis.x * v.z) + c * axis.y;
-          const z =
-              cos * v.z + sin * (axis.x * v.y - axis.y * v.x) + c * axis.z;
-          v.x = x;
-          v.y = y;
-          v.z = z;
-        }
-
         const func = (v) => {
           const psi = q * Math.atan2(v[0], v[1]);
           const theta = psi * p / q;
           const x1 = Math.sqrt(v[0] * v[0] + v[1] * v[1]);
           const phi = Math.atan2(x1 - offset, v[2]);
-          const point = {
-            x: threadRadius * Math.cos(phi),
-            y: 0,
-            z: threadRadius * Math.sin(phi)
-          };
+          vec3.set(
+              v, threadRadius * Math.cos(phi), 0, threadRadius * Math.sin(phi));
+          const center = [0, 0, 0];
           const r = majorRadius + minorRadius * Math.cos(theta);
-          rotateVector(
-              point, {x: 1, y: 0, z: 0}, -Math.atan2(p * minorRadius, q * r));
-          point.x += minorRadius;
-          rotateVector(point, {x: 0, y: 1, z: 0}, theta);
-          point.x += majorRadius;
-          rotateVector(point, {x: 0, y: 0, z: 1}, psi);
-          v[0] = point.x;
-          v[1] = point.y;
-          v[2] = point.z;
+          vec3.rotateX(v, v, center, -Math.atan2(p * minorRadius, q * r));
+          v[0] += minorRadius;
+          vec3.rotateY(v, v, center, theta);
+          v[0] += majorRadius;
+          vec3.rotateZ(v, v, center, psi);
         };
 
         let knot = revolve(circle, m).warp(func);
