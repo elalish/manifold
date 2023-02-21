@@ -75,9 +75,14 @@ wasm.cleanup = function() {
 function runExample(name) {
   try {
     const content = examples.functionBodies.get(name) + '\nreturn result;\n';
-    ;
     const f = new Function(...exposedFunctions, content);
     const manifold = f(...exposedFunctions.map(name => wasm[name]));
+
+    const mesh = manifold.getMesh();
+    expect(mesh.mergeFromVert.length).to.equal(mesh.mergeToVert.length);
+    expect(mesh.mergeFromVert.length)
+        .to.equal(mesh.numVert - manifold.numVert());
+
     const prop = manifold.getProperties();
     const genus = manifold.genus();
     return {...prop, genus};

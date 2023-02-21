@@ -203,6 +203,9 @@ Manifold::Impl CsgLeafNode::Compose(
               node->pImpl_->meshRelation_.triRef.end(),
               combined.meshRelation_.triRef.begin() + nextTri,
               UpdateMeshIDs({offset}));
+    for (const auto pair : node->pImpl_->meshRelation_.meshIDtransform) {
+      combined.meshRelation_.meshIDtransform[pair.first + offset] = pair.second;
+    }
 
     nextVert += node->pImpl_->NumVert();
     nextEdge += 2 * node->pImpl_->NumEdge();

@@ -12,12 +12,60 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {Accessor, Document, WebIO} from 'https://cdn.skypack.dev/pin/@gltf-transform/core@v3.0.0-SfbIFhNPTRdr1UE2VSan/mode=imports,min/optimized/@gltf-transform/core.js';
+import {Accessor, Document, Material, WebIO} from 'https://cdn.skypack.dev/pin/@gltf-transform/core@v3.0.0-SfbIFhNPTRdr1UE2VSan/mode=imports,min/optimized/@gltf-transform/core.js';
 
 import Module from '../manifold.js';
 
 const wasm = await Module();
 wasm.setup();
+
+// Scene setup
+const io = new WebIO();
+const doc = new Document();
+
+const buffer = doc.createBuffer();
+const position =
+    doc.createAccessor().setBuffer(buffer).setType(Accessor.Type.VEC3);
+const indices =
+    doc.createAccessor().setBuffer(buffer).setType(Accessor.Type.SCALAR);
+const material = doc.createMaterial()
+                     .setBaseColorFactor([1, 1, 0, 1])
+                     .setMetallicFactor(1)
+                     .setRoughnessFactor(0.2);
+const primitive = doc.createPrimitive()
+                      .setMaterial(material)
+                      .setIndices(indices)
+                      .setAttribute('POSITION', position);
+const mesh = doc.createMesh().addPrimitive(primitive);
+const node = doc.createNode('result').setMesh(mesh);
+const scene = doc.createScene().addChild(node);
+
+// Debug setup to show source meshes
+const shown = new Map();
+const debugMaterial = doc.createMaterial()
+                          .setBaseColorFactor([1, 0, 0, 0.25])
+                          .setAlphaMode(Material.AlphaMode.BLEND)
+                          .setDoubleSided(true)
+                          .setMetallicFactor(0);
+
+wasm.show = (manifold) => {
+  const position =
+      doc.createAccessor().setBuffer(buffer).setType(Accessor.Type.VEC3);
+  const indices =
+      doc.createAccessor().setBuffer(buffer).setType(Accessor.Type.SCALAR);
+
+  const primitive = doc.createPrimitive()
+                        .setMaterial(debugMaterial)
+                        .setIndices(indices)
+                        .setAttribute('POSITION', position);
+  const mesh = doc.createMesh('debug').addPrimitive(primitive);
+
+  const result = manifold.asOriginal();
+  outputMesh(indices, position, result.getMesh());
+
+  shown.set(result.originalID(), mesh);
+  return result;
+};
 
 // manifold member functions that returns a new manifold
 const memberFunctions = [
@@ -27,7 +75,7 @@ const memberFunctions = [
 // top level functions that constructs a new manifold
 const constructors = [
   'cube', 'cylinder', 'sphere', 'tetrahedron', 'extrude', 'revolve', 'union',
-  'difference', 'intersection', 'compose', 'levelSet', 'smooth'
+  'difference', 'intersection', 'compose', 'levelSet', 'smooth', 'show'
 ];
 const utils = [
   'setMinCircularAngle', 'setMinCircularEdgeLength', 'setCircularSegments',
@@ -40,7 +88,7 @@ const exposedFunctions = constructors.concat(utils);
 // Note that this only fixes memory leak across different runs: the memory
 // will only be freed when the compilation finishes.
 
-let manifoldRegistry = [];
+const manifoldRegistry = [];
 for (const name of memberFunctions) {
   const originalFn = wasm.Manifold.prototype[name];
   wasm.Manifold.prototype['_' + name] = originalFn;
@@ -68,7 +116,7 @@ wasm.cleanup = function() {
     else
       obj.delete();
   }
-  manifoldRegistry = [];
+  manifoldRegistry.length = 0;
 };
 
 // Setup complete
@@ -88,11 +136,11 @@ console.log = function(...args) {
   oldLog(...args);
 };
 
-onmessage = (e) => {
-  const content = e.data + '\nexportGLB(result);\n';
+onmessage = async (e) => {
+  const content = e.data + '\nreturn exportGLB(result);\n';
   try {
     const f = new Function('exportGLB', ...exposedFunctions, content);
-    f(exportGLB, ...exposedFunctions.map(name => wasm[name]));
+    await f(exportGLB, ...exposedFunctions.map(name => wasm[name]));
   } catch (error) {
     console.log(error.toString());
     postMessage({objectURL: null});
@@ -101,27 +149,19 @@ onmessage = (e) => {
   }
 };
 
-// Export
-// ------------------------------------------------------------
-const io = new WebIO();
-const doc = new Document();
+function outputMesh(indices, position, mesh) {
+  indices.setArray(mesh.triVerts);
 
-const buffer = doc.createBuffer();
-const position =
-    doc.createAccessor().setBuffer(buffer).setType(Accessor.Type.VEC3);
-const indices =
-    doc.createAccessor().setBuffer(buffer).setType(Accessor.Type.SCALAR);
-const material = doc.createMaterial()
-                     .setBaseColorFactor([1, 1, 0, 1])
-                     .setMetallicFactor(1)
-                     .setRoughnessFactor(0.2);
-const primitive = doc.createPrimitive()
-                      .setMaterial(material)
-                      .setIndices(indices)
-                      .setAttribute('POSITION', position);
-const mesh = doc.createMesh('result').addPrimitive(primitive);
-const node = doc.createNode().setMesh(mesh);
-doc.createScene().addChild(node);
+  const numVert = mesh.numVert;
+  const numProp = mesh.numProp;
+  const posArray = new Float32Array(3 * numVert);
+  for (let i = 0; i < numVert; ++i) {
+    posArray[3 * i] = mesh.vertProperties[numProp * i];
+    posArray[3 * i + 1] = mesh.vertProperties[numProp * i + 1];
+    posArray[3 * i + 2] = mesh.vertProperties[numProp * i + 2];
+  }
+  position.setArray(posArray);
+}
 
 async function exportGLB(manifold) {
   console.log(`Triangles: ${manifold.numTri().toLocaleString()}`);
@@ -139,20 +179,44 @@ async function exportGLB(manifold) {
   // From Z-up to Y-up (glTF)
   const mesh = manifold.rotate([-90, 0, 0]).getMesh();
 
-  indices.setArray(mesh.triVerts);
+  outputMesh(indices, position, mesh);
 
-  const numVert = mesh.numVert;
-  const numProp = mesh.numProp;
-  const posArray = new Float32Array(3 * numVert);
-  for (let i = 0; i < numVert; ++i) {
-    posArray[3 * i] = mesh.vertProperties[numProp * i];
-    posArray[3 * i + 1] = mesh.vertProperties[numProp * i + 1];
-    posArray[3 * i + 2] = mesh.vertProperties[numProp * i + 2];
+  for (const [run, id] of mesh.runOriginalID.entries()) {
+    const outMesh = shown.get(id);
+    if (outMesh == null) {
+      continue;
+    }
+
+    const transform = mesh.transform(run);
+    const mat4 = new Float32Array(16);
+    for (const col of [0, 1, 2, 3]) {
+      for (const row of [0, 1, 2]) {
+        mat4[4 * col + row] = transform[3 * col + row];
+      }
+    }
+    mat4[15] = 1;
+    const node = doc.createNode('debug').setMesh(outMesh).setMatrix(mat4);
+    scene.addChild(node);
   }
-  position.setArray(posArray);
 
   const glb = await io.writeBinary(doc);
 
   const blob = new Blob([glb], {type: 'application/octet-stream'});
   postMessage({objectURL: URL.createObjectURL(blob)});
+
+  // Clean up debug nodes
+  for (const [id, mesh] of shown) {
+    const primitive = mesh.listPrimitives()[0];
+    primitive.getAttribute('POSITION').dispose();
+    primitive.getIndices().dispose();
+    primitive.dispose();
+    mesh.dispose();
+  }
+
+  scene.traverse((node) => {
+    if (node.getName() == 'debug') {
+      node.dispose();
+    }
+  });
+  shown.clear();
 }

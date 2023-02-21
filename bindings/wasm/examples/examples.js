@@ -25,6 +25,8 @@ export const examples = {
       const ball = sphere(60, 100);
       // You must name your final output "result".
       const result = box.subtract(ball);
+      // For visual debug, wrap any shape with show() and it and all of its
+      // copies will be shown in transparent red, akin to # in OpenSCAD.
 
       // All changes are automatically saved and restored between sessions.
       // This app is purely local - there is no server communication.

@@ -215,21 +215,11 @@ struct InitializeTriRef {
   }
 };
 
-struct MarkMeshID {
-  HashTableD<uint32_t> table;
-
-  __host__ __device__ void operator()(TriRef& ref) {
-    if (table.Full()) return;
-    table.Insert(ref.meshID, 1);
-  }
-};
-
 struct UpdateMeshID {
   const HashTableD<uint32_t> meshIDold2new;
-  const int meshIDoffset;
 
   __host__ __device__ void operator()(TriRef& ref) {
-    ref.meshID = meshIDold2new[ref.meshID] + meshIDoffset;
+    ref.meshID = meshIDold2new[ref.meshID];
   }
 };
 
@@ -491,12 +481,13 @@ Manifold::Impl::Impl(const MeshGL& meshGL,
       }
 
       if (meshGL.runTransform.empty()) {
-        relation.meshIDtransform[meshID] = {};
+        relation.meshIDtransform[meshID] = {originalID};
       } else {
         const float* m = meshGL.runTransform.data() + 12 * i;
-        relation.meshIDtransform[meshID] = {{m[0], m[1], m[2], m[3], m[4], m[5],
-                                             m[6], m[7], m[8], m[9], m[10],
-                                             m[11]}};
+        relation.meshIDtransform[meshID] = {
+            originalID,
+            {m[0], m[1], m[2], m[3], m[4], m[5], m[6], m[7], m[8], m[9], m[10],
+             m[11]}};
       }
     }
   }
@@ -630,7 +621,7 @@ void Manifold::Impl::InitializeOriginal() {
              zip(meshRelation_.triRef.begin(), countAt(0)), NumTri(),
              InitializeTriRef({meshID, halfedge_.cptrD()}));
   meshRelation_.meshIDtransform.clear();
-  meshRelation_.meshIDtransform[meshID] = {};
+  meshRelation_.meshIDtransform[meshID] = {meshID};
 }
 
 void Manifold::Impl::CreateFaces(const std::vector<float>& propertyTolerance) {
@@ -824,37 +815,20 @@ void Manifold::Impl::CalculateNormals() {
  * instances of these meshes.
  */
 void Manifold::Impl::IncrementMeshIDs() {
-  const int numTri = NumTri();
-  const auto policy = autoPolicy(numTri);
   HashTable<uint32_t> meshIDold2new(meshRelation_.meshIDtransform.size() * 2);
-
-  while (1) {
-    for_each_n(policy, meshRelation_.triRef.begin(), numTri,
-               MarkMeshID({meshIDold2new.D()}));
-    if (!meshIDold2new.Full()) break;
-    meshIDold2new = HashTable<uint32_t>(meshIDold2new.Size() * 2);
-  }
-  inclusive_scan(autoPolicy(meshIDold2new.Size()),
-                 meshIDold2new.GetValueStore().begin(),
-                 meshIDold2new.GetValueStore().end(),
-                 meshIDold2new.GetValueStore().begin());
-  const int numMeshIDs = meshIDold2new.GetValueStore().back();
-  const int meshIDstart = ReserveIDs(numMeshIDs);
-  // We do start - 1 because the inclusive scan makes our first index 1
-  // instead of 0.
-  for_each_n(policy, meshRelation_.triRef.begin(), numTri,
-             UpdateMeshID({meshIDold2new.D(), meshIDstart}));
   // Update keys of the transform map
   std::map<int, Relation> oldTransforms;
   std::swap(meshRelation_.meshIDtransform, oldTransforms);
-  const int tableSize = meshIDold2new.Size();
-  for (int i = 0; i < tableSize; ++i) {
-    const auto oldID = meshIDold2new.D().KeyAt(i);
-    if (oldID != HashTable<uint32_t>::Open()) {
-      meshRelation_.meshIDtransform[meshIDold2new.D().At(i) + meshIDstart] =
-          oldTransforms[oldID];
-    }
+  const int numMeshIDs = oldTransforms.size();
+  int nextMeshID = ReserveIDs(numMeshIDs);
+  for (const auto& pair : oldTransforms) {
+    meshIDold2new.D().Insert(pair.first, nextMeshID);
+    meshRelation_.meshIDtransform[nextMeshID++] = pair.second;
   }
+
+  const int numTri = NumTri();
+  for_each_n(autoPolicy(numTri), meshRelation_.triRef.begin(), numTri,
+             UpdateMeshID({meshIDold2new.D()}));
 }
 
 /**
