@@ -63,69 +63,69 @@ interface GLMatrix {
    */
   equals(a: number, b: number): boolean;
 
-  vec2: Vec2;
-  vec3: Vec3;
-  vec4: Vec4;
-  mat2: Mat2;
-  mat2d: Mat2d;
-  mat3: Mat3;
-  mat4: Mat4;
-  quat: Quat;
+  vec2: Vec2Type;
+  vec3: Vec3Type;
+  vec4: Vec4Type;
+  mat2: Mat2Type;
+  mat2d: Mat2dType;
+  mat3: Mat3Type;
+  mat4: Mat4Type;
+  quat: QuatType;
 }
 
-interface Vec2 extends Float32Array {
+interface Vec2Type extends Float32Array {
   /**
-   * Creates a new, empty Vec2
+   * Creates a new, empty Vec2Type
    *
    * @returns a new 2D vector
    */
-  create(): Vec2;
+  create(): Vec2Type;
 
   /**
-   * Creates a new Vec2 initialized with values from an existing vector
+   * Creates a new Vec2Type initialized with values from an existing vector
    *
    * @param a a vector to clone
    * @returns a new 2D vector
    */
-  clone(a: Vec2|number[]): Vec2;
+  clone(a: Vec2Type|number[]): Vec2Type;
 
   /**
-   * Creates a new Vec2 initialized with the given values
+   * Creates a new Vec2Type initialized with the given values
    *
    * @param x X component
    * @param y Y component
    * @returns a new 2D vector
    */
-  fromValues(x: number, y: number): Vec2;
+  fromValues(x: number, y: number): Vec2Type;
 
   /**
-   * Copy the values from one Vec2 to another
+   * Copy the values from one Vec2Type to another
    *
    * @param out the receiving vector
    * @param a the source vector
    * @returns out
    */
-  copy(out: Vec2, a: Vec2|number[]): Vec2;
+  copy(out: Vec2Type, a: Vec2Type|number[]): Vec2Type;
 
   /**
-   * Set the components of a Vec2 to the given values
+   * Set the components of a Vec2Type to the given values
    *
    * @param out the receiving vector
    * @param x X component
    * @param y Y component
    * @returns out
    */
-  set(out: Vec2, x: number, y: number): Vec2;
+  set(out: Vec2Type, x: number, y: number): Vec2Type;
 
   /**
-   * Adds two Vec2's
+   * Adds two Vec2Type's
    *
    * @param out the receiving vector
    * @param a the first operand
    * @param b the second operand
    * @returns out
    */
-  add(out: Vec2, a: Vec2|number[], b: Vec2|number[]): Vec2;
+  add(out: Vec2Type, a: Vec2Type|number[], b: Vec2Type|number[]): Vec2Type;
 
   /**
    * Subtracts vector b from vector a
@@ -135,7 +135,7 @@ interface Vec2 extends Float32Array {
    * @param b the second operand
    * @returns out
    */
-  subtract(out: Vec2, a: Vec2|number[], b: Vec2|number[]): Vec2;
+  subtract(out: Vec2Type, a: Vec2Type|number[], b: Vec2Type|number[]): Vec2Type;
 
   /**
    * Subtracts vector b from vector a
@@ -145,108 +145,108 @@ interface Vec2 extends Float32Array {
    * @param b the second operand
    * @returns out
    */
-  sub(out: Vec2, a: Vec2|number[], b: Vec2|number[]): Vec2;
+  sub(out: Vec2Type, a: Vec2Type|number[], b: Vec2Type|number[]): Vec2Type;
 
   /**
-   * Multiplies two Vec2's
+   * Multiplies two Vec2Type's
    *
    * @param out the receiving vector
    * @param a the first operand
    * @param b the second operand
    * @returns out
    */
-  multiply(out: Vec2, a: Vec2|number[], b: Vec2|number[]): Vec2;
+  multiply(out: Vec2Type, a: Vec2Type|number[], b: Vec2Type|number[]): Vec2Type;
 
   /**
-   * Multiplies two Vec2's
+   * Multiplies two Vec2Type's
    *
    * @param out the receiving vector
    * @param a the first operand
    * @param b the second operand
    * @returns out
    */
-  mul(out: Vec2, a: Vec2|number[], b: Vec2|number[]): Vec2;
+  mul(out: Vec2Type, a: Vec2Type|number[], b: Vec2Type|number[]): Vec2Type;
 
   /**
-   * Divides two Vec2's
+   * Divides two Vec2Type's
    *
    * @param out the receiving vector
    * @param a the first operand
    * @param b the second operand
    * @returns out
    */
-  divide(out: Vec2, a: Vec2|number[], b: Vec2|number[]): Vec2;
+  divide(out: Vec2Type, a: Vec2Type|number[], b: Vec2Type|number[]): Vec2Type;
 
   /**
-   * Divides two Vec2's
+   * Divides two Vec2Type's
    *
    * @param out the receiving vector
    * @param a the first operand
    * @param b the second operand
    * @returns out
    */
-  div(out: Vec2, a: Vec2|number[], b: Vec2|number[]): Vec2;
+  div(out: Vec2Type, a: Vec2Type|number[], b: Vec2Type|number[]): Vec2Type;
 
   /**
-   * Math.ceil the components of a Vec2
+   * Math.ceil the components of a Vec2Type
    *
-   * @param {Vec2} out the receiving vector
-   * @param {Vec2} a vector to ceil
-   * @returns {Vec2} out
+   * @param {Vec2Type} out the receiving vector
+   * @param {Vec2Type} a vector to ceil
+   * @returns {Vec2Type} out
    */
-  ceil(out: Vec2, a: Vec2|number[]): Vec2;
+  ceil(out: Vec2Type, a: Vec2Type|number[]): Vec2Type;
 
   /**
-   * Math.floor the components of a Vec2
+   * Math.floor the components of a Vec2Type
    *
-   * @param {Vec2} out the receiving vector
-   * @param {Vec2} a vector to floor
-   * @returns {Vec2} out
+   * @param {Vec2Type} out the receiving vector
+   * @param {Vec2Type} a vector to floor
+   * @returns {Vec2Type} out
    */
-  floor(out: Vec2, a: Vec2|number[]): Vec2;
+  floor(out: Vec2Type, a: Vec2Type|number[]): Vec2Type;
 
   /**
-   * Returns the minimum of two Vec2's
-   *
-   * @param out the receiving vector
-   * @param a the first operand
-   * @param b the second operand
-   * @returns out
-   */
-  min(out: Vec2, a: Vec2|number[], b: Vec2|number[]): Vec2;
-
-  /**
-   * Returns the maximum of two Vec2's
+   * Returns the minimum of two Vec2Type's
    *
    * @param out the receiving vector
    * @param a the first operand
    * @param b the second operand
    * @returns out
    */
-  max(out: Vec2, a: Vec2|number[], b: Vec2|number[]): Vec2;
+  min(out: Vec2Type, a: Vec2Type|number[], b: Vec2Type|number[]): Vec2Type;
 
   /**
-   * Math.round the components of a Vec2
+   * Returns the maximum of two Vec2Type's
    *
-   * @param {Vec2} out the receiving vector
-   * @param {Vec2} a vector to round
-   * @returns {Vec2} out
+   * @param out the receiving vector
+   * @param a the first operand
+   * @param b the second operand
+   * @returns out
    */
-  round(out: Vec2, a: Vec2|number[]): Vec2;
+  max(out: Vec2Type, a: Vec2Type|number[], b: Vec2Type|number[]): Vec2Type;
+
+  /**
+   * Math.round the components of a Vec2Type
+   *
+   * @param {Vec2Type} out the receiving vector
+   * @param {Vec2Type} a vector to round
+   * @returns {Vec2Type} out
+   */
+  round(out: Vec2Type, a: Vec2Type|number[]): Vec2Type;
 
 
   /**
-   * Scales a Vec2 by a scalar number
+   * Scales a Vec2Type by a scalar number
    *
    * @param out the receiving vector
    * @param a the vector to scale
    * @param b amount to scale the vector by
    * @returns out
    */
-  scale(out: Vec2, a: Vec2|number[], b: number): Vec2;
+  scale(out: Vec2Type, a: Vec2Type|number[], b: number): Vec2Type;
 
   /**
-   * Adds two Vec2's after scaling the second operand by a scalar value
+   * Adds two Vec2Type's after scaling the second operand by a scalar value
    *
    * @param out the receiving vector
    * @param a the first operand
@@ -254,115 +254,116 @@ interface Vec2 extends Float32Array {
    * @param scale the amount to scale b by before adding
    * @returns out
    */
-  scaleAndAdd(out: Vec2, a: Vec2|number[], b: Vec2|number[], scale: number):
-      Vec2;
+  scaleAndAdd(
+      out: Vec2Type, a: Vec2Type|number[], b: Vec2Type|number[],
+      scale: number): Vec2Type;
 
   /**
-   * Calculates the euclidian distance between two Vec2's
+   * Calculates the euclidian distance between two Vec2Type's
    *
    * @param a the first operand
    * @param b the second operand
    * @returns distance between a and b
    */
-  distance(a: Vec2|number[], b: Vec2|number[]): number;
+  distance(a: Vec2Type|number[], b: Vec2Type|number[]): number;
 
   /**
-   * Calculates the euclidian distance between two Vec2's
+   * Calculates the euclidian distance between two Vec2Type's
    *
    * @param a the first operand
    * @param b the second operand
    * @returns distance between a and b
    */
-  dist(a: Vec2|number[], b: Vec2|number[]): number;
+  dist(a: Vec2Type|number[], b: Vec2Type|number[]): number;
 
   /**
-   * Calculates the squared euclidian distance between two Vec2's
+   * Calculates the squared euclidian distance between two Vec2Type's
    *
    * @param a the first operand
    * @param b the second operand
    * @returns squared distance between a and b
    */
-  squaredDistance(a: Vec2|number[], b: Vec2|number[]): number;
+  squaredDistance(a: Vec2Type|number[], b: Vec2Type|number[]): number;
 
   /**
-   * Calculates the squared euclidian distance between two Vec2's
+   * Calculates the squared euclidian distance between two Vec2Type's
    *
    * @param a the first operand
    * @param b the second operand
    * @returns squared distance between a and b
    */
-  sqrDist(a: Vec2|number[], b: Vec2|number[]): number;
+  sqrDist(a: Vec2Type|number[], b: Vec2Type|number[]): number;
 
   /**
-   * Calculates the length of a Vec2
+   * Calculates the length of a Vec2Type
    *
    * @param a vector to calculate length of
    * @returns length of a
    */
-  length(a: Vec2|number[]): number;
+  length(a: Vec2Type|number[]): number;
 
   /**
-   * Calculates the length of a Vec2
+   * Calculates the length of a Vec2Type
    *
    * @param a vector to calculate length of
    * @returns length of a
    */
-  len(a: Vec2|number[]): number;
+  len(a: Vec2Type|number[]): number;
 
   /**
-   * Calculates the squared length of a Vec2
+   * Calculates the squared length of a Vec2Type
    *
    * @param a vector to calculate squared length of
    * @returns squared length of a
    */
-  squaredLength(a: Vec2|number[]): number;
+  squaredLength(a: Vec2Type|number[]): number;
 
   /**
-   * Calculates the squared length of a Vec2
+   * Calculates the squared length of a Vec2Type
    *
    * @param a vector to calculate squared length of
    * @returns squared length of a
    */
-  sqrLen(a: Vec2|number[]): number;
+  sqrLen(a: Vec2Type|number[]): number;
 
   /**
-   * Negates the components of a Vec2
+   * Negates the components of a Vec2Type
    *
    * @param out the receiving vector
    * @param a vector to negate
    * @returns out
    */
-  negate(out: Vec2, a: Vec2|number[]): Vec2;
+  negate(out: Vec2Type, a: Vec2Type|number[]): Vec2Type;
 
   /**
-   * Returns the inverse of the components of a Vec2
+   * Returns the inverse of the components of a Vec2Type
    *
    * @param out the receiving vector
    * @param a vector to invert
    * @returns out
    */
-  inverse(out: Vec2, a: Vec2|number[]): Vec2;
+  inverse(out: Vec2Type, a: Vec2Type|number[]): Vec2Type;
 
   /**
-   * Normalize a Vec2
+   * Normalize a Vec2Type
    *
    * @param out the receiving vector
    * @param a vector to normalize
    * @returns out
    */
-  normalize(out: Vec2, a: Vec2|number[]): Vec2;
+  normalize(out: Vec2Type, a: Vec2Type|number[]): Vec2Type;
 
   /**
-   * Calculates the dot product of two Vec2's
+   * Calculates the dot product of two Vec2Type's
    *
    * @param a the first operand
    * @param b the second operand
    * @returns dot product of a and b
    */
-  dot(a: Vec2|number[], b: Vec2|number[]): number;
+  dot(a: Vec2Type|number[], b: Vec2Type|number[]): number;
 
   /**
-   * Computes the cross product of two Vec2's
+   * Computes the cross product of two Vec2Type's
    * Note that the cross product must by definition produce a 3D vector
    *
    * @param out the receiving vector
@@ -370,10 +371,10 @@ interface Vec2 extends Float32Array {
    * @param b the second operand
    * @returns out
    */
-  cross(out: Vec2, a: Vec2|number[], b: Vec2|number[]): Vec2;
+  cross(out: Vec2Type, a: Vec2Type|number[], b: Vec2Type|number[]): Vec2Type;
 
   /**
-   * Performs a linear interpolation between two Vec2's
+   * Performs a linear interpolation between two Vec2Type's
    *
    * @param out the receiving vector
    * @param a the first operand
@@ -381,7 +382,8 @@ interface Vec2 extends Float32Array {
    * @param t interpolation amount between the two inputs
    * @returns out
    */
-  lerp(out: Vec2, a: Vec2|number[], b: Vec2|number[], t: number): Vec2;
+  lerp(out: Vec2Type, a: Vec2Type|number[], b: Vec2Type|number[], t: number):
+      Vec2Type;
 
   /**
    * Generates a random unit vector
@@ -389,7 +391,7 @@ interface Vec2 extends Float32Array {
    * @param out the receiving vector
    * @returns out
    */
-  random(out: Vec2): Vec2;
+  random(out: Vec2Type): Vec2Type;
 
   /**
    * Generates a random vector with the given scale
@@ -399,30 +401,30 @@ interface Vec2 extends Float32Array {
    *     will be returned
    * @returns out
    */
-  random(out: Vec2, scale: number): Vec2;
+  random(out: Vec2Type, scale: number): Vec2Type;
 
   /**
-   * Transforms the Vec2 with a Mat2
+   * Transforms the Vec2Type with a Mat2Type
    *
    * @param out the receiving vector
    * @param a the vector to transform
    * @param m matrix to transform with
    * @returns out
    */
-  transformMat2(out: Vec2, a: Vec2|number[], m: Mat2): Vec2;
+  transformMat2(out: Vec2Type, a: Vec2Type|number[], m: Mat2Type): Vec2Type;
 
   /**
-   * Transforms the Vec2 with a Mat2d
+   * Transforms the Vec2Type with a Mat2dType
    *
    * @param out the receiving vector
    * @param a the vector to transform
    * @param m matrix to transform with
    * @returns out
    */
-  transformMat2d(out: Vec2, a: Vec2|number[], m: Mat2d): Vec2;
+  transformMat2d(out: Vec2Type, a: Vec2Type|number[], m: Mat2dType): Vec2Type;
 
   /**
-   * Transforms the Vec2 with a Mat3
+   * Transforms the Vec2Type with a Mat3Type
    * 3rd vector component is implicitly '1'
    *
    * @param out the receiving vector
@@ -430,10 +432,10 @@ interface Vec2 extends Float32Array {
    * @param m matrix to transform with
    * @returns out
    */
-  transformMat3(out: Vec2, a: Vec2|number[], m: Mat3): Vec2;
+  transformMat3(out: Vec2Type, a: Vec2Type|number[], m: Mat3Type): Vec2Type;
 
   /**
-   * Transforms the Vec2 with a Mat4
+   * Transforms the Vec2Type with a Mat4Type
    * 3rd vector component is implicitly '0'
    * 4th vector component is implicitly '1'
    *
@@ -442,16 +444,16 @@ interface Vec2 extends Float32Array {
    * @param m matrix to transform with
    * @returns out
    */
-  transformMat4(out: Vec2, a: Vec2|number[], m: Mat4): Vec2;
+  transformMat4(out: Vec2Type, a: Vec2Type|number[], m: Mat4Type): Vec2Type;
 
   /**
-   * Perform some operation over an array of vec2s.
+   * Perform some operation over an array of vec2Types.
    *
    * @param a the array of vectors to iterate over
-   * @param stride Number of elements between the start of each Vec2. If 0
+   * @param stride Number of elements between the start of each Vec2Type. If 0
    *     assumes tightly packed
    * @param offset Number of elements to skip at the beginning of the array
-   * @param count Number of vec2s to iterate over. If 0 iterates over entire
+   * @param count Number of vec2Types to iterate over. If 0 iterates over entire
    *     array
    * @param fn Function to call for each vector in the array
    * @param arg additional argument to pass to fn
@@ -459,24 +461,24 @@ interface Vec2 extends Float32Array {
    */
   forEach(
       a: Float32Array, stride: number, offset: number, count: number,
-      fn: (a: Vec2|number[], b: Vec2|number[], arg: any) => void,
+      fn: (a: Vec2Type|number[], b: Vec2Type|number[], arg: any) => void,
       arg: any): Float32Array;
 
   /**
-   * Perform some operation over an array of vec2s.
+   * Perform some operation over an array of vec2Types.
    *
    * @param a the array of vectors to iterate over
-   * @param stride Number of elements between the start of each Vec2. If 0
+   * @param stride Number of elements between the start of each Vec2Type. If 0
    *     assumes tightly packed
    * @param offset Number of elements to skip at the beginning of the array
-   * @param count Number of vec2s to iterate over. If 0 iterates over entire
+   * @param count Number of vec2Types to iterate over. If 0 iterates over entire
    *     array
    * @param fn Function to call for each vector in the array
    * @returns a
    */
   forEach(
       a: Float32Array, stride: number, offset: number, count: number,
-      fn: (a: Vec2|number[], b: Vec2|number[]) => void): Float32Array;
+      fn: (a: Vec2Type|number[], b: Vec2Type|number[]) => void): Float32Array;
 
   /**
    * Returns a string representation of a vector
@@ -484,67 +486,67 @@ interface Vec2 extends Float32Array {
    * @param a vector to represent as a string
    * @returns string representation of the vector
    */
-  str(a: Vec2|number[]): string;
+  str(a: Vec2Type|number[]): string;
 
   /**
    * Returns whether or not the vectors exactly have the same elements in the
    * same position (when compared with ===)
    *
-   * @param {Vec2} a The first vector.
-   * @param {Vec2} b The second vector.
+   * @param {Vec2Type} a The first vector.
+   * @param {Vec2Type} b The second vector.
    * @returns {boolean} True if the vectors are equal, false otherwise.
    */
-  exactEquals(a: Vec2|number[], b: Vec2|number[]): boolean;
+  exactEquals(a: Vec2Type|number[], b: Vec2Type|number[]): boolean;
 
   /**
    * Returns whether or not the vectors have approximately the same elements
    * in the same position.
    *
-   * @param {Vec2} a The first vector.
-   * @param {Vec2} b The second vector.
+   * @param {Vec2Type} a The first vector.
+   * @param {Vec2Type} b The second vector.
    * @returns {boolean} True if the vectors are equal, false otherwise.
    */
-  equals(a: Vec2|number[], b: Vec2|number[]): boolean;
+  equals(a: Vec2Type|number[], b: Vec2Type|number[]): boolean;
 }
 
-// Vec3
-interface Vec3 extends Float32Array {
+// Vec3Type
+interface Vec3Type extends Float32Array {
   /**
-   * Creates a new, empty Vec3
+   * Creates a new, empty Vec3Type
    *
    * @returns a new 3D vector
    */
-  create(): Vec3;
+  create(): Vec3Type;
 
   /**
-   * Creates a new Vec3 initialized with values from an existing vector
+   * Creates a new Vec3Type initialized with values from an existing vector
    *
    * @param a vector to clone
    * @returns a new 3D vector
    */
-  clone(a: Vec3|number[]): Vec3;
+  clone(a: Vec3Type|number[]): Vec3Type;
 
   /**
-   * Creates a new Vec3 initialized with the given values
+   * Creates a new Vec3Type initialized with the given values
    *
    * @param x X component
    * @param y Y component
    * @param z Z component
    * @returns a new 3D vector
    */
-  fromValues(x: number, y: number, z: number): Vec3;
+  fromValues(x: number, y: number, z: number): Vec3Type;
 
   /**
-   * Copy the values from one Vec3 to another
+   * Copy the values from one Vec3Type to another
    *
    * @param out the receiving vector
    * @param a the source vector
    * @returns out
    */
-  copy(out: Vec3, a: Vec3|number[]): Vec3;
+  copy(out: Vec3Type, a: Vec3Type|number[]): Vec3Type;
 
   /**
-   * Set the components of a Vec3 to the given values
+   * Set the components of a Vec3Type to the given values
    *
    * @param out the receiving vector
    * @param x X component
@@ -552,17 +554,17 @@ interface Vec3 extends Float32Array {
    * @param z Z component
    * @returns out
    */
-  set(out: Vec3, x: number, y: number, z: number): Vec3;
+  set(out: Vec3Type, x: number, y: number, z: number): Vec3Type;
 
   /**
-   * Adds two Vec3's
+   * Adds two Vec3Type's
    *
    * @param out the receiving vector
    * @param a the first operand
    * @param b the second operand
    * @returns out
    */
-  add(out: Vec3, a: Vec3|number[], b: Vec3|number[]): Vec3;
+  add(out: Vec3Type, a: Vec3Type|number[], b: Vec3Type|number[]): Vec3Type;
 
   /**
    * Subtracts vector b from vector a
@@ -572,7 +574,7 @@ interface Vec3 extends Float32Array {
    * @param b the second operand
    * @returns out
    */
-  subtract(out: Vec3, a: Vec3|number[], b: Vec3|number[]): Vec3;
+  subtract(out: Vec3Type, a: Vec3Type|number[], b: Vec3Type|number[]): Vec3Type;
 
   /**
    * Subtracts vector b from vector a
@@ -582,107 +584,107 @@ interface Vec3 extends Float32Array {
    * @param b the second operand
    * @returns out
    */
-  sub(out: Vec3, a: Vec3|number[], b: Vec3|number[]): Vec3
+  sub(out: Vec3Type, a: Vec3Type|number[], b: Vec3Type|number[]): Vec3Type
 
   /**
-   * Multiplies two Vec3's
+   * Multiplies two Vec3Type's
    *
    * @param out the receiving vector
    * @param a the first operand
    * @param b the second operand
    * @returns out
    */
-  multiply(out: Vec3, a: Vec3|number[], b: Vec3|number[]): Vec3;
+  multiply(out: Vec3Type, a: Vec3Type|number[], b: Vec3Type|number[]): Vec3Type;
 
   /**
-   * Multiplies two Vec3's
+   * Multiplies two Vec3Type's
    *
    * @param out the receiving vector
    * @param a the first operand
    * @param b the second operand
    * @returns out
    */
-  mul(out: Vec3, a: Vec3|number[], b: Vec3|number[]): Vec3;
+  mul(out: Vec3Type, a: Vec3Type|number[], b: Vec3Type|number[]): Vec3Type;
 
   /**
-   * Divides two Vec3's
+   * Divides two Vec3Type's
    *
    * @param out the receiving vector
    * @param a the first operand
    * @param b the second operand
    * @returns out
    */
-  divide(out: Vec3, a: Vec3|number[], b: Vec3|number[]): Vec3;
+  divide(out: Vec3Type, a: Vec3Type|number[], b: Vec3Type|number[]): Vec3Type;
 
   /**
-   * Divides two Vec3's
+   * Divides two Vec3Type's
    *
    * @param out the receiving vector
    * @param a the first operand
    * @param b the second operand
    * @returns out
    */
-  div(out: Vec3, a: Vec3|number[], b: Vec3|number[]): Vec3;
+  div(out: Vec3Type, a: Vec3Type|number[], b: Vec3Type|number[]): Vec3Type;
 
   /**
-   * Math.ceil the components of a Vec3
+   * Math.ceil the components of a Vec3Type
    *
-   * @param {Vec3} out the receiving vector
-   * @param {Vec3} a vector to ceil
-   * @returns {Vec3} out
+   * @param {Vec3Type} out the receiving vector
+   * @param {Vec3Type} a vector to ceil
+   * @returns {Vec3Type} out
    */
-  ceil(out: Vec3, a: Vec3|number[]): Vec3;
+  ceil(out: Vec3Type, a: Vec3Type|number[]): Vec3Type;
 
   /**
-   * Math.floor the components of a Vec3
+   * Math.floor the components of a Vec3Type
    *
-   * @param {Vec3} out the receiving vector
-   * @param {Vec3} a vector to floor
-   * @returns {Vec3} out
+   * @param {Vec3Type} out the receiving vector
+   * @param {Vec3Type} a vector to floor
+   * @returns {Vec3Type} out
    */
-  floor(out: Vec3, a: Vec3|number[]): Vec3;
+  floor(out: Vec3Type, a: Vec3Type|number[]): Vec3Type;
 
   /**
-   * Returns the minimum of two Vec3's
-   *
-   * @param out the receiving vector
-   * @param a the first operand
-   * @param b the second operand
-   * @returns out
-   */
-  min(out: Vec3, a: Vec3|number[], b: Vec3|number[]): Vec3;
-
-  /**
-   * Returns the maximum of two Vec3's
+   * Returns the minimum of two Vec3Type's
    *
    * @param out the receiving vector
    * @param a the first operand
    * @param b the second operand
    * @returns out
    */
-  max(out: Vec3, a: Vec3|number[], b: Vec3|number[]): Vec3;
+  min(out: Vec3Type, a: Vec3Type|number[], b: Vec3Type|number[]): Vec3Type;
 
   /**
-   * Math.round the components of a Vec3
+   * Returns the maximum of two Vec3Type's
    *
-   * @param {Vec3} out the receiving vector
-   * @param {Vec3} a vector to round
-   * @returns {Vec3} out
+   * @param out the receiving vector
+   * @param a the first operand
+   * @param b the second operand
+   * @returns out
    */
-  round(out: Vec3, a: Vec3|number[]): Vec3
+  max(out: Vec3Type, a: Vec3Type|number[], b: Vec3Type|number[]): Vec3Type;
 
   /**
-   * Scales a Vec3 by a scalar number
+   * Math.round the components of a Vec3Type
+   *
+   * @param {Vec3Type} out the receiving vector
+   * @param {Vec3Type} a vector to round
+   * @returns {Vec3Type} out
+   */
+  round(out: Vec3Type, a: Vec3Type|number[]): Vec3Type
+
+  /**
+   * Scales a Vec3Type by a scalar number
    *
    * @param out the receiving vector
    * @param a the vector to scale
    * @param b amount to scale the vector by
    * @returns out
    */
-  scale(out: Vec3, a: Vec3|number[], b: number): Vec3;
+  scale(out: Vec3Type, a: Vec3Type|number[], b: number): Vec3Type;
 
   /**
-   * Adds two Vec3's after scaling the second operand by a scalar value
+   * Adds two Vec3Type's after scaling the second operand by a scalar value
    *
    * @param out the receiving vector
    * @param a the first operand
@@ -690,125 +692,126 @@ interface Vec3 extends Float32Array {
    * @param scale the amount to scale b by before adding
    * @returns out
    */
-  scaleAndAdd(out: Vec3, a: Vec3|number[], b: Vec3|number[], scale: number):
-      Vec3;
+  scaleAndAdd(
+      out: Vec3Type, a: Vec3Type|number[], b: Vec3Type|number[],
+      scale: number): Vec3Type;
 
   /**
-   * Calculates the euclidian distance between two Vec3's
+   * Calculates the euclidian distance between two Vec3Type's
    *
    * @param a the first operand
    * @param b the second operand
    * @returns distance between a and b
    */
-  distance(a: Vec3|number[], b: Vec3|number[]): number;
+  distance(a: Vec3Type|number[], b: Vec3Type|number[]): number;
 
   /**
-   * Calculates the euclidian distance between two Vec3's
+   * Calculates the euclidian distance between two Vec3Type's
    *
    * @param a the first operand
    * @param b the second operand
    * @returns distance between a and b
    */
-  dist(a: Vec3|number[], b: Vec3|number[]): number;
+  dist(a: Vec3Type|number[], b: Vec3Type|number[]): number;
 
   /**
-   * Calculates the squared euclidian distance between two Vec3's
+   * Calculates the squared euclidian distance between two Vec3Type's
    *
    * @param a the first operand
    * @param b the second operand
    * @returns squared distance between a and b
    */
-  squaredDistance(a: Vec3|number[], b: Vec3|number[]): number;
+  squaredDistance(a: Vec3Type|number[], b: Vec3Type|number[]): number;
 
   /**
-   * Calculates the squared euclidian distance between two Vec3's
+   * Calculates the squared euclidian distance between two Vec3Type's
    *
    * @param a the first operand
    * @param b the second operand
    * @returns squared distance between a and b
    */
-  sqrDist(a: Vec3|number[], b: Vec3|number[]): number;
+  sqrDist(a: Vec3Type|number[], b: Vec3Type|number[]): number;
 
   /**
-   * Calculates the length of a Vec3
+   * Calculates the length of a Vec3Type
    *
    * @param a vector to calculate length of
    * @returns length of a
    */
-  length(a: Vec3|number[]): number;
+  length(a: Vec3Type|number[]): number;
 
   /**
-   * Calculates the length of a Vec3
+   * Calculates the length of a Vec3Type
    *
    * @param a vector to calculate length of
    * @returns length of a
    */
-  len(a: Vec3|number[]): number;
+  len(a: Vec3Type|number[]): number;
 
   /**
-   * Calculates the squared length of a Vec3
+   * Calculates the squared length of a Vec3Type
    *
    * @param a vector to calculate squared length of
    * @returns squared length of a
    */
-  squaredLength(a: Vec3|number[]): number;
+  squaredLength(a: Vec3Type|number[]): number;
 
   /**
-   * Calculates the squared length of a Vec3
+   * Calculates the squared length of a Vec3Type
    *
    * @param a vector to calculate squared length of
    * @returns squared length of a
    */
-  sqrLen(a: Vec3|number[]): number;
+  sqrLen(a: Vec3Type|number[]): number;
 
   /**
-   * Negates the components of a Vec3
+   * Negates the components of a Vec3Type
    *
    * @param out the receiving vector
    * @param a vector to negate
    * @returns out
    */
-  negate(out: Vec3, a: Vec3|number[]): Vec3;
+  negate(out: Vec3Type, a: Vec3Type|number[]): Vec3Type;
 
   /**
-   * Returns the inverse of the components of a Vec3
+   * Returns the inverse of the components of a Vec3Type
    *
    * @param out the receiving vector
    * @param a vector to invert
    * @returns out
    */
-  inverse(out: Vec3, a: Vec3|number[]): Vec3;
+  inverse(out: Vec3Type, a: Vec3Type|number[]): Vec3Type;
 
   /**
-   * Normalize a Vec3
+   * Normalize a Vec3Type
    *
    * @param out the receiving vector
    * @param a vector to normalize
    * @returns out
    */
-  normalize(out: Vec3, a: Vec3|number[]): Vec3;
+  normalize(out: Vec3Type, a: Vec3Type|number[]): Vec3Type;
 
   /**
-   * Calculates the dot product of two Vec3's
+   * Calculates the dot product of two Vec3Type's
    *
    * @param a the first operand
    * @param b the second operand
    * @returns dot product of a and b
    */
-  dot(a: Vec3|number[], b: Vec3|number[]): number;
+  dot(a: Vec3Type|number[], b: Vec3Type|number[]): number;
 
   /**
-   * Computes the cross product of two Vec3's
+   * Computes the cross product of two Vec3Type's
    *
    * @param out the receiving vector
    * @param a the first operand
    * @param b the second operand
    * @returns out
    */
-  cross(out: Vec3, a: Vec3|number[], b: Vec3|number[]): Vec3;
+  cross(out: Vec3Type, a: Vec3Type|number[], b: Vec3Type|number[]): Vec3Type;
 
   /**
-   * Performs a linear interpolation between two Vec3's
+   * Performs a linear interpolation between two Vec3Type's
    *
    * @param out the receiving vector
    * @param a the first operand
@@ -816,37 +819,38 @@ interface Vec3 extends Float32Array {
    * @param t interpolation amount between the two inputs
    * @returns out
    */
-  lerp(out: Vec3, a: Vec3|number[], b: Vec3|number[], t: number): Vec3;
+  lerp(out: Vec3Type, a: Vec3Type|number[], b: Vec3Type|number[], t: number):
+      Vec3Type;
 
   /**
    * Performs a hermite interpolation with two control points
    *
-   * @param {Vec3} out the receiving vector
-   * @param {Vec3} a the first operand
-   * @param {Vec3} b the second operand
-   * @param {Vec3} c the third operand
-   * @param {Vec3} d the fourth operand
+   * @param {Vec3Type} out the receiving vector
+   * @param {Vec3Type} a the first operand
+   * @param {Vec3Type} b the second operand
+   * @param {Vec3Type} c the third operand
+   * @param {Vec3Type} d the fourth operand
    * @param {number} t interpolation amount between the two inputs
-   * @returns {Vec3} out
+   * @returns {Vec3Type} out
    */
   hermite(
-      out: Vec3, a: Vec3|number[], b: Vec3|number[], c: Vec3|number[],
-      d: Vec3|number[], t: number): Vec3;
+      out: Vec3Type, a: Vec3Type|number[], b: Vec3Type|number[],
+      c: Vec3Type|number[], d: Vec3Type|number[], t: number): Vec3Type;
 
   /**
    * Performs a bezier interpolation with two control points
    *
-   * @param {Vec3} out the receiving vector
-   * @param {Vec3} a the first operand
-   * @param {Vec3} b the second operand
-   * @param {Vec3} c the third operand
-   * @param {Vec3} d the fourth operand
+   * @param {Vec3Type} out the receiving vector
+   * @param {Vec3Type} a the first operand
+   * @param {Vec3Type} b the second operand
+   * @param {Vec3Type} c the third operand
+   * @param {Vec3Type} d the fourth operand
    * @param {number} t interpolation amount between the two inputs
-   * @returns {Vec3} out
+   * @returns {Vec3Type} out
    */
   bezier(
-      out: Vec3, a: Vec3|number[], b: Vec3|number[], c: Vec3|number[],
-      d: Vec3|number[], t: number): Vec3;
+      out: Vec3Type, a: Vec3Type|number[], b: Vec3Type|number[],
+      c: Vec3Type|number[], d: Vec3Type|number[], t: number): Vec3Type;
 
   /**
    * Generates a random unit vector
@@ -854,7 +858,7 @@ interface Vec3 extends Float32Array {
    * @param out the receiving vector
    * @returns out
    */
-  random(out: Vec3): Vec3;
+  random(out: Vec3Type): Vec3Type;
 
   /**
    * Generates a random vector with the given scale
@@ -864,20 +868,20 @@ interface Vec3 extends Float32Array {
    *     will be returned
    * @returns out
    */
-  random(out: Vec3, scale: number): Vec3;
+  random(out: Vec3Type, scale: number): Vec3Type;
 
   /**
-   * Transforms the Vec3 with a Mat3.
+   * Transforms the Vec3Type with a Mat3Type.
    *
    * @param out the receiving vector
    * @param a the vector to transform
    * @param m the 3x3 matrix to transform with
    * @returns out
    */
-  transformMat3(out: Vec3, a: Vec3|number[], m: Mat3): Vec3;
+  transformMat3(out: Vec3Type, a: Vec3Type|number[], m: Mat3Type): Vec3Type;
 
   /**
-   * Transforms the Vec3 with a Mat4.
+   * Transforms the Vec3Type with a Mat4Type.
    * 4th vector component is implicitly '1'
    *
    * @param out the receiving vector
@@ -885,54 +889,57 @@ interface Vec3 extends Float32Array {
    * @param m matrix to transform with
    * @returns out
    */
-  transformMat4(out: Vec3, a: Vec3|number[], m: Mat4): Vec3;
+  transformMat4(out: Vec3Type, a: Vec3Type|number[], m: Mat4Type): Vec3Type;
 
   /**
-   * Transforms the Vec3 with a Quat
+   * Transforms the Vec3Type with a QuatType
    *
    * @param out the receiving vector
    * @param a the vector to transform
    * @param q Quaternion to transform with
    * @returns out
    */
-  transformQuat(out: Vec3, a: Vec3|number[], q: Quat): Vec3;
+  transformQuat(out: Vec3Type, a: Vec3Type|number[], q: QuatType): Vec3Type;
 
 
   /**
    * Rotate a 3D vector around the x-axis
-   * @param out The receiving Vec3
-   * @param a The Vec3 point to rotate
+   * @param out The receiving Vec3Type
+   * @param a The Vec3Type point to rotate
    * @param b The origin of the rotation
    * @param c The angle of rotation
    * @returns out
    */
-  rotateX(out: Vec3, a: Vec3|number[], b: Vec3|number[], c: number): Vec3;
+  rotateX(out: Vec3Type, a: Vec3Type|number[], b: Vec3Type|number[], c: number):
+      Vec3Type;
 
   /**
    * Rotate a 3D vector around the y-axis
-   * @param out The receiving Vec3
-   * @param a The Vec3 point to rotate
+   * @param out The receiving Vec3Type
+   * @param a The Vec3Type point to rotate
    * @param b The origin of the rotation
    * @param c The angle of rotation
    * @returns out
    */
-  rotateY(out: Vec3, a: Vec3|number[], b: Vec3|number[], c: number): Vec3;
+  rotateY(out: Vec3Type, a: Vec3Type|number[], b: Vec3Type|number[], c: number):
+      Vec3Type;
 
   /**
    * Rotate a 3D vector around the z-axis
-   * @param out The receiving Vec3
-   * @param a The Vec3 point to rotate
+   * @param out The receiving Vec3Type
+   * @param a The Vec3Type point to rotate
    * @param b The origin of the rotation
    * @param c The angle of rotation
    * @returns out
    */
-  rotateZ(out: Vec3, a: Vec3|number[], b: Vec3|number[], c: number): Vec3;
+  rotateZ(out: Vec3Type, a: Vec3Type|number[], b: Vec3Type|number[], c: number):
+      Vec3Type;
 
   /**
    * Perform some operation over an array of vec3s.
    *
    * @param a the array of vectors to iterate over
-   * @param stride Number of elements between the start of each Vec3. If 0
+   * @param stride Number of elements between the start of each Vec3Type. If 0
    *     assumes tightly packed
    * @param offset Number of elements to skip at the beginning of the array
    * @param count Number of vec3s to iterate over. If 0 iterates over entire
@@ -944,14 +951,14 @@ interface Vec3 extends Float32Array {
    */
   forEach(
       a: Float32Array, stride: number, offset: number, count: number,
-      fn: (a: Vec3|number[], b: Vec3|number[], arg: any) => void,
+      fn: (a: Vec3Type|number[], b: Vec3Type|number[], arg: any) => void,
       arg: any): Float32Array;
 
   /**
    * Perform some operation over an array of vec3s.
    *
    * @param a the array of vectors to iterate over
-   * @param stride Number of elements between the start of each Vec3. If 0
+   * @param stride Number of elements between the start of each Vec3Type. If 0
    *     assumes tightly packed
    * @param offset Number of elements to skip at the beginning of the array
    * @param count Number of vec3s to iterate over. If 0 iterates over entire
@@ -962,7 +969,7 @@ interface Vec3 extends Float32Array {
    */
   forEach(
       a: Float32Array, stride: number, offset: number, count: number,
-      fn: (a: Vec3|number[], b: Vec3|number[]) => void): Float32Array;
+      fn: (a: Vec3Type|number[], b: Vec3Type|number[]) => void): Float32Array;
 
   /**
    * Get the angle between two 3D vectors
@@ -970,7 +977,7 @@ interface Vec3 extends Float32Array {
    * @param b The second operand
    * @returns The angle in radians
    */
-  angle(a: Vec3|number[], b: Vec3|number[]): number;
+  angle(a: Vec3Type|number[], b: Vec3Type|number[]): number;
 
   /**
    * Returns a string representation of a vector
@@ -978,48 +985,48 @@ interface Vec3 extends Float32Array {
    * @param a vector to represent as a string
    * @returns string representation of the vector
    */
-  str(a: Vec3|number[]): string;
+  str(a: Vec3Type|number[]): string;
 
   /**
    * Returns whether or not the vectors have exactly the same elements in the
    * same position (when compared with ===)
    *
-   * @param {Vec3} a The first vector.
-   * @param {Vec3} b The second vector.
+   * @param {Vec3Type} a The first vector.
+   * @param {Vec3Type} b The second vector.
    * @returns {boolean} True if the vectors are equal, false otherwise.
    */
-  exactEquals(a: Vec3|number[], b: Vec3|number[]): boolean
+  exactEquals(a: Vec3Type|number[], b: Vec3Type|number[]): boolean
 
   /**
    * Returns whether or not the vectors have approximately the same
    * elements in the same position.
    *
-   * @param {Vec3} a The first vector.
-   * @param {Vec3} b The second vector.
+   * @param {Vec3Type} a The first vector.
+   * @param {Vec3Type} b The second vector.
    * @returns {boolean} True if the vectors are equal, false otherwise.
    */
-  equals(a: Vec3|number[], b: Vec3|number[]): boolean
+  equals(a: Vec3Type|number[], b: Vec3Type|number[]): boolean
 }
 
-// Vec4
-interface Vec4 extends Float32Array {
+// Vec4Type
+interface Vec4Type extends Float32Array {
   /**
-   * Creates a new, empty Vec4
+   * Creates a new, empty Vec4Type
    *
    * @returns a new 4D vector
    */
-  create(): Vec4;
+  create(): Vec4Type;
 
   /**
-   * Creates a new Vec4 initialized with values from an existing vector
+   * Creates a new Vec4Type initialized with values from an existing vector
    *
    * @param a vector to clone
    * @returns a new 4D vector
    */
-  clone(a: Vec4|number[]): Vec4;
+  clone(a: Vec4Type|number[]): Vec4Type;
 
   /**
-   * Creates a new Vec4 initialized with the given values
+   * Creates a new Vec4Type initialized with the given values
    *
    * @param x X component
    * @param y Y component
@@ -1027,19 +1034,19 @@ interface Vec4 extends Float32Array {
    * @param w W component
    * @returns a new 4D vector
    */
-  fromValues(x: number, y: number, z: number, w: number): Vec4;
+  fromValues(x: number, y: number, z: number, w: number): Vec4Type;
 
   /**
-   * Copy the values from one Vec4 to another
+   * Copy the values from one Vec4Type to another
    *
    * @param out the receiving vector
    * @param a the source vector
    * @returns out
    */
-  copy(out: Vec4, a: Vec4|number[]): Vec4;
+  copy(out: Vec4Type, a: Vec4Type|number[]): Vec4Type;
 
   /**
-   * Set the components of a Vec4 to the given values
+   * Set the components of a Vec4Type to the given values
    *
    * @param out the receiving vector
    * @param x X component
@@ -1048,17 +1055,17 @@ interface Vec4 extends Float32Array {
    * @param w W component
    * @returns out
    */
-  set(out: Vec4, x: number, y: number, z: number, w: number): Vec4;
+  set(out: Vec4Type, x: number, y: number, z: number, w: number): Vec4Type;
 
   /**
-   * Adds two Vec4's
+   * Adds two Vec4Type's
    *
    * @param out the receiving vector
    * @param a the first operand
    * @param b the second operand
    * @returns out
    */
-  add(out: Vec4, a: Vec4|number[], b: Vec4|number[]): Vec4;
+  add(out: Vec4Type, a: Vec4Type|number[], b: Vec4Type|number[]): Vec4Type;
 
   /**
    * Subtracts vector b from vector a
@@ -1068,7 +1075,7 @@ interface Vec4 extends Float32Array {
    * @param b the second operand
    * @returns out
    */
-  subtract(out: Vec4, a: Vec4|number[], b: Vec4|number[]): Vec4;
+  subtract(out: Vec4Type, a: Vec4Type|number[], b: Vec4Type|number[]): Vec4Type;
 
   /**
    * Subtracts vector b from vector a
@@ -1078,107 +1085,107 @@ interface Vec4 extends Float32Array {
    * @param b the second operand
    * @returns out
    */
-  sub(out: Vec4, a: Vec4|number[], b: Vec4|number[]): Vec4;
+  sub(out: Vec4Type, a: Vec4Type|number[], b: Vec4Type|number[]): Vec4Type;
 
   /**
-   * Multiplies two Vec4's
+   * Multiplies two Vec4Type's
    *
    * @param out the receiving vector
    * @param a the first operand
    * @param b the second operand
    * @returns out
    */
-  multiply(out: Vec4, a: Vec4|number[], b: Vec4|number[]): Vec4;
+  multiply(out: Vec4Type, a: Vec4Type|number[], b: Vec4Type|number[]): Vec4Type;
 
   /**
-   * Multiplies two Vec4's
+   * Multiplies two Vec4Type's
    *
    * @param out the receiving vector
    * @param a the first operand
    * @param b the second operand
    * @returns out
    */
-  mul(out: Vec4, a: Vec4|number[], b: Vec4|number[]): Vec4;
+  mul(out: Vec4Type, a: Vec4Type|number[], b: Vec4Type|number[]): Vec4Type;
 
   /**
-   * Divides two Vec4's
+   * Divides two Vec4Type's
    *
    * @param out the receiving vector
    * @param a the first operand
    * @param b the second operand
    * @returns out
    */
-  divide(out: Vec4, a: Vec4|number[], b: Vec4|number[]): Vec4;
+  divide(out: Vec4Type, a: Vec4Type|number[], b: Vec4Type|number[]): Vec4Type;
 
   /**
-   * Divides two Vec4's
+   * Divides two Vec4Type's
    *
    * @param out the receiving vector
    * @param a the first operand
    * @param b the second operand
    * @returns out
    */
-  div(out: Vec4, a: Vec4|number[], b: Vec4|number[]): Vec4;
+  div(out: Vec4Type, a: Vec4Type|number[], b: Vec4Type|number[]): Vec4Type;
 
   /**
-   * Math.ceil the components of a Vec4
+   * Math.ceil the components of a Vec4Type
    *
-   * @param {Vec4} out the receiving vector
-   * @param {Vec4} a vector to ceil
-   * @returns {Vec4} out
+   * @param {Vec4Type} out the receiving vector
+   * @param {Vec4Type} a vector to ceil
+   * @returns {Vec4Type} out
    */
-  ceil(out: Vec4, a: Vec4|number[]): Vec4;
+  ceil(out: Vec4Type, a: Vec4Type|number[]): Vec4Type;
 
   /**
-   * Math.floor the components of a Vec4
+   * Math.floor the components of a Vec4Type
    *
-   * @param {Vec4} out the receiving vector
-   * @param {Vec4} a vector to floor
-   * @returns {Vec4} out
+   * @param {Vec4Type} out the receiving vector
+   * @param {Vec4Type} a vector to floor
+   * @returns {Vec4Type} out
    */
-  floor(out: Vec4, a: Vec4|number[]): Vec4;
+  floor(out: Vec4Type, a: Vec4Type|number[]): Vec4Type;
 
   /**
-   * Returns the minimum of two Vec4's
-   *
-   * @param out the receiving vector
-   * @param a the first operand
-   * @param b the second operand
-   * @returns out
-   */
-  min(out: Vec4, a: Vec4|number[], b: Vec4|number[]): Vec4;
-
-  /**
-   * Returns the maximum of two Vec4's
+   * Returns the minimum of two Vec4Type's
    *
    * @param out the receiving vector
    * @param a the first operand
    * @param b the second operand
    * @returns out
    */
-  max(out: Vec4, a: Vec4|number[], b: Vec4|number[]): Vec4;
+  min(out: Vec4Type, a: Vec4Type|number[], b: Vec4Type|number[]): Vec4Type;
 
   /**
-   * Math.round the components of a Vec4
+   * Returns the maximum of two Vec4Type's
    *
-   * @param {Vec4} out the receiving vector
-   * @param {Vec4} a vector to round
-   * @returns {Vec4} out
+   * @param out the receiving vector
+   * @param a the first operand
+   * @param b the second operand
+   * @returns out
    */
-  round(out: Vec4, a: Vec4|number[]): Vec4;
+  max(out: Vec4Type, a: Vec4Type|number[], b: Vec4Type|number[]): Vec4Type;
 
   /**
-   * Scales a Vec4 by a scalar number
+   * Math.round the components of a Vec4Type
+   *
+   * @param {Vec4Type} out the receiving vector
+   * @param {Vec4Type} a vector to round
+   * @returns {Vec4Type} out
+   */
+  round(out: Vec4Type, a: Vec4Type|number[]): Vec4Type;
+
+  /**
+   * Scales a Vec4Type by a scalar number
    *
    * @param out the receiving vector
    * @param a the vector to scale
    * @param b amount to scale the vector by
    * @returns out
    */
-  scale(out: Vec4, a: Vec4|number[], b: number): Vec4;
+  scale(out: Vec4Type, a: Vec4Type|number[], b: number): Vec4Type;
 
   /**
-   * Adds two Vec4's after scaling the second operand by a scalar value
+   * Adds two Vec4Type's after scaling the second operand by a scalar value
    *
    * @param out the receiving vector
    * @param a the first operand
@@ -1186,115 +1193,116 @@ interface Vec4 extends Float32Array {
    * @param scale the amount to scale b by before adding
    * @returns out
    */
-  scaleAndAdd(out: Vec4, a: Vec4|number[], b: Vec4|number[], scale: number):
-      Vec4;
+  scaleAndAdd(
+      out: Vec4Type, a: Vec4Type|number[], b: Vec4Type|number[],
+      scale: number): Vec4Type;
 
   /**
-   * Calculates the euclidian distance between two Vec4's
+   * Calculates the euclidian distance between two Vec4Type's
    *
    * @param a the first operand
    * @param b the second operand
    * @returns distance between a and b
    */
-  distance(a: Vec4|number[], b: Vec4|number[]): number;
+  distance(a: Vec4Type|number[], b: Vec4Type|number[]): number;
 
   /**
-   * Calculates the euclidian distance between two Vec4's
+   * Calculates the euclidian distance between two Vec4Type's
    *
    * @param a the first operand
    * @param b the second operand
    * @returns distance between a and b
    */
-  dist(a: Vec4|number[], b: Vec4|number[]): number;
+  dist(a: Vec4Type|number[], b: Vec4Type|number[]): number;
 
   /**
-   * Calculates the squared euclidian distance between two Vec4's
+   * Calculates the squared euclidian distance between two Vec4Type's
    *
    * @param a the first operand
    * @param b the second operand
    * @returns squared distance between a and b
    */
-  squaredDistance(a: Vec4|number[], b: Vec4|number[]): number;
+  squaredDistance(a: Vec4Type|number[], b: Vec4Type|number[]): number;
 
   /**
-   * Calculates the squared euclidian distance between two Vec4's
+   * Calculates the squared euclidian distance between two Vec4Type's
    *
    * @param a the first operand
    * @param b the second operand
    * @returns squared distance between a and b
    */
-  sqrDist(a: Vec4|number[], b: Vec4|number[]): number;
+  sqrDist(a: Vec4Type|number[], b: Vec4Type|number[]): number;
 
   /**
-   * Calculates the length of a Vec4
+   * Calculates the length of a Vec4Type
    *
    * @param a vector to calculate length of
    * @returns length of a
    */
-  length(a: Vec4|number[]): number;
+  length(a: Vec4Type|number[]): number;
 
   /**
-   * Calculates the length of a Vec4
+   * Calculates the length of a Vec4Type
    *
    * @param a vector to calculate length of
    * @returns length of a
    */
-  len(a: Vec4|number[]): number;
+  len(a: Vec4Type|number[]): number;
 
   /**
-   * Calculates the squared length of a Vec4
+   * Calculates the squared length of a Vec4Type
    *
    * @param a vector to calculate squared length of
    * @returns squared length of a
    */
-  squaredLength(a: Vec4|number[]): number;
+  squaredLength(a: Vec4Type|number[]): number;
 
   /**
-   * Calculates the squared length of a Vec4
+   * Calculates the squared length of a Vec4Type
    *
    * @param a vector to calculate squared length of
    * @returns squared length of a
    */
-  sqrLen(a: Vec4|number[]): number;
+  sqrLen(a: Vec4Type|number[]): number;
 
   /**
-   * Negates the components of a Vec4
+   * Negates the components of a Vec4Type
    *
    * @param out the receiving vector
    * @param a vector to negate
    * @returns out
    */
-  negate(out: Vec4, a: Vec4|number[]): Vec4;
+  negate(out: Vec4Type, a: Vec4Type|number[]): Vec4Type;
 
   /**
-   * Returns the inverse of the components of a Vec4
+   * Returns the inverse of the components of a Vec4Type
    *
    * @param out the receiving vector
    * @param a vector to invert
    * @returns out
    */
-  inverse(out: Vec4, a: Vec4|number[]): Vec4;
+  inverse(out: Vec4Type, a: Vec4Type|number[]): Vec4Type;
 
   /**
-   * Normalize a Vec4
+   * Normalize a Vec4Type
    *
    * @param out the receiving vector
    * @param a vector to normalize
    * @returns out
    */
-  normalize(out: Vec4, a: Vec4|number[]): Vec4;
+  normalize(out: Vec4Type, a: Vec4Type|number[]): Vec4Type;
 
   /**
-   * Calculates the dot product of two Vec4's
+   * Calculates the dot product of two Vec4Type's
    *
    * @param a the first operand
    * @param b the second operand
    * @returns dot product of a and b
    */
-  dot(a: Vec4|number[], b: Vec4|number[]): number;
+  dot(a: Vec4Type|number[], b: Vec4Type|number[]): number;
 
   /**
-   * Performs a linear interpolation between two Vec4's
+   * Performs a linear interpolation between two Vec4Type's
    *
    * @param out the receiving vector
    * @param a the first operand
@@ -1302,7 +1310,8 @@ interface Vec4 extends Float32Array {
    * @param t interpolation amount between the two inputs
    * @returns out
    */
-  lerp(out: Vec4, a: Vec4|number[], b: Vec4|number[], t: number): Vec4;
+  lerp(out: Vec4Type, a: Vec4Type|number[], b: Vec4Type|number[], t: number):
+      Vec4Type;
 
   /**
    * Generates a random unit vector
@@ -1310,7 +1319,7 @@ interface Vec4 extends Float32Array {
    * @param out the receiving vector
    * @returns out
    */
-  random(out: Vec4): Vec4;
+  random(out: Vec4Type): Vec4Type;
 
   /**
    * Generates a random vector with the given scale
@@ -1320,20 +1329,20 @@ interface Vec4 extends Float32Array {
    *     will be returned
    * @returns out
    */
-  random(out: Vec4, scale: number): Vec4;
+  random(out: Vec4Type, scale: number): Vec4Type;
 
   /**
-   * Transforms the Vec4 with a Mat4.
+   * Transforms the Vec4Type with a Mat4Type.
    *
    * @param out the receiving vector
    * @param a the vector to transform
    * @param m matrix to transform with
    * @returns out
    */
-  transformMat4(out: Vec4, a: Vec4|number[], m: Mat4): Vec4;
+  transformMat4(out: Vec4Type, a: Vec4Type|number[], m: Mat4Type): Vec4Type;
 
   /**
-   * Transforms the Vec4 with a Quat
+   * Transforms the Vec4Type with a QuatType
    *
    * @param out the receiving vector
    * @param a the vector to transform
@@ -1341,13 +1350,13 @@ interface Vec4 extends Float32Array {
    * @returns out
    */
 
-  transformQuat(out: Vec4, a: Vec4|number[], q: Quat): Vec4;
+  transformQuat(out: Vec4Type, a: Vec4Type|number[], q: QuatType): Vec4Type;
 
   /**
    * Perform some operation over an array of Vec4s.
    *
    * @param a the array of vectors to iterate over
-   * @param stride Number of elements between the start of each Vec4. If 0
+   * @param stride Number of elements between the start of each Vec4Type. If 0
    *     assumes tightly packed
    * @param offset Number of elements to skip at the beginning of the array
    * @param count Number of Vec4s to iterate over. If 0 iterates over entire
@@ -1359,14 +1368,14 @@ interface Vec4 extends Float32Array {
    */
   forEach(
       a: Float32Array, stride: number, offset: number, count: number,
-      fn: (a: Vec4|number[], b: Vec4|number[], arg: any) => void,
+      fn: (a: Vec4Type|number[], b: Vec4Type|number[], arg: any) => void,
       arg: any): Float32Array;
 
   /**
    * Perform some operation over an array of Vec4s.
    *
    * @param a the array of vectors to iterate over
-   * @param stride Number of elements between the start of each Vec4. If 0
+   * @param stride Number of elements between the start of each Vec4Type. If 0
    *     assumes tightly packed
    * @param offset Number of elements to skip at the beginning of the array
    * @param count Number of Vec4s to iterate over. If 0 iterates over entire
@@ -1377,7 +1386,7 @@ interface Vec4 extends Float32Array {
    */
   forEach(
       a: Float32Array, stride: number, offset: number, count: number,
-      fn: (a: Vec4|number[], b: Vec4|number[]) => void): Float32Array;
+      fn: (a: Vec4Type|number[], b: Vec4Type|number[]) => void): Float32Array;
 
   /**
    * Returns a string representation of a vector
@@ -1385,202 +1394,203 @@ interface Vec4 extends Float32Array {
    * @param a vector to represent as a string
    * @returns string representation of the vector
    */
-  str(a: Vec4|number[]): string;
+  str(a: Vec4Type|number[]): string;
 
   /**
    * Returns whether or not the vectors have exactly the same elements in the
    * same position (when compared with ===)
    *
-   * @param {Vec4} a The first vector.
-   * @param {Vec4} b The second vector.
+   * @param {Vec4Type} a The first vector.
+   * @param {Vec4Type} b The second vector.
    * @returns {boolean} True if the vectors are equal, false otherwise.
    */
-  exactEquals(a: Vec4|number[], b: Vec4|number[]): boolean;
+  exactEquals(a: Vec4Type|number[], b: Vec4Type|number[]): boolean;
 
   /**
    * Returns whether or not the vectors have approximately the same elements
    * in the same position.
    *
-   * @param {Vec4} a The first vector.
-   * @param {Vec4} b The second vector.
+   * @param {Vec4Type} a The first vector.
+   * @param {Vec4Type} b The second vector.
    * @returns {boolean} True if the vectors are equal, false otherwise.
    */
-  equals(a: Vec4|number[], b: Vec4|number[]): boolean;
+  equals(a: Vec4Type|number[], b: Vec4Type|number[]): boolean;
 }
 
-// Mat2
-interface Mat2 extends Float32Array {
+// Mat2Type
+interface Mat2Type extends Float32Array {
   /**
-   * Creates a new identity Mat2
+   * Creates a new identity Mat2Type
    *
    * @returns a new 2x2 matrix
    */
-  create(): Mat2;
+  create(): Mat2Type;
 
   /**
-   * Creates a new Mat2 initialized with values from an existing matrix
+   * Creates a new Mat2Type initialized with values from an existing matrix
    *
    * @param a matrix to clone
    * @returns a new 2x2 matrix
    */
-  clone(a: Mat2): Mat2;
+  clone(a: Mat2Type): Mat2Type;
 
   /**
-   * Copy the values from one Mat2 to another
+   * Copy the values from one Mat2Type to another
    *
    * @param out the receiving matrix
    * @param a the source matrix
    * @returns out
    */
-  copy(out: Mat2, a: Mat2): Mat2;
+  copy(out: Mat2Type, a: Mat2Type): Mat2Type;
 
   /**
-   * Set a Mat2 to the identity matrix
+   * Set a Mat2Type to the identity matrix
    *
    * @param out the receiving matrix
    * @returns out
    */
-  identity(out: Mat2): Mat2;
+  identity(out: Mat2Type): Mat2Type;
 
   /**
-   * Create a new Mat2 with the given values
+   * Create a new Mat2Type with the given values
    *
    * @param {number} m00 Component in column 0, row 0 position (index 0)
    * @param {number} m01 Component in column 0, row 1 position (index 1)
    * @param {number} m10 Component in column 1, row 0 position (index 2)
    * @param {number} m11 Component in column 1, row 1 position (index 3)
-   * @returns {Mat2} out A new 2x2 matrix
+   * @returns {Mat2Type} out A new 2x2 matrix
    */
-  fromValues(m00: number, m01: number, m10: number, m11: number): Mat2;
+  fromValues(m00: number, m01: number, m10: number, m11: number): Mat2Type;
 
   /**
-   * Set the components of a Mat2 to the given values
+   * Set the components of a Mat2Type to the given values
    *
-   * @param {Mat2} out the receiving matrix
+   * @param {Mat2Type} out the receiving matrix
    * @param {number} m00 Component in column 0, row 0 position (index 0)
    * @param {number} m01 Component in column 0, row 1 position (index 1)
    * @param {number} m10 Component in column 1, row 0 position (index 2)
    * @param {number} m11 Component in column 1, row 1 position (index 3)
-   * @returns {Mat2} out
+   * @returns {Mat2Type} out
    */
-  set(out: Mat2, m00: number, m01: number, m10: number, m11: number): Mat2;
+  set(out: Mat2Type, m00: number, m01: number, m10: number,
+      m11: number): Mat2Type;
 
   /**
-   * Transpose the values of a Mat2
+   * Transpose the values of a Mat2Type
    *
    * @param out the receiving matrix
    * @param a the source matrix
    * @returns out
    */
-  transpose(out: Mat2, a: Mat2): Mat2;
+  transpose(out: Mat2Type, a: Mat2Type): Mat2Type;
 
   /**
-   * Inverts a Mat2
+   * Inverts a Mat2Type
    *
    * @param out the receiving matrix
    * @param a the source matrix
    * @returns out
    */
-  invert(out: Mat2, a: Mat2): Mat2|null;
+  invert(out: Mat2Type, a: Mat2Type): Mat2Type|null;
 
   /**
-   * Calculates the adjugate of a Mat2
+   * Calculates the adjugate of a Mat2Type
    *
    * @param out the receiving matrix
    * @param a the source matrix
    * @returns out
    */
-  adjoint(out: Mat2, a: Mat2): Mat2;
+  adjoint(out: Mat2Type, a: Mat2Type): Mat2Type;
 
   /**
-   * Calculates the determinant of a Mat2
+   * Calculates the determinant of a Mat2Type
    *
    * @param a the source matrix
    * @returns determinant of a
    */
-  determinant(a: Mat2): number;
+  determinant(a: Mat2Type): number;
 
   /**
-   * Multiplies two Mat2's
+   * Multiplies two Mat2Type's
    *
    * @param out the receiving matrix
    * @param a the first operand
    * @param b the second operand
    * @returns out
    */
-  multiply(out: Mat2, a: Mat2, b: Mat2): Mat2;
+  multiply(out: Mat2Type, a: Mat2Type, b: Mat2Type): Mat2Type;
 
   /**
-   * Multiplies two Mat2's
+   * Multiplies two Mat2Type's
    *
    * @param out the receiving matrix
    * @param a the first operand
    * @param b the second operand
    * @returns out
    */
-  mul(out: Mat2, a: Mat2, b: Mat2): Mat2;
+  mul(out: Mat2Type, a: Mat2Type, b: Mat2Type): Mat2Type;
 
   /**
-   * Rotates a Mat2 by the given angle
+   * Rotates a Mat2Type by the given angle
    *
    * @param out the receiving matrix
    * @param a the matrix to rotate
    * @param rad the angle to rotate the matrix by
    * @returns out
    */
-  rotate(out: Mat2, a: Mat2, rad: number): Mat2;
+  rotate(out: Mat2Type, a: Mat2Type, rad: number): Mat2Type;
 
   /**
-   * Scales the Mat2 by the dimensions in the given Vec2
+   * Scales the Mat2Type by the dimensions in the given Vec2Type
    *
    * @param out the receiving matrix
    * @param a the matrix to rotate
-   * @param v the Vec2 to scale the matrix by
+   * @param v the Vec2Type to scale the matrix by
    * @returns out
    **/
-  scale(out: Mat2, a: Mat2, v: Vec2|number[]): Mat2;
+  scale(out: Mat2Type, a: Mat2Type, v: Vec2Type|number[]): Mat2Type;
 
   /**
    * Creates a matrix from a given angle
    * This is equivalent to (but much faster than):
    *
-   *     Mat2.identity(dest);
-   *     Mat2.rotate(dest, dest, rad);
+   *     Mat2Type.identity(dest);
+   *     Mat2Type.rotate(dest, dest, rad);
    *
-   * @param {Mat2} out Mat2 receiving operation result
+   * @param {Mat2Type} out Mat2Type receiving operation result
    * @param {number} rad the angle to rotate the matrix by
-   * @returns {Mat2} out
+   * @returns {Mat2Type} out
    */
-  fromRotation(out: Mat2, rad: number): Mat2;
+  fromRotation(out: Mat2Type, rad: number): Mat2Type;
 
   /**
    * Creates a matrix from a vector scaling
    * This is equivalent to (but much faster than):
    *
-   *     Mat2.identity(dest);
-   *     Mat2.scale(dest, dest, vec);
+   *     Mat2Type.identity(dest);
+   *     Mat2Type.scale(dest, dest, vec);
    *
-   * @param {Mat2} out Mat2 receiving operation result
-   * @param {Vec2} v Scaling vector
-   * @returns {Mat2} out
+   * @param {Mat2Type} out Mat2Type receiving operation result
+   * @param {Vec2Type} v Scaling vector
+   * @returns {Mat2Type} out
    */
-  fromScaling(out: Mat2, v: Vec2|number[]): Mat2;
+  fromScaling(out: Mat2Type, v: Vec2Type|number[]): Mat2Type;
 
   /**
-   * Returns a string representation of a Mat2
+   * Returns a string representation of a Mat2Type
    *
    * @param a matrix to represent as a string
    * @returns string representation of the matrix
    */
-  str(a: Mat2): string;
+  str(a: Mat2Type): string;
 
   /**
-   * Returns Frobenius norm of a Mat2
+   * Returns Frobenius norm of a Mat2Type
    *
    * @param a the matrix to calculate Frobenius norm of
    * @returns Frobenius norm
    */
-  frob(a: Mat2): number;
+  frob(a: Mat2Type): number;
 
   /**
    * Returns L, D and U matrices (Lower triangular, Diagonal and Upper
@@ -1590,118 +1600,119 @@ interface Mat2 extends Float32Array {
    * @param U the upper triangular matrix
    * @param a the input matrix to factorize
    */
-  LDU(L: Mat2, D: Mat2, U: Mat2, a: Mat2): Mat2;
+  LDU(L: Mat2Type, D: Mat2Type, U: Mat2Type, a: Mat2Type): Mat2Type;
 
   /**
-   * Adds two Mat2's
+   * Adds two Mat2Type's
    *
-   * @param {Mat2} out the receiving matrix
-   * @param {Mat2} a the first operand
-   * @param {Mat2} b the second operand
-   * @returns {Mat2} out
+   * @param {Mat2Type} out the receiving matrix
+   * @param {Mat2Type} a the first operand
+   * @param {Mat2Type} b the second operand
+   * @returns {Mat2Type} out
    */
-  add(out: Mat2, a: Mat2, b: Mat2): Mat2;
-
-  /**
-   * Subtracts matrix b from matrix a
-   *
-   * @param {Mat2} out the receiving matrix
-   * @param {Mat2} a the first operand
-   * @param {Mat2} b the second operand
-   * @returns {Mat2} out
-   */
-  subtract(out: Mat2, a: Mat2, b: Mat2): Mat2;
+  add(out: Mat2Type, a: Mat2Type, b: Mat2Type): Mat2Type;
 
   /**
    * Subtracts matrix b from matrix a
    *
-   * @param {Mat2} out the receiving matrix
-   * @param {Mat2} a the first operand
-   * @param {Mat2} b the second operand
-   * @returns {Mat2} out
+   * @param {Mat2Type} out the receiving matrix
+   * @param {Mat2Type} a the first operand
+   * @param {Mat2Type} b the second operand
+   * @returns {Mat2Type} out
    */
-  sub(out: Mat2, a: Mat2, b: Mat2): Mat2;
+  subtract(out: Mat2Type, a: Mat2Type, b: Mat2Type): Mat2Type;
+
+  /**
+   * Subtracts matrix b from matrix a
+   *
+   * @param {Mat2Type} out the receiving matrix
+   * @param {Mat2Type} a the first operand
+   * @param {Mat2Type} b the second operand
+   * @returns {Mat2Type} out
+   */
+  sub(out: Mat2Type, a: Mat2Type, b: Mat2Type): Mat2Type;
 
   /**
    * Returns whether or not the matrices have exactly the same elements in the
    * same position (when compared with ===)
    *
-   * @param {Mat2} a The first matrix.
-   * @param {Mat2} b The second matrix.
+   * @param {Mat2Type} a The first matrix.
+   * @param {Mat2Type} b The second matrix.
    * @returns {boolean} True if the matrices are equal, false otherwise.
    */
-  exactEquals(a: Mat2, b: Mat2): boolean;
+  exactEquals(a: Mat2Type, b: Mat2Type): boolean;
 
   /**
    * Returns whether or not the matrices have approximately the same elements
    * in the same position.
    *
-   * @param {Mat2} a The first matrix.
-   * @param {Mat2} b The second matrix.
+   * @param {Mat2Type} a The first matrix.
+   * @param {Mat2Type} b The second matrix.
    * @returns {boolean} True if the matrices are equal, false otherwise.
    */
-  equals(a: Mat2, b: Mat2): boolean;
+  equals(a: Mat2Type, b: Mat2Type): boolean;
 
   /**
    * Multiply each element of the matrix by a scalar.
    *
-   * @param {Mat2} out the receiving matrix
-   * @param {Mat2} a the matrix to scale
+   * @param {Mat2Type} out the receiving matrix
+   * @param {Mat2Type} a the matrix to scale
    * @param {number} b amount to scale the matrix's elements by
-   * @returns {Mat2} out
+   * @returns {Mat2Type} out
    */
-  multiplyScalar(out: Mat2, a: Mat2, b: number): Mat2
+  multiplyScalar(out: Mat2Type, a: Mat2Type, b: number): Mat2Type
 
   /**
-   * Adds two Mat2's after multiplying each element of the second operand
+   * Adds two Mat2Type's after multiplying each element of the second operand
    * by a scalar value.
    *
-   * @param {Mat2} out the receiving vector
-   * @param {Mat2} a the first operand
-   * @param {Mat2} b the second operand
+   * @param {Mat2Type} out the receiving vector
+   * @param {Mat2Type} a the first operand
+   * @param {Mat2Type} b the second operand
    * @param {number} scale the amount to scale b's elements by before
    *     adding
-   * @returns {Mat2} out
+   * @returns {Mat2Type} out
    */
-  multiplyScalarAndAdd(out: Mat2, a: Mat2, b: Mat2, scale: number): Mat2
+  multiplyScalarAndAdd(out: Mat2Type, a: Mat2Type, b: Mat2Type, scale: number):
+      Mat2Type
 }
 
-// Mat2d
-interface Mat2d extends Float32Array {
+// Mat2dType
+interface Mat2dType extends Float32Array {
   /**
-   * Creates a new identity Mat2d
+   * Creates a new identity Mat2dType
    *
    * @returns a new 2x3 matrix
    */
-  create(): Mat2d;
+  create(): Mat2dType;
 
   /**
-   * Creates a new Mat2d initialized with values from an existing matrix
+   * Creates a new Mat2dType initialized with values from an existing matrix
    *
    * @param a matrix to clone
    * @returns a new 2x3 matrix
    */
-  clone(a: Mat2d): Mat2d;
+  clone(a: Mat2dType): Mat2dType;
 
   /**
-   * Copy the values from one Mat2d to another
+   * Copy the values from one Mat2dType to another
    *
    * @param out the receiving matrix
    * @param a the source matrix
    * @returns out
    */
-  copy(out: Mat2d, a: Mat2d): Mat2d;
+  copy(out: Mat2dType, a: Mat2dType): Mat2dType;
 
   /**
-   * Set a Mat2d to the identity matrix
+   * Set a Mat2dType to the identity matrix
    *
    * @param out the receiving matrix
    * @returns out
    */
-  identity(out: Mat2d): Mat2d;
+  identity(out: Mat2dType): Mat2dType;
 
   /**
-   * Create a new Mat2d with the given values
+   * Create a new Mat2dType with the given values
    *
    * @param {number} a Component A (index 0)
    * @param {number} b Component B (index 1)
@@ -1709,259 +1720,261 @@ interface Mat2d extends Float32Array {
    * @param {number} d Component D (index 3)
    * @param {number} tx Component TX (index 4)
    * @param {number} ty Component TY (index 5)
-   * @returns {Mat2d} A new Mat2d
+   * @returns {Mat2dType} A new Mat2dType
    */
   fromValues(
-      a: number, b: number, c: number, d: number, tx: number, ty: number): Mat2d
+      a: number, b: number, c: number, d: number, tx: number,
+      ty: number): Mat2dType
 
 
   /**
-   * Set the components of a Mat2d to the given values
+   * Set the components of a Mat2dType to the given values
    *
-   * @param {Mat2d} out the receiving matrix
+   * @param {Mat2dType} out the receiving matrix
    * @param {number} a Component A (index 0)
    * @param {number} b Component B (index 1)
    * @param {number} c Component C (index 2)
    * @param {number} d Component D (index 3)
    * @param {number} tx Component TX (index 4)
    * @param {number} ty Component TY (index 5)
-   * @returns {Mat2d} out
+   * @returns {Mat2dType} out
    */
-  set(out: Mat2d, a: number, b: number, c: number, d: number, tx: number,
-      ty: number): Mat2d
+  set(out: Mat2dType, a: number, b: number, c: number, d: number, tx: number,
+      ty: number): Mat2dType
 
   /**
-   * Inverts a Mat2d
+   * Inverts a Mat2dType
    *
    * @param out the receiving matrix
    * @param a the source matrix
    * @returns out
    */
-  invert(out: Mat2d, a: Mat2d): Mat2d|null;
+  invert(out: Mat2dType, a: Mat2dType): Mat2dType|null;
 
   /**
-   * Calculates the determinant of a Mat2d
+   * Calculates the determinant of a Mat2dType
    *
    * @param a the source matrix
    * @returns determinant of a
    */
-  determinant(a: Mat2d): number;
+  determinant(a: Mat2dType): number;
 
   /**
-   * Multiplies two Mat2d's
+   * Multiplies two Mat2dType's
    *
    * @param out the receiving matrix
    * @param a the first operand
    * @param b the second operand
    * @returns out
    */
-  multiply(out: Mat2d, a: Mat2d, b: Mat2d): Mat2d;
+  multiply(out: Mat2dType, a: Mat2dType, b: Mat2dType): Mat2dType;
 
   /**
-   * Multiplies two Mat2d's
+   * Multiplies two Mat2dType's
    *
    * @param out the receiving matrix
    * @param a the first operand
    * @param b the second operand
    * @returns out
    */
-  mul(out: Mat2d, a: Mat2d, b: Mat2d): Mat2d;
+  mul(out: Mat2dType, a: Mat2dType, b: Mat2dType): Mat2dType;
 
   /**
-   * Rotates a Mat2d by the given angle
+   * Rotates a Mat2dType by the given angle
    *
    * @param out the receiving matrix
    * @param a the matrix to rotate
    * @param rad the angle to rotate the matrix by
    * @returns out
    */
-  rotate(out: Mat2d, a: Mat2d, rad: number): Mat2d;
+  rotate(out: Mat2dType, a: Mat2dType, rad: number): Mat2dType;
 
   /**
-   * Scales the Mat2d by the dimensions in the given Vec2
+   * Scales the Mat2dType by the dimensions in the given Vec2Type
    *
    * @param out the receiving matrix
    * @param a the matrix to translate
-   * @param v the Vec2 to scale the matrix by
+   * @param v the Vec2Type to scale the matrix by
    * @returns out
    **/
-  scale(out: Mat2d, a: Mat2d, v: Vec2|number[]): Mat2d;
+  scale(out: Mat2dType, a: Mat2dType, v: Vec2Type|number[]): Mat2dType;
 
   /**
-   * Translates the Mat2d by the dimensions in the given Vec2
+   * Translates the Mat2dType by the dimensions in the given Vec2Type
    *
    * @param out the receiving matrix
    * @param a the matrix to translate
-   * @param v the Vec2 to translate the matrix by
+   * @param v the Vec2Type to translate the matrix by
    * @returns out
    **/
-  translate(out: Mat2d, a: Mat2d, v: Vec2|number[]): Mat2d;
+  translate(out: Mat2dType, a: Mat2dType, v: Vec2Type|number[]): Mat2dType;
 
   /**
    * Creates a matrix from a given angle
    * This is equivalent to (but much faster than):
    *
-   *     Mat2d.identity(dest);
-   *     Mat2d.rotate(dest, dest, rad);
+   *     Mat2dType.identity(dest);
+   *     Mat2dType.rotate(dest, dest, rad);
    *
-   * @param {Mat2d} out Mat2d receiving operation result
+   * @param {Mat2dType} out Mat2dType receiving operation result
    * @param {number} rad the angle to rotate the matrix by
-   * @returns {Mat2d} out
+   * @returns {Mat2dType} out
    */
-  fromRotation(out: Mat2d, rad: number): Mat2d;
+  fromRotation(out: Mat2dType, rad: number): Mat2dType;
 
   /**
    * Creates a matrix from a vector scaling
    * This is equivalent to (but much faster than):
    *
-   *     Mat2d.identity(dest);
-   *     Mat2d.scale(dest, dest, vec);
+   *     Mat2dType.identity(dest);
+   *     Mat2dType.scale(dest, dest, vec);
    *
-   * @param {Mat2d} out Mat2d receiving operation result
-   * @param {Vec2} v Scaling vector
-   * @returns {Mat2d} out
+   * @param {Mat2dType} out Mat2dType receiving operation result
+   * @param {Vec2Type} v Scaling vector
+   * @returns {Mat2dType} out
    */
-  fromScaling(out: Mat2d, v: Vec2|number[]): Mat2d;
+  fromScaling(out: Mat2dType, v: Vec2Type|number[]): Mat2dType;
 
   /**
    * Creates a matrix from a vector translation
    * This is equivalent to (but much faster than):
    *
-   *     Mat2d.identity(dest);
-   *     Mat2d.translate(dest, dest, vec);
+   *     Mat2dType.identity(dest);
+   *     Mat2dType.translate(dest, dest, vec);
    *
-   * @param {Mat2d} out Mat2d receiving operation result
-   * @param {Vec2} v Translation vector
-   * @returns {Mat2d} out
+   * @param {Mat2dType} out Mat2dType receiving operation result
+   * @param {Vec2Type} v Translation vector
+   * @returns {Mat2dType} out
    */
-  fromTranslation(out: Mat2d, v: Vec2|number[]): Mat2d
+  fromTranslation(out: Mat2dType, v: Vec2Type|number[]): Mat2dType
 
   /**
-   * Returns a string representation of a Mat2d
+   * Returns a string representation of a Mat2dType
    *
    * @param a matrix to represent as a string
    * @returns string representation of the matrix
    */
-  str(a: Mat2d): string;
+  str(a: Mat2dType): string;
 
   /**
-   * Returns Frobenius norm of a Mat2d
+   * Returns Frobenius norm of a Mat2dType
    *
    * @param a the matrix to calculate Frobenius norm of
    * @returns Frobenius norm
    */
-  frob(a: Mat2d): number;
+  frob(a: Mat2dType): number;
 
   /**
-   * Adds two Mat2d's
+   * Adds two Mat2dType's
    *
-   * @param {Mat2d} out the receiving matrix
-   * @param {Mat2d} a the first operand
-   * @param {Mat2d} b the second operand
-   * @returns {Mat2d} out
+   * @param {Mat2dType} out the receiving matrix
+   * @param {Mat2dType} a the first operand
+   * @param {Mat2dType} b the second operand
+   * @returns {Mat2dType} out
    */
-  add(out: Mat2d, a: Mat2d, b: Mat2d): Mat2d
-
-  /**
-   * Subtracts matrix b from matrix a
-   *
-   * @param {Mat2d} out the receiving matrix
-   * @param {Mat2d} a the first operand
-   * @param {Mat2d} b the second operand
-   * @returns {Mat2d} out
-   */
-  subtract(out: Mat2d, a: Mat2d, b: Mat2d): Mat2d
+  add(out: Mat2dType, a: Mat2dType, b: Mat2dType): Mat2dType
 
   /**
    * Subtracts matrix b from matrix a
    *
-   * @param {Mat2d} out the receiving matrix
-   * @param {Mat2d} a the first operand
-   * @param {Mat2d} b the second operand
-   * @returns {Mat2d} out
+   * @param {Mat2dType} out the receiving matrix
+   * @param {Mat2dType} a the first operand
+   * @param {Mat2dType} b the second operand
+   * @returns {Mat2dType} out
    */
-  sub(out: Mat2d, a: Mat2d, b: Mat2d): Mat2d
+  subtract(out: Mat2dType, a: Mat2dType, b: Mat2dType): Mat2dType
+
+  /**
+   * Subtracts matrix b from matrix a
+   *
+   * @param {Mat2dType} out the receiving matrix
+   * @param {Mat2dType} a the first operand
+   * @param {Mat2dType} b the second operand
+   * @returns {Mat2dType} out
+   */
+  sub(out: Mat2dType, a: Mat2dType, b: Mat2dType): Mat2dType
 
   /**
    * Multiply each element of the matrix by a scalar.
    *
-   * @param {Mat2d} out the receiving matrix
-   * @param {Mat2d} a the matrix to scale
+   * @param {Mat2dType} out the receiving matrix
+   * @param {Mat2dType} a the matrix to scale
    * @param {number} b amount to scale the matrix's elements by
-   * @returns {Mat2d} out
+   * @returns {Mat2dType} out
    */
-  multiplyScalar(out: Mat2d, a: Mat2d, b: number): Mat2d;
+  multiplyScalar(out: Mat2dType, a: Mat2dType, b: number): Mat2dType;
 
   /**
-   * Adds two Mat2d's after multiplying each element of the second operand by
-   * a scalar value.
+   * Adds two Mat2dType's after multiplying each element of the second operand
+   * by a scalar value.
    *
-   * @param {Mat2d} out the receiving vector
-   * @param {Mat2d} a the first operand
-   * @param {Mat2d} b the second operand
+   * @param {Mat2dType} out the receiving vector
+   * @param {Mat2dType} a the first operand
+   * @param {Mat2dType} b the second operand
    * @param {number} scale the amount to scale b's elements by before adding
-   * @returns {Mat2d} out
+   * @returns {Mat2dType} out
    */
-  multiplyScalarAndAdd(out: Mat2d, a: Mat2d, b: Mat2d, scale: number): Mat2d
+  multiplyScalarAndAdd(
+      out: Mat2dType, a: Mat2dType, b: Mat2dType, scale: number): Mat2dType
 
   /**
    * Returns whether or not the matrices have exactly the same elements in
    * the same position (when compared with ===)
    *
-   * @param {Mat2d} a The first matrix.
-   * @param {Mat2d} b The second matrix.
+   * @param {Mat2dType} a The first matrix.
+   * @param {Mat2dType} b The second matrix.
    * @returns {boolean} True if the matrices are equal, false otherwise.
    */
-  exactEquals(a: Mat2d, b: Mat2d): boolean;
+  exactEquals(a: Mat2dType, b: Mat2dType): boolean;
 
   /**
    * Returns whether or not the matrices have approximately the same elements
    * in the same position.
    *
-   * @param {Mat2d} a The first matrix.
-   * @param {Mat2d} b The second matrix.
+   * @param {Mat2dType} a The first matrix.
+   * @param {Mat2dType} b The second matrix.
    * @returns {boolean} True if the matrices are equal, false otherwise.
    */
-  equals(a: Mat2d, b: Mat2d): boolean
+  equals(a: Mat2dType, b: Mat2dType): boolean
 }
 
-// Mat3
-interface Mat3 extends Float32Array {
+// Mat3Type
+interface Mat3Type extends Float32Array {
   /**
-   * Creates a new identity Mat3
+   * Creates a new identity Mat3Type
    *
    * @returns a new 3x3 matrix
    */
-  create(): Mat3;
+  create(): Mat3Type;
 
   /**
-   * Copies the upper-left 3x3 values into the given Mat3.
+   * Copies the upper-left 3x3 values into the given Mat3Type.
    *
-   * @param {Mat3} out the receiving 3x3 matrix
-   * @param {Mat4} a   the source 4x4 matrix
-   * @returns {Mat3} out
+   * @param {Mat3Type} out the receiving 3x3 matrix
+   * @param {Mat4Type} a   the source 4x4 matrix
+   * @returns {Mat3Type} out
    */
-  fromMat4(out: Mat3, a: Mat4): Mat3
+  fromMat4(out: Mat3Type, a: Mat4Type): Mat3Type
 
   /**
-   * Creates a new Mat3 initialized with values from an existing matrix
+   * Creates a new Mat3Type initialized with values from an existing matrix
    *
    * @param a matrix to clone
    * @returns a new 3x3 matrix
    */
-  clone(a: Mat3): Mat3;
+  clone(a: Mat3Type): Mat3Type;
 
   /**
-   * Copy the values from one Mat3 to another
+   * Copy the values from one Mat3Type to another
    *
    * @param out the receiving matrix
    * @param a the source matrix
    * @returns out
    */
-  copy(out: Mat3, a: Mat3): Mat3;
+  copy(out: Mat3Type, a: Mat3Type): Mat3Type;
 
   /**
-   * Create a new Mat3 with the given values
+   * Create a new Mat3Type with the given values
    *
    * @param {number} m00 Component in column 0, row 0 position (index 0)
    * @param {number} m01 Component in column 0, row 1 position (index 1)
@@ -1972,17 +1985,17 @@ interface Mat3 extends Float32Array {
    * @param {number} m20 Component in column 2, row 0 position (index 6)
    * @param {number} m21 Component in column 2, row 1 position (index 7)
    * @param {number} m22 Component in column 2, row 2 position (index 8)
-   * @returns {Mat3} A new Mat3
+   * @returns {Mat3Type} A new Mat3Type
    */
   fromValues(
       m00: number, m01: number, m02: number, m10: number, m11: number,
-      m12: number, m20: number, m21: number, m22: number): Mat3;
+      m12: number, m20: number, m21: number, m22: number): Mat3Type;
 
 
   /**
-   * Set the components of a Mat3 to the given values
+   * Set the components of a Mat3Type to the given values
    *
-   * @param {Mat3} out the receiving matrix
+   * @param {Mat3Type} out the receiving matrix
    * @param {number} m00 Component in column 0, row 0 position (index 0)
    * @param {number} m01 Component in column 0, row 1 position (index 1)
    * @param {number} m02 Component in column 0, row 2 position (index 2)
@@ -1992,292 +2005,293 @@ interface Mat3 extends Float32Array {
    * @param {number} m20 Component in column 2, row 0 position (index 6)
    * @param {number} m21 Component in column 2, row 1 position (index 7)
    * @param {number} m22 Component in column 2, row 2 position (index 8)
-   * @returns {Mat3} out
+   * @returns {Mat3Type} out
    */
-  set(out: Mat3, m00: number, m01: number, m02: number, m10: number,
-      m11: number, m12: number, m20: number, m21: number, m22: number): Mat3
+  set(out: Mat3Type, m00: number, m01: number, m02: number, m10: number,
+      m11: number, m12: number, m20: number, m21: number, m22: number): Mat3Type
 
   /**
-   * Set a Mat3 to the identity matrix
+   * Set a Mat3Type to the identity matrix
    *
    * @param out the receiving matrix
    * @returns out
    */
-  identity(out: Mat3): Mat3;
+  identity(out: Mat3Type): Mat3Type;
 
   /**
-   * Transpose the values of a Mat3
-   *
-   * @param out the receiving matrix
-   * @param a the source matrix
-   * @returns out
-   */
-  transpose(out: Mat3, a: Mat3): Mat3;
-
-  /**
-   * Inverts a Mat3
+   * Transpose the values of a Mat3Type
    *
    * @param out the receiving matrix
    * @param a the source matrix
    * @returns out
    */
-  invert(out: Mat3, a: Mat3): Mat3|null;
+  transpose(out: Mat3Type, a: Mat3Type): Mat3Type;
 
   /**
-   * Calculates the adjugate of a Mat3
+   * Inverts a Mat3Type
    *
    * @param out the receiving matrix
    * @param a the source matrix
    * @returns out
    */
-  adjoint(out: Mat3, a: Mat3): Mat3;
+  invert(out: Mat3Type, a: Mat3Type): Mat3Type|null;
 
   /**
-   * Calculates the determinant of a Mat3
+   * Calculates the adjugate of a Mat3Type
+   *
+   * @param out the receiving matrix
+   * @param a the source matrix
+   * @returns out
+   */
+  adjoint(out: Mat3Type, a: Mat3Type): Mat3Type;
+
+  /**
+   * Calculates the determinant of a Mat3Type
    *
    * @param a the source matrix
    * @returns determinant of a
    */
-  determinant(a: Mat3): number;
+  determinant(a: Mat3Type): number;
 
   /**
-   * Multiplies two Mat3's
+   * Multiplies two Mat3Type's
    *
    * @param out the receiving matrix
    * @param a the first operand
    * @param b the second operand
    * @returns out
    */
-  multiply(out: Mat3, a: Mat3, b: Mat3): Mat3;
+  multiply(out: Mat3Type, a: Mat3Type, b: Mat3Type): Mat3Type;
 
   /**
-   * Multiplies two Mat3's
+   * Multiplies two Mat3Type's
    *
    * @param out the receiving matrix
    * @param a the first operand
    * @param b the second operand
    * @returns out
    */
-  mul(out: Mat3, a: Mat3, b: Mat3): Mat3;
+  mul(out: Mat3Type, a: Mat3Type, b: Mat3Type): Mat3Type;
 
 
   /**
-   * Translate a Mat3 by the given vector
+   * Translate a Mat3Type by the given vector
    *
    * @param out the receiving matrix
    * @param a the matrix to translate
    * @param v vector to translate by
    * @returns out
    */
-  translate(out: Mat3, a: Mat3, v: Vec3|number[]): Mat3;
+  translate(out: Mat3Type, a: Mat3Type, v: Vec3Type|number[]): Mat3Type;
 
   /**
-   * Rotates a Mat3 by the given angle
+   * Rotates a Mat3Type by the given angle
    *
    * @param out the receiving matrix
    * @param a the matrix to rotate
    * @param rad the angle to rotate the matrix by
    * @returns out
    */
-  rotate(out: Mat3, a: Mat3, rad: number): Mat3;
+  rotate(out: Mat3Type, a: Mat3Type, rad: number): Mat3Type;
 
   /**
-   * Scales the Mat3 by the dimensions in the given Vec2
+   * Scales the Mat3Type by the dimensions in the given Vec2Type
    *
    * @param out the receiving matrix
    * @param a the matrix to rotate
-   * @param v the Vec2 to scale the matrix by
+   * @param v the Vec2Type to scale the matrix by
    * @returns out
    **/
-  scale(out: Mat3, a: Mat3, v: Vec2|number[]): Mat3;
+  scale(out: Mat3Type, a: Mat3Type, v: Vec2Type|number[]): Mat3Type;
 
   /**
    * Creates a matrix from a vector translation
    * This is equivalent to (but much faster than):
    *
-   *     Mat3.identity(dest);
-   *     Mat3.translate(dest, dest, vec);
+   *     Mat3Type.identity(dest);
+   *     Mat3Type.translate(dest, dest, vec);
    *
-   * @param {Mat3} out Mat3 receiving operation result
-   * @param {Vec2} v Translation vector
-   * @returns {Mat3} out
+   * @param {Mat3Type} out Mat3Type receiving operation result
+   * @param {Vec2Type} v Translation vector
+   * @returns {Mat3Type} out
    */
-  fromTranslation(out: Mat3, v: Vec2|number[]): Mat3
+  fromTranslation(out: Mat3Type, v: Vec2Type|number[]): Mat3Type
 
   /**
    * Creates a matrix from a given angle
    * This is equivalent to (but much faster than):
    *
-   *     Mat3.identity(dest);
-   *     Mat3.rotate(dest, dest, rad);
+   *     Mat3Type.identity(dest);
+   *     Mat3Type.rotate(dest, dest, rad);
    *
-   * @param {Mat3} out Mat3 receiving operation result
+   * @param {Mat3Type} out Mat3Type receiving operation result
    * @param {number} rad the angle to rotate the matrix by
-   * @returns {Mat3} out
+   * @returns {Mat3Type} out
    */
-  fromRotation(out: Mat3, rad: number): Mat3
+  fromRotation(out: Mat3Type, rad: number): Mat3Type
 
   /**
    * Creates a matrix from a vector scaling
    * This is equivalent to (but much faster than):
    *
-   *     Mat3.identity(dest);
-   *     Mat3.scale(dest, dest, vec);
+   *     Mat3Type.identity(dest);
+   *     Mat3Type.scale(dest, dest, vec);
    *
-   * @param {Mat3} out Mat3 receiving operation result
-   * @param {Vec2} v Scaling vector
-   * @returns {Mat3} out
+   * @param {Mat3Type} out Mat3Type receiving operation result
+   * @param {Vec2Type} v Scaling vector
+   * @returns {Mat3Type} out
    */
-  fromScaling(out: Mat3, v: Vec2|number[]): Mat3
+  fromScaling(out: Mat3Type, v: Vec2Type|number[]): Mat3Type
 
   /**
-   * Copies the values from a Mat2d into a Mat3
+   * Copies the values from a Mat2dType into a Mat3Type
    *
    * @param out the receiving matrix
-   * @param {Mat2d} a the matrix to copy
+   * @param {Mat2dType} a the matrix to copy
    * @returns out
    **/
-  fromMat2d(out: Mat3, a: Mat2d): Mat3;
+  fromMat2d(out: Mat3Type, a: Mat2dType): Mat3Type;
 
   /**
    * Calculates a 3x3 matrix from the given Quaternion
    *
-   * @param out Mat3 receiving operation result
+   * @param out Mat3Type receiving operation result
    * @param q Quaternion to create matrix from
    *
    * @returns out
    */
-  fromQuat(out: Mat3, q: Quat): Mat3;
+  fromQuat(out: Mat3Type, q: QuatType): Mat3Type;
 
   /**
    * Calculates a 3x3 normal matrix (transpose inverse) from the 4x4 matrix
    *
-   * @param out Mat3 receiving operation result
-   * @param a Mat4 to derive the normal matrix from
+   * @param out Mat3Type receiving operation result
+   * @param a Mat4Type to derive the normal matrix from
    *
    * @returns out
    */
-  normalFromMat4(out: Mat3, a: Mat4): Mat3|null;
+  normalFromMat4(out: Mat3Type, a: Mat4Type): Mat3Type|null;
 
   /**
-   * Returns a string representation of a Mat3
+   * Returns a string representation of a Mat3Type
    *
    * @param mat matrix to represent as a string
    * @returns string representation of the matrix
    */
-  str(mat: Mat3): string;
+  str(mat: Mat3Type): string;
 
   /**
-   * Returns Frobenius norm of a Mat3
+   * Returns Frobenius norm of a Mat3Type
    *
    * @param a the matrix to calculate Frobenius norm of
    * @returns Frobenius norm
    */
-  frob(a: Mat3): number;
+  frob(a: Mat3Type): number;
 
   /**
-   * Adds two Mat3's
+   * Adds two Mat3Type's
    *
-   * @param {Mat3} out the receiving matrix
-   * @param {Mat3} a the first operand
-   * @param {Mat3} b the second operand
-   * @returns {Mat3} out
+   * @param {Mat3Type} out the receiving matrix
+   * @param {Mat3Type} a the first operand
+   * @param {Mat3Type} b the second operand
+   * @returns {Mat3Type} out
    */
-  add(out: Mat3, a: Mat3, b: Mat3): Mat3
-
-  /**
-   * Subtracts matrix b from matrix a
-   *
-   * @param {Mat3} out the receiving matrix
-   * @param {Mat3} a the first operand
-   * @param {Mat3} b the second operand
-   * @returns {Mat3} out
-   */
-  subtract(out: Mat3, a: Mat3, b: Mat3): Mat3
+  add(out: Mat3Type, a: Mat3Type, b: Mat3Type): Mat3Type
 
   /**
    * Subtracts matrix b from matrix a
    *
-   * @param {Mat3} out the receiving matrix
-   * @param {Mat3} a the first operand
-   * @param {Mat3} b the second operand
-   * @returns {Mat3} out
+   * @param {Mat3Type} out the receiving matrix
+   * @param {Mat3Type} a the first operand
+   * @param {Mat3Type} b the second operand
+   * @returns {Mat3Type} out
    */
-  sub(out: Mat3, a: Mat3, b: Mat3): Mat3
+  subtract(out: Mat3Type, a: Mat3Type, b: Mat3Type): Mat3Type
+
+  /**
+   * Subtracts matrix b from matrix a
+   *
+   * @param {Mat3Type} out the receiving matrix
+   * @param {Mat3Type} a the first operand
+   * @param {Mat3Type} b the second operand
+   * @returns {Mat3Type} out
+   */
+  sub(out: Mat3Type, a: Mat3Type, b: Mat3Type): Mat3Type
 
   /**
    * Multiply each element of the matrix by a scalar.
    *
-   * @param {Mat3} out the receiving matrix
-   * @param {Mat3} a the matrix to scale
+   * @param {Mat3Type} out the receiving matrix
+   * @param {Mat3Type} a the matrix to scale
    * @param {number} b amount to scale the matrix's elements by
-   * @returns {Mat3} out
+   * @returns {Mat3Type} out
    */
-  multiplyScalar(out: Mat3, a: Mat3, b: number): Mat3
+  multiplyScalar(out: Mat3Type, a: Mat3Type, b: number): Mat3Type
 
   /**
-   * Adds two Mat3's after multiplying each element of the second operand
+   * Adds two Mat3Type's after multiplying each element of the second operand
    * by a scalar value.
    *
-   * @param {Mat3} out the receiving vector
-   * @param {Mat3} a the first operand
-   * @param {Mat3} b the second operand
+   * @param {Mat3Type} out the receiving vector
+   * @param {Mat3Type} a the first operand
+   * @param {Mat3Type} b the second operand
    * @param {number} scale the amount to scale b's elements by before
    *     adding
-   * @returns {Mat3} out
+   * @returns {Mat3Type} out
    */
-  multiplyScalarAndAdd(out: Mat3, a: Mat3, b: Mat3, scale: number): Mat3
+  multiplyScalarAndAdd(out: Mat3Type, a: Mat3Type, b: Mat3Type, scale: number):
+      Mat3Type
 
   /**
    * Returns whether or not the matrices have exactly the same elements in
    * the same position (when compared with ===)
    *
-   * @param {Mat3} a The first matrix.
-   * @param {Mat3} b The second matrix.
+   * @param {Mat3Type} a The first matrix.
+   * @param {Mat3Type} b The second matrix.
    * @returns {boolean} True if the matrices are equal, false otherwise.
    */
-  exactEquals(a: Mat3, b: Mat3): boolean;
+  exactEquals(a: Mat3Type, b: Mat3Type): boolean;
 
   /**
    * Returns whether or not the matrices have approximately the same elements
    * in the same position.
    *
-   * @param {Mat3} a The first matrix.
-   * @param {Mat3} b The second matrix.
+   * @param {Mat3Type} a The first matrix.
+   * @param {Mat3Type} b The second matrix.
    * @returns {boolean} True if the matrices are equal, false otherwise.
    */
-  equals(a: Mat3, b: Mat3): boolean
+  equals(a: Mat3Type, b: Mat3Type): boolean
 }
 
-// Mat4
-interface Mat4 extends Float32Array {
+// Mat4Type
+interface Mat4Type extends Float32Array {
   /**
-   * Creates a new identity Mat4
+   * Creates a new identity Mat4Type
    *
    * @returns a new 4x4 matrix
    */
-  create(): Mat4;
+  create(): Mat4Type;
 
   /**
-   * Creates a new Mat4 initialized with values from an existing matrix
+   * Creates a new Mat4Type initialized with values from an existing matrix
    *
    * @param a matrix to clone
    * @returns a new 4x4 matrix
    */
-  clone(a: Mat4): Mat4;
+  clone(a: Mat4Type): Mat4Type;
 
   /**
-   * Copy the values from one Mat4 to another
+   * Copy the values from one Mat4Type to another
    *
    * @param out the receiving matrix
    * @param a the source matrix
    * @returns out
    */
-  copy(out: Mat4, a: Mat4): Mat4;
+  copy(out: Mat4Type, a: Mat4Type): Mat4Type;
 
 
   /**
-   * Create a new Mat4 with the given values
+   * Create a new Mat4Type with the given values
    *
    * @param {number} m00 Component in column 0, row 0 position (index 0)
    * @param {number} m01 Component in column 0, row 1 position (index 1)
@@ -2295,18 +2309,18 @@ interface Mat4 extends Float32Array {
    * @param {number} m31 Component in column 3, row 1 position (index 13)
    * @param {number} m32 Component in column 3, row 2 position (index 14)
    * @param {number} m33 Component in column 3, row 3 position (index 15)
-   * @returns {Mat4} A new Mat4
+   * @returns {Mat4Type} A new Mat4Type
    */
   fromValues(
       m00: number, m01: number, m02: number, m03: number, m10: number,
       m11: number, m12: number, m13: number, m20: number, m21: number,
       m22: number, m23: number, m30: number, m31: number, m32: number,
-      m33: number): Mat4;
+      m33: number): Mat4Type;
 
   /**
-   * Set the components of a Mat4 to the given values
+   * Set the components of a Mat4Type to the given values
    *
-   * @param {Mat4} out the receiving matrix
+   * @param {Mat4Type} out the receiving matrix
    * @param {number} m00 Component in column 0, row 0 position (index 0)
    * @param {number} m01 Component in column 0, row 1 position (index 1)
    * @param {number} m02 Component in column 0, row 2 position (index 2)
@@ -2323,98 +2337,98 @@ interface Mat4 extends Float32Array {
    * @param {number} m31 Component in column 3, row 1 position (index 13)
    * @param {number} m32 Component in column 3, row 2 position (index 14)
    * @param {number} m33 Component in column 3, row 3 position (index 15)
-   * @returns {Mat4} out
+   * @returns {Mat4Type} out
    */
-  set(out: Mat4, m00: number, m01: number, m02: number, m03: number,
+  set(out: Mat4Type, m00: number, m01: number, m02: number, m03: number,
       m10: number, m11: number, m12: number, m13: number, m20: number,
       m21: number, m22: number, m23: number, m30: number, m31: number,
-      m32: number, m33: number): Mat4;
+      m32: number, m33: number): Mat4Type;
 
   /**
-   * Set a Mat4 to the identity matrix
+   * Set a Mat4Type to the identity matrix
    *
    * @param out the receiving matrix
    * @returns out
    */
-  identity(out: Mat4): Mat4;
+  identity(out: Mat4Type): Mat4Type;
 
   /**
-   * Transpose the values of a Mat4
-   *
-   * @param out the receiving matrix
-   * @param a the source matrix
-   * @returns out
-   */
-  transpose(out: Mat4, a: Mat4): Mat4;
-
-  /**
-   * Inverts a Mat4
+   * Transpose the values of a Mat4Type
    *
    * @param out the receiving matrix
    * @param a the source matrix
    * @returns out
    */
-  invert(out: Mat4, a: Mat4): Mat4|null;
+  transpose(out: Mat4Type, a: Mat4Type): Mat4Type;
 
   /**
-   * Calculates the adjugate of a Mat4
+   * Inverts a Mat4Type
    *
    * @param out the receiving matrix
    * @param a the source matrix
    * @returns out
    */
-  adjoint(out: Mat4, a: Mat4): Mat4;
+  invert(out: Mat4Type, a: Mat4Type): Mat4Type|null;
 
   /**
-   * Calculates the determinant of a Mat4
+   * Calculates the adjugate of a Mat4Type
+   *
+   * @param out the receiving matrix
+   * @param a the source matrix
+   * @returns out
+   */
+  adjoint(out: Mat4Type, a: Mat4Type): Mat4Type;
+
+  /**
+   * Calculates the determinant of a Mat4Type
    *
    * @param a the source matrix
    * @returns determinant of a
    */
-  determinant(a: Mat4): number;
+  determinant(a: Mat4Type): number;
 
   /**
-   * Multiplies two Mat4's
+   * Multiplies two Mat4Type's
    *
    * @param out the receiving matrix
    * @param a the first operand
    * @param b the second operand
    * @returns out
    */
-  multiply(out: Mat4, a: Mat4, b: Mat4): Mat4;
+  multiply(out: Mat4Type, a: Mat4Type, b: Mat4Type): Mat4Type;
 
   /**
-   * Multiplies two Mat4's
+   * Multiplies two Mat4Type's
    *
    * @param out the receiving matrix
    * @param a the first operand
    * @param b the second operand
    * @returns out
    */
-  mul(out: Mat4, a: Mat4, b: Mat4): Mat4;
+  mul(out: Mat4Type, a: Mat4Type, b: Mat4Type): Mat4Type;
 
   /**
-   * Translate a Mat4 by the given vector
+   * Translate a Mat4Type by the given vector
    *
    * @param out the receiving matrix
    * @param a the matrix to translate
    * @param v vector to translate by
    * @returns out
    */
-  translate(out: Mat4, a: Mat4, v: Vec3|number[]): Mat4;
+  translate(out: Mat4Type, a: Mat4Type, v: Vec3Type|number[]): Mat4Type;
 
   /**
-   * Scales the Mat4 by the dimensions in the given Vec3
+   * Scales the Mat4Type by the dimensions in the given Vec3Type
    *
    * @param out the receiving matrix
    * @param a the matrix to scale
-   * @param v the Vec3 to scale the matrix by
+   * @param v the Vec3Type to scale the matrix by
    * @returns out
    **/
-  scale(out: Mat4, a: Mat4, v: Vec3|number[]): Mat4;
+  scale(out: Mat4Type, a: Mat4Type, v: Vec3Type|number[]): Mat4Type;
 
   /**
-   * Rotates a Mat4 by the given angle
+   * Rotates a Mat4Type by the given angle
    *
    * @param out the receiving matrix
    * @param a the matrix to rotate
@@ -2422,7 +2436,8 @@ interface Mat4 extends Float32Array {
    * @param axis the axis to rotate around
    * @returns out
    */
-  rotate(out: Mat4, a: Mat4, rad: number, axis: Vec3|number[]): Mat4;
+  rotate(out: Mat4Type, a: Mat4Type, rad: number, axis: Vec3Type|number[]):
+      Mat4Type;
 
   /**
    * Rotates a matrix by the given angle around the X axis
@@ -2432,7 +2447,7 @@ interface Mat4 extends Float32Array {
    * @param rad the angle to rotate the matrix by
    * @returns out
    */
-  rotateX(out: Mat4, a: Mat4, rad: number): Mat4;
+  rotateX(out: Mat4Type, a: Mat4Type, rad: number): Mat4Type;
 
   /**
    * Rotates a matrix by the given angle around the Y axis
@@ -2442,7 +2457,7 @@ interface Mat4 extends Float32Array {
    * @param rad the angle to rotate the matrix by
    * @returns out
    */
-  rotateY(out: Mat4, a: Mat4, rad: number): Mat4;
+  rotateY(out: Mat4Type, a: Mat4Type, rad: number): Mat4Type;
 
   /**
    * Rotates a matrix by the given angle around the Z axis
@@ -2452,186 +2467,188 @@ interface Mat4 extends Float32Array {
    * @param rad the angle to rotate the matrix by
    * @returns out
    */
-  rotateZ(out: Mat4, a: Mat4, rad: number): Mat4;
+  rotateZ(out: Mat4Type, a: Mat4Type, rad: number): Mat4Type;
 
   /**
    * Creates a matrix from a vector translation
    * This is equivalent to (but much faster than):
    *
-   *     Mat4.identity(dest);
-   *     Mat4.translate(dest, dest, vec);
+   *     Mat4Type.identity(dest);
+   *     Mat4Type.translate(dest, dest, vec);
    *
-   * @param {Mat4} out Mat4 receiving operation result
-   * @param {Vec3} v Translation vector
-   * @returns {Mat4} out
+   * @param {Mat4Type} out Mat4Type receiving operation result
+   * @param {Vec3Type} v Translation vector
+   * @returns {Mat4Type} out
    */
-  fromTranslation(out: Mat4, v: Vec3|number[]): Mat4
+  fromTranslation(out: Mat4Type, v: Vec3Type|number[]): Mat4Type
 
   /**
    * Creates a matrix from a vector scaling
    * This is equivalent to (but much faster than):
    *
-   *     Mat4.identity(dest);
-   *     Mat4.scale(dest, dest, vec);
+   *     Mat4Type.identity(dest);
+   *     Mat4Type.scale(dest, dest, vec);
    *
-   * @param {Mat4} out Mat4 receiving operation result
-   * @param {Vec3} v Scaling vector
-   * @returns {Mat4} out
+   * @param {Mat4Type} out Mat4Type receiving operation result
+   * @param {Vec3Type} v Scaling vector
+   * @returns {Mat4Type} out
    */
-  fromScaling(out: Mat4, v: Vec3|number[]): Mat4
+  fromScaling(out: Mat4Type, v: Vec3Type|number[]): Mat4Type
 
   /**
    * Creates a matrix from a given angle around a given axis
    * This is equivalent to (but much faster than):
    *
-   *     Mat4.identity(dest);
-   *     Mat4.rotate(dest, dest, rad, axis);
+   *     Mat4Type.identity(dest);
+   *     Mat4Type.rotate(dest, dest, rad, axis);
    *
-   * @param {Mat4} out Mat4 receiving operation result
+   * @param {Mat4Type} out Mat4Type receiving operation result
    * @param {number} rad the angle to rotate the matrix by
-   * @param {Vec3} axis the axis to rotate around
-   * @returns {Mat4} out
+   * @param {Vec3Type} axis the axis to rotate around
+   * @returns {Mat4Type} out
    */
-  fromRotation(out: Mat4, rad: number, axis: Vec3|number[]): Mat4
+  fromRotation(out: Mat4Type, rad: number, axis: Vec3Type|number[]): Mat4Type
 
   /**
    * Creates a matrix from the given angle around the X axis
    * This is equivalent to (but much faster than):
    *
-   *     Mat4.identity(dest);
-   *     Mat4.rotateX(dest, dest, rad);
+   *     Mat4Type.identity(dest);
+   *     Mat4Type.rotateX(dest, dest, rad);
    *
-   * @param {Mat4} out Mat4 receiving operation result
+   * @param {Mat4Type} out Mat4Type receiving operation result
    * @param {number} rad the angle to rotate the matrix by
-   * @returns {Mat4} out
+   * @returns {Mat4Type} out
    */
-  fromXRotation(out: Mat4, rad: number): Mat4
+  fromXRotation(out: Mat4Type, rad: number): Mat4Type
 
   /**
    * Creates a matrix from the given angle around the Y axis
    * This is equivalent to (but much faster than):
    *
-   *     Mat4.identity(dest);
-   *     Mat4.rotateY(dest, dest, rad);
+   *     Mat4Type.identity(dest);
+   *     Mat4Type.rotateY(dest, dest, rad);
    *
-   * @param {Mat4} out Mat4 receiving operation result
+   * @param {Mat4Type} out Mat4Type receiving operation result
    * @param {number} rad the angle to rotate the matrix by
-   * @returns {Mat4} out
+   * @returns {Mat4Type} out
    */
-  fromYRotation(out: Mat4, rad: number): Mat4
+  fromYRotation(out: Mat4Type, rad: number): Mat4Type
 
 
   /**
    * Creates a matrix from the given angle around the Z axis
    * This is equivalent to (but much faster than):
    *
-   *     Mat4.identity(dest);
-   *     Mat4.rotateZ(dest, dest, rad);
+   *     Mat4Type.identity(dest);
+   *     Mat4Type.rotateZ(dest, dest, rad);
    *
-   * @param {Mat4} out Mat4 receiving operation result
+   * @param {Mat4Type} out Mat4Type receiving operation result
    * @param {number} rad the angle to rotate the matrix by
-   * @returns {Mat4} out
+   * @returns {Mat4Type} out
    */
-  fromZRotation(out: Mat4, rad: number): Mat4
+  fromZRotation(out: Mat4Type, rad: number): Mat4Type
 
   /**
    * Creates a matrix from a Quaternion rotation and vector translation
    * This is equivalent to (but much faster than):
    *
-   *     Mat4.identity(dest);
-   *     Mat4.translate(dest, vec);
-   *     var QuatMat = Mat4.create();
-   *     Quat4.toMat4(Quat, QuatMat);
-   *     Mat4.multiply(dest, QuatMat);
+   *     Mat4Type.identity(dest);
+   *     Mat4Type.translate(dest, vec);
+   *     var QuatMat = Mat4Type.create();
+   *     Quat4.toMat4(QuatType, QuatMat);
+   *     Mat4Type.multiply(dest, QuatMat);
    *
-   * @param out Mat4 receiving operation result
+   * @param out Mat4Type receiving operation result
    * @param q Rotation Quaternion
    * @param v Translation vector
    * @returns out
    */
-  fromRotationTranslation(out: Mat4, q: Quat, v: Vec3|number[]): Mat4;
+  fromRotationTranslation(out: Mat4Type, q: QuatType, v: Vec3Type|number[]):
+      Mat4Type;
 
   /**
    * Returns the translation vector component of a transformation
    *  matrix. If a matrix is built with fromRotationTranslation,
    *  the returned vector will be the same as the translation vector
    *  originally supplied.
-   * @param  {Vec3} out Vector to receive translation component
-   * @param  {Mat4} mat Matrix to be decomposed (input)
-   * @return {Vec3} out
+   * @param  {Vec3Type} out Vector to receive translation component
+   * @param  {Mat4Type} mat Matrix to be decomposed (input)
+   * @return {Vec3Type} out
    */
-  getTranslation(out: Vec3, mat: Mat4): Vec3;
+  getTranslation(out: Vec3Type, mat: Mat4Type): Vec3Type;
 
   /**
    * Returns a Quaternion representing the rotational component
    *  of a transformation matrix. If a matrix is built with
    *  fromRotationTranslation, the returned Quaternion will be the
    *  same as the Quaternion originally supplied.
-   * @param {Quat} out Quaternion to receive the rotation component
-   * @param {Mat4} mat Matrix to be decomposed (input)
-   * @return {Quat} out
+   * @param {QuatType} out Quaternion to receive the rotation component
+   * @param {Mat4Type} mat Matrix to be decomposed (input)
+   * @return {QuatType} out
    */
-  getRotation(out: Quat, mat: Mat4): Quat;
+  getRotation(out: QuatType, mat: Mat4Type): QuatType;
 
   /**
    * Creates a matrix from a Quaternion rotation, vector translation and
    * vector scale This is equivalent to (but much faster than):
    *
-   *     Mat4.identity(dest);
-   *     Mat4.translate(dest, vec);
-   *     var QuatMat = Mat4.create();
-   *     Quat4.toMat4(Quat, QuatMat);
-   *     Mat4.multiply(dest, QuatMat);
-   *     Mat4.scale(dest, scale)
+   *     Mat4Type.identity(dest);
+   *     Mat4Type.translate(dest, vec);
+   *     var QuatMat = Mat4Type.create();
+   *     Quat4.toMat4(QuatType, QuatMat);
+   *     Mat4Type.multiply(dest, QuatMat);
+   *     Mat4Type.scale(dest, scale)
    *
-   * @param out Mat4 receiving operation result
+   * @param out Mat4Type receiving operation result
    * @param q Rotation Quaternion
    * @param v Translation vector
    * @param s Scaling vector
    * @returns out
    */
   fromRotationTranslationScale(
-      out: Mat4, q: Quat, v: Vec3|number[], s: Vec3|number[]): Mat4;
+      out: Mat4Type, q: QuatType, v: Vec3Type|number[],
+      s: Vec3Type|number[]): Mat4Type;
 
   /**
    * Creates a matrix from a Quaternion rotation, vector translation and
    * vector scale, rotating and scaling around the given origin This is
    * equivalent to (but much faster than):
    *
-   *     Mat4.identity(dest);
-   *     Mat4.translate(dest, vec);
-   *     Mat4.translate(dest, origin);
-   *     var QuatMat = Mat4.create();
-   *     Quat4.toMat4(Quat, QuatMat);
-   *     Mat4.multiply(dest, QuatMat);
-   *     Mat4.scale(dest, scale)
-   *     Mat4.translate(dest, negativeOrigin);
+   *     Mat4Type.identity(dest);
+   *     Mat4Type.translate(dest, vec);
+   *     Mat4Type.translate(dest, origin);
+   *     var QuatMat = Mat4Type.create();
+   *     Quat4.toMat4(QuatType, QuatMat);
+   *     Mat4Type.multiply(dest, QuatMat);
+   *     Mat4Type.scale(dest, scale)
+   *     Mat4Type.translate(dest, negativeOrigin);
    *
-   * @param {Mat4} out Mat4 receiving operation result
-   * @param {Quat} q Rotation Quaternion
-   * @param {Vec3} v Translation vector
-   * @param {Vec3} s Scaling vector
-   * @param {Vec3} o The origin vector around which to scale and rotate
-   * @returns {Mat4} out
+   * @param {Mat4Type} out Mat4Type receiving operation result
+   * @param {QuatType} q Rotation Quaternion
+   * @param {Vec3Type} v Translation vector
+   * @param {Vec3Type} s Scaling vector
+   * @param {Vec3Type} o The origin vector around which to scale and rotate
+   * @returns {Mat4Type} out
    */
   fromRotationTranslationScaleOrigin(
-      out: Mat4, q: Quat, v: Vec3|number[], s: Vec3|number[],
-      o: Vec3|number[]): Mat4
+      out: Mat4Type, q: QuatType, v: Vec3Type|number[], s: Vec3Type|number[],
+      o: Vec3Type|number[]): Mat4Type
 
   /**
    * Calculates a 4x4 matrix from the given Quaternion
    *
-   * @param {Mat4} out Mat4 receiving operation result
-   * @param {Quat} q Quaternion to create matrix from
+   * @param {Mat4Type} out Mat4Type receiving operation result
+   * @param {QuatType} q Quaternion to create matrix from
    *
-   * @returns {Mat4} out
+   * @returns {Mat4Type} out
    */
-  fromQuat(out: Mat4, q: Quat): Mat4
+  fromQuat(out: Mat4Type, q: QuatType): Mat4Type
 
   /**
    * Generates a frustum matrix with the given bounds
    *
-   * @param out Mat4 frustum matrix will be written into
+   * @param out Mat4Type frustum matrix will be written into
    * @param left Left bound of the frustum
    * @param right Right bound of the frustum
    * @param bottom Bottom bound of the frustum
@@ -2641,13 +2658,13 @@ interface Mat4 extends Float32Array {
    * @returns out
    */
   frustum(
-      out: Mat4, left: number, right: number, bottom: number, top: number,
-      near: number, far: number): Mat4;
+      out: Mat4Type, left: number, right: number, bottom: number, top: number,
+      near: number, far: number): Mat4Type;
 
   /**
    * Generates a perspective projection matrix with the given bounds
    *
-   * @param out Mat4 frustum matrix will be written into
+   * @param out Mat4Type frustum matrix will be written into
    * @param fovy Vertical field of view in radians
    * @param aspect Aspect ratio. typically viewport width/height
    * @param near Near bound of the frustum
@@ -2655,33 +2672,34 @@ interface Mat4 extends Float32Array {
    * @returns out
    */
   perspective(
-      out: Mat4, fovy: number, aspect: number, near: number, far: number): Mat4;
+      out: Mat4Type, fovy: number, aspect: number, near: number,
+      far: number): Mat4Type;
 
   /**
    * Generates a perspective projection matrix with the given field of view.
    * This is primarily useful for generating projection matrices to be used
    * with the still experimental WebVR API.
    *
-   * @param {Mat4} out Mat4 frustum matrix will be written into
+   * @param {Mat4Type} out Mat4Type frustum matrix will be written into
    * @param {Object} fov Object containing the following values: upDegrees,
    *     downDegrees, leftDegrees, rightDegrees
    * @param {number} near Near bound of the frustum
    * @param {number} far Far bound of the frustum
-   * @returns {Mat4} out
+   * @returns {Mat4Type} out
    */
   perspectiveFromFieldOfView(
-      out: Mat4, fov: {
+      out: Mat4Type, fov: {
         upDegrees: number,
         downDegrees: number,
         leftDegrees: number,
         rightDegrees: number
       },
-      near: number, far: number): Mat4
+      near: number, far: number): Mat4Type
 
   /**
    * Generates a orthogonal projection matrix with the given bounds
    *
-   * @param out Mat4 frustum matrix will be written into
+   * @param out Mat4Type frustum matrix will be written into
    * @param left Left bound of the frustum
    * @param right Right bound of the frustum
    * @param bottom Bottom bound of the frustum
@@ -2691,133 +2709,134 @@ interface Mat4 extends Float32Array {
    * @returns out
    */
   ortho(
-      out: Mat4, left: number, right: number, bottom: number, top: number,
-      near: number, far: number): Mat4;
+      out: Mat4Type, left: number, right: number, bottom: number, top: number,
+      near: number, far: number): Mat4Type;
 
   /**
    * Generates a look-at matrix with the given eye position, focal point, and
    * up axis
    *
-   * @param out Mat4 frustum matrix will be written into
+   * @param out Mat4Type frustum matrix will be written into
    * @param eye Position of the viewer
    * @param center Point the viewer is looking at
-   * @param up Vec3 pointing up
+   * @param up Vec3Type pointing up
    * @returns out
    */
   lookAt(
-      out: Mat4, eye: Vec3|number[], center: Vec3|number[],
-      up: Vec3|number[]): Mat4;
+      out: Mat4Type, eye: Vec3Type|number[], center: Vec3Type|number[],
+      up: Vec3Type|number[]): Mat4Type;
 
   /**
-   * Returns a string representation of a Mat4
+   * Returns a string representation of a Mat4Type
    *
    * @param mat matrix to represent as a string
    * @returns string representation of the matrix
    */
-  str(mat: Mat4): string;
+  str(mat: Mat4Type): string;
 
   /**
-   * Returns Frobenius norm of a Mat4
+   * Returns Frobenius norm of a Mat4Type
    *
    * @param a the matrix to calculate Frobenius norm of
    * @returns Frobenius norm
    */
-  frob(a: Mat4): number;
+  frob(a: Mat4Type): number;
 
   /**
-   * Adds two Mat4's
+   * Adds two Mat4Type's
    *
-   * @param {Mat4} out the receiving matrix
-   * @param {Mat4} a the first operand
-   * @param {Mat4} b the second operand
-   * @returns {Mat4} out
+   * @param {Mat4Type} out the receiving matrix
+   * @param {Mat4Type} a the first operand
+   * @param {Mat4Type} b the second operand
+   * @returns {Mat4Type} out
    */
-  add(out: Mat4, a: Mat4, b: Mat4): Mat4
-
-  /**
-   * Subtracts matrix b from matrix a
-   *
-   * @param {Mat4} out the receiving matrix
-   * @param {Mat4} a the first operand
-   * @param {Mat4} b the second operand
-   * @returns {Mat4} out
-   */
-  subtract(out: Mat4, a: Mat4, b: Mat4): Mat4
+  add(out: Mat4Type, a: Mat4Type, b: Mat4Type): Mat4Type
 
   /**
    * Subtracts matrix b from matrix a
    *
-   * @param {Mat4} out the receiving matrix
-   * @param {Mat4} a the first operand
-   * @param {Mat4} b the second operand
-   * @returns {Mat4} out
+   * @param {Mat4Type} out the receiving matrix
+   * @param {Mat4Type} a the first operand
+   * @param {Mat4Type} b the second operand
+   * @returns {Mat4Type} out
    */
-  sub(out: Mat4, a: Mat4, b: Mat4): Mat4
+  subtract(out: Mat4Type, a: Mat4Type, b: Mat4Type): Mat4Type
+
+  /**
+   * Subtracts matrix b from matrix a
+   *
+   * @param {Mat4Type} out the receiving matrix
+   * @param {Mat4Type} a the first operand
+   * @param {Mat4Type} b the second operand
+   * @returns {Mat4Type} out
+   */
+  sub(out: Mat4Type, a: Mat4Type, b: Mat4Type): Mat4Type
 
   /**
    * Multiply each element of the matrix by a scalar.
    *
-   * @param {Mat4} out the receiving matrix
-   * @param {Mat4} a the matrix to scale
+   * @param {Mat4Type} out the receiving matrix
+   * @param {Mat4Type} a the matrix to scale
    * @param {number} b amount to scale the matrix's elements by
-   * @returns {Mat4} out
+   * @returns {Mat4Type} out
    */
-  multiplyScalar(out: Mat4, a: Mat4, b: number): Mat4
+  multiplyScalar(out: Mat4Type, a: Mat4Type, b: number): Mat4Type
 
   /**
-   * Adds two Mat4's after multiplying each element of the second operand
+   * Adds two Mat4Type's after multiplying each element of the second operand
    * by a scalar value.
    *
-   * @param {Mat4} out the receiving vector
-   * @param {Mat4} a the first operand
-   * @param {Mat4} b the second operand
+   * @param {Mat4Type} out the receiving vector
+   * @param {Mat4Type} a the first operand
+   * @param {Mat4Type} b the second operand
    * @param {number} scale the amount to scale b's elements by before
    *     adding
-   * @returns {Mat4} out
+   * @returns {Mat4Type} out
    */
-  multiplyScalarAndAdd(out: Mat4, a: Mat4, b: Mat4, scale: number): Mat4
+  multiplyScalarAndAdd(out: Mat4Type, a: Mat4Type, b: Mat4Type, scale: number):
+      Mat4Type
 
   /**
    * Returns whether or not the matrices have exactly the same elements in
    * the same position (when compared with ===)
    *
-   * @param {Mat4} a The first matrix.
-   * @param {Mat4} b The second matrix.
+   * @param {Mat4Type} a The first matrix.
+   * @param {Mat4Type} b The second matrix.
    * @returns {boolean} True if the matrices are equal, false otherwise.
    */
-  exactEquals(a: Mat4, b: Mat4): boolean
+  exactEquals(a: Mat4Type, b: Mat4Type): boolean
 
   /**
    * Returns whether or not the matrices have approximately the same
    * elements in the same position.
    *
-   * @param {Mat4} a The first matrix.
-   * @param {Mat4} b The second matrix.
+   * @param {Mat4Type} a The first matrix.
+   * @param {Mat4Type} b The second matrix.
    * @returns {boolean} True if the matrices are equal, false otherwise.
    */
-  equals(a: Mat4, b: Mat4): boolean
+  equals(a: Mat4Type, b: Mat4Type): boolean
 }
 
-// Quat
-interface Quat extends Float32Array {
+// QuatType
+interface QuatType extends Float32Array {
   /**
-   * Creates a new identity Quat
+   * Creates a new identity QuatType
    *
    * @returns a new Quaternion
    */
-  create(): Quat;
+  create(): QuatType;
 
   /**
-   * Creates a new Quat initialized with values from an existing Quaternion
+   * Creates a new QuatType initialized with values from an existing Quaternion
    *
    * @param a Quaternion to clone
    * @returns a new Quaternion
    * @function
    */
-  clone(a: Quat): Quat;
+  clone(a: QuatType): QuatType;
 
   /**
-   * Creates a new Quat initialized with the given values
+   * Creates a new QuatType initialized with the given values
    *
    * @param x X component
    * @param y Y component
@@ -2826,20 +2845,20 @@ interface Quat extends Float32Array {
    * @returns a new Quaternion
    * @function
    */
-  fromValues(x: number, y: number, z: number, w: number): Quat;
+  fromValues(x: number, y: number, z: number, w: number): QuatType;
 
   /**
-   * Copy the values from one Quat to another
+   * Copy the values from one QuatType to another
    *
    * @param out the receiving Quaternion
    * @param a the source Quaternion
    * @returns out
    * @function
    */
-  copy(out: Quat, a: Quat): Quat;
+  copy(out: QuatType, a: QuatType): QuatType;
 
   /**
-   * Set the components of a Quat to the given values
+   * Set the components of a QuatType to the given values
    *
    * @param out the receiving Quaternion
    * @param x X component
@@ -2849,15 +2868,15 @@ interface Quat extends Float32Array {
    * @returns out
    * @function
    */
-  set(out: Quat, x: number, y: number, z: number, w: number): Quat;
+  set(out: QuatType, x: number, y: number, z: number, w: number): QuatType;
 
   /**
-   * Set a Quat to the identity Quaternion
+   * Set a QuatType to the identity Quaternion
    *
    * @param out the receiving Quaternion
    * @returns out
    */
-  identity(out: Quat): Quat;
+  identity(out: QuatType): QuatType;
 
   /**
    * Sets a Quaternion to represent the shortest rotation from one
@@ -2865,31 +2884,32 @@ interface Quat extends Float32Array {
    *
    * Both vectors are assumed to be unit length.
    *
-   * @param {Quat} out the receiving Quaternion.
-   * @param {Vec3} a the initial vector
-   * @param {Vec3} b the destination vector
-   * @returns {Quat} out
+   * @param {QuatType} out the receiving Quaternion.
+   * @param {Vec3Type} a the initial vector
+   * @param {Vec3Type} b the destination vector
+   * @returns {QuatType} out
    */
-  rotationTo(out: Quat, a: Vec3|number[], b: Vec3|number[]): Quat;
+  rotationTo(out: QuatType, a: Vec3Type|number[], b: Vec3Type|number[]):
+      QuatType;
 
   /**
    * Sets the specified Quaternion with values corresponding to the given
-   * axes. Each axis is a Vec3 and is expected to be unit length and
+   * axes. Each axis is a Vec3Type and is expected to be unit length and
    * perpendicular to all other specified axes.
    *
-   * @param {Vec3} view  the vector representing the viewing direction
-   * @param {Vec3} right the vector representing the local "right" direction
-   * @param {Vec3} up    the vector representing the local "up" direction
-   * @returns {Quat} out
+   * @param {Vec3Type} view  the vector representing the viewing direction
+   * @param {Vec3Type} right the vector representing the local "right" direction
+   * @param {Vec3Type} up    the vector representing the local "up" direction
+   * @returns {QuatType} out
    */
   setAxes(
-      out: Quat, view: Vec3|number[], right: Vec3|number[],
-      up: Vec3|number[]): Quat
+      out: QuatType, view: Vec3Type|number[], right: Vec3Type|number[],
+      up: Vec3Type|number[]): QuatType
 
 
 
   /**
-   * Sets a Quat from the given angle and rotation axis,
+   * Sets a QuatType from the given angle and rotation axis,
    * then returns it.
    *
    * @param out the receiving Quaternion
@@ -2897,7 +2917,7 @@ interface Quat extends Float32Array {
    * @param rad the angle in radians
    * @returns out
    **/
-  setAxisAngle(out: Quat, axis: Vec3|number[], rad: number): Quat;
+  setAxisAngle(out: QuatType, axis: Vec3Type|number[], rad: number): QuatType;
 
   /**
    * Gets the rotation axis and angle for a given
@@ -2908,14 +2928,14 @@ interface Quat extends Float32Array {
    * Example: The Quaternion formed by axis [0, 0, 1] and
    *  angle -90 is the same as the Quaternion formed by
    *  [0, 0, 1] and 270. This method favors the latter.
-   * @param  {Vec3} out_axis  Vector receiving the axis of rotation
-   * @param  {Quat} q     Quaternion to be decomposed
+   * @param  {Vec3Type} out_axis  Vector receiving the axis of rotation
+   * @param  {QuatType} q     Quaternion to be decomposed
    * @return {number}     Angle, in radians, of the rotation
    */
-  getAxisAngle(out_axis: Vec3|number[], q: Quat): number
+  getAxisAngle(out_axis: Vec3Type|number[], q: QuatType): number
 
   /**
-   * Adds two Quat's
+   * Adds two QuatType's
    *
    * @param out the receiving Quaternion
    * @param a the first operand
@@ -2923,30 +2943,30 @@ interface Quat extends Float32Array {
    * @returns out
    * @function
    */
-  add(out: Quat, a: Quat, b: Quat): Quat;
+  add(out: QuatType, a: QuatType, b: QuatType): QuatType;
 
   /**
-   * Multiplies two Quat's
+   * Multiplies two QuatType's
    *
    * @param out the receiving Quaternion
    * @param a the first operand
    * @param b the second operand
    * @returns out
    */
-  multiply(out: Quat, a: Quat, b: Quat): Quat;
+  multiply(out: QuatType, a: QuatType, b: QuatType): QuatType;
 
   /**
-   * Multiplies two Quat's
+   * Multiplies two QuatType's
    *
    * @param out the receiving Quaternion
    * @param a the first operand
    * @param b the second operand
    * @returns out
    */
-  mul(out: Quat, a: Quat, b: Quat): Quat;
+  mul(out: QuatType, a: QuatType, b: QuatType): QuatType;
 
   /**
-   * Scales a Quat by a scalar number
+   * Scales a QuatType by a scalar number
    *
    * @param out the receiving vector
    * @param a the vector to scale
@@ -2954,66 +2974,66 @@ interface Quat extends Float32Array {
    * @returns out
    * @function
    */
-  scale(out: Quat, a: Quat, b: number): Quat;
+  scale(out: QuatType, a: QuatType, b: number): QuatType;
 
   /**
-   * Calculates the length of a Quat
+   * Calculates the length of a QuatType
    *
    * @param a vector to calculate length of
    * @returns length of a
    * @function
    */
-  length(a: Quat): number;
+  length(a: QuatType): number;
 
   /**
-   * Calculates the length of a Quat
+   * Calculates the length of a QuatType
    *
    * @param a vector to calculate length of
    * @returns length of a
    * @function
    */
-  len(a: Quat): number;
+  len(a: QuatType): number;
 
   /**
-   * Calculates the squared length of a Quat
+   * Calculates the squared length of a QuatType
    *
    * @param a vector to calculate squared length of
    * @returns squared length of a
    * @function
    */
-  squaredLength(a: Quat): number;
+  squaredLength(a: QuatType): number;
 
   /**
-   * Calculates the squared length of a Quat
+   * Calculates the squared length of a QuatType
    *
    * @param a vector to calculate squared length of
    * @returns squared length of a
    * @function
    */
-  sqrLen(a: Quat): number;
+  sqrLen(a: QuatType): number;
 
   /**
-   * Normalize a Quat
+   * Normalize a QuatType
    *
    * @param out the receiving Quaternion
    * @param a Quaternion to normalize
    * @returns out
    * @function
    */
-  normalize(out: Quat, a: Quat): Quat;
+  normalize(out: QuatType, a: QuatType): QuatType;
 
   /**
-   * Calculates the dot product of two Quat's
+   * Calculates the dot product of two QuatType's
    *
    * @param a the first operand
    * @param b the second operand
    * @returns dot product of a and b
    * @function
    */
-  dot(a: Quat, b: Quat): number;
+  dot(a: QuatType, b: QuatType): number;
 
   /**
-   * Performs a linear interpolation between two Quat's
+   * Performs a linear interpolation between two QuatType's
    *
    * @param out the receiving Quaternion
    * @param a the first operand
@@ -3022,10 +3042,10 @@ interface Quat extends Float32Array {
    * @returns out
    * @function
    */
-  lerp(out: Quat, a: Quat, b: Quat, t: number): Quat;
+  lerp(out: QuatType, a: QuatType, b: QuatType, t: number): QuatType;
 
   /**
-   * Performs a spherical linear interpolation between two Quat
+   * Performs a spherical linear interpolation between two QuatType
    *
    * @param out the receiving Quaternion
    * @param a the first operand
@@ -3033,78 +3053,80 @@ interface Quat extends Float32Array {
    * @param t interpolation amount between the two inputs
    * @returns out
    */
-  slerp(out: Quat, a: Quat, b: Quat, t: number): Quat;
+  slerp(out: QuatType, a: QuatType, b: QuatType, t: number): QuatType;
 
   /**
    * Performs a spherical linear interpolation with two control points
    *
-   * @param {Quat} out the receiving Quaternion
-   * @param {Quat} a the first operand
-   * @param {Quat} b the second operand
-   * @param {Quat} c the third operand
-   * @param {Quat} d the fourth operand
+   * @param {QuatType} out the receiving Quaternion
+   * @param {QuatType} a the first operand
+   * @param {QuatType} b the second operand
+   * @param {QuatType} c the third operand
+   * @param {QuatType} d the fourth operand
    * @param {number} t interpolation amount
-   * @returns {Quat} out
+   * @returns {QuatType} out
    */
-  sqlerp(out: Quat, a: Quat, b: Quat, c: Quat, d: Quat, t: number): Quat;
+  sqlerp(
+      out: QuatType, a: QuatType, b: QuatType, c: QuatType, d: QuatType,
+      t: number): QuatType;
 
   /**
-   * Calculates the inverse of a Quat
+   * Calculates the inverse of a QuatType
    *
    * @param out the receiving Quaternion
-   * @param a Quat to calculate inverse of
+   * @param a QuatType to calculate inverse of
    * @returns out
    */
-  invert(out: Quat, a: Quat): Quat;
+  invert(out: QuatType, a: QuatType): QuatType;
 
   /**
-   * Calculates the conjugate of a Quat
+   * Calculates the conjugate of a QuatType
    * If the Quaternion is normalized, this function is faster than
-   * Quat.inverse and produces the same result.
+   * QuatType.inverse and produces the same result.
    *
    * @param out the receiving Quaternion
-   * @param a Quat to calculate conjugate of
+   * @param a QuatType to calculate conjugate of
    * @returns out
    */
-  conjugate(out: Quat, a: Quat): Quat;
+  conjugate(out: QuatType, a: QuatType): QuatType;
 
   /**
    * Returns a string representation of a Quaternion
    *
-   * @param a Quat to represent as a string
-   * @returns string representation of the Quat
+   * @param a QuatType to represent as a string
+   * @returns string representation of the QuatType
    */
-  str(a: Quat): string;
+  str(a: QuatType): string;
 
   /**
    * Rotates a Quaternion by the given angle about the X axis
    *
-   * @param out Quat receiving operation result
-   * @param a Quat to rotate
+   * @param out QuatType receiving operation result
+   * @param a QuatType to rotate
    * @param rad angle (in radians) to rotate
    * @returns out
    */
-  rotateX(out: Quat, a: Quat, rad: number): Quat;
+  rotateX(out: QuatType, a: QuatType, rad: number): QuatType;
 
   /**
    * Rotates a Quaternion by the given angle about the Y axis
    *
-   * @param out Quat receiving operation result
-   * @param a Quat to rotate
+   * @param out QuatType receiving operation result
+   * @param a QuatType to rotate
    * @param rad angle (in radians) to rotate
    * @returns out
    */
-  rotateY(out: Quat, a: Quat, rad: number): Quat;
+  rotateY(out: QuatType, a: QuatType, rad: number): QuatType;
 
   /**
    * Rotates a Quaternion by the given angle about the Z axis
    *
-   * @param out Quat receiving operation result
-   * @param a Quat to rotate
+   * @param out QuatType receiving operation result
+   * @param a QuatType to rotate
    * @param rad angle (in radians) to rotate
    * @returns out
    */
-  rotateZ(out: Quat, a: Quat, rad: number): Quat;
+  rotateZ(out: QuatType, a: QuatType, rad: number): QuatType;
 
   /**
    * Creates a Quaternion from the given 3x3 rotation matrix.
@@ -3117,22 +3139,22 @@ interface Quat extends Float32Array {
    * @returns out
    * @function
    */
-  fromMat3(out: Quat, m: Mat3): Quat;
+  fromMat3(out: QuatType, m: Mat3Type): QuatType;
 
   /**
    * Sets the specified Quaternion with values corresponding to the given
-   * axes. Each axis is a Vec3 and is expected to be unit length and
+   * axes. Each axis is a Vec3Type and is expected to be unit length and
    * perpendicular to all other specified axes.
    *
-   * @param out the receiving Quat
+   * @param out the receiving QuatType
    * @param view  the vector representing the viewing direction
    * @param right the vector representing the local "right" direction
    * @param up    the vector representing the local "up" direction
    * @returns out
    */
   setAxes(
-      out: Quat, view: Vec3|number[], right: Vec3|number[],
-      up: Vec3|number[]): Quat;
+      out: QuatType, view: Vec3Type|number[], right: Vec3Type|number[],
+      up: Vec3Type|number[]): QuatType;
 
   /**
    * Sets a Quaternion to represent the shortest rotation from one
@@ -3145,36 +3167,37 @@ interface Quat extends Float32Array {
    * @param b the destination vector
    * @returns out
    */
-  rotationTo(out: Quat, a: Vec3|number[], b: Vec3|number[]): Quat;
+  rotationTo(out: QuatType, a: Vec3Type|number[], b: Vec3Type|number[]):
+      QuatType;
 
   /**
-   * Calculates the W component of a Quat from the X, Y, and Z components.
+   * Calculates the W component of a QuatType from the X, Y, and Z components.
    * Assumes that Quaternion is 1 unit in length.
    * Any existing W component will be ignored.
    *
    * @param out the receiving Quaternion
-   * @param a Quat to calculate W component of
+   * @param a QuatType to calculate W component of
    * @returns out
    */
-  calculateW(out: Quat, a: Quat): Quat;
+  calculateW(out: QuatType, a: QuatType): QuatType;
 
   /**
    * Returns whether or not the Quaternions have exactly the same elements in
    * the same position (when compared with ===)
    *
-   * @param {Quat} a The first vector.
-   * @param {Quat} b The second vector.
+   * @param {QuatType} a The first vector.
+   * @param {QuatType} b The second vector.
    * @returns {boolean} True if the Quaternions are equal, false otherwise.
    */
-  exactEquals(a: Quat, b: Quat): boolean;
+  exactEquals(a: QuatType, b: QuatType): boolean;
 
   /**
    * Returns whether or not the Quaternions have approximately the same
    * elements in the same position.
    *
-   * @param {Quat} a The first vector.
-   * @param {Quat} b The second vector.
+   * @param {QuatType} a The first vector.
+   * @param {QuatType} b The second vector.
    * @returns {boolean} True if the Quaternions are equal, false otherwise.
    */
-  equals(a: Quat, b: Quat): boolean;
+  equals(a: QuatType, b: QuatType): boolean;
 }
