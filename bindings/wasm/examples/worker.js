@@ -186,16 +186,8 @@ async function exportGLB(manifold) {
     if (outMesh == null) {
       continue;
     }
-
-    const transform = mesh.transform(run);
-    const mat4 = new Float32Array(16);
-    for (const col of [0, 1, 2, 3]) {
-      for (const row of [0, 1, 2]) {
-        mat4[4 * col + row] = transform[3 * col + row];
-      }
-    }
-    mat4[15] = 1;
-    const node = doc.createNode('debug').setMesh(outMesh).setMatrix(mat4);
+    const node =
+        doc.createNode('debug').setMesh(outMesh).setMatrix(mesh.transform(run));
     scene.addChild(node);
   }
 

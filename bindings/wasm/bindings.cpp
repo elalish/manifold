@@ -146,10 +146,11 @@ Manifold Revolve(std::vector<std::vector<glm::vec2>>& polygons,
   return Manifold::Revolve(ToPolygon(polygons), circularSegments);
 }
 
-Manifold Transform(Manifold& manifold, std::vector<float>& mat) {
+Manifold Transform(Manifold& manifold, const val& mat) {
+  std::vector<float> array = convertJSArrayToNumberVector<float>(mat);
   glm::mat4x3 matrix;
-  for (int i = 0; i < 4; i++)
-    for (int j = 0; j < 3; j++) matrix[i][j] = mat[i * 3 + j];
+  for (const int col : {0, 1, 2, 3})
+    for (const int row : {0, 1, 2}) matrix[col][row] = array[col * 4 + row];
   return manifold.Transform(matrix);
 }
 
@@ -237,7 +238,7 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .function("_GetMeshJS", &GetMeshJS)
       .function("refine", &Manifold::Refine)
       .function("_Warp", &Warp)
-      .function("_Transform", &Transform)
+      .function("transform", &Transform)
       .function("_Translate", &Manifold::Translate)
       .function("_Rotate", &Manifold::Rotate)
       .function("_Scale", &Manifold::Scale)

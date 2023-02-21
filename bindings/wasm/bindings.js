@@ -75,27 +75,6 @@ Module.setup = function() {
     return out;
   };
 
-  // note that the matrix is using column major (same as glm)
-  Module.Manifold.prototype.transform = function(mat) {
-    const vec = new Module.Vector_f32();
-    if (mat.length == 16) {
-      // assuming glMatrix format (column major)
-      // skip the last row
-      for (let i = 0; i < 16; i++)
-        if (i % 4 != 3)
-          vec.push_back(mat[i]);
-    } else {
-      console.assert(mat.length == 4, 'expects a 3x4 matrix');
-      for (let col of mat) {
-        console.assert(col.length == 3, 'expects a 3x4 matrix');
-        for (let x of col) vec.push_back(x);
-      }
-    }
-    const result = this._Transform(vec);
-    vec.delete();
-    return result;
-  };
-
   Module.Manifold.prototype.translate = function(...vec) {
     return this._Translate(vararg2vec(vec));
   };
@@ -184,7 +163,14 @@ Module.setup = function() {
     }
 
     transform(run) {
-      return this.runTransform.subarray(12 * run, 12 * (run + 1));
+      const mat4 = new Float32Array(16);
+      for (const col of [0, 1, 2, 3]) {
+        for (const row of [0, 1, 2]) {
+          mat4[4 * col + row] = transform[12 * run + 3 * col + row];
+        }
+      }
+      mat4[15] = 1;
+      return mat4;
     }
   }
 
