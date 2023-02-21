@@ -226,6 +226,19 @@ interface Vec2Type extends Float32Array {
   max(out: Vec2Type, a: Vec2Type|number[], b: Vec2Type|number[]): Vec2Type;
 
   /**
+   * Rotates the 2D vector.
+   *
+   * @param {Vec2Type} out the receiving vector
+   * @param {Vec2Type} a vector to rotate
+   * @param {Vec2Type} b origin of the rotation
+   * @param {number} rad angle of rotation in radians
+   * @returns {Vec2Type} out
+   */
+  rotate(
+      out: Vec2Type, a: Vec2Type|number[], b: Vec2Type|number[],
+      rad: number): Vec2Type;
+
+  /**
    * Math.round the components of a Vec2Type
    *
    * @param {Vec2Type} out the receiving vector
@@ -233,7 +246,6 @@ interface Vec2Type extends Float32Array {
    * @returns {Vec2Type} out
    */
   round(out: Vec2Type, a: Vec2Type|number[]): Vec2Type;
-
 
   /**
    * Scales a Vec2Type by a scalar number

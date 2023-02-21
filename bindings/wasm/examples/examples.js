@@ -34,7 +34,9 @@ export const examples = {
       // To share your code with another browser/device, simply copy the text to
       // a file.
 
-      // See the script drop-down above ("Intro") for usage examples.
+      // See the script drop-down above ("Intro") for usage examples. The
+      // gl-matrix package from npm is automatically imported for convenience -
+      // its API is available in the top-level glMatrix object.
       return result;
     },
 
@@ -47,8 +49,7 @@ export const examples = {
 
       const edgeLength = 50;  // Length of each edge of the overall tetrahedron.
       const gap = 0.2;  // Spacing between the two halves to allow sliding.
-      const nDivisions =
-          50;  // Number of divisions (both ways) in the screw surface.
+      const nDivisions = 50;  // Divisions (both ways) in the screw surface.
 
       const scale = edgeLength / (2 * Math.sqrt(2));
 
@@ -78,23 +79,19 @@ export const examples = {
         const edge = cylinder(edgeLength, radius, -1, circularSegments);
         const corner = sphere(radius, circularSegments);
 
-        let edge1 = union(corner, edge);
-        edge1 = edge1.rotate([-90, 0, 0]).translate([
+        const edge1 = union(corner, edge).rotate([-90, 0, 0]).translate([
           -edgeLength / 2, -edgeLength / 2, 0
         ]);
 
-        let edge2 = edge1.rotate([0, 0, 180]);
-        edge2 = union(edge2, edge1);
-        edge2 =
-            union(edge2, edge.translate([-edgeLength / 2, -edgeLength / 2, 0]));
+        const edge2 = union(
+            union(edge1, edge1.rotate([0, 0, 180])),
+            edge.translate([-edgeLength / 2, -edgeLength / 2, 0]));
 
-        let edge4 = edge2.rotate([0, 0, 90]);
-        edge4 = union(edge4, edge2);
+        const edge4 = union(edge2, edge2.rotate([0, 0, 90])).translate([
+          0, 0, -edgeLength / 2
+        ]);
 
-        let frame = edge4.translate([0, 0, -edgeLength / 2]);
-        frame = union(frame, frame.rotate([180, 0, 0]));
-
-        return frame;
+        return union(edge4, edge4.rotate([180, 0, 0]));
       }
 
       setMinCircularAngle(3);
@@ -275,10 +272,7 @@ export const examples = {
     MengerSponge: function() {
       // This example demonstrates how symbolic perturbation correctly creates
       // holes even though the subtracted objects are exactly coplanar.
-
-      function vec2add(a, b) {
-        return [a[0] + b[0], a[1] + b[1]];
-      }
+      const {vec2} = glMatrix;
 
       function fractal(holes, hole, w, position, depth, maxDepth) {
         w /= 3;
@@ -291,7 +285,8 @@ export const examples = {
         ];
         for (let offset of offsets)
           fractal(
-              holes, hole, w, vec2add(position, offset), depth + 1, maxDepth);
+              holes, hole, w, vec2.add(offset, position, offset), depth + 1,
+              maxDepth);
       }
 
       function mengerSponge(n) {
@@ -315,17 +310,11 @@ export const examples = {
     StretchyBracelet: function() {
       // Recreates Stretchy Bracelet by Emmett Lalish:
       // https://www.thingiverse.com/thing:13505
+      const {vec2} = glMatrix;
 
       function base(
           width, radius, decorRadius, twistRadius, nDecor, innerRadius,
           outerRadius, cut, nCut, nDivision) {
-        function rotate(v, theta) {
-          return [
-            v[0] * Math.cos(theta) - v[1] * Math.sin(theta),
-            v[0] * Math.sin(theta) + v[1] * Math.cos(theta)
-          ];
-        }
-
         let b = cylinder(width, radius + twistRadius / 2);
         const circle = [];
         const dPhiDeg = 180 / nDivision;
@@ -343,14 +332,15 @@ export const examples = {
         const stretch = [];
         const dPhiRad = 2 * Math.PI / nCut;
 
+        const o = [0, 0];
         const p0 = [outerRadius, 0];
         const p1 = [innerRadius, -cut];
         const p2 = [innerRadius, cut];
         for (let i = 0; i < nCut; ++i) {
-          stretch.push(rotate(p0, dPhiRad * i));
-          stretch.push(rotate(p1, dPhiRad * i));
-          stretch.push(rotate(p2, dPhiRad * i));
-          stretch.push(rotate(p0, dPhiRad * i));
+          stretch.push(vec2.rotate([0, 0], p0, o, dPhiRad * i));
+          stretch.push(vec2.rotate([0, 0], p1, o, dPhiRad * i));
+          stretch.push(vec2.rotate([0, 0], p2, o, dPhiRad * i));
+          stretch.push(vec2.rotate([0, 0], p0, o, dPhiRad * i));
         }
         b = intersection(extrude(stretch, width), b);
         return b;
