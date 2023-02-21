@@ -28,6 +28,7 @@ namespace manifold {
 /** @ingroup Private */
 struct Manifold::Impl {
   struct Relation {
+    int originalID = -1;
     glm::mat4x3 transform = glm::mat4x3(1);
     bool backSide = false;
   };

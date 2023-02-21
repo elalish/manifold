@@ -167,8 +167,9 @@ MeshGL Manifold::GetMeshGL(glm::ivec3 normalIdx) const {
   const int numVert = NumPropVert();
   const int numTri = NumTri();
 
+  const bool isOriginal = impl.meshRelation_.originalID >= 0;
   const bool updateNormals =
-      glm::all(glm::greaterThan(normalIdx, glm::ivec3(2)));
+      !isOriginal && glm::all(glm::greaterThan(normalIdx, glm::ivec3(2)));
 
   MeshGL out;
   out.numProp = 3 + numProp;
@@ -190,7 +191,7 @@ MeshGL Manifold::GetMeshGL(glm::ivec3 normalIdx) const {
   std::iota(triNew2Old.begin(), triNew2Old.end(), 0);
   const TriRef* triRef = impl.meshRelation_.triRef.cptrD();
   // Don't sort originals - keep them in order
-  if (impl.meshRelation_.originalID < 0) {
+  if (!isOriginal) {
     std::sort(triNew2Old.begin(), triNew2Old.end(), [triRef](int a, int b) {
       return triRef[a].originalID == triRef[b].originalID
                  ? triRef[a].meshID < triRef[b].meshID
@@ -199,31 +200,45 @@ MeshGL Manifold::GetMeshGL(glm::ivec3 normalIdx) const {
   }
 
   std::vector<glm::mat3> runNormalTransform;
+
+  auto addRun = [updateNormals, isOriginal](
+                    MeshGL& out, std::vector<glm::mat3>& runNormalTransform,
+                    int tri, const Impl::Relation& rel) {
+    out.runIndex.push_back(3 * tri);
+    out.runOriginalID.push_back(rel.originalID);
+    if (updateNormals) {
+      runNormalTransform.push_back(NormalTransform(rel.transform) *
+                                   (rel.backSide ? -1.0f : 1.0f));
+    }
+    if (!isOriginal) {
+      for (const int col : {0, 1, 2, 3}) {
+        for (const int row : {0, 1, 2}) {
+          out.runTransform.push_back(rel.transform[col][row]);
+        }
+      }
+    }
+  };
+
+  auto meshIDtransform = impl.meshRelation_.meshIDtransform;
   int lastID = -1;
   for (int tri = 0; tri < numTri; ++tri) {
     const int oldTri = triNew2Old[tri];
     const auto ref = triRef[oldTri];
     const int meshID = ref.meshID;
-    if (meshID != lastID) {
-      out.runIndex.push_back(3 * tri);
-      out.runOriginalID.push_back(ref.originalID);
-      const Impl::Relation& m = impl.meshRelation_.meshIDtransform.at(meshID);
-      if (updateNormals) {
-        runNormalTransform.push_back(NormalTransform(m.transform) *
-                                     (m.backSide ? -1.0f : 1.0f));
-      }
-      if (impl.meshRelation_.originalID < 0) {
-        for (const int col : {0, 1, 2, 3}) {
-          for (const int row : {0, 1, 2}) {
-            out.runTransform.push_back(m.transform[col][row]);
-          }
-        }
-      }
-      lastID = meshID;
-    }
+
     out.faceID[tri] = ref.tri;
     for (const int i : {0, 1, 2})
       out.triVerts[3 * tri + i] = impl.halfedge_[3 * oldTri + i].startVert;
+
+    if (meshID != lastID) {
+      addRun(out, runNormalTransform, tri, meshIDtransform.at(meshID));
+      meshIDtransform.erase(meshID);
+      lastID = meshID;
+    }
+  }
+  // Add runs for originals that did not contribute any faces to the output
+  for (const auto& pair : meshIDtransform) {
+    addRun(out, runNormalTransform, numTri, pair.second);
   }
   out.runIndex.push_back(3 * numTri);
 
