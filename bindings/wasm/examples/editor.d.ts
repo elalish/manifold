@@ -23,32 +23,32 @@ declare function show(manifold: Manifold): Manifold;
 //
 // Definitions by: Nikolay Babanov <https://github.com/nbabanov>
 
-declare glMatrix as GLMatrix;
+declare const glMatrix: GLMatrix;
 
 interface GLMatrix {
   // Configuration constants
-  static EPSILON: number;
-  static ARRAY_TYPE: any;
-  static RANDOM(): number;
-  static ENABLE_SIMD: boolean;
+  EPSILON: number;
+  ARRAY_TYPE: any;
+  RANDOM(): number;
+  ENABLE_SIMD: boolean;
 
   // Compatibility detection
-  static SIMD_AVAILABLE: boolean;
-  static USE_SIMD: boolean;
+  SIMD_AVAILABLE: boolean;
+  USE_SIMD: boolean;
 
   /**
    * Sets the type of array used when creating new vectors and matrices
    *
    * @param {any} type - Array type, such as Float32Array or Array
    */
-  static setMatrixArrayType(type: any): void;
+  setMatrixArrayType(type: any): void;
 
   /**
    * Convert Degree To Radian
    *
    * @param {number} a - Angle in Degrees
    */
-  static toRadian(a: number): number;
+  toRadian(a: number): number;
 
   /**
    * Tests whether or not the arguments have approximately the same value,
@@ -61,27 +61,25 @@ interface GLMatrix {
    * @returns {boolean} True if the numbers are approximately equal, false
    *     otherwise.
    */
-  static equals(a: number, b: number): boolean;
+  equals(a: number, b: number): boolean;
 
-  static vec2: Vec2;
-  static vec3: Vec3;
-  static vec4: Vec4;
-  static mat2: Mat2;
-  static mat2d: Mat2d;
-  static mat3: Mat3;
-  static mat4: Mat4;
-  static quat: Quat;
+  vec2: Vec2;
+  vec3: Vec3;
+  vec4: Vec4;
+  mat2: Mat2;
+  mat2d: Mat2d;
+  mat3: Mat3;
+  mat4: Mat4;
+  quat: Quat;
 }
 
 interface Vec2 extends Float32Array {
-  private typeVec2: number;
-
   /**
    * Creates a new, empty Vec2
    *
    * @returns a new 2D vector
    */
-  public static create(): Vec2;
+  create(): Vec2;
 
   /**
    * Creates a new Vec2 initialized with values from an existing vector
@@ -89,7 +87,7 @@ interface Vec2 extends Float32Array {
    * @param a a vector to clone
    * @returns a new 2D vector
    */
-  public static clone(a: Vec2|number[]): Vec2;
+  clone(a: Vec2|number[]): Vec2;
 
   /**
    * Creates a new Vec2 initialized with the given values
@@ -98,7 +96,7 @@ interface Vec2 extends Float32Array {
    * @param y Y component
    * @returns a new 2D vector
    */
-  public static fromValues(x: number, y: number): Vec2;
+  fromValues(x: number, y: number): Vec2;
 
   /**
    * Copy the values from one Vec2 to another
@@ -107,7 +105,7 @@ interface Vec2 extends Float32Array {
    * @param a the source vector
    * @returns out
    */
-  public static copy(out: Vec2, a: Vec2|number[]): Vec2;
+  copy(out: Vec2, a: Vec2|number[]): Vec2;
 
   /**
    * Set the components of a Vec2 to the given values
@@ -117,7 +115,7 @@ interface Vec2 extends Float32Array {
    * @param y Y component
    * @returns out
    */
-  public static set(out: Vec2, x: number, y: number): Vec2;
+  set(out: Vec2, x: number, y: number): Vec2;
 
   /**
    * Adds two Vec2's
@@ -127,7 +125,7 @@ interface Vec2 extends Float32Array {
    * @param b the second operand
    * @returns out
    */
-  public static add(out: Vec2, a: Vec2|number[], b: Vec2|number[]): Vec2;
+  add(out: Vec2, a: Vec2|number[], b: Vec2|number[]): Vec2;
 
   /**
    * Subtracts vector b from vector a
@@ -137,7 +135,7 @@ interface Vec2 extends Float32Array {
    * @param b the second operand
    * @returns out
    */
-  public static subtract(out: Vec2, a: Vec2|number[], b: Vec2|number[]): Vec2;
+  subtract(out: Vec2, a: Vec2|number[], b: Vec2|number[]): Vec2;
 
   /**
    * Subtracts vector b from vector a
@@ -147,7 +145,7 @@ interface Vec2 extends Float32Array {
    * @param b the second operand
    * @returns out
    */
-  public static sub(out: Vec2, a: Vec2|number[], b: Vec2|number[]): Vec2;
+  sub(out: Vec2, a: Vec2|number[], b: Vec2|number[]): Vec2;
 
   /**
    * Multiplies two Vec2's
@@ -157,7 +155,7 @@ interface Vec2 extends Float32Array {
    * @param b the second operand
    * @returns out
    */
-  public static multiply(out: Vec2, a: Vec2|number[], b: Vec2|number[]): Vec2;
+  multiply(out: Vec2, a: Vec2|number[], b: Vec2|number[]): Vec2;
 
   /**
    * Multiplies two Vec2's
@@ -167,7 +165,7 @@ interface Vec2 extends Float32Array {
    * @param b the second operand
    * @returns out
    */
-  public static mul(out: Vec2, a: Vec2|number[], b: Vec2|number[]): Vec2;
+  mul(out: Vec2, a: Vec2|number[], b: Vec2|number[]): Vec2;
 
   /**
    * Divides two Vec2's
@@ -177,7 +175,7 @@ interface Vec2 extends Float32Array {
    * @param b the second operand
    * @returns out
    */
-  public static divide(out: Vec2, a: Vec2|number[], b: Vec2|number[]): Vec2;
+  divide(out: Vec2, a: Vec2|number[], b: Vec2|number[]): Vec2;
 
   /**
    * Divides two Vec2's
@@ -187,7 +185,7 @@ interface Vec2 extends Float32Array {
    * @param b the second operand
    * @returns out
    */
-  public static div(out: Vec2, a: Vec2|number[], b: Vec2|number[]): Vec2;
+  div(out: Vec2, a: Vec2|number[], b: Vec2|number[]): Vec2;
 
   /**
    * Math.ceil the components of a Vec2
@@ -196,7 +194,7 @@ interface Vec2 extends Float32Array {
    * @param {Vec2} a vector to ceil
    * @returns {Vec2} out
    */
-  public static ceil(out: Vec2, a: Vec2|number[]): Vec2;
+  ceil(out: Vec2, a: Vec2|number[]): Vec2;
 
   /**
    * Math.floor the components of a Vec2
@@ -205,7 +203,7 @@ interface Vec2 extends Float32Array {
    * @param {Vec2} a vector to floor
    * @returns {Vec2} out
    */
-  public static floor(out: Vec2, a: Vec2|number[]): Vec2;
+  floor(out: Vec2, a: Vec2|number[]): Vec2;
 
   /**
    * Returns the minimum of two Vec2's
@@ -215,7 +213,7 @@ interface Vec2 extends Float32Array {
    * @param b the second operand
    * @returns out
    */
-  public static min(out: Vec2, a: Vec2|number[], b: Vec2|number[]): Vec2;
+  min(out: Vec2, a: Vec2|number[], b: Vec2|number[]): Vec2;
 
   /**
    * Returns the maximum of two Vec2's
@@ -225,7 +223,7 @@ interface Vec2 extends Float32Array {
    * @param b the second operand
    * @returns out
    */
-  public static max(out: Vec2, a: Vec2|number[], b: Vec2|number[]): Vec2;
+  max(out: Vec2, a: Vec2|number[], b: Vec2|number[]): Vec2;
 
   /**
    * Math.round the components of a Vec2
@@ -234,7 +232,7 @@ interface Vec2 extends Float32Array {
    * @param {Vec2} a vector to round
    * @returns {Vec2} out
    */
-  public static round(out: Vec2, a: Vec2|number[]): Vec2;
+  round(out: Vec2, a: Vec2|number[]): Vec2;
 
 
   /**
@@ -245,7 +243,7 @@ interface Vec2 extends Float32Array {
    * @param b amount to scale the vector by
    * @returns out
    */
-  public static scale(out: Vec2, a: Vec2|number[], b: number): Vec2;
+  scale(out: Vec2, a: Vec2|number[], b: number): Vec2;
 
   /**
    * Adds two Vec2's after scaling the second operand by a scalar value
@@ -256,8 +254,8 @@ interface Vec2 extends Float32Array {
    * @param scale the amount to scale b by before adding
    * @returns out
    */
-  public static scaleAndAdd(
-      out: Vec2, a: Vec2|number[], b: Vec2|number[], scale: number): Vec2;
+  scaleAndAdd(out: Vec2, a: Vec2|number[], b: Vec2|number[], scale: number):
+      Vec2;
 
   /**
    * Calculates the euclidian distance between two Vec2's
@@ -266,7 +264,7 @@ interface Vec2 extends Float32Array {
    * @param b the second operand
    * @returns distance between a and b
    */
-  public static distance(a: Vec2|number[], b: Vec2|number[]): number;
+  distance(a: Vec2|number[], b: Vec2|number[]): number;
 
   /**
    * Calculates the euclidian distance between two Vec2's
@@ -275,7 +273,7 @@ interface Vec2 extends Float32Array {
    * @param b the second operand
    * @returns distance between a and b
    */
-  public static dist(a: Vec2|number[], b: Vec2|number[]): number;
+  dist(a: Vec2|number[], b: Vec2|number[]): number;
 
   /**
    * Calculates the squared euclidian distance between two Vec2's
@@ -284,7 +282,7 @@ interface Vec2 extends Float32Array {
    * @param b the second operand
    * @returns squared distance between a and b
    */
-  public static squaredDistance(a: Vec2|number[], b: Vec2|number[]): number;
+  squaredDistance(a: Vec2|number[], b: Vec2|number[]): number;
 
   /**
    * Calculates the squared euclidian distance between two Vec2's
@@ -293,7 +291,7 @@ interface Vec2 extends Float32Array {
    * @param b the second operand
    * @returns squared distance between a and b
    */
-  public static sqrDist(a: Vec2|number[], b: Vec2|number[]): number;
+  sqrDist(a: Vec2|number[], b: Vec2|number[]): number;
 
   /**
    * Calculates the length of a Vec2
@@ -301,7 +299,7 @@ interface Vec2 extends Float32Array {
    * @param a vector to calculate length of
    * @returns length of a
    */
-  public static length(a: Vec2|number[]): number;
+  length(a: Vec2|number[]): number;
 
   /**
    * Calculates the length of a Vec2
@@ -309,7 +307,7 @@ interface Vec2 extends Float32Array {
    * @param a vector to calculate length of
    * @returns length of a
    */
-  public static len(a: Vec2|number[]): number;
+  len(a: Vec2|number[]): number;
 
   /**
    * Calculates the squared length of a Vec2
@@ -317,7 +315,7 @@ interface Vec2 extends Float32Array {
    * @param a vector to calculate squared length of
    * @returns squared length of a
    */
-  public static squaredLength(a: Vec2|number[]): number;
+  squaredLength(a: Vec2|number[]): number;
 
   /**
    * Calculates the squared length of a Vec2
@@ -325,7 +323,7 @@ interface Vec2 extends Float32Array {
    * @param a vector to calculate squared length of
    * @returns squared length of a
    */
-  public static sqrLen(a: Vec2|number[]): number;
+  sqrLen(a: Vec2|number[]): number;
 
   /**
    * Negates the components of a Vec2
@@ -334,7 +332,7 @@ interface Vec2 extends Float32Array {
    * @param a vector to negate
    * @returns out
    */
-  public static negate(out: Vec2, a: Vec2|number[]): Vec2;
+  negate(out: Vec2, a: Vec2|number[]): Vec2;
 
   /**
    * Returns the inverse of the components of a Vec2
@@ -343,7 +341,7 @@ interface Vec2 extends Float32Array {
    * @param a vector to invert
    * @returns out
    */
-  public static inverse(out: Vec2, a: Vec2|number[]): Vec2;
+  inverse(out: Vec2, a: Vec2|number[]): Vec2;
 
   /**
    * Normalize a Vec2
@@ -352,7 +350,7 @@ interface Vec2 extends Float32Array {
    * @param a vector to normalize
    * @returns out
    */
-  public static normalize(out: Vec2, a: Vec2|number[]): Vec2;
+  normalize(out: Vec2, a: Vec2|number[]): Vec2;
 
   /**
    * Calculates the dot product of two Vec2's
@@ -361,7 +359,7 @@ interface Vec2 extends Float32Array {
    * @param b the second operand
    * @returns dot product of a and b
    */
-  public static dot(a: Vec2|number[], b: Vec2|number[]): number;
+  dot(a: Vec2|number[], b: Vec2|number[]): number;
 
   /**
    * Computes the cross product of two Vec2's
@@ -372,7 +370,7 @@ interface Vec2 extends Float32Array {
    * @param b the second operand
    * @returns out
    */
-  public static cross(out: Vec2, a: Vec2|number[], b: Vec2|number[]): Vec2;
+  cross(out: Vec2, a: Vec2|number[], b: Vec2|number[]): Vec2;
 
   /**
    * Performs a linear interpolation between two Vec2's
@@ -383,8 +381,7 @@ interface Vec2 extends Float32Array {
    * @param t interpolation amount between the two inputs
    * @returns out
    */
-  public static lerp(out: Vec2, a: Vec2|number[], b: Vec2|number[], t: number):
-      Vec2;
+  lerp(out: Vec2, a: Vec2|number[], b: Vec2|number[], t: number): Vec2;
 
   /**
    * Generates a random unit vector
@@ -392,7 +389,7 @@ interface Vec2 extends Float32Array {
    * @param out the receiving vector
    * @returns out
    */
-  public static random(out: Vec2): Vec2;
+  random(out: Vec2): Vec2;
 
   /**
    * Generates a random vector with the given scale
@@ -402,7 +399,7 @@ interface Vec2 extends Float32Array {
    *     will be returned
    * @returns out
    */
-  public static random(out: Vec2, scale: number): Vec2;
+  random(out: Vec2, scale: number): Vec2;
 
   /**
    * Transforms the Vec2 with a Mat2
@@ -412,7 +409,7 @@ interface Vec2 extends Float32Array {
    * @param m matrix to transform with
    * @returns out
    */
-  public static transformMat2(out: Vec2, a: Vec2|number[], m: Mat2): Vec2;
+  transformMat2(out: Vec2, a: Vec2|number[], m: Mat2): Vec2;
 
   /**
    * Transforms the Vec2 with a Mat2d
@@ -422,7 +419,7 @@ interface Vec2 extends Float32Array {
    * @param m matrix to transform with
    * @returns out
    */
-  public static transformMat2d(out: Vec2, a: Vec2|number[], m: Mat2d): Vec2;
+  transformMat2d(out: Vec2, a: Vec2|number[], m: Mat2d): Vec2;
 
   /**
    * Transforms the Vec2 with a Mat3
@@ -433,7 +430,7 @@ interface Vec2 extends Float32Array {
    * @param m matrix to transform with
    * @returns out
    */
-  public static transformMat3(out: Vec2, a: Vec2|number[], m: Mat3): Vec2;
+  transformMat3(out: Vec2, a: Vec2|number[], m: Mat3): Vec2;
 
   /**
    * Transforms the Vec2 with a Mat4
@@ -445,7 +442,7 @@ interface Vec2 extends Float32Array {
    * @param m matrix to transform with
    * @returns out
    */
-  public static transformMat4(out: Vec2, a: Vec2|number[], m: Mat4): Vec2;
+  transformMat4(out: Vec2, a: Vec2|number[], m: Mat4): Vec2;
 
   /**
    * Perform some operation over an array of vec2s.
@@ -460,7 +457,7 @@ interface Vec2 extends Float32Array {
    * @param arg additional argument to pass to fn
    * @returns a
    */
-  public static forEach(
+  forEach(
       a: Float32Array, stride: number, offset: number, count: number,
       fn: (a: Vec2|number[], b: Vec2|number[], arg: any) => void,
       arg: any): Float32Array;
@@ -477,7 +474,7 @@ interface Vec2 extends Float32Array {
    * @param fn Function to call for each vector in the array
    * @returns a
    */
-  public static forEach(
+  forEach(
       a: Float32Array, stride: number, offset: number, count: number,
       fn: (a: Vec2|number[], b: Vec2|number[]) => void): Float32Array;
 
@@ -487,7 +484,7 @@ interface Vec2 extends Float32Array {
    * @param a vector to represent as a string
    * @returns string representation of the vector
    */
-  public static str(a: Vec2|number[]): string;
+  str(a: Vec2|number[]): string;
 
   /**
    * Returns whether or not the vectors exactly have the same elements in the
@@ -497,7 +494,7 @@ interface Vec2 extends Float32Array {
    * @param {Vec2} b The second vector.
    * @returns {boolean} True if the vectors are equal, false otherwise.
    */
-  public static exactEquals(a: Vec2|number[], b: Vec2|number[]): boolean;
+  exactEquals(a: Vec2|number[], b: Vec2|number[]): boolean;
 
   /**
    * Returns whether or not the vectors have approximately the same elements
@@ -507,19 +504,17 @@ interface Vec2 extends Float32Array {
    * @param {Vec2} b The second vector.
    * @returns {boolean} True if the vectors are equal, false otherwise.
    */
-  public static equals(a: Vec2|number[], b: Vec2|number[]): boolean;
+  equals(a: Vec2|number[], b: Vec2|number[]): boolean;
 }
 
 // Vec3
 interface Vec3 extends Float32Array {
-  private typeVec3: number;
-
   /**
    * Creates a new, empty Vec3
    *
    * @returns a new 3D vector
    */
-  public static create(): Vec3;
+  create(): Vec3;
 
   /**
    * Creates a new Vec3 initialized with values from an existing vector
@@ -527,7 +522,7 @@ interface Vec3 extends Float32Array {
    * @param a vector to clone
    * @returns a new 3D vector
    */
-  public static clone(a: Vec3|number[]): Vec3;
+  clone(a: Vec3|number[]): Vec3;
 
   /**
    * Creates a new Vec3 initialized with the given values
@@ -537,7 +532,7 @@ interface Vec3 extends Float32Array {
    * @param z Z component
    * @returns a new 3D vector
    */
-  public static fromValues(x: number, y: number, z: number): Vec3;
+  fromValues(x: number, y: number, z: number): Vec3;
 
   /**
    * Copy the values from one Vec3 to another
@@ -546,7 +541,7 @@ interface Vec3 extends Float32Array {
    * @param a the source vector
    * @returns out
    */
-  public static copy(out: Vec3, a: Vec3|number[]): Vec3;
+  copy(out: Vec3, a: Vec3|number[]): Vec3;
 
   /**
    * Set the components of a Vec3 to the given values
@@ -557,7 +552,7 @@ interface Vec3 extends Float32Array {
    * @param z Z component
    * @returns out
    */
-  public static set(out: Vec3, x: number, y: number, z: number): Vec3;
+  set(out: Vec3, x: number, y: number, z: number): Vec3;
 
   /**
    * Adds two Vec3's
@@ -567,7 +562,7 @@ interface Vec3 extends Float32Array {
    * @param b the second operand
    * @returns out
    */
-  public static add(out: Vec3, a: Vec3|number[], b: Vec3|number[]): Vec3;
+  add(out: Vec3, a: Vec3|number[], b: Vec3|number[]): Vec3;
 
   /**
    * Subtracts vector b from vector a
@@ -577,7 +572,7 @@ interface Vec3 extends Float32Array {
    * @param b the second operand
    * @returns out
    */
-  public static subtract(out: Vec3, a: Vec3|number[], b: Vec3|number[]): Vec3;
+  subtract(out: Vec3, a: Vec3|number[], b: Vec3|number[]): Vec3;
 
   /**
    * Subtracts vector b from vector a
@@ -587,18 +582,7 @@ interface Vec3 extends Float32Array {
    * @param b the second operand
    * @returns out
    */
-  public static sub(out: Vec3, a: Vec3|number[], b: Vec3|number[]): Vec3
-
-      /**
-       * Multiplies two Vec3's
-       *
-       * @param out the receiving vector
-       * @param a the first operand
-       * @param b the second operand
-       * @returns out
-       */
-      public static multiply(out: Vec3, a: Vec3|number[], b: Vec3|number[]):
-          Vec3;
+  sub(out: Vec3, a: Vec3|number[], b: Vec3|number[]): Vec3
 
   /**
    * Multiplies two Vec3's
@@ -608,7 +592,17 @@ interface Vec3 extends Float32Array {
    * @param b the second operand
    * @returns out
    */
-  public static mul(out: Vec3, a: Vec3|number[], b: Vec3|number[]): Vec3;
+  multiply(out: Vec3, a: Vec3|number[], b: Vec3|number[]): Vec3;
+
+  /**
+   * Multiplies two Vec3's
+   *
+   * @param out the receiving vector
+   * @param a the first operand
+   * @param b the second operand
+   * @returns out
+   */
+  mul(out: Vec3, a: Vec3|number[], b: Vec3|number[]): Vec3;
 
   /**
    * Divides two Vec3's
@@ -618,7 +612,7 @@ interface Vec3 extends Float32Array {
    * @param b the second operand
    * @returns out
    */
-  public static divide(out: Vec3, a: Vec3|number[], b: Vec3|number[]): Vec3;
+  divide(out: Vec3, a: Vec3|number[], b: Vec3|number[]): Vec3;
 
   /**
    * Divides two Vec3's
@@ -628,7 +622,7 @@ interface Vec3 extends Float32Array {
    * @param b the second operand
    * @returns out
    */
-  public static div(out: Vec3, a: Vec3|number[], b: Vec3|number[]): Vec3;
+  div(out: Vec3, a: Vec3|number[], b: Vec3|number[]): Vec3;
 
   /**
    * Math.ceil the components of a Vec3
@@ -637,7 +631,7 @@ interface Vec3 extends Float32Array {
    * @param {Vec3} a vector to ceil
    * @returns {Vec3} out
    */
-  public static ceil(out: Vec3, a: Vec3|number[]): Vec3;
+  ceil(out: Vec3, a: Vec3|number[]): Vec3;
 
   /**
    * Math.floor the components of a Vec3
@@ -646,7 +640,7 @@ interface Vec3 extends Float32Array {
    * @param {Vec3} a vector to floor
    * @returns {Vec3} out
    */
-  public static floor(out: Vec3, a: Vec3|number[]): Vec3;
+  floor(out: Vec3, a: Vec3|number[]): Vec3;
 
   /**
    * Returns the minimum of two Vec3's
@@ -656,7 +650,7 @@ interface Vec3 extends Float32Array {
    * @param b the second operand
    * @returns out
    */
-  public static min(out: Vec3, a: Vec3|number[], b: Vec3|number[]): Vec3;
+  min(out: Vec3, a: Vec3|number[], b: Vec3|number[]): Vec3;
 
   /**
    * Returns the maximum of two Vec3's
@@ -666,7 +660,7 @@ interface Vec3 extends Float32Array {
    * @param b the second operand
    * @returns out
    */
-  public static max(out: Vec3, a: Vec3|number[], b: Vec3|number[]): Vec3;
+  max(out: Vec3, a: Vec3|number[], b: Vec3|number[]): Vec3;
 
   /**
    * Math.round the components of a Vec3
@@ -675,17 +669,17 @@ interface Vec3 extends Float32Array {
    * @param {Vec3} a vector to round
    * @returns {Vec3} out
    */
-  public static round(out: Vec3, a: Vec3|number[]): Vec3
+  round(out: Vec3, a: Vec3|number[]): Vec3
 
-      /**
-       * Scales a Vec3 by a scalar number
-       *
-       * @param out the receiving vector
-       * @param a the vector to scale
-       * @param b amount to scale the vector by
-       * @returns out
-       */
-      public static scale(out: Vec3, a: Vec3|number[], b: number): Vec3;
+  /**
+   * Scales a Vec3 by a scalar number
+   *
+   * @param out the receiving vector
+   * @param a the vector to scale
+   * @param b amount to scale the vector by
+   * @returns out
+   */
+  scale(out: Vec3, a: Vec3|number[], b: number): Vec3;
 
   /**
    * Adds two Vec3's after scaling the second operand by a scalar value
@@ -696,8 +690,8 @@ interface Vec3 extends Float32Array {
    * @param scale the amount to scale b by before adding
    * @returns out
    */
-  public static scaleAndAdd(
-      out: Vec3, a: Vec3|number[], b: Vec3|number[], scale: number): Vec3;
+  scaleAndAdd(out: Vec3, a: Vec3|number[], b: Vec3|number[], scale: number):
+      Vec3;
 
   /**
    * Calculates the euclidian distance between two Vec3's
@@ -706,7 +700,7 @@ interface Vec3 extends Float32Array {
    * @param b the second operand
    * @returns distance between a and b
    */
-  public static distance(a: Vec3|number[], b: Vec3|number[]): number;
+  distance(a: Vec3|number[], b: Vec3|number[]): number;
 
   /**
    * Calculates the euclidian distance between two Vec3's
@@ -715,7 +709,7 @@ interface Vec3 extends Float32Array {
    * @param b the second operand
    * @returns distance between a and b
    */
-  public static dist(a: Vec3|number[], b: Vec3|number[]): number;
+  dist(a: Vec3|number[], b: Vec3|number[]): number;
 
   /**
    * Calculates the squared euclidian distance between two Vec3's
@@ -724,7 +718,7 @@ interface Vec3 extends Float32Array {
    * @param b the second operand
    * @returns squared distance between a and b
    */
-  public static squaredDistance(a: Vec3|number[], b: Vec3|number[]): number;
+  squaredDistance(a: Vec3|number[], b: Vec3|number[]): number;
 
   /**
    * Calculates the squared euclidian distance between two Vec3's
@@ -733,7 +727,7 @@ interface Vec3 extends Float32Array {
    * @param b the second operand
    * @returns squared distance between a and b
    */
-  public static sqrDist(a: Vec3|number[], b: Vec3|number[]): number;
+  sqrDist(a: Vec3|number[], b: Vec3|number[]): number;
 
   /**
    * Calculates the length of a Vec3
@@ -741,7 +735,7 @@ interface Vec3 extends Float32Array {
    * @param a vector to calculate length of
    * @returns length of a
    */
-  public static length(a: Vec3|number[]): number;
+  length(a: Vec3|number[]): number;
 
   /**
    * Calculates the length of a Vec3
@@ -749,7 +743,7 @@ interface Vec3 extends Float32Array {
    * @param a vector to calculate length of
    * @returns length of a
    */
-  public static len(a: Vec3|number[]): number;
+  len(a: Vec3|number[]): number;
 
   /**
    * Calculates the squared length of a Vec3
@@ -757,7 +751,7 @@ interface Vec3 extends Float32Array {
    * @param a vector to calculate squared length of
    * @returns squared length of a
    */
-  public static squaredLength(a: Vec3|number[]): number;
+  squaredLength(a: Vec3|number[]): number;
 
   /**
    * Calculates the squared length of a Vec3
@@ -765,7 +759,7 @@ interface Vec3 extends Float32Array {
    * @param a vector to calculate squared length of
    * @returns squared length of a
    */
-  public static sqrLen(a: Vec3|number[]): number;
+  sqrLen(a: Vec3|number[]): number;
 
   /**
    * Negates the components of a Vec3
@@ -774,7 +768,7 @@ interface Vec3 extends Float32Array {
    * @param a vector to negate
    * @returns out
    */
-  public static negate(out: Vec3, a: Vec3|number[]): Vec3;
+  negate(out: Vec3, a: Vec3|number[]): Vec3;
 
   /**
    * Returns the inverse of the components of a Vec3
@@ -783,7 +777,7 @@ interface Vec3 extends Float32Array {
    * @param a vector to invert
    * @returns out
    */
-  public static inverse(out: Vec3, a: Vec3|number[]): Vec3;
+  inverse(out: Vec3, a: Vec3|number[]): Vec3;
 
   /**
    * Normalize a Vec3
@@ -792,7 +786,7 @@ interface Vec3 extends Float32Array {
    * @param a vector to normalize
    * @returns out
    */
-  public static normalize(out: Vec3, a: Vec3|number[]): Vec3;
+  normalize(out: Vec3, a: Vec3|number[]): Vec3;
 
   /**
    * Calculates the dot product of two Vec3's
@@ -801,7 +795,7 @@ interface Vec3 extends Float32Array {
    * @param b the second operand
    * @returns dot product of a and b
    */
-  public static dot(a: Vec3|number[], b: Vec3|number[]): number;
+  dot(a: Vec3|number[], b: Vec3|number[]): number;
 
   /**
    * Computes the cross product of two Vec3's
@@ -811,7 +805,7 @@ interface Vec3 extends Float32Array {
    * @param b the second operand
    * @returns out
    */
-  public static cross(out: Vec3, a: Vec3|number[], b: Vec3|number[]): Vec3;
+  cross(out: Vec3, a: Vec3|number[], b: Vec3|number[]): Vec3;
 
   /**
    * Performs a linear interpolation between two Vec3's
@@ -822,8 +816,7 @@ interface Vec3 extends Float32Array {
    * @param t interpolation amount between the two inputs
    * @returns out
    */
-  public static lerp(out: Vec3, a: Vec3|number[], b: Vec3|number[], t: number):
-      Vec3;
+  lerp(out: Vec3, a: Vec3|number[], b: Vec3|number[], t: number): Vec3;
 
   /**
    * Performs a hermite interpolation with two control points
@@ -836,7 +829,7 @@ interface Vec3 extends Float32Array {
    * @param {number} t interpolation amount between the two inputs
    * @returns {Vec3} out
    */
-  public static hermite(
+  hermite(
       out: Vec3, a: Vec3|number[], b: Vec3|number[], c: Vec3|number[],
       d: Vec3|number[], t: number): Vec3;
 
@@ -851,7 +844,7 @@ interface Vec3 extends Float32Array {
    * @param {number} t interpolation amount between the two inputs
    * @returns {Vec3} out
    */
-  public static bezier(
+  bezier(
       out: Vec3, a: Vec3|number[], b: Vec3|number[], c: Vec3|number[],
       d: Vec3|number[], t: number): Vec3;
 
@@ -861,7 +854,7 @@ interface Vec3 extends Float32Array {
    * @param out the receiving vector
    * @returns out
    */
-  public static random(out: Vec3): Vec3;
+  random(out: Vec3): Vec3;
 
   /**
    * Generates a random vector with the given scale
@@ -871,7 +864,7 @@ interface Vec3 extends Float32Array {
    *     will be returned
    * @returns out
    */
-  public static random(out: Vec3, scale: number): Vec3;
+  random(out: Vec3, scale: number): Vec3;
 
   /**
    * Transforms the Vec3 with a Mat3.
@@ -881,7 +874,7 @@ interface Vec3 extends Float32Array {
    * @param m the 3x3 matrix to transform with
    * @returns out
    */
-  public static transformMat3(out: Vec3, a: Vec3|number[], m: Mat3): Vec3;
+  transformMat3(out: Vec3, a: Vec3|number[], m: Mat3): Vec3;
 
   /**
    * Transforms the Vec3 with a Mat4.
@@ -892,7 +885,7 @@ interface Vec3 extends Float32Array {
    * @param m matrix to transform with
    * @returns out
    */
-  public static transformMat4(out: Vec3, a: Vec3|number[], m: Mat4): Vec3;
+  transformMat4(out: Vec3, a: Vec3|number[], m: Mat4): Vec3;
 
   /**
    * Transforms the Vec3 with a Quat
@@ -902,7 +895,7 @@ interface Vec3 extends Float32Array {
    * @param q Quaternion to transform with
    * @returns out
    */
-  public static transformQuat(out: Vec3, a: Vec3|number[], q: Quat): Vec3;
+  transformQuat(out: Vec3, a: Vec3|number[], q: Quat): Vec3;
 
 
   /**
@@ -913,8 +906,7 @@ interface Vec3 extends Float32Array {
    * @param c The angle of rotation
    * @returns out
    */
-  public static rotateX(
-      out: Vec3, a: Vec3|number[], b: Vec3|number[], c: number): Vec3;
+  rotateX(out: Vec3, a: Vec3|number[], b: Vec3|number[], c: number): Vec3;
 
   /**
    * Rotate a 3D vector around the y-axis
@@ -924,8 +916,7 @@ interface Vec3 extends Float32Array {
    * @param c The angle of rotation
    * @returns out
    */
-  public static rotateY(
-      out: Vec3, a: Vec3|number[], b: Vec3|number[], c: number): Vec3;
+  rotateY(out: Vec3, a: Vec3|number[], b: Vec3|number[], c: number): Vec3;
 
   /**
    * Rotate a 3D vector around the z-axis
@@ -935,8 +926,7 @@ interface Vec3 extends Float32Array {
    * @param c The angle of rotation
    * @returns out
    */
-  public static rotateZ(
-      out: Vec3, a: Vec3|number[], b: Vec3|number[], c: number): Vec3;
+  rotateZ(out: Vec3, a: Vec3|number[], b: Vec3|number[], c: number): Vec3;
 
   /**
    * Perform some operation over an array of vec3s.
@@ -952,7 +942,7 @@ interface Vec3 extends Float32Array {
    * @returns a
    * @function
    */
-  public static forEach(
+  forEach(
       a: Float32Array, stride: number, offset: number, count: number,
       fn: (a: Vec3|number[], b: Vec3|number[], arg: any) => void,
       arg: any): Float32Array;
@@ -970,7 +960,7 @@ interface Vec3 extends Float32Array {
    * @returns a
    * @function
    */
-  public static forEach(
+  forEach(
       a: Float32Array, stride: number, offset: number, count: number,
       fn: (a: Vec3|number[], b: Vec3|number[]) => void): Float32Array;
 
@@ -980,7 +970,7 @@ interface Vec3 extends Float32Array {
    * @param b The second operand
    * @returns The angle in radians
    */
-  public static angle(a: Vec3|number[], b: Vec3|number[]): number;
+  angle(a: Vec3|number[], b: Vec3|number[]): number;
 
   /**
    * Returns a string representation of a vector
@@ -988,7 +978,7 @@ interface Vec3 extends Float32Array {
    * @param a vector to represent as a string
    * @returns string representation of the vector
    */
-  public static str(a: Vec3|number[]): string;
+  str(a: Vec3|number[]): string;
 
   /**
    * Returns whether or not the vectors have exactly the same elements in the
@@ -998,29 +988,27 @@ interface Vec3 extends Float32Array {
    * @param {Vec3} b The second vector.
    * @returns {boolean} True if the vectors are equal, false otherwise.
    */
-  public static exactEquals(a: Vec3|number[], b: Vec3|number[]): boolean
+  exactEquals(a: Vec3|number[], b: Vec3|number[]): boolean
 
-      /**
-       * Returns whether or not the vectors have approximately the same
-       * elements in the same position.
-       *
-       * @param {Vec3} a The first vector.
-       * @param {Vec3} b The second vector.
-       * @returns {boolean} True if the vectors are equal, false otherwise.
-       */
-      public static equals(a: Vec3|number[], b: Vec3|number[]): boolean
+  /**
+   * Returns whether or not the vectors have approximately the same
+   * elements in the same position.
+   *
+   * @param {Vec3} a The first vector.
+   * @param {Vec3} b The second vector.
+   * @returns {boolean} True if the vectors are equal, false otherwise.
+   */
+  equals(a: Vec3|number[], b: Vec3|number[]): boolean
 }
 
 // Vec4
 interface Vec4 extends Float32Array {
-  private typeVec3: number;
-
   /**
    * Creates a new, empty Vec4
    *
    * @returns a new 4D vector
    */
-  public static create(): Vec4;
+  create(): Vec4;
 
   /**
    * Creates a new Vec4 initialized with values from an existing vector
@@ -1028,7 +1016,7 @@ interface Vec4 extends Float32Array {
    * @param a vector to clone
    * @returns a new 4D vector
    */
-  public static clone(a: Vec4|number[]): Vec4;
+  clone(a: Vec4|number[]): Vec4;
 
   /**
    * Creates a new Vec4 initialized with the given values
@@ -1039,7 +1027,7 @@ interface Vec4 extends Float32Array {
    * @param w W component
    * @returns a new 4D vector
    */
-  public static fromValues(x: number, y: number, z: number, w: number): Vec4;
+  fromValues(x: number, y: number, z: number, w: number): Vec4;
 
   /**
    * Copy the values from one Vec4 to another
@@ -1048,7 +1036,7 @@ interface Vec4 extends Float32Array {
    * @param a the source vector
    * @returns out
    */
-  public static copy(out: Vec4, a: Vec4|number[]): Vec4;
+  copy(out: Vec4, a: Vec4|number[]): Vec4;
 
   /**
    * Set the components of a Vec4 to the given values
@@ -1060,8 +1048,7 @@ interface Vec4 extends Float32Array {
    * @param w W component
    * @returns out
    */
-  public static set(out: Vec4, x: number, y: number, z: number, w: number):
-      Vec4;
+  set(out: Vec4, x: number, y: number, z: number, w: number): Vec4;
 
   /**
    * Adds two Vec4's
@@ -1071,7 +1058,7 @@ interface Vec4 extends Float32Array {
    * @param b the second operand
    * @returns out
    */
-  public static add(out: Vec4, a: Vec4|number[], b: Vec4|number[]): Vec4;
+  add(out: Vec4, a: Vec4|number[], b: Vec4|number[]): Vec4;
 
   /**
    * Subtracts vector b from vector a
@@ -1081,7 +1068,7 @@ interface Vec4 extends Float32Array {
    * @param b the second operand
    * @returns out
    */
-  public static subtract(out: Vec4, a: Vec4|number[], b: Vec4|number[]): Vec4;
+  subtract(out: Vec4, a: Vec4|number[], b: Vec4|number[]): Vec4;
 
   /**
    * Subtracts vector b from vector a
@@ -1091,7 +1078,7 @@ interface Vec4 extends Float32Array {
    * @param b the second operand
    * @returns out
    */
-  public static sub(out: Vec4, a: Vec4|number[], b: Vec4|number[]): Vec4;
+  sub(out: Vec4, a: Vec4|number[], b: Vec4|number[]): Vec4;
 
   /**
    * Multiplies two Vec4's
@@ -1101,7 +1088,7 @@ interface Vec4 extends Float32Array {
    * @param b the second operand
    * @returns out
    */
-  public static multiply(out: Vec4, a: Vec4|number[], b: Vec4|number[]): Vec4;
+  multiply(out: Vec4, a: Vec4|number[], b: Vec4|number[]): Vec4;
 
   /**
    * Multiplies two Vec4's
@@ -1111,7 +1098,7 @@ interface Vec4 extends Float32Array {
    * @param b the second operand
    * @returns out
    */
-  public static mul(out: Vec4, a: Vec4|number[], b: Vec4|number[]): Vec4;
+  mul(out: Vec4, a: Vec4|number[], b: Vec4|number[]): Vec4;
 
   /**
    * Divides two Vec4's
@@ -1121,7 +1108,7 @@ interface Vec4 extends Float32Array {
    * @param b the second operand
    * @returns out
    */
-  public static divide(out: Vec4, a: Vec4|number[], b: Vec4|number[]): Vec4;
+  divide(out: Vec4, a: Vec4|number[], b: Vec4|number[]): Vec4;
 
   /**
    * Divides two Vec4's
@@ -1131,7 +1118,7 @@ interface Vec4 extends Float32Array {
    * @param b the second operand
    * @returns out
    */
-  public static div(out: Vec4, a: Vec4|number[], b: Vec4|number[]): Vec4;
+  div(out: Vec4, a: Vec4|number[], b: Vec4|number[]): Vec4;
 
   /**
    * Math.ceil the components of a Vec4
@@ -1140,7 +1127,7 @@ interface Vec4 extends Float32Array {
    * @param {Vec4} a vector to ceil
    * @returns {Vec4} out
    */
-  public static ceil(out: Vec4, a: Vec4|number[]): Vec4;
+  ceil(out: Vec4, a: Vec4|number[]): Vec4;
 
   /**
    * Math.floor the components of a Vec4
@@ -1149,7 +1136,7 @@ interface Vec4 extends Float32Array {
    * @param {Vec4} a vector to floor
    * @returns {Vec4} out
    */
-  public static floor(out: Vec4, a: Vec4|number[]): Vec4;
+  floor(out: Vec4, a: Vec4|number[]): Vec4;
 
   /**
    * Returns the minimum of two Vec4's
@@ -1159,7 +1146,7 @@ interface Vec4 extends Float32Array {
    * @param b the second operand
    * @returns out
    */
-  public static min(out: Vec4, a: Vec4|number[], b: Vec4|number[]): Vec4;
+  min(out: Vec4, a: Vec4|number[], b: Vec4|number[]): Vec4;
 
   /**
    * Returns the maximum of two Vec4's
@@ -1169,7 +1156,7 @@ interface Vec4 extends Float32Array {
    * @param b the second operand
    * @returns out
    */
-  public static max(out: Vec4, a: Vec4|number[], b: Vec4|number[]): Vec4;
+  max(out: Vec4, a: Vec4|number[], b: Vec4|number[]): Vec4;
 
   /**
    * Math.round the components of a Vec4
@@ -1178,7 +1165,7 @@ interface Vec4 extends Float32Array {
    * @param {Vec4} a vector to round
    * @returns {Vec4} out
    */
-  public static round(out: Vec4, a: Vec4|number[]): Vec4;
+  round(out: Vec4, a: Vec4|number[]): Vec4;
 
   /**
    * Scales a Vec4 by a scalar number
@@ -1188,7 +1175,7 @@ interface Vec4 extends Float32Array {
    * @param b amount to scale the vector by
    * @returns out
    */
-  public static scale(out: Vec4, a: Vec4|number[], b: number): Vec4;
+  scale(out: Vec4, a: Vec4|number[], b: number): Vec4;
 
   /**
    * Adds two Vec4's after scaling the second operand by a scalar value
@@ -1199,8 +1186,8 @@ interface Vec4 extends Float32Array {
    * @param scale the amount to scale b by before adding
    * @returns out
    */
-  public static scaleAndAdd(
-      out: Vec4, a: Vec4|number[], b: Vec4|number[], scale: number): Vec4;
+  scaleAndAdd(out: Vec4, a: Vec4|number[], b: Vec4|number[], scale: number):
+      Vec4;
 
   /**
    * Calculates the euclidian distance between two Vec4's
@@ -1209,7 +1196,7 @@ interface Vec4 extends Float32Array {
    * @param b the second operand
    * @returns distance between a and b
    */
-  public static distance(a: Vec4|number[], b: Vec4|number[]): number;
+  distance(a: Vec4|number[], b: Vec4|number[]): number;
 
   /**
    * Calculates the euclidian distance between two Vec4's
@@ -1218,7 +1205,7 @@ interface Vec4 extends Float32Array {
    * @param b the second operand
    * @returns distance between a and b
    */
-  public static dist(a: Vec4|number[], b: Vec4|number[]): number;
+  dist(a: Vec4|number[], b: Vec4|number[]): number;
 
   /**
    * Calculates the squared euclidian distance between two Vec4's
@@ -1227,7 +1214,7 @@ interface Vec4 extends Float32Array {
    * @param b the second operand
    * @returns squared distance between a and b
    */
-  public static squaredDistance(a: Vec4|number[], b: Vec4|number[]): number;
+  squaredDistance(a: Vec4|number[], b: Vec4|number[]): number;
 
   /**
    * Calculates the squared euclidian distance between two Vec4's
@@ -1236,7 +1223,7 @@ interface Vec4 extends Float32Array {
    * @param b the second operand
    * @returns squared distance between a and b
    */
-  public static sqrDist(a: Vec4|number[], b: Vec4|number[]): number;
+  sqrDist(a: Vec4|number[], b: Vec4|number[]): number;
 
   /**
    * Calculates the length of a Vec4
@@ -1244,7 +1231,7 @@ interface Vec4 extends Float32Array {
    * @param a vector to calculate length of
    * @returns length of a
    */
-  public static length(a: Vec4|number[]): number;
+  length(a: Vec4|number[]): number;
 
   /**
    * Calculates the length of a Vec4
@@ -1252,7 +1239,7 @@ interface Vec4 extends Float32Array {
    * @param a vector to calculate length of
    * @returns length of a
    */
-  public static len(a: Vec4|number[]): number;
+  len(a: Vec4|number[]): number;
 
   /**
    * Calculates the squared length of a Vec4
@@ -1260,7 +1247,7 @@ interface Vec4 extends Float32Array {
    * @param a vector to calculate squared length of
    * @returns squared length of a
    */
-  public static squaredLength(a: Vec4|number[]): number;
+  squaredLength(a: Vec4|number[]): number;
 
   /**
    * Calculates the squared length of a Vec4
@@ -1268,7 +1255,7 @@ interface Vec4 extends Float32Array {
    * @param a vector to calculate squared length of
    * @returns squared length of a
    */
-  public static sqrLen(a: Vec4|number[]): number;
+  sqrLen(a: Vec4|number[]): number;
 
   /**
    * Negates the components of a Vec4
@@ -1277,7 +1264,7 @@ interface Vec4 extends Float32Array {
    * @param a vector to negate
    * @returns out
    */
-  public static negate(out: Vec4, a: Vec4|number[]): Vec4;
+  negate(out: Vec4, a: Vec4|number[]): Vec4;
 
   /**
    * Returns the inverse of the components of a Vec4
@@ -1286,7 +1273,7 @@ interface Vec4 extends Float32Array {
    * @param a vector to invert
    * @returns out
    */
-  public static inverse(out: Vec4, a: Vec4|number[]): Vec4;
+  inverse(out: Vec4, a: Vec4|number[]): Vec4;
 
   /**
    * Normalize a Vec4
@@ -1295,7 +1282,7 @@ interface Vec4 extends Float32Array {
    * @param a vector to normalize
    * @returns out
    */
-  public static normalize(out: Vec4, a: Vec4|number[]): Vec4;
+  normalize(out: Vec4, a: Vec4|number[]): Vec4;
 
   /**
    * Calculates the dot product of two Vec4's
@@ -1304,7 +1291,7 @@ interface Vec4 extends Float32Array {
    * @param b the second operand
    * @returns dot product of a and b
    */
-  public static dot(a: Vec4|number[], b: Vec4|number[]): number;
+  dot(a: Vec4|number[], b: Vec4|number[]): number;
 
   /**
    * Performs a linear interpolation between two Vec4's
@@ -1315,8 +1302,7 @@ interface Vec4 extends Float32Array {
    * @param t interpolation amount between the two inputs
    * @returns out
    */
-  public static lerp(out: Vec4, a: Vec4|number[], b: Vec4|number[], t: number):
-      Vec4;
+  lerp(out: Vec4, a: Vec4|number[], b: Vec4|number[], t: number): Vec4;
 
   /**
    * Generates a random unit vector
@@ -1324,7 +1310,7 @@ interface Vec4 extends Float32Array {
    * @param out the receiving vector
    * @returns out
    */
-  public static random(out: Vec4): Vec4;
+  random(out: Vec4): Vec4;
 
   /**
    * Generates a random vector with the given scale
@@ -1334,7 +1320,7 @@ interface Vec4 extends Float32Array {
    *     will be returned
    * @returns out
    */
-  public static random(out: Vec4, scale: number): Vec4;
+  random(out: Vec4, scale: number): Vec4;
 
   /**
    * Transforms the Vec4 with a Mat4.
@@ -1344,7 +1330,7 @@ interface Vec4 extends Float32Array {
    * @param m matrix to transform with
    * @returns out
    */
-  public static transformMat4(out: Vec4, a: Vec4|number[], m: Mat4): Vec4;
+  transformMat4(out: Vec4, a: Vec4|number[], m: Mat4): Vec4;
 
   /**
    * Transforms the Vec4 with a Quat
@@ -1355,7 +1341,7 @@ interface Vec4 extends Float32Array {
    * @returns out
    */
 
-  public static transformQuat(out: Vec4, a: Vec4|number[], q: Quat): Vec4;
+  transformQuat(out: Vec4, a: Vec4|number[], q: Quat): Vec4;
 
   /**
    * Perform some operation over an array of Vec4s.
@@ -1371,7 +1357,7 @@ interface Vec4 extends Float32Array {
    * @returns a
    * @function
    */
-  public static forEach(
+  forEach(
       a: Float32Array, stride: number, offset: number, count: number,
       fn: (a: Vec4|number[], b: Vec4|number[], arg: any) => void,
       arg: any): Float32Array;
@@ -1389,7 +1375,7 @@ interface Vec4 extends Float32Array {
    * @returns a
    * @function
    */
-  public static forEach(
+  forEach(
       a: Float32Array, stride: number, offset: number, count: number,
       fn: (a: Vec4|number[], b: Vec4|number[]) => void): Float32Array;
 
@@ -1399,7 +1385,7 @@ interface Vec4 extends Float32Array {
    * @param a vector to represent as a string
    * @returns string representation of the vector
    */
-  public static str(a: Vec4|number[]): string;
+  str(a: Vec4|number[]): string;
 
   /**
    * Returns whether or not the vectors have exactly the same elements in the
@@ -1409,7 +1395,7 @@ interface Vec4 extends Float32Array {
    * @param {Vec4} b The second vector.
    * @returns {boolean} True if the vectors are equal, false otherwise.
    */
-  public static exactEquals(a: Vec4|number[], b: Vec4|number[]): boolean;
+  exactEquals(a: Vec4|number[], b: Vec4|number[]): boolean;
 
   /**
    * Returns whether or not the vectors have approximately the same elements
@@ -1419,19 +1405,17 @@ interface Vec4 extends Float32Array {
    * @param {Vec4} b The second vector.
    * @returns {boolean} True if the vectors are equal, false otherwise.
    */
-  public static equals(a: Vec4|number[], b: Vec4|number[]): boolean;
+  equals(a: Vec4|number[], b: Vec4|number[]): boolean;
 }
 
 // Mat2
 interface Mat2 extends Float32Array {
-  private typeMat2: number;
-
   /**
    * Creates a new identity Mat2
    *
    * @returns a new 2x2 matrix
    */
-  public static create(): Mat2;
+  create(): Mat2;
 
   /**
    * Creates a new Mat2 initialized with values from an existing matrix
@@ -1439,7 +1423,7 @@ interface Mat2 extends Float32Array {
    * @param a matrix to clone
    * @returns a new 2x2 matrix
    */
-  public static clone(a: Mat2): Mat2;
+  clone(a: Mat2): Mat2;
 
   /**
    * Copy the values from one Mat2 to another
@@ -1448,7 +1432,7 @@ interface Mat2 extends Float32Array {
    * @param a the source matrix
    * @returns out
    */
-  public static copy(out: Mat2, a: Mat2): Mat2;
+  copy(out: Mat2, a: Mat2): Mat2;
 
   /**
    * Set a Mat2 to the identity matrix
@@ -1456,7 +1440,7 @@ interface Mat2 extends Float32Array {
    * @param out the receiving matrix
    * @returns out
    */
-  public static identity(out: Mat2): Mat2;
+  identity(out: Mat2): Mat2;
 
   /**
    * Create a new Mat2 with the given values
@@ -1467,8 +1451,7 @@ interface Mat2 extends Float32Array {
    * @param {number} m11 Component in column 1, row 1 position (index 3)
    * @returns {Mat2} out A new 2x2 matrix
    */
-  public static fromValues(m00: number, m01: number, m10: number, m11: number):
-      Mat2;
+  fromValues(m00: number, m01: number, m10: number, m11: number): Mat2;
 
   /**
    * Set the components of a Mat2 to the given values
@@ -1480,8 +1463,7 @@ interface Mat2 extends Float32Array {
    * @param {number} m11 Component in column 1, row 1 position (index 3)
    * @returns {Mat2} out
    */
-  public static set(
-      out: Mat2, m00: number, m01: number, m10: number, m11: number): Mat2;
+  set(out: Mat2, m00: number, m01: number, m10: number, m11: number): Mat2;
 
   /**
    * Transpose the values of a Mat2
@@ -1490,7 +1472,7 @@ interface Mat2 extends Float32Array {
    * @param a the source matrix
    * @returns out
    */
-  public static transpose(out: Mat2, a: Mat2): Mat2;
+  transpose(out: Mat2, a: Mat2): Mat2;
 
   /**
    * Inverts a Mat2
@@ -1499,7 +1481,7 @@ interface Mat2 extends Float32Array {
    * @param a the source matrix
    * @returns out
    */
-  public static invert(out: Mat2, a: Mat2): Mat2|null;
+  invert(out: Mat2, a: Mat2): Mat2|null;
 
   /**
    * Calculates the adjugate of a Mat2
@@ -1508,7 +1490,7 @@ interface Mat2 extends Float32Array {
    * @param a the source matrix
    * @returns out
    */
-  public static adjoint(out: Mat2, a: Mat2): Mat2;
+  adjoint(out: Mat2, a: Mat2): Mat2;
 
   /**
    * Calculates the determinant of a Mat2
@@ -1516,7 +1498,7 @@ interface Mat2 extends Float32Array {
    * @param a the source matrix
    * @returns determinant of a
    */
-  public static determinant(a: Mat2): number;
+  determinant(a: Mat2): number;
 
   /**
    * Multiplies two Mat2's
@@ -1526,7 +1508,7 @@ interface Mat2 extends Float32Array {
    * @param b the second operand
    * @returns out
    */
-  public static multiply(out: Mat2, a: Mat2, b: Mat2): Mat2;
+  multiply(out: Mat2, a: Mat2, b: Mat2): Mat2;
 
   /**
    * Multiplies two Mat2's
@@ -1536,7 +1518,7 @@ interface Mat2 extends Float32Array {
    * @param b the second operand
    * @returns out
    */
-  public static mul(out: Mat2, a: Mat2, b: Mat2): Mat2;
+  mul(out: Mat2, a: Mat2, b: Mat2): Mat2;
 
   /**
    * Rotates a Mat2 by the given angle
@@ -1546,7 +1528,7 @@ interface Mat2 extends Float32Array {
    * @param rad the angle to rotate the matrix by
    * @returns out
    */
-  public static rotate(out: Mat2, a: Mat2, rad: number): Mat2;
+  rotate(out: Mat2, a: Mat2, rad: number): Mat2;
 
   /**
    * Scales the Mat2 by the dimensions in the given Vec2
@@ -1556,7 +1538,7 @@ interface Mat2 extends Float32Array {
    * @param v the Vec2 to scale the matrix by
    * @returns out
    **/
-  public static scale(out: Mat2, a: Mat2, v: Vec2|number[]): Mat2;
+  scale(out: Mat2, a: Mat2, v: Vec2|number[]): Mat2;
 
   /**
    * Creates a matrix from a given angle
@@ -1569,7 +1551,7 @@ interface Mat2 extends Float32Array {
    * @param {number} rad the angle to rotate the matrix by
    * @returns {Mat2} out
    */
-  public static fromRotation(out: Mat2, rad: number): Mat2;
+  fromRotation(out: Mat2, rad: number): Mat2;
 
   /**
    * Creates a matrix from a vector scaling
@@ -1582,7 +1564,7 @@ interface Mat2 extends Float32Array {
    * @param {Vec2} v Scaling vector
    * @returns {Mat2} out
    */
-  public static fromScaling(out: Mat2, v: Vec2|number[]): Mat2;
+  fromScaling(out: Mat2, v: Vec2|number[]): Mat2;
 
   /**
    * Returns a string representation of a Mat2
@@ -1590,7 +1572,7 @@ interface Mat2 extends Float32Array {
    * @param a matrix to represent as a string
    * @returns string representation of the matrix
    */
-  public static str(a: Mat2): string;
+  str(a: Mat2): string;
 
   /**
    * Returns Frobenius norm of a Mat2
@@ -1598,7 +1580,7 @@ interface Mat2 extends Float32Array {
    * @param a the matrix to calculate Frobenius norm of
    * @returns Frobenius norm
    */
-  public static frob(a: Mat2): number;
+  frob(a: Mat2): number;
 
   /**
    * Returns L, D and U matrices (Lower triangular, Diagonal and Upper
@@ -1608,7 +1590,7 @@ interface Mat2 extends Float32Array {
    * @param U the upper triangular matrix
    * @param a the input matrix to factorize
    */
-  public static LDU(L: Mat2, D: Mat2, U: Mat2, a: Mat2): Mat2;
+  LDU(L: Mat2, D: Mat2, U: Mat2, a: Mat2): Mat2;
 
   /**
    * Adds two Mat2's
@@ -1618,7 +1600,7 @@ interface Mat2 extends Float32Array {
    * @param {Mat2} b the second operand
    * @returns {Mat2} out
    */
-  public static add(out: Mat2, a: Mat2, b: Mat2): Mat2;
+  add(out: Mat2, a: Mat2, b: Mat2): Mat2;
 
   /**
    * Subtracts matrix b from matrix a
@@ -1628,7 +1610,7 @@ interface Mat2 extends Float32Array {
    * @param {Mat2} b the second operand
    * @returns {Mat2} out
    */
-  public static subtract(out: Mat2, a: Mat2, b: Mat2): Mat2;
+  subtract(out: Mat2, a: Mat2, b: Mat2): Mat2;
 
   /**
    * Subtracts matrix b from matrix a
@@ -1638,7 +1620,7 @@ interface Mat2 extends Float32Array {
    * @param {Mat2} b the second operand
    * @returns {Mat2} out
    */
-  public static sub(out: Mat2, a: Mat2, b: Mat2): Mat2;
+  sub(out: Mat2, a: Mat2, b: Mat2): Mat2;
 
   /**
    * Returns whether or not the matrices have exactly the same elements in the
@@ -1648,7 +1630,7 @@ interface Mat2 extends Float32Array {
    * @param {Mat2} b The second matrix.
    * @returns {boolean} True if the matrices are equal, false otherwise.
    */
-  public static exactEquals(a: Mat2, b: Mat2): boolean;
+  exactEquals(a: Mat2, b: Mat2): boolean;
 
   /**
    * Returns whether or not the matrices have approximately the same elements
@@ -1658,7 +1640,7 @@ interface Mat2 extends Float32Array {
    * @param {Mat2} b The second matrix.
    * @returns {boolean} True if the matrices are equal, false otherwise.
    */
-  public static equals(a: Mat2, b: Mat2): boolean;
+  equals(a: Mat2, b: Mat2): boolean;
 
   /**
    * Multiply each element of the matrix by a scalar.
@@ -1668,33 +1650,30 @@ interface Mat2 extends Float32Array {
    * @param {number} b amount to scale the matrix's elements by
    * @returns {Mat2} out
    */
-  public static multiplyScalar(out: Mat2, a: Mat2, b: number): Mat2
+  multiplyScalar(out: Mat2, a: Mat2, b: number): Mat2
 
-      /**
-       * Adds two Mat2's after multiplying each element of the second operand
-       * by a scalar value.
-       *
-       * @param {Mat2} out the receiving vector
-       * @param {Mat2} a the first operand
-       * @param {Mat2} b the second operand
-       * @param {number} scale the amount to scale b's elements by before
-       *     adding
-       * @returns {Mat2} out
-       */
-      public static multiplyScalarAndAdd(
-          out: Mat2, a: Mat2, b: Mat2, scale: number): Mat2
+  /**
+   * Adds two Mat2's after multiplying each element of the second operand
+   * by a scalar value.
+   *
+   * @param {Mat2} out the receiving vector
+   * @param {Mat2} a the first operand
+   * @param {Mat2} b the second operand
+   * @param {number} scale the amount to scale b's elements by before
+   *     adding
+   * @returns {Mat2} out
+   */
+  multiplyScalarAndAdd(out: Mat2, a: Mat2, b: Mat2, scale: number): Mat2
 }
 
 // Mat2d
 interface Mat2d extends Float32Array {
-  private typeMat2d: number;
-
   /**
    * Creates a new identity Mat2d
    *
    * @returns a new 2x3 matrix
    */
-  public static create(): Mat2d;
+  create(): Mat2d;
 
   /**
    * Creates a new Mat2d initialized with values from an existing matrix
@@ -1702,7 +1681,7 @@ interface Mat2d extends Float32Array {
    * @param a matrix to clone
    * @returns a new 2x3 matrix
    */
-  public static clone(a: Mat2d): Mat2d;
+  clone(a: Mat2d): Mat2d;
 
   /**
    * Copy the values from one Mat2d to another
@@ -1711,7 +1690,7 @@ interface Mat2d extends Float32Array {
    * @param a the source matrix
    * @returns out
    */
-  public static copy(out: Mat2d, a: Mat2d): Mat2d;
+  copy(out: Mat2d, a: Mat2d): Mat2d;
 
   /**
    * Set a Mat2d to the identity matrix
@@ -1719,7 +1698,7 @@ interface Mat2d extends Float32Array {
    * @param out the receiving matrix
    * @returns out
    */
-  public static identity(out: Mat2d): Mat2d;
+  identity(out: Mat2d): Mat2d;
 
   /**
    * Create a new Mat2d with the given values
@@ -1732,34 +1711,33 @@ interface Mat2d extends Float32Array {
    * @param {number} ty Component TY (index 5)
    * @returns {Mat2d} A new Mat2d
    */
-  public static fromValues(
+  fromValues(
       a: number, b: number, c: number, d: number, tx: number, ty: number): Mat2d
 
 
-      /**
-       * Set the components of a Mat2d to the given values
-       *
-       * @param {Mat2d} out the receiving matrix
-       * @param {number} a Component A (index 0)
-       * @param {number} b Component B (index 1)
-       * @param {number} c Component C (index 2)
-       * @param {number} d Component D (index 3)
-       * @param {number} tx Component TX (index 4)
-       * @param {number} ty Component TY (index 5)
-       * @returns {Mat2d} out
-       */
-      public static set(
-          out: Mat2d, a: number, b: number, c: number, d: number, tx: number,
-          ty: number): Mat2d
+  /**
+   * Set the components of a Mat2d to the given values
+   *
+   * @param {Mat2d} out the receiving matrix
+   * @param {number} a Component A (index 0)
+   * @param {number} b Component B (index 1)
+   * @param {number} c Component C (index 2)
+   * @param {number} d Component D (index 3)
+   * @param {number} tx Component TX (index 4)
+   * @param {number} ty Component TY (index 5)
+   * @returns {Mat2d} out
+   */
+  set(out: Mat2d, a: number, b: number, c: number, d: number, tx: number,
+      ty: number): Mat2d
 
-      /**
-       * Inverts a Mat2d
-       *
-       * @param out the receiving matrix
-       * @param a the source matrix
-       * @returns out
-       */
-      public static invert(out: Mat2d, a: Mat2d): Mat2d|null;
+  /**
+   * Inverts a Mat2d
+   *
+   * @param out the receiving matrix
+   * @param a the source matrix
+   * @returns out
+   */
+  invert(out: Mat2d, a: Mat2d): Mat2d|null;
 
   /**
    * Calculates the determinant of a Mat2d
@@ -1767,7 +1745,7 @@ interface Mat2d extends Float32Array {
    * @param a the source matrix
    * @returns determinant of a
    */
-  public static determinant(a: Mat2d): number;
+  determinant(a: Mat2d): number;
 
   /**
    * Multiplies two Mat2d's
@@ -1777,7 +1755,7 @@ interface Mat2d extends Float32Array {
    * @param b the second operand
    * @returns out
    */
-  public static multiply(out: Mat2d, a: Mat2d, b: Mat2d): Mat2d;
+  multiply(out: Mat2d, a: Mat2d, b: Mat2d): Mat2d;
 
   /**
    * Multiplies two Mat2d's
@@ -1787,7 +1765,7 @@ interface Mat2d extends Float32Array {
    * @param b the second operand
    * @returns out
    */
-  public static mul(out: Mat2d, a: Mat2d, b: Mat2d): Mat2d;
+  mul(out: Mat2d, a: Mat2d, b: Mat2d): Mat2d;
 
   /**
    * Rotates a Mat2d by the given angle
@@ -1797,7 +1775,7 @@ interface Mat2d extends Float32Array {
    * @param rad the angle to rotate the matrix by
    * @returns out
    */
-  public static rotate(out: Mat2d, a: Mat2d, rad: number): Mat2d;
+  rotate(out: Mat2d, a: Mat2d, rad: number): Mat2d;
 
   /**
    * Scales the Mat2d by the dimensions in the given Vec2
@@ -1807,7 +1785,7 @@ interface Mat2d extends Float32Array {
    * @param v the Vec2 to scale the matrix by
    * @returns out
    **/
-  public static scale(out: Mat2d, a: Mat2d, v: Vec2|number[]): Mat2d;
+  scale(out: Mat2d, a: Mat2d, v: Vec2|number[]): Mat2d;
 
   /**
    * Translates the Mat2d by the dimensions in the given Vec2
@@ -1817,7 +1795,7 @@ interface Mat2d extends Float32Array {
    * @param v the Vec2 to translate the matrix by
    * @returns out
    **/
-  public static translate(out: Mat2d, a: Mat2d, v: Vec2|number[]): Mat2d;
+  translate(out: Mat2d, a: Mat2d, v: Vec2|number[]): Mat2d;
 
   /**
    * Creates a matrix from a given angle
@@ -1830,7 +1808,7 @@ interface Mat2d extends Float32Array {
    * @param {number} rad the angle to rotate the matrix by
    * @returns {Mat2d} out
    */
-  public static fromRotation(out: Mat2d, rad: number): Mat2d;
+  fromRotation(out: Mat2d, rad: number): Mat2d;
 
   /**
    * Creates a matrix from a vector scaling
@@ -1843,7 +1821,7 @@ interface Mat2d extends Float32Array {
    * @param {Vec2} v Scaling vector
    * @returns {Mat2d} out
    */
-  public static fromScaling(out: Mat2d, v: Vec2|number[]): Mat2d;
+  fromScaling(out: Mat2d, v: Vec2|number[]): Mat2d;
 
   /**
    * Creates a matrix from a vector translation
@@ -1856,15 +1834,15 @@ interface Mat2d extends Float32Array {
    * @param {Vec2} v Translation vector
    * @returns {Mat2d} out
    */
-  public static fromTranslation(out: Mat2d, v: Vec2|number[]): Mat2d
+  fromTranslation(out: Mat2d, v: Vec2|number[]): Mat2d
 
-      /**
-       * Returns a string representation of a Mat2d
-       *
-       * @param a matrix to represent as a string
-       * @returns string representation of the matrix
-       */
-      public static str(a: Mat2d): string;
+  /**
+   * Returns a string representation of a Mat2d
+   *
+   * @param a matrix to represent as a string
+   * @returns string representation of the matrix
+   */
+  str(a: Mat2d): string;
 
   /**
    * Returns Frobenius norm of a Mat2d
@@ -1872,7 +1850,7 @@ interface Mat2d extends Float32Array {
    * @param a the matrix to calculate Frobenius norm of
    * @returns Frobenius norm
    */
-  public static frob(a: Mat2d): number;
+  frob(a: Mat2d): number;
 
   /**
    * Adds two Mat2d's
@@ -1882,37 +1860,37 @@ interface Mat2d extends Float32Array {
    * @param {Mat2d} b the second operand
    * @returns {Mat2d} out
    */
-  public static add(out: Mat2d, a: Mat2d, b: Mat2d): Mat2d
+  add(out: Mat2d, a: Mat2d, b: Mat2d): Mat2d
 
-      /**
-       * Subtracts matrix b from matrix a
-       *
-       * @param {Mat2d} out the receiving matrix
-       * @param {Mat2d} a the first operand
-       * @param {Mat2d} b the second operand
-       * @returns {Mat2d} out
-       */
-      public static subtract(out: Mat2d, a: Mat2d, b: Mat2d): Mat2d
+  /**
+   * Subtracts matrix b from matrix a
+   *
+   * @param {Mat2d} out the receiving matrix
+   * @param {Mat2d} a the first operand
+   * @param {Mat2d} b the second operand
+   * @returns {Mat2d} out
+   */
+  subtract(out: Mat2d, a: Mat2d, b: Mat2d): Mat2d
 
-      /**
-       * Subtracts matrix b from matrix a
-       *
-       * @param {Mat2d} out the receiving matrix
-       * @param {Mat2d} a the first operand
-       * @param {Mat2d} b the second operand
-       * @returns {Mat2d} out
-       */
-      public static sub(out: Mat2d, a: Mat2d, b: Mat2d): Mat2d
+  /**
+   * Subtracts matrix b from matrix a
+   *
+   * @param {Mat2d} out the receiving matrix
+   * @param {Mat2d} a the first operand
+   * @param {Mat2d} b the second operand
+   * @returns {Mat2d} out
+   */
+  sub(out: Mat2d, a: Mat2d, b: Mat2d): Mat2d
 
-      /**
-       * Multiply each element of the matrix by a scalar.
-       *
-       * @param {Mat2d} out the receiving matrix
-       * @param {Mat2d} a the matrix to scale
-       * @param {number} b amount to scale the matrix's elements by
-       * @returns {Mat2d} out
-       */
-      public static multiplyScalar(out: Mat2d, a: Mat2d, b: number): Mat2d;
+  /**
+   * Multiply each element of the matrix by a scalar.
+   *
+   * @param {Mat2d} out the receiving matrix
+   * @param {Mat2d} a the matrix to scale
+   * @param {number} b amount to scale the matrix's elements by
+   * @returns {Mat2d} out
+   */
+  multiplyScalar(out: Mat2d, a: Mat2d, b: number): Mat2d;
 
   /**
    * Adds two Mat2d's after multiplying each element of the second operand by
@@ -1924,18 +1902,17 @@ interface Mat2d extends Float32Array {
    * @param {number} scale the amount to scale b's elements by before adding
    * @returns {Mat2d} out
    */
-  public static multiplyScalarAndAdd(
-      out: Mat2d, a: Mat2d, b: Mat2d, scale: number): Mat2d
+  multiplyScalarAndAdd(out: Mat2d, a: Mat2d, b: Mat2d, scale: number): Mat2d
 
-      /**
-       * Returns whether or not the matrices have exactly the same elements in
-       * the same position (when compared with ===)
-       *
-       * @param {Mat2d} a The first matrix.
-       * @param {Mat2d} b The second matrix.
-       * @returns {boolean} True if the matrices are equal, false otherwise.
-       */
-      public static exactEquals(a: Mat2d, b: Mat2d): boolean;
+  /**
+   * Returns whether or not the matrices have exactly the same elements in
+   * the same position (when compared with ===)
+   *
+   * @param {Mat2d} a The first matrix.
+   * @param {Mat2d} b The second matrix.
+   * @returns {boolean} True if the matrices are equal, false otherwise.
+   */
+  exactEquals(a: Mat2d, b: Mat2d): boolean;
 
   /**
    * Returns whether or not the matrices have approximately the same elements
@@ -1945,19 +1922,17 @@ interface Mat2d extends Float32Array {
    * @param {Mat2d} b The second matrix.
    * @returns {boolean} True if the matrices are equal, false otherwise.
    */
-  public static equals(a: Mat2d, b: Mat2d): boolean
+  equals(a: Mat2d, b: Mat2d): boolean
 }
 
 // Mat3
 interface Mat3 extends Float32Array {
-  private typeMat3: number;
-
   /**
    * Creates a new identity Mat3
    *
    * @returns a new 3x3 matrix
    */
-  public static create(): Mat3;
+  create(): Mat3;
 
   /**
    * Copies the upper-left 3x3 values into the given Mat3.
@@ -1966,15 +1941,15 @@ interface Mat3 extends Float32Array {
    * @param {Mat4} a   the source 4x4 matrix
    * @returns {Mat3} out
    */
-  public static fromMat4(out: Mat3, a: Mat4): Mat3
+  fromMat4(out: Mat3, a: Mat4): Mat3
 
-      /**
-       * Creates a new Mat3 initialized with values from an existing matrix
-       *
-       * @param a matrix to clone
-       * @returns a new 3x3 matrix
-       */
-      public static clone(a: Mat3): Mat3;
+  /**
+   * Creates a new Mat3 initialized with values from an existing matrix
+   *
+   * @param a matrix to clone
+   * @returns a new 3x3 matrix
+   */
+  clone(a: Mat3): Mat3;
 
   /**
    * Copy the values from one Mat3 to another
@@ -1983,7 +1958,7 @@ interface Mat3 extends Float32Array {
    * @param a the source matrix
    * @returns out
    */
-  public static copy(out: Mat3, a: Mat3): Mat3;
+  copy(out: Mat3, a: Mat3): Mat3;
 
   /**
    * Create a new Mat3 with the given values
@@ -1999,7 +1974,7 @@ interface Mat3 extends Float32Array {
    * @param {number} m22 Component in column 2, row 2 position (index 8)
    * @returns {Mat3} A new Mat3
    */
-  public static fromValues(
+  fromValues(
       m00: number, m01: number, m02: number, m10: number, m11: number,
       m12: number, m20: number, m21: number, m22: number): Mat3;
 
@@ -2019,17 +1994,16 @@ interface Mat3 extends Float32Array {
    * @param {number} m22 Component in column 2, row 2 position (index 8)
    * @returns {Mat3} out
    */
-  public static set(
-      out: Mat3, m00: number, m01: number, m02: number, m10: number,
+  set(out: Mat3, m00: number, m01: number, m02: number, m10: number,
       m11: number, m12: number, m20: number, m21: number, m22: number): Mat3
 
-      /**
-       * Set a Mat3 to the identity matrix
-       *
-       * @param out the receiving matrix
-       * @returns out
-       */
-      public static identity(out: Mat3): Mat3;
+  /**
+   * Set a Mat3 to the identity matrix
+   *
+   * @param out the receiving matrix
+   * @returns out
+   */
+  identity(out: Mat3): Mat3;
 
   /**
    * Transpose the values of a Mat3
@@ -2038,7 +2012,7 @@ interface Mat3 extends Float32Array {
    * @param a the source matrix
    * @returns out
    */
-  public static transpose(out: Mat3, a: Mat3): Mat3;
+  transpose(out: Mat3, a: Mat3): Mat3;
 
   /**
    * Inverts a Mat3
@@ -2047,7 +2021,7 @@ interface Mat3 extends Float32Array {
    * @param a the source matrix
    * @returns out
    */
-  public static invert(out: Mat3, a: Mat3): Mat3|null;
+  invert(out: Mat3, a: Mat3): Mat3|null;
 
   /**
    * Calculates the adjugate of a Mat3
@@ -2056,7 +2030,7 @@ interface Mat3 extends Float32Array {
    * @param a the source matrix
    * @returns out
    */
-  public static adjoint(out: Mat3, a: Mat3): Mat3;
+  adjoint(out: Mat3, a: Mat3): Mat3;
 
   /**
    * Calculates the determinant of a Mat3
@@ -2064,7 +2038,7 @@ interface Mat3 extends Float32Array {
    * @param a the source matrix
    * @returns determinant of a
    */
-  public static determinant(a: Mat3): number;
+  determinant(a: Mat3): number;
 
   /**
    * Multiplies two Mat3's
@@ -2074,7 +2048,7 @@ interface Mat3 extends Float32Array {
    * @param b the second operand
    * @returns out
    */
-  public static multiply(out: Mat3, a: Mat3, b: Mat3): Mat3;
+  multiply(out: Mat3, a: Mat3, b: Mat3): Mat3;
 
   /**
    * Multiplies two Mat3's
@@ -2084,7 +2058,7 @@ interface Mat3 extends Float32Array {
    * @param b the second operand
    * @returns out
    */
-  public static mul(out: Mat3, a: Mat3, b: Mat3): Mat3;
+  mul(out: Mat3, a: Mat3, b: Mat3): Mat3;
 
 
   /**
@@ -2095,7 +2069,7 @@ interface Mat3 extends Float32Array {
    * @param v vector to translate by
    * @returns out
    */
-  public static translate(out: Mat3, a: Mat3, v: Vec3|number[]): Mat3;
+  translate(out: Mat3, a: Mat3, v: Vec3|number[]): Mat3;
 
   /**
    * Rotates a Mat3 by the given angle
@@ -2105,7 +2079,7 @@ interface Mat3 extends Float32Array {
    * @param rad the angle to rotate the matrix by
    * @returns out
    */
-  public static rotate(out: Mat3, a: Mat3, rad: number): Mat3;
+  rotate(out: Mat3, a: Mat3, rad: number): Mat3;
 
   /**
    * Scales the Mat3 by the dimensions in the given Vec2
@@ -2115,7 +2089,7 @@ interface Mat3 extends Float32Array {
    * @param v the Vec2 to scale the matrix by
    * @returns out
    **/
-  public static scale(out: Mat3, a: Mat3, v: Vec2|number[]): Mat3;
+  scale(out: Mat3, a: Mat3, v: Vec2|number[]): Mat3;
 
   /**
    * Creates a matrix from a vector translation
@@ -2128,42 +2102,42 @@ interface Mat3 extends Float32Array {
    * @param {Vec2} v Translation vector
    * @returns {Mat3} out
    */
-  public static fromTranslation(out: Mat3, v: Vec2|number[]): Mat3
+  fromTranslation(out: Mat3, v: Vec2|number[]): Mat3
 
-      /**
-       * Creates a matrix from a given angle
-       * This is equivalent to (but much faster than):
-       *
-       *     Mat3.identity(dest);
-       *     Mat3.rotate(dest, dest, rad);
-       *
-       * @param {Mat3} out Mat3 receiving operation result
-       * @param {number} rad the angle to rotate the matrix by
-       * @returns {Mat3} out
-       */
-      public static fromRotation(out: Mat3, rad: number): Mat3
+  /**
+   * Creates a matrix from a given angle
+   * This is equivalent to (but much faster than):
+   *
+   *     Mat3.identity(dest);
+   *     Mat3.rotate(dest, dest, rad);
+   *
+   * @param {Mat3} out Mat3 receiving operation result
+   * @param {number} rad the angle to rotate the matrix by
+   * @returns {Mat3} out
+   */
+  fromRotation(out: Mat3, rad: number): Mat3
 
-      /**
-       * Creates a matrix from a vector scaling
-       * This is equivalent to (but much faster than):
-       *
-       *     Mat3.identity(dest);
-       *     Mat3.scale(dest, dest, vec);
-       *
-       * @param {Mat3} out Mat3 receiving operation result
-       * @param {Vec2} v Scaling vector
-       * @returns {Mat3} out
-       */
-      public static fromScaling(out: Mat3, v: Vec2|number[]): Mat3
+  /**
+   * Creates a matrix from a vector scaling
+   * This is equivalent to (but much faster than):
+   *
+   *     Mat3.identity(dest);
+   *     Mat3.scale(dest, dest, vec);
+   *
+   * @param {Mat3} out Mat3 receiving operation result
+   * @param {Vec2} v Scaling vector
+   * @returns {Mat3} out
+   */
+  fromScaling(out: Mat3, v: Vec2|number[]): Mat3
 
-      /**
-       * Copies the values from a Mat2d into a Mat3
-       *
-       * @param out the receiving matrix
-       * @param {Mat2d} a the matrix to copy
-       * @returns out
-       **/
-      public static fromMat2d(out: Mat3, a: Mat2d): Mat3;
+  /**
+   * Copies the values from a Mat2d into a Mat3
+   *
+   * @param out the receiving matrix
+   * @param {Mat2d} a the matrix to copy
+   * @returns out
+   **/
+  fromMat2d(out: Mat3, a: Mat2d): Mat3;
 
   /**
    * Calculates a 3x3 matrix from the given Quaternion
@@ -2173,7 +2147,7 @@ interface Mat3 extends Float32Array {
    *
    * @returns out
    */
-  public static fromQuat(out: Mat3, q: Quat): Mat3;
+  fromQuat(out: Mat3, q: Quat): Mat3;
 
   /**
    * Calculates a 3x3 normal matrix (transpose inverse) from the 4x4 matrix
@@ -2183,7 +2157,7 @@ interface Mat3 extends Float32Array {
    *
    * @returns out
    */
-  public static normalFromMat4(out: Mat3, a: Mat4): Mat3|null;
+  normalFromMat4(out: Mat3, a: Mat4): Mat3|null;
 
   /**
    * Returns a string representation of a Mat3
@@ -2191,7 +2165,7 @@ interface Mat3 extends Float32Array {
    * @param mat matrix to represent as a string
    * @returns string representation of the matrix
    */
-  public static str(mat: Mat3): string;
+  str(mat: Mat3): string;
 
   /**
    * Returns Frobenius norm of a Mat3
@@ -2199,7 +2173,7 @@ interface Mat3 extends Float32Array {
    * @param a the matrix to calculate Frobenius norm of
    * @returns Frobenius norm
    */
-  public static frob(a: Mat3): number;
+  frob(a: Mat3): number;
 
   /**
    * Adds two Mat3's
@@ -2209,61 +2183,60 @@ interface Mat3 extends Float32Array {
    * @param {Mat3} b the second operand
    * @returns {Mat3} out
    */
-  public static add(out: Mat3, a: Mat3, b: Mat3): Mat3
+  add(out: Mat3, a: Mat3, b: Mat3): Mat3
 
-      /**
-       * Subtracts matrix b from matrix a
-       *
-       * @param {Mat3} out the receiving matrix
-       * @param {Mat3} a the first operand
-       * @param {Mat3} b the second operand
-       * @returns {Mat3} out
-       */
-      public static subtract(out: Mat3, a: Mat3, b: Mat3): Mat3
+  /**
+   * Subtracts matrix b from matrix a
+   *
+   * @param {Mat3} out the receiving matrix
+   * @param {Mat3} a the first operand
+   * @param {Mat3} b the second operand
+   * @returns {Mat3} out
+   */
+  subtract(out: Mat3, a: Mat3, b: Mat3): Mat3
 
-      /**
-       * Subtracts matrix b from matrix a
-       *
-       * @param {Mat3} out the receiving matrix
-       * @param {Mat3} a the first operand
-       * @param {Mat3} b the second operand
-       * @returns {Mat3} out
-       */
-      public static sub(out: Mat3, a: Mat3, b: Mat3): Mat3
+  /**
+   * Subtracts matrix b from matrix a
+   *
+   * @param {Mat3} out the receiving matrix
+   * @param {Mat3} a the first operand
+   * @param {Mat3} b the second operand
+   * @returns {Mat3} out
+   */
+  sub(out: Mat3, a: Mat3, b: Mat3): Mat3
 
-      /**
-       * Multiply each element of the matrix by a scalar.
-       *
-       * @param {Mat3} out the receiving matrix
-       * @param {Mat3} a the matrix to scale
-       * @param {number} b amount to scale the matrix's elements by
-       * @returns {Mat3} out
-       */
-      public static multiplyScalar(out: Mat3, a: Mat3, b: number): Mat3
+  /**
+   * Multiply each element of the matrix by a scalar.
+   *
+   * @param {Mat3} out the receiving matrix
+   * @param {Mat3} a the matrix to scale
+   * @param {number} b amount to scale the matrix's elements by
+   * @returns {Mat3} out
+   */
+  multiplyScalar(out: Mat3, a: Mat3, b: number): Mat3
 
-      /**
-       * Adds two Mat3's after multiplying each element of the second operand
-       * by a scalar value.
-       *
-       * @param {Mat3} out the receiving vector
-       * @param {Mat3} a the first operand
-       * @param {Mat3} b the second operand
-       * @param {number} scale the amount to scale b's elements by before
-       *     adding
-       * @returns {Mat3} out
-       */
-      public static multiplyScalarAndAdd(
-          out: Mat3, a: Mat3, b: Mat3, scale: number): Mat3
+  /**
+   * Adds two Mat3's after multiplying each element of the second operand
+   * by a scalar value.
+   *
+   * @param {Mat3} out the receiving vector
+   * @param {Mat3} a the first operand
+   * @param {Mat3} b the second operand
+   * @param {number} scale the amount to scale b's elements by before
+   *     adding
+   * @returns {Mat3} out
+   */
+  multiplyScalarAndAdd(out: Mat3, a: Mat3, b: Mat3, scale: number): Mat3
 
-      /**
-       * Returns whether or not the matrices have exactly the same elements in
-       * the same position (when compared with ===)
-       *
-       * @param {Mat3} a The first matrix.
-       * @param {Mat3} b The second matrix.
-       * @returns {boolean} True if the matrices are equal, false otherwise.
-       */
-      public static exactEquals(a: Mat3, b: Mat3): boolean;
+  /**
+   * Returns whether or not the matrices have exactly the same elements in
+   * the same position (when compared with ===)
+   *
+   * @param {Mat3} a The first matrix.
+   * @param {Mat3} b The second matrix.
+   * @returns {boolean} True if the matrices are equal, false otherwise.
+   */
+  exactEquals(a: Mat3, b: Mat3): boolean;
 
   /**
    * Returns whether or not the matrices have approximately the same elements
@@ -2273,19 +2246,17 @@ interface Mat3 extends Float32Array {
    * @param {Mat3} b The second matrix.
    * @returns {boolean} True if the matrices are equal, false otherwise.
    */
-  public static equals(a: Mat3, b: Mat3): boolean
+  equals(a: Mat3, b: Mat3): boolean
 }
 
 // Mat4
 interface Mat4 extends Float32Array {
-  private typeMat4: number;
-
   /**
    * Creates a new identity Mat4
    *
    * @returns a new 4x4 matrix
    */
-  public static create(): Mat4;
+  create(): Mat4;
 
   /**
    * Creates a new Mat4 initialized with values from an existing matrix
@@ -2293,7 +2264,7 @@ interface Mat4 extends Float32Array {
    * @param a matrix to clone
    * @returns a new 4x4 matrix
    */
-  public static clone(a: Mat4): Mat4;
+  clone(a: Mat4): Mat4;
 
   /**
    * Copy the values from one Mat4 to another
@@ -2302,7 +2273,7 @@ interface Mat4 extends Float32Array {
    * @param a the source matrix
    * @returns out
    */
-  public static copy(out: Mat4, a: Mat4): Mat4;
+  copy(out: Mat4, a: Mat4): Mat4;
 
 
   /**
@@ -2326,7 +2297,7 @@ interface Mat4 extends Float32Array {
    * @param {number} m33 Component in column 3, row 3 position (index 15)
    * @returns {Mat4} A new Mat4
    */
-  public static fromValues(
+  fromValues(
       m00: number, m01: number, m02: number, m03: number, m10: number,
       m11: number, m12: number, m13: number, m20: number, m21: number,
       m22: number, m23: number, m30: number, m31: number, m32: number,
@@ -2354,8 +2325,7 @@ interface Mat4 extends Float32Array {
    * @param {number} m33 Component in column 3, row 3 position (index 15)
    * @returns {Mat4} out
    */
-  public static set(
-      out: Mat4, m00: number, m01: number, m02: number, m03: number,
+  set(out: Mat4, m00: number, m01: number, m02: number, m03: number,
       m10: number, m11: number, m12: number, m13: number, m20: number,
       m21: number, m22: number, m23: number, m30: number, m31: number,
       m32: number, m33: number): Mat4;
@@ -2366,7 +2336,7 @@ interface Mat4 extends Float32Array {
    * @param out the receiving matrix
    * @returns out
    */
-  public static identity(out: Mat4): Mat4;
+  identity(out: Mat4): Mat4;
 
   /**
    * Transpose the values of a Mat4
@@ -2375,7 +2345,7 @@ interface Mat4 extends Float32Array {
    * @param a the source matrix
    * @returns out
    */
-  public static transpose(out: Mat4, a: Mat4): Mat4;
+  transpose(out: Mat4, a: Mat4): Mat4;
 
   /**
    * Inverts a Mat4
@@ -2384,7 +2354,7 @@ interface Mat4 extends Float32Array {
    * @param a the source matrix
    * @returns out
    */
-  public static invert(out: Mat4, a: Mat4): Mat4|null;
+  invert(out: Mat4, a: Mat4): Mat4|null;
 
   /**
    * Calculates the adjugate of a Mat4
@@ -2393,7 +2363,7 @@ interface Mat4 extends Float32Array {
    * @param a the source matrix
    * @returns out
    */
-  public static adjoint(out: Mat4, a: Mat4): Mat4;
+  adjoint(out: Mat4, a: Mat4): Mat4;
 
   /**
    * Calculates the determinant of a Mat4
@@ -2401,7 +2371,7 @@ interface Mat4 extends Float32Array {
    * @param a the source matrix
    * @returns determinant of a
    */
-  public static determinant(a: Mat4): number;
+  determinant(a: Mat4): number;
 
   /**
    * Multiplies two Mat4's
@@ -2411,7 +2381,7 @@ interface Mat4 extends Float32Array {
    * @param b the second operand
    * @returns out
    */
-  public static multiply(out: Mat4, a: Mat4, b: Mat4): Mat4;
+  multiply(out: Mat4, a: Mat4, b: Mat4): Mat4;
 
   /**
    * Multiplies two Mat4's
@@ -2421,7 +2391,7 @@ interface Mat4 extends Float32Array {
    * @param b the second operand
    * @returns out
    */
-  public static mul(out: Mat4, a: Mat4, b: Mat4): Mat4;
+  mul(out: Mat4, a: Mat4, b: Mat4): Mat4;
 
   /**
    * Translate a Mat4 by the given vector
@@ -2431,7 +2401,7 @@ interface Mat4 extends Float32Array {
    * @param v vector to translate by
    * @returns out
    */
-  public static translate(out: Mat4, a: Mat4, v: Vec3|number[]): Mat4;
+  translate(out: Mat4, a: Mat4, v: Vec3|number[]): Mat4;
 
   /**
    * Scales the Mat4 by the dimensions in the given Vec3
@@ -2441,7 +2411,7 @@ interface Mat4 extends Float32Array {
    * @param v the Vec3 to scale the matrix by
    * @returns out
    **/
-  public static scale(out: Mat4, a: Mat4, v: Vec3|number[]): Mat4;
+  scale(out: Mat4, a: Mat4, v: Vec3|number[]): Mat4;
 
   /**
    * Rotates a Mat4 by the given angle
@@ -2452,8 +2422,7 @@ interface Mat4 extends Float32Array {
    * @param axis the axis to rotate around
    * @returns out
    */
-  public static rotate(out: Mat4, a: Mat4, rad: number, axis: Vec3|number[]):
-      Mat4;
+  rotate(out: Mat4, a: Mat4, rad: number, axis: Vec3|number[]): Mat4;
 
   /**
    * Rotates a matrix by the given angle around the X axis
@@ -2463,7 +2432,7 @@ interface Mat4 extends Float32Array {
    * @param rad the angle to rotate the matrix by
    * @returns out
    */
-  public static rotateX(out: Mat4, a: Mat4, rad: number): Mat4;
+  rotateX(out: Mat4, a: Mat4, rad: number): Mat4;
 
   /**
    * Rotates a matrix by the given angle around the Y axis
@@ -2473,7 +2442,7 @@ interface Mat4 extends Float32Array {
    * @param rad the angle to rotate the matrix by
    * @returns out
    */
-  public static rotateY(out: Mat4, a: Mat4, rad: number): Mat4;
+  rotateY(out: Mat4, a: Mat4, rad: number): Mat4;
 
   /**
    * Rotates a matrix by the given angle around the Z axis
@@ -2483,7 +2452,7 @@ interface Mat4 extends Float32Array {
    * @param rad the angle to rotate the matrix by
    * @returns out
    */
-  public static rotateZ(out: Mat4, a: Mat4, rad: number): Mat4;
+  rotateZ(out: Mat4, a: Mat4, rad: number): Mat4;
 
   /**
    * Creates a matrix from a vector translation
@@ -2496,93 +2465,91 @@ interface Mat4 extends Float32Array {
    * @param {Vec3} v Translation vector
    * @returns {Mat4} out
    */
-  public static fromTranslation(out: Mat4, v: Vec3|number[]): Mat4
+  fromTranslation(out: Mat4, v: Vec3|number[]): Mat4
 
-      /**
-       * Creates a matrix from a vector scaling
-       * This is equivalent to (but much faster than):
-       *
-       *     Mat4.identity(dest);
-       *     Mat4.scale(dest, dest, vec);
-       *
-       * @param {Mat4} out Mat4 receiving operation result
-       * @param {Vec3} v Scaling vector
-       * @returns {Mat4} out
-       */
-      public static fromScaling(out: Mat4, v: Vec3|number[]): Mat4
+  /**
+   * Creates a matrix from a vector scaling
+   * This is equivalent to (but much faster than):
+   *
+   *     Mat4.identity(dest);
+   *     Mat4.scale(dest, dest, vec);
+   *
+   * @param {Mat4} out Mat4 receiving operation result
+   * @param {Vec3} v Scaling vector
+   * @returns {Mat4} out
+   */
+  fromScaling(out: Mat4, v: Vec3|number[]): Mat4
 
-      /**
-       * Creates a matrix from a given angle around a given axis
-       * This is equivalent to (but much faster than):
-       *
-       *     Mat4.identity(dest);
-       *     Mat4.rotate(dest, dest, rad, axis);
-       *
-       * @param {Mat4} out Mat4 receiving operation result
-       * @param {number} rad the angle to rotate the matrix by
-       * @param {Vec3} axis the axis to rotate around
-       * @returns {Mat4} out
-       */
-      public static fromRotation(out: Mat4, rad: number, axis: Vec3|number[]):
-          Mat4
+  /**
+   * Creates a matrix from a given angle around a given axis
+   * This is equivalent to (but much faster than):
+   *
+   *     Mat4.identity(dest);
+   *     Mat4.rotate(dest, dest, rad, axis);
+   *
+   * @param {Mat4} out Mat4 receiving operation result
+   * @param {number} rad the angle to rotate the matrix by
+   * @param {Vec3} axis the axis to rotate around
+   * @returns {Mat4} out
+   */
+  fromRotation(out: Mat4, rad: number, axis: Vec3|number[]): Mat4
 
-      /**
-       * Creates a matrix from the given angle around the X axis
-       * This is equivalent to (but much faster than):
-       *
-       *     Mat4.identity(dest);
-       *     Mat4.rotateX(dest, dest, rad);
-       *
-       * @param {Mat4} out Mat4 receiving operation result
-       * @param {number} rad the angle to rotate the matrix by
-       * @returns {Mat4} out
-       */
-      public static fromXRotation(out: Mat4, rad: number): Mat4
+  /**
+   * Creates a matrix from the given angle around the X axis
+   * This is equivalent to (but much faster than):
+   *
+   *     Mat4.identity(dest);
+   *     Mat4.rotateX(dest, dest, rad);
+   *
+   * @param {Mat4} out Mat4 receiving operation result
+   * @param {number} rad the angle to rotate the matrix by
+   * @returns {Mat4} out
+   */
+  fromXRotation(out: Mat4, rad: number): Mat4
 
-      /**
-       * Creates a matrix from the given angle around the Y axis
-       * This is equivalent to (but much faster than):
-       *
-       *     Mat4.identity(dest);
-       *     Mat4.rotateY(dest, dest, rad);
-       *
-       * @param {Mat4} out Mat4 receiving operation result
-       * @param {number} rad the angle to rotate the matrix by
-       * @returns {Mat4} out
-       */
-      public static fromYRotation(out: Mat4, rad: number): Mat4
+  /**
+   * Creates a matrix from the given angle around the Y axis
+   * This is equivalent to (but much faster than):
+   *
+   *     Mat4.identity(dest);
+   *     Mat4.rotateY(dest, dest, rad);
+   *
+   * @param {Mat4} out Mat4 receiving operation result
+   * @param {number} rad the angle to rotate the matrix by
+   * @returns {Mat4} out
+   */
+  fromYRotation(out: Mat4, rad: number): Mat4
 
 
-      /**
-       * Creates a matrix from the given angle around the Z axis
-       * This is equivalent to (but much faster than):
-       *
-       *     Mat4.identity(dest);
-       *     Mat4.rotateZ(dest, dest, rad);
-       *
-       * @param {Mat4} out Mat4 receiving operation result
-       * @param {number} rad the angle to rotate the matrix by
-       * @returns {Mat4} out
-       */
-      public static fromZRotation(out: Mat4, rad: number): Mat4
+  /**
+   * Creates a matrix from the given angle around the Z axis
+   * This is equivalent to (but much faster than):
+   *
+   *     Mat4.identity(dest);
+   *     Mat4.rotateZ(dest, dest, rad);
+   *
+   * @param {Mat4} out Mat4 receiving operation result
+   * @param {number} rad the angle to rotate the matrix by
+   * @returns {Mat4} out
+   */
+  fromZRotation(out: Mat4, rad: number): Mat4
 
-      /**
-       * Creates a matrix from a Quaternion rotation and vector translation
-       * This is equivalent to (but much faster than):
-       *
-       *     Mat4.identity(dest);
-       *     Mat4.translate(dest, vec);
-       *     var QuatMat = Mat4.create();
-       *     Quat4.toMat4(Quat, QuatMat);
-       *     Mat4.multiply(dest, QuatMat);
-       *
-       * @param out Mat4 receiving operation result
-       * @param q Rotation Quaternion
-       * @param v Translation vector
-       * @returns out
-       */
-      public static fromRotationTranslation(
-          out: Mat4, q: Quat, v: Vec3|number[]): Mat4;
+  /**
+   * Creates a matrix from a Quaternion rotation and vector translation
+   * This is equivalent to (but much faster than):
+   *
+   *     Mat4.identity(dest);
+   *     Mat4.translate(dest, vec);
+   *     var QuatMat = Mat4.create();
+   *     Quat4.toMat4(Quat, QuatMat);
+   *     Mat4.multiply(dest, QuatMat);
+   *
+   * @param out Mat4 receiving operation result
+   * @param q Rotation Quaternion
+   * @param v Translation vector
+   * @returns out
+   */
+  fromRotationTranslation(out: Mat4, q: Quat, v: Vec3|number[]): Mat4;
 
   /**
    * Returns the translation vector component of a transformation
@@ -2593,7 +2560,7 @@ interface Mat4 extends Float32Array {
    * @param  {Mat4} mat Matrix to be decomposed (input)
    * @return {Vec3} out
    */
-  public static getTranslation(out: Vec3, mat: Mat4): Vec3;
+  getTranslation(out: Vec3, mat: Mat4): Vec3;
 
   /**
    * Returns a Quaternion representing the rotational component
@@ -2604,7 +2571,7 @@ interface Mat4 extends Float32Array {
    * @param {Mat4} mat Matrix to be decomposed (input)
    * @return {Quat} out
    */
-  public static getRotation(out: Quat, mat: Mat4): Quat;
+  getRotation(out: Quat, mat: Mat4): Quat;
 
   /**
    * Creates a matrix from a Quaternion rotation, vector translation and
@@ -2623,7 +2590,7 @@ interface Mat4 extends Float32Array {
    * @param s Scaling vector
    * @returns out
    */
-  public static fromRotationTranslationScale(
+  fromRotationTranslationScale(
       out: Mat4, q: Quat, v: Vec3|number[], s: Vec3|number[]): Mat4;
 
   /**
@@ -2647,35 +2614,35 @@ interface Mat4 extends Float32Array {
    * @param {Vec3} o The origin vector around which to scale and rotate
    * @returns {Mat4} out
    */
-  public static fromRotationTranslationScaleOrigin(
-      out: Mat4, q: Quat, v: Vec3|number[], s: Vec3|number[], o: Vec3|number[]):
-      Mat4
+  fromRotationTranslationScaleOrigin(
+      out: Mat4, q: Quat, v: Vec3|number[], s: Vec3|number[],
+      o: Vec3|number[]): Mat4
 
-      /**
-       * Calculates a 4x4 matrix from the given Quaternion
-       *
-       * @param {Mat4} out Mat4 receiving operation result
-       * @param {Quat} q Quaternion to create matrix from
-       *
-       * @returns {Mat4} out
-       */
-      public static fromQuat(out: Mat4, q: Quat): Mat4
+  /**
+   * Calculates a 4x4 matrix from the given Quaternion
+   *
+   * @param {Mat4} out Mat4 receiving operation result
+   * @param {Quat} q Quaternion to create matrix from
+   *
+   * @returns {Mat4} out
+   */
+  fromQuat(out: Mat4, q: Quat): Mat4
 
-      /**
-       * Generates a frustum matrix with the given bounds
-       *
-       * @param out Mat4 frustum matrix will be written into
-       * @param left Left bound of the frustum
-       * @param right Right bound of the frustum
-       * @param bottom Bottom bound of the frustum
-       * @param top Top bound of the frustum
-       * @param near Near bound of the frustum
-       * @param far Far bound of the frustum
-       * @returns out
-       */
-      public static frustum(
-          out: Mat4, left: number, right: number, bottom: number, top: number,
-          near: number, far: number): Mat4;
+  /**
+   * Generates a frustum matrix with the given bounds
+   *
+   * @param out Mat4 frustum matrix will be written into
+   * @param left Left bound of the frustum
+   * @param right Right bound of the frustum
+   * @param bottom Bottom bound of the frustum
+   * @param top Top bound of the frustum
+   * @param near Near bound of the frustum
+   * @param far Far bound of the frustum
+   * @returns out
+   */
+  frustum(
+      out: Mat4, left: number, right: number, bottom: number, top: number,
+      near: number, far: number): Mat4;
 
   /**
    * Generates a perspective projection matrix with the given bounds
@@ -2687,7 +2654,7 @@ interface Mat4 extends Float32Array {
    * @param far Far bound of the frustum
    * @returns out
    */
-  public static perspective(
+  perspective(
       out: Mat4, fovy: number, aspect: number, near: number, far: number): Mat4;
 
   /**
@@ -2702,7 +2669,7 @@ interface Mat4 extends Float32Array {
    * @param {number} far Far bound of the frustum
    * @returns {Mat4} out
    */
-  public static perspectiveFromFieldOfView(
+  perspectiveFromFieldOfView(
       out: Mat4, fov: {
         upDegrees: number,
         downDegrees: number,
@@ -2711,21 +2678,21 @@ interface Mat4 extends Float32Array {
       },
       near: number, far: number): Mat4
 
-      /**
-       * Generates a orthogonal projection matrix with the given bounds
-       *
-       * @param out Mat4 frustum matrix will be written into
-       * @param left Left bound of the frustum
-       * @param right Right bound of the frustum
-       * @param bottom Bottom bound of the frustum
-       * @param top Top bound of the frustum
-       * @param near Near bound of the frustum
-       * @param far Far bound of the frustum
-       * @returns out
-       */
-      public static ortho(
-          out: Mat4, left: number, right: number, bottom: number, top: number,
-          near: number, far: number): Mat4;
+  /**
+   * Generates a orthogonal projection matrix with the given bounds
+   *
+   * @param out Mat4 frustum matrix will be written into
+   * @param left Left bound of the frustum
+   * @param right Right bound of the frustum
+   * @param bottom Bottom bound of the frustum
+   * @param top Top bound of the frustum
+   * @param near Near bound of the frustum
+   * @param far Far bound of the frustum
+   * @returns out
+   */
+  ortho(
+      out: Mat4, left: number, right: number, bottom: number, top: number,
+      near: number, far: number): Mat4;
 
   /**
    * Generates a look-at matrix with the given eye position, focal point, and
@@ -2737,7 +2704,7 @@ interface Mat4 extends Float32Array {
    * @param up Vec3 pointing up
    * @returns out
    */
-  public static lookAt(
+  lookAt(
       out: Mat4, eye: Vec3|number[], center: Vec3|number[],
       up: Vec3|number[]): Mat4;
 
@@ -2747,7 +2714,7 @@ interface Mat4 extends Float32Array {
    * @param mat matrix to represent as a string
    * @returns string representation of the matrix
    */
-  public static str(mat: Mat4): string;
+  str(mat: Mat4): string;
 
   /**
    * Returns Frobenius norm of a Mat4
@@ -2755,7 +2722,7 @@ interface Mat4 extends Float32Array {
    * @param a the matrix to calculate Frobenius norm of
    * @returns Frobenius norm
    */
-  public static frob(a: Mat4): number;
+  frob(a: Mat4): number;
 
   /**
    * Adds two Mat4's
@@ -2765,83 +2732,80 @@ interface Mat4 extends Float32Array {
    * @param {Mat4} b the second operand
    * @returns {Mat4} out
    */
-  public static add(out: Mat4, a: Mat4, b: Mat4): Mat4
+  add(out: Mat4, a: Mat4, b: Mat4): Mat4
 
-      /**
-       * Subtracts matrix b from matrix a
-       *
-       * @param {Mat4} out the receiving matrix
-       * @param {Mat4} a the first operand
-       * @param {Mat4} b the second operand
-       * @returns {Mat4} out
-       */
-      public static subtract(out: Mat4, a: Mat4, b: Mat4): Mat4
+  /**
+   * Subtracts matrix b from matrix a
+   *
+   * @param {Mat4} out the receiving matrix
+   * @param {Mat4} a the first operand
+   * @param {Mat4} b the second operand
+   * @returns {Mat4} out
+   */
+  subtract(out: Mat4, a: Mat4, b: Mat4): Mat4
 
-      /**
-       * Subtracts matrix b from matrix a
-       *
-       * @param {Mat4} out the receiving matrix
-       * @param {Mat4} a the first operand
-       * @param {Mat4} b the second operand
-       * @returns {Mat4} out
-       */
-      public static sub(out: Mat4, a: Mat4, b: Mat4): Mat4
+  /**
+   * Subtracts matrix b from matrix a
+   *
+   * @param {Mat4} out the receiving matrix
+   * @param {Mat4} a the first operand
+   * @param {Mat4} b the second operand
+   * @returns {Mat4} out
+   */
+  sub(out: Mat4, a: Mat4, b: Mat4): Mat4
 
-      /**
-       * Multiply each element of the matrix by a scalar.
-       *
-       * @param {Mat4} out the receiving matrix
-       * @param {Mat4} a the matrix to scale
-       * @param {number} b amount to scale the matrix's elements by
-       * @returns {Mat4} out
-       */
-      public static multiplyScalar(out: Mat4, a: Mat4, b: number): Mat4
+  /**
+   * Multiply each element of the matrix by a scalar.
+   *
+   * @param {Mat4} out the receiving matrix
+   * @param {Mat4} a the matrix to scale
+   * @param {number} b amount to scale the matrix's elements by
+   * @returns {Mat4} out
+   */
+  multiplyScalar(out: Mat4, a: Mat4, b: number): Mat4
 
-      /**
-       * Adds two Mat4's after multiplying each element of the second operand
-       * by a scalar value.
-       *
-       * @param {Mat4} out the receiving vector
-       * @param {Mat4} a the first operand
-       * @param {Mat4} b the second operand
-       * @param {number} scale the amount to scale b's elements by before
-       *     adding
-       * @returns {Mat4} out
-       */
-      public static multiplyScalarAndAdd(
-          out: Mat4, a: Mat4, b: Mat4, scale: number): Mat4
+  /**
+   * Adds two Mat4's after multiplying each element of the second operand
+   * by a scalar value.
+   *
+   * @param {Mat4} out the receiving vector
+   * @param {Mat4} a the first operand
+   * @param {Mat4} b the second operand
+   * @param {number} scale the amount to scale b's elements by before
+   *     adding
+   * @returns {Mat4} out
+   */
+  multiplyScalarAndAdd(out: Mat4, a: Mat4, b: Mat4, scale: number): Mat4
 
-      /**
-       * Returns whether or not the matrices have exactly the same elements in
-       * the same position (when compared with ===)
-       *
-       * @param {Mat4} a The first matrix.
-       * @param {Mat4} b The second matrix.
-       * @returns {boolean} True if the matrices are equal, false otherwise.
-       */
-      public static exactEquals(a: Mat4, b: Mat4): boolean
+  /**
+   * Returns whether or not the matrices have exactly the same elements in
+   * the same position (when compared with ===)
+   *
+   * @param {Mat4} a The first matrix.
+   * @param {Mat4} b The second matrix.
+   * @returns {boolean} True if the matrices are equal, false otherwise.
+   */
+  exactEquals(a: Mat4, b: Mat4): boolean
 
-      /**
-       * Returns whether or not the matrices have approximately the same
-       * elements in the same position.
-       *
-       * @param {Mat4} a The first matrix.
-       * @param {Mat4} b The second matrix.
-       * @returns {boolean} True if the matrices are equal, false otherwise.
-       */
-      public static equals(a: Mat4, b: Mat4): boolean
+  /**
+   * Returns whether or not the matrices have approximately the same
+   * elements in the same position.
+   *
+   * @param {Mat4} a The first matrix.
+   * @param {Mat4} b The second matrix.
+   * @returns {boolean} True if the matrices are equal, false otherwise.
+   */
+  equals(a: Mat4, b: Mat4): boolean
 }
 
 // Quat
 interface Quat extends Float32Array {
-  private typeQuat: number;
-
   /**
    * Creates a new identity Quat
    *
    * @returns a new Quaternion
    */
-  public static create(): Quat;
+  create(): Quat;
 
   /**
    * Creates a new Quat initialized with values from an existing Quaternion
@@ -2850,7 +2814,7 @@ interface Quat extends Float32Array {
    * @returns a new Quaternion
    * @function
    */
-  public static clone(a: Quat): Quat;
+  clone(a: Quat): Quat;
 
   /**
    * Creates a new Quat initialized with the given values
@@ -2862,7 +2826,7 @@ interface Quat extends Float32Array {
    * @returns a new Quaternion
    * @function
    */
-  public static fromValues(x: number, y: number, z: number, w: number): Quat;
+  fromValues(x: number, y: number, z: number, w: number): Quat;
 
   /**
    * Copy the values from one Quat to another
@@ -2872,7 +2836,7 @@ interface Quat extends Float32Array {
    * @returns out
    * @function
    */
-  public static copy(out: Quat, a: Quat): Quat;
+  copy(out: Quat, a: Quat): Quat;
 
   /**
    * Set the components of a Quat to the given values
@@ -2885,8 +2849,7 @@ interface Quat extends Float32Array {
    * @returns out
    * @function
    */
-  public static set(out: Quat, x: number, y: number, z: number, w: number):
-      Quat;
+  set(out: Quat, x: number, y: number, z: number, w: number): Quat;
 
   /**
    * Set a Quat to the identity Quaternion
@@ -2894,7 +2857,7 @@ interface Quat extends Float32Array {
    * @param out the receiving Quaternion
    * @returns out
    */
-  public static identity(out: Quat): Quat;
+  identity(out: Quat): Quat;
 
   /**
    * Sets a Quaternion to represent the shortest rotation from one
@@ -2907,7 +2870,7 @@ interface Quat extends Float32Array {
    * @param {Vec3} b the destination vector
    * @returns {Quat} out
    */
-  public static rotationTo(out: Quat, a: Vec3|number[], b: Vec3|number[]): Quat;
+  rotationTo(out: Quat, a: Vec3|number[], b: Vec3|number[]): Quat;
 
   /**
    * Sets the specified Quaternion with values corresponding to the given
@@ -2919,23 +2882,22 @@ interface Quat extends Float32Array {
    * @param {Vec3} up    the vector representing the local "up" direction
    * @returns {Quat} out
    */
-  public static setAxes(
-      out: Quat, view: Vec3|number[], right: Vec3|number[], up: Vec3|number[]):
-      Quat
+  setAxes(
+      out: Quat, view: Vec3|number[], right: Vec3|number[],
+      up: Vec3|number[]): Quat
 
 
 
-      /**
-       * Sets a Quat from the given angle and rotation axis,
-       * then returns it.
-       *
-       * @param out the receiving Quaternion
-       * @param axis the axis around which to rotate
-       * @param rad the angle in radians
-       * @returns out
-       **/
-      public static setAxisAngle(out: Quat, axis: Vec3|number[], rad: number):
-          Quat;
+  /**
+   * Sets a Quat from the given angle and rotation axis,
+   * then returns it.
+   *
+   * @param out the receiving Quaternion
+   * @param axis the axis around which to rotate
+   * @param rad the angle in radians
+   * @returns out
+   **/
+  setAxisAngle(out: Quat, axis: Vec3|number[], rad: number): Quat;
 
   /**
    * Gets the rotation axis and angle for a given
@@ -2950,18 +2912,18 @@ interface Quat extends Float32Array {
    * @param  {Quat} q     Quaternion to be decomposed
    * @return {number}     Angle, in radians, of the rotation
    */
-  public static getAxisAngle(out_axis: Vec3|number[], q: Quat): number
+  getAxisAngle(out_axis: Vec3|number[], q: Quat): number
 
-      /**
-       * Adds two Quat's
-       *
-       * @param out the receiving Quaternion
-       * @param a the first operand
-       * @param b the second operand
-       * @returns out
-       * @function
-       */
-      public static add(out: Quat, a: Quat, b: Quat): Quat;
+  /**
+   * Adds two Quat's
+   *
+   * @param out the receiving Quaternion
+   * @param a the first operand
+   * @param b the second operand
+   * @returns out
+   * @function
+   */
+  add(out: Quat, a: Quat, b: Quat): Quat;
 
   /**
    * Multiplies two Quat's
@@ -2971,7 +2933,7 @@ interface Quat extends Float32Array {
    * @param b the second operand
    * @returns out
    */
-  public static multiply(out: Quat, a: Quat, b: Quat): Quat;
+  multiply(out: Quat, a: Quat, b: Quat): Quat;
 
   /**
    * Multiplies two Quat's
@@ -2981,7 +2943,7 @@ interface Quat extends Float32Array {
    * @param b the second operand
    * @returns out
    */
-  public static mul(out: Quat, a: Quat, b: Quat): Quat;
+  mul(out: Quat, a: Quat, b: Quat): Quat;
 
   /**
    * Scales a Quat by a scalar number
@@ -2992,7 +2954,7 @@ interface Quat extends Float32Array {
    * @returns out
    * @function
    */
-  public static scale(out: Quat, a: Quat, b: number): Quat;
+  scale(out: Quat, a: Quat, b: number): Quat;
 
   /**
    * Calculates the length of a Quat
@@ -3001,7 +2963,7 @@ interface Quat extends Float32Array {
    * @returns length of a
    * @function
    */
-  public static length(a: Quat): number;
+  length(a: Quat): number;
 
   /**
    * Calculates the length of a Quat
@@ -3010,7 +2972,7 @@ interface Quat extends Float32Array {
    * @returns length of a
    * @function
    */
-  public static len(a: Quat): number;
+  len(a: Quat): number;
 
   /**
    * Calculates the squared length of a Quat
@@ -3019,7 +2981,7 @@ interface Quat extends Float32Array {
    * @returns squared length of a
    * @function
    */
-  public static squaredLength(a: Quat): number;
+  squaredLength(a: Quat): number;
 
   /**
    * Calculates the squared length of a Quat
@@ -3028,7 +2990,7 @@ interface Quat extends Float32Array {
    * @returns squared length of a
    * @function
    */
-  public static sqrLen(a: Quat): number;
+  sqrLen(a: Quat): number;
 
   /**
    * Normalize a Quat
@@ -3038,7 +3000,7 @@ interface Quat extends Float32Array {
    * @returns out
    * @function
    */
-  public static normalize(out: Quat, a: Quat): Quat;
+  normalize(out: Quat, a: Quat): Quat;
 
   /**
    * Calculates the dot product of two Quat's
@@ -3048,7 +3010,7 @@ interface Quat extends Float32Array {
    * @returns dot product of a and b
    * @function
    */
-  public static dot(a: Quat, b: Quat): number;
+  dot(a: Quat, b: Quat): number;
 
   /**
    * Performs a linear interpolation between two Quat's
@@ -3060,7 +3022,7 @@ interface Quat extends Float32Array {
    * @returns out
    * @function
    */
-  public static lerp(out: Quat, a: Quat, b: Quat, t: number): Quat;
+  lerp(out: Quat, a: Quat, b: Quat, t: number): Quat;
 
   /**
    * Performs a spherical linear interpolation between two Quat
@@ -3071,7 +3033,7 @@ interface Quat extends Float32Array {
    * @param t interpolation amount between the two inputs
    * @returns out
    */
-  public static slerp(out: Quat, a: Quat, b: Quat, t: number): Quat;
+  slerp(out: Quat, a: Quat, b: Quat, t: number): Quat;
 
   /**
    * Performs a spherical linear interpolation with two control points
@@ -3084,8 +3046,7 @@ interface Quat extends Float32Array {
    * @param {number} t interpolation amount
    * @returns {Quat} out
    */
-  public static sqlerp(
-      out: Quat, a: Quat, b: Quat, c: Quat, d: Quat, t: number): Quat;
+  sqlerp(out: Quat, a: Quat, b: Quat, c: Quat, d: Quat, t: number): Quat;
 
   /**
    * Calculates the inverse of a Quat
@@ -3094,7 +3055,7 @@ interface Quat extends Float32Array {
    * @param a Quat to calculate inverse of
    * @returns out
    */
-  public static invert(out: Quat, a: Quat): Quat;
+  invert(out: Quat, a: Quat): Quat;
 
   /**
    * Calculates the conjugate of a Quat
@@ -3105,7 +3066,7 @@ interface Quat extends Float32Array {
    * @param a Quat to calculate conjugate of
    * @returns out
    */
-  public static conjugate(out: Quat, a: Quat): Quat;
+  conjugate(out: Quat, a: Quat): Quat;
 
   /**
    * Returns a string representation of a Quaternion
@@ -3113,7 +3074,7 @@ interface Quat extends Float32Array {
    * @param a Quat to represent as a string
    * @returns string representation of the Quat
    */
-  public static str(a: Quat): string;
+  str(a: Quat): string;
 
   /**
    * Rotates a Quaternion by the given angle about the X axis
@@ -3123,7 +3084,7 @@ interface Quat extends Float32Array {
    * @param rad angle (in radians) to rotate
    * @returns out
    */
-  public static rotateX(out: Quat, a: Quat, rad: number): Quat;
+  rotateX(out: Quat, a: Quat, rad: number): Quat;
 
   /**
    * Rotates a Quaternion by the given angle about the Y axis
@@ -3133,7 +3094,7 @@ interface Quat extends Float32Array {
    * @param rad angle (in radians) to rotate
    * @returns out
    */
-  public static rotateY(out: Quat, a: Quat, rad: number): Quat;
+  rotateY(out: Quat, a: Quat, rad: number): Quat;
 
   /**
    * Rotates a Quaternion by the given angle about the Z axis
@@ -3143,7 +3104,7 @@ interface Quat extends Float32Array {
    * @param rad angle (in radians) to rotate
    * @returns out
    */
-  public static rotateZ(out: Quat, a: Quat, rad: number): Quat;
+  rotateZ(out: Quat, a: Quat, rad: number): Quat;
 
   /**
    * Creates a Quaternion from the given 3x3 rotation matrix.
@@ -3156,7 +3117,7 @@ interface Quat extends Float32Array {
    * @returns out
    * @function
    */
-  public static fromMat3(out: Quat, m: Mat3): Quat;
+  fromMat3(out: Quat, m: Mat3): Quat;
 
   /**
    * Sets the specified Quaternion with values corresponding to the given
@@ -3169,7 +3130,7 @@ interface Quat extends Float32Array {
    * @param up    the vector representing the local "up" direction
    * @returns out
    */
-  public static setAxes(
+  setAxes(
       out: Quat, view: Vec3|number[], right: Vec3|number[],
       up: Vec3|number[]): Quat;
 
@@ -3184,7 +3145,7 @@ interface Quat extends Float32Array {
    * @param b the destination vector
    * @returns out
    */
-  public static rotationTo(out: Quat, a: Vec3|number[], b: Vec3|number[]): Quat;
+  rotationTo(out: Quat, a: Vec3|number[], b: Vec3|number[]): Quat;
 
   /**
    * Calculates the W component of a Quat from the X, Y, and Z components.
@@ -3195,7 +3156,7 @@ interface Quat extends Float32Array {
    * @param a Quat to calculate W component of
    * @returns out
    */
-  public static calculateW(out: Quat, a: Quat): Quat;
+  calculateW(out: Quat, a: Quat): Quat;
 
   /**
    * Returns whether or not the Quaternions have exactly the same elements in
@@ -3205,7 +3166,7 @@ interface Quat extends Float32Array {
    * @param {Quat} b The second vector.
    * @returns {boolean} True if the Quaternions are equal, false otherwise.
    */
-  public static exactEquals(a: Quat, b: Quat): boolean;
+  exactEquals(a: Quat, b: Quat): boolean;
 
   /**
    * Returns whether or not the Quaternions have approximately the same
@@ -3215,5 +3176,5 @@ interface Quat extends Float32Array {
    * @param {Quat} b The second vector.
    * @returns {boolean} True if the Quaternions are equal, false otherwise.
    */
-  public static equals(a: Quat, b: Quat): boolean;
+  equals(a: Quat, b: Quat): boolean;
 }
