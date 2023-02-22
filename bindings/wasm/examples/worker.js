@@ -20,6 +20,9 @@ import Module from '../manifold.js';
 const wasm = await Module();
 wasm.setup();
 
+// Faster on modern browsers than Float32Array
+glMatrix.glMatrix.setMatrixArrayType(Array);
+
 // Scene setup
 const io = new WebIO();
 const doc = new Document();

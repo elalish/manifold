@@ -21,6 +21,9 @@ import Module from '../manifold.js';
 const wasm = await Module();
 wasm.setup();
 
+// Faster on modern browsers than Float32Array
+glMatrix.glMatrix.setMatrixArrayType(Array);
+
 // manifold member functions that returns a new manifold
 const memberFunctions = [
   'add', 'subtract', 'intersect', 'refine', 'transform', 'translate', 'rotate',

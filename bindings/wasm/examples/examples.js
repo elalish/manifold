@@ -157,9 +157,9 @@ export const examples = {
       const sharpness = 0.8;
       const n = 50;
 
-      const vertPos = [];
-      const triVerts = [];
-      vertPos.push(-offset, 0, height, -offset, 0, -height);
+      const positions = [];
+      const triangles = [];
+      positions.push(-offset, 0, height, -offset, 0, -height);
       const sharpenedEdges = [];
 
       const delta = 3.14159 / wiggles;
@@ -167,25 +167,25 @@ export const examples = {
         const theta = (i - wiggles) * delta;
         const amp = 0.5 * height * Math.max(Math.cos(0.8 * theta), 0);
 
-        vertPos.push(
+        positions.push(
             radius * Math.cos(theta), radius * Math.sin(theta),
             amp * (i % 2 == 0 ? 1 : -1));
         let j = i + 1;
         if (j == 2 * wiggles) j = 0;
 
         const smoothness = 1 - sharpness * Math.cos((theta + delta / 2) / 2);
-        let halfedge = triVerts.length + 1;
+        let halfedge = triangles.length + 1;
         sharpenedEdges.push({halfedge, smoothness});
-        triVerts.push(0, 2 + i, 2 + j);
+        triangles.push(0, 2 + i, 2 + j);
 
-        halfedge = triVerts.length + 1;
+        halfedge = triangles.length + 1;
         sharpenedEdges.push({halfedge, smoothness});
-        triVerts.push(1, 2 + j, 2 + i);
+        triangles.push(1, 2 + j, 2 + i);
       }
 
-      const scallop = new Mesh();
-      scallop.triVerts = Uint32Array.from(triVerts);
-      scallop.vertProperties = Float32Array.from(vertPos);
+      const triVerts = Uint32Array.from(triangles);
+      const vertProperties = Float32Array.from(positions);
+      const scallop = new Mesh({numProp: 3, triVerts, vertProperties});
       const result = smooth(scallop, sharpenedEdges).refine(n);
       return result;
     },
@@ -240,7 +240,7 @@ export const examples = {
           const phi = Math.atan2(x1 - offset, v[2]);
           vec3.set(
               v, threadRadius * Math.cos(phi), 0, threadRadius * Math.sin(phi));
-          const center = [0, 0, 0];
+          const center = vec3.fromValues(0, 0, 0);
           const r = majorRadius + minorRadius * Math.cos(theta);
           vec3.rotateX(v, v, center, -Math.atan2(p * minorRadius, q * r));
           v[0] += minorRadius;
@@ -280,8 +280,10 @@ export const examples = {
             hole.scale([w, w, 1.0]).translate([position[0], position[1], 0.0]));
         if (depth == maxDepth) return;
         const offsets = [
-          [-w, -w], [-w, 0.0], [-w, w], [0.0, w], [w, w], [w, 0.0], [w, -w],
-          [0.0, -w]
+          vec2.fromValues(-w, -w), vec2.fromValues(-w, 0.0),
+          vec2.fromValues(-w, w), vec2.fromValues(0.0, w),
+          vec2.fromValues(w, w), vec2.fromValues(w, 0.0),
+          vec2.fromValues(w, -w), vec2.fromValues(0.0, -w)
         ];
         for (let offset of offsets)
           fractal(
@@ -332,10 +334,10 @@ export const examples = {
         const stretch = [];
         const dPhiRad = 2 * Math.PI / nCut;
 
-        const o = [0, 0];
-        const p0 = [outerRadius, 0];
-        const p1 = [innerRadius, -cut];
-        const p2 = [innerRadius, cut];
+        const o = vec2.fromValues(0, 0);
+        const p0 = vec2.fromValues(outerRadius, 0);
+        const p1 = vec2.fromValues(innerRadius, -cut);
+        const p2 = vec2.fromValues(innerRadius, cut);
         for (let i = 0; i < nCut; ++i) {
           stretch.push(vec2.rotate([0, 0], p0, o, dPhiRad * i));
           stretch.push(vec2.rotate([0, 0], p1, o, dPhiRad * i));
@@ -376,6 +378,7 @@ export const examples = {
       // https://www.thingiverse.com/thing:25477. This sample demonstrates the
       // use of a Signed Distance Function (SDF) to create smooth, complex
       // manifolds.
+      const {vec3} = glMatrix;
 
       const size = 20;
       const n = 20;
@@ -392,8 +395,8 @@ export const examples = {
       function gyroidOffset(level) {
         const period = 2 * pi;
         const box = {
-          min: [-period, -period, -period],
-          max: [period, period, period]
+          min: vec3.fromValues(-period, -period, -period),
+          max: vec3.fromValues(period, period, period)
         };
         return levelSet(gyroid, box, period / n, level).scale(size / period);
       };

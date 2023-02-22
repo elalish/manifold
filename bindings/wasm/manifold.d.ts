@@ -20,9 +20,26 @@ interface SealedFloat32Array<N extends number> extends Float32Array {
   length: N;
 }
 
-type Vec2 = number[2];
-type Vec3 = number[3];
-type Mat4 = number[16];
+type Vec2 = [number, number];
+type Vec3 = [number, number, number];
+type Mat4 = [
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+];
 type SimplePolygon = Vec2[];
 type Polygons = SimplePolygon|SimplePolygon[];
 type Box = {
@@ -76,7 +93,7 @@ declare class Mesh {
   position(vert: number): SealedFloat32Array<3>;
   extras(vert: number): Float32Array;
   tangent(halfedge: number): SealedFloat32Array<4>;
-  transform(run: number): SealedFloat32Array<16>;
+  transform(run: number): Mat4;
 }
 
 declare class Manifold {
