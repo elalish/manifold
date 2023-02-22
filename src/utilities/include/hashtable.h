@@ -31,8 +31,30 @@ __host__ __device__ T AtomicCAS(T& target, T compare, T val) {
   return atomicCAS(&target, compare, val);
 #else
   std::atomic<T>& tar = reinterpret_cast<std::atomic<T>&>(target);
-  tar.compare_exchange_strong(compare, val);
+  tar.compare_exchange_strong(compare, val, std::memory_order_acq_rel);
   return compare;
+#endif
+}
+
+template <typename T>
+__host__ __device__ void AtomicStore(T& target, T val) {
+#ifdef __CUDA_ARCH__
+  target = val;
+#else
+  std::atomic<T>& tar = reinterpret_cast<std::atomic<T>&>(target);
+  // release is good enough, although not really something general
+  tar.store(val, std::memory_order_release);
+#endif
+}
+
+template <typename T>
+__host__ __device__ T AtomicLoad(const T& target) {
+#ifdef __CUDA_ARCH__
+  return target;
+#else
+  const std::atomic<T>& tar = reinterpret_cast<const std::atomic<T>&>(target);
+  // acquire is good enough, although not general
+  return tar.load(std::memory_order_acquire);
 #endif
 }
 
@@ -59,11 +81,14 @@ class HashTableD {
 
   __host__ __device__ int Size() const { return keys_.size(); }
 
-  __host__ __device__ bool Full() const { return used_[0] * 2 > Size(); }
+  __host__ __device__ bool Full() const {
+    return AtomicLoad(used_[0]) * 2 > Size();
+  }
 
   __host__ __device__ void Insert(Uint64 key, const V& val) {
     uint32_t idx = H(key) & (Size() - 1);
     while (1) {
+      if (Full()) return;
       Uint64& k = keys_[idx];
       const Uint64 found = AtomicCAS(k, kOpen, key);
       if (found == kOpen) {
@@ -79,12 +104,17 @@ class HashTableD {
   __host__ __device__ V& operator[](Uint64 key) const {
     uint32_t idx = H(key) & (Size() - 1);
     while (1) {
-      if (keys_[idx] == key || keys_[idx] == kOpen) return values_[idx];
+      const Uint64 k = AtomicLoad(keys_[idx]);
+      if (k == key || k == kOpen) {
+        return values_[idx];
+      }
       idx = (idx + step_) & (Size() - 1);
     }
   }
 
-  __host__ __device__ Uint64 KeyAt(int idx) const { return keys_[idx]; }
+  __host__ __device__ Uint64 KeyAt(int idx) const {
+    return AtomicLoad(keys_[idx]);
+  }
   __host__ __device__ V& At(int idx) const { return values_[idx]; }
 
  private:
@@ -104,13 +134,15 @@ class HashTable {
 
   HashTableD<V, H> D() { return table_; }
 
-  int Entries() const { return used_[0]; }
+  int Entries() const { return AtomicLoad(used_[0]); }
 
   int Size() const { return table_.Size(); }
 
-  bool Full() const { return used_[0] * 2 > Size(); }
+  bool Full() const { return AtomicLoad(used_[0]) * 2 > Size(); }
 
-  float FilledFraction() const { return static_cast<float>(used_[0]) / Size(); }
+  float FilledFraction() const {
+    return static_cast<float>(AtomicLoad(used_[0])) / Size();
+  }
 
   VecDH<V>& GetValueStore() { return values_; }
 
