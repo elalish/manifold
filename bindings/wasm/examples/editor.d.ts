@@ -12,7 +12,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+/**
+ * Wrap any object with this method to display it and any copies in transparent
+ * red. This is particularly useful for debugging subtract() as it will allow
+ * you find the object even if it doesn't currently intersect the result.
+ *
+ * @param manifold The object show - returns the input unchanged for chaining.
+ */
 declare function show(manifold: Manifold): Manifold;
+
+/**
+ * Wrap any object with this method to display it and any copies as the result,
+ * while ghosting out the final result in transparent gray. Helpful for
+ * debugging as it allows you to see objects that may be hidden in the interior
+ * of the result. Multiple objects marked only() will all be shown.
+ *
+ * @param manifold The object show - returns the input unchanged for chaining.
+ */
 declare function only(manifold: Manifold): Manifold;
 
 // Type definitions for gl-matrix 3.4.3 Project:
