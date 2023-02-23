@@ -13,20 +13,16 @@ ManifoldPolygons *manifold_polygons(void *mem, ManifoldSimplePolygon **ps,
                                     size_t length);
 
 // Mesh Construction
-ManifoldMesh *manifold_mesh(void *mem, ManifoldVec3 *vert_pos, size_t n_verts,
-                            ManifoldIVec3 *tri_verts, size_t n_tris);
-ManifoldMesh *manifold_mesh_w_normals(void *mem, ManifoldVec3 *vert_pos,
-                                      size_t n_verts, ManifoldIVec3 *tri_verts,
-                                      size_t n_tris, ManifoldVec3 *vert_normal);
-ManifoldMesh *manifold_mesh_w_tangents(void *mem, ManifoldVec3 *vert_pos,
-                                       size_t n_verts, ManifoldIVec3 *tri_verts,
-                                       size_t n_tris,
-                                       ManifoldVec4 *halfedge_tangent);
-ManifoldMesh *manifold_mesh_w_normals_tangents(
-    void *mem, ManifoldVec3 *vert_pos, size_t n_verts, ManifoldIVec3 *tri_verts,
-    size_t n_tris, ManifoldVec3 *vert_normal, ManifoldVec4 *halfedge_tangent);
+ManifoldMeshGL *manifold_meshgl(void *mem, float *vert_props, size_t n_verts,
+                                size_t n_props, uint32_t *tri_verts,
+                                size_t n_tris);
 
-ManifoldMesh *manifold_mesh_copy(void *mem, ManifoldMesh *m);
+ManifoldMeshGL *manifold_meshgl_w_tangents(void *mem, float *vert_props,
+                                           size_t n_verts, size_t n_props,
+                                           uint32_t *tri_verts, size_t n_tris,
+                                           float *halfedge_tangent);
+ManifoldMeshGL *manifold_get_meshgl(void *mem, ManifoldManifold *m);
+ManifoldMeshGL *manifold_meshgl_copy(void *mem, ManifoldMeshGL *m);
 
 // SDF
 // By default, the execution policy (sequential or parallel) of
@@ -35,13 +31,13 @@ ManifoldMesh *manifold_mesh_copy(void *mem, ManifoldMesh *m);
 // using these bindings from a language that has a runtime lock preventing the
 // parallel execution of closures, then you should use manifold_level_set_seq to
 // force sequential execution.
-ManifoldMesh *manifold_level_set(void *mem, float (*sdf)(float, float, float),
-                                 ManifoldBox *bounds, float edge_length,
-                                 float level);
-ManifoldMesh *manifold_level_set_seq(void *mem,
-                                     float (*sdf)(float, float, float),
-                                     ManifoldBox *bounds, float edge_length,
-                                     float level);
+ManifoldMeshGL *manifold_level_set(void *mem, float (*sdf)(float, float, float),
+                                   ManifoldBox *bounds, float edge_length,
+                                   float level);
+ManifoldMeshGL *manifold_level_set_seq(void *mem,
+                                       float (*sdf)(float, float, float),
+                                       ManifoldBox *bounds, float edge_length,
+                                       float level);
 
 // Manifold Booleans
 ManifoldManifold *manifold_union(void *mem, ManifoldManifold *a,
@@ -86,13 +82,8 @@ ManifoldManifold *manifold_cylinder(void *mem, float height, float radius_low,
                                     int center);
 ManifoldManifold *manifold_sphere(void *mem, float radius,
                                   int circular_segments);
-ManifoldManifold *manifold_of_mesh(void *mem, ManifoldMesh *mesh);
-ManifoldManifold *manifold_of_mesh_props(void *mem, ManifoldMesh *mesh,
-                                         ManifoldIVec3 *tri_properties,
-                                         float *properties,
-                                         float *property_tolerance,
-                                         size_t n_props);
-ManifoldManifold *manifold_smooth(void *mem, ManifoldMesh *mesh,
+ManifoldManifold *manifold_of_meshgl(void *mem, ManifoldMeshGL *mesh);
+ManifoldManifold *manifold_smooth(void *mem, ManifoldMeshGL *mesh,
                                   int *half_edges, float *smoothness,
                                   int n_idxs);
 ManifoldManifold *manifold_extrude(void *mem, ManifoldPolygons *polygons,
@@ -128,16 +119,6 @@ float *manifold_curvature_vert_gaussian(void *mem, ManifoldCurvature *curv);
 int manifold_get_circular_segments(float radius);
 int manifold_original_id(ManifoldManifold *m);
 
-// Mesh Relation
-ManifoldMeshRelation *manifold_get_mesh_relation(void *mem,
-                                                 ManifoldManifold *m);
-size_t manifold_mesh_relation_barycentric_length(ManifoldMeshRelation *m);
-ManifoldVec3 *manifold_mesh_relation_barycentric(void *mem,
-                                                 ManifoldMeshRelation *m);
-size_t manifold_mesh_relation_tri_bary_length(ManifoldMeshRelation *m);
-ManifoldBaryRef *manifold_mesh_relation_tri_bary(void *mem,
-                                                 ManifoldMeshRelation *m);
-
 // Bounding Box
 ManifoldBox *manifold_box(void *mem, float x1, float y1, float z1, float x2,
                           float y2, float z2);
@@ -168,25 +149,25 @@ void manifold_set_min_circular_edge_length(float length);
 void manifold_set_circular_segments(int number);
 
 // Manifold Mesh Extraction
-ManifoldMesh *manifold_get_mesh(void *mem, ManifoldManifold *m);
-size_t manifold_mesh_vert_length(ManifoldMesh *m);
-size_t manifold_mesh_tri_length(ManifoldMesh *m);
-size_t manifold_mesh_normal_length(ManifoldMesh *m);
-size_t manifold_mesh_tangent_length(ManifoldMesh *m);
-ManifoldVec3 *manifold_mesh_vert_pos(void *mem, ManifoldMesh *m);
-ManifoldIVec3 *manifold_mesh_tri_verts(void *mem, ManifoldMesh *m);
-ManifoldVec3 *manifold_mesh_vert_normal(void *mem, ManifoldMesh *m);
-ManifoldVec4 *manifold_mesh_halfedge_tangent(void *mem, ManifoldMesh *m);
-
-ManifoldMeshGL *manifold_get_meshgl(void *mem, ManifoldManifold *m);
-ManifoldMeshGL *manifold_meshgl_copy(void *mem, ManifoldMeshGL *m);
-size_t manifold_meshgl_vert_length(ManifoldMeshGL *m);
+int manifold_meshgl_num_prop(ManifoldMeshGL *m);
+int manifold_meshgl_num_vert(ManifoldMeshGL *m);
+int manifold_meshgl_num_tri(ManifoldMeshGL *m);
+size_t manifold_meshgl_vert_properties_length(ManifoldMeshGL *m);
 size_t manifold_meshgl_tri_length(ManifoldMeshGL *m);
-size_t manifold_meshgl_normal_length(ManifoldMeshGL *m);
+size_t manifold_meshgl_merge_length(ManifoldMeshGL *m);
+size_t manifold_meshgl_run_index_length(ManifoldMeshGL *m);
+size_t manifold_meshgl_run_original_id_length(ManifoldMeshGL *m);
+size_t manifold_meshgl_run_transform_length(ManifoldMeshGL *m);
+size_t manifold_meshgl_face_id_length(ManifoldMeshGL *m);
 size_t manifold_meshgl_tangent_length(ManifoldMeshGL *m);
-float *manifold_meshgl_vert_pos(void *mem, ManifoldMeshGL *m);
+float *manifold_meshgl_vert_properties(void *mem, ManifoldMeshGL *m);
 uint32_t *manifold_meshgl_tri_verts(void *mem, ManifoldMeshGL *m);
-float *manifold_meshgl_vert_normal(void *mem, ManifoldMeshGL *m);
+uint32_t *manifold_meshgl_merge_from_vert(void *mem, ManifoldMeshGL *m);
+uint32_t *manifold_meshgl_merge_to_vert(void *mem, ManifoldMeshGL *m);
+uint32_t *manifold_meshgl_run_index(void *mem, ManifoldMeshGL *m);
+uint32_t *manifold_meshgl_run_original_id(void *mem, ManifoldMeshGL *m);
+float *manifold_meshgl_run_transform(void *mem, ManifoldMeshGL *m);
+uint32_t *manifold_meshgl_face_id(void *mem, ManifoldMeshGL *m);
 float *manifold_meshgl_halfedge_tangent(void *mem, ManifoldMeshGL *m);
 
 // MeshIO / Export
@@ -201,20 +182,18 @@ void manifold_export_options_set_faceted(ManifoldExportOptions *options,
                                          int faceted);
 void manifold_export_options_set_material(ManifoldExportOptions *options,
                                           ManifoldMaterial *mat);
-void manifold_export_mesh(const char *filename, ManifoldMesh *mesh,
-                          ManifoldExportOptions *options);
+void manifold_export_meshgl(const char *filename, ManifoldMeshGL *mesh,
+                            ManifoldExportOptions *options);
 
 // memory size
 size_t manifold_simple_polygon_size();
 size_t manifold_polygons_size();
 size_t manifold_manifold_size();
 size_t manifold_manifold_pair_size();
-size_t manifold_mesh_size();
 size_t manifold_meshgl_size();
 size_t manifold_box_size();
 size_t manifold_curvature_size();
 size_t manifold_components_size();
-size_t manifold_mesh_relation_size();
 size_t manifold_material_size();
 size_t manifold_export_options_size();
 
@@ -222,12 +201,10 @@ size_t manifold_export_options_size();
 void manifold_destruct_simple_polygon(ManifoldSimplePolygon *p);
 void manifold_destruct_polygons(ManifoldPolygons *p);
 void manifold_destruct_manifold(ManifoldManifold *m);
-void manifold_destruct_mesh(ManifoldMesh *m);
 void manifold_destruct_meshgl(ManifoldMeshGL *m);
 void manifold_destruct_box(ManifoldBox *b);
 void manifold_destruct_curvature(ManifoldCurvature *c);
 void manifold_destruct_components(ManifoldComponents *c);
-void manifold_destruct_mesh_relation(ManifoldMeshRelation *m);
 void manifold_destruct_material(ManifoldMaterial *m);
 void manifold_destruct_export_options(ManifoldExportOptions *options);
 
@@ -235,12 +212,10 @@ void manifold_destruct_export_options(ManifoldExportOptions *options);
 void manifold_delete_simple_polygon(ManifoldSimplePolygon *p);
 void manifold_delete_polygons(ManifoldPolygons *p);
 void manifold_delete_manifold(ManifoldManifold *m);
-void manifold_delete_mesh(ManifoldMesh *m);
 void manifold_delete_meshgl(ManifoldMeshGL *m);
 void manifold_delete_box(ManifoldBox *b);
 void manifold_delete_curvature(ManifoldCurvature *c);
 void manifold_delete_components(ManifoldComponents *c);
-void manifold_delete_mesh_relation(ManifoldMeshRelation *m);
 void manifold_delete_material(ManifoldMaterial *m);
 void manifold_delete_export_options(ManifoldExportOptions *options);
 

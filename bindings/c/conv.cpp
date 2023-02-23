@@ -36,28 +36,40 @@ ManifoldComponents *to_c(manifold::Components *components) {
 }
 
 ManifoldError to_c(manifold::Manifold::Error error) {
-  ManifoldError e = NO_ERROR;
+  ManifoldError e = MANIFOLD_NO_ERROR;
   switch (error) {
-    case Manifold::Error::NO_ERROR:
-      e = NO_ERROR;
+    case Manifold::Error::NoError:
+      e = MANIFOLD_NO_ERROR;
       break;
-    case Manifold::Error::NON_FINITE_VERTEX:
-      e = NON_FINITE_VERTEX;
+    case Manifold::Error::NonFiniteVertex:
+      e = MANIFOLD_NON_FINITE_VERTEX;
       break;
-    case Manifold::Error::NOT_MANIFOLD:
-      e = NOT_MANIFOLD;
+    case Manifold::Error::NotManifold:
+      e = MANIFOLD_NOT_MANIFOLD;
       break;
-    case Manifold::Error::VERTEX_INDEX_OUT_OF_BOUNDS:
-      e = VERTEX_INDEX_OUT_OF_BOUNDS;
+    case Manifold::Error::VertexOutOfBounds:
+      e = MANIFOLD_VERTEX_INDEX_OUT_OF_BOUNDS;
       break;
-    case Manifold::Error::PROPERTIES_WRONG_LENGTH:
-      e = PROPERTIES_WRONG_LENGTH;
+    case Manifold::Error::PropertiesWrongLength:
+      e = MANIFOLD_PROPERTIES_WRONG_LENGTH;
       break;
-    case Manifold::Error::TRI_PROPERTIES_WRONG_LENGTH:
-      e = TRI_PROPERTIES_WRONG_LENGTH;
+    case Manifold::Error::MissingPositionProperties:
+      e = MANIFOLD_MISSING_POSITION_PROPERTIES;
       break;
-    case Manifold::Error::TRI_PROPERTIES_OUT_OF_BOUNDS:
-      e = TRI_PROPERTIES_OUT_OF_BOUNDS;
+    case Manifold::Error::MergeVectorsDifferentLengths:
+      e = MANIFOLD_MERGE_VECTORS_DIFFERENT_LENGTHS;
+      break;
+    case Manifold::Error::MergeIndexOutOfBounds:
+      e = MANIFOLD_MERGE_INDEX_OUT_OF_BOUNDS;
+      break;
+    case Manifold::Error::TransformWrongLength:
+      e = MANIFOLD_TRANSFORM_WRONG_LENGTH;
+      break;
+    case Manifold::Error::RunIndexWrongLength:
+      e = MANIFOLD_RUN_INDEX_WRONG_LENGTH;
+      break;
+    case Manifold::Error::FaceIDWrongLength:
+      e = MANIFOLD_FACE_ID_WRONG_LENGTH;
       break;
   };
   return e;
@@ -65,10 +77,6 @@ ManifoldError to_c(manifold::Manifold::Error error) {
 
 ManifoldBox *to_c(manifold::Box *m) {
   return reinterpret_cast<ManifoldBox *>(m);
-}
-
-ManifoldMeshRelation *to_c(manifold::MeshRelation *m) {
-  return reinterpret_cast<ManifoldMeshRelation *>(m);
 }
 
 ManifoldMaterial *to_c(manifold::Material *m) {
@@ -119,10 +127,6 @@ const manifold::Box *from_c(ManifoldBox *m) {
   return reinterpret_cast<manifold::Box const *>(m);
 }
 
-const manifold::MeshRelation *from_c(ManifoldMeshRelation *m) {
-  return reinterpret_cast<manifold::MeshRelation const *>(m);
-}
-
 manifold::Material *from_c(ManifoldMaterial *mat) {
   return reinterpret_cast<manifold::Material *>(mat);
 }
@@ -137,7 +141,7 @@ glm::ivec3 from_c(ManifoldIVec3 v) { return glm::ivec3(v.x, v.y, v.z); }
 
 glm::vec4 from_c(ManifoldVec4 v) { return glm::vec4(v.x, v.y, v.z, v.w); }
 
-std::vector<glm::vec3> vector_of_array(ManifoldVec3 *vs, size_t length) {
+std::vector<glm::vec3> vector_of_vec_array(ManifoldVec3 *vs, size_t length) {
   auto vec = std::vector<glm::vec3>();
   for (int i = 0; i < length; ++i) {
     vec.push_back(from_c(vs[i]));
@@ -145,15 +149,7 @@ std::vector<glm::vec3> vector_of_array(ManifoldVec3 *vs, size_t length) {
   return vec;
 }
 
-std::vector<float> vector_of_array(float *fs, size_t length) {
-  auto vec = std::vector<float>();
-  for (int i = 0; i < length; ++i) {
-    vec.push_back(fs[i]);
-  }
-  return vec;
-}
-
-std::vector<glm::ivec3> vector_of_array(ManifoldIVec3 *vs, size_t length) {
+std::vector<glm::ivec3> vector_of_vec_array(ManifoldIVec3 *vs, size_t length) {
   auto vec = std::vector<glm::ivec3>();
   for (int i = 0; i < length; ++i) {
     vec.push_back(from_c(vs[i]));
@@ -161,7 +157,7 @@ std::vector<glm::ivec3> vector_of_array(ManifoldIVec3 *vs, size_t length) {
   return vec;
 }
 
-std::vector<glm::vec4> vector_of_array(ManifoldVec4 *vs, size_t length) {
+std::vector<glm::vec4> vector_of_vec_array(ManifoldVec4 *vs, size_t length) {
   auto vec = std::vector<glm::vec4>();
   for (int i = 0; i < length; ++i) {
     vec.push_back(from_c(vs[i]));

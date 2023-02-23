@@ -12,6 +12,7 @@ on:
 
 jobs:
   build:
+    timeout-minutes: 30
     strategy:
       matrix:
         cuda_support: [ON, OFF]
@@ -19,7 +20,7 @@ jobs:
     runs-on: ubuntu-22.04
     if: github.event.pull_request.draft == false
     container:
-      image: docker://nvidia/cuda:11.6.0-devel-ubuntu20.04
+      image: docker://nvidia/cuda:12.0.1-devel-ubuntu22.04
     steps:
     - name: Install dependencies
       run: |
@@ -35,7 +36,7 @@ jobs:
         git apply thrust.diff
         mkdir build
         cd build
-        cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DMANIFOLD_DEBUG=ON -DMANIFOLD_PYBIND=ON -DMANIFOLD_PAR=${{matrix.parallel_backend}} -DMANIFOLD_USE_CUDA=${{matrix.cuda_support}} .. && make
+        cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DMANIFOLD_DEBUG=ON -DMANIFOLD_EXPORT=ON -DMANIFOLD_PYBIND=ON -DMANIFOLD_PAR=${{matrix.parallel_backend}} -DMANIFOLD_USE_CUDA=${{matrix.cuda_support}} .. && make
     - name: Test ${{matrix.parallel_backend}} with CUDA ${{matrix.cuda_support}}
       # note that the test for CUDA backend does not really test CUDA, as we
       # don't have CUDA GPU on GitHub Action
@@ -68,10 +69,11 @@ jobs:
         name: ${{matrix.parallel_backend}}-${{matrix.cuda_support}}
 
   build_cbind:
+    timeout-minutes: 30
     runs-on: ubuntu-22.04
     if: github.event.pull_request.draft == false
     container:
-      image: docker://nvidia/cuda:11.6.0-devel-ubuntu20.04
+      image: docker://nvidia/cuda:12.0.1-devel-ubuntu22.04
     steps:
     - name: Install dependencies
       run: |
@@ -95,7 +97,8 @@ jobs:
         ./manifold_test --gtest_filter=CBIND.*
 
   build_wasm:
-    runs-on: ubuntu-20.04
+    timeout-minutes: 30
+    runs-on: ubuntu-22.04
     if: github.event.pull_request.draft == false
     steps:
     - name: Install dependencies
@@ -135,9 +138,10 @@ jobs:
           build/bindings/wasm/manifold.js
           build/bindings/wasm/manifold.wasm
           build/bindings/wasm/manifold.d.ts
-        retention-days: 7
+        retention-days: 90
 
   build_windows:
+    timeout-minutes: 30
     strategy:
       matrix:
         parallel_backend: [NONE]
@@ -181,12 +185,15 @@ jobs:
         ./Release/manifold_test.exe
 
   build_mac:
+    timeout-minutes: 30
     strategy:
       matrix:
         parallel_backend: [NONE, TBB]
     runs-on: macos-latest
     if: github.event.pull_request.draft == false
     steps:
+    - name: Install common dependencies
+      run: brew install pkg-config
     - name: Install OpenMP
       if: matrix.parallel_backend == 'OMP'
       run: brew install libomp
@@ -209,6 +216,7 @@ jobs:
         ./manifold_test
 
   build_nix:
+    timeout-minutes: 30
     strategy:
       matrix:
         variant: [none, omp, tbb, none-cuda, omp-cuda, tbb-cuda, js]

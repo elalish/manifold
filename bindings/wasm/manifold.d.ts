@@ -12,10 +12,34 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+interface SealedUint32Array<N extends number> extends Uint32Array {
+  length: N;
+}
+
+interface SealedFloat32Array<N extends number> extends Float32Array {
+  length: N;
+}
+
 type Vec2 = [number, number];
 type Vec3 = [number, number, number];
-type Vec4 = [number, number, number, number];
-type Matrix3x4 = [Vec3, Vec3, Vec3, Vec3];
+type Mat4 = [
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+];
 type SimplePolygon = Vec2[];
 type Polygons = SimplePolygon|SimplePolygon[];
 type Box = {
@@ -30,12 +54,6 @@ type Properties = {
   surfaceArea: number,
   volume: number
 };
-type BaryRef = {
-  meshID: number,
-  originalID: number,
-  tri: number,
-  vertBary: Vec3
-};
 type Curvature = {
   maxMeanCurvature: number,
   minMeanCurvature: number,
@@ -44,22 +62,38 @@ type Curvature = {
   vertMeanCurvature: number[],
   vertGaussianCurvature: number[]
 };
-type MeshRelation = {
-  barycentric: Vec3[],
-  triBary: BaryRef[],
-};
 
 declare class Mesh {
-  vertPos: Float32Array;
+  constructor(options: {
+    numProp: number,
+    vertProperties: Float32Array,
+    triVerts: Uint32Array,
+    mergeFromVert?: Uint32Array,
+    mergeToVert?: Uint32Array,
+    runIndex?: Uint32Array,
+    runOriginalID?: Uint32Array,
+    runTransform?: Float32Array,
+    faceID?: Uint32Array,
+    halfedgeTangent?: Float32Array
+  });
+  numProp: number;
+  vertProperties: Float32Array;
   triVerts: Uint32Array;
-  vertNormal?: Float32Array;
+  mergeFromVert?: Uint32Array;
+  mergeToVert?: Uint32Array;
+  runIndex?: Uint32Array;
+  runOriginalID?: Uint32Array;
+  runTransform?: Float32Array;
+  faceID?: Uint32Array;
   halfedgeTangent?: Float32Array;
   get numTri(): number;
   get numVert(): number;
-  verts(tri: number): Uint32Array<3>;
-  position(vert: number): Float32Array<3>;
-  normal(vert: number): Float32Array<3>;
-  tangent(halfedge: number): Float32Array<4>;
+  get numRun(): number;
+  verts(tri: number): SealedUint32Array<3>;
+  position(vert: number): SealedFloat32Array<3>;
+  extras(vert: number): Float32Array;
+  tangent(halfedge: number): SealedFloat32Array<4>;
+  transform(run: number): Mat4;
 }
 
 declare class Manifold {
@@ -68,13 +102,13 @@ declare class Manifold {
    */
   constructor(mesh: Mesh);
   /**
-   * Transform this Manifold in space. The first three columns form a 3x3 matrix
-   * transform and the last is a translation vector. This operation can be
-   * chained. Transforms are combined and applied lazily.
+   * Transform this Manifold in space. Stored in column-major order. This
+   * operation can be chained. Transforms are combined and applied lazily.
    *
-   * @param m The affine transform matrix to apply to all the vertices.
+   * @param m The affine transformation matrix to apply to all the vertices. The
+   *     last row is ignored.
    */
-  transform(m: Matrix3x4): Manifold;
+  transform(m: Mat4): Manifold;
 
   /**
    * Move this Manifold in space. This operation can be chained. Transforms are
@@ -212,31 +246,23 @@ declare class Manifold {
   getCurvature(): Curvature;
 
   /**
-   * This returns a Mesh of simple vectors of vertices and triangles suitable
-   * for saving or other operations outside of the context of this library.
-   */
-  getMesh(): Mesh;
-
-  /**
-   * Gets the relationship to the previous meshes, for the purpose of assigning
-   * properties like texture coordinates. The triBary vector is the same length
-   * as Mesh.triVerts: BaryRef.originalID indicates the source mesh and
-   * BaryRef.tri is that mesh's triangle index to which these barycentric
-   * coordinates refer. BaryRef.vertBary gives an index for each vertex into the
-   * barycentric vector if that index is >= 0, indicating it is a new vertex. If
-   * the index is < 0, this indicates it is an original vertex, the index + 3
-   * vert of the referenced triangle.
+   * Returns a Mesh that is designed to easily push into a renderer, including
+   * all interleaved vertex properties that may have been input. It also
+   * includes relations to all the input meshes that form a part of this result
+   * and the transforms applied to each.
    *
-   * BaryRef.meshID is a unique ID to the particular instance of a given mesh.
-   * For instance, if you want to convert the triangle mesh to a polygon mesh,
-   * all the triangles from a given face will have the same .meshID and .tri
-   * values.
+   * @param normalIdx If the original Mesh inputs that formed this manifold had
+   * properties corresponding to normal vectors, you can specify which property
+   * channels these are (x, y, z), which will cause this output Mesh to
+   * automatically update these normals according to the applied transforms and
+   * front/back side. Each channel must be >= 3 and < numProp, and all original
+   * Meshes must use the same channels for their normals.
    */
-  getMeshRelation(): MeshRelation;
+  getMesh(normalIdx?: Vec3): Mesh;
 
   /**
    * If you copy a manifold, but you want this new copy to have new properties
-   * (e.g. a different UV mapping), you can reset its meshIDs to a new original,
+   * (e.g. a different UV mapping), you can reset its IDs to a new original,
    * meaning it will now be referenced by its descendants instead of the meshes
    * it was built from, allowing you to differentiate the copies when applying
    * your properties to the final result.
@@ -250,8 +276,8 @@ declare class Manifold {
   asOriginal(): Manifold;
 
   /**
-   * If this mesh is an original, this returns its meshID that can be referenced
-   * by product manifolds' MeshRelation. If this manifold is a product, this
+   * If this mesh is an original, this returns its ID that can be referenced
+   * by product manifolds. If this manifold is a product, this
    * returns -1.
    */
   originalID(): number;
@@ -420,12 +446,11 @@ declare function getCircularSegments(radius: number): number;
 ///@}
 
 /**
- * Create a Manifold from a serialized Mesh object (MeshVec). Unlike the
- * constructor, this method does not dispose the Mesh after using it.
- *
- * @param meshVec The serialized Mesh object to convert into a Manifold.
+ * Returns the first of n sequential new unique mesh IDs for marking sets of
+ * triangles that can be looked up after further operations. Assign to
+ * Mesh.runOriginalID vector.
  */
-declare function ManifoldFromMeshVec(meshVec: MeshVec): Manifold;
+declare function reserveIDs(count: number): number;
 
 declare interface ManifoldStatic {
   cube: typeof cube;
@@ -444,7 +469,8 @@ declare interface ManifoldStatic {
   setMinCircularEdgeLength: typeof setMinCircularEdgeLength;
   setCircularSegments: typeof setCircularSegments;
   getCircularSegments: typeof getCircularSegments;
-  ManifoldFromMeshVec: typeof ManifoldFromMeshVec;
+  reserveIDs: typeof reserveIDs;
+  Mesh: typeof Mesh;
   Manifold: typeof Manifold;
   setup: () => void;
 }

@@ -60,19 +60,19 @@ struct ShortEdge {
 
 struct FlagEdge {
   const Halfedge* halfedge;
-  const BaryRef* triBary;
+  const TriRef* triRef;
 
   __host__ __device__ bool operator()(int edge) {
     if (halfedge[edge].pairedHalfedge < 0) return false;
     // Flag redundant edges - those where the startVert is surrounded by only
     // two original triangles.
-    const BaryRef ref0 = triBary[edge / 3];
+    const TriRef ref0 = triRef[edge / 3];
     int current = NextHalfedge(halfedge[edge].pairedHalfedge);
-    const BaryRef ref1 = triBary[current / 3];
+    const TriRef ref1 = triRef[current / 3];
     while (current != edge) {
       current = NextHalfedge(halfedge[current].pairedHalfedge);
       int tri = current / 3;
-      const BaryRef ref = triBary[tri];
+      const TriRef ref = triRef[tri];
       if ((ref.meshID != ref0.meshID || ref.tri != ref0.tri) &&
           (ref.meshID != ref1.meshID || ref.tri != ref1.tri))
         return false;
@@ -168,7 +168,7 @@ void Manifold::Impl::SimplifyTopology() {
   numFlagged =
       copy_if<decltype(flaggedEdges.begin())>(
           policy, countAt(0), countAt(halfedge_.size()), flaggedEdges.begin(),
-          FlagEdge({halfedge_.cptrD(), meshRelation_.triBary.cptrD()})) -
+          FlagEdge({halfedge_.cptrD(), meshRelation_.triRef.cptrD()})) -
       flaggedEdges.begin();
   flaggedEdges.resize(numFlagged);
 
@@ -213,8 +213,11 @@ void Manifold::Impl::DedupeEdge(const int edge) {
       halfedge_.push_back({outsideVert, endVert, -1, newFace});
       PairUp(newHalfedge + 2, halfedge_[current].pairedHalfedge);
       PairUp(newHalfedge + 1, current);
-      if (meshRelation_.triBary.size() > 0)
-        meshRelation_.triBary.push_back(meshRelation_.triBary[oldFace]);
+      if (meshRelation_.triRef.size() > 0)
+        meshRelation_.triRef.push_back(meshRelation_.triRef[oldFace]);
+      if (meshRelation_.triProperties.size() > 0)
+        meshRelation_.triProperties.push_back(
+            meshRelation_.triProperties[oldFace]);
       if (faceNormal_.size() > 0) faceNormal_.push_back(faceNormal_[oldFace]);
 
       newHalfedge += 3;
@@ -227,8 +230,11 @@ void Manifold::Impl::DedupeEdge(const int edge) {
       PairUp(newHalfedge + 2, halfedge_[opposite].pairedHalfedge);
       PairUp(newHalfedge + 1, opposite);
       PairUp(newHalfedge, newHalfedge - 3);
-      if (meshRelation_.triBary.size() > 0)
-        meshRelation_.triBary.push_back(meshRelation_.triBary[oldFace]);
+      if (meshRelation_.triRef.size() > 0)
+        meshRelation_.triRef.push_back(meshRelation_.triRef[oldFace]);
+      if (meshRelation_.triProperties.size() > 0)
+        meshRelation_.triProperties.push_back(
+            meshRelation_.triProperties[oldFace]);
       if (faceNormal_.size() > 0) faceNormal_.push_back(faceNormal_[oldFace]);
 
       break;
@@ -301,7 +307,8 @@ void Manifold::Impl::RemoveIfFolded(int edge) {
 }
 
 void Manifold::Impl::CollapseEdge(const int edge) {
-  VecDH<BaryRef>& triBary = meshRelation_.triBary;
+  VecDH<TriRef>& triRef = meshRelation_.triRef;
+  VecDH<glm::ivec3>& triProp = meshRelation_.triProperties;
 
   const Halfedge toRemove = halfedge_[edge];
   if (toRemove.pairedHalfedge < 0) return;
@@ -326,24 +333,32 @@ void Manifold::Impl::CollapseEdge(const int edge) {
 
   // Orbit startVert
   int start = halfedge_[tri1edge[1]].pairedHalfedge;
-  const BaryRef ref0 = triBary[edge / 3];
-  const BaryRef ref1 = triBary[toRemove.pairedHalfedge / 3];
   if (!shortEdge) {
     current = start;
+    TriRef refCheck = triRef[toRemove.pairedHalfedge / 3];
     glm::vec3 pLast = vertPos_[halfedge_[tri1edge[1]].endVert];
     while (current != tri0edge[2]) {
       current = NextHalfedge(current);
       glm::vec3 pNext = vertPos_[halfedge_[current].endVert];
       const int tri = current / 3;
-      const BaryRef ref = triBary[tri];
+      const TriRef ref = triRef[tri];
+      const glm::mat3x2 projection = GetAxisAlignedProjection(faceNormal_[tri]);
       // Don't collapse if the edge is not redundant (this may have changed due
       // to the collapse of neighbors).
-      if ((ref.meshID != ref0.meshID || ref.tri != ref0.tri) &&
-          (ref.meshID != ref1.meshID || ref.tri != ref1.tri))
-        return;
+      if (ref.meshID != refCheck.meshID || ref.tri != refCheck.tri) {
+        refCheck = triRef[edge / 3];
+        if (ref.meshID != refCheck.meshID || ref.tri != refCheck.tri) {
+          return;
+        } else {
+          // Don't collapse if the edges separating the faces are not colinear
+          // (can happen when the two faces are coplanar).
+          if (CCW(projection * pOld, projection * pLast, projection * pNew,
+                  precision_) != 0)
+            return;
+        }
+      }
 
       // Don't collapse edge if it would cause a triangle to invert.
-      const glm::mat3x2 projection = GetAxisAlignedProjection(faceNormal_[tri]);
       if (CCW(projection * pNext, projection * pLast, projection * pNew,
               precision_) < 0)
         return;
@@ -358,18 +373,30 @@ void Manifold::Impl::CollapseEdge(const int edge) {
   CollapseTri(tri1edge);
 
   // Orbit startVert
+  const int tri0 = edge / 3;
+  const int tri1 = toRemove.pairedHalfedge / 3;
+  const int triVert0 = (edge + 1) % 3;
+  const int triVert1 = toRemove.pairedHalfedge % 3;
+  const int prop0 = triProp.size() > 0 ? triProp[tri0][edge % 3] : -1;
+  const int prop1 = triProp.size() > 0
+                        ? triProp[tri1][(toRemove.pairedHalfedge + 1) % 3]
+                        : -1;
   current = start;
   while (current != tri0edge[2]) {
     current = NextHalfedge(current);
 
+    // Update the shifted triangles to the vertBary of endVert
+    const int tri = current / 3;
+    const int vIdx = current - 3 * tri;
+
     if (!shortEdge) {
-      // Update the shifted triangles to the vertBary of endVert
-      const int tri = current / 3;
-      const int vIdx = current - 3 * tri;
-      triBary[tri].vertBary[vIdx] =
-          (ref0.meshID == triBary[tri].meshID && ref0.tri == triBary[tri].tri)
-              ? ref0.vertBary[(edge + 1) % 3]
-              : ref1.vertBary[toRemove.pairedHalfedge % 3];
+      if (triProp.size() > 0) {
+        if (triProp[tri][vIdx] == prop0) {
+          triProp[tri][vIdx] = triProp[tri0][triVert0];
+        } else if (triProp[tri][vIdx] == prop1) {
+          triProp[tri][vIdx] = triProp[tri1][triVert1];
+        }
+      }
     }
 
     const int vert = halfedge_[current].endVert;
@@ -391,7 +418,7 @@ void Manifold::Impl::CollapseEdge(const int edge) {
 }
 
 void Manifold::Impl::RecursiveEdgeSwap(const int edge) {
-  VecDH<BaryRef>& triBary = meshRelation_.triBary;
+  VecDH<TriRef>& triRef = meshRelation_.triRef;
 
   if (edge < 0) return;
   const int pair = halfedge_[edge].pairedHalfedge;
@@ -431,23 +458,28 @@ void Manifold::Impl::RecursiveEdgeSwap(const int edge) {
     const int tri0 = halfedge_[tri0edge[0]].face;
     const int tri1 = halfedge_[tri1edge[0]].face;
     faceNormal_[tri0] = faceNormal_[tri1];
-    triBary[tri0] = triBary[tri1];
-    triBary[tri0].vertBary[perm0[1]] = triBary[tri1].vertBary[perm1[0]];
-    triBary[tri0].vertBary[perm0[0]] = triBary[tri1].vertBary[perm1[2]];
-    // Calculate a new barycentric coordinate for the split triangle.
-    const glm::vec3 uvw0 = UVW(triBary[tri1].vertBary[perm1[0]],
-                               meshRelation_.barycentric.cptrH());
-    const glm::vec3 uvw1 = UVW(triBary[tri1].vertBary[perm1[1]],
-                               meshRelation_.barycentric.cptrH());
+    triRef[tri0] = triRef[tri1];
     const float l01 = glm::length(v[1] - v[0]);
     const float l02 = glm::length(v[2] - v[0]);
     const float a = glm::max(0.0f, glm::min(1.0f, l02 / l01));
-    const glm::vec3 uvw2 = a * uvw0 + (1 - a) * uvw1;
-    // And assign it.
-    const int newBary = meshRelation_.barycentric.size();
-    meshRelation_.barycentric.push_back(uvw2);
-    triBary[tri1].vertBary[perm1[0]] = newBary;
-    triBary[tri0].vertBary[perm0[2]] = newBary;
+    // Update properties if applicable
+    if (meshRelation_.properties.size() > 0) {
+      VecDH<glm::ivec3>& triProp = meshRelation_.triProperties;
+      VecDH<float>& prop = meshRelation_.properties;
+      triProp[tri0] = triProp[tri1];
+      triProp[tri0][perm0[1]] = triProp[tri1][perm1[0]];
+      triProp[tri0][perm0[0]] = triProp[tri1][perm1[2]];
+      const int numProp = NumProp();
+      const int newProp = prop.size() / numProp;
+      const int propIdx0 = triProp[tri1][perm1[0]];
+      const int propIdx1 = triProp[tri1][perm1[1]];
+      for (int p = 0; p < numProp; ++p) {
+        prop.push_back(a * prop[numProp * propIdx0 + p] +
+                       (1 - a) * prop[numProp * propIdx1 + p]);
+      }
+      triProp[tri1][perm1[0]] = newProp;
+      triProp[tri0][perm0[2]] = newProp;
+    }
 
     // if the new edge already exists, duplicate the verts and split the mesh.
     int current = halfedge_[tri1edge[0]].pairedHalfedge;

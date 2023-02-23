@@ -52,6 +52,7 @@ Manifold Base(float width, float radius, float decorRadius, float twistRadius,
   }
 
   base = Manifold::Extrude(stretch, width) ^ base;
+  // Remove extra edges in coplanar faces
   base = base.AsOriginal();
 
   return base;

@@ -40,8 +40,16 @@ PYBIND11_MODULE(pymanifold, m) {
       .def(py::init<>())
       .def(py::init([](std::vector<Manifold> &manifolds) {
              Manifold result;
-             for (Manifold &manifold : manifolds) result += manifold;
-             return result;
+             if (manifolds.size() >= 1) {
+               // for some reason using Manifold() as the initial object
+               // will cause failure for python specifically
+               // unable to reproduce with c++ directly
+               Manifold first = manifolds[0];
+               for (int i = 1; i < manifolds.size(); i++) first += manifolds[i];
+               return first;
+             } else {
+               return Manifold();
+             }
            }),
            "Construct manifold as the union of a set of manifolds.")
       .def(py::self + py::self, "Boolean union.")
@@ -196,53 +204,53 @@ PYBIND11_MODULE(pymanifold, m) {
           ":param n: The number of pieces to split every edge into. Must be > "
           "1.")
       .def("to_mesh", &Manifold::GetMesh)
-      .def_static("smooth", Manifold::Smooth,
-
-                  "Constructs a smooth version of the input mesh by creating "
-                  "tangents; this\n"
-                  "method will throw if you have supplied tangents with your "
-                  "mesh already. The\n"
-                  "actual triangle resolution is unchanged; use the Refine() "
-                  "method to\n"
-                  "interpolate to a higher-resolution curve.\n"
-                  "\n"
-                  "By default, every edge is calculated for maximum smoothness "
-                  "(very much\n"
-                  "approximately), attempting to minimize the maximum mean "
-                  "Curvature magnitude.\n"
-                  "No higher-order derivatives are considered, as the "
-                  "interpolation is\n"
-                  "independent per triangle, only sharing constraints on their "
-                  "boundaries.\n"
-                  "\n"
-                  ":param mesh: input Mesh.\n"
-                  ":param sharpenedEdges: If desired, you can supply a vector "
-                  "of sharpened\n"
-                  "halfedges, which should in general be a small subset of all "
-                  "halfedges. Order\n"
-                  "of entries doesn't matter, as each one specifies the "
-                  "desired smoothness\n"
-                  "(between zero and one, with one the default for all "
-                  "unspecified halfedges)\n"
-                  "and the halfedge index (3 * triangle index + [0,1,2] where "
-                  "0 is the edge\n"
-                  "between triVert 0 and 1, etc).\n"
-                  "\n"
-                  "At a smoothness value of zero, a sharp crease is made. The "
-                  "smoothness is\n"
-                  "interpolated along each edge, so the specified value should "
-                  "be thought of as\n"
-                  "an average. Where exactly two sharpened edges meet at a "
-                  "vertex, their\n"
-                  "tangents are rotated to be colinear so that the sharpened "
-                  "edge can be\n"
-                  "continuous. Vertices with only one sharpened edge are "
-                  "completely smooth,\n"
-                  "allowing sharpened edges to smoothly vanish at termination. "
-                  "A single vertex\n"
-                  "can be sharpened by sharping all edges that are incident on "
-                  "it, allowing\n"
-                  "cones to be formed.")
+      .def_static(
+          "smooth", [](const Mesh &mesh) { return Manifold::Smooth(mesh); },
+          "Constructs a smooth version of the input mesh by creating "
+          "tangents; this\n"
+          "method will throw if you have supplied tangents with your "
+          "mesh already. The\n"
+          "actual triangle resolution is unchanged; use the Refine() "
+          "method to\n"
+          "interpolate to a higher-resolution curve.\n"
+          "\n"
+          "By default, every edge is calculated for maximum smoothness "
+          "(very much\n"
+          "approximately), attempting to minimize the maximum mean "
+          "Curvature magnitude.\n"
+          "No higher-order derivatives are considered, as the "
+          "interpolation is\n"
+          "independent per triangle, only sharing constraints on their "
+          "boundaries.\n"
+          "\n"
+          ":param mesh: input Mesh.\n"
+          ":param sharpenedEdges: If desired, you can supply a vector "
+          "of sharpened\n"
+          "halfedges, which should in general be a small subset of all "
+          "halfedges. Order\n"
+          "of entries doesn't matter, as each one specifies the "
+          "desired smoothness\n"
+          "(between zero and one, with one the default for all "
+          "unspecified halfedges)\n"
+          "and the halfedge index (3 * triangle index + [0,1,2] where "
+          "0 is the edge\n"
+          "between triVert 0 and 1, etc).\n"
+          "\n"
+          "At a smoothness value of zero, a sharp crease is made. The "
+          "smoothness is\n"
+          "interpolated along each edge, so the specified value should "
+          "be thought of as\n"
+          "an average. Where exactly two sharpened edges meet at a "
+          "vertex, their\n"
+          "tangents are rotated to be colinear so that the sharpened "
+          "edge can be\n"
+          "continuous. Vertices with only one sharpened edge are "
+          "completely smooth,\n"
+          "allowing sharpened edges to smoothly vanish at termination. "
+          "A single vertex\n"
+          "can be sharpened by sharping all edges that are incident on "
+          "it, allowing\n"
+          "cones to be formed.")
       .def_static(
           "from_mesh", [](const Mesh &mesh) { return Manifold(mesh); },
           py::arg("mesh"))

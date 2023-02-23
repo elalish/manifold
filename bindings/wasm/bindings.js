@@ -75,19 +75,6 @@ Module.setup = function() {
     return out;
   };
 
-  // note that the matrix is using column major (same as glm)
-  Module.Manifold.prototype.transform = function(mat) {
-    console.assert(mat.length == 4, 'expects a 3x4 matrix');
-    const vec = new Module.Vector_f32();
-    for (let col of mat) {
-      console.assert(col.length == 3, 'expects a 3x4 matrix');
-      for (let x of col) mat.push_back(x);
-    }
-    const result = this._Transform(vec);
-    vec.delete();
-    return result;
-  };
-
   Module.Manifold.prototype.translate = function(...vec) {
     return this._Translate(vararg2vec(vec));
   };
@@ -123,15 +110,27 @@ Module.setup = function() {
 
   class Mesh {
     constructor({
+      numProp = 3,
       triVerts = new Uint32Array(),
-      vertPos = new Float32Array(),
-      vertNormal,
-      halfedgeTangent
+      vertProperties = new Float32Array(),
+      mergeFromVert,
+      mergeToVert,
+      runIndex,
+      runOriginalID,
+      faceID,
+      halfedgeTangent,
+      runTransform
     } = {}) {
+      this.numProp = numProp;
       this.triVerts = triVerts;
-      this.vertPos = vertPos;
-      this.vertNormal = vertNormal;
+      this.vertProperties = vertProperties;
+      this.mergeFromVert = mergeFromVert;
+      this.mergeToVert = mergeToVert;
+      this.runIndex = runIndex;
+      this.runOriginalID = runOriginalID;
+      this.faceID = faceID;
       this.halfedgeTangent = halfedgeTangent;
+      this.runTransform = runTransform;
     }
 
     get numTri() {
@@ -139,7 +138,11 @@ Module.setup = function() {
     }
 
     get numVert() {
-      return this.vertPos.length / 3;
+      return this.vertProperties.length / this.numProp;
+    }
+
+    get numRun() {
+      return this.runOriginalID.length;
     }
 
     verts(tri) {
@@ -147,43 +150,36 @@ Module.setup = function() {
     }
 
     position(vert) {
-      return this.vertPos.subarray(3 * vert, 3 * (vert + 1));
+      return this.vertProperties.subarray(numProp * vert, numProp * vert + 3);
     }
 
-    normal(vert) {
-      return this.vertNormal.subarray(3 * vert, 3 * (vert + 1));
+    extras(vert) {
+      return this.vertProperties.subarray(
+          numProp * vert + 3, numProp * (vert + 1));
     }
 
     tangent(halfedge) {
       return this.halfedgeTangent.subarray(4 * halfedge, 4 * (halfedge + 1));
     }
+
+    transform(run) {
+      const mat4 = new Array(16);
+      for (const col of [0, 1, 2, 3]) {
+        for (const row of [0, 1, 2]) {
+          mat4[4 * col + row] = this.runTransform[12 * run + 3 * col + row];
+        }
+      }
+      mat4[15] = 1;
+      return mat4;
+    }
   }
 
   Module.Mesh = Mesh;
 
-  Module.Manifold.prototype.getMesh = function() {
-    return new Mesh(this._GetMeshJS());
-  };
-
-  Module.Manifold.prototype.getMeshRelation = function() {
-    const result = this._getMeshRelation();
-    const oldBarycentric = result.barycentric;
-    const oldTriBary = result.triBary;
-    const conversion1 = v => [v.x, v.y, v.z];
-    const conversion2 = v => [v[0], v[1], v[2]];
-    const conversion3 = v => {
-      return {
-        meshID: v.meshID,
-        originalID: v.originalID,
-        tri: v.tri,
-        vertBary: conversion2(v.vertBary)
-      };
-    };
-    result.barycentric = fromVec(oldBarycentric, conversion1);
-    result.triBary = fromVec(oldTriBary, conversion3);
-    oldBarycentric.delete();
-    oldTriBary.delete();
-    return result;
+  Module.Manifold.prototype.getMesh = function(normalIdx = [0, 0, 0]) {
+    if (normalIdx instanceof Array)
+      normalIdx = {0: normalIdx[0], 1: normalIdx[1], 2: normalIdx[2]};
+    return new Mesh(this._GetMeshJS(normalIdx));
   };
 
   Module.Manifold.prototype.boundingBox = function() {
@@ -197,23 +193,35 @@ Module.setup = function() {
   Module.ManifoldError = function ManifoldError(code, ...args) {
     let message = 'Unknown error';
     switch (code) {
-      case Module.status.NON_FINITE_VERTEX.value:
+      case Module.status.NonFiniteVertex.value:
         message = 'Non-finite vertex';
         break;
-      case Module.status.NOT_MANIFOLD.value:
+      case Module.status.NotManifold.value:
         message = 'Not manifold';
         break;
-      case Module.status.VERTEX_INDEX_OUT_OF_BOUNDS.value:
+      case Module.status.VertexOutOfBounds.value:
         message = 'Vertex index out of bounds';
         break;
-      case Module.status.PROPERTIES_WRONG_LENGTH.value:
+      case Module.status.PropertiesWrongLength.value:
         message = 'Properties have wrong length';
         break;
-      case Module.status.TRI_PROPERTIES_WRONG_LENGTH.value:
-        message = 'Tri properties have wrong length';
+      case Module.status.MissingPositionProperties.value:
+        message = 'Less than three properties';
         break;
-      case Module.status.TRI_PROPERTIES_OUT_OF_BOUNDS.value:
-        message = 'Tri properties out of bounds';
+      case Module.status.MergeVectorsDifferentLengths.value:
+        message = 'Merge vectors have different lengths';
+        break;
+      case Module.status.MergeIndexOutOfBounds.value:
+        message = 'Merge index out of bounds';
+        break;
+      case Module.status.TransformWrongLength.value:
+        message = 'Transform vector has wrong length';
+        break;
+      case Module.status.RunIndexWrongLength.value:
+        message = 'Run index vector has wrong length';
+        break;
+      case Module.status.FaceIDWrongLength.value:
+        message = 'Face ID vector has wrong length';
     }
 
     const base = Error.apply(this, [message, ...args]);
@@ -324,7 +332,7 @@ Module.setup = function() {
       const result = Module['_' + name + 'N'](v);
       v.delete();
       return result;
-    }
+    };
   }
 
   Module.union = batchbool('union');

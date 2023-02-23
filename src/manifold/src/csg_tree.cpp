@@ -40,16 +40,6 @@ struct TransformNormals {
   }
 };
 
-struct UpdateTriBary {
-  const int nextBary;
-
-  __host__ __device__ BaryRef operator()(BaryRef ref) {
-    for (int i : {0, 1, 2})
-      if (ref.vertBary[i] >= 0) ref.vertBary[i] += nextBary;
-    return ref;
-  }
-};
-
 struct UpdateHalfedge {
   const int nextVert;
   const int nextEdge;
@@ -61,6 +51,15 @@ struct UpdateHalfedge {
     edge.pairedHalfedge += nextEdge;
     edge.face += nextFace;
     return edge;
+  }
+};
+
+struct UpdateMeshIDs {
+  const int offset;
+
+  __host__ __device__ TriRef operator()(TriRef ref) {
+    ref.meshID += offset;
+    return ref;
   }
 };
 
@@ -128,7 +127,7 @@ std::shared_ptr<CsgNode> CsgLeafNode::Transform(const glm::mat4x3 &m) const {
   return std::make_shared<CsgLeafNode>(pImpl_, m * glm::mat4(transform_));
 }
 
-CsgNodeType CsgLeafNode::GetNodeType() const { return CsgNodeType::LEAF; }
+CsgNodeType CsgLeafNode::GetNodeType() const { return CsgNodeType::Leaf; }
 
 /**
  * Efficient union of a set of pairwise disjoint meshes.
@@ -139,10 +138,7 @@ Manifold::Impl CsgLeafNode::Compose(
   int numVert = 0;
   int numEdge = 0;
   int numTri = 0;
-  int numBary = 0;
-  int meshids = 0;
   for (auto &node : nodes) {
-    meshids += node->pImpl_->meshids;
     float nodeOldScale = node->pImpl_->bBox_.Scale();
     float nodeNewScale =
         node->pImpl_->bBox_.Transform(node->transform_).Scale();
@@ -155,24 +151,21 @@ Manifold::Impl CsgLeafNode::Compose(
     numVert += node->pImpl_->NumVert();
     numEdge += node->pImpl_->NumEdge();
     numTri += node->pImpl_->NumTri();
-    numBary += node->pImpl_->meshRelation_.barycentric.size();
   }
 
   Manifold::Impl combined;
-  combined.meshids = meshids;
   combined.precision_ = precision;
   combined.vertPos_.resize(numVert);
   combined.halfedge_.resize(2 * numEdge);
   combined.faceNormal_.resize(numTri);
   combined.halfedgeTangent_.resize(2 * numEdge);
-  combined.meshRelation_.barycentric.resize(numBary);
-  combined.meshRelation_.triBary.resize(numTri);
+  combined.meshRelation_.triRef.resize(numTri);
   auto policy = autoPolicy(numTri);
 
   int nextVert = 0;
   int nextEdge = 0;
   int nextTri = 0;
-  int nextBary = 0;
+  int i = 0;
   for (auto &node : nodes) {
     if (node->transform_ == glm::mat4x3(1.0f)) {
       copy(policy, node->pImpl_->vertPos_.begin(), node->pImpl_->vertPos_.end(),
@@ -198,31 +191,31 @@ Manifold::Impl CsgLeafNode::Compose(
     copy(policy, node->pImpl_->halfedgeTangent_.begin(),
          node->pImpl_->halfedgeTangent_.end(),
          combined.halfedgeTangent_.begin() + nextEdge);
-    copy(policy, node->pImpl_->meshRelation_.barycentric.begin(),
-         node->pImpl_->meshRelation_.barycentric.end(),
-         combined.meshRelation_.barycentric.begin() + nextBary);
-    transform(policy, node->pImpl_->meshRelation_.triBary.begin(),
-              node->pImpl_->meshRelation_.triBary.end(),
-              combined.meshRelation_.triBary.begin() + nextTri,
-              UpdateTriBary({nextBary}));
     transform(policy, node->pImpl_->halfedge_.begin(),
               node->pImpl_->halfedge_.end(),
               combined.halfedge_.begin() + nextEdge,
               UpdateHalfedge({nextVert, nextEdge, nextTri}));
-
     // Since the nodes may be copies containing the same meshIDs, it is
-    // important to increment them separately so that each node instance gets
+    // important to add an offset so that each node instance gets
     // unique meshIDs.
-    combined.IncrementMeshIDs(nextTri, node->pImpl_->NumTri());
+    const int offset = i++ * Manifold::Impl::meshIDCounter_;
+    transform(policy, node->pImpl_->meshRelation_.triRef.begin(),
+              node->pImpl_->meshRelation_.triRef.end(),
+              combined.meshRelation_.triRef.begin() + nextTri,
+              UpdateMeshIDs({offset}));
+    for (const auto pair : node->pImpl_->meshRelation_.meshIDtransform) {
+      combined.meshRelation_.meshIDtransform[pair.first + offset] = pair.second;
+    }
 
     nextVert += node->pImpl_->NumVert();
     nextEdge += 2 * node->pImpl_->NumEdge();
     nextTri += node->pImpl_->NumTri();
-    nextBary += node->pImpl_->meshRelation_.barycentric.size();
   }
+
   // required to remove parts that are smaller than the precision
   combined.SimplifyTopology();
   combined.Finish();
+  combined.IncrementMeshIDs();
   return combined;
 }
 
@@ -261,21 +254,21 @@ std::shared_ptr<CsgLeafNode> CsgOpNode::ToLeafNode() const {
   auto &children_ = impl_->children_;
   if (children_.size() > 1) {
     switch (impl_->op_) {
-      case CsgNodeType::UNION:
+      case CsgNodeType::Union:
         BatchUnion();
         break;
-      case CsgNodeType::INTERSECTION: {
+      case CsgNodeType::Intersection: {
         std::vector<std::shared_ptr<const Manifold::Impl>> impls;
         for (auto &child : children_) {
           impls.push_back(
               std::dynamic_pointer_cast<CsgLeafNode>(child)->GetImpl());
         }
-        BatchBoolean(Manifold::OpType::INTERSECT, impls);
+        BatchBoolean(Manifold::OpType::Intersect, impls);
         children_.clear();
         children_.push_back(std::make_shared<CsgLeafNode>(impls.front()));
         break;
       };
-      case CsgNodeType::DIFFERENCE: {
+      case CsgNodeType::Difference: {
         // take the lhs out and treat the remaining nodes as the rhs, perform
         // union optimization for them
         auto lhs = std::dynamic_pointer_cast<CsgLeafNode>(children_.front());
@@ -284,12 +277,12 @@ std::shared_ptr<CsgLeafNode> CsgOpNode::ToLeafNode() const {
         auto rhs = std::dynamic_pointer_cast<CsgLeafNode>(children_.front());
         children_.clear();
         Boolean3 boolean(*lhs->GetImpl(), *rhs->GetImpl(),
-                         Manifold::OpType::SUBTRACT);
+                         Manifold::OpType::Subtract);
         children_.push_back(
             std::make_shared<CsgLeafNode>(std::make_shared<Manifold::Impl>(
-                boolean.Result(Manifold::OpType::SUBTRACT))));
+                boolean.Result(Manifold::OpType::Subtract))));
       };
-      case CsgNodeType::LEAF:
+      case CsgNodeType::Leaf:
         // unreachable
         break;
     }
@@ -308,7 +301,7 @@ std::shared_ptr<CsgLeafNode> CsgOpNode::ToLeafNode() const {
 void CsgOpNode::BatchBoolean(
     Manifold::OpType operation,
     std::vector<std::shared_ptr<const Manifold::Impl>> &results) {
-  ASSERT(operation != Manifold::OpType::SUBTRACT, logicErr,
+  ASSERT(operation != Manifold::OpType::Subtract, logicErr,
          "BatchBoolean doesn't support Difference.");
   auto cmpFn = [](std::shared_ptr<const Manifold::Impl> a,
                   std::shared_ptr<const Manifold::Impl> b) {
@@ -394,7 +387,7 @@ void CsgOpNode::BatchUnion() const {
             std::make_shared<const Manifold::Impl>(CsgLeafNode::Compose(tmp)));
       }
     }
-    BatchBoolean(Manifold::OpType::ADD, impls);
+    BatchBoolean(Manifold::OpType::Add, impls);
     children_.erase(children_.begin() + start, children_.end());
     children_.push_back(std::make_shared<CsgLeafNode>(impls.back()));
     // move it to the front as we process from the back, and the newly added
@@ -431,15 +424,15 @@ std::vector<std::shared_ptr<CsgNode>> &CsgOpNode::GetChildren(
         newChildren.push_back(grandchild->Transform(child->GetTransform()));
       }
     } else {
-      if (!finalize || child->GetNodeType() == CsgNodeType::LEAF) {
+      if (!finalize || child->GetNodeType() == CsgNodeType::Leaf) {
         newChildren.push_back(child);
       } else {
         newChildren.push_back(child->ToLeafNode());
       }
     }
     // special handling for difference: we treat it as first - (second + third +
-    // ...) so op = UNION after the first node
-    if (op == CsgNodeType::DIFFERENCE) op = CsgNodeType::UNION;
+    // ...) so op = Union after the first node
+    if (op == CsgNodeType::Difference) op = CsgNodeType::Union;
   }
   children_ = newChildren;
   return children_;
@@ -447,14 +440,14 @@ std::vector<std::shared_ptr<CsgNode>> &CsgOpNode::GetChildren(
 
 void CsgOpNode::SetOp(Manifold::OpType op) {
   switch (op) {
-    case Manifold::OpType::ADD:
-      impl_->op_ = CsgNodeType::UNION;
+    case Manifold::OpType::Add:
+      impl_->op_ = CsgNodeType::Union;
       break;
-    case Manifold::OpType::SUBTRACT:
-      impl_->op_ = CsgNodeType::DIFFERENCE;
+    case Manifold::OpType::Subtract:
+      impl_->op_ = CsgNodeType::Difference;
       break;
-    case Manifold::OpType::INTERSECT:
-      impl_->op_ = CsgNodeType::INTERSECTION;
+    case Manifold::OpType::Intersect:
+      impl_->op_ = CsgNodeType::Intersection;
       break;
   }
 }

@@ -90,11 +90,6 @@ inline HOST_DEVICE glm::mat4x3 RotateUp(glm::vec3 up) {
 }
 
 /**
- * Returns 1 for positive values, -1 for negative, and 0 for exactly zero.
- */
-inline HOST_DEVICE int Signum(float val) { return (val > 0) - (val < 0); }
-
-/**
  * Determines if the three points are wound counter-clockwise, clockwise, or
  * colinear within the specified tolerance.
  *
@@ -149,22 +144,6 @@ using Polygons = std::vector<SimplePolygon>;
 /** @} */
 
 /**
- * An alternative to Mesh for output suitable for pushing into graphics
- * libraries directly.
- */
-struct MeshGL {
-  /// Number of vertices
-  int NumVert() const { return this->vertPos.size() / 3; };
-  /// Number of triangles
-  int NumTri() const { return this->triVerts.size() / 3; };
-
-  std::vector<float> vertPos;
-  std::vector<float> vertNormal;
-  std::vector<uint32_t> triVerts;
-  std::vector<float> halfedgeTangent;
-};
-
-/**
  * The triangle-mesh input and output of this library.
  */
 struct Mesh {
@@ -182,45 +161,81 @@ struct Mesh {
   /// as 3 * tri + i, representing the tangent from Mesh.triVerts[tri][i] along
   /// the CCW edge. If empty, mesh is faceted.
   std::vector<glm::vec4> halfedgeTangent;
+};
 
-  Mesh() = default;
-  Mesh(const std::vector<glm::vec3>& vertPos_,
-       const std::vector<glm::ivec3>& triVerts_,
-       const std::vector<glm::vec3>& vertNormal_ = {},
-       const std::vector<glm::vec4>& halfedgeTangent_ = {})
-      : vertPos(vertPos_),
-        triVerts(triVerts_),
-        vertNormal(vertNormal_),
-        halfedgeTangent(halfedgeTangent_) {}
+/**
+ * An alternative to Mesh for output suitable for pushing into graphics
+ * libraries directly. This may not be manifold since the verts are duplicated
+ * along property boundaries that do not match. The additional merge vectors
+ * store this missing information, allowing the manifold to be reconstructed.
+ */
+struct MeshGL {
+  /// Number of property vertices
+  uint32_t NumVert() const { return vertProperties.size() / numProp; };
+  /// Number of triangles
+  uint32_t NumTri() const { return triVerts.size() / 3; };
 
-  Mesh(const MeshGL& in) {
-    const int numTri = in.NumTri();
-    const int numVert = in.NumVert();
-    triVerts.resize(numTri);
-    vertPos.resize(numVert);
-    if (!in.vertNormal.empty()) {
-      vertNormal.resize(numVert);
+  /// Number of properties per vertex, always >= 3.
+  uint32_t numProp = 3;
+  /// Flat, GL-style interleaved list of all vertex properties: propVal =
+  /// vertProperties[vert * numProp + propIdx]. The first three properties are
+  /// always the position x, y, z.
+  std::vector<float> vertProperties;
+  /// The vertex indices of the three triangle corners in CCW (from the outside)
+  /// order, for each triangle.
+  std::vector<uint32_t> triVerts;
+  /// Optional: A list of only the vertex indicies that need to be merged to
+  /// reconstruct the manifold.
+  std::vector<uint32_t> mergeFromVert;
+  /// Optional: The same length as mergeFromVert, and the corresponding value
+  /// contains the vertex to merge with. It will have an identical position, but
+  /// the other properties may differ.
+  std::vector<uint32_t> mergeToVert;
+  /// Optional: Indicates runs of triangles that correspond to a particular
+  /// input mesh instance. The runs encompass all of triVerts and are sorted
+  /// by runOriginalID. Run i begins at triVerts[runIndex[i]] and ends at
+  /// triVerts[runIndex[i+1]]. All runIndex values are divisible by 3.
+  std::vector<uint32_t> runIndex;
+  /// Optional: The OriginalID of the mesh this triangle run came from. This ID
+  /// is ideal for reapplying materials to the output mesh. Multiple runs may
+  /// have the same ID, e.g. representing different copies of the same input
+  /// mesh. If you create an input MeshGL that you want to be able to reference
+  /// as one or more originals, be sure to set unique values from ReserveIDs().
+  std::vector<uint32_t> runOriginalID;
+  /// Optional: For each run, a 3x4 transform is stored representing how the
+  /// corresponding original mesh was transformed to create this triangle run.
+  /// This matrix is stored in column-major order and the length of the overall
+  /// vector is 12 * runOriginalID.size().
+  std::vector<float> runTransform;
+  /// Optional: Length NumTri, contains an ID of the source face this triangle
+  /// comes from. When auto-generated, this ID will be a triangle index into the
+  /// original mesh. All neighboring coplanar triangles from that input mesh
+  /// will refer to a single triangle of that group as the faceID. When
+  /// supplying faceIDs, ensure that triangles with the same ID are in fact
+  /// coplanar and have consistent properties (within some tolerance) or the
+  /// output will be surprising.
+  std::vector<uint32_t> faceID;
+  /// Optional: The X-Y-Z-W weighted tangent vectors for smooth Refine(). If
+  /// non-empty, must be exactly four times as long as Mesh.triVerts. Indexed
+  /// as 4 * (3 * tri + i) + j, i < 3, j < 4, representing the tangent value
+  /// Mesh.triVerts[tri][i] along the CCW edge. If empty, mesh is faceted.
+  std::vector<float> halfedgeTangent;
+
+  MeshGL() = default;
+  MeshGL(const Mesh& mesh) {
+    numProp = 3;
+    vertProperties.resize(numProp * mesh.vertPos.size());
+    for (int i = 0; i < mesh.vertPos.size(); ++i) {
+      for (int j : {0, 1, 2}) vertProperties[3 * i + j] = mesh.vertPos[i][j];
     }
-
-    for (int i = 0; i < numVert; ++i) {
-      vertPos[i] = {in.vertPos[3 * i], in.vertPos[3 * i + 1],
-                    in.vertPos[3 * i + 2]};
-      if (!in.vertNormal.empty()) {
-        vertNormal[i] = {in.vertNormal[3 * i], in.vertNormal[3 * i + 1],
-                         in.vertNormal[3 * i + 2]};
-      }
+    triVerts.resize(3 * mesh.triVerts.size());
+    for (int i = 0; i < mesh.triVerts.size(); ++i) {
+      for (int j : {0, 1, 2}) triVerts[3 * i + j] = mesh.triVerts[i][j];
     }
-    for (int i = 0; i < numTri; ++i) {
-      triVerts[i] = {in.triVerts[3 * i], in.triVerts[3 * i + 1],
-                     in.triVerts[3 * i + 2]};
-      if (!in.halfedgeTangent.empty()) {
-        for (const int j : {0, 1, 2})
-          halfedgeTangent[3 * i + j] = {
-              in.halfedgeTangent[4 * (3 * i + j)],
-              in.halfedgeTangent[4 * (3 * i + j) + 1],
-              in.halfedgeTangent[4 * (3 * i + j) + 2],
-              in.halfedgeTangent[4 * (3 * i + j) + 3]};
-      }
+    halfedgeTangent.resize(4 * mesh.halfedgeTangent.size());
+    for (int i = 0; i < mesh.halfedgeTangent.size(); ++i) {
+      for (int j : {0, 1, 2, 3})
+        halfedgeTangent[4 * i + j] = mesh.halfedgeTangent[i][j];
     }
   }
 };
@@ -263,60 +278,7 @@ struct Components {
   std::vector<int> indices;
   int numComponents;
 };
-
-/**
- * Part of MeshRelation - represents a single triangle relation to an original
- * Mesh.
- */
-struct BaryRef {
-  /// The unique ID of the mesh instance of this triangle. If .meshID and .tri
-  /// match for two triangles, then they are coplanar and came from the same
-  /// face.
-  int meshID;
-  /// The OriginalID of the mesh this triangle came from. This ID is ideal for
-  /// reapplying properties like UV coordinates to the output mesh.
-  int originalID;
-  /// The triangle index of the original triangle this was part of:
-  /// Mesh.triVerts[tri].
-  int tri;
-  /// For the three corners of the output triangle, new (intersection) vertices
-  /// store an index to the MeshRelation.barycentric vector, while original
-  /// vertices have negative values referring to Mesh.triVerts[tri][i + 3].
-  glm::ivec3 vertBary;
-};
 /** @} */
-
-/**
- *  @ingroup Connections
- *  Represents the relationship of this output Mesh to all input Meshes that
- * eventually led to it, see Manifold.GetMeshRelation().
- */
-struct MeshRelation {
-  /// A vector of shared barycentric coordinates representing the position of a
-  /// vertex relative to its original triangle.
-  std::vector<glm::vec3> barycentric;
-  /// A vector matching Mesh.triVerts that contains the relation of each output
-  /// triangle to a single input triangle.
-  std::vector<BaryRef> triBary;
-
-  /**
-   * A convenience function to get the barycentric coordinates of a given
-   * corner.
-   *
-   * @param tri A valid triangle index of Mesh.triVerts.
-   * @param vert The corner of the triangle: 0, 1, or 2.
-   */
-  inline glm::vec3 UVW(int tri, int vert) {
-    glm::vec3 uvw(0.0f);
-    const int idx = triBary[tri].vertBary[vert];
-    if (idx < 0) {
-      uvw[idx + 3] = 1;
-    } else {
-      uvw = barycentric[idx];
-    }
-    return uvw;
-  }
-};
 
 /**
  * @ingroup Connections
@@ -548,12 +510,6 @@ inline std::ostream& operator<<(std::ostream& stream, const glm::mat4x3& mat) {
   return stream << tam[0] << std::endl
                 << tam[1] << std::endl
                 << tam[2] << std::endl;
-}
-
-inline std::ostream& operator<<(std::ostream& stream, const BaryRef& ref) {
-  return stream << "meshID: " << ref.meshID
-                << ", originalID: " << ref.originalID << ", tri: " << ref.tri
-                << ", uvw idx: " << ref.vertBary;
 }
 
 /**

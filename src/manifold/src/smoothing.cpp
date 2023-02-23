@@ -33,10 +33,23 @@ __host__ __device__ int VertsPerTri(int edgeVerts) {
   return (edgeVerts * edgeVerts + edgeVerts) / 2;
 }
 
-struct Barycentric {
-  int tri;
-  glm::vec3 uvw;
-};
+/**
+ * Retained verts are part of several triangles, and it doesn't matter which one
+ * the vertBary refers to. Here, whichever is last will win and it's done on the
+ * CPU for simplicity for now. Using AtomicCAS on .tri should work for a GPU
+ * version if desired.
+ */
+void FillRetainedVerts(VecDH<Barycentric>& vertBary,
+                       const VecDH<Halfedge>& halfedge_) {
+  const int numTri = halfedge_.size() / 3;
+  for (int tri = 0; tri < numTri; ++tri) {
+    for (const int i : {0, 1, 2}) {
+      glm::vec3 uvw(0);
+      uvw[i] = 1;
+      vertBary[halfedge_[3 * tri + i].startVert] = {tri, uvw};
+    }
+  }
+}
 
 struct ReindexHalfedge {
   int* half2Edge;
@@ -51,6 +64,7 @@ struct ReindexHalfedge {
 
 struct EdgeVerts {
   glm::vec3* vertPos;
+  Barycentric* vertBary;
   const int startIdx;
   const int n;
 
@@ -59,35 +73,32 @@ struct EdgeVerts {
     TmpEdge edgeVerts = thrust::get<1>(in);
 
     float invTotal = 1.0f / n;
-    for (int i = 1; i < n; ++i)
-      vertPos[startIdx + (n - 1) * edge + i - 1] =
-          (float(n - i) * vertPos[edgeVerts.first] +
-           float(i) * vertPos[edgeVerts.second]) *
-          invTotal;
+    for (int i = 1; i < n; ++i) {
+      const int vert = startIdx + (n - 1) * edge + i - 1;
+      const float v = i * invTotal;
+      const float u = 1 - v;
+      vertPos[vert] =
+          u * vertPos[edgeVerts.first] + v * vertPos[edgeVerts.second];
+
+      const int tri = edgeVerts.halfedgeIdx / 3;
+      const int idx = edgeVerts.halfedgeIdx - 3 * tri;
+      glm::vec3 uvw(0);
+      uvw[idx] = u;
+      uvw[Next3(idx)] = v;
+      vertBary[vert] = {tri, uvw};
+    }
   }
 };
 
 struct InteriorVerts {
   glm::vec3* vertPos;
-  glm::vec3* uvw;
-  BaryRef* triBary;
-  glm::vec3* uvwNew;
-  BaryRef* triBaryNew;
-  const glm::vec3* uvwOld;
+  Barycentric* vertBary;
   const int startIdx;
   const int n;
   const Halfedge* halfedge;
 
-  __host__ __device__ void operator()(thrust::tuple<int, BaryRef> in) {
-    const int tri = thrust::get<0>(in);
-    const BaryRef baryOld = thrust::get<1>(in);
-
-    glm::mat3 uvwOldTri;
-    for (int i : {0, 1, 2}) uvwOldTri[i] = UVW(baryOld.vertBary[i], uvwOld);
-
+  __host__ __device__ void operator()(int tri) {
     const float invTotal = 1.0f / n;
-    int posTri = tri * n * n;
-    int posBary = tri * VertsPerTri(n + 1);
     int pos = startIdx + tri * VertsPerTri(n - 2);
     for (int i = 0; i <= n; ++i) {
       for (int j = 0; j <= n - i; ++j) {
@@ -95,34 +106,13 @@ struct InteriorVerts {
         const float u = invTotal * j;
         const float v = invTotal * k;
         const float w = invTotal * i;
-        const int first = posBary;
-        uvw[posBary] = {u, v, w};
-        uvwNew[posBary] = uvwOldTri * uvw[posBary];
-        ++posBary;
-        if (j == n - i) continue;
+        if (i == 0 || j == 0 || k == 0 || j == n - i) continue;
 
-        // The three retained verts are denoted by their index - 3. uvw entries
-        // are added for them out of laziness of indexing only.
-        const int a = (k == n) ? -2 : first;
-        const int b = (i == n - 1) ? -1 : first + n - i + 1;
-        const int c = (j == n - 1) ? -3 : first + 1;
-        glm::ivec3 vertBary(c, a, b);
-        triBary[posTri] = {-1, -1, tri, vertBary};
-        triBaryNew[posTri++] = {baryOld.meshID, baryOld.originalID, baryOld.tri,
-                                vertBary};
-        if (j < n - 1 - i) {
-          int d = b + 1;  // d cannot be a retained vert
-          vertBary = {b, d, c};
-          triBary[posTri] = {-1, -1, tri, vertBary};
-          triBaryNew[posTri++] = {baryOld.meshID, baryOld.originalID,
-                                  baryOld.tri, vertBary};
-        }
+        vertPos[pos] = u * vertPos[halfedge[3 * tri].startVert] +      //
+                       v * vertPos[halfedge[3 * tri + 1].startVert] +  //
+                       w * vertPos[halfedge[3 * tri + 2].startVert];
 
-        if (i == 0 || j == 0 || k == 0) continue;
-
-        vertPos[pos++] = u * vertPos[halfedge[3 * tri].startVert] +      //
-                         v * vertPos[halfedge[3 * tri + 1].startVert] +  //
-                         w * vertPos[halfedge[3 * tri + 2].startVert];
+        vertBary[pos++] = {tri, {u, v, w}};
       }
     }
   }
@@ -219,24 +209,6 @@ struct SmoothBezier {
     const glm::vec4 bz3 = glm::mix(glm::vec4(startV, 1.0f), bz2, 2 / 3.0f);
     // Convert from homogeneous form to geometric form
     tangent = glm::vec4(glm::vec3(bz3) / bz3.w - startV, bz3.w);
-  }
-};
-
-struct TriBary2Vert {
-  Barycentric* vertBary;
-  int* lock;
-  const glm::vec3* uvw;
-  const Halfedge* halfedge;
-
-  __host__ __device__ void operator()(thrust::tuple<BaryRef, int> in) {
-    const BaryRef baryRef = thrust::get<0>(in);
-    const int tri = thrust::get<1>(in);
-
-    for (int i : {0, 1, 2}) {
-      int vert = halfedge[3 * tri + i].startVert;
-      if (AtomicAdd(lock[vert], 1) != 0) continue;
-      vertBary[vert] = {baryRef.tri, UVW(baryRef.vertBary[i], uvw)};
-    }
   }
 };
 
@@ -365,14 +337,14 @@ void Manifold::Impl::CreateTangents(
                            vertNormal_.cptrD(), halfedge_.cptrD()}));
 
   if (!sharpenedEdges.empty()) {
-    const VecDH<BaryRef>& triBary = meshRelation_.triBary;
+    const VecDH<TriRef>& triRef = meshRelation_.triRef;
 
     // sharpenedEdges are referenced to the input Mesh, but the triangles have
     // been sorted in creating the Manifold, so the indices are converted using
     // meshRelation_.
     std::vector<int> oldHalfedge2New(halfedge_.size());
     for (int tri = 0; tri < NumTri(); ++tri) {
-      int oldTri = triBary[tri].tri;
+      int oldTri = triRef[tri].tri;
       for (int i : {0, 1, 2}) oldHalfedge2New[3 * oldTri + i] = 3 * tri + i;
     }
 
@@ -459,24 +431,22 @@ void Manifold::Impl::CreateTangents(
  * run after the new vertices have moved, which is a likely scenario after
  * refinement (smoothing).
  */
-Manifold::Impl::MeshRelationD Manifold::Impl::Subdivide(int n) {
-  if (n < 2) return meshRelation_;
+VecDH<Barycentric> Manifold::Impl::Subdivide(int n) {
+  if (n < 2) return VecDH<Barycentric>();
   faceNormal_.resize(0);
   vertNormal_.resize(0);
-  int numVert = NumVert();
-  int numEdge = NumEdge();
-  int numTri = NumTri();
+  const int numVert = NumVert();
+  const int numEdge = NumEdge();
+  const int numTri = NumTri();
   // Append new verts
-  int vertsPerEdge = n - 1;
-  int triVertStart = numVert + numEdge * vertsPerEdge;
+  const int vertsPerEdge = n - 1;
+  const int triVertStart = numVert + numEdge * vertsPerEdge;
   vertPos_.resize(triVertStart + numTri * VertsPerTri(n - 2));
+  VecDH<Barycentric> vertBary(vertPos_.size());
+  FillRetainedVerts(vertBary, halfedge_);
 
-  MeshRelationD relation;
-  relation.barycentric.resize(numTri * VertsPerTri(n + 1));
-  relation.triBary.resize(n * n * numTri);
   MeshRelationD oldMeshRelation = std::move(meshRelation_);
-  meshRelation_.barycentric.resize(relation.barycentric.size());
-  meshRelation_.triBary.resize(relation.triBary.size());
+  meshRelation_.triRef.resize(n * n * numTri);
   meshRelation_.originalID = oldMeshRelation.originalID;
 
   VecDH<TmpEdge> edges = CreateTmpEdges(halfedge_);
@@ -485,36 +455,40 @@ Manifold::Impl::MeshRelationD Manifold::Impl::Subdivide(int n) {
   for_each_n(policy, zip(countAt(0), edges.begin()), numEdge,
              ReindexHalfedge({half2Edge.ptrD()}));
   for_each_n(policy, zip(countAt(0), edges.begin()), numEdge,
-             EdgeVerts({vertPos_.ptrD(), numVert, n}));
-  for_each_n(
-      policy, zip(countAt(0), oldMeshRelation.triBary.begin()), numTri,
-      InteriorVerts({vertPos_.ptrD(), relation.barycentric.ptrD(),
-                     relation.triBary.ptrD(), meshRelation_.barycentric.ptrD(),
-                     meshRelation_.triBary.ptrD(),
-                     oldMeshRelation.barycentric.cptrD(), triVertStart, n,
-                     halfedge_.ptrD()}));
+             EdgeVerts({vertPos_.ptrD(), vertBary.ptrD(), numVert, n}));
+  for_each_n(policy, countAt(0), numTri,
+             InteriorVerts({vertPos_.ptrD(), vertBary.ptrD(), triVertStart, n,
+                            halfedge_.cptrD()}));
   // Create sub-triangles
   VecDH<glm::ivec3> triVerts(n * n * numTri);
   for_each_n(policy, countAt(0), numTri,
              SplitTris({triVerts.ptrD(), halfedge_.cptrD(), half2Edge.cptrD(),
                         numVert, triVertStart, n}));
   CreateHalfedges(triVerts);
-  return relation;
+  // Make original since the subdivided faces are intended to be warped into
+  // being non-coplanar, and hence not being related to the original faces.
+  meshRelation_.originalID = ReserveIDs(1);
+  InitializeOriginal();
+
+  if (meshRelation_.numProp > 0) {
+    meshRelation_.properties.resize(meshRelation_.numProp * numVert);
+    meshRelation_.triProperties.resize(meshRelation_.triRef.size());
+    // Fill properties according to barycentric.
+    // Set triProp to share properties on continuous edges.
+    // Duplicate properties will be removed during sorting.
+  }
+
+  return vertBary;
 }
 
 void Manifold::Impl::Refine(int n) {
   Manifold::Impl old = *this;
-  MeshRelationD relation = Subdivide(n);
+  VecDH<Barycentric> vertBary = Subdivide(n);
+  if (vertBary.size() == 0) return;
 
   if (old.halfedgeTangent_.size() == old.halfedge_.size()) {
-    VecDH<Barycentric> vertBary(NumVert());
-    VecDH<int> lock(NumVert(), 0);
-    auto policy = autoPolicy(NumTri());
-    for_each_n(policy, zip(relation.triBary.begin(), countAt(0)), NumTri(),
-               TriBary2Vert({vertBary.ptrD(), lock.ptrD(),
-                             relation.barycentric.cptrD(), halfedge_.cptrD()}));
-
-    for_each_n(policy, zip(vertPos_.begin(), vertBary.begin()), NumVert(),
+    for_each_n(autoPolicy(NumTri()), zip(vertPos_.begin(), vertBary.begin()),
+               NumVert(),
                InterpTri({old.halfedge_.cptrD(), old.halfedgeTangent_.cptrD(),
                           old.vertPos_.cptrD()}));
   }

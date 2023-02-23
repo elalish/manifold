@@ -49,12 +49,11 @@ class Manifold {
   Manifold(Manifold&&) noexcept;
   Manifold& operator=(Manifold&&) noexcept;
 
-  Manifold(
-      const Mesh&,
-      const std::vector<glm::ivec3>& triProperties = std::vector<glm::ivec3>(),
-      const std::vector<float>& properties = std::vector<float>(),
-      const std::vector<float>& propertyTolerance = std::vector<float>());
+  Manifold(const MeshGL&, const std::vector<float>& propertyTolerance = {});
+  Manifold(const Mesh&);
 
+  static Manifold Smooth(const MeshGL&,
+                         const std::vector<Smoothness>& sharpenedEdges = {});
   static Manifold Smooth(const Mesh&,
                          const std::vector<Smoothness>& sharpenedEdges = {});
   static Manifold Tetrahedron();
@@ -101,21 +100,27 @@ class Manifold {
    */
   ///@{
   Mesh GetMesh() const;
-  MeshGL GetMeshGL() const;
+  MeshGL GetMeshGL(glm::ivec3 normalIdx = glm::ivec3(0)) const;
   bool IsEmpty() const;
   enum class Error {
-    NO_ERROR,
-    NON_FINITE_VERTEX,
-    NOT_MANIFOLD,
-    VERTEX_INDEX_OUT_OF_BOUNDS,
-    PROPERTIES_WRONG_LENGTH,
-    TRI_PROPERTIES_WRONG_LENGTH,
-    TRI_PROPERTIES_OUT_OF_BOUNDS,
+    NoError,
+    NonFiniteVertex,
+    NotManifold,
+    VertexOutOfBounds,
+    PropertiesWrongLength,
+    MissingPositionProperties,
+    MergeVectorsDifferentLengths,
+    MergeIndexOutOfBounds,
+    TransformWrongLength,
+    RunIndexWrongLength,
+    FaceIDWrongLength,
   };
   Error Status() const;
   int NumVert() const;
   int NumEdge() const;
   int NumTri() const;
+  int NumProp() const;
+  int NumPropVert() const;
   Box BoundingBox() const;
   float Precision() const;
   int Genus() const;
@@ -123,14 +128,14 @@ class Manifold {
   Curvature GetCurvature() const;
   ///@}
 
-  /** @name Relation
+  /** @name Mesh ID
    *  Details of the manifold's relation to its input meshes, for the purposes
    * of reapplying mesh properties.
    */
   ///@{
-  MeshRelation GetMeshRelation() const;
   int OriginalID() const;
   Manifold AsOriginal() const;
+  static uint32_t ReserveIDs(uint32_t);
   ///@}
 
   /** @name Modification
@@ -152,18 +157,18 @@ class Manifold {
    */
   ///@{
   /**
-   * Boolean operation type: ADD (Union), SUBTRACT (Difference), and INTERSECT.
+   * Boolean operation type: Add (Union), Subtract (Difference), and Intersect.
    */
-  enum class OpType { ADD, SUBTRACT, INTERSECT };
+  enum class OpType { Add, Subtract, Intersect };
   Manifold Boolean(const Manifold& second, OpType op) const;
   static Manifold BatchBoolean(const std::vector<Manifold>& manifolds,
                                OpType op);
   // Boolean operation shorthand
-  Manifold operator+(const Manifold&) const;  // ADD (Union)
+  Manifold operator+(const Manifold&) const;  // Add (Union)
   Manifold& operator+=(const Manifold&);
-  Manifold operator-(const Manifold&) const;  // SUBTRACT (Difference)
+  Manifold operator-(const Manifold&) const;  // Subtract (Difference)
   Manifold& operator-=(const Manifold&);
-  Manifold operator^(const Manifold&) const;  // INTERSECT
+  Manifold operator^(const Manifold&) const;  // Intersect
   Manifold& operator^=(const Manifold&);
   std::pair<Manifold, Manifold> Split(const Manifold&) const;
   std::pair<Manifold, Manifold> SplitByPlane(glm::vec3 normal,

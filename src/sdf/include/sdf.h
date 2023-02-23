@@ -25,16 +25,6 @@ namespace {
 using namespace manifold;
 __host__ __device__ Uint64 identity(Uint64 x) { return x; }
 
-__host__ __device__ int Next3(int i) {
-  constexpr glm::ivec3 next3(1, 2, 0);
-  return next3[i];
-}
-
-__host__ __device__ int Prev3(int i) {
-  constexpr glm::ivec3 prev3(2, 0, 1);
-  return prev3[i];
-}
-
 __host__ __device__ glm::ivec3 TetTri0(int i) {
   constexpr glm::ivec3 tetTri0[16] = {{-1, -1, -1},  //
                                       {0, 3, 4},     //
@@ -291,7 +281,8 @@ template <>
 void for_each_n_wrapper<std::function<float(glm::vec3)>>(
     ExecutionPolicy policy, int morton,
     ComputeVerts<std::function<float(glm::vec3)>> cv) {
-  const auto pol = policy == ParUnseq ? Par : policy;
+  const auto pol =
+      policy == ExecutionPolicy::ParUnseq ? ExecutionPolicy::Par : policy;
   for_each_n(pol, countAt(0), morton, cv);
 }
 
@@ -344,7 +335,8 @@ inline Mesh LevelSet(Func sdf, Box bounds, float edgeLength, float level = 0,
   // bindings use LevelSet despite being compiled with MANIFOLD_PAR
   // active (CUDA is already avoided when Func is a function ptr).
   const auto pol =
-      (!policy.has_value() || (policy.value() == ParUnseq && !CudaEnabled()))
+      (!policy.has_value() ||
+       (policy.value() == ExecutionPolicy::ParUnseq && !CudaEnabled()))
           ? autoPolicy(maxMorton)
           : policy.value();
 

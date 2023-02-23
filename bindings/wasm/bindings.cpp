@@ -31,18 +31,15 @@ Manifold Difference(const Manifold& a, const Manifold& b) { return a - b; }
 Manifold Intersection(const Manifold& a, const Manifold& b) { return a ^ b; }
 
 Manifold UnionN(const std::vector<Manifold>& manifolds) {
-  return Manifold::BatchBoolean(manifolds, Manifold::OpType::ADD);
-  ;
+  return Manifold::BatchBoolean(manifolds, Manifold::OpType::Add);
 }
 
 Manifold DifferenceN(const std::vector<Manifold>& manifolds) {
-  return Manifold::BatchBoolean(manifolds, Manifold::OpType::SUBTRACT);
-  ;
+  return Manifold::BatchBoolean(manifolds, Manifold::OpType::Subtract);
 }
 
 Manifold IntersectionN(const std::vector<Manifold>& manifolds) {
-  return Manifold::BatchBoolean(manifolds, Manifold::OpType::INTERSECT);
-  ;
+  return Manifold::BatchBoolean(manifolds, Manifold::OpType::Intersect);
 }
 
 std::vector<SimplePolygon> ToPolygon(
@@ -58,37 +55,75 @@ std::vector<SimplePolygon> ToPolygon(
   return simplePolygons;
 }
 
-val GetMeshJS(const Manifold& manifold) {
-  MeshGL mesh = manifold.GetMeshGL();
+val GetMeshJS(const Manifold& manifold, const glm::ivec3& normalIdx) {
+  MeshGL mesh = manifold.GetMeshGL(normalIdx);
   val meshJS = val::object();
 
+  meshJS.set("numProp", mesh.numProp);
   meshJS.set("triVerts",
              val(typed_memory_view(mesh.triVerts.size(), mesh.triVerts.data()))
                  .call<val>("slice"));
-  meshJS.set("vertPos",
-             val(typed_memory_view(mesh.vertPos.size(), mesh.vertPos.data()))
+  meshJS.set("vertProperties",
+             val(typed_memory_view(mesh.vertProperties.size(),
+                                   mesh.vertProperties.data()))
                  .call<val>("slice"));
-  meshJS.set("vertNormal", val(typed_memory_view(mesh.vertNormal.size(),
-                                                 mesh.vertNormal.data()))
-                               .call<val>("slice"));
+  meshJS.set("mergeFromVert", val(typed_memory_view(mesh.mergeFromVert.size(),
+                                                    mesh.mergeFromVert.data()))
+                                  .call<val>("slice"));
+  meshJS.set("mergeToVert", val(typed_memory_view(mesh.mergeToVert.size(),
+                                                  mesh.mergeToVert.data()))
+                                .call<val>("slice"));
+  meshJS.set("runIndex",
+             val(typed_memory_view(mesh.runIndex.size(), mesh.runIndex.data()))
+                 .call<val>("slice"));
+  meshJS.set("runOriginalID", val(typed_memory_view(mesh.runOriginalID.size(),
+                                                    mesh.runOriginalID.data()))
+                                  .call<val>("slice"));
+  meshJS.set("faceID",
+             val(typed_memory_view(mesh.faceID.size(), mesh.faceID.data()))
+                 .call<val>("slice"));
   meshJS.set("halfedgeTangent",
              val(typed_memory_view(mesh.halfedgeTangent.size(),
                                    mesh.halfedgeTangent.data()))
                  .call<val>("slice"));
+  meshJS.set("runTransform", val(typed_memory_view(mesh.runTransform.size(),
+                                                   mesh.runTransform.data()))
+                                 .call<val>("slice"));
 
   return meshJS;
 }
 
 MeshGL MeshJS2GL(const val& mesh) {
   MeshGL out;
+  out.numProp = mesh["numProp"].as<int>();
   out.triVerts = convertJSArrayToNumberVector<uint32_t>(mesh["triVerts"]);
-  out.vertPos = convertJSArrayToNumberVector<float>(mesh["vertPos"]);
-  if (mesh["vertNormal"] != val::undefined()) {
-    out.vertNormal = convertJSArrayToNumberVector<float>(mesh["vertNormal"]);
+  out.vertProperties =
+      convertJSArrayToNumberVector<float>(mesh["vertProperties"]);
+  if (mesh["mergeFromVert"] != val::undefined()) {
+    out.mergeFromVert =
+        convertJSArrayToNumberVector<uint32_t>(mesh["mergeFromVert"]);
+  }
+  if (mesh["mergeToVert"] != val::undefined()) {
+    out.mergeToVert =
+        convertJSArrayToNumberVector<uint32_t>(mesh["mergeToVert"]);
+  }
+  if (mesh["runIndex"] != val::undefined()) {
+    out.runIndex = convertJSArrayToNumberVector<uint32_t>(mesh["runIndex"]);
+  }
+  if (mesh["runOriginalID"] != val::undefined()) {
+    out.runOriginalID =
+        convertJSArrayToNumberVector<uint32_t>(mesh["runOriginalID"]);
+  }
+  if (mesh["faceID"] != val::undefined()) {
+    out.faceID = convertJSArrayToNumberVector<uint32_t>(mesh["faceID"]);
   }
   if (mesh["halfedgeTangent"] != val::undefined()) {
     out.halfedgeTangent =
         convertJSArrayToNumberVector<float>(mesh["halfedgeTangent"]);
+  }
+  if (mesh["runTransform"] != val::undefined()) {
+    out.runTransform =
+        convertJSArrayToNumberVector<float>(mesh["runTransform"]);
   }
   return out;
 }
@@ -111,10 +146,11 @@ Manifold Revolve(std::vector<std::vector<glm::vec2>>& polygons,
   return Manifold::Revolve(ToPolygon(polygons), circularSegments);
 }
 
-Manifold Transform(Manifold& manifold, std::vector<float>& mat) {
+Manifold Transform(Manifold& manifold, const val& mat) {
+  std::vector<float> array = convertJSArrayToNumberVector<float>(mat);
   glm::mat4x3 matrix;
-  for (int i = 0; i < 4; i++)
-    for (int j = 0; j < 3; j++) matrix[i][j] = mat[i * 3 + j];
+  for (const int col : {0, 1, 2, 3})
+    for (const int row : {0, 1, 2}) matrix[col][row] = array[col * 4 + row];
   return manifold.Transform(matrix);
 }
 
@@ -153,17 +189,19 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .field("w", &glm::vec4::w);
 
   enum_<Manifold::Error>("status")
-      .value("NO_ERROR", Manifold::Error::NO_ERROR)
-      .value("NON_FINITE_VERTEX", Manifold::Error::NON_FINITE_VERTEX)
-      .value("NOT_MANIFOLD", Manifold::Error::NOT_MANIFOLD)
-      .value("VERTEX_INDEX_OUT_OF_BOUNDS",
-             Manifold::Error::VERTEX_INDEX_OUT_OF_BOUNDS)
-      .value("PROPERTIES_WRONG_LENGTH",
-             Manifold::Error::PROPERTIES_WRONG_LENGTH)
-      .value("TRI_PROPERTIES_WRONG_LENGTH",
-             Manifold::Error::TRI_PROPERTIES_WRONG_LENGTH)
-      .value("TRI_PROPERTIES_OUT_OF_BOUNDS",
-             Manifold::Error::TRI_PROPERTIES_OUT_OF_BOUNDS);
+      .value("NoError", Manifold::Error::NoError)
+      .value("NonFiniteVertex", Manifold::Error::NonFiniteVertex)
+      .value("NotManifold", Manifold::Error::NotManifold)
+      .value("VertexOutOfBounds", Manifold::Error::VertexOutOfBounds)
+      .value("PropertiesWrongLength", Manifold::Error::PropertiesWrongLength)
+      .value("MissingPositionProperties",
+             Manifold::Error::MissingPositionProperties)
+      .value("MergeVectorsDifferentLengths",
+             Manifold::Error::MergeVectorsDifferentLengths)
+      .value("MergeIndexOutOfBounds", Manifold::Error::MergeIndexOutOfBounds)
+      .value("TransformWrongLength", Manifold::Error::TransformWrongLength)
+      .value("RunIndexWrongLength", Manifold::Error::RunIndexWrongLength)
+      .value("FaceIDWrongLength", Manifold::Error::FaceIDWrongLength);
 
   value_object<Box>("box").field("min", &Box::min).field("max", &Box::max);
 
@@ -174,16 +212,6 @@ EMSCRIPTEN_BINDINGS(whatever) {
   value_object<Properties>("properties")
       .field("surfaceArea", &Properties::surfaceArea)
       .field("volume", &Properties::volume);
-
-  value_object<BaryRef>("baryRef")
-      .field("meshID", &BaryRef::meshID)
-      .field("originalID", &BaryRef::originalID)
-      .field("tri", &BaryRef::tri)
-      .field("vertBary", &BaryRef::vertBary);
-
-  value_object<MeshRelation>("meshRelation")
-      .field("barycentric", &MeshRelation::barycentric)
-      .field("triBary", &MeshRelation::triBary);
 
   value_object<Curvature>("curvature")
       .field("maxMeanCurvature", &Curvature::maxMeanCurvature)
@@ -200,7 +228,6 @@ EMSCRIPTEN_BINDINGS(whatever) {
   register_vector<float>("Vector_f32");
   register_vector<Manifold>("Vector_manifold");
   register_vector<Smoothness>("Vector_smoothness");
-  register_vector<BaryRef>("Vector_baryRef");
   register_vector<glm::vec4>("Vector_vec4");
 
   class_<Manifold>("Manifold")
@@ -228,8 +255,7 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .function("getProperties", &Manifold::GetProperties)
       .function("_getCurvature", &Manifold::GetCurvature)
       .function("originalID", &Manifold::OriginalID)
-      .function("asOriginal", &Manifold::AsOriginal)
-      .function("_getMeshRelation", &Manifold::GetMeshRelation);
+      .function("asOriginal", &Manifold::AsOriginal);
 
   function("_Cube", &Manifold::Cube);
   function("_Cylinder", &Manifold::Cylinder);
@@ -249,4 +275,5 @@ EMSCRIPTEN_BINDINGS(whatever) {
   function("setMinCircularEdgeLength", &Manifold::SetMinCircularEdgeLength);
   function("setCircularSegments", &Manifold::SetCircularSegments);
   function("getCircularSegments", &Manifold::GetCircularSegments);
+  function("reserveIDs", &Manifold::ReserveIDs);
 }

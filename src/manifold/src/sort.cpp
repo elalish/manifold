@@ -119,6 +119,42 @@ struct Reindex {
   }
 };
 
+struct MarkProp {
+  int* keep;
+
+  __host__ __device__ void operator()(glm::ivec3 triProp) {
+    for (const int i : {0, 1, 2}) {
+      keep[triProp[i]] = 1;
+    }
+  }
+};
+
+struct GatherProps {
+  float* properties;
+  const float* oldProperties;
+  const int numProp;
+
+  __host__ __device__ void operator()(thrust::tuple<int, int, int> in) {
+    const int oldIdx = thrust::get<0>(in);
+    const int newIdx = thrust::get<1>(in);
+    const int keep = thrust::get<2>(in);
+    if (keep == 0) return;
+    for (int p = 0; p < numProp; ++p) {
+      properties[newIdx * numProp + p] = oldProperties[oldIdx * numProp + p];
+    }
+  }
+};
+
+struct ReindexProps {
+  const int* old2new;
+
+  __host__ __device__ void operator()(glm::ivec3& triProp) {
+    for (const int i : {0, 1, 2}) {
+      triProp[i] = old2new[triProp[i]];
+    }
+  }
+};
+
 template <typename T>
 void Permute(VecDH<T>& inOut, const VecDH<int>& new2Old) {
   VecDH<T> tmp(std::move(inOut));
@@ -127,7 +163,7 @@ void Permute(VecDH<T>& inOut, const VecDH<int>& new2Old) {
          tmp.begin(), inOut.begin());
 }
 
-template void Permute<BaryRef>(VecDH<BaryRef>&, const VecDH<int>&);
+template void Permute<TriRef>(VecDH<TriRef>&, const VecDH<int>&);
 template void Permute<glm::vec3>(VecDH<glm::vec3>&, const VecDH<int>&);
 
 struct ReindexFace {
@@ -172,7 +208,7 @@ void Manifold::Impl::Finish() {
   SetPrecision(precision_);
   if (!bBox_.IsFinite()) {
     // Decimated out of existence - early out.
-    MarkFailure(Error::NO_ERROR);
+    MarkFailure(Error::NoError);
     return;
   }
 
@@ -182,6 +218,7 @@ void Manifold::Impl::Finish() {
   GetFaceBoxMorton(faceBox, faceMorton);
   SortFaces(faceBox, faceMorton);
   if (halfedge_.size() == 0) return;
+  CompactProps();
 
   ASSERT(halfedge_.size() % 6 == 0, topologyErr,
          "Not an even number of faces after sorting faces!");
@@ -202,8 +239,8 @@ void Manifold::Impl::Finish() {
          "Halfedge index is negative!");
   ASSERT(extrema.pairedHalfedge < 2 * NumEdge(), topologyErr,
          "Halfedge index exceeds number of halfedges!");
-  ASSERT(meshRelation_.triBary.size() == NumTri() ||
-             meshRelation_.triBary.size() == 0,
+  ASSERT(meshRelation_.triRef.size() == NumTri() ||
+             meshRelation_.triRef.size() == 0,
          logicErr, "Mesh Relation doesn't fit!");
   ASSERT(faceNormal_.size() == NumTri() || faceNormal_.size() == 0, logicErr,
          "faceNormal size = " + std::to_string(faceNormal_.size()) +
@@ -264,6 +301,32 @@ void Manifold::Impl::ReindexVerts(const VecDH<int>& vertNew2Old,
 }
 
 /**
+ * Removes unreferenced property verts and reindexes triProperties.
+ */
+void Manifold::Impl::CompactProps() {
+  if (meshRelation_.numProp == 0) return;
+
+  const int numVerts = meshRelation_.properties.size() / meshRelation_.numProp;
+  VecDH<int> keep(numVerts, 0);
+  auto policy = autoPolicy(numVerts);
+
+  for_each(policy, meshRelation_.triProperties.cbegin(),
+           meshRelation_.triProperties.cend(), MarkProp({keep.ptrD()}));
+  VecDH<int> propOld2New(numVerts + 1, 0);
+  inclusive_scan(policy, keep.begin(), keep.end(), propOld2New.begin() + 1);
+
+  VecDH<float> oldProp = meshRelation_.properties;
+  const int numVertsNew = propOld2New[numVerts];
+  meshRelation_.properties.resize(meshRelation_.numProp * numVertsNew);
+  for_each_n(policy, zip(countAt(0), propOld2New.cbegin(), keep.cbegin()),
+             numVerts,
+             GatherProps({meshRelation_.properties.ptrD(), oldProp.cptrD(),
+                          meshRelation_.numProp}));
+  for_each_n(policy, meshRelation_.triProperties.begin(), NumTri(),
+             ReindexProps({propOld2New.cptrD()}));
+}
+
+/**
  * Fills the faceBox and faceMorton input with the bounding boxes and Morton
  * codes of the faces, respectively. The Morton code is based on the center of
  * the bounding box.
@@ -310,9 +373,10 @@ void Manifold::Impl::SortFaces(VecDH<Box>& faceBox,
  */
 void Manifold::Impl::GatherFaces(const VecDH<int>& faceNew2Old) {
   const int numTri = faceNew2Old.size();
-  if (meshRelation_.triBary.size() == NumTri())
-    Permute(meshRelation_.triBary, faceNew2Old);
-
+  if (meshRelation_.triRef.size() == NumTri())
+    Permute(meshRelation_.triRef, faceNew2Old);
+  if (meshRelation_.triProperties.size() == NumTri())
+    Permute(meshRelation_.triProperties, faceNew2Old);
   if (faceNormal_.size() == NumTri()) Permute(faceNormal_, faceNew2Old);
 
   VecDH<Halfedge> oldHalfedge(std::move(halfedge_));
@@ -333,11 +397,23 @@ void Manifold::Impl::GatherFaces(const VecDH<int>& faceNew2Old) {
 void Manifold::Impl::GatherFaces(const Impl& old,
                                  const VecDH<int>& faceNew2Old) {
   const int numTri = faceNew2Old.size();
-  meshRelation_.triBary.resize(numTri);
   auto policy = autoPolicy(numTri);
+
+  meshRelation_.triRef.resize(numTri);
   gather(policy, faceNew2Old.begin(), faceNew2Old.end(),
-         old.meshRelation_.triBary.begin(), meshRelation_.triBary.begin());
-  meshRelation_.barycentric = old.meshRelation_.barycentric;
+         old.meshRelation_.triRef.begin(), meshRelation_.triRef.begin());
+
+  for (const auto& pair : old.meshRelation_.meshIDtransform) {
+    meshRelation_.meshIDtransform[pair.first] = pair.second;
+  }
+
+  if (old.meshRelation_.triProperties.size() > 0) {
+    meshRelation_.triProperties.resize(numTri);
+    gather(policy, faceNew2Old.begin(), faceNew2Old.end(),
+           old.meshRelation_.triProperties.begin(),
+           meshRelation_.triProperties.begin());
+    meshRelation_.properties = old.meshRelation_.properties;
+  }
 
   if (old.faceNormal_.size() == old.NumTri()) {
     faceNormal_.resize(numTri);

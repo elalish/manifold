@@ -6,7 +6,6 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="shortcut icon" type="image/png" href="https://elalish.github.io/manifold/samples/models/favicon.png" />
-
   <style>
     body {
       margin: 0;
@@ -37,8 +36,7 @@
 
 <body>
   <p>This demonstrates the minimum code to connect Manifold to a three.js rendering. A slightly more complex example
-    involving GLTF export and &lt;model-viewer&gt; can be found <a href="model-viewer.html">here</a>.
-  </p>
+    involving GLTF export and &lt;model-viewer&gt; can be found <a href="model-viewer.html">here</a>. </p>
   <select>
     <option value="difference" selected>Difference</option>
     <option value="intersection">Intersection</option>
@@ -46,64 +44,67 @@
   </select><br />
   <canvas id="output"></canvas>
 </body>
+<script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.149.0/build/three.module.js"
+    }
+  }
+</script>
+<script type="module">
+  import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.149.0/build/three.module.js';
+  import { mergeVertices } from 'https://cdn.jsdelivr.net/npm/three@0.149.0/examples/jsm/utils/BufferGeometryUtils.js';
+  import Module from '../manifold.js';
 
-<script src="https://unpkg.com/three@0.142.0/build/three.js"></script>
-<script src="https://unpkg.com/three@0.142.0/examples/js/utils/BufferGeometryUtils.js"></script>
-<script src="manifold.js"></script>
-<script>
-  let wasm;
-  Module().then(function (tmp) {
-    wasm = tmp;
-    // we have manifold module, let's do some three.js
-    const camera = new THREE.PerspectiveCamera(30, 1, 0.01, 10);
-    camera.position.z = 1;
+  const wasm = await Module();
+  wasm.setup();
 
-    wasm.setup();
-    const scene = new THREE.Scene();
-    const mesh = new THREE.Mesh(undefined, new THREE.MeshNormalMaterial({
-      flatShading: true
-    }));
-    scene.add(mesh);
+  // we have manifold module, let's do some three.js
+  const camera = new THREE.PerspectiveCamera(30, 1, 0.01, 10);
+  camera.position.z = 1;
 
-    const icosahedron = simplify(new THREE.IcosahedronGeometry(0.16));
+  const scene = new THREE.Scene();
+  const mesh = new THREE.Mesh(undefined, new THREE.MeshNormalMaterial({
+    flatShading: true
+  }));
+  scene.add(mesh);
 
-    const manifold_1 = wasm.cube(0.2, 0.2, 0.2, true);
-    const manifold_2 = new wasm.Manifold(geometry2mesh(icosahedron));
+  const icosahedron = simplify(new THREE.IcosahedronGeometry(0.16));
 
-    const csg = function (operation) {
-      mesh.geometry?.dispose();
-      mesh.geometry = mesh2geometry(wasm[operation](manifold_1, manifold_2).getMesh());
-    };
+  const manifold_1 = wasm.cube(0.2, 0.2, 0.2, true);
+  const manifold_2 = new wasm.Manifold(geometry2mesh(icosahedron));
 
-    document.querySelector('select').onchange = function (event) {
-      csg(event.target.value);
-    };
+  const csg = function (operation) {
+    mesh.geometry?.dispose();
+    mesh.geometry = mesh2geometry(wasm[operation](manifold_1, manifold_2).getMesh());
+  };
 
-    csg('difference');
+  document.querySelector('select').onchange = function (event) {
+    csg(event.target.value);
+  };
 
-    const output = document.querySelector("#output");
-    const renderer = new THREE.WebGLRenderer({ canvas: output, antialias: true });
-    const dim = output.getBoundingClientRect();
-    renderer.setSize(dim.width, dim.height);
-    renderer.setAnimationLoop(function (time) {
-      mesh.rotation.x = time / 2000;
-      mesh.rotation.y = time / 1000;
-      renderer.render(scene, camera);
-    });
+  csg('difference');
+
+  const output = document.querySelector("#output");
+  const renderer = new THREE.WebGLRenderer({ canvas: output, antialias: true });
+  const dim = output.getBoundingClientRect();
+  renderer.setSize(dim.width, dim.height);
+  renderer.setAnimationLoop(function (time) {
+    mesh.rotation.x = time / 2000;
+    mesh.rotation.y = time / 1000;
+    renderer.render(scene, camera);
   });
 
   // functions to convert between three.js and wasm
   function geometry2mesh(geometry) {
-    const vertPos = geometry.attributes.position.array;
-    const vertNormal = geometry.attributes.normal.array;
+    const vertProperties = geometry.attributes.position.array;
     const triVerts = geometry.index.array;
-    return new wasm.Mesh({vertPos, vertNormal, triVerts});
+    return new wasm.Mesh({ numProp: 3, vertProperties, triVerts });
   }
 
   function mesh2geometry(mesh) {
     const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute('position', new THREE.BufferAttribute(mesh.vertPos, 3));
-    geometry.setAttribute('normal', new THREE.BufferAttribute(mesh.vertNormal, 3));
+    geometry.setAttribute('position', new THREE.BufferAttribute(mesh.vertProperties, 3));
     geometry.setIndex(new THREE.BufferAttribute(mesh.triVerts, 1));
     return geometry;
   }
@@ -112,7 +113,7 @@
   function simplify(geometry) {
     delete geometry.attributes.normal;
     delete geometry.attributes.uv;
-    const simplified = THREE.BufferGeometryUtils.mergeVertices(geometry);
+    const simplified = mergeVertices(geometry);
     simplified.computeVertexNormals();
     return simplified;
   }

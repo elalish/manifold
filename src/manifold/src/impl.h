@@ -13,6 +13,8 @@
 // limitations under the License.
 
 #pragma once
+#include <map>
+
 #include "collider.h"
 #include "manifold.h"
 #include "optional_assert.h"
@@ -25,16 +27,24 @@ namespace manifold {
 
 /** @ingroup Private */
 struct Manifold::Impl {
-  struct MeshRelationD {
-    VecDH<glm::vec3> barycentric;
-    VecDH<BaryRef> triBary;
-    /// The meshID of this Manifold if it is an original; -1 otherwise.
+  struct Relation {
     int originalID = -1;
+    glm::mat4x3 transform = glm::mat4x3(1);
+    bool backSide = false;
+  };
+  struct MeshRelationD {
+    /// The originalID of this Manifold if it is an original; -1 otherwise.
+    int originalID = -1;
+    int numProp = 0;
+    VecDH<TriRef> triRef;
+    VecDH<glm::ivec3> triProperties;
+    VecDH<float> properties;
+    std::map<int, Relation> meshIDtransform;
   };
 
   Box bBox_;
   float precision_ = -1;
-  Error status_ = Error::NO_ERROR;
+  Error status_ = Error::NoError;
   VecDH<glm::vec3> vertPos_;
   VecDH<Halfedge> halfedge_;
   VecDH<glm::vec3> vertNormal_;
@@ -42,29 +52,25 @@ struct Manifold::Impl {
   VecDH<glm::vec4> halfedgeTangent_;
   MeshRelationD meshRelation_;
   Collider collider_;
-  unsigned int meshids = 1;
 
-  static std::atomic<int> meshIDCounter_;
+  static std::atomic<uint32_t> meshIDCounter_;
+  static uint32_t ReserveIDs(uint32_t);
 
   Impl() {}
-  enum class Shape { TETRAHEDRON, CUBE, OCTAHEDRON };
+  enum class Shape { Tetrahedron, Cube, Octahedron };
   Impl(Shape);
 
-  Impl(const Mesh&,
-       const std::vector<glm::ivec3>& triProperties = std::vector<glm::ivec3>(),
-       const std::vector<float>& properties = std::vector<float>(),
-       const std::vector<float>& propertyTolerance = std::vector<float>());
+  Impl(const MeshGL&, std::vector<float> propertyTolerance = {});
+  Impl(const Mesh&, const MeshRelationD& relation,
+       const std::vector<float>& propertyTolerance = {},
+       bool hasFaceIDs = false);
 
-  int InitializeNewReference(
-      const std::vector<glm::ivec3>& triProperties = std::vector<glm::ivec3>(),
-      const std::vector<float>& properties = std::vector<float>(),
-      const std::vector<float>& propertyTolerance = std::vector<float>());
-
+  void CreateFaces(const std::vector<float>& propertyTolerance = {});
   void RemoveUnreferencedVerts(VecDH<glm::ivec3>& triVerts);
-  void ReinitializeReference(int meshID);
+  void InitializeOriginal();
   void CreateHalfedges(const VecDH<glm::ivec3>& triVerts);
   void CalculateNormals();
-  void IncrementMeshIDs(int start, int length);
+  void IncrementMeshIDs();
 
   void Update();
   void MarkFailure(Error status);
@@ -76,6 +82,11 @@ struct Manifold::Impl {
   int NumVert() const { return vertPos_.size(); }
   int NumEdge() const { return halfedge_.size() / 2; }
   int NumTri() const { return halfedge_.size() / 3; }
+  int NumProp() const { return meshRelation_.numProp; }
+  int NumPropVert() const {
+    return NumProp() == 0 ? NumVert()
+                          : meshRelation_.properties.size() / NumProp();
+  }
 
   // properties.cu
   Properties GetProperties() const;
@@ -93,14 +104,14 @@ struct Manifold::Impl {
   void Finish();
   void SortVerts();
   void ReindexVerts(const VecDH<int>& vertNew2Old, int numOldVert);
+  void CompactProps();
   void GetFaceBoxMorton(VecDH<Box>& faceBox, VecDH<uint32_t>& faceMorton) const;
   void SortFaces(VecDH<Box>& faceBox, VecDH<uint32_t>& faceMorton);
   void GatherFaces(const VecDH<int>& faceNew2Old);
   void GatherFaces(const Impl& old, const VecDH<int>& faceNew2Old);
 
   // face_op.cu
-  void Face2Tri(const VecDH<int>& faceEdge, const VecDH<BaryRef>& faceRef,
-                const VecDH<int>& halfedgeBary);
+  void Face2Tri(const VecDH<int>& faceEdge, const VecDH<TriRef>& halfedgeRef);
   Polygons Face2Polygons(int face, glm::mat3x2 projection,
                          const VecDH<int>& faceEdge) const;
 
@@ -117,7 +128,7 @@ struct Manifold::Impl {
 
   // smoothing.cu
   void CreateTangents(const std::vector<Smoothness>&);
-  MeshRelationD Subdivide(int n);
+  VecDH<Barycentric> Subdivide(int n);
   void Refine(int n);
 };
 }  // namespace manifold

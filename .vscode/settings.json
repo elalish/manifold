@@ -120,8 +120,12 @@
   "editor.detectIndentation": false,
   "cSpell.words": [
     "Bary",
+    "csaszar",
+    "Gyroid",
     "halfedge",
     "halfedges",
+    "Tris",
     "Verts"
   ],
+  "javascript.format.semicolons": "insert",
 }

@@ -61,6 +61,48 @@ namespace manifold {
  * No higher-order derivatives are considered, as the interpolation is
  * independent per triangle, only sharing constraints on their boundaries.
  *
+ * @param meshGL input MeshGL.
+ * @param sharpenedEdges If desired, you can supply a vector of sharpened
+ * halfedges, which should in general be a small subset of all halfedges. Order
+ * of entries doesn't matter, as each one specifies the desired smoothness
+ * (between zero and one, with one the default for all unspecified halfedges)
+ * and the halfedge index (3 * triangle index + [0,1,2] where 0 is the edge
+ * between triVert 0 and 1, etc).
+ *
+ * At a smoothness value of zero, a sharp crease is made. The smoothness is
+ * interpolated along each edge, so the specified value should be thought of as
+ * an average. Where exactly two sharpened edges meet at a vertex, their
+ * tangents are rotated to be colinear so that the sharpened edge can be
+ * continuous. Vertices with only one sharpened edge are completely smooth,
+ * allowing sharpened edges to smoothly vanish at termination. A single vertex
+ * can be sharpened by sharping all edges that are incident on it, allowing
+ * cones to be formed.
+ */
+Manifold Manifold::Smooth(const MeshGL& meshGL,
+                          const std::vector<Smoothness>& sharpenedEdges) {
+  ASSERT(meshGL.halfedgeTangent.empty(), std::runtime_error,
+         "when supplying tangents, the normal constructor should be used "
+         "rather than Smooth().");
+
+  // Don't allow any triangle merging.
+  std::vector<float> propertyTolerance(meshGL.numProp - 3, -1);
+  std::shared_ptr<Impl> impl =
+      std::make_shared<Impl>(meshGL, propertyTolerance);
+  impl->CreateTangents(sharpenedEdges);
+  return Manifold(impl);
+}
+
+/**
+ * Constructs a smooth version of the input mesh by creating tangents; this
+ * method will throw if you have supplied tangents with your mesh already. The
+ * actual triangle resolution is unchanged; use the Refine() method to
+ * interpolate to a higher-resolution curve.
+ *
+ * By default, every edge is calculated for maximum smoothness (very much
+ * approximately), attempting to minimize the maximum mean Curvature magnitude.
+ * No higher-order derivatives are considered, as the interpolation is
+ * independent per triangle, only sharing constraints on their boundaries.
+ *
  * @param mesh input Mesh.
  * @param sharpenedEdges If desired, you can supply a vector of sharpened
  * halfedges, which should in general be a small subset of all halfedges. Order
@@ -84,7 +126,8 @@ Manifold Manifold::Smooth(const Mesh& mesh,
          "when supplying tangents, the normal constructor should be used "
          "rather than Smooth().");
 
-  std::shared_ptr<Impl> impl = std::make_shared<Impl>(mesh);
+  Impl::MeshRelationD relation = {(int)ReserveIDs(1)};
+  std::shared_ptr<Impl> impl = std::make_shared<Impl>(mesh, relation);
   impl->CreateTangents(sharpenedEdges);
   return Manifold(impl);
 }
@@ -94,7 +137,7 @@ Manifold Manifold::Smooth(const Mesh& mesh,
  * and the rest at similarly symmetric points.
  */
 Manifold Manifold::Tetrahedron() {
-  return Manifold(std::make_shared<Impl>(Impl::Shape::TETRAHEDRON));
+  return Manifold(std::make_shared<Impl>(Impl::Shape::Tetrahedron));
 }
 
 /**
@@ -105,10 +148,10 @@ Manifold Manifold::Tetrahedron() {
  * @param center Set to true to shift the center to the origin.
  */
 Manifold Manifold::Cube(glm::vec3 size, bool center) {
-  auto cube = Manifold(std::make_shared<Impl>(Impl::Shape::CUBE));
+  auto cube = Manifold(std::make_shared<Impl>(Impl::Shape::Cube));
   cube = cube.Scale(size);
   if (center) cube = cube.Translate(-size / 2.0f);
-  return cube;
+  return cube.AsOriginal();
 }
 
 /**
@@ -138,7 +181,8 @@ Manifold Manifold::Cylinder(float height, float radiusLow, float radiusHigh,
   Manifold cylinder =
       Manifold::Extrude(circle, height, 0, 0.0f, glm::vec2(scale));
   if (center)
-    cylinder = cylinder.Translate(glm::vec3(0.0f, 0.0f, -height / 2.0f));
+    cylinder =
+        cylinder.Translate(glm::vec3(0.0f, 0.0f, -height / 2.0f)).AsOriginal();
   return cylinder;
 }
 
@@ -155,13 +199,13 @@ Manifold Manifold::Cylinder(float height, float radiusLow, float radiusHigh,
 Manifold Manifold::Sphere(float radius, int circularSegments) {
   int n = circularSegments > 0 ? (circularSegments + 3) / 4
                                : GetCircularSegments(radius) / 4;
-  auto pImpl_ = std::make_shared<Impl>(Impl::Shape::OCTAHEDRON);
+  auto pImpl_ = std::make_shared<Impl>(Impl::Shape::Octahedron);
   pImpl_->Subdivide(n);
   for_each_n(autoPolicy(pImpl_->NumVert()), pImpl_->vertPos_.begin(),
              pImpl_->NumVert(), ToSphere({radius}));
   pImpl_->Finish();
   // Ignore preceding octahedron.
-  pImpl_->ReinitializeReference(Impl::meshIDCounter_.fetch_add(1));
+  pImpl_->InitializeOriginal();
   return Manifold(pImpl_);
 }
 
@@ -239,7 +283,9 @@ Manifold Manifold::Extrude(Polygons crossSection, float height, int nDivisions,
 
   pImpl_->CreateHalfedges(triVertsDH);
   pImpl_->Finish();
-  pImpl_->InitializeNewReference();
+  pImpl_->meshRelation_.originalID = ReserveIDs(1);
+  pImpl_->InitializeOriginal();
+  pImpl_->CreateFaces();
   return Manifold(pImpl_);
 }
 
@@ -338,7 +384,9 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments) {
 
   pImpl_->CreateHalfedges(triVertsDH);
   pImpl_->Finish();
-  pImpl_->InitializeNewReference();
+  pImpl_->meshRelation_.originalID = ReserveIDs(1);
+  pImpl_->InitializeOriginal();
+  pImpl_->CreateFaces();
   return Manifold(pImpl_);
 }
 

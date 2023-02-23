@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import {examples} from './examples.js';
 const exampleFunctions = examples.functionBodies;
 
 let editor = undefined;
@@ -215,9 +216,12 @@ require.config({
       {vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.34.0/min/vs'}
 });
 require(['vs/editor/editor.main'], async function() {
-  const content =
-      await fetch('manifold.d.ts').then(response => response.text());
-  monaco.languages.typescript.typescriptDefaults.addExtraLib(content);
+  async function addTypes(uri) {
+    const content = await fetch(uri).then(response => response.text());
+    monaco.languages.typescript.typescriptDefaults.addExtraLib(content);
+  }
+  await addTypes('manifold.d.ts');
+  await addTypes('editor.d.ts');
   editor = monaco.editor.create(
       document.getElementById('editor'),
       {language: 'typescript', automaticLayout: true});
@@ -309,7 +313,7 @@ let objectURL = null;
 let manifoldWorker = null;
 
 function createWorker() {
-  manifoldWorker = new Worker('worker.js');
+  manifoldWorker = new Worker('worker.js', {type: 'module'});
   manifoldWorker.onmessage = function(e) {
     if (e.data == null) {
       if (tsWorker != null && !manifoldInitialized) {

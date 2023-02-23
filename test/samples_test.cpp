@@ -23,14 +23,6 @@
 
 using namespace manifold;
 
-void CheckManifold(const Manifold& manifold) {
-  EXPECT_TRUE(manifold.IsManifold());
-  EXPECT_TRUE(manifold.MatchesTriNormals());
-  for (const glm::vec3& normal : manifold.GetMesh().vertNormal) {
-    ASSERT_NEAR(glm::length(normal), 1, 0.0001);
-  }
-}
-
 std::vector<int> EdgePairs(const Mesh in) {
   const int numHalfedge = 3 * in.triVerts.size();
   std::vector<int> edgePair(numHalfedge);
@@ -62,6 +54,7 @@ TEST(Samples, Knot13) {
   auto prop = knot13.GetProperties();
   EXPECT_NEAR(prop.volume, 20786, 1);
   EXPECT_NEAR(prop.surfaceArea, 11177, 1);
+  CheckGL(knot13);
 }
 
 // This creates two interlinked knots.
@@ -79,6 +72,7 @@ TEST(Samples, Knot42) {
   auto prop1 = knots[1].GetProperties();
   EXPECT_NEAR(prop0.volume, prop1.volume, 1);
   EXPECT_NEAR(prop0.surfaceArea, prop1.surfaceArea, 1);
+  CheckGL(knot42);
 }
 
 TEST(Samples, Scallop) {
@@ -114,6 +108,7 @@ TEST(Samples, Scallop) {
   auto prop = scallop.GetProperties();
   EXPECT_NEAR(prop.volume, 41.3, 0.1);
   EXPECT_NEAR(prop.surfaceArea, 78.1, 0.1);
+  CheckGL(scallop);
 
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) {
@@ -137,6 +132,8 @@ TEST(Samples, TetPuzzle) {
   Manifold puzzle = TetPuzzle(50, 0.2, 50);
   CheckManifold(puzzle);
   EXPECT_LE(puzzle.NumDegenerateTris(), 2);
+  CheckGL(puzzle);
+
   Manifold puzzle2 = puzzle.Rotate(0, 0, 180);
   EXPECT_TRUE((puzzle ^ puzzle2).IsEmpty());
   puzzle = puzzle.Transform(RotateUp({1, -1, -1}));
@@ -153,6 +150,7 @@ TEST(Samples, FrameReduced) {
   auto prop = frame.GetProperties();
   EXPECT_NEAR(prop.volume, 227333, 10);
   EXPECT_NEAR(prop.surfaceArea, 62635, 1);
+  CheckGL(frame);
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels)
     ExportMesh("roundedFrameReduced.glb", frame.GetMesh(), {});
@@ -164,6 +162,7 @@ TEST(Samples, Frame) {
   CheckManifold(frame);
   EXPECT_EQ(frame.NumDegenerateTris(), 0);
   EXPECT_EQ(frame.Genus(), 5);
+  CheckGL(frame);
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) ExportMesh("roundedFrame.glb", frame.GetMesh(), {});
 #endif
@@ -176,6 +175,7 @@ TEST(Samples, Bracelet) {
   CheckManifold(bracelet);
   EXPECT_LE(bracelet.NumDegenerateTris(), 22);
   EXPECT_EQ(bracelet.Genus(), 1);
+  CheckGL(bracelet);
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) ExportMesh("bracelet.glb", bracelet.GetMesh(), {});
 #endif
@@ -187,6 +187,7 @@ TEST(Samples, GyroidModule) {
   CheckManifold(gyroid);
   EXPECT_LE(gyroid.NumDegenerateTris(), 2);
   EXPECT_EQ(gyroid.Genus(), 15);
+  CheckGL(gyroid);
 
   const Box bounds = gyroid.BoundingBox();
   const float precision = gyroid.Precision();
@@ -204,6 +205,7 @@ TEST(Samples, Sponge1) {
   EXPECT_EQ(sponge.NumDegenerateTris(), 0);
   EXPECT_EQ(sponge.NumVert(), 40);
   EXPECT_EQ(sponge.Genus(), 5);
+  CheckGL(sponge);
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels)
     ExportMesh("mengerSponge1.glb", sponge.GetMesh(), {});
@@ -221,6 +223,7 @@ TEST(Samples, Sponge4) {
   // FIXME: limit NumDegenerateTris
   EXPECT_LE(sponge.NumDegenerateTris(), 40000);
   EXPECT_EQ(sponge.Genus(), 26433);  // should be 1:5, 2:81, 3:1409, 4:26433
+  CheckGL(sponge);
 
   std::pair<Manifold, Manifold> cutSponge = sponge.SplitByPlane({1, 1, 1}, 0);
   EXPECT_TRUE(cutSponge.first.IsManifold());

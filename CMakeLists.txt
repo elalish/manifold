@@ -24,6 +24,7 @@ option(MANIFOLD_USE_CUDA OFF)
 option(MANIFOLD_PYBIND ON)
 option(MANIFOLD_CBIND OFF)
 set(MANIFOLD_PAR "NONE" CACHE STRING "Parallel backend, either \"TBB\" or \"OpenMP\" or \"NONE\"")
+set(MANIFOLD_FLAGS -O3)
 
 if(EMSCRIPTEN)
   message("Building for Emscripten")
