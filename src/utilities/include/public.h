@@ -474,7 +474,7 @@ struct ExecutionParams {
   bool verbose = false;
   /// If processOverlaps is false, a geometric check will be performed to assert
   /// all triangles are CCW.
-  bool processOverlaps = false;
+  bool processOverlaps = true;
   /// Suppresses printed errors regarding CW triangles. Has no effect if
   /// processOverlaps is true.
   bool suppressErrors = false;
