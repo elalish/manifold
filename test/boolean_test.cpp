@@ -558,7 +558,7 @@ TEST(Boolean, Subtract) {
 }
 
 // FIXME: test is failing on Mac CI (passing on others)
-TEST(Boolean, DISABLED_Close) {
+TEST(Boolean, Close) {
   PolygonParams().processOverlaps = true;
 
   const float r = 10;

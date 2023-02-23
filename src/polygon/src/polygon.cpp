@@ -35,11 +35,8 @@ struct Polyedge {
 
 bool OverlapAssert(bool condition, const char *file, int line,
                    const std::string &cond, const std::string &msg) {
-  if (!params.processOverlaps && !condition) {
-    std::ostringstream output;
-    output << "Error in file: " << file << " (" << line << "): \'" << cond
-           << "\' is false: " << msg;
-    throw geometryErr(output.str());
+  if (!params.processOverlaps) {
+    ASSERT(condition, geometryErr, msg);
   }
   return condition;
 }

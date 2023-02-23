@@ -94,11 +94,11 @@ void TestPoly(const Polygons &polys, int expectedNumTri,
   EXPECT_NO_THROW(triangles = Triangulate(polys, precision));
   EXPECT_EQ(triangles.size(), expectedNumTri) << "Basic";
 
-  //   EXPECT_NO_THROW(triangles = Triangulate(Turn180(polys), precision));
-  //   EXPECT_EQ(triangles.size(), expectedNumTri) << "Turn 180";
+  EXPECT_NO_THROW(triangles = Triangulate(Turn180(polys), precision));
+  EXPECT_EQ(triangles.size(), expectedNumTri) << "Turn 180";
 
-  //   EXPECT_NO_THROW(triangles = Triangulate(Duplicate(polys), precision));
-  //   EXPECT_EQ(triangles.size(), 2 * expectedNumTri) << "Duplicate";
+  EXPECT_NO_THROW(triangles = Triangulate(Duplicate(polys), precision));
+  EXPECT_EQ(triangles.size(), 2 * expectedNumTri) << "Duplicate";
 
   PolygonParams().verbose = false;
 }
@@ -529,6 +529,33 @@ TEST(Polygon, Sliver7) {
       {glm::vec2(50, 0), 1},                //
   });
   TestPoly(polys, 6);
+}
+
+TEST(Polygon, DISABLED_Sliver8) {
+  Polygons polys;
+  polys.push_back({
+      {glm::vec2(27.9279995, 4.9749999), 4},    //
+      {glm::vec2(31.0610008, 2.32299995), 6},   //
+      {glm::vec2(31.0610008, 2.32299995), 18},  //
+      {glm::vec2(27.9279995, 4.9749999), 16},   //
+      {glm::vec2(27.9279995, 4.9749999), 15},   //
+      {glm::vec2(31.0610008, 2.32299995), 28},  //
+      {glm::vec2(30.4400005, 5.34100008), 17},  //
+  });
+  TestPoly(polys, 5);
+}
+
+TEST(Polygon, DISABLED_Sliver9) {
+  Polygons polys;
+  polys.push_back({
+      {glm::vec2(1.49183154, -0.479596376), 16194},  //
+      {glm::vec2(1.71669781, -0.246418983), 16195},  //
+      {glm::vec2(1.70233643, -0.246410117), 16196},  //
+      {glm::vec2(1.47253978, -0.246277586), 16197},  //
+      {glm::vec2(1.47254002, -0.246287003), 17997},  //
+      {glm::vec2(1.4869014, -0.246295869), 17996},   //
+  });
+  TestPoly(polys, 4);
 }
 
 TEST(Polygon, Colinear2) {
