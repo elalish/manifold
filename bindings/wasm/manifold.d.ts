@@ -22,8 +22,24 @@ interface SealedFloat32Array<N extends number> extends Float32Array {
 
 type Vec2 = [number, number];
 type Vec3 = [number, number, number];
-type Vec4 = [number, number, number, number];
-type Matrix3x4 = [Vec3, Vec3, Vec3, Vec3];
+type Mat4 = [
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+];
 type SimplePolygon = Vec2[];
 type Polygons = SimplePolygon|SimplePolygon[];
 type Box = {
@@ -56,9 +72,9 @@ declare class Mesh {
     mergeToVert?: Uint32Array,
     runIndex?: Uint32Array,
     runOriginalID?: Uint32Array,
+    runTransform?: Float32Array,
     faceID?: Uint32Array,
-    halfedgeTangent?: Float32Array,
-    runTransform?: Float32Array
+    halfedgeTangent?: Float32Array
   });
   numProp: number;
   vertProperties: Float32Array;
@@ -67,9 +83,9 @@ declare class Mesh {
   mergeToVert?: Uint32Array;
   runIndex?: Uint32Array;
   runOriginalID?: Uint32Array;
+  runTransform?: Float32Array;
   faceID?: Uint32Array;
   halfedgeTangent?: Float32Array;
-  runTransform?: Float32Array;
   get numTri(): number;
   get numVert(): number;
   get numRun(): number;
@@ -77,7 +93,7 @@ declare class Mesh {
   position(vert: number): SealedFloat32Array<3>;
   extras(vert: number): Float32Array;
   tangent(halfedge: number): SealedFloat32Array<4>;
-  transform(run: number): SealedFloat32Array<12>;
+  transform(run: number): Mat4;
 }
 
 declare class Manifold {
@@ -86,13 +102,13 @@ declare class Manifold {
    */
   constructor(mesh: Mesh);
   /**
-   * Transform this Manifold in space. The first three columns form a 3x3 matrix
-   * transform and the last is a translation vector. This operation can be
-   * chained. Transforms are combined and applied lazily.
+   * Transform this Manifold in space. Stored in column-major order. This
+   * operation can be chained. Transforms are combined and applied lazily.
    *
-   * @param m The affine transform matrix to apply to all the vertices.
+   * @param m The affine transformation matrix to apply to all the vertices. The
+   *     last row is ignored.
    */
-  transform(m: Matrix3x4 | number[16]): Manifold;
+  transform(m: Mat4): Manifold;
 
   /**
    * Move this Manifold in space. This operation can be chained. Transforms are

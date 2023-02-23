@@ -12,12 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import * as glMatrix from 'https://cdn.jsdelivr.net/npm/gl-matrix@3.4.3/+esm';
 import {Accessor, Document, Material, WebIO} from 'https://cdn.skypack.dev/pin/@gltf-transform/core@v3.0.0-SfbIFhNPTRdr1UE2VSan/mode=imports,min/optimized/@gltf-transform/core.js';
 
 import Module from '../manifold.js';
 
 const wasm = await Module();
 wasm.setup();
+
+// Faster on modern browsers than Float32Array
+glMatrix.glMatrix.setMatrixArrayType(Array);
 
 // Scene setup
 const io = new WebIO();
@@ -28,34 +32,40 @@ const position =
     doc.createAccessor().setBuffer(buffer).setType(Accessor.Type.VEC3);
 const indices =
     doc.createAccessor().setBuffer(buffer).setType(Accessor.Type.SCALAR);
-const material = doc.createMaterial()
-                     .setBaseColorFactor([1, 1, 0, 1])
-                     .setMetallicFactor(1)
-                     .setRoughnessFactor(0.2);
-const primitive = doc.createPrimitive()
-                      .setMaterial(material)
-                      .setIndices(indices)
-                      .setAttribute('POSITION', position);
-const mesh = doc.createMesh().addPrimitive(primitive);
+const resultMaterial = doc.createMaterial()
+                           .setBaseColorFactor([1, 1, 0, 1])
+                           .setMetallicFactor(1)
+                           .setRoughnessFactor(0.2);
+const resultPrimitive = doc.createPrimitive()
+                            .setMaterial(resultMaterial)
+                            .setIndices(indices)
+                            .setAttribute('POSITION', position);
+const mesh = doc.createMesh().addPrimitive(resultPrimitive);
 const node = doc.createNode('result').setMesh(mesh);
 const scene = doc.createScene().addChild(node);
 
 // Debug setup to show source meshes
 const shown = new Map();
+let ghost = false;
 const debugMaterial = doc.createMaterial()
                           .setBaseColorFactor([1, 0, 0, 0.25])
                           .setAlphaMode(Material.AlphaMode.BLEND)
                           .setDoubleSided(true)
                           .setMetallicFactor(0);
+const ghostMaterial = doc.createMaterial()
+                          .setBaseColorFactor([0.5, 0.5, 0.5, 0.25])
+                          .setAlphaMode(Material.AlphaMode.BLEND)
+                          .setDoubleSided(true)
+                          .setMetallicFactor(0);
 
-wasm.show = (manifold) => {
+function debug(manifold, material) {
   const position =
       doc.createAccessor().setBuffer(buffer).setType(Accessor.Type.VEC3);
   const indices =
       doc.createAccessor().setBuffer(buffer).setType(Accessor.Type.SCALAR);
 
   const primitive = doc.createPrimitive()
-                        .setMaterial(debugMaterial)
+                        .setMaterial(material)
                         .setIndices(indices)
                         .setAttribute('POSITION', position);
   const mesh = doc.createMesh('debug').addPrimitive(primitive);
@@ -67,6 +77,33 @@ wasm.show = (manifold) => {
   return result;
 };
 
+wasm.show = (manifold) => {
+  return debug(manifold, debugMaterial);
+};
+
+wasm.only = (manifold) => {
+  ghost = true;
+  return debug(manifold, resultMaterial);
+};
+
+function debugCleanup() {
+  for (const [id, mesh] of shown) {
+    const primitive = mesh.listPrimitives()[0];
+    primitive.getAttribute('POSITION').dispose();
+    primitive.getIndices().dispose();
+    primitive.dispose();
+    mesh.dispose();
+  }
+
+  scene.traverse((node) => {
+    if (node.getName() == 'debug') {
+      node.dispose();
+    }
+  });
+  shown.clear();
+  ghost = false;
+}
+
 // manifold member functions that returns a new manifold
 const memberFunctions = [
   'add', 'subtract', 'intersect', 'refine', 'transform', 'translate', 'rotate',
@@ -75,7 +112,7 @@ const memberFunctions = [
 // top level functions that constructs a new manifold
 const constructors = [
   'cube', 'cylinder', 'sphere', 'tetrahedron', 'extrude', 'revolve', 'union',
-  'difference', 'intersection', 'compose', 'levelSet', 'smooth', 'show'
+  'difference', 'intersection', 'compose', 'levelSet', 'smooth', 'show', 'only'
 ];
 const utils = [
   'setMinCircularAngle', 'setMinCircularEdgeLength', 'setCircularSegments',
@@ -139,13 +176,15 @@ console.log = function(...args) {
 onmessage = async (e) => {
   const content = e.data + '\nreturn exportGLB(result);\n';
   try {
-    const f = new Function('exportGLB', ...exposedFunctions, content);
-    await f(exportGLB, ...exposedFunctions.map(name => wasm[name]));
+    const f =
+        new Function('exportGLB', 'glMatrix', ...exposedFunctions, content);
+    await f(exportGLB, glMatrix, ...exposedFunctions.map(name => wasm[name]));
   } catch (error) {
     console.log(error.toString());
     postMessage({objectURL: null});
   } finally {
     wasm.cleanup();
+    debugCleanup();
   }
 };
 
@@ -186,37 +225,15 @@ async function exportGLB(manifold) {
     if (outMesh == null) {
       continue;
     }
-
-    const transform = mesh.transform(run);
-    const mat4 = new Float32Array(16);
-    for (const col of [0, 1, 2, 3]) {
-      for (const row of [0, 1, 2]) {
-        mat4[4 * col + row] = transform[3 * col + row];
-      }
-    }
-    mat4[15] = 1;
-    const node = doc.createNode('debug').setMesh(outMesh).setMatrix(mat4);
+    const node =
+        doc.createNode('debug').setMesh(outMesh).setMatrix(mesh.transform(run));
     scene.addChild(node);
   }
+
+  resultPrimitive.setMaterial(ghost ? ghostMaterial : resultMaterial);
 
   const glb = await io.writeBinary(doc);
 
   const blob = new Blob([glb], {type: 'application/octet-stream'});
   postMessage({objectURL: URL.createObjectURL(blob)});
-
-  // Clean up debug nodes
-  for (const [id, mesh] of shown) {
-    const primitive = mesh.listPrimitives()[0];
-    primitive.getAttribute('POSITION').dispose();
-    primitive.getIndices().dispose();
-    primitive.dispose();
-    mesh.dispose();
-  }
-
-  scene.traverse((node) => {
-    if (node.getName() == 'debug') {
-      node.dispose();
-    }
-  });
-  shown.clear();
 }
