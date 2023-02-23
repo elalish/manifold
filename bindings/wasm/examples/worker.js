@@ -12,12 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import * as glMatrix from 'https://cdn.jsdelivr.net/npm/gl-matrix@3.4.3/+esm';
 import {Accessor, Document, Material, WebIO} from 'https://cdn.skypack.dev/pin/@gltf-transform/core@v3.0.0-SfbIFhNPTRdr1UE2VSan/mode=imports,min/optimized/@gltf-transform/core.js';
 
 import Module from '../manifold.js';
 
 const wasm = await Module();
 wasm.setup();
+
+// Faster on modern browsers than Float32Array
+glMatrix.glMatrix.setMatrixArrayType(Array);
 
 // Scene setup
 const io = new WebIO();
@@ -139,8 +143,9 @@ console.log = function(...args) {
 onmessage = async (e) => {
   const content = e.data + '\nreturn exportGLB(result);\n';
   try {
-    const f = new Function('exportGLB', ...exposedFunctions, content);
-    await f(exportGLB, ...exposedFunctions.map(name => wasm[name]));
+    const f =
+        new Function('exportGLB', 'glMatrix', ...exposedFunctions, content);
+    await f(exportGLB, glMatrix, ...exposedFunctions.map(name => wasm[name]));
   } catch (error) {
     console.log(error.toString());
     postMessage({objectURL: null});
@@ -186,16 +191,8 @@ async function exportGLB(manifold) {
     if (outMesh == null) {
       continue;
     }
-
-    const transform = mesh.transform(run);
-    const mat4 = new Float32Array(16);
-    for (const col of [0, 1, 2, 3]) {
-      for (const row of [0, 1, 2]) {
-        mat4[4 * col + row] = transform[3 * col + row];
-      }
-    }
-    mat4[15] = 1;
-    const node = doc.createNode('debug').setMesh(outMesh).setMatrix(mat4);
+    const node =
+        doc.createNode('debug').setMesh(outMesh).setMatrix(mesh.transform(run));
     scene.addChild(node);
   }
 

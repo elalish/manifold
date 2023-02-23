@@ -34,7 +34,9 @@ export const examples = {
       // To share your code with another browser/device, simply copy the text to
       // a file.
 
-      // See the script drop-down above ("Intro") for usage examples.
+      // See the script drop-down above ("Intro") for usage examples. The
+      // gl-matrix package from npm is automatically imported for convenience -
+      // its API is available in the top-level glMatrix object.
       return result;
     },
 
@@ -47,8 +49,7 @@ export const examples = {
 
       const edgeLength = 50;  // Length of each edge of the overall tetrahedron.
       const gap = 0.2;  // Spacing between the two halves to allow sliding.
-      const nDivisions =
-          50;  // Number of divisions (both ways) in the screw surface.
+      const nDivisions = 50;  // Divisions (both ways) in the screw surface.
 
       const scale = edgeLength / (2 * Math.sqrt(2));
 
@@ -78,23 +79,19 @@ export const examples = {
         const edge = cylinder(edgeLength, radius, -1, circularSegments);
         const corner = sphere(radius, circularSegments);
 
-        let edge1 = union(corner, edge);
-        edge1 = edge1.rotate([-90, 0, 0]).translate([
+        const edge1 = union(corner, edge).rotate([-90, 0, 0]).translate([
           -edgeLength / 2, -edgeLength / 2, 0
         ]);
 
-        let edge2 = edge1.rotate([0, 0, 180]);
-        edge2 = union(edge2, edge1);
-        edge2 =
-            union(edge2, edge.translate([-edgeLength / 2, -edgeLength / 2, 0]));
+        const edge2 = union(
+            union(edge1, edge1.rotate([0, 0, 180])),
+            edge.translate([-edgeLength / 2, -edgeLength / 2, 0]));
 
-        let edge4 = edge2.rotate([0, 0, 90]);
-        edge4 = union(edge4, edge2);
+        const edge4 = union(edge2, edge2.rotate([0, 0, 90])).translate([
+          0, 0, -edgeLength / 2
+        ]);
 
-        let frame = edge4.translate([0, 0, -edgeLength / 2]);
-        frame = union(frame, frame.rotate([180, 0, 0]));
-
-        return frame;
+        return union(edge4, edge4.rotate([180, 0, 0]));
       }
 
       setMinCircularAngle(3);
@@ -160,9 +157,9 @@ export const examples = {
       const sharpness = 0.8;
       const n = 50;
 
-      const vertPos = [];
-      const triVerts = [];
-      vertPos.push(-offset, 0, height, -offset, 0, -height);
+      const positions = [];
+      const triangles = [];
+      positions.push(-offset, 0, height, -offset, 0, -height);
       const sharpenedEdges = [];
 
       const delta = 3.14159 / wiggles;
@@ -170,25 +167,25 @@ export const examples = {
         const theta = (i - wiggles) * delta;
         const amp = 0.5 * height * Math.max(Math.cos(0.8 * theta), 0);
 
-        vertPos.push(
+        positions.push(
             radius * Math.cos(theta), radius * Math.sin(theta),
             amp * (i % 2 == 0 ? 1 : -1));
         let j = i + 1;
         if (j == 2 * wiggles) j = 0;
 
         const smoothness = 1 - sharpness * Math.cos((theta + delta / 2) / 2);
-        let halfedge = triVerts.length + 1;
+        let halfedge = triangles.length + 1;
         sharpenedEdges.push({halfedge, smoothness});
-        triVerts.push(0, 2 + i, 2 + j);
+        triangles.push(0, 2 + i, 2 + j);
 
-        halfedge = triVerts.length + 1;
+        halfedge = triangles.length + 1;
         sharpenedEdges.push({halfedge, smoothness});
-        triVerts.push(1, 2 + j, 2 + i);
+        triangles.push(1, 2 + j, 2 + i);
       }
 
-      const scallop = new Mesh();
-      scallop.triVerts = Uint32Array.from(triVerts);
-      scallop.vertProperties = Float32Array.from(vertPos);
+      const triVerts = Uint32Array.from(triangles);
+      const vertProperties = Float32Array.from(positions);
+      const scallop = new Mesh({numProp: 3, triVerts, vertProperties});
       const result = smooth(scallop, sharpenedEdges).refine(n);
       return result;
     },
@@ -215,6 +212,8 @@ export const examples = {
       function torusKnot(
           p, q, majorRadius, minorRadius, threadRadius, circularSegments = 0,
           linearSegments = 0) {
+        const {vec3} = glMatrix;
+
         function gcd(a, b) {
           return b == 0 ? a : gcd(b, a % b);
         }
@@ -234,42 +233,20 @@ export const examples = {
           circle.push([Math.cos(dPhi * i) + offset, Math.sin(dPhi * i)]);
         }
 
-        function rotateVector(v, axis, angle) {
-          const cos = Math.cos(angle);
-          const sin = Math.sin(angle);
-          const c = (1 - cos) * (v.x * axis.x + v.y * axis.y + v.z * axis.z);
-
-          const x =
-              cos * v.x + sin * (axis.y * v.z - axis.z * v.y) + c * axis.x;
-          const y =
-              cos * v.y + sin * (axis.z * v.x - axis.x * v.z) + c * axis.y;
-          const z =
-              cos * v.z + sin * (axis.x * v.y - axis.y * v.x) + c * axis.z;
-          v.x = x;
-          v.y = y;
-          v.z = z;
-        }
-
         const func = (v) => {
           const psi = q * Math.atan2(v[0], v[1]);
           const theta = psi * p / q;
           const x1 = Math.sqrt(v[0] * v[0] + v[1] * v[1]);
           const phi = Math.atan2(x1 - offset, v[2]);
-          const point = {
-            x: threadRadius * Math.cos(phi),
-            y: 0,
-            z: threadRadius * Math.sin(phi)
-          };
+          vec3.set(
+              v, threadRadius * Math.cos(phi), 0, threadRadius * Math.sin(phi));
+          const center = vec3.fromValues(0, 0, 0);
           const r = majorRadius + minorRadius * Math.cos(theta);
-          rotateVector(
-              point, {x: 1, y: 0, z: 0}, -Math.atan2(p * minorRadius, q * r));
-          point.x += minorRadius;
-          rotateVector(point, {x: 0, y: 1, z: 0}, theta);
-          point.x += majorRadius;
-          rotateVector(point, {x: 0, y: 0, z: 1}, psi);
-          v[0] = point.x;
-          v[1] = point.y;
-          v[2] = point.z;
+          vec3.rotateX(v, v, center, -Math.atan2(p * minorRadius, q * r));
+          v[0] += minorRadius;
+          vec3.rotateY(v, v, center, theta);
+          v[0] += majorRadius;
+          vec3.rotateZ(v, v, center, psi);
         };
 
         let knot = revolve(circle, m).warp(func);
@@ -295,10 +272,7 @@ export const examples = {
     MengerSponge: function() {
       // This example demonstrates how symbolic perturbation correctly creates
       // holes even though the subtracted objects are exactly coplanar.
-
-      function vec2add(a, b) {
-        return [a[0] + b[0], a[1] + b[1]];
-      }
+      const {vec2} = glMatrix;
 
       function fractal(holes, hole, w, position, depth, maxDepth) {
         w /= 3;
@@ -306,12 +280,15 @@ export const examples = {
             hole.scale([w, w, 1.0]).translate([position[0], position[1], 0.0]));
         if (depth == maxDepth) return;
         const offsets = [
-          [-w, -w], [-w, 0.0], [-w, w], [0.0, w], [w, w], [w, 0.0], [w, -w],
-          [0.0, -w]
+          vec2.fromValues(-w, -w), vec2.fromValues(-w, 0.0),
+          vec2.fromValues(-w, w), vec2.fromValues(0.0, w),
+          vec2.fromValues(w, w), vec2.fromValues(w, 0.0),
+          vec2.fromValues(w, -w), vec2.fromValues(0.0, -w)
         ];
         for (let offset of offsets)
           fractal(
-              holes, hole, w, vec2add(position, offset), depth + 1, maxDepth);
+              holes, hole, w, vec2.add(offset, position, offset), depth + 1,
+              maxDepth);
       }
 
       function mengerSponge(n) {
@@ -335,17 +312,11 @@ export const examples = {
     StretchyBracelet: function() {
       // Recreates Stretchy Bracelet by Emmett Lalish:
       // https://www.thingiverse.com/thing:13505
+      const {vec2} = glMatrix;
 
       function base(
           width, radius, decorRadius, twistRadius, nDecor, innerRadius,
           outerRadius, cut, nCut, nDivision) {
-        function rotate(v, theta) {
-          return [
-            v[0] * Math.cos(theta) - v[1] * Math.sin(theta),
-            v[0] * Math.sin(theta) + v[1] * Math.cos(theta)
-          ];
-        }
-
         let b = cylinder(width, radius + twistRadius / 2);
         const circle = [];
         const dPhiDeg = 180 / nDivision;
@@ -363,14 +334,15 @@ export const examples = {
         const stretch = [];
         const dPhiRad = 2 * Math.PI / nCut;
 
-        const p0 = [outerRadius, 0];
-        const p1 = [innerRadius, -cut];
-        const p2 = [innerRadius, cut];
+        const o = vec2.fromValues(0, 0);
+        const p0 = vec2.fromValues(outerRadius, 0);
+        const p1 = vec2.fromValues(innerRadius, -cut);
+        const p2 = vec2.fromValues(innerRadius, cut);
         for (let i = 0; i < nCut; ++i) {
-          stretch.push(rotate(p0, dPhiRad * i));
-          stretch.push(rotate(p1, dPhiRad * i));
-          stretch.push(rotate(p2, dPhiRad * i));
-          stretch.push(rotate(p0, dPhiRad * i));
+          stretch.push(vec2.rotate([0, 0], p0, o, dPhiRad * i));
+          stretch.push(vec2.rotate([0, 0], p1, o, dPhiRad * i));
+          stretch.push(vec2.rotate([0, 0], p2, o, dPhiRad * i));
+          stretch.push(vec2.rotate([0, 0], p0, o, dPhiRad * i));
         }
         b = intersection(extrude(stretch, width), b);
         return b;
@@ -406,6 +378,7 @@ export const examples = {
       // https://www.thingiverse.com/thing:25477. This sample demonstrates the
       // use of a Signed Distance Function (SDF) to create smooth, complex
       // manifolds.
+      const {vec3} = glMatrix;
 
       const size = 20;
       const n = 20;
@@ -422,8 +395,8 @@ export const examples = {
       function gyroidOffset(level) {
         const period = 2 * pi;
         const box = {
-          min: [-period, -period, -period],
-          max: [period, period, period]
+          min: vec3.fromValues(-period, -period, -period),
+          max: vec3.fromValues(period, period, period)
         };
         return levelSet(gyroid, box, period / n, level).scale(size / period);
       };
