@@ -32,34 +32,40 @@ const position =
     doc.createAccessor().setBuffer(buffer).setType(Accessor.Type.VEC3);
 const indices =
     doc.createAccessor().setBuffer(buffer).setType(Accessor.Type.SCALAR);
-const material = doc.createMaterial()
-                     .setBaseColorFactor([1, 1, 0, 1])
-                     .setMetallicFactor(1)
-                     .setRoughnessFactor(0.2);
-const primitive = doc.createPrimitive()
-                      .setMaterial(material)
-                      .setIndices(indices)
-                      .setAttribute('POSITION', position);
-const mesh = doc.createMesh().addPrimitive(primitive);
+const resultMaterial = doc.createMaterial()
+                           .setBaseColorFactor([1, 1, 0, 1])
+                           .setMetallicFactor(1)
+                           .setRoughnessFactor(0.2);
+const resultPrimitive = doc.createPrimitive()
+                            .setMaterial(resultMaterial)
+                            .setIndices(indices)
+                            .setAttribute('POSITION', position);
+const mesh = doc.createMesh().addPrimitive(resultPrimitive);
 const node = doc.createNode('result').setMesh(mesh);
 const scene = doc.createScene().addChild(node);
 
 // Debug setup to show source meshes
 const shown = new Map();
+let ghost = false;
 const debugMaterial = doc.createMaterial()
                           .setBaseColorFactor([1, 0, 0, 0.25])
                           .setAlphaMode(Material.AlphaMode.BLEND)
                           .setDoubleSided(true)
                           .setMetallicFactor(0);
+const ghostMaterial = doc.createMaterial()
+                          .setBaseColorFactor([0.5, 0.5, 0.5, 0.25])
+                          .setAlphaMode(Material.AlphaMode.BLEND)
+                          .setDoubleSided(true)
+                          .setMetallicFactor(0);
 
-wasm.show = (manifold) => {
+function debug(manifold, material) {
   const position =
       doc.createAccessor().setBuffer(buffer).setType(Accessor.Type.VEC3);
   const indices =
       doc.createAccessor().setBuffer(buffer).setType(Accessor.Type.SCALAR);
 
   const primitive = doc.createPrimitive()
-                        .setMaterial(debugMaterial)
+                        .setMaterial(material)
                         .setIndices(indices)
                         .setAttribute('POSITION', position);
   const mesh = doc.createMesh('debug').addPrimitive(primitive);
@@ -71,6 +77,33 @@ wasm.show = (manifold) => {
   return result;
 };
 
+wasm.show = (manifold) => {
+  return debug(manifold, debugMaterial);
+};
+
+wasm.only = (manifold) => {
+  ghost = true;
+  return debug(manifold, resultMaterial);
+};
+
+function debugCleanup() {
+  for (const [id, mesh] of shown) {
+    const primitive = mesh.listPrimitives()[0];
+    primitive.getAttribute('POSITION').dispose();
+    primitive.getIndices().dispose();
+    primitive.dispose();
+    mesh.dispose();
+  }
+
+  scene.traverse((node) => {
+    if (node.getName() == 'debug') {
+      node.dispose();
+    }
+  });
+  shown.clear();
+  ghost = false;
+}
+
 // manifold member functions that returns a new manifold
 const memberFunctions = [
   'add', 'subtract', 'intersect', 'refine', 'transform', 'translate', 'rotate',
@@ -79,7 +112,7 @@ const memberFunctions = [
 // top level functions that constructs a new manifold
 const constructors = [
   'cube', 'cylinder', 'sphere', 'tetrahedron', 'extrude', 'revolve', 'union',
-  'difference', 'intersection', 'compose', 'levelSet', 'smooth', 'show'
+  'difference', 'intersection', 'compose', 'levelSet', 'smooth', 'show', 'only'
 ];
 const utils = [
   'setMinCircularAngle', 'setMinCircularEdgeLength', 'setCircularSegments',
@@ -151,6 +184,7 @@ onmessage = async (e) => {
     postMessage({objectURL: null});
   } finally {
     wasm.cleanup();
+    debugCleanup();
   }
 };
 
@@ -196,24 +230,10 @@ async function exportGLB(manifold) {
     scene.addChild(node);
   }
 
+  resultPrimitive.setMaterial(ghost ? ghostMaterial : resultMaterial);
+
   const glb = await io.writeBinary(doc);
 
   const blob = new Blob([glb], {type: 'application/octet-stream'});
   postMessage({objectURL: URL.createObjectURL(blob)});
-
-  // Clean up debug nodes
-  for (const [id, mesh] of shown) {
-    const primitive = mesh.listPrimitives()[0];
-    primitive.getAttribute('POSITION').dispose();
-    primitive.getIndices().dispose();
-    primitive.dispose();
-    mesh.dispose();
-  }
-
-  scene.traverse((node) => {
-    if (node.getName() == 'debug') {
-      node.dispose();
-    }
-  });
-  shown.clear();
 }

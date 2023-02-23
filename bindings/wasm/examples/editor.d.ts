@@ -13,6 +13,7 @@
 // limitations under the License.
 
 declare function show(manifold: Manifold): Manifold;
+declare function only(manifold: Manifold): Manifold;
 
 // Type definitions for gl-matrix 3.4.3 Project:
 // https://github.com/toji/gl-matrix
