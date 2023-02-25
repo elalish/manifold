@@ -186,6 +186,16 @@ model-viewer {
   background-position: center;
 }
 
+.edit {
+  background-image: url(icons/pencil.png);
+  right: 30px;
+}
+
+.trash {
+  background-image: url(icons/trash.png);
+  right: 0px;
+}
+
 .icon:hover {
   background-color: rgba(0, 0, 0, 0.2);
 }
