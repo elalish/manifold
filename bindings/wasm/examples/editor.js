@@ -12,10 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-navigator.serviceWorker.register('service-worker.js');
-
 import {examples} from './examples.js';
 const exampleFunctions = examples.functionBodies;
+
+if (navigator.serviceWorker) {
+  navigator.serviceWorker.register('service-worker.js');
+}
 
 let editor = undefined;
 
