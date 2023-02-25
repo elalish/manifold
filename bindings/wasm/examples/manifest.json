@@ -1,0 +1,33 @@
+{
+  "name": "ManifoldCAD",
+  "icons": [
+    {
+      "src": "/icons/mengerSponge192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "/icons/mengerSponge512.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#FFFFFF",
+  "display": "standalone",
+  "scope": "/",
+  "theme_color": "rgb(162 136 179)",
+  "description": "Fast, reliable, parametric solid modeling web app. Programmatic 3D design with JavaScript, inspired by and improving upon OpenSCAD/JSCAD. Demonstrates a new GPU-parallel, open-source geometry kernel: Manifold.",
+  "screenshots": [
+    {
+      "src": "/icons/manifoldCAD.png",
+      "type": "image/png",
+      "sizes": "2906x1980"
+    },
+    {
+      "src": "/icons/manifoldCADonly.png",
+      "type": "image/png",
+      "sizes": "2906x1980"
+    }
+  ]
+}

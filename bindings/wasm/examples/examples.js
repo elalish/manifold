@@ -30,10 +30,9 @@ export const examples = {
       // only() to ghost out everything else, akin to * in OpenSCAD.
 
       // All changes are automatically saved and restored between sessions.
-      // This app is purely local - there is no server communication.
+      // This PWA is purely local - there is no server communication.
       // This means it will work equally well offline once loaded.
-      // To share your code with another browser/device, simply copy the text to
-      // a file.
+      // Consider installing it (icon in the search bar) for easy access.
 
       // See the script drop-down above ("Intro") for usage examples. The
       // gl-matrix package from npm is automatically imported for convenience -
