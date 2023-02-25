@@ -22,6 +22,7 @@ interface SealedFloat32Array<N extends number> extends Float32Array {
 
 type Vec2 = [number, number];
 type Vec3 = [number, number, number];
+// 4x4 matrix stored in column-major order
 type Mat4 = [
   number,
   number,
@@ -98,7 +99,15 @@ declare class Mesh {
 
 declare class Manifold {
   /**
-   * Create a Manifold from a Mesh object.
+   * Convert a Mesh into a Manifold, retaining its properties and merging only
+   * the positions according to the merge vectors. Will throw an error if the
+   * result is not an oriented 2-manifold. Will collapse degenerate triangles
+   * and unnecessary vertices.
+   *
+   * All fields are read, making this structure suitable for a lossless
+   * round-trip of data from getMesh(). For multi-material input, use
+   * reserveIDs() to set a unique originalID for each material, and sort the
+   * materials into triangle runs.
    */
   constructor(mesh: Mesh);
   /**
