@@ -17,7 +17,7 @@
  * red. This is particularly useful for debugging subtract() as it will allow
  * you find the object even if it doesn't currently intersect the result.
  *
- * @param manifold The object show - returns the input unchanged for chaining.
+ * @param manifold The object to show - returned for chaining.
  */
 declare function show(manifold: Manifold): Manifold;
 
@@ -27,7 +27,7 @@ declare function show(manifold: Manifold): Manifold;
  * debugging as it allows you to see objects that may be hidden in the interior
  * of the result. Multiple objects marked only() will all be shown.
  *
- * @param manifold The object show - returns the input unchanged for chaining.
+ * @param manifold The object to show - returned for chaining.
  */
 declare function only(manifold: Manifold): Manifold;
 
