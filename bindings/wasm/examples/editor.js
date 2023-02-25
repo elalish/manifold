@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+navigator.serviceWorker.register('service-worker.js');
+
 import {examples} from './examples.js';
 const exampleFunctions = examples.functionBodies;
 
@@ -116,8 +118,7 @@ function uniqueName(name) {
 function addEdit(button) {
   const label = button.firstChild;
   const edit = addIcon(button);
-  edit.style.backgroundImage = 'url(icons/pencil.png)';
-  edit.style.right = '30px';
+  edit.classList.add('edit');
 
   edit.onclick = function(event) {
     event.stopPropagation();
@@ -157,8 +158,7 @@ function addEdit(button) {
   };
 
   const trash = addIcon(button);
-  trash.style.backgroundImage = 'url(icons/trash.png)';
-  trash.style.right = '0px';
+  trash.classList.add('trash');
   let lastClick = 0;
 
   trash.onclick = function(event) {
