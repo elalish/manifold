@@ -33,7 +33,7 @@ class Clippoly {
   Clippoly(std::vector<glm::vec2> contour);
   Clippoly(std::vector<std::vector<glm::vec2>> contours);
 
-  static Clippoly Square(glm::vec2 dims, bool center = true);
+  static Clippoly Square(glm::vec2 dims, bool center = false);
 
   enum class OpType { Add, Subtract, Intersect, Xor };
   Clippoly Boolean(const Clippoly& second, OpType op) const;
