@@ -21,6 +21,7 @@
 #include "clipper2/clipper.core.h"
 #include "clipper2/clipper.engine.h"
 #include "glm/ext/vector_float2.hpp"
+#include "public.h"
 
 using namespace manifold;
 
@@ -47,12 +48,12 @@ C2::ClipType cliptype_of_op(Clippoly::OpType op) {
 }  // namespace
 
 namespace manifold {
-Clippoly::Clippoly() { paths = C2::PathsD(); }
+Clippoly::Clippoly() { paths_ = C2::PathsD(); }
 Clippoly::~Clippoly() = default;
 Clippoly::Clippoly(Clippoly&&) noexcept = default;
 Clippoly& Clippoly::operator=(Clippoly&&) noexcept = default;
-Clippoly::Clippoly(const Clippoly& other) { paths = C2::PathsD(other.paths); }
-Clippoly::Clippoly(C2::PathsD ps) { paths = ps; }
+Clippoly::Clippoly(const Clippoly& other) { paths_ = C2::PathsD(other.paths_); }
+Clippoly::Clippoly(C2::PathsD ps) { paths_ = ps; }
 
 Clippoly::Clippoly(std::vector<glm::vec2> contour) {
   auto p = C2::PathD();
@@ -61,7 +62,7 @@ Clippoly::Clippoly(std::vector<glm::vec2> contour) {
   }
   auto ps = C2::PathsD();
   ps.push_back(p);
-  paths = ps;
+  paths_ = ps;
 }
 
 Clippoly::Clippoly(std::vector<std::vector<glm::vec2>> contours) {
@@ -73,13 +74,35 @@ Clippoly::Clippoly(std::vector<std::vector<glm::vec2>> contours) {
     }
     ps.push_back(p);
   }
-  paths = ps;
+  paths_ = ps;
+}
+
+Clippoly Clippoly::Square(glm::vec2 dims, bool center) {
+  auto p = C2::PathD();
+  if (center) {
+    auto w = dims.x / 2;
+    auto h = dims.y / 2;
+    p.push_back(C2::PointD(w, -h));
+    p.push_back(C2::PointD(-w, -h));
+    p.push_back(C2::PointD(-w, h));
+    p.push_back(C2::PointD(w, h));
+  } else {
+    double x = dims.x;
+    double y = dims.y;
+    p.push_back(C2::PointD(0.0, y));
+    p.push_back(C2::PointD(x, y));
+    p.push_back(C2::PointD(x, 0.0));
+    p.push_back(C2::PointD(0.0, 0.0));
+  }
+  auto ps = C2::PathsD();
+  ps.push_back(p);
+  return Clippoly(ps);
 }
 
 Clippoly Clippoly::Boolean(const Clippoly& second, OpType op) const {
   auto ct = cliptype_of_op(op);
-  auto res =
-      C2::BooleanOp(ct, C2::FillRule::NonZero, paths, second.paths, precision_);
+  auto res = C2::BooleanOp(ct, C2::FillRule::NonZero, paths_, second.paths_,
+                           precision_);
   return Clippoly(res);
 }
 
@@ -90,10 +113,10 @@ Clippoly Clippoly::BatchBoolean(const std::vector<Clippoly>& clippolys,
   else if (clippolys.size() == 1)
     return clippolys[0];
 
-  auto subjs = clippolys[0].paths;
+  auto subjs = clippolys[0].paths_;
   auto clips = C2::PathsD();
   for (int i = 1; i < clippolys.size(); ++i) {
-    auto ps = clippolys[i].paths;
+    auto ps = clippolys[i].paths_;
     clips.insert(clips.end(), ps.begin(), ps.end());
   }
 
@@ -145,6 +168,23 @@ Clippoly Clippoly::operator^(const Clippoly& Q) const {
 Clippoly& Clippoly::operator^=(const Clippoly& Q) {
   *this = *this ^ Q;
   return *this;
+}
+
+Clippoly Clippoly::Translate(glm::vec2 v) {
+  auto ps = C2::TranslatePaths(paths_, v.x, v.y);
+  return Clippoly(ps);
+}
+
+Polygons Clippoly::ToPolygons() const {
+  auto polys = Polygons();
+  for (auto p : paths_) {
+    auto sp = SimplePolygon();
+    for (int i = 0; i < p.size(); ++i) {
+      sp.push_back({{p[i].x, p[i].y}, i});
+    }
+    polys.push_back(sp);
+  }
+  return polys;
 }
 
 }  // namespace manifold

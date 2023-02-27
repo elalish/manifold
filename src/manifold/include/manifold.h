@@ -16,6 +16,7 @@
 #include <functional>
 #include <memory>
 
+#include "clippoly.h"
 #include "public.h"
 
 namespace manifold {
@@ -65,7 +66,12 @@ class Manifold {
   static Manifold Extrude(Polygons crossSection, float height,
                           int nDivisions = 0, float twistDegrees = 0.0f,
                           glm::vec2 scaleTop = glm::vec2(1.0f));
+  static Manifold Extrude(Clippoly crossSection, float height,
+                          int nDivisions = 0, float twistDegrees = 0.0f,
+                          glm::vec2 scaleTop = glm::vec2(1.0f));
   static Manifold Revolve(const Polygons& crossSection,
+                          int circularSegments = 0);
+  static Manifold Revolve(const Clippoly& crossSection,
                           int circularSegments = 0);
   ///@}
 

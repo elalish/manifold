@@ -131,6 +131,14 @@ using SimplePolygon = std::vector<glm::vec2>;
  * [&epsilon;-valid](https://github.com/elalish/manifold/wiki/Manifold-Library#definition-of-%CE%B5-valid).
  */
 using Polygons = std::vector<SimplePolygon>;
+// class Polygons {
+//   public:
+//     Polygons();
+//     ~Polygons();
+//   private:
+//     std::vector<SimplePolygon> polygons_;
+
+// };
 /** @} */
 
 /**

@@ -16,6 +16,7 @@
 
 #include <clipper2/clipper.h>
 
+#include "glm/ext/vector_float2.hpp"
 #include "public.h"
 
 namespace C2 = Clipper2Lib;
@@ -32,6 +33,8 @@ class Clippoly {
   Clippoly(std::vector<glm::vec2> contour);
   Clippoly(std::vector<std::vector<glm::vec2>> contours);
 
+  static Clippoly Square(glm::vec2 dims, bool center = true);
+
   enum class OpType { Add, Subtract, Intersect, Xor };
   Clippoly Boolean(const Clippoly& second, OpType op) const;
   static Clippoly BatchBoolean(const std::vector<Clippoly>& clippolys,
@@ -44,8 +47,12 @@ class Clippoly {
   Clippoly operator^(const Clippoly&) const;  // Intersect
   Clippoly& operator^=(const Clippoly&);
 
+  Clippoly Translate(glm::vec2 v);
+
+  Polygons ToPolygons() const;
+
  private:
-  C2::PathsD paths;
+  C2::PathsD paths_;
   Clippoly(C2::PathsD paths);
 };
 

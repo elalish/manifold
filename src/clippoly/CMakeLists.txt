@@ -21,8 +21,8 @@ target_include_directories(${PROJECT_NAME}
     PUBLIC ${PROJECT_SOURCE_DIR}/include
 )
 target_link_libraries( ${PROJECT_NAME}
-    PUBLIC utilities
-    PRIVATE Clipper2
+    PUBLIC utilities Clipper2
+    # PRIVATE Clipper2
 )
 
 target_compile_options(${PROJECT_NAME} PRIVATE ${MANIFOLD_FLAGS})

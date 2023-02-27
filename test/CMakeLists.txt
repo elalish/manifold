@@ -18,14 +18,14 @@ add_subdirectory(third_party)
 
 enable_testing()
 
-set(SOURCE_FILES polygon_test.cpp manifold_test.cpp boolean_test.cpp sdf_test.cpp samples_test.cpp test_main.cpp)
+set(SOURCE_FILES polygon_test.cpp manifold_test.cpp boolean_test.cpp sdf_test.cpp samples_test.cpp test_main.cpp clippoly_test.cpp)
 
 if(MANIFOLD_CBIND)
   list(APPEND SOURCE_FILES manifoldc_test.cpp)
 endif()
 
 add_executable(${PROJECT_NAME} ${SOURCE_FILES})
-target_link_libraries(${PROJECT_NAME} polygon GTest::GTest manifold sdf samples samplesGPU)
+target_link_libraries(${PROJECT_NAME} polygon GTest::GTest manifold sdf samples samplesGPU clippoly)
 
 if(MANIFOLD_CBIND)
   target_link_libraries(${PROJECT_NAME} manifoldc)

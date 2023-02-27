@@ -24,8 +24,8 @@ endif()
 
 target_include_directories(${PROJECT_NAME} PUBLIC ${PROJECT_SOURCE_DIR}/include)
 target_link_libraries(${PROJECT_NAME}
-    PUBLIC utilities
-    PRIVATE collider polygon ${MANIFOLD_INCLUDE} graphlite
+    PUBLIC utilities clippoly
+    PRIVATE collider polygon ${MANIFOLD_INCLUDE} graphlite Clipper2
 )
 
 target_compile_features(${PROJECT_NAME}

@@ -14,6 +14,7 @@
 
 #include <thrust/sequence.h>
 
+#include "clippoly.h"
 #include "csg_tree.h"
 #include "graph.h"
 #include "impl.h"
@@ -291,6 +292,11 @@ Manifold Manifold::Extrude(Polygons crossSection, float height, int nDivisions,
   return Manifold(pImpl_);
 }
 
+Manifold Manifold::Extrude(Clippoly poly, float height, int nDivisions,
+                           float twistDegrees, glm::vec2 scaleTop) {
+  return Extrude(poly.ToPolygons(), height, nDivisions, twistDegrees, scaleTop);
+}
+
 /**
  * Constructs a manifold from a set of polygons by revolving this cross-section
  * around its Y-axis and then setting this as the Z-axis of the resulting
@@ -390,6 +396,10 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments) {
   pImpl_->InitializeOriginal();
   pImpl_->CreateFaces();
   return Manifold(pImpl_);
+}
+
+Manifold Manifold::Revolve(const Clippoly& poly, int circularSegments) {
+  return Revolve(poly.ToPolygons(), circularSegments);
 }
 
 /**
