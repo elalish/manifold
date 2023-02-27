@@ -53,7 +53,9 @@ class Clippoly {
 
  private:
   C2::PathsD paths_;
-  Clippoly(C2::PathsD paths);
+  // if not clean, paths_ need to be unioned before extraction
+  bool clean_ = false;
+  Clippoly(C2::PathsD paths, bool clean);
 };
 
 }  // namespace manifold

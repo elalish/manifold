@@ -52,8 +52,14 @@ Clippoly::Clippoly() { paths_ = C2::PathsD(); }
 Clippoly::~Clippoly() = default;
 Clippoly::Clippoly(Clippoly&&) noexcept = default;
 Clippoly& Clippoly::operator=(Clippoly&&) noexcept = default;
-Clippoly::Clippoly(const Clippoly& other) { paths_ = C2::PathsD(other.paths_); }
-Clippoly::Clippoly(C2::PathsD ps) { paths_ = ps; }
+Clippoly::Clippoly(const Clippoly& other) {
+  paths_ = C2::PathsD(other.paths_);
+  clean_ = other.clean_;
+}
+Clippoly::Clippoly(C2::PathsD ps, bool clean) {
+  paths_ = ps;
+  clean_ = clean;
+}
 
 Clippoly::Clippoly(std::vector<glm::vec2> contour) {
   auto p = C2::PathD();
@@ -96,14 +102,14 @@ Clippoly Clippoly::Square(glm::vec2 dims, bool center) {
   }
   auto ps = C2::PathsD();
   ps.push_back(p);
-  return Clippoly(ps);
+  return Clippoly(ps, true);
 }
 
 Clippoly Clippoly::Boolean(const Clippoly& second, OpType op) const {
   auto ct = cliptype_of_op(op);
   auto res = C2::BooleanOp(ct, C2::FillRule::NonZero, paths_, second.paths_,
                            precision_);
-  return Clippoly(res);
+  return Clippoly(res, true);
 }
 
 Clippoly Clippoly::BatchBoolean(const std::vector<Clippoly>& clippolys,
@@ -122,7 +128,7 @@ Clippoly Clippoly::BatchBoolean(const std::vector<Clippoly>& clippolys,
 
   auto ct = cliptype_of_op(op);
   auto res = C2::BooleanOp(ct, C2::FillRule::NonZero, subjs, clips, precision_);
-  return Clippoly(res);
+  return Clippoly(res, true);
 }
 
 /**
@@ -172,12 +178,14 @@ Clippoly& Clippoly::operator^=(const Clippoly& Q) {
 
 Clippoly Clippoly::Translate(glm::vec2 v) {
   auto ps = C2::TranslatePaths(paths_, v.x, v.y);
-  return Clippoly(ps);
+  return Clippoly(ps, true);
 }
 
 Polygons Clippoly::ToPolygons() const {
   auto polys = Polygons();
-  for (auto p : paths_) {
+  auto paths =
+      clean_ ? paths_ : C2::Union(paths_, C2::FillRule::NonZero, precision_);
+  for (auto p : paths) {
     auto sp = SimplePolygon();
     for (int i = 0; i < p.size(); ++i) {
       sp.push_back({{p[i].x, p[i].y}, i});
