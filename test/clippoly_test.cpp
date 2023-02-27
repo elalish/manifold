@@ -25,7 +25,7 @@
 using namespace manifold;
 
 TEST(Clippoly, Union) {
-  auto a = Clippoly::Square({5., 5.});
+  auto a = Clippoly::Square({5., 5.}, true);
   auto b = a.Translate({2.5, 2.5});
   auto cross = (a + b);
   auto result = Manifold::Extrude(cross, 5.);
