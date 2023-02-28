@@ -1,5 +1,5 @@
 """
- Copyright 2023 The Manifold Authors.
+ Copyright 2022 The Manifold Authors.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -13,7 +13,7 @@
  See the License for the specific language governing permissions and
  limitations under the License.
  """
-
+ 
 from pymanifold import Manifold
 from functools import reduce
 
@@ -27,3 +27,4 @@ def run(n=5, overlap=True):
     spheres = reduce(lambda a, b: a + b, spheres)
 
     return a - spheres
+

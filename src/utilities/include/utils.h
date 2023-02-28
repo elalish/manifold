@@ -1,4 +1,4 @@
-// Copyright 2023 The Manifold Authors, Jared Hoberock and Nathan Bell of
+// Copyright 2020 The Manifold Authors, Jared Hoberock and Nathan Bell of
 // NVIDIA Research
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
