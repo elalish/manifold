@@ -63,7 +63,8 @@ C2::JoinType jt(CrossSection::JoinType jointype) {
 }
 
 C2::PathD pathd_of_contour(const SimplePolygon& ctr) {
-  auto p = C2::PathD(ctr.size());
+  auto p = C2::PathD();
+  p.reserve(ctr.size());
   for (auto v : ctr) {
     p.push_back(C2::PointD(v.x, v.y));
   }
@@ -87,7 +88,8 @@ CrossSection::CrossSection(const SimplePolygon& contour) {
 }
 
 CrossSection::CrossSection(const Polygons& contours) {
-  auto ps = C2::PathsD(contours.size());
+  auto ps = C2::PathsD();
+  ps.reserve(contours.size());
   for (auto ctr : contours) {
     ps.push_back(pathd_of_contour(ctr));
   }
