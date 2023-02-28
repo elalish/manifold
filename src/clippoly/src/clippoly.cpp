@@ -45,6 +45,13 @@ C2::ClipType cliptype_of_op(Clippoly::OpType op) {
   };
   return ct;
 }
+C2::PathD pathd_of_contour(std::vector<glm::vec2> ctr) {
+  auto p = C2::PathD();
+  for (auto v : ctr) {
+    p.push_back(C2::PointD(v.x, v.y));
+  }
+  return p;
+}
 }  // namespace
 
 namespace manifold {
@@ -62,23 +69,15 @@ Clippoly::Clippoly(C2::PathsD ps, bool clean) {
 }
 
 Clippoly::Clippoly(std::vector<glm::vec2> contour) {
-  auto p = C2::PathD();
-  for (auto v : contour) {
-    p.push_back(C2::PointD(v.x, v.y));
-  }
   auto ps = C2::PathsD();
-  ps.push_back(p);
+  ps.push_back(pathd_of_contour(contour));
   paths_ = ps;
 }
 
 Clippoly::Clippoly(std::vector<std::vector<glm::vec2>> contours) {
   auto ps = C2::PathsD();
   for (auto ctr : contours) {
-    auto p = C2::PathD();
-    for (auto v : ctr) {
-      p.push_back(C2::PointD(v.x, v.y));
-    }
-    ps.push_back(p);
+    ps.push_back(pathd_of_contour(ctr));
   }
   paths_ = ps;
 }
@@ -179,6 +178,68 @@ Clippoly& Clippoly::operator^=(const Clippoly& Q) {
 Clippoly Clippoly::Translate(glm::vec2 v) {
   auto ps = C2::TranslatePaths(paths_, v.x, v.y);
   return Clippoly(ps, true);
+}
+
+Clippoly Clippoly::Scale(glm::vec2 scale) {
+  auto scaled = C2::PathsD();
+  for (auto path : paths_) {
+    auto s = C2::PathD();
+    for (auto p : path) {
+      s.push_back(C2::PointD(p.x * scale.x, p.y * scale.y));
+    }
+    scaled.push_back(s);
+  }
+  return Clippoly(scaled, false);
+}
+
+Clippoly Clippoly::Simplify(double epsilon) {
+  auto ps = SimplifyPaths(paths_, epsilon, false);
+  return Clippoly(ps, false);
+}
+
+Clippoly Clippoly::RamerDouglasPeucker(double epsilon) {
+  auto ps = C2::RamerDouglasPeucker(paths_, epsilon);
+  return Clippoly(ps, false);
+}
+
+Clippoly Clippoly::StripNearEqual(double epsilon) {
+  auto ps = C2::StripNearEqual(paths_, epsilon, true);
+  return Clippoly(ps, false);
+}
+
+Clippoly Clippoly::StripDuplicates() {
+  auto ps = C2::StripDuplicates(paths_, true);
+  return Clippoly(ps, false);
+}
+
+Clippoly Clippoly::TrimCollinear() {
+  auto trimmed = C2::PathsD();
+  for (auto p : paths_) {
+    trimmed.push_back(C2::TrimCollinear(p, false));
+  }
+  return Clippoly(trimmed, false);
+}
+
+Clippoly Clippoly::MinkowskiSum(const std::vector<glm::vec2> pattern) {
+  auto pat = pathd_of_contour(pattern);
+  auto summed = C2::PathsD();
+  for (auto p : paths_) {
+    auto ss = C2::MinkowskiSum(pat, p, true);
+    summed.insert(summed.end(), ss.begin(), ss.end());
+  }
+  auto u = Union(summed, C2::FillRule::NonZero);
+  return Clippoly(u, true);
+}
+
+Clippoly Clippoly::MinkowskiDiff(const std::vector<glm::vec2> pattern) {
+  auto pat = pathd_of_contour(pattern);
+  auto diffed = C2::PathsD();
+  for (auto p : paths_) {
+    auto ss = C2::MinkowskiDiff(pat, p, true);
+    diffed.insert(diffed.end(), ss.begin(), ss.end());
+  }
+  auto u = Union(diffed, C2::FillRule::NonZero);
+  return Clippoly(u, true);
 }
 
 Polygons Clippoly::ToPolygons() const {

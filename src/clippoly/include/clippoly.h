@@ -33,13 +33,14 @@ class Clippoly {
   Clippoly(std::vector<glm::vec2> contour);
   Clippoly(std::vector<std::vector<glm::vec2>> contours);
 
+  // Shapes
   static Clippoly Square(glm::vec2 dims, bool center = false);
 
+  // Booleans
   enum class OpType { Add, Subtract, Intersect, Xor };
   Clippoly Boolean(const Clippoly& second, OpType op) const;
   static Clippoly BatchBoolean(const std::vector<Clippoly>& clippolys,
                                OpType op);
-  // Boolean operation shorthand
   Clippoly operator+(const Clippoly&) const;  // Add (Union)
   Clippoly& operator+=(const Clippoly&);
   Clippoly operator-(const Clippoly&) const;  // Subtract (Difference)
@@ -47,8 +48,22 @@ class Clippoly {
   Clippoly operator^(const Clippoly&) const;  // Intersect
   Clippoly& operator^=(const Clippoly&);
 
+  // Transformations
   Clippoly Translate(glm::vec2 v);
+  Clippoly Scale(glm::vec2 s);
 
+  // Path Simplification
+  Clippoly TrimCollinear();
+  Clippoly Simplify(double epsilon = 1e-6);
+  Clippoly RamerDouglasPeucker(double epsilon = 1e-6);
+  Clippoly StripNearEqual(double epsilon = 1e-6);
+  Clippoly StripDuplicates();
+
+  // Minkowski
+  Clippoly MinkowskiSum(const std::vector<glm::vec2> pattern);
+  Clippoly MinkowskiDiff(const std::vector<glm::vec2> pattern);
+
+  // Output
   Polygons ToPolygons() const;
 
  private:
