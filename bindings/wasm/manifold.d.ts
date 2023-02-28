@@ -397,8 +397,7 @@ function extrude(
  * @param circularSegments Number of segments along its diameter. Default is
  * calculated by the static Defaults.
  */
-function revolve(
-    crossSection: Polygons, circularSegments?: number): Manifold;
+function revolve(crossSection: Polygons, circularSegments?: number): Manifold;
 
 function union(a: Manifold, b: Manifold): Manifold;
 function difference(a: Manifold, b: Manifold): Manifold;
