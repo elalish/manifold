@@ -119,7 +119,7 @@ void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge,
     } else {  // General triangulation
       const glm::mat3x2 projection = GetAxisAlignedProjection(normal);
 
-      const Polygons polys = Face2Polygons(face, projection, faceEdge);
+      const PolygonsIdx polys = Face2Polygons(face, projection, faceEdge);
 
       std::vector<glm::ivec3> newTris = Triangulate(polys, precision_);
 
@@ -138,8 +138,8 @@ void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge,
  * For the input face index, return a set of 2D polygons formed by the input
  * projection of the vertices.
  */
-Polygons Manifold::Impl::Face2Polygons(int face, glm::mat3x2 projection,
-                                       const VecDH<int>& faceEdge) const {
+PolygonsIdx Manifold::Impl::Face2Polygons(int face, glm::mat3x2 projection,
+                                          const VecDH<int>& faceEdge) const {
   const int firstEdge = faceEdge[face];
   const int lastEdge = faceEdge[face + 1];
 
@@ -151,7 +151,7 @@ Polygons Manifold::Impl::Face2Polygons(int face, glm::mat3x2 projection,
     ASSERT(inserted, topologyErr, "face has duplicate vertices.");
   }
 
-  Polygons polys;
+  PolygonsIdx polys;
   int startEdge = 0;
   int thisEdge = startEdge;
   while (1) {

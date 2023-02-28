@@ -46,12 +46,6 @@ typedef struct ManifoldProperties {
   float volume;
 } ManifoldProperties;
 
-typedef struct ManifoldPolyVert {
-  ManifoldVec2 pos;
-  int idx;
-
-} ManifoldPolyVert;
-
 typedef struct ManifoldCurvatureBounds {
   float max_mean_curvature;
   float min_mean_curvature;

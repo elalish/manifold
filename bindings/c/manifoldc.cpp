@@ -34,9 +34,9 @@ extern "C" {
 
 ManifoldSimplePolygon *manifold_simple_polygon(void *mem, ManifoldVec2 *ps,
                                                size_t length) {
-  auto vec = new (mem) std::vector<PolyVert>;
+  auto vec = new (mem) std::vector<glm::vec2>;
   for (int i = 0; i < length; ++i) {
-    vec->push_back({{ps[i].x, ps[i].y}, i});
+    vec->push_back({ps[i].x, ps[i].y});
   }
   return to_c(vec);
 }

@@ -31,10 +31,10 @@ Manifold TetPuzzle(float edgeLength, float gap, int nDivisions) {
   Manifold tet = Manifold::Tetrahedron().Scale(scale);
 
   Polygons box;
-  box.push_back({{glm::vec2(2, -2), 0}, {glm::vec2(2, 2), 1}});
+  box.push_back({glm::vec2(2, -2), glm::vec2(2, 2)});
 
   for (int i = 0; i <= nDivisions; ++i) {
-    box[0].push_back({glm::vec2(gap / 2, 2 - i * 4.0f / nDivisions), 2 + i});
+    box[0].push_back(glm::vec2(gap / 2, 2 - i * 4.0f / nDivisions));
   }
 
   Manifold screw = Manifold::Extrude(box, 2, nDivisions, 270)
