@@ -353,8 +353,8 @@ PYBIND11_MODULE(pymanifold, m) {
              for (int i = 0; i < polygons.size(); i++) {
                std::vector<glm::vec2> vertices(polygons[i].size());
                for (int j = 0; j < polygons[i].size(); j++) {
-                 vertices[j] = {{std::get<0>(polygons[i][j]),
-                                 std::get<1>(polygons[i][j])}};
+                 vertices[j] = {std::get<0>(polygons[i][j]),
+                                std::get<1>(polygons[i][j])};
                }
                simplePolygons[i] = {vertices};
              }
