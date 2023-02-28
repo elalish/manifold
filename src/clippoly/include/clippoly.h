@@ -16,6 +16,7 @@
 
 #include <clipper2/clipper.h>
 
+#include "clipper2/clipper.offset.h"
 #include "glm/ext/vector_float2.hpp"
 #include "public.h"
 
@@ -59,6 +60,10 @@ class Clippoly {
   Clippoly RamerDouglasPeucker(double epsilon = 1e-6);
   Clippoly StripNearEqual(double epsilon = 1e-6);
   Clippoly StripDuplicates();
+
+  enum class JoinType { Square, Round, Miter };
+  Clippoly Offset(double delta, JoinType jt, double miter_limit = 2.0,
+                  double arc_tolerance = 0.0);
 
   // Minkowski
   // NOTE: OpenSCAD does not use Minkowski as is (from Clipper1). Also, they

@@ -20,6 +20,7 @@
 
 #include "clipper2/clipper.core.h"
 #include "clipper2/clipper.engine.h"
+#include "clipper2/clipper.offset.h"
 #include "glm/ext/vector_float2.hpp"
 #include "public.h"
 
@@ -45,6 +46,22 @@ C2::ClipType cliptype_of_op(Clippoly::OpType op) {
   };
   return ct;
 }
+
+C2::JoinType jt(Clippoly::JoinType jointype) {
+  C2::JoinType jt = C2::JoinType::Square;
+  switch (jointype) {
+    case Clippoly::JoinType::Square:
+      break;
+    case Clippoly::JoinType::Round:
+      jt = C2::JoinType::Round;
+      break;
+    case Clippoly::JoinType::Miter:
+      jt = C2::JoinType::Miter;
+      break;
+  };
+  return jt;
+}
+
 C2::PathD pathd_of_contour(std::vector<glm::vec2> ctr) {
   auto p = C2::PathD();
   for (auto v : ctr) {
@@ -87,17 +104,17 @@ Clippoly Clippoly::Square(glm::vec2 dims, bool center) {
   if (center) {
     auto w = dims.x / 2;
     auto h = dims.y / 2;
-    p.push_back(C2::PointD(w, -h));
-    p.push_back(C2::PointD(-w, -h));
-    p.push_back(C2::PointD(-w, h));
     p.push_back(C2::PointD(w, h));
+    p.push_back(C2::PointD(-w, h));
+    p.push_back(C2::PointD(-w, -h));
+    p.push_back(C2::PointD(w, -h));
   } else {
     double x = dims.x;
     double y = dims.y;
-    p.push_back(C2::PointD(0.0, y));
-    p.push_back(C2::PointD(x, y));
-    p.push_back(C2::PointD(x, 0.0));
     p.push_back(C2::PointD(0.0, 0.0));
+    p.push_back(C2::PointD(x, 0.0));
+    p.push_back(C2::PointD(x, y));
+    p.push_back(C2::PointD(0.0, y));
   }
   auto ps = C2::PathsD();
   ps.push_back(p);
@@ -230,6 +247,13 @@ Clippoly Clippoly::TrimCollinear() {
     trimmed.push_back(C2::TrimCollinear(p, false));
   }
   return Clippoly(trimmed, false);
+}
+
+Clippoly Clippoly::Offset(double delta, JoinType jointype, double miter_limit,
+                          double arc_tolerance) {
+  auto ps = C2::InflatePaths(paths_, delta, jt(jointype), C2::EndType::Polygon,
+                             miter_limit, precision_, arc_tolerance);
+  return Clippoly(ps, true);
 }
 
 Clippoly Clippoly::MinkowskiSum(const std::vector<glm::vec2> pattern) {

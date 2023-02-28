@@ -34,3 +34,14 @@ TEST(Clippoly, Union) {
     ExportMesh("clippoly_union.glb", result.GetMesh(), {});
 #endif
 }
+
+TEST(Clippoly, RoundOffset) {
+  auto a = Clippoly::Square({20., 20.}, true);
+  auto rounded = a.Offset(5., Clippoly::JoinType::Round);
+  auto result = Manifold::Extrude(rounded, 5.);
+
+#ifdef MANIFOLD_EXPORT
+  if (options.exportModels)
+    ExportMesh("clippoly_round_offset.glb", result.GetMesh(), {});
+#endif
+}
