@@ -99,17 +99,17 @@ CrossSection CrossSection::Square(glm::vec2 dims, bool center) {
   if (center) {
     auto w = dims.x / 2;
     auto h = dims.y / 2;
-    p.push_back(C2::PointD(w, h));
-    p.push_back(C2::PointD(-w, h));
-    p.push_back(C2::PointD(-w, -h));
-    p.push_back(C2::PointD(w, -h));
+    p[0] = C2::PointD(w, h);
+    p[1] = C2::PointD(-w, h);
+    p[2] = C2::PointD(-w, -h);
+    p[3] = C2::PointD(w, -h);
   } else {
     double x = dims.x;
     double y = dims.y;
-    p.push_back(C2::PointD(0.0, 0.0));
-    p.push_back(C2::PointD(x, 0.0));
-    p.push_back(C2::PointD(x, y));
-    p.push_back(C2::PointD(0.0, y));
+    p[0] = C2::PointD(0.0, 0.0);
+    p[1] = C2::PointD(x, 0.0);
+    p[2] = C2::PointD(x, y);
+    p[3] = C2::PointD(0.0, y);
   }
   return CrossSection(C2::PathsD{p});
 }
@@ -120,8 +120,7 @@ CrossSection CrossSection::Circle(float radius, int circularSegments) {
   float dPhi = 360.0f / n;
   auto circle = C2::PathD(n);
   for (int i = 0; i < n; ++i) {
-    circle.push_back(
-        C2::PointD(radius * cosd(dPhi * i), radius * sind(dPhi * i)));
+    circle[i] = C2::PointD(radius * cosd(dPhi * i), radius * sind(dPhi * i));
   }
   return CrossSection(C2::PathsD{circle});
 }
@@ -142,7 +141,12 @@ CrossSection CrossSection::BatchBoolean(
     return crossSections[0];
 
   auto subjs = crossSections[0].paths_;
+  int n_clips = 0;
+  for (int i = 1; i < crossSections.size(); ++i) {
+    n_clips += crossSections[i].paths_.size();
+  }
   auto clips = C2::PathsD();
+  clips.reserve(n_clips);
   for (int i = 1; i < crossSections.size(); ++i) {
     auto ps = crossSections[i].paths_;
     clips.insert(clips.end(), ps.begin(), ps.end());
@@ -205,11 +209,13 @@ CrossSection CrossSection::Translate(glm::vec2 v) {
 }
 
 CrossSection CrossSection::Rotate(float degrees) {
-  auto rotated = C2::PathsD(paths_.size());
+  auto rotated = C2::PathsD();
+  rotated.reserve(paths_.size());
   auto s = sind(degrees);
   auto c = cosd(degrees);
   for (auto path : paths_) {
-    auto r = C2::PathD(path.size());
+    auto r = C2::PathD();
+    r.reserve(path.size());
     for (auto p : path) {
       auto rx = (p.x * c) - (p.y * s);
       auto ry = (p.y * c) + (p.x * s);
@@ -221,9 +227,11 @@ CrossSection CrossSection::Rotate(float degrees) {
 }
 
 CrossSection CrossSection::Scale(glm::vec2 scale) {
-  auto scaled = C2::PathsD(paths_.size());
+  auto scaled = C2::PathsD();
+  scaled.reserve(paths_.size());
   for (auto path : paths_) {
-    auto s = C2::PathD(path.size());
+    auto s = C2::PathD();
+    s.reserve(path.size());
     for (auto p : path) {
       s.push_back(C2::PointD(p.x * scale.x, p.y * scale.y));
     }
@@ -245,11 +253,13 @@ CrossSection CrossSection::Offset(double delta, JoinType jointype,
 }
 
 Polygons CrossSection::ToPolygons() const {
-  auto polys = Polygons(paths_.size());
+  auto polys = Polygons();
+  polys.reserve(paths_.size());
   for (auto p : paths_) {
-    auto sp = SimplePolygon(p.size());
-    for (int i = 0; i < p.size(); ++i) {
-      sp.push_back({p[i].x, p[i].y});
+    auto sp = SimplePolygon();
+    sp.reserve(paths_.size());
+    for (auto v : p) {
+      sp.push_back({v.x, v.y});
     }
     polys.push_back(sp);
   }
