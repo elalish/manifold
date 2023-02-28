@@ -78,29 +78,24 @@ CrossSection::CrossSection(CrossSection&&) noexcept = default;
 CrossSection& CrossSection::operator=(CrossSection&&) noexcept = default;
 CrossSection::CrossSection(const CrossSection& other) {
   paths_ = C2::PathsD(other.paths_);
-  clean_ = other.clean_;
 }
-CrossSection::CrossSection(C2::PathsD ps, bool clean) {
-  paths_ = ps;
-  clean_ = clean;
-}
+CrossSection::CrossSection(C2::PathsD ps) { paths_ = ps; }
 
 CrossSection::CrossSection(std::vector<glm::vec2> contour) {
-  auto ps = C2::PathsD();
-  ps.push_back(pathd_of_contour(contour));
-  paths_ = ps;
+  auto ps = C2::PathsD{(pathd_of_contour(contour))};
+  paths_ = C2::Union(ps, C2::FillRule::Positive);
 }
 
 CrossSection::CrossSection(std::vector<std::vector<glm::vec2>> contours) {
-  auto ps = C2::PathsD();
+  auto ps = C2::PathsD(contours.size());
   for (auto ctr : contours) {
     ps.push_back(pathd_of_contour(ctr));
   }
-  paths_ = ps;
+  paths_ = C2::Union(ps, C2::FillRule::Positive);
 }
 
 CrossSection CrossSection::Square(glm::vec2 dims, bool center) {
-  auto p = C2::PathD();
+  auto p = C2::PathD(4);
   if (center) {
     auto w = dims.x / 2;
     auto h = dims.y / 2;
@@ -116,21 +111,19 @@ CrossSection CrossSection::Square(glm::vec2 dims, bool center) {
     p.push_back(C2::PointD(x, y));
     p.push_back(C2::PointD(0.0, y));
   }
-  auto ps = C2::PathsD();
-  ps.push_back(p);
-  return CrossSection(ps, true);
+  return CrossSection(C2::PathsD{p});
 }
 
 CrossSection CrossSection::Circle(float radius, int circularSegments) {
   // GetCircularSegments(radius) -- in Manifold, not available atm
   int n = circularSegments > 2 ? circularSegments : 3;
   float dPhi = 360.0f / n;
-  auto circle = C2::PathsD(1);
+  auto circle = C2::PathD(n);
   for (int i = 0; i < n; ++i) {
-    circle[0].push_back(
+    circle.push_back(
         C2::PointD(radius * cosd(dPhi * i), radius * sind(dPhi * i)));
   }
-  return CrossSection(circle, true);
+  return CrossSection(C2::PathsD{circle});
 }
 
 CrossSection CrossSection::Boolean(const CrossSection& second,
@@ -138,7 +131,7 @@ CrossSection CrossSection::Boolean(const CrossSection& second,
   auto ct = cliptype_of_op(op);
   auto res = C2::BooleanOp(ct, C2::FillRule::Positive, paths_, second.paths_,
                            precision_);
-  return CrossSection(res, true);
+  return CrossSection(res);
 }
 
 CrossSection CrossSection::BatchBoolean(
@@ -158,7 +151,7 @@ CrossSection CrossSection::BatchBoolean(
   auto ct = cliptype_of_op(op);
   auto res =
       C2::BooleanOp(ct, C2::FillRule::Positive, subjs, clips, precision_);
-  return CrossSection(res, true);
+  return CrossSection(res);
 }
 
 /**
@@ -208,84 +201,37 @@ CrossSection& CrossSection::operator^=(const CrossSection& Q) {
 
 CrossSection CrossSection::Translate(glm::vec2 v) {
   auto ps = C2::TranslatePaths(paths_, v.x, v.y);
-  return CrossSection(ps, true);
+  return CrossSection(ps);
 }
 
 CrossSection CrossSection::Scale(glm::vec2 scale) {
-  auto scaled = C2::PathsD();
+  auto scaled = C2::PathsD(paths_.size());
   for (auto path : paths_) {
-    auto s = C2::PathD();
+    auto s = C2::PathD(path.size());
     for (auto p : path) {
       s.push_back(C2::PointD(p.x * scale.x, p.y * scale.y));
     }
     scaled.push_back(s);
   }
-  return CrossSection(scaled, false);
+  return CrossSection(scaled);
 }
 
 CrossSection CrossSection::Simplify(double epsilon) {
   auto ps = SimplifyPaths(paths_, epsilon, false);
-  return CrossSection(ps, false);
-}
-
-CrossSection CrossSection::RamerDouglasPeucker(double epsilon) {
-  auto ps = C2::RamerDouglasPeucker(paths_, epsilon);
-  return CrossSection(ps, false);
-}
-
-CrossSection CrossSection::StripNearEqual(double epsilon) {
-  auto ps = C2::StripNearEqual(paths_, epsilon, true);
-  return CrossSection(ps, false);
-}
-
-CrossSection CrossSection::StripDuplicates() {
-  auto ps = C2::StripDuplicates(paths_, true);
-  return CrossSection(ps, false);
-}
-
-CrossSection CrossSection::TrimCollinear() {
-  auto trimmed = C2::PathsD();
-  for (auto p : paths_) {
-    trimmed.push_back(C2::TrimCollinear(p, false));
-  }
-  return CrossSection(trimmed, false);
+  return CrossSection(ps);
 }
 
 CrossSection CrossSection::Offset(double delta, JoinType jointype,
                                   double miter_limit, double arc_tolerance) {
   auto ps = C2::InflatePaths(paths_, delta, jt(jointype), C2::EndType::Polygon,
                              miter_limit, precision_, arc_tolerance);
-  return CrossSection(ps, true);
-}
-
-CrossSection CrossSection::MinkowskiSum(const std::vector<glm::vec2> pattern) {
-  auto pat = pathd_of_contour(pattern);
-  auto summed = C2::PathsD();
-  for (auto p : paths_) {
-    auto ss = C2::MinkowskiSum(pat, p, true);
-    summed.insert(summed.end(), ss.begin(), ss.end());
-  }
-  auto u = Union(summed, C2::FillRule::Positive);
-  return CrossSection(u, true);
-}
-
-CrossSection CrossSection::MinkowskiDiff(const std::vector<glm::vec2> pattern) {
-  auto pat = pathd_of_contour(pattern);
-  auto diffed = C2::PathsD();
-  for (auto p : paths_) {
-    auto ss = C2::MinkowskiDiff(pat, p, true);
-    diffed.insert(diffed.end(), ss.begin(), ss.end());
-  }
-  auto u = Union(diffed, C2::FillRule::Positive);
-  return CrossSection(u, true);
+  return CrossSection(ps);
 }
 
 Polygons CrossSection::ToPolygons() const {
-  auto polys = Polygons();
-  auto paths =
-      clean_ ? paths_ : C2::Union(paths_, C2::FillRule::Positive, precision_);
-  for (auto p : paths) {
-    auto sp = SimplePolygon();
+  auto polys = Polygons(paths_.size());
+  for (auto p : paths_) {
+    auto sp = SimplePolygon(p.size());
     for (int i = 0; i < p.size(); ++i) {
       sp.push_back({{p[i].x, p[i].y}, i});
     }
