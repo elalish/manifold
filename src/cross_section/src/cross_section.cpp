@@ -136,7 +136,7 @@ CrossSection CrossSection::Circle(float radius, int circularSegments) {
 CrossSection CrossSection::Boolean(const CrossSection& second,
                                    OpType op) const {
   auto ct = cliptype_of_op(op);
-  auto res = C2::BooleanOp(ct, C2::FillRule::NonZero, paths_, second.paths_,
+  auto res = C2::BooleanOp(ct, C2::FillRule::Positive, paths_, second.paths_,
                            precision_);
   return CrossSection(res, true);
 }
@@ -156,7 +156,8 @@ CrossSection CrossSection::BatchBoolean(
   }
 
   auto ct = cliptype_of_op(op);
-  auto res = C2::BooleanOp(ct, C2::FillRule::NonZero, subjs, clips, precision_);
+  auto res =
+      C2::BooleanOp(ct, C2::FillRule::Positive, subjs, clips, precision_);
   return CrossSection(res, true);
 }
 
@@ -264,7 +265,7 @@ CrossSection CrossSection::MinkowskiSum(const std::vector<glm::vec2> pattern) {
     auto ss = C2::MinkowskiSum(pat, p, true);
     summed.insert(summed.end(), ss.begin(), ss.end());
   }
-  auto u = Union(summed, C2::FillRule::NonZero);
+  auto u = Union(summed, C2::FillRule::Positive);
   return CrossSection(u, true);
 }
 
@@ -275,14 +276,14 @@ CrossSection CrossSection::MinkowskiDiff(const std::vector<glm::vec2> pattern) {
     auto ss = C2::MinkowskiDiff(pat, p, true);
     diffed.insert(diffed.end(), ss.begin(), ss.end());
   }
-  auto u = Union(diffed, C2::FillRule::NonZero);
+  auto u = Union(diffed, C2::FillRule::Positive);
   return CrossSection(u, true);
 }
 
 Polygons CrossSection::ToPolygons() const {
   auto polys = Polygons();
   auto paths =
-      clean_ ? paths_ : C2::Union(paths_, C2::FillRule::NonZero, precision_);
+      clean_ ? paths_ : C2::Union(paths_, C2::FillRule::Positive, precision_);
   for (auto p : paths) {
     auto sp = SimplePolygon();
     for (int i = 0; i < p.size(); ++i) {
