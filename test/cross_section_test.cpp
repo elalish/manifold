@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "clippoly.h"
+#include "cross_section.h"
 
 #include "manifold.h"
 #include "polygon.h"
@@ -24,24 +24,24 @@
 
 using namespace manifold;
 
-TEST(Clippoly, Union) {
-  auto a = Clippoly::Square({5., 5.}, true);
+TEST(CrossSection, Union) {
+  auto a = CrossSection::Square({5., 5.}, true);
   auto b = a.Translate({2.5, 2.5});
   auto result = Manifold::Extrude(a + b, 5.);
 
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels)
-    ExportMesh("clippoly_union.glb", result.GetMesh(), {});
+    ExportMesh("cross_section_union.glb", result.GetMesh(), {});
 #endif
 }
 
-TEST(Clippoly, RoundOffset) {
-  auto a = Clippoly::Square({20., 20.}, true);
-  auto rounded = a.Offset(5., Clippoly::JoinType::Round);
+TEST(CrossSection, RoundOffset) {
+  auto a = CrossSection::Square({20., 20.}, true);
+  auto rounded = a.Offset(5., CrossSection::JoinType::Round);
   auto result = Manifold::Extrude(rounded, 5.);
 
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels)
-    ExportMesh("clippoly_round_offset.glb", result.GetMesh(), {});
+    ExportMesh("cross_section_round_offset.glb", result.GetMesh(), {});
 #endif
 }

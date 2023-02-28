@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-project (clippoly)
+project (cross_section)
 
 file(GLOB_RECURSE SOURCE_FILES CONFIGURE_DEPENDS *.cpp)
 add_library(${PROJECT_NAME} OBJECT ${SOURCE_FILES})
@@ -22,7 +22,6 @@ target_include_directories(${PROJECT_NAME}
 )
 target_link_libraries( ${PROJECT_NAME}
     PUBLIC utilities Clipper2
-    # PRIVATE Clipper2
 )
 
 target_compile_options(${PROJECT_NAME} PRIVATE ${MANIFOLD_FLAGS})
