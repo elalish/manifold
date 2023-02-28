@@ -104,6 +104,18 @@ Clippoly Clippoly::Square(glm::vec2 dims, bool center) {
   return Clippoly(ps, true);
 }
 
+Clippoly Clippoly::Circle(float radius, int circularSegments) {
+  // GetCircularSegments(radius) -- in Manifold, not available atm
+  int n = circularSegments > 2 ? circularSegments : 3;
+  float dPhi = 360.0f / n;
+  auto circle = C2::PathsD(1);
+  for (int i = 0; i < n; ++i) {
+    circle[0].push_back(
+        C2::PointD(radius * cosd(dPhi * i), radius * sind(dPhi * i)));
+  }
+  return Clippoly(circle, true);
+}
+
 Clippoly Clippoly::Boolean(const Clippoly& second, OpType op) const {
   auto ct = cliptype_of_op(op);
   auto res = C2::BooleanOp(ct, C2::FillRule::NonZero, paths_, second.paths_,

@@ -35,6 +35,7 @@ class Clippoly {
 
   // Shapes
   static Clippoly Square(glm::vec2 dims, bool center = false);
+  static Clippoly Circle(float radius, int circularSegments);
 
   // Booleans
   enum class OpType { Add, Subtract, Intersect, Xor };
@@ -60,6 +61,11 @@ class Clippoly {
   Clippoly StripDuplicates();
 
   // Minkowski
+  // NOTE: OpenSCAD does not use Minkowski as is (from Clipper1). Also, they
+  // allow a list patterns (see applyMinkowski). Should read through that and
+  // write these methods such that they can take Clippoly rather than a single
+  // path pattern.
+  // https://github.com/openscad/openscad/blob/master/src/geometry/ClipperUtils.cc#L190
   Clippoly MinkowskiSum(const std::vector<glm::vec2> pattern);
   Clippoly MinkowskiDiff(const std::vector<glm::vec2> pattern);
 
