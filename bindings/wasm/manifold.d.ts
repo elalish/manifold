@@ -12,18 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-interface SealedUint32Array<N extends number> extends Uint32Array {
+export interface SealedUint32Array<N extends number> extends Uint32Array {
   length: N;
 }
 
-interface SealedFloat32Array<N extends number> extends Float32Array {
+export interface SealedFloat32Array<N extends number> extends Float32Array {
   length: N;
 }
 
-type Vec2 = [number, number];
-type Vec3 = [number, number, number];
+export type Vec2 = [number, number];
+export type Vec3 = [number, number, number];
 // 4x4 matrix stored in column-major order
-type Mat4 = [
+export type Mat4 = [
   number,
   number,
   number,
@@ -41,21 +41,21 @@ type Mat4 = [
   number,
   number,
 ];
-type SimplePolygon = Vec2[];
-type Polygons = SimplePolygon|SimplePolygon[];
-type Box = {
+export type SimplePolygon = Vec2[];
+export type Polygons = SimplePolygon|SimplePolygon[];
+export type Box = {
   min: Vec3,
   max: Vec3
 };
-type Smoothness = {
+export type Smoothness = {
   halfedge: number,
   smoothness: number
 };
-type Properties = {
+export type Properties = {
   surfaceArea: number,
   volume: number
 };
-type Curvature = {
+export type Curvature = {
   maxMeanCurvature: number,
   minMeanCurvature: number,
   maxGaussianCurvature: number,
@@ -64,7 +64,7 @@ type Curvature = {
   vertGaussianCurvature: number[]
 };
 
-declare class Mesh {
+export class Mesh {
   constructor(options: {
     numProp: number,
     vertProperties: Float32Array,
@@ -97,7 +97,7 @@ declare class Mesh {
   transform(run: number): Mat4;
 }
 
-declare class Manifold {
+export class Manifold {
   /**
    * Convert a Mesh into a Manifold, retaining its properties and merging only
    * the positions according to the merge vectors. Will throw an error if the
@@ -299,7 +299,7 @@ declare class Manifold {
  * @param size The X, Y, and Z dimensions of the box.
  * @param center Set to true to shift the center to the origin.
  */
-declare function cube(size?: Vec3|number, center?: boolean): Manifold;
+function cube(size?: Vec3|number, center?: boolean): Manifold;
 
 /**
  * A convenience constructor for the common case of extruding a circle. Can also
@@ -314,7 +314,7 @@ declare function cube(size?: Vec3|number, center?: boolean): Manifold;
  * @param center Set to true to shift the center to the origin. Default is
  * origin at the bottom.
  */
-declare function cylinder(
+function cylinder(
     height: number, radiusLow: number, radiusHigh?: number,
     circularSegments?: number, center?: boolean): Manifold;
 
@@ -328,7 +328,7 @@ declare function cylinder(
  * there are a circle of vertices on all three of the axis planes. Default is
  * calculated by the static Defaults.
  */
-declare function sphere(radius: number, circularSegments?: number): Manifold;
+function sphere(radius: number, circularSegments?: number): Manifold;
 
 
 /**
@@ -359,13 +359,13 @@ declare function sphere(radius: number, circularSegments?: number): Manifold;
  * can be sharpened by sharping all edges that are incident on it, allowing
  * cones to be formed.
  */
-declare function smooth(mesh: Mesh, sharpenedEdges?: Smoothness[]): Manifold;
+function smooth(mesh: Mesh, sharpenedEdges?: Smoothness[]): Manifold;
 
 /**
  * Constructs a tetrahedron centered at the origin with one vertex at (1,1,1)
  * and the rest at similarly symmetric points.
  */
-declare function tetrahedron(): Manifold;
+function tetrahedron(): Manifold;
 
 /**
  * Constructs a manifold from a set of polygons by extruding them along the
@@ -382,7 +382,7 @@ declare function tetrahedron(): Manifold;
  * scale is {0, 0}, a pure cone is formed with only a single vertex at the top.
  * Default {1, 1}.
  */
-declare function extrude(
+function extrude(
     crossSection: Polygons, height: number, nDivisions?: number,
     twistDegrees?: number, scaleTop?: Vec2): Manifold;
 
@@ -397,16 +397,16 @@ declare function extrude(
  * @param circularSegments Number of segments along its diameter. Default is
  * calculated by the static Defaults.
  */
-declare function revolve(
+function revolve(
     crossSection: Polygons, circularSegments?: number): Manifold;
 
-declare function union(a: Manifold, b: Manifold): Manifold;
-declare function difference(a: Manifold, b: Manifold): Manifold;
-declare function intersection(a: Manifold, b: Manifold): Manifold;
+function union(a: Manifold, b: Manifold): Manifold;
+function difference(a: Manifold, b: Manifold): Manifold;
+function intersection(a: Manifold, b: Manifold): Manifold;
 
-declare function union(manifolds: Manifold[]): Manifold;
-declare function difference(manifolds: Manifold[]): Manifold;
-declare function intersection(manifolds: Manifold[]): Manifold;
+function union(manifolds: Manifold[]): Manifold;
+function difference(manifolds: Manifold[]): Manifold;
+function intersection(manifolds: Manifold[]): Manifold;
 
 /**
  * Constructs a new manifold from a list of other manifolds. This is a purely
@@ -415,7 +415,7 @@ declare function intersection(manifolds: Manifold[]): Manifold;
  *
  * @param manifolds A list of Manifolds to lazy-union together.
  */
-declare function compose(manifolds: Manifold[]): Manifold;
+function compose(manifolds: Manifold[]): Manifold;
 
 /**
  * Constructs a level-set Mesh from the input Signed-Distance Function (SDF).
@@ -434,7 +434,7 @@ declare function compose(manifolds: Manifold[]): Manifold;
  * @param level You can inset your Mesh by using a positive value, or outset
  * it with a negative value.
  */
-declare function levelSet(
+function levelSet(
     sdf: (point: Vec3) => number, bounds: Box, edgeLength: number,
     level?: number): Manifold;
 
@@ -448,10 +448,10 @@ declare function levelSet(
  * must be specified.
  */
 ///@{
-declare function setMinCircularAngle(angle: number): void;
-declare function setMinCircularEdgeLength(length: number): void;
-declare function setCircularSegments(segments: number): void;
-declare function getCircularSegments(radius: number): number;
+function setMinCircularAngle(angle: number): void;
+function setMinCircularEdgeLength(length: number): void;
+function setCircularSegments(segments: number): void;
+function getCircularSegments(radius: number): number;
 ///@}
 
 /**
@@ -459,9 +459,9 @@ declare function getCircularSegments(radius: number): number;
  * triangles that can be looked up after further operations. Assign to
  * Mesh.runOriginalID vector.
  */
-declare function reserveIDs(count: number): number;
+function reserveIDs(count: number): number;
 
-declare interface ManifoldStatic {
+export interface ManifoldStatic {
   cube: typeof cube;
   cylinder: typeof cylinder;
   sphere: typeof sphere;
@@ -484,4 +484,4 @@ declare interface ManifoldStatic {
   setup: () => void;
 }
 
-declare function Module(): Promise<ManifoldStatic>;
+export default function Module(): Promise<ManifoldStatic>;
