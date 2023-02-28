@@ -31,8 +31,8 @@ class CrossSection {
   CrossSection& operator=(const CrossSection& other);
   CrossSection(CrossSection&&) noexcept;
   CrossSection& operator=(CrossSection&&) noexcept;
-  CrossSection(std::vector<glm::vec2> contour);
-  CrossSection(std::vector<std::vector<glm::vec2>> contours);
+  CrossSection(const SimplePolygon& contour);
+  CrossSection(const Polygons& contours);
 
   // Shapes
   static CrossSection Square(glm::vec2 dims, bool center = false);

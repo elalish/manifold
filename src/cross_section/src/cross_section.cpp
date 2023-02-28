@@ -62,7 +62,7 @@ C2::JoinType jt(CrossSection::JoinType jointype) {
   return jt;
 }
 
-C2::PathD pathd_of_contour(std::vector<glm::vec2> ctr) {
+C2::PathD pathd_of_contour(const SimplePolygon& ctr) {
   auto p = C2::PathD(ctr.size());
   for (auto v : ctr) {
     p.push_back(C2::PointD(v.x, v.y));
@@ -81,12 +81,12 @@ CrossSection::CrossSection(const CrossSection& other) {
 }
 CrossSection::CrossSection(C2::PathsD ps) { paths_ = ps; }
 
-CrossSection::CrossSection(std::vector<glm::vec2> contour) {
+CrossSection::CrossSection(const SimplePolygon& contour) {
   auto ps = C2::PathsD{(pathd_of_contour(contour))};
   paths_ = C2::Union(ps, C2::FillRule::Positive);
 }
 
-CrossSection::CrossSection(std::vector<std::vector<glm::vec2>> contours) {
+CrossSection::CrossSection(const Polygons& contours) {
   auto ps = C2::PathsD(contours.size());
   for (auto ctr : contours) {
     ps.push_back(pathd_of_contour(ctr));
