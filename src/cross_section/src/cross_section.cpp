@@ -204,6 +204,22 @@ CrossSection CrossSection::Translate(glm::vec2 v) {
   return CrossSection(ps);
 }
 
+CrossSection CrossSection::Rotate(float degrees) {
+  auto rotated = C2::PathsD(paths_.size());
+  auto s = sind(degrees);
+  auto c = cosd(degrees);
+  for (auto path : paths_) {
+    auto r = C2::PathD(path.size());
+    for (auto p : path) {
+      auto rx = (p.x * c) - (p.y * s);
+      auto ry = (p.y * c) + (p.x * s);
+      r.push_back(C2::PointD(rx, ry));
+    }
+    rotated.push_back(r);
+  }
+  return CrossSection(rotated);
+}
+
 CrossSection CrossSection::Scale(glm::vec2 scale) {
   auto scaled = C2::PathsD(paths_.size());
   for (auto path : paths_) {

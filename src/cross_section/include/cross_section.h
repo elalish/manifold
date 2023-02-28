@@ -52,6 +52,7 @@ class CrossSection {
 
   // Transformations
   CrossSection Translate(glm::vec2 v);
+  CrossSection Rotate(float degrees);
   CrossSection Scale(glm::vec2 s);
 
   // Path Simplification
