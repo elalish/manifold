@@ -63,14 +63,9 @@ class Manifold {
                            float radiusHigh = -1.0f, int circularSegments = 0,
                            bool center = false);
   static Manifold Sphere(float radius, int circularSegments = 0);
-  static Manifold Extrude(Polygons crossSection, float height,
+  static Manifold Extrude(const CrossSection& crossSection, float height,
                           int nDivisions = 0, float twistDegrees = 0.0f,
                           glm::vec2 scaleTop = glm::vec2(1.0f));
-  static Manifold Extrude(CrossSection crossSection, float height,
-                          int nDivisions = 0, float twistDegrees = 0.0f,
-                          glm::vec2 scaleTop = glm::vec2(1.0f));
-  static Manifold Revolve(const Polygons& crossSection,
-                          int circularSegments = 0);
   static Manifold Revolve(const CrossSection& crossSection,
                           int circularSegments = 0);
   ///@}

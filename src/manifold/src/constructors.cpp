@@ -224,8 +224,11 @@ Manifold Manifold::Sphere(float radius, int circularSegments) {
  * scale is {0, 0}, a pure cone is formed with only a single vertex at the top.
  * Default {1, 1}.
  */
-Manifold Manifold::Extrude(Polygons crossSection, float height, int nDivisions,
-                           float twistDegrees, glm::vec2 scaleTop) {
+Manifold Manifold::Extrude(const CrossSection& crossSection, float height,
+                           int nDivisions, float twistDegrees,
+                           glm::vec2 scaleTop) {
+  auto polygons = crossSection.ToPolygons();
+
   scaleTop.x = glm::max(scaleTop.x, 0.0f);
   scaleTop.y = glm::max(scaleTop.y, 0.0f);
 
@@ -237,15 +240,15 @@ Manifold Manifold::Extrude(Polygons crossSection, float height, int nDivisions,
   int nCrossSection = 0;
   bool isCone = scaleTop.x == 0.0 && scaleTop.y == 0.0;
   int idx = 0;
-  PolygonsIdx crossSectionIndexed;
-  for (auto& poly : crossSection) {
+  PolygonsIdx polygonsIndexed;
+  for (auto& poly : polygons) {
     nCrossSection += poly.size();
     SimplePolygonIdx simpleIndexed;
     for (const glm::vec2& polyVert : poly) {
       vertPos.push_back({polyVert.x, polyVert.y, 0.0f});
       simpleIndexed.push_back({polyVert, idx++});
     }
-    crossSectionIndexed.push_back(simpleIndexed);
+    polygonsIndexed.push_back(simpleIndexed);
   }
   for (int i = 1; i < nDivisions + 1; ++i) {
     float alpha = i / float(nDivisions);
@@ -255,7 +258,7 @@ Manifold Manifold::Extrude(Polygons crossSection, float height, int nDivisions,
     transform = transform * glm::mat2(scale.x, 0.0f, 0.0f, scale.y);
     int j = 0;
     int idx = 0;
-    for (const auto& poly : crossSection) {
+    for (const auto& poly : polygons) {
       for (int vert = 0; vert < poly.size(); ++vert) {
         int offset = idx + nCrossSection * i;
         int thisVert = vert + offset;
@@ -276,9 +279,9 @@ Manifold Manifold::Extrude(Polygons crossSection, float height, int nDivisions,
     }
   }
   if (isCone)
-    for (int j = 0; j < crossSection.size(); ++j)  // Duplicate vertex for Genus
+    for (int j = 0; j < polygons.size(); ++j)  // Duplicate vertex for Genus
       vertPos.push_back({0.0f, 0.0f, height});
-  std::vector<glm::ivec3> top = Triangulate(crossSectionIndexed);
+  std::vector<glm::ivec3> top = Triangulate(polygonsIndexed);
   for (const glm::ivec3& tri : top) {
     triVerts.push_back({tri[0], tri[2], tri[1]});
     if (!isCone) triVerts.push_back(tri + nCrossSection * nDivisions);
@@ -292,11 +295,6 @@ Manifold Manifold::Extrude(Polygons crossSection, float height, int nDivisions,
   return Manifold(pImpl_);
 }
 
-Manifold Manifold::Extrude(CrossSection poly, float height, int nDivisions,
-                           float twistDegrees, glm::vec2 scaleTop) {
-  return Extrude(poly.ToPolygons(), height, nDivisions, twistDegrees, scaleTop);
-}
-
 /**
  * Constructs a manifold from a set of polygons by revolving this cross-section
  * around its Y-axis and then setting this as the Z-axis of the resulting
@@ -308,9 +306,12 @@ Manifold Manifold::Extrude(CrossSection poly, float height, int nDivisions,
  * @param circularSegments Number of segments along its diameter. Default is
  * calculated by the static Defaults.
  */
-Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments) {
+Manifold Manifold::Revolve(const CrossSection& crossSection,
+                           int circularSegments) {
+  auto polygons = crossSection.ToPolygons();
+
   float radius = 0.0f;
-  for (const auto& poly : crossSection) {
+  for (const auto& poly : polygons) {
     for (const auto& vert : poly) {
       radius = fmax(radius, vert.x);
     }
@@ -322,7 +323,7 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments) {
   VecDH<glm::ivec3> triVertsDH;
   auto& triVerts = triVertsDH;
   float dPhi = 360.0f / nDivisions;
-  for (const auto& poly : crossSection) {
+  for (const auto& poly : polygons) {
     int start = -1;
     for (int polyVert = 0; polyVert < poly.size(); ++polyVert) {
       if (poly[polyVert].x <= 0) {
@@ -396,10 +397,6 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments) {
   pImpl_->InitializeOriginal();
   pImpl_->CreateFaces();
   return Manifold(pImpl_);
-}
-
-Manifold Manifold::Revolve(const CrossSection& poly, int circularSegments) {
-  return Revolve(poly.ToPolygons(), circularSegments);
 }
 
 /**
