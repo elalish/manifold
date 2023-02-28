@@ -29,7 +29,7 @@ using namespace manifold;
 ExecutionParams params;
 
 #ifdef MANIFOLD_DEBUG
-struct Polyedge {
+struct PolyEdge {
   int startVert, endVert;
 };
 
@@ -63,8 +63,8 @@ bool OverlapAssert(bool condition, const char *file, int line,
 #define PRINT(msg) \
   if (params.verbose) std::cout << msg << std::endl;
 
-std::vector<Polyedge> Polygons2Edges(const Polygons &polys) {
-  std::vector<Polyedge> halfedges;
+std::vector<PolyEdge> Polygons2Edges(const PolygonsIdx &polys) {
+  std::vector<PolyEdge> halfedges;
   for (const auto &poly : polys) {
     for (int i = 1; i < poly.size(); ++i) {
       halfedges.push_back({poly[i - 1].idx, poly[i].idx});
@@ -74,9 +74,9 @@ std::vector<Polyedge> Polygons2Edges(const Polygons &polys) {
   return halfedges;
 }
 
-std::vector<Polyedge> Triangles2Edges(
+std::vector<PolyEdge> Triangles2Edges(
     const std::vector<glm::ivec3> &triangles) {
-  std::vector<Polyedge> halfedges;
+  std::vector<PolyEdge> halfedges;
   for (const glm::ivec3 &tri : triangles) {
     halfedges.push_back({tri[0], tri[1]});
     halfedges.push_back({tri[1], tri[2]});
@@ -85,26 +85,26 @@ std::vector<Polyedge> Triangles2Edges(
   return halfedges;
 }
 
-void CheckTopology(const std::vector<Polyedge> &halfedges) {
+void CheckTopology(const std::vector<PolyEdge> &halfedges) {
   ASSERT(halfedges.size() % 2 == 0, topologyErr, "Odd number of halfedges.");
   size_t n_edges = halfedges.size() / 2;
-  std::vector<Polyedge> forward(halfedges.size()), backward(halfedges.size());
+  std::vector<PolyEdge> forward(halfedges.size()), backward(halfedges.size());
 
   auto end = std::copy_if(halfedges.begin(), halfedges.end(), forward.begin(),
-                          [](Polyedge e) { return e.endVert > e.startVert; });
+                          [](PolyEdge e) { return e.endVert > e.startVert; });
   ASSERT(std::distance(forward.begin(), end) == n_edges, topologyErr,
          "Half of halfedges should be forward.");
   forward.resize(n_edges);
 
   end = std::copy_if(halfedges.begin(), halfedges.end(), backward.begin(),
-                     [](Polyedge e) { return e.endVert < e.startVert; });
+                     [](PolyEdge e) { return e.endVert < e.startVert; });
   ASSERT(std::distance(backward.begin(), end) == n_edges, topologyErr,
          "Half of halfedges should be backward.");
   backward.resize(n_edges);
 
   std::for_each(backward.begin(), backward.end(),
-                [](Polyedge &e) { std::swap(e.startVert, e.endVert); });
-  auto cmp = [](const Polyedge &a, const Polyedge &b) {
+                [](PolyEdge &e) { std::swap(e.startVert, e.endVert); });
+  auto cmp = [](const PolyEdge &a, const PolyEdge &b) {
     return a.startVert < b.startVert ||
            (a.startVert == b.startVert && a.endVert < b.endVert);
   };
@@ -126,17 +126,17 @@ void CheckTopology(const std::vector<Polyedge> &halfedges) {
 }
 
 void CheckTopology(const std::vector<glm::ivec3> &triangles,
-                   const Polygons &polys) {
-  std::vector<Polyedge> halfedges = Triangles2Edges(triangles);
-  std::vector<Polyedge> openEdges = Polygons2Edges(polys);
-  for (Polyedge e : openEdges) {
+                   const PolygonsIdx &polys) {
+  std::vector<PolyEdge> halfedges = Triangles2Edges(triangles);
+  std::vector<PolyEdge> openEdges = Polygons2Edges(polys);
+  for (PolyEdge e : openEdges) {
     halfedges.push_back({e.endVert, e.startVert});
   }
   CheckTopology(halfedges);
 }
 
 void CheckGeometry(const std::vector<glm::ivec3> &triangles,
-                   const Polygons &polys, float precision) {
+                   const PolygonsIdx &polys, float precision) {
   std::map<int, glm::vec2> vertPos;
   for (const auto &poly : polys) {
     for (int i = 0; i < poly.size(); ++i) {
@@ -151,7 +151,7 @@ void CheckGeometry(const std::vector<glm::ivec3> &triangles,
          geometryErr, "triangulation is not entirely CCW!");
 }
 
-void Dump(const Polygons &polys) {
+void Dump(const PolygonsIdx &polys) {
   for (auto poly : polys) {
     std::cout << "polys.push_back({" << std::setprecision(9) << std::endl;
     for (auto v : poly) {
@@ -169,7 +169,7 @@ void Dump(const Polygons &polys) {
   }
 }
 
-void PrintFailure(const std::exception &e, const Polygons &polys,
+void PrintFailure(const std::exception &e, const PolygonsIdx &polys,
                   std::vector<glm::ivec3> &triangles, float precision) {
   std::cout << "-----------------------------------" << std::endl;
   std::cout << "Triangulation failed! Precision = " << precision << std::endl;
@@ -193,10 +193,10 @@ void PrintFailure(const std::exception &e, const Polygons &polys,
  */
 class Monotones {
  public:
-  Monotones(const Polygons &polys, float precision) : precision_(precision) {
+  Monotones(const PolygonsIdx &polys, float precision) : precision_(precision) {
     VertItr start, last, current;
     float bound = 0;
-    for (const SimplePolygon &poly : polys) {
+    for (const SimplePolygonIdx &poly : polys) {
       for (int i = 0; i < poly.size(); ++i) {
         monotones_.push_back({poly[i].pos,  //
                               poly[i].idx,  //
@@ -272,7 +272,7 @@ class Monotones {
   void Check() {
 #ifdef MANIFOLD_DEBUG
     if (!params.intermediateChecks) return;
-    std::vector<Polyedge> edges;
+    std::vector<PolyEdge> edges;
     for (VertItr vert = monotones_.begin(); vert != monotones_.end(); vert++) {
       vert->SetProcessed(false);
       edges.push_back({vert->mesh_idx, vert->right->mesh_idx});
@@ -306,7 +306,7 @@ class Monotones {
   typedef std::list<VertAdj>::iterator VertItr;
   struct EdgePair;
   typedef std::list<EdgePair>::iterator PairItr;
-  enum VertType { Start, Westside, Eastside, Merge, End, Skip };
+  enum VertType { Start, WestSide, EastSide, Merge, End, Skip };
 
   std::list<VertAdj> monotones_;     // sweep-line list of verts
   std::list<EdgePair> activePairs_;  // west to east list of monotone edge pairs
@@ -487,7 +487,7 @@ class Monotones {
 
   PairItr GetPair(VertItr vert, VertType type) const {
     // Merge returns westPair, as this is the one that will be removed.
-    return type == Westside ? vert->eastPair : vert->westPair;
+    return type == WestSide ? vert->eastPair : vert->westPair;
   }
 
   bool Coincident(glm::vec2 p0, glm::vec2 p1) const {
@@ -538,8 +538,8 @@ class Monotones {
           return Skip;
         }
         SetVWest(eastPair, vert);
-        PRINT("Westside");
-        return Westside;
+        PRINT("WestSide");
+        return WestSide;
       }
     } else {
       if (vert->left->Processed()) {
@@ -550,8 +550,8 @@ class Monotones {
           return Skip;
         }
         SetVEast(westPair, vert);
-        PRINT("Eastside");
-        return Eastside;
+        PRINT("EastSide");
+        return EastSide;
       } else {
         PRINT("Start");
         return Start;
@@ -575,7 +575,7 @@ class Monotones {
    * function will continue to search up the neighbors until the degeneracy is
    * broken and a certain answer is returned. Like CCW, this function returns 1
    * for a hole, -1 for a start, and 0 only if the entire polygon degenerates to
-   * a polyline.
+   * a line.
    */
   int IsHole(VertItr vert) const {
     VertItr left = vert->left;
@@ -865,10 +865,10 @@ class Monotones {
         monotones_.splice(insertAt, monotones_, vert);
 
       switch (type) {
-        case Westside:
+        case WestSide:
           nextAttached.push(vert->left);
           break;
-        case Eastside:
+        case EastSide:
           nextAttached.push(vert->right);
           break;
         case Start:
@@ -958,11 +958,11 @@ class Monotones {
         }
         case End:
           RemovePair(westPair);
-        case Westside:
-        case Eastside:
+        case WestSide:
+        case EastSide:
           if (westPair->vMerge != monotones_.end()) {
             VertItr eastVert = SplitVerts(vert, westPair->vMerge);
-            if (type == Westside) westPair->vWest = eastVert;
+            if (type == WestSide) westPair->vWest = eastVert;
             westPair->vMerge = monotones_.end();
           }
           break;
@@ -1042,7 +1042,7 @@ namespace manifold {
  * @return std::vector<glm::ivec3> The triangles, referencing the original
  * vertex indicies.
  */
-std::vector<glm::ivec3> Triangulate(const Polygons &polys, float precision) {
+std::vector<glm::ivec3> Triangulate(const PolygonsIdx &polys, float precision) {
   std::vector<glm::ivec3> triangles;
   try {
     Monotones monotones(polys, precision);

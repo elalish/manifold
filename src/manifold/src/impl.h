@@ -18,6 +18,7 @@
 #include "collider.h"
 #include "manifold.h"
 #include "optional_assert.h"
+#include "polygon.h"
 #include "shared.h"
 #include "sparse.h"
 #include "utils.h"
@@ -112,8 +113,8 @@ struct Manifold::Impl {
 
   // face_op.cu
   void Face2Tri(const VecDH<int>& faceEdge, const VecDH<TriRef>& halfedgeRef);
-  Polygons Face2Polygons(int face, glm::mat3x2 projection,
-                         const VecDH<int>& faceEdge) const;
+  PolygonsIdx Face2Polygons(int face, glm::mat3x2 projection,
+                            const VecDH<int>& faceEdge) const;
 
   // edge_op.cu
   void SimplifyTopology();

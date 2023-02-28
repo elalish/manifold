@@ -22,7 +22,21 @@ namespace manifold {
 /** @addtogroup Private
  *  @{
  */
-std::vector<glm::ivec3> Triangulate(const Polygons &polys,
+
+/**
+ * Polygon vertex.
+ */
+struct PolyVert {
+  /// X-Y position
+  glm::vec2 pos;
+  /// ID or index into another vertex vector
+  int idx;
+};
+
+using SimplePolygonIdx = std::vector<PolyVert>;
+using PolygonsIdx = std::vector<SimplePolygonIdx>;
+
+std::vector<glm::ivec3> Triangulate(const PolygonsIdx &polys,
                                     float precision = -1);
 
 ExecutionParams &PolygonParams();

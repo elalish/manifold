@@ -118,21 +118,11 @@ inline HOST_DEVICE int CCW(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2,
  */
 
 /**
- * Polygon vertex.
- */
-struct PolyVert {
-  /// X-Y position
-  glm::vec2 pos;
-  /// ID or index into another vertex vector
-  int idx;
-};
-
-/**
  * Single polygon contour, wound CCW. First and last point are implicitly
  * connected. Should ensure all input is
  * [&epsilon;-valid](https://github.com/elalish/manifold/wiki/Manifold-Library#definition-of-%CE%B5-valid).
  */
-using SimplePolygon = std::vector<PolyVert>;
+using SimplePolygon = std::vector<glm::vec2>;
 
 /**
  * Set of polygons with holes. Order of contours is arbitrary. Can contain any

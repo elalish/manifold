@@ -73,16 +73,16 @@ int main(int argc, char** argv) {
 Polygons SquareHole(float xOffset) {
   Polygons polys;
   polys.push_back({
-      {glm::vec2(2 + xOffset, 2), 0},    //
-      {glm::vec2(-2 + xOffset, 2), 0},   //
-      {glm::vec2(-2 + xOffset, -2), 0},  //
-      {glm::vec2(2 + xOffset, -2), 0},   //
+      {2 + xOffset, 2},    //
+      {-2 + xOffset, 2},   //
+      {-2 + xOffset, -2},  //
+      {2 + xOffset, -2},   //
   });
   polys.push_back({
-      {glm::vec2(-1 + xOffset, 1), 0},   //
-      {glm::vec2(1 + xOffset, 1), 0},    //
-      {glm::vec2(1 + xOffset, -1), 0},   //
-      {glm::vec2(-1 + xOffset, -1), 0},  //
+      {-1 + xOffset, 1},   //
+      {1 + xOffset, 1},    //
+      {1 + xOffset, -1},   //
+      {-1 + xOffset, -1},  //
   });
   return polys;
 }

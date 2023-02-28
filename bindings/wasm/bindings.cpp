@@ -46,9 +46,9 @@ std::vector<SimplePolygon> ToPolygon(
     std::vector<std::vector<glm::vec2>>& polygons) {
   std::vector<SimplePolygon> simplePolygons(polygons.size());
   for (int i = 0; i < polygons.size(); i++) {
-    std::vector<PolyVert> vertices(polygons[i].size());
+    std::vector<glm::vec2> vertices(polygons[i].size());
     for (int j = 0; j < polygons[i].size(); j++) {
-      vertices[j] = {polygons[i][j], j};
+      vertices[j] = polygons[i][j];
     }
     simplePolygons[i] = {vertices};
   }

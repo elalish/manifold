@@ -175,8 +175,7 @@ Manifold Manifold::Cylinder(float height, float radiusLow, float radiusHigh,
   Polygons circle(1);
   float dPhi = 360.0f / n;
   for (int i = 0; i < n; ++i) {
-    circle[0].push_back(
-        {radiusLow * glm::vec2(cosd(dPhi * i), sind(dPhi * i)), 0});
+    circle[0].push_back(radiusLow * glm::vec2(cosd(dPhi * i), sind(dPhi * i)));
   }
   Manifold cylinder =
       Manifold::Extrude(circle, height, 0, 0.0f, glm::vec2(scale));
@@ -237,12 +236,15 @@ Manifold Manifold::Extrude(Polygons crossSection, float height, int nDivisions,
   int nCrossSection = 0;
   bool isCone = scaleTop.x == 0.0 && scaleTop.y == 0.0;
   int idx = 0;
+  PolygonsIdx crossSectionIndexed;
   for (auto& poly : crossSection) {
     nCrossSection += poly.size();
-    for (PolyVert& polyVert : poly) {
-      vertPos.push_back({polyVert.pos.x, polyVert.pos.y, 0.0f});
-      polyVert.idx = idx++;
+    SimplePolygonIdx simpleIndexed;
+    for (const glm::vec2& polyVert : poly) {
+      vertPos.push_back({polyVert.x, polyVert.y, 0.0f});
+      simpleIndexed.push_back({polyVert, idx++});
     }
+    crossSectionIndexed.push_back(simpleIndexed);
   }
   for (int i = 1; i < nDivisions + 1; ++i) {
     float alpha = i / float(nDivisions);
@@ -261,7 +263,7 @@ Manifold Manifold::Extrude(Polygons crossSection, float height, int nDivisions,
           triVerts.push_back({nCrossSection * i + j, lastVert - nCrossSection,
                               thisVert - nCrossSection});
         } else {
-          glm::vec2 pos = transform * poly[vert].pos;
+          glm::vec2 pos = transform * poly[vert];
           vertPos.push_back({pos.x, pos.y, height * alpha});
           triVerts.push_back({thisVert, lastVert, thisVert - nCrossSection});
           triVerts.push_back(
@@ -275,7 +277,7 @@ Manifold Manifold::Extrude(Polygons crossSection, float height, int nDivisions,
   if (isCone)
     for (int j = 0; j < crossSection.size(); ++j)  // Duplicate vertex for Genus
       vertPos.push_back({0.0f, 0.0f, height});
-  std::vector<glm::ivec3> top = Triangulate(crossSection);
+  std::vector<glm::ivec3> top = Triangulate(crossSectionIndexed);
   for (const glm::ivec3& tri : top) {
     triVerts.push_back({tri[0], tri[2], tri[1]});
     if (!isCone) triVerts.push_back(tri + nCrossSection * nDivisions);
@@ -304,7 +306,7 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments) {
   float radius = 0.0f;
   for (const auto& poly : crossSection) {
     for (const auto& vert : poly) {
-      radius = fmax(radius, vert.pos.x);
+      radius = fmax(radius, vert.x);
     }
   }
   int nDivisions =
@@ -317,7 +319,7 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments) {
   for (const auto& poly : crossSection) {
     int start = -1;
     for (int polyVert = 0; polyVert < poly.size(); ++polyVert) {
-      if (poly[polyVert].pos.x <= 0) {
+      if (poly[polyVert].x <= 0) {
         start = polyVert;
         break;
       }
@@ -331,7 +333,7 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments) {
         for (int slice = 0; slice < nDivisions; ++slice) {
           int lastSlice = (slice == 0 ? nDivisions : slice) - 1;
           float phi = slice * dPhi;
-          glm::vec2 pos = poly[polyVert].pos;
+          glm::vec2 pos = poly[polyVert];
           vertPos.push_back({pos.x * cosd(phi), pos.x * sind(phi), pos.y});
           triVerts.push_back({startVert + slice, startVert + lastSlice,
                               lastStart + lastSlice});
@@ -341,11 +343,11 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments) {
       }
     } else {  // poly crosses zero
       int polyVert = start;
-      glm::vec2 pos = poly[polyVert].pos;
+      glm::vec2 pos = poly[polyVert];
       do {
         glm::vec2 lastPos = pos;
         polyVert = (polyVert + 1) % poly.size();
-        pos = poly[polyVert].pos;
+        pos = poly[polyVert];
         if (pos.x > 0) {
           if (lastPos.x <= 0) {
             float a = pos.x / (pos.x - lastPos.x);
@@ -355,7 +357,7 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments) {
           for (int slice = 0; slice < nDivisions; ++slice) {
             int lastSlice = (slice == 0 ? nDivisions : slice) - 1;
             float phi = slice * dPhi;
-            glm::vec2 pos = poly[polyVert].pos;
+            glm::vec2 pos = poly[polyVert];
             vertPos.push_back({pos.x * cosd(phi), pos.x * sind(phi), pos.y});
             if (lastPos.x > 0) {
               triVerts.push_back({startVert + slice, startVert + lastSlice,
