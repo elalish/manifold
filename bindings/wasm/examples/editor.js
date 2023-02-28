@@ -222,7 +222,6 @@ require(['vs/editor/editor.main'], async function() {
     const content = await fetch(uri).then(response => response.text());
     monaco.languages.typescript.typescriptDefaults.addExtraLib(content);
   }
-  await addTypes('manifold.d.ts');
   await addTypes('editor.d.ts');
   editor = monaco.editor.create(
       document.getElementById('editor'),
