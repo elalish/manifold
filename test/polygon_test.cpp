@@ -24,22 +24,22 @@ namespace {
 
 using namespace manifold;
 
-void StandardizePoly(SimplePolygon &p) {
+void StandardizePoly(SimplePolygonIdx &p) {
   auto start = std::min_element(
       p.begin(), p.end(),
       [](const PolyVert &v1, const PolyVert &v2) { return v1.idx < v2.idx; });
   std::rotate(p.begin(), start, p.end());
 }
 
-void StandardizePolys(Polygons &polys) {
+void StandardizePolys(PolygonsIdx &polys) {
   for (auto &p : polys) StandardizePoly(p);
   std::sort(polys.begin(), polys.end(),
-            [](SimplePolygon &p1, SimplePolygon &p2) {
+            [](SimplePolygonIdx &p1, SimplePolygonIdx &p2) {
               return p1[0].idx < p2[0].idx;
             });
 }
 
-void Identical(Polygons p1, Polygons p2) {
+void Identical(PolygonsIdx p1, PolygonsIdx p2) {
   ASSERT_EQ(p1.size(), p2.size());
   StandardizePolys(p1);
   StandardizePolys(p2);
@@ -51,8 +51,8 @@ void Identical(Polygons p1, Polygons p2) {
   }
 }
 
-Polygons Turn180(Polygons polys) {
-  for (SimplePolygon &poly : polys) {
+PolygonsIdx Turn180(PolygonsIdx polys) {
+  for (SimplePolygonIdx &poly : polys) {
     for (PolyVert &vert : poly) {
       vert.pos *= -1;
     }
@@ -60,11 +60,11 @@ Polygons Turn180(Polygons polys) {
   return polys;
 }
 
-Polygons Duplicate(Polygons polys) {
+PolygonsIdx Duplicate(PolygonsIdx polys) {
   float xMin = std::numeric_limits<float>::infinity();
   float xMax = -std::numeric_limits<float>::infinity();
   int indexMax = 0;
-  for (SimplePolygon &poly : polys) {
+  for (SimplePolygonIdx &poly : polys) {
     for (PolyVert &vert : poly) {
       xMin = std::min(xMin, vert.pos.x);
       xMax = std::max(xMax, vert.pos.x);
@@ -76,7 +76,7 @@ Polygons Duplicate(Polygons polys) {
 
   const int nPolys = polys.size();
   for (int i = 0; i < nPolys; ++i) {
-    SimplePolygon poly = polys[i];
+    SimplePolygonIdx poly = polys[i];
     for (PolyVert &vert : poly) {
       vert.pos.x += shift;
       vert.idx += indexMax;
@@ -86,7 +86,7 @@ Polygons Duplicate(Polygons polys) {
   return polys;
 }
 
-void TestPoly(const Polygons &polys, int expectedNumTri,
+void TestPoly(const PolygonsIdx &polys, int expectedNumTri,
               float precision = -1.0f) {
   PolygonParams().verbose = options.params.verbose;
 
@@ -110,7 +110,7 @@ void TestPoly(const Polygons &polys, int expectedNumTri,
  * tolerance.
  */
 TEST(Polygon, SimpleHole) {
-  Polygons polys;
+  PolygonsIdx polys;
   polys.push_back({
       {glm::vec2(0, -2), 0},  //
       {glm::vec2(2, 2), 1},   //
@@ -126,7 +126,7 @@ TEST(Polygon, SimpleHole) {
 }
 
 TEST(Polygon, SimpleHole2) {
-  Polygons polys;
+  PolygonsIdx polys;
   polys.push_back({
       {glm::vec2(0, 1.63299), 0},           //
       {glm::vec2(-1.41421, -0.816496), 1},  //
@@ -141,7 +141,7 @@ TEST(Polygon, SimpleHole2) {
 }
 
 TEST(Polygon, MultiMerge) {
-  Polygons polys;
+  PolygonsIdx polys;
   polys.push_back({
       {glm::vec2(-7, 0), 0},   //
       {glm::vec2(-6, 3), 1},   //
@@ -163,7 +163,7 @@ TEST(Polygon, MultiMerge) {
 }
 
 TEST(Polygon, Colinear) {
-  Polygons polys;
+  PolygonsIdx polys;
   polys.push_back({
       {glm::vec2(-5.48368, -3.73905), 0},   //
       {glm::vec2(-4.9881, -4.51552), 1},    //
@@ -196,7 +196,7 @@ TEST(Polygon, Colinear) {
 }
 
 TEST(Polygon, Merges) {
-  Polygons polys;
+  PolygonsIdx polys;
   polys.push_back({
       {glm::vec2(-3.22039, 10.2769), 0},   //
       {glm::vec2(-3.12437, 10.4147), 1},   //
@@ -214,7 +214,7 @@ TEST(Polygon, Merges) {
 }
 
 TEST(Polygon, ExtraTriangle) {
-  Polygons polys;
+  PolygonsIdx polys;
   polys.push_back({
       {glm::vec2(1.23141634, -0.493547261), 0},  //
       {glm::vec2(1.23142254, -0.493540883), 1},  //
@@ -253,7 +253,7 @@ TEST(Polygon, ExtraTriangle) {
 }
 
 TEST(Polygon, SpongeThin) {
-  Polygons polys;
+  PolygonsIdx polys;
   polys.push_back({
       {glm::vec2(-0.5, -0.475308657), 11},          //
       {glm::vec2(-0.487654328, -0.475461066), 12},  //
@@ -308,7 +308,7 @@ TEST(Polygon, SpongeThin) {
 }
 
 TEST(Polygon, ColinearY) {
-  Polygons polys;
+  PolygonsIdx polys;
   polys.push_back({
       {glm::vec2(0, 0), 0},    //
       {glm::vec2(1, 1), 1},    //
@@ -333,7 +333,7 @@ TEST(Polygon, ColinearY) {
 }
 
 TEST(Polygon, Concave) {
-  Polygons polys;
+  PolygonsIdx polys;
   polys.push_back({
       {glm::vec2(-0.707107008, -0.707107008), 0},    //
       {glm::vec2(1, 0), 1},                          //
@@ -349,7 +349,7 @@ TEST(Polygon, Concave) {
 }
 
 TEST(Polygon, Concave2) {
-  Polygons polys;
+  PolygonsIdx polys;
   polys.push_back({
       {glm::vec2(4, 0), 1},    //
       {glm::vec2(3, 2), 3},    //
@@ -368,7 +368,7 @@ TEST(Polygon, Concave2) {
 }
 
 TEST(Polygon, Sliver) {
-  Polygons polys;
+  PolygonsIdx polys;
   polys.push_back({
       {glm::vec2(2.82002997, 0), 0},             //
       {glm::vec2(2.82002997, 0), 1},             //
@@ -384,7 +384,7 @@ TEST(Polygon, Sliver) {
 }
 
 TEST(Polygon, Duplicate) {
-  Polygons polys;
+  PolygonsIdx polys;
   polys.push_back({
       {glm::vec2(-32.0774002, -10.4309998), 0},   //
       {glm::vec2(-31.7346992, -6.10348988), 1},   //
@@ -413,7 +413,7 @@ TEST(Polygon, Duplicate) {
 }
 
 TEST(Polygon, Folded) {
-  Polygons polys;
+  PolygonsIdx polys;
   polys.push_back({
       {glm::vec2(2.82002997, 0), 0},              //
       {glm::vec2(1.23706996, 4.20994997), 1},     //
@@ -431,7 +431,7 @@ TEST(Polygon, Folded) {
 }
 
 TEST(Polygon, NearlyLinear) {
-  Polygons polys;
+  PolygonsIdx polys;
   polys.push_back({
       {glm::vec2(2.82002997, -8.22814036e-05), 0},    //
       {glm::vec2(2.82002997, -8.22814036e-05), 1},    //
@@ -445,7 +445,7 @@ TEST(Polygon, NearlyLinear) {
 }
 
 TEST(Polygon, Sliver2) {
-  Polygons polys;
+  PolygonsIdx polys;
   polys.push_back({
       {glm::vec2(27.4996014, 8.6873703), 74},    //
       {glm::vec2(28.27701, 9.52887344), 76},     //
@@ -458,7 +458,7 @@ TEST(Polygon, Sliver2) {
 }
 
 TEST(Polygon, Sliver3) {
-  Polygons polys;
+  PolygonsIdx polys;
   polys.push_back({
       {glm::vec2(0, -2.65168381), 369},               //
       {glm::vec2(0, -0.792692184), 1889},             //
@@ -471,7 +471,7 @@ TEST(Polygon, Sliver3) {
 }
 
 TEST(Polygon, Sliver4) {
-  Polygons polys;
+  PolygonsIdx polys;
   polys.push_back({
       {glm::vec2(-0.375669807, 8.90489388), 7474},  //
       {glm::vec2(0, 8.39722729), 7459},             //
@@ -486,7 +486,7 @@ TEST(Polygon, Sliver4) {
 }
 
 TEST(Polygon, Sliver5) {
-  Polygons polys;
+  PolygonsIdx polys;
   polys.push_back({
       {glm::vec2(-60, 0), 19},               //
       {glm::vec2(-50, 0), 21},               //
@@ -504,7 +504,7 @@ TEST(Polygon, Sliver5) {
 }
 
 TEST(Polygon, Sliver6) {
-  Polygons polys;
+  PolygonsIdx polys;
   polys.push_back({
       {glm::vec2(10, 0), 5},                //
       {glm::vec2(0, 10), 9},                //
@@ -517,7 +517,7 @@ TEST(Polygon, Sliver6) {
 }
 
 TEST(Polygon, Sliver7) {
-  Polygons polys;
+  PolygonsIdx polys;
   polys.push_back({
       {glm::vec2(50, -10), 0},              //
       {glm::vec2(60, 0), 25},               //
@@ -532,7 +532,7 @@ TEST(Polygon, Sliver7) {
 }
 
 TEST(Polygon, DISABLED_Sliver8) {
-  Polygons polys;
+  PolygonsIdx polys;
   polys.push_back({
       {glm::vec2(27.9279995, 4.9749999), 4},    //
       {glm::vec2(31.0610008, 2.32299995), 6},   //
@@ -546,7 +546,7 @@ TEST(Polygon, DISABLED_Sliver8) {
 }
 
 TEST(Polygon, DISABLED_Sliver9) {
-  Polygons polys;
+  PolygonsIdx polys;
   polys.push_back({
       {glm::vec2(1.49183154, -0.479596376), 16194},  //
       {glm::vec2(1.71669781, -0.246418983), 16195},  //
@@ -559,7 +559,7 @@ TEST(Polygon, DISABLED_Sliver9) {
 }
 
 TEST(Polygon, Colinear2) {
-  Polygons polys;
+  PolygonsIdx polys;
   polys.push_back({
       {glm::vec2(11.7864399, -7.4572401), 4176},    //
       {glm::vec2(11.6818037, -7.30982304), 24873},  //
@@ -572,7 +572,7 @@ TEST(Polygon, Colinear2) {
 }
 
 TEST(Polygon, Split) {
-  Polygons polys;
+  PolygonsIdx polys;
   polys.push_back({
       {glm::vec2(-0.707106769, -0.707106769), 1},     //
       {glm::vec2(1, 0), 14},                          //
@@ -588,7 +588,7 @@ TEST(Polygon, Split) {
 }
 
 TEST(Polygon, Duplicates) {
-  Polygons polys;
+  PolygonsIdx polys;
   polys.push_back({
       {glm::vec2(-15, -8.10255623), 1648},         //
       {glm::vec2(-15, -9.02439785), 1650},         //
@@ -601,7 +601,7 @@ TEST(Polygon, Duplicates) {
 }
 
 TEST(Polygon, Simple1) {
-  Polygons polys;
+  PolygonsIdx polys;
   polys.push_back({
       {glm::vec2(4.04059982, -4.01843977), 2872},   //
       {glm::vec2(3.95867562, -4.25263977), 24604},  //
@@ -613,7 +613,7 @@ TEST(Polygon, Simple1) {
 }
 
 TEST(Polygon, Simple2) {
-  Polygons polys;
+  PolygonsIdx polys;
   polys.push_back({
       {glm::vec2(-1, -1), 1},      //
       {glm::vec2(-0.5, -0.5), 9},  //
@@ -627,7 +627,7 @@ TEST(Polygon, Simple2) {
 }
 
 TEST(Polygon, Simple3) {
-  Polygons polys;
+  PolygonsIdx polys;
   polys.push_back({
       {glm::vec2(19.7193489, 6.15445995), 19798},  //
       {glm::vec2(20.2308197, 5.64299059), 31187},  //
@@ -640,7 +640,7 @@ TEST(Polygon, Simple3) {
 }
 
 TEST(Polygon, Simple4) {
-  Polygons polys;
+  PolygonsIdx polys;
   polys.push_back({
       {glm::vec2(15, -12.7135563), 287},          //
       {glm::vec2(15, -10.6843739), 288},          //
@@ -656,7 +656,7 @@ TEST(Polygon, Simple4) {
 }
 
 TEST(Polygon, Simple5) {
-  Polygons polys;
+  PolygonsIdx polys;
   polys.push_back({
       {glm::vec2(-27.3845081, 0.375669748), 364},  //
       {glm::vec2(-27.6389656, 0), 365},            //
@@ -671,7 +671,7 @@ TEST(Polygon, Simple5) {
 }
 
 TEST(Polygon, Simple6) {
-  Polygons polys;
+  PolygonsIdx polys;
   polys.push_back({
       {glm::vec2(-7.99813318, 12.8888826), 25009},  //
       {glm::vec2(-7.85714436, 12.9125195), 25006},  //
@@ -683,7 +683,7 @@ TEST(Polygon, Simple6) {
 }
 
 TEST(Polygon, TouchingHole) {
-  Polygons polys;
+  PolygonsIdx polys;
   polys.push_back({
       {glm::vec2(-2, -1), 0},  //
       {glm::vec2(2, -1), 1},   //
@@ -700,7 +700,7 @@ TEST(Polygon, TouchingHole) {
 }
 
 TEST(Polygon, Degenerate) {
-  Polygons polys;
+  PolygonsIdx polys;
   polys.push_back({
       {glm::vec2(1, -1), 0},   //
       {glm::vec2(1, 1), 1},    //
@@ -714,7 +714,7 @@ TEST(Polygon, Degenerate) {
 }
 
 TEST(Polygon, Degenerate2) {
-  Polygons polys;
+  PolygonsIdx polys;
   polys.push_back({
       {glm::vec2(0.0740740597, -0.314814836), 4829},  //
       {glm::vec2(0.0925925896, -0.314814806), 4828},  //
@@ -725,7 +725,7 @@ TEST(Polygon, Degenerate2) {
 }
 
 TEST(Polygon, Degenerate3) {
-  Polygons polys;
+  PolygonsIdx polys;
   polys.push_back({
       {glm::vec2(-0.413580239, -0.216049403), 49696},  //
       {glm::vec2(-0.42592591, -0.216049403), 49690},   //
@@ -739,7 +739,7 @@ TEST(Polygon, Degenerate3) {
 }
 
 TEST(Polygon, Degenerate4) {
-  Polygons polys;
+  PolygonsIdx polys;
   polys.push_back({
       {glm::vec2(0, 10), 213},                      //
       {glm::vec2(-0.0696326792, 9.99390793), 360},  //
@@ -750,7 +750,7 @@ TEST(Polygon, Degenerate4) {
 }
 
 TEST(Polygon, Degenerate5) {
-  Polygons polys;
+  PolygonsIdx polys;
   polys.push_back({
       {glm::vec2(1, 0), 3},   //
       {glm::vec2(1, 1), 7},   //
@@ -765,7 +765,7 @@ TEST(Polygon, Degenerate5) {
 }
 
 TEST(Polygon, Degenerate6) {
-  Polygons polys;
+  PolygonsIdx polys;
   polys.push_back({
       {glm::vec2(4.37113897e-07, -4.37113897e-07), 0},  //
       {glm::vec2(4.37113897e-07, 0), 18},               //
@@ -779,7 +779,7 @@ TEST(Polygon, Degenerate6) {
 }
 
 TEST(Polygon, Tricky) {
-  Polygons polys;
+  PolygonsIdx polys;
   polys.push_back({
       {glm::vec2(1, 0), 0},  //
       {glm::vec2(2, 1), 1},  //
@@ -795,7 +795,7 @@ TEST(Polygon, Tricky) {
 }
 
 TEST(Polygon, Tricky2) {
-  Polygons polys;
+  PolygonsIdx polys;
   polys.push_back({
       {glm::vec2(1, 0), 0},    //
       {glm::vec2(3, 1), 1},    //
@@ -812,7 +812,7 @@ TEST(Polygon, Tricky2) {
 }
 
 TEST(Polygon, Slit) {
-  Polygons polys;
+  PolygonsIdx polys;
   polys.push_back({
       {glm::vec2(27.7069321, 13.5144091), 286},  //
       {glm::vec2(28.664566, 10.8102894), 267},   //
@@ -834,7 +834,7 @@ TEST(Polygon, Slit) {
 }
 
 TEST(Polygon, SharedEdge) {
-  Polygons polys;
+  PolygonsIdx polys;
   polys.push_back({
       {glm::vec2(0.265432119, 0.0061728349), 61185},    //
       {glm::vec2(0.277777791, -3.7252903e-09), 61180},  //
@@ -847,7 +847,7 @@ TEST(Polygon, SharedEdge) {
 }
 
 TEST(Polygon, Precision) {
-  Polygons polys;
+  PolygonsIdx polys;
   polys.push_back({
       {glm::vec2(-0.98486793, -0.492948532), 0},   //
       {glm::vec2(-0.984859049, -0.492013603), 1},  //
@@ -865,7 +865,7 @@ TEST(Polygon, Precision2) {
   const bool intermediateChecks = PolygonParams().intermediateChecks;
   PolygonParams().intermediateChecks = false;
 
-  Polygons polys;
+  PolygonsIdx polys;
   polys.push_back({
       {glm::vec2(4.98093176, -0.247938812), 11113},   //
       {glm::vec2(4.94630527, -0.0826399028), 22736},  //
@@ -893,7 +893,7 @@ TEST(Polygon, Precision2) {
 };
 
 TEST(Polygon, Comb) {
-  Polygons polys;
+  PolygonsIdx polys;
   polys.push_back({
       {glm::vec2(0.462962955, -0.427297652), 18},      //
       {glm::vec2(0.5, -0.42592591), 17},               //
@@ -939,7 +939,7 @@ TEST(Polygon, Comb) {
 }
 
 TEST(Polygon, Comb2) {
-  Polygons polys;
+  PolygonsIdx polys;
   polys.push_back({
       {glm::vec2(-0.5, -0.462962955), 2},             //
       {glm::vec2(-0.462962955, -0.461591214), 4},     //
@@ -985,7 +985,7 @@ TEST(Polygon, Comb2) {
 }
 
 TEST(Polygon, PointPoly) {
-  Polygons polys;
+  PolygonsIdx polys;
   polys.push_back({
       {glm::vec2(0, -15.9780979), 32},            //
       {glm::vec2(5.08144999, -14.2678728), 244},  //
@@ -1018,7 +1018,7 @@ TEST(Polygon, PointPoly) {
 };
 
 TEST(Polygon, KissingZigzag) {
-  Polygons polys;
+  PolygonsIdx polys;
   polys.push_back({
       {glm::vec2(37.4667358, 0), 0},              //
       {glm::vec2(27.8904877, -3.04520559), 1},    //
@@ -1133,7 +1133,7 @@ TEST(Polygon, KissingZigzag) {
 }
 
 TEST(Polygon, Sponge) {
-  Polygons polys;
+  PolygonsIdx polys;
   polys.push_back({
       {glm::vec2(-0.5, -0.5), 22},                  //
       {glm::vec2(-0.388888896, -0.388888896), 23},  //
@@ -1191,7 +1191,7 @@ TEST(Polygon, Sponge) {
 }
 
 TEST(Polygon, SquareHoles) {
-  Polygons polys;
+  PolygonsIdx polys;
   polys.push_back({
       {glm::vec2(0.388888896, -0.277777791), 10},  //
       {glm::vec2(0.388888896, -0.388888896), 8},   //
@@ -1256,7 +1256,7 @@ TEST(Polygon, SquareHoles) {
 }
 
 TEST(Polygon, BigSponge) {
-  Polygons polys;
+  PolygonsIdx polys;
   polys.push_back({
       {glm::vec2(0.5, 0.5), 1},                        //
       {glm::vec2(0.487654328, 0.487654328), 13834},    //
