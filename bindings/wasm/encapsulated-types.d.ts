@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Box, Curvature, Mat4, Polygons, Properties, SealedFloat32Array, SealedUint32Array, Smoothness, Vec2, Vec3 } from './manifold-types';
+import { Box, Curvature, Mat4, Polygons, Properties, SealedFloat32Array, SealedUint32Array, Smoothness, Vec2, Vec3 } from './global-types';
 
 /**
  * Constructs a unit cube (edge lengths all one), by default in the first
