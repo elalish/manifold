@@ -16,6 +16,7 @@
 
 #include "manifold.h"
 #include "polygon.h"
+#include "public.h"
 #include "test.h"
 
 #ifdef MANIFOLD_EXPORT
@@ -24,15 +25,19 @@
 
 using namespace manifold;
 
-TEST(CrossSection, Union) {
+TEST(CrossSection, MirrorUnion) {
   auto a = CrossSection::Square({5., 5.}, true);
   auto b = a.Translate({2.5, 2.5});
-  auto result = Manifold::Extrude(a + b, 5.);
+  auto cross = a + b + b.Mirror({-1, 1});
+  auto result = Manifold::Extrude(cross, 5.);
 
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels)
-    ExportMesh("cross_section_union.glb", result.GetMesh(), {});
+    ExportMesh("cross_section_mirror_union.glb", result.GetMesh(), {});
 #endif
+
+  auto area_a = a.Area();
+  EXPECT_EQ(area_a + 1.5 * area_a, cross.Area());
 }
 
 TEST(CrossSection, RoundOffset) {
