@@ -22,6 +22,7 @@
 #include "clipper2/clipper.engine.h"
 #include "clipper2/clipper.offset.h"
 #include "glm/ext/vector_float2.hpp"
+#include "glm/glm.hpp"
 #include "public.h"
 #include "quality.h"
 
@@ -63,11 +64,15 @@ C2::JoinType jt(CrossSection::JoinType jointype) {
   return jt;
 }
 
+glm::vec2 v2_of_pd(C2::PointD p) { return {p.x, p.y}; }
+
+C2::PointD v2_to_pd(glm::vec2 v) { return C2::PointD(v.x, v.y); }
+
 C2::PathD pathd_of_contour(const SimplePolygon& ctr) {
   auto p = C2::PathD();
   p.reserve(ctr.size());
   for (auto v : ctr) {
-    p.push_back(C2::PointD(v.x, v.y));
+    p.push_back(v2_to_pd(v));
   }
   return p;
 }
@@ -126,6 +131,15 @@ CrossSection CrossSection::Circle(float radius, int circularSegments) {
     circle[i] = C2::PointD(radius * cosd(dPhi * i), radius * sind(dPhi * i));
   }
   return CrossSection(C2::PathsD{circle});
+}
+
+CrossSection CrossSection::Ellipse(float radiusX, float radiusY,
+                                   int circularSegments) {
+  auto r = glm::max(radiusX, radiusY);
+  int n =
+      circularSegments > 2 ? circularSegments : Quality::GetCircularSegments(r);
+  auto ellipse = C2::Ellipse(C2::PointD(0., 0.), radiusX, radiusY, n);
+  return CrossSection(C2::PathsD({ellipse}));
 }
 
 CrossSection CrossSection::Boolean(const CrossSection& second,
@@ -243,6 +257,22 @@ CrossSection CrossSection::Scale(glm::vec2 scale) {
   return CrossSection(scaled);
 }
 
+CrossSection CrossSection::Mirror(glm::vec2 ax, bool reverse) {
+  auto mirrored = C2::PathsD();
+  mirrored.reserve(paths_.size());
+  for (auto path : paths_) {
+    auto sz = path.size();
+    auto m = C2::PathD(sz);
+    for (int i = 0; i < sz; ++i) {
+      auto v = v2_of_pd(path[i]);
+      int idx = reverse ? sz - 1 - i : i;
+      m[idx] = v2_to_pd(ax * (2 * glm::dot(v, ax) / glm::dot(ax, ax)) - v);
+    }
+    mirrored.push_back(m);
+  }
+  return CrossSection(mirrored);
+}
+
 CrossSection CrossSection::Simplify(double epsilon) {
   auto ps = SimplifyPaths(paths_, epsilon, false);
   return CrossSection(ps);
@@ -254,6 +284,8 @@ CrossSection CrossSection::Offset(double delta, JoinType jointype,
                              miter_limit, precision_, arc_tolerance);
   return CrossSection(ps);
 }
+
+double CrossSection::Area() { return C2::Area(paths_); }
 
 Polygons CrossSection::ToPolygons() const {
   auto polys = Polygons();

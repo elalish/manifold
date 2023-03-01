@@ -36,7 +36,9 @@ class CrossSection {
 
   // Shapes
   static CrossSection Square(glm::vec2 dims, bool center = false);
-  static CrossSection Circle(float radius, int circularSegments);
+  static CrossSection Circle(float radius, int circularSegments = 0);
+  static CrossSection Ellipse(float radiusX, float radiusY,
+                              int circularSegments = 0);
 
   // Booleans
   enum class OpType { Add, Subtract, Intersect, Xor };
@@ -54,6 +56,7 @@ class CrossSection {
   CrossSection Translate(glm::vec2 v);
   CrossSection Rotate(float degrees);
   CrossSection Scale(glm::vec2 s);
+  CrossSection Mirror(glm::vec2 ax, bool reverse = true);
 
   // Path Simplification
   CrossSection Simplify(double epsilon = 1e-6);
@@ -62,6 +65,9 @@ class CrossSection {
   enum class JoinType { Square, Round, Miter };
   CrossSection Offset(double delta, JoinType jt, double miter_limit = 2.0,
                       double arc_tolerance = 0.0);
+
+  // Geometry
+  double Area();
 
   // Output
   Polygons ToPolygons() const;
