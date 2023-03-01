@@ -57,6 +57,7 @@ class CrossSection {
   CrossSection Rotate(float degrees);
   CrossSection Scale(glm::vec2 s);
   CrossSection Mirror(glm::vec2 ax, bool reverse = true);
+  CrossSection Rewind();
 
   // Path Simplification
   CrossSection Simplify(double epsilon = 1e-6);

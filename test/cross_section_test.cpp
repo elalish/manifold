@@ -38,6 +38,7 @@ TEST(CrossSection, MirrorUnion) {
 
   auto area_a = a.Area();
   EXPECT_EQ(area_a + 1.5 * area_a, cross.Area());
+  EXPECT_EQ(area_a, -a.Rewind().Area());
 }
 
 TEST(CrossSection, RoundOffset) {

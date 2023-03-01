@@ -273,6 +273,20 @@ CrossSection CrossSection::Mirror(glm::vec2 ax, bool reverse) {
   return CrossSection(mirrored);
 }
 
+CrossSection CrossSection::Rewind() {
+  auto rewound = C2::PathsD();
+  rewound.reserve(paths_.size());
+  for (auto path : paths_) {
+    auto sz = path.size();
+    auto r = C2::PathD(sz);
+    for (int i = 0; i < sz; ++i) {
+      r[sz - 1 - i] = path[i];
+    }
+    rewound.push_back(r);
+  }
+  return CrossSection(rewound);
+}
+
 CrossSection CrossSection::Simplify(double epsilon) {
   auto ps = SimplifyPaths(paths_, epsilon, false);
   return CrossSection(ps);
