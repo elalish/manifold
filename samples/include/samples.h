@@ -14,6 +14,7 @@
 
 #pragma once
 #include "manifold.h"
+#include "quality.h"
 
 namespace manifold {
 

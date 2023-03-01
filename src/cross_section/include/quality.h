@@ -8,6 +8,15 @@ class Quality {
   static float circularEdgeLength_;
 
  public:
+  /** @name Defaults
+   * These static properties control how circular shapes are quantized by
+   * default on construction. If circularSegments is specified, it takes
+   * precedence. If it is zero, then instead the minimum is used of the segments
+   * calculated based on edge length and angle, rounded up to the nearest
+   * multiple of four. To get numbers not divisible by four, circularSegments
+   * must be specified.
+   */
+  ///@{
   /**
    * Sets an angle constraint the default number of circular segments for the
    * Cylinder(), Sphere(), and Revolve() constructors. The number of segments
@@ -48,5 +57,6 @@ class Quality {
    * segments there will be.
    */
   static int GetCircularSegments(float radius);
+  ///@}
 };
 }  // namespace manifold

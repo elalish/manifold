@@ -20,6 +20,7 @@
 #include "impl.h"
 #include "par.h"
 #include "polygon.h"
+#include "quality.h"
 
 namespace {
 using namespace manifold;
@@ -172,7 +173,8 @@ Manifold Manifold::Cylinder(float height, float radiusLow, float radiusHigh,
                             int circularSegments, bool center) {
   float scale = radiusHigh >= 0.0f ? radiusHigh / radiusLow : 1.0f;
   float radius = fmax(radiusLow, radiusHigh);
-  int n = circularSegments > 2 ? circularSegments : GetCircularSegments(radius);
+  int n = circularSegments > 2 ? circularSegments
+                               : Quality::GetCircularSegments(radius);
   Polygons circle(1);
   float dPhi = 360.0f / n;
   for (int i = 0; i < n; ++i) {
@@ -198,7 +200,7 @@ Manifold Manifold::Cylinder(float height, float radiusLow, float radiusHigh,
  */
 Manifold Manifold::Sphere(float radius, int circularSegments) {
   int n = circularSegments > 0 ? (circularSegments + 3) / 4
-                               : GetCircularSegments(radius) / 4;
+                               : Quality::GetCircularSegments(radius) / 4;
   auto pImpl_ = std::make_shared<Impl>(Impl::Shape::Octahedron);
   pImpl_->Subdivide(n);
   for_each_n(autoPolicy(pImpl_->NumVert()), pImpl_->vertPos_.begin(),
@@ -316,8 +318,8 @@ Manifold Manifold::Revolve(const CrossSection& crossSection,
       radius = fmax(radius, vert.x);
     }
   }
-  int nDivisions =
-      circularSegments > 2 ? circularSegments : GetCircularSegments(radius);
+  int nDivisions = circularSegments > 2 ? circularSegments
+                                        : Quality::GetCircularSegments(radius);
   auto pImpl_ = std::make_shared<Impl>();
   auto& vertPos = pImpl_->vertPos_;
   VecDH<glm::ivec3> triVertsDH;
