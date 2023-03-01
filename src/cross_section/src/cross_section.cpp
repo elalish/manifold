@@ -84,7 +84,7 @@ CrossSection::CrossSection(C2::PathsD ps) { paths_ = ps; }
 
 CrossSection::CrossSection(const SimplePolygon& contour) {
   auto ps = C2::PathsD{(pathd_of_contour(contour))};
-  paths_ = C2::Union(ps, C2::FillRule::Positive);
+  paths_ = C2::Union(ps, C2::FillRule::Positive, precision_);
 }
 
 CrossSection::CrossSection(const Polygons& contours) {
@@ -93,7 +93,7 @@ CrossSection::CrossSection(const Polygons& contours) {
   for (auto ctr : contours) {
     ps.push_back(pathd_of_contour(ctr));
   }
-  paths_ = C2::Union(ps, C2::FillRule::Positive);
+  paths_ = C2::Union(ps, C2::FillRule::Positive, precision_);
 }
 
 CrossSection CrossSection::Square(glm::vec2 dims, bool center) {
