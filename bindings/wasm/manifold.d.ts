@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import * as T from './encapsulated-types.js';
-export * from './global-types.js';
+import * as T from './manifold-encapsulated-types';
+export * from './manifold-global-types';
 
 export type Manifold = T.Manifold;
 export type Mesh = T.Mesh;
