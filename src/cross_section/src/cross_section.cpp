@@ -23,6 +23,7 @@
 #include "clipper2/clipper.offset.h"
 #include "glm/ext/vector_float2.hpp"
 #include "public.h"
+#include "quality.h"
 
 using namespace manifold;
 
@@ -117,8 +118,8 @@ CrossSection CrossSection::Square(glm::vec2 dims, bool center) {
 }
 
 CrossSection CrossSection::Circle(float radius, int circularSegments) {
-  // GetCircularSegments(radius) -- in Manifold, not available atm
-  int n = circularSegments > 2 ? circularSegments : 3;
+  int n = circularSegments > 2 ? circularSegments
+                               : Quality::GetCircularSegments(radius);
   float dPhi = 360.0f / n;
   auto circle = C2::PathD(n);
   for (int i = 0; i < n; ++i) {
