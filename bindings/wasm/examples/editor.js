@@ -213,6 +213,40 @@ function initializeRun() {
 
 // Editor ------------------------------------------------------------
 let tsWorker = undefined;
+
+async function getManifoldDTS() {
+  const global = await fetch('manifold-global-types.d.ts')
+                     .then(response => response.text());
+
+  const encapsulated = await fetch('manifold-encapsulated-types.d.ts')
+                           .then(response => response.text());
+
+  return `
+${global.replaceAll('export', '')}
+${encapsulated.replace(/^import.*$/gm, '').replaceAll('export', 'declare')}
+declare interface ManifoldStatic {
+  cube: typeof cube;
+  cylinder: typeof cylinder;
+  sphere: typeof sphere;
+  smooth: typeof smooth;
+  tetrahedron: typeof tetrahedron;
+  extrude: typeof extrude;
+  revolve: typeof revolve;
+  union: typeof union;
+  difference: typeof difference;
+  intersection: typeof intersection;
+  compose: typeof compose;
+  levelSet: typeof levelSet;
+  setMinCircularAngle: typeof setMinCircularAngle;
+  setMinCircularEdgeLength: typeof setMinCircularEdgeLength;
+  setCircularSegments: typeof setCircularSegments;
+  getCircularSegments: typeof getCircularSegments;
+  reserveIDs: typeof reserveIDs;
+}
+declare const module: ManifoldStatic;
+`;
+}
+
 require.config({
   paths:
       {vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.34.0/min/vs'}
@@ -222,6 +256,8 @@ require(['vs/editor/editor.main'], async function() {
     const content = await fetch(uri).then(response => response.text());
     monaco.languages.typescript.typescriptDefaults.addExtraLib(content);
   }
+  monaco.languages.typescript.typescriptDefaults.addExtraLib(
+      await getManifoldDTS());
   await addTypes('editor.d.ts');
   editor = monaco.editor.create(
       document.getElementById('editor'),
