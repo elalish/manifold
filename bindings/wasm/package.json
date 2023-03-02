@@ -7,8 +7,8 @@
     "manifold.js",
     "manifold.wasm",
     "manifold.d.ts",
-    "encapsulated-types.d.ts",
-    "global-types.d.ts",
+    "manifold-encapsulated-types.d.ts",
+    "manifold-global-types.d.ts",
     "examples/examples.js",
     "test/test.js"
   ],
