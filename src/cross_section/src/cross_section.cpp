@@ -22,6 +22,7 @@
 #include "clipper2/clipper.engine.h"
 #include "clipper2/clipper.offset.h"
 #include "glm/ext/vector_float2.hpp"
+#include "glm/geometric.hpp"
 #include "glm/glm.hpp"
 #include "public.h"
 #include "quality.h"
@@ -47,6 +48,24 @@ C2::ClipType cliptype_of_op(CrossSection::OpType op) {
       break;
   };
   return ct;
+}
+
+C2::FillRule fr(CrossSection::FillRule fillrule) {
+  C2::FillRule fr = C2::FillRule::EvenOdd;
+  switch (fillrule) {
+    case CrossSection::FillRule::EvenOdd:
+      break;
+    case CrossSection::FillRule::NonZero:
+      fr = C2::FillRule::NonZero;
+      break;
+    case CrossSection::FillRule::Positive:
+      fr = C2::FillRule::Positive;
+      break;
+    case CrossSection::FillRule::Negative:
+      fr = C2::FillRule::Negative;
+      break;
+  };
+  return fr;
 }
 
 C2::JoinType jt(CrossSection::JoinType jointype) {
@@ -88,18 +107,18 @@ CrossSection::CrossSection(const CrossSection& other) {
 }
 CrossSection::CrossSection(C2::PathsD ps) { paths_ = ps; }
 
-CrossSection::CrossSection(const SimplePolygon& contour) {
+CrossSection::CrossSection(const SimplePolygon& contour, FillRule fillrule) {
   auto ps = C2::PathsD{(pathd_of_contour(contour))};
-  paths_ = C2::Union(ps, C2::FillRule::Positive, precision_);
+  paths_ = C2::Union(ps, fr(fillrule), precision_);
 }
 
-CrossSection::CrossSection(const Polygons& contours) {
+CrossSection::CrossSection(const Polygons& contours, FillRule fillrule) {
   auto ps = C2::PathsD();
   ps.reserve(contours.size());
   for (auto ctr : contours) {
     ps.push_back(pathd_of_contour(ctr));
   }
-  paths_ = C2::Union(ps, C2::FillRule::Positive, precision_);
+  paths_ = C2::Union(ps, fr(fillrule), precision_);
 }
 
 CrossSection CrossSection::Square(glm::vec2 dims, bool center) {
@@ -131,15 +150,6 @@ CrossSection CrossSection::Circle(float radius, int circularSegments) {
     circle[i] = C2::PointD(radius * cosd(dPhi * i), radius * sind(dPhi * i));
   }
   return CrossSection(C2::PathsD{circle});
-}
-
-CrossSection CrossSection::Ellipse(float radiusX, float radiusY,
-                                   int circularSegments) {
-  auto r = glm::max(radiusX, radiusY);
-  int n =
-      circularSegments > 2 ? circularSegments : Quality::GetCircularSegments(r);
-  auto ellipse = C2::Ellipse(C2::PointD(0., 0.), radiusX, radiusY, n);
-  return CrossSection(C2::PathsD({ellipse}));
 }
 
 CrossSection CrossSection::Boolean(const CrossSection& second,
@@ -257,34 +267,22 @@ CrossSection CrossSection::Scale(glm::vec2 scale) {
   return CrossSection(scaled);
 }
 
-CrossSection CrossSection::Mirror(glm::vec2 ax, bool reverse) {
+CrossSection CrossSection::Mirror(glm::vec2 ax) {
+  if (glm::length(ax) == 0.) {
+    return CrossSection();
+  }
   auto mirrored = C2::PathsD();
   mirrored.reserve(paths_.size());
   for (auto path : paths_) {
     auto sz = path.size();
     auto m = C2::PathD(sz);
     for (int i = 0; i < sz; ++i) {
-      auto v = v2_of_pd(path[i]);
-      int idx = reverse ? sz - 1 - i : i;
-      m[idx] = v2_to_pd(ax * (2 * glm::dot(v, ax) / glm::dot(ax, ax)) - v);
+      auto v = v2_of_pd(path[sz - 1 - i]);
+      m[i] = v2_to_pd(ax * (2 * glm::dot(v, ax) / glm::dot(ax, ax)) - v);
     }
     mirrored.push_back(m);
   }
   return CrossSection(mirrored);
-}
-
-CrossSection CrossSection::Rewind() {
-  auto rewound = C2::PathsD();
-  rewound.reserve(paths_.size());
-  for (auto path : paths_) {
-    auto sz = path.size();
-    auto r = C2::PathD(sz);
-    for (int i = 0; i < sz; ++i) {
-      r[sz - 1 - i] = path[i];
-    }
-    rewound.push_back(r);
-  }
-  return CrossSection(rewound);
 }
 
 CrossSection CrossSection::Simplify(double epsilon) {
@@ -300,6 +298,7 @@ CrossSection CrossSection::Offset(double delta, JoinType jointype,
 }
 
 double CrossSection::Area() { return C2::Area(paths_); }
+bool CrossSection::IsEmpty() { return paths_.empty(); }
 
 Polygons CrossSection::ToPolygons() const {
   auto polys = Polygons();

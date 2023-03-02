@@ -14,6 +14,8 @@
 
 #include "cross_section.h"
 
+#include <gtest/gtest.h>
+
 #include "manifold.h"
 #include "polygon.h"
 #include "public.h"
@@ -38,7 +40,7 @@ TEST(CrossSection, MirrorUnion) {
 
   auto area_a = a.Area();
   EXPECT_EQ(area_a + 1.5 * area_a, cross.Area());
-  EXPECT_EQ(area_a, -a.Rewind().Area());
+  EXPECT_TRUE(a.Mirror(glm::vec2(0)).IsEmpty());
 }
 
 TEST(CrossSection, RoundOffset) {

@@ -31,14 +31,17 @@ class CrossSection {
   CrossSection& operator=(const CrossSection& other);
   CrossSection(CrossSection&&) noexcept;
   CrossSection& operator=(CrossSection&&) noexcept;
-  CrossSection(const SimplePolygon& contour);
-  CrossSection(const Polygons& contours);
+
+  // Construction from arbitrary contours
+  enum class FillRule { EvenOdd, NonZero, Positive, Negative };
+  CrossSection(const SimplePolygon& contour,
+               FillRule fillrule = FillRule::Positive);
+  CrossSection(const Polygons& contours,
+               FillRule fillrule = FillRule::Positive);
 
   // Shapes
   static CrossSection Square(glm::vec2 dims, bool center = false);
   static CrossSection Circle(float radius, int circularSegments = 0);
-  static CrossSection Ellipse(float radiusX, float radiusY,
-                              int circularSegments = 0);
 
   // Booleans
   enum class OpType { Add, Subtract, Intersect, Xor };
@@ -56,8 +59,7 @@ class CrossSection {
   CrossSection Translate(glm::vec2 v);
   CrossSection Rotate(float degrees);
   CrossSection Scale(glm::vec2 s);
-  CrossSection Mirror(glm::vec2 ax, bool reverse = true);
-  CrossSection Rewind();
+  CrossSection Mirror(glm::vec2 ax);
 
   // Path Simplification
   CrossSection Simplify(double epsilon = 1e-6);
@@ -69,6 +71,7 @@ class CrossSection {
 
   // Geometry
   double Area();
+  bool IsEmpty();
 
   // Output
   Polygons ToPolygons() const;
