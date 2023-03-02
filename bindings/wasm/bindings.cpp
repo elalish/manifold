@@ -20,7 +20,6 @@
 using namespace emscripten;
 
 #include <manifold.h>
-#include <quality.h>
 #include <sdf.h>
 
 using namespace manifold;

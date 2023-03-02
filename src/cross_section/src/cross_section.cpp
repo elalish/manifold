@@ -25,7 +25,6 @@
 #include "glm/geometric.hpp"
 #include "glm/glm.hpp"
 #include "public.h"
-#include "quality.h"
 
 using namespace manifold;
 

@@ -4,7 +4,6 @@
 #include <manifoldc.h>
 #include <meshIO.h>
 #include <public.h>
-#include <quality.h>
 #include <sdf.h>
 
 #include "box.cpp"

@@ -20,7 +20,6 @@
 #include "impl.h"
 #include "par.h"
 #include "polygon.h"
-#include "quality.h"
 
 namespace {
 using namespace manifold;
