@@ -60,6 +60,3 @@ if(MANIFOLD_DEBUG)
     target_compile_options(${PROJECT_NAME}
         PUBLIC -DMANIFOLD_DEBUG)
 endif()
-
-# Ignore warning for use of inline variables in Quality
-add_definitions(-Wc++17-extensions)
