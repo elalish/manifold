@@ -17,8 +17,8 @@ import {Accessor, Document, Material, WebIO} from 'https://cdn.skypack.dev/pin/@
 
 import Module from '../manifold.js';
 
-const wasm = await Module();
-wasm.setup();
+const module = await Module();
+module.setup();
 
 // Faster on modern browsers than Float32Array
 glMatrix.glMatrix.setMatrixArrayType(Array);
@@ -77,11 +77,11 @@ function debug(manifold, material) {
   return result;
 };
 
-wasm.show = (manifold) => {
+module.show = (manifold) => {
   return debug(manifold, debugMaterial);
 };
 
-wasm.only = (manifold) => {
+module.only = (manifold) => {
   ghost = true;
   return debug(manifold, resultMaterial);
 };
@@ -127,9 +127,9 @@ const exposedFunctions = constructors.concat(utils);
 
 const manifoldRegistry = [];
 for (const name of memberFunctions) {
-  const originalFn = wasm.Manifold.prototype[name];
-  wasm.Manifold.prototype['_' + name] = originalFn;
-  wasm.Manifold.prototype[name] = function(...args) {
+  const originalFn = module.Manifold.prototype[name];
+  module.Manifold.prototype['_' + name] = originalFn;
+  module.Manifold.prototype[name] = function(...args) {
     const result = this['_' + name](...args);
     manifoldRegistry.push(result);
     return result;
@@ -137,15 +137,15 @@ for (const name of memberFunctions) {
 }
 
 for (const name of constructors) {
-  const originalFn = wasm[name];
-  wasm[name] = function(...args) {
+  const originalFn = module[name];
+  module[name] = function(...args) {
     const result = originalFn(...args);
     manifoldRegistry.push(result);
     return result;
   };
 }
 
-wasm.cleanup = function() {
+module.cleanup = function() {
   for (const obj of manifoldRegistry) {
     // decompose result is an array of manifolds
     if (obj instanceof Array)
@@ -176,14 +176,16 @@ console.log = function(...args) {
 onmessage = async (e) => {
   const content = e.data + '\nreturn exportGLB(result);\n';
   try {
-    const f =
-        new Function('exportGLB', 'glMatrix', ...exposedFunctions, content);
-    await f(exportGLB, glMatrix, ...exposedFunctions.map(name => wasm[name]));
+    const f = new Function(
+        'exportGLB', 'glMatrix', 'module', ...exposedFunctions, content);
+    await f(
+        exportGLB, glMatrix, module,
+        ...exposedFunctions.map(name => module[name]));
   } catch (error) {
     console.log(error.toString());
     postMessage({objectURL: null});
   } finally {
-    wasm.cleanup();
+    module.cleanup();
     debugCleanup();
   }
 };
