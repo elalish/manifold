@@ -174,11 +174,8 @@ Manifold Manifold::Cylinder(float height, float radiusLow, float radiusHigh,
   float radius = fmax(radiusLow, radiusHigh);
   int n = circularSegments > 2 ? circularSegments
                                : Quality::GetCircularSegments(radius);
-  Polygons circle(1);
-  float dPhi = 360.0f / n;
-  for (int i = 0; i < n; ++i) {
-    circle[0].push_back(radiusLow * glm::vec2(cosd(dPhi * i), sind(dPhi * i)));
-  }
+
+  CrossSection circle = CrossSection::Circle(radiusLow, n);
   Manifold cylinder =
       Manifold::Extrude(circle, height, 0, 0.0f, glm::vec2(scale));
   if (center)

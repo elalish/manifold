@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "cross_section.h"
 #include "samples.h"
 
 namespace {
@@ -48,12 +49,7 @@ Manifold TorusKnot(int p, int q, float majorRadius, float minorRadius,
   int m =
       linearSegments > 2 ? linearSegments : n * q * majorRadius / threadRadius;
 
-  Polygons circle(1);
-  float dPhi = 360.0f / n;
-  for (int i = 0; i < n; ++i) {
-    circle[0].push_back({cosd(dPhi * i) + 2.0f, sind(dPhi * i)});
-  }
-
+  CrossSection circle = CrossSection::Circle(1., n).Translate({2, 0});
   Manifold knot = Manifold::Revolve(circle, m);
 
   knot =
