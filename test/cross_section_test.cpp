@@ -53,3 +53,9 @@ TEST(CrossSection, RoundOffset) {
     ExportMesh("cross_section_round_offset.glb", result.GetMesh(), {});
 #endif
 }
+
+TEST(CrossSection, Empty) {
+  Polygons polys(2);
+  auto e = CrossSection(polys);
+  EXPECT_TRUE(e.IsEmpty());
+}
