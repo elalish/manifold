@@ -138,6 +138,8 @@ jobs:
           build/bindings/wasm/manifold.js
           build/bindings/wasm/manifold.wasm
           build/bindings/wasm/manifold.d.ts
+          build/bindings/wasm/manifold-global-types.d.ts
+          build/bindings/wasm/manifold-encapsulated-types.d.ts
         retention-days: 90
 
   build_windows:
