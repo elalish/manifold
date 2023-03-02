@@ -16,7 +16,7 @@ export const examples = {
   functions: {
     Intro: function() {
       // Write code in JavaScript or TypeScript and this editor will show the
-      // API docs. Type e.g. "box." to see the Manifold API. Type "Module." to
+      // API docs. Type e.g. "box." to see the Manifold API. Type "module." to
       // see the static API - these functions can also be used bare. Use
       // console.log() to print output (lower-right). This editor defines Z as
       // up and units of mm.
@@ -25,6 +25,7 @@ export const examples = {
       const ball = sphere(60, 100);
       // You must name your final output "result".
       const result = box.subtract(ball);
+
       // For visual debug, wrap any shape with show() and it and all of its
       // copies will be shown in transparent red, akin to # in OpenSCAD. Or try
       // only() to ghost out everything else, akin to * in OpenSCAD.
