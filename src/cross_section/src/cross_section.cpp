@@ -290,6 +290,20 @@ CrossSection CrossSection::Mirror(const glm::vec2 ax) const {
   return CrossSection(mirrored);
 }
 
+CrossSection CrossSection::Transform(const glm::mat3x2& m) const {
+  auto transformed = C2::PathsD();
+  transformed.reserve(paths_.size());
+  for (auto path : paths_) {
+    auto s = C2::PathD();
+    s.reserve(path.size());
+    for (auto p : path) {
+      s.push_back(v2_to_pd(m * glm::vec3(p.x, p.y, 1)));
+    }
+    transformed.push_back(s);
+  }
+  return CrossSection(transformed);
+}
+
 CrossSection CrossSection::Simplify(double epsilon) const {
   auto ps = SimplifyPaths(paths_, epsilon, false);
   return CrossSection(ps);
@@ -394,6 +408,13 @@ Rect& Rect::operator*=(const glm::vec2 scale) {
   min *= scale;
   max *= scale;
   return *this;
+}
+
+Rect Rect::Transform(const glm::mat3x2& m) const {
+  Rect rect;
+  rect.min = m * glm::vec3(min, 1);
+  rect.max = m * glm::vec3(max, 1);
+  return rect;
 }
 
 bool Rect::DoesOverlap(const Rect& rect) const {

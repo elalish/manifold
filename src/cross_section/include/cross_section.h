@@ -65,6 +65,7 @@ class CrossSection {
   CrossSection Rotate(float degrees) const;
   CrossSection Scale(const glm::vec2 s) const;
   CrossSection Mirror(const glm::vec2 ax) const;
+  CrossSection Transform(const glm::mat3x2& m) const;
 
   // Path Simplification
   CrossSection Simplify(double epsilon = 1e-6) const;
@@ -158,6 +159,8 @@ class Rect {
    * Scale this rectangle in-place by the given vector.
    */
   Rect& operator*=(const glm::vec2 scale);
+
+  Rect Transform(const glm::mat3x2& m) const;
 
   CrossSection AsCrossSection() const;
 };

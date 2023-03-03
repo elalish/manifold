@@ -73,3 +73,23 @@ TEST(CrossSection, RectClip) {
   EXPECT_TRUE(rect.DoesOverlap(Rect({5, 5}, {15, 15})));
   EXPECT_TRUE(Rect().IsEmpty());
 }
+
+TEST(CrossSection, Transform) {
+  auto sq = CrossSection::Square({10., 10.});
+  auto a = sq.Rotate(45).Scale({2, 3}).Translate({4, 5});
+
+  glm::mat3x3 trans(1.0f, 0.0f, 0.0f,  //
+                    0.0f, 1.0f, 0.0f,  //
+                    4.0f, 5.0f, 1.0f);
+  glm::mat3x3 rot(cosd(45), sind(45), 0.0f,   //
+                  -sind(45), cosd(45), 0.0f,  //
+                  0.0f, 0.0f, 1.0f);
+  glm::mat3x3 scale(2.0f, 0.0f, 0.0f,  //
+                    0.0f, 3.0f, 0.0f,  //
+                    0.0f, 0.0f, 1.0f);
+
+  auto b = sq.Transform(trans * scale * rot);
+
+  Identical(Manifold::Extrude(a, 1.).GetMesh(),
+            Manifold::Extrude(b, 1.).GetMesh());
+}
