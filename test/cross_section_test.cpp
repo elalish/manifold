@@ -52,10 +52,24 @@ TEST(CrossSection, RoundOffset) {
   if (options.exportModels)
     ExportMesh("cross_section_round_offset.glb", result.GetMesh(), {});
 #endif
+
+  EXPECT_TRUE(result.IsManifold());
 }
 
 TEST(CrossSection, Empty) {
   Polygons polys(2);
   auto e = CrossSection(polys);
   EXPECT_TRUE(e.IsEmpty());
+}
+
+TEST(CrossSection, RectClip) {
+  auto sq = CrossSection::Square({10, 10});
+  auto rect = Rect({0, 0}, {10, 5});
+  auto clipped = sq.RectClip(rect);
+
+  EXPECT_EQ(sq.Area() / 2, clipped.Area());
+  EXPECT_TRUE(rect.Contains({5, 5}));
+  EXPECT_TRUE(rect.Contains(Rect()));
+  EXPECT_TRUE(rect.DoesOverlap(Rect({5, 5}, {15, 15})));
+  EXPECT_TRUE(Rect().IsEmpty());
 }

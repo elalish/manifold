@@ -82,9 +82,9 @@ C2::JoinType jt(CrossSection::JoinType jointype) {
   return jt;
 }
 
-glm::vec2 v2_of_pd(C2::PointD p) { return {p.x, p.y}; }
+glm::vec2 v2_of_pd(const C2::PointD p) { return {p.x, p.y}; }
 
-C2::PointD v2_to_pd(glm::vec2 v) { return C2::PointD(v.x, v.y); }
+C2::PointD v2_to_pd(const glm::vec2 v) { return C2::PointD(v.x, v.y); }
 
 C2::PathD pathd_of_contour(const SimplePolygon& ctr) {
   auto p = C2::PathD();
@@ -120,7 +120,7 @@ CrossSection::CrossSection(const Polygons& contours, FillRule fillrule) {
   paths_ = C2::Union(ps, fr(fillrule), precision_);
 }
 
-CrossSection CrossSection::Square(glm::vec2 dims, bool center) {
+CrossSection CrossSection::Square(const glm::vec2 dims, bool center) {
   auto p = C2::PathD(4);
   if (center) {
     auto w = dims.x / 2;
@@ -229,12 +229,18 @@ CrossSection& CrossSection::operator^=(const CrossSection& Q) {
   return *this;
 }
 
-CrossSection CrossSection::Translate(glm::vec2 v) {
+CrossSection CrossSection::RectClip(const Rect& rect) const {
+  auto r = C2::RectD(rect.min.x, rect.min.y, rect.max.x, rect.max.y);
+  auto ps = C2::RectClip(r, paths_, false, precision_);
+  return CrossSection(ps);
+}
+
+CrossSection CrossSection::Translate(const glm::vec2 v) const {
   auto ps = C2::TranslatePaths(paths_, v.x, v.y);
   return CrossSection(ps);
 }
 
-CrossSection CrossSection::Rotate(float degrees) {
+CrossSection CrossSection::Rotate(float degrees) const {
   auto rotated = C2::PathsD();
   rotated.reserve(paths_.size());
   auto s = sind(degrees);
@@ -252,7 +258,7 @@ CrossSection CrossSection::Rotate(float degrees) {
   return CrossSection(rotated);
 }
 
-CrossSection CrossSection::Scale(glm::vec2 scale) {
+CrossSection CrossSection::Scale(const glm::vec2 scale) const {
   auto scaled = C2::PathsD();
   scaled.reserve(paths_.size());
   for (auto path : paths_) {
@@ -266,7 +272,7 @@ CrossSection CrossSection::Scale(glm::vec2 scale) {
   return CrossSection(scaled);
 }
 
-CrossSection CrossSection::Mirror(glm::vec2 ax) {
+CrossSection CrossSection::Mirror(const glm::vec2 ax) const {
   if (glm::length(ax) == 0.) {
     return CrossSection();
   }
@@ -284,20 +290,25 @@ CrossSection CrossSection::Mirror(glm::vec2 ax) {
   return CrossSection(mirrored);
 }
 
-CrossSection CrossSection::Simplify(double epsilon) {
+CrossSection CrossSection::Simplify(double epsilon) const {
   auto ps = SimplifyPaths(paths_, epsilon, false);
   return CrossSection(ps);
 }
 
 CrossSection CrossSection::Offset(double delta, JoinType jointype,
-                                  double miter_limit, double arc_tolerance) {
+                                  double miter_limit,
+                                  double arc_tolerance) const {
   auto ps = C2::InflatePaths(paths_, delta, jt(jointype), C2::EndType::Polygon,
                              miter_limit, precision_, arc_tolerance);
   return CrossSection(ps);
 }
 
-double CrossSection::Area() { return C2::Area(paths_); }
-bool CrossSection::IsEmpty() { return paths_.empty(); }
+double CrossSection::Area() const { return C2::Area(paths_); }
+Rect CrossSection::Bounds() const {
+  auto r = C2::GetBounds(paths_);
+  return Rect({r.left, r.bottom}, {r.right, r.top});
+}
+bool CrossSection::IsEmpty() const { return paths_.empty(); }
 
 Polygons CrossSection::ToPolygons() const {
   auto polys = Polygons();
@@ -311,6 +322,97 @@ Polygons CrossSection::ToPolygons() const {
     polys.push_back(sp);
   }
   return polys;
+}
+
+// Rect
+
+Rect::Rect() {}
+Rect::~Rect() = default;
+Rect::Rect(Rect&&) noexcept = default;
+Rect& Rect::operator=(Rect&&) noexcept = default;
+Rect::Rect(const Rect& other) {
+  min = glm::vec2(other.min);
+  max = glm::vec2(other.max);
+}
+
+Rect::Rect(const glm::vec2 a, const glm::vec2 b) {
+  min = glm::min(a, b);
+  max = glm::max(a, b);
+}
+glm::vec2 Rect::Size() const { return max - min; }
+
+float Rect::Scale() const {
+  glm::vec2 absMax = glm::max(glm::abs(min), glm::abs(max));
+  return glm::max(absMax.x, absMax.y);
+}
+
+glm::vec2 Rect::Center() const { return 0.5f * (max + min); }
+
+bool Rect::Contains(const glm::vec2& p) const {
+  return glm::all(glm::greaterThanEqual(p, min)) &&
+         glm::all(glm::greaterThanEqual(max, p));
+}
+
+bool Rect::Contains(const Rect& rect) const {
+  return glm::all(glm::greaterThanEqual(rect.min, min)) &&
+         glm::all(glm::greaterThanEqual(max, rect.max));
+}
+
+void Rect::Union(const glm::vec2 p) {
+  min = glm::min(min, p);
+  max = glm::max(max, p);
+}
+
+Rect Rect::Union(const Rect& rect) const {
+  Rect out;
+  out.min = glm::min(min, rect.min);
+  out.max = glm::max(max, rect.max);
+  return out;
+}
+
+Rect Rect::operator+(const glm::vec2 shift) const {
+  Rect out;
+  out.min = min + shift;
+  out.max = max + shift;
+  return out;
+}
+
+Rect& Rect::operator+=(const glm::vec2 shift) {
+  min += shift;
+  max += shift;
+  return *this;
+}
+
+Rect Rect::operator*(const glm::vec2 scale) const {
+  Rect out;
+  out.min = min * scale;
+  out.max = max * scale;
+  return out;
+}
+
+Rect& Rect::operator*=(const glm::vec2 scale) {
+  min *= scale;
+  max *= scale;
+  return *this;
+}
+
+bool Rect::DoesOverlap(const Rect& rect) const {
+  return min.x <= rect.max.x && min.y <= rect.max.y && max.x >= rect.min.x &&
+         max.y >= rect.min.y;
+}
+
+bool Rect::IsEmpty() const { return max.y <= min.y || max.x <= min.x; };
+bool Rect::IsFinite() const {
+  return glm::all(glm::isfinite(min)) && glm::all(glm::isfinite(max));
+}
+
+CrossSection Rect::AsCrossSection() const {
+  SimplePolygon p(4);
+  p[0] = glm::vec2(min.x, max.y);
+  p[1] = glm::vec2(max.x, max.y);
+  p[2] = glm::vec2(max.x, min.y);
+  p[3] = glm::vec2(min.x, min.y);
+  return CrossSection(p);
 }
 
 }  // namespace manifold
