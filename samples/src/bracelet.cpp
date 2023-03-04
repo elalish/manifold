@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "cross_section.h"
 #include "samples.h"
 
 namespace {
@@ -23,12 +24,8 @@ Manifold Base(float width, float radius, float decorRadius, float twistRadius,
               int nCut, int nDivision) {
   Manifold base = Manifold::Cylinder(width, radius + twistRadius / 2);
 
-  Polygons circle(1);
-  float dPhiDeg = 180.0f / nDivision;
-  for (int i = 0; i < 2 * nDivision; ++i) {
-    circle[0].push_back({decorRadius * cosd(dPhiDeg * i) + twistRadius,
-                         decorRadius * sind(dPhiDeg * i)});
-  }
+  CrossSection circle =
+      CrossSection::Circle(decorRadius, nDivision).Translate({twistRadius, 0});
   Manifold decor = Manifold::Extrude(circle, width, nDivision, 180)
                        .Scale({1.0f, 0.5f, 1.0f})
                        .Translate({0.0f, radius, 0.0f});

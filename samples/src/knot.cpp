@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "cross_section.h"
 #include "samples.h"
 
 namespace {
@@ -33,7 +34,7 @@ namespace manifold {
  * @param minorRadius Radius of the small cross-section of the imaginary donut.
  * @param threadRadius Radius of the small cross-section of the actual object.
  * @param circularSegments Number of linear segments making up the threadRadius
- * circle. Default is Manifold.GetCircularSegments().
+ * circle. Default is Quality.GetCircularSegments().
  * @param linearSegments Number of segments along the length of the knot.
  * Default makes roughly square facets.
  */
@@ -44,16 +45,11 @@ Manifold TorusKnot(int p, int q, float majorRadius, float minorRadius,
   p /= kLoops;
   q /= kLoops;
   int n = circularSegments > 2 ? circularSegments
-                               : Manifold::GetCircularSegments(threadRadius);
+                               : Quality::GetCircularSegments(threadRadius);
   int m =
       linearSegments > 2 ? linearSegments : n * q * majorRadius / threadRadius;
 
-  Polygons circle(1);
-  float dPhi = 360.0f / n;
-  for (int i = 0; i < n; ++i) {
-    circle[0].push_back({cosd(dPhi * i) + 2.0f, sind(dPhi * i)});
-  }
-
+  CrossSection circle = CrossSection::Circle(1., n).Translate({2, 0});
   Manifold knot = Manifold::Revolve(circle, m);
 
   knot =
