@@ -306,66 +306,6 @@ MeshGL Manifold::GetMeshGL(glm::ivec3 normalIdx) const {
   return out;
 }
 
-int Manifold::circularSegments_ = 0;
-float Manifold::circularAngle_ = 10.0f;
-float Manifold::circularEdgeLength_ = 1.0f;
-
-/**
- * Sets an angle constraint the default number of circular segments for the
- * Cylinder(), Sphere(), and Revolve() constructors. The number of segments will
- * be rounded up to the nearest factor of four.
- *
- * @param angle The minimum angle in degrees between consecutive segments. The
- * angle will increase if the the segments hit the minimum edge length. Default
- * is 10 degrees.
- */
-void Manifold::SetMinCircularAngle(float angle) {
-  if (angle <= 0) return;
-  Manifold::circularAngle_ = angle;
-}
-
-/**
- * Sets a length constraint the default number of circular segments for the
- * Cylinder(), Sphere(), and Revolve() constructors. The number of segments will
- * be rounded up to the nearest factor of four.
- *
- * @param length The minimum length of segments. The length will
- * increase if the the segments hit the minimum angle. Default is 1.0.
- */
-void Manifold::SetMinCircularEdgeLength(float length) {
-  if (length <= 0) return;
-  Manifold::circularEdgeLength_ = length;
-}
-
-/**
- * Sets the default number of circular segments for the
- * Cylinder(), Sphere(), and Revolve() constructors. Overrides the edge length
- * and angle constraints and sets the number of segments to exactly this value.
- *
- * @param number Number of circular segments. Default is 0, meaning no
- * constraint is applied.
- */
-void Manifold::SetCircularSegments(int number) {
-  if (number < 3 && number != 0) return;
-  Manifold::circularSegments_ = number;
-}
-
-/**
- * Determine the result of the SetMinCircularAngle(),
- * SetMinCircularEdgeLength(), and SetCircularSegments() defaults.
- *
- * @param radius For a given radius of circle, determine how many default
- * segments there will be.
- */
-int Manifold::GetCircularSegments(float radius) {
-  if (Manifold::circularSegments_ > 0) return Manifold::circularSegments_;
-  int nSegA = 360.0f / Manifold::circularAngle_;
-  int nSegL = 2.0f * radius * glm::pi<float>() / Manifold::circularEdgeLength_;
-  int nSeg = fmin(nSegA, nSegL) + 3;
-  nSeg -= nSeg % 4;
-  return nSeg;
-}
-
 /**
  * Does the Manifold have any triangles?
  */

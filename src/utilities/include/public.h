@@ -131,6 +131,7 @@ using SimplePolygon = std::vector<glm::vec2>;
  * [&epsilon;-valid](https://github.com/elalish/manifold/wiki/Manifold-Library#definition-of-%CE%B5-valid).
  */
 using Polygons = std::vector<SimplePolygon>;
+// };
 /** @} */
 
 /**
@@ -420,6 +421,83 @@ struct Box {
   HOST_DEVICE bool IsFinite() const {
     return glm::all(glm::isfinite(min)) && glm::all(glm::isfinite(max));
   }
+};
+
+class Quality {
+ private:
+  inline static int circularSegments_ = 0;
+  inline static float circularAngle_ = 10.0f;
+  inline static float circularEdgeLength_ = 1.0f;
+
+ public:
+  /** @name Defaults
+   * These static properties control how circular shapes are quantized by
+   * default on construction. If circularSegments is specified, it takes
+   * precedence. If it is zero, then instead the minimum is used of the segments
+   * calculated based on edge length and angle, rounded up to the nearest
+   * multiple of four. To get numbers not divisible by four, circularSegments
+   * must be specified.
+   */
+  ///@{
+  /**
+   * Sets an angle constraint the default number of circular segments for the
+   * CrossSection::Circle(), Manifold::Cylinder(), Manifold::Sphere(), and
+   * Manifold::Revolve() constructors. The number of segments will be rounded up
+   * to the nearest factor of four.
+   *
+   * @param angle The minimum angle in degrees between consecutive segments. The
+   * angle will increase if the the segments hit the minimum edge length.
+   * Default is 10 degrees.
+   */
+  static void SetMinCircularAngle(float angle) {
+    if (angle <= 0) return;
+    circularAngle_ = angle;
+  }
+
+  /**
+   * Sets a length constraint the default number of circular segments for the
+   * CrossSection::Circle(), Manifold::Cylinder(), Manifold::Sphere(), and
+   * Manifold::Revolve() constructors. The number of segments will be rounded up
+   * to the nearest factor of four.
+   *
+   * @param length The minimum length of segments. The length will
+   * increase if the the segments hit the minimum angle. Default is 1.0.
+   */
+  static void SetMinCircularEdgeLength(float length) {
+    if (length <= 0) return;
+    circularEdgeLength_ = length;
+  }
+
+  /**
+   * Sets the default number of circular segments for the
+   * CrossSection::Circle(), Manifold::Cylinder(), Manifold::Sphere(), and
+   * Manifold::Revolve() constructors. Overrides the edge length and angle
+   * constraints and sets the number of segments to exactly this value.
+   *
+   * @param number Number of circular segments. Default is 0, meaning no
+   * constraint is applied.
+   */
+  static void SetCircularSegments(int number) {
+    if (number < 3 && number != 0) return;
+    circularSegments_ = number;
+  }
+
+  /**
+   * Determine the result of the SetMinCircularAngle(),
+   * SetMinCircularEdgeLength(), and SetCircularSegments() defaults.
+   *
+   * @param radius For a given radius of circle, determine how many default
+   * segments there will be.
+   */
+  static int GetCircularSegments(float radius) {
+    if (circularSegments_ > 0) return circularSegments_;
+    int nSegA = 360.0f / circularAngle_;
+    int nSegL = 2.0f * radius * glm::pi<float>() / circularEdgeLength_;
+    int nSeg = fmin(nSegA, nSegL) + 3;
+    nSeg -= nSeg % 4;
+    return nSeg;
+  }
+  ///@}
 };
 
 /** @defgroup Debug

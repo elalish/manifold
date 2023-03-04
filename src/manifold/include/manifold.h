@@ -16,6 +16,7 @@
 #include <functional>
 #include <memory>
 
+#include "cross_section.h"
 #include "public.h"
 
 namespace manifold {
@@ -62,10 +63,10 @@ class Manifold {
                            float radiusHigh = -1.0f, int circularSegments = 0,
                            bool center = false);
   static Manifold Sphere(float radius, int circularSegments = 0);
-  static Manifold Extrude(Polygons crossSection, float height,
+  static Manifold Extrude(const CrossSection& crossSection, float height,
                           int nDivisions = 0, float twistDegrees = 0.0f,
                           glm::vec2 scaleTop = glm::vec2(1.0f));
-  static Manifold Revolve(const Polygons& crossSection,
+  static Manifold Revolve(const CrossSection& crossSection,
                           int circularSegments = 0);
   ///@}
 
@@ -78,21 +79,6 @@ class Manifold {
   Components GetComponents() const;
   std::vector<Manifold> Decompose(Components components) const;
   std::vector<Manifold> Decompose() const;
-  ///@}
-
-  /** @name Defaults
-   * These static properties control how circular shapes are quantized by
-   * default on construction. If circularSegments is specified, it takes
-   * precedence. If it is zero, then instead the minimum is used of the segments
-   * calculated based on edge length and angle, rounded up to the nearest
-   * multiple of four. To get numbers not divisible by four, circularSegments
-   * must be specified.
-   */
-  ///@{
-  static void SetMinCircularAngle(float degrees);
-  static void SetMinCircularEdgeLength(float length);
-  static void SetCircularSegments(int number);
-  static int GetCircularSegments(float radius);
   ///@}
 
   /** @name Information

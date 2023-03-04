@@ -10,7 +10,7 @@ endif()
 
 target_link_libraries(
   manifoldc
-  PRIVATE manifold sdf meshIO graphlite
+  PRIVATE manifold sdf meshIO graphlite cross_section
 )
 
 target_include_directories(manifoldc PUBLIC ${PROJECT_SOURCE_DIR}/include)

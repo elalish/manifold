@@ -271,9 +271,9 @@ EMSCRIPTEN_BINDINGS(whatever) {
   function("_intersectionN", &IntersectionN);
   function("_Compose", &Manifold::Compose);
 
-  function("setMinCircularAngle", &Manifold::SetMinCircularAngle);
-  function("setMinCircularEdgeLength", &Manifold::SetMinCircularEdgeLength);
-  function("setCircularSegments", &Manifold::SetCircularSegments);
-  function("getCircularSegments", &Manifold::GetCircularSegments);
+  function("setMinCircularAngle", &Quality::SetMinCircularAngle);
+  function("setMinCircularEdgeLength", &Quality::SetMinCircularEdgeLength);
+  function("setCircularSegments", &Quality::SetCircularSegments);
+  function("getCircularSegments", &Quality::GetCircularSegments);
   function("reserveIDs", &Manifold::ReserveIDs);
 }

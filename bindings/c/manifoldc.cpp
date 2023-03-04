@@ -1,4 +1,5 @@
 #include <conv.h>
+#include <cross_section.h>
 #include <manifold.h>
 #include <manifoldc.h>
 #include <meshIO.h>
@@ -406,19 +407,19 @@ float *manifold_curvature_vert_gaussian(void *mem, ManifoldCurvature *curv) {
 
 // Static Quality Globals
 void manifold_set_min_circular_angle(float degrees) {
-  Manifold::SetMinCircularAngle(degrees);
+  Quality::SetMinCircularAngle(degrees);
 }
 
 void manifold_set_min_circular_edge_length(float length) {
-  Manifold::SetMinCircularEdgeLength(length);
+  Quality::SetMinCircularEdgeLength(length);
 }
 
 void manifold_set_circular_segments(int number) {
-  Manifold::SetCircularSegments(number);
+  Quality::SetCircularSegments(number);
 }
 
 int manifold_get_circular_segments(float radius) {
-  return Manifold::GetCircularSegments(radius);
+  return Quality::GetCircularSegments(radius);
 }
 
 // memory size

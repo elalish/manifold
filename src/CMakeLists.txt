@@ -15,6 +15,7 @@
 add_subdirectory(third_party)
 add_subdirectory(utilities)
 add_subdirectory(collider)
+add_subdirectory(cross_section)
 add_subdirectory(polygon)
 add_subdirectory(manifold)
 add_subdirectory(sdf)
