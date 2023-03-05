@@ -3,12 +3,17 @@
 #include <meshIO.h>
 #include <sdf.h>
 
+#include "cross_section.h"
 #include "include/types.h"
 #include "public.h"
 #include "types.h"
 
 ManifoldManifold *to_c(manifold::Manifold *m) {
   return reinterpret_cast<ManifoldManifold *>(m);
+}
+
+ManifoldCrossSection *to_c(manifold::CrossSection *cs) {
+  return reinterpret_cast<ManifoldCrossSection *>(cs);
 }
 
 ManifoldSimplePolygon *to_c(manifold::SimplePolygon *m) {
@@ -39,7 +44,6 @@ ManifoldError to_c(manifold::Manifold::Error error) {
   ManifoldError e = MANIFOLD_NO_ERROR;
   switch (error) {
     case Manifold::Error::NoError:
-      e = MANIFOLD_NO_ERROR;
       break;
     case Manifold::Error::NonFiniteVertex:
       e = MANIFOLD_NON_FINITE_VERTEX;
@@ -79,6 +83,10 @@ ManifoldBox *to_c(manifold::Box *m) {
   return reinterpret_cast<ManifoldBox *>(m);
 }
 
+ManifoldRect *to_c(manifold::Rect *m) {
+  return reinterpret_cast<ManifoldRect *>(m);
+}
+
 ManifoldMaterial *to_c(manifold::Material *m) {
   return reinterpret_cast<ManifoldMaterial *>(m);
 }
@@ -86,6 +94,8 @@ ManifoldMaterial *to_c(manifold::Material *m) {
 ManifoldExportOptions *to_c(manifold::ExportOptions *m) {
   return reinterpret_cast<ManifoldExportOptions *>(m);
 }
+
+ManifoldVec2 to_c(glm::vec2 v) { return {v.x, v.y}; }
 
 ManifoldVec3 to_c(glm::vec3 v) { return {v.x, v.y, v.z}; }
 
@@ -97,6 +107,10 @@ ManifoldProperties to_c(manifold::Properties p) {
 
 const manifold::Manifold *from_c(ManifoldManifold *m) {
   return reinterpret_cast<manifold::Manifold const *>(m);
+}
+
+const manifold::CrossSection *from_c(ManifoldCrossSection *m) {
+  return reinterpret_cast<manifold::CrossSection const *>(m);
 }
 
 const manifold::SimplePolygon *from_c(ManifoldSimplePolygon *m) {
@@ -123,8 +137,45 @@ const manifold::Components *from_c(ManifoldComponents *components) {
   return reinterpret_cast<manifold::Components *>(components);
 }
 
+CrossSection::FillRule from_c(ManifoldFillRule fillrule) {
+  auto fr = CrossSection::FillRule::EvenOdd;
+  switch (fillrule) {
+    case MANIFOLD_FILL_RULE_EVEN_ODD:
+      break;
+    case MANIFOLD_FILL_RULE_NON_ZERO:
+      fr = CrossSection::FillRule::NonZero;
+      break;
+    case MANIFOLD_FILL_RULE_POSITIVE:
+      fr = CrossSection::FillRule::Positive;
+      break;
+    case MANIFOLD_FILL_RULE_NEGATIVE:
+      fr = CrossSection::FillRule::Negative;
+      break;
+  };
+  return fr;
+}
+
+CrossSection::JoinType from_c(ManifoldJoinType join_type) {
+  auto jt = CrossSection::JoinType::Square;
+  switch (join_type) {
+    case MANIFOLD_JOIN_TYPE_SQUARE:
+      break;
+    case MANIFOLD_JOIN_TYPE_ROUND:
+      jt = CrossSection::JoinType::Round;
+      break;
+    case MANIFOLD_JOIN_TYPE_MITER:
+      jt = CrossSection::JoinType::Miter;
+      break;
+  };
+  return jt;
+}
+
 const manifold::Box *from_c(ManifoldBox *m) {
   return reinterpret_cast<manifold::Box const *>(m);
+}
+
+const manifold::Rect *from_c(ManifoldRect *m) {
+  return reinterpret_cast<manifold::Rect const *>(m);
 }
 
 manifold::Material *from_c(ManifoldMaterial *mat) {
@@ -134,6 +185,8 @@ manifold::Material *from_c(ManifoldMaterial *mat) {
 manifold::ExportOptions *from_c(ManifoldExportOptions *options) {
   return reinterpret_cast<manifold::ExportOptions *>(options);
 }
+
+glm::vec2 from_c(ManifoldVec2 v) { return glm::vec2(v.x, v.y); }
 
 glm::vec3 from_c(ManifoldVec3 v) { return glm::vec3(v.x, v.y, v.z); }
 

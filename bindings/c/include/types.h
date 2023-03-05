@@ -2,6 +2,7 @@
 #include <stddef.h>
 
 typedef struct ManifoldManifold ManifoldManifold;
+typedef struct ManifoldCrossSection ManifoldCrossSection;
 typedef struct ManifoldSimplePolygon ManifoldSimplePolygon;
 typedef struct ManifoldPolygons ManifoldPolygons;
 typedef struct ManifoldMesh ManifoldMesh;
@@ -9,6 +10,7 @@ typedef struct ManifoldMeshGL ManifoldMeshGL;
 typedef struct ManifoldCurvature ManifoldCurvature;
 typedef struct ManifoldComponents ManifoldComponents;
 typedef struct ManifoldBox ManifoldBox;
+typedef struct ManifoldRect ManifoldRect;
 typedef struct ManifoldMaterial ManifoldMaterial;
 typedef struct ManifoldExportOptions ManifoldExportOptions;
 
@@ -66,3 +68,16 @@ typedef enum ManifoldError {
   MANIFOLD_RUN_INDEX_WRONG_LENGTH,
   MANIFOLD_FACE_ID_WRONG_LENGTH,
 } ManifoldError;
+
+typedef enum ManifoldFillRule {
+  MANIFOLD_FILL_RULE_EVEN_ODD,
+  MANIFOLD_FILL_RULE_NON_ZERO,
+  MANIFOLD_FILL_RULE_POSITIVE,
+  MANIFOLD_FILL_RULE_NEGATIVE
+} ManifoldFillRule;
+
+typedef enum ManifoldJoinType {
+  MANIFOLD_JOIN_TYPE_SQUARE,
+  MANIFOLD_JOIN_TYPE_ROUND,
+  MANIFOLD_JOIN_TYPE_MITER,
+} ManifoldJoinType;
