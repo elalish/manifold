@@ -132,6 +132,7 @@ class Manifold {
   Manifold Rotate(float xDegrees, float yDegrees = 0.0f,
                   float zDegrees = 0.0f) const;
   Manifold Transform(const glm::mat4x3&) const;
+  Manifold Mirror(glm::vec3) const;
   Manifold Warp(std::function<void(glm::vec3&)>) const;
   Manifold Refine(int) const;
   // Manifold RefineToLength(float);

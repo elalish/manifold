@@ -490,3 +490,18 @@ TEST(Manifold, FaceIDRoundTrip) {
   const MeshGL outGL = cube2.GetMeshGL();
   ASSERT_EQ(NumUnique(outGL.faceID), 12);
 }
+
+TEST(Manifold, MirrorUnion) {
+  auto a = Manifold::Cube({5., 5., 5.}, true);
+  auto b = a.Translate({2.5, 2.5, 2.5});
+  auto result = a + b + b.Mirror({1, 1, 0});
+
+#ifdef MANIFOLD_EXPORT
+  if (options.exportModels)
+    ExportMesh("manifold_mirror_union.glb", result.GetMesh(), {});
+#endif
+
+  auto vol_a = a.GetProperties().volume;
+  EXPECT_FLOAT_EQ(vol_a + 1.75 * vol_a, result.GetProperties().volume);
+  EXPECT_TRUE(a.Mirror(glm::vec3(0)).IsEmpty());
+}

@@ -518,6 +518,30 @@ Manifold Manifold::Transform(const glm::mat4x3& m) const {
 }
 
 /**
+ * Mirror this Manifold over the plane described by the unit form of the given
+ * normal vector. If the length of the normal is zero, an empty Manifold is
+ * returned. This operation can be chained. Transforms are combined and applied
+ * lazily.
+ *
+ * @param normal The normal vector of the plane to be mirrored over
+ */
+Manifold Manifold::Mirror(glm::vec3 normal) const {
+  if (glm::length(normal) == 0.) {
+    return Manifold();
+  }
+  auto n = glm::normalize(normal);
+  glm::mat4x3 m(1.0f - 2.0f * n.x * n.x, -2.0f * n.x * n.y,
+                -2.0f * n.x * n.z,  //
+                -2.0f * n.x * n.y, 1.0f - 2.0f * n.y * n.y,
+                -2.0f * n.y * n.z,  //
+                -2.0f * n.x * n.z, -2.0f * n.y * n.z,
+                1.0f - 2.0f * n.z * n.z  //
+                ,
+                0.0f, 0.0f, 0.0f);
+  return Manifold(pNode_->Transform(m));
+}
+
+/**
  * This function does not change the topology, but allows the vertices to be
  * moved according to any arbitrary input function. It is easy to create a
  * function that warps a geometrically valid object into one which overlaps, but
