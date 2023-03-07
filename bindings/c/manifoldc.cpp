@@ -408,6 +408,7 @@ float *manifold_curvature_vert_gaussian(void *mem, ManifoldCurvature *curv) {
 }
 
 // Static Quality Globals
+
 void manifold_set_min_circular_angle(float degrees) {
   Quality::SetMinCircularAngle(degrees);
 }
