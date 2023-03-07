@@ -222,7 +222,7 @@ Manifold::Impl CsgLeafNode::Compose(
 CsgOpNode::CsgOpNode() {}
 
 CsgOpNode::CsgOpNode(const std::vector<std::shared_ptr<CsgNode>> &children,
-                     Manifold::OpType op)
+                     OpType op)
     : impl_(std::make_shared<Impl>()) {
   impl_->children_ = children;
   SetOp(op);
@@ -231,7 +231,7 @@ CsgOpNode::CsgOpNode(const std::vector<std::shared_ptr<CsgNode>> &children,
 }
 
 CsgOpNode::CsgOpNode(std::vector<std::shared_ptr<CsgNode>> &&children,
-                     Manifold::OpType op)
+                     OpType op)
     : impl_(std::make_shared<Impl>()) {
   impl_->children_ = children;
   SetOp(op);
@@ -263,7 +263,7 @@ std::shared_ptr<CsgLeafNode> CsgOpNode::ToLeafNode() const {
           impls.push_back(
               std::dynamic_pointer_cast<CsgLeafNode>(child)->GetImpl());
         }
-        BatchBoolean(Manifold::OpType::Intersect, impls);
+        BatchBoolean(OpType::Intersect, impls);
         children_.clear();
         children_.push_back(std::make_shared<CsgLeafNode>(impls.front()));
         break;
@@ -276,11 +276,10 @@ std::shared_ptr<CsgLeafNode> CsgOpNode::ToLeafNode() const {
         BatchUnion();
         auto rhs = std::dynamic_pointer_cast<CsgLeafNode>(children_.front());
         children_.clear();
-        Boolean3 boolean(*lhs->GetImpl(), *rhs->GetImpl(),
-                         Manifold::OpType::Subtract);
+        Boolean3 boolean(*lhs->GetImpl(), *rhs->GetImpl(), OpType::Subtract);
         children_.push_back(
             std::make_shared<CsgLeafNode>(std::make_shared<Manifold::Impl>(
-                boolean.Result(Manifold::OpType::Subtract))));
+                boolean.Result(OpType::Subtract))));
       };
       case CsgNodeType::Leaf:
         // unreachable
@@ -299,9 +298,9 @@ std::shared_ptr<CsgLeafNode> CsgOpNode::ToLeafNode() const {
  * operation. Only supports union and intersection.
  */
 void CsgOpNode::BatchBoolean(
-    Manifold::OpType operation,
+    OpType operation,
     std::vector<std::shared_ptr<const Manifold::Impl>> &results) {
-  ASSERT(operation != Manifold::OpType::Subtract, logicErr,
+  ASSERT(operation != OpType::Subtract, logicErr,
          "BatchBoolean doesn't support Difference.");
   auto cmpFn = [](std::shared_ptr<const Manifold::Impl> a,
                   std::shared_ptr<const Manifold::Impl> b) {
@@ -387,7 +386,7 @@ void CsgOpNode::BatchUnion() const {
             std::make_shared<const Manifold::Impl>(CsgLeafNode::Compose(tmp)));
       }
     }
-    BatchBoolean(Manifold::OpType::Add, impls);
+    BatchBoolean(OpType::Add, impls);
     children_.erase(children_.begin() + start, children_.end());
     children_.push_back(std::make_shared<CsgLeafNode>(impls.back()));
     // move it to the front as we process from the back, and the newly added
@@ -438,15 +437,15 @@ std::vector<std::shared_ptr<CsgNode>> &CsgOpNode::GetChildren(
   return children_;
 }
 
-void CsgOpNode::SetOp(Manifold::OpType op) {
+void CsgOpNode::SetOp(OpType op) {
   switch (op) {
-    case Manifold::OpType::Add:
+    case OpType::Add:
       impl_->op_ = CsgNodeType::Union;
       break;
-    case Manifold::OpType::Subtract:
+    case OpType::Subtract:
       impl_->op_ = CsgNodeType::Difference;
       break;
-    case Manifold::OpType::Intersect:
+    case OpType::Intersect:
       impl_->op_ = CsgNodeType::Intersection;
       break;
   }

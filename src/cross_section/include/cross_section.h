@@ -27,8 +27,16 @@ namespace manifold {
 
 class Rect;
 
+/** @addtogroup Core
+ *  @{
+ */
+
 class CrossSection {
  public:
+  /** @name Creation
+   *  Constructors
+   */
+  ///@{
   CrossSection();
   ~CrossSection();
   CrossSection(const CrossSection& other);
@@ -36,19 +44,45 @@ class CrossSection {
   CrossSection(CrossSection&&) noexcept;
   CrossSection& operator=(CrossSection&&) noexcept;
 
-  // Construction from arbitrary contours
   enum class FillRule { EvenOdd, NonZero, Positive, Negative };
   CrossSection(const SimplePolygon& contour,
                FillRule fillrule = FillRule::Positive);
   CrossSection(const Polygons& contours,
                FillRule fillrule = FillRule::Positive);
 
-  // Shapes
   static CrossSection Square(const glm::vec2 dims, bool center = false);
   static CrossSection Circle(float radius, int circularSegments = 0);
+  ///@}
 
-  // Booleans
-  enum class OpType { Add, Subtract, Intersect, Xor };
+  /** @name Information
+   *  Details of the cross-section
+   */
+  ///@{
+  // Output
+  Polygons ToPolygons() const;
+  double Area() const;
+  bool IsEmpty() const;
+  Rect Bounds() const;
+  ///@}
+
+  /** @name Modification
+   */
+  ///@{
+  CrossSection Translate(const glm::vec2 v) const;
+  CrossSection Rotate(float degrees) const;
+  CrossSection Scale(const glm::vec2 s) const;
+  CrossSection Mirror(const glm::vec2 ax) const;
+  CrossSection Transform(const glm::mat3x2& m) const;
+  CrossSection Simplify(double epsilon = 1e-6) const;
+  enum class JoinType { Square, Round, Miter };
+  CrossSection Offset(double delta, JoinType jt, double miter_limit = 2.0,
+                      double arc_tolerance = 0.0) const;
+  ///@}
+
+  /** @name Boolean
+   *  Combine two manifolds
+   */
+  ///@{
   CrossSection Boolean(const CrossSection& second, OpType op) const;
   static CrossSection BatchBoolean(
       const std::vector<CrossSection>& crossSections, OpType op);
@@ -59,34 +93,17 @@ class CrossSection {
   CrossSection operator^(const CrossSection&) const;  // Intersect
   CrossSection& operator^=(const CrossSection&);
   CrossSection RectClip(const Rect& rect) const;
-
-  // Transformations
-  CrossSection Translate(const glm::vec2 v) const;
-  CrossSection Rotate(float degrees) const;
-  CrossSection Scale(const glm::vec2 s) const;
-  CrossSection Mirror(const glm::vec2 ax) const;
-  CrossSection Transform(const glm::mat3x2& m) const;
-
-  // Path Simplification
-  CrossSection Simplify(double epsilon = 1e-6) const;
-
-  // Offsetting
-  enum class JoinType { Square, Round, Miter };
-  CrossSection Offset(double delta, JoinType jt, double miter_limit = 2.0,
-                      double arc_tolerance = 0.0) const;
-
-  // Geometry
-  double Area() const;
-  bool IsEmpty() const;
-  Rect Bounds() const;
-
-  // Output
-  Polygons ToPolygons() const;
+  ///@}
 
  private:
   C2::PathsD paths_;
   CrossSection(C2::PathsD paths);
 };
+/** @} */
+
+/** @addtogroup Connections
+ *  @{
+ */
 
 class Rect {
  public:
@@ -164,4 +181,5 @@ class Rect {
 
   CrossSection AsCrossSection() const;
 };
+/** @} */
 }  // namespace manifold

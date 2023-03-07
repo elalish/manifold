@@ -512,10 +512,10 @@ VecDH<int> Winding03(const Manifold::Impl &inP, SparseIndices &p0q2,
 
 namespace manifold {
 Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ,
-                   Manifold::OpType op)
+                   OpType op)
     : inP_(inP),
       inQ_(inQ),
-      expandP_(op == Manifold::OpType::Add ? 1.0 : -1.0),
+      expandP_(op == OpType::Add ? 1.0 : -1.0),
       policy_(autoPolicy(glm::max(inP.NumEdge(), inQ.NumEdge()))) {
   // Symbolic perturbation:
   // Union -> expand inP
