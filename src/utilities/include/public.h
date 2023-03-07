@@ -112,11 +112,6 @@ inline HOST_DEVICE int CCW(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2,
     return area > 0 ? 1 : -1;
 }
 
-/** @defgroup Polygon
- *  @brief Polygon data structures
- * @{
- */
-
 /**
  * Single polygon contour, wound CCW. First and last point are implicitly
  * connected. Should ensure all input is
@@ -131,8 +126,6 @@ using SimplePolygon = std::vector<glm::vec2>;
  * [&epsilon;-valid](https://github.com/elalish/manifold/wiki/Manifold-Library#definition-of-%CE%B5-valid).
  */
 using Polygons = std::vector<SimplePolygon>;
-// };
-/** @} */
 
 /**
  * The triangle-mesh input and output of this library.
@@ -269,12 +262,7 @@ struct Components {
   std::vector<int> indices;
   int numComponents;
 };
-/** @} */
 
-/**
- * @ingroup Connections
- * Axis-aligned bounding box
- */
 struct Box {
   glm::vec3 min = glm::vec3(std::numeric_limits<float>::infinity());
   glm::vec3 max = glm::vec3(-std::numeric_limits<float>::infinity());
@@ -422,7 +410,25 @@ struct Box {
     return glm::all(glm::isfinite(min)) && glm::all(glm::isfinite(max));
   }
 };
+/** @} */
 
+/** @addtogroup Core
+ *  @{
+ */
+
+/**
+ * Boolean operation type: Add (Union), Subtract (Difference), and Intersect.
+ */
+enum class OpType { Add, Subtract, Intersect };
+
+/**
+ * These static properties control how circular shapes are quantized by
+ * default on construction. If circularSegments is specified, it takes
+ * precedence. If it is zero, then instead the minimum is used of the segments
+ * calculated based on edge length and angle, rounded up to the nearest
+ * multiple of four. To get numbers not divisible by four, circularSegments
+ * must be specified.
+ */
 class Quality {
  private:
   inline static int circularSegments_ = 0;
@@ -430,15 +436,6 @@ class Quality {
   inline static float circularEdgeLength_ = 1.0f;
 
  public:
-  /** @name Defaults
-   * These static properties control how circular shapes are quantized by
-   * default on construction. If circularSegments is specified, it takes
-   * precedence. If it is zero, then instead the minimum is used of the segments
-   * calculated based on edge length and angle, rounded up to the nearest
-   * multiple of four. To get numbers not divisible by four, circularSegments
-   * must be specified.
-   */
-  ///@{
   /**
    * Sets an angle constraint the default number of circular segments for the
    * CrossSection::Circle(), Manifold::Cylinder(), Manifold::Sphere(), and
@@ -497,8 +494,8 @@ class Quality {
     nSeg -= nSeg % 4;
     return nSeg;
   }
-  ///@}
 };
+/** @} */
 
 /** @defgroup Debug
  *  @brief Debugging features

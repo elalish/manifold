@@ -142,10 +142,6 @@ class Manifold {
    *  Combine two manifolds
    */
   ///@{
-  /**
-   * Boolean operation type: Add (Union), Subtract (Difference), and Intersect.
-   */
-  enum class OpType { Add, Subtract, Intersect };
   Manifold Boolean(const Manifold& second, OpType op) const;
   static Manifold BatchBoolean(const std::vector<Manifold>& manifolds,
                                OpType op);
