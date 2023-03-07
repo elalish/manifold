@@ -86,11 +86,11 @@ ManifoldManifold *manifold_of_meshgl(void *mem, ManifoldMeshGL *mesh);
 ManifoldManifold *manifold_smooth(void *mem, ManifoldMeshGL *mesh,
                                   int *half_edges, float *smoothness,
                                   int n_idxs);
-ManifoldManifold *manifold_extrude(void *mem, ManifoldPolygons *polygons,
+ManifoldManifold *manifold_extrude(void *mem, ManifoldCrossSection *cs,
                                    float height, int slices,
                                    float twist_degrees, float scale_x,
                                    float scale_y);
-ManifoldManifold *manifold_revolve(void *mem, ManifoldPolygons *polygons,
+ManifoldManifold *manifold_revolve(void *mem, ManifoldCrossSection *cs,
                                    int circular_segments);
 ManifoldManifold *manifold_compose(void *mem, ManifoldManifold **ms,
                                    size_t length);

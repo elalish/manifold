@@ -225,20 +225,19 @@ ManifoldManifold *manifold_of_meshgl(void *mem, ManifoldMeshGL *mesh) {
   return to_c(new (mem) Manifold(m));
 }
 
-ManifoldManifold *manifold_extrude(void *mem, ManifoldPolygons *polygons,
+ManifoldManifold *manifold_extrude(void *mem, ManifoldCrossSection *cs,
                                    float height, int slices,
                                    float twist_degrees, float scale_x,
                                    float scale_y) {
   auto scale = glm::vec2(scale_x, scale_y);
-  auto m = Manifold::Extrude(*from_c(polygons), height, slices, twist_degrees,
-                             scale);
+  auto m = Manifold::Extrude(*from_c(cs), height, slices, twist_degrees, scale);
   return to_c(new (mem) Manifold(m));
 }
 
-ManifoldManifold *manifold_revolve(void *mem, ManifoldPolygons *polygons,
+ManifoldManifold *manifold_revolve(void *mem, ManifoldCrossSection *cs,
 
                                    int circular_segments) {
-  auto m = Manifold::Revolve(*from_c(polygons), circular_segments);
+  auto m = Manifold::Revolve(*from_c(cs), circular_segments);
   return to_c(new (mem) Manifold(m));
 }
 
