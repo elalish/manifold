@@ -121,6 +121,9 @@ int manifold_original_id(ManifoldManifold *m);
 
 // CrossSection
 
+ManifoldCrossSection *manifold_cross_section_empty(void *mem);
+ManifoldCrossSection *manifold_cross_section_copy(void *mem,
+                                                  ManifoldCrossSection *cs);
 ManifoldCrossSection *manifold_cross_section_of_simple_polygon(
     void *mem, ManifoldSimplePolygon *p, ManifoldFillRule fr);
 ManifoldCrossSection *manifold_cross_section_of_polygons(void *mem,
@@ -167,6 +170,7 @@ ManifoldCrossSection *manifold_cross_section_offset(
     void *mem, ManifoldCrossSection *cs, double delta, ManifoldJoinType jt,
     double miter_limit, double arc_tolerance);
 double manifold_cross_section_area(ManifoldCrossSection *cs);
+int manifold_cross_section_is_empty(ManifoldCrossSection *cs);
 ManifoldRect *manifold_cross_section_bounds(void *mem,
                                             ManifoldCrossSection *cs);
 ManifoldPolygons *manifold_cross_section_to_polygons(void *mem,

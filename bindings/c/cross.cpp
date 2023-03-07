@@ -5,6 +5,16 @@
 #include "cross_section.h"
 #include "types.h"
 
+ManifoldCrossSection *manifold_cross_section_empty(void *mem) {
+  return to_c(new (mem) CrossSection());
+}
+
+ManifoldCrossSection *manifold_cross_section_copy(void *mem,
+                                                  ManifoldCrossSection *cs) {
+  auto cross = *from_c(cs);
+  return to_c(new (mem) CrossSection(cross));
+}
+
 ManifoldCrossSection *manifold_cross_section_of_simple_polygon(
     void *mem, ManifoldSimplePolygon *p, ManifoldFillRule fr) {
   return to_c(new (mem) CrossSection(*from_c(p), from_c(fr)));
