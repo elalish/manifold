@@ -7,9 +7,11 @@
 #include <sdf.h>
 
 #include "box.cpp"
+#include "cross.cpp"
 #include "include/conv.h"
 #include "include/types.h"
 #include "meshio.cpp"
+#include "rect.cpp"
 #include "types.h"
 
 using namespace manifold;
@@ -223,20 +225,19 @@ ManifoldManifold *manifold_of_meshgl(void *mem, ManifoldMeshGL *mesh) {
   return to_c(new (mem) Manifold(m));
 }
 
-ManifoldManifold *manifold_extrude(void *mem, ManifoldPolygons *polygons,
+ManifoldManifold *manifold_extrude(void *mem, ManifoldCrossSection *cs,
                                    float height, int slices,
                                    float twist_degrees, float scale_x,
                                    float scale_y) {
   auto scale = glm::vec2(scale_x, scale_y);
-  auto m = Manifold::Extrude(*from_c(polygons), height, slices, twist_degrees,
-                             scale);
+  auto m = Manifold::Extrude(*from_c(cs), height, slices, twist_degrees, scale);
   return to_c(new (mem) Manifold(m));
 }
 
-ManifoldManifold *manifold_revolve(void *mem, ManifoldPolygons *polygons,
+ManifoldManifold *manifold_revolve(void *mem, ManifoldCrossSection *cs,
 
                                    int circular_segments) {
-  auto m = Manifold::Revolve(*from_c(polygons), circular_segments);
+  auto m = Manifold::Revolve(*from_c(cs), circular_segments);
   return to_c(new (mem) Manifold(m));
 }
 
@@ -406,6 +407,7 @@ float *manifold_curvature_vert_gaussian(void *mem, ManifoldCurvature *curv) {
 }
 
 // Static Quality Globals
+
 void manifold_set_min_circular_angle(float degrees) {
   Quality::SetMinCircularAngle(degrees);
 }
@@ -423,16 +425,21 @@ int manifold_get_circular_segments(float radius) {
 }
 
 // memory size
+size_t manifold_cross_section_size() { return sizeof(CrossSection); }
 size_t manifold_simple_polygon_size() { return sizeof(SimplePolygon); }
 size_t manifold_polygons_size() { return sizeof(Polygons); }
 size_t manifold_manifold_size() { return sizeof(Manifold); }
 size_t manifold_manifold_pair_size() { return sizeof(ManifoldManifoldPair); }
 size_t manifold_meshgl_size() { return sizeof(MeshGL); }
 size_t manifold_box_size() { return sizeof(Box); }
+size_t manifold_rect_size() { return sizeof(Rect); }
 size_t manifold_curvature_size() { return sizeof(Curvature); }
 size_t manifold_components_size() { return sizeof(Components); }
 
 // pointer free + destruction
+void manifold_delete_cross_section(ManifoldCrossSection *c) {
+  delete from_c(c);
+}
 void manifold_delete_simple_polygon(ManifoldSimplePolygon *p) {
   delete from_c(p);
 }
@@ -440,10 +447,14 @@ void manifold_delete_polygons(ManifoldPolygons *p) { delete from_c(p); }
 void manifold_delete_manifold(ManifoldManifold *m) { delete from_c(m); }
 void manifold_delete_meshgl(ManifoldMeshGL *m) { delete from_c(m); }
 void manifold_delete_box(ManifoldBox *b) { delete from_c(b); }
+void manifold_delete_rect(ManifoldRect *r) { delete from_c(r); }
 void manifold_delete_curvature(ManifoldCurvature *c) { delete from_c(c); }
 void manifold_delete_components(ManifoldComponents *c) { delete from_c(c); }
 
 // destruction
+void manifold_destruct_cross_section(ManifoldCrossSection *m) {
+  from_c(m)->~CrossSection();
+}
 void manifold_destruct_simple_polygon(ManifoldSimplePolygon *p) {
   from_c(p)->~SimplePolygon();
 }
@@ -451,6 +462,7 @@ void manifold_destruct_polygons(ManifoldPolygons *p) { from_c(p)->~Polygons(); }
 void manifold_destruct_manifold(ManifoldManifold *m) { from_c(m)->~Manifold(); }
 void manifold_destruct_meshgl(ManifoldMeshGL *m) { from_c(m)->~MeshGL(); }
 void manifold_destruct_box(ManifoldBox *b) { from_c(b)->~Box(); }
+void manifold_destruct_rect(ManifoldRect *r) { from_c(r)->~Rect(); }
 void manifold_destruct_curvature(ManifoldCurvature *c) {
   from_c(c)->~Curvature();
 }
