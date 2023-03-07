@@ -47,9 +47,8 @@ namespace manifold {
 /** @ingroup Private */
 class Boolean3 {
  public:
-  Boolean3(const Manifold::Impl& inP, const Manifold::Impl& inQ,
-           Manifold::OpType op);
-  Manifold::Impl Result(Manifold::OpType op) const;
+  Boolean3(const Manifold::Impl& inP, const Manifold::Impl& inQ, OpType op);
+  Manifold::Impl Result(OpType op) const;
 
  private:
   const Manifold::Impl &inP_, &inQ_;

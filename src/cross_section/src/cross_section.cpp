@@ -31,19 +31,16 @@ using namespace manifold;
 namespace {
 const int precision_ = 8;
 
-C2::ClipType cliptype_of_op(CrossSection::OpType op) {
+C2::ClipType cliptype_of_op(OpType op) {
   C2::ClipType ct = C2::ClipType::Union;
   switch (op) {
-    case CrossSection::OpType::Add:
+    case OpType::Add:
       break;
-    case CrossSection::OpType::Subtract:
+    case OpType::Subtract:
       ct = C2::ClipType::Difference;
       break;
-    case CrossSection::OpType::Intersect:
+    case OpType::Intersect:
       ct = C2::ClipType::Intersection;
-      break;
-    case CrossSection::OpType::Xor:
-      ct = C2::ClipType::Xor;
       break;
   };
   return ct;

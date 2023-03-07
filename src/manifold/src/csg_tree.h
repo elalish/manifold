@@ -63,11 +63,9 @@ class CsgOpNode final : public CsgNode {
  public:
   CsgOpNode();
 
-  CsgOpNode(const std::vector<std::shared_ptr<CsgNode>> &children,
-            Manifold::OpType op);
+  CsgOpNode(const std::vector<std::shared_ptr<CsgNode>> &children, OpType op);
 
-  CsgOpNode(std::vector<std::shared_ptr<CsgNode>> &&children,
-            Manifold::OpType op);
+  CsgOpNode(std::vector<std::shared_ptr<CsgNode>> &&children, OpType op);
 
   std::shared_ptr<CsgNode> Transform(const glm::mat4x3 &m) const override;
 
@@ -89,10 +87,10 @@ class CsgOpNode final : public CsgNode {
   // the following fields are for lazy evaluation, so they are mutable
   mutable std::shared_ptr<CsgLeafNode> cache_ = nullptr;
 
-  void SetOp(Manifold::OpType);
+  void SetOp(OpType);
 
   static void BatchBoolean(
-      Manifold::OpType operation,
+      OpType operation,
       std::vector<std::shared_ptr<const Manifold::Impl>> &results);
 
   void BatchUnion() const;

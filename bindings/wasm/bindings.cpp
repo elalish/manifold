@@ -31,15 +31,15 @@ Manifold Difference(const Manifold& a, const Manifold& b) { return a - b; }
 Manifold Intersection(const Manifold& a, const Manifold& b) { return a ^ b; }
 
 Manifold UnionN(const std::vector<Manifold>& manifolds) {
-  return Manifold::BatchBoolean(manifolds, Manifold::OpType::Add);
+  return Manifold::BatchBoolean(manifolds, OpType::Add);
 }
 
 Manifold DifferenceN(const std::vector<Manifold>& manifolds) {
-  return Manifold::BatchBoolean(manifolds, Manifold::OpType::Subtract);
+  return Manifold::BatchBoolean(manifolds, OpType::Subtract);
 }
 
 Manifold IntersectionN(const std::vector<Manifold>& manifolds) {
-  return Manifold::BatchBoolean(manifolds, Manifold::OpType::Intersect);
+  return Manifold::BatchBoolean(manifolds, OpType::Intersect);
 }
 
 std::vector<SimplePolygon> ToPolygon(
