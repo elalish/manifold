@@ -12,6 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "public.h"
+
+using namespace manifold;
+
 #ifdef MANIFOLD_USE_CUDA
 #include <cuda_runtime.h>
 
@@ -34,3 +38,22 @@ namespace manifold {
 bool CudaEnabled() { return false; }
 }  // namespace manifold
 #endif
+
+MeshGL::MeshGL(const Mesh& mesh) {
+  numProp = 3;
+  vertProperties.resize(numProp * mesh.vertPos.size());
+  for (int i = 0; i < mesh.vertPos.size(); ++i) {
+    for (int j : {0, 1, 2}) vertProperties[3 * i + j] = mesh.vertPos[i][j];
+  }
+  triVerts.resize(3 * mesh.triVerts.size());
+  for (int i = 0; i < mesh.triVerts.size(); ++i) {
+    for (int j : {0, 1, 2}) triVerts[3 * i + j] = mesh.triVerts[i][j];
+  }
+  halfedgeTangent.resize(4 * mesh.halfedgeTangent.size());
+  for (int i = 0; i < mesh.halfedgeTangent.size(); ++i) {
+    for (int j : {0, 1, 2, 3})
+      halfedgeTangent[4 * i + j] = mesh.halfedgeTangent[i][j];
+  }
+}
+
+MeshGL::MergeResult MeshGL::Merge() { return MergeResult::AlreadyManifold; }
