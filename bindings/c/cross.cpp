@@ -57,13 +57,6 @@ ManifoldCrossSection *manifold_cross_section_intersection(
   return to_c(new (mem) CrossSection(cs));
 }
 
-ManifoldCrossSection *manifold_cross_section_xor(void *mem,
-                                                 ManifoldCrossSection *a,
-                                                 ManifoldCrossSection *b) {
-  auto cs = from_c(a)->Boolean(*from_c(b), CrossSection::OpType::Xor);
-  return to_c(new (mem) CrossSection(cs));
-}
-
 ManifoldCrossSection *manifold_cross_section_rect_clip(void *mem,
                                                        ManifoldCrossSection *cs,
                                                        ManifoldRect *r) {

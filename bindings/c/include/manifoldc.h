@@ -140,9 +140,6 @@ ManifoldCrossSection *manifold_cross_section_difference(
     void *mem, ManifoldCrossSection *a, ManifoldCrossSection *b);
 ManifoldCrossSection *manifold_cross_section_intersection(
     void *mem, ManifoldCrossSection *a, ManifoldCrossSection *b);
-ManifoldCrossSection *manifold_cross_section_xor(void *mem,
-                                                 ManifoldCrossSection *a,
-                                                 ManifoldCrossSection *b);
 ManifoldCrossSection *manifold_cross_section_rect_clip(void *mem,
                                                        ManifoldCrossSection *cs,
                                                        ManifoldRect *r);
