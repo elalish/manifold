@@ -126,6 +126,12 @@ ManifoldManifold *manifold_transform(void *mem, ManifoldManifold *m, float x1,
   return to_c(new (mem) Manifold(transformed));
 }
 
+ManifoldManifold *manifold_mirror(void *mem, ManifoldManifold *m, float nx,
+                                  float ny, float nz) {
+  auto mirrored = from_c(m)->Mirror({nx, ny, nz});
+  return to_c(new (mem) Manifold(mirrored));
+}
+
 ManifoldManifold *manifold_warp(void *mem, ManifoldManifold *m,
                                 ManifoldVec3 (*fun)(float, float, float)) {
   std::function<void(glm::vec3 & v)> warp = [fun](glm::vec3 &v) {
