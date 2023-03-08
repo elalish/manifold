@@ -95,12 +95,9 @@ C2::PathD pathd_of_contour(const SimplePolygon& ctr) {
 
 C2::PathsD transform(const C2::PathsD ps, const glm::mat3x2 m) {
   if (m == glm::mat3x2(1.0f)) {
-    // return ps;
-    return C2::PathsD(ps);
+    return ps;
   }
   const bool invert = glm::determinant(glm::mat2(m)) < 0;
-  // const bool invert = false;
-  printf("invert = %i\n", invert);
   auto transformed = C2::PathsD();
   transformed.reserve(ps.size());
   for (auto path : ps) {
@@ -278,44 +275,21 @@ CrossSection CrossSection::Scale(const glm::vec2 scale) const {
   return Transform(m);
 }
 
-// let ax = V2.normalize ax in
-// let x = V2.x ax
-// and y = V2.y ax in
-// let xx = 1. -. (2. *. x *. x)
-// and xy = -2. *. x *. y
-// and yy = 1. -. (2. *. y *. y) in
-// v xx xy 0. xy yy 0. 0. 0. 1.
 CrossSection CrossSection::Mirror(const glm::vec2 ax) const {
   if (glm::length(ax) == 0.) {
     return CrossSection();
   }
-  auto n = glm::normalize(ax);
+  auto n = glm::normalize(glm::abs(ax));
   glm::mat3x2 m(1 - 2 * n.x * n.x, -2 * n.x * n.y,  //
                 -2 * n.x * n.y, 1 - 2 * n.y * n.y,  //
                 0.0f, 0.0f);
   return Transform(m);
-  // auto cs = CrossSection(transform(paths_, transform_));
-  // return cs.Transform(m);
-  // auto mirrored = C2::PathsD();
-  // mirrored.reserve(paths_.size());
-  // for (auto path : paths_) {
-  //   auto sz = path.size();
-  //   auto m = C2::PathD(sz);
-  //   for (int i = 0; i < sz; ++i) {
-  //     auto v = v2_of_pd(path[sz - 1 - i]);
-  //     m[i] = v2_to_pd(ax * (2 * glm::dot(v, ax) / glm::dot(ax, ax)) - v);
-  //   }
-  //   mirrored.push_back(m);
-  // }
-  // return CrossSection(mirrored);
 }
 
 CrossSection CrossSection::Transform(const glm::mat3x2& m) const {
   auto transformed = CrossSection();
-  // transformed.transform_ = glm::mat3(m) * glm::mat3(transform_);
   transformed.transform_ = m * glm::mat3(transform_);
-  // transformed.paths_ = paths_;
-  transformed.paths_ = C2::PathsD(paths_);
+  transformed.paths_ = paths_;
   return transformed;
 }
 

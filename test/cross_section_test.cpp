@@ -30,27 +30,16 @@ using namespace manifold;
 
 TEST(CrossSection, MirrorUnion) {
   auto a = CrossSection::Square({5., 5.}, true);
-  printf("translating a\n");
   auto b = a.Translate({2.5, 2.5});
-  printf("mirroring b and unioning\n");
-  // auto cross = a + b + b.Mirror({-1, 1});
-  auto cross = a.Translate({0, -5}) + b + b.Rotate(45).Translate({0., 10.});
-  // auto cross = b ^ b.Mirror({-1, 1});
-  // auto cross = (a + b) ^ b.Mirror({-1, 1});
-  printf("b area = %f\n", b.Area());
-  printf("mirrored b area = %f\n", b.Mirror({-1, 1}).Area());
-  printf("extruding\n");
+  auto cross = a + b + b.Mirror({1, 1});
   auto result = Manifold::Extrude(cross, 5.);
 
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels)
     ExportMesh("cross_section_mirror_union.glb", result.GetMesh(), {});
-  ExportMesh("cross_section_mirror_union_m.glb",
-             Manifold::Extrude(b.Mirror({-1, 1}), 5.).GetMesh(), {});
 #endif
 
-  auto area_a = a.Area();
-  EXPECT_EQ(area_a + 1.5 * area_a, cross.Area());
+  EXPECT_FLOAT_EQ(2.5 * a.Area(), cross.Area());
   EXPECT_TRUE(a.Mirror(glm::vec2(0)).IsEmpty());
 }
 
