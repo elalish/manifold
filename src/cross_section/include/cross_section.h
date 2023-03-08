@@ -96,8 +96,10 @@ class CrossSection {
   ///@}
 
  private:
-  C2::PathsD paths_;
+  mutable C2::PathsD paths_;
+  mutable glm::mat3x2 transform_;
   CrossSection(C2::PathsD paths);
+  C2::PathsD GetPaths() const;
 };
 /** @} */
 
