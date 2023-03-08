@@ -502,6 +502,6 @@ TEST(Manifold, MirrorUnion) {
 #endif
 
   auto vol_a = a.GetProperties().volume;
-  EXPECT_FLOAT_EQ(vol_a + 1.75 * vol_a, result.GetProperties().volume);
+  EXPECT_FLOAT_EQ(vol_a * 2.75, result.GetProperties().volume);
   EXPECT_TRUE(a.Mirror(glm::vec3(0)).IsEmpty());
 }
