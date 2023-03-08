@@ -118,7 +118,10 @@ CrossSection::CrossSection() { paths_ = C2::PathsD(); }
 CrossSection::~CrossSection() = default;
 CrossSection::CrossSection(CrossSection&&) noexcept = default;
 CrossSection& CrossSection::operator=(CrossSection&&) noexcept = default;
-CrossSection::CrossSection(const CrossSection& other) { paths_ = other.paths_; }
+CrossSection::CrossSection(const CrossSection& other) {
+  paths_ = other.paths_;
+  transform_ = other.transform_;
+}
 CrossSection::CrossSection(C2::PathsD ps) { paths_ = ps; }
 
 CrossSection::CrossSection(const SimplePolygon& contour, FillRule fillrule) {
