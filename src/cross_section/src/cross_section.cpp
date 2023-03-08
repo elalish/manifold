@@ -257,7 +257,9 @@ CrossSection CrossSection::RectClip(const Rect& rect) const {
 }
 
 CrossSection CrossSection::Translate(const glm::vec2 v) const {
-  glm::mat3x2 m(1.0f, 0.0f, 0.0f, 1.0f, v.x, v.y);
+  glm::mat3x2 m(1.0f, 0.0f,  //
+                0.0f, 1.0f,  //
+                v.x, v.y);
   return Transform(m);
 }
 
@@ -280,9 +282,7 @@ CrossSection CrossSection::Mirror(const glm::vec2 ax) const {
     return CrossSection();
   }
   auto n = glm::normalize(glm::abs(ax));
-  glm::mat3x2 m(1 - 2 * n.x * n.x, -2 * n.x * n.y,  //
-                -2 * n.x * n.y, 1 - 2 * n.y * n.y,  //
-                0.0f, 0.0f);
+  auto m = glm::mat3x2(glm::mat2(1.0f) - 2.0f * glm::outerProduct(n, n));
   return Transform(m);
 }
 
