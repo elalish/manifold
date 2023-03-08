@@ -67,6 +67,8 @@ ManifoldManifold *manifold_transform(void *mem, ManifoldManifold *m, float x1,
                                      float y1, float z1, float x2, float y2,
                                      float z2, float x3, float y3, float z3,
                                      float x4, float y4, float z4);
+ManifoldManifold *manifold_mirror(void *mem, ManifoldManifold *m, float nx,
+                                  float ny, float nz);
 ManifoldManifold *manifold_warp(void *mem, ManifoldManifold *m,
                                 ManifoldVec3 (*fun)(float, float, float));
 ManifoldManifold *manifold_refine(void *mem, ManifoldManifold *m, int refine);
