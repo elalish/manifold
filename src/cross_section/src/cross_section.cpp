@@ -93,14 +93,22 @@ C2::PathD pathd_of_contour(const SimplePolygon& ctr) {
   return p;
 }
 
-C2::PathsD transform(C2::PathsD ps, glm::mat3x2 m) {
+C2::PathsD transform(const C2::PathsD ps, const glm::mat3x2 m) {
+  if (m == glm::mat3x2(1.0f)) {
+    // return ps;
+    return C2::PathsD(ps);
+  }
+  const bool invert = glm::determinant(glm::mat2(m)) < 0;
+  // const bool invert = false;
+  printf("invert = %i\n", invert);
   auto transformed = C2::PathsD();
   transformed.reserve(ps.size());
   for (auto path : ps) {
-    auto s = C2::PathD();
-    s.reserve(path.size());
-    for (auto p : path) {
-      s.push_back(v2_to_pd(m * glm::vec3(p.x, p.y, 1)));
+    auto sz = path.size();
+    auto s = C2::PathD(sz);
+    for (int i = 0; i < sz; ++i) {
+      auto idx = invert ? sz - 1 - i : i;
+      s[idx] = v2_to_pd(m * glm::vec3(path[i].x, path[i].y, 1));
     }
     transformed.push_back(s);
   }
@@ -113,9 +121,7 @@ CrossSection::CrossSection() { paths_ = C2::PathsD(); }
 CrossSection::~CrossSection() = default;
 CrossSection::CrossSection(CrossSection&&) noexcept = default;
 CrossSection& CrossSection::operator=(CrossSection&&) noexcept = default;
-CrossSection::CrossSection(const CrossSection& other) {
-  paths_ = C2::PathsD(other.paths_);
-}
+CrossSection::CrossSection(const CrossSection& other) { paths_ = other.paths_; }
 CrossSection::CrossSection(C2::PathsD ps) { paths_ = ps; }
 
 CrossSection::CrossSection(const SimplePolygon& contour, FillRule fillrule) {
@@ -133,8 +139,8 @@ CrossSection::CrossSection(const Polygons& contours, FillRule fillrule) {
 }
 
 C2::PathsD CrossSection::GetPaths() const {
-  transform_ = glm::mat3x2(1.);
   paths_ = transform(paths_, transform_);
+  transform_ = glm::mat3x2(1.0f);
   return paths_;
 }
 
@@ -249,7 +255,7 @@ CrossSection& CrossSection::operator^=(const CrossSection& Q) {
 
 CrossSection CrossSection::RectClip(const Rect& rect) const {
   auto r = C2::RectD(rect.min.x, rect.min.y, rect.max.x, rect.max.y);
-  auto ps = C2::RectClip(r, paths_, false, precision_);
+  auto ps = C2::RectClip(r, GetPaths(), false, precision_);
   return CrossSection(ps);
 }
 
@@ -258,51 +264,57 @@ CrossSection CrossSection::Translate(const glm::vec2 v) const {
   return Transform(m);
 }
 
-// TODO: Rotate and Mirror converted to use Transform, then testing.
 CrossSection CrossSection::Rotate(float degrees) const {
-  auto rotated = C2::PathsD();
-  rotated.reserve(paths_.size());
   auto s = sind(degrees);
   auto c = cosd(degrees);
-  for (auto path : paths_) {
-    auto r = C2::PathD();
-    r.reserve(path.size());
-    for (auto p : path) {
-      auto rx = (p.x * c) - (p.y * s);
-      auto ry = (p.y * c) + (p.x * s);
-      r.push_back(C2::PointD(rx, ry));
-    }
-    rotated.push_back(r);
-  }
-  return CrossSection(rotated);
-}
-
-CrossSection CrossSection::Scale(const glm::vec2 scale) const {
-  glm::mat3x2 m(scale.x, 0.0f, 0.0f, scale.y, 0.0f, 0.0f);
+  glm::mat3x2 m(c, s, -s, c, 0.0f, 0.0f);
   return Transform(m);
 }
 
+CrossSection CrossSection::Scale(const glm::vec2 scale) const {
+  glm::mat3x2 m(scale.x, 0.0f,  //
+                0.0f, scale.y,  //
+                0.0f, 0.0f);
+  return Transform(m);
+}
+
+// let ax = V2.normalize ax in
+// let x = V2.x ax
+// and y = V2.y ax in
+// let xx = 1. -. (2. *. x *. x)
+// and xy = -2. *. x *. y
+// and yy = 1. -. (2. *. y *. y) in
+// v xx xy 0. xy yy 0. 0. 0. 1.
 CrossSection CrossSection::Mirror(const glm::vec2 ax) const {
   if (glm::length(ax) == 0.) {
     return CrossSection();
   }
-  auto mirrored = C2::PathsD();
-  mirrored.reserve(paths_.size());
-  for (auto path : paths_) {
-    auto sz = path.size();
-    auto m = C2::PathD(sz);
-    for (int i = 0; i < sz; ++i) {
-      auto v = v2_of_pd(path[sz - 1 - i]);
-      m[i] = v2_to_pd(ax * (2 * glm::dot(v, ax) / glm::dot(ax, ax)) - v);
-    }
-    mirrored.push_back(m);
-  }
-  return CrossSection(mirrored);
+  auto n = glm::normalize(ax);
+  glm::mat3x2 m(1 - 2 * n.x * n.x, -2 * n.x * n.y,  //
+                -2 * n.x * n.y, 1 - 2 * n.y * n.y,  //
+                0.0f, 0.0f);
+  return Transform(m);
+  // auto cs = CrossSection(transform(paths_, transform_));
+  // return cs.Transform(m);
+  // auto mirrored = C2::PathsD();
+  // mirrored.reserve(paths_.size());
+  // for (auto path : paths_) {
+  //   auto sz = path.size();
+  //   auto m = C2::PathD(sz);
+  //   for (int i = 0; i < sz; ++i) {
+  //     auto v = v2_of_pd(path[sz - 1 - i]);
+  //     m[i] = v2_to_pd(ax * (2 * glm::dot(v, ax) / glm::dot(ax, ax)) - v);
+  //   }
+  //   mirrored.push_back(m);
+  // }
+  // return CrossSection(mirrored);
 }
 
 CrossSection CrossSection::Transform(const glm::mat3x2& m) const {
   auto transformed = CrossSection();
-  transformed.transform_ = glm::mat3(m) * glm::mat3(transform_);
+  // transformed.transform_ = glm::mat3(m) * glm::mat3(transform_);
+  transformed.transform_ = m * glm::mat3(transform_);
+  // transformed.paths_ = paths_;
   transformed.paths_ = C2::PathsD(paths_);
   return transformed;
 }
