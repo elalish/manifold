@@ -530,14 +530,7 @@ Manifold Manifold::Mirror(glm::vec3 normal) const {
     return Manifold();
   }
   auto n = glm::normalize(normal);
-  glm::mat4x3 m(1.0f - 2.0f * n.x * n.x, -2.0f * n.x * n.y,
-                -2.0f * n.x * n.z,  //
-                -2.0f * n.x * n.y, 1.0f - 2.0f * n.y * n.y,
-                -2.0f * n.y * n.z,  //
-                -2.0f * n.x * n.z, -2.0f * n.y * n.z,
-                1.0f - 2.0f * n.z * n.z  //
-                ,
-                0.0f, 0.0f, 0.0f);
+  auto m = glm::mat4x3(glm::mat3(1.0f) - 2.0f * glm::outerProduct(n, n));
   return Manifold(pNode_->Transform(m));
 }
 
