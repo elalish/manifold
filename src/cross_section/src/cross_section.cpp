@@ -16,6 +16,7 @@
 
 #include <clipper2/clipper.h>
 
+#include <memory>
 #include <vector>
 
 #include "clipper2/clipper.core.h"
@@ -94,9 +95,6 @@ C2::PathD pathd_of_contour(const SimplePolygon& ctr) {
 }
 
 C2::PathsD transform(const C2::PathsD ps, const glm::mat3x2 m) {
-  if (m == glm::mat3x2(1.0f)) {
-    return ps;
-  }
   const bool invert = glm::determinant(glm::mat2(m)) < 0;
   auto transformed = C2::PathsD();
   transformed.reserve(ps.size());
@@ -111,10 +109,14 @@ C2::PathsD transform(const C2::PathsD ps, const glm::mat3x2 m) {
   }
   return transformed;
 }
+
+std::shared_ptr<const C2::PathsD> shared_paths(const C2::PathsD& ps) {
+  return std::make_shared<const C2::PathsD>(ps);
+}
 }  // namespace
 
 namespace manifold {
-CrossSection::CrossSection() { paths_ = C2::PathsD(); }
+CrossSection::CrossSection() { paths_ = shared_paths(C2::PathsD()); }
 CrossSection::~CrossSection() = default;
 CrossSection::CrossSection(CrossSection&&) noexcept = default;
 CrossSection& CrossSection::operator=(CrossSection&&) noexcept = default;
@@ -122,11 +124,11 @@ CrossSection::CrossSection(const CrossSection& other) {
   paths_ = other.paths_;
   transform_ = other.transform_;
 }
-CrossSection::CrossSection(C2::PathsD ps) { paths_ = ps; }
+CrossSection::CrossSection(C2::PathsD ps) { paths_ = shared_paths(ps); }
 
 CrossSection::CrossSection(const SimplePolygon& contour, FillRule fillrule) {
   auto ps = C2::PathsD{(pathd_of_contour(contour))};
-  paths_ = C2::Union(ps, fr(fillrule), precision_);
+  paths_ = shared_paths(C2::Union(ps, fr(fillrule), precision_));
 }
 
 CrossSection::CrossSection(const Polygons& contours, FillRule fillrule) {
@@ -135,13 +137,18 @@ CrossSection::CrossSection(const Polygons& contours, FillRule fillrule) {
   for (auto ctr : contours) {
     ps.push_back(pathd_of_contour(ctr));
   }
-  paths_ = C2::Union(ps, fr(fillrule), precision_);
+  paths_ = shared_paths(C2::Union(ps, fr(fillrule), precision_));
 }
 
+// All access to paths_ should be done through the GetPaths() method, which
+// applies the accumulated transform_
 C2::PathsD CrossSection::GetPaths() const {
-  paths_ = transform(paths_, transform_);
+  if (transform_ == glm::mat3x2(1.0f)) {
+    return *paths_;
+  }
+  paths_ = shared_paths(transform(*paths_, transform_));
   transform_ = glm::mat3x2(1.0f);
-  return paths_;
+  return *paths_;
 }
 
 CrossSection CrossSection::Square(const glm::vec2 dims, bool center) {
@@ -193,7 +200,7 @@ CrossSection CrossSection::BatchBoolean(
   auto subjs = crossSections[0].GetPaths();
   int n_clips = 0;
   for (int i = 1; i < crossSections.size(); ++i) {
-    n_clips += crossSections[i].paths_.size();
+    n_clips += crossSections[i].GetPaths().size();
   }
   auto clips = C2::PathsD();
   clips.reserve(n_clips);
@@ -269,7 +276,9 @@ CrossSection CrossSection::Translate(const glm::vec2 v) const {
 CrossSection CrossSection::Rotate(float degrees) const {
   auto s = sind(degrees);
   auto c = cosd(degrees);
-  glm::mat3x2 m(c, s, -s, c, 0.0f, 0.0f);
+  glm::mat3x2 m(c, s,   //
+                -s, c,  //
+                0.0f, 0.0f);
   return Transform(m);
 }
 

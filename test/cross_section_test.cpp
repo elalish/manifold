@@ -89,7 +89,11 @@ TEST(CrossSection, Transform) {
                     0.0f, 0.0f, 1.0f);
 
   auto b = sq.Transform(trans * scale * rot);
+  auto b_copy = CrossSection(b);
 
-  Identical(Manifold::Extrude(a, 1.).GetMesh(),
-            Manifold::Extrude(b, 1.).GetMesh());
+  auto ex_b = Manifold::Extrude(b, 1.).GetMesh();
+  Identical(Manifold::Extrude(a, 1.).GetMesh(), ex_b);
+
+  // same transformations are applied in b_copy (giving same result)
+  Identical(ex_b, Manifold::Extrude(b_copy, 1.).GetMesh());
 }

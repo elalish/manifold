@@ -16,6 +16,8 @@
 
 #include <clipper2/clipper.h>
 
+#include <memory>
+
 #include "clipper2/clipper.core.h"
 #include "clipper2/clipper.offset.h"
 #include "glm/ext/matrix_float3x2.hpp"
@@ -97,7 +99,7 @@ class CrossSection {
   ///@}
 
  private:
-  mutable C2::PathsD paths_;
+  mutable std::shared_ptr<const C2::PathsD> paths_;
   mutable glm::mat3x2 transform_ = glm::mat3x2(1.0f);
   CrossSection(C2::PathsD paths);
   C2::PathsD GetPaths() const;
