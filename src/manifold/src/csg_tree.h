@@ -14,6 +14,7 @@
 
 #pragma once
 #include "manifold.h"
+#include "utils.h"
 
 namespace manifold {
 
@@ -89,7 +90,7 @@ class CsgOpNode final : public CsgNode {
 
   void SetOp(OpType);
 
-  static void BatchBoolean(
+  static std::shared_ptr<Manifold::Impl> BatchBoolean(
       OpType operation,
       std::vector<std::shared_ptr<const Manifold::Impl>> &results);
 

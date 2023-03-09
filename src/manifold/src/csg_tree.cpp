@@ -260,12 +260,10 @@ std::shared_ptr<CsgLeafNode> CsgOpNode::ToLeafNode() const {
       case CsgNodeType::Intersection: {
         std::vector<std::shared_ptr<const Manifold::Impl>> impls;
         for (auto &child : children_) {
-          impls.push_back(
-              std::dynamic_pointer_cast<CsgLeafNode>(child)->GetImpl());
+          impls.push_back(std::dynamic_pointer_cast<CsgLeafNode>(child)->GetImpl());
         }
-        BatchBoolean(OpType::Intersect, impls);
         children_.clear();
-        children_.push_back(std::make_shared<CsgLeafNode>(impls.front()));
+        children_.push_back(std::make_shared<CsgLeafNode>(BatchBoolean(OpType::Intersect, impls)));
         break;
       };
       case CsgNodeType::Difference: {
@@ -297,7 +295,7 @@ std::shared_ptr<CsgLeafNode> CsgOpNode::ToLeafNode() const {
  * Efficient boolean operation on a set of nodes utilizing commutativity of the
  * operation. Only supports union and intersection.
  */
-void CsgOpNode::BatchBoolean(
+std::shared_ptr<Manifold::Impl> CsgOpNode::BatchBoolean(
     OpType operation,
     std::vector<std::shared_ptr<const Manifold::Impl>> &results) {
   ASSERT(operation != OpType::Subtract, logicErr,
@@ -321,10 +319,17 @@ void CsgOpNode::BatchBoolean(
     results.pop_back();
     // boolean operation
     Boolean3 boolean(*a, *b, operation);
+    if (results.size() == 0) {
+      return std::make_shared<Manifold::Impl>(boolean.Result(operation));
+    }
     results.push_back(
         std::make_shared<const Manifold::Impl>(boolean.Result(operation)));
     std::push_heap(results.begin(), results.end(), cmpFn);
   }
+  if (results.size() == 1) {
+    return std::make_shared<Manifold::Impl>(*results.front());
+  }
+  return std::make_shared<Manifold::Impl>();
 }
 
 /**
@@ -386,9 +391,8 @@ void CsgOpNode::BatchUnion() const {
             std::make_shared<const Manifold::Impl>(CsgLeafNode::Compose(tmp)));
       }
     }
-    BatchBoolean(OpType::Add, impls);
     children_.erase(children_.begin() + start, children_.end());
-    children_.push_back(std::make_shared<CsgLeafNode>(impls.back()));
+    children_.push_back(std::make_shared<CsgLeafNode>(BatchBoolean(OpType::Add, impls)));
     // move it to the front as we process from the back, and the newly added
     // child should be quite complicated
     std::swap(children_.front(), children_.back());
