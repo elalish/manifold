@@ -72,18 +72,18 @@ class CsgOpNode final : public CsgNode {
 
   std::shared_ptr<CsgLeafNode> ToLeafNode() const override;
 
-  CsgNodeType GetNodeType() const override { return impl_->op_; }
+  CsgNodeType GetNodeType() const override { return op_; }
 
   glm::mat4x3 GetTransform() const override;
 
  private:
   struct Impl {
-    CsgNodeType op_;
-    mutable std::vector<std::shared_ptr<CsgNode>> children_;
-    mutable bool simplified_ = false;
-    mutable bool flattened_ = false;
+    std::vector<std::shared_ptr<CsgNode>> children_;
+    bool simplified_ = false;
+    bool flattened_ = false;
   };
-  std::shared_ptr<Impl> impl_ = nullptr;
+  mutable ConcurrentSharedPtr<Impl> impl_ = ConcurrentSharedPtr<Impl>(Impl{});
+  CsgNodeType op_;
   glm::mat4x3 transform_ = glm::mat4x3(1.0f);
   // the following fields are for lazy evaluation, so they are mutable
   mutable std::shared_ptr<CsgLeafNode> cache_ = nullptr;

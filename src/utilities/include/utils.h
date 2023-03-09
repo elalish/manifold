@@ -194,11 +194,12 @@ class strided_range {
 template <typename T>
 class ConcurrentSharedPtr {
  public:
-  ConcurrentSharedPtr(T value) : impl(std::make_shared<T>(value)), mutex(std::make_shared<std::mutex>()) {}
-  ConcurrentSharedPtr(const ConcurrentSharedPtr<T>& other) : impl(other.impl), mutex(other.mutex) {}
+  ConcurrentSharedPtr(T value) : impl(std::make_shared<T>(value)) {}
+  ConcurrentSharedPtr(const ConcurrentSharedPtr<T>& other)
+      : impl(other.impl), mutex(other.mutex) {}
   class SharedPtrGuard {
    public:
-    SharedPtrGuard(std::mutex* mutex, T* content)
+    SharedPtrGuard(std::recursive_mutex* mutex, T* content)
         : mutex(mutex), content(content) {
       mutex->lock();
     }
@@ -208,14 +209,16 @@ class ConcurrentSharedPtr {
     T* operator->() { return content; }
 
    private:
-    std::mutex* mutex;
+    std::recursive_mutex* mutex;
     T* content;
   };
   SharedPtrGuard GetGuard() { return SharedPtrGuard(mutex.get(), impl.get()); };
+  unsigned int UseCount() { return impl.use_count(); };
 
  private:
   std::shared_ptr<T> impl;
-  std::shared_ptr<std::mutex> mutex;
+  std::shared_ptr<std::recursive_mutex> mutex =
+      std::make_shared<std::recursive_mutex>();
 };
 /** @} */
 }  // namespace manifold
