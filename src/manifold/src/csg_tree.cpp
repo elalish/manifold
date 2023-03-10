@@ -223,8 +223,9 @@ CsgOpNode::CsgOpNode() {}
 
 CsgOpNode::CsgOpNode(const std::vector<std::shared_ptr<CsgNode>> &children,
                      OpType op)
-    : impl_(std::make_shared<Impl>()) {
-  impl_->children_ = children;
+    : impl_(Impl{}) {
+  auto impl = impl_.GetGuard();
+  impl->children_ = children;
   SetOp(op);
   // opportunistically flatten the tree without costly evaluation
   GetChildren(false);
@@ -232,8 +233,9 @@ CsgOpNode::CsgOpNode(const std::vector<std::shared_ptr<CsgNode>> &children,
 
 CsgOpNode::CsgOpNode(std::vector<std::shared_ptr<CsgNode>> &&children,
                      OpType op)
-    : impl_(std::make_shared<Impl>()) {
-  impl_->children_ = children;
+    : impl_(Impl{}) {
+  auto impl = impl_.GetGuard();
+  impl->children_ = children;
   SetOp(op);
   // opportunistically flatten the tree without costly evaluation
   GetChildren(false);
@@ -243,17 +245,18 @@ std::shared_ptr<CsgNode> CsgOpNode::Transform(const glm::mat4x3 &m) const {
   auto node = std::make_shared<CsgOpNode>();
   node->impl_ = impl_;
   node->transform_ = m * glm::mat4(transform_);
+  node->op_ = op_;
   return node;
 }
 
 std::shared_ptr<CsgLeafNode> CsgOpNode::ToLeafNode() const {
   if (cache_ != nullptr) return cache_;
-  if (impl_->children_.empty()) return nullptr;
   // turn the children into leaf nodes
   GetChildren();
-  auto &children_ = impl_->children_;
+  auto impl = impl_.GetGuard();
+  auto &children_ = impl->children_;
   if (children_.size() > 1) {
-    switch (impl_->op_) {
+    switch (op_) {
       case CsgNodeType::Union:
         BatchUnion();
         break;
@@ -263,9 +266,9 @@ std::shared_ptr<CsgLeafNode> CsgOpNode::ToLeafNode() const {
           impls.push_back(
               std::dynamic_pointer_cast<CsgLeafNode>(child)->GetImpl());
         }
-        BatchBoolean(OpType::Intersect, impls);
         children_.clear();
-        children_.push_back(std::make_shared<CsgLeafNode>(impls.front()));
+        children_.push_back(std::make_shared<CsgLeafNode>(
+            BatchBoolean(OpType::Intersect, impls)));
         break;
       };
       case CsgNodeType::Difference: {
@@ -285,6 +288,8 @@ std::shared_ptr<CsgLeafNode> CsgOpNode::ToLeafNode() const {
         // unreachable
         break;
     }
+  } else if (children_.size() == 0) {
+    return nullptr;
   }
   // children_ must contain only one CsgLeafNode now, and its Transform will
   // give CsgLeafNode as well
@@ -297,7 +302,7 @@ std::shared_ptr<CsgLeafNode> CsgOpNode::ToLeafNode() const {
  * Efficient boolean operation on a set of nodes utilizing commutativity of the
  * operation. Only supports union and intersection.
  */
-void CsgOpNode::BatchBoolean(
+std::shared_ptr<Manifold::Impl> CsgOpNode::BatchBoolean(
     OpType operation,
     std::vector<std::shared_ptr<const Manifold::Impl>> &results) {
   ASSERT(operation != OpType::Subtract, logicErr,
@@ -321,10 +326,17 @@ void CsgOpNode::BatchBoolean(
     results.pop_back();
     // boolean operation
     Boolean3 boolean(*a, *b, operation);
+    if (results.size() == 0) {
+      return std::make_shared<Manifold::Impl>(boolean.Result(operation));
+    }
     results.push_back(
         std::make_shared<const Manifold::Impl>(boolean.Result(operation)));
     std::push_heap(results.begin(), results.end(), cmpFn);
   }
+  if (results.size() == 1) {
+    return std::make_shared<Manifold::Impl>(*results.front());
+  }
+  return std::make_shared<Manifold::Impl>();
 }
 
 /**
@@ -340,7 +352,8 @@ void CsgOpNode::BatchUnion() const {
   // If the number of children exceeded this limit, we will operate on chunks
   // with size kMaxUnionSize.
   constexpr int kMaxUnionSize = 1000;
-  auto &children_ = impl_->children_;
+  auto impl = impl_.GetGuard();
+  auto &children_ = impl->children_;
   while (children_.size() > 1) {
     const int start = (children_.size() > kMaxUnionSize)
                           ? (children_.size() - kMaxUnionSize)
@@ -386,9 +399,9 @@ void CsgOpNode::BatchUnion() const {
             std::make_shared<const Manifold::Impl>(CsgLeafNode::Compose(tmp)));
       }
     }
-    BatchBoolean(OpType::Add, impls);
     children_.erase(children_.begin() + start, children_.end());
-    children_.push_back(std::make_shared<CsgLeafNode>(impls.back()));
+    children_.push_back(
+        std::make_shared<CsgLeafNode>(BatchBoolean(OpType::Add, impls)));
     // move it to the front as we process from the back, and the newly added
     // child should be quite complicated
     std::swap(children_.front(), children_.back());
@@ -404,18 +417,18 @@ void CsgOpNode::BatchUnion() const {
  */
 std::vector<std::shared_ptr<CsgNode>> &CsgOpNode::GetChildren(
     bool finalize) const {
-  auto &children_ = impl_->children_;
-  if (children_.empty() || (impl_->simplified_ && !finalize) ||
-      impl_->flattened_)
+  auto impl = impl_.GetGuard();
+  auto &children_ = impl->children_;
+  if (children_.empty() || (impl->simplified_ && !finalize) || impl->flattened_)
     return children_;
-  impl_->simplified_ = true;
-  impl_->flattened_ = finalize;
+  impl->simplified_ = true;
+  impl->flattened_ = finalize;
   std::vector<std::shared_ptr<CsgNode>> newChildren;
 
-  CsgNodeType op = impl_->op_;
+  CsgNodeType op = op_;
   for (auto &child : children_) {
     if (child->GetNodeType() == op && child.use_count() == 1 &&
-        std::dynamic_pointer_cast<CsgOpNode>(child)->impl_.use_count() == 1) {
+        std::dynamic_pointer_cast<CsgOpNode>(child)->impl_.UseCount() == 1) {
       auto grandchildren =
           std::dynamic_pointer_cast<CsgOpNode>(child)->GetChildren(finalize);
       int start = children_.size();
@@ -440,13 +453,13 @@ std::vector<std::shared_ptr<CsgNode>> &CsgOpNode::GetChildren(
 void CsgOpNode::SetOp(OpType op) {
   switch (op) {
     case OpType::Add:
-      impl_->op_ = CsgNodeType::Union;
+      op_ = CsgNodeType::Union;
       break;
     case OpType::Subtract:
-      impl_->op_ = CsgNodeType::Difference;
+      op_ = CsgNodeType::Difference;
       break;
     case OpType::Intersect:
-      impl_->op_ = CsgNodeType::Intersection;
+      op_ = CsgNodeType::Intersection;
       break;
   }
 }
