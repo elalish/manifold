@@ -211,7 +211,7 @@ jobs:
         git apply thrust.diff
         mkdir build
         cd build
-        cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DMANIFOLD_DEBUG=ON -DMANIFOLD_PYBIND=ON -DMANIFOLD_PAR=${{matrix.parallel_backend}} .. && make
+        cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DMANIFOLD_DEBUG=ON -DMANIFOLD_PYBIND=ON -DPYBIND11_FINDPYTHON=ON -DMANIFOLD_PAR=${{matrix.parallel_backend}} .. && make
     - name: Test
       run: |
         cd build/test
