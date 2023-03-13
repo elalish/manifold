@@ -196,7 +196,7 @@ jobs:
     steps:
     - name: Install common dependencies
       run: |
-        brew install pkg-config python@3.10
+        brew install pkg-config
         pip install trimesh
     - name: Install OpenMP
       if: matrix.parallel_backend == 'OMP'
