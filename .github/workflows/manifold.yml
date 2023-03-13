@@ -195,7 +195,9 @@ jobs:
     if: github.event.pull_request.draft == false
     steps:
     - name: Install common dependencies
-      run: brew install pkg-config
+      run: |
+        brew install pkg-config python
+        pip install trimesh
     - name: Install OpenMP
       if: matrix.parallel_backend == 'OMP'
       run: brew install libomp
