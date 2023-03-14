@@ -257,7 +257,7 @@ std::shared_ptr<CsgNode> CsgOpNode::Boolean(
   auto handleOperand = [&](const std::shared_ptr<CsgNode> &operand) {
     if (auto opNode = std::dynamic_pointer_cast<CsgOpNode>(operand)) {
       if (opNode->IsOp(op) && opNode->impl_.UseCount() == 1) {
-        for (auto &child : opNode->GetChildren(/* finalize= */ false)) {
+        for (auto &child : opNode->GetChildren(/* forceToLeafNodes= */ false)) {
           children.push_back(child);
         }
         return;
@@ -448,19 +448,19 @@ void CsgOpNode::BatchUnion() const {
 
 /**
  * Flatten the children to a list of leaf nodes and return them.
- * If finalize is true, the list will be guaranteed to be a list of leaf nodes
- * (i.e. no ops). Otherwise, the list may contain ops.
- * Note that this function will not apply the transform to children, as they may
- * be shared with other nodes.
+ * If forceToLeafNodes is true, the list will be guaranteed to be a list of leaf
+ * nodes (i.e. no ops). Otherwise, the list may contain ops. Note that this
+ * function will not apply the transform to children, as they may be shared with
+ * other nodes.
  */
 std::vector<std::shared_ptr<CsgNode>> &CsgOpNode::GetChildren(
-    bool finalize) const {
+    bool forceToLeafNodes) const {
   auto impl = impl_.GetGuard();
   auto &children_ = impl->children_;
-  if (children_.empty() || impl->flattened_) return children_;
-  impl->flattened_ = finalize;
+  if (children_.empty() || impl->forcedToLeafNodes_) return children_;
+  impl->forcedToLeafNodes_ = forceToLeafNodes;
 
-  if (finalize) {
+  if (forceToLeafNodes) {
     for (auto &child : children_) {
       if (child->GetNodeType() != CsgNodeType::Leaf) {
         child = child->ToLeafNode();

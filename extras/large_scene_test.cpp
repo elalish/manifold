@@ -32,7 +32,7 @@ using namespace manifold;
     time ./extras/largeSceneTest 50 )
 */
 int main(int argc, char **argv) {
-  int n = 20;  // Crashes at n=50
+  int n = 20;
   if (argc == 2) n = atoi(argv[1]);
 
   std::cout << "n = " << n << std::endl;

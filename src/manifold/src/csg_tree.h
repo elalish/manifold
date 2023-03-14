@@ -85,7 +85,7 @@ class CsgOpNode final : public CsgNode {
  private:
   struct Impl {
     std::vector<std::shared_ptr<CsgNode>> children_;
-    bool flattened_ = false;
+    bool forcedToLeafNodes_ = false;
   };
   mutable ConcurrentSharedPtr<Impl> impl_ = ConcurrentSharedPtr<Impl>(Impl{});
   CsgNodeType op_;
@@ -103,7 +103,7 @@ class CsgOpNode final : public CsgNode {
   void BatchUnion() const;
 
   std::vector<std::shared_ptr<CsgNode>> &GetChildren(
-      bool finalize = true) const;
+      bool forceToLeafNodes = true) const;
 };
 
 }  // namespace manifold
