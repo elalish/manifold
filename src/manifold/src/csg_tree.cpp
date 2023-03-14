@@ -73,8 +73,8 @@ struct CheckOverlap {
 }  // namespace
 namespace manifold {
 
-std::shared_ptr<CsgNode> CsgNode::Boolean(std::shared_ptr<CsgNode> second,
-                                          OpType op) {
+std::shared_ptr<CsgNode> CsgNode::Boolean(
+    const std::shared_ptr<CsgNode> &second, OpType op) {
   if (auto opNode = std::dynamic_pointer_cast<CsgOpNode>(second)) {
     // "this" is not a CsgOpNode (which overrides Boolean), but if "second" is
     // and the operation is commutative, we let it built the tree.
@@ -250,8 +250,8 @@ CsgOpNode::CsgOpNode(std::vector<std::shared_ptr<CsgNode>> &&children,
   SetOp(op);
 }
 
-std::shared_ptr<CsgNode> CsgOpNode::Boolean(std::shared_ptr<CsgNode> second,
-                                            OpType op) {
+std::shared_ptr<CsgNode> CsgOpNode::Boolean(
+    const std::shared_ptr<CsgNode> &second, OpType op) {
   std::vector<std::shared_ptr<CsgNode>> children;
 
   auto handleOperand = [&](const std::shared_ptr<CsgNode> &operand) {

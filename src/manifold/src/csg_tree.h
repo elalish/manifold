@@ -29,8 +29,8 @@ class CsgNode : public std::enable_shared_from_this<CsgNode> {
   virtual CsgNodeType GetNodeType() const = 0;
   virtual glm::mat4x3 GetTransform() const = 0;
 
-  virtual std::shared_ptr<CsgNode> Boolean(std::shared_ptr<CsgNode> second,
-                                           OpType op);
+  virtual std::shared_ptr<CsgNode> Boolean(
+      const std::shared_ptr<CsgNode> &second, OpType op);
 
   std::shared_ptr<CsgNode> Translate(const glm::vec3 &t) const;
   std::shared_ptr<CsgNode> Scale(const glm::vec3 &s) const;
@@ -71,7 +71,7 @@ class CsgOpNode final : public CsgNode {
 
   CsgOpNode(std::vector<std::shared_ptr<CsgNode>> &&children, OpType op);
 
-  std::shared_ptr<CsgNode> Boolean(std::shared_ptr<CsgNode> second,
+  std::shared_ptr<CsgNode> Boolean(const std::shared_ptr<CsgNode> &second,
                                    OpType op) override;
 
   std::shared_ptr<CsgNode> Transform(const glm::mat4x3 &m) const override;
