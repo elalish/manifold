@@ -241,8 +241,6 @@ CsgOpNode::CsgOpNode(const std::vector<std::shared_ptr<CsgNode>> &children,
   auto impl = impl_.GetGuard();
   impl->children_ = children;
   SetOp(op);
-  // opportunistically flatten the tree without costly evaluation
-  GetChildren(false);
 }
 
 CsgOpNode::CsgOpNode(std::vector<std::shared_ptr<CsgNode>> &&children,
