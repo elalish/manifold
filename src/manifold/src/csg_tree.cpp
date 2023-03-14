@@ -259,7 +259,8 @@ std::shared_ptr<CsgNode> CsgOpNode::Boolean(std::shared_ptr<CsgNode> second,
 
   auto handleOperand = [&](const std::shared_ptr<CsgNode> &operand) {
     if (auto opNode = std::dynamic_pointer_cast<CsgOpNode>(operand)) {
-      if (opNode->IsOp(op)) {
+      if (opNode->IsOp(op) && opNode.use_count() == 1 &&
+          opNode->impl_.UseCount() == 1) {
         for (auto &child : opNode->GetChildren(/* finalize= */ false)) {
           children.push_back(child);
         }
