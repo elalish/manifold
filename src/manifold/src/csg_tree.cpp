@@ -272,6 +272,14 @@ std::shared_ptr<CsgNode> CsgOpNode::Boolean(std::shared_ptr<CsgNode> second,
   handleOperand(shared_from_this());
   handleOperand(second);
 
+  if (op == OpType::Subtract && children.size() > 2) {
+    // special handling for difference: we treat it as first - (second + third +
+    // ...) so op = Union after the first node
+    std::vector<std::shared_ptr<CsgNode>> unionChildren(children.begin() + 1,
+                                                        children.end());
+    children.resize(1);
+    children.push_back(std::make_shared<CsgOpNode>(unionChildren, OpType::Add));
+  }
   return std::make_shared<CsgOpNode>(children, op);
 }
 
