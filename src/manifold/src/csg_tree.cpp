@@ -256,7 +256,9 @@ std::shared_ptr<CsgNode> CsgOpNode::Boolean(
 
   auto handleOperand = [&](const std::shared_ptr<CsgNode> &operand) {
     if (auto opNode = std::dynamic_pointer_cast<CsgOpNode>(operand)) {
-      if (opNode->IsOp(op) && opNode->impl_.UseCount() == 1) {
+      if ((opNode->IsOp(op) ||
+           (op == OpType::Subtract && opNode->IsOp(OpType::Add))) &&
+          opNode->impl_.UseCount() == 1) {
         for (auto &child : opNode->GetChildren(/* forceToLeafNodes= */ false)) {
           children.push_back(child);
         }
@@ -268,14 +270,6 @@ std::shared_ptr<CsgNode> CsgOpNode::Boolean(
   handleOperand(shared_from_this());
   handleOperand(second);
 
-  if (op == OpType::Subtract && children.size() > 2) {
-    // special handling for difference: we treat it as first - (second + third +
-    // ...) so op = Union after the first node
-    std::vector<std::shared_ptr<CsgNode>> unionChildren(children.begin() + 1,
-                                                        children.end());
-    children.resize(1);
-    children.push_back(std::make_shared<CsgOpNode>(unionChildren, OpType::Add));
-  }
   return std::make_shared<CsgOpNode>(children, op);
 }
 
