@@ -73,6 +73,20 @@ struct CheckOverlap {
 }  // namespace
 namespace manifold {
 
+std::shared_ptr<CsgNode> CsgNode::Boolean(std::shared_ptr<CsgNode> second,
+                                          OpType op) {
+  if (auto opNode = std::dynamic_pointer_cast<CsgOpNode>(second)) {
+    // "this" is not a CsgOpNode (which overrides Boolean), but if "second" is
+    // and the operation is commutative, we let it built the tree.
+    if ((op == OpType::Add || op == OpType::Intersect)) {
+      return opNode->Boolean(shared_from_this(), op);
+    }
+  }
+  std::vector<std::shared_ptr<CsgNode>> children(
+      {shared_from_this(), second->shared_from_this()});
+  return std::make_shared<CsgOpNode>(children, op);
+}
+
 std::shared_ptr<CsgNode> CsgNode::Translate(const glm::vec3 &t) const {
   glm::mat4x3 transform(1.0f);
   transform[3] += t;
@@ -237,8 +251,27 @@ CsgOpNode::CsgOpNode(std::vector<std::shared_ptr<CsgNode>> &&children,
   auto impl = impl_.GetGuard();
   impl->children_ = children;
   SetOp(op);
-  // opportunistically flatten the tree without costly evaluation
-  GetChildren(false);
+}
+
+std::shared_ptr<CsgNode> CsgOpNode::Boolean(std::shared_ptr<CsgNode> second,
+                                            OpType op) {
+  std::vector<std::shared_ptr<CsgNode>> children;
+
+  auto handleOperand = [&](const std::shared_ptr<CsgNode> &operand) {
+    if (auto opNode = std::dynamic_pointer_cast<CsgOpNode>(operand)) {
+      if (opNode->IsOp(op)) {
+        for (auto &child : opNode->GetChildren(/* finalize= */ false)) {
+          children.push_back(child);
+        }
+        return;
+      }
+    }
+    children.push_back(operand);
+  };
+  handleOperand(shared_from_this());
+  handleOperand(second);
+
+  return std::make_shared<CsgOpNode>(children, op);
 }
 
 std::shared_ptr<CsgNode> CsgOpNode::Transform(const glm::mat4x3 &m) const {
@@ -423,30 +456,14 @@ std::vector<std::shared_ptr<CsgNode>> &CsgOpNode::GetChildren(
     return children_;
   impl->simplified_ = true;
   impl->flattened_ = finalize;
-  std::vector<std::shared_ptr<CsgNode>> newChildren;
 
-  CsgNodeType op = op_;
-  for (auto &child : children_) {
-    if (child->GetNodeType() == op && child.use_count() == 1 &&
-        std::dynamic_pointer_cast<CsgOpNode>(child)->impl_.UseCount() == 1) {
-      auto grandchildren =
-          std::dynamic_pointer_cast<CsgOpNode>(child)->GetChildren(finalize);
-      int start = children_.size();
-      for (auto &grandchild : grandchildren) {
-        newChildren.push_back(grandchild->Transform(child->GetTransform()));
-      }
-    } else {
-      if (!finalize || child->GetNodeType() == CsgNodeType::Leaf) {
-        newChildren.push_back(child);
-      } else {
-        newChildren.push_back(child->ToLeafNode());
+  if (finalize) {
+    for (auto &child : children_) {
+      if (child->GetNodeType() != CsgNodeType::Leaf) {
+        child = child->ToLeafNode();
       }
     }
-    // special handling for difference: we treat it as first - (second + third +
-    // ...) so op = Union after the first node
-    if (op == CsgNodeType::Difference) op = CsgNodeType::Union;
   }
-  children_ = newChildren;
   return children_;
 }
 
@@ -461,6 +478,19 @@ void CsgOpNode::SetOp(OpType op) {
     case OpType::Intersect:
       op_ = CsgNodeType::Intersection;
       break;
+  }
+}
+
+bool CsgOpNode::IsOp(OpType op) {
+  switch (op) {
+    case OpType::Add:
+      return op_ == CsgNodeType::Union;
+    case OpType::Subtract:
+      return op_ == CsgNodeType::Difference;
+    case OpType::Intersect:
+      return op_ == CsgNodeType::Intersection;
+    default:
+      return false;
   }
 }
 

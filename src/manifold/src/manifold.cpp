@@ -585,8 +585,7 @@ Manifold Manifold::Refine(int n) const {
  * @param op The type of operation to perform.
  */
 Manifold Manifold::Boolean(const Manifold& second, OpType op) const {
-  std::vector<std::shared_ptr<CsgNode>> children({pNode_, second.pNode_});
-  return Manifold(std::make_shared<CsgOpNode>(children, op));
+  return Manifold(pNode_->Boolean(second.pNode_, op));
 }
 
 Manifold Manifold::BatchBoolean(const std::vector<Manifold>& manifolds,
