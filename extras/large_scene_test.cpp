@@ -23,11 +23,7 @@ using namespace manifold;
   Build & execute with the following command:
 
   ( mkdir -p build && cd build && \
-    cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON \
-      -DMANIFOLD_PAR=TBB \
-      -DTHRUST_MULTICONFIG_ENABLE_SYSTEM_TBB=1 \
-      -DTHRUST_HOST_SYSTEM=THRUST_HOST_SYSTEM_TBB \
-      .. && \
+    cmake -DCMAKE_BUILD_TYPE=Release -DMANIFOLD_PAR=TBB .. && \
     make -j && \
     time ./extras/largeSceneTest 50 )
 */
