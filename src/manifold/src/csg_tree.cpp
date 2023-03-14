@@ -456,18 +456,16 @@ void CsgOpNode::BatchUnion() const {
 std::vector<std::shared_ptr<CsgNode>> &CsgOpNode::GetChildren(
     bool forceToLeafNodes) const {
   auto impl = impl_.GetGuard();
-  auto &children_ = impl->children_;
-  if (children_.empty() || impl->forcedToLeafNodes_) return children_;
-  impl->forcedToLeafNodes_ = forceToLeafNodes;
 
-  if (forceToLeafNodes) {
-    for (auto &child : children_) {
+  if (forceToLeafNodes && !impl->forcedToLeafNodes_) {
+    impl->forcedToLeafNodes_ = true;
+    for (auto &child : impl->children_) {
       if (child->GetNodeType() != CsgNodeType::Leaf) {
         child = child->ToLeafNode();
       }
     }
   }
-  return children_;
+  return impl->children_;
 }
 
 void CsgOpNode::SetOp(OpType op) {
