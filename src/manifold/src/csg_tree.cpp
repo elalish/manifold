@@ -82,8 +82,7 @@ std::shared_ptr<CsgNode> CsgNode::Boolean(std::shared_ptr<CsgNode> second,
       return opNode->Boolean(shared_from_this(), op);
     }
   }
-  std::vector<std::shared_ptr<CsgNode>> children(
-      {shared_from_this(), second->shared_from_this()});
+  std::vector<std::shared_ptr<CsgNode>> children({shared_from_this(), second});
   return std::make_shared<CsgOpNode>(children, op);
 }
 
