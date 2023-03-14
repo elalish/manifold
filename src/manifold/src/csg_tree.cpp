@@ -458,9 +458,7 @@ std::vector<std::shared_ptr<CsgNode>> &CsgOpNode::GetChildren(
     bool finalize) const {
   auto impl = impl_.GetGuard();
   auto &children_ = impl->children_;
-  if (children_.empty() || (impl->simplified_ && !finalize) || impl->flattened_)
-    return children_;
-  impl->simplified_ = true;
+  if (children_.empty() || impl->flattened_) return children_;
   impl->flattened_ = finalize;
 
   if (finalize) {

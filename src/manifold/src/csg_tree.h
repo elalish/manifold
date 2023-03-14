@@ -85,7 +85,6 @@ class CsgOpNode final : public CsgNode {
  private:
   struct Impl {
     std::vector<std::shared_ptr<CsgNode>> children_;
-    bool simplified_ = false;
     bool flattened_ = false;
   };
   mutable ConcurrentSharedPtr<Impl> impl_ = ConcurrentSharedPtr<Impl>(Impl{});
