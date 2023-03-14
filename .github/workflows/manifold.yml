@@ -195,7 +195,7 @@ jobs:
     if: github.event.pull_request.draft == false
     steps:
     - name: Install common dependencies
-      run: brew install pkg-config
+      run: brew install pkg-config python@3.11
     - name: Install OpenMP
       if: matrix.parallel_backend == 'OMP'
       run: brew install libomp
@@ -211,7 +211,7 @@ jobs:
         git apply thrust.diff
         mkdir build
         cd build
-        cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DMANIFOLD_DEBUG=ON -DMANIFOLD_PYBIND=ON -DMANIFOLD_PAR=${{matrix.parallel_backend}} .. && make
+        cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DMANIFOLD_DEBUG=ON -DMANIFOLD_PYBIND=ON -DPYBIND11_FINDPYTHON=ON -DMANIFOLD_PAR=${{matrix.parallel_backend}} .. && make
     - name: Test
       run: |
         cd build/test
