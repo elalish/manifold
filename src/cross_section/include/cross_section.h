@@ -64,6 +64,8 @@ class CrossSection {
   // Output
   Polygons ToPolygons() const;
   double Area() const;
+  int NumVert() const;
+  int NumContours() const;
   bool IsEmpty() const;
   Rect Bounds() const;
   ///@}
@@ -76,6 +78,7 @@ class CrossSection {
   CrossSection Scale(const glm::vec2 s) const;
   CrossSection Mirror(const glm::vec2 ax) const;
   CrossSection Transform(const glm::mat3x2& m) const;
+  CrossSection Warp(std::function<void(glm::vec2&)> warpFunc) const;
   CrossSection Simplify(double epsilon = 1e-6) const;
   enum class JoinType { Square, Round, Miter };
   CrossSection Offset(double delta, JoinType jt, double miter_limit = 2.0,
