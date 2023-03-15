@@ -52,9 +52,18 @@ class CrossSection {
   CrossSection& operator=(CrossSection&&) noexcept;
 
   /**
-   *
+   * Filling rules defining which polygon sub-regions are considered to be
+   * inside a given polygon, and which sub-regions will not (based on winding
+   * numbers). See the [Clipper2
+   * docs](https://www.doxygen.nl/manual/markdown.html) for a detailed
+   * explaination with illusrations.
    */
-  enum class FillRule { EvenOdd, NonZero, Positive, Negative };
+  enum class FillRule {
+    EvenOdd,   ///< Only odd numbered sub-regions are filled
+    NonZero,   ///< Only non-zero sub-regions are filled
+    Positive,  ///< Only sub-regions with winding counts > 0 are filled
+    Negative   ///< Only sub-regions with winding counts < 0 are filled
+  };
 
   /**
    *
