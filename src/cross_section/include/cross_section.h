@@ -51,12 +51,15 @@ class CrossSection {
   CrossSection(CrossSection&&) noexcept;
   CrossSection& operator=(CrossSection&&) noexcept;
 
+  // Adapted from Clipper2 docs:
+  // http://www.angusj.com/clipper2/Docs/Units/Clipper/Types/FillRule.htm
+  // (Copyright © 2010-2023 Angus Johnson)
   /**
    * Filling rules defining which polygon sub-regions are considered to be
    * inside a given polygon, and which sub-regions will not (based on winding
    * numbers). See the [Clipper2
-   * docs](https://www.doxygen.nl/manual/markdown.html) for a detailed
-   * explaination with illusrations.
+   * docs](http://www.angusj.com/clipper2/Docs/Units/Clipper/Types/FillRule.htm)
+   * for a detailed explaination with illusrations.
    */
   enum class FillRule {
     EvenOdd,   ///< Only odd numbered sub-regions are filled
@@ -187,10 +190,29 @@ class CrossSection {
    */
   CrossSection Simplify(double epsilon = 1e-6) const;
 
+  // Adapted from Clipper2 docs:
+  // http://www.angusj.com/clipper2/Docs/Units/Clipper/Types/JoinType.htm
+  // (Copyright © 2010-2023 Angus Johnson)
   /**
-   *
+   * Specifies the treatment of path/contour joins (corners) when offseting
+   * CrossSections. See the [Clipper2
+   * doc](http://www.angusj.com/clipper2/Docs/Units/Clipper/Types/JoinType.htm)
+   * for illustrations.
    */
-  enum class JoinType { Square, Round, Miter };
+  enum class JoinType {
+    Square,  ///< Squaring is applied uniformally at all joins where the
+             ///< internal join angle is less that 90 degrees. The squared edge
+             ///< will be at exactly the offset distance from the join vertex.
+    Round,   ///< Rounding is applied to all joins that have convex external
+             ///< angles, and it maintains the exact offset distance from the
+             ///< join vertex.
+    Miter    ///< There's a necessary limit to mitered joins (to avoid narrow
+             ///< angled joins producing excessively long and narrow
+    ///< [spikes](http://www.angusj.com/clipper2/Docs/Units/Clipper.Offset/Classes/ClipperOffset/Properties/MiterLimit.htm)).
+    ///< So where mitered joins would exceed a given maximum miter
+    ///< distance (relative to the offset distance), these are 'squared'
+    ///< instead.
+  };
 
   /**
    *
