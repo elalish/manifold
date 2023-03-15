@@ -62,31 +62,53 @@ class CrossSection {
    * for a detailed explaination with illusrations.
    */
   enum class FillRule {
-    EvenOdd,   ///< Only odd numbered sub-regions are filled
-    NonZero,   ///< Only non-zero sub-regions are filled
-    Positive,  ///< Only sub-regions with winding counts > 0 are filled
-    Negative   ///< Only sub-regions with winding counts < 0 are filled
+    EvenOdd,   ///< Only odd numbered sub-regions are filled.
+    NonZero,   ///< Only non-zero sub-regions are filled.
+    Positive,  ///< Only sub-regions with winding counts > 0 are filled.
+    Negative   ///< Only sub-regions with winding counts < 0 are filled.
   };
 
   /**
+   * Create a 2d cross section from a single contour. A boolean union operation
+   * (with Positive filling rule by default) is performed to ensure the
+   * resulting CrossSection is free of self-intersections.
    *
+   * @param contour A closed path outlining the desired cross section.
+   * @param fillrule The filling rule used to interpret polygon sub-regions
+   * created by self-intersections in contour.
    */
   CrossSection(const SimplePolygon& contour,
                FillRule fillrule = FillRule::Positive);
 
   /**
+   * Create a 2d cross section from a set of contours (complex polygons). A
+   * boolean union operation (with Positive filling rule by default) is
+   * performed to combine overlapping polygons and ensure the resulting
+   * CrossSection is free of intersections.
    *
+   * @param contours A set of closed paths describing zero or more complex
+   * polygons.
+   * @param fillrule The filling rule used to interpret polygon sub-regions in
+   * contours.
    */
   CrossSection(const Polygons& contours,
                FillRule fillrule = FillRule::Positive);
 
   /**
+   * Constructs a square with the given XY dimensions. By default it is
+   * positioned in the first quadrant, touching the origin.
    *
+   * @param size The X, and Y dimensions of the square.
+   * @param center Set to true to shift the center to the origin.
    */
   static CrossSection Square(const glm::vec2 dims, bool center = false);
 
   /**
+   * Constructs a circle of a given radius.
    *
+   * @param radius Radius of the circle. Must be positive.
+   * @param circularSegments Number of segments along its diameter. Default is
+   * calculated by the static Quality defaults according to the radius.
    */
   static CrossSection Circle(float radius, int circularSegments = 0);
   ///@}
