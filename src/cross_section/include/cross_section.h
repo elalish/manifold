@@ -186,7 +186,16 @@ class CrossSection {
   CrossSection Warp(std::function<void(glm::vec2&)> warpFunc) const;
 
   /**
+   * Remove vertices from the contours in this CrossSection that are less than
+   * the specified distance epsilon from an imaginary line that passes through
+   * its two adjacent vertices. Near duplicate vertices and collinear points
+   * will be removed at lower epsilons, with elimination of line segments
+   * becoming increasingly aggressive with larger epsilons.
    *
+   * It is recommended to apply this function following Offset, in order to
+   * clean up any spurious tiny line segments introduced that do not improve
+   * quality in any meaningful way. This is particularly important if further
+   * offseting operations are to be performed, which would compound the issue.
    */
   CrossSection Simplify(double epsilon = 1e-6) const;
 
