@@ -88,11 +88,13 @@ ManifoldManifold *manifold_union(void *mem, ManifoldManifold *a,
   auto m = (*from_c(a)) + (*from_c(b));
   return to_c(new (mem) Manifold(m));
 }
+
 ManifoldManifold *manifold_difference(void *mem, ManifoldManifold *a,
                                       ManifoldManifold *b) {
   auto m = (*from_c(a)) - (*from_c(b));
   return to_c(new (mem) Manifold(m));
 }
+
 ManifoldManifold *manifold_intersection(void *mem, ManifoldManifold *a,
                                         ManifoldManifold *b) {
   auto m = (*from_c(a)) ^ (*from_c(b));
