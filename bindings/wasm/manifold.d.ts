@@ -41,4 +41,4 @@ export interface ManifoldStatic {
   setup: () => void;
 }
 
-export default function Module(): Promise<ManifoldStatic>;
+export default function Module(config: {locateFile: () => string}): Promise<ManifoldStatic>;
