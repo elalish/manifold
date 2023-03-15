@@ -107,7 +107,7 @@ TEST(CrossSection, Warp) {
   });
 
   EXPECT_EQ(sq.NumVert(), 4);
-  EXPECT_EQ(sq.NumContours(), 1);
+  EXPECT_EQ(sq.NumContour(), 1);
   Identical(Manifold::Extrude(a, 1.).GetMesh(),
             Manifold::Extrude(b, 1.).GetMesh());
 }
