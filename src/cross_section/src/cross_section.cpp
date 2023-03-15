@@ -320,7 +320,7 @@ CrossSection CrossSection::Warp(
     }
     warped.push_back(s);
   }
-  return warped;
+  return CrossSection(C2::Union(warped, C2::FillRule::Positive, precision_));
 }
 
 CrossSection CrossSection::Simplify(double epsilon) const {
