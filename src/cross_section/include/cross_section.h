@@ -51,13 +51,31 @@ class CrossSection {
   CrossSection(CrossSection&&) noexcept;
   CrossSection& operator=(CrossSection&&) noexcept;
 
+  /**
+   *
+   */
   enum class FillRule { EvenOdd, NonZero, Positive, Negative };
+
+  /**
+   *
+   */
   CrossSection(const SimplePolygon& contour,
                FillRule fillrule = FillRule::Positive);
+
+  /**
+   *
+   */
   CrossSection(const Polygons& contours,
                FillRule fillrule = FillRule::Positive);
 
+  /**
+   *
+   */
   static CrossSection Square(const glm::vec2 dims, bool center = false);
+
+  /**
+   *
+   */
   static CrossSection Circle(float radius, int circularSegments = 0);
   ///@}
 
@@ -65,26 +83,109 @@ class CrossSection {
    *  Details of the cross-section
    */
   ///@{
-  // Output
+  /**
+   * Return the contours of this CrossSection as a Polygons.
+   */
   Polygons ToPolygons() const;
+
+  /**
+   * Return the total area covered by complex polygons making up the
+   * CrossSection.
+   */
   double Area() const;
+
+  /**
+   * Return the number of vertices in the CrossSection.
+   */
   int NumVert() const;
+
+  /**
+   * Return the number of contours (both outer and inner paths) in the
+   * CrossSection.
+   */
   int NumContour() const;
+
+  /**
+   * Does the CrossSection contain any contours?
+   */
   bool IsEmpty() const;
+
+  /**
+   * Returns the axis-aligned bounding rectangle of all the CrossSections'
+   * vertices.
+   */
   Rect Bounds() const;
   ///@}
 
   /** @name Modification
    */
   ///@{
+  /**
+   * Move this CrossSection in space. This operation can be chained. Transforms
+   * are combined and applied lazily.
+   *
+   * @param v The vector to add to every vertex.
+   */
   CrossSection Translate(const glm::vec2 v) const;
+
+  /**
+   * Applies a (Z-axis) rotation to the CrossSection, in degrees. This operation
+   * can be chained. Transforms are combined and applied lazily.
+   *
+   * @param degrees degrees about the Z-axis to rotate.
+   */
   CrossSection Rotate(float degrees) const;
+
+  /**
+   * Scale this CrossSection in space. This operation can be chained. Transforms
+   * are combined and applied lazily.
+   *
+   * @param v The vector to multiply every vertex by per component.
+   */
   CrossSection Scale(const glm::vec2 s) const;
+
+  /**
+   * Mirror this CrossSection over the arbitrary axis described by the unit form
+   * of the given vector. If the length of the vector is zero, an empty
+   * CrossSection is returned. This operation can be chained. Transforms are
+   * combined and applied lazily.
+   *
+   * @param ax the axis to be mirrored over
+   */
   CrossSection Mirror(const glm::vec2 ax) const;
+
+  /**
+   * Transform this CrossSection in space. The first two columns form a 2x2
+   * matrix transform and the last is a translation vector. This operation can
+   * be chained. Transforms are combined and applied lazily.
+   *
+   * @param m The affine transform matrix to apply to all the vertices.
+   */
   CrossSection Transform(const glm::mat3x2& m) const;
+
+  /**
+   * Move the vertices of this CrossSection (creating a new one) according to
+   * any arbitrary input function, followed by a union operation (with a
+   * Positive fill rule) that ensures any introduced intersections are not
+   * included in the result.
+   *
+   * @param warpFunc A function that modifies a given vertex position.
+   */
   CrossSection Warp(std::function<void(glm::vec2&)> warpFunc) const;
+
+  /**
+   *
+   */
   CrossSection Simplify(double epsilon = 1e-6) const;
+
+  /**
+   *
+   */
   enum class JoinType { Square, Round, Miter };
+
+  /**
+   *
+   */
   CrossSection Offset(double delta, JoinType jt, double miter_limit = 2.0,
                       double arc_tolerance = 0.0) const;
   ///@}
@@ -93,7 +194,14 @@ class CrossSection {
    *  Combine two manifolds
    */
   ///@{
+  /**
+   *
+   */
   CrossSection Boolean(const CrossSection& second, OpType op) const;
+
+  /**
+   *
+   */
   static CrossSection BatchBoolean(
       const std::vector<CrossSection>& crossSections, OpType op);
   CrossSection operator+(const CrossSection&) const;  // Add (Union)
@@ -102,6 +210,10 @@ class CrossSection {
   CrossSection& operator-=(const CrossSection&);
   CrossSection operator^(const CrossSection&) const;  // Intersect
   CrossSection& operator^=(const CrossSection&);
+
+  /**
+   *
+   */
   CrossSection RectClip(const Rect& rect) const;
   ///@}
 
