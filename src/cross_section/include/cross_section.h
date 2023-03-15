@@ -40,6 +40,10 @@ class CrossSection {
    *  Constructors
    */
   ///@{
+
+  /**
+   * The default constructor is an empty cross-section (containing no contours).
+   */
   CrossSection();
   ~CrossSection();
   CrossSection(const CrossSection& other);
@@ -113,6 +117,9 @@ class CrossSection {
  *  @{
  */
 
+/**
+ * Axis-aligned rectangular bounds.
+ */
 class Rect {
  public:
   glm::vec2 min = glm::vec2(0);
@@ -134,7 +141,7 @@ class Rect {
   Rect(const glm::vec2 a, const glm::vec2 b);
 
   /**
-   * Returns the dimensions of the Rect.
+   * Returns the dimensions of the rectangle.
    */
   glm::vec2 Size() const;
 
@@ -145,14 +152,33 @@ class Rect {
   float Scale() const;
 
   /**
-   * Returns the center point of the Box.
+   * Returns the center point of the rectangle.
    */
   glm::vec2 Center() const;
 
+  /**
+   * Does this rectangle contain (includes equal) the given point?
+   */
   bool Contains(const glm::vec2& pt) const;
+
+  /**
+   * Does this rectangle contain (includes equal) the given rectangle?
+   */
   bool Contains(const Rect& other) const;
+
+  /**
+   * Does this rectangle overlap the one given (including equality)?
+   */
   bool DoesOverlap(const Rect& other) const;
+
+  /**
+   * Is the rectangle empty (containing no space)?
+   */
   bool IsEmpty() const;
+
+  /**
+   * Does this recangle have finite bounds?
+   */
   bool IsFinite() const;
 
   /**
@@ -185,8 +211,19 @@ class Rect {
    */
   Rect& operator*=(const glm::vec2 scale);
 
+  /**
+   * Transform the rectangle by the given axis-aligned affine transform.
+   *
+   * Ensure the transform passed in is axis-aligned (rotations are all
+   * multiples of 90 degrees), or else the resulting rectangle will no longer
+   * bound properly.
+   */
   Rect Transform(const glm::mat3x2& m) const;
 
+  /**
+   * Return a CrossSection with an outline defined by this axis-aligned
+   * rectangle.
+   */
   CrossSection AsCrossSection() const;
 };
 /** @} */
