@@ -156,3 +156,22 @@ TEST(CBIND, compose_decompose) {
     manifold_delete_manifold(decomposed[i]);
   }
 }
+
+TEST(CBIND, polygons) {
+  ManifoldVec2 vs[] = {{0, 0}, {1, 1}, {2, 2}};
+  ManifoldSimplePolygon *sp =
+      manifold_simple_polygon(malloc(manifold_simple_polygon_size()), vs, 3);
+  ManifoldSimplePolygon *sps[] = {sp};
+  ManifoldPolygons *ps =
+      manifold_polygons(malloc(manifold_polygons_size()), sps, 1);
+
+  EXPECT_EQ(vs[0].x, manifold_simple_polygon_get_point(sp, 0).x);
+  EXPECT_EQ(vs[1].x, manifold_simple_polygon_get_point(sp, 1).x);
+  EXPECT_EQ(vs[2].x, manifold_simple_polygon_get_point(sp, 2).x);
+  EXPECT_EQ(vs[0].x, manifold_polygons_get_point(ps, 0, 0).x);
+  EXPECT_EQ(vs[1].x, manifold_polygons_get_point(ps, 0, 1).x);
+  EXPECT_EQ(vs[2].x, manifold_polygons_get_point(ps, 0, 2).x);
+
+  manifold_delete_simple_polygon(sp);
+  manifold_delete_polygons(ps);
+}
