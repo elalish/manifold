@@ -11,6 +11,16 @@ ManifoldSimplePolygon *manifold_simple_polygon(void *mem, ManifoldVec2 *ps,
                                                size_t length);
 ManifoldPolygons *manifold_polygons(void *mem, ManifoldSimplePolygon **ps,
                                     size_t length);
+size_t manifold_simple_polygon_length(ManifoldSimplePolygon *p);
+size_t manifold_polygons_length(ManifoldPolygons *ps);
+size_t manifold_polygons_simple_length(ManifoldPolygons *ps, int idx);
+ManifoldVec2 manifold_simple_polygon_get_point(ManifoldSimplePolygon *p,
+                                               int idx);
+ManifoldSimplePolygon *manifold_polygons_get_simple(void *mem,
+                                                    ManifoldPolygons *ps,
+                                                    int idx);
+ManifoldVec2 manifold_polygons_get_point(ManifoldPolygons *ps, int simple_idx,
+                                         int pt_idx);
 
 // Mesh Construction
 ManifoldMeshGL *manifold_meshgl(void *mem, float *vert_props, size_t n_verts,
