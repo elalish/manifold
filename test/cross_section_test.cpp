@@ -97,3 +97,17 @@ TEST(CrossSection, Transform) {
   // same transformations are applied in b_copy (giving same result)
   Identical(ex_b, Manifold::Extrude(b_copy, 1.).GetMesh());
 }
+
+TEST(CrossSection, Warp) {
+  auto sq = CrossSection::Square({10., 10.});
+  auto a = sq.Scale({2, 3}).Translate({4, 5});
+  auto b = sq.Warp([](glm::vec2 &v) {
+    v.x = v.x * 2 + 4;
+    v.y = v.y * 3 + 5;
+  });
+
+  EXPECT_EQ(sq.NumVert(), 4);
+  EXPECT_EQ(sq.NumContour(), 1);
+  Identical(Manifold::Extrude(a, 1.).GetMesh(),
+            Manifold::Extrude(b, 1.).GetMesh());
+}

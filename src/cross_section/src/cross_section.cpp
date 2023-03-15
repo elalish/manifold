@@ -305,6 +305,24 @@ CrossSection CrossSection::Transform(const glm::mat3x2& m) const {
   return transformed;
 }
 
+CrossSection CrossSection::Warp(
+    std::function<void(glm::vec2&)> warpFunc) const {
+  auto paths = GetPaths();
+  auto warped = C2::PathsD();
+  warped.reserve(paths.size());
+  for (auto path : paths) {
+    auto sz = path.size();
+    auto s = C2::PathD(sz);
+    for (int i = 0; i < sz; ++i) {
+      auto v = v2_of_pd(path[i]);
+      warpFunc(v);
+      s[i] = v2_to_pd(v);
+    }
+    warped.push_back(s);
+  }
+  return CrossSection(C2::Union(warped, C2::FillRule::Positive, precision_));
+}
+
 CrossSection CrossSection::Simplify(double epsilon) const {
   auto ps = SimplifyPaths(GetPaths(), epsilon, false);
   return CrossSection(ps);
@@ -320,10 +338,23 @@ CrossSection CrossSection::Offset(double delta, JoinType jointype,
 }
 
 double CrossSection::Area() const { return C2::Area(GetPaths()); }
+
+int CrossSection::NumVert() const {
+  int n = 0;
+  auto paths = GetPaths();
+  for (auto p : paths) {
+    n += p.size();
+  }
+  return n;
+}
+
+int CrossSection::NumContour() const { return GetPaths().size(); }
+
 Rect CrossSection::Bounds() const {
   auto r = C2::GetBounds(GetPaths());
   return Rect({r.left, r.bottom}, {r.right, r.top});
 }
+
 bool CrossSection::IsEmpty() const { return GetPaths().empty(); }
 
 Polygons CrossSection::ToPolygons() const {
