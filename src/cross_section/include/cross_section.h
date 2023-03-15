@@ -65,7 +65,7 @@ class CrossSection {
   Polygons ToPolygons() const;
   double Area() const;
   int NumVert() const;
-  int NumContours() const;
+  int NumContour() const;
   bool IsEmpty() const;
   Rect Bounds() const;
   ///@}

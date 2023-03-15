@@ -348,7 +348,7 @@ int CrossSection::NumVert() const {
   return n;
 }
 
-int CrossSection::NumContours() const { return GetPaths().size(); }
+int CrossSection::NumContour() const { return GetPaths().size(); }
 
 Rect CrossSection::Bounds() const {
   auto r = C2::GetBounds(GetPaths());
