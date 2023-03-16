@@ -533,3 +533,11 @@ TEST(Manifold, BooleanVolumes) {
   EXPECT_FLOAT_EQ((m7 - (m7 - m1)).GetProperties().volume, 1);
   EXPECT_FLOAT_EQ((m7 - (m1 + m2)).GetProperties().volume, 4);
 }
+
+TEST(Manifold, TreeTransforms) {
+  auto a = (Manifold::Cube({1, 1, 1}) + Manifold::Cube({1, 1, 1}))
+               .Translate({1, 0, 0});
+  auto b = (Manifold::Cube({1, 1, 1}) + Manifold::Cube({1, 1, 1}));
+
+  EXPECT_FLOAT_EQ((a + b).GetProperties().volume, 2);
+}

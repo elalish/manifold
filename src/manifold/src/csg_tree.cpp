@@ -254,12 +254,21 @@ std::shared_ptr<CsgNode> CsgOpNode::Boolean(
     const std::shared_ptr<CsgNode> &second, OpType op) {
   std::vector<std::shared_ptr<CsgNode>> children;
 
-  if (IsOp(op) && (impl_.UseCount() == 1)) {
+  auto isReused = [](const auto &node) { return node->impl_.UseCount() > 1; };
+
+  auto copyChildren = [&](const auto &list, const glm::mat4x3 &transform) {
+    for (const auto &child : list) {
+      children.push_back(child->Transform(transform));
+    }
+  };
+
+  auto self = std::dynamic_pointer_cast<CsgOpNode>(shared_from_this());
+  assert(self);
+  if (IsOp(op) && !isReused(self)) {
     auto impl = impl_.GetGuard();
-    std::copy(impl->children_.begin(), impl->children_.end(),
-              std::back_inserter(children));
+    copyChildren(impl->children_, transform_);
   } else {
-    children.push_back(shared_from_this());
+    children.push_back(self);
   }
 
   auto secondOp = std::dynamic_pointer_cast<CsgOpNode>(second);
@@ -275,10 +284,9 @@ std::shared_ptr<CsgNode> CsgOpNode::Boolean(
     }
   };
 
-  if (secondOp && (secondOp->impl_.UseCount() == 1) && canInlineSecondOp()) {
+  if (secondOp && canInlineSecondOp() && !isReused(secondOp)) {
     auto secondImpl = secondOp->impl_.GetGuard();
-    std::copy(secondImpl->children_.begin(), secondImpl->children_.end(),
-              std::back_inserter(children));
+    copyChildren(secondImpl->children_, secondOp->transform_);
   } else {
     children.push_back(second);
   }
