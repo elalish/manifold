@@ -47,19 +47,9 @@ class CrossSection {
    */
   ///@{
 
-  /**
-   * The default constructor is an empty cross-section (containing no contours).
-   */
   CrossSection();
   ~CrossSection();
 
-  /**
-   * The copy constructor avoids copying the underlying paths vector (sharing
-   * with its parent via shared_ptr), however subsequent transformations, and
-   * their application will not be shared. It is generally recommended to avoid
-   * this, opting instead to simply create CrossSections with the available
-   * const methods.
-   */
   CrossSection(const CrossSection& other);
   CrossSection& operator=(const CrossSection& other);
   CrossSection(CrossSection&&) noexcept;
@@ -82,48 +72,11 @@ class CrossSection {
     Negative   ///< Only sub-regions with winding counts < 0 are filled.
   };
 
-  /**
-   * Create a 2d cross section from a single contour. A boolean union operation
-   * (with Positive filling rule by default) is performed to ensure the
-   * resulting CrossSection is free of self-intersections.
-   *
-   * @param contour A closed path outlining the desired cross section.
-   * @param fillrule The filling rule used to interpret polygon sub-regions
-   * created by self-intersections in contour.
-   */
   CrossSection(const SimplePolygon& contour,
                FillRule fillrule = FillRule::Positive);
-
-  /**
-   * Create a 2d cross section from a set of contours (complex polygons). A
-   * boolean union operation (with Positive filling rule by default) is
-   * performed to combine overlapping polygons and ensure the resulting
-   * CrossSection is free of intersections.
-   *
-   * @param contours A set of closed paths describing zero or more complex
-   * polygons.
-   * @param fillrule The filling rule used to interpret polygon sub-regions in
-   * contours.
-   */
   CrossSection(const Polygons& contours,
                FillRule fillrule = FillRule::Positive);
-
-  /**
-   * Constructs a square with the given XY dimensions. By default it is
-   * positioned in the first quadrant, touching the origin.
-   *
-   * @param size The X, and Y dimensions of the square.
-   * @param center Set to true to shift the center to the origin.
-   */
   static CrossSection Square(const glm::vec2 dims, bool center = false);
-
-  /**
-   * Constructs a circle of a given radius.
-   *
-   * @param radius Radius of the circle. Must be positive.
-   * @param circularSegments Number of segments along its diameter. Default is
-   * calculated by the static Quality defaults according to the radius.
-   */
   static CrossSection Circle(float radius, int circularSegments = 0);
   ///@}
 
@@ -131,108 +84,23 @@ class CrossSection {
    *  Details of the cross-section
    */
   ///@{
-  /**
-   * Return the contours of this CrossSection as a Polygons.
-   */
   Polygons ToPolygons() const;
-
-  /**
-   * Return the total area covered by complex polygons making up the
-   * CrossSection.
-   */
   double Area() const;
-
-  /**
-   * Return the number of vertices in the CrossSection.
-   */
   int NumVert() const;
-
-  /**
-   * Return the number of contours (both outer and inner paths) in the
-   * CrossSection.
-   */
   int NumContour() const;
-
-  /**
-   * Does the CrossSection contain any contours?
-   */
   bool IsEmpty() const;
-
-  /**
-   * Returns the axis-aligned bounding rectangle of all the CrossSections'
-   * vertices.
-   */
   Rect Bounds() const;
   ///@}
 
   /** @name Modification
    */
   ///@{
-  /**
-   * Move this CrossSection in space. This operation can be chained. Transforms
-   * are combined and applied lazily.
-   *
-   * @param v The vector to add to every vertex.
-   */
   CrossSection Translate(const glm::vec2 v) const;
-
-  /**
-   * Applies a (Z-axis) rotation to the CrossSection, in degrees. This operation
-   * can be chained. Transforms are combined and applied lazily.
-   *
-   * @param degrees degrees about the Z-axis to rotate.
-   */
   CrossSection Rotate(float degrees) const;
-
-  /**
-   * Scale this CrossSection in space. This operation can be chained. Transforms
-   * are combined and applied lazily.
-   *
-   * @param v The vector to multiply every vertex by per component.
-   */
   CrossSection Scale(const glm::vec2 s) const;
-
-  /**
-   * Mirror this CrossSection over the arbitrary axis described by the unit form
-   * of the given vector. If the length of the vector is zero, an empty
-   * CrossSection is returned. This operation can be chained. Transforms are
-   * combined and applied lazily.
-   *
-   * @param ax the axis to be mirrored over
-   */
   CrossSection Mirror(const glm::vec2 ax) const;
-
-  /**
-   * Transform this CrossSection in space. The first two columns form a 2x2
-   * matrix transform and the last is a translation vector. This operation can
-   * be chained. Transforms are combined and applied lazily.
-   *
-   * @param m The affine transform matrix to apply to all the vertices.
-   */
   CrossSection Transform(const glm::mat3x2& m) const;
-
-  /**
-   * Move the vertices of this CrossSection (creating a new one) according to
-   * any arbitrary input function, followed by a union operation (with a
-   * Positive fill rule) that ensures any introduced intersections are not
-   * included in the result.
-   *
-   * @param warpFunc A function that modifies a given vertex position.
-   */
   CrossSection Warp(std::function<void(glm::vec2&)> warpFunc) const;
-
-  /**
-   * Remove vertices from the contours in this CrossSection that are less than
-   * the specified distance epsilon from an imaginary line that passes through
-   * its two adjacent vertices. Near duplicate vertices and collinear points
-   * will be removed at lower epsilons, with elimination of line segments
-   * becoming increasingly aggressive with larger epsilons.
-   *
-   * It is recommended to apply this function following Offset, in order to
-   * clean up any spurious tiny line segments introduced that do not improve
-   * quality in any meaningful way. This is particularly important if further
-   * offseting operations are to be performed, which would compound the issue.
-   */
   CrossSection Simplify(double epsilon = 1e-6) const;
 
   // Adapted from Clipper2 docs:
@@ -258,26 +126,6 @@ class CrossSection {
              (relative to the offset distance), these are 'squared' instead. */
   };
 
-  /**
-   * Inflate the contours in CrossSection by the specified delta, handling
-   * corners according to the given JoinType.
-   *
-   * @param delta Positive deltas will cause the expansion of outlining contours
-   * to expand, and retraction of inner (hole) contours. Negative deltas will
-   * have the opposite effect.
-   * @param jt The join type specifying the treatment of contour joins
-   * (corners).
-   * @param miter_limit The maximum distance in multiples of delta that vertices
-   * can be offset from their original positions with before squaring is
-   * applied, <B>when the join type is Miter</B> (default is 2, which is the
-   * minimum allowed). See the [Clipper2
-   * MiterLimit](http://www.angusj.com/clipper2/Docs/Units/Clipper.Offset/Classes/ClipperOffset/Properties/MiterLimit.htm)
-   * page for a visual example.
-   * @param arc_tolerance The maximum acceptable imperfection for curves drawn
-   * (approximated with line segments) for Round joins (not relevant for other
-   * JoinTypes). By default (when undefined or =0), the allowable imprecision is
-   * scaled in inverse proportion to the offset delta.
-   */
   CrossSection Offset(double delta, JoinType jt, double miter_limit = 2.0,
                       double arc_tolerance = 0.0) const;
   ///@}
@@ -286,58 +134,15 @@ class CrossSection {
    *  Combine two manifolds
    */
   ///@{
-  /**
-   * Perform the given boolean operation between this and another CrossSection.
-   */
   CrossSection Boolean(const CrossSection& second, OpType op) const;
-
-  /**
-   * Perform the given boolean operation on a list of CrossSections. In case of
-   * Subtract, all CrossSections in the tail are differenced from the head.
-   */
   static CrossSection BatchBoolean(
       const std::vector<CrossSection>& crossSections, OpType op);
-
-  /**
-   * Compute the boolean union between two cross sections.
-   */
   CrossSection operator+(const CrossSection&) const;
-
-  /**
-   * Compute the boolean union between two cross sections, assigning the result
-   * to the first.
-   */
   CrossSection& operator+=(const CrossSection&);
-
-  /**
-   * Compute the boolean difference of a (clip) cross section from another
-   * (subject).
-   */
   CrossSection operator-(const CrossSection&) const;
-
-  /**
-   * Compute the boolean difference of a (clip) cross section from a another
-   * (subject), assigning the result to the subject.
-   */
   CrossSection& operator-=(const CrossSection&);
-
-  /**
-   * Compute the boolean intersection between two cross sections.
-   */
   CrossSection operator^(const CrossSection&) const;
-
-  /**
-   * Compute the boolean intersection between two cross sections, assigning the
-   * result to the first.
-   */
   CrossSection& operator^=(const CrossSection&);
-
-  /**
-   * Compute the intersection between a cross section and an axis-aligned
-   * rectangle. This operation has much higher performance (<B>O(n)</B> vs
-   * <B>O(n<SUP>3</SUP>)</B>) than the general purpose intersection algorithm
-   * used for sets of cross sections.
-   */
   CrossSection RectClip(const Rect& rect) const;
   ///@}
 
@@ -361,106 +166,50 @@ class Rect {
   glm::vec2 min = glm::vec2(0);
   glm::vec2 max = glm::vec2(0);
 
-  /**
-   * Default constructor is an empty rectangle..
+  /** @name Creation
+   *  Constructors
    */
+  ///@{
   Rect();
   ~Rect();
   Rect(const Rect& other);
   Rect& operator=(const Rect& other);
   Rect(Rect&&) noexcept;
   Rect& operator=(Rect&&) noexcept;
-
-  /**
-   * Creates a rectangle that contains the two given points.
-   */
   Rect(const glm::vec2 a, const glm::vec2 b);
+  ///@}
 
-  /**
-   * Returns the dimensions of the rectangle.
+  /** @name Information
+   *  Details of the rectangle
    */
+  ///@{
   glm::vec2 Size() const;
-
-  /**
-   * Returns the absolute-largest coordinate value of any contained
-   * point.
-   */
   float Scale() const;
-
-  /**
-   * Returns the center point of the rectangle.
-   */
   glm::vec2 Center() const;
-
-  /**
-   * Does this rectangle contain (includes equal) the given point?
-   */
   bool Contains(const glm::vec2& pt) const;
-
-  /**
-   * Does this rectangle contain (includes equal) the given rectangle?
-   */
   bool Contains(const Rect& other) const;
-
-  /**
-   * Does this rectangle overlap the one given (including equality)?
-   */
   bool DoesOverlap(const Rect& other) const;
-
-  /**
-   * Is the rectangle empty (containing no space)?
-   */
   bool IsEmpty() const;
-
-  /**
-   * Does this recangle have finite bounds?
-   */
   bool IsFinite() const;
+  ///@}
 
-  /**
-   * Expand this rectangle (in place) to include the given point.
+  /** @name Modification
    */
+  ///@{
   void Union(const glm::vec2 p);
-
-  /**
-   * Expand this rectangle to include the given Rect.
-   */
   Rect Union(const Rect& other) const;
-
-  /**
-   * Shift this rectangle by the given vector.
-   */
   Rect operator+(const glm::vec2 shift) const;
-
-  /**
-   * Shift this rectangle in-place by the given vector.
-   */
   Rect& operator+=(const glm::vec2 shift);
-
-  /**
-   * Scale this rectangle by the given vector.
-   */
   Rect operator*(const glm::vec2 scale) const;
-
-  /**
-   * Scale this rectangle in-place by the given vector.
-   */
   Rect& operator*=(const glm::vec2 scale);
-
-  /**
-   * Transform the rectangle by the given axis-aligned affine transform.
-   *
-   * Ensure the transform passed in is axis-aligned (rotations are all
-   * multiples of 90 degrees), or else the resulting rectangle will no longer
-   * bound properly.
-   */
   Rect Transform(const glm::mat3x2& m) const;
+  ///@}
 
-  /**
-   * Return a CrossSection with an outline defined by this axis-aligned
-   * rectangle.
+  /** @name Conversion
    */
+  ///@{
   CrossSection AsCrossSection() const;
+  ///@}
 };
 /** @} */
 }  // namespace manifold
