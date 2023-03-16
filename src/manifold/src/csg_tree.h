@@ -22,12 +22,15 @@ enum class CsgNodeType { Union, Intersection, Difference, Leaf };
 
 class CsgLeafNode;
 
-class CsgNode {
+class CsgNode : public std::enable_shared_from_this<CsgNode> {
  public:
   virtual std::shared_ptr<CsgLeafNode> ToLeafNode() const = 0;
   virtual std::shared_ptr<CsgNode> Transform(const glm::mat4x3 &m) const = 0;
   virtual CsgNodeType GetNodeType() const = 0;
   virtual glm::mat4x3 GetTransform() const = 0;
+
+  virtual std::shared_ptr<CsgNode> Boolean(
+      const std::shared_ptr<CsgNode> &second, OpType op);
 
   std::shared_ptr<CsgNode> Translate(const glm::vec3 &t) const;
   std::shared_ptr<CsgNode> Scale(const glm::vec3 &s) const;
@@ -68,6 +71,9 @@ class CsgOpNode final : public CsgNode {
 
   CsgOpNode(std::vector<std::shared_ptr<CsgNode>> &&children, OpType op);
 
+  std::shared_ptr<CsgNode> Boolean(const std::shared_ptr<CsgNode> &second,
+                                   OpType op) override;
+
   std::shared_ptr<CsgNode> Transform(const glm::mat4x3 &m) const override;
 
   std::shared_ptr<CsgLeafNode> ToLeafNode() const override;
@@ -79,8 +85,7 @@ class CsgOpNode final : public CsgNode {
  private:
   struct Impl {
     std::vector<std::shared_ptr<CsgNode>> children_;
-    bool simplified_ = false;
-    bool flattened_ = false;
+    bool forcedToLeafNodes_ = false;
   };
   mutable ConcurrentSharedPtr<Impl> impl_ = ConcurrentSharedPtr<Impl>(Impl{});
   CsgNodeType op_;
@@ -89,6 +94,7 @@ class CsgOpNode final : public CsgNode {
   mutable std::shared_ptr<CsgLeafNode> cache_ = nullptr;
 
   void SetOp(OpType);
+  bool IsOp(OpType op);
 
   static std::shared_ptr<Manifold::Impl> BatchBoolean(
       OpType operation,
@@ -97,7 +103,7 @@ class CsgOpNode final : public CsgNode {
   void BatchUnion() const;
 
   std::vector<std::shared_ptr<CsgNode>> &GetChildren(
-      bool finalize = true) const;
+      bool forceToLeafNodes = true) const;
 };
 
 }  // namespace manifold
