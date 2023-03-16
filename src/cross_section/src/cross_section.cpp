@@ -372,7 +372,7 @@ std::vector<CrossSection> CrossSection::Decompose() const {
                 C2::PathsD(), tree, precision_);
 
   auto polys = std::vector<C2::PathsD>();
-  decompose_outline((C2::PolyTreeD*)(tree.Child(0)->Parent()), polys, 0);
+  decompose_outline(&tree, polys, 0);
 
   auto n_polys = polys.size();
   auto comps = std::vector<CrossSection>(n_polys);
