@@ -239,7 +239,7 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .function("_GetMeshJS", &GetMeshJS)
       .function("refine", &Manifold::Refine)
       .function("_Warp", &Warp)
-      .function("_Transform", &Transform)
+      .function("transform", &Transform)
       .function("_Translate", &Manifold::Translate)
       .function("_Rotate", &Manifold::Rotate)
       .function("_Scale", &Manifold::Scale)
