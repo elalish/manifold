@@ -34,25 +34,48 @@ class Rect;
  *  @{
  */
 
+/**
+ * Two-dimensional cross sections guaranteed to be without self-intersections,
+ * or overlaps between polygons (from construction onwards). This class makes
+ * use of the [Clipper2](http://www.angusj.com/clipper2/Docs/Overview.htm)
+ * library for polygon clipping (boolean) and offsetting operations.
+ */
 class CrossSection {
  public:
   /** @name Creation
    *  Constructors
    */
   ///@{
+
   CrossSection();
   ~CrossSection();
+
   CrossSection(const CrossSection& other);
   CrossSection& operator=(const CrossSection& other);
   CrossSection(CrossSection&&) noexcept;
   CrossSection& operator=(CrossSection&&) noexcept;
 
-  enum class FillRule { EvenOdd, NonZero, Positive, Negative };
+  // Adapted from Clipper2 docs:
+  // http://www.angusj.com/clipper2/Docs/Units/Clipper/Types/FillRule.htm
+  // (Copyright © 2010-2023 Angus Johnson)
+  /**
+   * Filling rules defining which polygon sub-regions are considered to be
+   * inside a given polygon, and which sub-regions will not (based on winding
+   * numbers). See the [Clipper2
+   * docs](http://www.angusj.com/clipper2/Docs/Units/Clipper/Types/FillRule.htm)
+   * for a detailed explaination with illusrations.
+   */
+  enum class FillRule {
+    EvenOdd,   ///< Only odd numbered sub-regions are filled.
+    NonZero,   ///< Only non-zero sub-regions are filled.
+    Positive,  ///< Only sub-regions with winding counts > 0 are filled.
+    Negative   ///< Only sub-regions with winding counts < 0 are filled.
+  };
+
   CrossSection(const SimplePolygon& contour,
                FillRule fillrule = FillRule::Positive);
   CrossSection(const Polygons& contours,
                FillRule fillrule = FillRule::Positive);
-
   static CrossSection Square(const glm::vec2 dims, bool center = false);
   static CrossSection Circle(float radius, int circularSegments = 0);
   ///@}
@@ -61,7 +84,6 @@ class CrossSection {
    *  Details of the cross-section
    */
   ///@{
-  // Output
   Polygons ToPolygons() const;
   double Area() const;
   int NumVert() const;
@@ -80,7 +102,30 @@ class CrossSection {
   CrossSection Transform(const glm::mat3x2& m) const;
   CrossSection Warp(std::function<void(glm::vec2&)> warpFunc) const;
   CrossSection Simplify(double epsilon = 1e-6) const;
-  enum class JoinType { Square, Round, Miter };
+
+  // Adapted from Clipper2 docs:
+  // http://www.angusj.com/clipper2/Docs/Units/Clipper/Types/JoinType.htm
+  // (Copyright © 2010-2023 Angus Johnson)
+  /**
+   * Specifies the treatment of path/contour joins (corners) when offseting
+   * CrossSections. See the [Clipper2
+   * doc](http://www.angusj.com/clipper2/Docs/Units/Clipper/Types/JoinType.htm)
+   * for illustrations.
+   */
+  enum class JoinType {
+    Square, /*!< Squaring is applied uniformly at all joins where the internal
+              join angle is less that 90 degrees. The squared edge will be at
+              exactly the offset distance from the join vertex. */
+    Round,  /*!< Rounding is applied to all joins that have convex external
+             angles, and it maintains the exact offset distance from the join
+             vertex. */
+    Miter   /*!< There's a necessary limit to mitered joins (to avoid narrow
+             angled joins producing excessively long and narrow
+             [spikes](http://www.angusj.com/clipper2/Docs/Units/Clipper.Offset/Classes/ClipperOffset/Properties/MiterLimit.htm)).
+             So where mitered joins would exceed a given maximum miter distance
+             (relative to the offset distance), these are 'squared' instead. */
+  };
+
   CrossSection Offset(double delta, JoinType jt, double miter_limit = 2.0,
                       double arc_tolerance = 0.0) const;
   ///@}
@@ -92,11 +137,11 @@ class CrossSection {
   CrossSection Boolean(const CrossSection& second, OpType op) const;
   static CrossSection BatchBoolean(
       const std::vector<CrossSection>& crossSections, OpType op);
-  CrossSection operator+(const CrossSection&) const;  // Add (Union)
+  CrossSection operator+(const CrossSection&) const;
   CrossSection& operator+=(const CrossSection&);
-  CrossSection operator-(const CrossSection&) const;  // Subtract (Difference)
+  CrossSection operator-(const CrossSection&) const;
   CrossSection& operator-=(const CrossSection&);
-  CrossSection operator^(const CrossSection&) const;  // Intersect
+  CrossSection operator^(const CrossSection&) const;
   CrossSection& operator^=(const CrossSection&);
   CrossSection RectClip(const Rect& rect) const;
   ///@}
@@ -113,81 +158,58 @@ class CrossSection {
  *  @{
  */
 
+/**
+ * Axis-aligned rectangular bounds.
+ */
 class Rect {
  public:
   glm::vec2 min = glm::vec2(0);
   glm::vec2 max = glm::vec2(0);
 
-  /**
-   * Default constructor is an empty rectangle..
+  /** @name Creation
+   *  Constructors
    */
+  ///@{
   Rect();
   ~Rect();
   Rect(const Rect& other);
   Rect& operator=(const Rect& other);
   Rect(Rect&&) noexcept;
   Rect& operator=(Rect&&) noexcept;
-
-  /**
-   * Creates a rectangle that contains the two given points.
-   */
   Rect(const glm::vec2 a, const glm::vec2 b);
+  ///@}
 
-  /**
-   * Returns the dimensions of the Rect.
+  /** @name Information
+   *  Details of the rectangle
    */
+  ///@{
   glm::vec2 Size() const;
-
-  /**
-   * Returns the absolute-largest coordinate value of any contained
-   * point.
-   */
   float Scale() const;
-
-  /**
-   * Returns the center point of the Box.
-   */
   glm::vec2 Center() const;
-
   bool Contains(const glm::vec2& pt) const;
   bool Contains(const Rect& other) const;
   bool DoesOverlap(const Rect& other) const;
   bool IsEmpty() const;
   bool IsFinite() const;
+  ///@}
 
-  /**
-   * Expand this rectangle (in place) to include the given point.
+  /** @name Modification
    */
+  ///@{
   void Union(const glm::vec2 p);
-
-  /**
-   * Expand this rectangle to include the given Rect.
-   */
   Rect Union(const Rect& other) const;
-
-  /**
-   * Shift this rectangle by the given vector.
-   */
   Rect operator+(const glm::vec2 shift) const;
-
-  /**
-   * Shift this rectangle in-place by the given vector.
-   */
   Rect& operator+=(const glm::vec2 shift);
-
-  /**
-   * Scale this rectangle by the given vector.
-   */
   Rect operator*(const glm::vec2 scale) const;
-
-  /**
-   * Scale this rectangle in-place by the given vector.
-   */
   Rect& operator*=(const glm::vec2 scale);
-
   Rect Transform(const glm::mat3x2& m) const;
+  ///@}
 
+  /** @name Conversion
+   */
+  ///@{
   CrossSection AsCrossSection() const;
+  ///@}
 };
 /** @} */
 }  // namespace manifold
