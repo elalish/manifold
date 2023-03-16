@@ -320,6 +320,44 @@ CrossSection& CrossSection::operator^=(const CrossSection& Q) {
   return *this;
 }
 
+CrossSection CrossSection::Compose(std::vector<CrossSection>& crossSections) {
+  return BatchBoolean(crossSections, OpType::Add);
+}
+// let decompose to_vs t =
+//   let polys = ref Seq.empty in
+//   let rec outer i t =
+//     let n_outlines = count t in
+//     if i < n_outlines
+//     then (
+//       let outline = child t i in
+//       let holes = inner outline (count outline) 0 Seq.empty in
+//       polys := Seq.cons (Seq.cons (to_vs (polygon outline)) holes) !polys;
+//       if i < n_outlines - 1 then outer (i + 1) t else () )
+//   and inner outline n_holes j holes =
+//     if j < n_holes
+//     then (
+//       let c = child outline j in
+//       outer 0 c;
+//       inner outline n_holes (j + 1) (Seq.cons (to_vs (polygon c)) holes) )
+//     else holes
+//   in
+//   outer 0 t;
+//   !polys
+//
+// To convert this to a non-recursive solution, there will need to be a stack of
+// paths, such that hole contours are always pushed onto the topmost paths. Then
+// when the children are exhausted, the paths is popped off and made into a
+// CrossSection, and the previous paths recieves contours again -- and so on.
+// The pointer into the tree will also have to be managed with a stack I guess,
+// since we want to jump back up when a child is exhausted.
+std::vector<CrossSection> CrossSection::Decompose() const {
+  C2::PolyTreeD tree;
+  C2::BooleanOp(C2::ClipType::Union, C2::FillRule::Positive, GetPaths(),
+                C2::PathsD(), tree, precision_);
+
+  auto comps = std::vector<CrossSection>();
+}
+
 /**
  * Compute the intersection between a cross-section and an axis-aligned
  * rectangle. This operation has much higher performance (<B>O(n)</B> vs
