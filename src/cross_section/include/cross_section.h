@@ -149,17 +149,7 @@ class CrossSection {
   /** @name Topological
    */
   ///@{
-  /**
-   * Construct a CrossSection from a vector of other CrossSections (batch
-   * boolean union).
-   */
   static CrossSection Compose(std::vector<CrossSection>&);
-
-  /**
-   * This operation returns a vector of CrossSections that are topologically
-   * disconnected, each containing only one outline contour and zero or more
-   * holes.
-   */
   std::vector<CrossSection> Decompose() const;
   ///@}
 

@@ -113,6 +113,39 @@ C2::PathsD transform(const C2::PathsD ps, const glm::mat3x2 m) {
 std::shared_ptr<const C2::PathsD> shared_paths(const C2::PathsD& ps) {
   return std::make_shared<const C2::PathsD>(ps);
 }
+
+// forward declaration for mutual recursion
+void decompose_hole(const C2::PolyTreeD* outline,
+                    std::vector<C2::PathsD>& polys, C2::PathsD& poly,
+                    int n_holes, int j);
+
+void decompose_outline(const C2::PolyTreeD* tree,
+                       std::vector<C2::PathsD>& polys, int i) {
+  auto n_outlines = tree->Count();
+  if (i < n_outlines) {
+    auto outline = tree->Child(i);
+    auto n_holes = outline->Count();
+    auto poly = C2::PathsD(n_holes + 1);
+    poly[0] = outline->Polygon();
+    decompose_hole(outline, polys, poly, n_holes, 0);
+    polys.push_back(poly);
+    if (i < n_outlines - 1) {
+      decompose_outline(tree, polys, i + 1);
+    }
+  }
+}
+
+void decompose_hole(const C2::PolyTreeD* outline,
+                    std::vector<C2::PathsD>& polys, C2::PathsD& poly,
+                    int n_holes, int j) {
+  if (j < n_holes) {
+    auto child = outline->Child(j);
+    decompose_outline(child, polys, 0);
+    poly[j + 1] = child->Polygon();
+    decompose_hole(outline, polys, poly, n_holes, j + 1);
+  }
+}
+
 }  // namespace
 
 namespace manifold {
@@ -320,42 +353,35 @@ CrossSection& CrossSection::operator^=(const CrossSection& Q) {
   return *this;
 }
 
+/**
+ * Construct a CrossSection from a vector of other CrossSections (batch
+ * boolean union).
+ */
 CrossSection CrossSection::Compose(std::vector<CrossSection>& crossSections) {
   return BatchBoolean(crossSections, OpType::Add);
 }
-// let decompose to_vs t =
-//   let polys = ref Seq.empty in
-//   let rec outer i t =
-//     let n_outlines = count t in
-//     if i < n_outlines
-//     then (
-//       let outline = child t i in
-//       let holes = inner outline (count outline) 0 Seq.empty in
-//       polys := Seq.cons (Seq.cons (to_vs (polygon outline)) holes) !polys;
-//       if i < n_outlines - 1 then outer (i + 1) t else () )
-//   and inner outline n_holes j holes =
-//     if j < n_holes
-//     then (
-//       let c = child outline j in
-//       outer 0 c;
-//       inner outline n_holes (j + 1) (Seq.cons (to_vs (polygon c)) holes) )
-//     else holes
-//   in
-//   outer 0 t;
-//   !polys
-//
-// To convert this to a non-recursive solution, there will need to be a stack of
-// paths, such that hole contours are always pushed onto the topmost paths. Then
-// when the children are exhausted, the paths is popped off and made into a
-// CrossSection, and the previous paths recieves contours again -- and so on.
-// The pointer into the tree will also have to be managed with a stack I guess,
-// since we want to jump back up when a child is exhausted.
+
+/**
+ * This operation returns a vector of CrossSections that are topologically
+ * disconnected, each containing only one outline contour and zero or more
+ * holes.
+ */
 std::vector<CrossSection> CrossSection::Decompose() const {
   C2::PolyTreeD tree;
   C2::BooleanOp(C2::ClipType::Union, C2::FillRule::Positive, GetPaths(),
                 C2::PathsD(), tree, precision_);
 
-  auto comps = std::vector<CrossSection>();
+  auto polys = std::vector<C2::PathsD>();
+  decompose_outline((C2::PolyTreeD*)(tree.Child(0)->Parent()), polys, 0);
+
+  auto n_polys = polys.size();
+  auto comps = std::vector<CrossSection>(n_polys);
+  // reverse the stack while wrapping
+  for (int i = 0; i < n_polys; ++i) {
+    comps[n_polys - i - 1] = CrossSection(polys[i]);
+  }
+
+  return comps;
 }
 
 /**
