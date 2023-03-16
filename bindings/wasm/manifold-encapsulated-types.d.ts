@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Box, Curvature, Mat4, Polygons, Properties, SealedFloat32Array, SealedUint32Array, Smoothness, Vec2, Vec3 } from './manifold-global-types';
+import {Box, Curvature, Mat4, Polygons, Properties, SealedFloat32Array, SealedUint32Array, Smoothness, Vec2, Vec3} from './manifold-global-types';
 
 /**
  * Constructs a unit cube (edge lengths all one), by default in the first
@@ -232,6 +232,16 @@ export class Manifold {
    * @param v The vector to multiply every vertex by per component.
    */
   scale(v: Vec3|number): Manifold;
+
+  /**
+   * Mirror this Manifold over the plane described by the unit form of the given
+   * normal vector. If the length of the normal is zero, an empty Manifold is
+   * returned. This operation can be chained. Transforms are combined and
+   * applied lazily.
+   *
+   * @param normal The normal vector of the plane to be mirrored over
+   */
+  mirror(v: Vec3): Manifold;
 
   /**
    * Boolean union

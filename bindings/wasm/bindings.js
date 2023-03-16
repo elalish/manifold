@@ -103,6 +103,10 @@ Module.setup = function() {
     return this._Scale(vararg2vec([vec]));
   };
 
+  Module.Manifold.prototype.mirror = function(vec) {
+    return this._Mirror(vararg2vec([vec]));
+  };
+
   Module.Manifold.prototype.decompose = function() {
     const vec = this._Decompose();
     const result = fromVec(vec);
