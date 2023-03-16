@@ -306,7 +306,7 @@ export const examples = {
         return result;
       }
 
-      const result = mengerSponge(3).scale(100);
+      const result = mengerSponge(3).trimByPlane([1, 1, 1], 0).scale(100);
       return result;
     },
 
