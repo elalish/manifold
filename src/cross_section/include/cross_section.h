@@ -231,18 +231,17 @@ class CrossSection {
    * for illustrations.
    */
   enum class JoinType {
-    Square,  ///< Squaring is applied uniformly at all joins where the
-             ///< internal join angle is less that 90 degrees. The squared edge
-             ///< will be at exactly the offset distance from the join vertex.
-    Round,   ///< Rounding is applied to all joins that have convex external
-             ///< angles, and it maintains the exact offset distance from the
-             ///< join vertex.
-    Miter    ///< There's a necessary limit to mitered joins (to avoid narrow
-             ///< angled joins producing excessively long and narrow
-    ///< [spikes](http://www.angusj.com/clipper2/Docs/Units/Clipper.Offset/Classes/ClipperOffset/Properties/MiterLimit.htm)).
-    ///< So where mitered joins would exceed a given maximum miter
-    ///< distance (relative to the offset distance), these are 'squared'
-    ///< instead.
+    Square, /*!< Squaring is applied uniformly at all joins where the internal
+              join angle is less that 90 degrees. The squared edge will be at
+              exactly the offset distance from the join vertex. */
+    Round,  /*!< Rounding is applied to all joins that have convex external
+             angles, and it maintains the exact offset distance from the join
+             vertex. */
+    Miter   /*!< There's a necessary limit to mitered joins (to avoid narrow
+             angled joins producing excessively long and narrow
+             [spikes](http://www.angusj.com/clipper2/Docs/Units/Clipper.Offset/Classes/ClipperOffset/Properties/MiterLimit.htm)).
+             So where mitered joins would exceed a given maximum miter distance
+             (relative to the offset distance), these are 'squared' instead. */
   };
 
   /**
@@ -274,24 +273,56 @@ class CrossSection {
    */
   ///@{
   /**
-   *
+   * Perform the given boolean operation between this and another CrossSection.
    */
   CrossSection Boolean(const CrossSection& second, OpType op) const;
 
   /**
-   *
+   * Perform the given boolean operation on a list of CrossSections. In case of
+   * Subtract, all CrossSections in the tail are differenced from the head.
    */
   static CrossSection BatchBoolean(
       const std::vector<CrossSection>& crossSections, OpType op);
-  CrossSection operator+(const CrossSection&) const;  // Add (Union)
+
+  /**
+   * Compute the boolean union between two cross sections.
+   */
+  CrossSection operator+(const CrossSection&) const;
+
+  /**
+   * Compute the boolean union between two cross sections, assigning the result
+   * to the first.
+   */
   CrossSection& operator+=(const CrossSection&);
-  CrossSection operator-(const CrossSection&) const;  // Subtract (Difference)
+
+  /**
+   * Compute the boolean difference of a (clip) cross section from another
+   * (subject).
+   */
+  CrossSection operator-(const CrossSection&) const;
+
+  /**
+   * Compute the boolean difference of a (clip) cross section from a another
+   * (subject), assigning the result to the subject.
+   */
   CrossSection& operator-=(const CrossSection&);
-  CrossSection operator^(const CrossSection&) const;  // Intersect
+
+  /**
+   * Compute the boolean intersection between two cross sections.
+   */
+  CrossSection operator^(const CrossSection&) const;
+
+  /**
+   * Compute the boolean intersection between two cross sections, assigning the
+   * result to the first.
+   */
   CrossSection& operator^=(const CrossSection&);
 
   /**
-   *
+   * Compute the intersection between a cross section and an axis-aligned
+   * rectangle. This operation has much higher performance (**O(n)** vs
+   * **O(n<SUP>3</SUP>)**) than the general purpose intersection algorithm used
+   * for sets of cross sections.
    */
   CrossSection RectClip(const Rect& rect) const;
   ///@}
