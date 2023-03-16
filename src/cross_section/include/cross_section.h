@@ -231,7 +231,7 @@ class CrossSection {
    * for illustrations.
    */
   enum class JoinType {
-    Square,  ///< Squaring is applied uniformally at all joins where the
+    Square,  ///< Squaring is applied uniformly at all joins where the
              ///< internal join angle is less that 90 degrees. The squared edge
              ///< will be at exactly the offset distance from the join vertex.
     Round,   ///< Rounding is applied to all joins that have convex external
