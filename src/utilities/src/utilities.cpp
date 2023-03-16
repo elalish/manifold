@@ -12,6 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <numeric>
+#include <set>
+
 #include "public.h"
 
 using namespace manifold;
@@ -39,6 +42,29 @@ bool CudaEnabled() { return false; }
 }  // namespace manifold
 #endif
 
+namespace {
+
+struct Edge {
+  int first, second;
+  bool forward;
+
+  Edge(int start, int end) {
+    forward = start < end;
+    if (forward) {
+      first = start;
+      second = end;
+    } else {
+      first = end;
+      second = start;
+    }
+  }
+
+  bool operator<(const Edge& other) const {
+    return first == other.first ? second < other.second : first < other.first;
+  }
+};
+}  // namespace
+
 MeshGL::MeshGL(const Mesh& mesh) {
   numProp = 3;
   vertProperties.resize(numProp * mesh.vertPos.size());
@@ -56,4 +82,51 @@ MeshGL::MeshGL(const Mesh& mesh) {
   }
 }
 
-MeshGL::MergeResult MeshGL::Merge() { return MergeResult::AlreadyManifold; }
+MeshGL::MergeResult MeshGL::Merge() {
+  std::multiset<Edge> openEdges;
+
+  std::vector<int> merge(NumVert());
+  std::iota(merge.begin(), merge.end(), 0);
+  for (int i = 0; i < mergeFromVert.size(); ++i) {
+    merge[mergeFromVert[i]] = mergeToVert[i];
+  }
+
+  const int numTri = NumTri();
+  const int next[3] = {1, 2, 0};
+  for (int tri = 0; tri < numTri; ++tri) {
+    for (int i : {0, 1, 2}) {
+      Edge edge(merge[triVerts[3 * tri + i]],
+                merge[triVerts[3 * tri + next[i]]]);
+      auto range = openEdges.equal_range(edge);
+      bool found = false;
+      for (auto it = range.first; it != range.second; ++it) {
+        if (it->forward != edge.forward) {
+          openEdges.erase(it);
+          found = true;
+          break;
+        }
+      }
+      if (!found) openEdges.insert(edge);
+    }
+  }
+
+  if (openEdges.empty()) {
+    return MergeResult::AlreadyManifold;
+  }
+
+  const float tol2 = kTolerance * kTolerance;
+
+  for (auto it = openEdges.begin(); it != openEdges.end();) {
+    glm::vec3 delta;
+    for (int i : {0, 1, 2}) {
+      delta[i] = vertProperties[numProp * it->first + i] -
+                 vertProperties[numProp * it->second + i];
+    }
+    if (glm::dot(delta, delta) < tol2) {
+      merge[it->first] = it->second;
+      it = openEdges.erase(it);
+    } else {
+      ++it;
+    }
+  }
+}
