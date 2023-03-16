@@ -363,10 +363,14 @@ CrossSection CrossSection::Compose(std::vector<CrossSection>& crossSections) {
 
 /**
  * This operation returns a vector of CrossSections that are topologically
- * disconnected, each containing only one outline contour and zero or more
+ * disconnected, each containing one outline contour with zero or more
  * holes.
  */
 std::vector<CrossSection> CrossSection::Decompose() const {
+  if (NumContour() < 2) {
+    return std::vector<CrossSection>{CrossSection(*this)};
+  }
+
   C2::PolyTreeD tree;
   C2::BooleanOp(C2::ClipType::Union, C2::FillRule::Positive, GetPaths(),
                 C2::PathsD(), tree, precision_);
