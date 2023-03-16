@@ -254,21 +254,34 @@ std::shared_ptr<CsgNode> CsgOpNode::Boolean(
     const std::shared_ptr<CsgNode> &second, OpType op) {
   std::vector<std::shared_ptr<CsgNode>> children;
 
-  auto handleOperand = [&](const std::shared_ptr<CsgNode> &operand) {
-    if (auto opNode = std::dynamic_pointer_cast<CsgOpNode>(operand)) {
-      if ((opNode->IsOp(op) ||
-           (op == OpType::Subtract && opNode->IsOp(OpType::Add))) &&
-          opNode->impl_.UseCount() == 1) {
-        for (auto &child : opNode->GetChildren(/* forceToLeafNodes= */ false)) {
-          children.push_back(child);
-        }
-        return;
-      }
+  if (IsOp(op) && (impl_.UseCount() == 1)) {
+    auto impl = impl_.GetGuard();
+    std::copy(impl->children_.begin(), impl->children_.end(),
+              std::back_inserter(children));
+  } else {
+    children.push_back(shared_from_this());
+  }
+
+  auto secondOp = std::dynamic_pointer_cast<CsgOpNode>(second);
+  auto canInlineSecondOp = [&]() {
+    switch (op) {
+      case OpType::Add:
+      case OpType::Intersect:
+        return secondOp->IsOp(op);
+      case OpType::Subtract:
+        return secondOp->IsOp(OpType::Add);
+      default:
+        return false;
     }
-    children.push_back(operand);
   };
-  handleOperand(shared_from_this());
-  handleOperand(second);
+
+  if (secondOp && (secondOp->impl_.UseCount() == 1) && canInlineSecondOp()) {
+    auto secondImpl = secondOp->impl_.GetGuard();
+    std::copy(secondImpl->children_.begin(), secondImpl->children_.end(),
+              std::back_inserter(children));
+  } else {
+    children.push_back(second);
+  }
 
   return std::make_shared<CsgOpNode>(children, op);
 }
