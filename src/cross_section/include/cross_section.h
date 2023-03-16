@@ -246,7 +246,24 @@ class CrossSection {
   };
 
   /**
+   * Inflate the contours in CrossSection by the specified delta, handling
+   * corners according to the given JoinType.
    *
+   * @param delta Positive deltas will cause the expansion of outlining contours
+   * to expand, and retraction of inner (hole) contours. Negative deltas will
+   * have the opposite effect.
+   * @param jt The join type specifying the treatment of contour joins
+   * (corners).
+   * @param miter_limit The maximum distance in multiples of delta that vertices
+   * can be offset from their original positions with before squaring is
+   * applied, **when the join type is Miter** (default is 2, which is the
+   * minimum allowed). See the [Clipper2
+   * MiterLimit](http://www.angusj.com/clipper2/Docs/Units/Clipper.Offset/Classes/ClipperOffset/Properties/MiterLimit.htm)
+   * page for a visual example.
+   * @param arc_tolerance The maximum acceptable imperfection for curves drawn
+   * (approximated with line segments) for Round joins (not relevant for other
+   * JoinTypes). By default (when undefined or =0), the allowable imprecision is
+   * scaled in inverse proportion to the offset delta.
    */
   CrossSection Offset(double delta, JoinType jt, double miter_limit = 2.0,
                       double arc_tolerance = 0.0) const;
