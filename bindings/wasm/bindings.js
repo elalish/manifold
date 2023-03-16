@@ -75,6 +75,19 @@ Module.setup = function() {
     return out;
   };
 
+  Module.Manifold.prototype.transform = function(mat) {
+    const vec = new Module.Vector_f32();
+    console.assert(mat.length == 16, 'expects a 4x4 matrix');
+    // assuming glMatrix format (column major)
+    // skip the last row
+    for (let i = 0; i < 16; i++)
+      if (i % 4 != 3) vec.push_back(mat[i]);
+
+    const result = this._Transform(vec);
+    vec.delete();
+    return result;
+  };
+
   Module.Manifold.prototype.translate = function(...vec) {
     return this._Translate(vararg2vec(vec));
   };
