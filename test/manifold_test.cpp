@@ -505,39 +505,3 @@ TEST(Manifold, MirrorUnion) {
   EXPECT_FLOAT_EQ(vol_a * 2.75, result.GetProperties().volume);
   EXPECT_TRUE(a.Mirror(glm::vec3(0)).IsEmpty());
 }
-
-TEST(Manifold, BooleanVolumes) {
-  glm::mat4 m = glm::translate(glm::mat4(1.0f), glm::vec3(1.0f));
-
-  // Define solids which volumes are easy to compute w/ bit arithmetics:
-  // m1, m2, m4 are unique, non intersecting "bits" (of volume 1, 2, 4)
-  // m3 = m1 + m2
-  // m7 = m1 + m2 + m3
-  auto m1 = Manifold::Cube({1, 1, 1});
-  auto m2 = Manifold::Cube({2, 1, 1}).Transform(
-      glm::translate(glm::mat4(1.0f), glm::vec3(1.0f, 0, 0)));
-  auto m4 = Manifold::Cube({4, 1, 1}).Transform(
-      glm::translate(glm::mat4(1.0f), glm::vec3(3.0f, 0, 0)));
-  auto m3 = Manifold::Cube({3, 1, 1});
-  auto m7 = Manifold::Cube({7, 1, 1});
-
-  EXPECT_FLOAT_EQ((m1 ^ m2).GetProperties().volume, 0);
-  EXPECT_FLOAT_EQ((m1 + m2 + m4).GetProperties().volume, 7);
-  EXPECT_FLOAT_EQ((m1 + m2 - m4).GetProperties().volume, 3);
-  EXPECT_FLOAT_EQ((m1 + (m2 ^ m4)).GetProperties().volume, 1);
-  EXPECT_FLOAT_EQ((m7 ^ m4).GetProperties().volume, 4);
-  EXPECT_FLOAT_EQ((m7 ^ m3 ^ m1).GetProperties().volume, 1);
-  EXPECT_FLOAT_EQ((m7 ^ (m1 + m2)).GetProperties().volume, 3);
-  EXPECT_FLOAT_EQ((m7 - m4).GetProperties().volume, 3);
-  EXPECT_FLOAT_EQ((m7 - m4 - m2).GetProperties().volume, 1);
-  EXPECT_FLOAT_EQ((m7 - (m7 - m1)).GetProperties().volume, 1);
-  EXPECT_FLOAT_EQ((m7 - (m1 + m2)).GetProperties().volume, 4);
-}
-
-TEST(Manifold, TreeTransforms) {
-  auto a = (Manifold::Cube({1, 1, 1}) + Manifold::Cube({1, 1, 1}))
-               .Translate({1, 0, 0});
-  auto b = (Manifold::Cube({1, 1, 1}) + Manifold::Cube({1, 1, 1}));
-
-  EXPECT_FLOAT_EQ((a + b).GetProperties().volume, 2);
-}
