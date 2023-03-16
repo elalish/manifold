@@ -215,46 +215,28 @@ CrossSection CrossSection::BatchBoolean(
   return CrossSection(res);
 }
 
-/**
- * Shorthand for Boolean Union.
- */
 CrossSection CrossSection::operator+(const CrossSection& Q) const {
   return Boolean(Q, OpType::Add);
 }
 
-/**
- * Shorthand for Boolean Union assignment.
- */
 CrossSection& CrossSection::operator+=(const CrossSection& Q) {
   *this = *this + Q;
   return *this;
 }
 
-/**
- * Shorthand for Boolean Difference.
- */
 CrossSection CrossSection::operator-(const CrossSection& Q) const {
   return Boolean(Q, OpType::Subtract);
 }
 
-/**
- * Shorthand for Boolean Difference assignment.
- */
 CrossSection& CrossSection::operator-=(const CrossSection& Q) {
   *this = *this - Q;
   return *this;
 }
 
-/**
- * Shorthand for Boolean Intersection.
- */
 CrossSection CrossSection::operator^(const CrossSection& Q) const {
   return Boolean(Q, OpType::Intersect);
 }
 
-/**
- * Shorthand for Boolean Intersection assignment.
- */
 CrossSection& CrossSection::operator^=(const CrossSection& Q) {
   *this = *this ^ Q;
   return *this;

@@ -34,6 +34,12 @@ class Rect;
  *  @{
  */
 
+/**
+ * Two-dimensional cross sections guaranteed to be without self-intersections,
+ * or overlaps between polygons (from construction onwards). This class makes
+ * use of the [Clipper2](http://www.angusj.com/clipper2/Docs/Overview.htm)
+ * library for polygon clipping (boolean) and offsetting operations.
+ */
 class CrossSection {
  public:
   /** @name Creation
@@ -46,6 +52,14 @@ class CrossSection {
    */
   CrossSection();
   ~CrossSection();
+
+  /**
+   * The copy constructor avoids copying the underlying paths vector (sharing
+   * with its parent via shared_ptr), however subsequent transformations, and
+   * their application will not be shared. It is generally recommended to avoid
+   * this, opting instead to simply create CrossSections with the available
+   * const methods.
+   */
   CrossSection(const CrossSection& other);
   CrossSection& operator=(const CrossSection& other);
   CrossSection(CrossSection&&) noexcept;
@@ -255,7 +269,7 @@ class CrossSection {
    * (corners).
    * @param miter_limit The maximum distance in multiples of delta that vertices
    * can be offset from their original positions with before squaring is
-   * applied, **when the join type is Miter** (default is 2, which is the
+   * applied, <B>when the join type is Miter</B> (default is 2, which is the
    * minimum allowed). See the [Clipper2
    * MiterLimit](http://www.angusj.com/clipper2/Docs/Units/Clipper.Offset/Classes/ClipperOffset/Properties/MiterLimit.htm)
    * page for a visual example.
@@ -320,9 +334,9 @@ class CrossSection {
 
   /**
    * Compute the intersection between a cross section and an axis-aligned
-   * rectangle. This operation has much higher performance (**O(n)** vs
-   * **O(n<SUP>3</SUP>)**) than the general purpose intersection algorithm used
-   * for sets of cross sections.
+   * rectangle. This operation has much higher performance (<B>O(n)</B> vs
+   * <B>O(n<SUP>3</SUP>)</B>) than the general purpose intersection algorithm
+   * used for sets of cross sections.
    */
   CrossSection RectClip(const Rect& rect) const;
   ///@}
