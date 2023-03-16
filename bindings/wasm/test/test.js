@@ -26,8 +26,8 @@ glMatrix.glMatrix.setMatrixArrayType(Array);
 
 // manifold member functions that returns a new manifold
 const memberFunctions = [
-  'add', 'subtract', 'intersect', 'refine', 'transform', 'translate', 'rotate',
-  'scale', 'mirror', 'asOriginal', 'decompose'
+  'add', 'subtract', 'intersect', 'trimByPlane', 'refine', 'transform',
+  'translate', 'rotate', 'scale', 'mirror', 'asOriginal', 'decompose'
 ];
 // top level functions that constructs a new manifold
 const constructors = [

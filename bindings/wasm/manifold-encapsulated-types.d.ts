@@ -259,6 +259,17 @@ export class Manifold {
   intersect(other: Manifold): Manifold;
 
   /**
+   * Removes everything behind the given half-space plane.
+   *
+   * @param normal This vector is normal to the cutting plane and its length
+   *     does not matter. The result is in the direction of this vector from the
+   *     plane.
+   * @param originOffset The distance of the plane from the origin in the
+   *     direction of the normal vector.
+   */
+  trimByPlane(normal: vec3, originOffset: number): Manifold;
+
+  /**
    * Increase the density of the mesh by splitting every edge into n pieces. For
    * instance, with n = 2, each triangle will be split into 4 triangles. These
    * will all be coplanar (and will not be immediately collapsed) unless the

@@ -235,6 +235,7 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .function("add", &Union)
       .function("subtract", &Difference)
       .function("intersect", &Intersection)
+      .function("_TrimByPlane", &Manifold::TrimByPlane)
       .function("_GetMeshJS", &GetMeshJS)
       .function("refine", &Manifold::Refine)
       .function("_Warp", &Warp)

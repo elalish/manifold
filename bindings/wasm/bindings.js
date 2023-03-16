@@ -107,6 +107,10 @@ Module.setup = function() {
     return this._Mirror(vararg2vec([vec]));
   };
 
+  Module.Manifold.prototype.trimByPlane = function(normal, offset) {
+    return this._TrimByPlane(vararg2vec([normal], offset));
+  };
+
   Module.Manifold.prototype.decompose = function() {
     const vec = this._Decompose();
     const result = fromVec(vec);
