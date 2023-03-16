@@ -140,9 +140,9 @@ suite('Examples', () => {
 
   test('Menger Sponge', () => {
     const result = runExample('Menger Sponge');
-    expect(result.genus).to.equal(1409, 'Genus');
-    expect(result.volume).to.be.closeTo(406457, 10, 'Volume');
-    expect(result.surfaceArea).to.be.closeTo(247590, 10, 'Surface Area');
+    expect(result.genus).to.equal(729, 'Genus');
+    expect(result.volume).to.be.closeTo(203222, 10, 'Volume');
+    expect(result.surfaceArea).to.be.closeTo(130475, 10, 'Surface Area');
   });
 
   test('Stretchy Bracelet', () => {
