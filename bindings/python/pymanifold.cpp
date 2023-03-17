@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "cross_section.h"
 #include "manifold.h"
 #include "pybind11/functional.h"
 #include "pybind11/numpy.h"
@@ -586,4 +587,152 @@ PYBIND11_MODULE(pymanifold, m) {
             halfedge_tangent_view(i, j) = self.halfedgeTangent[i][j];
         return halfedge_tangent;
       });
+
+  py::enum_<CrossSection::FillRule>(m, "FillRule")
+      .value("EvenOdd", CrossSection::FillRule::EvenOdd,
+             "Only odd numbered sub-regions are filled.")
+      .value("NonZero", CrossSection::FillRule::NonZero,
+             "Only non-zero sub-regions are filled.")
+      .value("Positive", CrossSection::FillRule::Positive,
+             "Only sub-regions with winding counts > 0 are filled.")
+      .value("Negative", CrossSection::FillRule::Negative,
+             "Only sub-regions with winding counts < 0 are filled.");
+
+  py::enum_<CrossSection::JoinType>(m, "JoinType")
+      .value("Square", CrossSection::JoinType::Square,
+             "Squaring is applied uniformly at all joins where the internal "
+             "join angle is less that 90 degrees. The squared edge will be at "
+             "exactly the offset distance from the join vertex.")
+      .value(
+          "Round", CrossSection::JoinType::Square,
+          "Rounding is applied to all joins that have convex external angles, "
+          "and it maintains the exact offset distance from the join vertex.")
+      .value(
+          "Miter", CrossSection::JoinType::Miter,
+          "There's a necessary limit to mitered joins (to avoid narrow angled "
+          "joins producing excessively long and narrow "
+          "[spikes](http://www.angusj.com/clipper2/Docs/Units/Clipper.Offset/"
+          "Classes/ClipperOffset/Properties/MiterLimit.htm)). So where mitered "
+          "joins would exceed a given maximum miter distance (relative to the "
+          "offset distance), these are 'squared' instead.");
+
+  py::class_<CrossSection>(
+      m, "CrossSection",
+      "Two-dimensional cross sections guaranteed to be without "
+      "self-intersections, or overlaps between polygons (from construction "
+      "onwards). This class makes use of the "
+      "[Clipper2](http://www.angusj.com/clipper2/Docs/Overview.htm) library "
+      "for polygon clipping (boolean) and offsetting operations.")
+      .def(py::init<>())
+      .def(py::init(
+               [](PolygonsWrapper &contours, CrossSection::FillRule fillrule) {
+                 return CrossSection(*contours.polygons, fillrule);
+               }),
+           py::arg("contours"),
+           py::arg("fillrule") = CrossSection::FillRule::Positive)
+      .def("area", &CrossSection::Area)
+      .def("num_vert", &CrossSection::NumVert)
+      .def("num_contour", &CrossSection::NumContour)
+      .def("is_empty", &CrossSection::IsEmpty)
+      .def("translate",
+           [](CrossSection self, Float2 v) {
+             return self.Translate({std::get<0>(v), std::get<1>(v)});
+           })
+      .def("rotate", &CrossSection::Rotate)
+      .def("scale",
+           [](CrossSection self, Float2 s) {
+             return self.Scale({std::get<0>(s), std::get<1>(s)});
+           })
+      .def("mirror",
+           [](CrossSection self, Float2 ax) {
+             return self.Mirror({std::get<0>(ax), std::get<1>(ax)});
+           })
+      .def("transform",
+           [](CrossSection self, py::array_t<float> &mat) {
+             auto mat_view = mat.unchecked<2>();
+             if (mat_view.shape(0) != 2 || mat_view.shape(1) != 3)
+               throw std::runtime_error("Invalid matrix shape");
+             glm::mat3x2 mat_glm;
+             for (int i = 0; i < 2; i++) {
+               for (int j = 0; j < 3; j++) {
+                 mat_glm[j][i] = mat_view(i, j);
+               }
+             }
+             return self.Transform(mat_glm);
+           })
+      .def(
+          "warp",
+          [](CrossSection self, const std::function<Float2(Float2)> &f) {
+            return self.Warp([&f](glm::vec2 &v) {
+              Float2 fv = f(std::make_tuple(v.x, v.y));
+              v.x = std::get<0>(fv);
+              v.y = std::get<1>(fv);
+            });
+          },
+          py::arg("f"))
+      .def("simplify", &CrossSection::Simplify)
+      .def("offset", &CrossSection::Offset, py::arg("delta"),
+           py::arg("join_type"), py::arg("miter_limit") = 2.0,
+           py::arg("arc_tolerance") = 0.0)
+      .def(py::self + py::self, "Boolean union.")
+      .def(py::self - py::self, "Boolean difference.")
+      .def(py::self ^ py::self, "Boolean intersection.")
+      .def("decompose", &CrossSection::Decompose)
+      .def("to_polygons",
+           [](CrossSection self) {
+             return PolygonsWrapper{
+                 std::make_unique<Polygons>(self.ToPolygons())};
+           })
+      .def(
+          "extrude",
+          [](CrossSection self, float height, int nDivisions = 0,
+             float twistDegrees = 0.0f,
+             Float2 scaleTop = std::make_tuple(1.0f, 1.0f)) {
+            glm::vec2 scaleTopVec(std::get<0>(scaleTop), std::get<1>(scaleTop));
+            return Manifold::Extrude(self, height, nDivisions, twistDegrees,
+                                     scaleTopVec);
+          },
+          py::arg("height"), py::arg("n_divisions") = 0,
+          py::arg("twist_degrees") = 0.0f,
+          py::arg("scale_top") = std::make_tuple(1.0f, 1.0f),
+          "Constructs a manifold from the set of polygons by extruding them "
+          "along the Z-axis.\n"
+          "\n"
+          ":param height: Z-extent of extrusion.\n"
+          ":param nDivisions: Number of extra copies of the crossSection to "
+          "insert into the shape vertically; especially useful in combination "
+          "with twistDegrees to avoid interpolation artifacts. Default is "
+          "none.\n"
+          ":param twistDegrees: Amount to twist the top crossSection relative "
+          "to the bottom, interpolated linearly for the divisions in between.\n"
+          ":param scaleTop: Amount to scale the top (independently in X and "
+          "Y). If the scale is (0, 0), a pure cone is formed with only a "
+          "single vertex at the top. Default (1, 1).")
+      .def(
+          "revolve",
+          [](CrossSection self, int circularSegments = 0) {
+            return Manifold::Revolve(self, circularSegments);
+          },
+          py::arg("circular_segments") = 0,
+          "Constructs a manifold from the set of polygons by revolving this "
+          "cross-section around its Y-axis and then setting this as the Z-axis "
+          "of the resulting manifold. If the polygons cross the Y-axis, only "
+          "the part on the positive X side is used. Geometrically valid input "
+          "will result in geometrically valid output.\n"
+          "\n"
+          ":param circularSegments: Number of segments along its diameter. "
+          "Default is calculated by the static Defaults.")
+      .def_static(
+          "square",
+          [](Float2 dims, bool center) {
+            return CrossSection::Square({std::get<0>(dims), std::get<1>(dims)},
+                                        center);
+          },
+          py::arg("dims"), py::arg("center") = false)
+      .def_static(
+          "circle",
+          [](float radius, int circularSegments) {
+            return CrossSection::Circle(radius, circularSegments);
+          },
+          py::arg("radius"), py::arg("circularSegments") = 0);
 }
