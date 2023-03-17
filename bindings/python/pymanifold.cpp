@@ -36,6 +36,43 @@ PYBIND11_MODULE(pymanifold, m) {
       "documentation for APIs.\n"
       "This binding will perform copying to make the API more familiar to "
       "OpenSCAD users.";
+
+  m.def("set_min_circular_angle", Quality::SetMinCircularAngle,
+        "Sets an angle constraint the default number of circular segments for "
+        "the CrossSection::Circle(), Manifold::Cylinder(), Manifold::Sphere(), "
+        "and Manifold::Revolve() constructors. The number of segments will be "
+        "rounded up to the nearest factor of four."
+        "\n\n"
+        "@param angle The minimum angle in degrees between consecutive "
+        "segments. The angle will increase if the the segments hit the minimum "
+        "edge length.\n"
+        "Default is 10 degrees.");
+
+  m.def("set_min_circular_edge_length", Quality::SetMinCircularEdgeLength,
+        "Sets a length constraint the default number of circular segments for "
+        "the CrossSection::Circle(), Manifold::Cylinder(), Manifold::Sphere(), "
+        "and Manifold::Revolve() constructors. The number of segments will be "
+        "rounded up to the nearest factor of four."
+        "\n\n"
+        "@param length The minimum length of segments. The length will "
+        "increase if the the segments hit the minimum angle. Default is 1.0.");
+
+  m.def("set_circular_segments", Quality::SetCircularSegments,
+        "Sets the default number of circular segments for the "
+        "CrossSection::Circle(), Manifold::Cylinder(), Manifold::Sphere(), and "
+        "Manifold::Revolve() constructors. Overrides the edge length and angle "
+        "constraints and sets the number of segments to exactly this value."
+        "\n\n"
+        "@param number Number of circular segments. Default is 0, meaning no "
+        "constraint is applied.");
+
+  m.def(
+      "get_circular_segments", Quality::GetCircularSegments,
+      "Determine the result of the SetMinCircularAngle(), "
+      "SetMinCircularEdgeLength(), and SetCircularSegments() defaults."
+      "\n\n"
+      "@param radius For a given radius of circle, determine how many default");
+
   py::class_<Manifold>(m, "Manifold")
       .def(py::init<>())
       .def(py::init([](std::vector<Manifold> &manifolds) {
@@ -188,6 +225,60 @@ PYBIND11_MODULE(pymanifold, m) {
           ":param n: The number of pieces to split every edge into. Must be > "
           "1.")
       .def("to_mesh", &Manifold::GetMesh)
+      .def("num_vert", &Manifold::NumVert,
+           "The number of vertices in the Manifold.")
+      .def("num_edge", &Manifold::NumEdge,
+           "The number of edges in the Manifold.")
+      .def("num_tri", &Manifold::NumTri,
+           "The number of triangles in the Manifold.")
+      .def("num_prop", &Manifold::NumProp,
+           "The number of properties per vertex in the Manifold")
+      .def("num_prop_vert", &Manifold::NumPropVert,
+           "The number of property vertices in the Manifold. This will always "
+           "be >= NumVert, as some physical vertices may be duplicated to "
+           "account for different properties on different neighboring "
+           "triangles.")
+      .def("precision", &Manifold::Precision,
+           "Returns the precision of this Manifold's vertices, which tracks "
+           "the approximate rounding error over all the transforms and "
+           "operations that have led to this state. Any triangles that are "
+           "colinear within this precision are considered degenerate and "
+           "removed. This is the value of &epsilon; defining "
+           "[&epsilon;-valid](https://github.com/elalish/manifold/wiki/"
+           "Manifold-Library#definition-of-%CE%B5-valid).")
+      .def("genus", &Manifold::Genus,
+           "The genus is a topological property of the manifold, representing "
+           "the number of \"handles\". A sphere is 0, torus 1, etc. It is only "
+           "meaningful for a single mesh, so it is best to call Decompose() "
+           "first.")
+      .def(
+          "get_volume",
+          [](Manifold self) { return self.GetProperties().volume; },
+          "Get the volume of the manifold\n This is clamped to zero for a "
+          "given face if they are within the Precision().")
+      .def(
+          "get_surface_area",
+          [](Manifold self) { return self.GetProperties().surfaceArea; },
+          "Get the surface area of the manifold\n This is clamped to zero for "
+          "a given face if they are within the Precision().")
+      .def("original_id", &Manifold::OriginalID,
+           "If this mesh is an original, this returns its meshID that can be "
+           "referenced by product manifolds' MeshRelation. If this manifold is "
+           "a product, this returns -1.")
+      .def("as_original", &Manifold::AsOriginal,
+           "This function condenses all coplanar faces in the relation, and "
+           "collapses those edges. In the process the relation to ancestor "
+           "meshes is lost and this new Manifold is marked an original. "
+           "Properties are preserved, so if they do not match across an edge, "
+           "that edge will be kept.")
+      .def("is_empty", &Manifold::IsEmpty,
+           "Does the Manifold have any triangles?")
+      .def(
+          "decompose", [](Manifold self) { return self.Decompose(); },
+          " This operation returns a vector of Manifolds that are "
+          "topologically disconnected. If everything is connected, the vector "
+          "is length one, containing a copy of the original. It is the inverse "
+          "operation of Compose().")
       .def_static(
           "smooth", [](const Mesh &mesh) { return Manifold::Smooth(mesh); },
           "Constructs a smooth version of the input mesh by creating tangents; "
@@ -272,12 +363,13 @@ PYBIND11_MODULE(pymanifold, m) {
       .def_static(
           "cylinder",
           [](float height, float radiusLow, float radiusHigh = -1.0f,
-             int circularSegments = 0) {
+             int circularSegments = 0, bool center = false) {
             return Manifold::Cylinder(height, radiusLow, radiusHigh,
-                                      circularSegments);
+                                      circularSegments, center);
           },
           py::arg("height"), py::arg("radius_low"),
           py::arg("radius_high") = -1.0f, py::arg("circular_segments") = 0,
+          py::arg("center") = false,
           "A convenience constructor for the common case of extruding a "
           "circle. Can also form cones if both radii are specified."
           "\n\n"
@@ -302,7 +394,11 @@ PYBIND11_MODULE(pymanifold, m) {
           "This number will always be rounded up to the nearest factor of "
           "four, as this sphere is constructed by refining an octahedron. This "
           "means there are a circle of vertices on all three of the axis "
-          "planes. Default is calculated by the static Defaults.");
+          "planes. Default is calculated by the static Defaults.")
+      .def_static("reserve_ids", Manifold::ReserveIDs, py::arg("n"),
+                  "Returns the first of n sequential new unique mesh IDs for "
+                  "marking sets of triangles that can be looked up after "
+                  "further operations. Assign to MeshGL.runOriginalID vector");
 
   py::class_<PolygonsWrapper>(m, "Polygons")
       .def(py::init([](std::vector<std::vector<Float2>> &polygons) {
