@@ -279,6 +279,41 @@ PYBIND11_MODULE(pymanifold, m) {
           "topologically disconnected. If everything is connected, the vector "
           "is length one, containing a copy of the original. It is the inverse "
           "operation of Compose().")
+      .def("split", &Manifold::Split,
+           "Split cuts this manifold in two using the cutter manifold. The "
+           "first result is the intersection, second is the difference. This "
+           "is more efficient than doing them separately.")
+      .def(
+          "split_by_plane",
+          [](Manifold self, Float3 normal, float originOffset) {
+            return self.SplitByPlane(
+                {std::get<0>(normal), std::get<1>(normal), std::get<2>(normal)},
+                originOffset);
+          },
+          py::arg("normal"), py::arg("origin_offset"),
+          "Convenient version of Split() for a half-space."
+          "\n\n"
+          "@param normal This vector is normal to the cutting plane and its "
+          "length does not matter. The first result is in the direction of "
+          "this vector, the second result is on the opposite side.\n"
+          "@param originOffset The distance of the plane from the origin in "
+          "the direction of the normal vector.")
+      .def(
+          "trim_by_plane",
+          [](Manifold self, Float3 normal, float originOffset) {
+            return self.TrimByPlane(
+                {std::get<0>(normal), std::get<1>(normal), std::get<2>(normal)},
+                originOffset);
+          },
+          py::arg("normal"), py::arg("origin_offset"),
+          "Identical to SplitByPlane(), but calculating and returning only the "
+          "first result."
+          "\n\n"
+          "@param normal This vector is normal to the cutting plane and its "
+          "length does not matter. The result is in the direction of this "
+          "vector from the plane.\n"
+          "@param originOffset The distance of the plane from the origin in "
+          "the direction of the normal vector.")
       .def_static(
           "smooth", [](const Mesh &mesh) { return Manifold::Smooth(mesh); },
           "Constructs a smooth version of the input mesh by creating tangents; "
