@@ -113,6 +113,39 @@ C2::PathsD transform(const C2::PathsD ps, const glm::mat3x2 m) {
 std::shared_ptr<const C2::PathsD> shared_paths(const C2::PathsD& ps) {
   return std::make_shared<const C2::PathsD>(ps);
 }
+
+// forward declaration for mutual recursion
+void decompose_hole(const C2::PolyTreeD* outline,
+                    std::vector<C2::PathsD>& polys, C2::PathsD& poly,
+                    int n_holes, int j);
+
+void decompose_outline(const C2::PolyTreeD* tree,
+                       std::vector<C2::PathsD>& polys, int i) {
+  auto n_outlines = tree->Count();
+  if (i < n_outlines) {
+    auto outline = tree->Child(i);
+    auto n_holes = outline->Count();
+    auto poly = C2::PathsD(n_holes + 1);
+    poly[0] = outline->Polygon();
+    decompose_hole(outline, polys, poly, n_holes, 0);
+    polys.push_back(poly);
+    if (i < n_outlines - 1) {
+      decompose_outline(tree, polys, i + 1);
+    }
+  }
+}
+
+void decompose_hole(const C2::PolyTreeD* outline,
+                    std::vector<C2::PathsD>& polys, C2::PathsD& poly,
+                    int n_holes, int j) {
+  if (j < n_holes) {
+    auto child = outline->Child(j);
+    decompose_outline(child, polys, 0);
+    poly[j + 1] = child->Polygon();
+    decompose_hole(outline, polys, poly, n_holes, j + 1);
+  }
+}
+
 }  // namespace
 
 namespace manifold {
@@ -318,6 +351,41 @@ CrossSection CrossSection::operator^(const CrossSection& Q) const {
 CrossSection& CrossSection::operator^=(const CrossSection& Q) {
   *this = *this ^ Q;
   return *this;
+}
+
+/**
+ * Construct a CrossSection from a vector of other CrossSections (batch
+ * boolean union).
+ */
+CrossSection CrossSection::Compose(std::vector<CrossSection>& crossSections) {
+  return BatchBoolean(crossSections, OpType::Add);
+}
+
+/**
+ * This operation returns a vector of CrossSections that are topologically
+ * disconnected, each containing one outline contour with zero or more
+ * holes.
+ */
+std::vector<CrossSection> CrossSection::Decompose() const {
+  if (NumContour() < 2) {
+    return std::vector<CrossSection>{CrossSection(*this)};
+  }
+
+  C2::PolyTreeD tree;
+  C2::BooleanOp(C2::ClipType::Union, C2::FillRule::Positive, GetPaths(),
+                C2::PathsD(), tree, precision_);
+
+  auto polys = std::vector<C2::PathsD>();
+  decompose_outline(&tree, polys, 0);
+
+  auto n_polys = polys.size();
+  auto comps = std::vector<CrossSection>(n_polys);
+  // reverse the stack while wrapping
+  for (int i = 0; i < n_polys; ++i) {
+    comps[n_polys - i - 1] = CrossSection(polys[i]);
+  }
+
+  return comps;
 }
 
 /**
