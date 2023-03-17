@@ -111,3 +111,23 @@ TEST(CrossSection, Warp) {
   Identical(Manifold::Extrude(a, 1.).GetMesh(),
             Manifold::Extrude(b, 1.).GetMesh());
 }
+
+TEST(CrossSection, Decompose) {
+  auto a = CrossSection::Square({2., 2.}, true) -
+           CrossSection::Square({1., 1.}, true);
+  auto b = a.Translate({4, 4});
+  auto ab = a + b;
+  auto decomp = ab.Decompose();
+  auto recomp = CrossSection::Compose(decomp);
+
+  EXPECT_EQ(decomp.size(), 2);
+  EXPECT_EQ(decomp[0].NumContour(), 2);
+  EXPECT_EQ(decomp[1].NumContour(), 2);
+
+  Identical(Manifold::Extrude(a, 1.).GetMesh(),
+            Manifold::Extrude(decomp[0], 1.).GetMesh());
+  Identical(Manifold::Extrude(b, 1.).GetMesh(),
+            Manifold::Extrude(decomp[1], 1.).GetMesh());
+  Identical(Manifold::Extrude(ab, 1.).GetMesh(),
+            Manifold::Extrude(recomp, 1.).GetMesh());
+}

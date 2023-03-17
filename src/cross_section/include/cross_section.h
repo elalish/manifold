@@ -17,6 +17,7 @@
 #include <clipper2/clipper.h>
 
 #include <memory>
+#include <vector>
 
 #include "clipper2/clipper.core.h"
 #include "clipper2/clipper.offset.h"
@@ -84,7 +85,6 @@ class CrossSection {
    *  Details of the cross-section
    */
   ///@{
-  Polygons ToPolygons() const;
   double Area() const;
   int NumVert() const;
   int NumContour() const;
@@ -144,6 +144,19 @@ class CrossSection {
   CrossSection operator^(const CrossSection&) const;
   CrossSection& operator^=(const CrossSection&);
   CrossSection RectClip(const Rect& rect) const;
+  ///@}
+
+  /** @name Topological
+   */
+  ///@{
+  static CrossSection Compose(std::vector<CrossSection>&);
+  std::vector<CrossSection> Decompose() const;
+  ///@}
+
+  /** @name Conversion
+   */
+  ///@{
+  Polygons ToPolygons() const;
   ///@}
 
  private:
