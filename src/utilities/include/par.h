@@ -122,6 +122,23 @@ inline ExecutionPolicy autoPolicy(int size) {
   }
 #endif
 
+#define THRUST_DYNAMIC_BACKEND_HOST_VOID(NAME)               \
+  template <typename... Args>                                \
+  void NAME##_host(ExecutionPolicy policy, Args... args) {   \
+    switch (policy) {                                        \
+      case ExecutionPolicy::ParUnseq:                        \
+      case ExecutionPolicy::Par:                             \
+        thrust::NAME(thrust::MANIFOLD_PAR_NS::par, args...); \
+        break;                                               \
+      case ExecutionPolicy::Seq:                             \
+        break;                                               \
+    }                                                        \
+    thrust::NAME(thrust::cpp::par, args...);                 \
+  }
+
+THRUST_DYNAMIC_BACKEND_HOST_VOID(for_each)
+THRUST_DYNAMIC_BACKEND_HOST_VOID(for_each_n)
+
 THRUST_DYNAMIC_BACKEND_VOID(gather)
 THRUST_DYNAMIC_BACKEND_VOID(scatter)
 THRUST_DYNAMIC_BACKEND_VOID(for_each)

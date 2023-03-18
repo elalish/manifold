@@ -151,6 +151,9 @@ Manifold::Impl CsgLeafNode::Compose(
   int numVert = 0;
   int numEdge = 0;
   int numTri = 0;
+  std::vector<int> vertIndices;
+  std::vector<int> edgeIndices;
+  std::vector<int> triIndices;
   for (auto &node : nodes) {
     float nodeOldScale = node->pImpl_->bBox_.Scale();
     float nodeNewScale =
@@ -161,6 +164,9 @@ Manifold::Impl CsgLeafNode::Compose(
     if (!glm::isfinite(nodePrecision)) nodePrecision = -1;
     precision = glm::max(precision, nodePrecision);
 
+    vertIndices.push_back(numVert);
+    edgeIndices.push_back(numEdge * 2);
+    triIndices.push_back(numTri);
     numVert += node->pImpl_->NumVert();
     numEdge += node->pImpl_->NumEdge();
     numTri += node->pImpl_->NumTri();
@@ -175,54 +181,66 @@ Manifold::Impl CsgLeafNode::Compose(
   combined.meshRelation_.triRef.resize(numTri);
   auto policy = autoPolicy(numTri);
 
-  int nextVert = 0;
-  int nextEdge = 0;
-  int nextTri = 0;
-  int i = 0;
-  for (auto &node : nodes) {
-    if (node->transform_ == glm::mat4x3(1.0f)) {
-      copy(policy, node->pImpl_->vertPos_.begin(), node->pImpl_->vertPos_.end(),
-           combined.vertPos_.begin() + nextVert);
-      copy(policy, node->pImpl_->faceNormal_.begin(),
-           node->pImpl_->faceNormal_.end(),
-           combined.faceNormal_.begin() + nextTri);
-    } else {
-      // no need to apply the transform to the node, just copy the vertices and
-      // face normals and apply transform on the fly
-      auto vertPosBegin = thrust::make_transform_iterator(
-          node->pImpl_->vertPos_.begin(), Transform4x3({node->transform_}));
-      glm::mat3 normalTransform =
-          glm::inverse(glm::transpose(glm::mat3(node->transform_)));
-      auto faceNormalBegin =
-          thrust::make_transform_iterator(node->pImpl_->faceNormal_.begin(),
-                                          TransformNormals({normalTransform}));
-      copy_n(policy, vertPosBegin, node->pImpl_->vertPos_.size(),
-             combined.vertPos_.begin() + nextVert);
-      copy_n(policy, faceNormalBegin, node->pImpl_->faceNormal_.size(),
-             combined.faceNormal_.begin() + nextTri);
-    }
-    copy(policy, node->pImpl_->halfedgeTangent_.begin(),
-         node->pImpl_->halfedgeTangent_.end(),
-         combined.halfedgeTangent_.begin() + nextEdge);
-    transform(policy, node->pImpl_->halfedge_.begin(),
-              node->pImpl_->halfedge_.end(),
-              combined.halfedge_.begin() + nextEdge,
-              UpdateHalfedge({nextVert, nextEdge, nextTri}));
-    // Since the nodes may be copies containing the same meshIDs, it is
-    // important to add an offset so that each node instance gets
-    // unique meshIDs.
-    const int offset = i++ * Manifold::Impl::meshIDCounter_;
-    transform(policy, node->pImpl_->meshRelation_.triRef.begin(),
-              node->pImpl_->meshRelation_.triRef.end(),
-              combined.meshRelation_.triRef.begin() + nextTri,
-              UpdateMeshIDs({offset}));
+  // if we are already parallelizing for each node, do not perform multithreaded
+  // copying as it will slightly hurt performance
+  if (nodes.size() > 1 &&
+      (policy == ExecutionPolicy::Par ||
+       (policy == ExecutionPolicy::ParUnseq && !CudaEnabled())))
+    policy = ExecutionPolicy::Seq;
+
+  for_each_n_host(
+      nodes.size() > 1 ? ExecutionPolicy::Par : ExecutionPolicy::Seq,
+      countAt(0), nodes.size(),
+      [&nodes, &vertIndices, &edgeIndices, &triIndices, &combined,
+       policy](int i) {
+        auto &node = nodes[i];
+        if (node->transform_ == glm::mat4x3(1.0f)) {
+          copy(policy, node->pImpl_->vertPos_.begin(),
+               node->pImpl_->vertPos_.end(),
+               combined.vertPos_.begin() + vertIndices[i]);
+          copy(policy, node->pImpl_->faceNormal_.begin(),
+               node->pImpl_->faceNormal_.end(),
+               combined.faceNormal_.begin() + triIndices[i]);
+        } else {
+          // no need to apply the transform to the node, just copy the vertices
+          // and face normals and apply transform on the fly
+          auto vertPosBegin = thrust::make_transform_iterator(
+              node->pImpl_->vertPos_.begin(), Transform4x3({node->transform_}));
+          glm::mat3 normalTransform =
+              glm::inverse(glm::transpose(glm::mat3(node->transform_)));
+          auto faceNormalBegin = thrust::make_transform_iterator(
+              node->pImpl_->faceNormal_.begin(),
+              TransformNormals({normalTransform}));
+          copy_n(policy, vertPosBegin, node->pImpl_->vertPos_.size(),
+                 combined.vertPos_.begin() + vertIndices[i]);
+          copy_n(policy, faceNormalBegin, node->pImpl_->faceNormal_.size(),
+                 combined.faceNormal_.begin() + triIndices[i]);
+        }
+        copy(policy, node->pImpl_->halfedgeTangent_.begin(),
+             node->pImpl_->halfedgeTangent_.end(),
+             combined.halfedgeTangent_.begin() + edgeIndices[i]);
+        transform(
+            policy, node->pImpl_->halfedge_.begin(),
+            node->pImpl_->halfedge_.end(),
+            combined.halfedge_.begin() + edgeIndices[i],
+            UpdateHalfedge({vertIndices[i], edgeIndices[i], triIndices[i]}));
+        // Since the nodes may be copies containing the same meshIDs, it is
+        // important to add an offset so that each node instance gets
+        // unique meshIDs.
+        const int offset = i * Manifold::Impl::meshIDCounter_;
+        transform(policy, node->pImpl_->meshRelation_.triRef.begin(),
+                  node->pImpl_->meshRelation_.triRef.end(),
+                  combined.meshRelation_.triRef.begin() + triIndices[i],
+                  UpdateMeshIDs({offset}));
+      });
+
+  for (int i = 0; i < nodes.size(); i++) {
+    auto &node = nodes[i];
+    const int offset = i * Manifold::Impl::meshIDCounter_;
+
     for (const auto pair : node->pImpl_->meshRelation_.meshIDtransform) {
       combined.meshRelation_.meshIDtransform[pair.first + offset] = pair.second;
     }
-
-    nextVert += node->pImpl_->NumVert();
-    nextEdge += 2 * node->pImpl_->NumEdge();
-    nextTri += node->pImpl_->NumTri();
   }
 
   // required to remove parts that are smaller than the precision
@@ -436,22 +454,28 @@ void CsgOpNode::BatchUnion() const {
       }
     }
     // compose each set of disjoint children
-    std::vector<std::shared_ptr<const Manifold::Impl>> impls;
-    for (const auto &set : disjointSets) {
-      if (set.size() == 1) {
-        impls.push_back(
-            std::dynamic_pointer_cast<CsgLeafNode>(children_[start + set[0]])
-                ->GetImpl());
-      } else {
-        std::vector<std::shared_ptr<CsgLeafNode>> tmp;
-        for (size_t j : set) {
-          tmp.push_back(
-              std::dynamic_pointer_cast<CsgLeafNode>(children_[start + j]));
-        }
-        impls.push_back(
-            std::make_shared<const Manifold::Impl>(CsgLeafNode::Compose(tmp)));
-      }
-    }
+    std::vector<std::shared_ptr<const Manifold::Impl>> impls(
+        disjointSets.size());
+    for_each_n_host(
+        disjointSets.size() > 1 ? ExecutionPolicy::Par : ExecutionPolicy::Seq,
+        countAt(0), disjointSets.size(),
+        [children_, &impls, &disjointSets, start](int i) {
+          auto set = disjointSets[i];
+          if (set.size() == 1) {
+            impls[i] = std::dynamic_pointer_cast<CsgLeafNode>(
+                           children_[start + set[0]])
+                           ->GetImpl();
+          } else {
+            std::vector<std::shared_ptr<CsgLeafNode>> tmp;
+            for (size_t j : set) {
+              tmp.push_back(
+                  std::dynamic_pointer_cast<CsgLeafNode>(children_[start + j]));
+            }
+            impls[i] = std::make_shared<const Manifold::Impl>(
+                CsgLeafNode::Compose(tmp));
+          }
+        });
+
     children_.erase(children_.begin() + start, children_.end());
     children_.push_back(
         std::make_shared<CsgLeafNode>(BatchBoolean(OpType::Add, impls)));
@@ -474,11 +498,14 @@ std::vector<std::shared_ptr<CsgNode>> &CsgOpNode::GetChildren(
 
   if (forceToLeafNodes && !impl->forcedToLeafNodes_) {
     impl->forcedToLeafNodes_ = true;
-    for (auto &child : impl->children_) {
-      if (child->GetNodeType() != CsgNodeType::Leaf) {
-        child = child->ToLeafNode();
-      }
-    }
+    for_each_host(impl->children_.size() > 1 ? ExecutionPolicy::Par
+                                             : ExecutionPolicy::Seq,
+                  impl->children_.begin(), impl->children_.end(),
+                  [](auto &child) {
+                    if (child->GetNodeType() != CsgNodeType::Leaf) {
+                      child = child->ToLeafNode();
+                    }
+                  });
   }
   return impl->children_;
 }
