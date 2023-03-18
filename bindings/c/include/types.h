@@ -2,7 +2,9 @@
 #include <stddef.h>
 
 typedef struct ManifoldManifold ManifoldManifold;
+typedef struct ManifoldManifoldVec ManifoldManifoldVec;
 typedef struct ManifoldCrossSection ManifoldCrossSection;
+typedef struct ManifoldCrossSectionVec ManifoldCrossSectionVec;
 typedef struct ManifoldSimplePolygon ManifoldSimplePolygon;
 typedef struct ManifoldPolygons ManifoldPolygons;
 typedef struct ManifoldMesh ManifoldMesh;
@@ -54,6 +56,12 @@ typedef struct ManifoldCurvatureBounds {
   float max_gaussian_curvature;
   float min_gaussian_curvature;
 } ManifoldCurvatureBounds;
+
+typedef enum ManifoldOpType {
+  MANIFOLD_ADD,
+  MANIFOLD_SUBTRACT,
+  MANIFOLD_INTERSECT
+} ManifoldOpType;
 
 typedef enum ManifoldError {
   MANIFOLD_NO_ERROR,
