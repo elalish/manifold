@@ -50,6 +50,10 @@ ManifoldMeshGL *manifold_level_set_seq(void *mem,
                                        float level);
 
 // Manifold Booleans
+
+// TODO: add boolean functions taking Op enum (including batch) for manifold and
+// cross section Add manifold and cross vector types for this, and update
+// compose/decompose for this
 ManifoldManifold *manifold_union(void *mem, ManifoldManifold *a,
                                  ManifoldManifold *b);
 ManifoldManifold *manifold_difference(void *mem, ManifoldManifold *a,
@@ -172,6 +176,8 @@ ManifoldCrossSection *manifold_cross_section_transform(void *mem,
                                                        float x1, float y1,
                                                        float x2, float y2,
                                                        float x3, float y3);
+ManifoldCrossSection *manifold_cross_section_warp(
+    void *mem, ManifoldCrossSection *cs, ManifoldVec2 (*fun)(float, float));
 ManifoldCrossSection *manifold_cross_section_simplify(void *mem,
                                                       ManifoldCrossSection *cs,
                                                       double epsilon);
@@ -179,6 +185,8 @@ ManifoldCrossSection *manifold_cross_section_offset(
     void *mem, ManifoldCrossSection *cs, double delta, ManifoldJoinType jt,
     double miter_limit, double arc_tolerance);
 double manifold_cross_section_area(ManifoldCrossSection *cs);
+int manifold_cross_section_num_vert(ManifoldCrossSection *cs);
+int manifold_cross_section_num_contour(ManifoldCrossSection *cs);
 int manifold_cross_section_is_empty(ManifoldCrossSection *cs);
 ManifoldRect *manifold_cross_section_bounds(void *mem,
                                             ManifoldCrossSection *cs);
