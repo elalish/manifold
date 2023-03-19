@@ -10,7 +10,6 @@ typedef struct ManifoldPolygons ManifoldPolygons;
 typedef struct ManifoldMesh ManifoldMesh;
 typedef struct ManifoldMeshGL ManifoldMeshGL;
 typedef struct ManifoldCurvature ManifoldCurvature;
-typedef struct ManifoldComponents ManifoldComponents;
 typedef struct ManifoldBox ManifoldBox;
 typedef struct ManifoldRect ManifoldRect;
 typedef struct ManifoldMaterial ManifoldMaterial;

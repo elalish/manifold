@@ -337,7 +337,6 @@ size_t manifold_meshgl_size();
 size_t manifold_box_size();
 size_t manifold_rect_size();
 size_t manifold_curvature_size();
-size_t manifold_components_size();
 size_t manifold_material_size();
 size_t manifold_export_options_size();
 
@@ -352,7 +351,6 @@ void manifold_destruct_meshgl(ManifoldMeshGL *m);
 void manifold_destruct_box(ManifoldBox *b);
 void manifold_destruct_rect(ManifoldRect *b);
 void manifold_destruct_curvature(ManifoldCurvature *c);
-void manifold_destruct_components(ManifoldComponents *c);
 void manifold_destruct_material(ManifoldMaterial *m);
 void manifold_destruct_export_options(ManifoldExportOptions *options);
 
@@ -367,7 +365,6 @@ void manifold_delete_meshgl(ManifoldMeshGL *m);
 void manifold_delete_box(ManifoldBox *b);
 void manifold_delete_rect(ManifoldRect *b);
 void manifold_delete_curvature(ManifoldCurvature *c);
-void manifold_delete_components(ManifoldComponents *c);
 void manifold_delete_material(ManifoldMaterial *m);
 void manifold_delete_export_options(ManifoldExportOptions *options);
 

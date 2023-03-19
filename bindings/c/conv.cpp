@@ -46,10 +46,6 @@ ManifoldCurvature *to_c(manifold::Curvature *m) {
   return reinterpret_cast<ManifoldCurvature *>(m);
 }
 
-ManifoldComponents *to_c(manifold::Components *components) {
-  return reinterpret_cast<ManifoldComponents *>(components);
-}
-
 ManifoldOpType to_c(manifold::OpType optype) {
   ManifoldOpType op = MANIFOLD_ADD;
   switch (optype) {
@@ -138,8 +134,8 @@ ManifoldVec *from_c(ManifoldManifoldVec *ms) {
   return reinterpret_cast<ManifoldVec *>(ms);
 }
 
-manifold::CrossSection *from_c(ManifoldCrossSection *m) {
-  return reinterpret_cast<manifold::CrossSection *>(m);
+const manifold::CrossSection *from_c(ManifoldCrossSection *cs) {
+  return reinterpret_cast<manifold::CrossSection *>(cs);
 }
 
 CrossSectionVec *from_c(ManifoldCrossSectionVec *csv) {
@@ -162,12 +158,8 @@ const manifold::MeshGL *from_c(ManifoldMeshGL *m) {
   return reinterpret_cast<manifold::MeshGL const *>(m);
 }
 
-const manifold::Curvature *from_c(ManifoldCurvature *m) {
-  return reinterpret_cast<manifold::Curvature const *>(m);
-}
-
-const manifold::Components *from_c(ManifoldComponents *components) {
-  return reinterpret_cast<manifold::Components *>(components);
+const manifold::Curvature *from_c(ManifoldCurvature *c) {
+  return reinterpret_cast<manifold::Curvature const *>(c);
 }
 
 OpType from_c(ManifoldOpType optype) {
