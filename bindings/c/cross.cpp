@@ -73,6 +73,20 @@ ManifoldCrossSection *manifold_cross_section_circle(void *mem, float radius,
   return to_c(new (mem) CrossSection(cs));
 }
 
+ManifoldCrossSection *manifold_cross_section_boolean(void *mem,
+                                                     ManifoldCrossSection *a,
+                                                     ManifoldCrossSection *b,
+                                                     ManifoldOpType op) {
+  auto cs = from_c(a)->Boolean(*from_c(b), from_c(op));
+  return to_c(new (mem) CrossSection(cs));
+}
+
+ManifoldCrossSection *manifold_cross_section_batch_boolean(
+    void *mem, ManifoldCrossSectionVec *csv, ManifoldOpType op) {
+  auto cs = CrossSection::BatchBoolean(*from_c(csv), from_c(op));
+  return to_c(new (mem) CrossSection(cs));
+}
+
 ManifoldCrossSection *manifold_cross_section_union(void *mem,
                                                    ManifoldCrossSection *a,
                                                    ManifoldCrossSection *b) {

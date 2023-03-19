@@ -147,7 +147,7 @@ TEST(CBIND, compose_decompose) {
 
   manifold_delete_manifold(s1);
   manifold_delete_manifold(s2);
-  // manifold_delete_manifold_vec(ss);
+  manifold_delete_manifold_vec(ss);
   manifold_delete_manifold(composed);
   manifold_delete_manifold_vec(decomposed);
 }

@@ -117,6 +117,18 @@ void manifold_manifold_vec_push_back(ManifoldManifoldVec *ms,
   return from_c(ms)->push_back(*from_c(m));
 }
 
+ManifoldManifold *manifold_boolean(void *mem, ManifoldManifold *a,
+                                   ManifoldManifold *b, ManifoldOpType op) {
+  auto m = from_c(a)->Boolean(*from_c(b), from_c(op));
+  return to_c(new (mem) Manifold(m));
+}
+
+ManifoldManifold *manifold_batch_boolean(void *mem, ManifoldManifoldVec *ms,
+                                         ManifoldOpType op) {
+  auto m = Manifold::BatchBoolean(*from_c(ms), from_c(op));
+  return to_c(new (mem) Manifold(m));
+}
+
 ManifoldManifold *manifold_union(void *mem, ManifoldManifold *a,
                                  ManifoldManifold *b) {
   auto m = (*from_c(a)) + (*from_c(b));
