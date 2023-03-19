@@ -9,10 +9,13 @@
 
 #include "cross_section.h"
 
+using ManifoldVec = std::vector<Manifold>;
+using CrossSectionVec = std::vector<CrossSection>;
+
 ManifoldManifold *to_c(manifold::Manifold *m);
-ManifoldManifoldVec *to_c(std::vector<manifold::Manifold> *ms);
+ManifoldManifoldVec *to_c(ManifoldVec *ms);
 ManifoldCrossSection *to_c(manifold::CrossSection *cs);
-ManifoldCrossSectionVec *to_c(std::vector<manifold::CrossSection> *csv);
+ManifoldCrossSectionVec *to_c(CrossSectionVec *csv);
 ManifoldSimplePolygon *to_c(manifold::SimplePolygon *p);
 ManifoldPolygons *to_c(manifold::Polygons *ps);
 ManifoldMesh *to_c(manifold::Mesh *m);
@@ -30,9 +33,9 @@ ManifoldIVec3 to_c(glm::ivec3 v);
 ManifoldProperties to_c(manifold::Properties p);
 
 const manifold::Manifold *from_c(ManifoldManifold *m);
-const std::vector<manifold::Manifold> *from_c(ManifoldManifoldVec *ms);
-const manifold::CrossSection *from_c(ManifoldCrossSection *cs);
-const std::vector<manifold::CrossSection> *from_c(ManifoldCrossSectionVec *csv);
+ManifoldVec *from_c(ManifoldManifoldVec *ms);
+manifold::CrossSection *from_c(ManifoldCrossSection *cs);
+CrossSectionVec *from_c(ManifoldCrossSectionVec *csv);
 const manifold::SimplePolygon *from_c(ManifoldSimplePolygon *m);
 const manifold::Polygons *from_c(ManifoldPolygons *m);
 const manifold::Mesh *from_c(ManifoldMesh *m);

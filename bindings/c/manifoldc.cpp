@@ -6,6 +6,8 @@
 #include <public.h>
 #include <sdf.h>
 
+#include <vector>
+
 #include "box.cpp"
 #include "cross.cpp"
 #include "include/conv.h"
@@ -81,6 +83,38 @@ ManifoldSimplePolygon *manifold_polygons_get_simple(void *mem,
 ManifoldVec2 manifold_polygons_get_point(ManifoldPolygons *ps, int simple_idx,
                                          int pt_idx) {
   return to_c((*from_c(ps))[simple_idx][pt_idx]);
+}
+
+ManifoldManifoldVec *manifold_manifold_empty_vec(void *mem) {
+  return to_c(new (mem) ManifoldVec());
+}
+
+ManifoldManifoldVec *manifold_manifold_vec(void *mem, size_t sz) {
+  return to_c(new (mem) ManifoldVec(sz));
+}
+
+void manifold_manifold_vec_reserve(ManifoldManifoldVec *ms, size_t sz) {
+  from_c(ms)->reserve(sz);
+}
+
+size_t manifold_manifold_vec_length(ManifoldManifoldVec *ms) {
+  return from_c(ms)->size();
+}
+
+ManifoldManifold *manifold_manifold_vec_get(void *mem, ManifoldManifoldVec *ms,
+                                            int idx) {
+  auto m = (*from_c(ms))[idx];
+  return to_c(new (mem) Manifold(m));
+}
+
+void manifold_manifold_vec_set(ManifoldManifoldVec *ms, int idx,
+                               ManifoldManifold *m) {
+  (*from_c(ms))[idx] = *from_c(m);
+}
+
+void manifold_manifold_vec_push_back(ManifoldManifoldVec *ms,
+                                     ManifoldManifold *m) {
+  return from_c(ms)->push_back(*from_c(m));
 }
 
 ManifoldManifold *manifold_union(void *mem, ManifoldManifold *a,
@@ -278,34 +312,14 @@ ManifoldManifold *manifold_revolve(void *mem, ManifoldCrossSection *cs,
   return to_c(new (mem) Manifold(m));
 }
 
-ManifoldManifold *manifold_compose(void *mem, ManifoldManifold **ms,
-                                   size_t length) {
-  auto vec = std::vector<Manifold>();
-  auto manifolds = reinterpret_cast<Manifold **>(ms);
-  for (int i = 0; i < length; ++i) {
-    vec.push_back(*manifolds[i]);
-  }
-  auto composed = Manifold::Compose(vec);
+ManifoldManifold *manifold_compose(void *mem, ManifoldManifoldVec *ms) {
+  auto composed = Manifold::Compose(*from_c(ms));
   return to_c(new (mem) Manifold(composed));
 }
 
-ManifoldComponents *manifold_get_components(void *mem, ManifoldManifold *m) {
-  return to_c(new (mem) Components(from_c(m)->GetComponents()));
-}
-
-size_t manifold_components_length(ManifoldComponents *components) {
-  return from_c(components)->numComponents;
-}
-
-ManifoldManifold **manifold_decompose(void **mem, ManifoldManifold *m,
-                                      ManifoldComponents *cs) {
-  auto components = *from_c(cs);
-  auto manifolds = from_c(m)->Decompose(components);
-  ManifoldManifold **ms = reinterpret_cast<ManifoldManifold **>(mem);
-  for (int i = 0; i < components.numComponents; ++i) {
-    ms[i] = to_c(new (mem[i]) Manifold(manifolds[i]));
-  }
-  return ms;
+ManifoldManifoldVec *manifold_decompose(void *mem, ManifoldManifold *m) {
+  auto comps = from_c(m)->Decompose();
+  return to_c(new (mem) std::vector<Manifold>(comps));
 }
 
 ManifoldMeshGL *manifold_get_meshgl(void *mem, ManifoldManifold *m) {
@@ -463,48 +477,59 @@ int manifold_get_circular_segments(float radius) {
 
 // memory size
 size_t manifold_cross_section_size() { return sizeof(CrossSection); }
+size_t manifold_cross_section_vec_size() {
+  return sizeof(std::vector<CrossSection>);
+}
 size_t manifold_simple_polygon_size() { return sizeof(SimplePolygon); }
 size_t manifold_polygons_size() { return sizeof(Polygons); }
 size_t manifold_manifold_size() { return sizeof(Manifold); }
+size_t manifold_manifold_vec_size() { return sizeof(std::vector<Manifold>); }
 size_t manifold_manifold_pair_size() { return sizeof(ManifoldManifoldPair); }
 size_t manifold_meshgl_size() { return sizeof(MeshGL); }
 size_t manifold_box_size() { return sizeof(Box); }
 size_t manifold_rect_size() { return sizeof(Rect); }
 size_t manifold_curvature_size() { return sizeof(Curvature); }
-size_t manifold_components_size() { return sizeof(Components); }
 
 // pointer free + destruction
 void manifold_delete_cross_section(ManifoldCrossSection *c) {
   delete from_c(c);
+}
+void manifold_delete_cross_section_vec(ManifoldCrossSectionVec *csv) {
+  delete from_c(csv);
 }
 void manifold_delete_simple_polygon(ManifoldSimplePolygon *p) {
   delete from_c(p);
 }
 void manifold_delete_polygons(ManifoldPolygons *p) { delete from_c(p); }
 void manifold_delete_manifold(ManifoldManifold *m) { delete from_c(m); }
+void manifold_delete_manifold_vec(ManifoldManifoldVec *ms) {
+  delete from_c(ms);
+}
 void manifold_delete_meshgl(ManifoldMeshGL *m) { delete from_c(m); }
 void manifold_delete_box(ManifoldBox *b) { delete from_c(b); }
 void manifold_delete_rect(ManifoldRect *r) { delete from_c(r); }
 void manifold_delete_curvature(ManifoldCurvature *c) { delete from_c(c); }
-void manifold_delete_components(ManifoldComponents *c) { delete from_c(c); }
 
 // destruction
-void manifold_destruct_cross_section(ManifoldCrossSection *m) {
-  from_c(m)->~CrossSection();
+void manifold_destruct_cross_section(ManifoldCrossSection *cs) {
+  from_c(cs)->~CrossSection();
+}
+void manifold_destruct_cross_section_vec(ManifoldCrossSectionVec *csv) {
+  from_c(csv)->~CrossSectionVec();
 }
 void manifold_destruct_simple_polygon(ManifoldSimplePolygon *p) {
   from_c(p)->~SimplePolygon();
 }
 void manifold_destruct_polygons(ManifoldPolygons *p) { from_c(p)->~Polygons(); }
 void manifold_destruct_manifold(ManifoldManifold *m) { from_c(m)->~Manifold(); }
+void manifold_destruct_manifold_vec(ManifoldManifoldVec *ms) {
+  from_c(ms)->~ManifoldVec();
+}
 void manifold_destruct_meshgl(ManifoldMeshGL *m) { from_c(m)->~MeshGL(); }
 void manifold_destruct_box(ManifoldBox *b) { from_c(b)->~Box(); }
 void manifold_destruct_rect(ManifoldRect *r) { from_c(r)->~Rect(); }
 void manifold_destruct_curvature(ManifoldCurvature *c) {
   from_c(c)->~Curvature();
-}
-void manifold_destruct_components(ManifoldComponents *c) {
-  from_c(c)->~Components();
 }
 
 #ifdef __cplusplus

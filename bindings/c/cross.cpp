@@ -2,6 +2,8 @@
 #include <manifold.h>
 #include <public.h>
 
+#include <vector>
+
 #include "cross_section.h"
 #include "types.h"
 
@@ -24,6 +26,39 @@ ManifoldCrossSection *manifold_cross_section_of_polygons(void *mem,
                                                          ManifoldPolygons *p,
                                                          ManifoldFillRule fr) {
   return to_c(new (mem) CrossSection(*from_c(p), from_c(fr)));
+}
+
+ManifoldCrossSectionVec *manifold_cross_section_empty_vec(void *mem) {
+  return to_c(new (mem) CrossSectionVec());
+}
+
+ManifoldCrossSectionVec *manifold_cross_section_vec(void *mem, size_t sz) {
+  return to_c(new (mem) CrossSectionVec(sz));
+}
+
+void manifold_cross_section_vec_reserve(ManifoldCrossSectionVec *csv,
+                                        size_t sz) {
+  from_c(csv)->reserve(sz);
+}
+
+size_t manifold_cross_section_vec_length(ManifoldCrossSectionVec *csv) {
+  return from_c(csv)->size();
+}
+
+ManifoldCrossSection *manifold_cross_section_vec_get(
+    void *mem, ManifoldCrossSectionVec *csv, int idx) {
+  auto cs = (*from_c(csv))[idx];
+  return to_c(new (mem) CrossSection(cs));
+}
+
+void manifold_cross_section_vec_set(ManifoldCrossSectionVec *csv, int idx,
+                                    ManifoldCrossSection *cs) {
+  (*from_c(csv))[idx] = *from_c(cs);
+}
+
+void manifold_cross_section_vec_push_back(ManifoldCrossSectionVec *csv,
+                                          ManifoldCrossSection *cs) {
+  return from_c(csv)->push_back(*from_c(cs));
 }
 
 ManifoldCrossSection *manifold_cross_section_square(void *mem, float x, float y,
@@ -102,6 +137,15 @@ ManifoldCrossSection *manifold_cross_section_transform(void *mem,
   return to_c(new (mem) CrossSection(transformed));
 }
 
+ManifoldCrossSection *manifold_cross_section_warp(
+    void *mem, ManifoldCrossSection *cs, ManifoldVec2 (*fun)(float, float)) {
+  std::function<void(glm::vec2 & v)> warp = [fun](glm::vec2 &v) {
+    v = from_c(fun(v.x, v.y));
+  };
+  auto warped = from_c(cs)->Warp(warp);
+  return to_c(new (mem) CrossSection(warped));
+}
+
 ManifoldCrossSection *manifold_cross_section_simplify(void *mem,
                                                       ManifoldCrossSection *cs,
                                                       double epsilon) {
@@ -121,6 +165,14 @@ double manifold_cross_section_area(ManifoldCrossSection *cs) {
   return from_c(cs)->Area();
 }
 
+int manifold_cross_section_num_vert(ManifoldCrossSection *cs) {
+  return from_c(cs)->NumVert();
+}
+
+int manifold_cross_section_num_contour(ManifoldCrossSection *cs) {
+  return from_c(cs)->NumContour();
+}
+
 int manifold_cross_section_is_empty(ManifoldCrossSection *cs) {
   return from_c(cs)->IsEmpty();
 }
@@ -135,4 +187,16 @@ ManifoldPolygons *manifold_cross_section_to_polygons(void *mem,
                                                      ManifoldCrossSection *cs) {
   auto ps = from_c(cs)->ToPolygons();
   return to_c(new (mem) Polygons(ps));
+}
+
+ManifoldCrossSection *manifold_cross_section_compose(
+    void *mem, ManifoldCrossSectionVec *csv) {
+  auto cs = CrossSection::Compose(*from_c(csv));
+  return to_c(new (mem) CrossSection(cs));
+}
+
+ManifoldCrossSectionVec *manifold_cross_section_decompose(
+    void *mem, ManifoldCrossSection *cs) {
+  auto comps = from_c(cs)->Decompose();
+  return to_c(new (mem) CrossSectionVec(comps));
 }

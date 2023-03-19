@@ -14,7 +14,7 @@ ManifoldManifold *to_c(manifold::Manifold *m) {
   return reinterpret_cast<ManifoldManifold *>(m);
 }
 
-ManifoldManifoldVec *to_c(std::vector<manifold::Manifold> *ms) {
+ManifoldManifoldVec *to_c(ManifoldVec *ms) {
   return reinterpret_cast<ManifoldManifoldVec *>(ms);
 }
 
@@ -22,7 +22,7 @@ ManifoldCrossSection *to_c(manifold::CrossSection *cs) {
   return reinterpret_cast<ManifoldCrossSection *>(cs);
 }
 
-ManifoldCrossSectionVec *to_c(std::vector<manifold::CrossSection> *csv) {
+ManifoldCrossSectionVec *to_c(CrossSectionVec *csv) {
   return reinterpret_cast<ManifoldCrossSectionVec *>(csv);
 }
 
@@ -134,17 +134,16 @@ const manifold::Manifold *from_c(ManifoldManifold *m) {
   return reinterpret_cast<manifold::Manifold const *>(m);
 }
 
-const std::vector<manifold::Manifold> *from_c(ManifoldManifoldVec *ms) {
-  return reinterpret_cast<std::vector<manifold::Manifold> const *>(ms);
+ManifoldVec *from_c(ManifoldManifoldVec *ms) {
+  return reinterpret_cast<ManifoldVec *>(ms);
 }
 
-const manifold::CrossSection *from_c(ManifoldCrossSection *m) {
-  return reinterpret_cast<manifold::CrossSection const *>(m);
+manifold::CrossSection *from_c(ManifoldCrossSection *m) {
+  return reinterpret_cast<manifold::CrossSection *>(m);
 }
 
-const std::vector<manifold::CrossSection> *from_c(
-    ManifoldCrossSectionVec *csv) {
-  return reinterpret_cast<std::vector<manifold::CrossSection> const *>(csv);
+CrossSectionVec *from_c(ManifoldCrossSectionVec *csv) {
+  return reinterpret_cast<CrossSectionVec *>(csv);
 }
 
 const manifold::SimplePolygon *from_c(ManifoldSimplePolygon *m) {
