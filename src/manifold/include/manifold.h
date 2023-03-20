@@ -97,6 +97,7 @@ class Manifold {
     TransformWrongLength,
     RunIndexWrongLength,
     FaceIDWrongLength,
+    InvalidConstruction,
   };
   Error Status() const;
   int NumVert() const;
