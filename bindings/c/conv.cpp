@@ -3,6 +3,8 @@
 #include <meshIO.h>
 #include <sdf.h>
 
+#include <vector>
+
 #include "cross_section.h"
 #include "include/types.h"
 #include "public.h"
@@ -12,8 +14,16 @@ ManifoldManifold *to_c(manifold::Manifold *m) {
   return reinterpret_cast<ManifoldManifold *>(m);
 }
 
+ManifoldManifoldVec *to_c(ManifoldVec *ms) {
+  return reinterpret_cast<ManifoldManifoldVec *>(ms);
+}
+
 ManifoldCrossSection *to_c(manifold::CrossSection *cs) {
   return reinterpret_cast<ManifoldCrossSection *>(cs);
+}
+
+ManifoldCrossSectionVec *to_c(CrossSectionVec *csv) {
+  return reinterpret_cast<ManifoldCrossSectionVec *>(csv);
 }
 
 ManifoldSimplePolygon *to_c(manifold::SimplePolygon *m) {
@@ -36,8 +46,19 @@ ManifoldCurvature *to_c(manifold::Curvature *m) {
   return reinterpret_cast<ManifoldCurvature *>(m);
 }
 
-ManifoldComponents *to_c(manifold::Components *components) {
-  return reinterpret_cast<ManifoldComponents *>(components);
+ManifoldOpType to_c(manifold::OpType optype) {
+  ManifoldOpType op = MANIFOLD_ADD;
+  switch (optype) {
+    case manifold::OpType::Add:
+      break;
+    case manifold::OpType::Subtract:
+      op = MANIFOLD_SUBTRACT;
+      break;
+    case manifold::OpType::Intersect:
+      op = MANIFOLD_INTERSECT;
+      break;
+  };
+  return op;
 }
 
 ManifoldError to_c(manifold::Manifold::Error error) {
@@ -109,8 +130,16 @@ const manifold::Manifold *from_c(ManifoldManifold *m) {
   return reinterpret_cast<manifold::Manifold const *>(m);
 }
 
-const manifold::CrossSection *from_c(ManifoldCrossSection *m) {
-  return reinterpret_cast<manifold::CrossSection const *>(m);
+ManifoldVec *from_c(ManifoldManifoldVec *ms) {
+  return reinterpret_cast<ManifoldVec *>(ms);
+}
+
+const manifold::CrossSection *from_c(ManifoldCrossSection *cs) {
+  return reinterpret_cast<manifold::CrossSection *>(cs);
+}
+
+CrossSectionVec *from_c(ManifoldCrossSectionVec *csv) {
+  return reinterpret_cast<CrossSectionVec *>(csv);
 }
 
 const manifold::SimplePolygon *from_c(ManifoldSimplePolygon *m) {
@@ -129,12 +158,23 @@ const manifold::MeshGL *from_c(ManifoldMeshGL *m) {
   return reinterpret_cast<manifold::MeshGL const *>(m);
 }
 
-const manifold::Curvature *from_c(ManifoldCurvature *m) {
-  return reinterpret_cast<manifold::Curvature const *>(m);
+const manifold::Curvature *from_c(ManifoldCurvature *c) {
+  return reinterpret_cast<manifold::Curvature const *>(c);
 }
 
-const manifold::Components *from_c(ManifoldComponents *components) {
-  return reinterpret_cast<manifold::Components *>(components);
+OpType from_c(ManifoldOpType optype) {
+  auto op = OpType::Add;
+  switch (optype) {
+    case MANIFOLD_ADD:
+      break;
+    case MANIFOLD_SUBTRACT:
+      op = OpType::Subtract;
+      break;
+    case MANIFOLD_INTERSECT:
+      op = OpType::Intersect;
+      break;
+  };
+  return op;
 }
 
 CrossSection::FillRule from_c(ManifoldFillRule fillrule) {

@@ -134,27 +134,22 @@ TEST(CBIND, compose_decompose) {
 
   ManifoldManifold *s1 = manifold_sphere(malloc(sz), 1.0f, 100);
   ManifoldManifold *s2 = manifold_translate(malloc(sz), s1, 2., 2., 2.);
-  ManifoldManifold *ss[] = {s1, s2};
-  ManifoldManifold *composed = manifold_compose(malloc(sz), ss, 2);
+  ManifoldManifoldVec *ss =
+      manifold_manifold_vec(malloc(manifold_manifold_vec_size()), 2);
+  manifold_manifold_vec_set(ss, 0, s1);
+  manifold_manifold_vec_set(ss, 1, s2);
+  ManifoldManifold *composed = manifold_compose(malloc(sz), ss);
 
-  ManifoldComponents *cs =
-      manifold_get_components(malloc(manifold_components_size()), composed);
-  size_t len = manifold_components_length(cs);
-  void *bufs[len];
-  for (int i = 0; i < len; ++i) {
-    bufs[i] = malloc(sz);
-  }
-  ManifoldManifold **decomposed = manifold_decompose(bufs, composed, cs);
+  ManifoldManifoldVec *decomposed =
+      manifold_decompose(malloc(manifold_manifold_vec_size()), composed);
 
-  EXPECT_EQ(len, 2);
+  EXPECT_EQ(manifold_manifold_vec_length(decomposed), 2);
 
   manifold_delete_manifold(s1);
   manifold_delete_manifold(s2);
+  manifold_delete_manifold_vec(ss);
   manifold_delete_manifold(composed);
-  manifold_delete_components(cs);
-  for (int i = 0; i < len; ++i) {
-    manifold_delete_manifold(decomposed[i]);
-  }
+  manifold_delete_manifold_vec(decomposed);
 }
 
 TEST(CBIND, polygons) {

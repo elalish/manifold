@@ -49,7 +49,25 @@ ManifoldMeshGL *manifold_level_set_seq(void *mem,
                                        ManifoldBox *bounds, float edge_length,
                                        float level);
 
+// Manifold Vectors
+
+ManifoldManifoldVec *manifold_manifold_empty_vec(void *mem);
+ManifoldManifoldVec *manifold_manifold_vec(void *mem, size_t sz);
+void manifold_manifold_vec_reserve(ManifoldManifoldVec *ms, size_t sz);
+size_t manifold_manifold_vec_length(ManifoldManifoldVec *ms);
+ManifoldManifold *manifold_manifold_vec_get(void *mem, ManifoldManifoldVec *ms,
+                                            int idx);
+void manifold_manifold_vec_set(ManifoldManifoldVec *ms, int idx,
+                               ManifoldManifold *m);
+void manifold_manifold_vec_push_back(ManifoldManifoldVec *ms,
+                                     ManifoldManifold *m);
+
 // Manifold Booleans
+
+ManifoldManifold *manifold_boolean(void *mem, ManifoldManifold *a,
+                                   ManifoldManifold *b, ManifoldOpType op);
+ManifoldManifold *manifold_batch_boolean(void *mem, ManifoldManifoldVec *ms,
+                                         ManifoldOpType op);
 ManifoldManifold *manifold_union(void *mem, ManifoldManifold *a,
                                  ManifoldManifold *b);
 ManifoldManifold *manifold_difference(void *mem, ManifoldManifold *a,
@@ -104,13 +122,8 @@ ManifoldManifold *manifold_extrude(void *mem, ManifoldCrossSection *cs,
                                    float scale_y);
 ManifoldManifold *manifold_revolve(void *mem, ManifoldCrossSection *cs,
                                    int circular_segments);
-ManifoldManifold *manifold_compose(void *mem, ManifoldManifold **ms,
-                                   size_t length);
-size_t manifold_decompose_length(ManifoldManifold *m);
-ManifoldComponents *manifold_get_components(void *mem, ManifoldManifold *m);
-size_t manifold_components_length(ManifoldComponents *components);
-ManifoldManifold **manifold_decompose(void **mem, ManifoldManifold *m,
-                                      ManifoldComponents *cs);
+ManifoldManifold *manifold_compose(void *mem, ManifoldManifoldVec *ms);
+ManifoldManifoldVec *manifold_decompose(void *mem, ManifoldManifold *m);
 ManifoldManifold *manifold_as_original(void *mem, ManifoldManifold *m);
 
 // Manifold Info
@@ -131,7 +144,7 @@ float *manifold_curvature_vert_gaussian(void *mem, ManifoldCurvature *curv);
 int manifold_get_circular_segments(float radius);
 int manifold_original_id(ManifoldManifold *m);
 
-// CrossSection
+// CrossSection Shapes/Constructors
 
 ManifoldCrossSection *manifold_cross_section_empty(void *mem);
 ManifoldCrossSection *manifold_cross_section_copy(void *mem,
@@ -145,6 +158,33 @@ ManifoldCrossSection *manifold_cross_section_square(void *mem, float x, float y,
                                                     int center);
 ManifoldCrossSection *manifold_cross_section_circle(void *mem, float radius,
                                                     int circular_segments);
+ManifoldCrossSection *manifold_cross_section_compose(
+    void *mem, ManifoldCrossSectionVec *csv);
+ManifoldCrossSectionVec *manifold_cross_section_decompose(
+    void *mem, ManifoldCrossSection *cs);
+
+// CrossSection Vectors
+
+ManifoldCrossSectionVec *manifold_cross_section_empty_vec(void *mem);
+ManifoldCrossSectionVec *manifold_cross_section_vec(void *mem, size_t sz);
+void manifold_cross_section_vec_reserve(ManifoldCrossSectionVec *csv,
+                                        size_t sz);
+size_t manifold_cross_section_vec_length(ManifoldCrossSectionVec *csv);
+ManifoldCrossSection *manifold_cross_section_vec_get(
+    void *mem, ManifoldCrossSectionVec *csv, int idx);
+void manifold_cross_section_vec_set(ManifoldCrossSectionVec *csv, int idx,
+                                    ManifoldCrossSection *cs);
+void manifold_cross_section_vec_push_back(ManifoldCrossSectionVec *csv,
+                                          ManifoldCrossSection *cs);
+
+// CrossSection Booleans
+
+ManifoldCrossSection *manifold_cross_section_boolean(void *mem,
+                                                     ManifoldCrossSection *a,
+                                                     ManifoldCrossSection *b,
+                                                     ManifoldOpType op);
+ManifoldCrossSection *manifold_cross_section_batch_boolean(
+    void *mem, ManifoldCrossSectionVec *csv, ManifoldOpType op);
 ManifoldCrossSection *manifold_cross_section_union(void *mem,
                                                    ManifoldCrossSection *a,
                                                    ManifoldCrossSection *b);
@@ -155,6 +195,9 @@ ManifoldCrossSection *manifold_cross_section_intersection(
 ManifoldCrossSection *manifold_cross_section_rect_clip(void *mem,
                                                        ManifoldCrossSection *cs,
                                                        ManifoldRect *r);
+
+// CrossSection Transformation
+
 ManifoldCrossSection *manifold_cross_section_translate(void *mem,
                                                        ManifoldCrossSection *cs,
                                                        float x, float y);
@@ -172,13 +215,20 @@ ManifoldCrossSection *manifold_cross_section_transform(void *mem,
                                                        float x1, float y1,
                                                        float x2, float y2,
                                                        float x3, float y3);
+ManifoldCrossSection *manifold_cross_section_warp(
+    void *mem, ManifoldCrossSection *cs, ManifoldVec2 (*fun)(float, float));
 ManifoldCrossSection *manifold_cross_section_simplify(void *mem,
                                                       ManifoldCrossSection *cs,
                                                       double epsilon);
 ManifoldCrossSection *manifold_cross_section_offset(
     void *mem, ManifoldCrossSection *cs, double delta, ManifoldJoinType jt,
     double miter_limit, double arc_tolerance);
+
+// CrossSection Info
+
 double manifold_cross_section_area(ManifoldCrossSection *cs);
+int manifold_cross_section_num_vert(ManifoldCrossSection *cs);
+int manifold_cross_section_num_contour(ManifoldCrossSection *cs);
 int manifold_cross_section_is_empty(ManifoldCrossSection *cs);
 ManifoldRect *manifold_cross_section_bounds(void *mem,
                                             ManifoldCrossSection *cs);
@@ -186,6 +236,7 @@ ManifoldPolygons *manifold_cross_section_to_polygons(void *mem,
                                                      ManifoldCrossSection *cs);
 
 // Rectangle
+
 ManifoldRect *manifold_rect(void *mem, float x1, float y1, float x2, float y2);
 ManifoldVec2 manifold_rect_min(ManifoldRect *r);
 ManifoldVec2 manifold_rect_max(ManifoldRect *r);
@@ -276,7 +327,9 @@ void manifold_export_meshgl(const char *filename, ManifoldMeshGL *mesh,
 
 // memory size
 size_t manifold_manifold_size();
+size_t manifold_manifold_vec_size();
 size_t manifold_cross_section_size();
+size_t manifold_cross_section_vec_size();
 size_t manifold_simple_polygon_size();
 size_t manifold_polygons_size();
 size_t manifold_manifold_pair_size();
@@ -284,33 +337,34 @@ size_t manifold_meshgl_size();
 size_t manifold_box_size();
 size_t manifold_rect_size();
 size_t manifold_curvature_size();
-size_t manifold_components_size();
 size_t manifold_material_size();
 size_t manifold_export_options_size();
 
 // destruction
 void manifold_destruct_manifold(ManifoldManifold *m);
+void manifold_destruct_manifold_vec(ManifoldManifoldVec *ms);
 void manifold_destruct_cross_section(ManifoldCrossSection *m);
+void manifold_destruct_cross_section_vec(ManifoldCrossSectionVec *csv);
 void manifold_destruct_simple_polygon(ManifoldSimplePolygon *p);
 void manifold_destruct_polygons(ManifoldPolygons *p);
 void manifold_destruct_meshgl(ManifoldMeshGL *m);
 void manifold_destruct_box(ManifoldBox *b);
 void manifold_destruct_rect(ManifoldRect *b);
 void manifold_destruct_curvature(ManifoldCurvature *c);
-void manifold_destruct_components(ManifoldComponents *c);
 void manifold_destruct_material(ManifoldMaterial *m);
 void manifold_destruct_export_options(ManifoldExportOptions *options);
 
 // pointer free + destruction
 void manifold_delete_manifold(ManifoldManifold *m);
-void manifold_delete_cross_section(ManifoldCrossSection *m);
+void manifold_delete_manifold_vec(ManifoldManifoldVec *ms);
+void manifold_delete_cross_section(ManifoldCrossSection *cs);
+void manifold_delete_cross_section_vec(ManifoldCrossSectionVec *csv);
 void manifold_delete_simple_polygon(ManifoldSimplePolygon *p);
 void manifold_delete_polygons(ManifoldPolygons *p);
 void manifold_delete_meshgl(ManifoldMeshGL *m);
 void manifold_delete_box(ManifoldBox *b);
 void manifold_delete_rect(ManifoldRect *b);
 void manifold_delete_curvature(ManifoldCurvature *c);
-void manifold_delete_components(ManifoldComponents *c);
 void manifold_delete_material(ManifoldMaterial *m);
 void manifold_delete_export_options(ManifoldExportOptions *options);
 

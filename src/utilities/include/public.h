@@ -254,15 +254,6 @@ struct Curvature {
   std::vector<float> vertMeanCurvature, vertGaussianCurvature;
 };
 
-/**
- * Connected component indices and number of discrete components. Intermediate
- * step for Manifold.Decompose(), completed by Manifold.GetComponents()
- */
-struct Components {
-  std::vector<int> indices;
-  int numComponents;
-};
-
 struct Box {
   glm::vec3 min = glm::vec3(std::numeric_limits<float>::infinity());
   glm::vec3 max = glm::vec3(-std::numeric_limits<float>::infinity());
