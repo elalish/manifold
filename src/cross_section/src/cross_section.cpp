@@ -170,6 +170,15 @@ CrossSection::CrossSection(const CrossSection& other) {
   paths_ = other.paths_;
   transform_ = other.transform_;
 }
+
+CrossSection& CrossSection::operator=(const CrossSection& other) {
+  if (this != &other) {
+    paths_ = other.paths_;
+    transform_ = other.transform_;
+  }
+  return *this;
+};
+
 // Private, skips unioning.
 CrossSection::CrossSection(C2::PathsD ps) { paths_ = shared_paths(ps); }
 

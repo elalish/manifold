@@ -412,7 +412,12 @@ Manifold Manifold::Compose(const std::vector<Manifold>& manifolds) {
   return Manifold(std::make_shared<Impl>(CsgLeafNode::Compose(children)));
 }
 
-Components Manifold::GetComponents() const {
+/**
+ * This operation returns a vector of Manifolds that are topologically
+ * disconnected. If everything is connected, the vector is length one,
+ * containing a copy of the original. It is the inverse operation of Compose().
+ */
+std::vector<Manifold> Manifold::Decompose() const {
   Graph graph;
   auto pImpl_ = GetCsgLeafNode().GetImpl();
   for (int i = 0; i < NumVert(); ++i) {
@@ -422,23 +427,18 @@ Components Manifold::GetComponents() const {
     if (halfedge.IsForward())
       graph.add_edge(halfedge.startVert, halfedge.endVert);
   }
-  std::vector<int> components;
-  const int numLabel = ConnectedComponents(components, graph);
-  return {components, numLabel};
-}
+  std::vector<int> componentIndices;
+  const int numComponents = ConnectedComponents(componentIndices, graph);
 
-std::vector<Manifold> Manifold::Decompose(Components components) const {
-  auto pImpl_ = GetCsgLeafNode().GetImpl();
-
-  if (components.numComponents == 1) {
+  if (numComponents == 1) {
     std::vector<Manifold> meshes(1);
     meshes[0] = *this;
     return meshes;
   }
-  VecDH<int> vertLabel(components.indices);
+  VecDH<int> vertLabel(componentIndices);
 
   std::vector<Manifold> meshes;
-  for (int i = 0; i < components.numComponents; ++i) {
+  for (int i = 0; i < numComponents; ++i) {
     auto impl = std::make_shared<Impl>();
     // inherit original object's precision
     impl->precision_ = pImpl_->precision_;
@@ -472,14 +472,5 @@ std::vector<Manifold> Manifold::Decompose(Components components) const {
     meshes.push_back(Manifold(impl));
   }
   return meshes;
-}
-
-/**
- * This operation returns a vector of Manifolds that are topologically
- * disconnected. If everything is connected, the vector is length one,
- * containing a copy of the original. It is the inverse operation of Compose().
- */
-std::vector<Manifold> Manifold::Decompose() const {
-  return Decompose(GetComponents());
 }
 }  // namespace manifold
