@@ -17,6 +17,7 @@
 #include <clipper2/clipper.h>
 
 #include <memory>
+#include <tuple>
 #include <vector>
 
 #include "clipper2/clipper.core.h"
@@ -241,26 +242,21 @@ CrossSection CrossSection::Square(const glm::vec2 dims, bool center) {
   }
 
   // reverse winding if dimensions are negative
-  int start, step;
-  if (dims.x * dims.y < 0.0f) {
-    start = 3;
-    step = -1;
-  } else {
-    start = 0;
-    step = 1;
-  }
+  const bool neg = dims.x * dims.y < 0.0f;
+  const int start = neg ? 3 : 0;
+  const int step = neg ? -1 : 1;
 
   auto p = C2::PathD(4);
   if (center) {
-    auto w = dims.x / 2;
-    auto h = dims.y / 2;
+    const auto w = dims.x / 2;
+    const auto h = dims.y / 2;
     p[start + step * 0] = C2::PointD(w, h);
     p[start + step * 1] = C2::PointD(-w, h);
     p[start + step * 2] = C2::PointD(-w, -h);
     p[start + step * 3] = C2::PointD(w, -h);
   } else {
-    double x = dims.x;
-    double y = dims.y;
+    const double x = dims.x;
+    const double y = dims.y;
     p[start + step * 0] = C2::PointD(0.0, 0.0);
     p[start + step * 1] = C2::PointD(x, 0.0);
     p[start + step * 2] = C2::PointD(x, y);
