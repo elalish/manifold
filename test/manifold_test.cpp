@@ -14,6 +14,7 @@
 
 #include "manifold.h"
 
+#include "cross_section.h"
 #include "test.h"
 
 #ifdef MANIFOLD_EXPORT
@@ -504,4 +505,19 @@ TEST(Manifold, MirrorUnion) {
   auto vol_a = a.GetProperties().volume;
   EXPECT_FLOAT_EQ(vol_a * 2.75, result.GetProperties().volume);
   EXPECT_TRUE(a.Mirror(glm::vec3(0)).IsEmpty());
+}
+
+TEST(Manifold, Invalid) {
+  auto invalid = Manifold::Error::InvalidConstruction;
+  auto circ = CrossSection::Circle(10.);
+  auto empty_circ = CrossSection::Circle(-2.);
+  auto empty_sq = CrossSection::Square(glm::vec3(0.0f));
+
+  EXPECT_EQ(Manifold::Sphere(0).Status(), invalid);
+  EXPECT_EQ(Manifold::Cylinder(0, 5).Status(), invalid);
+  EXPECT_EQ(Manifold::Cylinder(2, -5).Status(), invalid);
+  EXPECT_EQ(Manifold::Cube(glm::vec3(0.0f)).Status(), invalid);
+  EXPECT_EQ(Manifold::Extrude(circ, 0.).Status(), invalid);
+  EXPECT_EQ(Manifold::Extrude(empty_circ, 10.).Status(), invalid);
+  EXPECT_EQ(Manifold::Revolve(empty_sq).Status(), invalid);
 }

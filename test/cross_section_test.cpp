@@ -28,6 +28,24 @@
 
 using namespace manifold;
 
+TEST(CrossSection, Square) {
+  auto sq = CrossSection::Square({5, 5});
+  auto neg_x_sq = CrossSection::Square({-5, 5});
+  auto neg_y_sq = CrossSection::Square({5, -5});
+  auto neg_xy_sq = CrossSection::Square({-5, -5});
+
+  auto cb = Manifold::Cube({5, 5, 5});
+  auto neg_x_cb = Manifold::Cube({-5, 5, 5});
+  auto neg_y_cb = Manifold::Cube({5, -5, 5});
+  auto neg_xy_cb = Manifold::Cube({-5, -5, 5});
+
+  auto cubes = cb + neg_x_cb + neg_y_cb + neg_xy_cb;
+  auto ex = Manifold::Extrude(sq + neg_x_sq + neg_y_sq + neg_xy_sq, 5);
+
+  // ensure semantics for negative dimensions for square and cube agree
+  EXPECT_FLOAT_EQ((cubes - ex).GetProperties().volume, 0.);
+}
+
 TEST(CrossSection, MirrorUnion) {
   auto a = CrossSection::Square({5., 5.}, true);
   auto b = a.Translate({2.5, 2.5});
