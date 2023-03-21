@@ -19,7 +19,7 @@ If you like OpenSCAD / JSCAD, you might also like ManifoldCAD - our own solid mo
 
 This is a modern C++ library that Github's CI verifies builds and runs on a variety of platforms. Additionally, we build bindings for JavaScript ([manifold-3d](https://www.npmjs.com/package/manifold-3d) on npm), Python, and C to make this library more portable and easy to use. 
 
-We have only four core dependencies, making use of submodules to ensure compatibility: 
+We have four core dependencies, making use of submodules to ensure compatibility: 
 - `graphlite`: connected components algorithm
 - `Clipper2`: provides our 2D subsystem
 - `GLM`: a compact vector library
