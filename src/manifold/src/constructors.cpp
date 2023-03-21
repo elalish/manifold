@@ -173,7 +173,7 @@ Manifold Manifold::Cube(glm::vec3 size, bool center) {
  */
 Manifold Manifold::Cylinder(float height, float radiusLow, float radiusHigh,
                             int circularSegments, bool center) {
-  if (height <= 0.0f || radiusLow <= 0.0f || radiusHigh < 0.0f) {
+  if (height <= 0.0f || radiusLow <= 0.0f) {
     return Invalid();
   }
   float scale = radiusHigh >= 0.0f ? radiusHigh / radiusLow : 1.0f;
