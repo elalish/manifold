@@ -236,21 +236,35 @@ C2::PathsD CrossSection::GetPaths() const {
  * @param center Set to true to shift the center to the origin.
  */
 CrossSection CrossSection::Square(const glm::vec2 dims, bool center) {
+  if (glm::length(dims) == 0.0f) {
+    return CrossSection();
+  }
+
+  // reverse winding if dimensions are negative
+  int start, step;
+  if (dims.x * dims.y < 0.0f) {
+    start = 3;
+    step = -1;
+  } else {
+    start = 0;
+    step = 1;
+  }
+
   auto p = C2::PathD(4);
   if (center) {
     auto w = dims.x / 2;
     auto h = dims.y / 2;
-    p[0] = C2::PointD(w, h);
-    p[1] = C2::PointD(-w, h);
-    p[2] = C2::PointD(-w, -h);
-    p[3] = C2::PointD(w, -h);
+    p[start + step * 0] = C2::PointD(w, h);
+    p[start + step * 1] = C2::PointD(-w, h);
+    p[start + step * 2] = C2::PointD(-w, -h);
+    p[start + step * 3] = C2::PointD(w, -h);
   } else {
     double x = dims.x;
     double y = dims.y;
-    p[0] = C2::PointD(0.0, 0.0);
-    p[1] = C2::PointD(x, 0.0);
-    p[2] = C2::PointD(x, y);
-    p[3] = C2::PointD(0.0, y);
+    p[start + step * 0] = C2::PointD(0.0, 0.0);
+    p[start + step * 1] = C2::PointD(x, 0.0);
+    p[start + step * 2] = C2::PointD(x, y);
+    p[start + step * 3] = C2::PointD(0.0, y);
   }
   return CrossSection(C2::PathsD{p});
 }
@@ -263,6 +277,9 @@ CrossSection CrossSection::Square(const glm::vec2 dims, bool center) {
  * calculated by the static Quality defaults according to the radius.
  */
 CrossSection CrossSection::Circle(float radius, int circularSegments) {
+  if (radius <= 0.0f) {
+    return CrossSection();
+  }
   int n = circularSegments > 2 ? circularSegments
                                : Quality::GetCircularSegments(radius);
   float dPhi = 360.0f / n;
