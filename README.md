@@ -7,7 +7,7 @@
 
 For example, here is a log-log plot of Manifold's performance vs. earlier OpenSCAD geometry backends:
 
-<img src="https://github.com/elalish/manifold/samples/models/perfSpheres.png" width="350px"/>
+<img src="https://elalish.github.io/manifold/samples/models/perfSpheres.png" width="350px"/>
 
 ## [ManifoldCAD.org](https://manifoldcad.org)
 
