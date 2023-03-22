@@ -231,36 +231,32 @@ C2::PathsD CrossSection::GetPaths() const {
 
 /**
  * Constructs a square with the given XY dimensions. By default it is
- * positioned in the first quadrant, touching the origin.
+ * positioned in the first quadrant, touching the origin. If any dimensions in
+ * size are negative, or if all are zero, an empty Manifold will be returned.
  *
  * @param size The X, and Y dimensions of the square.
  * @param center Set to true to shift the center to the origin.
  */
-CrossSection CrossSection::Square(const glm::vec2 dims, bool center) {
-  if (glm::length(dims) == 0.0f) {
+CrossSection CrossSection::Square(const glm::vec2 size, bool center) {
+  if (size.x < 0.0f || size.y < 0.0f || glm::length(size) == 0.0f) {
     return CrossSection();
   }
 
-  // reverse winding if dimensions are negative
-  const bool neg = dims.x * dims.y < 0.0f;
-  const int start = neg ? 3 : 0;
-  const int step = neg ? -1 : 1;
-
   auto p = C2::PathD(4);
   if (center) {
-    const auto w = dims.x / 2;
-    const auto h = dims.y / 2;
-    p[start + step * 0] = C2::PointD(w, h);
-    p[start + step * 1] = C2::PointD(-w, h);
-    p[start + step * 2] = C2::PointD(-w, -h);
-    p[start + step * 3] = C2::PointD(w, -h);
+    const auto w = size.x / 2;
+    const auto h = size.y / 2;
+    p[0] = C2::PointD(w, h);
+    p[1] = C2::PointD(-w, h);
+    p[2] = C2::PointD(-w, -h);
+    p[3] = C2::PointD(w, -h);
   } else {
-    const double x = dims.x;
-    const double y = dims.y;
-    p[start + step * 0] = C2::PointD(0.0, 0.0);
-    p[start + step * 1] = C2::PointD(x, 0.0);
-    p[start + step * 2] = C2::PointD(x, y);
-    p[start + step * 3] = C2::PointD(0.0, y);
+    const double x = size.x;
+    const double y = size.y;
+    p[0] = C2::PointD(0.0, 0.0);
+    p[1] = C2::PointD(x, 0.0);
+    p[2] = C2::PointD(x, y);
+    p[3] = C2::PointD(0.0, y);
   }
   return CrossSection(C2::PathsD{p});
 }

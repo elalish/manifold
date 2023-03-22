@@ -517,6 +517,7 @@ TEST(Manifold, Invalid) {
   EXPECT_EQ(Manifold::Cylinder(0, 5).Status(), invalid);
   EXPECT_EQ(Manifold::Cylinder(2, -5).Status(), invalid);
   EXPECT_EQ(Manifold::Cube(glm::vec3(0.0f)).Status(), invalid);
+  EXPECT_EQ(Manifold::Cube({-1, 1, 1}).Status(), invalid);
   EXPECT_EQ(Manifold::Extrude(circ, 0.).Status(), invalid);
   EXPECT_EQ(Manifold::Extrude(empty_circ, 10.).Status(), invalid);
   EXPECT_EQ(Manifold::Revolve(empty_sq).Status(), invalid);

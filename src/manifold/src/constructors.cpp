@@ -143,13 +143,15 @@ Manifold Manifold::Tetrahedron() {
 
 /**
  * Constructs a unit cube (edge lengths all one), by default in the first
- * octant, touching the origin.
+ * octant, touching the origin. If any dimensions in size are negative, or if
+ * all are zero, an empty Manifold will be returned.
  *
  * @param size The X, Y, and Z dimensions of the box.
  * @param center Set to true to shift the center to the origin.
  */
 Manifold Manifold::Cube(glm::vec3 size, bool center) {
-  if (glm::length(size) == 0.) {
+  if (size.x < 0.0f || size.y < 0.0f || size.z < 0.0f ||
+      glm::length(size) == 0.) {
     return Invalid();
   }
   auto cube = Manifold(std::make_shared<Impl>(Impl::Shape::Cube));
