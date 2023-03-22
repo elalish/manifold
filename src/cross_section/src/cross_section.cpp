@@ -14,21 +14,6 @@
 
 #include "cross_section.h"
 
-#include <clipper2/clipper.h>
-
-#include <memory>
-#include <tuple>
-#include <vector>
-
-#include "clipper2/clipper.core.h"
-#include "clipper2/clipper.engine.h"
-#include "clipper2/clipper.offset.h"
-#include "glm/ext/matrix_float3x2.hpp"
-#include "glm/ext/vector_float2.hpp"
-#include "glm/geometric.hpp"
-#include "glm/glm.hpp"
-#include "public.h"
-
 using namespace manifold;
 
 namespace {
