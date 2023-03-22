@@ -3,7 +3,11 @@
 
 ## Users
 
-[OpenSCAD](https://openscad.org/), [IFCjs](https://ifcjs.github.io/info/), and [Grid.Space](https://grid.space/) have all integrated our Manifold geometry kernel! Why? Because its reliability is guaranteed and it's 1,000 times faster than other libraries. See our [usage](https://github.com/elalish/manifold/discussions/340) and [performance](https://github.com/elalish/manifold/discussions/383) discussions for all the latest and to add your own projects & analyses. 
+[OpenSCAD](https://openscad.org/), [IFCjs](https://ifcjs.github.io/info/), [Grid.Space](https://grid.space/), and [OCADml](https://github.com/OCADml/OManifold) have all integrated our Manifold geometry kernel! Why? Because its reliability is guaranteed and it's 1,000 times faster than other libraries. See our [usage](https://github.com/elalish/manifold/discussions/340) and [performance](https://github.com/elalish/manifold/discussions/383) discussions for all the latest and to add your own projects & analyses. 
+
+For example, here is a log-log plot of Manifold's performance vs. earlier OpenSCAD geometry backends:
+
+<img src="https://github.com/elalish/manifold/samples/models/perfSpheres.png" width="350px"/>
 
 ## [ManifoldCAD.org](https://manifoldcad.org)
 
