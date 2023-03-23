@@ -208,8 +208,7 @@ struct MeshGL {
   MeshGL() = default;
   MeshGL(const Mesh& mesh);
 
-  enum class MergeResult { AlreadyManifold, NowManifold, NotManifold };
-  MergeResult Merge();
+  bool Merge();
 };
 
 /**

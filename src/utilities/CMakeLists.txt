@@ -39,6 +39,7 @@ else()
 endif()
 
 target_include_directories(${PROJECT_NAME} PUBLIC ${THRUST_INC_DIR} ${GLM_INC_DIR} ${PROJECT_SOURCE_DIR}/include)
+target_link_libraries(${PROJECT_NAME} PRIVATE collider)
 
 if(MANIFOLD_USE_CUDA)
     set_source_files_properties(${SOURCE_FILES} PROPERTIES LANGUAGE CUDA)

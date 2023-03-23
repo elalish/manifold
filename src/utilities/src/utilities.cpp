@@ -15,6 +15,8 @@
 #include <numeric>
 #include <set>
 
+#include "collider.h"
+#include "graph.h"
 #include "public.h"
 
 using namespace manifold;
@@ -63,6 +65,29 @@ struct Edge {
     return first == other.first ? second < other.second : first < other.first;
   }
 };
+
+struct VertMortonBox {
+  const float* vertProperties;
+  const int numProp;
+  const float tol;
+  const Box bBox;
+
+  __host__ __device__ void operator()(
+      thrust::tuple<uint32_t&, Box&, int> inout) {
+    uint32_t& mortonCode = thrust::get<0>(inout);
+    Box& vertBox = thrust::get<1>(inout);
+    int vert = thrust::get<2>(inout);
+
+    const glm::vec3 center(vertProperties[numProp * vert],
+                           vertProperties[numProp * vert + 1],
+                           vertProperties[numProp * vert + 2]);
+
+    vertBox.min = center - tol / 2;
+    vertBox.max = center + tol / 2;
+
+    mortonCode = MortonCode(center, bBox);
+  }
+};
 }  // namespace
 
 MeshGL::MeshGL(const Mesh& mesh) {
@@ -82,7 +107,7 @@ MeshGL::MeshGL(const Mesh& mesh) {
   }
 }
 
-MeshGL::MergeResult MeshGL::Merge() {
+bool MeshGL::Merge() {
   std::multiset<Edge> openEdges;
 
   std::vector<int> merge(NumVert());
@@ -111,22 +136,37 @@ MeshGL::MergeResult MeshGL::Merge() {
   }
 
   if (openEdges.empty()) {
-    return MergeResult::AlreadyManifold;
+    return false;
   }
 
-  const float tol2 = kTolerance * kTolerance;
+  // TODO: calculate bounding box and fill in openVerts list
+  Box bBox;
+  VecDH<int> openVerts(numOpenVert);
 
-  for (auto it = openEdges.begin(); it != openEdges.end();) {
-    glm::vec3 delta;
-    for (int i : {0, 1, 2}) {
-      delta[i] = vertProperties[numProp * it->first + i] -
-                 vertProperties[numProp * it->second + i];
-    }
-    if (glm::dot(delta, delta) < tol2) {
-      merge[it->first] = it->second;
-      it = openEdges.erase(it);
-    } else {
-      ++it;
-    }
+  VecDH<float> vertPropD(vertProperties);
+  VecDH<Box> vertBox(numOpenVert);
+  VecDH<uint32_t> vertMorton(numOpenVert);
+  for_each_n(autoPolicy(NumTri()),
+             zip(vertMorton.begin(), vertBox.begin(), openVerts.cbegin()),
+             numOpenVert,
+             VertMortonBox({vertPropD.cptrD(), numProp, kTolerance, bBox}));
+
+  Collider collider(vertBox, vertMorton);
+  // TODO: ignore self-collisions
+  SparseIndices toMerge = collider.Collisions(vertBox);
+
+  Graph graph;
+  for (int i = 0; i < numVert; ++i) {
+    graph.add_nodes(i);
   }
+  // TODO: incorporate input merge vec here
+  for (int i = 0; i < toMerge.size(); ++i) {
+    graph.add_edge(*(toMerge.begin(0) + i), *(toMerge.begin(1) + i));
+  }
+
+  std::vector<int> vertLabels;
+  const int numComponents = ConnectedComponents(vertLabels, graph);
+  // TODO: rebuild merge vec from vertLabels
+
+  return true;
 }
