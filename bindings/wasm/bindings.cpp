@@ -201,7 +201,8 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .value("MergeIndexOutOfBounds", Manifold::Error::MergeIndexOutOfBounds)
       .value("TransformWrongLength", Manifold::Error::TransformWrongLength)
       .value("RunIndexWrongLength", Manifold::Error::RunIndexWrongLength)
-      .value("FaceIDWrongLength", Manifold::Error::FaceIDWrongLength);
+      .value("FaceIDWrongLength", Manifold::Error::FaceIDWrongLength)
+      .value("InvalidConstruction", Manifold::Error::InvalidConstruction);
 
   value_object<Box>("box").field("min", &Box::min).field("max", &Box::max);
 

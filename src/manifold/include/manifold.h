@@ -97,6 +97,7 @@ class Manifold {
     TransformWrongLength,
     RunIndexWrongLength,
     FaceIDWrongLength,
+    InvalidConstruction,
   };
   Error Status() const;
   int NumVert() const;
@@ -171,14 +172,11 @@ class Manifold {
  private:
   Manifold(std::shared_ptr<CsgNode> pNode_);
   Manifold(std::shared_ptr<Impl> pImpl_);
+  static Manifold Invalid();
 
   mutable std::shared_ptr<CsgNode> pNode_;
 
   CsgLeafNode& GetCsgLeafNode() const;
-
-  static int circularSegments_;
-  static float circularAngle_;
-  static float circularEdgeLength_;
 };
 /** @} */
 }  // namespace manifold
