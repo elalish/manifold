@@ -33,7 +33,7 @@ jobs:
     - uses: jwlawson/actions-setup-cmake@v1.12
     - name: Build ${{matrix.backend}}
       run: |
-        /usr/bin/git config --global --add safe.directory ${pwd}
+        /usr/bin/git config --global --add safe.directory $(pwd)
         git submodule update --init --recursive
         mkdir build
         cd build
@@ -86,7 +86,7 @@ jobs:
     - uses: jwlawson/actions-setup-cmake@v1.12
     - name: Build C bindings with OMP and CUDA
       run: |
-        /usr/bin/git config --global --add safe.directory ${pwd}
+        /usr/bin/git config --global --add safe.directory $(pwd)
         git submodule update --init --recursive
         mkdir build
         cd build
@@ -121,7 +121,7 @@ jobs:
     - name: Build WASM
       run: |
         source ./emsdk/emsdk_env.sh
-        /usr/bin/git config --global --add safe.directory ${pwd}
+        /usr/bin/git config --global --add safe.directory $(pwd)
         git submodule update --init --recursive
         mkdir build
         cd build
@@ -213,7 +213,7 @@ jobs:
     - uses: jwlawson/actions-setup-cmake@v1.12
     - name: Build
       run: |
-        /usr/bin/git config --global --add safe.directory ${pwd}
+        /usr/bin/git config --global --add safe.directory $(pwd)
         git submodule update --init --recursive
         mkdir build
         cd build
@@ -234,6 +234,6 @@ jobs:
     - uses: actions/checkout@v3
     - uses: cachix/install-nix-action@v15
     - run: |
-        /usr/bin/git config --global --add safe.directory ${pwd}
+        /usr/bin/git config --global --add safe.directory $(pwd)
         git submodule update --init --recursive
         nix build -L '.?submodules=1#manifold-${{matrix.variant}}'
