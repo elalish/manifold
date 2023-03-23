@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Box, Curvature, Mat4, Polygons, Properties, SealedFloat32Array, SealedUint32Array, Smoothness, Vec2, Vec3 } from './manifold-global-types';
+import {Box, Curvature, Mat4, Polygons, Properties, SealedFloat32Array, SealedUint32Array, Smoothness, Vec2, Vec3} from './manifold-global-types';
 
 /**
  * Constructs a unit cube (edge lengths all one), by default in the first
@@ -234,6 +234,16 @@ export class Manifold {
   scale(v: Vec3|number): Manifold;
 
   /**
+   * Mirror this Manifold over the plane described by the unit form of the given
+   * normal vector. If the length of the normal is zero, an empty Manifold is
+   * returned. This operation can be chained. Transforms are combined and
+   * applied lazily.
+   *
+   * @param normal The normal vector of the plane to be mirrored over
+   */
+  mirror(v: Vec3): Manifold;
+
+  /**
    * Boolean union
    */
   add(other: Manifold): Manifold;
@@ -247,6 +257,17 @@ export class Manifold {
    * Boolean intersection
    */
   intersect(other: Manifold): Manifold;
+
+  /**
+   * Removes everything behind the given half-space plane.
+   *
+   * @param normal This vector is normal to the cutting plane and its length
+   *     does not matter. The result is in the direction of this vector from the
+   *     plane.
+   * @param originOffset The distance of the plane from the origin in the
+   *     direction of the normal vector.
+   */
+  trimByPlane(normal: vec3, originOffset: number): Manifold;
 
   /**
    * Increase the density of the mesh by splitting every edge into n pieces. For

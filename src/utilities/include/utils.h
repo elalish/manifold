@@ -21,6 +21,7 @@
 #include <thrust/tuple.h>
 
 #include <atomic>
+#include <mutex>
 
 #ifdef MANIFOLD_DEBUG
 #include <chrono>
@@ -188,6 +189,36 @@ class strided_range {
   Iterator first;
   Iterator last;
   difference_type stride;
+};
+
+template <typename T>
+class ConcurrentSharedPtr {
+ public:
+  ConcurrentSharedPtr(T value) : impl(std::make_shared<T>(value)) {}
+  ConcurrentSharedPtr(const ConcurrentSharedPtr<T>& other)
+      : impl(other.impl), mutex(other.mutex) {}
+  class SharedPtrGuard {
+   public:
+    SharedPtrGuard(std::recursive_mutex* mutex, T* content)
+        : mutex(mutex), content(content) {
+      mutex->lock();
+    }
+    ~SharedPtrGuard() { mutex->unlock(); }
+
+    T& operator*() { return *content; }
+    T* operator->() { return content; }
+
+   private:
+    std::recursive_mutex* mutex;
+    T* content;
+  };
+  SharedPtrGuard GetGuard() { return SharedPtrGuard(mutex.get(), impl.get()); };
+  unsigned int UseCount() { return impl.use_count(); };
+
+ private:
+  std::shared_ptr<T> impl;
+  std::shared_ptr<std::recursive_mutex> mutex =
+      std::make_shared<std::recursive_mutex>();
 };
 /** @} */
 }  // namespace manifold

@@ -276,8 +276,8 @@ void Manifold::Impl::SortVerts() {
   // Verts were flagged for removal with NaNs and assigned kNoCode to sort
   // them to the end, which allows them to be removed.
   const int newNumVert =
-      find<decltype(vertMorton.begin())>(policy, vertMorton.begin(),
-                                         vertMorton.end(), kNoCode) -
+      lower_bound<decltype(vertMorton.begin())>(policy, vertMorton.begin(),
+                                                vertMorton.end(), kNoCode) -
       vertMorton.begin();
   vertPos_.resize(newNumVert);
   if (vertNormal_.size() == numVert) {

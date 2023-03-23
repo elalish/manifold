@@ -75,9 +75,6 @@ class Manifold {
    */
   ///@{
   static Manifold Compose(const std::vector<Manifold>&);
-
-  Components GetComponents() const;
-  std::vector<Manifold> Decompose(Components components) const;
   std::vector<Manifold> Decompose() const;
   ///@}
 
@@ -100,6 +97,7 @@ class Manifold {
     TransformWrongLength,
     RunIndexWrongLength,
     FaceIDWrongLength,
+    InvalidConstruction,
   };
   Error Status() const;
   int NumVert() const;
@@ -132,6 +130,7 @@ class Manifold {
   Manifold Rotate(float xDegrees, float yDegrees = 0.0f,
                   float zDegrees = 0.0f) const;
   Manifold Transform(const glm::mat4x3&) const;
+  Manifold Mirror(glm::vec3) const;
   Manifold Warp(std::function<void(glm::vec3&)>) const;
   Manifold Refine(int) const;
   // Manifold RefineToLength(float);
@@ -173,14 +172,11 @@ class Manifold {
  private:
   Manifold(std::shared_ptr<CsgNode> pNode_);
   Manifold(std::shared_ptr<Impl> pImpl_);
+  static Manifold Invalid();
 
   mutable std::shared_ptr<CsgNode> pNode_;
 
   CsgLeafNode& GetCsgLeafNode() const;
-
-  static int circularSegments_;
-  static float circularAngle_;
-  static float circularEdgeLength_;
 };
 /** @} */
 }  // namespace manifold

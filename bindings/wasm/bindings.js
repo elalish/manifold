@@ -90,6 +90,14 @@ Module.setup = function() {
     return this._Scale(vararg2vec([vec]));
   };
 
+  Module.Manifold.prototype.mirror = function(vec) {
+    return this._Mirror(vararg2vec([vec]));
+  };
+
+  Module.Manifold.prototype.trimByPlane = function(normal, offset) {
+    return this._TrimByPlane(vararg2vec([normal]), offset);
+  };
+
   Module.Manifold.prototype.decompose = function() {
     const vec = this._Decompose();
     const result = fromVec(vec);
@@ -222,6 +230,8 @@ Module.setup = function() {
         break;
       case Module.status.FaceIDWrongLength.value:
         message = 'Face ID vector has wrong length';
+      case Module.status.InvalidConstruction.value:
+        message = 'Manifold constructed with invalid parameters';
     }
 
     const base = Error.apply(this, [message, ...args]);

@@ -201,7 +201,8 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .value("MergeIndexOutOfBounds", Manifold::Error::MergeIndexOutOfBounds)
       .value("TransformWrongLength", Manifold::Error::TransformWrongLength)
       .value("RunIndexWrongLength", Manifold::Error::RunIndexWrongLength)
-      .value("FaceIDWrongLength", Manifold::Error::FaceIDWrongLength);
+      .value("FaceIDWrongLength", Manifold::Error::FaceIDWrongLength)
+      .value("InvalidConstruction", Manifold::Error::InvalidConstruction);
 
   value_object<Box>("box").field("min", &Box::min).field("max", &Box::max);
 
@@ -235,13 +236,15 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .function("add", &Union)
       .function("subtract", &Difference)
       .function("intersect", &Intersection)
+      .function("_TrimByPlane", &Manifold::TrimByPlane)
       .function("_GetMeshJS", &GetMeshJS)
       .function("refine", &Manifold::Refine)
       .function("_Warp", &Warp)
-      .function("_Transform", &Transform)
+      .function("transform", &Transform)
       .function("_Translate", &Manifold::Translate)
       .function("_Rotate", &Manifold::Rotate)
       .function("_Scale", &Manifold::Scale)
+      .function("_Mirror", &Manifold::Mirror)
       .function("_Decompose", select_overload<std::vector<Manifold>() const>(
                                   &Manifold::Decompose))
       .function("isEmpty", &Manifold::IsEmpty)

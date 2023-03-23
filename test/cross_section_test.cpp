@@ -16,6 +16,7 @@
 
 #include <gtest/gtest.h>
 
+#include "glm/geometric.hpp"
 #include "manifold.h"
 #include "polygon.h"
 #include "public.h"
@@ -27,10 +28,17 @@
 
 using namespace manifold;
 
+TEST(CrossSection, Square) {
+  auto a = Manifold::Cube({5, 5, 5});
+  auto b = Manifold::Extrude(CrossSection::Square({5, 5}), 5);
+
+  EXPECT_FLOAT_EQ((a - b).GetProperties().volume, 0.);
+}
+
 TEST(CrossSection, MirrorUnion) {
   auto a = CrossSection::Square({5., 5.}, true);
   auto b = a.Translate({2.5, 2.5});
-  auto cross = a + b + b.Mirror({-1, 1});
+  auto cross = a + b + b.Mirror({1, 1});
   auto result = Manifold::Extrude(cross, 5.);
 
 #ifdef MANIFOLD_EXPORT
@@ -38,8 +46,7 @@ TEST(CrossSection, MirrorUnion) {
     ExportMesh("cross_section_mirror_union.glb", result.GetMesh(), {});
 #endif
 
-  auto area_a = a.Area();
-  EXPECT_EQ(area_a + 1.5 * area_a, cross.Area());
+  EXPECT_FLOAT_EQ(2.5 * a.Area(), cross.Area());
   EXPECT_TRUE(a.Mirror(glm::vec2(0)).IsEmpty());
 }
 
@@ -89,7 +96,45 @@ TEST(CrossSection, Transform) {
                     0.0f, 0.0f, 1.0f);
 
   auto b = sq.Transform(trans * scale * rot);
+  auto b_copy = CrossSection(b);
 
+  auto ex_b = Manifold::Extrude(b, 1.).GetMesh();
+  Identical(Manifold::Extrude(a, 1.).GetMesh(), ex_b);
+
+  // same transformations are applied in b_copy (giving same result)
+  Identical(ex_b, Manifold::Extrude(b_copy, 1.).GetMesh());
+}
+
+TEST(CrossSection, Warp) {
+  auto sq = CrossSection::Square({10., 10.});
+  auto a = sq.Scale({2, 3}).Translate({4, 5});
+  auto b = sq.Warp([](glm::vec2 &v) {
+    v.x = v.x * 2 + 4;
+    v.y = v.y * 3 + 5;
+  });
+
+  EXPECT_EQ(sq.NumVert(), 4);
+  EXPECT_EQ(sq.NumContour(), 1);
   Identical(Manifold::Extrude(a, 1.).GetMesh(),
             Manifold::Extrude(b, 1.).GetMesh());
+}
+
+TEST(CrossSection, Decompose) {
+  auto a = CrossSection::Square({2., 2.}, true) -
+           CrossSection::Square({1., 1.}, true);
+  auto b = a.Translate({4, 4});
+  auto ab = a + b;
+  auto decomp = ab.Decompose();
+  auto recomp = CrossSection::Compose(decomp);
+
+  EXPECT_EQ(decomp.size(), 2);
+  EXPECT_EQ(decomp[0].NumContour(), 2);
+  EXPECT_EQ(decomp[1].NumContour(), 2);
+
+  Identical(Manifold::Extrude(a, 1.).GetMesh(),
+            Manifold::Extrude(decomp[0], 1.).GetMesh());
+  Identical(Manifold::Extrude(b, 1.).GetMesh(),
+            Manifold::Extrude(decomp[1], 1.).GetMesh());
+  Identical(Manifold::Extrude(ab, 1.).GetMesh(),
+            Manifold::Extrude(recomp, 1.).GetMesh());
 }

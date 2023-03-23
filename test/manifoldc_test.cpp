@@ -4,6 +4,7 @@
 #include "manifold.h"
 #include "polygon.h"
 #include "sdf.h"
+#include "types.h"
 
 #ifdef MANIFOLD_EXPORT
 #include "meshIO.h"
@@ -108,10 +109,13 @@ TEST(CBIND, extrude) {
       malloc(manifold_simple_polygon_size()), &pts[0], 4)};
   ManifoldPolygons *polys =
       manifold_polygons(malloc(manifold_polygons_size()), sq, 1);
+  ManifoldCrossSection *cross =
+      manifold_cross_section_of_polygons(malloc(manifold_cross_section_size()),
+                                         polys, MANIFOLD_FILL_RULE_POSITIVE);
 
   ManifoldManifold *cube = manifold_cube(malloc(sz), 1., 1., 1., 0);
   ManifoldManifold *extrusion =
-      manifold_extrude(malloc(sz), polys, 1, 0, 0, 1, 1);
+      manifold_extrude(malloc(sz), cross, 1, 0, 0, 1, 1);
 
   ManifoldManifold *diff = manifold_difference(malloc(sz), cube, extrusion);
   ManifoldProperties props = manifold_get_properties(diff);
@@ -130,25 +134,39 @@ TEST(CBIND, compose_decompose) {
 
   ManifoldManifold *s1 = manifold_sphere(malloc(sz), 1.0f, 100);
   ManifoldManifold *s2 = manifold_translate(malloc(sz), s1, 2., 2., 2.);
-  ManifoldManifold *ss[] = {s1, s2};
-  ManifoldManifold *composed = manifold_compose(malloc(sz), ss, 2);
+  ManifoldManifoldVec *ss =
+      manifold_manifold_vec(malloc(manifold_manifold_vec_size()), 2);
+  manifold_manifold_vec_set(ss, 0, s1);
+  manifold_manifold_vec_set(ss, 1, s2);
+  ManifoldManifold *composed = manifold_compose(malloc(sz), ss);
 
-  ManifoldComponents *cs =
-      manifold_get_components(malloc(manifold_components_size()), composed);
-  size_t len = manifold_components_length(cs);
-  void *bufs[len];
-  for (int i = 0; i < len; ++i) {
-    bufs[i] = malloc(sz);
-  }
-  ManifoldManifold **decomposed = manifold_decompose(bufs, composed, cs);
+  ManifoldManifoldVec *decomposed =
+      manifold_decompose(malloc(manifold_manifold_vec_size()), composed);
 
-  EXPECT_EQ(len, 2);
+  EXPECT_EQ(manifold_manifold_vec_length(decomposed), 2);
 
   manifold_delete_manifold(s1);
   manifold_delete_manifold(s2);
+  manifold_delete_manifold_vec(ss);
   manifold_delete_manifold(composed);
-  manifold_delete_components(cs);
-  for (int i = 0; i < len; ++i) {
-    manifold_delete_manifold(decomposed[i]);
-  }
+  manifold_delete_manifold_vec(decomposed);
+}
+
+TEST(CBIND, polygons) {
+  ManifoldVec2 vs[] = {{0, 0}, {1, 1}, {2, 2}};
+  ManifoldSimplePolygon *sp =
+      manifold_simple_polygon(malloc(manifold_simple_polygon_size()), vs, 3);
+  ManifoldSimplePolygon *sps[] = {sp};
+  ManifoldPolygons *ps =
+      manifold_polygons(malloc(manifold_polygons_size()), sps, 1);
+
+  EXPECT_EQ(vs[0].x, manifold_simple_polygon_get_point(sp, 0).x);
+  EXPECT_EQ(vs[1].x, manifold_simple_polygon_get_point(sp, 1).x);
+  EXPECT_EQ(vs[2].x, manifold_simple_polygon_get_point(sp, 2).x);
+  EXPECT_EQ(vs[0].x, manifold_polygons_get_point(ps, 0, 0).x);
+  EXPECT_EQ(vs[1].x, manifold_polygons_get_point(ps, 0, 1).x);
+  EXPECT_EQ(vs[2].x, manifold_polygons_get_point(ps, 0, 2).x);
+
+  manifold_delete_simple_polygon(sp);
+  manifold_delete_polygons(ps);
 }

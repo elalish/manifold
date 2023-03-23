@@ -71,6 +71,12 @@ Manifold::Manifold(std::shared_ptr<CsgNode> pNode) : pNode_(pNode) {}
 Manifold::Manifold(std::shared_ptr<Impl> pImpl_)
     : pNode_(std::make_shared<CsgLeafNode>(pImpl_)) {}
 
+Manifold Manifold::Invalid() {
+  auto pImpl_ = std::make_shared<Impl>();
+  pImpl_->status_ = Error::InvalidConstruction;
+  return Manifold(pImpl_);
+}
+
 Manifold& Manifold::operator=(const Manifold& other) {
   if (this != &other) {
     pNode_ = other.pNode_;
@@ -518,6 +524,23 @@ Manifold Manifold::Transform(const glm::mat4x3& m) const {
 }
 
 /**
+ * Mirror this Manifold over the plane described by the unit form of the given
+ * normal vector. If the length of the normal is zero, an empty Manifold is
+ * returned. This operation can be chained. Transforms are combined and applied
+ * lazily.
+ *
+ * @param normal The normal vector of the plane to be mirrored over
+ */
+Manifold Manifold::Mirror(glm::vec3 normal) const {
+  if (glm::length(normal) == 0.) {
+    return Manifold();
+  }
+  auto n = glm::normalize(normal);
+  auto m = glm::mat4x3(glm::mat3(1.0f) - 2.0f * glm::outerProduct(n, n));
+  return Manifold(pNode_->Transform(m));
+}
+
+/**
  * This function does not change the topology, but allows the vertices to be
  * moved according to any arbitrary input function. It is easy to create a
  * function that warps a geometrically valid object into one which overlaps, but
@@ -568,8 +591,7 @@ Manifold Manifold::Refine(int n) const {
  * @param op The type of operation to perform.
  */
 Manifold Manifold::Boolean(const Manifold& second, OpType op) const {
-  std::vector<std::shared_ptr<CsgNode>> children({pNode_, second.pNode_});
-  return Manifold(std::make_shared<CsgOpNode>(children, op));
+  return Manifold(pNode_->Boolean(second.pNode_, op));
 }
 
 Manifold Manifold::BatchBoolean(const std::vector<Manifold>& manifolds,

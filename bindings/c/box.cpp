@@ -17,26 +17,20 @@ ManifoldVec3 manifold_box_min(ManifoldBox *b) { return to_c((*from_c(b)).min); }
 ManifoldVec3 manifold_box_max(ManifoldBox *b) { return to_c((*from_c(b)).max); }
 
 ManifoldVec3 manifold_box_dimensions(ManifoldBox *b) {
-  auto box = *from_c(b);
-  auto v = box.Size();
+  auto v = from_c(b)->Size();
   return {v.x, v.y, v.z};
 }
 
 ManifoldVec3 manifold_box_center(ManifoldBox *b) {
-  auto box = *from_c(b);
-  auto v = box.Center();
+  auto v = from_c(b)->Center();
   return {v.x, v.y, v.z};
 }
 
-float manifold_box_scale(ManifoldBox *b) {
-  auto box = *from_c(b);
-  return box.Scale();
-}
+float manifold_box_scale(ManifoldBox *b) { return from_c(b)->Scale(); }
 
 int manifold_box_contains_pt(ManifoldBox *b, float x, float y, float z) {
-  auto box = *from_c(b);
   auto p = glm::vec3(x, y, z);
-  return box.Contains(p);
+  return from_c(b)->Contains(p);
 }
 
 int manifold_box_contains_box(ManifoldBox *a, ManifoldBox *b) {
@@ -52,7 +46,7 @@ void manifold_box_include_pt(ManifoldBox *b, float x, float y, float z) {
 }
 
 ManifoldBox *manifold_box_union(void *mem, ManifoldBox *a, ManifoldBox *b) {
-  auto box = (*from_c(a)).Union(*from_c(b));
+  auto box = from_c(a)->Union(*from_c(b));
   return to_c(new (mem) Box(box));
 }
 
@@ -61,13 +55,12 @@ ManifoldBox *manifold_box_transform(void *mem, ManifoldBox *b, float x1,
                                     float z2, float x3, float y3, float z3,
                                     float x4, float y4, float z4) {
   auto mat = glm::mat4x3(x1, y1, z1, x2, y2, z2, x3, y3, z3, x4, y4, z4);
-  auto transformed = (*from_c(b)).Transform(mat);
+  auto transformed = from_c(b)->Transform(mat);
   return to_c(new (mem) Box(transformed));
 }
 
 ManifoldBox *manifold_box_translate(void *mem, ManifoldBox *b, float x, float y,
                                     float z) {
-  auto box = *from_c(b);
   auto p = glm::vec3(x, y, z);
   auto translated = (*from_c(b)) + p;
   return to_c(new (mem) Box(translated));
@@ -75,20 +68,18 @@ ManifoldBox *manifold_box_translate(void *mem, ManifoldBox *b, float x, float y,
 
 ManifoldBox *manifold_box_mul(void *mem, ManifoldBox *b, float x, float y,
                               float z) {
-  auto box = *from_c(b);
   auto p = glm::vec3(x, y, z);
   auto scaled = (*from_c(b)) * p;
   return to_c(new (mem) Box(scaled));
 }
 
 int manifold_box_does_overlap_pt(ManifoldBox *b, float x, float y, float z) {
-  auto box = *from_c(b);
   auto p = glm::vec3(x, y, z);
-  return box.DoesOverlap(p);
+  return from_c(b)->DoesOverlap(p);
 }
 
 int manifold_box_does_overlap_box(ManifoldBox *a, ManifoldBox *b) {
-  return (*from_c(a)).DoesOverlap(*from_c(b));
+  return from_c(a)->DoesOverlap(*from_c(b));
 }
 
-int manifold_box_is_finite(ManifoldBox *b) { return (*from_c(b)).IsFinite(); }
+int manifold_box_is_finite(ManifoldBox *b) { return from_c(b)->IsFinite(); }

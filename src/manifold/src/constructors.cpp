@@ -143,12 +143,17 @@ Manifold Manifold::Tetrahedron() {
 
 /**
  * Constructs a unit cube (edge lengths all one), by default in the first
- * octant, touching the origin.
+ * octant, touching the origin. If any dimensions in size are negative, or if
+ * all are zero, an empty Manifold will be returned.
  *
  * @param size The X, Y, and Z dimensions of the box.
  * @param center Set to true to shift the center to the origin.
  */
 Manifold Manifold::Cube(glm::vec3 size, bool center) {
+  if (size.x < 0.0f || size.y < 0.0f || size.z < 0.0f ||
+      glm::length(size) == 0.) {
+    return Invalid();
+  }
   auto cube = Manifold(std::make_shared<Impl>(Impl::Shape::Cube));
   cube = cube.Scale(size);
   if (center) cube = cube.Translate(-size / 2.0f);
@@ -170,6 +175,9 @@ Manifold Manifold::Cube(glm::vec3 size, bool center) {
  */
 Manifold Manifold::Cylinder(float height, float radiusLow, float radiusHigh,
                             int circularSegments, bool center) {
+  if (height <= 0.0f || radiusLow <= 0.0f) {
+    return Invalid();
+  }
   float scale = radiusHigh >= 0.0f ? radiusHigh / radiusLow : 1.0f;
   float radius = fmax(radiusLow, radiusHigh);
   int n = circularSegments > 2 ? circularSegments
@@ -195,6 +203,9 @@ Manifold Manifold::Cylinder(float height, float radiusLow, float radiusHigh,
  * calculated by the static Defaults.
  */
 Manifold Manifold::Sphere(float radius, int circularSegments) {
+  if (radius <= 0.0f) {
+    return Invalid();
+  }
   int n = circularSegments > 0 ? (circularSegments + 3) / 4
                                : Quality::GetCircularSegments(radius) / 4;
   auto pImpl_ = std::make_shared<Impl>(Impl::Shape::Octahedron);
@@ -226,6 +237,9 @@ Manifold Manifold::Extrude(const CrossSection& crossSection, float height,
                            int nDivisions, float twistDegrees,
                            glm::vec2 scaleTop) {
   auto polygons = crossSection.ToPolygons();
+  if (polygons.size() == 0 || height <= 0.0f) {
+    return Invalid();
+  }
 
   scaleTop.x = glm::max(scaleTop.x, 0.0f);
   scaleTop.y = glm::max(scaleTop.y, 0.0f);
@@ -307,6 +321,9 @@ Manifold Manifold::Extrude(const CrossSection& crossSection, float height,
 Manifold Manifold::Revolve(const CrossSection& crossSection,
                            int circularSegments) {
   auto polygons = crossSection.ToPolygons();
+  if (polygons.size() == 0) {
+    return Invalid();
+  }
 
   float radius = 0.0f;
   for (const auto& poly : polygons) {
@@ -412,7 +429,12 @@ Manifold Manifold::Compose(const std::vector<Manifold>& manifolds) {
   return Manifold(std::make_shared<Impl>(CsgLeafNode::Compose(children)));
 }
 
-Components Manifold::GetComponents() const {
+/**
+ * This operation returns a vector of Manifolds that are topologically
+ * disconnected. If everything is connected, the vector is length one,
+ * containing a copy of the original. It is the inverse operation of Compose().
+ */
+std::vector<Manifold> Manifold::Decompose() const {
   Graph graph;
   auto pImpl_ = GetCsgLeafNode().GetImpl();
   for (int i = 0; i < NumVert(); ++i) {
@@ -422,23 +444,18 @@ Components Manifold::GetComponents() const {
     if (halfedge.IsForward())
       graph.add_edge(halfedge.startVert, halfedge.endVert);
   }
-  std::vector<int> components;
-  const int numLabel = ConnectedComponents(components, graph);
-  return {components, numLabel};
-}
+  std::vector<int> componentIndices;
+  const int numComponents = ConnectedComponents(componentIndices, graph);
 
-std::vector<Manifold> Manifold::Decompose(Components components) const {
-  auto pImpl_ = GetCsgLeafNode().GetImpl();
-
-  if (components.numComponents == 1) {
+  if (numComponents == 1) {
     std::vector<Manifold> meshes(1);
     meshes[0] = *this;
     return meshes;
   }
-  VecDH<int> vertLabel(components.indices);
+  VecDH<int> vertLabel(componentIndices);
 
   std::vector<Manifold> meshes;
-  for (int i = 0; i < components.numComponents; ++i) {
+  for (int i = 0; i < numComponents; ++i) {
     auto impl = std::make_shared<Impl>();
     // inherit original object's precision
     impl->precision_ = pImpl_->precision_;
@@ -472,14 +489,5 @@ std::vector<Manifold> Manifold::Decompose(Components components) const {
     meshes.push_back(Manifold(impl));
   }
   return meshes;
-}
-
-/**
- * This operation returns a vector of Manifolds that are topologically
- * disconnected. If everything is connected, the vector is length one,
- * containing a copy of the original. It is the inverse operation of Compose().
- */
-std::vector<Manifold> Manifold::Decompose() const {
-  return Decompose(GetComponents());
 }
 }  // namespace manifold

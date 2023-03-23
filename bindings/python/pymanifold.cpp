@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "cross_section.h"
 #include "manifold.h"
 #include "pybind11/functional.h"
 #include "pybind11/numpy.h"
@@ -36,6 +37,43 @@ PYBIND11_MODULE(pymanifold, m) {
       "documentation for APIs.\n"
       "This binding will perform copying to make the API more familiar to "
       "OpenSCAD users.";
+
+  m.def("set_min_circular_angle", Quality::SetMinCircularAngle,
+        "Sets an angle constraint the default number of circular segments for "
+        "the CrossSection::Circle(), Manifold::Cylinder(), Manifold::Sphere(), "
+        "and Manifold::Revolve() constructors. The number of segments will be "
+        "rounded up to the nearest factor of four."
+        "\n\n"
+        "@param angle The minimum angle in degrees between consecutive "
+        "segments. The angle will increase if the the segments hit the minimum "
+        "edge length.\n"
+        "Default is 10 degrees.");
+
+  m.def("set_min_circular_edge_length", Quality::SetMinCircularEdgeLength,
+        "Sets a length constraint the default number of circular segments for "
+        "the CrossSection::Circle(), Manifold::Cylinder(), Manifold::Sphere(), "
+        "and Manifold::Revolve() constructors. The number of segments will be "
+        "rounded up to the nearest factor of four."
+        "\n\n"
+        "@param length The minimum length of segments. The length will "
+        "increase if the the segments hit the minimum angle. Default is 1.0.");
+
+  m.def("set_circular_segments", Quality::SetCircularSegments,
+        "Sets the default number of circular segments for the "
+        "CrossSection::Circle(), Manifold::Cylinder(), Manifold::Sphere(), and "
+        "Manifold::Revolve() constructors. Overrides the edge length and angle "
+        "constraints and sets the number of segments to exactly this value."
+        "\n\n"
+        "@param number Number of circular segments. Default is 0, meaning no "
+        "constraint is applied.");
+
+  m.def(
+      "get_circular_segments", Quality::GetCircularSegments,
+      "Determine the result of the SetMinCircularAngle(), "
+      "SetMinCircularEdgeLength(), and SetCircularSegments() defaults."
+      "\n\n"
+      "@param radius For a given radius of circle, determine how many default");
+
   py::class_<Manifold>(m, "Manifold")
       .def(py::init<>())
       .def(py::init([](std::vector<Manifold> &manifolds) {
@@ -71,11 +109,10 @@ PYBIND11_MODULE(pymanifold, m) {
           },
           py::arg("m"),
           "Transform this Manifold in space. The first three columns form a "
-          "3x3 matrix\n"
-          "transform and the last is a translation vector. This operation can "
-          "be\n"
-          "chained. Transforms are combined and applied lazily.\n"
-          "\n"
+          "3x3 matrix transform and the last is a translation vector. This "
+          "operation can be chained. Transforms are combined and applied "
+          "lazily.\n"
+          "\n\n"
           ":param m: The affine transform matrix to apply to all the vertices.")
       .def(
           "translate",
@@ -84,9 +121,8 @@ PYBIND11_MODULE(pymanifold, m) {
           },
           py::arg("x") = 0.0f, py::arg("y") = 0.0f, py::arg("z") = 0.0f,
           "Move this Manifold in space. This operation can be chained. "
-          "Transforms are\n"
-          "combined and applied lazily.\n"
-          "\n"
+          "Transforms are combined and applied lazily."
+          "\n\n"
           ":param x: X axis translation. (default 0.0).\n"
           ":param y: Y axis translation. (default 0.0).\n"
           ":param z: Z axis translation. (default 0.0).")
@@ -100,9 +136,8 @@ PYBIND11_MODULE(pymanifold, m) {
           },
           py::arg("t"),
           "Move this Manifold in space. This operation can be chained. "
-          "Transforms are\n"
-          "combined and applied lazily.\n"
-          "\n"
+          "Transforms are combined and applied lazily."
+          "\n\n"
           ":param v: The vector to add to every vertex.")
       .def("scale",
            static_cast<Manifold (*)(Manifold, float)>(
@@ -111,9 +146,8 @@ PYBIND11_MODULE(pymanifold, m) {
                }),
            py::arg("scale"),
            "Scale this Manifold in space. This operation can be chained. "
-           "Transforms are\n"
-           "combined and applied lazily.\n"
-           "\n"
+           "Transforms are combined and applied lazily."
+           "\n\n"
            ":param scale: The scalar multiplier for each component of every "
            "vertices.")
       .def(
@@ -127,9 +161,8 @@ PYBIND11_MODULE(pymanifold, m) {
           },
           py::arg("v"),
           "Scale this Manifold in space. This operation can be chained. "
-          "Transforms are\n"
-          "combined and applied lazily.\n"
-          "\n"
+          "Transforms are combined and applied lazily."
+          "\n\n"
           ":param v: The vector to multiply every vertex by component.")
       .def(
           "rotate",
@@ -141,17 +174,13 @@ PYBIND11_MODULE(pymanifold, m) {
           },
           py::arg("v"),
           "Applies an Euler angle rotation to the manifold, first about the X "
-          "axis, then\n"
-          "Y, then Z, in degrees. We use degrees so that we can minimize "
-          "rounding error,\n"
-          "and eliminate it completely for any multiples of 90 degrees. "
-          "Additionally, more\n"
-          "efficient code paths are used to update the manifold when the "
-          "transforms only\n"
-          "rotate by multiples of 90 degrees. This operation can be chained. "
-          "Transforms\n"
-          "are combined and applied lazily.\n"
-          "\n"
+          "axis, then Y, then Z, in degrees. We use degrees so that we can "
+          "minimize rounding error, and eliminate it completely for any "
+          "multiples of 90 degrees. Additionally, more efficient code paths "
+          "are used to update the manifold when the transforms only rotate by "
+          "multiples of 90 degrees. This operation can be chained. Transforms "
+          "are combined and applied lazily."
+          "\n\n"
           ":param v: [X, Y, Z] rotation in degrees.")
       .def(
           "rotate",
@@ -162,17 +191,13 @@ PYBIND11_MODULE(pymanifold, m) {
           py::arg("x_degrees") = 0.0f, py::arg("y_degrees") = 0.0f,
           py::arg("z_degrees") = 0.0f,
           "Applies an Euler angle rotation to the manifold, first about the X "
-          "axis, then\n"
-          "Y, then Z, in degrees. We use degrees so that we can minimize "
-          "rounding error,\n"
-          "and eliminate it completely for any multiples of 90 degrees. "
-          "Additionally, more\n"
-          "efficient code paths are used to update the manifold when the "
-          "transforms only\n"
-          "rotate by multiples of 90 degrees. This operation can be chained. "
-          "Transforms\n"
-          "are combined and applied lazily.\n"
-          "\n"
+          "axis, then Y, then Z, in degrees. We use degrees so that we can "
+          "minimize rounding error, and eliminate it completely for any "
+          "multiples of 90 degrees. Additionally, more efficient code paths "
+          "are used to update the manifold when the transforms only rotate by "
+          "multiples of 90 degrees. This operation can be chained. "
+          "Transforms are combined and applied lazily."
+          "\n\n"
           ":param x: X rotation in degrees. (default 0.0).\n"
           ":param y: Y rotation in degrees. (default 0.0).\n"
           ":param z: Z rotation in degrees. (default 0.0).")
@@ -191,74 +216,143 @@ PYBIND11_MODULE(pymanifold, m) {
           "refine", [](Manifold self, int n) { return self.Refine(n); },
           py::arg("n"),
           "Increase the density of the mesh by splitting every edge into n "
-          "pieces. For\n"
-          "instance, with n = 2, each triangle will be split into 4 triangles. "
-          "These\n"
-          "will all be coplanar (and will not be immediately collapsed) unless "
-          "the\n"
-          "Mesh/Manifold has halfedgeTangents specified (e.g. from the "
-          "Smooth()\n"
-          "constructor), in which case the new vertices will be moved to the\n"
-          "interpolated surface according to their barycentric coordinates.\n"
+          "pieces. For instance, with n = 2, each triangle will be split into "
+          "4 triangles. These will all be coplanar (and will not be "
+          "immediately collapsed) unless the Mesh/Manifold has "
+          "halfedgeTangents specified (e.g. from the Smooth() constructor), "
+          "in which case the new vertices will be moved to the interpolated "
+          "surface according to their barycentric coordinates.\n"
           "\n"
           ":param n: The number of pieces to split every edge into. Must be > "
           "1.")
       .def("to_mesh", &Manifold::GetMesh)
+      .def("num_vert", &Manifold::NumVert,
+           "The number of vertices in the Manifold.")
+      .def("num_edge", &Manifold::NumEdge,
+           "The number of edges in the Manifold.")
+      .def("num_tri", &Manifold::NumTri,
+           "The number of triangles in the Manifold.")
+      .def("num_prop", &Manifold::NumProp,
+           "The number of properties per vertex in the Manifold")
+      .def("num_prop_vert", &Manifold::NumPropVert,
+           "The number of property vertices in the Manifold. This will always "
+           "be >= NumVert, as some physical vertices may be duplicated to "
+           "account for different properties on different neighboring "
+           "triangles.")
+      .def("precision", &Manifold::Precision,
+           "Returns the precision of this Manifold's vertices, which tracks "
+           "the approximate rounding error over all the transforms and "
+           "operations that have led to this state. Any triangles that are "
+           "colinear within this precision are considered degenerate and "
+           "removed. This is the value of &epsilon; defining "
+           "[&epsilon;-valid](https://github.com/elalish/manifold/wiki/"
+           "Manifold-Library#definition-of-%CE%B5-valid).")
+      .def("genus", &Manifold::Genus,
+           "The genus is a topological property of the manifold, representing "
+           "the number of \"handles\". A sphere is 0, torus 1, etc. It is only "
+           "meaningful for a single mesh, so it is best to call Decompose() "
+           "first.")
+      .def(
+          "get_volume",
+          [](Manifold self) { return self.GetProperties().volume; },
+          "Get the volume of the manifold\n This is clamped to zero for a "
+          "given face if they are within the Precision().")
+      .def(
+          "get_surface_area",
+          [](Manifold self) { return self.GetProperties().surfaceArea; },
+          "Get the surface area of the manifold\n This is clamped to zero for "
+          "a given face if they are within the Precision().")
+      .def("original_id", &Manifold::OriginalID,
+           "If this mesh is an original, this returns its meshID that can be "
+           "referenced by product manifolds' MeshRelation. If this manifold is "
+           "a product, this returns -1.")
+      .def("as_original", &Manifold::AsOriginal,
+           "This function condenses all coplanar faces in the relation, and "
+           "collapses those edges. In the process the relation to ancestor "
+           "meshes is lost and this new Manifold is marked an original. "
+           "Properties are preserved, so if they do not match across an edge, "
+           "that edge will be kept.")
+      .def("is_empty", &Manifold::IsEmpty,
+           "Does the Manifold have any triangles?")
+      .def(
+          "decompose", [](Manifold self) { return self.Decompose(); },
+          " This operation returns a vector of Manifolds that are "
+          "topologically disconnected. If everything is connected, the vector "
+          "is length one, containing a copy of the original. It is the inverse "
+          "operation of Compose().")
+      .def("split", &Manifold::Split,
+           "Split cuts this manifold in two using the cutter manifold. The "
+           "first result is the intersection, second is the difference. This "
+           "is more efficient than doing them separately.")
+      .def(
+          "split_by_plane",
+          [](Manifold self, Float3 normal, float originOffset) {
+            return self.SplitByPlane(
+                {std::get<0>(normal), std::get<1>(normal), std::get<2>(normal)},
+                originOffset);
+          },
+          py::arg("normal"), py::arg("origin_offset"),
+          "Convenient version of Split() for a half-space."
+          "\n\n"
+          "@param normal This vector is normal to the cutting plane and its "
+          "length does not matter. The first result is in the direction of "
+          "this vector, the second result is on the opposite side.\n"
+          "@param originOffset The distance of the plane from the origin in "
+          "the direction of the normal vector.")
+      .def(
+          "trim_by_plane",
+          [](Manifold self, Float3 normal, float originOffset) {
+            return self.TrimByPlane(
+                {std::get<0>(normal), std::get<1>(normal), std::get<2>(normal)},
+                originOffset);
+          },
+          py::arg("normal"), py::arg("origin_offset"),
+          "Identical to SplitByPlane(), but calculating and returning only the "
+          "first result."
+          "\n\n"
+          "@param normal This vector is normal to the cutting plane and its "
+          "length does not matter. The result is in the direction of this "
+          "vector from the plane.\n"
+          "@param originOffset The distance of the plane from the origin in "
+          "the direction of the normal vector.")
       .def_static(
           "smooth", [](const Mesh &mesh) { return Manifold::Smooth(mesh); },
-          "Constructs a smooth version of the input mesh by creating "
-          "tangents; this\n"
-          "method will throw if you have supplied tangents with your "
-          "mesh already. The\n"
-          "actual triangle resolution is unchanged; use the Refine() "
-          "method to\n"
-          "interpolate to a higher-resolution curve.\n"
-          "\n"
-          "By default, every edge is calculated for maximum smoothness "
-          "(very much\n"
-          "approximately), attempting to minimize the maximum mean "
-          "Curvature magnitude.\n"
-          "No higher-order derivatives are considered, as the "
-          "interpolation is\n"
-          "independent per triangle, only sharing constraints on their "
-          "boundaries.\n"
-          "\n"
+          "Constructs a smooth version of the input mesh by creating tangents; "
+          "this method will throw if you have supplied tangents with your "
+          "mesh already. The actual triangle resolution is unchanged; use the "
+          "Refine() method to interpolate to a higher-resolution curve."
+          "\n\n"
+          "By default, every edge is calculated for maximum smoothness (very "
+          "much approximately), attempting to minimize the maximum mean "
+          "Curvature magnitude. No higher-order derivatives are considered, "
+          "as the interpolation is independent per triangle, only sharing "
+          "constraints on their boundaries."
+          "\n\n"
           ":param mesh: input Mesh.\n"
-          ":param sharpenedEdges: If desired, you can supply a vector "
-          "of sharpened\n"
-          "halfedges, which should in general be a small subset of all "
-          "halfedges. Order\n"
-          "of entries doesn't matter, as each one specifies the "
-          "desired smoothness\n"
-          "(between zero and one, with one the default for all "
-          "unspecified halfedges)\n"
-          "and the halfedge index (3 * triangle index + [0,1,2] where "
-          "0 is the edge\n"
-          "between triVert 0 and 1, etc).\n"
-          "\n"
+          ":param sharpenedEdges: If desired, you can supply a vector of "
+          "sharpened halfedges, which should in general be a small subset of "
+          "all halfedges. Order of entries doesn't matter, as each one "
+          "specifies the desired smoothness (between zero and one, with one "
+          "the default for all unspecified halfedges) and the halfedge index "
+          "(3 * triangle index + [0,1,2] where 0 is the edge between triVert 0 "
+          "and 1, etc)."
+          "\n\n"
           "At a smoothness value of zero, a sharp crease is made. The "
-          "smoothness is\n"
-          "interpolated along each edge, so the specified value should "
-          "be thought of as\n"
-          "an average. Where exactly two sharpened edges meet at a "
-          "vertex, their\n"
-          "tangents are rotated to be colinear so that the sharpened "
-          "edge can be\n"
-          "continuous. Vertices with only one sharpened edge are "
-          "completely smooth,\n"
-          "allowing sharpened edges to smoothly vanish at termination. "
-          "A single vertex\n"
-          "can be sharpened by sharping all edges that are incident on "
-          "it, allowing\n"
-          "cones to be formed.")
+          "smoothness is interpolated along each edge, so the specified value "
+          "should be thought of as an average. Where exactly two sharpened "
+          "edges meet at a vertex, their tangents are rotated to be colinear "
+          "so that the sharpened edge can be continuous. Vertices with only "
+          "one sharpened edge are completely smooth, allowing sharpened edges "
+          "to smoothly vanish at termination. A single vertex can be sharpened "
+          "by sharping all edges that are incident on it, allowing cones to be "
+          "formed.")
       .def_static(
           "from_mesh", [](const Mesh &mesh) { return Manifold(mesh); },
           py::arg("mesh"))
       .def_static(
           "tetrahedron", []() { return Manifold::Tetrahedron(); },
           "Constructs a tetrahedron centered at the origin with one vertex at "
-          "(1,1,1)\n"
-          "and the rest at similarly symmetric points.")
+          "(1,1,1) and the rest at similarly symmetric points.")
       .def_static(
           "cube",
           [](Float3 size, bool center = false) {
@@ -270,9 +364,8 @@ PYBIND11_MODULE(pymanifold, m) {
           py::arg("size") = std::make_tuple(1.0f, 1.0f, 1.0f),
           py::arg("center") = false,
           "Constructs a unit cube (edge lengths all one), by default in the "
-          "first\n"
-          "octant, touching the origin.\n"
-          "\n"
+          "first octant, touching the origin."
+          "\n\n"
           ":param size: The X, Y, and Z dimensions of the box.\n"
           ":param center: Set to true to shift the center to the origin.")
       .def_static(
@@ -286,9 +379,8 @@ PYBIND11_MODULE(pymanifold, m) {
           },
           py::arg("size"), py::arg("center") = false,
           "Constructs a unit cube (edge lengths all one), by default in the "
-          "first\n"
-          "octant, touching the origin.\n"
-          "\n"
+          "first octant, touching the origin."
+          "\n\n"
           ":param size: The X, Y, and Z dimensions of the box.\n"
           ":param center: Set to true to shift the center to the origin.")
       .def_static(
@@ -298,9 +390,8 @@ PYBIND11_MODULE(pymanifold, m) {
           },
           py::arg("x"), py::arg("y"), py::arg("z"), py::arg("center") = false,
           "Constructs a unit cube (edge lengths all one), by default in the "
-          "first\n"
-          "octant, touching the origin.\n"
-          "\n"
+          "first octant, touching the origin."
+          "\n\n"
           ":param x: The X dimensions of the box.\n"
           ":param y: The Y dimensions of the box.\n"
           ":param z: The Z dimensions of the box.\n"
@@ -308,27 +399,24 @@ PYBIND11_MODULE(pymanifold, m) {
       .def_static(
           "cylinder",
           [](float height, float radiusLow, float radiusHigh = -1.0f,
-             int circularSegments = 0) {
+             int circularSegments = 0, bool center = false) {
             return Manifold::Cylinder(height, radiusLow, radiusHigh,
-                                      circularSegments);
+                                      circularSegments, center);
           },
           py::arg("height"), py::arg("radius_low"),
           py::arg("radius_high") = -1.0f, py::arg("circular_segments") = 0,
+          py::arg("center") = false,
           "A convenience constructor for the common case of extruding a "
-          "circle. Can also\n"
-          "form cones if both radii are specified.\n"
-          "\n"
+          "circle. Can also form cones if both radii are specified."
+          "\n\n"
           ":param height: Z-extent\n"
           ":param radiusLow: Radius of bottom circle. Must be positive.\n"
           ":param radiusHigh: Radius of top circle. Can equal zero. Default "
-          "(-1) is equal to\n"
-          "radiusLow.\n"
+          "(-1) is equal to radiusLow.\n"
           ":param circularSegments: How many line segments to use around the "
-          "circle.\n"
-          "Default (-1) is calculated by the static Defaults.\n"
+          "circle. Default (-1) is calculated by the static Defaults.\n"
           ":param center: Set to true to shift the center to the origin. "
-          "Default is\n"
-          "origin at the bottom.")
+          "Default is origin at the bottom.")
       .def_static(
           "sphere",
           [](float radius, int circularSegments = 0) {
@@ -338,14 +426,15 @@ PYBIND11_MODULE(pymanifold, m) {
           "Constructs a geodesic sphere of a given radius.\n"
           "\n"
           ":param radius: Radius of the sphere. Must be positive.\n"
-          ":param circularSegments: Number of segments along its\n"
-          "diameter. This number will always be rounded up to the nearest "
-          "factor of\n"
+          ":param circularSegments: Number of segments along its diameter. "
+          "This number will always be rounded up to the nearest factor of "
           "four, as this sphere is constructed by refining an octahedron. This "
-          "means\n"
-          "there are a circle of vertices on all three of the axis planes. "
-          "Default is\n"
-          "calculated by the static Defaults.");
+          "means there are a circle of vertices on all three of the axis "
+          "planes. Default is calculated by the static Defaults.")
+      .def_static("reserve_ids", Manifold::ReserveIDs, py::arg("n"),
+                  "Returns the first of n sequential new unique mesh IDs for "
+                  "marking sets of triangles that can be looked up after "
+                  "further operations. Assign to MeshGL.runOriginalID vector");
 
   py::class_<PolygonsWrapper>(m, "Polygons")
       .def(py::init([](std::vector<std::vector<Float2>> &polygons) {
@@ -376,23 +465,18 @@ PYBIND11_MODULE(pymanifold, m) {
           py::arg("twist_degrees") = 0.0f,
           py::arg("scale_top") = std::make_tuple(1.0f, 1.0f),
           "Constructs a manifold from the set of polygons by extruding them "
-          "along the\n"
-          "Z-axis.\n"
+          "along the Z-axis.\n"
           "\n"
           ":param height: Z-extent of extrusion.\n"
           ":param nDivisions: Number of extra copies of the crossSection to "
-          "insert into\n"
-          "the shape vertically; especially useful in combination with "
-          "twistDegrees to\n"
-          "avoid interpolation artifacts. Default is none.\n"
+          "insert into the shape vertically; especially useful in combination "
+          "with twistDegrees to avoid interpolation artifacts. Default is "
+          "none.\n"
           ":param twistDegrees: Amount to twist the top crossSection relative "
-          "to the\n"
-          "bottom, interpolated linearly for the divisions in between.\n"
+          "to the bottom, interpolated linearly for the divisions in between.\n"
           ":param scaleTop: Amount to scale the top (independently in X and "
-          "Y). If the\n"
-          "scale is (0, 0), a pure cone is formed with only a single vertex at "
-          "the top.\n"
-          "Default (1, 1).")
+          "Y). If the scale is (0, 0), a pure cone is formed with only a "
+          "single vertex at the top. Default (1, 1).")
       .def(
           "revolve",
           [](PolygonsWrapper &self, int circularSegments = 0) {
@@ -400,18 +484,13 @@ PYBIND11_MODULE(pymanifold, m) {
           },
           py::arg("circular_segments") = 0,
           "Constructs a manifold from the set of polygons by revolving this "
-          "cross-section\n"
-          "around its Y-axis and then setting this as the Z-axis of the "
-          "resulting\n"
-          "manifold. If the polygons cross the Y-axis, only the part on the "
-          "positive X\n"
-          "side is used. Geometrically valid input will result in "
-          "geometrically valid\n"
-          "output.\n"
+          "cross-section around its Y-axis and then setting this as the Z-axis "
+          "of the resulting manifold. If the polygons cross the Y-axis, only "
+          "the part on the positive X side is used. Geometrically valid input "
+          "will result in geometrically valid output.\n"
           "\n"
           ":param circularSegments: Number of segments along its diameter. "
-          "Default is\n"
-          "calculated by the static Defaults.");
+          "Default is calculated by the static Defaults.");
 
   py::class_<Mesh>(m, "Mesh")
       .def(py::init([](py::array_t<float> &vertPos, py::array_t<int> &triVerts,
@@ -508,4 +587,152 @@ PYBIND11_MODULE(pymanifold, m) {
             halfedge_tangent_view(i, j) = self.halfedgeTangent[i][j];
         return halfedge_tangent;
       });
+
+  py::enum_<CrossSection::FillRule>(m, "FillRule")
+      .value("EvenOdd", CrossSection::FillRule::EvenOdd,
+             "Only odd numbered sub-regions are filled.")
+      .value("NonZero", CrossSection::FillRule::NonZero,
+             "Only non-zero sub-regions are filled.")
+      .value("Positive", CrossSection::FillRule::Positive,
+             "Only sub-regions with winding counts > 0 are filled.")
+      .value("Negative", CrossSection::FillRule::Negative,
+             "Only sub-regions with winding counts < 0 are filled.");
+
+  py::enum_<CrossSection::JoinType>(m, "JoinType")
+      .value("Square", CrossSection::JoinType::Square,
+             "Squaring is applied uniformly at all joins where the internal "
+             "join angle is less that 90 degrees. The squared edge will be at "
+             "exactly the offset distance from the join vertex.")
+      .value(
+          "Round", CrossSection::JoinType::Square,
+          "Rounding is applied to all joins that have convex external angles, "
+          "and it maintains the exact offset distance from the join vertex.")
+      .value(
+          "Miter", CrossSection::JoinType::Miter,
+          "There's a necessary limit to mitered joins (to avoid narrow angled "
+          "joins producing excessively long and narrow "
+          "[spikes](http://www.angusj.com/clipper2/Docs/Units/Clipper.Offset/"
+          "Classes/ClipperOffset/Properties/MiterLimit.htm)). So where mitered "
+          "joins would exceed a given maximum miter distance (relative to the "
+          "offset distance), these are 'squared' instead.");
+
+  py::class_<CrossSection>(
+      m, "CrossSection",
+      "Two-dimensional cross sections guaranteed to be without "
+      "self-intersections, or overlaps between polygons (from construction "
+      "onwards). This class makes use of the "
+      "[Clipper2](http://www.angusj.com/clipper2/Docs/Overview.htm) library "
+      "for polygon clipping (boolean) and offsetting operations.")
+      .def(py::init<>())
+      .def(py::init(
+               [](PolygonsWrapper &contours, CrossSection::FillRule fillrule) {
+                 return CrossSection(*contours.polygons, fillrule);
+               }),
+           py::arg("contours"),
+           py::arg("fillrule") = CrossSection::FillRule::Positive)
+      .def("area", &CrossSection::Area)
+      .def("num_vert", &CrossSection::NumVert)
+      .def("num_contour", &CrossSection::NumContour)
+      .def("is_empty", &CrossSection::IsEmpty)
+      .def("translate",
+           [](CrossSection self, Float2 v) {
+             return self.Translate({std::get<0>(v), std::get<1>(v)});
+           })
+      .def("rotate", &CrossSection::Rotate)
+      .def("scale",
+           [](CrossSection self, Float2 s) {
+             return self.Scale({std::get<0>(s), std::get<1>(s)});
+           })
+      .def("mirror",
+           [](CrossSection self, Float2 ax) {
+             return self.Mirror({std::get<0>(ax), std::get<1>(ax)});
+           })
+      .def("transform",
+           [](CrossSection self, py::array_t<float> &mat) {
+             auto mat_view = mat.unchecked<2>();
+             if (mat_view.shape(0) != 2 || mat_view.shape(1) != 3)
+               throw std::runtime_error("Invalid matrix shape");
+             glm::mat3x2 mat_glm;
+             for (int i = 0; i < 2; i++) {
+               for (int j = 0; j < 3; j++) {
+                 mat_glm[j][i] = mat_view(i, j);
+               }
+             }
+             return self.Transform(mat_glm);
+           })
+      .def(
+          "warp",
+          [](CrossSection self, const std::function<Float2(Float2)> &f) {
+            return self.Warp([&f](glm::vec2 &v) {
+              Float2 fv = f(std::make_tuple(v.x, v.y));
+              v.x = std::get<0>(fv);
+              v.y = std::get<1>(fv);
+            });
+          },
+          py::arg("f"))
+      .def("simplify", &CrossSection::Simplify)
+      .def("offset", &CrossSection::Offset, py::arg("delta"),
+           py::arg("join_type"), py::arg("miter_limit") = 2.0,
+           py::arg("arc_tolerance") = 0.0)
+      .def(py::self + py::self, "Boolean union.")
+      .def(py::self - py::self, "Boolean difference.")
+      .def(py::self ^ py::self, "Boolean intersection.")
+      .def("decompose", &CrossSection::Decompose)
+      .def("to_polygons",
+           [](CrossSection self) {
+             return PolygonsWrapper{
+                 std::make_unique<Polygons>(self.ToPolygons())};
+           })
+      .def(
+          "extrude",
+          [](CrossSection self, float height, int nDivisions = 0,
+             float twistDegrees = 0.0f,
+             Float2 scaleTop = std::make_tuple(1.0f, 1.0f)) {
+            glm::vec2 scaleTopVec(std::get<0>(scaleTop), std::get<1>(scaleTop));
+            return Manifold::Extrude(self, height, nDivisions, twistDegrees,
+                                     scaleTopVec);
+          },
+          py::arg("height"), py::arg("n_divisions") = 0,
+          py::arg("twist_degrees") = 0.0f,
+          py::arg("scale_top") = std::make_tuple(1.0f, 1.0f),
+          "Constructs a manifold from the set of polygons by extruding them "
+          "along the Z-axis.\n"
+          "\n"
+          ":param height: Z-extent of extrusion.\n"
+          ":param nDivisions: Number of extra copies of the crossSection to "
+          "insert into the shape vertically; especially useful in combination "
+          "with twistDegrees to avoid interpolation artifacts. Default is "
+          "none.\n"
+          ":param twistDegrees: Amount to twist the top crossSection relative "
+          "to the bottom, interpolated linearly for the divisions in between.\n"
+          ":param scaleTop: Amount to scale the top (independently in X and "
+          "Y). If the scale is (0, 0), a pure cone is formed with only a "
+          "single vertex at the top. Default (1, 1).")
+      .def(
+          "revolve",
+          [](CrossSection self, int circularSegments = 0) {
+            return Manifold::Revolve(self, circularSegments);
+          },
+          py::arg("circular_segments") = 0,
+          "Constructs a manifold from the set of polygons by revolving this "
+          "cross-section around its Y-axis and then setting this as the Z-axis "
+          "of the resulting manifold. If the polygons cross the Y-axis, only "
+          "the part on the positive X side is used. Geometrically valid input "
+          "will result in geometrically valid output.\n"
+          "\n"
+          ":param circularSegments: Number of segments along its diameter. "
+          "Default is calculated by the static Defaults.")
+      .def_static(
+          "square",
+          [](Float2 dims, bool center) {
+            return CrossSection::Square({std::get<0>(dims), std::get<1>(dims)},
+                                        center);
+          },
+          py::arg("dims"), py::arg("center") = false)
+      .def_static(
+          "circle",
+          [](float radius, int circularSegments) {
+            return CrossSection::Circle(radius, circularSegments);
+          },
+          py::arg("radius"), py::arg("circularSegments") = 0);
 }
