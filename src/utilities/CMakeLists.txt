@@ -21,6 +21,7 @@ message("CUDA Support: ${MANIFOLD_USE_CUDA}")
 message("Parallel Backend: ${MANIFOLD_PAR}")
 
 target_include_directories(${PROJECT_NAME} INTERFACE ${PROJECT_SOURCE_DIR}/include)
+target_include_directories(${PROJECT_NAME} INTERFACE ${THRUST_INC_DIR}/dependencies/libcudacxx/include)
 
 if(MANIFOLD_PAR STREQUAL "OMP")
     find_package(OpenMP REQUIRED)
