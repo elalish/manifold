@@ -33,7 +33,6 @@ jobs:
     - uses: jwlawson/actions-setup-cmake@v1.12
     - name: Build ${{matrix.backend}}
       run: |
-        git apply thrust.diff
         mkdir build
         cd build
         cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DMANIFOLD_DEBUG=ON -DMANIFOLD_EXPORT=ON -DMANIFOLD_PAR=${{matrix.parallel_backend}} -DMANIFOLD_USE_CUDA=${{matrix.cuda_support}} .. && make
@@ -85,7 +84,6 @@ jobs:
     - uses: jwlawson/actions-setup-cmake@v1.12
     - name: Build C bindings with OMP and CUDA
       run: |
-        git apply thrust.diff
         mkdir build
         cd build
         cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DMANIFOLD_DEBUG=ON -DMANIFOLD_CBIND=ON -DMANIFOLD_PAR=OMP -DMANIFOLD_USE_CUDA=ON .. && make
@@ -119,7 +117,6 @@ jobs:
     - name: Build WASM
       run: |
         source ./emsdk/emsdk_env.sh
-        git apply thrust.diff
         mkdir build
         cd build
         emcmake cmake -DCMAKE_BUILD_TYPE=Release .. && emmake make
@@ -210,7 +207,6 @@ jobs:
     - uses: jwlawson/actions-setup-cmake@v1.12
     - name: Build
       run: |
-        git apply thrust.diff
         mkdir build
         cd build
         cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DMANIFOLD_DEBUG=ON -DMANIFOLD_PAR=${{matrix.parallel_backend}} .. && make

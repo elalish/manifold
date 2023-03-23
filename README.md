@@ -47,7 +47,6 @@ Build and test (Ubuntu or similar):
 ```
 git clone --recurse-submodules https://github.com/elalish/manifold.git
 cd manifold
-git apply thrust.diff
 mkdir build
 cd build
 cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON .. && make

@@ -24,8 +24,7 @@
                 else
                   "manifold-${parallel-backend}";
               version = "beta";
-              src = self;
-              patches = [ ./thrust.diff ];
+              src = self;\
               nativeBuildInputs = (with pkgs; [ cmake (python39.withPackages(ps: with ps; [trimesh])) ]) ++ build-tools ++
                 (if cuda-support then with pkgs.cudaPackages; [ cuda_nvcc cuda_cudart cuda_cccl pkgs.addOpenGLRunpath ] else [ ]);
               cmakeFlags = [
