@@ -71,6 +71,12 @@ Manifold::Manifold(std::shared_ptr<CsgNode> pNode) : pNode_(pNode) {}
 Manifold::Manifold(std::shared_ptr<Impl> pImpl_)
     : pNode_(std::make_shared<CsgLeafNode>(pImpl_)) {}
 
+Manifold Manifold::Invalid() {
+  auto pImpl_ = std::make_shared<Impl>();
+  pImpl_->status_ = Error::InvalidConstruction;
+  return Manifold(pImpl_);
+}
+
 Manifold& Manifold::operator=(const Manifold& other) {
   if (this != &other) {
     pNode_ = other.pNode_;

@@ -14,20 +14,6 @@
 
 #include "cross_section.h"
 
-#include <clipper2/clipper.h>
-
-#include <memory>
-#include <vector>
-
-#include "clipper2/clipper.core.h"
-#include "clipper2/clipper.engine.h"
-#include "clipper2/clipper.offset.h"
-#include "glm/ext/matrix_float3x2.hpp"
-#include "glm/ext/vector_float2.hpp"
-#include "glm/geometric.hpp"
-#include "glm/glm.hpp"
-#include "public.h"
-
 using namespace manifold;
 
 namespace {
@@ -230,23 +216,28 @@ C2::PathsD CrossSection::GetPaths() const {
 
 /**
  * Constructs a square with the given XY dimensions. By default it is
- * positioned in the first quadrant, touching the origin.
+ * positioned in the first quadrant, touching the origin. If any dimensions in
+ * size are negative, or if all are zero, an empty Manifold will be returned.
  *
  * @param size The X, and Y dimensions of the square.
  * @param center Set to true to shift the center to the origin.
  */
-CrossSection CrossSection::Square(const glm::vec2 dims, bool center) {
+CrossSection CrossSection::Square(const glm::vec2 size, bool center) {
+  if (size.x < 0.0f || size.y < 0.0f || glm::length(size) == 0.0f) {
+    return CrossSection();
+  }
+
   auto p = C2::PathD(4);
   if (center) {
-    auto w = dims.x / 2;
-    auto h = dims.y / 2;
+    const auto w = size.x / 2;
+    const auto h = size.y / 2;
     p[0] = C2::PointD(w, h);
     p[1] = C2::PointD(-w, h);
     p[2] = C2::PointD(-w, -h);
     p[3] = C2::PointD(w, -h);
   } else {
-    double x = dims.x;
-    double y = dims.y;
+    const double x = size.x;
+    const double y = size.y;
     p[0] = C2::PointD(0.0, 0.0);
     p[1] = C2::PointD(x, 0.0);
     p[2] = C2::PointD(x, y);
@@ -263,6 +254,9 @@ CrossSection CrossSection::Square(const glm::vec2 dims, bool center) {
  * calculated by the static Quality defaults according to the radius.
  */
 CrossSection CrossSection::Circle(float radius, int circularSegments) {
+  if (radius <= 0.0f) {
+    return CrossSection();
+  }
   int n = circularSegments > 2 ? circularSegments
                                : Quality::GetCircularSegments(radius);
   float dPhi = 360.0f / n;

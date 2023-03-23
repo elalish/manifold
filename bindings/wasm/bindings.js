@@ -230,6 +230,8 @@ Module.setup = function() {
         break;
       case Module.status.FaceIDWrongLength.value:
         message = 'Face ID vector has wrong length';
+      case Module.status.InvalidConstruction.value:
+        message = 'Manifold constructed with invalid parameters';
     }
 
     const base = Error.apply(this, [message, ...args]);

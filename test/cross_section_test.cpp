@@ -28,6 +28,13 @@
 
 using namespace manifold;
 
+TEST(CrossSection, Square) {
+  auto a = Manifold::Cube({5, 5, 5});
+  auto b = Manifold::Extrude(CrossSection::Square({5, 5}), 5);
+
+  EXPECT_FLOAT_EQ((a - b).GetProperties().volume, 0.);
+}
+
 TEST(CrossSection, MirrorUnion) {
   auto a = CrossSection::Square({5., 5.}, true);
   auto b = a.Translate({2.5, 2.5});

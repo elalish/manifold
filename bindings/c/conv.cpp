@@ -96,6 +96,9 @@ ManifoldError to_c(manifold::Manifold::Error error) {
     case Manifold::Error::FaceIDWrongLength:
       e = MANIFOLD_FACE_ID_WRONG_LENGTH;
       break;
+    case Manifold::Error::InvalidConstruction:
+      e = MANIFOLD_INVALID_CONSTRUCTION;
+      break;
   };
   return e;
 }
