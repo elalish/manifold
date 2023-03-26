@@ -399,7 +399,7 @@ std::vector<CrossSection> CrossSection::Decompose() const {
  */
 CrossSection CrossSection::RectClip(const Rect& rect) const {
   auto r = C2::RectD(rect.min.x, rect.min.y, rect.max.x, rect.max.y);
-  auto ps = C2::RectClip(r, GetPaths(), false, precision_);
+  auto ps = C2::ExecuteRectClip(r, GetPaths(), false, precision_);
   return CrossSection(ps);
 }
 
