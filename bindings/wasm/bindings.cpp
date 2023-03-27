@@ -20,6 +20,7 @@
 using namespace emscripten;
 
 #include <manifold.h>
+#include <polygon.h>
 #include <sdf.h>
 
 using namespace manifold;
@@ -139,6 +140,23 @@ Manifold Extrude(std::vector<std::vector<glm::vec2>>& polygons, float height,
                  int nDivisions, float twistDegrees, glm::vec2 scaleTop) {
   return Manifold::Extrude(ToPolygon(polygons), height, nDivisions,
                            twistDegrees, scaleTop);
+}
+
+std::vector<glm::ivec3> TriangulateJS(
+    std::vector<std::vector<glm::vec2>>& polygons) {
+  CrossSection crossSection(polygons);
+  auto _polygons = crossSection.ToPolygons();
+
+  int idx = 0;
+  PolygonsIdx polygonsIndexed;
+  for (auto& poly : _polygons) {
+    SimplePolygonIdx simpleIndexed;
+    for (const glm::vec2& polyVert : poly) {
+      simpleIndexed.push_back({polyVert, idx++});
+    }
+    polygonsIndexed.push_back(simpleIndexed);
+  }
+  return Triangulate(polygonsIndexed);
 }
 
 Manifold Revolve(std::vector<std::vector<glm::vec2>>& polygons,
@@ -266,6 +284,7 @@ EMSCRIPTEN_BINDINGS(whatever) {
   function("tetrahedron", &Manifold::Tetrahedron);
   function("_Smooth", &Smooth);
   function("_Extrude", &Extrude);
+  function("_Triangulate", &TriangulateJS);
   function("_Revolve", &Revolve);
   function("_LevelSet", &LevelSetJs);
 

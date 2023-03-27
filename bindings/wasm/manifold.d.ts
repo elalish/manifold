@@ -25,6 +25,7 @@ export interface ManifoldStatic {
   smooth: typeof T.smooth;
   tetrahedron: typeof T.tetrahedron;
   extrude: typeof T.extrude;
+  triangulate: typeof T.triangulate;
   revolve: typeof T.revolve;
   union: typeof T.union;
   difference: typeof T.difference;

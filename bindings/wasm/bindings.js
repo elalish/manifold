@@ -302,6 +302,13 @@ Module.setup = function() {
     return result;
   };
 
+  Module.triangulate = function(polygons) {
+    const polygonsVec = polygons2vec(polygons);
+    const result = fromVec(Module._Triangulate(polygonsVec), (x) => [x[0], x[1], x[2]]);
+    disposePolygons(polygonsVec);
+    return result;
+  }
+
   Module.revolve = function(polygons, circularSegments = 0) {
     const polygonsVec = polygons2vec(polygons);
     const result = Module._Revolve(polygonsVec, circularSegments);

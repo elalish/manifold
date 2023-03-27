@@ -109,6 +109,13 @@ export function extrude(
     twistDegrees?: number, scaleTop?: Vec2): Manifold;
 
 /**
+ * Triangulates a set of polygons.
+ * 
+ * @param crossSection A set of non-overlapping polygons to triangulate.
+ */
+export function triangulate(crossSection: Polygons): Vec3[];
+
+/**
  * Constructs a manifold from a set of polygons by revolving this cross-section
  * around its Y-axis and then setting this as the Z-axis of the resulting
  * manifold. If the polygons cross the Y-axis, only the part on the positive X
