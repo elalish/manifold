@@ -145,11 +145,9 @@ Manifold Extrude(std::vector<std::vector<glm::vec2>>& polygons, float height,
 std::vector<glm::ivec3> TriangulateJS(
     std::vector<std::vector<glm::vec2>>& polygons) {
   CrossSection crossSection(polygons);
-  auto _polygons = crossSection.ToPolygons();
-
   int idx = 0;
   PolygonsIdx polygonsIndexed;
-  for (auto& poly : _polygons) {
+  for (auto& poly : polygons) {
     SimplePolygonIdx simpleIndexed;
     for (const glm::vec2& polyVert : poly) {
       simpleIndexed.push_back({polyVert, idx++});
