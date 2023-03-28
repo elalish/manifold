@@ -14,6 +14,10 @@
 
 #include <thrust/sequence.h>
 
+#include <numeric>
+#include <set>
+
+#include "graph.h"
 #include "impl.h"
 #include "par.h"
 
@@ -192,6 +196,48 @@ struct ReindexFace {
   }
 };
 
+struct Edge {
+  int first, second;
+  bool forward;
+
+  Edge(int start, int end) {
+    forward = start < end;
+    if (forward) {
+      first = start;
+      second = end;
+    } else {
+      first = end;
+      second = start;
+    }
+  }
+
+  bool operator<(const Edge& other) const {
+    return first == other.first ? second < other.second : first < other.first;
+  }
+};
+
+struct VertMortonBox {
+  const float* vertProperties;
+  const uint32_t numProp;
+  const float tol;
+  const Box bBox;
+
+  __host__ __device__ void operator()(
+      thrust::tuple<uint32_t&, Box&, int> inout) {
+    uint32_t& mortonCode = thrust::get<0>(inout);
+    Box& vertBox = thrust::get<1>(inout);
+    int vert = thrust::get<2>(inout);
+
+    const glm::vec3 center(vertProperties[numProp * vert],
+                           vertProperties[numProp * vert + 1],
+                           vertProperties[numProp * vert + 2]);
+
+    vertBox.min = center - tol / 2;
+    vertBox.max = center + tol / 2;
+
+    mortonCode = MortonCode(center, bBox);
+  }
+};
 }  // namespace
 
 namespace manifold {
@@ -431,5 +477,88 @@ void Manifold::Impl::GatherFaces(const Impl& old,
              ReindexFace({halfedge_.ptrD(), halfedgeTangent_.ptrD(),
                           old.halfedge_.cptrD(), old.halfedgeTangent_.cptrD(),
                           faceNew2Old.cptrD(), faceOld2New.cptrD()}));
+}
+
+MeshGL::MeshGL(const Mesh& mesh) {
+  numProp = 3;
+  vertProperties.resize(numProp * mesh.vertPos.size());
+  for (int i = 0; i < mesh.vertPos.size(); ++i) {
+    for (int j : {0, 1, 2}) vertProperties[3 * i + j] = mesh.vertPos[i][j];
+  }
+  triVerts.resize(3 * mesh.triVerts.size());
+  for (int i = 0; i < mesh.triVerts.size(); ++i) {
+    for (int j : {0, 1, 2}) triVerts[3 * i + j] = mesh.triVerts[i][j];
+  }
+  halfedgeTangent.resize(4 * mesh.halfedgeTangent.size());
+  for (int i = 0; i < mesh.halfedgeTangent.size(); ++i) {
+    for (int j : {0, 1, 2, 3})
+      halfedgeTangent[4 * i + j] = mesh.halfedgeTangent[i][j];
+  }
+}
+
+bool MeshGL::Merge() {
+  std::multiset<Edge> openEdges;
+
+  std::vector<int> merge(NumVert());
+  std::iota(merge.begin(), merge.end(), 0);
+  for (int i = 0; i < mergeFromVert.size(); ++i) {
+    merge[mergeFromVert[i]] = mergeToVert[i];
+  }
+
+  const int numVert = NumVert();
+  const int numTri = NumTri();
+  const int next[3] = {1, 2, 0};
+  for (int tri = 0; tri < numTri; ++tri) {
+    for (int i : {0, 1, 2}) {
+      Edge edge(merge[triVerts[3 * tri + i]],
+                merge[triVerts[3 * tri + next[i]]]);
+      auto range = openEdges.equal_range(edge);
+      bool found = false;
+      for (auto it = range.first; it != range.second; ++it) {
+        if (it->forward != edge.forward) {
+          openEdges.erase(it);
+          found = true;
+          break;
+        }
+      }
+      if (!found) openEdges.insert(edge);
+    }
+  }
+
+  if (openEdges.empty()) {
+    return false;
+  }
+
+  // TODO: calculate bounding box and fill in openVerts list
+  Box bBox;
+  const int numOpenVert = openEdges.size();
+  VecDH<int> openVerts(numOpenVert);
+
+  VecDH<float> vertPropD(vertProperties);
+  VecDH<Box> vertBox(numOpenVert);
+  VecDH<uint32_t> vertMorton(numOpenVert);
+  for_each_n(autoPolicy(NumTri()),
+             zip(vertMorton.begin(), vertBox.begin(), openVerts.cbegin()),
+             numOpenVert,
+             VertMortonBox({vertPropD.cptrD(), numProp, kTolerance, bBox}));
+
+  Collider collider(vertBox, vertMorton);
+  // TODO: ignore self-collisions
+  SparseIndices toMerge = collider.Collisions(vertBox);
+
+  Graph graph;
+  for (int i = 0; i < numVert; ++i) {
+    graph.add_nodes(i);
+  }
+  // TODO: incorporate input merge vec here
+  for (int i = 0; i < toMerge.size(); ++i) {
+    graph.add_edge(*(toMerge.begin(0) + i), *(toMerge.begin(1) + i));
+  }
+
+  std::vector<int> vertLabels;
+  const int numComponents = ConnectedComponents(vertLabels, graph);
+  // TODO: rebuild merge vec from vertLabels
+
+  return true;
 }
 }  // namespace manifold
