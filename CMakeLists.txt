@@ -29,7 +29,7 @@ set(MANIFOLD_FLAGS -O3)
 
 if(EMSCRIPTEN)
   message("Building for Emscripten")
-  set(MANIFOLD_FLAGS -fexceptions)
+  set(MANIFOLD_FLAGS -fexceptions -pthread)
   set(CMAKE_EXE_LINKER_FLAGS ${CMAKE_EXE_LINKER_FLAGS} -sALLOW_MEMORY_GROWTH=1)
 endif()
 
