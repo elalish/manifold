@@ -12,10 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "public.h"
-
-using namespace manifold;
-
 #ifdef MANIFOLD_USE_CUDA
 #include <cuda_runtime.h>
 

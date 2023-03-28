@@ -214,6 +214,8 @@ struct Edge {
   bool operator<(const Edge& other) const {
     return first == other.first ? second < other.second : first < other.first;
   }
+
+  int Start() const { return forward ? first : second; }
 };
 
 struct VertMortonBox {
@@ -529,10 +531,18 @@ bool MeshGL::Merge() {
     return false;
   }
 
-  // TODO: calculate bounding box and fill in openVerts list
   Box bBox;
   const int numOpenVert = openEdges.size();
   VecDH<int> openVerts(numOpenVert);
+  int i = 0;
+  for (const auto edge : openEdges) {
+    const int vert = edge.Start();
+    openVerts[i++] = vert;
+    const glm::vec3 pos(vertProperties[numProp * vert],
+                        vertProperties[numProp * vert + 1],
+                        vertProperties[numProp * vert + 2]);
+    bBox.Union(pos);
+  }
 
   VecDH<float> vertPropD(vertProperties);
   VecDH<Box> vertBox(numOpenVert);
