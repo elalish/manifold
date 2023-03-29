@@ -1042,7 +1042,8 @@ namespace manifold {
  * @return std::vector<glm::ivec3> The triangles, referencing the original
  * vertex indicies.
  */
-std::vector<glm::ivec3> Triangulate(const PolygonsIdx &polys, float precision) {
+std::vector<glm::ivec3> TriangulateIdx(const PolygonsIdx &polys,
+                                       float precision) {
   std::vector<glm::ivec3> triangles;
   try {
     Monotones monotones(polys, precision);
@@ -1067,6 +1068,29 @@ std::vector<glm::ivec3> Triangulate(const PolygonsIdx &polys, float precision) {
 #endif
   }
   return triangles;
+}
+
+/**
+ * @brief Triangulates a set of /epsilon-valid polygons.
+ *
+ * @param polygons The set of polygons, wound CCW and representing multiple
+ * polygons and/or holes.
+ * @param precision The value of epsilon, bounding the uncertainty of the input
+ * @return std::vector<glm::ivec3> The triangles, referencing the original
+ * polygon points in order.
+ */
+std::vector<glm::ivec3> Triangulate(
+    std::vector<std::vector<glm::vec2>> &polygons, float precision) {
+  int idx = 0;
+  PolygonsIdx polygonsIndexed;
+  for (auto &poly : polygons) {
+    SimplePolygonIdx simpleIndexed;
+    for (const glm::vec2 &polyVert : poly) {
+      simpleIndexed.push_back({polyVert, idx++});
+    }
+    polygonsIndexed.push_back(simpleIndexed);
+  }
+  return TriangulateIdx(polygonsIndexed, precision);
 }
 
 ExecutionParams &PolygonParams() { return params; }

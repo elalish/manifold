@@ -142,21 +142,6 @@ Manifold Extrude(std::vector<std::vector<glm::vec2>>& polygons, float height,
                            twistDegrees, scaleTop);
 }
 
-std::vector<glm::ivec3> TriangulateJS(
-    std::vector<std::vector<glm::vec2>>& polygons) {
-  CrossSection crossSection(polygons);
-  int idx = 0;
-  PolygonsIdx polygonsIndexed;
-  for (auto& poly : polygons) {
-    SimplePolygonIdx simpleIndexed;
-    for (const glm::vec2& polyVert : poly) {
-      simpleIndexed.push_back({polyVert, idx++});
-    }
-    polygonsIndexed.push_back(simpleIndexed);
-  }
-  return Triangulate(polygonsIndexed);
-}
-
 Manifold Revolve(std::vector<std::vector<glm::vec2>>& polygons,
                  int circularSegments) {
   return Manifold::Revolve(ToPolygon(polygons), circularSegments);
@@ -282,7 +267,7 @@ EMSCRIPTEN_BINDINGS(whatever) {
   function("tetrahedron", &Manifold::Tetrahedron);
   function("_Smooth", &Smooth);
   function("_Extrude", &Extrude);
-  function("_Triangulate", &TriangulateJS);
+  function("_Triangulate", &Triangulate);
   function("_Revolve", &Revolve);
   function("_LevelSet", &LevelSetJs);
 

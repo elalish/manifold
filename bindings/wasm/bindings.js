@@ -302,9 +302,9 @@ Module.setup = function() {
     return result;
   };
 
-  Module.triangulate = function(polygons) {
+  Module.triangulate = function(polygons, precision = -1) {
     const polygonsVec = polygons2vec(polygons);
-    const result = fromVec(Module._Triangulate(polygonsVec), (x) => [x[0], x[1], x[2]]);
+    const result = fromVec(Module._Triangulate(polygonsVec, precision), (x) => [x[0], x[1], x[2]]);
     disposePolygons(polygonsVec);
     return result;
   }
