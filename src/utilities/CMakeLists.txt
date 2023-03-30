@@ -41,7 +41,8 @@ else()
         "Should be one of \"TBB\", \"OMP\", \"NONE\"")
 endif()
 
-target_include_directories(${PROJECT_NAME} PUBLIC ${THRUST_INC_DIR} ${GLM_INC_DIR})
+target_include_directories(${PROJECT_NAME} PUBLIC ${THRUST_INC_DIR})
+target_link_libraries(${PROJECT_NAME} PUBLIC glm)
 
 if(MANIFOLD_USE_CUDA)
     set_source_files_properties(${SOURCE_FILES} PROPERTIES LANGUAGE CUDA)

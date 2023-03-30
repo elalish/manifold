@@ -38,7 +38,6 @@ option(PYBIND11_FINDPYTHON "Enable PyBind to perform FindPython for you" ON)
 option(BUILD_TEST_CGAL "Build CGAL performance comparisons" OFF)
 
 option(BUILD_SHARED_LIBS "Build dynamic/shared libraries" OFF)
-set(GLM_INC_DIR ${PROJECT_SOURCE_DIR}/src/third_party/glm)
 set(PYBIND11_DIR ${PROJECT_SOURCE_DIR}/bindings/python/third_party/pybind11)
 set(THRUST_INC_DIR ${PROJECT_SOURCE_DIR}/src/third_party/thrust)
 
