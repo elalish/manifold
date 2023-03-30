@@ -163,6 +163,7 @@ struct FindCollisions {
   int* counts;
   const Box* nodeBBox_;
   const thrust::pair<int, int>* internalChildren_;
+  const bool selfCollision;
 
   __host__ __device__ int RecordCollision(int node,
                                           thrust::tuple<T, int>& query) {
@@ -172,12 +173,15 @@ struct FindCollisions {
 
     bool overlaps = nodeBBox_[node].DoesOverlap(queryObj);
     if (overlaps && IsLeaf(node)) {
-      if (allocateOnly) {
-        count++;
-      } else {
-        int pos = count++;
-        queryTri_.first[pos] = queryIdx;
-        queryTri_.second[pos] = Node2Leaf(node);
+      const int leafIdx = Node2Leaf(node);
+      if (!selfCollision || leafIdx != queryIdx) {
+        if (allocateOnly) {
+          count++;
+        } else {
+          int pos = count++;
+          queryTri_.first[pos] = queryIdx;
+          queryTri_.second[pos] = leafIdx;
+        }
       }
     }
     return overlaps && IsInternal(node);  // Should traverse into node
@@ -267,10 +271,13 @@ Collider::Collider(const VecDH<Box>& leafBB,
  * For a vector of query objects, this returns a sparse array of overlaps
  * between the queries and the bounding boxes of the collider. Queries are
  * normally axis-aligned bounding boxes. Points can also be used, and this case
- * overlaps are defined as lying in the XY projection of the bounding box.
+ * overlaps are defined as lying in the XY projection of the bounding box. If
+ * the query vector is the leaf vector, set selfCollision to true, which will
+ * then not report any collisions between an index and itself.
  */
 template <typename T>
-SparseIndices Collider::Collisions(const VecDH<T>& queriesIn) const {
+SparseIndices Collider::Collisions(const VecDH<T>& queriesIn,
+                                   bool selfCollision) const {
   // note that the length is 1 larger than the number of queries so the last
   // element can store the sum when using exclusive scan
   VecDH<int> counts(queriesIn.size() + 1, 0);
@@ -280,15 +287,15 @@ SparseIndices Collider::Collisions(const VecDH<T>& queriesIn) const {
   for_each_n(policy, zip(queriesIn.cbegin(), countAt(0)), queriesIn.size(),
              FindCollisions<T, true>(
                  {thrust::pair<int*, int*>(nullptr, nullptr), counts.ptrD(),
-                  nodeBBox_.ptrD(), internalChildren_.ptrD()}));
+                  nodeBBox_.ptrD(), internalChildren_.ptrD(), selfCollision}));
   // compute start index for each query and total count
   exclusive_scan(policy, counts.begin(), counts.end(), counts.begin());
   SparseIndices queryTri(counts.back());
   // actually recording collisions
-  for_each_n(
-      policy, zip(queriesIn.cbegin(), countAt(0)), queriesIn.size(),
-      FindCollisions<T, false>({queryTri.ptrDpq(), counts.ptrD(),
-                                nodeBBox_.ptrD(), internalChildren_.ptrD()}));
+  for_each_n(policy, zip(queriesIn.cbegin(), countAt(0)), queriesIn.size(),
+             FindCollisions<T, false>(
+                 {queryTri.ptrDpq(), counts.ptrD(), nodeBBox_.ptrD(),
+                  internalChildren_.ptrD(), selfCollision}));
   return queryTri;
 }
 
@@ -332,9 +339,9 @@ bool Collider::Transform(glm::mat4x3 transform) {
   return axisAligned;
 }
 
-template SparseIndices Collider::Collisions<Box>(const VecDH<Box>&) const;
+template SparseIndices Collider::Collisions<Box>(const VecDH<Box>&, bool) const;
 
-template SparseIndices Collider::Collisions<glm::vec3>(
-    const VecDH<glm::vec3>&) const;
+template SparseIndices Collider::Collisions<glm::vec3>(const VecDH<glm::vec3>&,
+                                                       bool) const;
 
 }  // namespace manifold

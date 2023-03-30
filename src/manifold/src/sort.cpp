@@ -553,21 +553,36 @@ bool MeshGL::Merge() {
              VertMortonBox({vertPropD.cptrD(), numProp, kTolerance, bBox}));
 
   Collider collider(vertBox, vertMorton);
-  // TODO: ignore self-collisions
-  SparseIndices toMerge = collider.Collisions(vertBox);
+  SparseIndices toMerge = collider.Collisions(vertBox, true);
 
   Graph graph;
   for (int i = 0; i < numVert; ++i) {
     graph.add_nodes(i);
   }
-  // TODO: incorporate input merge vec here
+  for (int i = 0; i < mergeFromVert.size(); ++i) {
+    graph.add_edge(static_cast<int>(mergeFromVert[i]),
+                   static_cast<int>(mergeToVert[i]));
+  }
   for (int i = 0; i < toMerge.size(); ++i) {
-    graph.add_edge(*(toMerge.begin(0) + i), *(toMerge.begin(1) + i));
+    graph.add_edge(toMerge.Get(0)[i], toMerge.Get(1)[i]);
   }
 
   std::vector<int> vertLabels;
-  const int numComponents = ConnectedComponents(vertLabels, graph);
-  // TODO: rebuild merge vec from vertLabels
+  const int numLabels = ConnectedComponents(vertLabels, graph);
+  std::vector<int> label2vert(numLabels);
+  for (int v = 0; v < numVert; ++v) {
+    label2vert[vertLabels[v]] = v;
+  }
+
+  mergeToVert.clear();
+  mergeFromVert.clear();
+  for (int v = 0; v < numVert; ++v) {
+    const int mergeTo = label2vert[vertLabels[v]];
+    if (mergeTo != v) {
+      mergeFromVert.push_back(v);
+      mergeToVert.push_back(mergeTo);
+    }
+  }
 
   return true;
 }
