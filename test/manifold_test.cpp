@@ -480,6 +480,26 @@ TEST(Manifold, MeshGLRoundTrip) {
   RelatedGL(cylinder2, {inGL});
 }
 
+TEST(Manifold, Merge) {
+  MeshGL cubeSTL = CubeSTL();
+  EXPECT_EQ(cubeSTL.NumTri(), 12);
+  EXPECT_EQ(cubeSTL.NumVert(), 36);
+
+  Manifold cubeBad(cubeSTL);
+  EXPECT_TRUE(cubeBad.IsEmpty());
+  EXPECT_EQ(cubeBad.Status(), Manifold::Error::NotManifold);
+
+  cubeSTL.Merge();
+  Manifold cube(cubeSTL);
+  EXPECT_EQ(cube.NumTri(), 12);
+  EXPECT_EQ(cube.NumVert(), 8);
+  EXPECT_EQ(cube.NumPropVert(), 24);
+
+  auto prop = cube.GetProperties();
+  EXPECT_FLOAT_EQ(prop.volume, 1.0f);
+  EXPECT_FLOAT_EQ(prop.surfaceArea, 6.0f);
+}
+
 TEST(Manifold, FaceIDRoundTrip) {
   const Manifold cube = Manifold::Cube();
   ASSERT_GE(cube.OriginalID(), 0);

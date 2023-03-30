@@ -63,12 +63,11 @@ TEST(Boolean, MeshGLRoundTrip) {
 }
 
 TEST(Boolean, Normals) {
-  const MeshGL boxGL = WithNormals(Manifold::Cube({200, 200, 100}, true));
-  const Manifold box(boxGL);
+  MeshGL cubeGL = CubeSTL();
+  cubeGL.Merge();
+  const Manifold cube(cubeGL);
   const MeshGL sphereGL = WithNormals(Manifold::Sphere(60));
   const Manifold sphere(sphereGL);
-
-  Manifold cube = box ^ box.Rotate(90) ^ box.Rotate(0, 90);
 
   Manifold result =
       cube - (sphere.Rotate(180) -
@@ -83,7 +82,7 @@ TEST(Boolean, Normals) {
     ExportMesh("normals.glb", result.GetMeshGL({3, 4, 5}), opt);
 #endif
 
-  RelatedGL(result, {boxGL, sphereGL}, true);
+  RelatedGL(result, {cubeGL, sphereGL}, true);
 }
 
 TEST(Boolean, EmptyOriginal) {
@@ -557,7 +556,6 @@ TEST(Boolean, Subtract) {
   first.GetMesh();
 }
 
-// FIXME: test is failing on Mac CI (passing on others)
 TEST(Boolean, Close) {
   PolygonParams().processOverlaps = true;
 

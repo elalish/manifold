@@ -157,6 +157,40 @@ MeshGL TetGL() {
   return tet;
 }
 
+// STL-style meshGL with face normals. Not manifold, requires Merge().
+MeshGL CubeSTL() {
+  const MeshGL cubeIn = Manifold::Cube(glm::vec3(1), true).GetMeshGL();
+  MeshGL cube;
+  cube.numProp = 6;
+
+  for (int tri = 0, vert = 0; tri < cubeIn.NumTri(); tri++) {
+    glm::mat3 triPos;
+    for (const int i : {0, 1, 2}) {
+      cube.triVerts.push_back(vert++);
+
+      for (const int j : {0, 1, 2}) {
+        triPos[i][j] =
+            cubeIn
+                .vertProperties[cubeIn.numProp * cubeIn.triVerts[3 * tri + i] +
+                                j];
+      }
+    }
+
+    const glm::vec3 normal = glm::normalize(
+        glm::cross(triPos[1] - triPos[0], triPos[2] - triPos[0]));
+    for (const int i : {0, 1, 2}) {
+      for (const int j : {0, 1, 2}) {
+        cube.vertProperties.push_back(triPos[i][j]);
+      }
+      for (const int j : {0, 1, 2}) {
+        cube.vertProperties.push_back(normal[j]);
+      }
+    }
+  }
+
+  return cube;
+}
+
 MeshGL WithIndexColors(const Mesh& in) {
   MeshGL inGL(in);
   inGL.runOriginalID = {Manifold::ReserveIDs(1)};

@@ -37,6 +37,7 @@ Mesh Csaszar();
 Mesh Gyroid();
 Mesh Tet();
 MeshGL TetGL();
+MeshGL CubeSTL();
 MeshGL WithIndexColors(const Mesh& in);
 MeshGL WithPositionColors(const Manifold& in);
 MeshGL WithNormals(const Manifold& in);
