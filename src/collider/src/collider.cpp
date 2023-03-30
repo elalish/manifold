@@ -315,8 +315,8 @@ void Collider::UpdateBoxes(const VecDH<Box>& leafBB) {
   // kernel over leaves to save internal Boxes
   for_each_n(
       policy, countAt(0), NumLeaves(),
-      BuildInternalBoxes({nodeBBox_.ptrD(), counter.ptrD(), nodeParent_.ptrD(),
-                          internalChildren_.ptrD()}));
+      BuildInternalBoxes({nodeBBox_.ptrD(), counter.ptrD(), nodeParent_.cptrD(),
+                          internalChildren_.cptrD()}));
 }
 
 /**

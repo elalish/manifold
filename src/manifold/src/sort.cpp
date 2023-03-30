@@ -552,6 +552,12 @@ bool MeshGL::Merge() {
              numOpenVert,
              VertMortonBox({vertPropD.cptrD(), numProp, kTolerance, bBox}));
 
+  auto policy = autoPolicy(numVert);
+  VecDH<int> vertNew2Old(numVert);
+  sequence(policy, vertNew2Old.begin(), vertNew2Old.end());
+  sort_by_key(policy, vertMorton.begin(), vertMorton.end(),
+              zip(vertBox.begin(), vertNew2Old.begin()));
+
   Collider collider(vertBox, vertMorton);
   SparseIndices toMerge = collider.Collisions(vertBox, true);
 
@@ -564,7 +570,8 @@ bool MeshGL::Merge() {
                    static_cast<int>(mergeToVert[i]));
   }
   for (int i = 0; i < toMerge.size(); ++i) {
-    graph.add_edge(toMerge.Get(0)[i], toMerge.Get(1)[i]);
+    graph.add_edge(vertNew2Old[toMerge.Get(0)[i]],
+                   vertNew2Old[toMerge.Get(1)[i]]);
   }
 
   std::vector<int> vertLabels;
