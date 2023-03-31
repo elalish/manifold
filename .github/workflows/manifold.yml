@@ -29,11 +29,10 @@ jobs:
         pip install trimesh
     - uses: actions/checkout@v3
       with:
-        submodules: true
+        submodules: recursive
     - uses: jwlawson/actions-setup-cmake@v1.12
     - name: Build ${{matrix.backend}}
       run: |
-        git apply thrust.diff
         mkdir build
         cd build
         cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DMANIFOLD_DEBUG=ON -DMANIFOLD_EXPORT=ON -DMANIFOLD_PAR=${{matrix.parallel_backend}} -DMANIFOLD_USE_CUDA=${{matrix.cuda_support}} .. && make
@@ -81,11 +80,10 @@ jobs:
         DEBIAN_FRONTEND=noninteractive apt install -y libomp-dev libassimp-dev git libtbb-dev pkg-config libpython3-dev python3 python3-distutils python3-pip
     - uses: actions/checkout@v3
       with:
-        submodules: true
+        submodules: recursive
     - uses: jwlawson/actions-setup-cmake@v1.12
     - name: Build C bindings with OMP and CUDA
       run: |
-        git apply thrust.diff
         mkdir build
         cd build
         cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DMANIFOLD_DEBUG=ON -DMANIFOLD_CBIND=ON -DMANIFOLD_PAR=OMP -DMANIFOLD_USE_CUDA=ON .. && make
@@ -107,7 +105,7 @@ jobs:
         DEBIAN_FRONTEND=noninteractive sudo apt install -y nodejs
     - uses: actions/checkout@v3
       with:
-        submodules: true
+        submodules: recursive
     - name: Setup WASM
       run: |
         # setup emscripten
@@ -119,7 +117,6 @@ jobs:
     - name: Build WASM
       run: |
         source ./emsdk/emsdk_env.sh
-        git apply thrust.diff
         mkdir build
         cd build
         emcmake cmake -DCMAKE_BUILD_TYPE=Release .. && emmake make
@@ -154,7 +151,7 @@ jobs:
     steps:
     - uses: actions/checkout@v3
       with:
-        submodules: true
+        submodules: recursive
     - uses: jwlawson/actions-setup-cmake@v1.12
     - uses: ilammy/msvc-dev-cmd@v1
     - name: Install CUDA
@@ -206,11 +203,10 @@ jobs:
       run: brew install tbb
     - uses: actions/checkout@v3
       with:
-        submodules: true
+        submodules: recursive
     - uses: jwlawson/actions-setup-cmake@v1.12
     - name: Build
       run: |
-        git apply thrust.diff
         mkdir build
         cd build
         cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DMANIFOLD_DEBUG=ON -DMANIFOLD_PAR=${{matrix.parallel_backend}} .. && make
@@ -228,5 +224,7 @@ jobs:
     if: github.event.pull_request.draft == false
     steps:
     - uses: actions/checkout@v3
+      with:
+        submodules: recursive
     - uses: cachix/install-nix-action@v15
     - run: nix build -L '.?submodules=1#manifold-${{matrix.variant}}'
