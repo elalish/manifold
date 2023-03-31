@@ -29,7 +29,7 @@ set(MANIFOLD_FLAGS -O3)
 
 if(EMSCRIPTEN)
   message("Building for Emscripten")
-  set(MANIFOLD_FLAGS -fexceptions)
+  set(MANIFOLD_FLAGS -fexceptions -D_LIBCUDACXX_HAS_THREAD_API_EXTERNAL -D_LIBCUDACXX_HAS_THREAD_API_CUDA)
   set(CMAKE_EXE_LINKER_FLAGS ${CMAKE_EXE_LINKER_FLAGS} -sALLOW_MEMORY_GROWTH=1)
 endif()
 
@@ -38,7 +38,6 @@ option(PYBIND11_FINDPYTHON "Enable PyBind to perform FindPython for you" ON)
 option(BUILD_TEST_CGAL "Build CGAL performance comparisons" OFF)
 
 option(BUILD_SHARED_LIBS "Build dynamic/shared libraries" OFF)
-set(GLM_INC_DIR ${PROJECT_SOURCE_DIR}/src/third_party/glm)
 set(PYBIND11_DIR ${PROJECT_SOURCE_DIR}/bindings/python/third_party/pybind11)
 set(THRUST_INC_DIR ${PROJECT_SOURCE_DIR}/src/third_party/thrust)
 
