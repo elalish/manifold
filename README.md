@@ -56,7 +56,7 @@ test/manifold_test
 CMake flags (usage e.g. `-DMANIFOLD_USE_CUDA=ON`):
 - `MANIFOLD_USE_CUDA=[<OFF>, ON]`: Provides Nvidia GPU parallelization, requires CUDA Toolkit and its nvcc compiler.
 - `MANIFOLD_PAR=[<NONE>, OMP, TBB]`: Provides multi-thread parallelization, requires `libomp-dev` or `libtbb-dev`.
-- `MANIFOLD_EXPORT=[<OFF>, ON]`: Enables GLB export of 3D models from the tests, requires `libassimp-dev`.
+- `MANIFOLD_EXPORT=[<OFF>, ON]`: Enables GLB export of 3D models from the tests, uses `assimp`.
 - `MANIFOLD_DEBUG=[<OFF>, ON]`: Enables internal assertions and exceptions.
 - `BUILD_TEST_CGAL=[<OFF>, ON]`: Builds a CGAL-based performance [comparison](https://github.com/elalish/manifold/tree/master/extras), requires `libcgal-dev`.
 

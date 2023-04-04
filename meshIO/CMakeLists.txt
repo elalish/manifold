@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+add_subdirectory(third_party)
+
 project(meshIO)
 
 add_library(${PROJECT_NAME} src/meshIO.cpp)
