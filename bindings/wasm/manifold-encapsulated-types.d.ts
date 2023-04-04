@@ -277,7 +277,7 @@ export class Manifold {
    * @param originOffset The distance of the plane from the origin in the
    *     direction of the normal vector.
    */
-  trimByPlane(normal: vec3, originOffset: number): Manifold;
+  trimByPlane(normal: Vec3, originOffset: number): Manifold;
 
   /**
    * Increase the density of the mesh by splitting every edge into n pieces. For
