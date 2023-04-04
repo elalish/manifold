@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <ciso646>  // Added to fix MSVC error
 #include <functional>
 #include <iostream>
 #include <list>
