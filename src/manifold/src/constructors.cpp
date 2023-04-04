@@ -293,7 +293,7 @@ Manifold Manifold::Extrude(const CrossSection& crossSection, float height,
   if (isCone)
     for (int j = 0; j < polygons.size(); ++j)  // Duplicate vertex for Genus
       vertPos.push_back({0.0f, 0.0f, height});
-  std::vector<glm::ivec3> top = Triangulate(polygonsIndexed);
+  std::vector<glm::ivec3> top = TriangulateIdx(polygonsIndexed);
   for (const glm::ivec3& tri : top) {
     triVerts.push_back({tri[0], tri[2], tri[1]});
     if (!isCone) triVerts.push_back(tri + nCrossSection * nDivisions);

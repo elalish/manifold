@@ -109,6 +109,16 @@ export function extrude(
     twistDegrees?: number, scaleTop?: Vec2): Manifold;
 
 /**
+ * Triangulates a set of /epsilon-valid polygons.
+ *
+ * @param polygons The set of polygons, wound CCW and representing multiple
+ * polygons and/or holes.
+ * @param precision The value of epsilon, bounding the uncertainty of the input
+ * @return The triangles, referencing the original polygon points in order.
+ */
+export function triangulate(polygons: Polygons, precision?: number): Vec3[];
+
+/**
  * Constructs a manifold from a set of polygons by revolving this cross-section
  * around its Y-axis and then setting this as the Z-axis of the resulting
  * manifold. If the polygons cross the Y-axis, only the part on the positive X
