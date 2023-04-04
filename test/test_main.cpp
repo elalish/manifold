@@ -188,6 +188,8 @@ MeshGL CubeSTL() {
     }
   }
 
+  cube.runOriginalID.push_back(Manifold::ReserveIDs(1));
+
   return cube;
 }
 

@@ -70,8 +70,9 @@ TEST(Boolean, Normals) {
   const Manifold sphere(sphereGL);
 
   Manifold result =
-      cube - (sphere.Rotate(180) -
-              sphere.Scale(glm::vec3(0.5)).Rotate(90).Translate({40, 40, 40}));
+      cube.Scale(glm::vec3(100)) -
+      (sphere.Rotate(180) -
+       sphere.Scale(glm::vec3(0.5)).Rotate(90).Translate({40, 40, 40}));
 
 #ifdef MANIFOLD_EXPORT
   ExportOptions opt;
