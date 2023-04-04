@@ -121,7 +121,7 @@ void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge,
 
       const PolygonsIdx polys = Face2Polygons(face, projection, faceEdge);
 
-      std::vector<glm::ivec3> newTris = Triangulate(polys, precision_);
+      std::vector<glm::ivec3> newTris = TriangulateIdx(polys, precision_);
 
       for (auto tri : newTris) {
         triVerts.push_back(tri);

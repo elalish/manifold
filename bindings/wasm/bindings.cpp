@@ -20,6 +20,7 @@
 using namespace emscripten;
 
 #include <manifold.h>
+#include <polygon.h>
 #include <sdf.h>
 
 using namespace manifold;
@@ -266,6 +267,7 @@ EMSCRIPTEN_BINDINGS(whatever) {
   function("tetrahedron", &Manifold::Tetrahedron);
   function("_Smooth", &Smooth);
   function("_Extrude", &Extrude);
+  function("_Triangulate", &Triangulate);
   function("_Revolve", &Revolve);
   function("_LevelSet", &LevelSetJs);
 

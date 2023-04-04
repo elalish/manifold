@@ -91,13 +91,13 @@ void TestPoly(const PolygonsIdx &polys, int expectedNumTri,
   PolygonParams().verbose = options.params.verbose;
 
   std::vector<glm::ivec3> triangles;
-  EXPECT_NO_THROW(triangles = Triangulate(polys, precision));
+  EXPECT_NO_THROW(triangles = TriangulateIdx(polys, precision));
   EXPECT_EQ(triangles.size(), expectedNumTri) << "Basic";
 
-  EXPECT_NO_THROW(triangles = Triangulate(Turn180(polys), precision));
+  EXPECT_NO_THROW(triangles = TriangulateIdx(Turn180(polys), precision));
   EXPECT_EQ(triangles.size(), expectedNumTri) << "Turn 180";
 
-  EXPECT_NO_THROW(triangles = Triangulate(Duplicate(polys), precision));
+  EXPECT_NO_THROW(triangles = TriangulateIdx(Duplicate(polys), precision));
   EXPECT_EQ(triangles.size(), 2 * expectedNumTri) << "Duplicate";
 
   PolygonParams().verbose = false;
