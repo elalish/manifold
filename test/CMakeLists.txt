@@ -14,9 +14,8 @@
 
 project(manifold_test)
 
-add_subdirectory(third_party)
-
 enable_testing()
+find_package(GTest REQUIRED)
 
 set(SOURCE_FILES polygon_test.cpp cross_section_test.cpp manifold_test.cpp boolean_test.cpp sdf_test.cpp samples_test.cpp test_main.cpp)
 
@@ -25,7 +24,7 @@ if(MANIFOLD_CBIND)
 endif()
 
 add_executable(${PROJECT_NAME} ${SOURCE_FILES})
-target_link_libraries(${PROJECT_NAME} polygon GTest::GTest manifold sdf samples samplesGPU cross_section)
+target_link_libraries(${PROJECT_NAME} polygon GTest::gtest manifold sdf samples samplesGPU cross_section)
 
 if(MANIFOLD_CBIND)
   target_link_libraries(${PROJECT_NAME} manifoldc)
