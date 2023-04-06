@@ -779,8 +779,7 @@ Manifold::Impl Manifold::Impl::Transform(const glm::mat4x3& transform_) const {
  * by the optional input.
  */
 void Manifold::Impl::SetPrecision(float minPrecision) {
-  precision_ = glm::max(minPrecision, kTolerance * bBox_.Scale());
-  if (!glm::isfinite(precision_)) precision_ = -1;
+  precision_ = MaxPrecision(minPrecision, bBox_);
 }
 
 /**

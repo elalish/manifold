@@ -28,6 +28,12 @@ __host__ __device__ inline glm::vec3 SafeNormalize(glm::vec3 v) {
   return glm::isfinite(v.x) ? v : glm::vec3(0);
 }
 
+__host__ __device__ inline float MaxPrecision(float minPrecision,
+                                              const Box& bBox) {
+  float precision = glm::max(minPrecision, kTolerance * bBox.Scale());
+  return glm::isfinite(precision) ? precision : -1;
+}
+
 __host__ __device__ inline int NextHalfedge(int current) {
   ++current;
   if (current % 3 == 0) current -= 3;

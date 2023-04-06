@@ -94,6 +94,11 @@ struct MeshGL {
   /// as 4 * (3 * tri + i) + j, i < 3, j < 4, representing the tangent value
   /// Mesh.triVerts[tri][i] along the CCW edge. If empty, mesh is faceted.
   std::vector<float> halfedgeTangent;
+  /// The absolute precision of the vertex positions, based on accrued rounding
+  /// errors. When creating a Manifold, the precision used will be the maximum
+  /// of this and a baseline precision from the size of the bounding box. Any
+  /// edge shorter than precision may be collapsed.
+  float precision = 0;
 
   MeshGL() = default;
   MeshGL(const Mesh& mesh);

@@ -240,6 +240,22 @@ struct VertMortonBox {
     mortonCode = MortonCode(center, bBox);
   }
 };
+
+struct Duplicate {
+  __host__ __device__ thrust::pair<float, float> operator()(float x) {
+    return thrust::make_pair(x, x);
+  }
+};
+
+struct MinMax : public thrust::binary_function<thrust::pair<float, float>,
+                                               thrust::pair<float, float>,
+                                               thrust::pair<float, float>> {
+  __host__ __device__ thrust::pair<float, float> operator()(
+      thrust::pair<float, float> a, thrust::pair<float, float> b) {
+    return thrust::make_pair(glm::min(a.first, b.first),
+                             glm::max(a.second, b.second));
+  }
+};
 }  // namespace
 
 namespace manifold {
@@ -481,6 +497,7 @@ void Manifold::Impl::GatherFaces(const Impl& old,
                           faceNew2Old.cptrD(), faceOld2New.cptrD()}));
 }
 
+/// Constructs a position-only MeshGL from the input Mesh.
 MeshGL::MeshGL(const Mesh& mesh) {
   numProp = 3;
   vertProperties.resize(numProp * mesh.vertPos.size());
@@ -498,6 +515,18 @@ MeshGL::MeshGL(const Mesh& mesh) {
   }
 }
 
+/**
+ * Updates the mergeFromVert and mergeToVert vectors in order to create a
+ * manifold solid. If the MeshGL is already manifold, no change will occur and
+ * the function will return false. Otherwise, this will merge verts along open
+ * edges within precision (the maximum of the MeshGL precision and the baseline
+ * bounding-box precision), keeping any from the existing merge vectors.
+ *
+ * There is no guarantee the result will be manifold - this is a best-effort
+ * helper function designed primarily to aid in the case where a manifold
+ * multi-material MeshGL was produced, but its merge vectors were lost due to a
+ * round-trip through a file format.
+ */
 bool MeshGL::Merge() {
   std::multiset<Edge> openEdges;
 
@@ -531,28 +560,38 @@ bool MeshGL::Merge() {
     return false;
   }
 
-  Box bBox;
   const int numOpenVert = openEdges.size();
   VecDH<int> openVerts(numOpenVert);
   int i = 0;
   for (const auto edge : openEdges) {
     const int vert = edge.Start();
     openVerts[i++] = vert;
-    const glm::vec3 pos(vertProperties[numProp * vert],
-                        vertProperties[numProp * vert + 1],
-                        vertProperties[numProp * vert + 2]);
-    bBox.Union(pos);
   }
 
-  auto policy = autoPolicy(numOpenVert);
   VecDH<float> vertPropD(vertProperties);
+  Box bBox;
+  for (const int i : {0, 1, 2}) {
+    strided_range<VecDH<float>::Iter> iPos(vertPropD.begin() + i,
+                                           vertPropD.end(), numProp);
+    auto minMax = transform_reduce<thrust::pair<float, float>>(
+        autoPolicy(numVert), iPos.begin(), iPos.end(), Duplicate(),
+        thrust::make_pair(std::numeric_limits<float>::infinity(),
+                          -std::numeric_limits<float>::infinity()),
+        MinMax());
+    bBox.min[i] = minMax.first;
+    bBox.max[i] = minMax.second;
+  }
+  precision = MaxPrecision(precision, bBox);
+  if (precision < 0) return false;
+
+  auto policy = autoPolicy(numOpenVert);
   VecDH<Box> vertBox(numOpenVert);
   VecDH<uint32_t> vertMorton(numOpenVert);
 
   for_each_n(policy,
              zip(vertMorton.begin(), vertBox.begin(), openVerts.cbegin()),
              numOpenVert,
-             VertMortonBox({vertPropD.cptrD(), numProp, kTolerance, bBox}));
+             VertMortonBox({vertPropD.cptrD(), numProp, precision, bBox}));
 
   sort_by_key(policy, vertMorton.begin(), vertMorton.end(),
               zip(vertBox.begin(), openVerts.begin()));
