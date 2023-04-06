@@ -66,7 +66,7 @@ TEST(Boolean, Normals) {
   MeshGL cubeGL = CubeSTL();
   cubeGL.Merge();
   const Manifold cube(cubeGL);
-  const MeshGL sphereGL = WithNormals(Manifold::Sphere(60, 4));
+  const MeshGL sphereGL = WithNormals(Manifold::Sphere(60));
   const Manifold sphere(sphereGL);
 
   Manifold result =
