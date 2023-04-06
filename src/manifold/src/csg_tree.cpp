@@ -18,6 +18,7 @@
 
 #include "boolean3.h"
 #include "impl.h"
+#include "mesh_fixes.h"
 #include "par.h"
 
 namespace {
@@ -27,16 +28,6 @@ struct Transform4x3 {
 
   __host__ __device__ glm::vec3 operator()(glm::vec3 position) {
     return transform * glm::vec4(position, 1.0f);
-  }
-};
-
-struct TransformNormals {
-  const glm::mat3 transform;
-
-  __host__ __device__ glm::vec3 operator()(glm::vec3 normal) {
-    normal = glm::normalize(transform * normal);
-    if (isnan(normal.x)) normal = glm::vec3(0.0f);
-    return normal;
   }
 };
 
@@ -194,6 +185,9 @@ Manifold::Impl CsgLeafNode::Compose(
       [&nodes, &vertIndices, &edgeIndices, &triIndices, &combined,
        policy](int i) {
         auto &node = nodes[i];
+        copy(policy, node->pImpl_->halfedgeTangent_.begin(),
+             node->pImpl_->halfedgeTangent_.end(),
+             combined.halfedgeTangent_.begin() + edgeIndices[i]);
         if (node->transform_ == glm::mat4x3(1.0f)) {
           copy(policy, node->pImpl_->vertPos_.begin(),
                node->pImpl_->vertPos_.end(),
@@ -201,6 +195,11 @@ Manifold::Impl CsgLeafNode::Compose(
           copy(policy, node->pImpl_->faceNormal_.begin(),
                node->pImpl_->faceNormal_.end(),
                combined.faceNormal_.begin() + triIndices[i]);
+          transform(
+              policy, node->pImpl_->halfedge_.begin(),
+              node->pImpl_->halfedge_.end(),
+              combined.halfedge_.begin() + edgeIndices[i],
+              UpdateHalfedge({vertIndices[i], edgeIndices[i], triIndices[i]}));
         } else {
           // no need to apply the transform to the node, just copy the vertices
           // and face normals and apply transform on the fly
@@ -215,15 +214,27 @@ Manifold::Impl CsgLeafNode::Compose(
                  combined.vertPos_.begin() + vertIndices[i]);
           copy_n(policy, faceNormalBegin, node->pImpl_->faceNormal_.size(),
                  combined.faceNormal_.begin() + triIndices[i]);
+
+          transform(
+              policy, node->pImpl_->halfedge_.begin(),
+              node->pImpl_->halfedge_.end(),
+              combined.halfedge_.begin() + edgeIndices[i],
+              UpdateHalfedge({vertIndices[i], edgeIndices[i], triIndices[i]}));
+          const bool invert = glm::determinant(glm::mat3(node->transform_)) < 0;
+          for_each_n(
+              policy,
+              zip(combined.halfedgeTangent_.begin(), countAt(edgeIndices[i])),
+              node->pImpl_->halfedgeTangent_.size(),
+              TransformTangents{glm::mat3(node->transform_), invert,
+                                node->pImpl_->halfedgeTangent_.cptrD(),
+                                node->pImpl_->halfedge_.cptrD()});
+          if (invert)
+            for_each_n(policy,
+                       zip(combined.meshRelation_.triRef.begin(),
+                           countAt(triIndices[i])),
+                       node->pImpl_->NumTri(),
+                       FlipTris({combined.halfedge_.ptrD()}));
         }
-        copy(policy, node->pImpl_->halfedgeTangent_.begin(),
-             node->pImpl_->halfedgeTangent_.end(),
-             combined.halfedgeTangent_.begin() + edgeIndices[i]);
-        transform(
-            policy, node->pImpl_->halfedge_.begin(),
-            node->pImpl_->halfedge_.end(),
-            combined.halfedge_.begin() + edgeIndices[i],
-            UpdateHalfedge({vertIndices[i], edgeIndices[i], triIndices[i]}));
         // Since the nodes may be copies containing the same meshIDs, it is
         // important to add an offset so that each node instance gets
         // unique meshIDs.
