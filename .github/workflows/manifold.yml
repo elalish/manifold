@@ -193,7 +193,7 @@ jobs:
     steps:
     - name: Install common dependencies
       run: |
-        brew install pkg-config
+        brew install pkg-config assimp
         pip install trimesh
     - name: Install OpenMP
       if: matrix.parallel_backend == 'OMP'
@@ -209,7 +209,7 @@ jobs:
       run: |
         mkdir build
         cd build
-        cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DMANIFOLD_DEBUG=ON -DMANIFOLD_PAR=${{matrix.parallel_backend}} .. && make
+        cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DMANIFOLD_DEBUG=ON -DMANIFOLD_EXPORT=ON -DMANIFOLD_PAR=${{matrix.parallel_backend}} .. && make
     - name: Test
       run: |
         cd build/test
