@@ -503,6 +503,21 @@ void Dump(const std::vector<T>& vec) {
   }
   std::cout << std::endl;
 }
+
+template <typename T>
+void Diff(const std::vector<T>& a, const std::vector<T>& b) {
+  std::cout << "Diff = " << std::endl;
+  if (a.size() != b.size()) {
+    std::cout << "a and b must have the same length, aborting Diff"
+              << std::endl;
+    return;
+  }
+  for (int i = 0; i < a.size(); ++i) {
+    if (a[i] != b[i])
+      std::cout << i << ": " << a[i] << ", " << b[i] << std::endl;
+  }
+  std::cout << std::endl;
+}
 /** @} */
 #endif
 }  // namespace manifold

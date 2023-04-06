@@ -480,6 +480,17 @@ TEST(Manifold, MeshGLRoundTrip) {
   RelatedGL(cylinder2, {inGL});
 }
 
+void CheckCube(const MeshGL& cubeSTL) {
+  Manifold cube(cubeSTL);
+  EXPECT_EQ(cube.NumTri(), 12);
+  EXPECT_EQ(cube.NumVert(), 8);
+  EXPECT_EQ(cube.NumPropVert(), 24);
+
+  auto prop = cube.GetProperties();
+  EXPECT_FLOAT_EQ(prop.volume, 1.0f);
+  EXPECT_FLOAT_EQ(prop.surfaceArea, 6.0f);
+}
+
 TEST(Manifold, Merge) {
   MeshGL cubeSTL = CubeSTL();
   EXPECT_EQ(cubeSTL.NumTri(), 12);
@@ -489,15 +500,17 @@ TEST(Manifold, Merge) {
   EXPECT_TRUE(cubeBad.IsEmpty());
   EXPECT_EQ(cubeBad.Status(), Manifold::Error::NotManifold);
 
-  cubeSTL.Merge();
-  Manifold cube(cubeSTL);
-  EXPECT_EQ(cube.NumTri(), 12);
-  EXPECT_EQ(cube.NumVert(), 8);
-  EXPECT_EQ(cube.NumPropVert(), 24);
+  EXPECT_TRUE(cubeSTL.Merge());
+  CheckCube(cubeSTL);
 
-  auto prop = cube.GetProperties();
-  EXPECT_FLOAT_EQ(prop.volume, 1.0f);
-  EXPECT_FLOAT_EQ(prop.surfaceArea, 6.0f);
+  EXPECT_FALSE(cubeSTL.Merge());
+  EXPECT_EQ(cubeSTL.mergeFromVert.size(), 28);
+  cubeSTL.mergeFromVert.resize(14);
+  cubeSTL.mergeToVert.resize(14);
+
+  EXPECT_TRUE(cubeSTL.Merge());
+  EXPECT_EQ(cubeSTL.mergeFromVert.size(), 28);
+  CheckCube(cubeSTL);
 }
 
 TEST(Manifold, FaceIDRoundTrip) {

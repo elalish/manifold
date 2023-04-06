@@ -264,10 +264,10 @@ void Identical(const Mesh& mesh1, const Mesh& mesh2) {
 }
 
 void RelatedGL(const Manifold& out, const std::vector<MeshGL>& originals,
-               bool checkNormals) {
+               bool checkNormals, bool updateNormals) {
   ASSERT_FALSE(out.IsEmpty());
   const glm::ivec3 normalIdx =
-      checkNormals ? glm::ivec3(3, 4, 5) : glm::ivec3(0);
+      updateNormals ? glm::ivec3(3, 4, 5) : glm::ivec3(0);
   MeshGL output = out.GetMeshGL(normalIdx);
   for (int run = 0; run < output.runOriginalID.size(); ++run) {
     const float* m = output.runTransform.data() + 12 * run;
@@ -325,8 +325,7 @@ void RelatedGL(const Manifold& out, const std::vector<MeshGL>& originals,
         if (checkNormals) {
           glm::vec3 normal;
           for (int k : {0, 1, 2})
-            normal[k] =
-                output.vertProperties[vert * output.numProp + normalIdx[k]];
+            normal[k] = output.vertProperties[vert * output.numProp + 3 + k];
           ASSERT_NEAR(glm::length(normal), 1, 0.0001);
           ASSERT_GT(glm::dot(normal, outNormal), 0);
         } else {

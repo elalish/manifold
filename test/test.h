@@ -43,7 +43,7 @@ MeshGL WithPositionColors(const Manifold& in);
 MeshGL WithNormals(const Manifold& in);
 void Identical(const Mesh& mesh1, const Mesh& mesh2);
 void RelatedGL(const Manifold& out, const std::vector<MeshGL>& originals,
-               bool checkNormals = false);
+               bool checkNormals = false, bool updateNormals = false);
 void ExpectMeshes(const Manifold& manifold,
                   const std::vector<MeshSize>& meshSize);
 void CheckManifold(const Manifold& manifold);

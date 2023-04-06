@@ -66,13 +66,15 @@ TEST(Boolean, Normals) {
   MeshGL cubeGL = CubeSTL();
   cubeGL.Merge();
   const Manifold cube(cubeGL);
-  const MeshGL sphereGL = WithNormals(Manifold::Sphere(60));
+  const MeshGL sphereGL = WithNormals(Manifold::Sphere(60, 4));
   const Manifold sphere(sphereGL);
 
   Manifold result =
       cube.Scale(glm::vec3(100)) -
       (sphere.Rotate(180) -
        sphere.Scale(glm::vec3(0.5)).Rotate(90).Translate({40, 40, 40}));
+
+  RelatedGL(result, {cubeGL, sphereGL}, true, true);
 
 #ifdef MANIFOLD_EXPORT
   ExportOptions opt;
@@ -83,7 +85,13 @@ TEST(Boolean, Normals) {
     ExportMesh("normals.glb", result.GetMeshGL({3, 4, 5}), opt);
 #endif
 
-  RelatedGL(result, {cubeGL, sphereGL}, true);
+  MeshGL output = result.GetMeshGL({3, 4, 5});
+  output.mergeFromVert.clear();
+  output.mergeToVert.clear();
+  output.Merge();
+  Manifold roundTrip(output);
+
+  RelatedGL(roundTrip, {cubeGL, sphereGL}, true, false);
 }
 
 TEST(Boolean, EmptyOriginal) {
