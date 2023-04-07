@@ -157,13 +157,12 @@ struct CreateRadixTree {
   }
 };
 
-template <typename T, const bool allocateOnly>
+template <typename T, const bool allocateOnly, const bool selfCollision>
 struct FindCollisions {
   thrust::pair<int*, int*> queryTri_;
   int* counts;
   const Box* nodeBBox_;
   const thrust::pair<int, int>* internalChildren_;
-  const bool selfCollision;
 
   __host__ __device__ int RecordCollision(int node,
                                           thrust::tuple<T, int>& query) {
@@ -275,9 +274,8 @@ Collider::Collider(const VecDH<Box>& leafBB,
  * the query vector is the leaf vector, set selfCollision to true, which will
  * then not report any collisions between an index and itself.
  */
-template <typename T>
-SparseIndices Collider::Collisions(const VecDH<T>& queriesIn,
-                                   bool selfCollision) const {
+template <const bool selfCollision, typename T>
+SparseIndices Collider::Collisions(const VecDH<T>& queriesIn) const {
   // note that the length is 1 larger than the number of queries so the last
   // element can store the sum when using exclusive scan
   VecDH<int> counts(queriesIn.size() + 1, 0);
@@ -285,17 +283,17 @@ SparseIndices Collider::Collisions(const VecDH<T>& queriesIn,
   // compute the number of collisions to determine the size for allocation and
   // offset, this avoids the need for atomic
   for_each_n(policy, zip(queriesIn.cbegin(), countAt(0)), queriesIn.size(),
-             FindCollisions<T, true>(
+             FindCollisions<T, true, selfCollision>(
                  {thrust::pair<int*, int*>(nullptr, nullptr), counts.ptrD(),
-                  nodeBBox_.ptrD(), internalChildren_.ptrD(), selfCollision}));
+                  nodeBBox_.ptrD(), internalChildren_.ptrD()}));
   // compute start index for each query and total count
   exclusive_scan(policy, counts.begin(), counts.end(), counts.begin());
   SparseIndices queryTri(counts.back());
   // actually recording collisions
   for_each_n(policy, zip(queriesIn.cbegin(), countAt(0)), queriesIn.size(),
-             FindCollisions<T, false>(
+             FindCollisions<T, false, selfCollision>(
                  {queryTri.ptrDpq(), counts.ptrD(), nodeBBox_.ptrD(),
-                  internalChildren_.ptrD(), selfCollision}));
+                  internalChildren_.ptrD()}));
   return queryTri;
 }
 
@@ -339,9 +337,12 @@ bool Collider::Transform(glm::mat4x3 transform) {
   return axisAligned;
 }
 
-template SparseIndices Collider::Collisions<Box>(const VecDH<Box>&, bool) const;
+template SparseIndices Collider::Collisions<true, Box>(const VecDH<Box>&) const;
 
-template SparseIndices Collider::Collisions<glm::vec3>(const VecDH<glm::vec3>&,
-                                                       bool) const;
+template SparseIndices Collider::Collisions<false, Box>(
+    const VecDH<Box>&) const;
+
+template SparseIndices Collider::Collisions<false, glm::vec3>(
+    const VecDH<glm::vec3>&) const;
 
 }  // namespace manifold

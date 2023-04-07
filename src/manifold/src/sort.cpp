@@ -597,7 +597,7 @@ bool MeshGL::Merge() {
               zip(vertBox.begin(), openVerts.begin()));
 
   Collider collider(vertBox, vertMorton);
-  SparseIndices toMerge = collider.Collisions(vertBox, true);
+  SparseIndices toMerge = collider.Collisions<true>(vertBox);
 
   Graph graph;
   for (int i = 0; i < numVert; ++i) {

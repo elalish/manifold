@@ -26,9 +26,8 @@ class Collider {
   Collider(const VecDH<Box>& leafBB, const VecDH<uint32_t>& leafMorton);
   bool Transform(glm::mat4x3);
   void UpdateBoxes(const VecDH<Box>& leafBB);
-  template <typename T>
-  SparseIndices Collisions(const VecDH<T>& queriesIn,
-                           bool selfCollision = false) const;
+  template <const bool selfCollision = false, typename T>
+  SparseIndices Collisions(const VecDH<T>& queriesIn) const;
 
  private:
   VecDH<Box> nodeBBox_;
