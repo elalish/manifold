@@ -507,6 +507,12 @@ TEST(Manifold, MirrorUnion) {
   EXPECT_TRUE(a.Mirror(glm::vec3(0)).IsEmpty());
 }
 
+TEST(Manifold, MirrorUnion2) {
+  auto a = Manifold::Cube();
+  auto result = Manifold::Compose({a.Mirror({1, 0, 0})});
+  EXPECT_TRUE(result.MatchesTriNormals());
+}
+
 TEST(Manifold, Invalid) {
   auto invalid = Manifold::Error::InvalidConstruction;
   auto circ = CrossSection::Circle(10.);
