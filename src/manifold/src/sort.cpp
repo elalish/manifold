@@ -196,28 +196,6 @@ struct ReindexFace {
   }
 };
 
-struct Edge {
-  int first, second;
-  bool forward;
-
-  Edge(int start, int end) {
-    forward = start < end;
-    if (forward) {
-      first = start;
-      second = end;
-    } else {
-      first = end;
-      second = start;
-    }
-  }
-
-  bool operator<(const Edge& other) const {
-    return first == other.first ? second < other.second : first < other.first;
-  }
-
-  int Start() const { return forward ? first : second; }
-};
-
 struct VertMortonBox {
   const float* vertProperties;
   const uint32_t numProp;
@@ -528,7 +506,7 @@ MeshGL::MeshGL(const Mesh& mesh) {
  * round-trip through a file format.
  */
 bool MeshGL::Merge() {
-  std::multiset<Edge> openEdges;
+  std::multiset<std::pair<int, int>> openEdges;
 
   std::vector<int> merge(NumVert());
   std::iota(merge.begin(), merge.end(), 0);
@@ -541,18 +519,15 @@ bool MeshGL::Merge() {
   const int next[3] = {1, 2, 0};
   for (int tri = 0; tri < numTri; ++tri) {
     for (int i : {0, 1, 2}) {
-      Edge edge(merge[triVerts[3 * tri + i]],
-                merge[triVerts[3 * tri + next[i]]]);
-      auto range = openEdges.equal_range(edge);
-      bool found = false;
-      for (auto it = range.first; it != range.second; ++it) {
-        if (it->forward != edge.forward) {
-          openEdges.erase(it);
-          found = true;
-          break;
-        }
+      auto edge = std::make_pair(merge[triVerts[3 * tri + next[i]]],
+                                 merge[triVerts[3 * tri + i]]);
+      auto it = openEdges.find(edge);
+      if (it == openEdges.end()) {
+        std::swap(edge.first, edge.second);
+        openEdges.insert(edge);
+      } else {
+        openEdges.erase(it);
       }
-      if (!found) openEdges.insert(edge);
     }
   }
 
@@ -563,8 +538,8 @@ bool MeshGL::Merge() {
   const int numOpenVert = openEdges.size();
   VecDH<int> openVerts(numOpenVert);
   int i = 0;
-  for (const auto edge : openEdges) {
-    const int vert = edge.Start();
+  for (const auto& edge : openEdges) {
+    const int vert = edge.first;
     openVerts[i++] = vert;
   }
 
