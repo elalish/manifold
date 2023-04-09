@@ -503,7 +503,8 @@ MeshGL::MeshGL(const Mesh& mesh) {
  * There is no guarantee the result will be manifold - this is a best-effort
  * helper function designed primarily to aid in the case where a manifold
  * multi-material MeshGL was produced, but its merge vectors were lost due to a
- * round-trip through a file format.
+ * round-trip through a file format. Constructing a Manifold from the result
+ * will report a Status if it is not manifold.
  */
 bool MeshGL::Merge() {
   std::multiset<std::pair<int, int>> openEdges;
