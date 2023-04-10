@@ -15,7 +15,7 @@
 #pragma once
 #include <string>
 
-#include "public.h"
+#include "manifold.h"
 
 namespace manifold {
 

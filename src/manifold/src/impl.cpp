@@ -191,20 +191,17 @@ struct CoplanarEdge {
     const int edgeIdx = thrust::get<2>(inOut);
 
     const Halfedge edge = halfedge[edgeIdx];
-    if (!edge.IsForward()) return;
     const Halfedge pair = halfedge[edge.pairedHalfedge];
+
     if (triRef[edge.face].meshID != triRef[pair.face].meshID) return;
 
     const glm::vec3 base = vertPos[edge.startVert];
-
     const int baseNum = edgeIdx - 3 * edge.face;
     const int jointNum = edge.pairedHalfedge - 3 * pair.face;
-    const int edgeNum = baseNum == 0 ? 2 : baseNum - 1;
-    const int pairNum = jointNum == 0 ? 2 : jointNum - 1;
 
     if (numProp > 0) {
       const int prop0 = triProp[edge.face][baseNum];
-      const int prop1 = triProp[edge.face][edgeNum];
+      const int prop1 = triProp[pair.face][jointNum == 2 ? 0 : jointNum + 1];
       bool propEqual = true;
       for (int p = 0; p < numProp; ++p) {
         if (glm::abs(prop[numProp * prop0 + p] - prop[numProp * prop1 + p]) >
@@ -219,6 +216,10 @@ struct CoplanarEdge {
       }
     }
 
+    if (!edge.IsForward()) return;
+
+    const int edgeNum = baseNum == 0 ? 2 : baseNum - 1;
+    const int pairNum = jointNum == 0 ? 2 : jointNum - 1;
     const glm::vec3 jointVec = vertPos[pair.startVert] - base;
     const glm::vec3 edgeVec =
         vertPos[halfedge[3 * edge.face + edgeNum].startVert] - base;
@@ -727,8 +728,7 @@ Manifold::Impl Manifold::Impl::Transform(const glm::mat4x3& transform_) const {
  * by the optional input.
  */
 void Manifold::Impl::SetPrecision(float minPrecision) {
-  precision_ = glm::max(minPrecision, kTolerance * bBox_.Scale());
-  if (!glm::isfinite(precision_)) precision_ = -1;
+  precision_ = MaxPrecision(minPrecision, bBox_);
 }
 
 /**

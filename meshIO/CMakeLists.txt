@@ -14,6 +14,8 @@
 
 project(meshIO)
 
+find_package(assimp REQUIRED)
+
 add_library(${PROJECT_NAME} src/meshIO.cpp)
 
 target_include_directories(${PROJECT_NAME}
@@ -21,8 +23,8 @@ target_include_directories(${PROJECT_NAME}
 )
 
 target_link_libraries(${PROJECT_NAME}
-    PUBLIC utilities
-    PRIVATE assimp
+    PUBLIC manifold
+    PRIVATE assimp::assimp
 )
 
 target_compile_options(${PROJECT_NAME} PRIVATE ${MANIFOLD_FLAGS})
