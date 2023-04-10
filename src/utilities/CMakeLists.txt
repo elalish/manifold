@@ -62,3 +62,5 @@ if(MANIFOLD_DEBUG)
     target_compile_options(${PROJECT_NAME}
         PUBLIC -DMANIFOLD_DEBUG)
 endif()
+
+target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_17)
