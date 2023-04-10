@@ -1079,11 +1079,10 @@ std::vector<glm::ivec3> TriangulateIdx(const PolygonsIdx &polys,
  * @return std::vector<glm::ivec3> The triangles, referencing the original
  * polygon points in order.
  */
-std::vector<glm::ivec3> Triangulate(
-    std::vector<std::vector<glm::vec2>> &polygons, float precision) {
+std::vector<glm::ivec3> Triangulate(const Polygons &polygons, float precision) {
   int idx = 0;
   PolygonsIdx polygonsIndexed;
-  for (auto &poly : polygons) {
+  for (const auto &poly : polygons) {
     SimplePolygonIdx simpleIndexed;
     for (const glm::vec2 &polyVert : poly) {
       simpleIndexed.push_back({polyVert, idx++});
