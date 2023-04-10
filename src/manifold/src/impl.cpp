@@ -23,6 +23,7 @@
 
 #include "graph.h"
 #include "hashtable.h"
+#include "mesh_fixes.h"
 #include "par.h"
 
 namespace {
@@ -43,12 +44,6 @@ __host__ __device__ void AtomicAddVec3(glm::vec3& target,
   }
 }
 
-__host__ __device__ int FlipHalfedge(int halfedge) {
-  const int tri = halfedge / 3;
-  const int vert = 2 - (halfedge - 3 * tri);
-  return 3 * tri + vert;
-}
-
 struct Normalize {
   __host__ __device__ void operator()(glm::vec3& v) { v = SafeNormalize(v); }
 };
@@ -58,52 +53,6 @@ struct Transform4x3 {
 
   __host__ __device__ glm::vec3 operator()(glm::vec3 position) {
     return transform * glm::vec4(position, 1.0f);
-  }
-};
-
-struct TransformNormals {
-  const glm::mat3 transform;
-
-  __host__ __device__ glm::vec3 operator()(glm::vec3 normal) {
-    normal = glm::normalize(transform * normal);
-    if (isnan(normal.x)) normal = glm::vec3(0.0f);
-    return normal;
-  }
-};
-
-struct TransformTangents {
-  const glm::mat3 transform;
-  const bool invert;
-  const glm::vec4* oldTangents;
-  const Halfedge* halfedge;
-
-  __host__ __device__ void operator()(thrust::tuple<glm::vec4&, int> inOut) {
-    glm::vec4& tangent = thrust::get<0>(inOut);
-    int edge = thrust::get<1>(inOut);
-    if (invert) {
-      edge = halfedge[FlipHalfedge(edge)].pairedHalfedge;
-    }
-
-    tangent = glm::vec4(transform * glm::vec3(oldTangents[edge]),
-                        oldTangents[edge].w);
-  }
-};
-
-struct FlipTris {
-  Halfedge* halfedge;
-
-  __host__ __device__ void operator()(thrust::tuple<TriRef&, int> inOut) {
-    TriRef& bary = thrust::get<0>(inOut);
-    const int tri = thrust::get<1>(inOut);
-
-    thrust::swap(halfedge[3 * tri], halfedge[3 * tri + 2]);
-
-    for (const int i : {0, 1, 2}) {
-      thrust::swap(halfedge[3 * tri + i].startVert,
-                   halfedge[3 * tri + i].endVert);
-      halfedge[3 * tri + i].pairedHalfedge =
-          FlipHalfedge(halfedge[3 * tri + i].pairedHalfedge);
-    }
   }
 };
 
@@ -242,20 +191,17 @@ struct CoplanarEdge {
     const int edgeIdx = thrust::get<2>(inOut);
 
     const Halfedge edge = halfedge[edgeIdx];
-    if (!edge.IsForward()) return;
     const Halfedge pair = halfedge[edge.pairedHalfedge];
+
     if (triRef[edge.face].meshID != triRef[pair.face].meshID) return;
 
     const glm::vec3 base = vertPos[edge.startVert];
-
     const int baseNum = edgeIdx - 3 * edge.face;
     const int jointNum = edge.pairedHalfedge - 3 * pair.face;
-    const int edgeNum = baseNum == 0 ? 2 : baseNum - 1;
-    const int pairNum = jointNum == 0 ? 2 : jointNum - 1;
 
     if (numProp > 0) {
       const int prop0 = triProp[edge.face][baseNum];
-      const int prop1 = triProp[edge.face][edgeNum];
+      const int prop1 = triProp[pair.face][jointNum == 2 ? 0 : jointNum + 1];
       bool propEqual = true;
       for (int p = 0; p < numProp; ++p) {
         if (glm::abs(prop[numProp * prop0 + p] - prop[numProp * prop1 + p]) >
@@ -270,6 +216,10 @@ struct CoplanarEdge {
       }
     }
 
+    if (!edge.IsForward()) return;
+
+    const int edgeNum = baseNum == 0 ? 2 : baseNum - 1;
+    const int pairNum = jointNum == 0 ? 2 : jointNum - 1;
     const glm::vec3 jointVec = vertPos[pair.startVert] - base;
     const glm::vec3 edgeVec =
         vertPos[halfedge[3 * edge.face + edgeNum].startVert] - base;
@@ -778,8 +728,7 @@ Manifold::Impl Manifold::Impl::Transform(const glm::mat4x3& transform_) const {
  * by the optional input.
  */
 void Manifold::Impl::SetPrecision(float minPrecision) {
-  precision_ = glm::max(minPrecision, kTolerance * bBox_.Scale());
-  if (!glm::isfinite(precision_)) precision_ = -1;
+  precision_ = MaxPrecision(minPrecision, bBox_);
 }
 
 /**

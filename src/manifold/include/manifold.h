@@ -33,6 +33,80 @@ ExecutionParams& ManifoldParams();
 class CsgNode;
 class CsgLeafNode;
 
+/** @ingroup Connections
+ *  @{
+ */
+
+/**
+ * An alternative to Mesh for output suitable for pushing into graphics
+ * libraries directly. This may not be manifold since the verts are duplicated
+ * along property boundaries that do not match. The additional merge vectors
+ * store this missing information, allowing the manifold to be reconstructed.
+ */
+struct MeshGL {
+  /// Number of property vertices
+  uint32_t NumVert() const { return vertProperties.size() / numProp; };
+  /// Number of triangles
+  uint32_t NumTri() const { return triVerts.size() / 3; };
+
+  /// Number of properties per vertex, always >= 3.
+  uint32_t numProp = 3;
+  /// Flat, GL-style interleaved list of all vertex properties: propVal =
+  /// vertProperties[vert * numProp + propIdx]. The first three properties are
+  /// always the position x, y, z.
+  std::vector<float> vertProperties;
+  /// The vertex indices of the three triangle corners in CCW (from the outside)
+  /// order, for each triangle.
+  std::vector<uint32_t> triVerts;
+  /// Optional: A list of only the vertex indicies that need to be merged to
+  /// reconstruct the manifold.
+  std::vector<uint32_t> mergeFromVert;
+  /// Optional: The same length as mergeFromVert, and the corresponding value
+  /// contains the vertex to merge with. It will have an identical position, but
+  /// the other properties may differ.
+  std::vector<uint32_t> mergeToVert;
+  /// Optional: Indicates runs of triangles that correspond to a particular
+  /// input mesh instance. The runs encompass all of triVerts and are sorted
+  /// by runOriginalID. Run i begins at triVerts[runIndex[i]] and ends at
+  /// triVerts[runIndex[i+1]]. All runIndex values are divisible by 3.
+  std::vector<uint32_t> runIndex;
+  /// Optional: The OriginalID of the mesh this triangle run came from. This ID
+  /// is ideal for reapplying materials to the output mesh. Multiple runs may
+  /// have the same ID, e.g. representing different copies of the same input
+  /// mesh. If you create an input MeshGL that you want to be able to reference
+  /// as one or more originals, be sure to set unique values from ReserveIDs().
+  std::vector<uint32_t> runOriginalID;
+  /// Optional: For each run, a 3x4 transform is stored representing how the
+  /// corresponding original mesh was transformed to create this triangle run.
+  /// This matrix is stored in column-major order and the length of the overall
+  /// vector is 12 * runOriginalID.size().
+  std::vector<float> runTransform;
+  /// Optional: Length NumTri, contains an ID of the source face this triangle
+  /// comes from. When auto-generated, this ID will be a triangle index into the
+  /// original mesh. All neighboring coplanar triangles from that input mesh
+  /// will refer to a single triangle of that group as the faceID. When
+  /// supplying faceIDs, ensure that triangles with the same ID are in fact
+  /// coplanar and have consistent properties (within some tolerance) or the
+  /// output will be surprising.
+  std::vector<uint32_t> faceID;
+  /// Optional: The X-Y-Z-W weighted tangent vectors for smooth Refine(). If
+  /// non-empty, must be exactly four times as long as Mesh.triVerts. Indexed
+  /// as 4 * (3 * tri + i) + j, i < 3, j < 4, representing the tangent value
+  /// Mesh.triVerts[tri][i] along the CCW edge. If empty, mesh is faceted.
+  std::vector<float> halfedgeTangent;
+  /// The absolute precision of the vertex positions, based on accrued rounding
+  /// errors. When creating a Manifold, the precision used will be the maximum
+  /// of this and a baseline precision from the size of the bounding box. Any
+  /// edge shorter than precision may be collapsed.
+  float precision = 0;
+
+  MeshGL() = default;
+  MeshGL(const Mesh& mesh);
+
+  bool Merge();
+};
+/** @} */
+
 /** @defgroup Core
  *  @brief The central classes of the library
  *  @{
