@@ -155,8 +155,8 @@ void Dump(const PolygonsIdx &polys) {
   for (auto poly : polys) {
     std::cout << "polys.push_back({" << std::setprecision(9) << std::endl;
     for (auto v : poly) {
-      std::cout << "    {glm::vec2(" << v.pos.x << ", " << v.pos.y << "), "
-                << v.idx << "},  //" << std::endl;
+      std::cout << "    {" << v.pos.x << ", " << v.pos.y << "},  //"
+                << std::endl;
     }
     std::cout << "});" << std::endl;
   }
