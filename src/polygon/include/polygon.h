@@ -38,7 +38,11 @@ using PolygonsIdx = std::vector<SimplePolygonIdx>;
 
 std::vector<glm::ivec3> TriangulateIdx(const PolygonsIdx &polys,
                                        float precision = -1);
+/** @} */
 
+/** @ingroup Connections
+ *  @{
+ */
 std::vector<glm::ivec3> Triangulate(const Polygons &polygons,
                                     float precision = -1);
 
