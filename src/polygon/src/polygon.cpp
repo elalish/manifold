@@ -947,7 +947,8 @@ class Monotones {
       OVERLAP_ASSERT(type != Skip, "Skip should not happen on reverse sweep!");
 
       PairItr westPair = GetPair(vert, type);
-      OVERLAP_ASSERT(westPair != activePairs_.end(), "No active pair!");
+      OVERLAP_ASSERT(type == Start || westPair != activePairs_.end(),
+                     "No active pair!");
 
       switch (type) {
         case Merge: {
