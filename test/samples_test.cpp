@@ -49,7 +49,7 @@ TEST(Samples, Knot13) {
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) ExportMesh("knot13.glb", knot13.GetMesh(), {});
 #endif
-  CheckManifold(knot13);
+  CheckNormals(knot13);
   EXPECT_EQ(knot13.Genus(), 1);
   auto prop = knot13.GetProperties();
   EXPECT_NEAR(prop.volume, 20786, 1);
@@ -63,7 +63,7 @@ TEST(Samples, Knot42) {
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) ExportMesh("knot42.glb", knot42.GetMesh(), {});
 #endif
-  CheckManifold(knot42);
+  CheckNormals(knot42);
   std::vector<Manifold> knots = knot42.Decompose();
   ASSERT_EQ(knots.size(), 2);
   EXPECT_EQ(knots[0].Genus(), 1);
@@ -104,7 +104,7 @@ TEST(Samples, Scallop) {
 #endif
 
   scallop = scallop.Refine(50);
-  CheckManifold(scallop);
+  CheckNormals(scallop);
   auto prop = scallop.GetProperties();
   EXPECT_NEAR(prop.volume, 41.3, 0.1);
   EXPECT_NEAR(prop.surfaceArea, 78.1, 0.1);
@@ -130,7 +130,7 @@ TEST(Samples, Scallop) {
 
 TEST(Samples, TetPuzzle) {
   Manifold puzzle = TetPuzzle(50, 0.2, 50);
-  CheckManifold(puzzle);
+  CheckNormals(puzzle);
   EXPECT_LE(puzzle.NumDegenerateTris(), 2);
   CheckGL(puzzle);
 
@@ -144,7 +144,7 @@ TEST(Samples, TetPuzzle) {
 
 TEST(Samples, FrameReduced) {
   Manifold frame = RoundedFrame(100, 10, 4);
-  CheckManifold(frame);
+  CheckNormals(frame);
   EXPECT_EQ(frame.NumDegenerateTris(), 0);
   EXPECT_EQ(frame.Genus(), 5);
   auto prop = frame.GetProperties();
@@ -159,7 +159,7 @@ TEST(Samples, FrameReduced) {
 
 TEST(Samples, Frame) {
   Manifold frame = RoundedFrame(100, 10);
-  CheckManifold(frame);
+  CheckNormals(frame);
   EXPECT_EQ(frame.NumDegenerateTris(), 0);
   EXPECT_EQ(frame.Genus(), 5);
   CheckGL(frame);
@@ -172,7 +172,7 @@ TEST(Samples, Frame) {
 // that are not in general position, e.g. coplanar faces.
 TEST(Samples, Bracelet) {
   Manifold bracelet = StretchyBracelet();
-  CheckManifold(bracelet);
+  CheckNormals(bracelet);
   EXPECT_LE(bracelet.NumDegenerateTris(), 22);
   EXPECT_EQ(bracelet.Genus(), 1);
   CheckGL(bracelet);
@@ -184,7 +184,7 @@ TEST(Samples, Bracelet) {
 TEST(Samples, GyroidModule) {
   const float size = 20;
   Manifold gyroid = GyroidModule(size);
-  CheckManifold(gyroid);
+  CheckNormals(gyroid);
   EXPECT_LE(gyroid.NumDegenerateTris(), 2);
   EXPECT_EQ(gyroid.Genus(), 15);
   CheckGL(gyroid);
@@ -201,7 +201,7 @@ TEST(Samples, GyroidModule) {
 
 TEST(Samples, Sponge1) {
   Manifold sponge = MengerSponge(1);
-  CheckManifold(sponge);
+  CheckNormals(sponge);
   EXPECT_EQ(sponge.NumDegenerateTris(), 0);
   EXPECT_EQ(sponge.NumVert(), 40);
   EXPECT_EQ(sponge.Genus(), 5);
@@ -219,16 +219,14 @@ TEST(Samples, Sponge1) {
 // degree rotations.
 TEST(Samples, Sponge4) {
   Manifold sponge = MengerSponge(4);
-  CheckManifold(sponge);
+  CheckNormals(sponge);
   // FIXME: limit NumDegenerateTris
   EXPECT_LE(sponge.NumDegenerateTris(), 40000);
   EXPECT_EQ(sponge.Genus(), 26433);  // should be 1:5, 2:81, 3:1409, 4:26433
   CheckGL(sponge);
 
   std::pair<Manifold, Manifold> cutSponge = sponge.SplitByPlane({1, 1, 1}, 0);
-  EXPECT_TRUE(cutSponge.first.IsManifold());
   EXPECT_EQ(cutSponge.first.Genus(), 13394);
-  EXPECT_TRUE(cutSponge.second.IsManifold());
   EXPECT_EQ(cutSponge.second.Genus(), 13394);
 
 #ifdef MANIFOLD_EXPORT
