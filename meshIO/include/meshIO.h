@@ -19,10 +19,6 @@
 
 namespace manifold {
 
-/** @addtogroup Debug
- *  @{
- */
-
 /** @defgroup MeshIO
  *  @brief 3D model file I/O based on Assimp
  * @{
@@ -69,6 +65,5 @@ void ExportMesh(const std::string& filename, const Mesh& mesh,
 
 void ExportMesh(const std::string& filename, const MeshGL& mesh,
                 const ExportOptions& options);
-/** @} */
 /** @} */
 }  // namespace manifold
