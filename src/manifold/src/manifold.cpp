@@ -435,13 +435,6 @@ uint32_t Manifold::ReserveIDs(uint32_t n) {
 }
 
 /**
- * Should always be true. Also checks saneness of the internal data structures.
- */
-bool Manifold::IsManifold() const {
-  return GetCsgLeafNode().GetImpl()->Is2Manifold();
-}
-
-/**
  * The triangle normal vectors are saved over the course of operations rather
  * than recalculated to avoid rounding error. This checks that triangles still
  * match their normal vectors within Precision().

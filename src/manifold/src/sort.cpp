@@ -296,6 +296,8 @@ void Manifold::Impl::Finish() {
 
   CalculateNormals();
   collider_ = Collider(faceBox, faceMorton);
+
+  ASSERT(Is2Manifold(), logicErr, "mesh is not 2-manifold!");
 }
 
 /**
