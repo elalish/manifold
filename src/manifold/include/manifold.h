@@ -235,7 +235,6 @@ class Manifold {
    *  These are just for internal testing.
    */
   ///@{
-  bool IsManifold() const;
   bool MatchesTriNormals() const;
   int NumDegenerateTris() const;
   int NumOverlaps(const Manifold& second) const;

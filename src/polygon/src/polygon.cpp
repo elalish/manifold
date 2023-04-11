@@ -155,8 +155,8 @@ void Dump(const PolygonsIdx &polys) {
   for (auto poly : polys) {
     std::cout << "polys.push_back({" << std::setprecision(9) << std::endl;
     for (auto v : poly) {
-      std::cout << "    {glm::vec2(" << v.pos.x << ", " << v.pos.y << "), "
-                << v.idx << "},  //" << std::endl;
+      std::cout << "    {" << v.pos.x << ", " << v.pos.y << "},  //"
+                << std::endl;
     }
     std::cout << "});" << std::endl;
   }
@@ -1034,12 +1034,15 @@ class Monotones {
 namespace manifold {
 
 /**
- * @brief Triangulates a set of /epsilon-valid polygons.
+ * @brief Triangulates a set of &epsilon;-valid polygons. If the input is not
+ * &epsilon;-valid, the triangulation may overlap, but will always return a
+ * manifold result that matches the input edge directions.
  *
  * @param polys The set of polygons, wound CCW and representing multiple
  * polygons and/or holes. These have 2D-projected positions as well as
- * references back to the original vertices
- * @param precision The value of epsilon, bounding the uncertainty of the input
+ * references back to the original vertices.
+ * @param precision The value of &epsilon;, bounding the uncertainty of the
+ * input.
  * @return std::vector<glm::ivec3> The triangles, referencing the original
  * vertex indicies.
  */
@@ -1072,19 +1075,21 @@ std::vector<glm::ivec3> TriangulateIdx(const PolygonsIdx &polys,
 }
 
 /**
- * @brief Triangulates a set of /epsilon-valid polygons.
+ * @brief Triangulates a set of &epsilon;-valid polygons. If the input is not
+ * &epsilon;-valid, the triangulation may overlap, but will always return a
+ * manifold result that matches the input edge directions.
  *
  * @param polygons The set of polygons, wound CCW and representing multiple
  * polygons and/or holes.
- * @param precision The value of epsilon, bounding the uncertainty of the input
+ * @param precision The value of &epsilon;, bounding the uncertainty of the
+ * input.
  * @return std::vector<glm::ivec3> The triangles, referencing the original
  * polygon points in order.
  */
-std::vector<glm::ivec3> Triangulate(
-    std::vector<std::vector<glm::vec2>> &polygons, float precision) {
+std::vector<glm::ivec3> Triangulate(const Polygons &polygons, float precision) {
   int idx = 0;
   PolygonsIdx polygonsIndexed;
-  for (auto &poly : polygons) {
+  for (const auto &poly : polygons) {
     SimplePolygonIdx simpleIndexed;
     for (const glm::vec2 &polyVert : poly) {
       simpleIndexed.push_back({polyVert, idx++});

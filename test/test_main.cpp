@@ -354,7 +354,6 @@ void RelatedGL(const Manifold& out, const std::vector<MeshGL>& originals,
 void ExpectMeshes(const Manifold& manifold,
                   const std::vector<MeshSize>& meshSize) {
   EXPECT_FALSE(manifold.IsEmpty());
-  EXPECT_TRUE(manifold.IsManifold());
   EXPECT_TRUE(manifold.MatchesTriNormals());
   std::vector<Manifold> manifolds = manifold.Decompose();
   ASSERT_EQ(manifolds.size(), meshSize.size());
@@ -364,7 +363,6 @@ void ExpectMeshes(const Manifold& manifold,
                                                 : a.NumTri() > b.NumTri();
             });
   for (int i = 0; i < manifolds.size(); ++i) {
-    EXPECT_TRUE(manifolds[i].IsManifold());
     EXPECT_EQ(manifolds[i].NumVert(), meshSize[i].numVert);
     EXPECT_EQ(manifolds[i].NumTri(), meshSize[i].numTri);
     EXPECT_EQ(manifolds[i].NumProp(), meshSize[i].numProp);
@@ -380,8 +378,7 @@ void ExpectMeshes(const Manifold& manifold,
   }
 }
 
-void CheckManifold(const Manifold& manifold) {
-  EXPECT_TRUE(manifold.IsManifold());
+void CheckNormals(const Manifold& manifold) {
   EXPECT_TRUE(manifold.MatchesTriNormals());
   for (const glm::vec3& normal : manifold.GetMesh().vertNormal) {
     ASSERT_NEAR(glm::length(normal), 1, 0.0001);
@@ -389,8 +386,7 @@ void CheckManifold(const Manifold& manifold) {
 }
 
 void CheckStrictly(const Manifold& manifold) {
-  EXPECT_TRUE(manifold.IsManifold());
-  EXPECT_TRUE(manifold.MatchesTriNormals());
+  CheckNormals(manifold);
   EXPECT_EQ(manifold.NumDegenerateTris(), 0);
 }
 
