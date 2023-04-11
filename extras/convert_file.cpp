@@ -27,6 +27,8 @@ int main(int argc, char** argv) {
     return 1;
   }
 
+  manifold::ManifoldParams().verbose = true;
+
   const std::string filename(argv[1]);
 
   MeshGL input = ImportMesh(filename);
