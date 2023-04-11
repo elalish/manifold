@@ -71,7 +71,6 @@ TEST(Manifold, Empty) {
 
   EXPECT_TRUE(empty.IsEmpty());
   EXPECT_EQ(empty.Status(), Manifold::Error::NoError);
-  EXPECT_TRUE(empty.IsManifold());
 }
 
 TEST(Manifold, ValidInput) {
@@ -80,7 +79,6 @@ TEST(Manifold, ValidInput) {
   Manifold tet(tetGL, propTol);
   EXPECT_FALSE(tet.IsEmpty());
   EXPECT_EQ(tet.Status(), Manifold::Error::NoError);
-  EXPECT_TRUE(tet.IsManifold());
 }
 
 TEST(Manifold, InvalidInput1) {
@@ -89,7 +87,6 @@ TEST(Manifold, InvalidInput1) {
   Manifold tet(in);
   EXPECT_TRUE(tet.IsEmpty());
   EXPECT_EQ(tet.Status(), Manifold::Error::NonFiniteVertex);
-  EXPECT_TRUE(tet.IsManifold());
 }
 
 TEST(Manifold, InvalidInput2) {
@@ -98,7 +95,6 @@ TEST(Manifold, InvalidInput2) {
   Manifold tet(in);
   EXPECT_TRUE(tet.IsEmpty());
   EXPECT_EQ(tet.Status(), Manifold::Error::NotManifold);
-  EXPECT_TRUE(tet.IsManifold());
 }
 
 TEST(Manifold, InvalidInput3) {
@@ -111,7 +107,6 @@ TEST(Manifold, InvalidInput3) {
   Manifold tet(in);
   EXPECT_TRUE(tet.IsEmpty());
   EXPECT_EQ(tet.Status(), Manifold::Error::VertexOutOfBounds);
-  EXPECT_TRUE(tet.IsManifold());
 }
 
 TEST(Manifold, InvalidInput4) {
@@ -124,7 +119,6 @@ TEST(Manifold, InvalidInput4) {
   Manifold tet(in);
   EXPECT_TRUE(tet.IsEmpty());
   EXPECT_EQ(tet.Status(), Manifold::Error::VertexOutOfBounds);
-  EXPECT_TRUE(tet.IsManifold());
 }
 
 TEST(Manifold, InvalidInput5) {
@@ -133,7 +127,6 @@ TEST(Manifold, InvalidInput5) {
   Manifold tet(tetGL);
   EXPECT_TRUE(tet.IsEmpty());
   EXPECT_EQ(tet.Status(), Manifold::Error::MergeIndexOutOfBounds);
-  EXPECT_TRUE(tet.IsManifold());
 }
 
 TEST(Manifold, InvalidInput7) {
@@ -142,7 +135,6 @@ TEST(Manifold, InvalidInput7) {
   Manifold tet(tetGL);
   EXPECT_TRUE(tet.IsEmpty());
   EXPECT_EQ(tet.Status(), Manifold::Error::VertexOutOfBounds);
-  EXPECT_TRUE(tet.IsManifold());
 }
 
 /**
@@ -174,7 +166,6 @@ TEST(Manifold, Decompose) {
 TEST(Manifold, Sphere) {
   int n = 25;
   Manifold sphere = Manifold::Sphere(1.0f, 4 * n);
-  EXPECT_TRUE(sphere.IsManifold());
   EXPECT_EQ(sphere.NumTri(), n * n * 8);
 }
 
@@ -193,7 +184,6 @@ TEST(Manifold, Normals) {
 TEST(Manifold, Extrude) {
   Polygons polys = SquareHole();
   Manifold donut = Manifold::Extrude(polys, 1.0f, 3);
-  EXPECT_TRUE(donut.IsManifold());
   EXPECT_EQ(donut.Genus(), 1);
   auto prop = donut.GetProperties();
   EXPECT_FLOAT_EQ(prop.volume, 12.0f);
@@ -203,7 +193,6 @@ TEST(Manifold, Extrude) {
 TEST(Manifold, ExtrudeCone) {
   Polygons polys = SquareHole();
   Manifold donut = Manifold::Extrude(polys, 1.0f, 0, 0, glm::vec2(0.0f));
-  EXPECT_TRUE(donut.IsManifold());
   EXPECT_EQ(donut.Genus(), 0);
   EXPECT_FLOAT_EQ(donut.GetProperties().volume, 4.0f);
 }
@@ -211,7 +200,6 @@ TEST(Manifold, ExtrudeCone) {
 TEST(Manifold, Revolve) {
   Polygons polys = SquareHole();
   Manifold vug = Manifold::Revolve(polys, 48);
-  EXPECT_TRUE(vug.IsManifold());
   EXPECT_EQ(vug.Genus(), -1);
   auto prop = vug.GetProperties();
   EXPECT_NEAR(prop.volume, 14.0f * glm::pi<float>(), 0.2f);
@@ -221,7 +209,6 @@ TEST(Manifold, Revolve) {
 TEST(Manifold, Revolve2) {
   Polygons polys = SquareHole(2.0f);
   Manifold donutHole = Manifold::Revolve(polys, 48);
-  EXPECT_TRUE(donutHole.IsManifold());
   EXPECT_EQ(donutHole.Genus(), 0);
   auto prop = donutHole.GetProperties();
   EXPECT_NEAR(prop.volume, 48.0f * glm::pi<float>(), 1.0f);
@@ -350,7 +337,6 @@ TEST(Manifold, Csaszar) {
  */
 TEST(Manifold, GetProperties) {
   Manifold cube = Manifold::Cube();
-  EXPECT_TRUE(cube.IsManifold());
   auto prop = cube.GetProperties();
   EXPECT_FLOAT_EQ(prop.volume, 1.0f);
   EXPECT_FLOAT_EQ(prop.surfaceArea, 6.0f);

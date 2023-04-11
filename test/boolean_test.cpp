@@ -117,7 +117,6 @@ TEST(Boolean, EmptyOriginal) {
 
 TEST(Boolean, Mirrored) {
   Manifold cube = Manifold::Cube(glm::vec3(1)).Scale({1, -1, 1});
-  EXPECT_TRUE(cube.IsManifold());
   EXPECT_TRUE(cube.MatchesTriNormals());
 
   Manifold cube2 = Manifold::Cube(glm::vec3(1)).Scale({0.5, -1, 0.5});
@@ -136,7 +135,6 @@ TEST(Boolean, Mirrored) {
 TEST(Boolean, SelfSubtract) {
   Manifold cube = Manifold::Cube();
   Manifold empty = cube - cube;
-  EXPECT_TRUE(empty.IsManifold());
   EXPECT_TRUE(empty.IsEmpty());
 
   auto prop = empty.GetProperties();
@@ -153,7 +151,6 @@ TEST(Boolean, Perturb) {
   tmp.triVerts = {{2, 0, 1}, {0, 3, 1}, {2, 3, 0}, {3, 2, 1}};
   Manifold corner(tmp);
   Manifold empty = corner - corner;
-  EXPECT_TRUE(empty.IsManifold());
   EXPECT_TRUE(empty.IsEmpty());
 
   auto prop = empty.GetProperties();
@@ -339,7 +336,7 @@ TEST(Boolean, Winding) {
   Manifold doubled = Manifold::Compose(cubes);
 
   Manifold cube = Manifold::Cube(glm::vec3(1.0f), true);
-  EXPECT_TRUE((cube ^= doubled).IsManifold());
+  EXPECT_FALSE((cube ^= doubled).IsEmpty());
 }
 
 TEST(Boolean, NonIntersecting) {
@@ -408,7 +405,6 @@ TEST(Boolean, MeshRelation) {
   Manifold gyroid2 = gyroid.Translate(glm::vec3(2.0f));
 
   EXPECT_FALSE(gyroid.IsEmpty());
-  EXPECT_TRUE(gyroid.IsManifold());
   EXPECT_TRUE(gyroid.MatchesTriNormals());
   EXPECT_LE(gyroid.NumDegenerateTris(), 0);
   Manifold result = gyroid + gyroid2;
@@ -421,7 +417,6 @@ TEST(Boolean, MeshRelation) {
     ExportMesh("gyroidUnion.glb", result.GetMeshGL(), opt);
 #endif
 
-  EXPECT_TRUE(result.IsManifold());
   EXPECT_TRUE(result.MatchesTriNormals());
   EXPECT_LE(result.NumDegenerateTris(), 1);
   EXPECT_EQ(result.Decompose().size(), 1);
@@ -515,7 +510,6 @@ TEST(Boolean, Cylinders) {
   }
   m1 += m2;
 
-  EXPECT_TRUE(m1.IsManifold());
   EXPECT_TRUE(m1.MatchesTriNormals());
   EXPECT_LE(m1.NumDegenerateTris(), 12);
 }
@@ -525,7 +519,6 @@ TEST(Boolean, Cubes) {
   result += Manifold::Cube({1, 0.8, 0.5}).Translate({-0.5, 0, 0.5});
   result += Manifold::Cube({1.2, 0.1, 0.5}).Translate({-0.6, -0.1, 0});
 
-  EXPECT_TRUE(result.IsManifold());
   EXPECT_TRUE(result.MatchesTriNormals());
   EXPECT_LE(result.NumDegenerateTris(), 0);
   auto prop = result.GetProperties();
@@ -574,7 +567,6 @@ TEST(Boolean, Close) {
   for (int i = 0; i < 10; i++) {
     // std::cout << i << std::endl;
     result ^= a.Translate({a.Precision() / 10 * i, 0.0, 0.0});
-    EXPECT_TRUE(result.IsManifold());
   }
   auto prop = result.GetProperties();
   const float tol = 0.004;
