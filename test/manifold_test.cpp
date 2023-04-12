@@ -362,6 +362,20 @@ TEST(Manifold, Precision2) {
   EXPECT_FLOAT_EQ(cube.Precision(), 2 * kTolerance);
 }
 
+TEST(Manifold, Precision3) {
+  Manifold cylinder = Manifold::Cylinder(1, 1, 1, 1000);
+  const auto prop = cylinder.GetProperties();
+
+  MeshGL mesh = cylinder.GetMeshGL();
+  mesh.precision = 0.001;
+  mesh.faceID.clear();
+  Manifold cylinder2(mesh);
+
+  const auto prop2 = cylinder2.GetProperties();
+  EXPECT_NEAR(prop.volume, prop2.volume, 0.001);
+  EXPECT_NEAR(prop.surfaceArea, prop2.surfaceArea, 0.001);
+}
+
 /**
  * Curvature is the inverse of the radius of curvature, and signed such that
  * positive is convex and negative is concave. There are two orthogonal

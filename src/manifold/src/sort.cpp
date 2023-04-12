@@ -480,6 +480,7 @@ void Manifold::Impl::GatherFaces(const Impl& old,
 /// Constructs a position-only MeshGL from the input Mesh.
 MeshGL::MeshGL(const Mesh& mesh) {
   numProp = 3;
+  precision = mesh.precision;
   vertProperties.resize(numProp * mesh.vertPos.size());
   for (int i = 0; i < mesh.vertPos.size(); ++i) {
     for (int j : {0, 1, 2}) vertProperties[3 * i + j] = mesh.vertPos[i][j];
