@@ -43,9 +43,7 @@ struct FaceAreaVolume {
     float area = glm::length(crossP);
     float volume = glm::dot(crossP, vertPos[halfedges[3 * face].startVert]);
 
-    return area > perimeter * precision
-               ? thrust::make_pair(area / 2.0f, volume / 6.0f)
-               : thrust::make_pair(0.0f, 0.0f);
+    return thrust::make_pair(area / 2.0f, volume / 6.0f);
   }
 };
 

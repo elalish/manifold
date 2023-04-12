@@ -356,6 +356,7 @@ uint32_t Manifold::Impl::ReserveIDs(uint32_t n) {
 Manifold::Impl::Impl(const MeshGL& meshGL,
                      std::vector<float> propertyTolerance) {
   Mesh mesh;
+  mesh.precision = meshGL.precision;
   const int numVert = meshGL.NumVert();
   const int numTri = meshGL.NumTri();
 
@@ -502,7 +503,7 @@ Manifold::Impl::Impl(const Mesh& mesh, const MeshRelationD& relation,
     MarkFailure(Error::NonFiniteVertex);
     return;
   }
-  SetPrecision();
+  SetPrecision(mesh.precision);
 
   CreateHalfedges(triVerts);
   if (!IsManifold()) {
