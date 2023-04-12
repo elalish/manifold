@@ -61,7 +61,7 @@ TEST(CrossSection, RoundOffset) {
 #endif
 
   EXPECT_EQ(result.Genus(), 0);
-  EXPECT_NEAR(result.GetProperties().volume, 4373, 1);
+  EXPECT_NEAR(result.GetProperties().volume, 4393, 1);
 }
 
 TEST(CrossSection, Empty) {

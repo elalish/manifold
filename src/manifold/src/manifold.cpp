@@ -137,6 +137,7 @@ Mesh Manifold::GetMesh() const {
   const Impl& impl = *GetCsgLeafNode().GetImpl();
 
   Mesh result;
+  result.precision = Precision();
   result.vertPos.insert(result.vertPos.end(), impl.vertPos_.begin(),
                         impl.vertPos_.end());
   result.vertNormal.insert(result.vertNormal.end(), impl.vertNormal_.begin(),
@@ -178,6 +179,7 @@ MeshGL Manifold::GetMeshGL(glm::ivec3 normalIdx) const {
       !isOriginal && glm::all(glm::greaterThan(normalIdx, glm::ivec3(2)));
 
   MeshGL out;
+  out.precision = Precision();
   out.numProp = 3 + numProp;
   out.triVerts.resize(3 * numTri);
 
@@ -379,10 +381,7 @@ int Manifold::Genus() const {
 }
 
 /**
- * Returns the surface area and volume of the manifold. These properties are
- * clamped to zero for a given face if they are within the Precision(). This
- * means degenerate manifolds can by identified by testing these properties as
- * == 0.
+ * Returns the surface area and volume of the manifold.
  */
 Properties Manifold::GetProperties() const {
   return GetCsgLeafNode().GetImpl()->GetProperties();
