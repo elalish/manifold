@@ -284,7 +284,7 @@ struct CheckCoplanarity {
   __host__ __device__ void operator()(int tri) {
     const int component = components[tri];
     const int referenceTri = comp2tri[component];
-    if (referenceTri == tri) return;
+    if (referenceTri < 0 || referenceTri == tri) return;
 
     const glm::vec3 origin = vertPos[halfedge[3 * referenceTri].startVert];
     const glm::vec3 normal = glm::normalize(
