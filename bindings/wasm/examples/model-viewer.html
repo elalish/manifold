@@ -177,8 +177,22 @@
     const mesh = manifold.rotate([-90, 0, 0]).getMesh();
 
     indices.setArray(mesh.triVerts);
-    mergeIndices.setArray(mesh.mergeFromVert);
-    mergeValues.setArray(mesh.mergeToVert);
+
+    const vert2merge = [...Array(mesh.numVert).keys()];
+    for (const [i, from] of mesh.mergeFromVert.entries()) {
+      vert2merge[from] = mesh.mergeToVert[i];
+    }
+    const ind = [];
+    const val = [];
+    for (const [i, vert] of mesh.triVerts.entries()) {
+      const newVert = vert2merge[vert];
+      if (vert !== newVert) {
+        ind.push(i);
+        val.push(newVert);
+      }
+    }
+    mergeIndices.setArray(new Uint32Array(ind));
+    mergeValues.setArray(new Uint32Array(val));
 
     const numVert = mesh.numVert;
     const numProp = mesh.numProp;
