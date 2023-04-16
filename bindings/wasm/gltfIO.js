@@ -1,0 +1,97 @@
+// Copyright 2023 The Manifold Authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+import {Accessor} from '@gltf-transform/core';
+
+import {EXTManifold} from './manifold-gltf';
+
+const attributeDefs = {
+  'POSITION': {type: Accessor.Type.VEC3, components: 3},
+  'NORMAL': {type: Accessor.Type.VEC3, components: 3},
+  'TANGENT': {type: Accessor.Type.VEC4, components: 4},
+  'TEXCOORD_0': {type: Accessor.Type.VEC2, components: 2},
+  'TEXCOORD_1': {type: Accessor.Type.VEC2, components: 2},
+  'COLOR_0': {type: Accessor.Type.VEC3, components: 3},
+  'JOINTS_0': {type: Accessor.Type.VEC4, components: 4},
+  'WEIGHTS_0': {type: Accessor.Type.VEC4, components: 4},
+};
+
+export function createMesh(doc, manifoldMesh, attributeArray) {
+  if (doc.getRoot().listBuffers().length !== 1)
+    throw new Error('Document must have a single buffer.');
+  const buffer = doc.getRoot().listBuffers()[0];
+
+  const indices = doc.createAccessor('indices')
+                      .setBuffer(buffer)
+                      .setType(Accessor.Type.SCALAR)
+                      .setArray(manifoldMesh.triVerts);
+
+  const mesh = doc.createMesh();
+  const numPrimitive = manifoldMesh.runIndex.length - 1;
+  for (let run = 0; run < numPrimitive; ++run) {
+    const primitive = doc.createPrimitive().setIndices(indices);
+    mesh.addPrimitive(primitive);
+  }
+
+  if (attributeArray.length < 1 || attributeArray[0] !== 'POSITION')
+    throw new Error('First attribute must be "POSITION".');
+
+  const numVert = manifoldMesh.numVert;
+  const numProp = manifoldMesh.numProp;
+  let offset = 0;
+  for (const attribute of attributeArray) {
+    const def = attributeDefs[attribute];
+    if (def == null)
+      throw new Error(attribute + ' is not a recognized attribute.');
+
+    const n = def.components;
+    if (offset + n > numProp) throw new Error('Too many attribute channels.');
+
+    const array = new Float32Array(n * numVert);
+    for (let v = 0; v < numVert; ++v) {
+      for (let i = 0; i < n; ++i) {
+        array[3 * v + i] =
+            manifoldMesh.vertProperties[numProp * v + offset + i];
+      }
+    }
+
+    const accessor =
+        doc.createAccessor().setBuffer(buffer).setType(def.type).setArray(
+            array);
+    for (const primitive of mesh.listPrimitives()) {
+      primitive.setAttribute(attribute, accessor);
+    }
+    offset += n;
+  }
+
+  const manifoldExtension = doc.createExtension(EXTManifold);
+  const manifoldPrimitive = manifoldExtension.createManifoldPrimitive();
+  const primitive = doc.createPrimitive().setIndices(indices).setAttribute(
+      'POSITION', mesh.listPrimitives()[0].getAttribute('POSITION'));
+  manifoldPrimitive.setPrimitive(primitive, manifoldMesh.runIndex);
+
+  const indicesAccessor = doc.createAccessor()
+                              .setBuffer(buffer)
+                              .setType(Accessor.Type.SCALAR)
+                              .setArray(manifoldMesh.mergeFromVert);
+  const valuesAccessor = doc.createAccessor()
+                             .setBuffer(buffer)
+                             .setType(Accessor.Type.SCALAR)
+                             .setArray(manifoldMesh.mergeToVert);
+  manifoldPrimitive.setMerge(indicesAccessor, valuesAccessor);
+
+  mesh.setExtension('EXT_manifold', manifoldPrimitive);
+
+  return mesh;
+}
