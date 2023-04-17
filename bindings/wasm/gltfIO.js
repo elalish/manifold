@@ -12,12 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {Accessor} from '@gltf-transform/core';
+import {Accessor, WebIO} from '@gltf-transform/core';
 
 import {EXTManifold} from './manifold-gltf';
 
+const io = new WebIO();
+
 const attributeDefs = {
   'POSITION': {type: Accessor.Type.VEC3, components: 3},
+  'SKIP': {type: null, components: 1},
   'NORMAL': {type: Accessor.Type.VEC3, components: 3},
   'TANGENT': {type: Accessor.Type.VEC4, components: 4},
   'TEXCOORD_0': {type: Accessor.Type.VEC2, components: 2},
@@ -27,7 +30,7 @@ const attributeDefs = {
   'WEIGHTS_0': {type: Accessor.Type.VEC4, components: 4},
 };
 
-export function createMesh(doc, manifoldMesh, attributeArray) {
+export function toGLTFMesh(doc, manifoldMesh, attributeArray, materialArray) {
   if (doc.getRoot().listBuffers().length !== 1)
     throw new Error('Document must have a single buffer.');
   const buffer = doc.getRoot().listBuffers()[0];
@@ -39,8 +42,12 @@ export function createMesh(doc, manifoldMesh, attributeArray) {
 
   const mesh = doc.createMesh();
   const numPrimitive = manifoldMesh.runIndex.length - 1;
+  if (materialArray.length != numPrimitive)
+    throw new Error('materialArray does not match number of triangle runs.');
+
   for (let run = 0; run < numPrimitive; ++run) {
-    const primitive = doc.createPrimitive().setIndices(indices);
+    const primitive = doc.createPrimitive().setIndices(indices).setMaterial(
+        materialArray[run]);
     mesh.addPrimitive(primitive);
   }
 
@@ -51,6 +58,10 @@ export function createMesh(doc, manifoldMesh, attributeArray) {
   const numProp = manifoldMesh.numProp;
   let offset = 0;
   for (const attribute of attributeArray) {
+    if (attribute === 'SKIP') {
+      ++offset;
+      continue;
+    }
     const def = attributeDefs[attribute];
     if (def == null)
       throw new Error(attribute + ' is not a recognized attribute.');
@@ -61,7 +72,7 @@ export function createMesh(doc, manifoldMesh, attributeArray) {
     const array = new Float32Array(n * numVert);
     for (let v = 0; v < numVert; ++v) {
       for (let i = 0; i < n; ++i) {
-        array[3 * v + i] =
+        array[n * v + i] =
             manifoldMesh.vertProperties[numProp * v + offset + i];
       }
     }
@@ -94,4 +105,20 @@ export function createMesh(doc, manifoldMesh, attributeArray) {
   mesh.setExtension('EXT_manifold', manifoldPrimitive);
 
   return mesh;
+}
+
+export async function loadTexture(texture, uri) {
+  const response = await fetch(uri);
+  const blob = await response.blob();
+  texture.setMimeType(blob.type);
+  texture.setImage(new Uint8Array(await blob.arrayBuffer()));
+}
+
+export async function exportGLB(
+    doc, manifoldMesh, attributeArray, materialArray) {
+  const mesh = toGLTFMesh(doc, manifoldMesh, attributeArray, materialArray);
+  const node = doc.createNode().setMesh(mesh);
+  doc.createScene().addChild(node);
+
+  return io.writeBinary(doc);
 }
