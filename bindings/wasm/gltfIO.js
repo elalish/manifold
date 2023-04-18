@@ -113,7 +113,7 @@ export function toGLTFMesh(manifoldMesh, attributeArray, materialArray) {
   const indicesAccessor = doc.createAccessor()
                               .setBuffer(buffer)
                               .setType(Accessor.Type.SCALAR)
-                              .setArray(manifoldMesh.mergeFromVert);
+                              .setArray(manifoldMesh.mergeTriVert);
   const valuesAccessor = doc.createAccessor()
                              .setBuffer(buffer)
                              .setType(Accessor.Type.SCALAR)

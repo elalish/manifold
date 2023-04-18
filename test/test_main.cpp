@@ -152,8 +152,8 @@ MeshGL TetGL() {
                         1,  -1, -1, 5, -5,  //
                         1,  1,  1,  6, -6};
   tet.triVerts = {2, 0, 1, 0, 3, 1, 2, 3, 0, 6, 5, 4};
-  tet.mergeFromVert = {4, 5, 6};
-  tet.mergeToVert = {1, 2, 3};
+  tet.mergeTriVert = {9, 10, 11};
+  tet.mergeToVert = {3, 2, 1};
   return tet;
 }
 
@@ -368,8 +368,8 @@ void ExpectMeshes(const Manifold& manifold,
     EXPECT_EQ(manifolds[i].NumProp(), meshSize[i].numProp);
     EXPECT_EQ(manifolds[i].NumPropVert(), meshSize[i].numPropVert);
     const MeshGL meshGL = manifolds[i].GetMeshGL();
-    EXPECT_EQ(meshGL.mergeFromVert.size(), meshGL.mergeToVert.size());
-    EXPECT_EQ(meshGL.mergeFromVert.size(),
+    EXPECT_EQ(meshGL.mergeTriVert.size(), meshGL.mergeToVert.size());
+    EXPECT_EQ(meshGL.mergeTriVert.size(),
               meshGL.NumVert() - manifolds[i].NumVert());
     const Mesh mesh = manifolds[i].GetMesh();
     for (const glm::vec3& normal : mesh.vertNormal) {
@@ -393,8 +393,8 @@ void CheckStrictly(const Manifold& manifold) {
 void CheckGL(const Manifold& manifold) {
   ASSERT_FALSE(manifold.IsEmpty());
   const MeshGL meshGL = manifold.GetMeshGL();
-  EXPECT_EQ(meshGL.mergeFromVert.size(), meshGL.mergeToVert.size());
-  EXPECT_EQ(meshGL.mergeFromVert.size(), meshGL.NumVert() - manifold.NumVert());
+  EXPECT_EQ(meshGL.mergeTriVert.size(), meshGL.mergeToVert.size());
+  EXPECT_EQ(meshGL.mergeTriVert.size(), meshGL.NumVert() - manifold.NumVert());
   EXPECT_EQ(meshGL.runIndex.size(), meshGL.runOriginalID.size() + 1);
   EXPECT_EQ(meshGL.runIndex.front(), 0);
   EXPECT_EQ(meshGL.runIndex.back(), 3 * meshGL.NumTri());

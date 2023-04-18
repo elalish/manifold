@@ -366,7 +366,7 @@ Manifold::Impl::Impl(const MeshGL& meshGL,
   }
 
   mesh.triVerts.resize(numTri);
-  if (meshGL.mergeFromVert.size() != meshGL.mergeToVert.size()) {
+  if (meshGL.mergeTriVert.size() != meshGL.mergeToVert.size()) {
     MarkFailure(Error::MergeVectorsDifferentLengths);
     return;
   }
@@ -388,25 +388,24 @@ Manifold::Impl::Impl(const MeshGL& meshGL,
     return;
   }
 
-  std::vector<int> prop2vert(numVert);
-  std::iota(prop2vert.begin(), prop2vert.end(), 0);
-  for (int i = 0; i < meshGL.mergeFromVert.size(); ++i) {
-    const int from = meshGL.mergeFromVert[i];
-    const int to = meshGL.mergeToVert[i];
-    if (from >= numVert || to >= numVert) {
+  std::vector<uint32_t> triVerts(meshGL.triVerts);
+  for (int i = 0; i < meshGL.mergeTriVert.size(); ++i) {
+    const uint32_t from = meshGL.mergeTriVert[i];
+    const uint32_t to = meshGL.mergeToVert[i];
+    if (from >= 3 * numTri || to >= numVert) {
       MarkFailure(Error::MergeIndexOutOfBounds);
       return;
     }
-    prop2vert[from] = to;
+    triVerts[from] = to;
   }
   for (int i = 0; i < numTri; ++i) {
     for (const int j : {0, 1, 2}) {
-      const int vert = meshGL.triVerts[3 * i + j];
+      const int vert = triVerts[3 * i + j];
       if (vert < 0 || vert >= numVert) {
         MarkFailure(Error::VertexOutOfBounds);
         return;
       }
-      mesh.triVerts[i][j] = prop2vert[vert];
+      mesh.triVerts[i][j] = vert;
     }
   }
 
@@ -492,7 +491,8 @@ Manifold::Impl::Impl(const Mesh& mesh, const MeshRelationD& relation,
       halfedgeTangent_(mesh.halfedgeTangent),
       meshRelation_(relation) {
   VecDH<glm::ivec3> triVerts = mesh.triVerts;
-  if (!IsIndexInBounds(triVerts)) {
+  if (!IsIndexInBounds(triVerts, NumVert()) ||
+      !IsIndexInBounds(relation.triProperties, NumPropVert())) {
     MarkFailure(Error::VertexOutOfBounds);
     return;
   }

@@ -154,7 +154,7 @@ struct NormalizeCurvature {
   }
 };
 
-struct CheckNormals {
+struct CheckManifold {
   const Halfedge* halfedges;
 
   __host__ __device__ bool operator()(int edge) {
@@ -241,7 +241,7 @@ bool Manifold::Impl::IsManifold() const {
   auto policy = autoPolicy(halfedge_.size());
 
   return all_of(policy, countAt(0), countAt(halfedge_.size()),
-                CheckNormals({halfedge_.cptrD()}));
+                CheckManifold({halfedge_.cptrD()}));
 }
 
 /**
@@ -355,10 +355,11 @@ bool Manifold::Impl::IsFinite() const {
 }
 
 /**
- * Checks that the input triVerts array has all indices inside bounds of the
- * vertPos_ array.
+ * Checks that the input array has all indices inside bounds of the
+ * given size.
  */
-bool Manifold::Impl::IsIndexInBounds(const VecDH<glm::ivec3>& triVerts) const {
+bool Manifold::Impl::IsIndexInBounds(const VecDH<glm::ivec3>& triVerts,
+                                     int size) const {
   auto policy = autoPolicy(triVerts.size());
   glm::ivec2 minmax = transform_reduce<glm::ivec2>(
       policy, triVerts.begin(), triVerts.end(), MakeMinMax(),
@@ -366,6 +367,6 @@ bool Manifold::Impl::IsIndexInBounds(const VecDH<glm::ivec3>& triVerts) const {
                  std::numeric_limits<int>::min()),
       MinMax());
 
-  return minmax[0] >= 0 && minmax[1] < NumVert();
+  return minmax[0] >= 0 && minmax[1] < size;
 }
 }  // namespace manifold

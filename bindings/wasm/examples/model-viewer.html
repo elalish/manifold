@@ -134,10 +134,10 @@
     const v4 = [0, 1, 2, 5];
     const v6 = [0, 1, 2, 0, 2, 3];
     const vertProperties = new Float32Array(numProp * numPropVert);
-    const mergeFromVert = new Uint32Array(numPropVert - numVert);
+    const mergeTriVert = new Uint32Array(numPropVert - numVert);
     const mergeToVert = new Uint32Array(numPropVert - numVert);
     const runOriginalID = new Uint32Array(1);
-    const meshUV = new wasm.Mesh({ numProp, triVerts, vertProperties, mergeFromVert, mergeToVert, runOriginalID });
+    const meshUV = new wasm.Mesh({ numProp, triVerts, vertProperties, mergeTriVert, mergeToVert, runOriginalID });
     runOriginalID[0] = id;
     const vert2vert = [-1, -1, -1, -1, -1, -1, -1, -1];
     let idx = 0;
@@ -148,7 +148,7 @@
         if (vert2vert[vOld] === -1) {
           vert2vert[vOld] = vIdx;
         } else {
-          mergeFromVert[idx] = vIdx;
+          mergeTriVert[idx] = vIdx;
           mergeToVert[idx] = vert2vert[vOld];
           ++idx;
         }
@@ -176,10 +176,10 @@
     const numProp = 5;
     const triVerts = new Uint32Array(3 * numTri);
     const vertProperties = new Float32Array(numProp * (numVert + nMerge));
-    const mergeFromVert = new Uint32Array(nMerge);
+    const mergeTriVert = new Uint32Array(nMerge);
     const mergeToVert = new Uint32Array(nMerge);
     const runOriginalID = new Uint32Array(1);
-    const meshUV = new wasm.Mesh({ numProp, triVerts, vertProperties, mergeFromVert, mergeToVert, runOriginalID });
+    const meshUV = new wasm.Mesh({ numProp, triVerts, vertProperties, mergeTriVert, mergeToVert, runOriginalID });
     runOriginalID[0] = id;
     const vert2vert = new Uint32Array(numVert);
     let idx = 0;
@@ -195,7 +195,7 @@
       vertProperties[numProp * i + 4] = v;
       if (Math.abs(y) < tol && x < -tol) {// Seam
         const iNew = numVert + idx;
-        mergeFromVert[idx] = iNew;
+        mergeTriVert[idx] = iNew;
         mergeToVert[idx] = i;
         vert2vert[i] = iNew;
         vertProperties[numProp * iNew] = x;

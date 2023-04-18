@@ -58,10 +58,10 @@ struct MeshGL {
   /// The vertex indices of the three triangle corners in CCW (from the outside)
   /// order, for each triangle.
   std::vector<uint32_t> triVerts;
-  /// Optional: A list of only the vertex indicies that need to be merged to
+  /// Optional: A list of only the triVerts indicies that need to be merged to
   /// reconstruct the manifold.
-  std::vector<uint32_t> mergeFromVert;
-  /// Optional: The same length as mergeFromVert, and the corresponding value
+  std::vector<uint32_t> mergeTriVert;
+  /// Optional: The same length as mergeTriVert, and the corresponding value
   /// contains the vertex to merge with. It will have an identical position, but
   /// the other properties may differ.
   std::vector<uint32_t> mergeToVert;

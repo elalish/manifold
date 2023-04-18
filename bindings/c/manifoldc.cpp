@@ -356,7 +356,7 @@ size_t manifold_meshgl_tri_length(ManifoldMeshGL *m) {
 }
 
 size_t manifold_meshgl_merge_length(ManifoldMeshGL *m) {
-  return from_c(m)->mergeFromVert.size();
+  return from_c(m)->mergeTriVert.size();
 }
 
 size_t manifold_meshgl_run_index_length(ManifoldMeshGL *m) {
@@ -388,7 +388,7 @@ uint32_t *manifold_meshgl_tri_verts(void *mem, ManifoldMeshGL *m) {
 }
 
 uint32_t *manifold_meshgl_merge_from_vert(void *mem, ManifoldMeshGL *m) {
-  return copy_data(mem, from_c(m)->mergeFromVert);
+  return copy_data(mem, from_c(m)->mergeTriVert);
 }
 
 uint32_t *manifold_meshgl_merge_to_vert(void *mem, ManifoldMeshGL *m) {

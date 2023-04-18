@@ -121,7 +121,7 @@ Module.setup = function() {
       numProp = 3,
       triVerts = new Uint32Array(),
       vertProperties = new Float32Array(),
-      mergeFromVert,
+      mergeTriVert,
       mergeToVert,
       runIndex,
       runOriginalID,
@@ -132,7 +132,7 @@ Module.setup = function() {
       this.numProp = numProp;
       this.triVerts = triVerts;
       this.vertProperties = vertProperties;
-      this.mergeFromVert = mergeFromVert;
+      this.mergeTriVert = mergeTriVert;
       this.mergeToVert = mergeToVert;
       this.runIndex = runIndex;
       this.runOriginalID = runOriginalID;
@@ -302,14 +302,16 @@ Module.setup = function() {
     return result;
   };
 
-  Module.triangulate = function(polygons, precision = -1) {
+  Module.triangulate =
+      function(polygons, precision = -1) {
     const polygonsVec = polygons2vec(polygons);
-    const result = fromVec(Module._Triangulate(polygonsVec, precision), (x) => [x[0], x[1], x[2]]);
+    const result = fromVec(
+        Module._Triangulate(polygonsVec, precision), (x) => [x[0], x[1], x[2]]);
     disposePolygons(polygonsVec);
     return result;
   }
 
-  Module.revolve = function(polygons, circularSegments = 0) {
+      Module.revolve = function(polygons, circularSegments = 0) {
     const polygonsVec = polygons2vec(polygons);
     const result = Module._Revolve(polygonsVec, circularSegments);
     disposePolygons(polygonsVec);

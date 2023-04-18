@@ -83,8 +83,8 @@ function runExample(name) {
     const manifold = f(...exposedFunctions.map(name => wasm[name]), glMatrix);
 
     const mesh = manifold.getMesh();
-    expect(mesh.mergeFromVert.length).to.equal(mesh.mergeToVert.length);
-    expect(mesh.mergeFromVert.length)
+    expect(mesh.mergeTriVert.length).to.equal(mesh.mergeToVert.length);
+    expect(mesh.mergeTriVert.length)
         .to.equal(mesh.numVert - manifold.numVert());
 
     const prop = manifold.getProperties();

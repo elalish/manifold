@@ -497,7 +497,7 @@ MeshGL::MeshGL(const Mesh& mesh) {
 }
 
 /**
- * Updates the mergeFromVert and mergeToVert vectors in order to create a
+ * Updates the mergeTriVert and mergeToVert vectors in order to create a
  * manifold solid. If the MeshGL is already manifold, no change will occur and
  * the function will return false. Otherwise, this will merge verts along open
  * edges within precision (the maximum of the MeshGL precision and the baseline
@@ -512,10 +512,10 @@ MeshGL::MeshGL(const Mesh& mesh) {
 bool MeshGL::Merge() {
   std::multiset<std::pair<int, int>> openEdges;
 
-  std::vector<int> merge(NumVert());
+  std::vector<int> merge(3 * NumTri());
   std::iota(merge.begin(), merge.end(), 0);
-  for (int i = 0; i < mergeFromVert.size(); ++i) {
-    merge[mergeFromVert[i]] = mergeToVert[i];
+  for (int i = 0; i < mergeTriVert.size(); ++i) {
+    merge[mergeTriVert[i]] = mergeToVert[i];
   }
 
   const int numVert = NumVert();
@@ -523,8 +523,8 @@ bool MeshGL::Merge() {
   const int next[3] = {1, 2, 0};
   for (int tri = 0; tri < numTri; ++tri) {
     for (int i : {0, 1, 2}) {
-      auto edge = std::make_pair(merge[triVerts[3 * tri + next[i]]],
-                                 merge[triVerts[3 * tri + i]]);
+      auto edge = std::make_pair(triVerts[merge[3 * tri + next[i]]],
+                                 triVerts[merge[3 * tri + i]]);
       auto it = openEdges.find(edge);
       if (it == openEdges.end()) {
         std::swap(edge.first, edge.second);
@@ -582,8 +582,8 @@ bool MeshGL::Merge() {
   for (int i = 0; i < numVert; ++i) {
     graph.add_nodes(i);
   }
-  for (int i = 0; i < mergeFromVert.size(); ++i) {
-    graph.add_edge(static_cast<int>(mergeFromVert[i]),
+  for (int i = 0; i < mergeTriVert.size(); ++i) {
+    graph.add_edge(static_cast<int>(triVerts[mergeTriVert[i]]),
                    static_cast<int>(mergeToVert[i]));
   }
   for (int i = 0; i < toMerge.size(); ++i) {
@@ -598,11 +598,12 @@ bool MeshGL::Merge() {
   }
 
   mergeToVert.clear();
-  mergeFromVert.clear();
-  for (int v = 0; v < numVert; ++v) {
+  mergeTriVert.clear();
+  for (int i = 0; i < triVerts.size(); ++i) {
+    const int v = triVerts[i];
     const int mergeTo = label2vert[vertLabels[v]];
     if (mergeTo != v) {
-      mergeFromVert.push_back(v);
+      mergeTriVert.push_back(i);
       mergeToVert.push_back(mergeTo);
     }
   }

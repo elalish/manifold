@@ -123,7 +123,7 @@ TEST(Manifold, InvalidInput4) {
 
 TEST(Manifold, InvalidInput5) {
   MeshGL tetGL = TetGL();
-  tetGL.mergeFromVert[tetGL.mergeFromVert.size() - 1] = 7;
+  tetGL.mergeTriVert[tetGL.mergeTriVert.size() - 1] = 12;
   Manifold tet(tetGL);
   EXPECT_TRUE(tet.IsEmpty());
   EXPECT_EQ(tet.Status(), Manifold::Error::MergeIndexOutOfBounds);
@@ -504,12 +504,12 @@ TEST(Manifold, Merge) {
   CheckCube(cubeSTL);
 
   EXPECT_FALSE(cubeSTL.Merge());
-  EXPECT_EQ(cubeSTL.mergeFromVert.size(), 28);
-  cubeSTL.mergeFromVert.resize(14);
+  EXPECT_EQ(cubeSTL.mergeTriVert.size(), 28);
+  cubeSTL.mergeTriVert.resize(14);
   cubeSTL.mergeToVert.resize(14);
 
   EXPECT_TRUE(cubeSTL.Merge());
-  EXPECT_EQ(cubeSTL.mergeFromVert.size(), 28);
+  EXPECT_EQ(cubeSTL.mergeTriVert.size(), 28);
   CheckCube(cubeSTL);
 }
 

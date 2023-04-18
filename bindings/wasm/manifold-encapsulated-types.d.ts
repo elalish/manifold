@@ -414,7 +414,7 @@ export class Mesh {
     numProp: number,
     vertProperties: Float32Array,
     triVerts: Uint32Array,
-    mergeFromVert?: Uint32Array,
+    mergeTriVert?: Uint32Array,
     mergeToVert?: Uint32Array,
     runIndex?: Uint32Array,
     runOriginalID?: Uint32Array,
@@ -425,7 +425,7 @@ export class Mesh {
   numProp: number;
   vertProperties: Float32Array;
   triVerts: Uint32Array;
-  mergeFromVert?: Uint32Array;
+  mergeTriVert?: Uint32Array;
   mergeToVert?: Uint32Array;
   runIndex?: Uint32Array;
   runOriginalID?: Uint32Array;

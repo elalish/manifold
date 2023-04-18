@@ -68,9 +68,9 @@ val GetMeshJS(const Manifold& manifold, const glm::ivec3& normalIdx) {
              val(typed_memory_view(mesh.vertProperties.size(),
                                    mesh.vertProperties.data()))
                  .call<val>("slice"));
-  meshJS.set("mergeFromVert", val(typed_memory_view(mesh.mergeFromVert.size(),
-                                                    mesh.mergeFromVert.data()))
-                                  .call<val>("slice"));
+  meshJS.set("mergeTriVert", val(typed_memory_view(mesh.mergeTriVert.size(),
+                                                   mesh.mergeTriVert.data()))
+                                 .call<val>("slice"));
   meshJS.set("mergeToVert", val(typed_memory_view(mesh.mergeToVert.size(),
                                                   mesh.mergeToVert.data()))
                                 .call<val>("slice"));
@@ -100,9 +100,9 @@ MeshGL MeshJS2GL(const val& mesh) {
   out.triVerts = convertJSArrayToNumberVector<uint32_t>(mesh["triVerts"]);
   out.vertProperties =
       convertJSArrayToNumberVector<float>(mesh["vertProperties"]);
-  if (mesh["mergeFromVert"] != val::undefined()) {
-    out.mergeFromVert =
-        convertJSArrayToNumberVector<uint32_t>(mesh["mergeFromVert"]);
+  if (mesh["mergeTriVert"] != val::undefined()) {
+    out.mergeTriVert =
+        convertJSArrayToNumberVector<uint32_t>(mesh["mergeTriVert"]);
   }
   if (mesh["mergeToVert"] != val::undefined()) {
     out.mergeToVert =

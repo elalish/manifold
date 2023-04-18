@@ -94,7 +94,7 @@ struct Manifold::Impl {
   Curvature GetCurvature() const;
   void CalculateBBox();
   bool IsFinite() const;
-  bool IsIndexInBounds(const VecDH<glm::ivec3>& triVerts) const;
+  bool IsIndexInBounds(const VecDH<glm::ivec3>& triVerts, int size) const;
   void SetPrecision(float minPrecision = -1);
   bool IsManifold() const;
   bool Is2Manifold() const;

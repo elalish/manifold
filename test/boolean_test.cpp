@@ -86,7 +86,7 @@ TEST(Boolean, Normals) {
 #endif
 
   MeshGL output = result.GetMeshGL({3, 4, 5});
-  output.mergeFromVert.clear();
+  output.mergeTriVert.clear();
   output.mergeToVert.clear();
   output.Merge();
   Manifold roundTrip(output);

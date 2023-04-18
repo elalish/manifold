@@ -305,7 +305,7 @@ MeshGL Manifold::GetMeshGL(glm::ivec3 normalIdx) const {
         if (vert2idx[vert] == -1) {
           vert2idx[vert] = idx;
         } else {
-          out.mergeFromVert.push_back(idx);
+          out.mergeTriVert.push_back(3 * tri + i);
           out.mergeToVert.push_back(vert2idx[vert]);
         }
       }
