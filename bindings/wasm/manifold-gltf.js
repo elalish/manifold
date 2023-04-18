@@ -12,13 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {Extension} from '@gltf-transform/core';
+import {Extension, ExtensionProperty, PropertyType} from '@gltf-transform/core';
 
 const NAME = 'EXT_manifold';
 
 export class ManifoldPrimitive extends ExtensionProperty {
-  constructor() {
-    super();
+  static EXTENSION_NAME = NAME;
+
+  init() {
     this.EXTENSION_NAME = NAME;
     this.propertyType = 'ManifoldPrimitive';
     this.parentTypes = [PropertyType.MESH];
@@ -37,10 +38,11 @@ export class ManifoldPrimitive extends ExtensionProperty {
   }
 
   setPrimitive(primitive, runIndex) {
-    const mesh = this.listParents[0];
-    if (mesh.listPrimitives.length !== runIndex.length - 1)
+    const mesh = this.listParents()[0];
+    if (mesh.listPrimitives().length !== runIndex.length - 1)
       throw new Error(
           'You must attach all material primitives to the mesh before setting the manifold primitive.');
+    this.runIndex = runIndex;
     mesh.addPrimitive(primitive);
     return this.setRef('manifoldPrimitive', primitive);
   }
@@ -62,11 +64,8 @@ export class ManifoldPrimitive extends ExtensionProperty {
 }
 
 export class EXTManifold extends Extension {
-  constructor() {
-    super();
-    this.extensionName = NAME;
-    this.EXTENSION_NAME = NAME;
-  }
+  extensionName = NAME;
+  static EXTENSION_NAME = NAME;
 
   createManifoldPrimitive() {
     return new ManifoldPrimitive(this.document.getGraph());
@@ -127,7 +126,8 @@ export class EXTManifold extends Extension {
       json.accessors.splice(mergeValuesIndex, 1);
 
       const {runIndex} = manifoldPrimitive;
-      for (let i = 0; i < runIndex - 1; ++i) {
+      const numPrimitive = runIndex.length - 1;
+      for (let i = 0; i < numPrimitive; ++i) {
         meshDef.primitives[i].indices = json.accessors.length;
         json.accessors.push({
           type: 'SCALAR',
@@ -140,6 +140,9 @@ export class EXTManifold extends Extension {
 
       meshDef.extensions = meshDef.extensions || {};
       meshDef.extensions[NAME] = {manifoldPrimitive: primitive};
+
+      // Test the manifold primitive by replacing the material primitives
+      // meshDef.primitives = [primitive];
     });
 
     return this;

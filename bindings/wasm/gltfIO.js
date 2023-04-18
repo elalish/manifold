@@ -12,13 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {Accessor, WebIO} from '@gltf-transform/core';
+import {Accessor} from '@gltf-transform/core';
 
-import {EXTManifold} from './manifold-gltf';
+import {EXTManifold} from './manifold-gltf.js';
 
-const io = new WebIO();
-
-const attributeDefs = {
+export const attributeDefs = {
   'POSITION': {type: Accessor.Type.VEC3, components: 3},
   'SKIP': {type: null, components: 1},
   'NORMAL': {type: Accessor.Type.VEC3, components: 3},
@@ -88,6 +86,8 @@ export function toGLTFMesh(doc, manifoldMesh, attributeArray, materialArray) {
 
   const manifoldExtension = doc.createExtension(EXTManifold);
   const manifoldPrimitive = manifoldExtension.createManifoldPrimitive();
+  mesh.setExtension('EXT_manifold', manifoldPrimitive);
+
   const primitive = doc.createPrimitive().setIndices(indices).setAttribute(
       'POSITION', mesh.listPrimitives()[0].getAttribute('POSITION'));
   manifoldPrimitive.setPrimitive(primitive, manifoldMesh.runIndex);
@@ -102,9 +102,27 @@ export function toGLTFMesh(doc, manifoldMesh, attributeArray, materialArray) {
                              .setArray(manifoldMesh.mergeToVert);
   manifoldPrimitive.setMerge(indicesAccessor, valuesAccessor);
 
-  mesh.setExtension('EXT_manifold', manifoldPrimitive);
-
   return mesh;
+}
+
+export function disposeMesh(mesh) {
+  if (!mesh) return;
+  const primitives = mesh.listPrimitives();
+  const manifoldPrimitive = mesh.getExtension('EXT_manifold');
+  if (!!manifoldPrimitive) {
+    manifoldPrimitive.getMergeIndices()?.dispose();
+    manifoldPrimitive.getMergeValues()?.dispose();
+    primitives.push(manifoldPrimitive.getPrimitive());
+  }
+
+  for (const primitive of primitives) {
+    primitive.getIndices()?.dispose();
+    for (const accessor of primitive.listAttributes()) {
+      accessor.dispose();
+    }
+  }
+
+  mesh.dispose();
 }
 
 export async function loadTexture(texture, uri) {
@@ -112,13 +130,4 @@ export async function loadTexture(texture, uri) {
   const blob = await response.blob();
   texture.setMimeType(blob.type);
   texture.setImage(new Uint8Array(await blob.arrayBuffer()));
-}
-
-export async function exportGLB(
-    doc, manifoldMesh, attributeArray, materialArray) {
-  const mesh = toGLTFMesh(doc, manifoldMesh, attributeArray, materialArray);
-  const node = doc.createNode().setMesh(mesh);
-  doc.createScene().addChild(node);
-
-  return io.writeBinary(doc);
 }

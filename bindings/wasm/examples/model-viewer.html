@@ -47,50 +47,33 @@
   </select>
   <model-viewer camera-controls shadow-intensity="1" alt="Output of mesh Boolean operation"></model-viewer>
 </body>
+<script type="importmap">
+  {
+    "imports": {
+      "@gltf-transform/core": "https://cdn.jsdelivr.net/npm/@gltf-transform/core@3.1.2/+esm"
+    }
+  }
+</script>
 <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/2.0.1/model-viewer.min.js"></script>
 <script type="module">
-  import { Accessor, Document, WebIO, Format, BufferUtils } from 'https://cdn.jsdelivr.net/npm/@gltf-transform/core@3.1.2/+esm';
+  import { Document, WebIO } from '@gltf-transform/core';
+  import { EXTManifold } from '../manifold-gltf.js';
+  import { loadTexture, toGLTFMesh, disposeMesh } from '../gltfIO.js';
   import Module from '../manifold.js';
 
-  const io = new WebIO();
+  const io = new WebIO().registerExtensions([EXTManifold]);
   const doc = new Document();
+  doc.createBuffer();
+  const node = doc.createNode();
+  doc.createScene().addChild(node);
 
-  const buffer = doc.createBuffer();
-  const position = doc.createAccessor().setBuffer(buffer).setType(Accessor.Type.VEC3);
-  const uv = doc.createAccessor().setBuffer(buffer).setType(Accessor.Type.VEC2);
-  const indices = doc.createAccessor('indices').setBuffer(buffer).setType(Accessor.Type.SCALAR);
   const moonTexture = doc.createTexture('moon');
   const spaceTexture = doc.createTexture('space');
   const moonMaterial = doc.createMaterial('moon').setBaseColorTexture(moonTexture);
   const spaceMaterial = doc.createMaterial('space').setBaseColorTexture(spaceTexture);
-  const moonPrimitive = doc.createPrimitive().setMaterial(moonMaterial)
-    .setIndices(indices).setAttribute('POSITION', position).setAttribute('TEXCOORD_0', uv);
-  const spacePrimitive = doc.createPrimitive().setMaterial(spaceMaterial)
-    .setIndices(indices).setAttribute('POSITION', position).setAttribute('TEXCOORD_0', uv);
-  const manifoldPrimitive = doc.createPrimitive()
-    .setIndices(indices).setAttribute('POSITION', position);
-  const mesh = doc.createMesh('result').addPrimitive(moonPrimitive).addPrimitive(spacePrimitive).addPrimitive(manifoldPrimitive);
-  const node = doc.createNode().setMesh(mesh);
-  const scene = doc.createScene().addChild(node);
-
-  const mergeIndices = doc.createAccessor('mergeFrom').setBuffer(buffer).setType(Accessor.Type.SCALAR);
-  const mergeValues = doc.createAccessor('mergeTo').setBuffer(buffer).setType(Accessor.Type.SCALAR);
-
-  async function loadTexture(texture, uri) {
-    const response = await fetch(uri);
-    const blob = await response.blob();
-    texture.setMimeType(blob.type);
-    texture.setImage(new Uint8Array(await blob.arrayBuffer()));
-  }
-
-  async function loadTextures() {
-    const moonLoads = loadTexture(moonTexture, './moonAltitude.jpg');
-    const spaceLoads = loadTexture(spaceTexture, './hubbleDeepField.jpg');
-    await Promise.all([moonLoads, spaceLoads]);
-  }
-
-  const texturesLoad = loadTextures();
-  const materialMap = new Map();
+  const moonLoads = loadTexture(moonTexture, './moonAltitude.jpg');
+  const spaceLoads = loadTexture(spaceTexture, './hubbleDeepField.jpg');
+  const texturesLoad = Promise.all([moonLoads, spaceLoads]);
 
   const wasm = await Module();
   wasm.setup();
@@ -98,8 +81,8 @@
   const firstID = wasm.reserveIDs(2);
   const space = cubeUV(firstID).scale(50);
   const moon = sphereUV(firstID + 1).scale(60);
-  materialMap.set(firstID, 'space');
-  materialMap.set(firstID + 1, 'moon');
+  const materialArray = [spaceMaterial, moonMaterial];
+  const attributeArray = ['POSITION', 'TEXCOORD_0'];
 
   const csg = function (operation) {
     push2MV(wasm[operation](space, moon));
@@ -114,107 +97,17 @@
   const mv = document.querySelector('model-viewer');
   let objectURL = null;
 
-  function addExtension(json, mesh) {
-    const indicesAccessor = json.accessors.find((a) => { return a.name == 'indices'; });
-    const mergeFromAccessor = json.accessors.find((a) => { return a.name == 'mergeFrom'; });
-    const mergeToAccessor = json.accessors.find((a) => { return a.name == 'mergeTo'; });
-    indicesAccessor.sparse = {
-      count: mergeFromAccessor.count,
-      indices: {
-        bufferView: mergeFromAccessor.bufferView,
-        byteOffset: mergeFromAccessor.byteOffset,
-        componentType: 5125
-      },
-      values: {
-        bufferView: mergeToAccessor.bufferView,
-        byteOffset: mergeToAccessor.byteOffset,
-      }
-    };
-
-    for (const [i, id] of mesh.runOriginalID.entries()) {
-      const name = materialMap.get(id);
-      const primitive = json.meshes[0].primitives.find((p) => { return json.materials[p.material].name == name; });
-      primitive.indices = json.accessors.length;
-      json.accessors.push({
-        name,
-        type: "SCALAR",
-        componentType: 5125,
-        count: mesh.runIndex[i + 1] - mesh.runIndex[i],
-        bufferView: indicesAccessor.bufferView,
-        byteOffset: 4 * mesh.runIndex[i]
-      });
-    }
-
-    console.log(json);
-    // const manifoldIdx = json.meshes[0].primitives.findIndex((p) => { return p.material == null; });
-    // const manifoldPrimitives = json.meshes[0].primitives.splice(manifoldIdx, 1);
-  }
-
-  async function writeGLB(json, resources) {
-    const header = new Uint32Array([0x46546c67, 2, 12]);
-
-    const jsonText = JSON.stringify(json);
-    const jsonChunkData = BufferUtils.pad(BufferUtils.encodeText(jsonText), 0x20);
-    const jsonChunkHeader = BufferUtils.toView(new Uint32Array([jsonChunkData.byteLength, 0x4e4f534a]));
-    const jsonChunk = BufferUtils.concat([jsonChunkHeader, jsonChunkData]);
-    header[header.length - 1] += jsonChunk.byteLength;
-
-    const binBuffer = Object.values(resources)[0];
-    if (!binBuffer || !binBuffer.byteLength) {
-      return BufferUtils.concat([BufferUtils.toView(header), jsonChunk]);
-    }
-
-    const binChunkData = BufferUtils.pad(binBuffer, 0x00);
-    const binChunkHeader = BufferUtils.toView(new Uint32Array([binChunkData.byteLength, 0x004e4942]));
-    const binChunk = BufferUtils.concat([binChunkHeader, binChunkData]);
-    header[header.length - 1] += binChunk.byteLength;
-
-    return BufferUtils.concat([BufferUtils.toView(header), jsonChunk, binChunk]);
-  }
-
   async function push2MV(manifold) {
     // From Z-up to Y-up (glTF)
-    const mesh = manifold.rotate([-90, 0, 0]).getMesh();
+    const manifoldMesh = manifold.rotate([-90, 0, 0]).getMesh();
 
-    indices.setArray(mesh.triVerts);
-
-    const vert2merge = [...Array(mesh.numVert).keys()];
-    for (const [i, from] of mesh.mergeFromVert.entries()) {
-      vert2merge[from] = mesh.mergeToVert[i];
-    }
-    const ind = [];
-    const val = [];
-    for (const [i, vert] of mesh.triVerts.entries()) {
-      const newVert = vert2merge[vert];
-      if (vert !== newVert) {
-        ind.push(i);
-        val.push(newVert);
-      }
-    }
-    mergeIndices.setArray(new Uint32Array(ind));
-    mergeValues.setArray(new Uint32Array(val));
-
-    const numVert = mesh.numVert;
-    const numProp = mesh.numProp;
-    const posArray = new Float32Array(3 * numVert);
-    const uvArray = new Float32Array(2 * numVert);
-    for (let i = 0; i < numVert; ++i) {
-      posArray[3 * i] = mesh.vertProperties[numProp * i];
-      posArray[3 * i + 1] = mesh.vertProperties[numProp * i + 1];
-      posArray[3 * i + 2] = mesh.vertProperties[numProp * i + 2];
-      uvArray[2 * i] = mesh.vertProperties[numProp * i + 3];
-      uvArray[2 * i + 1] = mesh.vertProperties[numProp * i + 4];
-    }
-    position.setArray(posArray);
-    uv.setArray(uvArray);
+    disposeMesh(node.getMesh());
+    const mesh = toGLTFMesh(doc, manifoldMesh, attributeArray, materialArray);
+    node.setMesh(mesh);
 
     await texturesLoad;
 
-    const { json, resources } = await io.writeJSON(doc, { format: Format.GLB });
-
-    addExtension(json, mesh);
-
-    const glb = await writeGLB(json, resources);
+    const glb = await io.writeBinary(doc);
 
     const blob = new Blob([glb], { type: 'application/octet-stream' });
     URL.revokeObjectURL(objectURL);
