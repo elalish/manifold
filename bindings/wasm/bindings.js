@@ -153,6 +153,12 @@ Module.setup = function() {
       return this.runOriginalID.length;
     }
 
+    merge() {
+      const {changed, mesh} = Module._Merge(this);
+      Object.assign(this, {...mesh});
+      return changed;
+    }
+
     verts(tri) {
       return this.triVerts.subarray(3 * tri, 3 * (tri + 1));
     }
