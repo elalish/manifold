@@ -12,9 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {Accessor} from '@gltf-transform/core';
+import {Accessor, Document, WebIO} from '@gltf-transform/core';
 
 import {EXTManifold} from './manifold-gltf.js';
+
+const io = new WebIO().registerExtensions([EXTManifold]);
+const doc = new Document();
+doc.createBuffer();
+const node = doc.createNode();
+doc.createScene().addChild(node);
 
 export const attributeDefs = {
   'POSITION': {type: Accessor.Type.VEC3, components: 3},
@@ -28,7 +34,19 @@ export const attributeDefs = {
   'WEIGHTS_0': {type: Accessor.Type.VEC4, components: 4},
 };
 
-export function toGLTFMesh(doc, manifoldMesh, attributeArray, materialArray) {
+export function getGLTFDoc() {
+  return doc;
+}
+
+export function getRootNode() {
+  return node;
+}
+
+export async function writeGLB() {
+  return io.writeBinary(doc);
+}
+
+export function toGLTFMesh(manifoldMesh, attributeArray, materialArray) {
   if (doc.getRoot().listBuffers().length !== 1)
     throw new Error('Document must have a single buffer.');
   const buffer = doc.getRoot().listBuffers()[0];

@@ -56,17 +56,10 @@
 </script>
 <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/2.0.1/model-viewer.min.js"></script>
 <script type="module">
-  import { Document, WebIO } from '@gltf-transform/core';
-  import { EXTManifold } from '../manifold-gltf.js';
-  import { loadTexture, toGLTFMesh, disposeMesh } from '../gltfIO.js';
+  import { loadTexture, toGLTFMesh, disposeMesh, getGLTFDoc, writeGLB, getRootNode } from '../gltfIO.js';
   import Module from '../manifold.js';
 
-  const io = new WebIO().registerExtensions([EXTManifold]);
-  const doc = new Document();
-  doc.createBuffer();
-  const node = doc.createNode();
-  doc.createScene().addChild(node);
-
+  const doc = getGLTFDoc();
   const moonTexture = doc.createTexture('moon');
   const spaceTexture = doc.createTexture('space');
   const moonMaterial = doc.createMaterial('moon').setBaseColorTexture(moonTexture);
@@ -101,13 +94,14 @@
     // From Z-up to Y-up (glTF)
     const manifoldMesh = manifold.rotate([-90, 0, 0]).getMesh();
 
+    const node = getRootNode();
     disposeMesh(node.getMesh());
-    const mesh = toGLTFMesh(doc, manifoldMesh, attributeArray, materialArray);
+    const mesh = toGLTFMesh(manifoldMesh, attributeArray, materialArray);
     node.setMesh(mesh);
 
     await texturesLoad;
 
-    const glb = await io.writeBinary(doc);
+    const glb = await writeGLB();
 
     const blob = new Blob([glb], { type: 'application/octet-stream' });
     URL.revokeObjectURL(objectURL);
