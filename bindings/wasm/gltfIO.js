@@ -110,14 +110,21 @@ export function toGLTFMesh(manifoldMesh, attributeArray, materialArray) {
       'POSITION', mesh.listPrimitives()[0].getAttribute('POSITION'));
   manifoldPrimitive.setPrimitive(primitive, manifoldMesh.runIndex);
 
+  const idx = [...manifoldMesh.mergeTriVert.keys()];
+  idx.sort(
+      (a, b) => manifoldMesh.mergeTriVert[a] - manifoldMesh.mergeTriVert[b]);
+  const mergeTriVert =
+      new Uint32Array(idx.map(i => manifoldMesh.mergeTriVert[i]));
+  const mergeToVert =
+      new Uint32Array(idx.map(i => manifoldMesh.mergeToVert[i]));
   const indicesAccessor = doc.createAccessor()
                               .setBuffer(buffer)
                               .setType(Accessor.Type.SCALAR)
-                              .setArray(manifoldMesh.mergeTriVert);
+                              .setArray(mergeTriVert);
   const valuesAccessor = doc.createAccessor()
                              .setBuffer(buffer)
                              .setType(Accessor.Type.SCALAR)
-                             .setArray(manifoldMesh.mergeToVert);
+                             .setArray(mergeToVert);
   manifoldPrimitive.setMerge(indicesAccessor, valuesAccessor);
 
   return mesh;

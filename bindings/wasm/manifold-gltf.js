@@ -58,8 +58,8 @@ export class ManifoldPrimitive extends ExtensionProperty {
   setMerge(indicesAccessor, valuesAccessor) {
     if (indicesAccessor.getCount() !== valuesAccessor.getCount())
       throw new Error('merge vectors must be the same length.');
-    this.setRef('mergeValues', indicesAccessor);
-    return this.setRef('mergeIndices', valuesAccessor);
+    this.setRef('mergeIndices', indicesAccessor);
+    return this.setRef('mergeValues', valuesAccessor);
   }
 }
 
@@ -121,9 +121,6 @@ export class EXTManifold extends Extension {
           byteOffset: mergeValues.byteOffset,
         }
       };
-
-      json.accessors.splice(mergeIndicesIndex, 1);
-      json.accessors.splice(mergeValuesIndex, 1);
 
       const {runIndex} = manifoldPrimitive;
       const numPrimitive = runIndex.length - 1;
