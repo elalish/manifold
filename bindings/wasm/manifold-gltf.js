@@ -77,13 +77,23 @@ export class EXTManifold extends Extension {
     meshDefs.forEach((meshDef, meshIndex) => {
       if (!meshDef.extensions || !meshDef.extensions[NAME]) return;
 
+      const mesh = context.meshes[meshIndex];
       const manifoldPrimitive = this.createManifoldPrimitive();
-      context.meshes[meshIndex].setExtension(NAME, manifoldPrimitive);
+      mesh.setExtension(NAME, manifoldPrimitive);
 
       const manifoldDef = meshDef.extensions[NAME];
 
-      if (manifoldDef.manifoldPrimitive != null) {
-        manifoldPrimitive.setPrimitive(manifoldDef.manifoldPrimitive);
+      if (manifoldDef.manifoldPrimitive) {
+        for (const primitive of mesh.listPrimitives()) {
+          const indices = context.accessors[primitive.indices];
+          manifoldPrimitive.runIndex.push(indices.byteOffset / 4);
+        }
+      }
+
+      if (manifoldDef.mergeIndices && manifoldDef.mergeValues) {
+        manifoldPrimitive.setMerge(
+            context.accessors[manifoldDef.mergeIndices],
+            context.accessors[manifoldDef.mergeValues]);
       }
     });
 
@@ -114,7 +124,7 @@ export class EXTManifold extends Extension {
         indices: {
           bufferView: mergeIndices.bufferView,
           byteOffset: mergeIndices.byteOffset,
-          componentType: 5125
+          componentType: mergeIndices.componentType
         },
         values: {
           bufferView: mergeValues.bufferView,
@@ -128,7 +138,7 @@ export class EXTManifold extends Extension {
         meshDef.primitives[i].indices = json.accessors.length;
         json.accessors.push({
           type: 'SCALAR',
-          componentType: 5125,
+          componentType: indices.componentType,
           count: runIndex[i + 1] - runIndex[i],
           bufferView: indices.bufferView,
           byteOffset: 4 * runIndex[i]
@@ -136,7 +146,11 @@ export class EXTManifold extends Extension {
       }
 
       meshDef.extensions = meshDef.extensions || {};
-      meshDef.extensions[NAME] = {manifoldPrimitive: primitive};
+      meshDef.extensions[NAME] = {
+        manifoldPrimitive: primitive,
+        mergeIndices: mergeIndicesIndex,
+        mergeValues: mergeValuesIndex
+      };
 
       // Test the manifold primitive by replacing the material primitives
       // meshDef.primitives = [primitive];

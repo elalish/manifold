@@ -18,6 +18,7 @@ import {EXTManifold} from './manifold-gltf.js';
 
 const io = new WebIO().registerExtensions([EXTManifold]);
 const doc = new Document();
+const manifoldExtension = doc.createExtension(EXTManifold);
 doc.createBuffer();
 const node = doc.createNode();
 doc.createScene().addChild(node);
@@ -102,7 +103,6 @@ export function toGLTFMesh(manifoldMesh, attributeArray, materialArray) {
     offset += n;
   }
 
-  const manifoldExtension = doc.createExtension(EXTManifold);
   const manifoldPrimitive = manifoldExtension.createManifoldPrimitive();
   mesh.setExtension('EXT_manifold', manifoldPrimitive);
 
@@ -134,7 +134,7 @@ export function disposeMesh(mesh) {
   if (!mesh) return;
   const primitives = mesh.listPrimitives();
   const manifoldPrimitive = mesh.getExtension('EXT_manifold');
-  if (!!manifoldPrimitive) {
+  if (manifoldPrimitive) {
     manifoldPrimitive.getMergeIndices()?.dispose();
     manifoldPrimitive.getMergeValues()?.dispose();
     primitives.push(manifoldPrimitive.getPrimitive());
