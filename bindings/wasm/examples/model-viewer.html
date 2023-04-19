@@ -169,6 +169,7 @@
     const runOriginalID = new Uint32Array(1);
     const meshUV = new wasm.Mesh({ numProp, triVerts, vertProperties, runOriginalID });
     runOriginalID[0] = id;
+    const vert2vert = new Uint32Array(numVert);
     let idx = 0;
     for (let i = 0; i < numVert; ++i) {
       const x = mesh.vertProperties[numPropIn * i];
@@ -182,6 +183,7 @@
       vertProperties[numProp * i + 4] = v;
       if (Math.abs(y) < tol && x < -tol) {// Seam
         const iNew = numVert + idx;
+        vert2vert[i] = iNew;
         vertProperties[numProp * iNew] = x;
         vertProperties[numProp * iNew + 1] = y;
         vertProperties[numProp * iNew + 2] = z;
@@ -190,6 +192,7 @@
         vertProperties[numProp * i + 3] = 0;
         ++idx;
       } else {
+        vert2vert[i] = i;
         vertProperties[numProp * i + 3] = u;
       }
     }
@@ -197,9 +200,17 @@
       const v0 = mesh.triVerts[3 * tri];
       const v1 = mesh.triVerts[3 * tri + 1];
       const v2 = mesh.triVerts[3 * tri + 2];
-      triVerts[3 * tri] = v0;
-      triVerts[3 * tri + 1] = v1;
-      triVerts[3 * tri + 2] = v2;
+      if ((vert2vert[v0] !== v0 || vert2vert[v1] !== v1 || vert2vert[v2] !== v2) &&
+        (vertProperties[numProp * v0 + 1] > tol || vertProperties[numProp * v1 + 1] > tol ||
+          vertProperties[numProp * v2 + 1] > tol)) {
+        triVerts[3 * tri] = vert2vert[v0];
+        triVerts[3 * tri + 1] = vert2vert[v1];
+        triVerts[3 * tri + 2] = vert2vert[v2];
+      } else {
+        triVerts[3 * tri] = v0;
+        triVerts[3 * tri + 1] = v1;
+        triVerts[3 * tri + 2] = v2;
+      }
     }
     meshUV.merge();
     return wasm.Manifold(meshUV);
