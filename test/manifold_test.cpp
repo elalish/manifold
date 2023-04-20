@@ -215,6 +215,21 @@ TEST(Manifold, Revolve2) {
   EXPECT_NEAR(prop.surfaceArea, 96.0f * glm::pi<float>(), 1.0f);
 }
 
+TEST(Manifold, Warp) {
+  CrossSection square = CrossSection::Square({1, 1});
+  Manifold shape = Manifold::Extrude(square, 2, 10).Warp([](glm::vec3& v) {
+    v.x += v.z * v.z;
+  });
+  auto propBefore = shape.GetProperties();
+
+  Manifold simplified = Manifold::Compose({shape});
+  auto propAfter = simplified.GetProperties();
+
+  EXPECT_FLOAT_EQ(propBefore.volume, propAfter.volume);
+  EXPECT_FLOAT_EQ(propBefore.surfaceArea, propAfter.surfaceArea);
+  EXPECT_NEAR(propBefore.volume, 2, 0.0001);
+}
+
 TEST(Manifold, Smooth) {
   Manifold tet = Manifold::Tetrahedron();
   Manifold smooth = Manifold::Smooth(tet.GetMesh());

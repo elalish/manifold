@@ -549,6 +549,8 @@ Manifold Manifold::Warp(std::function<void(glm::vec3&)> warpFunc) const {
   pImpl->faceNormal_.resize(0);  // force recalculation of triNormal
   pImpl->CalculateNormals();
   pImpl->SetPrecision();
+  pImpl->CreateFaces();
+  pImpl->SimplifyTopology();
   return Manifold(std::make_shared<CsgLeafNode>(pImpl));
 }
 
