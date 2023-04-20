@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {Extension, ExtensionProperty, PropertyType} from '@gltf-transform/core';
+import {Extension, ExtensionProperty, Mesh, PropertyType} from '@gltf-transform/core';
 
 const NAME = 'EXT_manifold';
 
@@ -31,20 +31,6 @@ export class ManifoldPrimitive extends ExtensionProperty {
     return Object.assign(
         super.getDefaults(),
         {manifoldPrimitive: null, mergeIndices: null, mergeValues: null});
-  }
-
-  getPrimitive() {
-    return this.getRef('manifoldPrimitive');
-  }
-
-  setPrimitive(primitive, runIndex) {
-    const mesh = this.listParents()[0];
-    if (mesh.listPrimitives().length !== runIndex.length - 1)
-      throw new Error(
-          'You must attach all material primitives to the mesh before setting the manifold primitive.');
-    this.runIndex = runIndex;
-    mesh.addPrimitive(primitive);
-    return this.setRef('manifoldPrimitive', primitive);
   }
 
   getMergeIndices() {
@@ -113,6 +99,14 @@ export class EXTManifold extends Extension {
       const meshIndex = context.meshIndexMap.get(mesh);
       const meshDef = json.meshes[meshIndex];
 
+      const {runIndex} = manifoldPrimitive;
+      const numPrimitive = runIndex.length - 1;
+
+      if (numPrimitive !== meshDef.primitives.length) {
+        throw new Error(
+            'The number of primitives must be exactly one less than the length of runIndex.');
+      }
+
       const mergeIndicesIndex =
           context.accessorIndexMap.get(manifoldPrimitive.getMergeIndices());
       const mergeValuesIndex =
@@ -120,7 +114,13 @@ export class EXTManifold extends Extension {
       const mergeIndices = json.accessors[mergeIndicesIndex];
       const mergeValues = json.accessors[mergeValuesIndex];
 
-      const primitive = meshDef.primitives.pop();
+      const existingPrimitive = meshDef.primitives[0];
+      const primitive = {
+        indices: existingPrimitive.indices,
+        mode: existingPrimitive.mode,
+        attributes: {'POSITION': existingPrimitive.attributes['POSITION']}
+      };
+
       const indices = json.accessors[primitive.indices];
       indices.sparse = {
         count: mergeIndices.count,
@@ -135,8 +135,6 @@ export class EXTManifold extends Extension {
         }
       };
 
-      const {runIndex} = manifoldPrimitive;
-      const numPrimitive = runIndex.length - 1;
       for (let i = 0; i < numPrimitive; ++i) {
         meshDef.primitives[i].indices = json.accessors.length;
         json.accessors.push({

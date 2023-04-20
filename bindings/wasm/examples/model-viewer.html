@@ -56,10 +56,11 @@
 </script>
 <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/2.0.1/model-viewer.min.js"></script>
 <script type="module">
-  import { Document } from '@gltf-transform/core';
-  import { loadTexture, toGLTFMesh, disposeMesh, writeGLB } from '../gltfIO.js';
+  import { Document, WebIO } from '@gltf-transform/core';
+  import { loadTexture, toGLTFMesh, disposeMesh, setupIO } from '../gltfIO.js';
   import Module from '../manifold.js';
 
+  const io = setupIO(new WebIO());
   const doc = new Document();
   const node = doc.createNode();
   doc.createScene().addChild(node);
@@ -104,7 +105,7 @@
 
     await texturesLoad;
 
-    const glb = await writeGLB(doc);
+    const glb = await io.writeBinary(doc);
 
     const blob = new Blob([glb], { type: 'application/octet-stream' });
     URL.revokeObjectURL(objectURL);

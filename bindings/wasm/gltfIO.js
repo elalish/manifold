@@ -12,11 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {Accessor, WebIO} from '@gltf-transform/core';
+import {Accessor} from '@gltf-transform/core';
 
 import {EXTManifold} from './manifold-gltf.js';
-
-const io = new WebIO().registerExtensions([EXTManifold]);
 
 export const attributeDefs = {
   'POSITION': {type: Accessor.Type.VEC3, components: 3},
@@ -30,12 +28,8 @@ export const attributeDefs = {
   'WEIGHTS_0': {type: Accessor.Type.VEC4, components: 4},
 };
 
-export async function loadGLB(url) {
-  return io.read(url);
-}
-
-export async function writeGLB(doc) {
-  return io.writeBinary(doc);
+export function setupIO(io) {
+  return io.registerExtensions([EXTManifold]);
 }
 
 export function toGLTFMesh(doc, manifoldMesh, attributeArray, materialArray) {
@@ -99,11 +93,8 @@ export function toGLTFMesh(doc, manifoldMesh, attributeArray, materialArray) {
   }
 
   const manifoldPrimitive = manifoldExtension.createManifoldPrimitive();
+  manifoldPrimitive.runIndex = manifoldMesh.runIndex;
   mesh.setExtension('EXT_manifold', manifoldPrimitive);
-
-  const primitive = doc.createPrimitive().setIndices(indices).setAttribute(
-      'POSITION', mesh.listPrimitives()[0].getAttribute('POSITION'));
-  manifoldPrimitive.setPrimitive(primitive, manifoldMesh.runIndex);
 
   const idx = [...manifoldMesh.mergeTriVert.keys()];
   idx.sort(
@@ -128,13 +119,6 @@ export function toGLTFMesh(doc, manifoldMesh, attributeArray, materialArray) {
 export function disposeMesh(mesh) {
   if (!mesh) return;
   const primitives = mesh.listPrimitives();
-  const manifoldPrimitive = mesh.getExtension('EXT_manifold');
-  if (manifoldPrimitive) {
-    manifoldPrimitive.getMergeIndices()?.dispose();
-    manifoldPrimitive.getMergeValues()?.dispose();
-    primitives.push(manifoldPrimitive.getPrimitive());
-  }
-
   for (const primitive of primitives) {
     primitive.getIndices()?.dispose();
     for (const accessor of primitive.listAttributes()) {
