@@ -88,6 +88,9 @@ export class EXTManifold extends Extension {
           const indices = context.accessors[primitive.indices];
           manifoldPrimitive.runIndex.push(indices.byteOffset / 4);
         }
+        const indices =
+            context.accessors[manifoldDef.manifoldPrimitive.indices];
+        runIndex.push(indices.count);
       }
 
       if (manifoldDef.mergeIndices && manifoldDef.mergeValues) {

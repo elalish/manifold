@@ -12,16 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {Accessor, Document, WebIO} from '@gltf-transform/core';
+import {Accessor, WebIO} from '@gltf-transform/core';
 
 import {EXTManifold} from './manifold-gltf.js';
 
 const io = new WebIO().registerExtensions([EXTManifold]);
-const doc = new Document();
-const manifoldExtension = doc.createExtension(EXTManifold);
-doc.createBuffer();
-const node = doc.createNode();
-doc.createScene().addChild(node);
 
 export const attributeDefs = {
   'POSITION': {type: Accessor.Type.VEC3, components: 3},
@@ -35,22 +30,22 @@ export const attributeDefs = {
   'WEIGHTS_0': {type: Accessor.Type.VEC4, components: 4},
 };
 
-export function getGLTFDoc() {
-  return doc;
+export async function loadGLB(url) {
+  return io.read(url);
 }
 
-export function getRootNode() {
-  return node;
-}
-
-export async function writeGLB() {
+export async function writeGLB(doc) {
   return io.writeBinary(doc);
 }
 
-export function toGLTFMesh(manifoldMesh, attributeArray, materialArray) {
-  if (doc.getRoot().listBuffers().length !== 1)
-    throw new Error('Document must have a single buffer.');
+export function toGLTFMesh(doc, manifoldMesh, attributeArray, materialArray) {
+  if (doc.getRoot().listBuffers().length > 1)
+    throw new Error('Document must not have multiple buffers.');
+  if (doc.getRoot().listBuffers().length === 0) {
+    doc.createBuffer();
+  }
   const buffer = doc.getRoot().listBuffers()[0];
+  const manifoldExtension = doc.createExtension(EXTManifold);
 
   const indices = doc.createAccessor('indices')
                       .setBuffer(buffer)
