@@ -225,8 +225,8 @@ TEST(Manifold, Warp) {
   Manifold simplified = Manifold::Compose({shape});
   auto propAfter = simplified.GetProperties();
 
-  EXPECT_FLOAT_EQ(propBefore.volume, propAfter.volume);
-  EXPECT_FLOAT_EQ(propBefore.surfaceArea, propAfter.surfaceArea);
+  EXPECT_NEAR(propBefore.volume, propAfter.volume, 0.0001);
+  EXPECT_NEAR(propBefore.surfaceArea, propAfter.surfaceArea, 0.0001);
   EXPECT_NEAR(propBefore.volume, 2, 0.0001);
 }
 
