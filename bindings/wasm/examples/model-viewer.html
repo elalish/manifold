@@ -57,7 +57,7 @@
 <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/2.0.1/model-viewer.min.js"></script>
 <script type="module">
   import { Document, WebIO } from '@gltf-transform/core';
-  import { loadTexture, toGLTFMesh, disposeMesh, setupIO } from '../gltfIO.js';
+  import { loadTexture, writeMesh, disposeMesh, setupIO, getMaterialMap } from '../gltfIO.js';
   import Module from '../manifold.js';
 
   const io = setupIO(new WebIO());
@@ -79,7 +79,9 @@
   const firstID = wasm.reserveIDs(2);
   const space = cubeUV(firstID).scale(50);
   const moon = sphereUV(firstID + 1).scale(60);
-  const materialArray = [spaceMaterial, moonMaterial];
+  const materialMap = getMaterialMap();
+  materialMap.set(firstID, spaceMaterial);
+  materialMap.set(firstID + 1, moonMaterial);
   const attributeArray = ['POSITION', 'TEXCOORD_0'];
 
   const csg = function (operation) {
@@ -100,7 +102,7 @@
     const manifoldMesh = manifold.rotate([-90, 0, 0]).getMesh();
 
     disposeMesh(node.getMesh());
-    const mesh = toGLTFMesh(doc, manifoldMesh, attributeArray, materialArray);
+    const mesh = writeMesh(doc, manifoldMesh, attributeArray);
     node.setMesh(mesh);
 
     await texturesLoad;

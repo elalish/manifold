@@ -60,6 +60,7 @@ export class EXTManifold extends Extension {
   read(context) {
     const {json} = context.jsonDoc;
     const meshDefs = json.meshes || [];
+
     meshDefs.forEach((meshDef, meshIndex) => {
       if (!meshDef.extensions || !meshDef.extensions[NAME]) return;
 

@@ -16,6 +16,8 @@ import {Accessor} from '@gltf-transform/core';
 
 import {EXTManifold} from './manifold-gltf.js';
 
+const materialMap = new Map();
+
 export const attributeDefs = {
   'POSITION': {type: Accessor.Type.VEC3, components: 3},
   'SKIP': {type: null, components: 1},
@@ -32,7 +34,11 @@ export function setupIO(io) {
   return io.registerExtensions([EXTManifold]);
 }
 
-export function toGLTFMesh(doc, manifoldMesh, attributeArray, materialArray) {
+export function getMaterialMap() {
+  return materialMap;
+}
+
+export function writeMesh(doc, manifoldMesh, attributeArray) {
   if (doc.getRoot().listBuffers().length > 1)
     throw new Error('Document must not have multiple buffers.');
   if (doc.getRoot().listBuffers().length === 0) {
@@ -48,12 +54,12 @@ export function toGLTFMesh(doc, manifoldMesh, attributeArray, materialArray) {
 
   const mesh = doc.createMesh();
   const numPrimitive = manifoldMesh.runIndex.length - 1;
-  if (materialArray.length != numPrimitive)
-    throw new Error('materialArray does not match number of triangle runs.');
-
   for (let run = 0; run < numPrimitive; ++run) {
-    const primitive = doc.createPrimitive().setIndices(indices).setMaterial(
-        materialArray[run]);
+    const primitive = doc.createPrimitive().setIndices(indices);
+    const material = materialMap.get(manifoldMesh.runOriginalID[run]);
+    if (material) {
+      primitive.setMaterial(material);
+    }
     mesh.addPrimitive(primitive);
   }
 
