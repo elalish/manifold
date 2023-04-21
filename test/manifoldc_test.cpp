@@ -10,7 +10,7 @@
 #include "meshIO.h"
 #endif
 
-float eps = 0.000001;
+float eps = 0.00001;
 
 bool approx_float_array(float *a, float *b, size_t len) {
   for (int i = 0; i < len; ++i) {
