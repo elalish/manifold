@@ -115,7 +115,7 @@ TEST(CBIND, extrude) {
   ManifoldManifold *diff = manifold_difference(malloc(sz), cube, extrusion);
   ManifoldProperties props = manifold_get_properties(diff);
 
-  EXPECT_TRUE(props.volume < eps);
+  EXPECT_TRUE(props.volume < 0.0001);
 
   manifold_delete_manifold(cube);
   manifold_delete_manifold(extrusion);
