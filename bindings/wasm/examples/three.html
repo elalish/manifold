@@ -71,7 +71,7 @@
 
   const icosahedron = simplify(new THREE.IcosahedronGeometry(0.16));
 
-  const manifold_1 = wasm.cube(0.2, 0.2, 0.2, true);
+  const manifold_1 = wasm.cube([0.2, 0.2, 0.2], true);
   const manifold_2 = new wasm.Manifold(geometry2mesh(icosahedron));
 
   const csg = function (operation) {
