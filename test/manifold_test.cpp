@@ -230,6 +230,30 @@ TEST(Manifold, Warp) {
   EXPECT_NEAR(propBefore.volume, 2, 0.0001);
 }
 
+TEST(Manifold, Warp2) {
+  CrossSection circle =
+      CrossSection::Circle(5, 20).Translate(glm::vec2(10.0, 10.0));
+
+  Manifold shape = Manifold::Extrude(circle, 2, 10).Warp([](glm::vec3& v) {
+    int nSegments = 10;
+    double angleStep = 2.0 / 3.0 * M_PI / nSegments;
+    int zIndex = nSegments - 1 - std::round(v.z);
+    double angle = zIndex * angleStep;
+    v.z = v.y;
+    v.y = v.x * sin(angle);
+    v.x = v.x * cos(angle);
+  });
+
+  auto propBefore = shape.GetProperties();
+
+  Manifold simplified = Manifold::Compose({shape});
+  auto propAfter = simplified.GetProperties();
+
+  EXPECT_NEAR(propBefore.volume, propAfter.volume, 0.0001);
+  EXPECT_NEAR(propBefore.surfaceArea, propAfter.surfaceArea, 0.0001);
+  EXPECT_NEAR(propBefore.volume, 321, 1);
+}
+
 TEST(Manifold, Smooth) {
   Manifold tet = Manifold::Tetrahedron();
   Manifold smooth = Manifold::Smooth(tet.GetMesh());
