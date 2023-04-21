@@ -10,15 +10,10 @@
 #include "meshIO.h"
 #endif
 
-float eps = 0.00001;
-
-bool approx_float_array(float *a, float *b, size_t len) {
+void approx_float_array(float *a, float *b, size_t len) {
   for (int i = 0; i < len; ++i) {
-    if (abs(a[i] - b[i]) > eps) {
-      return false;
-    };
+    EXPECT_NEAR(a[i], b[i], 0.0001);
   }
-  return true;
 }
 
 TEST(CBIND, sphere) {
@@ -53,7 +48,7 @@ TEST(CBIND, warp_translation) {
   float *warped_props = manifold_meshgl_vert_properties(
       malloc(sizeof(float) * len_props), warped_mesh);
 
-  EXPECT_TRUE(approx_float_array(trans_props, warped_props, len_props));
+  approx_float_array(trans_props, warped_props, len_props);
 
   manifold_delete_manifold(sphere);
   manifold_delete_manifold(trans);
