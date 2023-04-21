@@ -236,7 +236,7 @@ TEST(Manifold, Warp2) {
 
   Manifold shape = Manifold::Extrude(circle, 2, 10).Warp([](glm::vec3& v) {
     int nSegments = 10;
-    double angleStep = 2.0 / 3.0 * M_PI / nSegments;
+    double angleStep = 2.0 / 3.0 * glm::pi<float>() / nSegments;
     int zIndex = nSegments - 1 - std::round(v.z);
     double angle = zIndex * angleStep;
     v.z = v.y;
