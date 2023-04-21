@@ -10,17 +10,6 @@
 #include "meshIO.h"
 #endif
 
-float eps = 0.000001;
-
-bool approx_float_array(float *a, float *b, size_t len) {
-  for (int i = 0; i < len; ++i) {
-    if (abs(a[i] - b[i]) > eps) {
-      return false;
-    };
-  }
-  return true;
-}
-
 TEST(CBIND, sphere) {
   int n = 25;
   size_t sz = manifold_manifold_size();
@@ -41,27 +30,16 @@ TEST(CBIND, warp_translation) {
   ManifoldManifold *sphere = manifold_sphere(malloc(sz), 1.0f, 100);
   ManifoldManifold *trans = manifold_translate(malloc(sz), sphere, 15., 0., 0.);
   ManifoldManifold *warped = manifold_warp(malloc(sz), sphere, warp);
+  ManifoldManifold *diff = manifold_difference(malloc(sz), trans, warped);
 
-  ManifoldMeshGL *trans_mesh =
-      manifold_get_meshgl(malloc(manifold_meshgl_size()), trans);
-  ManifoldMeshGL *warped_mesh =
-      manifold_get_meshgl(malloc(manifold_meshgl_size()), warped);
+  ManifoldProperties props = manifold_get_properties(diff);
 
-  size_t len_props = manifold_meshgl_vert_properties_length(trans_mesh);
-  float *trans_props = manifold_meshgl_vert_properties(
-      malloc(sizeof(float) * len_props), trans_mesh);
-  float *warped_props = manifold_meshgl_vert_properties(
-      malloc(sizeof(float) * len_props), warped_mesh);
-
-  EXPECT_TRUE(approx_float_array(trans_props, warped_props, len_props));
+  EXPECT_NEAR(props.volume, 0, 0.0001);
 
   manifold_delete_manifold(sphere);
   manifold_delete_manifold(trans);
   manifold_delete_manifold(warped);
-  manifold_delete_meshgl(trans_mesh);
-  manifold_delete_meshgl(warped_mesh);
-  delete trans_props;
-  delete warped_props;
+  manifold_delete_manifold(diff);
 }
 
 TEST(CBIND, level_set) {
@@ -120,7 +98,7 @@ TEST(CBIND, extrude) {
   ManifoldManifold *diff = manifold_difference(malloc(sz), cube, extrusion);
   ManifoldProperties props = manifold_get_properties(diff);
 
-  EXPECT_TRUE(props.volume < eps);
+  EXPECT_TRUE(props.volume < 0.0001);
 
   manifold_delete_manifold(cube);
   manifold_delete_manifold(extrusion);
