@@ -68,13 +68,13 @@
   const node = doc.createNode();
   doc.createScene().addChild(node);
 
-  const moonTexture = doc.createTexture('moon');
-  const spaceTexture = doc.createTexture('space');
-  const moonMaterial = doc.createMaterial('moon').setBaseColorTexture(moonTexture);
-  const spaceMaterial = doc.createMaterial('space').setBaseColorTexture(spaceTexture);
-  const moonLoads = loadTexture(moonTexture, './moonAltitude.jpg');
-  const spaceLoads = loadTexture(spaceTexture, './hubbleDeepField.jpg');
-  const texturesLoad = Promise.all([moonLoads, spaceLoads]);
+  // const moonTexture = doc.createTexture('moon');
+  // const spaceTexture = doc.createTexture('space');
+  // const moonMaterial = doc.createMaterial('moon').setBaseColorTexture(moonTexture);
+  // const spaceMaterial = doc.createMaterial('space').setBaseColorTexture(spaceTexture);
+  // const moonLoads = loadTexture(moonTexture, './moonAltitude.jpg');
+  // const spaceLoads = loadTexture(spaceTexture, './hubbleDeepField.jpg');
+  // const texturesLoad = Promise.all([moonLoads, spaceLoads]);
 
   const wasm = await Module();
   wasm.setup();
@@ -102,12 +102,12 @@
     return wasm.compose(manifolds);
   }
 
-  const firstID = wasm.reserveIDs(2);
-  const space = cubeUV(firstID).scale(50);//await readGLB('models/space.glb', attributes, materialMap); //
-  const moon = sphereUV(firstID + 1).scale(60);//await readGLB('models/moon.glb', attributes, materialMap); //
+  // const firstID = wasm.reserveIDs(2);
+  const space = await readGLB('models/space.glb', attributes, materialMap); //cubeUV(firstID).scale(50);//
+  const moon = await readGLB('models/moon.glb', attributes, materialMap); //sphereUV(firstID + 1).scale(60);//
 
-  materialMap.set(firstID, spaceMaterial);
-  materialMap.set(firstID + 1, moonMaterial);
+  // materialMap.set(firstID, spaceMaterial);
+  // materialMap.set(firstID + 1, moonMaterial);
 
 
   function csg(operation) {
@@ -119,7 +119,6 @@
   };
 
   csg('difference');
-  // push2MV(moon);
 
   const mv = document.querySelector('model-viewer');
   let objectURL = null;
@@ -144,7 +143,7 @@
     const mesh = writeMesh(doc, manifoldMesh, attributes, materials);
     node.setMesh(mesh);
 
-    await texturesLoad;
+    // await texturesLoad;
 
     const glb = await io.writeBinary(doc);
 

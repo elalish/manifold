@@ -74,19 +74,27 @@ export function readMesh(mesh, attributes, materials) {
   const runIndex = new Uint32Array(runIndexArray);
 
   const manifoldPrimitive = mesh.getExtension('EXT_manifold');
-  const mergeTriVert = manifoldPrimitive ?
-      manifoldPrimitive.getMergeIndices().getArray() :
-      undefined;
-  const mergeToVert = manifoldPrimitive ?
-      manifoldPrimitive.getMergeValues().getArray() :
-      undefined;
+  const mergeTriVert =
+      manifoldPrimitive ? manifoldPrimitive.getMergeIndices().getArray() : [];
+  const mergeTo =
+      manifoldPrimitive ? manifoldPrimitive.getMergeValues().getArray() : [];
+  const vert2merge = new Map();
+  for (const [i, idx] of mergeTriVert.entries()) {
+    vert2merge.set(triVerts[idx], mergeTo[i]);
+  }
+  const mergeFromVert = [];
+  const mergeToVert = [];
+  for (const [from, to] of vert2merge.entries()) {
+    mergeFromVert.push(from);
+    mergeToVert.push(to);
+  }
 
   return {
     numProp,
     triVerts,
     vertProperties,
     runIndex,
-    mergeTriVert,
+    mergeFromVert,
     mergeToVert
   };
 }
