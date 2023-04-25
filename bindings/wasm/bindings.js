@@ -153,6 +153,12 @@ Module.setup = function() {
       return this.runOriginalID.length;
     }
 
+    merge() {
+      const {changed, mesh} = Module._Merge(this);
+      Object.assign(this, {...mesh});
+      return changed;
+    }
+
     verts(tri) {
       return this.triVerts.subarray(3 * tri, 3 * (tri + 1));
     }
@@ -302,14 +308,16 @@ Module.setup = function() {
     return result;
   };
 
-  Module.triangulate = function(polygons, precision = -1) {
+  Module.triangulate =
+      function(polygons, precision = -1) {
     const polygonsVec = polygons2vec(polygons);
-    const result = fromVec(Module._Triangulate(polygonsVec, precision), (x) => [x[0], x[1], x[2]]);
+    const result = fromVec(
+        Module._Triangulate(polygonsVec, precision), (x) => [x[0], x[1], x[2]]);
     disposePolygons(polygonsVec);
     return result;
   }
 
-  Module.revolve = function(polygons, circularSegments = 0) {
+      Module.revolve = function(polygons, circularSegments = 0) {
     const polygonsVec = polygons2vec(polygons);
     const result = Module._Revolve(polygonsVec, circularSegments);
     disposePolygons(polygonsVec);

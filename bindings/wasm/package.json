@@ -41,6 +41,9 @@
   "scripts": {
     "test": "mocha -u tdd -t 30000"
   },
+  "dependencies": {
+    "@gltf-transform/core": "^3.2.0"
+  },
   "devDependencies": {
     "chai": "*",
     "mocha": "*",
