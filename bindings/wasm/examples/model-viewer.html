@@ -59,14 +59,12 @@
 <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/2.0.1/model-viewer.min.js"></script>
 <script type="module">
   import { Document, WebIO } from '@gltf-transform/core';
-  import { clearNodeTransform, flatten } from '@gltf-transform/functions';
+  import { clearNodeTransform, flatten, prune } from '@gltf-transform/functions';
   import { loadTexture, readMesh, writeMesh, disposeMesh, setupIO } from '../gltfIO.js';
   import Module from '../manifold.js';
 
   const io = setupIO(new WebIO());
   const doc = new Document();
-  const node = doc.createNode();
-  doc.createScene().addChild(node);
 
   // const moonTexture = doc.createTexture('moon');
   // const spaceTexture = doc.createTexture('space');
@@ -84,9 +82,10 @@
 
   async function readGLB(url, attributes, materialMap) {
     const manifolds = [];
-    const doc = await io.read(url);
-    doc.transform(flatten());
-    const nodes = doc.getRoot().listNodes();
+    const docIn = await io.read(url);
+    docIn.transform(flatten());
+    const nodes = docIn.getRoot().listNodes();
+    const ids = [];
     for (const node of nodes) {
       clearNodeTransform(node);
       const materials = [];
@@ -94,12 +93,22 @@
       manifoldMesh.runOriginalID = [];
       const firstID = wasm.reserveIDs(materials.length);
       for (let i = 0; i < materials.length; ++i) {
-        materialMap.set(firstID + i, materials[i]);
+        // materialMap.set(firstID + i, materials[i]);
         manifoldMesh.runOriginalID.push(firstID + i);
+        ids.push(firstID + i);
       }
       manifolds.push(wasm.Manifold(new wasm.Mesh(manifoldMesh)));
     }
-    return wasm.compose(manifolds);
+    // pull in materials, TODO: replace with transfer() when available
+    const startIdx = doc.getRoot().listMaterials().length;
+    doc.merge(docIn);
+    doc.getRoot().listScenes().forEach((s) => s.dispose());
+    doc.getRoot().listBuffers().forEach((s) => s.dispose());
+    for (const [i, id] of ids.entries()) {
+      materialMap.set(id, doc.getRoot().listMaterials()[startIdx + i]);
+    }
+
+    return wasm.union(manifolds);
   }
 
   // const firstID = wasm.reserveIDs(2);
@@ -109,6 +118,8 @@
   // materialMap.set(firstID, spaceMaterial);
   // materialMap.set(firstID + 1, moonMaterial);
 
+  const node = doc.createNode();
+  doc.createScene().addChild(node);
 
   function csg(operation) {
     push2MV(wasm[operation](space, moon));
@@ -142,6 +153,9 @@
     }
     const mesh = writeMesh(doc, manifoldMesh, attributes, materials);
     node.setMesh(mesh);
+    doc.getRoot().listNodes().forEach((n) => console.log(n.listParents()));
+    doc.transform(prune());
+    doc.getRoot().listNodes().forEach((n) => console.log(n.listParents()));
 
     // await texturesLoad;
 

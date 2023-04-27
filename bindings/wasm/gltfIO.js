@@ -158,8 +158,8 @@ export function writeMesh(doc, manifoldMesh, attributes, materials) {
   }
 
   const manifoldPrimitive = manifoldExtension.createManifoldPrimitive();
-  manifoldPrimitive.runIndex = manifoldMesh.runIndex;
   mesh.setExtension('EXT_manifold', manifoldPrimitive);
+  manifoldPrimitive.setRunIndex(manifoldMesh.runIndex);
 
   const vert2merge = [...Array(manifoldMesh.numVert).keys()];
   for (const [i, from] of manifoldMesh.mergeFromVert.entries()) {

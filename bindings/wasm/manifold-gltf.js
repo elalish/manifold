@@ -23,8 +23,6 @@ export class ManifoldPrimitive extends ExtensionProperty {
     this.EXTENSION_NAME = NAME;
     this.propertyType = 'ManifoldPrimitive';
     this.parentTypes = [PropertyType.MESH];
-
-    this.runIndex = [];
   }
 
   getDefaults() {
@@ -46,6 +44,14 @@ export class ManifoldPrimitive extends ExtensionProperty {
       throw new Error('merge vectors must be the same length.');
     this.setRef('mergeIndices', indicesAccessor);
     return this.setRef('mergeValues', valuesAccessor);
+  }
+
+  getRunIndex() {
+    return this.get('runIndex');
+  }
+
+  setRunIndex(runIndex) {
+    return this.set('runIndex', runIndex);
   }
 }
 
@@ -72,11 +78,13 @@ export class EXTManifold extends Extension {
 
       if (manifoldDef.manifoldPrimitive) {
         let count = 0;
-        manifoldPrimitive.runIndex.push(count);
+        const runIndex = [];
+        runIndex.push(count);
         for (const primitive of mesh.listPrimitives()) {
           count += primitive.getIndices().getCount();
-          manifoldPrimitive.runIndex.push(count);
+          runIndex.push(count);
         }
+        manifoldPrimitive.setRunIndex(runIndex);
       }
 
       if (manifoldDef.mergeIndices && manifoldDef.mergeValues) {
@@ -99,7 +107,7 @@ export class EXTManifold extends Extension {
       const meshIndex = context.meshIndexMap.get(mesh);
       const meshDef = json.meshes[meshIndex];
 
-      const {runIndex} = manifoldPrimitive;
+      const runIndex = manifoldPrimitive.getRunIndex();
       const numPrimitive = runIndex.length - 1;
 
       if (numPrimitive !== meshDef.primitives.length) {
