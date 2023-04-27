@@ -83,7 +83,7 @@
   async function readGLB(url, attributes, materialMap) {
     const manifolds = [];
     const docIn = await io.read(url);
-    docIn.transform(flatten());
+    await docIn.transform(flatten());
     const nodes = docIn.getRoot().listNodes();
     const ids = [];
     for (const node of nodes) {
@@ -154,7 +154,7 @@
     const mesh = writeMesh(doc, manifoldMesh, attributes, materials);
     node.setMesh(mesh);
     doc.getRoot().listNodes().forEach((n) => console.log(n.listParents()));
-    doc.transform(prune());
+    await doc.transform(prune());
     doc.getRoot().listNodes().forEach((n) => console.log(n.listParents()));
 
     // await texturesLoad;
