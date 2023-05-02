@@ -15,7 +15,7 @@
 import * as glMatrix from 'https://cdn.jsdelivr.net/npm/gl-matrix@3.4.3/+esm';
 import {Accessor, Document, Material, WebIO} from 'https://cdn.skypack.dev/pin/@gltf-transform/core@v3.0.0-SfbIFhNPTRdr1UE2VSan/mode=imports,min/optimized/@gltf-transform/core.js';
 
-import Module from '../manifold.js';
+import Module from './manifold.js';
 
 const module = await Module();
 module.setup();

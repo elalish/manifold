@@ -60,8 +60,8 @@
 <script type="module">
   import { Document, WebIO } from '@gltf-transform/core';
   import { clearNodeTransform, flatten, prune } from '@gltf-transform/functions';
-  import { loadTexture, readMesh, writeMesh, disposeMesh, setupIO } from '../gltfIO.js';
-  import Module from '../manifold.js';
+  import { loadTexture, readMesh, writeMesh, disposeMesh, setupIO } from './gltfIO.js';
+  import Module from './manifold.js';
 
   const io = setupIO(new WebIO());
   const doc = new Document();
