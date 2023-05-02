@@ -10,6 +10,8 @@
     "manifold-encapsulated-types.d.ts",
     "manifold-global-types.d.ts",
     "examples/examples.js",
+    "examples/manifold-gltf.js",
+    "examples/gltf-io.js",
     "test/test.js"
   ],
   "typings": "manifold.d.ts",
