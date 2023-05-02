@@ -130,18 +130,24 @@ export class EXTManifold extends Extension {
       };
 
       const indices = json.accessors[primitive.indices];
-      indices.sparse = {
-        count: mergeIndices.count,
-        indices: {
-          bufferView: mergeIndices.bufferView,
-          byteOffset: mergeIndices.byteOffset,
-          componentType: mergeIndices.componentType
-        },
-        values: {
-          bufferView: mergeValues.bufferView,
-          byteOffset: mergeValues.byteOffset,
-        }
-      };
+      if (!indices) {
+        return;
+      }
+
+      if (mergeIndices && mergeValues) {
+        indices.sparse = {
+          count: mergeIndices.count,
+          indices: {
+            bufferView: mergeIndices.bufferView,
+            byteOffset: mergeIndices.byteOffset,
+            componentType: mergeIndices.componentType
+          },
+          values: {
+            bufferView: mergeValues.bufferView,
+            byteOffset: mergeValues.byteOffset,
+          }
+        };
+      }
 
       for (let i = 0; i < numPrimitive; ++i) {
         meshDef.primitives[i].indices = json.accessors.length;
