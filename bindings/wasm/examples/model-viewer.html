@@ -51,8 +51,8 @@
 <script type="importmap">
   {
     "imports": {
-      "@gltf-transform/core": "https://cdn.jsdelivr.net/npm/@gltf-transform/core@3/+esm",
-      "@gltf-transform/functions": "https://cdn.jsdelivr.net/npm/@gltf-transform/functions@3/+esm"
+      "@gltf-transform/core": "https://cdn.jsdelivr.net/npm/@gltf-transform/core@3.2.1/+esm",
+      "@gltf-transform/functions": "https://cdn.jsdelivr.net/npm/@gltf-transform/functions@3.2.1/+esm"
     }
   }
 </script>
@@ -61,7 +61,7 @@
   import { Document, WebIO } from '@gltf-transform/core';
   import { clearNodeTransform, flatten, prune } from '@gltf-transform/functions';
   import { loadTexture, readMesh, writeMesh, disposeMesh, setupIO } from './gltf-io.js';
-  import Module from './manifold.js';
+  import Module from './built/manifold.js';
 
   const io = setupIO(new WebIO());
   const doc = new Document();

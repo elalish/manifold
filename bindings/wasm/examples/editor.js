@@ -216,10 +216,10 @@ function initializeRun() {
 let tsWorker = undefined;
 
 async function getManifoldDTS() {
-  const global = await fetch('manifold-global-types.d.ts')
+  const global = await fetch('built/manifold-global-types.d.ts')
                      .then(response => response.text());
 
-  const encapsulated = await fetch('manifold-encapsulated-types.d.ts')
+  const encapsulated = await fetch('built/manifold-encapsulated-types.d.ts')
                            .then(response => response.text());
 
   return `
