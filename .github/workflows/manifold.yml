@@ -219,7 +219,7 @@ jobs:
     timeout-minutes: 30
     strategy:
       matrix:
-        variant: [none, omp, tbb, none-cuda, omp-cuda, tbb-cuda, js]
+        variant: [none, omp, tbb, none-cuda, omp-cuda, tbb-cuda]
     runs-on: ubuntu-latest
     if: github.event.pull_request.draft == false
     steps:
