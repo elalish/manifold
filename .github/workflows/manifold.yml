@@ -40,6 +40,7 @@ jobs:
     - name: Test ${{matrix.parallel_backend}} with CUDA ${{matrix.cuda_support}}
       # note that the test for CUDA backend does not really test CUDA, as we
       # don't have CUDA GPU on GitHub Action
+      if: matrix.parallel_backend != 'NONE' || matrix.cuda_support != 'OFF'
       run: |
         export PYTHONPATH=$PYTHONPATH:$(pwd)/build/bindings/python
         cd build/test
