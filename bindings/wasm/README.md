@@ -20,7 +20,24 @@ The most significant contribution here is a guaranteed-manifold [mesh Boolean](h
 
 ## Note on memory management
 
-Since Manifold is a WASM module, it does not automatically garbage-collect like regular JavaScript. You must manually `delete()` each manifold object constructed by your scripts, see https://github.com/elalish/manifold/discussions/256#discussioncomment-3944287.
+Since Manifold is a WASM module, it does not automatically garbage-collect like regular JavaScript. You must manually `delete()` each manifold object constructed by your scripts, see [discussion](https://github.com/elalish/manifold/discussions/256#discussioncomment-3944287).
+
+## Local development
+
+First, follow the directions in the root README to get your C++ build environment set up and working for WASM. From this directory (`bindings/wasm/`) you can test the JS bindings by running:
+
+```
+npm install
+npm test
+```
+
+You can also test the manifoldCAD.org editor as well as our other example pages by serving from `bindings/wasm/examples/` with e.g. `npx http-server`.
+
+Note that the `emcmake` command automatically copies your WASM build into `examples/built/` - these are checked into our repo in order to make sharing repro cases much easier. Note that you can test manifoldCAD.org on anyone's branch by simply going to: `https://raw.githack.com/<user>/manifold/<branch>/bindings/wasm/examples/index.html` e.g. https://raw.githack.com/elalish/manifold/glTFextension/bindings/wasm/examples/index.html
+
+Of course these built files may easily end up with conflicts, but there's no need to address them; simply overwrite them with your newer build. These files are also not used for our deployed pages, as the deployment process overwrites them with current builds. Never edit anything in the `built` directory by hand. 
+
+When testing [manifoldCAD.org](https://manifoldcad.org/) (either locally or the deployed version) note that it uses a service worker for faster loading. This means you need to open the page twice to see updates (the first time loads the old version and caches the new one, the second time loads the new version from cache). To see changes on each reload, open Chrome dev tools, go to the Application tab and check "update on reload".
 
 ## About the author
 
