@@ -15,8 +15,8 @@
 import {expect} from 'chai';
 import glMatrix from 'gl-matrix';
 
+import Module from '../examples/built/manifold.js';
 import {examples} from '../examples/examples.js';
-import Module from '../manifold.js';
 
 const wasm = await Module();
 wasm.setup();

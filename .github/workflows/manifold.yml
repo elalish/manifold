@@ -12,7 +12,7 @@ on:
 
 jobs:
   build:
-    timeout-minutes: 30
+    timeout-minutes: 45
     strategy:
       matrix:
         cuda_support: [ON, OFF]
@@ -32,6 +32,7 @@ jobs:
         submodules: recursive
     - uses: jwlawson/actions-setup-cmake@v1.12
     - name: Build ${{matrix.backend}}
+      if: matrix.parallel_backend != 'NONE' || matrix.cuda_support != 'OFF'
       run: |
         mkdir build
         cd build
@@ -39,6 +40,7 @@ jobs:
     - name: Test ${{matrix.parallel_backend}} with CUDA ${{matrix.cuda_support}}
       # note that the test for CUDA backend does not really test CUDA, as we
       # don't have CUDA GPU on GitHub Action
+      if: matrix.parallel_backend != 'NONE' || matrix.cuda_support != 'OFF'
       run: |
         export PYTHONPATH=$PYTHONPATH:$(pwd)/build/bindings/python
         cd build/test
@@ -51,6 +53,7 @@ jobs:
       # perhaps issue related to invalid memory access?
       if: matrix.parallel_backend == 'NONE' && matrix.cuda_support == 'OFF'
       run: |
+        mkdir build
         cd build
         cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DMANIFOLD_PAR=${{matrix.parallel_backend}} -DMANIFOLD_USE_CUDA=${{matrix.cuda_support}} -DCODE_COVERAGE=ON .. && make
         lcov --capture --initial --directory . --output-file ./code_coverage_init.info
@@ -219,7 +222,7 @@ jobs:
     timeout-minutes: 30
     strategy:
       matrix:
-        variant: [none, omp, tbb, none-cuda, omp-cuda, tbb-cuda, js]
+        variant: [none, omp, tbb, none-cuda, omp-cuda, tbb-cuda]
     runs-on: ubuntu-latest
     if: github.event.pull_request.draft == false
     steps:

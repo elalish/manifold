@@ -56,8 +56,7 @@ std::vector<SimplePolygon> ToPolygon(
   return simplePolygons;
 }
 
-val GetMeshJS(const Manifold& manifold, const glm::ivec3& normalIdx) {
-  MeshGL mesh = manifold.GetMeshGL(normalIdx);
+val MeshGL2JS(const MeshGL& mesh) {
   val meshJS = val::object();
 
   meshJS.set("numProp", mesh.numProp);
@@ -126,6 +125,20 @@ MeshGL MeshJS2GL(const val& mesh) {
     out.runTransform =
         convertJSArrayToNumberVector<float>(mesh["runTransform"]);
   }
+  return out;
+}
+
+val GetMeshJS(const Manifold& manifold, const glm::ivec3& normalIdx) {
+  MeshGL mesh = manifold.GetMeshGL(normalIdx);
+  return MeshGL2JS(mesh);
+}
+
+val Merge(const val& mesh) {
+  val out = val::object();
+  MeshGL meshGL = MeshJS2GL(mesh);
+  bool changed = meshGL.Merge();
+  out.set("changed", changed);
+  out.set("mesh", changed ? MeshGL2JS(meshGL) : mesh);
   return out;
 }
 
@@ -270,6 +283,7 @@ EMSCRIPTEN_BINDINGS(whatever) {
   function("_Triangulate", &Triangulate);
   function("_Revolve", &Revolve);
   function("_LevelSet", &LevelSetJs);
+  function("_Merge", &Merge);
 
   function("_unionN", &UnionN);
   function("_differenceN", &DifferenceN);
