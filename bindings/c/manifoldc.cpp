@@ -31,6 +31,18 @@ ManifoldMeshGL *level_set(void *mem, float (*sdf)(float, float, float),
   auto mesh = LevelSet(fun, *from_c(bounds), edge_length, level, pol);
   return to_c(new (mem) MeshGL(mesh));
 }
+ManifoldMeshGL *level_set_user(void *mem, float (*sdf)(float, float, float, void*),
+                          ManifoldBox *bounds, float edge_length, float level,
+                          bool seq, void *userdata) {
+  // typing with std::function rather than auto compiles when CUDA is on,
+  // passing it into GPU (and crashing) is avoided dynamically in `sdf.h`
+  std::function<float(glm::vec3)> fun = [sdf](glm::vec3 v) {
+    return (sdf(v.x, v.y, v.z, userdata));
+  };
+  auto pol = seq ? std::make_optional(ExecutionPolicy::Seq) : std::nullopt;
+  auto mesh = LevelSet(fun, *from_c(bounds), edge_length, level, pol);
+  return to_c(new (mem) MeshGL(mesh));
+}
 }  // namespace
 
 #ifdef __cplusplus
@@ -222,6 +234,12 @@ ManifoldMeshGL *manifold_level_set(void *mem, float (*sdf)(float, float, float),
                                    ManifoldBox *bounds, float edge_length,
                                    float level) {
   return level_set(mem, sdf, bounds, edge_length, level, false);
+}
+  
+ManifoldMeshGL *manifold_level_set_user(void *mem, float (*sdf)(float, float, float, void*),
+                                   ManifoldBox *bounds, float edge_length,
+                                   float level, void *userdata) {
+  return level_set_user(mem, sdf, bounds, edge_length, level, false, userdata);
 }
 
 ManifoldMeshGL *manifold_level_set_seq(void *mem,
