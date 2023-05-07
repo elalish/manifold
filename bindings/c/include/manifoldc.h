@@ -44,6 +44,9 @@ ManifoldMeshGL *manifold_meshgl_copy(void *mem, ManifoldMeshGL *m);
 ManifoldMeshGL *manifold_level_set(void *mem, float (*sdf)(float, float, float),
                                    ManifoldBox *bounds, float edge_length,
                                    float level);
+ManifoldMeshGL *manifold_level_set_user(void *mem, float (*sdf)(float, float, float, void*),
+                                   ManifoldBox *bounds, float edge_length,
+                                   float level, void *userdata);
 ManifoldMeshGL *manifold_level_set_seq(void *mem,
                                        float (*sdf)(float, float, float),
                                        ManifoldBox *bounds, float edge_length,
