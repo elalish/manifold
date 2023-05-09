@@ -44,11 +44,12 @@
 
 <body>
   <p>Load a glTF/GLB model and our <a href="https://github.com/elalish/manifold">Manifold</a> library will attempt to
-    merge it into a set of manifold objects. You can download the new GLB which will have our <a
-      href="https://github.com/KhronosGroup/glTF/pull/2286">EXT_manifold</a> extension, thus preserving the manifold
-    data without losing any mesh properties.</p>
+    merge it into a set of manifold objects. If the model is water-tight, you can download the new GLB which will have
+    our <a href="https://github.com/KhronosGroup/glTF/pull/2286">EXT_manifold</a> extension, thus preserving the
+    manifold data without losing any mesh properties. If the download button is disabled, it means your model has open
+    edges and does not represent a solid object.</p>
   <input type="file" id="input">
-  <button id="download">Download manifold GLB</button>
+  <button id="download" disabled>Download manifold GLB</button>
   <model-viewer camera-controls shadow-intensity="1" alt="Loaded GLB model">
     <span id="poster" slot="poster">Drop a GLB here</span>
   </model-viewer>
@@ -113,6 +114,8 @@
   }
 
   async function readGLB(url) {
+    downloadButton.disabled = true;
+    let failure = false;
     const docIn = await io.read(url);
     const nodes = docIn.getRoot().listNodes();
     for (const node of nodes) {
@@ -139,7 +142,13 @@
         node.setMesh(writeMesh(docIn, manifold.getMesh(), attributes, materials));
       } catch (e) {
         console.log(mesh.getName(), e);
+        failure = true;
+        break;
       }
+    }
+
+    if (!failure) {
+      downloadButton.disabled = false;
     }
 
     await docIn.transform(prune());
