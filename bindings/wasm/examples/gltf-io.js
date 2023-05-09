@@ -88,16 +88,16 @@ export function readMesh(mesh, attributes, materials) {
 
   const manifoldPrimitive = mesh.getExtension('EXT_manifold');
 
-  const vertPropArray = [];
-  const triVertArray = [];
+  let vertPropArray = [];
+  let triVertArray = [];
   const runIndexArray = [];
   const mergeFromVert = [];
   const mergeToVert = [];
   if (manifoldPrimitive != null) {
     runIndexArray.push(0);
-    vertPropArray.push(...readPrimitive(primitives[0], numProp, attributes));
+    vertPropArray = readPrimitive(primitives[0], numProp, attributes);
     for (const primitive of primitives) {
-      triVertArray.push(...primitive.getIndices().getArray());
+      triVertArray = [...triVertArray, ...primitive.getIndices().getArray()];
       runIndexArray.push(triVertArray.length);
       materials.push(primitive.getMaterial());
     }
@@ -114,9 +114,12 @@ export function readMesh(mesh, attributes, materials) {
   } else {
     for (const primitive of primitives) {
       const numVert = vertPropArray.length / numProp;
-      vertPropArray.push(...readPrimitive(primitive, numProp, attributes));
-      triVertArray.push(
-          ...primitive.getIndices().getArray().map((i) => i + numVert));
+      vertPropArray =
+          [...vertPropArray, ...readPrimitive(primitive, numProp, attributes)];
+      triVertArray = [
+        ...triVertArray,
+        ...primitive.getIndices().getArray().map((i) => i + numVert)
+      ];
       materials.push(primitive.getMaterial());
     }
   }
