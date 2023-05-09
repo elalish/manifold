@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <title>Make manifold glTF</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="shortcut icon" type="image/png" href="https://elalish.github.io/manifold/samples/models/favicon.png" />
+  <style>
+    body {
+      margin: 0;
+      background-color: #f7f7f7;
+      font-family: 'Rubik', sans-serif;
+      font-size: 16px;
+      line-height: 24px;
+      color: rgba(0, 0, 0, .87);
+      font-weight: 400;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    p {
+      max-width: 700px;
+      margin: 1em;
+      text-align: left;
+    }
+
+    model-viewer {
+      display: block;
+      width: 100vw;
+      height: 100vw;
+      max-width: 600px;
+      max-height: 600px;
+    }
+  </style>
+</head>
+
+<body>
+  <p>Load a glTF/GLB model and our <a href="https://github.com/elalish/manifold">Manifold</a> library will attempt to
+    merge it into a set of manifold objects. You can download the new GLB which will have our <a
+      href="https://github.com/KhronosGroup/glTF/pull/2286">EXT_manifold</a> extension, thus preserving the manifold
+    data without losing any mesh properties.</p>
+  <input type="file" id="input">
+  <button id="download">Download manifold GLB</button>
+  <model-viewer camera-controls shadow-intensity="1" alt="Output of mesh Boolean operation">
+    <span slot="poster">Drop a GLB here</span>
+  </model-viewer>
+</body>
+<script type="importmap">
+  {
+    "imports": {
+      "@gltf-transform/core": "https://cdn.jsdelivr.net/npm/@gltf-transform/core@3.2.1/+esm",
+      "@gltf-transform/functions": "https://cdn.jsdelivr.net/npm/@gltf-transform/functions@3.2.1/+esm"
+    }
+  }
+</script>
+<script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/2.0.1/model-viewer.min.js"></script>
+<script type="module">
+  import { WebIO } from '@gltf-transform/core';
+  import { prune } from '@gltf-transform/functions';
+  import { SimpleDropzone } from 'https://cdn.jsdelivr.net/npm/simple-dropzone@0.8.3/+esm';
+  import { readMesh, writeMesh, setupIO } from './gltf-io.js';
+  import Module from './built/manifold.js';
+
+  const io = setupIO(new WebIO());
+
+  const wasm = await Module();
+  wasm.setup();
+
+  const mv = document.querySelector('model-viewer');
+  const inputEl = document.querySelector('#input');
+  const dropCtrl = new SimpleDropzone(mv, inputEl);
+
+  dropCtrl.on('drop', async ({ files }) => {
+    for (const [path, file] of files) {
+      const filename = file.name.toLowerCase();
+      if (filename.match(/\.(gltf|glb)$/)) {
+        const blobURL = URL.createObjectURL(file);
+        push2MV(await readGLB(blobURL));
+        URL.revokeObjectURL(blobURL);
+        break;
+      }
+    }
+  });
+
+  let objectURL = null;
+
+  const downloadButton = document.querySelector('#download');
+  downloadButton.onclick = function () {
+    const link = document.createElement('a');
+    link.download = 'manifold.glb';
+    link.href = objectURL;
+    link.click();
+  };
+
+  async function push2MV(doc) {
+    const glb = await io.writeBinary(doc);
+
+    const blob = new Blob([glb], { type: 'application/octet-stream' });
+    URL.revokeObjectURL(objectURL);
+    objectURL = URL.createObjectURL(blob);
+    mv.src = objectURL;
+  }
+
+  async function readGLB(url) {
+    const docIn = await io.read(url);
+    const nodes = docIn.getRoot().listNodes();
+    for (const node of nodes) {
+      const attributes = [];
+      const mesh = node.getMesh();
+      if (!mesh) {
+        continue;
+      }
+
+      const materials = [];
+      const tmpMesh = readMesh(mesh, attributes, materials);
+      tmpMesh.runOriginalID = [];
+      const firstID = wasm.reserveIDs(materials.length);
+      for (let i = 0; i < materials.length; ++i) {
+        tmpMesh.runOriginalID.push(firstID + i);
+      }
+      const manifoldMesh = new wasm.Mesh(tmpMesh);
+
+      manifoldMesh.merge();
+
+      try {
+        const manifold = wasm.Manifold(manifoldMesh);
+        mesh.dispose();
+        node.setMesh(writeMesh(docIn, manifold.getMesh(), attributes, materials));
+      } catch (e) {
+        console.log(mesh.getName(), e);
+      }
+    }
+
+    await docIn.transform(prune());
+
+    return docIn;
+  }
+</script>
+
+</html>
