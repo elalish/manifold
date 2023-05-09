@@ -8,7 +8,6 @@
   <link rel="shortcut icon" type="image/png" href="https://elalish.github.io/manifold/samples/models/favicon.png" />
   <style>
     body {
-      margin: 0;
       background-color: #f7f7f7;
       font-family: 'Rubik', sans-serif;
       font-size: 16px;
@@ -30,6 +29,15 @@
       height: 100vw;
       max-width: 600px;
       max-height: 600px;
+      border: 3px solid black;
+      border-radius: 10px;
+    }
+
+    #poster {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate3d(-50%, -50%, 0);
     }
   </style>
 </head>
@@ -41,15 +49,16 @@
     data without losing any mesh properties.</p>
   <input type="file" id="input">
   <button id="download">Download manifold GLB</button>
-  <model-viewer camera-controls shadow-intensity="1" alt="Output of mesh Boolean operation">
-    <span slot="poster">Drop a GLB here</span>
+  <model-viewer camera-controls shadow-intensity="1" alt="Loaded GLB model">
+    <span id="poster" slot="poster">Drop a GLB here</span>
   </model-viewer>
 </body>
 <script type="importmap">
   {
     "imports": {
       "@gltf-transform/core": "https://cdn.jsdelivr.net/npm/@gltf-transform/core@3.2.1/+esm",
-      "@gltf-transform/functions": "https://cdn.jsdelivr.net/npm/@gltf-transform/functions@3.2.1/+esm"
+      "@gltf-transform/functions": "https://cdn.jsdelivr.net/npm/@gltf-transform/functions@3.2.1/+esm",
+      "@gltf-transform/extensions": "https://cdn.jsdelivr.net/npm/@gltf-transform/extensions@3.2.1/+esm"
     }
   }
 </script>
@@ -57,11 +66,13 @@
 <script type="module">
   import { WebIO } from '@gltf-transform/core';
   import { prune } from '@gltf-transform/functions';
+  import { KHRONOS_EXTENSIONS } from '@gltf-transform/extensions';
   import { SimpleDropzone } from 'https://cdn.jsdelivr.net/npm/simple-dropzone@0.8.3/+esm';
   import { readMesh, writeMesh, setupIO } from './gltf-io.js';
   import Module from './built/manifold.js';
 
   const io = setupIO(new WebIO());
+  io.registerExtensions(KHRONOS_EXTENSIONS);
 
   const wasm = await Module();
   wasm.setup();
