@@ -71,7 +71,6 @@ TEST(Manifold, Empty) {
 
   EXPECT_TRUE(empty.IsEmpty());
   EXPECT_EQ(empty.Status(), Manifold::Error::NoError);
-  EXPECT_TRUE(empty.IsManifold());
 }
 
 TEST(Manifold, ValidInput) {
@@ -80,7 +79,6 @@ TEST(Manifold, ValidInput) {
   Manifold tet(tetGL, propTol);
   EXPECT_FALSE(tet.IsEmpty());
   EXPECT_EQ(tet.Status(), Manifold::Error::NoError);
-  EXPECT_TRUE(tet.IsManifold());
 }
 
 TEST(Manifold, InvalidInput1) {
@@ -89,7 +87,6 @@ TEST(Manifold, InvalidInput1) {
   Manifold tet(in);
   EXPECT_TRUE(tet.IsEmpty());
   EXPECT_EQ(tet.Status(), Manifold::Error::NonFiniteVertex);
-  EXPECT_TRUE(tet.IsManifold());
 }
 
 TEST(Manifold, InvalidInput2) {
@@ -98,7 +95,6 @@ TEST(Manifold, InvalidInput2) {
   Manifold tet(in);
   EXPECT_TRUE(tet.IsEmpty());
   EXPECT_EQ(tet.Status(), Manifold::Error::NotManifold);
-  EXPECT_TRUE(tet.IsManifold());
 }
 
 TEST(Manifold, InvalidInput3) {
@@ -111,7 +107,6 @@ TEST(Manifold, InvalidInput3) {
   Manifold tet(in);
   EXPECT_TRUE(tet.IsEmpty());
   EXPECT_EQ(tet.Status(), Manifold::Error::VertexOutOfBounds);
-  EXPECT_TRUE(tet.IsManifold());
 }
 
 TEST(Manifold, InvalidInput4) {
@@ -124,7 +119,6 @@ TEST(Manifold, InvalidInput4) {
   Manifold tet(in);
   EXPECT_TRUE(tet.IsEmpty());
   EXPECT_EQ(tet.Status(), Manifold::Error::VertexOutOfBounds);
-  EXPECT_TRUE(tet.IsManifold());
 }
 
 TEST(Manifold, InvalidInput5) {
@@ -133,7 +127,6 @@ TEST(Manifold, InvalidInput5) {
   Manifold tet(tetGL);
   EXPECT_TRUE(tet.IsEmpty());
   EXPECT_EQ(tet.Status(), Manifold::Error::MergeIndexOutOfBounds);
-  EXPECT_TRUE(tet.IsManifold());
 }
 
 TEST(Manifold, InvalidInput7) {
@@ -142,7 +135,6 @@ TEST(Manifold, InvalidInput7) {
   Manifold tet(tetGL);
   EXPECT_TRUE(tet.IsEmpty());
   EXPECT_EQ(tet.Status(), Manifold::Error::VertexOutOfBounds);
-  EXPECT_TRUE(tet.IsManifold());
 }
 
 /**
@@ -174,7 +166,6 @@ TEST(Manifold, Decompose) {
 TEST(Manifold, Sphere) {
   int n = 25;
   Manifold sphere = Manifold::Sphere(1.0f, 4 * n);
-  EXPECT_TRUE(sphere.IsManifold());
   EXPECT_EQ(sphere.NumTri(), n * n * 8);
 }
 
@@ -193,7 +184,6 @@ TEST(Manifold, Normals) {
 TEST(Manifold, Extrude) {
   Polygons polys = SquareHole();
   Manifold donut = Manifold::Extrude(polys, 1.0f, 3);
-  EXPECT_TRUE(donut.IsManifold());
   EXPECT_EQ(donut.Genus(), 1);
   auto prop = donut.GetProperties();
   EXPECT_FLOAT_EQ(prop.volume, 12.0f);
@@ -203,7 +193,6 @@ TEST(Manifold, Extrude) {
 TEST(Manifold, ExtrudeCone) {
   Polygons polys = SquareHole();
   Manifold donut = Manifold::Extrude(polys, 1.0f, 0, 0, glm::vec2(0.0f));
-  EXPECT_TRUE(donut.IsManifold());
   EXPECT_EQ(donut.Genus(), 0);
   EXPECT_FLOAT_EQ(donut.GetProperties().volume, 4.0f);
 }
@@ -211,7 +200,6 @@ TEST(Manifold, ExtrudeCone) {
 TEST(Manifold, Revolve) {
   Polygons polys = SquareHole();
   Manifold vug = Manifold::Revolve(polys, 48);
-  EXPECT_TRUE(vug.IsManifold());
   EXPECT_EQ(vug.Genus(), -1);
   auto prop = vug.GetProperties();
   EXPECT_NEAR(prop.volume, 14.0f * glm::pi<float>(), 0.2f);
@@ -221,11 +209,49 @@ TEST(Manifold, Revolve) {
 TEST(Manifold, Revolve2) {
   Polygons polys = SquareHole(2.0f);
   Manifold donutHole = Manifold::Revolve(polys, 48);
-  EXPECT_TRUE(donutHole.IsManifold());
   EXPECT_EQ(donutHole.Genus(), 0);
   auto prop = donutHole.GetProperties();
   EXPECT_NEAR(prop.volume, 48.0f * glm::pi<float>(), 1.0f);
   EXPECT_NEAR(prop.surfaceArea, 96.0f * glm::pi<float>(), 1.0f);
+}
+
+TEST(Manifold, Warp) {
+  CrossSection square = CrossSection::Square({1, 1});
+  Manifold shape = Manifold::Extrude(square, 2, 10).Warp([](glm::vec3& v) {
+    v.x += v.z * v.z;
+  });
+  auto propBefore = shape.GetProperties();
+
+  Manifold simplified = Manifold::Compose({shape});
+  auto propAfter = simplified.GetProperties();
+
+  EXPECT_NEAR(propBefore.volume, propAfter.volume, 0.0001);
+  EXPECT_NEAR(propBefore.surfaceArea, propAfter.surfaceArea, 0.0001);
+  EXPECT_NEAR(propBefore.volume, 2, 0.0001);
+}
+
+TEST(Manifold, Warp2) {
+  CrossSection circle =
+      CrossSection::Circle(5, 20).Translate(glm::vec2(10.0, 10.0));
+
+  Manifold shape = Manifold::Extrude(circle, 2, 10).Warp([](glm::vec3& v) {
+    int nSegments = 10;
+    double angleStep = 2.0 / 3.0 * glm::pi<float>() / nSegments;
+    int zIndex = nSegments - 1 - std::round(v.z);
+    double angle = zIndex * angleStep;
+    v.z = v.y;
+    v.y = v.x * sin(angle);
+    v.x = v.x * cos(angle);
+  });
+
+  auto propBefore = shape.GetProperties();
+
+  Manifold simplified = Manifold::Compose({shape});
+  auto propAfter = simplified.GetProperties();
+
+  EXPECT_NEAR(propBefore.volume, propAfter.volume, 0.0001);
+  EXPECT_NEAR(propBefore.surfaceArea, propAfter.surfaceArea, 0.0001);
+  EXPECT_NEAR(propBefore.volume, 321, 1);
 }
 
 TEST(Manifold, Smooth) {
@@ -350,7 +376,6 @@ TEST(Manifold, Csaszar) {
  */
 TEST(Manifold, GetProperties) {
   Manifold cube = Manifold::Cube();
-  EXPECT_TRUE(cube.IsManifold());
   auto prop = cube.GetProperties();
   EXPECT_FLOAT_EQ(prop.volume, 1.0f);
   EXPECT_FLOAT_EQ(prop.surfaceArea, 6.0f);
@@ -374,6 +399,20 @@ TEST(Manifold, Precision2) {
   Manifold cube = Manifold::Cube();
   cube = cube.Translate({-0.5, 0, 0}).Scale({2, 1, 1});
   EXPECT_FLOAT_EQ(cube.Precision(), 2 * kTolerance);
+}
+
+TEST(Manifold, Precision3) {
+  Manifold cylinder = Manifold::Cylinder(1, 1, 1, 1000);
+  const auto prop = cylinder.GetProperties();
+
+  MeshGL mesh = cylinder.GetMeshGL();
+  mesh.precision = 0.001;
+  mesh.faceID.clear();
+  Manifold cylinder2(mesh);
+
+  const auto prop2 = cylinder2.GetProperties();
+  EXPECT_NEAR(prop.volume, prop2.volume, 0.001);
+  EXPECT_NEAR(prop.surfaceArea, prop2.surfaceArea, 0.001);
 }
 
 /**
@@ -478,6 +517,39 @@ TEST(Manifold, MeshGLRoundTrip) {
   ASSERT_EQ(outGL.runOriginalID[0], inGL.runOriginalID[0]);
 
   RelatedGL(cylinder2, {inGL});
+}
+
+void CheckCube(const MeshGL& cubeSTL) {
+  Manifold cube(cubeSTL);
+  EXPECT_EQ(cube.NumTri(), 12);
+  EXPECT_EQ(cube.NumVert(), 8);
+  EXPECT_EQ(cube.NumPropVert(), 24);
+
+  auto prop = cube.GetProperties();
+  EXPECT_FLOAT_EQ(prop.volume, 1.0f);
+  EXPECT_FLOAT_EQ(prop.surfaceArea, 6.0f);
+}
+
+TEST(Manifold, Merge) {
+  MeshGL cubeSTL = CubeSTL();
+  EXPECT_EQ(cubeSTL.NumTri(), 12);
+  EXPECT_EQ(cubeSTL.NumVert(), 36);
+
+  Manifold cubeBad(cubeSTL);
+  EXPECT_TRUE(cubeBad.IsEmpty());
+  EXPECT_EQ(cubeBad.Status(), Manifold::Error::NotManifold);
+
+  EXPECT_TRUE(cubeSTL.Merge());
+  CheckCube(cubeSTL);
+
+  EXPECT_FALSE(cubeSTL.Merge());
+  EXPECT_EQ(cubeSTL.mergeFromVert.size(), 28);
+  cubeSTL.mergeFromVert.resize(14);
+  cubeSTL.mergeToVert.resize(14);
+
+  EXPECT_TRUE(cubeSTL.Merge());
+  EXPECT_EQ(cubeSTL.mergeFromVert.size(), 28);
+  CheckCube(cubeSTL);
 }
 
 TEST(Manifold, FaceIDRoundTrip) {

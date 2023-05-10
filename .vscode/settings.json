@@ -104,7 +104,8 @@
   "editor.formatOnSave": true,
   "cmake.configureArgs": [
     "-DBUILD_SHARED_LIBS=ON",
-    "-DMANIFOLD_EXPORT=OFF",
+    "-DMANIFOLD_CBIND=ON",
+    "-DMANIFOLD_EXPORT=ON",
     "-DMANIFOLD_DEBUG=ON",
     "-DMANIFOLD_USE_CUDA=OFF",
     "-DMANIFOLD_PAR=NONE",
@@ -120,6 +121,7 @@
   "editor.detectIndentation": false,
   "cSpell.words": [
     "Bary",
+    "Coplanarity",
     "csaszar",
     "Gyroid",
     "halfedge",

@@ -191,20 +191,17 @@ struct CoplanarEdge {
     const int edgeIdx = thrust::get<2>(inOut);
 
     const Halfedge edge = halfedge[edgeIdx];
-    if (!edge.IsForward()) return;
     const Halfedge pair = halfedge[edge.pairedHalfedge];
+
     if (triRef[edge.face].meshID != triRef[pair.face].meshID) return;
 
     const glm::vec3 base = vertPos[edge.startVert];
-
     const int baseNum = edgeIdx - 3 * edge.face;
     const int jointNum = edge.pairedHalfedge - 3 * pair.face;
-    const int edgeNum = baseNum == 0 ? 2 : baseNum - 1;
-    const int pairNum = jointNum == 0 ? 2 : jointNum - 1;
 
     if (numProp > 0) {
       const int prop0 = triProp[edge.face][baseNum];
-      const int prop1 = triProp[edge.face][edgeNum];
+      const int prop1 = triProp[pair.face][jointNum == 2 ? 0 : jointNum + 1];
       bool propEqual = true;
       for (int p = 0; p < numProp; ++p) {
         if (glm::abs(prop[numProp * prop0 + p] - prop[numProp * prop1 + p]) >
@@ -219,6 +216,10 @@ struct CoplanarEdge {
       }
     }
 
+    if (!edge.IsForward()) return;
+
+    const int edgeNum = baseNum == 0 ? 2 : baseNum - 1;
+    const int pairNum = jointNum == 0 ? 2 : jointNum - 1;
     const glm::vec3 jointVec = vertPos[pair.startVert] - base;
     const glm::vec3 edgeVec =
         vertPos[halfedge[3 * edge.face + edgeNum].startVert] - base;
@@ -270,6 +271,36 @@ struct CoplanarEdge {
 
     face2face.first = edge.face;
     face2face.second = pair.face;
+  }
+};
+
+struct CheckCoplanarity {
+  int* comp2tri;
+  const Halfedge* halfedge;
+  const glm::vec3* vertPos;
+  const int* components;
+  const float precision;
+
+  __host__ __device__ void operator()(int tri) {
+    const int component = components[tri];
+    const int referenceTri = comp2tri[component];
+    if (referenceTri < 0 || referenceTri == tri) return;
+
+    const glm::vec3 origin = vertPos[halfedge[3 * referenceTri].startVert];
+    const glm::vec3 normal = glm::normalize(
+        glm::cross(vertPos[halfedge[3 * referenceTri + 1].startVert] - origin,
+                   vertPos[halfedge[3 * referenceTri + 2].startVert] - origin));
+
+    for (const int i : {0, 1, 2}) {
+      const glm::vec3 vert = vertPos[halfedge[3 * tri + i].startVert];
+      // If any component vertex is not coplanar with the component's reference
+      // triangle, unmark the entire component so that none of its triangles are
+      // marked coplanar.
+      if (glm::abs(glm::dot(normal, vert - origin)) > precision) {
+        comp2tri[component] = -1;
+        break;
+      }
+    }
   }
 };
 
@@ -325,6 +356,7 @@ uint32_t Manifold::Impl::ReserveIDs(uint32_t n) {
 Manifold::Impl::Impl(const MeshGL& meshGL,
                      std::vector<float> propertyTolerance) {
   Mesh mesh;
+  mesh.precision = meshGL.precision;
   const int numVert = meshGL.NumVert();
   const int numTri = meshGL.NumTri();
 
@@ -471,7 +503,7 @@ Manifold::Impl::Impl(const Mesh& mesh, const MeshRelationD& relation,
     MarkFailure(Error::NonFiniteVertex);
     return;
   }
-  SetPrecision();
+  SetPrecision(mesh.precision);
 
   CreateHalfedges(triVerts);
   if (!IsManifold()) {
@@ -608,9 +640,20 @@ void Manifold::Impl::CreateFaces(const std::vector<float>& propertyTolerance) {
     }
   }
 
+  VecDH<int> componentsD(components);
+  VecDH<int> comp2triD(comp2tri);
+  for_each_n(
+      autoPolicy(halfedge_.size()), countAt(0), NumTri(),
+      CheckCoplanarity({comp2triD.ptrD(), halfedge_.cptrD(), vertPos_.cptrD(),
+                        componentsD.cptrD(), precision_}));
+
   VecDH<TriRef>& triRef = meshRelation_.triRef;
-  for (int tri = 0; tri < NumTri(); ++tri)
-    triRef[tri].tri = comp2tri[components[tri]];
+  for (int tri = 0; tri < NumTri(); ++tri) {
+    const int referenceTri = comp2triD[components[tri]];
+    if (referenceTri >= 0) {
+      triRef[tri].tri = referenceTri;
+    }
+  }
 }
 
 /**
@@ -727,8 +770,7 @@ Manifold::Impl Manifold::Impl::Transform(const glm::mat4x3& transform_) const {
  * by the optional input.
  */
 void Manifold::Impl::SetPrecision(float minPrecision) {
-  precision_ = glm::max(minPrecision, kTolerance * bBox_.Scale());
-  if (!glm::isfinite(precision_)) precision_ = -1;
+  precision_ = MaxPrecision(minPrecision, bBox_);
 }
 
 /**

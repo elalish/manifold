@@ -152,6 +152,13 @@ void Manifold::Impl::SimplifyTopology() {
       flaggedEdges.begin();
   flaggedEdges.resize(numFlagged);
 
+#ifdef MANIFOLD_DEBUG
+  if (ManifoldParams().verbose && numFlagged > 0) {
+    std::cout << "found " << numFlagged << " duplicate edges to split"
+              << std::endl;
+  }
+#endif
+
   for (const int edge : flaggedEdges) DedupeEdge(edge);
 
   flaggedEdges.resize(halfedge_.size());
@@ -161,6 +168,13 @@ void Manifold::Impl::SimplifyTopology() {
           ShortEdge({halfedge_.cptrD(), vertPos_.cptrD(), precision_})) -
       flaggedEdges.begin();
   flaggedEdges.resize(numFlagged);
+
+#ifdef MANIFOLD_DEBUG
+  if (ManifoldParams().verbose && numFlagged > 0) {
+    std::cout << "found " << numFlagged << " short edges to collapse"
+              << std::endl;
+  }
+#endif
 
   for (const int edge : flaggedEdges) CollapseEdge(edge);
 
@@ -172,6 +186,13 @@ void Manifold::Impl::SimplifyTopology() {
       flaggedEdges.begin();
   flaggedEdges.resize(numFlagged);
 
+#ifdef MANIFOLD_DEBUG
+  if (ManifoldParams().verbose && numFlagged > 0) {
+    std::cout << "found " << numFlagged << " colinear edges to collapse"
+              << std::endl;
+  }
+#endif
+
   for (const int edge : flaggedEdges) CollapseEdge(edge);
 
   flaggedEdges.resize(halfedge_.size());
@@ -182,6 +203,12 @@ void Manifold::Impl::SimplifyTopology() {
                          faceNormal_.cptrD(), precision_})) -
       flaggedEdges.begin();
   flaggedEdges.resize(numFlagged);
+
+#ifdef MANIFOLD_DEBUG
+  if (ManifoldParams().verbose && numFlagged > 0) {
+    std::cout << "found " << numFlagged << " edges to swap" << std::endl;
+  }
+#endif
 
   for (const int edge : flaggedEdges) {
     RecursiveEdgeSwap(edge);

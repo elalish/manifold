@@ -10,7 +10,8 @@
     "manifold-encapsulated-types.d.ts",
     "manifold-global-types.d.ts",
     "examples/examples.js",
-    "test/test.js"
+    "examples/manifold-gltf.js",
+    "examples/gltf-io.js"
   ],
   "typings": "manifold.d.ts",
   "types": "manifold.d.ts",
@@ -40,6 +41,9 @@
   "homepage": "https://github.com/elalish/manifold#readme",
   "scripts": {
     "test": "mocha -u tdd -t 30000"
+  },
+  "dependencies": {
+    "@gltf-transform/core": "^3.2.1"
   },
   "devDependencies": {
     "chai": "*",

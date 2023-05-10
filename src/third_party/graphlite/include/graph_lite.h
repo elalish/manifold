@@ -1,9 +1,11 @@
-// From https://github.com/haasdo95/graphlite commit 9cd2815e5d571a87e5b8b8ef3752e04d971f35d4
+// From https://github.com/haasdo95/graphlite commit
+// 26b9d8c05b5b2a93def516a1c50857695e8efe06
 #ifndef GSK_GRAPH_LITE_H
 #define GSK_GRAPH_LITE_H
 
 #include <algorithm>
 #include <cassert>
+#include <ciso646>  // Added to fix MSVC error
 #include <functional>
 #include <iostream>
 #include <list>
@@ -18,7 +20,14 @@
 // container spec
 namespace graph_lite {
 // ContainerGen, supposed to be container of neighbors
-enum class Container { VEC, LIST, SET, UNORDERED_SET, MULTISET, UNORDERED_MULTISET };
+enum class Container {
+  VEC,
+  LIST,
+  SET,
+  UNORDERED_SET,
+  MULTISET,
+  UNORDERED_MULTISET
+};
 
 // self loop permission
 enum class SelfLoop { ALLOWED, DISALLOWED };
@@ -31,27 +40,32 @@ enum class EdgeDirection { DIRECTED, UNDIRECTED };
 
 // map for adj list
 enum class Map { MAP, UNORDERED_MAP };
-}
+
+// Logging permission
+enum class Logging { ALLOWED, DISALLOWED };
+
+}  // namespace graph_lite
 
 // type manipulation
 namespace graph_lite::detail {
 template <typename T>
-constexpr bool is_vector_v =
-    std::is_same_v<T, std::vector<typename T::value_type, typename T::allocator_type>>;
+constexpr bool is_vector_v = std::is_same_v<
+    T, std::vector<typename T::value_type, typename T::allocator_type>>;
 
 template <typename T>
-constexpr bool is_list_v =
-    std::is_same_v<T, std::vector<typename T::value_type, typename T::allocator_type>>;
+constexpr bool is_list_v = std::is_same_v<
+    T, std::vector<typename T::value_type, typename T::allocator_type>>;
 
 // determine if type is map or unordered_map
 template <typename T, typename U = void>
 struct is_map : std::false_type {};
 template <typename T>
-struct is_map<T, std::void_t<typename T::key_type, typename T::mapped_type, typename T::key_compare,
-                             typename T::allocator_type>> {
-  static constexpr bool value =
-      std::is_same_v<T, std::map<typename T::key_type, typename T::mapped_type,
-                                 typename T::key_compare, typename T::allocator_type>>;
+struct is_map<
+    T, std::void_t<typename T::key_type, typename T::mapped_type,
+                   typename T::key_compare, typename T::allocator_type>> {
+  static constexpr bool value = std::is_same_v<
+      T, std::map<typename T::key_type, typename T::mapped_type,
+                  typename T::key_compare, typename T::allocator_type>>;
 };
 template <typename T>
 constexpr bool is_map_v = is_map<T>::value;
@@ -60,20 +74,24 @@ template <typename T, typename U = void>
 struct is_unordered_map : std::false_type {};
 template <typename T>
 struct is_unordered_map<
-    T, std::void_t<typename T::key_type, typename T::mapped_type, typename T::hasher,
-                   typename T::key_equal, typename T::allocator_type>> {
+    T, std::void_t<typename T::key_type, typename T::mapped_type,
+                   typename T::hasher, typename T::key_equal,
+                   typename T::allocator_type>> {
   static constexpr bool value = std::is_same_v<
-      T, std::unordered_map<typename T::key_type, typename T::mapped_type, typename T::hasher,
-                            typename T::key_equal, typename T::allocator_type>>;
+      T, std::unordered_map<typename T::key_type, typename T::mapped_type,
+                            typename T::hasher, typename T::key_equal,
+                            typename T::allocator_type>>;
 };
 template <typename T>
 constexpr bool is_unordered_map_v = is_unordered_map<T>::value;
 template <typename T>
-constexpr bool is_either_map_v = is_map_v<T> || is_unordered_map_v<T>;
+constexpr bool is_either_map_v = is_map_v<T> or is_unordered_map_v<T>;
 
-// CREDIT: https://stackoverflow.com/questions/765148/how-to-remove-constness-of-const-iterator
+// CREDIT:
+// https://stackoverflow.com/questions/765148/how-to-remove-constness-of-const-iterator
 template <typename ContainerType, typename ConstIterator>
-typename ContainerType::iterator const_iter_to_iter(ContainerType& c, ConstIterator it) {
+typename ContainerType::iterator const_iter_to_iter(ContainerType& c,
+                                                    ConstIterator it) {
   return c.erase(it, it);
 }
 // shorthand for turning const T& into T
@@ -89,7 +107,8 @@ using remove_cv_ref_t = typename remove_cv_ref<T>::type;
 template <typename T, typename = std::void_t<>>
 struct is_eq_comparable : std::false_type {};
 template <typename T>
-struct is_eq_comparable<T, std::void_t<decltype(std::declval<T>() == std::declval<T>())>>
+struct is_eq_comparable<
+    T, std::void_t<decltype(std::declval<T>() == std::declval<T>())>>
     : std::true_type {};
 template <typename T>
 constexpr bool is_eq_comparable_v = is_eq_comparable<T>::value;
@@ -100,7 +119,8 @@ constexpr bool is_eq_comparable_v = is_eq_comparable<T>::value;
 template <typename T, typename = std::void_t<>>
 struct is_comparable : std::false_type {};
 template <typename T>
-struct is_comparable<T, std::void_t<decltype(std::declval<T>() < std::declval<T>())>>
+struct is_comparable<
+    T, std::void_t<decltype(std::declval<T>() < std::declval<T>())>>
     : std::true_type {};
 template <typename T>
 constexpr bool is_comparable_v = is_comparable<T>::value;
@@ -110,7 +130,8 @@ constexpr bool is_comparable_v = is_comparable<T>::value;
 template <typename T, typename = std::void_t<>>
 struct is_streamable : std::false_type {};
 template <typename T>
-struct is_streamable<T, std::void_t<decltype(std::declval<std::ostream&>() << std::declval<T>())>>
+struct is_streamable<T, std::void_t<decltype(std::declval<std::ostream&>()
+                                             << std::declval<T>())>>
     : std::true_type {};
 template <typename T>
 constexpr bool is_streamable_v = is_streamable<T>::value;
@@ -120,7 +141,8 @@ constexpr bool is_streamable_v = is_streamable<T>::value;
 template <typename T, typename = std::void_t<>>
 struct is_std_hashable : std::false_type {};
 template <typename T>
-struct is_std_hashable<T, std::void_t<decltype(std::declval<std::hash<T>>()(std::declval<T>()))>>
+struct is_std_hashable<
+    T, std::void_t<decltype(std::declval<std::hash<T>>()(std::declval<T>()))>>
     : std::true_type {};
 template <typename T>
 constexpr bool is_std_hashable_v = is_std_hashable<T>::value;
@@ -158,63 +180,73 @@ struct OutIn {
   T out;
   T in;
 };
-}
+}  // namespace graph_lite::detail
 
 // operation on containers
 namespace graph_lite::detail::container {
 template <typename ContainerType, typename ValueType,
-          typename = std::enable_if_t<std::is_convertible_v<remove_cv_ref_t<ValueType>,
-                                                            typename ContainerType::value_type>>>
+          typename = std::enable_if_t<std::is_convertible_v<
+              remove_cv_ref_t<ValueType>, typename ContainerType::value_type>>>
 auto insert(ContainerType& c, ValueType&& v) {
   return c.insert(c.cend(), std::forward<ValueType>(v));
 }
 
 // find the first occurrence of a value
 // using different find for efficiency; std::find is always linear
-template <typename ContainerType, typename ValueType,
-          std::enable_if_t<!is_vector_v<ContainerType> && !is_list_v<ContainerType>, bool> = true>
+template <
+    typename ContainerType, typename ValueType,
+    std::enable_if_t<!is_vector_v<ContainerType> and !is_list_v<ContainerType>,
+                     bool> = true>
 auto find(ContainerType& c, const ValueType& v) {
   return c.find(v);
 }
 
 template <typename ValueType, typename T>
 auto find(std::vector<std::pair<ValueType, T>>& c, const ValueType& v) {
-  return std::find_if(c.begin(), c.end(), [&v](const auto& p) { return p.first == v; });
+  return std::find_if(c.begin(), c.end(),
+                      [&v](const auto& p) { return p.first == v; });
 }
 template <typename ValueType, typename T>
 auto find(std::list<std::pair<ValueType, T>>& c, const ValueType& v) {
-  return std::find_if(c.begin(), c.end(), [&v](const auto& p) { return p.first == v; });
+  return std::find_if(c.begin(), c.end(),
+                      [&v](const auto& p) { return p.first == v; });
 }
 
 template <typename ValueType, typename T>
 auto find(const std::vector<std::pair<ValueType, T>>& c, const ValueType& v) {
-  return std::find_if(c.begin(), c.end(), [&v](const auto& p) { return p.first == v; });
+  return std::find_if(c.begin(), c.end(),
+                      [&v](const auto& p) { return p.first == v; });
 }
 template <typename ValueType, typename T>
 auto find(const std::list<std::pair<ValueType, T>>& c, const ValueType& v) {
-  return std::find_if(c.begin(), c.end(), [&v](const auto& p) { return p.first == v; });
+  return std::find_if(c.begin(), c.end(),
+                      [&v](const auto& p) { return p.first == v; });
 }
 
 template <typename ValueType, typename FullValueType,
-          std::enable_if_t<std::is_convertible_v<ValueType, FullValueType>, bool> = true>
+          std::enable_if_t<std::is_convertible_v<ValueType, FullValueType>,
+                           bool> = true>
 auto find(std::vector<FullValueType>& c, const ValueType& v) {
   return std::find(c.begin(), c.end(), v);
 }
 
 template <typename ValueType, typename FullValueType,
-          std::enable_if_t<std::is_convertible_v<ValueType, FullValueType>, bool> = true>
+          std::enable_if_t<std::is_convertible_v<ValueType, FullValueType>,
+                           bool> = true>
 auto find(std::list<FullValueType>& c, const ValueType& v) {
   return std::find(c.begin(), c.end(), v);
 }
 
 template <typename ValueType, typename FullValueType,
-          std::enable_if_t<std::is_convertible_v<ValueType, FullValueType>, bool> = true>
+          std::enable_if_t<std::is_convertible_v<ValueType, FullValueType>,
+                           bool> = true>
 auto find(const std::vector<FullValueType>& c, const ValueType& v) {
   return std::find(c.begin(), c.end(), v);
 }
 
 template <typename ValueType, typename FullValueType,
-          std::enable_if_t<std::is_convertible_v<ValueType, FullValueType>, bool> = true>
+          std::enable_if_t<std::is_convertible_v<ValueType, FullValueType>,
+                           bool> = true>
 auto find(const std::list<FullValueType>& c, const ValueType& v) {
   return std::find(c.begin(), c.end(), v);
 }
@@ -222,19 +254,21 @@ auto find(const std::list<FullValueType>& c, const ValueType& v) {
 
 // count the occurrence of a value
 template <typename ContainerType, typename ValueType>
-std::enable_if_t<!is_vector_v<ContainerType> && !is_list_v<ContainerType>, int> count(
-    const ContainerType& c, const ValueType& v) {
+std::enable_if_t<!is_vector_v<ContainerType> and !is_list_v<ContainerType>, int>
+count(const ContainerType& c, const ValueType& v) {
   return c.count(v);
 }
 
 template <typename ValueType, typename T>
 int count(const std::vector<std::pair<ValueType, T>>& c, const ValueType& v) {
-  return std::count_if(c.begin(), c.end(), [&v](const auto& e) { return e.first == v; });
+  return std::count_if(c.begin(), c.end(),
+                       [&v](const auto& e) { return e.first == v; });
 }
 
 template <typename ValueType, typename T>
 int count(const std::list<std::pair<ValueType, T>>& c, const ValueType& v) {
-  return std::count_if(c.begin(), c.end(), [&v](const auto& e) { return e.first == v; });
+  return std::count_if(c.begin(), c.end(),
+                       [&v](const auto& e) { return e.first == v; });
 }
 
 template <typename ValueType, typename FullValueType>
@@ -253,15 +287,16 @@ std::enable_if_t<std::is_convertible_v<ValueType, FullValueType>, int> count(
 // remove all by value
 // erase always erases all with value v; again, std::remove is linear
 template <typename ContainerType, typename ValueType>
-std::enable_if_t<!is_vector_v<ContainerType> && !is_list_v<ContainerType>, int> erase_all(
-    ContainerType& c, const ValueType& v) {
-  static_assert(std::is_same_v<ContainerType, std::remove_const_t<ContainerType>>);
+std::enable_if_t<!is_vector_v<ContainerType> and !is_list_v<ContainerType>, int>
+erase_all(ContainerType& c, const ValueType& v) {
+  static_assert(
+      std::is_same_v<ContainerType, std::remove_const_t<ContainerType>>);
   return c.erase(v);
 }
 
 template <typename ValueType, typename FullValueType>
-std::enable_if_t<std::is_convertible_v<ValueType, FullValueType>, int> erase_all(
-    std::vector<FullValueType>& c, const ValueType& v) {
+std::enable_if_t<std::is_convertible_v<ValueType, FullValueType>, int>
+erase_all(std::vector<FullValueType>& c, const ValueType& v) {
   size_t old_size = c.size();
   c.erase(std::remove(c.begin(), c.end(), v), c.end());
   return old_size - c.size();
@@ -270,14 +305,15 @@ std::enable_if_t<std::is_convertible_v<ValueType, FullValueType>, int> erase_all
 template <typename ValueType, typename T>
 int erase_all(std::vector<std::pair<ValueType, T>>& c, const ValueType& v) {
   size_t old_size = c.size();
-  c.erase(std::remove_if(c.begin(), c.end(), [&v](const auto& p) { return p.first == v; }),
+  c.erase(std::remove_if(c.begin(), c.end(),
+                         [&v](const auto& p) { return p.first == v; }),
           c.end());
   return old_size - c.size();
 }
 
 template <typename ValueType, typename FullValueType>
-std::enable_if_t<std::is_convertible_v<ValueType, FullValueType>, int> erase_all(
-    std::list<FullValueType>& c, const ValueType& v) {
+std::enable_if_t<std::is_convertible_v<ValueType, FullValueType>, int>
+erase_all(std::list<FullValueType>& c, const ValueType& v) {
   size_t old_size = c.size();
   c.remove(v);
   return old_size - c.size();
@@ -294,9 +330,11 @@ int erase_all(std::list<std::pair<ValueType, T>>& c, const ValueType& v) {
 // remove one by value or position; remove AT MOST 1 element
 template <typename ContainerType, typename ValueType>
 int erase_one(ContainerType& c, const ValueType& v) {
-  if constexpr (std::is_same_v<remove_cv_ref_t<ValueType>, typename ContainerType::iterator> ||
-                std::is_same_v<remove_cv_ref_t<ValueType>,
-                               typename ContainerType::const_iterator>) {  // remove by pos
+  if constexpr (std::is_same_v<remove_cv_ref_t<ValueType>,
+                               typename ContainerType::iterator> or
+                std::is_same_v<
+                    remove_cv_ref_t<ValueType>,
+                    typename ContainerType::const_iterator>) {  // remove by pos
     c.erase(v);
     return 1;
   } else {  // remove by value
@@ -309,7 +347,7 @@ int erase_one(ContainerType& c, const ValueType& v) {
   }
 }
 // END OF remove one
-}
+}  // namespace graph_lite::detail::container
 
 // mixin base classes of Graph
 namespace graph_lite::detail {
@@ -320,14 +358,16 @@ struct EdgePropListBase {
   std::list<EPT> edge_prop_list;
 };
 template <>
-struct EdgePropListBase<void> {};  // empty base optimization if edge prop is not needed
+struct EdgePropListBase<void> {
+};  // empty base optimization if edge prop is not needed
 
 // EdgeDirectionBase provides different API for directed and undirected graphs
 template <typename GType, EdgeDirection direction>
 struct EdgeDirectionBase {};
 
 template <typename GType>
-struct EdgeDirectionBase<GType, EdgeDirection::UNDIRECTED> {  // undirected graph only
+struct EdgeDirectionBase<GType,
+                         EdgeDirection::UNDIRECTED> {  // undirected graph only
   template <typename T>
   auto neighbors(const T& node_iv) const {
     const auto* self = static_cast<const GType*>(this);
@@ -349,17 +389,21 @@ struct EdgeDirectionBase<GType, EdgeDirection::UNDIRECTED> {  // undirected grap
   template <typename U, typename V>
   auto find_neighbor(const U& src_iv, V&& tgt_identifier) const {
     const auto* self = static_cast<const GType*>(this);
-    return self->template find_neighbor_helper<true>(src_iv, std::forward<V>(tgt_identifier));
+    return self->template find_neighbor_helper<true>(
+        src_iv, std::forward<V>(tgt_identifier));
   }
   template <typename U, typename V>
-  auto find_neighbor(const U& src_iv, V&& tgt_identifier) {  // non-const overload
+  auto find_neighbor(const U& src_iv,
+                     V&& tgt_identifier) {  // non-const overload
     auto* self = static_cast<GType*>(this);
-    return self->template find_neighbor_helper<true>(src_iv, std::forward<V>(tgt_identifier));
+    return self->template find_neighbor_helper<true>(
+        src_iv, std::forward<V>(tgt_identifier));
   }
 };
 
 template <typename GType>
-struct EdgeDirectionBase<GType, EdgeDirection::DIRECTED> {  // directed graph only
+struct EdgeDirectionBase<GType,
+                         EdgeDirection::DIRECTED> {  // directed graph only
   template <typename T>
   auto out_neighbors(const T& node_iv) const {
     const auto* self = static_cast<const GType*>(this);
@@ -400,28 +444,35 @@ struct EdgeDirectionBase<GType, EdgeDirection::DIRECTED> {  // directed graph on
   template <typename U, typename V>
   auto find_out_neighbor(const U& src_iv, V&& tgt_identifier) const {
     const auto* self = static_cast<const GType*>(this);
-    return self->template find_neighbor_helper<true>(src_iv, std::forward<V>(tgt_identifier));
+    return self->template find_neighbor_helper<true>(
+        src_iv, std::forward<V>(tgt_identifier));
   }
   template <typename U, typename V>
-  auto find_out_neighbor(const U& src_iv, V&& tgt_identifier) {  // non-const overload
+  auto find_out_neighbor(const U& src_iv,
+                         V&& tgt_identifier) {  // non-const overload
     auto* self = static_cast<GType*>(this);
-    return self->template find_neighbor_helper<true>(src_iv, std::forward<V>(tgt_identifier));
+    return self->template find_neighbor_helper<true>(
+        src_iv, std::forward<V>(tgt_identifier));
   }
 
   // find a node with value tgt within the in-neighborhood of src
   template <typename U, typename V>
   auto find_in_neighbor(const U& src_iv, V&& tgt_identifier) const {
     const auto* self = static_cast<const GType*>(this);
-    return self->template find_neighbor_helper<false>(src_iv, std::forward<V>(tgt_identifier));
+    return self->template find_neighbor_helper<false>(
+        src_iv, std::forward<V>(tgt_identifier));
   }
   template <typename U, typename V>
-  auto find_in_neighbor(const U& src_iv, V&& tgt_identifier) {  // non-const overload
+  auto find_in_neighbor(const U& src_iv,
+                        V&& tgt_identifier) {  // non-const overload
     auto* self = static_cast<GType*>(this);
-    return self->template find_neighbor_helper<false>(src_iv, std::forward<V>(tgt_identifier));
+    return self->template find_neighbor_helper<false>(
+        src_iv, std::forward<V>(tgt_identifier));
   }
 };
 
-// NodePropGraphBase provides different API depending on whether node prop is needed
+// NodePropGraphBase provides different API depending on whether node prop is
+// needed
 template <typename GType, typename NodePropType>
 struct NodePropGraphBase {
  public:  // this can seg fault if node_identifier is invalid...
@@ -439,7 +490,8 @@ struct NodePropGraphBase {
 
   template <typename NT, typename... NPT>
   int add_node_with_prop(NT&& new_node, NPT&&... prop) noexcept {
-    static_assert(std::is_same_v<remove_cv_ref_t<NT>, typename GType::node_type>);
+    static_assert(
+        std::is_same_v<remove_cv_ref_t<NT>, typename GType::node_type>);
     static_assert(std::is_constructible_v<NodePropType, NPT...>);
     auto* self = static_cast<GType*>(this);
     if (!self->adj_list.count(new_node)) {  // insert if not already existing
@@ -456,16 +508,20 @@ template <typename GType>
 struct NodePropGraphBase<GType, void> {  // no node prop
   template <typename T>
   int add_nodes(T&& new_node) noexcept {  // base case
-    static_assert(std::is_same_v<detail::remove_cv_ref_t<T>, typename GType::node_type>);
+    static_assert(
+        std::is_same_v<detail::remove_cv_ref_t<T>, typename GType::node_type>);
     auto* self = static_cast<GType*>(this);
     int old_size = self->adj_list.size();
-    self->adj_list[std::forward<T>(new_node)];  // insertion here; no-op if already existing
+    self->adj_list[std::forward<T>(
+        new_node)];  // insertion here; no-op if already existing
     return self->adj_list.size() - old_size;
   }
   template <typename T, typename... Args>
   int add_nodes(T&& new_node, Args&&... args) noexcept {
-    static_assert(std::is_same_v<detail::remove_cv_ref_t<T>, typename GType::node_type>);
-    return add_nodes(std::forward<T>(new_node)) + add_nodes(std::forward<Args>(args)...);
+    static_assert(
+        std::is_same_v<detail::remove_cv_ref_t<T>, typename GType::node_type>);
+    return add_nodes(std::forward<T>(new_node)) +
+           add_nodes(std::forward<Args>(args)...);
   }
 };
 
@@ -487,32 +543,38 @@ struct EdgePropGraphBase {
     const char* src_not_found_msg = "source is not found";
     const char* tgt_not_found_msg = "target is not found";
     auto find_neighbor_iv = [self, &source_iv, &target_iv]() {
-      auto&& tgt_val = self->unwrap_by_iter_or_by_value(std::forward<V>(target_iv));
+      auto&& tgt_val =
+          self->unwrap_by_iter_or_by_value(std::forward<V>(target_iv));
       if constexpr (GType::DIRECTION == EdgeDirection::UNDIRECTED) {
-        return self->find_neighbor(source_iv, std::forward<decltype(tgt_val)>(tgt_val));
+        return self->find_neighbor(source_iv,
+                                   std::forward<decltype(tgt_val)>(tgt_val));
       } else {
-        return self->find_out_neighbor(source_iv, std::forward<decltype(tgt_val)>(tgt_val));
+        return self->find_out_neighbor(
+            source_iv, std::forward<decltype(tgt_val)>(tgt_val));
       }
     };
     auto find_neighbor_vi = [self, &source_iv, &target_iv]() {
-      auto&& src_val = self->unwrap_by_iter_or_by_value(std::forward<U>(source_iv));
+      auto&& src_val =
+          self->unwrap_by_iter_or_by_value(std::forward<U>(source_iv));
       if constexpr (GType::DIRECTION == EdgeDirection::UNDIRECTED) {
-        return self->find_neighbor(target_iv, std::forward<decltype(src_val)>(src_val));
+        return self->find_neighbor(target_iv,
+                                   std::forward<decltype(src_val)>(src_val));
       } else {
-        return self->find_in_neighbor(target_iv, std::forward<decltype(src_val)>(src_val));
+        return self->find_in_neighbor(target_iv,
+                                      std::forward<decltype(src_val)>(src_val));
       }
     };
     // this ensures that no adj list lookup will happen if either is an iterator
     if constexpr (GType::template is_iterator<U>()) {  // I & V or I & I
       auto [found, pos] = find_neighbor_iv();
-      if (!found) {
+      if (not found) {
         throw std::runtime_error(tgt_not_found_msg);
       }
       return pos->second.prop();
     } else {
       // V & I or V & V
       auto [found, pos] = find_neighbor_vi();
-      if (!found) {
+      if (not found) {
         throw std::runtime_error(src_not_found_msg);
       }
       return pos->second.prop();
@@ -525,21 +587,26 @@ struct EdgePropGraphBase {
     auto* self = static_cast<GType*>(this);
     auto src_pos = self->find_by_iter_or_by_value(source_iv);
     auto tgt_pos = self->find_by_iter_or_by_value(target_iv);
-    if (src_pos == self->adj_list.end() || tgt_pos == self->adj_list.end()) {
-      if (src_pos == self->adj_list.end()) {
-        self->print_by_iter_or_by_value(std::cerr << "(add_edge) edge involves non-existent source",
-                                        source_iv)
-            << "\n";
-      }
-      if (tgt_pos == self->adj_list.end()) {
-        self->print_by_iter_or_by_value(std::cerr << "(add_edge) edge involves non-existent target",
-                                        target_iv)
-            << "\n";
+    if (src_pos == self->adj_list.end() or tgt_pos == self->adj_list.end()) {
+      if constexpr (GType::LOGGING == Logging::ALLOWED) {
+        if (src_pos == self->adj_list.end()) {
+          self->print_by_iter_or_by_value(
+              std::cerr << "(add_edge) edge involves non-existent source",
+              source_iv)
+              << "\n";
+        }
+        if (tgt_pos == self->adj_list.end()) {
+          self->print_by_iter_or_by_value(
+              std::cerr << "(add_edge) edge involves non-existent target",
+              target_iv)
+              << "\n";
+        }
       }
       return 0;
     }
     const typename GType::node_type& src_full = src_pos->first;
-    const typename GType::node_type& tgt_full = tgt_pos->first;  // flesh out src and tgt
+    const typename GType::node_type& tgt_full =
+        tgt_pos->first;  // flesh out src and tgt
     if (self->check_edge_dup(src_pos, src_full, tgt_full)) {
       return 0;
     }
@@ -547,9 +614,11 @@ struct EdgePropGraphBase {
       return 0;
     }
     auto prop_pos = self->insert_edge_prop(std::forward<EPT>(prop)...);
-    container::insert(self->get_out_neighbors(src_pos), std::make_pair(tgt_full, prop_pos));
-    if (src_pos != tgt_pos || GType::DIRECTION == EdgeDirection::DIRECTED) {
-      container::insert(self->get_in_neighbors(tgt_pos), std::make_pair(src_full, prop_pos));
+    container::insert(self->get_out_neighbors(src_pos),
+                      std::make_pair(tgt_full, prop_pos));
+    if (src_pos != tgt_pos or GType::DIRECTION == EdgeDirection::DIRECTED) {
+      container::insert(self->get_in_neighbors(tgt_pos),
+                        std::make_pair(src_full, prop_pos));
     }
     ++self->num_of_edges;
     return 1;
@@ -562,21 +631,26 @@ struct EdgePropGraphBase<GType, void> {
     auto* self = static_cast<GType*>(this);
     auto src_pos = self->find_by_iter_or_by_value(source_iv);
     auto tgt_pos = self->find_by_iter_or_by_value(target_iv);
-    if (src_pos == self->adj_list.end() || tgt_pos == self->adj_list.end()) {
-      if (src_pos == self->adj_list.end()) {
-        self->print_by_iter_or_by_value(std::cerr << "(add_edge) edge involves non-existent source",
-                                        source_iv)
-            << "\n";
-      }
-      if (tgt_pos == self->adj_list.end()) {
-        self->print_by_iter_or_by_value(std::cerr << "(add_edge) edge involves non-existent target",
-                                        target_iv)
-            << "\n";
+    if (src_pos == self->adj_list.end() or tgt_pos == self->adj_list.end()) {
+      if constexpr (GType::LOGGING == Logging::ALLOWED) {
+        if (src_pos == self->adj_list.end()) {
+          self->print_by_iter_or_by_value(
+              std::cerr << "(add_edge) edge involves non-existent source",
+              source_iv)
+              << "\n";
+        }
+        if (tgt_pos == self->adj_list.end()) {
+          self->print_by_iter_or_by_value(
+              std::cerr << "(add_edge) edge involves non-existent target",
+              target_iv)
+              << "\n";
+        }
       }
       return 0;
     }
     const typename GType::node_type& src_full = src_pos->first;
-    const typename GType::node_type& tgt_full = tgt_pos->first;  // flesh out src and tgt
+    const typename GType::node_type& tgt_full =
+        tgt_pos->first;  // flesh out src and tgt
     if (self->check_edge_dup(src_pos, src_full, tgt_full)) {
       return 0;
     }
@@ -584,80 +658,89 @@ struct EdgePropGraphBase<GType, void> {
       return 0;
     }
     container::insert(self->get_out_neighbors(src_pos), tgt_full);
-    if (src_pos != tgt_pos || GType::DIRECTION == EdgeDirection::DIRECTED) {
+    if (src_pos != tgt_pos or GType::DIRECTION == EdgeDirection::DIRECTED) {
       container::insert(self->get_in_neighbors(tgt_pos), src_full);
     }
     ++self->num_of_edges;
     return 1;
   }
 };
-}
+}  // namespace graph_lite::detail
 
 // Graph class
 namespace graph_lite {
-template <typename NodeType = int, typename NodePropType = void, typename EdgePropType = void,
+template <typename NodeType = int, typename NodePropType = void,
+          typename EdgePropType = void,
           EdgeDirection direction = EdgeDirection::UNDIRECTED,
-          MultiEdge multi_edge = MultiEdge::DISALLOWED, SelfLoop self_loop = SelfLoop::DISALLOWED,
+          MultiEdge multi_edge = MultiEdge::DISALLOWED,
+          SelfLoop self_loop = SelfLoop::DISALLOWED,
           Map adj_list_spec = Map::UNORDERED_MAP,
-          Container neighbors_container_spec = Container::UNORDERED_SET>
-class Graph : private detail::EdgePropListBase<EdgePropType>,
-              public detail::EdgeDirectionBase<
-                  Graph<NodeType, NodePropType, EdgePropType, direction, multi_edge, self_loop,
-                        adj_list_spec, neighbors_container_spec>,
-                  direction>,
-              public detail::NodePropGraphBase<
-                  Graph<NodeType, NodePropType, EdgePropType, direction, multi_edge, self_loop,
-                        adj_list_spec, neighbors_container_spec>,
-                  NodePropType>,
-              public detail::EdgePropGraphBase<
-                  Graph<NodeType, NodePropType, EdgePropType, direction, multi_edge, self_loop,
-                        adj_list_spec, neighbors_container_spec>,
-                  EdgePropType> {
+          Container neighbors_container_spec = Container::UNORDERED_SET,
+          Logging logging = Logging::DISALLOWED>
+class Graph
+    : private detail::EdgePropListBase<EdgePropType>,
+      public detail::EdgeDirectionBase<
+          Graph<NodeType, NodePropType, EdgePropType, direction, multi_edge,
+                self_loop, adj_list_spec, neighbors_container_spec, logging>,
+          direction>,
+      public detail::NodePropGraphBase<
+          Graph<NodeType, NodePropType, EdgePropType, direction, multi_edge,
+                self_loop, adj_list_spec, neighbors_container_spec, logging>,
+          NodePropType>,
+      public detail::EdgePropGraphBase<
+          Graph<NodeType, NodePropType, EdgePropType, direction, multi_edge,
+                self_loop, adj_list_spec, neighbors_container_spec, logging>,
+          EdgePropType> {
   // friend class with CRTP base classes
   friend detail::EdgeDirectionBase<
-      Graph<NodeType, NodePropType, EdgePropType, direction, multi_edge, self_loop, adj_list_spec,
-            neighbors_container_spec>,
+      Graph<NodeType, NodePropType, EdgePropType, direction, multi_edge,
+            self_loop, adj_list_spec, neighbors_container_spec, logging>,
       direction>;
   friend detail::NodePropGraphBase<
-      Graph<NodeType, NodePropType, EdgePropType, direction, multi_edge, self_loop, adj_list_spec,
-            neighbors_container_spec>,
+      Graph<NodeType, NodePropType, EdgePropType, direction, multi_edge,
+            self_loop, adj_list_spec, neighbors_container_spec, logging>,
       NodePropType>;
   friend detail::EdgePropGraphBase<
-      Graph<NodeType, NodePropType, EdgePropType, direction, multi_edge, self_loop, adj_list_spec,
-            neighbors_container_spec>,
+      Graph<NodeType, NodePropType, EdgePropType, direction, multi_edge,
+            self_loop, adj_list_spec, neighbors_container_spec, logging>,
       EdgePropType>;
   static_assert(std::is_same_v<NodeType, std::remove_reference_t<NodeType>>,
                 "NodeType should not be a reference");
   static_assert(std::is_same_v<NodeType, std::remove_cv_t<NodeType>>,
                 "NodeType should not be cv-qualified");
-  static_assert(std::is_same_v<NodePropType, std::remove_reference_t<NodePropType>> &&
-                    std::is_same_v<EdgePropType, std::remove_reference_t<EdgePropType>>,
-                "Property types should not be references");
-  static_assert(std::is_same_v<NodePropType, std::remove_cv_t<NodePropType>> &&
-                    std::is_same_v<EdgePropType, std::remove_cv_t<EdgePropType>>,
-                "Property types should not be cv-qualified");
+  static_assert(
+      std::is_same_v<NodePropType, std::remove_reference_t<NodePropType>> and
+          std::is_same_v<EdgePropType, std::remove_reference_t<EdgePropType>>,
+      "Property types should not be references");
+  static_assert(
+      std::is_same_v<NodePropType, std::remove_cv_t<NodePropType>> and
+          std::is_same_v<EdgePropType, std::remove_cv_t<EdgePropType>>,
+      "Property types should not be cv-qualified");
   static_assert(detail::is_eq_comparable_v<NodeType>,
                 "NodeType does not support ==; implement operator==");
   static_assert(detail::is_streamable_v<NodeType>,
                 "NodeType is not streamable; implement operator<<");
-  static_assert(!((neighbors_container_spec == Container::UNORDERED_SET ||
-                     neighbors_container_spec == Container::UNORDERED_MULTISET ||
-                     adj_list_spec == Map::UNORDERED_MAP) &&
+  static_assert(not((neighbors_container_spec == Container::UNORDERED_SET or
+                     neighbors_container_spec ==
+                         Container::UNORDERED_MULTISET or
+                     adj_list_spec == Map::UNORDERED_MAP) and
                     !detail::is_std_hashable_v<NodeType>),
                 "NodeType is not hashable");
-  static_assert(!((neighbors_container_spec == Container::SET ||
-                     neighbors_container_spec == Container::MULTISET ||
-                     adj_list_spec == Map::MAP) &&
+  static_assert(not((neighbors_container_spec == Container::SET or
+                     neighbors_container_spec == Container::MULTISET or
+                     adj_list_spec == Map::MAP) and
                     !detail::is_comparable_v<NodeType>),
                 "NodeType does not support operator <");
-  static_assert(!(detail::MultiEdgeTraits<neighbors_container_spec>::value ==
-                        MultiEdge::DISALLOWED &&
+  static_assert(not(detail::MultiEdgeTraits<neighbors_container_spec>::value ==
+                        MultiEdge::DISALLOWED and
                     multi_edge == MultiEdge::ALLOWED),
                 "node container does not support multi-edge");
-  static_assert(!((neighbors_container_spec == Container::MULTISET ||
-                     neighbors_container_spec == Container::UNORDERED_MULTISET) &&
+  static_assert(not((neighbors_container_spec == Container::MULTISET or
+                     neighbors_container_spec ==
+                         Container::UNORDERED_MULTISET) and
                     multi_edge == MultiEdge::DISALLOWED),
-                "disallowing multi-edge yet still using multi-set; use set/unordered_set instead");
+                "disallowing multi-edge yet still using multi-set; use "
+                "set/unordered_set instead");
 
  public:  // exposed types and constants
   using node_type = NodeType;
@@ -667,13 +750,17 @@ class Graph : private detail::EdgePropListBase<EdgePropType>,
   static constexpr MultiEdge MULTI_EDGE = multi_edge;
   static constexpr SelfLoop SELF_LOOP = self_loop;
   static constexpr Map ADJ_LIST_SPEC = adj_list_spec;
-  static constexpr Container NEIGHBORS_CONTAINER_SPEC = neighbors_container_spec;
+  static constexpr Container NEIGHBORS_CONTAINER_SPEC =
+      neighbors_container_spec;
+  static constexpr Logging LOGGING = logging;
 
  private:  // type gymnastics
   // handle neighbors that may have property
-  // PairIterator is useful only when (1) the container is VEC or LIST and (2) edge prop is needed
+  // PairIterator is useful only when (1) the container is VEC or LIST and (2)
+  // edge prop is needed
   template <typename ContainerType>
-  class PairIterator {  // always non const, since the build-in iter can handle const
+  class PairIterator {  // always non const, since the build-in iter can handle
+                        // const
     friend class Graph;
 
    private:
@@ -703,19 +790,30 @@ class Graph : private detail::EdgePropListBase<EdgePropType>,
     friend bool operator!=(const PairIterator& lhs, const PairIterator& rhs) {
       return lhs.it != rhs.it;
     }
-    friend bool operator==(const PairIterator& lhs, const ConstIt& rhs) { return lhs.it == rhs; }
-    friend bool operator!=(const PairIterator& lhs, const ConstIt& rhs) { return lhs.it != rhs; }
+    friend bool operator==(const PairIterator& lhs, const ConstIt& rhs) {
+      return lhs.it == rhs;
+    }
+    friend bool operator!=(const PairIterator& lhs, const ConstIt& rhs) {
+      return lhs.it != rhs;
+    }
     // symmetry
-    friend bool operator==(const ConstIt& lhs, const PairIterator& rhs) { return rhs == lhs; }
-    friend bool operator!=(const ConstIt& lhs, const PairIterator& rhs) { return rhs != lhs; }
+    friend bool operator==(const ConstIt& lhs, const PairIterator& rhs) {
+      return rhs == lhs;
+    }
+    friend bool operator!=(const ConstIt& lhs, const PairIterator& rhs) {
+      return rhs != lhs;
+    }
 
-    reference operator*() const { return {std::cref(it->first), std::ref(it->second)}; }
+    reference operator*() const {
+      return {std::cref(it->first), std::ref(it->second)};
+    }
     pointer operator->() const {
       std::pair<FirstType, SecondType>* ptr = it.operator->();
       using CVT = std::pair<const FirstType, SecondType>;
       static_assert(offsetof(VT, first) == offsetof(CVT, first) &&
                     offsetof(VT, second) == offsetof(CVT, second));
-      return static_cast<pointer>(static_cast<void*>(ptr));  // adding constness to first
+      return static_cast<pointer>(
+          static_cast<void*>(ptr));  // adding constness to first
     }
 
     PairIterator& operator++() {  // prefix
@@ -744,7 +842,8 @@ class Graph : private detail::EdgePropListBase<EdgePropType>,
 
    private:
     using Iter = typename std::list<EPT>::iterator;
-    // list iterators are NOT invalidated by insertion/removal(of others), making this possible
+    // list iterators are NOT invalidated by insertion/removal(of others),
+    // making this possible
     Iter pos;
 
    public:
@@ -754,10 +853,11 @@ class Graph : private detail::EdgePropListBase<EdgePropType>,
     EPT& prop() { return *(this->pos); }
   };
 
-  using NeighborType = std::conditional_t<std::is_void_v<EdgePropType>, NodeType,
-                                          std::pair<NodeType, EdgePropIterWrap<EdgePropType>>>;
-  // type of neighbors container; the typename NT is here only because explicit spec is not allowed
-  // in a class...
+  using NeighborType =
+      std::conditional_t<std::is_void_v<EdgePropType>, NodeType,
+                         std::pair<NodeType, EdgePropIterWrap<EdgePropType>>>;
+  // type of neighbors container; the typename NT is here only because explicit
+  // spec is not allowed in a class...
   template <Container C, typename NT, typename EPT>
   struct ContainerGen {};
   template <typename NT, typename EPT>
@@ -803,50 +903,61 @@ class Graph : private detail::EdgePropListBase<EdgePropType>,
 
  public:
   using NeighborsContainerType =
-      typename ContainerGen<neighbors_container_spec, NodeType, EdgePropType>::type;
+      typename ContainerGen<neighbors_container_spec, NodeType,
+                            EdgePropType>::type;
 
  private:
   using NeighborsType =
-      std::conditional_t<direction == EdgeDirection::UNDIRECTED, NeighborsContainerType,
+      std::conditional_t<direction == EdgeDirection::UNDIRECTED,
+                         NeighborsContainerType,
                          detail::OutIn<NeighborsContainerType>>;
   struct PropNode {  // node with property
     NodePropType prop;
     NeighborsType neighbors;
     PropNode() = default;  // needed for map/unordered map
     template <typename... NPT>
-    explicit PropNode(NPT&&... prop) : prop{std::forward<NPT>(prop)...}, neighbors{} {
+    explicit PropNode(NPT&&... prop)
+        : prop{std::forward<NPT>(prop)...}, neighbors{} {
       static_assert(std::is_constructible_v<NodePropType, NPT...>);
     }
   };
-  static constexpr bool has_node_prop = ! std::is_void_v<NodePropType>;
-  using AdjListValueType = std::conditional_t<!has_node_prop, NeighborsType, PropNode>;
+  static constexpr bool has_node_prop = not std::is_void_v<NodePropType>;
+  using AdjListValueType =
+      std::conditional_t<not has_node_prop, NeighborsType, PropNode>;
   using AdjListType =
-      std::conditional_t<adj_list_spec == Map::MAP, std::map<NodeType, AdjListValueType>,
+      std::conditional_t<adj_list_spec == Map::MAP,
+                         std::map<NodeType, AdjListValueType>,
                          std::unordered_map<NodeType, AdjListValueType>>;
 
  public:  // iterator types
-  using NeighborsConstIterator = typename NeighborsContainerType::const_iterator;
+  using NeighborsConstIterator =
+      typename NeighborsContainerType::const_iterator;
 
  private:
   template <typename T>
   static constexpr bool can_construct_node =
       std::is_constructible_v<NodeType, detail::remove_cv_ref_t<T>>;
-  static constexpr bool has_edge_prop = !std::is_void_v<EdgePropType>;
+  static constexpr bool has_edge_prop = not std::is_void_v<EdgePropType>;
   static constexpr bool need_pair_iter =
-      has_edge_prop &&
-      (neighbors_container_spec == Container::VEC || neighbors_container_spec == Container::LIST);
+      has_edge_prop and (neighbors_container_spec == Container::VEC or
+                         neighbors_container_spec == Container::LIST);
 
  public:
   using NeighborsIterator = std::conditional_t<
       has_edge_prop,
-      std::conditional_t<need_pair_iter,
-                         PairIterator<NeighborsContainerType>,  // make node(aka first) immutable
-                         typename NeighborsContainerType::iterator>,  // the iter for map/multi-map
-                                                                      // works just fine
+      std::conditional_t<
+          need_pair_iter,
+          PairIterator<NeighborsContainerType>,        // make node(aka first)
+                                                       // immutable
+          typename NeighborsContainerType::iterator>,  // the iter for
+                                                       // map/multi-map works
+                                                       // just fine
       NeighborsConstIterator>;  // if no edge prop is needed, always const
-  static_assert(std::is_convertible_v<NeighborsIterator, NeighborsConstIterator>);
+  static_assert(
+      std::is_convertible_v<NeighborsIterator, NeighborsConstIterator>);
   using NeighborsView = std::pair<NeighborsIterator, NeighborsIterator>;
-  using NeighborsConstView = std::pair<NeighborsConstIterator, NeighborsConstIterator>;
+  using NeighborsConstView =
+      std::pair<NeighborsConstIterator, NeighborsConstIterator>;
 
  private:
   using AdjListIterType = typename AdjListType::iterator;
@@ -859,11 +970,19 @@ class Graph : private detail::EdgePropListBase<EdgePropType>,
  private:  // iterator support
   template <bool IsConst>
   class Iter {
+   public:
+    using difference_type = typename AdjListConstIterType::difference_type;
+    using value_type = const NodeType;
+    using reference = const NodeType&;
+    using pointer = const NodeType*;
+    using iterator_category = std::bidirectional_iterator_tag;
+
    private:
     template <bool>
     friend class Iter;
     friend class Graph;
-    using AdjIterT = std::conditional_t<IsConst, AdjListConstIterType, AdjListIterType>;
+    using AdjIterT =
+        std::conditional_t<IsConst, AdjListConstIterType, AdjListIterType>;
     AdjIterT it;
 
    public:
@@ -871,7 +990,7 @@ class Graph : private detail::EdgePropListBase<EdgePropType>,
     Iter(AdjIterT it) : it{it} {};
 
     // enables implicit conversion from non-const to const
-    template <bool WasConst, typename = std::enable_if_t<IsConst || !WasConst>>
+    template <bool WasConst, typename = std::enable_if_t<IsConst or !WasConst>>
     Iter(const Iter<WasConst>& other) : it{other.it} {}
 
     Iter& operator++() {  // prefix
@@ -883,10 +1002,24 @@ class Graph : private detail::EdgePropListBase<EdgePropType>,
       ++(*this);
       return tmp;
     }
+    Iter& operator--() {  // prefix
+      --it;
+      return *this;
+    }
+    Iter operator--(int) & {  // postfix
+      Iter tmp = *this;
+      --(*this);
+      return tmp;
+    }
+
     const NodeType& operator*() const { return it->first; }
     const NodeType* operator->() const { return &(it->first); }
-    friend bool operator==(const Iter& lhs, const Iter& rhs) { return lhs.it == rhs.it; }
-    friend bool operator!=(const Iter& lhs, const Iter& rhs) { return lhs.it != rhs.it; }
+    friend bool operator==(const Iter& lhs, const Iter& rhs) {
+      return lhs.it == rhs.it;
+    }
+    friend bool operator!=(const Iter& lhs, const Iter& rhs) {
+      return lhs.it != rhs.it;
+    }
   };
 
  public:
@@ -900,8 +1033,9 @@ class Graph : private detail::EdgePropListBase<EdgePropType>,
   ConstIterator end() const noexcept { return Iter<true>(adj_list.cend()); }
   // END OF iterator support
  private:  // neighbor access helpers
-  const NeighborsContainerType& get_out_neighbors(AdjListConstIterType adj_iter) const {
-    if constexpr (!has_node_prop) {
+  const NeighborsContainerType& get_out_neighbors(
+      AdjListConstIterType adj_iter) const {
+    if constexpr (not has_node_prop) {
       if constexpr (direction == EdgeDirection::UNDIRECTED) {
         return adj_iter->second;
       } else {
@@ -920,8 +1054,9 @@ class Graph : private detail::EdgePropListBase<EdgePropType>,
         static_cast<const Graph*>(this)->get_out_neighbors(adj_iter));
   }
 
-  const NeighborsContainerType& get_in_neighbors(AdjListConstIterType adj_iter) const {
-    if constexpr (!has_node_prop) {
+  const NeighborsContainerType& get_in_neighbors(
+      AdjListConstIterType adj_iter) const {
+    if constexpr (not has_node_prop) {
       if constexpr (direction == EdgeDirection::UNDIRECTED) {
         return adj_iter->second;
       } else {
@@ -946,11 +1081,15 @@ class Graph : private detail::EdgePropListBase<EdgePropType>,
     AdjListConstIterType pos = find_by_iter_or_by_value(node_iv);
     if (pos == adj_list.end()) {
       std::string msg = is_out ? "out" : "in";
-      print_by_iter_or_by_value(
-          std::cerr << "(count_neighbors) counting " << msg << "-neighbors of a non-existent node",
-          node_iv)
-          << "\n";
-      throw std::runtime_error("counting " + msg + "-neighbors of a non-existent node");
+      if constexpr (logging == Logging::ALLOWED) {
+        print_by_iter_or_by_value(std::cerr
+                                      << "(count_neighbors) counting " << msg
+                                      << "-neighbors of a non-existent node",
+                                  node_iv)
+            << "\n";
+      }
+      throw std::runtime_error("counting " + msg +
+                               "-neighbors of a non-existent node");
     }
     if constexpr (is_out) {
       return get_out_neighbors(pos).size();
@@ -964,20 +1103,23 @@ class Graph : private detail::EdgePropListBase<EdgePropType>,
     AdjListConstIterType pos = find_by_iter_or_by_value(node_iv);
     if (pos == adj_list.end()) {
       std::string msg = is_out ? "out" : "in";
-      print_by_iter_or_by_value(
-          std::cerr << "(neighbors) finding " << msg << "-neighbors of a non-existent node",
-          node_iv)
-          << "\n";
-      throw std::runtime_error("finding " + msg + "-neighbors of a non-existent node");
+      if constexpr (logging == Logging::ALLOWED) {
+        print_by_iter_or_by_value(std::cerr
+                                      << "(neighbors) finding " << msg
+                                      << "-neighbors of a non-existent node",
+                                  node_iv)
+            << "\n";
+      }
+      throw std::runtime_error("finding " + msg +
+                               "-neighbors of a non-existent node");
     }
-    const NeighborsContainerType& neighbors = [ this, &pos ]() -> auto& {
+    const NeighborsContainerType& neighbors = [this, &pos]() -> auto& {
       if constexpr (is_out) {
         return get_out_neighbors(pos);
       } else {
         return get_in_neighbors(pos);
       }
-    }
-    ();
+    }();
     return {neighbors.begin(), neighbors.end()};
   }
   template <bool is_out, typename T>
@@ -985,25 +1127,29 @@ class Graph : private detail::EdgePropListBase<EdgePropType>,
     AdjListIterType pos = find_by_iter_or_by_value(node_iv);
     if (pos == adj_list.end()) {
       std::string msg = is_out ? "out" : "in";
-      print_by_iter_or_by_value(
-          std::cerr << "(neighbors) finding " << msg << "-neighbors of a non-existent node",
-          node_iv)
-          << "\n";
-      throw std::runtime_error("finding " + msg + "-neighbors of a non-existent node");
+      if constexpr (logging == Logging::ALLOWED) {
+        print_by_iter_or_by_value(std::cerr
+                                      << "(neighbors) finding " << msg
+                                      << "-neighbors of a non-existent node",
+                                  node_iv)
+            << "\n";
+      }
+      throw std::runtime_error("finding " + msg +
+                               "-neighbors of a non-existent node");
     }
-    NeighborsContainerType& neighbors = [ this, &pos ]() -> auto& {
+    NeighborsContainerType& neighbors = [this, &pos]() -> auto& {
       if constexpr (is_out) {
         return get_out_neighbors(pos);
       } else {
         return get_in_neighbors(pos);
       }
-    }
-    ();
+    }();
     return {neighbors.begin(), neighbors.end()};
   }
   // END OF helpers for EdgeDirectionBase
 
-  const NodeType& get_neighbor_node(const NeighborsConstIterator& nbr_pos) const {
+  const NodeType& get_neighbor_node(
+      const NeighborsConstIterator& nbr_pos) const {
     if constexpr (has_edge_prop) {
       return nbr_pos->first;
     } else {
@@ -1025,13 +1171,13 @@ class Graph : private detail::EdgePropListBase<EdgePropType>,
   }
   template <typename T>
   AdjListIterType find_node(const T& node_identifier) {
-    return detail::const_iter_to_iter(adj_list,
-                                      static_cast<const Graph*>(this)->find_node(node_identifier));
+    return detail::const_iter_to_iter(
+        adj_list, static_cast<const Graph*>(this)->find_node(node_identifier));
   }
 
   template <typename T>
   static constexpr bool is_iterator() {
-    return std::is_same_v<ConstIterator, detail::remove_cv_ref_t<T>> ||
+    return std::is_same_v<ConstIterator, detail::remove_cv_ref_t<T>> or
            std::is_same_v<Iterator, detail::remove_cv_ref_t<T>>;
   }
 
@@ -1057,13 +1203,15 @@ class Graph : private detail::EdgePropListBase<EdgePropType>,
   template <typename T>
   AdjListIterType find_by_iter_or_by_value(const T& iter_or_val) {
     return detail::const_iter_to_iter(
-        adj_list, static_cast<const Graph*>(this)->find_by_iter_or_by_value(iter_or_val));
+        adj_list,
+        static_cast<const Graph*>(this)->find_by_iter_or_by_value(iter_or_val));
   }
   // END OF either unwrap the iterator, or find the node in adj_list
 
   // helper method to provide better error messages
   template <typename T>
-  std::ostream& print_by_iter_or_by_value(std::ostream& os, const T& iter_or_val) const {
+  std::ostream& print_by_iter_or_by_value(std::ostream& os,
+                                          const T& iter_or_val) const {
     if constexpr (is_iterator<T>()) {  // by iter
       return os;                       // no-op if by iter
     } else {                           // by value
@@ -1073,62 +1221,69 @@ class Graph : private detail::EdgePropListBase<EdgePropType>,
     }
   }
 
-  // find tgt in the neighborhood of src; returns a pair {is_found, neighbor_iterator}
+  // find tgt in the neighborhood of src; returns a pair {is_found,
+  // neighbor_iterator}
   template <bool is_out, typename U, typename V>
-  std::pair<bool, NeighborsConstIterator> find_neighbor_helper(const U& src_iv,
-                                                               V&& tgt_identifier) const {
+  std::pair<bool, NeighborsConstIterator> find_neighbor_helper(
+      const U& src_iv, V&& tgt_identifier) const {
     static_assert(can_construct_node<V>);
     AdjListConstIterType src_pos = find_by_iter_or_by_value(src_iv);
     if (src_pos == adj_list.end()) {
-      print_by_iter_or_by_value(std::cerr << "(find_neighbor) source node not found", src_iv)
-          << "\n";
+      if constexpr (logging == Logging::ALLOWED) {
+        print_by_iter_or_by_value(
+            std::cerr << "(find_neighbor) source node not found", src_iv)
+            << "\n";
+      }
       throw std::runtime_error{"source node is not found"};
     }
-    const NeighborsContainerType& src_neighbors = [ this, &src_pos ]() -> auto& {
+    const NeighborsContainerType& src_neighbors = [this, &src_pos]() -> auto& {
       if constexpr (is_out) {
         return get_out_neighbors(src_pos);
       } else {
         return get_in_neighbors(src_pos);
       }
-    }
-    ();
+    }();
     if constexpr (std::is_same_v<NodeType, detail::remove_cv_ref_t<V>>) {
-      NeighborsConstIterator tgt_pos = detail::container::find(src_neighbors, tgt_identifier);
+      NeighborsConstIterator tgt_pos =
+          detail::container::find(src_neighbors, tgt_identifier);
       return {tgt_pos != src_neighbors.end(), tgt_pos};
     } else {
-      NeighborsConstIterator tgt_pos =
-          detail::container::find(src_neighbors, NodeType{std::forward<V>(tgt_identifier)});
+      NeighborsConstIterator tgt_pos = detail::container::find(
+          src_neighbors, NodeType{std::forward<V>(tgt_identifier)});
       return {tgt_pos != src_neighbors.end(), tgt_pos};
     }
   }
   template <bool is_out, typename U, typename V>
-  std::pair<bool, NeighborsIterator> find_neighbor_helper(const U& src_iv, V&& tgt_identifier) {
+  std::pair<bool, NeighborsIterator> find_neighbor_helper(const U& src_iv,
+                                                          V&& tgt_identifier) {
     static_assert(can_construct_node<V>);
     AdjListIterType src_pos = find_by_iter_or_by_value(src_iv);
     if (src_pos == adj_list.end()) {
-      print_by_iter_or_by_value(std::cerr << "(find_neighbor) source node not found", src_iv)
-          << "\n";
+      if constexpr (logging == Logging::ALLOWED) {
+        print_by_iter_or_by_value(
+            std::cerr << "(find_neighbor) source node not found", src_iv)
+            << "\n";
+      }
       throw std::runtime_error{"source node is not found"};
     }
-    NeighborsContainerType& src_neighbors = [ this, &src_pos ]() -> auto& {
+    NeighborsContainerType& src_neighbors = [this, &src_pos]() -> auto& {
       if constexpr (is_out) {
         return get_out_neighbors(src_pos);
       } else {
         return get_in_neighbors(src_pos);
       }
-    }
-    ();
+    }();
     if constexpr (std::is_same_v<NodeType, detail::remove_cv_ref_t<V>>) {
       auto tgt_pos = detail::container::find(src_neighbors, tgt_identifier);
       return {tgt_pos != src_neighbors.end(), tgt_pos};
     } else {
-      auto tgt_pos =
-          detail::container::find(src_neighbors, NodeType{std::forward<V>(tgt_identifier)});
+      auto tgt_pos = detail::container::find(
+          src_neighbors, NodeType{std::forward<V>(tgt_identifier)});
       return {tgt_pos != src_neighbors.end(), tgt_pos};
     }
   }
-  // END OF find tgt in the neighborhood of src; returns a pair {is_found, neighbor_iterator}
-  // END OF helpers for node search
+  // END OF find tgt in the neighborhood of src; returns a pair {is_found,
+  // neighbor_iterator} END OF helpers for node search
  public:  // simple queries
   [[nodiscard]] size_t size() const noexcept { return adj_list.size(); }
 
@@ -1145,14 +1300,18 @@ class Graph : private detail::EdgePropListBase<EdgePropType>,
   int count_edges(const U& source_iv, const V& target_iv) const noexcept {
     AdjListConstIterType src_pos = find_by_iter_or_by_value(source_iv);
     AdjListConstIterType tgt_pos = find_by_iter_or_by_value(target_iv);
-    if (src_pos == adj_list.end() || tgt_pos == adj_list.end()) {
-      if (src_pos == adj_list.end()) {
-        print_by_iter_or_by_value(std::cerr << "(count_edges) source node not found", source_iv)
-            << "\n";
-      }
-      if (tgt_pos == adj_list.end()) {
-        print_by_iter_or_by_value(std::cerr << "(count_edges) target node not found", target_iv)
-            << "\n";
+    if (src_pos == adj_list.end() or tgt_pos == adj_list.end()) {
+      if constexpr (logging == Logging::ALLOWED) {
+        if (src_pos == adj_list.end()) {
+          print_by_iter_or_by_value(
+              std::cerr << "(count_edges) source node not found", source_iv)
+              << "\n";
+        }
+        if (tgt_pos == adj_list.end()) {
+          print_by_iter_or_by_value(
+              std::cerr << "(count_edges) target node not found", target_iv)
+              << "\n";
+        }
       }
       return 0;
     }
@@ -1184,22 +1343,29 @@ class Graph : private detail::EdgePropListBase<EdgePropType>,
   bool check_edge_dup(AdjListConstIterType src_pos, const NodeType& src_full,
                       const NodeType& tgt_full) const {
     if constexpr (multi_edge ==
-                  MultiEdge::DISALLOWED) {  // check is needed only when we disallow dup
+                  MultiEdge::DISALLOWED) {  // check is needed only when we
+                                            // disallow dup
       // this catches multi-self-loop as well
       const NeighborsContainerType& neighbors = get_out_neighbors(src_pos);
       if (detail::container::find(neighbors, tgt_full) != neighbors.end()) {
-        std::cerr << "(add_edge) re-adding existing edge: (" << src_full << ", " << tgt_full
-                  << ")\n";
+        if constexpr (logging == Logging::ALLOWED) {
+          std::cerr << "(add_edge) re-adding existing edge: (" << src_full
+                    << ", " << tgt_full << ")\n";
+        }
         return true;
       }
     }
     return false;
   }
 
-  bool check_self_loop(AdjListIterType src_pos, AdjListIterType tgt_pos, const NodeType& src_full) {
+  bool check_self_loop(AdjListIterType src_pos, AdjListIterType tgt_pos,
+                       const NodeType& src_full) {
     if constexpr (self_loop == SelfLoop::DISALLOWED) {
       if (src_pos == tgt_pos) {
-        std::cerr << "(add_edge) adding self loop on node: " << src_full << "\n";
+        if constexpr (logging == Logging::ALLOWED) {
+          std::cerr << "(add_edge) adding self loop on node: " << src_full
+                    << "\n";
+        }
         return true;
       }
     }
@@ -1207,31 +1373,36 @@ class Graph : private detail::EdgePropListBase<EdgePropType>,
   }
   // END OF edge addition helpers
  private:  // edge removal helpers
-  // because every edge has double entry, this method finds the correct double entry to remove
-  NeighborsConstIterator find_tgt_remove_pos(AdjListIterType src_pos,
-                                             NeighborsConstIterator src_remove_pos,
-                                             NeighborsContainerType& tgt_neighbors) {
-    if constexpr (has_edge_prop && multi_edge == MultiEdge::ALLOWED) {
+  // because every edge has double entry, this method finds the correct double
+  // entry to remove
+  NeighborsConstIterator find_tgt_remove_pos(
+      AdjListIterType src_pos, NeighborsConstIterator src_remove_pos,
+      NeighborsContainerType& tgt_neighbors) {
+    if constexpr (has_edge_prop and multi_edge == MultiEdge::ALLOWED) {
       auto prop_address =
-          &(src_remove_pos->second.prop());  // finding the corresponding double entry
+          &(src_remove_pos->second
+                .prop());  // finding the corresponding double entry
       auto prop_finder = [&prop_address](const auto& tgt_nbr) {
         return prop_address == &(tgt_nbr.second.prop());
       };
-      if constexpr (neighbors_container_spec == Container::VEC ||
+      if constexpr (neighbors_container_spec == Container::VEC or
                     neighbors_container_spec == Container::LIST) {
         // NeighborsContainerType is a vector/list of pairs
         // linearly search for the correct entry and remove
-        return std::find_if(tgt_neighbors.begin(), tgt_neighbors.end(), prop_finder);
+        return std::find_if(tgt_neighbors.begin(), tgt_neighbors.end(),
+                            prop_finder);
       } else {
         // NeighborsContainerType is a multi_map or unordered_multi_map
-        static_assert(neighbors_container_spec == Container::MULTISET ||
-                      neighbors_container_spec == Container::UNORDERED_MULTISET);
-        auto [eq_begin, eq_end] =
-            tgt_neighbors.equal_range(src_pos->first);  // slightly optimized search
+        static_assert(neighbors_container_spec == Container::MULTISET or
+                      neighbors_container_spec ==
+                          Container::UNORDERED_MULTISET);
+        auto [eq_begin, eq_end] = tgt_neighbors.equal_range(
+            src_pos->first);  // slightly optimized search
         return std::find_if(eq_begin, eq_end, prop_finder);
       }
-    } else {  // either multi edge is disallowed, or we don't differentiate multi-edges
-      static_assert(!has_edge_prop || multi_edge == MultiEdge::DISALLOWED);
+    } else {  // either multi edge is disallowed, or we don't differentiate
+              // multi-edges
+      static_assert(not has_edge_prop or multi_edge == MultiEdge::DISALLOWED);
       return detail::container::find(tgt_neighbors, src_pos->first);
     }
   }
@@ -1240,14 +1411,14 @@ class Graph : private detail::EdgePropListBase<EdgePropType>,
   std::pair<NeighborsConstIterator, NeighborsConstIterator> find_remove_range(
       NeighborsContainerType& neighbors, const NodeType& node) {
     static_assert(has_edge_prop);
-    if constexpr (neighbors_container_spec == Container::VEC ||
+    if constexpr (neighbors_container_spec == Container::VEC or
                   neighbors_container_spec == Container::LIST) {
-      NeighborsConstIterator partition_pos =
-          std::partition(neighbors.begin(), neighbors.end(),
-                         [&node](const auto& src_nbr) { return !(src_nbr.first == node); });
+      NeighborsConstIterator partition_pos = std::partition(
+          neighbors.begin(), neighbors.end(),
+          [&node](const auto& src_nbr) { return !(src_nbr.first == node); });
       return {partition_pos, neighbors.end()};
     } else {
-      static_assert(neighbors_container_spec == Container::MULTISET ||
+      static_assert(neighbors_container_spec == Container::MULTISET or
                     neighbors_container_spec == Container::UNORDERED_MULTISET);
       return neighbors.equal_range(node);
     }
@@ -1255,8 +1426,10 @@ class Graph : private detail::EdgePropListBase<EdgePropType>,
   // END OF edge removal helpers
  public:  // edge removal
   // all iterators are assumed to be valid
-  int remove_edge(ConstIterator source_pos, NeighborsConstIterator target_nbr_pos) noexcept {
-    AdjListIterType src_pos = detail::const_iter_to_iter(adj_list, source_pos.it);
+  int remove_edge(ConstIterator source_pos,
+                  NeighborsConstIterator target_nbr_pos) noexcept {
+    AdjListIterType src_pos =
+        detail::const_iter_to_iter(adj_list, source_pos.it);
     NeighborsContainerType& src_neighbors = get_out_neighbors(src_pos);
     assert(target_nbr_pos != src_neighbors.cend());
     AdjListIterType tgt_pos = adj_list.find(get_neighbor_node(target_nbr_pos));
@@ -1272,7 +1445,7 @@ class Graph : private detail::EdgePropListBase<EdgePropType>,
       this->edge_prop_list.erase(target_nbr_pos->second.pos);
     }
     detail::container::erase_one(src_neighbors, target_nbr_pos);
-    if (src_pos != tgt_pos || direction == EdgeDirection::DIRECTED) {
+    if (src_pos != tgt_pos or direction == EdgeDirection::DIRECTED) {
       // when src==tgt && UNDIRECTED, there is NO double entry
       detail::container::erase_one(tgt_neighbors, tgt_remove_pos);
     }
@@ -1282,20 +1455,24 @@ class Graph : private detail::EdgePropListBase<EdgePropType>,
 
   // remove all edges between source and target
   template <typename U, typename V>
-  std::enable_if_t<!std::is_convertible_v<V, NeighborsConstIterator>, int> remove_edge(
-      const U& source_iv, const V& target_iv) noexcept {
+  std::enable_if_t<not std::is_convertible_v<V, NeighborsConstIterator>, int>
+  remove_edge(const U& source_iv, const V& target_iv) noexcept {
     auto src_pos = find_by_iter_or_by_value(source_iv);
     auto tgt_pos = find_by_iter_or_by_value(target_iv);
-    if (src_pos == adj_list.end() || tgt_pos == adj_list.end()) {
-      if (src_pos == adj_list.end()) {
-        print_by_iter_or_by_value(std::cerr << "(remove_edge) edge involves non-existent node",
-                                  source_iv)
-            << "\n";
-      }
-      if (tgt_pos == adj_list.end()) {
-        print_by_iter_or_by_value(std::cerr << "(remove_edge) edge involves non-existent node",
-                                  target_iv)
-            << "\n";
+    if (src_pos == adj_list.end() or tgt_pos == adj_list.end()) {
+      if constexpr (logging == Logging::ALLOWED) {
+        if (src_pos == adj_list.end()) {
+          print_by_iter_or_by_value(
+              std::cerr << "(remove_edge) edge involves non-existent node",
+              source_iv)
+              << "\n";
+        }
+        if (tgt_pos == adj_list.end()) {
+          print_by_iter_or_by_value(
+              std::cerr << "(remove_edge) edge involves non-existent node",
+              target_iv)
+              << "\n";
+        }
       }
       return 0;  // no-op if nodes are not found
     }
@@ -1303,28 +1480,36 @@ class Graph : private detail::EdgePropListBase<EdgePropType>,
     const NodeType& tgt_full = tgt_pos->first;
     if constexpr (self_loop == SelfLoop::DISALLOWED) {
       if (src_pos == tgt_pos) {  // we know self loop cannot exist
-        std::cerr << "(remove_edge) cannot remove self loop on node " << src_full
-                  << " when self loop is not even permitted\n";
+        if constexpr (logging == Logging::ALLOWED) {
+          std::cerr << "(remove_edge) cannot remove self loop on node "
+                    << src_full << " when self loop is not even permitted\n";
+        }
         return 0;
       }
     }
     NeighborsContainerType& src_neighbors = get_out_neighbors(src_pos);
     if constexpr (multi_edge == MultiEdge::DISALLOWED) {  // remove at most 1
-      NeighborsIterator src_remove_pos = detail::container::find(src_neighbors, tgt_full);
+      NeighborsIterator src_remove_pos =
+          detail::container::find(src_neighbors, tgt_full);
       if (src_remove_pos == src_neighbors.cend()) {
-        std::cerr << "(remove_edge) edge (" << src_full << ", " << tgt_full << ") not found\n";
+        if constexpr (logging == Logging::ALLOWED) {
+          std::cerr << "(remove_edge) edge (" << src_full << ", " << tgt_full
+                    << ") not found\n";
+        }
         return 0;
       }
       remove_edge(ConstIterator{src_pos}, src_remove_pos);
       --num_of_edges;
       return 1;
-    } else {  // remove all edges between src and tgt, potentially removing no edge at all
+    } else {  // remove all edges between src and tgt, potentially removing no
+              // edge at all
       static_assert(multi_edge == MultiEdge::ALLOWED);
-      static_assert(neighbors_container_spec != Container::SET &&
+      static_assert(neighbors_container_spec != Container::SET and
                     neighbors_container_spec != Container::UNORDERED_SET);
       int num_edges_removed = 0;
       if constexpr (has_edge_prop) {  // remove prop too
-        const auto [src_remove_begin, src_remove_end] = find_remove_range(src_neighbors, tgt_full);
+        const auto [src_remove_begin, src_remove_end] =
+            find_remove_range(src_neighbors, tgt_full);
         // loop through this range to remove prop
         for (auto it = src_remove_begin; it != src_remove_end; ++it) {
           ++num_edges_removed;
@@ -1333,14 +1518,19 @@ class Graph : private detail::EdgePropListBase<EdgePropType>,
         // erase this range itself
         src_neighbors.erase(src_remove_begin, src_remove_end);
       } else {  // simply erase all
-        num_edges_removed = detail::container::erase_all(src_neighbors, tgt_full);
+        num_edges_removed =
+            detail::container::erase_all(src_neighbors, tgt_full);
       }
-      if (src_pos != tgt_pos || direction == EdgeDirection::DIRECTED) {
-        int num_tgt_removed = detail::container::erase_all(get_in_neighbors(tgt_pos), src_full);
+      if (src_pos != tgt_pos or direction == EdgeDirection::DIRECTED) {
+        int num_tgt_removed =
+            detail::container::erase_all(get_in_neighbors(tgt_pos), src_full);
         assert(num_edges_removed == num_tgt_removed);
       }
-      if (num_edges_removed == 0) {
-        std::cerr << "(remove_edge) edge (" << src_full << ", " << tgt_full << ") not found\n";
+      if constexpr (logging == Logging::ALLOWED) {
+        if (num_edges_removed == 0) {
+          std::cerr << "(remove_edge) edge (" << src_full << ", " << tgt_full
+                    << ") not found\n";
+        }
       }
       num_of_edges -= num_edges_removed;
       return num_edges_removed;
@@ -1351,28 +1541,27 @@ class Graph : private detail::EdgePropListBase<EdgePropType>,
   template <bool OutIn>
   void purge_edge_with(AdjListIterType pos) noexcept {
     const NodeType& node = pos->first;
-    NeighborsContainerType& neighbors = [ this, &pos ]() -> auto& {
+    NeighborsContainerType& neighbors = [this, &pos]() -> auto& {
       if constexpr (OutIn) {
         return get_out_neighbors(pos);
       } else {
         return get_in_neighbors(pos);
       }
-    }
-    ();
+    }();
     NeighborsIterator nbr_begin = neighbors.begin();
     NeighborsIterator nbr_end = neighbors.end();
     // this loop should be enough for undirected graphs
     for (auto it = nbr_begin; it != nbr_end; ++it) {
       // purge edges that has to do with the to-be-removed node
       AdjListIterType neighbor_pos = adj_list.find(get_neighbor_node(it));
-      NeighborsContainerType& neighbors_of_neighbor = [ this, &neighbor_pos ]() -> auto& {
+      NeighborsContainerType& neighbors_of_neighbor =
+          [this, &neighbor_pos]() -> auto& {
         if constexpr (OutIn) {
           return get_in_neighbors(neighbor_pos);
         } else {
           return get_out_neighbors(neighbor_pos);
         }
-      }
-      ();
+      }();
       if constexpr (self_loop == SelfLoop::DISALLOWED) {
         detail::container::erase_all(neighbors_of_neighbor, node);
       } else {
@@ -1388,14 +1577,17 @@ class Graph : private detail::EdgePropListBase<EdgePropType>,
   }
 
  public:  // node removal
-  // we can allow removal of several nodes by iterator because erase does not invalidate other
-  // iterators
+  // we can allow removal of several nodes by iterator because erase does not
+  // invalidate other iterators
   template <typename T>
   int remove_nodes(const T& node_iv) noexcept {
     auto pos = find_by_iter_or_by_value(node_iv);
     if (pos == adj_list.end()) {  // no-op if not found
-      print_by_iter_or_by_value(std::cerr << "(remove_nodes) removing non-existent node", node_iv)
-          << "\n";
+      if constexpr (logging == Logging::ALLOWED) {
+        print_by_iter_or_by_value(
+            std::cerr << "(remove_nodes) removing non-existent node", node_iv)
+            << "\n";
+      }
       return 0;
     }
     purge_edge_with<true>(pos);  // purge all edges going out of node
@@ -1408,7 +1600,8 @@ class Graph : private detail::EdgePropListBase<EdgePropType>,
     int num_edges_purged = out_nbrs.size();
     if constexpr (direction == EdgeDirection::DIRECTED) {
       num_edges_purged += get_in_neighbors(pos).size();
-      if constexpr (self_loop == SelfLoop::ALLOWED) {  // we would be double counting self-edges
+      if constexpr (self_loop == SelfLoop::ALLOWED) {  // we would be double
+                                                       // counting self-edges
         num_edges_purged -= detail::container::count(out_nbrs, pos->first);
       }
     }
@@ -1423,6 +1616,6 @@ class Graph : private detail::EdgePropListBase<EdgePropType>,
   }
   // END OF node removal
 };
-}
+}  // namespace graph_lite
 
 #endif  // GSK_GRAPH_LITE_H

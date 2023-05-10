@@ -24,6 +24,13 @@ target_link_libraries(largeSceneTest manifold)
 target_compile_options(largeSceneTest PRIVATE ${MANIFOLD_FLAGS})
 target_compile_features(largeSceneTest PUBLIC cxx_std_17)
 
+if(MANIFOLD_EXPORT)
+  add_executable(convertFile convert_file.cpp)
+  target_link_libraries(convertFile manifold meshIO)
+  target_compile_options(convertFile PRIVATE ${MANIFOLD_FLAGS})
+  target_compile_features(convertFile PUBLIC cxx_std_17)
+endif()
+
 if(BUILD_TEST_CGAL)
     add_executable(perfTestCGAL perf_test_cgal.cpp)
     find_package(CGAL REQUIRED COMPONENTS Core)

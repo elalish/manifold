@@ -60,7 +60,8 @@ TEST(CrossSection, RoundOffset) {
     ExportMesh("cross_section_round_offset.glb", result.GetMesh(), {});
 #endif
 
-  EXPECT_TRUE(result.IsManifold());
+  EXPECT_EQ(result.Genus(), 0);
+  EXPECT_NEAR(result.GetProperties().volume, 4393, 1);
 }
 
 TEST(CrossSection, Empty) {

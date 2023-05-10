@@ -157,6 +157,42 @@ MeshGL TetGL() {
   return tet;
 }
 
+// STL-style meshGL with face normals. Not manifold, requires Merge().
+MeshGL CubeSTL() {
+  const MeshGL cubeIn = Manifold::Cube(glm::vec3(1), true).GetMeshGL();
+  MeshGL cube;
+  cube.numProp = 6;
+
+  for (int tri = 0, vert = 0; tri < cubeIn.NumTri(); tri++) {
+    glm::mat3 triPos;
+    for (const int i : {0, 1, 2}) {
+      cube.triVerts.push_back(vert++);
+
+      for (const int j : {0, 1, 2}) {
+        triPos[i][j] =
+            cubeIn
+                .vertProperties[cubeIn.numProp * cubeIn.triVerts[3 * tri + i] +
+                                j];
+      }
+    }
+
+    const glm::vec3 normal = glm::normalize(
+        glm::cross(triPos[1] - triPos[0], triPos[2] - triPos[0]));
+    for (const int i : {0, 1, 2}) {
+      for (const int j : {0, 1, 2}) {
+        cube.vertProperties.push_back(triPos[i][j]);
+      }
+      for (const int j : {0, 1, 2}) {
+        cube.vertProperties.push_back(normal[j]);
+      }
+    }
+  }
+
+  cube.runOriginalID.push_back(Manifold::ReserveIDs(1));
+
+  return cube;
+}
+
 MeshGL WithIndexColors(const Mesh& in) {
   MeshGL inGL(in);
   inGL.runOriginalID = {Manifold::ReserveIDs(1)};
@@ -228,10 +264,10 @@ void Identical(const Mesh& mesh1, const Mesh& mesh2) {
 }
 
 void RelatedGL(const Manifold& out, const std::vector<MeshGL>& originals,
-               bool checkNormals) {
+               bool checkNormals, bool updateNormals) {
   ASSERT_FALSE(out.IsEmpty());
   const glm::ivec3 normalIdx =
-      checkNormals ? glm::ivec3(3, 4, 5) : glm::ivec3(0);
+      updateNormals ? glm::ivec3(3, 4, 5) : glm::ivec3(0);
   MeshGL output = out.GetMeshGL(normalIdx);
   for (int run = 0; run < output.runOriginalID.size(); ++run) {
     const float* m = output.runTransform.data() + 12 * run;
@@ -289,8 +325,7 @@ void RelatedGL(const Manifold& out, const std::vector<MeshGL>& originals,
         if (checkNormals) {
           glm::vec3 normal;
           for (int k : {0, 1, 2})
-            normal[k] =
-                output.vertProperties[vert * output.numProp + normalIdx[k]];
+            normal[k] = output.vertProperties[vert * output.numProp + 3 + k];
           ASSERT_NEAR(glm::length(normal), 1, 0.0001);
           ASSERT_GT(glm::dot(normal, outNormal), 0);
         } else {
@@ -319,7 +354,6 @@ void RelatedGL(const Manifold& out, const std::vector<MeshGL>& originals,
 void ExpectMeshes(const Manifold& manifold,
                   const std::vector<MeshSize>& meshSize) {
   EXPECT_FALSE(manifold.IsEmpty());
-  EXPECT_TRUE(manifold.IsManifold());
   EXPECT_TRUE(manifold.MatchesTriNormals());
   std::vector<Manifold> manifolds = manifold.Decompose();
   ASSERT_EQ(manifolds.size(), meshSize.size());
@@ -329,7 +363,6 @@ void ExpectMeshes(const Manifold& manifold,
                                                 : a.NumTri() > b.NumTri();
             });
   for (int i = 0; i < manifolds.size(); ++i) {
-    EXPECT_TRUE(manifolds[i].IsManifold());
     EXPECT_EQ(manifolds[i].NumVert(), meshSize[i].numVert);
     EXPECT_EQ(manifolds[i].NumTri(), meshSize[i].numTri);
     EXPECT_EQ(manifolds[i].NumProp(), meshSize[i].numProp);
@@ -345,8 +378,7 @@ void ExpectMeshes(const Manifold& manifold,
   }
 }
 
-void CheckManifold(const Manifold& manifold) {
-  EXPECT_TRUE(manifold.IsManifold());
+void CheckNormals(const Manifold& manifold) {
   EXPECT_TRUE(manifold.MatchesTriNormals());
   for (const glm::vec3& normal : manifold.GetMesh().vertNormal) {
     ASSERT_NEAR(glm::length(normal), 1, 0.0001);
@@ -354,8 +386,7 @@ void CheckManifold(const Manifold& manifold) {
 }
 
 void CheckStrictly(const Manifold& manifold) {
-  EXPECT_TRUE(manifold.IsManifold());
-  EXPECT_TRUE(manifold.MatchesTriNormals());
+  CheckNormals(manifold);
   EXPECT_EQ(manifold.NumDegenerateTris(), 0);
 }
 

@@ -14,6 +14,10 @@
 
 #include <thrust/sequence.h>
 
+#include <numeric>
+#include <set>
+
+#include "graph.h"
 #include "impl.h"
 #include "par.h"
 
@@ -192,6 +196,44 @@ struct ReindexFace {
   }
 };
 
+struct VertMortonBox {
+  const float* vertProperties;
+  const uint32_t numProp;
+  const float tol;
+  const Box bBox;
+
+  __host__ __device__ void operator()(
+      thrust::tuple<uint32_t&, Box&, int> inout) {
+    uint32_t& mortonCode = thrust::get<0>(inout);
+    Box& vertBox = thrust::get<1>(inout);
+    int vert = thrust::get<2>(inout);
+
+    const glm::vec3 center(vertProperties[numProp * vert],
+                           vertProperties[numProp * vert + 1],
+                           vertProperties[numProp * vert + 2]);
+
+    vertBox.min = center - tol / 2;
+    vertBox.max = center + tol / 2;
+
+    mortonCode = MortonCode(center, bBox);
+  }
+};
+
+struct Duplicate {
+  __host__ __device__ thrust::pair<float, float> operator()(float x) {
+    return thrust::make_pair(x, x);
+  }
+};
+
+struct MinMax : public thrust::binary_function<thrust::pair<float, float>,
+                                               thrust::pair<float, float>,
+                                               thrust::pair<float, float>> {
+  __host__ __device__ thrust::pair<float, float> operator()(
+      thrust::pair<float, float> a, thrust::pair<float, float> b) {
+    return thrust::make_pair(glm::min(a.first, b.first),
+                             glm::max(a.second, b.second));
+  }
+};
 }  // namespace
 
 namespace manifold {
@@ -254,6 +296,8 @@ void Manifold::Impl::Finish() {
 
   CalculateNormals();
   collider_ = Collider(faceBox, faceMorton);
+
+  ASSERT(Is2Manifold(), logicErr, "mesh is not 2-manifold!");
 }
 
 /**
@@ -431,5 +475,138 @@ void Manifold::Impl::GatherFaces(const Impl& old,
              ReindexFace({halfedge_.ptrD(), halfedgeTangent_.ptrD(),
                           old.halfedge_.cptrD(), old.halfedgeTangent_.cptrD(),
                           faceNew2Old.cptrD(), faceOld2New.cptrD()}));
+}
+
+/// Constructs a position-only MeshGL from the input Mesh.
+MeshGL::MeshGL(const Mesh& mesh) {
+  numProp = 3;
+  precision = mesh.precision;
+  vertProperties.resize(numProp * mesh.vertPos.size());
+  for (int i = 0; i < mesh.vertPos.size(); ++i) {
+    for (int j : {0, 1, 2}) vertProperties[3 * i + j] = mesh.vertPos[i][j];
+  }
+  triVerts.resize(3 * mesh.triVerts.size());
+  for (int i = 0; i < mesh.triVerts.size(); ++i) {
+    for (int j : {0, 1, 2}) triVerts[3 * i + j] = mesh.triVerts[i][j];
+  }
+  halfedgeTangent.resize(4 * mesh.halfedgeTangent.size());
+  for (int i = 0; i < mesh.halfedgeTangent.size(); ++i) {
+    for (int j : {0, 1, 2, 3})
+      halfedgeTangent[4 * i + j] = mesh.halfedgeTangent[i][j];
+  }
+}
+
+/**
+ * Updates the mergeFromVert and mergeToVert vectors in order to create a
+ * manifold solid. If the MeshGL is already manifold, no change will occur and
+ * the function will return false. Otherwise, this will merge verts along open
+ * edges within precision (the maximum of the MeshGL precision and the baseline
+ * bounding-box precision), keeping any from the existing merge vectors.
+ *
+ * There is no guarantee the result will be manifold - this is a best-effort
+ * helper function designed primarily to aid in the case where a manifold
+ * multi-material MeshGL was produced, but its merge vectors were lost due to a
+ * round-trip through a file format. Constructing a Manifold from the result
+ * will report a Status if it is not manifold.
+ */
+bool MeshGL::Merge() {
+  std::multiset<std::pair<int, int>> openEdges;
+
+  std::vector<int> merge(NumVert());
+  std::iota(merge.begin(), merge.end(), 0);
+  for (int i = 0; i < mergeFromVert.size(); ++i) {
+    merge[mergeFromVert[i]] = mergeToVert[i];
+  }
+
+  const int numVert = NumVert();
+  const int numTri = NumTri();
+  const int next[3] = {1, 2, 0};
+  for (int tri = 0; tri < numTri; ++tri) {
+    for (int i : {0, 1, 2}) {
+      auto edge = std::make_pair(merge[triVerts[3 * tri + next[i]]],
+                                 merge[triVerts[3 * tri + i]]);
+      auto it = openEdges.find(edge);
+      if (it == openEdges.end()) {
+        std::swap(edge.first, edge.second);
+        openEdges.insert(edge);
+      } else {
+        openEdges.erase(it);
+      }
+    }
+  }
+
+  if (openEdges.empty()) {
+    return false;
+  }
+
+  const int numOpenVert = openEdges.size();
+  VecDH<int> openVerts(numOpenVert);
+  int i = 0;
+  for (const auto& edge : openEdges) {
+    const int vert = edge.first;
+    openVerts[i++] = vert;
+  }
+
+  VecDH<float> vertPropD(vertProperties);
+  Box bBox;
+  for (const int i : {0, 1, 2}) {
+    strided_range<VecDH<float>::Iter> iPos(vertPropD.begin() + i,
+                                           vertPropD.end(), numProp);
+    auto minMax = transform_reduce<thrust::pair<float, float>>(
+        autoPolicy(numVert), iPos.begin(), iPos.end(), Duplicate(),
+        thrust::make_pair(std::numeric_limits<float>::infinity(),
+                          -std::numeric_limits<float>::infinity()),
+        MinMax());
+    bBox.min[i] = minMax.first;
+    bBox.max[i] = minMax.second;
+  }
+  precision = MaxPrecision(precision, bBox);
+  if (precision < 0) return false;
+
+  auto policy = autoPolicy(numOpenVert);
+  VecDH<Box> vertBox(numOpenVert);
+  VecDH<uint32_t> vertMorton(numOpenVert);
+
+  for_each_n(policy,
+             zip(vertMorton.begin(), vertBox.begin(), openVerts.cbegin()),
+             numOpenVert,
+             VertMortonBox({vertPropD.cptrD(), numProp, precision, bBox}));
+
+  sort_by_key(policy, vertMorton.begin(), vertMorton.end(),
+              zip(vertBox.begin(), openVerts.begin()));
+
+  Collider collider(vertBox, vertMorton);
+  SparseIndices toMerge = collider.Collisions<true>(vertBox);
+
+  Graph graph;
+  for (int i = 0; i < numVert; ++i) {
+    graph.add_nodes(i);
+  }
+  for (int i = 0; i < mergeFromVert.size(); ++i) {
+    graph.add_edge(static_cast<int>(mergeFromVert[i]),
+                   static_cast<int>(mergeToVert[i]));
+  }
+  for (int i = 0; i < toMerge.size(); ++i) {
+    graph.add_edge(openVerts[toMerge.Get(0)[i]], openVerts[toMerge.Get(1)[i]]);
+  }
+
+  std::vector<int> vertLabels;
+  const int numLabels = ConnectedComponents(vertLabels, graph);
+  std::vector<int> label2vert(numLabels);
+  for (int v = 0; v < numVert; ++v) {
+    label2vert[vertLabels[v]] = v;
+  }
+
+  mergeToVert.clear();
+  mergeFromVert.clear();
+  for (int v = 0; v < numVert; ++v) {
+    const int mergeTo = label2vert[vertLabels[v]];
+    if (mergeTo != v) {
+      mergeFromVert.push_back(v);
+      mergeToVert.push_back(mergeTo);
+    }
+  }
+
+  return true;
 }
 }  // namespace manifold

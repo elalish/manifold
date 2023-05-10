@@ -35,4 +35,4 @@ add_custom_command(
         COMMAND ${CMAKE_COMMAND} -E copy
                 ${CMAKE_CURRENT_BINARY_DIR}/manifold.*
                 ${CMAKE_CURRENT_BINARY_DIR}/manifold-*.d.ts
-                ${CMAKE_CURRENT_BINARY_DIR}/examples/)
+                ${CMAKE_CURRENT_SOURCE_DIR}/examples/built/)

@@ -43,9 +43,7 @@ struct FaceAreaVolume {
     float area = glm::length(crossP);
     float volume = glm::dot(crossP, vertPos[halfedges[3 * face].startVert]);
 
-    return area > perimeter * precision
-               ? thrust::make_pair(area / 2.0f, volume / 6.0f)
-               : thrust::make_pair(0.0f, 0.0f);
+    return thrust::make_pair(area / 2.0f, volume / 6.0f);
   }
 };
 
@@ -156,7 +154,7 @@ struct NormalizeCurvature {
   }
 };
 
-struct CheckManifold {
+struct CheckNormals {
   const Halfedge* halfedges;
 
   __host__ __device__ bool operator()(int edge) {
@@ -243,7 +241,7 @@ bool Manifold::Impl::IsManifold() const {
   auto policy = autoPolicy(halfedge_.size());
 
   return all_of(policy, countAt(0), countAt(halfedge_.size()),
-                CheckManifold({halfedge_.cptrD()}));
+                CheckNormals({halfedge_.cptrD()}));
 }
 
 /**
