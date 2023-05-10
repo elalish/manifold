@@ -1,6 +1,7 @@
 package manifold3d;
 
 import manifold3d.FloatVec4;
+import manifold3d.FloatVec4Vector;
 import org.bytedeco.javacpp.*;
 import org.bytedeco.javacpp.annotation.*;
 
