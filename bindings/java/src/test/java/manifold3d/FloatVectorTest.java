@@ -16,6 +16,8 @@ public class FloatVectorTest {
 
         assert vec3.get(0) == vec3.x();
         assert vec3.get(2) != vec4.get(3);
+
+        assert vec3 == vec3;
     }
 
 }
