@@ -51,8 +51,10 @@
                         <includePath>${project.build.sourceDirectory}</includePath>
                         <includePath>../../src/cross_section/include/</includePath>
                         <includePath>../../src/third_party/clipper2/CPP/Clipper2Lib/include/</includePath>
-                        <includePath>../../src/third_party/glm/glm/</includePath>
-                        <includePath>../../manifold/src/utilities/include/</includePath>
+                        <includePath>../../src/third_party/glm/</includePath>
+                        <includePath>../../src/manifold/include/</includePath>
+                        <includePath>../../src/utilities/include/</includePath>
+                        <includePath>../../meshIO/include/</includePath>
                     </includePaths>
                     <copyLibs>true</copyLibs>
                 </configuration>

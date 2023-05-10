@@ -3,7 +3,7 @@ package manifold3d;
 import org.bytedeco.javacpp.*;
 import org.bytedeco.javacpp.annotation.*;
 
-@Platform(include = "glm.hpp")
+@Platform(include = "glm/glm.hpp")
 @Namespace("glm")
 @Name("vec3")
 public class DoubleVec3 extends DoublePointer {
