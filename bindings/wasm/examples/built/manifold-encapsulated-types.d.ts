@@ -435,6 +435,7 @@ export class Mesh {
   get numTri(): number;
   get numVert(): number;
   get numRun(): number;
+  merge(): boolean;
   verts(tri: number): SealedUint32Array<3>;
   position(vert: number): SealedFloat32Array<3>;
   extras(vert: number): Float32Array;
