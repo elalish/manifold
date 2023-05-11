@@ -18,6 +18,8 @@ public class FloatVec4VectorTest {
         vec4array.pushBack(vec4);
 
         assert vec4array.get(1).get(1) == 2.0f;
+
+        assert vec4array.size() == 2;
     }
 
 }
