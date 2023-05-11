@@ -16,5 +16,10 @@ public class DoubleVec4Vector extends Pointer {
     public native void resize(@Cast("size_t") long n);
 
     @Name("operator[]") public native @ByRef DoubleVec4 get(@Cast("size_t") long i);
+
+    public void set(@Cast("size_t") long i, DoubleVec4 value) {
+        get(i).put(value);
+    }
+
     @Name("push_back") public native void pushBack(@ByRef DoubleVec4 value);
 }

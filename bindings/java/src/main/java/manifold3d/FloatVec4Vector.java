@@ -17,4 +17,8 @@ public class FloatVec4Vector extends Pointer {
 
     @Name("operator[]") public native @ByRef FloatVec4 get(@Cast("size_t") long i);
     @Name("push_back") public native void pushBack(@ByRef FloatVec4 value);
+
+    public void set(@Cast("size_t") long i, FloatVec4 value) {
+        get(i).put(value);
+    }
 }

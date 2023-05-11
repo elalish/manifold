@@ -19,7 +19,11 @@ public class FloatVec4VectorTest {
 
         assert vec4array.get(1).get(1) == 2.0f;
 
-        assert vec4array.size() == 2;
+        assert vec4array.size() == 2.0;
+
+        vec4array.set(1, new FloatVec4(5.0f, 6.0f, 7.0f, 8.0f));
+
+        assert vec4array.get(1).get(1) == 6.0;
     }
 
 }

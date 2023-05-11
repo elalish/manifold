@@ -4,6 +4,7 @@ import manifold3d.FloatVec4;
 import manifold3d.FloatVec3Vector;
 import manifold3d.FloatVec4Vector;
 import manifold3d.DoubleVec3Vector;
+import manifold3d.DoubleMat4x3;
 import manifold3d.IntegerVec3Vector;
 import manifold3d.FloatVec4;
 import manifold3d.IntegerVec3;
@@ -17,30 +18,119 @@ import org.bytedeco.javacpp.annotation.*;
 public class Public {
     static { Loader.load(); }
 
-    public class Mesh extends Pointer {
-        public Mesh() { allocate(); }
+    @Name("Mesh")
+    public class DoubleMesh extends Pointer {
+        public DoubleMesh() { allocate(); }
         public native void allocate();
 
-        @Name("vertPos") public native @MemberGetter @ByRef FloatVec3Vector vertPosFloat();
-        @Name("vertPos") public native @MemberSetter void vertPosFloat(@ByRef FloatVec3Vector vertPosDouble);
-        @Name("vertPos") public native @MemberGetter @ByRef DoubleVec3Vector vertPosDouble();
-        @Name("vertPos") public native @MemberSetter void vertPosDouble(@ByRef DoubleVec3Vector vertPosDouble);
+        public native @MemberGetter @ByRef DoubleVec3Vector vertPos();
+        public native @MemberSetter void vertPos(@ByRef DoubleVec3Vector vertPos);
 
         public native @MemberGetter @ByRef IntegerVec3Vector triVerts();
         public native @MemberSetter void triVerts(@ByRef IntegerVec3Vector triVerts);
 
-        @Name("vertNormal") public native @MemberGetter @ByRef FloatVec3Vector vertNormalFloat();
-        @Name("vertNormal") public native @MemberSetter void vertNormalFloat(@ByRef FloatVec3Vector vertNormalFloat);
-        @Name("vertNormal") public native @MemberGetter @ByRef DoubleVec3Vector vertNormalDouble();
-        @Name("vertNormal") public native @MemberSetter void vertNormalFloat(@ByRef DoubleVec3Vector vertNormalDouble);
+        public native @MemberGetter @ByRef DoubleVec3Vector vertNormal();
+        public native @MemberSetter void vertNormal(@ByRef DoubleVec3Vector vertNormal);
 
-        @Name("halfedgeTangent") public native @MemberGetter @ByRef FloatVec4Vector halfedgeTangentFloat();
-        @Name("halfedgeTangent") public native @MemberSetter void halfedgeTangentFloat(@ByRef FloatVec4Vector halfedgeTangentFloat);
-        @Name("halfedgeTangent") public native @MemberGetter @ByRef DoubleVec4Vector halfedgeTangentDouble();
-        @Name("halfedgeTangent") public native @MemberSetter void halfedgeTangentDouble(@ByRef DoubleVec4Vector halfedgeTangentDouble);
+        public native @MemberGetter @ByRef DoubleVec4Vector halfedgeTangent();
+        public native @MemberSetter void halfedgeTangent(@ByRef DoubleVec4Vector halfedgeTangent);
 
         public native @MemberGetter float precision();
         public native @MemberSetter void precision(float precision);
 
+    }
+
+    @Name("Mesh")
+    public class FloatMesh extends Pointer {
+        public FloatMesh() { allocate(); }
+        public native void allocate();
+
+        public native @MemberGetter @ByRef FloatVec3Vector vertPos();
+        public native @MemberSetter void vertPos(@ByRef FloatVec3Vector vertPos);
+
+        public native @MemberGetter @ByRef IntegerVec3Vector triVerts();
+        public native @MemberSetter void triVerts(@ByRef IntegerVec3Vector triVerts);
+
+        public native @MemberGetter @ByRef FloatVec3Vector vertNormal();
+        public native @MemberSetter void vertNormal(@ByRef FloatVec3Vector vertNormal);
+
+        public native @MemberGetter @ByRef FloatVec4Vector halfedgeTangent();
+        public native @MemberSetter void halfedgeTangent(@ByRef FloatVec4Vector halfedgeTangent);
+
+        public native @MemberGetter float precision();
+        public native @MemberSetter void precision(float precision);
+    }
+
+    public class Smoothness extends Pointer {
+        public Smoothness() { allocate(); }
+        public native void allocate();
+
+        public native @MemberGetter int halfedge();
+        public native @MemberSetter void halfedge(float halfedge);
+
+        public native @MemberGetter float smoothness();
+        public native @MemberSetter void smoothness(float smoothness);
+    }
+
+    public class Properties extends Pointer {
+        public Properties() { allocate(); }
+        public native void allocate();
+
+        public native @MemberGetter float surfaceArea();
+        public native @MemberSetter void surfaceArea(float surfaceArea);
+
+        public native @MemberGetter float volume();
+        public native @MemberSetter void volume(float volume);
+    }
+
+
+    public class Curvature extends Pointer {
+        public Curvature() { allocate(); }
+        public native void allocate();
+
+        public native @MemberGetter float maxMeanCurvature();
+        public native @MemberSetter void maxMeanCurvature(float maxMeanCurvature);
+
+        public native @MemberGetter float minMeanCurvature();
+        public native @MemberSetter void minMeanCurvature(float minMeanCurvature);
+
+        public native @MemberGetter float maxGaussianCurvature();
+        public native @MemberSetter void maxGaussianCurvature(float maxGaussianCurvature);
+
+        public native @MemberGetter float minGaussianCurvature();
+        public native @MemberSetter void minGaussianCurvature(float minGaussianCurvature);
+
+    }
+
+    public class Box extends Pointer {
+        public Box() { allocate(); }
+        private native void allocate();
+
+        public Box(@ByRef DoubleVec3 p1, @ByRef DoubleVec3 p2) { allocate(p1, p2); }
+        private native void allocate(@ByRef DoubleVec3 p1, @ByRef DoubleVec3 p2);
+
+        public native @ByVal DoubleVec3 Size();
+        public native @ByVal DoubleVec3 Center();
+        public native float Scale();
+        public native boolean Contains(@ByRef DoubleVec3 p);
+
+        public native boolean Contains(@ByRef Box box);
+        public native void Union(@ByRef DoubleVec3 p);
+        public native @ByVal Box Union(@ByRef Box box);
+        public native @ByVal Box Transform(@ByRef DoubleMat4x3 transform);
+
+        @Name("operator+")
+        public native @ByVal Box add(@ByRef DoubleVec3 shift);
+        @Name("operator+=")
+        public native @ByRef Box addPut(@ByRef DoubleVec3 shift);
+
+        @Name("operator*")
+        public native @ByVal Box multiply(@ByRef DoubleVec3 scale);
+        @Name("operator*=")
+        public native @ByRef Box multiplyPut(@ByRef DoubleVec3 scale);
+
+        public native boolean DoesOverlap(@ByRef Box box);
+        public native boolean DoesOverlap(@ByRef DoubleVec3 p);
+        public native boolean IsFinite();
     }
 }
