@@ -133,4 +133,29 @@ public class Public {
         public native boolean DoesOverlap(@ByRef DoubleVec3 p);
         public native boolean IsFinite();
     }
+
+    public class OpType {
+        public static final int
+            Add = 0,
+            Subtract = 1,
+            Intersect = 2;
+    }
+
+    public class ExecutionParams extends Pointer {
+
+        public ExecutionParams() { allocate(); }
+        private native void allocate();
+
+        public native @Cast("bool") boolean intermediateChecks();
+        public native ExecutionParams intermediateChecks(boolean intermediateChecks);
+
+        public native @Cast("bool") boolean verbose();
+        public native ExecutionParams verbose(boolean verbose);
+
+        public native @Cast("bool") boolean processOverlaps();
+        public native ExecutionParams processOverlaps(boolean processOverlaps);
+
+        public native @Cast("bool") boolean suppressErrors();
+        public native ExecutionParams suppressErrors(boolean suppressErrors);
+    }
 }
