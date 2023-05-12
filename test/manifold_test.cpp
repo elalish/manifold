@@ -1090,10 +1090,10 @@ TEST(Manifold, Invalid) {
 }
 
 TEST(Manifold, MultiCompose) {
-  auto legAssembly = Manifold::Compose({Manifold::Cube({100, 140, 38})});
-  auto finalAssembly = Manifold::Compose(
-      {legAssembly, legAssembly.Translate({0, 300, 0}),
-       legAssembly.Mirror({1, 0, 0}).Translate({300, 0, 0}),
-       legAssembly.Mirror({1, 0, 0}).Translate({300, 300, 0})});
-  finalAssembly.GetMesh();
+  auto part = Manifold::Compose({Manifold::Cube({10, 10, 10})});
+  auto finalAssembly =
+      Manifold::Compose({part, part.Translate({0, 10, 0}),
+                         part.Mirror({1, 0, 0}).Translate({10, 0, 0}),
+                         part.Mirror({1, 0, 0}).Translate({10, 10, 0})});
+  EXPECT_FLOAT_EQ(finalAssembly.GetProperties().volume, 4000);
 }
