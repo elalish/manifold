@@ -1088,3 +1088,12 @@ TEST(Manifold, Invalid) {
   EXPECT_EQ(Manifold::Extrude(empty_circ, 10.).Status(), invalid);
   EXPECT_EQ(Manifold::Revolve(empty_sq).Status(), invalid);
 }
+
+TEST(Manifold, MultiCompose) {
+  auto legAssembly = Manifold::Compose({Manifold::Cube({100, 140, 38})});
+  auto finalAssembly = Manifold::Compose(
+      {legAssembly, legAssembly.Translate({0, 300, 0}),
+       legAssembly.Mirror({1, 0, 0}).Translate({300, 0, 0}),
+       legAssembly.Mirror({1, 0, 0}).Translate({300, 300, 0})});
+  finalAssembly.GetMesh();
+}
