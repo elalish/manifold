@@ -221,13 +221,13 @@ Manifold::Impl CsgLeafNode::Compose(
               combined.halfedge_.begin() + edgeIndices[i],
               UpdateHalfedge({vertIndices[i], edgeIndices[i], triIndices[i]}));
           const bool invert = glm::determinant(glm::mat3(node->transform_)) < 0;
-          for_each_n(
-              policy,
-              zip(combined.halfedgeTangent_.begin(), countAt(edgeIndices[i])),
-              node->pImpl_->halfedgeTangent_.size(),
-              TransformTangents{glm::mat3(node->transform_), invert,
-                                node->pImpl_->halfedgeTangent_.cptrD(),
-                                node->pImpl_->halfedge_.cptrD()});
+          for_each_n(policy,
+                     zip(combined.halfedgeTangent_.begin() + edgeIndices[i],
+                         countAt(0)),
+                     node->pImpl_->halfedgeTangent_.size(),
+                     TransformTangents{glm::mat3(node->transform_), invert,
+                                       node->pImpl_->halfedgeTangent_.cptrD(),
+                                       node->pImpl_->halfedge_.cptrD()});
           if (invert)
             for_each_n(policy,
                        zip(combined.meshRelation_.triRef.begin(),
