@@ -1088,3 +1088,12 @@ TEST(Manifold, Invalid) {
   EXPECT_EQ(Manifold::Extrude(empty_circ, 10.).Status(), invalid);
   EXPECT_EQ(Manifold::Revolve(empty_sq).Status(), invalid);
 }
+
+TEST(Manifold, MultiCompose) {
+  auto part = Manifold::Compose({Manifold::Cube({10, 10, 10})});
+  auto finalAssembly =
+      Manifold::Compose({part, part.Translate({0, 10, 0}),
+                         part.Mirror({1, 0, 0}).Translate({10, 0, 0}),
+                         part.Mirror({1, 0, 0}).Translate({10, 10, 0})});
+  EXPECT_FLOAT_EQ(finalAssembly.GetProperties().volume, 4000);
+}
