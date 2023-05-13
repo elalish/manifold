@@ -100,7 +100,7 @@
       if (filename.match(/\.(gltf|glb)$/)) {
         URL.revokeObjectURL(inputGLBurl);
         inputGLBurl = URL.createObjectURL(file);
-        writeGLB(await readGLB(inputGLBurl));
+        await writeGLB(await readGLB(inputGLBurl));
         updateUI();
         break;
       }

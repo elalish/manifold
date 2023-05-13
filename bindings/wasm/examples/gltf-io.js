@@ -144,14 +144,13 @@ export function writeMesh(doc, manifoldMesh, attributes, materials) {
   const buffer = doc.getRoot().listBuffers()[0];
   const manifoldExtension = doc.createExtension(EXTManifold);
 
-  const indices = doc.createAccessor('indices')
-                      .setBuffer(buffer)
-                      .setType(Accessor.Type.SCALAR)
-                      .setArray(manifoldMesh.triVerts);
-
   const mesh = doc.createMesh();
   const numPrimitive = manifoldMesh.runIndex.length - 1;
   for (let run = 0; run < numPrimitive; ++run) {
+    const indices = doc.createAccessor('indices')
+                        .setBuffer(buffer)
+                        .setType(Accessor.Type.SCALAR)
+                        .setArray(new Uint32Array());
     const primitive = doc.createPrimitive().setIndices(indices);
     const material = materials[run];
     if (material) {
@@ -197,6 +196,12 @@ export function writeMesh(doc, manifoldMesh, attributes, materials) {
 
   const manifoldPrimitive = manifoldExtension.createManifoldPrimitive();
   mesh.setExtension('EXT_manifold', manifoldPrimitive);
+
+  const indices = doc.createAccessor('indices')
+                      .setBuffer(buffer)
+                      .setType(Accessor.Type.SCALAR)
+                      .setArray(manifoldMesh.triVerts);
+  manifoldPrimitive.setIndices(indices);
   manifoldPrimitive.setRunIndex(manifoldMesh.runIndex);
 
   const vert2merge = [...Array(manifoldMesh.numVert).keys()];
