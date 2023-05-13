@@ -90,11 +90,10 @@ export function readMesh(mesh, attributes, materials) {
 
   let vertPropArray = [];
   let triVertArray = [];
-  const runIndexArray = [];
+  const runIndexArray = [0];
   const mergeFromVert = [];
   const mergeToVert = [];
   if (manifoldPrimitive != null) {
-    runIndexArray.push(0);
     vertPropArray = readPrimitive(primitives[0], numProp, attributes);
     for (const primitive of primitives) {
       triVertArray = [...triVertArray, ...primitive.getIndices().getArray()];
@@ -120,6 +119,7 @@ export function readMesh(mesh, attributes, materials) {
         ...triVertArray,
         ...primitive.getIndices().getArray().map((i) => i + numVert)
       ];
+      runIndexArray.push(triVertArray.length);
       materials.push(primitive.getMaterial());
     }
   }
