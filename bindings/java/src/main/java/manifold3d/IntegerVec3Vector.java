@@ -1,6 +1,6 @@
 package manifold3d;
 
-import manifold3d.IntegerVec3;
+import manifold3d.Glm.IntegerVec3;
 import org.bytedeco.javacpp.*;
 import org.bytedeco.javacpp.annotation.*;
 

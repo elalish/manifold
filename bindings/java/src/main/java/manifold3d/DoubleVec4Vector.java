@@ -1,6 +1,6 @@
 package manifold3d;
 
-import manifold3d.DoubleVec4;
+import manifold3d.Glm.DoubleVec4;
 import org.bytedeco.javacpp.*;
 import org.bytedeco.javacpp.annotation.*;
 

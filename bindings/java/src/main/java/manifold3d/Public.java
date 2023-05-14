@@ -1,14 +1,13 @@
 package manifold3d;
 
-import manifold3d.FloatVec4;
 import manifold3d.FloatVec3Vector;
 import manifold3d.FloatVec4Vector;
 import manifold3d.DoubleVec3Vector;
-import manifold3d.DoubleMat4x3;
 import manifold3d.IntegerVec3Vector;
-import manifold3d.FloatVec4;
-import manifold3d.IntegerVec3;
-import manifold3d.IntegerVec4;
+import manifold3d.Glm.FloatVec4;
+import manifold3d.Glm.IntegerVec3;
+import manifold3d.Glm.IntegerVec4;
+import manifold3d.Glm.DoubleMat4x3;
 
 import org.bytedeco.javacpp.*;
 import org.bytedeco.javacpp.annotation.*;

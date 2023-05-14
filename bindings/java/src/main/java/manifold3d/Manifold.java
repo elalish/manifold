@@ -1,9 +1,9 @@
 package manifold3d;
 
-import manifold3d.FloatVec4;
+import manifold3d.Glm.FloatVec4;
 import manifold3d.FloatVec4Vector;
-import manifold3d.IntegerVec3;
-import manifold3d.IntegerVec4;
+import manifold3d.Glm.IntegerVec3;
+import manifold3d.Glm.IntegerVec4;
 
 import manifold3d.Public.DoubleMesh;
 
@@ -91,7 +91,61 @@ public class Manifold {
         public native float precision();
         public native MeshGL precision(float precision);
 
-        //// MeshGL constructor and other methods
+        // MeshGL constructor and other methods
         public native boolean Merge();
     }
+
+    //public static class Manifold extends Pointer {
+    //    // Constructors and destructor
+    //    public Manifold() { allocate(); }
+    //    private native void allocate();
+
+    //    public Manifold(@ByRef Manifold other) { allocate(other); }
+    //    private native void allocate(@ByRef Manifold other);
+
+    //    public native @ByRef @Name("operator=") Manifold put(@ByRef Manifold other);
+
+    //    public Manifold(@ByRef MeshGL mesh, @ByRef FloatVector propertyTolerance) { allocate(mesh, propertyTolerance); }
+    //    private native void allocate(@ByRef MeshGL mesh, @ByRef FloatVector propertyTolerance);
+
+    //    public Manifold(@ByRef Mesh mesh) { allocate(mesh); }
+    //    private native void allocate(@ByRef Mesh mesh);
+
+    //    // Methods
+    //    public native @ByRef Mesh GetMesh();
+    //    public native @ByRef MeshGL GetMeshGL(@ByRef glm.vec3 normalIdx);
+    //    public native boolean IsEmpty();
+    //    public native @Cast("manifold3d::Manifold::Error") int Status();
+    //    public native int NumVert();
+    //    public native int NumEdge();
+    //    public native int NumTri();
+    //    public native int NumProp();
+    //    public native int NumPropVert();
+    //    public native @ByRef Box BoundingBox();
+    //    public native float Precision();
+    //    public native int Genus();
+    //    public native @ByRef Properties GetProperties();
+    //    public native @ByRef Curvature GetCurvature();
+    //    public native int OriginalID();
+    //    public native @ByRef Manifold AsOriginal();
+
+    //    // Modifiers
+    //    public native @ByRef Manifold Translate(@ByRef glm.vec3 translation);
+    //    public native @ByRef Manifold Scale(@ByRef glm.vec3 scale);
+    //    public native @ByRef Manifold Rotate(float xDegrees, float yDegrees, float zDegrees);
+    //    public native @ByRef Manifold Transform(@ByRef glm.mat4x3 transform);
+    //    public native @ByRef Manifold Mirror(@ByRef glm.vec3 mirrorAxis);
+    //    public native @ByRef Manifold Refine(int refineValue);
+
+    //    // Static methods
+    //    public static native @ByVal Manifold Smooth(@ByRef MeshGL mesh, @ByRef SmoothnessVector sharpenedEdges);
+    //    public static native @ByVal Manifold Smooth(@ByRef Mesh mesh, @ByRef SmoothnessVector sharpenedEdges);
+    //    public static native @ByVal Manifold Tetrahedron();
+    //    public static native @ByVal Manifold Cube(@ByRef glm.vec3 size, boolean center);
+    //    public static native @ByVal Manifold Cylinder(float height, float radiusLow, float radiusHigh, int circularSegments, boolean center);
+    //    public static native @ByVal Manifold Sphere(float radius, int circularSegments);
+    //    public static native @ByVal Manifold Extrude(@ByRef CrossSection crossSection, float height, int nDivisions, float twistDegrees, @ByRef glm.vec2 scaleTop);
+    //    public static native @ByVal Manifold Revolve(@ByRef CrossSection crossSection, int circularSegments);
+    //    public static native @ByVal Manifold Compose(@ByRef ManifoldVector manifolds);
+    //}
 }

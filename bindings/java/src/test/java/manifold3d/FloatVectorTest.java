@@ -1,8 +1,8 @@
 package manifold3d;
 
 import org.junit.Test;
-import manifold3d.FloatVec3;
-import manifold3d.FloatVec4;
+import manifold3d.Glm.FloatVec3;
+import manifold3d.Glm.FloatVec4;
 
 public class FloatVectorTest {
 
