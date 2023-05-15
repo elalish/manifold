@@ -73,7 +73,7 @@ class CrossSection {
     Negative   ///< Only sub-regions with winding counts < 0 are filled.
   };
 
-  CrossSection(const SimplePolygon& contour, bBvter
+  CrossSection(const SimplePolygon& contour,
                FillRule fillrule = FillRule::Positive);
   CrossSection(const Polygons& contours,
                FillRule fillrule = FillRule::Positive);

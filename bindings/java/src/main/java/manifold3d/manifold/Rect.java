@@ -5,13 +5,7 @@ import org.bytedeco.javacpp.annotation.*;
 
 import manifold3d.glm.DoubleVec2;
 import manifold3d.glm.DoubleMat3x2;
-
-@Platform(include = "cross_section.h")
-@Namespace("manifold")
-@Opaque
-class CrossSection extends Pointer {
-    // Empty class for forward declaration
-}
+import manifold3d.manifold.CrossSection;
 
 @Platform(include = "cross_section.h")
 @Namespace("manifold")

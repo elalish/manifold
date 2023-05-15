@@ -1,3 +1,5 @@
+package manifold3d.manifold;
+
 import org.bytedeco.javacpp.*;
 import org.bytedeco.javacpp.annotation.*;
 
@@ -20,7 +22,6 @@ public class CrossSection extends Pointer {
     public native @ByRef CrossSection put(@ByRef CrossSection other);
 
     public enum FillRule {
-        EvenOdd,
         NonZero,
         Positive,
         Negative
@@ -32,18 +33,18 @@ public class CrossSection extends Pointer {
         Miter
     };
 
-    public CrossSection(@ByRef SimplePolygon contour, @Cast("FillRule") int fillrule) { allocate(contour, fillrule); }
-    private native void allocate(@ByRef SimplePolygon contour, @Cast("FillRule") int fillrule);
+    public CrossSection(@ByRef SimplePolygon contour, @Cast("manifold::CrossSection::FillRule") int fillrule) { allocate(contour, fillrule); }
+    private native void allocate(@ByRef SimplePolygon contour, @Cast("manifold::CrossSection::FillRule") int fillrule);
 
-    public CrossSection(@ByRef Polygons contours, @Cast("FillRule") int fillrule) { allocate(contours, fillrule); }
-    private native void allocate(@ByRef Polygons contours, @Cast("FillRule") int fillrule);
+    public CrossSection(@ByRef Polygons contours, @Cast("manifold::CrossSection::FillRule") int fillrule) { allocate(contours, fillrule); }
+    private native void allocate(@ByRef Polygons contours, @Cast("manifold::CrossSection::FillRule") int fillrule);
 
     //// Other methods
     public native @ByVal DoubleVec2 Area();
     public native int NumVert();
     public native int NumContour();
     public native boolean IsEmpty();
-    public native @ByVal Rect Bounds();
+    //public native @ByVal Rect Bounds();
 
     public native @ByVal CrossSection Translate(@ByVal DoubleVec2 v);
     public native @ByVal CrossSection Rotate(float degrees);
@@ -53,23 +54,17 @@ public class CrossSection extends Pointer {
     // Warp method is omitted because of the std::function parameter
     public native @ByVal CrossSection Simplify(double epsilon);
 
-    public native @ByVal CrossSection Offset(double delta, @Cast("JoinType") int jt, double miter_limit, double arc_tolerance);
+    public native @ByVal CrossSection Offset(double delta, @Cast("manifold::CrossSection::JoinType") int jt, double miter_limit, double arc_tolerance);
 
-    public native @ByVal CrossSection Boolean(@ByRef CrossSection second, @Cast("OpType") int op);
+    public native @ByVal CrossSection Boolean(@ByRef CrossSection second, @Cast("manifold::OpType") int op);
     // BatchBoolean method is omitted because of the std::vector parameter
 
-    @Name("operator+")
-    public native @ByVal CrossSection add(@ByRef CrossSection rhs);
-    @Name("operator+=")
-    public native @ByVal CrossSection addPut(@ByRef CrossSection rhs);
-    @Name("operator-")
-    public native @ByVal CrossSection subtract(@ByRef CrossSection rhs);
-    @Name("operator-=")
-    public native @ByRef CrossSection subtractPut(@ByRef CrossSection rhs);
-    @Name("operator^")
-    public native @ByVal CrossSection bitwiseXor(@ByRef CrossSection rhs);
-    @Name("operator^=")
-    public native @ByVal CrossSection bitwiseXorPut(@ByRef CrossSection rhs);
+    @Name("operator+") public native @ByVal CrossSection add(@ByRef CrossSection rhs);
+    @Name("operator+=") public native @ByVal CrossSection addPut(@ByRef CrossSection rhs);
+    @Name("operator-") public native @ByVal CrossSection subtract(@ByRef CrossSection rhs);
+    @Name("operator-=") public native @ByRef CrossSection subtractPut(@ByRef CrossSection rhs);
+    @Name("operator^") public native @ByVal CrossSection bitwiseXor(@ByRef CrossSection rhs);
+    @Name("operator^=") public native @ByVal CrossSection bitwiseXorPut(@ByRef CrossSection rhs);
 
     public native @ByVal CrossSection RectClip(@ByVal Rect rect);
     // Compose and Decompose methods are omitted because of the std::vector parameter

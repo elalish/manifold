@@ -7,6 +7,7 @@ import manifold3d.StdVector.FloatVector;
 
 import manifold3d.manifold.MeshGL;
 import manifold3d.manifold.ExportOptions;
+import manifold3d.manifold.CrossSection;
 
 import manifold3d.pub.DoubleMesh;
 import manifold3d.pub.Box;
@@ -15,6 +16,7 @@ import manifold3d.pub.Curvature;
 import manifold3d.pub.SmoothnessVector;
 
 import manifold3d.glm.DoubleMat4x3;
+import manifold3d.glm.DoubleVec2;
 import manifold3d.glm.DoubleVec3;
 
 import org.bytedeco.javacpp.*;
@@ -72,9 +74,9 @@ public class Manifold extends Pointer {
     public static native @ByVal Manifold Tetrahedron();
     public static native @ByVal Manifold Cube(@ByRef DoubleVec3 size, boolean center);
     public static native @ByVal Manifold Cylinder(float height, float radiusLow, float radiusHigh, int circularSegments, boolean center);
-    public static native @ByVal Manifold Sphere(float radius, int circularSegments)/;
-    //public static native @ByVal Manifold Extrude(@ByRef CrossSection crossSection, float height, int nDivisions, float twistDegrees, @ByRef glm.vec2 scaleTop);
-    //public static native @ByVal Manifold Revolve(@ByRef CrossSection crossSection, int circularSegments);
+    public static native @ByVal Manifold Sphere(float radius, int circularSegments);
+    public static native @ByVal Manifold Extrude(@ByRef CrossSection crossSection, float height, int nDivisions, float twistDegrees, @ByRef DoubleVec2 scaleTop);
+    public static native @ByVal Manifold Revolve(@ByRef CrossSection crossSection, int circularSegments);
     //public static native @ByVal Manifold Compose(@ByRef ManifoldVector manifolds);
     //}
 }
