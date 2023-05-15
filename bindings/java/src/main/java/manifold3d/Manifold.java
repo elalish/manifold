@@ -22,7 +22,7 @@ import manifold3d.glm.DoubleVec3;
 import org.bytedeco.javacpp.*;
 import org.bytedeco.javacpp.annotation.*;
 
-@Platform(include = {"meshIO.h"})
+@Platform(include = {"manifold.h", "meshIO.h"}, link = {"manifold"})
 @Namespace("manifold")
 public class Manifold extends Pointer {
     static { Loader.load(); }
@@ -78,5 +78,4 @@ public class Manifold extends Pointer {
     public static native @ByVal Manifold Extrude(@ByRef CrossSection crossSection, float height, int nDivisions, float twistDegrees, @ByRef DoubleVec2 scaleTop);
     public static native @ByVal Manifold Revolve(@ByRef CrossSection crossSection, int circularSegments);
     //public static native @ByVal Manifold Compose(@ByRef ManifoldVector manifolds);
-    //}
 }

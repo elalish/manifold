@@ -58,7 +58,7 @@
                 <version>1.0</version>
                 <configuration>
                     <classPath>${project.build.outputDirectory}</classPath>
-                    <libraryPath>../../build/</libraryPath>
+                    <libraryPath>../../build/src/manifold/</libraryPath>
                     <includePaths>
                         <includePath>${project.build.sourceDirectory}</includePath>
                         <includePath>../../src/cross_section/include/</includePath>
