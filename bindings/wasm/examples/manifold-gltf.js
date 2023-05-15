@@ -53,6 +53,14 @@ export class ManifoldPrimitive extends ExtensionProperty {
   setRunIndex(runIndex) {
     return this.set('runIndex', runIndex);
   }
+
+  setIndices(indices) {
+    return this.setRef('indices', indices);
+  }
+
+  getIndices() {
+    return this.getRef('indices');
+  }
 }
 
 export class EXTManifold extends Extension {
@@ -124,7 +132,7 @@ export class EXTManifold extends Extension {
 
       const existingPrimitive = meshDef.primitives[0];
       const primitive = {
-        indices: existingPrimitive.indices,
+        indices: context.accessorIndexMap.get(manifoldPrimitive.getIndices()),
         mode: existingPrimitive.mode,
         attributes: {'POSITION': existingPrimitive.attributes['POSITION']}
       };
@@ -150,14 +158,10 @@ export class EXTManifold extends Extension {
       }
 
       for (let i = 0; i < numPrimitive; ++i) {
-        meshDef.primitives[i].indices = json.accessors.length;
-        json.accessors.push({
-          type: 'SCALAR',
-          componentType: indices.componentType,
-          count: runIndex[i + 1] - runIndex[i],
-          bufferView: indices.bufferView,
-          byteOffset: 4 * runIndex[i]
-        });
+        const accessor = json.accessors[meshDef.primitives[i].indices];
+        accessor.bufferView = indices.bufferView;
+        accessor.byteOffset = indices.byteOffset + 4 * runIndex[i];
+        accessor.count = runIndex[i + 1] - runIndex[i];
       }
 
       meshDef.extensions = meshDef.extensions || {};
