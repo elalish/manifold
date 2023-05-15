@@ -32,23 +32,17 @@ export function setupIO(io) {
   return io.registerExtensions([EXTManifold]);
 }
 
-export function readMesh(mesh, attributes, materials) {
-  if (attributes.length < 1 || attributes[0] !== 'POSITION')
-    throw new Error('First attribute must be "POSITION".');
-
-  const primitives = mesh.listPrimitives();
-  if (primitives.length === 0) {
-    return {};
-  }
-
-  const numProp = attributes.map((def) => attributeDefs[def].components)
-                      .reduce((a, b) => a + b);
-  const position = primitives[0].getAttribute('POSITION');
-  const numVert = position.getCount()
-  const vertProperties = new Float32Array(numProp * numVert);
+function readPrimitive(primitive, numProp, attributes) {
+  const position = primitive.getAttribute('POSITION');
+  const numVert = position.getCount();
+  const vertProperties = [];
   let offset = 0;
   for (const attribute of attributes) {
-    const accessor = primitives[0].getAttribute(attribute);
+    if (attribute === 'SKIP') {
+      offset += attributeDefs[attribute].components;
+      continue;
+    }
+    const accessor = primitive.getAttribute(attribute);
     const array = accessor.getArray();
     const size = accessor.getElementSize();
     for (let i = 0; i < numVert; ++i) {
@@ -58,36 +52,80 @@ export function readMesh(mesh, attributes, materials) {
     }
     offset += size;
   }
+  return vertProperties;
+}
 
-  const triVertArray = [];
-  const runIndexArray = [0];
-  for (const primitive of primitives) {
-    if (primitive.getAttribute('POSITION') === position) {
-      triVertArray.push(...primitive.getIndices().getArray());
-      runIndexArray.push(triVertArray.length);
-      materials.push(primitive.getMaterial());
-    } else {
-      console.log('primitives do not share accessors!');
+export function readMesh(mesh, attributes, materials) {
+  const primitives = mesh.listPrimitives();
+  if (primitives.length === 0) {
+    return {};
+  }
+
+  if (attributes.length === 0) {
+    const attributeSet = new Set();
+    for (const primitive of primitives) {
+      const semantics = primitive.listSemantics();
+      for (const semantic of semantics) {
+        attributeSet.add(semantic);
+      }
+    }
+    for (const semantic in attributeDefs) {
+      if (attributeSet.has(semantic)) {
+        attributes.push(semantic);
+        attributeSet.delete(semantic);
+      }
+    }
+    for (const semantic of attributeSet.keys()) {
+      attributes.push(semantic);
     }
   }
-  const triVerts = new Uint32Array(triVertArray);
-  const runIndex = new Uint32Array(runIndexArray);
+
+  if (attributes.length < 1 || attributes[0] !== 'POSITION')
+    throw new Error('First attribute must be "POSITION".');
+
+  const numProp = attributes.map((def) => attributeDefs[def].components)
+                      .reduce((a, b) => a + b);
 
   const manifoldPrimitive = mesh.getExtension('EXT_manifold');
-  const mergeTriVert =
-      manifoldPrimitive ? manifoldPrimitive.getMergeIndices().getArray() : [];
-  const mergeTo =
-      manifoldPrimitive ? manifoldPrimitive.getMergeValues().getArray() : [];
-  const vert2merge = new Map();
-  for (const [i, idx] of mergeTriVert.entries()) {
-    vert2merge.set(triVerts[idx], mergeTo[i]);
-  }
+
+  let vertPropArray = [];
+  let triVertArray = [];
+  const runIndexArray = [0];
   const mergeFromVert = [];
   const mergeToVert = [];
-  for (const [from, to] of vert2merge.entries()) {
-    mergeFromVert.push(from);
-    mergeToVert.push(to);
+  if (manifoldPrimitive != null) {
+    vertPropArray = readPrimitive(primitives[0], numProp, attributes);
+    for (const primitive of primitives) {
+      triVertArray = [...triVertArray, ...primitive.getIndices().getArray()];
+      runIndexArray.push(triVertArray.length);
+      materials.push(primitive.getMaterial());
+    }
+    const mergeTriVert = manifoldPrimitive.getMergeIndices()?.getArray() ?? [];
+    const mergeTo = manifoldPrimitive.getMergeValues()?.getArray() ?? [];
+    const vert2merge = new Map();
+    for (const [i, idx] of mergeTriVert.entries()) {
+      vert2merge.set(triVertArray[idx], mergeTo[i]);
+    }
+    for (const [from, to] of vert2merge.entries()) {
+      mergeFromVert.push(from);
+      mergeToVert.push(to);
+    }
+  } else {
+    for (const primitive of primitives) {
+      const numVert = vertPropArray.length / numProp;
+      vertPropArray =
+          [...vertPropArray, ...readPrimitive(primitive, numProp, attributes)];
+      triVertArray = [
+        ...triVertArray,
+        ...primitive.getIndices().getArray().map((i) => i + numVert)
+      ];
+      runIndexArray.push(triVertArray.length);
+      materials.push(primitive.getMaterial());
+    }
   }
+  const vertProperties = new Float32Array(vertPropArray);
+  const triVerts = new Uint32Array(triVertArray);
+  const runIndex = new Uint32Array(runIndexArray);
 
   return {
     numProp,
@@ -106,14 +144,13 @@ export function writeMesh(doc, manifoldMesh, attributes, materials) {
   const buffer = doc.getRoot().listBuffers()[0];
   const manifoldExtension = doc.createExtension(EXTManifold);
 
-  const indices = doc.createAccessor('indices')
-                      .setBuffer(buffer)
-                      .setType(Accessor.Type.SCALAR)
-                      .setArray(manifoldMesh.triVerts);
-
   const mesh = doc.createMesh();
   const numPrimitive = manifoldMesh.runIndex.length - 1;
   for (let run = 0; run < numPrimitive; ++run) {
+    const indices = doc.createAccessor('indices')
+                        .setBuffer(buffer)
+                        .setType(Accessor.Type.SCALAR)
+                        .setArray(new Uint32Array());
     const primitive = doc.createPrimitive().setIndices(indices);
     const material = materials[run];
     if (material) {
@@ -159,6 +196,12 @@ export function writeMesh(doc, manifoldMesh, attributes, materials) {
 
   const manifoldPrimitive = manifoldExtension.createManifoldPrimitive();
   mesh.setExtension('EXT_manifold', manifoldPrimitive);
+
+  const indices = doc.createAccessor('indices')
+                      .setBuffer(buffer)
+                      .setType(Accessor.Type.SCALAR)
+                      .setArray(manifoldMesh.triVerts);
+  manifoldPrimitive.setIndices(indices);
   manifoldPrimitive.setRunIndex(manifoldMesh.runIndex);
 
   const vert2merge = [...Array(manifoldMesh.numVert).keys()];
