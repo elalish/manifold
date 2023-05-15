@@ -1,13 +1,14 @@
 package manifold3d;
 
-import manifold3d.FloatVec3Vector;
-import manifold3d.FloatVec4Vector;
-import manifold3d.DoubleVec3Vector;
-import manifold3d.IntegerVec3Vector;
-import manifold3d.Glm.FloatVec4;
-import manifold3d.Glm.IntegerVec3;
-import manifold3d.Glm.IntegerVec4;
-import manifold3d.Glm.DoubleMat4x3;
+import manifold3d.glm.FloatVec3Vector;
+import manifold3d.glm.FloatVec4Vector;
+import manifold3d.glm.DoubleVec3Vector;
+import manifold3d.glm.IntegerVec3Vector;
+import manifold3d.glm.FloatVec4;
+import manifold3d.glm.DoubleVec3;
+import manifold3d.glm.IntegerVec3;
+import manifold3d.glm.IntegerVec4;
+import manifold3d.glm.DoubleMat4x3;
 
 import org.bytedeco.javacpp.*;
 import org.bytedeco.javacpp.annotation.*;
@@ -17,27 +18,26 @@ import org.bytedeco.javacpp.annotation.*;
 public class Public {
     static { Loader.load(); }
 
-    @Name("Mesh")
-    public class DoubleMesh extends Pointer {
-        public DoubleMesh() { allocate(); }
-        public native void allocate();
+    //@Name("Mesh")
+    //public static class DoubleMesh extends Pointer {
+    //    public DoubleMesh() { allocate(); }
+    //    public native void allocate();
 
-        public native @MemberGetter @ByRef DoubleVec3Vector vertPos();
-        public native @MemberSetter void vertPos(@ByRef DoubleVec3Vector vertPos);
+    //    public native @MemberGetter @ByRef DoubleVec3Vector vertPos();
+    //    public native @MemberSetter void vertPos(@ByRef DoubleVec3Vector vertPos);
 
-        public native @MemberGetter @ByRef IntegerVec3Vector triVerts();
-        public native @MemberSetter void triVerts(@ByRef IntegerVec3Vector triVerts);
+    //    public native @MemberGetter @ByRef IntegerVec3Vector triVerts();
+    //    public native @MemberSetter void triVerts(@ByRef IntegerVec3Vector triVerts);
 
-        public native @MemberGetter @ByRef DoubleVec3Vector vertNormal();
-        public native @MemberSetter void vertNormal(@ByRef DoubleVec3Vector vertNormal);
+    //    public native @MemberGetter @ByRef DoubleVec3Vector vertNormal();
+    //    public native @MemberSetter void vertNormal(@ByRef DoubleVec3Vector vertNormal);
 
-        public native @MemberGetter @ByRef DoubleVec4Vector halfedgeTangent();
-        public native @MemberSetter void halfedgeTangent(@ByRef DoubleVec4Vector halfedgeTangent);
+    //    public native @MemberGetter @ByRef DoubleVec4Vector halfedgeTangent();
+    //    public native @MemberSetter void halfedgeTangent(@ByRef DoubleVec4Vector halfedgeTangent);
 
-        public native @MemberGetter float precision();
-        public native @MemberSetter void precision(float precision);
-
-    }
+    //    public native @MemberGetter float precision();
+    //    public native @MemberSetter void precision(float precision);
+    //}
 
     @Name("Mesh")
     public class FloatMesh extends Pointer {

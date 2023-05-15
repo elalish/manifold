@@ -68,6 +68,9 @@
                         <configuration>
                             <classOrPackageNames>
                                 <classOrPackageName>manifold3d.*</classOrPackageName>
+                                <classOrPackageName>manifold3d.manifold.*</classOrPackageName>
+                                <classOrPackageName>manifold3d.pub.*</classOrPackageName>
+                                <classOrPackageName>manifold3d.glm.*</classOrPackageName>
                             </classOrPackageNames>
                         </configuration>
                     </execution>

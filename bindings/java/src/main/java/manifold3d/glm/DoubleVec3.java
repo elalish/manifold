@@ -1,4 +1,4 @@
-package manifold3d;
+package manifold3d.glm;
 
 import org.bytedeco.javacpp.*;
 import org.bytedeco.javacpp.annotation.*;
@@ -21,9 +21,6 @@ public class DoubleVec3 extends DoublePointer {
     public native @MemberGetter double x();
     public native @MemberGetter double y();
     public native @MemberGetter double z();
-
-    //public native void put(int i, double value);
-    //public native void set(int component, double value);
 
     public native @Name("operator=") @ByRef DoubleVec3 put(@ByRef DoubleVec3 rhs);
 }

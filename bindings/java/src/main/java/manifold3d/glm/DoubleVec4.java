@@ -1,4 +1,4 @@
-package manifold3d;
+package manifold3d.glm;
 
 import org.bytedeco.javacpp.*;
 import org.bytedeco.javacpp.annotation.*;
