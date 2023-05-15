@@ -3,8 +3,8 @@ package manifold3d.manifold;
 import org.bytedeco.javacpp.*;
 import org.bytedeco.javacpp.annotation.*;
 
-import manifold3d.StdVector.UIntVector;
-import manifold3d.StdVector.FloatVector;
+import manifold3d.UIntVector;
+import manifold3d.FloatVector;
 
 @Platform(include = "meshIO.h")
 @Namespace("manifold")

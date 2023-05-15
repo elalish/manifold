@@ -2,8 +2,8 @@ package manifold3d;
 
 import manifold3d.pub.DoubleMesh;
 
-import manifold3d.StdVector.UIntVector;
-import manifold3d.StdVector.FloatVector;
+import manifold3d.UIntVector;
+import manifold3d.FloatVector;
 
 import manifold3d.manifold.MeshGL;
 import manifold3d.manifold.ExportOptions;

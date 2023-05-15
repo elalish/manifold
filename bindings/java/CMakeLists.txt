@@ -12,14 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-cmake_minimum_required(VERSION 3.10)
-project(manifoldJNI)
+#cmake_minimum_required(VERSION 3.10)
+project(java)
 
 # set(CMAKE_CXX_STANDARD 14)
-
-find_package(JNI REQUIRED)
-include_directories(${JNI_INCLUDE_DIRS})
-
-add_library(QualityJNI SHARED QualityJNI.cpp QualityJNI.h)
-
-target_link_libraries(QualityJNI ${JNI_LIBRARIES})
+target_link_libraries(pymanifold PRIVATE manifold)
+target_compile_options(pymanifold PRIVATE ${MANIFOLD_FLAGS})
+target_compile_features(pymanifold PUBLIC cxx_std_17)
+target_include_directories(pymanifold
+    PRIVATE ${PYBIND11_DIR}/include
+)

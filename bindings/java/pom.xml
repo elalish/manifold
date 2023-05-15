@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
-    <groupId>uk.me.mjt</groupId>
-    <artifactId>javacpp-mvn-simple-demo</artifactId>
+    <groupId>manifold3d</groupId>
+    <artifactId>manifold3d</artifactId>
     <version>1.0-SNAPSHOT</version>
     <packaging>jar</packaging>
     
@@ -27,6 +27,17 @@
     </dependencies>
     
     <build>
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+            </resource>
+            <resource>
+                <directory>../../build/src/manifold</directory>
+                <includes>
+                    <include>libmanifold.so</include>
+                </includes>
+            </resource>
+        </resources>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -47,6 +58,7 @@
                 <version>1.0</version>
                 <configuration>
                     <classPath>${project.build.outputDirectory}</classPath>
+                    <libraryPath>../../build/</libraryPath>
                     <includePaths>
                         <includePath>${project.build.sourceDirectory}</includePath>
                         <includePath>../../src/cross_section/include/</includePath>
@@ -56,6 +68,7 @@
                         <includePath>../../src/utilities/include/</includePath>
                         <includePath>../../meshIO/include/</includePath>
                     </includePaths>
+                    <preload>libmanifold.so</preload>
                     <copyLibs>true</copyLibs>
                 </configuration>
                 <executions>
@@ -76,7 +89,6 @@
                     </execution>
                 </executions>
             </plugin>
-
         </plugins>
     </build>
 </project>

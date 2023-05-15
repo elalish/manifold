@@ -11,7 +11,7 @@ import manifold3d.pub.SimplePolygon;
 import manifold3d.pub.Polygons;
 
 @Platform(include = "cross_section.h")
-@Namespace("manifold") // Replace with your actual namespace
+@Namespace("manifold")
 public class CrossSection extends Pointer {
     static { Loader.load(); }
 
@@ -44,7 +44,7 @@ public class CrossSection extends Pointer {
     public native int NumVert();
     public native int NumContour();
     public native boolean IsEmpty();
-    //public native @ByVal Rect Bounds();
+    public native @ByVal Rect Bounds();
 
     public native @ByVal CrossSection Translate(@ByVal DoubleVec2 v);
     public native @ByVal CrossSection Rotate(float degrees);
