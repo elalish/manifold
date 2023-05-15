@@ -206,6 +206,9 @@ class Manifold {
   Manifold Transform(const glm::mat4x3&) const;
   Manifold Mirror(glm::vec3) const;
   Manifold Warp(std::function<void(glm::vec3&)>) const;
+  Manifold SetProperties(
+      int,
+      std::function<void(glm::vec3, const float* const, float* const)>) const;
   Manifold Refine(int) const;
   // Manifold RefineToLength(float);
   // Manifold RefineToPrecision(float);

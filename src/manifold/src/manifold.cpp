@@ -40,6 +40,26 @@ struct MakeTri {
   }
 };
 
+struct UpdateProperties {
+  float* properties;
+  const int numProp;
+  const float* oldProperties;
+  const int numOldProp;
+  const glm::vec3* vertPos;
+  const glm::ivec3* triProperties;
+  const Halfedge* halfedges;
+  std::function<void(glm::vec3, const float* const, float* const)> propFunc;
+
+  __host__ __device__ void operator()(int tri) {
+    for (int i : {0, 1, 2}) {
+      const int vert = halfedges[3 * tri + i].startVert;
+      const int propVert = triProperties[tri][i];
+      propFunc(vertPos[vert], oldProperties + numOldProp * propVert,
+               properties + numProp * propVert);
+    }
+  }
+};
+
 Manifold Halfspace(Box bBox, glm::vec3 normal, float originOffset) {
   normal = glm::normalize(normal);
   Manifold cutter =
@@ -549,6 +569,59 @@ Manifold Manifold::Warp(std::function<void(glm::vec3&)> warpFunc) const {
   pImpl->faceNormal_.resize(0);  // force recalculation of triNormal
   pImpl->CalculateNormals();
   pImpl->SetPrecision();
+  pImpl->CreateFaces();
+  pImpl->SimplifyTopology();
+  pImpl->Finish();
+  return Manifold(std::make_shared<CsgLeafNode>(pImpl));
+}
+
+/**
+ * Create a new copy of this manifold with updated vertex properties by
+ * supplying a function that takes the existing position and properties as
+ * input. You may specify any number of output properties, allowing creation and
+ * removal of channels. Note: undefined behavior will result if you read past
+ * the number of input properties or write past the number of output properties.
+ *
+ * @param numProp The new number of properties per vertex.
+ * @param propFunc A function that modifies the properties of a given vertex.
+ */
+Manifold Manifold::SetProperties(
+    int numProp,
+    std::function<void(glm::vec3 position, const float* const oldProp,
+                       float* const newProp)>
+        propFunc) const {
+  auto pImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
+  const int oldNumProp = NumProp();
+  const VecDH<float> oldProperties = pImpl->meshRelation_.properties;
+
+  auto& triProperties = pImpl->meshRelation_.triProperties;
+  if (numProp == 0) {
+    triProperties.resize(0);
+    pImpl->meshRelation_.properties.resize(0);
+  } else {
+    if (triProperties.size() == 0) {
+      const int numTri = NumTri();
+      triProperties.resize(numTri);
+      int idx = 0;
+      for (int i = 0; i < numTri; ++i) {
+        for (const int j : {0, 1, 2}) {
+          triProperties[i][j] = idx++;
+        }
+      }
+      pImpl->meshRelation_.properties = VecDH<float>(numProp * idx, 0);
+    } else {
+      pImpl->meshRelation_.properties =
+          VecDH<float>(numProp * NumPropVert(), 0);
+    }
+    thrust::for_each_n(
+        thrust::host, countAt(0), NumTri(),
+        UpdateProperties({pImpl->meshRelation_.properties.ptrH(), numProp,
+                          oldProperties.ptrH(), oldNumProp,
+                          pImpl->vertPos_.ptrH(), triProperties.ptrH(),
+                          pImpl->halfedge_.ptrH(), propFunc}));
+  }
+
+  pImpl->meshRelation_.numProp = numProp;
   pImpl->CreateFaces();
   pImpl->SimplifyTopology();
   pImpl->Finish();
