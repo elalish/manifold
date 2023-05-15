@@ -586,10 +586,9 @@ Manifold Manifold::Warp(std::function<void(glm::vec3&)> warpFunc) const {
  * @param propFunc A function that modifies the properties of a given vertex.
  */
 Manifold Manifold::SetProperties(
-    int numProp,
-    std::function<void(glm::vec3 position, const float* const oldProp,
-                       float* const newProp)>
-        propFunc) const {
+    int numProp, std::function<void(glm::vec3 position, const float* oldProp,
+                                    float* newProp)>
+                     propFunc) const {
   auto pImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
   const int oldNumProp = NumProp();
   const VecDH<float> oldProperties = pImpl->meshRelation_.properties;
