@@ -61,6 +61,7 @@
                     <libraryPath>../../build/src/manifold/</libraryPath>
                     <includePaths>
                         <includePath>${project.build.sourceDirectory}</includePath>
+                        <includePath>src/main/cpp/manifold3d/</includePath>
                         <includePath>../../src/cross_section/include/</includePath>
                         <includePath>../../src/third_party/clipper2/CPP/Clipper2Lib/include/</includePath>
                         <includePath>../../src/third_party/glm/</includePath>

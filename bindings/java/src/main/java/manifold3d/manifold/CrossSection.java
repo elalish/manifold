@@ -63,8 +63,8 @@ public class CrossSection extends Pointer {
     @Name("operator+=") public native @ByVal CrossSection addPut(@ByRef CrossSection rhs);
     @Name("operator-") public native @ByVal CrossSection subtract(@ByRef CrossSection rhs);
     @Name("operator-=") public native @ByRef CrossSection subtractPut(@ByRef CrossSection rhs);
-    @Name("operator^") public native @ByVal CrossSection bitwiseXor(@ByRef CrossSection rhs);
-    @Name("operator^=") public native @ByVal CrossSection bitwiseXorPut(@ByRef CrossSection rhs);
+    @Name("operator^") public native @ByVal CrossSection intersect(@ByRef CrossSection rhs);
+    @Name("operator^=") public native @ByVal CrossSection intersectPut(@ByRef CrossSection rhs);
 
     public native @ByVal CrossSection RectClip(@ByVal Rect rect);
     // Compose and Decompose methods are omitted because of the std::vector parameter
