@@ -7,10 +7,12 @@ import org.bytedeco.javacpp.*;
 import org.bytedeco.javacpp.annotation.*;
 
 
-@Platform(include = "meshIO.h")
+@Platform(include = {"meshIO.h"}, link = {"meshIO"})
 @Namespace("manifold")
 public class MeshIO {
+    static { Loader.load(); }
+
     public native static @ByVal DoubleMesh ImportMesh(@StdString BytePointer filename, @Cast("bool") boolean forceCleanup);
 
-    public native static void ExportMesh(@StdString BytePointer filename, @ByRef DoubleMesh mesh, @ByRef ExportOptions options);
+    public native static void ExportMesh(@StdString String filename, @Const @ByRef DoubleMesh mesh, @Const @ByRef ExportOptions options);
 }

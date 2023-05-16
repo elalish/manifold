@@ -68,6 +68,15 @@ public class Manifold extends Pointer {
     public native @ByVal Manifold Mirror(@ByRef DoubleVec3 mirrorAxis);
     public native @ByVal Manifold Refine(int refineValue);
 
+    // CSG operators
+    public native @ByVal Manifold Boolean(@ByRef Manifold second, @Cast("manifold::OpType") int op);
+    @Name("operator+") public native @ByVal Manifold add(@ByRef Manifold manifold);
+    @Name("operator+=") public native @ByRef Manifold addPut(@ByRef Manifold manifold);
+    @Name("operator-") public native @ByVal Manifold subtract(@ByRef Manifold manifold);
+    @Name("operator-=") public native @ByRef Manifold subtractPut(@ByRef Manifold manifold);
+    @Name("operator^") public native @ByVal Manifold intersect(@ByRef Manifold manifold);
+    @Name("operator^=") public native @ByRef Manifold intersectPut(@ByRef Manifold manifold);
+
     //// Static methods
     public static native @ByVal Manifold Smooth(@ByRef MeshGL mesh, @ByRef SmoothnessVector sharpenedEdges);
     public static native @ByVal Manifold Smooth(@ByRef DoubleMesh mesh, @ByRef SmoothnessVector sharpenedEdges);
