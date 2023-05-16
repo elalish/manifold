@@ -12,22 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-declare class Node {
+declare class GLTFNode {
   manifold?: Manifold;
   translation?: Vec3|((t: number) => Vec3);
   rotation?: Vec3|((t: number) => Vec3);
   scale?: Vec3|((t: number) => Vec3);
   material?: Material;
   name?: string;
-  constructor(parent: Node): Node;
-  clone(parent: Node): Node;
+  constructor(parent?: GLTFNode): GLTFNode;
+  clone(parent?: GLTFNode): GLTFNode;
 }
 
-declare class Material {
-  attributes: string[] = ['POSITION'];
-  roughness: number = 1;
-  metallic: number = 0;
-  baseColorFactor: [number, number, number] = [1, 1, 1];
+declare class GLTFMaterial {
+  attributes: string[];
+  roughness: number;
+  metallic: number;
+  baseColorFactor: [number, number, number];
 }
 
 /**

@@ -12,9 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import encapsulatedTypesURL from './built/manifold-encapsulated-types.d.ts?url';
-import globalTypesURL from './built/manifold-global-types.d.ts?url';
-import editorTypesURL from './editor.d.ts?url';
 import ManifoldWorker from './worker.js?worker';
 
 // Loaded globally by examples.js
@@ -221,10 +218,11 @@ function initializeRun() {
 let tsWorker = undefined;
 
 async function getManifoldDTS() {
-  const global = await fetch(globalTypesURL).then(response => response.text());
+  const global = await fetch('/manifold-global-types.d.ts')
+                     .then(response => response.text());
 
-  const encapsulated =
-      await fetch(encapsulatedTypesURL).then(response => response.text());
+  const encapsulated = await fetch('/manifold-encapsulated-types.d.ts')
+                           .then(response => response.text());
 
   return `
 ${global.replaceAll('export', '')}
@@ -263,7 +261,7 @@ require(['vs/editor/editor.main'], async function() {
   }
   monaco.languages.typescript.typescriptDefaults.addExtraLib(
       await getManifoldDTS());
-  await addTypes(editorTypesURL);
+  await addTypes('/editor.d.ts');
   editor = monaco.editor.create(
       document.getElementById('editor'),
       {language: 'typescript', automaticLayout: true});

@@ -54,7 +54,16 @@ const nodes = [];
 const id2material = new Map();
 const materialCache = new Map();
 
-class Node {
+function cleanup() {
+  ghost = false;
+  shown.clear();
+  singles.clear();
+  nodes.length = 0;
+  id2material.clear();
+  materialCache.clear();
+}
+
+class GLTFNode {
   constructor(parent) {
     this._parent = parent;
     nodes.push(this);
@@ -67,7 +76,7 @@ class Node {
   }
 }
 
-module.Node = Node;
+module.GLTFNode = GLTFNode;
 
 module.setMaterial = (manifold, material) => {
   const id = manifold.originalID();
@@ -92,7 +101,7 @@ const constructors = [
 ];
 const utils = [
   'setMinCircularAngle', 'setMinCircularEdgeLength', 'setCircularSegments',
-  'getCircularSegments', 'Mesh', 'Node', 'setMaterial'
+  'getCircularSegments', 'Mesh', 'GLTFNode', 'setMaterial'
 ];
 const exposedFunctions = constructors.concat(utils);
 
@@ -152,7 +161,8 @@ console.log = function(...args) {
 };
 
 onmessage = async (e) => {
-  const content = e.data + '\nreturn exportGLB(result);\n';
+  const content = e.data +
+      '\nreturn exportGLB(typeof result === "undefined" ? undefined : result);\n';
   try {
     const f = new Function(
         'exportGLB', 'glMatrix', 'module', ...exposedFunctions, content);
@@ -164,6 +174,7 @@ onmessage = async (e) => {
     postMessage({objectURL: null});
   } finally {
     module.cleanup();
+    cleanup();
   }
 };
 
@@ -174,10 +185,11 @@ function createGLTFnode(doc, node) {
   }
   if (node.rotation) {
     const {quat} = glMatrix;
+    const deg2rad = Math.PI / 180;
     const q = quat.create();
-    quat.rotateX(q, q, node.rotation[0]);
-    quat.rotateY(q, q, node.rotation[1]);
-    quat.rotateZ(q, q, node.rotation[2]);
+    quat.rotateX(q, q, deg2rad * node.rotation[0]);
+    quat.rotateY(q, q, deg2rad * node.rotation[1]);
+    quat.rotateZ(q, q, deg2rad * node.rotation[2]);
     out.setRotation(q);
   }
   if (node.scale) {
@@ -229,7 +241,7 @@ function writeManifold(doc, node, manifold, material = {}) {
       (volume / 100).toLocaleString()} cm^3`);
 
   // From Z-up to Y-up (glTF)
-  const manifoldMesh = manifold.rotate([-90, 0, 0]).getMesh();
+  const manifoldMesh = manifold.getMesh();
 
   const materials = [];
   for (const id of manifoldMesh.runOriginalID) {
@@ -268,7 +280,10 @@ function writeManifold(doc, node, manifold, material = {}) {
 
 async function exportGLB(manifold) {
   const doc = new Document();
-  const scene = doc.createScene();
+  const halfRoot2 = Math.sqrt(2) / 2;
+  const wrapper =
+      doc.createNode('wrapper').setRotation([-halfRoot2, 0, 0, halfRoot2]);
+  doc.createScene().addChild(wrapper);
 
   if (shown.size > 0) {
     const showMaterial = doc.createMaterial()
@@ -301,15 +316,15 @@ async function exportGLB(manifold) {
     for (const node of nodes) {
       const gltfNode = node2gltf.get(node);
       if (node._parent == null) {
-        scene.addChild(gltfNode);
+        wrapper.addChild(gltfNode);
       } else {
         node2gltf.get(node._parent).addChild(gltfNode);
       }
     }
   } else {
     const node = doc.createNode('result');
-    writeManifold(doc, node, manifold);
-    scene.addChild(node);
+    writeManifold(doc, node, manifold.rotate([-90, 0, 0]));
+    wrapper.addChild(node);
   }
 
   const glb = await io.writeBinary(doc);
