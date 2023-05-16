@@ -1,0 +1,23 @@
+{
+  "name": "vite-starter",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "build:watch": "vite build --watch",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@gltf-transform/core": "^3.2.1",
+    "@gltf-transform/functions": "^3.2.1",
+    "@gltf-transform/extensions": "^3.2.1",
+    "three": "0.151.2",
+    "gl-matrix": "^3.4.3",
+    "simple-dropzone": "0.8.3"
+  },
+  "devDependencies": {
+    "vite": "^4.3.2"
+  }
+}

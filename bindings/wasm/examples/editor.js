@@ -12,12 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {examples} from './examples.js';
-const exampleFunctions = examples.functionBodies;
+import encapsulatedTypesURL from './built/manifold-encapsulated-types.d.ts?url';
+import globalTypesURL from './built/manifold-global-types.d.ts?url';
+import editorTypesURL from './editor.d.ts?url';
+import ManifoldWorker from './worker.js?worker';
+
+// Loaded globally by examples.js
+const exampleFunctions = self.examples.functionBodies;
 
 if (navigator.serviceWorker) {
   navigator.serviceWorker.register(
-      'service-worker.js', {scope: './index.html'});
+      '/service-worker.js', {scope: './index.html'});
 }
 
 let editor = undefined;
@@ -216,11 +221,10 @@ function initializeRun() {
 let tsWorker = undefined;
 
 async function getManifoldDTS() {
-  const global = await fetch('built/manifold-global-types.d.ts')
-                     .then(response => response.text());
+  const global = await fetch(globalTypesURL).then(response => response.text());
 
-  const encapsulated = await fetch('built/manifold-encapsulated-types.d.ts')
-                           .then(response => response.text());
+  const encapsulated =
+      await fetch(encapsulatedTypesURL).then(response => response.text());
 
   return `
 ${global.replaceAll('export', '')}
@@ -259,7 +263,7 @@ require(['vs/editor/editor.main'], async function() {
   }
   monaco.languages.typescript.typescriptDefaults.addExtraLib(
       await getManifoldDTS());
-  await addTypes('editor.d.ts');
+  await addTypes(editorTypesURL);
   editor = monaco.editor.create(
       document.getElementById('editor'),
       {language: 'typescript', automaticLayout: true});
@@ -351,7 +355,7 @@ let objectURL = null;
 let manifoldWorker = null;
 
 function createWorker() {
-  manifoldWorker = new Worker('worker.js', {type: 'module'});
+  manifoldWorker = new ManifoldWorker();
   manifoldWorker.onmessage = function(e) {
     if (e.data == null) {
       if (tsWorker != null && !manifoldInitialized) {

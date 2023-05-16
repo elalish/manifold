@@ -432,3 +432,5 @@ for (const [func, code] of Object.entries(examples.functions)) {
       func.replace(/([a-z])([A-Z])/g, '$1 $2');  // Add spaces between words
   examples.functionBodies.set(name, body);
 };
+
+self.examples = examples;

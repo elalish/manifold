@@ -180,19 +180,19 @@ model-viewer {
 }
 
 .cancel {
-  background-image: url(icons/close.png);
+  background-image: url(/icons/close.png);
   background-size: 20px;
   background-repeat: no-repeat;
   background-position: center;
 }
 
 .edit {
-  background-image: url(icons/pencil.png);
+  background-image: url(/icons/pencil.png);
   right: 30px;
 }
 
 .trash {
-  background-image: url(icons/trash.png);
+  background-image: url(/icons/trash.png);
   right: 0px;
 }
 

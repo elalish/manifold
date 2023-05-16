@@ -12,11 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import * as glMatrix from 'https://cdn.jsdelivr.net/npm/gl-matrix@3.4.3/+esm';
-import {Document, Material, WebIO} from 'https://cdn.skypack.dev/pin/@gltf-transform/core@v3.0.0-SfbIFhNPTRdr1UE2VSan/mode=imports,min/optimized/@gltf-transform/core.js';
+import {Document, Material, WebIO} from '@gltf-transform/core';
+import {KHRONOS_EXTENSIONS} from '@gltf-transform/extensions';
+import * as glMatrix from 'gl-matrix';
 
 import Module from './built/manifold.js';
-import {writeMesh} from './gltf-io.js';
+import {setupIO, writeMesh} from './gltf-io.js';
 
 const module = await Module();
 module.setup();
@@ -24,13 +25,13 @@ module.setup();
 // Faster on modern browsers than Float32Array
 glMatrix.glMatrix.setMatrixArrayType(Array);
 
-// Scene setup
-const io = new WebIO();
+const io = setupIO(new WebIO());
+io.registerExtensions(KHRONOS_EXTENSIONS);
 
 // Debug setup to show source meshes
+let ghost = false;
 const shown = new Map();
 const singles = new Map();
-let ghost = false;
 const SHOW = 'show';
 const GHOST = 'ghost';
 
@@ -138,7 +139,9 @@ const oldLog = console.log;
 console.log = function(...args) {
   let message = '';
   for (const arg of args) {
-    if (typeof arg == 'object') {
+    if (arg == null) {
+      message += 'undefined';
+    } else if (typeof arg == 'object') {
       message += JSON.stringify(arg, null, 4);
     } else {
       message += arg.toString();
@@ -194,16 +197,20 @@ function getMaterial(node) {
 }
 
 function makeDefaultedMaterial(
-    {roughness = 0.2, metallic = 1, baseColorFactor = [1, 1, 0, 1]} = {}) {
-  return doc.createMaterial(matDef.name)
+    doc,
+    {roughness = 0.2,
+     metallic = 1,
+     baseColorFactor = [1, 1, 0, 1],
+     name = ''} = {}) {
+  return doc.createMaterial(name)
       .setRoughnessFactor(roughness)
       .setMetallicFactor(metallic)
       .setBaseColorFactor(baseColorFactor);
 }
 
-function getMaterial(matDef) {
+function getGltfMaterial(doc, matDef) {
   if (!materialCache.has(matDef)) {
-    materialCache.set(matDef, makeDefaultedMaterial(matDef));
+    materialCache.set(matDef, makeDefaultedMaterial(doc, matDef));
   }
   return materialCache.get(matDef);
 }
@@ -224,15 +231,17 @@ function writeManifold(doc, node, manifold, material = {}) {
   // From Z-up to Y-up (glTF)
   const manifoldMesh = manifold.rotate([-90, 0, 0]).getMesh();
 
-  const materials =
-      manifoldMesh.runOriginalID.map((id) => id2material.get(id) | material);
-  const attributes = materials[0].attributes | ['POSITION'];
+  const materials = [];
+  for (const id of manifoldMesh.runOriginalID) {
+    materials.push(id2material.get(id) || material);
+  }
+  const attributes = materials[0].attributes || ['POSITION'];
 
   const gltfMaterials = materials.map((matDef) => {
     if (ghost) {
       matDef = GHOST;
     }
-    return getMaterial(matDef);
+    return getGltfMaterial(doc, matDef);
   });
 
   node.setMesh(writeMesh(doc, manifoldMesh, attributes, gltfMaterials));
@@ -247,10 +256,11 @@ function writeManifold(doc, node, manifold, material = {}) {
     if (inMesh == null) {
       continue;
     }
-    const mat = single ? id2material.get(id) | material : SHOW;
+    const mat = single ? id2material.get(id) || material : SHOW;
     const debugNode =
         doc.createNode('debug')
-            .setMesh(writeMesh(doc, inMesh, attributes, [getMaterial(mat)]))
+            .setMesh(
+                writeMesh(doc, inMesh, attributes, [getGltfMaterial(doc, mat)]))
             .setMatrix(manifoldMesh.transform(run));
     node.addChild(debugNode);
   }
