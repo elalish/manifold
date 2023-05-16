@@ -12,6 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+declare class Node {
+  manifold?: Manifold;
+  translation?: Vec3|((t: number) => Vec3);
+  rotation?: Vec3|((t: number) => Vec3);
+  scale?: Vec3|((t: number) => Vec3);
+  material?: Material;
+  name?: string;
+  constructor(parent: Node): Node;
+  clone(parent: Node): Node;
+}
+
+declare class Material {
+  attributes: string[] = ['POSITION'];
+  roughness: number = 1;
+  metallic: number = 0;
+  baseColorFactor: [number, number, number] = [1, 1, 1];
+}
+
 /**
  * Wrap any object with this method to display it and any copies in transparent
  * red. This is particularly useful for debugging subtract() as it will allow

@@ -13,9 +13,10 @@
 // limitations under the License.
 
 import * as glMatrix from 'https://cdn.jsdelivr.net/npm/gl-matrix@3.4.3/+esm';
-import {Accessor, Document, Material, WebIO} from 'https://cdn.skypack.dev/pin/@gltf-transform/core@v3.0.0-SfbIFhNPTRdr1UE2VSan/mode=imports,min/optimized/@gltf-transform/core.js';
+import {Document, Material, WebIO} from 'https://cdn.skypack.dev/pin/@gltf-transform/core@v3.0.0-SfbIFhNPTRdr1UE2VSan/mode=imports,min/optimized/@gltf-transform/core.js';
 
 import Module from './built/manifold.js';
+import {writeMesh} from './gltf-io.js';
 
 const module = await Module();
 module.setup();
@@ -25,84 +26,58 @@ glMatrix.glMatrix.setMatrixArrayType(Array);
 
 // Scene setup
 const io = new WebIO();
-const doc = new Document();
-
-const buffer = doc.createBuffer();
-const position =
-    doc.createAccessor().setBuffer(buffer).setType(Accessor.Type.VEC3);
-const indices =
-    doc.createAccessor().setBuffer(buffer).setType(Accessor.Type.SCALAR);
-const resultMaterial = doc.createMaterial()
-                           .setBaseColorFactor([1, 1, 0, 1])
-                           .setMetallicFactor(1)
-                           .setRoughnessFactor(0.2);
-const resultPrimitive = doc.createPrimitive()
-                            .setMaterial(resultMaterial)
-                            .setIndices(indices)
-                            .setAttribute('POSITION', position);
-const mesh = doc.createMesh().addPrimitive(resultPrimitive);
-const node = doc.createNode('result').setMesh(mesh);
-const scene = doc.createScene().addChild(node);
 
 // Debug setup to show source meshes
 const shown = new Map();
+const singles = new Map();
 let ghost = false;
-const debugMaterial = doc.createMaterial()
-                          .setBaseColorFactor([1, 0, 0, 0.25])
-                          .setAlphaMode(Material.AlphaMode.BLEND)
-                          .setDoubleSided(true)
-                          .setMetallicFactor(0);
-const ghostMaterial = doc.createMaterial()
-                          .setBaseColorFactor([0.5, 0.5, 0.5, 0.25])
-                          .setAlphaMode(Material.AlphaMode.BLEND)
-                          .setDoubleSided(true)
-                          .setMetallicFactor(0);
+const SHOW = 'show';
+const GHOST = 'ghost';
 
-function debug(manifold, material) {
-  const position =
-      doc.createAccessor().setBuffer(buffer).setType(Accessor.Type.VEC3);
-  const indices =
-      doc.createAccessor().setBuffer(buffer).setType(Accessor.Type.SCALAR);
-
-  const primitive = doc.createPrimitive()
-                        .setMaterial(material)
-                        .setIndices(indices)
-                        .setAttribute('POSITION', position);
-  const mesh = doc.createMesh('debug').addPrimitive(primitive);
-
+function debug(manifold, map) {
   const result = manifold.asOriginal();
-  outputMesh(indices, position, result.getMesh());
-
-  shown.set(result.originalID(), mesh);
+  map.set(result.originalID(), result.getMesh());
   return result;
 };
 
 module.show = (manifold) => {
-  return debug(manifold, debugMaterial);
+  return debug(manifold, shown);
 };
 
 module.only = (manifold) => {
   ghost = true;
-  return debug(manifold, resultMaterial);
+  return debug(manifold, singles);
 };
 
-function debugCleanup() {
-  for (const [id, mesh] of shown) {
-    const primitive = mesh.listPrimitives()[0];
-    primitive.getAttribute('POSITION').dispose();
-    primitive.getIndices().dispose();
-    primitive.dispose();
-    mesh.dispose();
-  }
+const nodes = [];
+const id2material = new Map();
+const materialCache = new Map();
 
-  scene.traverse((node) => {
-    if (node.getName() == 'debug') {
-      node.dispose();
-    }
-  });
-  shown.clear();
-  ghost = false;
+class Node {
+  constructor(parent) {
+    this._parent = parent;
+    nodes.push(this);
+  }
+  clone(parent) {
+    const copy = {...this};
+    copy._parent = parent;
+    nodes.push(copy);
+    return copy;
+  }
 }
+
+module.Node = Node;
+
+module.setMaterial = (manifold, material) => {
+  const id = manifold.originalID();
+  if (id < 0) {
+    console.warn(
+        manifold,
+        ' is not an original - call asOriginal() before setting a material.');
+    return;
+  }
+  id2material.set(id, material);
+};
 
 // manifold member functions that returns a new manifold
 const memberFunctions = [
@@ -116,7 +91,7 @@ const constructors = [
 ];
 const utils = [
   'setMinCircularAngle', 'setMinCircularEdgeLength', 'setCircularSegments',
-  'getCircularSegments', 'Mesh'
+  'getCircularSegments', 'Mesh', 'Node', 'setMaterial'
 ];
 const exposedFunctions = constructors.concat(utils);
 
@@ -186,25 +161,54 @@ onmessage = async (e) => {
     postMessage({objectURL: null});
   } finally {
     module.cleanup();
-    debugCleanup();
   }
 };
 
-function outputMesh(indices, position, mesh) {
-  indices.setArray(mesh.triVerts);
-
-  const numVert = mesh.numVert;
-  const numProp = mesh.numProp;
-  const posArray = new Float32Array(3 * numVert);
-  for (let i = 0; i < numVert; ++i) {
-    posArray[3 * i] = mesh.vertProperties[numProp * i];
-    posArray[3 * i + 1] = mesh.vertProperties[numProp * i + 1];
-    posArray[3 * i + 2] = mesh.vertProperties[numProp * i + 2];
+function createGLTFnode(doc, node) {
+  const out = doc.createNode(node.name);
+  if (node.translation) {
+    out.setTranslation(node.translation);
   }
-  position.setArray(posArray);
+  if (node.rotation) {
+    const {quat} = glMatrix;
+    const q = quat.create();
+    quat.rotateX(q, q, node.rotation[0]);
+    quat.rotateY(q, q, node.rotation[1]);
+    quat.rotateZ(q, q, node.rotation[2]);
+    out.setRotation(q);
+  }
+  if (node.scale) {
+    out.setScale(node.scale);
+  }
+  return out;
 }
 
-async function exportGLB(manifold) {
+function getMaterial(node) {
+  if (node == null) {
+    return {};
+  }
+  if (node.material == null) {
+    node.material = getMaterial(node._parent);
+  }
+  return node.material;
+}
+
+function makeDefaultedMaterial(
+    {roughness = 0.2, metallic = 1, baseColorFactor = [1, 1, 0, 1]} = {}) {
+  return doc.createMaterial(matDef.name)
+      .setRoughnessFactor(roughness)
+      .setMetallicFactor(metallic)
+      .setBaseColorFactor(baseColorFactor);
+}
+
+function getMaterial(matDef) {
+  if (!materialCache.has(matDef)) {
+    materialCache.set(matDef, makeDefaultedMaterial(matDef));
+  }
+  return materialCache.get(matDef);
+}
+
+function writeManifold(doc, node, manifold, material = {}) {
   console.log(`Triangles: ${manifold.numTri().toLocaleString()}`);
   const box = manifold.boundingBox();
   const size = [0, 0, 0];
@@ -218,21 +222,85 @@ async function exportGLB(manifold) {
       (volume / 100).toLocaleString()} cm^3`);
 
   // From Z-up to Y-up (glTF)
-  const mesh = manifold.rotate([-90, 0, 0]).getMesh();
+  const manifoldMesh = manifold.rotate([-90, 0, 0]).getMesh();
 
-  outputMesh(indices, position, mesh);
+  const materials =
+      manifoldMesh.runOriginalID.map((id) => id2material.get(id) | material);
+  const attributes = materials[0].attributes | ['POSITION'];
 
-  for (const [run, id] of mesh.runOriginalID.entries()) {
-    const outMesh = shown.get(id);
-    if (outMesh == null) {
+  const gltfMaterials = materials.map((matDef) => {
+    if (ghost) {
+      matDef = GHOST;
+    }
+    return getMaterial(matDef);
+  });
+
+  node.setMesh(writeMesh(doc, manifoldMesh, attributes, gltfMaterials));
+
+  for (const [run, id] of manifoldMesh.runOriginalID.entries()) {
+    let inMesh = shown.get(id);
+    let single = false;
+    if (inMesh == null) {
+      single = true;
+      inMesh = singles.get(id);
+    }
+    if (inMesh == null) {
       continue;
     }
-    const node =
-        doc.createNode('debug').setMesh(outMesh).setMatrix(mesh.transform(run));
-    scene.addChild(node);
+    const mat = single ? id2material.get(id) | material : SHOW;
+    const debugNode =
+        doc.createNode('debug')
+            .setMesh(writeMesh(doc, inMesh, attributes, [getMaterial(mat)]))
+            .setMatrix(manifoldMesh.transform(run));
+    node.addChild(debugNode);
+  }
+}
+
+async function exportGLB(manifold) {
+  const doc = new Document();
+  const scene = doc.createScene();
+
+  if (shown.size > 0) {
+    const showMaterial = doc.createMaterial()
+                             .setBaseColorFactor([1, 0, 0, 0.25])
+                             .setAlphaMode(Material.AlphaMode.BLEND)
+                             .setDoubleSided(true)
+                             .setMetallicFactor(0);
+    materialCache.set(SHOW, showMaterial);
+  }
+  if (singles.size > 0) {
+    const ghostMaterial = doc.createMaterial()
+                              .setBaseColorFactor([0.5, 0.5, 0.5, 0.25])
+                              .setAlphaMode(Material.AlphaMode.BLEND)
+                              .setDoubleSided(true)
+                              .setMetallicFactor(0);
+    materialCache.set(GHOST, ghostMaterial);
   }
 
-  resultPrimitive.setMaterial(ghost ? ghostMaterial : resultMaterial);
+  if (nodes.length > 0) {
+    const node2gltf = new Map();
+
+    for (const node of nodes) {
+      const gltfNode = createGLTFnode(doc, node);
+      node2gltf.set(node, gltfNode);
+      if (node.manifold != null) {
+        writeManifold(doc, gltfNode, node.manifold, getMaterial(node));
+      }
+    }
+
+    for (const node of nodes) {
+      const gltfNode = node2gltf.get(node);
+      if (node._parent == null) {
+        scene.addChild(gltfNode);
+      } else {
+        node2gltf.get(node._parent).addChild(gltfNode);
+      }
+    }
+  } else {
+    const node = doc.createNode('result');
+    writeManifold(doc, node, manifold);
+    scene.addChild(node);
+  }
 
   const glb = await io.writeBinary(doc);
 
