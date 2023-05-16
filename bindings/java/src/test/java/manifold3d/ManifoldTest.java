@@ -20,11 +20,17 @@ public class ManifoldTest {
         Manifold cube = Manifold.Cube(new DoubleVec3(15.0f, 15.0f, 15.0f), true);
 
         Manifold diff = cube.subtract(sphere);
+        Manifold intersection = cube.intersect(sphere);
+        Manifold union = cube.add(sphere);
 
         DoubleMesh diffMesh = diff.GetMesh();
+        DoubleMesh intersectMesh = intersection.GetMesh();
+        DoubleMesh unionMesh = union.GetMesh();
         ExportOptions opts = new ExportOptions();
-        opts.faceted(true);
+        opts.faceted(false);
 
         MeshIO.ExportMesh("CubeMinusSphere.stl", diffMesh, opts);
+        MeshIO.ExportMesh("CubeIntersectSphere.glb", intersectMesh, opts);
+        MeshIO.ExportMesh("CubeUnionSphere.obj", unionMesh, opts);
     }
 }

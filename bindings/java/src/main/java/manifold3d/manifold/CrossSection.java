@@ -10,7 +10,7 @@ import manifold3d.manifold.Rect;
 import manifold3d.pub.SimplePolygon;
 import manifold3d.pub.Polygons;
 
-@Platform(include = "cross_section.h")
+@Platform(include = "cross_section.h", link = {"manifold"})
 @Namespace("manifold")
 public class CrossSection extends Pointer {
     static { Loader.load(); }
