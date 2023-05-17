@@ -91,8 +91,9 @@ module.setMaterial = (manifold, material) => {
 
 // manifold member functions that returns a new manifold
 const memberFunctions = [
-  'add', 'subtract', 'intersect', 'trimByPlane', 'refine', 'transform',
-  'translate', 'rotate', 'scale', 'mirror', 'asOriginal', 'decompose'
+  'add', 'subtract', 'intersect', 'trimByPlane', 'refine', 'warp',
+  'setProperties', 'transform', 'translate', 'rotate', 'scale', 'mirror',
+  'asOriginal', 'decompose'
 ];
 // top level functions that constructs a new manifold
 const constructors = [
@@ -247,7 +248,10 @@ function writeManifold(doc, node, manifold, material = {}) {
   for (const id of manifoldMesh.runOriginalID) {
     materials.push(id2material.get(id) || material);
   }
-  const attributes = materials[0].attributes || ['POSITION'];
+  const attributes = ['POSITION'];
+  if (materials[0].attributes != null) {
+    attributes.push(materials[0].attributes);
+  }
 
   const gltfMaterials = materials.map((matDef) => {
     if (ghost) {
@@ -281,8 +285,10 @@ function writeManifold(doc, node, manifold, material = {}) {
 async function exportGLB(manifold) {
   const doc = new Document();
   const halfRoot2 = Math.sqrt(2) / 2;
-  const wrapper =
-      doc.createNode('wrapper').setRotation([-halfRoot2, 0, 0, halfRoot2]);
+  const mm2m = 1 / 1000;
+  const wrapper = doc.createNode('wrapper')
+                      .setRotation([-halfRoot2, 0, 0, halfRoot2])
+                      .setScale([mm2m, mm2m, mm2m]);
   doc.createScene().addChild(wrapper);
 
   if (shown.size > 0) {
@@ -323,7 +329,7 @@ async function exportGLB(manifold) {
     }
   } else {
     const node = doc.createNode('result');
-    writeManifold(doc, node, manifold.rotate([-90, 0, 0]));
+    writeManifold(doc, node, manifold);
     wrapper.addChild(node);
   }
 

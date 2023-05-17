@@ -173,6 +173,12 @@ Manifold Warp(Manifold& manifold, uintptr_t funcPtr) {
   return manifold.Warp(f);
 }
 
+Manifold SetProperties(Manifold& manifold, int numProp, uintptr_t funcPtr) {
+  void (*f)(glm::vec3, const float*, float*) =
+      reinterpret_cast<void (*)(glm::vec3, const float*, float*)>(funcPtr);
+  return manifold.SetProperties(numProp, f);
+}
+
 Manifold LevelSetJs(uintptr_t funcPtr, Box bounds, float edgeLength,
                     float level) {
   float (*f)(const glm::vec3&) =
@@ -254,6 +260,7 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .function("_GetMeshJS", &GetMeshJS)
       .function("refine", &Manifold::Refine)
       .function("_Warp", &Warp)
+      .function("_SetProperties", &SetProperties)
       .function("transform", &Transform)
       .function("_Translate", &Manifold::Translate)
       .function("_Rotate", &Manifold::Rotate)
