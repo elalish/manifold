@@ -3,6 +3,15 @@
 
 namespace BufferUtils {
 
+std::vector<glm::vec2> createDoubleVec2Vector(double* values, std::size_t count) {
+    std::vector<glm::vec2> result(count / 2);
+
+    for (std::size_t i = 0; i < count; i += 2) {
+        result[i/2] = glm::vec2(values[i], values[i + 1]);
+    }
+    return result;
+}
+
 std::vector<glm::vec3> createDoubleVec3Vector(double* values, std::size_t count) {
     std::vector<glm::vec3> result(count / 3);
 

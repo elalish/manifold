@@ -62,7 +62,24 @@ public class Manifold extends Pointer {
 
     //// Modifiers
     public native @ByVal Manifold Translate(@ByRef DoubleVec3 translation);
+    public Manifold Translate(Manifold manifold, double x, double y, double z) {
+        return manifold.Translate(new DoubleVec3(x, y, z));
+    }
+    public Manifold TranslateX(Manifold manifold, double x) {
+        return manifold.Translate(new DoubleVec3(x, 0, 0));
+    }
+    public Manifold TranslateY(Manifold manifold, double y) {
+        return manifold.Translate(new DoubleVec3(0, y, 0));
+    }
+    public Manifold TranslateZ(Manifold manifold, double z) {
+        return manifold.Translate(new DoubleVec3(0, 0, z));
+    }
+
     public native @ByVal Manifold Scale(@ByRef DoubleVec3 scale);
+    public Manifold Scale(Manifold manifold, double x, double y, double z) {
+        return manifold.Scale(new DoubleVec3(x, y, z));
+    }
+
     public native @ByVal Manifold Rotate(float xDegrees, float yDegrees, float zDegrees);
     public native @ByVal Manifold Transform(@ByRef DoubleMat4x3 transform);
     public native @ByVal Manifold Mirror(@ByRef DoubleVec3 mirrorAxis);

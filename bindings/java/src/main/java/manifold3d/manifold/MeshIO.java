@@ -12,7 +12,7 @@ import org.bytedeco.javacpp.annotation.*;
 public class MeshIO {
     static { Loader.load(); }
 
-    public native static @ByVal DoubleMesh ImportMesh(@StdString BytePointer filename, @Cast("bool") boolean forceCleanup);
+    public native static @ByVal DoubleMesh ImportMesh(@StdString String filename, @Cast("bool") boolean forceCleanup);
 
     public native static void ExportMesh(@StdString String filename, @Const @ByRef DoubleMesh mesh, @Const @ByRef ExportOptions options);
 }
