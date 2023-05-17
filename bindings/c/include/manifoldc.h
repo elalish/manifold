@@ -324,6 +324,8 @@ void manifold_export_options_set_material(ManifoldExportOptions *options,
                                           ManifoldMaterial *mat);
 void manifold_export_meshgl(const char *filename, ManifoldMeshGL *mesh,
                             ManifoldExportOptions *options);
+ManifoldMeshGL *manifold_import_meshgl(void *mem, const char *filename,
+                                       int force_cleanup);
 
 // memory size
 size_t manifold_manifold_size();

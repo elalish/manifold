@@ -2,6 +2,8 @@
 
 #include <conv.h>
 
+#include "include/types.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -44,6 +46,12 @@ void manifold_export_options_set_material(ManifoldExportOptions *options,
 void manifold_export_meshgl(const char *filename, ManifoldMeshGL *mesh,
                             ManifoldExportOptions *options) {
   manifold::ExportMesh(std::string(filename), *from_c(mesh), *from_c(options));
+}
+
+ManifoldMeshGL *manifold_import_meshgl(void *mem, const char *filename,
+                                       int force_cleanup) {
+  auto m = manifold::ImportMesh(std::string(filename), force_cleanup);
+  return to_c(new (mem) manifold::MeshGL(m));
 }
 
 // memory size
