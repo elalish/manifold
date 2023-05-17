@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import {Document, Material, WebIO} from '@gltf-transform/core';
-import {KHRONOS_EXTENSIONS} from '@gltf-transform/extensions';
+import {KHRMaterialsUnlit, KHRONOS_EXTENSIONS} from '@gltf-transform/extensions';
 import * as glMatrix from 'gl-matrix';
 
 import Module from './built/manifold.js';
@@ -209,14 +209,19 @@ function getMaterial(node) {
   return node.material;
 }
 
-function makeDefaultedMaterial(
-    doc,
-    {roughness = 0.2,
-     metallic = 1,
-     baseColorFactor = [1, 1, 0, 1],
-     name = ''} = {}) {
-  return doc.createMaterial(name)
-      .setRoughnessFactor(roughness)
+function makeDefaultedMaterial(doc, {
+  roughness = 0.2,
+  metallic = 1,
+  baseColorFactor = [1, 1, 0, 1],
+  unlit = false,
+  name = ''
+} = {}) {
+  const material = doc.createMaterial(name);
+  if (unlit) {
+    const unlit = doc.createExtension(KHRMaterialsUnlit).createUnlit();
+    material.setExtension('KHR_materials_unlit', unlit);
+  }
+  return material.setRoughnessFactor(roughness)
       .setMetallicFactor(metallic)
       .setBaseColorFactor(baseColorFactor);
 }

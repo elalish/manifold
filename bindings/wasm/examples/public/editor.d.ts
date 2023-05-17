@@ -17,17 +17,19 @@ declare class GLTFNode {
   translation?: Vec3|((t: number) => Vec3);
   rotation?: Vec3|((t: number) => Vec3);
   scale?: Vec3|((t: number) => Vec3);
-  material?: Material;
+  material?: GLTFMaterial;
   name?: string;
   constructor(parent?: GLTFNode): GLTFNode;
   clone(parent?: GLTFNode): GLTFNode;
 }
 
 declare class GLTFMaterial {
-  attributes: string[];
-  roughness: number;
-  metallic: number;
-  baseColorFactor: [number, number, number];
+  attributes?: string[];
+  roughness?: number;
+  metallic?: number;
+  baseColorFactor?: [number, number, number];
+  unlit?: boolean;
+  name?: string;
 }
 
 /**
