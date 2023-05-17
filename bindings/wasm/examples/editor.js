@@ -101,6 +101,10 @@ function createDropdownItem(name) {
     saveCurrent();
     switchTo(label.textContent);
   };
+  // Stop text input spaces from triggering the button
+  button.onkeyup = function(event) {
+    event.preventDefault();
+  };
   return button;
 }
 
