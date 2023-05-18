@@ -16,6 +16,7 @@
 #include <map>
 #include <numeric>
 
+#include "convex_hull.h"
 #include "boolean3.h"
 #include "csg_tree.h"
 #include "impl.h"
@@ -569,6 +570,15 @@ Manifold Manifold::Refine(int n) const {
   auto pImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
   pImpl->Refine(n);
   return Manifold(std::make_shared<CsgLeafNode>(pImpl));
+}
+
+Manifold Manifold::ConvexHull(const Manifold& other) const {
+  Mesh mesh1 = this->GetMesh();
+  Mesh mesh2 = other.GetMesh();
+
+  Mesh hullMesh = computeConvexHull3D(mesh1, mesh2);
+
+  return Manifold(hullMesh);
 }
 
 /**

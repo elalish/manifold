@@ -14,3 +14,6 @@
 [submodule "src/third_party/clipper2"]
 	path = src/third_party/clipper2
 	url = https://github.com/AngusJohnson/clipper2
+[submodule "src/third_party/qhull"]
+	path = src/third_party/qhull
+	url = https://github.com/qhull/qhull.git

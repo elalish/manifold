@@ -23,8 +23,11 @@ if(MANIFOLD_USE_CUDA)
 endif()
 
 target_include_directories(${PROJECT_NAME} PUBLIC ${PROJECT_SOURCE_DIR}/include)
+
+# I'm not sure why qhull's include_directories statement doesn't not seem to work correctly.
+target_include_directories(${PROJECT_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/qhull/src)
 target_link_libraries(${PROJECT_NAME}
-    PUBLIC utilities cross_section
+    PUBLIC utilities cross_section libqhull
     PRIVATE collider polygon ${MANIFOLD_INCLUDE} graphlite Clipper2
 )
 
