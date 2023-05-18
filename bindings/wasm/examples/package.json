@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "tsc --noEmit && vite build",
     "build:watch": "vite build --watch",
     "preview": "vite preview"
   },
@@ -18,6 +18,7 @@
     "simple-dropzone": "0.8.3"
   },
   "devDependencies": {
-    "vite": "^4.3.2"
+    "vite": "^4.3.2",
+    "typescript": "5.0.4"
   }
 }

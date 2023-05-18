@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import ManifoldWorker from './worker.js?worker';
+import ManifoldWorker from './worker?worker';
 
 // Loaded globally by examples.js
 const exampleFunctions = self.examples.functionBodies;
@@ -254,18 +254,20 @@ declare const module: ManifoldStatic;
 `;
 }
 
+async function getEditorDTS() {
+  const global = await fetch('/editor.d.ts').then(response => response.text());
+  return `${global.replace(/^import.*$/gm, '')}`;
+}
+
 require.config({
   paths:
       {vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.34.0/min/vs'}
 });
 require(['vs/editor/editor.main'], async function() {
-  async function addTypes(uri) {
-    const content = await fetch(uri).then(response => response.text());
-    monaco.languages.typescript.typescriptDefaults.addExtraLib(content);
-  }
   monaco.languages.typescript.typescriptDefaults.addExtraLib(
       await getManifoldDTS());
-  await addTypes('/editor.d.ts');
+  monaco.languages.typescript.typescriptDefaults.addExtraLib(
+      await getEditorDTS());
   editor = monaco.editor.create(
       document.getElementById('editor'),
       {language: 'typescript', automaticLayout: true});

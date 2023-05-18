@@ -36,3 +36,9 @@ add_custom_command(
                 ${CMAKE_CURRENT_BINARY_DIR}/manifold.*
                 ${CMAKE_CURRENT_BINARY_DIR}/manifold-*.d.ts
                 ${CMAKE_CURRENT_SOURCE_DIR}/examples/built/)
+
+add_custom_command(
+        TARGET manifoldjs POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy
+                ${CMAKE_CURRENT_BINARY_DIR}/manifold*.d.ts
+                ${CMAKE_CURRENT_SOURCE_DIR}/examples/public/)

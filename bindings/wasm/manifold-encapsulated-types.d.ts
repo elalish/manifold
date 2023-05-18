@@ -423,6 +423,12 @@ export class Manifold {
    * returns -1.
    */
   originalID(): number;
+
+  /**
+   * Frees the WASM memory of this Manifold, since these cannot be
+   * garbage-collected automatically.
+   */
+  delete(): void;
 }
 
 export class Mesh {

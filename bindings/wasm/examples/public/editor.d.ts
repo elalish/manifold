@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import {Manifold, Mat4, Vec2, Vec3} from './manifold';
+
 declare class GLTFNode {
   manifold?: Manifold;
   translation?: Vec3|((t: number) => Vec3);
@@ -19,7 +21,7 @@ declare class GLTFNode {
   scale?: Vec3|((t: number) => Vec3);
   material?: GLTFMaterial;
   name?: string;
-  constructor(parent?: GLTFNode): GLTFNode;
+  constructor(parent?: GLTFNode);
   clone(parent?: GLTFNode): GLTFNode;
 }
 
@@ -28,6 +30,7 @@ declare class GLTFMaterial {
   roughness?: number;
   metallic?: number;
   baseColorFactor?: [number, number, number];
+  alpha?: number;
   unlit?: boolean;
   name?: string;
 }

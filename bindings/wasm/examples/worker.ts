@@ -12,14 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {Document, Material, WebIO} from '@gltf-transform/core';
+import {Document, Material, Node, WebIO} from '@gltf-transform/core';
 import {KHRMaterialsUnlit, KHRONOS_EXTENSIONS} from '@gltf-transform/extensions';
 import * as glMatrix from 'gl-matrix';
 
 import Module from './built/manifold.js';
+//@ts-ignore
 import {setupIO, writeMesh} from './gltf-io.js';
+import {GLTFMaterial, Quat} from './public/editor.js';
+import {Manifold, ManifoldStatic, Mesh, Vec3} from './public/manifold.js';
 
-const module = await Module();
+interface WorkerStatic extends ManifoldStatic {
+  GLTFNode: typeof GLTFNode;
+  show(manifold: Manifold): Manifold;
+  only(manifold: Manifold): Manifold;
+  setMaterial(manifold: Manifold, material: GLTFMaterial): void;
+  cleanup(): void;
+}
+
+const module = await Module() as WorkerStatic;
 module.setup();
 
 // Faster on modern browsers than Float32Array
@@ -30,12 +41,24 @@ io.registerExtensions(KHRONOS_EXTENSIONS);
 
 // Debug setup to show source meshes
 let ghost = false;
-const shown = new Map();
-const singles = new Map();
-const SHOW = 'show';
-const GHOST = 'ghost';
+const shown = new Map<number, Mesh>();
+const singles = new Map<number, Mesh>();
 
-function debug(manifold, map) {
+const SHOW = {
+  baseColorFactor: [1, 0, 0],
+  alpha: 0.25,
+  roughness: 1,
+  metallic: 0
+} as GLTFMaterial;
+
+const GHOST = {
+  baseColorFactor: [0.5, 0.5, 0.5],
+  alpha: 0.25,
+  roughness: 1,
+  metallic: 0
+} as GLTFMaterial;
+
+function debug(manifold: Manifold, map: Map<number, Mesh>) {
   const result = manifold.asOriginal();
   map.set(result.originalID(), result.getMesh());
   return result;
@@ -50,9 +73,9 @@ module.only = (manifold) => {
   return debug(manifold, singles);
 };
 
-const nodes = [];
-const id2material = new Map();
-const materialCache = new Map();
+const nodes = new Array<GLTFNode>();
+const id2material = new Map<number, GLTFMaterial>();
+const materialCache = new Map<GLTFMaterial, Material>();
 
 function cleanup() {
   ghost = false;
@@ -64,21 +87,32 @@ function cleanup() {
 }
 
 class GLTFNode {
-  constructor(parent) {
+  private _parent?: GLTFNode;
+  manifold?: Manifold;
+  translation?: Vec3;
+  rotation?: Vec3;
+  scale?: Vec3;
+  material?: GLTFMaterial;
+  name?: string;
+
+  constructor(parent?: GLTFNode) {
     this._parent = parent;
     nodes.push(this);
   }
-  clone(parent) {
+  clone(parent?: GLTFNode) {
     const copy = {...this};
     copy._parent = parent;
     nodes.push(copy);
     return copy;
   }
+  get parent() {
+    return this._parent;
+  }
 }
 
 module.GLTFNode = GLTFNode;
 
-module.setMaterial = (manifold, material) => {
+module.setMaterial = (manifold: Manifold, material: GLTFMaterial): void => {
   const id = manifold.originalID();
   if (id < 0) {
     console.warn(
@@ -111,11 +145,15 @@ const exposedFunctions = constructors.concat(utils);
 // Note that this only fixes memory leak across different runs: the memory
 // will only be freed when the compilation finishes.
 
-const manifoldRegistry = [];
+const manifoldRegistry = new Array<Manifold>();
 for (const name of memberFunctions) {
+  //@ts-ignore
   const originalFn = module.Manifold.prototype[name];
+  //@ts-ignore
   module.Manifold.prototype['_' + name] = originalFn;
-  module.Manifold.prototype[name] = function(...args) {
+  //@ts-ignore
+  module.Manifold.prototype[name] = function(...args: any) {
+    //@ts-ignore
     const result = this['_' + name](...args);
     manifoldRegistry.push(result);
     return result;
@@ -123,8 +161,10 @@ for (const name of memberFunctions) {
 }
 
 for (const name of constructors) {
+  //@ts-ignore
   const originalFn = module[name];
-  module[name] = function(...args) {
+  //@ts-ignore
+  module[name] = function(...args: any) {
     const result = originalFn(...args);
     manifoldRegistry.push(result);
     return result;
@@ -168,9 +208,9 @@ onmessage = async (e) => {
     const f = new Function(
         'exportGLB', 'glMatrix', 'module', ...exposedFunctions, content);
     await f(
-        exportGLB, glMatrix, module,
+        exportGLB, glMatrix, module,  //@ts-ignore
         ...exposedFunctions.map(name => module[name]));
-  } catch (error) {
+  } catch (error: any) {
     console.log(error.toString());
     postMessage({objectURL: null});
   } finally {
@@ -179,7 +219,7 @@ onmessage = async (e) => {
   }
 };
 
-function createGLTFnode(doc, node) {
+function createGLTFnode(doc: Document, node: GLTFNode) {
   const out = doc.createNode(node.name);
   if (node.translation) {
     out.setTranslation(node.translation);
@@ -187,7 +227,7 @@ function createGLTFnode(doc, node) {
   if (node.rotation) {
     const {quat} = glMatrix;
     const deg2rad = Math.PI / 180;
-    const q = quat.create();
+    const q = quat.create() as Quat;
     quat.rotateX(q, q, deg2rad * node.rotation[0]);
     quat.rotateY(q, q, deg2rad * node.rotation[1]);
     quat.rotateZ(q, q, deg2rad * node.rotation[2]);
@@ -199,41 +239,50 @@ function createGLTFnode(doc, node) {
   return out;
 }
 
-function getMaterial(node) {
+function getMaterial(node?: GLTFNode): GLTFMaterial {
   if (node == null) {
     return {};
   }
   if (node.material == null) {
-    node.material = getMaterial(node._parent);
+    node.material = getMaterial(node.parent);
   }
   return node.material;
 }
 
-function makeDefaultedMaterial(doc, {
+function makeDefaultedMaterial(doc: Document, {
   roughness = 0.2,
   metallic = 1,
-  baseColorFactor = [1, 1, 0, 1],
+  baseColorFactor = [1, 1, 0],
+  alpha = 1,
   unlit = false,
   name = ''
-} = {}) {
+}: GLTFMaterial = {}) {
   const material = doc.createMaterial(name);
+
   if (unlit) {
     const unlit = doc.createExtension(KHRMaterialsUnlit).createUnlit();
     material.setExtension('KHR_materials_unlit', unlit);
   }
+
+  if (alpha < 1) {
+    material.setAlphaMode(Material.AlphaMode.BLEND).setDoubleSided(true);
+  }
+
   return material.setRoughnessFactor(roughness)
       .setMetallicFactor(metallic)
-      .setBaseColorFactor(baseColorFactor);
+      .setBaseColorFactor([...baseColorFactor, alpha]);
 }
 
-function getGltfMaterial(doc, matDef) {
+function getGltfMaterial(doc: Document, matDef: GLTFMaterial): Material {
   if (!materialCache.has(matDef)) {
     materialCache.set(matDef, makeDefaultedMaterial(doc, matDef));
   }
-  return materialCache.get(matDef);
+  return materialCache.get(matDef)!;
 }
 
-function writeManifold(doc, node, manifold, material = {}) {
+function writeManifold(
+    doc: Document, node: Node, manifold: Manifold,
+    material: GLTFMaterial = {}) {
   console.log(`Triangles: ${manifold.numTri().toLocaleString()}`);
   const box = manifold.boundingBox();
   const size = [0, 0, 0];
@@ -249,13 +298,13 @@ function writeManifold(doc, node, manifold, material = {}) {
   // From Z-up to Y-up (glTF)
   const manifoldMesh = manifold.getMesh();
 
-  const materials = [];
-  for (const id of manifoldMesh.runOriginalID) {
+  const materials = new Array<GLTFMaterial>();
+  for (const id of manifoldMesh.runOriginalID!) {
     materials.push(id2material.get(id) || material);
   }
   const attributes = ['POSITION'];
   if (materials[0].attributes != null) {
-    attributes.push(materials[0].attributes);
+    attributes.push(...materials[0].attributes);
   }
 
   const gltfMaterials = materials.map((matDef) => {
@@ -267,7 +316,7 @@ function writeManifold(doc, node, manifold, material = {}) {
 
   node.setMesh(writeMesh(doc, manifoldMesh, attributes, gltfMaterials));
 
-  for (const [run, id] of manifoldMesh.runOriginalID.entries()) {
+  for (const [run, id] of manifoldMesh.runOriginalID!.entries()) {
     let inMesh = shown.get(id);
     let single = false;
     if (inMesh == null) {
@@ -287,7 +336,7 @@ function writeManifold(doc, node, manifold, material = {}) {
   }
 }
 
-async function exportGLB(manifold) {
+async function exportGLB(manifold: Manifold) {
   const doc = new Document();
   const halfRoot2 = Math.sqrt(2) / 2;
   const mm2m = 1 / 1000;
@@ -314,7 +363,7 @@ async function exportGLB(manifold) {
   }
 
   if (nodes.length > 0) {
-    const node2gltf = new Map();
+    const node2gltf = new Map<GLTFNode, Node>();
 
     for (const node of nodes) {
       const gltfNode = createGLTFnode(doc, node);
@@ -325,11 +374,11 @@ async function exportGLB(manifold) {
     }
 
     for (const node of nodes) {
-      const gltfNode = node2gltf.get(node);
-      if (node._parent == null) {
+      const gltfNode = node2gltf.get(node)!;
+      if (node.parent == null) {
         wrapper.addChild(gltfNode);
       } else {
-        node2gltf.get(node._parent).addChild(gltfNode);
+        node2gltf.get(node.parent)!.addChild(gltfNode);
       }
     }
   } else {
