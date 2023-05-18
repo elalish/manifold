@@ -1,11 +1,14 @@
 #include "convex_hull.h"
 
+extern "C" {
+#include "libqhull/libqhull.h"
+}
+
 #include "public.h"
 #include <glm/glm.hpp>
 #include <vector>
 #include <queue>
 #include <map>
-
 
 namespace manifold {
 
@@ -131,18 +134,16 @@ Mesh computeConvexHull3D(const Mesh& mesh1, const Mesh& mesh2) {
   return convexHull;
 }
 
-SimplePolygon computeConvexHull2D(const SimplePolygon& polygon1, const SimplePolygon& polygon2) {
-  SimplePolygon combinedPoints = polygon1;
-  combinedPoints.insert(combinedPoints.end(), polygon2.begin(), polygon2.end());
+SimplePolygon computeConvexHull2D(const SimplePolygon& allPoints) {
 
   // Convert points to coordinate array for Qhull
   int dim = 2;  // We're now in 2D
-  int n = combinedPoints.size();
+  int n = allPoints.size();
 
   coordT* points = new coordT[n*dim];
   for(int i = 0; i < n; i++) {
-    points[i*dim] = combinedPoints[i].x;
-    points[i*dim+1] = combinedPoints[i].y;
+    points[i*dim] = allPoints[i].x;
+    points[i*dim+1] = allPoints[i].y;
   }
 
   boolT ismalloc = false;
@@ -151,7 +152,7 @@ SimplePolygon computeConvexHull2D(const SimplePolygon& polygon1, const SimplePol
   int exitcode = qh_new_qhull(dim, n, points, ismalloc, flags, NULL, NULL);
   if(exitcode != 0) {
     std::cout << "Convex Hull failed! Returning first polygon." << std::endl;
-    return polygon1;
+    return allPoints;
   }
 
   // Create a new polygon for the convex hull
@@ -165,7 +166,7 @@ SimplePolygon computeConvexHull2D(const SimplePolygon& polygon1, const SimplePol
 
     // Check if the vertex is already added
     if(vertexIndexMap.find(id) == vertexIndexMap.end()) {
-      convexHull.push_back(combinedPoints[id]);
+      convexHull.push_back(allPoints[id]);
       vertexIndexMap[id] = convexHull.size() - 1;
     }
   }

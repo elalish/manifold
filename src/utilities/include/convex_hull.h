@@ -1,3 +1,4 @@
+
 #pragma once
 
 extern "C" {
@@ -10,10 +11,9 @@ extern "C" {
 #include <queue>
 #include <map>
 
-
 namespace manifold {
 
 Mesh computeConvexHull3D(const Mesh& mesh1, const Mesh& mesh2);
-
+SimplePolygon computeConvexHull2D(const SimplePolygon& allPoints);
 
 }

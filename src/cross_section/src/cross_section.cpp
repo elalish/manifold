@@ -308,24 +308,38 @@ CrossSection CrossSection::BatchBoolean(
   return CrossSection(res);
 }
 /*
+ * Compute the convex hull of paths in cross-section.
+ */
+CrossSection CrossSection::ConvexHull() const {
+
+  SimplePolygon hullPoints;
+  for (auto& path: GetPaths()) {
+    for (auto& pt: path) {
+      hullPoints.push_back(glm::vec2(pt.x, pt.y));
+    }
+  }
+  SimplePolygon res = computeConvexHull2D(hullPoints);
+  return CrossSection(res);
+
+}
+/*
  * Compute the convex hull between two cross-sections.
  */
 CrossSection CrossSection::ConvexHull(const CrossSection& Q) const {
 
-  SimplePolygon hullPoints1;
+  SimplePolygon hullPoints;
   for (auto& path: GetPaths()) {
     for (auto& pt: path) {
-      hullPoints1.push_back(glm::vec2(pt.x, pt.y));
+      hullPoints.push_back(glm::vec2(pt.x, pt.y));
     }
   }
-  SimplePolygon hullPoints2;
   for (auto& path: Q.GetPaths()) {
     for (auto& pt: path) {
-      hullPoints2.push_back(glm::vec2(pt.x, pt.y));
+      hullPoints.push_back(glm::vec2(pt.x, pt.y));
     }
   }
 
-  SimplePolygon res = computeConvexHull2D(hullPoints1, hullPoints2);
+  SimplePolygon res = computeConvexHull2D(hullPoints);
   return CrossSection(res);
 }
 

@@ -139,6 +139,7 @@ class CrossSection {
   static CrossSection BatchBoolean(
       const std::vector<CrossSection>& crossSections, OpType op);
 
+  CrossSection ConvexHull() const;
   CrossSection ConvexHull(const CrossSection& Q) const;
   CrossSection operator+(const CrossSection&) const;
   CrossSection& operator+=(const CrossSection&);
