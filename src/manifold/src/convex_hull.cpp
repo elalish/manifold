@@ -42,7 +42,7 @@ void orientMesh(Mesh &mesh) {
     std::vector<bool> visited(mesh.triVerts.size(), false);
     std::queue<int> q;
 
-    q.push(0); // Start from the first face
+    q.push(0);
     visited[0] = true;
 
     while (!q.empty()) {
@@ -71,15 +71,14 @@ void orientMesh(Mesh &mesh) {
 }
 
 Mesh computeConvexHull3D(const Mesh& mesh1, const Mesh& mesh2) {
-  // Combine vertices of both meshes
   std::vector<glm::vec3> combinedVerts = mesh1.vertPos;
   combinedVerts.insert(combinedVerts.end(), mesh2.vertPos.begin(), mesh2.vertPos.end());
 
   // Convert vertices to coordinate array for Qhull
-  int dim = 3;  // dimension of points
-  int n = combinedVerts.size();  // number of points
+  int dim = 3;
+  int n = combinedVerts.size();
 
-  coordT* points = new coordT[n*dim];  // array to hold coordinates
+  coordT* points = new coordT[n*dim];
   for(int i = 0; i < n; i++) {
     points[i*dim] = combinedVerts[i].x;
     points[i*dim+1] = combinedVerts[i].y;
@@ -92,7 +91,6 @@ Mesh computeConvexHull3D(const Mesh& mesh1, const Mesh& mesh2) {
   int exitcode = qh_new_qhull(dim, n, points, ismalloc, flags, NULL, NULL);
   if(exitcode != 0) {
     std::cout << "Convex Hull failled! Returning first mesh." << std::endl;
-    // Handle error
     return mesh1;
   }
 
@@ -129,6 +127,51 @@ Mesh computeConvexHull3D(const Mesh& mesh1, const Mesh& mesh2) {
 
   // Orient faces by right-hand rule.
   orientMesh(convexHull);
+
+  return convexHull;
+}
+
+SimplePolygon computeConvexHull2D(const SimplePolygon& polygon1, const SimplePolygon& polygon2) {
+  SimplePolygon combinedPoints = polygon1;
+  combinedPoints.insert(combinedPoints.end(), polygon2.begin(), polygon2.end());
+
+  // Convert points to coordinate array for Qhull
+  int dim = 2;  // We're now in 2D
+  int n = combinedPoints.size();
+
+  coordT* points = new coordT[n*dim];
+  for(int i = 0; i < n; i++) {
+    points[i*dim] = combinedPoints[i].x;
+    points[i*dim+1] = combinedPoints[i].y;
+  }
+
+  boolT ismalloc = false;
+  char flags[] = "qhull Qt";
+
+  int exitcode = qh_new_qhull(dim, n, points, ismalloc, flags, NULL, NULL);
+  if(exitcode != 0) {
+    std::cout << "Convex Hull failed! Returning first polygon." << std::endl;
+    return polygon1;
+  }
+
+  // Create a new polygon for the convex hull
+  SimplePolygon convexHull;
+
+  std::map<int, int> vertexIndexMap;
+
+  vertexT *vertex, **vertexp;
+  FORALLvertices {
+    int id = qh_pointid(vertex->point);
+
+    // Check if the vertex is already added
+    if(vertexIndexMap.find(id) == vertexIndexMap.end()) {
+      convexHull.push_back(combinedPoints[id]);
+      vertexIndexMap[id] = convexHull.size() - 1;
+    }
+  }
+
+  qh_freeqhull(!qh_ALL);
+  delete[] points;
 
   return convexHull;
 }

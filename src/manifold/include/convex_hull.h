@@ -4,7 +4,6 @@ extern "C" {
 #include "libqhull/libqhull.h"
 }
 
-#include "cross_section.h"
 #include "public.h"
 #include <glm/glm.hpp>
 #include <vector>

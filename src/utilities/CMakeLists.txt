@@ -42,7 +42,10 @@ else()
 endif()
 
 target_include_directories(${PROJECT_NAME} PUBLIC ${THRUST_INC_DIR})
-target_link_libraries(${PROJECT_NAME} PUBLIC glm)
+
+# I'm not sure why qhull's include_directories statement doesn't not seem to work correctly.
+target_include_directories(${PROJECT_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/qhull/src)
+target_link_libraries(${PROJECT_NAME} PUBLIC glm libqhull)
 
 if(MANIFOLD_USE_CUDA)
     set_source_files_properties(${SOURCE_FILES} PROPERTIES LANGUAGE CUDA)

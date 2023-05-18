@@ -24,6 +24,7 @@
 #include "glm/ext/matrix_float3x2.hpp"
 #include "glm/ext/vector_float2.hpp"
 #include "public.h"
+#include "convex_hull.h"
 
 namespace C2 = Clipper2Lib;
 
@@ -137,6 +138,8 @@ class CrossSection {
   CrossSection Boolean(const CrossSection& second, OpType op) const;
   static CrossSection BatchBoolean(
       const std::vector<CrossSection>& crossSections, OpType op);
+
+  CrossSection ConvexHull(const CrossSection& Q) const;
   CrossSection operator+(const CrossSection&) const;
   CrossSection& operator+=(const CrossSection&);
   CrossSection operator-(const CrossSection&) const;
