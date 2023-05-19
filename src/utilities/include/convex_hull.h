@@ -10,6 +10,7 @@ extern "C" {
 #include <vector>
 #include <queue>
 #include <map>
+#include <algorithm>
 
 namespace manifold {
 

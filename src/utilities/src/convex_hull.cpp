@@ -9,6 +9,7 @@ extern "C" {
 #include <vector>
 #include <queue>
 #include <map>
+#include <algorithm>
 
 namespace manifold {
 
@@ -134,8 +135,39 @@ Mesh computeConvexHull3D(const Mesh& mesh1, const Mesh& mesh2) {
   return convexHull;
 }
 
-SimplePolygon computeConvexHull2D(const SimplePolygon& allPoints) {
+int findMinYPointIndex(const std::vector<glm::vec2>& points) {
+    int minYPointIndex = 0;
+    for (size_t i = 1; i < points.size(); i++) {
+        if ((points[i].y < points[minYPointIndex].y) ||
+            (points[i].y == points[minYPointIndex].y && points[i].x > points[minYPointIndex].x)) {
+            minYPointIndex = i;
+        }
+    }
+    return minYPointIndex;
+}
 
+std::vector<glm::vec2> sortPointsCounterClockwise(const std::vector<glm::vec2>& points) {
+    std::vector<glm::vec2> sortedPoints(points);
+
+    // Find the bottom-most point (or one of them, if multiple)
+    int minYPointIndex = findMinYPointIndex(sortedPoints);
+
+    // Sort the points by angle from the line horizontal to minYPoint, counter-clockwise
+    glm::vec2 minYPoint = points[minYPointIndex];
+    std::sort(sortedPoints.begin(), sortedPoints.end(),
+        [minYPoint](const glm::vec2& p1, const glm::vec2& p2) -> bool {
+            double angle1 = atan2(p1.y - minYPoint.y, p1.x - minYPoint.x);
+            double angle2 = atan2(p2.y - minYPoint.y, p2.x - minYPoint.x);
+            if (angle1 < 0) angle1 += 2*M_PI;
+            if (angle2 < 0) angle2 += 2*M_PI;
+            return angle1 < angle2;
+        }
+    );
+
+    return sortedPoints;
+}
+
+SimplePolygon computeConvexHull2D(const SimplePolygon& allPoints) {
   // Convert points to coordinate array for Qhull
   int dim = 2;  // We're now in 2D
   int n = allPoints.size();
@@ -159,22 +191,18 @@ SimplePolygon computeConvexHull2D(const SimplePolygon& allPoints) {
   SimplePolygon convexHull;
 
   std::map<int, int> vertexIndexMap;
-
   vertexT *vertex, **vertexp;
   FORALLvertices {
     int id = qh_pointid(vertex->point);
-
-    // Check if the vertex is already added
-    if(vertexIndexMap.find(id) == vertexIndexMap.end()) {
-      convexHull.push_back(allPoints[id]);
-      vertexIndexMap[id] = convexHull.size() - 1;
-    }
+    convexHull.push_back(allPoints[id]);
   }
 
   qh_freeqhull(!qh_ALL);
   delete[] points;
 
-  return convexHull;
+  // It's not clear why qhull does not sanely order vertices. For now we sort them ourselves.
+  SimplePolygon sortedPoints = sortPointsCounterClockwise(convexHull);
+  return sortedPoints;
 }
 
 }

@@ -320,7 +320,6 @@ CrossSection CrossSection::ConvexHull() const {
   }
   SimplePolygon res = computeConvexHull2D(hullPoints);
   return CrossSection(res);
-
 }
 /*
  * Compute the convex hull between two cross-sections.
