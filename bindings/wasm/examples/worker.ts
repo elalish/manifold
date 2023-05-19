@@ -283,7 +283,13 @@ function getGltfMaterial(doc: Document, matDef: GLTFMaterial): Material {
 function writeManifold(
     doc: Document, node: Node, manifold: Manifold,
     material: GLTFMaterial = {}) {
-  console.log(`Triangles: ${manifold.numTri().toLocaleString()}`);
+  const numTri = manifold.numTri();
+  if (numTri == 0) {
+    console.log('Empty manifold, skipping.');
+    return;
+  }
+
+  console.log(`Triangles: ${numTri.toLocaleString()}`);
   const box = manifold.boundingBox();
   const size = [0, 0, 0];
   for (let i = 0; i < 3; i++) {
@@ -344,23 +350,6 @@ async function exportGLB(manifold: Manifold) {
                       .setRotation([-halfRoot2, 0, 0, halfRoot2])
                       .setScale([mm2m, mm2m, mm2m]);
   doc.createScene().addChild(wrapper);
-
-  if (shown.size > 0) {
-    const showMaterial = doc.createMaterial()
-                             .setBaseColorFactor([1, 0, 0, 0.25])
-                             .setAlphaMode(Material.AlphaMode.BLEND)
-                             .setDoubleSided(true)
-                             .setMetallicFactor(0);
-    materialCache.set(SHOW, showMaterial);
-  }
-  if (singles.size > 0) {
-    const ghostMaterial = doc.createMaterial()
-                              .setBaseColorFactor([0.5, 0.5, 0.5, 0.25])
-                              .setAlphaMode(Material.AlphaMode.BLEND)
-                              .setDoubleSided(true)
-                              .setMetallicFactor(0);
-    materialCache.set(GHOST, ghostMaterial);
-  }
 
   if (nodes.length > 0) {
     const node2gltf = new Map<GLTFNode, Node>();
