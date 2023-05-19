@@ -15,6 +15,9 @@ extern "C" {
 namespace manifold {
 
 Mesh computeConvexHull3D(const Mesh& mesh1, const Mesh& mesh2);
+// For MeshGL
+void computeConvexHull3D(const std::vector<float>& vertPos, std::vector<float>& resultVertPos, std::vector<uint32_t>& resultTriVerts);
+
 SimplePolygon computeConvexHull2D(const SimplePolygon& allPoints);
 
 }

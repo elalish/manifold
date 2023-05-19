@@ -572,8 +572,32 @@ Manifold Manifold::Refine(int n) const {
   return Manifold(std::make_shared<CsgLeafNode>(pImpl));
 }
 
+Manifold Manifold::ConvexHullGL(const Manifold& other) const {
+  MeshGL mesh1 = GetMeshGL();
+  MeshGL mesh2 = other.GetMeshGL();
+
+  if (mesh1.numProp > 3 || mesh2.numProp > 3) {
+    std::cerr << "ConvexHull not supported for more than three Properties. Returning empty manifold." << std::endl;
+    return Manifold();
+  }
+
+  std::vector<float>& combinedVertProps = mesh1.vertProperties;
+  combinedVertProps.insert(combinedVertProps.end(), mesh2.vertProperties.begin(), mesh2.vertProperties.end());
+
+  std::vector<float> resultVertPos;
+  std::vector<uint32_t> resultTriVerts;
+
+  computeConvexHull3D(combinedVertProps, resultVertPos, resultTriVerts);
+
+  MeshGL resultMesh;
+  resultMesh.vertProperties = resultVertPos;
+  resultMesh.triVerts = resultTriVerts;
+
+  return Manifold(resultMesh);
+}
+
 Manifold Manifold::ConvexHull(const Manifold& other) const {
-  Mesh mesh1 = this->GetMesh();
+  Mesh mesh1 = GetMesh();
   Mesh mesh2 = other.GetMesh();
 
   Mesh hullMesh = computeConvexHull3D(mesh1, mesh2);

@@ -209,6 +209,7 @@ class Manifold {
   Manifold Warp(std::function<void(glm::vec3&)>) const;
   Manifold Refine(int) const;
 
+  Manifold ConvexHullGL(const Manifold& other) const;
   Manifold ConvexHull(const Manifold& other) const;
   // Manifold RefineToLength(float);
   // Manifold RefineToPrecision(float);
