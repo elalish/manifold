@@ -280,9 +280,9 @@ function getGltfMaterial(doc: Document, matDef: GLTFMaterial): Material {
   return materialCache.get(matDef)!;
 }
 
-function writeManifold(
+function addMesh(
     doc: Document, node: Node, manifold: Manifold,
-    material: GLTFMaterial = {}) {
+    backupMaterial: GLTFMaterial = {}) {
   const numTri = manifold.numTri();
   if (numTri == 0) {
     console.log('Empty manifold, skipping.');
@@ -305,12 +305,14 @@ function writeManifold(
   const manifoldMesh = manifold.getMesh();
 
   const materials = new Array<GLTFMaterial>();
+  const attributes = ['POSITION', ...backupMaterial.attributes ?? []];
   for (const id of manifoldMesh.runOriginalID!) {
-    materials.push(id2material.get(id) || material);
-  }
-  const attributes = ['POSITION'];
-  if (materials[0].attributes != null) {
-    attributes.push(...materials[0].attributes);
+    const material = id2material.get(id) || backupMaterial;
+    materials.push(material);
+    if (material.attributes != null &&
+        material.attributes.length > attributes.length) {
+      attributes.splice(1, Infinity, ...material.attributes);
+    }
   }
 
   const gltfMaterials = materials.map((matDef) => {
@@ -332,7 +334,7 @@ function writeManifold(
     if (inMesh == null) {
       continue;
     }
-    const mat = single ? id2material.get(id) || material : SHOW;
+    const mat = single ? materials[run] : SHOW;
     const debugNode =
         doc.createNode('debug')
             .setMesh(
@@ -340,6 +342,57 @@ function writeManifold(
             .setMatrix(manifoldMesh.transform(run));
     node.addChild(debugNode);
   }
+}
+
+function cloneNode(toNode: Node, fromNode: Node) {
+  toNode.setMesh(fromNode.getMesh());
+  fromNode.listChildren().forEach((child) => {
+    const clone = child.clone();
+    toNode.addChild(clone);
+  });
+}
+
+function cloneNodeNewMaterial(
+    doc: Document, toNode: Node, fromNode: Node, backupMaterial: Material,
+    oldBackupMaterial: Material) {
+  cloneNode(toNode, fromNode);
+  const mesh = doc.createMesh();
+  toNode.setMesh(mesh);
+  fromNode.getMesh()!.listPrimitives().forEach((primitive) => {
+    const newPrimitive = primitive.clone();
+    if (primitive.getMaterial() === oldBackupMaterial) {
+      newPrimitive.setMaterial(backupMaterial);
+    }
+    mesh.addPrimitive(newPrimitive);
+  });
+}
+
+function createNodeFromCache(
+    doc: Document, nodeDef: GLTFNode,
+    manifold2node: Map<Manifold, Map<GLTFMaterial, Node>>): Node {
+  const node = createGLTFnode(doc, nodeDef);
+  if (nodeDef.manifold != null) {
+    const backupMaterial = getMaterial(nodeDef);
+    const cachedNodes = manifold2node.get(nodeDef.manifold);
+    if (cachedNodes == null) {
+      addMesh(doc, node, nodeDef.manifold, backupMaterial);
+      const cache = new Map<GLTFMaterial, Node>();
+      cache.set(backupMaterial, node);
+      manifold2node.set(nodeDef.manifold, cache);
+    } else {
+      const cachedNode = cachedNodes.get(backupMaterial);
+      if (cachedNode == null) {
+        const [oldBackupMaterial, oldNode] = cachedNodes.entries().next().value;
+        cloneNodeNewMaterial(
+            doc, node, oldNode, getGltfMaterial(doc, backupMaterial),
+            getGltfMaterial(doc, oldBackupMaterial));
+        cachedNodes.set(backupMaterial, node);
+      } else {
+        cloneNode(node, cachedNode);
+      }
+    }
+  }
+  return node;
 }
 
 async function exportGLB(manifold: Manifold) {
@@ -353,26 +406,23 @@ async function exportGLB(manifold: Manifold) {
 
   if (nodes.length > 0) {
     const node2gltf = new Map<GLTFNode, Node>();
+    const manifold2node = new Map<Manifold, Map<GLTFMaterial, Node>>();
 
-    for (const node of nodes) {
-      const gltfNode = createGLTFnode(doc, node);
-      node2gltf.set(node, gltfNode);
-      if (node.manifold != null) {
-        writeManifold(doc, gltfNode, node.manifold, getMaterial(node));
-      }
+    for (const nodeDef of nodes) {
+      node2gltf.set(nodeDef, createNodeFromCache(doc, nodeDef, manifold2node));
     }
 
-    for (const node of nodes) {
-      const gltfNode = node2gltf.get(node)!;
-      if (node.parent == null) {
+    for (const nodeDef of nodes) {
+      const gltfNode = node2gltf.get(nodeDef)!;
+      if (nodeDef.parent == null) {
         wrapper.addChild(gltfNode);
       } else {
-        node2gltf.get(node.parent)!.addChild(gltfNode);
+        node2gltf.get(nodeDef.parent)!.addChild(gltfNode);
       }
     }
   } else {
-    const node = doc.createNode('result');
-    writeManifold(doc, node, manifold);
+    const node = doc.createNode();
+    addMesh(doc, node, manifold);
     wrapper.addChild(node);
   }
 
