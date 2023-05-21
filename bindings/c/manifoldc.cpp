@@ -15,8 +15,6 @@
 #include "types.h"
 
 #ifdef MANIFOLD_EXPORT
-#include <meshIO.h>
-
 #include "meshio.cpp"
 #endif
 

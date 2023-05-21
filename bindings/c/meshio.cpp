@@ -4,9 +4,29 @@
 
 #include "include/types.h"
 
+// C <-> C++ conversions
+
+ManifoldMaterial *to_c(manifold::Material *m) {
+  return reinterpret_cast<ManifoldMaterial *>(m);
+}
+
+ManifoldExportOptions *to_c(manifold::ExportOptions *m) {
+  return reinterpret_cast<ManifoldExportOptions *>(m);
+}
+
+manifold::Material *from_c(ManifoldMaterial *mat) {
+  return reinterpret_cast<manifold::Material *>(mat);
+}
+
+manifold::ExportOptions *from_c(ManifoldExportOptions *options) {
+  return reinterpret_cast<manifold::ExportOptions *>(options);
+}
+
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+// material
 
 ManifoldMaterial *manifold_material(void *mem) {
   return to_c(new (mem) manifold::Material());
@@ -29,6 +49,8 @@ void manifold_material_set_vert_color(ManifoldMaterial *mat,
   from_c(mat)->vertColor = vector_of_vec_array(vert_color, n_vert);
 }
 
+// export options
+
 ManifoldExportOptions *manifold_export_options(void *mem) {
   return to_c(new (mem) manifold::ExportOptions());
 }
@@ -42,6 +64,8 @@ void manifold_export_options_set_material(ManifoldExportOptions *options,
                                           ManifoldMaterial *mat) {
   from_c(options)->mat = *from_c(mat);
 }
+
+// mesh IO
 
 void manifold_export_meshgl(const char *filename, ManifoldMeshGL *mesh,
                             ManifoldExportOptions *options) {
