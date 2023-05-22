@@ -239,12 +239,12 @@ function createGLTFnode(doc: Document, node: GLTFNode) {
   return out;
 }
 
-function getMaterial(node?: GLTFNode): GLTFMaterial {
+function getBackupMaterial(node?: GLTFNode): GLTFMaterial {
   if (node == null) {
     return {};
   }
   if (node.material == null) {
-    node.material = getMaterial(node.parent);
+    node.material = getBackupMaterial(node.parent);
   }
   return node.material;
 }
@@ -273,7 +273,7 @@ function makeDefaultedMaterial(doc: Document, {
       .setBaseColorFactor([...baseColorFactor, alpha]);
 }
 
-function getGltfMaterial(doc: Document, matDef: GLTFMaterial): Material {
+function getCachedMaterial(doc: Document, matDef: GLTFMaterial): Material {
   if (!materialCache.has(matDef)) {
     materialCache.set(matDef, makeDefaultedMaterial(doc, matDef));
   }
@@ -316,10 +316,7 @@ function addMesh(
   }
 
   const gltfMaterials = materials.map((matDef) => {
-    if (ghost) {
-      matDef = GHOST;
-    }
-    return getGltfMaterial(doc, matDef);
+    return getCachedMaterial(doc, ghost ? GHOST : matDef);
   });
 
   node.setMesh(writeMesh(doc, manifoldMesh, attributes, gltfMaterials));
@@ -337,8 +334,8 @@ function addMesh(
     const mat = single ? materials[run] : SHOW;
     const debugNode =
         doc.createNode('debug')
-            .setMesh(
-                writeMesh(doc, inMesh, attributes, [getGltfMaterial(doc, mat)]))
+            .setMesh(writeMesh(
+                doc, inMesh, attributes, [getCachedMaterial(doc, mat)]))
             .setMatrix(manifoldMesh.transform(run));
     node.addChild(debugNode);
   }
@@ -372,7 +369,7 @@ function createNodeFromCache(
     manifold2node: Map<Manifold, Map<GLTFMaterial, Node>>): Node {
   const node = createGLTFnode(doc, nodeDef);
   if (nodeDef.manifold != null) {
-    const backupMaterial = getMaterial(nodeDef);
+    const backupMaterial = getBackupMaterial(nodeDef);
     const cachedNodes = manifold2node.get(nodeDef.manifold);
     if (cachedNodes == null) {
       addMesh(doc, node, nodeDef.manifold, backupMaterial);
@@ -384,8 +381,8 @@ function createNodeFromCache(
       if (cachedNode == null) {
         const [oldBackupMaterial, oldNode] = cachedNodes.entries().next().value;
         cloneNodeNewMaterial(
-            doc, node, oldNode, getGltfMaterial(doc, backupMaterial),
-            getGltfMaterial(doc, oldBackupMaterial));
+            doc, node, oldNode, getCachedMaterial(doc, backupMaterial),
+            getCachedMaterial(doc, oldBackupMaterial));
         cachedNodes.set(backupMaterial, node);
       } else {
         cloneNode(node, cachedNode);
@@ -395,7 +392,7 @@ function createNodeFromCache(
   return node;
 }
 
-async function exportGLB(manifold: Manifold) {
+async function exportGLB(manifold?: Manifold) {
   const doc = new Document();
   const halfRoot2 = Math.sqrt(2) / 2;
   const mm2m = 1 / 1000;
@@ -407,9 +404,13 @@ async function exportGLB(manifold: Manifold) {
   if (nodes.length > 0) {
     const node2gltf = new Map<GLTFNode, Node>();
     const manifold2node = new Map<Manifold, Map<GLTFMaterial, Node>>();
+    let leafNodes = 0;
 
     for (const nodeDef of nodes) {
       node2gltf.set(nodeDef, createNodeFromCache(doc, nodeDef, manifold2node));
+      if (nodeDef.manifold) {
+        ++leafNodes;
+      }
     }
 
     for (const nodeDef of nodes) {
@@ -420,7 +421,16 @@ async function exportGLB(manifold: Manifold) {
         node2gltf.get(nodeDef.parent)!.addChild(gltfNode);
       }
     }
+
+    console.log(
+        'Total glTF nodes: ', nodes.length,
+        ', Total mesh references: ', leafNodes);
   } else {
+    if (manifold == null) {
+      console.log(
+          'No output because "result" is undefined and no "GLTFNode"s were created.');
+      return;
+    }
     const node = doc.createNode();
     addMesh(doc, node, manifold);
     wrapper.addChild(node);

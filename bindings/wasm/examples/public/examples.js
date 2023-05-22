@@ -381,8 +381,13 @@ export const examples = {
       // manifolds.
       const {vec3} = glMatrix;
 
+      // number of modules along pyramid edge (use 1 for print orientation)
+      const m = 4;
+      // module size
       const size = 20;
+      // SDF resolution
       const n = 20;
+
       const pi = 3.14159;
 
       function gyroid(p) {
@@ -409,10 +414,30 @@ export const examples = {
         return result.intersect(box.rotate([0, 0, 45]));
       }
 
-      let result = rhombicDodecahedron().intersect(gyroidOffset(-0.4));
-      result = result.subtract(gyroidOffset(0.4));
-      result =
-          result.rotate([-45, 0, 90]).translate([0, 0, size / Math.sqrt(2)]);
+      const gyroidModule = rhombicDodecahedron()
+                               .intersect(gyroidOffset(-0.4))
+                               .subtract(gyroidOffset(0.4));
+
+      if (m > 1) {
+        for (let i = 0; i < m; ++i) {
+          for (let j = i; j < m; ++j) {
+            for (let k = j; k < m; ++k) {
+              const node = new GLTFNode();
+              node.manifold = gyroidModule;
+              node.translation =
+                  [(k + i - j) * size, (k - i) * size, (-j) * size];
+              node.material = {
+                baseColorFactor:
+                    [(k + i - j + 1) / m, (k - i + 1) / m, (j + 1) / m]
+              };
+            }
+          }
+        }
+      }
+
+      const result = gyroidModule.rotate([-45, 0, 90]).translate([
+        0, 0, size / Math.sqrt(2)
+      ]);
       return result;
     }
   },
