@@ -90,7 +90,9 @@ Module.setup = function() {
       for (let i = 0; i < oldNumProp; ++i) {
         oldProp[i] = getValue(oldPtr + 4 * i, 'float');
       }
+
       func(newProp, pos, oldProp);
+
       for (let i = 0; i < numProp; ++i) {
         setValue(newPtr + 4 * i, newProp[i], 'float');
       }
