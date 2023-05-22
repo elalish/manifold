@@ -23,7 +23,8 @@ export const examples = {
 
       const box = cube([100, 100, 100], true);
       const ball = sphere(60, 100);
-      // You must name your final output "result".
+      // You must name your final output "result", or create at least one
+      // GLTFNode - see Menger Sponge and Gyroid Module examples.
       const result = box.subtract(ball);
 
       // For visual debug, wrap any shape with show() and it and all of its
@@ -38,6 +39,11 @@ export const examples = {
       // See the script drop-down above ("Intro") for usage examples. The
       // gl-matrix package from npm is automatically imported for convenience -
       // its API is available in the top-level glMatrix object.
+
+      // Use GLTFNode for disjoint manifolds rather than compose(), as this will
+      // keep them better organized in the GLB. This will also allow you to
+      // specify material properties, and even vertex colors via
+      // setProperties(). See Menger Sponge and Gyroid Module examples.
       return result;
     },
 
@@ -306,7 +312,20 @@ export const examples = {
         return result;
       }
 
-      const result = mengerSponge(3).trimByPlane([1, 1, 1], 0).scale(100);
+      const posColors = (newProp, pos) => {
+        for (let i = 0; i < 3; ++i) {
+          newProp[i] = (1 - pos[i]) / 2;
+        }
+      };
+
+      const result = mengerSponge(3)
+                         .trimByPlane([1, 1, 1], 0)
+                         .setProperties(3, posColors)
+                         .scale(100);
+
+      const node = new GLTFNode();
+      node.manifold = result;
+      node.material = {baseColorFactor: [1, 1, 1], attributes: ['COLOR_0']};
       return result;
     },
 
