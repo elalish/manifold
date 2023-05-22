@@ -77,7 +77,11 @@ Module.setup = function() {
 
   Module.Manifold.prototype.setProperties = function(numProp, func) {
     const oldNumProp = this.numProp;
-    const wasmFuncPtr = addFunction(function(vec3Ptr, oldPtr, newPtr) {
+    const wasmFuncPtr = addFunction(function(newPtr, vec3Ptr, oldPtr) {
+      const newProp = [];
+      for (let i = 0; i < numProp; ++i) {
+        newProp[i] = getValue(newPtr + 4 * i, 'float');
+      }
       const pos = [];
       for (let i = 0; i < 3; ++i) {
         pos[i] = getValue(vec3Ptr + 4 * i, 'float');
@@ -86,11 +90,7 @@ Module.setup = function() {
       for (let i = 0; i < oldNumProp; ++i) {
         oldProp[i] = getValue(oldPtr + 4 * i, 'float');
       }
-      const newProp = [];
-      for (let i = 0; i < numProp; ++i) {
-        newProp[i] = getValue(newPtr + 4 * i, 'float');
-      }
-      func(pos, oldProp, newProp);
+      func(newProp, pos, oldProp);
       for (let i = 0; i < numProp; ++i) {
         setValue(newPtr + 4 * i, newProp[i], 'float');
       }

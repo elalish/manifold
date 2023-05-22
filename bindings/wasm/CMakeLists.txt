@@ -27,8 +27,7 @@ target_link_options(manifoldjs PUBLIC --pre-js ${CMAKE_CURRENT_SOURCE_DIR}/bindi
 target_compile_features(manifoldjs PUBLIC cxx_std_17)
 set_target_properties(manifoldjs PROPERTIES OUTPUT_NAME "manifold")
 
-file(COPY examples;test;. DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
-set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS examples;test)
+file(MAKE_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/examples/built)
 
 add_custom_command(
         TARGET manifoldjs POST_BUILD

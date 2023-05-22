@@ -315,7 +315,7 @@ export class Manifold {
    */
   setProperties(
       numProp: number,
-      propFunc: (vert: Vec3, oldProp: number[], newProp: number[]) => void):
+      propFunc: (newProp: number[], position: Vec3, oldProp: number[]) => void):
       Manifold;
 
   /**

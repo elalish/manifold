@@ -174,8 +174,8 @@ Manifold Warp(Manifold& manifold, uintptr_t funcPtr) {
 }
 
 Manifold SetProperties(Manifold& manifold, int numProp, uintptr_t funcPtr) {
-  void (*f)(glm::vec3, const float*, float*) =
-      reinterpret_cast<void (*)(glm::vec3, const float*, float*)>(funcPtr);
+  void (*f)(float*, glm::vec3, const float*) =
+      reinterpret_cast<void (*)(float*, glm::vec3, const float*)>(funcPtr);
   return manifold.SetProperties(numProp, f);
 }
 
