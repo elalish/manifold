@@ -577,7 +577,7 @@ Manifold Manifold::ConvexHullGL(const Manifold& other) const {
   MeshGL mesh2 = other.GetMeshGL();
 
   if (mesh1.numProp > 3 || mesh2.numProp > 3) {
-    std::cerr << "ConvexHull not supported for more than three Properties. Returning empty manifold." << std::endl;
+    //std::cerr << "ConvexHull not supported for more than three Properties. Returning empty manifold." << std::endl;
     return Manifold();
   }
 
