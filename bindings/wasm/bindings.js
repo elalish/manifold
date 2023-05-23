@@ -59,6 +59,10 @@ Module.setup = function() {
     return vec[0];
   }
 
+  function isCrossSection(x) {
+    return (x instanceof Module.CrossSection);
+  }
+
   Module.Manifold.prototype.warp = function(func) {
     const wasmFuncPtr = addFunction(function(vec3Ptr) {
       const x = getValue(vec3Ptr, 'float');
@@ -168,12 +172,12 @@ Module.setup = function() {
     }
 
     position(vert) {
-      return this.vertProperties.subarray(numProp * vert, numProp * vert + 3);
+      return this.vertProperties.subarray(this.numProp * vert, this.numProp * vert + 3);
     }
 
     extras(vert) {
       return this.vertProperties.subarray(
-          numProp * vert + 3, numProp * (vert + 1));
+        this.numProp * vert + 3, this.numProp * (vert + 1));
     }
 
     tangent(halfedge) {
@@ -256,6 +260,44 @@ Module.setup = function() {
         {value: Module.ManifoldError, writable: true, configurable: true}
   });
 
+  Module.square = function(vec, center = false) {
+    return Module._Square({x: vec[0], y: vec[1]}, center);
+  }
+
+  Module.circle = function(radius, circularSegments = 0) {
+    return Module._Circle(radius, circularSegments);
+  }
+
+  Module.CrossSection.prototype.offset = function(delta, joinType = Module.JoinType.Square, miterLimit = 2.0, arcTolerance = 0.0) {
+    return this._Offset(delta, joinType, miterLimit, arcTolerance);
+  }
+
+  Module.CrossSection.prototype.convexHull = function(...args) {
+    if (args.length == 0) {
+      return this._ConvexHull();
+    } else if (args.length == 1) {
+      return this._ConvexHull(args[0]);
+    } else {
+      let ret = this._ConvexHull(args[0]);
+      for (let arg of args) {
+        ret = ret._ConvexHull(arg);
+      }
+      return ret;
+    }
+  };
+
+  Module.CrossSection.prototype.translate = function(...vec) {
+    return this._Translate({x: vec[0], y: vec[1]});
+  }
+
+  Module.CrossSection.prototype.rotate = function(degrees) {
+    return this._Rotate(degrees);
+  }
+
+  Module.CrossSection.prototype.scale = function(...vec) {
+    return this._Rotate({x: vec[0], y: vec[1]});
+  }
+
   const ManifoldCtor = Module.Manifold;
   Module.Manifold = function(mesh) {
     const manifold = new ManifoldCtor(mesh);
@@ -302,13 +344,11 @@ Module.setup = function() {
   };
 
   Module.extrude = function(
-      polygons, height, nDivisions = 0, twistDegrees = 0.0,
+      crossSection, height, nDivisions = 0, twistDegrees = 0.0,
       scaleTop = [1.0, 1.0]) {
     if (scaleTop instanceof Array) scaleTop = {x: scaleTop[0], y: scaleTop[1]};
-    const polygonsVec = polygons2vec(polygons);
     const result = Module._Extrude(
-        polygonsVec, height, nDivisions, twistDegrees, scaleTop);
-    disposePolygons(polygonsVec);
+        crossSection, height, nDivisions, twistDegrees, scaleTop);
     return result;
   };
 
@@ -320,10 +360,15 @@ Module.setup = function() {
     return result;
   };
 
-  Module.revolve = function(polygons, circularSegments = 0) {
-    const polygonsVec = polygons2vec(polygons);
-    const result = Module._Revolve(polygonsVec, circularSegments);
-    disposePolygons(polygonsVec);
+  Module.revolve = function(section, circularSegments = 0, revolveDegrees = 0.0) {
+    let result;
+    if (isCrossSection(section)) {
+      result = Module._RevolveCrossSection(section, circularSegments, revolveDegrees);
+    } else {
+      const polygonsVec = polygons2vec(section);
+      result = Module._Revolve(polygonsVec, circularSegments, revolveDegrees);
+      disposePolygons(polygonsVec);
+    }
     return result;
   };
 

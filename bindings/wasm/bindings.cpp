@@ -20,16 +20,20 @@
 using namespace emscripten;
 
 #include <manifold.h>
+#include <cross_section.h>
 #include <polygon.h>
 #include <sdf.h>
 
 using namespace manifold;
 
 Manifold Union(const Manifold& a, const Manifold& b) { return a + b; }
+CrossSection UnionCrossSection(const CrossSection& a, const CrossSection& b) { return a + b; }
 
 Manifold Difference(const Manifold& a, const Manifold& b) { return a - b; }
+CrossSection DifferenceCrossSection(const CrossSection& a, const CrossSection& b) { return a - b; }
 
 Manifold Intersection(const Manifold& a, const Manifold& b) { return a ^ b; }
+CrossSection IntersectCrossSection(const CrossSection& a, const CrossSection& b) { return a ^ b; }
 
 Manifold UnionN(const std::vector<Manifold>& manifolds) {
   return Manifold::BatchBoolean(manifolds, OpType::Add);
@@ -41,6 +45,20 @@ Manifold DifferenceN(const std::vector<Manifold>& manifolds) {
 
 Manifold IntersectionN(const std::vector<Manifold>& manifolds) {
   return Manifold::BatchBoolean(manifolds, OpType::Intersect);
+}
+
+std::vector<glm::vec2> convertJSArrayToVec3Vector(const val& jsArray) {
+    std::vector<glm::vec2> vec;
+
+    int length = jsArray["length"].as<int>();
+    for(int i=0; i<length; i++) {
+        val jsSubArray = jsArray[i];
+        double x = jsSubArray[0].as<double>();
+        double y = jsSubArray[1].as<double>();
+
+        vec.push_back(glm::vec2(x, y));
+    }
+    return vec;
 }
 
 std::vector<SimplePolygon> ToPolygon(
@@ -128,6 +146,11 @@ MeshGL MeshJS2GL(const val& mesh) {
   return out;
 }
 
+SimplePolygon toSimplePolygon(const val& polygon) {
+  SimplePolygon out = convertJSArrayToVec3Vector(polygon);;
+  return out;
+}
+
 val GetMeshJS(const Manifold& manifold, const glm::ivec3& normalIdx) {
   MeshGL mesh = manifold.GetMeshGL(normalIdx);
   return MeshGL2JS(mesh);
@@ -144,20 +167,31 @@ val Merge(const val& mesh) {
 
 Manifold FromMeshJS(const val& mesh) { return Manifold(MeshJS2GL(mesh)); }
 
+CrossSection fromSimplePolygon(const val& polygon) {
+  return CrossSection(toSimplePolygon(polygon));
+}
+
 Manifold Smooth(const val& mesh,
                 const std::vector<Smoothness>& sharpenedEdges = {}) {
   return Manifold::Smooth(MeshJS2GL(mesh), sharpenedEdges);
 }
 
-Manifold Extrude(std::vector<std::vector<glm::vec2>>& polygons, float height,
+Manifold Extrude(CrossSection& crossSection, float height,
                  int nDivisions, float twistDegrees, glm::vec2 scaleTop) {
-  return Manifold::Extrude(ToPolygon(polygons), height, nDivisions,
+  return Manifold::Extrude(crossSection, height, nDivisions,
                            twistDegrees, scaleTop);
 }
 
 Manifold Revolve(std::vector<std::vector<glm::vec2>>& polygons,
-                 int circularSegments) {
-  return Manifold::Revolve(ToPolygon(polygons), circularSegments);
+                 int circularSegments,
+                 float revolveDegrees) {
+  return Manifold::Revolve(ToPolygon(polygons), circularSegments, revolveDegrees);
+}
+
+Manifold RevolveCrossSection(CrossSection& crossSection,
+                             int circularSegments,
+                             float revolveDegrees) {
+  return Manifold::Revolve(crossSection, circularSegments, revolveDegrees);
 }
 
 Manifold Transform(Manifold& manifold, const val& mat) {
@@ -202,6 +236,17 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .field("z", &glm::vec4::z)
       .field("w", &glm::vec4::w);
 
+  enum_<CrossSection::JoinType>("JoinType")
+    .value("Square", CrossSection::JoinType::Square)
+    .value("Round", CrossSection::JoinType::Round)
+    .value("Miter", CrossSection::JoinType::Miter);
+
+  enum_<CrossSection::FillRule>("FillRule")
+    .value("EvenOdd", CrossSection::FillRule::EvenOdd)
+    .value("NonZero", CrossSection::FillRule::NonZero)
+    .value("Positive", CrossSection::FillRule::Positive)
+    .value("Negative", CrossSection::FillRule::Negative);
+
   enum_<Manifold::Error>("status")
       .value("NoError", Manifold::Error::NoError)
       .value("NonFiniteVertex", Manifold::Error::NonFiniteVertex)
@@ -245,6 +290,19 @@ EMSCRIPTEN_BINDINGS(whatever) {
   register_vector<Smoothness>("Vector_smoothness");
   register_vector<glm::vec4>("Vector_vec4");
 
+  class_<CrossSection>("CrossSection")
+    .constructor(&fromSimplePolygon)
+    .function("add", &UnionCrossSection)
+    .function("subtract", &DifferenceCrossSection)
+    .function("intersect", &IntersectCrossSection)
+    .function("toPolygons", &CrossSection::ToPolygons)
+    .function("_Translate", &CrossSection::Translate)
+    .function("_Rotate", &CrossSection::Rotate)
+    .function("_Offset", &CrossSection::Offset)
+    .function("_Scale", &CrossSection::Scale)
+    .function("_ConvexHull", select_overload<CrossSection() const>(&CrossSection::ConvexHull))
+    .function("_ConvexHull", select_overload<CrossSection(const CrossSection&) const>(&CrossSection::ConvexHull));
+
   class_<Manifold>("Manifold")
       .constructor(&FromMeshJS)
       .function("add", &Union)
@@ -275,6 +333,10 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .function("originalID", &Manifold::OriginalID)
       .function("asOriginal", &Manifold::AsOriginal);
 
+
+  function("_Square", CrossSection::Square);
+  function("_Circle", CrossSection::Circle);
+
   function("_Cube", &Manifold::Cube);
   function("_Cylinder", &Manifold::Cylinder);
   function("_Sphere", &Manifold::Sphere);
@@ -283,6 +345,7 @@ EMSCRIPTEN_BINDINGS(whatever) {
   function("_Extrude", &Extrude);
   function("_Triangulate", &Triangulate);
   function("_Revolve", &Revolve);
+  function("_RevolveCrossSection", &RevolveCrossSection);
   function("_LevelSet", &LevelSetJs);
   function("_Merge", &Merge);
 
