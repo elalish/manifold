@@ -252,7 +252,7 @@ function makeDefaultedMaterial(doc: Document, {
   alpha = 1,
   unlit = false,
   name = ''
-}: GLTFMaterial = {}) {
+}: GLTFMaterial = {}): Material {
   const material = doc.createMaterial(name);
 
   if (unlit) {
@@ -301,14 +301,11 @@ function addMesh(
   const manifoldMesh = manifold.getMesh();
 
   const materials = new Array<GLTFMaterial>();
-  const attributes = ['POSITION', ...backupMaterial.attributes ?? []];
+  const attributes = new Array<Array<string>>();
   for (const id of manifoldMesh.runOriginalID!) {
     const material = id2material.get(id) || backupMaterial;
     materials.push(material);
-    if (material.attributes != null &&
-        material.attributes.length >= attributes.length) {
-      attributes.splice(1, Infinity, ...material.attributes);
-    }
+    attributes.push(['POSITION', ...material.attributes ?? []]);
   }
 
   const gltfMaterials = materials.map((matDef) => {

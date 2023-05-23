@@ -43,7 +43,7 @@ export const examples = {
       // Use GLTFNode for disjoint manifolds rather than compose(), as this will
       // keep them better organized in the GLB. This will also allow you to
       // specify material properties, and even vertex colors via
-      // setProperties(). See Menger Sponge and Gyroid Module examples.
+      // setProperties(). See Tetrahedron Puzzle example.
       return result;
     },
 
@@ -63,17 +63,43 @@ export const examples = {
       const tet = tetrahedron().scale(scale);
 
       const box = [];
-      box.push([2, -2], [2, 2]);
+      box.push([1, -1], [1, 1]);
       for (let i = 0; i <= nDivisions; ++i) {
-        box.push([gap / (2 * scale), 2 - i * 4 / nDivisions]);
+        box.push([gap / (4 * scale), 1 - i * 2 / nDivisions]);
       }
 
-      const screw = extrude(box, 2, nDivisions, 270)
-                        .rotate([0, 0, -45])
-                        .translate([0, 0, -1])
-                        .scale(scale);
+      const cyan = [0, 1, 1];
+      const magenta = [1, 0, 1];
+      const fade = (color, pos) => {
+        for (let i = 0; i < 3; ++i) {
+          color[i] = cyan[i] * pos[2] + magenta[i] * (1 - pos[2]);
+        }
+      };
 
-      const result = tet.intersect(screw);
+      // setProperties(3, fade) creates three channels of vertex properties
+      // according to the above fade function. setMaterial assigns these
+      // channels as colors, and sets the factor to white, since our default is
+      // yellow.
+      const screw = setMaterial(
+          extrude(box, 1, nDivisions, 270).setProperties(3, fade),
+          {baseColorFactor: [1, 1, 1], attributes: ['COLOR_0']});
+
+      const result = tet.intersect(
+          screw.rotate([0, 0, -45]).translate([0, 0, -0.5]).scale(2 * scale));
+
+      // Assigned materials are only applied to a GLTFNode. Note that material
+      // definitions cascade, applying recursively to all child surfaces, but
+      // overridden by any materials defined lower down. Our default material:
+      // {
+      //   roughness = 0.2,
+      //   metallic = 1,
+      //   baseColorFactor = [1, 1, 0],
+      //   alpha = 1,
+      //   unlit = false,
+      //   name = ''
+      // }
+      const node = new GLTFNode();
+      node.manifold = result;
       return result;
     },
 

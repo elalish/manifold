@@ -18,7 +18,6 @@ import {EXTManifold} from './manifold-gltf.js';
 
 export const attributeDefs = {
   'POSITION': {type: Accessor.Type.VEC3, components: 3},
-  'SKIP': {type: null, components: 1},
   'NORMAL': {type: Accessor.Type.VEC3, components: 3},
   'TANGENT': {type: Accessor.Type.VEC4, components: 4},
   'TEXCOORD_0': {type: Accessor.Type.VEC2, components: 2},
@@ -26,6 +25,10 @@ export const attributeDefs = {
   'COLOR_0': {type: Accessor.Type.VEC3, components: 3},
   'JOINTS_0': {type: Accessor.Type.VEC4, components: 4},
   'WEIGHTS_0': {type: Accessor.Type.VEC4, components: 4},
+  'SKIP_1': {type: null, components: 1},
+  'SKIP_2': {type: null, components: 2},
+  'SKIP_3': {type: null, components: 3},
+  'SKIP_4': {type: null, components: 4},
 };
 
 export function setupIO(io) {
@@ -144,6 +147,28 @@ export function writeMesh(doc, manifoldMesh, attributes, materials) {
   const buffer = doc.getRoot().listBuffers()[0];
   const manifoldExtension = doc.createExtension(EXTManifold);
 
+  const attributeUnion = [];
+  for (const matAttributes of attributes) {
+    matAttributes.forEach((attribute, i) => {
+      if (i >= attributeUnion.length) {
+        attributeUnion.push(attribute);
+      } else {
+        const size = attributeDefs[attribute].components;
+        const unionSize = attributeDefs[attributeUnion[i]].components;
+        if (size != unionSize) {
+          throw new Error(
+              'Attribute sizes do not correspond: ', attribute, ' and ',
+              attributeUnion[i]);
+        }
+        if (attributeDefs[attributeUnion[i]].type == null) {
+          attributeUnion[i] = attribute;
+        }
+      }
+    });
+  }
+  if (attributeUnion.length < 1 || attributeUnion[0] !== 'POSITION')
+    throw new Error('First attribute must be "POSITION".');
+
   const mesh = doc.createMesh();
   const numPrimitive = manifoldMesh.runIndex.length - 1;
   for (let run = 0; run < numPrimitive; ++run) {
@@ -159,16 +184,13 @@ export function writeMesh(doc, manifoldMesh, attributes, materials) {
     mesh.addPrimitive(primitive);
   }
 
-  if (attributes.length < 1 || attributes[0] !== 'POSITION')
-    throw new Error('First attribute must be "POSITION".');
-
   const numVert = manifoldMesh.numVert;
   const numProp = manifoldMesh.numProp;
   let offset = 0;
-  for (const attribute of attributes) {
+  attributeUnion.forEach((attribute, aIdx) => {
     if (attribute === 'SKIP') {
       ++offset;
-      continue;
+      return;
     }
     const def = attributeDefs[attribute];
     if (def == null)
@@ -188,11 +210,15 @@ export function writeMesh(doc, manifoldMesh, attributes, materials) {
     const accessor =
         doc.createAccessor().setBuffer(buffer).setType(def.type).setArray(
             array);
-    for (const primitive of mesh.listPrimitives()) {
-      primitive.setAttribute(attribute, accessor);
-    }
+
+    mesh.listPrimitives().forEach((primitive, pIdx) => {
+      if (attributes[pIdx].length > aIdx &&
+          attributeDefs[attributes[pIdx][aIdx]].type != null) {
+        primitive.setAttribute(attribute, accessor);
+      }
+    });
     offset += n;
-  }
+  });
 
   const manifoldPrimitive = manifoldExtension.createManifoldPrimitive();
   mesh.setExtension('EXT_manifold', manifoldPrimitive);
