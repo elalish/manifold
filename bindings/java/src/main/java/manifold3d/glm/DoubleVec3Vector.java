@@ -5,6 +5,8 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.DoubleBuffer;
 
+import java.util.Arrays;
+
 import manifold3d.BufferUtils;
 import manifold3d.glm.DoubleVec3;
 import org.bytedeco.javacpp.*;
@@ -15,6 +17,11 @@ import org.bytedeco.javacpp.annotation.*;
 public class DoubleVec3Vector extends Pointer {
     static { Loader.load(); }
 
+    @Override
+    public String toString() {
+        return "value=" + Arrays.deepToString(this.toArrays()) + '}';
+    }
+
     public DoubleVec3Vector() { allocate(); }
     private native void allocate();
 
@@ -23,6 +30,20 @@ public class DoubleVec3Vector extends Pointer {
 
     @Name("operator[]") public native @ByRef DoubleVec3 get(@Cast("size_t") long i);
     @Name("push_back") public native void pushBack(@ByRef DoubleVec3 value);
+
+    public double[][] toArrays() {
+        int length = (int) this.size();
+
+        double[][] values = new double[length][3];
+
+        for (int i = 0; i < this.size(); i++) {
+            DoubleVec3 vec3 = this.get(i);
+            double[] v = {vec3.get(0), vec3.get(1), vec3.get(2)};
+            values[i] = v;
+        }
+
+        return values;
+    }
 
     public static DoubleVec3Vector FromBuffer(DoubleBuffer buff) {
         DoublePointer ptr = new DoublePointer(buff);

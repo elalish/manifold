@@ -47,6 +47,13 @@ public class CrossSection extends Pointer {
     public native @ByVal Rect Bounds();
 
     public native @ByVal CrossSection Translate(@ByVal DoubleVec2 v);
+    public CrossSection translateX(double x) {
+        return this.Translate(new DoubleVec2(x, 0));
+    }
+    public CrossSection translateY(double y) {
+        return this.Translate(new DoubleVec2(0, y));
+    }
+
     public native @ByVal CrossSection Rotate(float degrees);
     public native @ByVal CrossSection Scale(@ByVal DoubleVec2 s);
     public native @ByVal CrossSection Mirror(@ByVal DoubleVec2 ax);
@@ -57,7 +64,9 @@ public class CrossSection extends Pointer {
     public native @ByVal CrossSection Offset(double delta, @Cast("manifold::CrossSection::JoinType") int jt, double miter_limit, double arc_tolerance);
 
     public native @ByVal CrossSection Boolean(@ByRef CrossSection second, @Cast("manifold::OpType") int op);
-    // BatchBoolean method is omitted because of the std::vector parameter
+
+    @Name("ConvexHull") public native @ByVal CrossSection convexHull();
+    @Name("ConvexHull") public native @ByVal CrossSection convexHull(@ByRef CrossSection other);
 
     @Name("operator+") public native @ByVal CrossSection add(@ByRef CrossSection rhs);
     @Name("operator+=") public native @ByVal CrossSection addPut(@ByRef CrossSection rhs);
@@ -68,6 +77,9 @@ public class CrossSection extends Pointer {
 
     public native @ByVal CrossSection RectClip(@ByVal Rect rect);
     // Compose and Decompose methods are omitted because of the std::vector parameter
+
+    public static native @ByVal CrossSection Circle(float radius, int circularSegments);
+    public static native @ByVal CrossSection Square(@ByRef DoubleVec2 size, boolean center);
 
     public native @ByVal Polygons ToPolygons();
 }

@@ -60,24 +60,26 @@ public class Manifold extends Pointer {
     public native int OriginalID();
     public native @ByVal Manifold AsOriginal();
 
+    public native @ByVal Manifold ConvexHull(@ByRef Manifold other);
+
     //// Modifiers
     public native @ByVal Manifold Translate(@ByRef DoubleVec3 translation);
     public Manifold Translate(Manifold manifold, double x, double y, double z) {
         return manifold.Translate(new DoubleVec3(x, y, z));
     }
-    public Manifold TranslateX(Manifold manifold, double x) {
-        return manifold.Translate(new DoubleVec3(x, 0, 0));
+    public Manifold TranslateX(double x) {
+        return this.Translate(new DoubleVec3(x, 0, 0));
     }
-    public Manifold TranslateY(Manifold manifold, double y) {
-        return manifold.Translate(new DoubleVec3(0, y, 0));
+    public Manifold TranslateY(double y) {
+        return this.Translate(new DoubleVec3(0, y, 0));
     }
-    public Manifold TranslateZ(Manifold manifold, double z) {
-        return manifold.Translate(new DoubleVec3(0, 0, z));
+    public Manifold TranslateZ(double z) {
+        return this.Translate(new DoubleVec3(0, 0, z));
     }
 
     public native @ByVal Manifold Scale(@ByRef DoubleVec3 scale);
-    public Manifold Scale(Manifold manifold, double x, double y, double z) {
-        return manifold.Scale(new DoubleVec3(x, y, z));
+    public Manifold Scale(double x, double y, double z) {
+        return this.Scale(new DoubleVec3(x, y, z));
     }
 
     public native @ByVal Manifold Rotate(float xDegrees, float yDegrees, float zDegrees);
@@ -103,5 +105,6 @@ public class Manifold extends Pointer {
     public static native @ByVal Manifold Sphere(float radius, int circularSegments);
     public static native @ByVal Manifold Extrude(@ByRef CrossSection crossSection, float height, int nDivisions, float twistDegrees, @ByRef DoubleVec2 scaleTop);
     public static native @ByVal Manifold Revolve(@ByRef CrossSection crossSection, int circularSegments);
+    public static native @ByVal Manifold Revolve(@ByRef CrossSection crossSection, int circularSegments, float revolveDegrees);
     //public static native @ByVal Manifold Compose(@ByRef ManifoldVector manifolds);
 }
