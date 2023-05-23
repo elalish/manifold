@@ -179,25 +179,27 @@ module.cleanup = function() {
 };
 
 // Setup complete
-postMessage(null);
+self.postMessage(null);
 
-const oldLog = console.log;
-console.log = function(...args) {
-  let message = '';
-  for (const arg of args) {
-    if (arg == null) {
-      message += 'undefined';
-    } else if (typeof arg == 'object') {
-      message += JSON.stringify(arg, null, 4);
-    } else {
-      message += arg.toString();
+if (self.console) {
+  const oldLog = self.console.log;
+  self.console.log = function(...args) {
+    let message = '';
+    for (const arg of args) {
+      if (arg == null) {
+        message += 'undefined';
+      } else if (typeof arg == 'object') {
+        message += JSON.stringify(arg, null, 4);
+      } else {
+        message += arg.toString();
+      }
     }
-  }
-  postMessage({log: message});
-  oldLog(...args);
-};
+    self.postMessage({log: message});
+    oldLog(...args);
+  };
+}
 
-onmessage = async (e) => {
+self.onmessage = async (e) => {
   const content = e.data +
       '\nreturn exportGLB(typeof result === "undefined" ? undefined : result);\n';
   try {
@@ -208,7 +210,7 @@ onmessage = async (e) => {
         ...exposedFunctions.map(name => module[name]));
   } catch (error: any) {
     console.log(error.toString());
-    postMessage({objectURL: null});
+    self.postMessage({objectURL: null});
   } finally {
     module.cleanup();
     cleanup();
@@ -432,5 +434,5 @@ async function exportGLB(manifold?: Manifold) {
   const glb = await io.writeBinary(doc);
 
   const blob = new Blob([glb], {type: 'application/octet-stream'});
-  postMessage({objectURL: URL.createObjectURL(blob)});
+  self.postMessage({objectURL: URL.createObjectURL(blob)});
 }

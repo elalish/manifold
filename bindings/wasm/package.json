@@ -8,10 +8,7 @@
     "manifold.wasm",
     "manifold.d.ts",
     "manifold-encapsulated-types.d.ts",
-    "manifold-global-types.d.ts",
-    "examples/examples.js",
-    "examples/manifold-gltf.js",
-    "examples/gltf-io.js"
+    "manifold-global-types.d.ts"
   ],
   "typings": "manifold.d.ts",
   "types": "manifold.d.ts",
@@ -38,16 +35,5 @@
   "bugs": {
     "url": "https://github.com/elalish/manifold/issues"
   },
-  "homepage": "https://github.com/elalish/manifold#readme",
-  "scripts": {
-    "test": "mocha -u tdd -t 30000"
-  },
-  "dependencies": {
-    "@gltf-transform/core": "^3.2.1"
-  },
-  "devDependencies": {
-    "chai": "*",
-    "mocha": "*",
-    "gl-matrix": "3.4.3"
-  }
+  "homepage": "https://github.com/elalish/manifold#readme"
 }

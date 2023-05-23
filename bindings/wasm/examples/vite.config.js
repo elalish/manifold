@@ -3,6 +3,7 @@ import {resolve} from 'path'
 import {defineConfig} from 'vite'
 
 export default defineConfig({
+  test: {timeout: 10000},
   worker: {
     format: 'es',
   },

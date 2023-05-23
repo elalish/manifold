@@ -503,4 +503,6 @@ for (const [func, code] of Object.entries(examples.functions)) {
   examples.functionBodies.set(name, body);
 };
 
-self.examples = examples;
+if (typeof self !== 'undefined') {
+  self.examples = examples;
+}

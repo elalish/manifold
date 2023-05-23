@@ -7,7 +7,10 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "build:watch": "vite build --watch",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest",
+    "test:ui": "vitest --ui",
+    "test:run": "vitest run"
   },
   "dependencies": {
     "@gltf-transform/core": "^3.2.1",
@@ -18,7 +21,10 @@
     "simple-dropzone": "0.8.3"
   },
   "devDependencies": {
+    "@vitest/web-worker": "^0.31.1",
+    "@vitest/ui": "^0.31.1",
     "vite": "^4.3.2",
+    "vitest": "^0.31.1",
     "typescript": "5.0.4"
   }
 }
