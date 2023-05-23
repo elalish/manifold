@@ -75,6 +75,10 @@ Module.setup = function() {
     return out;
   };
 
+  Module.Manifold.prototype.convexHull = function(manifold) {
+    return this._ConvexHull(manifold);
+  };
+
   Module.Manifold.prototype.translate = function(...vec) {
     return this._Translate(vararg2vec(vec));
   };
