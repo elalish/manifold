@@ -19,8 +19,8 @@ import * as glMatrix from 'gl-matrix';
 import Module from './built/manifold.js';
 //@ts-ignore
 import {setupIO, writeMesh} from './gltf-io.js';
-import {GLTFMaterial, Quat} from './public/editor.js';
-import {Manifold, ManifoldStatic, Mesh, Vec3} from './public/manifold.js';
+import type {GLTFMaterial, Quat} from './public/editor.js';
+import type {Manifold, ManifoldStatic, Mesh, Vec3} from './public/manifold.js';
 
 interface WorkerStatic extends ManifoldStatic {
   GLTFNode: typeof GLTFNode;
@@ -30,7 +30,7 @@ interface WorkerStatic extends ManifoldStatic {
   cleanup(): void;
 }
 
-const module = await Module() as WorkerStatic;
+const module = await Module() as unknown as WorkerStatic;
 module.setup();
 
 // Faster on modern browsers than Float32Array
@@ -306,7 +306,7 @@ function addMesh(
     const material = id2material.get(id) || backupMaterial;
     materials.push(material);
     if (material.attributes != null &&
-        material.attributes.length > attributes.length) {
+        material.attributes.length >= attributes.length) {
       attributes.splice(1, Infinity, ...material.attributes);
     }
   }
