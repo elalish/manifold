@@ -36,6 +36,16 @@ declare class GLTFMaterial {
 }
 
 /**
+ * Set material properties on the input manifold. They will be carried along
+ * through operations.
+ *
+ * @param manifold The object to add properties to - returned for chaining.
+ * @param material A set of material properties to apply to this manifold.
+ */
+declare function setMaterial(
+    manifold: Manifold, material: GLTFMaterial): Manifold;
+
+/**
  * Wrap any object with this method to display it and any copies in transparent
  * red. This is particularly useful for debugging subtract() as it will allow
  * you find the object even if it doesn't currently intersect the result.

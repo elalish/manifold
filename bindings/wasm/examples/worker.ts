@@ -112,15 +112,10 @@ class GLTFNode {
 
 module.GLTFNode = GLTFNode;
 
-module.setMaterial = (manifold: Manifold, material: GLTFMaterial): void => {
-  const id = manifold.originalID();
-  if (id < 0) {
-    console.warn(
-        manifold,
-        ' is not an original - call asOriginal() before setting a material.');
-    return;
-  }
-  id2material.set(id, material);
+module.setMaterial = (manifold: Manifold, material: GLTFMaterial): Manifold => {
+  const out = manifold.asOriginal();
+  id2material.set(out.originalID(), material);
+  return out;
 };
 
 // manifold member functions that returns a new manifold
@@ -132,11 +127,12 @@ const memberFunctions = [
 // top level functions that constructs a new manifold
 const constructors = [
   'cube', 'cylinder', 'sphere', 'tetrahedron', 'extrude', 'revolve', 'union',
-  'difference', 'intersection', 'compose', 'levelSet', 'smooth', 'show', 'only'
+  'difference', 'intersection', 'compose', 'levelSet', 'smooth', 'show', 'only',
+  'setMaterial'
 ];
 const utils = [
   'setMinCircularAngle', 'setMinCircularEdgeLength', 'setCircularSegments',
-  'getCircularSegments', 'Mesh', 'GLTFNode', 'setMaterial'
+  'getCircularSegments', 'Mesh', 'GLTFNode'
 ];
 const exposedFunctions = constructors.concat(utils);
 
