@@ -253,6 +253,7 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .function("_TrimByPlane", &Manifold::TrimByPlane)
       .function("_GetMeshJS", &GetMeshJS)
       .function("refine", &Manifold::Refine)
+      .function("_ConvexHull", &Manifold::ConvexHullGL)
       .function("_Warp", &Warp)
       .function("transform", &Transform)
       .function("_Translate", &Manifold::Translate)

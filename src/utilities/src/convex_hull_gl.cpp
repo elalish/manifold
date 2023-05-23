@@ -91,7 +91,7 @@ void computeConvexHull3D(const std::vector<float>& vertPos, std::vector<float>& 
 
     int exitcode = qh_new_qhull(dim, n, points, ismalloc, flags, NULL, NULL);
     if(exitcode != 0) {
-        std::cout << "Convex Hull failled! Exiting the function." << std::endl;
+        //std::cout << "Convex Hull failled! Exiting the function." << std::endl;
         delete[] points;
         return;
     }

@@ -94,7 +94,7 @@ Mesh computeConvexHull3D(const Mesh& mesh1, const Mesh& mesh2) {
 
   int exitcode = qh_new_qhull(dim, n, points, ismalloc, flags, NULL, NULL);
   if(exitcode != 0) {
-    std::cout << "Convex Hull failled! Returning first mesh." << std::endl;
+    //std::cout << "Convex Hull failled! Returning first mesh." << std::endl;
     return mesh1;
   }
 
@@ -183,7 +183,7 @@ SimplePolygon computeConvexHull2D(const SimplePolygon& allPoints) {
 
   int exitcode = qh_new_qhull(dim, n, points, ismalloc, flags, NULL, NULL);
   if(exitcode != 0) {
-    std::cout << "Convex Hull failed! Returning first polygon." << std::endl;
+    //std::cout << "Convex Hull failed! Returning first polygon." << std::endl;
     return allPoints;
   }
 
