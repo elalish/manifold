@@ -128,10 +128,12 @@
 
     disposeMesh(node.getMesh());
     const materials = [];
+    const matAttributes = [];
     for (const id of manifoldMesh.runOriginalID) {
       materials.push(materialMap.get(id));
+      matAttributes.push(attributes);
     }
-    const mesh = writeMesh(doc, manifoldMesh, attributes, materials);
+    const mesh = writeMesh(doc, manifoldMesh, matAttributes, materials);
     node.setMesh(mesh);
     await doc.transform(prune());
 

@@ -161,12 +161,15 @@
       const manifoldMesh = new wasm.Mesh(tmpMesh);
       mesh.dispose();
 
+      const matAttributes = [];
+      materials.forEach(() => matAttributes.push(attributes));
+
       manifoldMesh.merge();
 
       try {
         // Test manifoldness - will throw if not.
         const manifold = wasm.Manifold(manifoldMesh);
-        node.setMesh(writeMesh(docIn, manifold.getMesh(), attributes, materials));
+        node.setMesh(writeMesh(docIn, manifold.getMesh(), matAttributes, materials));
         manifold.delete();
         anyManifold = true;
       } catch (e) {
