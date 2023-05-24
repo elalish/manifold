@@ -54,27 +54,31 @@ async function runExample(name) {
     };
 
     worker.onmessage = async function(e) {
-      URL.revokeObjectURL(objectURL);
-      objectURL = e.data.objectURL;
-      if (!objectURL) {
-        reject('no objectURL');
-      }
-      const docIn = await io.read(objectURL);
-      const nodes = docIn.getRoot().listNodes();
-      for (const node of nodes) {
-        const mesh = node.getMesh();
-        if (!mesh) {
-          continue;
+      try {
+        URL.revokeObjectURL(objectURL);
+        objectURL = e.data.objectURL;
+        if (objectURL == null) {
+          reject('no objectURL');
         }
-        const attributes = [];
-        const materials = [];
-        const manifoldMesh = readMesh(mesh, attributes, materials);
-        const manifold = wasm.Manifold(manifoldMesh);
-        const prop = manifold.getProperties();
-        const genus = manifold.genus();
-        console.log(genus);
-        manifold.delete();
-        resolve({...prop, genus});
+        const docIn = await io.read(objectURL);
+        const nodes = docIn.getRoot().listNodes();
+        for (const node of nodes) {
+          const mesh = node.getMesh();
+          if (!mesh) {
+            continue;
+          }
+          const attributes = [];
+          const materials = [];
+          const manifoldMesh = readMesh(mesh, attributes, materials);
+          const manifold = wasm.Manifold(manifoldMesh);
+          const prop = manifold.getProperties();
+          const genus = manifold.genus();
+          console.log(genus);
+          manifold.delete();
+          resolve({...prop, genus});
+        }
+      } catch (e) {
+        reject(e);
       }
     };
 
@@ -121,8 +125,8 @@ suite('Examples', () => {
   test('Torus Knot', async () => {
     const result = await runExample('Torus Knot');
     expect(result.genus).to.equal(1, 'Genus');
-    expect(result.volume).to.be.closeTo(20960, 1, 'Volume');
-    expect(result.surfaceArea).to.be.closeTo(11202, 1, 'Surface Area');
+    expect(result.volume).to.be.closeTo(20786, 1, 'Volume');
+    expect(result.surfaceArea).to.be.closeTo(11177, 1, 'Surface Area');
   });
 
   test('Menger Sponge', async () => {

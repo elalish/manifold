@@ -41,16 +41,24 @@ function readPrimitive(primitive, numProp, attributes) {
   const vertProperties = [];
   let offset = 0;
   for (const attribute of attributes) {
+    const size = attributeDefs[attribute].components;
     if (attribute === 'SKIP') {
-      offset += attributeDefs[attribute].components;
+      offset += size;
       continue;
     }
     const accessor = primitive.getAttribute(attribute);
-    const array = accessor.getArray();
-    const size = accessor.getElementSize();
-    for (let i = 0; i < numVert; ++i) {
-      for (let j = 0; j < size; ++j) {
-        vertProperties[numProp * i + offset + j] = array[i * size + j];
+    if (accessor) {
+      const array = accessor.getArray();
+      for (let i = 0; i < numVert; ++i) {
+        for (let j = 0; j < size; ++j) {
+          vertProperties[numProp * i + offset + j] = array[i * size + j];
+        }
+      }
+    } else {
+      for (let i = 0; i < numVert; ++i) {
+        for (let j = 0; j < size; ++j) {
+          vertProperties[numProp * i + offset + j] = 0;
+        }
       }
     }
     offset += size;
