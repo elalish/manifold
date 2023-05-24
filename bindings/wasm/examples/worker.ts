@@ -199,6 +199,13 @@ if (self.console) {
   };
 }
 
+// Swallow informational logs in testing framework
+function log(...args: any[]) {
+  if (self.console) {
+    self.console.log(...args);
+  }
+}
+
 self.onmessage = async (e) => {
   const content = e.data +
       '\nreturn exportGLB(typeof result === "undefined" ? undefined : result);\n';
@@ -283,20 +290,20 @@ function addMesh(
     backupMaterial: GLTFMaterial = {}) {
   const numTri = manifold.numTri();
   if (numTri == 0) {
-    console.log('Empty manifold, skipping.');
+    log('Empty manifold, skipping.');
     return;
   }
 
-  console.log(`Triangles: ${numTri.toLocaleString()}`);
+  log(`Triangles: ${numTri.toLocaleString()}`);
   const box = manifold.boundingBox();
   const size = [0, 0, 0];
   for (let i = 0; i < 3; i++) {
     size[i] = Math.round((box.max[i] - box.min[i]) * 10) / 10;
   }
-  console.log(`Bounding Box: X = ${size[0].toLocaleString()} mm, Y = ${
+  log(`Bounding Box: X = ${size[0].toLocaleString()} mm, Y = ${
       size[1].toLocaleString()} mm, Z = ${size[2].toLocaleString()} mm`);
   const volume = Math.round(manifold.getProperties().volume / 10);
-  console.log(`Genus: ${manifold.genus().toLocaleString()}, Volume: ${
+  log(`Genus: ${manifold.genus().toLocaleString()}, Volume: ${
       (volume / 100).toLocaleString()} cm^3`);
 
   // From Z-up to Y-up (glTF)
@@ -417,13 +424,11 @@ async function exportGLB(manifold?: Manifold) {
       }
     }
 
-    console.log(
-        'Total glTF nodes: ', nodes.length,
+    log('Total glTF nodes: ', nodes.length,
         ', Total mesh references: ', leafNodes);
   } else {
     if (manifold == null) {
-      console.log(
-          'No output because "result" is undefined and no "GLTFNode"s were created.');
+      log('No output because "result" is undefined and no "GLTFNode"s were created.');
       return;
     }
     const node = doc.createNode();
