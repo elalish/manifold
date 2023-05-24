@@ -16,11 +16,11 @@ import {Document, Material, Node, WebIO} from '@gltf-transform/core';
 import {KHRMaterialsUnlit, KHRONOS_EXTENSIONS} from '@gltf-transform/extensions';
 import * as glMatrix from 'gl-matrix';
 
-import Module from './built/manifold.js';
+import Module from './built/manifold';
 //@ts-ignore
-import {setupIO, writeMesh} from './gltf-io.js';
-import type {GLTFMaterial, Quat} from './public/editor.js';
-import type {Manifold, ManifoldStatic, Mesh, Vec3} from './public/manifold.js';
+import {setupIO, writeMesh} from './gltf-io';
+import type {GLTFMaterial, Quat} from './public/editor';
+import type {Manifold, ManifoldStatic, Mesh, Vec3} from './public/manifold';
 
 interface WorkerStatic extends ManifoldStatic {
   GLTFNode: typeof GLTFNode;
