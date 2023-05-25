@@ -20,16 +20,15 @@ jobs:
         mkdir public
         mv ./samples ./public
         mv ./docs ./public
-        mv ./bindings/wasm/examples/* ./public
 
-    - name: Download WASM files
+    - name: Download built examples
       uses: dawidd6/action-download-artifact@v2
       with:
         workflow: manifold.yml
         workflow_conclusion: completed
         pr: ${{github.event.pull_request.number}}
         name: wasm
-        path: ./public/built
+        path: ./public
 
     - name: Deploy to Github Pages
       uses: peaceiris/actions-gh-pages@v3

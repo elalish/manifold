@@ -59,21 +59,12 @@
     <span id="poster" slot="poster">Drop a GLB here</span>
   </model-viewer>
 </body>
-<script type="importmap">
-  {
-    "imports": {
-      "@gltf-transform/core": "https://cdn.jsdelivr.net/npm/@gltf-transform/core@3.2.1/+esm",
-      "@gltf-transform/functions": "https://cdn.jsdelivr.net/npm/@gltf-transform/functions@3.2.1/+esm",
-      "@gltf-transform/extensions": "https://cdn.jsdelivr.net/npm/@gltf-transform/extensions@3.2.1/+esm"
-    }
-  }
-</script>
 <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/2.0.1/model-viewer.min.js"></script>
 <script type="module">
   import { WebIO } from '@gltf-transform/core';
   import { prune } from '@gltf-transform/functions';
   import { KHRONOS_EXTENSIONS } from '@gltf-transform/extensions';
-  import { SimpleDropzone } from 'https://cdn.jsdelivr.net/npm/simple-dropzone@0.8.3/+esm';
+  import { SimpleDropzone } from 'simple-dropzone';
   import { readMesh, writeMesh, setupIO } from './gltf-io.js';
   import Module from './built/manifold.js';
 
@@ -170,12 +161,15 @@
       const manifoldMesh = new wasm.Mesh(tmpMesh);
       mesh.dispose();
 
+      const matAttributes = [];
+      materials.forEach(() => matAttributes.push(attributes));
+
       manifoldMesh.merge();
 
       try {
         // Test manifoldness - will throw if not.
         const manifold = wasm.Manifold(manifoldMesh);
-        node.setMesh(writeMesh(docIn, manifold.getMesh(), attributes, materials));
+        node.setMesh(writeMesh(docIn, manifold.getMesh(), matAttributes, materials));
         manifold.delete();
         anyManifold = true;
       } catch (e) {
