@@ -121,32 +121,38 @@ module.setMaterial = (manifold: Manifold, material: GLTFMaterial): Manifold => {
 
 // manifold static methods
 const manifoldStaticFunctions = [
-  'cube', 'cylinder', 'sphere', 'tetrahedron', 'extrude', 'revolve', 'smooth',
-  'compose', 'union', 'difference', 'intersection', 'levelSet', 'ofMesh'
+  'cube', 'cylinder', 'sphere', 'tetrahedron',
+  'extrude', 'revolve',
+  'compose', 'union', 'difference', 'intersection',
+  'levelSet', 'smooth', 'ofMesh'
 ];
 // manifold member functions that return a new manifold
 const manifoldMemberFunctions = [
-  'add', 'subtract', 'intersect', 'trimByPlane', 'refine', 'warp', 'transform',
-  'setProperties', 'translate', 'rotate', 'scale', 'mirror', 'asOriginal', 'decompose',
-  'split', 'splitByPlane'
+  'add', 'subtract', 'intersect', 'decompose',
+  'warp', 'transform', 'translate', 'rotate', 'scale', 'mirror',
+  'refine', 'setProperties', 'asOriginal',
+  'trimByPlane', 'split', 'splitByPlane'
 ];
 // CrossSection static methods
 const crossSectionStaticFunctions = [
-  'square', 'circle', 'union', 'difference', 'intersection', 'compose', 'ofPolygons'
+  'square', 'circle',
+  'union', 'difference', 'intersection', 'compose',
+  'ofPolygons'
 ];
 // CrossSection member functions that returns a new manifold
 const crossSectionMemberFunctions = [
-  'add', 'subtract', 'intersect', 'transform',
-  'translate', 'rotate', 'scale', 'mirror', 'decompose', 'simplify', 'offset',
-  'rectClip', 'toPolygons'
+  'add', 'subtract', 'intersect', 'rectClip', 'decompose',
+  'transform', 'translate', 'rotate', 'scale', 'mirror',
+  'simplify', 'offset',
+  'toPolygons'
 ];
 // top level functions that construct a new manifolds/meshes
 const toplevelConstructors = [
   'show', 'only', 'setMaterial'
 ];
 const toplevel = [
-  'setMinCircularAngle', 'setMinCircularEdgeLength', 'setCircularSegments',
-  'getCircularSegments', 'Mesh', 'GLTFNode', 'Manifold', 'CrossSection'
+  'setMinCircularAngle', 'setMinCircularEdgeLength', 'setCircularSegments', 'getCircularSegments',
+  'Mesh', 'GLTFNode', 'Manifold', 'CrossSection'
 ];
 const exposedFunctions = toplevelConstructors.concat(toplevel);
 
