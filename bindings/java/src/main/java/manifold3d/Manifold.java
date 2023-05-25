@@ -1,10 +1,18 @@
 package manifold3d;
 
+import java.net.URL;
+import java.security.CodeSource;
+import java.security.ProtectionDomain;
+
 import manifold3d.pub.DoubleMesh;
 
 import manifold3d.UIntVector;
 import manifold3d.FloatVector;
 
+import java.io.IOException;
+import java.io.File;
+
+import manifold3d.ManifoldPair;
 import manifold3d.manifold.MeshGL;
 import manifold3d.manifold.ExportOptions;
 import manifold3d.manifold.CrossSection;
@@ -15,6 +23,7 @@ import manifold3d.pub.Properties;
 import manifold3d.pub.Curvature;
 import manifold3d.pub.SmoothnessVector;
 
+import manifold3d.glm.DoubleVec3Vector;
 import manifold3d.glm.DoubleMat4x3;
 import manifold3d.glm.DoubleVec2;
 import manifold3d.glm.DoubleVec3;
@@ -25,7 +34,20 @@ import org.bytedeco.javacpp.annotation.*;
 @Platform(include = {"manifold.h", "meshIO.h"}, link = {"manifold"})
 @Namespace("manifold")
 public class Manifold extends Pointer {
-    static { Loader.load(); }
+    static {
+
+        String osName = System.getProperty("os.name").toLowerCase();
+        if (osName.contains("linux")) {
+            try {
+                System.load(Loader.extractResource("/libmanifold.so", null, "libmanifold", ".so").getAbsolutePath());
+                System.load(Loader.extractResource("/libmeshIO.so", null, "libmeshIO", ".so").getAbsolutePath());
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        Loader.load();
+    }
 
     // Constructors and destructor
     public Manifold() { allocate(); }
@@ -52,7 +74,7 @@ public class Manifold extends Pointer {
     public native int NumTri();
     public native int NumProp();
     public native int NumPropVert();
-    public native @ByVal Box BoundingBox();
+    @Name("BoundingBox") public native @ByVal Box boundingBox();
     public native float Precision();
     public native int Genus();
     public native @ByVal Properties GetProperties();
@@ -95,6 +117,15 @@ public class Manifold extends Pointer {
     @Name("operator-=") public native @ByRef Manifold subtractPut(@ByRef Manifold manifold);
     @Name("operator^") public native @ByVal Manifold intersect(@ByRef Manifold manifold);
     @Name("operator^=") public native @ByRef Manifold intersectPut(@ByRef Manifold manifold);
+
+    @Name("SplitByPlane")
+    public native @ByVal ManifoldPair splitByPlane(@ByRef DoubleVec3 normal, float originOffset);
+
+    @Name("Split")
+    public native @ByVal ManifoldPair split(@ByRef Manifold otehr);
+
+    @Name("TrimByPlane")
+    public native @ByVal Manifold trimByPlane(@ByRef DoubleVec3 normal, float originOffset);
 
     //// Static methods
     public static native @ByVal Manifold Smooth(@ByRef MeshGL mesh, @ByRef SmoothnessVector sharpenedEdges);

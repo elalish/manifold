@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
-    <groupId>manifold3d</groupId>
+    <groupId>org.clojars.cartesiantheatrics</groupId>
     <artifactId>manifold3d</artifactId>
     <version>1.0-SNAPSHOT</version>
     <packaging>jar</packaging>
@@ -25,11 +25,22 @@
             <scope>test</scope>
         </dependency>
     </dependencies>
+
+    <distributionManagement>
+        <repository>
+            <id>clojars</id>
+            <name>Clojars repository</name>
+            <url>https://clojars.org/repo</url>
+        </repository>
+    </distributionManagement>
     
     <build>
         <resources>
             <resource>
-                <directory>src/main/resources</directory>
+                <directory>../../build/meshIO</directory>
+                <includes>
+                    <include>libmeshIO.so</include>
+                </includes>
             </resource>
             <resource>
                 <directory>../../build/src/manifold</directory>
@@ -39,26 +50,14 @@
             </resource>
         </resources>
         <plugins>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-dependency-plugin</artifactId>
-                <version>2.3</version>
-                <executions>
-                    <execution>
-                        <goals>
-                            <goal>properties</goal>
-                        </goals>
-                    </execution>
-                </executions>
-            </plugin>
-            
            <plugin>
                 <groupId>org.bytedeco</groupId>
                 <artifactId>javacpp</artifactId>
                 <version>1.0</version>
                 <configuration>
                     <classPath>${project.build.outputDirectory}</classPath>
-                    <libraryPath>../../build/src/manifold/</libraryPath>
+                    <libraryPath>${project.build.directory}/../../../build/src/manifold/</libraryPath>
+                    <compilerOptions>-L../../build/src/manifold/,-L../../build/meshIO/</compilerOptions>
                     <includePaths>
                         <includePath>${project.build.sourceDirectory}</includePath>
                         <includePath>src/main/cpp/manifold3d/</includePath>
@@ -66,12 +65,14 @@
                         <includePath>../../src/third_party/clipper2/CPP/Clipper2Lib/include/</includePath>
                         <includePath>../../src/third_party/glm/</includePath>
                         <includePath>../../src/third_party/qhull/src/</includePath>
+                        <includePath>../../src/polygon/include</includePath>
                         <includePath>../../src/manifold/include/</includePath>
                         <includePath>../../src/utilities/include/</includePath>
                         <includePath>../../meshIO/include/</includePath>
                     </includePaths>
                     <preload>libmanifold.so</preload>
-                    <copyLibs>true</copyLibs>
+                    <copyLibs>false</copyLibs>
+
                 </configuration>
                 <executions>
                     <execution>
@@ -81,12 +82,22 @@
                             <goal>build</goal>
                         </goals>
                         <configuration>
+                            <includes>
+                                <include>${project.build.directory}/../../../build/src/manifold/</include>
+                            </includes>
+                            <compilerProperties>                                <java.library.path>../../build/src/manifold/</java.library.path>
+                            </compilerProperties>
                             <classOrPackageNames>
                                 <classOrPackageName>manifold3d.*</classOrPackageName>
                                 <classOrPackageName>manifold3d.manifold.*</classOrPackageName>
                                 <classOrPackageName>manifold3d.pub.*</classOrPackageName>
                                 <classOrPackageName>manifold3d.glm.*</classOrPackageName>
                             </classOrPackageNames>
+
+
+                    <compilerProperties>                                <java.library.path>${project.build.directory}/../../../build/src/manifold/</java.library.path>
+
+                    </compilerProperties>
                         </configuration>
                     </execution>
                 </executions>
