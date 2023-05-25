@@ -30,6 +30,7 @@ interface WorkerStatic extends ManifoldStatic {
   cleanup(): void;
 }
 
+//@ts-ignore
 const module = await Module() as unknown as WorkerStatic;
 module.setup();
 
