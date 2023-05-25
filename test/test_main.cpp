@@ -215,7 +215,7 @@ MeshGL WithPositionColors(const Manifold& in) {
   const glm::vec3 size = bbox.Size();
 
   Manifold out = in.SetProperties(
-      3, [bbox, size](glm::vec3 pos, const float* oldProp, float* prop) {
+      3, [bbox, size](float* prop, glm::vec3 pos, const float* oldProp) {
         for (int i : {0, 1, 2}) {
           prop[i] = (pos[i] - bbox.min[i]) / size[i];
         }

@@ -12,6 +12,39 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import {Manifold, Mat4, Vec2, Vec3} from './manifold';
+
+declare class GLTFNode {
+  manifold?: Manifold;
+  translation?: Vec3|((t: number) => Vec3);
+  rotation?: Vec3|((t: number) => Vec3);
+  scale?: Vec3|((t: number) => Vec3);
+  material?: GLTFMaterial;
+  name?: string;
+  constructor(parent?: GLTFNode);
+  clone(parent?: GLTFNode): GLTFNode;
+}
+
+declare class GLTFMaterial {
+  attributes?: string[];
+  roughness?: number;
+  metallic?: number;
+  baseColorFactor?: [number, number, number];
+  alpha?: number;
+  unlit?: boolean;
+  name?: string;
+}
+
+/**
+ * Set material properties on the input manifold. They will be carried along
+ * through operations.
+ *
+ * @param manifold The object to add properties to - returned for chaining.
+ * @param material A set of material properties to apply to this manifold.
+ */
+declare function setMaterial(
+    manifold: Manifold, material: GLTFMaterial): Manifold;
+
 /**
  * Wrap any object with this method to display it and any copies in transparent
  * red. This is particularly useful for debugging subtract() as it will allow

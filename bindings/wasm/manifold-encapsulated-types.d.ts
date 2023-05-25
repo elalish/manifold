@@ -303,6 +303,22 @@ export class Manifold {
   warp(warpFunc: (vert: Vec3) => void): Manifold;
 
   /**
+   * Create a new copy of this manifold with updated vertex properties by
+   * supplying a function that takes the existing position and properties as
+   * input. You may specify any number of output properties, allowing creation
+   * and removal of channels. Note: undefined behavior will result if you read
+   * past the number of input properties or write past the number of output
+   * properties.
+   *
+   * @param numProp The new number of properties per vertex.
+   * @param propFunc A function that modifies the properties of a given vertex.
+   */
+  setProperties(
+      numProp: number,
+      propFunc: (newProp: number[], position: Vec3, oldProp: number[]) => void):
+      Manifold;
+
+  /**
    * This operation returns a vector of Manifolds that are topologically
    * disconnected. If everything is connected, the vector is length one,
    * containing a copy of the original. It is the inverse operation of
@@ -407,6 +423,12 @@ export class Manifold {
    * returns -1.
    */
   originalID(): number;
+
+  /**
+   * Frees the WASM memory of this Manifold, since these cannot be
+   * garbage-collected automatically.
+   */
+  delete(): void;
 }
 
 export class Mesh {

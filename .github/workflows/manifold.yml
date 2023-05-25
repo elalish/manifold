@@ -127,19 +127,17 @@ jobs:
       run: |
         cd build/test
         node ./manifold_test.js
-        cd ../bindings/wasm
-        npm install
+    - name: Test examples
+      run: |
+        cd bindings/wasm/examples
+        npm ci
+        npm run build
         npm test
     - name: Upload WASM files
       uses: actions/upload-artifact@v3
       with:
         name: wasm
-        path: |
-          build/bindings/wasm/manifold.js
-          build/bindings/wasm/manifold.wasm
-          build/bindings/wasm/manifold.d.ts
-          build/bindings/wasm/manifold-global-types.d.ts
-          build/bindings/wasm/manifold-encapsulated-types.d.ts
+        path: bindings/wasm/examples/dist/
         retention-days: 90
 
   build_windows:

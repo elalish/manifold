@@ -23,7 +23,8 @@ export const examples = {
 
       const box = cube([100, 100, 100], true);
       const ball = sphere(60, 100);
-      // You must name your final output "result".
+      // You must name your final output "result", or create at least one
+      // GLTFNode - see Menger Sponge and Gyroid Module examples.
       const result = box.subtract(ball);
 
       // For visual debug, wrap any shape with show() and it and all of its
@@ -38,6 +39,11 @@ export const examples = {
       // See the script drop-down above ("Intro") for usage examples. The
       // gl-matrix package from npm is automatically imported for convenience -
       // its API is available in the top-level glMatrix object.
+
+      // Use GLTFNode for disjoint manifolds rather than compose(), as this will
+      // keep them better organized in the GLB. This will also allow you to
+      // specify material properties, and even vertex colors via
+      // setProperties(). See Tetrahedron Puzzle example.
       return result;
     },
 
@@ -57,17 +63,43 @@ export const examples = {
       const tet = tetrahedron().scale(scale);
 
       const box = [];
-      box.push([2, -2], [2, 2]);
+      box.push([1, -1], [1, 1]);
       for (let i = 0; i <= nDivisions; ++i) {
-        box.push([gap / (2 * scale), 2 - i * 4 / nDivisions]);
+        box.push([gap / (4 * scale), 1 - i * 2 / nDivisions]);
       }
 
-      const screw = extrude(box, 2, nDivisions, 270)
-                        .rotate([0, 0, -45])
-                        .translate([0, 0, -1])
-                        .scale(scale);
+      const cyan = [0, 1, 1];
+      const magenta = [1, 0, 1];
+      const fade = (color, pos) => {
+        for (let i = 0; i < 3; ++i) {
+          color[i] = cyan[i] * pos[2] + magenta[i] * (1 - pos[2]);
+        }
+      };
 
-      const result = tet.intersect(screw);
+      // setProperties(3, fade) creates three channels of vertex properties
+      // according to the above fade function. setMaterial assigns these
+      // channels as colors, and sets the factor to white, since our default is
+      // yellow.
+      const screw = setMaterial(
+          extrude(box, 1, nDivisions, 270).setProperties(3, fade),
+          {baseColorFactor: [1, 1, 1], attributes: ['COLOR_0']});
+
+      const result = tet.intersect(
+          screw.rotate([0, 0, -45]).translate([0, 0, -0.5]).scale(2 * scale));
+
+      // Assigned materials are only applied to a GLTFNode. Note that material
+      // definitions cascade, applying recursively to all child surfaces, but
+      // overridden by any materials defined lower down. Our default material:
+      // {
+      //   roughness = 0.2,
+      //   metallic = 1,
+      //   baseColorFactor = [1, 1, 0],
+      //   alpha = 1,
+      //   unlit = false,
+      //   name = ''
+      // }
+      const node = new GLTFNode();
+      node.manifold = result;
       return result;
     },
 
@@ -306,7 +338,20 @@ export const examples = {
         return result;
       }
 
-      const result = mengerSponge(3).trimByPlane([1, 1, 1], 0).scale(100);
+      const posColors = (newProp, pos) => {
+        for (let i = 0; i < 3; ++i) {
+          newProp[i] = (1 - pos[i]) / 2;
+        }
+      };
+
+      const result = mengerSponge(3)
+                         .trimByPlane([1, 1, 1], 0)
+                         .setProperties(3, posColors)
+                         .scale(100);
+
+      const node = new GLTFNode();
+      node.manifold = result;
+      node.material = {baseColorFactor: [1, 1, 1], attributes: ['COLOR_0']};
       return result;
     },
 
@@ -381,8 +426,13 @@ export const examples = {
       // manifolds.
       const {vec3} = glMatrix;
 
+      // number of modules along pyramid edge (use 1 for print orientation)
+      const m = 4;
+      // module size
       const size = 20;
+      // SDF resolution
       const n = 20;
+
       const pi = 3.14159;
 
       function gyroid(p) {
@@ -409,10 +459,30 @@ export const examples = {
         return result.intersect(box.rotate([0, 0, 45]));
       }
 
-      let result = rhombicDodecahedron().intersect(gyroidOffset(-0.4));
-      result = result.subtract(gyroidOffset(0.4));
-      result =
-          result.rotate([-45, 0, 90]).translate([0, 0, size / Math.sqrt(2)]);
+      const gyroidModule = rhombicDodecahedron()
+                               .intersect(gyroidOffset(-0.4))
+                               .subtract(gyroidOffset(0.4));
+
+      if (m > 1) {
+        for (let i = 0; i < m; ++i) {
+          for (let j = i; j < m; ++j) {
+            for (let k = j; k < m; ++k) {
+              const node = new GLTFNode();
+              node.manifold = gyroidModule;
+              node.translation =
+                  [(k + i - j) * size, (k - i) * size, (-j) * size];
+              node.material = {
+                baseColorFactor:
+                    [(k + i - j + 1) / m, (k - i + 1) / m, (j + 1) / m]
+              };
+            }
+          }
+        }
+      }
+
+      const result = gyroidModule.rotate([-45, 0, 90]).translate([
+        0, 0, size / Math.sqrt(2)
+      ]);
       return result;
     }
   },
@@ -432,3 +502,7 @@ for (const [func, code] of Object.entries(examples.functions)) {
       func.replace(/([a-z])([A-Z])/g, '$1 $2');  // Add spaces between words
   examples.functionBodies.set(name, body);
 };
+
+if (typeof self !== 'undefined') {
+  self.examples = examples;
+}

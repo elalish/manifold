@@ -48,14 +48,14 @@ struct UpdateProperties {
   const glm::vec3* vertPos;
   const glm::ivec3* triProperties;
   const Halfedge* halfedges;
-  std::function<void(glm::vec3, const float* const, float* const)> propFunc;
+  std::function<void(float*, glm::vec3, const float*)> propFunc;
 
   __host__ __device__ void operator()(int tri) {
     for (int i : {0, 1, 2}) {
       const int vert = halfedges[3 * tri + i].startVert;
       const int propVert = triProperties[tri][i];
-      propFunc(vertPos[vert], oldProperties + numOldProp * propVert,
-               properties + numProp * propVert);
+      propFunc(properties + numProp * propVert, vertPos[vert],
+               oldProperties + numOldProp * propVert);
     }
   }
 };
@@ -586,8 +586,8 @@ Manifold Manifold::Warp(std::function<void(glm::vec3&)> warpFunc) const {
  * @param propFunc A function that modifies the properties of a given vertex.
  */
 Manifold Manifold::SetProperties(
-    int numProp, std::function<void(glm::vec3 position, const float* oldProp,
-                                    float* newProp)>
+    int numProp, std::function<void(float* newProp, glm::vec3 position,
+                                    const float* oldProp)>
                      propFunc) const {
   auto pImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
   const int oldNumProp = NumProp();
