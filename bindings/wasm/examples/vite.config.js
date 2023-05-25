@@ -1,9 +1,9 @@
 // vite.config.js
-import {resolve} from 'path'
-import {defineConfig} from 'vite'
+import { resolve } from 'path'
+import { defineConfig } from 'vite'
 
 export default defineConfig({
-  test: {testTimeout: 15000},
+  test: { timeout: 10000 },
   worker: {
     format: 'es',
   },

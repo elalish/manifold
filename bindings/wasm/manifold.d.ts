@@ -15,6 +15,7 @@
 import * as T from './manifold-encapsulated-types';
 export * from './manifold-global-types';
 
+export type CrossSection = T.CrossSection;
 export type Manifold = T.Manifold;
 export type Mesh = T.Mesh;
 
@@ -37,10 +38,10 @@ export interface ManifoldStatic {
   setCircularSegments: typeof T.setCircularSegments;
   getCircularSegments: typeof T.getCircularSegments;
   reserveIDs: typeof T.reserveIDs;
+  CrossSection: typeof T.CrossSection;
   Manifold: typeof T.Manifold;
   Mesh: typeof T.Mesh;
   setup: () => void;
 }
 
-export default function Module(config?: {locateFile: () => string}):
-    Promise<ManifoldStatic>;
+export default function Module(config: { locateFile: () => string }): Promise<ManifoldStatic>;
