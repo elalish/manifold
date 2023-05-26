@@ -16,6 +16,6 @@ jobs:
       with:
         source: '.'
         exclude: '*/third_party'
-        extensions: 'h,cpp,js,ts,py,json,html,css'
+        extensions: 'h,cpp,js,ts,html'
         clangFormatVersion: 12
 

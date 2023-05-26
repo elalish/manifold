@@ -1,26 +1,26 @@
 {
-    // Use IntelliSense to learn about possible attributes.
-    // Hover to view descriptions of existing attributes.
-    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
-    "version": "0.2.0",
-    "configurations": [
+  // Use IntelliSense to learn about possible attributes.
+  // Hover to view descriptions of existing attributes.
+  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "manifold test",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/build/test/manifold_test",
+      "args": [
+        "--gtest_break_on_failure",
+        "--gtest_filter=Manifold.GetMesh"
+      ],
+      "stopAtEntry": false,
+      "cwd": "${workspaceFolder}/build/test",
+      "environment": [
         {
-            "name": "manifold test",
-            "type": "cppdbg",
-            "request": "launch",
-            "program": "${workspaceFolder}/build/test/manifold_test",
-            "args": [
-                "--gtest_break_on_failure",
-                "--gtest_filter=Manifold.GetMesh"
-            ],
-            "stopAtEntry": false,
-            "cwd": "${workspaceFolder}/build/test",
-            "environment": [
-                {
-                    "name": "MALLOC_CHECK_",
-                    "value": "2"
-                }
-            ]
+          "name": "MALLOC_CHECK_",
+          "value": "2"
         }
-    ]
+      ]
+    }
+  ]
 }
