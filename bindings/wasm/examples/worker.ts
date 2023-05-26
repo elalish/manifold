@@ -132,7 +132,6 @@ const SHOW = {
   alpha: 0.25,
   roughness: 1,
   metallic: 0
-
 } as GLTFMaterial;
 
 const GHOST = {
