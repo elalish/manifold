@@ -39,86 +39,6 @@ glMatrix.glMatrix.setMatrixArrayType(Array);
 const io = setupIO(new WebIO());
 io.registerExtensions(KHRONOS_EXTENSIONS);
 
-// Debug setup to show source meshes
-let ghost = false;
-const shown = new Map<number, Mesh>();
-const singles = new Map<number, Mesh>();
-
-const SHOW = {
-  baseColorFactor: [1, 0, 0],
-  alpha: 0.25,
-  roughness: 1,
-  metallic: 0
-
-} as GLTFMaterial;
-
-const GHOST = {
-  baseColorFactor: [0.5, 0.5, 0.5],
-  alpha: 0.25,
-  roughness: 1,
-  metallic: 0
-} as GLTFMaterial;
-
-function debug(manifold: Manifold, map: Map<number, Mesh>) {
-  const result = manifold.asOriginal();
-  map.set(result.originalID(), result.getMesh());
-  return result;
-};
-
-module.show = (manifold) => {
-  return debug(manifold, shown);
-};
-
-module.only = (manifold) => {
-  ghost = true;
-  return debug(manifold, singles);
-};
-
-const nodes = new Array<GLTFNode>();
-const id2material = new Map<number, GLTFMaterial>();
-const materialCache = new Map<GLTFMaterial, Material>();
-
-function cleanup() {
-  ghost = false;
-  shown.clear();
-  singles.clear();
-  nodes.length = 0;
-  id2material.clear();
-  materialCache.clear();
-}
-
-class GLTFNode {
-  private _parent?: GLTFNode;
-  manifold?: Manifold;
-  translation?: Vec3;
-  rotation?: Vec3;
-  scale?: Vec3;
-  material?: GLTFMaterial;
-  name?: string;
-
-  constructor(parent?: GLTFNode) {
-    this._parent = parent;
-    nodes.push(this);
-  }
-  clone(parent?: GLTFNode) {
-    const copy = {...this};
-    copy._parent = parent;
-    nodes.push(copy);
-    return copy;
-  }
-  get parent() {
-    return this._parent;
-  }
-}
-
-module.GLTFNode = GLTFNode;
-
-module.setMaterial = (manifold: Manifold, material: GLTFMaterial): Manifold => {
-  const out = manifold.asOriginal();
-  id2material.set(out.originalID(), material);
-  return out;
-};
-
 // manifold static methods
 const manifoldStaticFunctions = [
   'cube', 'cylinder', 'sphere', 'tetrahedron', 'extrude', 'revolve', 'compose',
@@ -200,6 +120,86 @@ module.cleanup = function() {
       obj.delete();
   }
   memoryRegistry.length = 0;
+};
+
+// Debug setup to show source meshes
+let ghost = false;
+const shown = new Map<number, Mesh>();
+const singles = new Map<number, Mesh>();
+
+const SHOW = {
+  baseColorFactor: [1, 0, 0],
+  alpha: 0.25,
+  roughness: 1,
+  metallic: 0
+
+} as GLTFMaterial;
+
+const GHOST = {
+  baseColorFactor: [0.5, 0.5, 0.5],
+  alpha: 0.25,
+  roughness: 1,
+  metallic: 0
+} as GLTFMaterial;
+
+const nodes = new Array<GLTFNode>();
+const id2material = new Map<number, GLTFMaterial>();
+const materialCache = new Map<GLTFMaterial, Material>();
+
+function cleanup() {
+  ghost = false;
+  shown.clear();
+  singles.clear();
+  nodes.length = 0;
+  id2material.clear();
+  materialCache.clear();
+}
+
+class GLTFNode {
+  private _parent?: GLTFNode;
+  manifold?: Manifold;
+  translation?: Vec3;
+  rotation?: Vec3;
+  scale?: Vec3;
+  material?: GLTFMaterial;
+  name?: string;
+
+  constructor(parent?: GLTFNode) {
+    this._parent = parent;
+    nodes.push(this);
+  }
+  clone(parent?: GLTFNode) {
+    const copy = {...this};
+    copy._parent = parent;
+    nodes.push(copy);
+    return copy;
+  }
+  get parent() {
+    return this._parent;
+  }
+}
+
+module.GLTFNode = GLTFNode;
+
+module.setMaterial = (manifold: Manifold, material: GLTFMaterial): Manifold => {
+  const out = manifold.asOriginal();
+  id2material.set(out.originalID(), material);
+  return out;
+};
+
+function debug(manifold: Manifold, map: Map<number, Mesh>) {
+  const result = manifold.asOriginal();
+  map.set(result.originalID(), result.getMesh());
+  return result;
+};
+
+module.show = (manifold) => {
+  return debug(manifold, shown);
+};
+
+module.only = (manifold) => {
+  ghost = true;
+  return debug(manifold, singles);
 };
 
 // Setup complete
