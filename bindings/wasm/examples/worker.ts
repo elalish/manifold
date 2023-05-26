@@ -12,15 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Document, Material, Node, WebIO } from '@gltf-transform/core';
-import { KHRMaterialsUnlit, KHRONOS_EXTENSIONS } from '@gltf-transform/extensions';
+import {Document, Material, Node, WebIO} from '@gltf-transform/core';
+import {KHRMaterialsUnlit, KHRONOS_EXTENSIONS} from '@gltf-transform/extensions';
 import * as glMatrix from 'gl-matrix';
 
 import Module from './built/manifold';
 //@ts-ignore
-import { setupIO, writeMesh } from './gltf-io';
-import type { GLTFMaterial, Quat } from './public/editor';
-import type { CrossSection, Manifold, ManifoldStatic, Mesh, Vec3 } from './public/manifold';
+import {setupIO, writeMesh} from './gltf-io';
+import type {GLTFMaterial, Quat} from './public/editor';
+import type {CrossSection, Manifold, ManifoldStatic, Mesh, Vec3} from './public/manifold';
 
 interface WorkerStatic extends ManifoldStatic {
   GLTFNode: typeof GLTFNode;
@@ -30,7 +30,6 @@ interface WorkerStatic extends ManifoldStatic {
   cleanup(): void;
 }
 
-//@ts-ignore
 const module = await Module() as unknown as WorkerStatic;
 module.setup();
 
@@ -50,6 +49,7 @@ const SHOW = {
   alpha: 0.25,
   roughness: 1,
   metallic: 0
+
 } as GLTFMaterial;
 
 const GHOST = {
@@ -101,7 +101,7 @@ class GLTFNode {
     nodes.push(this);
   }
   clone(parent?: GLTFNode) {
-    const copy = { ...this };
+    const copy = {...this};
     copy._parent = parent;
     nodes.push(copy);
     return copy;
@@ -121,38 +121,30 @@ module.setMaterial = (manifold: Manifold, material: GLTFMaterial): Manifold => {
 
 // manifold static methods
 const manifoldStaticFunctions = [
-  'cube', 'cylinder', 'sphere', 'tetrahedron',
-  'extrude', 'revolve',
-  'compose', 'union', 'difference', 'intersection',
-  'levelSet', 'smooth', 'ofMesh'
+  'cube', 'cylinder', 'sphere', 'tetrahedron', 'extrude', 'revolve', 'compose',
+  'union', 'difference', 'intersection', 'levelSet', 'smooth', 'ofMesh'
 ];
 // manifold member functions that return a new manifold
 const manifoldMemberFunctions = [
-  'add', 'subtract', 'intersect', 'decompose',
-  'warp', 'transform', 'translate', 'rotate', 'scale', 'mirror',
-  'refine', 'setProperties', 'asOriginal',
+  'add', 'subtract', 'intersect', 'decompose', 'warp', 'transform', 'translate',
+  'rotate', 'scale', 'mirror', 'refine', 'setProperties', 'asOriginal',
   'trimByPlane', 'split', 'splitByPlane'
 ];
 // CrossSection static methods
 const crossSectionStaticFunctions = [
-  'square', 'circle',
-  'union', 'difference', 'intersection', 'compose',
+  'square', 'circle', 'union', 'difference', 'intersection', 'compose',
   'ofPolygons'
 ];
 // CrossSection member functions that returns a new manifold
 const crossSectionMemberFunctions = [
-  'add', 'subtract', 'intersect', 'rectClip', 'decompose',
-  'transform', 'translate', 'rotate', 'scale', 'mirror',
-  'simplify', 'offset',
-  'toPolygons'
+  'add', 'subtract', 'intersect', 'rectClip', 'decompose', 'transform',
+  'translate', 'rotate', 'scale', 'mirror', 'simplify', 'offset', 'toPolygons'
 ];
 // top level functions that construct a new manifolds/meshes
-const toplevelConstructors = [
-  'show', 'only', 'setMaterial'
-];
+const toplevelConstructors = ['show', 'only', 'setMaterial'];
 const toplevel = [
-  'setMinCircularAngle', 'setMinCircularEdgeLength', 'setCircularSegments', 'getCircularSegments',
-  'Mesh', 'GLTFNode', 'Manifold', 'CrossSection'
+  'setMinCircularAngle', 'setMinCircularEdgeLength', 'setCircularSegments',
+  'getCircularSegments', 'Mesh', 'GLTFNode', 'Manifold', 'CrossSection'
 ];
 const exposedFunctions = toplevelConstructors.concat(toplevel);
 
@@ -161,9 +153,10 @@ const exposedFunctions = toplevelConstructors.concat(toplevel);
 // Note that this only fixes memory leak across different runs: the memory
 // will only be freed when the compilation finishes.
 
-const memoryRegistry = new Array<Manifold | CrossSection>();
+const memoryRegistry = new Array<Manifold|CrossSection>();
 
-function addMembers(className: string, methodNames: Array<string>, areStatic: boolean) {
+function addMembers(
+    className: string, methodNames: Array<string>, areStatic: boolean) {
   //@ts-ignore
   const cls = module[className];
   const obj = areStatic ? cls : cls.prototype;
@@ -173,7 +166,7 @@ function addMembers(className: string, methodNames: Array<string>, areStatic: bo
     //@ts-ignore
     obj['_' + name] = originalFn;
     //@ts-ignore
-    obj[name] = function (...args: any) {
+    obj[name] = function(...args: any) {
       //@ts-ignore
       const result = this['_' + name](...args);
       memoryRegistry.push(result);
@@ -191,14 +184,14 @@ for (const name of toplevelConstructors) {
   //@ts-ignore
   const originalFn = module[name];
   //@ts-ignore
-  module[name] = function (...args: any) {
+  module[name] = function(...args: any) {
     const result = originalFn(...args);
     memoryRegistry.push(result);
     return result;
   };
 }
 
-module.cleanup = function () {
+module.cleanup = function() {
   for (const obj of memoryRegistry) {
     // decompose result is an array of manifolds
     if (obj instanceof Array)
@@ -214,7 +207,7 @@ self.postMessage(null);
 
 if (self.console) {
   const oldLog = self.console.log;
-  self.console.log = function (...args) {
+  self.console.log = function(...args) {
     let message = '';
     for (const arg of args) {
       if (arg == null) {
@@ -225,7 +218,7 @@ if (self.console) {
         message += arg.toString();
       }
     }
-    self.postMessage({ log: message });
+    self.postMessage({log: message});
     oldLog(...args);
   };
 }
@@ -239,16 +232,16 @@ function log(...args: any[]) {
 
 self.onmessage = async (e) => {
   const content = e.data +
-    '\nreturn exportGLB(typeof result === "undefined" ? undefined : result);\n';
+      '\nreturn exportGLB(typeof result === "undefined" ? undefined : result);\n';
   try {
     const f = new Function(
-      'exportGLB', 'glMatrix', 'module', ...exposedFunctions, content);
+        'exportGLB', 'glMatrix', 'module', ...exposedFunctions, content);
     await f(
-      exportGLB, glMatrix, module,  //@ts-ignore
-      ...exposedFunctions.map(name => module[name]));
+        exportGLB, glMatrix, module,  //@ts-ignore
+        ...exposedFunctions.map(name => module[name]));
   } catch (error: any) {
     console.log(error.toString());
-    self.postMessage({ objectURL: null });
+    self.postMessage({objectURL: null});
   } finally {
     module.cleanup();
     cleanup();
@@ -261,7 +254,7 @@ function createGLTFnode(doc: Document, node: GLTFNode) {
     out.setTranslation(node.translation);
   }
   if (node.rotation) {
-    const { quat } = glMatrix;
+    const {quat} = glMatrix;
     const deg2rad = Math.PI / 180;
     const q = quat.create() as Quat;
     quat.rotateX(q, q, deg2rad * node.rotation[0]);
@@ -305,8 +298,8 @@ function makeDefaultedMaterial(doc: Document, {
   }
 
   return material.setRoughnessFactor(roughness)
-    .setMetallicFactor(metallic)
-    .setBaseColorFactor([...baseColorFactor, alpha]);
+      .setMetallicFactor(metallic)
+      .setBaseColorFactor([...baseColorFactor, alpha]);
 }
 
 function getCachedMaterial(doc: Document, matDef: GLTFMaterial): Material {
@@ -317,8 +310,8 @@ function getCachedMaterial(doc: Document, matDef: GLTFMaterial): Material {
 }
 
 function addMesh(
-  doc: Document, node: Node, manifold: Manifold,
-  backupMaterial: GLTFMaterial = {}) {
+    doc: Document, node: Node, manifold: Manifold,
+    backupMaterial: GLTFMaterial = {}) {
   const numTri = manifold.numTri();
   if (numTri == 0) {
     log('Empty manifold, skipping.');
@@ -331,9 +324,11 @@ function addMesh(
   for (let i = 0; i < 3; i++) {
     size[i] = Math.round((box.max[i] - box.min[i]) * 10) / 10;
   }
-  log(`Bounding Box: X = ${size[0].toLocaleString()} mm, Y = ${size[1].toLocaleString()} mm, Z = ${size[2].toLocaleString()} mm`);
+  log(`Bounding Box: X = ${size[0].toLocaleString()} mm, Y = ${
+      size[1].toLocaleString()} mm, Z = ${size[2].toLocaleString()} mm`);
   const volume = Math.round(manifold.getProperties().volume / 10);
-  log(`Genus: ${manifold.genus().toLocaleString()}, Volume: ${(volume / 100).toLocaleString()} cm^3`);
+  log(`Genus: ${manifold.genus().toLocaleString()}, Volume: ${
+      (volume / 100).toLocaleString()} cm^3`);
 
   // From Z-up to Y-up (glTF)
   const manifoldMesh = manifold.getMesh();
@@ -364,10 +359,10 @@ function addMesh(
     }
     const mat = single ? materials[run] : SHOW;
     const debugNode =
-      doc.createNode('debug')
-        .setMesh(writeMesh(
-          doc, inMesh, attributes, [getCachedMaterial(doc, mat)]))
-        .setMatrix(manifoldMesh.transform(run));
+        doc.createNode('debug')
+            .setMesh(writeMesh(
+                doc, inMesh, attributes, [getCachedMaterial(doc, mat)]))
+            .setMatrix(manifoldMesh.transform(run));
     node.addChild(debugNode);
   }
 }
@@ -381,8 +376,8 @@ function cloneNode(toNode: Node, fromNode: Node) {
 }
 
 function cloneNodeNewMaterial(
-  doc: Document, toNode: Node, fromNode: Node, backupMaterial: Material,
-  oldBackupMaterial: Material) {
+    doc: Document, toNode: Node, fromNode: Node, backupMaterial: Material,
+    oldBackupMaterial: Material) {
   cloneNode(toNode, fromNode);
   const mesh = doc.createMesh();
   toNode.setMesh(mesh);
@@ -396,8 +391,8 @@ function cloneNodeNewMaterial(
 }
 
 function createNodeFromCache(
-  doc: Document, nodeDef: GLTFNode,
-  manifold2node: Map<Manifold, Map<GLTFMaterial, Node>>): Node {
+    doc: Document, nodeDef: GLTFNode,
+    manifold2node: Map<Manifold, Map<GLTFMaterial, Node>>): Node {
   const node = createGLTFnode(doc, nodeDef);
   if (nodeDef.manifold != null) {
     const backupMaterial = getBackupMaterial(nodeDef);
@@ -412,8 +407,8 @@ function createNodeFromCache(
       if (cachedNode == null) {
         const [oldBackupMaterial, oldNode] = cachedNodes.entries().next().value;
         cloneNodeNewMaterial(
-          doc, node, oldNode, getCachedMaterial(doc, backupMaterial),
-          getCachedMaterial(doc, oldBackupMaterial));
+            doc, node, oldNode, getCachedMaterial(doc, backupMaterial),
+            getCachedMaterial(doc, oldBackupMaterial));
         cachedNodes.set(backupMaterial, node);
       } else {
         cloneNode(node, cachedNode);
@@ -428,8 +423,8 @@ async function exportGLB(manifold?: Manifold) {
   const halfRoot2 = Math.sqrt(2) / 2;
   const mm2m = 1 / 1000;
   const wrapper = doc.createNode('wrapper')
-    .setRotation([-halfRoot2, 0, 0, halfRoot2])
-    .setScale([mm2m, mm2m, mm2m]);
+                      .setRotation([-halfRoot2, 0, 0, halfRoot2])
+                      .setScale([mm2m, mm2m, mm2m]);
   doc.createScene().addChild(wrapper);
 
   if (nodes.length > 0) {
@@ -454,7 +449,7 @@ async function exportGLB(manifold?: Manifold) {
     }
 
     log('Total glTF nodes: ', nodes.length,
-      ', Total mesh references: ', leafNodes);
+        ', Total mesh references: ', leafNodes);
   } else {
     if (manifold == null) {
       log('No output because "result" is undefined and no "GLTFNode"s were created.');
@@ -467,6 +462,6 @@ async function exportGLB(manifold?: Manifold) {
 
   const glb = await io.writeBinary(doc);
 
-  const blob = new Blob([glb], { type: 'application/octet-stream' });
-  self.postMessage({ objectURL: URL.createObjectURL(blob) });
+  const blob = new Blob([glb], {type: 'application/octet-stream'});
+  self.postMessage({objectURL: URL.createObjectURL(blob)});
 }
