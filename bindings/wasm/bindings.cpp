@@ -126,6 +126,7 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .function("_RectClip", &CrossSection::RectClip)
       .function("_ToPolygons", &CrossSection::ToPolygons);
 
+  // CrossSection Static Methods
   function("_Square", &CrossSection::Square);
   function("_Circle", &CrossSection::Circle);
   function("_crossSectionCompose", &CrossSection::Compose);
@@ -165,6 +166,7 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .function("originalID", &Manifold::OriginalID)
       .function("asOriginal", &Manifold::AsOriginal);
 
+  // Manifold Static Methods
   function("_Cube", &Manifold::Cube);
   function("_Cylinder", &Manifold::Cylinder);
   function("_Sphere", &Manifold::Sphere);
@@ -175,17 +177,15 @@ EMSCRIPTEN_BINDINGS(whatever) {
   function("_Revolve", &Manifold::Revolve);
   function("_LevelSet", &man_js::LevelSet);
   function("_Merge", &js::Merge);
+  function("_ReserveIDs", &Manifold::ReserveIDs);
   function("_manifoldCompose", &Manifold::Compose);
   function("_manifoldUnionN", &man_js::UnionN);
   function("_manifoldDifferenceN", &man_js::DifferenceN);
   function("_manifoldIntersectionN", &man_js::IntersectionN);
 
-  // TODO: these are ambiguous with addition of CrossSection
-  // should they be unified with a dynamic check that the input array
-  // isn't mixed?
+  // Quality Globals
   function("setMinCircularAngle", &Quality::SetMinCircularAngle);
   function("setMinCircularEdgeLength", &Quality::SetMinCircularEdgeLength);
   function("setCircularSegments", &Quality::SetCircularSegments);
   function("getCircularSegments", &Quality::GetCircularSegments);
-  function("reserveIDs", &Manifold::ReserveIDs);
 }

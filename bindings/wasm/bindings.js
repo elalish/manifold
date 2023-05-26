@@ -547,6 +547,10 @@ Module.setup = function() {
     return cs.revolve(circularSegments);
   };
 
+  Module.Manifold.reserveIDs = function(n) {
+    return Module._ReserveIDs(n);
+  };
+
   Module.Manifold.compose = function(manifolds) {
     const vec = new Module.Vector_manifold();
     toVec(vec, manifolds);

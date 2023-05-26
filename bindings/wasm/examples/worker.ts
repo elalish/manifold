@@ -39,28 +39,28 @@ glMatrix.glMatrix.setMatrixArrayType(Array);
 const io = setupIO(new WebIO());
 io.registerExtensions(KHRONOS_EXTENSIONS);
 
-// manifold static methods
+// manifold static methods (that return a new manifold)
 const manifoldStaticFunctions = [
   'cube', 'cylinder', 'sphere', 'tetrahedron', 'extrude', 'revolve', 'compose',
   'union', 'difference', 'intersection', 'levelSet', 'smooth', 'ofMesh'
 ];
-// manifold member functions that return a new manifold
+// manifold member functions (that return a new manifold)
 const manifoldMemberFunctions = [
   'add', 'subtract', 'intersect', 'decompose', 'warp', 'transform', 'translate',
   'rotate', 'scale', 'mirror', 'refine', 'setProperties', 'asOriginal',
   'trimByPlane', 'split', 'splitByPlane'
 ];
-// CrossSection static methods
+// CrossSection static methods (that return a new cross-section)
 const crossSectionStaticFunctions = [
   'square', 'circle', 'union', 'difference', 'intersection', 'compose',
   'ofPolygons'
 ];
-// CrossSection member functions that returns a new manifold
+// CrossSection member functions (that return a new cross-section)
 const crossSectionMemberFunctions = [
   'add', 'subtract', 'intersect', 'rectClip', 'decompose', 'transform',
   'translate', 'rotate', 'scale', 'mirror', 'simplify', 'offset', 'toPolygons'
 ];
-// top level functions that construct a new manifolds/meshes
+// top level functions that construct a new manifold/mesh
 const toplevelConstructors = ['show', 'only', 'setMaterial'];
 const toplevel = [
   'setMinCircularAngle', 'setMinCircularEdgeLength', 'setCircularSegments',
