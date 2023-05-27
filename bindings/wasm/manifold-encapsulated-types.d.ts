@@ -425,6 +425,13 @@ export class Manifold {
   originalID(): number;
 
   /**
+   * Returns the first of n sequential new unique mesh IDs for marking sets of
+   * triangles that can be looked up after further operations. Assign to
+   * Mesh.runOriginalID vector.
+   */
+  static reserveIDs(count: number): number;
+
+  /**
    * Frees the WASM memory of this Manifold, since these cannot be
    * garbage-collected automatically.
    */
