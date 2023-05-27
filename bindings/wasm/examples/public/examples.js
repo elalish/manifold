@@ -20,9 +20,9 @@ export const examples = {
       // see the static API - these functions can also be used bare. Use
       // console.log() to print output (lower-right). This editor defines Z as
       // up and units of mm.
-
-      const box = Manifold.cube([100, 100, 100], true);
-      const ball = Manifold.sphere(60, 100);
+      const {cube, sphere} = Manifold;
+      const box = cube([100, 100, 100], true);
+      const ball = sphere(60, 100);
       // You must name your final output "result", or create at least one
       // GLTFNode - see Menger Sponge and Gyroid Module examples.
       const result = box.subtract(ball);
@@ -107,27 +107,25 @@ export const examples = {
       // Demonstrates how at 90-degree intersections, the sphere and cylinder
       // facets match up perfectly, for any choice of global resolution
       // parameters.
+      const {sphere, cylinder, union} = Manifold;
 
       function roundedFrame(edgeLength, radius, circularSegments = 0) {
-        const edge =
-            Manifold.cylinder(edgeLength, radius, -1, circularSegments);
-        const corner = Manifold.sphere(radius, circularSegments);
+        const edge = cylinder(edgeLength, radius, -1, circularSegments);
+        const corner = sphere(radius, circularSegments);
 
-        const edge1 =
-            Manifold.union(corner, edge).rotate([-90, 0, 0]).translate([
-              -edgeLength / 2, -edgeLength / 2, 0
-            ]);
+        const edge1 = union(corner, edge).rotate([-90, 0, 0]).translate([
+          -edgeLength / 2, -edgeLength / 2, 0
+        ]);
 
-        const edge2 = Manifold.union(
-            Manifold.union(edge1, edge1.rotate([0, 0, 180])),
+        const edge2 = union(
+            union(edge1, edge1.rotate([0, 0, 180])),
             edge.translate([-edgeLength / 2, -edgeLength / 2, 0]));
 
-        const edge4 =
-            Manifold.union(edge2, edge2.rotate([0, 0, 90])).translate([
-              0, 0, -edgeLength / 2
-            ]);
+        const edge4 = union(edge2, edge2.rotate([0, 0, 90])).translate([
+          0, 0, -edgeLength / 2
+        ]);
 
-        return Manifold.union(edge4, edge4.rotate([180, 0, 0]));
+        return union(edge4, edge4.rotate([180, 0, 0]));
       }
 
       setMinCircularAngle(3);
@@ -330,10 +328,12 @@ export const examples = {
 
         const hole = Manifold.compose(holes);
 
-        result = Manifold.difference(result, hole);
-        result = Manifold.difference(result, hole.rotate([90, 0, 0]));
-        result = Manifold.difference(result, hole.rotate([0, 90, 0]));
-
+        result = Manifold.difference(
+            result,
+            hole,
+            hole.rotate([90, 0, 0]),
+            hole.rotate([0, 90, 0]),
+        );
         return result;
       }
 
@@ -389,8 +389,9 @@ export const examples = {
           stretch.push(vec2.rotate([0, 0], p2, o, dPhiRad * i));
           stretch.push(vec2.rotate([0, 0], p0, o, dPhiRad * i));
         }
-        b = Manifold.intersection(Manifold.extrude(stretch, width), b);
-        return b;
+        const result =
+            Manifold.intersection(Manifold.extrude(stretch, width), b);
+        return result;
       }
 
       function stretchyBracelet(
