@@ -75,6 +75,7 @@ struct Manifold::Impl {
 
   void Update();
   void MarkFailure(Error status);
+  void Warp(std::function<void(glm::vec3&)> warpFunc);
   Impl Transform(const glm::mat4x3& transform) const;
   SparseIndices EdgeCollisions(const Impl& B) const;
   SparseIndices VertexCollisionsZ(const VecDH<glm::vec3>& vertsIn) const;
