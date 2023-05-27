@@ -231,7 +231,7 @@ async function getManifoldDTS() {
   return `
 ${global.replaceAll('export', '')}
 ${encapsulated.replace(/^import.*$/gm, '').replaceAll('export', 'declare')}
-declare interface ManifoldStatic {
+declare interface ManifoldToplevel {
   cube: typeof cube;
   cylinder: typeof cylinder;
   sphere: typeof sphere;
@@ -250,7 +250,7 @@ declare interface ManifoldStatic {
   getCircularSegments: typeof getCircularSegments;
   reserveIDs: typeof reserveIDs;
 }
-declare const module: ManifoldStatic;
+declare const module: ManifoldToplevel;
 `;
 }
 

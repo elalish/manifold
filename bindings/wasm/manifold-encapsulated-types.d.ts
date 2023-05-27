@@ -15,100 +15,6 @@
 import {Box, Curvature, Mat4, Polygons, Properties, SealedFloat32Array, SealedUint32Array, Smoothness, Vec2, Vec3} from './manifold-global-types';
 
 /**
- * Constructs a unit cube (edge lengths all one), by default in the first
- * octant, touching the origin.
- *
- * @param size The X, Y, and Z dimensions of the box.
- * @param center Set to true to shift the center to the origin.
- */
-export function cube(size?: Vec3|number, center?: boolean): Manifold;
-
-/**
- * A convenience constructor for the common case of extruding a circle. Can also
- * form cones if both radii are specified.
- *
- * @param height Z-extent
- * @param radiusLow Radius of bottom circle. Must be positive.
- * @param radiusHigh Radius of top circle. Can equal zero. Default is equal to
- * radiusLow.
- * @param circularSegments How many line segments to use around the circle.
- * Default is calculated by the static Defaults.
- * @param center Set to true to shift the center to the origin. Default is
- * origin at the bottom.
- */
-export function cylinder(
-    height: number, radiusLow: number, radiusHigh?: number,
-    circularSegments?: number, center?: boolean): Manifold;
-
-/**
- * Constructs a geodesic sphere of a given radius.
- *
- * @param radius Radius of the sphere. Must be positive.
- * @param circularSegments Number of segments along its
- * diameter. This number will always be rounded up to the nearest factor of
- * four, as this sphere is constructed by refining an octahedron. This means
- * there are a circle of vertices on all three of the axis planes. Default is
- * calculated by the static Defaults.
- */
-export function sphere(radius: number, circularSegments?: number): Manifold;
-
-
-/**
- * Constructs a smooth version of the input mesh by creating tangents; this
- * method will throw if you have supplied tangents with your mesh already. The
- * actual triangle resolution is unchanged; use the Refine() method to
- * interpolate to a higher-resolution curve.
- *
- * By default, every edge is calculated for maximum smoothness (very much
- * approximately), attempting to minimize the maximum mean Curvature magnitude.
- * No higher-order derivatives are considered, as the interpolation is
- * independent per triangle, only sharing constraints on their boundaries.
- *
- * @param mesh input Mesh.
- * @param sharpenedEdges If desired, you can supply a vector of sharpened
- * halfedges, which should in general be a small subset of all halfedges. Order
- * of entries doesn't matter, as each one specifies the desired smoothness
- * (between zero and one, with one the default for all unspecified halfedges)
- * and the halfedge index (3 * triangle index + [0,1,2] where 0 is the edge
- * between triVert 0 and 1, etc).
- *
- * At a smoothness value of zero, a sharp crease is made. The smoothness is
- * interpolated along each edge, so the specified value should be thought of as
- * an average. Where exactly two sharpened edges meet at a vertex, their
- * tangents are rotated to be colinear so that the sharpened edge can be
- * continuous. Vertices with only one sharpened edge are completely smooth,
- * allowing sharpened edges to smoothly vanish at termination. A single vertex
- * can be sharpened by sharping all edges that are incident on it, allowing
- * cones to be formed.
- */
-export function smooth(mesh: Mesh, sharpenedEdges?: Smoothness[]): Manifold;
-
-/**
- * Constructs a tetrahedron centered at the origin with one vertex at (1,1,1)
- * and the rest at similarly symmetric points.
- */
-export function tetrahedron(): Manifold;
-
-/**
- * Constructs a manifold from a set of polygons by extruding them along the
- * Z-axis.
- *
- * @param crossSection A set of non-overlapping polygons to extrude.
- * @param height Z-extent of extrusion.
- * @param nDivisions Number of extra copies of the crossSection to insert into
- * the shape vertically; especially useful in combination with twistDegrees to
- * avoid interpolation artifacts. Default is none.
- * @param twistDegrees Amount to twist the top crossSection relative to the
- * bottom, interpolated linearly for the divisions in between.
- * @param scaleTop Amount to scale the top (independently in X and Y). If the
- * scale is {0, 0}, a pure cone is formed with only a single vertex at the top.
- * Default {1, 1}.
- */
-export function extrude(
-    crossSection: Polygons, height: number, nDivisions?: number,
-    twistDegrees?: number, scaleTop?: Vec2): Manifold;
-
-/**
  * Triangulates a set of /epsilon-valid polygons.
  *
  * @param polygons The set of polygons, wound CCW and representing multiple
@@ -117,58 +23,6 @@ export function extrude(
  * @return The triangles, referencing the original polygon points in order.
  */
 export function triangulate(polygons: Polygons, precision?: number): Vec3[];
-
-/**
- * Constructs a manifold from a set of polygons by revolving this cross-section
- * around its Y-axis and then setting this as the Z-axis of the resulting
- * manifold. If the polygons cross the Y-axis, only the part on the positive X
- * side is used. Geometrically valid input will result in geometrically valid
- * output.
- *
- * @param crossSection A set of non-overlapping polygons to revolve.
- * @param circularSegments Number of segments along its diameter. Default is
- * calculated by the static Defaults.
- */
-export function revolve(
-    crossSection: Polygons, circularSegments?: number): Manifold;
-
-export function union(a: Manifold, b: Manifold): Manifold;
-export function difference(a: Manifold, b: Manifold): Manifold;
-export function intersection(a: Manifold, b: Manifold): Manifold;
-
-export function union(manifolds: Manifold[]): Manifold;
-export function difference(manifolds: Manifold[]): Manifold;
-export function intersection(manifolds: Manifold[]): Manifold;
-
-/**
- * Constructs a new manifold from a list of other manifolds. This is a purely
- * topological operation, so care should be taken to avoid creating
- * overlapping results. It is the inverse operation of Decompose().
- *
- * @param manifolds A list of Manifolds to lazy-union together.
- */
-export function compose(manifolds: Manifold[]): Manifold;
-
-/**
- * Constructs a level-set Mesh from the input Signed-Distance Function (SDF).
- * This uses a form of Marching Tetrahedra (akin to Marching Cubes, but better
- * for manifoldness). Instead of using a cubic grid, it uses a body-centered
- * cubic grid (two shifted cubic grids). This means if your function's interior
- * exceeds the given bounds, you will see a kind of egg-crate shape closing off
- * the manifold, which is due to the underlying grid.
- *
- * @param sdf The signed-distance function which returns the signed distance of
- * a given point in R^3. Positive values are inside, negative outside.
- * @param bounds An axis-aligned box that defines the extent of the grid.
- * @param edgeLength Approximate maximum edge length of the triangles in the
- * final result. This affects grid spacing, and hence has a strong effect on
- * performance.
- * @param level You can inset your Mesh by using a positive value, or outset
- * it with a negative value.
- */
-export function levelSet(
-    sdf: (point: Vec3) => number, bounds: Box, edgeLength: number,
-    level?: number): Manifold;
 
 /**
  * @name Defaults
@@ -186,13 +40,6 @@ export function setCircularSegments(segments: number): void;
 export function getCircularSegments(radius: number): number;
 ///@}
 
-/**
- * Returns the first of n sequential new unique mesh IDs for marking sets of
- * triangles that can be looked up after further operations. Assign to
- * Mesh.runOriginalID vector.
- */
-export function reserveIDs(count: number): number;
-
 export class Manifold {
   /**
    * Convert a Mesh into a Manifold, retaining its properties and merging only
@@ -206,6 +53,151 @@ export class Manifold {
    * materials into triangle runs.
    */
   constructor(mesh: Mesh);
+
+  /**
+   * Constructs a tetrahedron centered at the origin with one vertex at (1,1,1)
+   * and the rest at similarly symmetric points.
+   */
+  static tetrahedron(): Manifold;
+
+  /**
+   * Constructs a unit cube (edge lengths all one), by default in the first
+   * octant, touching the origin.
+   *
+   * @param size The X, Y, and Z dimensions of the box.
+   * @param center Set to true to shift the center to the origin.
+   */
+  static cube(size?: Vec3|number, center?: boolean): Manifold;
+
+  /**
+   * A convenience constructor for the common case of extruding a circle. Can
+   * also form cones if both radii are specified.
+   *
+   * @param height Z-extent
+   * @param radiusLow Radius of bottom circle. Must be positive.
+   * @param radiusHigh Radius of top circle. Can equal zero. Default is equal to
+   * radiusLow.
+   * @param circularSegments How many line segments to use around the circle.
+   * Default is calculated by the static Defaults.
+   * @param center Set to true to shift the center to the origin. Default is
+   * origin at the bottom.
+   */
+  static cylinder(
+      height: number, radiusLow: number, radiusHigh?: number,
+      circularSegments?: number, center?: boolean): Manifold;
+
+  /**
+   * Constructs a geodesic sphere of a given radius.
+   *
+   * @param radius Radius of the sphere. Must be positive.
+   * @param circularSegments Number of segments along its
+   * diameter. This number will always be rounded up to the nearest factor of
+   * four, as this sphere is constructed by refining an octahedron. This means
+   * there are a circle of vertices on all three of the axis planes. Default is
+   * calculated by the static Defaults.
+   */
+  static sphere(radius: number, circularSegments?: number): Manifold;
+
+  /**
+   * Constructs a manifold from a set of polygons/cross-section by extruding
+   * them along the Z-axis.
+   *
+   * @param crossSection A set of non-overlapping polygons to extrude.
+   * @param height Z-extent of extrusion.
+   * @param nDivisions Number of extra copies of the crossSection to insert into
+   * the shape vertically; especially useful in combination with twistDegrees to
+   * avoid interpolation artifacts. Default is none.
+   * @param twistDegrees Amount to twist the top crossSection relative to the
+   * bottom, interpolated linearly for the divisions in between.
+   * @param scaleTop Amount to scale the top (independently in X and Y). If the
+   * scale is {0, 0}, a pure cone is formed with only a single vertex at the
+   * top. Default {1, 1}.
+   * @param center If true, the extrusion is centered on the z-axis through the
+   *     origin
+   * as opposed to resting on the XY plane as is default.
+   */
+  static extrude(
+      crossSection: Polygons, height: number, nDivisions?: number,
+      twistDegrees?: number, scaleTop?: Vec2, center?: boolean): Manifold;
+
+  /**
+   * Constructs a manifold from a set of polygons/cross-section by revolving
+   * this cross-section around its Y-axis and then setting this as the Z-axis of
+   * the resulting manifold. If the polygons cross the Y-axis, only the part on
+   * the positive X side is used. Geometrically valid input will result in
+   * geometrically valid output.
+   *
+   * @param crossSection A set of non-overlapping polygons to revolve.
+   * @param circularSegments Number of segments along its diameter. Default is
+   * calculated by the static Defaults.
+   */
+  static revolve(crossSection: Polygons, circularSegments?: number): Manifold;
+
+  /**
+   * Convert a Mesh into a Manifold, retaining its properties and merging only
+   * the positions according to the merge vectors. Will throw an error if the
+   * result is not an oriented 2-manifold. Will collapse degenerate triangles
+   * and unnecessary vertices.
+   *
+   * All fields are read, making this structure suitable for a lossless
+   * round-trip of data from getMesh(). For multi-material input, use
+   * reserveIDs() to set a unique originalID for each material, and sort the
+   * materials into triangle runs.
+   */
+  static ofMesh(mesh: Mesh): Manifold;
+
+  /**
+   * Constructs a smooth version of the input mesh by creating tangents; this
+   * method will throw if you have supplied tangents with your mesh already. The
+   * actual triangle resolution is unchanged; use the Refine() method to
+   * interpolate to a higher-resolution curve.
+   *
+   * By default, every edge is calculated for maximum smoothness (very much
+   * approximately), attempting to minimize the maximum mean Curvature
+   * magnitude. No higher-order derivatives are considered, as the interpolation
+   * is independent per triangle, only sharing constraints on their boundaries.
+   *
+   * @param mesh input Mesh.
+   * @param sharpenedEdges If desired, you can supply a vector of sharpened
+   * halfedges, which should in general be a small subset of all halfedges.
+   * Order of entries doesn't matter, as each one specifies the desired
+   * smoothness (between zero and one, with one the default for all unspecified
+   * halfedges) and the halfedge index (3 * triangle index + [0,1,2] where 0 is
+   * the edge between triVert 0 and 1, etc).
+   *
+   * At a smoothness value of zero, a sharp crease is made. The smoothness is
+   * interpolated along each edge, so the specified value should be thought of
+   * as an average. Where exactly two sharpened edges meet at a vertex, their
+   * tangents are rotated to be colinear so that the sharpened edge can be
+   * continuous. Vertices with only one sharpened edge are completely smooth,
+   * allowing sharpened edges to smoothly vanish at termination. A single vertex
+   * can be sharpened by sharping all edges that are incident on it, allowing
+   * cones to be formed.
+   */
+  static smooth(mesh: Mesh, sharpenedEdges?: Smoothness[]): Manifold;
+
+  /**
+   * Constructs a level-set Mesh from the input Signed-Distance Function (SDF).
+   * This uses a form of Marching Tetrahedra (akin to Marching Cubes, but better
+   * for manifoldness). Instead of using a cubic grid, it uses a body-centered
+   * cubic grid (two shifted cubic grids). This means if your function's
+   * interior exceeds the given bounds, you will see a kind of egg-crate shape
+   * closing off the manifold, which is due to the underlying grid.
+   *
+   * @param sdf The signed-distance function which returns the signed distance
+   *     of
+   * a given point in R^3. Positive values are inside, negative outside.
+   * @param bounds An axis-aligned box that defines the extent of the grid.
+   * @param edgeLength Approximate maximum edge length of the triangles in the
+   * final result. This affects grid spacing, and hence has a strong effect on
+   * performance.
+   * @param level You can inset your Mesh by using a positive value, or outset
+   * it with a negative value.
+   */
+  static levelSet(
+      sdf: (point: Vec3) => number, bounds: Box, edgeLength: number,
+      level?: number): Manifold;
+
   /**
    * Transform this Manifold in space. Stored in column-major order. This
    * operation can be chained. Transforms are combined and applied lazily.
@@ -269,6 +261,36 @@ export class Manifold {
   intersect(other: Manifold): Manifold;
 
   /**
+   * Boolean union of the manifolds a and b
+   */
+  static union(a: Manifold, b: Manifold): Manifold;
+
+  /**
+   * Boolean difference of the manifold b from the manifold a
+   */
+  static difference(a: Manifold, b: Manifold): Manifold;
+
+  /**
+   * Boolean intersection of the manifolds a and b
+   */
+  static intersection(a: Manifold, b: Manifold): Manifold;
+
+  /**
+   * Boolean union of a list of manifolds
+   */
+  static union(manifolds: Manifold[]): Manifold;
+
+  /**
+   * Boolean difference of the tail of a list of manifolds from its head
+   */
+  static difference(manifolds: Manifold[]): Manifold;
+
+  /**
+   * Boolean intersection of a list of manifolds
+   */
+  static intersection(manifolds: Manifold[]): Manifold;
+
+  /**
    * Removes everything behind the given half-space plane.
    *
    * @param normal This vector is normal to the cutting plane and its length
@@ -317,6 +339,15 @@ export class Manifold {
       numProp: number,
       propFunc: (newProp: number[], position: Vec3, oldProp: number[]) => void):
       Manifold;
+
+  /**
+   * Constructs a new manifold from a list of other manifolds. This is a purely
+   * topological operation, so care should be taken to avoid creating
+   * overlapping results. It is the inverse operation of Decompose().
+   *
+   * @param manifolds A list of Manifolds to lazy-union together.
+   */
+  static compose(manifolds: Manifold[]): Manifold;
 
   /**
    * This operation returns a vector of Manifolds that are topologically

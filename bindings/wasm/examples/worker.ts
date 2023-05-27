@@ -20,9 +20,9 @@ import Module from './built/manifold';
 //@ts-ignore
 import {setupIO, writeMesh} from './gltf-io';
 import type {GLTFMaterial, Quat} from './public/editor';
-import type {CrossSection, Manifold, ManifoldStatic, Mesh, Vec3} from './public/manifold';
+import type {CrossSection, Manifold, ManifoldToplevel, Mesh, Vec3} from './public/manifold';
 
-interface WorkerStatic extends ManifoldStatic {
+interface WorkerStatic extends ManifoldToplevel {
   GLTFNode: typeof GLTFNode;
   show(manifold: Manifold): Manifold;
   only(manifold: Manifold): Manifold;
