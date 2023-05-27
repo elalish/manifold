@@ -107,6 +107,10 @@ Module.setup = function() {
   };
 
   Module.CrossSection.prototype.scale = function(vec) {
+    // if only one factor provided, scale both x and y with it
+    if (typeof vec == 'number') {
+      return this._Scale({x: vec, y: vec});
+    }
     return this._Scale(vararg2vec2([vec]));
   };
 
@@ -247,6 +251,10 @@ Module.setup = function() {
   };
 
   Module.Manifold.prototype.scale = function(vec) {
+    // if only one factor provided, scale all three dimensions (xyz) with it
+    if (typeof vec == 'number') {
+      return this._Scale({x: vec, y: vec, z: vec});
+    }
     return this._Scale(vararg2vec3([vec]));
   };
 
