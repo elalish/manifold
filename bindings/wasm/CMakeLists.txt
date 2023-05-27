@@ -16,13 +16,14 @@ project(wasm)
 
 add_executable(manifoldjs bindings.cpp)
 
+set(JS_DEPS
+        ${CMAKE_CURRENT_SOURCE_DIR}/bindings.js
+        ${CMAKE_CURRENT_SOURCE_DIR}/manifold.d.ts
+        ${CMAKE_CURRENT_SOURCE_DIR}/manifold-encapsulated-types.d.ts)
+# FIXME: can we rewrite the custom command to run after these are modified when building
+# without recompiling bindings.cpp?
 # make sure that we recompile the wasm when bindings.js is being modified
-set_source_files_properties(bindings.cpp
-  OBJECT_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/bindings.js
-  # FIXME: can we rewrite the custom command to run after these are modified when building
-  # without recompiling bindings.cpp?
-  OBJECT_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/manifold.d.ts
-  OBJECT_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/manifold-encapsulated-types.d.ts)
+set_source_files_properties(bindings.cpp PROPERTIES OBJECT_DEPENDS ${JS_DEPS})
 target_link_libraries(manifoldjs manifold sdf cross_section polygon)
 target_compile_options(manifoldjs PRIVATE ${MANIFOLD_FLAGS})
 target_link_options(manifoldjs PUBLIC --pre-js ${CMAKE_CURRENT_SOURCE_DIR}/bindings.js --bind -sALLOW_TABLE_GROWTH=1
