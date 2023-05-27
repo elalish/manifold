@@ -707,6 +707,22 @@ void Manifold::Impl::MarkFailure(Error status) {
   status_ = status;
 }
 
+void Manifold::Impl::Warp(std::function<void(glm::vec3&)> warpFunc) {
+  thrust::for_each_n(thrust::host, vertPos_.begin(), NumVert(), warpFunc);
+  CalculateBBox();
+  if (!IsFinite()) {
+    MarkFailure(Error::NonFiniteVertex);
+    return;
+  }
+  Update();
+  faceNormal_.resize(0);  // force recalculation of triNormal
+  CalculateNormals();
+  SetPrecision();
+  CreateFaces();
+  SimplifyTopology();
+  Finish();
+}
+
 Manifold::Impl Manifold::Impl::Transform(const glm::mat4x3& transform_) const {
   if (transform_ == glm::mat4x3(1.0f)) return *this;
   auto policy = autoPolicy(NumVert());

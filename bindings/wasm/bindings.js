@@ -72,6 +72,11 @@ Module.setup = function() {
     }, 'vi');
     const out = this._Warp(wasmFuncPtr);
     removeFunction(wasmFuncPtr);
+
+    const status = out.status();
+    if (status.value !== 0) {
+      throw new Module.ManifoldError(status.value);
+    }
     return out;
   };
 

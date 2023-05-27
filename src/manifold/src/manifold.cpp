@@ -563,15 +563,7 @@ Manifold Manifold::Mirror(glm::vec3 normal) const {
  */
 Manifold Manifold::Warp(std::function<void(glm::vec3&)> warpFunc) const {
   auto pImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
-  thrust::for_each_n(thrust::host, pImpl->vertPos_.begin(), NumVert(),
-                     warpFunc);
-  pImpl->Update();
-  pImpl->faceNormal_.resize(0);  // force recalculation of triNormal
-  pImpl->CalculateNormals();
-  pImpl->SetPrecision();
-  pImpl->CreateFaces();
-  pImpl->SimplifyTopology();
-  pImpl->Finish();
+  pImpl->Warp(warpFunc);
   return Manifold(std::make_shared<CsgLeafNode>(pImpl));
 }
 

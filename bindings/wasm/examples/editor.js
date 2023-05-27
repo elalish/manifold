@@ -377,7 +377,6 @@ function createWorker() {
 
     finishRun();
     runButton.disabled = true;
-    setScript('safe', 'true');
 
     URL.revokeObjectURL(objectURL);
     objectURL = e.data.objectURL;
@@ -385,6 +384,9 @@ function createWorker() {
     if (objectURL == null) {
       mv.showPoster();
       poster.textContent = 'Error';
+      createWorker();
+    } else {
+      setScript('safe', 'true');
     }
   }
 }
