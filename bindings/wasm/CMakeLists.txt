@@ -16,14 +16,7 @@ project(wasm)
 
 add_executable(manifoldjs bindings.cpp)
 
-set(JS_DEPS
-        ${CMAKE_CURRENT_SOURCE_DIR}/bindings.js
-        ${CMAKE_CURRENT_SOURCE_DIR}/manifold.d.ts
-        ${CMAKE_CURRENT_SOURCE_DIR}/manifold-encapsulated-types.d.ts)
-# FIXME: can we rewrite the custom command to run after these are modified when building
-# without recompiling bindings.cpp?
-# make sure that we recompile the wasm when bindings.js is being modified
-set_source_files_properties(bindings.cpp PROPERTIES OBJECT_DEPENDS ${JS_DEPS})
+set_source_files_properties(bindings.cpp PROPERTIES OBJECT_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/bindings.js)
 target_link_libraries(manifoldjs manifold sdf cross_section polygon)
 target_compile_options(manifoldjs PRIVATE ${MANIFOLD_FLAGS})
 target_link_options(manifoldjs PUBLIC --pre-js ${CMAKE_CURRENT_SOURCE_DIR}/bindings.js --bind -sALLOW_TABLE_GROWTH=1
@@ -34,15 +27,20 @@ set_target_properties(manifoldjs PROPERTIES OUTPUT_NAME "manifold")
 
 file(MAKE_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/examples/built)
 
-add_custom_command(
-        TARGET manifoldjs POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy
-                ${CMAKE_CURRENT_BINARY_DIR}/manifold.*
-                ${CMAKE_CURRENT_SOURCE_DIR}/manifold*.d.ts
-                ${CMAKE_CURRENT_SOURCE_DIR}/examples/built/)
+# ensure that interface files are copied over when modified
+add_custom_target(js_deps ALL
+        DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/manifold.*
+               ${CMAKE_CURRENT_SOURCE_DIR}/manifold*.d.ts)
 
 add_custom_command(
-        TARGET manifoldjs POST_BUILD
+        TARGET js_deps POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy
-                ${CMAKE_CURRENT_SOURCE_DIR}/manifold*.d.ts
-                ${CMAKE_CURRENT_SOURCE_DIR}/examples/public/)
+               ${CMAKE_CURRENT_BINARY_DIR}/manifold.*
+               ${CMAKE_CURRENT_SOURCE_DIR}/manifold*.d.ts
+               ${CMAKE_CURRENT_SOURCE_DIR}/examples/built/)
+
+add_custom_command(
+        TARGET js_deps POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy
+               ${CMAKE_CURRENT_SOURCE_DIR}/manifold*.d.ts
+               ${CMAKE_CURRENT_SOURCE_DIR}/examples/public/)
