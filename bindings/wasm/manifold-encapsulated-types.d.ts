@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {Box, Curvature, Mat4, Polygons, Properties, SealedFloat32Array, SealedUint32Array, Smoothness, Vec2, Vec3} from './manifold-global-types';
+import {Box, Curvature, FillRule, JoinType, Mat4, Polygons, Properties, Rect, SealedFloat32Array, SealedUint32Array, SimplePolygon, Smoothness, Vec2, Vec3} from './manifold-global-types';
 
 /**
  * Triangulates a set of /epsilon-valid polygons.
@@ -39,6 +39,274 @@ export function setMinCircularEdgeLength(length: number): void;
 export function setCircularSegments(segments: number): void;
 export function getCircularSegments(radius: number): number;
 ///@}
+
+export class CrossSection {
+  /**
+   * Create a 2d cross-section from a set of contours (complex polygons). A
+   * boolean union operation (with Positive filling rule by default) is
+   * performed to combine overlapping polygons and ensure the resulting
+   * CrossSection is free of intersections.
+   *
+   * @param contours A set of closed paths describing zero or more complex
+   * polygons.
+   * @param fillrule The filling rule used to interpret polygon sub-regions in
+   * contours.
+   */
+  constructor(polygons: SimplePolygon|SimplePolygon[], fillrule?: FillRule);
+
+  static square(size?: Vec2|number, center?: boolean): CrossSection;
+
+  static circle(radius: number, circularSegments?: number): CrossSection;
+
+  /**
+   * Constructs a manifold by extruding the cross-section along Z-axis.
+   *
+   * @param height Z-extent of extrusion.
+   * @param nDivisions Number of extra copies of the crossSection to insert into
+   * the shape vertically; especially useful in combination with twistDegrees to
+   * avoid interpolation artifacts. Default is none.
+   * @param twistDegrees Amount to twist the top crossSection relative to the
+   * bottom, interpolated linearly for the divisions in between.
+   * @param scaleTop Amount to scale the top (independently in X and Y). If the
+   * scale is {0, 0}, a pure cone is formed with only a single vertex at the
+   * top. Default {1, 1}.
+   * @param center If true, the extrusion is centered on the z-axis through the
+   *     origin
+   * as opposed to resting on the XY plane as is default.
+   */
+  extrude(
+      height: number, nDivisions?: number, twistDegrees?: number,
+      scaleTop?: Vec2, center?: boolean): CrossSection;
+
+  /**
+   * Constructs a manifold by revolving this cross-section around its Y-axis and
+   * then setting this as the Z-axis of the resulting manifold. If the contours
+   * cross the Y-axis, only the part on the positive X side is used.
+   * Geometrically valid input will result in geometrically valid output.
+   *
+   * @param circularSegments Number of segments along its diameter. Default is
+   * calculated by the static Defaults.
+   */
+  static revolve(circularSegments?: number): CrossSection;
+
+  /**
+   * Transform this CrossSection in space. Stored in column-major order. This
+   * operation can be chained. Transforms are combined and applied lazily.
+   *
+   * @param m The affine transformation matrix to apply to all the vertices. The
+   *     last row is ignored.
+   */
+  transform(m: Mat3): CrossSection;
+
+  /**
+   * Move this CrossSection in space. This operation can be chained. Transforms
+   * are combined and applied lazily.
+   *
+   * @param v The vector to add to every vertex.
+   */
+  translate(v: Vec2): CrossSection;
+
+  /**
+   * Applies an Euler angle rotation to the cross-section, first about the X
+   * axis, then Y, then Z, in degrees. We use degrees so that we can minimize
+   * rounding error, and eliminate it completely for any multiples of 90
+   * degrees. Additionally, more efficient code paths are used to update the
+   * cross-section when the transforms only rotate by multiples of 90 degrees.
+   * This operation can be chained. Transforms are combined and applied lazily.
+   *
+   * @param v [X, Y, Z] rotation in degrees.
+   */
+  rotate(v: Vec2): CrossSection;
+
+  /**
+   * Scale this CrossSection in space. This operation can be chained. Transforms
+   * are combined and applied lazily.
+   *
+   * @param v The vector to multiply every vertex by per component.
+   */
+  scale(v: Vec2|number): CrossSection;
+
+
+  /**
+   * Mirror this CrossSection over the arbitrary axis described by the unit form
+   * of the given vector. If the length of the vector is zero, an empty
+   * CrossSection is returned. This operation can be chained. Transforms are
+   * combined and applied lazily.
+   *
+   * @param ax the axis to be mirrored over
+   */
+  mirror(v: Vec2): CrossSection;
+
+  /**
+   * Move the vertices of this CrossSection (creating a new one) according to
+   * any arbitrary input function, followed by a union operation (with a
+   * Positive fill rule) that ensures any introduced intersections are not
+   * included in the result.
+   *
+   * @param warpFunc A function that modifies a given vertex position.
+   */
+  warp(warpFunc: (vert: Vec2) => void): CrossSection;
+
+  /**
+   * Inflate the contours in CrossSection by the specified delta, handling
+   * corners according to the given JoinType.
+   *
+   * @param delta Positive deltas will cause the expansion of outlining contours
+   * to expand, and retraction of inner (hole) contours. Negative deltas will
+   * have the opposite effect.
+   * @param jt The join type specifying the treatment of contour joins
+   * (corners).
+   * @param miter_limit The maximum distance in multiples of delta that vertices
+   * can be offset from their original positions with before squaring is
+   * applied, <B>when the join type is Miter</B> (default is 2, which is the
+   * minimum allowed). See the [Clipper2
+   * MiterLimit](http://www.angusj.com/clipper2/Docs/Units/Clipper.Offset/Classes/ClipperOffset/Properties/MiterLimit.htm)
+   * page for a visual example.
+   * @param arc_tolerance The maximum acceptable imperfection for curves drawn
+   * (approximated with line segments) for Round joins (not relevant for other
+   * JoinTypes). By default (when undefined or =0), the allowable imprecision is
+   * scaled in inverse proportion to the offset delta.
+   */
+  offset(
+      delta: number, jointype?: JoinType, miterLimit?: number,
+      arcTolerance?: number): CrossSection;
+
+  /**
+   * Remove vertices from the contours in this CrossSection that are less than
+   * the specified distance epsilon from an imaginary line that passes through
+   * its two adjacent vertices. Near duplicate vertices and collinear points
+   * will be removed at lower epsilons, with elimination of line segments
+   * becoming increasingly aggressive with larger epsilons.
+   *
+   * It is recommended to apply this function following Offset, in order to
+   * clean up any spurious tiny line segments introduced that do not improve
+   * quality in any meaningful way. This is particularly important if further
+   * offseting operations are to be performed, which would compound the issue.
+   *
+   * @param epsilon minimum distance vertices must diverge from the hypothetical
+   *     outline without them in order to be included in the output (default
+   *     1e-6)
+   */
+  simplify(epsilon?: number): CrossSection;
+
+  /**
+   * Boolean union
+   */
+  add(other: Polygons): CrossSection;
+
+  /**
+   * Boolean difference
+   */
+  subtract(other: Polygons): CrossSection;
+
+  /**
+   * Boolean intersection
+   */
+  intersect(other: Polygons): CrossSection;
+
+  /**
+   * Boolean union of the cross-sections a and b
+   */
+  static union(a: Polygons, b: Polygons): CrossSection;
+
+  /**
+   * Boolean difference of the cross-section b from the cross-section a
+   */
+  static difference(a: Polygons, b: Polygons): CrossSection;
+
+  /**
+   * Boolean intersection of the cross-sections a and b
+   */
+  static intersection(a: Polygons, b: Polygons): CrossSection;
+
+  /**
+   * Boolean union of a list of cross-sections
+   */
+  static union(polygons: Polygons[]): CrossSection;
+
+  /**
+   * Boolean difference of the tail of a list of cross-sections from its head
+   */
+  static difference(polygons: Polygons[]): CrossSection;
+
+  /**
+   * Boolean intersection of a list of cross-sections
+   */
+  static intersection(polygons: Polygons[]): CrossSection;
+
+  /**
+   * Compute the intersection between a cross-section and an axis-aligned
+   * rectangle. This operation has much higher performance (O(n) vs
+   * >O(n^3)) than the general purpose intersection algorithm
+   * used for sets of cross-sections.
+   */
+  rectClip(rect: Rect): CrossSection;
+
+  /**
+   * Construct a CrossSection from a vector of other Polygons (batch
+   * boolean union).
+   */
+  static compose(polygons: Polygons[]): CrossSection;
+
+  /**
+   * This operation returns a vector of CrossSections that are topologically
+   * disconnected, each containing one outline contour with zero or more
+   * holes.
+   */
+  decompose(): CrossSection[];
+
+  /**
+   * Create a 2d cross-section from a set of contours (complex polygons). A
+   * boolean union operation (with Positive filling rule by default) is
+   * performed to combine overlapping polygons and ensure the resulting
+   * CrossSection is free of intersections.
+   *
+   * @param contours A set of closed paths describing zero or more complex
+   * polygons.
+   * @param fillrule The filling rule used to interpret polygon sub-regions in
+   * contours.
+   */
+  ofPoygons(polygons: SimplePolygon|SimplePolygon[], fillrule?: FillRule):
+      CrossSection;
+
+  /**
+   * Return the contours of this CrossSection as a list of simple polygons.
+   */
+  toPolygons(): SimplePolygon[];
+
+  /**
+   * Return the total area covered by complex polygons making up the
+   * CrossSection.
+   */
+  area(): number;
+
+  /**
+   * Does the CrossSection (not) have any contours?
+   */
+  isEmpty(): boolean;
+
+  /**
+   * The number of vertices in the CrossSection.
+   */
+  numVert(): number;
+
+  /**
+   * The number of contours in the CrossSection.
+   */
+  numContour(): number;
+
+  /**
+   * Returns the axis-aligned bounding rectangle of all the CrossSection's
+   * vertices.
+   */
+  bounds(): Rect;
+
+  /**
+   * Frees the WASM memory of this CrossSection, since these cannot be
+   * garbage-collected automatically.
+   */
+  delete(): void;
+}
 
 export class Manifold {
   /**
@@ -122,10 +390,10 @@ export class Manifold {
 
   /**
    * Constructs a manifold from a set of polygons/cross-section by revolving
-   * this cross-section around its Y-axis and then setting this as the Z-axis of
-   * the resulting manifold. If the polygons cross the Y-axis, only the part on
-   * the positive X side is used. Geometrically valid input will result in
-   * geometrically valid output.
+   * them around the Y-axis and then setting this as the Z-axis of the resulting
+   * manifold. If the polygons cross the Y-axis, only the part on the positive X
+   * side is used. Geometrically valid input will result in geometrically valid
+   * output.
    *
    * @param crossSection A set of non-overlapping polygons to revolve.
    * @param circularSegments Number of segments along its diameter. Default is
@@ -289,6 +557,27 @@ export class Manifold {
    * Boolean intersection of a list of manifolds
    */
   static intersection(manifolds: Manifold[]): Manifold;
+
+  /**
+   * Split cuts this manifold in two using the cutter manifold. The first result
+   * is the intersection, second is the difference. This is more efficient than
+   * doing them separately.
+   *
+   * @param cutter
+   */
+  split(cutter: Manifold): Manifold[];
+
+  /**
+   * Convenient version of Split() for a half-space.
+   *
+   * @param normal This vector is normal to the cutting plane and its length
+   *     does
+   * not matter. The first result is in the direction of this vector, the second
+   * result is on the opposite side.
+   * @param originOffset The distance of the plane from the origin in the
+   * direction of the normal vector.
+   */
+  splitByPlane(normal: Vec3, originOffset: number): Manifold[];
 
   /**
    * Removes everything behind the given half-space plane.
