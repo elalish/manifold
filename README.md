@@ -3,7 +3,7 @@
 
 ## Users
 
-[OpenSCAD](https://openscad.org/), [IFCjs](https://ifcjs.github.io/info/), [Grid.Space](https://grid.space/), and [OCADml](https://github.com/OCADml/OManifold) have all integrated our Manifold geometry kernel! Why? Because its reliability is guaranteed and it's 1,000 times faster than other libraries. See our [usage](https://github.com/elalish/manifold/discussions/340) and [performance](https://github.com/elalish/manifold/discussions/383) discussions for all the latest and to add your own projects & analyses. 
+[OpenSCAD](https://openscad.org/), [IFCjs](https://ifcjs.github.io/info/), [Grid.Space](https://grid.space/), and [OCADml](https://github.com/OCADml/OManifold) have all integrated our Manifold geometry kernel! Why? Because its reliability is guaranteed and it's 1,000 times faster than other libraries. See our [usage](https://github.com/elalish/manifold/discussions/340) and [performance](https://github.com/elalish/manifold/discussions/383) discussions for all the latest and to add your own projects & analyses.
 
 For example, here is a log-log plot of Manifold's performance vs. earlier OpenSCAD geometry backends:
 
@@ -15,15 +15,23 @@ If you like OpenSCAD / JSCAD, you might also like ManifoldCAD - our own solid mo
 
 ![A metallic Menger sponge](https://elalish.github.io/manifold/samples/models/mengerSponge3.webp "A metallic Menger sponge")
 
+### Note for Firefox users
+
+If you find the editor is stuck on **Loading...**, setting
+`dom.workers.modules.enabled: true` in your `about:config`, as mentioned in the
+discussion of the
+[issue#328](https://github.com/elalish/manifold/issues/328#issuecomment-1473847102)
+of this repository may solve the problem.
+
 # Manifold
 
 [**API Documentation**](https://elalish.github.io/manifold/docs/html/modules.html) | [**Algorithm Documentation**](https://github.com/elalish/manifold/wiki/Manifold-Library) | [**Blog Posts**](https://elalish.blogspot.com/search/label/Manifold) | [**Web Examples**](https://elalish.github.io/manifold/model-viewer.html)
 
 [Manifold](https://github.com/elalish/manifold) is a geometry library dedicated to creating and operating on manifold triangle meshes. A [manifold mesh](https://github.com/elalish/manifold/wiki/Manifold-Library#manifoldness) is a mesh that represents a solid object, and so is very important in manufacturing, CAD, structural analysis, etc. Further information can be found on the [wiki](https://github.com/elalish/manifold/wiki/Manifold-Library).
 
-This is a modern C++ library that Github's CI verifies builds and runs on a variety of platforms. Additionally, we build bindings for JavaScript ([manifold-3d](https://www.npmjs.com/package/manifold-3d) on npm), Python, and C to make this library more portable and easy to use. 
+This is a modern C++ library that Github's CI verifies builds and runs on a variety of platforms. Additionally, we build bindings for JavaScript ([manifold-3d](https://www.npmjs.com/package/manifold-3d) on npm), Python, and C to make this library more portable and easy to use.
 
-We have four core dependencies, making use of submodules to ensure compatibility: 
+We have four core dependencies, making use of submodules to ensure compatibility:
 - `graphlite`: connected components algorithm
 - `Clipper2`: provides our 2D subsystem
 - `GLM`: a compact vector library
@@ -31,7 +39,7 @@ We have four core dependencies, making use of submodules to ensure compatibility
 
 ## What's here
 
-This library is fast with guaranteed manifold output. As such you need manifold meshes as input, which this library can create using constructors inspired by the OpenSCAD API, as well as more advanced features like smoothing and signed-distance function (SDF) level sets. You can also pass in your own mesh data, but you'll get an error status if the imported mesh isn't manifold. Various automated repair tools exist online for fixing non manifold models, usually for 3D printing. 
+This library is fast with guaranteed manifold output. As such you need manifold meshes as input, which this library can create using constructors inspired by the OpenSCAD API, as well as more advanced features like smoothing and signed-distance function (SDF) level sets. You can also pass in your own mesh data, but you'll get an error status if the imported mesh isn't manifold. Various automated repair tools exist online for fixing non manifold models, usually for 3D printing.
 
 The most significant contribution here is a guaranteed-manifold [mesh Boolean](https://github.com/elalish/manifold/wiki/Manifold-Library#mesh-boolean) algorithm, which I believe is the first of its kind. If you know of another, please open a discussion - a mesh Boolean algorithm robust to edge cases has been an open problem for many years. Likewise, if the Boolean here ever fails you, please submit an issue! This Boolean forms the basis of a CAD kernel, as it allows simple shapes to be combined into more complex ones.
 
@@ -41,7 +49,7 @@ Look in the [samples](https://github.com/elalish/manifold/tree/master/samples) d
 
 ## Building
 
-Only CMake, a C++ compiler, and Python are required to be installed and set up to build this library (it has been tested with GCC, LLVM, MSVC). However, a variety of optional dependencies can bring in more functionality, see below. 
+Only CMake, a C++ compiler, and Python are required to be installed and set up to build this library (it has been tested with GCC, LLVM, MSVC). However, a variety of optional dependencies can bring in more functionality, see below.
 
 Build and test (Ubuntu or similar):
 ```
