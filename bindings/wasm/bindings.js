@@ -107,9 +107,6 @@ Module.setup = function() {
   };
 
   Module.CrossSection.prototype.scale = function(vec) {
-    if (typeof vec == 'number') {
-      return this._Scale({x: vec, y: vec});
-    }
     return this._Scale(vararg2vec2([vec]));
   };
 
@@ -250,9 +247,6 @@ Module.setup = function() {
   };
 
   Module.Manifold.prototype.scale = function(vec) {
-    if (typeof vec == 'number') {
-      return this._Scale({x: vec, y: vec, z: vec});
-    }
     return this._Scale(vararg2vec3([vec]));
   };
 
