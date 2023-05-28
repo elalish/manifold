@@ -64,4 +64,14 @@ std::vector<glm::vec4> createFloatVec4Vector(float* values, std::size_t count) {
     return result;
 }
 
+std::vector<glm::ivec4> createIntegerVec4Vector(int* values, std::size_t count) {
+    std::vector<glm::ivec4> result(count / 4);
+
+    for (std::size_t i = 0; i < count; i += 4) {
+        result[i/4] = glm::ivec4(values[i], values[i + 1], values[i + 2], values[i + 4]);
+    }
+
+    return result;
+}
+
 } // namespace BufferUtils

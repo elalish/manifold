@@ -6,7 +6,7 @@ glm::vec3 rodrigues_rotation(const glm::vec3& v, const glm::vec3& k, float a) {
     return v * glm::cos(a) + glm::cross(k, v) * glm::sin(a) + k * glm::dot(k, v) * (1 - glm::cos(a));
 }
 
-glm::mat4x3 yaw(const glm::mat4x3& m, float a) {
+glm::mat4x3 Yaw(const glm::mat4x3& m, float a) {
     glm::vec3 d[] = {
         rodrigues_rotation(m[0], m[1], a),
         m[1],
@@ -15,7 +15,7 @@ glm::mat4x3 yaw(const glm::mat4x3& m, float a) {
     return glm::mat4x3(d[0], d[1], d[2], m[3]);
 }
 
-glm::mat4x3 pitch(const glm::mat4x3& m, float a) {
+glm::mat4x3 Pitch(const glm::mat4x3& m, float a) {
     glm::vec3 d[] = {
         m[0],
         rodrigues_rotation(m[1], m[0], a),
@@ -24,7 +24,7 @@ glm::mat4x3 pitch(const glm::mat4x3& m, float a) {
     return glm::mat4x3(d[0], d[1], d[2], m[3]);
 }
 
-glm::mat4x3 roll(const glm::mat4x3& m, float a) {
+glm::mat4x3 Roll(const glm::mat4x3& m, float a) {
     glm::vec3 d[] = {
         rodrigues_rotation(m[0], m[2], a),
         rodrigues_rotation(m[1], m[2], a),
@@ -33,7 +33,7 @@ glm::mat4x3 roll(const glm::mat4x3& m, float a) {
     return glm::mat4x3(d[0], d[1], d[2], m[3]);
 }
 
-glm::mat4x3 rotate(const glm::mat4x3& m, const glm::vec3& axis, float a) {
+glm::mat4x3 Rotate(const glm::mat4x3& m, const glm::vec3& axis, float a) {
     glm::vec3 d[] = {
         rodrigues_rotation(m[0], axis, a),
         rodrigues_rotation(m[1], axis, a),
@@ -42,21 +42,21 @@ glm::mat4x3 rotate(const glm::mat4x3& m, const glm::vec3& axis, float a) {
     return glm::mat4x3(d[0], d[1], d[2], m[3]);
 }
 
-glm::mat4x3 rotate(const glm::mat4x3& m, const glm::vec3& angles) {
+glm::mat4x3 Rotate(const glm::mat4x3& m, const glm::vec3& angles) {
     glm::mat4x3 res = m;
     if (angles[0] != 0) {
-        res = pitch(res, angles[0]);
+        res = Pitch(res, angles[0]);
     }
     if (angles[1] != 0) {
-        res = yaw(res, angles[1]);
+        res = Yaw(res, angles[1]);
     }
     if (angles[2] != 0) {
-        res = roll(res, angles[2]);
+        res = Roll(res, angles[2]);
     }
     return res;
 }
 
-glm::mat4x3 setRotation(const glm::mat4x3& m, const glm::mat3x3& rotation) {
+glm::mat4x3 SetRotation(const glm::mat4x3& m, const glm::mat3x3& rotation) {
     glm::mat4x3 result = m;
     for (int i = 0; i < 3; ++i) {
         result[i] = rotation[i];
@@ -64,7 +64,7 @@ glm::mat4x3 setRotation(const glm::mat4x3& m, const glm::mat3x3& rotation) {
     return result;
 }
 
-glm::mat4x3 translate(const glm::mat4x3& m, const glm::vec3& offset) {
+glm::mat4x3 Translate(const glm::mat4x3& m, const glm::vec3& offset) {
     glm::mat4x3 result = m;
 
     if (offset[0] != 0.0) {
@@ -80,13 +80,13 @@ glm::mat4x3 translate(const glm::mat4x3& m, const glm::vec3& offset) {
     return result;
 }
 
-glm::mat4x3 setTranslation(const glm::mat4x3& m, const glm::vec3& translation) {
+glm::mat4x3 SetTranslation(const glm::mat4x3& m, const glm::vec3& translation) {
     glm::mat4x3 result = m;
     result[3] = translation;
     return result;
 }
 
-glm::mat4x3 transform(const glm::mat4x3& a, const glm::mat4x3& b) {
+glm::mat4x3 Transform(const glm::mat4x3& a, const glm::mat4x3& b) {
     glm::mat4x3 result;
 
     for (int row = 0; row < 3; ++row) {

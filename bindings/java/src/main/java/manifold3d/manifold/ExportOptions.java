@@ -1,5 +1,7 @@
 package manifold3d.manifold;
 
+import manifold3d.manifold.Material;
+
 import org.bytedeco.javacpp.*;
 import org.bytedeco.javacpp.annotation.*;
 
@@ -13,4 +15,7 @@ public class ExportOptions extends Pointer {
 
     public native @MemberGetter boolean faceted();
     public native @MemberSetter void faceted(boolean faceted);
+
+    @Name("mat") public native @MemberGetter @ByRef Material material();
+    @Name("mat") public native @MemberSetter void material(@ByRef Material material);
 }

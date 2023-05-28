@@ -47,6 +47,9 @@ public class CrossSection extends Pointer {
     @Name("Bounds") public native @ByVal Rect bounds();
 
     @Name("Translate") public native @ByVal CrossSection translate(@ByVal DoubleVec2 v);
+    public CrossSection translate(double x, double y) {
+        return this.translate(new DoubleVec2(x, y));
+    }
     public CrossSection translateX(double x) {
         return this.translate(new DoubleVec2(x, 0));
     }

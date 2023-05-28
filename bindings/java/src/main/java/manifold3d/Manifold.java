@@ -88,8 +88,8 @@ public class Manifold extends Pointer {
 
     //// Modifiers
     @Name("Translate") public native @ByVal Manifold translate(@ByRef DoubleVec3 translation);
-    public Manifold Translate(Manifold manifold, double x, double y, double z) {
-        return manifold.translate(new DoubleVec3(x, y, z));
+    public Manifold translate(double x, double y, double z) {
+        return this.translate(new DoubleVec3(x, y, z));
     }
     public Manifold translateX(double x) {
         return this.translate(new DoubleVec3(x, 0, 0));

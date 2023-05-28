@@ -2,21 +2,47 @@ package manifold3d.glm;
 
 import manifold3d.glm.DoubleVec3;
 import manifold3d.glm.DoubleVec4;
+import manifold3d.glm.MatrixTransforms;
 
 import org.bytedeco.javacpp.*;
 import org.bytedeco.javacpp.annotation.*;
 
+import java.util.Iterator;
+import java.lang.Iterable;
+import java.util.NoSuchElementException;
+
 @Platform(include = {"glm/glm.hpp"})
 @Namespace("glm")
 @Name("mat4x3")
-public class DoubleMat4x3 extends DoublePointer {
+public class DoubleMat4x3 extends DoublePointer implements Iterable<DoubleVec3> {
     static { Loader.load(); }
+
+    @Override
+    public Iterator<DoubleVec3> iterator() {
+        return new Iterator<DoubleVec3>() {
+
+            private int index = 0;
+
+            @Override
+            public boolean hasNext() {
+                return index < 3;
+            }
+
+            @Override
+            public DoubleVec3 next() {
+                if (!hasNext()) {
+                    throw new NoSuchElementException();
+                }
+                return getColumn(index++);
+            }
+        };
+    }
 
     public DoubleMat4x3() { allocate(); }
     private native void allocate();
 
-    private native void allocate(double v);
-    public DoubleMat4x3(double v) { allocate(v); }
+    private native void allocate(double x);
+    public DoubleMat4x3(double x) { allocate(x); }
 
     public DoubleMat4x3(@ByRef DoubleVec3 col1, @ByRef DoubleVec3 col2,
                         @ByRef DoubleVec3 col3, @ByRef DoubleVec3 col4) {
@@ -37,4 +63,20 @@ public class DoubleMat4x3 extends DoublePointer {
     @Name("operator[]") public native @ByRef DoubleVec3 getColumn(int i);
 
     public native @Name("operator=") @ByRef DoubleMat4x3 put(@ByRef DoubleMat4x3 rhs);
+
+    public DoubleMat4x3 transform(@ByRef DoubleMat4x3 other) {
+        return MatrixTransforms.Transform(this, other);
+    }
+
+    public DoubleMat4x3 rotate(@ByRef DoubleVec3 angles) {
+        return MatrixTransforms.Rotate(this, angles);
+    }
+
+    public DoubleMat4x3 rotate(@ByRef DoubleVec3 axis, float angle) {
+        return MatrixTransforms.Rotate(this, axis, angle);
+    }
+
+    public DoubleMat4x3 translate(@ByRef DoubleVec3 vec) {
+        return MatrixTransforms.Translate(this, vec);
+    }
 }
