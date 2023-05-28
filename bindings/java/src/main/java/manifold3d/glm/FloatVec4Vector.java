@@ -4,10 +4,35 @@ import manifold3d.glm.FloatVec4;
 import org.bytedeco.javacpp.*;
 import org.bytedeco.javacpp.annotation.*;
 
+import java.util.Iterator;
+import java.lang.Iterable;
+import java.util.NoSuchElementException;
+
 @Platform(include = {"<vector>", "glm/glm.hpp"})
 @Name("std::vector<glm::vec4>")
-public class FloatVec4Vector extends Pointer {
+public class FloatVec4Vector extends Pointer implements Iterable<FloatVec4> {
     static { Loader.load(); }
+
+    @Override
+    public Iterator<FloatVec4> iterator() {
+        return new Iterator<FloatVec4>() {
+
+            private long index = 0;
+
+            @Override
+            public boolean hasNext() {
+                return index < size();
+            }
+
+            @Override
+            public FloatVec4 next() {
+                if (!hasNext()) {
+                    throw new NoSuchElementException();
+                }
+                return get(index++);
+            }
+        };
+    }
 
     public FloatVec4Vector() { allocate(); }
     private native void allocate();

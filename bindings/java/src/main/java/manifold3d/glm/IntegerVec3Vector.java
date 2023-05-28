@@ -9,10 +9,35 @@ import manifold3d.glm.IntegerVec3;
 import org.bytedeco.javacpp.*;
 import org.bytedeco.javacpp.annotation.*;
 
+import java.util.Iterator;
+import java.lang.Iterable;
+import java.util.NoSuchElementException;
+
 @Platform(include = {"<vector>", "glm/glm.hpp"})
 @Name("std::vector<glm::ivec3>")
-public class IntegerVec3Vector extends Pointer {
+public class IntegerVec3Vector extends Pointer implements Iterable<IntegerVec3> {
     static { Loader.load(); }
+
+    @Override
+    public Iterator<IntegerVec3> iterator() {
+        return new Iterator<IntegerVec3>() {
+
+            private long index = 0;
+
+            @Override
+            public boolean hasNext() {
+                return index < size();
+            }
+
+            @Override
+            public IntegerVec3 next() {
+                if (!hasNext()) {
+                    throw new NoSuchElementException();
+                }
+                return get(index++);
+            }
+        };
+    }
 
     public IntegerVec3Vector() { allocate(); }
     private native void allocate();

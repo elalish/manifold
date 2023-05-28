@@ -12,10 +12,35 @@ import manifold3d.glm.DoubleVec3;
 import org.bytedeco.javacpp.*;
 import org.bytedeco.javacpp.annotation.*;
 
+import java.util.Iterator;
+import java.lang.Iterable;
+import java.util.NoSuchElementException;
+
 @Platform(include = {"<vector>", "glm/glm.hpp"})
 @Name("std::vector<glm::vec3>")
-public class DoubleVec3Vector extends Pointer {
+public class DoubleVec3Vector extends Pointer implements Iterable<DoubleVec3> {
     static { Loader.load(); }
+
+    @Override
+    public Iterator<DoubleVec3> iterator() {
+        return new Iterator<DoubleVec3>() {
+
+            private long index = 0;
+
+            @Override
+            public boolean hasNext() {
+                return index < size();
+            }
+
+            @Override
+            public DoubleVec3 next() {
+                if (!hasNext()) {
+                    throw new NoSuchElementException();
+                }
+                return get(index++);
+            }
+        };
+    }
 
     @Override
     public String toString() {

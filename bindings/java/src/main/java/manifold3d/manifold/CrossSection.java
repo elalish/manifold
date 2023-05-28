@@ -6,6 +6,7 @@ import org.bytedeco.javacpp.annotation.*;
 import manifold3d.glm.DoubleVec2;
 import manifold3d.glm.DoubleMat3x2;
 import manifold3d.manifold.Rect;
+import manifold3d.manifold.CrossSectionVector;
 
 import manifold3d.pub.SimplePolygon;
 import manifold3d.pub.Polygons;
@@ -64,6 +65,7 @@ public class CrossSection extends Pointer {
     public native @ByVal CrossSection Offset(double delta, @Cast("manifold::CrossSection::JoinType") int jt, double miter_limit, double arc_tolerance);
 
     public native @ByVal CrossSection Boolean(@ByRef CrossSection second, @Cast("manifold::OpType") int op);
+    @Name("BatchBoolean") public static native @ByVal CrossSection batchBoolean(@ByRef CrossSectionVector sections, @Cast("manifold::OpType") int op);
 
     @Name("ConvexHull") public native @ByVal CrossSection convexHull();
     @Name("ConvexHull") public native @ByVal CrossSection convexHull(@ByRef CrossSection other);
@@ -76,7 +78,8 @@ public class CrossSection extends Pointer {
     @Name("operator^=") public native @ByVal CrossSection intersectPut(@ByRef CrossSection rhs);
 
     public native @ByVal CrossSection RectClip(@ByVal Rect rect);
-    // Compose and Decompose methods are omitted because of the std::vector parameter
+    public static native @ByVal CrossSection Compose(@ByRef CrossSectionVector crossSection);
+    @Name("Decompose") public native @ByVal CrossSectionVector decompose();
 
     public static native @ByVal CrossSection Circle(float radius, int circularSegments);
     public static native @ByVal CrossSection Square(@ByRef DoubleVec2 size, boolean center);

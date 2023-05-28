@@ -13,6 +13,7 @@ import java.io.IOException;
 import java.io.File;
 
 import manifold3d.ManifoldPair;
+import manifold3d.ManifoldVector;
 import manifold3d.manifold.MeshGL;
 import manifold3d.manifold.ExportOptions;
 import manifold3d.manifold.CrossSection;
@@ -22,6 +23,7 @@ import manifold3d.pub.Box;
 import manifold3d.pub.Properties;
 import manifold3d.pub.Curvature;
 import manifold3d.pub.SmoothnessVector;
+import manifold3d.pub.OpType;
 
 import manifold3d.glm.DoubleVec3Vector;
 import manifold3d.glm.DoubleMat4x3;
@@ -127,6 +129,12 @@ public class Manifold extends Pointer {
     @Name("TrimByPlane")
     public native @ByVal Manifold trimByPlane(@ByRef DoubleVec3 normal, float originOffset);
 
+    @Name("Decompose")
+    public native @ByVal ManifoldVector decompose();
+
+    @Name("BatchBoolean")
+    public static native @ByVal Manifold batchBoolean(@ByRef ManifoldVector manifolds, @Cast("manifold::OpType") int op);
+
     //// Static methods
     public static native @ByVal Manifold Smooth(@ByRef MeshGL mesh, @ByRef SmoothnessVector sharpenedEdges);
     public static native @ByVal Manifold Smooth(@ByRef DoubleMesh mesh, @ByRef SmoothnessVector sharpenedEdges);
@@ -137,5 +145,5 @@ public class Manifold extends Pointer {
     public static native @ByVal Manifold Extrude(@ByRef CrossSection crossSection, float height, int nDivisions, float twistDegrees, @ByRef DoubleVec2 scaleTop);
     public static native @ByVal Manifold Revolve(@ByRef CrossSection crossSection, int circularSegments);
     public static native @ByVal Manifold Revolve(@ByRef CrossSection crossSection, int circularSegments, float revolveDegrees);
-    //public static native @ByVal Manifold Compose(@ByRef ManifoldVector manifolds);
+    public static native @ByVal Manifold Compose(@ByRef ManifoldVector manifolds);
 }

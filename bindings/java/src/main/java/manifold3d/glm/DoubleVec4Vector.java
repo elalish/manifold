@@ -10,10 +10,35 @@ import manifold3d.glm.DoubleVec4;
 import org.bytedeco.javacpp.*;
 import org.bytedeco.javacpp.annotation.*;
 
+import java.util.Iterator;
+import java.lang.Iterable;
+import java.util.NoSuchElementException;
+
 @Platform(include = {"<vector>", "glm/glm.hpp"})
 @Name("std::vector<glm::vec4>")
-public class DoubleVec4Vector extends Pointer {
+public class DoubleVec4Vector extends Pointer  implements Iterable<DoubleVec4>{
     static { Loader.load(); }
+
+    @Override
+    public Iterator<DoubleVec4> iterator() {
+        return new Iterator<DoubleVec4>() {
+
+            private long index = 0;
+
+            @Override
+            public boolean hasNext() {
+                return index < size();
+            }
+
+            @Override
+            public DoubleVec4 next() {
+                if (!hasNext()) {
+                    throw new NoSuchElementException();
+                }
+                return get(index++);
+            }
+        };
+    }
 
     public DoubleVec4Vector() { allocate(); }
     private native void allocate();
