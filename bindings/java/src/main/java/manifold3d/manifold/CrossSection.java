@@ -40,32 +40,30 @@ public class CrossSection extends Pointer {
     public CrossSection(@ByRef Polygons contours, @Cast("manifold::CrossSection::FillRule") int fillrule) { allocate(contours, fillrule); }
     private native void allocate(@ByRef Polygons contours, @Cast("manifold::CrossSection::FillRule") int fillrule);
 
-    //// Other methods
-    public native @ByVal DoubleVec2 Area();
-    public native int NumVert();
-    public native int NumContour();
-    public native boolean IsEmpty();
-    public native @ByVal Rect Bounds();
+    @Name("Area") public native @ByVal DoubleVec2 area();
+    @Name("NumVert") public native int numVert();
+    @Name("NumContour") public native int numContour();
+    @Name("IsEmpty") public native boolean isEmpty();
+    @Name("Bounds") public native @ByVal Rect bounds();
 
-    public native @ByVal CrossSection Translate(@ByVal DoubleVec2 v);
+    @Name("Translate") public native @ByVal CrossSection translate(@ByVal DoubleVec2 v);
     public CrossSection translateX(double x) {
-        return this.Translate(new DoubleVec2(x, 0));
+        return this.translate(new DoubleVec2(x, 0));
     }
     public CrossSection translateY(double y) {
-        return this.Translate(new DoubleVec2(0, y));
+        return this.translate(new DoubleVec2(0, y));
     }
 
-    public native @ByVal CrossSection Rotate(float degrees);
-    public native @ByVal CrossSection Scale(@ByVal DoubleVec2 s);
-    public native @ByVal CrossSection Mirror(@ByVal DoubleVec2 ax);
-    public native @ByVal CrossSection Transform(@ByVal DoubleMat3x2 m);
-    // Warp method is omitted because of the std::function parameter
-    public native @ByVal CrossSection Simplify(double epsilon);
+    @Name("Rotate") public native @ByVal CrossSection rotate(float degrees);
+    @Name("Scale") public native @ByVal CrossSection scale(@ByVal DoubleVec2 s);
+    @Name("Mirror") public native @ByVal CrossSection mirror(@ByVal DoubleVec2 ax);
+    @Name("Transform") public native @ByVal CrossSection transform(@ByVal DoubleMat3x2 m);
+    @Name("Simplify") public native @ByVal CrossSection simplify(double epsilon);
 
-    public native @ByVal CrossSection Offset(double delta, @Cast("manifold::CrossSection::JoinType") int jt, double miter_limit, double arc_tolerance);
+    @Name("Offset") public native @ByVal CrossSection offset(double delta, @Cast("manifold::CrossSection::JoinType") int jt, double miter_limit, double arc_tolerance);
 
-    public native @ByVal CrossSection Boolean(@ByRef CrossSection second, @Cast("manifold::OpType") int op);
-    @Name("BatchBoolean") public static native @ByVal CrossSection batchBoolean(@ByRef CrossSectionVector sections, @Cast("manifold::OpType") int op);
+    @Name("Boolean") public native @ByVal CrossSection booleanOp(@ByRef CrossSection second, @Cast("manifold::OpType") int op);
+    public static native @ByVal CrossSection BatchBoolean(@ByRef CrossSectionVector sections, @Cast("manifold::OpType") int op);
 
     @Name("ConvexHull") public native @ByVal CrossSection convexHull();
     @Name("ConvexHull") public native @ByVal CrossSection convexHull(@ByRef CrossSection other);
@@ -77,12 +75,12 @@ public class CrossSection extends Pointer {
     @Name("operator^") public native @ByVal CrossSection intersect(@ByRef CrossSection rhs);
     @Name("operator^=") public native @ByVal CrossSection intersectPut(@ByRef CrossSection rhs);
 
-    public native @ByVal CrossSection RectClip(@ByVal Rect rect);
+    @Name("RectClip") public native @ByVal CrossSection rectClip(@ByVal Rect rect);
     public static native @ByVal CrossSection Compose(@ByRef CrossSectionVector crossSection);
     @Name("Decompose") public native @ByVal CrossSectionVector decompose();
 
     public static native @ByVal CrossSection Circle(float radius, int circularSegments);
     public static native @ByVal CrossSection Square(@ByRef DoubleVec2 size, boolean center);
 
-    public native @ByVal Polygons ToPolygons();
+    @Name("ToPolygons") public native @ByVal Polygons toPolygons();
 }

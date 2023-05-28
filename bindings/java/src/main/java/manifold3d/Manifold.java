@@ -67,52 +67,52 @@ public class Manifold extends Pointer {
     private native void allocate(@ByRef DoubleMesh mesh);
 
     // Methods
-    public native @ByVal DoubleMesh GetMesh();
-    public native @ByVal MeshGL GetMeshGL(@ByRef DoubleVec3 normalIdx);
-    public native boolean IsEmpty();
-    public native @Cast("manifold::Manifold::Error") int Status();
-    public native int NumVert();
-    public native int NumEdge();
-    public native int NumTri();
-    public native int NumProp();
-    public native int NumPropVert();
+    @Name("GetMesh") public native @ByVal DoubleMesh getMesh();
+    @Name("GetMeshGL") public native @ByVal MeshGL getMeshGL(@ByRef DoubleVec3 normalIdx);
+    @Name("IsEmpty") public native boolean isEmpty();
+    @Name("Status") public native @Cast("manifold::Manifold::Error") int status();
+    @Name("NumVert") public native int numVert();
+    @Name("NumEdge") public native int numEdge();
+    @Name("NumTri") public native int numTri();
+    @Name("NumProp") public native int numProp();
+    @Name("NumPropVert") public native int numPropVert();
     @Name("BoundingBox") public native @ByVal Box boundingBox();
-    public native float Precision();
-    public native int Genus();
-    public native @ByVal Properties GetProperties();
-    public native @ByVal Curvature GetCurvature();
-    public native int OriginalID();
-    public native @ByVal Manifold AsOriginal();
+    @Name("Precision") public native float precision();
+    @Name("Genus") public native int genus();
+    @Name("GetProperties")  public native @ByVal Properties getProperties();
+    @Name("GetCurvature") public native @ByVal Curvature getCurvature();
+    @Name("OriginalID") public native int originalID();
+    @Name("AsOriginal") public native @ByVal Manifold asOriginal();
 
-    public native @ByVal Manifold ConvexHull(@ByRef Manifold other);
+    @Name("ConvexHull") public native @ByVal Manifold convexHull(@ByRef Manifold other);
 
     //// Modifiers
-    public native @ByVal Manifold Translate(@ByRef DoubleVec3 translation);
+    @Name("Translate") public native @ByVal Manifold translate(@ByRef DoubleVec3 translation);
     public Manifold Translate(Manifold manifold, double x, double y, double z) {
-        return manifold.Translate(new DoubleVec3(x, y, z));
+        return manifold.translate(new DoubleVec3(x, y, z));
     }
-    public Manifold TranslateX(double x) {
-        return this.Translate(new DoubleVec3(x, 0, 0));
+    public Manifold translateX(double x) {
+        return this.translate(new DoubleVec3(x, 0, 0));
     }
-    public Manifold TranslateY(double y) {
-        return this.Translate(new DoubleVec3(0, y, 0));
+    public Manifold translateY(double y) {
+        return this.translate(new DoubleVec3(0, y, 0));
     }
-    public Manifold TranslateZ(double z) {
-        return this.Translate(new DoubleVec3(0, 0, z));
-    }
-
-    public native @ByVal Manifold Scale(@ByRef DoubleVec3 scale);
-    public Manifold Scale(double x, double y, double z) {
-        return this.Scale(new DoubleVec3(x, y, z));
+    public Manifold translateZ(double z) {
+        return this.translate(new DoubleVec3(0, 0, z));
     }
 
-    public native @ByVal Manifold Rotate(float xDegrees, float yDegrees, float zDegrees);
-    public native @ByVal Manifold Transform(@ByRef DoubleMat4x3 transform);
-    public native @ByVal Manifold Mirror(@ByRef DoubleVec3 mirrorAxis);
-    public native @ByVal Manifold Refine(int refineValue);
+    @Name("Scale") public native @ByVal Manifold scale(@ByRef DoubleVec3 scale);
+    public Manifold scale(double x, double y, double z) {
+        return this.scale(new DoubleVec3(x, y, z));
+    }
+
+    @Name("Rotate") public native @ByVal Manifold rotate(float xDegrees, float yDegrees, float zDegrees);
+    @Name("Transform") public native @ByVal Manifold transform(@ByRef DoubleMat4x3 transform);
+    @Name("Mirror") public native @ByVal Manifold mirror(@ByRef DoubleVec3 mirrorAxis);
+    @Name("Refine") public native @ByVal Manifold refine(int refineValue);
 
     // CSG operators
-    public native @ByVal Manifold Boolean(@ByRef Manifold second, @Cast("manifold::OpType") int op);
+    @Name("Boolean") public native @ByVal Manifold booleanOp(@ByRef Manifold second, @Cast("manifold::OpType") int op);
     @Name("operator+") public native @ByVal Manifold add(@ByRef Manifold manifold);
     @Name("operator+=") public native @ByRef Manifold addPut(@ByRef Manifold manifold);
     @Name("operator-") public native @ByVal Manifold subtract(@ByRef Manifold manifold);
@@ -133,7 +133,7 @@ public class Manifold extends Pointer {
     public native @ByVal ManifoldVector decompose();
 
     @Name("BatchBoolean")
-    public static native @ByVal Manifold batchBoolean(@ByRef ManifoldVector manifolds, @Cast("manifold::OpType") int op);
+    public static native @ByVal Manifold BatchBoolean(@ByRef ManifoldVector manifolds, @Cast("manifold::OpType") int op);
 
     //// Static methods
     public static native @ByVal Manifold Smooth(@ByRef MeshGL mesh, @ByRef SmoothnessVector sharpenedEdges);

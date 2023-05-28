@@ -25,9 +25,9 @@ public class ManifoldTest {
         Manifold intersection = cube.intersect(sphere);
         Manifold union = cube.add(sphere);
 
-        DoubleMesh diffMesh = diff.GetMesh();
-        DoubleMesh intersectMesh = intersection.GetMesh();
-        DoubleMesh unionMesh = union.GetMesh();
+        DoubleMesh diffMesh = diff.getMesh();
+        DoubleMesh intersectMesh = intersection.getMesh();
+        DoubleMesh unionMesh = union.getMesh();
         ExportOptions opts = new ExportOptions();
         opts.faceted(false);
 
@@ -35,10 +35,10 @@ public class ManifoldTest {
         MeshIO.ExportMesh("CubeIntersectSphere.glb", intersectMesh, opts);
         MeshIO.ExportMesh("CubeUnionSphere.obj", unionMesh, opts);
 
-        Manifold hull = cylinder.ConvexHull(cube.TranslateZ(200.0)
-                                            .TranslateX(50))
-            .subtract(Manifold.Cylinder(100, 4f, 4f, 0, false).TranslateZ(-1f));
-        DoubleMesh hullMesh = hull.GetMesh();
+        Manifold hull = cylinder.convexHull(cube.translateZ(200.0)
+                                            .translateX(50))
+            .subtract(Manifold.Cylinder(100, 4f, 4f, 0, false).translateZ(-1f));
+        DoubleMesh hullMesh = hull.getMesh();
 
         DoubleVec3Vector vertPos = hullMesh.vertPos();
         //MeshIO.ExportMesh("HullCubes.stl", hullMesh, opts);
