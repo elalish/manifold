@@ -158,7 +158,7 @@ export class CrossSection {
    * (corners).
    * @param miterLimit The maximum distance in multiples of delta that vertices
    * can be offset from their original positions with before squaring is
-   * applied, <B>when the join type is Miter</B> (default is 2, which is the
+   * applied, **when the join type is Miter** (default is 2, which is the
    * minimum allowed). See the [Clipper2
    * MiterLimit](http://www.angusj.com/clipper2/Docs/Units/Clipper.Offset/Classes/ClipperOffset/Properties/MiterLimit.htm)
    * page for a visual example.
@@ -372,7 +372,7 @@ export class Manifold {
    * Constructs a manifold from a set of polygons/cross-section by extruding
    * them along the Z-axis.
    *
-   * @param crossSection A set of non-overlapping polygons to extrude.
+   * @param polygons A set of non-overlapping polygons to extrude.
    * @param height Z-extent of extrusion.
    * @param nDivisions Number of extra copies of the crossSection to insert into
    * the shape vertically; especially useful in combination with twistDegrees to
@@ -387,7 +387,7 @@ export class Manifold {
    * as opposed to resting on the XY plane as is default.
    */
   static extrude(
-      crossSection: CrossSection|Polygons, height: number, nDivisions?: number,
+      polygons: CrossSection|Polygons, height: number, nDivisions?: number,
       twistDegrees?: number, scaleTop?: Vec2, center?: boolean): Manifold;
 
   /**
@@ -397,12 +397,12 @@ export class Manifold {
    * side is used. Geometrically valid input will result in geometrically valid
    * output.
    *
-   * @param crossSection A set of non-overlapping polygons to revolve.
+   * @param polygons A set of non-overlapping polygons to revolve.
    * @param circularSegments Number of segments along its diameter. Default is
    * calculated by the static Defaults.
    */
-  static revolve(
-      crossSection: CrossSection|Polygons, circularSegments?: number): Manifold;
+  static revolve(polygons: CrossSection|Polygons, circularSegments?: number):
+      Manifold;
 
   /**
    * Convert a Mesh into a Manifold, retaining its properties and merging only
