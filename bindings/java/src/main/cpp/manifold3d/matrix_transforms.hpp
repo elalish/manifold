@@ -73,7 +73,7 @@ glm::mat4x3 Translate(const glm::mat4x3& m, const glm::vec3& offset) {
     if (offset[1] != 0.0) {
         result[3] += m[1]*offset[1];
     }
-    if (offset[3] != 0.0) {
+    if (offset[2] != 0.0) {
         result[3] += m[2]*offset[2];
     }
 

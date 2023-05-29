@@ -10,11 +10,36 @@ import manifold3d.glm.DoubleVec2;
 import org.bytedeco.javacpp.*;
 import org.bytedeco.javacpp.annotation.*;
 
+import java.util.Iterator;
+import java.lang.Iterable;
+import java.util.NoSuchElementException;
+
 @Platform(include = {"manifold.h"})
 @Namespace("manifold")
 @Name("SimplePolygon")
-public class SimplePolygon extends Pointer {
+public class SimplePolygon extends Pointer implements Iterable<DoubleVec2> {
     static { Loader.load(); }
+
+    @Override
+    public Iterator<DoubleVec2> iterator() {
+        return new Iterator<DoubleVec2>() {
+
+            private long index = 0;
+
+            @Override
+            public boolean hasNext() {
+                return index < size();
+            }
+
+            @Override
+            public DoubleVec2 next() {
+                if (!hasNext()) {
+                    throw new NoSuchElementException();
+                }
+                return get(index++);
+            }
+        };
+    }
 
     public SimplePolygon() { allocate(); }
     private native void allocate();
