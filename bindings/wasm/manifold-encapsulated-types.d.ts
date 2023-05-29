@@ -49,10 +49,10 @@ export class CrossSection {
    *
    * @param contours A set of closed paths describing zero or more complex
    * polygons.
-   * @param fillrule The filling rule used to interpret polygon sub-regions in
+   * @param fillRule The filling rule used to interpret polygon sub-regions in
    * contours.
    */
-  constructor(polygons: Polygons, fillrule?: FillRule);
+  constructor(polygons: Polygons, fillRule?: FillRule);
 
   static square(size?: Vec2|number, center?: boolean): CrossSection;
 
@@ -154,21 +154,21 @@ export class CrossSection {
    * @param delta Positive deltas will cause the expansion of outlining contours
    * to expand, and retraction of inner (hole) contours. Negative deltas will
    * have the opposite effect.
-   * @param jt The join type specifying the treatment of contour joins
+   * @param joinType The join type specifying the treatment of contour joins
    * (corners).
-   * @param miter_limit The maximum distance in multiples of delta that vertices
+   * @param miterLimit The maximum distance in multiples of delta that vertices
    * can be offset from their original positions with before squaring is
    * applied, <B>when the join type is Miter</B> (default is 2, which is the
    * minimum allowed). See the [Clipper2
    * MiterLimit](http://www.angusj.com/clipper2/Docs/Units/Clipper.Offset/Classes/ClipperOffset/Properties/MiterLimit.htm)
    * page for a visual example.
-   * @param arc_tolerance The maximum acceptable imperfection for curves drawn
+   * @param arcTolerance The maximum acceptable imperfection for curves drawn
    * (approximated with line segments) for Round joins (not relevant for other
    * JoinTypes). By default (when undefined or =0), the allowable imprecision is
    * scaled in inverse proportion to the offset delta.
    */
   offset(
-      delta: number, jointype?: JoinType, miterLimit?: number,
+      delta: number, joinType?: JoinType, miterLimit?: number,
       arcTolerance?: number): CrossSection;
 
   /**
@@ -266,10 +266,10 @@ export class CrossSection {
    *
    * @param contours A set of closed paths describing zero or more complex
    * polygons.
-   * @param fillrule The filling rule used to interpret polygon sub-regions in
+   * @param fillRule The filling rule used to interpret polygon sub-regions in
    * contours.
    */
-  ofPolygons(polygons: Polygons, fillrule?: FillRule): CrossSection;
+  ofPolygons(polygons: Polygons, fillRule?: FillRule): CrossSection;
 
   /**
    * Return the contours of this CrossSection as a list of simple polygons.

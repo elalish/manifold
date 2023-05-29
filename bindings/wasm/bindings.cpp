@@ -104,8 +104,7 @@ EMSCRIPTEN_BINDINGS(whatever) {
   register_vector<glm::vec4>("Vector_vec4");
 
   class_<CrossSection>("CrossSection")
-      .constructor<std::vector<std::vector<glm::vec2>>,
-                   CrossSection::FillRule>()
+      .constructor(&cross_js::OfPolygons)
       .function("_add", &cross_js::Union)
       .function("_subtract", &cross_js::Difference)
       .function("_intersect", &cross_js::Intersection)
@@ -122,7 +121,7 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .function("numContour", &CrossSection::NumContour)
       .function("_Bounds", &CrossSection::Bounds)
       .function("simplify", &CrossSection::Simplify)
-      .function("_Offset", &CrossSection::Offset)
+      .function("_Offset", &cross_js::Offset)
       .function("_RectClip", &CrossSection::RectClip)
       .function("_ToPolygons", &CrossSection::ToPolygons);
 

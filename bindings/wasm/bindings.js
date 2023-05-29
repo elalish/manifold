@@ -87,12 +87,12 @@ Module.setup = function() {
 
   const CrossSectionCtor = Module.CrossSection;
 
-  function cross(polygons, fillrule = 'Positive') {
+  function cross(polygons, fillRule = 'Positive') {
     if (polygons instanceof CrossSectionCtor) {
       return polygons;
     } else {
       const polygonsVec = polygons2vec(polygons);
-      const cs = new CrossSectionCtor(polygonsVec, fillrule = fillrule);
+      const cs = new CrossSectionCtor(polygonsVec, fillRule = fillRule);
       disposePolygons(polygonsVec);
       return cs;
     }
@@ -148,8 +148,8 @@ Module.setup = function() {
   };
 
   Module.CrossSection.prototype.offset = function(
-      delta, jointype = 'Square', miterLimit = 2.0, arcTolerance = 0.) {
-    return this._Offset(delta, jointype, miterLimit, arcTolerance);
+      delta, joinType = 'Square', miterLimit = 2.0, arcTolerance = 0.) {
+    return this._Offset(delta, joinType, miterLimit, arcTolerance);
   };
 
   Module.CrossSection.prototype.rectClip = function(rect) {
@@ -436,15 +436,15 @@ Module.setup = function() {
 
   // CrossSection Constructors
 
-  Module.CrossSection = function(polygons, fillrule = 'Positive') {
+  Module.CrossSection = function(polygons, fillRule = 'Positive') {
     const polygonsVec = polygons2vec(polygons);
-    const cs = new CrossSectionCtor(polygonsVec, fillrule = fillrule);
+    const cs = new CrossSectionCtor(polygonsVec, fillRule = fillRule);
     disposePolygons(polygonsVec);
     return cs;
   };
 
-  Module.CrossSection.ofPolygons = function(polygons, fillrule = 'Positive') {
-    return new Module.CrossSection(polygons, fillrule = fillrule);
+  Module.CrossSection.ofPolygons = function(polygons, fillRule = 'Positive') {
+    return new Module.CrossSection(polygons, fillRule = fillRule);
   };
 
   Module.CrossSection.square = function(...args) {
