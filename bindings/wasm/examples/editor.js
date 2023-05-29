@@ -232,23 +232,15 @@ async function getManifoldDTS() {
 ${global.replaceAll('export', '')}
 ${encapsulated.replace(/^import.*$/gm, '').replaceAll('export', 'declare')}
 declare interface ManifoldToplevel {
-  cube: typeof cube;
-  cylinder: typeof cylinder;
-  sphere: typeof sphere;
-  smooth: typeof smooth;
-  tetrahedron: typeof tetrahedron;
-  extrude: typeof extrude;
-  revolve: typeof revolve;
-  union: typeof union;
-  difference: typeof difference;
-  intersection: typeof intersection;
-  compose: typeof compose;
-  levelSet: typeof levelSet;
-  setMinCircularAngle: typeof setMinCircularAngle;
-  setMinCircularEdgeLength: typeof setMinCircularEdgeLength;
-  setCircularSegments: typeof setCircularSegments;
-  getCircularSegments: typeof getCircularSegments;
-  reserveIDs: typeof reserveIDs;
+  CrossSection: typeof T.CrossSection;
+  Manifold: typeof T.Manifold;
+  Mesh: typeof T.Mesh;
+  triangulate: typeof T.triangulate;
+  setMinCircularAngle: typeof T.setMinCircularAngle;
+  setMinCircularEdgeLength: typeof T.setMinCircularEdgeLength;
+  setCircularSegments: typeof T.setCircularSegments;
+  getCircularSegments: typeof T.getCircularSegments;
+  setup: () => void;
 }
 declare const module: ManifoldToplevel;
 `;

@@ -185,16 +185,17 @@ module.setMaterial = (manifold: Manifold, material: GLTFMaterial): Manifold => {
 };
 
 function debug(shape: Manifold|CrossSection, map: Map<number, Mesh>) {
-  let result;
+  let manifold;
   if (shape instanceof module.CrossSection) {
     const box = shape.bounds();
     const x = box.max[0] - box.min[0];
     const y = box.max[1] - box.min[1];
     const h = Math.max(x, y) / 100;
-    result = shape.extrude(h).translate([0, 0, -h / 2]);
+    manifold = shape.extrude(h).translate([0, 0, -h / 2]);
   } else {
-    result = shape.asOriginal();
+    manifold = shape;
   }
+  let result = manifold.asOriginal();
   map.set(result.originalID(), result.getMesh());
   return result;
 };
