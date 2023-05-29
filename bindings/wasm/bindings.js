@@ -483,6 +483,14 @@ Module.setup = function() {
 
   Module.CrossSection.prototype = Object.create(CrossSectionCtor.prototype);
 
+  // Because the constructor and prototype are being replaced, instanceof will
+  // not work as desired unless we refer back to the original like this
+  Object.defineProperty(Module.CrossSection, Symbol.hasInstance, {
+    get: () => (t) => {
+      return (t instanceof CrossSectionCtor);
+    }
+  });
+
   // Manifold Constructors
 
   const ManifoldCtor = Module.Manifold;
@@ -597,6 +605,14 @@ Module.setup = function() {
   };
 
   Module.Manifold.prototype = Object.create(ManifoldCtor.prototype);
+
+  // Because the constructor and prototype are being replaced, instanceof will
+  // not work as desired unless we refer back to the original like this
+  Object.defineProperty(Module.Manifold, Symbol.hasInstance, {
+    get: () => (t) => {
+      return (t instanceof ManifoldCtor);
+    }
+  });
 
   // Top-level functions
 
