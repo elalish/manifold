@@ -52,7 +52,7 @@ export class CrossSection {
    * @param fillrule The filling rule used to interpret polygon sub-regions in
    * contours.
    */
-  constructor(polygons: SimplePolygon|SimplePolygon[], fillrule?: FillRule);
+  constructor(polygons: Polygons, fillrule?: FillRule);
 
   static square(size?: Vec2|number, center?: boolean): CrossSection;
 
@@ -192,47 +192,50 @@ export class CrossSection {
   /**
    * Boolean union
    */
-  add(other: Polygons): CrossSection;
+  add(other: CrossSection|Polygons): CrossSection;
 
   /**
    * Boolean difference
    */
-  subtract(other: Polygons): CrossSection;
+  subtract(other: CrossSection|Polygons): CrossSection;
 
   /**
    * Boolean intersection
    */
-  intersect(other: Polygons): CrossSection;
+  intersect(other: CrossSection|Polygons): CrossSection;
 
   /**
    * Boolean union of the cross-sections a and b
    */
-  static union(a: Polygons, b: Polygons): CrossSection;
+  static union(a: CrossSection|Polygons, b: CrossSection|Polygons):
+      CrossSection;
 
   /**
    * Boolean difference of the cross-section b from the cross-section a
    */
-  static difference(a: Polygons, b: Polygons): CrossSection;
+  static difference(a: CrossSection|Polygons, b: CrossSection|Polygons):
+      CrossSection;
 
   /**
    * Boolean intersection of the cross-sections a and b
    */
-  static intersection(a: Polygons, b: Polygons): CrossSection;
+  static intersection(a: CrossSection|Polygons, b: CrossSection|Polygons):
+      CrossSection;
 
   /**
    * Boolean union of a list of cross-sections
    */
-  static union(polygons: Polygons[]): CrossSection;
+  static union(polygons: (CrossSection|Polygons)[]): CrossSection;
 
   /**
    * Boolean difference of the tail of a list of cross-sections from its head
    */
-  static difference(polygons: Polygons[]): CrossSection;
+  static difference(polygons: (CrossSection|Polygons)[]): CrossSection;
 
   /**
    * Boolean intersection of a list of cross-sections
    */
-  static intersection(polygons: Polygons[]): CrossSection;
+  static intersection(polygons: (CrossSection|Polygons)[]): CrossSection;
 
   /**
    * Compute the intersection between a cross-section and an axis-aligned
@@ -246,7 +249,7 @@ export class CrossSection {
    * Construct a CrossSection from a vector of other Polygons (batch
    * boolean union).
    */
-  static compose(polygons: Polygons[]): CrossSection;
+  static compose(polygons: (CrossSection|Polygons)[]): CrossSection;
 
   /**
    * This operation returns a vector of CrossSections that are topologically
@@ -266,8 +269,7 @@ export class CrossSection {
    * @param fillrule The filling rule used to interpret polygon sub-regions in
    * contours.
    */
-  ofPoygons(polygons: SimplePolygon|SimplePolygon[], fillrule?: FillRule):
-      CrossSection;
+  ofPolygons(polygons: Polygons, fillrule?: FillRule): CrossSection;
 
   /**
    * Return the contours of this CrossSection as a list of simple polygons.
@@ -385,7 +387,7 @@ export class Manifold {
    * as opposed to resting on the XY plane as is default.
    */
   static extrude(
-      crossSection: Polygons, height: number, nDivisions?: number,
+      crossSection: CrossSection|Polygons, height: number, nDivisions?: number,
       twistDegrees?: number, scaleTop?: Vec2, center?: boolean): Manifold;
 
   /**
@@ -399,7 +401,8 @@ export class Manifold {
    * @param circularSegments Number of segments along its diameter. Default is
    * calculated by the static Defaults.
    */
-  static revolve(crossSection: Polygons, circularSegments?: number): Manifold;
+  static revolve(
+      crossSection: CrossSection|Polygons, circularSegments?: number): Manifold;
 
   /**
    * Convert a Mesh into a Manifold, retaining its properties and merging only

@@ -42,7 +42,7 @@ export type Mat4 = [
   number,
 ];
 export type SimplePolygon = Vec2[];
-export type Polygons = SimplePolygon|SimplePolygon[]|CrossSection;
+export type Polygons = SimplePolygon|SimplePolygon[];
 export type Rect = {
   min: Vec2,
   max: Vec2
