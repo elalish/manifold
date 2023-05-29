@@ -76,7 +76,7 @@ export class CrossSection {
    */
   extrude(
       height: number, nDivisions?: number, twistDegrees?: number,
-      scaleTop?: Vec2, center?: boolean): CrossSection;
+      scaleTop?: Vec2, center?: boolean): Manifold;
 
   /**
    * Constructs a manifold by revolving this cross-section around its Y-axis and
@@ -87,7 +87,7 @@ export class CrossSection {
    * @param circularSegments Number of segments along its diameter. Default is
    * calculated by the static Defaults.
    */
-  static revolve(circularSegments?: number): CrossSection;
+  revolve(circularSegments?: number): Manifold;
 
   /**
    * Transform this CrossSection in space. Stored in column-major order. This
