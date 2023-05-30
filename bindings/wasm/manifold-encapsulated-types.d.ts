@@ -60,7 +60,7 @@ export class CrossSection {
 
   static circle(radius: number, circularSegments?: number): CrossSection;
 
-  // Extrusions
+  // Extrusions (2d to 3d manifold)
 
   /**
    * Constructs a manifold by extruding the cross-section along Z-axis.
@@ -340,6 +340,8 @@ export class Manifold {
    */
   constructor(mesh: Mesh);
 
+  // Shapes
+
   /**
    * Constructs a tetrahedron centered at the origin with one vertex at (1,1,1)
    * and the rest at similarly symmetric points.
@@ -384,6 +386,8 @@ export class Manifold {
    */
   static sphere(radius: number, circularSegments?: number): Manifold;
 
+  // Extrusions from 2d shapes
+
   /**
    * Constructs a manifold from a set of polygons/cross-section by extruding
    * them along the Z-axis.
@@ -420,6 +424,8 @@ export class Manifold {
    */
   static revolve(polygons: CrossSection|Polygons, circularSegments?: number):
       Manifold;
+
+  // Mesh Conversion
 
   /**
    * Convert a Mesh into a Manifold, retaining its properties and merging only
@@ -464,6 +470,8 @@ export class Manifold {
    */
   static smooth(mesh: Mesh, sharpenedEdges?: Smoothness[]): Manifold;
 
+  // Signed Distance Functions
+
   /**
    * Constructs a level-set Mesh from the input Signed-Distance Function (SDF).
    * This uses a form of Marching Tetrahedra (akin to Marching Cubes, but better
@@ -485,6 +493,8 @@ export class Manifold {
   static levelSet(
       sdf: (point: Vec3) => number, bounds: Box, edgeLength: number,
       level?: number): Manifold;
+
+  // Transformations
 
   /**
    * Transform this Manifold in space. Stored in column-major order. This
@@ -532,6 +542,47 @@ export class Manifold {
    * @param normal The normal vector of the plane to be mirrored over
    */
   mirror(v: Vec3): Manifold;
+
+  /**
+   * This function does not change the topology, but allows the vertices to be
+   * moved according to any arbitrary input function. It is easy to create a
+   * function that warps a geometrically valid object into one which overlaps,
+   * but that is not checked here, so it is up to the user to choose their
+   * function with discretion.
+   *
+   * @param warpFunc A function that modifies a given vertex position.
+   */
+  warp(warpFunc: (vert: Vec3) => void): Manifold;
+
+  /**
+   * Increase the density of the mesh by splitting every edge into n pieces. For
+   * instance, with n = 2, each triangle will be split into 4 triangles. These
+   * will all be coplanar (and will not be immediately collapsed) unless the
+   * Mesh/Manifold has halfedgeTangents specified (e.g. from the Smooth()
+   * constructor), in which case the new vertices will be moved to the
+   * interpolated surface according to their barycentric coordinates.
+   *
+   * @param n The number of pieces to split every edge into. Must be > 1.
+   */
+  refine(n: number): Manifold;
+
+  /**
+   * Create a new copy of this manifold with updated vertex properties by
+   * supplying a function that takes the existing position and properties as
+   * input. You may specify any number of output properties, allowing creation
+   * and removal of channels. Note: undefined behavior will result if you read
+   * past the number of input properties or write past the number of output
+   * properties.
+   *
+   * @param numProp The new number of properties per vertex.
+   * @param propFunc A function that modifies the properties of a given vertex.
+   */
+  setProperties(
+      numProp: number,
+      propFunc: (newProp: number[], position: Vec3, oldProp: number[]) => void):
+      Manifold;
+
+  // Boolean Operations
 
   /**
    * Boolean union
@@ -610,44 +661,7 @@ export class Manifold {
    */
   trimByPlane(normal: Vec3, originOffset: number): Manifold;
 
-  /**
-   * Increase the density of the mesh by splitting every edge into n pieces. For
-   * instance, with n = 2, each triangle will be split into 4 triangles. These
-   * will all be coplanar (and will not be immediately collapsed) unless the
-   * Mesh/Manifold has halfedgeTangents specified (e.g. from the Smooth()
-   * constructor), in which case the new vertices will be moved to the
-   * interpolated surface according to their barycentric coordinates.
-   *
-   * @param n The number of pieces to split every edge into. Must be > 1.
-   */
-  refine(n: number): Manifold;
-
-  /**
-   * This function does not change the topology, but allows the vertices to be
-   * moved according to any arbitrary input function. It is easy to create a
-   * function that warps a geometrically valid object into one which overlaps,
-   * but that is not checked here, so it is up to the user to choose their
-   * function with discretion.
-   *
-   * @param warpFunc A function that modifies a given vertex position.
-   */
-  warp(warpFunc: (vert: Vec3) => void): Manifold;
-
-  /**
-   * Create a new copy of this manifold with updated vertex properties by
-   * supplying a function that takes the existing position and properties as
-   * input. You may specify any number of output properties, allowing creation
-   * and removal of channels. Note: undefined behavior will result if you read
-   * past the number of input properties or write past the number of output
-   * properties.
-   *
-   * @param numProp The new number of properties per vertex.
-   * @param propFunc A function that modifies the properties of a given vertex.
-   */
-  setProperties(
-      numProp: number,
-      propFunc: (newProp: number[], position: Vec3, oldProp: number[]) => void):
-      Manifold;
+  // Topological Operations
 
   /**
    * Constructs a new manifold from a list of other manifolds. This is a purely
@@ -665,6 +679,8 @@ export class Manifold {
    * Compose().
    */
   decompose(): Manifold[];
+
+  // Property Access
 
   /**
    * Does the Manifold have any triangles?
@@ -727,6 +743,8 @@ export class Manifold {
    */
   getCurvature(): Curvature;
 
+  // Export
+
   /**
    * Returns a Mesh that is designed to easily push into a renderer, including
    * all interleaved vertex properties that may have been input. It also
@@ -741,6 +759,8 @@ export class Manifold {
    * Meshes must use the same channels for their normals.
    */
   getMesh(normalIdx?: Vec3): Mesh;
+
+  // ID Management
 
   /**
    * If you copy a manifold, but you want this new copy to have new properties
@@ -770,6 +790,8 @@ export class Manifold {
    * Mesh.runOriginalID vector.
    */
   static reserveIDs(count: number): number;
+
+  // Memory
 
   /**
    * Frees the WASM memory of this Manifold, since these cannot be
