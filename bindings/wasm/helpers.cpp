@@ -107,11 +107,11 @@ Manifold Smooth(const val& mesh,
 
 namespace cross_js {
 CrossSection OfPolygons(std::vector<std::vector<glm::vec2>> polygons,
-                        std::string fill_rule) {
-  auto fr = fill_rule == "EvenOdd"    ? CrossSection::FillRule::EvenOdd
-            : fill_rule == "NonZero"  ? CrossSection::FillRule::NonZero
-            : fill_rule == "Positive" ? CrossSection::FillRule::Positive
-                                      : CrossSection::FillRule::Negative;
+                        int fill_rule) {
+  auto fr = fill_rule == 0   ? CrossSection::FillRule::EvenOdd
+            : fill_rule == 1 ? CrossSection::FillRule::NonZero
+            : fill_rule == 2 ? CrossSection::FillRule::Positive
+                             : CrossSection::FillRule::Negative;
   return CrossSection(polygons, fr);
 }
 
@@ -152,12 +152,11 @@ CrossSection Warp(CrossSection& cross_section, uintptr_t funcPtr) {
   return cross_section.Warp(f);
 }
 
-CrossSection Offset(CrossSection& cross_section, double delta,
-                    std::string join_type, double miter_limit,
-                    double arc_tolerance) {
-  auto jt = join_type == "Square"  ? CrossSection::JoinType::Square
-            : join_type == "Round" ? CrossSection::JoinType::Round
-                                   : CrossSection::JoinType::Miter;
+CrossSection Offset(CrossSection& cross_section, double delta, int join_type,
+                    double miter_limit, double arc_tolerance) {
+  auto jt = join_type == 0   ? CrossSection::JoinType::Square
+            : join_type == 1 ? CrossSection::JoinType::Round
+                             : CrossSection::JoinType::Miter;
   return cross_section.Offset(delta, jt, miter_limit, arc_tolerance);
 }
 }  // namespace cross_js
