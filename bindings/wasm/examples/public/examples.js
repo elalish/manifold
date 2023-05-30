@@ -20,8 +20,11 @@ export const examples = {
       // see the static API - these functions can also be used bare. Use
       // console.log() to print output (lower-right). This editor defines Z as
       // up and units of mm.
-      const {cube, sphere} = Manifold;
-      const box = cube([100, 100, 100], true);
+      const {sphere} = Manifold;
+      const {square} = CrossSection;
+      const box = square([70, 70], true)
+                      .offset(15, 'Round')
+                      .extrude(100, 0, 0, [1, 1], true);
       const ball = sphere(60, 100);
       // You must name your final output "result", or create at least one
       // GLTFNode - see Menger Sponge and Gyroid Module examples.
@@ -363,17 +366,10 @@ export const examples = {
           width, radius, decorRadius, twistRadius, nDecor, innerRadius,
           outerRadius, cut, nCut, nDivision) {
         let b = Manifold.cylinder(width, radius + twistRadius / 2);
-        const circle = [];
-        const dPhiDeg = 180 / nDivision;
-        for (let i = 0; i < 2 * nDivision; ++i) {
-          circle.push([
-            decorRadius * Math.cos(dPhiDeg * i * Math.PI / 180) + twistRadius,
-            decorRadius * Math.sin(dPhiDeg * i * Math.PI / 180)
-          ]);
-        }
-        let decor = Manifold.extrude(circle, width, nDivision, 180)
-                        .scale([1, 0.5, 1])
-                        .translate([0, radius, 0]);
+        const cyl = CrossSection.circle(decorRadius)
+                        .translate([twistRadius, 0])
+                        .extrude(width, nDivision, 180);
+        const decor = cyl.scale([1, 0.5, 1]).translate([0, radius, 0]);
         for (let i = 0; i < nDecor; i++)
           b = b.add(decor.rotate([0, 0, (360.0 / nDecor) * i]));
         const stretch = [];
