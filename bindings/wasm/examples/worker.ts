@@ -24,8 +24,8 @@ import type {CrossSection, Manifold, ManifoldToplevel, Mesh, Vec3} from './publi
 
 interface WorkerStatic extends ManifoldToplevel {
   GLTFNode: typeof GLTFNode;
-  show(shape: CrossSection|Manifold): Manifold;
-  only(shape: CrossSection|Manifold): Manifold;
+  show(manifold: Manifold): Manifold;
+  only(manifold: Manifold): Manifold;
   setMaterial(manifold: Manifold, material: GLTFMaterial): void;
   cleanup(): void;
 }
@@ -184,29 +184,19 @@ module.setMaterial = (manifold: Manifold, material: GLTFMaterial): Manifold => {
   return out;
 };
 
-function debug(shape: Manifold|CrossSection, map: Map<number, Mesh>) {
-  let manifold;
-  if (shape instanceof module.CrossSection) {
-    const box = shape.bounds();
-    const x = box.max[0] - box.min[0];
-    const y = box.max[1] - box.min[1];
-    const h = Math.max(x, y) / 100;
-    manifold = shape.extrude(h).translate([0, 0, -h / 2]);
-  } else {
-    manifold = shape;
-  }
+function debug(manifold: Manifold, map: Map<number, Mesh>) {
   let result = manifold.asOriginal();
   map.set(result.originalID(), result.getMesh());
   return result;
 };
 
-module.show = (shape) => {
-  return debug(shape, shown);
+module.show = (manifold) => {
+  return debug(manifold, shown);
 };
 
-module.only = (shape) => {
+module.only = (manifold) => {
   ghost = true;
-  return debug(shape, singles);
+  return debug(manifold, singles);
 };
 
 // Setup complete
