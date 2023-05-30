@@ -58,7 +58,7 @@ const crossSectionStaticFunctions = [
 // CrossSection member functions (that return a new cross-section)
 const crossSectionMemberFunctions = [
   'add', 'subtract', 'intersect', 'rectClip', 'decompose', 'transform',
-  'translate', 'rotate', 'scale', 'mirror', 'simplify', 'offset', 'toPolygons'
+  'translate', 'rotate', 'scale', 'mirror', 'simplify', 'offset'
 ];
 // top level functions that construct a new manifold/mesh
 const toplevelConstructors = ['show', 'only', 'setMaterial'];

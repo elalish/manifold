@@ -281,7 +281,7 @@ export class CrossSection {
    * @param fillRule The filling rule used to interpret polygon sub-regions in
    * contours.
    */
-  ofPolygons(polygons: Polygons, fillRule?: FillRule): CrossSection;
+  static ofPolygons(polygons: Polygons, fillRule?: FillRule): CrossSection;
 
   /**
    * Return the contours of this CrossSection as a list of simple polygons.
