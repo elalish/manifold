@@ -54,9 +54,13 @@ export class CrossSection {
    */
   constructor(polygons: Polygons, fillRule?: FillRule);
 
+  // Shapes
+
   static square(size?: Vec2|number, center?: boolean): CrossSection;
 
   static circle(radius: number, circularSegments?: number): CrossSection;
+
+  // Extrusions
 
   /**
    * Constructs a manifold by extruding the cross-section along Z-axis.
@@ -88,6 +92,8 @@ export class CrossSection {
    * calculated by the static Defaults.
    */
   revolve(circularSegments?: number): Manifold;
+
+  // Transformations
 
   /**
    * Transform this CrossSection in space. Stored in column-major order. This
@@ -189,6 +195,8 @@ export class CrossSection {
    */
   simplify(epsilon?: number): CrossSection;
 
+  // Clipping Operations
+
   /**
    * Boolean union
    */
@@ -245,6 +253,8 @@ export class CrossSection {
    */
   rectClip(rect: Rect): CrossSection;
 
+  // Topological Operations
+
   /**
    * Construct a CrossSection from a vector of other Polygons (batch
    * boolean union).
@@ -257,6 +267,8 @@ export class CrossSection {
    * holes.
    */
   decompose(): CrossSection[];
+
+  // Polygon Conversion
 
   /**
    * Create a 2d cross-section from a set of contours (complex polygons). A
@@ -275,6 +287,8 @@ export class CrossSection {
    * Return the contours of this CrossSection as a list of simple polygons.
    */
   toPolygons(): SimplePolygon[];
+
+  // Properties
 
   /**
    * Return the total area covered by complex polygons making up the
@@ -302,6 +316,8 @@ export class CrossSection {
    * vertices.
    */
   bounds(): Rect;
+
+  // Memory
 
   /**
    * Frees the WASM memory of this CrossSection, since these cannot be
