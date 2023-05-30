@@ -76,7 +76,7 @@ export class CrossSection {
    */
   extrude(
       height: number, nDivisions?: number, twistDegrees?: number,
-      scaleTop?: Vec2, center?: boolean): Manifold;
+      scaleTop?: Vec2|number, center?: boolean): Manifold;
 
   /**
    * Constructs a manifold by revolving this cross-section around its Y-axis and
@@ -388,7 +388,8 @@ export class Manifold {
    */
   static extrude(
       polygons: CrossSection|Polygons, height: number, nDivisions?: number,
-      twistDegrees?: number, scaleTop?: Vec2, center?: boolean): Manifold;
+      twistDegrees?: number, scaleTop?: Vec2|number,
+      center?: boolean): Manifold;
 
   /**
    * Constructs a manifold from a set of polygons/cross-section by revolving

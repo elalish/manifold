@@ -163,10 +163,10 @@ Module.setup = function() {
   Module.CrossSection.prototype.extrude = function(
       height, nDivisions = 0, twistDegrees = 0.0, scaleTop = [1.0, 1.0],
       center = false) {
-    if (scaleTop instanceof Array) scaleTop = {x: scaleTop[0], y: scaleTop[1]};
+    scaleTop = vararg2vec2([scaleTop]);
     const man =
         Module._Extrude(this, height, nDivisions, twistDegrees, scaleTop);
-    return center ? man.translate([0., 0., -height / 2.]) : man;
+    return (center ? man.translate([0., 0., -height / 2.]) : man);
   };
 
   Module.CrossSection.prototype.revolve = function(circularSegments = 0) {
