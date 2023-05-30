@@ -39,10 +39,11 @@ Module.setup = function() {
     const result = [];
     const nPoly = vec.size();
     for (let i = 0; i < nPoly; i++) {
-      const nPts = vec[i].size();
+      const v = vec.get(i);
+      const nPts = v.size();
       const poly = [];
       for (let j = 0; j < nPts; j++) {
-        poly.push(f(vec[i].get(j)));
+        poly.push(f(v.get(j)));
       }
       result.push(poly);
     }
