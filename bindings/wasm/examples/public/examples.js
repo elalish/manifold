@@ -16,10 +16,11 @@ export const examples = {
   functions: {
     Intro: function() {
       // Write code in JavaScript or TypeScript and this editor will show the
-      // API docs. Type e.g. "box." to see the Manifold API. Type "module." to
-      // see the static API - these functions can also be used bare. Use
-      // console.log() to print output (lower-right). This editor defines Z as
-      // up and units of mm.
+      // API docs. Type e.g. "box." to see the Manifold API. Type
+      // "CrossSection." or "Manifold." to list the 2D and 3D constructors,
+      // respectively. Type "module." to see the static API - these functions
+      // can also be used bare. Use console.log() to print output (lower-right).
+      // This editor defines Z as up and units of mm.
       const {cube, sphere} = Manifold;
       const box = cube([100, 100, 100], true);
       const ball = sphere(60, 100);
