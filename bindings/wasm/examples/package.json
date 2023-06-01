@@ -14,17 +14,17 @@
   },
   "dependencies": {
     "@gltf-transform/core": "^3.2.1",
-    "@gltf-transform/functions": "^3.2.1",
     "@gltf-transform/extensions": "^3.2.1",
-    "three": "0.151.2",
+    "@gltf-transform/functions": "^3.2.1",
     "gl-matrix": "^3.4.3",
-    "simple-dropzone": "0.8.3"
+    "simple-dropzone": "0.8.3",
+    "three": "0.151.2"
   },
   "devDependencies": {
-    "@vitest/web-worker": "^0.31.1",
     "@vitest/ui": "^0.31.1",
+    "@vitest/web-worker": "^0.31.1",
+    "typescript": "5.0.4",
     "vite": "^4.3.2",
-    "vitest": "^0.31.1",
-    "typescript": "5.0.4"
+    "vitest": "^0.31.1"
   }
 }
