@@ -168,14 +168,14 @@ export class CrossSection {
    * minimum allowed). See the [Clipper2
    * MiterLimit](http://www.angusj.com/clipper2/Docs/Units/Clipper.Offset/Classes/ClipperOffset/Properties/MiterLimit.htm)
    * page for a visual example.
-   * @param arcTolerance The maximum acceptable imperfection for curves drawn
-   * (approximated with line segments) for Round joins (not relevant for other
-   * JoinTypes). By default (when undefined or =0), the allowable imprecision is
-   * scaled in inverse proportion to the offset delta.
+   * @param circularSegments Number of segments per 360 degrees of
+   * <B>JoinType::Round</B> corners (roughly, the number of vertices that
+   * will be added to each contour). Default is calculated by the static Quality
+   * defaults according to the radius.
    */
   offset(
       delta: number, joinType?: JoinType, miterLimit?: number,
-      arcTolerance?: number): CrossSection;
+      circularSegments?: number): CrossSection;
 
   /**
    * Remove vertices from the contours in this CrossSection that are less than
