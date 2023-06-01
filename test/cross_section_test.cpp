@@ -52,7 +52,8 @@ TEST(CrossSection, MirrorUnion) {
 
 TEST(CrossSection, RoundOffset) {
   auto a = CrossSection::Square({20., 20.}, true);
-  auto rounded = a.Offset(5., CrossSection::JoinType::Round);
+  int segments = 20;
+  auto rounded = a.Offset(5., CrossSection::JoinType::Round, 2, segments);
   auto result = Manifold::Extrude(rounded, 5.);
 
 #ifdef MANIFOLD_EXPORT
@@ -61,7 +62,8 @@ TEST(CrossSection, RoundOffset) {
 #endif
 
   EXPECT_EQ(result.Genus(), 0);
-  EXPECT_NEAR(result.GetProperties().volume, 4393, 1);
+  EXPECT_NEAR(result.GetProperties().volume, 4386, 1);
+  EXPECT_EQ(rounded.NumVert(), segments + 4);
 }
 
 TEST(CrossSection, Empty) {

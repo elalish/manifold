@@ -533,17 +533,28 @@ CrossSection CrossSection::Simplify(double epsilon) const {
  * minimum allowed). See the [Clipper2
  * MiterLimit](http://www.angusj.com/clipper2/Docs/Units/Clipper.Offset/Classes/ClipperOffset/Properties/MiterLimit.htm)
  * page for a visual example.
- * @param arc_tolerance The maximum acceptable imperfection for curves drawn
- * (approximated with line segments) for Round joins (not relevant for other
- * JoinTypes). By default (when undefined or =0), the allowable imprecision is
- * scaled in inverse proportion to the offset delta.
+ * @param circularSegments Number of segments per 360 degrees of
+ * <B>JoinType::Round</B> corners (roughly, the number of vertices that
+ * will be added to each contour). Default is calculated by the static Quality
+ * defaults according to the radius.
  */
 CrossSection CrossSection::Offset(double delta, JoinType jointype,
                                   double miter_limit,
-                                  double arc_tolerance) const {
+                                  int circularSegments) const {
+  double arc_tol = 0.;
+  if (jointype == JoinType::Round) {
+    int n = circularSegments > 2 ? circularSegments
+                                 : Quality::GetCircularSegments(delta);
+    // This calculates tolerance as a function of circular segments and delta
+    // (radius) in order to get back the same number of segments in Clipper2:
+    // steps_per_360 = PI / acos(1 - arc_tol / abs_delta)
+    const double abs_delta = std::fabs(delta);
+    const double scaled_delta = abs_delta * std::pow(10, precision_);
+    arc_tol = (std::cos(Clipper2Lib::PI / n) - 1) * -scaled_delta;
+  }
   auto ps =
       C2::InflatePaths(GetPaths(), delta, jt(jointype), C2::EndType::Polygon,
-                       miter_limit, precision_, arc_tolerance);
+                       miter_limit, precision_, arc_tol);
   return CrossSection(ps);
 }
 

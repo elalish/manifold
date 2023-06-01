@@ -222,7 +222,7 @@ ManifoldCrossSection *manifold_cross_section_simplify(void *mem,
                                                       double epsilon);
 ManifoldCrossSection *manifold_cross_section_offset(
     void *mem, ManifoldCrossSection *cs, double delta, ManifoldJoinType jt,
-    double miter_limit, double arc_tolerance);
+    double miter_limit, int circular_segments);
 
 // CrossSection Info
 
