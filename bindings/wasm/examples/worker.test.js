@@ -90,8 +90,8 @@ suite('Examples', () => {
   test('Intro', async () => {
     const result = await runExample('Intro');
     expect(result.genus).to.equal(5, 'Genus');
-    expect(result.volume).to.be.closeTo(183836, 1, 'Volume');
-    expect(result.surfaceArea).to.be.closeTo(59018, 1, 'Surface Area');
+    expect(result.volume).to.be.closeTo(203164, 1, 'Volume');
+    expect(result.surfaceArea).to.be.closeTo(62046, 1, 'Surface Area');
   });
 
   test('Tetrahedron Puzzle', async () => {
