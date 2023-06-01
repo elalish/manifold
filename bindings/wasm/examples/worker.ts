@@ -66,8 +66,7 @@ const toplevel = [
   'setMinCircularAngle', 'setMinCircularEdgeLength', 'setCircularSegments',
   'getCircularSegments', 'Mesh', 'GLTFNode', 'Manifold', 'CrossSection'
 ];
-const exposedFunctions =
-    toplevelConstructors.concat(toplevel, manifoldStaticFunctions);
+const exposedFunctions = toplevelConstructors.concat(toplevel);
 
 // Setup memory management, such that users don't have to care about
 // calling `delete` manually.
@@ -108,12 +107,6 @@ for (const name of toplevelConstructors) {
     memoryRegistry.push(result);
     return result;
   };
-}
-
-// for backwards compatibility
-for (const name of manifoldStaticFunctions) {
-  //@ts-ignore
-  module[name] = module.Manifold[name];
 }
 
 module.cleanup = function() {
