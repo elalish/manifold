@@ -95,7 +95,7 @@ PYBIND11_MODULE(pymanifold, m) {
       .def(py::self ^ py::self, "Boolean intersection.")
       .def(
           "transform",
-          [](Manifold self, py::array_t<float> &mat) {
+          [](Manifold &self, py::array_t<float> &mat) {
             auto mat_view = mat.unchecked<2>();
             if (mat_view.shape(0) != 3 || mat_view.shape(1) != 4)
               throw std::runtime_error("Invalid matrix shape");
@@ -116,7 +116,7 @@ PYBIND11_MODULE(pymanifold, m) {
           ":param m: The affine transform matrix to apply to all the vertices.")
       .def(
           "translate",
-          [](Manifold self, float x = 0.0f, float y = 0.0f, float z = 0.0f) {
+          [](Manifold &self, float x = 0.0f, float y = 0.0f, float z = 0.0f) {
             return self.Translate(glm::vec3(x, y, z));
           },
           py::arg("x") = 0.0f, py::arg("y") = 0.0f, py::arg("z") = 0.0f,
@@ -128,7 +128,7 @@ PYBIND11_MODULE(pymanifold, m) {
           ":param z: Z axis translation. (default 0.0).")
       .def(
           "translate",
-          [](Manifold self, py::array_t<float> &t) {
+          [](Manifold &self, py::array_t<float> &t) {
             auto t_view = t.unchecked<1>();
             if (t.shape(0) != 3)
               throw std::runtime_error("Invalid vector shape");
@@ -140,8 +140,8 @@ PYBIND11_MODULE(pymanifold, m) {
           "\n\n"
           ":param v: The vector to add to every vertex.")
       .def("scale",
-           static_cast<Manifold (*)(Manifold, float)>(
-               [](Manifold self, float scale) {
+           static_cast<Manifold (*)(Manifold &, float)>(
+               [](Manifold &self, float scale) {
                  return self.Scale(glm::vec3(scale));
                }),
            py::arg("scale"),
@@ -152,7 +152,7 @@ PYBIND11_MODULE(pymanifold, m) {
            "vertices.")
       .def(
           "scale",
-          [](Manifold self, py::array_t<float> &scale) {
+          [](Manifold &self, py::array_t<float> &scale) {
             auto scale_view = scale.unchecked<1>();
             if (scale_view.shape(0) != 3)
               throw std::runtime_error("Invalid vector shape");
@@ -166,7 +166,7 @@ PYBIND11_MODULE(pymanifold, m) {
           ":param v: The vector to multiply every vertex by component.")
       .def(
           "rotate",
-          [](Manifold self, py::array_t<float> &v) {
+          [](Manifold &self, py::array_t<float> &v) {
             auto v_view = v.unchecked<1>();
             if (v_view.shape(0) != 3)
               throw std::runtime_error("Invalid vector shape");
@@ -184,7 +184,7 @@ PYBIND11_MODULE(pymanifold, m) {
           ":param v: [X, Y, Z] rotation in degrees.")
       .def(
           "rotate",
-          [](Manifold self, float xDegrees = 0.0f, float yDegrees = 0.0f,
+          [](Manifold &self, float xDegrees = 0.0f, float yDegrees = 0.0f,
              float zDegrees = 0.0f) {
             return self.Rotate(xDegrees, yDegrees, zDegrees);
           },
@@ -203,7 +203,7 @@ PYBIND11_MODULE(pymanifold, m) {
           ":param z: Z rotation in degrees. (default 0.0).")
       .def(
           "warp",
-          [](Manifold self, const std::function<Float3(Float3)> &f) {
+          [](Manifold &self, const std::function<Float3(Float3)> &f) {
             return self.Warp([&f](glm::vec3 &v) {
               Float3 fv = f(std::make_tuple(v.x, v.y, v.z));
               v.x = std::get<0>(fv);
@@ -213,7 +213,7 @@ PYBIND11_MODULE(pymanifold, m) {
           },
           py::arg("f"))
       .def(
-          "refine", [](Manifold self, int n) { return self.Refine(n); },
+          "refine", [](Manifold &self, int n) { return self.Refine(n); },
           py::arg("n"),
           "Increase the density of the mesh by splitting every edge into n "
           "pieces. For instance, with n = 2, each triangle will be split into "
@@ -254,12 +254,12 @@ PYBIND11_MODULE(pymanifold, m) {
            "first.")
       .def(
           "get_volume",
-          [](Manifold self) { return self.GetProperties().volume; },
+          [](Manifold &self) { return self.GetProperties().volume; },
           "Get the volume of the manifold\n This is clamped to zero for a "
           "given face if they are within the Precision().")
       .def(
           "get_surface_area",
-          [](Manifold self) { return self.GetProperties().surfaceArea; },
+          [](Manifold &self) { return self.GetProperties().surfaceArea; },
           "Get the surface area of the manifold\n This is clamped to zero for "
           "a given face if they are within the Precision().")
       .def("original_id", &Manifold::OriginalID,
@@ -275,7 +275,7 @@ PYBIND11_MODULE(pymanifold, m) {
       .def("is_empty", &Manifold::IsEmpty,
            "Does the Manifold have any triangles?")
       .def(
-          "decompose", [](Manifold self) { return self.Decompose(); },
+          "decompose", [](Manifold &self) { return self.Decompose(); },
           " This operation returns a vector of Manifolds that are "
           "topologically disconnected. If everything is connected, the vector "
           "is length one, containing a copy of the original. It is the inverse "
@@ -286,7 +286,7 @@ PYBIND11_MODULE(pymanifold, m) {
            "is more efficient than doing them separately.")
       .def(
           "split_by_plane",
-          [](Manifold self, Float3 normal, float originOffset) {
+          [](Manifold &self, Float3 normal, float originOffset) {
             return self.SplitByPlane(
                 {std::get<0>(normal), std::get<1>(normal), std::get<2>(normal)},
                 originOffset);
@@ -301,7 +301,7 @@ PYBIND11_MODULE(pymanifold, m) {
           "the direction of the normal vector.")
       .def(
           "trim_by_plane",
-          [](Manifold self, Float3 normal, float originOffset) {
+          [](Manifold &self, Float3 normal, float originOffset) {
             return self.TrimByPlane(
                 {std::get<0>(normal), std::get<1>(normal), std::get<2>(normal)},
                 originOffset);
@@ -315,6 +315,16 @@ PYBIND11_MODULE(pymanifold, m) {
           "vector from the plane.\n"
           "@param originOffset The distance of the plane from the origin in "
           "the direction of the normal vector.")
+      .def_property_readonly(
+          "bounding_box",
+          [](Manifold &self) {
+            auto b = self.BoundingBox();
+            py::tuple box = py::make_tuple(b.min[0], b.min[1], b.min[2],
+                                           b.max[0], b.max[1], b.max[2]);
+            return box;
+          },
+          "Gets the manifold bounding box as a tuple "
+          "(xmin, ymin, zmin, xmax, ymax, zmax).")
       .def_static(
           "smooth", [](const Mesh &mesh) { return Manifold::Smooth(mesh); },
           "Constructs a smooth version of the input mesh by creating tangents; "
@@ -490,7 +500,25 @@ PYBIND11_MODULE(pymanifold, m) {
           "will result in geometrically valid output.\n"
           "\n"
           ":param circularSegments: Number of segments along its diameter. "
-          "Default is calculated by the static Defaults.");
+          "Default is calculated by the static Defaults.")
+      .def_property_readonly(
+          "data",
+          [](PolygonsWrapper &self) {
+            const Polygons &data = *self.polygons;
+            py::list polygon_list;
+            for (int i = 0; i < data.size(); ++i) {
+              py::list polygon;
+              for (int j = 0; j < data[i].size(); ++j) {
+                auto f = data[i][j];
+                py::tuple vertex = py::make_tuple(f[0], f[1]);
+                polygon.append(vertex);
+              }
+              polygon_list.append(polygon);
+            }
+            return polygon_list;
+          },
+          "Returns the vertices of the polygons as a "
+          "List[List[Tuple[float, float]]].");
 
   py::class_<Mesh>(m, "Mesh")
       .def(py::init([](py::array_t<float> &vertPos, py::array_t<int> &triVerts,
