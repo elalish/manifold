@@ -20,7 +20,7 @@ export const examples = {
       // see the static API - these functions can also be used bare. Use
       // console.log() to print output (lower-right). This editor defines Z as
       // up and units of mm.
-
+      const {cube, sphere} = Manifold;
       const box = cube([100, 100, 100], true);
       const ball = sphere(60, 100);
       // You must name your final output "result", or create at least one
@@ -60,7 +60,7 @@ export const examples = {
 
       const scale = edgeLength / (2 * Math.sqrt(2));
 
-      const tet = tetrahedron().scale(scale);
+      const tet = Manifold.tetrahedron().scale(scale);
 
       const box = [];
       box.push([1, -1], [1, 1]);
@@ -81,7 +81,7 @@ export const examples = {
       // channels as colors, and sets the factor to white, since our default is
       // yellow.
       const screw = setMaterial(
-          extrude(box, 1, nDivisions, 270).setProperties(3, fade),
+          Manifold.extrude(box, 1, nDivisions, 270).setProperties(3, fade),
           {baseColorFactor: [1, 1, 1], attributes: ['COLOR_0']});
 
       const result = tet.intersect(
@@ -107,6 +107,7 @@ export const examples = {
       // Demonstrates how at 90-degree intersections, the sphere and cylinder
       // facets match up perfectly, for any choice of global resolution
       // parameters.
+      const {sphere, cylinder, union} = Manifold;
 
       function roundedFrame(edgeLength, radius, circularSegments = 0) {
         const edge = cylinder(edgeLength, radius, -1, circularSegments);
@@ -171,7 +172,7 @@ export const examples = {
         v[2] *= r;
       };
 
-      const ball = sphere(1, 200);
+      const ball = Manifold.sphere(1, 200);
       const heart = ball.warp(func);
       const box = heart.boundingBox();
       const result = heart.scale(100 / (box.max[0] - box.min[0]));
@@ -219,7 +220,7 @@ export const examples = {
       const triVerts = Uint32Array.from(triangles);
       const vertProperties = Float32Array.from(positions);
       const scallop = new Mesh({numProp: 3, triVerts, vertProperties});
-      const result = smooth(scallop, sharpenedEdges).refine(n);
+      const result = Manifold.smooth(scallop, sharpenedEdges).refine(n);
       return result;
     },
 
@@ -259,12 +260,8 @@ export const examples = {
         const m = linearSegments > 2 ? linearSegments :
                                        n * q * majorRadius / threadRadius;
 
-        const circle = [];
-        const dPhi = 2 * 3.14159 / n;
-        const offset = 2;
-        for (let i = 0; i < n; ++i) {
-          circle.push([Math.cos(dPhi * i) + offset, Math.sin(dPhi * i)]);
-        }
+        const offset = 2
+        const circle = CrossSection.circle(1, n).translate([offset, 0]);
 
         const func = (v) => {
           const psi = q * Math.atan2(v[0], v[1]);
@@ -282,14 +279,14 @@ export const examples = {
           vec3.rotateZ(v, v, center, psi);
         };
 
-        let knot = revolve(circle, m).warp(func);
+        let knot = Manifold.revolve(circle, m).warp(func);
 
         if (kLoops > 1) {
           const knots = [];
           for (let k = 0; k < kLoops; ++k) {
             knots.push(knot.rotate([0, 0, 360 * (k / kLoops) * (q / p)]));
           }
-          knot = compose(knots);
+          knot = Manifold.compose(knots);
         }
 
         return knot;
@@ -325,16 +322,18 @@ export const examples = {
       }
 
       function mengerSponge(n) {
-        let result = cube([1, 1, 1], true);
+        let result = Manifold.cube([1, 1, 1], true);
         const holes = [];
         fractal(holes, result, 1.0, [0.0, 0.0], 1, n);
 
-        const hole = compose(holes);
+        const hole = Manifold.compose(holes);
 
-        result = difference(result, hole);
-        result = difference(result, hole.rotate([90, 0, 0]));
-        result = difference(result, hole.rotate([0, 90, 0]));
-
+        result = Manifold.difference(
+            result,
+            hole,
+            hole.rotate([90, 0, 0]),
+            hole.rotate([0, 90, 0]),
+        );
         return result;
       }
 
@@ -363,7 +362,7 @@ export const examples = {
       function base(
           width, radius, decorRadius, twistRadius, nDecor, innerRadius,
           outerRadius, cut, nCut, nDivision) {
-        let b = cylinder(width, radius + twistRadius / 2);
+        let b = Manifold.cylinder(width, radius + twistRadius / 2);
         const circle = [];
         const dPhiDeg = 180 / nDivision;
         for (let i = 0; i < 2 * nDivision; ++i) {
@@ -372,7 +371,7 @@ export const examples = {
             decorRadius * Math.sin(dPhiDeg * i * Math.PI / 180)
           ]);
         }
-        let decor = extrude(circle, width, nDivision, 180)
+        let decor = Manifold.extrude(circle, width, nDivision, 180)
                         .scale([1, 0.5, 1])
                         .translate([0, radius, 0]);
         for (let i = 0; i < nDecor; i++)
@@ -390,8 +389,9 @@ export const examples = {
           stretch.push(vec2.rotate([0, 0], p2, o, dPhiRad * i));
           stretch.push(vec2.rotate([0, 0], p0, o, dPhiRad * i));
         }
-        b = intersection(extrude(stretch, width), b);
-        return b;
+        const result =
+            Manifold.intersection(Manifold.extrude(stretch, width), b);
+        return result;
       }
 
       function stretchyBracelet(
@@ -404,7 +404,7 @@ export const examples = {
         const cut = 0.5 * (Math.PI * 2 * innerRadius / nCut - thickness);
         const adjThickness = 0.5 * thickness * height / cut;
 
-        return difference(
+        return Manifold.difference(
             base(
                 width, radius, decorRadius, twistRadius, nDecor,
                 innerRadius + thickness, outerRadius + adjThickness,
@@ -449,11 +449,12 @@ export const examples = {
           min: vec3.fromValues(-period, -period, -period),
           max: vec3.fromValues(period, period, period)
         };
-        return levelSet(gyroid, box, period / n, level).scale(size / period);
+        return Manifold.levelSet(gyroid, box, period / n, level)
+            .scale(size / period);
       };
 
       function rhombicDodecahedron() {
-        const box = cube([1, 1, 2], true).scale(size * Math.sqrt(2));
+        const box = Manifold.cube([1, 1, 2], true).scale(size * Math.sqrt(2));
         const result =
             box.rotate([90, 45, 0]).intersect(box.rotate([90, 45, 90]));
         return result.intersect(box.rotate([0, 0, 45]));

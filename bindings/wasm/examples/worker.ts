@@ -20,9 +20,9 @@ import Module from './built/manifold';
 //@ts-ignore
 import {setupIO, writeMesh} from './gltf-io';
 import type {GLTFMaterial, Quat} from './public/editor';
-import type {Manifold, ManifoldStatic, Mesh, Vec3} from './public/manifold';
+import type {CrossSection, Manifold, ManifoldToplevel, Mesh, Vec3} from './public/manifold';
 
-interface WorkerStatic extends ManifoldStatic {
+interface WorkerStatic extends ManifoldToplevel {
   GLTFNode: typeof GLTFNode;
   show(manifold: Manifold): Manifold;
   only(manifold: Manifold): Manifold;
@@ -38,6 +38,87 @@ glMatrix.glMatrix.setMatrixArrayType(Array);
 
 const io = setupIO(new WebIO());
 io.registerExtensions(KHRONOS_EXTENSIONS);
+
+// manifold static methods (that return a new manifold)
+const manifoldStaticFunctions = [
+  'cube', 'cylinder', 'sphere', 'tetrahedron', 'extrude', 'revolve', 'compose',
+  'union', 'difference', 'intersection', 'levelSet', 'smooth', 'ofMesh'
+];
+// manifold member functions (that return a new manifold)
+const manifoldMemberFunctions = [
+  'add', 'subtract', 'intersect', 'decompose', 'warp', 'transform', 'translate',
+  'rotate', 'scale', 'mirror', 'refine', 'setProperties', 'asOriginal',
+  'trimByPlane', 'split', 'splitByPlane'
+];
+// CrossSection static methods (that return a new cross-section)
+const crossSectionStaticFunctions = [
+  'square', 'circle', 'union', 'difference', 'intersection', 'compose',
+  'ofPolygons'
+];
+// CrossSection member functions (that return a new cross-section)
+const crossSectionMemberFunctions = [
+  'add', 'subtract', 'intersect', 'rectClip', 'decompose', 'transform',
+  'translate', 'rotate', 'scale', 'mirror', 'simplify', 'offset'
+];
+// top level functions that construct a new manifold/mesh
+const toplevelConstructors = ['show', 'only', 'setMaterial'];
+const toplevel = [
+  'setMinCircularAngle', 'setMinCircularEdgeLength', 'setCircularSegments',
+  'getCircularSegments', 'Mesh', 'GLTFNode', 'Manifold', 'CrossSection'
+];
+const exposedFunctions = toplevelConstructors.concat(toplevel);
+
+// Setup memory management, such that users don't have to care about
+// calling `delete` manually.
+// Note that this only fixes memory leak across different runs: the memory
+// will only be freed when the compilation finishes.
+
+const memoryRegistry = new Array<Manifold|CrossSection>();
+
+function addMembers(
+    className: string, methodNames: Array<string>, areStatic: boolean) {
+  //@ts-ignore
+  const cls = module[className];
+  const obj = areStatic ? cls : cls.prototype;
+  for (const name of methodNames) {
+    if (name != 'cylinder') {
+      const originalFn = obj[name];
+      obj[name] = function(...args: any) {
+        //@ts-ignore
+        const result = originalFn(...args);
+        memoryRegistry.push(result);
+        return result;
+      };
+    }
+  }
+}
+
+addMembers('Manifold', manifoldMemberFunctions, false);
+addMembers('Manifold', manifoldStaticFunctions, true);
+addMembers('CrossSection', crossSectionMemberFunctions, false);
+addMembers('CrossSection', crossSectionStaticFunctions, true);
+
+for (const name of toplevelConstructors) {
+  //@ts-ignore
+  const originalFn = module[name];
+  //@ts-ignore
+  module[name] = function(...args: any) {
+    const result = originalFn(...args);
+    memoryRegistry.push(result);
+    return result;
+  };
+}
+
+module.cleanup = function() {
+  for (const obj of memoryRegistry) {
+    // decompose result is an array of manifolds
+    if (obj instanceof Array)
+      for (const elem of obj) elem.delete();
+    else
+      obj.delete();
+  }
+  memoryRegistry.length = 0;
+};
 
 // Debug setup to show source meshes
 let ghost = false;
@@ -57,21 +138,6 @@ const GHOST = {
   roughness: 1,
   metallic: 0
 } as GLTFMaterial;
-
-function debug(manifold: Manifold, map: Map<number, Mesh>) {
-  const result = manifold.asOriginal();
-  map.set(result.originalID(), result.getMesh());
-  return result;
-};
-
-module.show = (manifold) => {
-  return debug(manifold, shown);
-};
-
-module.only = (manifold) => {
-  ghost = true;
-  return debug(manifold, singles);
-};
 
 const nodes = new Array<GLTFNode>();
 const id2material = new Map<number, GLTFMaterial>();
@@ -118,64 +184,19 @@ module.setMaterial = (manifold: Manifold, material: GLTFMaterial): Manifold => {
   return out;
 };
 
-// manifold member functions that returns a new manifold
-const memberFunctions = [
-  'add', 'subtract', 'intersect', 'trimByPlane', 'refine', 'warp',
-  'setProperties', 'transform', 'translate', 'rotate', 'scale', 'mirror',
-  'asOriginal', 'decompose'
-];
-// top level functions that constructs a new manifold
-const constructors = [
-  'cube', 'cylinder', 'sphere', 'tetrahedron', 'extrude', 'revolve', 'union',
-  'difference', 'intersection', 'compose', 'levelSet', 'smooth', 'show', 'only',
-  'setMaterial'
-];
-const utils = [
-  'setMinCircularAngle', 'setMinCircularEdgeLength', 'setCircularSegments',
-  'getCircularSegments', 'Mesh', 'GLTFNode'
-];
-const exposedFunctions = constructors.concat(utils);
+function debug(manifold: Manifold, map: Map<number, Mesh>) {
+  let result = manifold.asOriginal();
+  map.set(result.originalID(), result.getMesh());
+  return result;
+};
 
-// Setup memory management, such that users don't have to care about
-// calling `delete` manually.
-// Note that this only fixes memory leak across different runs: the memory
-// will only be freed when the compilation finishes.
+module.show = (manifold) => {
+  return debug(manifold, shown);
+};
 
-const manifoldRegistry = new Array<Manifold>();
-for (const name of memberFunctions) {
-  //@ts-ignore
-  const originalFn = module.Manifold.prototype[name];
-  //@ts-ignore
-  module.Manifold.prototype['_' + name] = originalFn;
-  //@ts-ignore
-  module.Manifold.prototype[name] = function(...args: any) {
-    //@ts-ignore
-    const result = this['_' + name](...args);
-    manifoldRegistry.push(result);
-    return result;
-  };
-}
-
-for (const name of constructors) {
-  //@ts-ignore
-  const originalFn = module[name];
-  //@ts-ignore
-  module[name] = function(...args: any) {
-    const result = originalFn(...args);
-    manifoldRegistry.push(result);
-    return result;
-  };
-}
-
-module.cleanup = function() {
-  for (const obj of manifoldRegistry) {
-    // decompose result is an array of manifolds
-    if (obj instanceof Array)
-      for (const elem of obj) elem.delete();
-    else
-      obj.delete();
-  }
-  manifoldRegistry.length = 0;
+module.only = (manifold) => {
+  ghost = true;
+  return debug(manifold, singles);
 };
 
 // Setup complete
