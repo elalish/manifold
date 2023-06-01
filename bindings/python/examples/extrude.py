@@ -18,7 +18,7 @@ def run():
         raise Exception(f"{data_out=} differs from {polygon_points=}")
 
     # extrude a polygon to create a manifold
-    extruded_polygon = polygon.extrude(10.0)
+    extruded_polygon = cross_section.extrude(10.0)
     eps = 0.001
     observed_volume = extruded_polygon.get_volume()
     expected_volume = 10.0
@@ -34,6 +34,8 @@ def run():
     expected_bbox = (0.0, 0.0, 0.0, 1.0, 1.0, 10.0)
     if observed_bbox != expected_bbox:
         raise Exception(f"{observed_bbox=} differs from {expected_bbox=}")
+
+    return extruded_polygon
 
 
 if __name__ == "__main__":

@@ -32,12 +32,11 @@ if __name__ == "__main__":
         module = importlib.import_module(f)
         t0 = time()
         model = module.run()
-        if model is not None:
-            mesh = model.to_mesh()
-            if export_models:
-                meshOut = trimesh.Trimesh(
-                    vertices=mesh.vert_pos, faces=mesh.tri_verts)
-                trimesh.exchange.export.export_mesh(meshOut, f'{f}.glb', 'glb')
-                print(f'Exported model to {f}.glb')
+        mesh = model.to_mesh()
+        if export_models:
+            meshOut = trimesh.Trimesh(
+                vertices=mesh.vert_pos, faces=mesh.tri_verts)
+            trimesh.exchange.export.export_mesh(meshOut, f'{f}.glb', 'glb')
+            print(f'Exported model to {f}.glb')
         t1 = time()
         print(f'Took {(t1-t0)*1000:.1f}ms for {f}')
