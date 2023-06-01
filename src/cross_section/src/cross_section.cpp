@@ -540,10 +540,20 @@ CrossSection CrossSection::Simplify(double epsilon) const {
  */
 CrossSection CrossSection::Offset(double delta, JoinType jointype,
                                   double miter_limit,
-                                  double arc_tolerance) const {
+                                  int circularSegments) const {
+  double tol = 0.;
+  if (jointype == JoinType::Round) {
+    int n = circularSegments > 2 ? circularSegments
+                                 : Quality::GetCircularSegments(delta);
+    // This calculates tolerance as a function of circular segments and delta
+    // (radius) in order to get back the same number of segments in Clipper2:
+    // steps_per_360 = PI / acos(1 - arc_tol / abs_delta)
+    double scaled_delta = std::abs(delta * std::pow(10, precision_));
+    tol = (std::cos(Clipper2Lib::PI / n) - 1) * -scaled_delta;
+  }
   auto ps =
       C2::InflatePaths(GetPaths(), delta, jt(jointype), C2::EndType::Polygon,
-                       miter_limit, precision_, arc_tolerance);
+                       miter_limit, precision_, tol);
   return CrossSection(ps);
 }
 

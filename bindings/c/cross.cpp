@@ -169,9 +169,9 @@ ManifoldCrossSection *manifold_cross_section_simplify(void *mem,
 
 ManifoldCrossSection *manifold_cross_section_offset(
     void *mem, ManifoldCrossSection *cs, double delta, ManifoldJoinType jt,
-    double miter_limit, double arc_tolerance) {
+    double miter_limit, int circular_segments) {
   auto offset =
-      from_c(cs)->Offset(delta, from_c(jt), miter_limit, arc_tolerance);
+      from_c(cs)->Offset(delta, from_c(jt), miter_limit, circular_segments);
   return to_c(new (mem) CrossSection(offset));
 }
 
