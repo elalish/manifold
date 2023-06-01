@@ -20,11 +20,8 @@ export const examples = {
       // see the static API - these functions can also be used bare. Use
       // console.log() to print output (lower-right). This editor defines Z as
       // up and units of mm.
-      const {sphere} = Manifold;
-      const {square} = CrossSection;
-      const box = square([70, 70], true)
-                      .offset(15, 'Round')
-                      .extrude(100, 0, 0, [1, 1], true);
+      const {cube, sphere} = Manifold;
+      const box = cube([100, 100, 100], true);
       const ball = sphere(60, 100);
       // You must name your final output "result", or create at least one
       // GLTFNode - see Menger Sponge and Gyroid Module examples.
@@ -263,8 +260,8 @@ export const examples = {
         const m = linearSegments > 2 ? linearSegments :
                                        n * q * majorRadius / threadRadius;
 
-        const offset = 2.
-        const circle = CrossSection.circle(1., n).translate([offset, 0.]);
+        const offset = 2
+        const circle = CrossSection.circle(1, n).translate([offset, 0]);
 
         const func = (v) => {
           const psi = q * Math.atan2(v[0], v[1]);
