@@ -19,4 +19,5 @@ public class MatrixTransforms extends Pointer {
     public static native @ByVal DoubleMat4x3 Translate(@ByRef DoubleMat4x3 mat, @ByRef DoubleVec3 vec);
 
     public static native @ByVal DoubleMat4x3 Transform(@ByRef DoubleMat4x3 mat1, @ByRef DoubleMat4x3 mat2);
+    public static native @ByVal DoubleMat4x3 InvertTransform(@ByRef DoubleMat4x3 mat);
 }

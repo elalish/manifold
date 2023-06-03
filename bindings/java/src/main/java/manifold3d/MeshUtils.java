@@ -3,7 +3,10 @@ package manifold3d;
 import org.bytedeco.javacpp.*;
 import org.bytedeco.javacpp.annotation.*;
 
+import manifold3d.manifold.CrossSectionVector;
 import manifold3d.glm.DoubleVec3Vector;
+import manifold3d.glm.DoubleMat4x3Vector;
+import manifold3d.glm.DoubleMat4x3Vector;
 import manifold3d.UIntVecVector;
 
 import manifold3d.Manifold;
@@ -16,7 +19,6 @@ public class MeshUtils extends Pointer {
 
     public MeshUtils() { }
 
-    //public static native @ByVal Manifold Polyhedron(@ByRef DoubleVec3Vector vertices, @ByRef UIntVecVector faces);
     public static native @ByVal Manifold Polyhedron(DoublePointer vertices, @Cast("std::size_t") long nVertices, IntPointer faceBuf, IntPointer faceLengths, @Cast("std::size_t") long nFaces);
     public static Manifold PolyhedronFromBuffers(DoubleBuffer vertices, long nVertices, IntBuffer faceBuf, IntBuffer faceLengths, long nFaces) {
 
@@ -26,4 +28,6 @@ public class MeshUtils extends Pointer {
 
         return Polyhedron(verticesPtr, nVertices, faceBufPtr, lengthsPtr, nFaces);
     }
+
+    public static native @ByVal Manifold Loft(@ByRef CrossSectionVector sections, @ByRef DoubleMat4x3Vector transforms);
 }

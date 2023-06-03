@@ -4,7 +4,9 @@
 #include <vector>
 #include "polygon.h"
 #include "manifold.h"
+#include "cross_section.h"
 #include "buffer_utils.hpp"
+#include "matrix_transforms.hpp"
 
 namespace MeshUtils {
 
@@ -50,7 +52,7 @@ std::vector<glm::ivec3> TriangulateFaces(const std::vector<glm::vec3>& vertices,
 
 manifold::Manifold Polyhedron(const std::vector<glm::vec3>& vertices, const std::vector<std::vector<uint32_t>>& faces) {
     manifold::Mesh mesh;
-    mesh.triVerts = TriangulateFaces(vertices, faces, 0.0001);
+    mesh.triVerts = TriangulateFaces(vertices, faces, -1.0);
     mesh.vertPos = vertices;
 
     return manifold::Manifold(mesh);
@@ -72,6 +74,77 @@ manifold::Manifold Polyhedron(double* vertices, std::size_t nVertices, int* face
     }
 
     return Polyhedron(verts, faces);
+}
+
+manifold::Manifold Loft(const std::vector<manifold::CrossSection>& sections, const std::vector<glm::mat4x3>& transforms) {
+    std::vector<glm::vec3> vertPos;
+    std::vector<glm::ivec3> triVerts;
+
+    if (sections.size() != transforms.size()) {
+        throw std::runtime_error("Mismatched number of sections and transforms");
+    }
+
+    std::size_t offset = 0;
+    std::size_t nVerticesInEachSection = 0;
+
+    for (std::size_t i = 0; i < sections.size(); ++i) {
+        const auto& polygons = sections[i].ToPolygons();
+        glm::mat4x3 transform = transforms[i];
+
+        for (const auto& polygon : polygons) {
+            for (const glm::vec2& vertex : polygon) {
+                glm::vec3 translatedVertex = MatrixTransforms::Translate(transform, glm::vec3(vertex.x, vertex.y, 0))[3];
+                vertPos.push_back(translatedVertex);
+            }
+        }
+
+        if (i == 0) {
+            nVerticesInEachSection = vertPos.size();
+        }
+
+        if (i < sections.size() - 1) {
+            std::size_t currentOffset = offset;
+            std::size_t nextOffset = offset + nVerticesInEachSection;
+
+            for (std::size_t j = 0; j < polygons.size(); ++j) {
+                const auto& polygon = polygons[j];
+
+                for (std::size_t k = 0; k < polygon.size(); ++k) {
+                    std::size_t nextIndex = (k + 1) % polygon.size();
+
+                    glm::ivec3 triangle1(currentOffset + k, currentOffset + nextIndex, nextOffset + k);
+                    glm::ivec3 triangle2(currentOffset + nextIndex, nextOffset + nextIndex, nextOffset + k);
+
+                    triVerts.push_back(triangle1);
+                    triVerts.push_back(triangle2);
+                }
+                currentOffset += polygon.size();
+                nextOffset += polygon.size();
+            }
+        }
+
+        offset += nVerticesInEachSection;
+    }
+
+    auto frontPolygons = sections.front().ToPolygons();
+    auto frontTriangles = manifold::Triangulate(frontPolygons, -1.0);
+    for (auto& tri : frontTriangles) {
+        triVerts.push_back({tri.z, tri.y, tri.x});
+    }
+
+    auto backPolygons = sections.back().ToPolygons();
+    auto backTriangles = manifold::Triangulate(backPolygons, -1.0);
+    for (auto& triangle : backTriangles) {
+        triangle.x += offset - nVerticesInEachSection;
+        triangle.y += offset - nVerticesInEachSection;
+        triangle.z += offset - nVerticesInEachSection;
+        triVerts.push_back(triangle);
+    }
+
+    manifold::Mesh mesh;
+    mesh.triVerts = triVerts;
+    mesh.vertPos = vertPos;
+    return manifold::Manifold(mesh);
 }
 
 }

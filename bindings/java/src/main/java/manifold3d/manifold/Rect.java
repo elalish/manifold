@@ -7,7 +7,7 @@ import manifold3d.glm.DoubleVec2;
 import manifold3d.glm.DoubleMat3x2;
 import manifold3d.manifold.CrossSection;
 
-@Platform(include = "cross_section.h")
+@Platform(include = "cross_section.h", link = { "manifold" })
 @Namespace("manifold")
 public class Rect extends Pointer {
     static { Loader.load(); }

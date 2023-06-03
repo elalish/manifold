@@ -42,6 +42,20 @@ glm::mat4x3 Rotate(const glm::mat4x3& m, const glm::vec3& axis, float a) {
     return glm::mat4x3(d[0], d[1], d[2], m[3]);
 }
 
+glm::mat4x3 InvertRotate(const glm::mat4x3& m, const glm::vec3& angles) {
+    glm::mat4x3 res = m;
+    if (angles[2] != 0) {
+        res = Roll(res, -angles[2]);
+    }
+    if (angles[1] != 0) {
+        res = Yaw(res, -angles[1]);
+    }
+    if (angles[0] != 0) {
+        res = Pitch(res, -angles[0]);
+    }
+    return res;
+}
+
 glm::mat4x3 Rotate(const glm::mat4x3& m, const glm::vec3& angles) {
     glm::mat4x3 res = m;
     if (angles[0] != 0) {
@@ -104,6 +118,17 @@ glm::mat4x3 Transform(const glm::mat4x3& a, const glm::mat4x3& b) {
     }
 
     return result;
+}
+
+glm::mat4x3 InvertTransform(const glm::mat4x3& m) {
+
+  glm::mat3x3 rotationPart = glm::mat3x3(m);
+  glm::mat3x3 unRotated = SetRotation(m, glm::transpose(rotationPart));
+
+  glm::vec3 translation = -m[3];
+  glm::mat4x3 result = Translate(unRotated, translation);
+
+  return result;
 }
 
 }

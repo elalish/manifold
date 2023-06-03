@@ -4,11 +4,36 @@ import manifold3d.pub.SimplePolygon;
 import org.bytedeco.javacpp.*;
 import org.bytedeco.javacpp.annotation.*;
 
+import java.util.Iterator;
+import java.lang.Iterable;
+import java.util.NoSuchElementException;
+
 @Platform(include = "manifold.h")
 @Namespace("manifold")
 @Name("Polygons")
-public class Polygons extends Pointer {
+public class Polygons extends Pointer implements Iterable<SimplePolygon> {
     static { Loader.load(); }
+
+    @Override
+    public Iterator<SimplePolygon> iterator() {
+        return new Iterator<SimplePolygon>() {
+
+            private long index = 0;
+
+            @Override
+            public boolean hasNext() {
+                return index < size();
+            }
+
+            @Override
+            public SimplePolygon next() {
+                if (!hasNext()) {
+                    throw new NoSuchElementException();
+                }
+                return get(index++);
+            }
+        };
+    }
 
     public Polygons() { allocate(); }
     private native void allocate();
