@@ -27,10 +27,6 @@ using namespace manifold;
 typedef std::tuple<float, float> Float2;
 typedef std::tuple<float, float, float> Float3;
 
-struct PolygonsWrapper {
-  std::unique_ptr<Polygons> polygons;
-};
-
 PYBIND11_MODULE(pymanifold, m) {
   m.doc() =
       "Python binding for the manifold library. Please check the C++ "
@@ -446,80 +442,6 @@ PYBIND11_MODULE(pymanifold, m) {
                   "marking sets of triangles that can be looked up after "
                   "further operations. Assign to MeshGL.runOriginalID vector");
 
-  py::class_<PolygonsWrapper>(m, "Polygons")
-      .def(py::init([](std::vector<std::vector<Float2>> &polygons) {
-             std::vector<SimplePolygon> simplePolygons(polygons.size());
-             for (int i = 0; i < polygons.size(); i++) {
-               std::vector<glm::vec2> vertices(polygons[i].size());
-               for (int j = 0; j < polygons[i].size(); j++) {
-                 vertices[j] = {std::get<0>(polygons[i][j]),
-                                std::get<1>(polygons[i][j])};
-               }
-               simplePolygons[i] = {vertices};
-             }
-             return PolygonsWrapper{std::make_unique<Polygons>(simplePolygons)};
-           }),
-           py::arg("polygons"),
-           "Construct the Polygons object from a list of simple polygon, "
-           "where each simple polygon is a list of points (pair of floats).")
-      .def(
-          "extrude",
-          [](PolygonsWrapper &self, float height, int nDivisions = 0,
-             float twistDegrees = 0.0f,
-             Float2 scaleTop = std::make_tuple(1.0f, 1.0f)) {
-            glm::vec2 scaleTopVec(std::get<0>(scaleTop), std::get<1>(scaleTop));
-            return Manifold::Extrude(*self.polygons, height, nDivisions,
-                                     twistDegrees, scaleTopVec);
-          },
-          py::arg("height"), py::arg("n_divisions") = 0,
-          py::arg("twist_degrees") = 0.0f,
-          py::arg("scale_top") = std::make_tuple(1.0f, 1.0f),
-          "Constructs a manifold from the set of polygons by extruding them "
-          "along the Z-axis.\n"
-          "\n"
-          ":param height: Z-extent of extrusion.\n"
-          ":param nDivisions: Number of extra copies of the crossSection to "
-          "insert into the shape vertically; especially useful in combination "
-          "with twistDegrees to avoid interpolation artifacts. Default is "
-          "none.\n"
-          ":param twistDegrees: Amount to twist the top crossSection relative "
-          "to the bottom, interpolated linearly for the divisions in between.\n"
-          ":param scaleTop: Amount to scale the top (independently in X and "
-          "Y). If the scale is (0, 0), a pure cone is formed with only a "
-          "single vertex at the top. Default (1, 1).")
-      .def(
-          "revolve",
-          [](PolygonsWrapper &self, int circularSegments = 0) {
-            return Manifold::Revolve(*self.polygons, circularSegments);
-          },
-          py::arg("circular_segments") = 0,
-          "Constructs a manifold from the set of polygons by revolving this "
-          "cross-section around its Y-axis and then setting this as the Z-axis "
-          "of the resulting manifold. If the polygons cross the Y-axis, only "
-          "the part on the positive X side is used. Geometrically valid input "
-          "will result in geometrically valid output.\n"
-          "\n"
-          ":param circularSegments: Number of segments along its diameter. "
-          "Default is calculated by the static Defaults.")
-      .def_property_readonly(
-          "data",
-          [](PolygonsWrapper &self) {
-            const Polygons &data = *self.polygons;
-            py::list polygon_list;
-            for (int i = 0; i < data.size(); ++i) {
-              py::list polygon;
-              for (int j = 0; j < data[i].size(); ++j) {
-                auto f = data[i][j];
-                py::tuple vertex = py::make_tuple(f[0], f[1]);
-                polygon.append(vertex);
-              }
-              polygon_list.append(polygon);
-            }
-            return polygon_list;
-          },
-          "Returns the vertices of the polygons as a "
-          "List[List[Tuple[float, float]]].");
-
   py::class_<Mesh>(m, "Mesh")
       .def(py::init([](py::array_t<float> &vertPos, py::array_t<int> &triVerts,
                        py::array_t<float> &vertNormal,
@@ -653,10 +575,20 @@ PYBIND11_MODULE(pymanifold, m) {
       "for polygon clipping (boolean) and offsetting operations.")
       .def(py::init<>())
       .def(py::init(
-               [](PolygonsWrapper &contours, CrossSection::FillRule fillrule) {
-                 return CrossSection(*contours.polygons, fillrule);
+               [](std::vector<std::vector<Float2>> &polygons,
+                      CrossSection::FillRule fillrule) {
+                 std::vector<SimplePolygon> simplePolygons(polygons.size());
+                 for (int i = 0; i < polygons.size(); i++) {
+                   std::vector<glm::vec2> vertices(polygons[i].size());
+                   for (int j = 0; j < polygons[i].size(); j++) {
+                     vertices[j] = {std::get<0>(polygons[i][j]),
+                                    std::get<1>(polygons[i][j])};
+                   }
+                   simplePolygons[i] = {vertices};
+                 }
+                 return CrossSection(simplePolygons, fillrule);
                }),
-           py::arg("contours"),
+           py::arg("polygons"),
            py::arg("fillrule") = CrossSection::FillRule::Positive)
       .def("area", &CrossSection::Area)
       .def("num_vert", &CrossSection::NumVert)
@@ -708,9 +640,21 @@ PYBIND11_MODULE(pymanifold, m) {
       .def("decompose", &CrossSection::Decompose)
       .def("to_polygons",
            [](CrossSection self) {
-             return PolygonsWrapper{
-                 std::make_unique<Polygons>(self.ToPolygons())};
-           })
+             const Polygons &data = self.ToPolygons();
+             py::list polygon_list;
+             for (int i = 0; i < data.size(); ++i) {
+               py::list polygon;
+               for (int j = 0; j < data[i].size(); ++j) {
+                 auto f = data[i][j];
+                 py::tuple vertex = py::make_tuple(f[0], f[1]);
+                 polygon.append(vertex);
+               }
+               polygon_list.append(polygon);
+             }
+             return polygon_list;
+          },
+          "Returns the vertices of the cross-section's polygons as a "
+          "List[List[Tuple[float, float]]].")
       .def(
           "extrude",
           [](CrossSection self, float height, int nDivisions = 0,

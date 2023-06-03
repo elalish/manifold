@@ -1,21 +1,17 @@
-from pymanifold import Polygons, CrossSection
+from pymanifold import CrossSection
 
 
 def run():
     # create a polygon
     polygon_points = [(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0)]
     polygons_points = [polygon_points]
-    polygon = Polygons(polygons_points)
-    data = polygon.data
-    if data != polygons_points:
-        raise Exception(f"{data=} differs from {polygons_points=}")
 
     # create a cross-section
-    cross_section = CrossSection(polygon)
-    polygon_out = cross_section.to_polygons()
-    data_out = polygon_out.data[0]
-    if set(data_out) != set(polygon_points):
-        raise Exception(f"{data_out=} differs from {polygon_points=}")
+    cross_section = CrossSection(polygons_points)
+    polygons = cross_section.to_polygons()
+    polygon = polygons[0]
+    if set(polygon) != set(polygon_points):
+        raise Exception(f"{polygon=} differs from {polygon_points=}")
 
     # extrude a polygon to create a manifold
     extruded_polygon = cross_section.extrude(10.0)
