@@ -574,22 +574,19 @@ PYBIND11_MODULE(pymanifold, m) {
       "[Clipper2](http://www.angusj.com/clipper2/Docs/Overview.htm) library "
       "for polygon clipping (boolean) and offsetting operations.")
       .def(py::init<>())
-      .def(py::init(
-               [](std::vector<std::vector<Float2>> &polygons,
-                      CrossSection::FillRule fillrule) {
-                 std::vector<SimplePolygon> simplePolygons(polygons.size());
-                 for (int i = 0; i < polygons.size(); i++) {
-                   std::vector<glm::vec2> vertices(polygons[i].size());
-                   for (int j = 0; j < polygons[i].size(); j++) {
-                     vertices[j] = {std::get<0>(polygons[i][j]),
-                                    std::get<1>(polygons[i][j])};
-                   }
-                   simplePolygons[i] = {vertices};
-                 }
-                 return CrossSection(simplePolygons, fillrule);
-               }),
-           py::arg("polygons"),
-           py::arg("fillrule") = CrossSection::FillRule::Positive)
+      .def(py::init([](std::vector<std::vector<Float2>> &polygons,
+                       CrossSection::FillRule fillrule) {
+             std::vector<SimplePolygon> simplePolygons(polygons.size());
+             for (int i = 0; i < polygons.size(); i++) {
+               std::vector<glm::vec2> vertices(polygons[i].size());
+               for (int j = 0; j < polygons[i].size(); j++) {
+                 vertices[j] = {std::get<0>(polygons[i][j]),
+                                std::get<1>(polygons[i][j])};
+               }
+               simplePolygons[i] = {vertices};
+             }
+             return CrossSection(simplePolygons, fillrule);
+           }),
       .def("area", &CrossSection::Area)
       .def("num_vert", &CrossSection::NumVert)
       .def("num_contour", &CrossSection::NumContour)
