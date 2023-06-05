@@ -128,7 +128,7 @@ class CrossSection {
   };
 
   CrossSection Offset(double delta, JoinType jt, double miter_limit = 2.0,
-                      double arc_tolerance = 0.0) const;
+                      int circularSegments = 0) const;
   ///@}
 
   /** @name Boolean

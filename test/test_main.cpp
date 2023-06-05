@@ -211,26 +211,23 @@ MeshGL WithIndexColors(const Mesh& in) {
 }
 
 MeshGL WithPositionColors(const Manifold& in) {
-  MeshGL inGL = in.GetMeshGL();
-  inGL.runIndex.clear();
-  inGL.runOriginalID.clear();
-  inGL.runTransform.clear();
-  inGL.faceID.clear();
-  inGL.runOriginalID = {Manifold::ReserveIDs(1)};
-  const int numVert = in.NumVert();
   const Box bbox = in.BoundingBox();
   const glm::vec3 size = bbox.Size();
-  const std::vector<float> oldProp = inGL.vertProperties;
-  inGL.numProp = 6;
-  inGL.vertProperties.resize(6 * numVert);
-  for (int i = 0; i < numVert; ++i) {
-    for (int j : {0, 1, 2}) inGL.vertProperties[6 * i + j] = oldProp[3 * i + j];
-    // vertex colors
-    inGL.vertProperties[6 * i + 3] = (oldProp[3 * i] - bbox.min.x) / size.x;
-    inGL.vertProperties[6 * i + 4] = (oldProp[3 * i + 1] - bbox.min.y) / size.y;
-    inGL.vertProperties[6 * i + 5] = (oldProp[3 * i + 2] - bbox.min.z) / size.z;
-  }
-  return inGL;
+
+  Manifold out = in.SetProperties(
+      3, [bbox, size](float* prop, glm::vec3 pos, const float* oldProp) {
+        for (int i : {0, 1, 2}) {
+          prop[i] = (pos[i] - bbox.min[i]) / size[i];
+        }
+      });
+
+  MeshGL outGL = out.GetMeshGL();
+  outGL.runIndex.clear();
+  outGL.runOriginalID.clear();
+  outGL.runTransform.clear();
+  outGL.faceID.clear();
+  outGL.runOriginalID = {Manifold::ReserveIDs(1)};
+  return outGL;
 }
 
 MeshGL WithNormals(const Manifold& in) {

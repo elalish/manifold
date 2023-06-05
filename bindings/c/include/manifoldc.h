@@ -222,7 +222,7 @@ ManifoldCrossSection *manifold_cross_section_simplify(void *mem,
                                                       double epsilon);
 ManifoldCrossSection *manifold_cross_section_offset(
     void *mem, ManifoldCrossSection *cs, double delta, ManifoldJoinType jt,
-    double miter_limit, double arc_tolerance);
+    double miter_limit, int circular_segments);
 
 // CrossSection Info
 
@@ -310,7 +310,45 @@ float *manifold_meshgl_run_transform(void *mem, ManifoldMeshGL *m);
 uint32_t *manifold_meshgl_face_id(void *mem, ManifoldMeshGL *m);
 float *manifold_meshgl_halfedge_tangent(void *mem, ManifoldMeshGL *m);
 
+// memory size
+size_t manifold_manifold_size();
+size_t manifold_manifold_vec_size();
+size_t manifold_cross_section_size();
+size_t manifold_cross_section_vec_size();
+size_t manifold_simple_polygon_size();
+size_t manifold_polygons_size();
+size_t manifold_manifold_pair_size();
+size_t manifold_meshgl_size();
+size_t manifold_box_size();
+size_t manifold_rect_size();
+size_t manifold_curvature_size();
+
+// destruction
+void manifold_destruct_manifold(ManifoldManifold *m);
+void manifold_destruct_manifold_vec(ManifoldManifoldVec *ms);
+void manifold_destruct_cross_section(ManifoldCrossSection *m);
+void manifold_destruct_cross_section_vec(ManifoldCrossSectionVec *csv);
+void manifold_destruct_simple_polygon(ManifoldSimplePolygon *p);
+void manifold_destruct_polygons(ManifoldPolygons *p);
+void manifold_destruct_meshgl(ManifoldMeshGL *m);
+void manifold_destruct_box(ManifoldBox *b);
+void manifold_destruct_rect(ManifoldRect *b);
+void manifold_destruct_curvature(ManifoldCurvature *c);
+
+// pointer free + destruction
+void manifold_delete_manifold(ManifoldManifold *m);
+void manifold_delete_manifold_vec(ManifoldManifoldVec *ms);
+void manifold_delete_cross_section(ManifoldCrossSection *cs);
+void manifold_delete_cross_section_vec(ManifoldCrossSectionVec *csv);
+void manifold_delete_simple_polygon(ManifoldSimplePolygon *p);
+void manifold_delete_polygons(ManifoldPolygons *p);
+void manifold_delete_meshgl(ManifoldMeshGL *m);
+void manifold_delete_box(ManifoldBox *b);
+void manifold_delete_rect(ManifoldRect *b);
+void manifold_delete_curvature(ManifoldCurvature *c);
+
 // MeshIO / Export
+#ifdef MANIFOLD_EXPORT
 ManifoldMaterial *manifold_material(void *mem);
 void manifold_material_set_roughness(ManifoldMaterial *mat, float roughness);
 void manifold_material_set_metalness(ManifoldMaterial *mat, float metalness);
@@ -324,49 +362,18 @@ void manifold_export_options_set_material(ManifoldExportOptions *options,
                                           ManifoldMaterial *mat);
 void manifold_export_meshgl(const char *filename, ManifoldMeshGL *mesh,
                             ManifoldExportOptions *options);
+ManifoldMeshGL *manifold_import_meshgl(void *mem, const char *filename,
+                                       int force_cleanup);
 
-// memory size
-size_t manifold_manifold_size();
-size_t manifold_manifold_vec_size();
-size_t manifold_cross_section_size();
-size_t manifold_cross_section_vec_size();
-size_t manifold_simple_polygon_size();
-size_t manifold_polygons_size();
-size_t manifold_manifold_pair_size();
-size_t manifold_meshgl_size();
-size_t manifold_box_size();
-size_t manifold_rect_size();
-size_t manifold_curvature_size();
 size_t manifold_material_size();
 size_t manifold_export_options_size();
 
-// destruction
-void manifold_destruct_manifold(ManifoldManifold *m);
-void manifold_destruct_manifold_vec(ManifoldManifoldVec *ms);
-void manifold_destruct_cross_section(ManifoldCrossSection *m);
-void manifold_destruct_cross_section_vec(ManifoldCrossSectionVec *csv);
-void manifold_destruct_simple_polygon(ManifoldSimplePolygon *p);
-void manifold_destruct_polygons(ManifoldPolygons *p);
-void manifold_destruct_meshgl(ManifoldMeshGL *m);
-void manifold_destruct_box(ManifoldBox *b);
-void manifold_destruct_rect(ManifoldRect *b);
-void manifold_destruct_curvature(ManifoldCurvature *c);
 void manifold_destruct_material(ManifoldMaterial *m);
 void manifold_destruct_export_options(ManifoldExportOptions *options);
 
-// pointer free + destruction
-void manifold_delete_manifold(ManifoldManifold *m);
-void manifold_delete_manifold_vec(ManifoldManifoldVec *ms);
-void manifold_delete_cross_section(ManifoldCrossSection *cs);
-void manifold_delete_cross_section_vec(ManifoldCrossSectionVec *csv);
-void manifold_delete_simple_polygon(ManifoldSimplePolygon *p);
-void manifold_delete_polygons(ManifoldPolygons *p);
-void manifold_delete_meshgl(ManifoldMeshGL *m);
-void manifold_delete_box(ManifoldBox *b);
-void manifold_delete_rect(ManifoldRect *b);
-void manifold_delete_curvature(ManifoldCurvature *c);
 void manifold_delete_material(ManifoldMaterial *m);
 void manifold_delete_export_options(ManifoldExportOptions *options);
+#endif
 
 #ifdef __cplusplus
 }

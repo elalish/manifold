@@ -2,7 +2,6 @@
 #include <cross_section.h>
 #include <manifold.h>
 #include <manifoldc.h>
-#include <meshIO.h>
 #include <public.h>
 #include <sdf.h>
 
@@ -12,9 +11,12 @@
 #include "cross.cpp"
 #include "include/conv.h"
 #include "include/types.h"
-#include "meshio.cpp"
 #include "rect.cpp"
 #include "types.h"
+
+#ifdef MANIFOLD_EXPORT
+#include "meshio.cpp"
+#endif
 
 using namespace manifold;
 

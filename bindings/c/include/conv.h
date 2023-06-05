@@ -1,6 +1,5 @@
 #pragma once
 #include <manifold.h>
-#include <meshIO.h>
 #include <public.h>
 #include <sdf.h>
 #include <types.h>
@@ -24,8 +23,6 @@ ManifoldBox *to_c(manifold::Box *m);
 ManifoldRect *to_c(manifold::Rect *m);
 ManifoldCurvature *to_c(manifold::Curvature *m);
 ManifoldError to_c(manifold::Manifold::Error error);
-ManifoldMaterial *to_c(manifold::Material *m);
-ManifoldExportOptions *to_c(manifold::ExportOptions *m);
 ManifoldVec2 to_c(glm::vec2 v);
 ManifoldVec3 to_c(glm::vec3 v);
 ManifoldIVec3 to_c(glm::ivec3 v);
@@ -45,8 +42,6 @@ CrossSection::JoinType from_c(ManifoldJoinType jt);
 const manifold::Box *from_c(ManifoldBox *m);
 const manifold::Rect *from_c(ManifoldRect *r);
 const manifold::Curvature *from_c(ManifoldCurvature *m);
-manifold::Material *from_c(ManifoldMaterial *mat);
-manifold::ExportOptions *from_c(ManifoldExportOptions *options);
 glm::vec2 from_c(ManifoldVec2 v);
 glm::vec3 from_c(ManifoldVec3 v);
 glm::ivec3 from_c(ManifoldIVec3 v);

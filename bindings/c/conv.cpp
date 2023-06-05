@@ -1,6 +1,5 @@
 #include <conv.h>
 #include <manifold.h>
-#include <meshIO.h>
 #include <sdf.h>
 
 #include <vector>
@@ -111,14 +110,6 @@ ManifoldRect *to_c(manifold::Rect *m) {
   return reinterpret_cast<ManifoldRect *>(m);
 }
 
-ManifoldMaterial *to_c(manifold::Material *m) {
-  return reinterpret_cast<ManifoldMaterial *>(m);
-}
-
-ManifoldExportOptions *to_c(manifold::ExportOptions *m) {
-  return reinterpret_cast<ManifoldExportOptions *>(m);
-}
-
 ManifoldVec2 to_c(glm::vec2 v) { return {v.x, v.y}; }
 
 ManifoldVec3 to_c(glm::vec3 v) { return {v.x, v.y, v.z}; }
@@ -219,14 +210,6 @@ const manifold::Box *from_c(ManifoldBox *m) {
 
 const manifold::Rect *from_c(ManifoldRect *m) {
   return reinterpret_cast<manifold::Rect const *>(m);
-}
-
-manifold::Material *from_c(ManifoldMaterial *mat) {
-  return reinterpret_cast<manifold::Material *>(mat);
-}
-
-manifold::ExportOptions *from_c(ManifoldExportOptions *options) {
-  return reinterpret_cast<manifold::ExportOptions *>(options);
 }
 
 glm::vec2 from_c(ManifoldVec2 v) { return glm::vec2(v.x, v.y); }

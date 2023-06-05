@@ -14,206 +14,17 @@
 
 #include <emscripten/bind.h>
 #include <emscripten/val.h>
-
-#include <vector>
-
-using namespace emscripten;
-
 #include <manifold.h>
-#include <cross_section.h>
 #include <polygon.h>
 #include <sdf.h>
 
+#include <vector>
+
+#include "cross_section.h"
+#include "helpers.cpp"
+
+using namespace emscripten;
 using namespace manifold;
-
-Manifold Union(const Manifold& a, const Manifold& b) { return a + b; }
-CrossSection UnionCrossSection(const CrossSection& a, const CrossSection& b) { return a + b; }
-
-Manifold Difference(const Manifold& a, const Manifold& b) { return a - b; }
-CrossSection DifferenceCrossSection(const CrossSection& a, const CrossSection& b) { return a - b; }
-
-Manifold Intersection(const Manifold& a, const Manifold& b) { return a ^ b; }
-CrossSection IntersectCrossSection(const CrossSection& a, const CrossSection& b) { return a ^ b; }
-
-Manifold UnionN(const std::vector<Manifold>& manifolds) {
-  return Manifold::BatchBoolean(manifolds, OpType::Add);
-}
-
-Manifold DifferenceN(const std::vector<Manifold>& manifolds) {
-  return Manifold::BatchBoolean(manifolds, OpType::Subtract);
-}
-
-Manifold IntersectionN(const std::vector<Manifold>& manifolds) {
-  return Manifold::BatchBoolean(manifolds, OpType::Intersect);
-}
-
-std::vector<glm::vec2> convertJSArrayToVec3Vector(const val& jsArray) {
-    std::vector<glm::vec2> vec;
-
-    int length = jsArray["length"].as<int>();
-    for(int i=0; i<length; i++) {
-        val jsSubArray = jsArray[i];
-        double x = jsSubArray[0].as<double>();
-        double y = jsSubArray[1].as<double>();
-
-        vec.push_back(glm::vec2(x, y));
-    }
-    return vec;
-}
-
-std::vector<SimplePolygon> ToPolygon(
-    std::vector<std::vector<glm::vec2>>& polygons) {
-  std::vector<SimplePolygon> simplePolygons(polygons.size());
-  for (int i = 0; i < polygons.size(); i++) {
-    std::vector<glm::vec2> vertices(polygons[i].size());
-    for (int j = 0; j < polygons[i].size(); j++) {
-      vertices[j] = polygons[i][j];
-    }
-    simplePolygons[i] = {vertices};
-  }
-  return simplePolygons;
-}
-
-val MeshGL2JS(const MeshGL& mesh) {
-  val meshJS = val::object();
-
-  meshJS.set("numProp", mesh.numProp);
-  meshJS.set("triVerts",
-             val(typed_memory_view(mesh.triVerts.size(), mesh.triVerts.data()))
-                 .call<val>("slice"));
-  meshJS.set("vertProperties",
-             val(typed_memory_view(mesh.vertProperties.size(),
-                                   mesh.vertProperties.data()))
-                 .call<val>("slice"));
-  meshJS.set("mergeFromVert", val(typed_memory_view(mesh.mergeFromVert.size(),
-                                                    mesh.mergeFromVert.data()))
-                                  .call<val>("slice"));
-  meshJS.set("mergeToVert", val(typed_memory_view(mesh.mergeToVert.size(),
-                                                  mesh.mergeToVert.data()))
-                                .call<val>("slice"));
-  meshJS.set("runIndex",
-             val(typed_memory_view(mesh.runIndex.size(), mesh.runIndex.data()))
-                 .call<val>("slice"));
-  meshJS.set("runOriginalID", val(typed_memory_view(mesh.runOriginalID.size(),
-                                                    mesh.runOriginalID.data()))
-                                  .call<val>("slice"));
-  meshJS.set("faceID",
-             val(typed_memory_view(mesh.faceID.size(), mesh.faceID.data()))
-                 .call<val>("slice"));
-  meshJS.set("halfedgeTangent",
-             val(typed_memory_view(mesh.halfedgeTangent.size(),
-                                   mesh.halfedgeTangent.data()))
-                 .call<val>("slice"));
-  meshJS.set("runTransform", val(typed_memory_view(mesh.runTransform.size(),
-                                                   mesh.runTransform.data()))
-                                 .call<val>("slice"));
-
-  return meshJS;
-}
-
-MeshGL MeshJS2GL(const val& mesh) {
-  MeshGL out;
-  out.numProp = mesh["numProp"].as<int>();
-  out.triVerts = convertJSArrayToNumberVector<uint32_t>(mesh["triVerts"]);
-  out.vertProperties =
-      convertJSArrayToNumberVector<float>(mesh["vertProperties"]);
-  if (mesh["mergeFromVert"] != val::undefined()) {
-    out.mergeFromVert =
-        convertJSArrayToNumberVector<uint32_t>(mesh["mergeFromVert"]);
-  }
-  if (mesh["mergeToVert"] != val::undefined()) {
-    out.mergeToVert =
-        convertJSArrayToNumberVector<uint32_t>(mesh["mergeToVert"]);
-  }
-  if (mesh["runIndex"] != val::undefined()) {
-    out.runIndex = convertJSArrayToNumberVector<uint32_t>(mesh["runIndex"]);
-  }
-  if (mesh["runOriginalID"] != val::undefined()) {
-    out.runOriginalID =
-        convertJSArrayToNumberVector<uint32_t>(mesh["runOriginalID"]);
-  }
-  if (mesh["faceID"] != val::undefined()) {
-    out.faceID = convertJSArrayToNumberVector<uint32_t>(mesh["faceID"]);
-  }
-  if (mesh["halfedgeTangent"] != val::undefined()) {
-    out.halfedgeTangent =
-        convertJSArrayToNumberVector<float>(mesh["halfedgeTangent"]);
-  }
-  if (mesh["runTransform"] != val::undefined()) {
-    out.runTransform =
-        convertJSArrayToNumberVector<float>(mesh["runTransform"]);
-  }
-  return out;
-}
-
-SimplePolygon toSimplePolygon(const val& polygon) {
-  SimplePolygon out = convertJSArrayToVec3Vector(polygon);;
-  return out;
-}
-
-val GetMeshJS(const Manifold& manifold, const glm::ivec3& normalIdx) {
-  MeshGL mesh = manifold.GetMeshGL(normalIdx);
-  return MeshGL2JS(mesh);
-}
-
-val Merge(const val& mesh) {
-  val out = val::object();
-  MeshGL meshGL = MeshJS2GL(mesh);
-  bool changed = meshGL.Merge();
-  out.set("changed", changed);
-  out.set("mesh", changed ? MeshGL2JS(meshGL) : mesh);
-  return out;
-}
-
-Manifold FromMeshJS(const val& mesh) { return Manifold(MeshJS2GL(mesh)); }
-
-CrossSection fromSimplePolygon(const val& polygon) {
-  return CrossSection(toSimplePolygon(polygon));
-}
-
-Manifold Smooth(const val& mesh,
-                const std::vector<Smoothness>& sharpenedEdges = {}) {
-  return Manifold::Smooth(MeshJS2GL(mesh), sharpenedEdges);
-}
-
-Manifold Extrude(CrossSection& crossSection, float height,
-                 int nDivisions, float twistDegrees, glm::vec2 scaleTop) {
-  return Manifold::Extrude(crossSection, height, nDivisions,
-                           twistDegrees, scaleTop);
-}
-
-Manifold Revolve(std::vector<std::vector<glm::vec2>>& polygons,
-                 int circularSegments,
-                 float revolveDegrees) {
-  return Manifold::Revolve(ToPolygon(polygons), circularSegments, revolveDegrees);
-}
-
-Manifold RevolveCrossSection(CrossSection& crossSection,
-                             int circularSegments,
-                             float revolveDegrees) {
-  return Manifold::Revolve(crossSection, circularSegments, revolveDegrees);
-}
-
-Manifold Transform(Manifold& manifold, const val& mat) {
-  std::vector<float> array = convertJSArrayToNumberVector<float>(mat);
-  glm::mat4x3 matrix;
-  for (const int col : {0, 1, 2, 3})
-    for (const int row : {0, 1, 2}) matrix[col][row] = array[col * 4 + row];
-  return manifold.Transform(matrix);
-}
-
-Manifold Warp(Manifold& manifold, uintptr_t funcPtr) {
-  void (*f)(glm::vec3&) = reinterpret_cast<void (*)(glm::vec3&)>(funcPtr);
-  return manifold.Warp(f);
-}
-
-Manifold LevelSetJs(uintptr_t funcPtr, Box bounds, float edgeLength,
-                    float level) {
-  float (*f)(const glm::vec3&) =
-      reinterpret_cast<float (*)(const glm::vec3&)>(funcPtr);
-  Mesh m = LevelSet(f, bounds, edgeLength, level);
-  return Manifold(m);
-}
 
 EMSCRIPTEN_BINDINGS(whatever) {
   value_object<glm::vec2>("vec2")
@@ -236,17 +47,6 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .field("z", &glm::vec4::z)
       .field("w", &glm::vec4::w);
 
-  enum_<CrossSection::JoinType>("JoinType")
-    .value("Square", CrossSection::JoinType::Square)
-    .value("Round", CrossSection::JoinType::Round)
-    .value("Miter", CrossSection::JoinType::Miter);
-
-  enum_<CrossSection::FillRule>("FillRule")
-    .value("EvenOdd", CrossSection::FillRule::EvenOdd)
-    .value("NonZero", CrossSection::FillRule::NonZero)
-    .value("Positive", CrossSection::FillRule::Positive)
-    .value("Negative", CrossSection::FillRule::Negative);
-
   enum_<Manifold::Error>("status")
       .value("NoError", Manifold::Error::NoError)
       .value("NonFiniteVertex", Manifold::Error::NonFiniteVertex)
@@ -263,6 +63,18 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .value("FaceIDWrongLength", Manifold::Error::FaceIDWrongLength)
       .value("InvalidConstruction", Manifold::Error::InvalidConstruction);
 
+  enum_<CrossSection::FillRule>("fillrule")
+      .value("EvenOdd", CrossSection::FillRule::EvenOdd)
+      .value("NonZero", CrossSection::FillRule::NonZero)
+      .value("Positive", CrossSection::FillRule::Positive)
+      .value("Negative", CrossSection::FillRule::Negative);
+
+  enum_<CrossSection::JoinType>("jointype")
+      .value("Square", CrossSection::JoinType::Square)
+      .value("Round", CrossSection::JoinType::Round)
+      .value("Miter", CrossSection::JoinType::Miter);
+
+  value_object<Rect>("rect").field("min", &Rect::min).field("max", &Rect::max);
   value_object<Box>("box").field("min", &Box::min).field("max", &Box::max);
 
   value_object<Smoothness>("smoothness")
@@ -286,34 +98,54 @@ EMSCRIPTEN_BINDINGS(whatever) {
   register_vector<glm::vec2>("Vector_vec2");
   register_vector<std::vector<glm::vec2>>("Vector2_vec2");
   register_vector<float>("Vector_f32");
+  register_vector<CrossSection>("Vector_crossSection");
   register_vector<Manifold>("Vector_manifold");
   register_vector<Smoothness>("Vector_smoothness");
   register_vector<glm::vec4>("Vector_vec4");
 
   class_<CrossSection>("CrossSection")
-    .constructor(&fromSimplePolygon)
-    .function("add", &UnionCrossSection)
-    .function("subtract", &DifferenceCrossSection)
-    .function("intersect", &IntersectCrossSection)
-    .function("toPolygons", &CrossSection::ToPolygons)
-    .function("_Translate", &CrossSection::Translate)
-    .function("_Rotate", &CrossSection::Rotate)
-    .function("_Offset", &CrossSection::Offset)
-    .function("_Scale", &CrossSection::Scale)
-    .function("_ConvexHull", select_overload<CrossSection() const>(&CrossSection::ConvexHull))
-    .function("_ConvexHull", select_overload<CrossSection(const CrossSection&) const>(&CrossSection::ConvexHull));
+      .constructor(&cross_js::OfPolygons)
+      .function("_add", &cross_js::Union)
+      .function("_subtract", &cross_js::Difference)
+      .function("_intersect", &cross_js::Intersection)
+      .function("_Warp", &cross_js::Warp)
+      .function("transform", &cross_js::Transform)
+      .function("_Translate", &CrossSection::Translate)
+      .function("_Rotate", &CrossSection::Rotate)
+      .function("_Scale", &CrossSection::Scale)
+      .function("_Mirror", &CrossSection::Mirror)
+      .function("_Decompose", &CrossSection::Decompose)
+      .function("isEmpty", &CrossSection::IsEmpty)
+      .function("area", &CrossSection::Area)
+      .function("numVert", &CrossSection::NumVert)
+      .function("numContour", &CrossSection::NumContour)
+      .function("_Bounds", &CrossSection::Bounds)
+      .function("simplify", &CrossSection::Simplify)
+      .function("_Offset", &cross_js::Offset)
+      .function("_RectClip", &CrossSection::RectClip)
+      .function("_ToPolygons", &CrossSection::ToPolygons);
+
+  // CrossSection Static Methods
+  function("_Square", &CrossSection::Square);
+  function("_Circle", &CrossSection::Circle);
+  function("_crossSectionCompose", &CrossSection::Compose);
+  function("_crossSectionUnionN", &cross_js::UnionN);
+  function("_crossSectionDifferenceN", &cross_js::DifferenceN);
+  function("_crossSectionIntersectionN", &cross_js::IntersectionN);
 
   class_<Manifold>("Manifold")
-      .constructor(&FromMeshJS)
-      .function("add", &Union)
-      .function("subtract", &Difference)
-      .function("intersect", &Intersection)
+      .constructor(&man_js::FromMeshJS)
+      .function("add", &man_js::Union)
+      .function("subtract", &man_js::Difference)
+      .function("intersect", &man_js::Intersection)
+      .function("_Split", &man_js::Split)
+      .function("_SplitByPlane", &man_js::SplitByPlane)
       .function("_TrimByPlane", &Manifold::TrimByPlane)
-      .function("_GetMeshJS", &GetMeshJS)
+      .function("_GetMeshJS", &js::GetMeshJS)
       .function("refine", &Manifold::Refine)
-      .function("_ConvexHull", &Manifold::ConvexHullGL)
-      .function("_Warp", &Warp)
-      .function("transform", &Transform)
+      .function("_Warp", &man_js::Warp)
+      .function("_SetProperties", &man_js::SetProperties)
+      .function("transform", &man_js::Transform)
       .function("_Translate", &Manifold::Translate)
       .function("_Rotate", &Manifold::Rotate)
       .function("_Scale", &Manifold::Scale)
@@ -333,30 +165,26 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .function("originalID", &Manifold::OriginalID)
       .function("asOriginal", &Manifold::AsOriginal);
 
-
-  function("_Square", CrossSection::Square);
-  function("_Circle", CrossSection::Circle);
-
+  // Manifold Static Methods
   function("_Cube", &Manifold::Cube);
   function("_Cylinder", &Manifold::Cylinder);
   function("_Sphere", &Manifold::Sphere);
-  function("tetrahedron", &Manifold::Tetrahedron);
-  function("_Smooth", &Smooth);
-  function("_Extrude", &Extrude);
+  function("_Tetrahedron", &Manifold::Tetrahedron);
+  function("_Smooth", &js::Smooth);
+  function("_Extrude", &Manifold::Extrude);
   function("_Triangulate", &Triangulate);
-  function("_Revolve", &Revolve);
-  function("_RevolveCrossSection", &RevolveCrossSection);
-  function("_LevelSet", &LevelSetJs);
-  function("_Merge", &Merge);
+  function("_Revolve", &Manifold::Revolve);
+  function("_LevelSet", &man_js::LevelSet);
+  function("_Merge", &js::Merge);
+  function("_ReserveIDs", &Manifold::ReserveIDs);
+  function("_manifoldCompose", &Manifold::Compose);
+  function("_manifoldUnionN", &man_js::UnionN);
+  function("_manifoldDifferenceN", &man_js::DifferenceN);
+  function("_manifoldIntersectionN", &man_js::IntersectionN);
 
-  function("_unionN", &UnionN);
-  function("_differenceN", &DifferenceN);
-  function("_intersectionN", &IntersectionN);
-  function("_Compose", &Manifold::Compose);
-
+  // Quality Globals
   function("setMinCircularAngle", &Quality::SetMinCircularAngle);
   function("setMinCircularEdgeLength", &Quality::SetMinCircularEdgeLength);
   function("setCircularSegments", &Quality::SetCircularSegments);
   function("getCircularSegments", &Quality::GetCircularSegments);
-  function("reserveIDs", &Manifold::ReserveIDs);
 }
