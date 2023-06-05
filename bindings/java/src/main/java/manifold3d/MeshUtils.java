@@ -4,6 +4,7 @@ import org.bytedeco.javacpp.*;
 import org.bytedeco.javacpp.annotation.*;
 
 import manifold3d.manifold.CrossSectionVector;
+import manifold3d.manifold.CrossSection;
 import manifold3d.glm.DoubleVec3Vector;
 import manifold3d.glm.DoubleMat4x3Vector;
 import manifold3d.glm.DoubleMat4x3Vector;
@@ -30,4 +31,5 @@ public class MeshUtils extends Pointer {
     }
 
     public static native @ByVal Manifold Loft(@ByRef CrossSectionVector sections, @ByRef DoubleMat4x3Vector transforms);
+    public static native @ByVal Manifold Loft(@ByRef CrossSection section, @ByRef DoubleMat4x3Vector transforms);
 }

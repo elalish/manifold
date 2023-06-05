@@ -147,4 +147,12 @@ manifold::Manifold Loft(const std::vector<manifold::CrossSection>& sections, con
     return manifold::Manifold(mesh);
 }
 
+manifold::Manifold Loft(const manifold::CrossSection section, const std::vector<glm::mat4x3>& transforms) {
+    std::vector<manifold::CrossSection> sections(transforms.size());
+    for (std::size_t i = 0; i < transforms.size(); i++) {
+        sections[i] = section;
+    }
+    return Loft(sections, transforms);
+}
+
 }
