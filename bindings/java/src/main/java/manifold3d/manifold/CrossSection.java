@@ -63,7 +63,7 @@ public class CrossSection extends Pointer {
     @Name("Transform") public native @ByVal CrossSection transform(@ByVal DoubleMat3x2 m);
     @Name("Simplify") public native @ByVal CrossSection simplify(double epsilon);
 
-    @Name("Offset") public native @ByVal CrossSection offset(double delta, @Cast("manifold::CrossSection::JoinType") int jt, double miter_limit, double arc_tolerance);
+    @Name("Offset") public native @ByVal CrossSection offset(double delta, @Cast("manifold::CrossSection::JoinType") int joinType, double miterLimit, int arcTolerance);
 
     @Name("Boolean") public native @ByVal CrossSection booleanOp(@ByRef CrossSection second, @Cast("manifold::OpType") int op);
     public static native @ByVal CrossSection BatchBoolean(@ByRef CrossSectionVector sections, @Cast("manifold::OpType") int op);
