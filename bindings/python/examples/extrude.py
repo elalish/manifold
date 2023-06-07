@@ -1,4 +1,4 @@
-from pymanifold import CrossSection
+from pymanifold import CrossSection, FillRule
 
 
 def run():
@@ -7,7 +7,7 @@ def run():
     polygons_points = [polygon_points]
 
     # create a cross-section
-    cross_section = CrossSection(polygons_points)
+    cross_section = CrossSection(polygons_points, FillRule.Positive)
     polygons = cross_section.to_polygons()
     polygon = polygons[0]
     if set(polygon) != set(polygon_points):
