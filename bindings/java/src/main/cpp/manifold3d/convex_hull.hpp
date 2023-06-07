@@ -25,7 +25,14 @@ struct vec3_hash {
     }
 };
 
-void QuickHull(const std::vector<glm::vec3>& inputVerts, std::vector<glm::ivec3>& triVerts, std::vector<glm::vec3>& vertPos) {
+struct vec2_hash {
+    size_t operator()(const std::array<float, 2>& vec) const {
+        std::hash<float> hash_fn;
+        return hash_fn(vec[0]) ^ hash_fn(vec[1]);
+    }
+};
+
+void QuickHull3D(const std::vector<glm::vec3>& inputVerts, std::vector<glm::ivec3>& triVerts, std::vector<glm::vec3>& vertPos) {
 
     using F = float;
     constexpr std::size_t dim = 3;
@@ -48,27 +55,17 @@ void QuickHull(const std::vector<glm::vec3>& inputVerts, std::vector<glm::ivec3>
     QuickHull::quick_hull<typename Points::const_iterator> quickhulltmp{dim, eps};
     quickhulltmp.add_points(std::cbegin(points), std::cend(points));
     auto initial_simplex = quickhulltmp.get_affine_basis();
-    //if (initial_simplex.size() < dim + 1) {
-    //    return EXIT_FAILURE; // degenerated input set
-    //}
+
     quickhulltmp.create_initial_simplex(std::cbegin(initial_simplex), std::prev(std::cend(initial_simplex)));
     quickhulltmp.create_convex_hull();
-    //if (!quickhulltmp.check()) {
-    //    return EXIT_FAILURE; // resulted structure is not convex (generally due to precision errors)
-    //}
 
     std::unordered_map<std::array<float, 3>, int, vec3_hash> vertIndices;
 
     for (const auto& facet : quickhulltmp.facets_) {
         for(const auto& vertex : facet.vertices_) {
 
-            std::array<float, 3> arrVertex;
-
-            std::size_t i = 0;
-            for (auto & coordinate_ : *vertex) {
-                arrVertex[i] = coordinate_;
-                i++;
-            }
+            auto vert = *vertex;
+            std::array<float, 3> arrVertex = {vert[0], vert[1], vert[2]};
 
             if(vertIndices.count(arrVertex) == 0) {
                 vertIndices[arrVertex] = vertPos.size();
@@ -90,15 +87,89 @@ void QuickHull(const std::vector<glm::vec3>& inputVerts, std::vector<glm::ivec3>
             triVerts.push_back(glm::ivec3(firstVertIndex, secondVertIndex, thirdVertIndex));
         }
     }
+}
 
-    std::cout << "N verts: " << vertPos.size() << std::endl;
-    std::cout << "N tri: " << triVerts.size() << std::endl;
+int findMinYPointIndex(const std::vector<glm::vec2>& points) {
+    int minYPointIndex = 0;
+    for (size_t i = 1; i < points.size(); i++) {
+        if ((points[i].y < points[minYPointIndex].y) ||
+            (points[i].y == points[minYPointIndex].y && points[i].x > points[minYPointIndex].x)) {
+            minYPointIndex = i;
+        }
+    }
+    return minYPointIndex;
+}
+
+std::vector<glm::vec2> sortPointsCounterClockwise(const std::vector<glm::vec2>& points) {
+    std::vector<glm::vec2> sortedPoints(points);
+
+    // Find the bottom-most point (or one of them, if multiple)
+    int minYPointIndex = findMinYPointIndex(sortedPoints);
+
+    // Sort the points by angle from the line horizontal to minYPoint, counter-clockwise
+    glm::vec2 minYPoint = points[minYPointIndex];
+    std::sort(sortedPoints.begin(), sortedPoints.end(),
+        [minYPoint](const glm::vec2& p1, const glm::vec2& p2) -> bool {
+            double angle1 = atan2(p1.y - minYPoint.y, p1.x - minYPoint.x);
+            double angle2 = atan2(p2.y - minYPoint.y, p2.x - minYPoint.x);
+            if (angle1 < 0) angle1 += 2 * 3.141592653589;
+            if (angle2 < 0) angle2 += 2 * 3.141592653589;
+            return angle1 < angle2;
+        }
+    );
+
+    return sortedPoints;
+}
+
+manifold::SimplePolygon QuickHull2D(const manifold::SimplePolygon& inputVerts) {
+
+    using F = float;
+    constexpr std::size_t dim = 2;
+    using PointType = std::array<float, dim>;
+    using Points = std::vector<PointType>;
+
+    Points points(inputVerts.size()); // input
+
+    for (std::size_t i = 0; i < inputVerts.size(); ++i) {
+        auto pt = inputVerts[i];
+        points[i] = {pt.x, pt.y};
+    }
+
+    for (auto& pt: points) {
+        std::cout << pt[0] << " " << pt[1] << " " << pt[2] << "; ";
+    }
+    std::cout << std::endl;
+
+    const F eps = 0.0001;
+    QuickHull::quick_hull<typename Points::const_iterator> quickhulltmp{dim, eps};
+    quickhulltmp.add_points(std::cbegin(points), std::cend(points));
+    auto initial_simplex = quickhulltmp.get_affine_basis();
+
+    quickhulltmp.create_initial_simplex(std::cbegin(initial_simplex), std::prev(std::cend(initial_simplex)));
+    quickhulltmp.create_convex_hull();
+
+    std::unordered_map<std::array<float, 2>, int, vec2_hash> vertIndices;
+    manifold::SimplePolygon ret;
+
+    for (const auto& facet : quickhulltmp.facets_) {
+        for(const auto& vertex : facet.vertices_) {
+
+            auto vert = *vertex;
+            std::array<float, 2> arrVertex = {vert[0], vert[1]};
+
+            if(vertIndices.count(arrVertex) == 0) {
+                vertIndices[arrVertex] = ret.size();
+                ret.push_back(glm::vec3(arrVertex[0], arrVertex[1], arrVertex[2]));
+            }
+        }
+    }
+    return sortPointsCounterClockwise(ret);
 }
 
 manifold::Manifold ConvexHull(const manifold::Manifold manifold) {
     manifold::Mesh inputMesh = manifold.GetMesh();
     manifold::Mesh outputMesh;
-    QuickHull(inputMesh.vertPos, outputMesh.triVerts, outputMesh.vertPos);
+    QuickHull3D(inputMesh.vertPos, outputMesh.triVerts, outputMesh.vertPos);
     //orientMesh(outputMesh);
     return manifold::Manifold(outputMesh);
 }
@@ -119,11 +190,42 @@ manifold::Manifold ConvexHull(const manifold::Manifold manifold, const manifold:
 
     manifold::Mesh outputMesh;
 
-    QuickHull(combinedVerts, outputMesh.triVerts, outputMesh.vertPos);
+    QuickHull3D(combinedVerts, outputMesh.triVerts, outputMesh.vertPos);
 
     //orientMesh(outputMesh);
 
     return manifold::Manifold(outputMesh);
+}
+
+manifold::CrossSection ConvexHull(const manifold::CrossSection& cross_section) {
+    manifold::SimplePolygon hullPoints;
+    for (auto& poly: cross_section.ToPolygons()) {
+        for (auto& pt: poly) {
+            hullPoints.push_back(glm::vec2(pt.x, pt.y));
+        }
+    }
+    manifold::SimplePolygon res = QuickHull2D(hullPoints);
+    return manifold::CrossSection(res);
+}
+
+
+manifold::CrossSection ConvexHull(const manifold::CrossSection& cross_section, const manifold::CrossSection& other) {
+    manifold::SimplePolygon hullPoints;
+
+    for (auto& poly: cross_section.ToPolygons()) {
+        for (auto& pt: poly) {
+            hullPoints.push_back(glm::vec2(pt.x, pt.y));
+        }
+    }
+
+    for (auto& poly: other.ToPolygons()) {
+        for (auto& pt: poly) {
+            hullPoints.push_back(glm::vec2(pt.x, pt.y));
+        }
+    }
+
+    manifold::SimplePolygon res = QuickHull2D(hullPoints);
+    return manifold::CrossSection(res);
 }
 
 }

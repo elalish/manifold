@@ -4,6 +4,7 @@ import org.bytedeco.javacpp.*;
 import org.bytedeco.javacpp.annotation.*;
 
 import manifold3d.Manifold;
+import manifold3d.manifold.CrossSection;
 import manifold3d.glm.DoubleVec3Vector;
 import manifold3d.glm.DoubleMat4x3Vector;
 import manifold3d.glm.DoubleMat4x3Vector;
@@ -21,4 +22,7 @@ public class ConvexHull extends Pointer {
 
     public static native @ByVal Manifold ConvexHull(@Const @ByRef Manifold manifold);
     public static native @ByVal Manifold ConvexHull(@Const @ByRef Manifold manifold, @Const @ByRef Manifold other);
+
+    public static native @ByVal CrossSection ConvexHull(@Const @ByRef CrossSection crossSection);
+    public static native @ByVal CrossSection ConvexHull(@Const @ByRef CrossSection crossSection, @Const @ByRef CrossSection other);
 }

@@ -41,6 +41,8 @@ public class CrossSectionTest {
 
         CrossSection unionSection = section.convexHull(CrossSection.Circle(5, 0).translateX(60));
 
+        assert unionSection.area() > 0.0;
+
         Manifold man = Manifold.Extrude(unionSection, 50, 60, 0, new DoubleVec2(1.0, 1.0));
         DoubleMesh mesh = man.getMesh();
         ExportOptions opts = new ExportOptions();

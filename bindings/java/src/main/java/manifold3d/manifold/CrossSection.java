@@ -3,6 +3,7 @@ package manifold3d.manifold;
 import org.bytedeco.javacpp.*;
 import org.bytedeco.javacpp.annotation.*;
 
+import manifold3d.ConvexHull;
 import manifold3d.glm.DoubleVec2;
 import manifold3d.glm.DoubleMat3x2;
 import manifold3d.manifold.Rect;
@@ -40,7 +41,7 @@ public class CrossSection extends Pointer {
     public CrossSection(@ByRef Polygons contours, @Cast("manifold::CrossSection::FillRule") int fillrule) { allocate(contours, fillrule); }
     private native void allocate(@ByRef Polygons contours, @Cast("manifold::CrossSection::FillRule") int fillrule);
 
-    @Name("Area") public native @ByVal DoubleVec2 area();
+    @Name("Area") public native double area();
     @Name("NumVert") public native int numVert();
     @Name("NumContour") public native int numContour();
     @Name("IsEmpty") public native boolean isEmpty();
@@ -68,8 +69,16 @@ public class CrossSection extends Pointer {
     @Name("Boolean") public native @ByVal CrossSection booleanOp(@ByRef CrossSection second, @Cast("manifold::OpType") int op);
     public static native @ByVal CrossSection BatchBoolean(@ByRef CrossSectionVector sections, @Cast("manifold::OpType") int op);
 
-    @Name("ConvexHull") public native @ByVal CrossSection convexHull();
-    @Name("ConvexHull") public native @ByVal CrossSection convexHull(@ByRef CrossSection other);
+    //@Name("ConvexHull") public native @ByVal CrossSection convexHull();
+    //@Name("ConvexHull") public native @ByVal CrossSection convexHull(@ByRef CrossSection other);
+
+    public @ByVal CrossSection convexHull() {
+        return ConvexHull.ConvexHull(this);
+    }
+
+    public @ByVal CrossSection convexHull(@Const @ByRef CrossSection other) {
+       return ConvexHull.ConvexHull(this, other);
+    }
 
     @Name("operator+") public native @ByVal CrossSection add(@ByRef CrossSection rhs);
     @Name("operator+=") public native @ByVal CrossSection addPut(@ByRef CrossSection rhs);
