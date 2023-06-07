@@ -158,8 +158,8 @@ std::vector<glm::vec2> sortPointsCounterClockwise(const std::vector<glm::vec2>& 
         [minYPoint](const glm::vec2& p1, const glm::vec2& p2) -> bool {
             double angle1 = atan2(p1.y - minYPoint.y, p1.x - minYPoint.x);
             double angle2 = atan2(p2.y - minYPoint.y, p2.x - minYPoint.x);
-            if (angle1 < 0) angle1 += 2*M_PI;
-            if (angle2 < 0) angle2 += 2*M_PI;
+            if (angle1 < 0) angle1 += 2 * 3.141592653589;
+            if (angle2 < 0) angle2 += 2 * 3.141592653589;
             return angle1 < angle2;
         }
     );
