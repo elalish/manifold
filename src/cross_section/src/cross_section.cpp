@@ -13,7 +13,6 @@
 // limitations under the License.
 
 #include "cross_section.h"
-#include "convex_hull.h"
 
 using namespace manifold;
 
@@ -305,40 +304,6 @@ CrossSection CrossSection::BatchBoolean(
   auto ct = cliptype_of_op(op);
   auto res =
       C2::BooleanOp(ct, C2::FillRule::Positive, subjs, clips, precision_);
-  return CrossSection(res);
-}
-/*
- * Compute the convex hull of paths in cross-section.
- */
-CrossSection CrossSection::ConvexHull() const {
-
-  SimplePolygon hullPoints;
-  for (auto& path: GetPaths()) {
-    for (auto& pt: path) {
-      hullPoints.push_back(glm::vec2(pt.x, pt.y));
-    }
-  }
-  SimplePolygon res = computeConvexHull2D(hullPoints);
-  return CrossSection(res);
-}
-/*
- * Compute the convex hull between two cross-sections.
- */
-CrossSection CrossSection::ConvexHull(const CrossSection& Q) const {
-
-  SimplePolygon hullPoints;
-  for (auto& path: GetPaths()) {
-    for (auto& pt: path) {
-      hullPoints.push_back(glm::vec2(pt.x, pt.y));
-    }
-  }
-  for (auto& path: Q.GetPaths()) {
-    for (auto& pt: path) {
-      hullPoints.push_back(glm::vec2(pt.x, pt.y));
-    }
-  }
-
-  SimplePolygon res = computeConvexHull2D(hullPoints);
   return CrossSection(res);
 }
 

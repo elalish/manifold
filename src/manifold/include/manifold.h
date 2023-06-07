@@ -18,7 +18,6 @@
 
 #include "cross_section.h"
 #include "public.h"
-#include "convex_hull.h"
 
 namespace manifold {
 
@@ -211,9 +210,6 @@ class Manifold {
   Manifold SetProperties(
       int, std::function<void(float*, glm::vec3, const float*)>) const;
   Manifold Refine(int) const;
-
-  Manifold ConvexHullGL(const Manifold& other) const;
-  Manifold ConvexHull(const Manifold& other) const;
   // Manifold RefineToLength(float);
   // Manifold RefineToPrecision(float);
   ///@}
