@@ -506,14 +506,6 @@ export class Manifold {
   transform(m: Mat4): Manifold;
 
   /**
-   * Creates a manifold the is the convex hull of the two manifolds. Note
-   * this function only works if numProps of both meshes is 3.
-   *
-   * @param v The vector to add to every vertex.
-   */
-  convexHull(v: Manifold): Manifold;
-
-  /**
    * Move this Manifold in space. This operation can be chained. Transforms are
    * combined and applied lazily.
    *
