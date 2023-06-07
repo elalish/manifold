@@ -32,9 +32,8 @@ struct vec2_hash {
     }
 };
 
-void QuickHull3D(const std::vector<glm::vec3>& inputVerts, std::vector<glm::ivec3>& triVerts, std::vector<glm::vec3>& vertPos) {
+void QuickHull3D(const std::vector<glm::vec3>& inputVerts, std::vector<glm::ivec3>& triVerts, std::vector<glm::vec3>& vertPos, const float precision) {
 
-    using F = float;
     constexpr std::size_t dim = 3;
     using PointType = std::array<float, dim>;
     using Points = std::vector<PointType>;
@@ -46,13 +45,7 @@ void QuickHull3D(const std::vector<glm::vec3>& inputVerts, std::vector<glm::ivec
         points[i] = {pt.x, pt.y, pt.z};
     }
 
-    for (auto& pt: points) {
-        std::cout << pt[0] << " " << pt[1] << " " << pt[2] << "; ";
-    }
-    std::cout << std::endl;
-
-    const F eps = 0.0001;
-    QuickHull::quick_hull<typename Points::const_iterator> quickhulltmp{dim, eps};
+    QuickHull::quick_hull<typename Points::const_iterator> quickhulltmp{dim, precision};
     quickhulltmp.add_points(std::cbegin(points), std::cend(points));
     auto initial_simplex = quickhulltmp.get_affine_basis();
 
@@ -121,9 +114,8 @@ std::vector<glm::vec2> sortPointsCounterClockwise(const std::vector<glm::vec2>& 
     return sortedPoints;
 }
 
-manifold::SimplePolygon QuickHull2D(const manifold::SimplePolygon& inputVerts) {
+manifold::SimplePolygon QuickHull2D(const manifold::SimplePolygon& inputVerts, const float precision) {
 
-    using F = float;
     constexpr std::size_t dim = 2;
     using PointType = std::array<float, dim>;
     using Points = std::vector<PointType>;
@@ -135,13 +127,7 @@ manifold::SimplePolygon QuickHull2D(const manifold::SimplePolygon& inputVerts) {
         points[i] = {pt.x, pt.y};
     }
 
-    for (auto& pt: points) {
-        std::cout << pt[0] << " " << pt[1] << " " << pt[2] << "; ";
-    }
-    std::cout << std::endl;
-
-    const F eps = 0.0001;
-    QuickHull::quick_hull<typename Points::const_iterator> quickhulltmp{dim, eps};
+    QuickHull::quick_hull<typename Points::const_iterator> quickhulltmp{dim, precision};
     quickhulltmp.add_points(std::cbegin(points), std::cend(points));
     auto initial_simplex = quickhulltmp.get_affine_basis();
 
@@ -166,15 +152,15 @@ manifold::SimplePolygon QuickHull2D(const manifold::SimplePolygon& inputVerts) {
     return sortPointsCounterClockwise(ret);
 }
 
-manifold::Manifold ConvexHull(const manifold::Manifold manifold) {
+manifold::Manifold ConvexHull(const manifold::Manifold manifold, const float precision = 0.0001) {
     manifold::Mesh inputMesh = manifold.GetMesh();
     manifold::Mesh outputMesh;
-    QuickHull3D(inputMesh.vertPos, outputMesh.triVerts, outputMesh.vertPos);
+    QuickHull3D(inputMesh.vertPos, outputMesh.triVerts, outputMesh.vertPos, precision);
     //orientMesh(outputMesh);
     return manifold::Manifold(outputMesh);
 }
 
-manifold::Manifold ConvexHull(const manifold::Manifold manifold, const manifold::Manifold other) {
+manifold::Manifold ConvexHull(const manifold::Manifold manifold, const manifold::Manifold other, const float precision = 0.0001) {
     manifold::Mesh inputMesh1 = manifold.GetMesh();
     manifold::Mesh inputMesh2 = other.GetMesh();
 
@@ -190,26 +176,26 @@ manifold::Manifold ConvexHull(const manifold::Manifold manifold, const manifold:
 
     manifold::Mesh outputMesh;
 
-    QuickHull3D(combinedVerts, outputMesh.triVerts, outputMesh.vertPos);
+    QuickHull3D(combinedVerts, outputMesh.triVerts, outputMesh.vertPos, precision);
 
     //orientMesh(outputMesh);
 
     return manifold::Manifold(outputMesh);
 }
 
-manifold::CrossSection ConvexHull(const manifold::CrossSection& cross_section) {
+manifold::CrossSection ConvexHull(const manifold::CrossSection& cross_section, const float precision = 0.0001) {
     manifold::SimplePolygon hullPoints;
     for (auto& poly: cross_section.ToPolygons()) {
         for (auto& pt: poly) {
             hullPoints.push_back(glm::vec2(pt.x, pt.y));
         }
     }
-    manifold::SimplePolygon res = QuickHull2D(hullPoints);
+    manifold::SimplePolygon res = QuickHull2D(hullPoints, precision);
     return manifold::CrossSection(res);
 }
 
 
-manifold::CrossSection ConvexHull(const manifold::CrossSection& cross_section, const manifold::CrossSection& other) {
+manifold::CrossSection ConvexHull(const manifold::CrossSection& cross_section, const manifold::CrossSection& other, const float precision = 0.0001) {
     manifold::SimplePolygon hullPoints;
 
     for (auto& poly: cross_section.ToPolygons()) {
@@ -224,7 +210,7 @@ manifold::CrossSection ConvexHull(const manifold::CrossSection& cross_section, c
         }
     }
 
-    manifold::SimplePolygon res = QuickHull2D(hullPoints);
+    manifold::SimplePolygon res = QuickHull2D(hullPoints, precision);
     return manifold::CrossSection(res);
 }
 

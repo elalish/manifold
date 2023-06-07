@@ -21,8 +21,12 @@ public class ConvexHull extends Pointer {
     public ConvexHull() { }
 
     public static native @ByVal Manifold ConvexHull(@Const @ByRef Manifold manifold);
+    public static native @ByVal Manifold ConvexHull(@Const @ByRef Manifold manifold, @Const float precision);
     public static native @ByVal Manifold ConvexHull(@Const @ByRef Manifold manifold, @Const @ByRef Manifold other);
+    public static native @ByVal Manifold ConvexHull(@Const @ByRef Manifold manifold, @Const @ByRef Manifold other, float precision);
 
     public static native @ByVal CrossSection ConvexHull(@Const @ByRef CrossSection crossSection);
+    public static native @ByVal CrossSection ConvexHull(@Const @ByRef CrossSection crossSection, @Const float precision);
     public static native @ByVal CrossSection ConvexHull(@Const @ByRef CrossSection crossSection, @Const @ByRef CrossSection other);
+    public static native @ByVal CrossSection ConvexHull(@Const @ByRef CrossSection crossSection, @Const @ByRef CrossSection other, float precision);
 }
