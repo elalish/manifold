@@ -587,6 +587,7 @@ PYBIND11_MODULE(pymanifold, m) {
              }
              return CrossSection(simplePolygons, fillrule);
            }),
+           "Construct a 2d cross-section from a set of contours.")
       .def("area", &CrossSection::Area)
       .def("num_vert", &CrossSection::NumVert)
       .def("num_contour", &CrossSection::NumContour)
@@ -635,20 +636,21 @@ PYBIND11_MODULE(pymanifold, m) {
       .def(py::self - py::self, "Boolean difference.")
       .def(py::self ^ py::self, "Boolean intersection.")
       .def("decompose", &CrossSection::Decompose)
-      .def("to_polygons",
-           [](CrossSection self) {
-             const Polygons &data = self.ToPolygons();
-             py::list polygon_list;
-             for (int i = 0; i < data.size(); ++i) {
-               py::list polygon;
-               for (int j = 0; j < data[i].size(); ++j) {
-                 auto f = data[i][j];
-                 py::tuple vertex = py::make_tuple(f[0], f[1]);
-                 polygon.append(vertex);
-               }
-               polygon_list.append(polygon);
-             }
-             return polygon_list;
+      .def(
+          "to_polygons",
+          [](CrossSection self) {
+            const Polygons &data = self.ToPolygons();
+            py::list polygon_list;
+            for (int i = 0; i < data.size(); ++i) {
+              py::list polygon;
+              for (int j = 0; j < data[i].size(); ++j) {
+                auto f = data[i][j];
+                py::tuple vertex = py::make_tuple(f[0], f[1]);
+                polygon.append(vertex);
+              }
+              polygon_list.append(polygon);
+            }
+            return polygon_list;
           },
           "Returns the vertices of the cross-section's polygons as a "
           "List[List[Tuple[float, float]]].")
