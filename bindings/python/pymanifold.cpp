@@ -587,6 +587,8 @@ PYBIND11_MODULE(pymanifold, m) {
              }
              return CrossSection(simplePolygons, fillrule);
            }),
+           py::arg("polygons"),
+           py::arg("fillrule") = CrossSection::FillRule::Positive,
            "Construct a 2d cross-section from a set of contours.")
       .def("area", &CrossSection::Area)
       .def("num_vert", &CrossSection::NumVert)

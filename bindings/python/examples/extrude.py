@@ -7,7 +7,7 @@ def run():
     polygons_points = [polygon_points]
 
     # create a cross-section
-    cross_section = CrossSection(polygons_points, FillRule.Positive)
+    cross_section = CrossSection(polygons_points)
     polygons = cross_section.to_polygons()
     polygon = polygons[0]
     if set(polygon) != set(polygon_points):
