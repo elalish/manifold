@@ -19,6 +19,7 @@ import manifold3d.manifold.ExportOptions;
 import manifold3d.manifold.CrossSection;
 
 import manifold3d.pub.DoubleMesh;
+import manifold3d.ConvexHull;
 import manifold3d.pub.Box;
 import manifold3d.pub.Properties;
 import manifold3d.pub.Curvature;
@@ -41,9 +42,9 @@ public class Manifold extends Pointer {
         String osName = System.getProperty("os.name").toLowerCase();
         if (osName.contains("linux")) {
             try {
-                System.load(Loader.extractResource("/libClipper2.so.1.2.1", null, "libClipper2", ".so").getAbsolutePath());
-                System.load(Loader.extractResource("/libmanifold.so", null, "libmanifold", ".so").getAbsolutePath());
                 System.load(Loader.extractResource("/libmeshIO.so", null, "libmeshIO", ".so").getAbsolutePath());
+                System.load(Loader.extractResource("/libmanifold.so", null, "libmanifold", ".so").getAbsolutePath());
+                System.load(Loader.extractResource("/libClipper2.so.1.2.1", null, "libClipper2", ".so").getAbsolutePath());
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
@@ -85,7 +86,14 @@ public class Manifold extends Pointer {
     @Name("OriginalID") public native int originalID();
     @Name("AsOriginal") public native @ByVal Manifold asOriginal();
 
-    @Name("ConvexHull") public native @ByVal Manifold convexHull(@ByRef Manifold other);
+    //@Name("ConvexHull") public native @ByVal Manifold convexHull(@ByRef Manifold other);
+
+    public @ByVal Manifold convexHull() {
+        return ConvexHull.ConvexHull(this);
+    }
+    public @ByVal Manifold convexHull(@ByRef Manifold other) {
+        return ConvexHull.ConvexHull(this, other);
+    }
 
     //// Modifiers
     @Name("Translate") public native @ByVal Manifold translate(@ByRef DoubleVec3 translation);
