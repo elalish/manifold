@@ -16,7 +16,7 @@
         <dependency>
             <groupId>org.bytedeco</groupId>
             <artifactId>javacpp</artifactId>
-            <version>1.0</version>
+            <version>1.5.9</version>
         </dependency>
         <dependency>
             <groupId>junit</groupId>
@@ -59,7 +59,7 @@
            <plugin>
                 <groupId>org.bytedeco</groupId>
                 <artifactId>javacpp</artifactId>
-                <version>1.0</version>
+                <version>1.5.9</version>
                 <configuration>
                     <classPath>${project.build.outputDirectory}</classPath>
                     <libraryPath>${project.build.directory}/../../../build/src/manifold/</libraryPath>
