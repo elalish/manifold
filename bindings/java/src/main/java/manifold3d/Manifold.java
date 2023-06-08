@@ -64,7 +64,7 @@ public class Manifold extends Pointer {
                 System.out.println("Loading Mac libs...");
                 System.load(Loader.extractResource("/libmeshIO.dylib", null, "libmeshIO", ".dylib").getAbsolutePath());
                 System.load(Loader.extractResource("/libmanifold.dylib", null, "libmanifold", ".dylib").getAbsolutePath());
-                System.load(Loader.extractResource("/libClipper2.dylib.1.2.1", null, "libClipper2", ".dylib").getAbsolutePath());
+                System.load(Loader.extractResource("/libClipper2.1.2.1.dylib", null, "libClipper2", ".dylib").getAbsolutePath());
                 System.out.println("Finished Loading Mac libs...");
             } catch (IOException e) {
                 throw new RuntimeException(e);
