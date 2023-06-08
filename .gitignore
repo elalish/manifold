@@ -114,3 +114,6 @@ __pycache__
 *.sublime-project
 *.sublime-workspace
 .cache
+
+# PyCharm
+.idea
