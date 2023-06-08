@@ -3,7 +3,7 @@ package manifold3d;
 import org.bytedeco.javacpp.*;
 import org.bytedeco.javacpp.annotation.*;
 
-@Platform(include = "public.h")
+@Platform(compiler = "cpp17", include = "public.h")
 @Namespace("manifold")
 public class Quality extends Pointer {
     //private native static int circularSegments_();

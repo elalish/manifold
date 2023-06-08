@@ -3,11 +3,12 @@ package manifold3d.manifold;
 import manifold3d.pub.DoubleMesh;
 import manifold3d.manifold.ExportOptions;
 
+import manifold3d.LibraryPaths;
 import org.bytedeco.javacpp.*;
 import org.bytedeco.javacpp.annotation.*;
 
 
-@Platform(include = {"meshIO.h"}, link = {"meshIO"})
+@Platform(compiler = "cpp17", include = {"meshIO.h"}, linkpath = { LibraryPaths.MESHIO_LIB_DIR }, link = {"meshIO"})
 @Namespace("manifold")
 public class MeshIO {
     static { Loader.load(); }

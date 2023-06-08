@@ -13,7 +13,7 @@ import java.util.Iterator;
 import java.lang.Iterable;
 import java.util.NoSuchElementException;
 
-@Platform(include = {"<vector>", "glm/glm.hpp"})
+@Platform(compiler = "cpp17", include = {"<vector>", "glm/glm.hpp"})
 @Name("std::vector<glm::ivec4>")
 public class IntegerVec4Vector extends Pointer implements Iterable<IntegerVec4> {
     static { Loader.load(); }

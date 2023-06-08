@@ -11,7 +11,7 @@ import java.util.Iterator;
 import java.lang.Iterable;
 import java.util.NoSuchElementException;
 
-@Platform(include = {"glm/glm.hpp"})
+@Platform(compiler = "cpp17", include = {"glm/glm.hpp"})
 @Namespace("glm")
 @Name("mat4x3")
 public class DoubleMat4x3 extends DoublePointer implements Iterable<DoubleVec3> {

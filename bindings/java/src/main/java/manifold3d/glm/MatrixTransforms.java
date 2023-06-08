@@ -6,7 +6,7 @@ import manifold3d.glm.DoubleVec3;
 import org.bytedeco.javacpp.*;
 import org.bytedeco.javacpp.annotation.*;
 
-@Platform(include = {"matrix_transforms.hpp"})
+@Platform(compiler = "cpp17", include = {"matrix_transforms.hpp"})
 public class MatrixTransforms extends Pointer {
     static { Loader.load(); }
 

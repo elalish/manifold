@@ -7,7 +7,7 @@ import manifold3d.glm.FloatVec4Vector;
 import org.bytedeco.javacpp.*;
 import org.bytedeco.javacpp.annotation.*;
 
-@Platform(include = "public.h")
+@Platform(compiler = "cpp17", include = "public.h")
 @Namespace("manifold")
 @Name("Mesh")
 public class FloatMesh extends Pointer {

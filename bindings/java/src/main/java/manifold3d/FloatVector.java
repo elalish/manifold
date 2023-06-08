@@ -3,7 +3,7 @@ package manifold3d;
 import org.bytedeco.javacpp.*;
 import org.bytedeco.javacpp.annotation.*;
 
-@Platform(include = "<vector>")
+@Platform(compiler = "cpp17", include = "<vector>")
 @Name("std::vector<float>")
 public class FloatVector extends Pointer {
     static { Loader.load(); }

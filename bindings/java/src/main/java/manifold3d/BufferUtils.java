@@ -9,7 +9,7 @@ import manifold3d.glm.DoubleVec4Vector;
 import manifold3d.glm.IntegerVec3Vector;
 import manifold3d.glm.IntegerVec4Vector;
 
-@Platform(include= {"buffer_utils.hpp", "manifold.h"})
+@Platform(compiler = "cpp17", include= {"buffer_utils.hpp", "manifold.h"})
 public class BufferUtils extends Pointer {
     static { Loader.load(); }
 

@@ -3,7 +3,7 @@ package manifold3d.glm;
 import org.bytedeco.javacpp.*;
 import org.bytedeco.javacpp.annotation.*;
 
-@Platform(include = "glm/glm.hpp")
+@Platform(compiler = "cpp17", include = "glm/glm.hpp")
 @Namespace("glm")
 @Name("ivec4")
 public class IntegerVec4 extends IntPointer {

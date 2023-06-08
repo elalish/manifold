@@ -8,7 +8,7 @@ import java.util.Iterator;
 import java.lang.Iterable;
 import java.util.NoSuchElementException;
 
-@Platform(include = {"<vector>", "glm/glm.hpp"})
+@Platform(compiler = "cpp17", include = {"<vector>", "glm/glm.hpp"})
 @Name("std::vector<glm::vec3>")
 public class FloatVec3Vector extends Pointer implements Iterable<FloatVec3> {
     static { Loader.load(); }

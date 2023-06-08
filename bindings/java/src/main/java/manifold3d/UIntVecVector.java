@@ -4,7 +4,7 @@ import org.bytedeco.javacpp.*;
 import org.bytedeco.javacpp.annotation.*;
 
 
-@Platform(include = { "<vector>" })
+@Platform(compiler = "cpp17", include = { "<vector>" })
 @Name("std::vector<std::vector<uint32_t>>")
 public class UIntVecVector extends Pointer {
     static { Loader.load(); }

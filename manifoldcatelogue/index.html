@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <title>ManifoldCAD</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description"
+    content="Fast, reliable, parametric solid modeling web app. Programmatic 3D design with JavaScript, inspired by and improving upon OpenSCAD & JSCAD. Demonstrates a new GPU-parallel, open-source geometry kernel: Manifold.">
+  <meta name="theme-color" content="#A288B3">
+  <meta property="og:title" content="ManifoldCAD">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://manifoldcad.org/" />
+  <meta property="og:image" content="https://elalish.github.io/manifold/samples/models/mengerSpongeSquare.png">
+  <meta property="og:image:width" content="850">
+  <meta property="og:image:height" content="850">
+  <link rel="shortcut icon" type="image/png" href="https://elalish.github.io/manifold/samples/models/favicon.png">
+  <link rel="manifest" href="/manifest.json">
+  <link type="text/css" href="editor.css" rel="stylesheet">
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "ManifoldCAD",
+      "applicationCategory": "DesignApplication",
+      "offers": {
+        "@type": "Offer",
+        "price": "0"
+      }
+    }
+  </script>
+</head>
+
+<body>
+  <div class="page">
+    <div class="container header" style="background-color: #A288B3;">
+      <p style="flex: 2;"><a target="_blank" href="https://github.com/elalish/manifold">Manifold</a>CAD </p>
+      <div class="margin" style="position: relative;">
+        <button type="button" id="file" class="blue"><b class="uparrow"></b>&nbsp;&nbsp;<span
+            id="current">Intro</span></button>
+        <div class="dropdown">
+          <button type="button" class="green item" id="new">New</button>
+        </div>
+      </div>
+      <button type="button" id="compile" class="margin green" disabled><span>Run</span></button>
+      <button type="button" id="download" class="blue margin">Save GLB</button>
+    </div>
+    <div class="container" style="flex: 2;">
+      <div id="editor" class="col"></div>
+      <div class="col container" style="flex-direction: column;">
+        <model-viewer camera-controls min-camera-orbit="auto 0deg auto" max-camera-orbit="auto 180deg auto"
+          shadow-intensity="1" interaction-prompt="none" alt="Editor 3D output">
+          <div class="center" slot="poster">
+            <p id="poster" style="text-align: center; line-height: 36px;"> Loading... </p>
+          </div>
+        </model-viewer>
+        <div id="console"></div>
+      </div>
+    </div>
+  </div>
+</body>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.34.0/min/vs/loader.min.js"
+  integrity="sha512-6bIYsGqvLpAiEBXPdRQeFf5cueeBECtAKJjIHer3BhBZNTV3WLcLA8Tm3pDfxUwTMIS+kAZwTUvJ1IrMdX8C5w=="
+  crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<link rel="stylesheet"
+  href="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.34.0/min/vs/editor/editor.main.min.css"
+  integrity="sha512-iQEIc0rsSDujsfjtD+lfyJ1W23Bh/lbgriubKDAym6VlEIDRj9rrbSIyJRyshOrl8s0yRcQ0+gyrZfSLyjJGWQ=="
+  crossorigin="anonymous" referrerpolicy="no-referrer">
+<script type="module" src="editor.js"></script>
+<script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/2.0.1/model-viewer.min.js"></script>
+
+</html>

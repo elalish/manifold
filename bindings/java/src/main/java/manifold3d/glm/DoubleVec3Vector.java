@@ -16,7 +16,7 @@ import java.util.Iterator;
 import java.lang.Iterable;
 import java.util.NoSuchElementException;
 
-@Platform(include = {"<vector>", "glm/glm.hpp"})
+@Platform(compiler = "cpp17", include = {"<vector>", "glm/glm.hpp"})
 @Name("std::vector<glm::vec3>")
 public class DoubleVec3Vector extends Pointer implements Iterable<DoubleVec3> {
     static { Loader.load(); }

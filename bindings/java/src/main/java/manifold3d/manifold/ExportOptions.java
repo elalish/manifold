@@ -5,7 +5,7 @@ import manifold3d.manifold.Material;
 import org.bytedeco.javacpp.*;
 import org.bytedeco.javacpp.annotation.*;
 
-@Platform(include = "meshIO.h")
+@Platform(compiler = "cpp17", include = "meshIO.h")
 @Namespace("manifold")
 public class ExportOptions extends Pointer {
     static { Loader.load(); }

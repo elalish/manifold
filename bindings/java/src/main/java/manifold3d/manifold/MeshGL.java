@@ -6,7 +6,7 @@ import org.bytedeco.javacpp.annotation.*;
 import manifold3d.UIntVector;
 import manifold3d.FloatVector;
 
-@Platform(include = "meshIO.h")
+@Platform(compiler = "cpp17", include = "meshIO.h")
 @Namespace("manifold")
 public class MeshGL extends Pointer {
     static { Loader.load(); }

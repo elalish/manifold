@@ -5,7 +5,7 @@ import org.bytedeco.javacpp.annotation.*;
 
 import manifold3d.Manifold;
 
-@Platform(include = {"manifold.h"})
+@Platform(compiler = "cpp17", include = {"manifold.h"})
 @Name("std::pair<manifold::Manifold, manifold::Manifold>")
 public class ManifoldPair extends Pointer {
     static { Loader.load(); }

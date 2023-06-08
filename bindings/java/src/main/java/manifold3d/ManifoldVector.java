@@ -3,6 +3,7 @@ package manifold3d;
 import org.bytedeco.javacpp.*;
 import org.bytedeco.javacpp.annotation.*;
 
+import manifold3d.LibraryPaths;
 import java.util.ArrayList;
 import manifold3d.Manifold;
 
@@ -10,7 +11,7 @@ import java.util.Iterator;
 import java.lang.Iterable;
 import java.util.NoSuchElementException;
 
-@Platform(include = {"manifold.h", "<vector>"}, link = { "manifold" })
+@Platform(compiler = "cpp17", include = {"manifold.h", "<vector>"}, linkpath = { LibraryPaths.MANIFOLD_LIB_DIR }, link = { "manifold" })
 @Name("std::vector<manifold::Manifold>")
 public class ManifoldVector extends Pointer implements Iterable<Manifold>  {
     static { Loader.load(); }

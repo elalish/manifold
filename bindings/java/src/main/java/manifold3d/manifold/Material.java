@@ -8,7 +8,7 @@ import manifold3d.glm.DoubleVec4Vector;
 import manifold3d.glm.IntegerVec3;
 import manifold3d.glm.IntegerVec4;
 
-@Platform(include = "meshIO.h")
+@Platform(compiler = "cpp17", include = "meshIO.h")
 @Namespace("manifold")
 public class Material extends Pointer {
     static { Loader.load(); }

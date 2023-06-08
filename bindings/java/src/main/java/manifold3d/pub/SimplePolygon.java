@@ -14,7 +14,7 @@ import java.util.Iterator;
 import java.lang.Iterable;
 import java.util.NoSuchElementException;
 
-@Platform(include = {"manifold.h"})
+@Platform(compiler = "cpp17", include = {"manifold.h"})
 @Namespace("manifold")
 @Name("SimplePolygon")
 public class SimplePolygon extends Pointer implements Iterable<DoubleVec2> {

@@ -3,6 +3,7 @@ package manifold3d.manifold;
 import org.bytedeco.javacpp.*;
 import org.bytedeco.javacpp.annotation.*;
 
+import manifold3d.LibraryPaths;
 import java.util.ArrayList;
 import manifold3d.manifold.CrossSection;
 
@@ -10,7 +11,7 @@ import java.util.Iterator;
 import java.lang.Iterable;
 import java.util.NoSuchElementException;
 
-@Platform(include = {"manifold.h", "<vector>"}, link = { "manifold" })
+@Platform(compiler = "cpp17", include = {"manifold.h", "<vector>"}, linkpath = { LibraryPaths.MANIFOLD_LIB_DIR }, link = { "manifold" })
 @Name("std::vector<manifold::CrossSection>")
 public class CrossSectionVector extends Pointer implements Iterable<CrossSection> {
     static { Loader.load(); }

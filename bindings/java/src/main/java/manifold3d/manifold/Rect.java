@@ -3,11 +3,12 @@ package manifold3d.manifold;
 import org.bytedeco.javacpp.*;
 import org.bytedeco.javacpp.annotation.*;
 
+import manifold3d.LibraryPaths;
 import manifold3d.glm.DoubleVec2;
 import manifold3d.glm.DoubleMat3x2;
 import manifold3d.manifold.CrossSection;
 
-@Platform(include = "cross_section.h", link = { "manifold" })
+@Platform(compiler = "cpp17", include = "cross_section.h", linkpath = { LibraryPaths.MANIFOLD_LIB_DIR }, link = { "manifold" })
 @Namespace("manifold")
 public class Rect extends Pointer {
     static { Loader.load(); }

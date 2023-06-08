@@ -6,7 +6,7 @@ import manifold3d.glm.DoubleMat4x3;
 import org.bytedeco.javacpp.*;
 import org.bytedeco.javacpp.annotation.*;
 
-@Platform(include = "public.h")
+@Platform(compiler = "cpp17", include = "public.h")
 @Namespace("manifold")
 public class Box extends Pointer {
     static { Loader.load(); }

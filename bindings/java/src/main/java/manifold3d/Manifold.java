@@ -12,6 +12,7 @@ import manifold3d.FloatVector;
 import java.io.IOException;
 import java.io.File;
 
+import manifold3d.LibraryPaths;
 import manifold3d.ManifoldPair;
 import manifold3d.ManifoldVector;
 import manifold3d.manifold.MeshGL;
@@ -34,7 +35,7 @@ import manifold3d.glm.DoubleVec3;
 import org.bytedeco.javacpp.*;
 import org.bytedeco.javacpp.annotation.*;
 
-@Platform(include = {"manifold.h", "meshIO.h"}, link = {"manifold"})
+@Platform(compiler = "cpp17", include = {"manifold.h", "meshIO.h"}, linkpath = { LibraryPaths.MANIFOLD_LIB_DIR }, link = {"manifold"})
 @Namespace("manifold")
 public class Manifold extends Pointer {
     static {

@@ -9,7 +9,7 @@ import java.util.Iterator;
 import java.lang.Iterable;
 import java.util.NoSuchElementException;
 
-@Platform(include = "glm/glm.hpp")
+@Platform(compiler = "cpp17", include = "glm/glm.hpp")
 @Namespace("glm")
 @Name("mat3x2")
 public class DoubleMat3x2 extends DoublePointer implements Iterable<DoubleVec2> {
