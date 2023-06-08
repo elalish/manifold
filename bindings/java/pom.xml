@@ -40,18 +40,21 @@
                 <directory>../../build/meshIO</directory>
                 <includes>
                     <include>libmeshIO.so</include>
+                    <include>libmeshIO.dylib</include>
                 </includes>
             </resource>
             <resource>
                 <directory>../../build/src/manifold</directory>
                 <includes>
                     <include>libmanifold.so</include>
+                    <include>libmanifold.dylib</include>
                 </includes>
             </resource>
             <resource>
                 <directory>../../build/src/third_party/clipper2/CPP</directory>
                 <includes>
                     <include>libClipper2.so.1.2.1</include>
+                    <include>libClipper2.1.2.1.dylib</include>
                 </includes>
             </resource>
         </resources>
