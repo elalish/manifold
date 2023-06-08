@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {Box, Curvature, FillRule, JoinType, Mat4, Polygons, Properties, Rect, SealedFloat32Array, SealedUint32Array, SimplePolygon, Smoothness, Vec2, Vec3} from './manifold-global-types';
+import {Box, FillRule, JoinType, Mat4, Polygons, Properties, Rect, SealedFloat32Array, SealedUint32Array, SimplePolygon, Smoothness, Vec2, Vec3} from './manifold-global-types';
 
 /**
  * Triangulates a set of /epsilon-valid polygons.
@@ -582,6 +582,25 @@ export class Manifold {
       propFunc: (newProp: number[], position: Vec3, oldProp: number[]) => void):
       Manifold;
 
+  /**
+   * Curvature is the inverse of the radius of curvature, and signed such that
+   * positive is convex and negative is concave. There are two orthogonal
+   * principal curvatures at any point on a manifold, with one maximum and the
+   * other minimum. Gaussian curvature is their product, while mean
+   * curvature is their sum. This approximates them for every vertex and assigns
+   * them as vertex properties on the given channels.
+   *
+   * @param gaussianIdx The property channel index in which to store the
+   *     Gaussian curvature. An index < 3 will be ignored (stores nothing). The
+   *     property set will be automatically expanded to include the channel
+   *     index specified.
+   * @param meanIdx The property channel index in which to store the mean
+   *     curvature. An index < 3 will be ignored (stores nothing). The property
+   *     set will be automatically expanded to include the channel index
+   *     specified.
+   */
+  calculateCurvature(gaussianIdx: number, meanIdx: number): Manifold;
+
   // Boolean Operations
 
   /**
@@ -731,17 +750,6 @@ export class Manifold {
    * == 0.
    */
   getProperties(): Properties;
-
-  /**
-   * Curvature is the inverse of the radius of curvature, and signed such that
-   * positive is convex and negative is concave. There are two orthogonal
-   * principal curvatures at any point on a manifold, with one maximum and the
-   * other minimum. Gaussian curvature is their product, while mean
-   * curvature is their sum. This approximates them for every vertex (returned
-   * as vectors in the structure) and also returns their minimum and maximum
-   * values.
-   */
-  getCurvature(): Curvature;
 
   // Export
 

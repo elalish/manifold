@@ -92,7 +92,7 @@ struct Manifold::Impl {
 
   // properties.cu
   Properties GetProperties() const;
-  Curvature GetCurvature() const;
+  void CalculateCurvature(int gaussianIdx, int meanIdx);
   void CalculateBBox();
   bool IsFinite() const;
   bool IsIndexInBounds(const VecDH<glm::ivec3>& triVerts) const;

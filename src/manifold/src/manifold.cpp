@@ -408,18 +408,6 @@ Properties Manifold::GetProperties() const {
 }
 
 /**
- * Curvature is the inverse of the radius of curvature, and signed such that
- * positive is convex and negative is concave. There are two orthogonal
- * principal curvatures at any point on a manifold, with one maximum and the
- * other minimum. Gaussian curvature is their product, while mean
- * curvature is their sum. This approximates them for every vertex (returned as
- * vectors in the structure) and also returns their minimum and maximum values.
- */
-Curvature Manifold::GetCurvature() const {
-  return GetCsgLeafNode().GetImpl()->GetCurvature();
-}
-
-/**
  * If this mesh is an original, this returns its meshID that can be referenced
  * by product manifolds' MeshRelation. If this manifold is a product, this
  * returns -1.
@@ -616,6 +604,28 @@ Manifold Manifold::SetProperties(
   pImpl->CreateFaces();
   pImpl->SimplifyTopology();
   pImpl->Finish();
+  return Manifold(std::make_shared<CsgLeafNode>(pImpl));
+}
+
+/**
+ * Curvature is the inverse of the radius of curvature, and signed such that
+ * positive is convex and negative is concave. There are two orthogonal
+ * principal curvatures at any point on a manifold, with one maximum and the
+ * other minimum. Gaussian curvature is their product, while mean
+ * curvature is their sum. This approximates them for every vertex and assigns
+ * them as vertex properties on the given channels.
+ *
+ * @param gaussianIdx The property channel index in which to store the Gaussian
+ * curvature. An index < 0 will be ignored (stores nothing). The property set
+ * will be automatically expanded to include the channel index specified.
+ *
+ * @param meanIdx The property channel index in which to store the mean
+ * curvature. An index < 0 will be ignored (stores nothing). The property set
+ * will be automatically expanded to include the channel index specified.
+ */
+Manifold Manifold::CalculateCurvature(int gaussianIdx, int meanIdx) const {
+  auto pImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
+  pImpl->CalculateCurvature(gaussianIdx, meanIdx);
   return Manifold(std::make_shared<CsgLeafNode>(pImpl));
 }
 

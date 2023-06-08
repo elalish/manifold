@@ -300,17 +300,6 @@ Module.setup = function() {
     return result;
   };
 
-  Module.Manifold.prototype.getCurvature = function() {
-    const result = this._getCurvature();
-    const oldMeanCurvature = result.vertMeanCurvature;
-    const oldGaussianCurvature = result.vertGaussianCurvature;
-    result.vertMeanCurvature = fromVec(oldMeanCurvature);
-    result.vertGaussianCurvature = fromVec(oldGaussianCurvature);
-    oldMeanCurvature.delete();
-    oldGaussianCurvature.delete();
-    return result;
-  };
-
   Module.Manifold.prototype.boundingBox = function() {
     const result = this._boundingBox();
     return {

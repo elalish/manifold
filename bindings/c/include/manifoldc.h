@@ -136,11 +136,6 @@ ManifoldBox *manifold_bounding_box(void *mem, ManifoldManifold *m);
 float manifold_precision(ManifoldManifold *m);
 int manifold_genus(ManifoldManifold *m);
 ManifoldProperties manifold_get_properties(ManifoldManifold *m);
-ManifoldCurvature *manifold_get_curvature(void *mem, ManifoldManifold *m);
-ManifoldCurvatureBounds manifold_curvature_bounds(ManifoldCurvature *curv);
-size_t manifold_curvature_vert_length(ManifoldCurvature *curv);
-float *manifold_curvature_vert_mean(void *mem, ManifoldCurvature *curv);
-float *manifold_curvature_vert_gaussian(void *mem, ManifoldCurvature *curv);
 int manifold_get_circular_segments(float radius);
 int manifold_original_id(ManifoldManifold *m);
 
@@ -333,7 +328,6 @@ void manifold_destruct_polygons(ManifoldPolygons *p);
 void manifold_destruct_meshgl(ManifoldMeshGL *m);
 void manifold_destruct_box(ManifoldBox *b);
 void manifold_destruct_rect(ManifoldRect *b);
-void manifold_destruct_curvature(ManifoldCurvature *c);
 
 // pointer free + destruction
 void manifold_delete_manifold(ManifoldManifold *m);
@@ -345,7 +339,6 @@ void manifold_delete_polygons(ManifoldPolygons *p);
 void manifold_delete_meshgl(ManifoldMeshGL *m);
 void manifold_delete_box(ManifoldBox *b);
 void manifold_delete_rect(ManifoldRect *b);
-void manifold_delete_curvature(ManifoldCurvature *c);
 
 // MeshIO / Export
 #ifdef MANIFOLD_EXPORT

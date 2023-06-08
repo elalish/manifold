@@ -912,22 +912,28 @@ TEST(Manifold, Precision3) {
  * at each vertex against the constant expected values of spheres of different
  * radii and at different mesh resolutions.
  */
-TEST(Manifold, GetCurvature) {
+TEST(Manifold, CalculateCurvature) {
   const float precision = 0.015;
   for (int n = 4; n < 100; n *= 2) {
-    Manifold sphere = Manifold::Sphere(1, 64);
-    Curvature curvature = sphere.GetCurvature();
-    EXPECT_NEAR(curvature.minMeanCurvature, 2, 2 * precision);
-    EXPECT_NEAR(curvature.maxMeanCurvature, 2, 2 * precision);
-    EXPECT_NEAR(curvature.minGaussianCurvature, 1, precision);
-    EXPECT_NEAR(curvature.maxGaussianCurvature, 1, precision);
+    const int gaussianIdx = 3;
+    const int meanIdx = 4;
+    Manifold sphere = Manifold::Sphere(1, 64).CalculateCurvature(
+        gaussianIdx - 3, meanIdx - 3);
+    MeshGL sphereGL = sphere.GetMeshGL();
+    ASSERT_EQ(sphereGL.numProp, 5);
+    EXPECT_NEAR(GetMinProperty(sphereGL, meanIdx), 2, 2 * precision);
+    EXPECT_NEAR(GetMaxProperty(sphereGL, meanIdx), 2, 2 * precision);
+    EXPECT_NEAR(GetMinProperty(sphereGL, gaussianIdx), 1, precision);
+    EXPECT_NEAR(GetMaxProperty(sphereGL, gaussianIdx), 1, precision);
 
-    sphere = sphere.Scale(glm::vec3(2.0f));
-    curvature = sphere.GetCurvature();
-    EXPECT_NEAR(curvature.minMeanCurvature, 1, precision);
-    EXPECT_NEAR(curvature.maxMeanCurvature, 1, precision);
-    EXPECT_NEAR(curvature.minGaussianCurvature, 0.25, 0.25 * precision);
-    EXPECT_NEAR(curvature.maxGaussianCurvature, 0.25, 0.25 * precision);
+    sphere = sphere.Scale(glm::vec3(2.0f))
+                 .CalculateCurvature(gaussianIdx - 3, meanIdx - 3);
+    sphereGL = sphere.GetMeshGL();
+    ASSERT_EQ(sphereGL.numProp, 5);
+    EXPECT_NEAR(GetMinProperty(sphereGL, meanIdx), 1, precision);
+    EXPECT_NEAR(GetMaxProperty(sphereGL, meanIdx), 1, precision);
+    EXPECT_NEAR(GetMinProperty(sphereGL, gaussianIdx), 0.25, 0.25 * precision);
+    EXPECT_NEAR(GetMaxProperty(sphereGL, gaussianIdx), 0.25, 0.25 * precision);
   }
 }
 

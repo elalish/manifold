@@ -41,6 +41,8 @@ MeshGL CubeSTL();
 MeshGL WithIndexColors(const Mesh& in);
 MeshGL WithPositionColors(const Manifold& in);
 MeshGL WithNormals(const Manifold& in);
+float GetMaxProperty(const MeshGL& mesh, int channel);
+float GetMinProperty(const MeshGL& mesh, int channel);
 void Identical(const Mesh& mesh1, const Mesh& mesh2);
 void RelatedGL(const Manifold& out, const std::vector<MeshGL>& originals,
                bool checkNormals = false, bool updateNormals = false);
