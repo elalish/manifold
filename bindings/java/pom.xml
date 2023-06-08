@@ -39,26 +39,29 @@
     <build>
         <resources>
             <resource>
-                <directory>../../build/meshIO</directory>
+                <directory>${manifold.build.directory}/meshIO</directory>
                 <includes>
                     <include>libmeshIO.so</include>
                     <include>meshIO.dll</include>
+                    <include>meshIO.lib</include>
                     <include>libmeshIO.dylib</include>
                 </includes>
             </resource>
             <resource>
-                <directory>../../build/src/manifold</directory>
+                <directory>${manifold.build.directory}/src/manifold</directory>
                 <includes>
                     <include>libmanifold.so</include>
                     <include>manifold.dll</include>
+                    <include>manifold.lib</include>
                     <include>libmanifold.dylib</include>
                 </includes>
             </resource>
             <resource>
-                <directory>../../build/src/third_party/clipper2/CPP</directory>
+                <directory>${manifold.build.directory}/src/third_party/clipper2/CPP</directory>
                 <includes>
                     <include>libClipper2.so.1.2.1</include>
                     <include>Clipper2.dll</include>
+                    <include>Clipper2.lib</include>
                     <include>libClipper2.dylib.1.2.1</include>
                 </includes>
             </resource>
@@ -95,9 +98,10 @@
                         </goals>
                         <configuration>
                             <includes>
-                                <include>${project.build.directory}/../../../build/src/manifold/</include>
+                                <include>${manifold.build.directory}/src/manifold/</include>
                             </includes>
-                            <compilerProperties>                                <java.library.path>../../build/src/manifold/</java.library.path>
+                            <compilerProperties>
+                                <java.library.path>${manifold.build.directory}/src/manifold/</java.library.path>
                             </compilerProperties>
                             <classOrPackageNames>
                                 <classOrPackageName>manifold3d.*</classOrPackageName>
@@ -107,8 +111,8 @@
                             </classOrPackageNames>
 
 
-                    <compilerProperties>                                <java.library.path>${project.build.directory}/../../../build/src/manifold/</java.library.path>
-
+                    <compilerProperties>
+                        <java.library.path>${manifold.build.directory}/src/manifold/</java.library.path>
                     </compilerProperties>
                         </configuration>
                     </execution>
