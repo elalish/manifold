@@ -10,13 +10,15 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.source>11</maven.compiler.source>
         <maven.compiler.target>11</maven.compiler.target>
+        <manifold.root.directory>${project.build.directory}/../../..</manifold.root.directory>
+        <manifold.build.directory>${manifold.root.directory}/build</manifold.build.directory>
     </properties>
-    
+
     <dependencies>
         <dependency>
             <groupId>org.bytedeco</groupId>
             <artifactId>javacpp</artifactId>
-            <version>1.0</version>
+            <version>1.5.9</version>
         </dependency>
         <dependency>
             <groupId>junit</groupId>
@@ -65,21 +67,20 @@
            <plugin>
                 <groupId>org.bytedeco</groupId>
                 <artifactId>javacpp</artifactId>
-                <version>1.0</version>
+                <version>1.5.9</version>
                 <configuration>
                     <classPath>${project.build.outputDirectory}</classPath>
                     <libraryPath>${project.build.directory}/../../../build/src/manifold/</libraryPath>
-                    <compilerOptions>-L../../build/src/manifold/,-L../../build/meshIO/</compilerOptions>
                     <includePaths>
                         <includePath>${project.build.sourceDirectory}</includePath>
                         <includePath>src/main/cpp/manifold3d/</includePath>
-                        <includePath>../../src/cross_section/include/</includePath>
-                        <includePath>../../src/third_party/clipper2/CPP/Clipper2Lib/include/</includePath>
-                        <includePath>../../src/third_party/glm/</includePath>
-                        <includePath>../../src/polygon/include</includePath>
-                        <includePath>../../src/manifold/include/</includePath>
-                        <includePath>../../src/utilities/include/</includePath>
-                        <includePath>../../meshIO/include/</includePath>
+                        <includePath>${manifold.root.directory}/src/cross_section/include/</includePath>
+                        <includePath>${manifold.root.directory}/src/third_party/clipper2/CPP/Clipper2Lib/include/</includePath>
+                        <includePath>${manifold.root.directory}/src/third_party/glm/</includePath>
+                        <includePath>${manifold.root.directory}/src/polygon/include</includePath>
+                        <includePath>${manifold.root.directory}/src/manifold/include/</includePath>
+                        <includePath>${manifold.root.directory}/src/utilities/include/</includePath>
+                        <includePath>${manifold.root.directory}/meshIO/include/</includePath>
                     </includePaths>
                     <preload>libmanifold.so</preload>
                     <copyLibs>false</copyLibs>
@@ -115,4 +116,51 @@
             </plugin>
         </plugins>
     </build>
+
+ <profiles>
+        <profile>
+            <id>linux-build</id>
+            <activation>
+                <os>
+                    <family>unix</family>
+                </os>
+            </activation>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.bytedeco</groupId>
+                        <artifactId>javacpp</artifactId>
+                        <version>1.5.9</version>
+                        <configuration>
+                            <!-- Place linux-specific configurations here -->
+                            <compilerOptions>-L${manifold.build.directory}/src/manifold/,-L${manifold.build.directory}/meshIO/,-std=c++17</compilerOptions>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+
+        <profile>
+            <id>windows</id>
+            <activation>
+                <os>
+                    <family>unix</family>
+                </os>
+            </activation>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.bytedeco</groupId>
+                        <artifactId>javacpp</artifactId>
+                        <version>1.5.9</version>
+                        <configuration>
+                            <!-- Place linux-specific configurations here -->
+                            <compilerOptions>/LIBPATH:${manifold.build.directory}/src/manifold/,/LIBPATH:${manifold.build.directory}/meshIO,/std:c++17</compilerOptions>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
+
 </project>
