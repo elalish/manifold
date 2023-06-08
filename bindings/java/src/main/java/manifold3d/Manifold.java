@@ -43,6 +43,7 @@ public class Manifold extends Pointer {
         String osName = System.getProperty("os.name").toLowerCase();
         if (osName.contains("linux")) {
             try {
+                System.out.println("Loading Linux libs...");
                 System.load(Loader.extractResource("/libmeshIO.so", null, "libmeshIO", ".so").getAbsolutePath());
                 System.load(Loader.extractResource("/libmanifold.so", null, "libmanifold", ".so").getAbsolutePath());
                 System.load(Loader.extractResource("/libClipper2.so.1.2.1", null, "libClipper2", ".so").getAbsolutePath());
@@ -51,6 +52,7 @@ public class Manifold extends Pointer {
             }
         } else if (osName.contains("windows")) {
             try {
+                System.out.println("Loading Windows libs...");
                 System.load(Loader.extractResource("/meshIO.dll", null, "meshIO", ".dll").getAbsolutePath());
                 System.load(Loader.extractResource("/manifold.dll", null, "manifold", ".dll").getAbsolutePath());
                 System.load(Loader.extractResource("/Clipper2.dll", null, "Clipper2", ".dll").getAbsolutePath());
@@ -59,6 +61,7 @@ public class Manifold extends Pointer {
             }
         } else if (osName.contains("mac")) {
             try {
+                System.out.println("Loading Mac libs...");
                 System.load(Loader.extractResource("/libmeshIO.dylib", null, "libmeshIO", ".dylib").getAbsolutePath());
                 System.load(Loader.extractResource("/libmanifold.dylib", null, "libmanifold", ".dylib").getAbsolutePath());
                 System.load(Loader.extractResource("/libClipper2.dylib.1.2.1", null, "libClipper2", ".dylib").getAbsolutePath());
