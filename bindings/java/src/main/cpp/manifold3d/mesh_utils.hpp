@@ -155,4 +155,98 @@ manifold::Manifold Loft(const manifold::CrossSection section, const std::vector<
     return Loft(sections, transforms);
 }
 
+manifold::Manifold Revolve(const manifold::CrossSection& crossSection,
+                           int circularSegments,
+                           float revolveDegrees = 360.0f) {
+
+    manifold::Rect bounds = crossSection.Bounds();
+    manifold::Polygons polygons;
+
+    // Take the x>=0 slice.
+    if (bounds.min.x < 0) {
+        glm::vec2 min = bounds.min;
+        glm::vec2 max = bounds.max;
+        manifold::CrossSection posBoundingBox = manifold::CrossSection({{0.0, min.y},{max.x, min.y},
+                                                                        {max.x,max.y},{0.0,max.y}});
+
+        // Can't use RectClip unfortunately as it has many failure cases.
+        polygons = (crossSection ^ posBoundingBox).ToPolygons();
+    } else {
+        polygons = crossSection.ToPolygons();
+    }
+
+    float radius = 0.0f;
+    for (const auto& poly : polygons) {
+        for (const auto& vert : poly) {
+            radius = fmax(radius, vert.x);
+        }
+    }
+
+    bool isFullRevolution = revolveDegrees >= 360.0f;
+
+    int nDivisions = circularSegments > 2 ? circularSegments
+        : manifold::Quality::GetCircularSegments(radius);
+
+    std::vector<glm::vec3> vertPos;
+    std::vector<glm::ivec3> triVerts;
+
+    std::vector<int> startPoses;
+    std::vector<int> endPoses;
+
+    float dPhi = revolveDegrees / nDivisions;
+
+    for (const auto& poly : polygons) {
+        for (std::size_t polyVert = 0; polyVert < poly.size(); ++polyVert) {
+
+            int startVert = vertPos.size();
+
+            if (!isFullRevolution)
+                startPoses.push_back(startVert);
+
+            // first and last slice are distinguished if not a full revolution.
+            int nSlices = isFullRevolution ? nDivisions : nDivisions + 1;
+            int lastStart = startVert + (polyVert == 0 ? nSlices * (poly.size() - 1) : -nSlices);
+
+            for (int slice = 0; slice < nSlices; ++slice) {
+
+                float phi = slice * dPhi;
+                glm::vec2 pos = poly[polyVert];
+                glm::vec3 p = {pos.x * manifold::cosd(phi), pos.x * manifold::sind(phi), pos.y};
+                vertPos.push_back(p);
+
+                int lastSlice = (slice == 0 ? nDivisions : slice) - 1;
+                if (isFullRevolution || slice > 0) {
+                    triVerts.push_back({startVert + slice, startVert + lastSlice,
+                            lastStart + lastSlice});
+                    triVerts.push_back(
+                        {lastStart + lastSlice, lastStart + slice, startVert + slice});
+                }
+
+            }
+            if (!isFullRevolution)
+                endPoses.push_back(vertPos.size() -1);
+        }
+    }
+
+    // Add front and back triangles if not a full revolution.
+    if (!isFullRevolution ) {
+        std::vector<glm::ivec3> frontTriangles = manifold::Triangulate(polygons, 0.0001);
+        for (auto& tv: frontTriangles) {
+            glm::vec3 t = {startPoses[tv.x], startPoses[tv.y], startPoses[tv.z]};
+            triVerts.push_back(t);
+        }
+
+        for (auto& v: frontTriangles) {
+            glm::vec3 t = {endPoses[v.z], endPoses[v.y], endPoses[v.x]};
+            triVerts.push_back(t);
+        }
+    }
+
+    manifold::Mesh mesh;
+    mesh.vertPos = vertPos;
+    mesh.triVerts = triVerts;
+    return manifold::Manifold(mesh);
+}
+
+
 }

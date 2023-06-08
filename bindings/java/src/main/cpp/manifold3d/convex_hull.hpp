@@ -38,23 +38,23 @@ void QuickHull3D(const std::vector<glm::vec3>& inputVerts, std::vector<glm::ivec
     using PointType = std::array<float, dim>;
     using Points = std::vector<PointType>;
 
-    Points points(inputVerts.size()); // input
+    Points points(inputVerts.size());
 
     for (std::size_t i = 0; i < inputVerts.size(); ++i) {
         auto pt = inputVerts[i];
         points[i] = {pt.x, pt.y, pt.z};
     }
 
-    QuickHull::quick_hull<typename Points::const_iterator> quickhulltmp{dim, precision};
-    quickhulltmp.add_points(std::cbegin(points), std::cend(points));
-    auto initial_simplex = quickhulltmp.get_affine_basis();
+    QuickHull::quick_hull<typename Points::const_iterator> quickhull{dim, precision};
+    quickhull.add_points(std::cbegin(points), std::cend(points));
+    auto initial_simplex = quickhull.get_affine_basis();
 
-    quickhulltmp.create_initial_simplex(std::cbegin(initial_simplex), std::prev(std::cend(initial_simplex)));
-    quickhulltmp.create_convex_hull();
+    quickhull.create_initial_simplex(std::cbegin(initial_simplex), std::prev(std::cend(initial_simplex)));
+    quickhull.create_convex_hull();
 
     std::unordered_map<std::array<float, 3>, int, vec3_hash> vertIndices;
 
-    for (const auto& facet : quickhulltmp.facets_) {
+    for (const auto& facet : quickhull.facets_) {
         for(const auto& vertex : facet.vertices_) {
 
             auto vert = *vertex;
@@ -67,8 +67,7 @@ void QuickHull3D(const std::vector<glm::vec3>& inputVerts, std::vector<glm::ivec
         }
     }
 
-    for (const auto& facet : quickhulltmp.facets_) {
-        //if(facet.vertices_.size() < 3) continue;  // Skip degenerate facets
+    for (const auto& facet : quickhull.facets_) {
 
         auto vert = *facet.vertices_[0];
         int firstVertIndex = vertIndices[{vert[0], vert[1], vert[2]}];
@@ -127,17 +126,17 @@ manifold::SimplePolygon QuickHull2D(const manifold::SimplePolygon& inputVerts, c
         points[i] = {pt.x, pt.y};
     }
 
-    QuickHull::quick_hull<typename Points::const_iterator> quickhulltmp{dim, precision};
-    quickhulltmp.add_points(std::cbegin(points), std::cend(points));
-    auto initial_simplex = quickhulltmp.get_affine_basis();
+    QuickHull::quick_hull<typename Points::const_iterator> quickhull{dim, precision};
+    quickhull.add_points(std::cbegin(points), std::cend(points));
+    auto initial_simplex = quickhull.get_affine_basis();
 
-    quickhulltmp.create_initial_simplex(std::cbegin(initial_simplex), std::prev(std::cend(initial_simplex)));
-    quickhulltmp.create_convex_hull();
+    quickhull.create_initial_simplex(std::cbegin(initial_simplex), std::prev(std::cend(initial_simplex)));
+    quickhull.create_convex_hull();
 
     std::unordered_map<std::array<float, 2>, int, vec2_hash> vertIndices;
     manifold::SimplePolygon ret;
 
-    for (const auto& facet : quickhulltmp.facets_) {
+    for (const auto& facet : quickhull.facets_) {
         for(const auto& vertex : facet.vertices_) {
 
             auto vert = *vertex;

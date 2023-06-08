@@ -141,8 +141,7 @@ class Manifold {
                           int nDivisions = 0, float twistDegrees = 0.0f,
                           glm::vec2 scaleTop = glm::vec2(1.0f));
   static Manifold Revolve(const CrossSection& crossSection,
-                          int circularSegments = 0,
-                          float revolveDegrees = 360.0f);
+                          int circularSegments = 0);
   ///@}
 
   /** @name Topological

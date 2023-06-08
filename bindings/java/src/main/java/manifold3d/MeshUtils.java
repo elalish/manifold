@@ -32,4 +32,7 @@ public class MeshUtils extends Pointer {
 
     public static native @ByVal Manifold Loft(@ByRef CrossSectionVector sections, @ByRef DoubleMat4x3Vector transforms);
     public static native @ByVal Manifold Loft(@ByRef CrossSection section, @ByRef DoubleMat4x3Vector transforms);
+
+    public static native @ByVal Manifold Revolve(@ByRef CrossSection crossSection, int circularSegments);
+    public static native @ByVal Manifold Revolve(@ByRef CrossSection crossSection, int circularSegments, float revolveDegrees);
 }

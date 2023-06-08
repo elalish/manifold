@@ -319,25 +319,8 @@ Manifold Manifold::Extrude(const CrossSection& crossSection, float height,
  * calculated by the static Defaults.
  */
 Manifold Manifold::Revolve(const CrossSection& crossSection,
-                           int circularSegments,
-                           float revolveDegrees) {
-
-  Rect bounds = crossSection.Bounds();
-  Polygons polygons;
-
-  // Take the x>=0 slice.
-  if (bounds.min.x < 0) {
-    glm::vec2 min = bounds.min;
-    glm::vec2 max = bounds.max;
-    CrossSection posBoundingBox = CrossSection({{0.0, min.y},{max.x, min.y},
-                                                {max.x,max.y},{0.0,max.y}});
-
-    // Can't use RectClip unfortunately as it has many failure cases.
-    polygons = (crossSection ^ posBoundingBox).ToPolygons();
-  } else {
-    polygons = crossSection.ToPolygons();
-  }
-
+                           int circularSegments) {
+  auto polygons = crossSection.ToPolygons();
   if (polygons.size() == 0) {
     return Invalid();
   }
@@ -348,70 +331,82 @@ Manifold Manifold::Revolve(const CrossSection& crossSection,
       radius = fmax(radius, vert.x);
     }
   }
-
-  bool isFullRevolution = revolveDegrees >= 360.0f;
-
   int nDivisions = circularSegments > 2 ? circularSegments
                                         : Quality::GetCircularSegments(radius);
-
   auto pImpl_ = std::make_shared<Impl>();
   auto& vertPos = pImpl_->vertPos_;
   VecDH<glm::ivec3> triVertsDH;
   auto& triVerts = triVertsDH;
-
-  std::vector<int> startPoses;
-  std::vector<int> endPoses;
-
-  float dPhi = revolveDegrees / nDivisions;
-
+  float dPhi = 360.0f / nDivisions;
   for (const auto& poly : polygons) {
+    int start = -1;
     for (int polyVert = 0; polyVert < poly.size(); ++polyVert) {
-
-      int startVert = vertPos.size();
-
-      if (!isFullRevolution)
-        startPoses.push_back(startVert);
-
-      // first and last slice are distinguished if not a full revolution.
-      int nSlices = isFullRevolution ? nDivisions : nDivisions + 1;
-      int lastStart = startVert + (polyVert == 0 ? nSlices * (poly.size() - 1) : -nSlices);
-
-      for (int slice = 0; slice < nSlices; ++slice) {
-
-        float phi = slice * dPhi;
-        glm::vec2 pos = poly[polyVert];
-        glm::vec3 p = {pos.x * cosd(phi), pos.x * sind(phi), pos.y};
-        vertPos.push_back(p);
-
-        int lastSlice = (slice == 0 ? nDivisions : slice) - 1;
-        if (isFullRevolution || slice > 0) {
-          triVerts.push_back({startVert + slice, startVert + lastSlice,
-              lastStart + lastSlice});
-          triVerts.push_back(
-            {lastStart + lastSlice, lastStart + slice, startVert + slice});
-        }
-
+      if (poly[polyVert].x <= 0) {
+        start = polyVert;
+        break;
       }
-      if (!isFullRevolution)
-        endPoses.push_back(vertPos.size() -1);
+    }
+    if (start == -1) {  // poly all positive
+      for (int polyVert = 0; polyVert < poly.size(); ++polyVert) {
+        int startVert = vertPos.size();
+        int lastStart =
+            startVert +
+            (polyVert == 0 ? nDivisions * (poly.size() - 1) : -nDivisions);
+        for (int slice = 0; slice < nDivisions; ++slice) {
+          int lastSlice = (slice == 0 ? nDivisions : slice) - 1;
+          float phi = slice * dPhi;
+          glm::vec2 pos = poly[polyVert];
+          vertPos.push_back({pos.x * cosd(phi), pos.x * sind(phi), pos.y});
+          triVerts.push_back({startVert + slice, startVert + lastSlice,
+                              lastStart + lastSlice});
+          triVerts.push_back(
+              {lastStart + lastSlice, lastStart + slice, startVert + slice});
+        }
+      }
+    } else {  // poly crosses zero
+      int polyVert = start;
+      glm::vec2 pos = poly[polyVert];
+      do {
+        glm::vec2 lastPos = pos;
+        polyVert = (polyVert + 1) % poly.size();
+        pos = poly[polyVert];
+        if (pos.x > 0) {
+          if (lastPos.x <= 0) {
+            float a = pos.x / (pos.x - lastPos.x);
+            vertPos.push_back({0.0f, 0.0f, glm::mix(pos.y, lastPos.y, a)});
+          }
+          int startVert = vertPos.size();
+          for (int slice = 0; slice < nDivisions; ++slice) {
+            int lastSlice = (slice == 0 ? nDivisions : slice) - 1;
+            float phi = slice * dPhi;
+            glm::vec2 pos = poly[polyVert];
+            vertPos.push_back({pos.x * cosd(phi), pos.x * sind(phi), pos.y});
+            if (lastPos.x > 0) {
+              triVerts.push_back({startVert + slice, startVert + lastSlice,
+                                  startVert - nDivisions + lastSlice});
+              triVerts.push_back({startVert - nDivisions + lastSlice,
+                                  startVert - nDivisions + slice,
+                                  startVert + slice});
+            } else {
+              triVerts.push_back(
+                  {startVert - 1, startVert + slice, startVert + lastSlice});
+            }
+          }
+        } else if (lastPos.x > 0) {
+          int startVert = vertPos.size();
+          float a = pos.x / (pos.x - lastPos.x);
+          vertPos.push_back({0.0f, 0.0f, glm::mix(pos.y, lastPos.y, a)});
+          for (int slice = 0; slice < nDivisions; ++slice) {
+            int lastSlice = (slice == 0 ? nDivisions : slice) - 1;
+            triVerts.push_back({startVert, startVert - nDivisions + lastSlice,
+                                startVert - nDivisions + slice});
+          }
+        }
+      } while (polyVert != start);
     }
   }
 
-  // Add front and back triangles if not a full revolution.
-  if (!isFullRevolution ) {
-      std::vector<glm::ivec3> frontTriangles = Triangulate(polygons, pImpl_->precision_);
-      for (auto& tv: frontTriangles) {
-        glm::vec3 t = {startPoses[tv.x], startPoses[tv.y], startPoses[tv.z]};
-        triVerts.push_back(t);
-      }
-
-      for (auto& v: frontTriangles) {
-        glm::vec3 t = {endPoses[v.z], endPoses[v.y], endPoses[v.x]};
-        triVerts.push_back(t);
-      }
-  }
-
-  pImpl_->CreateHalfedges(triVerts);
+  pImpl_->CreateHalfedges(triVertsDH);
   pImpl_->Finish();
   pImpl_->meshRelation_.originalID = ReserveIDs(1);
   pImpl_->InitializeOriginal();
