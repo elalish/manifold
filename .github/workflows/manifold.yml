@@ -166,106 +166,106 @@ jobs:
  #       path: bindings/wasm/examples/dist/
  #       retention-days: 90
 
- # build_windows:
+ build_windows:
+   timeout-minutes: 30
+   strategy:
+     matrix:
+       parallel_backend: [NONE]
+       cuda_support: [OFF]
+     max-parallel: 1
+   runs-on: windows-2019
+   if: github.event.pull_request.draft == false
+   steps:
+   - uses: actions/checkout@v3
+     with:
+       submodules: recursive
+   - uses: jwlawson/actions-setup-cmake@v1.12
+   - uses: ilammy/msvc-dev-cmd@v1
+   - name: Install CUDA
+     if: matrix.backend == 'CUDA'
+     env:
+       cuda: "11.3.0"
+       visual_studio: "Visual Studio 16 2019"
+     shell: powershell
+     run: |
+       Invoke-RestMethod https://raw.githubusercontent.com/ptheywood/cuda-cmake-github-actions/21811d232fc775fa8d44dddf7f8c5ce2cf8d2b81/scripts/actions/install_cuda_windows.ps1 -OutFile install_cuda_windows.ps1
+       .\install_cuda_windows.ps1
+   - name: nvcc check
+     if: matrix.backend == 'CUDA'
+     shell: powershell
+     run: |
+       nvcc -V
+       ls $env:CUDA_PATH
+       ls $env:CUDA_PATH\bin
+       ls $env:CUDA_PATH\include
+   - name: Build ${{matrix.backend}}
+     shell: powershell
+     run: |
+       cmake . -DBUILD_SHARED_LIBS=ON -DCMAKE_BUILD_TYPE=Release -B build -DMANIFOLD_DEBUG=ON -DPYBIND11_FINDPYTHON=OFF -DMANIFOLD_PAR=${{matrix.parallel_backend}} -DMANIFOLD_USE_CUDA=${{matrix.cuda_support}} -A x64
+       cd build
+       cmake --build . --target ALL_BUILD --config Release
+   - name: Test ${{matrix.parallel_backend}} with CUDA ${{matrix.cuda_support}}
+     shell: bash
+     run: |
+       cd build/test
+       ./Release/manifold_test.exe
+
+ # build_mac:
  #   timeout-minutes: 30
  #   strategy:
  #     matrix:
- #       parallel_backend: [NONE]
- #       cuda_support: [OFF]
- #     max-parallel: 1
- #   runs-on: windows-2019
+ #       parallel_backend: [NONE, TBB]
+ #   runs-on: macos-latest
  #   if: github.event.pull_request.draft == false
  #   steps:
+ #   - name: Install common dependencies
+ #     run: |
+ #       brew install pkg-config assimp
+ #       pip install trimesh
+ #   - name: Install OpenMP
+ #     if: matrix.parallel_backend == 'OMP'
+ #     run: brew install libomp
+ #   - name: Install TBB
+ #     if: matrix.parallel_backend == 'TBB'
+ #     run: brew install tbb
+ #   - name: Install Java and Maven
+ #     run: |
+ #       brew install openjdk@11
+ #       brew install maven
+ #       echo "JAVA_HOME=$(/usr/libexec/java_home -v 11)" >> $GITHUB_ENV
+ #   - name: Check Java version
+ #     run: java -version
  #   - uses: actions/checkout@v3
  #     with:
  #       submodules: recursive
  #   - uses: jwlawson/actions-setup-cmake@v1.12
- #   - uses: ilammy/msvc-dev-cmd@v1
- #   - name: Install CUDA
- #     if: matrix.backend == 'CUDA'
- #     env:
- #       cuda: "11.3.0"
- #       visual_studio: "Visual Studio 16 2019"
- #     shell: powershell
+ #   - name: Build
  #     run: |
- #       Invoke-RestMethod https://raw.githubusercontent.com/ptheywood/cuda-cmake-github-actions/21811d232fc775fa8d44dddf7f8c5ce2cf8d2b81/scripts/actions/install_cuda_windows.ps1 -OutFile install_cuda_windows.ps1
- #       .\install_cuda_windows.ps1
- #   - name: nvcc check
- #     if: matrix.backend == 'CUDA'
- #     shell: powershell
- #     run: |
- #       nvcc -V
- #       ls $env:CUDA_PATH
- #       ls $env:CUDA_PATH\bin
- #       ls $env:CUDA_PATH\include
- #   - name: Build ${{matrix.backend}}
- #     shell: powershell
- #     run: |
- #       cmake . -DCMAKE_BUILD_TYPE=Release -B build -DMANIFOLD_DEBUG=ON -DPYBIND11_FINDPYTHON=OFF -DMANIFOLD_PAR=${{matrix.parallel_backend}} -DMANIFOLD_USE_CUDA=${{matrix.cuda_support}} -A x64
+ #       mkdir build
  #       cd build
- #       cmake --build . --target ALL_BUILD --config Release
- #   - name: Test ${{matrix.parallel_backend}} with CUDA ${{matrix.cuda_support}}
- #     shell: bash
+ #       cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DMANIFOLD_DEBUG=ON -DMANIFOLD_EXPORT=ON -DMANIFOLD_PAR=${{matrix.parallel_backend}} .. && make
+ #   - name: Check files
+ #     run: |
+ #       ls build/meshIO/;
+ #       if [[ -f build/meshIO/libmeshIO.dylib ]]; then
+ #         echo "Files exist."
+ #       else
+ #         echo "One or more required files do not exist."
+ #         exit 1
+ #       fi
+ #   - name: Build Java package
+ #     run: |
+ #       cd bindings/java
+ #       mvn package
+ #   - name: Test
  #     run: |
  #       cd build/test
- #       ./Release/manifold_test.exe
-
-  build_mac:
-    timeout-minutes: 30
-    strategy:
-      matrix:
-        parallel_backend: [NONE, TBB]
-    runs-on: macos-latest
-    if: github.event.pull_request.draft == false
-    steps:
-    - name: Install common dependencies
-      run: |
-        brew install pkg-config assimp
-        pip install trimesh
-    - name: Install OpenMP
-      if: matrix.parallel_backend == 'OMP'
-      run: brew install libomp
-    - name: Install TBB
-      if: matrix.parallel_backend == 'TBB'
-      run: brew install tbb
-    - name: Install Java and Maven
-      run: |
-        brew install openjdk@11
-        brew install maven
-        echo "JAVA_HOME=$(/usr/libexec/java_home -v 11)" >> $GITHUB_ENV
-    - name: Check Java version
-      run: java -version
-    - uses: actions/checkout@v3
-      with:
-        submodules: recursive
-    - uses: jwlawson/actions-setup-cmake@v1.12
-    - name: Build
-      run: |
-        mkdir build
-        cd build
-        cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DMANIFOLD_DEBUG=ON -DMANIFOLD_EXPORT=ON -DMANIFOLD_PAR=${{matrix.parallel_backend}} .. && make
-    - name: Check files
-      run: |
-        ls build/meshIO/;
-        if [[ -f build/meshIO/libmeshIO.dylib ]]; then
-          echo "Files exist."
-        else
-          echo "One or more required files do not exist."
-          exit 1
-        fi
-    - name: Build Java package
-      run: |
-        cd bindings/java
-        mvn package
-    - name: Test
-      run: |
-        cd build/test
-        ./manifold_test
-    - name: Upload artifact
-      uses: actions/upload-artifact@v3
-      with:
-        name: java-package-mac
-        path: bindings/java/target/*.jar
+ #       ./manifold_test
+ #   - name: Upload artifact
+ #     uses: actions/upload-artifact@v3
+ #     with:
+ #       name: java-package-mac
+ #       path: bindings/java/target/*.jar
 
 #  build_nix:
 #    timeout-minutes: 30
