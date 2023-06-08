@@ -31,12 +31,27 @@ jobs:
       with:
         submodules: recursive
     - uses: jwlawson/actions-setup-cmake@v1.12
+    - name: Setup Java
+      uses: actions/setup-java@v2
+      with:
+        java-version: '11'
+        distribution: 'adopt'
+    - name: Cache Maven packages
+      uses: actions/cache@v3
+      with:
+        path: ~/.m2
+        key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+        restore-keys: ${{ runner.os }}-m2
     - name: Build ${{matrix.backend}}
       if: matrix.parallel_backend != 'NONE' || matrix.cuda_support != 'OFF'
       run: |
         mkdir build
         cd build
         cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DMANIFOLD_DEBUG=ON -DMANIFOLD_EXPORT=ON -DMANIFOLD_PAR=${{matrix.parallel_backend}} -DMANIFOLD_USE_CUDA=${{matrix.cuda_support}} .. && make
+    - name: Build Java package
+      run: |
+        cd bindings/java
+        mvn package
     - name: Test ${{matrix.parallel_backend}} with CUDA ${{matrix.cuda_support}}
       # note that the test for CUDA backend does not really test CUDA, as we
       # don't have CUDA GPU on GitHub Action
@@ -69,6 +84,11 @@ jobs:
         files: build/code_coverage.info
         fail_ci_if_error: false
         name: ${{matrix.parallel_backend}}-${{matrix.cuda_support}}
+    - name: Upload artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: java-package
+        path: bindings/java/target/*.jar
 
   build_cbind:
     timeout-minutes: 30
