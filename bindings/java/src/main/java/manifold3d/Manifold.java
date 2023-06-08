@@ -45,7 +45,9 @@ public class Manifold extends Pointer {
             try {
                 System.out.println("Loading Linux libs...");
                 System.load(Loader.extractResource("/libmeshIO.so", null, "libmeshIO", ".so").getAbsolutePath());
+                System.out.println("Loading Manifold lib...");
                 System.load(Loader.extractResource("/libmanifold.so", null, "libmanifold", ".so").getAbsolutePath());
+                System.out.println("Loading Clipper lib...");
                 System.load(Loader.extractResource("/libClipper2.so.1.2.1", null, "libClipper2", ".so").getAbsolutePath());
             } catch (IOException e) {
                 throw new RuntimeException(e);
