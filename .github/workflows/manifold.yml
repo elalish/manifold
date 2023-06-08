@@ -181,6 +181,12 @@ jobs:
         submodules: recursive
     - uses: jwlawson/actions-setup-cmake@v1.12
     - uses: ilammy/msvc-dev-cmd@v1
+    - uses: actions/setup-java@v2
+      with:
+        java-version: '11'
+        distribution: 'adopt'
+    - name: Install Maven
+      run: choco install maven
     - name: Install CUDA
       if: matrix.backend == 'CUDA'
       env:
@@ -209,6 +215,15 @@ jobs:
       run: |
         cd build/test
         ./Release/manifold_test.exe
+    - name: Build Java bindings
+      run: |
+        cd bindings/java
+        mvn package
+    - name: Upload Java artifacts
+      uses: actions/upload-artifact@v2
+      with:
+        name: java_artifacts_${{matrix.parallel_backend}}_${{matrix.cuda_support}}
+        path: bindings/java/target/*.jar
 
   build_mac:
     timeout-minutes: 30
@@ -232,6 +247,9 @@ jobs:
       run: |
         brew install openjdk@11
         brew install maven
+        echo "JAVA_HOME=$(/usr/libexec/java_home -v 11)" >> $GITHUB_ENV
+    - name: Check Java version
+      run: java -version
     - uses: actions/checkout@v3
       with:
         submodules: recursive
