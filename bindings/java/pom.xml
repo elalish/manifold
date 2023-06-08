@@ -119,7 +119,7 @@
 
  <profiles>
         <profile>
-            <id>linux-build</id>
+            <id>unix-build</id>
             <activation>
                 <os>
                     <family>unix</family>
@@ -141,10 +141,10 @@
         </profile>
 
         <profile>
-            <id>windows</id>
+            <id>windows-build</id>
             <activation>
                 <os>
-                    <family>unix</family>
+                    <family>windows</family>
                 </os>
             </activation>
             <build>

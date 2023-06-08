@@ -56,7 +56,7 @@ jobs:
       if: matrix.parallel_backend != 'NONE' || matrix.cuda_support != 'OFF'
       run: |
         cd bindings/java
-        mvn package
+        mvn package -Punix-build
     - name: Test ${{matrix.parallel_backend}} with CUDA ${{matrix.cuda_support}}
       # note that the test for CUDA backend does not really test CUDA, as we
       # don't have CUDA GPU on GitHub Action
@@ -218,7 +218,7 @@ jobs:
     - name: Build Java bindings
       run: |
         cd bindings/java
-        mvn package
+        mvn package -Pwindows-build
     - name: Upload Java artifacts
       uses: actions/upload-artifact@v2
       with:
@@ -262,7 +262,7 @@ jobs:
     - name: Build Java package
       run: |
         cd bindings/java
-        mvn package
+        mvn package -Punix-build
     - name: Test
       run: |
         cd build/test
