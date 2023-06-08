@@ -34,7 +34,7 @@ import manifold3d.glm.DoubleVec3;
 import org.bytedeco.javacpp.*;
 import org.bytedeco.javacpp.annotation.*;
 
-@Platform(include = {"manifold.h", "meshIO.h"}, link = {"manifold"})
+@Platform(compiler = "cpp17", include = {"manifold.h", "meshIO.h"}, linkpath = { LibraryPaths.MANIFOLD_LIB_DIR }, link = {"manifold"})
 @Namespace("manifold")
 public class Manifold extends Pointer {
     static {
@@ -60,7 +60,7 @@ public class Manifold extends Pointer {
             try {
                 System.load(Loader.extractResource("/libmeshIO.dylib", null, "libmeshIO", ".dylib").getAbsolutePath());
                 System.load(Loader.extractResource("/libmanifold.dylib", null, "libmanifold", ".dylib").getAbsolutePath());
-                System.load(Loader.extractResource("/libClipper2.dylib.1.2.1", null, "libClipper2", ".dylib").getAbsolutePath());
+                System.load(Loader.extractResource("/libClipper2.1.2.1.dylib", null, "libClipper2", ".dylib").getAbsolutePath());
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
