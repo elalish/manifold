@@ -47,7 +47,6 @@ jobs:
         key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
         restore-keys: ${{ runner.os }}-m2
     - name: Build ${{matrix.backend}}
-      if: matrix.parallel_backend != 'NONE' || matrix.cuda_support != 'OFF'
       run: |
         mkdir build
         cd build
