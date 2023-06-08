@@ -12,7 +12,6 @@ import manifold3d.FloatVector;
 import java.io.IOException;
 import java.io.File;
 
-import manifold3d.LibraryPaths;
 import manifold3d.ManifoldPair;
 import manifold3d.ManifoldVector;
 import manifold3d.manifold.MeshGL;
@@ -35,7 +34,7 @@ import manifold3d.glm.DoubleVec3;
 import org.bytedeco.javacpp.*;
 import org.bytedeco.javacpp.annotation.*;
 
-@Platform(compiler = "cpp17", include = {"manifold.h", "meshIO.h"}, linkpath = { LibraryPaths.MANIFOLD_LIB_DIR }, link = {"manifold"})
+@Platform(include = {"manifold.h", "meshIO.h"}, link = {"manifold"})
 @Namespace("manifold")
 public class Manifold extends Pointer {
     static {
@@ -43,18 +42,14 @@ public class Manifold extends Pointer {
         String osName = System.getProperty("os.name").toLowerCase();
         if (osName.contains("linux")) {
             try {
-                System.out.println("Loading Linux libs...");
                 System.load(Loader.extractResource("/libmeshIO.so", null, "libmeshIO", ".so").getAbsolutePath());
-                System.out.println("Loading Manifold lib...");
                 System.load(Loader.extractResource("/libmanifold.so", null, "libmanifold", ".so").getAbsolutePath());
-                System.out.println("Loading Clipper lib...");
                 System.load(Loader.extractResource("/libClipper2.so.1.2.1", null, "libClipper2", ".so").getAbsolutePath());
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
         } else if (osName.contains("windows")) {
             try {
-                System.out.println("Loading Windows libs...");
                 System.load(Loader.extractResource("/meshIO.dll", null, "meshIO", ".dll").getAbsolutePath());
                 System.load(Loader.extractResource("/manifold.dll", null, "manifold", ".dll").getAbsolutePath());
                 System.load(Loader.extractResource("/Clipper2.dll", null, "Clipper2", ".dll").getAbsolutePath());
@@ -63,13 +58,9 @@ public class Manifold extends Pointer {
             }
         } else if (osName.contains("mac")) {
             try {
-                System.out.println("Loading Mac libs...");
                 System.load(Loader.extractResource("/libmeshIO.dylib", null, "libmeshIO", ".dylib").getAbsolutePath());
-                System.out.println("Loading Manifold lib");
                 System.load(Loader.extractResource("/libmanifold.dylib", null, "libmanifold", ".dylib").getAbsolutePath());
-                System.out.println("Loading Clipper2 lib");
-                System.load(Loader.extractResource("/libClipper2.dylib", null, "libClipper2", ".dylib").getAbsolutePath());
-                System.out.println("Finished Loading Mac libs...");
+                System.load(Loader.extractResource("/libClipper2.dylib.1.2.1", null, "libClipper2", ".dylib").getAbsolutePath());
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
