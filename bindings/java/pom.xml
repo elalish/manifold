@@ -63,7 +63,6 @@
                 <configuration>
                     <classPath>${project.build.outputDirectory}</classPath>
                     <libraryPath>${project.build.directory}/../../../build/src/manifold/</libraryPath>
-                    <compilerOptions>-L../../build/src/manifold/,-L../../build/meshIO/</compilerOptions>
                     <includePaths>
                         <includePath>${project.build.sourceDirectory}</includePath>
                         <includePath>src/main/cpp/manifold3d/</includePath>
