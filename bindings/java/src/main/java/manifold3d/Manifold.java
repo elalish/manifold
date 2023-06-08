@@ -48,6 +48,24 @@ public class Manifold extends Pointer {
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
+        } else if (osName.contains("windows")) {
+            try {
+                System.load(Loader.extractResource("/meshIO.dll", null, "meshIO", ".dll").getAbsolutePath());
+                System.load(Loader.extractResource("/manifold.dll", null, "manifold", ".dll").getAbsolutePath());
+                System.load(Loader.extractResource("/Clipper2.dll", null, "Clipper2", ".dll").getAbsolutePath());
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        } else if (osName.contains("mac")) {
+            try {
+                System.load(Loader.extractResource("/libmeshIO.dylib", null, "libmeshIO", ".dylib").getAbsolutePath());
+                System.load(Loader.extractResource("/libmanifold.dylib", null, "libmanifold", ".dylib").getAbsolutePath());
+                System.load(Loader.extractResource("/libClipper2.dylib.1.2.1", null, "libClipper2", ".dylib").getAbsolutePath());
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        } else {
+            throw new UnsupportedOperationException("Unsupported operating system: " + osName);
         }
 
         Loader.load();

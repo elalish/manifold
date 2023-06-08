@@ -47,11 +47,13 @@ jobs:
         key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
         restore-keys: ${{ runner.os }}-m2
     - name: Build ${{matrix.backend}}
+      if: matrix.parallel_backend != 'NONE' || matrix.cuda_support != 'OFF'
       run: |
         mkdir build
         cd build
         cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DMANIFOLD_DEBUG=ON -DMANIFOLD_EXPORT=ON -DMANIFOLD_PAR=${{matrix.parallel_backend}} -DMANIFOLD_USE_CUDA=${{matrix.cuda_support}} .. && make
     - name: Build Java package
+      if: matrix.parallel_backend != 'NONE' || matrix.cuda_support != 'OFF'
       run: |
         cd bindings/java
         mvn package
@@ -88,6 +90,7 @@ jobs:
         fail_ci_if_error: false
         name: ${{matrix.parallel_backend}}-${{matrix.cuda_support}}
     - name: Upload artifact
+      if: matrix.parallel_backend != 'NONE' || matrix.cuda_support != 'OFF'
       uses: actions/upload-artifact@v3
       with:
         name: java-package
@@ -225,6 +228,10 @@ jobs:
     - name: Install TBB
       if: matrix.parallel_backend == 'TBB'
       run: brew install tbb
+    - name: Install Java and Maven
+      run: |
+        brew install openjdk@11
+        brew install maven
     - uses: actions/checkout@v3
       with:
         submodules: recursive
@@ -234,10 +241,19 @@ jobs:
         mkdir build
         cd build
         cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DMANIFOLD_DEBUG=ON -DMANIFOLD_EXPORT=ON -DMANIFOLD_PAR=${{matrix.parallel_backend}} .. && make
+    - name: Build Java package
+      run: |
+        cd bindings/java
+        mvn package
     - name: Test
       run: |
         cd build/test
         ./manifold_test
+    - name: Upload artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: java-package-mac
+        path: bindings/java/target/*.jar
 
   build_nix:
     timeout-minutes: 30
