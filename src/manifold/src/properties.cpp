@@ -166,18 +166,22 @@ struct UpdateProperties {
   const int gaussianIdx;
   const int meanIdx;
 
-  __host__ __device__ void operator()(thrust::tuple<int, glm::ivec3> in) {
-    const int tri = thrust::get<0>(in);
-    const glm::ivec3 triProp = thrust::get<1>(in);
+  __host__ __device__ void operator()(thrust::tuple<glm::ivec3&, int> inOut) {
+    glm::ivec3& triProp = thrust::get<0>(inOut);
+    const int tri = thrust::get<1>(inOut);
 
     for (const int i : {0, 1, 2}) {
+      const int vert = halfedge[3 * tri + i].startVert;
+      if (oldNumProp == 0) {
+        triProp[i] = vert;
+      }
       const int propVert = triProp[i];
+
       for (int p = 0; p < oldNumProp; ++p) {
         properties[numProp * propVert + p] =
             oldProperties[oldNumProp * propVert + p];
       }
 
-      const int vert = halfedge[3 * tri + i].startVert;
       if (gaussianIdx >= 0) {
         properties[numProp * propVert + gaussianIdx] = gaussianCurvature[vert];
       }
@@ -343,13 +347,16 @@ void Manifold::Impl::CalculateCurvature(int gaussianIdx, int meanIdx) {
              NumVert(), NormalizeCurvature());
 
   const int oldNumProp = NumProp();
-  const int numProp = glm::max(oldNumProp, glm::max(gaussianIdx, meanIdx));
+  const int numProp = glm::max(oldNumProp, glm::max(gaussianIdx, meanIdx) + 1);
   const VecDH<float> oldProperties = meshRelation_.properties;
-  meshRelation_.numProp = numProp;
   meshRelation_.properties = VecDH<float>(numProp * NumPropVert(), 0);
+  meshRelation_.numProp = numProp;
+  if (meshRelation_.triProperties.size() == 0) {
+    meshRelation_.triProperties.resize(NumTri());
+  }
 
   for_each_n(
-      policy, zip(countAt(0), meshRelation_.triProperties.cbegin()), NumTri(),
+      policy, zip(meshRelation_.triProperties.begin(), countAt(0)), NumTri(),
       UpdateProperties({meshRelation_.properties.ptrD(), oldProperties.cptrD(),
                         halfedge_.cptrD(), vertMeanCurvature.cptrD(),
                         vertGaussianCurvature.cptrD(), oldNumProp, numProp,

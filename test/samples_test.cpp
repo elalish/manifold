@@ -128,8 +128,9 @@ TEST(Samples, Scallop) {
   if (options.exportModels) {
     MeshGL out = scallop.GetMeshGL();
     ExportOptions options2;
-    options2.faceted = false;
+    // options2.faceted = false;
     options2.mat.roughness = 0.1;
+    options2.mat.metalness = 0;
     options2.mat.colorChannels = {3, 4, 5, -1};
     ExportMesh("scallop.glb", out, options2);
   }
