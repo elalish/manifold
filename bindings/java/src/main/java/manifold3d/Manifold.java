@@ -52,10 +52,10 @@ public class Manifold extends Pointer {
             try {
                 System.out.println("Loading meshIO");
                 System.load(Loader.extractResource("/meshIO.dll", null, "meshIO", ".dll").getAbsolutePath());
-                System.out.println("Loading manifold");
-                System.load(Loader.extractResource("/manifold.dll", null, "manifold", ".dll").getAbsolutePath());
                 System.out.println("Loading Clipper");
                 System.load(Loader.extractResource("/Clipper2.dll", null, "Clipper2", ".dll").getAbsolutePath());
+                System.out.println("Loading manifold");
+                System.load(Loader.extractResource("/manifold.dll", null, "manifold", ".dll").getAbsolutePath());
                 System.out.println("Finished Loading.");
             } catch (IOException e) {
                 throw new RuntimeException(e);

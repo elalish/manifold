@@ -232,8 +232,10 @@ jobs:
      shell: powershell
      run: |
        echo "List DLL dependencies"
-       Add-Content $env:GITHUB_PATH build/bin
-       dumpbin /DEPENDENTS build/bin/manifold.dll
+       $currentDir = Get-Location
+       $binPath = Join-Path -Path $currentDir -ChildPath "build/bin"
+       Add-Content $env:GITHUB_PATH $binPath
+       dumpbin /DEPENDENTS build/bin/Clipper2.dll
 
    #- name: Test ${{matrix.parallel_backend}} with CUDA ${{matrix.cuda_support}}
    #  shell: bash
