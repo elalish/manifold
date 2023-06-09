@@ -204,6 +204,24 @@ jobs:
        ls $env:CUDA_PATH
        ls $env:CUDA_PATH\bin
        ls $env:CUDA_PATH\include
+   - name: Check out Assimp repository
+     uses: actions/checkout@v3
+     with:
+       repository: assimp/assimp
+       path: assimp
+   - name: Configure Assimp
+     run: |
+       mkdir assimp/build
+       cd assimp/build
+       cmake .. -G "Visual Studio 16 2019" -A x64 -DCMAKE_INSTALL_PREFIX=./install
+   - name: Build Assimp
+     run: |
+       cd assimp/build
+       cmake --build . --config Release
+   - name: Install Assimp
+     run: |
+       cd assimp/build
+       cmake --build . --target INSTALL --config Release
    - name: Build ${{matrix.backend}}
      shell: powershell
      run: |
