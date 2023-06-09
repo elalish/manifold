@@ -8,7 +8,7 @@ import manifold3d.glm.DoubleVec2;
 import manifold3d.glm.DoubleMat3x2;
 import manifold3d.manifold.CrossSection;
 
-@Platform(compiler = "cpp17", include = "cross_section.h", linkpath = { LibraryPaths.MANIFOLD_LIB_DIR }, link = { "manifold" })
+@Platform(compiler = "cpp17", include = { "manifold.h", "cross_section.h" }, linkpath = { LibraryPaths.MANIFOLD_LIB_DIR }, link = { "manifold" })
 @Namespace("manifold")
 public class Rect extends Pointer {
     static { Loader.load(); }
@@ -16,11 +16,11 @@ public class Rect extends Pointer {
     public Rect() { allocate(); }
     private native void allocate();
 
-    @Name("operator=")
-    public native @ByRef Rect put(@ByRef Rect other);
-
     public Rect(@ByVal DoubleVec2 a, @ByVal DoubleVec2 b) { allocate(a, b); }
     private native void allocate(@ByVal DoubleVec2 a, @ByVal DoubleVec2 b);
+
+    //@Name("operator=")
+    //public native @ByRef Rect put(@Const @ByRef Rect other);
 
     public native @ByVal DoubleVec2 Size();
     public native float Scale();
