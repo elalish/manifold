@@ -1,12 +1,13 @@
 package manifold3d.manifold;
 
+import manifold3d.LibraryPaths;
 import org.bytedeco.javacpp.*;
 import org.bytedeco.javacpp.annotation.*;
 
 import manifold3d.UIntVector;
 import manifold3d.FloatVector;
 
-@Platform(compiler = "cpp17", include = "meshIO.h")
+@Platform(compiler = "cpp17", include = "meshIO.h", linkpath = { LibraryPaths.MANIFOLD_LIB_DIR }, link = { "manifold" })
 @Namespace("manifold")
 public class MeshGL extends Pointer {
     static { Loader.load(); }
