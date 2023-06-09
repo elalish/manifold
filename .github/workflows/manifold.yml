@@ -209,9 +209,9 @@ jobs:
      run: |
        git clone https://github.com/assimp/assimp.git
        cd assimp
-       cmake -S . -B build -DCMAKE_INSTALL_PREFIX=assimp-install -DASSIMP_BUILD_ZLIB=ON -DCMAKE_BUILD_TYPE=Release
-       cmake --build build
-       cmake --install build
+       cmake -S . -B build -DASSIMP_BUILD_ZLIB=ON -DCMAKE_BUILD_TYPE=Release
+       cmake --build build --config Release
+       cmake --install build --config Release
    - name: Build ${{matrix.backend}}
      shell: powershell
      run: |
