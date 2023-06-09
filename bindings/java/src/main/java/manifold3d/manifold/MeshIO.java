@@ -8,7 +8,7 @@ import org.bytedeco.javacpp.*;
 import org.bytedeco.javacpp.annotation.*;
 
 
-@Platform(compiler = "cpp17", include = {"meshIO.h"}, linkpath = { LibraryPaths.MESHIO_LIB_DIR }, link = {"meshIO"})
+@Platform(compiler = "cpp17", include = {"meshIO.h"}, linkpath = { LibraryPaths.MESHIO_LIB_DIR, LibraryPaths.MESHIO_LIB_DIR_WINDOWS }, link = {"meshIO"})
 @Namespace("manifold")
 public class MeshIO {
     static { Loader.load(); }

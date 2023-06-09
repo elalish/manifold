@@ -5,7 +5,7 @@ import org.bytedeco.javacpp.annotation.*;
 
 import manifold3d.LibraryPaths;
 
-@Platform(compiler = "cpp17", include = {"public.h"}, linkpath = { LibraryPaths.MANIFOLD_LIB_DIR }, link = {"manifold"})
+@Platform(compiler = "cpp17", include = {"public.h"}, linkpath = { LibraryPaths.MANIFOLD_LIB_DIR, LibraryPaths.MANIFOLD_LIB_DIR_WINDOWS }, link = {"manifold"})
 @Namespace("manifold")
 public class OpType extends IntPointer {
     static { Loader.load(); }

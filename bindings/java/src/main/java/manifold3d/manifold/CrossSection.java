@@ -13,7 +13,7 @@ import manifold3d.manifold.CrossSectionVector;
 import manifold3d.pub.SimplePolygon;
 import manifold3d.pub.Polygons;
 
-@Platform(compiler = "cpp17", include = "cross_section.h", linkpath = { LibraryPaths.MANIFOLD_LIB_DIR }, link = {"manifold"})
+@Platform(compiler = "cpp17", include = "cross_section.h", linkpath = { LibraryPaths.MANIFOLD_LIB_DIR, LibraryPaths.MANIFOLD_LIB_DIR_WINDOWS }, link = {"manifold"})
 @Namespace("manifold")
 public class CrossSection extends Pointer {
     static { Loader.load(); }
