@@ -211,9 +211,9 @@ jobs:
        cd build
        cmake --build . --target ALL_BUILD --config Release
    - name: Check files
-      run: |
-        ls build/meshIO/;
-        ls build/src/manifold/;
+     run: |
+       ls build/meshIO/
+       ls build/src/manifold/
    #- name: Test ${{matrix.parallel_backend}} with CUDA ${{matrix.cuda_support}}
    #  shell: bash
    #  run: |
