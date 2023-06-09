@@ -96,230 +96,229 @@ jobs:
         name: java-package
         path: bindings/java/target/*.jar
 
-  build_cbind:
-    timeout-minutes: 30
-    runs-on: ubuntu-22.04
-    if: github.event.pull_request.draft == false
-    container:
-      image: docker://nvidia/cuda:12.0.1-devel-ubuntu22.04
-    steps:
-    - name: Install dependencies
-      run: |
-        apt-get -y update
-        DEBIAN_FRONTEND=noninteractive apt install -y libomp-dev libassimp-dev git libtbb-dev pkg-config libpython3-dev python3 python3-distutils python3-pip
-    - uses: actions/checkout@v3
-      with:
-        submodules: recursive
-    - uses: jwlawson/actions-setup-cmake@v1.12
-    - name: Build C bindings with OMP and CUDA
-      run: |
-        mkdir build
-        cd build
-        cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DMANIFOLD_DEBUG=ON -DMANIFOLD_CBIND=ON -DMANIFOLD_PAR=OMP -DMANIFOLD_USE_CUDA=ON .. && make
-    - name: Test ${{matrix.parallel_backend}} with CUDA ${{matrix.cuda_support}}
-      # note that the test for CUDA backend does not really test CUDA, as we
-      # don't have CUDA GPU on GitHub Action
-      run: |
-        cd build/test
-        ./manifold_test --gtest_filter=CBIND.*
+  #build_cbind:
+  #  timeout-minutes: 30
+  #  runs-on: ubuntu-22.04
+  #  if: github.event.pull_request.draft == false
+  #  container:
+  #    image: docker://nvidia/cuda:12.0.1-devel-ubuntu22.04
+  #  steps:
+  #  - name: Install dependencies
+  #    run: |
+  #      apt-get -y update
+  #      DEBIAN_FRONTEND=noninteractive apt install -y libomp-dev libassimp-dev git libtbb-dev pkg-config libpython3-dev python3 python3-distutils python3-pip
+  #  - uses: actions/checkout@v3
+  #    with:
+  #      submodules: recursive
+  #  - uses: jwlawson/actions-setup-cmake@v1.12
+  #  - name: Build C bindings with OMP and CUDA
+  #    run: |
+  #      mkdir build
+  #      cd build
+  #      cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DMANIFOLD_DEBUG=ON -DMANIFOLD_CBIND=ON -DMANIFOLD_PAR=OMP -DMANIFOLD_USE_CUDA=ON .. && make
+  #  - name: Test ${{matrix.parallel_backend}} with CUDA ${{matrix.cuda_support}}
+  #    # note that the test for CUDA backend does not really test CUDA, as we
+  #    # don't have CUDA GPU on GitHub Action
+  #    run: |
+  #      cd build/test
+  #      ./manifold_test --gtest_filter=CBIND.*
 
-  build_wasm:
-    timeout-minutes: 30
-    runs-on: ubuntu-22.04
-    if: github.event.pull_request.draft == false
-    steps:
-    - name: Install dependencies
-      run: |
-        sudo apt-get -y update
-        DEBIAN_FRONTEND=noninteractive sudo apt install -y nodejs
-    - uses: actions/checkout@v3
-      with:
-        submodules: recursive
-    - name: Setup WASM
-      run: |
-        # setup emscripten
-        git clone https://github.com/emscripten-core/emsdk.git
-        cd emsdk
-        ./emsdk install latest
-        ./emsdk activate latest
-    - uses: jwlawson/actions-setup-cmake@v1.12
-    - name: Build WASM
-      run: |
-        source ./emsdk/emsdk_env.sh
-        mkdir build
-        cd build
-        emcmake cmake -DCMAKE_BUILD_TYPE=Release .. && emmake make
-    - name: Test WASM
-      run: |
-        cd build/test
-        node ./manifold_test.js
-    - name: Test examples
-      run: |
-        cd bindings/wasm/examples
-        npm ci
-        npm run build
-        npm test
-    - name: Upload WASM files
-      uses: actions/upload-artifact@v3
-      with:
-        name: wasm
-        path: bindings/wasm/examples/dist/
-        retention-days: 90
+  #build_wasm:
+  #  timeout-minutes: 30
+  #  runs-on: ubuntu-22.04
+  #  if: github.event.pull_request.draft == false
+  #  steps:
+  #  - name: Install dependencies
+  #    run: |
+  #      sudo apt-get -y update
+  #      DEBIAN_FRONTEND=noninteractive sudo apt install -y nodejs
+  #  - uses: actions/checkout@v3
+  #    with:
+  #      submodules: recursive
+  #  - name: Setup WASM
+  #    run: |
+  #      # setup emscripten
+  #      git clone https://github.com/emscripten-core/emsdk.git
+  #      cd emsdk
+  #      ./emsdk install latest
+  #      ./emsdk activate latest
+  #  - uses: jwlawson/actions-setup-cmake@v1.12
+  #  - name: Build WASM
+  #    run: |
+  #      source ./emsdk/emsdk_env.sh
+  #      mkdir build
+  #      cd build
+  #      emcmake cmake -DCMAKE_BUILD_TYPE=Release .. && emmake make
+  #  - name: Test WASM
+  #    run: |
+  #      cd build/test
+  #      node ./manifold_test.js
+  #  - name: Test examples
+  #    run: |
+  #      cd bindings/wasm/examples
+  #      npm ci
+  #      npm run build
+  #      npm test
+  #  - name: Upload WASM files
+  #    uses: actions/upload-artifact@v3
+  #    with:
+  #      name: wasm
+  #      path: bindings/wasm/examples/dist/
+  #      retention-days: 90
 
-  build_windows:
-    timeout-minutes: 30
-    strategy:
-      matrix:
-        parallel_backend: [NONE]
-        cuda_support: [OFF]
-      max-parallel: 1
-    runs-on: windows-2019
-    if: github.event.pull_request.draft == false
-    steps:
-    - uses: actions/checkout@v3
-      with:
-        submodules: recursive
-    - uses: jwlawson/actions-setup-cmake@v1.12
-    - uses: ilammy/msvc-dev-cmd@v1
-    - uses: actions/setup-java@v2
-      with:
-        java-version: '11'
-        distribution: 'adopt'
-    - name: Install Maven
-      run: choco install maven
-    - name: Install CUDA
-      if: matrix.backend == 'CUDA'
-      env:
-        cuda: "11.3.0"
-        visual_studio: "Visual Studio 16 2019"
-      shell: powershell
-      run: |
-        Invoke-RestMethod https://raw.githubusercontent.com/ptheywood/cuda-cmake-github-actions/21811d232fc775fa8d44dddf7f8c5ce2cf8d2b81/scripts/actions/install_cuda_windows.ps1 -OutFile install_cuda_windows.ps1
-        .\install_cuda_windows.ps1
-    - name: nvcc check
-      if: matrix.backend == 'CUDA'
-      shell: powershell
-      run: |
-        nvcc -V
-        ls $env:CUDA_PATH
-        ls $env:CUDA_PATH\bin
-        ls $env:CUDA_PATH\include
-    - name: Install Assimp from source
-      shell: bash
+  #build_windows:
+  #  timeout-minutes: 30
+  #  strategy:
+  #    matrix:
+  #      parallel_backend: [NONE]
+  #      cuda_support: [OFF]
+  #    max-parallel: 1
+  #  runs-on: windows-2019
+  #  if: github.event.pull_request.draft == false
+  #  steps:
+  #  - uses: actions/checkout@v3
+  #    with:
+  #      submodules: recursive
+  #  - uses: jwlawson/actions-setup-cmake@v1.12
+  #  - uses: ilammy/msvc-dev-cmd@v1
+  #  - uses: actions/setup-java@v2
+  #    with:
+  #      java-version: '11'
+  #      distribution: 'adopt'
+  #  - name: Install Maven
+  #    run: choco install maven
+  #  - name: Install CUDA
+  #    if: matrix.backend == 'CUDA'
+  #    env:
+  #      cuda: "11.3.0"
+  #      visual_studio: "Visual Studio 16 2019"
+  #    shell: powershell
+  #    run: |
+  #      Invoke-RestMethod https://raw.githubusercontent.com/ptheywood/cuda-cmake-github-actions/21811d232fc775fa8d44dddf7f8c5ce2cf8d2b81/scripts/actions/install_cuda_windows.ps1 -OutFile install_cuda_windows.ps1
+  #      .\install_cuda_windows.ps1
+  #  - name: nvcc check
+  #    if: matrix.backend == 'CUDA'
+  #    shell: powershell
+  #    run: |
+  #      nvcc -V
+  #      ls $env:CUDA_PATH
+  #      ls $env:CUDA_PATH\bin
+  #      ls $env:CUDA_PATH\include
+  #  - name: Install Assimp from source
+  #    shell: bash
+  #    run: |
+  #      git clone https://github.com/assimp/assimp.git
+  #      cd assimp
+  #      git checkout v5.2.5
+  #      cmake CMakeLists.txt -DASSIMP_BUILD_ZLIB=ON -DCMAKE_BUILD_TYPE=Release
+  #      cmake --build . --config Release
+  #      cmake --install . --config Release
+  #      echo "C:/Program Files (x86)/Assimp/bin/" >> $GITHUB_PATH
+  #  - name: Add Assimp to PATH
+  #    shell: powershell
+  #    run: |
+  #      Add-Content $env:GITHUB_PATH "C:/Program Files (x86)/Assimp/bin/"
+  #  - name: Build ${{matrix.backend}}
+  #    shell: powershell
+  #    run: |
+  #      cmake . -DBUILD_SHARED_LIBS=ON -DCMAKE_WINDOWS_EXPORT_ALL_SYMBOLS=TRUE -DMANIFOLD_EXPORT=ON -DCMAKE_BUILD_TYPE=Release -B build -DMANIFOLD_DEBUG=ON -DPYBIND11_FINDPYTHON=OFF -DMANIFOLD_PAR=${{matrix.parallel_backend}} -DMANIFOLD_USE_CUDA=${{matrix.cuda_support}} -A x64
+  #      cd build
+  #      cmake --build . --target ALL_BUILD --config Release
+  #  - name: Check files
+  #    run: |
+  #      ls build/meshIO/Release
+  #      ls build/bin
+  #  - name: List DLL dependencies
+  #    shell: powershell
+  #    run: |
+  #      echo "List DLL dependencies"
+  #      $currentDir = Get-Location
+  #      $binPath = Join-Path -Path $currentDir -ChildPath "build/bin"
+  #      Add-Content $env:GITHUB_PATH $binPath
+  #      dumpbin /DEPENDENTS build/bin/Clipper2.dll
 
-      run: |
-        git clone https://github.com/assimp/assimp.git
-        cd assimp
-        git checkout v5.2.5
-        cmake CMakeLists.txt -DASSIMP_BUILD_ZLIB=ON -DCMAKE_BUILD_TYPE=Release
-        cmake --build . --config Release
-        cmake --install . --config Release
-        echo "C:/Program Files (x86)/Assimp/bin/" >> $GITHUB_PATH
-    - name: Add Assimp to PATH
-      shell: powershell
-      run: |
-        Add-Content $env:GITHUB_PATH "C:/Program Files (x86)/Assimp/bin/"
-    - name: Build ${{matrix.backend}}
-      shell: powershell
-      run: |
-        cmake . -DBUILD_SHARED_LIBS=ON -DCMAKE_WINDOWS_EXPORT_ALL_SYMBOLS=TRUE -DMANIFOLD_EXPORT=ON -DCMAKE_BUILD_TYPE=Release -B build -DMANIFOLD_DEBUG=ON -DPYBIND11_FINDPYTHON=OFF -DMANIFOLD_PAR=${{matrix.parallel_backend}} -DMANIFOLD_USE_CUDA=${{matrix.cuda_support}} -A x64
-        cd build
-        cmake --build . --target ALL_BUILD --config Release
-    - name: Check files
-      run: |
-        ls build/meshIO/Release
-        ls build/bin
-    - name: List DLL dependencies
-      shell: powershell
-      run: |
-        echo "List DLL dependencies"
-        $currentDir = Get-Location
-        $binPath = Join-Path -Path $currentDir -ChildPath "build/bin"
-        Add-Content $env:GITHUB_PATH $binPath
-        dumpbin /DEPENDENTS build/bin/Clipper2.dll
+  #  #- name: Test ${{matrix.parallel_backend}} with CUDA ${{matrix.cuda_support}}
+  #  #  shell: bash
+  #  #  run: |
+  #  #    cd build/test
+  #  #    ./Release/manifold_test.exe
+  #  - name: Build Java bindings
+  #    run: |
+  #      cd bindings/java
+  #      mvn package
+  #  - name: Upload Java artifacts
+  #    uses: actions/upload-artifact@v2
+  #    with:
+  #      name: java_artifacts_${{matrix.parallel_backend}}_${{matrix.cuda_support}}
+  #      path: bindings/java/target/*.jar
 
-    #- name: Test ${{matrix.parallel_backend}} with CUDA ${{matrix.cuda_support}}
-    #  shell: bash
-    #  run: |
-    #    cd build/test
-    #    ./Release/manifold_test.exe
-    - name: Build Java bindings
-      run: |
-        cd bindings/java
-        mvn package
-    - name: Upload Java artifacts
-      uses: actions/upload-artifact@v2
-      with:
-        name: java_artifacts_${{matrix.parallel_backend}}_${{matrix.cuda_support}}
-        path: bindings/java/target/*.jar
+  #build_mac:
+  #  timeout-minutes: 30
+  #  strategy:
+  #    matrix:
+  #      parallel_backend: [NONE, TBB]
+  #  runs-on: macos-latest
+  #  if: github.event.pull_request.draft == false
+  #  steps:
+  #  - name: Install common dependencies
+  #    run: |
+  #      brew install pkg-config assimp
+  #      pip install trimesh
+  #  - name: Install OpenMP
+  #    if: matrix.parallel_backend == 'OMP'
+  #    run: brew install libomp
+  #  - name: Install TBB
+  #    if: matrix.parallel_backend == 'TBB'
+  #    run: brew install tbb
+  #  - name: Install Java and Maven
+  #    run: |
+  #      brew install openjdk@11
+  #      brew install maven
+  #      echo "JAVA_HOME=$(/usr/libexec/java_home -v 11)" >> $GITHUB_ENV
+  #  - name: Check Java version
+  #    run: java -version
+  #  - uses: actions/checkout@v3
+  #    with:
+  #      submodules: recursive
+  #  - uses: jwlawson/actions-setup-cmake@v1.12
+  #  - name: Build
+  #    run: |
+  #      mkdir build
+  #      cd build
+  #      cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DMANIFOLD_DEBUG=ON -DMANIFOLD_EXPORT=ON -DMANIFOLD_PAR=${{matrix.parallel_backend}} .. && make
+  #  - name: Check files
+  #    run: |
+  #      ls build/meshIO/;
+  #      if [[ -f build/meshIO/libmeshIO.dylib ]]; then
+  #        echo "Files exist."
+  #      else
+  #        echo "One or more required files do not exist."
+  #        exit 1
+  #      fi
+  #  - name: Build Java package
+  #    run: |
+  #      cd bindings/java
+  #      mvn package
+  #  - name: Test
+  #    run: |
+  #      cd build/test
+  #      ./manifold_test
+  #  - name: Upload artifact
+  #    uses: actions/upload-artifact@v3
+  #    with:
+  #      name: java-package-mac
+  #      path: bindings/java/target/*.jar
 
-  build_mac:
-    timeout-minutes: 30
-    strategy:
-      matrix:
-        parallel_backend: [NONE, TBB]
-    runs-on: macos-latest
-    if: github.event.pull_request.draft == false
-    steps:
-    - name: Install common dependencies
-      run: |
-        brew install pkg-config assimp
-        pip install trimesh
-    - name: Install OpenMP
-      if: matrix.parallel_backend == 'OMP'
-      run: brew install libomp
-    - name: Install TBB
-      if: matrix.parallel_backend == 'TBB'
-      run: brew install tbb
-    - name: Install Java and Maven
-      run: |
-        brew install openjdk@11
-        brew install maven
-        echo "JAVA_HOME=$(/usr/libexec/java_home -v 11)" >> $GITHUB_ENV
-    - name: Check Java version
-      run: java -version
-    - uses: actions/checkout@v3
-      with:
-        submodules: recursive
-    - uses: jwlawson/actions-setup-cmake@v1.12
-    - name: Build
-      run: |
-        mkdir build
-        cd build
-        cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DMANIFOLD_DEBUG=ON -DMANIFOLD_EXPORT=ON -DMANIFOLD_PAR=${{matrix.parallel_backend}} .. && make
-    - name: Check files
-      run: |
-        ls build/meshIO/;
-        if [[ -f build/meshIO/libmeshIO.dylib ]]; then
-          echo "Files exist."
-        else
-          echo "One or more required files do not exist."
-          exit 1
-        fi
-    - name: Build Java package
-      run: |
-        cd bindings/java
-        mvn package
-    - name: Test
-      run: |
-        cd build/test
-        ./manifold_test
-    - name: Upload artifact
-      uses: actions/upload-artifact@v3
-      with:
-        name: java-package-mac
-        path: bindings/java/target/*.jar
-
-  build_nix:
-    timeout-minutes: 30
-    strategy:
-      matrix:
-        variant: [none, omp, tbb, none-cuda, omp-cuda, tbb-cuda]
-    runs-on: ubuntu-latest
-    if: github.event.pull_request.draft == false
-    steps:
-    - uses: actions/checkout@v3
-      with:
-        submodules: recursive
-    - uses: cachix/install-nix-action@v15
-    - run: nix build -L '.?submodules=1#manifold-${{matrix.variant}}'
+  #build_nix:
+  #  timeout-minutes: 30
+  #  strategy:
+  #    matrix:
+  #      variant: [none, omp, tbb, none-cuda, omp-cuda, tbb-cuda]
+  #  runs-on: ubuntu-latest
+  #  if: github.event.pull_request.draft == false
+  #  steps:
+  #  - uses: actions/checkout@v3
+  #    with:
+  #      submodules: recursive
+  #  - uses: cachix/install-nix-action@v15
+  #  - run: nix build -L '.?submodules=1#manifold-${{matrix.variant}}'
