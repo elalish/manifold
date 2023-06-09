@@ -204,11 +204,6 @@ jobs:
        ls $env:CUDA_PATH
        ls $env:CUDA_PATH\bin
        ls $env:CUDA_PATH\include
-   - name: Check out Assimp repository
-     uses: actions/checkout@v3
-     with:
-       repository: assimp/assimp
-       path: assimp
    - name: Install Assimp from source
      shell: bash
      run: |
