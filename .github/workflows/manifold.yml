@@ -209,8 +209,7 @@ jobs:
      run: |
        git clone https://github.com/assimp/assimp.git
        cd assimp
-       git checkout v5.0.1
-       cmake -S . -B build -DCMAKE_INSTALL_PREFIX=assimp-install -DASSIMP_BUILD_ZLIB=ON
+       cmake -S . -B build -DCMAKE_INSTALL_PREFIX=assimp-install -DASSIMP_BUILD_ZLIB=ON -DCMAKE_BUILD_TYPE=Release
        cmake --build build
        cmake --install build
    - name: Build ${{matrix.backend}}
