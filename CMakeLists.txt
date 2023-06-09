@@ -27,6 +27,8 @@ option(MANIFOLD_CBIND "Build C (FFI) bindings" OFF)
 set(MANIFOLD_PAR "NONE" CACHE STRING "Parallel backend, either \"TBB\" or \"OpenMP\" or \"NONE\"")
 set(MANIFOLD_FLAGS -O3)
 
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_BINARY_DIR}/bin)
+
 if(EMSCRIPTEN)
   message("Building for Emscripten")
   set(MANIFOLD_FLAGS -fexceptions -D_LIBCUDACXX_HAS_THREAD_API_EXTERNAL -D_LIBCUDACXX_HAS_THREAD_API_CUDA)
