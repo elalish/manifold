@@ -222,7 +222,7 @@ jobs:
    - name: Check files
      run: |
        ls build/meshIO/Release
-       ls build/src/manifold/Release
+       ls build/bin
    #- name: Test ${{matrix.parallel_backend}} with CUDA ${{matrix.cuda_support}}
    #  shell: bash
    #  run: |
