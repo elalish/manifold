@@ -209,19 +209,15 @@ jobs:
      with:
        repository: assimp/assimp
        path: assimp
-   - name: Configure Assimp
+   - name: Install Assimp from source
+     shell: bash
      run: |
-       mkdir assimp/build
-       cd assimp/build
-       cmake .. -G "Visual Studio 16 2019" -A x64 -DCMAKE_INSTALL_PREFIX=./install
-   - name: Build Assimp
-     run: |
-       cd assimp/build
-       cmake --build . --config Release
-   - name: Install Assimp
-     run: |
-       cd assimp/build
-       cmake --build . --target INSTALL --config Release
+       git clone https://github.com/assimp/assimp.git
+       cd assimp
+       git checkout v5.0.1
+       cmake -S . -B build -DCMAKE_INSTALL_PREFIX=assimp-install
+       cmake --build build
+       cmake --install build
    - name: Build ${{matrix.backend}}
      shell: powershell
      run: |
