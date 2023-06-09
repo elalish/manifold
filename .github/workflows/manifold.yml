@@ -213,6 +213,9 @@ jobs:
        cmake CMakeLists.txt -DASSIMP_BUILD_ZLIB=ON -DCMAKE_BUILD_TYPE=Release
        cmake --build . --config Release
        cmake --install . --config Release
+   - name: Add Assimp to PATH
+     run: |
+       echo "C:/Program Files (x86)/Assimp/bin/" >> $GITHUB_PATH
    - name: Build ${{matrix.backend}}
      shell: powershell
      run: |
