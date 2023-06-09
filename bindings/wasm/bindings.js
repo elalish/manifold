@@ -229,7 +229,7 @@ Module.setup = function() {
   };
 
   Module.Manifold.prototype.setProperties = function(numProp, func) {
-    const oldNumProp = this.numProp;
+    const oldNumProp = this.numProp();
     const wasmFuncPtr = addFunction(function(newPtr, vec3Ptr, oldPtr) {
       const newProp = [];
       for (let i = 0; i < numProp; ++i) {

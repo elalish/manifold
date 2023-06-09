@@ -591,11 +591,11 @@ export class Manifold {
    * them as vertex properties on the given channels.
    *
    * @param gaussianIdx The property channel index in which to store the
-   *     Gaussian curvature. An index < 3 will be ignored (stores nothing). The
+   *     Gaussian curvature. An index < 0 will be ignored (stores nothing). The
    *     property set will be automatically expanded to include the channel
    *     index specified.
    * @param meanIdx The property channel index in which to store the mean
-   *     curvature. An index < 3 will be ignored (stores nothing). The property
+   *     curvature. An index < 0 will be ignored (stores nothing). The property
    *     set will be automatically expanded to include the channel index
    *     specified.
    */
@@ -720,6 +720,18 @@ export class Manifold {
    * The number of edges in the Manifold.
    */
   numEdge(): number;
+
+  /**
+   * The number of properties per vertex in the Manifold.
+   */
+  numProp(): number;
+
+  /**
+   * The number of property vertices in the Manifold. This will always be >=
+   * numVert, as some physical vertices may be duplicated to account for
+   * different properties on different neighboring triangles.
+   */
+  numPropVert(): number
 
   /**
    * Returns the axis-aligned bounding box of all the Manifold's vertices.

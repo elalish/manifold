@@ -106,8 +106,8 @@ TEST(Samples, Scallop) {
   auto colorCurvature = [](float* newProp, glm::vec3 pos,
                            const float* oldProp) {
     const float curvature = oldProp[0];
-    const glm::vec4 blue(0, 0, 1, 1);
-    const glm::vec4 red(1, 0, 0, 1);
+    const glm::vec3 red(1, 0, 0);
+    const glm::vec3 blue(0, 0, 1);
     const float limit = 15;
     glm::vec3 color =
         glm::mix(blue, red, glm::smoothstep(-limit, limit, curvature));

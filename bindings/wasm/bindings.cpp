@@ -149,6 +149,8 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .function("numVert", &Manifold::NumVert)
       .function("numEdge", &Manifold::NumEdge)
       .function("numTri", &Manifold::NumTri)
+      .function("numProp", &Manifold::NumProp)
+      .function("numPropVert", &Manifold::NumPropVert)
       .function("_boundingBox", &Manifold::BoundingBox)
       .function("precision", &Manifold::Precision)
       .function("genus", &Manifold::Genus)
