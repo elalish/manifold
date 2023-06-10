@@ -448,28 +448,6 @@ ManifoldBox *manifold_bounding_box(void *mem, ManifoldManifold *m) {
 }
 
 float manifold_precision(ManifoldManifold *m) { return from_c(m)->Precision(); }
-ManifoldCurvature *manifold_get_curvature(void *mem, ManifoldManifold *m) {
-  auto curv = from_c(m)->GetCurvature();
-  return to_c(new (mem) Curvature(curv));
-}
-
-ManifoldCurvatureBounds manifold_curvature_bounds(ManifoldCurvature *curv) {
-  auto c = *from_c(curv);
-  return {c.maxMeanCurvature, c.minMeanCurvature, c.maxGaussianCurvature,
-          c.minGaussianCurvature};
-}
-
-size_t manifold_curvature_vert_length(ManifoldCurvature *curv) {
-  return from_c(curv)->vertMeanCurvature.size();
-}
-
-float *manifold_curvature_vert_mean(void *mem, ManifoldCurvature *curv) {
-  return copy_data(mem, from_c(curv)->vertMeanCurvature);
-}
-
-float *manifold_curvature_vert_gaussian(void *mem, ManifoldCurvature *curv) {
-  return copy_data(mem, from_c(curv)->vertGaussianCurvature);
-}
 
 // Static Quality Globals
 
@@ -502,7 +480,6 @@ size_t manifold_manifold_pair_size() { return sizeof(ManifoldManifoldPair); }
 size_t manifold_meshgl_size() { return sizeof(MeshGL); }
 size_t manifold_box_size() { return sizeof(Box); }
 size_t manifold_rect_size() { return sizeof(Rect); }
-size_t manifold_curvature_size() { return sizeof(Curvature); }
 
 // pointer free + destruction
 void manifold_delete_cross_section(ManifoldCrossSection *c) {
@@ -522,7 +499,6 @@ void manifold_delete_manifold_vec(ManifoldManifoldVec *ms) {
 void manifold_delete_meshgl(ManifoldMeshGL *m) { delete from_c(m); }
 void manifold_delete_box(ManifoldBox *b) { delete from_c(b); }
 void manifold_delete_rect(ManifoldRect *r) { delete from_c(r); }
-void manifold_delete_curvature(ManifoldCurvature *c) { delete from_c(c); }
 
 // destruction
 void manifold_destruct_cross_section(ManifoldCrossSection *cs) {
@@ -542,9 +518,6 @@ void manifold_destruct_manifold_vec(ManifoldManifoldVec *ms) {
 void manifold_destruct_meshgl(ManifoldMeshGL *m) { from_c(m)->~MeshGL(); }
 void manifold_destruct_box(ManifoldBox *b) { from_c(b)->~Box(); }
 void manifold_destruct_rect(ManifoldRect *r) { from_c(r)->~Rect(); }
-void manifold_destruct_curvature(ManifoldCurvature *c) {
-  from_c(c)->~Curvature();
-}
 
 #ifdef __cplusplus
 }

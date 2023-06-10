@@ -11,7 +11,6 @@ typedef struct ManifoldSimplePolygon ManifoldSimplePolygon;
 typedef struct ManifoldPolygons ManifoldPolygons;
 typedef struct ManifoldMesh ManifoldMesh;
 typedef struct ManifoldMeshGL ManifoldMeshGL;
-typedef struct ManifoldCurvature ManifoldCurvature;
 typedef struct ManifoldBox ManifoldBox;
 typedef struct ManifoldRect ManifoldRect;
 
@@ -55,13 +54,6 @@ typedef struct ManifoldProperties {
   float surface_area;
   float volume;
 } ManifoldProperties;
-
-typedef struct ManifoldCurvatureBounds {
-  float max_mean_curvature;
-  float min_mean_curvature;
-  float max_gaussian_curvature;
-  float min_gaussian_curvature;
-} ManifoldCurvatureBounds;
 
 // enums
 

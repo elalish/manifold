@@ -183,7 +183,6 @@ class Manifold {
   float Precision() const;
   int Genus() const;
   Properties GetProperties() const;
-  Curvature GetCurvature() const;
   ///@}
 
   /** @name Mesh ID
@@ -208,6 +207,7 @@ class Manifold {
   Manifold Warp(std::function<void(glm::vec3&)>) const;
   Manifold SetProperties(
       int, std::function<void(float*, glm::vec3, const float*)>) const;
+  Manifold CalculateCurvature(int gaussianIdx, int meanIdx) const;
   Manifold Refine(int) const;
   // Manifold RefineToLength(float);
   // Manifold RefineToPrecision(float);

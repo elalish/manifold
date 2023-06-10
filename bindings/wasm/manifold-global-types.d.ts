@@ -59,13 +59,5 @@ export type Properties = {
   surfaceArea: number,
   volume: number
 };
-export type Curvature = {
-  maxMeanCurvature: number,
-  minMeanCurvature: number,
-  maxGaussianCurvature: number,
-  minGaussianCurvature: number,
-  vertMeanCurvature: number[],
-  vertGaussianCurvature: number[]
-};
 export type FillRule = 'EvenOdd'|'NonZero'|'Positive'|'Negative'
 export type JoinType = 'Square'|'Round'|'Miter'
