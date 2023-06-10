@@ -626,6 +626,8 @@ TEST(Boolean, TreeTransforms) {
 }
 
 TEST(Boolean, Sweep) {
+  PolygonParams().processOverlaps = true;
+
   // generate the minimum equivalent positive angle
   auto minPosAngle = [](float angle) {
     float div = angle / glm::two_pi<float>();
@@ -864,4 +866,6 @@ TEST(Boolean, Sweep) {
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) ExportMesh("unionError.glb", shape.GetMesh(), {});
 #endif
+
+  PolygonParams().processOverlaps = false;
 }
