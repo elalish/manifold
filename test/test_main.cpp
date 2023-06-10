@@ -249,6 +249,24 @@ MeshGL WithNormals(const Manifold& in) {
   return out;
 }
 
+float GetMaxProperty(const MeshGL& mesh, int channel) {
+  float max = -std::numeric_limits<float>::infinity();
+  const int numVert = mesh.NumVert();
+  for (int i = 0; i < numVert; ++i) {
+    max = glm::max(max, mesh.vertProperties[i * mesh.numProp + channel]);
+  }
+  return max;
+}
+
+float GetMinProperty(const MeshGL& mesh, int channel) {
+  float min = std::numeric_limits<float>::infinity();
+  const int numVert = mesh.NumVert();
+  for (int i = 0; i < numVert; ++i) {
+    min = glm::min(min, mesh.vertProperties[i * mesh.numProp + channel]);
+  }
+  return min;
+}
+
 void Identical(const Mesh& mesh1, const Mesh& mesh2) {
   ASSERT_EQ(mesh1.vertPos.size(), mesh2.vertPos.size());
   for (int i = 0; i < mesh1.vertPos.size(); ++i)
