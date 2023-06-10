@@ -172,16 +172,6 @@ struct Properties {
   float surfaceArea, volume;
 };
 
-/**
- * Discrete curvature of a manifold calculated at every vertex. See
- * Manifold.GetCurvature() for details.
- */
-struct Curvature {
-  float maxMeanCurvature, minMeanCurvature;
-  float maxGaussianCurvature, minGaussianCurvature;
-  std::vector<float> vertMeanCurvature, vertGaussianCurvature;
-};
-
 struct Box {
   glm::vec3 min = glm::vec3(std::numeric_limits<float>::infinity());
   glm::vec3 max = glm::vec3(-std::numeric_limits<float>::infinity());

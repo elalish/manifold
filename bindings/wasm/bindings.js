@@ -229,7 +229,7 @@ Module.setup = function() {
   };
 
   Module.Manifold.prototype.setProperties = function(numProp, func) {
-    const oldNumProp = this.numProp;
+    const oldNumProp = this.numProp();
     const wasmFuncPtr = addFunction(function(newPtr, vec3Ptr, oldPtr) {
       const newProp = [];
       for (let i = 0; i < numProp; ++i) {
@@ -297,17 +297,6 @@ Module.setup = function() {
     const vec = this._Decompose();
     const result = fromVec(vec);
     vec.delete();
-    return result;
-  };
-
-  Module.Manifold.prototype.getCurvature = function() {
-    const result = this._getCurvature();
-    const oldMeanCurvature = result.vertMeanCurvature;
-    const oldGaussianCurvature = result.vertGaussianCurvature;
-    result.vertMeanCurvature = fromVec(oldMeanCurvature);
-    result.vertGaussianCurvature = fromVec(oldGaussianCurvature);
-    oldMeanCurvature.delete();
-    oldGaussianCurvature.delete();
     return result;
   };
 

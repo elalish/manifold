@@ -103,7 +103,21 @@ TEST(Samples, Scallop) {
   }
 #endif
 
-  scallop = scallop.Refine(50);
+  auto colorCurvature = [](float* newProp, glm::vec3 pos,
+                           const float* oldProp) {
+    const float curvature = oldProp[0];
+    const glm::vec3 red(1, 0, 0);
+    const glm::vec3 blue(0, 0, 1);
+    const float limit = 15;
+    glm::vec3 color =
+        glm::mix(blue, red, glm::smoothstep(-limit, limit, curvature));
+    for (const int i : {0, 1, 2}) {
+      newProp[i] = color[i];
+    }
+  };
+
+  scallop = scallop.Refine(50).CalculateCurvature(-1, 0).SetProperties(
+      3, colorCurvature);
   CheckNormals(scallop);
   auto prop = scallop.GetProperties();
   EXPECT_NEAR(prop.volume, 41.3, 0.1);
@@ -112,17 +126,12 @@ TEST(Samples, Scallop) {
 
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) {
-    const Mesh out = scallop.GetMesh();
+    MeshGL out = scallop.GetMeshGL();
     ExportOptions options2;
-    options2.faceted = false;
+    // options2.faceted = false;
     options2.mat.roughness = 0.1;
-    const glm::vec4 blue(0, 0, 1, 1);
-    const glm::vec4 red(1, 0, 0, 1);
-    const float limit = 15;
-    for (float curvature : scallop.GetCurvature().vertMeanCurvature) {
-      options2.mat.vertColor.push_back(
-          glm::mix(blue, red, glm::smoothstep(-limit, limit, curvature)));
-    }
+    options2.mat.metalness = 0;
+    options2.mat.colorChannels = {3, 4, 5, -1};
     ExportMesh("scallop.glb", out, options2);
   }
 #endif

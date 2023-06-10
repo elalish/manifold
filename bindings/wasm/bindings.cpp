@@ -85,14 +85,6 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .field("surfaceArea", &Properties::surfaceArea)
       .field("volume", &Properties::volume);
 
-  value_object<Curvature>("curvature")
-      .field("maxMeanCurvature", &Curvature::maxMeanCurvature)
-      .field("minMeanCurvature", &Curvature::minMeanCurvature)
-      .field("maxGaussianCurvature", &Curvature::maxGaussianCurvature)
-      .field("minGaussianCurvature", &Curvature::minGaussianCurvature)
-      .field("vertMeanCurvature", &Curvature::vertMeanCurvature)
-      .field("vertGaussianCurvature", &Curvature::vertGaussianCurvature);
-
   register_vector<glm::ivec3>("Vector_ivec3");
   register_vector<glm::vec3>("Vector_vec3");
   register_vector<glm::vec2>("Vector_vec2");
@@ -157,11 +149,13 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .function("numVert", &Manifold::NumVert)
       .function("numEdge", &Manifold::NumEdge)
       .function("numTri", &Manifold::NumTri)
+      .function("numProp", &Manifold::NumProp)
+      .function("numPropVert", &Manifold::NumPropVert)
       .function("_boundingBox", &Manifold::BoundingBox)
       .function("precision", &Manifold::Precision)
       .function("genus", &Manifold::Genus)
       .function("getProperties", &Manifold::GetProperties)
-      .function("_getCurvature", &Manifold::GetCurvature)
+      .function("calculateCurvature", &Manifold::CalculateCurvature)
       .function("originalID", &Manifold::OriginalID)
       .function("asOriginal", &Manifold::AsOriginal);
 

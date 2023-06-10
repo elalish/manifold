@@ -221,7 +221,28 @@ export const examples = {
       const triVerts = Uint32Array.from(triangles);
       const vertProperties = Float32Array.from(positions);
       const scallop = new Mesh({numProp: 3, triVerts, vertProperties});
-      const result = Manifold.smooth(scallop, sharpenedEdges).refine(n);
+
+      const colorCurvature = (color, pos, oldProp) => {
+        const a = Math.max(0, Math.min(1, oldProp[0] / 3 + 0.5));
+        const b = a * a * (3 - 2 * a);
+        const red = [1, 0, 0];
+        const blue = [0, 0, 1];
+        for (let i = 0; i < 3; ++i) {
+          color[i] = (1 - b) * blue[i] + b * red[i];
+        }
+      };
+      const result = Manifold.smooth(scallop, sharpenedEdges)
+                         .refine(n)
+                         .calculateCurvature(-1, 0)
+                         .setProperties(3, colorCurvature);
+
+      const node = new GLTFNode();
+      node.manifold = result;
+      node.material = {
+        baseColorFactor: [1, 1, 1],
+        metallic: 0,
+        attributes: ['COLOR_0']
+      };
       return result;
     },
 

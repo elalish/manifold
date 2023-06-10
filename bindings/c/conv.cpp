@@ -41,10 +41,6 @@ ManifoldMeshGL *to_c(manifold::MeshGL *m) {
   return reinterpret_cast<ManifoldMeshGL *>(m);
 }
 
-ManifoldCurvature *to_c(manifold::Curvature *m) {
-  return reinterpret_cast<ManifoldCurvature *>(m);
-}
-
 ManifoldOpType to_c(manifold::OpType optype) {
   ManifoldOpType op = MANIFOLD_ADD;
   switch (optype) {
@@ -150,10 +146,6 @@ const manifold::Mesh *from_c(ManifoldMesh *m) {
 
 const manifold::MeshGL *from_c(ManifoldMeshGL *m) {
   return reinterpret_cast<manifold::MeshGL const *>(m);
-}
-
-const manifold::Curvature *from_c(ManifoldCurvature *c) {
-  return reinterpret_cast<manifold::Curvature const *>(c);
 }
 
 OpType from_c(ManifoldOpType optype) {
