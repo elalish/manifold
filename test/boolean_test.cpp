@@ -625,7 +625,7 @@ TEST(Boolean, TreeTransforms) {
   EXPECT_FLOAT_EQ((a + b).GetProperties().volume, 2);
 }
 
-TEST(Boolean, UnionError) {
+TEST(Boolean, Sweep) {
   // generate the minimum equivalent positive angle
   auto minPosAngle = [](float angle) {
     float div = angle / glm::two_pi<float>();
