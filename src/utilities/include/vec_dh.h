@@ -17,6 +17,7 @@
 #include <cuda.h>
 #endif
 
+// #include "optional_assert.h"
 #include "par.h"
 #include "public.h"
 
@@ -226,9 +227,19 @@ class ManagedVec {
 
   const T &back() const { return *(ptr_ + size_ - 1); }
 
-  T &operator[](size_t i) { return *(ptr_ + i); }
+  T &operator[](size_t i) {
+    // ASSERT(i < size_, logicErr,
+    //        "Index out of bounds: " + std::to_string(i) +
+    //            ", size: " + std::to_string(size_));
+    return *(ptr_ + i);
+  }
 
-  const T &operator[](size_t i) const { return *(ptr_ + i); }
+  const T &operator[](size_t i) const {
+    // ASSERT(i < size_, logicErr,
+    //        "Index out of bounds: " + std::to_string(i) +
+    //            ", size: " + std::to_string(size_));
+    return *(ptr_ + i);
+  }
 
   bool empty() const { return size_ == 0; }
 

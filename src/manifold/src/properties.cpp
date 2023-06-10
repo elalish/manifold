@@ -192,7 +192,7 @@ struct UpdateProperties {
   }
 };
 
-struct CheckNormals {
+struct CheckHalfedges {
   const Halfedge* halfedges;
 
   __host__ __device__ bool operator()(int edge) {
@@ -279,7 +279,7 @@ bool Manifold::Impl::IsManifold() const {
   auto policy = autoPolicy(halfedge_.size());
 
   return all_of(policy, countAt(0), countAt(halfedge_.size()),
-                CheckNormals({halfedge_.cptrD()}));
+                CheckHalfedges({halfedge_.cptrD()}));
 }
 
 /**

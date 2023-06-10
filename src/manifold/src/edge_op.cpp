@@ -325,8 +325,23 @@ void Manifold::Impl::RemoveIfFolded(int edge) {
   const glm::ivec3 tri0edge = TriOf(edge);
   const glm::ivec3 tri1edge = TriOf(halfedge_[edge].pairedHalfedge);
   if (halfedge_[tri0edge[1]].endVert == halfedge_[tri1edge[1]].endVert) {
+    if (halfedge_[tri0edge[1]].pairedHalfedge == tri1edge[2]) {
+      if (halfedge_[tri0edge[2]].pairedHalfedge == tri1edge[1]) {
+        for (int i : {0, 1, 2})
+          vertPos_[halfedge_[tri0edge[i]].startVert] = glm::vec3(NAN);
+      } else {
+        vertPos_[halfedge_[tri0edge[1]].startVert] = glm::vec3(NAN);
+      }
+    } else {
+      if (halfedge_[tri0edge[2]].pairedHalfedge == tri1edge[1]) {
+        vertPos_[halfedge_[tri1edge[1]].startVert] = glm::vec3(NAN);
+      }
+    }
+    PairUp(halfedge_[tri0edge[1]].pairedHalfedge,
+           halfedge_[tri1edge[2]].pairedHalfedge);
+    PairUp(halfedge_[tri0edge[2]].pairedHalfedge,
+           halfedge_[tri1edge[1]].pairedHalfedge);
     for (int i : {0, 1, 2}) {
-      vertPos_[halfedge_[tri0edge[i]].startVert] = glm::vec3(NAN);
       halfedge_[tri0edge[i]] = {-1, -1, -1, -1};
       halfedge_[tri1edge[i]] = {-1, -1, -1, -1};
     }
