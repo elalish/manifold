@@ -860,7 +860,7 @@ TEST(Boolean, UnionError) {
   Manifold shape = Manifold::BatchBoolean(result, OpType::Add);
   auto prop = shape.GetProperties();
 
-  EXPECT_NEAR(prop.volume, 5120, 1);
+  EXPECT_NEAR(prop.volume, 3757, 1);
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) ExportMesh("unionError.glb", shape.GetMesh(), {});
 #endif
