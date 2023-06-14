@@ -17,7 +17,6 @@
 #include <memory>
 
 #include "cross_section.h"
-#include "optional"
 #include "public.h"
 
 namespace manifold {
