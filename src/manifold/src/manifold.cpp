@@ -566,12 +566,16 @@ Manifold Manifold::Warp(std::function<void(glm::vec3&)> warpFunc) const {
  * @param propFunc A function that modifies the properties of a given vertex.
  */
 Manifold Manifold::SetProperties(
-    int numProp, std::function<void(float* newProp, glm::vec3 position,
-                                    const float* oldProp)>
-                     propFunc) const {
+    int numProp,
+    std::function<void(float* newProp, glm::vec3 position,
+                       const float* oldProp)>
+        propFunc,
+    bool forceSequential) const {
   auto pImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
   const int oldNumProp = NumProp();
   const VecDH<float> oldProperties = pImpl->meshRelation_.properties;
+  const auto pol =
+      forceSequential ? ExecutionPolicy::Seq : autoPolicy(NumVert());
 
   auto& triProperties = pImpl->meshRelation_.triProperties;
   if (numProp == 0) {
@@ -592,12 +596,11 @@ Manifold Manifold::SetProperties(
       pImpl->meshRelation_.properties =
           VecDH<float>(numProp * NumPropVert(), 0);
     }
-    thrust::for_each_n(
-        thrust::host, countAt(0), NumTri(),
-        UpdateProperties({pImpl->meshRelation_.properties.ptrH(), numProp,
-                          oldProperties.ptrH(), oldNumProp,
-                          pImpl->vertPos_.ptrH(), triProperties.ptrH(),
-                          pImpl->halfedge_.ptrH(), propFunc}));
+    for_each_n(pol, countAt(0), NumTri(),
+               UpdateProperties({pImpl->meshRelation_.properties.ptrH(),
+                                 numProp, oldProperties.ptrH(), oldNumProp,
+                                 pImpl->vertPos_.ptrH(), triProperties.ptrH(),
+                                 pImpl->halfedge_.ptrH(), propFunc}));
   }
 
   pImpl->meshRelation_.numProp = numProp;

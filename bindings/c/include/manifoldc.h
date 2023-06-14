@@ -141,13 +141,10 @@ ManifoldProperties manifold_get_properties(ManifoldManifold *m);
 int manifold_get_circular_segments(float radius);
 int manifold_original_id(ManifoldManifold *m);
 uint32_t manifold_reserve_ids(uint32_t n);
-/* ManifoldManifold *manifold_set_properties( */
-/*     void *mem, ManifoldManifold *m, int num_prop, */
-/*     void (*fun)(float *new_prop, ManifoldVec3 position, float *old_prop)); */
-ManifoldManifold *manifold_set_properties(void *mem, ManifoldManifold *m,
-                                          int num_prop,
-                                          float *(*fun)(ManifoldVec3 position,
-                                                        float *old_prop));
+ManifoldManifold *manifold_set_properties(
+    void *mem, ManifoldManifold *m, int num_prop,
+    void (*fun)(float *new_prop, ManifoldVec3 position, const float *old_prop),
+    int forceSequential);
 ManifoldManifold *manifold_calculate_curvature(void *mem, ManifoldManifold *m,
                                                int gaussian_idx, int mean_idx);
 

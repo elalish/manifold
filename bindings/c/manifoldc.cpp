@@ -449,32 +449,17 @@ ManifoldBox *manifold_bounding_box(void *mem, ManifoldManifold *m) {
 
 float manifold_precision(ManifoldManifold *m) { return from_c(m)->Precision(); }
 
-uint32_t manifold_reserve_ids(uint32_t n) { Manifold::ReserveIDs(n); }
-
-// ManifoldManifold *manifold_set_properties(void *mem, ManifoldManifold *m,
-//                                           int num_prop,
-//                                           float *(*fun)(ManifoldVec3
-//                                           position,
-//                                                         float *old_prop)) {
-//   size_t new_sz = sizeof(float) * num_prop;
-//   std::function<void(float *, glm::vec3, const float *)> f =
-//       [fun](float *new_prop, glm::vec3 v, const float *old_prop) {
-//         float *op = malloc(new_sz);  // FIXME: need old size if doing this
-//         float *np = fun(new_prop, to_c(v), op);
-//         memcpy(new_prop, np, new_sz);
-//       };
-//   auto man = from_c(m)->SetProperties(num_prop, f);
-//   return to_c(new (mem) Manifold(man));
-// };
+uint32_t manifold_reserve_ids(uint32_t n) { return Manifold::ReserveIDs(n); }
 
 ManifoldManifold *manifold_set_properties(
     void *mem, ManifoldManifold *m, int num_prop,
-    void (*fun)(float *new_prop, ManifoldVec3 position, float *old_prop)) {
+    void (*fun)(float *new_prop, ManifoldVec3 position, const float *old_prop),
+    int force_sequential) {
   std::function<void(float *, glm::vec3, const float *)> f =
       [fun](float *new_prop, glm::vec3 v, const float *old_prop) {
         fun(new_prop, to_c(v), old_prop);
       };
-  auto man = from_c(m)->SetProperties(num_prop, f);
+  auto man = from_c(m)->SetProperties(num_prop, f, force_sequential);
   return to_c(new (mem) Manifold(man));
 };
 
