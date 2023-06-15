@@ -79,6 +79,13 @@ void ExportScene(aiScene* scene, const std::string& filename) {
   //   std::cout << i << ", id = " << desc->id << ", " << desc->description
   //             << std::endl;
   // }
+  auto ext = filename.substr(filename.length() - 4, 4);
+  if (ext == ".3mf") {
+    // Workaround https://github.com/assimp/assimp/issues/3816
+    aiNode* old_root = scene->mRootNode;
+    scene->mRootNode = new aiNode();
+    scene->mRootNode->addChildren(1, &old_root);
+  }
 
   auto result = exporter.Export(scene, GetType(filename), filename);
 
