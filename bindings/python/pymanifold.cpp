@@ -595,20 +595,20 @@ PYBIND11_MODULE(pymanifold, m) {
       .def("num_contour", &CrossSection::NumContour)
       .def("is_empty", &CrossSection::IsEmpty)
       .def("translate",
-           [](CrossSection self, Float2 v) {
+           [](CrossSection &self, Float2 v) {
              return self.Translate({std::get<0>(v), std::get<1>(v)});
            })
       .def("rotate", &CrossSection::Rotate)
       .def("scale",
-           [](CrossSection self, Float2 s) {
+           [](CrossSection &self, Float2 s) {
              return self.Scale({std::get<0>(s), std::get<1>(s)});
            })
       .def("mirror",
-           [](CrossSection self, Float2 ax) {
+           [](CrossSection &self, Float2 ax) {
              return self.Mirror({std::get<0>(ax), std::get<1>(ax)});
            })
       .def("transform",
-           [](CrossSection self, py::array_t<float> &mat) {
+           [](CrossSection &self, py::array_t<float> &mat) {
              auto mat_view = mat.unchecked<2>();
              if (mat_view.shape(0) != 2 || mat_view.shape(1) != 3)
                throw std::runtime_error("Invalid matrix shape");
@@ -622,7 +622,7 @@ PYBIND11_MODULE(pymanifold, m) {
            })
       .def(
           "warp",
-          [](CrossSection self, const std::function<Float2(Float2)> &f) {
+          [](CrossSection &self, const std::function<Float2(Float2)> &f) {
             return self.Warp([&f](glm::vec2 &v) {
               Float2 fv = f(std::make_tuple(v.x, v.y));
               v.x = std::get<0>(fv);
@@ -640,7 +640,7 @@ PYBIND11_MODULE(pymanifold, m) {
       .def("decompose", &CrossSection::Decompose)
       .def(
           "to_polygons",
-          [](CrossSection self) {
+          [](CrossSection &self) {
             const Polygons &data = self.ToPolygons();
             py::list polygon_list;
             for (int i = 0; i < data.size(); ++i) {
@@ -658,7 +658,7 @@ PYBIND11_MODULE(pymanifold, m) {
           "List[List[Tuple[float, float]]].")
       .def(
           "extrude",
-          [](CrossSection self, float height, int nDivisions = 0,
+          [](CrossSection &self, float height, int nDivisions = 0,
              float twistDegrees = 0.0f,
              Float2 scaleTop = std::make_tuple(1.0f, 1.0f)) {
             glm::vec2 scaleTopVec(std::get<0>(scaleTop), std::get<1>(scaleTop));
@@ -683,7 +683,7 @@ PYBIND11_MODULE(pymanifold, m) {
           "single vertex at the top. Default (1, 1).")
       .def(
           "revolve",
-          [](CrossSection self, int circularSegments = 0) {
+          [](CrossSection &self, int circularSegments = 0) {
             return Manifold::Revolve(self, circularSegments);
           },
           py::arg("circular_segments") = 0,
