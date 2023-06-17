@@ -198,10 +198,9 @@ TEST(Manifold, ExtrudeCone) {
 }
 
 TEST(Manifold, Revolve) {
-  //Polygons polys = SquareHole();
-  Polygons polys = CrossSection::Square({4, 4}).ToPolygons();
-  Manifold vug = Manifold::Revolve(polys, 4);
-  ///EXPECT_EQ(vug.Genus(), 1);
+  Polygons polys = SquareHole();
+  Manifold vug = Manifold::Revolve(polys, 48);
+  EXPECT_EQ(vug.Genus(), -1);
   ExportMesh("revolve.glb", vug.GetMesh(), {});
   auto prop = vug.GetProperties();
   EXPECT_NEAR(prop.volume, 14.0f * glm::pi<float>(), 0.2f);
@@ -211,7 +210,7 @@ TEST(Manifold, Revolve) {
 TEST(Manifold, Revolve2) {
   Polygons polys = SquareHole(2.0f);
   Manifold donutHole = Manifold::Revolve(polys, 48);
-  EXPECT_EQ(donutHole.Genus(), 1);
+  EXPECT_EQ(donutHole.Genus(), 0);
   auto prop = donutHole.GetProperties();
   EXPECT_NEAR(prop.volume, 48.0f * glm::pi<float>(), 1.0f);
   EXPECT_NEAR(prop.surfaceArea, 96.0f * glm::pi<float>(), 1.0f);

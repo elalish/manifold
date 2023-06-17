@@ -317,6 +317,7 @@ Manifold Manifold::Extrude(const CrossSection& crossSection, float height,
  * @param crossSection A set of non-overlapping polygons to revolve.
  * @param circularSegments Number of segments along its diameter. Default is
  * calculated by the static Defaults.
+ * @param revolveDegrees Number of degrees to revolve. Default is 360 degrees.
  */
 Manifold Manifold::Revolve(const CrossSection& crossSection,
                            int circularSegments,
@@ -353,8 +354,6 @@ Manifold Manifold::Revolve(const CrossSection& crossSection,
   }
   bool isFullRevolution = revolveDegrees == 360.0f;
 
-  std::cout << "isFullRevolution:" << isFullRevolution << std::endl;
-
   int nDivisions = circularSegments > 2 ? circularSegments
                                         : Quality::GetCircularSegments(radius);
 
@@ -376,12 +375,12 @@ Manifold Manifold::Revolve(const CrossSection& crossSection,
   for (const auto& poly : polygons) {
 
     std::size_t nPosVerts = 0;
-    std::size_t nZeroVerts = 0;
+    std::size_t nRevolveAxisVerts = 0;
     for (auto& pt: poly) {
       if (pt.x > 0) {
         nPosVerts++;
       } else {
-        nZeroVerts++;
+        nRevolveAxisVerts++;
       }
     }
 
@@ -392,14 +391,10 @@ Manifold Manifold::Revolve(const CrossSection& crossSection,
       if (!isFullRevolution)
         startPoses.push_back(startPosIndex);
 
-      int prevStartPosIndex = startPosIndex + (polyVert == 0 ? nZeroVerts + (nSlices * nPosVerts) - poly.size() : poly[polyVert-1].x == 0.0 ? -1 : -nSlices);
+      int prevStartPosIndex = startPosIndex + (polyVert == 0 ? nRevolveAxisVerts + (nSlices * nPosVerts) - nSlices
+                                                             : poly[polyVert-1].x == 0.0 ? -1 : -nSlices);
       glm::vec2 currPolyVertex = poly[polyVert];
       glm::vec2 prevPolyVertex = poly[polyVert == 0 ? poly.size() - 1 : polyVert - 1];
-      //if ( polyVert > 0 ) {
-      //  std::cout << "start: " << startPosIndex << " prevStartPosIndex: " << prevStartPosIndex << " polyVert: " << polyVert << " X: " << currPolyVertex.x << " Prev X: " << poly[polyVert-1].x << std::endl;
-      //} else {
-      //  std::cout << "start: " << startPosIndex << " prevStartPosIndex: " << prevStartPosIndex << " polyVert: " << polyVert << " X: " << currPolyVertex.x << std::endl;
-      //}
 
       int nFacesAdded = 0;
       for (int slice = 0; slice < nSlices; ++slice) {
@@ -412,29 +407,17 @@ Manifold Manifold::Revolve(const CrossSection& crossSection,
 
         if (isFullRevolution || slice > 0) {
           int lastSlice = (slice == 0 ? nDivisions : slice) - 1;
-          glm::vec2 prevSliceStartPos = vertPos[prevStartPosIndex];
-          glm::vec2 currSliceStartPos = vertPos[startPosIndex];
-          //std::cout << "currSliceStartPosX: " << currSliceStartPos.x << " prevSliceStartPosX: " << prevSliceStartPos.x << " currPolyVertexX: " << currPolyVertex.x << " prevPolyVertexX: " << prevPolyVertex.x << std::endl;
-          //std::cout << "startX: " << currPolyVertex.x << " lastStartX: " << prevPolyVertex.x << std::endl;
-
           if (currPolyVertex.x > 0.0) {
-            glm::ivec3 t = {startPosIndex + slice,
-                            startPosIndex + lastSlice,
-                            (prevPolyVertex.x == 0.0 ? prevStartPosIndex : prevStartPosIndex+lastSlice)};
-            std::cout << "triangleA: " << t.x << " " << t.y << " " << t.z << std::endl;
-            triVerts.push_back(t);
-            nFaces += 1;
-            nFacesAdded += 1;
+            triVerts.push_back({startPosIndex + slice,
+                startPosIndex + lastSlice,
+                // "Reuse" vertex of first slice if it lies on the revolve axis
+                (prevPolyVertex.x == 0.0 ? prevStartPosIndex : prevStartPosIndex+lastSlice)});
           }
 
           if (prevPolyVertex.x > 0.0) {
-            glm::ivec3 t = {prevStartPosIndex + lastSlice,
-                            prevStartPosIndex + slice,
-                            (currPolyVertex.x == 0.0 ? startPosIndex : startPosIndex+slice)};
-            std::cout << "triangleB: " << t.x << " " << t.y << " " << t.z << std::endl;
-            triVerts.push_back(t);
-            nFaces += 1;
-            nFacesAdded += 1;
+            triVerts.push_back({prevStartPosIndex + lastSlice,
+                prevStartPosIndex + slice,
+                (currPolyVertex.x == 0.0 ? startPosIndex : startPosIndex+slice)});
           }
         }
       }
@@ -442,32 +425,6 @@ Manifold Manifold::Revolve(const CrossSection& crossSection,
         endPoses.push_back(vertPos.size() - 1);
     }
   }
-
-
-  std::cout << "N verts: " << nVertices << std::endl;
-  std::cout << "N faces: " << nFaces << std::endl;
-
-  int maxt = 0;
-  for (auto& t: triVerts) {
-    if (t.x > maxt) {
-      maxt = t.x;
-    }
-    if (t.y > maxt) {
-      maxt = t.y;
-    }
-    if (t.z > maxt) {
-      maxt = t.z;
-    }
-  }
-  std::cout << "Max T: " << maxt << std::endl;
-  std::cout << "Size:" << vertPos.size() << std::endl;
-
-  for (auto& v: vertPos) {
-    if (v.x == 0.0 && v.y == 0.0)
-      std::cout << "vertex: " << v.x << " " << v.y << " " << v.z << std::endl;
-  }
-
-  std::cout << "wtf" << std::endl;
 
   // Add front and back triangles if not a full revolution.
   if (!isFullRevolution) {
