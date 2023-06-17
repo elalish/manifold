@@ -319,10 +319,26 @@ Manifold Manifold::Extrude(const CrossSection& crossSection, float height,
  * calculated by the static Defaults.
  */
 Manifold Manifold::Revolve(const CrossSection& crossSection,
-                           int circularSegments) {
-  auto polygons = crossSection.ToPolygons();
+                           int circularSegments,
+                           float revolveDegrees) {
+
+  Polygons polygons = crossSection.ToPolygons();
+
   if (polygons.size() == 0) {
     return Invalid();
+  }
+
+  Rect bounds = crossSection.Bounds();
+
+  // Take the x>=0 slice.
+  if (bounds.min.x < 0) {
+    glm::vec2 min = bounds.min;
+    glm::vec2 max = bounds.max;
+    CrossSection posBoundingBox = CrossSection({{0.0, min.y},{max.x, min.y},
+                                                {max.x,max.y},{0.0,max.y}});
+
+    // Can't use RectClip as it has many failure cases.
+    polygons = (crossSection ^ posBoundingBox).ToPolygons();
   }
 
   float radius = 0.0f;
@@ -331,79 +347,138 @@ Manifold Manifold::Revolve(const CrossSection& crossSection,
       radius = fmax(radius, vert.x);
     }
   }
+
+  if (revolveDegrees > 360.0f) {
+    revolveDegrees = 360.0f;
+  }
+  bool isFullRevolution = revolveDegrees == 360.0f;
+
+  std::cout << "isFullRevolution:" << isFullRevolution << std::endl;
+
   int nDivisions = circularSegments > 2 ? circularSegments
                                         : Quality::GetCircularSegments(radius);
+
   auto pImpl_ = std::make_shared<Impl>();
   auto& vertPos = pImpl_->vertPos_;
   VecDH<glm::ivec3> triVertsDH;
   auto& triVerts = triVertsDH;
-  float dPhi = 360.0f / nDivisions;
+
+  std::vector<int> startPoses;
+  std::vector<int> endPoses;
+
+  float dPhi = revolveDegrees / nDivisions;
+  // first and last slice are distinguished if not a full revolution.
+  int nSlices = isFullRevolution ? nDivisions : nDivisions + 1;
+
+  int nVertices = 0;
+  int nFaces = 0;
+
   for (const auto& poly : polygons) {
-    int start = -1;
+
+    std::size_t nPosVerts = 0;
+    std::size_t nZeroVerts = 0;
+    for (auto& pt: poly) {
+      if (pt.x > 0) {
+        nPosVerts++;
+      } else {
+        nZeroVerts++;
+      }
+    }
+
     for (int polyVert = 0; polyVert < poly.size(); ++polyVert) {
-      if (poly[polyVert].x <= 0) {
-        start = polyVert;
-        break;
-      }
-    }
-    if (start == -1) {  // poly all positive
-      for (int polyVert = 0; polyVert < poly.size(); ++polyVert) {
-        int startVert = vertPos.size();
-        int lastStart =
-            startVert +
-            (polyVert == 0 ? nDivisions * (poly.size() - 1) : -nDivisions);
-        for (int slice = 0; slice < nDivisions; ++slice) {
+
+      int startPosIndex = vertPos.size();
+
+      if (!isFullRevolution)
+        startPoses.push_back(startPosIndex);
+
+      int prevStartPosIndex = startPosIndex + (polyVert == 0 ? nZeroVerts + (nSlices * nPosVerts) - poly.size() : poly[polyVert-1].x == 0.0 ? -1 : -nSlices);
+      glm::vec2 currPolyVertex = poly[polyVert];
+      glm::vec2 prevPolyVertex = poly[polyVert == 0 ? poly.size() - 1 : polyVert - 1];
+      //if ( polyVert > 0 ) {
+      //  std::cout << "start: " << startPosIndex << " prevStartPosIndex: " << prevStartPosIndex << " polyVert: " << polyVert << " X: " << currPolyVertex.x << " Prev X: " << poly[polyVert-1].x << std::endl;
+      //} else {
+      //  std::cout << "start: " << startPosIndex << " prevStartPosIndex: " << prevStartPosIndex << " polyVert: " << polyVert << " X: " << currPolyVertex.x << std::endl;
+      //}
+
+      int nFacesAdded = 0;
+      for (int slice = 0; slice < nSlices; ++slice) {
+
+        float phi = slice * dPhi;
+        if (slice == 0 || currPolyVertex.x > 0) {
+          vertPos.push_back({currPolyVertex.x * cosd(phi), currPolyVertex.x * sind(phi), currPolyVertex.y});
+          nVertices += 1;
+        }
+
+        if (isFullRevolution || slice > 0) {
           int lastSlice = (slice == 0 ? nDivisions : slice) - 1;
-          float phi = slice * dPhi;
-          glm::vec2 pos = poly[polyVert];
-          vertPos.push_back({pos.x * cosd(phi), pos.x * sind(phi), pos.y});
-          triVerts.push_back({startVert + slice, startVert + lastSlice,
-                              lastStart + lastSlice});
-          triVerts.push_back(
-              {lastStart + lastSlice, lastStart + slice, startVert + slice});
+          glm::vec2 prevSliceStartPos = vertPos[prevStartPosIndex];
+          glm::vec2 currSliceStartPos = vertPos[startPosIndex];
+          //std::cout << "currSliceStartPosX: " << currSliceStartPos.x << " prevSliceStartPosX: " << prevSliceStartPos.x << " currPolyVertexX: " << currPolyVertex.x << " prevPolyVertexX: " << prevPolyVertex.x << std::endl;
+          //std::cout << "startX: " << currPolyVertex.x << " lastStartX: " << prevPolyVertex.x << std::endl;
+
+          if (currPolyVertex.x > 0.0) {
+            glm::ivec3 t = {startPosIndex + slice,
+                            startPosIndex + lastSlice,
+                            (prevPolyVertex.x == 0.0 ? prevStartPosIndex : prevStartPosIndex+lastSlice)};
+            std::cout << "triangleA: " << t.x << " " << t.y << " " << t.z << std::endl;
+            triVerts.push_back(t);
+            nFaces += 1;
+            nFacesAdded += 1;
+          }
+
+          if (prevPolyVertex.x > 0.0) {
+            glm::ivec3 t = {prevStartPosIndex + lastSlice,
+                            prevStartPosIndex + slice,
+                            (currPolyVertex.x == 0.0 ? startPosIndex : startPosIndex+slice)};
+            std::cout << "triangleB: " << t.x << " " << t.y << " " << t.z << std::endl;
+            triVerts.push_back(t);
+            nFaces += 1;
+            nFacesAdded += 1;
+          }
         }
       }
-    } else {  // poly crosses zero
-      int polyVert = start;
-      glm::vec2 pos = poly[polyVert];
-      do {
-        glm::vec2 lastPos = pos;
-        polyVert = (polyVert + 1) % poly.size();
-        pos = poly[polyVert];
-        if (pos.x > 0) {
-          if (lastPos.x <= 0) {
-            float a = pos.x / (pos.x - lastPos.x);
-            vertPos.push_back({0.0f, 0.0f, glm::mix(pos.y, lastPos.y, a)});
-          }
-          int startVert = vertPos.size();
-          for (int slice = 0; slice < nDivisions; ++slice) {
-            int lastSlice = (slice == 0 ? nDivisions : slice) - 1;
-            float phi = slice * dPhi;
-            glm::vec2 pos = poly[polyVert];
-            vertPos.push_back({pos.x * cosd(phi), pos.x * sind(phi), pos.y});
-            if (lastPos.x > 0) {
-              triVerts.push_back({startVert + slice, startVert + lastSlice,
-                                  startVert - nDivisions + lastSlice});
-              triVerts.push_back({startVert - nDivisions + lastSlice,
-                                  startVert - nDivisions + slice,
-                                  startVert + slice});
-            } else {
-              triVerts.push_back(
-                  {startVert - 1, startVert + slice, startVert + lastSlice});
-            }
-          }
-        } else if (lastPos.x > 0) {
-          int startVert = vertPos.size();
-          float a = pos.x / (pos.x - lastPos.x);
-          vertPos.push_back({0.0f, 0.0f, glm::mix(pos.y, lastPos.y, a)});
-          for (int slice = 0; slice < nDivisions; ++slice) {
-            int lastSlice = (slice == 0 ? nDivisions : slice) - 1;
-            triVerts.push_back({startVert, startVert - nDivisions + lastSlice,
-                                startVert - nDivisions + slice});
-          }
-        }
-      } while (polyVert != start);
+      if (!isFullRevolution)
+        endPoses.push_back(vertPos.size() - 1);
     }
+  }
+
+
+  std::cout << "N verts: " << nVertices << std::endl;
+  std::cout << "N faces: " << nFaces << std::endl;
+
+  int maxt = 0;
+  for (auto& t: triVerts) {
+    if (t.x > maxt) {
+      maxt = t.x;
+    }
+    if (t.y > maxt) {
+      maxt = t.y;
+    }
+    if (t.z > maxt) {
+      maxt = t.z;
+    }
+  }
+  std::cout << "Max T: " << maxt << std::endl;
+  std::cout << "Size:" << vertPos.size() << std::endl;
+
+  for (auto& v: vertPos) {
+    if (v.x == 0.0 && v.y == 0.0)
+      std::cout << "vertex: " << v.x << " " << v.y << " " << v.z << std::endl;
+  }
+
+  std::cout << "wtf" << std::endl;
+
+  // Add front and back triangles if not a full revolution.
+  if (!isFullRevolution) {
+      std::vector<glm::ivec3> frontTriangles = Triangulate(polygons, pImpl_->precision_);
+      for (auto& tv: frontTriangles) {
+        triVerts.push_back({startPoses[tv.x], startPoses[tv.y], startPoses[tv.z]});
+      }
+
+      for (auto& v: frontTriangles) {
+        triVerts.push_back({endPoses[v.z], endPoses[v.y], endPoses[v.x]});
+      }
   }
 
   pImpl_->CreateHalfedges(triVertsDH);
