@@ -28,7 +28,8 @@ def run():
 
     diff = test_cross - cross_section
     if diff.area() != 0:
-        print("Cross-section is missing a part of the polygon!")
+        print(f"Cross-section is missing a part of the polygon! "
+              f"points_list={cross_section.to_polygons()}")
 
     manifold = cross_section.extrude(1.0)
     return manifold
