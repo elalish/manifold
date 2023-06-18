@@ -161,6 +161,20 @@ PYBIND11_MODULE(pymanifold, m) {
           "\n\n"
           ":param v: The vector to multiply every vertex by component.")
       .def(
+          "mirror",
+          [](Manifold &self, py::array_t<float> &mirror) {
+            auto v_view = mirror.unchecked<1>();
+            if (v_view.shape(0) != 3)
+              throw std::runtime_error("Invalid vector shape");
+            glm::vec3 v(v_view(0), v_view(1), v_view(2));
+            return self.Mirror(v);
+          },
+          py::arg("v"),
+          "Mirror this Manifold in space. This operation can be chained. "
+          "Transforms are combined and applied lazily."
+          "\n\n"
+          ":param mirror: The vector defining the axis of mirroring.")
+      .def(
           "rotate",
           [](Manifold &self, py::array_t<float> &v) {
             auto v_view = v.unchecked<1>();
