@@ -166,9 +166,9 @@ class ManagedVec {
   void shrink_to_fit() {
     T *newBuffer = nullptr;
     if (size_ > 0) {
-      int n_bytes = size_ * sizeof(T);
-      mallocManaged(&newBuffer, n_bytes);
-      prefetch(newBuffer, n_bytes, onHost);
+      size_t n_bytes = size_ * sizeof(T);
+      mallocManaged(&newBuffer, size_ * sizeof(T));
+      prefetch(newBuffer, size_ * sizeof(T), onHost);
       uninitialized_copy(autoPolicy(size_), ptr_, ptr_ + size_, newBuffer);
     }
     freeManaged(ptr_);
@@ -270,7 +270,7 @@ class ManagedVec {
       free(ptr);
   }
 
-  static void prefetch(T *ptr, int bytes, bool onHost) {
+  static void prefetch(T *ptr, size_t bytes, bool onHost) {
 #ifdef MANIFOLD_USE_CUDA
     if (bytes > 0 && CudaEnabled())
       cudaMemPrefetchAsync(ptr, std::min(bytes, DEVICE_MAX_BYTES),
@@ -279,7 +279,7 @@ class ManagedVec {
   }
 
   // fast routine for memcpy from std::vector to ManagedVec
-  static void fastUninitializedCopy(T *dst, const T *src, int n,
+  static void fastUninitializedCopy(T *dst, const T *src, size_t n,
                                     ExecutionPolicy policy) {
     prefetch(dst, n * sizeof(T), policy != ExecutionPolicy::ParUnseq);
     switch (policy) {
@@ -322,9 +322,9 @@ class VecDH {
   // Note that the vector constructed with this constructor will contain
   // uninitialized memory. Please specify `val` if you need to make sure that
   // the data is initialized.
-  VecDH(int size) { impl_.resize(size); }
+  VecDH(size_t size) { impl_.resize(size); }
 
-  VecDH(int size, T val) { impl_.resize(size, val); }
+  VecDH(size_t size, T val) { impl_.resize(size, val); }
 
   VecDH(const std::vector<T> &vec) { impl_ = vec; }
 
@@ -342,9 +342,9 @@ class VecDH {
     return *this;
   }
 
-  int size() const { return impl_.size(); }
+  size_t size() const { return impl_.size(); }
 
-  void resize(int newSize, T val = T()) {
+  void resize(size_t newSize, T val = T()) {
     bool shrink = size() > 2 * newSize;
     impl_.resize(newSize, val);
     if (shrink) impl_.shrink_to_fit();
@@ -400,12 +400,12 @@ class VecDH {
 
   const T *ptrH() const { return cptrH(); }
 
-  T &operator[](int i) {
+  T &operator[](size_t i) {
     impl_.prefetch_to(true);
     return impl_[i];
   }
 
-  const T &operator[](int i) const {
+  const T &operator[](size_t i) const {
     impl_.prefetch_to(true);
     return impl_[i];
   }
@@ -416,12 +416,12 @@ class VecDH {
 
   void push_back(const T &val) { impl_.push_back(val); }
 
-  void reserve(int n) { impl_.reserve(n); }
+  void reserve(size_t n) { impl_.reserve(n); }
 
 #ifdef MANIFOLD_DEBUG
   void Dump() const {
     std::cout << "VecDH = " << std::endl;
-    for (int i = 0; i < impl_.size(); ++i) {
+    for (size_t i = 0; i < impl_.size(); ++i) {
       std::cout << i << ", " << impl_[i] << ", " << std::endl;
     }
     std::cout << std::endl;
@@ -437,12 +437,12 @@ class VecDc {
  public:
   VecDc(const VecDH<T> &vec) : ptr_(vec.ptrD()), size_(vec.size()) {}
 
-  __host__ __device__ const T &operator[](int i) const { return ptr_[i]; }
-  __host__ __device__ int size() const { return size_; }
+  __host__ __device__ const T &operator[](size_t i) const { return ptr_[i]; }
+  __host__ __device__ size_t size() const { return size_; }
 
  private:
   T const *const ptr_;
-  const int size_;
+  const size_t size_;
 };
 
 template <typename T>
@@ -450,12 +450,12 @@ class VecD {
  public:
   VecD(VecDH<T> &vec) : ptr_(vec.ptrD()), size_(vec.size()) {}
 
-  __host__ __device__ T &operator[](int i) const { return ptr_[i]; }
-  __host__ __device__ int size() const { return size_; }
+  __host__ __device__ T &operator[](size_t i) const { return ptr_[i]; }
+  __host__ __device__ size_t size() const { return size_; }
 
  private:
   T *ptr_;
-  int size_;
+  size_t size_;
 };
 /** @} */
 }  // namespace manifold

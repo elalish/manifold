@@ -128,8 +128,8 @@ template <typename V, hash_fun_t H = hash64bit>
 class HashTable {
  public:
   HashTable(uint32_t size, uint32_t step = 1)
-      : keys_{1 << (int)ceil(log2(size)), kOpen},
-        values_{1 << (int)ceil(log2(size)), {}},
+      : keys_{1lu << (int)ceil(log2(size)), kOpen},
+        values_{1lu << (int)ceil(log2(size)), {}},
         table_{keys_, values_, used_, step} {}
 
   HashTableD<V, H> D() { return table_; }
