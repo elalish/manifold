@@ -64,7 +64,10 @@ if(MANIFOLD_USE_CUDA)
 endif()
 
 if(NOT MSVC)
-  set(WARNING_FLAGS -Werror -Wall -Wno-sign-compare -Wno-unused -Wno-alloc-size-larger-than)
+  set(WARNING_FLAGS -Werror -Wall -Wno-sign-compare -Wno-unused)
+  if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    set(WARNING_FLAGS ${WARNING_FLAGS} -Wno-alloc-size-larger-than)
+  endif()
   add_compile_options(
     "$<$<COMPILE_LANGUAGE:CXX>:${WARNING_FLAGS}>"
     "$<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=${WARNING_FLAGS}>")
