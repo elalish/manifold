@@ -64,7 +64,7 @@ if(MANIFOLD_USE_CUDA)
 endif()
 
 if(NOT MSVC)
-  set(WARNING_FLAGS -Werror -Wall -Wno-sign-compare -Wno-unused)
+  set(WARNING_FLAGS -Werror -Wall -Wno-sign-compare -Wno-unused -Wno-alloc-size-larger-than)
   add_compile_options(
     "$<$<COMPILE_LANGUAGE:CXX>:${WARNING_FLAGS}>"
     "$<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=${WARNING_FLAGS}>")
