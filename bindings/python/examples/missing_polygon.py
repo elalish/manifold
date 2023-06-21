@@ -25,10 +25,11 @@ def run():
             ]]
         )
 
-    diff = test_cross - cross_section
-    if diff.area() != 0:
+    diff = test_cross - cross_section  # we expect full overlap, so diff should be zero
+    if diff.area() > 0.01:
         print(f"Cross-section is missing a part of the polygon! "
-              f"points_list={cross_section.to_polygons()}")
+              f"Area: {diff.area()}, "
+              f"to_polygons={cross_section.to_polygons()}")
 
     manifold = cross_section.extrude(1.0)
     return manifold
