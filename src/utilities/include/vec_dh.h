@@ -166,7 +166,6 @@ class ManagedVec {
   void shrink_to_fit() {
     T *newBuffer = nullptr;
     if (size_ > 0) {
-      size_t n_bytes = size_ * sizeof(T);
       mallocManaged(&newBuffer, size_ * sizeof(T));
       prefetch(newBuffer, size_ * sizeof(T), onHost);
       uninitialized_copy(autoPolicy(size_), ptr_, ptr_ + size_, newBuffer);
@@ -250,7 +249,7 @@ class ManagedVec {
   size_t capacity_ = 0;
   mutable bool onHost = true;
 
-  static constexpr int DEVICE_MAX_BYTES = 1 << 16;
+  static constexpr size_t DEVICE_MAX_BYTES = 1ul << 16;
 
   static void mallocManaged(T **ptr, size_t bytes) {
 #ifdef MANIFOLD_USE_CUDA
