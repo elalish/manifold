@@ -141,3 +141,25 @@ TEST(CrossSection, Decompose) {
   Identical(Manifold::Extrude(ab, 1.).GetMesh(),
             Manifold::Extrude(recomp, 1.).GetMesh());
 }
+
+TEST(CrossSection, FillRule) {
+  SimplePolygon polygon = {
+      {-7, 13},   //
+      {-7, 12},   //
+      {-5, 9},    //
+      {-5, 8.1},  //
+      {-4.8, 8},  //
+  };
+
+  CrossSection positive(polygon);
+  EXPECT_NEAR(positive.Area(), 0.683, 0.001);
+
+  CrossSection negative(polygon, CrossSection::FillRule::Negative);
+  EXPECT_NEAR(negative.Area(), 0.193, 0.001);
+
+  CrossSection evenOdd(polygon, CrossSection::FillRule::EvenOdd);
+  EXPECT_NEAR(evenOdd.Area(), 0.875, 0.001);
+
+  CrossSection nonZero(polygon, CrossSection::FillRule::NonZero);
+  EXPECT_NEAR(nonZero.Area(), 0.875, 0.001);
+}
