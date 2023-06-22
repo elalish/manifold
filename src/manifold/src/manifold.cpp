@@ -630,6 +630,27 @@ Manifold Manifold::CalculateCurvature(int gaussianIdx, int meanIdx) const {
 }
 
 /**
+ * Fills in vertex properties for normal vectors, calculated from the mesh
+ * geometry. Flat faces composed of three or more triangles will remain flat.
+ *
+ * @param normalIdx The property channels in which to store the X, Y, and Z
+ * values of the normals. The property set will be automatically expanded to
+ * include the channel indices specified.
+ *
+ * @param minSharpAngle Any edges with angles greater than this value will
+ * remain sharp, getting different normal vector properties on each side of the
+ * edge. By default, no edges are sharp and all normals are shared. With a value
+ * of zero, the model is faceted and all normals match their triangle normals,
+ * but in this case it would be better not to calculate normals at all.
+ */
+Manifold Manifold::CalculateNormals(glm::ivec3 normalIdx,
+                                    float minSharpAngle) const {
+  auto pImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
+  pImpl->SetNormals(normalIdx, minSharpAngle);
+  return Manifold(std::make_shared<CsgLeafNode>(pImpl));
+}
+
+/**
  * Increase the density of the mesh by splitting every edge into n pieces. For
  * instance, with n = 2, each triangle will be split into 4 triangles. These
  * will all be coplanar (and will not be immediately collapsed) unless the

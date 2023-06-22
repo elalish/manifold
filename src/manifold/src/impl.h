@@ -71,6 +71,7 @@ struct Manifold::Impl {
   void InitializeOriginal();
   void CreateHalfedges(const VecDH<glm::ivec3>& triVerts);
   void CalculateNormals();
+  void SetNormals(glm::ivec3 normalIdx, float minSharpAngle);
   void IncrementMeshIDs();
 
   void Update();
