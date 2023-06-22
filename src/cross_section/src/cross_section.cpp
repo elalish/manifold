@@ -17,7 +17,7 @@
 using namespace manifold;
 
 namespace {
-const int precision_ = 8;
+const int precision_ = 6;
 
 C2::ClipType cliptype_of_op(OpType op) {
   C2::ClipType ct = C2::ClipType::Union;
