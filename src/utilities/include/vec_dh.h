@@ -166,8 +166,9 @@ class ManagedVec {
   void shrink_to_fit() {
     T *newBuffer = nullptr;
     if (size_ > 0) {
-      mallocManaged(&newBuffer, size_ * sizeof(T));
-      prefetch(newBuffer, size_ * sizeof(T), onHost);
+      int n_bytes = size_ * sizeof(T);
+      mallocManaged(&newBuffer, n_bytes);
+      prefetch(newBuffer, n_bytes, onHost);
       uninitialized_copy(autoPolicy(size_), ptr_, ptr_ + size_, newBuffer);
     }
     freeManaged(ptr_);
