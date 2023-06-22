@@ -98,7 +98,17 @@
     "concepts": "cpp",
     "queue": "cpp",
     "stack": "cpp",
-    "__hash_table": "cpp"
+    "__hash_table": "cpp",
+    "__std_stream": "cpp",
+    "__verbose_abort": "cpp",
+    "any": "cpp",
+    "barrier": "cpp",
+    "charconv": "cpp",
+    "coroutine": "cpp",
+    "latch": "cpp",
+    "semaphore": "cpp",
+    "span": "cpp",
+    "__sso_allocator": "cpp"
   },
   "C_Cpp.clang_format_fallbackStyle": "google",
   "editor.formatOnSave": true,
