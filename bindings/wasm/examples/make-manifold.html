@@ -74,6 +74,8 @@
   const wasm = await Module();
   wasm.setup();
 
+  const { Manifold, Mesh } = wasm;
+
   const mv = document.querySelector('model-viewer');
   const inputEl = document.querySelector('#input');
   const downloadButton = document.querySelector('#download');
@@ -154,11 +156,11 @@
       const materials = [];
       const tmpMesh = readMesh(mesh, attributes, materials);
       tmpMesh.runOriginalID = [];
-      const firstID = wasm.reserveIDs(materials.length);
+      const firstID = Manifold.reserveIDs(materials.length);
       for (let i = 0; i < materials.length; ++i) {
         tmpMesh.runOriginalID.push(firstID + i);
       }
-      const manifoldMesh = new wasm.Mesh(tmpMesh);
+      const manifoldMesh = new Mesh(tmpMesh);
       mesh.dispose();
 
       const matAttributes = [];
@@ -168,7 +170,7 @@
 
       try {
         // Test manifoldness - will throw if not.
-        const manifold = wasm.Manifold(manifoldMesh);
+        const manifold = Manifold(manifoldMesh);
         node.setMesh(writeMesh(docIn, manifold.getMesh(), matAttributes, materials));
         manifold.delete();
         anyManifold = true;

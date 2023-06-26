@@ -61,6 +61,8 @@
   const wasm = await Module();
   wasm.setup();
 
+  const { Manifold, Mesh } = wasm;
+
   const attributes = ['POSITION', 'TEXCOORD_0'];
   const materialMap = new Map();
 
@@ -75,12 +77,12 @@
       const materials = [];
       const manifoldMesh = readMesh(node.getMesh(), attributes, materials);
       manifoldMesh.runOriginalID = [];
-      const firstID = wasm.reserveIDs(materials.length);
+      const firstID = Manifold.reserveIDs(materials.length);
       for (let i = 0; i < materials.length; ++i) {
         manifoldMesh.runOriginalID.push(firstID + i);
         ids.push(firstID + i);
       }
-      manifolds.push(wasm.Manifold(new wasm.Mesh(manifoldMesh)));
+      manifolds.push(Manifold(new Mesh(manifoldMesh)));
     }
     // pull in materials, TODO: replace with transfer() when available
     const startIdx = doc.getRoot().listMaterials().length;
@@ -92,7 +94,7 @@
       materialMap.set(id, material);
     }
 
-    return wasm.union(manifolds);
+    return Manifold.union(manifolds);
   }
 
   const space = await readGLB('/models/space.glb', attributes, materialMap);
@@ -102,7 +104,7 @@
   doc.createScene().addChild(node);
 
   function csg(operation) {
-    push2MV(wasm[operation](space, moon));
+    push2MV(Manifold[operation](space, moon));
   };
 
   document.querySelector('select').onchange = function (event) {
