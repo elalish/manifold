@@ -161,6 +161,20 @@ PYBIND11_MODULE(pymanifold, m) {
           "\n\n"
           ":param v: The vector to multiply every vertex by component.")
       .def(
+          "mirror",
+          [](Manifold &self, py::array_t<float> &mirror) {
+            auto v_view = mirror.unchecked<1>();
+            if (v_view.shape(0) != 3)
+              throw std::runtime_error("Invalid vector shape");
+            glm::vec3 v(v_view(0), v_view(1), v_view(2));
+            return self.Mirror(v);
+          },
+          py::arg("v"),
+          "Mirror this Manifold in space. This operation can be chained. "
+          "Transforms are combined and applied lazily."
+          "\n\n"
+          ":param mirror: The vector defining the axis of mirroring.")
+      .def(
           "rotate",
           [](Manifold &self, py::array_t<float> &v) {
             auto v_view = v.unchecked<1>();
@@ -443,54 +457,64 @@ PYBIND11_MODULE(pymanifold, m) {
                   "further operations. Assign to MeshGL.runOriginalID vector");
 
   py::class_<Mesh>(m, "Mesh")
-      .def(py::init([](py::array_t<float> &vertPos, py::array_t<int> &triVerts,
-                       py::array_t<float> &vertNormal,
-                       py::array_t<float> &halfedgeTangent) {
-             auto vertPos_view = vertPos.unchecked<2>();
-             auto triVerts_view = triVerts.unchecked<2>();
-             auto vertNormal_view = vertNormal.unchecked<2>();
-             auto halfedgeTangent_view = halfedgeTangent.unchecked<2>();
-             if (vertPos_view.shape(1) != 3)
-               throw std::runtime_error("Invalid vert_pos shape");
-             if (triVerts_view.shape(1) != 3)
-               throw std::runtime_error("Invalid tri_verts shape");
-             if (vertNormal_view.shape(0) != 0) {
-               if (vertNormal_view.shape(1) != 3)
-                 throw std::runtime_error("Invalid vert_normal shape");
-               if (vertNormal_view.shape(0) != vertPos_view.shape(0))
-                 throw std::runtime_error(
-                     "vert_normal must have the same length as vert_pos");
-             }
-             if (halfedgeTangent_view.shape(0) != 0) {
-               if (halfedgeTangent_view.shape(1) != 4)
-                 throw std::runtime_error("Invalid halfedge_tangent shape");
-               if (halfedgeTangent_view.shape(0) != triVerts_view.shape(0) * 3)
-                 throw std::runtime_error(
-                     "halfedge_tangent must be three times as long as "
-                     "tri_verts");
-             }
-             std::vector<glm::vec3> vertPos_vec(vertPos_view.shape(0));
-             std::vector<glm::ivec3> triVerts_vec(triVerts_view.shape(0));
-             std::vector<glm::vec3> vertNormal_vec(vertNormal_view.shape(0));
-             std::vector<glm::vec4> halfedgeTangent_vec(
-                 halfedgeTangent_view.shape(0));
-             for (int i = 0; i < vertPos_view.shape(0); i++)
-               for (const int j : {0, 1, 2})
-                 vertPos_vec[i][j] = vertPos_view(i, j);
-             for (int i = 0; i < triVerts_view.shape(0); i++)
-               for (const int j : {0, 1, 2})
-                 triVerts_vec[i][j] = triVerts_view(i, j);
-             for (int i = 0; i < vertNormal_view.shape(0); i++)
-               for (const int j : {0, 1, 2})
-                 vertNormal_vec[i][j] = vertNormal_view(i, j);
-             for (int i = 0; i < halfedgeTangent_view.shape(0); i++)
-               for (const int j : {0, 1, 2, 3})
-                 halfedgeTangent_vec[i][j] = halfedgeTangent_view(i, j);
-             return Mesh({vertPos_vec, triVerts_vec, vertNormal_vec,
-                          halfedgeTangent_vec});
-           }),
-           py::arg("vert_pos"), py::arg("tri_verts"), py::arg("vert_normal"),
-           py::arg("halfedge_tangent"))
+      .def(
+          py::init([](py::array_t<float> &vertPos, py::array_t<int> &triVerts,
+                      std::optional<py::array_t<float>> &vertNormal,
+                      std::optional<py::array_t<float>> &halfedgeTangent) {
+            auto vertPos_view = vertPos.unchecked<2>();
+            auto triVerts_view = triVerts.unchecked<2>();
+            if (vertPos_view.shape(1) != 3)
+              throw std::runtime_error("Invalid vert_pos shape");
+            if (triVerts_view.shape(1) != 3)
+              throw std::runtime_error("Invalid tri_verts shape");
+            std::vector<glm::vec3> vertPos_vec(vertPos_view.shape(0));
+            std::vector<glm::ivec3> triVerts_vec(triVerts_view.shape(0));
+            for (int i = 0; i < vertPos_view.shape(0); i++)
+              for (const int j : {0, 1, 2})
+                vertPos_vec[i][j] = vertPos_view(i, j);
+            for (int i = 0; i < triVerts_view.shape(0); i++)
+              for (const int j : {0, 1, 2})
+                triVerts_vec[i][j] = triVerts_view(i, j);
+
+            // optional arguments
+            if (!vertNormal.has_value() && !halfedgeTangent.has_value()) {
+              return Mesh({vertPos_vec, triVerts_vec});
+            } else {
+              auto vertNormal_view = vertNormal.value().unchecked<2>();
+              auto halfedgeTangent_view =
+                  halfedgeTangent.value().unchecked<2>();
+              if (vertNormal_view.shape(0) != 0) {
+                if (vertNormal_view.shape(1) != 3)
+                  throw std::runtime_error("Invalid vert_normal shape");
+                if (vertNormal_view.shape(0) != vertPos_view.shape(0))
+                  throw std::runtime_error(
+                      "vert_normal must have the same length as vert_pos");
+              }
+              if (halfedgeTangent_view.shape(0) != 0) {
+                if (halfedgeTangent_view.shape(1) != 4)
+                  throw std::runtime_error("Invalid halfedge_tangent shape");
+                if (halfedgeTangent_view.shape(0) != triVerts_view.shape(0) * 3)
+                  throw std::runtime_error(
+                      "halfedge_tangent must be three times as long as "
+                      "tri_verts");
+              }
+              std::vector<glm::vec3> vertNormal_vec(vertNormal_view.shape(0));
+              std::vector<glm::vec4> halfedgeTangent_vec(
+                  halfedgeTangent_view.shape(0));
+              for (int i = 0; i < vertNormal_view.shape(0); i++)
+                for (const int j : {0, 1, 2})
+                  vertNormal_vec[i][j] = vertNormal_view(i, j);
+              for (int i = 0; i < halfedgeTangent_view.shape(0); i++)
+                for (const int j : {0, 1, 2, 3})
+                  halfedgeTangent_vec[i][j] = halfedgeTangent_view(i, j);
+
+              return Mesh({vertPos_vec, triVerts_vec, vertNormal_vec,
+                           halfedgeTangent_vec});
+            }
+          }),
+          py::arg("vert_pos"), py::arg("tri_verts"),
+          py::arg("vert_normal") = py::none(),
+          py::arg("halfedge_tangent") = py::none())
       .def_property_readonly("vert_pos",
                              [](Mesh &self) {
                                const int numVert = self.vertPos.size();
