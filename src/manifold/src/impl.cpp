@@ -661,12 +661,12 @@ void Manifold::Impl::CreateFaces(const std::vector<float>& propertyTolerance) {
  */
 void Manifold::Impl::CreateHalfedges(const VecDH<glm::ivec3>& triVerts) {
   const int numTri = triVerts.size();
-  const int numEdge = 3 * numTri / 2;
+  const int numHalfedge = 3 * numTri;
   // drop the old value first to avoid copy
   halfedge_.resize(0);
-  halfedge_.resize(2 * numEdge);
-  VecDH<uint64_t> edge(2 * numEdge);
-  VecDH<int> ids(2 * numEdge);
+  halfedge_.resize(numHalfedge);
+  VecDH<uint64_t> edge(numHalfedge);
+  VecDH<int> ids(numHalfedge);
   auto policy = autoPolicy(numTri);
   sequence(policy, ids.begin(), ids.end());
   for_each_n(policy, zip(countAt(0), triVerts.begin()), numTri,
@@ -680,8 +680,8 @@ void Manifold::Impl::CreateHalfedges(const VecDH<glm::ivec3>& triVerts) {
   // Once sorted, the first half of the range is the forward halfedges, which
   // correspond to their backward pair at the same offset in the second half
   // of the range.
-  for_each_n(policy, countAt(0), numEdge,
-             LinkHalfedges({halfedge_.ptrD(), ids.ptrD(), numEdge}));
+  for_each_n(policy, countAt(0), numHalfedge / 2,
+             LinkHalfedges({halfedge_.ptrD(), ids.ptrD(), numHalfedge / 2}));
 }
 
 /**
