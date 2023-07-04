@@ -197,13 +197,28 @@ TEST(Manifold, ExtrudeCone) {
   EXPECT_FLOAT_EQ(donut.GetProperties().volume, 4.0f);
 }
 
+Polygons RotatePolygons(Polygons polys, const int index) {
+  Polygons rotatedPolys;
+  for (auto& polygon : polys) {
+    auto rotatedPolygon = polygon;
+    std::rotate(rotatedPolygon.begin(), rotatedPolygon.begin() + index,
+                rotatedPolygon.end());
+    rotatedPolys.push_back(rotatedPolygon);
+  }
+  return rotatedPolys;
+}
+
 TEST(Manifold, Revolve) {
   Polygons polys = SquareHole();
-  Manifold vug = Manifold::Revolve(polys, 48);
-  EXPECT_EQ(vug.Genus(), -1);
-  auto prop = vug.GetProperties();
-  EXPECT_NEAR(prop.volume, 14.0f * glm::pi<float>(), 0.2f);
-  EXPECT_NEAR(prop.surfaceArea, 30.0f * glm::pi<float>(), 0.2f);
+  Manifold vug;
+  for (int i = 0; i < polys[0].size(); i++) {
+    Polygons rotatedPolys = RotatePolygons(polys, i);
+    vug = Manifold::Revolve(rotatedPolys, 48);
+    EXPECT_EQ(vug.Genus(), -1);
+    auto prop = vug.GetProperties();
+    EXPECT_NEAR(prop.volume, 14.0f * glm::pi<float>(), 0.2f);
+    EXPECT_NEAR(prop.surfaceArea, 30.0f * glm::pi<float>(), 0.2f);
+  }
 }
 
 TEST(Manifold, Revolve2) {
@@ -213,6 +228,38 @@ TEST(Manifold, Revolve2) {
   auto prop = donutHole.GetProperties();
   EXPECT_NEAR(prop.volume, 48.0f * glm::pi<float>(), 1.0f);
   EXPECT_NEAR(prop.surfaceArea, 96.0f * glm::pi<float>(), 1.0f);
+}
+
+TEST(Manifold, PartialRevolveOnYAxis) {
+  Polygons polys = SquareHole(2.0f);
+  Polygons offsetPolys = SquareHole(10.0f);
+
+  Manifold revolute;
+  for (int i = 0; i < polys[0].size(); i++) {
+    Polygons rotatedPolys = RotatePolygons(polys, i);
+    revolute = Manifold::Revolve(rotatedPolys, 48, 180);
+    EXPECT_EQ(revolute.Genus(), 1);
+    auto prop = revolute.GetProperties();
+    EXPECT_NEAR(prop.volume, 24.0f * glm::pi<float>(), 1.0f);
+    EXPECT_NEAR(
+        prop.surfaceArea,
+        48.0f * glm::pi<float>() + 4.0f * 4.0f * 2.0f - 2.0f * 2.0f * 2.0f,
+        1.0f);
+  }
+}
+
+TEST(Manifold, PartialRevolveOffset) {
+  Polygons polys = SquareHole(10.0f);
+
+  Manifold revolute;
+  for (int i = 0; i < polys[0].size(); i++) {
+    Polygons rotatedPolys = RotatePolygons(polys, i);
+    revolute = Manifold::Revolve(rotatedPolys, 48, 180);
+    auto prop = revolute.GetProperties();
+    EXPECT_EQ(revolute.Genus(), 1);
+    EXPECT_NEAR(prop.surfaceArea, 777.0f, 1.0f);
+    EXPECT_NEAR(prop.volume, 376.0f, 1.0f);
+  }
 }
 
 TEST(Manifold, Warp) {
