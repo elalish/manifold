@@ -91,7 +91,7 @@ export class CrossSection {
    * @param circularSegments Number of segments along its diameter. Default is
    * calculated by the static Defaults.
    */
-  revolve(circularSegments?: number): Manifold;
+  revolve(circularSegments?: number, revolveDegrees?: number): Manifold;
 
   // Transformations
 
@@ -421,9 +421,11 @@ export class Manifold {
    * @param polygons A set of non-overlapping polygons to revolve.
    * @param circularSegments Number of segments along its diameter. Default is
    * calculated by the static Defaults.
+   * @param revolveDegrees Number of degrees to revolve. Default is 360 degrees.
    */
-  static revolve(polygons: CrossSection|Polygons, circularSegments?: number):
-      Manifold;
+  static revolve(
+      polygons: CrossSection|Polygons, circularSegments?: number,
+      revolveDegrees?: number): Manifold;
 
   // Mesh Conversion
 
