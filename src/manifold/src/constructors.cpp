@@ -329,14 +329,16 @@ Manifold Manifold::Revolve(const CrossSection& crossSection,
 
   const Rect bounds = crossSection.Bounds();
 
-  // Take the x>=0 slice.
-  if (bounds.min.x < 0) {
+  if (bounds.max.x <= 0) {
+    return Invalid();
+  } else if (bounds.min.x < 0) {
+    // Take the x>=0 slice.
     glm::vec2 min = bounds.min;
     glm::vec2 max = bounds.max;
     CrossSection posBoundingBox = CrossSection(
         {{0.0, min.y}, {max.x, min.y}, {max.x, max.y}, {0.0, max.y}});
 
-    // Can't use RectClip as it has many failure cases.
+    // Can't use RectClip because it can't distinguish holes from outlines.
     polygons = (crossSection ^ posBoundingBox).ToPolygons();
   }
 
@@ -350,10 +352,11 @@ Manifold Manifold::Revolve(const CrossSection& crossSection,
   if (revolveDegrees > 360.0f) {
     revolveDegrees = 360.0f;
   }
-  bool isFullRevolution = revolveDegrees == 360.0f;
+  const bool isFullRevolution = revolveDegrees == 360.0f;
 
-  int nDivisions = circularSegments > 2 ? circularSegments
-                                        : Quality::GetCircularSegments(radius);
+  const int nDivisions = circularSegments > 2
+                             ? circularSegments
+                             : Quality::GetCircularSegments(radius);
 
   auto pImpl_ = std::make_shared<Impl>();
   auto& vertPos = pImpl_->vertPos_;
@@ -425,13 +428,12 @@ Manifold Manifold::Revolve(const CrossSection& crossSection,
   if (!isFullRevolution) {
     std::vector<glm::ivec3> frontTriangles =
         Triangulate(polygons, pImpl_->precision_);
-    for (auto& tv : frontTriangles) {
-      triVerts.push_back(
-          {startPoses[tv.x], startPoses[tv.y], startPoses[tv.z]});
+    for (auto& t : frontTriangles) {
+      triVerts.push_back({startPoses[t.x], startPoses[t.y], startPoses[t.z]});
     }
 
-    for (auto& v : frontTriangles) {
-      triVerts.push_back({endPoses[v.z], endPoses[v.y], endPoses[v.x]});
+    for (auto& t : frontTriangles) {
+      triVerts.push_back({endPoses[t.z], endPoses[t.y], endPoses[t.x]});
     }
   }
 

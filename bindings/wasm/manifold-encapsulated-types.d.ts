@@ -91,7 +91,7 @@ export class CrossSection {
    * @param circularSegments Number of segments along its diameter. Default is
    * calculated by the static Defaults.
    */
-  revolve(circularSegments?: number): Manifold;
+  revolve(circularSegments?: number, revolveDegrees?: number): Manifold;
 
   // Transformations
 
