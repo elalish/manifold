@@ -182,7 +182,8 @@ Module.setup = function() {
     return (center ? man.translate([0., 0., -height / 2.]) : man);
   };
 
-  Module.CrossSection.prototype.revolve = function(circularSegments = 0, revolveDegrees = 360.0) {
+  Module.CrossSection.prototype.revolve = function(
+      circularSegments = 0, revolveDegrees = 360.0) {
     return Module._Revolve(this, circularSegments, revolveDegrees);
   };
 
@@ -555,7 +556,8 @@ Module.setup = function() {
     return cs.extrude(height, nDivisions, twistDegrees, scaleTop, center);
   };
 
-  Module.Manifold.revolve = function(polygons, circularSegments = 0, revolveDegrees = 360.0) {
+  Module.Manifold.revolve = function(
+      polygons, circularSegments = 0, revolveDegrees = 360.0) {
     const cs = (polygons instanceof CrossSectionCtor) ?
         polygons :
         Module.CrossSection(polygons, 'Positive');
