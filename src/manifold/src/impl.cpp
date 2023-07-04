@@ -29,6 +29,8 @@
 namespace {
 using namespace manifold;
 
+constexpr uint64_t kRemove = std::numeric_limits<uint64_t>::max();
+
 __host__ __device__ void AtomicAddVec3(glm::vec3& target,
                                        const glm::vec3& add) {
   for (int i : {0, 1, 2}) {
@@ -104,6 +106,17 @@ struct Tri2Halfedges {
       thrust::tuple<int, const glm::ivec3&> in) {
     const int tri = thrust::get<0>(in);
     const glm::ivec3& triVerts = thrust::get<1>(in);
+
+    if (triVerts[0] == triVerts[1] || triVerts[1] == triVerts[2] ||
+        triVerts[2] == triVerts[0]) {
+      for (const int i : {0, 1, 2}) {
+        const int edge = 3 * tri + i;
+        halfedges[edge] = {-1, -1, -1, -1};
+        edges[edge] = kRemove;
+      }
+      return;
+    }
+
     for (const int i : {0, 1, 2}) {
       const int j = (i + 1) % 3;
       const int edge = 3 * tri + i;
@@ -677,11 +690,17 @@ void Manifold::Impl::CreateHalfedges(const VecDH<glm::ivec3>& triVerts) {
   // two different faces, causing this edge to not be 2-manifold. These are
   // fixed by duplicating verts in SimplifyTopology.
   stable_sort_by_key(policy, edge.begin(), edge.end(), ids.begin());
+  // Delete any triangles that have been flagged for removal due to containing
+  // duplicate verts, which occurred when verts were merged together.
+  const int newNumHalfedge = lower_bound<decltype(edge.begin())>(
+                                 policy, edge.begin(), edge.end(), kRemove) -
+                             edge.begin();
+  halfedge_.resize(newNumHalfedge);
   // Once sorted, the first half of the range is the forward halfedges, which
   // correspond to their backward pair at the same offset in the second half
   // of the range.
-  for_each_n(policy, countAt(0), numHalfedge / 2,
-             LinkHalfedges({halfedge_.ptrD(), ids.ptrD(), numHalfedge / 2}));
+  for_each_n(policy, countAt(0), newNumHalfedge / 2,
+             LinkHalfedges({halfedge_.ptrD(), ids.ptrD(), newNumHalfedge / 2}));
 }
 
 /**

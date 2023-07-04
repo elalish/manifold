@@ -615,3 +615,20 @@ TEST(Manifold, MultiCompose) {
                          part.Mirror({1, 0, 0}).Translate({10, 10, 0})});
   EXPECT_FLOAT_EQ(finalAssembly.GetProperties().volume, 4000);
 }
+
+TEST(Manifold, MergeDegenerates) {
+  MeshGL cube = Manifold::Cube(glm::vec3(1), true).GetMeshGL();
+  MeshGL squash;
+  squash.vertProperties = cube.vertProperties;
+  squash.triVerts = cube.triVerts;
+  // Move one vert to the position of its neighbor and remove one triangle
+  // linking them to break the manifold.
+  squash.vertProperties[squash.vertProperties.size() - 1] *= -1;
+  squash.triVerts.resize(squash.triVerts.size() - 3);
+  // Merge should remove the now duplicate vertex.
+  EXPECT_TRUE(squash.Merge());
+  // Manifold should remove the triangle with two references to the same vert.
+  Manifold squashed = Manifold(squash);
+  EXPECT_FALSE(squashed.IsEmpty());
+  EXPECT_EQ(squashed.Status(), Manifold::Error::NoError);
+}
