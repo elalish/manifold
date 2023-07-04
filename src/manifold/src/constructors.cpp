@@ -365,12 +365,9 @@ Manifold Manifold::Revolve(const CrossSection& crossSection,
   std::vector<int> startPoses;
   std::vector<int> endPoses;
 
-  float dPhi = revolveDegrees / nDivisions;
+  const float dPhi = revolveDegrees / nDivisions;
   // first and last slice are distinguished if not a full revolution.
-  int nSlices = isFullRevolution ? nDivisions : nDivisions + 1;
-
-  int nVertices = 0;
-  int nFaces = 0;
+  const int nSlices = isFullRevolution ? nDivisions : nDivisions + 1;
 
   for (const auto& poly : polygons) {
 
@@ -391,22 +388,20 @@ Manifold Manifold::Revolve(const CrossSection& crossSection,
       if (!isFullRevolution)
         startPoses.push_back(startPosIndex);
 
-      int prevStartPosIndex = startPosIndex + (polyVert == 0 ? nRevolveAxisVerts + (nSlices * nPosVerts) - nSlices
-                                                             : poly[polyVert-1].x == 0.0 ? -1 : -nSlices);
+      const int prevStartPosIndex = startPosIndex + (polyVert == 0 ? nRevolveAxisVerts + (nSlices * nPosVerts) - nSlices
+                                                                   : poly[polyVert-1].x == 0.0 ? -1 : -nSlices);
       glm::vec2 currPolyVertex = poly[polyVert];
       glm::vec2 prevPolyVertex = poly[polyVert == 0 ? poly.size() - 1 : polyVert - 1];
 
-      int nFacesAdded = 0;
       for (int slice = 0; slice < nSlices; ++slice) {
 
         float phi = slice * dPhi;
         if (slice == 0 || currPolyVertex.x > 0) {
           vertPos.push_back({currPolyVertex.x * cosd(phi), currPolyVertex.x * sind(phi), currPolyVertex.y});
-          nVertices += 1;
         }
 
         if (isFullRevolution || slice > 0) {
-          int lastSlice = (slice == 0 ? nDivisions : slice) - 1;
+          const int lastSlice = (slice == 0 ? nDivisions : slice) - 1;
           if (currPolyVertex.x > 0.0) {
             triVerts.push_back({startPosIndex + slice,
                 startPosIndex + lastSlice,
