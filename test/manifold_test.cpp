@@ -625,6 +625,9 @@ TEST(Manifold, MergeDegenerates) {
   // linking them to break the manifold.
   squash.vertProperties[squash.vertProperties.size() - 1] *= -1;
   squash.triVerts.resize(squash.triVerts.size() - 3);
+  // Rotate the degenerate triangle to the middle to catch more problems.
+  std::rotate(squash.triVerts.begin(), squash.triVerts.begin() + 3 * 5,
+              squash.triVerts.end());
   // Merge should remove the now duplicate vertex.
   EXPECT_TRUE(squash.Merge());
   // Manifold should remove the triangle with two references to the same vert.
