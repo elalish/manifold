@@ -490,14 +490,22 @@ Manifold::Impl::Impl(const MeshGL& meshGL,
 Manifold::Impl::Impl(const Mesh& mesh, const MeshRelationD& relation,
                      const std::vector<float>& propertyTolerance,
                      bool hasFaceIDs)
-    : vertPos_(mesh.vertPos),
-      halfedgeTangent_(mesh.halfedgeTangent),
-      meshRelation_(relation) {
+    : vertPos_(mesh.vertPos), halfedgeTangent_(mesh.halfedgeTangent) {
+  meshRelation_ = {relation.originalID, relation.numProp, relation.properties,
+                   relation.meshIDtransform};
+
   VecDH<glm::ivec3> triVerts;
-  for (const glm::ivec3 tri : mesh.triVerts) {
+  for (int i = 0; i < mesh.triVerts.size(); ++i) {
+    const glm::ivec3 tri = mesh.triVerts[i];
     // Remove topological degenerates
     if (tri[0] != tri[1] && tri[1] != tri[2] && tri[2] != tri[0]) {
       triVerts.push_back(tri);
+      if (relation.triRef.size() > 0) {
+        meshRelation_.triRef.push_back(relation.triRef[i]);
+      }
+      if (relation.triProperties.size() > 0) {
+        meshRelation_.triProperties.push_back(relation.triProperties[i]);
+      }
     }
   }
 

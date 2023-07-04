@@ -37,10 +37,10 @@ struct Manifold::Impl {
     /// The originalID of this Manifold if it is an original; -1 otherwise.
     int originalID = -1;
     int numProp = 0;
-    VecDH<TriRef> triRef;
-    VecDH<glm::ivec3> triProperties;
     VecDH<float> properties;
     std::map<int, Relation> meshIDtransform;
+    VecDH<TriRef> triRef;
+    VecDH<glm::ivec3> triProperties;
   };
 
   Box bBox_;
