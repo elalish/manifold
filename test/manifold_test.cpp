@@ -14,9 +14,10 @@
 
 #include "manifold.h"
 
+#include <iostream>
+
 #include "cross_section.h"
 #include "test.h"
-#include <iostream>
 
 #ifdef MANIFOLD_EXPORT
 #include "meshIO.h"
@@ -201,11 +202,12 @@ TEST(Manifold, ExtrudeCone) {
 TEST(Manifold, Revolve) {
   Polygons polys = SquareHole();
   Manifold vug = Manifold::Revolve(polys, 48);
-  for(int i = 0; i < polys[0].size(); i++) {
+  for (int i = 0; i < polys[0].size(); i++) {
     Polygons rotatedPolys;
-    for(auto &polygon : polys) {
+    for (auto& polygon : polys) {
       auto rotatedPolygon = polygon;
-      std::rotate(rotatedPolygon.begin(), rotatedPolygon.begin() + i, rotatedPolygon.end());
+      std::rotate(rotatedPolygon.begin(), rotatedPolygon.begin() + i,
+                  rotatedPolygon.end());
       rotatedPolys.push_back(rotatedPolygon);
     }
     Manifold vug = Manifold::Revolve(rotatedPolys, 48);
@@ -229,17 +231,19 @@ TEST(Manifold, PartialRevolve) {
   Polygons polys = SquareHole(2.0f);
   Polygons offsetPolys = SquareHole(10.0f);
 
-  for(int i = 0; i < polys[0].size(); i++) {
+  for (int i = 0; i < polys[0].size(); i++) {
     Polygons rotatedPolys;
-    for(auto &polygon : polys) {
+    for (auto& polygon : polys) {
       auto rotatedPolygon = polygon;
-      std::rotate(rotatedPolygon.begin(), rotatedPolygon.begin() + i, rotatedPolygon.end());
+      std::rotate(rotatedPolygon.begin(), rotatedPolygon.begin() + i,
+                  rotatedPolygon.end());
       rotatedPolys.push_back(rotatedPolygon);
     }
     Polygons rotatedOffsetPolys;
-    for(auto &polygon : offsetPolys) {
+    for (auto& polygon : offsetPolys) {
       auto rotatedPolygon = polygon;
-      std::rotate(rotatedPolygon.begin(), rotatedPolygon.begin() + i, rotatedPolygon.end());
+      std::rotate(rotatedPolygon.begin(), rotatedPolygon.begin() + i,
+                  rotatedPolygon.end());
       rotatedOffsetPolys.push_back(rotatedPolygon);
     }
 
@@ -248,7 +252,10 @@ TEST(Manifold, PartialRevolve) {
     EXPECT_EQ(halfDonut.Genus(), 1);
     auto prop = halfDonut.GetProperties();
     EXPECT_NEAR(prop.volume, 24.0f * glm::pi<float>(), 1.0f);
-    EXPECT_NEAR(prop.surfaceArea, 48.0f * glm::pi<float>() + 4.0f*4.0f*2.0f - 2.0f*2.0f*2.0f, 1.0f);
+    EXPECT_NEAR(
+        prop.surfaceArea,
+        48.0f * glm::pi<float>() + 4.0f * 4.0f * 2.0f - 2.0f * 2.0f * 2.0f,
+        1.0f);
 
     halfDonut = Manifold::Revolve(rotatedOffsetPolys, 48, 180);
     prop = halfDonut.GetProperties();
