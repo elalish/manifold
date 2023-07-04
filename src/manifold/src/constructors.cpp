@@ -320,23 +320,21 @@ Manifold Manifold::Extrude(const CrossSection& crossSection, float height,
  * @param revolveDegrees Number of degrees to revolve. Default is 360 degrees.
  */
 Manifold Manifold::Revolve(const CrossSection& crossSection,
-                           int circularSegments,
-                           float revolveDegrees) {
-
+                           int circularSegments, float revolveDegrees) {
   Polygons polygons = crossSection.ToPolygons();
 
   if (polygons.size() == 0) {
     return Invalid();
   }
 
-  Rect bounds = crossSection.Bounds();
+  const Rect bounds = crossSection.Bounds();
 
   // Take the x>=0 slice.
   if (bounds.min.x < 0) {
     glm::vec2 min = bounds.min;
     glm::vec2 max = bounds.max;
-    CrossSection posBoundingBox = CrossSection({{0.0, min.y},{max.x, min.y},
-                                                {max.x,max.y},{0.0,max.y}});
+    CrossSection posBoundingBox = CrossSection(
+        {{0.0, min.y}, {max.x, min.y}, {max.x, max.y}, {0.0, max.y}});
 
     // Can't use RectClip as it has many failure cases.
     polygons = (crossSection ^ posBoundingBox).ToPolygons();
@@ -370,10 +368,9 @@ Manifold Manifold::Revolve(const CrossSection& crossSection,
   const int nSlices = isFullRevolution ? nDivisions : nDivisions + 1;
 
   for (const auto& poly : polygons) {
-
     std::size_t nPosVerts = 0;
     std::size_t nRevolveAxisVerts = 0;
-    for (auto& pt: poly) {
+    for (auto& pt : poly) {
       if (pt.x > 0) {
         nPosVerts++;
       } else {
@@ -382,55 +379,60 @@ Manifold Manifold::Revolve(const CrossSection& crossSection,
     }
 
     for (int polyVert = 0; polyVert < poly.size(); ++polyVert) {
+      const int startPosIndex = vertPos.size();
 
-      int startPosIndex = vertPos.size();
+      if (!isFullRevolution) startPoses.push_back(startPosIndex);
 
-      if (!isFullRevolution)
-        startPoses.push_back(startPosIndex);
-
-      const int prevStartPosIndex = startPosIndex + (polyVert == 0 ? nRevolveAxisVerts + (nSlices * nPosVerts) - nSlices
-                                                                   : poly[polyVert-1].x == 0.0 ? -1 : -nSlices);
+      const int prevStartPosIndex =
+          startPosIndex +
+          (polyVert == 0 ? nRevolveAxisVerts + (nSlices * nPosVerts) - nSlices
+           : poly[polyVert - 1].x == 0.0 ? -1
+                                         : -nSlices);
       glm::vec2 currPolyVertex = poly[polyVert];
-      glm::vec2 prevPolyVertex = poly[polyVert == 0 ? poly.size() - 1 : polyVert - 1];
+      glm::vec2 prevPolyVertex =
+          poly[polyVert == 0 ? poly.size() - 1 : polyVert - 1];
 
       for (int slice = 0; slice < nSlices; ++slice) {
-
-        float phi = slice * dPhi;
+        const float phi = slice * dPhi;
         if (slice == 0 || currPolyVertex.x > 0) {
-          vertPos.push_back({currPolyVertex.x * cosd(phi), currPolyVertex.x * sind(phi), currPolyVertex.y});
+          vertPos.push_back({currPolyVertex.x * cosd(phi),
+                             currPolyVertex.x * sind(phi), currPolyVertex.y});
         }
 
         if (isFullRevolution || slice > 0) {
           const int lastSlice = (slice == 0 ? nDivisions : slice) - 1;
           if (currPolyVertex.x > 0.0) {
-            triVerts.push_back({startPosIndex + slice,
-                startPosIndex + lastSlice,
-                // "Reuse" vertex of first slice if it lies on the revolve axis
-                (prevPolyVertex.x == 0.0 ? prevStartPosIndex : prevStartPosIndex+lastSlice)});
+            triVerts.push_back(
+                {startPosIndex + slice, startPosIndex + lastSlice,
+                 // "Reuse" vertex of first slice if it lies on the revolve axis
+                 (prevPolyVertex.x == 0.0 ? prevStartPosIndex
+                                          : prevStartPosIndex + lastSlice)});
           }
 
           if (prevPolyVertex.x > 0.0) {
-            triVerts.push_back({prevStartPosIndex + lastSlice,
-                prevStartPosIndex + slice,
-                (currPolyVertex.x == 0.0 ? startPosIndex : startPosIndex+slice)});
+            triVerts.push_back(
+                {prevStartPosIndex + lastSlice, prevStartPosIndex + slice,
+                 (currPolyVertex.x == 0.0 ? startPosIndex
+                                          : startPosIndex + slice)});
           }
         }
       }
-      if (!isFullRevolution)
-        endPoses.push_back(vertPos.size() - 1);
+      if (!isFullRevolution) endPoses.push_back(vertPos.size() - 1);
     }
   }
 
   // Add front and back triangles if not a full revolution.
   if (!isFullRevolution) {
-      std::vector<glm::ivec3> frontTriangles = Triangulate(polygons, pImpl_->precision_);
-      for (auto& tv: frontTriangles) {
-        triVerts.push_back({startPoses[tv.x], startPoses[tv.y], startPoses[tv.z]});
-      }
+    std::vector<glm::ivec3> frontTriangles =
+        Triangulate(polygons, pImpl_->precision_);
+    for (auto& tv : frontTriangles) {
+      triVerts.push_back(
+          {startPoses[tv.x], startPoses[tv.y], startPoses[tv.z]});
+    }
 
-      for (auto& v: frontTriangles) {
-        triVerts.push_back({endPoses[v.z], endPoses[v.y], endPoses[v.x]});
-      }
+    for (auto& v : frontTriangles) {
+      triVerts.push_back({endPoses[v.z], endPoses[v.y], endPoses[v.x]});
+    }
   }
 
   pImpl_->CreateHalfedges(triVertsDH);
