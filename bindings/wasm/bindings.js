@@ -165,14 +165,6 @@ Module.setup = function() {
         delta, joinTypeToInt(joinType), miterLimit, circularSegments);
   };
 
-  Module.CrossSection.prototype.rectClip = function(rect) {
-    const rect2 = {
-      min: {x: rect.min[0], y: rect.min[1]},
-      max: {x: rect.max[0], y: rect.max[1]},
-    };
-    return this._RectClip(rect2);
-  };
-
   Module.CrossSection.prototype.extrude = function(
       height, nDivisions = 0, twistDegrees = 0.0, scaleTop = [1.0, 1.0],
       center = false) {

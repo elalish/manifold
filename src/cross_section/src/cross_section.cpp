@@ -202,6 +202,20 @@ CrossSection::CrossSection(const Polygons& contours, FillRule fillrule) {
   paths_ = shared_paths(C2::Union(ps, fr(fillrule), precision_));
 }
 
+/**
+ * Create a 2d cross-section from an axis-aligned rectangle (bounding box).
+ *
+ * @param rect An axis-aligned rectangular bounding box.
+ */
+CrossSection::CrossSection(const Rect& rect) {
+  C2::PathD p(4);
+  p[0] = C2::PointD(rect.min.x, rect.min.y);
+  p[1] = C2::PointD(rect.max.x, rect.min.y);
+  p[2] = C2::PointD(rect.max.x, rect.max.y);
+  p[3] = C2::PointD(rect.min.x, rect.max.y);
+  paths_ = shared_paths(C2::PathsD{p});
+}
+
 // Private
 // All access to paths_ should be done through the GetPaths() method, which
 // applies the accumulated transform_
@@ -389,18 +403,6 @@ std::vector<CrossSection> CrossSection::Decompose() const {
   }
 
   return comps;
-}
-
-/**
- * Compute the intersection between a cross-section and an axis-aligned
- * rectangle. This operation has much higher performance (<B>O(n)</B> vs
- * <B>O(n<SUP>3</SUP>)</B>) than the general purpose intersection algorithm
- * used for sets of cross-sections.
- */
-CrossSection CrossSection::RectClip(const Rect& rect) const {
-  auto r = C2::RectD(rect.min.x, rect.min.y, rect.max.x, rect.max.y);
-  auto ps = C2::RectClip(r, GetPaths(), precision_);
-  return CrossSection(ps);
 }
 
 /**
@@ -643,6 +645,14 @@ Rect::Rect(const glm::vec2 a, const glm::vec2 b) {
 glm::vec2 Rect::Size() const { return max - min; }
 
 /**
+ * Return the area of the rectangle.
+ */
+float Rect::Area() const {
+  auto sz = Size();
+  return sz.x * sz.y;
+}
+
+/**
  * Returns the absolute-largest coordinate value of any contained
  * point.
  */
@@ -657,7 +667,7 @@ float Rect::Scale() const {
 glm::vec2 Rect::Center() const { return 0.5f * (max + min); }
 
 /**
- * Does this rectangle contain (includes equal) the given point?
+ * Does this rectangle contain (includes on border) the given point?
  */
 bool Rect::Contains(const glm::vec2& p) const {
   return glm::all(glm::greaterThanEqual(p, min)) &&
@@ -766,13 +776,6 @@ Rect Rect::Transform(const glm::mat3x2& m) const {
  * Return a CrossSection with an outline defined by this axis-aligned
  * rectangle.
  */
-CrossSection Rect::AsCrossSection() const {
-  SimplePolygon p(4);
-  p[0] = glm::vec2(min.x, max.y);
-  p[1] = glm::vec2(max.x, max.y);
-  p[2] = glm::vec2(max.x, min.y);
-  p[3] = glm::vec2(min.x, min.y);
-  return CrossSection(p);
-}
+CrossSection Rect::AsCrossSection() const { return CrossSection(*this); }
 
 }  // namespace manifold
