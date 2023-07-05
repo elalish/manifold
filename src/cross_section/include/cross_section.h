@@ -77,6 +77,7 @@ class CrossSection {
                FillRule fillrule = FillRule::Positive);
   CrossSection(const Polygons& contours,
                FillRule fillrule = FillRule::Positive);
+  CrossSection(const Rect& rect);
   static CrossSection Square(const glm::vec2 dims, bool center = false);
   static CrossSection Circle(float radius, int circularSegments = 0);
   ///@}
@@ -143,7 +144,6 @@ class CrossSection {
   CrossSection& operator-=(const CrossSection&);
   CrossSection operator^(const CrossSection&) const;
   CrossSection& operator^=(const CrossSection&);
-  CrossSection RectClip(const Rect& rect) const;
   ///@}
 
   /** @name Topological
@@ -197,6 +197,7 @@ class Rect {
    */
   ///@{
   glm::vec2 Size() const;
+  float Area() const;
   float Scale() const;
   glm::vec2 Center() const;
   bool Contains(const glm::vec2& pt) const;

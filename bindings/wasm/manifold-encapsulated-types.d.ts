@@ -245,14 +245,6 @@ export class CrossSection {
    */
   static intersection(polygons: (CrossSection|Polygons)[]): CrossSection;
 
-  /**
-   * Compute the intersection between a cross-section and an axis-aligned
-   * rectangle. This operation has much higher performance (O(n) vs
-   * >O(n^3)) than the general purpose intersection algorithm
-   * used for sets of cross-sections.
-   */
-  rectClip(rect: Rect): CrossSection;
-
   // Topological Operations
 
   /**

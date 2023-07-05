@@ -338,7 +338,6 @@ Manifold Manifold::Revolve(const CrossSection& crossSection,
     CrossSection posBoundingBox = CrossSection(
         {{0.0, min.y}, {max.x, min.y}, {max.x, max.y}, {0.0, max.y}});
 
-    // Can't use RectClip because it can't distinguish holes from outlines.
     polygons = (crossSection ^ posBoundingBox).ToPolygons();
   }
 
