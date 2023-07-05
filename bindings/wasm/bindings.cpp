@@ -114,7 +114,6 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .function("_Bounds", &CrossSection::Bounds)
       .function("simplify", &CrossSection::Simplify)
       .function("_Offset", &cross_js::Offset)
-      .function("_RectClip", &CrossSection::RectClip)
       .function("_ToPolygons", &CrossSection::ToPolygons);
 
   // CrossSection Static Methods
