@@ -72,13 +72,17 @@ TEST(CrossSection, Empty) {
   EXPECT_TRUE(e.IsEmpty());
 }
 
-TEST(CrossSection, RectClip) {
-  auto sq = CrossSection::Square({10, 10});
-  auto rect = Rect({0, 0}, {10, 5});
-  auto clipped = sq.RectClip(rect);
+TEST(CrossSection, Rect) {
+  float w = 10;
+  float h = 5;
+  auto rect = Rect({0, 0}, {w, h});
+  auto cross = rect.AsCrossSection();
+  auto area = rect.Area();
 
-  EXPECT_EQ(sq.Area() / 2, clipped.Area());
+  EXPECT_FLOAT_EQ(area, w * h);
+  EXPECT_FLOAT_EQ(area, cross.Area());
   EXPECT_TRUE(rect.Contains({5, 5}));
+  EXPECT_TRUE(rect.Contains(cross.Bounds()));
   EXPECT_TRUE(rect.Contains(Rect()));
   EXPECT_TRUE(rect.DoesOverlap(Rect({5, 5}, {15, 15})));
   EXPECT_TRUE(Rect().IsEmpty());
