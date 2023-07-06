@@ -530,26 +530,42 @@ TEST(Boolean, Cubes) {
 #endif
 }
 
-TEST(Boolean, CubesUVnoIntersection) {
-  auto m0 = CubeUV();
-  auto m1 = m0.Translate(glm::vec3(1.5));
-  ASSERT_EQ((m0 + m1).GetMeshGL().numProp, 5);
-  ASSERT_EQ((m0 - m1).GetMeshGL().numProp, 5);
+TEST(Boolean, NoRetainedVerts) {
+  Manifold cube = Manifold::Cube(glm::vec3(1), true);
+  Manifold oct = Manifold::Sphere(1, 4);
+  EXPECT_NEAR(cube.GetProperties().volume, 1, 0.001);
+  EXPECT_NEAR(oct.GetProperties().volume, 1.333, 0.001);
+  EXPECT_NEAR((cube ^ oct).GetProperties().volume, 0.833, 0.001);
+}
+
+TEST(Boolean, PropertiesNoIntersection) {
+  MeshGL cubeUV = CubeUV();
+  Manifold m0(cubeUV);
+  Manifold m1 = m0.Translate(glm::vec3(1.5));
+  Manifold result = m0 + m1;
+  EXPECT_EQ(result.NumProp(), 2);
+  RelatedGL(result, {cubeUV});
 }
 
 TEST(Boolean, MixedProperties) {
-  Manifold m0 = CubeUV();
-  Manifold m1 = Manifold::Cube().Translate(glm::vec3(0.5));
-  ASSERT_EQ((m0 + m1).GetMeshGL().numProp, 5);
+  MeshGL cubeUV = CubeUV();
+  Manifold m0(cubeUV);
+  Manifold m1 = Manifold::Cube();
+  Manifold result = m0 + m1.Translate(glm::vec3(0.5));
+  EXPECT_EQ(result.NumProp(), 2);
+  RelatedGL(result, {cubeUV, m1.GetMeshGL()});
 }
 
 TEST(Boolean, MixedNumProp) {
-  Manifold m0 = CubeUV();
-  Manifold m1 = Manifold::Cube()
-                    .SetProperties(1, [](float* prop, glm::vec3 p,
-                                         const float* n) { prop[0] = 1; })
-                    .Translate(glm::vec3(0.5));
-  ASSERT_EQ((m0 + m1).GetMeshGL().numProp, 5);
+  MeshGL cubeUV = CubeUV();
+  Manifold m0(cubeUV);
+  Manifold m1 = Manifold::Cube();
+  Manifold result =
+      m0 + m1.SetProperties(1, [](float* prop, glm::vec3 p, const float* n) {
+               prop[0] = 1;
+             }).Translate(glm::vec3(0.5));
+  EXPECT_EQ(result.NumProp(), 2);
+  RelatedGL(result, {cubeUV, m1.GetMeshGL()});
 }
 
 TEST(Boolean, Subtract) {

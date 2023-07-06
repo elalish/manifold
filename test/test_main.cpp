@@ -249,7 +249,7 @@ MeshGL WithNormals(const Manifold& in) {
   return out;
 }
 
-Manifold CubeUV() {
+MeshGL CubeUV() {
   MeshGL mgl;
   mgl.numProp = 5;
   mgl.vertProperties = {0.5,  -0.5, 0.5,  0.5,  0.66,  //
@@ -270,7 +270,8 @@ Manifold CubeUV() {
                   9, 8, 1, 9, 1, 3, 11, 10, 3, 11, 3, 2, 0, 1, 12, 0, 12, 13};
   mgl.mergeFromVert = {8, 12, 13, 9, 10, 11};
   mgl.mergeToVert = {4, 4, 5, 6, 6, 7};
-  return Manifold(mgl);
+  mgl.runOriginalID.push_back(Manifold::ReserveIDs(1));
+  return mgl;
 }
 
 float GetMaxProperty(const MeshGL& mesh, int channel) {
@@ -368,7 +369,7 @@ void RelatedGL(const Manifold& out, const std::vector<MeshGL>& originals,
           ASSERT_NEAR(glm::length(normal), 1, 0.0001);
           ASSERT_GT(glm::dot(normal, outNormal), 0);
         } else {
-          for (int p = 3; p < output.numProp; ++p) {
+          for (int p = 3; p < inMesh.numProp; ++p) {
             const float propOut =
                 output.vertProperties[vert * output.numProp + p];
 

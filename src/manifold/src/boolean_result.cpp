@@ -560,12 +560,12 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   const int c2 = op == OpType::Add ? 1 : 0;
   const int c3 = op == OpType::Intersect ? 1 : -1;
 
-  if (w03_.size() == 0) {
-    if (w30_.size() != 0 && op == OpType::Add) {
+  if (inP_.IsEmpty()) {
+    if (!inQ_.IsEmpty() && op == OpType::Add) {
       return inQ_;
     }
     return Manifold::Impl();
-  } else if (w30_.size() == 0) {
+  } else if (inQ_.IsEmpty()) {
     if (op == OpType::Intersect) {
       return Manifold::Impl();
     }
