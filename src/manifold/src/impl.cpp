@@ -527,6 +527,9 @@ Manifold::Impl::Impl(const Mesh& mesh, const MeshRelationD& relation,
     MarkFailure(Error::NotManifold);
     return;
   }
+
+  SplitPinchedVerts();
+
   CalculateNormals();
 
   InitializeOriginal();

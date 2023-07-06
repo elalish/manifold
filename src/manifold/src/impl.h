@@ -127,6 +127,7 @@ struct Manifold::Impl {
   void UpdateVert(int vert, int startEdge, int endEdge);
   void FormLoop(int current, int end);
   void CollapseTri(const glm::ivec3& triEdge);
+  void SplitPinchedVerts();
 
   // smoothing.cu
   void CreateTangents(const std::vector<Smoothness>&);

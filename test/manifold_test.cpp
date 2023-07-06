@@ -682,3 +682,33 @@ TEST(Manifold, MergeDegenerates) {
   EXPECT_FALSE(squashed.IsEmpty());
   EXPECT_EQ(squashed.Status(), Manifold::Error::NoError);
 }
+
+TEST(Manifold, PinchedVert) {
+  Mesh shape;
+  shape.vertPos = {{0, 0, 0},         //
+                   {1, 1, 0},         //
+                   {1, -1, 0},        //
+                   {-0.00001, 0, 0},  //
+                   {-1, -1, -0},      //
+                   {-1, 1, 0},        //
+                   {0, 0, 2},         //
+                   {0, 0, -2}};
+  shape.triVerts = {{0, 2, 6},  //
+                    {2, 1, 6},  //
+                    {1, 0, 6},  //
+                    {4, 3, 6},  //
+                    {3, 5, 6},  //
+                    {5, 4, 6},  //
+                    {2, 0, 4},  //
+                    {0, 3, 4},  //
+                    {3, 0, 1},  //
+                    {3, 1, 5},  //
+                    {7, 2, 4},  //
+                    {7, 4, 5},  //
+                    {7, 5, 1},  //
+                    {7, 1, 2}};
+  Manifold touch(shape);
+  EXPECT_FALSE(touch.IsEmpty());
+  EXPECT_EQ(touch.Status(), Manifold::Error::NoError);
+  EXPECT_EQ(touch.Genus(), 0);
+}
