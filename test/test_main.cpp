@@ -249,6 +249,31 @@ MeshGL WithNormals(const Manifold& in) {
   return out;
 }
 
+MeshGL CubeUV() {
+  MeshGL mgl;
+  mgl.numProp = 5;
+  mgl.vertProperties = {0.5,  -0.5, 0.5,  0.5,  0.66,  //
+                        -0.5, -0.5, 0.5,  0.25, 0.66,  //
+                        0.5,  0.5,  0.5,  0.5,  0.33,  //
+                        -0.5, 0.5,  0.5,  0.25, 0.33,  //
+                        -0.5, -0.5, -0.5, 1.0,  0.66,  //
+                        0.5,  -0.5, -0.5, 0.75, 0.66,  //
+                        -0.5, 0.5,  -0.5, 1.0,  0.33,  //
+                        0.5,  0.5,  -0.5, 0.75, 0.33,  //
+                        -0.5, -0.5, -0.5, 0.0,  0.66,  //
+                        -0.5, 0.5,  -0.5, 0.0,  0.33,  //
+                        -0.5, 0.5,  -0.5, 0.25, 0.0,   //
+                        0.5,  0.5,  -0.5, 0.5,  0.0,   //
+                        -0.5, -0.5, -0.5, 0.25, 1.0,   //
+                        0.5,  -0.5, -0.5, 0.5,  1.0};
+  mgl.triVerts = {3, 1, 0, 3, 0, 2, 7,  5,  4, 7,  4, 6, 2, 0, 5,  2, 5,  7,
+                  9, 8, 1, 9, 1, 3, 11, 10, 3, 11, 3, 2, 0, 1, 12, 0, 12, 13};
+  mgl.mergeFromVert = {8, 12, 13, 9, 10, 11};
+  mgl.mergeToVert = {4, 4, 5, 6, 6, 7};
+  mgl.runOriginalID.push_back(Manifold::ReserveIDs(1));
+  return mgl;
+}
+
 float GetMaxProperty(const MeshGL& mesh, int channel) {
   float max = -std::numeric_limits<float>::infinity();
   const int numVert = mesh.NumVert();
@@ -344,7 +369,7 @@ void RelatedGL(const Manifold& out, const std::vector<MeshGL>& originals,
           ASSERT_NEAR(glm::length(normal), 1, 0.0001);
           ASSERT_GT(glm::dot(normal, outNormal), 0);
         } else {
-          for (int p = 3; p < output.numProp; ++p) {
+          for (int p = 3; p < inMesh.numProp; ++p) {
             const float propOut =
                 output.vertProperties[vert * output.numProp + p];
 

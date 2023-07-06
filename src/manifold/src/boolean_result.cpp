@@ -490,32 +490,37 @@ void CreateProperties(Manifold::Impl &outR, const VecDH<TriRef> &refPQ,
 
     const int triPQ = refPQ[tri].tri;
     const bool PQ = refPQ[tri].meshID == 0;
+    const int oldNumProp = PQ ? numPropP : numPropQ;
     const auto &properties =
         PQ ? inP.meshRelation_.properties : inQ.meshRelation_.properties;
-    const auto &triProp = PQ ? inP.meshRelation_.triProperties[triPQ]
-                             : inQ.meshRelation_.triProperties[triPQ];
+    const glm::ivec3 &triProp = oldNumProp == 0 ? glm::ivec3(-1)
+                                : PQ ? inP.meshRelation_.triProperties[triPQ]
+                                     : inQ.meshRelation_.triProperties[triPQ];
 
     for (const int i : {0, 1, 2}) {
       const int vert = outR.halfedge_[3 * tri + i].startVert;
       const glm::vec3 uvw = bary[3 * tri + i];
 
-      auto key = std::make_tuple(PQ, vert, -1, -1);
-      int edge = -1;
-      for (const int j : {0, 1, 2}) {
-        if (uvw[j] == 1) {
-          // On a retained vert, the propVert must also match
-          std::get<2>(key) = triProp[j];
-          edge = -1;
-          break;
+      auto key = std::make_tuple(PQ, -1, -1, -1);
+      if (oldNumProp > 0) {
+        std::get<1>(key) = vert;
+        int edge = -1;
+        for (const int j : {0, 1, 2}) {
+          if (uvw[j] == 1) {
+            // On a retained vert, the propVert must also match
+            std::get<2>(key) = triProp[j];
+            edge = -1;
+            break;
+          }
+          if (uvw[j] == 0) edge = j;
         }
-        if (uvw[j] == 0) edge = j;
-      }
-      if (edge >= 0) {
-        // On an edge, both propVerts must match
-        const int p0 = triProp[Next3(edge)];
-        const int p1 = triProp[Prev3(edge)];
-        std::get<2>(key) = glm::min(p0, p1);
-        std::get<3>(key) = glm::max(p0, p1);
+        if (edge >= 0) {
+          // On an edge, both propVerts must match
+          const int p0 = triProp[Next3(edge)];
+          const int p1 = triProp[Prev3(edge)];
+          std::get<2>(key) = glm::min(p0, p1);
+          std::get<3>(key) = glm::max(p0, p1);
+        }
       }
 
       const auto it = propIdx.find(key);
@@ -527,10 +532,14 @@ void CreateProperties(Manifold::Impl &outR, const VecDH<TriRef> &refPQ,
       propIdx.insert({key, idx++});
 
       for (int p = 0; p < numProp; ++p) {
-        glm::vec3 oldProps;
-        for (const int j : {0, 1, 2})
-          oldProps[j] = properties[numProp * triProp[j] + p];
-        outR.meshRelation_.properties.push_back(glm::dot(uvw, oldProps));
+        if (p < oldNumProp) {
+          glm::vec3 oldProps;
+          for (const int j : {0, 1, 2})
+            oldProps[j] = properties[oldNumProp * triProp[j] + p];
+          outR.meshRelation_.properties.push_back(glm::dot(uvw, oldProps));
+        } else {
+          outR.meshRelation_.properties.push_back(0);
+        }
       }
     }
   }
@@ -551,12 +560,12 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   const int c2 = op == OpType::Add ? 1 : 0;
   const int c3 = op == OpType::Intersect ? 1 : -1;
 
-  if (w03_.size() == 0) {
-    if (w30_.size() != 0 && op == OpType::Add) {
+  if (inP_.IsEmpty()) {
+    if (!inQ_.IsEmpty() && op == OpType::Add) {
       return inQ_;
     }
     return Manifold::Impl();
-  } else if (w30_.size() == 0) {
+  } else if (inQ_.IsEmpty()) {
     if (op == OpType::Intersect) {
       return Manifold::Impl();
     }
