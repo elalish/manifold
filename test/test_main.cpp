@@ -249,6 +249,30 @@ MeshGL WithNormals(const Manifold& in) {
   return out;
 }
 
+Manifold CubeUV() {
+  MeshGL mgl;
+  mgl.numProp = 5;
+  mgl.vertProperties = {0.5,  -0.5, 0.5,  0.5,  0.66,  //
+                        -0.5, -0.5, 0.5,  0.25, 0.66,  //
+                        0.5,  0.5,  0.5,  0.5,  0.33,  //
+                        -0.5, 0.5,  0.5,  0.25, 0.33,  //
+                        -0.5, -0.5, -0.5, 1.0,  0.66,  //
+                        0.5,  -0.5, -0.5, 0.75, 0.66,  //
+                        -0.5, 0.5,  -0.5, 1.0,  0.33,  //
+                        0.5,  0.5,  -0.5, 0.75, 0.33,  //
+                        -0.5, -0.5, -0.5, 0.0,  0.66,  //
+                        -0.5, 0.5,  -0.5, 0.0,  0.33,  //
+                        -0.5, 0.5,  -0.5, 0.25, 0.0,   //
+                        0.5,  0.5,  -0.5, 0.5,  0.0,   //
+                        -0.5, -0.5, -0.5, 0.25, 1.0,   //
+                        0.5,  -0.5, -0.5, 0.5,  1.0};
+  mgl.triVerts = {3, 1, 0, 3, 0, 2, 7,  5,  4, 7,  4, 6, 2, 0, 5,  2, 5,  7,
+                  9, 8, 1, 9, 1, 3, 11, 10, 3, 11, 3, 2, 0, 1, 12, 0, 12, 13};
+  mgl.mergeFromVert = {8, 12, 13, 9, 10, 11};
+  mgl.mergeToVert = {4, 4, 5, 6, 6, 7};
+  return Manifold(mgl);
+}
+
 float GetMaxProperty(const MeshGL& mesh, int channel) {
   float max = -std::numeric_limits<float>::infinity();
   const int numVert = mesh.NumVert();

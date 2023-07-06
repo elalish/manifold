@@ -530,6 +530,28 @@ TEST(Boolean, Cubes) {
 #endif
 }
 
+TEST(Boolean, CubesUVnoIntersection) {
+  auto m0 = CubeUV();
+  auto m1 = m0.Translate(glm::vec3(1.5));
+  ASSERT_EQ((m0 + m1).GetMeshGL().numProp, 5);
+  ASSERT_EQ((m0 - m1).GetMeshGL().numProp, 5);
+}
+
+TEST(Boolean, MixedProperties) {
+  Manifold m0 = CubeUV();
+  Manifold m1 = Manifold::Cube().Translate(glm::vec3(0.5));
+  ASSERT_EQ((m0 + m1).GetMeshGL().numProp, 5);
+}
+
+TEST(Boolean, MixedNumProp) {
+  Manifold m0 = CubeUV();
+  Manifold m1 = Manifold::Cube()
+                    .SetProperties(1, [](float* prop, glm::vec3 p,
+                                         const float* n) { prop[0] = 1; })
+                    .Translate(glm::vec3(0.5));
+  ASSERT_EQ((m0 + m1).GetMeshGL().numProp, 5);
+}
+
 TEST(Boolean, Subtract) {
   Mesh firstMesh;
   firstMesh.vertPos = {{0, 0, 0},           {1540, 0, 0},
