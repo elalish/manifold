@@ -165,14 +165,6 @@ Module.setup = function() {
         delta, joinTypeToInt(joinType), miterLimit, circularSegments);
   };
 
-  Module.CrossSection.prototype.rectClip = function(rect) {
-    const rect2 = {
-      min: {x: rect.min[0], y: rect.min[1]},
-      max: {x: rect.max[0], y: rect.max[1]},
-    };
-    return this._RectClip(rect2);
-  };
-
   Module.CrossSection.prototype.extrude = function(
       height, nDivisions = 0, twistDegrees = 0.0, scaleTop = [1.0, 1.0],
       center = false) {
@@ -182,8 +174,9 @@ Module.setup = function() {
     return (center ? man.translate([0., 0., -height / 2.]) : man);
   };
 
-  Module.CrossSection.prototype.revolve = function(circularSegments = 0) {
-    return Module._Revolve(this, circularSegments);
+  Module.CrossSection.prototype.revolve = function(
+      circularSegments = 0, revolveDegrees = 360.0) {
+    return Module._Revolve(this, circularSegments, revolveDegrees);
   };
 
   Module.CrossSection.prototype.add = function(other) {
@@ -555,11 +548,12 @@ Module.setup = function() {
     return cs.extrude(height, nDivisions, twistDegrees, scaleTop, center);
   };
 
-  Module.Manifold.revolve = function(polygons, circularSegments = 0) {
+  Module.Manifold.revolve = function(
+      polygons, circularSegments = 0, revolveDegrees = 360.0) {
     const cs = (polygons instanceof CrossSectionCtor) ?
         polygons :
         Module.CrossSection(polygons, 'Positive');
-    return cs.revolve(circularSegments);
+    return cs.revolve(circularSegments, revolveDegrees);
   };
 
   Module.Manifold.reserveIDs = function(n) {

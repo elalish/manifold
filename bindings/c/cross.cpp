@@ -106,13 +106,6 @@ ManifoldCrossSection *manifold_cross_section_intersection(
   return to_c(new (mem) CrossSection(cs));
 }
 
-ManifoldCrossSection *manifold_cross_section_rect_clip(void *mem,
-                                                       ManifoldCrossSection *cs,
-                                                       ManifoldRect *r) {
-  auto clipped = from_c(cs)->RectClip(*from_c(r));
-  return to_c(new (mem) CrossSection(clipped));
-}
-
 ManifoldCrossSection *manifold_cross_section_translate(void *mem,
                                                        ManifoldCrossSection *cs,
                                                        float x, float y) {

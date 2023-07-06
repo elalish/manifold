@@ -91,7 +91,7 @@ export class CrossSection {
    * @param circularSegments Number of segments along its diameter. Default is
    * calculated by the static Defaults.
    */
-  revolve(circularSegments?: number): Manifold;
+  revolve(circularSegments?: number, revolveDegrees?: number): Manifold;
 
   // Transformations
 
@@ -244,14 +244,6 @@ export class CrossSection {
    * Boolean intersection of a list of cross-sections
    */
   static intersection(polygons: (CrossSection|Polygons)[]): CrossSection;
-
-  /**
-   * Compute the intersection between a cross-section and an axis-aligned
-   * rectangle. This operation has much higher performance (O(n) vs
-   * >O(n^3)) than the general purpose intersection algorithm
-   * used for sets of cross-sections.
-   */
-  rectClip(rect: Rect): CrossSection;
 
   // Topological Operations
 
@@ -421,9 +413,11 @@ export class Manifold {
    * @param polygons A set of non-overlapping polygons to revolve.
    * @param circularSegments Number of segments along its diameter. Default is
    * calculated by the static Defaults.
+   * @param revolveDegrees Number of degrees to revolve. Default is 360 degrees.
    */
-  static revolve(polygons: CrossSection|Polygons, circularSegments?: number):
-      Manifold;
+  static revolve(
+      polygons: CrossSection|Polygons, circularSegments?: number,
+      revolveDegrees?: number): Manifold;
 
   // Mesh Conversion
 
