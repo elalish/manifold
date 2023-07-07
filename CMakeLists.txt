@@ -41,6 +41,10 @@ option(BUILD_SHARED_LIBS "Build dynamic/shared libraries" OFF)
 set(PYBIND11_DIR ${PROJECT_SOURCE_DIR}/bindings/python/third_party/pybind11)
 set(THRUST_INC_DIR ${PROJECT_SOURCE_DIR}/src/third_party/thrust)
 
+if(NOT GLM_INC_DIR)
+  set(GLM_INC_DIR ${PROJECT_SOURCE_DIR}/src/third_party/glm)
+endif()
+
 if(BUILD_SHARED_LIBS OR MANIFOLD_CBIND)
   # Allow shared libraries to be relocatable (add Place Independent Code flag).
   # Also include when statically linking C bindings to avoid issues with bundling

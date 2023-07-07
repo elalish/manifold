@@ -22,6 +22,7 @@ message("Parallel Backend: ${MANIFOLD_PAR}")
 
 target_include_directories(${PROJECT_NAME} INTERFACE ${PROJECT_SOURCE_DIR}/include)
 target_include_directories(${PROJECT_NAME} INTERFACE ${THRUST_INC_DIR}/dependencies/libcudacxx/include)
+target_include_directories(${PROJECT_NAME} INTERFACE ${GLM_INC_DIR})
 
 if(MANIFOLD_PAR STREQUAL "OMP")
     find_package(OpenMP REQUIRED)
@@ -42,7 +43,6 @@ else()
 endif()
 
 target_include_directories(${PROJECT_NAME} PUBLIC ${THRUST_INC_DIR})
-target_link_libraries(${PROJECT_NAME} PUBLIC glm)
 
 if(MANIFOLD_USE_CUDA)
     set_source_files_properties(${SOURCE_FILES} PROPERTIES LANGUAGE CUDA)

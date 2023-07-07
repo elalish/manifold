@@ -1,4 +1,3 @@
-add_subdirectory(glm)
 add_subdirectory(graphlite)
 
 set(CLIPPER2_UTILS OFF)
