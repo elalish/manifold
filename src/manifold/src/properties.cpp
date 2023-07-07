@@ -197,9 +197,8 @@ struct CheckHalfedges {
 
   __host__ __device__ bool operator()(int edge) {
     const Halfedge halfedge = halfedges[edge];
-    if (halfedge.startVert == -1 && halfedge.endVert == -1 &&
-        halfedge.pairedHalfedge == -1)
-      return true;
+    if (halfedge.startVert == -1 && halfedge.endVert == -1) return true;
+    if (halfedge.pairedHalfedge == -1) return false;
 
     const Halfedge paired = halfedges[halfedge.pairedHalfedge];
     bool good = true;

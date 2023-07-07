@@ -23,6 +23,12 @@ See `package.json` for other useful scripts.
 
 Note that the `emcmake` command automatically copies your WASM build into `built/`, (here, not just under the `buildWASM` directory) which is then packaged by Vite into `dist/assets/`.
 
+To debug the WASM build directly in Chrome dev tools, simply build in debug mode:
+```
+emcmake cmake -DCMAKE_BUILD_TYPE=Debug .. && emmake make
+```
+and install the [DWARF](goo.gle/wasm-debugging-extension) Chrome extension.
+
 When testing [ManifoldCAD.org](https://manifoldcad.org/) (either locally or the
 deployed version) note that it uses a service worker for faster loading. This
 means you need to open the page twice to see updates (the first time loads the
