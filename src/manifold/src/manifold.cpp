@@ -284,7 +284,9 @@ MeshGL Manifold::GetMeshGL(glm::ivec3 normalIdx) const {
 
   // Duplicate verts with different props
   std::vector<int> vert2idx(impl.NumVert(), -1);
-  std::map<std::pair<int, int>, int> vertPropPair;
+  std::vector<std::vector<glm::ivec2>> vertPropPair(impl.NumVert());
+  out.vertProperties.reserve(numVert * out.numProp);
+
   for (int run = 0; run < out.runOriginalID.size(); ++run) {
     for (int tri = out.runIndex[run] / 3; tri < out.runIndex[run + 1] / 3;
          ++tri) {
@@ -294,14 +296,19 @@ MeshGL Manifold::GetMeshGL(glm::ivec3 normalIdx) const {
         const int prop = triProp[i];
         const int vert = out.triVerts[3 * tri + i];
 
-        const auto it = vertPropPair.find({vert, prop});
-        if (it != vertPropPair.end()) {
-          out.triVerts[3 * tri + i] = it->second;
-          continue;
+        auto& bin = vertPropPair[vert];
+        bool bFound = false;
+        for (int k = 0; k < bin.size(); ++k) {
+          if (bin[k].x == prop) {
+            bFound = true;
+            out.triVerts[3 * tri + i] = bin[k].y;
+            break;
+          }
         }
+        if (bFound) continue;
         const int idx = out.vertProperties.size() / out.numProp;
-        vertPropPair.insert({{vert, prop}, idx});
         out.triVerts[3 * tri + i] = idx;
+        bin.push_back({prop, idx});
 
         for (int p : {0, 1, 2}) {
           out.vertProperties.push_back(impl.vertPos_[vert][p]);
@@ -310,6 +317,7 @@ MeshGL Manifold::GetMeshGL(glm::ivec3 normalIdx) const {
           out.vertProperties.push_back(
               impl.meshRelation_.properties[prop * numProp + p]);
         }
+
         if (updateNormals) {
           glm::vec3 normal;
           const int start = out.vertProperties.size() - out.numProp;
