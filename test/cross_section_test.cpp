@@ -177,11 +177,12 @@ TEST(CrossSection, Hull) {
   auto circ_tri = CrossSection::Hull(circs);
   auto centres = SimplePolygon{{0, 0}, {0, 30}, {30, 0}, {15, 5}};
   auto tri = CrossSection::Hull(centres);
-  auto circ_tri_ex = Manifold::Extrude(circ_tri, 10);
 
 #ifdef MANIFOLD_EXPORT
-  if (options.exportModels)
+  if (options.exportModels) {
+    auto circ_tri_ex = Manifold::Extrude(circ_tri, 10);
     ExportMesh("cross_section_hull_circ_tri.glb", circ_tri_ex.GetMesh(), {});
+  }
 #endif
 
   auto circ_area = circ.Area();
