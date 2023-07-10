@@ -161,7 +161,7 @@ void HullBacktrack(const SimplePolygon& pts, const int idx,
 // https://www.hackerearth.com/practice/math/geometry/line-sweep-technique/tutorial/
 C2::PathD HullImpl(SimplePolygon& pts) {
   int len = pts.size();
-  if (len < 2) return C2::PathD();
+  if (len < 3) return C2::PathD();  // not enough points to create a polygon
   std::sort(pts.begin(), pts.end(), V2Lesser);
   auto keep = std::vector<int>{0, 1};
   for (int i = 2; i < len; i++) {
