@@ -168,10 +168,10 @@ C2::PathD HullImpl(SimplePolygon& pts) {
     HullBacktrack(pts, i, keep, 1);
     keep.push_back(i);
   }
-  int n_lower = keep.size();
+  int nLower = keep.size();
   for (int i = 0; i < len - 1; i++) {
     int idx = len - 2 - i;
-    HullBacktrack(pts, idx, keep, n_lower);
+    HullBacktrack(pts, idx, keep, nLower);
     if (idx > 0) keep.push_back(idx);
   }
   auto path = C2::PathD(keep.size());
