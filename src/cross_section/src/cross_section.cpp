@@ -132,30 +132,26 @@ void decompose_hole(const C2::PolyTreeD* outline,
   }
 }
 
-bool v2_lesser(glm::vec2 a, glm::vec2 b) {
+bool V2Lesser(glm::vec2 a, glm::vec2 b) {
   if (a.x == b.x) return a.y < b.y;
   return a.x < b.x;
 }
 
 double cross(glm::vec2 a, glm::vec2 b) { return a.x * b.y - a.y * b.x; }
 
-double distance(glm::vec2 a, glm::vec2 b) {
-  auto d = a - b;
-  return std::sqrt(d.x * d.x + d.y * d.y);
-}
-
-bool is_cw(glm::vec2 a, glm::vec2 b, glm::vec2 c) {
+bool IsCw(glm::vec2 a, glm::vec2 b, glm::vec2 c) {
   double lhs = cross(a - c, b - c);
-  double rhs = 1e-9 * distance(a, c) * distance(b, c);
-  return lhs < -rhs;
+  double rhs = 1e-9 * glm::distance(a, c) * glm::distance(b, c);
+  // return lhs < -rhs;
+  return lhs <= rhs;
 }
 
-void backtrack(const SimplePolygon& pts, const int idx, std::vector<int>& keep,
-               const int hold) {
+void HullBacktrack(const SimplePolygon& pts, const int idx,
+                   std::vector<int>& keep, const int hold) {
   const int stop = keep.size() - hold;
   int i = 0;
-  while (i < stop && !is_cw(pts[idx], pts[keep[keep.size() - 1]],
-                            pts[keep[keep.size() - 2]])) {
+  while (i < stop && !IsCw(pts[idx], pts[keep[keep.size() - 1]],
+                           pts[keep[keep.size() - 2]])) {
     keep.pop_back();
     i++;
   }
@@ -163,19 +159,19 @@ void backtrack(const SimplePolygon& pts, const int idx, std::vector<int>& keep,
 
 // Based on method described here:
 // https://www.hackerearth.com/practice/math/geometry/line-sweep-technique/tutorial/
-C2::PathD hull(SimplePolygon& pts) {
+C2::PathD HullImpl(SimplePolygon& pts) {
   int len = pts.size();
   if (len < 2) return C2::PathD();
-  std::sort(pts.begin(), pts.end(), v2_lesser);
+  std::sort(pts.begin(), pts.end(), V2Lesser);
   auto keep = std::vector<int>{0, 1};
   for (int i = 2; i < len; i++) {
-    backtrack(pts, i, keep, 1);
+    HullBacktrack(pts, i, keep, 1);
     keep.push_back(i);
   }
   int n_lower = keep.size();
   for (int i = 0; i < len - 1; i++) {
     int idx = len - 2 - i;
-    backtrack(pts, idx, keep, n_lower);
+    HullBacktrack(pts, idx, keep, n_lower);
     if (idx > 0) keep.push_back(idx);
   }
   auto path = C2::PathD(keep.size());
@@ -626,7 +622,7 @@ CrossSection CrossSection::Hull(
       }
     }
   }
-  return CrossSection(C2::PathsD{hull(pts)});
+  return CrossSection(C2::PathsD{HullImpl(pts)});
 }
 
 CrossSection CrossSection::Hull() const {
@@ -634,8 +630,8 @@ CrossSection CrossSection::Hull() const {
 }
 
 CrossSection CrossSection::Hull(const SimplePolygon poly) {
-  auto pts = poly;  // hull will sort inplace, so we copy here
-  return CrossSection(C2::PathsD{hull(pts)});
+  auto pts = poly;  // HullImpl will sort inplace, so we copy here
+  return CrossSection(C2::PathsD{HullImpl(pts)});
 }
 
 CrossSection CrossSection::Hull(const Polygons polys) {
