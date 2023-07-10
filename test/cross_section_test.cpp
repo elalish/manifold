@@ -16,6 +16,8 @@
 
 #include <gtest/gtest.h>
 
+#include <vector>
+
 #include "glm/geometric.hpp"
 #include "manifold.h"
 #include "polygon.h"
@@ -166,4 +168,17 @@ TEST(CrossSection, FillRule) {
 
   CrossSection nonZero(polygon, CrossSection::FillRule::NonZero);
   EXPECT_NEAR(nonZero.Area(), 0.875, 0.001);
+}
+
+TEST(CrossSection, Hull) {
+  auto circ = CrossSection::Circle(10);
+  auto circs = std::vector<CrossSection>{circ, circ.Translate({0, 30}),
+                                         circ.Translate({30, 0})};
+  auto tri = CrossSection::Hull(circs);
+  auto tri_ex = Manifold::Extrude(tri, 10);
+
+#ifdef MANIFOLD_EXPORT
+  if (options.exportModels)
+    ExportMesh("cross_section_hull_tri.glb", tri_ex.GetMesh(), {});
+#endif
 }

@@ -132,6 +132,58 @@ void decompose_hole(const C2::PolyTreeD* outline,
   }
 }
 
+bool v2_lesser(glm::vec2 a, glm::vec2 b) {
+  if (a.x == b.x) return a.y < b.y;
+  return a.x < b.x;
+}
+
+double cross(glm::vec2 a, glm::vec2 b) { return a.x * b.y - a.y * b.x; }
+
+double distance(glm::vec2 a, glm::vec2 b) {
+  auto d = a - b;
+  return std::sqrt(d.x * d.x + d.y * d.y);
+}
+
+bool is_cw(glm::vec2 a, glm::vec2 b, glm::vec2 c) {
+  double lhs = cross(a - c, b - c);
+  double rhs = 1e-9 * distance(a, c) * distance(b, c);
+  return lhs < -rhs;
+}
+
+void backtrack(const SimplePolygon& pts, const int idx, std::vector<int>& keep,
+               const int hold) {
+  const int stop = keep.size() - hold;
+  int i = 0;
+  while (i < stop && !is_cw(pts[idx], pts[keep[keep.size() - 1]],
+                            pts[keep[keep.size() - 2]])) {
+    keep.pop_back();
+    i++;
+  }
+}
+
+// Based on method described here:
+// https://www.hackerearth.com/practice/math/geometry/line-sweep-technique/tutorial/
+C2::PathD hull(SimplePolygon pts) {
+  int len = pts.size();
+  if (len < 2) return C2::PathD();
+  std::sort(pts.begin(), pts.end(), v2_lesser);
+  auto keep = std::vector<int>{0, 1};
+  for (int i = 2; i < len; i++) {
+    backtrack(pts, i, keep, 1);
+    keep.push_back(i);
+  }
+  int n_lower = keep.size();
+  for (int i = 0; i < len - 1; i++) {
+    int idx = len - 2 - i;
+    backtrack(pts, idx, keep, n_lower);
+    if (idx > 0) keep.push_back(idx);
+  }
+  auto path = C2::PathD(keep.size());
+  for (int i = 0; i < keep.size(); i++) {
+    path[i] = v2_to_pd(pts[keep[i]]);
+  }
+  return path;
+}
 }  // namespace
 
 namespace manifold {
@@ -558,6 +610,41 @@ CrossSection CrossSection::Offset(double delta, JoinType jointype,
       C2::InflatePaths(GetPaths(), delta, jt(jointype), C2::EndType::Polygon,
                        miter_limit, precision_, arc_tol);
   return CrossSection(ps);
+}
+
+CrossSection CrossSection::Hull(
+    const std::vector<CrossSection>& crossSections) {
+  int n = 0;
+  for (auto cs : crossSections) n += cs.NumVert();
+  SimplePolygon pts;
+  pts.reserve(n);
+  for (auto cs : crossSections) {
+    auto paths = cs.GetPaths();
+    for (auto path : paths) {
+      for (auto p : path) {
+        pts.push_back(v2_of_pd(p));
+      }
+    }
+  }
+  return CrossSection(C2::PathsD{hull(pts)});
+}
+
+CrossSection CrossSection::Hull() const {
+  return Hull(std::vector<CrossSection>{*this});
+}
+
+CrossSection CrossSection::Hull(const SimplePolygon pts) {
+  return CrossSection(C2::PathsD{hull(pts)});
+}
+
+CrossSection CrossSection::Hull(const Polygons polys) {
+  SimplePolygon pts;
+  for (auto poly : polys) {
+    for (auto p : poly) {
+      pts.push_back(p);
+    }
+  }
+  return Hull(pts);
 }
 
 /**
