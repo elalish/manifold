@@ -163,7 +163,7 @@ void backtrack(const SimplePolygon& pts, const int idx, std::vector<int>& keep,
 
 // Based on method described here:
 // https://www.hackerearth.com/practice/math/geometry/line-sweep-technique/tutorial/
-C2::PathD hull(SimplePolygon pts) {
+C2::PathD hull(SimplePolygon& pts) {
   int len = pts.size();
   if (len < 2) return C2::PathD();
   std::sort(pts.begin(), pts.end(), v2_lesser);
@@ -633,7 +633,8 @@ CrossSection CrossSection::Hull() const {
   return Hull(std::vector<CrossSection>{*this});
 }
 
-CrossSection CrossSection::Hull(const SimplePolygon pts) {
+CrossSection CrossSection::Hull(const SimplePolygon poly) {
+  auto pts = poly;  // hull will sort inplace, so we copy here
   return CrossSection(C2::PathsD{hull(pts)});
 }
 
