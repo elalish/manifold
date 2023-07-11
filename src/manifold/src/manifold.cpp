@@ -71,6 +71,43 @@ Manifold Halfspace(Box bBox, glm::vec3 normal, float originOffset) {
   float zDeg = glm::degrees(glm::atan(normal.y, normal.x));
   return cutter.Rotate(0.0f, yDeg, zDeg);
 }
+
+float DistanceToVector(glm::vec3 pt, glm::vec3 v) {
+  return glm::length(pt - v * glm::dot(pt, v));
+}
+// Return a trio of non-collinear indices into pts. If none are found, indices
+// will be -1 (and hulling cannot be performed).
+glm::ivec3 NonCollinearTriple(const std::vector<glm::vec3>& pts,
+                              const float precision) {
+  const int len = pts.size();
+  int furthest = 1;
+  float dist = glm::distance(pts[0], pts[1]);
+  for (int i = 2; i < len; i++) {
+    float d = glm::distance(pts[0], pts[i]);
+    if (d > dist) {
+      furthest = i;
+      dist = d;
+    }
+  }
+  if (dist <= precision) return glm::ivec3(-1);
+  const auto n = (pts[0] - pts[furthest]) / dist;
+  int third = -1;
+  float offset = dist * precision;
+  for (int i = 1; i < len; i++) {
+    auto off = DistanceToVector(pts[i] - pts[0], n);
+    if (off > offset) {
+      third = i;
+      offset = off;
+    }
+  }
+  if (third < 0) return glm::ivec3(-1);
+  return glm::ivec3(0, furthest, third);
+}
+
+Manifold HullImpl(std::vector<glm::vec3> pts, float precision) {
+  auto len = pts.size();
+  if (len < 4) return Manifold();
+}
 }  // namespace
 
 namespace manifold {
@@ -775,4 +812,6 @@ Manifold Manifold::TrimByPlane(glm::vec3 normal, float originOffset) const {
 }
 
 ExecutionParams& ManifoldParams() { return params; }
+
+// Manifold Manifold::Hull() const {}
 }  // namespace manifold
