@@ -629,8 +629,7 @@ CrossSection CrossSection::Hull() const {
   return Hull(std::vector<CrossSection>{*this});
 }
 
-CrossSection CrossSection::Hull(const SimplePolygon poly) {
-  auto pts = poly;  // HullImpl will sort inplace, so we copy here
+CrossSection CrossSection::Hull(SimplePolygon pts) {
   return CrossSection(C2::PathsD{HullImpl(pts)});
 }
 
