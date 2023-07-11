@@ -153,6 +153,15 @@ class CrossSection {
   std::vector<CrossSection> Decompose() const;
   ///@}
 
+  /** @name Convex Hulling
+   */
+  ///@{
+  CrossSection Hull() const;
+  static CrossSection Hull(const std::vector<CrossSection>& crossSections);
+  static CrossSection Hull(const SimplePolygon poly);
+  static CrossSection Hull(const Polygons polys);
+  ///@}
+  ///
   /** @name Conversion
    */
   ///@{
