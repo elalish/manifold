@@ -141,7 +141,7 @@ double Cross(glm::vec2 a, glm::vec2 b) { return a.x * b.y - a.y * b.x; }
 
 double SquaredDistance(glm::vec2 a, glm::vec2 b) {
   auto d = a - b;
-  return d.x * d.x + d.y * d.y;
+  return glm::dot(d, d);
 }
 
 bool IsCw(glm::vec2 a, glm::vec2 b, glm::vec2 c) {

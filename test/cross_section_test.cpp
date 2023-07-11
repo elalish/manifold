@@ -171,7 +171,7 @@ TEST(CrossSection, FillRule) {
 }
 
 TEST(CrossSection, Hull) {
-  auto circ = CrossSection::Circle(10);
+  auto circ = CrossSection::Circle(10, 360);
   auto circs = std::vector<CrossSection>{circ, circ.Translate({0, 30}),
                                          circ.Translate({30, 0})};
   auto circ_tri = CrossSection::Hull(circs);
