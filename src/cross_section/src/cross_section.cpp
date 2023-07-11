@@ -137,13 +137,17 @@ bool V2Lesser(glm::vec2 a, glm::vec2 b) {
   return a.x < b.x;
 }
 
-double cross(glm::vec2 a, glm::vec2 b) { return a.x * b.y - a.y * b.x; }
+double Cross(glm::vec2 a, glm::vec2 b) { return a.x * b.y - a.y * b.x; }
+
+double SquaredDistance(glm::vec2 a, glm::vec2 b) {
+  auto d = a - b;
+  return d.x * d.x + d.y * d.y;
+}
 
 bool IsCw(glm::vec2 a, glm::vec2 b, glm::vec2 c) {
-  double lhs = cross(a - c, b - c);
-  double rhs = 1e-9 * glm::distance(a, c) * glm::distance(b, c);
-  // return lhs < -rhs;
-  return lhs <= rhs;
+  double lhs = Cross(a - c, b - c);
+  double rhs = 1e-18 * SquaredDistance(a, c) * SquaredDistance(b, c);
+  return lhs * std::abs(lhs) <= rhs;
 }
 
 void HullBacktrack(const SimplePolygon& pts, const int idx,
