@@ -174,6 +174,11 @@ export class CrossSection {
       circularSegments?: number): CrossSection;
 
   /**
+   * Compute the convex hull of the contours in this CrossSection.
+   */
+  hull(): CrossSection;
+
+  /**
    * Remove vertices from the contours in this CrossSection that are less than
    * the specified distance epsilon from an imaginary line that passes through
    * its two adjacent vertices. Near duplicate vertices and collinear points
