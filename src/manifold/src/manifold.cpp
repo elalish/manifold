@@ -902,32 +902,38 @@ Manifold Manifold::HullImpl(std::vector<glm::vec3> pts, float precision) {
     std::vector<int> internal;
     for (int j = 0; j < halfEdges.size() / 2 - 1; j++) {
       // skip if this edge has already been marked as internal
-      bool doSkip = false;
-      for (int s : internal) {
-        if (j == s) {
-          doSkip = true;
-          break;
-        }
-      }
-      if (doSkip) continue;
+      if (std::find(internal.begin(), internal.end(), j) != internal.end())
+        continue;
       bool nonInternal = true;
       for (int k = j + 1; k < halfEdges.size() / 2; k++) {
         if (j == k) continue;
-        if (halfEdges[j] == halfEdges[k + 1] &&
-            halfEdges[j + 1] == halfEdges[k]) {
+        if (halfEdges[j * 2] == halfEdges[k * 2 + 1] &&
+            halfEdges[j * 2 + 1] == halfEdges[k * 2]) {
           internal.push_back(k);
           nonInternal = false;
           break;
         }
       }
-      if (nonInternal) AddTri(halfEdges[j], halfEdges[j + 1], i);
+      if (nonInternal) AddTri(halfEdges[j * 2], halfEdges[j * 2 + 1], i);
     }
   }
   Mesh mesh;
   mesh.vertPos = pts;
-  mesh.triVerts = triangles;
+  if (dropped.size() > 0) {
+    std::vector<glm::ivec3> tris;
+    tris.reserve(triangles.size() - dropped.size());
+    for (int i = 0; i < triangles.size(); i++) {
+      if (std::find(dropped.begin(), dropped.end(), i) != dropped.end())
+        continue;
+      tris.push_back(triangles[i]);
+    }
+    mesh.triVerts = tris;
+  } else {
+    mesh.triVerts = triangles;
+  }
   return Manifold(mesh);
 }
+
 Manifold Manifold::Hull() const {
   return HullImpl(GetMesh().vertPos, Precision());
 }
