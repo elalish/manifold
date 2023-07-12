@@ -29,7 +29,7 @@ file(MAKE_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/examples/built)
 
 # ensure that interface files are copied over when modified
 add_custom_target(js_deps ALL
-        DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/manifold.*
+        DEPENDS manifoldjs
                ${CMAKE_CURRENT_SOURCE_DIR}/manifold*.d.ts)
 
 add_custom_command(
