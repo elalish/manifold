@@ -103,7 +103,7 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .function("_Warp", &cross_js::Warp)
       .function("transform", &cross_js::Transform)
       .function("_Translate", &CrossSection::Translate)
-      .function("_Rotate", &CrossSection::Rotate)
+      .function("rotate", &CrossSection::Rotate)
       .function("_Scale", &CrossSection::Scale)
       .function("_Mirror", &CrossSection::Mirror)
       .function("_Decompose", &CrossSection::Decompose)
@@ -114,7 +114,9 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .function("_Bounds", &CrossSection::Bounds)
       .function("simplify", &CrossSection::Simplify)
       .function("_Offset", &cross_js::Offset)
-      .function("_ToPolygons", &CrossSection::ToPolygons);
+      .function("_ToPolygons", &CrossSection::ToPolygons)
+      .function("hull",
+                select_overload<CrossSection() const>(&CrossSection::Hull));
 
   // CrossSection Static Methods
   function("_Square", &CrossSection::Square);
