@@ -103,7 +103,7 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .function("_Warp", &cross_js::Warp)
       .function("transform", &cross_js::Transform)
       .function("_Translate", &CrossSection::Translate)
-      .function("_Rotate", &CrossSection::Rotate)
+      .function("rotate", &CrossSection::Rotate)
       .function("_Scale", &CrossSection::Scale)
       .function("_Mirror", &CrossSection::Mirror)
       .function("_Decompose", &CrossSection::Decompose)

@@ -113,16 +113,12 @@ export class CrossSection {
   translate(v: Vec2): CrossSection;
 
   /**
-   * Applies an Euler angle rotation to the cross-section, first about the X
-   * axis, then Y, then Z, in degrees. We use degrees so that we can minimize
-   * rounding error, and eliminate it completely for any multiples of 90
-   * degrees. Additionally, more efficient code paths are used to update the
-   * cross-section when the transforms only rotate by multiples of 90 degrees.
-   * This operation can be chained. Transforms are combined and applied lazily.
+   * Applies a (Z-axis) rotation to the CrossSection, in degrees. This operation
+   * can be chained. Transforms are combined and applied lazily.
    *
-   * @param v [X, Y, Z] rotation in degrees.
+   * @param degrees degrees about the Z-axis to rotate.
    */
-  rotate(v: Vec2): CrossSection;
+  rotate(v: number): CrossSection;
 
   /**
    * Scale this CrossSection in space. This operation can be chained. Transforms

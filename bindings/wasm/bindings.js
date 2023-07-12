@@ -114,10 +114,6 @@ Module.setup = function() {
     return this._Translate(vararg2vec2(vec));
   };
 
-  Module.CrossSection.prototype.rotate = function(vec) {
-    return this._Rotate(...vec);
-  };
-
   Module.CrossSection.prototype.scale = function(vec) {
     // if only one factor provided, scale both x and y with it
     if (typeof vec == 'number') {
