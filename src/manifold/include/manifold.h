@@ -234,6 +234,8 @@ class Manifold {
   Manifold TrimByPlane(glm::vec3 normal, float originOffset) const;
   ///@}
 
+  Manifold Hull() const;
+
   /** @name Testing hooks
    *  These are just for internal testing.
    */
@@ -249,7 +251,7 @@ class Manifold {
   Manifold(std::shared_ptr<CsgNode> pNode_);
   Manifold(std::shared_ptr<Impl> pImpl_);
   static Manifold Invalid();
-
+  static Manifold HullImpl(std::vector<glm::vec3> pts, float precision);
   mutable std::shared_ptr<CsgNode> pNode_;
 
   CsgLeafNode& GetCsgLeafNode() const;

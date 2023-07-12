@@ -75,6 +75,18 @@ Manifold Halfspace(Box bBox, glm::vec3 normal, float originOffset) {
 float DistanceToVector(glm::vec3 pt, glm::vec3 v) {
   return glm::length(pt - v * glm::dot(pt, v));
 }
+
+float DistanceToPlane(glm::vec3 pt, glm::vec4 plane) {
+  return glm::dot(glm::vec3(plane), pt) - plane.w;
+}
+
+glm::vec4 PlaneOfPts(glm::vec3 a, glm::vec3 b, glm::vec3 c) {
+  auto crx = glm::cross(c - a, b - a);
+  auto n = glm::length(crx);
+  if (n == 0.) return glm::vec4();
+  return glm::vec4(crx, glm::dot(crx, a)) / n;
+}
+
 // Return a trio of non-collinear indices into pts. If none are found, indices
 // will be -1 (and hulling cannot be performed).
 glm::ivec3 NonCollinearTriple(const std::vector<glm::vec3>& pts,
@@ -104,10 +116,15 @@ glm::ivec3 NonCollinearTriple(const std::vector<glm::vec3>& pts,
   return glm::ivec3(0, furthest, third);
 }
 
-Manifold HullImpl(std::vector<glm::vec3> pts, float precision) {
-  auto len = pts.size();
-  if (len < 4) return Manifold();
+std::pair<int, bool> NonCoplanar(const std::vector<glm::vec3>& pts,
+                                 glm::vec4 plane, const float precision) {
+  for (int i = 0; i < pts.size(); i++) {
+    float dist = DistanceToPlane(pts[i], plane);
+    if (std::abs(dist) > precision) return {i, dist > precision};
+  }
+  return {-1, false};  // All points are coplanar, hull is not a 3d shape
 }
+
 }  // namespace
 
 namespace manifold {
@@ -813,5 +830,105 @@ Manifold Manifold::TrimByPlane(glm::vec3 normal, float originOffset) const {
 
 ExecutionParams& ManifoldParams() { return params; }
 
-// Manifold Manifold::Hull() const {}
+Manifold Manifold::HullImpl(std::vector<glm::vec3> pts, float precision) {
+  auto len = pts.size();
+  if (len < 4) return Invalid();  // FIXME: as with below, is this possible?
+  const auto trip = NonCollinearTriple(pts, precision);
+  const auto plane = PlaneOfPts(pts[trip.x], pts[trip.y], pts[trip.z]);
+  const auto [d, dIsAboveTrip] = NonCoplanar(pts, plane, precision);
+  // FIXME: Should there be a hull specific error? If the inputs are all
+  // manifolds, is this error (all points coplanar) even possible?
+  if (d < 0) return Invalid();
+  const int a = trip.x;
+  const int b = dIsAboveTrip ? trip.z : trip.y;
+  const int c = dIsAboveTrip ? trip.y : trip.z;
+  std::vector<glm::ivec3> triangles;
+  std::vector<glm::vec4> planes;
+  std::vector<int> dropped;
+  // FIXME: actually, I don't want to capture triangles and planes since I
+  // actually throw them out during pruning on each pass. starting fresh with
+  // std::vector is still probably faster than a data structure that would allow
+  // deletion I guess.
+  // const auto AddTri = [&pts](std::vector<glm::ivec3>& triangles,
+  //                            std::vector<glm::vec4>& planes, int a, int b,
+  //                            int c) {
+  //   triangles.push_back({a, b, c});
+  //   planes.push_back(PlaneOfPts(pts[a], pts[b], pts[c]));
+  // };
+  // AddTri(triangles, planes, a, b, c);
+  // AddTri(triangles, planes, d, b, a);
+  // AddTri(triangles, planes, c, d, a);
+  // AddTri(triangles, planes, b, d, c);
+  const auto AddTri = [&pts, &triangles, &planes, &dropped](int a, int b,
+                                                            int c) {
+    auto tri = glm::ivec3(a, b, c);
+    auto plane = PlaneOfPts(pts[a], pts[b], pts[c]);
+    if (dropped.size() > 0) {
+      const int idx = dropped[dropped.size() - 1];
+      triangles[idx] = tri;
+      planes[idx] = plane;
+      dropped.pop_back();
+    } else {
+      triangles.push_back(tri);
+      planes.push_back(plane);
+    }
+  };
+  AddTri(a, b, c);
+  AddTri(d, b, a);
+  AddTri(c, d, a);
+  AddTri(b, d, c);
+  for (int i = 0; i < len; i++) {
+    if (i == a || i == b || i == c || i == d) continue;  // skip starting points
+    // collect half edges of triangles that are in conflict with the points at
+    // idx, pruning the conflicting triangles and their planes in the process
+    std::vector<int> halfEdges;  // flat set of pairs of indices
+    for (int j = 0; j < triangles.size(); j++) {
+      if (DistanceToPlane(pts[i], planes[j]) > precision) {
+        // edge a -> b
+        halfEdges.push_back(triangles[j].x);
+        halfEdges.push_back(triangles[j].y);
+        // edge b -> c
+        halfEdges.push_back(triangles[j].y);
+        halfEdges.push_back(triangles[j].z);
+        // edge c -> a
+        halfEdges.push_back(triangles[j].z);
+        halfEdges.push_back(triangles[j].x);
+        // mark triangle/plane as dropped
+        dropped.push_back(j);
+      }
+    }
+    // form new triangles with the outer perimeter (horizon) of the set of
+    // conflicting triangles and the point at idx
+    std::vector<int> internal;
+    for (int j = 0; j < halfEdges.size() / 2 - 1; j++) {
+      // skip if this edge has already been marked as internal
+      bool doSkip = false;
+      for (int s : internal) {
+        if (j == s) {
+          doSkip = true;
+          break;
+        }
+      }
+      if (doSkip) continue;
+      bool nonInternal = true;
+      for (int k = j + 1; k < halfEdges.size() / 2; k++) {
+        if (j == k) continue;
+        if (halfEdges[j] == halfEdges[k + 1] &&
+            halfEdges[j + 1] == halfEdges[k]) {
+          internal.push_back(k);
+          nonInternal = false;
+          break;
+        }
+      }
+      if (nonInternal) AddTri(halfEdges[j], halfEdges[j + 1], i);
+    }
+  }
+  Mesh mesh;
+  mesh.vertPos = pts;
+  mesh.triVerts = triangles;
+  return Manifold(mesh);
+}
+Manifold Manifold::Hull() const {
+  return HullImpl(GetMesh().vertPos, Precision());
+}
 }  // namespace manifold
