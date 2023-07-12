@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <algorithm>
+#include <cstdio>
 #include <map>
 #include <numeric>
 
@@ -877,12 +878,17 @@ Manifold Manifold::HullImpl(std::vector<glm::vec3> pts, float precision) {
   AddTri(d, b, a);
   AddTri(c, d, a);
   AddTri(b, d, c);
+  std::printf("pts loop start\n");
   for (int i = 0; i < len; i++) {
     if (i == a || i == b || i == c || i == d) continue;  // skip starting points
     // collect half edges of triangles that are in conflict with the points at
     // idx, pruning the conflicting triangles and their planes in the process
     std::vector<int> halfEdges;  // flat set of pairs of indices
+    std::printf("triangles loop start, size = %i with %i dropped\n",
+                (int)triangles.size(), (int)dropped.size());
     for (int j = 0; j < triangles.size(); j++) {
+      if (std::find(dropped.begin(), dropped.end(), j) != dropped.end())
+        continue;
       if (DistanceToPlane(pts[i], planes[j]) > precision) {
         // edge a -> b
         halfEdges.push_back(triangles[j].x);
@@ -899,22 +905,29 @@ Manifold Manifold::HullImpl(std::vector<glm::vec3> pts, float precision) {
     }
     // form new triangles with the outer perimeter (horizon) of the set of
     // conflicting triangles and the point at idx
+    // FIXME: definitely need to use set for halfedges it seems like
     std::vector<int> internal;
-    for (int j = 0; j < halfEdges.size() / 2 - 1; j++) {
-      // skip if this edge has already been marked as internal
-      if (std::find(internal.begin(), internal.end(), j) != internal.end())
-        continue;
-      bool nonInternal = true;
-      for (int k = j + 1; k < halfEdges.size() / 2; k++) {
-        if (j == k) continue;
-        if (halfEdges[j * 2] == halfEdges[k * 2 + 1] &&
-            halfEdges[j * 2 + 1] == halfEdges[k * 2]) {
-          internal.push_back(k);
-          nonInternal = false;
-          break;
+    std::printf("halfedges (%i) loop start\n", (int)halfEdges.size());
+    if (halfEdges.size() == 0) {
+      continue;
+    } else if (halfEdges.size() == 2) {
+      AddTri(halfEdges[0], halfEdges[1], i);
+    } else {
+      for (int j = 0; j < halfEdges.size() / 2 - 1; j++) {
+        // skip if this edge has already been marked as internal
+        if (std::find(internal.begin(), internal.end(), j) != internal.end())
+          continue;
+        bool nonInternal = true;
+        for (int k = j + 1; k < halfEdges.size() / 2; k++) {
+          if (halfEdges[j * 2] == halfEdges[k * 2 + 1] &&
+              halfEdges[j * 2 + 1] == halfEdges[k * 2]) {
+            internal.push_back(k);
+            nonInternal = false;
+            break;
+          }
         }
+        if (nonInternal) AddTri(halfEdges[j * 2], halfEdges[j * 2 + 1], i);
       }
-      if (nonInternal) AddTri(halfEdges[j * 2], halfEdges[j * 2 + 1], i);
     }
   }
   Mesh mesh;

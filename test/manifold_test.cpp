@@ -712,3 +712,14 @@ TEST(Manifold, PinchedVert) {
   EXPECT_EQ(touch.Status(), Manifold::Error::NoError);
   EXPECT_EQ(touch.Genus(), 0);
 }
+
+TEST(Manifold, Hull) {
+#ifdef MANIFOLD_EXPORT
+  if (options.exportModels) {
+    auto spheres =
+        Manifold::Sphere(10) + Manifold::Sphere(10).Translate({0, 0, 30});
+    auto tictac = spheres.Hull();
+    ExportMesh("tictac_hull.glb", tictac.GetMesh(), {});
+  }
+#endif
+}
