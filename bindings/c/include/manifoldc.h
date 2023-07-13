@@ -2,9 +2,8 @@
 #include <stdint.h>
 #include <types.h>
 
-#include <cstdint>
-
 #ifdef __cplusplus
+#include <cstdint>
 extern "C" {
 #endif
 
@@ -50,6 +49,15 @@ ManifoldMeshGL *manifold_level_set_seq(void *mem,
                                        float (*sdf)(float, float, float),
                                        ManifoldBox *bounds, float edge_length,
                                        float level);
+// The _context variants of manifold_level_set allow a pointer to be passed
+// back to each invocation of the sdf function pointer, for languages that
+// need additional data.
+ManifoldMeshGL *manifold_level_set_context(
+    void *mem, float (*sdf)(float, float, float, void *), ManifoldBox *bounds,
+    float edge_length, float level, void *ctx);
+ManifoldMeshGL *manifold_level_set_seq_context(
+    void *mem, float (*sdf)(float, float, float, void *), ManifoldBox *bounds,
+    float edge_length, float level, void *ctx);
 
 // Manifold Vectors
 
