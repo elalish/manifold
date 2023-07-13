@@ -481,7 +481,10 @@ void CreateProperties(Manifold::Impl &outR, const VecDH<TriRef> &refPQ,
                           inP.halfedge_.cptrD(), inQ.halfedge_.cptrD(),
                           outR.halfedge_.cptrD(), outR.precision_}));
 
-  std::map<std::tuple<int, int, int, int>, int> propIdx;
+  using Entry = std::pair<glm::ivec3, int>;
+  int idMissProp = outR.NumVert();
+  std::vector<std::vector<Entry>> propIdx(outR.NumVert() + 1);
+  outR.meshRelation_.properties.reserve(outR.NumVert() * numProp);
   int idx = 0;
 
   for (int tri = 0; tri < numTri; ++tri) {
@@ -499,16 +502,16 @@ void CreateProperties(Manifold::Impl &outR, const VecDH<TriRef> &refPQ,
 
     for (const int i : {0, 1, 2}) {
       const int vert = outR.halfedge_[3 * tri + i].startVert;
-      const glm::vec3 uvw = bary[3 * tri + i];
+      const glm::vec3 &uvw = bary[3 * tri + i];
 
-      auto key = std::make_tuple(PQ, -1, -1, -1);
+      glm::ivec4 key(PQ, idMissProp, -1, -1);
       if (oldNumProp > 0) {
-        std::get<1>(key) = vert;
+        key[1] = vert;
         int edge = -1;
         for (const int j : {0, 1, 2}) {
           if (uvw[j] == 1) {
             // On a retained vert, the propVert must also match
-            std::get<2>(key) = triProp[j];
+            key[2] = triProp[j];
             edge = -1;
             break;
           }
@@ -518,18 +521,23 @@ void CreateProperties(Manifold::Impl &outR, const VecDH<TriRef> &refPQ,
           // On an edge, both propVerts must match
           const int p0 = triProp[Next3(edge)];
           const int p1 = triProp[Prev3(edge)];
-          std::get<2>(key) = glm::min(p0, p1);
-          std::get<3>(key) = glm::max(p0, p1);
+          key[2] = glm::min(p0, p1);
+          key[3] = glm::max(p0, p1);
         }
       }
 
-      const auto it = propIdx.find(key);
-      if (it != propIdx.end()) {
-        outR.meshRelation_.triProperties[tri][i] = it->second;
-        continue;
+      auto &bin = propIdx[key.y];
+      bool bFound = false;
+      for (int k = 0; k < bin.size(); ++k) {
+        if (bin[k].first == glm::ivec3(key.x, key.z, key.w)) {
+          bFound = true;
+          outR.meshRelation_.triProperties[tri][i] = bin[k].second;
+          break;
+        }
       }
-      outR.meshRelation_.triProperties[tri][i] = idx;
-      propIdx.insert({key, idx++});
+      if (bFound) continue;
+      bin.push_back(std::make_pair(glm::ivec3(key.x, key.z, key.w), idx));
+      outR.meshRelation_.triProperties[tri][i] = idx++;
 
       for (int p = 0; p < numProp; ++p) {
         if (p < oldNumProp) {
