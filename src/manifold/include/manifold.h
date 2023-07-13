@@ -235,6 +235,7 @@ class Manifold {
   ///@}
 
   Manifold Hull() const;
+  static Manifold Hull(const std::vector<glm::vec3>& pts);
 
   /** @name Testing hooks
    *  These are just for internal testing.
@@ -251,7 +252,8 @@ class Manifold {
   Manifold(std::shared_ptr<CsgNode> pNode_);
   Manifold(std::shared_ptr<Impl> pImpl_);
   static Manifold Invalid();
-  static Manifold HullImpl(std::vector<glm::vec3> pts, float precision);
+  static Manifold HullImpl(const std::vector<float>& vertProps,
+                           const int numProp, float precision);
   mutable std::shared_ptr<CsgNode> pNode_;
 
   CsgLeafNode& GetCsgLeafNode() const;

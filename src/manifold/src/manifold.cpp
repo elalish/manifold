@@ -16,6 +16,7 @@
 #include <cstdio>
 #include <map>
 #include <numeric>
+#include <unordered_set>
 
 #include "boolean3.h"
 #include "csg_tree.h"
@@ -126,6 +127,12 @@ std::pair<int, bool> NonCoplanar(const std::vector<glm::vec3>& pts,
   return {-1, false};  // All points are coplanar, hull is not a 3d shape
 }
 
+struct IVec2Hash {
+  std::size_t operator()(const glm::ivec2& v) const {
+    return (v.y << 16) ^ v.x;
+    // return (v.x + v.y) * ((v.x + v.y + 1) / 2) + v.y;
+  }
+};
 }  // namespace
 
 namespace manifold {
@@ -831,9 +838,16 @@ Manifold Manifold::TrimByPlane(glm::vec3 normal, float originOffset) const {
 
 ExecutionParams& ManifoldParams() { return params; }
 
-Manifold Manifold::HullImpl(std::vector<glm::vec3> pts, float precision) {
-  auto len = pts.size();
+// Manifold Manifold::HullImpl(const MeshGL& mesh, float precision) {
+Manifold Manifold::HullImpl(const std::vector<float>& vertProps,
+                            const int numProp, float precision) {
+  const int len = vertProps.size() / numProp;
   if (len < 4) return Invalid();  // FIXME: as with below, is this possible?
+  std::vector<glm::vec3> pts(len);
+  for (int i = 0; i < len; i++) {
+    const int j = i * numProp;
+    pts[i] = {vertProps[j], vertProps[j + 1], vertProps[j + 2]};
+  }
   const auto trip = NonCollinearTriple(pts, precision);
   const auto plane = PlaneOfPts(pts[trip.x], pts[trip.y], pts[trip.z]);
   const auto [d, dIsAboveTrip] = NonCoplanar(pts, plane, precision);
@@ -846,23 +860,9 @@ Manifold Manifold::HullImpl(std::vector<glm::vec3> pts, float precision) {
   std::vector<glm::ivec3> triangles;
   std::vector<glm::vec4> planes;
   std::vector<int> dropped;
-  // FIXME: actually, I don't want to capture triangles and planes since I
-  // actually throw them out during pruning on each pass. starting fresh with
-  // std::vector is still probably faster than a data structure that would allow
-  // deletion I guess.
-  // const auto AddTri = [&pts](std::vector<glm::ivec3>& triangles,
-  //                            std::vector<glm::vec4>& planes, int a, int b,
-  //                            int c) {
-  //   triangles.push_back({a, b, c});
-  //   planes.push_back(PlaneOfPts(pts[a], pts[b], pts[c]));
-  // };
-  // AddTri(triangles, planes, a, b, c);
-  // AddTri(triangles, planes, d, b, a);
-  // AddTri(triangles, planes, c, d, a);
-  // AddTri(triangles, planes, b, d, c);
   const auto AddTri = [&pts, &triangles, &planes, &dropped](int a, int b,
                                                             int c) {
-    auto tri = glm::ivec3(a, b, c);
+    auto tri = glm::ivec3(c, b, a);
     auto plane = PlaneOfPts(pts[a], pts[b], pts[c]);
     if (dropped.size() > 0) {
       const int idx = dropped[dropped.size() - 1];
@@ -878,76 +878,61 @@ Manifold Manifold::HullImpl(std::vector<glm::vec3> pts, float precision) {
   AddTri(d, b, a);
   AddTri(c, d, a);
   AddTri(b, d, c);
-  std::printf("pts loop start\n");
   for (int i = 0; i < len; i++) {
     if (i == a || i == b || i == c || i == d) continue;  // skip starting points
     // collect half edges of triangles that are in conflict with the points at
     // idx, pruning the conflicting triangles and their planes in the process
-    std::vector<int> halfEdges;  // flat set of pairs of indices
-    std::printf("triangles loop start, size = %i with %i dropped\n",
-                (int)triangles.size(), (int)dropped.size());
+    std::unordered_set<glm::ivec2, IVec2Hash> halfEdges{};
     for (int j = 0; j < triangles.size(); j++) {
-      if (std::find(dropped.begin(), dropped.end(), j) != dropped.end())
+      if (dropped.size() > 0 &&
+          std::find(dropped.begin(), dropped.end(), j) != dropped.end())
         continue;
       if (DistanceToPlane(pts[i], planes[j]) > precision) {
-        // edge a -> b
-        halfEdges.push_back(triangles[j].x);
-        halfEdges.push_back(triangles[j].y);
-        // edge b -> c
-        halfEdges.push_back(triangles[j].y);
-        halfEdges.push_back(triangles[j].z);
-        // edge c -> a
-        halfEdges.push_back(triangles[j].z);
-        halfEdges.push_back(triangles[j].x);
-        // mark triangle/plane as dropped
-        dropped.push_back(j);
+        halfEdges.insert({triangles[j].x, triangles[j].z});
+        halfEdges.insert({triangles[j].z, triangles[j].y});
+        halfEdges.insert({triangles[j].y, triangles[j].x});
+        dropped.push_back(j);  // mark triangle/plane as dropped
       }
     }
     // form new triangles with the outer perimeter (horizon) of the set of
     // conflicting triangles and the point at idx
-    // FIXME: definitely need to use set for halfedges it seems like
-    std::vector<int> internal;
-    std::printf("halfedges (%i) loop start\n", (int)halfEdges.size());
-    if (halfEdges.size() == 0) {
-      continue;
-    } else if (halfEdges.size() == 2) {
-      AddTri(halfEdges[0], halfEdges[1], i);
-    } else {
-      for (int j = 0; j < halfEdges.size() / 2 - 1; j++) {
-        // skip if this edge has already been marked as internal
-        if (std::find(internal.begin(), internal.end(), j) != internal.end())
-          continue;
-        bool nonInternal = true;
-        for (int k = j + 1; k < halfEdges.size() / 2; k++) {
-          if (halfEdges[j * 2] == halfEdges[k * 2 + 1] &&
-              halfEdges[j * 2 + 1] == halfEdges[k * 2]) {
-            internal.push_back(k);
-            nonInternal = false;
-            break;
-          }
-        }
-        if (nonInternal) AddTri(halfEdges[j * 2], halfEdges[j * 2 + 1], i);
-      }
+    for (auto e : halfEdges) {
+      if (halfEdges.erase({e.y, e.x}) == 0) AddTri(e.x, e.y, i);
     }
   }
-  Mesh mesh;
-  mesh.vertPos = pts;
-  if (dropped.size() > 0) {
-    std::vector<glm::ivec3> tris;
-    tris.reserve(triangles.size() - dropped.size());
-    for (int i = 0; i < triangles.size(); i++) {
-      if (std::find(dropped.begin(), dropped.end(), i) != dropped.end())
-        continue;
-      tris.push_back(triangles[i]);
-    }
-    mesh.triVerts = tris;
-  } else {
-    mesh.triVerts = triangles;
+  MeshGL mesh;
+  mesh.numProp = numProp;
+  mesh.vertProperties = vertProps;
+  mesh.triVerts.reserve((triangles.size() - dropped.size()) * 3);
+  for (int i = 0; i < triangles.size(); i++) {
+    if (dropped.size() > 0 &&
+        std::find(dropped.begin(), dropped.end(), i) != dropped.end())
+      continue;
+    mesh.triVerts.push_back(triangles[i].x);
+    mesh.triVerts.push_back(triangles[i].y);
+    mesh.triVerts.push_back(triangles[i].z);
   }
   return Manifold(mesh);
 }
 
 Manifold Manifold::Hull() const {
-  return HullImpl(GetMesh().vertPos, Precision());
+  auto mesh = GetMeshGL();
+  return HullImpl(mesh.vertProperties, mesh.numProp, Precision());
+}
+
+Manifold Manifold::Hull(const std::vector<glm::vec3>& pts) {
+  std::vector<float> props(pts.size() * 3);
+  float scale = 0;
+  for (int i = 0; i < pts.size(); i++) {
+    props[i * 3] = pts[i].x;
+    props[i * 3 + 1] = pts[i].y;
+    props[i * 3 + 2] = pts[i].z;
+    auto abs = glm::abs(pts[i]);
+    if (abs.x > scale) scale = abs.x;
+    if (abs.y > scale) scale = abs.y;
+    if (abs.z > scale) scale = abs.z;
+  }
+
+  return HullImpl(props, 3, kTolerance * scale);
 }
 }  // namespace manifold
