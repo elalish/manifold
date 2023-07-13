@@ -14,7 +14,7 @@
  limitations under the License.
  """
 
-from pymanifold import Manifold
+from manifold3d import Manifold
 
 # https://gist.github.com/deckar01/ef11def51de7e71d9f288c6e5819fdb7
 

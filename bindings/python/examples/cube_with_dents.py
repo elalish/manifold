@@ -14,7 +14,7 @@
  limitations under the License.
  """
  
-from pymanifold import Manifold
+from manifold3d import Manifold
 from functools import reduce
 
 # https://gist.github.com/ochafik/2db96400e3c1f73558fcede990b8a355#file-cube-with-half-spheres-dents-scad
