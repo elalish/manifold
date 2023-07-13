@@ -33,6 +33,20 @@ ManifoldMeshGL *level_set(void *mem, float (*sdf)(float, float, float),
   auto mesh = LevelSet(fun, *from_c(bounds), edge_length, level, pol);
   return to_c(new (mem) MeshGL(mesh));
 }
+ManifoldMeshGL *level_set_context(
+    void *mem, float (*sdf_context)(float, float, float, void *),
+    ManifoldBox *bounds, float edge_length, float level, bool seq, void *ctx) {
+  // Bind function with context argument to one without
+  using namespace std::placeholders;
+  std::function<float(float, float, float)> sdf =
+      std::bind(sdf_context, _1, _2, _3, ctx);
+  std::function<float(glm::vec3)> fun = [sdf](glm::vec3 v) {
+    return (sdf(v.x, v.y, v.z));
+  };
+  auto pol = seq ? std::make_optional(ExecutionPolicy::Seq) : std::nullopt;
+  auto mesh = LevelSet(fun, *from_c(bounds), edge_length, level, pol);
+  return to_c(new (mem) MeshGL(mesh));
+}
 }  // namespace
 
 #ifdef __cplusplus
@@ -231,6 +245,18 @@ ManifoldMeshGL *manifold_level_set_seq(void *mem,
                                        ManifoldBox *bounds, float edge_length,
                                        float level) {
   return level_set(mem, sdf, bounds, edge_length, level, true);
+}
+
+ManifoldMeshGL *manifold_level_set_context(
+    void *mem, float (*sdf)(float, float, float, void *), ManifoldBox *bounds,
+    float edge_length, float level, void *ctx) {
+  return level_set_context(mem, sdf, bounds, edge_length, level, false, ctx);
+}
+
+ManifoldMeshGL *manifold_level_set_seq_context(
+    void *mem, float (*sdf)(float, float, float, void *), ManifoldBox *bounds,
+    float edge_length, float level, void *ctx) {
+  return level_set_context(mem, sdf, bounds, edge_length, level, true, ctx);
 }
 
 ManifoldManifold *manifold_refine(void *mem, ManifoldManifold *m, int refine) {
