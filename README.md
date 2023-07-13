@@ -98,7 +98,7 @@ node test/manifold_test.js
 
 ### Python
 
-The CMake script will build the python binding `pymanifold` automatically. To
+The CMake script will build the python binding `manifold3d` automatically. To
 use the extension, please add `$BUILD_DIR/tools` to your `PYTHONPATH`, where
 `$BUILD_DIR` is the build directory for CMake. Examples using the python binding
 can be found in `bindings/python/examples`. To see exported samples, run:
@@ -112,8 +112,8 @@ Run the following code in the interpreter for
 python binding documentation:
 
 ```
->>> import pymanifold
->>> help(pymanifold)
+>>> import manifold3d
+>>> help(manifold3d)
 ```
 
 For more detailed documentation, please refer to the C++ API.

@@ -1,7 +1,7 @@
 # One of the benchmarks in in https://gist.github.com/ochafik/2db96400e3c1f73558fcede990b8a355
 # https://www.thingiverse.com/groups/openscad/forums/general/topic:34699
 
-from pymanifold import Manifold
+from manifold3d import Manifold
 import numpy as np
 
 n = 10
