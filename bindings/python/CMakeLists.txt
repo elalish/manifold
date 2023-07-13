@@ -15,10 +15,10 @@
 project(python)
 
 add_subdirectory(third_party)
-pybind11_add_module(pymanifold pymanifold.cpp)
-target_link_libraries(pymanifold PRIVATE manifold)
-target_compile_options(pymanifold PRIVATE ${MANIFOLD_FLAGS})
-target_compile_features(pymanifold PUBLIC cxx_std_17)
-target_include_directories(pymanifold
+pybind11_add_module(manifold3d manifold3d.cpp)
+target_link_libraries(manifold3d PRIVATE manifold)
+target_compile_options(manifold3d PRIVATE ${MANIFOLD_FLAGS})
+target_compile_features(manifold3d PUBLIC cxx_std_17)
+target_include_directories(manifold3d
     PRIVATE ${PYBIND11_DIR}/include
 )

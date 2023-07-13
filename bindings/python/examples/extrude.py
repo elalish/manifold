@@ -1,4 +1,4 @@
-from pymanifold import CrossSection, FillRule
+from manifold3d import CrossSection, FillRule
 
 
 def run():

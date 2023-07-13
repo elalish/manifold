@@ -1,4 +1,4 @@
-from pymanifold import Manifold
+from manifold3d import Manifold
 
 def run():
     # for some reason this causes collider error
