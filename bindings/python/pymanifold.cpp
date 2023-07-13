@@ -27,12 +27,8 @@ using namespace manifold;
 typedef std::tuple<float, float> Float2;
 typedef std::tuple<float, float, float> Float3;
 
-PYBIND11_MODULE(pymanifold, m) {
-  m.doc() =
-      "Python binding for the manifold library. Please check the C++ "
-      "documentation for APIs.\n"
-      "This binding will perform copying to make the API more familiar to "
-      "OpenSCAD users.";
+PYBIND11_MODULE(manifold3d, m) {
+  m.doc() = "Python binding for the Manifold library.";
 
   m.def("set_min_circular_angle", Quality::SetMinCircularAngle,
         "Sets an angle constraint the default number of circular segments for "
@@ -40,7 +36,7 @@ PYBIND11_MODULE(pymanifold, m) {
         "and Manifold::Revolve() constructors. The number of segments will be "
         "rounded up to the nearest factor of four."
         "\n\n"
-        "@param angle The minimum angle in degrees between consecutive "
+        ":param angle: The minimum angle in degrees between consecutive "
         "segments. The angle will increase if the the segments hit the minimum "
         "edge length.\n"
         "Default is 10 degrees.");
@@ -51,7 +47,7 @@ PYBIND11_MODULE(pymanifold, m) {
         "and Manifold::Revolve() constructors. The number of segments will be "
         "rounded up to the nearest factor of four."
         "\n\n"
-        "@param length The minimum length of segments. The length will "
+        ":param length: The minimum length of segments. The length will "
         "increase if the the segments hit the minimum angle. Default is 1.0.");
 
   m.def("set_circular_segments", Quality::SetCircularSegments,
@@ -60,15 +56,15 @@ PYBIND11_MODULE(pymanifold, m) {
         "Manifold::Revolve() constructors. Overrides the edge length and angle "
         "constraints and sets the number of segments to exactly this value."
         "\n\n"
-        "@param number Number of circular segments. Default is 0, meaning no "
+        ":param number: Number of circular segments. Default is 0, meaning no "
         "constraint is applied.");
 
-  m.def(
-      "get_circular_segments", Quality::GetCircularSegments,
-      "Determine the result of the SetMinCircularAngle(), "
-      "SetMinCircularEdgeLength(), and SetCircularSegments() defaults."
-      "\n\n"
-      "@param radius For a given radius of circle, determine how many default");
+  m.def("get_circular_segments", Quality::GetCircularSegments,
+        "Determine the result of the SetMinCircularAngle(), "
+        "SetMinCircularEdgeLength(), and SetCircularSegments() defaults."
+        "\n\n"
+        ":param radius: For a given radius of circle, determine how many "
+        "default");
 
   py::class_<Manifold>(m, "Manifold")
       .def(py::init<>())
@@ -135,17 +131,17 @@ PYBIND11_MODULE(pymanifold, m) {
           "Transforms are combined and applied lazily."
           "\n\n"
           ":param v: The vector to add to every vertex.")
-      .def("scale",
-           static_cast<Manifold (*)(Manifold &, float)>(
-               [](Manifold &self, float scale) {
-                 return self.Scale(glm::vec3(scale));
-               }),
-           py::arg("scale"),
-           "Scale this Manifold in space. This operation can be chained. "
-           "Transforms are combined and applied lazily."
-           "\n\n"
-           ":param scale: The scalar multiplier for each component of every "
-           "vertices.")
+      .def(
+          "scale",
+          [](Manifold &self, float scale) {
+            return self.Scale(glm::vec3(scale));
+          },
+          py::arg("scale"),
+          "Scale this Manifold in space. This operation can be chained. "
+          "Transforms are combined and applied lazily."
+          "\n\n"
+          ":param scale: The scalar multiplier for each component of every "
+          "vertices.")
       .def(
           "scale",
           [](Manifold &self, py::array_t<float> &scale) {
@@ -221,7 +217,14 @@ PYBIND11_MODULE(pymanifold, m) {
               v.z = std::get<2>(fv);
             });
           },
-          py::arg("f"))
+          py::arg("f"),
+          "This function does not change the topology, but allows the vertices "
+          "to be moved according to any arbitrary input function. It is easy "
+          "to create a function that warps a geometrically valid object into "
+          "one which overlaps, but that is not checked here, so it is up to "
+          "the user to choose their function with discretion."
+          "\n\n"
+          ":param warpFunc: A function that modifies a given vertex position.")
       .def(
           "refine", [](Manifold &self, int n) { return self.Refine(n); },
           py::arg("n"),
@@ -286,7 +289,7 @@ PYBIND11_MODULE(pymanifold, m) {
            "Does the Manifold have any triangles?")
       .def(
           "decompose", [](Manifold &self) { return self.Decompose(); },
-          " This operation returns a vector of Manifolds that are "
+          "This operation returns a vector of Manifolds that are "
           "topologically disconnected. If everything is connected, the vector "
           "is length one, containing a copy of the original. It is the inverse "
           "operation of Compose().")
@@ -304,10 +307,10 @@ PYBIND11_MODULE(pymanifold, m) {
           py::arg("normal"), py::arg("origin_offset"),
           "Convenient version of Split() for a half-space."
           "\n\n"
-          "@param normal This vector is normal to the cutting plane and its "
+          ":param normal: This vector is normal to the cutting plane and its "
           "length does not matter. The first result is in the direction of "
           "this vector, the second result is on the opposite side.\n"
-          "@param originOffset The distance of the plane from the origin in "
+          ":param originOffset: The distance of the plane from the origin in "
           "the direction of the normal vector.")
       .def(
           "trim_by_plane",
@@ -320,10 +323,10 @@ PYBIND11_MODULE(pymanifold, m) {
           "Identical to SplitByPlane(), but calculating and returning only the "
           "first result."
           "\n\n"
-          "@param normal This vector is normal to the cutting plane and its "
+          ":param normal: This vector is normal to the cutting plane and its "
           "length does not matter. The result is in the direction of this "
           "vector from the plane.\n"
-          "@param originOffset The distance of the plane from the origin in "
+          ":param originOffset: The distance of the plane from the origin in "
           "the direction of the normal vector.")
       .def_property_readonly(
           "bounding_box",
@@ -612,37 +615,80 @@ PYBIND11_MODULE(pymanifold, m) {
            }),
            py::arg("polygons"),
            py::arg("fillrule") = CrossSection::FillRule::Positive,
-           "Construct a 2d cross-section from a set of contours.")
-      .def("area", &CrossSection::Area)
-      .def("num_vert", &CrossSection::NumVert)
-      .def("num_contour", &CrossSection::NumContour)
-      .def("is_empty", &CrossSection::IsEmpty)
-      .def("translate",
-           [](CrossSection self, Float2 v) {
-             return self.Translate({std::get<0>(v), std::get<1>(v)});
-           })
-      .def("rotate", &CrossSection::Rotate)
-      .def("scale",
-           [](CrossSection self, Float2 s) {
-             return self.Scale({std::get<0>(s), std::get<1>(s)});
-           })
-      .def("mirror",
-           [](CrossSection self, Float2 ax) {
-             return self.Mirror({std::get<0>(ax), std::get<1>(ax)});
-           })
-      .def("transform",
-           [](CrossSection self, py::array_t<float> &mat) {
-             auto mat_view = mat.unchecked<2>();
-             if (mat_view.shape(0) != 2 || mat_view.shape(1) != 3)
-               throw std::runtime_error("Invalid matrix shape");
-             glm::mat3x2 mat_glm;
-             for (int i = 0; i < 2; i++) {
-               for (int j = 0; j < 3; j++) {
-                 mat_glm[j][i] = mat_view(i, j);
-               }
-             }
-             return self.Transform(mat_glm);
-           })
+           "Create a 2d cross-section from a set of contours (complex "
+           "polygons). A boolean union operation (with Positive filling rule "
+           "by default) performed to combine overlapping polygons and ensure "
+           "the resulting CrossSection is free of intersections."
+           "\n\n"
+           ":param contours: A set of closed paths describing zero or more "
+           "complex polygons.\n"
+           ":param fillrule: The filling rule used to interpret polygon "
+           "sub-regions in contours.")
+      .def("area", &CrossSection::Area,
+           "Return the total area covered by complex polygons making up the "
+           "CrossSection.")
+      .def("num_vert", &CrossSection::NumVert,
+           "Return the number of vertices in the CrossSection.")
+      .def("num_contour", &CrossSection::NumContour,
+           "Return the number of contours (both outer and inner paths) in the "
+           "CrossSection.")
+      .def("is_empty", &CrossSection::IsEmpty,
+           "Does the CrossSection contain any contours?")
+      .def(
+          "translate",
+          [](CrossSection self, Float2 v) {
+            return self.Translate({std::get<0>(v), std::get<1>(v)});
+          },
+          "Move this CrossSection in space. This operation can be chained. "
+          "Transforms are combined and applied lazily."
+          "\n\n"
+          ":param v: The vector to add to every vertex.")
+      .def("rotate", &CrossSection::Rotate,
+           "Applies a (Z-axis) rotation to the CrossSection, in degrees. This "
+           "operation can be chained. Transforms are combined and applied "
+           "lazily."
+           "\n\n"
+           ":param degrees: degrees about the Z-axis to rotate.")
+      .def(
+          "scale",
+          [](CrossSection self, Float2 s) {
+            return self.Scale({std::get<0>(s), std::get<1>(s)});
+          },
+          "Scale this CrossSection in space. This operation can be chained. "
+          "Transforms are combined and applied lazily."
+          "\n\n"
+          ":param v: The vector to multiply every vertex by per component.")
+      .def(
+          "mirror",
+          [](CrossSection self, Float2 ax) {
+            return self.Mirror({std::get<0>(ax), std::get<1>(ax)});
+          },
+          "Mirror this CrossSection over the arbitrary axis described by the "
+          "unit form of the given vector. If the length of the vector is zero, "
+          "an empty CrossSection is returned. This operation can be chained. "
+          "Transforms are combined and applied lazily."
+          "\n\n"
+          ":param ax: the axis to be mirrored over")
+      .def(
+          "transform",
+          [](CrossSection self, py::array_t<float> &mat) {
+            auto mat_view = mat.unchecked<2>();
+            if (mat_view.shape(0) != 2 || mat_view.shape(1) != 3)
+              throw std::runtime_error("Invalid matrix shape");
+            glm::mat3x2 mat_glm;
+            for (int i = 0; i < 2; i++) {
+              for (int j = 0; j < 3; j++) {
+                mat_glm[j][i] = mat_view(i, j);
+              }
+            }
+            return self.Transform(mat_glm);
+          },
+          "Transform this CrossSection in space. The first two columns form a "
+          "2x2 matrix transform and the last is a translation vector. This "
+          "operation can be chained. Transforms are combined and applied "
+          "lazily."
+          "\n\n"
+          ":param m: The affine transform matrix to apply to all the vertices.")
       .def(
           "warp",
           [](CrossSection self, const std::function<Float2(Float2)> &f) {
@@ -652,15 +698,55 @@ PYBIND11_MODULE(pymanifold, m) {
               v.y = std::get<1>(fv);
             });
           },
-          py::arg("f"))
-      .def("simplify", &CrossSection::Simplify)
+          py::arg("f"),
+          "Move the vertices of this CrossSection (creating a new one) "
+          "according to any arbitrary input function, followed by a union "
+          "operation (with a Positive fill rule) that ensures any introduced "
+          "intersections are not included in the result."
+          "\n\n"
+          ":param warpFunc: A function that modifies a given vertex position.")
+      .def("simplify", &CrossSection::Simplify,
+           "Remove vertices from the contours in this CrossSection that are "
+           "less than the specified distance epsilon from an imaginary line "
+           "that passes through its two adjacent vertices. Near duplicate "
+           "vertices and collinear points will be removed at lower epsilons, "
+           "with elimination of line segments becoming increasingly aggressive "
+           "with larger epsilons."
+           "\n\n"
+           "It is recommended to apply this function following Offset, in "
+           "order to clean up any spurious tiny line segments introduced that "
+           "do not improve quality in any meaningful way. This is particularly "
+           "important if further offseting operations are to be performed, "
+           "which would compound the issue.")
       .def("offset", &CrossSection::Offset, py::arg("delta"),
            py::arg("join_type"), py::arg("miter_limit") = 2.0,
-           py::arg("arc_tolerance") = 0.0)
+           py::arg("arc_tolerance") = 0.0,
+           "Inflate the contours in CrossSection by the specified delta, "
+           "handling corners according to the given JoinType."
+           "\n\n"
+           ":param delta: Positive deltas will cause the expansion of "
+           "outlining contours to expand, and retraction of inner (hole) "
+           "contours. Negative deltas will have the opposite effect.\n"
+           ":param jt: The join type specifying the treatment of contour joins "
+           "(corners).\n"
+           ":param miter_limit: The maximum distance in multiples of delta "
+           "that vertices can be offset from their original positions with "
+           "before squaring is applied, <B>when the join type is Miter</B> "
+           "(default is 2, which is the minimum allowed). See the [Clipper2 "
+           "MiterLimit](http://www.angusj.com/clipper2/Docs/Units/"
+           "Clipper.Offset/Classes/ClipperOffset/Properties/MiterLimit.htm) "
+           "page for a visual example.\n"
+           ":param circularSegments: Number of segments per 360 degrees of "
+           "<B>JoinType::Round</B> corners (roughly, the number of vertices "
+           "that will be added to each contour). Default is calculated by the "
+           "static Quality defaults according to the radius.")
       .def(py::self + py::self, "Boolean union.")
       .def(py::self - py::self, "Boolean difference.")
       .def(py::self ^ py::self, "Boolean intersection.")
-      .def("decompose", &CrossSection::Decompose)
+      .def("decompose", &CrossSection::Decompose,
+           "This operation returns a vector of CrossSections that are "
+           "topologically disconnected, each containing one outline contour "
+           "with zero or more holes.")
       .def(
           "to_polygons",
           [](CrossSection self) {
@@ -724,11 +810,24 @@ PYBIND11_MODULE(pymanifold, m) {
             return CrossSection::Square({std::get<0>(dims), std::get<1>(dims)},
                                         center);
           },
-          py::arg("dims"), py::arg("center") = false)
+          py::arg("dims"), py::arg("center") = false,
+          "Constructs a square with the given XY dimensions. By default it is "
+          "positioned in the first quadrant, touching the origin. If any "
+          "dimensions in size are negative, or if all are zero, an empty "
+          "Manifold will be returned."
+          "\n\n"
+          ":param size: The X, and Y dimensions of the square.\n"
+          ":param center: Set to true to shift the center to the origin.")
       .def_static(
           "circle",
           [](float radius, int circularSegments) {
             return CrossSection::Circle(radius, circularSegments);
           },
-          py::arg("radius"), py::arg("circularSegments") = 0);
+          py::arg("radius"), py::arg("circularSegments") = 0,
+          "Constructs a circle of a given radius."
+          "\n\n"
+          ":param radius: Radius of the circle. Must be positive.\n"
+          ":param circularSegments: Number of segments along its diameter. "
+          "Default is calculated by the static Quality defaults according to "
+          "the radius.");
 }
