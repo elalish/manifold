@@ -714,7 +714,6 @@ TEST(Manifold, PinchedVert) {
 }
 
 TEST(Manifold, Hull) {
-#ifdef MANIFOLD_EXPORT
   auto sphere = Manifold::Sphere(100, 36);
   auto spheres = sphere + sphere.Translate({0, 0, 300});
   auto tictac = spheres.Hull();
@@ -726,13 +725,14 @@ TEST(Manifold, Hull) {
   };
   auto cube = Manifold::Hull(cubePts);
 
+#ifdef MANIFOLD_EXPORT
   if (options.exportModels) {
     ExportMesh("tictac_hull.glb", tictac.GetMesh(), {});
   }
+#endif
 
   EXPECT_FLOAT_EQ(hollow.Hull().GetProperties().volume,
                   sphere.GetProperties().volume);
   EXPECT_EQ(spheres.NumVert() / 2 + 36, tictac.NumVert());
   EXPECT_FLOAT_EQ(cube.GetProperties().volume, 1);
-#endif
 }
