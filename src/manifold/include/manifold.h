@@ -235,6 +235,7 @@ class Manifold {
   ///@}
 
   Manifold Hull() const;
+  static Manifold Hull(const std::vector<Manifold>& manifolds);
   static Manifold Hull(const std::vector<glm::vec3>& pts);
 
   /** @name Testing hooks

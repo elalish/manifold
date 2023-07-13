@@ -920,6 +920,10 @@ Manifold Manifold::Hull() const {
   return Hull(mesh.vertProperties, mesh.numProp, 1e-4 * Precision());
 }
 
+Manifold Manifold::Hull(const std::vector<Manifold>& manifolds) {
+  return BatchBoolean(manifolds, OpType::Add).Hull();
+}
+
 Manifold Manifold::Hull(const std::vector<glm::vec3>& pts) {
   std::vector<float> props(pts.size() * 3);
   float scale = 0;
