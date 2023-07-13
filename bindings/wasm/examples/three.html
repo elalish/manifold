@@ -44,20 +44,15 @@
   </select><br />
   <canvas id="output"></canvas>
 </body>
-<script type="importmap">
-  {
-    "imports": {
-      "three": "https://cdn.jsdelivr.net/npm/three@0.149.0/build/three.module.js"
-    }
-  }
-</script>
 <script type="module">
-  import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.149.0/build/three.module.js';
-  import { mergeVertices } from 'https://cdn.jsdelivr.net/npm/three@0.149.0/examples/jsm/utils/BufferGeometryUtils.js';
+  import * as THREE from 'three';
+  import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
   import Module from './built/manifold.js';
 
   const wasm = await Module();
   wasm.setup();
+
+  const { Manifold, Mesh } = wasm;
 
   // we have manifold module, let's do some three.js
   const camera = new THREE.PerspectiveCamera(30, 1, 0.01, 10);
@@ -71,12 +66,12 @@
 
   const icosahedron = simplify(new THREE.IcosahedronGeometry(0.16));
 
-  const manifold_1 = wasm.cube([0.2, 0.2, 0.2], true);
-  const manifold_2 = new wasm.Manifold(geometry2mesh(icosahedron));
+  const manifold_1 = Manifold.cube([0.2, 0.2, 0.2], true);
+  const manifold_2 = new Manifold(geometry2mesh(icosahedron));
 
   const csg = function (operation) {
     mesh.geometry?.dispose();
-    mesh.geometry = mesh2geometry(wasm[operation](manifold_1, manifold_2).getMesh());
+    mesh.geometry = mesh2geometry(Manifold[operation](manifold_1, manifold_2).getMesh());
   };
 
   document.querySelector('select').onchange = function (event) {
@@ -99,7 +94,7 @@
   function geometry2mesh(geometry) {
     const vertProperties = geometry.attributes.position.array;
     const triVerts = geometry.index.array;
-    return new wasm.Mesh({ numProp: 3, vertProperties, triVerts });
+    return new Mesh({ numProp: 3, vertProperties, triVerts });
   }
 
   function mesh2geometry(mesh) {

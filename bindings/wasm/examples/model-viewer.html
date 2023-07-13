@@ -48,14 +48,6 @@
   <button id="download">Download manifold GLB</button>
   <model-viewer camera-controls shadow-intensity="1" alt="Output of mesh Boolean operation"></model-viewer>
 </body>
-<script type="importmap">
-  {
-    "imports": {
-      "@gltf-transform/core": "https://cdn.jsdelivr.net/npm/@gltf-transform/core@3.2.1/+esm",
-      "@gltf-transform/functions": "https://cdn.jsdelivr.net/npm/@gltf-transform/functions@3.2.1/+esm"
-    }
-  }
-</script>
 <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/2.0.1/model-viewer.min.js"></script>
 <script type="module">
   import { Document, WebIO } from '@gltf-transform/core';
@@ -68,6 +60,8 @@
 
   const wasm = await Module();
   wasm.setup();
+
+  const { Manifold, Mesh } = wasm;
 
   const attributes = ['POSITION', 'TEXCOORD_0'];
   const materialMap = new Map();
@@ -83,12 +77,12 @@
       const materials = [];
       const manifoldMesh = readMesh(node.getMesh(), attributes, materials);
       manifoldMesh.runOriginalID = [];
-      const firstID = wasm.reserveIDs(materials.length);
+      const firstID = Manifold.reserveIDs(materials.length);
       for (let i = 0; i < materials.length; ++i) {
         manifoldMesh.runOriginalID.push(firstID + i);
         ids.push(firstID + i);
       }
-      manifolds.push(wasm.Manifold(new wasm.Mesh(manifoldMesh)));
+      manifolds.push(Manifold(new Mesh(manifoldMesh)));
     }
     // pull in materials, TODO: replace with transfer() when available
     const startIdx = doc.getRoot().listMaterials().length;
@@ -100,17 +94,17 @@
       materialMap.set(id, material);
     }
 
-    return wasm.union(manifolds);
+    return Manifold.union(manifolds);
   }
 
-  const space = await readGLB('models/space.glb', attributes, materialMap);
-  const moon = await readGLB('models/moon.glb', attributes, materialMap);
+  const space = await readGLB('/models/space.glb', attributes, materialMap);
+  const moon = await readGLB('/models/moon.glb', attributes, materialMap);
 
   const node = doc.createNode();
   doc.createScene().addChild(node);
 
   function csg(operation) {
-    push2MV(wasm[operation](space, moon));
+    push2MV(Manifold[operation](space, moon));
   };
 
   document.querySelector('select').onchange = function (event) {
@@ -136,10 +130,12 @@
 
     disposeMesh(node.getMesh());
     const materials = [];
+    const matAttributes = [];
     for (const id of manifoldMesh.runOriginalID) {
       materials.push(materialMap.get(id));
+      matAttributes.push(attributes);
     }
-    const mesh = writeMesh(doc, manifoldMesh, attributes, materials);
+    const mesh = writeMesh(doc, manifoldMesh, matAttributes, materials);
     node.setMesh(mesh);
     await doc.transform(prune());
 

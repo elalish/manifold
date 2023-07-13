@@ -43,6 +43,10 @@ export type Mat4 = [
 ];
 export type SimplePolygon = Vec2[];
 export type Polygons = SimplePolygon|SimplePolygon[];
+export type Rect = {
+  min: Vec2,
+  max: Vec2
+};
 export type Box = {
   min: Vec3,
   max: Vec3
@@ -55,11 +59,5 @@ export type Properties = {
   surfaceArea: number,
   volume: number
 };
-export type Curvature = {
-  maxMeanCurvature: number,
-  minMeanCurvature: number,
-  maxGaussianCurvature: number,
-  minGaussianCurvature: number,
-  vertMeanCurvature: number[],
-  vertGaussianCurvature: number[]
-};
+export type FillRule = 'EvenOdd'|'NonZero'|'Positive'|'Negative'
+export type JoinType = 'Square'|'Round'|'Miter'

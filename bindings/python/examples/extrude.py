@@ -1,0 +1,38 @@
+from manifold3d import CrossSection, FillRule
+
+
+def run():
+    # create a polygon
+    polygon_points = [(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0)]
+    polygons_points = [polygon_points]
+
+    # create a cross-section
+    cross_section = CrossSection(polygons_points)
+    polygons = cross_section.to_polygons()
+    polygon = polygons[0]
+    if set(polygon) != set(polygon_points):
+        raise Exception(f"{polygon=} differs from {polygon_points=}")
+
+    # extrude a polygon to create a manifold
+    extruded_polygon = cross_section.extrude(10.0)
+    eps = 0.001
+    observed_volume = extruded_polygon.get_volume()
+    expected_volume = 10.0
+    if abs(observed_volume - expected_volume) > eps:
+        raise Exception(f"{observed_volume=} differs from {expected_volume=}")
+    observed_surface_area = extruded_polygon.get_surface_area()
+    expected_surface_area = 42.0
+    if abs(observed_surface_area - expected_surface_area) > eps:
+        raise Exception(f"{observed_surface_area=} differs from {expected_surface_area=}")
+
+    # get bounding box from manifold
+    observed_bbox = extruded_polygon.bounding_box
+    expected_bbox = (0.0, 0.0, 0.0, 1.0, 1.0, 10.0)
+    if observed_bbox != expected_bbox:
+        raise Exception(f"{observed_bbox=} differs from {expected_bbox=}")
+
+    return extruded_polygon
+
+
+if __name__ == "__main__":
+    run()

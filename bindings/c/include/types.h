@@ -1,6 +1,8 @@
 #pragma once
 #include <stddef.h>
 
+// opaque pointers
+
 typedef struct ManifoldManifold ManifoldManifold;
 typedef struct ManifoldManifoldVec ManifoldManifoldVec;
 typedef struct ManifoldCrossSection ManifoldCrossSection;
@@ -9,11 +11,15 @@ typedef struct ManifoldSimplePolygon ManifoldSimplePolygon;
 typedef struct ManifoldPolygons ManifoldPolygons;
 typedef struct ManifoldMesh ManifoldMesh;
 typedef struct ManifoldMeshGL ManifoldMeshGL;
-typedef struct ManifoldCurvature ManifoldCurvature;
 typedef struct ManifoldBox ManifoldBox;
 typedef struct ManifoldRect ManifoldRect;
+
+#ifdef MANIFOLD_EXPORT
 typedef struct ManifoldMaterial ManifoldMaterial;
 typedef struct ManifoldExportOptions ManifoldExportOptions;
+#endif
+
+// structs
 
 typedef struct ManifoldManifoldPair {
   ManifoldManifold* first;
@@ -49,12 +55,7 @@ typedef struct ManifoldProperties {
   float volume;
 } ManifoldProperties;
 
-typedef struct ManifoldCurvatureBounds {
-  float max_mean_curvature;
-  float min_mean_curvature;
-  float max_gaussian_curvature;
-  float min_gaussian_curvature;
-} ManifoldCurvatureBounds;
+// enums
 
 typedef enum ManifoldOpType {
   MANIFOLD_ADD,

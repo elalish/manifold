@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <title>Make manifold glTF</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="shortcut icon" type="image/png" href="https://elalish.github.io/manifold/samples/models/favicon.png" />
+  <style>
+    body {
+      background-color: #f7f7f7;
+      font-family: 'Rubik', sans-serif;
+      font-size: 16px;
+      line-height: 24px;
+      color: rgba(0, 0, 0, .87);
+      font-weight: 400;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    p {
+      max-width: 700px;
+      margin: 1em;
+      text-align: left;
+    }
+
+    model-viewer {
+      display: block;
+      width: 100vw;
+      height: 100vw;
+      max-width: 600px;
+      max-height: 600px;
+      border: 3px solid black;
+      border-radius: 10px;
+      margin-top: 5px;
+    }
+
+    #poster {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate3d(-50%, -50%, 0);
+    }
+  </style>
+</head>
+
+<body>
+  <p>Load a glTF/GLB model and our <a href="https://github.com/elalish/manifold">Manifold</a> library will attempt to
+    merge it into a set of manifold objects. If the model is water-tight, you can download the new GLB which will have
+    our <a href="https://github.com/KhronosGroup/glTF/pull/2286">EXT_manifold</a> extension, thus preserving the
+    manifold data without losing any mesh properties.</p>
+  <p> If the View Manifold GLB checkbox is enabled, then some meshes in the model have open edges and don't represent a
+    solid object. Check this box to see only the manifold parts, which will also enable them to be downloaded. If the
+    download button is still disabled, it means there were no manifold meshes found. </p>
+  <input type="file" id="input">
+  <button id="download" disabled>Download manifold GLB</button>
+  <input type="checkbox" id="viewFinal" disabled>
+  <label for="viewFinal">View Manifold GLB</label>
+  <model-viewer camera-controls shadow-intensity="1" alt="Loaded GLB model">
+    <span id="poster" slot="poster">Drop a GLB here</span>
+  </model-viewer>
+</body>
+<script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/2.0.1/model-viewer.min.js"></script>
+<script type="module">
+  import { WebIO } from '@gltf-transform/core';
+  import { prune } from '@gltf-transform/functions';
+  import { KHRONOS_EXTENSIONS } from '@gltf-transform/extensions';
+  import { SimpleDropzone } from 'simple-dropzone';
+  import { readMesh, writeMesh, setupIO } from './gltf-io.js';
+  import Module from './built/manifold.js';
+
+  const io = setupIO(new WebIO());
+  io.registerExtensions(KHRONOS_EXTENSIONS);
+
+  const wasm = await Module();
+  wasm.setup();
+
+  const { Manifold, Mesh } = wasm;
+
+  const mv = document.querySelector('model-viewer');
+  const inputEl = document.querySelector('#input');
+  const downloadButton = document.querySelector('#download');
+  const checkbox = document.querySelector('#viewFinal');
+  const dropCtrl = new SimpleDropzone(mv, inputEl);
+
+  let inputGLBurl = null;
+  let outputGLBurl = null;
+  let allManifold = true;
+  let anyManifold = false;
+
+  dropCtrl.on('drop', async ({ files }) => {
+    for (const [path, file] of files) {
+      const filename = file.name.toLowerCase();
+      if (filename.match(/\.(gltf|glb)$/)) {
+        URL.revokeObjectURL(inputGLBurl);
+        inputGLBurl = URL.createObjectURL(file);
+        await writeGLB(await readGLB(inputGLBurl));
+        updateUI();
+        break;
+      }
+    }
+  });
+
+  function updateUI() {
+    if (allManifold) {
+      checkbox.checked = true;
+      checkbox.disabled = true;
+    } else if (anyManifold) {
+      checkbox.checked = false;
+      checkbox.disabled = false;
+    } else {
+      checkbox.checked = false;
+      checkbox.disabled = true;
+    }
+    onClick();
+  }
+
+  checkbox.onclick = onClick;
+
+  function onClick() {
+    mv.src = checkbox.checked ? outputGLBurl : inputGLBurl;
+    downloadButton.disabled = !checkbox.checked;
+  };
+
+  downloadButton.onclick = function () {
+    const link = document.createElement('a');
+    link.download = 'manifold.glb';
+    link.href = outputGLBurl;
+    link.click();
+  };
+
+  async function writeGLB(doc) {
+    URL.revokeObjectURL(outputGLBurl);
+    if (!anyManifold) {
+      return;
+    }
+    const glb = await io.writeBinary(doc);
+
+    const blob = new Blob([glb], { type: 'application/octet-stream' });
+    outputGLBurl = URL.createObjectURL(blob);
+  }
+
+  async function readGLB(url) {
+    allManifold = false;
+    anyManifold = false;
+    updateUI();
+    allManifold = true;
+    const docIn = await io.read(url);
+    const nodes = docIn.getRoot().listNodes();
+    for (const node of nodes) {
+      const attributes = [];
+      const mesh = node.getMesh();
+      if (!mesh) {
+        continue;
+      }
+
+      const materials = [];
+      const tmpMesh = readMesh(mesh, attributes, materials);
+      tmpMesh.runOriginalID = [];
+      const firstID = Manifold.reserveIDs(materials.length);
+      for (let i = 0; i < materials.length; ++i) {
+        tmpMesh.runOriginalID.push(firstID + i);
+      }
+      const manifoldMesh = new Mesh(tmpMesh);
+      mesh.dispose();
+
+      const matAttributes = [];
+      materials.forEach(() => matAttributes.push(attributes));
+
+      manifoldMesh.merge();
+
+      try {
+        // Test manifoldness - will throw if not.
+        const manifold = Manifold(manifoldMesh);
+        node.setMesh(writeMesh(docIn, manifold.getMesh(), matAttributes, materials));
+        manifold.delete();
+        anyManifold = true;
+      } catch (e) {
+        console.log(mesh.getName(), e);
+        allManifold = false;
+      }
+    }
+
+    await docIn.transform(prune());
+
+    return docIn;
+  }
+</script>
+
+</html>

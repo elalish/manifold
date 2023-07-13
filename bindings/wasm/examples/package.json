@@ -1,0 +1,30 @@
+{
+  "name": "manifold-examples",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "build:watch": "vite build --watch",
+    "preview": "vite preview",
+    "test": "vitest",
+    "test:ui": "vitest --ui",
+    "test:run": "vitest run"
+  },
+  "dependencies": {
+    "@gltf-transform/core": "^3.2.1",
+    "@gltf-transform/extensions": "^3.2.1",
+    "@gltf-transform/functions": "^3.2.1",
+    "gl-matrix": "^3.4.3",
+    "simple-dropzone": "0.8.3",
+    "three": "0.151.2"
+  },
+  "devDependencies": {
+    "@vitest/ui": "^0.31.1",
+    "@vitest/web-worker": "^0.31.1",
+    "typescript": "5.0.4",
+    "vite": "^4.3.2",
+    "vitest": "^0.31.1"
+  }
+}

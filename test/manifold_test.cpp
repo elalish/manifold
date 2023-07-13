@@ -197,13 +197,28 @@ TEST(Manifold, ExtrudeCone) {
   EXPECT_FLOAT_EQ(donut.GetProperties().volume, 4.0f);
 }
 
+Polygons RotatePolygons(Polygons polys, const int index) {
+  Polygons rotatedPolys;
+  for (auto& polygon : polys) {
+    auto rotatedPolygon = polygon;
+    std::rotate(rotatedPolygon.begin(), rotatedPolygon.begin() + index,
+                rotatedPolygon.end());
+    rotatedPolys.push_back(rotatedPolygon);
+  }
+  return rotatedPolys;
+}
+
 TEST(Manifold, Revolve) {
   Polygons polys = SquareHole();
-  Manifold vug = Manifold::Revolve(polys, 48);
-  EXPECT_EQ(vug.Genus(), -1);
-  auto prop = vug.GetProperties();
-  EXPECT_NEAR(prop.volume, 14.0f * glm::pi<float>(), 0.2f);
-  EXPECT_NEAR(prop.surfaceArea, 30.0f * glm::pi<float>(), 0.2f);
+  Manifold vug;
+  for (int i = 0; i < polys[0].size(); i++) {
+    Polygons rotatedPolys = RotatePolygons(polys, i);
+    vug = Manifold::Revolve(rotatedPolys, 48);
+    EXPECT_EQ(vug.Genus(), -1);
+    auto prop = vug.GetProperties();
+    EXPECT_NEAR(prop.volume, 14.0f * glm::pi<float>(), 0.2f);
+    EXPECT_NEAR(prop.surfaceArea, 30.0f * glm::pi<float>(), 0.2f);
+  }
 }
 
 TEST(Manifold, Revolve2) {
@@ -213,6 +228,38 @@ TEST(Manifold, Revolve2) {
   auto prop = donutHole.GetProperties();
   EXPECT_NEAR(prop.volume, 48.0f * glm::pi<float>(), 1.0f);
   EXPECT_NEAR(prop.surfaceArea, 96.0f * glm::pi<float>(), 1.0f);
+}
+
+TEST(Manifold, PartialRevolveOnYAxis) {
+  Polygons polys = SquareHole(2.0f);
+  Polygons offsetPolys = SquareHole(10.0f);
+
+  Manifold revolute;
+  for (int i = 0; i < polys[0].size(); i++) {
+    Polygons rotatedPolys = RotatePolygons(polys, i);
+    revolute = Manifold::Revolve(rotatedPolys, 48, 180);
+    EXPECT_EQ(revolute.Genus(), 1);
+    auto prop = revolute.GetProperties();
+    EXPECT_NEAR(prop.volume, 24.0f * glm::pi<float>(), 1.0f);
+    EXPECT_NEAR(
+        prop.surfaceArea,
+        48.0f * glm::pi<float>() + 4.0f * 4.0f * 2.0f - 2.0f * 2.0f * 2.0f,
+        1.0f);
+  }
+}
+
+TEST(Manifold, PartialRevolveOffset) {
+  Polygons polys = SquareHole(10.0f);
+
+  Manifold revolute;
+  for (int i = 0; i < polys[0].size(); i++) {
+    Polygons rotatedPolys = RotatePolygons(polys, i);
+    revolute = Manifold::Revolve(rotatedPolys, 48, 180);
+    auto prop = revolute.GetProperties();
+    EXPECT_EQ(revolute.Genus(), 1);
+    EXPECT_NEAR(prop.surfaceArea, 777.0f, 1.0f);
+    EXPECT_NEAR(prop.volume, 376.0f, 1.0f);
+  }
 }
 
 TEST(Manifold, Warp) {
@@ -424,22 +471,28 @@ TEST(Manifold, Precision3) {
  * at each vertex against the constant expected values of spheres of different
  * radii and at different mesh resolutions.
  */
-TEST(Manifold, GetCurvature) {
+TEST(Manifold, CalculateCurvature) {
   const float precision = 0.015;
   for (int n = 4; n < 100; n *= 2) {
-    Manifold sphere = Manifold::Sphere(1, 64);
-    Curvature curvature = sphere.GetCurvature();
-    EXPECT_NEAR(curvature.minMeanCurvature, 2, 2 * precision);
-    EXPECT_NEAR(curvature.maxMeanCurvature, 2, 2 * precision);
-    EXPECT_NEAR(curvature.minGaussianCurvature, 1, precision);
-    EXPECT_NEAR(curvature.maxGaussianCurvature, 1, precision);
+    const int gaussianIdx = 3;
+    const int meanIdx = 4;
+    Manifold sphere = Manifold::Sphere(1, 64).CalculateCurvature(
+        gaussianIdx - 3, meanIdx - 3);
+    MeshGL sphereGL = sphere.GetMeshGL();
+    ASSERT_EQ(sphereGL.numProp, 5);
+    EXPECT_NEAR(GetMinProperty(sphereGL, meanIdx), 2, 2 * precision);
+    EXPECT_NEAR(GetMaxProperty(sphereGL, meanIdx), 2, 2 * precision);
+    EXPECT_NEAR(GetMinProperty(sphereGL, gaussianIdx), 1, precision);
+    EXPECT_NEAR(GetMaxProperty(sphereGL, gaussianIdx), 1, precision);
 
-    sphere = sphere.Scale(glm::vec3(2.0f));
-    curvature = sphere.GetCurvature();
-    EXPECT_NEAR(curvature.minMeanCurvature, 1, precision);
-    EXPECT_NEAR(curvature.maxMeanCurvature, 1, precision);
-    EXPECT_NEAR(curvature.minGaussianCurvature, 0.25, 0.25 * precision);
-    EXPECT_NEAR(curvature.maxGaussianCurvature, 0.25, 0.25 * precision);
+    sphere = sphere.Scale(glm::vec3(2.0f))
+                 .CalculateCurvature(gaussianIdx - 3, meanIdx - 3);
+    sphereGL = sphere.GetMeshGL();
+    ASSERT_EQ(sphereGL.numProp, 5);
+    EXPECT_NEAR(GetMinProperty(sphereGL, meanIdx), 1, precision);
+    EXPECT_NEAR(GetMaxProperty(sphereGL, meanIdx), 1, precision);
+    EXPECT_NEAR(GetMinProperty(sphereGL, gaussianIdx), 0.25, 0.25 * precision);
+    EXPECT_NEAR(GetMaxProperty(sphereGL, gaussianIdx), 0.25, 0.25 * precision);
   }
 }
 
@@ -599,4 +652,63 @@ TEST(Manifold, Invalid) {
   EXPECT_EQ(Manifold::Extrude(circ, 0.).Status(), invalid);
   EXPECT_EQ(Manifold::Extrude(empty_circ, 10.).Status(), invalid);
   EXPECT_EQ(Manifold::Revolve(empty_sq).Status(), invalid);
+}
+
+TEST(Manifold, MultiCompose) {
+  auto part = Manifold::Compose({Manifold::Cube({10, 10, 10})});
+  auto finalAssembly =
+      Manifold::Compose({part, part.Translate({0, 10, 0}),
+                         part.Mirror({1, 0, 0}).Translate({10, 0, 0}),
+                         part.Mirror({1, 0, 0}).Translate({10, 10, 0})});
+  EXPECT_FLOAT_EQ(finalAssembly.GetProperties().volume, 4000);
+}
+
+TEST(Manifold, MergeDegenerates) {
+  MeshGL cube = Manifold::Cube(glm::vec3(1), true).GetMeshGL();
+  MeshGL squash;
+  squash.vertProperties = cube.vertProperties;
+  squash.triVerts = cube.triVerts;
+  // Move one vert to the position of its neighbor and remove one triangle
+  // linking them to break the manifold.
+  squash.vertProperties[squash.vertProperties.size() - 1] *= -1;
+  squash.triVerts.resize(squash.triVerts.size() - 3);
+  // Rotate the degenerate triangle to the middle to catch more problems.
+  std::rotate(squash.triVerts.begin(), squash.triVerts.begin() + 3 * 5,
+              squash.triVerts.end());
+  // Merge should remove the now duplicate vertex.
+  EXPECT_TRUE(squash.Merge());
+  // Manifold should remove the triangle with two references to the same vert.
+  Manifold squashed = Manifold(squash);
+  EXPECT_FALSE(squashed.IsEmpty());
+  EXPECT_EQ(squashed.Status(), Manifold::Error::NoError);
+}
+
+TEST(Manifold, PinchedVert) {
+  Mesh shape;
+  shape.vertPos = {{0, 0, 0},         //
+                   {1, 1, 0},         //
+                   {1, -1, 0},        //
+                   {-0.00001, 0, 0},  //
+                   {-1, -1, -0},      //
+                   {-1, 1, 0},        //
+                   {0, 0, 2},         //
+                   {0, 0, -2}};
+  shape.triVerts = {{0, 2, 6},  //
+                    {2, 1, 6},  //
+                    {1, 0, 6},  //
+                    {4, 3, 6},  //
+                    {3, 5, 6},  //
+                    {5, 4, 6},  //
+                    {2, 0, 4},  //
+                    {0, 3, 4},  //
+                    {3, 0, 1},  //
+                    {3, 1, 5},  //
+                    {7, 2, 4},  //
+                    {7, 4, 5},  //
+                    {7, 5, 1},  //
+                    {7, 1, 2}};
+  Manifold touch(shape);
+  EXPECT_FALSE(touch.IsEmpty());
+  EXPECT_EQ(touch.Status(), Manifold::Error::NoError);
+  EXPECT_EQ(touch.Genus(), 0);
 }

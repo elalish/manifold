@@ -481,7 +481,10 @@ void CreateProperties(Manifold::Impl &outR, const VecDH<TriRef> &refPQ,
                           inP.halfedge_.cptrD(), inQ.halfedge_.cptrD(),
                           outR.halfedge_.cptrD(), outR.precision_}));
 
-  std::map<std::tuple<int, int, int, int>, int> propIdx;
+  using Entry = std::pair<glm::ivec3, int>;
+  int idMissProp = outR.NumVert();
+  std::vector<std::vector<Entry>> propIdx(outR.NumVert() + 1);
+  outR.meshRelation_.properties.reserve(outR.NumVert() * numProp);
   int idx = 0;
 
   for (int tri = 0; tri < numTri; ++tri) {
@@ -490,47 +493,61 @@ void CreateProperties(Manifold::Impl &outR, const VecDH<TriRef> &refPQ,
 
     const int triPQ = refPQ[tri].tri;
     const bool PQ = refPQ[tri].meshID == 0;
+    const int oldNumProp = PQ ? numPropP : numPropQ;
     const auto &properties =
         PQ ? inP.meshRelation_.properties : inQ.meshRelation_.properties;
-    const auto &triProp = PQ ? inP.meshRelation_.triProperties[triPQ]
-                             : inQ.meshRelation_.triProperties[triPQ];
+    const glm::ivec3 &triProp = oldNumProp == 0 ? glm::ivec3(-1)
+                                : PQ ? inP.meshRelation_.triProperties[triPQ]
+                                     : inQ.meshRelation_.triProperties[triPQ];
 
     for (const int i : {0, 1, 2}) {
       const int vert = outR.halfedge_[3 * tri + i].startVert;
-      const glm::vec3 uvw = bary[3 * tri + i];
+      const glm::vec3 &uvw = bary[3 * tri + i];
 
-      auto key = std::make_tuple(PQ, vert, -1, -1);
-      int edge = -1;
-      for (const int j : {0, 1, 2}) {
-        if (uvw[j] == 1) {
-          // On a retained vert, the propVert must also match
-          std::get<2>(key) = triProp[j];
-          edge = -1;
+      glm::ivec4 key(PQ, idMissProp, -1, -1);
+      if (oldNumProp > 0) {
+        key[1] = vert;
+        int edge = -1;
+        for (const int j : {0, 1, 2}) {
+          if (uvw[j] == 1) {
+            // On a retained vert, the propVert must also match
+            key[2] = triProp[j];
+            edge = -1;
+            break;
+          }
+          if (uvw[j] == 0) edge = j;
+        }
+        if (edge >= 0) {
+          // On an edge, both propVerts must match
+          const int p0 = triProp[Next3(edge)];
+          const int p1 = triProp[Prev3(edge)];
+          key[2] = glm::min(p0, p1);
+          key[3] = glm::max(p0, p1);
+        }
+      }
+
+      auto &bin = propIdx[key.y];
+      bool bFound = false;
+      for (int k = 0; k < bin.size(); ++k) {
+        if (bin[k].first == glm::ivec3(key.x, key.z, key.w)) {
+          bFound = true;
+          outR.meshRelation_.triProperties[tri][i] = bin[k].second;
           break;
         }
-        if (uvw[j] == 0) edge = j;
       }
-      if (edge >= 0) {
-        // On an edge, both propVerts must match
-        const int p0 = triProp[Next3(edge)];
-        const int p1 = triProp[Prev3(edge)];
-        std::get<2>(key) = glm::min(p0, p1);
-        std::get<3>(key) = glm::max(p0, p1);
-      }
-
-      const auto it = propIdx.find(key);
-      if (it != propIdx.end()) {
-        outR.meshRelation_.triProperties[tri][i] = it->second;
-        continue;
-      }
-      outR.meshRelation_.triProperties[tri][i] = idx;
-      propIdx.insert({key, idx++});
+      if (bFound) continue;
+      bin.push_back(std::make_pair(glm::ivec3(key.x, key.z, key.w), idx));
+      outR.meshRelation_.triProperties[tri][i] = idx++;
 
       for (int p = 0; p < numProp; ++p) {
-        glm::vec3 oldProps;
-        for (const int j : {0, 1, 2})
-          oldProps[j] = properties[numProp * triProp[j] + p];
-        outR.meshRelation_.properties.push_back(glm::dot(uvw, oldProps));
+        if (p < oldNumProp) {
+          glm::vec3 oldProps;
+          for (const int j : {0, 1, 2})
+            oldProps[j] = properties[oldNumProp * triProp[j] + p];
+          outR.meshRelation_.properties.push_back(glm::dot(uvw, oldProps));
+        } else {
+          outR.meshRelation_.properties.push_back(0);
+        }
       }
     }
   }
@@ -551,12 +568,12 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   const int c2 = op == OpType::Add ? 1 : 0;
   const int c3 = op == OpType::Intersect ? 1 : -1;
 
-  if (w03_.size() == 0) {
-    if (w30_.size() != 0 && op == OpType::Add) {
+  if (inP_.IsEmpty()) {
+    if (!inQ_.IsEmpty() && op == OpType::Add) {
       return inQ_;
     }
     return Manifold::Impl();
-  } else if (w30_.size() == 0) {
+  } else if (inQ_.IsEmpty()) {
     if (op == OpType::Intersect) {
       return Manifold::Impl();
     }

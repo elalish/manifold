@@ -280,11 +280,13 @@ void Manifold::Impl::PairUp(int edge0, int edge1) {
 // (edgeEdge.endVert must == startEdge.endVert), updating each edge to point
 // to vert instead.
 void Manifold::Impl::UpdateVert(int vert, int startEdge, int endEdge) {
-  while (startEdge != endEdge) {
-    halfedge_[startEdge].endVert = vert;
-    startEdge = NextHalfedge(startEdge);
-    halfedge_[startEdge].startVert = vert;
-    startEdge = halfedge_[startEdge].pairedHalfedge;
+  int current = startEdge;
+  while (current != endEdge) {
+    halfedge_[current].endVert = vert;
+    current = NextHalfedge(current);
+    halfedge_[current].startVert = vert;
+    current = halfedge_[current].pairedHalfedge;
+    ASSERT(current != startEdge, logicErr, "infinite loop in decimator!");
   }
 }
 
@@ -325,8 +327,23 @@ void Manifold::Impl::RemoveIfFolded(int edge) {
   const glm::ivec3 tri0edge = TriOf(edge);
   const glm::ivec3 tri1edge = TriOf(halfedge_[edge].pairedHalfedge);
   if (halfedge_[tri0edge[1]].endVert == halfedge_[tri1edge[1]].endVert) {
+    if (halfedge_[tri0edge[1]].pairedHalfedge == tri1edge[2]) {
+      if (halfedge_[tri0edge[2]].pairedHalfedge == tri1edge[1]) {
+        for (int i : {0, 1, 2})
+          vertPos_[halfedge_[tri0edge[i]].startVert] = glm::vec3(NAN);
+      } else {
+        vertPos_[halfedge_[tri0edge[1]].startVert] = glm::vec3(NAN);
+      }
+    } else {
+      if (halfedge_[tri0edge[2]].pairedHalfedge == tri1edge[1]) {
+        vertPos_[halfedge_[tri1edge[1]].startVert] = glm::vec3(NAN);
+      }
+    }
+    PairUp(halfedge_[tri0edge[1]].pairedHalfedge,
+           halfedge_[tri1edge[2]].pairedHalfedge);
+    PairUp(halfedge_[tri0edge[2]].pairedHalfedge,
+           halfedge_[tri1edge[1]].pairedHalfedge);
     for (int i : {0, 1, 2}) {
-      vertPos_[halfedge_[tri0edge[i]].startVert] = glm::vec3(NAN);
       halfedge_[tri0edge[i]] = {-1, -1, -1, -1};
       halfedge_[tri1edge[i]] = {-1, -1, -1, -1};
     }
@@ -545,5 +562,28 @@ void Manifold::Impl::RecursiveEdgeSwap(const int edge) {
   SwapEdge();
   RecursiveEdgeSwap(halfedge_[tri0edge[1]].pairedHalfedge);
   RecursiveEdgeSwap(halfedge_[tri1edge[0]].pairedHalfedge);
+}
+
+void Manifold::Impl::SplitPinchedVerts() {
+  std::vector<bool> vertProcessed(NumVert(), false);
+  std::vector<bool> halfedgeProcessed(halfedge_.size(), false);
+  for (int i = 0; i < halfedge_.size(); ++i) {
+    if (halfedgeProcessed[i]) continue;
+    int vert = halfedge_[i].startVert;
+    if (vertProcessed[vert]) {
+      vertPos_.push_back(vertPos_[vert]);
+      vert = NumVert() - 1;
+    } else {
+      vertProcessed[vert] = true;
+    }
+    int current = i;
+    do {
+      halfedgeProcessed[current] = true;
+      halfedge_[current].startVert = vert;
+      current = halfedge_[current].pairedHalfedge;
+      halfedge_[current].endVert = vert;
+      current = NextHalfedge(current);
+    } while (current != i);
+  }
 }
 }  // namespace manifold

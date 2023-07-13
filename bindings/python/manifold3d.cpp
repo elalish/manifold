@@ -27,16 +27,8 @@ using namespace manifold;
 typedef std::tuple<float, float> Float2;
 typedef std::tuple<float, float, float> Float3;
 
-struct PolygonsWrapper {
-  std::unique_ptr<Polygons> polygons;
-};
-
-PYBIND11_MODULE(pymanifold, m) {
-  m.doc() =
-      "Python binding for the manifold library. Please check the C++ "
-      "documentation for APIs.\n"
-      "This binding will perform copying to make the API more familiar to "
-      "OpenSCAD users.";
+PYBIND11_MODULE(manifold3d, m) {
+  m.doc() = "Python binding for the Manifold library.";
 
   m.def("set_min_circular_angle", Quality::SetMinCircularAngle,
         "Sets an angle constraint the default number of circular segments for "
@@ -44,7 +36,7 @@ PYBIND11_MODULE(pymanifold, m) {
         "and Manifold::Revolve() constructors. The number of segments will be "
         "rounded up to the nearest factor of four."
         "\n\n"
-        "@param angle The minimum angle in degrees between consecutive "
+        ":param angle: The minimum angle in degrees between consecutive "
         "segments. The angle will increase if the the segments hit the minimum "
         "edge length.\n"
         "Default is 10 degrees.");
@@ -55,7 +47,7 @@ PYBIND11_MODULE(pymanifold, m) {
         "and Manifold::Revolve() constructors. The number of segments will be "
         "rounded up to the nearest factor of four."
         "\n\n"
-        "@param length The minimum length of segments. The length will "
+        ":param length: The minimum length of segments. The length will "
         "increase if the the segments hit the minimum angle. Default is 1.0.");
 
   m.def("set_circular_segments", Quality::SetCircularSegments,
@@ -64,15 +56,15 @@ PYBIND11_MODULE(pymanifold, m) {
         "Manifold::Revolve() constructors. Overrides the edge length and angle "
         "constraints and sets the number of segments to exactly this value."
         "\n\n"
-        "@param number Number of circular segments. Default is 0, meaning no "
+        ":param number: Number of circular segments. Default is 0, meaning no "
         "constraint is applied.");
 
-  m.def(
-      "get_circular_segments", Quality::GetCircularSegments,
-      "Determine the result of the SetMinCircularAngle(), "
-      "SetMinCircularEdgeLength(), and SetCircularSegments() defaults."
-      "\n\n"
-      "@param radius For a given radius of circle, determine how many default");
+  m.def("get_circular_segments", Quality::GetCircularSegments,
+        "Determine the result of the SetMinCircularAngle(), "
+        "SetMinCircularEdgeLength(), and SetCircularSegments() defaults."
+        "\n\n"
+        ":param radius: For a given radius of circle, determine how many "
+        "default");
 
   py::class_<Manifold>(m, "Manifold")
       .def(py::init<>())
@@ -95,7 +87,7 @@ PYBIND11_MODULE(pymanifold, m) {
       .def(py::self ^ py::self, "Boolean intersection.")
       .def(
           "transform",
-          [](Manifold self, py::array_t<float> &mat) {
+          [](Manifold &self, py::array_t<float> &mat) {
             auto mat_view = mat.unchecked<2>();
             if (mat_view.shape(0) != 3 || mat_view.shape(1) != 4)
               throw std::runtime_error("Invalid matrix shape");
@@ -116,7 +108,7 @@ PYBIND11_MODULE(pymanifold, m) {
           ":param m: The affine transform matrix to apply to all the vertices.")
       .def(
           "translate",
-          [](Manifold self, float x = 0.0f, float y = 0.0f, float z = 0.0f) {
+          [](Manifold &self, float x = 0.0f, float y = 0.0f, float z = 0.0f) {
             return self.Translate(glm::vec3(x, y, z));
           },
           py::arg("x") = 0.0f, py::arg("y") = 0.0f, py::arg("z") = 0.0f,
@@ -128,7 +120,7 @@ PYBIND11_MODULE(pymanifold, m) {
           ":param z: Z axis translation. (default 0.0).")
       .def(
           "translate",
-          [](Manifold self, py::array_t<float> &t) {
+          [](Manifold &self, py::array_t<float> &t) {
             auto t_view = t.unchecked<1>();
             if (t.shape(0) != 3)
               throw std::runtime_error("Invalid vector shape");
@@ -139,20 +131,20 @@ PYBIND11_MODULE(pymanifold, m) {
           "Transforms are combined and applied lazily."
           "\n\n"
           ":param v: The vector to add to every vertex.")
-      .def("scale",
-           static_cast<Manifold (*)(Manifold, float)>(
-               [](Manifold self, float scale) {
-                 return self.Scale(glm::vec3(scale));
-               }),
-           py::arg("scale"),
-           "Scale this Manifold in space. This operation can be chained. "
-           "Transforms are combined and applied lazily."
-           "\n\n"
-           ":param scale: The scalar multiplier for each component of every "
-           "vertices.")
       .def(
           "scale",
-          [](Manifold self, py::array_t<float> &scale) {
+          [](Manifold &self, float scale) {
+            return self.Scale(glm::vec3(scale));
+          },
+          py::arg("scale"),
+          "Scale this Manifold in space. This operation can be chained. "
+          "Transforms are combined and applied lazily."
+          "\n\n"
+          ":param scale: The scalar multiplier for each component of every "
+          "vertices.")
+      .def(
+          "scale",
+          [](Manifold &self, py::array_t<float> &scale) {
             auto scale_view = scale.unchecked<1>();
             if (scale_view.shape(0) != 3)
               throw std::runtime_error("Invalid vector shape");
@@ -165,8 +157,22 @@ PYBIND11_MODULE(pymanifold, m) {
           "\n\n"
           ":param v: The vector to multiply every vertex by component.")
       .def(
+          "mirror",
+          [](Manifold &self, py::array_t<float> &mirror) {
+            auto v_view = mirror.unchecked<1>();
+            if (v_view.shape(0) != 3)
+              throw std::runtime_error("Invalid vector shape");
+            glm::vec3 v(v_view(0), v_view(1), v_view(2));
+            return self.Mirror(v);
+          },
+          py::arg("v"),
+          "Mirror this Manifold in space. This operation can be chained. "
+          "Transforms are combined and applied lazily."
+          "\n\n"
+          ":param mirror: The vector defining the axis of mirroring.")
+      .def(
           "rotate",
-          [](Manifold self, py::array_t<float> &v) {
+          [](Manifold &self, py::array_t<float> &v) {
             auto v_view = v.unchecked<1>();
             if (v_view.shape(0) != 3)
               throw std::runtime_error("Invalid vector shape");
@@ -184,7 +190,7 @@ PYBIND11_MODULE(pymanifold, m) {
           ":param v: [X, Y, Z] rotation in degrees.")
       .def(
           "rotate",
-          [](Manifold self, float xDegrees = 0.0f, float yDegrees = 0.0f,
+          [](Manifold &self, float xDegrees = 0.0f, float yDegrees = 0.0f,
              float zDegrees = 0.0f) {
             return self.Rotate(xDegrees, yDegrees, zDegrees);
           },
@@ -203,7 +209,7 @@ PYBIND11_MODULE(pymanifold, m) {
           ":param z: Z rotation in degrees. (default 0.0).")
       .def(
           "warp",
-          [](Manifold self, const std::function<Float3(Float3)> &f) {
+          [](Manifold &self, const std::function<Float3(Float3)> &f) {
             return self.Warp([&f](glm::vec3 &v) {
               Float3 fv = f(std::make_tuple(v.x, v.y, v.z));
               v.x = std::get<0>(fv);
@@ -211,9 +217,16 @@ PYBIND11_MODULE(pymanifold, m) {
               v.z = std::get<2>(fv);
             });
           },
-          py::arg("f"))
+          py::arg("f"),
+          "This function does not change the topology, but allows the vertices "
+          "to be moved according to any arbitrary input function. It is easy "
+          "to create a function that warps a geometrically valid object into "
+          "one which overlaps, but that is not checked here, so it is up to "
+          "the user to choose their function with discretion."
+          "\n\n"
+          ":param warpFunc: A function that modifies a given vertex position.")
       .def(
-          "refine", [](Manifold self, int n) { return self.Refine(n); },
+          "refine", [](Manifold &self, int n) { return self.Refine(n); },
           py::arg("n"),
           "Increase the density of the mesh by splitting every edge into n "
           "pieces. For instance, with n = 2, each triangle will be split into "
@@ -254,12 +267,12 @@ PYBIND11_MODULE(pymanifold, m) {
            "first.")
       .def(
           "get_volume",
-          [](Manifold self) { return self.GetProperties().volume; },
+          [](Manifold &self) { return self.GetProperties().volume; },
           "Get the volume of the manifold\n This is clamped to zero for a "
           "given face if they are within the Precision().")
       .def(
           "get_surface_area",
-          [](Manifold self) { return self.GetProperties().surfaceArea; },
+          [](Manifold &self) { return self.GetProperties().surfaceArea; },
           "Get the surface area of the manifold\n This is clamped to zero for "
           "a given face if they are within the Precision().")
       .def("original_id", &Manifold::OriginalID,
@@ -275,8 +288,8 @@ PYBIND11_MODULE(pymanifold, m) {
       .def("is_empty", &Manifold::IsEmpty,
            "Does the Manifold have any triangles?")
       .def(
-          "decompose", [](Manifold self) { return self.Decompose(); },
-          " This operation returns a vector of Manifolds that are "
+          "decompose", [](Manifold &self) { return self.Decompose(); },
+          "This operation returns a vector of Manifolds that are "
           "topologically disconnected. If everything is connected, the vector "
           "is length one, containing a copy of the original. It is the inverse "
           "operation of Compose().")
@@ -286,7 +299,7 @@ PYBIND11_MODULE(pymanifold, m) {
            "is more efficient than doing them separately.")
       .def(
           "split_by_plane",
-          [](Manifold self, Float3 normal, float originOffset) {
+          [](Manifold &self, Float3 normal, float originOffset) {
             return self.SplitByPlane(
                 {std::get<0>(normal), std::get<1>(normal), std::get<2>(normal)},
                 originOffset);
@@ -294,14 +307,14 @@ PYBIND11_MODULE(pymanifold, m) {
           py::arg("normal"), py::arg("origin_offset"),
           "Convenient version of Split() for a half-space."
           "\n\n"
-          "@param normal This vector is normal to the cutting plane and its "
+          ":param normal: This vector is normal to the cutting plane and its "
           "length does not matter. The first result is in the direction of "
           "this vector, the second result is on the opposite side.\n"
-          "@param originOffset The distance of the plane from the origin in "
+          ":param originOffset: The distance of the plane from the origin in "
           "the direction of the normal vector.")
       .def(
           "trim_by_plane",
-          [](Manifold self, Float3 normal, float originOffset) {
+          [](Manifold &self, Float3 normal, float originOffset) {
             return self.TrimByPlane(
                 {std::get<0>(normal), std::get<1>(normal), std::get<2>(normal)},
                 originOffset);
@@ -310,11 +323,21 @@ PYBIND11_MODULE(pymanifold, m) {
           "Identical to SplitByPlane(), but calculating and returning only the "
           "first result."
           "\n\n"
-          "@param normal This vector is normal to the cutting plane and its "
+          ":param normal: This vector is normal to the cutting plane and its "
           "length does not matter. The result is in the direction of this "
           "vector from the plane.\n"
-          "@param originOffset The distance of the plane from the origin in "
+          ":param originOffset: The distance of the plane from the origin in "
           "the direction of the normal vector.")
+      .def_property_readonly(
+          "bounding_box",
+          [](Manifold &self) {
+            auto b = self.BoundingBox();
+            py::tuple box = py::make_tuple(b.min[0], b.min[1], b.min[2],
+                                           b.max[0], b.max[1], b.max[2]);
+            return box;
+          },
+          "Gets the manifold bounding box as a tuple "
+          "(xmin, ymin, zmin, xmax, ymax, zmax).")
       .def_static(
           "smooth", [](const Mesh &mesh) { return Manifold::Smooth(mesh); },
           "Constructs a smooth version of the input mesh by creating tangents; "
@@ -436,111 +459,65 @@ PYBIND11_MODULE(pymanifold, m) {
                   "marking sets of triangles that can be looked up after "
                   "further operations. Assign to MeshGL.runOriginalID vector");
 
-  py::class_<PolygonsWrapper>(m, "Polygons")
-      .def(py::init([](std::vector<std::vector<Float2>> &polygons) {
-             std::vector<SimplePolygon> simplePolygons(polygons.size());
-             for (int i = 0; i < polygons.size(); i++) {
-               std::vector<glm::vec2> vertices(polygons[i].size());
-               for (int j = 0; j < polygons[i].size(); j++) {
-                 vertices[j] = {std::get<0>(polygons[i][j]),
-                                std::get<1>(polygons[i][j])};
-               }
-               simplePolygons[i] = {vertices};
-             }
-             return PolygonsWrapper{std::make_unique<Polygons>(simplePolygons)};
-           }),
-           py::arg("polygons"),
-           "Construct the Polygons object from a list of simple polygon, "
-           "where each simple polygon is a list of points (pair of floats).")
-      .def(
-          "extrude",
-          [](PolygonsWrapper &self, float height, int nDivisions = 0,
-             float twistDegrees = 0.0f,
-             Float2 scaleTop = std::make_tuple(1.0f, 1.0f)) {
-            glm::vec2 scaleTopVec(std::get<0>(scaleTop), std::get<1>(scaleTop));
-            return Manifold::Extrude(*self.polygons, height, nDivisions,
-                                     twistDegrees, scaleTopVec);
-          },
-          py::arg("height"), py::arg("n_divisions") = 0,
-          py::arg("twist_degrees") = 0.0f,
-          py::arg("scale_top") = std::make_tuple(1.0f, 1.0f),
-          "Constructs a manifold from the set of polygons by extruding them "
-          "along the Z-axis.\n"
-          "\n"
-          ":param height: Z-extent of extrusion.\n"
-          ":param nDivisions: Number of extra copies of the crossSection to "
-          "insert into the shape vertically; especially useful in combination "
-          "with twistDegrees to avoid interpolation artifacts. Default is "
-          "none.\n"
-          ":param twistDegrees: Amount to twist the top crossSection relative "
-          "to the bottom, interpolated linearly for the divisions in between.\n"
-          ":param scaleTop: Amount to scale the top (independently in X and "
-          "Y). If the scale is (0, 0), a pure cone is formed with only a "
-          "single vertex at the top. Default (1, 1).")
-      .def(
-          "revolve",
-          [](PolygonsWrapper &self, int circularSegments = 0) {
-            return Manifold::Revolve(*self.polygons, circularSegments);
-          },
-          py::arg("circular_segments") = 0,
-          "Constructs a manifold from the set of polygons by revolving this "
-          "cross-section around its Y-axis and then setting this as the Z-axis "
-          "of the resulting manifold. If the polygons cross the Y-axis, only "
-          "the part on the positive X side is used. Geometrically valid input "
-          "will result in geometrically valid output.\n"
-          "\n"
-          ":param circularSegments: Number of segments along its diameter. "
-          "Default is calculated by the static Defaults.");
-
   py::class_<Mesh>(m, "Mesh")
-      .def(py::init([](py::array_t<float> &vertPos, py::array_t<int> &triVerts,
-                       py::array_t<float> &vertNormal,
-                       py::array_t<float> &halfedgeTangent) {
-             auto vertPos_view = vertPos.unchecked<2>();
-             auto triVerts_view = triVerts.unchecked<2>();
-             auto vertNormal_view = vertNormal.unchecked<2>();
-             auto halfedgeTangent_view = halfedgeTangent.unchecked<2>();
-             if (vertPos_view.shape(1) != 3)
-               throw std::runtime_error("Invalid vert_pos shape");
-             if (triVerts_view.shape(1) != 3)
-               throw std::runtime_error("Invalid tri_verts shape");
-             if (vertNormal_view.shape(0) != 0) {
-               if (vertNormal_view.shape(1) != 3)
-                 throw std::runtime_error("Invalid vert_normal shape");
-               if (vertNormal_view.shape(0) != vertPos_view.shape(0))
-                 throw std::runtime_error(
-                     "vert_normal must have the same length as vert_pos");
-             }
-             if (halfedgeTangent_view.shape(0) != 0) {
-               if (halfedgeTangent_view.shape(1) != 4)
-                 throw std::runtime_error("Invalid halfedge_tangent shape");
-               if (halfedgeTangent_view.shape(0) != triVerts_view.shape(0) * 3)
-                 throw std::runtime_error(
-                     "halfedge_tangent must be three times as long as "
-                     "tri_verts");
-             }
-             std::vector<glm::vec3> vertPos_vec(vertPos_view.shape(0));
-             std::vector<glm::ivec3> triVerts_vec(triVerts_view.shape(0));
-             std::vector<glm::vec3> vertNormal_vec(vertNormal_view.shape(0));
-             std::vector<glm::vec4> halfedgeTangent_vec(
-                 halfedgeTangent_view.shape(0));
-             for (int i = 0; i < vertPos_view.shape(0); i++)
-               for (const int j : {0, 1, 2})
-                 vertPos_vec[i][j] = vertPos_view(i, j);
-             for (int i = 0; i < triVerts_view.shape(0); i++)
-               for (const int j : {0, 1, 2})
-                 triVerts_vec[i][j] = triVerts_view(i, j);
-             for (int i = 0; i < vertNormal_view.shape(0); i++)
-               for (const int j : {0, 1, 2})
-                 vertNormal_vec[i][j] = vertNormal_view(i, j);
-             for (int i = 0; i < halfedgeTangent_view.shape(0); i++)
-               for (const int j : {0, 1, 2, 3})
-                 halfedgeTangent_vec[i][j] = halfedgeTangent_view(i, j);
-             return Mesh({vertPos_vec, triVerts_vec, vertNormal_vec,
-                          halfedgeTangent_vec});
-           }),
-           py::arg("vert_pos"), py::arg("tri_verts"), py::arg("vert_normal"),
-           py::arg("halfedge_tangent"))
+      .def(
+          py::init([](py::array_t<float> &vertPos, py::array_t<int> &triVerts,
+                      std::optional<py::array_t<float>> &vertNormal,
+                      std::optional<py::array_t<float>> &halfedgeTangent) {
+            auto vertPos_view = vertPos.unchecked<2>();
+            auto triVerts_view = triVerts.unchecked<2>();
+            if (vertPos_view.shape(1) != 3)
+              throw std::runtime_error("Invalid vert_pos shape");
+            if (triVerts_view.shape(1) != 3)
+              throw std::runtime_error("Invalid tri_verts shape");
+            std::vector<glm::vec3> vertPos_vec(vertPos_view.shape(0));
+            std::vector<glm::ivec3> triVerts_vec(triVerts_view.shape(0));
+            for (int i = 0; i < vertPos_view.shape(0); i++)
+              for (const int j : {0, 1, 2})
+                vertPos_vec[i][j] = vertPos_view(i, j);
+            for (int i = 0; i < triVerts_view.shape(0); i++)
+              for (const int j : {0, 1, 2})
+                triVerts_vec[i][j] = triVerts_view(i, j);
+
+            // optional arguments
+            if (!vertNormal.has_value() && !halfedgeTangent.has_value()) {
+              return Mesh({vertPos_vec, triVerts_vec});
+            } else {
+              auto vertNormal_view = vertNormal.value().unchecked<2>();
+              auto halfedgeTangent_view =
+                  halfedgeTangent.value().unchecked<2>();
+              if (vertNormal_view.shape(0) != 0) {
+                if (vertNormal_view.shape(1) != 3)
+                  throw std::runtime_error("Invalid vert_normal shape");
+                if (vertNormal_view.shape(0) != vertPos_view.shape(0))
+                  throw std::runtime_error(
+                      "vert_normal must have the same length as vert_pos");
+              }
+              if (halfedgeTangent_view.shape(0) != 0) {
+                if (halfedgeTangent_view.shape(1) != 4)
+                  throw std::runtime_error("Invalid halfedge_tangent shape");
+                if (halfedgeTangent_view.shape(0) != triVerts_view.shape(0) * 3)
+                  throw std::runtime_error(
+                      "halfedge_tangent must be three times as long as "
+                      "tri_verts");
+              }
+              std::vector<glm::vec3> vertNormal_vec(vertNormal_view.shape(0));
+              std::vector<glm::vec4> halfedgeTangent_vec(
+                  halfedgeTangent_view.shape(0));
+              for (int i = 0; i < vertNormal_view.shape(0); i++)
+                for (const int j : {0, 1, 2})
+                  vertNormal_vec[i][j] = vertNormal_view(i, j);
+              for (int i = 0; i < halfedgeTangent_view.shape(0); i++)
+                for (const int j : {0, 1, 2, 3})
+                  halfedgeTangent_vec[i][j] = halfedgeTangent_view(i, j);
+
+              return Mesh({vertPos_vec, triVerts_vec, vertNormal_vec,
+                           halfedgeTangent_vec});
+            }
+          }),
+          py::arg("vert_pos"), py::arg("tri_verts"),
+          py::arg("vert_normal") = py::none(),
+          py::arg("halfedge_tangent") = py::none())
       .def_property_readonly("vert_pos",
                              [](Mesh &self) {
                                const int numVert = self.vertPos.size();
@@ -624,42 +601,94 @@ PYBIND11_MODULE(pymanifold, m) {
       "[Clipper2](http://www.angusj.com/clipper2/Docs/Overview.htm) library "
       "for polygon clipping (boolean) and offsetting operations.")
       .def(py::init<>())
-      .def(py::init(
-               [](PolygonsWrapper &contours, CrossSection::FillRule fillrule) {
-                 return CrossSection(*contours.polygons, fillrule);
-               }),
-           py::arg("contours"),
-           py::arg("fillrule") = CrossSection::FillRule::Positive)
-      .def("area", &CrossSection::Area)
-      .def("num_vert", &CrossSection::NumVert)
-      .def("num_contour", &CrossSection::NumContour)
-      .def("is_empty", &CrossSection::IsEmpty)
-      .def("translate",
-           [](CrossSection self, Float2 v) {
-             return self.Translate({std::get<0>(v), std::get<1>(v)});
-           })
-      .def("rotate", &CrossSection::Rotate)
-      .def("scale",
-           [](CrossSection self, Float2 s) {
-             return self.Scale({std::get<0>(s), std::get<1>(s)});
-           })
-      .def("mirror",
-           [](CrossSection self, Float2 ax) {
-             return self.Mirror({std::get<0>(ax), std::get<1>(ax)});
-           })
-      .def("transform",
-           [](CrossSection self, py::array_t<float> &mat) {
-             auto mat_view = mat.unchecked<2>();
-             if (mat_view.shape(0) != 2 || mat_view.shape(1) != 3)
-               throw std::runtime_error("Invalid matrix shape");
-             glm::mat3x2 mat_glm;
-             for (int i = 0; i < 2; i++) {
-               for (int j = 0; j < 3; j++) {
-                 mat_glm[j][i] = mat_view(i, j);
+      .def(py::init([](std::vector<std::vector<Float2>> &polygons,
+                       CrossSection::FillRule fillrule) {
+             std::vector<SimplePolygon> simplePolygons(polygons.size());
+             for (int i = 0; i < polygons.size(); i++) {
+               simplePolygons[i] = std::vector<glm::vec2>(polygons[i].size());
+               for (int j = 0; j < polygons[i].size(); j++) {
+                 simplePolygons[i][j] = {std::get<0>(polygons[i][j]),
+                                         std::get<1>(polygons[i][j])};
                }
              }
-             return self.Transform(mat_glm);
-           })
+             return CrossSection(simplePolygons, fillrule);
+           }),
+           py::arg("polygons"),
+           py::arg("fillrule") = CrossSection::FillRule::Positive,
+           "Create a 2d cross-section from a set of contours (complex "
+           "polygons). A boolean union operation (with Positive filling rule "
+           "by default) performed to combine overlapping polygons and ensure "
+           "the resulting CrossSection is free of intersections."
+           "\n\n"
+           ":param contours: A set of closed paths describing zero or more "
+           "complex polygons.\n"
+           ":param fillrule: The filling rule used to interpret polygon "
+           "sub-regions in contours.")
+      .def("area", &CrossSection::Area,
+           "Return the total area covered by complex polygons making up the "
+           "CrossSection.")
+      .def("num_vert", &CrossSection::NumVert,
+           "Return the number of vertices in the CrossSection.")
+      .def("num_contour", &CrossSection::NumContour,
+           "Return the number of contours (both outer and inner paths) in the "
+           "CrossSection.")
+      .def("is_empty", &CrossSection::IsEmpty,
+           "Does the CrossSection contain any contours?")
+      .def(
+          "translate",
+          [](CrossSection self, Float2 v) {
+            return self.Translate({std::get<0>(v), std::get<1>(v)});
+          },
+          "Move this CrossSection in space. This operation can be chained. "
+          "Transforms are combined and applied lazily."
+          "\n\n"
+          ":param v: The vector to add to every vertex.")
+      .def("rotate", &CrossSection::Rotate,
+           "Applies a (Z-axis) rotation to the CrossSection, in degrees. This "
+           "operation can be chained. Transforms are combined and applied "
+           "lazily."
+           "\n\n"
+           ":param degrees: degrees about the Z-axis to rotate.")
+      .def(
+          "scale",
+          [](CrossSection self, Float2 s) {
+            return self.Scale({std::get<0>(s), std::get<1>(s)});
+          },
+          "Scale this CrossSection in space. This operation can be chained. "
+          "Transforms are combined and applied lazily."
+          "\n\n"
+          ":param v: The vector to multiply every vertex by per component.")
+      .def(
+          "mirror",
+          [](CrossSection self, Float2 ax) {
+            return self.Mirror({std::get<0>(ax), std::get<1>(ax)});
+          },
+          "Mirror this CrossSection over the arbitrary axis described by the "
+          "unit form of the given vector. If the length of the vector is zero, "
+          "an empty CrossSection is returned. This operation can be chained. "
+          "Transforms are combined and applied lazily."
+          "\n\n"
+          ":param ax: the axis to be mirrored over")
+      .def(
+          "transform",
+          [](CrossSection self, py::array_t<float> &mat) {
+            auto mat_view = mat.unchecked<2>();
+            if (mat_view.shape(0) != 2 || mat_view.shape(1) != 3)
+              throw std::runtime_error("Invalid matrix shape");
+            glm::mat3x2 mat_glm;
+            for (int i = 0; i < 2; i++) {
+              for (int j = 0; j < 3; j++) {
+                mat_glm[j][i] = mat_view(i, j);
+              }
+            }
+            return self.Transform(mat_glm);
+          },
+          "Transform this CrossSection in space. The first two columns form a "
+          "2x2 matrix transform and the last is a translation vector. This "
+          "operation can be chained. Transforms are combined and applied "
+          "lazily."
+          "\n\n"
+          ":param m: The affine transform matrix to apply to all the vertices.")
       .def(
           "warp",
           [](CrossSection self, const std::function<Float2(Float2)> &f) {
@@ -669,20 +698,73 @@ PYBIND11_MODULE(pymanifold, m) {
               v.y = std::get<1>(fv);
             });
           },
-          py::arg("f"))
-      .def("simplify", &CrossSection::Simplify)
+          py::arg("f"),
+          "Move the vertices of this CrossSection (creating a new one) "
+          "according to any arbitrary input function, followed by a union "
+          "operation (with a Positive fill rule) that ensures any introduced "
+          "intersections are not included in the result."
+          "\n\n"
+          ":param warpFunc: A function that modifies a given vertex position.")
+      .def("simplify", &CrossSection::Simplify,
+           "Remove vertices from the contours in this CrossSection that are "
+           "less than the specified distance epsilon from an imaginary line "
+           "that passes through its two adjacent vertices. Near duplicate "
+           "vertices and collinear points will be removed at lower epsilons, "
+           "with elimination of line segments becoming increasingly aggressive "
+           "with larger epsilons."
+           "\n\n"
+           "It is recommended to apply this function following Offset, in "
+           "order to clean up any spurious tiny line segments introduced that "
+           "do not improve quality in any meaningful way. This is particularly "
+           "important if further offseting operations are to be performed, "
+           "which would compound the issue.")
       .def("offset", &CrossSection::Offset, py::arg("delta"),
            py::arg("join_type"), py::arg("miter_limit") = 2.0,
-           py::arg("arc_tolerance") = 0.0)
+           py::arg("arc_tolerance") = 0.0,
+           "Inflate the contours in CrossSection by the specified delta, "
+           "handling corners according to the given JoinType."
+           "\n\n"
+           ":param delta: Positive deltas will cause the expansion of "
+           "outlining contours to expand, and retraction of inner (hole) "
+           "contours. Negative deltas will have the opposite effect.\n"
+           ":param jt: The join type specifying the treatment of contour joins "
+           "(corners).\n"
+           ":param miter_limit: The maximum distance in multiples of delta "
+           "that vertices can be offset from their original positions with "
+           "before squaring is applied, <B>when the join type is Miter</B> "
+           "(default is 2, which is the minimum allowed). See the [Clipper2 "
+           "MiterLimit](http://www.angusj.com/clipper2/Docs/Units/"
+           "Clipper.Offset/Classes/ClipperOffset/Properties/MiterLimit.htm) "
+           "page for a visual example.\n"
+           ":param circularSegments: Number of segments per 360 degrees of "
+           "<B>JoinType::Round</B> corners (roughly, the number of vertices "
+           "that will be added to each contour). Default is calculated by the "
+           "static Quality defaults according to the radius.")
       .def(py::self + py::self, "Boolean union.")
       .def(py::self - py::self, "Boolean difference.")
       .def(py::self ^ py::self, "Boolean intersection.")
-      .def("decompose", &CrossSection::Decompose)
-      .def("to_polygons",
-           [](CrossSection self) {
-             return PolygonsWrapper{
-                 std::make_unique<Polygons>(self.ToPolygons())};
-           })
+      .def("decompose", &CrossSection::Decompose,
+           "This operation returns a vector of CrossSections that are "
+           "topologically disconnected, each containing one outline contour "
+           "with zero or more holes.")
+      .def(
+          "to_polygons",
+          [](CrossSection self) {
+            const Polygons &data = self.ToPolygons();
+            py::list polygon_list;
+            for (int i = 0; i < data.size(); ++i) {
+              py::list polygon;
+              for (int j = 0; j < data[i].size(); ++j) {
+                auto f = data[i][j];
+                py::tuple vertex = py::make_tuple(f[0], f[1]);
+                polygon.append(vertex);
+              }
+              polygon_list.append(polygon);
+            }
+            return polygon_list;
+          },
+          "Returns the vertices of the cross-section's polygons as a "
+          "List[List[Tuple[float, float]]].")
       .def(
           "extrude",
           [](CrossSection self, float height, int nDivisions = 0,
@@ -728,11 +810,24 @@ PYBIND11_MODULE(pymanifold, m) {
             return CrossSection::Square({std::get<0>(dims), std::get<1>(dims)},
                                         center);
           },
-          py::arg("dims"), py::arg("center") = false)
+          py::arg("dims"), py::arg("center") = false,
+          "Constructs a square with the given XY dimensions. By default it is "
+          "positioned in the first quadrant, touching the origin. If any "
+          "dimensions in size are negative, or if all are zero, an empty "
+          "Manifold will be returned."
+          "\n\n"
+          ":param size: The X, and Y dimensions of the square.\n"
+          ":param center: Set to true to shift the center to the origin.")
       .def_static(
           "circle",
           [](float radius, int circularSegments) {
             return CrossSection::Circle(radius, circularSegments);
           },
-          py::arg("radius"), py::arg("circularSegments") = 0);
+          py::arg("radius"), py::arg("circularSegments") = 0,
+          "Constructs a circle of a given radius."
+          "\n\n"
+          ":param radius: Radius of the circle. Must be positive.\n"
+          ":param circularSegments: Number of segments along its diameter. "
+          "Default is calculated by the static Quality defaults according to "
+          "the radius.");
 }

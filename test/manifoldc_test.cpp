@@ -67,7 +67,7 @@ TEST(CBIND, level_set) {
 #ifdef MANIFOLD_EXPORT
   ManifoldExportOptions *options =
       manifold_export_options(malloc(manifold_export_options_size()));
-  const char *name = "cbind_sdf_test.stl";
+  const char *name = "cbind_sdf_test.glb";
   manifold_export_meshgl(name, sdf_mesh, options);
   manifold_delete_export_options(options);
 #endif

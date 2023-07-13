@@ -12,12 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {examples} from './examples.js';
-const exampleFunctions = examples.functionBodies;
+import ManifoldWorker from './worker?worker';
+
+// Loaded globally by examples.js
+const exampleFunctions = self.examples.functionBodies;
 
 if (navigator.serviceWorker) {
   navigator.serviceWorker.register(
-      'service-worker.js', {scope: './index.html'});
+      '/service-worker.js', {scope: './index.html'});
 }
 
 let editor = undefined;
@@ -98,6 +100,10 @@ function createDropdownItem(name) {
   button.onclick = function() {
     saveCurrent();
     switchTo(label.textContent);
+  };
+  // Stop text input spaces from triggering the button
+  button.onkeyup = function(event) {
+    event.preventDefault();
   };
   return button;
 }
@@ -216,36 +222,33 @@ function initializeRun() {
 let tsWorker = undefined;
 
 async function getManifoldDTS() {
-  const global = await fetch('built/manifold-global-types.d.ts')
+  const global = await fetch('/manifold-global-types.d.ts')
                      .then(response => response.text());
 
-  const encapsulated = await fetch('built/manifold-encapsulated-types.d.ts')
+  const encapsulated = await fetch('/manifold-encapsulated-types.d.ts')
                            .then(response => response.text());
 
   return `
 ${global.replaceAll('export', '')}
 ${encapsulated.replace(/^import.*$/gm, '').replaceAll('export', 'declare')}
-declare interface ManifoldStatic {
-  cube: typeof cube;
-  cylinder: typeof cylinder;
-  sphere: typeof sphere;
-  smooth: typeof smooth;
-  tetrahedron: typeof tetrahedron;
-  extrude: typeof extrude;
-  revolve: typeof revolve;
-  union: typeof union;
-  difference: typeof difference;
-  intersection: typeof intersection;
-  compose: typeof compose;
-  levelSet: typeof levelSet;
-  setMinCircularAngle: typeof setMinCircularAngle;
-  setMinCircularEdgeLength: typeof setMinCircularEdgeLength;
-  setCircularSegments: typeof setCircularSegments;
-  getCircularSegments: typeof getCircularSegments;
-  reserveIDs: typeof reserveIDs;
+declare interface ManifoldToplevel {
+  CrossSection: typeof T.CrossSection;
+  Manifold: typeof T.Manifold;
+  Mesh: typeof T.Mesh;
+  triangulate: typeof T.triangulate;
+  setMinCircularAngle: typeof T.setMinCircularAngle;
+  setMinCircularEdgeLength: typeof T.setMinCircularEdgeLength;
+  setCircularSegments: typeof T.setCircularSegments;
+  getCircularSegments: typeof T.getCircularSegments;
+  setup: () => void;
 }
-declare const module: ManifoldStatic;
+declare const module: ManifoldToplevel;
 `;
+}
+
+async function getEditorDTS() {
+  const global = await fetch('/editor.d.ts').then(response => response.text());
+  return `${global.replace(/^import.*$/gm, '')}`;
 }
 
 require.config({
@@ -253,13 +256,10 @@ require.config({
       {vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.34.0/min/vs'}
 });
 require(['vs/editor/editor.main'], async function() {
-  async function addTypes(uri) {
-    const content = await fetch(uri).then(response => response.text());
-    monaco.languages.typescript.typescriptDefaults.addExtraLib(content);
-  }
   monaco.languages.typescript.typescriptDefaults.addExtraLib(
       await getManifoldDTS());
-  await addTypes('editor.d.ts');
+  monaco.languages.typescript.typescriptDefaults.addExtraLib(
+      await getEditorDTS());
   editor = monaco.editor.create(
       document.getElementById('editor'),
       {language: 'typescript', automaticLayout: true});
@@ -351,7 +351,7 @@ let objectURL = null;
 let manifoldWorker = null;
 
 function createWorker() {
-  manifoldWorker = new Worker('worker.js', {type: 'module'});
+  manifoldWorker = new ManifoldWorker();
   manifoldWorker.onmessage = function(e) {
     if (e.data == null) {
       if (tsWorker != null && !manifoldInitialized) {
@@ -369,7 +369,6 @@ function createWorker() {
 
     finishRun();
     runButton.disabled = true;
-    setScript('safe', 'true');
 
     URL.revokeObjectURL(objectURL);
     objectURL = e.data.objectURL;
@@ -377,6 +376,9 @@ function createWorker() {
     if (objectURL == null) {
       mv.showPoster();
       poster.textContent = 'Error';
+      createWorker();
+    } else {
+      setScript('safe', 'true');
     }
   }
 }

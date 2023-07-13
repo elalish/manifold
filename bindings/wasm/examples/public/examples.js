@@ -16,14 +16,16 @@ export const examples = {
   functions: {
     Intro: function() {
       // Write code in JavaScript or TypeScript and this editor will show the
-      // API docs. Type e.g. "box." to see the Manifold API. Type "module." to
-      // see the static API - these functions can also be used bare. Use
-      // console.log() to print output (lower-right). This editor defines Z as
-      // up and units of mm.
-
+      // API docs. Type e.g. "box." to see the Manifold API. Type
+      // "CrossSection." or "Manifold." to list the 2D and 3D constructors,
+      // respectively. Type "module." to see the static API - these functions
+      // can also be used bare. Use console.log() to print output (lower-right).
+      // This editor defines Z as up and units of mm.
+      const {cube, sphere} = Manifold;
       const box = cube([100, 100, 100], true);
       const ball = sphere(60, 100);
-      // You must name your final output "result".
+      // You must name your final output "result", or create at least one
+      // GLTFNode - see Menger Sponge and Gyroid Module examples.
       const result = box.subtract(ball);
 
       // For visual debug, wrap any shape with show() and it and all of its
@@ -38,6 +40,11 @@ export const examples = {
       // See the script drop-down above ("Intro") for usage examples. The
       // gl-matrix package from npm is automatically imported for convenience -
       // its API is available in the top-level glMatrix object.
+
+      // Use GLTFNode for disjoint manifolds rather than compose(), as this will
+      // keep them better organized in the GLB. This will also allow you to
+      // specify material properties, and even vertex colors via
+      // setProperties(). See Tetrahedron Puzzle example.
       return result;
     },
 
@@ -54,20 +61,46 @@ export const examples = {
 
       const scale = edgeLength / (2 * Math.sqrt(2));
 
-      const tet = tetrahedron().scale(scale);
+      const tet = Manifold.tetrahedron().scale(scale);
 
       const box = [];
-      box.push([2, -2], [2, 2]);
+      box.push([1, -1], [1, 1]);
       for (let i = 0; i <= nDivisions; ++i) {
-        box.push([gap / (2 * scale), 2 - i * 4 / nDivisions]);
+        box.push([gap / (4 * scale), 1 - i * 2 / nDivisions]);
       }
 
-      const screw = extrude(box, 2, nDivisions, 270)
-                        .rotate([0, 0, -45])
-                        .translate([0, 0, -1])
-                        .scale(scale);
+      const cyan = [0, 1, 1];
+      const magenta = [1, 0, 1];
+      const fade = (color, pos) => {
+        for (let i = 0; i < 3; ++i) {
+          color[i] = cyan[i] * pos[2] + magenta[i] * (1 - pos[2]);
+        }
+      };
 
-      const result = tet.intersect(screw);
+      // setProperties(3, fade) creates three channels of vertex properties
+      // according to the above fade function. setMaterial assigns these
+      // channels as colors, and sets the factor to white, since our default is
+      // yellow.
+      const screw = setMaterial(
+          Manifold.extrude(box, 1, nDivisions, 270).setProperties(3, fade),
+          {baseColorFactor: [1, 1, 1], attributes: ['COLOR_0']});
+
+      const result = tet.intersect(
+          screw.rotate([0, 0, -45]).translate([0, 0, -0.5]).scale(2 * scale));
+
+      // Assigned materials are only applied to a GLTFNode. Note that material
+      // definitions cascade, applying recursively to all child surfaces, but
+      // overridden by any materials defined lower down. Our default material:
+      // {
+      //   roughness = 0.2,
+      //   metallic = 1,
+      //   baseColorFactor = [1, 1, 0],
+      //   alpha = 1,
+      //   unlit = false,
+      //   name = ''
+      // }
+      const node = new GLTFNode();
+      node.manifold = result;
       return result;
     },
 
@@ -75,6 +108,7 @@ export const examples = {
       // Demonstrates how at 90-degree intersections, the sphere and cylinder
       // facets match up perfectly, for any choice of global resolution
       // parameters.
+      const {sphere, cylinder, union} = Manifold;
 
       function roundedFrame(edgeLength, radius, circularSegments = 0) {
         const edge = cylinder(edgeLength, radius, -1, circularSegments);
@@ -139,7 +173,7 @@ export const examples = {
         v[2] *= r;
       };
 
-      const ball = sphere(1, 200);
+      const ball = Manifold.sphere(1, 200);
       const heart = ball.warp(func);
       const box = heart.boundingBox();
       const result = heart.scale(100 / (box.max[0] - box.min[0]));
@@ -187,7 +221,28 @@ export const examples = {
       const triVerts = Uint32Array.from(triangles);
       const vertProperties = Float32Array.from(positions);
       const scallop = new Mesh({numProp: 3, triVerts, vertProperties});
-      const result = smooth(scallop, sharpenedEdges).refine(n);
+
+      const colorCurvature = (color, pos, oldProp) => {
+        const a = Math.max(0, Math.min(1, oldProp[0] / 3 + 0.5));
+        const b = a * a * (3 - 2 * a);
+        const red = [1, 0, 0];
+        const blue = [0, 0, 1];
+        for (let i = 0; i < 3; ++i) {
+          color[i] = (1 - b) * blue[i] + b * red[i];
+        }
+      };
+      const result = Manifold.smooth(scallop, sharpenedEdges)
+                         .refine(n)
+                         .calculateCurvature(-1, 0)
+                         .setProperties(3, colorCurvature);
+
+      const node = new GLTFNode();
+      node.manifold = result;
+      node.material = {
+        baseColorFactor: [1, 1, 1],
+        metallic: 0,
+        attributes: ['COLOR_0']
+      };
       return result;
     },
 
@@ -227,12 +282,8 @@ export const examples = {
         const m = linearSegments > 2 ? linearSegments :
                                        n * q * majorRadius / threadRadius;
 
-        const circle = [];
-        const dPhi = 2 * 3.14159 / n;
-        const offset = 2;
-        for (let i = 0; i < n; ++i) {
-          circle.push([Math.cos(dPhi * i) + offset, Math.sin(dPhi * i)]);
-        }
+        const offset = 2
+        const circle = CrossSection.circle(1, n).translate([offset, 0]);
 
         const func = (v) => {
           const psi = q * Math.atan2(v[0], v[1]);
@@ -250,14 +301,14 @@ export const examples = {
           vec3.rotateZ(v, v, center, psi);
         };
 
-        let knot = revolve(circle, m).warp(func);
+        let knot = Manifold.revolve(circle, m).warp(func);
 
         if (kLoops > 1) {
           const knots = [];
           for (let k = 0; k < kLoops; ++k) {
             knots.push(knot.rotate([0, 0, 360 * (k / kLoops) * (q / p)]));
           }
-          knot = compose(knots);
+          knot = Manifold.compose(knots);
         }
 
         return knot;
@@ -293,20 +344,35 @@ export const examples = {
       }
 
       function mengerSponge(n) {
-        let result = cube([1, 1, 1], true);
+        let result = Manifold.cube([1, 1, 1], true);
         const holes = [];
         fractal(holes, result, 1.0, [0.0, 0.0], 1, n);
 
-        const hole = compose(holes);
+        const hole = Manifold.compose(holes);
 
-        result = difference(result, hole);
-        result = difference(result, hole.rotate([90, 0, 0]));
-        result = difference(result, hole.rotate([0, 90, 0]));
-
+        result = Manifold.difference(
+            result,
+            hole,
+            hole.rotate([90, 0, 0]),
+            hole.rotate([0, 90, 0]),
+        );
         return result;
       }
 
-      const result = mengerSponge(3).trimByPlane([1, 1, 1], 0).scale(100);
+      const posColors = (newProp, pos) => {
+        for (let i = 0; i < 3; ++i) {
+          newProp[i] = (1 - pos[i]) / 2;
+        }
+      };
+
+      const result = mengerSponge(3)
+                         .trimByPlane([1, 1, 1], 0)
+                         .setProperties(3, posColors)
+                         .scale(100);
+
+      const node = new GLTFNode();
+      node.manifold = result;
+      node.material = {baseColorFactor: [1, 1, 1], attributes: ['COLOR_0']};
       return result;
     },
 
@@ -318,7 +384,7 @@ export const examples = {
       function base(
           width, radius, decorRadius, twistRadius, nDecor, innerRadius,
           outerRadius, cut, nCut, nDivision) {
-        let b = cylinder(width, radius + twistRadius / 2);
+        let b = Manifold.cylinder(width, radius + twistRadius / 2);
         const circle = [];
         const dPhiDeg = 180 / nDivision;
         for (let i = 0; i < 2 * nDivision; ++i) {
@@ -327,7 +393,7 @@ export const examples = {
             decorRadius * Math.sin(dPhiDeg * i * Math.PI / 180)
           ]);
         }
-        let decor = extrude(circle, width, nDivision, 180)
+        let decor = Manifold.extrude(circle, width, nDivision, 180)
                         .scale([1, 0.5, 1])
                         .translate([0, radius, 0]);
         for (let i = 0; i < nDecor; i++)
@@ -345,8 +411,9 @@ export const examples = {
           stretch.push(vec2.rotate([0, 0], p2, o, dPhiRad * i));
           stretch.push(vec2.rotate([0, 0], p0, o, dPhiRad * i));
         }
-        b = intersection(extrude(stretch, width), b);
-        return b;
+        const result =
+            Manifold.intersection(Manifold.extrude(stretch, width), b);
+        return result;
       }
 
       function stretchyBracelet(
@@ -359,7 +426,7 @@ export const examples = {
         const cut = 0.5 * (Math.PI * 2 * innerRadius / nCut - thickness);
         const adjThickness = 0.5 * thickness * height / cut;
 
-        return difference(
+        return Manifold.difference(
             base(
                 width, radius, decorRadius, twistRadius, nDecor,
                 innerRadius + thickness, outerRadius + adjThickness,
@@ -381,8 +448,13 @@ export const examples = {
       // manifolds.
       const {vec3} = glMatrix;
 
+      // number of modules along pyramid edge (use 1 for print orientation)
+      const m = 4;
+      // module size
       const size = 20;
+      // SDF resolution
       const n = 20;
+
       const pi = 3.14159;
 
       function gyroid(p) {
@@ -399,20 +471,41 @@ export const examples = {
           min: vec3.fromValues(-period, -period, -period),
           max: vec3.fromValues(period, period, period)
         };
-        return levelSet(gyroid, box, period / n, level).scale(size / period);
+        return Manifold.levelSet(gyroid, box, period / n, level)
+            .scale(size / period);
       };
 
       function rhombicDodecahedron() {
-        const box = cube([1, 1, 2], true).scale(size * Math.sqrt(2));
+        const box = Manifold.cube([1, 1, 2], true).scale(size * Math.sqrt(2));
         const result =
             box.rotate([90, 45, 0]).intersect(box.rotate([90, 45, 90]));
         return result.intersect(box.rotate([0, 0, 45]));
       }
 
-      let result = rhombicDodecahedron().intersect(gyroidOffset(-0.4));
-      result = result.subtract(gyroidOffset(0.4));
-      result =
-          result.rotate([-45, 0, 90]).translate([0, 0, size / Math.sqrt(2)]);
+      const gyroidModule = rhombicDodecahedron()
+                               .intersect(gyroidOffset(-0.4))
+                               .subtract(gyroidOffset(0.4));
+
+      if (m > 1) {
+        for (let i = 0; i < m; ++i) {
+          for (let j = i; j < m; ++j) {
+            for (let k = j; k < m; ++k) {
+              const node = new GLTFNode();
+              node.manifold = gyroidModule;
+              node.translation =
+                  [(k + i - j) * size, (k - i) * size, (-j) * size];
+              node.material = {
+                baseColorFactor:
+                    [(k + i - j + 1) / m, (k - i + 1) / m, (j + 1) / m]
+              };
+            }
+          }
+        }
+      }
+
+      const result = gyroidModule.rotate([-45, 0, 90]).translate([
+        0, 0, size / Math.sqrt(2)
+      ]);
       return result;
     }
   },
@@ -432,3 +525,7 @@ for (const [func, code] of Object.entries(examples.functions)) {
       func.replace(/([a-z])([A-Z])/g, '$1 $2');  // Add spaces between words
   examples.functionBodies.set(name, body);
 };
+
+if (typeof self !== 'undefined') {
+  self.examples = examples;
+}

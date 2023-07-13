@@ -17,6 +17,8 @@ Module.setup = function() {
   if (_ManifoldInitialized) return;
   _ManifoldInitialized = true;
 
+  // conversion utilities
+
   function toVec(vec, list, f = x => x) {
     if (list) {
       for (let x of list) {
@@ -30,6 +32,21 @@ Module.setup = function() {
     const result = [];
     const size = vec.size();
     for (let i = 0; i < size; i++) result.push(f(vec.get(i)));
+    return result;
+  }
+
+  function vec2polygons(vec, f = x => x) {
+    const result = [];
+    const nPoly = vec.size();
+    for (let i = 0; i < nPoly; i++) {
+      const v = vec.get(i);
+      const nPts = v.size();
+      const poly = [];
+      for (let j = 0; j < nPts; j++) {
+        poly.push(f(v.get(j)));
+      }
+      result.push(poly);
+    }
     return result;
   }
 
@@ -50,7 +67,15 @@ Module.setup = function() {
     polygonsVec.delete();
   }
 
-  function vararg2vec(vec) {
+  function vararg2vec2(vec) {
+    if (vec[0] instanceof Array) return {x: vec[0][0], y: vec[0][1]};
+    if (typeof (vec[0]) == 'number')
+      // default to 0
+      return {x: vec[0] || 0, y: vec[1] || 0};
+    return vec[0];
+  }
+
+  function vararg2vec3(vec) {
     if (vec[0] instanceof Array)
       return {x: vec[0][0], y: vec[0][1], z: vec[0][2]};
     if (typeof (vec[0]) == 'number')
@@ -58,6 +83,118 @@ Module.setup = function() {
       return {x: vec[0] || 0, y: vec[1] || 0, z: vec[2] || 0};
     return vec[0];
   }
+
+  function fillRuleToInt(fillRule) {
+    return fillRule == 'EvenOdd' ? 0 :
+        fillRule == 'NonZero'    ? 1 :
+        fillRule == 'Negative'   ? 3 :
+                                   /* Positive */ 2;
+  }
+
+  function joinTypeToInt(joinType) {
+    return joinType == 'Round' ? 1 : joinType == 'Miter' ? 2 : /* Square */ 0;
+  }
+
+  // CrossSection methods
+
+  const CrossSectionCtor = Module.CrossSection;
+
+  function cross(polygons, fillRule = 'Positive') {
+    if (polygons instanceof CrossSectionCtor) {
+      return polygons;
+    } else {
+      const polygonsVec = polygons2vec(polygons);
+      const cs = new CrossSectionCtor(polygonsVec, fillRuleToInt(fillRule));
+      disposePolygons(polygonsVec);
+      return cs;
+    }
+  };
+
+  Module.CrossSection.prototype.translate = function(...vec) {
+    return this._Translate(vararg2vec2(vec));
+  };
+
+  Module.CrossSection.prototype.scale = function(vec) {
+    // if only one factor provided, scale both x and y with it
+    if (typeof vec == 'number') {
+      return this._Scale({x: vec, y: vec});
+    }
+    return this._Scale(vararg2vec2([vec]));
+  };
+
+  Module.CrossSection.prototype.mirror = function(vec) {
+    return this._Mirror(vararg2vec2([vec]));
+  };
+
+  Module.CrossSection.prototype.warp = function(func) {
+    const wasmFuncPtr = addFunction(function(vec2Ptr) {
+      const x = getValue(vec2Ptr, 'float');
+      const y = getValue(vec2Ptr + 4, 'float');
+      const vert = [x, y];
+      func(vert);
+      setValue(vec2Ptr, vert[0], 'float');
+      setValue(vec2Ptr + 4, vert[1], 'float');
+    }, 'vi');
+    const out = this._Warp(wasmFuncPtr);
+    removeFunction(wasmFuncPtr);
+    return out;
+  };
+
+  Module.CrossSection.prototype.decompose = function() {
+    const vec = this._Decompose();
+    const result = fromVec(vec);
+    vec.delete();
+    return result;
+  };
+
+  Module.CrossSection.prototype.bounds = function() {
+    const result = this._Bounds();
+    return {
+      min: ['x', 'y'].map(f => result.min[f]),
+      max: ['x', 'y'].map(f => result.max[f]),
+    };
+  };
+
+  Module.CrossSection.prototype.offset = function(
+      delta, joinType = 'Square', miterLimit = 2.0, circularSegments = 0) {
+    return this._Offset(
+        delta, joinTypeToInt(joinType), miterLimit, circularSegments);
+  };
+
+  Module.CrossSection.prototype.extrude = function(
+      height, nDivisions = 0, twistDegrees = 0.0, scaleTop = [1.0, 1.0],
+      center = false) {
+    scaleTop = vararg2vec2([scaleTop]);
+    const man =
+        Module._Extrude(this, height, nDivisions, twistDegrees, scaleTop);
+    return (center ? man.translate([0., 0., -height / 2.]) : man);
+  };
+
+  Module.CrossSection.prototype.revolve = function(
+      circularSegments = 0, revolveDegrees = 360.0) {
+    return Module._Revolve(this, circularSegments, revolveDegrees);
+  };
+
+  Module.CrossSection.prototype.add = function(other) {
+    return this._add(cross(other));
+  };
+
+  Module.CrossSection.prototype.subtract = function(other) {
+    return this._subtract(cross(other));
+  };
+
+  Module.CrossSection.prototype.intersect = function(other) {
+    return this._intersect(cross(other));
+  };
+
+  Module.CrossSection.prototype.toPolygons = function() {
+    const vec = this._ToPolygons();
+    const result = vec2polygons(vec);
+    vec.delete();
+    return result;
+  };
+
+  // Manifold methods
 
   Module.Manifold.prototype.warp = function(func) {
     const wasmFuncPtr = addFunction(function(vec3Ptr) {
@@ -72,11 +209,43 @@ Module.setup = function() {
     }, 'vi');
     const out = this._Warp(wasmFuncPtr);
     removeFunction(wasmFuncPtr);
+
+    const status = out.status();
+    if (status.value !== 0) {
+      throw new Module.ManifoldError(status.value);
+    }
+    return out;
+  };
+
+  Module.Manifold.prototype.setProperties = function(numProp, func) {
+    const oldNumProp = this.numProp();
+    const wasmFuncPtr = addFunction(function(newPtr, vec3Ptr, oldPtr) {
+      const newProp = [];
+      for (let i = 0; i < numProp; ++i) {
+        newProp[i] = getValue(newPtr + 4 * i, 'float');
+      }
+      const pos = [];
+      for (let i = 0; i < 3; ++i) {
+        pos[i] = getValue(vec3Ptr + 4 * i, 'float');
+      }
+      const oldProp = [];
+      for (let i = 0; i < oldNumProp; ++i) {
+        oldProp[i] = getValue(oldPtr + 4 * i, 'float');
+      }
+
+      func(newProp, pos, oldProp);
+
+      for (let i = 0; i < numProp; ++i) {
+        setValue(newPtr + 4 * i, newProp[i], 'float');
+      }
+    }, 'viii');
+    const out = this._SetProperties(numProp, wasmFuncPtr);
+    removeFunction(wasmFuncPtr);
     return out;
   };
 
   Module.Manifold.prototype.translate = function(...vec) {
-    return this._Translate(vararg2vec(vec));
+    return this._Translate(vararg2vec3(vec));
   };
 
   Module.Manifold.prototype.rotate = function(vec) {
@@ -84,18 +253,33 @@ Module.setup = function() {
   };
 
   Module.Manifold.prototype.scale = function(vec) {
+    // if only one factor provided, scale all three dimensions (xyz) with it
     if (typeof vec == 'number') {
       return this._Scale({x: vec, y: vec, z: vec});
     }
-    return this._Scale(vararg2vec([vec]));
+    return this._Scale(vararg2vec3([vec]));
   };
 
   Module.Manifold.prototype.mirror = function(vec) {
-    return this._Mirror(vararg2vec([vec]));
+    return this._Mirror(vararg2vec3([vec]));
   };
 
-  Module.Manifold.prototype.trimByPlane = function(normal, offset) {
-    return this._TrimByPlane(vararg2vec([normal]), offset);
+  Module.Manifold.prototype.trimByPlane = function(normal, offset = 0.) {
+    return this._TrimByPlane(vararg2vec3([normal]), offset);
+  };
+
+  Module.Manifold.prototype.split = function(manifold) {
+    const vec = this._split(manifold);
+    const result = fromVec(vec);
+    vec.delete();
+    return result;
+  };
+
+  Module.Manifold.prototype.splitByPlane = function(normal, offset = 0.) {
+    const vec = this._splitByPlane(vararg2vec3([normal]), offset);
+    const result = fromVec(vec);
+    vec.delete();
+    return result;
   };
 
   Module.Manifold.prototype.decompose = function() {
@@ -105,15 +289,12 @@ Module.setup = function() {
     return result;
   };
 
-  Module.Manifold.prototype.getCurvature = function() {
-    const result = this._getCurvature();
-    const oldMeanCurvature = result.vertMeanCurvature;
-    const oldGaussianCurvature = result.vertGaussianCurvature;
-    result.vertMeanCurvature = fromVec(oldMeanCurvature);
-    result.vertGaussianCurvature = fromVec(oldGaussianCurvature);
-    oldMeanCurvature.delete();
-    oldGaussianCurvature.delete();
-    return result;
+  Module.Manifold.prototype.boundingBox = function() {
+    const result = this._boundingBox();
+    return {
+      min: ['x', 'y', 'z'].map(f => result.min[f]),
+      max: ['x', 'y', 'z'].map(f => result.max[f]),
+    };
   };
 
   class Mesh {
@@ -196,14 +377,6 @@ Module.setup = function() {
     return new Mesh(this._GetMeshJS(normalIdx));
   };
 
-  Module.Manifold.prototype.boundingBox = function() {
-    const result = this._boundingBox();
-    return {
-      min: ['x', 'y', 'z'].map(f => result.min[f]),
-      max: ['x', 'y', 'z'].map(f => result.max[f]),
-    };
-  };
-
   Module.ManifoldError = function ManifoldError(code, ...args) {
     let message = 'Unknown error';
     switch (code) {
@@ -252,6 +425,65 @@ Module.setup = function() {
         {value: Module.ManifoldError, writable: true, configurable: true}
   });
 
+  // CrossSection Constructors
+
+  Module.CrossSection = function(polygons, fillRule = 'Positive') {
+    const polygonsVec = polygons2vec(polygons);
+    const cs = new CrossSectionCtor(polygonsVec, fillRuleToInt(fillRule));
+    disposePolygons(polygonsVec);
+    return cs;
+  };
+
+  Module.CrossSection.ofPolygons = function(polygons, fillRule = 'Positive') {
+    return new Module.CrossSection(polygons, fillRule);
+  };
+
+  Module.CrossSection.square = function(...args) {
+    let size = undefined;
+    if (args.length == 0)
+      size = {x: 1, y: 1};
+    else if (typeof args[0] == 'number')
+      size = {x: args[0], y: args[0]};
+    else
+      size = vararg2vec2(args);
+    const center = args[1] || false;
+    return Module._Square(size, center);
+  };
+
+  Module.CrossSection.circle = function(radius, circularSegments = 0) {
+    return Module._Circle(radius, circularSegments);
+  };
+
+  // allows args to be either CrossSection or polygons (constructed with
+  // Positive fill)
+  function crossSectionBatchbool(name) {
+    return function(...args) {
+      if (args.length == 1) args = args[0];
+      const v = new Module.Vector_crossSection();
+      for (const cs of args) v.push_back(cross(cs));
+      const result = Module['_crossSection' + name](v);
+      v.delete();
+      return result;
+    };
+  }
+
+  Module.CrossSection.compose = crossSectionBatchbool('Compose');
+  Module.CrossSection.union = crossSectionBatchbool('UnionN');
+  Module.CrossSection.difference = crossSectionBatchbool('DifferenceN');
+  Module.CrossSection.intersection = crossSectionBatchbool('IntersectionN');
+
+  Module.CrossSection.prototype = Object.create(CrossSectionCtor.prototype);
+
+  // Because the constructor and prototype are being replaced, instanceof will
+  // not work as desired unless we refer back to the original like this
+  Object.defineProperty(Module.CrossSection, Symbol.hasInstance, {
+    get: () => (t) => {
+      return (t instanceof CrossSectionCtor);
+    }
+  });
+
+  // Manifold Constructors
+
   const ManifoldCtor = Module.Manifold;
   Module.Manifold = function(mesh) {
     const manifold = new ManifoldCtor(mesh);
@@ -264,32 +496,38 @@ Module.setup = function() {
     return manifold;
   };
 
-  Module.Manifold.prototype = Object.create(ManifoldCtor.prototype);
+  Module.Manifold.ofMesh = function(mesh) {
+    return new Module.Manifold(mesh);
+  };
 
-  Module.cube = function(...args) {
+  Module.Manifold.tetrahedron = function() {
+    return Module._Tetrahedron();
+  };
+
+  Module.Manifold.cube = function(...args) {
     let size = undefined;
     if (args.length == 0)
       size = {x: 1, y: 1, z: 1};
     else if (typeof args[0] == 'number')
       size = {x: args[0], y: args[0], z: args[0]};
     else
-      size = vararg2vec(args);
+      size = vararg2vec3(args);
     const center = args[1] || false;
     return Module._Cube(size, center);
   };
 
-  Module.cylinder = function(
+  Module.Manifold.cylinder = function(
       height, radiusLow, radiusHigh = -1.0, circularSegments = 0,
       center = false) {
     return Module._Cylinder(
         height, radiusLow, radiusHigh, circularSegments, center);
   };
 
-  Module.sphere = function(radius, circularSegments = 0) {
+  Module.Manifold.sphere = function(radius, circularSegments = 0) {
     return Module._Sphere(radius, circularSegments);
   };
 
-  Module.smooth = function(mesh, sharpenedEdges = []) {
+  Module.Manifold.smooth = function(mesh, sharpenedEdges = []) {
     const sharp = new Module.Vector_smoothness();
     toVec(sharp, sharpenedEdges);
     const result = Module._Smooth(mesh, sharp);
@@ -297,41 +535,51 @@ Module.setup = function() {
     return result;
   };
 
-  Module.extrude = function(
+  Module.Manifold.extrude = function(
       polygons, height, nDivisions = 0, twistDegrees = 0.0,
-      scaleTop = [1.0, 1.0]) {
-    if (scaleTop instanceof Array) scaleTop = {x: scaleTop[0], y: scaleTop[1]};
-    const polygonsVec = polygons2vec(polygons);
-    const result = Module._Extrude(
-        polygonsVec, height, nDivisions, twistDegrees, scaleTop);
-    disposePolygons(polygonsVec);
-    return result;
+      scaleTop = [1.0, 1.0], center = false) {
+    const cs = (polygons instanceof CrossSectionCtor) ?
+        polygons :
+        Module.CrossSection(polygons, 'Positive');
+    return cs.extrude(height, nDivisions, twistDegrees, scaleTop, center);
   };
 
-  Module.triangulate = function(polygons, precision = -1) {
-    const polygonsVec = polygons2vec(polygons);
-    const result = fromVec(
-        Module._Triangulate(polygonsVec, precision), (x) => [x[0], x[1], x[2]]);
-    disposePolygons(polygonsVec);
-    return result;
+  Module.Manifold.revolve = function(
+      polygons, circularSegments = 0, revolveDegrees = 360.0) {
+    const cs = (polygons instanceof CrossSectionCtor) ?
+        polygons :
+        Module.CrossSection(polygons, 'Positive');
+    return cs.revolve(circularSegments, revolveDegrees);
   };
 
-  Module.revolve = function(polygons, circularSegments = 0) {
-    const polygonsVec = polygons2vec(polygons);
-    const result = Module._Revolve(polygonsVec, circularSegments);
-    disposePolygons(polygonsVec);
-    return result;
+  Module.Manifold.reserveIDs = function(n) {
+    return Module._ReserveIDs(n);
   };
 
-  Module.compose = function(manifolds) {
+  Module.Manifold.compose = function(manifolds) {
     const vec = new Module.Vector_manifold();
     toVec(vec, manifolds);
-    const result = Module._Compose(vec);
+    const result = Module._manifoldCompose(vec);
     vec.delete();
     return result;
   };
 
-  Module.levelSet = function(sdf, bounds, edgeLength, level = 0) {
+  function manifoldBatchbool(name) {
+    return function(...args) {
+      if (args.length == 1) args = args[0];
+      const v = new Module.Vector_manifold();
+      for (const m of args) v.push_back(m);
+      const result = Module['_manifold' + name + 'N'](v);
+      v.delete();
+      return result;
+    };
+  }
+
+  Module.Manifold.union = manifoldBatchbool('Union');
+  Module.Manifold.difference = manifoldBatchbool('Difference');
+  Module.Manifold.intersection = manifoldBatchbool('Intersection');
+
+  Module.Manifold.levelSet = function(sdf, bounds, edgeLength, level = 0) {
     const bounds2 = {
       min: {x: bounds.min[0], y: bounds.min[1], z: bounds.min[2]},
       max: {x: bounds.max[0], y: bounds.max[1], z: bounds.max[2]},
@@ -348,18 +596,23 @@ Module.setup = function() {
     return out;
   };
 
-  function batchbool(name) {
-    return function(...args) {
-      if (args.length == 1) args = args[0];
-      const v = new Module.Vector_manifold();
-      for (const m of args) v.push_back(m);
-      const result = Module['_' + name + 'N'](v);
-      v.delete();
-      return result;
-    };
-  }
+  Module.Manifold.prototype = Object.create(ManifoldCtor.prototype);
 
-  Module.union = batchbool('union');
-  Module.difference = batchbool('difference');
-  Module.intersection = batchbool('intersection');
+  // Because the constructor and prototype are being replaced, instanceof will
+  // not work as desired unless we refer back to the original like this
+  Object.defineProperty(Module.Manifold, Symbol.hasInstance, {
+    get: () => (t) => {
+      return (t instanceof ManifoldCtor);
+    }
+  });
+
+  // Top-level functions
+
+  Module.triangulate = function(polygons, precision = -1) {
+    const polygonsVec = polygons2vec(polygons);
+    const result = fromVec(
+        Module._Triangulate(polygonsVec, precision), (x) => [x[0], x[1], x[2]]);
+    disposePolygons(polygonsVec);
+    return result;
+  };
 };

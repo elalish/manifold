@@ -1,6 +1,6 @@
 {
   inputs.flake-utils.url = "github:numtide/flake-utils";
-  inputs.nixpkgs.url = "nixpkgs/nixos-22.05";
+  inputs.nixpkgs.url = "nixpkgs/nixos-unstable";
 
   outputs = { self, nixpkgs, flake-utils }:
     flake-utils.lib.eachDefaultSystem
@@ -25,7 +25,7 @@
                   "manifold-${parallel-backend}";
               version = "beta";
               src = self;
-              nativeBuildInputs = (with pkgs; [ cmake (python39.withPackages(ps: with ps; [trimesh])) ]) ++ build-tools ++
+              nativeBuildInputs = (with pkgs; [ cmake (python39.withPackages (ps: with ps; [ trimesh ])) ]) ++ build-tools ++
                 (if cuda-support then with pkgs.cudaPackages; [ cuda_nvcc cuda_cudart cuda_cccl pkgs.addOpenGLRunpath ] else [ ]);
               cmakeFlags = [
                 "-DMANIFOLD_PYBIND=ON"
@@ -43,7 +43,7 @@
                 mkdir -p $out
                 cp src/manifold/libmanifold.a $out/
                 cp extras/perfTest $out
-                cp bindings/python/pymanifold* $out
+                cp bindings/python/manifold3d* $out
               '';
             };
           parallelBackends = [

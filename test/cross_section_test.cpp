@@ -16,6 +16,8 @@
 
 #include <gtest/gtest.h>
 
+#include <vector>
+
 #include "glm/geometric.hpp"
 #include "manifold.h"
 #include "polygon.h"
@@ -52,7 +54,8 @@ TEST(CrossSection, MirrorUnion) {
 
 TEST(CrossSection, RoundOffset) {
   auto a = CrossSection::Square({20., 20.}, true);
-  auto rounded = a.Offset(5., CrossSection::JoinType::Round);
+  int segments = 20;
+  auto rounded = a.Offset(5., CrossSection::JoinType::Round, 2, segments);
   auto result = Manifold::Extrude(rounded, 5.);
 
 #ifdef MANIFOLD_EXPORT
@@ -61,7 +64,8 @@ TEST(CrossSection, RoundOffset) {
 #endif
 
   EXPECT_EQ(result.Genus(), 0);
-  EXPECT_NEAR(result.GetProperties().volume, 4393, 1);
+  EXPECT_NEAR(result.GetProperties().volume, 4386, 1);
+  EXPECT_EQ(rounded.NumVert(), segments + 4);
 }
 
 TEST(CrossSection, Empty) {
@@ -70,13 +74,17 @@ TEST(CrossSection, Empty) {
   EXPECT_TRUE(e.IsEmpty());
 }
 
-TEST(CrossSection, RectClip) {
-  auto sq = CrossSection::Square({10, 10});
-  auto rect = Rect({0, 0}, {10, 5});
-  auto clipped = sq.RectClip(rect);
+TEST(CrossSection, Rect) {
+  float w = 10;
+  float h = 5;
+  auto rect = Rect({0, 0}, {w, h});
+  auto cross = rect.AsCrossSection();
+  auto area = rect.Area();
 
-  EXPECT_EQ(sq.Area() / 2, clipped.Area());
+  EXPECT_FLOAT_EQ(area, w * h);
+  EXPECT_FLOAT_EQ(area, cross.Area());
   EXPECT_TRUE(rect.Contains({5, 5}));
+  EXPECT_TRUE(rect.Contains(cross.Bounds()));
   EXPECT_TRUE(rect.Contains(Rect()));
   EXPECT_TRUE(rect.DoesOverlap(Rect({5, 5}, {15, 15})));
   EXPECT_TRUE(Rect().IsEmpty());
@@ -138,4 +146,48 @@ TEST(CrossSection, Decompose) {
             Manifold::Extrude(decomp[1], 1.).GetMesh());
   Identical(Manifold::Extrude(ab, 1.).GetMesh(),
             Manifold::Extrude(recomp, 1.).GetMesh());
+}
+
+TEST(CrossSection, FillRule) {
+  SimplePolygon polygon = {
+      {-7, 13},   //
+      {-7, 12},   //
+      {-5, 9},    //
+      {-5, 8.1},  //
+      {-4.8, 8},  //
+  };
+
+  CrossSection positive(polygon);
+  EXPECT_NEAR(positive.Area(), 0.683, 0.001);
+
+  CrossSection negative(polygon, CrossSection::FillRule::Negative);
+  EXPECT_NEAR(negative.Area(), 0.193, 0.001);
+
+  CrossSection evenOdd(polygon, CrossSection::FillRule::EvenOdd);
+  EXPECT_NEAR(evenOdd.Area(), 0.875, 0.001);
+
+  CrossSection nonZero(polygon, CrossSection::FillRule::NonZero);
+  EXPECT_NEAR(nonZero.Area(), 0.875, 0.001);
+}
+
+TEST(CrossSection, Hull) {
+  auto circ = CrossSection::Circle(10, 360);
+  auto circs = std::vector<CrossSection>{circ, circ.Translate({0, 30}),
+                                         circ.Translate({30, 0})};
+  auto circ_tri = CrossSection::Hull(circs);
+  auto centres = SimplePolygon{{0, 0}, {0, 30}, {30, 0}, {15, 5}};
+  auto tri = CrossSection::Hull(centres);
+
+#ifdef MANIFOLD_EXPORT
+  if (options.exportModels) {
+    auto circ_tri_ex = Manifold::Extrude(circ_tri, 10);
+    ExportMesh("cross_section_hull_circ_tri.glb", circ_tri_ex.GetMesh(), {});
+  }
+#endif
+
+  auto circ_area = circ.Area();
+  EXPECT_FLOAT_EQ(circ_area, (circ - circ.Scale({0.8, 0.8})).Hull().Area());
+  EXPECT_FLOAT_EQ(
+      circ_area * 2.5,
+      (CrossSection::BatchBoolean(circs, OpType::Add) - tri).Area());
 }

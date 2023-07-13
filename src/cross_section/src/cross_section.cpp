@@ -132,6 +132,58 @@ void decompose_hole(const C2::PolyTreeD* outline,
   }
 }
 
+bool V2Lesser(glm::vec2 a, glm::vec2 b) {
+  if (a.x == b.x) return a.y < b.y;
+  return a.x < b.x;
+}
+
+double Cross(glm::vec2 a, glm::vec2 b) { return a.x * b.y - a.y * b.x; }
+
+double SquaredDistance(glm::vec2 a, glm::vec2 b) {
+  auto d = a - b;
+  return glm::dot(d, d);
+}
+
+bool IsCw(glm::vec2 a, glm::vec2 b, glm::vec2 c) {
+  double lhs = Cross(a - c, b - c);
+  double rhs = 1e-18 * SquaredDistance(a, c) * SquaredDistance(b, c);
+  return lhs * std::abs(lhs) <= rhs;
+}
+
+void HullBacktrack(const SimplePolygon& pts, const int idx,
+                   std::vector<int>& keep, const int hold) {
+  const int stop = keep.size() - hold;
+  int i = 0;
+  while (i < stop && !IsCw(pts[idx], pts[keep[keep.size() - 1]],
+                           pts[keep[keep.size() - 2]])) {
+    keep.pop_back();
+    i++;
+  }
+}
+
+// Based on method described here:
+// https://www.hackerearth.com/practice/math/geometry/line-sweep-technique/tutorial/
+C2::PathD HullImpl(SimplePolygon& pts) {
+  int len = pts.size();
+  if (len < 3) return C2::PathD();  // not enough points to create a polygon
+  std::sort(pts.begin(), pts.end(), V2Lesser);
+  auto keep = std::vector<int>{0, 1};
+  for (int i = 2; i < len; i++) {
+    HullBacktrack(pts, i, keep, 1);
+    keep.push_back(i);
+  }
+  int nLower = keep.size();
+  for (int i = 0; i < len - 1; i++) {
+    int idx = len - 2 - i;
+    HullBacktrack(pts, idx, keep, nLower);
+    if (idx > 0) keep.push_back(idx);
+  }
+  auto path = C2::PathD(keep.size());
+  for (int i = 0; i < keep.size(); i++) {
+    path[i] = v2_to_pd(pts[keep[i]]);
+  }
+  return path;
+}
 }  // namespace
 
 namespace manifold {
@@ -200,6 +252,20 @@ CrossSection::CrossSection(const Polygons& contours, FillRule fillrule) {
     ps.push_back(pathd_of_contour(ctr));
   }
   paths_ = shared_paths(C2::Union(ps, fr(fillrule), precision_));
+}
+
+/**
+ * Create a 2d cross-section from an axis-aligned rectangle (bounding box).
+ *
+ * @param rect An axis-aligned rectangular bounding box.
+ */
+CrossSection::CrossSection(const Rect& rect) {
+  C2::PathD p(4);
+  p[0] = C2::PointD(rect.min.x, rect.min.y);
+  p[1] = C2::PointD(rect.max.x, rect.min.y);
+  p[2] = C2::PointD(rect.max.x, rect.max.y);
+  p[3] = C2::PointD(rect.min.x, rect.max.y);
+  paths_ = shared_paths(C2::PathsD{p});
 }
 
 // Private
@@ -392,18 +458,6 @@ std::vector<CrossSection> CrossSection::Decompose() const {
 }
 
 /**
- * Compute the intersection between a cross-section and an axis-aligned
- * rectangle. This operation has much higher performance (<B>O(n)</B> vs
- * <B>O(n<SUP>3</SUP>)</B>) than the general purpose intersection algorithm
- * used for sets of cross-sections.
- */
-CrossSection CrossSection::RectClip(const Rect& rect) const {
-  auto r = C2::RectD(rect.min.x, rect.min.y, rect.max.x, rect.max.y);
-  auto ps = C2::ExecuteRectClip(r, GetPaths(), false, precision_);
-  return CrossSection(ps);
-}
-
-/**
  * Move this CrossSection in space. This operation can be chained. Transforms
  * are combined and applied lazily.
  *
@@ -533,18 +587,64 @@ CrossSection CrossSection::Simplify(double epsilon) const {
  * minimum allowed). See the [Clipper2
  * MiterLimit](http://www.angusj.com/clipper2/Docs/Units/Clipper.Offset/Classes/ClipperOffset/Properties/MiterLimit.htm)
  * page for a visual example.
- * @param arc_tolerance The maximum acceptable imperfection for curves drawn
- * (approximated with line segments) for Round joins (not relevant for other
- * JoinTypes). By default (when undefined or =0), the allowable imprecision is
- * scaled in inverse proportion to the offset delta.
+ * @param circularSegments Number of segments per 360 degrees of
+ * <B>JoinType::Round</B> corners (roughly, the number of vertices that
+ * will be added to each contour). Default is calculated by the static Quality
+ * defaults according to the radius.
  */
 CrossSection CrossSection::Offset(double delta, JoinType jointype,
                                   double miter_limit,
-                                  double arc_tolerance) const {
+                                  int circularSegments) const {
+  double arc_tol = 0.;
+  if (jointype == JoinType::Round) {
+    int n = circularSegments > 2 ? circularSegments
+                                 : Quality::GetCircularSegments(delta);
+    // This calculates tolerance as a function of circular segments and delta
+    // (radius) in order to get back the same number of segments in Clipper2:
+    // steps_per_360 = PI / acos(1 - arc_tol / abs_delta)
+    const double abs_delta = std::fabs(delta);
+    const double scaled_delta = abs_delta * std::pow(10, precision_);
+    arc_tol = (std::cos(Clipper2Lib::PI / n) - 1) * -scaled_delta;
+  }
   auto ps =
       C2::InflatePaths(GetPaths(), delta, jt(jointype), C2::EndType::Polygon,
-                       miter_limit, precision_, arc_tolerance);
+                       miter_limit, precision_, arc_tol);
   return CrossSection(ps);
+}
+
+CrossSection CrossSection::Hull(
+    const std::vector<CrossSection>& crossSections) {
+  int n = 0;
+  for (auto cs : crossSections) n += cs.NumVert();
+  SimplePolygon pts;
+  pts.reserve(n);
+  for (auto cs : crossSections) {
+    auto paths = cs.GetPaths();
+    for (auto path : paths) {
+      for (auto p : path) {
+        pts.push_back(v2_of_pd(p));
+      }
+    }
+  }
+  return CrossSection(C2::PathsD{HullImpl(pts)});
+}
+
+CrossSection CrossSection::Hull() const {
+  return Hull(std::vector<CrossSection>{*this});
+}
+
+CrossSection CrossSection::Hull(SimplePolygon pts) {
+  return CrossSection(C2::PathsD{HullImpl(pts)});
+}
+
+CrossSection CrossSection::Hull(const Polygons polys) {
+  SimplePolygon pts;
+  for (auto poly : polys) {
+    for (auto p : poly) {
+      pts.push_back(p);
+    }
+  }
+  return Hull(pts);
 }
 
 /**
@@ -632,6 +732,14 @@ Rect::Rect(const glm::vec2 a, const glm::vec2 b) {
 glm::vec2 Rect::Size() const { return max - min; }
 
 /**
+ * Return the area of the rectangle.
+ */
+float Rect::Area() const {
+  auto sz = Size();
+  return sz.x * sz.y;
+}
+
+/**
  * Returns the absolute-largest coordinate value of any contained
  * point.
  */
@@ -646,7 +754,7 @@ float Rect::Scale() const {
 glm::vec2 Rect::Center() const { return 0.5f * (max + min); }
 
 /**
- * Does this rectangle contain (includes equal) the given point?
+ * Does this rectangle contain (includes on border) the given point?
  */
 bool Rect::Contains(const glm::vec2& p) const {
   return glm::all(glm::greaterThanEqual(p, min)) &&
@@ -755,13 +863,6 @@ Rect Rect::Transform(const glm::mat3x2& m) const {
  * Return a CrossSection with an outline defined by this axis-aligned
  * rectangle.
  */
-CrossSection Rect::AsCrossSection() const {
-  SimplePolygon p(4);
-  p[0] = glm::vec2(min.x, max.y);
-  p[1] = glm::vec2(max.x, max.y);
-  p[2] = glm::vec2(max.x, min.y);
-  p[3] = glm::vec2(min.x, min.y);
-  return CrossSection(p);
-}
+CrossSection Rect::AsCrossSection() const { return CrossSection(*this); }
 
 }  // namespace manifold

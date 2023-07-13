@@ -211,26 +211,23 @@ MeshGL WithIndexColors(const Mesh& in) {
 }
 
 MeshGL WithPositionColors(const Manifold& in) {
-  MeshGL inGL = in.GetMeshGL();
-  inGL.runIndex.clear();
-  inGL.runOriginalID.clear();
-  inGL.runTransform.clear();
-  inGL.faceID.clear();
-  inGL.runOriginalID = {Manifold::ReserveIDs(1)};
-  const int numVert = in.NumVert();
   const Box bbox = in.BoundingBox();
   const glm::vec3 size = bbox.Size();
-  const std::vector<float> oldProp = inGL.vertProperties;
-  inGL.numProp = 6;
-  inGL.vertProperties.resize(6 * numVert);
-  for (int i = 0; i < numVert; ++i) {
-    for (int j : {0, 1, 2}) inGL.vertProperties[6 * i + j] = oldProp[3 * i + j];
-    // vertex colors
-    inGL.vertProperties[6 * i + 3] = (oldProp[3 * i] - bbox.min.x) / size.x;
-    inGL.vertProperties[6 * i + 4] = (oldProp[3 * i + 1] - bbox.min.y) / size.y;
-    inGL.vertProperties[6 * i + 5] = (oldProp[3 * i + 2] - bbox.min.z) / size.z;
-  }
-  return inGL;
+
+  Manifold out = in.SetProperties(
+      3, [bbox, size](float* prop, glm::vec3 pos, const float* oldProp) {
+        for (int i : {0, 1, 2}) {
+          prop[i] = (pos[i] - bbox.min[i]) / size[i];
+        }
+      });
+
+  MeshGL outGL = out.GetMeshGL();
+  outGL.runIndex.clear();
+  outGL.runOriginalID.clear();
+  outGL.runTransform.clear();
+  outGL.faceID.clear();
+  outGL.runOriginalID = {Manifold::ReserveIDs(1)};
+  return outGL;
 }
 
 MeshGL WithNormals(const Manifold& in) {
@@ -250,6 +247,49 @@ MeshGL WithNormals(const Manifold& in) {
     for (int j : {0, 1, 2}) out.triVerts[3 * i + j] = mesh.triVerts[i][j];
   }
   return out;
+}
+
+MeshGL CubeUV() {
+  MeshGL mgl;
+  mgl.numProp = 5;
+  mgl.vertProperties = {0.5,  -0.5, 0.5,  0.5,  0.66,  //
+                        -0.5, -0.5, 0.5,  0.25, 0.66,  //
+                        0.5,  0.5,  0.5,  0.5,  0.33,  //
+                        -0.5, 0.5,  0.5,  0.25, 0.33,  //
+                        -0.5, -0.5, -0.5, 1.0,  0.66,  //
+                        0.5,  -0.5, -0.5, 0.75, 0.66,  //
+                        -0.5, 0.5,  -0.5, 1.0,  0.33,  //
+                        0.5,  0.5,  -0.5, 0.75, 0.33,  //
+                        -0.5, -0.5, -0.5, 0.0,  0.66,  //
+                        -0.5, 0.5,  -0.5, 0.0,  0.33,  //
+                        -0.5, 0.5,  -0.5, 0.25, 0.0,   //
+                        0.5,  0.5,  -0.5, 0.5,  0.0,   //
+                        -0.5, -0.5, -0.5, 0.25, 1.0,   //
+                        0.5,  -0.5, -0.5, 0.5,  1.0};
+  mgl.triVerts = {3, 1, 0, 3, 0, 2, 7,  5,  4, 7,  4, 6, 2, 0, 5,  2, 5,  7,
+                  9, 8, 1, 9, 1, 3, 11, 10, 3, 11, 3, 2, 0, 1, 12, 0, 12, 13};
+  mgl.mergeFromVert = {8, 12, 13, 9, 10, 11};
+  mgl.mergeToVert = {4, 4, 5, 6, 6, 7};
+  mgl.runOriginalID.push_back(Manifold::ReserveIDs(1));
+  return mgl;
+}
+
+float GetMaxProperty(const MeshGL& mesh, int channel) {
+  float max = -std::numeric_limits<float>::infinity();
+  const int numVert = mesh.NumVert();
+  for (int i = 0; i < numVert; ++i) {
+    max = glm::max(max, mesh.vertProperties[i * mesh.numProp + channel]);
+  }
+  return max;
+}
+
+float GetMinProperty(const MeshGL& mesh, int channel) {
+  float min = std::numeric_limits<float>::infinity();
+  const int numVert = mesh.NumVert();
+  for (int i = 0; i < numVert; ++i) {
+    min = glm::min(min, mesh.vertProperties[i * mesh.numProp + channel]);
+  }
+  return min;
 }
 
 void Identical(const Mesh& mesh1, const Mesh& mesh2) {
@@ -329,7 +369,7 @@ void RelatedGL(const Manifold& out, const std::vector<MeshGL>& originals,
           ASSERT_NEAR(glm::length(normal), 1, 0.0001);
           ASSERT_GT(glm::dot(normal, outNormal), 0);
         } else {
-          for (int p = 3; p < output.numProp; ++p) {
+          for (int p = 3; p < inMesh.numProp; ++p) {
             const float propOut =
                 output.vertProperties[vert * output.numProp + p];
 

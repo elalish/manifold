@@ -29,6 +29,8 @@
 namespace {
 using namespace manifold;
 
+constexpr uint64_t kRemove = std::numeric_limits<uint64_t>::max();
+
 __host__ __device__ void AtomicAddVec3(glm::vec3& target,
                                        const glm::vec3& add) {
   for (int i : {0, 1, 2}) {
@@ -488,10 +490,25 @@ Manifold::Impl::Impl(const MeshGL& meshGL,
 Manifold::Impl::Impl(const Mesh& mesh, const MeshRelationD& relation,
                      const std::vector<float>& propertyTolerance,
                      bool hasFaceIDs)
-    : vertPos_(mesh.vertPos),
-      halfedgeTangent_(mesh.halfedgeTangent),
-      meshRelation_(relation) {
-  VecDH<glm::ivec3> triVerts = mesh.triVerts;
+    : vertPos_(mesh.vertPos), halfedgeTangent_(mesh.halfedgeTangent) {
+  meshRelation_ = {relation.originalID, relation.numProp, relation.properties,
+                   relation.meshIDtransform};
+
+  VecDH<glm::ivec3> triVerts;
+  for (int i = 0; i < mesh.triVerts.size(); ++i) {
+    const glm::ivec3 tri = mesh.triVerts[i];
+    // Remove topological degenerates
+    if (tri[0] != tri[1] && tri[1] != tri[2] && tri[2] != tri[0]) {
+      triVerts.push_back(tri);
+      if (relation.triRef.size() > 0) {
+        meshRelation_.triRef.push_back(relation.triRef[i]);
+      }
+      if (relation.triProperties.size() > 0) {
+        meshRelation_.triProperties.push_back(relation.triProperties[i]);
+      }
+    }
+  }
+
   if (!IsIndexInBounds(triVerts)) {
     MarkFailure(Error::VertexOutOfBounds);
     return;
@@ -510,6 +527,9 @@ Manifold::Impl::Impl(const Mesh& mesh, const MeshRelationD& relation,
     MarkFailure(Error::NotManifold);
     return;
   }
+
+  SplitPinchedVerts();
+
   CalculateNormals();
 
   InitializeOriginal();
@@ -661,12 +681,12 @@ void Manifold::Impl::CreateFaces(const std::vector<float>& propertyTolerance) {
  */
 void Manifold::Impl::CreateHalfedges(const VecDH<glm::ivec3>& triVerts) {
   const int numTri = triVerts.size();
-  const int numEdge = 3 * numTri / 2;
+  const int numHalfedge = 3 * numTri;
   // drop the old value first to avoid copy
   halfedge_.resize(0);
-  halfedge_.resize(2 * numEdge);
-  VecDH<uint64_t> edge(2 * numEdge);
-  VecDH<int> ids(2 * numEdge);
+  halfedge_.resize(numHalfedge);
+  VecDH<uint64_t> edge(numHalfedge);
+  VecDH<int> ids(numHalfedge);
   auto policy = autoPolicy(numTri);
   sequence(policy, ids.begin(), ids.end());
   for_each_n(policy, zip(countAt(0), triVerts.begin()), numTri,
@@ -680,8 +700,8 @@ void Manifold::Impl::CreateHalfedges(const VecDH<glm::ivec3>& triVerts) {
   // Once sorted, the first half of the range is the forward halfedges, which
   // correspond to their backward pair at the same offset in the second half
   // of the range.
-  for_each_n(policy, countAt(0), numEdge,
-             LinkHalfedges({halfedge_.ptrD(), ids.ptrD(), numEdge}));
+  for_each_n(policy, countAt(0), numHalfedge / 2,
+             LinkHalfedges({halfedge_.ptrD(), ids.ptrD(), numHalfedge / 2}));
 }
 
 /**
@@ -705,6 +725,22 @@ void Manifold::Impl::MarkFailure(Error status) {
   halfedgeTangent_.resize(0);
   meshRelation_ = MeshRelationD();
   status_ = status;
+}
+
+void Manifold::Impl::Warp(std::function<void(glm::vec3&)> warpFunc) {
+  thrust::for_each_n(thrust::host, vertPos_.begin(), NumVert(), warpFunc);
+  CalculateBBox();
+  if (!IsFinite()) {
+    MarkFailure(Error::NonFiniteVertex);
+    return;
+  }
+  Update();
+  faceNormal_.resize(0);  // force recalculation of triNormal
+  CalculateNormals();
+  SetPrecision();
+  CreateFaces();
+  SimplifyTopology();
+  Finish();
 }
 
 Manifold::Impl Manifold::Impl::Transform(const glm::mat4x3& transform_) const {

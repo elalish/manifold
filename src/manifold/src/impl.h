@@ -37,10 +37,10 @@ struct Manifold::Impl {
     /// The originalID of this Manifold if it is an original; -1 otherwise.
     int originalID = -1;
     int numProp = 0;
-    VecDH<TriRef> triRef;
-    VecDH<glm::ivec3> triProperties;
     VecDH<float> properties;
     std::map<int, Relation> meshIDtransform;
+    VecDH<TriRef> triRef;
+    VecDH<glm::ivec3> triProperties;
   };
 
   Box bBox_;
@@ -75,6 +75,7 @@ struct Manifold::Impl {
 
   void Update();
   void MarkFailure(Error status);
+  void Warp(std::function<void(glm::vec3&)> warpFunc);
   Impl Transform(const glm::mat4x3& transform) const;
   SparseIndices EdgeCollisions(const Impl& B) const;
   SparseIndices VertexCollisionsZ(const VecDH<glm::vec3>& vertsIn) const;
@@ -91,7 +92,7 @@ struct Manifold::Impl {
 
   // properties.cu
   Properties GetProperties() const;
-  Curvature GetCurvature() const;
+  void CalculateCurvature(int gaussianIdx, int meanIdx);
   void CalculateBBox();
   bool IsFinite() const;
   bool IsIndexInBounds(const VecDH<glm::ivec3>& triVerts) const;
@@ -126,6 +127,7 @@ struct Manifold::Impl {
   void UpdateVert(int vert, int startEdge, int endEdge);
   void FormLoop(int current, int end);
   void CollapseTri(const glm::ivec3& triEdge);
+  void SplitPinchedVerts();
 
   // smoothing.cu
   void CreateTangents(const std::vector<Smoothness>&);

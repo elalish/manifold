@@ -77,6 +77,7 @@ class CrossSection {
                FillRule fillrule = FillRule::Positive);
   CrossSection(const Polygons& contours,
                FillRule fillrule = FillRule::Positive);
+  CrossSection(const Rect& rect);
   static CrossSection Square(const glm::vec2 dims, bool center = false);
   static CrossSection Circle(float radius, int circularSegments = 0);
   ///@}
@@ -127,7 +128,7 @@ class CrossSection {
   };
 
   CrossSection Offset(double delta, JoinType jt, double miter_limit = 2.0,
-                      double arc_tolerance = 0.0) const;
+                      int circularSegments = 0) const;
   ///@}
 
   /** @name Boolean
@@ -143,7 +144,6 @@ class CrossSection {
   CrossSection& operator-=(const CrossSection&);
   CrossSection operator^(const CrossSection&) const;
   CrossSection& operator^=(const CrossSection&);
-  CrossSection RectClip(const Rect& rect) const;
   ///@}
 
   /** @name Topological
@@ -153,6 +153,15 @@ class CrossSection {
   std::vector<CrossSection> Decompose() const;
   ///@}
 
+  /** @name Convex Hulling
+   */
+  ///@{
+  CrossSection Hull() const;
+  static CrossSection Hull(const std::vector<CrossSection>& crossSections);
+  static CrossSection Hull(const SimplePolygon poly);
+  static CrossSection Hull(const Polygons polys);
+  ///@}
+  ///
   /** @name Conversion
    */
   ///@{
@@ -197,6 +206,7 @@ class Rect {
    */
   ///@{
   glm::vec2 Size() const;
+  float Area() const;
   float Scale() const;
   glm::vec2 Center() const;
   bool Contains(const glm::vec2& pt) const;

@@ -1,6 +1,5 @@
 #include <conv.h>
 #include <manifold.h>
-#include <meshIO.h>
 #include <sdf.h>
 
 #include <vector>
@@ -40,10 +39,6 @@ ManifoldMesh *to_c(manifold::Mesh *m) {
 
 ManifoldMeshGL *to_c(manifold::MeshGL *m) {
   return reinterpret_cast<ManifoldMeshGL *>(m);
-}
-
-ManifoldCurvature *to_c(manifold::Curvature *m) {
-  return reinterpret_cast<ManifoldCurvature *>(m);
 }
 
 ManifoldOpType to_c(manifold::OpType optype) {
@@ -111,14 +106,6 @@ ManifoldRect *to_c(manifold::Rect *m) {
   return reinterpret_cast<ManifoldRect *>(m);
 }
 
-ManifoldMaterial *to_c(manifold::Material *m) {
-  return reinterpret_cast<ManifoldMaterial *>(m);
-}
-
-ManifoldExportOptions *to_c(manifold::ExportOptions *m) {
-  return reinterpret_cast<ManifoldExportOptions *>(m);
-}
-
 ManifoldVec2 to_c(glm::vec2 v) { return {v.x, v.y}; }
 
 ManifoldVec3 to_c(glm::vec3 v) { return {v.x, v.y, v.z}; }
@@ -159,10 +146,6 @@ const manifold::Mesh *from_c(ManifoldMesh *m) {
 
 const manifold::MeshGL *from_c(ManifoldMeshGL *m) {
   return reinterpret_cast<manifold::MeshGL const *>(m);
-}
-
-const manifold::Curvature *from_c(ManifoldCurvature *c) {
-  return reinterpret_cast<manifold::Curvature const *>(c);
 }
 
 OpType from_c(ManifoldOpType optype) {
@@ -219,14 +202,6 @@ const manifold::Box *from_c(ManifoldBox *m) {
 
 const manifold::Rect *from_c(ManifoldRect *m) {
   return reinterpret_cast<manifold::Rect const *>(m);
-}
-
-manifold::Material *from_c(ManifoldMaterial *mat) {
-  return reinterpret_cast<manifold::Material *>(mat);
-}
-
-manifold::ExportOptions *from_c(ManifoldExportOptions *options) {
-  return reinterpret_cast<manifold::ExportOptions *>(options);
 }
 
 glm::vec2 from_c(ManifoldVec2 v) { return glm::vec2(v.x, v.y); }

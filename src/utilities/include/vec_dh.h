@@ -17,6 +17,7 @@
 #include <cuda.h>
 #endif
 
+// #include "optional_assert.h"
 #include "par.h"
 #include "public.h"
 
@@ -165,8 +166,9 @@ class ManagedVec {
   void shrink_to_fit() {
     T *newBuffer = nullptr;
     if (size_ > 0) {
-      mallocManaged(&newBuffer, size_ * sizeof(T));
-      prefetch(newBuffer, size_ * sizeof(T), onHost);
+      int n_bytes = size_ * sizeof(T);
+      mallocManaged(&newBuffer, n_bytes);
+      prefetch(newBuffer, n_bytes, onHost);
       uninitialized_copy(autoPolicy(size_), ptr_, ptr_ + size_, newBuffer);
     }
     freeManaged(ptr_);
@@ -226,9 +228,19 @@ class ManagedVec {
 
   const T &back() const { return *(ptr_ + size_ - 1); }
 
-  T &operator[](size_t i) { return *(ptr_ + i); }
+  T &operator[](size_t i) {
+    // ASSERT(i < size_, logicErr,
+    //        "Index out of bounds: " + std::to_string(i) +
+    //            ", size: " + std::to_string(size_));
+    return *(ptr_ + i);
+  }
 
-  const T &operator[](size_t i) const { return *(ptr_ + i); }
+  const T &operator[](size_t i) const {
+    // ASSERT(i < size_, logicErr,
+    //        "Index out of bounds: " + std::to_string(i) +
+    //            ", size: " + std::to_string(size_));
+    return *(ptr_ + i);
+  }
 
   bool empty() const { return size_ == 0; }
 

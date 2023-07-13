@@ -141,7 +141,8 @@ class Manifold {
                           int nDivisions = 0, float twistDegrees = 0.0f,
                           glm::vec2 scaleTop = glm::vec2(1.0f));
   static Manifold Revolve(const CrossSection& crossSection,
-                          int circularSegments = 0);
+                          int circularSegments = 0,
+                          float revolveDegrees = 360.0f);
   ///@}
 
   /** @name Topological
@@ -183,7 +184,6 @@ class Manifold {
   float Precision() const;
   int Genus() const;
   Properties GetProperties() const;
-  Curvature GetCurvature() const;
   ///@}
 
   /** @name Mesh ID
@@ -206,6 +206,9 @@ class Manifold {
   Manifold Transform(const glm::mat4x3&) const;
   Manifold Mirror(glm::vec3) const;
   Manifold Warp(std::function<void(glm::vec3&)>) const;
+  Manifold SetProperties(
+      int, std::function<void(float*, glm::vec3, const float*)>) const;
+  Manifold CalculateCurvature(int gaussianIdx, int meanIdx) const;
   Manifold Refine(int) const;
   // Manifold RefineToLength(float);
   // Manifold RefineToPrecision(float);
