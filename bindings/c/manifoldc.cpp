@@ -2,7 +2,6 @@
 #include <cross_section.h>
 #include <manifold.h>
 #include <manifoldc.h>
-#include <meshIO.h>
 #include <public.h>
 #include <sdf.h>
 
@@ -12,9 +11,12 @@
 #include "cross.cpp"
 #include "include/conv.h"
 #include "include/types.h"
-#include "meshio.cpp"
 #include "rect.cpp"
 #include "types.h"
+
+#ifdef MANIFOLD_EXPORT
+#include "meshio.cpp"
+#endif
 
 using namespace manifold;
 
@@ -31,13 +33,14 @@ ManifoldMeshGL *level_set(void *mem, float (*sdf)(float, float, float),
   auto mesh = LevelSet(fun, *from_c(bounds), edge_length, level, pol);
   return to_c(new (mem) MeshGL(mesh));
 }
-ManifoldMeshGL *level_set_user(void *mem, float (*sdf)(float, float, float, void*),
+ManifoldMeshGL *level_set_context(void *mem, float (*sdf_context)(float, float, float, void*),
                           ManifoldBox *bounds, float edge_length, float level,
-                          bool seq, void *userdata) {
-  // typing with std::function rather than auto compiles when CUDA is on,
-  // passing it into GPU (and crashing) is avoided dynamically in `sdf.h`
+                          bool seq, void *ctx) {
+  // Bind function with context argument to one without
+  using namespace std::placeholders;
+  std::function<float(float,float,float)> sdf = std::bind(sdf_context, _1, _2, _3, ctx);
   std::function<float(glm::vec3)> fun = [sdf](glm::vec3 v) {
-    return (sdf(v.x, v.y, v.z, userdata));
+    return (sdf(v.x, v.y, v.z));
   };
   auto pol = seq ? std::make_optional(ExecutionPolicy::Seq) : std::nullopt;
   auto mesh = LevelSet(fun, *from_c(bounds), edge_length, level, pol);
@@ -235,18 +238,25 @@ ManifoldMeshGL *manifold_level_set(void *mem, float (*sdf)(float, float, float),
                                    float level) {
   return level_set(mem, sdf, bounds, edge_length, level, false);
 }
-  
-ManifoldMeshGL *manifold_level_set_user(void *mem, float (*sdf)(float, float, float, void*),
-                                   ManifoldBox *bounds, float edge_length,
-                                   float level, void *userdata) {
-  return level_set_user(mem, sdf, bounds, edge_length, level, false, userdata);
-}
 
 ManifoldMeshGL *manifold_level_set_seq(void *mem,
                                        float (*sdf)(float, float, float),
                                        ManifoldBox *bounds, float edge_length,
                                        float level) {
   return level_set(mem, sdf, bounds, edge_length, level, true);
+}
+
+ManifoldMeshGL *manifold_level_set_context(void *mem, float (*sdf)(float, float, float, void*),
+                                   ManifoldBox *bounds, float edge_length,
+                                   float level, void *ctx) {
+  return level_set_context(mem, sdf, bounds, edge_length, level, false, ctx);
+}
+
+ManifoldMeshGL *manifold_level_set_seq_context(void *mem,
+                                       float (*sdf)(float, float, float, void*),
+                                       ManifoldBox *bounds, float edge_length,
+                                       float level, void *ctx) {
+  return level_set_context(mem, sdf, bounds, edge_length, level, true, ctx);
 }
 
 ManifoldManifold *manifold_refine(void *mem, ManifoldManifold *m, int refine) {
@@ -464,27 +474,26 @@ ManifoldBox *manifold_bounding_box(void *mem, ManifoldManifold *m) {
 }
 
 float manifold_precision(ManifoldManifold *m) { return from_c(m)->Precision(); }
-ManifoldCurvature *manifold_get_curvature(void *mem, ManifoldManifold *m) {
-  auto curv = from_c(m)->GetCurvature();
-  return to_c(new (mem) Curvature(curv));
-}
 
-ManifoldCurvatureBounds manifold_curvature_bounds(ManifoldCurvature *curv) {
-  auto c = *from_c(curv);
-  return {c.maxMeanCurvature, c.minMeanCurvature, c.maxGaussianCurvature,
-          c.minGaussianCurvature};
-}
+uint32_t manifold_reserve_ids(uint32_t n) { return Manifold::ReserveIDs(n); }
 
-size_t manifold_curvature_vert_length(ManifoldCurvature *curv) {
-  return from_c(curv)->vertMeanCurvature.size();
-}
+ManifoldManifold *manifold_set_properties(void *mem, ManifoldManifold *m,
+                                          int num_prop,
+                                          void (*fun)(float *new_prop,
+                                                      ManifoldVec3 position,
+                                                      const float *old_prop)) {
+  std::function<void(float *, glm::vec3, const float *)> f =
+      [fun](float *new_prop, glm::vec3 v, const float *old_prop) {
+        fun(new_prop, to_c(v), old_prop);
+      };
+  auto man = from_c(m)->SetProperties(num_prop, f);
+  return to_c(new (mem) Manifold(man));
+};
 
-float *manifold_curvature_vert_mean(void *mem, ManifoldCurvature *curv) {
-  return copy_data(mem, from_c(curv)->vertMeanCurvature);
-}
-
-float *manifold_curvature_vert_gaussian(void *mem, ManifoldCurvature *curv) {
-  return copy_data(mem, from_c(curv)->vertGaussianCurvature);
+ManifoldManifold *manifold_calculate_curvature(void *mem, ManifoldManifold *m,
+                                               int gaussian_idx, int mean_idx) {
+  auto man = from_c(m)->CalculateCurvature(gaussian_idx, mean_idx);
+  return to_c(new (mem) Manifold(man));
 }
 
 // Static Quality Globals
@@ -518,7 +527,6 @@ size_t manifold_manifold_pair_size() { return sizeof(ManifoldManifoldPair); }
 size_t manifold_meshgl_size() { return sizeof(MeshGL); }
 size_t manifold_box_size() { return sizeof(Box); }
 size_t manifold_rect_size() { return sizeof(Rect); }
-size_t manifold_curvature_size() { return sizeof(Curvature); }
 
 // pointer free + destruction
 void manifold_delete_cross_section(ManifoldCrossSection *c) {
@@ -538,7 +546,6 @@ void manifold_delete_manifold_vec(ManifoldManifoldVec *ms) {
 void manifold_delete_meshgl(ManifoldMeshGL *m) { delete from_c(m); }
 void manifold_delete_box(ManifoldBox *b) { delete from_c(b); }
 void manifold_delete_rect(ManifoldRect *r) { delete from_c(r); }
-void manifold_delete_curvature(ManifoldCurvature *c) { delete from_c(c); }
 
 // destruction
 void manifold_destruct_cross_section(ManifoldCrossSection *cs) {
@@ -558,9 +565,6 @@ void manifold_destruct_manifold_vec(ManifoldManifoldVec *ms) {
 void manifold_destruct_meshgl(ManifoldMeshGL *m) { from_c(m)->~MeshGL(); }
 void manifold_destruct_box(ManifoldBox *b) { from_c(b)->~Box(); }
 void manifold_destruct_rect(ManifoldRect *r) { from_c(r)->~Rect(); }
-void manifold_destruct_curvature(ManifoldCurvature *c) {
-  from_c(c)->~Curvature();
-}
 
 #ifdef __cplusplus
 }
