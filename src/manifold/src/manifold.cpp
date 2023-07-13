@@ -74,15 +74,16 @@ Manifold Halfspace(Box bBox, glm::vec3 normal, float originOffset) {
   return cutter.Rotate(0.0f, yDeg, zDeg);
 }
 
-float DistanceToVector(glm::vec3 pt, glm::vec3 v) {
+double DistanceToVector(const glm::vec3& pt, const glm::vec3& v) {
   return glm::length(pt - v * glm::dot(pt, v));
 }
 
-float DistanceToPlane(glm::vec3 pt, glm::vec4 plane) {
-  return glm::dot(glm::vec3(plane), pt) - plane.w;
+inline double DistanceToPlane(const glm::vec3& pt, const glm::vec4& plane) {
+  return glm::dot({plane.x, plane.y, plane.z}, pt) - plane.w;
 }
 
-glm::vec4 PlaneOfPts(glm::vec3 a, glm::vec3 b, glm::vec3 c) {
+glm::vec4 PlaneOfPts(const glm::vec3& a, const glm::vec3& b,
+                     const glm::vec3& c) {
   auto crx = glm::cross(c - a, b - a);
   auto n = glm::length(crx);
   if (n == 0.) return glm::vec4();
@@ -92,12 +93,12 @@ glm::vec4 PlaneOfPts(glm::vec3 a, glm::vec3 b, glm::vec3 c) {
 // Return a trio of non-collinear indices into pts. If none are found, indices
 // will be -1 (and hulling cannot be performed).
 glm::ivec3 NonCollinearTriple(const std::vector<glm::vec3>& pts,
-                              const float precision) {
+                              const double precision) {
   const int len = pts.size();
   int furthest = 1;
   float dist = glm::distance(pts[0], pts[1]);
   for (int i = 2; i < len; i++) {
-    float d = glm::distance(pts[0], pts[i]);
+    double d = glm::distance(pts[0], pts[i]);
     if (d > dist) {
       furthest = i;
       dist = d;
@@ -106,7 +107,7 @@ glm::ivec3 NonCollinearTriple(const std::vector<glm::vec3>& pts,
   if (dist <= precision) return glm::ivec3(-1);
   const auto n = (pts[0] - pts[furthest]) / dist;
   int third = -1;
-  float offset = dist * precision;
+  double offset = dist * precision;
   for (int i = 1; i < len; i++) {
     auto off = DistanceToVector(pts[i] - pts[0], n);
     if (off > offset) {
@@ -119,9 +120,10 @@ glm::ivec3 NonCollinearTriple(const std::vector<glm::vec3>& pts,
 }
 
 std::pair<int, bool> NonCoplanar(const std::vector<glm::vec3>& pts,
-                                 glm::vec4 plane, const float precision) {
+                                 const glm::vec4& plane,
+                                 const double precision) {
   for (int i = 0; i < pts.size(); i++) {
-    float dist = DistanceToPlane(pts[i], plane);
+    auto dist = DistanceToPlane(pts[i], plane);
     if (std::abs(dist) > precision) return {i, dist > precision};
   }
   return {-1, false};  // All points are coplanar, hull is not a 3d shape
@@ -130,7 +132,6 @@ std::pair<int, bool> NonCoplanar(const std::vector<glm::vec3>& pts,
 struct IVec2Hash {
   std::size_t operator()(const glm::ivec2& v) const {
     return (v.y << 16) ^ v.x;
-    // return (v.x + v.y) * ((v.x + v.y + 1) / 2) + v.y;
   }
 };
 }  // namespace
@@ -838,11 +839,11 @@ Manifold Manifold::TrimByPlane(glm::vec3 normal, float originOffset) const {
 
 ExecutionParams& ManifoldParams() { return params; }
 
-// Manifold Manifold::HullImpl(const MeshGL& mesh, float precision) {
-Manifold Manifold::HullImpl(const std::vector<float>& vertProps,
-                            const int numProp, float precision) {
+Manifold Manifold::Hull(const std::vector<float>& vertProps, const int numProp,
+                        const double precision) {
   const int len = vertProps.size() / numProp;
-  if (len < 4) return Invalid();  // FIXME: as with below, is this possible?
+  // FIXME: Should there be a hull specific error?
+  if (len < 4) return Invalid();
   std::vector<glm::vec3> pts(len);
   for (int i = 0; i < len; i++) {
     const int j = i * numProp;
@@ -851,27 +852,29 @@ Manifold Manifold::HullImpl(const std::vector<float>& vertProps,
   const auto trip = NonCollinearTriple(pts, precision);
   const auto plane = PlaneOfPts(pts[trip.x], pts[trip.y], pts[trip.z]);
   const auto [d, dIsAboveTrip] = NonCoplanar(pts, plane, precision);
-  // FIXME: Should there be a hull specific error? If the inputs are all
-  // manifolds, is this error (all points coplanar) even possible?
-  if (d < 0) return Invalid();
+  if (d < 0) return Invalid();  // All points coplanar.
   const int a = trip.x;
   const int b = dIsAboveTrip ? trip.z : trip.y;
   const int c = dIsAboveTrip ? trip.y : trip.z;
   std::vector<glm::ivec3> triangles;
   std::vector<glm::vec4> planes;
+  std::unordered_set<glm::ivec2, IVec2Hash> halfEdges{};
   std::vector<int> dropped;
-  const auto AddTri = [&pts, &triangles, &planes, &dropped](int a, int b,
-                                                            int c) {
+  std::vector<bool> kept;
+  const auto AddTri = [&pts, &triangles, &planes, &dropped, &kept](int a, int b,
+                                                                   int c) {
     auto tri = glm::ivec3(c, b, a);
     auto plane = PlaneOfPts(pts[a], pts[b], pts[c]);
     if (dropped.size() > 0) {
       const int idx = dropped[dropped.size() - 1];
       triangles[idx] = tri;
       planes[idx] = plane;
+      kept[idx] = true;
       dropped.pop_back();
     } else {
       triangles.push_back(tri);
       planes.push_back(plane);
+      kept.push_back(true);
     }
   };
   AddTri(a, b, c);
@@ -882,16 +885,14 @@ Manifold Manifold::HullImpl(const std::vector<float>& vertProps,
     if (i == a || i == b || i == c || i == d) continue;  // skip starting points
     // collect half edges of triangles that are in conflict with the points at
     // idx, pruning the conflicting triangles and their planes in the process
-    std::unordered_set<glm::ivec2, IVec2Hash> halfEdges{};
     for (int j = 0; j < triangles.size(); j++) {
-      if (dropped.size() > 0 &&
-          std::find(dropped.begin(), dropped.end(), j) != dropped.end())
-        continue;
-      if (DistanceToPlane(pts[i], planes[j]) > precision) {
+      if (kept[j] && DistanceToPlane(pts[i], planes[j]) > precision) {
         halfEdges.insert({triangles[j].x, triangles[j].z});
         halfEdges.insert({triangles[j].z, triangles[j].y});
         halfEdges.insert({triangles[j].y, triangles[j].x});
-        dropped.push_back(j);  // mark triangle/plane as dropped
+        // mark triangle/plane as dropped (slot to be reused)
+        dropped.push_back(j);
+        kept[j] = false;
       }
     }
     // form new triangles with the outer perimeter (horizon) of the set of
@@ -899,15 +900,14 @@ Manifold Manifold::HullImpl(const std::vector<float>& vertProps,
     for (auto e : halfEdges) {
       if (halfEdges.erase({e.y, e.x}) == 0) AddTri(e.x, e.y, i);
     }
+    halfEdges.clear();
   }
   MeshGL mesh;
   mesh.numProp = numProp;
   mesh.vertProperties = vertProps;
   mesh.triVerts.reserve((triangles.size() - dropped.size()) * 3);
   for (int i = 0; i < triangles.size(); i++) {
-    if (dropped.size() > 0 &&
-        std::find(dropped.begin(), dropped.end(), i) != dropped.end())
-      continue;
+    if (!kept[i]) continue;
     mesh.triVerts.push_back(triangles[i].x);
     mesh.triVerts.push_back(triangles[i].y);
     mesh.triVerts.push_back(triangles[i].z);
@@ -917,7 +917,7 @@ Manifold Manifold::HullImpl(const std::vector<float>& vertProps,
 
 Manifold Manifold::Hull() const {
   auto mesh = GetMeshGL();
-  return HullImpl(mesh.vertProperties, mesh.numProp, Precision());
+  return Hull(mesh.vertProperties, mesh.numProp, 1e-4 * Precision());
 }
 
 Manifold Manifold::Hull(const std::vector<glm::vec3>& pts) {
@@ -932,7 +932,6 @@ Manifold Manifold::Hull(const std::vector<glm::vec3>& pts) {
     if (abs.y > scale) scale = abs.y;
     if (abs.z > scale) scale = abs.z;
   }
-
-  return HullImpl(props, 3, kTolerance * scale);
+  return Hull(props, 3, 1e-9 * scale);
 }
 }  // namespace manifold

@@ -252,8 +252,8 @@ class Manifold {
   Manifold(std::shared_ptr<CsgNode> pNode_);
   Manifold(std::shared_ptr<Impl> pImpl_);
   static Manifold Invalid();
-  static Manifold HullImpl(const std::vector<float>& vertProps,
-                           const int numProp, float precision);
+  static Manifold Hull(const std::vector<float>& vertProps, const int numProp,
+                       double precision);
   mutable std::shared_ptr<CsgNode> pNode_;
 
   CsgLeafNode& GetCsgLeafNode() const;
