@@ -715,11 +715,24 @@ TEST(Manifold, PinchedVert) {
 
 TEST(Manifold, Hull) {
 #ifdef MANIFOLD_EXPORT
+  auto sphere = Manifold::Sphere(100, 36);
+  auto spheres = sphere + sphere.Translate({0, 0, 300});
+  auto tictac = spheres.Hull();
+  auto hollow = sphere - sphere.Scale({0.8, 0.8, 0.8});
+  std::vector<glm::vec3> cubePts = {
+      {0, 0, 0},       {1, 0, 0},   {0, 1, 0},      {0, 0, 1},  // corners
+      {1, 1, 0},       {0, 1, 1},   {1, 0, 1},      {1, 1, 1},  // corners
+      {0.5, 0.5, 0.5}, {0.5, 0, 0}, {0.5, 0.7, 0.2}  // internal points
+  };
+  auto cube = Manifold::Hull(cubePts);
+
   if (options.exportModels) {
-    auto spheres =
-        Manifold::Sphere(10) + Manifold::Sphere(10).Translate({0, 0, 30});
-    auto tictac = spheres.Hull();
     ExportMesh("tictac_hull.glb", tictac.GetMesh(), {});
   }
+
+  EXPECT_FLOAT_EQ(hollow.Hull().GetProperties().volume,
+                  sphere.GetProperties().volume);
+  EXPECT_EQ(spheres.NumVert() / 2 + 36, tictac.NumVert());
+  EXPECT_FLOAT_EQ(cube.GetProperties().volume, 1);
 #endif
 }
