@@ -459,109 +459,211 @@ PYBIND11_MODULE(manifold3d, m) {
                   "marking sets of triangles that can be looked up after "
                   "further operations. Assign to MeshGL.runOriginalID vector");
 
-  py::class_<Mesh>(m, "Mesh")
+  py::class_<MeshGL>(m, "Mesh")
       .def(
-          py::init([](py::array_t<float> &vertPos, py::array_t<int> &triVerts,
-                      std::optional<py::array_t<float>> &vertNormal,
-                      std::optional<py::array_t<float>> &halfedgeTangent) {
-            auto vertPos_view = vertPos.unchecked<2>();
+          py::init([](const py::array_t<float> &vertProp,
+                      const py::array_t<int> &triVerts,
+                      const std::optional<py::array_t<uint32_t>> &mergeFromVert,
+                      const std::optional<py::array_t<uint32_t>> &mergeToVert,
+                      const std::optional<py::array_t<uint32_t>> &runIndex,
+                      const std::optional<py::array_t<uint32_t>> &runOriginalID,
+                      const std::optional<py::array_t<float>> &runTransform,
+                      const std::optional<py::array_t<uint32_t>> &faceID,
+                      const std::optional<py::array_t<float>> &halfedgeTangent,
+                      float precision) {
+            MeshGL out;
+
+            auto vertProp_view = vertProp.unchecked<2>();
             auto triVerts_view = triVerts.unchecked<2>();
-            if (vertPos_view.shape(1) != 3)
-              throw std::runtime_error("Invalid vert_pos shape");
+            const uint32_t numProp = vertProp_view.shape(1);
             if (triVerts_view.shape(1) != 3)
               throw std::runtime_error("Invalid tri_verts shape");
-            std::vector<glm::vec3> vertPos_vec(vertPos_view.shape(0));
-            std::vector<glm::ivec3> triVerts_vec(triVerts_view.shape(0));
-            for (int i = 0; i < vertPos_view.shape(0); i++)
-              for (const int j : {0, 1, 2})
-                vertPos_vec[i][j] = vertPos_view(i, j);
+            for (int i = 0; i < vertProp_view.shape(0); i++)
+              for (int j = 0; j < numProp; ++j)
+                out.vertProperties.push_back(vertProp_view(i, j));
             for (int i = 0; i < triVerts_view.shape(0); i++)
               for (const int j : {0, 1, 2})
-                triVerts_vec[i][j] = triVerts_view(i, j);
+                out.triVerts.push_back(triVerts_view(i, j));
 
-            // optional arguments
-            if (!vertNormal.has_value() && !halfedgeTangent.has_value()) {
-              return Mesh({vertPos_vec, triVerts_vec});
-            } else {
-              auto vertNormal_view = vertNormal.value().unchecked<2>();
-              auto halfedgeTangent_view =
-                  halfedgeTangent.value().unchecked<2>();
-              if (vertNormal_view.shape(0) != 0) {
-                if (vertNormal_view.shape(1) != 3)
-                  throw std::runtime_error("Invalid vert_normal shape");
-                if (vertNormal_view.shape(0) != vertPos_view.shape(0))
-                  throw std::runtime_error(
-                      "vert_normal must have the same length as vert_pos");
+            if (mergeFromVert.has_value()) {
+              auto mergeFrom_view = mergeFromVert.value().unchecked<1>();
+              for (int i = 0; i < mergeFrom_view.shape(0); ++i) {
+                out.mergeFromVert.push_back(mergeFrom_view(i));
               }
-              if (halfedgeTangent_view.shape(0) != 0) {
-                if (halfedgeTangent_view.shape(1) != 4)
-                  throw std::runtime_error("Invalid halfedge_tangent shape");
-                if (halfedgeTangent_view.shape(0) != triVerts_view.shape(0) * 3)
-                  throw std::runtime_error(
-                      "halfedge_tangent must be three times as long as "
-                      "tri_verts");
-              }
-              std::vector<glm::vec3> vertNormal_vec(vertNormal_view.shape(0));
-              std::vector<glm::vec4> halfedgeTangent_vec(
-                  halfedgeTangent_view.shape(0));
-              for (int i = 0; i < vertNormal_view.shape(0); i++)
-                for (const int j : {0, 1, 2})
-                  vertNormal_vec[i][j] = vertNormal_view(i, j);
-              for (int i = 0; i < halfedgeTangent_view.shape(0); i++)
-                for (const int j : {0, 1, 2, 3})
-                  halfedgeTangent_vec[i][j] = halfedgeTangent_view(i, j);
-
-              return Mesh({vertPos_vec, triVerts_vec, vertNormal_vec,
-                           halfedgeTangent_vec});
             }
+
+            if (mergeToVert.has_value()) {
+              auto mergeTo_view = mergeToVert.value().unchecked<1>();
+              for (int i = 0; i < mergeTo_view.shape(0); ++i) {
+                out.mergeToVert.push_back(mergeTo_view(i));
+              }
+            }
+
+            if (runIndex.has_value()) {
+              auto runIndex_view = runIndex.value().unchecked<1>();
+              for (int i = 0; i < runIndex_view.shape(0); ++i) {
+                out.runIndex.push_back(runIndex_view(i));
+              }
+            }
+
+            if (runOriginalID.has_value()) {
+              auto runOriginalID_view = runOriginalID.value().unchecked<1>();
+              for (int i = 0; i < runOriginalID_view.shape(0); ++i) {
+                out.runOriginalID.push_back(runOriginalID_view(i));
+              }
+            }
+
+            if (runTransform.has_value()) {
+              auto runTransform_view = runTransform.value().unchecked<3>();
+              if (runTransform_view.shape(1) != 4 ||
+                  runTransform_view.shape(2) != 3)
+                throw std::runtime_error("Invalid run_transform shape");
+              for (int i = 0; i < runTransform_view.shape(0); ++i) {
+                for (const int col : {0, 1, 2, 3}) {
+                  for (const int row : {0, 1, 2}) {
+                    out.runTransform.push_back(runTransform_view(i, col, row));
+                  }
+                }
+              }
+            }
+
+            if (faceID.has_value()) {
+              auto faceID_view = faceID.value().unchecked<1>();
+              for (int i = 0; i < faceID_view.shape(0); ++i) {
+                out.faceID.push_back(faceID_view(i));
+              }
+            }
+
+            if (halfedgeTangent.has_value()) {
+              auto halfedgeTangent_view =
+                  halfedgeTangent.value().unchecked<3>();
+              if (halfedgeTangent_view.shape(1) != 3 ||
+                  halfedgeTangent_view.shape(2) != 4)
+                throw std::runtime_error("Invalid halfedge_tangent shape");
+              for (int i = 0; i < halfedgeTangent_view.shape(0); ++i) {
+                for (const int j : {0, 1, 2}) {
+                  for (const int k : {0, 1, 2, 3}) {
+                    out.halfedgeTangent.push_back(
+                        halfedgeTangent_view(i, j, k));
+                  }
+                }
+              }
+            }
+
+            return out;
           }),
-          py::arg("vert_pos"), py::arg("tri_verts"),
-          py::arg("vert_normal") = py::none(),
-          py::arg("halfedge_tangent") = py::none())
-      .def_property_readonly("vert_pos",
-                             [](Mesh &self) {
-                               const int numVert = self.vertPos.size();
-                               py::array_t<float> vert_pos({numVert, 3});
-                               auto vert_pos_view =
-                                   vert_pos.mutable_unchecked<2>();
-
-                               for (int i = 0; i < numVert; ++i)
-                                 for (const int j : {0, 1, 2})
-                                   vert_pos_view(i, j) = self.vertPos[i][j];
-                               return vert_pos;
-                             })
-      .def_property_readonly("tri_verts",
-                             [](Mesh &self) {
-                               const int numTri = self.triVerts.size();
-                               py::array_t<int> tri_verts({numTri, 3});
-                               auto tri_verts_view =
-                                   tri_verts.mutable_unchecked<2>();
-
-                               for (int i = 0; i < numTri; ++i)
-                                 for (const int j : {0, 1, 2})
-                                   tri_verts_view(i, j) = self.triVerts[i][j];
-                               return tri_verts;
-                             })
+          py::arg("vert_properties"), py::arg("tri_verts"),
+          py::arg("merge_from_vert") = py::none(),
+          py::arg("merge_to_vert") = py::none(),
+          py::arg("run_index") = py::none(),
+          py::arg("run_original_id") = py::none(),
+          py::arg("run_transform") = py::none(),
+          py::arg("face_id") = py::none(),
+          py::arg("halfedge_tangent") = py::none(), py::arg("precision") = 0)
       .def_property_readonly(
-          "vert_normal",
-          [](Mesh &self) {
-            const int numVert = self.vertNormal.size();
-            py::array_t<float> vert_normal({numVert, 3});
-            auto vert_normal_view = vert_normal.mutable_unchecked<2>();
+          "vert_properties",
+          [](const MeshGL &self) {
+            const uint32_t numVert = self.NumVert();
+            py::array_t<float> vert_prop({numVert, self.numProp});
+            auto vert_prop_view = vert_prop.mutable_unchecked<2>();
 
             for (int i = 0; i < numVert; ++i)
-              for (const int j : {0, 1, 2})
-                vert_normal_view(i, j) = self.vertNormal[i][j];
-            return vert_normal;
+              for (int j = 0; j < self.numProp; ++j)
+                vert_prop_view(i, j) =
+                    self.vertProperties[i * self.numProp + j];
+            return vert_prop;
           })
-      .def_property_readonly("halfedge_tangent", [](Mesh &self) {
-        const int numEdge = self.halfedgeTangent.size();
-        py::array_t<float> halfedge_tangent({numEdge, 4});
-        auto halfedge_tangent_view = halfedge_tangent.mutable_unchecked<2>();
+      .def_property_readonly(
+          "tri_verts",
+          [](const MeshGL &self) {
+            const int numTri = self.NumTri();
+            py::array_t<int> tri_verts({numTri, 3});
+            auto tri_verts_view = tri_verts.mutable_unchecked<2>();
 
-        for (int i = 0; i < numEdge; ++i)
-          for (const int j : {0, 1, 2, 3})
-            halfedge_tangent_view(i, j) = self.halfedgeTangent[i][j];
+            for (int i = 0; i < numTri; ++i)
+              for (const int j : {0, 1, 2})
+                tri_verts_view(i, j) = self.triVerts[3 * i + j];
+            return tri_verts;
+          })
+      .def_property_readonly("merge_from_vert",
+                             [](const MeshGL &self) {
+                               const int len = self.mergeFromVert.size();
+                               py::array_t<int> merge_from(len);
+                               auto merge_from_view =
+                                   merge_from.mutable_unchecked<1>();
+
+                               for (int i = 0; i < len; ++i)
+                                 merge_from_view(i) = self.mergeFromVert[i];
+                               return merge_from;
+                             })
+      .def_property_readonly("merge_to_vert",
+                             [](const MeshGL &self) {
+                               const int len = self.mergeToVert.size();
+                               py::array_t<int> merge_to(len);
+                               auto merge_to_view =
+                                   merge_to.mutable_unchecked<1>();
+
+                               for (int i = 0; i < len; ++i)
+                                 merge_to_view(i) = self.mergeToVert[i];
+                               return merge_to;
+                             })
+      .def_property_readonly("run_index",
+                             [](const MeshGL &self) {
+                               const int len = self.runIndex.size();
+                               py::array_t<int> run_index(len);
+                               auto run_index_view =
+                                   run_index.mutable_unchecked<1>();
+
+                               for (int i = 0; i < len; ++i)
+                                 run_index_view(i) = self.runIndex[i];
+                               return run_index;
+                             })
+      .def_property_readonly(
+          "run_original_id",
+          [](const MeshGL &self) {
+            const int len = self.runOriginalID.size();
+            py::array_t<int> run_original_id(len);
+            auto run_original_id_view = run_original_id.mutable_unchecked<1>();
+
+            for (int i = 0; i < len; ++i)
+              run_original_id_view(i) = self.runOriginalID[i];
+            return run_original_id;
+          })
+      .def_property_readonly("run_transform",
+                             [](const MeshGL &self) {
+                               const int numTri = self.NumTri();
+                               py::array_t<float> run_transform({numTri, 4, 3});
+                               auto run_transform_view =
+                                   run_transform.mutable_unchecked<3>();
+
+                               for (int i = 0; i < numTri; ++i)
+                                 for (const int j : {0, 1, 2, 3})
+                                   for (const int k : {0, 1, 2})
+                                     run_transform_view(i, j, k) =
+                                         self.runTransform[12 * i + 3 * j + k];
+                               return run_transform;
+                             })
+      .def_property_readonly("face_id",
+                             [](const MeshGL &self) {
+                               const int len = self.faceID.size();
+                               py::array_t<int> face_id(len);
+                               auto face_id_view =
+                                   face_id.mutable_unchecked<1>();
+
+                               for (int i = 0; i < len; ++i)
+                                 face_id_view(i) = self.faceID[i];
+                               return face_id;
+                             })
+      .def_property_readonly("halfedge_tangent", [](const MeshGL &self) {
+        const int numTri = self.NumTri();
+        py::array_t<float> halfedge_tangent({numTri, 3, 4});
+        auto halfedge_tangent_view = halfedge_tangent.mutable_unchecked<3>();
+
+        for (int i = 0; i < numTri; ++i)
+          for (const int j : {0, 1, 2})
+            for (const int k : {0, 1, 2, 3})
+              halfedge_tangent_view(i, j, k) =
+                  self.halfedgeTangent[12 * i + 4 * j + k];
         return halfedge_tangent;
       });
 
