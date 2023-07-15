@@ -112,10 +112,11 @@ struct SwappableEdge {
 };
 
 struct SortEntry {
-  Halfedge hedge;
+  int start;
+  int end;
   int index;
-  inline bool operator<(const SortEntry& entry) const {
-    return hedge < entry.hedge;
+  inline bool operator<(const SortEntry& other) const {
+    return start == other.start ? end < other.end : start < other.start;
   }
 };
 }  // namespace
@@ -154,14 +155,15 @@ void Manifold::Impl::SimplifyTopology() {
 
   auto policy = autoPolicy(halfedge_.size());
   for_each_n(policy, countAt(0), nbEdges, [=] __host__ __device__(int i) {
-    entriesPtr[i].hedge = halfedge_[i];
+    entriesPtr[i].start = halfedge_[i].startVert;
+    entriesPtr[i].end = halfedge_[i].endVert;
     entriesPtr[i].index = i;
   });
 
   sort(policy, entries.begin(), entries.end());
   for (int i = 0; i < nbEdges - 1; ++i) {
-    if (entries[i].hedge.startVert == entries[i + 1].hedge.startVert &&
-        entries[i].hedge.endVert == entries[i + 1].hedge.endVert) {
+    if (entries[i].start == entries[i + 1].start &&
+        entries[i].end == entries[i + 1].end) {
       DedupeEdge(entries[i].index);
       numFlagged++;
     }
