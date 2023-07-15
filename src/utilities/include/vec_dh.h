@@ -400,15 +400,9 @@ class VecDH {
 
   const T *ptrH() const { return cptrH(); }
 
-  T &operator[](int i) {
-    impl_.prefetch_to(true);
-    return impl_[i];
-  }
+  T &operator[](int i) { return impl_[i]; }
 
-  const T &operator[](int i) const {
-    impl_.prefetch_to(true);
-    return impl_[i];
-  }
+  const T &operator[](int i) const { return impl_[i]; }
 
   T &back() { return impl_.back(); }
 
