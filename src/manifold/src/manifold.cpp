@@ -829,7 +829,7 @@ Manifold Manifold::Hull() const {
 }
 
 Manifold Manifold::Hull(const std::vector<Manifold>& manifolds) {
-  return BatchBoolean(manifolds, OpType::Add).Hull();
+  return Compose(manifolds).Hull();
 }
 
 Manifold Manifold::Hull(const std::vector<glm::vec3>& pts) {
