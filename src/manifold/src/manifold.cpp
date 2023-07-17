@@ -779,11 +779,9 @@ Manifold Manifold::TrimByPlane(glm::vec3 normal, float originOffset) const {
 
 ExecutionParams& ManifoldParams() { return params; }
 
-Manifold Manifold::Hull(const std::vector<glm::vec3>& pts,
-                        const std::vector<float>& props, const int numProp) {
+Manifold Manifold::Hull(const std::vector<glm::vec3>& pts) {
   const int numVert = pts.size();
-  // FIXME: Should there be a hull specific error?
-  if (numVert < 4) return Invalid();
+  if (numVert < 4) return Manifold();
 
   std::vector<quickhull::Vector3<double>> vertices(numVert);
   for (int i = 0; i < numVert; i++) {
@@ -797,11 +795,7 @@ Manifold Manifold::Hull(const std::vector<glm::vec3>& pts,
   const int numTris = triangles.size() / 3;
 
   Mesh mesh;
-  Impl::MeshRelationD relation;
-  relation.numProp = numProp;
-  relation.properties = props;
   mesh.vertPos = pts;
-
   mesh.triVerts.reserve(numTris);
   for (int i = 0; i < numTris; i++) {
     const int j = i * 3;
@@ -810,29 +804,9 @@ Manifold Manifold::Hull(const std::vector<glm::vec3>& pts,
   return Manifold(mesh);
 }
 
-Manifold Manifold::Hull() const {
-  auto mesh = GetMeshGL();
-  const int extraProps = mesh.numProp - 3;
-  const int numVert = mesh.NumVert();
-  std::vector<glm::vec3> pts(numVert);
-  std::vector<float> props;
-  if (extraProps > 0) props.reserve(extraProps * numVert);
-  for (int i = 0; i < mesh.NumVert(); i++) {
-    const int j = i * 3;
-    pts[i] = {mesh.vertProperties[j], mesh.vertProperties[j + 1],
-              mesh.vertProperties[j + 2]};
-    for (int k = 0; k < extraProps; k++) {
-      props.push_back(mesh.vertProperties[j + 3 + k]);
-    }
-  }
-  return Hull(pts, props, extraProps);
-}
+Manifold Manifold::Hull() const { return Hull(GetMesh().vertPos); }
 
 Manifold Manifold::Hull(const std::vector<Manifold>& manifolds) {
   return Compose(manifolds).Hull();
-}
-
-Manifold Manifold::Hull(const std::vector<glm::vec3>& pts) {
-  return Hull(pts, std::vector<float>{}, 0);
 }
 }  // namespace manifold
