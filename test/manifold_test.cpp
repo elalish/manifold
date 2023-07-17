@@ -747,3 +747,15 @@ TEST(Manifold, CubeHull) {
   auto cube = Manifold::Hull(cubePts);
   EXPECT_FLOAT_EQ(cube.GetProperties().volume, 1);
 }
+
+TEST(Manifold, InvalidHull) {
+  const std::vector<glm::vec3> tooFew{{0, 0, 0}, {1, 0, 0}, {0, 1, 0}};
+  const auto tooFewHull = Manifold::Hull(tooFew);
+
+  const std::vector<glm::vec3> coplanar{
+      {0, 0, 0}, {1, 0, 0}, {0, 1, 0}, {1, 1, 0}};
+  const auto coplanarHull = Manifold::Hull(coplanar);
+
+  EXPECT_EQ(tooFewHull.Status(), Manifold::Error::InvalidConstruction);
+  EXPECT_TRUE(coplanarHull.IsEmpty());
+}
