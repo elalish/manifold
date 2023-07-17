@@ -312,8 +312,9 @@ void Manifold::Impl::SortVerts() {
 
   VecDH<int> vertNew2Old(numVert);
   sequence(policy, vertNew2Old.begin(), vertNew2Old.end());
+
   sort_by_key(policy, vertMorton.begin(), vertMorton.end(),
-              zip(vertPos_.begin(), vertNew2Old.begin()));
+              vertNew2Old.begin());
 
   ReindexVerts(vertNew2Old, numVert);
 
@@ -323,10 +324,12 @@ void Manifold::Impl::SortVerts() {
       lower_bound<decltype(vertMorton.begin())>(policy, vertMorton.begin(),
                                                 vertMorton.end(), kNoCode) -
       vertMorton.begin();
-  vertPos_.resize(newNumVert);
+
+  vertNew2Old.resize(newNumVert);
+  Permute(vertPos_, vertNew2Old);
+
   if (vertNormal_.size() == numVert) {
     Permute(vertNormal_, vertNew2Old);
-    vertNormal_.resize(newNumVert);
   }
 }
 
@@ -395,7 +398,7 @@ void Manifold::Impl::SortFaces(VecDH<Box>& faceBox,
   sequence(policy, faceNew2Old.begin(), faceNew2Old.end());
 
   sort_by_key(policy, faceMorton.begin(), faceMorton.end(),
-              zip(faceBox.begin(), faceNew2Old.begin()));
+              faceNew2Old.begin());
 
   // Tris were flagged for removal with pairedHalfedge = -1 and assigned kNoCode
   // to sort them to the end, which allows them to be removed.
@@ -403,10 +406,10 @@ void Manifold::Impl::SortFaces(VecDH<Box>& faceBox,
       find<decltype(faceMorton.begin())>(policy, faceMorton.begin(),
                                          faceMorton.end(), kNoCode) -
       faceMorton.begin();
-  faceBox.resize(newNumTri);
   faceMorton.resize(newNumTri);
   faceNew2Old.resize(newNumTri);
 
+  Permute(faceBox, faceNew2Old);
   GatherFaces(faceNew2Old);
 }
 
