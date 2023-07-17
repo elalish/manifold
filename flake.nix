@@ -16,7 +16,7 @@
             , doCheck ? true
             , build-tools ? [ ]
             , ...
-            }: pkgs.stdenv.mkDerivation {
+            }: pkgs.llvmPackages_15.stdenv.mkDerivation {
               inherit doCheck;
               pname =
                 if cuda-support then
