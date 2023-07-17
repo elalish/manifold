@@ -8,7 +8,6 @@ set(CLIPPER2_USINGZ "OFF" CACHE STRING "Preempt cache default of USINGZ (we only
 add_definitions(-D_HAS_EXCEPTIONS=0) # disable exceptions for STL
 add_subdirectory(clipper2/CPP)
 
-file(GLOB_RECURSE QH_SOURCE_FILES CONFIGURE_DEPENDS quickhull/*.cpp)
-add_library(quickhull ${QH_SOURCE_FILES})
+add_library(quickhull quickhull/QuickHull.cpp)
 target_include_directories(quickhull PUBLIC quickhull)
 target_compile_features(quickhull PUBLIC cxx_std_17)
