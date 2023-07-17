@@ -779,6 +779,13 @@ Manifold Manifold::TrimByPlane(glm::vec3 normal, float originOffset) const {
 
 ExecutionParams& ManifoldParams() { return params; }
 
+/**
+ * Compute the convex hull of a set of points. If the given points are fewer
+ * than 4, or they are all coplanar, an empty Manifold will be returned.
+ *
+ * @param pts A vector of 3-dimensional points over which to compute a convex
+ * hull.
+ */
 Manifold Manifold::Hull(const std::vector<glm::vec3>& pts) {
   const int numVert = pts.size();
   if (numVert < 4) return Manifold();
@@ -804,8 +811,16 @@ Manifold Manifold::Hull(const std::vector<glm::vec3>& pts) {
   return Manifold(mesh);
 }
 
+/**
+ * Compute the convex hull of this manifold.
+ */
 Manifold Manifold::Hull() const { return Hull(GetMesh().vertPos); }
 
+/**
+ * Compute the convex hull enveloping a set of manifolds.
+ *
+ * @param manifolds A vector of manifolds over which to compute a convex hull.
+ */
 Manifold Manifold::Hull(const std::vector<Manifold>& manifolds) {
   return Compose(manifolds).Hull();
 }
