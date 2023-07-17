@@ -713,17 +713,14 @@ TEST(Manifold, PinchedVert) {
   EXPECT_EQ(touch.Genus(), 0);
 }
 
-TEST(Manifold, Hull) {
-  auto sphere = Manifold::Sphere(100, 36);
-  auto spheres = sphere + sphere.Translate({0, 0, 300});
+TEST(Manifold, TictacHull) {
+  const float tictacRad = 100;
+  const float tictacHeight = 500;
+  const int tictacSeg = 1000;
+  const float tictacMid = tictacHeight - 2 * tictacRad;
+  auto sphere = Manifold::Sphere(tictacRad, tictacSeg);
+  auto spheres = sphere + sphere.Translate({0, 0, tictacMid});
   auto tictac = spheres.Hull();
-  auto hollow = sphere - sphere.Scale({0.8, 0.8, 0.8});
-  std::vector<glm::vec3> cubePts = {
-      {0, 0, 0},       {1, 0, 0},   {0, 1, 0},      {0, 0, 1},  // corners
-      {1, 1, 0},       {0, 1, 1},   {1, 0, 1},      {1, 1, 1},  // corners
-      {0.5, 0.5, 0.5}, {0.5, 0, 0}, {0.5, 0.7, 0.2}  // internal points
-  };
-  auto cube = Manifold::Hull(cubePts);
 
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) {
@@ -731,8 +728,22 @@ TEST(Manifold, Hull) {
   }
 #endif
 
-  EXPECT_FLOAT_EQ(hollow.Hull().GetProperties().volume,
-                  sphere.GetProperties().volume);
-  EXPECT_EQ(spheres.NumVert() / 2 + 36, tictac.NumVert());
+  EXPECT_EQ(spheres.NumVert() / 2 + tictacSeg, tictac.NumVert());
+}
+
+TEST(Manifold, HollowHull) {
+  auto sphere = Manifold::Sphere(100, 360);
+  auto hollow = sphere - sphere.Scale({0.8, 0.8, 0.8});
+  const float sphere_vol = sphere.GetProperties().volume;
+  EXPECT_FLOAT_EQ(hollow.Hull().GetProperties().volume, sphere_vol);
+}
+
+TEST(Manifold, CubeHull) {
+  std::vector<glm::vec3> cubePts = {
+      {0, 0, 0},       {1, 0, 0},   {0, 1, 0},      {0, 0, 1},  // corners
+      {1, 1, 0},       {0, 1, 1},   {1, 0, 1},      {1, 1, 1},  // corners
+      {0.5, 0.5, 0.5}, {0.5, 0, 0}, {0.5, 0.7, 0.2}  // internal points
+  };
+  auto cube = Manifold::Hull(cubePts);
   EXPECT_FLOAT_EQ(cube.GetProperties().volume, 1);
 }
