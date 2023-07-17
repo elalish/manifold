@@ -14,10 +14,8 @@
 
 #include <QuickHull.hpp>
 #include <algorithm>
-#include <cstdio>
 #include <map>
 #include <numeric>
-#include <unordered_set>
 
 #include "boolean3.h"
 #include "csg_tree.h"
