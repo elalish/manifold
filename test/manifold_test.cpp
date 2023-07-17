@@ -718,9 +718,10 @@ TEST(Manifold, TictacHull) {
   const float tictacHeight = 500;
   const int tictacSeg = 1000;
   const float tictacMid = tictacHeight - 2 * tictacRad;
-  auto sphere = Manifold::Sphere(tictacRad, tictacSeg);
-  auto spheres = sphere + sphere.Translate({0, 0, tictacMid});
-  auto tictac = spheres.Hull();
+  const auto sphere = Manifold::Sphere(tictacRad, tictacSeg);
+  const std::vector<Manifold> spheres{sphere,
+                                      sphere.Translate({0, 0, tictacMid})};
+  const auto tictac = Manifold::Hull(spheres);
 
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) {
@@ -728,7 +729,7 @@ TEST(Manifold, TictacHull) {
   }
 #endif
 
-  EXPECT_EQ(spheres.NumVert() / 2 + tictacSeg, tictac.NumVert());
+  EXPECT_EQ(sphere.NumVert() + tictacSeg, tictac.NumVert());
 }
 
 TEST(Manifold, HollowHull) {
