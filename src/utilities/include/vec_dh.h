@@ -228,19 +228,9 @@ class ManagedVec {
 
   const T &back() const { return *(ptr_ + size_ - 1); }
 
-  T &operator[](size_t i) {
-    // ASSERT(i < size_, logicErr,
-    //        "Index out of bounds: " + std::to_string(i) +
-    //            ", size: " + std::to_string(size_));
-    return *(ptr_ + i);
-  }
+  T &operator[](size_t i) { return *(ptr_ + i); }
 
-  const T &operator[](size_t i) const {
-    // ASSERT(i < size_, logicErr,
-    //        "Index out of bounds: " + std::to_string(i) +
-    //            ", size: " + std::to_string(size_));
-    return *(ptr_ + i);
-  }
+  const T &operator[](size_t i) const { return *(ptr_ + i); }
 
   bool empty() const { return size_ == 0; }
 
@@ -253,6 +243,10 @@ class ManagedVec {
   static constexpr int DEVICE_MAX_BYTES = 1 << 16;
 
   static void mallocManaged(T **ptr, size_t bytes) {
+    // only exists to please the compiler
+    if (bytes >= (1ull << 63)) {
+      throw std::bad_alloc();
+    }
 #ifdef MANIFOLD_USE_CUDA
     if (CudaEnabled())
       cudaMallocManaged(reinterpret_cast<void **>(ptr), bytes);
