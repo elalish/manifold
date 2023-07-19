@@ -125,6 +125,7 @@ EMSCRIPTEN_BINDINGS(whatever) {
   function("_crossSectionUnionN", &cross_js::UnionN);
   function("_crossSectionDifferenceN", &cross_js::DifferenceN);
   function("_crossSectionIntersectionN", &cross_js::IntersectionN);
+  function("_crossSectionCollectVertices", &cross_js::CollectVertices);
   function("_crossSectionHullPoints",
            select_overload<CrossSection(std::vector<glm::vec2>)>(
                &CrossSection::Hull));
@@ -180,6 +181,7 @@ EMSCRIPTEN_BINDINGS(whatever) {
   function("_manifoldUnionN", &man_js::UnionN);
   function("_manifoldDifferenceN", &man_js::DifferenceN);
   function("_manifoldIntersectionN", &man_js::IntersectionN);
+  function("_manifoldCollectVertices", &man_js::CollectVertices);
   function("_manifoldHullPoints",
            select_overload<Manifold(const std::vector<glm::vec3>&)>(
                &Manifold::Hull));

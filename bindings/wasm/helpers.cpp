@@ -159,6 +159,11 @@ CrossSection Offset(CrossSection& cross_section, double delta, int join_type,
                              : CrossSection::JoinType::Miter;
   return cross_section.Offset(delta, jt, miter_limit, arc_tolerance);
 }
+
+void CollectVertices(std::vector<glm::vec2>& verts, const CrossSection& cs) {
+  auto polys = cs.ToPolygons();
+  for (auto poly : polys) verts.insert(verts.end(), poly.begin(), poly.end());
+}
 }  // namespace cross_js
 
 namespace man_js {
@@ -218,5 +223,10 @@ std::vector<Manifold> SplitByPlane(Manifold& m, glm::vec3 normal,
                                    float originOffset) {
   auto [a, b] = m.SplitByPlane(normal, originOffset);
   return {a, b};
+}
+
+void CollectVertices(std::vector<glm::vec3>& verts, const Manifold& manifold) {
+  Mesh mesh = manifold.GetMesh();
+  verts.insert(verts.end(), mesh.vertPos.begin(), mesh.vertPos.end());
 }
 }  // namespace man_js
