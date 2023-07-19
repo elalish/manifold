@@ -86,11 +86,23 @@ PYBIND11_MODULE(manifold3d, m) {
       .def(py::self - py::self, "Boolean difference.")
       .def(py::self ^ py::self, "Boolean intersection.")
       .def(
-          "hull", [](Manifold &self) { return self.Hull(); }, "Convex Hull.")
+          "hull", [](Manifold &self) { return self.Hull(); },
+          "Compute the convex hull of all points in this manifold.")
       .def_static(
           "batch_hull",
           [](std::vector<Manifold> &ms) { return Manifold::Hull(ms); },
           "Compute the convex hull enveloping a set of manifolds.")
+      .def_static(
+          "hull_points",
+          [](std::vector<Float3> &pts) {
+            std::vector<glm::vec3> vec(pts.size());
+            for (int i = 0; i < pts.size(); i++) {
+              vec[i] = {std::get<0>(pts[i]), std::get<1>(pts[i]),
+                        std::get<2>(pts[i])};
+            }
+            return Manifold::Hull(vec);
+          },
+          "Compute the convex hull enveloping a set of 3d points.")
       .def(
           "transform",
           [](Manifold &self, py::array_t<float> &mat) {
@@ -756,7 +768,7 @@ PYBIND11_MODULE(manifold3d, m) {
       .def(py::self ^ py::self, "Boolean intersection.")
       .def(
           "hull", [](CrossSection &self) { return self.Hull(); },
-          "Convex Hull.")
+          "Compute the convex hull of this cross-section.")
       .def_static(
           "batch_hull",
           [](std::vector<CrossSection> &cs) { return CrossSection::Hull(cs); },
