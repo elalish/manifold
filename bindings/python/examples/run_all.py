@@ -37,7 +37,7 @@ if __name__ == "__main__":
         if export_models:
             vertices = np.reshape(mesh.vert_properties, (-1, mesh.num_prop))
             if mesh.num_prop > 3:
-                vertices = np.hsplit(vertices, 3)
+                vertices = np.hsplit(vertices, 3)[0]
             meshOut = trimesh.Trimesh(
                 vertices=vertices, faces=np.reshape(mesh.tri_verts, (-1, 3)))
             trimesh.exchange.export.export_mesh(meshOut, f'{f}.glb', 'glb')
