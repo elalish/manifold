@@ -305,11 +305,6 @@ PYBIND11_MODULE(manifold3d, m) {
            "that edge will be kept.")
       .def("is_empty", &Manifold::IsEmpty,
            "Does the Manifold have any triangles?")
-      .def("compose", &Manifold::Compose,
-           "Constructs a new manifold from a vector of other manifolds. This "
-           "is a purely topological operation, so care should be taken to "
-           "avoid creating overlapping results. It is the inverse operation of "
-           "Decompose().")
       .def(
           "decompose", [](Manifold &self) { return self.Decompose(); },
           "This operation returns a vector of Manifolds that are "
