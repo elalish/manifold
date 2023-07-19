@@ -246,6 +246,13 @@ export class CrossSection {
    */
   static intersection(polygons: (CrossSection|Polygons)[]): CrossSection;
 
+  // Convex Hulls
+
+  /**
+   * Compute the convex hull of all points in a list of polygons/cross-sections.
+   */
+  static hull(polygons: (CrossSection|Polygons)[]): CrossSection;
+
   // Topological Operations
 
   /**
@@ -674,6 +681,19 @@ export class Manifold {
    *     direction of the normal vector.
    */
   trimByPlane(normal: Vec3, originOffset: number): Manifold;
+
+  // Convex Hulls
+
+  /**
+   * Compute the convex hull of all points in this Manifold.
+   */
+  hull(): Manifold;
+
+  /**
+   * Compute the convex hull of all points contained within a set of Manifolds
+   * and point vectors.
+   */
+  static hull(points: (Manifold|Vec3)[]): Manifold;
 
   // Topological Operations
 

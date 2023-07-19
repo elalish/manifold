@@ -125,6 +125,9 @@ EMSCRIPTEN_BINDINGS(whatever) {
   function("_crossSectionUnionN", &cross_js::UnionN);
   function("_crossSectionDifferenceN", &cross_js::DifferenceN);
   function("_crossSectionIntersectionN", &cross_js::IntersectionN);
+  function("_crossSectionHullPoints",
+           select_overload<CrossSection(std::vector<glm::vec2>)>(
+               &CrossSection::Hull));
 
   class_<Manifold>("Manifold")
       .constructor(&man_js::FromMeshJS)
@@ -134,6 +137,7 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .function("_Split", &man_js::Split)
       .function("_SplitByPlane", &man_js::SplitByPlane)
       .function("_TrimByPlane", &Manifold::TrimByPlane)
+      .function("hull", select_overload<Manifold() const>(&Manifold::Hull))
       .function("_GetMeshJS", &js::GetMeshJS)
       .function("refine", &Manifold::Refine)
       .function("_Warp", &man_js::Warp)
@@ -176,6 +180,9 @@ EMSCRIPTEN_BINDINGS(whatever) {
   function("_manifoldUnionN", &man_js::UnionN);
   function("_manifoldDifferenceN", &man_js::DifferenceN);
   function("_manifoldIntersectionN", &man_js::IntersectionN);
+  function("_manifoldHullPoints",
+           select_overload<Manifold(const std::vector<glm::vec3>&)>(
+               &Manifold::Hull));
 
   // Quality Globals
   function("setMinCircularAngle", &Quality::SetMinCircularAngle);

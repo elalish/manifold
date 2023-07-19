@@ -42,23 +42,23 @@ io.registerExtensions(KHRONOS_EXTENSIONS);
 // manifold static methods (that return a new manifold)
 const manifoldStaticFunctions = [
   'cube', 'cylinder', 'sphere', 'tetrahedron', 'extrude', 'revolve', 'compose',
-  'union', 'difference', 'intersection', 'levelSet', 'smooth', 'ofMesh'
+  'union', 'difference', 'intersection', 'levelSet', 'smooth', 'ofMesh', 'hull'
 ];
 // manifold member functions (that return a new manifold)
 const manifoldMemberFunctions = [
   'add', 'subtract', 'intersect', 'decompose', 'warp', 'transform', 'translate',
   'rotate', 'scale', 'mirror', 'refine', 'setProperties', 'asOriginal',
-  'trimByPlane', 'split', 'splitByPlane'
+  'trimByPlane', 'split', 'splitByPlane', 'hull'
 ];
 // CrossSection static methods (that return a new cross-section)
 const crossSectionStaticFunctions = [
   'square', 'circle', 'union', 'difference', 'intersection', 'compose',
-  'ofPolygons'
+  'ofPolygons', 'hull'
 ];
 // CrossSection member functions (that return a new cross-section)
 const crossSectionMemberFunctions = [
   'add', 'subtract', 'intersect', 'rectClip', 'decompose', 'transform',
-  'translate', 'rotate', 'scale', 'mirror', 'simplify', 'offset'
+  'translate', 'rotate', 'scale', 'mirror', 'simplify', 'offset', 'hull'
 ];
 // top level functions that construct a new manifold/mesh
 const toplevelConstructors = ['show', 'only', 'setMaterial'];

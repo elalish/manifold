@@ -472,6 +472,47 @@ Module.setup = function() {
   Module.CrossSection.difference = crossSectionBatchbool('DifferenceN');
   Module.CrossSection.intersection = crossSectionBatchbool('IntersectionN');
 
+  Module.CrossSection.hull = function(...args) {
+    if (args.length == 1) args = args[0];
+    let pts = new Module.Vector_vec2();
+    for (const cs of args) {
+      if (cs instanceof CrossSectionCtor) {
+        const polyVecs = cs._ToPolygons();
+        for (let i = 0; i < polyVecs.size(); i++) {
+          const vec = polyVecs.get(i);
+          for (let j = 0; j < vec.size(); j++) {
+            pts.push_back(vec.get(j));
+          }
+          vec.delete();
+        }
+        disposePolygons(polyVecs);
+      } else if (
+          cs instanceof Array && cs.length == 2 && typeof cs[0] == 'number') {
+        pts.push_back({x: cs[0], y: cs[1]});
+      } else if (cs.x) {
+        pts.push_back(cs);
+      } else {
+        const polys = cs instanceof Array &&
+                ((cs[0].length == 2 && typeof cs[0][0] == 'number') ||
+                 cs[0].x) ?
+            [cs] :
+            cs;
+        for (const poly of polys) {
+          for (const p of poly) {
+            if (p instanceof Array) {
+              pts.push_back({x: p[0], y: p[1]});
+            } else {
+              pts.push_back(p);
+            }
+          }
+        }
+      }
+    }
+    const result = Module._crossSectionHullPoints(pts);
+    pts.delete();
+    return result;
+  };
+
   Module.CrossSection.prototype = Object.create(CrossSectionCtor.prototype);
 
   // Because the constructor and prototype are being replaced, instanceof will
