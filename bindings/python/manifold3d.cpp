@@ -238,7 +238,33 @@ PYBIND11_MODULE(manifold3d, m) {
           "\n"
           ":param n: The number of pieces to split every edge into. Must be > "
           "1.")
-      .def("to_mesh", &Manifold::GetMesh)
+      .def(
+          "to_meshgl",
+          [](Manifold &self, std::optional<py::array_t<uint32_t>> &normalIdx) {
+            glm::ivec3 v(0);
+            if (normalIdx.has_value()) {
+              auto normalIdx_view = normalIdx.value().unchecked<1>();
+              if (normalIdx_view.shape(0) != 3)
+                throw std::runtime_error("Invalid vector shape");
+              v = glm::ivec3(normalIdx_view(0), normalIdx_view(1),
+                             normalIdx_view(2));
+            }
+            return self.GetMeshGL(v);
+          },
+          "The most complete output of this library, returning a MeshGL that "
+          "is designed to easily push into a renderer, including all "
+          "interleaved vertex properties that may have been input. It also "
+          "includes relations to all the input meshes that form a part of "
+          "this result and the transforms applied to each."
+          "\n\n"
+          ":param normalIdx: If the original MeshGL inputs that formed this "
+          "manifold had properties corresponding to normal vectors, you can "
+          "specify which property channels these are (x, y, z), which will "
+          "cause this output MeshGL to automatically update these normals "
+          "according to the applied transforms and front/back side. Each "
+          "channel must be >= 3 and < numProp, and all original MeshGLs must "
+          "use the same channels for their normals.",
+          py::arg("normalIdx") = py::none())
       .def("num_vert", &Manifold::NumVert,
            "The number of vertices in the Manifold.")
       .def("num_edge", &Manifold::NumEdge,
@@ -459,7 +485,7 @@ PYBIND11_MODULE(manifold3d, m) {
                   "marking sets of triangles that can be looked up after "
                   "further operations. Assign to MeshGL.runOriginalID vector");
 
-  py::class_<MeshGL>(m, "Mesh")
+  py::class_<MeshGL>(m, "MeshGL")
       .def(
           py::init([](const py::array_t<float> &vertProp,
                       const py::array_t<int> &triVerts,
@@ -560,112 +586,16 @@ PYBIND11_MODULE(manifold3d, m) {
           py::arg("run_transform") = py::none(),
           py::arg("face_id") = py::none(),
           py::arg("halfedge_tangent") = py::none(), py::arg("precision") = 0)
-      .def_property_readonly(
-          "vert_properties",
-          [](const MeshGL &self) {
-            const uint32_t numVert = self.NumVert();
-            py::array_t<float> vert_prop({numVert, self.numProp});
-            auto vert_prop_view = vert_prop.mutable_unchecked<2>();
-
-            for (int i = 0; i < numVert; ++i)
-              for (int j = 0; j < self.numProp; ++j)
-                vert_prop_view(i, j) =
-                    self.vertProperties[i * self.numProp + j];
-            return vert_prop;
-          })
-      .def_property_readonly(
-          "tri_verts",
-          [](const MeshGL &self) {
-            const int numTri = self.NumTri();
-            py::array_t<int> tri_verts({numTri, 3});
-            auto tri_verts_view = tri_verts.mutable_unchecked<2>();
-
-            for (int i = 0; i < numTri; ++i)
-              for (const int j : {0, 1, 2})
-                tri_verts_view(i, j) = self.triVerts[3 * i + j];
-            return tri_verts;
-          })
-      .def_property_readonly("merge_from_vert",
-                             [](const MeshGL &self) {
-                               const int len = self.mergeFromVert.size();
-                               py::array_t<int> merge_from(len);
-                               auto merge_from_view =
-                                   merge_from.mutable_unchecked<1>();
-
-                               for (int i = 0; i < len; ++i)
-                                 merge_from_view(i) = self.mergeFromVert[i];
-                               return merge_from;
-                             })
-      .def_property_readonly("merge_to_vert",
-                             [](const MeshGL &self) {
-                               const int len = self.mergeToVert.size();
-                               py::array_t<int> merge_to(len);
-                               auto merge_to_view =
-                                   merge_to.mutable_unchecked<1>();
-
-                               for (int i = 0; i < len; ++i)
-                                 merge_to_view(i) = self.mergeToVert[i];
-                               return merge_to;
-                             })
-      .def_property_readonly("run_index",
-                             [](const MeshGL &self) {
-                               const int len = self.runIndex.size();
-                               py::array_t<int> run_index(len);
-                               auto run_index_view =
-                                   run_index.mutable_unchecked<1>();
-
-                               for (int i = 0; i < len; ++i)
-                                 run_index_view(i) = self.runIndex[i];
-                               return run_index;
-                             })
-      .def_property_readonly(
-          "run_original_id",
-          [](const MeshGL &self) {
-            const int len = self.runOriginalID.size();
-            py::array_t<int> run_original_id(len);
-            auto run_original_id_view = run_original_id.mutable_unchecked<1>();
-
-            for (int i = 0; i < len; ++i)
-              run_original_id_view(i) = self.runOriginalID[i];
-            return run_original_id;
-          })
-      .def_property_readonly("run_transform",
-                             [](const MeshGL &self) {
-                               const int numTri = self.NumTri();
-                               py::array_t<float> run_transform({numTri, 4, 3});
-                               auto run_transform_view =
-                                   run_transform.mutable_unchecked<3>();
-
-                               for (int i = 0; i < numTri; ++i)
-                                 for (const int j : {0, 1, 2, 3})
-                                   for (const int k : {0, 1, 2})
-                                     run_transform_view(i, j, k) =
-                                         self.runTransform[12 * i + 3 * j + k];
-                               return run_transform;
-                             })
-      .def_property_readonly("face_id",
-                             [](const MeshGL &self) {
-                               const int len = self.faceID.size();
-                               py::array_t<int> face_id(len);
-                               auto face_id_view =
-                                   face_id.mutable_unchecked<1>();
-
-                               for (int i = 0; i < len; ++i)
-                                 face_id_view(i) = self.faceID[i];
-                               return face_id;
-                             })
-      .def_property_readonly("halfedge_tangent", [](const MeshGL &self) {
-        const int numTri = self.NumTri();
-        py::array_t<float> halfedge_tangent({numTri, 3, 4});
-        auto halfedge_tangent_view = halfedge_tangent.mutable_unchecked<3>();
-
-        for (int i = 0; i < numTri; ++i)
-          for (const int j : {0, 1, 2})
-            for (const int k : {0, 1, 2, 3})
-              halfedge_tangent_view(i, j, k) =
-                  self.halfedgeTangent[12 * i + 4 * j + k];
-        return halfedge_tangent;
-      });
+      .def_readonly("vert_properties", &MeshGL::vertProperties)
+      .def_readonly("tri_verts", &MeshGL::triVerts)
+      .def_readonly("merge_from_vert", &MeshGL::mergeFromVert)
+      .def_readonly("merge_to_vert", &MeshGL::mergeToVert)
+      .def_readonly("run_index", &MeshGL::runIndex)
+      .def_readonly("run_original_id", &MeshGL::runOriginalID)
+      .def_readonly("run_transform", &MeshGL::runTransform)
+      .def_readonly("face_id", &MeshGL::faceID)
+      .def_readonly("halfedge_tangent", &MeshGL::halfedgeTangent)
+      .def_readonly("num_prop", &MeshGL::numProp);
 
   py::enum_<CrossSection::FillRule>(m, "FillRule")
       .value("EvenOdd", CrossSection::FillRule::EvenOdd,
