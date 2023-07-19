@@ -86,6 +86,12 @@ PYBIND11_MODULE(manifold3d, m) {
       .def(py::self - py::self, "Boolean difference.")
       .def(py::self ^ py::self, "Boolean intersection.")
       .def(
+          "hull", [](Manifold &self) { return self.Hull(); }, "Convex Hull.")
+      .def_static(
+          "batch_hull",
+          [](std::vector<Manifold> &ms) { return Manifold::Hull(ms); },
+          "Compute the convex hull enveloping a set of manifolds.")
+      .def(
           "transform",
           [](Manifold &self, py::array_t<float> &mat) {
             auto mat_view = mat.unchecked<2>();
@@ -287,6 +293,11 @@ PYBIND11_MODULE(manifold3d, m) {
            "that edge will be kept.")
       .def("is_empty", &Manifold::IsEmpty,
            "Does the Manifold have any triangles?")
+      .def("compose", &Manifold::Compose,
+           "Constructs a new manifold from a vector of other manifolds. This "
+           "is a purely topological operation, so care should be taken to "
+           "avoid creating overlapping results. It is the inverse operation of "
+           "Decompose().")
       .def(
           "decompose", [](Manifold &self) { return self.Decompose(); },
           "This operation returns a vector of Manifolds that are "
@@ -743,6 +754,23 @@ PYBIND11_MODULE(manifold3d, m) {
       .def(py::self + py::self, "Boolean union.")
       .def(py::self - py::self, "Boolean difference.")
       .def(py::self ^ py::self, "Boolean intersection.")
+      .def(
+          "hull", [](CrossSection &self) { return self.Hull(); },
+          "Convex Hull.")
+      .def_static(
+          "batch_hull",
+          [](std::vector<CrossSection> &cs) { return CrossSection::Hull(cs); },
+          "Compute the convex hull enveloping a set of cross-sections.")
+      .def_static(
+          "hull_points",
+          [](std::vector<Float2> &pts) {
+            std::vector<glm::vec2> poly(pts.size());
+            for (int i = 0; i < pts.size(); i++) {
+              poly[i] = {std::get<0>(pts[i]), std::get<1>(pts[i])};
+            }
+            return CrossSection::Hull(poly);
+          },
+          "Compute the convex hull enveloping a set of 2d points.")
       .def("decompose", &CrossSection::Decompose,
            "This operation returns a vector of CrossSections that are "
            "topologically disconnected, each containing one outline contour "
