@@ -33,7 +33,7 @@ if __name__ == "__main__":
         module = importlib.import_module(f)
         t0 = time()
         model = module.run()
-        mesh = model.to_meshgl()
+        mesh = model.to_mesh()
         if export_models:
             vertices = np.reshape(mesh.vert_properties, (-1, mesh.num_prop))
             if mesh.num_prop > 3:

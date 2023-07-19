@@ -89,8 +89,8 @@ PYBIND11_MODULE(manifold3d, m) {
           "transform",
           [](Manifold &self, py::array_t<float> &mat) {
             auto mat_view = mat.unchecked<2>();
-            if (mat_view.shape(0) != 3 || mat_view.shape(1) != 4)
-              throw std::runtime_error("Invalid matrix shape");
+            if (mat.ndim() != 2 || mat.shape(0) != 3 || mat.shape(1) != 4)
+              throw std::runtime_error("Invalid matrix shape, expected (3, 4)");
             glm::mat4x3 mat_glm;
             for (int i = 0; i < 3; i++) {
               for (int j = 0; j < 4; j++) {
@@ -122,7 +122,7 @@ PYBIND11_MODULE(manifold3d, m) {
           "translate",
           [](Manifold &self, py::array_t<float> &t) {
             auto t_view = t.unchecked<1>();
-            if (t.shape(0) != 3)
+            if (t.ndim() != 1 || t.shape(0) != 3)
               throw std::runtime_error("Invalid vector shape");
             return self.Translate(glm::vec3(t_view(0), t_view(1), t_view(2)));
           },
@@ -146,8 +146,8 @@ PYBIND11_MODULE(manifold3d, m) {
           "scale",
           [](Manifold &self, py::array_t<float> &scale) {
             auto scale_view = scale.unchecked<1>();
-            if (scale_view.shape(0) != 3)
-              throw std::runtime_error("Invalid vector shape");
+            if (scale.ndim() != 1 || scale.shape(0) != 3)
+              throw std::runtime_error("Invalid vector shape, expected (3)");
             glm::vec3 v(scale_view(0), scale_view(1), scale_view(2));
             return self.Scale(v);
           },
@@ -160,8 +160,8 @@ PYBIND11_MODULE(manifold3d, m) {
           "mirror",
           [](Manifold &self, py::array_t<float> &mirror) {
             auto v_view = mirror.unchecked<1>();
-            if (v_view.shape(0) != 3)
-              throw std::runtime_error("Invalid vector shape");
+            if (mirror.ndim() != 1 || mirror.shape(0) != 3)
+              throw std::runtime_error("Invalid vector shape, expected (3)");
             glm::vec3 v(v_view(0), v_view(1), v_view(2));
             return self.Mirror(v);
           },
@@ -174,8 +174,8 @@ PYBIND11_MODULE(manifold3d, m) {
           "rotate",
           [](Manifold &self, py::array_t<float> &v) {
             auto v_view = v.unchecked<1>();
-            if (v_view.shape(0) != 3)
-              throw std::runtime_error("Invalid vector shape");
+            if (v.ndim() != 1 || v.shape(0) != 3)
+              throw std::runtime_error("Invalid vector shape, expected (3)");
             return self.Rotate(v_view(0), v_view(1), v_view(2));
           },
           py::arg("v"),
@@ -239,13 +239,14 @@ PYBIND11_MODULE(manifold3d, m) {
           ":param n: The number of pieces to split every edge into. Must be > "
           "1.")
       .def(
-          "to_meshgl",
+          "to_mesh",
           [](Manifold &self, std::optional<py::array_t<uint32_t>> &normalIdx) {
             glm::ivec3 v(0);
             if (normalIdx.has_value()) {
+              if (normalIdx.value().ndim() != 1 ||
+                  normalIdx.value().shape(0) != 3)
+                throw std::runtime_error("Invalid vector shape, expected (3)");
               auto normalIdx_view = normalIdx.value().unchecked<1>();
-              if (normalIdx_view.shape(0) != 3)
-                throw std::runtime_error("Invalid vector shape");
               v = glm::ivec3(normalIdx_view(0), normalIdx_view(1),
                              normalIdx_view(2));
             }
@@ -421,8 +422,8 @@ PYBIND11_MODULE(manifold3d, m) {
           "cube",
           [](py::array_t<float> &size, bool center = false) {
             auto size_view = size.unchecked<1>();
-            if (size_view.shape(0) != 3)
-              throw std::runtime_error("Invalid vector shape");
+            if (size.ndim() != 1 || size.shape(0) != 3)
+              throw std::runtime_error("Invalid vector shape, expected (3)");
             return Manifold::Cube(
                 glm::vec3(size_view(0), size_view(1), size_view(2)), center);
           },
@@ -487,93 +488,66 @@ PYBIND11_MODULE(manifold3d, m) {
 
   py::class_<MeshGL>(m, "MeshGL")
       .def(
-          py::init([](const py::array_t<float> &vertProp,
-                      const py::array_t<int> &triVerts,
-                      const std::optional<py::array_t<uint32_t>> &mergeFromVert,
-                      const std::optional<py::array_t<uint32_t>> &mergeToVert,
-                      const std::optional<py::array_t<uint32_t>> &runIndex,
-                      const std::optional<py::array_t<uint32_t>> &runOriginalID,
-                      const std::optional<py::array_t<float>> &runTransform,
-                      const std::optional<py::array_t<uint32_t>> &faceID,
+          // note that reshape requires mutable array_t, but this will not
+          // affect the original array passed into the function
+          py::init([](py::array_t<float> &vertProp, py::array_t<int> &triVerts,
+                      const std::optional<std::vector<uint32_t>> &mergeFromVert,
+                      const std::optional<std::vector<uint32_t>> &mergeToVert,
+                      const std::optional<std::vector<uint32_t>> &runIndex,
+                      const std::optional<std::vector<uint32_t>> &runOriginalID,
+                      std::optional<py::array_t<float>> &runTransform,
+                      const std::optional<std::vector<uint32_t>> &faceID,
                       const std::optional<py::array_t<float>> &halfedgeTangent,
                       float precision) {
             MeshGL out;
 
-            auto vertProp_view = vertProp.unchecked<2>();
-            auto triVerts_view = triVerts.unchecked<2>();
-            const uint32_t numProp = vertProp_view.shape(1);
-            if (triVerts_view.shape(1) != 3)
-              throw std::runtime_error("Invalid tri_verts shape");
-            for (int i = 0; i < vertProp_view.shape(0); i++)
-              for (int j = 0; j < numProp; ++j)
-                out.vertProperties.push_back(vertProp_view(i, j));
-            for (int i = 0; i < triVerts_view.shape(0); i++)
-              for (const int j : {0, 1, 2})
-                out.triVerts.push_back(triVerts_view(i, j));
+            out.numProp = vertProp.shape(1);
+            vertProp = vertProp.reshape({-1});
+            out.vertProperties = std::vector<float>(
+                vertProp.data(), vertProp.data() + vertProp.size());
 
-            if (mergeFromVert.has_value()) {
-              auto mergeFrom_view = mergeFromVert.value().unchecked<1>();
-              for (int i = 0; i < mergeFrom_view.shape(0); ++i) {
-                out.mergeFromVert.push_back(mergeFrom_view(i));
-              }
-            }
+            if (triVerts.ndim() != 2 || triVerts.shape(1) != 3)
+              throw std::runtime_error(
+                  "Invalid tri_verts shape, expected (-1, 3)");
+            triVerts = triVerts.reshape({-1});
+            out.triVerts = std::vector<uint32_t>(
+                triVerts.data(), triVerts.data() + triVerts.size());
 
-            if (mergeToVert.has_value()) {
-              auto mergeTo_view = mergeToVert.value().unchecked<1>();
-              for (int i = 0; i < mergeTo_view.shape(0); ++i) {
-                out.mergeToVert.push_back(mergeTo_view(i));
-              }
-            }
+            if (mergeFromVert.has_value())
+              out.mergeFromVert = mergeFromVert.value();
 
-            if (runIndex.has_value()) {
-              auto runIndex_view = runIndex.value().unchecked<1>();
-              for (int i = 0; i < runIndex_view.shape(0); ++i) {
-                out.runIndex.push_back(runIndex_view(i));
-              }
-            }
+            if (mergeToVert.has_value()) out.mergeToVert = mergeToVert.value();
 
-            if (runOriginalID.has_value()) {
-              auto runOriginalID_view = runOriginalID.value().unchecked<1>();
-              for (int i = 0; i < runOriginalID_view.shape(0); ++i) {
-                out.runOriginalID.push_back(runOriginalID_view(i));
-              }
-            }
+            if (runIndex.has_value()) out.runIndex = runIndex.value();
+
+            if (runOriginalID.has_value())
+              out.runOriginalID = runOriginalID.value();
 
             if (runTransform.has_value()) {
-              auto runTransform_view = runTransform.value().unchecked<3>();
-              if (runTransform_view.shape(1) != 4 ||
-                  runTransform_view.shape(2) != 3)
-                throw std::runtime_error("Invalid run_transform shape");
-              for (int i = 0; i < runTransform_view.shape(0); ++i) {
-                for (const int col : {0, 1, 2, 3}) {
-                  for (const int row : {0, 1, 2}) {
-                    out.runTransform.push_back(runTransform_view(i, col, row));
-                  }
-                }
-              }
+              auto runTransform1 = runTransform.value();
+              if (runTransform1.ndim() != 3 || runTransform1.shape(1) != 4 ||
+                  runTransform1.shape(2) != 3)
+                throw std::runtime_error(
+                    "Invalid run_transform shape, expected (-1, 4, 3)");
+              runTransform1 = runTransform1.reshape({-1});
+              out.runTransform = std::vector<float>(
+                  runTransform1.data(),
+                  runTransform1.data() + runTransform1.size());
             }
 
-            if (faceID.has_value()) {
-              auto faceID_view = faceID.value().unchecked<1>();
-              for (int i = 0; i < faceID_view.shape(0); ++i) {
-                out.faceID.push_back(faceID_view(i));
-              }
-            }
+            if (faceID.has_value()) out.faceID = faceID.value();
 
             if (halfedgeTangent.has_value()) {
-              auto halfedgeTangent_view =
-                  halfedgeTangent.value().unchecked<3>();
-              if (halfedgeTangent_view.shape(1) != 3 ||
-                  halfedgeTangent_view.shape(2) != 4)
-                throw std::runtime_error("Invalid halfedge_tangent shape");
-              for (int i = 0; i < halfedgeTangent_view.shape(0); ++i) {
-                for (const int j : {0, 1, 2}) {
-                  for (const int k : {0, 1, 2, 3}) {
-                    out.halfedgeTangent.push_back(
-                        halfedgeTangent_view(i, j, k));
-                  }
-                }
-              }
+              auto halfedgeTangent1 = halfedgeTangent.value();
+              if (halfedgeTangent1.ndim() != 3 ||
+                  halfedgeTangent1.shape(1) != 3 ||
+                  halfedgeTangent1.shape(2) != 4)
+                throw std::runtime_error(
+                    "Invalid halfedge_tangent shape, expected (-1, 3, 4)");
+              halfedgeTangent1 = halfedgeTangent1.reshape({-1});
+              out.halfedgeTangent = std::vector<float>(
+                  halfedgeTangent1.data(),
+                  halfedgeTangent1.data() + halfedgeTangent1.size());
             }
 
             return out;
@@ -705,8 +679,8 @@ PYBIND11_MODULE(manifold3d, m) {
           "transform",
           [](CrossSection self, py::array_t<float> &mat) {
             auto mat_view = mat.unchecked<2>();
-            if (mat_view.shape(0) != 2 || mat_view.shape(1) != 3)
-              throw std::runtime_error("Invalid matrix shape");
+            if (mat.ndim() != 2 || mat.shape(0) != 2 || mat.shape(1) != 3)
+              throw std::runtime_error("Invalid matrix shape, expected (2, 3)");
             glm::mat3x2 mat_glm;
             for (int i = 0; i < 2; i++) {
               for (int j = 0; j < 3; j++) {
