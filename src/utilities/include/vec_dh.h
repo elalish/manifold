@@ -244,6 +244,7 @@ class ManagedVec {
 
   static void mallocManaged(T **ptr, size_t bytes) {
     // only exists to please the compiler
+    // see https://github.com/elalish/manifold/pull/496 for background
     if (bytes >= (1ull << 63)) {
       throw std::bad_alloc();
     }
