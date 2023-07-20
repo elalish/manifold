@@ -612,6 +612,12 @@ CrossSection CrossSection::Offset(double delta, JoinType jointype,
   return CrossSection(ps);
 }
 
+/**
+ * Compute the convex hull enveloping a set of cross-sections.
+ *
+ * @param crossSections A vector of cross-sections over which to compute a
+ * convex hull.
+ */
 CrossSection CrossSection::Hull(
     const std::vector<CrossSection>& crossSections) {
   int n = 0;
@@ -629,14 +635,31 @@ CrossSection CrossSection::Hull(
   return CrossSection(C2::PathsD{HullImpl(pts)});
 }
 
+/**
+ * Compute the convex hull of this cross-section.
+ */
 CrossSection CrossSection::Hull() const {
   return Hull(std::vector<CrossSection>{*this});
 }
 
+/**
+ * Compute the convex hull of a set of points. If the given points are fewer
+ * than 3, an empty CrossSection will be returned.
+ *
+ * @param pts A vector of 2-dimensional points over which to compute a convex
+ * hull.
+ */
 CrossSection CrossSection::Hull(SimplePolygon pts) {
   return CrossSection(C2::PathsD{HullImpl(pts)});
 }
 
+/**
+ * Compute the convex hull of a set of points/polygons. If the given points are
+ * fewer than 3, an empty CrossSection will be returned.
+ *
+ * @param pts A vector of vectors of 2-dimensional points over which to compute
+ * a convex hull.
+ */
 CrossSection CrossSection::Hull(const Polygons polys) {
   SimplePolygon pts;
   for (auto poly : polys) {
