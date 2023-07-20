@@ -190,6 +190,26 @@ ManifoldManifold *manifold_trim_by_plane(void *mem, ManifoldManifold *m,
   return to_c(new (mem) Manifold(trimmed));
 }
 
+ManifoldManifold *manifold_hull(void *mem, ManifoldManifold *m) {
+  auto hulled = from_c(m)->Hull();
+  return to_c(new (mem) Manifold(hulled));
+}
+
+ManifoldManifold *manifold_batch_hull(void *mem, ManifoldManifoldVec *ms) {
+  auto hulled = Manifold::Hull(*from_c(ms));
+  return to_c(new (mem) Manifold(hulled));
+}
+
+ManifoldManifold *manifold_hull_pts(void *mem, ManifoldVec3 *ps,
+                                    size_t length) {
+  std::vector<glm::vec3> vec(length);
+  for (int i = 0; i < length; ++i) {
+    vec[i] = {ps[i].x, ps[i].y, ps[i].z};
+  }
+  auto hulled = Manifold::Hull(vec);
+  return to_c(new (mem) Manifold(hulled));
+}
+
 ManifoldManifold *manifold_translate(void *mem, ManifoldManifold *m, float x,
                                      float y, float z) {
   auto v = glm::vec3(x, y, z);

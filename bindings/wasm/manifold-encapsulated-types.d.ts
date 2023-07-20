@@ -111,6 +111,7 @@ export class CrossSection {
    * @param v The vector to add to every vertex.
    */
   translate(v: Vec2): CrossSection;
+  translate(x: number, y?: number): CrossSection;
 
   /**
    * Applies a (Z-axis) rotation to the CrossSection, in degrees. This operation
@@ -172,11 +173,6 @@ export class CrossSection {
   offset(
       delta: number, joinType?: JoinType, miterLimit?: number,
       circularSegments?: number): CrossSection;
-
-  /**
-   * Compute the convex hull of the contours in this CrossSection.
-   */
-  hull(): CrossSection;
 
   /**
    * Remove vertices from the contours in this CrossSection that are less than
@@ -245,6 +241,18 @@ export class CrossSection {
    * Boolean intersection of a list of cross-sections
    */
   static intersection(polygons: (CrossSection|Polygons)[]): CrossSection;
+
+  // Convex Hulls
+
+  /**
+   * Compute the convex hull of the contours in this CrossSection.
+   */
+  hull(): CrossSection;
+
+  /**
+   * Compute the convex hull of all points in a list of polygons/cross-sections.
+   */
+  static hull(polygons: (CrossSection|Polygons)[]): CrossSection;
 
   // Topological Operations
 
@@ -507,6 +515,7 @@ export class Manifold {
    * @param v The vector to add to every vertex.
    */
   translate(v: Vec3): Manifold;
+  translate(x: number, y?: number, z?: number): Manifold;
 
   /**
    * Applies an Euler angle rotation to the manifold, first about the X axis,
@@ -519,6 +528,7 @@ export class Manifold {
    * @param v [X, Y, Z] rotation in degrees.
    */
   rotate(v: Vec3): Manifold;
+  rotate(x: number, y?: number, z?: number): Manifold;
 
   /**
    * Scale this Manifold in space. This operation can be chained. Transforms are
@@ -674,6 +684,19 @@ export class Manifold {
    *     direction of the normal vector.
    */
   trimByPlane(normal: Vec3, originOffset: number): Manifold;
+
+  // Convex Hulls
+
+  /**
+   * Compute the convex hull of all points in this Manifold.
+   */
+  hull(): Manifold;
+
+  /**
+   * Compute the convex hull of all points contained within a set of Manifolds
+   * and point vectors.
+   */
+  static hull(points: (Manifold|Vec3)[]): Manifold;
 
   // Topological Operations
 
