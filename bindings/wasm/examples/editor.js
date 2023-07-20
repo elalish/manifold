@@ -371,11 +371,14 @@ function createWorker() {
     finishRun();
     runButton.disabled = true;
 
-    if (threeMFURL != null) URL.revokeObjectURL(threeMFURL);
+    if (threeMFURL != undefined) {
+      URL.revokeObjectURL(threeMFURL);
+      threeMFURL = undefined;
+    }
     URL.revokeObjectURL(glbURL);
     glbURL = e.data.glbURL;
     threeMFURL = e.data.threeMFURL;
-    threemfButton.disabled = threeMFURL == null;
+    threemfButton.disabled = threeMFURL == undefined;
     mv.src = glbURL;
     if (glbURL == null) {
       mv.showPoster();
