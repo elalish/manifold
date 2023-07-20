@@ -111,8 +111,7 @@ export class CrossSection {
    * @param v The vector to add to every vertex.
    */
   translate(v: Vec2): CrossSection;
-  translate(x: number): CrossSection;
-  translate(x: number, y: number): CrossSection;
+  translate(x: number, y?: number): CrossSection;
 
   /**
    * Applies a (Z-axis) rotation to the CrossSection, in degrees. This operation
@@ -516,9 +515,7 @@ export class Manifold {
    * @param v The vector to add to every vertex.
    */
   translate(v: Vec3): Manifold;
-  translate(x: number): Manifold;
-  translate(x: number, y: number): Manifold;
-  translate(x: number, y: number, z: number): Manifold;
+  translate(x: number, y?: number, z?: number): Manifold;
 
   /**
    * Applies an Euler angle rotation to the manifold, first about the X axis,
@@ -531,9 +528,7 @@ export class Manifold {
    * @param v [X, Y, Z] rotation in degrees.
    */
   rotate(v: Vec3): Manifold;
-  rotate(x: number): Manifold;
-  rotate(x: number, y: number): Manifold;
-  rotate(x: number, y: number, z: number): Manifold;
+  rotate(x: number, y?: number, z?: number): Manifold;
 
   /**
    * Scale this Manifold in space. This operation can be chained. Transforms are
