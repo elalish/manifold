@@ -14,11 +14,14 @@
 
 import {Document, Material, Node, WebIO} from '@gltf-transform/core';
 import {KHRMaterialsUnlit, KHRONOS_EXTENSIONS} from '@gltf-transform/extensions';
+import {fileForContentTypes, to3dmodel} from '@jscadui/3mf-export';
+import {strToU8, Zippable, zipSync} from 'fflate'
 import * as glMatrix from 'gl-matrix';
 
 import Module from './built/manifold';
 //@ts-ignore
 import {setupIO, writeMesh} from './gltf-io';
+
 import type {GLTFMaterial, Quat} from './public/editor';
 import type {CrossSection, Manifold, ManifoldToplevel, Mesh, Vec3} from './public/manifold';
 
@@ -457,8 +460,29 @@ async function exportGLB(manifold?: Manifold) {
     wrapper.addChild(node);
   }
 
+  const results: {[name: string]: string|null} = {};
+  if (manifold != null) {
+    const mesh = manifold.getMesh();
+    let vertices = new Float32Array(mesh.numVert * 3);
+    for (let i = 0; i < mesh.numVert; ++i) {
+      for (let j = 0; j < 3; ++j)
+        vertices[i * 3 + j] = mesh.vertProperties[i * mesh.numProp + j];
+    }
+    const model =
+        to3dmodel({simple: [{vertices, indices: mesh.triVerts, id: '1'}]});
+    const files: Zippable = {};
+    files['3D/3dmodel.model'] = strToU8(model);
+    files[fileForContentTypes.name] = strToU8(fileForContentTypes.content);
+    const zipFile = zipSync(files);
+    results['threeMFURL'] = URL.createObjectURL(
+        new Blob([zipFile], {type: 'application/octet-stream'}));
+  } else {
+    results['threeMFURL'] = null;
+  }
+
   const glb = await io.writeBinary(doc);
 
   const blob = new Blob([glb], {type: 'application/octet-stream'});
-  self.postMessage({objectURL: URL.createObjectURL(blob)});
+  results['glbURL'] = URL.createObjectURL(blob);
+  self.postMessage(results);
 }
