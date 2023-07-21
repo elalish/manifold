@@ -474,8 +474,9 @@ async function exportGLB(manifold?: Manifold) {
     files['3D/3dmodel.model'] = strToU8(model);
     files[fileForContentTypes.name] = strToU8(fileForContentTypes.content);
     const zipFile = zipSync(files);
-    results['threeMFURL'] = URL.createObjectURL(
-        new Blob([zipFile], {type: 'application/vnd.ms-package.3dmanufacturing-3dmodel+xml'}));
+    results['threeMFURL'] = URL.createObjectURL(new Blob(
+        [zipFile],
+        {type: 'application/vnd.ms-package.3dmanufacturing-3dmodel+xml'}));
   }
 
   const glb = await io.writeBinary(doc);
