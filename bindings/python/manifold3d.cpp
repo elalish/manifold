@@ -404,7 +404,7 @@ PYBIND11_MODULE(manifold3d, m) {
           "by sharping all edges that are incident on it, allowing cones to be "
           "formed.")
       .def_static(
-          "from_mesh", [](const Mesh &mesh) { return Manifold(mesh); },
+          "from_mesh", [](const MeshGL &mesh) { return Manifold(mesh); },
           py::arg("mesh"))
       .def_static(
           "tetrahedron", []() { return Manifold::Tetrahedron(); },
