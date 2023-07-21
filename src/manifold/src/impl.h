@@ -121,7 +121,7 @@ struct Manifold::Impl {
   void SimplifyTopology();
   void DedupeEdge(int edge);
   void CollapseEdge(int edge);
-  void RecursiveEdgeSwap(int edge, std::vector<int>& visited);
+  void RecursiveEdgeSwap(int edge, std::vector<int>& visited, int& tag);
   void RemoveIfFolded(int edge);
   void PairUp(int edge0, int edge1);
   void UpdateVert(int vert, int startEdge, int endEdge);

@@ -223,9 +223,11 @@ void Manifold::Impl::SimplifyTopology() {
     for_each_n(policy, countAt(0), nbEdges,
                [=] __host__ __device__(int i) { bflagsPtr[i] = se(i); });
     std::vector<int> visited(halfedge_.size(), -1);
+    int tag = 0;
     for (int i = 0; i < nbEdges; ++i) {
       if (bflags[i]) {
-        RecursiveEdgeSwap(i, visited);
+        tag++;
+        RecursiveEdgeSwap(i, visited, tag);
         numFlagged++;
       }
     }
@@ -485,14 +487,15 @@ void Manifold::Impl::CollapseEdge(const int edge) {
 }
 
 void Manifold::Impl::RecursiveEdgeSwap(const int edge,
-                                       std::vector<int>& visited) {
+                                       std::vector<int>& visited, int& tag) {
   VecDH<TriRef>& triRef = meshRelation_.triRef;
 
   if (edge < 0) return;
   const int pair = halfedge_[edge].pairedHalfedge;
   if (pair < 0) return;
-  if (visited[edge] == pair) return;
-  visited[edge] = pair;
+
+  // avoid infinite recursion
+  if (visited[edge] == tag && visited[pair] == tag) return;
 
   const glm::ivec3 tri0edge = TriOf(edge);
   const glm::ivec3 tri1edge = TriOf(pair);
@@ -572,12 +575,15 @@ void Manifold::Impl::RecursiveEdgeSwap(const int edge,
     SwapEdge();
     const glm::vec2 e23 = v[3] - v[2];
     if (glm::dot(e23, e23) < precision_ * precision_) {
+      tag++;
       CollapseEdge(tri0edge[2]);
     } else {
-      RecursiveEdgeSwap(tri0edge[0], visited);
-      RecursiveEdgeSwap(tri0edge[1], visited);
-      RecursiveEdgeSwap(tri1edge[0], visited);
-      RecursiveEdgeSwap(tri1edge[1], visited);
+      visited[edge] = tag;
+      visited[pair] = tag;
+      RecursiveEdgeSwap(tri0edge[0], visited, tag);
+      RecursiveEdgeSwap(tri0edge[1], visited, tag);
+      RecursiveEdgeSwap(tri1edge[0], visited, tag);
+      RecursiveEdgeSwap(tri1edge[1], visited, tag);
     }
     return;
   } else if (CCW(v[0], v[3], v[2], precision_) <= 0 ||
@@ -586,8 +592,10 @@ void Manifold::Impl::RecursiveEdgeSwap(const int edge,
   }
   // Normal path
   SwapEdge();
-  RecursiveEdgeSwap(halfedge_[tri0edge[1]].pairedHalfedge, visited);
-  RecursiveEdgeSwap(halfedge_[tri1edge[0]].pairedHalfedge, visited);
+  visited[edge] = tag;
+  visited[pair] = tag;
+  RecursiveEdgeSwap(halfedge_[tri0edge[1]].pairedHalfedge, visited, tag);
+  RecursiveEdgeSwap(halfedge_[tri1edge[0]].pairedHalfedge, visited, tag);
 }
 
 void Manifold::Impl::SplitPinchedVerts() {
