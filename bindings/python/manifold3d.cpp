@@ -27,6 +27,13 @@ using namespace manifold;
 typedef std::tuple<float, float> Float2;
 typedef std::tuple<float, float, float> Float3;
 
+constexpr auto pyArrayFlags = py::array::c_style | py::array::forcecast;
+
+template <typename T>
+std::vector<T> toVector(const py::array_t<T> &arr) {
+  return std::vector<T>(arr.data(), arr.data() + arr.size());
+}
+
 PYBIND11_MODULE(manifold3d, m) {
   m.doc() = "Python binding for the Manifold library.";
 
@@ -490,68 +497,74 @@ PYBIND11_MODULE(manifold3d, m) {
       .def(
           // note that reshape requires mutable array_t, but this will not
           // affect the original array passed into the function
-          py::init([](py::array_t<float> &vertProp, py::array_t<int> &triVerts,
-                      const std::optional<std::vector<uint32_t>> &mergeFromVert,
-                      const std::optional<std::vector<uint32_t>> &mergeToVert,
-                      const std::optional<std::vector<uint32_t>> &runIndex,
-                      const std::optional<std::vector<uint32_t>> &runOriginalID,
-                      std::optional<py::array_t<float>> &runTransform,
-                      const std::optional<std::vector<uint32_t>> &faceID,
-                      const std::optional<py::array_t<float>> &halfedgeTangent,
-                      float precision) {
-            MeshGL out;
+          py::init(
+              [](py::array_t<float, pyArrayFlags> &vertProp,
+                 py::array_t<int, pyArrayFlags> &triVerts,
+                 const std::optional<py::array_t<uint32_t, pyArrayFlags>>
+                     &mergeFromVert,
+                 const std::optional<py::array_t<uint32_t, pyArrayFlags>>
+                     &mergeToVert,
+                 const std::optional<py::array_t<uint32_t, pyArrayFlags>>
+                     &runIndex,
+                 const std::optional<py::array_t<uint32_t, pyArrayFlags>>
+                     &runOriginalID,
+                 std::optional<py::array_t<float, pyArrayFlags>> &runTransform,
+                 const std::optional<py::array_t<uint32_t, pyArrayFlags>>
+                     &faceID,
+                 const std::optional<py::array_t<float, pyArrayFlags>>
+                     &halfedgeTangent,
+                 float precision) {
+                MeshGL out;
 
-            out.numProp = vertProp.shape(1);
-            vertProp = vertProp.reshape({-1});
-            out.vertProperties = std::vector<float>(
-                vertProp.data(), vertProp.data() + vertProp.size());
+                out.numProp = vertProp.shape(1);
+                vertProp = vertProp.reshape({-1});
+                out.vertProperties = toVector<float>(vertProp);
 
-            if (triVerts.ndim() != 2 || triVerts.shape(1) != 3)
-              throw std::runtime_error(
-                  "Invalid tri_verts shape, expected (-1, 3)");
-            triVerts = triVerts.reshape({-1});
-            out.triVerts = std::vector<uint32_t>(
-                triVerts.data(), triVerts.data() + triVerts.size());
+                if (triVerts.ndim() != 2 || triVerts.shape(1) != 3)
+                  throw std::runtime_error(
+                      "Invalid tri_verts shape, expected (-1, 3)");
+                triVerts = triVerts.reshape({-1});
+                out.triVerts = toVector<uint32_t>(triVerts);
 
-            if (mergeFromVert.has_value())
-              out.mergeFromVert = mergeFromVert.value();
+                if (mergeFromVert.has_value())
+                  out.mergeFromVert = toVector<uint32_t>(mergeFromVert.value());
 
-            if (mergeToVert.has_value()) out.mergeToVert = mergeToVert.value();
+                if (mergeToVert.has_value())
+                  out.mergeToVert = toVector<uint32_t>(mergeToVert.value());
 
-            if (runIndex.has_value()) out.runIndex = runIndex.value();
+                if (runIndex.has_value())
+                  out.runIndex = toVector<uint32_t>(runIndex.value());
 
-            if (runOriginalID.has_value())
-              out.runOriginalID = runOriginalID.value();
+                if (runOriginalID.has_value())
+                  out.runOriginalID = toVector<uint32_t>(runOriginalID.value());
 
-            if (runTransform.has_value()) {
-              auto runTransform1 = runTransform.value();
-              if (runTransform1.ndim() != 3 || runTransform1.shape(1) != 4 ||
-                  runTransform1.shape(2) != 3)
-                throw std::runtime_error(
-                    "Invalid run_transform shape, expected (-1, 4, 3)");
-              runTransform1 = runTransform1.reshape({-1});
-              out.runTransform = std::vector<float>(
-                  runTransform1.data(),
-                  runTransform1.data() + runTransform1.size());
-            }
+                if (runTransform.has_value()) {
+                  auto runTransform1 = runTransform.value();
+                  if (runTransform1.ndim() != 3 ||
+                      runTransform1.shape(1) != 4 ||
+                      runTransform1.shape(2) != 3)
+                    throw std::runtime_error(
+                        "Invalid run_transform shape, expected (-1, 4, 3)");
+                  runTransform1 = runTransform1.reshape({-1});
+                  out.runTransform = toVector<float>(runTransform1);
+                }
 
-            if (faceID.has_value()) out.faceID = faceID.value();
+                if (faceID.has_value())
+                  out.faceID = toVector<uint32_t>(faceID.value());
 
-            if (halfedgeTangent.has_value()) {
-              auto halfedgeTangent1 = halfedgeTangent.value();
-              if (halfedgeTangent1.ndim() != 3 ||
-                  halfedgeTangent1.shape(1) != 3 ||
-                  halfedgeTangent1.shape(2) != 4)
-                throw std::runtime_error(
-                    "Invalid halfedge_tangent shape, expected (-1, 3, 4)");
-              halfedgeTangent1 = halfedgeTangent1.reshape({-1});
-              out.halfedgeTangent = std::vector<float>(
-                  halfedgeTangent1.data(),
-                  halfedgeTangent1.data() + halfedgeTangent1.size());
-            }
+                if (halfedgeTangent.has_value()) {
+                  auto halfedgeTangent1 = halfedgeTangent.value();
+                  if (halfedgeTangent1.ndim() != 3 ||
+                      halfedgeTangent1.shape(1) != 3 ||
+                      halfedgeTangent1.shape(2) != 4)
+                    throw std::runtime_error(
+                        "Invalid halfedge_tangent shape, expected (-1, 3, 4)");
+                  halfedgeTangent1 = halfedgeTangent1.reshape({-1});
+                  out.halfedgeTangent = toVector<float>(halfedgeTangent1);
+                }
 
-            return out;
-          }),
+                return out;
+              }),
           py::arg("vert_properties"), py::arg("tri_verts"),
           py::arg("merge_from_vert") = py::none(),
           py::arg("merge_to_vert") = py::none(),
@@ -560,15 +573,36 @@ PYBIND11_MODULE(manifold3d, m) {
           py::arg("run_transform") = py::none(),
           py::arg("face_id") = py::none(),
           py::arg("halfedge_tangent") = py::none(), py::arg("precision") = 0)
-      .def_readonly("vert_properties", &MeshGL::vertProperties)
-      .def_readonly("tri_verts", &MeshGL::triVerts)
+      .def_property_readonly(
+          "vert_properties",
+          [](const MeshGL &self) {
+            return py::array(self.vertProperties.size(),
+                             self.vertProperties.data())
+                .reshape(std::array<int, 2>{-1, (int)self.numProp});
+          })
+      .def_property_readonly("tri_verts",
+                             [](const MeshGL &self) {
+                               return py::array(self.triVerts.size(),
+                                                self.triVerts.data())
+                                   .reshape(std::array<int, 2>{-1, 3});
+                             })
+      .def_property_readonly("run_transform",
+                             [](const MeshGL &self) {
+                               return py::array(self.runTransform.size(),
+                                                self.runTransform.data())
+                                   .reshape(std::array<int, 3>{-1, 4, 3});
+                             })
+      .def_property_readonly("halfedge_tangent",
+                             [](const MeshGL &self) {
+                               return py::array(self.halfedgeTangent.size(),
+                                                self.halfedgeTangent.data())
+                                   .reshape(std::array<int, 3>{-1, 3, 4});
+                             })
       .def_readonly("merge_from_vert", &MeshGL::mergeFromVert)
       .def_readonly("merge_to_vert", &MeshGL::mergeToVert)
       .def_readonly("run_index", &MeshGL::runIndex)
       .def_readonly("run_original_id", &MeshGL::runOriginalID)
-      .def_readonly("run_transform", &MeshGL::runTransform)
       .def_readonly("face_id", &MeshGL::faceID)
-      .def_readonly("halfedge_tangent", &MeshGL::halfedgeTangent)
       .def_readonly("num_prop", &MeshGL::numProp);
 
   py::enum_<CrossSection::FillRule>(m, "FillRule")
