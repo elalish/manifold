@@ -30,6 +30,7 @@
 #define MANIFOLD_PAR_NS omp
 #elif MANIFOLD_PAR == 'T'
 #include <thrust/system/tbb/execution_policy.h>
+
 #include <algorithm>
 #include <execution>
 #define MANIFOLD_PAR_NS tbb
@@ -209,7 +210,8 @@ OutputIterator copy_if(ExecutionPolicy policy, InputIterator1 first,
     return thrust::copy_if(thrust::cpp::par, first, last, stencil, result,
                            pred);
   else
-    // note: this is not a typo, see https://github.com/NVIDIA/thrust/issues/1977
+    // note: this is not a typo, see
+    // https://github.com/NVIDIA/thrust/issues/1977
     return thrust::copy_if(first, last, stencil, result, pred);
 }
 template <typename DerivedPolicy, typename InputIterator1,

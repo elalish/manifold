@@ -20,10 +20,10 @@
 #endif
 #include <list>
 #include <map>
+#include <memory_resource>
 #include <queue>
 #include <set>
 #include <stack>
-#include <memory_resource>
 
 #include "optional_assert.h"
 
@@ -314,8 +314,8 @@ class Monotones {
 
   std::pmr::monotonic_buffer_resource mbr;
   std::pmr::polymorphic_allocator<int> pa{&mbr};
-  std::pmr::list<VertAdj> monotones_{pa};     // sweep-line list of verts
-  std::pmr::list<EdgePair> activePairs_{pa};  // west to east list of monotone edge pairs
+  std::pmr::list<VertAdj> monotones_{pa};       // sweep-line list of verts
+  std::pmr::list<EdgePair> activePairs_{pa};    // west to east monotone edges
   std::pmr::list<EdgePair> inactivePairs_{pa};  // completed monotones
   float precision_;  // a triangle of this height or less is degenerate
 
