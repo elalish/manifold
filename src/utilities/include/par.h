@@ -25,14 +25,13 @@
 #include <thrust/uninitialized_copy.h>
 #include <thrust/unique.h>
 
-#include <algorithm>
-#include <execution>
-
 #if MANIFOLD_PAR == 'O'
 #include <thrust/system/omp/execution_policy.h>
 #define MANIFOLD_PAR_NS omp
 #elif MANIFOLD_PAR == 'T'
 #include <thrust/system/tbb/execution_policy.h>
+#include <algorithm>
+#include <execution>
 #define MANIFOLD_PAR_NS tbb
 #else
 #define MANIFOLD_PAR_NS cpp

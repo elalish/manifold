@@ -15,7 +15,9 @@
 #include "polygon.h"
 
 #include <algorithm>
+#if MANIFOLD_PAR == 'T'
 #include <execution>
+#endif
 #include <list>
 #include <map>
 #include <queue>
@@ -785,7 +787,11 @@ class Monotones {
         starts.push_back(v);
       }
     }
+#if MANIFOLD_PAR == 'T'
     std::sort(std::execution::par_unseq, starts.begin(), starts.end(), cmp);
+#else
+    std::sort(starts.begin(), starts.end(), cmp);
+#endif
 
     std::vector<VertItr> skipped;
     VertItr insertAt = monotones_.begin();
