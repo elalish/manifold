@@ -209,6 +209,7 @@ OutputIterator copy_if(ExecutionPolicy policy, InputIterator1 first,
     return thrust::copy_if(thrust::cpp::par, first, last, stencil, result,
                            pred);
   else
+    // note: this is not a typo, see https://github.com/NVIDIA/thrust/issues/1977
     return thrust::copy_if(first, last, stencil, result, pred);
 }
 template <typename DerivedPolicy, typename InputIterator1,
