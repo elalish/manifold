@@ -25,6 +25,9 @@
 #include <thrust/uninitialized_copy.h>
 #include <thrust/unique.h>
 
+#include <algorithm>
+#include <execution>
+
 #if MANIFOLD_PAR == 'O'
 #include <thrust/system/omp/execution_policy.h>
 #define MANIFOLD_PAR_NS omp
@@ -143,7 +146,6 @@ THRUST_DYNAMIC_BACKEND_VOID(gather)
 THRUST_DYNAMIC_BACKEND_VOID(scatter)
 THRUST_DYNAMIC_BACKEND_VOID(for_each)
 THRUST_DYNAMIC_BACKEND_VOID(for_each_n)
-THRUST_DYNAMIC_BACKEND_VOID(sort)
 THRUST_DYNAMIC_BACKEND_VOID(stable_sort)
 THRUST_DYNAMIC_BACKEND_VOID(fill)
 THRUST_DYNAMIC_BACKEND_VOID(sequence)
@@ -152,7 +154,6 @@ THRUST_DYNAMIC_BACKEND_VOID(stable_sort_by_key)
 THRUST_DYNAMIC_BACKEND_VOID(copy)
 THRUST_DYNAMIC_BACKEND_VOID(transform)
 THRUST_DYNAMIC_BACKEND_VOID(inclusive_scan)
-THRUST_DYNAMIC_BACKEND_VOID(exclusive_scan)
 THRUST_DYNAMIC_BACKEND_VOID(uninitialized_fill)
 THRUST_DYNAMIC_BACKEND_VOID(uninitialized_copy)
 THRUST_DYNAMIC_BACKEND_VOID(copy_n)
@@ -165,9 +166,6 @@ THRUST_DYNAMIC_BACKEND(binary_search, bool)
 // void implies that the user have to specify the return type in the template
 // argument, as we are unable to deduce it
 THRUST_DYNAMIC_BACKEND(remove, void)
-THRUST_DYNAMIC_BACKEND(copy_if, void)
-THRUST_DYNAMIC_BACKEND(remove_if, void)
-THRUST_DYNAMIC_BACKEND(unique, void)
 THRUST_DYNAMIC_BACKEND(find, void)
 THRUST_DYNAMIC_BACKEND(find_if, void)
 THRUST_DYNAMIC_BACKEND(reduce_by_key, void)
@@ -175,4 +173,60 @@ THRUST_DYNAMIC_BACKEND(transform_reduce, void)
 THRUST_DYNAMIC_BACKEND(lower_bound, void)
 THRUST_DYNAMIC_BACKEND(gather_if, void)
 
+#if MANIFOLD_PAR == 'T' && !MANIFOLD_USE_CUDA
+// these are faster when compiled with gcc
+template <typename Ret = void, typename... Args>
+Ret remove_if(ExecutionPolicy policy, Args... args) {
+  if (policy == ExecutionPolicy::Seq)
+    return std::remove_if(args...);
+  else
+    return std::remove_if(std::execution::par_unseq, args...);
+}
+template <typename Ret = void, typename... Args>
+Ret unique(ExecutionPolicy policy, Args... args) {
+  if (policy == ExecutionPolicy::Seq)
+    return std::unique(args...);
+  else
+    return std::unique(std::execution::par_unseq, args...);
+}
+template <typename... Args>
+void sort(ExecutionPolicy policy, Args... args) {
+  if (policy == ExecutionPolicy::Seq)
+    return std::sort(args...);
+  else
+    return std::sort(std::execution::par_unseq, args...);
+}
+template <typename... Args>
+void exclusive_scan(ExecutionPolicy policy, Args... args) {
+  // https://github.com/llvm/llvm-project/issues/59810
+  std::exclusive_scan(args...);
+}
+template <typename DerivedPolicy, typename InputIterator1,
+          typename InputIterator2, typename OutputIterator, typename Predicate>
+OutputIterator copy_if(ExecutionPolicy policy, InputIterator1 first,
+                       InputIterator1 last, InputIterator2 stencil,
+                       OutputIterator result, Predicate pred) {
+  if (policy == ExecutionPolicy::Seq)
+    return thrust::copy_if(thrust::cpp::par, first, last, stencil, result,
+                           pred);
+  else
+    return thrust::copy_if(first, last, stencil, result, pred);
+}
+template <typename DerivedPolicy, typename InputIterator1,
+          typename OutputIterator, typename Predicate>
+OutputIterator copy_if(ExecutionPolicy policy, InputIterator1 first,
+                       InputIterator1 last, OutputIterator result,
+                       Predicate pred) {
+  if (policy == ExecutionPolicy::Seq)
+    return std::copy_if(first, last, result, pred);
+  else
+    return std::copy_if(std::execution::par_unseq, first, last, result, pred);
+}
+#else
+THRUST_DYNAMIC_BACKEND(remove_if, void)
+THRUST_DYNAMIC_BACKEND(unique, void)
+THRUST_DYNAMIC_BACKEND_VOID(sort)
+THRUST_DYNAMIC_BACKEND_VOID(exclusive_scan)
+THRUST_DYNAMIC_BACKEND(copy_if, void)
+#endif
 }  // namespace manifold

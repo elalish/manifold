@@ -15,6 +15,7 @@
 #include "polygon.h"
 
 #include <algorithm>
+#include <execution>
 #include <list>
 #include <map>
 #include <queue>
@@ -784,7 +785,7 @@ class Monotones {
         starts.push_back(v);
       }
     }
-    std::sort(starts.begin(), starts.end(), cmp);
+    std::sort(std::execution::par_unseq, starts.begin(), starts.end(), cmp);
 
     std::vector<VertItr> skipped;
     VertItr insertAt = monotones_.begin();
