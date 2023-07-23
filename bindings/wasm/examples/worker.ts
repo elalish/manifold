@@ -474,7 +474,7 @@ async function exportGLB(manifold?: Manifold) {
     files['3D/3dmodel.model'] = strToU8(model);
     files[fileForContentTypes.name] = strToU8(fileForContentTypes.content);
     const zipFile = zipSync(files);
-    results['threeMFURL'] = URL.createObjectURL(new Blob(
+    results.threeMFURL = URL.createObjectURL(new Blob(
         [zipFile],
         {type: 'application/vnd.ms-package.3dmanufacturing-3dmodel+xml'}));
   }
@@ -482,6 +482,6 @@ async function exportGLB(manifold?: Manifold) {
   const glb = await io.writeBinary(doc);
 
   const blob = new Blob([glb], {type: 'application/octet-stream'});
-  results['glbURL'] = URL.createObjectURL(blob);
+  results.glbURL = URL.createObjectURL(blob);
   self.postMessage(results);
 }
