@@ -15,12 +15,16 @@
 #include "polygon.h"
 
 #include <algorithm>
-#if MANIFOLD_PAR == 'T' && !(_APPLE_)
+#if MANIFOLD_PAR == 'T'
 #include <execution>
 #endif
 #include <list>
 #include <map>
+#if !_APPLE_
 #include <memory_resource>
+#else
+#include <experimental/memory_resource>
+#endif
 #include <queue>
 #include <set>
 #include <stack>
@@ -790,7 +794,7 @@ class Monotones {
         starts.push_back(v);
       }
     }
-#if MANIFOLD_PAR == 'T' && !(_APPLE_)
+#if MANIFOLD_PAR == 'T'
     std::sort(std::execution::par_unseq, starts.begin(), starts.end(), cmp);
 #else
     std::sort(starts.begin(), starts.end(), cmp);

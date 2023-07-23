@@ -32,9 +32,7 @@
 #include <thrust/system/tbb/execution_policy.h>
 
 #include <algorithm>
-#if !(_APPLE_)
 #include <execution>
-#endif
 #define MANIFOLD_PAR_NS tbb
 #else
 #define MANIFOLD_PAR_NS cpp
@@ -175,7 +173,7 @@ THRUST_DYNAMIC_BACKEND(transform_reduce, void)
 THRUST_DYNAMIC_BACKEND(lower_bound, void)
 THRUST_DYNAMIC_BACKEND(gather_if, void)
 
-#if MANIFOLD_PAR == 'T' && !MANIFOLD_USE_CUDA && !(_APPLE_)
+#if MANIFOLD_PAR == 'T'
 // these are faster when compiled with gcc
 template <typename Ret = void, typename... Args>
 Ret remove_if(ExecutionPolicy policy, Args... args) {
