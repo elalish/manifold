@@ -35,7 +35,7 @@ if __name__ == "__main__":
         model = module.run()
         mesh = model.to_mesh()
         if export_models:
-            if mesh.num_prop > 3:
+            if mesh.vert_properties.shape[1] > 3:
                 vertices = np.hsplit(mesh.vert_properties, 3)[0]
             else:
                 vertices = mesh.vert_properties

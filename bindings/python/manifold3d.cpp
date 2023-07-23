@@ -29,6 +29,10 @@ typedef std::tuple<float, float, float> Float3;
 
 constexpr auto pyArrayFlags = py::array::c_style | py::array::forcecast;
 
+PYBIND11_MAKE_OPAQUE(std::vector<int>);
+PYBIND11_MAKE_OPAQUE(std::vector<uint32_t>);
+PYBIND11_MAKE_OPAQUE(std::vector<float>);
+
 template <typename T>
 std::vector<T> toVector(const py::array_t<T> &arr) {
   return std::vector<T>(arr.data(), arr.data() + arr.size());
@@ -493,7 +497,7 @@ PYBIND11_MODULE(manifold3d, m) {
                   "marking sets of triangles that can be looked up after "
                   "further operations. Assign to MeshGL.runOriginalID vector");
 
-  py::class_<MeshGL>(m, "MeshGL")
+  py::class_<MeshGL>(m, "Mesh")
       .def(
           // note that reshape requires mutable array_t, but this will not
           // affect the original array passed into the function
@@ -602,8 +606,7 @@ PYBIND11_MODULE(manifold3d, m) {
       .def_readonly("merge_to_vert", &MeshGL::mergeToVert)
       .def_readonly("run_index", &MeshGL::runIndex)
       .def_readonly("run_original_id", &MeshGL::runOriginalID)
-      .def_readonly("face_id", &MeshGL::faceID)
-      .def_readonly("num_prop", &MeshGL::numProp);
+      .def_readonly("face_id", &MeshGL::faceID);
 
   py::enum_<CrossSection::FillRule>(m, "FillRule")
       .value("EvenOdd", CrossSection::FillRule::EvenOdd,
