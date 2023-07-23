@@ -15,7 +15,7 @@
 #include "polygon.h"
 
 #include <algorithm>
-#if MANIFOLD_PAR == 'T'
+#if MANIFOLD_PAR == 'T' && !(__APPLE__)
 #include <execution>
 #endif
 #include <list>
@@ -790,7 +790,7 @@ class Monotones {
         starts.push_back(v);
       }
     }
-#if MANIFOLD_PAR == 'T'
+#if MANIFOLD_PAR == 'T' && !(__APPLE__)
     std::sort(std::execution::par_unseq, starts.begin(), starts.end(), cmp);
 #else
     std::sort(starts.begin(), starts.end(), cmp);

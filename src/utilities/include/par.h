@@ -173,7 +173,7 @@ THRUST_DYNAMIC_BACKEND(transform_reduce, void)
 THRUST_DYNAMIC_BACKEND(lower_bound, void)
 THRUST_DYNAMIC_BACKEND(gather_if, void)
 
-#if MANIFOLD_PAR == 'T' && !MANIFOLD_USE_CUDA
+#if MANIFOLD_PAR == 'T' && !MANIFOLD_USE_CUDA && !(__APPLE__)
 // these are faster when compiled with gcc
 template <typename Ret = void, typename... Args>
 Ret remove_if(ExecutionPolicy policy, Args... args) {
