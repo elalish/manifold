@@ -794,7 +794,7 @@ class Monotones {
         starts.push_back(v);
       }
     }
-#if MANIFOLD_PAR == 'T'
+#if MANIFOLD_PAR == 'T' && !(_APPLE_)
     std::sort(std::execution::par_unseq, starts.begin(), starts.end(), cmp);
 #else
     std::sort(starts.begin(), starts.end(), cmp);
