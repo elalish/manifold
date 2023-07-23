@@ -20,10 +20,10 @@
 #endif
 #include <list>
 #include <map>
-#if !_APPLE_
-#include <memory_resource>
-#else
+#if _APPLE_
 #include <experimental/memory_resource>
+#else
+#include <memory_resource>
 #endif
 #include <queue>
 #include <set>
