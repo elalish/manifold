@@ -15,8 +15,14 @@
 #include "polygon.h"
 
 #include <algorithm>
+#if MANIFOLD_PAR == 'T'
+#include <execution>
+#endif
 #include <list>
 #include <map>
+#if !__APPLE__
+#include <memory_resource>
+#endif
 #include <queue>
 #include <set>
 #include <stack>
@@ -303,14 +309,25 @@ class Monotones {
 
  private:
   struct VertAdj;
-  typedef std::list<VertAdj>::iterator VertItr;
   struct EdgePair;
-  typedef std::list<EdgePair>::iterator PairItr;
   enum VertType { Start, WestSide, EastSide, Merge, End, Skip };
+#if __APPLE__
+  typedef std::list<VertAdj>::iterator VertItr;
+  typedef std::list<EdgePair>::iterator PairItr;
 
-  std::list<VertAdj> monotones_;     // sweep-line list of verts
-  std::list<EdgePair> activePairs_;  // west to east list of monotone edge pairs
+  std::list<VertAdj> monotones_;       // sweep-line list of verts
+  std::list<EdgePair> activePairs_;    // west to east monotone edges
   std::list<EdgePair> inactivePairs_;  // completed monotones
+#else
+  typedef std::pmr::list<VertAdj>::iterator VertItr;
+  typedef std::pmr::list<EdgePair>::iterator PairItr;
+
+  std::pmr::monotonic_buffer_resource mbr;
+  std::pmr::polymorphic_allocator<int> pa{&mbr};
+  std::pmr::list<VertAdj> monotones_{pa};       // sweep-line list of verts
+  std::pmr::list<EdgePair> activePairs_{pa};    // west to east monotone edges
+  std::pmr::list<EdgePair> inactivePairs_{pa};  // completed monotones
+#endif
   float precision_;  // a triangle of this height or less is degenerate
 
   /**
@@ -392,7 +409,7 @@ class Monotones {
   class Triangulator {
    public:
     Triangulator(VertItr vert, float precision) : precision_(precision) {
-      reflex_chain_.push(vert);
+      reflex_chain_.push_back(vert);
       other_side_ = vert;
     }
     int NumTriangles() const { return triangles_output_; }
@@ -407,14 +424,14 @@ class Monotones {
      */
     void ProcessVert(const VertItr vi, bool onRight, bool last,
                      std::vector<glm::ivec3> &triangles) {
-      VertItr v_top = reflex_chain_.top();
+      VertItr v_top = reflex_chain_.back();
       if (reflex_chain_.size() < 2) {
-        reflex_chain_.push(vi);
+        reflex_chain_.push_back(vi);
         onRight_ = onRight;
         return;
       }
-      reflex_chain_.pop();
-      VertItr vj = reflex_chain_.top();
+      reflex_chain_.pop_back();
+      VertItr vj = reflex_chain_.back();
       if (onRight_ == onRight && !last) {
         // This only creates enough triangles to ensure the reflex chain is
         // still reflex.
@@ -423,13 +440,13 @@ class Monotones {
         while (ccw == (onRight_ ? 1 : -1) || ccw == 0) {
           AddTriangle(triangles, vi, vj, v_top);
           v_top = vj;
-          reflex_chain_.pop();
+          reflex_chain_.pop_back();
           if (reflex_chain_.empty()) break;
-          vj = reflex_chain_.top();
+          vj = reflex_chain_.back();
           ccw = CCW(vi->pos, vj->pos, v_top->pos, precision_);
         }
-        reflex_chain_.push(v_top);
-        reflex_chain_.push(vi);
+        reflex_chain_.push_back(v_top);
+        reflex_chain_.push_back(vi);
       } else {
         // This branch empties the reflex chain and switches sides. It must be
         // used for the last point, as it will output all the triangles
@@ -438,19 +455,19 @@ class Monotones {
         onRight_ = !onRight_;
         VertItr v_last = v_top;
         while (!reflex_chain_.empty()) {
-          vj = reflex_chain_.top();
+          vj = reflex_chain_.back();
           AddTriangle(triangles, vi, v_last, vj);
           v_last = vj;
-          reflex_chain_.pop();
+          reflex_chain_.pop_back();
         }
-        reflex_chain_.push(v_top);
-        reflex_chain_.push(vi);
+        reflex_chain_.push_back(v_top);
+        reflex_chain_.push_back(vi);
         other_side_ = v_top;
       }
     }
 
    private:
-    std::stack<VertItr> reflex_chain_;
+    std::vector<VertItr> reflex_chain_;
     VertItr other_side_;  // The end vertex across from the reflex chain
     bool onRight_;        // The side the reflex chain is on
     int triangles_output_ = 0;
@@ -784,7 +801,11 @@ class Monotones {
         starts.push_back(v);
       }
     }
+#if MANIFOLD_PAR == 'T' && !(__APPLE__)
+    std::sort(std::execution::par_unseq, starts.begin(), starts.end(), cmp);
+#else
     std::sort(starts.begin(), starts.end(), cmp);
+#endif
 
     std::vector<VertItr> skipped;
     VertItr insertAt = monotones_.begin();
