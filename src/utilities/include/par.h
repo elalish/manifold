@@ -139,7 +139,7 @@ inline ExecutionPolicy autoPolicy(int size) {
     thrust::NAME(thrust::cpp::par, args...);                 \
   }
 
-#if MANIFOLD_PAR == 'T' && !(_APPLE)
+#if MANIFOLD_PAR == 'T' && !(__APPLE__)
 // sometimes stl variant is faster
 #define STL_DYNAMIC_BACKEND(NAME, RET)                        \
   template <typename Ret = RET, typename... Args>             \

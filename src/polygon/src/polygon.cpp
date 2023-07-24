@@ -20,9 +20,7 @@
 #endif
 #include <list>
 #include <map>
-#if _APPLE_
-#include <experimental/memory_resource>
-#else
+#if !__APPLE__
 #include <memory_resource>
 #endif
 #include <queue>
@@ -311,16 +309,25 @@ class Monotones {
 
  private:
   struct VertAdj;
-  typedef std::pmr::list<VertAdj>::iterator VertItr;
   struct EdgePair;
-  typedef std::pmr::list<EdgePair>::iterator PairItr;
   enum VertType { Start, WestSide, EastSide, Merge, End, Skip };
+#if __APPLE__
+  typedef std::list<VertAdj>::iterator VertItr;
+  typedef std::list<EdgePair>::iterator PairItr;
+
+  std::list<VertAdj> monotones_;       // sweep-line list of verts
+  std::list<EdgePair> activePairs_;    // west to east monotone edges
+  std::list<EdgePair> inactivePairs_;  // completed monotones
+#else
+  typedef std::pmr::list<VertAdj>::iterator VertItr;
+  typedef std::pmr::list<EdgePair>::iterator PairItr;
 
   std::pmr::monotonic_buffer_resource mbr;
   std::pmr::polymorphic_allocator<int> pa{&mbr};
   std::pmr::list<VertAdj> monotones_{pa};       // sweep-line list of verts
   std::pmr::list<EdgePair> activePairs_{pa};    // west to east monotone edges
   std::pmr::list<EdgePair> inactivePairs_{pa};  // completed monotones
+#endif
   float precision_;  // a triangle of this height or less is degenerate
 
   /**
@@ -794,7 +801,7 @@ class Monotones {
         starts.push_back(v);
       }
     }
-#if MANIFOLD_PAR == 'T' && !(_APPLE_)
+#if MANIFOLD_PAR == 'T' && !(__APPLE__)
     std::sort(std::execution::par_unseq, starts.begin(), starts.end(), cmp);
 #else
     std::sort(starts.begin(), starts.end(), cmp);
