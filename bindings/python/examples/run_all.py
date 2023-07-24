@@ -18,6 +18,7 @@ import pathlib
 import sys
 import importlib
 import trimesh
+import numpy as np
 from time import time
 
 if __name__ == "__main__":
@@ -34,8 +35,11 @@ if __name__ == "__main__":
         model = module.run()
         mesh = model.to_mesh()
         if export_models:
-            meshOut = trimesh.Trimesh(
-                vertices=mesh.vert_pos, faces=mesh.tri_verts)
+            if mesh.vert_properties.shape[1] > 3:
+                vertices = np.hsplit(mesh.vert_properties, 3)[0]
+            else:
+                vertices = mesh.vert_properties
+            meshOut = trimesh.Trimesh(vertices=vertices, faces=mesh.tri_verts)
             trimesh.exchange.export.export_mesh(meshOut, f'{f}.glb', 'glb')
             print(f'Exported model to {f}.glb')
         t1 = time()
