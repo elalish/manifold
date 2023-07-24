@@ -287,7 +287,8 @@ SparseIndices Collider::Collisions(const VecDH<T>& queriesIn) const {
                  {thrust::pair<int*, int*>(nullptr, nullptr), counts.ptrD(),
                   nodeBBox_.ptrD(), internalChildren_.ptrD()}));
   // compute start index for each query and total count
-  exclusive_scan(policy, counts.begin(), counts.end(), counts.begin());
+  exclusive_scan(policy, counts.begin(), counts.end(), counts.begin(), 0,
+                 std::plus<int>());
   SparseIndices queryTri(counts.back());
   // actually recording collisions
   for_each_n(policy, zip(queriesIn.cbegin(), countAt(0)), queriesIn.size(),
