@@ -255,6 +255,31 @@ PYBIND11_MODULE(manifold3d, m) {
           "\n\n"
           ":param warpFunc: A function that modifies a given vertex position.")
       .def(
+          "set_properties",
+          [](Manifold &self, int newNumProp,
+             const std::function<void(py::array_t<float> &, Float3,
+                                      const py::array_t<float> &)> &f) {
+            const int oldNumProp = self.NumProp();
+            return self.SetProperties(newNumProp, [newNumProp, oldNumProp, &f](
+                                                      float *newProps,
+                                                      glm::vec3 v,
+                                                      const float *oldProps) {
+              f(py::array(newNumProp, newProps), std::make_tuple(v.x, v.y, v.z),
+                py::array(oldNumProp, oldProps));
+            });
+          },
+          py::arg("new_num_prop"), py::arg("f"),
+          "Create a new copy of this manifold with updated vertex properties "
+          "by supplying a function that takes the existing position and "
+          "properties as input. You may specify any number of output "
+          "properties, allowing creation and removal of channels. Note: "
+          "undefined behavior will result if you read past the number of input "
+          "properties or write past the number of output properties."
+          "\n\n"
+          ":param numProp: The new number of properties per vertex."
+          ":param propFunc: A function that modifies the properties of a given "
+          "vertex.")
+      .def(
           "refine", [](Manifold &self, int n) { return self.Refine(n); },
           py::arg("n"),
           "Increase the density of the mesh by splitting every edge into n "
@@ -428,6 +453,13 @@ PYBIND11_MODULE(manifold3d, m) {
       .def_static(
           "from_mesh", [](const MeshGL &mesh) { return Manifold(mesh); },
           py::arg("mesh"))
+      .def_static(
+          "compose",
+          [](const std::vector<Manifold> &list) {
+            return Manifold::Compose(list);
+          },
+          "combine several manifolds into one without checking for "
+          "intersections.")
       .def_static(
           "tetrahedron", []() { return Manifold::Tetrahedron(); },
           "Constructs a tetrahedron centered at the origin with one vertex at "
