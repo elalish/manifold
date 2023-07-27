@@ -39,7 +39,7 @@ function initialized(worker) {
   });
 }
 
-let objectURL = null;
+let glbURL = null;
 
 async function runExample(name) {
   const worker = new ManifoldWorker();
@@ -55,12 +55,12 @@ async function runExample(name) {
 
     worker.onmessage = async function(e) {
       try {
-        URL.revokeObjectURL(objectURL);
-        objectURL = e.data.objectURL;
-        if (objectURL == null) {
-          reject('no objectURL');
+        URL.revokeObjectURL(glbURL);
+        glbURL = e.data.glbURL;
+        if (glbURL == null) {
+          reject('no glbURL)');
         }
-        const docIn = await io.read(objectURL);
+        const docIn = await io.read(glbURL);
         const nodes = docIn.getRoot().listNodes();
         for (const node of nodes) {
           const mesh = node.getMesh();
