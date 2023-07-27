@@ -347,7 +347,8 @@ function finishRun() {
 }
 
 const mv = document.querySelector('model-viewer');
-let objectURL = null;
+let glbURL = null;
+let threeMFURL = null;
 let manifoldWorker = null;
 
 function createWorker() {
@@ -370,10 +371,16 @@ function createWorker() {
     finishRun();
     runButton.disabled = true;
 
-    URL.revokeObjectURL(objectURL);
-    objectURL = e.data.objectURL;
-    mv.src = objectURL;
-    if (objectURL == null) {
+    if (threeMFURL != undefined) {
+      URL.revokeObjectURL(threeMFURL);
+      threeMFURL = undefined;
+    }
+    URL.revokeObjectURL(glbURL);
+    glbURL = e.data.glbURL;
+    threeMFURL = e.data.threeMFURL;
+    threemfButton.disabled = threeMFURL == undefined;
+    mv.src = glbURL;
+    if (glbURL == null) {
       mv.showPoster();
       poster.textContent = 'Error';
       createWorker();
@@ -411,10 +418,18 @@ runButton.onclick = function() {
   }
 };
 
-const downloadButton = document.querySelector('#download');
-downloadButton.onclick = function() {
+const glbButton = document.querySelector('#glb');
+glbButton.onclick = function() {
   const link = document.createElement('a');
   link.download = 'manifold.glb';
-  link.href = objectURL;
+  link.href = glbURL;
+  link.click();
+};
+
+const threemfButton = document.querySelector('#threemf');
+threemfButton.onclick = function() {
+  const link = document.createElement('a');
+  link.download = 'manifold.3mf';
+  link.href = threeMFURL;
   link.click();
 };
