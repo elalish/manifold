@@ -130,24 +130,24 @@ model-viewer {
 
 .header .margin {
   font-size: 16px;
-  margin: 1em;
-}
-
-#file {
-  width: 250px;
+  margin: 1em 0.5em;
 }
 
 .dropdown {
   display: none;
   position: absolute;
   z-index: 1;
-  width: 250px;
+  width: 100%;
   max-height: 80vh;
   overflow-y: auto;
 }
 
 .show {
   display: block;
+}
+
+.hide {
+  display: none;
 }
 
 .uparrow {
@@ -174,6 +174,7 @@ model-viewer {
   position: absolute;
   width: 36px;
   top: 0px;
+  right: 0px;
   background-size: 20px;
   background-repeat: no-repeat;
   background-position: center;
@@ -193,7 +194,6 @@ model-viewer {
 
 .trash {
   background-image: url(/icons/trash.png);
-  right: 0px;
 }
 
 .icon:hover {
@@ -212,6 +212,15 @@ model-viewer {
   background-color: rgb(255, 177, 177);
 }
 
+#file-margin {
+  position: relative;
+  width: 250px;
+}
+
+#save {
+  width: 125px;
+}
+
 @media only screen and (max-width: 600px) {
   .container {
     flex-direction: column;
@@ -220,5 +229,31 @@ model-viewer {
 
   .col {
     width: 100%;
+    height: 50%;
+  }
+
+  #file-margin {
+    width: calc(100% - 32px);
+  }
+
+  p {
+    margin: .2em 1em;
+    text-align: center;
+  }
+
+  .header .margin {
+    margin: 0.2em 16px;
+  }
+
+  #button-container {
+    flex-direction: row;
+    margin-left: 8px;
+    margin-right: 8px;
+    width: calc(100% - 16px);
+  }
+
+  #button-container .margin {
+    width: calc(50% - 16px);
+    margin: 8px;
   }
 }
