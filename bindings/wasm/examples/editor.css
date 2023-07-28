@@ -133,21 +133,21 @@ model-viewer {
   margin: 1em;
 }
 
-#file {
-  width: 250px;
-}
-
 .dropdown {
   display: none;
   position: absolute;
   z-index: 1;
-  width: 250px;
+  width: 100%;
   max-height: 80vh;
   overflow-y: auto;
 }
 
 .show {
   display: block;
+}
+
+.hide {
+  display: none;
 }
 
 .uparrow {
@@ -174,6 +174,7 @@ model-viewer {
   position: absolute;
   width: 36px;
   top: 0px;
+  right: 0px;
   background-size: 20px;
   background-repeat: no-repeat;
   background-position: center;
@@ -193,7 +194,6 @@ model-viewer {
 
 .trash {
   background-image: url(/icons/trash.png);
-  right: 0px;
 }
 
 .icon:hover {

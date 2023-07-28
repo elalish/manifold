@@ -40,16 +40,25 @@
   <div class="page">
     <div class="container header" style="background-color: #A288B3;">
       <p style="flex: 2;"><a target="_blank" href="https://github.com/elalish/manifold">Manifold</a>CAD </p>
-      <div class="margin" style="position: relative;">
-        <button type="button" id="file" class="blue"><b class="uparrow"></b>&nbsp;&nbsp;<span
+      <div class="margin" style="position: relative; width: 250px;">
+        <button type="button" id="file" class="blue item"><b class="uparrow"></b>&nbsp;&nbsp;<span
             id="current">Intro</span></button>
-        <div class="dropdown">
+        <div class="dropdown" id="fileDropdown">
           <button type="button" class="green item" id="new">New</button>
         </div>
       </div>
       <button type="button" id="compile" class="margin green" disabled><span>Run</span></button>
-      <button type="button" id="glb" class="blue margin">Save GLB</button>
-      <button type="button" id="threemf" class="blue margin">Save 3MF</button>
+      <div id="save" class="margin" style="position: relative; width: 125px;">
+        <div class="item">
+          <button type="button" id="glb" class="blue item">Save GLB</button>
+          <button type="button" class="icon"><b class="uparrow" style="right: 2px;"></b></button>
+        </div>
+        <div class="dropdown" id="saveDropdown">
+          <div class="item">
+            <button type="button" id="threemf" class="blue item">Save 3MF</button>
+          </div>
+        </div>
+      </div>
     </div>
     <div class="container" style="flex: 2;">
       <div id="editor" class="col"></div>
