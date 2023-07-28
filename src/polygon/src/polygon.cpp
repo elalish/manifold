@@ -20,7 +20,7 @@
 #endif
 #include <list>
 #include <map>
-#if !__APPLE__
+#if __has_include(<memory_resource>)
 #include <memory_resource>
 #endif
 #include <queue>
@@ -311,14 +311,7 @@ class Monotones {
   struct VertAdj;
   struct EdgePair;
   enum VertType { Start, WestSide, EastSide, Merge, End, Skip };
-#if __APPLE__
-  typedef std::list<VertAdj>::iterator VertItr;
-  typedef std::list<EdgePair>::iterator PairItr;
-
-  std::list<VertAdj> monotones_;       // sweep-line list of verts
-  std::list<EdgePair> activePairs_;    // west to east monotone edges
-  std::list<EdgePair> inactivePairs_;  // completed monotones
-#else
+#if __has_include(<memory_resource>)
   typedef std::pmr::list<VertAdj>::iterator VertItr;
   typedef std::pmr::list<EdgePair>::iterator PairItr;
 
@@ -327,6 +320,13 @@ class Monotones {
   std::pmr::list<VertAdj> monotones_{pa};       // sweep-line list of verts
   std::pmr::list<EdgePair> activePairs_{pa};    // west to east monotone edges
   std::pmr::list<EdgePair> inactivePairs_{pa};  // completed monotones
+#else
+  typedef std::list<VertAdj>::iterator VertItr;
+  typedef std::list<EdgePair>::iterator PairItr;
+
+  std::list<VertAdj> monotones_;       // sweep-line list of verts
+  std::list<EdgePair> activePairs_;    // west to east monotone edges
+  std::list<EdgePair> inactivePairs_;  // completed monotones
 #endif
   float precision_;  // a triangle of this height or less is degenerate
 
