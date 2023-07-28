@@ -358,8 +358,10 @@ function finishRun() {
 }
 
 const mv = document.querySelector('model-viewer');
-let glbURL = null;
-let threeMFURL = null;
+const output = {
+  glbURL: null,
+  threeMFURL: null
+};
 let manifoldWorker = null;
 
 function createWorker() {
@@ -382,16 +384,16 @@ function createWorker() {
     finishRun();
     runButton.disabled = true;
 
-    if (threeMFURL != undefined) {
-      URL.revokeObjectURL(threeMFURL);
-      threeMFURL = undefined;
+    if (output.threeMFURL != null) {
+      URL.revokeObjectURL(output.threeMFURL);
+      output.threeMFURL = null;
     }
-    URL.revokeObjectURL(glbURL);
-    glbURL = e.data.glbURL;
-    threeMFURL = e.data.threeMFURL;
-    threemfButton.disabled = threeMFURL == undefined;
-    mv.src = glbURL;
-    if (glbURL == null) {
+    URL.revokeObjectURL(output.glbURL);
+    output.glbURL = e.data.glbURL;
+    output.threeMFURL = e.data.threeMFURL;
+    threemfButton.disabled = output.threeMFURL == null;
+    mv.src = output.glbURL;
+    if (output.glbURL == null) {
       mv.showPoster();
       poster.textContent = 'Error';
       createWorker();
@@ -429,32 +431,24 @@ runButton.onclick = function() {
   }
 };
 
+function clickSave(saveButton, filename, outputName) {
+  const container = saveButton.parentElement;
+  return () => {
+    const oldSave = saveContainer.firstElementChild;
+    if (oldSave !== container) {
+      saveDropdown.insertBefore(oldSave, saveDropdown.firstElementChild);
+      saveContainer.insertBefore(container, saveDropdown);
+      container.appendChild(saveArrow.parentElement);
+    }
+    const link = document.createElement('a');
+    link.download = filename;
+    link.href = output[outputName];
+    link.click();
+  };
+}
+
 const glbButton = document.querySelector('#glb');
-const glbContainer = glbButton.parentElement;
-glbButton.onclick = function() {
-  const oldSave = saveContainer.firstElementChild;
-  if (oldSave !== glbContainer) {
-    saveDropdown.insertBefore(oldSave, saveDropdown.firstElementChild);
-    saveContainer.insertBefore(glbContainer, saveDropdown);
-    glbContainer.appendChild(saveArrow.parentElement);
-  }
-  const link = document.createElement('a');
-  link.download = 'manifold.glb';
-  link.href = glbURL;
-  link.click();
-};
+glbButton.onclick = clickSave(glbButton, 'manifold.glb', 'glbURL');
 
 const threemfButton = document.querySelector('#threemf');
-const threemfContainer = threemfButton.parentElement;
-threemfButton.onclick = function() {
-  const oldSave = saveContainer.firstElementChild;
-  if (oldSave !== threemfContainer) {
-    saveDropdown.insertBefore(oldSave, saveDropdown.firstElementChild);
-    saveContainer.insertBefore(threemfContainer, saveDropdown);
-    threemfContainer.appendChild(saveArrow.parentElement);
-  }
-  const link = document.createElement('a');
-  link.download = 'manifold.3mf';
-  link.href = threeMFURL;
-  link.click();
-};
+threemfButton.onclick = clickSave(threemfButton, 'manifold.3mf', 'threeMFURL');
