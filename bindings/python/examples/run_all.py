@@ -36,10 +36,13 @@ if __name__ == "__main__":
         mesh = model.to_mesh()
         if export_models:
             if mesh.vert_properties.shape[1] > 3:
-                vertices = np.hsplit(mesh.vert_properties, 3)[0]
+                vertices = mesh.vert_properties[:, :3]
+                colors = (mesh.vert_properties[:, 3:] * 255).astype(np.uint8)
             else:
                 vertices = mesh.vert_properties
-            meshOut = trimesh.Trimesh(vertices=vertices, faces=mesh.tri_verts)
+                colors = None
+            meshOut = trimesh.Trimesh(vertices=vertices, faces=mesh.tri_verts,
+                                      vertex_colors=colors)
             trimesh.exchange.export.export_mesh(meshOut, f'{f}.glb', 'glb')
             print(f'Exported model to {f}.glb')
         t1 = time()

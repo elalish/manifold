@@ -3,7 +3,8 @@ from manifold3d import Manifold
 
 def fractal(holes, hole, w, position, depth, maxDepth):
     w /= 3
-    holes.append(hole.scale([w, w, 1.0]).translate([position[0], position[1], 0.0]))
+    holes.append(hole.scale([w, w, 1.0]).translate(
+        [position[0], position[1], 0.0]))
     if depth == maxDepth:
         return
     offsets = [
@@ -20,9 +21,8 @@ def fractal(holes, hole, w, position, depth, maxDepth):
         fractal(holes, hole, w, position + offset, depth + 1, maxDepth)
 
 
-def posColors(newProp, pos):
-    for i in [0, 1, 2]:
-        newProp[i] = (1 - pos[i]) / 2
+def posColors(pos, _):
+    return [1 - p / 2 for p in pos] + [1.0]
 
 
 def run(n=1):
@@ -36,4 +36,4 @@ def run(n=1):
     result -= hole.rotate([90, 0, 0])
     result -= hole.rotate([0, 90, 0])
 
-    return result.trim_by_plane([1, 1, 1], 0).setProperties(3, posColors).scale(100)
+    return result.trim_by_plane([1, 1, 1], 0).set_properties(4, posColors).scale(100)

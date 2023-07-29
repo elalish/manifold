@@ -257,15 +257,20 @@ PYBIND11_MODULE(manifold3d, m) {
       .def(
           "set_properties",
           [](Manifold &self, int newNumProp,
-             const std::function<void(py::array_t<float> &, Float3,
-                                      const py::array_t<float> &)> &f) {
+             const std::function<py::array_t<float>(
+                 Float3, const py::array_t<float> &)> &f) {
             const int oldNumProp = self.NumProp();
             return self.SetProperties(newNumProp, [newNumProp, oldNumProp, &f](
                                                       float *newProps,
                                                       glm::vec3 v,
                                                       const float *oldProps) {
-              f(py::array(newNumProp, newProps), std::make_tuple(v.x, v.y, v.z),
-                py::array(oldNumProp, oldProps));
+              auto array = f(std::make_tuple(v.x, v.y, v.z),
+                             py::array(oldNumProp, oldProps));
+              if (array.ndim() != 1 || array.shape(0) != newNumProp)
+                throw std::runtime_error("Invalid vector shape, expected (" +
+                                         std::to_string(newNumProp) + ")");
+              auto array_view = array.unchecked<1>();
+              for (int i = 0; i < newNumProp; i++) newProps[i] = array_view(i);
             });
           },
           py::arg("new_num_prop"), py::arg("f"),
