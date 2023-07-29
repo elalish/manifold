@@ -34,15 +34,13 @@ using namespace manifold;
 
 ExecutionParams params;
 
-#ifdef MANIFOLD_DEBUG
-struct PolyEdge {
-  int startVert, endVert;
-};
-
+// FIXME: temporary hack to avoid a bug (#502) in the triangulator
+// should be guarded by MANIFOLD_DEBUG if the workaround can be removed
 bool OverlapAssert(bool condition, const char *file, int line,
                    const std::string &cond, const std::string &msg) {
-  if (!params.processOverlaps) {
-    ASSERT(condition, geometryErr, msg);
+  if (!params.processOverlaps && !condition) {
+    throw geometryErr(msg);
+    // ASSERT(condition, geometryErr, msg);
   }
   return condition;
 }
@@ -65,6 +63,11 @@ bool OverlapAssert(bool condition, const char *file, int line,
 #define OVERLAP_ASSERT(condition, msg)                                \
   if (!OverlapAssert(condition, __FILE__, __LINE__, #condition, msg)) \
     return true;
+
+#ifdef MANIFOLD_DEBUG
+struct PolyEdge {
+  int startVert, endVert;
+};
 
 #define PRINT(msg) \
   if (params.verbose) std::cout << msg << std::endl;
@@ -188,8 +191,7 @@ void PrintFailure(const std::exception &e, const PolygonsIdx &polys,
   }
 }
 #else
-#define OVERLAP_ASSERT(condition, msg) \
-  if (!(condition)) return true;
+// #define OVERLAP_ASSERT(condition, msg) if (!(condition)) return true;
 #define PRINT(msg)
 #endif
 
@@ -199,7 +201,14 @@ void PrintFailure(const std::exception &e, const PolygonsIdx &polys,
  */
 class Monotones {
  public:
-  Monotones(const PolygonsIdx &polys, float precision) : precision_(precision) {
+  Monotones() {}
+  void Init(const PolygonsIdx &polys, float precision) {
+    // reset monotones
+    precision_ = precision;
+    monotones_.clear();
+    activePairs_.clear();
+    inactivePairs_.clear();
+
     VertItr start, last, current;
     float bound = 0;
     for (const SimplePolygonIdx &poly : polys) {
@@ -1071,7 +1080,19 @@ std::vector<glm::ivec3> TriangulateIdx(const PolygonsIdx &polys,
                                        float precision) {
   std::vector<glm::ivec3> triangles;
   try {
-    Monotones monotones(polys, precision);
+    Monotones monotones;
+    if (params.processOverlaps) {
+      params.processOverlaps = false;
+      try {
+        monotones.Init(polys, 0);
+      } catch (geometryErr &e) {
+        params.processOverlaps = true;
+        monotones.Init(polys, precision);
+      }
+      params.processOverlaps = true;
+    } else {
+      monotones.Init(polys, precision);
+    }
     monotones.Triangulate(triangles);
 #ifdef MANIFOLD_DEBUG
     if (params.intermediateChecks) {

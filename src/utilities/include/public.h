@@ -19,13 +19,12 @@
 #include <glm/gtc/constants.hpp>
 #include <glm/gtx/compatibility.hpp>
 #include <glm/gtx/rotate_vector.hpp>
+#include <iomanip>
 #include <limits>
 #include <memory>
 #include <unordered_map>
 #include <vector>
-
 #ifdef MANIFOLD_DEBUG
-#include <iomanip>
 #include <iostream>
 #include <sstream>
 #endif
@@ -414,6 +413,8 @@ class Quality {
  * Exceptions are only thrown if the MANIFOLD_EXCEPTIONS flag is set. Import and
  * Export of 3D models is only supported with the MANIFOLD_EXPORT flag, which
  * also requires linking in the Assimp dependency.
+ *
+ * FIXME: temporarily moved out of MANIFOLD_DEBUG guard for #502
  *  @{
  */
 
@@ -421,7 +422,6 @@ class Quality {
  *  @brief Custom Exceptions
  * @{
  */
-#ifdef MANIFOLD_DEBUG
 struct userErr : public virtual std::runtime_error {
   using std::runtime_error::runtime_error;
 };
@@ -432,7 +432,6 @@ struct geometryErr : public virtual std::runtime_error {
   using std::runtime_error::runtime_error;
 };
 using logicErr = std::logic_error;
-#endif
 /** @} */
 
 /**
