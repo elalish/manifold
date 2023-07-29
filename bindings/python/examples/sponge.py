@@ -1,4 +1,5 @@
 from manifold3d import Manifold
+import numpy as np
 
 
 def fractal(holes, hole, w, position, depth, maxDepth):
@@ -7,7 +8,7 @@ def fractal(holes, hole, w, position, depth, maxDepth):
         [position[0], position[1], 0.0]))
     if depth == maxDepth:
         return
-    offsets = [
+    offsets = np.array([
         [-w, -w],
         [-w, 0.0],
         [-w, w],
@@ -16,7 +17,7 @@ def fractal(holes, hole, w, position, depth, maxDepth):
         [w, 0.0],
         [w, -w],
         [0.0, -w],
-    ]
+    ])
     for offset in offsets:
         fractal(holes, hole, w, position + offset, depth + 1, maxDepth)
 
@@ -28,7 +29,7 @@ def posColors(pos, _):
 def run(n=1):
     result = Manifold.cube([1, 1, 1], True)
     holes = []
-    fractal(holes, result, 1.0, [0.0, 0.0], 1, n)
+    fractal(holes, result, 1.0, np.array([0.0, 0.0]), 1, n)
 
     hole = Manifold.compose(holes)
 
