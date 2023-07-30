@@ -301,6 +301,23 @@ TEST(Polygon, ColinearY) {
   TestPoly(polys, 16);
 }
 
+TEST(Polygon, NearlyColinearY) {
+  Polygons polys;
+  polys.push_back({
+      {3.5, 0},       //
+      {3.0, 0.5},     //
+      {3.0, 0.0144},  //
+      {2.0, 0.4},     //
+      {1.8, 0.1},     //
+      {1.6, 0.0155},  //
+      {1.5, 0.0147},  //
+      {1.4, 0.0144},  //
+      {1.0, 0.1},     //
+      {0, 0},         //
+  });
+  TestPoly(polys, 8, 0.001);
+}
+
 TEST(Polygon, Concave) {
   Polygons polys;
   polys.push_back({

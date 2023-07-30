@@ -106,7 +106,7 @@ inline HOST_DEVICE int CCW(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2,
   glm::vec2 v2 = p2 - p0;
   float area = v1.x * v2.y - v1.y * v2.x;
   float base2 = glm::max(glm::dot(v1, v1), glm::dot(v2, v2));
-  if (area * area <= base2 * tol * tol)
+  if (area * area * 4 <= base2 * tol * tol)
     return 0;
   else
     return area > 0 ? 1 : -1;
