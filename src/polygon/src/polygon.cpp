@@ -32,7 +32,10 @@
 namespace {
 using namespace manifold;
 
-ExecutionParams params;
+constexpr bool kCheckMonotones = false;
+constexpr bool kCheckTriangulation = true;
+constexpr bool kAllowOverlaps = false;
+static ExecutionParams params;
 
 #ifdef MANIFOLD_DEBUG
 struct PolyEdge {
@@ -41,7 +44,7 @@ struct PolyEdge {
 
 bool OverlapAssert(bool condition, const char *file, int line,
                    const std::string &cond, const std::string &msg) {
-  if (!params.processOverlaps) {
+  if (!kAllowOverlaps) {
     ASSERT(condition, geometryErr, msg);
   }
   return condition;
@@ -52,7 +55,7 @@ bool OverlapAssert(bool condition, const char *file, int line,
  * the asserted condition is false, it implies the monotone subdivision has
  * failed. This is most likely due to the input polygons being overlapped by
  * more than the input precision, but if not, then it indicates a bug. Either
- * way subdivision processing stops: if params.processOverlaps is false, then an
+ * way subdivision processing stops: if kAllowOverlaps is false, then an
  * exception is thrown. Otherwise this returns true from the sweep function,
  * causing polygons to be left in their original state.
  *
@@ -277,7 +280,7 @@ class Monotones {
   // performed if params.intermediateChecks = true.
   void Check() {
 #ifdef MANIFOLD_DEBUG
-    if (!params.intermediateChecks) return;
+    if (!kCheckMonotones) return;
     std::vector<PolyEdge> edges;
     for (VertItr vert = monotones_.begin(); vert != monotones_.end(); vert++) {
       vert->SetProcessed(false);
@@ -1074,9 +1077,9 @@ std::vector<glm::ivec3> TriangulateIdx(const PolygonsIdx &polys,
     Monotones monotones(polys, precision);
     monotones.Triangulate(triangles);
 #ifdef MANIFOLD_DEBUG
-    if (params.intermediateChecks) {
+    if (kCheckTriangulation) {
       CheckTopology(triangles, polys);
-      if (!params.processOverlaps) {
+      if (!kAllowOverlaps) {
         CheckGeometry(triangles, polys, 2 * monotones.GetPrecision());
       }
     }

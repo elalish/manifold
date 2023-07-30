@@ -26,7 +26,7 @@ namespace {
 using namespace manifold;
 using namespace thrust::placeholders;
 
-ExecutionParams params;
+ExecutionParams manifoldParams;
 
 struct MakeTri {
   const Halfedge* halfedges;
@@ -775,7 +775,7 @@ Manifold Manifold::TrimByPlane(glm::vec3 normal, float originOffset) const {
   return *this ^ Halfspace(BoundingBox(), normal, originOffset);
 }
 
-ExecutionParams& ManifoldParams() { return params; }
+ExecutionParams& ManifoldParams() { return manifoldParams; }
 
 /**
  * Compute the convex hull of a set of points. If the given points are fewer
