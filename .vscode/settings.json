@@ -140,4 +140,8 @@
     "Verts"
   ],
   "javascript.format.semicolons": "insert",
+  "[python]": {
+    "editor.defaultFormatter": "ms-python.black-formatter"
+  },
+  "python.formatting.provider": "none",
 }
