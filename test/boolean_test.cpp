@@ -26,6 +26,8 @@ using namespace manifold;
  * The very simplest Boolean operation test.
  */
 TEST(Boolean, Tetra) {
+  std::cout << (PolygonParams().intermediateChecks ? "true" : "false")
+            << std::endl;
   Manifold tetra = Manifold::Tetrahedron();
   MeshGL tetraGL = WithPositionColors(tetra);
   tetra = Manifold(tetraGL);
@@ -37,6 +39,8 @@ TEST(Boolean, Tetra) {
   ExpectMeshes(result, {{8, 12, 3, 11}});
 
   RelatedGL(result, {tetraGL});
+  std::cout << (PolygonParams().intermediateChecks ? "true" : "false")
+            << std::endl;
 }
 
 TEST(Boolean, MeshGLRoundTrip) {

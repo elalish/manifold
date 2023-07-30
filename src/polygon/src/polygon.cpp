@@ -1074,6 +1074,9 @@ std::vector<glm::ivec3> TriangulateIdx(const PolygonsIdx &polys,
     Monotones monotones(polys, precision);
     monotones.Triangulate(triangles);
 #ifdef MANIFOLD_DEBUG
+    std::cout << "in triangulator: "
+              << (PolygonParams().intermediateChecks ? "true" : "false")
+              << std::endl;
     if (params.intermediateChecks) {
       CheckTopology(triangles, polys);
       if (!params.processOverlaps) {
