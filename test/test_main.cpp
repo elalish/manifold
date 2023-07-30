@@ -64,6 +64,9 @@ int main(int argc, char** argv) {
     }
   }
 
+  manifold::PolygonParams().intermediateChecks = true;
+  manifold::PolygonParams().processOverlaps = false;
+
   return RUN_ALL_TESTS();
 }
 
