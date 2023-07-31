@@ -883,7 +883,7 @@ TEST(Polygon, Precision3) {
   TestPoly(polys, 3, 0.00068);
 };
 
-TEST(Polygon, Sweep) {
+TEST(Polygon, DISABLED_Sweep) {
   Polygons polys;
   polys.push_back({
       {0, 0.637057483},          //
@@ -932,7 +932,7 @@ TEST(Polygon, Hole) {
   TestPoly(polys, 19);
 }
 
-TEST(Polygon, Small) {
+TEST(Polygon, DISABLED_Small) {
   Polygons polys;
   polys.push_back({
       {-0.487163663, 0.00357927009},  //

@@ -548,7 +548,8 @@ class Monotones {
           return Skip;
         }
       } else {
-        if (!eastPair->vEast->right->IsPast(vert, precision_) &&
+        if (!vert->IsPast(vert->right, precision_) &&
+            !eastPair->vEast->right->IsPast(vert, precision_) &&
             vert->IsPast(eastPair->vEast, precision_) &&
             vert->pos.x > eastPair->vEast->right->pos.x + precision_) {
           PRINT("Skip WEST");
@@ -560,7 +561,8 @@ class Monotones {
       }
     } else {
       if (vert->left->Processed()) {
-        if (!westPair->vWest->left->IsPast(vert, precision_) &&
+        if (!vert->IsPast(vert->left, precision_) &&
+            !westPair->vWest->left->IsPast(vert, precision_) &&
             vert->IsPast(westPair->vWest, precision_) &&
             vert->pos.x < westPair->vWest->left->pos.x - precision_) {
           PRINT("Skip EAST");

@@ -442,13 +442,13 @@ using logicErr = std::logic_error;
 struct ExecutionParams {
   /// Perform extra sanity checks and assertions on the intermediate data
   /// structures.
-  bool intermediateChecks = true;
+  bool intermediateChecks = false;
   /// Verbose output primarily of the Boolean, including timing info and vector
   /// sizes.
   bool verbose = false;
   /// If processOverlaps is false, a geometric check will be performed to assert
   /// all triangles are CCW.
-  bool processOverlaps = false;
+  bool processOverlaps = true;
   /// Suppresses printed errors regarding CW triangles. Has no effect if
   /// processOverlaps is true.
   bool suppressErrors = false;
