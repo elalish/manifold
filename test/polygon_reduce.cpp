@@ -84,6 +84,28 @@ void DumpTriangulation(const Polygons &polys) {
   }
 }
 
+bool triangulationValid(Polygons &polys, std::vector<glm::ivec3> triangles) {
+  std::vector<std::pair<glm::vec2, glm::vec2>> triangleEdges(triangles.size() *
+                                                             3);
+  for (auto &tri : triangles) {
+    auto x = findIndex(polys, tri.x);
+    auto y = findIndex(polys, tri.y);
+    auto z = findIndex(polys, tri.z);
+    triangleEdges.push_back(
+        std::make_pair(polys[x.first][x.second], polys[y.first][y.second]));
+    triangleEdges.push_back(
+        std::make_pair(polys[y.first][y.second], polys[z.first][z.second]));
+    triangleEdges.push_back(
+        std::make_pair(polys[z.first][z.second], polys[x.first][x.second]));
+  }
+  return std::all_of(triangleEdges.begin(), triangleEdges.end(), [&](auto &p) {
+    return all_of(ExecutionPolicy::Par, triangleEdges.begin(),
+                  triangleEdges.end(), [&](auto &q) {
+                    return !intersect(p.first, p.second, q.first, q.second);
+                  });
+  });
+}
+
 // we are assuming polys is valid
 // we try to remove vertices from polys such that
 // 1. the updated polys is still valid (no overlapping edges)
@@ -103,28 +125,8 @@ void simplify(Polygons &polys, float precision = -1) {
           polys[i].erase(polys[i].begin() + j);
           try {
             auto result = Triangulate(polys, precision);
-            std::vector<std::pair<glm::vec2, glm::vec2>> triangleEdges(
-                result.size() * 3);
-            for (auto &tri : result) {
-              auto x = findIndex(polys, tri.x);
-              auto y = findIndex(polys, tri.y);
-              auto z = findIndex(polys, tri.z);
-              triangleEdges.push_back(std::make_pair(polys[x.first][x.second],
-                                                     polys[y.first][y.second]));
-              triangleEdges.push_back(std::make_pair(polys[y.first][y.second],
-                                                     polys[z.first][z.second]));
-              triangleEdges.push_back(std::make_pair(polys[z.first][z.second],
-                                                     polys[x.first][x.second]));
-            }
             // if triangles are non-overlapping, it is fine
-            if (std::all_of(
-                    triangleEdges.begin(), triangleEdges.end(), [&](auto &p) {
-                      return all_of(ExecutionPolicy::Par, triangleEdges.begin(),
-                                    triangleEdges.end(), [&](auto &q) {
-                                      return !intersect(p.first, p.second,
-                                                        q.first, q.second);
-                                    });
-                    })) {
+            if (triangulationValid(polys, result)) {
               polys[i].insert(polys[i].begin() + j, removed);
             } else {
               removedSomething = true;
