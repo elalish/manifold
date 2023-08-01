@@ -33,13 +33,13 @@ bool safeToRemove(Polygons &polys, int i, int j) {
   int prev = j == 0 ? polys[i].size() - 1 : (j - 1);
   int next = j == (polys[i].size() - 1) ? 0 : (j + 1);
   for (int k = 0; k < polys.size(); k++) {
-    if (!std::all_of(countAt(0lu), countAt(polys[k].size()), [&](int l) {
-          int ll = l == (polys[k].size() - 1) ? 0 : (l + 1);
-          if (i == k && (l == j || ll == j)) return true;
-          bool intersected = intersect(polys[i][prev], polys[i][next],
-                                       polys[k][l], polys[k][ll]);
-          return !intersected;
-        }))
+    if (!all_of(ExecutionPolicy::Par, countAt(0lu), countAt(polys[k].size()),
+                [&](int l) {
+                  int ll = l == (polys[k].size() - 1) ? 0 : (l + 1);
+                  if (i == k && (l == j || ll == j)) return true;
+                  return !intersect(polys[i][prev], polys[i][next], polys[k][l],
+                                    polys[k][ll]);
+                }))
       return false;
   }
   return true;
@@ -69,10 +69,10 @@ void Dump(const Polygons &polys) {
 }
 
 void DumpTriangulation(const Polygons &polys) {
-  bool oldProcessOverlaps = manifold::PolygonParams().processOverlaps;
+  ExecutionParams oldParams = PolygonParams();
   manifold::PolygonParams().processOverlaps = true;
   auto result = Triangulate(polys);
-  manifold::PolygonParams().processOverlaps = oldProcessOverlaps;
+  PolygonParams() = oldParams;
   for (auto &tri : result) {
     auto x = findIndex(polys, tri.x);
     auto y = findIndex(polys, tri.y);
@@ -85,22 +85,21 @@ void DumpTriangulation(const Polygons &polys) {
 }
 
 bool triangulationValid(Polygons &polys, std::vector<glm::ivec3> triangles) {
-  std::vector<std::pair<glm::vec2, glm::vec2>> triangleEdges(triangles.size() *
-                                                             3);
+  std::vector<std::pair<glm::vec2, glm::vec2>> edges(3 * triangles.size());
   for (auto &tri : triangles) {
     auto x = findIndex(polys, tri.x);
     auto y = findIndex(polys, tri.y);
     auto z = findIndex(polys, tri.z);
-    triangleEdges.push_back(
+    edges.push_back(
         std::make_pair(polys[x.first][x.second], polys[y.first][y.second]));
-    triangleEdges.push_back(
+    edges.push_back(
         std::make_pair(polys[y.first][y.second], polys[z.first][z.second]));
-    triangleEdges.push_back(
+    edges.push_back(
         std::make_pair(polys[z.first][z.second], polys[x.first][x.second]));
   }
-  return std::all_of(triangleEdges.begin(), triangleEdges.end(), [&](auto &p) {
-    return all_of(ExecutionPolicy::Par, triangleEdges.begin(),
-                  triangleEdges.end(), [&](auto &q) {
+  return std::all_of(edges.begin(), edges.end(), [&](auto &p) {
+    return all_of(ExecutionPolicy::Par, edges.begin(), edges.end(),
+                  [&](auto &q) {
                     return !intersect(p.first, p.second, q.first, q.second);
                   });
   });
@@ -111,6 +110,7 @@ bool triangulationValid(Polygons &polys, std::vector<glm::ivec3> triangles) {
 // 1. the updated polys is still valid (no overlapping edges)
 // 2. error in triangulation (either geometryErr or overlapping triangles)
 void simplify(Polygons &polys, float precision = -1) {
+  ExecutionParams oldParams = PolygonParams();
   PolygonParams().intermediateChecks = true;
   PolygonParams().processOverlaps = false;
   PolygonParams().suppressErrors = true;
@@ -123,7 +123,9 @@ void simplify(Polygons &polys, float precision = -1) {
         if (safeToRemove(polys, i, j)) {
           glm::vec2 removed = polys[i][j];
           polys[i].erase(polys[i].begin() + j);
+#if MANIFOLD_DEBUG
           try {
+#endif
             auto result = Triangulate(polys, precision);
             // if triangles are non-overlapping, it is fine
             if (triangulationValid(polys, result)) {
@@ -131,13 +133,16 @@ void simplify(Polygons &polys, float precision = -1) {
             } else {
               removedSomething = true;
             }
+#if MANIFOLD_DEBUG
           } catch (geometryErr &e) {
             removedSomething = true;
           }
+#endif
         }
       }
     }
   }
+  PolygonParams() = oldParams;
 }
 
 TEST(Simplify, WoodgrainSimplified) {
