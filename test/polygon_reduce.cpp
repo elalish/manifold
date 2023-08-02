@@ -100,10 +100,10 @@ bool triangulationValid(Polygons &polys, std::vector<glm::ivec3> triangles) {
         std::make_pair(polys[z.first][z.second], polys[x.first][x.second]));
   }
   return std::all_of(edges.begin(), edges.end(), [&](auto &p) {
-    return std::all_of(std::execution::par, edges.begin(), edges.end(),
-                  [=](auto &q) {
-                    return !intersect(p.first, p.second, q.first, q.second);
-                  });
+    return std::all_of(
+        std::execution::par, edges.begin(), edges.end(), [=](auto &q) {
+          return !intersect(p.first, p.second, q.first, q.second);
+        });
   });
 }
 
