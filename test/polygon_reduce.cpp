@@ -11,7 +11,8 @@ inline float cross(glm::vec2 p, glm::vec2 q) { return p.x * q.y - p.y * q.x; }
 
 // return true if p intersects with q
 // note that we don't care about collinear, head-to-tail etc.
-bool intersect(glm::vec2 p0, glm::vec2 p1, glm::vec2 q0, glm::vec2 q1) {
+__host__ __device__ bool intersect(glm::vec2 p0, glm::vec2 p1, glm::vec2 q0,
+                                   glm::vec2 q1) {
   glm::vec2 r = p1 - p0;
   glm::vec2 s = q1 - q0;
   float rxs = cross(r, s);
@@ -30,15 +31,16 @@ bool intersect(glm::vec2 p0, glm::vec2 p1, glm::vec2 q0, glm::vec2 q1) {
 
 bool safeToRemove(Polygons &polys, int i, int j) {
   if (polys[i].size() == 3) return false;
-  int prev = j == 0 ? polys[i].size() - 1 : (j - 1);
-  int next = j == (polys[i].size() - 1) ? 0 : (j + 1);
+  glm::vec2 prev = polys[i][j == 0 ? polys[i].size() - 1 : (j - 1)];
+  glm::vec2 next = polys[i][j == (polys[i].size() - 1) ? 0 : (j + 1)];
   for (int k = 0; k < polys.size(); k++) {
+    int ksize = polys[k].size();
+    glm::vec2 *polysk = polys[k].data();
     if (!all_of(ExecutionPolicy::Par, countAt(0lu), countAt(polys[k].size()),
-                [&](int l) {
-                  int ll = l == (polys[k].size() - 1) ? 0 : (l + 1);
+                [=](int l) {
+                  int ll = l == (ksize - 1) ? 0 : (l + 1);
                   if (i == k && (l == j || ll == j)) return true;
-                  return !intersect(polys[i][prev], polys[i][next], polys[k][l],
-                                    polys[k][ll]);
+                  return !intersect(prev, next, polysk[l], polysk[ll]);
                 }))
       return false;
   }
@@ -99,7 +101,7 @@ bool triangulationValid(Polygons &polys, std::vector<glm::ivec3> triangles) {
   }
   return std::all_of(edges.begin(), edges.end(), [&](auto &p) {
     return all_of(ExecutionPolicy::Par, edges.begin(), edges.end(),
-                  [&](auto &q) {
+                  [=](auto &q) {
                     return !intersect(p.first, p.second, q.first, q.second);
                   });
   });
@@ -120,25 +122,24 @@ void simplify(Polygons &polys, float precision = -1) {
     removedSomething = false;
     for (int i = 0; i < polys.size(); i++) {
       for (int j = 0; j < polys[i].size(); j++) {
-        if (safeToRemove(polys, i, j)) {
-          glm::vec2 removed = polys[i][j];
-          polys[i].erase(polys[i].begin() + j);
+        if (!safeToRemove(polys, i, j)) continue;
+        glm::vec2 removed = polys[i][j];
+        polys[i].erase(polys[i].begin() + j);
 #if MANIFOLD_DEBUG
-          try {
+        try {
 #endif
-            auto result = Triangulate(polys, precision);
-            // if triangles are non-overlapping, it is fine
-            if (triangulationValid(polys, result)) {
-              polys[i].insert(polys[i].begin() + j, removed);
-            } else {
-              removedSomething = true;
-            }
-#if MANIFOLD_DEBUG
-          } catch (geometryErr &e) {
+          auto result = Triangulate(polys, precision);
+          // if triangles are non-overlapping, it is fine
+          if (triangulationValid(polys, result)) {
+            polys[i].insert(polys[i].begin() + j, removed);
+          } else {
             removedSomething = true;
           }
-#endif
+#if MANIFOLD_DEBUG
+        } catch (geometryErr &e) {
+          removedSomething = true;
         }
+#endif
       }
     }
   }
@@ -472,6 +473,14 @@ TEST(Simplify, WoodgrainSimplified) {
   });
 
   simplify(polys);
+
+  std::vector<size_t> sizes(polys.size());
+  std::transform(polys.begin(), polys.end(), sizes.begin(),
+                 [](const auto &poly) { return poly.size(); });
+
+  std::vector<size_t> expected{3, 3, 3};
+  ASSERT_EQ(sizes, expected);
+
   Dump(polys);
   std::cout << "-------------" << std::endl;
   DumpTriangulation(polys);
