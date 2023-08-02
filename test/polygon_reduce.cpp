@@ -1,6 +1,6 @@
 #include <algorithm>
+#include <execution>
 
-#include "par.h"
 #include "polygon.h"
 #include "test.h"
 #include "utils.h"
@@ -36,12 +36,12 @@ bool safeToRemove(Polygons &polys, int i, int j) {
   for (int k = 0; k < polys.size(); k++) {
     int ksize = polys[k].size();
     glm::vec2 *polysk = polys[k].data();
-    if (!all_of(ExecutionPolicy::Par, countAt(0lu), countAt(polys[k].size()),
-                [=](int l) {
-                  int ll = l == (ksize - 1) ? 0 : (l + 1);
-                  if (i == k && (l == j || ll == j)) return true;
-                  return !intersect(prev, next, polysk[l], polysk[ll]);
-                }))
+    if (!std::all_of(std::execution::par, countAt(0lu),
+                     countAt(polys[k].size()), [=](int l) {
+                       int ll = l == (ksize - 1) ? 0 : (l + 1);
+                       if (i == k && (l == j || ll == j)) return true;
+                       return !intersect(prev, next, polysk[l], polysk[ll]);
+                     }))
       return false;
   }
   return true;
@@ -100,7 +100,7 @@ bool triangulationValid(Polygons &polys, std::vector<glm::ivec3> triangles) {
         std::make_pair(polys[z.first][z.second], polys[x.first][x.second]));
   }
   return std::all_of(edges.begin(), edges.end(), [&](auto &p) {
-    return all_of(ExecutionPolicy::Par, edges.begin(), edges.end(),
+    return std::all_of(std::execution::par, edges.begin(), edges.end(),
                   [=](auto &q) {
                     return !intersect(p.first, p.second, q.first, q.second);
                   });
