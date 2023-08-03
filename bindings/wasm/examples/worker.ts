@@ -159,20 +159,40 @@ function cleanup() {
 }
 
 interface Mesh3MF {
-  id: string, vertices: Float32Array, indices: Uint32Array
+  id: string;
+  vertices: Float32Array;
+  indices: Uint32Array;
+  name?: string;
 }
 
 interface Child3MF {
-  objectID: string, transform?: mat4
+  objectID: string;
+  transform?: mat4;
 }
 
 interface Component3MF {
-  id: string, children: Array<Child3MF>
+  id: string;
+  children: Array<Child3MF>;
+  name?: string;
+}
+
+interface Header {
+  unit?: 'micron'|'millimeter'|'centimeter'|'inch'|'foot'|'meter';
+  title?: string;
+  author?: string;
+  description?: string;
+  application?: string;
+  creationDate?: string;
+  license?: string;
+  modificationDate?: string;
 }
 
 interface To3MF {
-  meshes: Array<Mesh3MF>, components: Array<Component3MF>,
-      items: Array<Child3MF>
+  meshes: Array<Mesh3MF>;
+  components: Array<Component3MF>;
+  items: Array<Child3MF>;
+  precision: number;
+  header: Header;
 }
 
 class GLTFNode {
@@ -428,14 +448,15 @@ function createNodeFromCache(
     doc: Document, to3MF: To3MF, nodeDef: GLTFNode,
     manifold2node: Map<Manifold, Map<GLTFMaterial, Node>>): Node {
   const node = createGLTFnode(doc, nodeDef);
-  if (nodeDef.manifold != null) {
+  const {manifold} = nodeDef;
+  if (manifold != null) {
     const backupMaterial = getBackupMaterial(nodeDef);
-    const cachedNodes = manifold2node.get(nodeDef.manifold);
+    const cachedNodes = manifold2node.get(manifold);
     if (cachedNodes == null) {
-      addMesh(doc, to3MF, node, nodeDef.manifold, backupMaterial);
+      addMesh(doc, to3MF, node, manifold, backupMaterial);
       const cache = new Map<GLTFMaterial, Node>();
       cache.set(backupMaterial, node);
-      manifold2node.set(nodeDef.manifold, cache);
+      manifold2node.set(manifold, cache);
     } else {
       const cachedNode = cachedNodes.get(backupMaterial);
       if (cachedNode == null) {
@@ -448,16 +469,15 @@ function createNodeFromCache(
         cloneNode(node, cachedNode);
       }
     }
-
-    object2globalID.set(nodeDef, nextGlobalID);
-    to3MF.components.push({
-      id: `${nextGlobalID++}`,
-      children: [{
-        objectID: `${object2globalID.get(nodeDef.manifold)}`,
-        transform: node.getMatrix()
-      }]
-    });
   }
+
+  object2globalID.set(nodeDef, nextGlobalID);
+  to3MF.components.push({
+    id: `${nextGlobalID++}`,
+    name: nodeDef.name,
+    children:
+        manifold == null ? [] : [{objectID: `${object2globalID.get(manifold)}`}]
+  });
   return node;
 }
 
@@ -470,7 +490,18 @@ async function exportModels(manifold?: Manifold) {
                       .setScale([mm2m, mm2m, mm2m]);
   doc.createScene().addChild(wrapper);
 
-  const to3mf = {meshes: [], components: [], items: []} as To3MF;
+  const to3mf = {
+    meshes: [],
+    components: [],
+    items: [],
+    precision: 7,
+    header: {
+      unit: 'millimeter',
+      title: 'ManifoldCAD.org model',
+      description: 'ManifoldCAD.org model',
+      application: 'ManifoldCAD.org',
+    }
+  } as To3MF;
 
   if (nodes.length > 0) {
     const node2gltf = new Map<GLTFNode, Node>();
