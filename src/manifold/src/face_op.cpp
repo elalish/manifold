@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#if __has_include(<tbb/task_arena.h>)
+#if MANIFOLD_PAR == 'T' && __has_include(<tbb/task_arena.h>)
 #include <tbb/task_arena.h>
 
 #include <future>
@@ -44,7 +44,7 @@ void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge,
   triNormal.reserve(halfedge_.size());
   triRef.reserve(halfedge_.size());
 
-#if __has_include(<tbb/task_arena.h>)
+#if MANIFOLD_PAR == 'T' && __has_include(<tbb/task_arena.h>)
   tbb::task_arena arena{tbb::task_arena::attach()};
 
   std::vector<
@@ -129,7 +129,7 @@ void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge,
         triNormal.push_back(normal);
         triRef.push_back(halfedgeRef[firstEdge]);
       }
-#if __has_include(<tbb/task_arena.h>)
+#if MANIFOLD_PAR == 'T' && __has_include(<tbb/task_arena.h>)
     } else if (numEdge >= 8) {
       // We can parallelize complex triangulation and obtain the results from
       // promise later.
@@ -169,7 +169,7 @@ void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge,
     }
   }
 
-#if __has_include(<tbb/task_arena.h>)
+#if MANIFOLD_PAR == 'T' && __has_include(<tbb/task_arena.h>)
   // sort according to numEdge, assuming tasks with small numEdge will finish
   // quicker so we are not waiting for the slow tasks.
   std::sort(slowTasks.begin(), slowTasks.end(),

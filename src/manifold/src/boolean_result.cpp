@@ -15,7 +15,7 @@
 #include <algorithm>
 #include <map>
 
-#if __has_include(<tbb/task_arena.h>)
+#if MANIFOLD_PAR == 'T' && __has_include(<tbb/task_arena.h>)
 #define TBB_PREVIEW_CONCURRENT_ORDERED_CONTAINERS 1
 #include <tbb/concurrent_map.h>
 #include <tbb/parallel_for.h>
@@ -165,7 +165,7 @@ void AddNewEdgeVerts(
   // the output vert index. When forward is false, all is reversed.
   const VecDH<int> &p1 = p1q2.Get(!forward);
   const VecDH<int> &q2 = p1q2.Get(forward);
-#if __has_include(<tbb/task_arena.h>)
+#if MANIFOLD_PAR == 'T' && __has_include(<tbb/task_arena.h>)
   // parallelize operations, requires concurrent_map so we can only enable this
   // with tbb
   if (p1q2.size() > 128) {
