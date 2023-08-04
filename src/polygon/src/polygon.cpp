@@ -15,8 +15,6 @@
 #include "polygon.h"
 
 #include <algorithm>
-
-#include "utils.h"
 #if MANIFOLD_PAR == 'T' && __has_include(<pstl/glue_execution_defs.h>)
 #include <execution>
 #endif
