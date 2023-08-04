@@ -134,9 +134,9 @@ inline ExecutionPolicy autoPolicy(int size) {
         thrust::NAME(thrust::MANIFOLD_PAR_NS::par, args...); \
         break;                                               \
       case ExecutionPolicy::Seq:                             \
+        thrust::NAME(thrust::cpp::par, args...);             \
         break;                                               \
     }                                                        \
-    thrust::NAME(thrust::cpp::par, args...);                 \
   }
 
 #if MANIFOLD_PAR == 'T' && !(__APPLE__)
