@@ -20,6 +20,10 @@
 #include "impl.h"
 #include "polygon.h"
 
+namespace {
+constexpr bool DISABLE_FACE_REORDERING = true;
+}
+
 namespace manifold {
 
 /**
@@ -126,7 +130,7 @@ void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge,
         triRef.push_back(halfedgeRef[firstEdge]);
       }
 #if MANIFOLD_PAR == 'T' && __has_include(<tbb/tbb.h>)
-    } else if (numEdge >= 8) {
+    } else if (!DISABLE_FACE_REORDERING && numEdge >= 8) {
       // We can parallelize complex triangulation and obtain the results from
       // promise later.
       // Note that this is using tbb instead of std::async, because std::async
