@@ -18,7 +18,6 @@
 #if __has_include(<tbb/task_arena.h>)
 #define TBB_PREVIEW_CONCURRENT_ORDERED_CONTAINERS 1
 #include <tbb/concurrent_map.h>
-#include <tbb/mutex.h>
 #include <tbb/parallel_for.h>
 
 template <typename K, typename V>
@@ -172,7 +171,7 @@ void AddNewEdgeVerts(
   if (p1q2.size() > 128) {
     // ideally we should have 1 mutex per key, but 64 is enough to avoid
     // contention for most of the cases
-    std::array<tbb::mutex, 128> mutexes;
+    std::array<std::mutex, 128> mutexes;
     static tbb::affinity_partitioner ap;
     tbb::parallel_for(
         tbb::blocked_range<int>(0, p1q2.size(), 32),
