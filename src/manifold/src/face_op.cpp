@@ -12,10 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#if MANIFOLD_PAR == 'T' && __has_include(<tbb/task_arena.h>)
-#include <tbb/task_arena.h>
-
-#include <future>
+#if MANIFOLD_PAR == 'T' && __has_include(<tbb/tbb.h>)
+#include <tbb/tbb.h>
 #endif
 #include <map>
 
@@ -44,12 +42,10 @@ void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge,
   triNormal.reserve(halfedge_.size());
   triRef.reserve(halfedge_.size());
 
-#if MANIFOLD_PAR == 'T' && __has_include(<tbb/task_arena.h>)
-  tbb::task_arena arena{tbb::task_arena::attach()};
+#if MANIFOLD_PAR == 'T' && __has_include(<tbb/tbb.h>)
+  tbb::task_group group;
 
-  std::vector<
-      std::pair<int, std::future<std::pair<int, std::vector<glm::ivec3>>>>>
-      slowTasks;
+  std::vector<std::pair<int, std::vector<glm::ivec3>>> asyncResults;
 #endif
 
   for (int face = 0; face < faceEdge.size() - 1; ++face) {
@@ -129,32 +125,23 @@ void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge,
         triNormal.push_back(normal);
         triRef.push_back(halfedgeRef[firstEdge]);
       }
-#if MANIFOLD_PAR == 'T' && __has_include(<tbb/task_arena.h>)
-    } else if (arena.max_concurrency() > 1 && numEdge >= 8) {
+#if MANIFOLD_PAR == 'T' && __has_include(<tbb/tbb.h>)
+    } else if (numEdge >= 8) {
       // We can parallelize complex triangulation and obtain the results from
       // promise later.
       // Note that this is using tbb instead of std::async, because std::async
       // will create a new thread for every single invocation, which is
       // expensive.
-      //
-      // we need shared_ptr because we need to avoid the promise from being
-      // deallocated.
-      std::shared_ptr<std::promise<std::pair<int, std::vector<glm::ivec3>>>>
-          promise = std::make_shared<
-              std::promise<std::pair<int, std::vector<glm::ivec3>>>>();
-      slowTasks.push_back(std::make_pair(numEdge, promise->get_future()));
-      auto f = [&, face, promise] {
-        try {
-          const glm::vec3 normal = faceNormal_[face];
-          const glm::mat3x2 projection = GetAxisAlignedProjection(normal);
-          const PolygonsIdx polys = Face2Polygons(face, projection, faceEdge);
-          std::vector<glm::ivec3> newTris = TriangulateIdx(polys, precision_);
-          promise->set_value(std::make_pair(face, std::move(newTris)));
-        } catch (const std::exception&) {
-          promise->set_exception(std::current_exception());
-        }
+      int count = asyncResults.size();
+      asyncResults.emplace_back();
+      auto f = [&, face, count] {
+        const glm::vec3 normal = faceNormal_[face];
+        const glm::mat3x2 projection = GetAxisAlignedProjection(normal);
+        const PolygonsIdx polys = Face2Polygons(face, projection, faceEdge);
+        std::vector<glm::ivec3> newTris = TriangulateIdx(polys, precision_);
+        asyncResults[count] = std::make_pair(face, std::move(newTris));
       };
-      arena.enqueue(f);
+      group.run(f);
 #endif
     } else {  // General triangulation
       const glm::mat3x2 projection = GetAxisAlignedProjection(normal);
@@ -169,13 +156,9 @@ void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge,
     }
   }
 
-#if MANIFOLD_PAR == 'T' && __has_include(<tbb/task_arena.h>)
-  // sort according to numEdge, assuming tasks with small numEdge will finish
-  // quicker so we are not waiting for the slow tasks.
-  std::sort(slowTasks.begin(), slowTasks.end(),
-            [](const auto& p1, const auto& p2) { return p1.first < p2.first; });
-  for (auto& task : slowTasks) {
-    const auto pair = task.second.get();
+#if MANIFOLD_PAR == 'T' && __has_include(<tbb/tbb.h>)
+  group.wait();
+  for (auto& pair : asyncResults) {
     const int face = pair.first;
     const int firstEdge = faceEdge[face];
     const glm::vec3 normal = faceNormal_[face];
