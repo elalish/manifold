@@ -143,7 +143,7 @@ PolygonsIdx Manifold::Impl::Face2Polygons(int face, glm::mat3x2 projection,
   const int firstEdge = faceEdge[face];
   const int lastEdge = faceEdge[face + 1];
 
-  std::map<int, int> vert_edge;
+  std::unordered_map<int, int> vert_edge;
   for (int edge = firstEdge; edge < lastEdge; ++edge) {
     const bool inserted =
         vert_edge.emplace(std::make_pair(halfedge_[edge].startVert, edge))

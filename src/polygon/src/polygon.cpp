@@ -15,7 +15,9 @@
 #include "polygon.h"
 
 #include <algorithm>
-#if MANIFOLD_PAR == 'T'
+
+#include "utils.h"
+#if MANIFOLD_PAR == 'T' && __has_include(<pstl/glue_execution_defs.h>)
 #include <execution>
 #endif
 #include <list>
@@ -83,6 +85,7 @@ std::vector<PolyEdge> Polygons2Edges(const PolygonsIdx &polys) {
 std::vector<PolyEdge> Triangles2Edges(
     const std::vector<glm::ivec3> &triangles) {
   std::vector<PolyEdge> halfedges;
+  halfedges.reserve(triangles.size() * 3);
   for (const glm::ivec3 &tri : triangles) {
     halfedges.push_back({tri[0], tri[1]});
     halfedges.push_back({tri[1], tri[2]});
@@ -143,7 +146,7 @@ void CheckTopology(const std::vector<glm::ivec3> &triangles,
 
 void CheckGeometry(const std::vector<glm::ivec3> &triangles,
                    const PolygonsIdx &polys, float precision) {
-  std::map<int, glm::vec2> vertPos;
+  std::unordered_map<int, glm::vec2> vertPos;
   for (const auto &poly : polys) {
     for (int i = 0; i < poly.size(); ++i) {
       vertPos[poly[i].idx] = poly[i].pos;
@@ -803,7 +806,7 @@ class Monotones {
         starts.push_back(v);
       }
     }
-#if MANIFOLD_PAR == 'T' && !(__APPLE__)
+#if MANIFOLD_PAR == 'T' && __has_include(<pstl/glue_execution_defs.h>)
     std::sort(std::execution::par_unseq, starts.begin(), starts.end(), cmp);
 #else
     std::sort(starts.begin(), starts.end(), cmp);
