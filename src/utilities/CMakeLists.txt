@@ -36,6 +36,7 @@ elseif(MANIFOLD_PAR STREQUAL "TBB")
     if(NOT TBB_FOUND)
         message(STATUS "tbb not found, downloading from source")
         include(FetchContent)
+        set(TBB_TEST OFF CACHE INTERNAL "" FORCE)
         FetchContent_Declare(TBB
           GIT_REPOSITORY https://github.com/oneapi-src/oneTBB.git
           # versions afterward forces -D_FORTIFY_SOURCE=2
@@ -44,11 +45,6 @@ elseif(MANIFOLD_PAR STREQUAL "TBB")
           GIT_SHALLOW    TRUE
           GIT_PROGRESS   TRUE
         )
-        if (NOT MSVC)
-            set(TBB_COMMON_COMPILE_FLAGS "-Wno-uninitialized")
-            set(TBB_TEST_COMPILE_FLAGS "-Wno-address")
-        endif()
-        set(TBB_TEST off)
         FetchContent_MakeAvailable(TBB)
     endif()
     target_compile_options(${PROJECT_NAME} PUBLIC -DMANIFOLD_PAR='T')
