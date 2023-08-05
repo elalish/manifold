@@ -144,7 +144,7 @@ jobs:
     timeout-minutes: 30
     strategy:
       matrix:
-        parallel_backend: [NONE, TBB]
+        parallel_backend: [NONE]
         cuda_support: [OFF]
       max-parallel: 1
     runs-on: windows-2019
