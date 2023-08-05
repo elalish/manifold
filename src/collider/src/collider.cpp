@@ -343,10 +343,10 @@ SparseIndices Collider::Collisions(const VecDH<T>& queriesIn) const {
   SparseIndices queryTri(size);
   size = 0;
   localStore.combine_each([&](const auto& pair) {
-    copy(autoPolicy(pair.first.size()), pair.first.begin(), pair.first.end(),
-         queryTri.begin(false) + size);
-    copy(autoPolicy(pair.first.size()), pair.second.begin(), pair.second.end(),
-         queryTri.begin(true) + size);
+    copy_host(autoPolicy(pair.first.size()), pair.first.begin(),
+              pair.first.end(), queryTri.begin(false) + size);
+    copy_host(autoPolicy(pair.first.size()), pair.second.begin(),
+              pair.second.end(), queryTri.begin(true) + size);
     size += pair.first.size();
   });
   return queryTri;
