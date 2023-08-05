@@ -24,6 +24,7 @@ option(MANIFOLD_DEBUG "Enable debug tracing/timing" OFF)
 option(MANIFOLD_USE_CUDA "Enable GPU support via CUDA" OFF)
 option(MANIFOLD_PYBIND "Build python bindings" ON)
 option(MANIFOLD_CBIND "Build C (FFI) bindings" OFF)
+option(TRACY_ENABLE "Use tracy profiling" OFF) 
 set(MANIFOLD_PAR "NONE" CACHE STRING "Parallel backend, either \"TBB\" or \"OpenMP\" or \"NONE\"")
 set(MANIFOLD_FLAGS -O3)
 
