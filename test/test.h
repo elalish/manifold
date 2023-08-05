@@ -13,9 +13,17 @@
 // limitations under the License.
 
 #pragma once
+#include <ostream>
 #include "gtest/gtest.h"
 #include "manifold.h"
 #include "public.h"
+
+// somehow gcc11 + gtest 1.11.0 is unable to print glm::ivec3
+namespace glm {
+  inline void PrintTo(const ivec3& point, std::ostream* os) {
+      *os << "(" << point.x << "," << point.y << "," << point.x << ")";
+  }
+}
 
 using namespace manifold;
 
