@@ -32,22 +32,18 @@ if(EMSCRIPTEN)
   message("Building for Emscripten")
   set(MANIFOLD_FLAGS -fexceptions -D_LIBCUDACXX_HAS_THREAD_API_EXTERNAL -D_LIBCUDACXX_HAS_THREAD_API_CUDA)
   set(CMAKE_EXE_LINKER_FLAGS ${CMAKE_EXE_LINKER_FLAGS} -sALLOW_MEMORY_GROWTH=1)
+  set(MANIFOLD_PYBIND OFF)
 endif()
 
-option(PYBIND11_FINDPYTHON "Enable PyBind to perform FindPython for you" ON)
+if(MANIFOLD_PYBIND)
+find_package(Python COMPONENTS Interpreter Development.Module REQUIRED)
+endif()
 
 option(BUILD_TEST_CGAL "Build CGAL performance comparisons" OFF)
 
 option(BUILD_SHARED_LIBS "Build dynamic/shared libraries" OFF)
 set(PYBIND11_DIR ${PROJECT_SOURCE_DIR}/bindings/python/third_party/pybind11)
 set(THRUST_INC_DIR ${PROJECT_SOURCE_DIR}/src/third_party/thrust)
-
-if(BUILD_SHARED_LIBS OR MANIFOLD_CBIND)
-  # Allow shared libraries to be relocatable (add Place Independent Code flag).
-  # Also include when statically linking C bindings to avoid issues with bundling
-  # artefacts in host languages using them for FFI.
-  add_compile_options(-fPIC)
-endif()
 
 if(MANIFOLD_USE_CUDA)
   enable_language(CUDA)

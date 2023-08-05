@@ -15,7 +15,7 @@
 project(utilities)
 
 file(GLOB_RECURSE SOURCE_FILES CONFIGURE_DEPENDS *.cpp)
-add_library(${PROJECT_NAME} OBJECT ${SOURCE_FILES})
+add_library(${PROJECT_NAME} ${SOURCE_FILES})
 
 message("CUDA Support: ${MANIFOLD_USE_CUDA}")
 message("Parallel Backend: ${MANIFOLD_PAR}")
@@ -37,6 +37,7 @@ elseif(MANIFOLD_PAR STREQUAL "TBB")
         message(STATUS "tbb not found, downloading from source")
         include(FetchContent)
         set(TBB_TEST OFF CACHE INTERNAL "" FORCE)
+        set(TBB_STRICT OFF CACHE INTERNAL "" FORCE)
         FetchContent_Declare(TBB
           GIT_REPOSITORY https://github.com/oneapi-src/oneTBB.git
           # versions afterward forces -D_FORTIFY_SOURCE=2

@@ -15,7 +15,7 @@
 project (polygon)
 
 file(GLOB_RECURSE SOURCE_FILES CONFIGURE_DEPENDS *.cpp)
-add_library(${PROJECT_NAME} OBJECT ${SOURCE_FILES})
+add_library(${PROJECT_NAME} ${SOURCE_FILES})
 
 target_include_directories(${PROJECT_NAME}
     PUBLIC ${PROJECT_SOURCE_DIR}/include
