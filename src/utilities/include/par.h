@@ -29,6 +29,7 @@
 #include <thrust/system/omp/execution_policy.h>
 #define MANIFOLD_PAR_NS omp
 #elif MANIFOLD_PAR == 'T'
+#include <tbb/tbb.h>
 #include <thrust/system/tbb/execution_policy.h>
 
 #include <algorithm>

@@ -217,6 +217,54 @@ struct FindCollisions {
   }
 };
 
+template <typename T, const bool selfCollision>
+struct FindCollisionsTbb {
+  const Box* nodeBBox_;
+  const thrust::pair<int, int>* internalChildren_;
+  std::vector<int>& queryIds;
+  std::vector<int>& leafIds;
+
+  int RecordCollision(int node, const T queryObj, int queryIdx) {
+    bool overlaps = nodeBBox_[node].DoesOverlap(queryObj);
+    if (overlaps && IsLeaf(node)) {
+      const int leafIdx = Node2Leaf(node);
+      if (!selfCollision || leafIdx != queryIdx) {
+        queryIds.push_back(queryIdx);
+        leafIds.push_back(leafIdx);
+      }
+    }
+    return overlaps && IsInternal(node);  // Should traverse into node
+  }
+
+  void operator()(const T& queryObj, int queryIdx) {
+    // stack cannot overflow because radix tree has max depth 30 (Morton code) +
+    // 32 (index).
+    int stack[64];
+    int top = -1;
+    // Depth-first search
+    int node = kRoot;
+    // same implies that this query do not have any collision
+    while (1) {
+      int internal = Node2Internal(node);
+      int child1 = internalChildren_[internal].first;
+      int child2 = internalChildren_[internal].second;
+
+      int traverse1 = RecordCollision(child1, queryObj, queryIdx);
+      int traverse2 = RecordCollision(child2, queryObj, queryIdx);
+
+      if (!traverse1 && !traverse2) {
+        if (top < 0) break;   // done
+        node = stack[top--];  // get a saved node
+      } else {
+        node = traverse1 ? child1 : child2;  // go here next
+        if (traverse1 && traverse2) {
+          stack[++top] = child2;  // save the other for later
+        }
+      }
+    }
+  }
+};
+
 struct BuildInternalBoxes {
   Box* nodeBBox_;
   int* counter_;
@@ -276,6 +324,33 @@ Collider::Collider(const VecDH<Box>& leafBB,
  */
 template <const bool selfCollision, typename T>
 SparseIndices Collider::Collisions(const VecDH<T>& queriesIn) const {
+#if MANIFOLD_PAR == 'T'
+  static tbb::affinity_partitioner ap;
+  tbb::combinable<std::pair<std::vector<int>, std::vector<int>>> localStore;
+  tbb::parallel_for(
+      tbb::blocked_range<int>(0, queriesIn.size()),
+      [&](const tbb::blocked_range<int>& range) {
+        FindCollisionsTbb<T, selfCollision> functor{
+            nodeBBox_.ptrD(), internalChildren_.ptrD(),
+            localStore.local().first, localStore.local().second};
+        for (int i = range.begin(); i != range.end(); ++i) {
+          functor(queriesIn[i], i);
+        }
+      },
+      ap);
+  size_t size = 0;
+  localStore.combine_each([&](const auto& pair) { size += pair.first.size(); });
+  SparseIndices queryTri(size);
+  size = 0;
+  localStore.combine_each([&](const auto& pair) {
+    copy(autoPolicy(pair.first.size()), pair.first.begin(), pair.first.end(),
+         queryTri.begin(false) + size);
+    copy(autoPolicy(pair.first.size()), pair.second.begin(), pair.second.end(),
+         queryTri.begin(true) + size);
+    size += pair.first.size();
+  });
+  return queryTri;
+#else
   // note that the length is 1 larger than the number of queries so the last
   // element can store the sum when using exclusive scan
   VecDH<int> counts(queriesIn.size() + 1, 0);
@@ -296,6 +371,7 @@ SparseIndices Collider::Collisions(const VecDH<T>& queriesIn) const {
                  {queryTri.ptrDpq(), counts.ptrD(), nodeBBox_.ptrD(),
                   internalChildren_.ptrD()}));
   return queryTri;
+#endif
 }
 
 /**
