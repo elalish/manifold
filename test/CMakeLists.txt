@@ -27,8 +27,8 @@ set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
 set(INSTALL_GMOCK OFF CACHE BOOL "" FORCE)
 
-find_package(GTest)
-if(NOT GTest_FOUND)
+find_package(GTest 1.12)
+if((NOT GTest_FOUND) OR NOT(GTest_VERSION GREATER_EQUAL 1.12))
   message(STATUS "GTest not found, downloading from source")
   include(FetchContent)
   FetchContent_Declare(googletest
@@ -36,12 +36,18 @@ if(NOT GTest_FOUND)
     GIT_TAG        v1.14.0
     GIT_SHALLOW    TRUE
     GIT_PROGRESS   TRUE
+    OVERRIDE_FIND_PACKAGE
   )
   FetchContent_MakeAvailable(googletest)
 endif()
 
+if(NOT TARGET GTest::GTest)
+    add_library(GTest::GTest ALIAS gtest)
+    add_library(GTest::Main ALIAS gtest_main)
+endif()
+
 add_executable(${PROJECT_NAME} ${SOURCE_FILES})
-target_link_libraries(${PROJECT_NAME} polygon gtest manifold sdf samples samplesGPU cross_section)
+target_link_libraries(${PROJECT_NAME} polygon GTest::GTest manifold sdf samples samplesGPU cross_section)
 
 if (TRACY_ENABLE)
   include(FetchContent)

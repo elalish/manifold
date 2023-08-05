@@ -66,14 +66,16 @@ endif()
 
 if(NOT MSVC)
   set(WARNING_FLAGS -Werror -Wall -Wno-sign-compare -Wno-unused)
-  add_compile_options(
+  set(MANIFOLD_FLAGS
+    "${MANIFOLD_FLAGS}"
     "$<$<COMPILE_LANGUAGE:CXX>:${WARNING_FLAGS}>"
     "$<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=${WARNING_FLAGS}>")
 endif()
 
 if(CODE_COVERAGE AND NOT MSVC)
   set(COVERAGE_FLAGS -coverage -fno-inline-small-functions -fkeep-inline-functions -fkeep-static-functions)
-  add_compile_options(
+  set(MANIFOLD_FLAGS
+    "${MANIFOLD_FLAGS}"
     "$<$<COMPILE_LANGUAGE:CXX>:${COVERAGE_FLAGS}>"
     "$<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=-coverage>")
   add_link_options("-coverage")

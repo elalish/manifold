@@ -19,16 +19,13 @@
 #include <glm/gtc/constants.hpp>
 #include <glm/gtx/compatibility.hpp>
 #include <glm/gtx/rotate_vector.hpp>
-#include <limits>
-#include <memory>
-#include <unordered_map>
-#include <vector>
-
-#ifdef MANIFOLD_DEBUG
 #include <iomanip>
 #include <iostream>
+#include <limits>
+#include <memory>
 #include <sstream>
-#endif
+#include <unordered_map>
+#include <vector>
 
 namespace manifold {
 
@@ -454,8 +451,6 @@ struct ExecutionParams {
   bool suppressErrors = false;
 };
 
-#ifdef MANIFOLD_DEBUG
-
 inline std::ostream& operator<<(std::ostream& stream, const Box& box) {
   return stream << "min: " << box.min.x << ", " << box.min.y << ", "
                 << box.min.z << ", "
@@ -514,7 +509,6 @@ void Diff(const std::vector<T>& a, const std::vector<T>& b) {
   std::cout << std::endl;
 }
 /** @} */
-#endif
 }  // namespace manifold
 
 #undef HOST_DEVICE
