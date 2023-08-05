@@ -14,15 +14,13 @@
 
 #if MANIFOLD_PAR == 'T' && __has_include(<tbb/tbb.h>)
 #include <tbb/tbb.h>
+#define TBB_PREVIEW_CONCURRENT_ORDERED_CONTAINERS 1
+#include <tbb/concurrent_map.h>
 #endif
 #include <map>
 
 #include "impl.h"
 #include "polygon.h"
-
-namespace {
-constexpr bool DISABLE_FACE_REORDERING = true;
-}
 
 namespace manifold {
 
@@ -42,16 +40,125 @@ void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge,
   VecDH<glm::vec3> triNormal;
   VecDH<TriRef>& triRef = meshRelation_.triRef;
   triRef.resize(0);
-  triVerts.reserve(halfedge_.size());
-  triNormal.reserve(halfedge_.size());
-  triRef.reserve(halfedge_.size());
-
 #if MANIFOLD_PAR == 'T' && __has_include(<tbb/tbb.h>)
   tbb::task_group group;
+  // map from face to triangle
+  tbb::concurrent_unordered_map<int, std::vector<glm::ivec3>> results;
+  std::vector<int> triCount(faceEdge.size(), 0);
+  for_each(
+      autoPolicy(faceEdge.size()), countAt(0), countAt(faceEdge.size() - 1),
+      [&](int face) {
+        triCount[face] = faceEdge[face + 1] - faceEdge[face] - 2;
+        ASSERT(triCount[face] >= 1, topologyErr,
+               "face has less than three edges.");
+        if (triCount[face] > 2)
+          group.run([&, face] {
+            const glm::vec3 normal = faceNormal_[face];
+            const glm::mat3x2 projection = GetAxisAlignedProjection(normal);
+            const PolygonsIdx polys = Face2Polygons(face, projection, faceEdge);
+            std::vector<glm::ivec3> newTris = TriangulateIdx(polys, precision_);
+            triCount[face] = newTris.size();
+            results[face] = std::move(newTris);
+          });
+      });
+  group.wait();
+  exclusive_scan(autoPolicy(triCount.size()), triCount.begin(), triCount.end(),
+                 triCount.begin(), 0);
+  triVerts.resize(triCount.back());
+  triNormal.resize(triCount.back());
+  triRef.resize(triCount.back());
 
-  std::vector<std::pair<int, std::vector<glm::ivec3>>> asyncResults;
-#endif
+  for_each(
+      autoPolicy(faceEdge.size()), countAt(0), countAt(faceEdge.size() - 1),
+      [&](int face) {
+        const int firstEdge = faceEdge[face];
+        const int lastEdge = faceEdge[face + 1];
+        const int numEdge = lastEdge - firstEdge;
+        const glm::vec3 normal = faceNormal_[face];
+        if (numEdge == 3) {  // Single triangle
+          int mapping[3] = {halfedge_[firstEdge].startVert,
+                            halfedge_[firstEdge + 1].startVert,
+                            halfedge_[firstEdge + 2].startVert};
+          glm::ivec3 tri(halfedge_[firstEdge].startVert,
+                         halfedge_[firstEdge + 1].startVert,
+                         halfedge_[firstEdge + 2].startVert);
+          glm::ivec3 ends(halfedge_[firstEdge].endVert,
+                          halfedge_[firstEdge + 1].endVert,
+                          halfedge_[firstEdge + 2].endVert);
+          if (ends[0] == tri[2]) {
+            std::swap(tri[1], tri[2]);
+            std::swap(ends[1], ends[2]);
+          }
+          ASSERT(ends[0] == tri[1] && ends[1] == tri[2] && ends[2] == tri[0],
+                 topologyErr, "These 3 edges do not form a triangle!");
 
+          triVerts[triCount[face]] = tri;
+          triNormal[triCount[face]] = normal;
+          triRef[triCount[face]] = halfedgeRef[firstEdge];
+        } else if (numEdge == 4) {  // Pair of triangles
+          int mapping[4] = {halfedge_[firstEdge].startVert,
+                            halfedge_[firstEdge + 1].startVert,
+                            halfedge_[firstEdge + 2].startVert,
+                            halfedge_[firstEdge + 3].startVert};
+          const glm::mat3x2 projection = GetAxisAlignedProjection(normal);
+          auto triCCW = [&projection, this](const glm::ivec3 tri) {
+            return CCW(projection * this->vertPos_[tri[0]],
+                       projection * this->vertPos_[tri[1]],
+                       projection * this->vertPos_[tri[2]], precision_) >= 0;
+          };
+
+          glm::ivec3 tri0(halfedge_[firstEdge].startVert,
+                          halfedge_[firstEdge].endVert, -1);
+          glm::ivec3 tri1(-1, -1, tri0[0]);
+          for (const int i : {1, 2, 3}) {
+            if (halfedge_[firstEdge + i].startVert == tri0[1]) {
+              tri0[2] = halfedge_[firstEdge + i].endVert;
+              tri1[0] = tri0[2];
+            }
+            if (halfedge_[firstEdge + i].endVert == tri0[0]) {
+              tri1[1] = halfedge_[firstEdge + i].startVert;
+            }
+          }
+          ASSERT(glm::all(glm::greaterThanEqual(tri0, glm::ivec3(0))) &&
+                     glm::all(glm::greaterThanEqual(tri1, glm::ivec3(0))),
+                 topologyErr, "non-manifold quad!");
+          bool firstValid = triCCW(tri0) && triCCW(tri1);
+          tri0[2] = tri1[1];
+          tri1[2] = tri0[1];
+          bool secondValid = triCCW(tri0) && triCCW(tri1);
+
+          if (!secondValid) {
+            tri0[2] = tri1[0];
+            tri1[2] = tri0[0];
+          } else if (firstValid) {
+            glm::vec3 firstCross = vertPos_[tri0[0]] - vertPos_[tri1[0]];
+            glm::vec3 secondCross = vertPos_[tri0[1]] - vertPos_[tri1[1]];
+            if (glm::dot(firstCross, firstCross) <
+                glm::dot(secondCross, secondCross)) {
+              tri0[2] = tri1[0];
+              tri1[2] = tri0[0];
+            }
+          }
+
+          for (auto tri : {tri0, tri1}) {
+            triVerts[triCount[face]] = tri;
+            triNormal[triCount[face]] = normal;
+            triRef[triCount[face]] = halfedgeRef[firstEdge];
+            triCount[face]++;
+          }
+        } else {  // General triangulation
+          for (auto tri : results[face]) {
+            triVerts[triCount[face]] = tri;
+            triNormal[triCount[face]] = normal;
+            triRef[triCount[face]] = halfedgeRef[firstEdge];
+            triCount[face]++;
+          }
+        }
+      });
+#else
+  triVerts.reserve(faceEdge.size());
+  triNormal.reserve(faceEdge.size());
+  triRef.reserve(faceEdge.size());
   for (int face = 0; face < faceEdge.size() - 1; ++face) {
     const int firstEdge = faceEdge[face];
     const int lastEdge = faceEdge[face + 1];
@@ -129,24 +236,6 @@ void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge,
         triNormal.push_back(normal);
         triRef.push_back(halfedgeRef[firstEdge]);
       }
-#if MANIFOLD_PAR == 'T' && __has_include(<tbb/tbb.h>)
-    } else if (!DISABLE_FACE_REORDERING && numEdge >= 8) {
-      // We can parallelize complex triangulation and obtain the results from
-      // promise later.
-      // Note that this is using tbb instead of std::async, because std::async
-      // will create a new thread for every single invocation, which is
-      // expensive.
-      int count = asyncResults.size();
-      asyncResults.emplace_back();
-      auto f = [&, face, count] {
-        const glm::vec3 normal = faceNormal_[face];
-        const glm::mat3x2 projection = GetAxisAlignedProjection(normal);
-        const PolygonsIdx polys = Face2Polygons(face, projection, faceEdge);
-        std::vector<glm::ivec3> newTris = TriangulateIdx(polys, precision_);
-        asyncResults[count] = std::make_pair(face, std::move(newTris));
-      };
-      group.run(f);
-#endif
     } else {  // General triangulation
       const glm::mat3x2 projection = GetAxisAlignedProjection(normal);
       const PolygonsIdx polys = Face2Polygons(face, projection, faceEdge);
@@ -157,19 +246,6 @@ void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge,
         triNormal.push_back(normal);
         triRef.push_back(halfedgeRef[firstEdge]);
       }
-    }
-  }
-
-#if MANIFOLD_PAR == 'T' && __has_include(<tbb/tbb.h>)
-  group.wait();
-  for (auto& pair : asyncResults) {
-    const int face = pair.first;
-    const int firstEdge = faceEdge[face];
-    const glm::vec3 normal = faceNormal_[face];
-    for (auto tri : pair.second) {
-      triVerts.push_back(tri);
-      triNormal.push_back(normal);
-      triRef.push_back(halfedgeRef[firstEdge]);
     }
   }
 #endif
