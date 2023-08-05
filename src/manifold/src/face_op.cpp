@@ -44,10 +44,11 @@ void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge,
   tbb::task_group group;
   // map from face to triangle
   tbb::concurrent_unordered_map<int, std::vector<glm::ivec3>> results;
-  std::vector<int> triCount(faceEdge.size(), 0);
+  VecDH<int> triCount(faceEdge.size());
+  triCount.back() = 0;
   // precompute number of triangles per face, and launch async tasks to
   // triangulate complex faces
-  for_each(
+  for_each_host(
       autoPolicy(faceEdge.size()), countAt(0), countAt(faceEdge.size() - 1),
       [&](int face) {
         triCount[face] = faceEdge[face + 1] - faceEdge[face] - 2;
@@ -72,7 +73,7 @@ void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge,
   triRef.resize(triCount.back());
 
   // set triangles in parallel
-  for_each(
+  for_each_host(
       autoPolicy(faceEdge.size()), countAt(0), countAt(faceEdge.size() - 1),
       [&](int face) {
         const int firstEdge = faceEdge[face];
