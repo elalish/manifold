@@ -14,12 +14,6 @@
 // limitations under the License.
 
 #pragma once
-#include <thrust/device_vector.h>
-#include <thrust/functional.h>
-#include <thrust/iterator/permutation_iterator.h>
-#include <thrust/iterator/zip_iterator.h>
-#include <thrust/tuple.h>
-
 #include <atomic>
 #include <mutex>
 
