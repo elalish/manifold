@@ -25,6 +25,16 @@ option(MANIFOLD_USE_CUDA "Enable GPU support via CUDA" OFF)
 option(MANIFOLD_PYBIND "Build python bindings" ON)
 option(MANIFOLD_CBIND "Build C (FFI) bindings" OFF)
 option(TRACY_ENABLE "Use tracy profiling" OFF) 
+
+if(TRACY_ENABLE)
+  option(CMAKE_BUILD_TYPE "Build type" RelWithDebInfo)
+  if(NOT MSVC)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-omit-frame-pointer")
+  endif()
+else()
+  option(CMAKE_BUILD_TYPE "Build type" Release)
+endif()
+
 set(MANIFOLD_PAR "NONE" CACHE STRING "Parallel backend, either \"TBB\" or \"OpenMP\" or \"NONE\"")
 set(MANIFOLD_FLAGS -O3)
 
