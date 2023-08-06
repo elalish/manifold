@@ -27,8 +27,8 @@ set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
 set(INSTALL_GMOCK OFF CACHE BOOL "" FORCE)
 
-find_package(GTest 1.12)
-if((NOT GTest_FOUND) OR NOT(GTest_VERSION GREATER_EQUAL 1.12))
+find_package(GTest)
+if(NOT GTest_FOUND)
   message(STATUS "GTest not found, downloading from source")
   include(FetchContent)
   FetchContent_Declare(googletest
