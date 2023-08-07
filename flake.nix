@@ -1,8 +1,12 @@
 {
   inputs.flake-utils.url = "github:numtide/flake-utils";
   inputs.nixpkgs.url = "nixpkgs/nixos-unstable";
+  inputs.gtest-src = {
+    url = "github:google/googletest/v1.14.0";
+    flake = false;
+  };
 
-  outputs = { self, nixpkgs, flake-utils }:
+  outputs = { self, nixpkgs, flake-utils, gtest-src }:
     flake-utils.lib.eachDefaultSystem
       (system:
         let
@@ -25,7 +29,7 @@
                   "manifold-${parallel-backend}";
               version = "beta";
               src = self;
-              nativeBuildInputs = (with pkgs; [ cmake (python39.withPackages (ps: with ps; [ trimesh ])) ]) ++ build-tools ++
+              nativeBuildInputs = (with pkgs; [ cmake (python39.withPackages (ps: with ps; [ trimesh ])) gtest ]) ++ build-tools ++
                 (if cuda-support then with pkgs.cudaPackages; [ cuda_nvcc cuda_cudart cuda_cccl pkgs.addOpenGLRunpath ] else [ ]);
               cmakeFlags = [
                 "-DMANIFOLD_PYBIND=ON"
@@ -75,6 +79,8 @@
               emscripten
               tbb
               lcov
+              gtest
+              tracy
             ] ++ additional;
           };
         in
@@ -98,9 +104,7 @@
                 export EM_CACHE=$(pwd)/.emscriptencache
                 mkdir build
                 cd build
-                mkdir cache
-                export EM_CACHE=$(pwd)/cache
-                emcmake cmake -DCMAKE_BUILD_TYPE=Release ..
+                emcmake cmake -DCMAKE_BUILD_TYPE=Release -DFETCHCONTENT_SOURCE_DIR_GOOGLETEST=${gtest-src} ..
               '';
               buildPhase = ''
                 emmake make -j''${NIX_BUILD_CORES}

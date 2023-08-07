@@ -260,7 +260,10 @@ MeshGL Manifold::GetMeshGL(glm::ivec3 normalIdx) const {
       out.triVerts[3 * tri + i] = impl.halfedge_[3 * oldTri + i].startVert;
 
     if (meshID != lastID) {
-      addRun(out, runNormalTransform, tri, meshIDtransform.at(meshID));
+      Impl::Relation rel;
+      auto it = meshIDtransform.find(meshID);
+      if (it != meshIDtransform.end()) rel = it->second;
+      addRun(out, runNormalTransform, tri, rel);
       meshIDtransform.erase(meshID);
       lastID = meshID;
     }
