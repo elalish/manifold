@@ -12,12 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#if MANIFOLD_PAR == 'T' && __has_include(<tbb/tbb.h>)
+#include <tbb/tbb.h>
+#define TBB_PREVIEW_CONCURRENT_ORDERED_CONTAINERS 1
+#include <tbb/concurrent_map.h>
+#endif
 #include <map>
 
 #include "impl.h"
 #include "polygon.h"
 
 namespace manifold {
+
+using GeneralTriangulation = std::function<std::vector<glm::ivec3>(int)>;
+using AddTriangle = std::function<void(int, glm::ivec3, glm::vec3, TriRef)>;
 
 /**
  * Triangulates the faces. In this case, the halfedge_ vector is not yet a set
@@ -35,11 +43,8 @@ void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge,
   VecDH<glm::vec3> triNormal;
   VecDH<TriRef>& triRef = meshRelation_.triRef;
   triRef.resize(0);
-  triVerts.reserve(halfedge_.size());
-  triNormal.reserve(halfedge_.size());
-  triRef.reserve(halfedge_.size());
-
-  for (int face = 0; face < faceEdge.size() - 1; ++face) {
+  auto processFace = [&](GeneralTriangulation general, AddTriangle addTri,
+                         int face) {
     const int firstEdge = faceEdge[face];
     const int lastEdge = faceEdge[face + 1];
     const int numEdge = lastEdge - firstEdge;
@@ -63,9 +68,7 @@ void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge,
       ASSERT(ends[0] == tri[1] && ends[1] == tri[2] && ends[2] == tri[0],
              topologyErr, "These 3 edges do not form a triangle!");
 
-      triVerts.push_back(tri);
-      triNormal.push_back(normal);
-      triRef.push_back(halfedgeRef[firstEdge]);
+      addTri(face, tri, normal, halfedgeRef[firstEdge]);
     } else if (numEdge == 4) {  // Pair of triangles
       int mapping[4] = {halfedge_[firstEdge].startVert,
                         halfedge_[firstEdge + 1].startVert,
@@ -111,25 +114,79 @@ void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge,
         }
       }
 
-      for (auto tri : {tri0, tri1}) {
-        triVerts.push_back(tri);
-        triNormal.push_back(normal);
-        triRef.push_back(halfedgeRef[firstEdge]);
+      for (const auto& tri : {tri0, tri1}) {
+        addTri(face, tri, normal, halfedgeRef[firstEdge]);
       }
     } else {  // General triangulation
-      const glm::mat3x2 projection = GetAxisAlignedProjection(normal);
-
-      const PolygonsIdx polys = Face2Polygons(face, projection, faceEdge);
-
-      std::vector<glm::ivec3> newTris = TriangulateIdx(polys, precision_);
-
-      for (auto tri : newTris) {
-        triVerts.push_back(tri);
-        triNormal.push_back(normal);
-        triRef.push_back(halfedgeRef[firstEdge]);
+      for (const auto& tri : general(face)) {
+        addTri(face, tri, normal, halfedgeRef[firstEdge]);
       }
     }
+  };
+  auto generalTriangulation = [&](int face) {
+    const glm::vec3 normal = faceNormal_[face];
+    const glm::mat3x2 projection = GetAxisAlignedProjection(normal);
+    const PolygonsIdx polys = Face2Polygons(face, projection, faceEdge);
+    return TriangulateIdx(polys, precision_);
+  };
+#if MANIFOLD_PAR == 'T' && __has_include(<tbb/tbb.h>)
+  tbb::task_group group;
+  // map from face to triangle
+  tbb::concurrent_unordered_map<int, std::vector<glm::ivec3>> results;
+  VecDH<int> triCount(faceEdge.size());
+  triCount.back() = 0;
+  // precompute number of triangles per face, and launch async tasks to
+  // triangulate complex faces
+  for_each_host(autoPolicy(faceEdge.size()), countAt(0),
+                countAt(faceEdge.size() - 1), [&](int face) {
+                  triCount[face] = faceEdge[face + 1] - faceEdge[face] - 2;
+                  ASSERT(triCount[face] >= 1, topologyErr,
+                         "face has less than three edges.");
+                  if (triCount[face] > 2)
+                    group.run([&, face] {
+                      std::vector<glm::ivec3> newTris =
+                          generalTriangulation(face);
+                      triCount[face] = newTris.size();
+                      results[face] = std::move(newTris);
+                    });
+                });
+  group.wait();
+  // prefix sum computation (assign unique index to each face) and preallocation
+  exclusive_scan(autoPolicy(triCount.size()), triCount.begin(), triCount.end(),
+                 triCount.begin(), 0);
+  triVerts.resize(triCount.back());
+  triNormal.resize(triCount.back());
+  triRef.resize(triCount.back());
+
+  auto processFace2 = std::bind(
+      processFace, [&](int face) { return std::move(results[face]); },
+      [&](int face, glm::ivec3 tri, glm::vec3 normal, TriRef r) {
+        triVerts[triCount[face]] = tri;
+        triNormal[triCount[face]] = normal;
+        triRef[triCount[face]] = r;
+        triCount[face]++;
+      },
+      std::placeholders::_1);
+  // set triangles in parallel
+  for_each_host(autoPolicy(faceEdge.size()), countAt(0),
+                countAt(faceEdge.size() - 1), processFace2);
+#else
+  triVerts.reserve(faceEdge.size());
+  triNormal.reserve(faceEdge.size());
+  triRef.reserve(faceEdge.size());
+  auto processFace2 = std::bind(
+      processFace, generalTriangulation,
+      [&](int _face, glm::ivec3 tri, glm::vec3 normal, TriRef r) {
+        triVerts.push_back(tri);
+        triNormal.push_back(normal);
+        triRef.push_back(r);
+      },
+      std::placeholders::_1);
+  for (int face = 0; face < faceEdge.size() - 1; ++face) {
+    processFace2(face);
   }
+#endif
+
   faceNormal_ = std::move(triNormal);
   CreateHalfedges(triVerts);
 }

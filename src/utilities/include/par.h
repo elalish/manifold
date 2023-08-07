@@ -29,6 +29,7 @@
 #include <thrust/system/omp/execution_policy.h>
 #define MANIFOLD_PAR_NS omp
 #elif MANIFOLD_PAR == 'T'
+#include <tbb/tbb.h>
 #include <thrust/system/tbb/execution_policy.h>
 
 #include <algorithm>
@@ -205,6 +206,7 @@ THRUST_DYNAMIC_BACKEND(copy_if, void)
 
 THRUST_DYNAMIC_BACKEND_HOST_VOID(for_each)
 THRUST_DYNAMIC_BACKEND_HOST_VOID(for_each_n)
+THRUST_DYNAMIC_BACKEND_HOST_VOID(copy)
 
 THRUST_DYNAMIC_BACKEND_VOID(gather)
 THRUST_DYNAMIC_BACKEND_VOID(scatter)
