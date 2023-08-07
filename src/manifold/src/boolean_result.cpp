@@ -165,110 +165,61 @@ void AddNewEdgeVerts(
   // the output vert index. When forward is false, all is reversed.
   const VecDH<int> &p1 = p1q2.Get(!forward);
   const VecDH<int> &q2 = p1q2.Get(forward);
-#if MANIFOLD_PAR == 'T' && __has_include(<tbb/tbb.h>)
-  // parallelize operations, requires concurrent_map so we can only enable this
-  // with tbb
-  if (p1q2.size() > 128) {
-    // ideally we should have 1 mutex per key, but 64 is enough to avoid
-    // contention for most of the cases
-    std::array<std::mutex, 128> mutexes;
-    static tbb::affinity_partitioner ap;
-    tbb::parallel_for(
-        tbb::blocked_range<int>(0, p1q2.size(), 32),
-        [&](const tbb::blocked_range<int> &range) {
-          for (int i = range.begin(); i != range.end(); i++) {
-            const int edgeP = p1[i];
-            const int faceQ = q2[i];
-            const int vert = v12R[i];
-            const int inclusion = i12[i];
-            Halfedge halfedge = halfedgeP[edgeP];
-
-            {
-              size_t hash = std::hash<int>()(edgeP) % mutexes.size();
-              EdgePos edgePos = {vert, 0.0f, inclusion < 0};
-              auto &edgePosP = edgesP[edgeP];
-              // each EdgePos need to be locked independently,
-              // as pushing elements into a vector may reallocate and
-              // invalidate the pointer
-              mutexes[hash].lock();
-              for (int j = 0; j < glm::abs(inclusion); ++j) {
-                edgePosP.push_back(edgePos);
-                ++edgePos.vert;
-              }
-              mutexes[hash].unlock();
-            }
-
-            {
-              std::pair<int, int> key = {
-                  halfedgeP[halfedge.pairedHalfedge].face, faceQ};
-              if (!forward) std::swap(key.first, key.second);
-              size_t hash =
-                  std::hash<std::pair<int, int>>()(key) % mutexes.size();
-              EdgePos edgePos = {vert, 0.0f, inclusion < 0};
-              EdgePos edgePosRev = edgePos;
-              edgePosRev.isStart = !edgePos.isStart;
-              auto &edgePosRight = edgesNew[key];
-              mutexes[hash].lock();
-              for (int j = 0; j < glm::abs(inclusion); ++j) {
-                edgePosRight.push_back(forward ? edgePos : edgePosRev);
-                ++edgePos.vert;
-                ++edgePosRev.vert;
-              }
-              mutexes[hash].unlock();
-            }
-
-            {
-              std::pair<int, int> key = {halfedge.face, faceQ};
-              if (!forward) std::swap(key.first, key.second);
-              size_t hash =
-                  std::hash<std::pair<int, int>>()(key) % mutexes.size();
-              auto &edgePosLeft = edgesNew[key];
-              EdgePos edgePos = {vert, 0.0f, inclusion < 0};
-              EdgePos edgePosRev = edgePos;
-              edgePosRev.isStart = !edgePos.isStart;
-              mutexes[hash].lock();
-              for (int j = 0; j < glm::abs(inclusion); ++j) {
-                edgePosLeft.push_back(forward ? edgePosRev : edgePos);
-                ++edgePos.vert;
-                ++edgePosRev.vert;
-              }
-              mutexes[hash].unlock();
-            }
-          }
-        },
-        ap);
-    return;
-  }
-#endif
-  for (int i = 0; i < p1q2.size(); ++i) {
+  auto process = [&](std::function<void(size_t)> lock,
+                     std::function<void(size_t)> unlock, int i) {
     const int edgeP = p1[i];
     const int faceQ = q2[i];
     const int vert = v12R[i];
     const int inclusion = i12[i];
 
-    auto &edgePosP = edgesP[edgeP];
-
     Halfedge halfedge = halfedgeP[edgeP];
-    std::pair<int, int> key = {halfedgeP[halfedge.pairedHalfedge].face, faceQ};
-    if (!forward) std::swap(key.first, key.second);
-    auto &edgePosRight = edgesNew[key];
+    std::pair<int, int> keyRight = {halfedgeP[halfedge.pairedHalfedge].face,
+                                    faceQ};
+    if (!forward) std::swap(keyRight.first, keyRight.second);
 
-    key = {halfedge.face, faceQ};
-    if (!forward) std::swap(key.first, key.second);
-    auto &edgePosLeft = edgesNew[key];
+    std::pair<int, int> keyLeft = {halfedge.face, faceQ};
+    if (!forward) std::swap(keyLeft.first, keyLeft.second);
 
-    EdgePos edgePos = {vert, 0.0f, inclusion < 0};
-    EdgePos edgePosRev = edgePos;
-    edgePosRev.isStart = !edgePos.isStart;
-
-    for (int j = 0; j < glm::abs(inclusion); ++j) {
-      edgePosP.push_back(edgePos);
-      edgePosRight.push_back(forward ? edgePos : edgePosRev);
-      edgePosLeft.push_back(forward ? edgePosRev : edgePos);
-      ++edgePos.vert;
-      ++edgePosRev.vert;
+    bool direction = inclusion < 0;
+    std::hash<std::pair<int, int>> pairHasher;
+    std::array<std::tuple<bool, size_t, std::vector<EdgePos> *>, 3> edges = {
+        std::make_tuple(direction, std::hash<int>{}(edgeP), &edgesP[edgeP]),
+        std::make_tuple(direction ^ !forward,  // revert if not forward
+                        pairHasher(keyRight), &edgesNew[keyRight]),
+        std::make_tuple(direction ^ forward,  // revert if forward
+                        pairHasher(keyLeft), &edgesNew[keyLeft])};
+    for (const auto &tuple : edges) {
+      lock(std::get<1>(tuple));
+      for (int j = 0; j < glm::abs(inclusion); ++j)
+        std::get<2>(tuple)->push_back({vert + j, 0.0f, std::get<0>(tuple)});
+      unlock(std::get<1>(tuple));
+      direction = !direction;
     }
+  };
+#if MANIFOLD_PAR == 'T' && __has_include(<tbb/tbb.h>)
+  // parallelize operations, requires concurrent_map so we can only enable this
+  // with tbb
+  if (p1q2.size() > 128) {
+    // ideally we should have 1 mutex per key, but 128 is enough to avoid
+    // contention for most of the cases
+    std::array<std::mutex, 128> mutexes;
+    static tbb::affinity_partitioner ap;
+    auto processFun = std::bind(
+        process, [&](size_t hash) { mutexes[hash % mutexes.size()].lock(); },
+        [&](size_t hash) { mutexes[hash % mutexes.size()].unlock(); },
+        std::placeholders::_1);
+    tbb::parallel_for(
+        tbb::blocked_range<int>(0, p1q2.size(), 32),
+        [&](const tbb::blocked_range<int> &range) {
+          for (int i = range.begin(); i != range.end(); i++) processFun(i);
+        },
+        ap);
+    return;
   }
+#endif
+  auto processFun = std::bind(
+      process, [](size_t _) {}, [](size_t _) {}, std::placeholders::_1);
+  for (int i = 0; i < p1q2.size(); ++i) processFun(i);
 }
 
 std::vector<Halfedge> PairUp(std::vector<EdgePos> &edgePos) {
