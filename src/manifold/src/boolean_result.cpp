@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <algorithm>
+#include <array>
 #include <map>
 
 #if MANIFOLD_PAR == 'T' && __has_include(<tbb/tbb.h>)
