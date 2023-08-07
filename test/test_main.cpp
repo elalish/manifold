@@ -17,6 +17,14 @@
 #include "sdf.h"
 #include "test.h"
 
+// we need to call some tracy API to establish the connection
+#if __has_include(<tracy/Tracy.hpp>)
+#include <tracy/Tracy.hpp>
+#else
+#define FrameMarkStart(x)
+#define FrameMarkEnd(x)
+#endif
+
 using namespace manifold;
 
 Options options;
@@ -33,6 +41,9 @@ void print_usage() {
 
 int main(int argc, char** argv) {
   ::testing::InitGoogleTest(&argc, argv);
+
+  const char* name = "test setup";
+  FrameMarkStart(name);
 
   for (int i = 1; i < argc; i++) {
     if (argv[i][0] != '-') {
@@ -67,6 +78,7 @@ int main(int argc, char** argv) {
   manifold::PolygonParams().intermediateChecks = true;
   manifold::PolygonParams().processOverlaps = false;
 
+  FrameMarkEnd(name);
   return RUN_ALL_TESTS();
 }
 

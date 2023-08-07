@@ -15,7 +15,7 @@
 project(utilities)
 
 file(GLOB_RECURSE SOURCE_FILES CONFIGURE_DEPENDS *.cpp)
-add_library(${PROJECT_NAME} OBJECT ${SOURCE_FILES})
+add_library(${PROJECT_NAME} ${SOURCE_FILES})
 
 message("CUDA Support: ${MANIFOLD_USE_CUDA}")
 message("Parallel Backend: ${MANIFOLD_PAR}")
@@ -29,11 +29,32 @@ if(MANIFOLD_PAR STREQUAL "OMP")
     target_compile_options(${PROJECT_NAME} PUBLIC -DMANIFOLD_PAR='O' -fopenmp)
     target_link_options(${PROJECT_NAME} PUBLIC -fopenmp)
 elseif(MANIFOLD_PAR STREQUAL "TBB")
-    find_package(PkgConfig REQUIRED)
-    pkg_check_modules(TBB REQUIRED tbb)
-    target_include_directories(${PROJECT_NAME} PUBLIC ${TBB_INCLUDE_DIRS})
+    find_package(PkgConfig)
+    if (PKG_CONFIG_FOUND)
+        pkg_check_modules(TBB tbb)
+    endif()
+    if(NOT TBB_FOUND)
+        message(STATUS "tbb not found, downloading from source")
+        include(FetchContent)
+        set(TBB_TEST OFF CACHE INTERNAL "" FORCE)
+        set(TBB_STRICT OFF CACHE INTERNAL "" FORCE)
+        FetchContent_Declare(TBB
+          GIT_REPOSITORY https://github.com/oneapi-src/oneTBB.git
+          # versions afterward forces -D_FORTIFY_SOURCE=2
+          # which conflicts with defaults with nixos...
+          GIT_TAG        v2021.10.0
+          GIT_SHALLOW    TRUE
+          GIT_PROGRESS   TRUE
+        )
+        FetchContent_MakeAvailable(TBB)
+    endif()
     target_compile_options(${PROJECT_NAME} PUBLIC -DMANIFOLD_PAR='T')
-    target_link_libraries(${PROJECT_NAME} PUBLIC ${TBB_LINK_LIBRARIES})
+    if(TARGET TBB::tbb)
+        target_link_libraries(${PROJECT_NAME} PUBLIC TBB::tbb)
+    else()
+        target_include_directories(${PROJECT_NAME} PUBLIC ${TBB_INCLUDE_DIRS})
+        target_link_libraries(${PROJECT_NAME} PUBLIC ${TBB_LINK_LIBRARIES})
+    endif()
 elseif(MANIFOLD_PAR STREQUAL "NONE")
     set(MANIFOLD_PAR "CPP")
 else()

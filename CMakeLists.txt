@@ -24,29 +24,36 @@ option(MANIFOLD_DEBUG "Enable debug tracing/timing" OFF)
 option(MANIFOLD_USE_CUDA "Enable GPU support via CUDA" OFF)
 option(MANIFOLD_PYBIND "Build python bindings" ON)
 option(MANIFOLD_CBIND "Build C (FFI) bindings" OFF)
+option(TRACY_ENABLE "Use tracy profiling" OFF) 
+
+if(TRACY_ENABLE)
+  option(CMAKE_BUILD_TYPE "Build type" RelWithDebInfo)
+  if(NOT MSVC)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-omit-frame-pointer")
+  endif()
+else()
+  option(CMAKE_BUILD_TYPE "Build type" Release)
+endif()
+
 set(MANIFOLD_PAR "NONE" CACHE STRING "Parallel backend, either \"TBB\" or \"OpenMP\" or \"NONE\"")
 set(MANIFOLD_FLAGS -O3)
 
 if(EMSCRIPTEN)
   message("Building for Emscripten")
-  set(MANIFOLD_FLAGS -fwasm-exceptions -D_LIBCUDACXX_HAS_THREAD_API_EXTERNAL -D_LIBCUDACXX_HAS_THREAD_API_CUDA)
-  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -sALLOW_MEMORY_GROWTH=1 -fwasm-exceptions")
+  set(MANIFOLD_FLAGS -fexceptions -D_LIBCUDACXX_HAS_THREAD_API_EXTERNAL -D_LIBCUDACXX_HAS_THREAD_API_CUDA)
+  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -sALLOW_MEMORY_GROWTH=1 -fexceptions -sDISABLE_EXCEPTION_CATCHING=0")
+  set(MANIFOLD_PYBIND OFF)
 endif()
 
-option(PYBIND11_FINDPYTHON "Enable PyBind to perform FindPython for you" ON)
+if(MANIFOLD_PYBIND)
+find_package(Python COMPONENTS Interpreter Development.Module REQUIRED)
+endif()
 
 option(BUILD_TEST_CGAL "Build CGAL performance comparisons" OFF)
 
 option(BUILD_SHARED_LIBS "Build dynamic/shared libraries" OFF)
 set(PYBIND11_DIR ${PROJECT_SOURCE_DIR}/bindings/python/third_party/pybind11)
 set(THRUST_INC_DIR ${PROJECT_SOURCE_DIR}/src/third_party/thrust)
-
-if(BUILD_SHARED_LIBS OR MANIFOLD_CBIND)
-  # Allow shared libraries to be relocatable (add Place Independent Code flag).
-  # Also include when statically linking C bindings to avoid issues with bundling
-  # artefacts in host languages using them for FFI.
-  add_compile_options(-fPIC)
-endif()
 
 if(MANIFOLD_USE_CUDA)
   enable_language(CUDA)
@@ -65,14 +72,16 @@ endif()
 
 if(NOT MSVC)
   set(WARNING_FLAGS -Werror -Wall -Wno-sign-compare -Wno-unused)
-  add_compile_options(
+  set(MANIFOLD_FLAGS
+    "${MANIFOLD_FLAGS}"
     "$<$<COMPILE_LANGUAGE:CXX>:${WARNING_FLAGS}>"
     "$<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=${WARNING_FLAGS}>")
 endif()
 
 if(CODE_COVERAGE AND NOT MSVC)
   set(COVERAGE_FLAGS -coverage -fno-inline-small-functions -fkeep-inline-functions -fkeep-static-functions)
-  add_compile_options(
+  set(MANIFOLD_FLAGS
+    "${MANIFOLD_FLAGS}"
     "$<$<COMPILE_LANGUAGE:CXX>:${COVERAGE_FLAGS}>"
     "$<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=-coverage>")
   add_link_options("-coverage")

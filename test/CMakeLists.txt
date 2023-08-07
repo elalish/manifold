@@ -14,8 +14,6 @@
 
 project(manifold_test)
 
-add_subdirectory(third_party)
-
 enable_testing()
 
 set(SOURCE_FILES polygon_test.cpp cross_section_test.cpp manifold_test.cpp boolean_test.cpp sdf_test.cpp samples_test.cpp test_main.cpp)
@@ -24,8 +22,44 @@ if(MANIFOLD_CBIND)
   list(APPEND SOURCE_FILES manifoldc_test.cpp)
 endif()
 
+set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+# Prevent installation of GTest with your project
+set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
+set(INSTALL_GMOCK OFF CACHE BOOL "" FORCE)
+
+find_package(GTest)
+if(NOT GTest_FOUND)
+  message(STATUS "GTest not found, downloading from source")
+  include(FetchContent)
+  FetchContent_Declare(googletest
+    GIT_REPOSITORY https://github.com/google/googletest.git
+    GIT_TAG        v1.14.0
+    GIT_SHALLOW    TRUE
+    GIT_PROGRESS   TRUE
+    OVERRIDE_FIND_PACKAGE
+  )
+  FetchContent_MakeAvailable(googletest)
+endif()
+
+if(NOT TARGET GTest::GTest)
+    add_library(GTest::GTest ALIAS gtest)
+    add_library(GTest::Main ALIAS gtest_main)
+endif()
+
 add_executable(${PROJECT_NAME} ${SOURCE_FILES})
 target_link_libraries(${PROJECT_NAME} polygon GTest::GTest manifold sdf samples samplesGPU cross_section)
+
+if (TRACY_ENABLE)
+  include(FetchContent)
+  FetchContent_Declare(tracy
+    GIT_REPOSITORY https://github.com/wolfpld/tracy.git
+    GIT_TAG v0.9.1
+    GIT_SHALLOW TRUE
+    GIT_PROGRESS TRUE
+  )
+  FetchContent_MakeAvailable(tracy)
+  target_link_libraries(${PROJECT_NAME} TracyClient)
+endif()
 
 if(MANIFOLD_CBIND)
   target_link_libraries(${PROJECT_NAME} manifoldc)
