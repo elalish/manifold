@@ -592,7 +592,6 @@ void Manifold::Impl::RecursiveEdgeSwap(const int edge, int& tag,
     } else {
       visited[edge] = tag;
       visited[pair] = tag;
-      // note: the order should be inverted
       edgeSwapStack.insert(edgeSwapStack.end(), {tri1edge[1], tri1edge[0],
                                                  tri0edge[1], tri0edge[0]});
     }
