@@ -58,16 +58,6 @@ if(MANIFOLD_EXPORT)
   target_compile_options(${PROJECT_NAME} PUBLIC -DMANIFOLD_EXPORT)
 endif()
 
-if(MANIFOLD_USE_CUDA)
-  set(CUDA_FILES test_main.cpp sdf_test.cpp)
-  if(MANIFOLD_CBIND)
-    list(APPEND CUDA_FILES manifoldc_test.cpp)
-  endif()
-
-  set_source_files_properties(${CUDA_FILES} PROPERTIES LANGUAGE CUDA)
-  set_property(TARGET ${PROJECT_NAME} PROPERTY CUDA_ARCHITECTURES 61)
-endif()
-
 target_compile_options(${PROJECT_NAME} PRIVATE ${MANIFOLD_FLAGS})
 target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_17)
 

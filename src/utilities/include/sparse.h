@@ -34,10 +34,11 @@ class SparseIndices {
     defined(__AARCH64EB__) || defined(_MIBSEB) || defined(__MIBSEB) ||       \
     defined(__MIBSEB__)
   static constexpr size_t pOffset = 0;
-#elif defined(__BYTE_ORDER) && __BYTE_ORDER == __LITTLE_ENDIAN ||         \
-    defined(__LITTLE_ENDIAN__) || defined(__ARMEL__) ||                   \
-    defined(__THUMBEL__) || defined(__AARCH64EL__) || defined(_MIPSEL) || \
-    defined(__MIPSEL) || defined(__MIPSEL__)
+#elif defined(__BYTE_ORDER) && __BYTE_ORDER == __LITTLE_ENDIAN ||          \
+    defined(__LITTLE_ENDIAN__) || defined(__ARMEL__) ||                    \
+    defined(__THUMBEL__) || defined(__AARCH64EL__) || defined(_MIPSEL) ||  \
+    defined(__MIPSEL) || defined(__MIPSEL__) || defined(__EMSCRIPTEN__) || \
+    defined(_MSC_VER)
   static constexpr size_t pOffset = 1;
 #else
 #error "unknown architecture"
@@ -76,7 +77,7 @@ class SparseIndices {
   }
 
   size_t RemoveZeros(VecDH<int>& S) {
-    ASSERT(S.size() == size_, userErr,
+    ASSERT(S.size() == data.size(), userErr,
            "Different number of values than indicies!");
     auto zBegin = zip(S.begin(), data.begin());
     auto zEnd = zip(S.end(), data.end());
@@ -113,7 +114,7 @@ class SparseIndices {
 
   template <typename T>
   size_t KeepFinite(VecDH<T>& v, VecDH<int>& x) {
-    ASSERT(x.size() == size_, userErr,
+    ASSERT(x.size() == data.size(), userErr,
            "Different number of values than indicies!");
     auto zBegin = zip(v.begin(), x.begin(), data.begin());
     auto zEnd = zip(v.end(), x.end(), data.end());

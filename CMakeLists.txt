@@ -21,7 +21,6 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 option(MANIFOLD_EXPORT "Build mesh export (via assimp) utility library" OFF)
 option(MANIFOLD_TEST "Enable testing suite" ON)
 option(MANIFOLD_DEBUG "Enable debug tracing/timing" OFF)
-option(MANIFOLD_USE_CUDA "Enable GPU support via CUDA" OFF)
 option(MANIFOLD_PYBIND "Build python bindings" ON)
 option(MANIFOLD_CBIND "Build C (FFI) bindings" OFF)
 option(TRACY_ENABLE "Use tracy profiling" OFF) 
@@ -35,7 +34,7 @@ else()
   option(CMAKE_BUILD_TYPE "Build type" Release)
 endif()
 
-set(MANIFOLD_PAR "NONE" CACHE STRING "Parallel backend, either \"TBB\" or \"OpenMP\" or \"NONE\"")
+set(MANIFOLD_PAR "NONE" CACHE STRING "Parallel backend, either \"TBB\" or \"NONE\"")
 set(MANIFOLD_FLAGS -O3)
 
 if(EMSCRIPTEN)
@@ -55,35 +54,24 @@ option(BUILD_SHARED_LIBS "Build dynamic/shared libraries" OFF)
 set(PYBIND11_DIR ${PROJECT_SOURCE_DIR}/bindings/python/third_party/pybind11)
 set(THRUST_INC_DIR ${PROJECT_SOURCE_DIR}/src/third_party/thrust)
 
-if(MANIFOLD_USE_CUDA)
-  enable_language(CUDA)
-  find_package(CUDA REQUIRED)
-
-  # we cannot set THRUST_INC_DIR when building with CUDA, otherwise the
-  # compiler will not use the system CUDA headers which causes incompatibility
-  # clear THRUST_INC_DIR, we use the one from nvcc
-  set(THRUST_INC_DIR "")
-  set(MANIFOLD_NVCC_RELEASE_FLAGS -O3 -lineinfo)
-  set(MANIFOLD_NVCC_DEBUG_FLAGS -G)
-  set(MANIFOLD_NVCC_FLAGS -Xcudafe --diag_suppress=esa_on_defaulted_function_ignored --extended-lambda --expt-relaxed-constexpr
-    "$<$<CONFIG:RELEASE>:${MANIFOLD_NVCC_RELEASE_FLAGS}>"
-    "$<$<CONFIG:DEBUG>:${MANIFOLD_NVCC_DEBUG_FLAGS}>")
+if(CMAKE_EXPORT_COMPILE_COMMANDS AND !EMSCRIPTEN)
+  # for nixos
+  set(CMAKE_CXX_STANDARD_INCLUDE_DIRECTORIES 
+      ${CMAKE_CXX_IMPLICIT_INCLUDE_DIRECTORIES})
 endif()
 
 if(NOT MSVC)
   set(WARNING_FLAGS -Werror -Wall -Wno-sign-compare -Wno-unused)
   set(MANIFOLD_FLAGS
     "${MANIFOLD_FLAGS}"
-    "$<$<COMPILE_LANGUAGE:CXX>:${WARNING_FLAGS}>"
-    "$<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=${WARNING_FLAGS}>")
+    "$<$<COMPILE_LANGUAGE:CXX>:${WARNING_FLAGS}>")
 endif()
 
 if(CODE_COVERAGE AND NOT MSVC)
   set(COVERAGE_FLAGS -coverage -fno-inline-small-functions -fkeep-inline-functions -fkeep-static-functions)
   set(MANIFOLD_FLAGS
     "${MANIFOLD_FLAGS}"
-    "$<$<COMPILE_LANGUAGE:CXX>:${COVERAGE_FLAGS}>"
-    "$<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=-coverage>")
+    "$<$<COMPILE_LANGUAGE:CXX>:${COVERAGE_FLAGS}>")
   add_link_options("-coverage")
 endif()
 
