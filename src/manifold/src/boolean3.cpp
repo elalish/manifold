@@ -67,21 +67,28 @@ __host__ __device__ glm::vec4 Intersect(const glm::vec3 &pL,
   return xyzz;
 }
 
+template <const bool inverted>
 struct CopyFaceEdges {
+  const int *p1q1;
   // x can be either vert or edge (0 or 1).
-  thrust::pair<int *, int *> pXq1;
+  int *pXq1;
   const Halfedge *halfedgesQ;
 
-  __host__ __device__ void operator()(thrust::tuple<int, int, int> in) {
+  __host__ __device__ void operator()(thrust::tuple<int, int> in) {
     int idx = 3 * thrust::get<0>(in);
-    const int pX = thrust::get<1>(in);
-    const int q2 = thrust::get<2>(in);
+    int i = thrust::get<1>(in);
+    int pX = p1q1[2 * i + SparseIndices::pOffset];
+    int q2 = p1q1[2 * i + 1 - SparseIndices::pOffset];
+    if (inverted) std::swap(pX, q2);
 
-    for (const int i : {0, 1, 2}) {
-      pXq1.first[idx + i] = pX;
-      const int q1 = 3 * q2 + i;
+    for (const int j : {0, 1, 2}) {
+      const int q1 = 3 * q2 + j;
       const Halfedge edge = halfedgesQ[q1];
-      pXq1.second[idx + i] = edge.IsForward() ? q1 : edge.pairedHalfedge;
+      int a = pX;
+      int b = edge.IsForward() ? q1 : edge.pairedHalfedge;
+      if (inverted) std::swap(a, b);
+      pXq1[2 * (idx + j) + SparseIndices::pOffset] = a;
+      pXq1[2 * (idx + j) + 1 - SparseIndices::pOffset] = b;
     }
   }
 };
@@ -90,14 +97,13 @@ SparseIndices Filter11(const Manifold::Impl &inP, const Manifold::Impl &inQ,
                        const SparseIndices &p1q2, const SparseIndices &p2q1,
                        ExecutionPolicy policy) {
   SparseIndices p1q1(3 * p1q2.size() + 3 * p2q1.size());
-  for_each_n(policy, zip(countAt(0), p1q2.begin(0), p1q2.begin(1)), p1q2.size(),
-             CopyFaceEdges({p1q1.ptrDpq(), inQ.halfedge_.cptrD()}));
+  for_each_n(
+      policy, zip(countAt(0), countAt(0)), p1q2.size(),
+      CopyFaceEdges<false>({p1q2.ptr(), p1q1.ptr(), inQ.halfedge_.cptrD()}));
 
-  p1q1.SwapPQ();
-  for_each_n(policy, zip(countAt(p1q2.size()), p2q1.begin(1), p2q1.begin(0)),
-             p2q1.size(),
-             CopyFaceEdges({p1q1.ptrDpq(), inP.halfedge_.cptrD()}));
-  p1q1.SwapPQ();
+  for_each_n(
+      policy, zip(countAt(p1q2.size()), countAt(0)), p2q1.size(),
+      CopyFaceEdges<true>({p2q1.ptr(), p1q1.ptr(), inP.halfedge_.cptrD()}));
   p1q1.Unique(policy);
   return p1q1;
 }
@@ -148,17 +154,16 @@ __host__ __device__ thrust::pair<int, glm::vec2> Shadow01(
   return thrust::make_pair(s01, yz01);
 }
 
-__host__ __device__ int BinarySearch(
-    const thrust::pair<const int *, const int *> keys, const int size,
-    const thrust::pair<int, int> key) {
+__host__ __device__ int BinarySearch(const int64_t *keys, const int size,
+                                     const int64_t key) {
   if (size <= 0) return -1;
   int left = 0;
   int right = size - 1;
   int m;
-  thrust::pair<int, int> keyM;
+  int64_t keyM;
   while (1) {
     m = right - (right - left) / 2;
-    keyM = thrust::make_pair(keys.first[m], keys.second[m]);
+    keyM = keys[m];
     if (left == right) break;
     if (keyM > key)
       right = m - 1;
@@ -178,13 +183,14 @@ struct Kernel11 {
   const Halfedge *halfedgeQ;
   float expandP;
   const glm::vec3 *normalP;
+  const int *p1q1;
 
   __host__ __device__ void operator()(
-      thrust::tuple<glm::vec4 &, int &, int, int> inout) {
-    glm::vec4 &xyzz11 = thrust::get<0>(inout);
-    int &s11 = thrust::get<1>(inout);
-    const int p1 = thrust::get<2>(inout);
-    const int q1 = thrust::get<3>(inout);
+      thrust::tuple<int, glm::vec4 &, int &> inout) {
+    const int p1 = p1q1[2 * thrust::get<0>(inout) + SparseIndices::pOffset];
+    const int q1 = p1q1[2 * thrust::get<0>(inout) + 1 - SparseIndices::pOffset];
+    glm::vec4 &xyzz11 = thrust::get<1>(inout);
+    int &s11 = thrust::get<2>(inout);
 
     // For pRL[k], qRL[k], k==0 is the left and k==1 is the right.
     int k = 0;
@@ -262,12 +268,10 @@ std::tuple<VecDH<int>, VecDH<glm::vec4>> Shadow11(SparseIndices &p1q1,
   VecDH<int> s11(p1q1.size());
   VecDH<glm::vec4> xyzz11(p1q1.size());
 
-  for_each_n(policy,
-             zip(xyzz11.begin(), s11.begin(), p1q1.begin(0), p1q1.begin(1)),
-             p1q1.size(),
+  for_each_n(policy, zip(countAt(0), xyzz11.begin(), s11.begin()), p1q1.size(),
              Kernel11({inP.vertPos_.cptrD(), inQ.vertPos_.cptrD(),
                        inP.halfedge_.cptrD(), inQ.halfedge_.cptrD(), expandP,
-                       inP.vertNormal_.cptrD()}));
+                       inP.vertNormal_.cptrD(), p1q1.ptr()}));
 
   p1q1.KeepFinite(xyzz11, s11);
 
@@ -281,13 +285,15 @@ struct Kernel02 {
   const bool forward;
   const float expandP;
   const glm::vec3 *vertNormalP;
+  const int *p0q2;
 
   __host__ __device__ void operator()(
-      thrust::tuple<int &, float &, int, int> inout) {
-    int &s02 = thrust::get<0>(inout);
-    float &z02 = thrust::get<1>(inout);
-    const int p0 = thrust::get<2>(inout);
-    const int q2 = thrust::get<3>(inout);
+      thrust::tuple<int, int &, float &> inout) {
+    int p0 = p0q2[2 * thrust::get<0>(inout) + SparseIndices::pOffset];
+    int q2 = p0q2[2 * thrust::get<0>(inout) + 1 - SparseIndices::pOffset];
+    if (!forward) thrust::swap(p0, q2);
+    int &s02 = thrust::get<1>(inout);
+    float &z02 = thrust::get<2>(inout);
 
     // For yzzLR[k], k==0 is the left and k==1 is the right.
     int k = 0;
@@ -361,12 +367,10 @@ std::tuple<VecDH<int>, VecDH<float>> Shadow02(const Manifold::Impl &inP,
 
   auto vertNormalP =
       forward ? inP.vertNormal_.cptrD() : inQ.vertNormal_.cptrD();
-  for_each_n(
-      policy,
-      zip(s02.begin(), z02.begin(), p0q2.begin(!forward), p0q2.begin(forward)),
-      p0q2.size(),
-      Kernel02({inP.vertPos_.cptrD(), inQ.halfedge_.cptrD(),
-                inQ.vertPos_.cptrD(), forward, expandP, vertNormalP}));
+  for_each_n(policy, zip(countAt(0), s02.begin(), z02.begin()), p0q2.size(),
+             Kernel02({inP.vertPos_.cptrD(), inQ.halfedge_.cptrD(),
+                       inQ.vertPos_.cptrD(), forward, expandP, vertNormalP,
+                       p0q2.ptr()}));
 
   p0q2.KeepFinite(z02, s02);
 
@@ -374,11 +378,11 @@ std::tuple<VecDH<int>, VecDH<float>> Shadow02(const Manifold::Impl &inP,
 };
 
 struct Kernel12 {
-  const thrust::pair<const int *, const int *> p0q2;
+  const int *p0q2;
   const int *s02;
   const float *z02;
   const int size02;
-  const thrust::pair<const int *, const int *> p1q1;
+  const int *p1q1;
   const int *s11;
   const glm::vec4 *xyzz11;
   const int size11;
@@ -386,13 +390,15 @@ struct Kernel12 {
   const Halfedge *halfedgesQ;
   const glm::vec3 *vertPosP;
   const bool forward;
+  const int *p1q2;
 
   __host__ __device__ void operator()(
-      thrust::tuple<int &, glm::vec3 &, int, int> inout) {
-    int &x12 = thrust::get<0>(inout);
-    glm::vec3 &v12 = thrust::get<1>(inout);
-    const int p1 = thrust::get<2>(inout);
-    const int q2 = thrust::get<3>(inout);
+      thrust::tuple<int, int &, glm::vec3 &> inout) {
+    int p1 = p1q2[2 * thrust::get<0>(inout) + SparseIndices::pOffset];
+    int q2 = p1q2[2 * thrust::get<0>(inout) + 1 - SparseIndices::pOffset];
+    if (!forward) thrust::swap(p1, q2);
+    int &x12 = thrust::get<1>(inout);
+    glm::vec3 &v12 = thrust::get<2>(inout);
 
     // For xzyLR-[k], k==0 is the left and k==1 is the right.
     int k = 0;
@@ -405,10 +411,12 @@ struct Kernel12 {
 
     const Halfedge edge = halfedgesP[p1];
 
+    // binary search can be slow...
     for (int vert : {edge.startVert, edge.endVert}) {
-      const auto key =
-          forward ? thrust::make_pair(vert, q2) : thrust::make_pair(q2, vert);
-      const int idx = BinarySearch(p0q2, size02, key);
+      const int64_t key = forward ? (((int64_t)vert << 32) | (int64_t)q2)
+                                  : (((int64_t)q2 << 32) | (int64_t)vert);
+      const int idx =
+          BinarySearch(reinterpret_cast<const int64_t *>(p0q2), size02, key);
       if (idx != -1) {
         const int s = s02[idx];
         x12 += s * ((vert == edge.startVert) == forward ? 1 : -1);
@@ -427,9 +435,10 @@ struct Kernel12 {
       const int q1 = 3 * q2 + i;
       const Halfedge edge = halfedgesQ[q1];
       const int q1F = edge.IsForward() ? q1 : edge.pairedHalfedge;
-      const auto key =
-          forward ? thrust::make_pair(p1, q1F) : thrust::make_pair(q1F, p1);
-      const int idx = BinarySearch(p1q1, size11, key);
+      const int64_t key = forward ? ((int64_t)p1 << 32) | (int64_t)q1F
+                                  : ((int64_t)q1F << 32) | (int64_t)p1;
+      const int idx =
+          BinarySearch(reinterpret_cast<const int64_t *>(p1q1), size11, key);
       if (idx != -1) {  // s is implicitly zero for anything not found
         const int s = s11[idx];
         x12 -= s * (edge.IsForward() ? 1 : -1);
@@ -473,34 +482,30 @@ std::tuple<VecDH<int>, VecDH<glm::vec3>> Intersect12(
   VecDH<int> x12(p1q2.size());
   VecDH<glm::vec3> v12(p1q2.size());
 
-  for_each_n(
-      policy,
-      zip(x12.begin(), v12.begin(), p1q2.begin(!forward), p1q2.begin(forward)),
-      p1q2.size(),
-      Kernel12({p0q2.ptrDpq(), s02.ptrD(), z02.cptrD(), p0q2.size(),
-                p1q1.ptrDpq(), s11.ptrD(), xyzz11.cptrD(), p1q1.size(),
-                inP.halfedge_.cptrD(), inQ.halfedge_.cptrD(),
-                inP.vertPos_.cptrD(), forward}));
+  for_each_n(policy, zip(countAt(0), x12.begin(), v12.begin()), p1q2.size(),
+             Kernel12({p0q2.ptr(), s02.ptrD(), z02.cptrD(), p0q2.size(),
+                       p1q1.ptr(), s11.ptrD(), xyzz11.cptrD(), p1q1.size(),
+                       inP.halfedge_.cptrD(), inQ.halfedge_.cptrD(),
+                       inP.vertPos_.cptrD(), forward, p1q2.ptr()}));
 
   p1q2.KeepFinite(v12, x12);
 
   return std::make_tuple(x12, v12);
 };
 
-VecDH<int> Winding03(const Manifold::Impl &inP, SparseIndices &p0q2,
+VecDH<int> Winding03(const Manifold::Impl &inP, VecDH<int> &indices,
                      VecDH<int> &s02, bool reverse, ExecutionPolicy policy) {
   // verts that are not shadowed (not in p0q2) have winding number zero.
   VecDH<int> w03(inP.NumVert(), 0);
-
-  if (!is_sorted(policy, p0q2.begin(reverse), p0q2.end(reverse)))
-    sort_by_key(policy, p0q2.begin(reverse), p0q2.end(reverse), s02.begin());
+  // checking is slow, so just sort and reduce
+  stable_sort_by_key(policy, indices.begin(), indices.end(), s02.begin());
   VecDH<int> w03val(w03.size());
   VecDH<int> w03vert(w03.size());
   // sum known s02 values into w03 (winding number)
   auto endPair = reduce_by_key<
       thrust::pair<decltype(w03val.begin()), decltype(w03val.begin())>>(
-      policy, p0q2.begin(reverse), p0q2.end(reverse), s02.begin(),
-      w03vert.begin(), w03val.begin());
+      policy, indices.begin(), indices.end(), s02.begin(), w03vert.begin(),
+      w03val.begin());
   scatter(policy, w03val.begin(), endPair.second, w03vert.begin(), w03.begin());
 
   if (reverse)
@@ -536,13 +541,12 @@ Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ,
   // Level 3
   // Find edge-triangle overlaps (broad phase)
   p1q2_ = inQ_.EdgeCollisions(inP_);
-  p2q1_ = inP_.EdgeCollisions(inQ_);
+  p2q1_ = inP_.EdgeCollisions(inQ_, true);  // inverted
 
   policy_ = autoPolicy(glm::max(p1q2_.size(), p2q1_.size()));
   p1q2_.Sort(policy_);
   PRINT("p1q2 size = " << p1q2_.size());
 
-  p2q1_.SwapPQ();
   p2q1_.Sort(policy_);
   PRINT("p2q1 size = " << p2q1_.size());
 
@@ -552,8 +556,7 @@ Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ,
   p0q2.Sort(policy_);
   PRINT("p0q2 size = " << p0q2.size());
 
-  SparseIndices p2q0 = inP.VertexCollisionsZ(inQ.vertPos_);
-  p2q0.SwapPQ();
+  SparseIndices p2q0 = inP.VertexCollisionsZ(inQ.vertPos_, true);  // inverted
   p2q0.Sort(policy_);
   PRINT("p2q0 size = " << p2q0.size());
 
@@ -599,10 +602,14 @@ Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ,
                                      xyzz11, p2q1_, false, policy_);
   PRINT("x21 size = " << x21_.size());
 
+  VecDH<int> p0 = p0q2.Copy(false);
+  p0q2.Resize(0);
+  VecDH<int> q0 = p2q0.Copy(true);
+  p2q0.Resize(0);
   // Sum up the winding numbers of all vertices.
-  w03_ = Winding03(inP, p0q2, s02, false, policy_);
+  w03_ = Winding03(inP, p0, s02, false, policy_);
 
-  w30_ = Winding03(inQ, p2q0, s20, true, policy_);
+  w30_ = Winding03(inQ, q0, s20, true, policy_);
 
 #ifdef MANIFOLD_DEBUG
   intersections.Stop();

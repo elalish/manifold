@@ -17,6 +17,7 @@
 #include "par.h"
 #include "utils.h"
 #include "vec_dh.h"
+#include "sparse.h"
 
 namespace manifold {
 
@@ -214,10 +215,14 @@ VecDH<TmpEdge> inline CreateTmpEdges(const VecDH<Halfedge>& halfedge) {
   return edges;
 }
 
+template <const bool inverted>
 struct ReindexEdge {
   const TmpEdge* edges;
+  int* indices;
 
-  __host__ __device__ void operator()(int& edge) {
+  __host__ __device__ void operator()(int i) {
+    int& edge = inverted ? indices[2 * i + 1 - SparseIndices::pOffset]
+                         : indices[2 * i + SparseIndices::pOffset];
     edge = edges[edge].halfedgeIdx;
   }
 };

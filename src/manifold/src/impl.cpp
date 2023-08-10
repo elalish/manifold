@@ -863,7 +863,8 @@ void Manifold::Impl::IncrementMeshIDs() {
  * the input manifold, Q and the faces of this manifold. Returned indices only
  * point to forward halfedges.
  */
-SparseIndices Manifold::Impl::EdgeCollisions(const Impl& Q) const {
+SparseIndices Manifold::Impl::EdgeCollisions(const Impl& Q,
+                                             bool inverted) const {
   VecDH<TmpEdge> edges = CreateTmpEdges(Q.halfedge_);
   const int numEdge = edges.size();
   VecDH<Box> QedgeBB(numEdge);
@@ -871,9 +872,18 @@ SparseIndices Manifold::Impl::EdgeCollisions(const Impl& Q) const {
   for_each_n(policy, zip(QedgeBB.begin(), edges.cbegin()), numEdge,
              EdgeBox({Q.vertPos_.cptrD()}));
 
-  SparseIndices q1p2 = collider_.Collisions(QedgeBB);
+  SparseIndices q1p2(0);
+  if (inverted)
+    q1p2 = collider_.Collisions<false, true>(QedgeBB);
+  else
+    q1p2 = collider_.Collisions<false, false>(QedgeBB);
 
-  for_each(policy, q1p2.begin(0), q1p2.end(0), ReindexEdge({edges.cptrD()}));
+  if (inverted)
+    for_each(policy, countAt(0), countAt(q1p2.size()),
+             ReindexEdge<true>({edges.cptrD(), q1p2.ptr()}));
+  else
+    for_each(policy, countAt(0), countAt(q1p2.size()),
+             ReindexEdge<false>({edges.cptrD(), q1p2.ptr()}));
   return q1p2;
 }
 
@@ -881,8 +891,11 @@ SparseIndices Manifold::Impl::EdgeCollisions(const Impl& Q) const {
  * Returns a sparse array of the input vertices that project inside the XY
  * bounding boxes of the faces of this manifold.
  */
-SparseIndices Manifold::Impl::VertexCollisionsZ(
-    const VecDH<glm::vec3>& vertsIn) const {
-  return collider_.Collisions(vertsIn);
+SparseIndices Manifold::Impl::VertexCollisionsZ(const VecDH<glm::vec3>& vertsIn,
+                                                bool inverted) const {
+  if (inverted)
+    return collider_.Collisions<false, true>(vertsIn);
+  else
+    return collider_.Collisions<false, false>(vertsIn);
 }
 }  // namespace manifold

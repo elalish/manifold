@@ -24,12 +24,10 @@
 #include <thrust/system/cpp/execution_policy.h>
 #include <thrust/uninitialized_copy.h>
 #include <thrust/unique.h>
-
 #if MANIFOLD_PAR == 'O'
 #include <thrust/system/omp/execution_policy.h>
 #define MANIFOLD_PAR_NS omp
 #elif MANIFOLD_PAR == 'T'
-#include <tbb/tbb.h>
 #include <thrust/system/tbb/execution_policy.h>
 
 #include <algorithm>
@@ -196,6 +194,7 @@ OutputIterator copy_if(ExecutionPolicy policy, InputIterator1 first,
   else
     return std::copy_if(std::execution::par_unseq, first, last, result, pred);
 }
+
 #else
 #define STL_DYNAMIC_BACKEND(NAME, RET) THRUST_DYNAMIC_BACKEND(NAME, RET)
 #define STL_DYNAMIC_BACKEND_VOID(NAME) THRUST_DYNAMIC_BACKEND_VOID(NAME)
@@ -223,7 +222,7 @@ THRUST_DYNAMIC_BACKEND_VOID(fill)
 THRUST_DYNAMIC_BACKEND_VOID(copy)
 THRUST_DYNAMIC_BACKEND_VOID(inclusive_scan)
 THRUST_DYNAMIC_BACKEND_VOID(copy_n)
-STL_DYNAMIC_BACKEND_VOID(sort)
+THRUST_DYNAMIC_BACKEND_VOID(sort)
 
 // void implies that the user have to specify the return type in the template
 // argument, as we are unable to deduce it

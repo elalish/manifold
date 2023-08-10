@@ -71,15 +71,18 @@ struct CountVerts {
   }
 };
 
+template <const bool inverted>
 struct CountNewVerts {
   int *countP;
   int *countQ;
+  const int *pq;
   const Halfedge *halfedges;
 
-  __host__ __device__ void operator()(thrust::tuple<int, int, int> in) {
-    int edgeP = thrust::get<0>(in);
-    int faceQ = thrust::get<1>(in);
-    int inclusion = glm::abs(thrust::get<2>(in));
+  __host__ __device__ void operator()(thrust::tuple<int, int> in) {
+    int edgeP = pq[2 * thrust::get<0>(in) + SparseIndices::pOffset];
+    int faceQ = pq[2 * thrust::get<0>(in) + 1 - SparseIndices::pOffset];
+    if (inverted) std::swap(edgeP, faceQ);
+    int inclusion = glm::abs(thrust::get<1>(in));
 
     AtomicAdd(countQ[faceQ], inclusion);
     const Halfedge half = halfedges[edgeP];
@@ -105,12 +108,12 @@ std::tuple<VecDH<int>, VecDH<int>> SizeOutput(
            CountVerts({sidesPerFaceP, i03.cptrD()}));
   for_each(policy, inQ.halfedge_.begin(), inQ.halfedge_.end(),
            CountVerts({sidesPerFaceQ, i30.cptrD()}));
-  for_each_n(
-      policy, zip(p1q2.begin(0), p1q2.begin(1), i12.begin()), i12.size(),
-      CountNewVerts({sidesPerFaceP, sidesPerFaceQ, inP.halfedge_.cptrD()}));
-  for_each_n(
-      policy, zip(p2q1.begin(1), p2q1.begin(0), i21.begin()), i21.size(),
-      CountNewVerts({sidesPerFaceQ, sidesPerFaceP, inQ.halfedge_.cptrD()}));
+  for_each_n(policy, zip(countAt(0), i12.begin()), i12.size(),
+             CountNewVerts<false>({sidesPerFaceP, sidesPerFaceQ, p1q2.ptr(),
+                                   inP.halfedge_.cptrD()}));
+  for_each_n(policy, zip(countAt(0), i21.begin()), i21.size(),
+             CountNewVerts<true>({sidesPerFaceQ, sidesPerFaceP, p2q1.ptr(),
+                                  inQ.halfedge_.cptrD()}));
 
   VecDH<int> facePQ2R(inP.NumTri() + inQ.NumTri() + 1, 0);
   auto keepFace =
@@ -164,8 +167,8 @@ void AddNewEdgeVerts(
   // intersections between the face of Q and the two faces of P attached to the
   // edge. The direction and duplicity are given by i12, while v12R remaps to
   // the output vert index. When forward is false, all is reversed.
-  const VecDH<int> &p1 = p1q2.Get(!forward);
-  const VecDH<int> &q2 = p1q2.Get(forward);
+  const VecDH<int> &p1 = p1q2.Copy(!forward);
+  const VecDH<int> &q2 = p1q2.Copy(forward);
   auto process = [&](std::function<void(size_t)> lock,
                      std::function<void(size_t)> unlock, int i) {
     const int edgeP = p1[i];

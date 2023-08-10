@@ -157,36 +157,27 @@ struct CreateRadixTree {
   }
 };
 
-template <typename T, const bool allocateOnly, const bool selfCollision>
+template <typename T, const bool selfCollision, typename Recorder>
 struct FindCollisions {
-  thrust::pair<int*, int*> queryTri_;
-  int* counts;
   const Box* nodeBBox_;
   const thrust::pair<int, int>* internalChildren_;
+  const Recorder& recorder;
 
-  __host__ __device__ int RecordCollision(int node,
-                                          thrust::tuple<T, int>& query) {
+  int RecordCollision(int node, thrust::tuple<T, int>& query) {
     const T& queryObj = thrust::get<0>(query);
     const int queryIdx = thrust::get<1>(query);
-    int& count = counts[queryIdx];
 
     bool overlaps = nodeBBox_[node].DoesOverlap(queryObj);
     if (overlaps && IsLeaf(node)) {
-      const int leafIdx = Node2Leaf(node);
+      int leafIdx = Node2Leaf(node);
       if (!selfCollision || leafIdx != queryIdx) {
-        if (allocateOnly) {
-          count++;
-        } else {
-          int pos = count++;
-          queryTri_.first[pos] = queryIdx;
-          queryTri_.second[pos] = leafIdx;
-        }
+        recorder.record(queryIdx, leafIdx);
       }
     }
     return overlaps && IsInternal(node);  // Should traverse into node
   }
 
-  __host__ __device__ void operator()(thrust::tuple<T, int> query) {
+  void operator()(thrust::tuple<T, int> query) {
     // stack cannot overflow because radix tree has max depth 30 (Morton code) +
     // 32 (index).
     int stack[64];
@@ -195,7 +186,7 @@ struct FindCollisions {
     int node = kRoot;
     const int queryIdx = thrust::get<1>(query);
     // same implies that this query do not have any collision
-    if (!allocateOnly && counts[queryIdx] == counts[queryIdx + 1]) return;
+    if (recorder.earlyexit(queryIdx)) return;
     while (1) {
       int internal = Node2Internal(node);
       int child1 = internalChildren_[internal].first;
@@ -214,6 +205,43 @@ struct FindCollisions {
         }
       }
     }
+  }
+};
+
+struct CountCollisions {
+  int* const counts;
+  void record(int queryIdx, int _leafIdx) const { counts[queryIdx]++; }
+  bool earlyexit(int _queryIdx) const { return false; }
+};
+
+template <const bool inverted>
+struct SeqCollisionRecorder {
+  SparseIndices& queryTri_;
+  void record(int queryIdx, int leafIdx) const {
+    if (inverted)
+      queryTri_.Add(leafIdx, queryIdx);
+    else
+      queryTri_.Add(queryIdx, leafIdx);
+  }
+  bool earlyexit(int queryIdx) const { return false; }
+};
+
+template <const bool inverted>
+struct ParCollisionRecorder {
+  int* queryTri_;
+  int* counts;
+  void record(int queryIdx, int leafIdx) const {
+    int pos = counts[queryIdx]++;
+    if (inverted) {
+      queryTri_[2 * pos + SparseIndices::pOffset] = leafIdx;
+      queryTri_[2 * pos + 1 - SparseIndices::pOffset] = queryIdx;
+    } else {
+      queryTri_[2 * pos + SparseIndices::pOffset] = queryIdx;
+      queryTri_[2 * pos + 1 - SparseIndices::pOffset] = leafIdx;
+    }
+  }
+  bool earlyexit(int queryIdx) const {
+    return counts[queryIdx] == counts[queryIdx + 1];
   }
 };
 
@@ -274,28 +302,40 @@ Collider::Collider(const VecDH<Box>& leafBB,
  * the query vector is the leaf vector, set selfCollision to true, which will
  * then not report any collisions between an index and itself.
  */
-template <const bool selfCollision, typename T>
+template <const bool selfCollision, const bool inverted, typename T>
 SparseIndices Collider::Collisions(const VecDH<T>& queriesIn) const {
   // note that the length is 1 larger than the number of queries so the last
   // element can store the sum when using exclusive scan
   VecDH<int> counts(queriesIn.size() + 1, 0);
-  auto policy = autoPolicy(queriesIn.size());
-  // compute the number of collisions to determine the size for allocation and
-  // offset, this avoids the need for atomic
-  for_each_n(policy, zip(queriesIn.cbegin(), countAt(0)), queriesIn.size(),
-             FindCollisions<T, true, selfCollision>(
-                 {thrust::pair<int*, int*>(nullptr, nullptr), counts.ptrD(),
-                  nodeBBox_.ptrD(), internalChildren_.ptrD()}));
-  // compute start index for each query and total count
-  exclusive_scan(policy, counts.begin(), counts.end(), counts.begin(), 0,
-                 std::plus<int>());
-  SparseIndices queryTri(counts.back());
-  // actually recording collisions
-  for_each_n(policy, zip(queriesIn.cbegin(), countAt(0)), queriesIn.size(),
-             FindCollisions<T, false, selfCollision>(
-                 {queryTri.ptrDpq(), counts.ptrD(), nodeBBox_.ptrD(),
-                  internalChildren_.ptrD()}));
-  return queryTri;
+  if (queriesIn.size() < 512) {
+    SparseIndices queryTri;
+    for_each_n(ExecutionPolicy::Seq, zip(queriesIn.cbegin(), countAt(0)),
+               queriesIn.size(),
+               FindCollisions<T, selfCollision, SeqCollisionRecorder<inverted>>{
+                   nodeBBox_.ptrD(), internalChildren_.ptrD(), {queryTri}});
+    return queryTri;
+  } else {
+    // compute the number of collisions to determine the size for allocation and
+    // offset, this avoids the need for atomic
+    for_each_n(
+        ExecutionPolicy::Par, zip(queriesIn.cbegin(), countAt(0)),
+        queriesIn.size(),
+        FindCollisions<T, selfCollision, CountCollisions>{
+            nodeBBox_.ptrD(), internalChildren_.ptrD(), {counts.ptrD()}});
+    // compute start index for each query and total count
+    exclusive_scan(ExecutionPolicy::Par, counts.begin(), counts.end(),
+                   counts.begin(), 0, std::plus<int>());
+    if (counts.back() == 0) return SparseIndices(0);
+    SparseIndices queryTri(counts.back());
+    // actually recording collisions
+    for_each_n(ExecutionPolicy::Par, zip(queriesIn.cbegin(), countAt(0)),
+               queriesIn.size(),
+               FindCollisions<T, selfCollision, ParCollisionRecorder<inverted>>{
+                   nodeBBox_.ptrD(),
+                   internalChildren_.ptrD(),
+                   {queryTri.ptr(), counts.ptrD()}});
+    return queryTri;
+  }
 }
 
 /**
@@ -338,12 +378,22 @@ bool Collider::Transform(glm::mat4x3 transform) {
   return axisAligned;
 }
 
-template SparseIndices Collider::Collisions<true, Box>(const VecDH<Box>&) const;
-
-template SparseIndices Collider::Collisions<false, Box>(
+template SparseIndices Collider::Collisions<true, false, Box>(
     const VecDH<Box>&) const;
 
-template SparseIndices Collider::Collisions<false, glm::vec3>(
+template SparseIndices Collider::Collisions<false, false, Box>(
+    const VecDH<Box>&) const;
+
+template SparseIndices Collider::Collisions<false, false, glm::vec3>(
+    const VecDH<glm::vec3>&) const;
+
+template SparseIndices Collider::Collisions<true, true, Box>(
+    const VecDH<Box>&) const;
+
+template SparseIndices Collider::Collisions<false, true, Box>(
+    const VecDH<Box>&) const;
+
+template SparseIndices Collider::Collisions<false, true, glm::vec3>(
     const VecDH<glm::vec3>&) const;
 
 }  // namespace manifold
