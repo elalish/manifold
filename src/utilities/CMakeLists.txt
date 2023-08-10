@@ -23,6 +23,19 @@ message("Parallel Backend: ${MANIFOLD_PAR}")
 target_include_directories(${PROJECT_NAME} INTERFACE ${PROJECT_SOURCE_DIR}/include)
 target_include_directories(${PROJECT_NAME} INTERFACE ${THRUST_INC_DIR}/dependencies/libcudacxx/include)
 
+if (TRACY_ENABLE)
+  include(FetchContent)
+  FetchContent_Declare(tracy
+    GIT_REPOSITORY https://github.com/wolfpld/tracy.git
+    GIT_TAG v0.9.1
+    GIT_SHALLOW TRUE
+    GIT_PROGRESS TRUE
+  )
+  FetchContent_MakeAvailable(tracy)
+  target_link_libraries(${PROJECT_NAME} PUBLIC TracyClient)
+  target_compile_options(${PROJECT_NAME} PUBLIC -DTRACY_NO_CODE_TRANSFER=1)
+endif()
+
 if(MANIFOLD_PAR STREQUAL "OMP")
     find_package(OpenMP REQUIRED)
     target_include_directories(${PROJECT_NAME} PUBLIC OpenMP::OpenMP_CXX)

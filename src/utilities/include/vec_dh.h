@@ -17,6 +17,13 @@
 #include <cuda.h>
 #endif
 
+#if TRACY_ENABLE
+#include <tracy/Tracy.hpp>
+#else
+#define TracyAllocS(ptr, size, n) (void)0
+#define TracyFreeS(ptr, n) (void)0
+#endif
+
 // #include "optional_assert.h"
 #include "par.h"
 #include "public.h"
@@ -254,6 +261,7 @@ class ManagedVec {
     else
 #endif
       *ptr = reinterpret_cast<T *>(malloc(bytes));
+    TracyAllocS(*ptr, bytes, 5);
   }
 
   static void freeManaged(T *ptr) {
@@ -262,6 +270,7 @@ class ManagedVec {
       cudaFree(ptr);
     else
 #endif
+      TracyFreeS(ptr, 5);
       free(ptr);
   }
 
