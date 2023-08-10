@@ -271,7 +271,7 @@ class ManagedVec {
     else
 #endif
       TracyFreeS(ptr, 5);
-      free(ptr);
+    free(ptr);
   }
 
   static void prefetch(T *ptr, int bytes, bool onHost) {

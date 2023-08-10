@@ -127,7 +127,7 @@ class SparseIndices {
     return size;
   }
 
-  #ifdef MANIFOLD_DEBUG
+#ifdef MANIFOLD_DEBUG
   void Dump() const {
     std::cout << "SparseIndices = " << std::endl;
     const int* p = ptr();
@@ -137,7 +137,7 @@ class SparseIndices {
     }
     std::cout << std::endl;
   }
-  #endif
+#endif
 
  private:
   VecDH<int64_t> data;

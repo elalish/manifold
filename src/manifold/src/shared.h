@@ -15,9 +15,9 @@
 #pragma once
 
 #include "par.h"
+#include "sparse.h"
 #include "utils.h"
 #include "vec_dh.h"
-#include "sparse.h"
 
 namespace manifold {
 
