@@ -14,6 +14,7 @@
 
 #include <thrust/sequence.h>
 
+#include <atomic>
 #include <numeric>
 #include <set>
 
@@ -126,9 +127,10 @@ struct Reindex {
 struct MarkProp {
   int* keep;
 
-  __host__ __device__ void operator()(glm::ivec3 triProp) {
+  void operator()(glm::ivec3 triProp) {
     for (const int i : {0, 1, 2}) {
-      keep[triProp[i]] = 1;
+      reinterpret_cast<std::atomic<int>*>(keep)[triProp[i]].store(
+          1, std::memory_order_relaxed);
     }
   }
 };

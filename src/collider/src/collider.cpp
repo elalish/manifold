@@ -205,13 +205,18 @@ struct FindCollisions {
         }
       }
     }
+    recorder.end(queryIdx);
   }
 };
 
 struct CountCollisions {
-  int* const counts;
+  int* counts;
+  char* empty;
   void record(int queryIdx, int _leafIdx) const { counts[queryIdx]++; }
   bool earlyexit(int _queryIdx) const { return false; }
+  void end(int queryIdx) const {
+    if (counts[queryIdx] == 0) empty[queryIdx] = 1;
+  }
 };
 
 template <const bool inverted>
@@ -224,12 +229,14 @@ struct SeqCollisionRecorder {
       queryTri_.Add(queryIdx, leafIdx);
   }
   bool earlyexit(int queryIdx) const { return false; }
+  void end(int queryIdx) const {}
 };
 
 template <const bool inverted>
 struct ParCollisionRecorder {
   int* queryTri_;
   int* counts;
+  char* empty;
   void record(int queryIdx, int leafIdx) const {
     int pos = counts[queryIdx]++;
     if (inverted) {
@@ -240,9 +247,8 @@ struct ParCollisionRecorder {
       queryTri_[2 * pos + 1 - SparseIndices::pOffset] = leafIdx;
     }
   }
-  bool earlyexit(int queryIdx) const {
-    return counts[queryIdx] == counts[queryIdx + 1];
-  }
+  bool earlyexit(int queryIdx) const { return empty[queryIdx] == 1; }
+  void end(int queryIdx) const {}
 };
 
 struct BuildInternalBoxes {
@@ -306,7 +312,6 @@ template <const bool selfCollision, const bool inverted, typename T>
 SparseIndices Collider::Collisions(const VecDH<T>& queriesIn) const {
   // note that the length is 1 larger than the number of queries so the last
   // element can store the sum when using exclusive scan
-  VecDH<int> counts(queriesIn.size() + 1, 0);
   if (queriesIn.size() < 512) {
     SparseIndices queryTri;
     for_each_n(ExecutionPolicy::Seq, zip(queriesIn.cbegin(), countAt(0)),
@@ -317,11 +322,14 @@ SparseIndices Collider::Collisions(const VecDH<T>& queriesIn) const {
   } else {
     // compute the number of collisions to determine the size for allocation and
     // offset, this avoids the need for atomic
-    for_each_n(
-        ExecutionPolicy::Par, zip(queriesIn.cbegin(), countAt(0)),
-        queriesIn.size(),
-        FindCollisions<T, selfCollision, CountCollisions>{
-            nodeBBox_.ptrD(), internalChildren_.ptrD(), {counts.ptrD()}});
+    VecDH<int> counts(queriesIn.size() + 1, 0);
+    VecDH<char> empty(queriesIn.size(), 0);
+    for_each_n(ExecutionPolicy::Par, zip(queriesIn.cbegin(), countAt(0)),
+               queriesIn.size(),
+               FindCollisions<T, selfCollision, CountCollisions>{
+                   nodeBBox_.ptrD(),
+                   internalChildren_.ptrD(),
+                   {counts.ptrD(), empty.ptrD()}});
     // compute start index for each query and total count
     exclusive_scan(ExecutionPolicy::Par, counts.begin(), counts.end(),
                    counts.begin(), 0, std::plus<int>());
@@ -333,7 +341,7 @@ SparseIndices Collider::Collisions(const VecDH<T>& queriesIn) const {
                FindCollisions<T, selfCollision, ParCollisionRecorder<inverted>>{
                    nodeBBox_.ptrD(),
                    internalChildren_.ptrD(),
-                   {queryTri.ptr(), counts.ptrD()}});
+                   {queryTri.ptr(), counts.ptrD(), empty.ptrD()}});
     return queryTri;
   }
 }

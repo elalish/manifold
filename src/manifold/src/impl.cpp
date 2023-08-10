@@ -135,9 +135,10 @@ struct LinkHalfedges {
 struct MarkVerts {
   int* vert;
 
-  __host__ __device__ void operator()(glm::ivec3 triVerts) {
+  void operator()(glm::ivec3 triVerts) {
     for (int i : {0, 1, 2}) {
-      vert[triVerts[i]] = 1;
+      reinterpret_cast<std::atomic<int>*>(vert)[triVerts[i]].store(
+          1, std::memory_order_relaxed);
     }
   }
 };
@@ -185,7 +186,8 @@ struct CoplanarEdge {
   const int numProp;
   const float precision;
 
-  __host__ __device__ void operator()(
+  // FIXME: race condition
+  void operator()(
       thrust::tuple<thrust::pair<int, int>&, thrust::pair<int, int>&, int>
           inOut) {
     thrust::pair<int, int>& face2face = thrust::get<0>(inOut);
@@ -283,7 +285,7 @@ struct CheckCoplanarity {
   const int* components;
   const float precision;
 
-  __host__ __device__ void operator()(int tri) {
+  void operator()(int tri) {
     const int component = components[tri];
     const int referenceTri = comp2tri[component];
     if (referenceTri < 0 || referenceTri == tri) return;
@@ -299,7 +301,8 @@ struct CheckCoplanarity {
       // triangle, unmark the entire component so that none of its triangles are
       // marked coplanar.
       if (glm::abs(glm::dot(normal, vert - origin)) > precision) {
-        comp2tri[component] = -1;
+        reinterpret_cast<std::atomic<int>*>(comp2tri)[component].store(
+            -1, std::memory_order_relaxed);
         break;
       }
     }

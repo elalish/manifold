@@ -166,6 +166,7 @@ struct UpdateProperties {
   const int gaussianIdx;
   const int meanIdx;
 
+  // FIXME: race condition
   __host__ __device__ void operator()(thrust::tuple<glm::ivec3&, int> inOut) {
     glm::ivec3& triProp = thrust::get<0>(inOut);
     const int tri = thrust::get<1>(inOut);

@@ -359,17 +359,11 @@ class VecDH {
   using Iter = typename ManagedVec<T>::Iter;
   using IterC = typename ManagedVec<T>::IterC;
 
-  Iter begin() {
-    impl_.prefetch_to(autoPolicy(size()) != ExecutionPolicy::ParUnseq);
-    return impl_.begin();
-  }
+  Iter begin() { return impl_.begin(); }
 
   Iter end() { return impl_.end(); }
 
-  IterC cbegin() const {
-    impl_.prefetch_to(autoPolicy(size()) != ExecutionPolicy::ParUnseq);
-    return impl_.cbegin();
-  }
+  IterC cbegin() const { return impl_.cbegin(); }
 
   IterC cend() const { return impl_.cend(); }
 
@@ -378,13 +372,11 @@ class VecDH {
 
   T *ptrD() {
     if (size() == 0) return nullptr;
-    impl_.prefetch_to(autoPolicy(size()) != ExecutionPolicy::ParUnseq);
     return impl_.data();
   }
 
   const T *cptrD() const {
     if (size() == 0) return nullptr;
-    impl_.prefetch_to(autoPolicy(size()) != ExecutionPolicy::ParUnseq);
     return impl_.data();
   }
 
@@ -392,13 +384,11 @@ class VecDH {
 
   T *ptrH() {
     if (size() == 0) return nullptr;
-    impl_.prefetch_to(true);
     return impl_.data();
   }
 
   const T *cptrH() const {
     if (size() == 0) return nullptr;
-    impl_.prefetch_to(true);
     return impl_.data();
   }
 
