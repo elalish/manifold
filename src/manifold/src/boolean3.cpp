@@ -154,26 +154,44 @@ __host__ __device__ thrust::pair<int, glm::vec2> Shadow01(
   return thrust::make_pair(s01, yz01);
 }
 
-__host__ __device__ int BinarySearch(const int64_t *keys, const int size,
-                                     const int64_t key) {
-  if (size <= 0) return -1;
-  int left = 0;
-  int right = size - 1;
-  int m;
-  int64_t keyM;
-  while (1) {
-    m = right - (right - left) / 2;
-    keyM = keys[m];
-    if (left == right) break;
-    if (keyM > key)
-      right = m - 1;
-    else
-      left = m;
-  }
-  if (keyM == key)
-    return m;
-  else
+// https://github.com/scandum/binary_search/blob/master/README.md
+// much faster than standard binary search on large arrays
+int monobound_quaternary_search(const int64_t *array, unsigned int array_size,
+                                int64_t key) {
+  if (array_size == 0) {
     return -1;
+  }
+  unsigned int bot = 0;
+  unsigned int top = array_size;
+  while (top >= 65536) {
+    unsigned int mid = top / 4;
+    top -= mid * 3;
+    if (key < array[bot + mid * 2]) {
+      if (key >= array[bot + mid]) {
+        bot += mid;
+      }
+    } else {
+      bot += mid * 2;
+      if (key >= array[bot + mid]) {
+        bot += mid;
+      }
+    }
+  }
+
+  while (top > 3) {
+    unsigned int mid = top / 2;
+    if (key >= array[bot + mid]) {
+      bot += mid;
+    }
+    top -= mid;
+  }
+
+  while (top--) {
+    if (key == array[bot + top]) {
+      return bot + top;
+    }
+  }
+  return -1;
 }
 
 struct Kernel11 {
@@ -411,12 +429,11 @@ struct Kernel12 {
 
     const Halfedge edge = halfedgesP[p1];
 
-    // binary search can be slow...
     for (int vert : {edge.startVert, edge.endVert}) {
       const int64_t key = forward ? (((int64_t)vert << 32) | (int64_t)q2)
                                   : (((int64_t)q2 << 32) | (int64_t)vert);
-      const int idx =
-          BinarySearch(reinterpret_cast<const int64_t *>(p0q2), size02, key);
+      const int idx = monobound_quaternary_search(
+          reinterpret_cast<const int64_t *>(p0q2), size02, key);
       if (idx != -1) {
         const int s = s02[idx];
         x12 += s * ((vert == edge.startVert) == forward ? 1 : -1);
@@ -437,8 +454,8 @@ struct Kernel12 {
       const int q1F = edge.IsForward() ? q1 : edge.pairedHalfedge;
       const int64_t key = forward ? ((int64_t)p1 << 32) | (int64_t)q1F
                                   : ((int64_t)q1F << 32) | (int64_t)p1;
-      const int idx =
-          BinarySearch(reinterpret_cast<const int64_t *>(p1q1), size11, key);
+      const int idx = monobound_quaternary_search(
+          reinterpret_cast<const int64_t *>(p1q1), size11, key);
       if (idx != -1) {  // s is implicitly zero for anything not found
         const int s = s11[idx];
         x12 -= s * (edge.IsForward() ? 1 : -1);
