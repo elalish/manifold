@@ -12,14 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "csg_tree.h"
+#if MANIFOLD_PAR == 'T' && __has_include(<tbb/tbb.h>)
+#include <tbb/tbb.h>
+#define TBB_PREVIEW_CONCURRENT_ORDERED_CONTAINERS 1
+#include <tbb/concurrent_priority_queue.h>
+#endif
 
 #include <algorithm>
 
 #include "boolean3.h"
+#include "csg_tree.h"
 #include "impl.h"
 #include "mesh_fixes.h"
 #include "par.h"
+
+constexpr int kParallelThreshold = 4096;
 
 namespace {
 using namespace manifold;
@@ -436,6 +443,50 @@ std::shared_ptr<Manifold::Impl> CsgOpNode::BatchBoolean(
     return a->NumVert() > b->NumVert();
   };
 
+  // common cases
+  if (results.size() == 0) return std::make_shared<Manifold::Impl>();
+  if (results.size() == 1)
+    return std::make_shared<Manifold::Impl>(*results.front());
+  if (results.size() == 2) {
+    Boolean3 boolean(*results[0], *results[1], operation);
+    return std::make_shared<Manifold::Impl>(boolean.Result(operation));
+  }
+#if MANIFOLD_PAR == 'T' && __has_include(<tbb/tbb.h>)
+  tbb::task_group group;
+  tbb::concurrent_priority_queue<std::shared_ptr<const Manifold::Impl>,
+                                 decltype(cmpFn)>
+      queue(cmpFn);
+  for (auto result : results) {
+    queue.push(result);
+  }
+  results.clear();
+  std::function<void()> process = [&queue, &group, &process, operation]() {
+    while (queue.size() > 1) {
+      std::shared_ptr<const Manifold::Impl> a = nullptr, b = nullptr;
+      if (!queue.try_pop(a)) continue;
+      if (!queue.try_pop(b)) {
+        queue.push(a);
+        continue;
+      }
+      if (a->NumVert() + b->NumVert() < kParallelThreshold) {
+        Boolean3 boolean(*a, *b, operation);
+        queue.push(
+            std::make_shared<const Manifold::Impl>(boolean.Result(operation)));
+      } else {
+        group.run([&queue, &group, &process, a, b, operation]() {
+          Boolean3 boolean(*a, *b, operation);
+          queue.push(std::make_shared<const Manifold::Impl>(
+              boolean.Result(operation)));
+          return group.run(process);
+        });
+      }
+    }
+  };
+  group.run_and_wait(process);
+  std::shared_ptr<const Manifold::Impl> r;
+  queue.try_pop(r);
+  return std::make_shared<Manifold::Impl>(*r);
+#else
   // apply boolean operations starting from smaller meshes
   // the assumption is that boolean operations on smaller meshes is faster,
   // due to less data being copied and processed
@@ -456,10 +507,8 @@ std::shared_ptr<Manifold::Impl> CsgOpNode::BatchBoolean(
         std::make_shared<const Manifold::Impl>(boolean.Result(operation)));
     std::push_heap(results.begin(), results.end(), cmpFn);
   }
-  if (results.size() == 1) {
-    return std::make_shared<Manifold::Impl>(*results.front());
-  }
-  return std::make_shared<Manifold::Impl>();
+  return std::make_shared<Manifold::Impl>(*results.front());
+#endif
 }
 
 /**
