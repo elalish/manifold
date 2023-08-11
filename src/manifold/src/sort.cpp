@@ -75,8 +75,7 @@ uint32_t MortonCode(glm::vec3 position, Box bBox) {
 struct Morton {
   const Box bBox;
 
-  void operator()(
-      thrust::tuple<uint32_t&, const glm::vec3&> inout) {
+  void operator()(thrust::tuple<uint32_t&, const glm::vec3&> inout) {
     glm::vec3 position = thrust::get<1>(inout);
     thrust::get<0>(inout) = MortonCode(position, bBox);
   }
@@ -87,8 +86,7 @@ struct FaceMortonBox {
   const glm::vec3* vertPos;
   const Box bBox;
 
-  void operator()(
-      thrust::tuple<uint32_t&, Box&, int> inout) {
+  void operator()(thrust::tuple<uint32_t&, Box&, int> inout) {
     uint32_t& mortonCode = thrust::get<0>(inout);
     Box& faceBox = thrust::get<1>(inout);
     int face = thrust::get<2>(inout);
@@ -204,8 +202,7 @@ struct VertMortonBox {
   const float tol;
   const Box bBox;
 
-  void operator()(
-      thrust::tuple<uint32_t&, Box&, int> inout) {
+  void operator()(thrust::tuple<uint32_t&, Box&, int> inout) {
     uint32_t& mortonCode = thrust::get<0>(inout);
     Box& vertBox = thrust::get<1>(inout);
     int vert = thrust::get<2>(inout);
@@ -230,8 +227,8 @@ struct Duplicate {
 struct MinMax : public thrust::binary_function<thrust::pair<float, float>,
                                                thrust::pair<float, float>,
                                                thrust::pair<float, float>> {
-  thrust::pair<float, float> operator()(
-      thrust::pair<float, float> a, thrust::pair<float, float> b) {
+  thrust::pair<float, float> operator()(thrust::pair<float, float> a,
+                                        thrust::pair<float, float> b) {
     return thrust::make_pair(glm::min(a.first, b.first),
                              glm::max(a.second, b.second));
   }

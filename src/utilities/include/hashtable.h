@@ -81,9 +81,7 @@ class HashTableD {
 
   int Size() const { return keys_.size(); }
 
-  bool Full() const {
-    return AtomicLoad(used_[0]) * 2 > Size();
-  }
+  bool Full() const { return AtomicLoad(used_[0]) * 2 > Size(); }
 
   void Insert(Uint64 key, const V& val) {
     uint32_t idx = H(key) & (Size() - 1);
@@ -112,9 +110,7 @@ class HashTableD {
     }
   }
 
-  Uint64 KeyAt(int idx) const {
-    return AtomicLoad(keys_[idx]);
-  }
+  Uint64 KeyAt(int idx) const { return AtomicLoad(keys_[idx]); }
   V& At(int idx) const { return values_[idx]; }
 
  private:

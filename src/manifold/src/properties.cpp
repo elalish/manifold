@@ -66,9 +66,7 @@ struct PosMax
 };
 
 struct FiniteVert {
-  bool operator()(glm::vec3 v) {
-    return glm::all(glm::isfinite(v));
-  }
+  bool operator()(glm::vec3 v) { return glm::all(glm::isfinite(v)); }
 };
 
 struct MakeMinMax {
@@ -90,8 +88,8 @@ struct MinMax
 struct SumPair : public thrust::binary_function<thrust::pair<float, float>,
                                                 thrust::pair<float, float>,
                                                 thrust::pair<float, float>> {
-  thrust::pair<float, float> operator()(
-      thrust::pair<float, float> a, thrust::pair<float, float> b) {
+  thrust::pair<float, float> operator()(thrust::pair<float, float> a,
+                                        thrust::pair<float, float> b) {
     a.first += b.first;
     a.second += b.second;
     return a;
@@ -142,8 +140,7 @@ struct CurvatureAngles {
 };
 
 struct NormalizeCurvature {
-  void operator()(
-      thrust::tuple<float&, float&, float, float> inOut) {
+  void operator()(thrust::tuple<float&, float&, float, float> inOut) {
     float& meanCurvature = thrust::get<0>(inOut);
     float& gaussianCurvature = thrust::get<1>(inOut);
     float area = thrust::get<2>(inOut);

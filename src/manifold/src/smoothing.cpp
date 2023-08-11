@@ -187,8 +187,7 @@ struct SmoothBezier {
   const glm::vec3* vertNormal;
   const Halfedge* halfedge;
 
-  void operator()(
-      thrust::tuple<glm::vec4&, Halfedge> inOut) {
+  void operator()(thrust::tuple<glm::vec4&, Halfedge> inOut) {
     glm::vec4& tangent = thrust::get<0>(inOut);
     const Halfedge edge = thrust::get<1>(inOut);
 
@@ -224,22 +223,16 @@ struct InterpTri {
     return v;
   }
 
-  glm::vec4 Homogeneous(glm::vec3 v) const {
-    return glm::vec4(v, 1.0f);
-  }
+  glm::vec4 Homogeneous(glm::vec3 v) const { return glm::vec4(v, 1.0f); }
 
-  glm::vec3 HNormalize(glm::vec4 v) const {
-    return glm::vec3(v) / v.w;
-  }
+  glm::vec3 HNormalize(glm::vec4 v) const { return glm::vec3(v) / v.w; }
 
-  glm::vec4 Bezier(glm::vec3 point,
-                                       glm::vec4 tangent) const {
+  glm::vec4 Bezier(glm::vec3 point, glm::vec4 tangent) const {
     return Homogeneous(glm::vec4(point, 0) + tangent);
   }
 
-  glm::mat2x4 CubicBezier2Linear(glm::vec4 p0, glm::vec4 p1,
-                                                     glm::vec4 p2, glm::vec4 p3,
-                                                     float x) const {
+  glm::mat2x4 CubicBezier2Linear(glm::vec4 p0, glm::vec4 p1, glm::vec4 p2,
+                                 glm::vec4 p3, float x) const {
     glm::mat2x4 out;
     glm::vec4 p12 = glm::mix(p1, p2, x);
     out[0] = glm::mix(glm::mix(p0, p1, x), p12, x);
@@ -255,8 +248,7 @@ struct InterpTri {
     return glm::normalize(HNormalize(points[1]) - HNormalize(points[0]));
   }
 
-  void operator()(
-      thrust::tuple<glm::vec3&, Barycentric> inOut) {
+  void operator()(thrust::tuple<glm::vec3&, Barycentric> inOut) {
     glm::vec3& pos = thrust::get<0>(inOut);
     const int tri = thrust::get<1>(inOut).tri;
     const glm::vec3 uvw = thrust::get<1>(inOut).uvw;

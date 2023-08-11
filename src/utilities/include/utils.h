@@ -150,8 +150,7 @@ class strided_range {
 
     stride_functor(difference_type stride) : stride(stride) {}
 
-    difference_type
-    operator()(const difference_type& i) const {
+    difference_type operator()(const difference_type& i) const {
       return stride * i;
     }
   };
