@@ -503,18 +503,18 @@ std::tuple<VecDH<int>, VecDH<glm::vec3>> Intersect12(
   return std::make_tuple(x12, v12);
 };
 
-VecDH<int> Winding03(const Manifold::Impl &inP, VecDH<int> &indices,
+VecDH<int> Winding03(const Manifold::Impl &inP, VecDH<int> &vertices,
                      VecDH<int> &s02, bool reverse, ExecutionPolicy policy) {
   // verts that are not shadowed (not in p0q2) have winding number zero.
   VecDH<int> w03(inP.NumVert(), 0);
   // checking is slow, so just sort and reduce
-  stable_sort_by_key(policy, indices.begin(), indices.end(), s02.begin());
+  stable_sort_by_key(policy, vertices.begin(), vertices.end(), s02.begin());
   VecDH<int> w03val(w03.size());
   VecDH<int> w03vert(w03.size());
   // sum known s02 values into w03 (winding number)
   auto endPair = reduce_by_key<
       thrust::pair<decltype(w03val.begin()), decltype(w03val.begin())>>(
-      policy, indices.begin(), indices.end(), s02.begin(), w03vert.begin(),
+      policy, vertices.begin(), vertices.end(), s02.begin(), w03vert.begin(),
       w03val.begin());
   scatter(policy, w03val.begin(), endPair.second, w03vert.begin(), w03.begin());
 
