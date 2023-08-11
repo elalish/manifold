@@ -19,6 +19,7 @@
 #endif
 
 #include <algorithm>
+#include <variant>
 
 #include "boolean3.h"
 #include "csg_tree.h"
@@ -435,12 +436,19 @@ std::shared_ptr<CsgLeafNode> CsgOpNode::ToLeafNode() const {
 std::shared_ptr<Manifold::Impl> CsgOpNode::BatchBoolean(
     OpType operation,
     std::vector<std::shared_ptr<const Manifold::Impl>> &results) {
+  using SharedImpl = std::variant<std::shared_ptr<const Manifold::Impl>,
+                                  std::shared_ptr<Manifold::Impl>>;
+  auto getImplPtr = [](const SharedImpl &p) -> const Manifold::Impl * {
+    if (std::holds_alternative<std::shared_ptr<const Manifold::Impl>>(p)) {
+      return std::get<std::shared_ptr<const Manifold::Impl>>(p).get();
+    } else {
+      return std::get<std::shared_ptr<Manifold::Impl>>(p).get();
+    }
+  };
   ASSERT(operation != OpType::Subtract, logicErr,
          "BatchBoolean doesn't support Difference.");
-  auto cmpFn = [](std::shared_ptr<const Manifold::Impl> a,
-                  std::shared_ptr<const Manifold::Impl> b) {
-    // invert the order because we want a min heap
-    return a->NumVert() > b->NumVert();
+  auto cmpFn = [&getImplPtr](const SharedImpl &a, const SharedImpl &b) {
+    return getImplPtr(a)->NumVert() < getImplPtr(b)->NumVert();
   };
 
   // common cases
@@ -453,39 +461,33 @@ std::shared_ptr<Manifold::Impl> CsgOpNode::BatchBoolean(
   }
 #if MANIFOLD_PAR == 'T' && __has_include(<tbb/tbb.h>)
   tbb::task_group group;
-  tbb::concurrent_priority_queue<std::shared_ptr<const Manifold::Impl>,
-                                 decltype(cmpFn)>
-      queue(cmpFn);
+  tbb::concurrent_priority_queue<SharedImpl, decltype(cmpFn)> queue(cmpFn);
   for (auto result : results) {
-    queue.push(result);
+    queue.emplace(result);
   }
   results.clear();
-  std::function<void()> process = [&queue, &group, &process, operation]() {
+  std::function<void()> process = [&]() {
     while (queue.size() > 1) {
-      std::shared_ptr<const Manifold::Impl> a = nullptr, b = nullptr;
+      SharedImpl a, b;
       if (!queue.try_pop(a)) continue;
       if (!queue.try_pop(b)) {
         queue.push(a);
         continue;
       }
-      if (a->NumVert() + b->NumVert() < kParallelThreshold) {
-        Boolean3 boolean(*a, *b, operation);
-        queue.push(
-            std::make_shared<const Manifold::Impl>(boolean.Result(operation)));
-      } else {
-        group.run([&queue, &group, &process, a, b, operation]() {
-          Boolean3 boolean(*a, *b, operation);
-          queue.push(std::make_shared<const Manifold::Impl>(
-              boolean.Result(operation)));
-          return group.run(process);
-        });
-      }
+      group.run([&, a, b]() {
+        const Manifold::Impl *aImpl;
+        const Manifold::Impl *bImpl;
+        Boolean3 boolean(*getImplPtr(a), *getImplPtr(b), operation);
+        queue.emplace(
+            std::make_shared<Manifold::Impl>(boolean.Result(operation)));
+        return group.run(process);
+      });
     }
   };
   group.run_and_wait(process);
-  std::shared_ptr<const Manifold::Impl> r;
+  SharedImpl r;
   queue.try_pop(r);
-  return std::make_shared<Manifold::Impl>(*r);
+  return std::get<std::shared_ptr<Manifold::Impl>>(r);
 #else
   // apply boolean operations starting from smaller meshes
   // the assumption is that boolean operations on smaller meshes is faster,
