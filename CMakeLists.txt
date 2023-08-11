@@ -65,7 +65,11 @@ if(CMAKE_EXPORT_COMPILE_COMMANDS AND !EMSCRIPTEN)
 endif()
 
 if(NOT MSVC)
-  set(WARNING_FLAGS -Werror -Wall -Wno-sign-compare -Wno-unused -Wno-array-bounds -Wno-stringop-overflow)
+  if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    set(WARNING_FLAGS -Werror -Wall -Wno-sign-compare -Wno-unused -Wno-array-bounds -Wno-stringop-overflow)
+  else()
+    set(WARNING_FLAGS -Werror -Wall -Wno-sign-compare -Wno-unused)
+  endif()
   set(MANIFOLD_FLAGS
     "${MANIFOLD_FLAGS}"
     "$<$<COMPILE_LANGUAGE:CXX>:${WARNING_FLAGS}>")
