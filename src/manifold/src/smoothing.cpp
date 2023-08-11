@@ -20,7 +20,7 @@
 namespace {
 using namespace manifold;
 
-__host__ __device__ glm::vec3 OrthogonalTo(glm::vec3 in, glm::vec3 ref) {
+glm::vec3 OrthogonalTo(glm::vec3 in, glm::vec3 ref) {
   in -= glm::dot(in, ref) * ref;
   return in;
 }
@@ -29,7 +29,7 @@ __host__ __device__ glm::vec3 OrthogonalTo(glm::vec3 in, glm::vec3 ref) {
  * The total number of verts if a triangle is subdivided naturally such that
  * each edge has edgeVerts verts along it (edgeVerts >= -1).
  */
-__host__ __device__ int VertsPerTri(int edgeVerts) {
+int VertsPerTri(int edgeVerts) {
   return (edgeVerts * edgeVerts + edgeVerts) / 2;
 }
 
@@ -54,7 +54,7 @@ void FillRetainedVerts(VecDH<Barycentric>& vertBary,
 struct ReindexHalfedge {
   int* half2Edge;
 
-  __host__ __device__ void operator()(thrust::tuple<int, TmpEdge> in) {
+  void operator()(thrust::tuple<int, TmpEdge> in) {
     const int edge = thrust::get<0>(in);
     const int halfedge = thrust::get<1>(in).halfedgeIdx;
 
@@ -68,7 +68,7 @@ struct EdgeVerts {
   const int startIdx;
   const int n;
 
-  __host__ __device__ void operator()(thrust::tuple<int, TmpEdge> in) {
+  void operator()(thrust::tuple<int, TmpEdge> in) {
     int edge = thrust::get<0>(in);
     TmpEdge edgeVerts = thrust::get<1>(in);
 
@@ -97,7 +97,7 @@ struct InteriorVerts {
   const int n;
   const Halfedge* halfedge;
 
-  __host__ __device__ void operator()(int tri) {
+  void operator()(int tri) {
     const float invTotal = 1.0f / n;
     int pos = startIdx + tri * VertsPerTri(n - 2);
     for (int i = 0; i <= n; ++i) {
@@ -126,14 +126,14 @@ struct SplitTris {
   const int triIdx;
   const int n;
 
-  __host__ __device__ int EdgeVert(int i, int inHalfedge) const {
+  int EdgeVert(int i, int inHalfedge) const {
     bool forward = halfedge[inHalfedge].IsForward();
     int edge = forward ? half2Edge[inHalfedge]
                        : half2Edge[halfedge[inHalfedge].pairedHalfedge];
     return edgeIdx + (n - 1) * edge + (forward ? i - 1 : n - 1 - i);
   }
 
-  __host__ __device__ int TriVert(int i, int j, int tri) const {
+  int TriVert(int i, int j, int tri) const {
     --i;
     --j;
     int m = n - 2;
@@ -142,7 +142,7 @@ struct SplitTris {
     return triIdx + vertsPerTri * tri + vertOffset;
   }
 
-  __host__ __device__ int Vert(int i, int j, int tri) const {
+  int Vert(int i, int j, int tri) const {
     bool edge0 = i == 0;
     bool edge1 = j == 0;
     bool edge2 = j == n - i;
@@ -164,7 +164,7 @@ struct SplitTris {
       return TriVert(i, j, tri);
   }
 
-  __host__ __device__ void operator()(int tri) {
+  void operator()(int tri) {
     int pos = n * n * tri;
     for (int i = 0; i < n; ++i) {
       for (int j = 0; j < n - i; ++j) {
@@ -187,7 +187,7 @@ struct SmoothBezier {
   const glm::vec3* vertNormal;
   const Halfedge* halfedge;
 
-  __host__ __device__ void operator()(
+  void operator()(
       thrust::tuple<glm::vec4&, Halfedge> inOut) {
     glm::vec4& tangent = thrust::get<0>(inOut);
     const Halfedge edge = thrust::get<1>(inOut);
@@ -217,27 +217,27 @@ struct InterpTri {
   const glm::vec4* halfedgeTangent;
   const glm::vec3* vertPos;
 
-  __host__ __device__ glm::vec4 Homogeneous(glm::vec4 v) const {
+  glm::vec4 Homogeneous(glm::vec4 v) const {
     v.x *= v.w;
     v.y *= v.w;
     v.z *= v.w;
     return v;
   }
 
-  __host__ __device__ glm::vec4 Homogeneous(glm::vec3 v) const {
+  glm::vec4 Homogeneous(glm::vec3 v) const {
     return glm::vec4(v, 1.0f);
   }
 
-  __host__ __device__ glm::vec3 HNormalize(glm::vec4 v) const {
+  glm::vec3 HNormalize(glm::vec4 v) const {
     return glm::vec3(v) / v.w;
   }
 
-  __host__ __device__ glm::vec4 Bezier(glm::vec3 point,
+  glm::vec4 Bezier(glm::vec3 point,
                                        glm::vec4 tangent) const {
     return Homogeneous(glm::vec4(point, 0) + tangent);
   }
 
-  __host__ __device__ glm::mat2x4 CubicBezier2Linear(glm::vec4 p0, glm::vec4 p1,
+  glm::mat2x4 CubicBezier2Linear(glm::vec4 p0, glm::vec4 p1,
                                                      glm::vec4 p2, glm::vec4 p3,
                                                      float x) const {
     glm::mat2x4 out;
@@ -247,15 +247,15 @@ struct InterpTri {
     return out;
   }
 
-  __host__ __device__ glm::vec3 BezierPoint(glm::mat2x4 points, float x) const {
+  glm::vec3 BezierPoint(glm::mat2x4 points, float x) const {
     return HNormalize(glm::mix(points[0], points[1], x));
   }
 
-  __host__ __device__ glm::vec3 BezierTangent(glm::mat2x4 points) const {
+  glm::vec3 BezierTangent(glm::mat2x4 points) const {
     return glm::normalize(HNormalize(points[1]) - HNormalize(points[0]));
   }
 
-  __host__ __device__ void operator()(
+  void operator()(
       thrust::tuple<glm::vec3&, Barycentric> inOut) {
     glm::vec3& pos = thrust::get<0>(inOut);
     const int tri = thrust::get<1>(inOut).tri;

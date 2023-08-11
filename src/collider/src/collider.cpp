@@ -59,36 +59,30 @@ uint32_t __inline clz(uint32_t value) {
 namespace {
 using namespace manifold;
 
-__host__ __device__ bool IsLeaf(int node) { return node % 2 == 0; }
-__host__ __device__ bool IsInternal(int node) { return node % 2 == 1; }
-__host__ __device__ int Node2Internal(int node) { return (node - 1) / 2; }
-__host__ __device__ int Internal2Node(int internal) { return internal * 2 + 1; }
-__host__ __device__ int Node2Leaf(int node) { return node / 2; }
-__host__ __device__ int Leaf2Node(int leaf) { return leaf * 2; }
+bool IsLeaf(int node) { return node % 2 == 0; }
+bool IsInternal(int node) { return node % 2 == 1; }
+int Node2Internal(int node) { return (node - 1) / 2; }
+int Internal2Node(int internal) { return internal * 2 + 1; }
+int Node2Leaf(int node) { return node / 2; }
+int Leaf2Node(int leaf) { return leaf * 2; }
 
 struct CreateRadixTree {
   int* nodeParent_;
   thrust::pair<int, int>* internalChildren_;
   const VecDc<uint32_t> leafMorton_;
 
-  __host__ __device__ int PrefixLength(uint32_t a, uint32_t b) const {
+  int PrefixLength(uint32_t a, uint32_t b) const {
 // count-leading-zeros is used to find the number of identical highest-order
 // bits
-#ifdef __CUDA_ARCH__
-    return __clz(a ^ b);
-#else
-
 #ifdef _MSC_VER
     // return __lzcnt(a ^ b);
     return clz(a ^ b);
 #else
     return __builtin_clz(a ^ b);
 #endif
-
-#endif
   }
 
-  __host__ __device__ int PrefixLength(int i, int j) const {
+  int PrefixLength(int i, int j) const {
     if (j < 0 || j >= leafMorton_.size()) {
       return -1;
     } else {
@@ -103,7 +97,7 @@ struct CreateRadixTree {
     }
   }
 
-  __host__ __device__ int RangeEnd(int i) const {
+  int RangeEnd(int i) const {
     // Determine direction of range (+1 or -1)
     int dir = PrefixLength(i, i + 1) - PrefixLength(i, i - 1);
     dir = (dir > 0) - (dir < 0);
@@ -121,7 +115,7 @@ struct CreateRadixTree {
     return i + dir * length;
   }
 
-  __host__ __device__ int FindSplit(int first, int last) const {
+  int FindSplit(int first, int last) const {
     int commonPrefix = PrefixLength(first, last);
     // Find the furthest object that shares more than commonPrefix bits with the
     // first one, using binary search.
@@ -138,7 +132,7 @@ struct CreateRadixTree {
     return split;
   }
 
-  __host__ __device__ void operator()(int internal) {
+  void operator()(int internal) {
     int first = internal;
     // Find the range of objects with a common prefix
     int last = RangeEnd(first);
@@ -257,7 +251,7 @@ struct BuildInternalBoxes {
   const int* nodeParent_;
   const thrust::pair<int, int>* internalChildren_;
 
-  __host__ __device__ void operator()(int leaf) {
+  void operator()(int leaf) {
     int node = Leaf2Node(leaf);
     do {
       node = nodeParent_[node];
@@ -271,9 +265,7 @@ struct BuildInternalBoxes {
 
 struct TransformBox {
   const glm::mat4x3 transform;
-  __host__ __device__ void operator()(Box& box) {
-    box = box.Transform(transform);
-  }
+  void operator()(Box& box) { box = box.Transform(transform); }
 };
 }  // namespace
 

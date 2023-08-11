@@ -98,18 +98,18 @@ thrust::counting_iterator<T> countAt(T i) {
   return thrust::make_counting_iterator(i);
 }
 
-inline __host__ __device__ int Next3(int i) {
+inline int Next3(int i) {
   constexpr glm::ivec3 next3(1, 2, 0);
   return next3[i];
 }
 
-inline __host__ __device__ int Prev3(int i) {
+inline int Prev3(int i) {
   constexpr glm::ivec3 prev3(2, 0, 1);
   return prev3[i];
 }
 
 template <typename T>
-__host__ __device__ T AtomicAdd(T& target, T add) {
+T AtomicAdd(T& target, T add) {
 #ifdef __CUDA_ARCH__
   // required for synchronization
   __threadfence();
@@ -125,7 +125,7 @@ __host__ __device__ T AtomicAdd(T& target, T add) {
 }
 
 template <>
-inline __host__ __device__ int AtomicAdd(int& target, int add) {
+inline int AtomicAdd(int& target, int add) {
 #ifdef __CUDA_ARCH__
   // required for synchronization
   __threadfence();
@@ -150,7 +150,7 @@ class strided_range {
 
     stride_functor(difference_type stride) : stride(stride) {}
 
-    __host__ __device__ difference_type
+    difference_type
     operator()(const difference_type& i) const {
       return stride * i;
     }

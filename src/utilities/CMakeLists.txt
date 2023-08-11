@@ -14,8 +14,7 @@
 
 project(utilities)
 
-file(GLOB_RECURSE SOURCE_FILES CONFIGURE_DEPENDS *.cpp)
-add_library(${PROJECT_NAME} ${SOURCE_FILES})
+add_library(${PROJECT_NAME} INTERFACE)
 
 message("Parallel Backend: ${MANIFOLD_PAR}")
 
@@ -31,8 +30,10 @@ if (TRACY_ENABLE)
     GIT_PROGRESS TRUE
   )
   FetchContent_MakeAvailable(tracy)
-  target_link_libraries(${PROJECT_NAME} PUBLIC TracyClient)
-  target_compile_options(${PROJECT_NAME} PUBLIC -DTRACY_NO_CODE_TRANSFER=1)
+  target_link_libraries(${PROJECT_NAME} INTERFACE TracyClient)
+  target_compile_options(${PROJECT_NAME} INTERFACE -DTRACY_NO_CODE_TRANSFER=1)
+endif()
+
 endif()
 
 if(MANIFOLD_PAR STREQUAL "TBB")
@@ -55,12 +56,12 @@ if(MANIFOLD_PAR STREQUAL "TBB")
         )
         FetchContent_MakeAvailable(TBB)
     endif()
-    target_compile_options(${PROJECT_NAME} PUBLIC -DMANIFOLD_PAR='T')
+    target_compile_options(${PROJECT_NAME} INTERFACE -DMANIFOLD_PAR='T')
     if(TARGET TBB::tbb)
-        target_link_libraries(${PROJECT_NAME} PUBLIC TBB::tbb)
+        target_link_libraries(${PROJECT_NAME} INTERFACE TBB::tbb)
     else()
-        target_include_directories(${PROJECT_NAME} PUBLIC ${TBB_INCLUDE_DIRS})
-        target_link_libraries(${PROJECT_NAME} PUBLIC ${TBB_LINK_LIBRARIES})
+        target_include_directories(${PROJECT_NAME} INTERFACE ${TBB_INCLUDE_DIRS})
+        target_link_libraries(${PROJECT_NAME} INTERFACE ${TBB_LINK_LIBRARIES})
     endif()
 elseif(MANIFOLD_PAR STREQUAL "NONE")
     set(MANIFOLD_PAR "CPP")
@@ -69,17 +70,17 @@ else()
         "Should be \"TBB\" or \"NONE\"")
 endif()
 
-target_include_directories(${PROJECT_NAME} PUBLIC ${THRUST_INC_DIR})
-target_link_libraries(${PROJECT_NAME} PUBLIC glm)
+target_include_directories(${PROJECT_NAME} INTERFACE ${THRUST_INC_DIR})
+target_link_libraries(${PROJECT_NAME} INTERFACE glm)
 
 target_compile_options(${PROJECT_NAME}
-    PUBLIC ${MANIFOLD_FLAGS}
+    INTERFACE ${MANIFOLD_FLAGS}
     -DTHRUST_DEVICE_SYSTEM=THRUST_DEVICE_SYSTEM_${MANIFOLD_PAR}
 )
 
 if(MANIFOLD_DEBUG)
     target_compile_options(${PROJECT_NAME}
-        PUBLIC -DMANIFOLD_DEBUG)
+        INTERFACE -DMANIFOLD_DEBUG)
 endif()
 
-target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_17)
+target_compile_features(${PROJECT_NAME} INTERFACE cxx_std_17)

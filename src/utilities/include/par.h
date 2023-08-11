@@ -32,21 +32,15 @@
 
 #include <algorithm>
 #include <execution>
+#include <numeric>
 #define MANIFOLD_PAR_NS tbb
 #else
 #define MANIFOLD_PAR_NS cpp
 #endif
 
-#ifdef MANIFOLD_USE_CUDA
-#include <thrust/system/cuda/execution_policy.h>
-#endif
-
 namespace manifold {
 
-bool CudaEnabled();
-
 enum class ExecutionPolicy {
-  ParUnseq,
   Par,
   Seq,
 };
@@ -60,47 +54,13 @@ inline ExecutionPolicy autoPolicy(int size) {
   if (size <= (1 << 12)) {
     return ExecutionPolicy::Seq;
   }
-  if (size <= (1 << 16) || !CudaEnabled()) {
-    return ExecutionPolicy::Par;
-  }
-  return ExecutionPolicy::ParUnseq;
+  return ExecutionPolicy::Par;
 }
 
-#ifdef MANIFOLD_USE_CUDA
 #define THRUST_DYNAMIC_BACKEND_VOID(NAME)                    \
   template <typename... Args>                                \
   void NAME(ExecutionPolicy policy, Args... args) {          \
     switch (policy) {                                        \
-      case ExecutionPolicy::ParUnseq:                        \
-        thrust::NAME(thrust::cuda::par, args...);            \
-        break;                                               \
-      case ExecutionPolicy::Par:                             \
-        thrust::NAME(thrust::MANIFOLD_PAR_NS::par, args...); \
-        break;                                               \
-      case ExecutionPolicy::Seq:                             \
-        thrust::NAME(thrust::cpp::par, args...);             \
-        break;                                               \
-    }                                                        \
-  }
-#define THRUST_DYNAMIC_BACKEND(NAME, RET)                           \
-  template <typename Ret = RET, typename... Args>                   \
-  Ret NAME(ExecutionPolicy policy, Args... args) {                  \
-    switch (policy) {                                               \
-      case ExecutionPolicy::ParUnseq:                               \
-        return thrust::NAME(thrust::cuda::par, args...);            \
-      case ExecutionPolicy::Par:                                    \
-        return thrust::NAME(thrust::MANIFOLD_PAR_NS::par, args...); \
-      case ExecutionPolicy::Seq:                                    \
-        break;                                                      \
-    }                                                               \
-    return thrust::NAME(thrust::cpp::par, args...);                 \
-  }
-#else
-#define THRUST_DYNAMIC_BACKEND_VOID(NAME)                    \
-  template <typename... Args>                                \
-  void NAME(ExecutionPolicy policy, Args... args) {          \
-    switch (policy) {                                        \
-      case ExecutionPolicy::ParUnseq:                        \
       case ExecutionPolicy::Par:                             \
         thrust::NAME(thrust::MANIFOLD_PAR_NS::par, args...); \
         break;                                               \
@@ -114,7 +74,6 @@ inline ExecutionPolicy autoPolicy(int size) {
   template <typename Ret = RET, typename... Args>                   \
   Ret NAME(ExecutionPolicy policy, Args... args) {                  \
     switch (policy) {                                               \
-      case ExecutionPolicy::ParUnseq:                               \
       case ExecutionPolicy::Par:                                    \
         return thrust::NAME(thrust::MANIFOLD_PAR_NS::par, args...); \
       case ExecutionPolicy::Seq:                                    \
@@ -122,13 +81,11 @@ inline ExecutionPolicy autoPolicy(int size) {
     }                                                               \
     return thrust::NAME(thrust::cpp::par, args...);                 \
   }
-#endif
 
 #define THRUST_DYNAMIC_BACKEND_HOST_VOID(NAME)               \
   template <typename... Args>                                \
   void NAME##_host(ExecutionPolicy policy, Args... args) {   \
     switch (policy) {                                        \
-      case ExecutionPolicy::ParUnseq:                        \
       case ExecutionPolicy::Par:                             \
         thrust::NAME(thrust::MANIFOLD_PAR_NS::par, args...); \
         break;                                               \
@@ -138,13 +95,12 @@ inline ExecutionPolicy autoPolicy(int size) {
     }                                                        \
   }
 
-#if MANIFOLD_PAR == 'T' && !(__APPLE__)
+#if MANIFOLD_PAR == 'T' && __has_include(<pstl/glue_execution_defs.h>)
 // sometimes stl variant is faster
 #define STL_DYNAMIC_BACKEND(NAME, RET)                        \
   template <typename Ret = RET, typename... Args>             \
   Ret NAME(ExecutionPolicy policy, Args... args) {            \
     switch (policy) {                                         \
-      case ExecutionPolicy::ParUnseq:                         \
       case ExecutionPolicy::Par:                              \
         return std::NAME(std::execution::par_unseq, args...); \
       case ExecutionPolicy::Seq:                              \
@@ -156,7 +112,6 @@ inline ExecutionPolicy autoPolicy(int size) {
   template <typename... Args>                          \
   void NAME(ExecutionPolicy policy, Args... args) {    \
     switch (policy) {                                  \
-      case ExecutionPolicy::ParUnseq:                  \
       case ExecutionPolicy::Par:                       \
         std::NAME(std::execution::par_unseq, args...); \
         break;                                         \
@@ -205,7 +160,6 @@ THRUST_DYNAMIC_BACKEND(copy_if, void)
 
 THRUST_DYNAMIC_BACKEND_HOST_VOID(for_each)
 THRUST_DYNAMIC_BACKEND_HOST_VOID(for_each_n)
-THRUST_DYNAMIC_BACKEND_HOST_VOID(copy)
 
 THRUST_DYNAMIC_BACKEND_VOID(gather)
 THRUST_DYNAMIC_BACKEND_VOID(scatter)

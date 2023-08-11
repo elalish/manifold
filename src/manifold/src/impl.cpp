@@ -31,29 +31,24 @@ using namespace manifold;
 
 constexpr uint64_t kRemove = std::numeric_limits<uint64_t>::max();
 
-__host__ __device__ void AtomicAddVec3(glm::vec3& target,
-                                       const glm::vec3& add) {
+void AtomicAddVec3(glm::vec3& target, const glm::vec3& add) {
   for (int i : {0, 1, 2}) {
-#ifdef __CUDA_ARCH__
-    atomicAdd(&target[i], add[i]);
-#else
     std::atomic<float>& tar = reinterpret_cast<std::atomic<float>&>(target[i]);
     float old_val = tar.load(std::memory_order_relaxed);
     while (!tar.compare_exchange_weak(old_val, old_val + add[i],
                                       std::memory_order_relaxed))
       ;
-#endif
   }
 }
 
 struct Normalize {
-  __host__ __device__ void operator()(glm::vec3& v) { v = SafeNormalize(v); }
+  void operator()(glm::vec3& v) { v = SafeNormalize(v); }
 };
 
 struct Transform4x3 {
   const glm::mat4x3 transform;
 
-  __host__ __device__ glm::vec3 operator()(glm::vec3 position) {
+  glm::vec3 operator()(glm::vec3 position) {
     return transform * glm::vec4(position, 1.0f);
   }
 };
@@ -65,7 +60,7 @@ struct AssignNormals {
   const float precision;
   const bool calculateTriNormal;
 
-  __host__ __device__ void operator()(thrust::tuple<glm::vec3&, int> in) {
+  void operator()(thrust::tuple<glm::vec3&, int> in) {
     glm::vec3& triNormal = thrust::get<0>(in);
     const int face = thrust::get<1>(in);
 
@@ -102,8 +97,7 @@ struct Tri2Halfedges {
   Halfedge* halfedges;
   glm::uint64_t* edges;
 
-  __host__ __device__ void operator()(
-      thrust::tuple<int, const glm::ivec3&> in) {
+  void operator()(thrust::tuple<int, const glm::ivec3&> in) {
     const int tri = thrust::get<0>(in);
     const glm::ivec3& triVerts = thrust::get<1>(in);
     for (const int i : {0, 1, 2}) {
@@ -124,7 +118,7 @@ struct LinkHalfedges {
   const int* ids;
   const int numEdge;
 
-  __host__ __device__ void operator()(int i) {
+  void operator()(int i) {
     const int pair0 = ids[i];
     const int pair1 = ids[i + numEdge];
     halfedges[pair0].pairedHalfedge = pair1;
@@ -146,7 +140,7 @@ struct MarkVerts {
 struct ReindexTriVerts {
   const int* old2new;
 
-  __host__ __device__ void operator()(glm::ivec3& triVerts) {
+  void operator()(glm::ivec3& triVerts) {
     for (int i : {0, 1, 2}) {
       triVerts[i] = old2new[triVerts[i]];
     }
@@ -157,7 +151,7 @@ struct InitializeTriRef {
   const int meshID;
   const Halfedge* halfedge;
 
-  __host__ __device__ void operator()(thrust::tuple<TriRef&, int> inOut) {
+  void operator()(thrust::tuple<TriRef&, int> inOut) {
     TriRef& baryRef = thrust::get<0>(inOut);
     int tri = thrust::get<1>(inOut);
 
@@ -170,9 +164,7 @@ struct InitializeTriRef {
 struct UpdateMeshID {
   const HashTableD<uint32_t> meshIDold2new;
 
-  __host__ __device__ void operator()(TriRef& ref) {
-    ref.meshID = meshIDold2new[ref.meshID];
-  }
+  void operator()(TriRef& ref) { ref.meshID = meshIDold2new[ref.meshID]; }
 };
 
 struct CoplanarEdge {
@@ -312,8 +304,7 @@ struct CheckCoplanarity {
 struct EdgeBox {
   const glm::vec3* vertPos;
 
-  __host__ __device__ void operator()(
-      thrust::tuple<Box&, const TmpEdge&> inout) {
+  void operator()(thrust::tuple<Box&, const TmpEdge&> inout) {
     const TmpEdge& edge = thrust::get<1>(inout);
     thrust::get<0>(inout) = Box(vertPos[edge.first], vertPos[edge.second]);
   }

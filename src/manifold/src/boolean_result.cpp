@@ -45,13 +45,13 @@ struct std::hash<std::pair<int, int>> {
 namespace {
 
 struct AbsSum : public thrust::binary_function<int, int, int> {
-  __host__ __device__ int operator()(int a, int b) { return abs(a) + abs(b); }
+  int operator()(int a, int b) { return abs(a) + abs(b); }
 };
 
 struct DuplicateVerts {
   glm::vec3 *vertPosR;
 
-  __host__ __device__ void operator()(thrust::tuple<int, int, glm::vec3> in) {
+  void operator()(thrust::tuple<int, int, glm::vec3> in) {
     int inclusion = abs(thrust::get<0>(in));
     int vertR = thrust::get<1>(in);
     glm::vec3 vertPosP = thrust::get<2>(in);
@@ -66,7 +66,7 @@ struct CountVerts {
   int *count;
   const int *inclusion;
 
-  __host__ __device__ void operator()(const Halfedge &edge) {
+  void operator()(const Halfedge &edge) {
     AtomicAdd(count[edge.face], glm::abs(inclusion[edge.startVert]));
   }
 };
@@ -78,7 +78,7 @@ struct CountNewVerts {
   const int *pq;
   const Halfedge *halfedges;
 
-  __host__ __device__ void operator()(thrust::tuple<int, int> in) {
+  void operator()(thrust::tuple<int, int> in) {
     int edgeP = pq[2 * thrust::get<0>(in) + SparseIndices::pOffset];
     int faceQ = pq[2 * thrust::get<0>(in) + 1 - SparseIndices::pOffset];
     if (inverted) std::swap(edgeP, faceQ);
@@ -92,7 +92,7 @@ struct CountNewVerts {
 };
 
 struct NotZero : public thrust::unary_function<int, int> {
-  __host__ __device__ int operator()(int x) const { return x > 0 ? 1 : 0; }
+  int operator()(int x) const { return x > 0 ? 1 : 0; }
 };
 
 std::tuple<VecDH<int>, VecDH<int>> SizeOutput(
@@ -393,7 +393,7 @@ struct DuplicateHalfedges {
   const int *faceP2R;
   const bool forward;
 
-  __host__ __device__ void operator()(thrust::tuple<bool, Halfedge, int> in) {
+  void operator()(thrust::tuple<bool, Halfedge, int> in) {
     if (!thrust::get<0>(in)) return;
     Halfedge halfedge = thrust::get<1>(in);
     if (!halfedge.IsForward()) return;
@@ -453,7 +453,7 @@ struct MapTriRef {
   const TriRef *triRefQ;
   const int offsetQ;
 
-  __host__ __device__ void operator()(TriRef &triRef) {
+  void operator()(TriRef &triRef) {
     const int tri = triRef.tri;
     const bool PQ = triRef.meshID == 0;
     triRef = PQ ? triRefP[tri] : triRefQ[tri];
@@ -491,7 +491,7 @@ struct Barycentric {
   const Halfedge *halfedgeR;
   const float precision;
 
-  __host__ __device__ void operator()(thrust::tuple<int, TriRef> in) {
+  void operator()(thrust::tuple<int, TriRef> in) {
     const int tri = thrust::get<0>(in);
     const TriRef refPQ = thrust::get<1>(in);
     if (halfedgeR[3 * tri].startVert < 0) return;

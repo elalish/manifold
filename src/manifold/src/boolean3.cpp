@@ -27,7 +27,7 @@ namespace {
 // carefully designed to minimize rounding error and to eliminate it at edge
 // cases to ensure consistency.
 
-__host__ __device__ glm::vec2 Interpolate(glm::vec3 pL, glm::vec3 pR, float x) {
+glm::vec2 Interpolate(glm::vec3 pL, glm::vec3 pR, float x) {
   float dxL = x - pL.x;
   float dxR = x - pR.x;
 #ifdef MANIFOLD_DEBUG
@@ -42,10 +42,8 @@ __host__ __device__ glm::vec2 Interpolate(glm::vec3 pL, glm::vec3 pR, float x) {
   return yz;
 }
 
-__host__ __device__ glm::vec4 Intersect(const glm::vec3 &pL,
-                                        const glm::vec3 &pR,
-                                        const glm::vec3 &qL,
-                                        const glm::vec3 &qR) {
+glm::vec4 Intersect(const glm::vec3 &pL, const glm::vec3 &pR,
+                    const glm::vec3 &qL, const glm::vec3 &qR) {
   float dyL = qL.y - pL.y;
   float dyR = qR.y - pR.y;
 #ifdef MANIFOLD_DEBUG
@@ -74,7 +72,7 @@ struct CopyFaceEdges {
   int *pXq1;
   const Halfedge *halfedgesQ;
 
-  __host__ __device__ void operator()(thrust::tuple<int, int> in) {
+  void operator()(thrust::tuple<int, int> in) {
     int idx = 3 * thrust::get<0>(in);
     int i = thrust::get<1>(in);
     int pX = p1q1[2 * i + SparseIndices::pOffset];
@@ -108,9 +106,7 @@ SparseIndices Filter11(const Manifold::Impl &inP, const Manifold::Impl &inQ,
   return p1q1;
 }
 
-__host__ __device__ bool Shadows(float p, float q, float dir) {
-  return p == q ? dir < 0 : p < q;
-}
+bool Shadows(float p, float q, float dir) { return p == q ? dir < 0 : p < q; }
 
 /**
  * Since this function is called from two different places, it is necessary that
@@ -123,7 +119,7 @@ __host__ __device__ bool Shadows(float p, float q, float dir) {
  * compiled function (they must agree on CPU or GPU). This is now taken care of
  * by the shared policy_ member.
  */
-__host__ __device__ thrust::pair<int, glm::vec2> Shadow01(
+thrust::pair<int, glm::vec2> Shadow01(
     const int p0, const int q1, const glm::vec3 *vertPosP,
     const glm::vec3 *vertPosQ, const Halfedge *halfedgeQ, const float expandP,
     const glm::vec3 *normalP, const bool reverse) {
@@ -203,8 +199,7 @@ struct Kernel11 {
   const glm::vec3 *normalP;
   const int *p1q1;
 
-  __host__ __device__ void operator()(
-      thrust::tuple<int, glm::vec4 &, int &> inout) {
+  void operator()(thrust::tuple<int, glm::vec4 &, int &> inout) {
     const int p1 = p1q1[2 * thrust::get<0>(inout) + SparseIndices::pOffset];
     const int q1 = p1q1[2 * thrust::get<0>(inout) + 1 - SparseIndices::pOffset];
     glm::vec4 &xyzz11 = thrust::get<1>(inout);
@@ -305,8 +300,7 @@ struct Kernel02 {
   const glm::vec3 *vertNormalP;
   const int *p0q2;
 
-  __host__ __device__ void operator()(
-      thrust::tuple<int, int &, float &> inout) {
+  void operator()(thrust::tuple<int, int &, float &> inout) {
     int p0 = p0q2[2 * thrust::get<0>(inout) + SparseIndices::pOffset];
     int q2 = p0q2[2 * thrust::get<0>(inout) + 1 - SparseIndices::pOffset];
     if (!forward) thrust::swap(p0, q2);
@@ -410,8 +404,7 @@ struct Kernel12 {
   const bool forward;
   const int *p1q2;
 
-  __host__ __device__ void operator()(
-      thrust::tuple<int, int &, glm::vec3 &> inout) {
+  void operator()(thrust::tuple<int, int &, glm::vec3 &> inout) {
     int p1 = p1q2[2 * thrust::get<0>(inout) + SparseIndices::pOffset];
     int q2 = p1q2[2 * thrust::get<0>(inout) + 1 - SparseIndices::pOffset];
     if (!forward) thrust::swap(p1, q2);

@@ -26,7 +26,7 @@ typedef Uint64 (*hash_fun_t)(Uint64);
 constexpr Uint64 kOpen = std::numeric_limits<Uint64>::max();
 
 template <typename T>
-__host__ __device__ T AtomicCAS(T& target, T compare, T val) {
+T AtomicCAS(T& target, T compare, T val) {
 #ifdef __CUDA_ARCH__
   return atomicCAS(&target, compare, val);
 #else
@@ -37,7 +37,7 @@ __host__ __device__ T AtomicCAS(T& target, T compare, T val) {
 }
 
 template <typename T>
-__host__ __device__ void AtomicStore(T& target, T val) {
+void AtomicStore(T& target, T val) {
 #ifdef __CUDA_ARCH__
   target = val;
 #else
@@ -48,7 +48,7 @@ __host__ __device__ void AtomicStore(T& target, T val) {
 }
 
 template <typename T>
-__host__ __device__ T AtomicLoad(const T& target) {
+T AtomicLoad(const T& target) {
 #ifdef __CUDA_ARCH__
   return target;
 #else
@@ -59,7 +59,7 @@ __host__ __device__ T AtomicLoad(const T& target) {
 }
 
 // https://stackoverflow.com/questions/664014/what-integer-hash-function-are-good-that-accepts-an-integer-hash-key
-__host__ __device__ inline Uint64 hash64bit(Uint64 x) {
+inline Uint64 hash64bit(Uint64 x) {
   x = (x ^ (x >> 30)) * 0xbf58476d1ce4e5b9ull;
   x = (x ^ (x >> 27)) * 0x94d049bb133111ebull;
   x = x ^ (x >> 31);
@@ -79,13 +79,13 @@ class HashTableD {
              uint32_t step = 1)
       : step_{step}, keys_{keys}, values_{values}, used_{used} {}
 
-  __host__ __device__ int Size() const { return keys_.size(); }
+  int Size() const { return keys_.size(); }
 
-  __host__ __device__ bool Full() const {
+  bool Full() const {
     return AtomicLoad(used_[0]) * 2 > Size();
   }
 
-  __host__ __device__ void Insert(Uint64 key, const V& val) {
+  void Insert(Uint64 key, const V& val) {
     uint32_t idx = H(key) & (Size() - 1);
     while (1) {
       if (Full()) return;
@@ -101,7 +101,7 @@ class HashTableD {
     }
   }
 
-  __host__ __device__ V& operator[](Uint64 key) const {
+  V& operator[](Uint64 key) const {
     uint32_t idx = H(key) & (Size() - 1);
     while (1) {
       const Uint64 k = AtomicLoad(keys_[idx]);
@@ -112,10 +112,10 @@ class HashTableD {
     }
   }
 
-  __host__ __device__ Uint64 KeyAt(int idx) const {
+  Uint64 KeyAt(int idx) const {
     return AtomicLoad(keys_[idx]);
   }
-  __host__ __device__ V& At(int idx) const { return values_[idx]; }
+  V& At(int idx) const { return values_[idx]; }
 
  private:
   uint32_t step_;

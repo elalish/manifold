@@ -26,7 +26,7 @@ using namespace manifold;
 struct Transform4x3 {
   const glm::mat4x3 transform;
 
-  __host__ __device__ glm::vec3 operator()(glm::vec3 position) {
+  glm::vec3 operator()(glm::vec3 position) {
     return transform * glm::vec4(position, 1.0f);
   }
 };
@@ -36,7 +36,7 @@ struct UpdateHalfedge {
   const int nextEdge;
   const int nextFace;
 
-  __host__ __device__ Halfedge operator()(Halfedge edge) {
+  Halfedge operator()(Halfedge edge) {
     edge.startVert += nextVert;
     edge.endVert += nextVert;
     edge.pairedHalfedge += nextEdge;
@@ -48,7 +48,7 @@ struct UpdateHalfedge {
 struct UpdateTriProp {
   const int nextProp;
 
-  __host__ __device__ glm::ivec3 operator()(glm::ivec3 tri) {
+  glm::ivec3 operator()(glm::ivec3 tri) {
     tri += nextProp;
     return tri;
   }
@@ -57,7 +57,7 @@ struct UpdateTriProp {
 struct UpdateMeshIDs {
   const int offset;
 
-  __host__ __device__ TriRef operator()(TriRef ref) {
+  TriRef operator()(TriRef ref) {
     ref.meshID += offset;
     return ref;
   }
@@ -66,9 +66,7 @@ struct UpdateMeshIDs {
 struct CheckOverlap {
   const Box *boxes;
   const size_t i;
-  __host__ __device__ bool operator()(int j) {
-    return boxes[i].DoesOverlap(boxes[j]);
-  }
+  bool operator()(int j) { return boxes[i].DoesOverlap(boxes[j]); }
 };
 }  // namespace
 namespace manifold {
@@ -197,9 +195,7 @@ Manifold::Impl CsgLeafNode::Compose(
 
   // if we are already parallelizing for each node, do not perform multithreaded
   // copying as it will slightly hurt performance
-  if (nodes.size() > 1 &&
-      (policy == ExecutionPolicy::Par ||
-       (policy == ExecutionPolicy::ParUnseq && !CudaEnabled())))
+  if (nodes.size() > 1 && policy == ExecutionPolicy::Par)
     policy = ExecutionPolicy::Seq;
 
   for_each_n_host(

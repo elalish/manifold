@@ -31,7 +31,7 @@ ExecutionParams manifoldParams;
 struct MakeTri {
   const Halfedge* halfedges;
 
-  __host__ __device__ void operator()(thrust::tuple<glm::ivec3&, int> inOut) {
+  void operator()(thrust::tuple<glm::ivec3&, int> inOut) {
     glm::ivec3& tri = thrust::get<0>(inOut);
     const int face = 3 * thrust::get<1>(inOut);
 
@@ -51,7 +51,7 @@ struct UpdateProperties {
   const Halfedge* halfedges;
   std::function<void(float*, glm::vec3, const float*)> propFunc;
 
-  __host__ __device__ void operator()(int tri) {
+  void operator()(int tri) {
     for (int i : {0, 1, 2}) {
       const int vert = halfedges[3 * tri + i].startVert;
       const int propVert = triProperties[tri][i];

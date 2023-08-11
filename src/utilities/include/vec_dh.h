@@ -34,10 +34,8 @@ namespace manifold {
  *  @{
  */
 
-// Vector implementation optimized for managed memory, will perform memory
-// prefetching to minimize page faults and use parallel/GPU copy/fill depending
-// on data size. This will also handle builds without CUDA or builds with CUDA
-// but run without CUDA GPU properly.
+// Specialized vector implementation with multithreaded fill and uninitialized
+// memory optimizations.
 //
 // Note that the constructor and resize function will not perform initialization
 // if the parameter val is not set. Also, this implementation is a toy
@@ -52,14 +50,12 @@ class ManagedVec {
   ManagedVec() {
     size_ = 0;
     capacity_ = 0;
-    onHost = true;
   }
 
   // note that we leave the memory uninitialized
   ManagedVec(size_t n) {
     size_ = n;
     capacity_ = n;
-    onHost = autoPolicy(n) != ExecutionPolicy::ParUnseq;
     if (n == 0) return;
     mallocManaged(&ptr_, size_ * sizeof(T));
   }
@@ -69,9 +65,7 @@ class ManagedVec {
     capacity_ = n;
     if (n == 0) return;
     auto policy = autoPolicy(n);
-    onHost = policy != ExecutionPolicy::ParUnseq;
     mallocManaged(&ptr_, size_ * sizeof(T));
-    prefetch(ptr_, size_ * sizeof(T), onHost);
     uninitialized_fill_n(policy, ptr_, n, val);
   }
 
@@ -86,7 +80,6 @@ class ManagedVec {
     size_ = vec.size();
     capacity_ = size_;
     auto policy = autoPolicy(size_);
-    onHost = policy != ExecutionPolicy::ParUnseq;
     if (size_ != 0) {
       mallocManaged(&ptr_, size_ * sizeof(T));
       fastUninitializedCopy(ptr_, vec.data(), size_, policy);
@@ -97,10 +90,8 @@ class ManagedVec {
     size_ = vec.size_;
     capacity_ = size_;
     auto policy = autoPolicy(size_);
-    onHost = policy != ExecutionPolicy::ParUnseq;
     if (size_ != 0) {
       mallocManaged(&ptr_, size_ * sizeof(T));
-      prefetch(ptr_, size_ * sizeof(T), onHost);
       uninitialized_copy(policy, vec.begin(), vec.end(), ptr_);
     }
   }
@@ -109,7 +100,6 @@ class ManagedVec {
     ptr_ = vec.ptr_;
     size_ = vec.size_;
     capacity_ = vec.capacity_;
-    onHost = vec.onHost;
     vec.ptr_ = nullptr;
     vec.size_ = 0;
     vec.capacity_ = 0;
@@ -121,10 +111,8 @@ class ManagedVec {
     size_ = vec.size_;
     capacity_ = vec.size_;
     auto policy = autoPolicy(size_);
-    onHost = policy != ExecutionPolicy::ParUnseq;
     if (size_ != 0) {
       mallocManaged(&ptr_, size_ * sizeof(T));
-      prefetch(ptr_, size_ * sizeof(T), onHost);
       uninitialized_copy(policy, vec.begin(), vec.end(), ptr_);
     }
     return *this;
@@ -133,7 +121,6 @@ class ManagedVec {
   ManagedVec &operator=(ManagedVec<T> &&vec) {
     if (&vec == this) return *this;
     if (ptr_ != nullptr) freeManaged(ptr_);
-    onHost = vec.onHost;
     size_ = vec.size_;
     capacity_ = vec.capacity_;
     ptr_ = vec.ptr_;
@@ -160,7 +147,6 @@ class ManagedVec {
     if (n > capacity_) {
       T *newBuffer;
       mallocManaged(&newBuffer, n * sizeof(T));
-      prefetch(newBuffer, size_ * sizeof(T), onHost);
       if (size_ > 0) {
         uninitialized_copy(autoPolicy(size_), ptr_, ptr_ + size_, newBuffer);
       }
@@ -175,7 +161,6 @@ class ManagedVec {
     if (size_ > 0) {
       int n_bytes = size_ * sizeof(T);
       mallocManaged(&newBuffer, n_bytes);
-      prefetch(newBuffer, n_bytes, onHost);
       uninitialized_copy(autoPolicy(size_), ptr_, ptr_ + size_, newBuffer);
     }
     freeManaged(ptr_);
@@ -188,7 +173,6 @@ class ManagedVec {
       // avoid dangling pointer in case val is a reference of our array
       T val_copy = val;
       reserve(capacity_ == 0 ? 128 : capacity_ * 2);
-      onHost = true;
       ptr_[size_++] = val_copy;
       return;
     }
@@ -199,12 +183,6 @@ class ManagedVec {
     std::swap(ptr_, other.ptr_);
     std::swap(size_, other.size_);
     std::swap(capacity_, other.capacity_);
-    std::swap(onHost, other.onHost);
-  }
-
-  void prefetch_to(bool toHost) const {
-    if (toHost != onHost) prefetch(ptr_, size_ * sizeof(T), toHost);
-    onHost = toHost;
   }
 
   IterC cbegin() const { return ptr_; }
@@ -245,7 +223,6 @@ class ManagedVec {
   T *ptr_ = nullptr;
   size_t size_ = 0;
   size_t capacity_ = 0;
-  mutable bool onHost = true;
 
   static constexpr int DEVICE_MAX_BYTES = 1 << 16;
 
@@ -255,42 +232,19 @@ class ManagedVec {
     if (bytes >= (1ull << 63)) {
       throw std::bad_alloc();
     }
-#ifdef MANIFOLD_USE_CUDA
-    if (CudaEnabled())
-      cudaMallocManaged(reinterpret_cast<void **>(ptr), bytes);
-    else
-#endif
-      *ptr = reinterpret_cast<T *>(malloc(bytes));
+    *ptr = reinterpret_cast<T *>(malloc(bytes));
     TracyAllocS(*ptr, bytes, 5);
   }
 
   static void freeManaged(T *ptr) {
-#ifdef MANIFOLD_USE_CUDA
-    if (CudaEnabled())
-      cudaFree(ptr);
-    else
-#endif
-      TracyFreeS(ptr, 5);
+    TracyFreeS(ptr, 5);
     free(ptr);
-  }
-
-  static void prefetch(T *ptr, int bytes, bool onHost) {
-#ifdef MANIFOLD_USE_CUDA
-    if (bytes > 0 && CudaEnabled())
-      cudaMemPrefetchAsync(ptr, std::min(bytes, DEVICE_MAX_BYTES),
-                           onHost ? cudaCpuDeviceId : 0);
-#endif
   }
 
   // fast routine for memcpy from std::vector to ManagedVec
   static void fastUninitializedCopy(T *dst, const T *src, int n,
                                     ExecutionPolicy policy) {
-    prefetch(dst, n * sizeof(T), policy != ExecutionPolicy::ParUnseq);
     switch (policy) {
-      case ExecutionPolicy::ParUnseq:
-#ifdef MANIFOLD_USE_CUDA
-        cudaMemcpy(dst, src, n * sizeof(T), cudaMemcpyHostToDevice);
-#endif
       case ExecutionPolicy::Par:
         thrust::uninitialized_copy_n(thrust::MANIFOLD_PAR_NS::par, src, n, dst);
         break;

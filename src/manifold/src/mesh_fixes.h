@@ -3,7 +3,7 @@
 namespace {
 using namespace manifold;
 
-__host__ __device__ inline int FlipHalfedge(int halfedge) {
+inline int FlipHalfedge(int halfedge) {
   const int tri = halfedge / 3;
   const int vert = 2 - (halfedge - 3 * tri);
   return 3 * tri + vert;
@@ -12,7 +12,7 @@ __host__ __device__ inline int FlipHalfedge(int halfedge) {
 struct TransformNormals {
   const glm::mat3 transform;
 
-  __host__ __device__ glm::vec3 operator()(glm::vec3 normal) {
+  glm::vec3 operator()(glm::vec3 normal) {
     normal = glm::normalize(transform * normal);
     if (isnan(normal.x)) normal = glm::vec3(0.0f);
     return normal;
@@ -25,7 +25,7 @@ struct TransformTangents {
   const glm::vec4* oldTangents;
   const Halfedge* halfedge;
 
-  __host__ __device__ void operator()(thrust::tuple<glm::vec4&, int> inOut) {
+  void operator()(thrust::tuple<glm::vec4&, int> inOut) {
     glm::vec4& tangent = thrust::get<0>(inOut);
     int edge = thrust::get<1>(inOut);
     if (invert) {
@@ -40,7 +40,7 @@ struct TransformTangents {
 struct FlipTris {
   Halfedge* halfedge;
 
-  __host__ __device__ void operator()(thrust::tuple<TriRef&, int> inOut) {
+  void operator()(thrust::tuple<TriRef&, int> inOut) {
     TriRef& bary = thrust::get<0>(inOut);
     const int tri = thrust::get<1>(inOut);
 

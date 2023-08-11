@@ -94,18 +94,18 @@ class SparseIndices {
 
   template <typename T>
   struct firstNonFinite {
-    __host__ __device__ bool NotFinite(float v) const { return !isfinite(v); }
-    __host__ __device__ bool NotFinite(glm::vec2 v) const {
+    bool NotFinite(float v) const { return !isfinite(v); }
+    bool NotFinite(glm::vec2 v) const {
       return !isfinite(v[0]);
     }
-    __host__ __device__ bool NotFinite(glm::vec3 v) const {
+    bool NotFinite(glm::vec3 v) const {
       return !isfinite(v[0]);
     }
-    __host__ __device__ bool NotFinite(glm::vec4 v) const {
+    bool NotFinite(glm::vec4 v) const {
       return !isfinite(v[0]);
     }
 
-    __host__ __device__ bool operator()(
+    bool operator()(
         thrust::tuple<T, int, int64_t> x) const {
       bool result = NotFinite(thrust::get<0>(x));
       return result;
