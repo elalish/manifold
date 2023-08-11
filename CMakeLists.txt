@@ -65,7 +65,7 @@ if(CMAKE_EXPORT_COMPILE_COMMANDS AND !EMSCRIPTEN)
 endif()
 
 if(NOT MSVC)
-  set(WARNING_FLAGS -Werror -Wall -Wno-sign-compare -Wno-unused)
+  set(WARNING_FLAGS -Werror -Wall -Wno-sign-compare -Wno-unused -Wno-array-bounds -Wno-stringop-overflow)
   set(MANIFOLD_FLAGS
     "${MANIFOLD_FLAGS}"
     "$<$<COMPILE_LANGUAGE:CXX>:${WARNING_FLAGS}>")
