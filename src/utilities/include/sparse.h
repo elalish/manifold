@@ -46,10 +46,6 @@ class SparseIndices {
   SparseIndices() = default;
   SparseIndices(size_t size) : data(size) {}
 
-  int* ptr() { return reinterpret_cast<int32_t*>(data.ptrD()); }
-  const int* ptr() const {
-    return reinterpret_cast<const int32_t*>(data.ptrD());
-  }
   int size() const { return data.size(); }
 
   VecDH<int> Copy(bool use_q) const {
@@ -66,7 +62,29 @@ class SparseIndices {
 
   void Resize(int size) { data.resize(size, -1); }
 
-  void Add(int p, int q) { data.push_back((int64_t(p) << 32) | q); }
+  inline int& Get(int i, bool use_q) {
+    if (use_q)
+      return ptr()[2 * i + 1 - pOffset];
+    else
+      return ptr()[2 * i + pOffset];
+  }
+
+  inline int Get(int i, bool use_q) const {
+    if (use_q)
+      return ptr()[2 * i + 1 - pOffset];
+    else
+      return ptr()[2 * i + pOffset];
+  }
+
+  inline int64_t GetPQ(int i) const { return data[i]; }
+
+  inline void Set(int i, int p, int q) { data[i] = (int64_t(p) << 32) | q; }
+
+  inline void SetPQ(int i, int64_t pq) { data[i] = pq; }
+
+  const VecDH<int64_t>& AsVec64() const { return data; }
+
+  inline void Add(int p, int q) { data.push_back((int64_t(p) << 32) | q); }
 
   void Unique(ExecutionPolicy policy) {
     Sort(policy);
@@ -134,6 +152,10 @@ class SparseIndices {
 
  private:
   VecDH<int64_t> data;
+  inline int* ptr() { return reinterpret_cast<int32_t*>(data.ptrD()); }
+  inline const int* ptr() const {
+    return reinterpret_cast<const int32_t*>(data.ptrD());
+  }
 };
 
 }  // namespace manifold

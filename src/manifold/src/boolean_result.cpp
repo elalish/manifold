@@ -75,13 +75,12 @@ template <const bool inverted>
 struct CountNewVerts {
   int *countP;
   int *countQ;
-  const int *pq;
+  const SparseIndices &pq;
   const Halfedge *halfedges;
 
   void operator()(thrust::tuple<int, int> in) {
-    int edgeP = pq[2 * thrust::get<0>(in) + SparseIndices::pOffset];
-    int faceQ = pq[2 * thrust::get<0>(in) + 1 - SparseIndices::pOffset];
-    if (inverted) std::swap(edgeP, faceQ);
+    int edgeP = pq.Get(thrust::get<0>(in), inverted);
+    int faceQ = pq.Get(thrust::get<0>(in), !inverted);
     int inclusion = glm::abs(thrust::get<1>(in));
 
     AtomicAdd(countQ[faceQ], inclusion);
@@ -109,11 +108,11 @@ std::tuple<VecDH<int>, VecDH<int>> SizeOutput(
   for_each(policy, inQ.halfedge_.begin(), inQ.halfedge_.end(),
            CountVerts({sidesPerFaceQ, i30.cptrD()}));
   for_each_n(policy, zip(countAt(0), i12.begin()), i12.size(),
-             CountNewVerts<false>({sidesPerFaceP, sidesPerFaceQ, p1q2.ptr(),
-                                   inP.halfedge_.cptrD()}));
+             CountNewVerts<false>(
+                 {sidesPerFaceP, sidesPerFaceQ, p1q2, inP.halfedge_.cptrD()}));
   for_each_n(policy, zip(countAt(0), i21.begin()), i21.size(),
-             CountNewVerts<true>({sidesPerFaceQ, sidesPerFaceP, p2q1.ptr(),
-                                  inQ.halfedge_.cptrD()}));
+             CountNewVerts<true>(
+                 {sidesPerFaceQ, sidesPerFaceP, p2q1, inQ.halfedge_.cptrD()}));
 
   VecDH<int> facePQ2R(inP.NumTri() + inQ.NumTri() + 1, 0);
   auto keepFace =

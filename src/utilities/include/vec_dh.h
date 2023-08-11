@@ -168,8 +168,8 @@ class ManagedVec {
     capacity_ = size_;
   }
 
-  void push_back(const T &val) {
-    if (size_ >= capacity_) {
+  inline void push_back(const T &val) {
+    if (__builtin_expect(size_ >= capacity_, 0)) {
       // avoid dangling pointer in case val is a reference of our array
       T val_copy = val;
       reserve(capacity_ == 0 ? 128 : capacity_ * 2);
@@ -213,9 +213,9 @@ class ManagedVec {
 
   const T &back() const { return *(ptr_ + size_ - 1); }
 
-  T &operator[](size_t i) { return *(ptr_ + i); }
+  inline T &operator[](size_t i) { return *(ptr_ + i); }
 
-  const T &operator[](size_t i) const { return *(ptr_ + i); }
+  inline const T &operator[](size_t i) const { return *(ptr_ + i); }
 
   bool empty() const { return size_ == 0; }
 
@@ -348,15 +348,15 @@ class VecDH {
 
   const T *ptrH() const { return cptrH(); }
 
-  T &operator[](int i) { return impl_[i]; }
+  inline T &operator[](int i) { return impl_[i]; }
 
-  const T &operator[](int i) const { return impl_[i]; }
+  inline const T &operator[](int i) const { return impl_[i]; }
 
   T &back() { return impl_.back(); }
 
   const T &back() const { return impl_.back(); }
 
-  void push_back(const T &val) { impl_.push_back(val); }
+  inline void push_back(const T &val) { impl_.push_back(val); }
 
   void reserve(int n) { impl_.reserve(n); }
 

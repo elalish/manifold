@@ -210,11 +210,10 @@ VecDH<TmpEdge> inline CreateTmpEdges(const VecDH<Halfedge>& halfedge) {
 template <const bool inverted>
 struct ReindexEdge {
   const TmpEdge* edges;
-  int* indices;
+  SparseIndices& indices;
 
   void operator()(int i) {
-    int& edge = inverted ? indices[2 * i + 1 - SparseIndices::pOffset]
-                         : indices[2 * i + SparseIndices::pOffset];
+    int& edge = indices.Get(i, inverted);
     edge = edges[edge].halfedgeIdx;
   }
 };

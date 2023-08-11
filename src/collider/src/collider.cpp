@@ -228,18 +228,15 @@ struct SeqCollisionRecorder {
 
 template <const bool inverted>
 struct ParCollisionRecorder {
-  int* queryTri_;
+  SparseIndices& queryTri;
   int* counts;
   char* empty;
   void record(int queryIdx, int leafIdx) const {
     int pos = counts[queryIdx]++;
-    if (inverted) {
-      queryTri_[2 * pos + SparseIndices::pOffset] = leafIdx;
-      queryTri_[2 * pos + 1 - SparseIndices::pOffset] = queryIdx;
-    } else {
-      queryTri_[2 * pos + SparseIndices::pOffset] = queryIdx;
-      queryTri_[2 * pos + 1 - SparseIndices::pOffset] = leafIdx;
-    }
+    if (inverted)
+      queryTri.Set(pos, leafIdx, queryIdx);
+    else
+      queryTri.Set(pos, queryIdx, leafIdx);
   }
   bool earlyexit(int queryIdx) const { return empty[queryIdx] == 1; }
   void end(int queryIdx) const {}
@@ -333,7 +330,7 @@ SparseIndices Collider::Collisions(const VecDH<T>& queriesIn) const {
                FindCollisions<T, selfCollision, ParCollisionRecorder<inverted>>{
                    nodeBBox_.ptrD(),
                    internalChildren_.ptrD(),
-                   {queryTri.ptr(), counts.ptrD(), empty.ptrD()}});
+                   {queryTri, counts.ptrD(), empty.ptrD()}});
     return queryTri;
   }
 }

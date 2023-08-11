@@ -589,9 +589,8 @@ bool MeshGL::Merge() {
                    static_cast<int>(mergeToVert[i]));
   }
   for (int i = 0; i < toMerge.size(); ++i) {
-    graph.add_edge(
-        openVerts[toMerge.ptr()[2 * i + SparseIndices::pOffset]],
-        openVerts[toMerge.ptr()[2 * i + 1 - SparseIndices::pOffset]]);
+    graph.add_edge(openVerts[toMerge.Get(i, false)],
+                   openVerts[toMerge.Get(i, true)]);
   }
 
   std::vector<int> vertLabels;

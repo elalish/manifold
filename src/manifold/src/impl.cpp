@@ -874,10 +874,10 @@ SparseIndices Manifold::Impl::EdgeCollisions(const Impl& Q,
 
   if (inverted)
     for_each(policy, countAt(0), countAt(q1p2.size()),
-             ReindexEdge<true>({edges.cptrD(), q1p2.ptr()}));
+             ReindexEdge<true>({edges.cptrD(), q1p2}));
   else
     for_each(policy, countAt(0), countAt(q1p2.size()),
-             ReindexEdge<false>({edges.cptrD(), q1p2.ptr()}));
+             ReindexEdge<false>({edges.cptrD(), q1p2}));
   return q1p2;
 }
 
