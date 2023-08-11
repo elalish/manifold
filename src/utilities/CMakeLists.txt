@@ -34,12 +34,6 @@ if (TRACY_ENABLE)
   target_compile_options(${PROJECT_NAME} INTERFACE -DTRACY_NO_CODE_TRANSFER=1)
 endif()
 
-if(EMSCRIPTEN)
-    set(TBB_GIT_TAG 8db4efacad3b8aa6eea62281a9e8444e5dc8f16a)
-else()
-    set(TBB_GIT_TAG v2021.10.0)
-endif()
-
 if(MANIFOLD_PAR STREQUAL "TBB")
     find_package(PkgConfig)
     if (PKG_CONFIG_FOUND)
@@ -52,8 +46,6 @@ if(MANIFOLD_PAR STREQUAL "TBB")
         set(TBB_STRICT OFF CACHE INTERNAL "" FORCE)
         FetchContent_Declare(TBB
           GIT_REPOSITORY https://github.com/oneapi-src/oneTBB.git
-          # versions afterward forces -D_FORTIFY_SOURCE=2
-          # which conflicts with defaults with nixos...
           GIT_TAG        v2021.10.0
           GIT_SHALLOW    TRUE
           GIT_PROGRESS   TRUE

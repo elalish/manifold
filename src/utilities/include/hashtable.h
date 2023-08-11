@@ -27,35 +27,23 @@ constexpr Uint64 kOpen = std::numeric_limits<Uint64>::max();
 
 template <typename T>
 T AtomicCAS(T& target, T compare, T val) {
-#ifdef __CUDA_ARCH__
-  return atomicCAS(&target, compare, val);
-#else
   std::atomic<T>& tar = reinterpret_cast<std::atomic<T>&>(target);
   tar.compare_exchange_strong(compare, val, std::memory_order_acq_rel);
   return compare;
-#endif
 }
 
 template <typename T>
 void AtomicStore(T& target, T val) {
-#ifdef __CUDA_ARCH__
-  target = val;
-#else
   std::atomic<T>& tar = reinterpret_cast<std::atomic<T>&>(target);
   // release is good enough, although not really something general
   tar.store(val, std::memory_order_release);
-#endif
 }
 
 template <typename T>
 T AtomicLoad(const T& target) {
-#ifdef __CUDA_ARCH__
-  return target;
-#else
   const std::atomic<T>& tar = reinterpret_cast<const std::atomic<T>&>(target);
   // acquire is good enough, although not general
   return tar.load(std::memory_order_acquire);
-#endif
 }
 
 // https://stackoverflow.com/questions/664014/what-integer-hash-function-are-good-that-accepts-an-integer-hash-key

@@ -49,7 +49,7 @@ enum class ExecutionPolicy {
 // - Sequential for small workload,
 // - Parallel (CPU) for medium workload,
 // - GPU for large workload if available.
-inline ExecutionPolicy autoPolicy(int size) {
+inline constexpr ExecutionPolicy autoPolicy(int size) {
   // some random numbers
   if (size <= (1 << 12)) {
     return ExecutionPolicy::Seq;
