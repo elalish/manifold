@@ -43,6 +43,10 @@ class SparseIndices {
 #else
 #error "unknown architecture"
 #endif
+  static constexpr int64_t EncodePQ(int p, int q) {
+    return (int64_t(p) << 32) | q;
+  }
+
   SparseIndices() = default;
   SparseIndices(size_t size) : data(size) {}
 
@@ -78,13 +82,13 @@ class SparseIndices {
 
   inline int64_t GetPQ(int i) const { return data[i]; }
 
-  inline void Set(int i, int p, int q) { data[i] = (int64_t(p) << 32) | q; }
+  inline void Set(int i, int p, int q) { data[i] = EncodePQ(p, q); }
 
   inline void SetPQ(int i, int64_t pq) { data[i] = pq; }
 
   const VecDH<int64_t>& AsVec64() const { return data; }
 
-  inline void Add(int p, int q) { data.push_back((int64_t(p) << 32) | q); }
+  inline void Add(int p, int q) { data.push_back(EncodePQ(p, q)); }
 
   void Unique(ExecutionPolicy policy) {
     Sort(policy);
@@ -143,8 +147,8 @@ class SparseIndices {
     std::cout << "SparseIndices = " << std::endl;
     const int* p = ptr();
     for (int i = 0; i < size(); ++i) {
-      std::cout << i << ", p = " << p[2 * i + pOffset]
-                << ", q = " << p[2 * i + 1 - pOffset] << std::endl;
+      std::cout << i << ", p = " << Get(i, false) << ", q = " << Get(i, true)
+                << std::endl;
     }
     std::cout << std::endl;
   }

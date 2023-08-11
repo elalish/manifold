@@ -24,6 +24,7 @@
 // Adjustable parameters
 constexpr int kInitialLength = 128;
 constexpr int kLengthMultiple = 4;
+constexpr int kSequentialThreshold = 512;
 // Fundamental constants
 constexpr int kRoot = 1;
 
@@ -301,7 +302,7 @@ template <const bool selfCollision, const bool inverted, typename T>
 SparseIndices Collider::Collisions(const VecDH<T>& queriesIn) const {
   // note that the length is 1 larger than the number of queries so the last
   // element can store the sum when using exclusive scan
-  if (queriesIn.size() < 512) {
+  if (queriesIn.size() < kSequentialThreshold) {
     SparseIndices queryTri;
     for_each_n(ExecutionPolicy::Seq, zip(queriesIn.cbegin(), countAt(0)),
                queriesIn.size(),

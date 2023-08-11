@@ -417,8 +417,8 @@ struct Kernel12 {
     const Halfedge edge = halfedgesP[p1];
 
     for (int vert : {edge.startVert, edge.endVert}) {
-      const int64_t key = forward ? (((int64_t)vert << 32) | (int64_t)q2)
-                                  : (((int64_t)q2 << 32) | (int64_t)vert);
+      const int64_t key = forward ? SparseIndices::EncodePQ(vert, q2)
+                                  : SparseIndices::EncodePQ(q2, vert);
       const int idx = monobound_quaternary_search(p0q2.ptrD(), size02, key);
       if (idx != -1) {
         const int s = s02[idx];
@@ -438,8 +438,8 @@ struct Kernel12 {
       const int q1 = 3 * q2 + i;
       const Halfedge edge = halfedgesQ[q1];
       const int q1F = edge.IsForward() ? q1 : edge.pairedHalfedge;
-      const int64_t key = forward ? ((int64_t)p1 << 32) | (int64_t)q1F
-                                  : ((int64_t)q1F << 32) | (int64_t)p1;
+      const int64_t key = forward ? SparseIndices::EncodePQ(p1, q1F)
+                                  : SparseIndices::EncodePQ(q1F, p1);
       const int idx = monobound_quaternary_search(p1q1.ptrD(), size11, key);
       if (idx != -1) {  // s is implicitly zero for anything not found
         const int s = s11[idx];

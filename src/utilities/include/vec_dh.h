@@ -169,7 +169,7 @@ class ManagedVec {
   }
 
   inline void push_back(const T &val) {
-    if (__builtin_expect(size_ >= capacity_, 0)) {
+    if (size_ >= capacity_) {
       // avoid dangling pointer in case val is a reference of our array
       T val_copy = val;
       reserve(capacity_ == 0 ? 128 : capacity_ * 2);
