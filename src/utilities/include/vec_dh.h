@@ -13,10 +13,7 @@
 // limitations under the License.
 
 #pragma once
-#ifdef MANIFOLD_USE_CUDA
-#include <cuda.h>
-#endif
-
+#include <exception>
 #if TRACY_ENABLE && TRACY_MEMORY_USAGE
 #include <tracy/Tracy.hpp>
 #else
@@ -63,6 +60,7 @@ class VecDH {
     auto policy = autoPolicy(size_);
     if (size_ != 0) {
       ptr_ = reinterpret_cast<T *>(malloc(size_ * sizeof(T)));
+      if (ptr_ == nullptr) throw std::bad_alloc();
       TracyAllocS(ptr_, size_ * sizeof(T), 3);
       uninitialized_copy(policy, vec.begin(), vec.end(), ptr_);
     }
@@ -74,6 +72,7 @@ class VecDH {
     auto policy = autoPolicy(size_);
     if (size_ != 0) {
       ptr_ = reinterpret_cast<T *>(malloc(size_ * sizeof(T)));
+      if (ptr_ == nullptr) throw std::bad_alloc();
       TracyAllocS(ptr_, size_ * sizeof(T), 3);
       uninitialized_copy(policy, vec.begin(), vec.end(), ptr_);
     }
@@ -109,6 +108,7 @@ class VecDH {
     auto policy = autoPolicy(size_);
     if (size_ != 0) {
       ptr_ = reinterpret_cast<T *>(malloc(size_ * sizeof(T)));
+      if (ptr_ == nullptr) throw std::bad_alloc();
       TracyAllocS(ptr_, size_ * sizeof(T), 3);
       uninitialized_copy(policy, other.begin(), other.end(), ptr_);
     }
@@ -183,6 +183,7 @@ class VecDH {
   void reserve(int n) {
     if (n > capacity_) {
       T *newBuffer = reinterpret_cast<T *>(malloc(n * sizeof(T)));
+      if (newBuffer == nullptr) throw std::bad_alloc();
       TracyAllocS(newBuffer, n * sizeof(T), 3);
       if (size_ > 0)
         uninitialized_copy(autoPolicy(size_), ptr_, ptr_ + size_, newBuffer);
@@ -210,6 +211,7 @@ class VecDH {
     T *newBuffer = nullptr;
     if (size_ > 0) {
       newBuffer = reinterpret_cast<T *>(malloc(size_ * sizeof(T)));
+      if (newBuffer == nullptr) throw std::bad_alloc();
       TracyAllocS(newBuffer, size_ * sizeof(T), 3);
       uninitialized_copy(autoPolicy(size_), ptr_, ptr_ + size_, newBuffer);
       if (ptr_ != nullptr) {
