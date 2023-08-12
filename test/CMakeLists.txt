@@ -49,18 +49,6 @@ endif()
 add_executable(${PROJECT_NAME} ${SOURCE_FILES})
 target_link_libraries(${PROJECT_NAME} polygon GTest::GTest manifold sdf samples samplesGPU cross_section)
 
-if (TRACY_ENABLE)
-  include(FetchContent)
-  FetchContent_Declare(tracy
-    GIT_REPOSITORY https://github.com/wolfpld/tracy.git
-    GIT_TAG v0.9.1
-    GIT_SHALLOW TRUE
-    GIT_PROGRESS TRUE
-  )
-  FetchContent_MakeAvailable(tracy)
-  target_link_libraries(${PROJECT_NAME} TracyClient)
-endif()
-
 if(MANIFOLD_CBIND)
   target_link_libraries(${PROJECT_NAME} manifoldc)
 endif()
@@ -68,16 +56,6 @@ endif()
 if(MANIFOLD_EXPORT)
   target_link_libraries(${PROJECT_NAME} meshIO)
   target_compile_options(${PROJECT_NAME} PUBLIC -DMANIFOLD_EXPORT)
-endif()
-
-if(MANIFOLD_USE_CUDA)
-  set(CUDA_FILES test_main.cpp sdf_test.cpp)
-  if(MANIFOLD_CBIND)
-    list(APPEND CUDA_FILES manifoldc_test.cpp)
-  endif()
-
-  set_source_files_properties(${CUDA_FILES} PROPERTIES LANGUAGE CUDA)
-  set_property(TARGET ${PROJECT_NAME} PROPERTY CUDA_ARCHITECTURES 61)
 endif()
 
 target_compile_options(${PROJECT_NAME} PRIVATE ${MANIFOLD_FLAGS})

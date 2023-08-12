@@ -12,21 +12,29 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "csg_tree.h"
+#if MANIFOLD_PAR == 'T' && __has_include(<tbb/tbb.h>)
+#include <tbb/tbb.h>
+#define TBB_PREVIEW_CONCURRENT_ORDERED_CONTAINERS 1
+#include <tbb/concurrent_priority_queue.h>
+#endif
 
 #include <algorithm>
+#include <variant>
 
 #include "boolean3.h"
+#include "csg_tree.h"
 #include "impl.h"
 #include "mesh_fixes.h"
 #include "par.h"
+
+constexpr int kParallelThreshold = 4096;
 
 namespace {
 using namespace manifold;
 struct Transform4x3 {
   const glm::mat4x3 transform;
 
-  __host__ __device__ glm::vec3 operator()(glm::vec3 position) {
+  glm::vec3 operator()(glm::vec3 position) {
     return transform * glm::vec4(position, 1.0f);
   }
 };
@@ -36,7 +44,7 @@ struct UpdateHalfedge {
   const int nextEdge;
   const int nextFace;
 
-  __host__ __device__ Halfedge operator()(Halfedge edge) {
+  Halfedge operator()(Halfedge edge) {
     edge.startVert += nextVert;
     edge.endVert += nextVert;
     edge.pairedHalfedge += nextEdge;
@@ -48,7 +56,7 @@ struct UpdateHalfedge {
 struct UpdateTriProp {
   const int nextProp;
 
-  __host__ __device__ glm::ivec3 operator()(glm::ivec3 tri) {
+  glm::ivec3 operator()(glm::ivec3 tri) {
     tri += nextProp;
     return tri;
   }
@@ -57,7 +65,7 @@ struct UpdateTriProp {
 struct UpdateMeshIDs {
   const int offset;
 
-  __host__ __device__ TriRef operator()(TriRef ref) {
+  TriRef operator()(TriRef ref) {
     ref.meshID += offset;
     return ref;
   }
@@ -66,9 +74,7 @@ struct UpdateMeshIDs {
 struct CheckOverlap {
   const Box *boxes;
   const size_t i;
-  __host__ __device__ bool operator()(int j) {
-    return boxes[i].DoesOverlap(boxes[j]);
-  }
+  bool operator()(int j) { return boxes[i].DoesOverlap(boxes[j]); }
 };
 }  // namespace
 namespace manifold {
@@ -197,9 +203,7 @@ Manifold::Impl CsgLeafNode::Compose(
 
   // if we are already parallelizing for each node, do not perform multithreaded
   // copying as it will slightly hurt performance
-  if (nodes.size() > 1 &&
-      (policy == ExecutionPolicy::Par ||
-       (policy == ExecutionPolicy::ParUnseq && !CudaEnabled())))
+  if (nodes.size() > 1 && policy == ExecutionPolicy::Par)
     policy = ExecutionPolicy::Seq;
 
   for_each_n_host(
@@ -432,14 +436,59 @@ std::shared_ptr<CsgLeafNode> CsgOpNode::ToLeafNode() const {
 std::shared_ptr<Manifold::Impl> CsgOpNode::BatchBoolean(
     OpType operation,
     std::vector<std::shared_ptr<const Manifold::Impl>> &results) {
+  using SharedImpl = std::variant<std::shared_ptr<const Manifold::Impl>,
+                                  std::shared_ptr<Manifold::Impl>>;
+  auto getImplPtr = [](const SharedImpl &p) -> const Manifold::Impl * {
+    if (std::holds_alternative<std::shared_ptr<const Manifold::Impl>>(p)) {
+      return std::get<std::shared_ptr<const Manifold::Impl>>(p).get();
+    } else {
+      return std::get<std::shared_ptr<Manifold::Impl>>(p).get();
+    }
+  };
   ASSERT(operation != OpType::Subtract, logicErr,
          "BatchBoolean doesn't support Difference.");
-  auto cmpFn = [](std::shared_ptr<const Manifold::Impl> a,
-                  std::shared_ptr<const Manifold::Impl> b) {
-    // invert the order because we want a min heap
-    return a->NumVert() > b->NumVert();
+  auto cmpFn = [&getImplPtr](const SharedImpl &a, const SharedImpl &b) {
+    return getImplPtr(a)->NumVert() < getImplPtr(b)->NumVert();
   };
 
+  // common cases
+  if (results.size() == 0) return std::make_shared<Manifold::Impl>();
+  if (results.size() == 1)
+    return std::make_shared<Manifold::Impl>(*results.front());
+  if (results.size() == 2) {
+    Boolean3 boolean(*results[0], *results[1], operation);
+    return std::make_shared<Manifold::Impl>(boolean.Result(operation));
+  }
+#if MANIFOLD_PAR == 'T' && __has_include(<tbb/tbb.h>)
+  tbb::task_group group;
+  tbb::concurrent_priority_queue<SharedImpl, decltype(cmpFn)> queue(cmpFn);
+  for (auto result : results) {
+    queue.emplace(result);
+  }
+  results.clear();
+  std::function<void()> process = [&]() {
+    while (queue.size() > 1) {
+      SharedImpl a, b;
+      if (!queue.try_pop(a)) continue;
+      if (!queue.try_pop(b)) {
+        queue.push(a);
+        continue;
+      }
+      group.run([&, a, b]() {
+        const Manifold::Impl *aImpl;
+        const Manifold::Impl *bImpl;
+        Boolean3 boolean(*getImplPtr(a), *getImplPtr(b), operation);
+        queue.emplace(
+            std::make_shared<Manifold::Impl>(boolean.Result(operation)));
+        return group.run(process);
+      });
+    }
+  };
+  group.run_and_wait(process);
+  SharedImpl r;
+  queue.try_pop(r);
+  return std::get<std::shared_ptr<Manifold::Impl>>(r);
+#else
   // apply boolean operations starting from smaller meshes
   // the assumption is that boolean operations on smaller meshes is faster,
   // due to less data being copied and processed
@@ -460,10 +509,8 @@ std::shared_ptr<Manifold::Impl> CsgOpNode::BatchBoolean(
         std::make_shared<const Manifold::Impl>(boolean.Result(operation)));
     std::push_heap(results.begin(), results.end(), cmpFn);
   }
-  if (results.size() == 1) {
-    return std::make_shared<Manifold::Impl>(*results.front());
-  }
-  return std::make_shared<Manifold::Impl>();
+  return std::make_shared<Manifold::Impl>(*results.front());
+#endif
 }
 
 /**

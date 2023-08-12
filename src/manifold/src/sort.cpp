@@ -14,6 +14,7 @@
 
 #include <thrust/sequence.h>
 
+#include <atomic>
 #include <numeric>
 #include <set>
 
@@ -27,7 +28,7 @@ using namespace manifold;
 constexpr uint32_t kNoCode = 0xFFFFFFFFu;
 
 struct Extrema : public thrust::binary_function<Halfedge, Halfedge, Halfedge> {
-  __host__ __device__ void MakeForward(Halfedge& a) {
+  void MakeForward(Halfedge& a) {
     if (!a.IsForward()) {
       int tmp = a.startVert;
       a.startVert = a.endVert;
@@ -35,11 +36,11 @@ struct Extrema : public thrust::binary_function<Halfedge, Halfedge, Halfedge> {
     }
   }
 
-  __host__ __device__ int MaxOrMinus(int a, int b) {
+  int MaxOrMinus(int a, int b) {
     return glm::min(a, b) < 0 ? -1 : glm::max(a, b);
   }
 
-  __host__ __device__ Halfedge operator()(Halfedge a, Halfedge b) {
+  Halfedge operator()(Halfedge a, Halfedge b) {
     MakeForward(a);
     MakeForward(b);
     a.startVert = glm::min(a.startVert, b.startVert);
@@ -50,7 +51,7 @@ struct Extrema : public thrust::binary_function<Halfedge, Halfedge, Halfedge> {
   }
 };
 
-__host__ __device__ uint32_t SpreadBits3(uint32_t v) {
+uint32_t SpreadBits3(uint32_t v) {
   v = 0xFF0000FFu & (v * 0x00010001u);
   v = 0x0F00F00Fu & (v * 0x00000101u);
   v = 0xC30C30C3u & (v * 0x00000011u);
@@ -58,7 +59,7 @@ __host__ __device__ uint32_t SpreadBits3(uint32_t v) {
   return v;
 }
 
-__host__ __device__ uint32_t MortonCode(glm::vec3 position, Box bBox) {
+uint32_t MortonCode(glm::vec3 position, Box bBox) {
   // Unreferenced vertices are marked NaN, and this will sort them to the end
   // (the Morton code only uses the first 30 of 32 bits).
   if (isnan(position.x)) return kNoCode;
@@ -74,8 +75,7 @@ __host__ __device__ uint32_t MortonCode(glm::vec3 position, Box bBox) {
 struct Morton {
   const Box bBox;
 
-  __host__ __device__ void operator()(
-      thrust::tuple<uint32_t&, const glm::vec3&> inout) {
+  void operator()(thrust::tuple<uint32_t&, const glm::vec3&> inout) {
     glm::vec3 position = thrust::get<1>(inout);
     thrust::get<0>(inout) = MortonCode(position, bBox);
   }
@@ -86,8 +86,7 @@ struct FaceMortonBox {
   const glm::vec3* vertPos;
   const Box bBox;
 
-  __host__ __device__ void operator()(
-      thrust::tuple<uint32_t&, Box&, int> inout) {
+  void operator()(thrust::tuple<uint32_t&, Box&, int> inout) {
     uint32_t& mortonCode = thrust::get<0>(inout);
     Box& faceBox = thrust::get<1>(inout);
     int face = thrust::get<2>(inout);
@@ -116,7 +115,7 @@ struct FaceMortonBox {
 struct Reindex {
   const int* indexInv;
 
-  __host__ __device__ void operator()(Halfedge& edge) {
+  void operator()(Halfedge& edge) {
     if (edge.startVert < 0) return;
     edge.startVert = indexInv[edge.startVert];
     edge.endVert = indexInv[edge.endVert];
@@ -126,9 +125,10 @@ struct Reindex {
 struct MarkProp {
   int* keep;
 
-  __host__ __device__ void operator()(glm::ivec3 triProp) {
+  void operator()(glm::ivec3 triProp) {
     for (const int i : {0, 1, 2}) {
-      keep[triProp[i]] = 1;
+      reinterpret_cast<std::atomic<int>*>(keep)[triProp[i]].store(
+          1, std::memory_order_relaxed);
     }
   }
 };
@@ -138,7 +138,7 @@ struct GatherProps {
   const float* oldProperties;
   const int numProp;
 
-  __host__ __device__ void operator()(thrust::tuple<int, int, int> in) {
+  void operator()(thrust::tuple<int, int, int> in) {
     const int oldIdx = thrust::get<0>(in);
     const int newIdx = thrust::get<1>(in);
     const int keep = thrust::get<2>(in);
@@ -152,7 +152,7 @@ struct GatherProps {
 struct ReindexProps {
   const int* old2new;
 
-  __host__ __device__ void operator()(glm::ivec3& triProp) {
+  void operator()(glm::ivec3& triProp) {
     for (const int i : {0, 1, 2}) {
       triProp[i] = old2new[triProp[i]];
     }
@@ -178,7 +178,7 @@ struct ReindexFace {
   const int* faceNew2Old;
   const int* faceOld2New;
 
-  __host__ __device__ void operator()(int newFace) {
+  void operator()(int newFace) {
     const int oldFace = faceNew2Old[newFace];
     for (const int i : {0, 1, 2}) {
       const int oldEdge = 3 * oldFace + i;
@@ -202,8 +202,7 @@ struct VertMortonBox {
   const float tol;
   const Box bBox;
 
-  __host__ __device__ void operator()(
-      thrust::tuple<uint32_t&, Box&, int> inout) {
+  void operator()(thrust::tuple<uint32_t&, Box&, int> inout) {
     uint32_t& mortonCode = thrust::get<0>(inout);
     Box& vertBox = thrust::get<1>(inout);
     int vert = thrust::get<2>(inout);
@@ -220,7 +219,7 @@ struct VertMortonBox {
 };
 
 struct Duplicate {
-  __host__ __device__ thrust::pair<float, float> operator()(float x) {
+  thrust::pair<float, float> operator()(float x) {
     return thrust::make_pair(x, x);
   }
 };
@@ -228,8 +227,8 @@ struct Duplicate {
 struct MinMax : public thrust::binary_function<thrust::pair<float, float>,
                                                thrust::pair<float, float>,
                                                thrust::pair<float, float>> {
-  __host__ __device__ thrust::pair<float, float> operator()(
-      thrust::pair<float, float> a, thrust::pair<float, float> b) {
+  thrust::pair<float, float> operator()(thrust::pair<float, float> a,
+                                        thrust::pair<float, float> b) {
     return thrust::make_pair(glm::min(a.first, b.first),
                              glm::max(a.second, b.second));
   }
@@ -590,7 +589,8 @@ bool MeshGL::Merge() {
                    static_cast<int>(mergeToVert[i]));
   }
   for (int i = 0; i < toMerge.size(); ++i) {
-    graph.add_edge(openVerts[toMerge.Get(0)[i]], openVerts[toMerge.Get(1)[i]]);
+    graph.add_edge(openVerts[toMerge.Get(i, false)],
+                   openVerts[toMerge.Get(i, true)]);
   }
 
   std::vector<int> vertLabels;

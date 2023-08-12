@@ -15,6 +15,7 @@
 #pragma once
 
 #include "par.h"
+#include "sparse.h"
 #include "utils.h"
 #include "vec_dh.h"
 
@@ -23,25 +24,23 @@ namespace manifold {
 /** @addtogroup Private
  *  @{
  */
-__host__ __device__ inline glm::vec3 SafeNormalize(glm::vec3 v) {
+inline glm::vec3 SafeNormalize(glm::vec3 v) {
   v = glm::normalize(v);
   return glm::isfinite(v.x) ? v : glm::vec3(0);
 }
 
-__host__ __device__ inline float MaxPrecision(float minPrecision,
-                                              const Box& bBox) {
+inline float MaxPrecision(float minPrecision, const Box& bBox) {
   float precision = glm::max(minPrecision, kTolerance * bBox.Scale());
   return glm::isfinite(precision) ? precision : -1;
 }
 
-__host__ __device__ inline int NextHalfedge(int current) {
+inline int NextHalfedge(int current) {
   ++current;
   if (current % 3 == 0) current -= 3;
   return current;
 }
 
-__host__ __device__ inline glm::vec3 UVW(int vert,
-                                         const glm::vec3* barycentric) {
+inline glm::vec3 UVW(int vert, const glm::vec3* barycentric) {
   glm::vec3 uvw(0.0f);
   if (vert < 0) {
     uvw[vert + 3] = 1;
@@ -51,8 +50,7 @@ __host__ __device__ inline glm::vec3 UVW(int vert,
   return uvw;
 }
 
-__host__ __device__ inline glm::mat3 NormalTransform(
-    const glm::mat4x3& transform) {
+inline glm::mat3 NormalTransform(const glm::mat4x3& transform) {
   return glm::inverse(glm::transpose(glm::mat3(transform)));
 }
 
@@ -60,8 +58,7 @@ __host__ __device__ inline glm::mat3 NormalTransform(
  * By using the closest axis-aligned projection to the normal instead of a
  * projection along the normal, we avoid introducing any rounding error.
  */
-__host__ __device__ inline glm::mat3x2 GetAxisAlignedProjection(
-    glm::vec3 normal) {
+inline glm::mat3x2 GetAxisAlignedProjection(glm::vec3 normal) {
   glm::vec3 absNormal = glm::abs(normal);
   float xyzMax;
   glm::mat2x3 projection;
@@ -82,9 +79,8 @@ __host__ __device__ inline glm::mat3x2 GetAxisAlignedProjection(
   return glm::transpose(projection);
 }
 
-__host__ __device__ inline glm::vec3 GetBarycentric(const glm::vec3& v,
-                                                    const glm::mat3& triPos,
-                                                    float precision) {
+inline glm::vec3 GetBarycentric(const glm::vec3& v, const glm::mat3& triPos,
+                                float precision) {
   const glm::mat3 edges(triPos[2] - triPos[1], triPos[0] - triPos[2],
                         triPos[1] - triPos[0]);
   const glm::vec3 d2(glm::dot(edges[0], edges[0]), glm::dot(edges[1], edges[1]),
@@ -138,8 +134,8 @@ struct Halfedge {
   int startVert, endVert;
   int pairedHalfedge;
   int face;
-  __host__ __device__ bool IsForward() const { return startVert < endVert; }
-  __host__ __device__ bool operator<(const Halfedge& other) const {
+  bool IsForward() const { return startVert < endVert; }
+  bool operator<(const Halfedge& other) const {
     return startVert == other.startVert ? endVert < other.endVert
                                         : startVert < other.startVert;
   }
@@ -170,22 +166,21 @@ struct TriRef {
 struct TmpEdge {
   int first, second, halfedgeIdx;
 
-  __host__ __device__ TmpEdge() {}
-  __host__ __device__ TmpEdge(int start, int end, int idx) {
+  TmpEdge() {}
+  TmpEdge(int start, int end, int idx) {
     first = glm::min(start, end);
     second = glm::max(start, end);
     halfedgeIdx = idx;
   }
 
-  __host__ __device__ bool operator<(const TmpEdge& other) const {
+  bool operator<(const TmpEdge& other) const {
     return first == other.first ? second < other.second : first < other.first;
   }
 };
 /** @} */
 
 struct Halfedge2Tmp {
-  __host__ __device__ void operator()(
-      thrust::tuple<TmpEdge&, const Halfedge&, int> inout) {
+  void operator()(thrust::tuple<TmpEdge&, const Halfedge&, int> inout) {
     const Halfedge& halfedge = thrust::get<1>(inout);
     int idx = thrust::get<2>(inout);
     if (!halfedge.IsForward()) idx = -1;
@@ -195,9 +190,7 @@ struct Halfedge2Tmp {
 };
 
 struct TmpInvalid {
-  __host__ __device__ bool operator()(const TmpEdge& edge) {
-    return edge.halfedgeIdx < 0;
-  }
+  bool operator()(const TmpEdge& edge) { return edge.halfedgeIdx < 0; }
 };
 
 VecDH<TmpEdge> inline CreateTmpEdges(const VecDH<Halfedge>& halfedge) {
@@ -214,10 +207,13 @@ VecDH<TmpEdge> inline CreateTmpEdges(const VecDH<Halfedge>& halfedge) {
   return edges;
 }
 
+template <const bool inverted>
 struct ReindexEdge {
   const TmpEdge* edges;
+  SparseIndices& indices;
 
-  __host__ __device__ void operator()(int& edge) {
+  void operator()(int i) {
+    int& edge = indices.Get(i, inverted);
     edge = edges[edge].halfedgeIdx;
   }
 };

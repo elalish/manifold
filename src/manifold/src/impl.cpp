@@ -31,29 +31,24 @@ using namespace manifold;
 
 constexpr uint64_t kRemove = std::numeric_limits<uint64_t>::max();
 
-__host__ __device__ void AtomicAddVec3(glm::vec3& target,
-                                       const glm::vec3& add) {
+void AtomicAddVec3(glm::vec3& target, const glm::vec3& add) {
   for (int i : {0, 1, 2}) {
-#ifdef __CUDA_ARCH__
-    atomicAdd(&target[i], add[i]);
-#else
     std::atomic<float>& tar = reinterpret_cast<std::atomic<float>&>(target[i]);
     float old_val = tar.load(std::memory_order_relaxed);
     while (!tar.compare_exchange_weak(old_val, old_val + add[i],
                                       std::memory_order_relaxed))
       ;
-#endif
   }
 }
 
 struct Normalize {
-  __host__ __device__ void operator()(glm::vec3& v) { v = SafeNormalize(v); }
+  void operator()(glm::vec3& v) { v = SafeNormalize(v); }
 };
 
 struct Transform4x3 {
   const glm::mat4x3 transform;
 
-  __host__ __device__ glm::vec3 operator()(glm::vec3 position) {
+  glm::vec3 operator()(glm::vec3 position) {
     return transform * glm::vec4(position, 1.0f);
   }
 };
@@ -65,7 +60,7 @@ struct AssignNormals {
   const float precision;
   const bool calculateTriNormal;
 
-  __host__ __device__ void operator()(thrust::tuple<glm::vec3&, int> in) {
+  void operator()(thrust::tuple<glm::vec3&, int> in) {
     glm::vec3& triNormal = thrust::get<0>(in);
     const int face = thrust::get<1>(in);
 
@@ -102,8 +97,7 @@ struct Tri2Halfedges {
   Halfedge* halfedges;
   glm::uint64_t* edges;
 
-  __host__ __device__ void operator()(
-      thrust::tuple<int, const glm::ivec3&> in) {
+  void operator()(thrust::tuple<int, const glm::ivec3&> in) {
     const int tri = thrust::get<0>(in);
     const glm::ivec3& triVerts = thrust::get<1>(in);
     for (const int i : {0, 1, 2}) {
@@ -124,7 +118,7 @@ struct LinkHalfedges {
   const int* ids;
   const int numEdge;
 
-  __host__ __device__ void operator()(int i) {
+  void operator()(int i) {
     const int pair0 = ids[i];
     const int pair1 = ids[i + numEdge];
     halfedges[pair0].pairedHalfedge = pair1;
@@ -135,9 +129,10 @@ struct LinkHalfedges {
 struct MarkVerts {
   int* vert;
 
-  __host__ __device__ void operator()(glm::ivec3 triVerts) {
+  void operator()(glm::ivec3 triVerts) {
     for (int i : {0, 1, 2}) {
-      vert[triVerts[i]] = 1;
+      reinterpret_cast<std::atomic<int>*>(vert)[triVerts[i]].store(
+          1, std::memory_order_relaxed);
     }
   }
 };
@@ -145,7 +140,7 @@ struct MarkVerts {
 struct ReindexTriVerts {
   const int* old2new;
 
-  __host__ __device__ void operator()(glm::ivec3& triVerts) {
+  void operator()(glm::ivec3& triVerts) {
     for (int i : {0, 1, 2}) {
       triVerts[i] = old2new[triVerts[i]];
     }
@@ -156,7 +151,7 @@ struct InitializeTriRef {
   const int meshID;
   const Halfedge* halfedge;
 
-  __host__ __device__ void operator()(thrust::tuple<TriRef&, int> inOut) {
+  void operator()(thrust::tuple<TriRef&, int> inOut) {
     TriRef& baryRef = thrust::get<0>(inOut);
     int tri = thrust::get<1>(inOut);
 
@@ -169,9 +164,7 @@ struct InitializeTriRef {
 struct UpdateMeshID {
   const HashTableD<uint32_t> meshIDold2new;
 
-  __host__ __device__ void operator()(TriRef& ref) {
-    ref.meshID = meshIDold2new[ref.meshID];
-  }
+  void operator()(TriRef& ref) { ref.meshID = meshIDold2new[ref.meshID]; }
 };
 
 struct CoplanarEdge {
@@ -185,7 +178,8 @@ struct CoplanarEdge {
   const int numProp;
   const float precision;
 
-  __host__ __device__ void operator()(
+  // FIXME: race condition
+  void operator()(
       thrust::tuple<thrust::pair<int, int>&, thrust::pair<int, int>&, int>
           inOut) {
     thrust::pair<int, int>& face2face = thrust::get<0>(inOut);
@@ -283,7 +277,7 @@ struct CheckCoplanarity {
   const int* components;
   const float precision;
 
-  __host__ __device__ void operator()(int tri) {
+  void operator()(int tri) {
     const int component = components[tri];
     const int referenceTri = comp2tri[component];
     if (referenceTri < 0 || referenceTri == tri) return;
@@ -299,7 +293,8 @@ struct CheckCoplanarity {
       // triangle, unmark the entire component so that none of its triangles are
       // marked coplanar.
       if (glm::abs(glm::dot(normal, vert - origin)) > precision) {
-        comp2tri[component] = -1;
+        reinterpret_cast<std::atomic<int>*>(comp2tri)[component].store(
+            -1, std::memory_order_relaxed);
         break;
       }
     }
@@ -309,8 +304,7 @@ struct CheckCoplanarity {
 struct EdgeBox {
   const glm::vec3* vertPos;
 
-  __host__ __device__ void operator()(
-      thrust::tuple<Box&, const TmpEdge&> inout) {
+  void operator()(thrust::tuple<Box&, const TmpEdge&> inout) {
     const TmpEdge& edge = thrust::get<1>(inout);
     thrust::get<0>(inout) = Box(vertPos[edge.first], vertPos[edge.second]);
   }
@@ -863,7 +857,8 @@ void Manifold::Impl::IncrementMeshIDs() {
  * the input manifold, Q and the faces of this manifold. Returned indices only
  * point to forward halfedges.
  */
-SparseIndices Manifold::Impl::EdgeCollisions(const Impl& Q) const {
+SparseIndices Manifold::Impl::EdgeCollisions(const Impl& Q,
+                                             bool inverted) const {
   VecDH<TmpEdge> edges = CreateTmpEdges(Q.halfedge_);
   const int numEdge = edges.size();
   VecDH<Box> QedgeBB(numEdge);
@@ -871,9 +866,18 @@ SparseIndices Manifold::Impl::EdgeCollisions(const Impl& Q) const {
   for_each_n(policy, zip(QedgeBB.begin(), edges.cbegin()), numEdge,
              EdgeBox({Q.vertPos_.cptrD()}));
 
-  SparseIndices q1p2 = collider_.Collisions(QedgeBB);
+  SparseIndices q1p2(0);
+  if (inverted)
+    q1p2 = collider_.Collisions<false, true>(QedgeBB);
+  else
+    q1p2 = collider_.Collisions<false, false>(QedgeBB);
 
-  for_each(policy, q1p2.begin(0), q1p2.end(0), ReindexEdge({edges.cptrD()}));
+  if (inverted)
+    for_each(policy, countAt(0), countAt(q1p2.size()),
+             ReindexEdge<true>({edges.cptrD(), q1p2}));
+  else
+    for_each(policy, countAt(0), countAt(q1p2.size()),
+             ReindexEdge<false>({edges.cptrD(), q1p2}));
   return q1p2;
 }
 
@@ -881,8 +885,11 @@ SparseIndices Manifold::Impl::EdgeCollisions(const Impl& Q) const {
  * Returns a sparse array of the input vertices that project inside the XY
  * bounding boxes of the faces of this manifold.
  */
-SparseIndices Manifold::Impl::VertexCollisionsZ(
-    const VecDH<glm::vec3>& vertsIn) const {
-  return collider_.Collisions(vertsIn);
+SparseIndices Manifold::Impl::VertexCollisionsZ(const VecDH<glm::vec3>& vertsIn,
+                                                bool inverted) const {
+  if (inverted)
+    return collider_.Collisions<false, true>(vertsIn);
+  else
+    return collider_.Collisions<false, false>(vertsIn);
 }
 }  // namespace manifold

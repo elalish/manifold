@@ -14,21 +14,27 @@
 
 project(utilities)
 
-file(GLOB_RECURSE SOURCE_FILES CONFIGURE_DEPENDS *.cpp)
-add_library(${PROJECT_NAME} ${SOURCE_FILES})
+add_library(${PROJECT_NAME} INTERFACE)
 
-message("CUDA Support: ${MANIFOLD_USE_CUDA}")
 message("Parallel Backend: ${MANIFOLD_PAR}")
 
 target_include_directories(${PROJECT_NAME} INTERFACE ${PROJECT_SOURCE_DIR}/include)
 target_include_directories(${PROJECT_NAME} INTERFACE ${THRUST_INC_DIR}/dependencies/libcudacxx/include)
 
-if(MANIFOLD_PAR STREQUAL "OMP")
-    find_package(OpenMP REQUIRED)
-    target_include_directories(${PROJECT_NAME} PUBLIC OpenMP::OpenMP_CXX)
-    target_compile_options(${PROJECT_NAME} PUBLIC -DMANIFOLD_PAR='O' -fopenmp)
-    target_link_options(${PROJECT_NAME} PUBLIC -fopenmp)
-elseif(MANIFOLD_PAR STREQUAL "TBB")
+if (TRACY_ENABLE)
+  include(FetchContent)
+  FetchContent_Declare(tracy
+    GIT_REPOSITORY https://github.com/wolfpld/tracy.git
+    GIT_TAG v0.9.1
+    GIT_SHALLOW TRUE
+    GIT_PROGRESS TRUE
+  )
+  FetchContent_MakeAvailable(tracy)
+  target_link_libraries(${PROJECT_NAME} INTERFACE TracyClient)
+  target_compile_options(${PROJECT_NAME} INTERFACE -DTRACY_NO_CODE_TRANSFER=1)
+endif()
+
+if(MANIFOLD_PAR STREQUAL "TBB")
     find_package(PkgConfig)
     if (PKG_CONFIG_FOUND)
         pkg_check_modules(TBB tbb)
@@ -40,48 +46,37 @@ elseif(MANIFOLD_PAR STREQUAL "TBB")
         set(TBB_STRICT OFF CACHE INTERNAL "" FORCE)
         FetchContent_Declare(TBB
           GIT_REPOSITORY https://github.com/oneapi-src/oneTBB.git
-          # versions afterward forces -D_FORTIFY_SOURCE=2
-          # which conflicts with defaults with nixos...
           GIT_TAG        v2021.10.0
           GIT_SHALLOW    TRUE
           GIT_PROGRESS   TRUE
         )
         FetchContent_MakeAvailable(TBB)
     endif()
-    target_compile_options(${PROJECT_NAME} PUBLIC -DMANIFOLD_PAR='T')
+    target_compile_options(${PROJECT_NAME} INTERFACE -DMANIFOLD_PAR='T')
     if(TARGET TBB::tbb)
-        target_link_libraries(${PROJECT_NAME} PUBLIC TBB::tbb)
+        target_link_libraries(${PROJECT_NAME} INTERFACE TBB::tbb)
     else()
-        target_include_directories(${PROJECT_NAME} PUBLIC ${TBB_INCLUDE_DIRS})
-        target_link_libraries(${PROJECT_NAME} PUBLIC ${TBB_LINK_LIBRARIES})
+        target_include_directories(${PROJECT_NAME} INTERFACE ${TBB_INCLUDE_DIRS})
+        target_link_libraries(${PROJECT_NAME} INTERFACE ${TBB_LINK_LIBRARIES})
     endif()
 elseif(MANIFOLD_PAR STREQUAL "NONE")
     set(MANIFOLD_PAR "CPP")
 else()
     message(FATAL_ERROR "Invalid value for MANIFOLD_PAR: ${MANIFOLD_PAR}. "
-        "Should be one of \"TBB\", \"OMP\", \"NONE\"")
+        "Should be \"TBB\" or \"NONE\"")
 endif()
 
-target_include_directories(${PROJECT_NAME} PUBLIC ${THRUST_INC_DIR})
-target_link_libraries(${PROJECT_NAME} PUBLIC glm)
+target_include_directories(${PROJECT_NAME} INTERFACE ${THRUST_INC_DIR})
+target_link_libraries(${PROJECT_NAME} INTERFACE glm)
 
-if(MANIFOLD_USE_CUDA)
-    set_source_files_properties(${SOURCE_FILES} PROPERTIES LANGUAGE CUDA)
-    set_property(TARGET ${PROJECT_NAME} PROPERTY CUDA_ARCHITECTURES 61)
-    target_compile_options(${PROJECT_NAME}
-        PUBLIC ${MANIFOLD_FLAGS} -DMANIFOLD_USE_CUDA
-        "$<$<COMPILE_LANGUAGE:CUDA>:${MANIFOLD_NVCC_FLAGS}>"
-    )
-else()
-    target_compile_options(${PROJECT_NAME}
-        PUBLIC ${MANIFOLD_FLAGS}
-        -DTHRUST_DEVICE_SYSTEM=THRUST_DEVICE_SYSTEM_${MANIFOLD_PAR}
-    )
-endif()
+target_compile_options(${PROJECT_NAME}
+    INTERFACE ${MANIFOLD_FLAGS}
+    -DTHRUST_DEVICE_SYSTEM=THRUST_DEVICE_SYSTEM_${MANIFOLD_PAR}
+)
 
 if(MANIFOLD_DEBUG)
     target_compile_options(${PROJECT_NAME}
-        PUBLIC -DMANIFOLD_DEBUG)
+        INTERFACE -DMANIFOLD_DEBUG)
 endif()
 
-target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_17)
+target_compile_features(${PROJECT_NAME} INTERFACE cxx_std_17)

@@ -25,92 +25,103 @@ namespace manifold {
 
 /** @ingroup Private */
 class SparseIndices {
-  // COO-style sparse matrix storage. Values corresponding to these indicies are
-  // stored in vectors separate from this class, but having the same length.
+  // sparse indices where {p1: q1, p2: q2, ...} are laid out as
+  // p1 q1 p2 q2 or q1 p1 q2 p2, depending on endianness
+  // such that the indices are sorted by (p << 32) | q
  public:
-  SparseIndices(int size = 0) : p(size), q(size) {}
-  typedef typename VecDH<int>::Iter Iter;
-  typedef typename thrust::zip_iterator<thrust::tuple<Iter, Iter>> Zip;
-  Zip beginPQ() { return zip(p.begin(), q.begin()); }
-  Zip endPQ() { return zip(p.end(), q.end()); }
-  Iter begin(bool use_q) { return use_q ? q.begin() : p.begin(); }
-  Iter end(bool use_q) { return use_q ? q.end() : p.end(); }
-  int* ptrD(bool use_q) { return use_q ? q.ptrD() : p.ptrD(); }
-  thrust::pair<int*, int*> ptrDpq(int idx = 0) {
-    return thrust::make_pair(p.ptrD() + idx, q.ptrD() + idx);
+#if defined(__BYTE_ORDER) && __BYTE_ORDER == __BIG_ENDIAN ||                 \
+    defined(__BIG_ENDIAN__) || defined(__ARMEB__) || defined(__THUMBEB__) || \
+    defined(__AARCH64EB__) || defined(_MIBSEB) || defined(__MIBSEB) ||       \
+    defined(__MIBSEB__)
+  static constexpr size_t pOffset = 0;
+#elif defined(__BYTE_ORDER) && __BYTE_ORDER == __LITTLE_ENDIAN ||          \
+    defined(__LITTLE_ENDIAN__) || defined(__ARMEL__) ||                    \
+    defined(__THUMBEL__) || defined(__AARCH64EL__) || defined(_MIPSEL) ||  \
+    defined(__MIPSEL) || defined(__MIPSEL__) || defined(__EMSCRIPTEN__) || \
+    defined(_MSC_VER)
+  static constexpr size_t pOffset = 1;
+#else
+#error "unknown architecture"
+#endif
+  static constexpr int64_t EncodePQ(int p, int q) {
+    return (int64_t(p) << 32) | q;
   }
-  const thrust::pair<const int*, const int*> ptrDpq(int idx = 0) const {
-    return thrust::make_pair(p.ptrD() + idx, q.ptrD() + idx);
-  }
-  const VecDH<int>& Get(bool use_q) const { return use_q ? q : p; }
+
+  SparseIndices() = default;
+  SparseIndices(size_t size) : data(size) {}
+
+  int size() const { return data.size(); }
+
   VecDH<int> Copy(bool use_q) const {
-    VecDH<int> out = use_q ? q : p;
+    VecDH<int> out(data.size());
+    int offset = pOffset;
+    if (use_q) offset = 1 - offset;
+    const int* p = ptr();
+    for_each(autoPolicy(data.size()), countAt(0), countAt((int)data.size()),
+             [&](int i) { out[i] = p[i * 2 + offset]; });
     return out;
   }
 
-  typedef typename VecDH<int>::IterC IterC;
-  typedef typename thrust::zip_iterator<thrust::tuple<IterC, IterC>> ZipC;
-  ZipC beginPQ() const { return zip(p.begin(), q.begin()); }
-  ZipC endPQ() const { return zip(p.end(), q.end()); }
-  IterC begin(bool use_q) const { return use_q ? q.begin() : p.begin(); }
-  IterC end(bool use_q) const { return use_q ? q.end() : p.end(); }
-  const int* ptrD(bool use_q) const { return use_q ? q.ptrD() : p.ptrD(); }
+  void Sort(ExecutionPolicy policy) { sort(policy, data.begin(), data.end()); }
 
-  ZipC beginHpq() const { return zip(p.begin(), q.begin()); }
-  ZipC endHpq() const { return zip(p.end(), q.end()); }
+  void Resize(int size) { data.resize(size, -1); }
 
-  int size() const { return p.size(); }
-  void SwapPQ() { p.swap(q); }
-
-  void Sort(ExecutionPolicy policy) { sort(policy, beginPQ(), endPQ()); }
-
-  void Resize(int size) {
-    p.resize(size, -1);
-    q.resize(size, -1);
+  inline int& Get(int i, bool use_q) {
+    if (use_q)
+      return ptr()[2 * i + 1 - pOffset];
+    else
+      return ptr()[2 * i + pOffset];
   }
+
+  inline int Get(int i, bool use_q) const {
+    if (use_q)
+      return ptr()[2 * i + 1 - pOffset];
+    else
+      return ptr()[2 * i + pOffset];
+  }
+
+  inline int64_t GetPQ(int i) const { return data[i]; }
+
+  inline void Set(int i, int p, int q) { data[i] = EncodePQ(p, q); }
+
+  inline void SetPQ(int i, int64_t pq) { data[i] = pq; }
+
+  const VecDH<int64_t>& AsVec64() const { return data; }
+
+  inline void Add(int p, int q) { data.push_back(EncodePQ(p, q)); }
 
   void Unique(ExecutionPolicy policy) {
     Sort(policy);
     int newSize =
-        unique<decltype(beginPQ())>(policy, beginPQ(), endPQ()) - beginPQ();
+        unique<decltype(data.begin())>(policy, data.begin(), data.end()) -
+        data.begin();
     Resize(newSize);
   }
 
-  struct firstZero {
-    __host__ __device__ bool operator()(thrust::tuple<int, int, int> x) const {
-      return thrust::get<0>(x) == 0;
-    }
-  };
-
   size_t RemoveZeros(VecDH<int>& S) {
-    ASSERT(S.size() == p.size(), userErr,
+    ASSERT(S.size() == data.size(), userErr,
            "Different number of values than indicies!");
-    auto zBegin = zip(S.begin(), begin(false), begin(true));
-    auto zEnd = zip(S.end(), end(false), end(true));
-    size_t size = remove_if<decltype(zBegin)>(autoPolicy(S.size()), zBegin,
-                                              zEnd, firstZero()) -
-                  zBegin;
+    auto zBegin = zip(S.begin(), data.begin());
+    auto zEnd = zip(S.end(), data.end());
+    size_t size =
+        remove_if<decltype(zBegin)>(autoPolicy(S.size()), zBegin, zEnd,
+                                    [](thrust::tuple<int, int64_t> x) {
+                                      return thrust::get<0>(x) == 0;
+                                    }) -
+        zBegin;
     S.resize(size, -1);
-    p.resize(size, -1);
-    q.resize(size, -1);
+    Resize(size);
     return size;
   }
 
   template <typename T>
   struct firstNonFinite {
-    __host__ __device__ bool NotFinite(float v) const { return !isfinite(v); }
-    __host__ __device__ bool NotFinite(glm::vec2 v) const {
-      return !isfinite(v[0]);
-    }
-    __host__ __device__ bool NotFinite(glm::vec3 v) const {
-      return !isfinite(v[0]);
-    }
-    __host__ __device__ bool NotFinite(glm::vec4 v) const {
-      return !isfinite(v[0]);
-    }
+    bool NotFinite(float v) const { return !isfinite(v); }
+    bool NotFinite(glm::vec2 v) const { return !isfinite(v[0]); }
+    bool NotFinite(glm::vec3 v) const { return !isfinite(v[0]); }
+    bool NotFinite(glm::vec4 v) const { return !isfinite(v[0]); }
 
-    __host__ __device__ bool operator()(
-        thrust::tuple<T, int, int, int> x) const {
+    bool operator()(thrust::tuple<T, int, int64_t> x) const {
       bool result = NotFinite(thrust::get<0>(x));
       return result;
     }
@@ -118,51 +129,37 @@ class SparseIndices {
 
   template <typename T>
   size_t KeepFinite(VecDH<T>& v, VecDH<int>& x) {
-    ASSERT(x.size() == p.size(), userErr,
+    ASSERT(x.size() == data.size(), userErr,
            "Different number of values than indicies!");
-    auto zBegin = zip(v.begin(), x.begin(), begin(false), begin(true));
-    auto zEnd = zip(v.end(), x.end(), end(false), end(true));
+    auto zBegin = zip(v.begin(), x.begin(), data.begin());
+    auto zEnd = zip(v.end(), x.end(), data.end());
     size_t size = remove_if<decltype(zBegin)>(autoPolicy(v.size()), zBegin,
                                               zEnd, firstNonFinite<T>()) -
                   zBegin;
     v.resize(size);
-    x.resize(size, -1);
-    p.resize(size, -1);
-    q.resize(size, -1);
+    x.resize(size);
+    Resize(size);
     return size;
-  }
-
-  template <typename Iter, typename T>
-  VecDH<T> Gather(const VecDH<T>& val, const Iter pqBegin, const Iter pqEnd,
-                  T missingVal) const {
-    ASSERT(val.size() == p.size(), userErr,
-           "Different number of values than indicies!");
-    size_t size = pqEnd - pqBegin;
-    VecDH<T> result(size);
-    VecDH<char> found(size);
-    VecDH<int> temp(size);
-    auto policy = autoPolicy(size);
-    fill(policy, result.begin(), result.end(), missingVal);
-    binary_search(policy, beginPQ(), endPQ(), pqBegin, pqEnd, found.begin());
-    lower_bound(policy, beginPQ(), endPQ(), pqBegin, pqEnd, temp.begin());
-    gather_if(policy, temp.begin(), temp.end(), found.begin(), val.begin(),
-              result.begin());
-    return result;
   }
 
 #ifdef MANIFOLD_DEBUG
   void Dump() const {
-    const auto& p = Get(0);
-    const auto& q = Get(1);
     std::cout << "SparseIndices = " << std::endl;
+    const int* p = ptr();
     for (int i = 0; i < size(); ++i) {
-      std::cout << i << ", p = " << p[i] << ", q = " << q[i] << std::endl;
+      std::cout << i << ", p = " << Get(i, false) << ", q = " << Get(i, true)
+                << std::endl;
     }
     std::cout << std::endl;
   }
 #endif
 
  private:
-  VecDH<int> p, q;
+  VecDH<int64_t> data;
+  inline int* ptr() { return reinterpret_cast<int32_t*>(data.ptrD()); }
+  inline const int* ptr() const {
+    return reinterpret_cast<const int32_t*>(data.ptrD());
+  }
 };
+
 }  // namespace manifold

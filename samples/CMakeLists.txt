@@ -31,11 +31,6 @@ project(samplesGPU)
 
 add_library(samplesGPU src/gyroid_module.cpp)
 
-if(MANIFOLD_USE_CUDA)
-    set_source_files_properties(src/gyroid_module.cpp PROPERTIES LANGUAGE CUDA)
-    set_property(TARGET samplesGPU PROPERTY CUDA_ARCHITECTURES 61)
-endif()
-
 target_include_directories(samplesGPU
     PUBLIC ${PROJECT_SOURCE_DIR}/include
 )
