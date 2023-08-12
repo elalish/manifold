@@ -29,7 +29,7 @@ struct FaceAreaVolume {
   const glm::vec3* vertPos;
   const float precision;
 
-  __host__ __device__ thrust::pair<float, float> operator()(int face) {
+  thrust::pair<float, float> operator()(int face) {
     float perimeter = 0;
     glm::vec3 edge[3];
     for (int i : {0, 1, 2}) {
@@ -49,7 +49,7 @@ struct FaceAreaVolume {
 
 struct PosMin
     : public thrust::binary_function<glm::vec3, glm::vec3, glm::vec3> {
-  __host__ __device__ glm::vec3 operator()(glm::vec3 a, glm::vec3 b) {
+  glm::vec3 operator()(glm::vec3 a, glm::vec3 b) {
     if (isnan(a.x)) return b;
     if (isnan(b.x)) return a;
     return glm::min(a, b);
@@ -58,7 +58,7 @@ struct PosMin
 
 struct PosMax
     : public thrust::binary_function<glm::vec3, glm::vec3, glm::vec3> {
-  __host__ __device__ glm::vec3 operator()(glm::vec3 a, glm::vec3 b) {
+  glm::vec3 operator()(glm::vec3 a, glm::vec3 b) {
     if (isnan(a.x)) return b;
     if (isnan(b.x)) return a;
     return glm::max(a, b);
@@ -66,13 +66,11 @@ struct PosMax
 };
 
 struct FiniteVert {
-  __host__ __device__ bool operator()(glm::vec3 v) {
-    return glm::all(glm::isfinite(v));
-  }
+  bool operator()(glm::vec3 v) { return glm::all(glm::isfinite(v)); }
 };
 
 struct MakeMinMax {
-  __host__ __device__ glm::ivec2 operator()(glm::ivec3 tri) {
+  glm::ivec2 operator()(glm::ivec3 tri) {
     return glm::ivec2(glm::min(tri[0], glm::min(tri[1], tri[2])),
                       glm::max(tri[0], glm::max(tri[1], tri[2])));
   }
@@ -80,7 +78,7 @@ struct MakeMinMax {
 
 struct MinMax
     : public thrust::binary_function<glm::ivec2, glm::ivec2, glm::ivec2> {
-  __host__ __device__ glm::ivec2 operator()(glm::ivec2 a, glm::ivec2 b) {
+  glm::ivec2 operator()(glm::ivec2 a, glm::ivec2 b) {
     a[0] = glm::min(a[0], b[0]);
     a[1] = glm::max(a[1], b[1]);
     return a;
@@ -90,8 +88,8 @@ struct MinMax
 struct SumPair : public thrust::binary_function<thrust::pair<float, float>,
                                                 thrust::pair<float, float>,
                                                 thrust::pair<float, float>> {
-  __host__ __device__ thrust::pair<float, float> operator()(
-      thrust::pair<float, float> a, thrust::pair<float, float> b) {
+  thrust::pair<float, float> operator()(thrust::pair<float, float> a,
+                                        thrust::pair<float, float> b) {
     a.first += b.first;
     a.second += b.second;
     return a;
@@ -107,7 +105,7 @@ struct CurvatureAngles {
   const glm::vec3* vertPos;
   const glm::vec3* triNormal;
 
-  __host__ __device__ void operator()(int tri) {
+  void operator()(int tri) {
     glm::vec3 edge[3];
     glm::vec3 edgeLength(0.0);
     for (int i : {0, 1, 2}) {
@@ -142,8 +140,7 @@ struct CurvatureAngles {
 };
 
 struct NormalizeCurvature {
-  __host__ __device__ void operator()(
-      thrust::tuple<float&, float&, float, float> inOut) {
+  void operator()(thrust::tuple<float&, float&, float, float> inOut) {
     float& meanCurvature = thrust::get<0>(inOut);
     float& gaussianCurvature = thrust::get<1>(inOut);
     float area = thrust::get<2>(inOut);
@@ -166,7 +163,8 @@ struct UpdateProperties {
   const int gaussianIdx;
   const int meanIdx;
 
-  __host__ __device__ void operator()(thrust::tuple<glm::ivec3&, int> inOut) {
+  // FIXME: race condition
+  void operator()(thrust::tuple<glm::ivec3&, int> inOut) {
     glm::ivec3& triProp = thrust::get<0>(inOut);
     const int tri = thrust::get<1>(inOut);
 
@@ -195,7 +193,7 @@ struct UpdateProperties {
 struct CheckHalfedges {
   const Halfedge* halfedges;
 
-  __host__ __device__ bool operator()(int edge) {
+  bool operator()(int edge) {
     const Halfedge halfedge = halfedges[edge];
     if (halfedge.startVert == -1 && halfedge.endVert == -1) return true;
     if (halfedge.pairedHalfedge == -1) return false;
@@ -213,7 +211,7 @@ struct CheckHalfedges {
 struct NoDuplicates {
   const Halfedge* halfedges;
 
-  __host__ __device__ bool operator()(int edge) {
+  bool operator()(int edge) {
     const Halfedge halfedge = halfedges[edge];
     if (halfedge.startVert == -1 && halfedge.endVert == -1 &&
         halfedge.pairedHalfedge == -1)
@@ -229,7 +227,7 @@ struct CheckCCW {
   const glm::vec3* triNormal;
   const float tol;
 
-  __host__ __device__ bool operator()(int face) {
+  bool operator()(int face) {
     if (halfedges[3 * face].pairedHalfedge < 0) return true;
 
     const glm::mat3x2 projection = GetAxisAlignedProjection(triNormal[face]);

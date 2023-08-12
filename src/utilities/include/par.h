@@ -24,31 +24,23 @@
 #include <thrust/system/cpp/execution_policy.h>
 #include <thrust/uninitialized_copy.h>
 #include <thrust/unique.h>
-
 #if MANIFOLD_PAR == 'O'
 #include <thrust/system/omp/execution_policy.h>
 #define MANIFOLD_PAR_NS omp
 #elif MANIFOLD_PAR == 'T'
-#include <tbb/tbb.h>
 #include <thrust/system/tbb/execution_policy.h>
 
 #include <algorithm>
 #include <execution>
+#include <numeric>
 #define MANIFOLD_PAR_NS tbb
 #else
 #define MANIFOLD_PAR_NS cpp
 #endif
 
-#ifdef MANIFOLD_USE_CUDA
-#include <thrust/system/cuda/execution_policy.h>
-#endif
-
 namespace manifold {
 
-bool CudaEnabled();
-
 enum class ExecutionPolicy {
-  ParUnseq,
   Par,
   Seq,
 };
@@ -57,52 +49,18 @@ enum class ExecutionPolicy {
 // - Sequential for small workload,
 // - Parallel (CPU) for medium workload,
 // - GPU for large workload if available.
-inline ExecutionPolicy autoPolicy(int size) {
+inline constexpr ExecutionPolicy autoPolicy(int size) {
   // some random numbers
   if (size <= (1 << 12)) {
     return ExecutionPolicy::Seq;
   }
-  if (size <= (1 << 16) || !CudaEnabled()) {
-    return ExecutionPolicy::Par;
-  }
-  return ExecutionPolicy::ParUnseq;
+  return ExecutionPolicy::Par;
 }
 
-#ifdef MANIFOLD_USE_CUDA
 #define THRUST_DYNAMIC_BACKEND_VOID(NAME)                    \
   template <typename... Args>                                \
   void NAME(ExecutionPolicy policy, Args... args) {          \
     switch (policy) {                                        \
-      case ExecutionPolicy::ParUnseq:                        \
-        thrust::NAME(thrust::cuda::par, args...);            \
-        break;                                               \
-      case ExecutionPolicy::Par:                             \
-        thrust::NAME(thrust::MANIFOLD_PAR_NS::par, args...); \
-        break;                                               \
-      case ExecutionPolicy::Seq:                             \
-        thrust::NAME(thrust::cpp::par, args...);             \
-        break;                                               \
-    }                                                        \
-  }
-#define THRUST_DYNAMIC_BACKEND(NAME, RET)                           \
-  template <typename Ret = RET, typename... Args>                   \
-  Ret NAME(ExecutionPolicy policy, Args... args) {                  \
-    switch (policy) {                                               \
-      case ExecutionPolicy::ParUnseq:                               \
-        return thrust::NAME(thrust::cuda::par, args...);            \
-      case ExecutionPolicy::Par:                                    \
-        return thrust::NAME(thrust::MANIFOLD_PAR_NS::par, args...); \
-      case ExecutionPolicy::Seq:                                    \
-        break;                                                      \
-    }                                                               \
-    return thrust::NAME(thrust::cpp::par, args...);                 \
-  }
-#else
-#define THRUST_DYNAMIC_BACKEND_VOID(NAME)                    \
-  template <typename... Args>                                \
-  void NAME(ExecutionPolicy policy, Args... args) {          \
-    switch (policy) {                                        \
-      case ExecutionPolicy::ParUnseq:                        \
       case ExecutionPolicy::Par:                             \
         thrust::NAME(thrust::MANIFOLD_PAR_NS::par, args...); \
         break;                                               \
@@ -116,7 +74,6 @@ inline ExecutionPolicy autoPolicy(int size) {
   template <typename Ret = RET, typename... Args>                   \
   Ret NAME(ExecutionPolicy policy, Args... args) {                  \
     switch (policy) {                                               \
-      case ExecutionPolicy::ParUnseq:                               \
       case ExecutionPolicy::Par:                                    \
         return thrust::NAME(thrust::MANIFOLD_PAR_NS::par, args...); \
       case ExecutionPolicy::Seq:                                    \
@@ -124,13 +81,11 @@ inline ExecutionPolicy autoPolicy(int size) {
     }                                                               \
     return thrust::NAME(thrust::cpp::par, args...);                 \
   }
-#endif
 
 #define THRUST_DYNAMIC_BACKEND_HOST_VOID(NAME)               \
   template <typename... Args>                                \
   void NAME##_host(ExecutionPolicy policy, Args... args) {   \
     switch (policy) {                                        \
-      case ExecutionPolicy::ParUnseq:                        \
       case ExecutionPolicy::Par:                             \
         thrust::NAME(thrust::MANIFOLD_PAR_NS::par, args...); \
         break;                                               \
@@ -140,13 +95,12 @@ inline ExecutionPolicy autoPolicy(int size) {
     }                                                        \
   }
 
-#if MANIFOLD_PAR == 'T' && !(__APPLE__)
+#if MANIFOLD_PAR == 'T' && __has_include(<pstl/glue_execution_defs.h>)
 // sometimes stl variant is faster
 #define STL_DYNAMIC_BACKEND(NAME, RET)                        \
   template <typename Ret = RET, typename... Args>             \
   Ret NAME(ExecutionPolicy policy, Args... args) {            \
     switch (policy) {                                         \
-      case ExecutionPolicy::ParUnseq:                         \
       case ExecutionPolicy::Par:                              \
         return std::NAME(std::execution::par_unseq, args...); \
       case ExecutionPolicy::Seq:                              \
@@ -158,7 +112,6 @@ inline ExecutionPolicy autoPolicy(int size) {
   template <typename... Args>                          \
   void NAME(ExecutionPolicy policy, Args... args) {    \
     switch (policy) {                                  \
-      case ExecutionPolicy::ParUnseq:                  \
       case ExecutionPolicy::Par:                       \
         std::NAME(std::execution::par_unseq, args...); \
         break;                                         \
@@ -196,6 +149,7 @@ OutputIterator copy_if(ExecutionPolicy policy, InputIterator1 first,
   else
     return std::copy_if(std::execution::par_unseq, first, last, result, pred);
 }
+
 #else
 #define STL_DYNAMIC_BACKEND(NAME, RET) THRUST_DYNAMIC_BACKEND(NAME, RET)
 #define STL_DYNAMIC_BACKEND_VOID(NAME) THRUST_DYNAMIC_BACKEND_VOID(NAME)
@@ -206,7 +160,6 @@ THRUST_DYNAMIC_BACKEND(copy_if, void)
 
 THRUST_DYNAMIC_BACKEND_HOST_VOID(for_each)
 THRUST_DYNAMIC_BACKEND_HOST_VOID(for_each_n)
-THRUST_DYNAMIC_BACKEND_HOST_VOID(copy)
 
 THRUST_DYNAMIC_BACKEND_VOID(gather)
 THRUST_DYNAMIC_BACKEND_VOID(scatter)
@@ -216,13 +169,13 @@ THRUST_DYNAMIC_BACKEND_VOID(sequence)
 THRUST_DYNAMIC_BACKEND_VOID(sort_by_key)
 THRUST_DYNAMIC_BACKEND_VOID(stable_sort_by_key)
 THRUST_DYNAMIC_BACKEND_VOID(transform)
-THRUST_DYNAMIC_BACKEND_VOID(uninitialized_fill)
-THRUST_DYNAMIC_BACKEND_VOID(uninitialized_copy)
-THRUST_DYNAMIC_BACKEND_VOID(stable_sort)
-THRUST_DYNAMIC_BACKEND_VOID(fill)
-THRUST_DYNAMIC_BACKEND_VOID(copy)
-THRUST_DYNAMIC_BACKEND_VOID(inclusive_scan)
-THRUST_DYNAMIC_BACKEND_VOID(copy_n)
+STL_DYNAMIC_BACKEND_VOID(uninitialized_fill)
+STL_DYNAMIC_BACKEND_VOID(uninitialized_copy)
+STL_DYNAMIC_BACKEND_VOID(stable_sort)
+STL_DYNAMIC_BACKEND_VOID(fill)
+STL_DYNAMIC_BACKEND_VOID(copy)
+STL_DYNAMIC_BACKEND_VOID(inclusive_scan)
+STL_DYNAMIC_BACKEND_VOID(copy_n)
 STL_DYNAMIC_BACKEND_VOID(sort)
 
 // void implies that the user have to specify the return type in the template
@@ -231,14 +184,14 @@ THRUST_DYNAMIC_BACKEND(transform_reduce, void)
 THRUST_DYNAMIC_BACKEND(gather_if, void)
 THRUST_DYNAMIC_BACKEND(reduce_by_key, void)
 THRUST_DYNAMIC_BACKEND(lower_bound, void)
-THRUST_DYNAMIC_BACKEND(remove, void)
-THRUST_DYNAMIC_BACKEND(find, void)
-THRUST_DYNAMIC_BACKEND(find_if, void)
-THRUST_DYNAMIC_BACKEND(all_of, bool)
-THRUST_DYNAMIC_BACKEND(is_sorted, bool)
-THRUST_DYNAMIC_BACKEND(reduce, void)
-THRUST_DYNAMIC_BACKEND(count_if, int)
-THRUST_DYNAMIC_BACKEND(binary_search, bool)
+STL_DYNAMIC_BACKEND(remove, void)
+STL_DYNAMIC_BACKEND(find, void)
+STL_DYNAMIC_BACKEND(find_if, void)
+STL_DYNAMIC_BACKEND(all_of, bool)
+STL_DYNAMIC_BACKEND(is_sorted, bool)
+STL_DYNAMIC_BACKEND(reduce, void)
+STL_DYNAMIC_BACKEND(count_if, int)
+STL_DYNAMIC_BACKEND(binary_search, bool)
 STL_DYNAMIC_BACKEND(remove_if, void)
 STL_DYNAMIC_BACKEND(unique, void)
 

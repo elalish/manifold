@@ -45,13 +45,13 @@ struct std::hash<std::pair<int, int>> {
 namespace {
 
 struct AbsSum : public thrust::binary_function<int, int, int> {
-  __host__ __device__ int operator()(int a, int b) { return abs(a) + abs(b); }
+  int operator()(int a, int b) { return abs(a) + abs(b); }
 };
 
 struct DuplicateVerts {
   glm::vec3 *vertPosR;
 
-  __host__ __device__ void operator()(thrust::tuple<int, int, glm::vec3> in) {
+  void operator()(thrust::tuple<int, int, glm::vec3> in) {
     int inclusion = abs(thrust::get<0>(in));
     int vertR = thrust::get<1>(in);
     glm::vec3 vertPosP = thrust::get<2>(in);
@@ -66,20 +66,22 @@ struct CountVerts {
   int *count;
   const int *inclusion;
 
-  __host__ __device__ void operator()(const Halfedge &edge) {
+  void operator()(const Halfedge &edge) {
     AtomicAdd(count[edge.face], glm::abs(inclusion[edge.startVert]));
   }
 };
 
+template <const bool inverted>
 struct CountNewVerts {
   int *countP;
   int *countQ;
+  const SparseIndices &pq;
   const Halfedge *halfedges;
 
-  __host__ __device__ void operator()(thrust::tuple<int, int, int> in) {
-    int edgeP = thrust::get<0>(in);
-    int faceQ = thrust::get<1>(in);
-    int inclusion = glm::abs(thrust::get<2>(in));
+  void operator()(thrust::tuple<int, int> in) {
+    int edgeP = pq.Get(thrust::get<0>(in), inverted);
+    int faceQ = pq.Get(thrust::get<0>(in), !inverted);
+    int inclusion = glm::abs(thrust::get<1>(in));
 
     AtomicAdd(countQ[faceQ], inclusion);
     const Halfedge half = halfedges[edgeP];
@@ -89,7 +91,7 @@ struct CountNewVerts {
 };
 
 struct NotZero : public thrust::unary_function<int, int> {
-  __host__ __device__ int operator()(int x) const { return x > 0 ? 1 : 0; }
+  int operator()(int x) const { return x > 0 ? 1 : 0; }
 };
 
 std::tuple<VecDH<int>, VecDH<int>> SizeOutput(
@@ -105,12 +107,12 @@ std::tuple<VecDH<int>, VecDH<int>> SizeOutput(
            CountVerts({sidesPerFaceP, i03.cptrD()}));
   for_each(policy, inQ.halfedge_.begin(), inQ.halfedge_.end(),
            CountVerts({sidesPerFaceQ, i30.cptrD()}));
-  for_each_n(
-      policy, zip(p1q2.begin(0), p1q2.begin(1), i12.begin()), i12.size(),
-      CountNewVerts({sidesPerFaceP, sidesPerFaceQ, inP.halfedge_.cptrD()}));
-  for_each_n(
-      policy, zip(p2q1.begin(1), p2q1.begin(0), i21.begin()), i21.size(),
-      CountNewVerts({sidesPerFaceQ, sidesPerFaceP, inQ.halfedge_.cptrD()}));
+  for_each_n(policy, zip(countAt(0), i12.begin()), i12.size(),
+             CountNewVerts<false>(
+                 {sidesPerFaceP, sidesPerFaceQ, p1q2, inP.halfedge_.cptrD()}));
+  for_each_n(policy, zip(countAt(0), i21.begin()), i21.size(),
+             CountNewVerts<true>(
+                 {sidesPerFaceQ, sidesPerFaceP, p2q1, inQ.halfedge_.cptrD()}));
 
   VecDH<int> facePQ2R(inP.NumTri() + inQ.NumTri() + 1, 0);
   auto keepFace =
@@ -164,8 +166,8 @@ void AddNewEdgeVerts(
   // intersections between the face of Q and the two faces of P attached to the
   // edge. The direction and duplicity are given by i12, while v12R remaps to
   // the output vert index. When forward is false, all is reversed.
-  const VecDH<int> &p1 = p1q2.Get(!forward);
-  const VecDH<int> &q2 = p1q2.Get(forward);
+  const VecDH<int> &p1 = p1q2.Copy(!forward);
+  const VecDH<int> &q2 = p1q2.Copy(forward);
   auto process = [&](std::function<void(size_t)> lock,
                      std::function<void(size_t)> unlock, int i) {
     const int edgeP = p1[i];
@@ -390,7 +392,7 @@ struct DuplicateHalfedges {
   const int *faceP2R;
   const bool forward;
 
-  __host__ __device__ void operator()(thrust::tuple<bool, Halfedge, int> in) {
+  void operator()(thrust::tuple<bool, Halfedge, int> in) {
     if (!thrust::get<0>(in)) return;
     Halfedge halfedge = thrust::get<1>(in);
     if (!halfedge.IsForward()) return;
@@ -450,7 +452,7 @@ struct MapTriRef {
   const TriRef *triRefQ;
   const int offsetQ;
 
-  __host__ __device__ void operator()(TriRef &triRef) {
+  void operator()(TriRef &triRef) {
     const int tri = triRef.tri;
     const bool PQ = triRef.meshID == 0;
     triRef = PQ ? triRefP[tri] : triRefQ[tri];
@@ -488,7 +490,7 @@ struct Barycentric {
   const Halfedge *halfedgeR;
   const float precision;
 
-  __host__ __device__ void operator()(thrust::tuple<int, TriRef> in) {
+  void operator()(thrust::tuple<int, TriRef> in) {
     const int tri = thrust::get<0>(in);
     const TriRef refPQ = thrust::get<1>(in);
     if (halfedgeR[3 * tri].startVert < 0) return;

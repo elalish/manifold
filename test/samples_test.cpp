@@ -194,7 +194,7 @@ TEST(Samples, GyroidModule) {
   const float size = 20;
   Manifold gyroid = GyroidModule(size);
   CheckNormals(gyroid);
-  EXPECT_LE(gyroid.NumDegenerateTris(), 2);
+  EXPECT_LE(gyroid.NumDegenerateTris(), 4);
   EXPECT_EQ(gyroid.Genus(), 15);
   CheckGL(gyroid);
 

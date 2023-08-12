@@ -16,25 +16,23 @@
           };
           manifold =
             { parallel-backend ? "none"
-            , cuda-support ? false
             , doCheck ? true
             , build-tools ? [ ]
             , ...
             }: pkgs.stdenv.mkDerivation {
               inherit doCheck;
-              pname =
-                if cuda-support then
-                  "manifold-${parallel-backend}-cuda"
-                else
-                  "manifold-${parallel-backend}";
+              pname = "manifold-${parallel-backend}";
               version = "beta";
               src = self;
-              nativeBuildInputs = (with pkgs; [ cmake (python39.withPackages (ps: with ps; [ trimesh ])) gtest ]) ++ build-tools ++
-                (if cuda-support then with pkgs.cudaPackages; [ cuda_nvcc cuda_cudart cuda_cccl pkgs.addOpenGLRunpath ] else [ ]);
+              nativeBuildInputs = (with pkgs; [
+                cmake
+                (python39.withPackages
+                  (ps: with ps; [ trimesh ]))
+                gtest
+              ]) ++ build-tools;
               cmakeFlags = [
                 "-DMANIFOLD_PYBIND=ON"
                 "-DMANIFOLD_PAR=${pkgs.lib.strings.toUpper parallel-backend}"
-                "-DMANIFOLD_USE_CUDA=${if cuda-support then "ON" else "OFF"}"
               ];
               checkPhase = ''
                 cd test
@@ -53,23 +51,10 @@
           parallelBackends = [
             { parallel-backend = "none"; }
             {
-              parallel-backend = "omp";
-              build-tools = [ pkgs.llvmPackages_13.openmp ];
-            }
-            {
               parallel-backend = "tbb";
               build-tools = with pkgs; [ tbb pkg-config ];
             }
           ];
-          buildMatrix = with pkgs; with lib; lists.flatten (map
-            (env: map
-              (x: x // env)
-              parallelBackends) [
-            { cuda-support = false; }
-            {
-              cuda-support = true;
-            }
-          ]);
           devShell = { additional ? [ ] }: pkgs.mkShell {
             buildInputs = with pkgs; [
               cmake
@@ -88,11 +73,10 @@
           packages = (builtins.listToAttrs
             (map
               (x: {
-                name = "manifold-" + x.parallel-backend + (if
-                  x.cuda-support then "-cuda" else "");
+                name = "manifold-" + x.parallel-backend;
                 value = manifold x;
               })
-              buildMatrix)) // {
+              parallelBackends)) // {
             manifold-js = pkgs.buildEmscriptenPackage {
               name = "manifold-js";
               version = "beta";
@@ -122,13 +106,6 @@
             };
           };
           devShell = devShell { };
-          devShells.cuda = devShell {
-            additional = with pkgs.cudaPackages; [
-              cuda_nvcc
-              cuda_cudart
-              cuda_cccl
-            ];
-          };
         }
       );
 }

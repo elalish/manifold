@@ -43,7 +43,9 @@ This library is fast with guaranteed manifold output. As such you need manifold 
 
 The most significant contribution here is a guaranteed-manifold [mesh Boolean](https://github.com/elalish/manifold/wiki/Manifold-Library#mesh-boolean) algorithm, which I believe is the first of its kind. If you know of another, please open a discussion - a mesh Boolean algorithm robust to edge cases has been an open problem for many years. Likewise, if the Boolean here ever fails you, please submit an issue! This Boolean forms the basis of a CAD kernel, as it allows simple shapes to be combined into more complex ones.
 
-To aid in speed, this library makes extensive use of parallelization, generally through Nvidia's Thrust library. You can switch between the CUDA, OMP, TBB, and serial C++ backends by setting a CMake flag. Not everything is so parallelizable, for instance a [polygon triangulation](https://github.com/elalish/manifold/wiki/Manifold-Library#polygon-triangulation) algorithm is included which is serial. Even if compiled for CUDA, the code will still run without a GPU, falling back to the serial version of the algorithms. The WASM build is serial-only for now, but still fast.
+To aid in speed, this library makes extensive use of parallelization, generally through Nvidia's Thrust library. You can switch between the TBB, and serial C++ backends by setting a CMake flag. Not everything is so parallelizable, for instance a [polygon triangulation](https://github.com/elalish/manifold/wiki/Manifold-Library#polygon-triangulation) algorithm is included which is serial. Even if compiled with parallel backend, the code will still fall back to the serial version of the algorithms if the problem size is small. The WASM build is serial-only for now, but still fast.
+
+> Note: OMP and CUDA backends are now removed
 
 Look in the [samples](https://github.com/elalish/manifold/tree/master/samples) directory for examples of how to use this library to make interesting 3D models. You may notice that some of these examples bare a certain resemblance to my OpenSCAD designs on [Thingiverse](https://www.thingiverse.com/emmett), which is no accident. Much as I love OpenSCAD, my library is dramatically faster and the code is more flexible.
 
@@ -61,9 +63,8 @@ cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON .. && make
 test/manifold_test
 ```
 
-CMake flags (usage e.g. `-DMANIFOLD_USE_CUDA=ON`):
-- `MANIFOLD_USE_CUDA=[<OFF>, ON]`: Provides Nvidia GPU parallelization, requires CUDA Toolkit and its nvcc compiler.
-- `MANIFOLD_PAR=[<NONE>, OMP, TBB]`: Provides multi-thread parallelization, requires `libomp-dev` or `libtbb-dev`.
+CMake flags (usage e.g. `-DMANIFOLD_DEBUG=ON`):
+- `MANIFOLD_PAR=[<NONE>, TBB]`: Provides multi-thread parallelization, requires `libtbb-dev` if `TBB` backend is selected.
 - `MANIFOLD_EXPORT=[<OFF>, ON]`: Enables GLB export of 3D models from the tests, requires `libassimp-dev`.
 - `MANIFOLD_DEBUG=[<OFF>, ON]`: Enables internal assertions and exceptions.
 - `BUILD_TEST_CGAL=[<OFF>, ON]`: Builds a CGAL-based performance [comparison](https://github.com/elalish/manifold/tree/master/extras), requires `libcgal-dev`.

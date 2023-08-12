@@ -18,7 +18,7 @@
 namespace {
 using namespace manifold;
 
-__host__ __device__ glm::ivec3 TriOf(int edge) {
+glm::ivec3 TriOf(int edge) {
   glm::ivec3 triEdge;
   triEdge[0] = edge;
   triEdge[1] = NextHalfedge(triEdge[0]);
@@ -26,7 +26,7 @@ __host__ __device__ glm::ivec3 TriOf(int edge) {
   return triEdge;
 }
 
-__host__ __device__ bool Is01Longest(glm::vec2 v0, glm::vec2 v1, glm::vec2 v2) {
+bool Is01Longest(glm::vec2 v0, glm::vec2 v1, glm::vec2 v2) {
   const glm::vec2 e[3] = {v1 - v0, v2 - v1, v0 - v2};
   float l[3];
   for (int i : {0, 1, 2}) l[i] = glm::dot(e[i], e[i]);
@@ -36,7 +36,7 @@ __host__ __device__ bool Is01Longest(glm::vec2 v0, glm::vec2 v1, glm::vec2 v2) {
 struct DuplicateEdge {
   const Halfedge* sortedHalfedge;
 
-  __host__ __device__ bool operator()(int edge) {
+  bool operator()(int edge) {
     const Halfedge& halfedge = sortedHalfedge[edge];
     const Halfedge& nextHalfedge = sortedHalfedge[edge + 1];
     return halfedge.startVert == nextHalfedge.startVert &&
@@ -49,7 +49,7 @@ struct ShortEdge {
   const glm::vec3* vertPos;
   const float precision;
 
-  __host__ __device__ bool operator()(int edge) const {
+  bool operator()(int edge) const {
     if (halfedge[edge].pairedHalfedge < 0) return false;
     // Flag short edges
     const glm::vec3 delta =
@@ -62,7 +62,7 @@ struct FlagEdge {
   const Halfedge* halfedge;
   const TriRef* triRef;
 
-  __host__ __device__ bool operator()(int edge) const {
+  bool operator()(int edge) const {
     if (halfedge[edge].pairedHalfedge < 0) return false;
     // Flag redundant edges - those where the startVert is surrounded by only
     // two original triangles.
@@ -87,7 +87,7 @@ struct SwappableEdge {
   const glm::vec3* triNormal;
   const float precision;
 
-  __host__ __device__ bool operator()(int edge) const {
+  bool operator()(int edge) const {
     if (halfedge[edge].pairedHalfedge < 0) return false;
 
     int tri = halfedge[edge].face;

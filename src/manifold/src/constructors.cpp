@@ -27,7 +27,7 @@ using namespace thrust::placeholders;
 
 struct ToSphere {
   float length;
-  __host__ __device__ void operator()(glm::vec3& v) {
+  void operator()(glm::vec3& v) {
     v = glm::cos(glm::half_pi<float>() * (1.0f - v));
     v = length * glm::normalize(v);
     if (isnan(v.x)) v = glm::vec3(0.0);
@@ -36,7 +36,7 @@ struct ToSphere {
 
 struct Equals {
   int val;
-  __host__ __device__ bool operator()(int x) { return x == val; }
+  bool operator()(int x) { return x == val; }
 };
 
 struct RemoveFace {
@@ -44,7 +44,7 @@ struct RemoveFace {
   const int* vertLabel;
   const int keepLabel;
 
-  __host__ __device__ bool operator()(int face) {
+  bool operator()(int face) {
     return vertLabel[halfedge[3 * face].startVert] != keepLabel;
   }
 };
