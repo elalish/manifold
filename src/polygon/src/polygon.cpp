@@ -381,9 +381,15 @@ class Monotones {
   struct EdgePair {
     VertItr vWest, vEast, vMerge;
     PairItr nextPair;
-    bool westCertain, eastCertain, startCertain;
+    bool westCertain, eastCertain;
 
     int WestOf(VertItr vert, float precision) const {
+      if (vEast->pos.x + precision < vert->pos.x &&
+          vEast->right->pos.x + precision < vert->pos.x)
+        return 1;
+      if (vEast->pos.x - precision > vert->pos.x &&
+          vEast->right->pos.x - precision > vert->pos.x)
+        return -1;
       int westOf = CCW(vEast->right->pos, vEast->pos, vert->pos, precision);
       if (westOf == 0 && !vert->right->Processed())
         westOf =
@@ -394,6 +400,12 @@ class Monotones {
     }
 
     int EastOf(VertItr vert, float precision) const {
+      if (vWest->pos.x - precision > vert->pos.x &&
+          vWest->left->pos.x - precision > vert->pos.x)
+        return 1;
+      if (vWest->pos.x + precision < vert->pos.x &&
+          vWest->left->pos.x + precision < vert->pos.x)
+        return -1;
       int eastOf = CCW(vWest->pos, vWest->left->pos, vert->pos, precision);
       if (eastOf == 0 && !vert->right->Processed())
         eastOf = CCW(vWest->pos, vWest->left->pos, vert->right->pos, precision);
@@ -536,8 +548,13 @@ class Monotones {
           PRINT("End");
           CloseEnd(vert);
           return End;
-        } else if (westPair != activePairs_.end() &&
-                   std::next(westPair) == eastPair) {
+        } else if (!eastPair->westCertain || !westPair->eastCertain ||
+                   (westPair != activePairs_.end() &&
+                    std::next(westPair) == eastPair)) {
+          if (!eastPair->westCertain)
+            activePairs_.splice(std::next(westPair), activePairs_, eastPair);
+          if (!westPair->eastCertain)
+            activePairs_.splice(eastPair, activePairs_, westPair);
           // facing out
           PRINT("Merge");
           CloseEnd(vert);
@@ -747,8 +764,13 @@ class Monotones {
     }
     if (isHole) return true;
 
-    activePairs_.splice(activePairs_.end(), activePairs_, inputPair);
-    inputPair->eastCertain = true;
+    if (activePairs_.size() > 1) {
+      activePairs_.splice(activePairs_.end(), activePairs_, inputPair);
+      inputPair->eastCertain =
+          std::prev(inputPair)->WestOf(vert, precision_) > 0;
+    } else {
+      inputPair->eastCertain = true;
+    }
     return false;
   }
 
@@ -780,9 +802,15 @@ class Monotones {
     }
     if (isHole) return true;
 
-    if (inputPair != activePairs_.begin())
-      activePairs_.splice(activePairs_.begin(), activePairs_, inputPair);
-    inputPair->westCertain = true;
+    activePairs_.splice(activePairs_.begin(), activePairs_, inputPair);
+
+    const PairItr eastPair = std::next(inputPair);
+    if (eastPair != activePairs_.end()) {
+      inputPair->westCertain = eastPair->EastOf(vert, precision_) > 0;
+    } else {
+      inputPair->westCertain = true;
+    }
+
     return false;
   }
 
@@ -845,8 +873,8 @@ class Monotones {
       bool isHole = false;
       if (type == Start) {
         newPair = activePairs_.insert(
-            activePairs_.begin(), {vert, vert, monotones_.end(),
-                                   activePairs_.end(), false, false, false});
+            activePairs_.begin(),
+            {vert, vert, monotones_.end(), activePairs_.end(), false, false});
         SetVWest(newPair, vert);
         SetVEast(newPair, vert);
         const int hole = IsHole(vert);
