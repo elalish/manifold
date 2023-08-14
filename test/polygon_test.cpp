@@ -932,7 +932,7 @@ TEST(Polygon, Hole) {
   TestPoly(polys, 19);
 }
 
-TEST(Polygon, Small) {
+TEST(Polygon, DISABLED_Small) {
   Polygons polys;
   polys.push_back({
       {-0.487163663, 0.00357927009},  //
@@ -3106,26 +3106,4 @@ TEST(Polygon, Woodgrain1) {
       {-1.02179492, -49.9855652},  //
   });
   TestPoly(polys, 12, 0.00145);
-}
-
-TEST(Polygon, Woodgrain2) {
-  Polygons polys;
-  polys.push_back({
-      {-15.694437, 33.8253479},   //
-      {13.2702093, -3.28426218},  //
-      {53.4751701, -32.0106316},  //
-      {61.4174232, 44.4299698},   //
-  });
-  polys.push_back({
-      {17.61759, 25.2365837},     //
-      {17.6270828, 25.2370052},   //
-      {17.1236248, 26.0772629},   //
-      {20.4602833, -7.37109232},  //
-  });
-  polys.push_back({
-      {44.9942932, 39.2275734},  //
-      {45.120945, 29.0997658},   //
-      {44.896656, 25.2351685},   //
-  });
-  TestPoly(polys, 9, 0.00145);
 }

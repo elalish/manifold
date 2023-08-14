@@ -758,8 +758,13 @@ class Monotones {
     }
     if (isHole) return true;
 
-    activePairs_.splice(activePairs_.end(), activePairs_, inputPair);
-    inputPair->eastCertain = true;
+    if (activePairs_.size() > 1) {
+      activePairs_.splice(activePairs_.end(), activePairs_, inputPair);
+      inputPair->eastCertain =
+          std::prev(inputPair)->WestOf(vert, precision_) > 0;
+    } else {
+      inputPair->eastCertain = true;
+    }
     return false;
   }
 
@@ -771,7 +776,8 @@ class Monotones {
     if (inputPair->westCertain) return false;
 
     PairItr potentialPair = inputPair;
-    while (true) {
+    while (potentialPair != activePairs_.begin()) {
+      --potentialPair;
       const int WestOf = potentialPair->WestOf(vert, precision_);
       if (WestOf > 0 && isHole) return true;
 
@@ -787,14 +793,18 @@ class Monotones {
         SwapHole(potentialPair, inputPair);
         return false;
       }
-      if (potentialPair == activePairs_.begin()) break;
-      --potentialPair;
     }
     if (isHole) return true;
 
-    if (inputPair != activePairs_.begin())
-      activePairs_.splice(activePairs_.begin(), activePairs_, inputPair);
-    inputPair->westCertain = true;
+    activePairs_.splice(activePairs_.begin(), activePairs_, inputPair);
+
+    const PairItr eastPair = std::next(inputPair);
+    if (eastPair != activePairs_.end()) {
+      inputPair->westCertain = eastPair->EastOf(vert, precision_) > 0;
+    } else {
+      inputPair->westCertain = true;
+    }
+
     return false;
   }
 
