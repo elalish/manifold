@@ -517,7 +517,7 @@ TEST(Polygon, Sliver7) {
   TestPoly(polys, 6);
 }
 
-TEST(Polygon, DISABLED_Sliver8) {
+TEST(Polygon, Sliver8) {
   Polygons polys;
   polys.push_back({
       {27.9279995, 4.9749999},    //
@@ -531,7 +531,7 @@ TEST(Polygon, DISABLED_Sliver8) {
   TestPoly(polys, 5);
 }
 
-TEST(Polygon, DISABLED_Sliver9) {
+TEST(Polygon, Sliver9) {
   Polygons polys;
   polys.push_back({
       {1.49183154, -0.4795963766194},  //
@@ -883,7 +883,7 @@ TEST(Polygon, Precision3) {
   TestPoly(polys, 3, 0.00068);
 };
 
-TEST(Polygon, DISABLED_Sweep) {
+TEST(Polygon, Sweep) {
   Polygons polys;
   polys.push_back({
       {0, 0.637057483},          //
@@ -3087,7 +3087,7 @@ TEST(Polygon, BigSponge) {
   TestPoly(polys, 1771);
 }
 
-TEST(Polygon, DISABLED_Woodgrain1) {
+TEST(Polygon, Woodgrain1) {
   Polygons polys;
   polys.push_back({
       {72.5, -50},   //
@@ -3108,24 +3108,20 @@ TEST(Polygon, DISABLED_Woodgrain1) {
   TestPoly(polys, 12, 0.00145);
 }
 
-TEST(Polygon, DISABLED_Woodgrain2) {
+TEST(Polygon, Woodgrain2) {
   Polygons polys;
   polys.push_back({
-      {-15.694437, 33.8253479},   //
-      {13.2702093, -3.28426218},  //
-      {53.4751701, -32.0106316},  //
-      {61.4174232, 44.4299698},   //
+      {22.7295628, -49.5001106},   //
+      {-21.1059895, -49.9855423},  //
+      {-35.0938339, 10.1798563},   //
+      {-72.5, -50},                //
+      {-12.7149582, -50},          //
   });
   polys.push_back({
-      {17.61759, 25.2365837},     //
-      {17.6270828, 25.2370052},   //
-      {17.1236248, 26.0772629},   //
-      {20.4602833, -7.37109232},  //
+      {-40.1850586, -49.9840584},  //
+      {-40.2071075, -49.9845123},  //
+      {-40.3756485, -49.9855652},  //
+      {-40.0327415, -19.857235},   //
   });
-  polys.push_back({
-      {44.9942932, 39.2275734},  //
-      {45.120945, 29.0997658},   //
-      {44.896656, 25.2351685},   //
-  });
-  TestPoly(polys, 13, 0.00145);
+  TestPoly(polys, 9, 0.00145);
 }
