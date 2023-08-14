@@ -387,6 +387,9 @@ class Monotones {
       if (vEast->pos.x + precision < vert->pos.x &&
           vEast->right->pos.x + precision < vert->pos.x)
         return 1;
+      if (vEast->pos.x - precision > vert->pos.x &&
+          vEast->right->pos.x - precision > vert->pos.x)
+        return -1;
       int westOf = CCW(vEast->right->pos, vEast->pos, vert->pos, precision);
       if (westOf == 0 && !vert->right->Processed())
         westOf =
@@ -400,6 +403,9 @@ class Monotones {
       if (vWest->pos.x - precision > vert->pos.x &&
           vWest->left->pos.x - precision > vert->pos.x)
         return 1;
+      if (vWest->pos.x + precision < vert->pos.x &&
+          vWest->left->pos.x + precision < vert->pos.x)
+        return -1;
       int eastOf = CCW(vWest->pos, vWest->left->pos, vert->pos, precision);
       if (eastOf == 0 && !vert->right->Processed())
         eastOf = CCW(vWest->pos, vWest->left->pos, vert->right->pos, precision);
