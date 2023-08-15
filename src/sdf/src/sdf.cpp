@@ -1,4 +1,4 @@
-// Copyright 2022 The Manifold Authors.
+// Copyright 2023 The Manifold Authors.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -292,6 +292,10 @@ namespace manifold {
  * performance.
  * @param level You can inset your Mesh by using a positive value, or outset
  * it with a negative value.
+ * @param canParallel Parallel policies violate will crash language runtimes
+ * with runtime locks that expect to not be called back by unregistered threads.
+ * This allows bindings use LevelSet despite being compiled with MANIFOLD_PAR
+ * active.
  * @return Mesh This class does not depend on Manifold, so it just returns a
  * Mesh, but it is guaranteed to be manifold and so can always be used as
  * input to the Manifold constructor for further operations.
