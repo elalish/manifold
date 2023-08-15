@@ -29,7 +29,7 @@ using namespace thrust::placeholders;
 ExecutionParams manifoldParams;
 
 struct MakeTri {
-  const Halfedge* halfedges;
+  VecDHView<const Halfedge> halfedges;
 
   void operator()(thrust::tuple<glm::ivec3&, int> inOut) {
     glm::ivec3& tri = thrust::get<0>(inOut);
@@ -170,7 +170,7 @@ Mesh Manifold::GetMesh() const {
   result.triVerts.resize(NumTri());
   // note that `triVerts` is `std::vector`, so we cannot use thrust::device
   thrust::for_each_n(thrust::host, zip(result.triVerts.begin(), countAt(0)),
-                     NumTri(), MakeTri({impl.halfedge_.cptrH()}));
+                     NumTri(), MakeTri({impl.halfedge_.get_cview()}));
 
   return result;
 }
@@ -218,7 +218,7 @@ MeshGL Manifold::GetMeshGL(glm::ivec3 normalIdx) const {
   out.faceID.resize(numTri);
   std::vector<int> triNew2Old(numTri);
   std::iota(triNew2Old.begin(), triNew2Old.end(), 0);
-  const TriRef* triRef = impl.meshRelation_.triRef.cptrD();
+  VecDHView<const TriRef> triRef = impl.meshRelation_.triRef.get_cview();
   // Don't sort originals - keep them in order
   if (!isOriginal) {
     std::sort(triNew2Old.begin(), triNew2Old.end(), [triRef](int a, int b) {
@@ -606,10 +606,10 @@ Manifold Manifold::SetProperties(
     }
     thrust::for_each_n(
         thrust::host, countAt(0), NumTri(),
-        UpdateProperties({pImpl->meshRelation_.properties.ptrH(), numProp,
-                          oldProperties.ptrH(), oldNumProp,
-                          pImpl->vertPos_.ptrH(), triProperties.ptrH(),
-                          pImpl->halfedge_.ptrH(), propFunc}));
+        UpdateProperties({pImpl->meshRelation_.properties.data(), numProp,
+                          oldProperties.data(), oldNumProp,
+                          pImpl->vertPos_.data(), triProperties.data(),
+                          pImpl->halfedge_.data(), propFunc}));
   }
 
   pImpl->meshRelation_.numProp = numProp;

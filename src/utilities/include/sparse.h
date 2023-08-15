@@ -156,9 +156,9 @@ class SparseIndices {
 
  private:
   VecDH<int64_t> data;
-  inline int* ptr() { return reinterpret_cast<int32_t*>(data.ptrD()); }
+  inline int* ptr() { return reinterpret_cast<int32_t*>(data.data()); }
   inline const int* ptr() const {
-    return reinterpret_cast<const int32_t*>(data.ptrD());
+    return reinterpret_cast<const int32_t*>(data.data());
   }
 };
 

@@ -45,8 +45,8 @@ struct DuplicateEdge {
 };
 
 struct ShortEdge {
-  const Halfedge* halfedge;
-  const glm::vec3* vertPos;
+  VecDHView<const Halfedge> halfedge;
+  VecDHView<const glm::vec3> vertPos;
   const float precision;
 
   bool operator()(int edge) const {
@@ -59,8 +59,8 @@ struct ShortEdge {
 };
 
 struct FlagEdge {
-  const Halfedge* halfedge;
-  const TriRef* triRef;
+  VecDHView<const Halfedge> halfedge;
+  VecDHView<const TriRef> triRef;
 
   bool operator()(int edge) const {
     if (halfedge[edge].pairedHalfedge < 0) return false;
@@ -82,9 +82,9 @@ struct FlagEdge {
 };
 
 struct SwappableEdge {
-  const Halfedge* halfedge;
-  const glm::vec3* vertPos;
-  const glm::vec3* triNormal;
+  VecDHView<const Halfedge> halfedge;
+  VecDHView<const glm::vec3> vertPos;
+  VecDHView<const glm::vec3> triNormal;
   const float precision;
 
   bool operator()(int edge) const {
@@ -148,16 +148,14 @@ void Manifold::Impl::SimplifyTopology() {
   int nbEdges = halfedge_.size();
   int numFlagged = 0;
   VecDH<uint8_t> bflags(nbEdges);
-  uint8_t* bflagsPtr = bflags.ptrD();
 
   VecDH<SortEntry> entries(nbEdges);
-  SortEntry* entriesPtr = entries.ptrD();
 
   auto policy = autoPolicy(halfedge_.size());
-  for_each_n(policy, countAt(0), nbEdges, [=] __host__ __device__(int i) {
-    entriesPtr[i].start = halfedge_[i].startVert;
-    entriesPtr[i].end = halfedge_[i].endVert;
-    entriesPtr[i].index = i;
+  for_each_n(policy, countAt(0), nbEdges, [&](int i) {
+    entries[i].start = halfedge_[i].startVert;
+    entries[i].end = halfedge_[i].endVert;
+    entries[i].index = i;
   });
 
   sort(policy, entries.begin(), entries.end());
@@ -180,9 +178,8 @@ void Manifold::Impl::SimplifyTopology() {
   scratchBuffer.reserve(10);
   {
     numFlagged = 0;
-    ShortEdge se{halfedge_.cptrD(), vertPos_.cptrD(), precision_};
-    for_each_n(policy, countAt(0), nbEdges,
-               [=] __host__ __device__(int i) { bflagsPtr[i] = se(i); });
+    ShortEdge se{halfedge_.get_cview(), vertPos_.get_cview(), precision_};
+    for_each_n(policy, countAt(0), nbEdges, [&](int i) { bflags[i] = se(i); });
     for (int i = 0; i < nbEdges; ++i) {
       if (bflags[i]) {
         CollapseEdge(i, scratchBuffer);
@@ -201,9 +198,8 @@ void Manifold::Impl::SimplifyTopology() {
 
   {
     numFlagged = 0;
-    FlagEdge se{halfedge_.cptrD(), meshRelation_.triRef.cptrD()};
-    for_each_n(policy, countAt(0), nbEdges,
-               [=] __host__ __device__(int i) { bflagsPtr[i] = se(i); });
+    FlagEdge se{halfedge_.get_cview(), meshRelation_.triRef.get_cview()};
+    for_each_n(policy, countAt(0), nbEdges, [&](int i) { bflags[i] = se(i); });
     for (int i = 0; i < nbEdges; ++i) {
       if (bflags[i]) {
         CollapseEdge(i, scratchBuffer);
@@ -222,10 +218,9 @@ void Manifold::Impl::SimplifyTopology() {
 
   {
     numFlagged = 0;
-    SwappableEdge se{halfedge_.cptrD(), vertPos_.cptrD(), faceNormal_.cptrD(),
-                     precision_};
-    for_each_n(policy, countAt(0), nbEdges,
-               [=] __host__ __device__(int i) { bflagsPtr[i] = se(i); });
+    SwappableEdge se{halfedge_.get_cview(), vertPos_.get_cview(),
+                     faceNormal_.get_cview(), precision_};
+    for_each_n(policy, countAt(0), nbEdges, [&](int i) { bflags[i] = se(i); });
     std::vector<int> edgeSwapStack;
     std::vector<int> visited(halfedge_.size(), -1);
     int tag = 0;

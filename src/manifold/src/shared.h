@@ -209,7 +209,7 @@ VecDH<TmpEdge> inline CreateTmpEdges(const VecDH<Halfedge>& halfedge) {
 
 template <const bool inverted>
 struct ReindexEdge {
-  const TmpEdge* edges;
+  VecDHView<const TmpEdge> edges;
   SparseIndices& indices;
 
   void operator()(int i) {

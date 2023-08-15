@@ -23,7 +23,7 @@
 namespace {
 typedef unsigned long long int Uint64;
 typedef Uint64 (*hash_fun_t)(Uint64);
-constexpr Uint64 kOpen = std::numeric_limits<Uint64>::max();
+inline constexpr Uint64 kOpen = std::numeric_limits<Uint64>::max();
 
 template <typename T>
 T AtomicCAS(T& target, T compare, T val) {
@@ -87,7 +87,18 @@ class HashTableD {
     }
   }
 
-  V& operator[](Uint64 key) const {
+  V& operator[](Uint64 key) {
+    uint32_t idx = H(key) & (Size() - 1);
+    while (1) {
+      const Uint64 k = AtomicLoad(keys_[idx]);
+      if (k == key || k == kOpen) {
+        return values_[idx];
+      }
+      idx = (idx + step_) & (Size() - 1);
+    }
+  }
+
+  const V& operator[](Uint64 key) const {
     uint32_t idx = H(key) & (Size() - 1);
     while (1) {
       const Uint64 k = AtomicLoad(keys_[idx]);
@@ -99,13 +110,14 @@ class HashTableD {
   }
 
   Uint64 KeyAt(int idx) const { return AtomicLoad(keys_[idx]); }
-  V& At(int idx) const { return values_[idx]; }
+  V& At(int idx) { return values_[idx]; }
+  const V& At(int idx) const { return values_[idx]; }
 
  private:
   uint32_t step_;
-  VecD<Uint64> keys_;
-  VecD<V> values_;
-  VecD<uint32_t> used_;
+  VecDHView<Uint64> keys_;
+  VecDHView<V> values_;
+  VecDHView<uint32_t> used_;
 };
 
 template <typename V, hash_fun_t H = hash64bit>

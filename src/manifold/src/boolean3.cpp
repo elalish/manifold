@@ -71,7 +71,7 @@ struct CopyFaceEdges {
   // const int *p1q1;
   // x can be either vert or edge (0 or 1).
   SparseIndices &pXq1;
-  const Halfedge *halfedgesQ;
+  VecDHView<const Halfedge> halfedgesQ;
 
   void operator()(thrust::tuple<int, int> in) {
     int idx = 3 * thrust::get<0>(in);
@@ -95,9 +95,9 @@ SparseIndices Filter11(const Manifold::Impl &inP, const Manifold::Impl &inQ,
                        ExecutionPolicy policy) {
   SparseIndices p1q1(3 * p1q2.size() + 3 * p2q1.size());
   for_each_n(policy, zip(countAt(0), countAt(0)), p1q2.size(),
-             CopyFaceEdges<false>({p1q2, p1q1, inQ.halfedge_.cptrD()}));
+             CopyFaceEdges<false>({p1q2, p1q1, inQ.halfedge_.get_cview()}));
   for_each_n(policy, zip(countAt(p1q2.size()), countAt(0)), p2q1.size(),
-             CopyFaceEdges<true>({p2q1, p1q1, inP.halfedge_.cptrD()}));
+             CopyFaceEdges<true>({p2q1, p1q1, inP.halfedge_.get_cview()}));
   p1q1.Unique(policy);
   return p1q1;
 }
@@ -115,10 +115,13 @@ bool Shadows(float p, float q, float dir) { return p == q ? dir < 0 : p < q; }
  * compiled function (they must agree on CPU or GPU). This is now taken care of
  * by the shared policy_ member.
  */
-thrust::pair<int, glm::vec2> Shadow01(
-    const int p0, const int q1, const glm::vec3 *vertPosP,
-    const glm::vec3 *vertPosQ, const Halfedge *halfedgeQ, const float expandP,
-    const glm::vec3 *normalP, const bool reverse) {
+thrust::pair<int, glm::vec2> Shadow01(const int p0, const int q1,
+                                      VecDHView<const glm::vec3> vertPosP,
+                                      VecDHView<const glm::vec3> vertPosQ,
+                                      VecDHView<const Halfedge> halfedgeQ,
+                                      const float expandP,
+                                      VecDHView<const glm::vec3> normalP,
+                                      const bool reverse) {
   const int q1s = halfedgeQ[q1].startVert;
   const int q1e = halfedgeQ[q1].endVert;
   const float p0x = vertPosP[p0].x;
@@ -148,13 +151,12 @@ thrust::pair<int, glm::vec2> Shadow01(
 
 // https://github.com/scandum/binary_search/blob/master/README.md
 // much faster than standard binary search on large arrays
-int monobound_quaternary_search(const int64_t *array, unsigned int array_size,
-                                int64_t key) {
-  if (array_size == 0) {
+int monobound_quaternary_search(VecDHView<const int64_t> array, int64_t key) {
+  if (array.size() == 0) {
     return -1;
   }
   unsigned int bot = 0;
-  unsigned int top = array_size;
+  unsigned int top = array.size();
   while (top >= 65536) {
     unsigned int mid = top / 4;
     top -= mid * 3;
@@ -187,12 +189,12 @@ int monobound_quaternary_search(const int64_t *array, unsigned int array_size,
 }
 
 struct Kernel11 {
-  const glm::vec3 *vertPosP;
-  const glm::vec3 *vertPosQ;
-  const Halfedge *halfedgeP;
-  const Halfedge *halfedgeQ;
+  VecDHView<const glm::vec3> vertPosP;
+  VecDHView<const glm::vec3> vertPosQ;
+  VecDHView<const Halfedge> halfedgeP;
+  VecDHView<const Halfedge> halfedgeQ;
   float expandP;
-  const glm::vec3 *normalP;
+  VecDHView<const glm::vec3> normalP;
   const SparseIndices &p1q1;
 
   void operator()(thrust::tuple<int, glm::vec4 &, int &> inout) {
@@ -278,9 +280,9 @@ std::tuple<VecDH<int>, VecDH<glm::vec4>> Shadow11(SparseIndices &p1q1,
   VecDH<glm::vec4> xyzz11(p1q1.size());
 
   for_each_n(policy, zip(countAt(0), xyzz11.begin(), s11.begin()), p1q1.size(),
-             Kernel11({inP.vertPos_.cptrD(), inQ.vertPos_.cptrD(),
-                       inP.halfedge_.cptrD(), inQ.halfedge_.cptrD(), expandP,
-                       inP.vertNormal_.cptrD(), p1q1}));
+             Kernel11({inP.vertPos_.get_cview(), inQ.vertPos_.get_cview(),
+                       inP.halfedge_.get_cview(), inQ.halfedge_.get_cview(),
+                       expandP, inP.vertNormal_.get_cview(), p1q1}));
 
   p1q1.KeepFinite(xyzz11, s11);
 
@@ -288,12 +290,12 @@ std::tuple<VecDH<int>, VecDH<glm::vec4>> Shadow11(SparseIndices &p1q1,
 };
 
 struct Kernel02 {
-  const glm::vec3 *vertPosP;
-  const Halfedge *halfedgeQ;
-  const glm::vec3 *vertPosQ;
+  VecDHView<const glm::vec3> vertPosP;
+  VecDHView<const Halfedge> halfedgeQ;
+  VecDHView<const glm::vec3> vertPosQ;
   const bool forward;
   const float expandP;
-  const glm::vec3 *vertNormalP;
+  VecDHView<const glm::vec3> vertNormalP;
   const SparseIndices &p0q2;
 
   void operator()(thrust::tuple<int, int &, float &> inout) {
@@ -373,11 +375,11 @@ std::tuple<VecDH<int>, VecDH<float>> Shadow02(const Manifold::Impl &inP,
   VecDH<float> z02(p0q2.size());
 
   auto vertNormalP =
-      forward ? inP.vertNormal_.cptrD() : inQ.vertNormal_.cptrD();
-  for_each_n(
-      policy, zip(countAt(0), s02.begin(), z02.begin()), p0q2.size(),
-      Kernel02({inP.vertPos_.cptrD(), inQ.halfedge_.cptrD(),
-                inQ.vertPos_.cptrD(), forward, expandP, vertNormalP, p0q2}));
+      forward ? inP.vertNormal_.get_cview() : inQ.vertNormal_.get_cview();
+  for_each_n(policy, zip(countAt(0), s02.begin(), z02.begin()), p0q2.size(),
+             Kernel02({inP.vertPos_.get_cview(), inQ.halfedge_.get_cview(),
+                       inQ.vertPos_.get_cview(), forward, expandP, vertNormalP,
+                       p0q2}));
 
   p0q2.KeepFinite(z02, s02);
 
@@ -386,16 +388,14 @@ std::tuple<VecDH<int>, VecDH<float>> Shadow02(const Manifold::Impl &inP,
 
 struct Kernel12 {
   const VecDH<int64_t> &p0q2;
-  const int *s02;
-  const float *z02;
-  const int size02;
+  VecDHView<const int> s02;
+  VecDHView<const float> z02;
   const VecDH<int64_t> &p1q1;
-  const int *s11;
-  const glm::vec4 *xyzz11;
-  const int size11;
-  const Halfedge *halfedgesP;
-  const Halfedge *halfedgesQ;
-  const glm::vec3 *vertPosP;
+  VecDHView<const int> s11;
+  VecDHView<const glm::vec4> xyzz11;
+  VecDHView<const Halfedge> halfedgesP;
+  VecDHView<const Halfedge> halfedgesQ;
+  VecDHView<const glm::vec3> vertPosP;
   const bool forward;
   const SparseIndices &p1q2;
 
@@ -419,7 +419,7 @@ struct Kernel12 {
     for (int vert : {edge.startVert, edge.endVert}) {
       const int64_t key = forward ? SparseIndices::EncodePQ(vert, q2)
                                   : SparseIndices::EncodePQ(q2, vert);
-      const int idx = monobound_quaternary_search(p0q2.ptrD(), size02, key);
+      const int idx = monobound_quaternary_search(p0q2, key);
       if (idx != -1) {
         const int s = s02[idx];
         x12 += s * ((vert == edge.startVert) == forward ? 1 : -1);
@@ -440,7 +440,7 @@ struct Kernel12 {
       const int q1F = edge.IsForward() ? q1 : edge.pairedHalfedge;
       const int64_t key = forward ? SparseIndices::EncodePQ(p1, q1F)
                                   : SparseIndices::EncodePQ(q1F, p1);
-      const int idx = monobound_quaternary_search(p1q1.ptrD(), size11, key);
+      const int idx = monobound_quaternary_search(p1q1, key);
       if (idx != -1) {  // s is implicitly zero for anything not found
         const int s = s11[idx];
         x12 -= s * (edge.IsForward() ? 1 : -1);
@@ -485,10 +485,10 @@ std::tuple<VecDH<int>, VecDH<glm::vec3>> Intersect12(
   VecDH<glm::vec3> v12(p1q2.size());
 
   for_each_n(policy, zip(countAt(0), x12.begin(), v12.begin()), p1q2.size(),
-             Kernel12({p0q2.AsVec64(), s02.ptrD(), z02.cptrD(), p0q2.size(),
-                       p1q1.AsVec64(), s11.ptrD(), xyzz11.cptrD(), p1q1.size(),
-                       inP.halfedge_.cptrD(), inQ.halfedge_.cptrD(),
-                       inP.vertPos_.cptrD(), forward, p1q2}));
+             Kernel12({p0q2.AsVec64(), s02.get_view(), z02.get_cview(),
+                       p1q1.AsVec64(), s11.get_view(), xyzz11.get_cview(),
+                       inP.halfedge_.get_cview(), inQ.halfedge_.get_cview(),
+                       inP.vertPos_.get_cview(), forward, p1q2}));
 
   p1q2.KeepFinite(v12, x12);
 
@@ -554,11 +554,12 @@ Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ,
 
   // Level 2
   // Find vertices that overlap faces in XY-projection
-  SparseIndices p0q2 = inQ.VertexCollisionsZ(inP.vertPos_);
+  SparseIndices p0q2 = inQ.VertexCollisionsZ(inP.vertPos_.get_cview());
   p0q2.Sort(policy_);
   PRINT("p0q2 size = " << p0q2.size());
 
-  SparseIndices p2q0 = inP.VertexCollisionsZ(inQ.vertPos_, true);  // inverted
+  SparseIndices p2q0 =
+      inP.VertexCollisionsZ(inQ.vertPos_.get_cview(), true);  // inverted
   p2q0.Sort(policy_);
   PRINT("p2q0 size = " << p2q0.size());
 

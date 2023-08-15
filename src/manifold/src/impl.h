@@ -78,7 +78,7 @@ struct Manifold::Impl {
   void Warp(std::function<void(glm::vec3&)> warpFunc);
   Impl Transform(const glm::mat4x3& transform) const;
   SparseIndices EdgeCollisions(const Impl& B, bool inverted = false) const;
-  SparseIndices VertexCollisionsZ(const VecDH<glm::vec3>& vertsIn,
+  SparseIndices VertexCollisionsZ(VecDHView<const glm::vec3> vertsIn,
                                   bool inverted = false) const;
 
   bool IsEmpty() const { return NumVert() == 0; }
@@ -96,7 +96,7 @@ struct Manifold::Impl {
   void CalculateCurvature(int gaussianIdx, int meanIdx);
   void CalculateBBox();
   bool IsFinite() const;
-  bool IsIndexInBounds(const VecDH<glm::ivec3>& triVerts) const;
+  bool IsIndexInBounds(VecDHView<const glm::ivec3> triVerts) const;
   void SetPrecision(float minPrecision = -1);
   bool IsManifold() const;
   bool Is2Manifold() const;

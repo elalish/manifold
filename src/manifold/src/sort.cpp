@@ -82,8 +82,8 @@ struct Morton {
 };
 
 struct FaceMortonBox {
-  const Halfedge* halfedge;
-  const glm::vec3* vertPos;
+  VecDHView<const Halfedge> halfedge;
+  VecDHView<const glm::vec3> vertPos;
   const Box bBox;
 
   void operator()(thrust::tuple<uint32_t&, Box&, int> inout) {
@@ -113,7 +113,7 @@ struct FaceMortonBox {
 };
 
 struct Reindex {
-  const int* indexInv;
+  VecDHView<const int> indexInv;
 
   void operator()(Halfedge& edge) {
     if (edge.startVert < 0) return;
@@ -123,19 +123,19 @@ struct Reindex {
 };
 
 struct MarkProp {
-  int* keep;
+  VecDHView<int> keep;
 
   void operator()(glm::ivec3 triProp) {
     for (const int i : {0, 1, 2}) {
-      reinterpret_cast<std::atomic<int>*>(keep)[triProp[i]].store(
-          1, std::memory_order_relaxed);
+      reinterpret_cast<std::atomic<int>*>(&keep[triProp[i]])
+          ->store(1, std::memory_order_relaxed);
     }
   }
 };
 
 struct GatherProps {
-  float* properties;
-  const float* oldProperties;
+  VecDHView<float> properties;
+  VecDHView<const float> oldProperties;
   const int numProp;
 
   void operator()(thrust::tuple<int, int, int> in) {
@@ -150,7 +150,7 @@ struct GatherProps {
 };
 
 struct ReindexProps {
-  const int* old2new;
+  VecDHView<const int> old2new;
 
   void operator()(glm::ivec3& triProp) {
     for (const int i : {0, 1, 2}) {
@@ -171,12 +171,12 @@ template void Permute<TriRef>(VecDH<TriRef>&, const VecDH<int>&);
 template void Permute<glm::vec3>(VecDH<glm::vec3>&, const VecDH<int>&);
 
 struct ReindexFace {
-  Halfedge* halfedge;
-  glm::vec4* halfedgeTangent;
-  const Halfedge* oldHalfedge;
-  const glm::vec4* oldHalfedgeTangent;
-  const int* faceNew2Old;
-  const int* faceOld2New;
+  VecDHView<Halfedge> halfedge;
+  VecDHView<glm::vec4> halfedgeTangent;
+  VecDHView<const Halfedge> oldHalfedge;
+  VecDHView<const glm::vec4> oldHalfedgeTangent;
+  VecDHView<const int> faceNew2Old;
+  VecDHView<const int> faceOld2New;
 
   void operator()(int newFace) {
     const int oldFace = faceNew2Old[newFace];
@@ -189,7 +189,7 @@ struct ReindexFace {
       edge.pairedHalfedge = 3 * faceOld2New[pairedFace] + offset;
       const int newEdge = 3 * newFace + i;
       halfedge[newEdge] = edge;
-      if (oldHalfedgeTangent != nullptr) {
+      if (!oldHalfedgeTangent.empty()) {
         halfedgeTangent[newEdge] = oldHalfedgeTangent[oldEdge];
       }
     }
@@ -197,7 +197,7 @@ struct ReindexFace {
 };
 
 struct VertMortonBox {
-  const float* vertProperties;
+  VecDHView<const float> vertProperties;
   const uint32_t numProp;
   const float tol;
   const Box bBox;
@@ -343,7 +343,7 @@ void Manifold::Impl::ReindexVerts(const VecDH<int>& vertNew2Old,
   scatter(autoPolicy(oldNumVert), countAt(0), countAt(NumVert()),
           vertNew2Old.begin(), vertOld2New.begin());
   for_each(autoPolicy(oldNumVert), halfedge_.begin(), halfedge_.end(),
-           Reindex({vertOld2New.cptrD()}));
+           Reindex({vertOld2New.get_cview()}));
 }
 
 /**
@@ -357,7 +357,7 @@ void Manifold::Impl::CompactProps() {
   auto policy = autoPolicy(numVerts);
 
   for_each(policy, meshRelation_.triProperties.cbegin(),
-           meshRelation_.triProperties.cend(), MarkProp({keep.ptrD()}));
+           meshRelation_.triProperties.cend(), MarkProp({keep.get_view()}));
   VecDH<int> propOld2New(numVerts + 1, 0);
   inclusive_scan(policy, keep.begin(), keep.end(), propOld2New.begin() + 1);
 
@@ -366,10 +366,10 @@ void Manifold::Impl::CompactProps() {
   meshRelation_.properties.resize(meshRelation_.numProp * numVertsNew);
   for_each_n(policy, zip(countAt(0), propOld2New.cbegin(), keep.cbegin()),
              numVerts,
-             GatherProps({meshRelation_.properties.ptrD(), oldProp.cptrD(),
-                          meshRelation_.numProp}));
+             GatherProps({meshRelation_.properties.get_view(),
+                          oldProp.get_cview(), meshRelation_.numProp}));
   for_each_n(policy, meshRelation_.triProperties.begin(), NumTri(),
-             ReindexProps({propOld2New.cptrD()}));
+             ReindexProps({propOld2New.get_cview()}));
 }
 
 /**
@@ -381,9 +381,10 @@ void Manifold::Impl::GetFaceBoxMorton(VecDH<Box>& faceBox,
                                       VecDH<uint32_t>& faceMorton) const {
   faceBox.resize(NumTri());
   faceMorton.resize(NumTri());
-  for_each_n(autoPolicy(NumTri()),
-             zip(faceMorton.begin(), faceBox.begin(), countAt(0)), NumTri(),
-             FaceMortonBox({halfedge_.cptrD(), vertPos_.cptrD(), bBox_}));
+  for_each_n(
+      autoPolicy(NumTri()),
+      zip(faceMorton.begin(), faceBox.begin(), countAt(0)), NumTri(),
+      FaceMortonBox({halfedge_.get_cview(), vertPos_.get_cview(), bBox_}));
 }
 
 /**
@@ -434,10 +435,11 @@ void Manifold::Impl::GatherFaces(const VecDH<int>& faceNew2Old) {
 
   halfedge_.resize(3 * numTri);
   if (oldHalfedgeTangent.size() != 0) halfedgeTangent_.resize(3 * numTri);
-  for_each_n(policy, countAt(0), numTri,
-             ReindexFace({halfedge_.ptrD(), halfedgeTangent_.ptrD(),
-                          oldHalfedge.cptrD(), oldHalfedgeTangent.cptrD(),
-                          faceNew2Old.cptrD(), faceOld2New.cptrD()}));
+  for_each_n(
+      policy, countAt(0), numTri,
+      ReindexFace({halfedge_.get_view(), halfedgeTangent_.get_view(),
+                   oldHalfedge.get_cview(), oldHalfedgeTangent.get_cview(),
+                   faceNew2Old.get_cview(), faceOld2New.get_cview()}));
 }
 
 void Manifold::Impl::GatherFaces(const Impl& old,
@@ -473,10 +475,11 @@ void Manifold::Impl::GatherFaces(const Impl& old,
 
   halfedge_.resize(3 * numTri);
   if (old.halfedgeTangent_.size() != 0) halfedgeTangent_.resize(3 * numTri);
-  for_each_n(policy, countAt(0), numTri,
-             ReindexFace({halfedge_.ptrD(), halfedgeTangent_.ptrD(),
-                          old.halfedge_.cptrD(), old.halfedgeTangent_.cptrD(),
-                          faceNew2Old.cptrD(), faceOld2New.cptrD()}));
+  for_each_n(
+      policy, countAt(0), numTri,
+      ReindexFace({halfedge_.get_view(), halfedgeTangent_.get_view(),
+                   old.halfedge_.get_cview(), old.halfedgeTangent_.get_cview(),
+                   faceNew2Old.get_cview(), faceOld2New.get_cview()}));
 }
 
 /// Constructs a position-only MeshGL from the input Mesh.
@@ -572,13 +575,13 @@ bool MeshGL::Merge() {
   for_each_n(policy,
              zip(vertMorton.begin(), vertBox.begin(), openVerts.cbegin()),
              numOpenVert,
-             VertMortonBox({vertPropD.cptrD(), numProp, precision, bBox}));
+             VertMortonBox({vertPropD.get_cview(), numProp, precision, bBox}));
 
   sort_by_key(policy, vertMorton.begin(), vertMorton.end(),
               zip(vertBox.begin(), openVerts.begin()));
 
   Collider collider(vertBox, vertMorton);
-  SparseIndices toMerge = collider.Collisions<true>(vertBox);
+  SparseIndices toMerge = collider.Collisions<true>(vertBox.get_cview());
 
   Graph graph;
   for (int i = 0; i < numVert; ++i) {

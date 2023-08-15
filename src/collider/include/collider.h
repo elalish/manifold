@@ -23,12 +23,12 @@ namespace manifold {
 class Collider {
  public:
   Collider() {}
-  Collider(const VecDH<Box>& leafBB, const VecDH<uint32_t>& leafMorton);
+  Collider(const VecDHView<const Box>& leafBB, const VecDHView<const uint32_t>& leafMorton);
   bool Transform(glm::mat4x3);
-  void UpdateBoxes(const VecDH<Box>& leafBB);
+  void UpdateBoxes(const VecDHView<const Box>& leafBB);
   template <const bool selfCollision = false, const bool inverted = false,
             typename T>
-  SparseIndices Collisions(const VecDH<T>& queriesIn) const;
+  SparseIndices Collisions(const VecDHView<const T>& queriesIn) const;
 
  private:
   VecDH<Box> nodeBBox_;

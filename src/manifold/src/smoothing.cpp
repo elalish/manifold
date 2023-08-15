@@ -52,7 +52,7 @@ void FillRetainedVerts(VecDH<Barycentric>& vertBary,
 }
 
 struct ReindexHalfedge {
-  int* half2Edge;
+  VecDHView<int> half2Edge;
 
   void operator()(thrust::tuple<int, TmpEdge> in) {
     const int edge = thrust::get<0>(in);
@@ -63,8 +63,8 @@ struct ReindexHalfedge {
 };
 
 struct EdgeVerts {
-  glm::vec3* vertPos;
-  Barycentric* vertBary;
+  VecDHView<glm::vec3> vertPos;
+  VecDHView<Barycentric> vertBary;
   const int startIdx;
   const int n;
 
@@ -91,11 +91,11 @@ struct EdgeVerts {
 };
 
 struct InteriorVerts {
-  glm::vec3* vertPos;
-  Barycentric* vertBary;
+  VecDHView<glm::vec3> vertPos;
+  VecDHView<Barycentric> vertBary;
   const int startIdx;
   const int n;
-  const Halfedge* halfedge;
+  VecDHView<const Halfedge> halfedge;
 
   void operator()(int tri) {
     const float invTotal = 1.0f / n;
@@ -119,9 +119,9 @@ struct InteriorVerts {
 };
 
 struct SplitTris {
-  glm::ivec3* triVerts;
-  const Halfedge* halfedge;
-  const int* half2Edge;
+  VecDHView<glm::ivec3> triVerts;
+  VecDHView<Halfedge> halfedge;
+  VecDHView<const int> half2Edge;
   const int edgeIdx;
   const int triIdx;
   const int n;
@@ -182,10 +182,10 @@ struct SplitTris {
 };
 
 struct SmoothBezier {
-  const glm::vec3* vertPos;
-  const glm::vec3* triNormal;
-  const glm::vec3* vertNormal;
-  const Halfedge* halfedge;
+  VecDHView<const glm::vec3> vertPos;
+  VecDHView<const glm::vec3> triNormal;
+  VecDHView<const glm::vec3> vertNormal;
+  VecDHView<const Halfedge> halfedge;
 
   void operator()(thrust::tuple<glm::vec4&, Halfedge> inOut) {
     glm::vec4& tangent = thrust::get<0>(inOut);
@@ -212,9 +212,9 @@ struct SmoothBezier {
 };
 
 struct InterpTri {
-  const Halfedge* halfedge;
-  const glm::vec4* halfedgeTangent;
-  const glm::vec3* vertPos;
+  VecDHView<const Halfedge> halfedge;
+  VecDHView<const glm::vec4> halfedgeTangent;
+  VecDHView<const glm::vec3> vertPos;
 
   glm::vec4 Homogeneous(glm::vec4 v) const {
     v.x *= v.w;
@@ -325,8 +325,8 @@ void Manifold::Impl::CreateTangents(
 
   for_each_n(autoPolicy(numHalfedge),
              zip(halfedgeTangent_.begin(), halfedge_.cbegin()), numHalfedge,
-             SmoothBezier({vertPos_.cptrD(), faceNormal_.cptrD(),
-                           vertNormal_.cptrD(), halfedge_.cptrD()}));
+             SmoothBezier({vertPos_.get_cview(), faceNormal_.get_cview(),
+                           vertNormal_.get_cview(), halfedge_.get_cview()}));
 
   if (!sharpenedEdges.empty()) {
     const VecDH<TriRef>& triRef = meshRelation_.triRef;
@@ -445,17 +445,17 @@ VecDH<Barycentric> Manifold::Impl::Subdivide(int n) {
   VecDH<int> half2Edge(2 * numEdge);
   auto policy = autoPolicy(numEdge);
   for_each_n(policy, zip(countAt(0), edges.begin()), numEdge,
-             ReindexHalfedge({half2Edge.ptrD()}));
+             ReindexHalfedge({half2Edge.get_view()}));
   for_each_n(policy, zip(countAt(0), edges.begin()), numEdge,
-             EdgeVerts({vertPos_.ptrD(), vertBary.ptrD(), numVert, n}));
+             EdgeVerts({vertPos_.get_view(), vertBary.get_view(), numVert, n}));
   for_each_n(policy, countAt(0), numTri,
-             InteriorVerts({vertPos_.ptrD(), vertBary.ptrD(), triVertStart, n,
-                            halfedge_.cptrD()}));
+             InteriorVerts({vertPos_.get_view(), vertBary.get_view(),
+                            triVertStart, n, halfedge_.get_cview()}));
   // Create sub-triangles
   VecDH<glm::ivec3> triVerts(n * n * numTri);
   for_each_n(policy, countAt(0), numTri,
-             SplitTris({triVerts.ptrD(), halfedge_.cptrD(), half2Edge.cptrD(),
-                        numVert, triVertStart, n}));
+             SplitTris({triVerts.get_view(), halfedge_.get_view(),
+                        half2Edge.get_cview(), numVert, triVertStart, n}));
   CreateHalfedges(triVerts);
   // Make original since the subdivided faces are intended to be warped into
   // being non-coplanar, and hence not being related to the original faces.
@@ -479,10 +479,11 @@ void Manifold::Impl::Refine(int n) {
   if (vertBary.size() == 0) return;
 
   if (old.halfedgeTangent_.size() == old.halfedge_.size()) {
-    for_each_n(autoPolicy(NumTri()), zip(vertPos_.begin(), vertBary.begin()),
-               NumVert(),
-               InterpTri({old.halfedge_.cptrD(), old.halfedgeTangent_.cptrD(),
-                          old.vertPos_.cptrD()}));
+    for_each_n(
+        autoPolicy(NumTri()), zip(vertPos_.begin(), vertBary.begin()),
+        NumVert(),
+        InterpTri({old.halfedge_.get_cview(), old.halfedgeTangent_.get_cview(),
+                   old.vertPos_.get_cview()}));
   }
 
   halfedgeTangent_.resize(0);

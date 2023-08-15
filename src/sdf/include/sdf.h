@@ -126,8 +126,8 @@ struct GridVert {
 
 template <typename Func>
 struct ComputeVerts {
-  glm::vec3* vertPos;
-  int* vertIndex;
+  VecDHView<glm::vec3> vertPos;
+  VecDHView<int> vertIndex;
   HashTableD<GridVert, identity> gridVerts;
   const Func sdf;
   const glm::vec3 origin;
@@ -178,7 +178,7 @@ struct ComputeVerts {
       if ((val > 0) == (gridVert.distance > 0)) continue;
       keep = true;
 
-      const int idx = AtomicAdd(*vertIndex, 1);
+      const int idx = AtomicAdd(vertIndex[0], 1);
       vertPos[idx] =
           (val * position - gridVert.distance * Position(neighborIndex)) /
           (val - gridVert.distance);
@@ -190,13 +190,13 @@ struct ComputeVerts {
 };
 
 struct BuildTris {
-  glm::ivec3* triVerts;
-  int* triIndex;
+  VecDHView<glm::ivec3> triVerts;
+  VecDHView<int> triIndex;
   const HashTableD<GridVert, identity> gridVerts;
 
   void CreateTri(const glm::ivec3& tri, const int edges[6]) {
     if (tri[0] < 0) return;
-    int idx = AtomicAdd(*triIndex, 1);
+    int idx = AtomicAdd(triIndex[0], 1);
     triVerts[idx] = {edges[tri[0]], edges[tri[1]], edges[tri[2]]};
   }
 
@@ -339,8 +339,8 @@ inline Mesh LevelSet(Func sdf, Box bounds, float edgeLength, float level = 0,
     VecDH<int> index(1, 0);
     for_each_n_wrapper<Func>(
         pol, maxMorton + 1,
-        ComputeVerts<Func>({vertPos.ptrD(), index.ptrD(), gridVerts.D(), sdf,
-                            bounds.min, gridSize + 1, spacing, level}));
+        ComputeVerts<Func>({vertPos.get_view(), index.get_view(), gridVerts.D(),
+                            sdf, bounds.min, gridSize + 1, spacing, level}));
 
     if (gridVerts.Full()) {  // Resize HashTable
       const glm::vec3 lastVert = vertPos[index[0] - 1];
@@ -363,7 +363,7 @@ inline Mesh LevelSet(Func sdf, Box bounds, float edgeLength, float level = 0,
 
   VecDH<int> index(1, 0);
   for_each_n(pol, countAt(0), gridVerts.Size(),
-             BuildTris({triVerts.ptrD(), index.ptrD(), gridVerts.D()}));
+             BuildTris({triVerts.get_view(), index.get_view(), gridVerts.D()}));
   triVerts.resize(index[0]);
 
   out.vertPos.insert(out.vertPos.end(), vertPos.begin(), vertPos.end());

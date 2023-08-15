@@ -30,6 +30,91 @@ namespace manifold {
 /** @addtogroup Private
  *  @{
  */
+template <typename T>
+class VecDH;
+
+/**
+ * View for VecDH, can perform offset operation.
+ * This will be invalidated when the original vector is dropped or changes
+ * length.
+ */
+template <typename T>
+class VecDHView {
+ public:
+  using Iter = T *;
+  using IterC = const T *;
+
+  VecDHView(const VecDHView &other) {
+    ptr_ = other.ptr_;
+    size_ = other.size_;
+  }
+
+  VecDHView &operator=(const VecDHView &other) {
+    ptr_ = other.ptr_;
+    size_ = other.size_;
+    return *this;
+  }
+
+  // allows conversion to a const VecDHView
+  operator VecDHView<const T>() const { return {ptr_, size_}; }
+
+  inline const T &operator[](int i) const {
+    if (i < 0 || i >= size_) throw std::out_of_range("VecDH out of range");
+    return ptr_[i];
+  }
+
+  inline T &operator[](int i) {
+    if (i < 0 || i >= size_) throw std::out_of_range("VecDH out of range");
+    return ptr_[i];
+  }
+
+  IterC cbegin() const { return ptr_; }
+  IterC cend() const { return ptr_ + size_; }
+
+  IterC begin() const { return cbegin(); }
+  IterC end() const { return cend(); }
+
+  Iter begin() { return ptr_; }
+  Iter end() { return ptr_ + size_; }
+
+  const T &front() const {
+    if (size_ == 0)
+      throw std::out_of_range("attempt to take the front of an empty vector");
+    return ptr_[0];
+  }
+
+  const T &back() const {
+    if (size_ == 0)
+      throw std::out_of_range("attempt to take the back of an empty vector");
+    return ptr_[size_ - 1];
+  }
+
+  T &front() {
+    if (size_ == 0)
+      throw std::out_of_range("attempt to take the front of an empty vector");
+    return ptr_[0];
+  }
+
+  T &back() {
+    if (size_ == 0)
+      throw std::out_of_range("attempt to take the back of an empty vector");
+    return ptr_[size_ - 1];
+  }
+
+  int size() const { return size_; }
+
+  bool empty() const { return size_ == 0; }
+
+ protected:
+  T *ptr_ = nullptr;
+  int size_ = 0;
+
+  VecDHView() = default;
+  VecDHView(T *ptr_, int size_) : ptr_(ptr_), size_(size_) {}
+  friend class VecDH<T>;
+  friend class VecDH<typename std::remove_const<T>::type>;
+  friend class VecDHView<typename std::remove_const<T>::type>;
+};
 
 /*
  * Specialized vector implementation with multithreaded fill and uninitialized
@@ -40,11 +125,8 @@ namespace manifold {
  * constructor/destructor, please keep T trivial.
  */
 template <typename T>
-class VecDH {
+class VecDH : public VecDHView<T> {
  public:
-  using Iter = T *;
-  using IterC = const T *;
-
   VecDH() {}
 
   // Note that the vector constructed with this constructor will contain
@@ -52,147 +134,105 @@ class VecDH {
   // the data is initialized.
   VecDH(int size) {
     reserve(size);
-    size_ = size;
+    this->size_ = size;
   }
 
   VecDH(int size, T val) { resize(size, val); }
 
-  VecDH(const std::vector<T> &vec) {
-    size_ = vec.size();
-    capacity_ = size_;
-    auto policy = autoPolicy(size_);
-    if (size_ != 0) {
-      ptr_ = reinterpret_cast<T *>(malloc(size_ * sizeof(T)));
-      if (ptr_ == nullptr) throw std::bad_alloc();
+  VecDH(const VecDH<T> &vec) {
+    this->size_ = vec.size();
+    this->capacity_ = this->size_;
+    auto policy = autoPolicy(this->size_);
+    if (this->size_ != 0) {
+      this->ptr_ = reinterpret_cast<T *>(malloc(this->size_ * sizeof(T)));
+      if (this->ptr_ == nullptr) throw std::bad_alloc();
       TracyAllocS(ptr_, size_ * sizeof(T), 3);
-      uninitialized_copy(policy, vec.begin(), vec.end(), ptr_);
+      uninitialized_copy(policy, vec.begin(), vec.end(), this->ptr_);
     }
   }
 
-  VecDH(const VecDH<T> &vec) {
-    size_ = vec.size_;
-    capacity_ = size_;
-    auto policy = autoPolicy(size_);
-    if (size_ != 0) {
-      ptr_ = reinterpret_cast<T *>(malloc(size_ * sizeof(T)));
-      if (ptr_ == nullptr) throw std::bad_alloc();
+  VecDH(const std::vector<T> &vec) {
+    this->size_ = vec.size();
+    this->capacity_ = this->size_;
+    auto policy = autoPolicy(this->size_);
+    if (this->size_ != 0) {
+      this->ptr_ = reinterpret_cast<T *>(malloc(this->size_ * sizeof(T)));
+      if (this->ptr_ == nullptr) throw std::bad_alloc();
       TracyAllocS(ptr_, size_ * sizeof(T), 3);
-      uninitialized_copy(policy, vec.begin(), vec.end(), ptr_);
+      uninitialized_copy(policy, vec.begin(), vec.end(), this->ptr_);
     }
   }
 
   VecDH(VecDH<T> &&vec) {
-    ptr_ = vec.ptr_;
-    size_ = vec.size_;
+    this->ptr_ = vec.ptr_;
+    this->size_ = vec.size_;
     capacity_ = vec.capacity_;
     vec.ptr_ = nullptr;
     vec.size_ = 0;
     vec.capacity_ = 0;
   }
 
+  operator VecDHView<T>() { return {this->ptr_, this->size_}; }
+  operator VecDHView<const T>() const { return {this->ptr_, this->size_}; }
+
   ~VecDH() {
-    if (ptr_ != nullptr) {
+    if (this->ptr_ != nullptr) {
       TracyFreeS(ptr_, 3);
-      free(ptr_);
+      free(this->ptr_);
     }
-    ptr_ = nullptr;
-    size_ = 0;
+    this->ptr_ = nullptr;
+    this->size_ = 0;
     capacity_ = 0;
   }
 
   VecDH<T> &operator=(const VecDH<T> &other) {
     if (&other == this) return *this;
-    if (ptr_ != nullptr) {
-      TracyFreeS(ptr_, 3);
-      free(ptr_);
+    if (this->ptr_ != nullptr) {
+      TracyFreeS(this->ptr_, 3);
+      free(this->ptr_);
     }
-    size_ = other.size_;
+    this->size_ = other.size_;
     capacity_ = other.size_;
-    auto policy = autoPolicy(size_);
-    if (size_ != 0) {
-      ptr_ = reinterpret_cast<T *>(malloc(size_ * sizeof(T)));
-      if (ptr_ == nullptr) throw std::bad_alloc();
+    auto policy = autoPolicy(this->size_);
+    if (this->size_ != 0) {
+      this->ptr_ = reinterpret_cast<T *>(malloc(this->size_ * sizeof(T)));
+      if (this->ptr_ == nullptr) throw std::bad_alloc();
       TracyAllocS(ptr_, size_ * sizeof(T), 3);
-      uninitialized_copy(policy, other.begin(), other.end(), ptr_);
+      uninitialized_copy(policy, other.begin(), other.end(), this->ptr_);
     }
     return *this;
   }
 
   VecDH<T> &operator=(VecDH<T> &&other) {
     if (&other == this) return *this;
-    if (ptr_ != nullptr) {
+    if (this->ptr_ != nullptr) {
       TracyFreeS(ptr_, 3);
-      free(ptr_);
+      free(this->ptr_);
     }
-    size_ = other.size_;
+    this->size_ = other.size_;
     capacity_ = other.capacity_;
-    ptr_ = other.ptr_;
+    this->ptr_ = other.ptr_;
     other.ptr_ = nullptr;
     other.size_ = 0;
     other.capacity_ = 0;
     return *this;
   }
 
-  int size() const { return size_; }
-
   void swap(VecDH<T> &other) {
-    std::swap(ptr_, other.ptr_);
-    std::swap(size_, other.size_);
+    std::swap(this->ptr_, other.ptr_);
+    std::swap(this->size_, other.size_);
     std::swap(capacity_, other.capacity_);
   }
 
-  Iter begin() { return ptr_; }
-
-  Iter end() { return ptr_ + size_; }
-
-  IterC cbegin() const { return ptr_; }
-
-  IterC cend() const { return ptr_ + size_; }
-
-  IterC begin() const { return cbegin(); }
-  IterC end() const { return cend(); }
-
-  T *ptrD() { return ptr_; }
-
-  const T *cptrD() const { return ptr_; }
-
-  const T *ptrD() const { return cptrD(); }
-
-  T *ptrH() { return ptr_; }
-
-  const T *cptrH() const { return ptr_; }
-
-  const T *ptrH() const { return cptrH(); }
-
-  inline T &operator[](int i) {
-    if (i < 0 || i >= size_) throw std::out_of_range("VecDH out of range");
-    return ptr_[i];
-  }
-
-  inline const T &operator[](int i) const {
-    if (i < 0 || i >= size_) throw std::out_of_range("VecDH out of range");
-    return ptr_[i];
-  }
-
-  T &back() {
-    if (size_ == 0) throw std::out_of_range("VecDH out of range");
-    return ptr_[size_ - 1];
-  }
-
-  const T &back() const {
-    if (size_ == 0) throw std::out_of_range("VecDH out of range");
-    return ptr_[size_ - 1];
-  }
-
   inline void push_back(const T &val) {
-    if (size_ >= capacity_) {
+    if (this->size_ >= capacity_) {
       // avoid dangling pointer in case val is a reference of our array
       T val_copy = val;
       reserve(capacity_ == 0 ? 128 : capacity_ * 2);
-      ptr_[size_++] = val_copy;
+      this->ptr_[this->size_++] = val_copy;
       return;
     }
-    ptr_[size_++] = val;
+    this->ptr_[this->size_++] = val;
   }
 
   void reserve(int n) {
@@ -200,84 +240,80 @@ class VecDH {
       T *newBuffer = reinterpret_cast<T *>(malloc(n * sizeof(T)));
       if (newBuffer == nullptr) throw std::bad_alloc();
       TracyAllocS(newBuffer, n * sizeof(T), 3);
-      if (size_ > 0)
-        uninitialized_copy(autoPolicy(size_), ptr_, ptr_ + size_, newBuffer);
-      if (ptr_ != nullptr) {
+      if (this->size_ > 0)
+        uninitialized_copy(autoPolicy(this->size_), this->ptr_,
+                           this->ptr_ + this->size_, newBuffer);
+      if (this->ptr_ != nullptr) {
         TracyFreeS(ptr_, 3);
-        free(ptr_);
+        free(this->ptr_);
       }
-      ptr_ = newBuffer;
+      this->ptr_ = newBuffer;
       capacity_ = n;
     }
   }
 
   void resize(int newSize, T val = T()) {
-    bool shrink = size_ > 2 * newSize;
+    bool shrink = this->size_ > 2 * newSize;
     reserve(newSize);
-    if (size_ < newSize) {
-      uninitialized_fill(autoPolicy(newSize - size_), ptr_ + size_,
-                         ptr_ + newSize, val);
+    if (this->size_ < newSize) {
+      uninitialized_fill(autoPolicy(newSize - this->size_),
+                         this->ptr_ + this->size_, this->ptr_ + newSize, val);
     }
-    size_ = newSize;
+    this->size_ = newSize;
     if (shrink) shrink_to_fit();
   }
 
   void shrink_to_fit() {
     T *newBuffer = nullptr;
-    if (size_ > 0) {
-      newBuffer = reinterpret_cast<T *>(malloc(size_ * sizeof(T)));
+    if (this->size_ > 0) {
+      newBuffer = reinterpret_cast<T *>(malloc(this->size_ * sizeof(T)));
       if (newBuffer == nullptr) throw std::bad_alloc();
       TracyAllocS(newBuffer, size_ * sizeof(T), 3);
-      uninitialized_copy(autoPolicy(size_), ptr_, ptr_ + size_, newBuffer);
-      if (ptr_ != nullptr) {
+      uninitialized_copy(autoPolicy(this->size_), this->ptr_,
+                         this->ptr_ + this->size_, newBuffer);
+      if (this->ptr_ != nullptr) {
         TracyFreeS(ptr_, 3);
-        free(ptr_);
+        free(this->ptr_);
       }
     }
-    ptr_ = newBuffer;
-    capacity_ = size_;
+    this->ptr_ = newBuffer;
+    capacity_ = this->size_;
   }
 
-#ifdef MANIFOLD_DEBUG
-  void Dump() const {
-    std::cout << "VecDH = " << std::endl;
-    for (int i = 0; i < size_; ++i) {
-      std::cout << i << ", " << ptr_[i] << ", " << std::endl;
+  VecDHView<T> get_view(int offset = 0, int length = -1) {
+    if (length == -1) {
+      length = this->size_ - offset;
+      if (length < 0) throw std::out_of_range("VecDH::get_view out of range");
+    } else if (offset + length > this->size_ || offset < 0) {
+      throw std::out_of_range("VecDH::get_view out of range");
+    } else if (length < 0) {
+      throw std::out_of_range("VecDH::get_view negative length is not allowed");
     }
-    std::cout << std::endl;
+    return VecDHView<T>(this->ptr_ + offset, length);
   }
-#endif
+
+  VecDHView<const T> get_cview(int offset = 0, int length = -1) const {
+    if (length == -1) {
+      length = this->size_ - offset;
+      if (length < 0) throw std::out_of_range("VecDH::get_cview out of range");
+    } else if (offset + length > this->size_ || offset < 0) {
+      throw std::out_of_range("VecDH::get_cview out of range");
+    } else if (length < 0) {
+      throw std::out_of_range(
+          "VecDH::get_cview negative length is not allowed");
+    }
+    return VecDHView<const T>(this->ptr_ + offset, length);
+  }
+
+  VecDHView<const T> get_view(int offset = 0, int length = -1) const {
+    return get_cview(offset, length);
+  }
+
+  T *data() { return this->ptr_; }
+  const T *data() const { return this->ptr_; }
 
  private:
-  int size_ = 0;
   int capacity_ = 0;
-  T *ptr_ = nullptr;
-};
-
-template <typename T>
-class VecDc {
- public:
-  VecDc(const VecDH<T> &vec) : ptr_(vec.ptrD()), size_(vec.size()) {}
-
-  __host__ __device__ const T &operator[](int i) const { return ptr_[i]; }
-  __host__ __device__ int size() const { return size_; }
-
- private:
-  T const *const ptr_;
-  const int size_;
-};
-
-template <typename T>
-class VecD {
- public:
-  VecD(VecDH<T> &vec) : ptr_(vec.ptrD()), size_(vec.size()) {}
-
-  __host__ __device__ T &operator[](int i) const { return ptr_[i]; }
-  __host__ __device__ int size() const { return size_; }
-
- private:
-  T *ptr_;
-  int size_;
 };
 /** @} */
 }  // namespace manifold

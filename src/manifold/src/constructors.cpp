@@ -40,8 +40,8 @@ struct Equals {
 };
 
 struct RemoveFace {
-  const Halfedge* halfedge;
-  const int* vertLabel;
+  VecDHView<const Halfedge> halfedge;
+  VecDHView<const int> vertLabel;
   const int keepLabel;
 
   bool operator()(int face) {
@@ -504,11 +504,11 @@ std::vector<Manifold> Manifold::Decompose() const {
     VecDH<int> faceNew2Old(NumTri());
     sequence(policy, faceNew2Old.begin(), faceNew2Old.end());
 
-    int nFace =
-        remove_if<decltype(faceNew2Old.begin())>(
-            policy, faceNew2Old.begin(), faceNew2Old.end(),
-            RemoveFace({pImpl_->halfedge_.cptrD(), vertLabel.cptrD(), i})) -
-        faceNew2Old.begin();
+    int nFace = remove_if<decltype(faceNew2Old.begin())>(
+                    policy, faceNew2Old.begin(), faceNew2Old.end(),
+                    RemoveFace({pImpl_->halfedge_.get_cview(),
+                                vertLabel.get_cview(), i})) -
+                faceNew2Old.begin();
     faceNew2Old.resize(nFace);
 
     impl->GatherFaces(*pImpl_, faceNew2Old);

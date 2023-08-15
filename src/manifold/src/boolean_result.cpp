@@ -49,7 +49,7 @@ struct AbsSum : public thrust::binary_function<int, int, int> {
 };
 
 struct DuplicateVerts {
-  glm::vec3 *vertPosR;
+  VecDHView<glm::vec3> vertPosR;
 
   void operator()(thrust::tuple<int, int, glm::vec3> in) {
     int inclusion = abs(thrust::get<0>(in));
@@ -63,8 +63,8 @@ struct DuplicateVerts {
 };
 
 struct CountVerts {
-  int *count;
-  const int *inclusion;
+  VecDHView<int> count;
+  VecDHView<const int> inclusion;
 
   void operator()(const Halfedge &edge) {
     AtomicAdd(count[edge.face], glm::abs(inclusion[edge.startVert]));
@@ -73,10 +73,10 @@ struct CountVerts {
 
 template <const bool inverted>
 struct CountNewVerts {
-  int *countP;
-  int *countQ;
+  VecDHView<int> countP;
+  VecDHView<int> countQ;
   const SparseIndices &pq;
-  const Halfedge *halfedges;
+  VecDHView<const Halfedge> halfedges;
 
   void operator()(thrust::tuple<int, int> in) {
     int edgeP = pq.Get(thrust::get<0>(in), inverted);
@@ -100,19 +100,19 @@ std::tuple<VecDH<int>, VecDH<int>> SizeOutput(
     const VecDH<int> &i21, const SparseIndices &p1q2, const SparseIndices &p2q1,
     bool invertQ, ExecutionPolicy policy) {
   VecDH<int> sidesPerFacePQ(inP.NumTri() + inQ.NumTri(), 0);
-  auto sidesPerFaceP = sidesPerFacePQ.ptrD();
-  auto sidesPerFaceQ = sidesPerFacePQ.ptrD() + inP.NumTri();
+  auto sidesPerFaceP = sidesPerFacePQ.get_view(0, inP.NumTri());
+  auto sidesPerFaceQ = sidesPerFacePQ.get_view(inP.NumTri(), inQ.NumTri());
 
   for_each(policy, inP.halfedge_.begin(), inP.halfedge_.end(),
-           CountVerts({sidesPerFaceP, i03.cptrD()}));
+           CountVerts({sidesPerFaceP, i03.get_cview()}));
   for_each(policy, inQ.halfedge_.begin(), inQ.halfedge_.end(),
-           CountVerts({sidesPerFaceQ, i30.cptrD()}));
+           CountVerts({sidesPerFaceQ, i30.get_cview()}));
   for_each_n(policy, zip(countAt(0), i12.begin()), i12.size(),
-             CountNewVerts<false>(
-                 {sidesPerFaceP, sidesPerFaceQ, p1q2, inP.halfedge_.cptrD()}));
+             CountNewVerts<false>({sidesPerFaceP, sidesPerFaceQ, p1q2,
+                                   inP.halfedge_.get_cview()}));
   for_each_n(policy, zip(countAt(0), i21.begin()), i21.size(),
-             CountNewVerts<true>(
-                 {sidesPerFaceQ, sidesPerFaceP, p2q1, inQ.halfedge_.cptrD()}));
+             CountNewVerts<true>({sidesPerFaceQ, sidesPerFaceP, p2q1,
+                                  inQ.halfedge_.get_cview()}));
 
   VecDH<int> facePQ2R(inP.NumTri() + inQ.NumTri() + 1, 0);
   auto keepFace =
@@ -383,13 +383,13 @@ void AppendNewEdges(
 }
 
 struct DuplicateHalfedges {
-  Halfedge *halfedgesR;
-  TriRef *halfedgeRef;
-  int *facePtr;
-  const Halfedge *halfedgesP;
-  const int *i03;
-  const int *vP2R;
-  const int *faceP2R;
+  VecDHView<Halfedge> halfedgesR;
+  VecDHView<TriRef> halfedgeRef;
+  VecDHView<int> facePtr;
+  VecDHView<const Halfedge> halfedgesP;
+  VecDHView<const int> i03;
+  VecDHView<const int> vP2R;
+  VecDHView<const int> faceP2R;
   const bool forward;
 
   void operator()(thrust::tuple<bool, Halfedge, int> in) {
@@ -437,19 +437,20 @@ struct DuplicateHalfedges {
 void AppendWholeEdges(Manifold::Impl &outR, VecDH<int> &facePtrR,
                       VecDH<TriRef> &halfedgeRef, const Manifold::Impl &inP,
                       const VecDH<char> wholeHalfedgeP, const VecDH<int> &i03,
-                      const VecDH<int> &vP2R, const int *faceP2R, bool forward,
-                      ExecutionPolicy policy) {
+                      const VecDH<int> &vP2R, VecDHView<const int> faceP2R,
+                      bool forward, ExecutionPolicy policy) {
   for_each_n(policy,
              zip(wholeHalfedgeP.begin(), inP.halfedge_.begin(), countAt(0)),
              inP.halfedge_.size(),
-             DuplicateHalfedges({outR.halfedge_.ptrD(), halfedgeRef.ptrD(),
-                                 facePtrR.ptrD(), inP.halfedge_.cptrD(),
-                                 i03.cptrD(), vP2R.cptrD(), faceP2R, forward}));
+             DuplicateHalfedges({outR.halfedge_.get_view(),
+                                 halfedgeRef.get_view(), facePtrR.get_view(),
+                                 inP.halfedge_.get_cview(), i03.get_cview(),
+                                 vP2R.get_cview(), faceP2R, forward}));
 }
 
 struct MapTriRef {
-  const TriRef *triRefP;
-  const TriRef *triRefQ;
+  VecDHView<const TriRef> triRefP;
+  VecDHView<const TriRef> triRefQ;
   const int offsetQ;
 
   void operator()(TriRef &triRef) {
@@ -466,8 +467,8 @@ VecDH<TriRef> UpdateReference(Manifold::Impl &outR, const Manifold::Impl &inP,
   VecDH<TriRef> refPQ = outR.meshRelation_.triRef;
   const int offsetQ = Manifold::Impl::meshIDCounter_;
   for_each_n(policy, outR.meshRelation_.triRef.begin(), outR.NumTri(),
-             MapTriRef({inP.meshRelation_.triRef.cptrD(),
-                        inQ.meshRelation_.triRef.cptrD(), offsetQ}));
+             MapTriRef({inP.meshRelation_.triRef.get_cview(),
+                        inQ.meshRelation_.triRef.get_cview(), offsetQ}));
 
   for (const auto &pair : inP.meshRelation_.meshIDtransform) {
     outR.meshRelation_.meshIDtransform[pair.first] = pair.second;
@@ -481,13 +482,13 @@ VecDH<TriRef> UpdateReference(Manifold::Impl &outR, const Manifold::Impl &inP,
 }
 
 struct Barycentric {
-  glm::vec3 *uvw;
-  const glm::vec3 *vertPosP;
-  const glm::vec3 *vertPosQ;
-  const glm::vec3 *vertPosR;
-  const Halfedge *halfedgeP;
-  const Halfedge *halfedgeQ;
-  const Halfedge *halfedgeR;
+  VecDHView<glm::vec3> uvw;
+  VecDHView<const glm::vec3> vertPosP;
+  VecDHView<const glm::vec3> vertPosQ;
+  VecDHView<const glm::vec3> vertPosR;
+  VecDHView<const Halfedge> halfedgeP;
+  VecDHView<const Halfedge> halfedgeQ;
+  VecDHView<const Halfedge> halfedgeR;
   const float precision;
 
   void operator()(thrust::tuple<int, TriRef> in) {
@@ -525,10 +526,10 @@ void CreateProperties(Manifold::Impl &outR, const VecDH<TriRef> &refPQ,
 
   VecDH<glm::vec3> bary(outR.halfedge_.size());
   for_each_n(policy, zip(countAt(0), refPQ.cbegin()), numTri,
-             Barycentric({bary.ptrD(), inP.vertPos_.cptrD(),
-                          inQ.vertPos_.cptrD(), outR.vertPos_.cptrD(),
-                          inP.halfedge_.cptrD(), inQ.halfedge_.cptrD(),
-                          outR.halfedge_.cptrD(), outR.precision_}));
+             Barycentric({bary.get_view(), inP.vertPos_.get_cview(),
+                          inQ.vertPos_.get_cview(), outR.vertPos_.get_cview(),
+                          inP.halfedge_.get_cview(), inQ.halfedge_.get_cview(),
+                          outR.halfedge_.get_cview(), outR.precision_}));
 
   using Entry = std::pair<glm::ivec3, int>;
   int idMissProp = outR.NumVert();
@@ -680,14 +681,14 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   // Add vertices, duplicating for inclusion numbers not in [-1, 1].
   // Retained vertices from P and Q:
   for_each_n(policy_, zip(i03.begin(), vP2R.begin(), inP_.vertPos_.begin()),
-             inP_.NumVert(), DuplicateVerts({outR.vertPos_.ptrD()}));
+             inP_.NumVert(), DuplicateVerts({outR.vertPos_.get_view()}));
   for_each_n(policy_, zip(i30.begin(), vQ2R.begin(), inQ_.vertPos_.begin()),
-             inQ_.NumVert(), DuplicateVerts({outR.vertPos_.ptrD()}));
+             inQ_.NumVert(), DuplicateVerts({outR.vertPos_.get_view()}));
   // New vertices created from intersections:
   for_each_n(policy_, zip(i12.begin(), v12R.begin(), v12_.begin()), i12.size(),
-             DuplicateVerts({outR.vertPos_.ptrD()}));
+             DuplicateVerts({outR.vertPos_.get_view()}));
   for_each_n(policy_, zip(i21.begin(), v21R.begin(), v21_.begin()), i21.size(),
-             DuplicateVerts({outR.vertPos_.ptrD()}));
+             DuplicateVerts({outR.vertPos_.get_view()}));
 
   PRINT(nPv << " verts from inP");
   PRINT(nQv << " verts from inQ");
@@ -734,9 +735,10 @@ Manifold::Impl Boolean3::Result(OpType op) const {
                  inP_.NumTri());
 
   AppendWholeEdges(outR, facePtrR, halfedgeRef, inP_, wholeHalfedgeP, i03, vP2R,
-                   facePQ2R.cptrD(), true, policy_);
+                   facePQ2R.get_cview(0, inP_.NumTri()), true, policy_);
   AppendWholeEdges(outR, facePtrR, halfedgeRef, inQ_, wholeHalfedgeQ, i30, vQ2R,
-                   facePQ2R.cptrD() + inP_.NumTri(), false, policy_);
+                   facePQ2R.get_cview(inP_.NumTri(), inQ_.NumTri()), false,
+                   policy_);
 
 #ifdef MANIFOLD_DEBUG
   assemble.Stop();

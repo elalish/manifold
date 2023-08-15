@@ -54,9 +54,9 @@ struct Transform4x3 {
 };
 
 struct AssignNormals {
-  glm::vec3* vertNormal;
-  const glm::vec3* vertPos;
-  const Halfedge* halfedges;
+  VecDHView<glm::vec3> vertNormal;
+  VecDHView<const glm::vec3> vertPos;
+  VecDHView<const Halfedge> halfedges;
   const float precision;
   const bool calculateTriNormal;
 
@@ -94,8 +94,8 @@ struct AssignNormals {
 };
 
 struct Tri2Halfedges {
-  Halfedge* halfedges;
-  glm::uint64_t* edges;
+  VecDHView<Halfedge> halfedges;
+  VecDHView<glm::uint64_t> edges;
 
   void operator()(thrust::tuple<int, const glm::ivec3&> in) {
     const int tri = thrust::get<0>(in);
@@ -114,8 +114,8 @@ struct Tri2Halfedges {
 };
 
 struct LinkHalfedges {
-  Halfedge* halfedges;
-  const int* ids;
+  VecDHView<Halfedge> halfedges;
+  VecDHView<const int> ids;
   const int numEdge;
 
   void operator()(int i) {
@@ -127,18 +127,18 @@ struct LinkHalfedges {
 };
 
 struct MarkVerts {
-  int* vert;
+  VecDHView<int> vert;
 
   void operator()(glm::ivec3 triVerts) {
     for (int i : {0, 1, 2}) {
-      reinterpret_cast<std::atomic<int>*>(vert)[triVerts[i]].store(
-          1, std::memory_order_relaxed);
+      reinterpret_cast<std::atomic<int>*>(&vert[triVerts[i]])
+          ->store(1, std::memory_order_relaxed);
     }
   }
 };
 
 struct ReindexTriVerts {
-  const int* old2new;
+  VecDHView<const int> old2new;
 
   void operator()(glm::ivec3& triVerts) {
     for (int i : {0, 1, 2}) {
@@ -149,7 +149,7 @@ struct ReindexTriVerts {
 
 struct InitializeTriRef {
   const int meshID;
-  const Halfedge* halfedge;
+  VecDHView<const Halfedge> halfedge;
 
   void operator()(thrust::tuple<TriRef&, int> inOut) {
     TriRef& baryRef = thrust::get<0>(inOut);
@@ -168,13 +168,13 @@ struct UpdateMeshID {
 };
 
 struct CoplanarEdge {
-  float* triArea;
-  const Halfedge* halfedge;
-  const glm::vec3* vertPos;
-  const TriRef* triRef;
-  const glm::ivec3* triProp;
-  const float* prop;
-  const float* propTol;
+  VecDHView<float> triArea;
+  VecDHView<const Halfedge> halfedge;
+  VecDHView<const glm::vec3> vertPos;
+  VecDHView<const TriRef> triRef;
+  VecDHView<const glm::ivec3> triProp;
+  VecDHView<const float> prop;
+  VecDHView<const float> propTol;
   const int numProp;
   const float precision;
 
@@ -271,10 +271,10 @@ struct CoplanarEdge {
 };
 
 struct CheckCoplanarity {
-  int* comp2tri;
-  const Halfedge* halfedge;
-  const glm::vec3* vertPos;
-  const int* components;
+  VecDHView<int> comp2tri;
+  VecDHView<const Halfedge> halfedge;
+  VecDHView<const glm::vec3> vertPos;
+  VecDHView<const int> components;
   const float precision;
 
   void operator()(int tri) {
@@ -293,8 +293,8 @@ struct CheckCoplanarity {
       // triangle, unmark the entire component so that none of its triangles are
       // marked coplanar.
       if (glm::abs(glm::dot(normal, vert - origin)) > precision) {
-        reinterpret_cast<std::atomic<int>*>(comp2tri)[component].store(
-            -1, std::memory_order_relaxed);
+        reinterpret_cast<std::atomic<int>*>(&comp2tri[component])
+            ->store(-1, std::memory_order_relaxed);
         break;
       }
     }
@@ -302,7 +302,7 @@ struct CheckCoplanarity {
 };
 
 struct EdgeBox {
-  const glm::vec3* vertPos;
+  VecDHView<const glm::vec3> vertPos;
 
   void operator()(thrust::tuple<Box&, const TmpEdge&> inout) {
     const TmpEdge& edge = thrust::get<1>(inout);
@@ -591,7 +591,7 @@ void Manifold::Impl::RemoveUnreferencedVerts(VecDH<glm::ivec3>& triVerts) {
   VecDH<int> vertOld2New(NumVert() + 1, 0);
   auto policy = autoPolicy(NumVert());
   for_each(policy, triVerts.cbegin(), triVerts.cend(),
-           MarkVerts({vertOld2New.ptrD() + 1}));
+           MarkVerts({vertOld2New.get_view(1)}));
 
   const VecDH<glm::vec3> oldVertPos = vertPos_;
   vertPos_.resize(copy_if<decltype(vertPos_.begin())>(
@@ -604,7 +604,7 @@ void Manifold::Impl::RemoveUnreferencedVerts(VecDH<glm::ivec3>& triVerts) {
                  vertOld2New.begin() + 1);
 
   for_each(policy, triVerts.begin(), triVerts.end(),
-           ReindexTriVerts({vertOld2New.cptrD()}));
+           ReindexTriVerts({vertOld2New.get_cview()}));
 }
 
 void Manifold::Impl::InitializeOriginal() {
@@ -614,7 +614,7 @@ void Manifold::Impl::InitializeOriginal() {
   meshRelation_.triRef.resize(NumTri());
   for_each_n(autoPolicy(NumTri()),
              zip(meshRelation_.triRef.begin(), countAt(0)), NumTri(),
-             InitializeTriRef({meshID, halfedge_.cptrD()}));
+             InitializeTriRef({meshID, halfedge_.get_cview()}));
   meshRelation_.meshIDtransform.clear();
   meshRelation_.meshIDtransform[meshID] = {meshID};
 }
@@ -631,11 +631,12 @@ void Manifold::Impl::CreateFaces(const std::vector<float>& propertyTolerance) {
   for_each_n(
       autoPolicy(halfedge_.size()),
       zip(face2face.begin(), vert2vert.begin(), countAt(0)), halfedge_.size(),
-      CoplanarEdge(
-          {triArea.ptrD(), halfedge_.cptrD(), vertPos_.cptrD(),
-           meshRelation_.triRef.cptrD(), meshRelation_.triProperties.cptrD(),
-           meshRelation_.properties.cptrD(), propertyToleranceD.cptrD(),
-           meshRelation_.numProp, precision_}));
+      CoplanarEdge({triArea.get_view(), halfedge_.get_cview(),
+                    vertPos_.get_cview(), meshRelation_.triRef.get_cview(),
+                    meshRelation_.triProperties.get_cview(),
+                    meshRelation_.properties.get_cview(),
+                    propertyToleranceD.get_cview(), meshRelation_.numProp,
+                    precision_}));
 
   if (meshRelation_.triProperties.size() > 0) {
     DedupePropVerts(meshRelation_.triProperties, vert2vert);
@@ -656,10 +657,10 @@ void Manifold::Impl::CreateFaces(const std::vector<float>& propertyTolerance) {
 
   VecDH<int> componentsD(components);
   VecDH<int> comp2triD(comp2tri);
-  for_each_n(
-      autoPolicy(halfedge_.size()), countAt(0), NumTri(),
-      CheckCoplanarity({comp2triD.ptrD(), halfedge_.cptrD(), vertPos_.cptrD(),
-                        componentsD.cptrD(), precision_}));
+  for_each_n(autoPolicy(halfedge_.size()), countAt(0), NumTri(),
+             CheckCoplanarity({comp2triD.get_view(), halfedge_.get_cview(),
+                               vertPos_.get_cview(), componentsD.get_cview(),
+                               precision_}));
 
   VecDH<TriRef>& triRef = meshRelation_.triRef;
   for (int tri = 0; tri < NumTri(); ++tri) {
@@ -684,7 +685,7 @@ void Manifold::Impl::CreateHalfedges(const VecDH<glm::ivec3>& triVerts) {
   auto policy = autoPolicy(numTri);
   sequence(policy, ids.begin(), ids.end());
   for_each_n(policy, zip(countAt(0), triVerts.begin()), numTri,
-             Tri2Halfedges({halfedge_.ptrD(), edge.ptrD()}));
+             Tri2Halfedges({halfedge_.get_view(), edge.get_view()}));
   // Stable sort is required here so that halfedges from the same face are
   // paired together (the triangles were created in face order). In some
   // degenerate situations the triangulator can add the same internal edge in
@@ -694,8 +695,9 @@ void Manifold::Impl::CreateHalfedges(const VecDH<glm::ivec3>& triVerts) {
   // Once sorted, the first half of the range is the forward halfedges, which
   // correspond to their backward pair at the same offset in the second half
   // of the range.
-  for_each_n(policy, countAt(0), numHalfedge / 2,
-             LinkHalfedges({halfedge_.ptrD(), ids.ptrD(), numHalfedge / 2}));
+  for_each_n(
+      policy, countAt(0), numHalfedge / 2,
+      LinkHalfedges({halfedge_.get_view(), ids.get_view(), numHalfedge / 2}));
 }
 
 /**
@@ -768,16 +770,16 @@ Manifold::Impl Manifold::Impl::Transform(const glm::mat4x3& transform_) const {
   const bool invert = glm::determinant(glm::mat3(transform_)) < 0;
 
   if (halfedgeTangent_.size() > 0) {
-    for_each_n(
-        policy, zip(result.halfedgeTangent_.begin(), countAt(0)),
-        halfedgeTangent_.size(),
-        TransformTangents({glm::mat3(transform_), invert,
-                           halfedgeTangent_.cptrD(), halfedge_.cptrD()}));
+    for_each_n(policy, zip(result.halfedgeTangent_.begin(), countAt(0)),
+               halfedgeTangent_.size(),
+               TransformTangents({glm::mat3(transform_), invert,
+                                  halfedgeTangent_.get_cview(),
+                                  halfedge_.get_cview()}));
   }
 
   if (invert) {
     for_each_n(policy, zip(result.meshRelation_.triRef.begin(), countAt(0)),
-               result.NumTri(), FlipTris({result.halfedge_.ptrD()}));
+               result.NumTri(), FlipTris({result.halfedge_.get_view()}));
   }
 
   // This optimization does a cheap collider update if the transform is
@@ -826,8 +828,8 @@ void Manifold::Impl::CalculateNormals() {
   }
   for_each_n(
       policy, zip(faceNormal_.begin(), countAt(0)), NumTri(),
-      AssignNormals({vertNormal_.ptrD(), vertPos_.cptrD(), halfedge_.cptrD(),
-                     precision_, calculateTriNormal}));
+      AssignNormals({vertNormal_.get_view(), vertPos_.get_cview(),
+                     halfedge_.get_cview(), precision_, calculateTriNormal}));
   for_each(policy, vertNormal_.begin(), vertNormal_.end(), Normalize());
 }
 
@@ -864,20 +866,20 @@ SparseIndices Manifold::Impl::EdgeCollisions(const Impl& Q,
   VecDH<Box> QedgeBB(numEdge);
   auto policy = autoPolicy(numEdge);
   for_each_n(policy, zip(QedgeBB.begin(), edges.cbegin()), numEdge,
-             EdgeBox({Q.vertPos_.cptrD()}));
+             EdgeBox({Q.vertPos_.get_cview()}));
 
   SparseIndices q1p2(0);
   if (inverted)
-    q1p2 = collider_.Collisions<false, true>(QedgeBB);
+    q1p2 = collider_.Collisions<false, true>(QedgeBB.get_cview());
   else
-    q1p2 = collider_.Collisions<false, false>(QedgeBB);
+    q1p2 = collider_.Collisions<false, false>(QedgeBB.get_cview());
 
   if (inverted)
     for_each(policy, countAt(0), countAt(q1p2.size()),
-             ReindexEdge<true>({edges.cptrD(), q1p2}));
+             ReindexEdge<true>({edges.get_cview(), q1p2}));
   else
     for_each(policy, countAt(0), countAt(q1p2.size()),
-             ReindexEdge<false>({edges.cptrD(), q1p2}));
+             ReindexEdge<false>({edges.get_cview(), q1p2}));
   return q1p2;
 }
 
@@ -885,8 +887,8 @@ SparseIndices Manifold::Impl::EdgeCollisions(const Impl& Q,
  * Returns a sparse array of the input vertices that project inside the XY
  * bounding boxes of the faces of this manifold.
  */
-SparseIndices Manifold::Impl::VertexCollisionsZ(const VecDH<glm::vec3>& vertsIn,
-                                                bool inverted) const {
+SparseIndices Manifold::Impl::VertexCollisionsZ(
+    VecDHView<const glm::vec3> vertsIn, bool inverted) const {
   if (inverted)
     return collider_.Collisions<false, true>(vertsIn);
   else
