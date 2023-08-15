@@ -1,13 +1,14 @@
 #pragma once
-#include <manifold.h>
-#include <public.h>
-#include <sdf.h>
-#include <types.h>
-
+#include <cstring>
 #include <vector>
 
 #include "cross_section.h"
+#include "manifold.h"
+#include "public.h"
+#include "sdf.h"
+#include "types.h"
 
+using namespace manifold;
 using ManifoldVec = std::vector<Manifold>;
 using CrossSectionVec = std::vector<CrossSection>;
 

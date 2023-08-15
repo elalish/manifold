@@ -1,12 +1,11 @@
-#include <conv.h>
-#include <manifold.h>
-#include <sdf.h>
+#include "conv.h"
 
 #include <vector>
 
 #include "cross_section.h"
-#include "include/types.h"
+#include "manifold.h"
 #include "public.h"
+#include "sdf.h"
 #include "types.h"
 
 ManifoldManifold *to_c(manifold::Manifold *m) {

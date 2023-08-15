@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <QuickHull.hpp>
 #include <algorithm>
 #include <map>
 #include <numeric>
 
+#include "QuickHull.hpp"
 #include "boolean3.h"
 #include "csg_tree.h"
 #include "impl.h"
@@ -601,8 +601,7 @@ Manifold Manifold::SetProperties(
       }
       pImpl->meshRelation_.properties = Vec<float>(numProp * idx, 0);
     } else {
-      pImpl->meshRelation_.properties =
-          Vec<float>(numProp * NumPropVert(), 0);
+      pImpl->meshRelation_.properties = Vec<float>(numProp * NumPropVert(), 0);
     }
     thrust::for_each_n(
         thrust::host, countAt(0), NumTri(),

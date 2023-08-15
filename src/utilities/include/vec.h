@@ -15,7 +15,7 @@
 #pragma once
 #include <exception>
 #if TRACY_ENABLE && TRACY_MEMORY_USAGE
-#include <tracy/Tracy.hpp>
+#include "tracy/Tracy.hpp"
 #else
 #define TracyAllocS(ptr, size, n) (void)0
 #define TracyFreeS(ptr, n) (void)0
@@ -299,8 +299,7 @@ class Vec : public VecView<T> {
     } else if (offset + length > this->size_ || offset < 0) {
       throw std::out_of_range("Vec::get_cview out of range");
     } else if (length < 0) {
-      throw std::out_of_range(
-          "Vec::get_cview negative length is not allowed");
+      throw std::out_of_range("Vec::get_cview negative length is not allowed");
     }
     return VecView<const T>(this->ptr_ + offset, length);
   }

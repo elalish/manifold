@@ -24,7 +24,7 @@
 using namespace manifold;
 
 struct CubeVoid {
-  __host__ __device__ float operator()(glm::vec3 p) const {
+  float operator()(glm::vec3 p) const {
     const glm::vec3 min = p + glm::vec3(1);
     const glm::vec3 max = glm::vec3(1) - p;
     const float min3 = glm::min(min.x, glm::min(min.y, min.z));
@@ -34,7 +34,7 @@ struct CubeVoid {
 };
 
 struct Layers {
-  __host__ __device__ float operator()(glm::vec3 p) const {
+  float operator()(glm::vec3 p) const {
     int a = glm::mod(glm::round(2 * p.z), 4.0f);
     return a == 0 ? 1 : (a == 2 ? -1 : 0);
   }

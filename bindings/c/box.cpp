@@ -1,7 +1,6 @@
-#include <conv.h>
-#include <manifold.h>
-#include <public.h>
-
+#include "conv.h"
+#include "manifold.h"
+#include "public.h"
 #include "types.h"
 
 ManifoldBox *manifold_box(void *mem, float x1, float y1, float z1, float x2,

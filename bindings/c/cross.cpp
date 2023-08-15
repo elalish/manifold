@@ -1,10 +1,9 @@
-#include <conv.h>
-#include <manifold.h>
-#include <public.h>
-
 #include <vector>
 
+#include "conv.h"
 #include "cross_section.h"
+#include "manifold.h"
+#include "public.h"
 #include "types.h"
 
 ManifoldCrossSection *manifold_cross_section_empty(void *mem) {
