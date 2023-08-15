@@ -23,7 +23,8 @@ namespace manifold {
 class Collider {
  public:
   Collider() {}
-  Collider(const VecView<const Box>& leafBB, const VecView<const uint32_t>& leafMorton);
+  Collider(const VecView<const Box>& leafBB,
+           const VecView<const uint32_t>& leafMorton);
   bool Transform(glm::mat4x3);
   void UpdateBoxes(const VecView<const Box>& leafBB);
   template <const bool selfCollision = false, const bool inverted = false,

@@ -621,9 +621,8 @@ void Manifold::Impl::InitializeOriginal() {
 
 void Manifold::Impl::CreateFaces(const std::vector<float>& propertyTolerance) {
   Vec<float> propertyToleranceD =
-      propertyTolerance.empty()
-          ? Vec<float>(meshRelation_.numProp, kTolerance)
-          : propertyTolerance;
+      propertyTolerance.empty() ? Vec<float>(meshRelation_.numProp, kTolerance)
+                                : propertyTolerance;
 
   Vec<thrust::pair<int, int>> face2face(halfedge_.size(), {-1, -1});
   Vec<thrust::pair<int, int>> vert2vert(halfedge_.size(), {-1, -1});

@@ -337,8 +337,7 @@ void Manifold::Impl::SortVerts() {
  * vertNew2Old. This may be a subset, so the total number of original verts is
  * also given.
  */
-void Manifold::Impl::ReindexVerts(const Vec<int>& vertNew2Old,
-                                  int oldNumVert) {
+void Manifold::Impl::ReindexVerts(const Vec<int>& vertNew2Old, int oldNumVert) {
   Vec<int> vertOld2New(oldNumVert);
   scatter(autoPolicy(oldNumVert), countAt(0), countAt(NumVert()),
           vertNew2Old.begin(), vertOld2New.begin());
@@ -391,8 +390,7 @@ void Manifold::Impl::GetFaceBoxMorton(Vec<Box>& faceBox,
  * Sorts the faces of this manifold according to their input Morton code. The
  * bounding box and Morton code arrays are also sorted accordingly.
  */
-void Manifold::Impl::SortFaces(Vec<Box>& faceBox,
-                               Vec<uint32_t>& faceMorton) {
+void Manifold::Impl::SortFaces(Vec<Box>& faceBox, Vec<uint32_t>& faceMorton) {
   Vec<int> faceNew2Old(NumTri());
   auto policy = autoPolicy(faceNew2Old.size());
   sequence(policy, faceNew2Old.begin(), faceNew2Old.end());
@@ -442,8 +440,7 @@ void Manifold::Impl::GatherFaces(const Vec<int>& faceNew2Old) {
                    faceNew2Old.get_cview(), faceOld2New.get_cview()}));
 }
 
-void Manifold::Impl::GatherFaces(const Impl& old,
-                                 const Vec<int>& faceNew2Old) {
+void Manifold::Impl::GatherFaces(const Impl& old, const Vec<int>& faceNew2Old) {
   const int numTri = faceNew2Old.size();
   auto policy = autoPolicy(numTri);
 
@@ -555,8 +552,8 @@ bool MeshGL::Merge() {
   Vec<float> vertPropD(vertProperties);
   Box bBox;
   for (const int i : {0, 1, 2}) {
-    strided_range<Vec<float>::Iter> iPos(vertPropD.begin() + i,
-                                           vertPropD.end(), numProp);
+    strided_range<Vec<float>::Iter> iPos(vertPropD.begin() + i, vertPropD.end(),
+                                         numProp);
     auto minMax = transform_reduce<thrust::pair<float, float>>(
         autoPolicy(numVert), iPos.begin(), iPos.end(), Duplicate(),
         thrust::make_pair(std::numeric_limits<float>::infinity(),

@@ -395,8 +395,7 @@ bool Manifold::Impl::IsFinite() const {
  * Checks that the input triVerts array has all indices inside bounds of the
  * vertPos_ array.
  */
-bool Manifold::Impl::IsIndexInBounds(
-    VecView<const glm::ivec3> triVerts) const {
+bool Manifold::Impl::IsIndexInBounds(VecView<const glm::ivec3> triVerts) const {
   auto policy = autoPolicy(triVerts.size());
   glm::ivec2 minmax = transform_reduce<glm::ivec2>(
       policy, triVerts.begin(), triVerts.end(), MakeMinMax(),

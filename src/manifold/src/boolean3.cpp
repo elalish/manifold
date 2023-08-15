@@ -115,13 +115,10 @@ bool Shadows(float p, float q, float dir) { return p == q ? dir < 0 : p < q; }
  * compiled function (they must agree on CPU or GPU). This is now taken care of
  * by the shared policy_ member.
  */
-thrust::pair<int, glm::vec2> Shadow01(const int p0, const int q1,
-                                      VecView<const glm::vec3> vertPosP,
-                                      VecView<const glm::vec3> vertPosQ,
-                                      VecView<const Halfedge> halfedgeQ,
-                                      const float expandP,
-                                      VecView<const glm::vec3> normalP,
-                                      const bool reverse) {
+thrust::pair<int, glm::vec2> Shadow01(
+    const int p0, const int q1, VecView<const glm::vec3> vertPosP,
+    VecView<const glm::vec3> vertPosQ, VecView<const Halfedge> halfedgeQ,
+    const float expandP, VecView<const glm::vec3> normalP, const bool reverse) {
   const int q1s = halfedgeQ[q1].startVert;
   const int q1e = halfedgeQ[q1].endVert;
   const float p0x = vertPosP[p0].x;
@@ -272,10 +269,10 @@ struct Kernel11 {
 };
 
 std::tuple<Vec<int>, Vec<glm::vec4>> Shadow11(SparseIndices &p1q1,
-                                                  const Manifold::Impl &inP,
-                                                  const Manifold::Impl &inQ,
-                                                  float expandP,
-                                                  ExecutionPolicy policy) {
+                                              const Manifold::Impl &inP,
+                                              const Manifold::Impl &inQ,
+                                              float expandP,
+                                              ExecutionPolicy policy) {
   Vec<int> s11(p1q1.size());
   Vec<glm::vec4> xyzz11(p1q1.size());
 
@@ -367,10 +364,10 @@ struct Kernel02 {
 };
 
 std::tuple<Vec<int>, Vec<float>> Shadow02(const Manifold::Impl &inP,
-                                              const Manifold::Impl &inQ,
-                                              SparseIndices &p0q2, bool forward,
-                                              float expandP,
-                                              ExecutionPolicy policy) {
+                                          const Manifold::Impl &inQ,
+                                          SparseIndices &p0q2, bool forward,
+                                          float expandP,
+                                          ExecutionPolicy policy) {
   Vec<int> s02(p0q2.size());
   Vec<float> z02(p0q2.size());
 
@@ -479,8 +476,8 @@ struct Kernel12 {
 std::tuple<Vec<int>, Vec<glm::vec3>> Intersect12(
     const Manifold::Impl &inP, const Manifold::Impl &inQ, const Vec<int> &s02,
     const SparseIndices &p0q2, const Vec<int> &s11, const SparseIndices &p1q1,
-    const Vec<float> &z02, const Vec<glm::vec4> &xyzz11,
-    SparseIndices &p1q2, bool forward, ExecutionPolicy policy) {
+    const Vec<float> &z02, const Vec<glm::vec4> &xyzz11, SparseIndices &p1q2,
+    bool forward, ExecutionPolicy policy) {
   Vec<int> x12(p1q2.size());
   Vec<glm::vec3> v12(p1q2.size());
 
@@ -495,8 +492,8 @@ std::tuple<Vec<int>, Vec<glm::vec3>> Intersect12(
   return std::make_tuple(x12, v12);
 };
 
-Vec<int> Winding03(const Manifold::Impl &inP, Vec<int> &vertices,
-                     Vec<int> &s02, bool reverse, ExecutionPolicy policy) {
+Vec<int> Winding03(const Manifold::Impl &inP, Vec<int> &vertices, Vec<int> &s02,
+                   bool reverse, ExecutionPolicy policy) {
   // verts that are not shadowed (not in p0q2) have winding number zero.
   Vec<int> w03(inP.NumVert(), 0);
   // checking is slow, so just sort and reduce

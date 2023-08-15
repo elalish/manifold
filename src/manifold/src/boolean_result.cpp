@@ -332,8 +332,7 @@ void AppendPartialEdges(Manifold::Impl &outR, Vec<char> &wholeHalfedgeP,
 void AppendNewEdges(
     Manifold::Impl &outR, Vec<int> &facePtrR,
     concurrent_map<std::pair<int, int>, std::vector<EdgePos>> &edgesNew,
-    Vec<TriRef> &halfedgeRef, const Vec<int> &facePQ2R,
-    const int numFaceP) {
+    Vec<TriRef> &halfedgeRef, const Vec<int> &facePQ2R, const int numFaceP) {
   // Pair up each edge's verts and distribute to faces based on indices in key.
   Vec<Halfedge> &halfedgeR = outR.halfedge_;
   Vec<glm::vec3> &vertPosR = outR.vertPos_;
@@ -462,8 +461,8 @@ struct MapTriRef {
 };
 
 Vec<TriRef> UpdateReference(Manifold::Impl &outR, const Manifold::Impl &inP,
-                              const Manifold::Impl &inQ, bool invertQ,
-                              ExecutionPolicy policy) {
+                            const Manifold::Impl &inQ, bool invertQ,
+                            ExecutionPolicy policy) {
   Vec<TriRef> refPQ = outR.meshRelation_.triRef;
   const int offsetQ = Manifold::Impl::meshIDCounter_;
   for_each_n(policy, outR.meshRelation_.triRef.begin(), outR.NumTri(),
