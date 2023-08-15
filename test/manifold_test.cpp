@@ -14,6 +14,8 @@
 
 #include "manifold.h"
 
+#include <algorithm>
+
 #include "cross_section.h"
 #include "test.h"
 
