@@ -170,7 +170,7 @@ Mesh Manifold::GetMesh() const {
   result.triVerts.resize(NumTri());
   // note that `triVerts` is `std::vector`, so we cannot use thrust::device
   thrust::for_each_n(thrust::host, zip(result.triVerts.begin(), countAt(0)),
-                     NumTri(), MakeTri({impl.halfedge_.get_cview()}));
+                     NumTri(), MakeTri({impl.halfedge_}));
 
   return result;
 }
@@ -218,7 +218,7 @@ MeshGL Manifold::GetMeshGL(glm::ivec3 normalIdx) const {
   out.faceID.resize(numTri);
   std::vector<int> triNew2Old(numTri);
   std::iota(triNew2Old.begin(), triNew2Old.end(), 0);
-  VecView<const TriRef> triRef = impl.meshRelation_.triRef.get_cview();
+  VecView<const TriRef> triRef = impl.meshRelation_.triRef;
   // Don't sort originals - keep them in order
   if (!isOriginal) {
     std::sort(triNew2Old.begin(), triNew2Old.end(), [triRef](int a, int b) {

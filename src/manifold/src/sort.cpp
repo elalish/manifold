@@ -342,7 +342,7 @@ void Manifold::Impl::ReindexVerts(const Vec<int>& vertNew2Old, int oldNumVert) {
   scatter(autoPolicy(oldNumVert), countAt(0), countAt(NumVert()),
           vertNew2Old.begin(), vertOld2New.begin());
   for_each(autoPolicy(oldNumVert), halfedge_.begin(), halfedge_.end(),
-           Reindex({vertOld2New.get_cview()}));
+           Reindex({vertOld2New}));
 }
 
 /**
@@ -356,19 +356,18 @@ void Manifold::Impl::CompactProps() {
   auto policy = autoPolicy(numVerts);
 
   for_each(policy, meshRelation_.triProperties.cbegin(),
-           meshRelation_.triProperties.cend(), MarkProp({keep.get_view()}));
+           meshRelation_.triProperties.cend(), MarkProp({keep}));
   Vec<int> propOld2New(numVerts + 1, 0);
   inclusive_scan(policy, keep.begin(), keep.end(), propOld2New.begin() + 1);
 
   Vec<float> oldProp = meshRelation_.properties;
   const int numVertsNew = propOld2New[numVerts];
   meshRelation_.properties.resize(meshRelation_.numProp * numVertsNew);
-  for_each_n(policy, zip(countAt(0), propOld2New.cbegin(), keep.cbegin()),
-             numVerts,
-             GatherProps({meshRelation_.properties.get_view(),
-                          oldProp.get_cview(), meshRelation_.numProp}));
+  for_each_n(
+      policy, zip(countAt(0), propOld2New.cbegin(), keep.cbegin()), numVerts,
+      GatherProps({meshRelation_.properties, oldProp, meshRelation_.numProp}));
   for_each_n(policy, meshRelation_.triProperties.begin(), NumTri(),
-             ReindexProps({propOld2New.get_cview()}));
+             ReindexProps({propOld2New}));
 }
 
 /**
@@ -380,10 +379,9 @@ void Manifold::Impl::GetFaceBoxMorton(Vec<Box>& faceBox,
                                       Vec<uint32_t>& faceMorton) const {
   faceBox.resize(NumTri());
   faceMorton.resize(NumTri());
-  for_each_n(
-      autoPolicy(NumTri()),
-      zip(faceMorton.begin(), faceBox.begin(), countAt(0)), NumTri(),
-      FaceMortonBox({halfedge_.get_cview(), vertPos_.get_cview(), bBox_}));
+  for_each_n(autoPolicy(NumTri()),
+             zip(faceMorton.begin(), faceBox.begin(), countAt(0)), NumTri(),
+             FaceMortonBox({halfedge_, vertPos_, bBox_}));
 }
 
 /**
@@ -433,11 +431,9 @@ void Manifold::Impl::GatherFaces(const Vec<int>& faceNew2Old) {
 
   halfedge_.resize(3 * numTri);
   if (oldHalfedgeTangent.size() != 0) halfedgeTangent_.resize(3 * numTri);
-  for_each_n(
-      policy, countAt(0), numTri,
-      ReindexFace({halfedge_.get_view(), halfedgeTangent_.get_view(),
-                   oldHalfedge.get_cview(), oldHalfedgeTangent.get_cview(),
-                   faceNew2Old.get_cview(), faceOld2New.get_cview()}));
+  for_each_n(policy, countAt(0), numTri,
+             ReindexFace({halfedge_, halfedgeTangent_, oldHalfedge,
+                          oldHalfedgeTangent, faceNew2Old, faceOld2New}));
 }
 
 void Manifold::Impl::GatherFaces(const Impl& old, const Vec<int>& faceNew2Old) {
@@ -472,11 +468,9 @@ void Manifold::Impl::GatherFaces(const Impl& old, const Vec<int>& faceNew2Old) {
 
   halfedge_.resize(3 * numTri);
   if (old.halfedgeTangent_.size() != 0) halfedgeTangent_.resize(3 * numTri);
-  for_each_n(
-      policy, countAt(0), numTri,
-      ReindexFace({halfedge_.get_view(), halfedgeTangent_.get_view(),
-                   old.halfedge_.get_cview(), old.halfedgeTangent_.get_cview(),
-                   faceNew2Old.get_cview(), faceOld2New.get_cview()}));
+  for_each_n(policy, countAt(0), numTri,
+             ReindexFace({halfedge_, halfedgeTangent_, old.halfedge_,
+                          old.halfedgeTangent_, faceNew2Old, faceOld2New}));
 }
 
 /// Constructs a position-only MeshGL from the input Mesh.
@@ -571,14 +565,13 @@ bool MeshGL::Merge() {
 
   for_each_n(policy,
              zip(vertMorton.begin(), vertBox.begin(), openVerts.cbegin()),
-             numOpenVert,
-             VertMortonBox({vertPropD.get_cview(), numProp, precision, bBox}));
+             numOpenVert, VertMortonBox({vertPropD, numProp, precision, bBox}));
 
   sort_by_key(policy, vertMorton.begin(), vertMorton.end(),
               zip(vertBox.begin(), openVerts.begin()));
 
   Collider collider(vertBox, vertMorton);
-  SparseIndices toMerge = collider.Collisions<true>(vertBox.get_cview());
+  SparseIndices toMerge = collider.Collisions<true>(vertBox.cview());
 
   Graph graph;
   for (int i = 0; i < numVert; ++i) {

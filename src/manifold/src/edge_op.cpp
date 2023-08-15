@@ -178,7 +178,7 @@ void Manifold::Impl::SimplifyTopology() {
   scratchBuffer.reserve(10);
   {
     numFlagged = 0;
-    ShortEdge se{halfedge_.get_cview(), vertPos_.get_cview(), precision_};
+    ShortEdge se{halfedge_, vertPos_, precision_};
     for_each_n(policy, countAt(0), nbEdges, [&](int i) { bflags[i] = se(i); });
     for (int i = 0; i < nbEdges; ++i) {
       if (bflags[i]) {
@@ -198,7 +198,7 @@ void Manifold::Impl::SimplifyTopology() {
 
   {
     numFlagged = 0;
-    FlagEdge se{halfedge_.get_cview(), meshRelation_.triRef.get_cview()};
+    FlagEdge se{halfedge_, meshRelation_.triRef};
     for_each_n(policy, countAt(0), nbEdges, [&](int i) { bflags[i] = se(i); });
     for (int i = 0; i < nbEdges; ++i) {
       if (bflags[i]) {
@@ -218,8 +218,7 @@ void Manifold::Impl::SimplifyTopology() {
 
   {
     numFlagged = 0;
-    SwappableEdge se{halfedge_.get_cview(), vertPos_.get_cview(),
-                     faceNormal_.get_cview(), precision_};
+    SwappableEdge se{halfedge_, vertPos_, faceNormal_, precision_};
     for_each_n(policy, countAt(0), nbEdges, [&](int i) { bflags[i] = se(i); });
     std::vector<int> edgeSwapStack;
     std::vector<int> visited(halfedge_.size(), -1);

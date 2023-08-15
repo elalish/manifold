@@ -325,8 +325,7 @@ void Manifold::Impl::CreateTangents(
 
   for_each_n(autoPolicy(numHalfedge),
              zip(halfedgeTangent_.begin(), halfedge_.cbegin()), numHalfedge,
-             SmoothBezier({vertPos_.get_cview(), faceNormal_.get_cview(),
-                           vertNormal_.get_cview(), halfedge_.get_cview()}));
+             SmoothBezier({vertPos_, faceNormal_, vertNormal_, halfedge_}));
 
   if (!sharpenedEdges.empty()) {
     const Vec<TriRef>& triRef = meshRelation_.triRef;
@@ -445,17 +444,16 @@ Vec<Barycentric> Manifold::Impl::Subdivide(int n) {
   Vec<int> half2Edge(2 * numEdge);
   auto policy = autoPolicy(numEdge);
   for_each_n(policy, zip(countAt(0), edges.begin()), numEdge,
-             ReindexHalfedge({half2Edge.get_view()}));
+             ReindexHalfedge({half2Edge}));
   for_each_n(policy, zip(countAt(0), edges.begin()), numEdge,
-             EdgeVerts({vertPos_.get_view(), vertBary.get_view(), numVert, n}));
+             EdgeVerts({vertPos_, vertBary, numVert, n}));
   for_each_n(policy, countAt(0), numTri,
-             InteriorVerts({vertPos_.get_view(), vertBary.get_view(),
-                            triVertStart, n, halfedge_.get_cview()}));
+             InteriorVerts({vertPos_, vertBary, triVertStart, n, halfedge_}));
   // Create sub-triangles
   Vec<glm::ivec3> triVerts(n * n * numTri);
-  for_each_n(policy, countAt(0), numTri,
-             SplitTris({triVerts.get_view(), halfedge_.get_view(),
-                        half2Edge.get_cview(), numVert, triVertStart, n}));
+  for_each_n(
+      policy, countAt(0), numTri,
+      SplitTris({triVerts, halfedge_, half2Edge, numVert, triVertStart, n}));
   CreateHalfedges(triVerts);
   // Make original since the subdivided faces are intended to be warped into
   // being non-coplanar, and hence not being related to the original faces.
@@ -479,11 +477,9 @@ void Manifold::Impl::Refine(int n) {
   if (vertBary.size() == 0) return;
 
   if (old.halfedgeTangent_.size() == old.halfedge_.size()) {
-    for_each_n(
-        autoPolicy(NumTri()), zip(vertPos_.begin(), vertBary.begin()),
-        NumVert(),
-        InterpTri({old.halfedge_.get_cview(), old.halfedgeTangent_.get_cview(),
-                   old.vertPos_.get_cview()}));
+    for_each_n(autoPolicy(NumTri()), zip(vertPos_.begin(), vertBary.begin()),
+               NumVert(),
+               InterpTri({old.halfedge_, old.halfedgeTangent_, old.vertPos_}));
   }
 
   halfedgeTangent_.resize(0);

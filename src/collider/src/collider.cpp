@@ -285,8 +285,8 @@ Collider::Collider(const VecView<const Box>& leafBB,
   internalChildren_.resize(leafBB.size() - 1, thrust::make_pair(-1, -1));
   // organize tree
   for_each_n(autoPolicy(NumInternal()), countAt(0), NumInternal(),
-             CreateRadixTree({nodeParent_.get_view(),
-                              internalChildren_.get_view(), leafMorton}));
+             CreateRadixTree({nodeParent_,
+                              internalChildren_, leafMorton}));
   UpdateBoxes(leafBB);
 }
 
@@ -308,7 +308,7 @@ SparseIndices Collider::Collisions(const VecView<const T>& queriesIn) const {
         ExecutionPolicy::Seq, zip(queriesIn.cbegin(), countAt(0)),
         queriesIn.size(),
         FindCollisions<T, selfCollision, SeqCollisionRecorder<inverted>>{
-            nodeBBox_.get_view(), internalChildren_.get_view(), {queryTri}});
+            nodeBBox_, internalChildren_, {queryTri}});
     return queryTri;
   } else {
     // compute the number of collisions to determine the size for allocation and
@@ -318,9 +318,9 @@ SparseIndices Collider::Collisions(const VecView<const T>& queriesIn) const {
     for_each_n(ExecutionPolicy::Par, zip(queriesIn.cbegin(), countAt(0)),
                queriesIn.size(),
                FindCollisions<T, selfCollision, CountCollisions>{
-                   nodeBBox_.get_view(),
-                   internalChildren_.get_view(),
-                   {counts.get_view(), empty.get_view()}});
+                   nodeBBox_,
+                   internalChildren_,
+                   {counts, empty}});
     // compute start index for each query and total count
     exclusive_scan(ExecutionPolicy::Par, counts.begin(), counts.end(),
                    counts.begin(), 0, std::plus<int>());
@@ -330,9 +330,9 @@ SparseIndices Collider::Collisions(const VecView<const T>& queriesIn) const {
     for_each_n(ExecutionPolicy::Par, zip(queriesIn.cbegin(), countAt(0)),
                queriesIn.size(),
                FindCollisions<T, selfCollision, ParCollisionRecorder<inverted>>{
-                   nodeBBox_.get_view(),
-                   internalChildren_.get_view(),
-                   {queryTri, counts.get_view(), empty.get_view()}});
+                   nodeBBox_,
+                   internalChildren_,
+                   {queryTri, counts, empty}});
     return queryTri;
   }
 }
@@ -352,9 +352,9 @@ void Collider::UpdateBoxes(const VecView<const Box>& leafBB) {
   Vec<int> counter(NumInternal(), 0);
   // kernel over leaves to save internal Boxes
   for_each_n(policy, countAt(0), NumLeaves(),
-             BuildInternalBoxes({nodeBBox_.get_view(), counter.get_view(),
-                                 nodeParent_.get_view(),
-                                 internalChildren_.get_view()}));
+             BuildInternalBoxes({nodeBBox_, counter,
+                                 nodeParent_,
+                                 internalChildren_}));
 }
 
 /**

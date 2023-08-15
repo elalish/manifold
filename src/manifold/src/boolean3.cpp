@@ -95,9 +95,9 @@ SparseIndices Filter11(const Manifold::Impl &inP, const Manifold::Impl &inQ,
                        ExecutionPolicy policy) {
   SparseIndices p1q1(3 * p1q2.size() + 3 * p2q1.size());
   for_each_n(policy, zip(countAt(0), countAt(0)), p1q2.size(),
-             CopyFaceEdges<false>({p1q2, p1q1, inQ.halfedge_.get_cview()}));
+             CopyFaceEdges<false>({p1q2, p1q1, inQ.halfedge_}));
   for_each_n(policy, zip(countAt(p1q2.size()), countAt(0)), p2q1.size(),
-             CopyFaceEdges<true>({p2q1, p1q1, inP.halfedge_.get_cview()}));
+             CopyFaceEdges<true>({p2q1, p1q1, inP.halfedge_}));
   p1q1.Unique(policy);
   return p1q1;
 }
@@ -277,9 +277,8 @@ std::tuple<Vec<int>, Vec<glm::vec4>> Shadow11(SparseIndices &p1q1,
   Vec<glm::vec4> xyzz11(p1q1.size());
 
   for_each_n(policy, zip(countAt(0), xyzz11.begin(), s11.begin()), p1q1.size(),
-             Kernel11({inP.vertPos_.get_cview(), inQ.vertPos_.get_cview(),
-                       inP.halfedge_.get_cview(), inQ.halfedge_.get_cview(),
-                       expandP, inP.vertNormal_.get_cview(), p1q1}));
+             Kernel11({inP.vertPos_, inQ.vertPos_, inP.halfedge_, inQ.halfedge_,
+                       expandP, inP.vertNormal_, p1q1}));
 
   p1q1.KeepFinite(xyzz11, s11);
 
@@ -371,12 +370,10 @@ std::tuple<Vec<int>, Vec<float>> Shadow02(const Manifold::Impl &inP,
   Vec<int> s02(p0q2.size());
   Vec<float> z02(p0q2.size());
 
-  auto vertNormalP =
-      forward ? inP.vertNormal_.get_cview() : inQ.vertNormal_.get_cview();
+  auto vertNormalP = forward ? inP.vertNormal_ : inQ.vertNormal_;
   for_each_n(policy, zip(countAt(0), s02.begin(), z02.begin()), p0q2.size(),
-             Kernel02({inP.vertPos_.get_cview(), inQ.halfedge_.get_cview(),
-                       inQ.vertPos_.get_cview(), forward, expandP, vertNormalP,
-                       p0q2}));
+             Kernel02({inP.vertPos_, inQ.halfedge_, inQ.vertPos_, forward,
+                       expandP, vertNormalP, p0q2}));
 
   p0q2.KeepFinite(z02, s02);
 
@@ -481,11 +478,10 @@ std::tuple<Vec<int>, Vec<glm::vec3>> Intersect12(
   Vec<int> x12(p1q2.size());
   Vec<glm::vec3> v12(p1q2.size());
 
-  for_each_n(policy, zip(countAt(0), x12.begin(), v12.begin()), p1q2.size(),
-             Kernel12({p0q2.AsVec64(), s02.get_view(), z02.get_cview(),
-                       p1q1.AsVec64(), s11.get_view(), xyzz11.get_cview(),
-                       inP.halfedge_.get_cview(), inQ.halfedge_.get_cview(),
-                       inP.vertPos_.get_cview(), forward, p1q2}));
+  for_each_n(
+      policy, zip(countAt(0), x12.begin(), v12.begin()), p1q2.size(),
+      Kernel12({p0q2.AsVec64(), s02, z02, p1q1.AsVec64(), s11, xyzz11,
+                inP.halfedge_, inQ.halfedge_, inP.vertPos_, forward, p1q2}));
 
   p1q2.KeepFinite(v12, x12);
 
@@ -551,12 +547,11 @@ Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ,
 
   // Level 2
   // Find vertices that overlap faces in XY-projection
-  SparseIndices p0q2 = inQ.VertexCollisionsZ(inP.vertPos_.get_cview());
+  SparseIndices p0q2 = inQ.VertexCollisionsZ(inP.vertPos_);
   p0q2.Sort(policy_);
   PRINT("p0q2 size = " << p0q2.size());
 
-  SparseIndices p2q0 =
-      inP.VertexCollisionsZ(inQ.vertPos_.get_cview(), true);  // inverted
+  SparseIndices p2q0 = inP.VertexCollisionsZ(inQ.vertPos_, true);  // inverted
   p2q0.Sort(policy_);
   PRINT("p2q0 size = " << p2q0.size());
 

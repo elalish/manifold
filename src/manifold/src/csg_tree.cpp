@@ -270,20 +270,18 @@ Manifold::Impl CsgLeafNode::Compose(
                  combined.faceNormal_.begin() + triIndices[i]);
 
           const bool invert = glm::determinant(glm::mat3(node->transform_)) < 0;
-          for_each_n(
-              policy,
-              zip(combined.halfedgeTangent_.begin() + edgeIndices[i],
-                  countAt(0)),
-              node->pImpl_->halfedgeTangent_.size(),
-              TransformTangents{glm::mat3(node->transform_), invert,
-                                node->pImpl_->halfedgeTangent_.get_cview(),
-                                node->pImpl_->halfedge_.get_cview()});
+          for_each_n(policy,
+                     zip(combined.halfedgeTangent_.begin() + edgeIndices[i],
+                         countAt(0)),
+                     node->pImpl_->halfedgeTangent_.size(),
+                     TransformTangents{glm::mat3(node->transform_), invert,
+                                       node->pImpl_->halfedgeTangent_,
+                                       node->pImpl_->halfedge_});
           if (invert)
             for_each_n(policy,
                        zip(combined.meshRelation_.triRef.begin(),
                            countAt(triIndices[i])),
-                       node->pImpl_->NumTri(),
-                       FlipTris({combined.halfedge_.get_view()}));
+                       node->pImpl_->NumTri(), FlipTris({combined.halfedge_}));
         }
         // Since the nodes may be copies containing the same meshIDs, it is
         // important to add an offset so that each node instance gets
@@ -547,7 +545,7 @@ void CsgOpNode::BatchUnion() const {
       auto lambda = [&boxes, i](const Vec<size_t> &set) {
         return find_if<decltype(set.end())>(
                    autoPolicy(set.size()), set.begin(), set.end(),
-                   CheckOverlap({boxes.get_cview(), i})) == set.end();
+                   CheckOverlap({boxes, i})) == set.end();
       };
       auto it = std::find_if(disjointSets.begin(), disjointSets.end(), lambda);
       if (it == disjointSets.end()) {

@@ -506,8 +506,7 @@ std::vector<Manifold> Manifold::Decompose() const {
 
     int nFace = remove_if<decltype(faceNew2Old.begin())>(
                     policy, faceNew2Old.begin(), faceNew2Old.end(),
-                    RemoveFace({pImpl_->halfedge_.get_cview(),
-                                vertLabel.get_cview(), i})) -
+                    RemoveFace({pImpl_->halfedge_, vertLabel, i})) -
                 faceNew2Old.begin();
     faceNew2Old.resize(nFace);
 

@@ -276,7 +276,7 @@ bool Manifold::Impl::IsManifold() const {
   auto policy = autoPolicy(halfedge_.size());
 
   return all_of(policy, countAt(0), countAt(halfedge_.size()),
-                CheckHalfedges({halfedge_.get_cview()}));
+                CheckHalfedges({halfedge_}));
 }
 
 /**
@@ -293,7 +293,7 @@ bool Manifold::Impl::Is2Manifold() const {
   sort(policy, halfedge.begin(), halfedge.end());
 
   return all_of(policy, countAt(0), countAt(2 * NumEdge() - 1),
-                NoDuplicates({halfedge.get_cview()}));
+                NoDuplicates({halfedge}));
 }
 
 /**
@@ -302,8 +302,7 @@ bool Manifold::Impl::Is2Manifold() const {
 bool Manifold::Impl::MatchesTriNormals() const {
   if (halfedge_.size() == 0 || faceNormal_.size() != NumTri()) return true;
   return all_of(autoPolicy(NumTri()), countAt(0), countAt(NumTri()),
-                CheckCCW({halfedge_.get_cview(), vertPos_.get_cview(),
-                          faceNormal_.get_cview(), 2 * precision_}));
+                CheckCCW({halfedge_, vertPos_, faceNormal_, 2 * precision_}));
 }
 
 /**
@@ -311,16 +310,16 @@ bool Manifold::Impl::MatchesTriNormals() const {
  */
 int Manifold::Impl::NumDegenerateTris() const {
   if (halfedge_.size() == 0 || faceNormal_.size() != NumTri()) return true;
-  return count_if(autoPolicy(NumTri()), countAt(0), countAt(NumTri()),
-                  CheckCCW({halfedge_.get_cview(), vertPos_.get_cview(),
-                            faceNormal_.get_cview(), -1 * precision_ / 2}));
+  return count_if(
+      autoPolicy(NumTri()), countAt(0), countAt(NumTri()),
+      CheckCCW({halfedge_, vertPos_, faceNormal_, -1 * precision_ / 2}));
 }
 
 Properties Manifold::Impl::GetProperties() const {
   if (IsEmpty()) return {0, 0};
   auto areaVolume = transform_reduce<thrust::pair<float, float>>(
       autoPolicy(NumTri()), countAt(0), countAt(NumTri()),
-      FaceAreaVolume({halfedge_.get_cview(), vertPos_.get_cview(), precision_}),
+      FaceAreaVolume({halfedge_, vertPos_, precision_}),
       thrust::make_pair(0.0f, 0.0f), SumPair());
   return {areaVolume.first, areaVolume.second};
 }
@@ -334,10 +333,8 @@ void Manifold::Impl::CalculateCurvature(int gaussianIdx, int meanIdx) {
   Vec<float> degree(NumVert(), 0);
   auto policy = autoPolicy(NumTri());
   for_each(policy, countAt(0), countAt(NumTri()),
-           CurvatureAngles(
-               {vertMeanCurvature.get_view(), vertGaussianCurvature.get_view(),
-                vertArea.get_view(), degree.get_view(), halfedge_.get_cview(),
-                vertPos_.get_cview(), faceNormal_.get_cview()}));
+           CurvatureAngles({vertMeanCurvature, vertGaussianCurvature, vertArea,
+                            degree, halfedge_, vertPos_, faceNormal_}));
   for_each_n(policy,
              zip(vertMeanCurvature.begin(), vertGaussianCurvature.begin(),
                  vertArea.begin(), degree.begin()),
@@ -352,13 +349,11 @@ void Manifold::Impl::CalculateCurvature(int gaussianIdx, int meanIdx) {
     meshRelation_.triProperties.resize(NumTri());
   }
 
-  for_each_n(policy, zip(meshRelation_.triProperties.begin(), countAt(0)),
-             NumTri(),
-             UpdateProperties({meshRelation_.properties.get_view(),
-                               oldProperties.get_cview(), halfedge_.get_cview(),
-                               vertMeanCurvature.get_cview(),
-                               vertGaussianCurvature.get_cview(), oldNumProp,
-                               numProp, gaussianIdx, meanIdx}));
+  for_each_n(
+      policy, zip(meshRelation_.triProperties.begin(), countAt(0)), NumTri(),
+      UpdateProperties({meshRelation_.properties, oldProperties, halfedge_,
+                        vertMeanCurvature, vertGaussianCurvature, oldNumProp,
+                        numProp, gaussianIdx, meanIdx}));
 
   CreateFaces();
   SimplifyTopology();

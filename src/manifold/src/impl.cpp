@@ -591,7 +591,7 @@ void Manifold::Impl::RemoveUnreferencedVerts(Vec<glm::ivec3>& triVerts) {
   Vec<int> vertOld2New(NumVert() + 1, 0);
   auto policy = autoPolicy(NumVert());
   for_each(policy, triVerts.cbegin(), triVerts.cend(),
-           MarkVerts({vertOld2New.get_view(1)}));
+           MarkVerts({vertOld2New.view(1)}));
 
   const Vec<glm::vec3> oldVertPos = vertPos_;
   vertPos_.resize(copy_if<decltype(vertPos_.begin())>(
@@ -604,7 +604,7 @@ void Manifold::Impl::RemoveUnreferencedVerts(Vec<glm::ivec3>& triVerts) {
                  vertOld2New.begin() + 1);
 
   for_each(policy, triVerts.begin(), triVerts.end(),
-           ReindexTriVerts({vertOld2New.get_cview()}));
+           ReindexTriVerts({vertOld2New}));
 }
 
 void Manifold::Impl::InitializeOriginal() {
@@ -614,7 +614,7 @@ void Manifold::Impl::InitializeOriginal() {
   meshRelation_.triRef.resize(NumTri());
   for_each_n(autoPolicy(NumTri()),
              zip(meshRelation_.triRef.begin(), countAt(0)), NumTri(),
-             InitializeTriRef({meshID, halfedge_.get_cview()}));
+             InitializeTriRef({meshID, halfedge_}));
   meshRelation_.meshIDtransform.clear();
   meshRelation_.meshIDtransform[meshID] = {meshID};
 }
@@ -630,12 +630,9 @@ void Manifold::Impl::CreateFaces(const std::vector<float>& propertyTolerance) {
   for_each_n(
       autoPolicy(halfedge_.size()),
       zip(face2face.begin(), vert2vert.begin(), countAt(0)), halfedge_.size(),
-      CoplanarEdge({triArea.get_view(), halfedge_.get_cview(),
-                    vertPos_.get_cview(), meshRelation_.triRef.get_cview(),
-                    meshRelation_.triProperties.get_cview(),
-                    meshRelation_.properties.get_cview(),
-                    propertyToleranceD.get_cview(), meshRelation_.numProp,
-                    precision_}));
+      CoplanarEdge({triArea, halfedge_, vertPos_, meshRelation_.triRef,
+                    meshRelation_.triProperties, meshRelation_.properties,
+                    propertyToleranceD, meshRelation_.numProp, precision_}));
 
   if (meshRelation_.triProperties.size() > 0) {
     DedupePropVerts(meshRelation_.triProperties, vert2vert);
@@ -657,9 +654,8 @@ void Manifold::Impl::CreateFaces(const std::vector<float>& propertyTolerance) {
   Vec<int> componentsD(components);
   Vec<int> comp2triD(comp2tri);
   for_each_n(autoPolicy(halfedge_.size()), countAt(0), NumTri(),
-             CheckCoplanarity({comp2triD.get_view(), halfedge_.get_cview(),
-                               vertPos_.get_cview(), componentsD.get_cview(),
-                               precision_}));
+             CheckCoplanarity(
+                 {comp2triD, halfedge_, vertPos_, componentsD, precision_}));
 
   Vec<TriRef>& triRef = meshRelation_.triRef;
   for (int tri = 0; tri < NumTri(); ++tri) {
@@ -684,7 +680,7 @@ void Manifold::Impl::CreateHalfedges(const Vec<glm::ivec3>& triVerts) {
   auto policy = autoPolicy(numTri);
   sequence(policy, ids.begin(), ids.end());
   for_each_n(policy, zip(countAt(0), triVerts.begin()), numTri,
-             Tri2Halfedges({halfedge_.get_view(), edge.get_view()}));
+             Tri2Halfedges({halfedge_, edge}));
   // Stable sort is required here so that halfedges from the same face are
   // paired together (the triangles were created in face order). In some
   // degenerate situations the triangulator can add the same internal edge in
@@ -694,9 +690,8 @@ void Manifold::Impl::CreateHalfedges(const Vec<glm::ivec3>& triVerts) {
   // Once sorted, the first half of the range is the forward halfedges, which
   // correspond to their backward pair at the same offset in the second half
   // of the range.
-  for_each_n(
-      policy, countAt(0), numHalfedge / 2,
-      LinkHalfedges({halfedge_.get_view(), ids.get_view(), numHalfedge / 2}));
+  for_each_n(policy, countAt(0), numHalfedge / 2,
+             LinkHalfedges({halfedge_, ids, numHalfedge / 2}));
 }
 
 /**
@@ -772,13 +767,12 @@ Manifold::Impl Manifold::Impl::Transform(const glm::mat4x3& transform_) const {
     for_each_n(policy, zip(result.halfedgeTangent_.begin(), countAt(0)),
                halfedgeTangent_.size(),
                TransformTangents({glm::mat3(transform_), invert,
-                                  halfedgeTangent_.get_cview(),
-                                  halfedge_.get_cview()}));
+                                  halfedgeTangent_, halfedge_}));
   }
 
   if (invert) {
     for_each_n(policy, zip(result.meshRelation_.triRef.begin(), countAt(0)),
-               result.NumTri(), FlipTris({result.halfedge_.get_view()}));
+               result.NumTri(), FlipTris({result.halfedge_}));
   }
 
   // This optimization does a cheap collider update if the transform is
@@ -825,10 +819,9 @@ void Manifold::Impl::CalculateNormals() {
     faceNormal_.resize(NumTri());
     calculateTriNormal = true;
   }
-  for_each_n(
-      policy, zip(faceNormal_.begin(), countAt(0)), NumTri(),
-      AssignNormals({vertNormal_.get_view(), vertPos_.get_cview(),
-                     halfedge_.get_cview(), precision_, calculateTriNormal}));
+  for_each_n(policy, zip(faceNormal_.begin(), countAt(0)), NumTri(),
+             AssignNormals({vertNormal_, vertPos_, halfedge_, precision_,
+                            calculateTriNormal}));
   for_each(policy, vertNormal_.begin(), vertNormal_.end(), Normalize());
 }
 
@@ -865,20 +858,20 @@ SparseIndices Manifold::Impl::EdgeCollisions(const Impl& Q,
   Vec<Box> QedgeBB(numEdge);
   auto policy = autoPolicy(numEdge);
   for_each_n(policy, zip(QedgeBB.begin(), edges.cbegin()), numEdge,
-             EdgeBox({Q.vertPos_.get_cview()}));
+             EdgeBox({Q.vertPos_}));
 
   SparseIndices q1p2(0);
   if (inverted)
-    q1p2 = collider_.Collisions<false, true>(QedgeBB.get_cview());
+    q1p2 = collider_.Collisions<false, true>(QedgeBB.cview());
   else
-    q1p2 = collider_.Collisions<false, false>(QedgeBB.get_cview());
+    q1p2 = collider_.Collisions<false, false>(QedgeBB.cview());
 
   if (inverted)
     for_each(policy, countAt(0), countAt(q1p2.size()),
-             ReindexEdge<true>({edges.get_cview(), q1p2}));
+             ReindexEdge<true>({edges, q1p2}));
   else
     for_each(policy, countAt(0), countAt(q1p2.size()),
-             ReindexEdge<false>({edges.get_cview(), q1p2}));
+             ReindexEdge<false>({edges, q1p2}));
   return q1p2;
 }
 

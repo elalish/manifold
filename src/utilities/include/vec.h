@@ -218,6 +218,8 @@ class Vec : public VecView<T> {
     return *this;
   }
 
+  operator VecView<T>() const { return {this->ptr_, this->size_}; }
+
   void swap(Vec<T> &other) {
     std::swap(this->ptr_, other.ptr_);
     std::swap(this->size_, other.size_);
@@ -280,32 +282,32 @@ class Vec : public VecView<T> {
     capacity_ = this->size_;
   }
 
-  VecView<T> get_view(int offset = 0, int length = -1) {
+  VecView<T> view(int offset = 0, int length = -1) {
     if (length == -1) {
       length = this->size_ - offset;
-      if (length < 0) throw std::out_of_range("Vec::get_view out of range");
+      if (length < 0) throw std::out_of_range("Vec::view out of range");
     } else if (offset + length > this->size_ || offset < 0) {
-      throw std::out_of_range("Vec::get_view out of range");
+      throw std::out_of_range("Vec::view out of range");
     } else if (length < 0) {
-      throw std::out_of_range("Vec::get_view negative length is not allowed");
+      throw std::out_of_range("Vec::view negative length is not allowed");
     }
     return VecView<T>(this->ptr_ + offset, length);
   }
 
-  VecView<const T> get_cview(int offset = 0, int length = -1) const {
+  VecView<const T> cview(int offset = 0, int length = -1) const {
     if (length == -1) {
       length = this->size_ - offset;
-      if (length < 0) throw std::out_of_range("Vec::get_cview out of range");
+      if (length < 0) throw std::out_of_range("Vec::cview out of range");
     } else if (offset + length > this->size_ || offset < 0) {
-      throw std::out_of_range("Vec::get_cview out of range");
+      throw std::out_of_range("Vec::cview out of range");
     } else if (length < 0) {
-      throw std::out_of_range("Vec::get_cview negative length is not allowed");
+      throw std::out_of_range("Vec::cview negative length is not allowed");
     }
     return VecView<const T>(this->ptr_ + offset, length);
   }
 
-  VecView<const T> get_view(int offset = 0, int length = -1) const {
-    return get_cview(offset, length);
+  VecView<const T> view(int offset = 0, int length = -1) const {
+    return cview(offset, length);
   }
 
   T *data() { return this->ptr_; }
