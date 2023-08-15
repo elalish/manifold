@@ -50,7 +50,10 @@ class VecDH {
   // Note that the vector constructed with this constructor will contain
   // uninitialized memory. Please specify `val` if you need to make sure that
   // the data is initialized.
-  VecDH(int size) { resize(size); }
+  VecDH(int size) {
+    reserve(size);
+    size_ = size;
+  }
 
   VecDH(int size, T val) { resize(size, val); }
 
@@ -161,13 +164,25 @@ class VecDH {
 
   const T *ptrH() const { return cptrH(); }
 
-  inline T &operator[](int i) { return ptr_[i]; }
+  inline T &operator[](int i) {
+    if (i < 0 || i >= size_) throw std::out_of_range("VecDH out of range");
+    return ptr_[i];
+  }
 
-  inline const T &operator[](int i) const { return ptr_[i]; }
+  inline const T &operator[](int i) const {
+    if (i < 0 || i >= size_) throw std::out_of_range("VecDH out of range");
+    return ptr_[i];
+  }
 
-  T &back() { return ptr_[size_ - 1]; }
+  T &back() {
+    if (size_ == 0) throw std::out_of_range("VecDH out of range");
+    return ptr_[size_ - 1];
+  }
 
-  const T &back() const { return ptr_[size_ - 1]; }
+  const T &back() const {
+    if (size_ == 0) throw std::out_of_range("VecDH out of range");
+    return ptr_[size_ - 1];
+  }
 
   inline void push_back(const T &val) {
     if (size_ >= capacity_) {
