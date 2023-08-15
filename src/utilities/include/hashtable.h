@@ -18,7 +18,7 @@
 
 #include "public.h"
 #include "utils.h"
-#include "vec_dh.h"
+#include "vec.h"
 
 namespace {
 typedef unsigned long long int Uint64;
@@ -63,7 +63,7 @@ namespace manifold {
 template <typename V, hash_fun_t H = hash64bit>
 class HashTableD {
  public:
-  HashTableD(VecDH<Uint64>& keys, VecDH<V>& values, VecDH<uint32_t>& used,
+  HashTableD(Vec<Uint64>& keys, Vec<V>& values, Vec<uint32_t>& used,
              uint32_t step = 1)
       : step_{step}, keys_{keys}, values_{values}, used_{used} {}
 
@@ -115,9 +115,9 @@ class HashTableD {
 
  private:
   uint32_t step_;
-  VecDHView<Uint64> keys_;
-  VecDHView<V> values_;
-  VecDHView<uint32_t> used_;
+  VecView<Uint64> keys_;
+  VecView<V> values_;
+  VecView<uint32_t> used_;
 };
 
 template <typename V, hash_fun_t H = hash64bit>
@@ -140,14 +140,14 @@ class HashTable {
     return static_cast<float>(AtomicLoad(used_[0])) / Size();
   }
 
-  VecDH<V>& GetValueStore() { return values_; }
+  Vec<V>& GetValueStore() { return values_; }
 
   static Uint64 Open() { return kOpen; }
 
  private:
-  VecDH<Uint64> keys_;
-  VecDH<V> values_;
-  VecDH<uint32_t> used_ = VecDH<uint32_t>(1, 0);
+  Vec<Uint64> keys_;
+  Vec<V> values_;
+  Vec<uint32_t> used_ = Vec<uint32_t>(1, 0);
   HashTableD<V, H> table_;
 };
 

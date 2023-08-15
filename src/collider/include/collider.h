@@ -15,7 +15,7 @@
 #pragma once
 #include "public.h"
 #include "sparse.h"
-#include "vec_dh.h"
+#include "vec.h"
 
 namespace manifold {
 
@@ -23,18 +23,18 @@ namespace manifold {
 class Collider {
  public:
   Collider() {}
-  Collider(const VecDHView<const Box>& leafBB, const VecDHView<const uint32_t>& leafMorton);
+  Collider(const VecView<const Box>& leafBB, const VecView<const uint32_t>& leafMorton);
   bool Transform(glm::mat4x3);
-  void UpdateBoxes(const VecDHView<const Box>& leafBB);
+  void UpdateBoxes(const VecView<const Box>& leafBB);
   template <const bool selfCollision = false, const bool inverted = false,
             typename T>
-  SparseIndices Collisions(const VecDHView<const T>& queriesIn) const;
+  SparseIndices Collisions(const VecView<const T>& queriesIn) const;
 
  private:
-  VecDH<Box> nodeBBox_;
-  VecDH<int> nodeParent_;
+  Vec<Box> nodeBBox_;
+  Vec<int> nodeParent_;
   // even nodes are leaves, odd nodes are internal, root is 1
-  VecDH<thrust::pair<int, int>> internalChildren_;
+  Vec<thrust::pair<int, int>> internalChildren_;
 
   int NumInternal() const { return internalChildren_.size(); };
   int NumLeaves() const { return NumInternal() + 1; };

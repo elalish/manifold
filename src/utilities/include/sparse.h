@@ -19,7 +19,7 @@
 #include "par.h"
 #include "public.h"
 #include "utils.h"
-#include "vec_dh.h"
+#include "vec.h"
 
 namespace manifold {
 
@@ -52,8 +52,8 @@ class SparseIndices {
 
   int size() const { return data.size(); }
 
-  VecDH<int> Copy(bool use_q) const {
-    VecDH<int> out(data.size());
+  Vec<int> Copy(bool use_q) const {
+    Vec<int> out(data.size());
     int offset = pOffset;
     if (use_q) offset = 1 - offset;
     const int* p = ptr();
@@ -86,7 +86,7 @@ class SparseIndices {
 
   inline void SetPQ(int i, int64_t pq) { data[i] = pq; }
 
-  const VecDH<int64_t>& AsVec64() const { return data; }
+  const Vec<int64_t>& AsVec64() const { return data; }
 
   inline void Add(int p, int q) { data.push_back(EncodePQ(p, q)); }
 
@@ -98,7 +98,7 @@ class SparseIndices {
     Resize(newSize);
   }
 
-  size_t RemoveZeros(VecDH<int>& S) {
+  size_t RemoveZeros(Vec<int>& S) {
     ASSERT(S.size() == data.size(), userErr,
            "Different number of values than indicies!");
     auto zBegin = zip(S.begin(), data.begin());
@@ -128,7 +128,7 @@ class SparseIndices {
   };
 
   template <typename T>
-  size_t KeepFinite(VecDH<T>& v, VecDH<int>& x) {
+  size_t KeepFinite(Vec<T>& v, Vec<int>& x) {
     ASSERT(x.size() == data.size(), userErr,
            "Different number of values than indicies!");
     auto zBegin = zip(v.begin(), x.begin(), data.begin());
@@ -155,7 +155,7 @@ class SparseIndices {
 #endif
 
  private:
-  VecDH<int64_t> data;
+  Vec<int64_t> data;
   inline int* ptr() { return reinterpret_cast<int32_t*>(data.data()); }
   inline const int* ptr() const {
     return reinterpret_cast<const int32_t*>(data.data());

@@ -29,7 +29,7 @@ using namespace thrust::placeholders;
 ExecutionParams manifoldParams;
 
 struct MakeTri {
-  VecDHView<const Halfedge> halfedges;
+  VecView<const Halfedge> halfedges;
 
   void operator()(thrust::tuple<glm::ivec3&, int> inOut) {
     glm::ivec3& tri = thrust::get<0>(inOut);
@@ -218,7 +218,7 @@ MeshGL Manifold::GetMeshGL(glm::ivec3 normalIdx) const {
   out.faceID.resize(numTri);
   std::vector<int> triNew2Old(numTri);
   std::iota(triNew2Old.begin(), triNew2Old.end(), 0);
-  VecDHView<const TriRef> triRef = impl.meshRelation_.triRef.get_cview();
+  VecView<const TriRef> triRef = impl.meshRelation_.triRef.get_cview();
   // Don't sort originals - keep them in order
   if (!isOriginal) {
     std::sort(triNew2Old.begin(), triNew2Old.end(), [triRef](int a, int b) {
@@ -583,7 +583,7 @@ Manifold Manifold::SetProperties(
                      propFunc) const {
   auto pImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
   const int oldNumProp = NumProp();
-  const VecDH<float> oldProperties = pImpl->meshRelation_.properties;
+  const Vec<float> oldProperties = pImpl->meshRelation_.properties;
 
   auto& triProperties = pImpl->meshRelation_.triProperties;
   if (numProp == 0) {
@@ -599,10 +599,10 @@ Manifold Manifold::SetProperties(
           triProperties[i][j] = idx++;
         }
       }
-      pImpl->meshRelation_.properties = VecDH<float>(numProp * idx, 0);
+      pImpl->meshRelation_.properties = Vec<float>(numProp * idx, 0);
     } else {
       pImpl->meshRelation_.properties =
-          VecDH<float>(numProp * NumPropVert(), 0);
+          Vec<float>(numProp * NumPropVert(), 0);
     }
     thrust::for_each_n(
         thrust::host, countAt(0), NumTri(),

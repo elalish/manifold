@@ -82,8 +82,8 @@ struct Morton {
 };
 
 struct FaceMortonBox {
-  VecDHView<const Halfedge> halfedge;
-  VecDHView<const glm::vec3> vertPos;
+  VecView<const Halfedge> halfedge;
+  VecView<const glm::vec3> vertPos;
   const Box bBox;
 
   void operator()(thrust::tuple<uint32_t&, Box&, int> inout) {
@@ -113,7 +113,7 @@ struct FaceMortonBox {
 };
 
 struct Reindex {
-  VecDHView<const int> indexInv;
+  VecView<const int> indexInv;
 
   void operator()(Halfedge& edge) {
     if (edge.startVert < 0) return;
@@ -123,7 +123,7 @@ struct Reindex {
 };
 
 struct MarkProp {
-  VecDHView<int> keep;
+  VecView<int> keep;
 
   void operator()(glm::ivec3 triProp) {
     for (const int i : {0, 1, 2}) {
@@ -134,8 +134,8 @@ struct MarkProp {
 };
 
 struct GatherProps {
-  VecDHView<float> properties;
-  VecDHView<const float> oldProperties;
+  VecView<float> properties;
+  VecView<const float> oldProperties;
   const int numProp;
 
   void operator()(thrust::tuple<int, int, int> in) {
@@ -150,7 +150,7 @@ struct GatherProps {
 };
 
 struct ReindexProps {
-  VecDHView<const int> old2new;
+  VecView<const int> old2new;
 
   void operator()(glm::ivec3& triProp) {
     for (const int i : {0, 1, 2}) {
@@ -160,23 +160,23 @@ struct ReindexProps {
 };
 
 template <typename T>
-void Permute(VecDH<T>& inOut, const VecDH<int>& new2Old) {
-  VecDH<T> tmp(std::move(inOut));
+void Permute(Vec<T>& inOut, const Vec<int>& new2Old) {
+  Vec<T> tmp(std::move(inOut));
   inOut.resize(new2Old.size());
   gather(autoPolicy(new2Old.size()), new2Old.begin(), new2Old.end(),
          tmp.begin(), inOut.begin());
 }
 
-template void Permute<TriRef>(VecDH<TriRef>&, const VecDH<int>&);
-template void Permute<glm::vec3>(VecDH<glm::vec3>&, const VecDH<int>&);
+template void Permute<TriRef>(Vec<TriRef>&, const Vec<int>&);
+template void Permute<glm::vec3>(Vec<glm::vec3>&, const Vec<int>&);
 
 struct ReindexFace {
-  VecDHView<Halfedge> halfedge;
-  VecDHView<glm::vec4> halfedgeTangent;
-  VecDHView<const Halfedge> oldHalfedge;
-  VecDHView<const glm::vec4> oldHalfedgeTangent;
-  VecDHView<const int> faceNew2Old;
-  VecDHView<const int> faceOld2New;
+  VecView<Halfedge> halfedge;
+  VecView<glm::vec4> halfedgeTangent;
+  VecView<const Halfedge> oldHalfedge;
+  VecView<const glm::vec4> oldHalfedgeTangent;
+  VecView<const int> faceNew2Old;
+  VecView<const int> faceOld2New;
 
   void operator()(int newFace) {
     const int oldFace = faceNew2Old[newFace];
@@ -197,7 +197,7 @@ struct ReindexFace {
 };
 
 struct VertMortonBox {
-  VecDHView<const float> vertProperties;
+  VecView<const float> vertProperties;
   const uint32_t numProp;
   const float tol;
   const Box bBox;
@@ -254,8 +254,8 @@ void Manifold::Impl::Finish() {
   }
 
   SortVerts();
-  VecDH<Box> faceBox;
-  VecDH<uint32_t> faceMorton;
+  Vec<Box> faceBox;
+  Vec<uint32_t> faceMorton;
   GetFaceBoxMorton(faceBox, faceMorton);
   SortFaces(faceBox, faceMorton);
   if (halfedge_.size() == 0) return;
@@ -304,12 +304,12 @@ void Manifold::Impl::Finish() {
  */
 void Manifold::Impl::SortVerts() {
   const int numVert = NumVert();
-  VecDH<uint32_t> vertMorton(numVert);
+  Vec<uint32_t> vertMorton(numVert);
   auto policy = autoPolicy(numVert);
   for_each_n(policy, zip(vertMorton.begin(), vertPos_.cbegin()), numVert,
              Morton({bBox_}));
 
-  VecDH<int> vertNew2Old(numVert);
+  Vec<int> vertNew2Old(numVert);
   sequence(policy, vertNew2Old.begin(), vertNew2Old.end());
 
   sort_by_key(policy, vertMorton.begin(), vertMorton.end(),
@@ -337,9 +337,9 @@ void Manifold::Impl::SortVerts() {
  * vertNew2Old. This may be a subset, so the total number of original verts is
  * also given.
  */
-void Manifold::Impl::ReindexVerts(const VecDH<int>& vertNew2Old,
+void Manifold::Impl::ReindexVerts(const Vec<int>& vertNew2Old,
                                   int oldNumVert) {
-  VecDH<int> vertOld2New(oldNumVert);
+  Vec<int> vertOld2New(oldNumVert);
   scatter(autoPolicy(oldNumVert), countAt(0), countAt(NumVert()),
           vertNew2Old.begin(), vertOld2New.begin());
   for_each(autoPolicy(oldNumVert), halfedge_.begin(), halfedge_.end(),
@@ -353,15 +353,15 @@ void Manifold::Impl::CompactProps() {
   if (meshRelation_.numProp == 0) return;
 
   const int numVerts = meshRelation_.properties.size() / meshRelation_.numProp;
-  VecDH<int> keep(numVerts, 0);
+  Vec<int> keep(numVerts, 0);
   auto policy = autoPolicy(numVerts);
 
   for_each(policy, meshRelation_.triProperties.cbegin(),
            meshRelation_.triProperties.cend(), MarkProp({keep.get_view()}));
-  VecDH<int> propOld2New(numVerts + 1, 0);
+  Vec<int> propOld2New(numVerts + 1, 0);
   inclusive_scan(policy, keep.begin(), keep.end(), propOld2New.begin() + 1);
 
-  VecDH<float> oldProp = meshRelation_.properties;
+  Vec<float> oldProp = meshRelation_.properties;
   const int numVertsNew = propOld2New[numVerts];
   meshRelation_.properties.resize(meshRelation_.numProp * numVertsNew);
   for_each_n(policy, zip(countAt(0), propOld2New.cbegin(), keep.cbegin()),
@@ -377,8 +377,8 @@ void Manifold::Impl::CompactProps() {
  * codes of the faces, respectively. The Morton code is based on the center of
  * the bounding box.
  */
-void Manifold::Impl::GetFaceBoxMorton(VecDH<Box>& faceBox,
-                                      VecDH<uint32_t>& faceMorton) const {
+void Manifold::Impl::GetFaceBoxMorton(Vec<Box>& faceBox,
+                                      Vec<uint32_t>& faceMorton) const {
   faceBox.resize(NumTri());
   faceMorton.resize(NumTri());
   for_each_n(
@@ -391,9 +391,9 @@ void Manifold::Impl::GetFaceBoxMorton(VecDH<Box>& faceBox,
  * Sorts the faces of this manifold according to their input Morton code. The
  * bounding box and Morton code arrays are also sorted accordingly.
  */
-void Manifold::Impl::SortFaces(VecDH<Box>& faceBox,
-                               VecDH<uint32_t>& faceMorton) {
-  VecDH<int> faceNew2Old(NumTri());
+void Manifold::Impl::SortFaces(Vec<Box>& faceBox,
+                               Vec<uint32_t>& faceMorton) {
+  Vec<int> faceNew2Old(NumTri());
   auto policy = autoPolicy(faceNew2Old.size());
   sequence(policy, faceNew2Old.begin(), faceNew2Old.end());
 
@@ -418,7 +418,7 @@ void Manifold::Impl::SortFaces(VecDH<Box>& faceBox,
  * another manifold, given by oldHalfedge. Input faceNew2Old defines the old
  * faces to gather into this.
  */
-void Manifold::Impl::GatherFaces(const VecDH<int>& faceNew2Old) {
+void Manifold::Impl::GatherFaces(const Vec<int>& faceNew2Old) {
   const int numTri = faceNew2Old.size();
   if (meshRelation_.triRef.size() == NumTri())
     Permute(meshRelation_.triRef, faceNew2Old);
@@ -426,9 +426,9 @@ void Manifold::Impl::GatherFaces(const VecDH<int>& faceNew2Old) {
     Permute(meshRelation_.triProperties, faceNew2Old);
   if (faceNormal_.size() == NumTri()) Permute(faceNormal_, faceNew2Old);
 
-  VecDH<Halfedge> oldHalfedge(std::move(halfedge_));
-  VecDH<glm::vec4> oldHalfedgeTangent(std::move(halfedgeTangent_));
-  VecDH<int> faceOld2New(oldHalfedge.size() / 3);
+  Vec<Halfedge> oldHalfedge(std::move(halfedge_));
+  Vec<glm::vec4> oldHalfedgeTangent(std::move(halfedgeTangent_));
+  Vec<int> faceOld2New(oldHalfedge.size() / 3);
   auto policy = autoPolicy(numTri);
   scatter(policy, countAt(0), countAt(numTri), faceNew2Old.begin(),
           faceOld2New.begin());
@@ -443,7 +443,7 @@ void Manifold::Impl::GatherFaces(const VecDH<int>& faceNew2Old) {
 }
 
 void Manifold::Impl::GatherFaces(const Impl& old,
-                                 const VecDH<int>& faceNew2Old) {
+                                 const Vec<int>& faceNew2Old) {
   const int numTri = faceNew2Old.size();
   auto policy = autoPolicy(numTri);
 
@@ -469,7 +469,7 @@ void Manifold::Impl::GatherFaces(const Impl& old,
            old.faceNormal_.begin(), faceNormal_.begin());
   }
 
-  VecDH<int> faceOld2New(old.NumTri());
+  Vec<int> faceOld2New(old.NumTri());
   scatter(policy, countAt(0), countAt(numTri), faceNew2Old.begin(),
           faceOld2New.begin());
 
@@ -545,17 +545,17 @@ bool MeshGL::Merge() {
   }
 
   const int numOpenVert = openEdges.size();
-  VecDH<int> openVerts(numOpenVert);
+  Vec<int> openVerts(numOpenVert);
   int i = 0;
   for (const auto& edge : openEdges) {
     const int vert = edge.first;
     openVerts[i++] = vert;
   }
 
-  VecDH<float> vertPropD(vertProperties);
+  Vec<float> vertPropD(vertProperties);
   Box bBox;
   for (const int i : {0, 1, 2}) {
-    strided_range<VecDH<float>::Iter> iPos(vertPropD.begin() + i,
+    strided_range<Vec<float>::Iter> iPos(vertPropD.begin() + i,
                                            vertPropD.end(), numProp);
     auto minMax = transform_reduce<thrust::pair<float, float>>(
         autoPolicy(numVert), iPos.begin(), iPos.end(), Duplicate(),
@@ -569,8 +569,8 @@ bool MeshGL::Merge() {
   if (precision < 0) return false;
 
   auto policy = autoPolicy(numOpenVert);
-  VecDH<Box> vertBox(numOpenVert);
-  VecDH<uint32_t> vertMorton(numOpenVert);
+  Vec<Box> vertBox(numOpenVert);
+  Vec<uint32_t> vertMorton(numOpenVert);
 
   for_each_n(policy,
              zip(vertMorton.begin(), vertBox.begin(), openVerts.cbegin()),

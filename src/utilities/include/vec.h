@@ -31,40 +31,40 @@ namespace manifold {
  *  @{
  */
 template <typename T>
-class VecDH;
+class Vec;
 
 /**
- * View for VecDH, can perform offset operation.
+ * View for Vec, can perform offset operation.
  * This will be invalidated when the original vector is dropped or changes
  * length.
  */
 template <typename T>
-class VecDHView {
+class VecView {
  public:
   using Iter = T *;
   using IterC = const T *;
 
-  VecDHView(const VecDHView &other) {
+  VecView(const VecView &other) {
     ptr_ = other.ptr_;
     size_ = other.size_;
   }
 
-  VecDHView &operator=(const VecDHView &other) {
+  VecView &operator=(const VecView &other) {
     ptr_ = other.ptr_;
     size_ = other.size_;
     return *this;
   }
 
-  // allows conversion to a const VecDHView
-  operator VecDHView<const T>() const { return {ptr_, size_}; }
+  // allows conversion to a const VecView
+  operator VecView<const T>() const { return {ptr_, size_}; }
 
   inline const T &operator[](int i) const {
-    if (i < 0 || i >= size_) throw std::out_of_range("VecDH out of range");
+    if (i < 0 || i >= size_) throw std::out_of_range("Vec out of range");
     return ptr_[i];
   }
 
   inline T &operator[](int i) {
-    if (i < 0 || i >= size_) throw std::out_of_range("VecDH out of range");
+    if (i < 0 || i >= size_) throw std::out_of_range("Vec out of range");
     return ptr_[i];
   }
 
@@ -109,11 +109,11 @@ class VecDHView {
   T *ptr_ = nullptr;
   int size_ = 0;
 
-  VecDHView() = default;
-  VecDHView(T *ptr_, int size_) : ptr_(ptr_), size_(size_) {}
-  friend class VecDH<T>;
-  friend class VecDH<typename std::remove_const<T>::type>;
-  friend class VecDHView<typename std::remove_const<T>::type>;
+  VecView() = default;
+  VecView(T *ptr_, int size_) : ptr_(ptr_), size_(size_) {}
+  friend class Vec<T>;
+  friend class Vec<typename std::remove_const<T>::type>;
+  friend class VecView<typename std::remove_const<T>::type>;
 };
 
 /*
@@ -125,21 +125,21 @@ class VecDHView {
  * constructor/destructor, please keep T trivial.
  */
 template <typename T>
-class VecDH : public VecDHView<T> {
+class Vec : public VecView<T> {
  public:
-  VecDH() {}
+  Vec() {}
 
   // Note that the vector constructed with this constructor will contain
   // uninitialized memory. Please specify `val` if you need to make sure that
   // the data is initialized.
-  VecDH(int size) {
+  Vec(int size) {
     reserve(size);
     this->size_ = size;
   }
 
-  VecDH(int size, T val) { resize(size, val); }
+  Vec(int size, T val) { resize(size, val); }
 
-  VecDH(const VecDH<T> &vec) {
+  Vec(const Vec<T> &vec) {
     this->size_ = vec.size();
     this->capacity_ = this->size_;
     auto policy = autoPolicy(this->size_);
@@ -151,7 +151,7 @@ class VecDH : public VecDHView<T> {
     }
   }
 
-  VecDH(const std::vector<T> &vec) {
+  Vec(const std::vector<T> &vec) {
     this->size_ = vec.size();
     this->capacity_ = this->size_;
     auto policy = autoPolicy(this->size_);
@@ -163,7 +163,7 @@ class VecDH : public VecDHView<T> {
     }
   }
 
-  VecDH(VecDH<T> &&vec) {
+  Vec(Vec<T> &&vec) {
     this->ptr_ = vec.ptr_;
     this->size_ = vec.size_;
     capacity_ = vec.capacity_;
@@ -172,10 +172,10 @@ class VecDH : public VecDHView<T> {
     vec.capacity_ = 0;
   }
 
-  operator VecDHView<T>() { return {this->ptr_, this->size_}; }
-  operator VecDHView<const T>() const { return {this->ptr_, this->size_}; }
+  operator VecView<T>() { return {this->ptr_, this->size_}; }
+  operator VecView<const T>() const { return {this->ptr_, this->size_}; }
 
-  ~VecDH() {
+  ~Vec() {
     if (this->ptr_ != nullptr) {
       TracyFreeS(ptr_, 3);
       free(this->ptr_);
@@ -185,7 +185,7 @@ class VecDH : public VecDHView<T> {
     capacity_ = 0;
   }
 
-  VecDH<T> &operator=(const VecDH<T> &other) {
+  Vec<T> &operator=(const Vec<T> &other) {
     if (&other == this) return *this;
     if (this->ptr_ != nullptr) {
       TracyFreeS(this->ptr_, 3);
@@ -203,7 +203,7 @@ class VecDH : public VecDHView<T> {
     return *this;
   }
 
-  VecDH<T> &operator=(VecDH<T> &&other) {
+  Vec<T> &operator=(Vec<T> &&other) {
     if (&other == this) return *this;
     if (this->ptr_ != nullptr) {
       TracyFreeS(ptr_, 3);
@@ -218,7 +218,7 @@ class VecDH : public VecDHView<T> {
     return *this;
   }
 
-  void swap(VecDH<T> &other) {
+  void swap(Vec<T> &other) {
     std::swap(this->ptr_, other.ptr_);
     std::swap(this->size_, other.size_);
     std::swap(capacity_, other.capacity_);
@@ -280,32 +280,32 @@ class VecDH : public VecDHView<T> {
     capacity_ = this->size_;
   }
 
-  VecDHView<T> get_view(int offset = 0, int length = -1) {
+  VecView<T> get_view(int offset = 0, int length = -1) {
     if (length == -1) {
       length = this->size_ - offset;
-      if (length < 0) throw std::out_of_range("VecDH::get_view out of range");
+      if (length < 0) throw std::out_of_range("Vec::get_view out of range");
     } else if (offset + length > this->size_ || offset < 0) {
-      throw std::out_of_range("VecDH::get_view out of range");
+      throw std::out_of_range("Vec::get_view out of range");
     } else if (length < 0) {
-      throw std::out_of_range("VecDH::get_view negative length is not allowed");
+      throw std::out_of_range("Vec::get_view negative length is not allowed");
     }
-    return VecDHView<T>(this->ptr_ + offset, length);
+    return VecView<T>(this->ptr_ + offset, length);
   }
 
-  VecDHView<const T> get_cview(int offset = 0, int length = -1) const {
+  VecView<const T> get_cview(int offset = 0, int length = -1) const {
     if (length == -1) {
       length = this->size_ - offset;
-      if (length < 0) throw std::out_of_range("VecDH::get_cview out of range");
+      if (length < 0) throw std::out_of_range("Vec::get_cview out of range");
     } else if (offset + length > this->size_ || offset < 0) {
-      throw std::out_of_range("VecDH::get_cview out of range");
+      throw std::out_of_range("Vec::get_cview out of range");
     } else if (length < 0) {
       throw std::out_of_range(
-          "VecDH::get_cview negative length is not allowed");
+          "Vec::get_cview negative length is not allowed");
     }
-    return VecDHView<const T>(this->ptr_ + offset, length);
+    return VecView<const T>(this->ptr_ + offset, length);
   }
 
-  VecDHView<const T> get_view(int offset = 0, int length = -1) const {
+  VecView<const T> get_view(int offset = 0, int length = -1) const {
     return get_cview(offset, length);
   }
 

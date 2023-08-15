@@ -25,8 +25,8 @@ namespace {
 using namespace manifold;
 
 struct FaceAreaVolume {
-  VecDHView<const Halfedge> halfedges;
-  VecDHView<const glm::vec3> vertPos;
+  VecView<const Halfedge> halfedges;
+  VecView<const glm::vec3> vertPos;
   const float precision;
 
   thrust::pair<float, float> operator()(int face) {
@@ -97,13 +97,13 @@ struct SumPair : public thrust::binary_function<thrust::pair<float, float>,
 };
 
 struct CurvatureAngles {
-  VecDHView<float> meanCurvature;
-  VecDHView<float> gaussianCurvature;
-  VecDHView<float> area;
-  VecDHView<float> degree;
-  VecDHView<const Halfedge> halfedge;
-  VecDHView<const glm::vec3> vertPos;
-  VecDHView<const glm::vec3> triNormal;
+  VecView<float> meanCurvature;
+  VecView<float> gaussianCurvature;
+  VecView<float> area;
+  VecView<float> degree;
+  VecView<const Halfedge> halfedge;
+  VecView<const glm::vec3> vertPos;
+  VecView<const glm::vec3> triNormal;
 
   void operator()(int tri) {
     glm::vec3 edge[3];
@@ -152,12 +152,12 @@ struct NormalizeCurvature {
 };
 
 struct UpdateProperties {
-  VecDHView<float> properties;
+  VecView<float> properties;
 
-  VecDHView<const float> oldProperties;
-  VecDHView<const Halfedge> halfedge;
-  VecDHView<const float> meanCurvature;
-  VecDHView<const float> gaussianCurvature;
+  VecView<const float> oldProperties;
+  VecView<const Halfedge> halfedge;
+  VecView<const float> meanCurvature;
+  VecView<const float> gaussianCurvature;
   const int oldNumProp;
   const int numProp;
   const int gaussianIdx;
@@ -191,7 +191,7 @@ struct UpdateProperties {
 };
 
 struct CheckHalfedges {
-  VecDHView<const Halfedge> halfedges;
+  VecView<const Halfedge> halfedges;
 
   bool operator()(int edge) {
     const Halfedge halfedge = halfedges[edge];
@@ -209,7 +209,7 @@ struct CheckHalfedges {
 };
 
 struct NoDuplicates {
-  VecDHView<const Halfedge> halfedges;
+  VecView<const Halfedge> halfedges;
 
   bool operator()(int edge) {
     const Halfedge halfedge = halfedges[edge];
@@ -222,9 +222,9 @@ struct NoDuplicates {
 };
 
 struct CheckCCW {
-  VecDHView<const Halfedge> halfedges;
-  VecDHView<const glm::vec3> vertPos;
-  VecDHView<const glm::vec3> triNormal;
+  VecView<const Halfedge> halfedges;
+  VecView<const glm::vec3> vertPos;
+  VecView<const glm::vec3> triNormal;
   const float tol;
 
   bool operator()(int face) {
@@ -289,7 +289,7 @@ bool Manifold::Impl::Is2Manifold() const {
 
   if (!IsManifold()) return false;
 
-  VecDH<Halfedge> halfedge(halfedge_);
+  Vec<Halfedge> halfedge(halfedge_);
   sort(policy, halfedge.begin(), halfedge.end());
 
   return all_of(policy, countAt(0), countAt(2 * NumEdge() - 1),
@@ -328,10 +328,10 @@ Properties Manifold::Impl::GetProperties() const {
 void Manifold::Impl::CalculateCurvature(int gaussianIdx, int meanIdx) {
   if (IsEmpty()) return;
   if (gaussianIdx < 0 && meanIdx < 0) return;
-  VecDH<float> vertMeanCurvature(NumVert(), 0);
-  VecDH<float> vertGaussianCurvature(NumVert(), glm::two_pi<float>());
-  VecDH<float> vertArea(NumVert(), 0);
-  VecDH<float> degree(NumVert(), 0);
+  Vec<float> vertMeanCurvature(NumVert(), 0);
+  Vec<float> vertGaussianCurvature(NumVert(), glm::two_pi<float>());
+  Vec<float> vertArea(NumVert(), 0);
+  Vec<float> degree(NumVert(), 0);
   auto policy = autoPolicy(NumTri());
   for_each(policy, countAt(0), countAt(NumTri()),
            CurvatureAngles(
@@ -345,8 +345,8 @@ void Manifold::Impl::CalculateCurvature(int gaussianIdx, int meanIdx) {
 
   const int oldNumProp = NumProp();
   const int numProp = glm::max(oldNumProp, glm::max(gaussianIdx, meanIdx) + 1);
-  const VecDH<float> oldProperties = meshRelation_.properties;
-  meshRelation_.properties = VecDH<float>(numProp * NumPropVert(), 0);
+  const Vec<float> oldProperties = meshRelation_.properties;
+  meshRelation_.properties = Vec<float>(numProp * NumPropVert(), 0);
   meshRelation_.numProp = numProp;
   if (meshRelation_.triProperties.size() == 0) {
     meshRelation_.triProperties.resize(NumTri());
@@ -396,7 +396,7 @@ bool Manifold::Impl::IsFinite() const {
  * vertPos_ array.
  */
 bool Manifold::Impl::IsIndexInBounds(
-    VecDHView<const glm::ivec3> triVerts) const {
+    VecView<const glm::ivec3> triVerts) const {
   auto policy = autoPolicy(triVerts.size());
   glm::ivec2 minmax = transform_reduce<glm::ivec2>(
       policy, triVerts.begin(), triVerts.end(), MakeMinMax(),

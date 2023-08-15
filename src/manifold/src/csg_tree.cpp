@@ -72,7 +72,7 @@ struct UpdateMeshIDs {
 };
 
 struct CheckOverlap {
-  VecDHView<const Box> boxes;
+  VecView<const Box> boxes;
   const size_t i;
   bool operator()(int j) { return boxes[i].DoesOverlap(boxes[j]); }
 };
@@ -233,9 +233,9 @@ Manifold::Impl CsgLeafNode::Compose(
             auto &oldProp = node->pImpl_->meshRelation_.properties;
             auto &newProp = combined.meshRelation_.properties;
             for (int p = 0; p < numProp; ++p) {
-              strided_range<VecDH<float>::IterC> oldRange(
+              strided_range<Vec<float>::IterC> oldRange(
                   oldProp.begin() + p, oldProp.end(), numProp);
-              strided_range<VecDH<float>::Iter> newRange(
+              strided_range<Vec<float>::Iter> newRange(
                   newProp.begin() + numPropOut * propVertIndices[i] + p,
                   newProp.end(), numPropOut);
               copy(policy, oldRange.begin(), oldRange.end(), newRange.begin());
@@ -533,7 +533,7 @@ void CsgOpNode::BatchUnion() const {
     const int start = (children_.size() > kMaxUnionSize)
                           ? (children_.size() - kMaxUnionSize)
                           : 0;
-    VecDH<Box> boxes;
+    Vec<Box> boxes;
     boxes.reserve(children_.size() - start);
     for (int i = start; i < children_.size(); i++) {
       boxes.push_back(std::dynamic_pointer_cast<CsgLeafNode>(children_[i])
@@ -542,9 +542,9 @@ void CsgOpNode::BatchUnion() const {
     }
     // partition the children into a set of disjoint sets
     // each set contains a set of children that are pairwise disjoint
-    std::vector<VecDH<size_t>> disjointSets;
+    std::vector<Vec<size_t>> disjointSets;
     for (size_t i = 0; i < boxes.size(); i++) {
-      auto lambda = [&boxes, i](const VecDH<size_t> &set) {
+      auto lambda = [&boxes, i](const Vec<size_t> &set) {
         return find_if<decltype(set.end())>(
                    autoPolicy(set.size()), set.begin(), set.end(),
                    CheckOverlap({boxes.get_cview(), i})) == set.end();

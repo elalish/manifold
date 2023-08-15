@@ -19,7 +19,7 @@
 #include "par.h"
 #include "public.h"
 #include "utils.h"
-#include "vec_dh.h"
+#include "vec.h"
 
 namespace {
 using namespace manifold;
@@ -126,8 +126,8 @@ struct GridVert {
 
 template <typename Func>
 struct ComputeVerts {
-  VecDHView<glm::vec3> vertPos;
-  VecDHView<int> vertIndex;
+  VecView<glm::vec3> vertPos;
+  VecView<int> vertIndex;
   HashTableD<GridVert, identity> gridVerts;
   const Func sdf;
   const glm::vec3 origin;
@@ -190,8 +190,8 @@ struct ComputeVerts {
 };
 
 struct BuildTris {
-  VecDHView<glm::ivec3> triVerts;
-  VecDHView<int> triIndex;
+  VecView<glm::ivec3> triVerts;
+  VecView<int> triIndex;
   const HashTableD<GridVert, identity> gridVerts;
 
   void CreateTri(const glm::ivec3& tri, const int edges[6]) {
@@ -333,10 +333,10 @@ inline Mesh LevelSet(Func sdf, Box bounds, float edgeLength, float level = 0,
   int tableSize = glm::min(
       2 * maxMorton, static_cast<Uint64>(10 * glm::pow(maxMorton, 0.667)));
   HashTable<GridVert, identity> gridVerts(tableSize);
-  VecDH<glm::vec3> vertPos(gridVerts.Size() * 7);
+  Vec<glm::vec3> vertPos(gridVerts.Size() * 7);
 
   while (1) {
-    VecDH<int> index(1, 0);
+    Vec<int> index(1, 0);
     for_each_n_wrapper<Func>(
         pol, maxMorton + 1,
         ComputeVerts<Func>({vertPos.get_view(), index.get_view(), gridVerts.D(),
@@ -352,16 +352,16 @@ inline Mesh LevelSet(Func sdf, Box bounds, float edgeLength, float level = 0,
       else
         tableSize *= ratio;
       gridVerts = HashTable<GridVert, identity>(tableSize);
-      vertPos = VecDH<glm::vec3>(gridVerts.Size() * 7);
+      vertPos = Vec<glm::vec3>(gridVerts.Size() * 7);
     } else {  // Success
       vertPos.resize(index[0]);
       break;
     }
   }
 
-  VecDH<glm::ivec3> triVerts(gridVerts.Entries() * 12);  // worst case
+  Vec<glm::ivec3> triVerts(gridVerts.Entries() * 12);  // worst case
 
-  VecDH<int> index(1, 0);
+  Vec<int> index(1, 0);
   for_each_n(pol, countAt(0), gridVerts.Size(),
              BuildTris({triVerts.get_view(), index.get_view(), gridVerts.D()}));
   triVerts.resize(index[0]);

@@ -45,8 +45,8 @@ struct DuplicateEdge {
 };
 
 struct ShortEdge {
-  VecDHView<const Halfedge> halfedge;
-  VecDHView<const glm::vec3> vertPos;
+  VecView<const Halfedge> halfedge;
+  VecView<const glm::vec3> vertPos;
   const float precision;
 
   bool operator()(int edge) const {
@@ -59,8 +59,8 @@ struct ShortEdge {
 };
 
 struct FlagEdge {
-  VecDHView<const Halfedge> halfedge;
-  VecDHView<const TriRef> triRef;
+  VecView<const Halfedge> halfedge;
+  VecView<const TriRef> triRef;
 
   bool operator()(int edge) const {
     if (halfedge[edge].pairedHalfedge < 0) return false;
@@ -82,9 +82,9 @@ struct FlagEdge {
 };
 
 struct SwappableEdge {
-  VecDHView<const Halfedge> halfedge;
-  VecDHView<const glm::vec3> vertPos;
-  VecDHView<const glm::vec3> triNormal;
+  VecView<const Halfedge> halfedge;
+  VecView<const glm::vec3> vertPos;
+  VecView<const glm::vec3> triNormal;
   const float precision;
 
   bool operator()(int edge) const {
@@ -147,9 +147,9 @@ void Manifold::Impl::SimplifyTopology() {
 
   int nbEdges = halfedge_.size();
   int numFlagged = 0;
-  VecDH<uint8_t> bflags(nbEdges);
+  Vec<uint8_t> bflags(nbEdges);
 
-  VecDH<SortEntry> entries(nbEdges);
+  Vec<SortEntry> entries(nbEdges);
 
   auto policy = autoPolicy(halfedge_.size());
   for_each_n(policy, countAt(0), nbEdges, [&](int i) {
@@ -381,8 +381,8 @@ void Manifold::Impl::RemoveIfFolded(int edge) {
 }
 
 void Manifold::Impl::CollapseEdge(const int edge, std::vector<int>& edges) {
-  VecDH<TriRef>& triRef = meshRelation_.triRef;
-  VecDH<glm::ivec3>& triProp = meshRelation_.triProperties;
+  Vec<TriRef>& triRef = meshRelation_.triRef;
+  Vec<glm::ivec3>& triProp = meshRelation_.triProperties;
 
   const Halfedge toRemove = halfedge_[edge];
   if (toRemove.pairedHalfedge < 0) return;
@@ -494,7 +494,7 @@ void Manifold::Impl::RecursiveEdgeSwap(const int edge, int& tag,
                                        std::vector<int>& visited,
                                        std::vector<int>& edgeSwapStack,
                                        std::vector<int>& edges) {
-  VecDH<TriRef>& triRef = meshRelation_.triRef;
+  Vec<TriRef>& triRef = meshRelation_.triRef;
 
   if (edge < 0) return;
   const int pair = halfedge_[edge].pairedHalfedge;
@@ -543,8 +543,8 @@ void Manifold::Impl::RecursiveEdgeSwap(const int edge, int& tag,
     const float a = glm::max(0.0f, glm::min(1.0f, l02 / l01));
     // Update properties if applicable
     if (meshRelation_.properties.size() > 0) {
-      VecDH<glm::ivec3>& triProp = meshRelation_.triProperties;
-      VecDH<float>& prop = meshRelation_.properties;
+      Vec<glm::ivec3>& triProp = meshRelation_.triProperties;
+      Vec<float>& prop = meshRelation_.properties;
       triProp[tri0] = triProp[tri1];
       triProp[tri0][perm0[1]] = triProp[tri1][perm1[0]];
       triProp[tri0][perm0[0]] = triProp[tri1][perm1[2]];
