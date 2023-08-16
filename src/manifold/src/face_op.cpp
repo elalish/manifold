@@ -138,18 +138,17 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
   // precompute number of triangles per face, and launch async tasks to
   // triangulate complex faces
   for_each(autoPolicy(faceEdge.size()), countAt(0),
-                countAt(faceEdge.size() - 1), [&](int face) {
-                  triCount[face] = faceEdge[face + 1] - faceEdge[face] - 2;
-                  ASSERT(triCount[face] >= 1, topologyErr,
-                         "face has less than three edges.");
-                  if (triCount[face] > 2)
-                    group.run([&, face] {
-                      std::vector<glm::ivec3> newTris =
-                          generalTriangulation(face);
-                      triCount[face] = newTris.size();
-                      results[face] = std::move(newTris);
-                    });
-                });
+           countAt(faceEdge.size() - 1), [&](int face) {
+             triCount[face] = faceEdge[face + 1] - faceEdge[face] - 2;
+             ASSERT(triCount[face] >= 1, topologyErr,
+                    "face has less than three edges.");
+             if (triCount[face] > 2)
+               group.run([&, face] {
+                 std::vector<glm::ivec3> newTris = generalTriangulation(face);
+                 triCount[face] = newTris.size();
+                 results[face] = std::move(newTris);
+               });
+           });
   group.wait();
   // prefix sum computation (assign unique index to each face) and preallocation
   exclusive_scan(autoPolicy(triCount.size()), triCount.begin(), triCount.end(),
@@ -169,7 +168,7 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
       std::placeholders::_1);
   // set triangles in parallel
   for_each(autoPolicy(faceEdge.size()), countAt(0),
-                countAt(faceEdge.size() - 1), processFace2);
+           countAt(faceEdge.size() - 1), processFace2);
 #else
   triVerts.reserve(faceEdge.size());
   triNormal.reserve(faceEdge.size());

@@ -600,13 +600,12 @@ std::vector<std::shared_ptr<CsgNode>> &CsgOpNode::GetChildren(
   if (forceToLeafNodes && !impl->forcedToLeafNodes_) {
     impl->forcedToLeafNodes_ = true;
     for_each(impl->children_.size() > 1 ? ExecutionPolicy::Par
-                                             : ExecutionPolicy::Seq,
-                  impl->children_.begin(), impl->children_.end(),
-                  [](auto &child) {
-                    if (child->GetNodeType() != CsgNodeType::Leaf) {
-                      child = child->ToLeafNode();
-                    }
-                  });
+                                        : ExecutionPolicy::Seq,
+             impl->children_.begin(), impl->children_.end(), [](auto &child) {
+               if (child->GetNodeType() != CsgNodeType::Leaf) {
+                 child = child->ToLeafNode();
+               }
+             });
   }
   return impl->children_;
 }
