@@ -273,10 +273,10 @@ class Vec : public VecView<T> {
       TracyAllocS(newBuffer, size_ * sizeof(T), 3);
       uninitialized_copy(autoPolicy(this->size_), this->ptr_,
                          this->ptr_ + this->size_, newBuffer);
-      if (this->ptr_ != nullptr) {
-        TracyFreeS(ptr_, 3);
-        free(this->ptr_);
-      }
+    }
+    if (this->ptr_ != nullptr) {
+      TracyFreeS(ptr_, 3);
+      free(this->ptr_);
     }
     this->ptr_ = newBuffer;
     capacity_ = this->size_;

@@ -34,12 +34,6 @@ namespace manifold {
 
 constexpr float kTolerance = 1e-5;
 
-#ifdef __CUDACC__
-#define HOST_DEVICE __host__ __device__
-#else
-#define HOST_DEVICE
-#endif
-
 /** @defgroup Connections
  *  @brief Move data in and out of the Manifold class.
  *  @{
@@ -50,7 +44,7 @@ constexpr float kTolerance = 1e-5;
  *
  * @param x Angle in degrees.
  */
-inline HOST_DEVICE float sind(float x) {
+inline float sind(float x) {
   if (!std::isfinite(x)) return sin(x);
   if (x < 0.0f) return -sind(-x);
   int quo;
@@ -73,7 +67,7 @@ inline HOST_DEVICE float sind(float x) {
  *
  * @param x Angle in degrees.
  */
-inline HOST_DEVICE float cosd(float x) { return sind(x + 90.0f); }
+inline float cosd(float x) { return sind(x + 90.0f); }
 
 /**
  * This 4x3 matrix can be used as an input to Manifold.Transform() to turn an
@@ -81,7 +75,7 @@ inline HOST_DEVICE float cosd(float x) { return sind(x + 90.0f); }
  *
  * @param up The vector to be turned to point upwards. Length does not matter.
  */
-inline HOST_DEVICE glm::mat4x3 RotateUp(glm::vec3 up) {
+inline glm::mat4x3 RotateUp(glm::vec3 up) {
   up = glm::normalize(up);
   glm::vec3 axis = glm::cross(up, {0, 0, 1});
   float angle = glm::asin(glm::length(axis));
@@ -100,8 +94,7 @@ inline HOST_DEVICE glm::mat4x3 RotateUp(glm::vec3 up) {
  * @return int, like Signum, this returns 1 for CCW, -1 for CW, and 0 if within
  * tol of colinear.
  */
-inline HOST_DEVICE int CCW(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2,
-                           float tol) {
+inline int CCW(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2, float tol) {
   glm::vec2 v1 = p1 - p0;
   glm::vec2 v2 = p2 - p0;
   float area = v1.x * v2.y - v1.y * v2.x;
@@ -179,12 +172,12 @@ struct Box {
   /**
    * Default constructor is an infinite box that contains all space.
    */
-  HOST_DEVICE Box() {}
+  Box() {}
 
   /**
    * Creates a box that contains the two given points.
    */
-  HOST_DEVICE Box(const glm::vec3 p1, const glm::vec3 p2) {
+  Box(const glm::vec3 p1, const glm::vec3 p2) {
     min = glm::min(p1, p2);
     max = glm::max(p1, p2);
   }
@@ -192,18 +185,18 @@ struct Box {
   /**
    * Returns the dimensions of the Box.
    */
-  HOST_DEVICE glm::vec3 Size() const { return max - min; }
+  glm::vec3 Size() const { return max - min; }
 
   /**
    * Returns the center point of the Box.
    */
-  HOST_DEVICE glm::vec3 Center() const { return 0.5f * (max + min); }
+  glm::vec3 Center() const { return 0.5f * (max + min); }
 
   /**
    * Returns the absolute-largest coordinate value of any contained
    * point.
    */
-  HOST_DEVICE float Scale() const {
+  float Scale() const {
     glm::vec3 absMax = glm::max(glm::abs(min), glm::abs(max));
     return glm::max(absMax.x, glm::max(absMax.y, absMax.z));
   }
@@ -211,7 +204,7 @@ struct Box {
   /**
    * Does this box contain (includes equal) the given point?
    */
-  HOST_DEVICE bool Contains(const glm::vec3& p) const {
+  bool Contains(const glm::vec3& p) const {
     return glm::all(glm::greaterThanEqual(p, min)) &&
            glm::all(glm::greaterThanEqual(max, p));
   }
@@ -219,7 +212,7 @@ struct Box {
   /**
    * Does this box contain (includes equal) the given box?
    */
-  HOST_DEVICE bool Contains(const Box& box) const {
+  bool Contains(const Box& box) const {
     return glm::all(glm::greaterThanEqual(box.min, min)) &&
            glm::all(glm::greaterThanEqual(max, box.max));
   }
@@ -227,7 +220,7 @@ struct Box {
   /**
    * Expand this box to include the given point.
    */
-  HOST_DEVICE void Union(const glm::vec3 p) {
+  void Union(const glm::vec3 p) {
     min = glm::min(min, p);
     max = glm::max(max, p);
   }
@@ -235,7 +228,7 @@ struct Box {
   /**
    * Expand this box to include the given box.
    */
-  HOST_DEVICE Box Union(const Box& box) const {
+  Box Union(const Box& box) const {
     Box out;
     out.min = glm::min(min, box.min);
     out.max = glm::max(max, box.max);
@@ -249,7 +242,7 @@ struct Box {
    * multiples of 90 degrees), or else the resulting bounding box will no longer
    * bound properly.
    */
-  HOST_DEVICE Box Transform(const glm::mat4x3& transform) const {
+  Box Transform(const glm::mat4x3& transform) const {
     Box out;
     glm::vec3 minT = transform * glm::vec4(min, 1.0f);
     glm::vec3 maxT = transform * glm::vec4(max, 1.0f);
@@ -261,7 +254,7 @@ struct Box {
   /**
    * Shift this box by the given vector.
    */
-  HOST_DEVICE Box operator+(glm::vec3 shift) const {
+  Box operator+(glm::vec3 shift) const {
     Box out;
     out.min = min + shift;
     out.max = max + shift;
@@ -271,7 +264,7 @@ struct Box {
   /**
    * Shift this box in-place by the given vector.
    */
-  HOST_DEVICE Box& operator+=(glm::vec3 shift) {
+  Box& operator+=(glm::vec3 shift) {
     min += shift;
     max += shift;
     return *this;
@@ -280,7 +273,7 @@ struct Box {
   /**
    * Scale this box by the given vector.
    */
-  HOST_DEVICE Box operator*(glm::vec3 scale) const {
+  Box operator*(glm::vec3 scale) const {
     Box out;
     out.min = min * scale;
     out.max = max * scale;
@@ -290,7 +283,7 @@ struct Box {
   /**
    * Scale this box in-place by the given vector.
    */
-  HOST_DEVICE Box& operator*=(glm::vec3 scale) {
+  Box& operator*=(glm::vec3 scale) {
     min *= scale;
     max *= scale;
     return *this;
@@ -299,7 +292,7 @@ struct Box {
   /**
    * Does this box overlap the one given (including equality)?
    */
-  HOST_DEVICE bool DoesOverlap(const Box& box) const {
+  bool DoesOverlap(const Box& box) const {
     return min.x <= box.max.x && min.y <= box.max.y && min.z <= box.max.z &&
            max.x >= box.min.x && max.y >= box.min.y && max.z >= box.min.z;
   }
@@ -308,14 +301,14 @@ struct Box {
    * Does the given point project within the XY extent of this box
    * (including equality)?
    */
-  HOST_DEVICE bool DoesOverlap(glm::vec3 p) const {  // projected in z
+  bool DoesOverlap(glm::vec3 p) const {  // projected in z
     return p.x <= max.x && p.x >= min.x && p.y <= max.y && p.y >= min.y;
   }
 
   /**
    * Does this box have finite bounds?
    */
-  HOST_DEVICE bool IsFinite() const {
+  bool IsFinite() const {
     return glm::all(glm::isfinite(min)) && glm::all(glm::isfinite(max));
   }
 };
