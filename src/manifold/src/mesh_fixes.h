@@ -22,8 +22,8 @@ struct TransformNormals {
 struct TransformTangents {
   const glm::mat3 transform;
   const bool invert;
-  const glm::vec4* oldTangents;
-  const Halfedge* halfedge;
+  VecView<const glm::vec4> oldTangents;
+  VecView<const Halfedge> halfedge;
 
   void operator()(thrust::tuple<glm::vec4&, int> inOut) {
     glm::vec4& tangent = thrust::get<0>(inOut);
@@ -38,7 +38,7 @@ struct TransformTangents {
 };
 
 struct FlipTris {
-  Halfedge* halfedge;
+  VecView<Halfedge> halfedge;
 
   void operator()(thrust::tuple<TriRef&, int> inOut) {
     TriRef& bary = thrust::get<0>(inOut);

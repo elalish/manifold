@@ -26,12 +26,15 @@
               src = self;
               nativeBuildInputs = (with pkgs; [
                 cmake
+                ninja
                 (python39.withPackages
                   (ps: with ps; [ trimesh ]))
                 gtest
               ]) ++ build-tools;
               cmakeFlags = [
                 "-DMANIFOLD_PYBIND=ON"
+                "-DMANIFOLD_CBIND=ON"
+                "-DBUILD_SHARED_LIBS=ON"
                 "-DMANIFOLD_PAR=${pkgs.lib.strings.toUpper parallel-backend}"
               ];
               checkPhase = ''
@@ -40,12 +43,6 @@
                 cd ../../
                 PYTHONPATH=$PYTHONPATH:$(pwd)/build/bindings/python python3 bindings/python/examples/run_all.py
                 cd build
-              '';
-              installPhase = ''
-                mkdir -p $out
-                cp src/manifold/libmanifold.a $out/
-                cp extras/perfTest $out
-                cp bindings/python/manifold3d* $out
               '';
             };
           parallelBackends = [

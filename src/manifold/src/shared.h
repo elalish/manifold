@@ -17,7 +17,7 @@
 #include "par.h"
 #include "sparse.h"
 #include "utils.h"
-#include "vec_dh.h"
+#include "vec.h"
 
 namespace manifold {
 
@@ -193,8 +193,8 @@ struct TmpInvalid {
   bool operator()(const TmpEdge& edge) { return edge.halfedgeIdx < 0; }
 };
 
-VecDH<TmpEdge> inline CreateTmpEdges(const VecDH<Halfedge>& halfedge) {
-  VecDH<TmpEdge> edges(halfedge.size());
+Vec<TmpEdge> inline CreateTmpEdges(const Vec<Halfedge>& halfedge) {
+  Vec<TmpEdge> edges(halfedge.size());
   for_each_n(autoPolicy(edges.size()),
              zip(edges.begin(), halfedge.begin(), countAt(0)), edges.size(),
              Halfedge2Tmp());
@@ -209,7 +209,7 @@ VecDH<TmpEdge> inline CreateTmpEdges(const VecDH<Halfedge>& halfedge) {
 
 template <const bool inverted>
 struct ReindexEdge {
-  const TmpEdge* edges;
+  VecView<const TmpEdge> edges;
   SparseIndices& indices;
 
   void operator()(int i) {

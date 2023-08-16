@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <QuickHull.hpp>
 #include <algorithm>
 #include <map>
 #include <numeric>
 
+#include "QuickHull.hpp"
 #include "boolean3.h"
 #include "csg_tree.h"
 #include "impl.h"
@@ -29,7 +29,7 @@ using namespace thrust::placeholders;
 ExecutionParams manifoldParams;
 
 struct MakeTri {
-  const Halfedge* halfedges;
+  VecView<const Halfedge> halfedges;
 
   void operator()(thrust::tuple<glm::ivec3&, int> inOut) {
     glm::ivec3& tri = thrust::get<0>(inOut);
@@ -170,7 +170,7 @@ Mesh Manifold::GetMesh() const {
   result.triVerts.resize(NumTri());
   // note that `triVerts` is `std::vector`, so we cannot use thrust::device
   thrust::for_each_n(thrust::host, zip(result.triVerts.begin(), countAt(0)),
-                     NumTri(), MakeTri({impl.halfedge_.cptrH()}));
+                     NumTri(), MakeTri({impl.halfedge_}));
 
   return result;
 }
@@ -218,7 +218,7 @@ MeshGL Manifold::GetMeshGL(glm::ivec3 normalIdx) const {
   out.faceID.resize(numTri);
   std::vector<int> triNew2Old(numTri);
   std::iota(triNew2Old.begin(), triNew2Old.end(), 0);
-  const TriRef* triRef = impl.meshRelation_.triRef.cptrD();
+  VecView<const TriRef> triRef = impl.meshRelation_.triRef;
   // Don't sort originals - keep them in order
   if (!isOriginal) {
     std::sort(triNew2Old.begin(), triNew2Old.end(), [triRef](int a, int b) {
@@ -583,7 +583,7 @@ Manifold Manifold::SetProperties(
                      propFunc) const {
   auto pImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
   const int oldNumProp = NumProp();
-  const VecDH<float> oldProperties = pImpl->meshRelation_.properties;
+  const Vec<float> oldProperties = pImpl->meshRelation_.properties;
 
   auto& triProperties = pImpl->meshRelation_.triProperties;
   if (numProp == 0) {
@@ -599,17 +599,16 @@ Manifold Manifold::SetProperties(
           triProperties[i][j] = idx++;
         }
       }
-      pImpl->meshRelation_.properties = VecDH<float>(numProp * idx, 0);
+      pImpl->meshRelation_.properties = Vec<float>(numProp * idx, 0);
     } else {
-      pImpl->meshRelation_.properties =
-          VecDH<float>(numProp * NumPropVert(), 0);
+      pImpl->meshRelation_.properties = Vec<float>(numProp * NumPropVert(), 0);
     }
     thrust::for_each_n(
         thrust::host, countAt(0), NumTri(),
-        UpdateProperties({pImpl->meshRelation_.properties.ptrH(), numProp,
-                          oldProperties.ptrH(), oldNumProp,
-                          pImpl->vertPos_.ptrH(), triProperties.ptrH(),
-                          pImpl->halfedge_.ptrH(), propFunc}));
+        UpdateProperties({pImpl->meshRelation_.properties.data(), numProp,
+                          oldProperties.data(), oldNumProp,
+                          pImpl->vertPos_.data(), triProperties.data(),
+                          pImpl->halfedge_.data(), propFunc}));
   }
 
   pImpl->meshRelation_.numProp = numProp;

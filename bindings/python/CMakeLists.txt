@@ -22,3 +22,9 @@ target_compile_features(manifold3d PUBLIC cxx_std_17)
 target_include_directories(manifold3d
     PRIVATE ${PYBIND11_DIR}/include
 )
+set_target_properties(manifold3d PROPERTIES OUTPUT_NAME "manifold3d")
+install(
+  TARGETS manifold3d
+  LIBRARY DESTINATION ${CMAKE_INSTALL_FULL_LIBDIR}
+  COMPONENT bindings
+)

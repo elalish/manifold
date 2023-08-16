@@ -1,12 +1,12 @@
 #include <emscripten/bind.h>
 #include <emscripten/val.h>
-#include <manifold.h>
-#include <polygon.h>
-#include <sdf.h>
 
 #include <vector>
 
 #include "cross_section.h"
+#include "manifold.h"
+#include "polygon.h"
+#include "sdf.h"
 
 using namespace emscripten;
 using namespace manifold;

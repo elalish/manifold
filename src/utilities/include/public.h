@@ -401,7 +401,7 @@ class Quality {
     int nSegL = 2.0f * radius * glm::pi<float>() / circularEdgeLength_;
     int nSeg = fmin(nSegA, nSegL) + 3;
     nSeg -= nSeg % 4;
-    return nSeg;
+    return std::max(nSeg, 3);
   }
 };
 /** @} */

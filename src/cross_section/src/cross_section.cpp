@@ -14,7 +14,21 @@
 
 #include "cross_section.h"
 
+#include "clipper2/clipper.core.h"
+#include "clipper2/clipper.h"
+#include "clipper2/clipper.offset.h"
+
+namespace C2 = Clipper2Lib;
+
 using namespace manifold;
+
+namespace manifold {
+struct PathImpl {
+  PathImpl(const C2::PathsD paths_) : paths_(paths_) {}
+  operator const C2::PathsD&() const { return paths_; }
+  const C2::PathsD paths_;
+};
+}  // namespace manifold
 
 namespace {
 const int precision_ = 8;
@@ -96,8 +110,8 @@ C2::PathsD transform(const C2::PathsD ps, const glm::mat3x2 m) {
   return transformed;
 }
 
-std::shared_ptr<const C2::PathsD> shared_paths(const C2::PathsD& ps) {
-  return std::make_shared<const C2::PathsD>(ps);
+std::shared_ptr<const PathImpl> shared_paths(const C2::PathsD& ps) {
+  return std::make_shared<const PathImpl>(ps);
 }
 
 // forward declaration for mutual recursion
@@ -191,7 +205,9 @@ namespace manifold {
 /**
  * The default constructor is an empty cross-section (containing no contours).
  */
-CrossSection::CrossSection() { paths_ = shared_paths(C2::PathsD()); }
+CrossSection::CrossSection() {
+  paths_ = std::make_shared<const PathImpl>(C2::PathsD());
+}
 
 CrossSection::~CrossSection() = default;
 CrossSection::CrossSection(CrossSection&&) noexcept = default;
@@ -218,7 +234,7 @@ CrossSection& CrossSection::operator=(const CrossSection& other) {
 };
 
 // Private, skips unioning.
-CrossSection::CrossSection(C2::PathsD ps) { paths_ = shared_paths(ps); }
+CrossSection::CrossSection(std::shared_ptr<const PathImpl> ps) { paths_ = ps; }
 
 /**
  * Create a 2d cross-section from a single contour. A boolean union operation
@@ -271,13 +287,13 @@ CrossSection::CrossSection(const Rect& rect) {
 // Private
 // All access to paths_ should be done through the GetPaths() method, which
 // applies the accumulated transform_
-C2::PathsD CrossSection::GetPaths() const {
+std::shared_ptr<const PathImpl> CrossSection::GetPaths() const {
   if (transform_ == glm::mat3x2(1.0f)) {
-    return *paths_;
+    return paths_;
   }
-  paths_ = shared_paths(transform(*paths_, transform_));
+  paths_ = shared_paths(transform(paths_->paths_, transform_));
   transform_ = glm::mat3x2(1.0f);
-  return *paths_;
+  return paths_;
 }
 
 /**
@@ -309,7 +325,7 @@ CrossSection CrossSection::Square(const glm::vec2 size, bool center) {
     p[2] = C2::PointD(x, y);
     p[3] = C2::PointD(0.0, y);
   }
-  return CrossSection(C2::PathsD{p});
+  return CrossSection(shared_paths(C2::PathsD{p}));
 }
 
 /**
@@ -330,7 +346,7 @@ CrossSection CrossSection::Circle(float radius, int circularSegments) {
   for (int i = 0; i < n; ++i) {
     circle[i] = C2::PointD(radius * cosd(dPhi * i), radius * sind(dPhi * i));
   }
-  return CrossSection(C2::PathsD{circle});
+  return CrossSection(shared_paths(C2::PathsD{circle}));
 }
 
 /**
@@ -339,9 +355,9 @@ CrossSection CrossSection::Circle(float radius, int circularSegments) {
 CrossSection CrossSection::Boolean(const CrossSection& second,
                                    OpType op) const {
   auto ct = cliptype_of_op(op);
-  auto res = C2::BooleanOp(ct, C2::FillRule::Positive, GetPaths(),
-                           second.GetPaths(), precision_);
-  return CrossSection(res);
+  auto res = C2::BooleanOp(ct, C2::FillRule::Positive, GetPaths()->paths_,
+                           second.GetPaths()->paths_, precision_);
+  return CrossSection(shared_paths(res));
 }
 
 /**
@@ -358,19 +374,19 @@ CrossSection CrossSection::BatchBoolean(
   auto subjs = crossSections[0].GetPaths();
   int n_clips = 0;
   for (int i = 1; i < crossSections.size(); ++i) {
-    n_clips += crossSections[i].GetPaths().size();
+    n_clips += crossSections[i].GetPaths()->paths_.size();
   }
   auto clips = C2::PathsD();
   clips.reserve(n_clips);
   for (int i = 1; i < crossSections.size(); ++i) {
     auto ps = crossSections[i].GetPaths();
-    clips.insert(clips.end(), ps.begin(), ps.end());
+    clips.insert(clips.end(), ps->paths_.begin(), ps->paths_.end());
   }
 
   auto ct = cliptype_of_op(op);
-  auto res =
-      C2::BooleanOp(ct, C2::FillRule::Positive, subjs, clips, precision_);
-  return CrossSection(res);
+  auto res = C2::BooleanOp(ct, C2::FillRule::Positive, subjs->paths_, clips,
+                           precision_);
+  return CrossSection(shared_paths(res));
 }
 
 /**
@@ -441,7 +457,7 @@ std::vector<CrossSection> CrossSection::Decompose() const {
   }
 
   C2::PolyTreeD tree;
-  C2::BooleanOp(C2::ClipType::Union, C2::FillRule::Positive, GetPaths(),
+  C2::BooleanOp(C2::ClipType::Union, C2::FillRule::Positive, GetPaths()->paths_,
                 C2::PathsD(), tree, precision_);
 
   auto polys = std::vector<C2::PathsD>();
@@ -451,7 +467,7 @@ std::vector<CrossSection> CrossSection::Decompose() const {
   auto comps = std::vector<CrossSection>(n_polys);
   // reverse the stack while wrapping
   for (int i = 0; i < n_polys; ++i) {
-    comps[n_polys - i - 1] = CrossSection(polys[i]);
+    comps[n_polys - i - 1] = CrossSection(shared_paths(polys[i]));
   }
 
   return comps;
@@ -541,8 +557,8 @@ CrossSection CrossSection::Warp(
     std::function<void(glm::vec2&)> warpFunc) const {
   auto paths = GetPaths();
   auto warped = C2::PathsD();
-  warped.reserve(paths.size());
-  for (auto path : paths) {
+  warped.reserve(paths->paths_.size());
+  for (auto path : paths->paths_) {
     auto sz = path.size();
     auto s = C2::PathD(sz);
     for (int i = 0; i < sz; ++i) {
@@ -552,7 +568,8 @@ CrossSection CrossSection::Warp(
     }
     warped.push_back(s);
   }
-  return CrossSection(C2::Union(warped, C2::FillRule::Positive, precision_));
+  return CrossSection(
+      shared_paths(C2::Union(warped, C2::FillRule::Positive, precision_)));
 }
 
 /**
@@ -568,8 +585,8 @@ CrossSection CrossSection::Warp(
  * offseting operations are to be performed, which would compound the issue.
  */
 CrossSection CrossSection::Simplify(double epsilon) const {
-  auto ps = SimplifyPaths(GetPaths(), epsilon, false);
-  return CrossSection(ps);
+  auto ps = SimplifyPaths(GetPaths()->paths_, epsilon, false);
+  return CrossSection(shared_paths(ps));
 }
 
 /**
@@ -607,9 +624,9 @@ CrossSection CrossSection::Offset(double delta, JoinType jointype,
     arc_tol = (std::cos(Clipper2Lib::PI / n) - 1) * -scaled_delta;
   }
   auto ps =
-      C2::InflatePaths(GetPaths(), delta, jt(jointype), C2::EndType::Polygon,
-                       miter_limit, precision_, arc_tol);
-  return CrossSection(ps);
+      C2::InflatePaths(GetPaths()->paths_, delta, jt(jointype),
+                       C2::EndType::Polygon, miter_limit, precision_, arc_tol);
+  return CrossSection(shared_paths(ps));
 }
 
 /**
@@ -625,14 +642,14 @@ CrossSection CrossSection::Hull(
   SimplePolygon pts;
   pts.reserve(n);
   for (auto cs : crossSections) {
-    auto paths = cs.GetPaths();
+    auto paths = cs.GetPaths()->paths_;
     for (auto path : paths) {
       for (auto p : path) {
         pts.push_back(v2_of_pd(p));
       }
     }
   }
-  return CrossSection(C2::PathsD{HullImpl(pts)});
+  return CrossSection(shared_paths(C2::PathsD{HullImpl(pts)}));
 }
 
 /**
@@ -650,7 +667,7 @@ CrossSection CrossSection::Hull() const {
  * hull.
  */
 CrossSection CrossSection::Hull(SimplePolygon pts) {
-  return CrossSection(C2::PathsD{HullImpl(pts)});
+  return CrossSection(shared_paths(C2::PathsD{HullImpl(pts)}));
 }
 
 /**
@@ -674,14 +691,14 @@ CrossSection CrossSection::Hull(const Polygons polys) {
  * Return the total area covered by complex polygons making up the
  * CrossSection.
  */
-double CrossSection::Area() const { return C2::Area(GetPaths()); }
+double CrossSection::Area() const { return C2::Area(GetPaths()->paths_); }
 
 /**
  * Return the number of vertices in the CrossSection.
  */
 int CrossSection::NumVert() const {
   int n = 0;
-  auto paths = GetPaths();
+  auto paths = GetPaths()->paths_;
   for (auto p : paths) {
     n += p.size();
   }
@@ -692,19 +709,19 @@ int CrossSection::NumVert() const {
  * Return the number of contours (both outer and inner paths) in the
  * CrossSection.
  */
-int CrossSection::NumContour() const { return GetPaths().size(); }
+int CrossSection::NumContour() const { return GetPaths()->paths_.size(); }
 
 /**
  * Does the CrossSection contain any contours?
  */
-bool CrossSection::IsEmpty() const { return GetPaths().empty(); }
+bool CrossSection::IsEmpty() const { return GetPaths()->paths_.empty(); }
 
 /**
  * Returns the axis-aligned bounding rectangle of all the CrossSections'
  * vertices.
  */
 Rect CrossSection::Bounds() const {
-  auto r = C2::GetBounds(GetPaths());
+  auto r = C2::GetBounds(GetPaths()->paths_);
   return Rect({r.left, r.bottom}, {r.right, r.top});
 }
 
@@ -713,7 +730,7 @@ Rect CrossSection::Bounds() const {
  */
 Polygons CrossSection::ToPolygons() const {
   auto polys = Polygons();
-  auto paths = GetPaths();
+  auto paths = GetPaths()->paths_;
   polys.reserve(paths.size());
   for (auto p : paths) {
     auto sp = SimplePolygon();

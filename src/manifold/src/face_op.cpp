@@ -37,11 +37,11 @@ using AddTriangle = std::function<void(int, glm::ivec3, glm::vec3, TriRef)>;
  * represents the mesh as a set of triangles as usual. In this process the
  * faceNormal_ values are retained, repeated as necessary.
  */
-void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge,
-                              const VecDH<TriRef>& halfedgeRef) {
-  VecDH<glm::ivec3> triVerts;
-  VecDH<glm::vec3> triNormal;
-  VecDH<TriRef>& triRef = meshRelation_.triRef;
+void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
+                              const Vec<TriRef>& halfedgeRef) {
+  Vec<glm::ivec3> triVerts;
+  Vec<glm::vec3> triNormal;
+  Vec<TriRef>& triRef = meshRelation_.triRef;
   triRef.resize(0);
   auto processFace = [&](GeneralTriangulation general, AddTriangle addTri,
                          int face) {
@@ -133,7 +133,7 @@ void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge,
   tbb::task_group group;
   // map from face to triangle
   tbb::concurrent_unordered_map<int, std::vector<glm::ivec3>> results;
-  VecDH<int> triCount(faceEdge.size());
+  Vec<int> triCount(faceEdge.size());
   triCount.back() = 0;
   // precompute number of triangles per face, and launch async tasks to
   // triangulate complex faces
@@ -196,7 +196,7 @@ void Manifold::Impl::Face2Tri(const VecDH<int>& faceEdge,
  * projection of the vertices.
  */
 PolygonsIdx Manifold::Impl::Face2Polygons(int face, glm::mat3x2 projection,
-                                          const VecDH<int>& faceEdge) const {
+                                          const Vec<int>& faceEdge) const {
   const int firstEdge = faceEdge[face];
   const int lastEdge = faceEdge[face + 1];
 
