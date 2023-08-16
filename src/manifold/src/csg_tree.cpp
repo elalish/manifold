@@ -206,7 +206,7 @@ Manifold::Impl CsgLeafNode::Compose(
   if (nodes.size() > 1 && policy == ExecutionPolicy::Par)
     policy = ExecutionPolicy::Seq;
 
-  for_each_n_host(
+  for_each_n(
       nodes.size() > 1 ? ExecutionPolicy::Par : ExecutionPolicy::Seq,
       countAt(0), nodes.size(),
       [&nodes, &vertIndices, &edgeIndices, &triIndices, &propVertIndices,
@@ -557,7 +557,7 @@ void CsgOpNode::BatchUnion() const {
     // compose each set of disjoint children
     std::vector<std::shared_ptr<const Manifold::Impl>> impls(
         disjointSets.size());
-    for_each_n_host(
+    for_each_n(
         disjointSets.size() > 1 ? ExecutionPolicy::Par : ExecutionPolicy::Seq,
         countAt(0), disjointSets.size(),
         [children_, &impls, &disjointSets, start](int i) {
@@ -599,7 +599,7 @@ std::vector<std::shared_ptr<CsgNode>> &CsgOpNode::GetChildren(
 
   if (forceToLeafNodes && !impl->forcedToLeafNodes_) {
     impl->forcedToLeafNodes_ = true;
-    for_each_host(impl->children_.size() > 1 ? ExecutionPolicy::Par
+    for_each(impl->children_.size() > 1 ? ExecutionPolicy::Par
                                              : ExecutionPolicy::Seq,
                   impl->children_.begin(), impl->children_.end(),
                   [](auto &child) {

@@ -137,7 +137,7 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
   triCount.back() = 0;
   // precompute number of triangles per face, and launch async tasks to
   // triangulate complex faces
-  for_each_host(autoPolicy(faceEdge.size()), countAt(0),
+  for_each(autoPolicy(faceEdge.size()), countAt(0),
                 countAt(faceEdge.size() - 1), [&](int face) {
                   triCount[face] = faceEdge[face + 1] - faceEdge[face] - 2;
                   ASSERT(triCount[face] >= 1, topologyErr,
@@ -168,7 +168,7 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
       },
       std::placeholders::_1);
   // set triangles in parallel
-  for_each_host(autoPolicy(faceEdge.size()), countAt(0),
+  for_each(autoPolicy(faceEdge.size()), countAt(0),
                 countAt(faceEdge.size() - 1), processFace2);
 #else
   triVerts.reserve(faceEdge.size());
