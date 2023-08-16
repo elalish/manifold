@@ -82,19 +82,6 @@ inline constexpr ExecutionPolicy autoPolicy(int size) {
     return thrust::NAME(thrust::cpp::par, args...);                 \
   }
 
-#define THRUST_DYNAMIC_BACKEND_HOST_VOID(NAME)               \
-  template <typename... Args>                                \
-  void NAME##_host(ExecutionPolicy policy, Args... args) {   \
-    switch (policy) {                                        \
-      case ExecutionPolicy::Par:                             \
-        thrust::NAME(thrust::MANIFOLD_PAR_NS::par, args...); \
-        break;                                               \
-      case ExecutionPolicy::Seq:                             \
-        thrust::NAME(thrust::cpp::par, args...);             \
-        break;                                               \
-    }                                                        \
-  }
-
 #if MANIFOLD_PAR == 'T' && __has_include(<pstl/glue_execution_defs.h>)
 // sometimes stl variant is faster
 #define STL_DYNAMIC_BACKEND(NAME, RET)                        \
@@ -157,9 +144,6 @@ OutputIterator copy_if(ExecutionPolicy policy, InputIterator1 first,
 THRUST_DYNAMIC_BACKEND_VOID(exclusive_scan)
 THRUST_DYNAMIC_BACKEND(copy_if, void)
 #endif
-
-THRUST_DYNAMIC_BACKEND_HOST_VOID(for_each)
-THRUST_DYNAMIC_BACKEND_HOST_VOID(for_each_n)
 
 THRUST_DYNAMIC_BACKEND_VOID(gather)
 THRUST_DYNAMIC_BACKEND_VOID(scatter)
