@@ -40,8 +40,8 @@ struct Equals {
 };
 
 struct RemoveFace {
-  const Halfedge* halfedge;
-  const int* vertLabel;
+  VecView<const Halfedge> halfedge;
+  VecView<const int> vertLabel;
   const int keepLabel;
 
   bool operator()(int face) {
@@ -247,7 +247,7 @@ Manifold Manifold::Extrude(const CrossSection& crossSection, float height,
   auto pImpl_ = std::make_shared<Impl>();
   ++nDivisions;
   auto& vertPos = pImpl_->vertPos_;
-  VecDH<glm::ivec3> triVertsDH;
+  Vec<glm::ivec3> triVertsDH;
   auto& triVerts = triVertsDH;
   int nCrossSection = 0;
   bool isCone = scaleTop.x == 0.0 && scaleTop.y == 0.0;
@@ -359,7 +359,7 @@ Manifold Manifold::Revolve(const CrossSection& crossSection,
 
   auto pImpl_ = std::make_shared<Impl>();
   auto& vertPos = pImpl_->vertPos_;
-  VecDH<glm::ivec3> triVertsDH;
+  Vec<glm::ivec3> triVertsDH;
   auto& triVerts = triVertsDH;
 
   std::vector<int> startPoses;
@@ -482,7 +482,7 @@ std::vector<Manifold> Manifold::Decompose() const {
     meshes[0] = *this;
     return meshes;
   }
-  VecDH<int> vertLabel(componentIndices);
+  Vec<int> vertLabel(componentIndices);
 
   std::vector<Manifold> meshes;
   for (int i = 0; i < numComponents; ++i) {
@@ -490,7 +490,7 @@ std::vector<Manifold> Manifold::Decompose() const {
     // inherit original object's precision
     impl->precision_ = pImpl_->precision_;
     impl->vertPos_.resize(NumVert());
-    VecDH<int> vertNew2Old(NumVert());
+    Vec<int> vertNew2Old(NumVert());
     auto policy = autoPolicy(NumVert());
     auto start = zip(impl->vertPos_.begin(), vertNew2Old.begin());
     int nVert =
@@ -501,14 +501,13 @@ std::vector<Manifold> Manifold::Decompose() const {
         start;
     impl->vertPos_.resize(nVert);
 
-    VecDH<int> faceNew2Old(NumTri());
+    Vec<int> faceNew2Old(NumTri());
     sequence(policy, faceNew2Old.begin(), faceNew2Old.end());
 
-    int nFace =
-        remove_if<decltype(faceNew2Old.begin())>(
-            policy, faceNew2Old.begin(), faceNew2Old.end(),
-            RemoveFace({pImpl_->halfedge_.cptrD(), vertLabel.cptrD(), i})) -
-        faceNew2Old.begin();
+    int nFace = remove_if<decltype(faceNew2Old.begin())>(
+                    policy, faceNew2Old.begin(), faceNew2Old.end(),
+                    RemoveFace({pImpl_->halfedge_, vertLabel, i})) -
+                faceNew2Old.begin();
     faceNew2Old.resize(nFace);
 
     impl->GatherFaces(*pImpl_, faceNew2Old);

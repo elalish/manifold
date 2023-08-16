@@ -18,12 +18,12 @@
 
 #include "public.h"
 #include "utils.h"
-#include "vec_dh.h"
+#include "vec.h"
 
 namespace {
 typedef unsigned long long int Uint64;
 typedef Uint64 (*hash_fun_t)(Uint64);
-constexpr Uint64 kOpen = std::numeric_limits<Uint64>::max();
+inline constexpr Uint64 kOpen = std::numeric_limits<Uint64>::max();
 
 template <typename T>
 T AtomicCAS(T& target, T compare, T val) {
@@ -63,7 +63,7 @@ namespace manifold {
 template <typename V, hash_fun_t H = hash64bit>
 class HashTableD {
  public:
-  HashTableD(VecDH<Uint64>& keys, VecDH<V>& values, VecDH<uint32_t>& used,
+  HashTableD(Vec<Uint64>& keys, Vec<V>& values, Vec<uint32_t>& used,
              uint32_t step = 1)
       : step_{step}, keys_{keys}, values_{values}, used_{used} {}
 
@@ -87,7 +87,18 @@ class HashTableD {
     }
   }
 
-  V& operator[](Uint64 key) const {
+  V& operator[](Uint64 key) {
+    uint32_t idx = H(key) & (Size() - 1);
+    while (1) {
+      const Uint64 k = AtomicLoad(keys_[idx]);
+      if (k == key || k == kOpen) {
+        return values_[idx];
+      }
+      idx = (idx + step_) & (Size() - 1);
+    }
+  }
+
+  const V& operator[](Uint64 key) const {
     uint32_t idx = H(key) & (Size() - 1);
     while (1) {
       const Uint64 k = AtomicLoad(keys_[idx]);
@@ -99,13 +110,14 @@ class HashTableD {
   }
 
   Uint64 KeyAt(int idx) const { return AtomicLoad(keys_[idx]); }
-  V& At(int idx) const { return values_[idx]; }
+  V& At(int idx) { return values_[idx]; }
+  const V& At(int idx) const { return values_[idx]; }
 
  private:
   uint32_t step_;
-  VecD<Uint64> keys_;
-  VecD<V> values_;
-  VecD<uint32_t> used_;
+  VecView<Uint64> keys_;
+  VecView<V> values_;
+  VecView<uint32_t> used_;
 };
 
 template <typename V, hash_fun_t H = hash64bit>
@@ -128,14 +140,14 @@ class HashTable {
     return static_cast<float>(AtomicLoad(used_[0])) / Size();
   }
 
-  VecDH<V>& GetValueStore() { return values_; }
+  Vec<V>& GetValueStore() { return values_; }
 
   static Uint64 Open() { return kOpen; }
 
  private:
-  VecDH<Uint64> keys_;
-  VecDH<V> values_;
-  VecDH<uint32_t> used_ = VecDH<uint32_t>(1, 0);
+  Vec<Uint64> keys_;
+  Vec<V> values_;
+  Vec<uint32_t> used_ = Vec<uint32_t>(1, 0);
   HashTableD<V, H> table_;
 };
 

@@ -12,13 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "manifold.h"
 #include "samples.h"
 #include "sdf.h"
 
 namespace {
+using namespace manifold;
 
 struct Gyroid {
-  __host__ __device__ float operator()(glm::vec3 p) const {
+  float operator()(glm::vec3 p) const {
     p -= glm::pi<float>() / 4;
     return cos(p.x) * sin(p.y) + cos(p.y) * sin(p.z) + cos(p.z) * sin(p.x);
   }

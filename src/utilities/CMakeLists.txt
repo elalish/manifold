@@ -80,3 +80,10 @@ if(MANIFOLD_DEBUG)
 endif()
 
 target_compile_features(${PROJECT_NAME} INTERFACE cxx_std_17)
+
+install(
+  FILES include/public.h
+  DESTINATION ${CMAKE_INSTALL_FULL_INCLUDEDIR}/manifold
+  COMPONENT devel
+)
+

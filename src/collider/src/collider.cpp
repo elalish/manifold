@@ -68,9 +68,9 @@ int Node2Leaf(int node) { return node / 2; }
 int Leaf2Node(int leaf) { return leaf * 2; }
 
 struct CreateRadixTree {
-  int* nodeParent_;
-  thrust::pair<int, int>* internalChildren_;
-  const VecDc<uint32_t> leafMorton_;
+  VecView<int> nodeParent_;
+  VecView<thrust::pair<int, int>> internalChildren_;
+  const VecView<const uint32_t> leafMorton_;
 
   int PrefixLength(uint32_t a, uint32_t b) const {
 // count-leading-zeros is used to find the number of identical highest-order
@@ -154,9 +154,9 @@ struct CreateRadixTree {
 
 template <typename T, const bool selfCollision, typename Recorder>
 struct FindCollisions {
-  const Box* nodeBBox_;
-  const thrust::pair<int, int>* internalChildren_;
-  const Recorder& recorder;
+  VecView<const Box> nodeBBox_;
+  VecView<const thrust::pair<int, int>> internalChildren_;
+  Recorder recorder;
 
   int RecordCollision(int node, thrust::tuple<T, int>& query) {
     const T& queryObj = thrust::get<0>(query);
@@ -205,11 +205,11 @@ struct FindCollisions {
 };
 
 struct CountCollisions {
-  int* counts;
-  char* empty;
-  void record(int queryIdx, int _leafIdx) const { counts[queryIdx]++; }
-  bool earlyexit(int _queryIdx) const { return false; }
-  void end(int queryIdx) const {
+  VecView<int> counts;
+  VecView<char> empty;
+  void record(int queryIdx, int _leafIdx) { counts[queryIdx]++; }
+  bool earlyexit(int _queryIdx) { return false; }
+  void end(int queryIdx) {
     if (counts[queryIdx] == 0) empty[queryIdx] = 1;
   }
 };
@@ -230,9 +230,9 @@ struct SeqCollisionRecorder {
 template <const bool inverted>
 struct ParCollisionRecorder {
   SparseIndices& queryTri;
-  int* counts;
-  char* empty;
-  void record(int queryIdx, int leafIdx) const {
+  VecView<int> counts;
+  VecView<char> empty;
+  void record(int queryIdx, int leafIdx) {
     int pos = counts[queryIdx]++;
     if (inverted)
       queryTri.Set(pos, leafIdx, queryIdx);
@@ -244,10 +244,10 @@ struct ParCollisionRecorder {
 };
 
 struct BuildInternalBoxes {
-  Box* nodeBBox_;
-  int* counter_;
-  const int* nodeParent_;
-  const thrust::pair<int, int>* internalChildren_;
+  VecView<Box> nodeBBox_;
+  VecView<int> counter_;
+  const VecView<int> nodeParent_;
+  const VecView<thrust::pair<int, int>> internalChildren_;
 
   void operator()(int leaf) {
     int node = Leaf2Node(leaf);
@@ -274,8 +274,8 @@ namespace manifold {
  * bounding boxes and corresponding Morton codes. It is assumed these vectors
  * are already sorted by increasing Morton code.
  */
-Collider::Collider(const VecDH<Box>& leafBB,
-                   const VecDH<uint32_t>& leafMorton) {
+Collider::Collider(const VecView<const Box>& leafBB,
+                   const VecView<const uint32_t>& leafMorton) {
   ASSERT(leafBB.size() == leafMorton.size(), userErr,
          "vectors must be the same length");
   int num_nodes = 2 * leafBB.size() - 1;
@@ -285,8 +285,7 @@ Collider::Collider(const VecDH<Box>& leafBB,
   internalChildren_.resize(leafBB.size() - 1, thrust::make_pair(-1, -1));
   // organize tree
   for_each_n(autoPolicy(NumInternal()), countAt(0), NumInternal(),
-             CreateRadixTree(
-                 {nodeParent_.ptrD(), internalChildren_.ptrD(), leafMorton}));
+             CreateRadixTree({nodeParent_, internalChildren_, leafMorton}));
   UpdateBoxes(leafBB);
 }
 
@@ -299,7 +298,7 @@ Collider::Collider(const VecDH<Box>& leafBB,
  * then not report any collisions between an index and itself.
  */
 template <const bool selfCollision, const bool inverted, typename T>
-SparseIndices Collider::Collisions(const VecDH<T>& queriesIn) const {
+SparseIndices Collider::Collisions(const VecView<const T>& queriesIn) const {
   // note that the length is 1 larger than the number of queries so the last
   // element can store the sum when using exclusive scan
   if (queriesIn.size() < kSequentialThreshold) {
@@ -307,19 +306,17 @@ SparseIndices Collider::Collisions(const VecDH<T>& queriesIn) const {
     for_each_n(ExecutionPolicy::Seq, zip(queriesIn.cbegin(), countAt(0)),
                queriesIn.size(),
                FindCollisions<T, selfCollision, SeqCollisionRecorder<inverted>>{
-                   nodeBBox_.ptrD(), internalChildren_.ptrD(), {queryTri}});
+                   nodeBBox_, internalChildren_, {queryTri}});
     return queryTri;
   } else {
     // compute the number of collisions to determine the size for allocation and
     // offset, this avoids the need for atomic
-    VecDH<int> counts(queriesIn.size() + 1, 0);
-    VecDH<char> empty(queriesIn.size(), 0);
+    Vec<int> counts(queriesIn.size() + 1, 0);
+    Vec<char> empty(queriesIn.size(), 0);
     for_each_n(ExecutionPolicy::Par, zip(queriesIn.cbegin(), countAt(0)),
                queriesIn.size(),
                FindCollisions<T, selfCollision, CountCollisions>{
-                   nodeBBox_.ptrD(),
-                   internalChildren_.ptrD(),
-                   {counts.ptrD(), empty.ptrD()}});
+                   nodeBBox_, internalChildren_, {counts, empty}});
     // compute start index for each query and total count
     exclusive_scan(ExecutionPolicy::Par, counts.begin(), counts.end(),
                    counts.begin(), 0, std::plus<int>());
@@ -329,9 +326,7 @@ SparseIndices Collider::Collisions(const VecDH<T>& queriesIn) const {
     for_each_n(ExecutionPolicy::Par, zip(queriesIn.cbegin(), countAt(0)),
                queriesIn.size(),
                FindCollisions<T, selfCollision, ParCollisionRecorder<inverted>>{
-                   nodeBBox_.ptrD(),
-                   internalChildren_.ptrD(),
-                   {queryTri, counts.ptrD(), empty.ptrD()}});
+                   nodeBBox_, internalChildren_, {queryTri, counts, empty}});
     return queryTri;
   }
 }
@@ -340,20 +335,19 @@ SparseIndices Collider::Collisions(const VecDH<T>& queriesIn) const {
  * Recalculate the collider's internal bounding boxes without changing the
  * hierarchy.
  */
-void Collider::UpdateBoxes(const VecDH<Box>& leafBB) {
+void Collider::UpdateBoxes(const VecView<const Box>& leafBB) {
   ASSERT(leafBB.size() == NumLeaves(), userErr,
          "must have the same number of updated boxes as original");
   // copy in leaf node Boxes
-  strided_range<VecDH<Box>::Iter> leaves(nodeBBox_.begin(), nodeBBox_.end(), 2);
+  strided_range<Vec<Box>::Iter> leaves(nodeBBox_.begin(), nodeBBox_.end(), 2);
   auto policy = autoPolicy(NumInternal());
   copy(policy, leafBB.cbegin(), leafBB.cend(), leaves.begin());
   // create global counters
-  VecDH<int> counter(NumInternal(), 0);
+  Vec<int> counter(NumInternal(), 0);
   // kernel over leaves to save internal Boxes
   for_each_n(
       policy, countAt(0), NumLeaves(),
-      BuildInternalBoxes({nodeBBox_.ptrD(), counter.ptrD(), nodeParent_.cptrD(),
-                          internalChildren_.cptrD()}));
+      BuildInternalBoxes({nodeBBox_, counter, nodeParent_, internalChildren_}));
 }
 
 /**
@@ -377,21 +371,21 @@ bool Collider::Transform(glm::mat4x3 transform) {
 }
 
 template SparseIndices Collider::Collisions<true, false, Box>(
-    const VecDH<Box>&) const;
+    const VecView<const Box>&) const;
 
 template SparseIndices Collider::Collisions<false, false, Box>(
-    const VecDH<Box>&) const;
+    const VecView<const Box>&) const;
 
 template SparseIndices Collider::Collisions<false, false, glm::vec3>(
-    const VecDH<glm::vec3>&) const;
+    const VecView<const glm::vec3>&) const;
 
 template SparseIndices Collider::Collisions<true, true, Box>(
-    const VecDH<Box>&) const;
+    const VecView<const Box>&) const;
 
 template SparseIndices Collider::Collisions<false, true, Box>(
-    const VecDH<Box>&) const;
+    const VecView<const Box>&) const;
 
 template SparseIndices Collider::Collisions<false, true, glm::vec3>(
-    const VecDH<glm::vec3>&) const;
+    const VecView<const glm::vec3>&) const;
 
 }  // namespace manifold

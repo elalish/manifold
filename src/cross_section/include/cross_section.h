@@ -14,18 +14,13 @@
 
 #pragma once
 
-#include <clipper2/clipper.h>
-
+#include <functional>
 #include <memory>
 #include <vector>
 
-#include "clipper2/clipper.core.h"
-#include "clipper2/clipper.offset.h"
 #include "glm/ext/matrix_float3x2.hpp"
 #include "glm/ext/vector_float2.hpp"
 #include "public.h"
-
-namespace C2 = Clipper2Lib;
 
 namespace manifold {
 
@@ -34,6 +29,8 @@ class Rect;
 /** @addtogroup Core
  *  @{
  */
+
+struct PathImpl;
 
 /**
  * Two-dimensional cross sections guaranteed to be without self-intersections,
@@ -169,10 +166,10 @@ class CrossSection {
   ///@}
 
  private:
-  mutable std::shared_ptr<const C2::PathsD> paths_;
+  mutable std::shared_ptr<const PathImpl> paths_;
   mutable glm::mat3x2 transform_ = glm::mat3x2(1.0f);
-  CrossSection(C2::PathsD paths);
-  C2::PathsD GetPaths() const;
+  CrossSection(std::shared_ptr<const PathImpl> paths);
+  std::shared_ptr<const PathImpl> GetPaths() const;
 };
 /** @} */
 

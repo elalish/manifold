@@ -25,6 +25,9 @@ option(MANIFOLD_PYBIND "Build python bindings" ON)
 option(MANIFOLD_CBIND "Build C (FFI) bindings" OFF)
 option(TRACY_ENABLE "Use tracy profiling" OFF) 
 option(TRACY_MEMORY_USAGE "Track memory allocation with tracy (expensive)" OFF)
+option(BUILD_TEST_CGAL "Build CGAL performance comparisons" OFF)
+set(MANIFOLD_PAR "NONE" CACHE STRING "Parallel backend, either \"TBB\" or \"NONE\"")
+set(MANIFOLD_FLAGS "" CACHE STRING "Manifold compiler flags")
 
 if(TRACY_ENABLE)
   option(CMAKE_BUILD_TYPE "Build type" RelWithDebInfo)
@@ -38,7 +41,6 @@ else()
   option(CMAKE_BUILD_TYPE "Build type" Release)
 endif()
 
-set(MANIFOLD_PAR "NONE" CACHE STRING "Parallel backend, either \"TBB\" or \"NONE\"")
 set(MANIFOLD_FLAGS ${MANIFOLD_FLAGS} -O3)
 
 if(EMSCRIPTEN)
@@ -49,16 +51,15 @@ if(EMSCRIPTEN)
 endif()
 
 if(MANIFOLD_PYBIND)
-find_package(Python COMPONENTS Interpreter Development.Module REQUIRED)
+  set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+  find_package(Python COMPONENTS Interpreter Development.Module REQUIRED)
 endif()
 
-option(BUILD_TEST_CGAL "Build CGAL performance comparisons" OFF)
 
-option(BUILD_SHARED_LIBS "Build dynamic/shared libraries" OFF)
 set(PYBIND11_DIR ${PROJECT_SOURCE_DIR}/bindings/python/third_party/pybind11)
 set(THRUST_INC_DIR ${PROJECT_SOURCE_DIR}/src/third_party/thrust)
 
-if(CMAKE_EXPORT_COMPILE_COMMANDS AND !EMSCRIPTEN)
+if(CMAKE_EXPORT_COMPILE_COMMANDS AND NOT EMSCRIPTEN)
   # for nixos
   set(CMAKE_CXX_STANDARD_INCLUDE_DIRECTORIES 
       ${CMAKE_CXX_IMPLICIT_INCLUDE_DIRECTORIES})
@@ -82,6 +83,8 @@ if(CODE_COVERAGE AND NOT MSVC)
     "$<$<COMPILE_LANGUAGE:CXX>:${COVERAGE_FLAGS}>")
   add_link_options("-coverage")
 endif()
+
+include(GNUInstallDirs)
 
 add_subdirectory(src)
 add_subdirectory(bindings)

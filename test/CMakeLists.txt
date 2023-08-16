@@ -47,7 +47,7 @@ if(NOT TARGET GTest::GTest)
 endif()
 
 add_executable(${PROJECT_NAME} ${SOURCE_FILES})
-target_link_libraries(${PROJECT_NAME} polygon GTest::GTest manifold sdf samples samplesGPU cross_section)
+target_link_libraries(${PROJECT_NAME} polygon GTest::GTest manifold sdf samples cross_section)
 
 if(MANIFOLD_CBIND)
   target_link_libraries(${PROJECT_NAME} manifoldc)

@@ -23,3 +23,9 @@ target_link_libraries(${PROJECT_NAME} PUBLIC utilities)
 target_compile_features(${PROJECT_NAME}
     PUBLIC cxx_std_17
 )
+
+install(
+  TARGETS ${PROJECT_NAME}
+  LIBRARY DESTINATION ${CMAKE_INSTALL_FULL_LIBDIR}
+  COMPONENT runtime
+)

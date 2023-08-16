@@ -20,3 +20,14 @@ target_link_libraries(
 target_include_directories(${PROJECT_NAME} PUBLIC ${PROJECT_SOURCE_DIR}/include)
 target_compile_options(${PROJECT_NAME} PRIVATE ${MANIFOLD_FLAGS})
 target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_17)
+
+install(
+  TARGETS ${PROJECT_NAME}
+  LIBRARY DESTINATION ${CMAKE_INSTALL_FULL_LIBDIR}
+  COMPONENT bindings
+)
+install(
+  FILES include/manifoldc.h include/types.h
+  DESTINATION ${CMAKE_INSTALL_FULL_INCLUDEDIR}/manifold
+  COMPONENT devel
+)

@@ -71,7 +71,7 @@ struct CopyFaceEdges {
   // const int *p1q1;
   // x can be either vert or edge (0 or 1).
   SparseIndices &pXq1;
-  const Halfedge *halfedgesQ;
+  VecView<const Halfedge> halfedgesQ;
 
   void operator()(thrust::tuple<int, int> in) {
     int idx = 3 * thrust::get<0>(in);
@@ -95,9 +95,9 @@ SparseIndices Filter11(const Manifold::Impl &inP, const Manifold::Impl &inQ,
                        ExecutionPolicy policy) {
   SparseIndices p1q1(3 * p1q2.size() + 3 * p2q1.size());
   for_each_n(policy, zip(countAt(0), countAt(0)), p1q2.size(),
-             CopyFaceEdges<false>({p1q2, p1q1, inQ.halfedge_.cptrD()}));
+             CopyFaceEdges<false>({p1q2, p1q1, inQ.halfedge_}));
   for_each_n(policy, zip(countAt(p1q2.size()), countAt(0)), p2q1.size(),
-             CopyFaceEdges<true>({p2q1, p1q1, inP.halfedge_.cptrD()}));
+             CopyFaceEdges<true>({p2q1, p1q1, inP.halfedge_}));
   p1q1.Unique(policy);
   return p1q1;
 }
@@ -116,9 +116,9 @@ bool Shadows(float p, float q, float dir) { return p == q ? dir < 0 : p < q; }
  * by the shared policy_ member.
  */
 thrust::pair<int, glm::vec2> Shadow01(
-    const int p0, const int q1, const glm::vec3 *vertPosP,
-    const glm::vec3 *vertPosQ, const Halfedge *halfedgeQ, const float expandP,
-    const glm::vec3 *normalP, const bool reverse) {
+    const int p0, const int q1, VecView<const glm::vec3> vertPosP,
+    VecView<const glm::vec3> vertPosQ, VecView<const Halfedge> halfedgeQ,
+    const float expandP, VecView<const glm::vec3> normalP, const bool reverse) {
   const int q1s = halfedgeQ[q1].startVert;
   const int q1e = halfedgeQ[q1].endVert;
   const float p0x = vertPosP[p0].x;
@@ -148,13 +148,12 @@ thrust::pair<int, glm::vec2> Shadow01(
 
 // https://github.com/scandum/binary_search/blob/master/README.md
 // much faster than standard binary search on large arrays
-int monobound_quaternary_search(const int64_t *array, unsigned int array_size,
-                                int64_t key) {
-  if (array_size == 0) {
+int monobound_quaternary_search(VecView<const int64_t> array, int64_t key) {
+  if (array.size() == 0) {
     return -1;
   }
   unsigned int bot = 0;
-  unsigned int top = array_size;
+  unsigned int top = array.size();
   while (top >= 65536) {
     unsigned int mid = top / 4;
     top -= mid * 3;
@@ -187,12 +186,12 @@ int monobound_quaternary_search(const int64_t *array, unsigned int array_size,
 }
 
 struct Kernel11 {
-  const glm::vec3 *vertPosP;
-  const glm::vec3 *vertPosQ;
-  const Halfedge *halfedgeP;
-  const Halfedge *halfedgeQ;
+  VecView<const glm::vec3> vertPosP;
+  VecView<const glm::vec3> vertPosQ;
+  VecView<const Halfedge> halfedgeP;
+  VecView<const Halfedge> halfedgeQ;
   float expandP;
-  const glm::vec3 *normalP;
+  VecView<const glm::vec3> normalP;
   const SparseIndices &p1q1;
 
   void operator()(thrust::tuple<int, glm::vec4 &, int &> inout) {
@@ -269,18 +268,17 @@ struct Kernel11 {
   }
 };
 
-std::tuple<VecDH<int>, VecDH<glm::vec4>> Shadow11(SparseIndices &p1q1,
-                                                  const Manifold::Impl &inP,
-                                                  const Manifold::Impl &inQ,
-                                                  float expandP,
-                                                  ExecutionPolicy policy) {
-  VecDH<int> s11(p1q1.size());
-  VecDH<glm::vec4> xyzz11(p1q1.size());
+std::tuple<Vec<int>, Vec<glm::vec4>> Shadow11(SparseIndices &p1q1,
+                                              const Manifold::Impl &inP,
+                                              const Manifold::Impl &inQ,
+                                              float expandP,
+                                              ExecutionPolicy policy) {
+  Vec<int> s11(p1q1.size());
+  Vec<glm::vec4> xyzz11(p1q1.size());
 
   for_each_n(policy, zip(countAt(0), xyzz11.begin(), s11.begin()), p1q1.size(),
-             Kernel11({inP.vertPos_.cptrD(), inQ.vertPos_.cptrD(),
-                       inP.halfedge_.cptrD(), inQ.halfedge_.cptrD(), expandP,
-                       inP.vertNormal_.cptrD(), p1q1}));
+             Kernel11({inP.vertPos_, inQ.vertPos_, inP.halfedge_, inQ.halfedge_,
+                       expandP, inP.vertNormal_, p1q1}));
 
   p1q1.KeepFinite(xyzz11, s11);
 
@@ -288,12 +286,12 @@ std::tuple<VecDH<int>, VecDH<glm::vec4>> Shadow11(SparseIndices &p1q1,
 };
 
 struct Kernel02 {
-  const glm::vec3 *vertPosP;
-  const Halfedge *halfedgeQ;
-  const glm::vec3 *vertPosQ;
+  VecView<const glm::vec3> vertPosP;
+  VecView<const Halfedge> halfedgeQ;
+  VecView<const glm::vec3> vertPosQ;
   const bool forward;
   const float expandP;
-  const glm::vec3 *vertNormalP;
+  VecView<const glm::vec3> vertNormalP;
   const SparseIndices &p0q2;
 
   void operator()(thrust::tuple<int, int &, float &> inout) {
@@ -364,20 +362,18 @@ struct Kernel02 {
   }
 };
 
-std::tuple<VecDH<int>, VecDH<float>> Shadow02(const Manifold::Impl &inP,
-                                              const Manifold::Impl &inQ,
-                                              SparseIndices &p0q2, bool forward,
-                                              float expandP,
-                                              ExecutionPolicy policy) {
-  VecDH<int> s02(p0q2.size());
-  VecDH<float> z02(p0q2.size());
+std::tuple<Vec<int>, Vec<float>> Shadow02(const Manifold::Impl &inP,
+                                          const Manifold::Impl &inQ,
+                                          SparseIndices &p0q2, bool forward,
+                                          float expandP,
+                                          ExecutionPolicy policy) {
+  Vec<int> s02(p0q2.size());
+  Vec<float> z02(p0q2.size());
 
-  auto vertNormalP =
-      forward ? inP.vertNormal_.cptrD() : inQ.vertNormal_.cptrD();
-  for_each_n(
-      policy, zip(countAt(0), s02.begin(), z02.begin()), p0q2.size(),
-      Kernel02({inP.vertPos_.cptrD(), inQ.halfedge_.cptrD(),
-                inQ.vertPos_.cptrD(), forward, expandP, vertNormalP, p0q2}));
+  auto vertNormalP = forward ? inP.vertNormal_ : inQ.vertNormal_;
+  for_each_n(policy, zip(countAt(0), s02.begin(), z02.begin()), p0q2.size(),
+             Kernel02({inP.vertPos_, inQ.halfedge_, inQ.vertPos_, forward,
+                       expandP, vertNormalP, p0q2}));
 
   p0q2.KeepFinite(z02, s02);
 
@@ -385,17 +381,15 @@ std::tuple<VecDH<int>, VecDH<float>> Shadow02(const Manifold::Impl &inP,
 };
 
 struct Kernel12 {
-  const VecDH<int64_t> &p0q2;
-  const int *s02;
-  const float *z02;
-  const int size02;
-  const VecDH<int64_t> &p1q1;
-  const int *s11;
-  const glm::vec4 *xyzz11;
-  const int size11;
-  const Halfedge *halfedgesP;
-  const Halfedge *halfedgesQ;
-  const glm::vec3 *vertPosP;
+  const Vec<int64_t> &p0q2;
+  VecView<const int> s02;
+  VecView<const float> z02;
+  const Vec<int64_t> &p1q1;
+  VecView<const int> s11;
+  VecView<const glm::vec4> xyzz11;
+  VecView<const Halfedge> halfedgesP;
+  VecView<const Halfedge> halfedgesQ;
+  VecView<const glm::vec3> vertPosP;
   const bool forward;
   const SparseIndices &p1q2;
 
@@ -419,7 +413,7 @@ struct Kernel12 {
     for (int vert : {edge.startVert, edge.endVert}) {
       const int64_t key = forward ? SparseIndices::EncodePQ(vert, q2)
                                   : SparseIndices::EncodePQ(q2, vert);
-      const int idx = monobound_quaternary_search(p0q2.ptrD(), size02, key);
+      const int idx = monobound_quaternary_search(p0q2, key);
       if (idx != -1) {
         const int s = s02[idx];
         x12 += s * ((vert == edge.startVert) == forward ? 1 : -1);
@@ -440,7 +434,7 @@ struct Kernel12 {
       const int q1F = edge.IsForward() ? q1 : edge.pairedHalfedge;
       const int64_t key = forward ? SparseIndices::EncodePQ(p1, q1F)
                                   : SparseIndices::EncodePQ(q1F, p1);
-      const int idx = monobound_quaternary_search(p1q1.ptrD(), size11, key);
+      const int idx = monobound_quaternary_search(p1q1, key);
       if (idx != -1) {  // s is implicitly zero for anything not found
         const int s = s11[idx];
         x12 -= s * (edge.IsForward() ? 1 : -1);
@@ -476,33 +470,32 @@ struct Kernel12 {
   }
 };
 
-std::tuple<VecDH<int>, VecDH<glm::vec3>> Intersect12(
-    const Manifold::Impl &inP, const Manifold::Impl &inQ, const VecDH<int> &s02,
-    const SparseIndices &p0q2, const VecDH<int> &s11, const SparseIndices &p1q1,
-    const VecDH<float> &z02, const VecDH<glm::vec4> &xyzz11,
-    SparseIndices &p1q2, bool forward, ExecutionPolicy policy) {
-  VecDH<int> x12(p1q2.size());
-  VecDH<glm::vec3> v12(p1q2.size());
+std::tuple<Vec<int>, Vec<glm::vec3>> Intersect12(
+    const Manifold::Impl &inP, const Manifold::Impl &inQ, const Vec<int> &s02,
+    const SparseIndices &p0q2, const Vec<int> &s11, const SparseIndices &p1q1,
+    const Vec<float> &z02, const Vec<glm::vec4> &xyzz11, SparseIndices &p1q2,
+    bool forward, ExecutionPolicy policy) {
+  Vec<int> x12(p1q2.size());
+  Vec<glm::vec3> v12(p1q2.size());
 
-  for_each_n(policy, zip(countAt(0), x12.begin(), v12.begin()), p1q2.size(),
-             Kernel12({p0q2.AsVec64(), s02.ptrD(), z02.cptrD(), p0q2.size(),
-                       p1q1.AsVec64(), s11.ptrD(), xyzz11.cptrD(), p1q1.size(),
-                       inP.halfedge_.cptrD(), inQ.halfedge_.cptrD(),
-                       inP.vertPos_.cptrD(), forward, p1q2}));
+  for_each_n(
+      policy, zip(countAt(0), x12.begin(), v12.begin()), p1q2.size(),
+      Kernel12({p0q2.AsVec64(), s02, z02, p1q1.AsVec64(), s11, xyzz11,
+                inP.halfedge_, inQ.halfedge_, inP.vertPos_, forward, p1q2}));
 
   p1q2.KeepFinite(v12, x12);
 
   return std::make_tuple(x12, v12);
 };
 
-VecDH<int> Winding03(const Manifold::Impl &inP, VecDH<int> &vertices,
-                     VecDH<int> &s02, bool reverse, ExecutionPolicy policy) {
+Vec<int> Winding03(const Manifold::Impl &inP, Vec<int> &vertices, Vec<int> &s02,
+                   bool reverse, ExecutionPolicy policy) {
   // verts that are not shadowed (not in p0q2) have winding number zero.
-  VecDH<int> w03(inP.NumVert(), 0);
+  Vec<int> w03(inP.NumVert(), 0);
   // checking is slow, so just sort and reduce
   stable_sort_by_key(policy, vertices.begin(), vertices.end(), s02.begin());
-  VecDH<int> w03val(w03.size());
-  VecDH<int> w03vert(w03.size());
+  Vec<int> w03val(w03.size());
+  Vec<int> w03vert(w03.size());
   // sum known s02 values into w03 (winding number)
   auto endPair = reduce_by_key<
       thrust::pair<decltype(w03val.begin()), decltype(w03val.begin())>>(
@@ -575,20 +568,20 @@ Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ,
   // Level 2
   // Build up XY-projection intersection of two edges, including the z-value for
   // each edge, keeping only those whose intersection exists.
-  VecDH<int> s11;
-  VecDH<glm::vec4> xyzz11;
+  Vec<int> s11;
+  Vec<glm::vec4> xyzz11;
   std::tie(s11, xyzz11) = Shadow11(p1q1, inP, inQ, expandP_, policy_);
   PRINT("s11 size = " << s11.size());
 
   // Build up Z-projection of vertices onto triangles, keeping only those that
   // fall inside the triangle.
-  VecDH<int> s02;
-  VecDH<float> z02;
+  Vec<int> s02;
+  Vec<float> z02;
   std::tie(s02, z02) = Shadow02(inP, inQ, p0q2, true, expandP_, policy_);
   PRINT("s02 size = " << s02.size());
 
-  VecDH<int> s20;
-  VecDH<float> z20;
+  Vec<int> s20;
+  Vec<float> z20;
   std::tie(s20, z20) = Shadow02(inQ, inP, p2q0, false, expandP_, policy_);
   PRINT("s20 size = " << s20.size());
 
@@ -604,9 +597,9 @@ Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ,
                                      xyzz11, p2q1_, false, policy_);
   PRINT("x21 size = " << x21_.size());
 
-  VecDH<int> p0 = p0q2.Copy(false);
+  Vec<int> p0 = p0q2.Copy(false);
   p0q2.Resize(0);
-  VecDH<int> q0 = p2q0.Copy(true);
+  Vec<int> q0 = p2q0.Copy(true);
   p2q0.Resize(0);
   // Sum up the winding numbers of all vertices.
   w03_ = Winding03(inP, p0, s02, false, policy_);

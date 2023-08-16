@@ -11,6 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+#include <algorithm>
 
 #include "manifold.h"
 #include "polygon.h"
@@ -126,7 +127,7 @@ Mesh Csaszar() {
 }
 
 struct GyroidSDF {
-  __host__ __device__ float operator()(glm::vec3 p) const {
+  float operator()(glm::vec3 p) const {
     const glm::vec3 min = p;
     const glm::vec3 max = glm::vec3(glm::two_pi<float>()) - p;
     const float min3 = glm::min(min.x, glm::min(min.y, min.z));
