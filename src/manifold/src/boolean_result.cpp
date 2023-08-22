@@ -170,12 +170,10 @@ void AddNewEdgeVerts(
   // intersections between the face of Q and the two faces of P attached to the
   // edge. The direction and duplicity are given by i12, while v12R remaps to
   // the output vert index. When forward is false, all is reversed.
-  const Vec<int> &p1 = p1q2.Copy(!forward);
-  const Vec<int> &q2 = p1q2.Copy(forward);
   auto process = [&](std::function<void(size_t)> lock,
                      std::function<void(size_t)> unlock, int i) {
-    const int edgeP = p1[i];
-    const int faceQ = q2[i];
+    const int edgeP = p1q2.Get(i, !forward);
+    const int faceQ = p1q2.Get(i, forward);
     const int vert = v12R[i];
     const int inclusion = i12[i];
 
