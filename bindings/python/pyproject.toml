@@ -34,7 +34,7 @@ test-command = "python {project}/bindings/python/examples/run_all.py"
 # Setuptools bug causes collision between pypy and cpython artifacts
 before-build = "rm -rf {project}/build"
 manylinux-x86_64-image = "manylinux_2_28"
-skip = ["*-win32", "*_i686", "pp*"]
+skip = ["*-win32", "*_i686", "pp*", "musl*"]
 
 [tool.cibuildwheel.macos]
 archs = ["x86_64", "arm64"]
