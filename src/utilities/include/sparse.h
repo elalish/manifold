@@ -62,7 +62,7 @@ class SparseIndices {
     return out;
   }
 
-  void Sort(ExecutionPolicy policy) { sort(policy, data.begin(), data.end()); }
+  void Sort() { sort(autoPolicy(data.size()), data.begin(), data.end()); }
 
   void Resize(int size) { data.resize(size, -1); }
 
@@ -90,11 +90,11 @@ class SparseIndices {
 
   inline void Add(int p, int q) { data.push_back(EncodePQ(p, q)); }
 
-  void Unique(ExecutionPolicy policy) {
-    Sort(policy);
-    int newSize =
-        unique<decltype(data.begin())>(policy, data.begin(), data.end()) -
-        data.begin();
+  void Unique() {
+    Sort();
+    int newSize = unique<decltype(data.begin())>(autoPolicy(data.size()),
+                                                 data.begin(), data.end()) -
+                  data.begin();
     Resize(newSize);
   }
 
