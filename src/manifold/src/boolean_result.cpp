@@ -98,52 +98,56 @@ std::tuple<Vec<int>, Vec<int>> SizeOutput(
     Manifold::Impl &outR, const Manifold::Impl &inP, const Manifold::Impl &inQ,
     const Vec<int> &i03, const Vec<int> &i30, const Vec<int> &i12,
     const Vec<int> &i21, const SparseIndices &p1q2, const SparseIndices &p2q1,
-    bool invertQ, ExecutionPolicy policy) {
+    bool invertQ) {
   Vec<int> sidesPerFacePQ(inP.NumTri() + inQ.NumTri(), 0);
   auto sidesPerFaceP = sidesPerFacePQ.view(0, inP.NumTri());
   auto sidesPerFaceQ = sidesPerFacePQ.view(inP.NumTri(), inQ.NumTri());
 
-  for_each(policy, inP.halfedge_.begin(), inP.halfedge_.end(),
-           CountVerts({sidesPerFaceP, i03}));
-  for_each(policy, inQ.halfedge_.begin(), inQ.halfedge_.end(),
-           CountVerts({sidesPerFaceQ, i30}));
-  for_each_n(policy, zip(countAt(0), i12.begin()), i12.size(),
+  for_each(autoPolicy(inP.halfedge_.size()), inP.halfedge_.begin(),
+           inP.halfedge_.end(), CountVerts({sidesPerFaceP, i03}));
+  for_each(autoPolicy(inP.halfedge_.size()), inQ.halfedge_.begin(),
+           inQ.halfedge_.end(), CountVerts({sidesPerFaceQ, i30}));
+  for_each_n(autoPolicy(i12.size()), zip(countAt(0), i12.begin()), i12.size(),
              CountNewVerts<false>(
                  {sidesPerFaceP, sidesPerFaceQ, p1q2, inP.halfedge_}));
   for_each_n(
-      policy, zip(countAt(0), i21.begin()), i21.size(),
+      autoPolicy(i21.size()), zip(countAt(0), i21.begin()), i21.size(),
       CountNewVerts<true>({sidesPerFaceQ, sidesPerFaceP, p2q1, inQ.halfedge_}));
 
   Vec<int> facePQ2R(inP.NumTri() + inQ.NumTri() + 1, 0);
   auto keepFace =
       thrust::make_transform_iterator(sidesPerFacePQ.begin(), NotZero());
-  inclusive_scan(policy, keepFace, keepFace + sidesPerFacePQ.size(),
-                 facePQ2R.begin() + 1);
+  inclusive_scan(autoPolicy(sidesPerFacePQ.size()), keepFace,
+                 keepFace + sidesPerFacePQ.size(), facePQ2R.begin() + 1);
   int numFaceR = facePQ2R.back();
   facePQ2R.resize(inP.NumTri() + inQ.NumTri());
 
   outR.faceNormal_.resize(numFaceR);
   auto next = copy_if<decltype(outR.faceNormal_.begin())>(
-      policy, inP.faceNormal_.begin(), inP.faceNormal_.end(), keepFace,
-      outR.faceNormal_.begin(), thrust::identity<bool>());
+      autoPolicy(inP.faceNormal_.size()), inP.faceNormal_.begin(),
+      inP.faceNormal_.end(), keepFace, outR.faceNormal_.begin(),
+      thrust::identity<bool>());
   if (invertQ) {
     auto start = thrust::make_transform_iterator(inQ.faceNormal_.begin(),
                                                  thrust::negate<glm::vec3>());
     auto end = thrust::make_transform_iterator(inQ.faceNormal_.end(),
                                                thrust::negate<glm::vec3>());
-    copy_if<decltype(inQ.faceNormal_.begin())>(policy, start, end,
-                                               keepFace + inP.NumTri(), next,
-                                               thrust::identity<bool>());
+    copy_if<decltype(inQ.faceNormal_.begin())>(
+        autoPolicy(inQ.faceNormal_.size()), start, end, keepFace + inP.NumTri(),
+        next, thrust::identity<bool>());
   } else {
     copy_if<decltype(inQ.faceNormal_.begin())>(
-        policy, inQ.faceNormal_.begin(), inQ.faceNormal_.end(),
-        keepFace + inP.NumTri(), next, thrust::identity<bool>());
+        autoPolicy(inQ.faceNormal_.size()), inQ.faceNormal_.begin(),
+        inQ.faceNormal_.end(), keepFace + inP.NumTri(), next,
+        thrust::identity<bool>());
   }
 
   auto newEnd = remove<decltype(sidesPerFacePQ.begin())>(
-      policy, sidesPerFacePQ.begin(), sidesPerFacePQ.end(), 0);
+      autoPolicy(sidesPerFacePQ.size()), sidesPerFacePQ.begin(),
+      sidesPerFacePQ.end(), 0);
   Vec<int> faceEdge(newEnd - sidesPerFacePQ.begin() + 1, 0);
-  inclusive_scan(policy, sidesPerFacePQ.begin(), newEnd, faceEdge.begin() + 1);
+  inclusive_scan(autoPolicy(std::distance(sidesPerFacePQ.begin(), newEnd)),
+                 sidesPerFacePQ.begin(), newEnd, faceEdge.begin() + 1);
   outR.halfedge_.resize(faceEdge.back());
 
   return std::make_tuple(faceEdge, facePQ2R);
@@ -166,12 +170,10 @@ void AddNewEdgeVerts(
   // intersections between the face of Q and the two faces of P attached to the
   // edge. The direction and duplicity are given by i12, while v12R remaps to
   // the output vert index. When forward is false, all is reversed.
-  const Vec<int> &p1 = p1q2.Copy(!forward);
-  const Vec<int> &q2 = p1q2.Copy(forward);
   auto process = [&](std::function<void(size_t)> lock,
                      std::function<void(size_t)> unlock, int i) {
-    const int edgeP = p1[i];
-    const int faceQ = q2[i];
+    const int edgeP = p1q2.Get(i, !forward);
+    const int faceQ = p1q2.Get(i, forward);
     const int vert = v12R[i];
     const int inclusion = i12[i];
 
@@ -437,8 +439,8 @@ void AppendWholeEdges(Manifold::Impl &outR, Vec<int> &facePtrR,
                       Vec<TriRef> &halfedgeRef, const Manifold::Impl &inP,
                       const Vec<char> wholeHalfedgeP, const Vec<int> &i03,
                       const Vec<int> &vP2R, VecView<const int> faceP2R,
-                      bool forward, ExecutionPolicy policy) {
-  for_each_n(policy,
+                      bool forward) {
+  for_each_n(autoPolicy(inP.halfedge_.size()),
              zip(wholeHalfedgeP.begin(), inP.halfedge_.begin(), countAt(0)),
              inP.halfedge_.size(),
              DuplicateHalfedges({outR.halfedge_, halfedgeRef, facePtrR,
@@ -459,12 +461,12 @@ struct MapTriRef {
 };
 
 Vec<TriRef> UpdateReference(Manifold::Impl &outR, const Manifold::Impl &inP,
-                            const Manifold::Impl &inQ, bool invertQ,
-                            ExecutionPolicy policy) {
+                            const Manifold::Impl &inQ, bool invertQ) {
   Vec<TriRef> refPQ = outR.meshRelation_.triRef;
   const int offsetQ = Manifold::Impl::meshIDCounter_;
   for_each_n(
-      policy, outR.meshRelation_.triRef.begin(), outR.NumTri(),
+      autoPolicy(outR.NumTri()), outR.meshRelation_.triRef.begin(),
+      outR.NumTri(),
       MapTriRef({inP.meshRelation_.triRef, inQ.meshRelation_.triRef, offsetQ}));
 
   for (const auto &pair : inP.meshRelation_.meshIDtransform) {
@@ -510,8 +512,7 @@ struct Barycentric {
 };
 
 void CreateProperties(Manifold::Impl &outR, const Vec<TriRef> &refPQ,
-                      const Manifold::Impl &inP, const Manifold::Impl &inQ,
-                      ExecutionPolicy policy) {
+                      const Manifold::Impl &inP, const Manifold::Impl &inQ) {
   const int numPropP = inP.NumProp();
   const int numPropQ = inQ.NumProp();
   const int numProp = glm::max(numPropP, numPropQ);
@@ -522,7 +523,7 @@ void CreateProperties(Manifold::Impl &outR, const Vec<TriRef> &refPQ,
   outR.meshRelation_.triProperties.resize(numTri);
 
   Vec<glm::vec3> bary(outR.halfedge_.size());
-  for_each_n(policy, zip(countAt(0), refPQ.cbegin()), numTri,
+  for_each_n(autoPolicy(numTri), zip(countAt(0), refPQ.cbegin()), numTri,
              Barycentric({bary, inP.vertPos_, inQ.vertPos_, outR.vertPos_,
                           inP.halfedge_, inQ.halfedge_, outR.halfedge_,
                           outR.precision_}));
@@ -634,34 +635,39 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   Vec<int> i03(w03_.size());
   Vec<int> i30(w30_.size());
 
-  transform(policy_, x12_.begin(), x12_.end(), i12.begin(), c3 * _1);
-  transform(policy_, x21_.begin(), x21_.end(), i21.begin(), c3 * _1);
-  transform(policy_, w03_.begin(), w03_.end(), i03.begin(), c1 + c3 * _1);
-  transform(policy_, w30_.begin(), w30_.end(), i30.begin(), c2 + c3 * _1);
+  transform(autoPolicy(x12_.size()), x12_.begin(), x12_.end(), i12.begin(),
+            c3 * _1);
+  transform(autoPolicy(x21_.size()), x21_.begin(), x21_.end(), i21.begin(),
+            c3 * _1);
+  transform(autoPolicy(w03_.size()), w03_.begin(), w03_.end(), i03.begin(),
+            c1 + c3 * _1);
+  transform(autoPolicy(w30_.size()), w30_.begin(), w30_.end(), i30.begin(),
+            c2 + c3 * _1);
 
   Vec<int> vP2R(inP_.NumVert());
-  exclusive_scan(policy_, i03.begin(), i03.end(), vP2R.begin(), 0, AbsSum());
+  exclusive_scan(autoPolicy(i03.size()), i03.begin(), i03.end(), vP2R.begin(),
+                 0, AbsSum());
   int numVertR = AbsSum()(vP2R.back(), i03.back());
   const int nPv = numVertR;
 
   Vec<int> vQ2R(inQ_.NumVert());
-  exclusive_scan(policy_, i30.begin(), i30.end(), vQ2R.begin(), numVertR,
-                 AbsSum());
+  exclusive_scan(autoPolicy(i30.size()), i30.begin(), i30.end(), vQ2R.begin(),
+                 numVertR, AbsSum());
   numVertR = AbsSum()(vQ2R.back(), i30.back());
   const int nQv = numVertR - nPv;
 
   Vec<int> v12R(v12_.size());
   if (v12_.size() > 0) {
-    exclusive_scan(policy_, i12.begin(), i12.end(), v12R.begin(), numVertR,
-                   AbsSum());
+    exclusive_scan(autoPolicy(i12.size()), i12.begin(), i12.end(), v12R.begin(),
+                   numVertR, AbsSum());
     numVertR = AbsSum()(v12R.back(), i12.back());
   }
   const int n12 = numVertR - nPv - nQv;
 
   Vec<int> v21R(v21_.size());
   if (v21_.size() > 0) {
-    exclusive_scan(policy_, i21.begin(), i21.end(), v21R.begin(), numVertR,
-                   AbsSum());
+    exclusive_scan(autoPolicy(i21.size()), i21.begin(), i21.end(), v21R.begin(),
+                   numVertR, AbsSum());
     numVertR = AbsSum()(v21R.back(), i21.back());
   }
   const int n21 = numVertR - nPv - nQv - n12;
@@ -676,14 +682,18 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   outR.vertPos_.resize(numVertR);
   // Add vertices, duplicating for inclusion numbers not in [-1, 1].
   // Retained vertices from P and Q:
-  for_each_n(policy_, zip(i03.begin(), vP2R.begin(), inP_.vertPos_.begin()),
+  for_each_n(autoPolicy(inP_.NumVert()),
+             zip(i03.begin(), vP2R.begin(), inP_.vertPos_.begin()),
              inP_.NumVert(), DuplicateVerts({outR.vertPos_}));
-  for_each_n(policy_, zip(i30.begin(), vQ2R.begin(), inQ_.vertPos_.begin()),
+  for_each_n(autoPolicy(inQ_.NumVert()),
+             zip(i30.begin(), vQ2R.begin(), inQ_.vertPos_.begin()),
              inQ_.NumVert(), DuplicateVerts({outR.vertPos_}));
   // New vertices created from intersections:
-  for_each_n(policy_, zip(i12.begin(), v12R.begin(), v12_.begin()), i12.size(),
+  for_each_n(autoPolicy(i12.size()),
+             zip(i12.begin(), v12R.begin(), v12_.begin()), i12.size(),
              DuplicateVerts({outR.vertPos_}));
-  for_each_n(policy_, zip(i21.begin(), v21R.begin(), v21_.begin()), i21.size(),
+  for_each_n(autoPolicy(i21.size()),
+             zip(i21.begin(), v21R.begin(), v21_.begin()), i21.size(),
              DuplicateVerts({outR.vertPos_}));
 
   PRINT(nPv << " verts from inP");
@@ -708,8 +718,8 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   // Level 4
   Vec<int> faceEdge;
   Vec<int> facePQ2R;
-  std::tie(faceEdge, facePQ2R) = SizeOutput(
-      outR, inP_, inQ_, i03, i30, i12, i21, p1q2_, p2q1_, invertQ, policy_);
+  std::tie(faceEdge, facePQ2R) =
+      SizeOutput(outR, inP_, inQ_, i03, i30, i12, i21, p1q2_, p2q1_, invertQ);
 
   const int numFaceR = faceEdge.size() - 1;
   // This gets incremented for each halfedge that's added to a face so that the
@@ -731,10 +741,9 @@ Manifold::Impl Boolean3::Result(OpType op) const {
                  inP_.NumTri());
 
   AppendWholeEdges(outR, facePtrR, halfedgeRef, inP_, wholeHalfedgeP, i03, vP2R,
-                   facePQ2R.cview(0, inP_.NumTri()), true, policy_);
+                   facePQ2R.cview(0, inP_.NumTri()), true);
   AppendWholeEdges(outR, facePtrR, halfedgeRef, inQ_, wholeHalfedgeQ, i30, vQ2R,
-                   facePQ2R.cview(inP_.NumTri(), inQ_.NumTri()), false,
-                   policy_);
+                   facePQ2R.cview(inP_.NumTri(), inQ_.NumTri()), false);
 
 #ifdef MANIFOLD_DEBUG
   assemble.Stop();
@@ -758,11 +767,11 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   if (ManifoldParams().intermediateChecks)
     ASSERT(outR.IsManifold(), logicErr, "triangulated mesh is not manifold!");
 
-  Vec<TriRef> refPQ = UpdateReference(outR, inP_, inQ_, invertQ, policy_);
+  Vec<TriRef> refPQ = UpdateReference(outR, inP_, inQ_, invertQ);
 
   outR.SimplifyTopology();
 
-  CreateProperties(outR, refPQ, inP_, inQ_, policy_);
+  CreateProperties(outR, refPQ, inP_, inQ_);
 
   if (ManifoldParams().intermediateChecks)
     ASSERT(outR.Is2Manifold(), logicErr, "simplified mesh is not 2-manifold!");
