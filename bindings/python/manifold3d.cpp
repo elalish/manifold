@@ -38,7 +38,7 @@ std::vector<T> toVector(const py::array_t<T> &arr) {
   return std::vector<T>(arr.data(), arr.data() + arr.size());
 }
 
-PYBIND11_MODULE(manifold3d, m) {
+PYBIND11_MODULE(MODULE_NAME, m) {
   m.doc() = "Python binding for the Manifold library.";
 
   m.def("set_min_circular_angle", Quality::SetMinCircularAngle,

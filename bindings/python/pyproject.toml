@@ -1,0 +1,46 @@
+[project]
+name = "manifold3d"
+version = "2.2.0"
+authors = [
+  { name="Emmett Lalish", email="elalish@gmail.com" },
+]
+description = "Library for geometric robustness"
+readme = "README.md"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+    "Programming Language :: C++",
+    "Topic :: Multimedia :: Graphics :: 3D Modeling",
+]
+requires-python = ">=3.7"
+
+[project.urls]
+"Homepage" = "https://github.com/elalish/manifold"
+"Bug Tracker" = "https://github.com/elalish/manifold/issues"
+
+[build-system]
+requires = [
+    "setuptools",
+    "scikit-build>=0.13",
+    "cmake",
+    "ninja",
+]
+build-backend = "setuptools.build_meta"
+
+[tool.cibuildwheel]
+test-requires = ["trimesh"]
+test-command = "python {project}/bindings/python/examples/run_all.py"
+# Setuptools bug causes collision between pypy and cpython artifacts
+before-build = "rm -rf {project}/build"
+manylinux-x86_64-image = "manylinux_2_28"
+musllinux-x86_64-image = "musllinux_1_2"
+skip = ["*-win32", "*_i686", "pp*"]
+
+[tool.cibuildwheel.macos]
+archs = ["x86_64", "arm64"]
+environment = "MACOSX_DEPLOYMENT_TARGET=10.14"
+
+[tool.cibuildwheel.windows]
+before-build = "pip install delvewheel"
+repair-wheel-command = "delvewheel repair -w {dest_dir} {wheel}"

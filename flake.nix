@@ -22,7 +22,7 @@
             }: pkgs.stdenv.mkDerivation {
               inherit doCheck;
               pname = "manifold-${parallel-backend}";
-              version = "beta";
+              version = "2.2.0";
               src = self;
               nativeBuildInputs = (with pkgs; [
                 cmake
