@@ -229,8 +229,7 @@ TEST(Samples, Sponge1) {
 TEST(Samples, Sponge4) {
   Manifold sponge = MengerSponge(4);
   CheckNormals(sponge);
-  // FIXME: limit NumDegenerateTris
-  EXPECT_LE(sponge.NumDegenerateTris(), 40000);
+  EXPECT_LE(sponge.NumDegenerateTris(), 0);
   EXPECT_EQ(sponge.Genus(), 26433);  // should be 1:5, 2:81, 3:1409, 4:26433
   CheckGL(sponge);
 
@@ -268,3 +267,19 @@ TEST(Samples, SelfIntersect) {
   manifold::PolygonParams().processOverlaps = false;
 }
 #endif
+
+TEST(Samples, CondensedMatter16) {
+  Manifold cm = CondensedMatter(16);
+  CheckGL(cm);
+  CheckNormals(cm);
+}
+
+TEST(Samples, CondensedMatter64) {
+  // FIXME: it should be geometrically valid
+  manifold::PolygonParams().processOverlaps = true;
+  Manifold cm = CondensedMatter(64);
+  CheckGL(cm);
+  // FIXME: normals should be correct
+  // CheckNormals(cm);
+  manifold::PolygonParams().processOverlaps = false;
+}
