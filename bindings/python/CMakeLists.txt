@@ -15,11 +15,7 @@
 project(python)
 
 add_subdirectory(third_party)
-if(SKBUILD)
-set(module_name _manifold3d)
-else()
 set(module_name manifold3d)
-endif()
 pybind11_add_module(${module_name} manifold3d.cpp)
 target_link_libraries(${module_name} PRIVATE manifold)
 target_compile_options(${module_name} PRIVATE ${MANIFOLD_FLAGS}
@@ -32,7 +28,8 @@ set_target_properties(${module_name} PROPERTIES OUTPUT_NAME "${module_name}")
 if(SKBUILD)
 install(
   TARGETS ${module_name}
-  LIBRARY DESTINATION .
+  LIBRARY DESTINATION ${SKBUILD_PLATLIB_DIR}
+  COMPONENT bindings
 )
 else()
 install(

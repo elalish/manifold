@@ -1,6 +1,6 @@
 name: Build
 
-on: [push, pull_request]
+on: [release]
 
 jobs:
   build_wheels:
@@ -19,5 +19,4 @@ jobs:
       - uses: actions/upload-artifact@v3
         with:
           path: ./wheelhouse/*.whl
-
 

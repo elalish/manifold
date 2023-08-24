@@ -116,7 +116,9 @@
                 cmake
                 ninja
                 setuptools
-                scikit-build
+                scikit-build-core
+                pyproject-metadata
+                pathspec
                 pkg-config
               ];
               checkInputs = [
