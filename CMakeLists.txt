@@ -41,7 +41,9 @@ else()
   option(CMAKE_BUILD_TYPE "Build type" Release)
 endif()
 
-set(MANIFOLD_FLAGS ${MANIFOLD_FLAGS} -O3)
+if(NOT MSVC)
+  set(MANIFOLD_FLAGS ${MANIFOLD_FLAGS} -O3)
+endif()
 
 if(EMSCRIPTEN)
   message("Building for Emscripten")

@@ -39,6 +39,7 @@ sdist.exclude = [
     "meshIO",
     "samples",
     "test",
+    "oneTBB", # we may have this when we build with cibuildwheel
     "bindings/python/third_party/pybind11/tests/",
     "src/third_party/clipper2/CPP/Examples/",
     "src/third_party/clipper2/CPP/Tests/",
@@ -72,10 +73,15 @@ build-frontend = "build"
 test-requires = ["trimesh"]
 test-command = "python {project}/bindings/python/examples/run_all.py"
 # Setuptools bug causes collision between pypy and cpython artifacts
-before-build = "rm -rf {project}/build"
 manylinux-x86_64-image = "manylinux_2_28"
 musllinux-x86_64-image = "musllinux_1_2"
-skip = ["*-win32", "*_i686", "pp*"]
+skip = ["*-win32", "*_i686", "pp*", "*-musllinux*"]
+
+# only clone TBB once
+before-all = "git clone --depth 1 --branch v2021.10.0 https://github.com/oneapi-src/oneTBB.git"
+[tool.cibuildwheel.config-settings]
+"cmake.define.FETCHCONTENT_SOURCE_DIR_TBB" = "./oneTBB"
+"cmake.define.FETCHCONTENT_UPDATES_DISCONNECTED" = "ON"
 
 [tool.cibuildwheel.macos]
 archs = ["x86_64", "arm64"]
