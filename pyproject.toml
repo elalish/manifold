@@ -34,6 +34,7 @@ requires = [
 build-backend = "setuptools.build_meta"
 
 [tool.cibuildwheel]
+build-frontend = "build"
 test-requires = ["trimesh"]
 test-command = "python {project}/bindings/python/examples/run_all.py"
 # Setuptools bug causes collision between pypy and cpython artifacts

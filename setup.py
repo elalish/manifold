@@ -8,6 +8,7 @@ setup(
     packages=["manifold3d"],
     package_dir={"": "bindings/python"},
     cmake_install_dir="bindings/python/manifold3d",
+    include_package_data=False,
     zip_safe=True,
     cmake_args=["-DMANIFOLD_PAR=TBB", "-DMANIFOLD_TEST=OFF"],
 )
