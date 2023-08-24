@@ -16,8 +16,6 @@ jobs:
           submodules: recursive
       - name: Build wheels
         uses: pypa/cibuildwheel@v2.15.0
-        with:
-          package-dir: bindings/python
       - uses: actions/upload-artifact@v3
         with:
           path: ./wheelhouse/*.whl
