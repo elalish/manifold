@@ -29,7 +29,11 @@ requires = [
 build-backend = "setuptools.build_meta"
 
 [tool.cibuildwheel]
-test-requires = ["trimesh"]
+test-requires = [
+    "trimesh",
+    "oldest-supported-numpy; python_version<'3.12'",
+    "numpy>=1.26.0b1; python_version>='3.12'"
+]
 test-command = "python {project}/bindings/python/examples/run_all.py"
 # Setuptools bug causes collision between pypy and cpython artifacts
 before-build = "rm -rf {project}/build"
