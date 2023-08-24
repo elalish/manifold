@@ -6,8 +6,8 @@ setup(
     description=" Geometry library for topological robustness",
     author="Emmett Lalish",
     packages=["manifold3d"],
-    cmake_install_dir="manifold3d",
-    cmake_source_dir="../../",
+    package_dir={"": "bindings/python"},
+    cmake_install_dir="bindings/python/manifold3d",
     zip_safe=True,
-    cmake_args=["-DMANIFOLD_PAR=TBB"],
+    cmake_args=["-DMANIFOLD_PAR=TBB", "-DMANIFOLD_TEST=OFF"],
 )
