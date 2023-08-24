@@ -16,7 +16,7 @@ project(samples)
 
 add_library(samples src/bracelet.cpp src/knot.cpp src/menger_sponge.cpp
     src/rounded_frame.cpp src/scallop.cpp src/tet_puzzle.cpp
-    src/gyroid_module.cpp)
+    src/gyroid_module.cpp src/condensed_matter.cpp)
 
 target_include_directories(samples
     PUBLIC ${PROJECT_SOURCE_DIR}/include
