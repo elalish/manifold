@@ -16,7 +16,7 @@ classifiers = [
 requires-python = ">=3.7"
 
 dependencies = [
-    "oldest-supported-numpy; python_version<'3.12'",
+    "numpy; python_version<'3.12'",
     "numpy>=1.26.0b1; python_version>='3.12'"
 ]
 

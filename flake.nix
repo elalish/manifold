@@ -101,6 +101,34 @@
                 cp {extras,wasm}/*.wasm $out/
               '';
             };
+            # but how should we make it work with other python versions?
+            manifold3d = with pkgs.python3Packages; buildPythonPackage {
+              pname = "manifold3d";
+              version = "2.2.0";
+              src = self;
+              propagatedBuildInputs = [
+                numpy
+              ];
+              buildInputs = with pkgs; [
+                tbb
+              ];
+              nativeBuildInputs = with pkgs; [
+                cmake
+                ninja
+                setuptools
+                scikit-build
+                pkg-config
+              ];
+              checkInputs = [
+                trimesh
+              ];
+              format = "pyproject";
+              dontUseCmakeConfigure = true;
+              doCheck = true;
+              checkPhase = ''
+                python3 bindings/python/examples/run_all.py
+              '';
+            };
           };
           devShell = devShell { };
         }
