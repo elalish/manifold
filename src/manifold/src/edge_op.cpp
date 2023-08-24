@@ -150,7 +150,6 @@ void Manifold::Impl::SimplifyTopology() {
   Vec<uint8_t> bflags(nbEdges);
 
   Vec<SortEntry> entries(nbEdges);
-
   auto policy = autoPolicy(halfedge_.size());
   for_each_n(policy, countAt(0), nbEdges, [&](int i) {
     entries[i].start = halfedge_[i].startVert;
@@ -162,8 +161,8 @@ void Manifold::Impl::SimplifyTopology() {
   for (int i = 0; i < nbEdges - 1; ++i) {
     if (entries[i].start == entries[i + 1].start &&
         entries[i].end == entries[i + 1].end) {
-      DedupeEdge(entries[i].index);
-      numFlagged++;
+      DedupeEdge(std::min(entries[i].index, entries[i + 1].index));
+      entries[i + 1].index = std::max(entries[i].index, entries[i + 1].index);
     }
   }
 
@@ -343,6 +342,7 @@ void Manifold::Impl::FormLoop(int current, int end) {
 }
 
 void Manifold::Impl::CollapseTri(const glm::ivec3& triEdge) {
+  if (halfedge_[triEdge[1]].pairedHalfedge == -1) return;
   int pair1 = halfedge_[triEdge[1]].pairedHalfedge;
   int pair2 = halfedge_[triEdge[2]].pairedHalfedge;
   halfedge_[pair1].pairedHalfedge = pair2;
@@ -355,6 +355,7 @@ void Manifold::Impl::CollapseTri(const glm::ivec3& triEdge) {
 void Manifold::Impl::RemoveIfFolded(int edge) {
   const glm::ivec3 tri0edge = TriOf(edge);
   const glm::ivec3 tri1edge = TriOf(halfedge_[edge].pairedHalfedge);
+  if (halfedge_[tri0edge[1]].pairedHalfedge == -1) return;
   if (halfedge_[tri0edge[1]].endVert == halfedge_[tri1edge[1]].endVert) {
     if (halfedge_[tri0edge[1]].pairedHalfedge == tri1edge[2]) {
       if (halfedge_[tri0edge[2]].pairedHalfedge == tri1edge[1]) {
