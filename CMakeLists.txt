@@ -54,7 +54,11 @@ endif()
 
 if(MANIFOLD_PYBIND)
   set(CMAKE_POSITION_INDEPENDENT_CODE ON)
-  find_package(Python COMPONENTS Interpreter Development.SABIModule REQUIRED)
+  if(Python_VERSION VERSION_LESS 3.12)
+    find_package(Python COMPONENTS Interpreter Development.Module REQUIRED)
+  else()
+    find_package(Python COMPONENTS Interpreter Development.SABIModule REQUIRED)
+  endif()
 endif()
 
 set(THRUST_INC_DIR ${PROJECT_SOURCE_DIR}/src/third_party/thrust)
