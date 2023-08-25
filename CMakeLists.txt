@@ -54,11 +54,9 @@ endif()
 
 if(MANIFOLD_PYBIND)
   set(CMAKE_POSITION_INDEPENDENT_CODE ON)
-  find_package(Python COMPONENTS Interpreter Development.Module REQUIRED)
+  find_package(Python COMPONENTS Interpreter Development.SABIModule REQUIRED)
 endif()
 
-
-set(PYBIND11_DIR ${PROJECT_SOURCE_DIR}/bindings/python/third_party/pybind11)
 set(THRUST_INC_DIR ${PROJECT_SOURCE_DIR}/src/third_party/thrust)
 
 if(CMAKE_EXPORT_COMPILE_COMMANDS AND NOT EMSCRIPTEN)

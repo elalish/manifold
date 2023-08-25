@@ -13,7 +13,7 @@ classifiers = [
     "Programming Language :: C++",
     "Topic :: Multimedia :: Graphics :: 3D Modeling",
 ]
-requires-python = ">=3.7"
+requires-python = ">=3.8"
 
 dependencies = [
     "numpy; python_version<'3.12'",
@@ -25,7 +25,7 @@ dependencies = [
 "Bug Tracker" = "https://github.com/elalish/manifold/issues"
 
 [build-system]
-requires = ["scikit-build-core", "pybind11"]
+requires = ["scikit-build-core"]
 build-backend = "scikit_build_core.build"
 
 [tool.scikit-build]
@@ -40,7 +40,8 @@ sdist.exclude = [
     "samples",
     "test",
     "oneTBB", # we may have this when we build with cibuildwheel
-    "bindings/python/third_party/pybind11/tests/",
+    "bindings/python/third_party/nanobind/tests/",
+    "bindings/python/third_party/nanobind/docs/",
     "src/third_party/clipper2/CPP/Examples/",
     "src/third_party/clipper2/CPP/Tests/",
     "src/third_party/clipper2/CSharp/",
