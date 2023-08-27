@@ -293,7 +293,7 @@ NB_MODULE(manifold3d, m) {
             });
           },
           nb::arg("new_num_prop"), nb::arg("f"),
-          "Create a new conb of this manifold with updated vertex properties "
+          "Create a new copy of this manifold with updated vertex properties "
           "by supplying a function that takes the existing position and "
           "properties as input. You may specify any number of output "
           "properties, allowing creation and removal of channels. Note: "
