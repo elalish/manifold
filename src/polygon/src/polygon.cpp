@@ -13,9 +13,13 @@
 // limitations under the License.
 
 #include "polygon.h"
+#if MANIFOLD_PAR == 'T'
+#include "tbb/tbb.h"
+#endif
 
 #include <algorithm>
-#if MANIFOLD_PAR == 'T' && __has_include(<pstl/glue_execution_defs.h>)
+#if MANIFOLD_PAR == 'T' && TBB_INTERFACE_VERSION >= 10000 && \
+    __has_include(<pstl/glue_execution_defs.h>)
 #include <execution>
 #endif
 #include <list>
@@ -832,7 +836,8 @@ class Monotones {
         starts.push_back(v);
       }
     }
-#if MANIFOLD_PAR == 'T' && __has_include(<pstl/glue_execution_defs.h>)
+#if MANIFOLD_PAR == 'T' && TBB_INTERFACE_VERSION >= 10000 && \
+    __has_include(<pstl/glue_execution_defs.h>)
     std::sort(std::execution::par_unseq, starts.begin(), starts.end(), cmp);
 #else
     std::sort(starts.begin(), starts.end(), cmp);

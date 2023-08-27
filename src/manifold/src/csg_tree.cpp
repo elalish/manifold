@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#if MANIFOLD_PAR == 'T' && __has_include(<tbb/tbb.h>)
+#if MANIFOLD_PAR == 'T' && __has_include(<tbb/concurrent_priority_queue.h>)
 #include <tbb/tbb.h>
 #define TBB_PREVIEW_CONCURRENT_ORDERED_CONTAINERS 1
 #include <tbb/concurrent_priority_queue.h>
