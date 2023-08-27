@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <optional>
+#include <string>
 
 #include "cross_section.h"
 #include "manifold.h"
