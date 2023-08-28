@@ -30,9 +30,12 @@
 #elif MANIFOLD_PAR == 'T'
 #include <thrust/system/tbb/execution_policy.h>
 
+#if MANIFOLD_PAR == 'T' && TBB_INTERFACE_VERSION >= 10000 && \
+    __has_include(<pstl/glue_execution_defs.h>)
 #include <algorithm>
 #include <execution>
 #include <numeric>
+#endif
 
 #include "tbb/tbb.h"
 #define MANIFOLD_PAR_NS tbb
