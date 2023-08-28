@@ -498,6 +498,7 @@ std::shared_ptr<Manifold::Impl> CsgOpNode::BatchBoolean(
   // apply boolean operations starting from smaller meshes
   // the assumption is that boolean operations on smaller meshes is faster,
   // due to less data being copied and processed
+  auto cmpFn = MeshCompare();
   std::make_heap(results.begin(), results.end(), cmpFn);
   while (results.size() > 1) {
     std::pop_heap(results.begin(), results.end(), cmpFn);
