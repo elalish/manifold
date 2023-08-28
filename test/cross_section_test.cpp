@@ -104,7 +104,7 @@ TEST(CrossSection, Transform) {
                     0.0f, 3.0f, 0.0f,  //
                     0.0f, 0.0f, 1.0f);
 
-  auto b = sq.Transform(trans * scale * rot);
+  auto b = sq.Transform(glm::mat3x2(trans * scale * rot));
   auto b_copy = CrossSection(b);
 
   auto ex_b = Manifold::Extrude(b, 1.).GetMesh();

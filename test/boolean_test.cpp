@@ -636,9 +636,9 @@ TEST(Boolean, BooleanVolumes) {
   // m7 = m1 + m2 + m3
   auto m1 = Manifold::Cube({1, 1, 1});
   auto m2 = Manifold::Cube({2, 1, 1}).Transform(
-      glm::translate(glm::mat4(1.0f), glm::vec3(1.0f, 0, 0)));
+      glm::mat4x3(glm::translate(glm::mat4(1.0f), glm::vec3(1.0f, 0, 0))));
   auto m4 = Manifold::Cube({4, 1, 1}).Transform(
-      glm::translate(glm::mat4(1.0f), glm::vec3(3.0f, 0, 0)));
+      glm::mat4x3(glm::translate(glm::mat4(1.0f), glm::vec3(3.0f, 0, 0))));
   auto m3 = Manifold::Cube({3, 1, 1});
   auto m7 = Manifold::Cube({7, 1, 1});
 

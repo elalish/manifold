@@ -12,33 +12,70 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <optional>
+#include <string>
+
 #include "cross_section.h"
 #include "manifold.h"
-#include "pybind11/functional.h"
-#include "pybind11/numpy.h"
-#include "pybind11/operators.h"
-#include "pybind11/pybind11.h"
-#include "pybind11/stl.h"
+#include "nanobind/nanobind.h"
+#include "nanobind/ndarray.h"
+#include "nanobind/operators.h"
+#include "nanobind/stl/function.h"
+#include "nanobind/stl/optional.h"
+#include "nanobind/stl/tuple.h"
+#include "nanobind/stl/vector.h"
 
-namespace py = pybind11;
+template <>
+struct nanobind::detail::type_caster<glm::vec3> {
+  NB_TYPE_CASTER(glm::vec3, const_name("Vec3"));
+
+  using Caster = make_caster<float>;
+
+  bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept {
+    size_t size;
+    PyObject *temp;
+    /* Will initialize 'size' and 'temp'. All return values and
+       return parameters are zero/NULL in the case of a failure. */
+    PyObject **o = seq_get(src.ptr(), &size, &temp);
+    if (size != 3) return false;
+    Caster caster;
+    if (o == nullptr) {
+      Py_XDECREF(temp);
+      return false;
+    }
+
+    bool success = true;
+    for (size_t i = 0; i < size; ++i) {
+      if (!caster.from_python(o[i], flags, cleanup)) {
+        success = false;
+        break;
+      }
+      value[i] = caster.value;
+    }
+    Py_XDECREF(temp);
+    return success;
+  }
+
+  static handle from_cpp(glm::vec3 vec, rv_policy policy,
+                         cleanup_list *ls) noexcept {
+    std::vector<float> v{vec.x, vec.y, vec.z};
+    return make_caster<std::vector<float>>().from_cpp(&v, policy, ls);
+  }
+};
+
+namespace nb = nanobind;
 
 using namespace manifold;
 
 typedef std::tuple<float, float> Float2;
 typedef std::tuple<float, float, float> Float3;
 
-constexpr auto pyArrayFlags = py::array::c_style | py::array::forcecast;
-
-PYBIND11_MAKE_OPAQUE(std::vector<int>);
-PYBIND11_MAKE_OPAQUE(std::vector<uint32_t>);
-PYBIND11_MAKE_OPAQUE(std::vector<float>);
-
 template <typename T>
-std::vector<T> toVector(const py::array_t<T> &arr) {
-  return std::vector<T>(arr.data(), arr.data() + arr.size());
+std::vector<T> toVector(const T *arr, size_t size) {
+  return std::vector<T>(arr, arr + size);
 }
 
-PYBIND11_MODULE(manifold3d, m) {
+NB_MODULE(manifold3d, m) {
   m.doc() = "Python binding for the Manifold library.";
 
   m.def("set_min_circular_angle", Quality::SetMinCircularAngle,
@@ -77,25 +114,26 @@ PYBIND11_MODULE(manifold3d, m) {
         ":param radius: For a given radius of circle, determine how many "
         "default");
 
-  py::class_<Manifold>(m, "Manifold")
-      .def(py::init<>())
-      .def(py::init([](std::vector<Manifold> &manifolds) {
-             Manifold result;
-             if (manifolds.size() >= 1) {
-               // for some reason using Manifold() as the initial object
-               // will cause failure for python specifically
-               // unable to reproduce with c++ directly
-               Manifold first = manifolds[0];
-               for (int i = 1; i < manifolds.size(); i++) first += manifolds[i];
-               return first;
-             } else {
-               return Manifold();
-             }
-           }),
-           "Construct manifold as the union of a set of manifolds.")
-      .def(py::self + py::self, "Boolean union.")
-      .def(py::self - py::self, "Boolean difference.")
-      .def(py::self ^ py::self, "Boolean intersection.")
+  nb::class_<Manifold>(m, "Manifold")
+      .def(nb::init<>())
+      .def(
+          "__init__",
+          [](Manifold *self, std::vector<Manifold> &manifolds) {
+            if (manifolds.size() >= 1) {
+              // for some reason using Manifold() as the initial object
+              // will cause failure for python specifically
+              // unable to reproduce with c++ directly
+              Manifold first = manifolds[0];
+              for (int i = 1; i < manifolds.size(); i++) first += manifolds[i];
+              new (self) Manifold(first);
+            } else {
+              new (self) Manifold();
+            }
+          },
+          "Construct manifold as the union of a set of manifolds.")
+      .def(nb::self + nb::self, "Boolean union.")
+      .def(nb::self - nb::self, "Boolean difference.")
+      .def(nb::self ^ nb::self, "Boolean intersection.")
       .def(
           "hull", [](Manifold &self) { return self.Hull(); },
           "Compute the convex hull of all points in this manifold.")
@@ -116,19 +154,18 @@ PYBIND11_MODULE(manifold3d, m) {
           "Compute the convex hull enveloping a set of 3d points.")
       .def(
           "transform",
-          [](Manifold &self, py::array_t<float> &mat) {
-            auto mat_view = mat.unchecked<2>();
+          [](Manifold &self, nb::ndarray<float, nb::shape<3, 4>> &mat) {
             if (mat.ndim() != 2 || mat.shape(0) != 3 || mat.shape(1) != 4)
               throw std::runtime_error("Invalid matrix shape, expected (3, 4)");
             glm::mat4x3 mat_glm;
             for (int i = 0; i < 3; i++) {
               for (int j = 0; j < 4; j++) {
-                mat_glm[j][i] = mat_view(i, j);
+                mat_glm[j][i] = mat(i, j);
               }
             }
             return self.Transform(mat_glm);
           },
-          py::arg("m"),
+          nb::arg("m"),
           "Transform this Manifold in space. The first three columns form a "
           "3x3 matrix transform and the last is a translation vector. This "
           "operation can be chained. Transforms are combined and applied "
@@ -140,74 +177,45 @@ PYBIND11_MODULE(manifold3d, m) {
           [](Manifold &self, float x = 0.0f, float y = 0.0f, float z = 0.0f) {
             return self.Translate(glm::vec3(x, y, z));
           },
-          py::arg("x") = 0.0f, py::arg("y") = 0.0f, py::arg("z") = 0.0f,
+          nb::arg("x") = 0.0f, nb::arg("y") = 0.0f, nb::arg("z") = 0.0f,
           "Move this Manifold in space. This operation can be chained. "
           "Transforms are combined and applied lazily."
           "\n\n"
           ":param x: X axis translation. (default 0.0).\n"
           ":param y: Y axis translation. (default 0.0).\n"
           ":param z: Z axis translation. (default 0.0).")
-      .def(
-          "translate",
-          [](Manifold &self, py::array_t<float> &t) {
-            auto t_view = t.unchecked<1>();
-            if (t.ndim() != 1 || t.shape(0) != 3)
-              throw std::runtime_error("Invalid vector shape");
-            return self.Translate(glm::vec3(t_view(0), t_view(1), t_view(2)));
-          },
-          py::arg("t"),
-          "Move this Manifold in space. This operation can be chained. "
-          "Transforms are combined and applied lazily."
-          "\n\n"
-          ":param v: The vector to add to every vertex.")
+      .def("translate", &Manifold::Translate, nb::arg("t"),
+           "Move this Manifold in space. This operation can be chained. "
+           "Transforms are combined and applied lazily."
+           "\n\n"
+           ":param v: The vector to add to every vertex.")
       .def(
           "scale",
           [](Manifold &self, float scale) {
             return self.Scale(glm::vec3(scale));
           },
-          py::arg("scale"),
+          nb::arg("scale"),
           "Scale this Manifold in space. This operation can be chained. "
           "Transforms are combined and applied lazily."
           "\n\n"
           ":param scale: The scalar multiplier for each component of every "
           "vertices.")
-      .def(
-          "scale",
-          [](Manifold &self, py::array_t<float> &scale) {
-            auto scale_view = scale.unchecked<1>();
-            if (scale.ndim() != 1 || scale.shape(0) != 3)
-              throw std::runtime_error("Invalid vector shape, expected (3)");
-            glm::vec3 v(scale_view(0), scale_view(1), scale_view(2));
-            return self.Scale(v);
-          },
-          py::arg("v"),
-          "Scale this Manifold in space. This operation can be chained. "
-          "Transforms are combined and applied lazily."
-          "\n\n"
-          ":param v: The vector to multiply every vertex by component.")
-      .def(
-          "mirror",
-          [](Manifold &self, py::array_t<float> &mirror) {
-            auto v_view = mirror.unchecked<1>();
-            if (mirror.ndim() != 1 || mirror.shape(0) != 3)
-              throw std::runtime_error("Invalid vector shape, expected (3)");
-            glm::vec3 v(v_view(0), v_view(1), v_view(2));
-            return self.Mirror(v);
-          },
-          py::arg("v"),
-          "Mirror this Manifold in space. This operation can be chained. "
-          "Transforms are combined and applied lazily."
-          "\n\n"
-          ":param mirror: The vector defining the axis of mirroring.")
+      .def("scale", &Manifold::Scale, nb::arg("v"),
+           "Scale this Manifold in space. This operation can be chained. "
+           "Transforms are combined and applied lazily."
+           "\n\n"
+           ":param v: The vector to multiply every vertex by component.")
+      .def("mirror", &Manifold::Mirror, nb::arg("v"),
+           "Mirror this Manifold in space. This operation can be chained. "
+           "Transforms are combined and applied lazily."
+           "\n\n"
+           ":param mirror: The vector defining the axis of mirroring.")
       .def(
           "rotate",
-          [](Manifold &self, py::array_t<float> &v) {
-            auto v_view = v.unchecked<1>();
-            if (v.ndim() != 1 || v.shape(0) != 3)
-              throw std::runtime_error("Invalid vector shape, expected (3)");
-            return self.Rotate(v_view(0), v_view(1), v_view(2));
+          [](Manifold &self, glm::vec3 v) {
+            return self.Rotate(v[0], v[1], v[2]);
           },
-          py::arg("v"),
+          nb::arg("v"),
           "Applies an Euler angle rotation to the manifold, first about the X "
           "axis, then Y, then Z, in degrees. We use degrees so that we can "
           "minimize rounding error, and eliminate it completely for any "
@@ -223,8 +231,8 @@ PYBIND11_MODULE(manifold3d, m) {
              float zDegrees = 0.0f) {
             return self.Rotate(xDegrees, yDegrees, zDegrees);
           },
-          py::arg("x_degrees") = 0.0f, py::arg("y_degrees") = 0.0f,
-          py::arg("z_degrees") = 0.0f,
+          nb::arg("x_degrees") = 0.0f, nb::arg("y_degrees") = 0.0f,
+          nb::arg("z_degrees") = 0.0f,
           "Applies an Euler angle rotation to the manifold, first about the X "
           "axis, then Y, then Z, in degrees. We use degrees so that we can "
           "minimize rounding error, and eliminate it completely for any "
@@ -246,7 +254,7 @@ PYBIND11_MODULE(manifold3d, m) {
               v.z = std::get<2>(fv);
             });
           },
-          py::arg("f"),
+          nb::arg("f"),
           "This function does not change the topology, but allows the vertices "
           "to be moved according to any arbitrary input function. It is easy "
           "to create a function that warps a geometrically valid object into "
@@ -257,23 +265,34 @@ PYBIND11_MODULE(manifold3d, m) {
       .def(
           "set_properties",
           [](Manifold &self, int newNumProp,
-             const std::function<py::array_t<float>(
-                 Float3, const py::array_t<float> &)> &f) {
+             const std::function<nb::object(
+                 Float3, const nb::ndarray<nb::numpy, const float, nb::c_contig>
+                             &)> &f) {
             const int oldNumProp = self.NumProp();
             return self.SetProperties(newNumProp, [newNumProp, oldNumProp, &f](
                                                       float *newProps,
                                                       glm::vec3 v,
                                                       const float *oldProps) {
-              auto array = f(std::make_tuple(v.x, v.y, v.z),
-                             py::array(oldNumProp, oldProps));
-              if (array.ndim() != 1 || array.shape(0) != newNumProp)
-                throw std::runtime_error("Invalid vector shape, expected (" +
-                                         std::to_string(newNumProp) + ")");
-              auto array_view = array.unchecked<1>();
-              for (int i = 0; i < newNumProp; i++) newProps[i] = array_view(i);
+              auto result =
+                  f(std::make_tuple(v.x, v.y, v.z),
+                    nb::ndarray<nb::numpy, const float, nb::c_contig>(
+                        &oldProps, {static_cast<unsigned long>(oldNumProp)}));
+              nb::ndarray<float, nb::shape<nb::any>> array;
+              std::vector<float> vec;
+              if (nb::try_cast(result, array)) {
+                if (array.ndim() != 1 || array.shape(0) != newNumProp)
+                  throw std::runtime_error("Invalid vector shape, expected (" +
+                                           std::to_string(newNumProp) + ")");
+                for (int i = 0; i < newNumProp; i++) newProps[i] = array(i);
+              } else if (nb::try_cast(result, vec)) {
+                for (int i = 0; i < newNumProp; i++) newProps[i] = vec[i];
+              } else {
+                throw std::runtime_error(
+                    "Callback in set_properties should return an array");
+              }
             });
           },
-          py::arg("new_num_prop"), py::arg("f"),
+          nb::arg("new_num_prop"), nb::arg("f"),
           "Create a new copy of this manifold with updated vertex properties "
           "by supplying a function that takes the existing position and "
           "properties as input. You may specify any number of output "
@@ -286,7 +305,7 @@ PYBIND11_MODULE(manifold3d, m) {
           "vertex.")
       .def(
           "refine", [](Manifold &self, int n) { return self.Refine(n); },
-          py::arg("n"),
+          nb::arg("n"),
           "Increase the density of the mesh by splitting every edge into n "
           "pieces. For instance, with n = 2, each triangle will be split into "
           "4 triangles. These will all be coplanar (and will not be "
@@ -299,15 +318,15 @@ PYBIND11_MODULE(manifold3d, m) {
           "1.")
       .def(
           "to_mesh",
-          [](Manifold &self, std::optional<py::array_t<uint32_t>> &normalIdx) {
+          [](Manifold &self,
+             std::optional<nb::ndarray<uint32_t, nb::shape<3>>> &normalIdx) {
             glm::ivec3 v(0);
             if (normalIdx.has_value()) {
               if (normalIdx.value().ndim() != 1 ||
                   normalIdx.value().shape(0) != 3)
                 throw std::runtime_error("Invalid vector shape, expected (3)");
-              auto normalIdx_view = normalIdx.value().unchecked<1>();
-              v = glm::ivec3(normalIdx_view(0), normalIdx_view(1),
-                             normalIdx_view(2));
+              auto value = normalIdx.value();
+              v = glm::ivec3(value(0), value(1), value(2));
             }
             return self.GetMeshGL(v);
           },
@@ -324,7 +343,7 @@ PYBIND11_MODULE(manifold3d, m) {
           "according to the applied transforms and front/back side. Each "
           "channel must be >= 3 and < numProp, and all original MeshGLs must "
           "use the same channels for their normals.",
-          py::arg("normalIdx") = py::none())
+          nb::arg("normalIdx") = nb::none())
       .def("num_vert", &Manifold::NumVert,
            "The number of vertices in the Manifold.")
       .def("num_edge", &Manifold::NumEdge,
@@ -390,7 +409,7 @@ PYBIND11_MODULE(manifold3d, m) {
                 {std::get<0>(normal), std::get<1>(normal), std::get<2>(normal)},
                 originOffset);
           },
-          py::arg("normal"), py::arg("origin_offset"),
+          nb::arg("normal"), nb::arg("origin_offset"),
           "Convenient version of Split() for a half-space."
           "\n\n"
           ":param normal: This vector is normal to the cutting plane and its "
@@ -405,7 +424,7 @@ PYBIND11_MODULE(manifold3d, m) {
                 {std::get<0>(normal), std::get<1>(normal), std::get<2>(normal)},
                 originOffset);
           },
-          py::arg("normal"), py::arg("origin_offset"),
+          nb::arg("normal"), nb::arg("origin_offset"),
           "Identical to SplitByPlane(), but calculating and returning only the "
           "first result."
           "\n\n"
@@ -414,11 +433,11 @@ PYBIND11_MODULE(manifold3d, m) {
           "vector from the plane.\n"
           ":param originOffset: The distance of the plane from the origin in "
           "the direction of the normal vector.")
-      .def_property_readonly(
+      .def_prop_ro(
           "bounding_box",
           [](Manifold &self) {
             auto b = self.BoundingBox();
-            py::tuple box = py::make_tuple(b.min[0], b.min[1], b.min[2],
+            nb::tuple box = nb::make_tuple(b.min[0], b.min[1], b.min[2],
                                            b.max[0], b.max[1], b.max[2]);
             return box;
           },
@@ -457,7 +476,7 @@ PYBIND11_MODULE(manifold3d, m) {
           "formed.")
       .def_static(
           "from_mesh", [](const MeshGL &mesh) { return Manifold(mesh); },
-          py::arg("mesh"))
+          nb::arg("mesh"))
       .def_static(
           "compose",
           [](const std::vector<Manifold> &list) {
@@ -477,23 +496,15 @@ PYBIND11_MODULE(manifold3d, m) {
                           std::get<2>(size)),
                 center);
           },
-          py::arg("size") = std::make_tuple(1.0f, 1.0f, 1.0f),
-          py::arg("center") = false,
+          nb::arg("size") = std::make_tuple(1.0f, 1.0f, 1.0f),
+          nb::arg("center") = false,
           "Constructs a unit cube (edge lengths all one), by default in the "
           "first octant, touching the origin."
           "\n\n"
           ":param size: The X, Y, and Z dimensions of the box.\n"
           ":param center: Set to true to shift the center to the origin.")
       .def_static(
-          "cube",
-          [](py::array_t<float> &size, bool center = false) {
-            auto size_view = size.unchecked<1>();
-            if (size.ndim() != 1 || size.shape(0) != 3)
-              throw std::runtime_error("Invalid vector shape, expected (3)");
-            return Manifold::Cube(
-                glm::vec3(size_view(0), size_view(1), size_view(2)), center);
-          },
-          py::arg("size"), py::arg("center") = false,
+          "cube", &Manifold::Cube, nb::arg("size"), nb::arg("center") = false,
           "Constructs a unit cube (edge lengths all one), by default in the "
           "first octant, touching the origin."
           "\n\n"
@@ -504,7 +515,7 @@ PYBIND11_MODULE(manifold3d, m) {
           [](float x, float y, float z, bool center = false) {
             return Manifold::Cube(glm::vec3(x, y, z), center);
           },
-          py::arg("x"), py::arg("y"), py::arg("z"), py::arg("center") = false,
+          nb::arg("x"), nb::arg("y"), nb::arg("z"), nb::arg("center") = false,
           "Constructs a unit cube (edge lengths all one), by default in the "
           "first octant, touching the origin."
           "\n\n"
@@ -519,9 +530,9 @@ PYBIND11_MODULE(manifold3d, m) {
             return Manifold::Cylinder(height, radiusLow, radiusHigh,
                                       circularSegments, center);
           },
-          py::arg("height"), py::arg("radius_low"),
-          py::arg("radius_high") = -1.0f, py::arg("circular_segments") = 0,
-          py::arg("center") = false,
+          nb::arg("height"), nb::arg("radius_low"),
+          nb::arg("radius_high") = -1.0f, nb::arg("circular_segments") = 0,
+          nb::arg("center") = false,
           "A convenience constructor for the common case of extruding a "
           "circle. Can also form cones if both radii are specified."
           "\n\n"
@@ -538,7 +549,7 @@ PYBIND11_MODULE(manifold3d, m) {
           [](float radius, int circularSegments = 0) {
             return Manifold::Sphere(radius, circularSegments);
           },
-          py::arg("radius"), py::arg("circular_segments") = 0,
+          nb::arg("radius"), nb::arg("circular_segments") = 0,
           "Constructs a geodesic sphere of a given radius.\n"
           "\n"
           ":param radius: Radius of the sphere. Must be positive.\n"
@@ -547,123 +558,129 @@ PYBIND11_MODULE(manifold3d, m) {
           "four, as this sphere is constructed by refining an octahedron. This "
           "means there are a circle of vertices on all three of the axis "
           "planes. Default is calculated by the static Defaults.")
-      .def_static("reserve_ids", Manifold::ReserveIDs, py::arg("n"),
+      .def_static("reserve_ids", Manifold::ReserveIDs, nb::arg("n"),
                   "Returns the first of n sequential new unique mesh IDs for "
                   "marking sets of triangles that can be looked up after "
                   "further operations. Assign to MeshGL.runOriginalID vector");
 
-  py::class_<MeshGL>(m, "Mesh")
+  nb::class_<MeshGL>(m, "Mesh")
       .def(
-          // note that reshape requires mutable array_t, but this will not
+          // note that reshape requires mutable ndarray, but this will not
           // affect the original array passed into the function
-          py::init(
-              [](py::array_t<float, pyArrayFlags> &vertProp,
-                 py::array_t<int, pyArrayFlags> &triVerts,
-                 const std::optional<py::array_t<uint32_t, pyArrayFlags>>
-                     &mergeFromVert,
-                 const std::optional<py::array_t<uint32_t, pyArrayFlags>>
-                     &mergeToVert,
-                 const std::optional<py::array_t<uint32_t, pyArrayFlags>>
-                     &runIndex,
-                 const std::optional<py::array_t<uint32_t, pyArrayFlags>>
-                     &runOriginalID,
-                 std::optional<py::array_t<float, pyArrayFlags>> &runTransform,
-                 const std::optional<py::array_t<uint32_t, pyArrayFlags>>
-                     &faceID,
-                 const std::optional<py::array_t<float, pyArrayFlags>>
-                     &halfedgeTangent,
-                 float precision) {
-                MeshGL out;
+          "__init__",
+          [](MeshGL *self,
+             nb::ndarray<float, nb::shape<nb::any, nb::any>, nb::c_contig>
+                 &vertProp,
+             nb::ndarray<uint32_t, nb::shape<nb::any, 3>, nb::c_contig>
+                 &triVerts,
+             const std::optional<nb::ndarray<uint32_t, nb::shape<nb::any>,
+                                             nb::c_contig>> &mergeFromVert,
+             const std::optional<nb::ndarray<uint32_t, nb::shape<nb::any>,
+                                             nb::c_contig>> &mergeToVert,
+             const std::optional<nb::ndarray<uint32_t, nb::shape<nb::any>,
+                                             nb::c_contig>> &runIndex,
+             const std::optional<nb::ndarray<uint32_t, nb::shape<nb::any>,
+                                             nb::c_contig>> &runOriginalID,
+             std::optional<nb::ndarray<float, nb::shape<nb::any, 4, 3>,
+                                       nb::c_contig>> &runTransform,
+             const std::optional<nb::ndarray<uint32_t, nb::shape<nb::any>,
+                                             nb::c_contig>> &faceID,
+             const std::optional<nb::ndarray<float, nb::shape<nb::any, 3, 4>,
+                                             nb::c_contig>> &halfedgeTangent,
+             float precision) {
+            new (self) MeshGL();
+            MeshGL &out = *self;
+            out.numProp = vertProp.shape(1);
+            out.vertProperties =
+                toVector<float>(vertProp.data(), vertProp.size());
 
-                out.numProp = vertProp.shape(1);
-                vertProp = vertProp.reshape({-1});
-                out.vertProperties = toVector<float>(vertProp);
+            if (triVerts.ndim() != 2 || triVerts.shape(1) != 3)
+              throw std::runtime_error(
+                  "Invalid tri_verts shape, expected (-1, 3)");
+            out.triVerts = toVector<uint32_t>(triVerts.data(), triVerts.size());
 
-                if (triVerts.ndim() != 2 || triVerts.shape(1) != 3)
-                  throw std::runtime_error(
-                      "Invalid tri_verts shape, expected (-1, 3)");
-                triVerts = triVerts.reshape({-1});
-                out.triVerts = toVector<uint32_t>(triVerts);
+            if (mergeFromVert.has_value())
+              out.mergeFromVert = toVector<uint32_t>(mergeFromVert->data(),
+                                                     mergeFromVert->size());
 
-                if (mergeFromVert.has_value())
-                  out.mergeFromVert = toVector<uint32_t>(mergeFromVert.value());
+            if (mergeToVert.has_value())
+              out.mergeToVert =
+                  toVector<uint32_t>(mergeToVert->data(), mergeToVert->size());
 
-                if (mergeToVert.has_value())
-                  out.mergeToVert = toVector<uint32_t>(mergeToVert.value());
+            if (runIndex.has_value())
+              out.runIndex =
+                  toVector<uint32_t>(runIndex->data(), runIndex->size());
 
-                if (runIndex.has_value())
-                  out.runIndex = toVector<uint32_t>(runIndex.value());
+            if (runOriginalID.has_value())
+              out.runOriginalID = toVector<uint32_t>(runOriginalID->data(),
+                                                     runOriginalID->size());
 
-                if (runOriginalID.has_value())
-                  out.runOriginalID = toVector<uint32_t>(runOriginalID.value());
+            if (runTransform.has_value()) {
+              auto runTransform1 = runTransform.value();
+              if (runTransform1.ndim() != 3 || runTransform1.shape(1) != 4 ||
+                  runTransform1.shape(2) != 3)
+                throw std::runtime_error(
+                    "Invalid run_transform shape, expected (-1, 4, 3)");
+              out.runTransform =
+                  toVector<float>(runTransform1.data(), runTransform1.size());
+            }
 
-                if (runTransform.has_value()) {
-                  auto runTransform1 = runTransform.value();
-                  if (runTransform1.ndim() != 3 ||
-                      runTransform1.shape(1) != 4 ||
-                      runTransform1.shape(2) != 3)
-                    throw std::runtime_error(
-                        "Invalid run_transform shape, expected (-1, 4, 3)");
-                  runTransform1 = runTransform1.reshape({-1});
-                  out.runTransform = toVector<float>(runTransform1);
-                }
+            if (faceID.has_value())
+              out.faceID = toVector<uint32_t>(faceID->data(), faceID->size());
 
-                if (faceID.has_value())
-                  out.faceID = toVector<uint32_t>(faceID.value());
+            if (halfedgeTangent.has_value()) {
+              auto halfedgeTangent1 = halfedgeTangent.value();
+              if (halfedgeTangent1.ndim() != 3 ||
+                  halfedgeTangent1.shape(1) != 3 ||
+                  halfedgeTangent1.shape(2) != 4)
+                throw std::runtime_error(
+                    "Invalid halfedge_tangent shape, expected (-1, 3, 4)");
+              out.halfedgeTangent = toVector<float>(halfedgeTangent1.data(),
+                                                    halfedgeTangent1.size());
+            }
+          },
+          nb::arg("vert_properties"), nb::arg("tri_verts"),
+          nb::arg("merge_from_vert") = nb::none(),
+          nb::arg("merge_to_vert") = nb::none(),
+          nb::arg("run_index") = nb::none(),
+          nb::arg("run_original_id") = nb::none(),
+          nb::arg("run_transform") = nb::none(),
+          nb::arg("face_id") = nb::none(),
+          nb::arg("halfedge_tangent") = nb::none(), nb::arg("precision") = 0)
+      .def_prop_ro("vert_properties",
+                   [](const MeshGL &self) {
+                     return nb::ndarray<const float, nb::c_contig>(
+                         self.vertProperties.data(),
+                         {self.vertProperties.size() / self.numProp,
+                          self.numProp});
+                   }, nb::rv_policy::reference_internal)
+      .def_prop_ro("tri_verts",
+                   [](const MeshGL &self) {
+                     return nb::ndarray<const float, nb::c_contig>(
+                         self.triVerts.data(), {self.triVerts.size() / 3, 3});
+                   }, nb::rv_policy::reference_internal)
+      .def_prop_ro("run_transform",
+                   [](const MeshGL &self) {
+                     return nb::ndarray<const float, nb::c_contig>(
+                         self.runTransform.data(), {self.runTransform.size() / 12, 4, 3});
+                   }, nb::rv_policy::reference_internal)
+      .def_prop_ro("halfedge_tangent",
+                   [](const MeshGL &self) {
+                     float *data = new float[self.halfedgeTangent.size()];
+                     std::copy(self.halfedgeTangent.data(),
+                               self.halfedgeTangent.data() +
+                                   self.halfedgeTangent.size(),
+                               data);
+                     return nb::ndarray<const float, nb::c_contig>(
+                         self.halfedgeTangent.data(), {self.halfedgeTangent.size() / 12, 3, 4});
+                   }, nb::rv_policy::reference_internal)
+      .def_ro("merge_from_vert", &MeshGL::mergeFromVert)
+      .def_ro("merge_to_vert", &MeshGL::mergeToVert)
+      .def_ro("run_index", &MeshGL::runIndex)
+      .def_ro("run_original_id", &MeshGL::runOriginalID)
+      .def_ro("face_id", &MeshGL::faceID);
 
-                if (halfedgeTangent.has_value()) {
-                  auto halfedgeTangent1 = halfedgeTangent.value();
-                  if (halfedgeTangent1.ndim() != 3 ||
-                      halfedgeTangent1.shape(1) != 3 ||
-                      halfedgeTangent1.shape(2) != 4)
-                    throw std::runtime_error(
-                        "Invalid halfedge_tangent shape, expected (-1, 3, 4)");
-                  halfedgeTangent1 = halfedgeTangent1.reshape({-1});
-                  out.halfedgeTangent = toVector<float>(halfedgeTangent1);
-                }
-
-                return out;
-              }),
-          py::arg("vert_properties"), py::arg("tri_verts"),
-          py::arg("merge_from_vert") = py::none(),
-          py::arg("merge_to_vert") = py::none(),
-          py::arg("run_index") = py::none(),
-          py::arg("run_original_id") = py::none(),
-          py::arg("run_transform") = py::none(),
-          py::arg("face_id") = py::none(),
-          py::arg("halfedge_tangent") = py::none(), py::arg("precision") = 0)
-      .def_property_readonly(
-          "vert_properties",
-          [](const MeshGL &self) {
-            return py::array(self.vertProperties.size(),
-                             self.vertProperties.data())
-                .reshape(std::array<int, 2>{-1, (int)self.numProp});
-          })
-      .def_property_readonly("tri_verts",
-                             [](const MeshGL &self) {
-                               return py::array(self.triVerts.size(),
-                                                self.triVerts.data())
-                                   .reshape(std::array<int, 2>{-1, 3});
-                             })
-      .def_property_readonly("run_transform",
-                             [](const MeshGL &self) {
-                               return py::array(self.runTransform.size(),
-                                                self.runTransform.data())
-                                   .reshape(std::array<int, 3>{-1, 4, 3});
-                             })
-      .def_property_readonly("halfedge_tangent",
-                             [](const MeshGL &self) {
-                               return py::array(self.halfedgeTangent.size(),
-                                                self.halfedgeTangent.data())
-                                   .reshape(std::array<int, 3>{-1, 3, 4});
-                             })
-      .def_readonly("merge_from_vert", &MeshGL::mergeFromVert)
-      .def_readonly("merge_to_vert", &MeshGL::mergeToVert)
-      .def_readonly("run_index", &MeshGL::runIndex)
-      .def_readonly("run_original_id", &MeshGL::runOriginalID)
-      .def_readonly("face_id", &MeshGL::faceID);
-
-  py::enum_<CrossSection::FillRule>(m, "FillRule")
+  nb::enum_<CrossSection::FillRule>(m, "FillRule")
       .value("EvenOdd", CrossSection::FillRule::EvenOdd,
              "Only odd numbered sub-regions are filled.")
       .value("NonZero", CrossSection::FillRule::NonZero,
@@ -673,7 +690,7 @@ PYBIND11_MODULE(manifold3d, m) {
       .value("Negative", CrossSection::FillRule::Negative,
              "Only sub-regions with winding counts < 0 are filled.");
 
-  py::enum_<CrossSection::JoinType>(m, "JoinType")
+  nb::enum_<CrossSection::JoinType>(m, "JoinType")
       .value("Square", CrossSection::JoinType::Square,
              "Squaring is applied uniformly at all joins where the internal "
              "join angle is less that 90 degrees. The squared edge will be at "
@@ -691,37 +708,39 @@ PYBIND11_MODULE(manifold3d, m) {
           "joins would exceed a given maximum miter distance (relative to the "
           "offset distance), these are 'squared' instead.");
 
-  py::class_<CrossSection>(
+  nb::class_<CrossSection>(
       m, "CrossSection",
       "Two-dimensional cross sections guaranteed to be without "
       "self-intersections, or overlaps between polygons (from construction "
       "onwards). This class makes use of the "
       "[Clipper2](http://www.angusj.com/clipper2/Docs/Overview.htm) library "
       "for polygon clipping (boolean) and offsetting operations.")
-      .def(py::init<>())
-      .def(py::init([](std::vector<std::vector<Float2>> &polygons,
-                       CrossSection::FillRule fillrule) {
-             std::vector<SimplePolygon> simplePolygons(polygons.size());
-             for (int i = 0; i < polygons.size(); i++) {
-               simplePolygons[i] = std::vector<glm::vec2>(polygons[i].size());
-               for (int j = 0; j < polygons[i].size(); j++) {
-                 simplePolygons[i][j] = {std::get<0>(polygons[i][j]),
-                                         std::get<1>(polygons[i][j])};
-               }
-             }
-             return CrossSection(simplePolygons, fillrule);
-           }),
-           py::arg("polygons"),
-           py::arg("fillrule") = CrossSection::FillRule::Positive,
-           "Create a 2d cross-section from a set of contours (complex "
-           "polygons). A boolean union operation (with Positive filling rule "
-           "by default) performed to combine overlapping polygons and ensure "
-           "the resulting CrossSection is free of intersections."
-           "\n\n"
-           ":param contours: A set of closed paths describing zero or more "
-           "complex polygons.\n"
-           ":param fillrule: The filling rule used to interpret polygon "
-           "sub-regions in contours.")
+      .def(nb::init<>())
+      .def(
+          "__init__",
+          [](CrossSection *self, std::vector<std::vector<Float2>> &polygons,
+             CrossSection::FillRule fillrule) {
+            std::vector<SimplePolygon> simplePolygons(polygons.size());
+            for (int i = 0; i < polygons.size(); i++) {
+              simplePolygons[i] = std::vector<glm::vec2>(polygons[i].size());
+              for (int j = 0; j < polygons[i].size(); j++) {
+                simplePolygons[i][j] = {std::get<0>(polygons[i][j]),
+                                        std::get<1>(polygons[i][j])};
+              }
+            }
+            new (self) CrossSection(simplePolygons, fillrule);
+          },
+          nb::arg("polygons"),
+          nb::arg("fillrule") = CrossSection::FillRule::Positive,
+          "Create a 2d cross-section from a set of contours (complex "
+          "polygons). A boolean union operation (with Positive filling rule "
+          "by default) performed to combine overlapping polygons and ensure "
+          "the resulting CrossSection is free of intersections."
+          "\n\n"
+          ":param contours: A set of closed paths describing zero or more "
+          "complex polygons.\n"
+          ":param fillrule: The filling rule used to interpret polygon "
+          "sub-regions in contours.")
       .def("area", &CrossSection::Area,
            "Return the total area covered by complex polygons making up the "
            "CrossSection.")
@@ -769,14 +788,13 @@ PYBIND11_MODULE(manifold3d, m) {
           ":param ax: the axis to be mirrored over")
       .def(
           "transform",
-          [](CrossSection self, py::array_t<float> &mat) {
-            auto mat_view = mat.unchecked<2>();
+          [](CrossSection self, nb::ndarray<float, nb::shape<2, 3>> &mat) {
             if (mat.ndim() != 2 || mat.shape(0) != 2 || mat.shape(1) != 3)
               throw std::runtime_error("Invalid matrix shape, expected (2, 3)");
             glm::mat3x2 mat_glm;
             for (int i = 0; i < 2; i++) {
               for (int j = 0; j < 3; j++) {
-                mat_glm[j][i] = mat_view(i, j);
+                mat_glm[j][i] = mat(i, j);
               }
             }
             return self.Transform(mat_glm);
@@ -796,7 +814,7 @@ PYBIND11_MODULE(manifold3d, m) {
               v.y = std::get<1>(fv);
             });
           },
-          py::arg("f"),
+          nb::arg("f"),
           "Move the vertices of this CrossSection (creating a new one) "
           "according to any arbitrary input function, followed by a union "
           "operation (with a Positive fill rule) that ensures any introduced "
@@ -816,9 +834,9 @@ PYBIND11_MODULE(manifold3d, m) {
            "do not improve quality in any meaningful way. This is particularly "
            "important if further offseting operations are to be performed, "
            "which would compound the issue.")
-      .def("offset", &CrossSection::Offset, py::arg("delta"),
-           py::arg("join_type"), py::arg("miter_limit") = 2.0,
-           py::arg("arc_tolerance") = 0.0,
+      .def("offset", &CrossSection::Offset, nb::arg("delta"),
+           nb::arg("join_type"), nb::arg("miter_limit") = 2.0,
+           nb::arg("arc_tolerance") = 0.0,
            "Inflate the contours in CrossSection by the specified delta, "
            "handling corners according to the given JoinType."
            "\n\n"
@@ -838,9 +856,9 @@ PYBIND11_MODULE(manifold3d, m) {
            "<B>JoinType::Round</B> corners (roughly, the number of vertices "
            "that will be added to each contour). Default is calculated by the "
            "static Quality defaults according to the radius.")
-      .def(py::self + py::self, "Boolean union.")
-      .def(py::self - py::self, "Boolean difference.")
-      .def(py::self ^ py::self, "Boolean intersection.")
+      .def(nb::self + nb::self, "Boolean union.")
+      .def(nb::self - nb::self, "Boolean difference.")
+      .def(nb::self ^ nb::self, "Boolean intersection.")
       .def(
           "hull", [](CrossSection &self) { return self.Hull(); },
           "Compute the convex hull of this cross-section.")
@@ -866,12 +884,12 @@ PYBIND11_MODULE(manifold3d, m) {
           "to_polygons",
           [](CrossSection self) {
             const Polygons &data = self.ToPolygons();
-            py::list polygon_list;
+            nb::list polygon_list;
             for (int i = 0; i < data.size(); ++i) {
-              py::list polygon;
+              nb::list polygon;
               for (int j = 0; j < data[i].size(); ++j) {
                 auto f = data[i][j];
-                py::tuple vertex = py::make_tuple(f[0], f[1]);
+                nb::tuple vertex = nb::make_tuple(f[0], f[1]);
                 polygon.append(vertex);
               }
               polygon_list.append(polygon);
@@ -889,9 +907,9 @@ PYBIND11_MODULE(manifold3d, m) {
             return Manifold::Extrude(self, height, nDivisions, twistDegrees,
                                      scaleTopVec);
           },
-          py::arg("height"), py::arg("n_divisions") = 0,
-          py::arg("twist_degrees") = 0.0f,
-          py::arg("scale_top") = std::make_tuple(1.0f, 1.0f),
+          nb::arg("height"), nb::arg("n_divisions") = 0,
+          nb::arg("twist_degrees") = 0.0f,
+          nb::arg("scale_top") = std::make_tuple(1.0f, 1.0f),
           "Constructs a manifold from the set of polygons by extruding them "
           "along the Z-axis.\n"
           "\n"
@@ -910,7 +928,7 @@ PYBIND11_MODULE(manifold3d, m) {
           [](CrossSection self, int circularSegments = 0) {
             return Manifold::Revolve(self, circularSegments);
           },
-          py::arg("circular_segments") = 0,
+          nb::arg("circular_segments") = 0,
           "Constructs a manifold from the set of polygons by revolving this "
           "cross-section around its Y-axis and then setting this as the Z-axis "
           "of the resulting manifold. If the polygons cross the Y-axis, only "
@@ -925,7 +943,7 @@ PYBIND11_MODULE(manifold3d, m) {
             return CrossSection::Square({std::get<0>(dims), std::get<1>(dims)},
                                         center);
           },
-          py::arg("dims"), py::arg("center") = false,
+          nb::arg("dims"), nb::arg("center") = false,
           "Constructs a square with the given XY dimensions. By default it is "
           "positioned in the first quadrant, touching the origin. If any "
           "dimensions in size are negative, or if all are zero, an empty "
@@ -938,7 +956,7 @@ PYBIND11_MODULE(manifold3d, m) {
           [](float radius, int circularSegments) {
             return CrossSection::Circle(radius, circularSegments);
           },
-          py::arg("radius"), py::arg("circularSegments") = 0,
+          nb::arg("radius"), nb::arg("circularSegments") = 0,
           "Constructs a circle of a given radius."
           "\n\n"
           ":param radius: Radius of the circle. Must be positive.\n"

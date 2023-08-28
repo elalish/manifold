@@ -1,4 +1,4 @@
-from manifold3d import CrossSection, FillRule
+from manifold3d import CrossSection
 
 
 def run():
@@ -11,7 +11,7 @@ def run():
     polygons = cross_section.to_polygons()
     polygon = polygons[0]
     if set(polygon) != set(polygon_points):
-        raise Exception(f"{polygon=} differs from {polygon_points=}")
+        raise Exception(f"polygon={polygon} differs from polygon_points={polygon_points}")
 
     # extrude a polygon to create a manifold
     extruded_polygon = cross_section.extrude(10.0)
@@ -19,17 +19,17 @@ def run():
     observed_volume = extruded_polygon.get_volume()
     expected_volume = 10.0
     if abs(observed_volume - expected_volume) > eps:
-        raise Exception(f"{observed_volume=} differs from {expected_volume=}")
+        raise Exception(f"observed_volume={observed_volume} differs from expected_volume={expected_volume}")
     observed_surface_area = extruded_polygon.get_surface_area()
     expected_surface_area = 42.0
     if abs(observed_surface_area - expected_surface_area) > eps:
-        raise Exception(f"{observed_surface_area=} differs from {expected_surface_area=}")
+        raise Exception(f"observed_surface_area={observed_surface_area} differs from expected_surface_area={expected_surface_area}")
 
     # get bounding box from manifold
     observed_bbox = extruded_polygon.bounding_box
     expected_bbox = (0.0, 0.0, 0.0, 1.0, 1.0, 10.0)
     if observed_bbox != expected_bbox:
-        raise Exception(f"{observed_bbox=} differs from {expected_bbox=}")
+        raise Exception(f"observed_bbox={observed_bbox} differs from expected_bbox={expected_bbox}")
 
     return extruded_polygon
 

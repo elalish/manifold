@@ -14,8 +14,6 @@
 
 #include "impl.h"
 
-#include <thrust/logical.h>
-
 #include <algorithm>
 #include <atomic>
 #include <map>
