@@ -48,23 +48,26 @@ class SparseIndices {
   }
 
   SparseIndices() = default;
-  SparseIndices(size_t size) : data(size) {}
+  SparseIndices(size_t size) : data_(size * sizeof(int64_t)) {}
 
-  int size() const { return data.size(); }
+  int size() const { return data_.size() / sizeof(int64_t); }
 
   Vec<int> Copy(bool use_q) const {
-    Vec<int> out(data.size());
+    Vec<int> out(size());
     int offset = pOffset;
     if (use_q) offset = 1 - offset;
     const int* p = ptr();
-    for_each(autoPolicy(data.size()), countAt(0), countAt((int)data.size()),
+    for_each(autoPolicy(out.size()), countAt(0), countAt((int)out.size()),
              [&](int i) { out[i] = p[i * 2 + offset]; });
     return out;
   }
 
-  void Sort() { sort(autoPolicy(data.size()), data.begin(), data.end()); }
+  void Sort() {
+    VecView<int64_t> view = AsVec64();
+    sort(autoPolicy(size()), view.begin(), view.end());
+  }
 
-  void Resize(int size) { data.resize(size, -1); }
+  void Resize(int size) { data_.resize(size * sizeof(int64_t), -1); }
 
   inline int& Get(int i, bool use_q) {
     if (use_q)
@@ -80,29 +83,63 @@ class SparseIndices {
       return ptr()[2 * i + pOffset];
   }
 
-  inline int64_t GetPQ(int i) const { return data[i]; }
+  inline int64_t GetPQ(int i) const {
+    VecView<const int64_t> view = AsVec64();
+    return view[i];
+  }
 
-  inline void Set(int i, int p, int q) { data[i] = EncodePQ(p, q); }
+  inline void Set(int i, int p, int q) {
+    VecView<int64_t> view = AsVec64();
+    view[i] = EncodePQ(p, q);
+  }
 
-  inline void SetPQ(int i, int64_t pq) { data[i] = pq; }
+  inline void SetPQ(int i, int64_t pq) {
+    VecView<int64_t> view = AsVec64();
+    view[i] = pq;
+  }
 
-  const Vec<int64_t>& AsVec64() const { return data; }
+  VecView<int64_t> AsVec64() {
+    return VecView<int64_t>(reinterpret_cast<int64_t*>(data_.data()),
+                            data_.size() / sizeof(int64_t));
+  }
 
-  inline void Add(int p, int q) { data.push_back(EncodePQ(p, q)); }
+  VecView<const int64_t> AsVec64() const {
+    return VecView<const int64_t>(
+        reinterpret_cast<const int64_t*>(data_.data()),
+        data_.size() / sizeof(int64_t));
+  }
+
+  VecView<int32_t> AsVec32() {
+    return VecView<int32_t>(reinterpret_cast<int32_t*>(data_.data()),
+                            data_.size() / sizeof(int32_t));
+  }
+
+  VecView<const int32_t> AsVec32() const {
+    return VecView<const int32_t>(
+        reinterpret_cast<const int32_t*>(data_.data()),
+        data_.size() / sizeof(int32_t));
+  }
+
+  inline void Add(int p, int q) {
+    for (int i = 0; i < sizeof(int64_t); ++i) data_.push_back(-1);
+    Set(size() - 1, p, q);
+  }
 
   void Unique() {
     Sort();
-    int newSize = unique<decltype(data.begin())>(autoPolicy(data.size()),
-                                                 data.begin(), data.end()) -
-                  data.begin();
+    VecView<int64_t> view = AsVec64();
+    int newSize = unique<decltype(view.begin())>(autoPolicy(view.size()),
+                                                 view.begin(), view.end()) -
+                  view.begin();
     Resize(newSize);
   }
 
   size_t RemoveZeros(Vec<int>& S) {
-    ASSERT(S.size() == data.size(), userErr,
+    ASSERT(S.size() == size(), userErr,
            "Different number of values than indicies!");
-    auto zBegin = zip(S.begin(), data.begin());
-    auto zEnd = zip(S.end(), data.end());
+    VecView<int64_t> view = AsVec64();
+    auto zBegin = zip(S.begin(), view.begin());
+    auto zEnd = zip(S.end(), view.end());
     size_t size =
         remove_if<decltype(zBegin)>(autoPolicy(S.size()), zBegin, zEnd,
                                     [](thrust::tuple<int, int64_t> x) {
@@ -129,10 +166,11 @@ class SparseIndices {
 
   template <typename T>
   size_t KeepFinite(Vec<T>& v, Vec<int>& x) {
-    ASSERT(x.size() == data.size(), userErr,
+    ASSERT(x.size() == size(), userErr,
            "Different number of values than indicies!");
-    auto zBegin = zip(v.begin(), x.begin(), data.begin());
-    auto zEnd = zip(v.end(), x.end(), data.end());
+    VecView<int64_t> view = AsVec64();
+    auto zBegin = zip(v.begin(), x.begin(), view.begin());
+    auto zEnd = zip(v.end(), x.end(), view.end());
     size_t size = remove_if<decltype(zBegin)>(autoPolicy(v.size()), zBegin,
                                               zEnd, firstNonFinite<T>()) -
                   zBegin;
@@ -155,10 +193,10 @@ class SparseIndices {
 #endif
 
  private:
-  Vec<int64_t> data;
-  inline int* ptr() { return reinterpret_cast<int32_t*>(data.data()); }
+  Vec<char> data_;
+  inline int* ptr() { return reinterpret_cast<int32_t*>(data_.data()); }
   inline const int* ptr() const {
-    return reinterpret_cast<const int32_t*>(data.data());
+    return reinterpret_cast<const int32_t*>(data_.data());
   }
 };
 
