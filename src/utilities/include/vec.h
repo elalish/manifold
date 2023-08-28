@@ -44,6 +44,8 @@ class VecView {
   using Iter = T *;
   using IterC = const T *;
 
+  VecView(T *ptr_, int size_) : ptr_(ptr_), size_(size_) {}
+
   VecView(const VecView &other) {
     ptr_ = other.ptr_;
     size_ = other.size_;
@@ -110,7 +112,6 @@ class VecView {
   int size_ = 0;
 
   VecView() = default;
-  VecView(T *ptr_, int size_) : ptr_(ptr_), size_(size_) {}
   friend class Vec<T>;
   friend class Vec<typename std::remove_const<T>::type>;
   friend class VecView<typename std::remove_const<T>::type>;
