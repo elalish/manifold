@@ -41,10 +41,6 @@ else()
   option(CMAKE_BUILD_TYPE "Build type" Release)
 endif()
 
-if(NOT MSVC)
-  set(MANIFOLD_FLAGS ${MANIFOLD_FLAGS} -O3)
-endif()
-
 if(EMSCRIPTEN)
   message("Building for Emscripten")
   set(MANIFOLD_FLAGS -fexceptions -D_LIBCUDACXX_HAS_THREAD_API_EXTERNAL -D_LIBCUDACXX_HAS_THREAD_API_CUDA)
@@ -69,22 +65,20 @@ if(CMAKE_EXPORT_COMPILE_COMMANDS AND NOT EMSCRIPTEN)
       ${CMAKE_CXX_IMPLICIT_INCLUDE_DIRECTORIES})
 endif()
 
-if(NOT MSVC)
+if (MSVC)
+  set(MANIFOLD_FLAGS ${MANIFOLD_FLAGS} /DNOMINMAX)
+else()
   if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     set(WARNING_FLAGS -Werror -Wall -Wno-sign-compare -Wno-unused -Wno-array-bounds -Wno-stringop-overflow)
   else()
     set(WARNING_FLAGS -Werror -Wall -Wno-sign-compare -Wno-unused)
   endif()
-  set(MANIFOLD_FLAGS
-    "${MANIFOLD_FLAGS}"
-    "$<$<COMPILE_LANGUAGE:CXX>:${WARNING_FLAGS}>")
+  set(MANIFOLD_FLAGS ${MANIFOLD_FLAGS} ${WARNING_FLAGS} -O3)
 endif()
 
 if(CODE_COVERAGE AND NOT MSVC)
   set(COVERAGE_FLAGS -coverage -fno-inline-small-functions -fkeep-inline-functions -fkeep-static-functions)
-  set(MANIFOLD_FLAGS
-    "${MANIFOLD_FLAGS}"
-    "$<$<COMPILE_LANGUAGE:CXX>:${COVERAGE_FLAGS}>")
+  set(MANIFOLD_FLAGS ${MANIFOLD_FLAGS} ${COVERAGE_FLAGS})
   add_link_options("-coverage")
 endif()
 
