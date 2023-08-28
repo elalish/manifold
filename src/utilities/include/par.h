@@ -30,9 +30,14 @@
 #elif MANIFOLD_PAR == 'T'
 #include <thrust/system/tbb/execution_policy.h>
 
+#if MANIFOLD_PAR == 'T' && TBB_INTERFACE_VERSION >= 10000 && \
+    __has_include(<pstl/glue_execution_defs.h>)
 #include <algorithm>
 #include <execution>
 #include <numeric>
+#endif
+
+#include "tbb/tbb.h"
 #define MANIFOLD_PAR_NS tbb
 #else
 #define MANIFOLD_PAR_NS cpp
@@ -82,7 +87,8 @@ inline constexpr ExecutionPolicy autoPolicy(int size) {
     return thrust::NAME(thrust::cpp::par, args...);                 \
   }
 
-#if MANIFOLD_PAR == 'T' && __has_include(<pstl/glue_execution_defs.h>)
+#if MANIFOLD_PAR == 'T' && TBB_INTERFACE_VERSION >= 10000 && \
+    __has_include(<pstl/glue_execution_defs.h>)
 // sometimes stl variant is faster
 #define STL_DYNAMIC_BACKEND(NAME, RET)                        \
   template <typename Ret = RET, typename... Args>             \

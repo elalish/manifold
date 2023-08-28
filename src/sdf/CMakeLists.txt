@@ -23,6 +23,8 @@ target_include_directories(${PROJECT_NAME}
 
 target_link_libraries(${PROJECT_NAME} PUBLIC utilities)
 
+target_compile_options(${PROJECT_NAME} PRIVATE ${MANIFOLD_FLAGS})
+
 install(
   TARGETS ${PROJECT_NAME}
   LIBRARY DESTINATION ${CMAKE_INSTALL_FULL_LIBDIR}

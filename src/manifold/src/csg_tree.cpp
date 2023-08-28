@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#if MANIFOLD_PAR == 'T' && __has_include(<tbb/tbb.h>)
+#if MANIFOLD_PAR == 'T' && __has_include(<tbb/concurrent_priority_queue.h>)
 #include <tbb/tbb.h>
 #define TBB_PREVIEW_CONCURRENT_ORDERED_CONTAINERS 1
 #include <tbb/concurrent_priority_queue.h>
@@ -76,6 +76,25 @@ struct CheckOverlap {
   const size_t i;
   bool operator()(int j) { return boxes[i].DoesOverlap(boxes[j]); }
 };
+
+using SharedImpl = std::variant<std::shared_ptr<const Manifold::Impl>,
+                                std::shared_ptr<Manifold::Impl>>;
+struct GetImplPtr {
+  const Manifold::Impl *operator()(const SharedImpl &p) {
+    if (std::holds_alternative<std::shared_ptr<const Manifold::Impl>>(p)) {
+      return std::get<std::shared_ptr<const Manifold::Impl>>(p).get();
+    } else {
+      return std::get<std::shared_ptr<Manifold::Impl>>(p).get();
+    }
+  };
+};
+
+struct MeshCompare {
+  bool operator()(const SharedImpl &a, const SharedImpl &b) {
+    return GetImplPtr()(a)->NumVert() < GetImplPtr()(b)->NumVert();
+  }
+};
+
 }  // namespace
 namespace manifold {
 
@@ -435,21 +454,9 @@ std::shared_ptr<CsgLeafNode> CsgOpNode::ToLeafNode() const {
 std::shared_ptr<Manifold::Impl> CsgOpNode::BatchBoolean(
     OpType operation,
     std::vector<std::shared_ptr<const Manifold::Impl>> &results) {
-  using SharedImpl = std::variant<std::shared_ptr<const Manifold::Impl>,
-                                  std::shared_ptr<Manifold::Impl>>;
-  auto getImplPtr = [](const SharedImpl &p) -> const Manifold::Impl * {
-    if (std::holds_alternative<std::shared_ptr<const Manifold::Impl>>(p)) {
-      return std::get<std::shared_ptr<const Manifold::Impl>>(p).get();
-    } else {
-      return std::get<std::shared_ptr<Manifold::Impl>>(p).get();
-    }
-  };
+  auto getImplPtr = GetImplPtr();
   ASSERT(operation != OpType::Subtract, logicErr,
          "BatchBoolean doesn't support Difference.");
-  auto cmpFn = [&getImplPtr](const SharedImpl &a, const SharedImpl &b) {
-    return getImplPtr(a)->NumVert() < getImplPtr(b)->NumVert();
-  };
-
   // common cases
   if (results.size() == 0) return std::make_shared<Manifold::Impl>();
   if (results.size() == 1)
@@ -460,7 +467,7 @@ std::shared_ptr<Manifold::Impl> CsgOpNode::BatchBoolean(
   }
 #if MANIFOLD_PAR == 'T' && __has_include(<tbb/tbb.h>)
   tbb::task_group group;
-  tbb::concurrent_priority_queue<SharedImpl, decltype(cmpFn)> queue(cmpFn);
+  tbb::concurrent_priority_queue<SharedImpl, MeshCompare> queue(results.size());
   for (auto result : results) {
     queue.emplace(result);
   }
@@ -491,6 +498,7 @@ std::shared_ptr<Manifold::Impl> CsgOpNode::BatchBoolean(
   // apply boolean operations starting from smaller meshes
   // the assumption is that boolean operations on smaller meshes is faster,
   // due to less data being copied and processed
+  auto cmpFn = MeshCompare();
   std::make_heap(results.begin(), results.end(), cmpFn);
   while (results.size() > 1) {
     std::pop_heap(results.begin(), results.end(), cmpFn);

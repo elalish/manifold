@@ -16,7 +16,7 @@
 #include <array>
 #include <map>
 
-#if MANIFOLD_PAR == 'T' && __has_include(<tbb/tbb.h>)
+#if MANIFOLD_PAR == 'T' && __has_include(<tbb/concurrent_map.h>)
 #define TBB_PREVIEW_CONCURRENT_ORDERED_CONTAINERS 1
 #include <tbb/concurrent_map.h>
 #include <tbb/parallel_for.h>

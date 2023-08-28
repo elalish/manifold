@@ -38,7 +38,7 @@ class SparseIndices {
     defined(__LITTLE_ENDIAN__) || defined(__ARMEL__) ||                    \
     defined(__THUMBEL__) || defined(__AARCH64EL__) || defined(_MIPSEL) ||  \
     defined(__MIPSEL) || defined(__MIPSEL__) || defined(__EMSCRIPTEN__) || \
-    defined(_MSC_VER)
+    defined(_WIN32)
   static constexpr size_t pOffset = 1;
 #else
 #error "unknown architecture"

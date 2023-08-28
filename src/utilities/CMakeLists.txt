@@ -70,8 +70,7 @@ endif()
 target_include_directories(${PROJECT_NAME} INTERFACE ${THRUST_INC_DIR})
 target_link_libraries(${PROJECT_NAME} INTERFACE glm)
 
-target_compile_options(${PROJECT_NAME}
-    INTERFACE ${MANIFOLD_FLAGS}
+target_compile_options(${PROJECT_NAME} INTERFACE
     -DTHRUST_DEVICE_SYSTEM=THRUST_DEVICE_SYSTEM_${MANIFOLD_PAR}
 )
 
