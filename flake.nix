@@ -22,7 +22,7 @@
             }: pkgs.stdenv.mkDerivation {
               inherit doCheck;
               pname = "manifold-${parallel-backend}";
-              version = "beta";
+              version = "2.2.0";
               src = self;
               nativeBuildInputs = (with pkgs; [
                 cmake
@@ -99,6 +99,36 @@
                 mkdir -p $out
                 cp {extras,wasm}/*.js $out/
                 cp {extras,wasm}/*.wasm $out/
+              '';
+            };
+            # but how should we make it work with other python versions?
+            manifold3d = with pkgs.python3Packages; buildPythonPackage {
+              pname = "manifold3d";
+              version = "2.2.0";
+              src = self;
+              propagatedBuildInputs = [
+                numpy
+              ];
+              buildInputs = with pkgs; [
+                tbb
+              ];
+              nativeBuildInputs = with pkgs; [
+                cmake
+                ninja
+                setuptools
+                scikit-build-core
+                pyproject-metadata
+                pathspec
+                pkg-config
+              ];
+              checkInputs = [
+                trimesh
+              ];
+              format = "pyproject";
+              dontUseCmakeConfigure = true;
+              doCheck = true;
+              checkPhase = ''
+                python3 bindings/python/examples/run_all.py
               '';
             };
           };

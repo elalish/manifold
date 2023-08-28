@@ -291,7 +291,7 @@ std::shared_ptr<const PathImpl> CrossSection::GetPaths() const {
   if (transform_ == glm::mat3x2(1.0f)) {
     return paths_;
   }
-  paths_ = shared_paths(transform(paths_->paths_, transform_));
+  paths_ = shared_paths(::transform(paths_->paths_, transform_));
   transform_ = glm::mat3x2(1.0f);
   return paths_;
 }
