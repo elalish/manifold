@@ -15,16 +15,25 @@
 project(python)
 
 add_subdirectory(third_party)
-pybind11_add_module(manifold3d manifold3d.cpp)
+nanobind_add_module(
+  manifold3d
+  NB_STATIC STABLE_ABI LTO
+  manifold3d.cpp)
 target_link_libraries(manifold3d PRIVATE manifold)
-target_compile_options(manifold3d PRIVATE ${MANIFOLD_FLAGS})
+target_compile_options(manifold3d PRIVATE ${MANIFOLD_FLAGS} -DMODULE_NAME=manifold3d)
 target_compile_features(manifold3d PUBLIC cxx_std_17)
-target_include_directories(manifold3d
-    PRIVATE ${PYBIND11_DIR}/include
-)
 set_target_properties(manifold3d PROPERTIES OUTPUT_NAME "manifold3d")
+
+if(SKBUILD)
+install(
+  TARGETS manifold3d
+  LIBRARY DESTINATION ${SKBUILD_PLATLIB_DIR}
+  COMPONENT bindings
+)
+else()
 install(
   TARGETS manifold3d
   LIBRARY DESTINATION ${CMAKE_INSTALL_FULL_LIBDIR}
   COMPONENT bindings
 )
+endif()

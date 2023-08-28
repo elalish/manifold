@@ -41,7 +41,9 @@ else()
   option(CMAKE_BUILD_TYPE "Build type" Release)
 endif()
 
-set(MANIFOLD_FLAGS ${MANIFOLD_FLAGS} -O3)
+if(NOT MSVC)
+  set(MANIFOLD_FLAGS ${MANIFOLD_FLAGS} -O3)
+endif()
 
 if(EMSCRIPTEN)
   message("Building for Emscripten")
@@ -52,11 +54,13 @@ endif()
 
 if(MANIFOLD_PYBIND)
   set(CMAKE_POSITION_INDEPENDENT_CODE ON)
-  find_package(Python COMPONENTS Interpreter Development.Module REQUIRED)
+  if(Python_VERSION VERSION_LESS 3.12)
+    find_package(Python COMPONENTS Interpreter Development.Module REQUIRED)
+  else()
+    find_package(Python COMPONENTS Interpreter Development.SABIModule REQUIRED)
+  endif()
 endif()
 
-
-set(PYBIND11_DIR ${PROJECT_SOURCE_DIR}/bindings/python/third_party/pybind11)
 set(THRUST_INC_DIR ${PROJECT_SOURCE_DIR}/src/third_party/thrust)
 
 if(CMAKE_EXPORT_COMPILE_COMMANDS AND NOT EMSCRIPTEN)

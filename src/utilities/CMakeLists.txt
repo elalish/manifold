@@ -51,6 +51,7 @@ if(MANIFOLD_PAR STREQUAL "TBB")
           GIT_PROGRESS   TRUE
         )
         FetchContent_MakeAvailable(TBB)
+        set_property(DIRECTORY ${TBB_SOURCE_DIR} PROPERTY EXCLUDE_FROM_ALL YES)
     endif()
     target_compile_options(${PROJECT_NAME} INTERFACE -DMANIFOLD_PAR='T')
     if(TARGET TBB::tbb)
