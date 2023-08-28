@@ -382,10 +382,10 @@ std::tuple<Vec<int>, Vec<float>> Shadow02(const Manifold::Impl &inP,
 };
 
 struct Kernel12 {
-  const Vec<int64_t> &p0q2;
+  VecView<const int64_t> p0q2;
   VecView<const int> s02;
   VecView<const float> z02;
-  const Vec<int64_t> &p1q1;
+  VecView<const int64_t> p1q1;
   VecView<const int> s11;
   VecView<const glm::vec4> xyzz11;
   VecView<const Halfedge> halfedgesP;
