@@ -656,7 +656,7 @@ NB_MODULE(manifold3d, m) {
                    }, nb::rv_policy::reference_internal)
       .def_prop_ro("tri_verts",
                    [](const MeshGL &self) {
-                     return nb::ndarray<nb::numpy, const float, nb::c_contig>(
+                     return nb::ndarray<nb::numpy, const int, nb::c_contig>(
                          self.triVerts.data(), {self.triVerts.size() / 3, 3});
                    }, nb::rv_policy::reference_internal)
       .def_prop_ro("run_transform",
