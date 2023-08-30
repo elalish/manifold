@@ -649,19 +649,19 @@ NB_MODULE(manifold3d, m) {
           nb::arg("halfedge_tangent") = nb::none(), nb::arg("precision") = 0)
       .def_prop_ro("vert_properties",
                    [](const MeshGL &self) {
-                     return nb::ndarray<const float, nb::c_contig>(
+                     return nb::ndarray<nb::numpy, const float, nb::c_contig>(
                          self.vertProperties.data(),
                          {self.vertProperties.size() / self.numProp,
                           self.numProp});
                    }, nb::rv_policy::reference_internal)
       .def_prop_ro("tri_verts",
                    [](const MeshGL &self) {
-                     return nb::ndarray<const float, nb::c_contig>(
+                     return nb::ndarray<nb::numpy, const float, nb::c_contig>(
                          self.triVerts.data(), {self.triVerts.size() / 3, 3});
                    }, nb::rv_policy::reference_internal)
       .def_prop_ro("run_transform",
                    [](const MeshGL &self) {
-                     return nb::ndarray<const float, nb::c_contig>(
+                     return nb::ndarray<nb::numpy, const float, nb::c_contig>(
                          self.runTransform.data(), {self.runTransform.size() / 12, 4, 3});
                    }, nb::rv_policy::reference_internal)
       .def_prop_ro("halfedge_tangent",
@@ -671,7 +671,7 @@ NB_MODULE(manifold3d, m) {
                                self.halfedgeTangent.data() +
                                    self.halfedgeTangent.size(),
                                data);
-                     return nb::ndarray<const float, nb::c_contig>(
+                     return nb::ndarray<nb::numpy, const float, nb::c_contig>(
                          self.halfedgeTangent.data(), {self.halfedgeTangent.size() / 12, 3, 4});
                    }, nb::rv_policy::reference_internal)
       .def_ro("merge_from_vert", &MeshGL::mergeFromVert)
