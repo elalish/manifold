@@ -41,7 +41,7 @@ jobs:
         cd build/test
         ./manifold_test
         cd ../../
-        python3 bindings/python/examples/run_all.py
+        python3 bindings/python/examples/run_all.py -e
     - name: Coverage Report
       # only do code coverage for default sequential backend, it seems that TBB
       # backend will cause failure
