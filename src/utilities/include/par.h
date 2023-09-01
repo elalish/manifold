@@ -23,18 +23,15 @@
 #include <thrust/sort.h>
 #include <thrust/system/cpp/execution_policy.h>
 #include <thrust/uninitialized_copy.h>
-#include <thrust/unique.h>
-#if MANIFOLD_PAR == 'O'
-#include <thrust/system/omp/execution_policy.h>
-#define MANIFOLD_PAR_NS omp
-#elif MANIFOLD_PAR == 'T'
+
+#include <algorithm>
+#include <numeric>
+#if MANIFOLD_PAR == 'T'
 #include <thrust/system/tbb/execution_policy.h>
 
 #if MANIFOLD_PAR == 'T' && TBB_INTERFACE_VERSION >= 10000 && \
     __has_include(<pstl/glue_execution_defs.h>)
-#include <algorithm>
 #include <execution>
-#include <numeric>
 #endif
 
 #include "tbb/tbb.h"
@@ -87,9 +84,9 @@ inline constexpr ExecutionPolicy autoPolicy(int size) {
     return thrust::NAME(thrust::cpp::par, args...);                 \
   }
 
-#if MANIFOLD_PAR == 'T' && TBB_INTERFACE_VERSION >= 10000 && \
-    __has_include(<pstl/glue_execution_defs.h>)
-// sometimes stl variant is faster
+#if MANIFOLD_PAR != 'T' || \
+    (TBB_INTERFACE_VERSION >= 10000 && __has_include(<pstl/glue_execution_defs.h>))
+#if MANIFOLD_PAR == 'T'
 #define STL_DYNAMIC_BACKEND(NAME, RET)                        \
   template <typename Ret = RET, typename... Args>             \
   Ret NAME(ExecutionPolicy policy, Args... args) {            \
@@ -113,6 +110,18 @@ inline constexpr ExecutionPolicy autoPolicy(int size) {
         break;                                         \
     }                                                  \
   }
+#else
+#define STL_DYNAMIC_BACKEND(NAME, RET)             \
+  template <typename Ret = RET, typename... Args>  \
+  Ret NAME(ExecutionPolicy policy, Args... args) { \
+    return std::NAME(args...);                     \
+  }
+#define STL_DYNAMIC_BACKEND_VOID(NAME)              \
+  template <typename... Args>                       \
+  void NAME(ExecutionPolicy policy, Args... args) { \
+    std::NAME(args...);                             \
+  }
+#endif
 
 template <typename... Args>
 void exclusive_scan(ExecutionPolicy policy, Args... args) {
@@ -137,10 +146,14 @@ template <typename DerivedPolicy, typename InputIterator1,
 OutputIterator copy_if(ExecutionPolicy policy, InputIterator1 first,
                        InputIterator1 last, OutputIterator result,
                        Predicate pred) {
+#if MANIFOLD_PAR == 'T'
   if (policy == ExecutionPolicy::Seq)
     return std::copy_if(first, last, result, pred);
   else
     return std::copy_if(std::execution::par_unseq, first, last, result, pred);
+#else
+  return std::copy_if(first, last, result, pred);
+#endif
 }
 
 #else
@@ -156,9 +169,7 @@ THRUST_DYNAMIC_BACKEND_VOID(scatter)
 THRUST_DYNAMIC_BACKEND_VOID(for_each)
 THRUST_DYNAMIC_BACKEND_VOID(for_each_n)
 THRUST_DYNAMIC_BACKEND_VOID(sequence)
-THRUST_DYNAMIC_BACKEND_VOID(sort_by_key)
-THRUST_DYNAMIC_BACKEND_VOID(stable_sort_by_key)
-THRUST_DYNAMIC_BACKEND_VOID(transform)
+STL_DYNAMIC_BACKEND_VOID(transform)
 STL_DYNAMIC_BACKEND_VOID(uninitialized_fill)
 STL_DYNAMIC_BACKEND_VOID(uninitialized_copy)
 STL_DYNAMIC_BACKEND_VOID(stable_sort)
@@ -173,7 +184,6 @@ STL_DYNAMIC_BACKEND_VOID(sort)
 THRUST_DYNAMIC_BACKEND(transform_reduce, void)
 THRUST_DYNAMIC_BACKEND(gather_if, void)
 THRUST_DYNAMIC_BACKEND(reduce_by_key, void)
-THRUST_DYNAMIC_BACKEND(lower_bound, void)
 STL_DYNAMIC_BACKEND(remove, void)
 STL_DYNAMIC_BACKEND(find, void)
 STL_DYNAMIC_BACKEND(find_if, void)

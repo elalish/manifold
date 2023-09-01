@@ -310,16 +310,19 @@ void Manifold::Impl::SortVerts() {
   Vec<int> vertNew2Old(numVert);
   sequence(policy, vertNew2Old.begin(), vertNew2Old.end());
 
-  sort_by_key(policy, vertMorton.begin(), vertMorton.end(),
-              vertNew2Old.begin());
+  sort(policy, zip(vertMorton.begin(), vertNew2Old.begin()),
+       zip(vertMorton.end(), vertNew2Old.end()),
+       [](const thrust::tuple<uint32_t, int>& a,
+          const thrust::tuple<uint32_t, int>& b) {
+         return thrust::get<0>(a) < thrust::get<0>(b);
+       });
 
   ReindexVerts(vertNew2Old, numVert);
 
   // Verts were flagged for removal with NaNs and assigned kNoCode to sort
   // them to the end, which allows them to be removed.
   const int newNumVert =
-      lower_bound<decltype(vertMorton.begin())>(policy, vertMorton.begin(),
-                                                vertMorton.end(), kNoCode) -
+      std::lower_bound(vertMorton.begin(), vertMorton.end(), kNoCode) -
       vertMorton.begin();
 
   vertNew2Old.resize(newNumVert);
@@ -391,8 +394,12 @@ void Manifold::Impl::SortFaces(Vec<Box>& faceBox, Vec<uint32_t>& faceMorton) {
   auto policy = autoPolicy(faceNew2Old.size());
   sequence(policy, faceNew2Old.begin(), faceNew2Old.end());
 
-  sort_by_key(policy, faceMorton.begin(), faceMorton.end(),
-              faceNew2Old.begin());
+  sort(policy, zip(faceMorton.begin(), faceNew2Old.begin()),
+       zip(faceMorton.end(), faceNew2Old.end()),
+       [](const thrust::tuple<uint32_t, int>& a,
+          const thrust::tuple<uint32_t, int>& b) {
+         return thrust::get<0>(a) < thrust::get<0>(b);
+       });
 
   // Tris were flagged for removal with pairedHalfedge = -1 and assigned kNoCode
   // to sort them to the end, which allows them to be removed.
@@ -565,8 +572,12 @@ bool MeshGL::Merge() {
              zip(vertMorton.begin(), vertBox.begin(), openVerts.cbegin()),
              numOpenVert, VertMortonBox({vertPropD, numProp, precision, bBox}));
 
-  sort_by_key(policy, vertMorton.begin(), vertMorton.end(),
-              zip(vertBox.begin(), openVerts.begin()));
+  sort(policy, zip(vertMorton.begin(), vertBox.begin(), openVerts.begin()),
+       zip(vertMorton.end(), vertBox.end(), openVerts.end()),
+       [](const thrust::tuple<uint32_t, Box, int>& a,
+          const thrust::tuple<uint32_t, Box, int>& b) {
+         return thrust::get<0>(a) < thrust::get<0>(b);
+       });
 
   Collider collider(vertBox, vertMorton);
   SparseIndices toMerge = collider.Collisions<true>(vertBox.cview());
