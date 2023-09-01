@@ -181,8 +181,6 @@ STL_DYNAMIC_BACKEND(all_of, bool)
 STL_DYNAMIC_BACKEND(is_sorted, bool)
 STL_DYNAMIC_BACKEND(reduce, void)
 STL_DYNAMIC_BACKEND(count_if, int)
-STL_DYNAMIC_BACKEND(binary_search, bool)
 STL_DYNAMIC_BACKEND(remove_if, void)
-STL_DYNAMIC_BACKEND(unique, void)
 
 }  // namespace manifold

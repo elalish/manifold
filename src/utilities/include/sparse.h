@@ -128,9 +128,7 @@ class SparseIndices {
   void Unique() {
     Sort();
     VecView<int64_t> view = AsVec64();
-    int newSize = unique<decltype(view.begin())>(autoPolicy(view.size()),
-                                                 view.begin(), view.end()) -
-                  view.begin();
+    int newSize = std::unique(view.begin(), view.end()) - view.begin();
     Resize(newSize);
   }
 
