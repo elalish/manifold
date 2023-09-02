@@ -496,7 +496,12 @@ Vec<int> Winding03(const Manifold::Impl &inP, Vec<int> &vertices, Vec<int> &s02,
   Vec<int> w03(inP.NumVert(), 0);
   // checking is slow, so just sort and reduce
   auto policy = autoPolicy(vertices.size());
-  stable_sort_by_key(policy, vertices.begin(), vertices.end(), s02.begin());
+  stable_sort(
+      policy, zip(vertices.begin(), s02.begin()),
+      zip(vertices.end(), s02.end()),
+      [](const thrust::tuple<int, int> &a, const thrust::tuple<int, int> &b) {
+        return thrust::get<0>(a) < thrust::get<0>(b);
+      });
   Vec<int> w03val(w03.size());
   Vec<int> w03vert(w03.size());
   // sum known s02 values into w03 (winding number)
