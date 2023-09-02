@@ -684,7 +684,12 @@ void Manifold::Impl::CreateHalfedges(const Vec<glm::ivec3>& triVerts) {
   // degenerate situations the triangulator can add the same internal edge in
   // two different faces, causing this edge to not be 2-manifold. These are
   // fixed by duplicating verts in SimplifyTopology.
-  stable_sort_by_key(policy, edge.begin(), edge.end(), ids.begin());
+  stable_sort(policy, zip(edge.begin(), ids.begin()),
+              zip(edge.end(), ids.end()),
+              [](const thrust::tuple<uint64_t, int>& a,
+                 const thrust::tuple<uint64_t, int>& b) {
+                return thrust::get<0>(a) < thrust::get<0>(b);
+              });
   // Once sorted, the first half of the range is the forward halfedges, which
   // correspond to their backward pair at the same offset in the second half
   // of the range.
