@@ -293,8 +293,8 @@ struct Box {
    * Does this box overlap the one given (including equality)?
    */
   inline bool DoesOverlap(const Box& box) const {
-    return (min.x <= box.max.x) & (min.y <= box.max.y) & (min.z <= box.max.z) &
-           (max.x >= box.min.x) & (max.y >= box.min.y) & (max.z >= box.min.z);
+    return min.x <= box.max.x && min.y <= box.max.y && min.z <= box.max.z &&
+           max.x >= box.min.x && max.y >= box.min.y && max.z >= box.min.z;
   }
 
   /**
@@ -302,7 +302,7 @@ struct Box {
    * (including equality)?
    */
   inline bool DoesOverlap(glm::vec3 p) const {  // projected in z
-    return (p.x <= max.x) & (p.x >= min.x) & (p.y <= max.y) & (p.y >= min.y);
+    return p.x <= max.x && p.x >= min.x && p.y <= max.y && p.y >= min.y;
   }
 
   /**
