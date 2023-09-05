@@ -879,7 +879,6 @@ TEST(Boolean, Sweep) {
   std::vector<Manifold> result;
 
   for (int i = 0; i < numPoints; i++) {
-    // std::cerr << i << std::endl;
     std::vector<Manifold> primitives =
         cutterPrimitives(pathPoints[i], pathPoints[(i + 1) % numPoints],
                          pathPoints[(i + 2) % numPoints]);

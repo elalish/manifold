@@ -157,7 +157,7 @@ void Manifold::Impl::SimplifyTopology() {
     entries[i].index = i;
   });
 
-  sort(policy, entries.begin(), entries.end());
+  stable_sort(policy, entries.begin(), entries.end());
   for (int i = 0; i < nbEdges - 1; ++i) {
     if (entries[i].start == entries[i + 1].start &&
         entries[i].end == entries[i + 1].end) {

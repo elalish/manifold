@@ -286,7 +286,7 @@ bool Manifold::Impl::Is2Manifold() const {
   if (!IsManifold()) return false;
 
   Vec<Halfedge> halfedge(halfedge_);
-  sort(policy, halfedge.begin(), halfedge.end());
+  stable_sort(policy, halfedge.begin(), halfedge.end());
 
   return all_of(policy, countAt(0), countAt(2 * NumEdge() - 1),
                 NoDuplicates({halfedge}));
@@ -313,11 +313,26 @@ int Manifold::Impl::NumDegenerateTris() const {
 
 Properties Manifold::Impl::GetProperties() const {
   if (IsEmpty()) return {0, 0};
-  auto areaVolume = transform_reduce<thrust::pair<float, float>>(
-      autoPolicy(NumTri()), countAt(0), countAt(NumTri()),
-      FaceAreaVolume({halfedge_, vertPos_, precision_}),
-      thrust::make_pair(0.0f, 0.0f), SumPair());
-  return {areaVolume.first, areaVolume.second};
+  // Kahan summation
+  float area = 0;
+  float volume = 0;
+  float areaCompensation = 0;
+  float volumeCompensation = 0;
+  for (int i = 0; i < NumTri(); ++i) {
+    auto [area1, volume1] =
+        FaceAreaVolume({halfedge_, vertPos_, precision_})(i);
+    const float t1 = area + area1;
+    const float t2 = volume + volume1;
+    // we know that the elements are non-negative
+    areaCompensation += (area - t1) + area1;
+    volumeCompensation += (volume - t2) + volume1;
+    area = t1;
+    volume = t2;
+  }
+  area += areaCompensation;
+  volume += volumeCompensation;
+
+  return {area, volume};
 }
 
 void Manifold::Impl::CalculateCurvature(int gaussianIdx, int meanIdx) {
