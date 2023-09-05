@@ -207,8 +207,8 @@ void AddNewEdgeVerts(
   // parallelize operations, requires concurrent_map so we can only enable this
   // with tbb
   if (!ManifoldParams().deterministic && p1q2.size() > kParallelThreshold) {
-    // ideally we should have 1 mutex per key, but kParallelThreshold is enough to avoid
-    // contention for most of the cases
+    // ideally we should have 1 mutex per key, but kParallelThreshold is enough
+    // to avoid contention for most of the cases
     std::array<std::mutex, kParallelThreshold> mutexes;
     static tbb::affinity_partitioner ap;
     auto processFun = std::bind(
