@@ -838,7 +838,8 @@ class Monotones {
     }
 #if MANIFOLD_PAR == 'T' && TBB_INTERFACE_VERSION >= 10000 && \
     __has_include(<pstl/glue_execution_defs.h>)
-    std::stable_sort(std::execution::par_unseq, starts.begin(), starts.end(), cmp);
+    std::stable_sort(std::execution::par_unseq, starts.begin(), starts.end(),
+                     cmp);
 #else
     std::stable_sort(starts.begin(), starts.end(), cmp);
 #endif
