@@ -119,8 +119,8 @@ void CheckTopology(const std::vector<PolyEdge> &halfedges) {
     return a.startVert < b.startVert ||
            (a.startVert == b.startVert && a.endVert < b.endVert);
   };
-  std::sort(forward.begin(), forward.end(), cmp);
-  std::sort(backward.begin(), backward.end(), cmp);
+  std::stable_sort(forward.begin(), forward.end(), cmp);
+  std::stable_sort(backward.begin(), backward.end(), cmp);
   for (int i = 0; i < n_edges; ++i) {
     ASSERT(forward[i].startVert == backward[i].startVert &&
                forward[i].endVert == backward[i].endVert,
@@ -838,9 +838,10 @@ class Monotones {
     }
 #if MANIFOLD_PAR == 'T' && TBB_INTERFACE_VERSION >= 10000 && \
     __has_include(<pstl/glue_execution_defs.h>)
-    std::sort(std::execution::par_unseq, starts.begin(), starts.end(), cmp);
+    std::stable_sort(std::execution::par_unseq, starts.begin(), starts.end(),
+                     cmp);
 #else
-    std::sort(starts.begin(), starts.end(), cmp);
+    std::stable_sort(starts.begin(), starts.end(), cmp);
 #endif
 
     std::vector<VertItr> skipped;

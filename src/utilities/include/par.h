@@ -177,7 +177,6 @@ STL_DYNAMIC_BACKEND_VOID(fill)
 STL_DYNAMIC_BACKEND_VOID(copy)
 STL_DYNAMIC_BACKEND_VOID(inclusive_scan)
 STL_DYNAMIC_BACKEND_VOID(copy_n)
-STL_DYNAMIC_BACKEND_VOID(sort)
 
 // void implies that the user have to specify the return type in the template
 // argument, as we are unable to deduce it

@@ -44,6 +44,8 @@ struct std::hash<std::pair<int, int>> {
 
 namespace {
 
+constexpr int kParallelThreshold = 128;
+
 struct AbsSum : public thrust::binary_function<int, int, int> {
   int operator()(int a, int b) { return abs(a) + abs(b); }
 };
@@ -204,10 +206,10 @@ void AddNewEdgeVerts(
 #if MANIFOLD_PAR == 'T' && __has_include(<tbb/tbb.h>)
   // parallelize operations, requires concurrent_map so we can only enable this
   // with tbb
-  if (p1q2.size() > 128) {
-    // ideally we should have 1 mutex per key, but 128 is enough to avoid
-    // contention for most of the cases
-    std::array<std::mutex, 128> mutexes;
+  if (!ManifoldParams().deterministic && p1q2.size() > kParallelThreshold) {
+    // ideally we should have 1 mutex per key, but kParallelThreshold is enough
+    // to avoid contention for most of the cases
+    std::array<std::mutex, kParallelThreshold> mutexes;
     static tbb::affinity_partitioner ap;
     auto processFun = std::bind(
         process, [&](size_t hash) { mutexes[hash % mutexes.size()].lock(); },
@@ -240,8 +242,8 @@ std::vector<Halfedge> PairUp(std::vector<EdgePos> &edgePos) {
                                [](EdgePos x) { return x.isStart; });
   ASSERT(middle - edgePos.begin() == nEdges, topologyErr, "Non-manifold edge!");
   auto cmp = [](EdgePos a, EdgePos b) { return a.edgePos < b.edgePos; };
-  std::sort(edgePos.begin(), middle, cmp);
-  std::sort(middle, edgePos.end(), cmp);
+  std::stable_sort(edgePos.begin(), middle, cmp);
+  std::stable_sort(middle, edgePos.end(), cmp);
   std::vector<Halfedge> edges;
   for (int i = 0; i < nEdges; ++i)
     edges.push_back({edgePos[i].vert, edgePos[i + nEdges].vert, -1, -1});
@@ -440,7 +442,8 @@ void AppendWholeEdges(Manifold::Impl &outR, Vec<int> &facePtrR,
                       const Vec<char> wholeHalfedgeP, const Vec<int> &i03,
                       const Vec<int> &vP2R, VecView<const int> faceP2R,
                       bool forward) {
-  for_each_n(autoPolicy(inP.halfedge_.size()),
+  for_each_n(ManifoldParams().deterministic ? ExecutionPolicy::Seq
+                                            : autoPolicy(inP.halfedge_.size()),
              zip(wholeHalfedgeP.begin(), inP.halfedge_.begin(), countAt(0)),
              inP.halfedge_.size(),
              DuplicateHalfedges({outR.halfedge_, halfedgeRef, facePtrR,
