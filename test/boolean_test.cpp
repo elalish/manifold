@@ -905,5 +905,4 @@ TEST(Boolean, Sweep) {
 #endif
 
   PolygonParams().processOverlaps = false;
-  ManifoldParams().deterministic = false;
 }
