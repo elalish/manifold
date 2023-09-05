@@ -665,6 +665,7 @@ TEST(Boolean, TreeTransforms) {
 
 TEST(Boolean, Sweep) {
   PolygonParams().processOverlaps = true;
+  ManifoldParams().deterministic = true;
 
   // generate the minimum equivalent positive angle
   auto minPosAngle = [](float angle) {
@@ -879,7 +880,6 @@ TEST(Boolean, Sweep) {
   std::vector<Manifold> result;
 
   for (int i = 0; i < numPoints; i++) {
-    // std::cerr << i << std::endl;
     std::vector<Manifold> primitives =
         cutterPrimitives(pathPoints[i], pathPoints[(i + 1) % numPoints],
                          pathPoints[(i + 2) % numPoints]);
@@ -898,6 +898,7 @@ TEST(Boolean, Sweep) {
   }
 
   Manifold shape = Manifold::BatchBoolean(result, OpType::Add);
+  EXPECT_EQ(shape.NumTri(), 4400);
   auto prop = shape.GetProperties();
 
   EXPECT_NEAR(prop.volume, 3757, 1);
@@ -906,4 +907,5 @@ TEST(Boolean, Sweep) {
 #endif
 
   PolygonParams().processOverlaps = false;
+  ManifoldParams().deterministic = false;
 }

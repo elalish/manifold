@@ -466,35 +466,38 @@ std::shared_ptr<Manifold::Impl> CsgOpNode::BatchBoolean(
     return std::make_shared<Manifold::Impl>(boolean.Result(operation));
   }
 #if MANIFOLD_PAR == 'T' && __has_include(<tbb/tbb.h>)
-  tbb::task_group group;
-  tbb::concurrent_priority_queue<SharedImpl, MeshCompare> queue(results.size());
-  for (auto result : results) {
-    queue.emplace(result);
-  }
-  results.clear();
-  std::function<void()> process = [&]() {
-    while (queue.size() > 1) {
-      SharedImpl a, b;
-      if (!queue.try_pop(a)) continue;
-      if (!queue.try_pop(b)) {
-        queue.push(a);
-        continue;
-      }
-      group.run([&, a, b]() {
-        const Manifold::Impl *aImpl;
-        const Manifold::Impl *bImpl;
-        Boolean3 boolean(*getImplPtr(a), *getImplPtr(b), operation);
-        queue.emplace(
-            std::make_shared<Manifold::Impl>(boolean.Result(operation)));
-        return group.run(process);
-      });
+  if (!ManifoldParams().deterministic) {
+    tbb::task_group group;
+    tbb::concurrent_priority_queue<SharedImpl, MeshCompare> queue(
+        results.size());
+    for (auto result : results) {
+      queue.emplace(result);
     }
-  };
-  group.run_and_wait(process);
-  SharedImpl r;
-  queue.try_pop(r);
-  return std::get<std::shared_ptr<Manifold::Impl>>(r);
-#else
+    results.clear();
+    std::function<void()> process = [&]() {
+      while (queue.size() > 1) {
+        SharedImpl a, b;
+        if (!queue.try_pop(a)) continue;
+        if (!queue.try_pop(b)) {
+          queue.push(a);
+          continue;
+        }
+        group.run([&, a, b]() {
+          const Manifold::Impl *aImpl;
+          const Manifold::Impl *bImpl;
+          Boolean3 boolean(*getImplPtr(a), *getImplPtr(b), operation);
+          queue.emplace(
+              std::make_shared<Manifold::Impl>(boolean.Result(operation)));
+          return group.run(process);
+        });
+      }
+    };
+    group.run_and_wait(process);
+    SharedImpl r;
+    queue.try_pop(r);
+    return std::get<std::shared_ptr<Manifold::Impl>>(r);
+  }
+#endif
   // apply boolean operations starting from smaller meshes
   // the assumption is that boolean operations on smaller meshes is faster,
   // due to less data being copied and processed
@@ -517,7 +520,6 @@ std::shared_ptr<Manifold::Impl> CsgOpNode::BatchBoolean(
     std::push_heap(results.begin(), results.end(), cmpFn);
   }
   return std::make_shared<Manifold::Impl>(*results.front());
-#endif
 }
 
 /**
@@ -551,9 +553,8 @@ void CsgOpNode::BatchUnion() const {
     std::vector<Vec<size_t>> disjointSets;
     for (size_t i = 0; i < boxes.size(); i++) {
       auto lambda = [&boxes, i](const Vec<size_t> &set) {
-        return find_if<decltype(set.end())>(
-                   autoPolicy(set.size()), set.begin(), set.end(),
-                   CheckOverlap({boxes, i})) == set.end();
+        return std::find_if(set.begin(), set.end(), CheckOverlap({boxes, i})) ==
+               set.end();
       };
       auto it = std::find_if(disjointSets.begin(), disjointSets.end(), lambda);
       if (it == disjointSets.end()) {
@@ -563,27 +564,22 @@ void CsgOpNode::BatchUnion() const {
       }
     }
     // compose each set of disjoint children
-    std::vector<std::shared_ptr<const Manifold::Impl>> impls(
-        disjointSets.size());
-    for_each_n(
-        disjointSets.size() > 1 ? ExecutionPolicy::Par : ExecutionPolicy::Seq,
-        countAt(0), disjointSets.size(),
-        [children_, &impls, &disjointSets, start](int i) {
-          auto set = disjointSets[i];
-          if (set.size() == 1) {
-            impls[i] = std::dynamic_pointer_cast<CsgLeafNode>(
-                           children_[start + set[0]])
-                           ->GetImpl();
-          } else {
-            std::vector<std::shared_ptr<CsgLeafNode>> tmp;
-            for (size_t j : set) {
-              tmp.push_back(
-                  std::dynamic_pointer_cast<CsgLeafNode>(children_[start + j]));
-            }
-            impls[i] = std::make_shared<const Manifold::Impl>(
-                CsgLeafNode::Compose(tmp));
-          }
-        });
+    std::vector<std::shared_ptr<const Manifold::Impl>> impls;
+    for (auto &set : disjointSets) {
+      if (set.size() == 1) {
+        impls.push_back(
+            std::dynamic_pointer_cast<CsgLeafNode>(children_[start + set[0]])
+                ->GetImpl());
+      } else {
+        std::vector<std::shared_ptr<CsgLeafNode>> tmp;
+        for (size_t j : set) {
+          tmp.push_back(
+              std::dynamic_pointer_cast<CsgLeafNode>(children_[start + j]));
+        }
+        impls.push_back(
+            std::make_shared<const Manifold::Impl>(CsgLeafNode::Compose(tmp)));
+      }
+    }
 
     children_.erase(children_.begin() + start, children_.end());
     children_.push_back(
@@ -607,8 +603,9 @@ std::vector<std::shared_ptr<CsgNode>> &CsgOpNode::GetChildren(
 
   if (forceToLeafNodes && !impl->forcedToLeafNodes_) {
     impl->forcedToLeafNodes_ = true;
-    for_each(impl->children_.size() > 1 ? ExecutionPolicy::Par
-                                        : ExecutionPolicy::Seq,
+    for_each(impl->children_.size() > 1 && !ManifoldParams().deterministic
+                 ? ExecutionPolicy::Par
+                 : ExecutionPolicy::Seq,
              impl->children_.begin(), impl->children_.end(), [](auto &child) {
                if (child->GetNodeType() != CsgNodeType::Leaf) {
                  child = child->ToLeafNode();

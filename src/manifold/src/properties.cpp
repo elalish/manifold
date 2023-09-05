@@ -286,7 +286,7 @@ bool Manifold::Impl::Is2Manifold() const {
   if (!IsManifold()) return false;
 
   Vec<Halfedge> halfedge(halfedge_);
-  sort(policy, halfedge.begin(), halfedge.end());
+  stable_sort(policy, halfedge.begin(), halfedge.end());
 
   return all_of(policy, countAt(0), countAt(2 * NumEdge() - 1),
                 NoDuplicates({halfedge}));

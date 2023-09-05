@@ -292,17 +292,17 @@ struct Box {
   /**
    * Does this box overlap the one given (including equality)?
    */
-  bool DoesOverlap(const Box& box) const {
-    return min.x <= box.max.x && min.y <= box.max.y && min.z <= box.max.z &&
-           max.x >= box.min.x && max.y >= box.min.y && max.z >= box.min.z;
+  inline bool DoesOverlap(const Box& box) const {
+    return (min.x <= box.max.x) & (min.y <= box.max.y) & (min.z <= box.max.z) &
+           (max.x >= box.min.x) & (max.y >= box.min.y) & (max.z >= box.min.z);
   }
 
   /**
    * Does the given point project within the XY extent of this box
    * (including equality)?
    */
-  bool DoesOverlap(glm::vec3 p) const {  // projected in z
-    return p.x <= max.x && p.x >= min.x && p.y <= max.y && p.y >= min.y;
+  inline bool DoesOverlap(glm::vec3 p) const {  // projected in z
+    return (p.x <= max.x) & (p.x >= min.x) & (p.y <= max.y) & (p.y >= min.y);
   }
 
   /**
@@ -445,6 +445,8 @@ struct ExecutionParams {
   /// Suppresses printed errors regarding CW triangles. Has no effect if
   /// processOverlaps is true.
   bool suppressErrors = false;
+  /// Deterministic outputs. Will disable some parallel optimizations.
+  bool deterministic = false;
 };
 
 #ifdef MANIFOLD_DEBUG

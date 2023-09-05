@@ -64,7 +64,7 @@ class SparseIndices {
 
   void Sort() {
     VecView<int64_t> view = AsVec64();
-    sort(autoPolicy(size()), view.begin(), view.end());
+    stable_sort(autoPolicy(size()), view.begin(), view.end());
   }
 
   void Resize(int size) { data_.resize(size * sizeof(int64_t), -1); }
