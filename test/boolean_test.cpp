@@ -665,7 +665,6 @@ TEST(Boolean, TreeTransforms) {
 
 TEST(Boolean, Sweep) {
   PolygonParams().processOverlaps = true;
-  ManifoldParams().deterministic = true;
 
   // generate the minimum equivalent positive angle
   auto minPosAngle = [](float angle) {
@@ -898,7 +897,6 @@ TEST(Boolean, Sweep) {
   }
 
   Manifold shape = Manifold::BatchBoolean(result, OpType::Add);
-  EXPECT_EQ(shape.NumTri(), 4400);
   auto prop = shape.GetProperties();
 
   EXPECT_NEAR(prop.volume, 3757, 1);

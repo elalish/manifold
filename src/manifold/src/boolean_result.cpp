@@ -44,6 +44,8 @@ struct std::hash<std::pair<int, int>> {
 
 namespace {
 
+constexpr int kParallelThreshold = 128;
+
 struct AbsSum : public thrust::binary_function<int, int, int> {
   int operator()(int a, int b) { return abs(a) + abs(b); }
 };
@@ -204,10 +206,10 @@ void AddNewEdgeVerts(
 #if MANIFOLD_PAR == 'T' && __has_include(<tbb/tbb.h>)
   // parallelize operations, requires concurrent_map so we can only enable this
   // with tbb
-  if (!ManifoldParams().deterministic && p1q2.size() > 128) {
-    // ideally we should have 1 mutex per key, but 128 is enough to avoid
+  if (!ManifoldParams().deterministic && p1q2.size() > kParallelThreshold) {
+    // ideally we should have 1 mutex per key, but kParallelThreshold is enough to avoid
     // contention for most of the cases
-    std::array<std::mutex, 128> mutexes;
+    std::array<std::mutex, kParallelThreshold> mutexes;
     static tbb::affinity_partitioner ap;
     auto processFun = std::bind(
         process, [&](size_t hash) { mutexes[hash % mutexes.size()].lock(); },
