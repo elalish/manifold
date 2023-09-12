@@ -433,6 +433,14 @@ NB_MODULE(manifold3d, m) {
           "vector from the plane.\n"
           ":param originOffset: The distance of the plane from the origin in "
           "the direction of the normal vector.")
+      .def(
+          "status", &Manifold::Status,
+          "Returns the reason for an input Mesh producing an empty Manifold. "
+          "This Status only applies to Manifolds newly-created from an input Mesh "
+          "- once they are combined into a new Manifold via operations, the status "
+          "reverts to NoError, simply processing the problem mesh as empty. "
+          "Likewise, empty meshes may still show NoError, for instance if they are "
+          "small enough relative to their precision to be collapsed to nothing.")
       .def_prop_ro(
           "bounding_box",
           [](Manifold &self) {
@@ -679,6 +687,20 @@ NB_MODULE(manifold3d, m) {
       .def_ro("run_index", &MeshGL::runIndex)
       .def_ro("run_original_id", &MeshGL::runOriginalID)
       .def_ro("face_id", &MeshGL::faceID);
+
+  nb::enum_<Manifold::Error>(m, "Error")
+      .value("NoError", Manifold::Error::NoError)
+      .value("NonFiniteVertex", Manifold::Error::NonFiniteVertex)
+      .value("NotManifold", Manifold::Error::NotManifold)
+      .value("VertexOutOfBounds", Manifold::Error::VertexOutOfBounds)
+      .value("PropertiesWrongLength", Manifold::Error::PropertiesWrongLength)
+      .value("MissingPositionProperties", Manifold::Error::MissingPositionProperties)
+      .value("MergeVectorsDifferentLengths", Manifold::Error::MergeVectorsDifferentLengths)
+      .value("MergeIndexOutOfBounds", Manifold::Error::MergeIndexOutOfBounds)
+      .value("TransformWrongLength", Manifold::Error::TransformWrongLength)
+      .value("RunIndexWrongLength", Manifold::Error::RunIndexWrongLength)
+      .value("FaceIDWrongLength", Manifold::Error::FaceIDWrongLength)
+      .value("InvalidConstruction", Manifold::Error::InvalidConstruction);
 
   nb::enum_<CrossSection::FillRule>(m, "FillRule")
       .value("EvenOdd", CrossSection::FillRule::EvenOdd,
