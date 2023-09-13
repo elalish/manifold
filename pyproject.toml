@@ -50,20 +50,6 @@ sdist.exclude = [
     "src/third_party/clipper2/Tests/",
     "src/third_party/glm/doc/",
     "src/third_party/glm/test/",
-    "src/third_party/thrust/dependencies/cub/",
-    "src/third_party/thrust/dependencies/libcudacxx/.upstream-tests/",
-    "src/third_party/thrust/dependencies/libcudacxx/docker/",
-    "src/third_party/thrust/dependencies/libcudacxx/test/",
-    "src/third_party/thrust/dependencies/libcudacxx/docs/",
-    "src/third_party/thrust/dependencies/libcudacxx/libcxx/",
-    "src/third_party/thrust/dependencies/libcudacxx/libcxxabi/",
-    "src/third_party/thrust/dependencies/libcudacxx/libunwind/",
-    "src/third_party/thrust/dependencies/libcudacxx/utils/google-benchmark/",
-    "src/third_party/thrust/docs/",
-    "src/third_party/thrust/testing/",
-    "src/third_party/thrust/internal/test/",
-    "src/third_party/thrust/examples/",
-    "src/third_party/thrust/thrust/system/cuda",
 ]
 wheel.packages = ["manifold3d"]
 cmake.args = ["-DMANIFOLD_PAR=TBB", "-DMANIFOLD_TEST=OFF"]

@@ -15,23 +15,36 @@
 project(utilities)
 
 add_library(${PROJECT_NAME} INTERFACE)
-
 message("Parallel Backend: ${MANIFOLD_PAR}")
 
-target_include_directories(${PROJECT_NAME} INTERFACE ${PROJECT_SOURCE_DIR}/include)
-target_include_directories(${PROJECT_NAME} INTERFACE ${THRUST_INC_DIR}/dependencies/libcudacxx/include)
-
-if (TRACY_ENABLE)
-  include(FetchContent)
-  FetchContent_Declare(tracy
-    GIT_REPOSITORY https://github.com/wolfpld/tracy.git
-    GIT_TAG v0.9.1
+include(FetchContent)
+FetchContent_Declare(glm
+    GIT_REPOSITORY https://github.com/g-truc/glm.git
+    GIT_TAG 0.9.9.8
     GIT_SHALLOW TRUE
     GIT_PROGRESS TRUE
-  )
-  FetchContent_MakeAvailable(tracy)
-  target_link_libraries(${PROJECT_NAME} INTERFACE TracyClient)
-  target_compile_options(${PROJECT_NAME} INTERFACE -DTRACY_NO_CODE_TRANSFER=1)
+    FIND_PACKAGE_ARGS NAMES glm
+)
+FetchContent_MakeAvailable(glm)
+
+FetchContent_Declare(Thrust
+    GIT_REPOSITORY https://github.com/NVIDIA/thrust.git
+    GIT_TAG 2.1.0
+    FIND_PACKAGE_ARGS NAMES Thrust
+)
+FetchContent_MakeAvailable(Thrust)
+
+if (TRACY_ENABLE)
+    include(FetchContent)
+    FetchContent_Declare(tracy
+        GIT_REPOSITORY https://github.com/wolfpld/tracy.git
+        GIT_TAG v0.9.1
+        GIT_SHALLOW TRUE
+        GIT_PROGRESS TRUE
+    )
+    FetchContent_MakeAvailable(tracy)
+    target_link_libraries(${PROJECT_NAME} INTERFACE TracyClient)
+    target_compile_options(${PROJECT_NAME} INTERFACE -DTRACY_NO_CODE_TRANSFER=1)
 endif()
 
 if(MANIFOLD_PAR STREQUAL "TBB")
@@ -44,13 +57,15 @@ if(MANIFOLD_PAR STREQUAL "TBB")
         include(FetchContent)
         set(TBB_TEST OFF CACHE INTERNAL "" FORCE)
         set(TBB_STRICT OFF CACHE INTERNAL "" FORCE)
+        set(BUILD_SHARED_LIBS ON)
         FetchContent_Declare(TBB
-          GIT_REPOSITORY https://github.com/oneapi-src/oneTBB.git
-          GIT_TAG        v2021.10.0
-          GIT_SHALLOW    TRUE
-          GIT_PROGRESS   TRUE
+            GIT_REPOSITORY https://github.com/oneapi-src/oneTBB.git
+            GIT_TAG        v2021.10.0
+            GIT_SHALLOW    TRUE
+            GIT_PROGRESS   TRUE
         )
         FetchContent_MakeAvailable(TBB)
+        unset(BUILD_SHARED_LIBS)
         set_property(DIRECTORY ${TBB_SOURCE_DIR} PROPERTY EXCLUDE_FROM_ALL YES)
     endif()
     target_compile_options(${PROJECT_NAME} INTERFACE -DMANIFOLD_PAR='T')
@@ -67,8 +82,19 @@ else()
         "Should be \"TBB\" or \"NONE\"")
 endif()
 
-target_include_directories(${PROJECT_NAME} INTERFACE ${THRUST_INC_DIR})
-target_link_libraries(${PROJECT_NAME} INTERFACE glm)
+target_include_directories(${PROJECT_NAME} INTERFACE ${PROJECT_SOURCE_DIR}/include)
+target_link_libraries(${PROJECT_NAME} INTERFACE glm::glm)
+if(DEFINED Thrust_SOURCE_DIR)
+target_include_directories(${PROJECT_NAME} INTERFACE
+    ${Thrust_SOURCE_DIR}
+    ${Thrust_SOURCE_DIR}/dependencies/libcudacxx/include
+)
+else()
+target_include_directories(${PROJECT_NAME} INTERFACE
+    ${THRUST_ROOT}
+    ${THRUST_ROOT}/dependencies/libcudacxx/include
+)
+endif()
 
 target_compile_options(${PROJECT_NAME} INTERFACE
     -DTHRUST_DEVICE_SYSTEM=THRUST_DEVICE_SYSTEM_${MANIFOLD_PAR}
