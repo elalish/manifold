@@ -226,14 +226,14 @@ class EarClip {
 
     for (const SimplePolygonIdx &poly : polys) {
       auto vert = poly.begin();
-      polygon_.push_back({vert->idx, vert->pos});
+      polygon_.push_back({vert->idx, earsQueue_.end(), vert->pos});
       const VertItr first = std::prev(polygon_.end());
       VertItr last = first;
       VertItr start = first;
       float maxX = start->pos.x;
 
       for (++vert; vert != poly.end(); ++vert) {
-        polygon_.push_back({vert->idx, vert->pos});
+        polygon_.push_back({vert->idx, earsQueue_.end(), vert->pos});
         VertItr next = std::prev(polygon_.end());
 
         bound = glm::max(
@@ -243,10 +243,13 @@ class EarClip {
           maxX = next->pos.x;
           start = next;
         }
+
+        last->rightDir = glm::normalize(next->pos - last->pos);
         last->right = next;
         next->left = last;
         last = next;
       }
+      last->rightDir = glm::normalize(first->pos - last->pos);
       last->right = first;
       first->left = last;
       starts_.insert(start);
@@ -262,7 +265,6 @@ class EarClip {
       VertItr last = start;
       VertItr next = last->right;
       do {
-        last->rightDir = glm::normalize(next->pos - last->pos);
         area += glm::determinant(glm::mat2(last->pos, next->pos));
         last = next;
         next = next->right;
@@ -323,7 +325,10 @@ class EarClip {
       const VertItr newStart = std::prev(polygon_.end());
       polygon_.push_back(*connector);
       const VertItr newConnector = std::prev(polygon_.end());
+
+      start->right->left = newStart;
       start->right = connector;
+      connector->left->right = newConnector;
       connector->left = start;
       newStart->left = newConnector;
       newConnector->right = newStart;
@@ -362,15 +367,15 @@ class EarClip {
   typedef std::set<VertItr, Angle>::iterator qItr;
 
   std::vector<Vert> polygon_;
-  std::set<VertItr, MaxX> starts_;
-  std::set<VertItr, Angle> earsQueue_;
+  std::multiset<VertItr, MaxX> starts_;
+  std::multiset<VertItr, Angle> earsQueue_;
   float precision_;
 
   struct Vert {
     int mesh_idx;
+    qItr ear;
     glm::vec2 pos, rightDir;
     VertItr left, right;
-    qItr ear;
     float cos = -2;  // Cosine of the angle; -2 represents reflex
 
     bool IsConvex() const { return cos >= -1; }
@@ -381,13 +386,15 @@ class EarClip {
       const glm::vec2 openSide = left->pos - right->pos;
       VertItr test = right->right;
       while (test != left) {
-        if (test->IsConvex()) continue;
-        glm::vec2 offset = test->pos - pos;
-        if (glm::determinant(glm::mat2(rightDir, offset)) > 0) return false;
-        if (glm::determinant(glm::mat2(left->rightDir, offset)) > 0)
-          return false;
-        if (glm::determinant(glm::mat2(openSide, test->pos - right->pos)) > 0)
-          return false;
+        if (!test->IsConvex()) {
+          glm::vec2 offset = test->pos - pos;
+          if (glm::determinant(glm::mat2(rightDir, offset)) > 0 &&
+              glm::determinant(glm::mat2(left->rightDir, offset)) > 0 &&
+              glm::determinant(glm::mat2(openSide, test->pos - right->pos)) >
+                  0) {
+            return false;
+          }
+        }
         test = test->right;
       }
       return true;
@@ -438,28 +445,40 @@ class EarClip {
     }
 
     glm::ivec3 ClipEar() {
+      // std::cout << "clipping " << mesh_idx << ", " << right->mesh_idx << ", "
+      //           << left->mesh_idx << std::endl;
       glm::ivec3 tri(left->mesh_idx, mesh_idx, right->mesh_idx);
       left->right = right;
       right->left = left;
       return tri;
     }
+
+#ifdef MANIFOLD_DEBUG
+    void PrintVert() {
+      std::cout << "vert: " << mesh_idx << ", left: " << left->mesh_idx
+                << ", right: " << right->mesh_idx << ", cos: " << cos
+                << std::endl;
+    }
+#endif
   };
 
   void ProcessEar(VertItr v) {
     v->CalculateConvexity(precision_);
     if (v->ear != earsQueue_.end()) {
       earsQueue_.erase(v->ear);
+      v->ear = earsQueue_.end();
     }
     if (v->IsEar()) {
-      v->ear = earsQueue_.insert(v).first;
+      v->ear = earsQueue_.insert(v);
     }
   }
 
   void TriangulatePoly(std::vector<glm::ivec3> &tris, VertItr start) {
-    int numTri = 0;
+    int numTri = -2;
     VertItr v = start;
     do {
       ProcessEar(v);
+      // v->PrintVert();
       v = v->right;
       ++numTri;
     } while (v != start);
@@ -468,7 +487,10 @@ class EarClip {
       const qItr ear = earsQueue_.begin();
       if (ear != earsQueue_.end()) {
         v = *ear;
+        // v->PrintVert();
         earsQueue_.erase(ear);
+      } else {
+        std::cout << "No ear found!" << std::endl;
       }
       const VertItr left = v->left;
       const VertItr right = v->right;
