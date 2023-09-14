@@ -57,6 +57,8 @@ if(MANIFOLD_PAR STREQUAL "TBB")
         include(FetchContent)
         set(TBB_TEST OFF CACHE INTERNAL "" FORCE)
         set(TBB_STRICT OFF CACHE INTERNAL "" FORCE)
+        set(PREV_BUILD_SHARED_LIBS BUILD_SHARED_LIBS)
+        set(BUILD_SHARED_LIBS ON)
         FetchContent_Declare(TBB
             GIT_REPOSITORY https://github.com/oneapi-src/oneTBB.git
             GIT_TAG        v2021.10.0
@@ -64,6 +66,7 @@ if(MANIFOLD_PAR STREQUAL "TBB")
             GIT_PROGRESS   TRUE
         )
         FetchContent_MakeAvailable(TBB)
+        set(BUILD_SHARED_LIBS PREV_BUILD_SHARED_LIBS)
         set_property(DIRECTORY ${TBB_SOURCE_DIR} PROPERTY EXCLUDE_FROM_ALL YES)
     endif()
     target_compile_options(${PROJECT_NAME} INTERFACE -DMANIFOLD_PAR='T')
