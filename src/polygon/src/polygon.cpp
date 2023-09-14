@@ -297,6 +297,9 @@ class EarClip {
 
         if (connector == polygon_.end()) continue;
 
+        std::cout << start->mesh_idx << ", " << connector->mesh_idx
+                  << std::endl;
+
         edge = connector->right;
         glm::vec2 left = start->pos - connector->pos;
         glm::vec2 right = glm::vec2(minX, startY) - connector->pos;
@@ -311,14 +314,15 @@ class EarClip {
           }
           edge = edge->right;
         }
-        break;
       }
 
       if (connector == polygon_.end()) {
-        std::cout << "hole did not fine an outer contour!" << std::endl;
+        PRINT("hole did not fine an outer contour!");
         ++startItr;
         continue;
       }
+
+      std::cout << start->mesh_idx << ", " << connector->mesh_idx << std::endl;
 
       // connect start to connector and duplicate verts.
       polygon_.push_back(*start);
@@ -332,6 +336,9 @@ class EarClip {
       connector->left = start;
       newStart->left = newConnector;
       newConnector->right = newStart;
+      start->rightDir = glm::normalize(start->right->pos - start->pos);
+      newConnector->rightDir =
+          glm::normalize(newConnector->right->pos - newConnector->pos);
 
       startItr = starts_.erase(startItr);
     }
@@ -388,10 +395,11 @@ class EarClip {
       while (test != left) {
         if (!test->IsConvex()) {
           glm::vec2 offset = test->pos - pos;
-          if (glm::determinant(glm::mat2(rightDir, offset)) > 0 &&
-              glm::determinant(glm::mat2(left->rightDir, offset)) > 0 &&
-              glm::determinant(glm::mat2(openSide, test->pos - right->pos)) >
+          if (glm::determinant(glm::mat2(rightDir, offset)) >= 0 &&
+              glm::determinant(glm::mat2(left->rightDir, offset)) >= 0 &&
+              glm::determinant(glm::mat2(openSide, test->pos - right->pos)) >=
                   0) {
+            PRINT("not an ear");
             return false;
           }
         }
@@ -403,7 +411,7 @@ class EarClip {
     void CalculateConvexity(float precision) {
       int convexity = CCW(left->pos, pos, right->pos, precision);
       if (convexity > 0) {
-        cos = glm::dot(rightDir, left->rightDir);
+        cos = glm::dot(rightDir, -left->rightDir);
       } else if (convexity < 0) {
         // Don't let a convex vert become reflex
         cos = IsConvex() ? 1 : -2;
@@ -445,11 +453,12 @@ class EarClip {
     }
 
     glm::ivec3 ClipEar() {
-      // std::cout << "clipping " << mesh_idx << ", " << right->mesh_idx << ", "
-      //           << left->mesh_idx << std::endl;
+      std::cout << "clipping " << mesh_idx << ", " << right->mesh_idx << ", "
+                << left->mesh_idx << std::endl;
       glm::ivec3 tri(left->mesh_idx, mesh_idx, right->mesh_idx);
       left->right = right;
       right->left = left;
+      left->rightDir = glm::normalize(right->pos - left->pos);
       return tri;
     }
 
@@ -475,10 +484,11 @@ class EarClip {
 
   void TriangulatePoly(std::vector<glm::ivec3> &tris, VertItr start) {
     int numTri = -2;
+    earsQueue_.clear();
     VertItr v = start;
     do {
       ProcessEar(v);
-      // v->PrintVert();
+      v->PrintVert();
       v = v->right;
       ++numTri;
     } while (v != start);
@@ -487,10 +497,10 @@ class EarClip {
       const qItr ear = earsQueue_.begin();
       if (ear != earsQueue_.end()) {
         v = *ear;
-        // v->PrintVert();
+        v->PrintVert();
         earsQueue_.erase(ear);
       } else {
-        std::cout << "No ear found!" << std::endl;
+        PRINT("No ear found!");
       }
       const VertItr left = v->left;
       const VertItr right = v->right;
@@ -503,6 +513,7 @@ class EarClip {
     }
 
     ASSERT(v->right == v->left, logicErr, "Triangulator error!");
+    PRINT("Finished poly");
   }
 };
 
