@@ -48,8 +48,6 @@ sdist.exclude = [
     "src/third_party/clipper2/Delphi/",
     "src/third_party/clipper2/DLL/",
     "src/third_party/clipper2/Tests/",
-    "src/third_party/glm/doc/",
-    "src/third_party/glm/test/",
 ]
 wheel.packages = ["manifold3d"]
 cmake.args = ["-DMANIFOLD_PAR=TBB", "-DMANIFOLD_TEST=OFF"]
