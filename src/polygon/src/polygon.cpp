@@ -18,6 +18,7 @@
 #endif
 
 #include <algorithm>
+#include <numeric>
 #if MANIFOLD_PAR == 'T' && TBB_INTERFACE_VERSION >= 10000 && \
     __has_include(<pstl/glue_execution_defs.h>)
 #include <execution>
@@ -197,6 +198,291 @@ void PrintFailure(const std::exception &e, const PolygonsIdx &polys,
   if (!(condition)) return true;
 #define PRINT(msg)
 #endif
+
+/**
+ * Ear-clipping triangulator based on David Eberly's approach from Geometric
+ * Tools, but adjusted to handle epsilon-valid polygons, and including a
+ * fallback that ensures a manifold triangulation even for overlapping polygons.
+ * This is an O(n^2) algorithm, but hopefully this is not a big problem as the
+ * number of edges in a given polygon is generally much less than the number of
+ * triangles in a mesh, and relatively few faces even need triangulation.
+ *
+ * The main adjustments for robustness involve clipping the sharpest ears first
+ * (a known technique to get higher triangle quality), and doing an exhaustive
+ * search to determine ear convexity exactly if the first geometric result is
+ * within precision.
+ */
+
+class EarClip {
+ public:
+  EarClip(const PolygonsIdx &polys, float precision) : precision_(precision) {
+    int numStart = polys.size();
+    int numVert = 0;
+    for (const SimplePolygonIdx &poly : polys) {
+      numVert += poly.size();
+    }
+    polygon_.reserve(numVert + 2 * numStart);
+    float bound;
+
+    for (const SimplePolygonIdx &poly : polys) {
+      auto vert = poly.begin();
+      polygon_.push_back({vert->idx, vert->pos});
+      const VertItr first = std::prev(polygon_.end());
+      VertItr last = first;
+      VertItr start = first;
+      float maxX = start->pos.x;
+
+      for (++vert; vert != poly.end(); ++vert) {
+        polygon_.push_back({vert->idx, vert->pos});
+        VertItr next = std::prev(polygon_.end());
+
+        bound = glm::max(
+            bound, glm::max(glm::abs(vert->pos.x), glm::abs(vert->pos.y)));
+
+        if (next->pos.x > maxX) {
+          maxX = next->pos.x;
+          start = next;
+        }
+        last->right = next;
+        next->left = last;
+        last = next;
+      }
+      last->right = first;
+      first->left = last;
+      starts_.insert(start);
+    }
+
+    if (precision_ < 0) precision_ = bound * kTolerance;
+
+    // Outer polygon cannot be a hole, so start with the next one.
+    auto startItr = std::next(starts_.begin());
+    while (startItr != starts_.end()) {
+      float area = 0;
+      VertItr start = *startItr;
+      VertItr last = start;
+      VertItr next = last->right;
+      do {
+        last->rightDir = glm::normalize(next->pos - last->pos);
+        area += glm::determinant(glm::mat2(last->pos, next->pos));
+        last = next;
+        next = next->right;
+      } while (last != start);
+
+      if (area >= 0) {  // Outer
+        ++startItr;
+        continue;
+      }
+
+      // Hole
+      const float startY = start->pos.y;
+      const float startX = start->pos.x;
+      float minX = std::numeric_limits<float>::infinity();
+      VertItr connector = polygon_.end();
+      for (auto poly = starts_.begin(); poly != startItr; ++poly) {
+        VertItr edge = *poly;
+        do {
+          if (edge->pos.y <= startY && edge->right->pos.y > startY) {
+            float a =
+                (startY - edge->pos.y) / (edge->right->pos.y - edge->pos.y);
+            float x = glm::mix(edge->pos.x, edge->right->pos.x, a);
+            if (x > startX && x < minX) {
+              minX = x;
+              connector = edge->pos.x > edge->right->pos.x ? edge : edge->right;
+            }
+          }
+          edge = edge->right;
+        } while (edge != *poly);
+
+        if (connector == polygon_.end()) continue;
+
+        edge = connector->right;
+        glm::vec2 left = start->pos - connector->pos;
+        glm::vec2 right = glm::vec2(minX, startY) - connector->pos;
+        while (edge != connector) {
+          glm::vec2 offset = edge->pos - connector->pos;
+          if (edge->pos.y <= startY &&
+              glm::determinant(glm::mat2(offset, left)) > 0 &&
+              glm::determinant(glm::mat2(right, offset)) > 0) {
+            connector = edge;
+            glm::vec2 left = start->pos - connector->pos;
+            glm::vec2 right = glm::vec2(minX, startY) - connector->pos;
+          }
+          edge = edge->right;
+        }
+        break;
+      }
+
+      if (connector == polygon_.end()) {
+        std::cout << "hole did not fine an outer contour!" << std::endl;
+        ++startItr;
+        continue;
+      }
+
+      // connect start to connector and duplicate verts.
+      polygon_.push_back(*start);
+      const VertItr newStart = std::prev(polygon_.end());
+      polygon_.push_back(*connector);
+      const VertItr newConnector = std::prev(polygon_.end());
+      start->right = connector;
+      connector->left = start;
+      newStart->left = newConnector;
+      newConnector->right = newStart;
+
+      startItr = starts_.erase(startItr);
+    }
+  }
+
+  void Triangulate(std::vector<glm::ivec3> &tris) {
+    int numTri = polygon_.size() - 2 * starts_.size();
+    tris.reserve(numTri);
+
+    for (const VertItr start : starts_) {
+      TriangulatePoly(tris, start);
+    }
+
+    ASSERT(tris.size() == numTri, logicErr,
+           "Triangulator produced the wrong number of tris!");
+  }
+
+  float GetPrecision() const { return precision_; }
+
+ private:
+  struct Vert;
+  typedef std::vector<Vert>::iterator VertItr;
+  struct MaxX {
+    bool operator()(const VertItr &a, const VertItr &b) const {
+      return a->pos.x > b->pos.x;
+    }
+  };
+  struct Angle {
+    bool operator()(const VertItr &a, const VertItr &b) const {
+      return a->cos > b->cos;
+    }
+  };
+  typedef std::set<VertItr, Angle>::iterator qItr;
+
+  std::vector<Vert> polygon_;
+  std::set<VertItr, MaxX> starts_;
+  std::set<VertItr, Angle> earsQueue_;
+  float precision_;
+
+  struct Vert {
+    int mesh_idx;
+    glm::vec2 pos, rightDir;
+    VertItr left, right;
+    qItr ear;
+    float cos = -2;  // Cosine of the angle; -2 represents reflex
+
+    bool IsConvex() const { return cos >= -1; }
+
+    bool IsEar() const {
+      if (!IsConvex()) return false;
+
+      const glm::vec2 openSide = left->pos - right->pos;
+      VertItr test = right->right;
+      while (test != left) {
+        if (test->IsConvex()) continue;
+        glm::vec2 offset = test->pos - pos;
+        if (glm::determinant(glm::mat2(rightDir, offset)) > 0) return false;
+        if (glm::determinant(glm::mat2(left->rightDir, offset)) > 0)
+          return false;
+        if (glm::determinant(glm::mat2(openSide, test->pos - right->pos)) > 0)
+          return false;
+        test = test->right;
+      }
+      return true;
+    }
+
+    void CalculateConvexity(float precision) {
+      int convexity = CCW(left->pos, pos, right->pos, precision);
+      if (convexity > 0) {
+        cos = glm::dot(rightDir, left->rightDir);
+      } else if (convexity < 0) {
+        // Don't let a convex vert become reflex
+        cos = IsConvex() ? 1 : -2;
+      } else {
+        // Uncertain - walk the polygon to get certainty.
+        VertItr nextL = left;
+        VertItr nextR = right;
+        VertItr center = left->right;
+        float folded = 0;
+        const float tol2 = precision * precision;
+
+        while (nextL != nextR) {
+          glm::vec2 vecL = center->pos - nextL->pos;
+          glm::vec2 vecR = center->pos - nextR->pos;
+          float L2 = glm::dot(vecL, vecL);
+          float R2 = glm::dot(vecR, vecR);
+          if (folded == 0) {
+            float LR = glm::dot(vecL, vecR);
+            folded = LR > tol2 ? 1 : LR < -tol2 ? -1 : 0;
+          }
+
+          if (L2 > R2) {
+            center = nextR;
+            nextR = nextR->right;
+          } else {
+            center = nextL;
+            nextL = nextL->left;
+          }
+
+          convexity = CCW(nextL->pos, center->pos, nextR->pos, precision);
+          if (convexity != 0) {
+            cos = convexity < 0 ? -2 : folded;
+            return;
+          }
+        }
+        // The whole polygon is degenerate - consider this to be convex.
+        cos = 1;
+      }
+    }
+
+    glm::ivec3 ClipEar() {
+      glm::ivec3 tri(left->mesh_idx, mesh_idx, right->mesh_idx);
+      left->right = right;
+      right->left = left;
+      return tri;
+    }
+  };
+
+  void ProcessEar(VertItr v) {
+    v->CalculateConvexity(precision_);
+    if (v->ear != earsQueue_.end()) {
+      earsQueue_.erase(v->ear);
+    }
+    if (v->IsEar()) {
+      v->ear = earsQueue_.insert(v).first;
+    }
+  }
+
+  void TriangulatePoly(std::vector<glm::ivec3> &tris, VertItr start) {
+    int numTri = 0;
+    VertItr v = start;
+    do {
+      ProcessEar(v);
+      v = v->right;
+      ++numTri;
+    } while (v != start);
+
+    while (numTri > 0) {
+      const qItr ear = earsQueue_.begin();
+      if (ear != earsQueue_.end()) {
+        v = *ear;
+        earsQueue_.erase(ear);
+      }
+      const VertItr left = v->left;
+      const VertItr right = v->right;
+      tris.push_back(v->ClipEar());
+      --numTri;
+
+      ProcessEar(left);
+      ProcessEar(right);
+      v = right;
+    }
+
+    ASSERT(v->right == v->left, logicErr, "Triangulator error!");
+  }
+};
 
 /**
  * The class first turns input polygons into monotone polygons, then
@@ -1108,13 +1394,15 @@ std::vector<glm::ivec3> TriangulateIdx(const PolygonsIdx &polys,
                                        float precision) {
   std::vector<glm::ivec3> triangles;
   try {
-    Monotones monotones(polys, precision);
-    monotones.Triangulate(triangles);
+    // Monotones monotones(polys, precision);
+    // monotones.Triangulate(triangles);
+    EarClip triangulator(polys, precision);
+    triangulator.Triangulate(triangles);
 #ifdef MANIFOLD_DEBUG
     if (params.intermediateChecks) {
       CheckTopology(triangles, polys);
       if (!params.processOverlaps) {
-        CheckGeometry(triangles, polys, 2 * monotones.GetPrecision());
+        CheckGeometry(triangles, polys, 2 * triangulator.GetPrecision());
       }
     }
   } catch (const geometryErr &e) {
