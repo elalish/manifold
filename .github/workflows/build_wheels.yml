@@ -1,6 +1,6 @@
-name: Build
+name: build_wheels
 
-on: [release]
+on: [release, workflow_dispatch]
 
 jobs:
   build_wheels:
@@ -10,7 +10,9 @@ jobs:
       matrix:
         os: [ubuntu-22.04, windows-latest, macos-latest]
     steps:
-      - run: git config --global submodule.fetchJobs 8
+      - run: |
+          git config --global submodule.fetchJobs 8
+          git config --global core.longpaths true
       - uses: actions/checkout@v3
         with:
           submodules: recursive

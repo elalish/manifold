@@ -11,7 +11,7 @@ For example, here is a log-log plot of Manifold's performance vs. earlier OpenSC
 
 ## [ManifoldCAD.org](https://manifoldcad.org)
 
-If you like OpenSCAD / JSCAD, you might also like ManifoldCAD - our own solid modelling web app. Our WASM is not GPU-accelerated, but it's still quite fast and a good way to test out our Manifold library.
+If you like OpenSCAD / JSCAD, you might also like ManifoldCAD - our own solid modelling web app. Our WASM is not multithreaded yet, but it's still quite fast and a good way to test out our Manifold library.
 
 ![A metallic Menger sponge](https://elalish.github.io/manifold/samples/models/mengerSponge3.webp "A metallic Menger sponge")
 
@@ -31,11 +31,16 @@ of this repository may solve the problem.
 
 This is a modern C++ library that Github's CI verifies builds and runs on a variety of platforms. Additionally, we build bindings for JavaScript ([manifold-3d](https://www.npmjs.com/package/manifold-3d) on npm), Python, and C to make this library more portable and easy to use.
 
-We have four core dependencies, making use of submodules to ensure compatibility:
-- `graphlite`: connected components algorithm
-- `Clipper2`: provides our 2D subsystem
-- `GLM`: a compact vector library
-- `Thrust`: Nvidia's parallel algorithms library (basically a superset of C++17 std::parallel_algorithms)
+System Dependencies (note that we will automatically download the dependency if there is no such package on the system):
+- [`GLM`](https://github.com/g-truc/glm/): A compact header-only vector library.
+- [`Thrust`](https://github.com/NVIDIA/thrust): NVIDIA's parallel algorithms library (basically a superset of C++17 std::parallel_algorithms)
+- [`tbb`](https://github.com/oneapi-src/oneTBB/): Intel's thread building blocks library. (only when `MANIFOLD_PAR=TBB` is enabled)
+- [`gtest`](https://github.com/google/googletest/): Google test library (only when test is enabled, i.e. `MANIFOLD_TEST=ON`)
+
+Other dependencies:
+- [`graphlite`](https://github.com/haasdo95/graphlite): connected components algorithm.
+- [`Clipper2`](https://github.com/AngusJohnson/Clipper2j): provides our 2D subsystem
+- [`quickhull`](https://github.com/akuukka/quickhull): 3D convex hull algorithm.
 
 ## What's here
 
@@ -64,10 +69,21 @@ test/manifold_test
 ```
 
 CMake flags (usage e.g. `-DMANIFOLD_DEBUG=ON`):
+- `MANIFOLD_JSBIND=[OFF, <ON>]`: Build js binding when using emscripten.
+- `MANIFOLD_CBIND=[<OFF>, ON]`: Build C FFI binding.
+- `MANIFOLD_PYBIND=[OFF, <ON>]`: Build python binding.
 - `MANIFOLD_PAR=[<NONE>, TBB]`: Provides multi-thread parallelization, requires `libtbb-dev` if `TBB` backend is selected.
 - `MANIFOLD_EXPORT=[<OFF>, ON]`: Enables GLB export of 3D models from the tests, requires `libassimp-dev`.
 - `MANIFOLD_DEBUG=[<OFF>, ON]`: Enables internal assertions and exceptions.
+- `MANIFOLD_TEST=[OFF, <ON>]`: Build unittests.
+- `TRACY_ENABLE=[<OFF>, ON]`: Enable integration with tracy profiler. 
+  See profiling section below.
 - `BUILD_TEST_CGAL=[<OFF>, ON]`: Builds a CGAL-based performance [comparison](https://github.com/elalish/manifold/tree/master/extras), requires `libcgal-dev`.
+
+Offline building:
+- `FETCHCONTENT_SOURCE_DIR_GLM`: path to glm source.
+- `FETCHCONTENT_SOURCE_DIR_GOOGLETEST`: path to googletest source.
+- `FETCHCONTENT_SOURCE_DIR_THRUST`: path to NVIDIA thrust source.
 
 The build instructions used by our CI are in [manifold.yml](https://github.com/elalish/manifold/blob/master/.github/workflows/manifold.yml), which is a good source to check if something goes wrong and for instructions specific to other platforms, like Windows.
 
