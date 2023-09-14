@@ -20,6 +20,6 @@ if(NOT EMSCRIPTEN AND MANIFOLD_PYBIND)
     add_subdirectory(python)
 endif()
 
-if(EMSCRIPTEN)
+if(EMSCRIPTEN AND MANIFOLD_JSBIND)
     add_subdirectory(wasm)
 endif()

@@ -16,19 +16,20 @@ cmake_minimum_required(VERSION 3.18)
 project(manifold LANGUAGES CXX)
 
 set(CMAKE_VERBOSE_MAKEFILE ON)
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+set(MANIFOLD_PAR "NONE" CACHE STRING "Parallel backend, either \"TBB\" or \"NONE\"")
+set(MANIFOLD_FLAGS "" CACHE STRING "Manifold compiler flags")
 option(MANIFOLD_EXPORT "Build mesh export (via assimp) utility library" OFF)
 option(MANIFOLD_TEST "Enable testing suite" ON)
 option(MANIFOLD_DEBUG "Enable debug tracing/timing" OFF)
+
 option(MANIFOLD_PYBIND "Build python bindings" ON)
 option(MANIFOLD_CBIND "Build C (FFI) bindings" OFF)
+option(MANIFOLD_JSBIND "Build js binding" ${EMSCRIPTEN})
+
 option(TRACY_ENABLE "Use tracy profiling" OFF) 
 option(TRACY_MEMORY_USAGE "Track memory allocation with tracy (expensive)" OFF)
 option(BUILD_TEST_CGAL "Build CGAL performance comparisons" OFF)
-set(MANIFOLD_PAR "NONE" CACHE STRING "Parallel backend, either \"TBB\" or \"NONE\"")
-set(MANIFOLD_FLAGS "" CACHE STRING "Manifold compiler flags")
-
 if(TRACY_ENABLE)
   option(CMAKE_BUILD_TYPE "Build type" RelWithDebInfo)
   if(TRACY_MEMORY_USAGE)
@@ -56,8 +57,6 @@ if(MANIFOLD_PYBIND)
     find_package(Python COMPONENTS Interpreter Development.SABIModule REQUIRED)
   endif()
 endif()
-
-set(THRUST_INC_DIR ${PROJECT_SOURCE_DIR}/src/third_party/thrust)
 
 if(CMAKE_EXPORT_COMPILE_COMMANDS AND NOT EMSCRIPTEN)
   # for nixos
