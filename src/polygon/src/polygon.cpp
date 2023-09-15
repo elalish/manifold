@@ -240,7 +240,8 @@ class EarClip {
       const float startX = start->pos.x;
       float minX = std::numeric_limits<float>::infinity();
       VertItr connector = polygon_.end();
-      for (auto poly = starts_.begin(); poly != startItr; ++poly) {
+      for (auto poly = starts_.begin(); poly != starts_.end(); ++poly) {
+        if (poly == startItr) continue;
         VertItr edge = *poly;
         do {
           if (edge->pos.y < edge->right->pos.y &&
@@ -249,7 +250,8 @@ class EarClip {
             float a =
                 (startY - edge->pos.y) / (edge->right->pos.y - edge->pos.y);
             float x = glm::mix(edge->pos.x, edge->right->pos.x, a);
-            if (x > startX && x < minX) {
+            if (x > startX - precision_ &&
+                ((x >= startX && x < minX) || (minX < startX && x > minX))) {
               minX = x;
               connector = edge->pos.x > edge->right->pos.x ? edge : edge->right;
             }
@@ -441,8 +443,8 @@ class EarClip {
     while (edge != guess) {
       glm::vec2 offset = edge->pos - guess->pos;
       if (edge->pos.y * above > start->pos.y * above &&
-          glm::determinant(glm::mat2(offset, left)) > 0 &&
-          glm::determinant(glm::mat2(right, offset)) > 0) {
+          above * glm::determinant(glm::mat2(left, offset)) > 0 &&
+          above * glm::determinant(glm::mat2(offset, right)) > 0) {
         guess = edge;
         glm::vec2 left = start->pos - guess->pos;
         glm::vec2 right = intersection - guess->pos;
@@ -488,6 +490,7 @@ class EarClip {
       v = v->right;
       ++numTri;
     } while (v != start);
+    // Dump(v);
 
     while (numTri > 0) {
       const qItr ear = earsQueue_.begin();
@@ -524,6 +527,16 @@ class EarClip {
 
     ASSERT(v->right == v->left, logicErr, "Triangulator error!");
     PRINT("Finished poly");
+  }
+
+  void Dump(VertItr start) const {
+    VertItr v = start->right;
+    std::cout << "array([" << std::endl;
+    while (v != start) {
+      std::cout << "  [" << v->pos.x << ", " << v->pos.y << "]," << std::endl;
+      v = v->right;
+    }
+    std::cout << "])" << std::endl;
   }
 };
 

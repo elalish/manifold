@@ -932,7 +932,7 @@ TEST(Polygon, Hole) {
   TestPoly(polys, 19);
 }
 
-TEST(Polygon, DISABLED_Small) {
+TEST(Polygon, Small) {
   Polygons polys;
   polys.push_back({
       {-0.487163663, 0.00357927009},  //
