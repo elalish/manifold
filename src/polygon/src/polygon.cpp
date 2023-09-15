@@ -230,7 +230,7 @@ class EarClip {
     while (startItr != starts_.end()) {
       const VertItr start = *startItr;
 
-      if (Area(start) >= 0) {  // Outer
+      if (start->IsConvex(precision_)) {  // Outer
         ++startItr;
         continue;
       }
@@ -366,6 +366,9 @@ class EarClip {
       openSide = glm::normalize(openSide);
 
       float totalCost = DelaunayCost(pos - center, scale, precision);
+      if (CCW(pos, left->pos, right->pos, precision) == 0) {
+        return totalCost;
+      }
       VertItr test = right->right;
       while (test != left) {
         if (test->mesh_idx != mesh_idx && test->mesh_idx != left->mesh_idx &&
@@ -427,18 +430,6 @@ class EarClip {
     }
 
     if (precision_ < 0) precision_ = bound * kTolerance;
-  }
-
-  float Area(VertItr start) const {
-    float area = 0;
-    VertItr last = start;
-    VertItr next = last->right;
-    do {
-      area += glm::determinant(glm::mat2(last->pos, next->pos));
-      last = next;
-      next = next->right;
-    } while (last != start);
-    return area;
   }
 
   VertItr FindBridge(VertItr start, VertItr guess,
@@ -520,6 +511,8 @@ class EarClip {
           std::cout << "output tri: " << v->mesh_idx << ", " << right->mesh_idx
                     << ", " << left->mesh_idx << std::endl;
         }
+      } else {
+        PRINT("Topological degenerate!");
       }
       Link(left, right);
       --numTri;
