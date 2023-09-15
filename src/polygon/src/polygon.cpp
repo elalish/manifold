@@ -37,6 +37,8 @@
 namespace {
 using namespace manifold;
 
+constexpr float kReflex = std::numeric_limits<float>::infinity();
+
 static ExecutionParams params;
 
 #ifdef MANIFOLD_DEBUG
@@ -292,16 +294,16 @@ class EarClip {
       return a->pos.x > b->pos.x;
     }
   };
-  struct Angle {
+  struct MinCost {
     bool operator()(const VertItr &a, const VertItr &b) const {
-      return a->cos > b->cos;
+      return a->cost < b->cost;
     }
   };
-  typedef std::set<VertItr, Angle>::iterator qItr;
+  typedef std::set<VertItr, MinCost>::iterator qItr;
 
   std::vector<Vert> polygon_;
   std::multiset<VertItr, MaxX> starts_;
-  std::multiset<VertItr, Angle> earsQueue_;
+  std::multiset<VertItr, MinCost> earsQueue_;
   float precision_;
 
   struct Vert {
@@ -309,79 +311,78 @@ class EarClip {
     qItr ear;
     glm::vec2 pos, rightDir;
     VertItr left, right;
-    float cos = -2;  // Cosine of the angle; -2 represents reflex
+    float cost;
 
-    bool IsConvex() const { return cos >= -1; }
+    bool IsConvex() const { return cost != kReflex; }
 
-    bool IsEar() const {
-      if (!IsConvex()) return false;
+    float Cost(VertItr v, glm::vec2 openSide) {
+      const glm::vec2 offset = v->pos - pos;
+      return glm::min(
+          glm::min(glm::determinant(glm::mat2(rightDir, offset)),
+                   glm::determinant(glm::mat2(left->rightDir, offset))),
+          glm::determinant(glm::mat2(openSide, v->pos - right->pos)));
+    }
 
-      const glm::vec2 openSide = left->pos - right->pos;
+    float DelaunayCost(glm::vec2 diff, float scale, float precision) const {
+      return precision - scale * glm::dot(diff, diff);
+    }
+
+    void CalculateCost(float precision) {
+      glm::vec2 openSide = left->pos - right->pos;
+      const glm::vec2 center = 0.5f * left->pos + 0.5f * right->pos;
+      const float scale = 4 * precision / glm::dot(openSide, openSide);
+      openSide = glm::normalize(openSide);
+      cost = DelaunayCost(pos - center, scale, precision);
       VertItr test = right->right;
       while (test != left) {
-        if (!test->IsConvex()) {
-          glm::vec2 offset = test->pos - pos;
-          if (glm::determinant(glm::mat2(rightDir, offset)) >= 0 &&
-              glm::determinant(glm::mat2(left->rightDir, offset)) >= 0 &&
-              glm::determinant(glm::mat2(openSide, test->pos - right->pos)) >=
-                  0) {
-            return false;
-          }
-        }
+        cost = glm::max(cost, Cost(test, openSide));
+        cost =
+            glm::max(cost, DelaunayCost(test->pos - center, scale, precision));
         test = test->right;
       }
-      return true;
     }
 
     void CalculateConvexity(float precision) {
       int convexity = CCW(left->pos, pos, right->pos, precision);
-      if (convexity > 0) {
-        cos = glm::dot(rightDir, -left->rightDir);
-      } else if (convexity < 0) {
-        // Don't let a convex vert become reflex
-        cos = IsConvex() ? 1 : -2;
-      } else {
-        // Uncertain - walk the polygon to get certainty.
-        VertItr nextL = left;
-        VertItr nextR = right;
-        VertItr center = left->right;
-        float folded = 0;
-        const float tol2 = precision * precision;
-
-        while (nextL != nextR) {
-          glm::vec2 vecL = center->pos - nextL->pos;
-          glm::vec2 vecR = center->pos - nextR->pos;
-          float L2 = glm::dot(vecL, vecL);
-          float R2 = glm::dot(vecR, vecR);
-          if (folded == 0) {
-            float LR = glm::dot(vecL, vecR);
-            folded = LR > tol2 ? 1 : LR < -tol2 ? -1 : 0;
-          }
-
-          if (L2 > R2) {
-            center = nextR;
-            nextR = nextR->right;
-          } else {
-            center = nextL;
-            nextL = nextL->left;
-          }
-
-          convexity = CCW(nextL->pos, center->pos, nextR->pos, precision);
-          if (convexity != 0) {
-            cos = convexity < 0 ? -2 : folded;
-            return;
-          }
-        }
-        // The whole polygon is degenerate - consider this to be convex.
-        cos = 1;
+      if (convexity != 0) {
+        cost = convexity > 0 ? 0 : kReflex;
+        return;
       }
+
+      // Uncertain - walk the polygon to get certainty.
+      VertItr nextL = left;
+      VertItr nextR = right;
+      VertItr center = left->right;
+
+      while (nextL != nextR) {
+        glm::vec2 vecL = center->pos - nextL->pos;
+        glm::vec2 vecR = center->pos - nextR->pos;
+        float L2 = glm::dot(vecL, vecL);
+        float R2 = glm::dot(vecR, vecR);
+
+        if (L2 > R2) {
+          center = nextR;
+          nextR = nextR->right;
+        } else {
+          center = nextL;
+          nextL = nextL->left;
+        }
+
+        convexity = CCW(nextL->pos, center->pos, nextR->pos, precision);
+        if (convexity != 0) {
+          cost = convexity > 0 ? 0 : kReflex;
+          return;
+        }
+      }
+      // The whole polygon is degenerate - consider this to be convex.
+      cost = 0;
     }
 
 #ifdef MANIFOLD_DEBUG
     void PrintVert() {
       if (!params.verbose) return;
       std::cout << "vert: " << mesh_idx << ", left: " << left->mesh_idx
-                << ", right: " << right->mesh_idx << ", cos: " << cos
+                << ", right: " << right->mesh_idx << ", cost: " << cost
                 << std::endl;
     }
 #endif
@@ -391,6 +392,7 @@ class EarClip {
     left->right = right;
     right->left = left;
     left->rightDir = glm::normalize(right->pos - left->pos);
+    if (!isfinite(left->rightDir.x)) left->rightDir = {0, 0};
   }
 
   void Initialize(const PolygonsIdx &polys) {
@@ -454,7 +456,9 @@ class EarClip {
       }
       edge = edge->right;
     }
-    std::cout << start->mesh_idx << ", " << guess->mesh_idx << std::endl;
+    if (params.verbose) {
+      std::cout << start->mesh_idx << ", " << guess->mesh_idx << std::endl;
+    }
     return guess;
   }
 
@@ -476,7 +480,8 @@ class EarClip {
       earsQueue_.erase(v->ear);
       v->ear = earsQueue_.end();
     }
-    if (v->IsEar()) {
+    if (v->IsConvex()) {
+      v->CalculateCost(precision_);
       v->ear = earsQueue_.insert(v);
     }
   }
