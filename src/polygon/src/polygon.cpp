@@ -243,7 +243,9 @@ class EarClip {
       for (auto poly = starts_.begin(); poly != startItr; ++poly) {
         VertItr edge = *poly;
         do {
-          if (edge->pos.y <= startY && edge->right->pos.y > startY) {
+          if (edge->pos.y < edge->right->pos.y &&
+              edge->pos.y < startY + precision_ &&
+              edge->right->pos.y > startY - precision_) {
             float a =
                 (startY - edge->pos.y) / (edge->right->pos.y - edge->pos.y);
             float x = glm::mix(edge->pos.x, edge->right->pos.x, a);
@@ -257,7 +259,7 @@ class EarClip {
       }
 
       if (connector == polygon_.end()) {
-        PRINT("hole did not fine an outer contour!");
+        PRINT("hole did not find an outer contour!");
         ++startItr;
         continue;
       }
@@ -354,34 +356,38 @@ class EarClip {
     }
 
     float DelaunayCost(glm::vec2 diff, float scale, float precision) const {
-      return precision - scale * glm::dot(diff, diff);
+      return -precision - scale * glm::dot(diff, diff);
     }
 
     float EarCost(float precision) const {
       glm::vec2 openSide = left->pos - right->pos;
-      const glm::vec2 center = 0.5f * left->pos + 0.5f * right->pos;
+      const glm::vec2 center = 0.5f * (left->pos + right->pos);
       const float scale = 4 * precision / glm::dot(openSide, openSide);
       openSide = glm::normalize(openSide);
 
       float totalCost = DelaunayCost(pos - center, scale, precision);
       VertItr test = right->right;
       while (test != left) {
-        totalCost = glm::max(totalCost, Cost(test, openSide));
-        totalCost = glm::max(
-            totalCost, DelaunayCost(test->pos - center, scale, precision));
+        if (test->mesh_idx != mesh_idx && test->mesh_idx != left->mesh_idx &&
+            test->mesh_idx != right->mesh_idx) {
+          totalCost = glm::max(totalCost, Cost(test, openSide));
+          totalCost = glm::max(
+              totalCost, DelaunayCost(test->pos - center, scale, precision));
+        }
         test = test->right;
       }
       return totalCost;
     }
 
-#ifdef MANIFOLD_DEBUG
     void PrintVert() const {
+#ifdef MANIFOLD_DEBUG
       if (!params.verbose) return;
       std::cout << "vert: " << mesh_idx << ", left: " << left->mesh_idx
                 << ", right: " << right->mesh_idx << ", cost: " << cost
                 << std::endl;
-    }
+
 #endif
+    }
   };
 
   void Link(VertItr left, VertItr right) const {
@@ -487,6 +493,7 @@ class EarClip {
     VertItr v = start;
     do {
       ProcessEar(v);
+      v->PrintVert();
       v = v->right;
       ++numTri;
     } while (v != start);
@@ -503,11 +510,17 @@ class EarClip {
 
       const VertItr left = v->left;
       const VertItr right = v->right;
-      if (params.verbose) {
-        std::cout << "clipping " << v->mesh_idx << ", " << right->mesh_idx
-                  << ", " << left->mesh_idx << std::endl;
+
+      if (left->mesh_idx != v->mesh_idx && v->mesh_idx != right->mesh_idx &&
+          right->mesh_idx != left->mesh_idx) {
+        // Filter out topological degenerates, which can form in bad
+        // triangulations of polygons with holes, due to vert duplication.
+        tris.push_back({left->mesh_idx, v->mesh_idx, right->mesh_idx});
+        if (params.verbose) {
+          std::cout << "output tri: " << v->mesh_idx << ", " << right->mesh_idx
+                    << ", " << left->mesh_idx << std::endl;
+        }
       }
-      tris.push_back({left->mesh_idx, v->mesh_idx, right->mesh_idx});
       Link(left, right);
       --numTri;
 
