@@ -325,7 +325,6 @@ class EarClip {
               glm::determinant(glm::mat2(left->rightDir, offset)) >= 0 &&
               glm::determinant(glm::mat2(openSide, test->pos - right->pos)) >=
                   0) {
-            PRINT("not an ear");
             return false;
           }
         }
@@ -378,24 +377,21 @@ class EarClip {
       }
     }
 
-    glm::ivec3 ClipEar() {
-      std::cout << "clipping " << mesh_idx << ", " << right->mesh_idx << ", "
-                << left->mesh_idx << std::endl;
-      glm::ivec3 tri(left->mesh_idx, mesh_idx, right->mesh_idx);
-      left->right = right;
-      right->left = left;
-      left->rightDir = glm::normalize(right->pos - left->pos);
-      return tri;
-    }
-
 #ifdef MANIFOLD_DEBUG
     void PrintVert() {
+      if (!params.verbose) return;
       std::cout << "vert: " << mesh_idx << ", left: " << left->mesh_idx
                 << ", right: " << right->mesh_idx << ", cos: " << cos
                 << std::endl;
     }
 #endif
   };
+
+  void Link(VertItr left, VertItr right) const {
+    left->right = right;
+    right->left = left;
+    left->rightDir = glm::normalize(right->pos - left->pos);
+  }
 
   void Initialize(const PolygonsIdx &polys) {
     float bound;
@@ -419,21 +415,17 @@ class EarClip {
           start = next;
         }
 
-        last->rightDir = glm::normalize(next->pos - last->pos);
-        last->right = next;
-        next->left = last;
+        Link(last, next);
         last = next;
       }
-      last->rightDir = glm::normalize(first->pos - last->pos);
-      last->right = first;
-      first->left = last;
+      Link(last, first);
       starts_.insert(start);
     }
 
     if (precision_ < 0) precision_ = bound * kTolerance;
   }
 
-  float Area(VertItr start) {
+  float Area(VertItr start) const {
     float area = 0;
     VertItr last = start;
     VertItr next = last->right;
@@ -445,7 +437,8 @@ class EarClip {
     return area;
   }
 
-  VertItr FindBridge(VertItr start, VertItr guess, glm::vec2 intersection) {
+  VertItr FindBridge(VertItr start, VertItr guess,
+                     glm::vec2 intersection) const {
     const float above = guess->pos.y > start->pos.y ? 1 : -1;
     VertItr edge = guess->right;
     glm::vec2 left = start->pos - guess->pos;
@@ -472,14 +465,9 @@ class EarClip {
     const VertItr newConnector = std::prev(polygon_.end());
 
     start->right->left = newStart;
-    start->right = connector;
     connector->left->right = newConnector;
-    connector->left = start;
-    newStart->left = newConnector;
-    newConnector->right = newStart;
-    start->rightDir = glm::normalize(start->right->pos - start->pos);
-    newConnector->rightDir =
-        glm::normalize(newConnector->right->pos - newConnector->pos);
+    Link(start, connector);
+    Link(newConnector, newStart);
   }
 
   void ProcessEar(VertItr v) {
@@ -499,7 +487,6 @@ class EarClip {
     VertItr v = start;
     do {
       ProcessEar(v);
-      v->PrintVert();
       v = v->right;
       ++numTri;
     } while (v != start);
@@ -513,9 +500,15 @@ class EarClip {
       } else {
         PRINT("No ear found!");
       }
+
       const VertItr left = v->left;
       const VertItr right = v->right;
-      tris.push_back(v->ClipEar());
+      if (params.verbose) {
+        std::cout << "clipping " << v->mesh_idx << ", " << right->mesh_idx
+                  << ", " << left->mesh_idx << std::endl;
+      }
+      tris.push_back({left->mesh_idx, v->mesh_idx, right->mesh_idx});
+      Link(left, right);
       --numTri;
 
       ProcessEar(left);
