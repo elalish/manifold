@@ -37,8 +37,6 @@
 namespace {
 using namespace manifold;
 
-constexpr float kReflex = std::numeric_limits<float>::infinity();
-
 static ExecutionParams params;
 
 #ifdef MANIFOLD_DEBUG
@@ -313,40 +311,10 @@ class EarClip {
     VertItr left, right;
     float cost;
 
-    bool IsConvex() const { return cost != kReflex; }
-
-    float Cost(VertItr v, glm::vec2 openSide) {
-      const glm::vec2 offset = v->pos - pos;
-      return glm::min(
-          glm::min(glm::determinant(glm::mat2(rightDir, offset)),
-                   glm::determinant(glm::mat2(left->rightDir, offset))),
-          glm::determinant(glm::mat2(openSide, v->pos - right->pos)));
-    }
-
-    float DelaunayCost(glm::vec2 diff, float scale, float precision) const {
-      return precision - scale * glm::dot(diff, diff);
-    }
-
-    void CalculateCost(float precision) {
-      glm::vec2 openSide = left->pos - right->pos;
-      const glm::vec2 center = 0.5f * left->pos + 0.5f * right->pos;
-      const float scale = 4 * precision / glm::dot(openSide, openSide);
-      openSide = glm::normalize(openSide);
-      cost = DelaunayCost(pos - center, scale, precision);
-      VertItr test = right->right;
-      while (test != left) {
-        cost = glm::max(cost, Cost(test, openSide));
-        cost =
-            glm::max(cost, DelaunayCost(test->pos - center, scale, precision));
-        test = test->right;
-      }
-    }
-
-    void CalculateConvexity(float precision) {
+    bool IsConvex(float precision) const {
       int convexity = CCW(left->pos, pos, right->pos, precision);
       if (convexity != 0) {
-        cost = convexity > 0 ? 0 : kReflex;
-        return;
+        return convexity > 0;
       }
 
       // Uncertain - walk the polygon to get certainty.
@@ -370,16 +338,44 @@ class EarClip {
 
         convexity = CCW(nextL->pos, center->pos, nextR->pos, precision);
         if (convexity != 0) {
-          cost = convexity > 0 ? 0 : kReflex;
-          return;
+          return convexity > 0;
         }
       }
       // The whole polygon is degenerate - consider this to be convex.
-      cost = 0;
+      return true;
+    }
+
+    float Cost(VertItr v, glm::vec2 openSide) const {
+      const glm::vec2 offset = v->pos - pos;
+      return glm::min(
+          glm::min(glm::determinant(glm::mat2(rightDir, offset)),
+                   glm::determinant(glm::mat2(left->rightDir, offset))),
+          glm::determinant(glm::mat2(openSide, v->pos - right->pos)));
+    }
+
+    float DelaunayCost(glm::vec2 diff, float scale, float precision) const {
+      return precision - scale * glm::dot(diff, diff);
+    }
+
+    float EarCost(float precision) const {
+      glm::vec2 openSide = left->pos - right->pos;
+      const glm::vec2 center = 0.5f * left->pos + 0.5f * right->pos;
+      const float scale = 4 * precision / glm::dot(openSide, openSide);
+      openSide = glm::normalize(openSide);
+
+      float totalCost = DelaunayCost(pos - center, scale, precision);
+      VertItr test = right->right;
+      while (test != left) {
+        totalCost = glm::max(totalCost, Cost(test, openSide));
+        totalCost = glm::max(
+            totalCost, DelaunayCost(test->pos - center, scale, precision));
+        test = test->right;
+      }
+      return totalCost;
     }
 
 #ifdef MANIFOLD_DEBUG
-    void PrintVert() {
+    void PrintVert() const {
       if (!params.verbose) return;
       std::cout << "vert: " << mesh_idx << ", left: " << left->mesh_idx
                 << ", right: " << right->mesh_idx << ", cost: " << cost
@@ -475,13 +471,12 @@ class EarClip {
   }
 
   void ProcessEar(VertItr v) {
-    v->CalculateConvexity(precision_);
     if (v->ear != earsQueue_.end()) {
       earsQueue_.erase(v->ear);
       v->ear = earsQueue_.end();
     }
-    if (v->IsConvex()) {
-      v->CalculateCost(precision_);
+    if (v->IsConvex(precision_)) {
+      v->cost = v->EarCost(precision_);
       v->ear = earsQueue_.insert(v);
     }
   }
