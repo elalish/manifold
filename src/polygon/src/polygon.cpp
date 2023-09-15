@@ -222,55 +222,15 @@ class EarClip {
       numVert += poly.size();
     }
     polygon_.reserve(numVert + 2 * numStart);
-    float bound;
 
-    for (const SimplePolygonIdx &poly : polys) {
-      auto vert = poly.begin();
-      polygon_.push_back({vert->idx, earsQueue_.end(), vert->pos});
-      const VertItr first = std::prev(polygon_.end());
-      VertItr last = first;
-      VertItr start = first;
-      float maxX = start->pos.x;
-
-      for (++vert; vert != poly.end(); ++vert) {
-        polygon_.push_back({vert->idx, earsQueue_.end(), vert->pos});
-        VertItr next = std::prev(polygon_.end());
-
-        bound = glm::max(
-            bound, glm::max(glm::abs(vert->pos.x), glm::abs(vert->pos.y)));
-
-        if (next->pos.x > maxX) {
-          maxX = next->pos.x;
-          start = next;
-        }
-
-        last->rightDir = glm::normalize(next->pos - last->pos);
-        last->right = next;
-        next->left = last;
-        last = next;
-      }
-      last->rightDir = glm::normalize(first->pos - last->pos);
-      last->right = first;
-      first->left = last;
-      starts_.insert(start);
-    }
-
-    if (precision_ < 0) precision_ = bound * kTolerance;
+    Initialize(polys);
 
     // Outer polygon cannot be a hole, so start with the next one.
     auto startItr = std::next(starts_.begin());
     while (startItr != starts_.end()) {
-      float area = 0;
-      VertItr start = *startItr;
-      VertItr last = start;
-      VertItr next = last->right;
-      do {
-        area += glm::determinant(glm::mat2(last->pos, next->pos));
-        last = next;
-        next = next->right;
-      } while (last != start);
+      const VertItr start = *startItr;
 
-      if (area >= 0) {  // Outer
+      if (Area(start) >= 0) {  // Outer
         ++startItr;
         continue;
       }
@@ -294,26 +254,6 @@ class EarClip {
           }
           edge = edge->right;
         } while (edge != *poly);
-
-        if (connector == polygon_.end()) continue;
-
-        std::cout << start->mesh_idx << ", " << connector->mesh_idx
-                  << std::endl;
-
-        edge = connector->right;
-        glm::vec2 left = start->pos - connector->pos;
-        glm::vec2 right = glm::vec2(minX, startY) - connector->pos;
-        while (edge != connector) {
-          glm::vec2 offset = edge->pos - connector->pos;
-          if (edge->pos.y <= startY &&
-              glm::determinant(glm::mat2(offset, left)) > 0 &&
-              glm::determinant(glm::mat2(right, offset)) > 0) {
-            connector = edge;
-            glm::vec2 left = start->pos - connector->pos;
-            glm::vec2 right = glm::vec2(minX, startY) - connector->pos;
-          }
-          edge = edge->right;
-        }
       }
 
       if (connector == polygon_.end()) {
@@ -322,23 +262,9 @@ class EarClip {
         continue;
       }
 
-      std::cout << start->mesh_idx << ", " << connector->mesh_idx << std::endl;
+      connector = FindBridge(start, connector, glm::vec2(minX, startY));
 
-      // connect start to connector and duplicate verts.
-      polygon_.push_back(*start);
-      const VertItr newStart = std::prev(polygon_.end());
-      polygon_.push_back(*connector);
-      const VertItr newConnector = std::prev(polygon_.end());
-
-      start->right->left = newStart;
-      start->right = connector;
-      connector->left->right = newConnector;
-      connector->left = start;
-      newStart->left = newConnector;
-      newConnector->right = newStart;
-      start->rightDir = glm::normalize(start->right->pos - start->pos);
-      newConnector->rightDir =
-          glm::normalize(newConnector->right->pos - newConnector->pos);
+      JoinPolygons(start, connector);
 
       startItr = starts_.erase(startItr);
     }
@@ -470,6 +396,91 @@ class EarClip {
     }
 #endif
   };
+
+  void Initialize(const PolygonsIdx &polys) {
+    float bound;
+    for (const SimplePolygonIdx &poly : polys) {
+      auto vert = poly.begin();
+      polygon_.push_back({vert->idx, earsQueue_.end(), vert->pos});
+      const VertItr first = std::prev(polygon_.end());
+      VertItr last = first;
+      VertItr start = first;
+      float maxX = start->pos.x;
+
+      for (++vert; vert != poly.end(); ++vert) {
+        polygon_.push_back({vert->idx, earsQueue_.end(), vert->pos});
+        VertItr next = std::prev(polygon_.end());
+
+        bound = glm::max(
+            bound, glm::max(glm::abs(vert->pos.x), glm::abs(vert->pos.y)));
+
+        if (next->pos.x > maxX) {
+          maxX = next->pos.x;
+          start = next;
+        }
+
+        last->rightDir = glm::normalize(next->pos - last->pos);
+        last->right = next;
+        next->left = last;
+        last = next;
+      }
+      last->rightDir = glm::normalize(first->pos - last->pos);
+      last->right = first;
+      first->left = last;
+      starts_.insert(start);
+    }
+
+    if (precision_ < 0) precision_ = bound * kTolerance;
+  }
+
+  float Area(VertItr start) {
+    float area = 0;
+    VertItr last = start;
+    VertItr next = last->right;
+    do {
+      area += glm::determinant(glm::mat2(last->pos, next->pos));
+      last = next;
+      next = next->right;
+    } while (last != start);
+    return area;
+  }
+
+  VertItr FindBridge(VertItr start, VertItr guess, glm::vec2 intersection) {
+    const float above = guess->pos.y > start->pos.y ? 1 : -1;
+    VertItr edge = guess->right;
+    glm::vec2 left = start->pos - guess->pos;
+    glm::vec2 right = intersection - guess->pos;
+    while (edge != guess) {
+      glm::vec2 offset = edge->pos - guess->pos;
+      if (edge->pos.y * above > start->pos.y * above &&
+          glm::determinant(glm::mat2(offset, left)) > 0 &&
+          glm::determinant(glm::mat2(right, offset)) > 0) {
+        guess = edge;
+        glm::vec2 left = start->pos - guess->pos;
+        glm::vec2 right = intersection - guess->pos;
+      }
+      edge = edge->right;
+    }
+    std::cout << start->mesh_idx << ", " << guess->mesh_idx << std::endl;
+    return guess;
+  }
+
+  void JoinPolygons(VertItr start, VertItr connector) {
+    polygon_.push_back(*start);
+    const VertItr newStart = std::prev(polygon_.end());
+    polygon_.push_back(*connector);
+    const VertItr newConnector = std::prev(polygon_.end());
+
+    start->right->left = newStart;
+    start->right = connector;
+    connector->left->right = newConnector;
+    connector->left = start;
+    newStart->left = newConnector;
+    newConnector->right = newStart;
+    start->rightDir = glm::normalize(start->right->pos - start->pos);
+    newConnector->rightDir =
+        glm::normalize(newConnector->right->pos - newConnector->pos);
+  }
 
   void ProcessEar(VertItr v) {
     v->CalculateConvexity(precision_);
