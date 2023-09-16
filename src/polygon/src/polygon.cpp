@@ -315,6 +315,11 @@ class EarClip {
     VertItr left, right;
     float cost;
 
+    bool IsShort(float precision) const {
+      const glm::vec2 edge = right->pos - pos;
+      return glm::dot(edge, edge) < precision * precision;
+    }
+
     bool IsConvex(float precision) const {
       int convexity = CCW(left->pos, pos, right->pos, precision);
       if (convexity != 0) {
@@ -474,7 +479,10 @@ class EarClip {
       earsQueue_.erase(v->ear);
       v->ear = earsQueue_.end();
     }
-    if (v->IsConvex(precision_)) {
+    if (v->IsShort(precision_)) {
+      v->cost = -std::numeric_limits<float>::infinity();
+      v->ear = earsQueue_.insert(v);
+    } else if (v->IsConvex(precision_)) {
       v->cost = v->EarCost(precision_);
       v->ear = earsQueue_.insert(v);
     }

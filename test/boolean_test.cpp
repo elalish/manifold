@@ -167,7 +167,7 @@ TEST(Boolean, Coplanar) {
                            .Rotate(0, 0, 15)
                            .Translate({0.25f, 0.25f, 0.0f});
   Manifold out = cylinder - cylinder2;
-  ExpectMeshes(out, {{32, 64, 3, 49}});
+  ExpectMeshes(out, {{32, 64, 3, 48}});
   EXPECT_EQ(out.NumDegenerateTris(), 0);
   EXPECT_EQ(out.Genus(), 1);
 
