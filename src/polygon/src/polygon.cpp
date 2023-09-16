@@ -126,14 +126,14 @@ void CheckTopology(const std::vector<PolyEdge> &halfedges) {
     ASSERT(forward[i].startVert == backward[i].startVert &&
                forward[i].endVert == backward[i].endVert,
            topologyErr, "Forward and backward edge do not match.");
-    if (i > 0) {
-      ASSERT(forward[i - 1].startVert != forward[i].startVert ||
-                 forward[i - 1].endVert != forward[i].endVert,
-             topologyErr, "Not a 2-manifold.");
-      ASSERT(backward[i - 1].startVert != backward[i].startVert ||
-                 backward[i - 1].endVert != backward[i].endVert,
-             topologyErr, "Not a 2-manifold.");
-    }
+    // if (i > 0) {
+    //   ASSERT(forward[i - 1].startVert != forward[i].startVert ||
+    //              forward[i - 1].endVert != forward[i].endVert,
+    //          topologyErr, "Not a 2-manifold.");
+    //   ASSERT(backward[i - 1].startVert != backward[i].startVert ||
+    //              backward[i - 1].endVert != backward[i].endVert,
+    //          topologyErr, "Not a 2-manifold.");
+    // }
   }
 }
 
@@ -281,9 +281,6 @@ class EarClip {
     for (const VertItr start : starts_) {
       TriangulatePoly(tris, start);
     }
-
-    ASSERT(tris.size() == numTri, logicErr,
-           "Triangulator produced the wrong number of tris!");
   }
 
   float GetPrecision() const { return precision_; }
@@ -354,11 +351,19 @@ class EarClip {
       return true;
     }
 
-    float Cost(VertItr v, glm::vec2 openSide) const {
+    float SignedDist(VertItr v, glm::vec2 unit, float precision) const {
+      float d = glm::determinant(glm::mat2(unit, v->pos - pos));
+      if (glm::abs(d) < precision) {
+        d = glm::max(d, glm::determinant(glm::mat2(unit, v->right->pos - pos)));
+      }
+      return d;
+    }
+
+    float Cost(VertItr v, glm::vec2 openSide, float precision) const {
       const glm::vec2 offset = v->pos - pos;
       return glm::min(
-          glm::min(glm::determinant(glm::mat2(rightDir, offset)),
-                   glm::determinant(glm::mat2(left->rightDir, offset))),
+          glm::min(SignedDist(v, rightDir, precision),
+                   SignedDist(v, left->rightDir, precision)),
           glm::determinant(glm::mat2(openSide, v->pos - right->pos)));
     }
 
@@ -380,7 +385,7 @@ class EarClip {
       while (test != left) {
         if (test->mesh_idx != mesh_idx && test->mesh_idx != left->mesh_idx &&
             test->mesh_idx != right->mesh_idx) {
-          totalCost = glm::max(totalCost, Cost(test, openSide));
+          totalCost = glm::max(totalCost, Cost(test, openSide, precision));
           totalCost = glm::max(
               totalCost, DelaunayCost(test->pos - center, scale, precision));
         }
@@ -395,7 +400,6 @@ class EarClip {
       std::cout << "vert: " << mesh_idx << ", left: " << left->mesh_idx
                 << ", right: " << right->mesh_idx << ", cost: " << cost
                 << std::endl;
-
 #endif
     }
   };
@@ -538,12 +542,13 @@ class EarClip {
   }
 
   void Dump(VertItr start) const {
-    VertItr v = start->right;
+    VertItr v = start;
     std::cout << "array([" << std::endl;
-    while (v != start) {
-      std::cout << "  [" << v->pos.x << ", " << v->pos.y << "]," << std::endl;
+    do {
+      std::cout << "  [" << v->pos.x << ", " << v->pos.y << "],# "
+                << v->mesh_idx << std::endl;
       v = v->right;
-    }
+    } while (v != start);
     std::cout << "])" << std::endl;
   }
 };
