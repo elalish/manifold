@@ -354,17 +354,25 @@ class EarClip {
     float SignedDist(VertItr v, glm::vec2 unit, float precision) const {
       float d = glm::determinant(glm::mat2(unit, v->pos - pos));
       if (glm::abs(d) < precision) {
-        d = glm::max(d, glm::determinant(glm::mat2(unit, v->right->pos - pos)));
+        d = glm::determinant(glm::mat2(unit, v->right->pos - pos));
+        if (d < precision) {
+          return -std::numeric_limits<float>::infinity();
+        }
       }
       return d;
     }
 
     float Cost(VertItr v, glm::vec2 openSide, float precision) const {
       const glm::vec2 offset = v->pos - pos;
-      return glm::min(
-          glm::min(SignedDist(v, rightDir, precision),
-                   SignedDist(v, left->rightDir, precision)),
-          glm::determinant(glm::mat2(openSide, v->pos - right->pos)));
+      float cost = SignedDist(v, rightDir, precision);
+      if (isfinite(cost)) {
+        cost = glm::min(cost, SignedDist(v, left->rightDir, precision));
+      }
+      if (isfinite(cost)) {
+        cost = glm::min(
+            cost, glm::determinant(glm::mat2(openSide, v->pos - right->pos)));
+      }
+      return cost;
     }
 
     float DelaunayCost(glm::vec2 diff, float scale, float precision) const {
@@ -374,7 +382,7 @@ class EarClip {
     float EarCost(float precision) const {
       glm::vec2 openSide = left->pos - right->pos;
       const glm::vec2 center = 0.5f * (left->pos + right->pos);
-      const float scale = 4 * precision / glm::dot(openSide, openSide);
+      const float scale = 4 / glm::dot(openSide, openSide);
       openSide = glm::normalize(openSide);
 
       float totalCost = DelaunayCost(pos - center, scale, precision);
@@ -383,12 +391,12 @@ class EarClip {
       }
       VertItr test = right->right;
       while (test != left) {
-        if (test->mesh_idx != mesh_idx && test->mesh_idx != left->mesh_idx &&
-            test->mesh_idx != right->mesh_idx) {
-          totalCost = glm::max(totalCost, Cost(test, openSide, precision));
-          totalCost = glm::max(
-              totalCost, DelaunayCost(test->pos - center, scale, precision));
+        float cost = Cost(test, openSide, precision);
+        if (cost < -precision) {
+          cost = DelaunayCost(test->pos - center, scale, precision);
         }
+        totalCost = glm::max(totalCost, cost);
+
         test = test->right;
       }
       return totalCost;
