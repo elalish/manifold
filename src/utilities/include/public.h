@@ -617,13 +617,6 @@ struct ExecutionParams {
 
 #ifdef MANIFOLD_DEBUG
 
-inline std::ostream& operator<<(std::ostream& stream, const Box& box) {
-  return stream << "min: " << box.min.x << ", " << box.min.y << ", "
-                << box.min.z << ", "
-                << "max: " << box.max.x << ", " << box.max.y << ", "
-                << box.max.z;
-}
-
 template <typename T>
 inline std::ostream& operator<<(std::ostream& stream, const glm::tvec2<T>& v) {
   return stream << "x = " << v.x << ", y = " << v.y;
@@ -645,6 +638,16 @@ inline std::ostream& operator<<(std::ostream& stream, const glm::mat4x3& mat) {
   return stream << tam[0] << std::endl
                 << tam[1] << std::endl
                 << tam[2] << std::endl;
+}
+
+inline std::ostream& operator<<(std::ostream& stream, const Box& box) {
+  return stream << "min: " << box.min << ", "
+                << "max: " << box.max;
+}
+
+inline std::ostream& operator<<(std::ostream& stream, const Rect& box) {
+  return stream << "min: " << box.min << ", "
+                << "max: " << box.max;
 }
 
 /**

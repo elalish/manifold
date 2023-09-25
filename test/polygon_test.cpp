@@ -591,7 +591,7 @@ TEST(Polygon, Envelope) {
       {-32.5569077, 5},           //
       {-36.8497353, 1.03053689},  //
   });
-  TestPoly(polys, 8);
+  TestPoly(polys, 6);
 }
 
 TEST(Polygon, Split) {

@@ -237,15 +237,15 @@ class EarClip {
 
       // Hole
       const float startX = start->pos.x;
+      const Rect bBox = start2BBox_[start];
+      const int onTop = start->pos.y >= bBox.max.y - precision_   ? 1
+                        : start->pos.y <= bBox.min.y + precision_ ? -1
+                                                                  : 0;
       float minX = std::numeric_limits<float>::infinity();
       VertItr connector = polygon_.end();
       for (auto poly = starts_.begin(); poly != starts_.end(); ++poly) {
         if (poly == startItr) continue;
         VertItr edge = *poly;
-        const Rect bBox = start2BBox_[edge];
-        const int onTop = edge->pos.y > bBox.max.y - precision_   ? 1
-                          : edge->pos.y < bBox.min.y + precision_ ? -1
-                                                                  : 0;
         do {
           const std::pair<VertItr, float> pair =
               edge->InterpY2X(start->pos.y, onTop, precision_);
