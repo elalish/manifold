@@ -236,7 +236,6 @@ class EarClip {
       }
 
       // Hole
-      const float startY = start->pos.y;
       const float startX = start->pos.x;
       float minX = std::numeric_limits<float>::infinity();
       VertItr connector = polygon_.end();
@@ -244,17 +243,13 @@ class EarClip {
         if (poly == startItr) continue;
         VertItr edge = *poly;
         do {
-          if (edge->pos.y < edge->right->pos.y &&
-              edge->pos.y < startY + precision_ &&
-              edge->right->pos.y > startY - precision_) {
-            float a =
-                (startY - edge->pos.y) / (edge->right->pos.y - edge->pos.y);
-            float x = glm::mix(edge->pos.x, edge->right->pos.x, a);
-            if (x > startX - precision_ &&
-                ((x >= startX && x < minX) || (minX < startX && x > minX))) {
-              minX = x;
-              connector = edge->pos.x > edge->right->pos.x ? edge : edge->right;
-            }
+          const std::pair<VertItr, float> pair =
+              edge->InterpY2X(start->pos.y, precision_);
+          const float x = pair.second;
+          if (isfinite(x) && x > startX - precision_ &&
+              ((x >= startX && x < minX) || (minX < startX && x > minX))) {
+            minX = x;
+            connector = pair.first;
           }
           edge = edge->right;
         } while (edge != *poly);
@@ -266,7 +261,7 @@ class EarClip {
         continue;
       }
 
-      connector = FindBridge(start, connector, glm::vec2(minX, startY));
+      connector = FindBridge(start, connector, glm::vec2(minX, start->pos.y));
 
       JoinPolygons(start, connector);
 
@@ -351,6 +346,48 @@ class EarClip {
       return true;
     }
 
+    std::pair<VertItr, float> InterpY2X(float y, float precision) const {
+      const float p2 = precision * precision;
+      if (pos.y < right->pos.y) {
+        if (glm::abs(pos.y - y) <= precision) {
+          if (glm::abs(right->pos.y - y) > precision) {
+            VertItr prev = left;
+            while (prev != right) {
+              const glm::vec2 diff = prev->pos - pos;
+              if (glm::dot(diff, diff) > p2) {
+                break;
+              }
+              prev = prev->left;
+            }
+            if (prev->pos.y <= y + precision) {
+              return std::make_pair(left->right, pos.x);
+            }
+          }
+        } else {
+          if (glm::abs(right->pos.y - y) <= precision) {
+            VertItr next = right->right;
+            while (next != left) {
+              const glm::vec2 diff = next->pos - right->pos;
+              if (glm::dot(diff, diff) > p2) {
+                break;
+              }
+              next = next->right;
+            }
+            if (next->pos.y > y - precision) {
+              return std::make_pair(right, right->pos.x);
+            }
+          } else if (pos.y < y && right->pos.y > y) {
+            float a =
+                glm::clamp((y - pos.y) / (right->pos.y - pos.y), 0.0f, 1.0f);
+            const float x = glm::mix(pos.x, right->pos.x, a);
+            const VertItr p = pos.x < right->pos.x ? right : left->right;
+            return std::make_pair(p, x);
+          }
+        }
+      }
+      return std::make_pair(left, std::numeric_limits<float>::infinity());
+    }
+
     float SignedDist(VertItr v, glm::vec2 unit, float precision) const {
       float d = glm::determinant(glm::mat2(unit, v->pos - pos));
       if (glm::abs(d) < precision) {
@@ -420,7 +457,7 @@ class EarClip {
   }
 
   void Initialize(const PolygonsIdx &polys) {
-    float bound;
+    float bound = 0;
     for (const SimplePolygonIdx &poly : polys) {
       auto vert = poly.begin();
       polygon_.push_back({vert->idx, earsQueue_.end(), vert->pos});
@@ -428,13 +465,13 @@ class EarClip {
       VertItr last = first;
       VertItr start = first;
       float maxX = start->pos.x;
+      // Rect bBox;
 
       for (++vert; vert != poly.end(); ++vert) {
         polygon_.push_back({vert->idx, earsQueue_.end(), vert->pos});
         VertItr next = std::prev(polygon_.end());
 
-        bound = glm::max(
-            bound, glm::max(glm::abs(vert->pos.x), glm::abs(vert->pos.y)));
+        // bBox.Union(next->pos);
 
         if (next->pos.x > maxX) {
           maxX = next->pos.x;
@@ -454,24 +491,24 @@ class EarClip {
   VertItr FindBridge(VertItr start, VertItr guess,
                      glm::vec2 intersection) const {
     const float above = guess->pos.y > start->pos.y ? 1 : -1;
+    VertItr best = guess;
     VertItr edge = guess->right;
-    glm::vec2 left = start->pos - guess->pos;
-    glm::vec2 right = intersection - guess->pos;
+    const glm::vec2 left = start->pos - guess->pos;
+    const glm::vec2 right = intersection - guess->pos;
     while (edge != guess) {
       glm::vec2 offset = edge->pos - guess->pos;
       if (edge->pos.y * above > start->pos.y * above &&
           above * glm::determinant(glm::mat2(left, offset)) > 0 &&
           above * glm::determinant(glm::mat2(offset, right)) > 0) {
-        guess = edge;
-        glm::vec2 left = start->pos - guess->pos;
-        glm::vec2 right = intersection - guess->pos;
+        best = edge;
       }
       edge = edge->right;
     }
     if (params.verbose) {
-      std::cout << start->mesh_idx << ", " << guess->mesh_idx << std::endl;
+      std::cout << "connected " << start->mesh_idx << " to " << best->mesh_idx
+                << std::endl;
     }
-    return guess;
+    return best;
   }
 
   void JoinPolygons(VertItr start, VertItr connector) {
@@ -539,6 +576,8 @@ class EarClip {
       }
       Link(left, right);
       --numTri;
+
+      // if (numTri == 35) Dump(left);
 
       ProcessEar(left);
       ProcessEar(right);
