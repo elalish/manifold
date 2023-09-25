@@ -242,9 +242,13 @@ class EarClip {
       for (auto poly = starts_.begin(); poly != starts_.end(); ++poly) {
         if (poly == startItr) continue;
         VertItr edge = *poly;
+        const Rect bBox = start2BBox_[edge];
+        const int onTop = edge->pos.y > bBox.max.y - precision_   ? 1
+                          : edge->pos.y < bBox.min.y + precision_ ? -1
+                                                                  : 0;
         do {
           const std::pair<VertItr, float> pair =
-              edge->InterpY2X(start->pos.y, precision_);
+              edge->InterpY2X(start->pos.y, onTop, precision_);
           const float x = pair.second;
           if (isfinite(x) && x > startX - precision_ &&
               ((x >= startX && x < minX) || (minX < startX && x > minX))) {
@@ -297,6 +301,7 @@ class EarClip {
 
   std::vector<Vert> polygon_;
   std::multiset<VertItr, MaxX> starts_;
+  std::map<VertItr, Rect> start2BBox_;
   std::multiset<VertItr, MinCost> earsQueue_;
   float precision_;
 
@@ -346,37 +351,43 @@ class EarClip {
       return true;
     }
 
-    std::pair<VertItr, float> InterpY2X(float y, float precision) const {
+    std::pair<VertItr, float> InterpY2X(float y, int onTop,
+                                        float precision) const {
       const float p2 = precision * precision;
-      if (pos.y < right->pos.y) {
+      if (pos.y < right->pos.y) {  // Edge goes up
         if (glm::abs(pos.y - y) <= precision) {
           if (glm::abs(right->pos.y - y) > precision) {
+            // Tail is at y
             VertItr prev = left;
-            while (prev != right) {
+            while (prev != right) {  // Find next non-degenerate
               const glm::vec2 diff = prev->pos - pos;
               if (glm::dot(diff, diff) > p2) {
                 break;
               }
               prev = prev->left;
             }
-            if (prev->pos.y <= y + precision) {
+            if (prev->pos.y <= y + precision &&
+                !(onTop == 1 && prev->pos.y > y - precision)) {
               return std::make_pair(left->right, pos.x);
             }
-          }
+          }  // Edges within the precision band are skipped
         } else {
           if (glm::abs(right->pos.y - y) <= precision) {
+            // Head is at y
             VertItr next = right->right;
-            while (next != left) {
+            while (next != left) {  // Find next non-degenerate
               const glm::vec2 diff = next->pos - right->pos;
               if (glm::dot(diff, diff) > p2) {
                 break;
               }
               next = next->right;
             }
-            if (next->pos.y > y - precision) {
+            if (next->pos.y > y - precision &&
+                !(onTop == -1 && next->pos.y <= y + precision)) {
               return std::make_pair(right, right->pos.x);
             }
           } else if (pos.y < y && right->pos.y > y) {
+            // Edge crosses y
             float a =
                 glm::clamp((y - pos.y) / (right->pos.y - pos.y), 0.0f, 1.0f);
             const float x = glm::mix(pos.x, right->pos.x, a);
@@ -385,6 +396,7 @@ class EarClip {
           }
         }
       }
+      // Edge does not cross y going up
       return std::make_pair(left, std::numeric_limits<float>::infinity());
     }
 
@@ -465,13 +477,13 @@ class EarClip {
       VertItr last = first;
       VertItr start = first;
       float maxX = start->pos.x;
-      // Rect bBox;
+      Rect bBox;
 
       for (++vert; vert != poly.end(); ++vert) {
         polygon_.push_back({vert->idx, earsQueue_.end(), vert->pos});
         VertItr next = std::prev(polygon_.end());
 
-        // bBox.Union(next->pos);
+        bBox.Union(next->pos);
 
         if (next->pos.x > maxX) {
           maxX = next->pos.x;
@@ -483,6 +495,8 @@ class EarClip {
       }
       Link(last, first);
       starts_.insert(start);
+      start2BBox_.insert({start, bBox});
+      bound = glm::max(bound, bBox.Scale());
     }
 
     if (precision_ < 0) precision_ = bound * kTolerance;
