@@ -312,6 +312,172 @@ struct Box {
     return glm::all(glm::isfinite(min)) && glm::all(glm::isfinite(max));
   }
 };
+
+/**
+ * Axis-aligned rectangular bounds.
+ */
+struct Rect {
+  glm::vec2 min = glm::vec2(0);
+  glm::vec2 max = glm::vec2(0);
+
+  /**
+   * Default constructor is an empty rectangle..
+   */
+  Rect() {}
+
+  /**
+   * Create a rectangle that contains the two given points.
+   */
+  Rect(const glm::vec2 a, const glm::vec2 b) {
+    min = glm::min(a, b);
+    max = glm::max(a, b);
+  }
+
+  /** @name Information
+   *  Details of the rectangle
+   */
+  ///@{
+
+  /**
+   * Return the dimensions of the rectangle.
+   */
+  glm::vec2 Size() const { return max - min; }
+
+  /**
+   * Return the area of the rectangle.
+   */
+  float Area() const {
+    auto sz = Size();
+    return sz.x * sz.y;
+  }
+
+  /**
+   * Returns the absolute-largest coordinate value of any contained
+   * point.
+   */
+  float Scale() const {
+    glm::vec2 absMax = glm::max(glm::abs(min), glm::abs(max));
+    return glm::max(absMax.x, absMax.y);
+  }
+
+  /**
+   * Returns the center point of the rectangle.
+   */
+  glm::vec2 Center() const { return 0.5f * (max + min); }
+
+  /**
+   * Does this rectangle contain (includes on border) the given point?
+   */
+  bool Contains(const glm::vec2& p) const {
+    return glm::all(glm::greaterThanEqual(p, min)) &&
+           glm::all(glm::greaterThanEqual(max, p));
+  }
+
+  /**
+   * Does this rectangle contain (includes equal) the given rectangle?
+   */
+  bool Contains(const Rect& rect) const {
+    return glm::all(glm::greaterThanEqual(rect.min, min)) &&
+           glm::all(glm::greaterThanEqual(max, rect.max));
+  }
+
+  /**
+   * Does this rectangle overlap the one given (including equality)?
+   */
+  bool DoesOverlap(const Rect& rect) const {
+    return min.x <= rect.max.x && min.y <= rect.max.y && max.x >= rect.min.x &&
+           max.y >= rect.min.y;
+  }
+
+  /**
+   * Is the rectangle empty (containing no space)?
+   */
+  bool IsEmpty() const { return max.y <= min.y || max.x <= min.x; };
+
+  /**
+   * Does this recangle have finite bounds?
+   */
+  bool IsFinite() const {
+    return glm::all(glm::isfinite(min)) && glm::all(glm::isfinite(max));
+  }
+
+  ///@}
+
+  /** @name Modification
+   */
+  ///@{
+
+  /**
+   * Expand this rectangle (in place) to include the given point.
+   */
+  void Union(const glm::vec2 p) {
+    min = glm::min(min, p);
+    max = glm::max(max, p);
+  }
+
+  /**
+   * Expand this rectangle to include the given Rect.
+   */
+  Rect Union(const Rect& rect) const {
+    Rect out;
+    out.min = glm::min(min, rect.min);
+    out.max = glm::max(max, rect.max);
+    return out;
+  }
+
+  /**
+   * Shift this rectangle by the given vector.
+   */
+  Rect operator+(const glm::vec2 shift) const {
+    Rect out;
+    out.min = min + shift;
+    out.max = max + shift;
+    return out;
+  }
+
+  /**
+   * Shift this rectangle in-place by the given vector.
+   */
+  Rect& operator+=(const glm::vec2 shift) {
+    min += shift;
+    max += shift;
+    return *this;
+  }
+
+  /**
+   * Scale this rectangle by the given vector.
+   */
+  Rect operator*(const glm::vec2 scale) const {
+    Rect out;
+    out.min = min * scale;
+    out.max = max * scale;
+    return out;
+  }
+
+  /**
+   * Scale this rectangle in-place by the given vector.
+   */
+  Rect& operator*=(const glm::vec2 scale) {
+    min *= scale;
+    max *= scale;
+    return *this;
+  }
+
+  /**
+   * Transform the rectangle by the given axis-aligned affine transform.
+   *
+   * Ensure the transform passed in is axis-aligned (rotations are all
+   * multiples of 90 degrees), or else the resulting rectangle will no longer
+   * bound properly.
+   */
+  Rect Transform(const glm::mat3x2& m) const {
+    Rect rect;
+    rect.min = m * glm::vec3(min, 1);
+    rect.max = m * glm::vec3(max, 1);
+    return rect;
+  }
+  ///@}
+};
 /** @} */
 
 /** @addtogroup Core

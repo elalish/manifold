@@ -98,9 +98,3 @@ int manifold_rect_does_overlap_rect(ManifoldRect *a, ManifoldRect *r) {
 int manifold_rect_is_empty(ManifoldRect *r) { return from_c(r)->IsEmpty(); }
 
 int manifold_rect_is_finite(ManifoldRect *r) { return from_c(r)->IsFinite(); }
-
-ManifoldCrossSection *manifold_rect_as_cross_section(void *mem,
-                                                     ManifoldRect *r) {
-  auto cs = from_c(r)->AsCrossSection();
-  return to_c(new (mem) CrossSection(cs));
-}

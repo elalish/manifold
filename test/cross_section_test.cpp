@@ -78,7 +78,7 @@ TEST(CrossSection, Rect) {
   float w = 10;
   float h = 5;
   auto rect = Rect({0, 0}, {w, h});
-  auto cross = rect.AsCrossSection();
+  CrossSection cross(rect);
   auto area = rect.Area();
 
   EXPECT_FLOAT_EQ(area, w * h);
