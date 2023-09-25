@@ -509,11 +509,15 @@ class EarClip {
     VertItr edge = guess->right;
     const glm::vec2 left = start->pos - guess->pos;
     const glm::vec2 right = intersection - guess->pos;
+    float minD2 = glm::dot(left, left);
     while (edge != guess) {
-      glm::vec2 offset = edge->pos - guess->pos;
-      if (edge->pos.y * above > start->pos.y * above &&
+      const glm::vec2 offset = edge->pos - guess->pos;
+      const glm::vec2 diff = edge->pos - start->pos;
+      const float d2 = glm::dot(diff, diff);
+      if (d2 < minD2 && edge->pos.y * above > start->pos.y * above &&
           above * glm::determinant(glm::mat2(left, offset)) > 0 &&
           above * glm::determinant(glm::mat2(offset, right)) > 0) {
+        minD2 = d2;
         best = edge;
       }
       edge = edge->right;
