@@ -251,7 +251,8 @@ class EarClip {
               edge->InterpY2X(start->pos.y, onTop, precision_);
           const float x = pair.second;
           if (isfinite(x) && x > startX - precision_ &&
-              ((x >= startX && x < minX) || (minX < startX && x > minX))) {
+              (!isfinite(minX) || (x >= startX && x < minX) ||
+               (minX < startX && x > minX))) {
             minX = x;
             connector = pair.first;
           }
