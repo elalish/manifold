@@ -506,21 +506,22 @@ class EarClip {
                      glm::vec2 intersection) const {
     const float above = guess->pos.y > start->pos.y ? 1 : -1;
     VertItr best = guess;
-    VertItr edge = guess->right;
+    VertItr vert = guess->right;
     const glm::vec2 left = start->pos - guess->pos;
     const glm::vec2 right = intersection - guess->pos;
     float minD2 = glm::dot(left, left);
-    while (edge != guess) {
-      const glm::vec2 offset = edge->pos - guess->pos;
-      const glm::vec2 diff = edge->pos - start->pos;
+    while (vert != guess) {
+      const glm::vec2 offset = vert->pos - guess->pos;
+      const glm::vec2 diff = vert->pos - start->pos;
       const float d2 = glm::dot(diff, diff);
-      if (d2 < minD2 && edge->pos.y * above > start->pos.y * above &&
+      if (d2 < minD2 && vert->pos.y * above > start->pos.y * above &&
           above * glm::determinant(glm::mat2(left, offset)) > 0 &&
-          above * glm::determinant(glm::mat2(offset, right)) > 0) {
+          above * glm::determinant(glm::mat2(offset, right)) > 0 &&
+          !vert->IsConvex(precision_)) {
         minD2 = d2;
-        best = edge;
+        best = vert;
       }
-      edge = edge->right;
+      vert = vert->right;
     }
     if (params.verbose) {
       std::cout << "connected " << start->mesh_idx << " to " << best->mesh_idx
