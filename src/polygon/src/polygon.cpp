@@ -175,11 +175,11 @@ void Dump(const PolygonsIdx &polys) {
     std::cout << "});" << std::endl;
   }
   for (auto poly : polys) {
-    std::cout << "array([" << std::endl;
+    std::cout << "show(array([" << std::endl;
     for (auto v : poly) {
       std::cout << "  [" << v.pos.x << ", " << v.pos.y << "]," << std::endl;
     }
-    std::cout << "])" << std::endl;
+    std::cout << "]))" << std::endl;
   }
 }
 
@@ -328,7 +328,7 @@ class EarClip {
               }
               prev = prev->left;
             }
-            if (prev->pos.y <= y + precision &&
+            if (!(prev->pos.y > y + precision && IsConvex(precision)) &&
                 !(onTop == 1 && prev->pos.y > y - precision)) {
               return std::make_pair(left->right, pos.x);
             }
@@ -344,7 +344,7 @@ class EarClip {
               }
               next = next->right;
             }
-            if (next->pos.y > y - precision &&
+            if (!(next->pos.y < y - precision && IsConvex(precision)) &&
                 !(onTop == -1 && next->pos.y <= y + precision)) {
               return std::make_pair(right, right->pos.x);
             }
@@ -676,13 +676,13 @@ class EarClip {
 
   void Dump(VertItr start) const {
     VertItr v = start;
-    std::cout << "array([" << std::endl;
+    std::cout << "show(array([" << std::endl;
     do {
       std::cout << "  [" << v->pos.x << ", " << v->pos.y << "],# "
                 << v->mesh_idx << std::endl;
       v = v->right;
     } while (v != start);
-    std::cout << "])" << std::endl;
+    std::cout << "]))" << std::endl;
   }
 };
 

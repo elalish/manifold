@@ -131,6 +131,26 @@ TEST(Polygon, MultiMerge) {
   TestPoly(polys, 13);
 }
 
+TEST(Polygon, SimpleHoles) {
+  Polygons polys;
+  polys.push_back({
+      {-0.277777791, 0.376543224},  //
+      {0.5, -0.233333275},          //
+      {0.285185158, 0.214814827},   //
+  });
+  polys.push_back({
+      {0.325617313, -0.055555556},  //
+      {0.277777791, 0.092592679},   //
+      {0.328042328, 0.0608465709},  //
+  });
+  polys.push_back({
+      {0.212963, 0.092592597},     //
+      {0.203703716, 0.141975299},  //
+      {0.212962985, 0.138888896},  //
+  });
+  TestPoly(polys, 11);
+}
+
 TEST(Polygon, Colinear) {
   Polygons polys;
   polys.push_back({
