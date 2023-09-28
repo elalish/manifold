@@ -344,7 +344,7 @@ class EarClip {
               }
               next = next->right;
             }
-            if (!(next->pos.y < y - precision && IsConvex(precision)) &&
+            if (!(next->pos.y < y - precision && right->IsConvex(precision)) &&
                 !(onTop == -1 && next->pos.y <= y + precision)) {
               return std::make_pair(right, right->pos.x);
             }
