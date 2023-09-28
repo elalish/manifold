@@ -229,7 +229,11 @@ class EarClip {
   }
 
   std::vector<glm::ivec3> Triangulate() {
-    // ClipDegenerates();
+    for (VertItr v = polygon_.begin(); v != polygon_.end(); ++v) {
+      ClipIfDegenerate(v);
+    }
+
+    FindStarts();
 
     CutKeyholes();
 
@@ -270,6 +274,8 @@ class EarClip {
     glm::vec2 pos, rightDir;
     VertItr left, right;
     float cost;
+
+    bool Clipped() const { return isnan(cost); }
 
     bool IsShort(float precision) const {
       const glm::vec2 edge = right->pos - pos;
@@ -428,7 +434,6 @@ class EarClip {
   }
 
   void ClipEar(VertItr ear) {
-    ear->cost = kClipped;
     Link(ear->left, ear->right);
     if (ear->left->mesh_idx != ear->mesh_idx &&
         ear->mesh_idx != ear->right->mesh_idx &&
@@ -448,7 +453,12 @@ class EarClip {
   }
 
   void ClipIfDegenerate(VertItr ear) {
+    if (ear->Clipped()) {
+      return;
+    }
     if (ear->left == ear->right) {
+      ear->left->cost = kClipped;
+      ear->right->cost = kClipped;
       return;
     }
     if (ear->IsShort(precision_) ||
@@ -456,6 +466,7 @@ class EarClip {
          glm::dot(ear->left->pos - ear->pos, ear->right->pos - ear->pos) > 0 &&
          ear->IsConvex(precision_))) {
       ClipEar(ear);
+      ear->cost = kClipped;
       ClipIfDegenerate(ear->left);
       ClipIfDegenerate(ear->right);
     }
@@ -468,28 +479,19 @@ class EarClip {
       polygon_.push_back({vert->idx, earsQueue_.end(), vert->pos});
       const VertItr first = std::prev(polygon_.end());
       VertItr last = first;
-      VertItr start = first;
-      float maxX = start->pos.x;
-      Rect bBox;
+      starts_.insert(first);
 
       for (++vert; vert != poly.end(); ++vert) {
         polygon_.push_back({vert->idx, earsQueue_.end(), vert->pos});
         VertItr next = std::prev(polygon_.end());
 
-        bBox.Union(next->pos);
-
-        if (next->pos.x > maxX) {
-          maxX = next->pos.x;
-          start = next;
-        }
+        bound = glm::max(
+            bound, glm::max(glm::abs(next->pos.x), glm::abs(next->pos.y)));
 
         Link(last, next);
         last = next;
       }
       Link(last, first);
-      starts_.insert(start);
-      start2BBox_.insert({start, bBox});
-      bound = glm::max(bound, bBox.Scale());
     }
 
     if (precision_ < 0) precision_ = bound * kTolerance;
@@ -497,35 +499,40 @@ class EarClip {
     triangles_.reserve(polygon_.size());
   }
 
-  void ClipDegenerates() {
-    for (VertItr v = polygon_.begin(); v != polygon_.end(); ++v) {
-      if (v->cost == kClipped) {
-        continue;
+  void FindStarts() {
+    std::multiset<VertItr, MaxX> starts;
+    for (auto startItr = starts_.begin(); startItr != starts_.end();
+         ++startItr) {
+      const VertItr first = *startItr;
+      VertItr start = first;
+      VertItr v = first;
+      float maxX = -std::numeric_limits<float>::infinity();
+      Rect bBox;
+      do {
+        if (!v->Clipped()) {
+          bBox.Union(v->pos);
+          if (v->pos.x > maxX) {
+            maxX = v->pos.x;
+            start = v;
+          }
+        }
+        v = v->right;
+      } while (v != first);
+
+      if (isfinite(maxX)) {
+        starts.insert(start);
+        start2BBox_.insert({start, bBox});
       }
-      ClipIfDegenerate(v);
     }
+    starts_ = starts;
   }
 
   void CutKeyholes() {
     auto startItr = starts_.begin();
     while (startItr != starts_.end()) {
-      VertItr start = *startItr;
+      const VertItr start = *startItr;
 
       if (start->IsConvex(precision_)) {  // Outer
-        ++startItr;
-        continue;
-      }
-
-      while (start->cost == kClipped) {
-        // Reflex ears were only removed if they had a short edge, so an
-        // un-clipped neighbor should still be a valid start.
-        start = start->right->pos.x > start->left->pos.x ? start->right
-                                                         : start->left;
-        if (start == *startItr) {
-          break;
-        }
-      }
-      if (start->cost == kClipped) {
         ++startItr;
         continue;
       }
