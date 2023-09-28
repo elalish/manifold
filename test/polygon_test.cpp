@@ -2219,7 +2219,7 @@ TEST(Polygon, Sponge4) {
       {-0.0308641978, -0.179012358},  //
       {-0.0308641978, -0.183127582},  //
   });
-  TestPoly(polys, 454);
+  TestPoly(polys, 210);
 }
 
 TEST(Polygon, BigSponge) {

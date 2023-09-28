@@ -618,10 +618,10 @@ class EarClip {
     Link(start, connector);
     Link(newConnector, newStart);
 
-    // ClipIfDegenerate(start);
-    // ClipIfDegenerate(newStart);
-    // ClipIfDegenerate(connector);
-    // ClipIfDegenerate(newConnector);
+    ClipIfDegenerate(start);
+    ClipIfDegenerate(newStart);
+    ClipIfDegenerate(connector);
+    ClipIfDegenerate(newConnector);
   }
 
   void ProcessEar(VertItr v) {
