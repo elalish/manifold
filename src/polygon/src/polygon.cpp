@@ -457,7 +457,7 @@ class EarClip {
       return;
     }
     if (ear->left == ear->right) {
-      ear->left->cost = kClipped;
+      ear->cost = kClipped;
       ear->right->cost = kClipped;
       return;
     }
@@ -503,7 +503,7 @@ class EarClip {
     std::multiset<VertItr, MaxX> starts;
     for (auto startItr = starts_.begin(); startItr != starts_.end();
          ++startItr) {
-      const VertItr first = *startItr;
+      VertItr first = *startItr;
       VertItr start = first;
       VertItr v = first;
       float maxX = -std::numeric_limits<float>::infinity();
@@ -515,6 +515,9 @@ class EarClip {
             maxX = v->pos.x;
             start = v;
           }
+        }
+        if (v->right->left != v) {
+          first = v->right->left;
         }
         v = v->right;
       } while (v != first);
