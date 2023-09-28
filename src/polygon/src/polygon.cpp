@@ -40,7 +40,6 @@ using namespace manifold;
 static ExecutionParams params;
 
 constexpr float kBest = -std::numeric_limits<float>::infinity();
-constexpr float kClipped = -std::numeric_limits<float>::quiet_NaN();
 
 #ifdef MANIFOLD_DEBUG
 struct PolyEdge {
@@ -275,8 +274,6 @@ class EarClip {
     VertItr left, right;
     float cost;
 
-    bool Clipped() const { return isnan(cost); }
-
     bool IsShort(float precision) const {
       const glm::vec2 edge = right->pos - pos;
       return glm::dot(edge, edge) < precision * precision;
@@ -433,6 +430,8 @@ class EarClip {
     if (!isfinite(left->rightDir.x)) left->rightDir = {0, 0};
   }
 
+  bool Clipped(VertItr v) { return v->right->left != v; }
+
   void ClipEar(VertItr ear) {
     Link(ear->left, ear->right);
     if (ear->left->mesh_idx != ear->mesh_idx &&
@@ -453,12 +452,10 @@ class EarClip {
   }
 
   void ClipIfDegenerate(VertItr ear) {
-    if (ear->Clipped()) {
+    if (Clipped(ear)) {
       return;
     }
     if (ear->left == ear->right) {
-      ear->cost = kClipped;
-      ear->right->cost = kClipped;
       return;
     }
     if (ear->IsShort(precision_) ||
@@ -466,7 +463,6 @@ class EarClip {
          glm::dot(ear->left->pos - ear->pos, ear->right->pos - ear->pos) > 0 &&
          ear->IsConvex(precision_))) {
       ClipEar(ear);
-      ear->cost = kClipped;
       ClipIfDegenerate(ear->left);
       ClipIfDegenerate(ear->right);
     }
@@ -509,15 +505,14 @@ class EarClip {
       float maxX = -std::numeric_limits<float>::infinity();
       Rect bBox;
       do {
-        if (!v->Clipped()) {
+        if (Clipped(v)) {
+          first = v->right->left;
+        } else {
           bBox.Union(v->pos);
           if (v->pos.x > maxX) {
             maxX = v->pos.x;
             start = v;
           }
-        }
-        if (v->right->left != v) {
-          first = v->right->left;
         }
         v = v->right;
       } while (v != first);
@@ -643,8 +638,15 @@ class EarClip {
     earsQueue_.clear();
     VertItr v = start;
     do {
-      ProcessEar(v);
-      v->PrintVert();
+      if (v->left == v->right) {
+        return;
+      }
+      if (Clipped(v)) {
+        start = v->right->left;
+      } else {
+        ProcessEar(v);
+        v->PrintVert();
+      }
       v = v->right;
       ++numTri;
     } while (v != start);

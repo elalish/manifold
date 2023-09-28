@@ -940,6 +940,24 @@ TEST(Polygon, Precision3) {
   TestPoly(polys, 3, 0.00068);
 };
 
+TEST(Polygon, DegenerateRing) {
+  Polygons polys;
+  polys.push_back({
+      {-9.82835007, -8.06539154},  //
+      {-10.1291866, -7.88505363},  //
+      {-10.1291866, -8.2457304},   //
+  });
+  polys.push_back({
+      {-9.82835007, -8.06539154},  //
+      {-9.82835007, -8.06539154},  //
+      {-9.82835007, -8.06539154},  //
+      {-10.1291866, -8.24572945},  //
+      {-10.1291866, -7.88505363},  //
+      {-9.82835007, -8.06539154},  //
+  });
+  TestPoly(polys, 9);
+}
+
 TEST(Polygon, Sweep) {
   Polygons polys;
   polys.push_back({
