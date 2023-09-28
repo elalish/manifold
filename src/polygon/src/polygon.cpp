@@ -39,6 +39,8 @@ using namespace manifold;
 
 static ExecutionParams params;
 
+constexpr float kBest = -std::numeric_limits<float>::infinity();
+
 #ifdef MANIFOLD_DEBUG
 struct PolyEdge {
   int startVert, endVert;
@@ -216,67 +218,20 @@ void PrintFailure(const std::exception &e, const PolygonsIdx &polys,
 class EarClip {
  public:
   EarClip(const PolygonsIdx &polys, float precision) : precision_(precision) {
-    int numStart = polys.size();
     int numVert = 0;
     for (const SimplePolygonIdx &poly : polys) {
       numVert += poly.size();
     }
-    polygon_.reserve(numVert + 2 * numStart);
+    polygon_.reserve(numVert + 2 * polys.size());
 
     Initialize(polys);
-
-    // Outer polygon cannot be a hole, so start with the next one.
-    auto startItr = std::next(starts_.begin());
-    while (startItr != starts_.end()) {
-      const VertItr start = *startItr;
-
-      if (start->IsConvex(precision_)) {  // Outer
-        ++startItr;
-        continue;
-      }
-
-      // Hole
-      const float startX = start->pos.x;
-      const Rect bBox = start2BBox_[start];
-      const int onTop = start->pos.y >= bBox.max.y - precision_   ? 1
-                        : start->pos.y <= bBox.min.y + precision_ ? -1
-                                                                  : 0;
-      float minX = std::numeric_limits<float>::infinity();
-      VertItr connector = polygon_.end();
-      for (auto poly = starts_.begin(); poly != starts_.end(); ++poly) {
-        if (poly == startItr) continue;
-        VertItr edge = *poly;
-        do {
-          const std::pair<VertItr, float> pair =
-              edge->InterpY2X(start->pos.y, onTop, precision_);
-          const float x = pair.second;
-          if (isfinite(x) && x > startX - precision_ &&
-              (!isfinite(minX) || (x >= startX && x < minX) ||
-               (minX < startX && x > minX))) {
-            minX = x;
-            connector = pair.first;
-          }
-          edge = edge->right;
-        } while (edge != *poly);
-      }
-
-      if (connector == polygon_.end()) {
-        PRINT("hole did not find an outer contour!");
-        ++startItr;
-        continue;
-      }
-
-      connector = FindBridge(start, connector, glm::vec2(minX, start->pos.y));
-
-      JoinPolygons(start, connector);
-
-      startItr = starts_.erase(startItr);
-    }
   }
 
   void Triangulate(std::vector<glm::ivec3> &tris) {
     int numTri = polygon_.size() - 2 * starts_.size();
     tris.reserve(numTri);
+
+    CutKeyholes();
 
     for (const VertItr start : starts_) {
       TriangulatePoly(tris, start);
@@ -406,7 +361,7 @@ class EarClip {
       if (glm::abs(d) < precision) {
         d = glm::determinant(glm::mat2(unit, v->right->pos - pos));
         if (d < precision) {
-          return -std::numeric_limits<float>::infinity();
+          return kBest;
         }
       }
       return d;
@@ -437,7 +392,7 @@ class EarClip {
 
       float totalCost = DelaunayCost(pos - center, scale, precision);
       if (CCW(pos, left->pos, right->pos, precision) == 0) {
-        return totalCost;
+        return totalCost < -1 ? kBest : 0;
       }
       VertItr test = right->right;
       while (test != left) {
@@ -467,6 +422,25 @@ class EarClip {
     right->left = left;
     left->rightDir = glm::normalize(right->pos - left->pos);
     if (!isfinite(left->rightDir.x)) left->rightDir = {0, 0};
+  }
+
+  void AddTriangle(VertItr ear, std::vector<glm::ivec3> &tris) const {
+    Link(ear->left, ear->right);
+    if (ear->left->mesh_idx != ear->mesh_idx &&
+        ear->mesh_idx != ear->right->mesh_idx &&
+        ear->right->mesh_idx != ear->left->mesh_idx) {
+      // Filter out topological degenerates, which can form in bad
+      // triangulations of polygons with holes, due to vert duplication.
+      tris.push_back(
+          {ear->left->mesh_idx, ear->mesh_idx, ear->right->mesh_idx});
+      if (params.verbose) {
+        std::cout << "output tri: " << ear->mesh_idx << ", "
+                  << ear->right->mesh_idx << ", " << ear->left->mesh_idx
+                  << std::endl;
+      }
+    } else {
+      PRINT("Topological degenerate!");
+    }
   }
 
   void Initialize(const PolygonsIdx &polys) {
@@ -501,6 +475,55 @@ class EarClip {
     }
 
     if (precision_ < 0) precision_ = bound * kTolerance;
+  }
+
+  void CutKeyholes() {
+    auto startItr = starts_.begin();
+    while (startItr != starts_.end()) {
+      const VertItr start = *startItr;
+
+      if (start->IsConvex(precision_)) {  // Outer
+        ++startItr;
+        continue;
+      }
+
+      // Hole
+      const float startX = start->pos.x;
+      const Rect bBox = start2BBox_[start];
+      const int onTop = start->pos.y >= bBox.max.y - precision_   ? 1
+                        : start->pos.y <= bBox.min.y + precision_ ? -1
+                                                                  : 0;
+      float minX = std::numeric_limits<float>::infinity();
+      VertItr connector = polygon_.end();
+      for (auto poly = starts_.begin(); poly != starts_.end(); ++poly) {
+        if (poly == startItr) continue;
+        VertItr edge = *poly;
+        do {
+          const std::pair<VertItr, float> pair =
+              edge->InterpY2X(start->pos.y, onTop, precision_);
+          const float x = pair.second;
+          if (isfinite(x) && x > startX - precision_ &&
+              (!isfinite(minX) || (x >= startX && x < minX) ||
+               (minX < startX && x > minX))) {
+            minX = x;
+            connector = pair.first;
+          }
+          edge = edge->right;
+        } while (edge != *poly);
+      }
+
+      if (connector == polygon_.end()) {
+        PRINT("hole did not find an outer contour!");
+        ++startItr;
+        continue;
+      }
+
+      connector = FindBridge(start, connector, glm::vec2(minX, start->pos.y));
+
+      JoinPolygons(start, connector);
+
+      startItr = starts_.erase(startItr);
+    }
   }
 
   VertItr FindBridge(VertItr start, VertItr guess,
@@ -549,7 +572,7 @@ class EarClip {
       v->ear = earsQueue_.end();
     }
     if (v->IsShort(precision_)) {
-      v->cost = -std::numeric_limits<float>::infinity();
+      v->cost = kBest;
       v->ear = earsQueue_.insert(v);
     } else if (v->IsConvex(precision_)) {
       v->cost = v->EarCost(precision_);
@@ -579,29 +602,12 @@ class EarClip {
         PRINT("No ear found!");
       }
 
-      const VertItr left = v->left;
-      const VertItr right = v->right;
-
-      if (left->mesh_idx != v->mesh_idx && v->mesh_idx != right->mesh_idx &&
-          right->mesh_idx != left->mesh_idx) {
-        // Filter out topological degenerates, which can form in bad
-        // triangulations of polygons with holes, due to vert duplication.
-        tris.push_back({left->mesh_idx, v->mesh_idx, right->mesh_idx});
-        if (params.verbose) {
-          std::cout << "output tri: " << v->mesh_idx << ", " << right->mesh_idx
-                    << ", " << left->mesh_idx << std::endl;
-        }
-      } else {
-        PRINT("Topological degenerate!");
-      }
-      Link(left, right);
+      AddTriangle(v, tris);
       --numTri;
 
-      // if (numTri == 35) Dump(left);
-
-      ProcessEar(left);
-      ProcessEar(right);
-      v = right;
+      ProcessEar(v->left);
+      ProcessEar(v->right);
+      v = v->right;
     }
 
     ASSERT(v->right == v->left, logicErr, "Triangulator error!");
