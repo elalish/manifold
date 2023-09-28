@@ -40,6 +40,7 @@ using namespace manifold;
 static ExecutionParams params;
 
 constexpr float kBest = -std::numeric_limits<float>::infinity();
+constexpr float kClipped = -std::numeric_limits<float>::quiet_NaN();
 
 #ifdef MANIFOLD_DEBUG
 struct PolyEdge {
@@ -227,15 +228,16 @@ class EarClip {
     Initialize(polys);
   }
 
-  void Triangulate(std::vector<glm::ivec3> &tris) {
-    int numTri = polygon_.size() - 2 * starts_.size();
-    tris.reserve(numTri);
+  std::vector<glm::ivec3> Triangulate() {
+    // ClipDegenerates();
 
     CutKeyholes();
 
     for (const VertItr start : starts_) {
-      TriangulatePoly(tris, start);
+      TriangulatePoly(start);
     }
+
+    return triangles_;
   }
 
   float GetPrecision() const { return precision_; }
@@ -259,6 +261,7 @@ class EarClip {
   std::multiset<VertItr, MaxX> starts_;
   std::map<VertItr, Rect> start2BBox_;
   std::multiset<VertItr, MinCost> earsQueue_;
+  std::vector<glm::ivec3> triangles_;
   float precision_;
 
   struct Vert {
@@ -424,14 +427,15 @@ class EarClip {
     if (!isfinite(left->rightDir.x)) left->rightDir = {0, 0};
   }
 
-  void AddTriangle(VertItr ear, std::vector<glm::ivec3> &tris) const {
+  void ClipEar(VertItr ear) {
+    ear->cost = kClipped;
     Link(ear->left, ear->right);
     if (ear->left->mesh_idx != ear->mesh_idx &&
         ear->mesh_idx != ear->right->mesh_idx &&
         ear->right->mesh_idx != ear->left->mesh_idx) {
       // Filter out topological degenerates, which can form in bad
       // triangulations of polygons with holes, due to vert duplication.
-      tris.push_back(
+      triangles_.push_back(
           {ear->left->mesh_idx, ear->mesh_idx, ear->right->mesh_idx});
       if (params.verbose) {
         std::cout << "output tri: " << ear->mesh_idx << ", "
@@ -440,6 +444,20 @@ class EarClip {
       }
     } else {
       PRINT("Topological degenerate!");
+    }
+  }
+
+  void ClipIfDegenerate(VertItr ear) {
+    if (ear->left == ear->right) {
+      return;
+    }
+    if (ear->IsShort(precision_) ||
+        (CCW(ear->left->pos, ear->pos, ear->right->pos, precision_) == 0 &&
+         glm::dot(ear->left->pos - ear->pos, ear->right->pos - ear->pos) > 0 &&
+         ear->IsConvex(precision_))) {
+      ClipEar(ear);
+      ClipIfDegenerate(ear->left);
+      ClipIfDegenerate(ear->right);
     }
   }
 
@@ -475,14 +493,39 @@ class EarClip {
     }
 
     if (precision_ < 0) precision_ = bound * kTolerance;
+
+    triangles_.reserve(polygon_.size());
+  }
+
+  void ClipDegenerates() {
+    for (VertItr v = polygon_.begin(); v != polygon_.end(); ++v) {
+      if (v->cost == kClipped) {
+        continue;
+      }
+      ClipIfDegenerate(v);
+    }
   }
 
   void CutKeyholes() {
     auto startItr = starts_.begin();
     while (startItr != starts_.end()) {
-      const VertItr start = *startItr;
+      VertItr start = *startItr;
 
       if (start->IsConvex(precision_)) {  // Outer
+        ++startItr;
+        continue;
+      }
+
+      while (start->cost == kClipped) {
+        // Reflex ears were only removed if they had a short edge, so an
+        // un-clipped neighbor should still be a valid start.
+        start = start->right->pos.x > start->left->pos.x ? start->right
+                                                         : start->left;
+        if (start == *startItr) {
+          break;
+        }
+      }
+      if (start->cost == kClipped) {
         ++startItr;
         continue;
       }
@@ -564,6 +607,11 @@ class EarClip {
     connector->left->right = newConnector;
     Link(start, connector);
     Link(newConnector, newStart);
+
+    // ClipIfDegenerate(start);
+    // ClipIfDegenerate(newStart);
+    // ClipIfDegenerate(connector);
+    // ClipIfDegenerate(newConnector);
   }
 
   void ProcessEar(VertItr v) {
@@ -580,7 +628,7 @@ class EarClip {
     }
   }
 
-  void TriangulatePoly(std::vector<glm::ivec3> &tris, VertItr start) {
+  void TriangulatePoly(VertItr start) {
     int numTri = -2;
     earsQueue_.clear();
     VertItr v = start;
@@ -602,7 +650,7 @@ class EarClip {
         PRINT("No ear found!");
       }
 
-      AddTriangle(v, tris);
+      ClipEar(v);
       --numTri;
 
       ProcessEar(v->left);
@@ -1539,7 +1587,7 @@ std::vector<glm::ivec3> TriangulateIdx(const PolygonsIdx &polys,
     // Monotones monotones(polys, precision);
     // monotones.Triangulate(triangles);
     EarClip triangulator(polys, precision);
-    triangulator.Triangulate(triangles);
+    triangles = triangulator.Triangulate();
 #ifdef MANIFOLD_DEBUG
     if (params.intermediateChecks) {
       CheckTopology(triangles, polys);
