@@ -231,13 +231,22 @@ class EarClip {
   };
   typedef std::set<VertItr, MinCost>::iterator qItr;
 
+  // The flat list where all the Verts are stored. Not used much for traversal.
   std::vector<Vert> polygon_;
+  // The set of right-most starting points, one for each polygon.
   std::multiset<VertItr, MaxX> starts_;
+  // Maps each polygon (by way of starting point) to its bounding box.
   std::map<VertItr, Rect> start2BBox_;
+  // A priority queue of valid ears - the multiset allows them to be updated.
   std::multiset<VertItr, MinCost> earsQueue_;
+  // The output triangulation.
   std::vector<glm::ivec3> triangles_;
+  // Working precision: max of float error and input value.
   float precision_;
 
+  // A circularly-linked list representing the polygon(s) that still need to be
+  // triangulated. This gets smaller as ears are clipped until it degenerates to
+  // two points and terminates.
   struct Vert {
     int mesh_idx;
     qItr ear;
@@ -250,6 +259,11 @@ class EarClip {
       return glm::dot(edge, edge) < precision * precision;
     }
 
+    // A major key to robustness is to only clip convex ears, but this is
+    // difficult to determine when an edge is folded back on itself. This
+    // function walks down the kinks in a degenerate portion of a polygon until
+    // it finds a clear geometric result. In the vast majority of cases the loop
+    // will never run, and when it does, it usually only needs one iteration.
     bool IsConvex(float precision) const {
       int convexity = CCW(left->pos, pos, right->pos, precision);
       if (convexity != 0) {
@@ -284,6 +298,18 @@ class EarClip {
       return true;
     }
 
+    // This function is the core of finding a proper place to keyhole. It runs
+    // on this Vert, which is represents the edge from this to right. It returns
+    // an iterator to the vert to connect to (either this or right) and the
+    // x-value of the edge at the given y-level. If the edge is not a valid
+    // option for a keyhole (must be upwards and cross the y-value), the x-value
+    // is inf.
+    //
+    // If the edge terminates within the precision band, it checks the next edge
+    // to ensure validity. No while loop is necessary because short edges have
+    // already been removed. The onTop value is 1 if the y-value is at the top
+    // of the polygon's bounding box, -1 if it's at the bottom, and 0 otherwise.
+    // This allows proper handling of horizontal edges.
     std::pair<VertItr, float> InterpY2X(float y, int onTop,
                                         float precision) const {
       const float p2 = precision * precision;
@@ -319,6 +345,10 @@ class EarClip {
       return std::make_pair(left, std::numeric_limits<float>::infinity());
     }
 
+    // This finds the cost of this vert relative to one of the two closed sides
+    // of the ear. Points are valid even when they touch, so long as their edge
+    // goes to the outside. No need to check the other side, since all verts are
+    // processed in the EarCost loop.
     float SignedDist(VertItr v, glm::vec2 unit, float precision) const {
       float d = glm::determinant(glm::mat2(unit, v->pos - pos));
       if (glm::abs(d) < precision) {
@@ -328,27 +358,45 @@ class EarClip {
       return d;
     }
 
+    // Find the cost of Vert v within this ear, where openSide is the unit
+    // vector from Verts right to left - passed in for reuse.
     float Cost(VertItr v, glm::vec2 openSide, float precision) const {
       const glm::vec2 offset = v->pos - pos;
       float cost = SignedDist(v, rightDir, precision);
-      if (glm::isfinite(cost)) {
-        cost = glm::min(cost, SignedDist(v, left->rightDir, precision));
+      if (!glm::isfinite(cost)) {
+        return cost;  // Not inside the ear
       }
-      if (glm::isfinite(cost)) {
-        float openCost =
-            glm::determinant(glm::mat2(openSide, v->pos - right->pos));
-        if (cost == 0 && glm::abs(openCost) < precision) {
-          return kBest;
-        }
-        cost = glm::min(cost, openCost);
+
+      cost = glm::min(cost, SignedDist(v, left->rightDir, precision));
+      if (!glm::isfinite(cost)) {
+        return cost;  // Not inside the ear
       }
-      return cost;
+
+      const float openCost =
+          glm::determinant(glm::mat2(openSide, v->pos - right->pos));
+      return (cost == 0 && glm::abs(openCost) < precision)
+                 ? kBest  // Not inside the ear
+                 : cost = glm::min(cost, openCost);
     }
 
+    // For verts outside the ear, apply a cost based on the Delaunay condition
+    // to aid in prioritization and produce cleaner triangulations. This doesn't
+    // affect robustness, but may be adjusted to improve output.
     float DelaunayCost(glm::vec2 diff, float scale, float precision) const {
       return -precision - scale * glm::dot(diff, diff);
     }
 
+    // This is the O(n^2) part of the algorithm, checking this ear against every
+    // Vert to ensure none are inside. It may be possible to improve performance
+    // by using the Collider to get it down to nlogn or doing some
+    // parallelization, but that may be more trouble than it's worth.
+    //
+    // Think of a cost as vaguely a distance metric - 0 is right on the edge of
+    // being invalid. cost > precision is definitely invalid. Cost < -precision
+    // is definitely valid, so all improvement costs are designed to always give
+    // values < -precision so they will never affect validity. The first
+    // totalCost is designed to give priority to sharper angles. Any cost < (-1
+    // - precision) has satisfied the Delaunay condition.
     float EarCost(float precision) const {
       glm::vec2 openSide = left->pos - right->pos;
       const glm::vec2 center = 0.5f * (left->pos + right->pos);
@@ -382,6 +430,8 @@ class EarClip {
     }
   };
 
+  // This function and JoinPolygons are the only functions that affect the
+  // circular list data structure. This helps ensure it remains circular.
   void Link(VertItr left, VertItr right) const {
     left->right = right;
     right->left = left;
@@ -389,8 +439,12 @@ class EarClip {
     if (!glm::isfinite(left->rightDir.x)) left->rightDir = {0, 0};
   }
 
+  // When an ear vert is clipped, its neighbors get linked, so they get unlinked
+  // from it, but it is still linked to them.
   bool Clipped(VertItr v) { return v->right->left != v; }
 
+  // Remove this vert from the circular list and output a corresponding
+  // triangle.
   void ClipEar(VertItr ear) {
     Link(ear->left, ear->right);
     if (ear->left->mesh_idx != ear->mesh_idx &&
@@ -412,6 +466,10 @@ class EarClip {
     }
   }
 
+  // If an ear will make a degenerate triangle, clip it early to avoid
+  // difficulty in key-holing. This function is recursive, as the process of
+  // clipping may cause the neighbors to degenerate. Reflex degenerates *must
+  // not* be clipped, unless they have a short edge.
   void ClipIfDegenerate(VertItr ear) {
     if (Clipped(ear)) {
       return;
@@ -429,6 +487,7 @@ class EarClip {
     }
   }
 
+  // Build the circular list polygon structures.
   void Initialize(const PolygonsIdx &polys) {
     float bound = 0;
     for (const SimplePolygonIdx &poly : polys) {
@@ -436,6 +495,8 @@ class EarClip {
       polygon_.push_back({vert->idx, earsQueue_.end(), vert->pos});
       const VertItr first = std::prev(polygon_.end());
       VertItr last = first;
+      // This is not the real rightmost start, but just an arbitrary vert for
+      // now to identify each polygon.
       starts_.insert(first);
 
       for (++vert; vert != poly.end(); ++vert) {
@@ -453,20 +514,26 @@ class EarClip {
 
     if (precision_ < 0) precision_ = bound * kTolerance;
 
-    triangles_.reserve(polygon_.size());
+    // Slightly more than enough, since each hole can cause two extra triangles.
+    triangles_.reserve(polygon_.size() + 2 * starts_.size());
   }
 
+  // Find the actual rightmost starts after degenerate removal. Also calculate
+  // the polygon bounding boxes.
   void FindStarts() {
     std::multiset<VertItr, MaxX> starts;
     for (auto startItr = starts_.begin(); startItr != starts_.end();
          ++startItr) {
       VertItr first = *startItr;
+      // This vert may have been clipped during the key-holing process.
       VertItr start = first;
       VertItr v = first;
       float maxX = -std::numeric_limits<float>::infinity();
       Rect bBox;
       do {
         if (Clipped(v)) {
+          // Update first to an un-clipped vert so we will return to it instead
+          // of infinite-looping.
           first = v->right->left;
         } else {
           bBox.Union(v->pos);
@@ -478,6 +545,7 @@ class EarClip {
         v = v->right;
       } while (v != first);
 
+      // No polygon left if all ears were degenerate and already clipped.
       if (glm::isfinite(maxX)) {
         starts.insert(start);
         start2BBox_.insert({start, bBox});
@@ -486,6 +554,11 @@ class EarClip {
     starts_ = starts;
   }
 
+  // All holes must be key-holed (attached to an outer polygon) before ear
+  // clipping can commence. A polygon is a hole if and only if its start vert is
+  // reflex. Instead of relying on sorting, which may be incorrect due to
+  // precision, we check for polygon edges both ahead and behind to ensure all
+  // valid options are found.
   void CutKeyholes() {
     auto startItr = starts_.begin();
     while (startItr != starts_.end()) {
@@ -511,6 +584,8 @@ class EarClip {
           const std::pair<VertItr, float> pair =
               edge->InterpY2X(start->pos.y, onTop, precision_);
           const float x = pair.second;
+          // This ensures we capture all valid edges, but will choose the same
+          // edge as precision == 0 would, if possible.
           if (glm::isfinite(x) && x > startX - precision_ &&
               (!glm::isfinite(minX) || (x >= startX && x < minX) ||
                (minX < startX && x > minX))) {
@@ -531,10 +606,17 @@ class EarClip {
 
       JoinPolygons(start, connector);
 
+      // Remove this hole polygon by erasing its start.
       startItr = starts_.erase(startItr);
     }
   }
 
+  // This converts the initial guess for the keyhole location into the final one
+  // and returns it. It does so by finding any reflex verts inside the triangle
+  // containing the guessed connection and the initial horizontal line, and
+  // returning the closest one to the start vert. This function doesn't
+  // currently make much use of precision, but it remains to be seen if this may
+  // be necessary.
   VertItr FindBridge(VertItr start, VertItr guess,
                      glm::vec2 intersection) const {
     const float above = guess->pos.y > start->pos.y ? 1 : -1;
@@ -565,6 +647,10 @@ class EarClip {
     return best;
   }
 
+  // Creates a keyhole between the start vert of a hole and the connector vert
+  // of an outer polygon. To do this, both verts are duplicated and reattached.
+  // This process may create degenerate ears, so these are clipped if necessary
+  // to keep from confusing subsequent key-holing operations.
   void JoinPolygons(VertItr start, VertItr connector) {
     polygon_.push_back(*start);
     const VertItr newStart = std::prev(polygon_.end());
@@ -582,6 +668,8 @@ class EarClip {
     ClipIfDegenerate(newConnector);
   }
 
+  // Recalculate the cost of the Vert v ear, updating it in the queue by
+  // removing and reinserting it.
   void ProcessEar(VertItr v) {
     if (v->ear != earsQueue_.end()) {
       earsQueue_.erase(v->ear);
@@ -596,7 +684,10 @@ class EarClip {
     }
   }
 
+  // The main ear-clipping loop. This is called once for each outer polygon -
+  // all holes have already been key-holed and joined to an outer polygon.
   void TriangulatePoly(VertItr start) {
+    // A simple polygon always creates two fewer triangles than it has verts.
     int numTri = -2;
     earsQueue_.clear();
     VertItr v = start;
@@ -613,12 +704,15 @@ class EarClip {
       v = v->right;
       ++numTri;
     } while (v != start);
+    // Uncomment this line to see each key-holed polygon and check for
+    // generated intersections.
     // Dump(v);
 
     while (numTri > 0) {
       const qItr ear = earsQueue_.begin();
       if (ear != earsQueue_.end()) {
         v = *ear;
+        // Cost should always be negative, generally < -precision.
         v->PrintVert();
         earsQueue_.erase(ear);
       } else {
@@ -630,6 +724,8 @@ class EarClip {
 
       ProcessEar(v->left);
       ProcessEar(v->right);
+      // This is a backup vert that is used if the queue is empty (geometrically
+      // invalid polygon), to ensure manifoldness.
       v = v->right;
     }
 
