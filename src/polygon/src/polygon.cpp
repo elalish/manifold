@@ -400,11 +400,13 @@ class EarClip {
       // triangulations of polygons with holes, due to vert duplication.
       triangles_.push_back(
           {ear->left->mesh_idx, ear->mesh_idx, ear->right->mesh_idx});
+#ifdef MANIFOLD_DEBUG
       if (params.verbose) {
         std::cout << "output tri: " << ear->mesh_idx << ", "
                   << ear->right->mesh_idx << ", " << ear->left->mesh_idx
                   << std::endl;
       }
+#endif
     } else {
       PRINT("Topological degenerate!");
     }
@@ -554,10 +556,12 @@ class EarClip {
       }
       vert = vert->right;
     }
+#ifdef MANIFOLD_DEBUG
     if (params.verbose) {
       std::cout << "connected " << start->mesh_idx << " to " << best->mesh_idx
                 << std::endl;
     }
+#endif
     return best;
   }
 
@@ -633,6 +637,7 @@ class EarClip {
     PRINT("Finished poly");
   }
 
+#ifdef MANIFOLD_DEBUG
   void Dump(VertItr start) const {
     VertItr v = start;
     std::cout << "show(array([" << std::endl;
@@ -645,6 +650,7 @@ class EarClip {
               << std::endl;
     std::cout << "]))" << std::endl;
   }
+#endif
 };
 }  // namespace
 
