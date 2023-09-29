@@ -384,7 +384,7 @@ class EarClip {
       const float scale = 4 / glm::dot(openSide, openSide);
       openSide = glm::normalize(openSide);
 
-      float totalCost = DelaunayCost(pos - center, scale, precision);
+      float totalCost = glm::dot(left->rightDir, rightDir) - 1 - precision;
       if (CCW(pos, left->pos, right->pos, precision) == 0) {
         return totalCost < -1 ? kBest : 0;
       }
