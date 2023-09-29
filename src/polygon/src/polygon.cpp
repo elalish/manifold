@@ -544,6 +544,12 @@ class EarClip {
         }
         v = v->right;
       } while (v != first);
+      // If first gets updated, it will not get processed by the loop.
+      bBox.Union(v->pos);
+      if (v->pos.x > maxX) {
+        maxX = v->pos.x;
+        start = v;
+      }
 
       // No polygon left if all ears were degenerate and already clipped.
       if (glm::isfinite(maxX)) {
