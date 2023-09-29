@@ -321,13 +321,6 @@ class EarClip {
           if (glm::abs(right->pos.y - y) > precision) {
             // Tail is at y
             VertItr prev = left;
-            while (prev != right) {  // Find next non-degenerate
-              const glm::vec2 diff = prev->pos - pos;
-              if (glm::dot(diff, diff) > p2) {
-                break;
-              }
-              prev = prev->left;
-            }
             if (!(prev->pos.y > y + precision && IsConvex(precision)) &&
                 !(onTop == 1 && prev->pos.y > y - precision)) {
               return std::make_pair(left->right, pos.x);
@@ -337,13 +330,6 @@ class EarClip {
           if (glm::abs(right->pos.y - y) <= precision) {
             // Head is at y
             VertItr next = right->right;
-            while (next != left) {  // Find next non-degenerate
-              const glm::vec2 diff = next->pos - right->pos;
-              if (glm::dot(diff, diff) > p2) {
-                break;
-              }
-              next = next->right;
-            }
             if (!(next->pos.y < y - precision && right->IsConvex(precision)) &&
                 !(onTop == -1 && next->pos.y <= y + precision)) {
               return std::make_pair(right, right->pos.x);
@@ -366,9 +352,7 @@ class EarClip {
       float d = glm::determinant(glm::mat2(unit, v->pos - pos));
       if (glm::abs(d) < precision) {
         d = glm::determinant(glm::mat2(unit, v->right->pos - pos));
-        if (d < precision) {
-          return kBest;
-        }
+        return d < precision ? kBest : 0;
       }
       return d;
     }
@@ -380,8 +364,12 @@ class EarClip {
         cost = glm::min(cost, SignedDist(v, left->rightDir, precision));
       }
       if (isfinite(cost)) {
-        cost = glm::min(
-            cost, glm::determinant(glm::mat2(openSide, v->pos - right->pos)));
+        float openCost =
+            glm::determinant(glm::mat2(openSide, v->pos - right->pos));
+        if (cost == 0 && glm::abs(openCost) < precision) {
+          return kBest;
+        }
+        cost = glm::min(cost, openCost);
       }
       return cost;
     }
@@ -400,7 +388,7 @@ class EarClip {
       if (CCW(pos, left->pos, right->pos, precision) == 0) {
         return totalCost < -1 ? kBest : 0;
       }
-      VertItr test = right->right;
+      VertItr test = right;
       while (test != left) {
         float cost = Cost(test, openSide, precision);
         if (cost < -precision) {
@@ -679,9 +667,11 @@ class EarClip {
     std::cout << "show(array([" << std::endl;
     do {
       std::cout << "  [" << v->pos.x << ", " << v->pos.y << "],# "
-                << v->mesh_idx << std::endl;
+                << v->mesh_idx << ", cost: " << v->cost << std::endl;
       v = v->right;
     } while (v != start);
+    std::cout << "  [" << v->pos.x << ", " << v->pos.y << "],# " << v->mesh_idx
+              << std::endl;
     std::cout << "]))" << std::endl;
   }
 };
