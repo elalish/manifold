@@ -331,10 +331,10 @@ class EarClip {
     float Cost(VertItr v, glm::vec2 openSide, float precision) const {
       const glm::vec2 offset = v->pos - pos;
       float cost = SignedDist(v, rightDir, precision);
-      if (isfinite(cost)) {
+      if (glm::isfinite(cost)) {
         cost = glm::min(cost, SignedDist(v, left->rightDir, precision));
       }
-      if (isfinite(cost)) {
+      if (glm::isfinite(cost)) {
         float openCost =
             glm::determinant(glm::mat2(openSide, v->pos - right->pos));
         if (cost == 0 && glm::abs(openCost) < precision) {
@@ -386,7 +386,7 @@ class EarClip {
     left->right = right;
     right->left = left;
     left->rightDir = glm::normalize(right->pos - left->pos);
-    if (!isfinite(left->rightDir.x)) left->rightDir = {0, 0};
+    if (!glm::isfinite(left->rightDir.x)) left->rightDir = {0, 0};
   }
 
   bool Clipped(VertItr v) { return v->right->left != v; }
@@ -476,7 +476,7 @@ class EarClip {
         v = v->right;
       } while (v != first);
 
-      if (isfinite(maxX)) {
+      if (glm::isfinite(maxX)) {
         starts.insert(start);
         start2BBox_.insert({start, bBox});
       }
@@ -509,8 +509,8 @@ class EarClip {
           const std::pair<VertItr, float> pair =
               edge->InterpY2X(start->pos.y, onTop, precision_);
           const float x = pair.second;
-          if (isfinite(x) && x > startX - precision_ &&
-              (!isfinite(minX) || (x >= startX && x < minX) ||
+          if (glm::isfinite(x) && x > startX - precision_ &&
+              (!glm::isfinite(minX) || (x >= startX && x < minX) ||
                (minX < startX && x > minX))) {
             minX = x;
             connector = pair.first;
