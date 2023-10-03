@@ -265,34 +265,53 @@ class EarClip {
     // it finds a clear geometric result. In the vast majority of cases the loop
     // will never run, and when it does, it usually only needs one iteration.
     bool IsConvex(float precision) const {
-      int convexity = CCW(left->pos, pos, right->pos, precision);
-      if (convexity != 0) {
-        return convexity > 0;
-      }
-
-      // Uncertain - walk the polygon to get certainty.
+      const float p2 = precision * precision;
       VertItr nextL = left;
       VertItr nextR = right;
       VertItr center = left->right;
+      VertItr last = center;
 
       while (nextL != nextR) {
-        glm::vec2 vecL = center->pos - nextL->pos;
-        glm::vec2 vecR = center->pos - nextR->pos;
-        float L2 = glm::dot(vecL, vecL);
-        float R2 = glm::dot(vecR, vecR);
+        const glm::vec2 edgeL = nextL->pos - center->pos;
+        const float l2 = glm::dot(edgeL, edgeL);
+        if (l2 <= p2) {
+          nextL = nextL->left;
+          continue;
+        }
 
-        if (L2 > R2) {
-          center = nextR;
+        const glm::vec2 edgeR = nextR->pos - center->pos;
+        const float r2 = glm::dot(edgeR, edgeR);
+        if (r2 <= p2) {
           nextR = nextR->right;
-        } else {
+          continue;
+        }
+
+        const glm::vec2 vecLR = nextR->pos - nextL->pos;
+        const float lr2 = glm::dot(vecLR, vecLR);
+        if (lr2 <= p2) {
+          last = center;
           center = nextL;
           nextL = nextL->left;
+          if (nextL == nextR) break;
+          nextR = nextR->right;
+          continue;
         }
 
-        convexity = CCW(nextL->pos, center->pos, nextR->pos, precision);
-        if (convexity != 0) {
-          return convexity > 0;
+        int convexity = CCW(nextL->pos, center->pos, nextR->pos, precision);
+        if (center != last) {
+          convexity += CCW(last->pos, center->pos, nextL->pos, precision) +
+                       CCW(nextR->pos, center->pos, last->pos, precision);
         }
+        if (convexity != 0) return convexity > 0;
+
+        if (l2 < r2) {
+          center = nextL;
+          nextL = nextL->left;
+        } else {
+          center = nextR;
+          nextR = nextR->right;
+        }
+        last = center;
       }
       // The whole polygon is degenerate - consider this to be convex.
       return true;
@@ -637,10 +656,15 @@ class EarClip {
       const float d2 = glm::dot(diff, diff);
       if (d2 < minD2 && vert->pos.y * above > start->pos.y * above &&
           above * glm::determinant(glm::mat2(left, offset)) > -precision_ &&
-          above * glm::determinant(glm::mat2(offset, right)) > -precision_ &&
-          !vert->IsConvex(precision_)) {
-        minD2 = d2;
-        best = vert;
+          above * glm::determinant(glm::mat2(offset, right)) > -precision_) {
+        const glm::vec2 diffN = d2 > precision_ * precision_
+                                    ? glm::normalize(diff)
+                                    : glm::vec2(1, 0);
+        if (CCW(vert->rightDir, -diffN, -vert->left->rightDir, precision_) >=
+            0) {
+          minD2 = d2;
+          best = vert;
+        }
       }
       vert = vert->right;
     }
@@ -710,9 +734,7 @@ class EarClip {
       v = v->right;
       ++numTri;
     } while (v != start);
-    // Uncomment this line to see each key-holed polygon and check for
-    // generated intersections.
-    // Dump(v);
+    Dump(v);
 
     while (numTri > 0) {
       const qItr ear = earsQueue_.begin();
@@ -741,6 +763,7 @@ class EarClip {
 
 #ifdef MANIFOLD_DEBUG
   void Dump(VertItr start) const {
+    if (!params.verbose) return;
     VertItr v = start;
     std::cout << "show(array([" << std::endl;
     do {
