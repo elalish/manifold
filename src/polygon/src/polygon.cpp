@@ -98,14 +98,14 @@ void CheckTopology(const std::vector<PolyEdge> &halfedges) {
     ASSERT(forward[i].startVert == backward[i].startVert &&
                forward[i].endVert == backward[i].endVert,
            topologyErr, "Forward and backward edge do not match.");
-    // if (i > 0) {
-    //   ASSERT(forward[i - 1].startVert != forward[i].startVert ||
-    //              forward[i - 1].endVert != forward[i].endVert,
-    //          topologyErr, "Not a 2-manifold.");
-    //   ASSERT(backward[i - 1].startVert != backward[i].startVert ||
-    //              backward[i - 1].endVert != backward[i].endVert,
-    //          topologyErr, "Not a 2-manifold.");
-    // }
+    if (i > 0) {
+      ASSERT(forward[i - 1].startVert != forward[i].startVert ||
+                 forward[i - 1].endVert != forward[i].endVert,
+             topologyErr, "Not a 2-manifold.");
+      ASSERT(backward[i - 1].startVert != backward[i].startVert ||
+                 backward[i - 1].endVert != backward[i].endVert,
+             topologyErr, "Not a 2-manifold.");
+    }
   }
 }
 
