@@ -761,8 +761,8 @@ class EarClip {
     PRINT("Finished poly");
   }
 
-#ifdef MANIFOLD_DEBUG
   void Dump(VertItr start) const {
+#ifdef MANIFOLD_DEBUG
     if (!params.verbose) return;
     VertItr v = start;
     std::cout << "show(array([" << std::endl;
@@ -774,8 +774,8 @@ class EarClip {
     std::cout << "  [" << v->pos.x << ", " << v->pos.y << "],# " << v->mesh_idx
               << std::endl;
     std::cout << "]))" << std::endl;
-  }
 #endif
+  }
 };
 }  // namespace
 
