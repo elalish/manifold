@@ -554,6 +554,13 @@ class EarClip {
           // Update first to an un-clipped vert so we will return to it instead
           // of infinite-looping.
           first = v->right->left;
+          if (!Clipped(first)) {
+            bBox.Union(first->pos);
+            if (first->pos.x > maxX) {
+              maxX = first->pos.x;
+              start = first;
+            }
+          }
         } else {
           bBox.Union(v->pos);
           if (v->pos.x > maxX) {
@@ -563,12 +570,6 @@ class EarClip {
         }
         v = v->right;
       } while (v != first);
-      // If first gets updated, it will not get processed by the loop.
-      bBox.Union(v->pos);
-      if (v->pos.x > maxX) {
-        maxX = v->pos.x;
-        start = v;
-      }
 
       // No polygon left if all ears were degenerate and already clipped.
       if (glm::isfinite(maxX)) {
@@ -727,12 +728,17 @@ class EarClip {
       }
       if (Clipped(v)) {
         start = v->right->left;
+        if (!Clipped(start)) {
+          ProcessEar(start);
+          ++numTri;
+          start->PrintVert();
+        }
       } else {
         ProcessEar(v);
+        ++numTri;
         v->PrintVert();
       }
       v = v->right;
-      ++numTri;
     } while (v != start);
     Dump(v);
 
