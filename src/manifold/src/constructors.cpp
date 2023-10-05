@@ -16,7 +16,6 @@
 
 #include "cross_section.h"
 #include "csg_tree.h"
-#include "graph.h"
 #include "impl.h"
 #include "par.h"
 #include "polygon.h"
@@ -465,17 +464,14 @@ Manifold Manifold::Compose(const std::vector<Manifold>& manifolds) {
  * containing a copy of the original. It is the inverse operation of Compose().
  */
 std::vector<Manifold> Manifold::Decompose() const {
-  Graph graph;
+  UnionFind<> uf(NumVert());
+  // Graph graph;
   auto pImpl_ = GetCsgLeafNode().GetImpl();
-  for (int i = 0; i < NumVert(); ++i) {
-    graph.add_nodes(i);
-  }
   for (const Halfedge& halfedge : pImpl_->halfedge_) {
-    if (halfedge.IsForward())
-      graph.add_edge(halfedge.startVert, halfedge.endVert);
+    if (halfedge.IsForward()) uf.unionXY(halfedge.startVert, halfedge.endVert);
   }
   std::vector<int> componentIndices;
-  const int numComponents = ConnectedComponents(componentIndices, graph);
+  const int numComponents = uf.connectedComponents(componentIndices);
 
   if (numComponents == 1) {
     std::vector<Manifold> meshes(1);

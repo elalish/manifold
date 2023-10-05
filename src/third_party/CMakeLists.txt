@@ -1,5 +1,3 @@
-add_subdirectory(graphlite)
-
 set(CLIPPER2_UTILS OFF)
 set(CLIPPER2_EXAMPLES OFF)
 set(CLIPPER2_TESTS OFF)
