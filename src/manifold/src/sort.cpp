@@ -16,7 +16,6 @@
 #include <numeric>
 #include <set>
 
-#include "graph.h"
 #include "impl.h"
 #include "par.h"
 
@@ -583,30 +582,20 @@ bool MeshGL::Merge() {
   Collider collider(vertBox, vertMorton);
   SparseIndices toMerge = collider.Collisions<true>(vertBox.cview());
 
-  Graph graph;
-  for (int i = 0; i < numVert; ++i) {
-    graph.add_nodes(i);
-  }
+  UnionFind<> uf(numVert);
   for (int i = 0; i < mergeFromVert.size(); ++i) {
-    graph.add_edge(static_cast<int>(mergeFromVert[i]),
-                   static_cast<int>(mergeToVert[i]));
+    uf.unionXY(static_cast<int>(mergeFromVert[i]),
+               static_cast<int>(mergeToVert[i]));
   }
   for (int i = 0; i < toMerge.size(); ++i) {
-    graph.add_edge(openVerts[toMerge.Get(i, false)],
-                   openVerts[toMerge.Get(i, true)]);
-  }
-
-  std::vector<int> vertLabels;
-  const int numLabels = ConnectedComponents(vertLabels, graph);
-  std::vector<int> label2vert(numLabels);
-  for (int v = 0; v < numVert; ++v) {
-    label2vert[vertLabels[v]] = v;
+    uf.unionXY(openVerts[toMerge.Get(i, false)],
+               openVerts[toMerge.Get(i, true)]);
   }
 
   mergeToVert.clear();
   mergeFromVert.clear();
   for (int v = 0; v < numVert; ++v) {
-    const int mergeTo = label2vert[vertLabels[v]];
+    const int mergeTo = uf.find(v);
     if (mergeTo != v) {
       mergeFromVert.push_back(v);
       mergeToVert.push_back(mergeTo);

@@ -38,8 +38,7 @@ System Dependencies (note that we will automatically download the dependency if 
 - [`gtest`](https://github.com/google/googletest/): Google test library (only when test is enabled, i.e. `MANIFOLD_TEST=ON`)
 
 Other dependencies:
-- [`graphlite`](https://github.com/haasdo95/graphlite): connected components algorithm.
-- [`Clipper2`](https://github.com/AngusJohnson/Clipper2j): provides our 2D subsystem
+- [`Clipper2`](https://github.com/AngusJohnson/Clipper2): provides our 2D subsystem
 - [`quickhull`](https://github.com/akuukka/quickhull): 3D convex hull algorithm.
 
 ## What's here
