@@ -19,7 +19,6 @@
 #include <map>
 #include <numeric>
 
-#include "graph.h"
 #include "hashtable.h"
 #include "mesh_fixes.h"
 #include "par.h"
@@ -272,11 +271,11 @@ struct CheckCoplanarity {
   VecView<int> comp2tri;
   VecView<const Halfedge> halfedge;
   VecView<const glm::vec3> vertPos;
-  VecView<const int> components;
+  std::vector<int>* components;
   const float precision;
 
   void operator()(int tri) {
-    const int component = components[tri];
+    const int component = (*components)[tri];
     const int referenceTri = comp2tri[component];
     if (referenceTri < 0 || referenceTri == tri) return;
 
@@ -310,17 +309,13 @@ struct EdgeBox {
 
 int GetLabels(std::vector<int>& components,
               const Vec<thrust::pair<int, int>>& edges, int numNodes) {
-  Graph graph;
-  for (int i = 0; i < numNodes; ++i) {
-    graph.add_nodes(i);
-  }
-  for (int i = 0; i < edges.size(); ++i) {
-    const thrust::pair<int, int> edge = edges[i];
-    if (edge.first < 0) continue;
-    graph.add_edge(edge.first, edge.second);
+  UnionFind<> uf(numNodes);
+  for (auto edge : edges) {
+    if (edge.first == -1 || edge.second == -1) continue;
+    uf.unionXY(edge.first, edge.second);
   }
 
-  return ConnectedComponents(components, graph);
+  return uf.connectedComponents(components);
 }
 
 void DedupePropVerts(manifold::Vec<glm::ivec3>& triProp,
@@ -639,7 +634,7 @@ void Manifold::Impl::CreateFaces(const std::vector<float>& propertyTolerance) {
   std::vector<int> components;
   const int numComponent = GetLabels(components, face2face, NumTri());
 
-  std::vector<int> comp2tri(numComponent, -1);
+  Vec<int> comp2tri(numComponent, -1);
   for (int tri = 0; tri < NumTri(); ++tri) {
     const int comp = components[tri];
     const int current = comp2tri[comp];
@@ -649,15 +644,13 @@ void Manifold::Impl::CreateFaces(const std::vector<float>& propertyTolerance) {
     }
   }
 
-  Vec<int> componentsD(components);
-  Vec<int> comp2triD(comp2tri);
   for_each_n(autoPolicy(halfedge_.size()), countAt(0), NumTri(),
              CheckCoplanarity(
-                 {comp2triD, halfedge_, vertPos_, componentsD, precision_}));
+                 {comp2tri, halfedge_, vertPos_, &components, precision_}));
 
   Vec<TriRef>& triRef = meshRelation_.triRef;
   for (int tri = 0; tri < NumTri(); ++tri) {
-    const int referenceTri = comp2triD[components[tri]];
+    const int referenceTri = comp2tri[components[tri]];
     if (referenceTri >= 0) {
       triRef[tri].tri = referenceTri;
     }
