@@ -468,7 +468,34 @@ class EarClip {
 
   // When an ear vert is clipped, its neighbors get linked, so they get unlinked
   // from it, but it is still linked to them.
-  bool Clipped(VertItr v) { return v->right->left != v; }
+  bool Clipped(VertItr v) const { return v->right->left != v; }
+
+  // Apply func to each un-clipped vert in a polygon and return an un-clipped
+  // vert.
+  VertItr Loop(VertItr first, std::function<void(VertItr)> func) {
+    VertItr v = first;
+    do {
+      if (Clipped(v)) {
+        // Update first to an un-clipped vert so we will return to it instead
+        // of infinite-looping.
+        first = v->right->left;
+        if (!Clipped(first)) {
+          v = first;
+          if (v->right == v->left) {
+            return polygon_.end();
+          }
+          func(v);
+        }
+      } else {
+        if (v->right == v->left) {
+          return polygon_.end();
+        }
+        func(v);
+      }
+      v = v->right;
+    } while (v != first);
+    return v;
+  }
 
   // Remove this vert from the circular list and output a corresponding
   // triangle.
@@ -550,9 +577,7 @@ class EarClip {
   // Find the actual rightmost starts after degenerate removal. Also calculate
   // the polygon bounding boxes.
   void FindStart(VertItr first) {
-    // This vert may have been clipped during the key-holing process.
     VertItr start = first;
-    VertItr v = first;
     float maxX = -std::numeric_limits<float>::infinity();
     Rect bBox;
     // Kahan summation
@@ -572,19 +597,10 @@ class EarClip {
       }
     };
 
-    do {
-      if (Clipped(v)) {
-        // Update first to an un-clipped vert so we will return to it instead
-        // of infinite-looping.
-        first = v->right->left;
-        if (!Clipped(first)) {
-          AddPoint(first);
-        }
-      } else {
-        AddPoint(v);
-      }
-      v = v->right;
-    } while (v != first);
+    if (Loop(first, AddPoint) == polygon_.end()) {
+      // No polygon left if all ears were degenerate and already clipped.
+      return;
+    }
 
     area += areaCompensation;
     const glm::vec2 size = bBox.Size();
@@ -593,12 +609,12 @@ class EarClip {
     if (area < -minArea) {
       holes_.insert(start);
       hole2BBox_.insert({start, bBox});
-    } else if (bBox.IsFinite()) {
+    } else {
       simples_.push_back(start);
       if (area > minArea) {
         outers_.push_back(start);
       }
-    }  // No polygon left if all ears were degenerate and already clipped.
+    }
   }
 
   // All holes must be key-holed (attached to an outer polygon) before ear
@@ -614,22 +630,22 @@ class EarClip {
     float minX = std::numeric_limits<float>::infinity();
     VertItr connector = polygon_.end();
 
+    auto CheckEdge = [&](VertItr edge) {
+      const std::pair<VertItr, float> pair =
+          edge->InterpY2X(start->pos.y, onTop, precision_);
+      const float x = pair.second;
+      // This ensures we capture all valid edges, but will choose the same
+      // edge as precision == 0 would, if possible.
+      if (glm::isfinite(x) && x > startX - precision_ &&
+          (!glm::isfinite(minX) || (x >= startX && x < minX) ||
+           (minX < startX && x > minX))) {
+        minX = x;
+        connector = pair.first;
+      }
+    };
+
     for (const VertItr first : outers_) {
-      VertItr edge = first;
-      do {
-        const std::pair<VertItr, float> pair =
-            edge->InterpY2X(start->pos.y, onTop, precision_);
-        const float x = pair.second;
-        // This ensures we capture all valid edges, but will choose the same
-        // edge as precision == 0 would, if possible.
-        if (glm::isfinite(x) && x > startX - precision_ &&
-            (!glm::isfinite(minX) || (x >= startX && x < minX) ||
-             (minX < startX && x > minX))) {
-          minX = x;
-          connector = pair.first;
-        }
-        edge = edge->right;
-      } while (edge != first);
+      Loop(first, CheckEdge);
     }
 
     if (connector == polygon_.end()) {
@@ -727,25 +743,15 @@ class EarClip {
     // A simple polygon always creates two fewer triangles than it has verts.
     int numTri = -2;
     earsQueue_.clear();
-    VertItr v = start;
-    do {
-      if (v->left == v->right) {
-        return;
-      }
-      if (Clipped(v)) {
-        start = v->right->left;
-        if (!Clipped(start)) {
-          ProcessEar(start);
-          ++numTri;
-          start->PrintVert();
-        }
-      } else {
-        ProcessEar(v);
-        ++numTri;
-        v->PrintVert();
-      }
-      v = v->right;
-    } while (v != start);
+
+    auto QueueVert = [&](VertItr v) {
+      v->PrintVert();
+      ProcessEar(v);
+      ++numTri;
+    };
+
+    VertItr v = Loop(start, QueueVert);
+    if (v == polygon_.end()) return;
     Dump(v);
 
     while (numTri > 0) {

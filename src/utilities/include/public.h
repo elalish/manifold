@@ -317,8 +317,8 @@ struct Box {
  * Axis-aligned rectangular bounds.
  */
 struct Rect {
-  glm::vec2 min = glm::vec2(0);
-  glm::vec2 max = glm::vec2(0);
+  glm::vec2 min = glm::vec2(std::numeric_limits<float>::infinity());
+  glm::vec2 max = glm::vec2(-std::numeric_limits<float>::infinity());
 
   /**
    * Default constructor is an empty rectangle..
