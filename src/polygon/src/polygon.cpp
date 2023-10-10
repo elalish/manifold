@@ -195,19 +195,23 @@ class EarClip {
     }
     polygon_.reserve(numVert + 2 * polys.size());
 
-    Initialize(polys);
-  }
+    std::vector<VertItr> starts = Initialize(polys);
 
-  std::vector<glm::ivec3> Triangulate() {
     for (VertItr v = polygon_.begin(); v != polygon_.end(); ++v) {
       ClipIfDegenerate(v);
     }
 
-    FindStarts();
+    for (const VertItr first : starts) {
+      FindStart(first);
+    }
+  }
 
-    CutKeyholes();
+  std::vector<glm::ivec3> Triangulate() {
+    for (const VertItr start : holes_) {
+      CutKeyhole(start);
+    }
 
-    for (const VertItr start : starts_) {
+    for (const VertItr start : simples_) {
       TriangulatePoly(start);
     }
 
@@ -233,10 +237,14 @@ class EarClip {
 
   // The flat list where all the Verts are stored. Not used much for traversal.
   std::vector<Vert> polygon_;
-  // The set of right-most starting points, one for each polygon.
-  std::multiset<VertItr, MaxX> starts_;
-  // Maps each polygon (by way of starting point) to its bounding box.
-  std::map<VertItr, Rect> start2BBox_;
+  // The set of right-most starting points, one for each negative-area contour.
+  std::multiset<VertItr, MaxX> holes_;
+  // The set of starting points, one for each positive-area contour.
+  std::vector<VertItr> outers_;
+  // The set of starting points, one for each simple polygon.
+  std::vector<VertItr> simples_;
+  // Maps each hole (by way of starting point) to its bounding box.
+  std::map<VertItr, Rect> hole2BBox_;
   // A priority queue of valid ears - the multiset allows them to be updated.
   std::multiset<VertItr, MinCost> earsQueue_;
   // The output triangulation.
@@ -507,7 +515,8 @@ class EarClip {
   }
 
   // Build the circular list polygon structures.
-  void Initialize(const PolygonsIdx &polys) {
+  std::vector<VertItr> Initialize(const PolygonsIdx &polys) {
+    std::vector<VertItr> starts;
     float bound = 0;
     for (const SimplePolygonIdx &poly : polys) {
       auto vert = poly.begin();
@@ -516,7 +525,7 @@ class EarClip {
       VertItr last = first;
       // This is not the real rightmost start, but just an arbitrary vert for
       // now to identify each polygon.
-      starts_.insert(first);
+      starts.push_back(first);
 
       for (++vert; vert != poly.end(); ++vert) {
         polygon_.push_back({vert->idx, earsQueue_.end(), vert->pos});
@@ -534,107 +543,104 @@ class EarClip {
     if (precision_ < 0) precision_ = bound * kTolerance;
 
     // Slightly more than enough, since each hole can cause two extra triangles.
-    triangles_.reserve(polygon_.size() + 2 * starts_.size());
+    triangles_.reserve(polygon_.size() + 2 * starts.size());
+    return starts;
   }
 
   // Find the actual rightmost starts after degenerate removal. Also calculate
   // the polygon bounding boxes.
-  void FindStarts() {
-    std::multiset<VertItr, MaxX> starts;
-    for (auto startItr = starts_.begin(); startItr != starts_.end();
-         ++startItr) {
-      VertItr first = *startItr;
-      // This vert may have been clipped during the key-holing process.
-      VertItr start = first;
-      VertItr v = first;
-      float maxX = -std::numeric_limits<float>::infinity();
-      Rect bBox;
-      do {
-        if (Clipped(v)) {
-          // Update first to an un-clipped vert so we will return to it instead
-          // of infinite-looping.
-          first = v->right->left;
-          if (!Clipped(first)) {
-            bBox.Union(first->pos);
-            if (first->pos.x > maxX) {
-              maxX = first->pos.x;
-              start = first;
-            }
-          }
-        } else {
-          bBox.Union(v->pos);
-          if (v->pos.x > maxX) {
-            maxX = v->pos.x;
-            start = v;
-          }
-        }
-        v = v->right;
-      } while (v != first);
+  void FindStart(VertItr first) {
+    // This vert may have been clipped during the key-holing process.
+    VertItr start = first;
+    VertItr v = first;
+    float maxX = -std::numeric_limits<float>::infinity();
+    Rect bBox;
+    // Kahan summation
+    float area = 0;
+    float areaCompensation = 0;
 
-      // No polygon left if all ears were degenerate and already clipped.
-      if (glm::isfinite(maxX)) {
-        starts.insert(start);
-        start2BBox_.insert({start, bBox});
+    auto AddPoint = [&](VertItr v) {
+      bBox.Union(v->pos);
+      const float area1 = glm::determinant(glm::mat2(v->pos, v->right->pos));
+      const float t1 = area + area1;
+      areaCompensation += (area - t1) + area1;
+      area = t1;
+
+      if (!v->IsConvex(precision_) && v->pos.x > maxX) {
+        maxX = v->pos.x;
+        start = v;
       }
-    }
-    starts_ = starts;
+    };
+
+    do {
+      if (Clipped(v)) {
+        // Update first to an un-clipped vert so we will return to it instead
+        // of infinite-looping.
+        first = v->right->left;
+        if (!Clipped(first)) {
+          AddPoint(first);
+        }
+      } else {
+        AddPoint(v);
+      }
+      v = v->right;
+    } while (v != first);
+
+    area += areaCompensation;
+    const glm::vec2 size = bBox.Size();
+    const float minArea = precision_ * glm::max(size.x, size.y);
+
+    if (area < -minArea) {
+      holes_.insert(start);
+      hole2BBox_.insert({start, bBox});
+    } else if (bBox.IsFinite()) {
+      simples_.push_back(start);
+      if (area > minArea) {
+        outers_.push_back(start);
+      }
+    }  // No polygon left if all ears were degenerate and already clipped.
   }
 
   // All holes must be key-holed (attached to an outer polygon) before ear
-  // clipping can commence. A polygon is a hole if and only if its start vert is
-  // reflex. Instead of relying on sorting, which may be incorrect due to
-  // precision, we check for polygon edges both ahead and behind to ensure all
-  // valid options are found.
-  void CutKeyholes() {
-    auto startItr = starts_.begin();
-    while (startItr != starts_.end()) {
-      const VertItr start = *startItr;
+  // clipping can commence. Instead of relying on sorting, which may be
+  // incorrect due to precision, we check for polygon edges both ahead and
+  // behind to ensure all valid options are found.
+  void CutKeyhole(const VertItr start) {
+    const float startX = start->pos.x;
+    const Rect bBox = hole2BBox_[start];
+    const int onTop = start->pos.y >= bBox.max.y - precision_   ? 1
+                      : start->pos.y <= bBox.min.y + precision_ ? -1
+                                                                : 0;
+    float minX = std::numeric_limits<float>::infinity();
+    VertItr connector = polygon_.end();
 
-      if (start->IsConvex(precision_)) {  // Outer
-        ++startItr;
-        continue;
-      }
-
-      // Hole
-      const float startX = start->pos.x;
-      const Rect bBox = start2BBox_[start];
-      const int onTop = start->pos.y >= bBox.max.y - precision_   ? 1
-                        : start->pos.y <= bBox.min.y + precision_ ? -1
-                                                                  : 0;
-      float minX = std::numeric_limits<float>::infinity();
-      VertItr connector = polygon_.end();
-      for (auto poly = starts_.begin(); poly != starts_.end(); ++poly) {
-        if (poly == startItr) continue;
-        VertItr edge = *poly;
-        do {
-          const std::pair<VertItr, float> pair =
-              edge->InterpY2X(start->pos.y, onTop, precision_);
-          const float x = pair.second;
-          // This ensures we capture all valid edges, but will choose the same
-          // edge as precision == 0 would, if possible.
-          if (glm::isfinite(x) && x > startX - precision_ &&
-              (!glm::isfinite(minX) || (x >= startX && x < minX) ||
-               (minX < startX && x > minX))) {
-            minX = x;
-            connector = pair.first;
-          }
-          edge = edge->right;
-        } while (edge != *poly);
-      }
-
-      if (connector == polygon_.end()) {
-        PRINT("hole did not find an outer contour!");
-        ++startItr;
-        continue;
-      }
-
-      connector = FindBridge(start, connector, glm::vec2(minX, start->pos.y));
-
-      JoinPolygons(start, connector);
-
-      // Remove this hole polygon by erasing its start.
-      startItr = starts_.erase(startItr);
+    for (const VertItr first : outers_) {
+      VertItr edge = first;
+      do {
+        const std::pair<VertItr, float> pair =
+            edge->InterpY2X(start->pos.y, onTop, precision_);
+        const float x = pair.second;
+        // This ensures we capture all valid edges, but will choose the same
+        // edge as precision == 0 would, if possible.
+        if (glm::isfinite(x) && x > startX - precision_ &&
+            (!glm::isfinite(minX) || (x >= startX && x < minX) ||
+             (minX < startX && x > minX))) {
+          minX = x;
+          connector = pair.first;
+        }
+        edge = edge->right;
+      } while (edge != first);
     }
+
+    if (connector == polygon_.end()) {
+      PRINT("hole did not find an outer contour!");
+      simples_.push_back(start);
+      return;
+    }
+
+    connector = FindBridge(start, connector, glm::vec2(minX, start->pos.y));
+
+    JoinPolygons(start, connector);
   }
 
   // This converts the initial guess for the keyhole location into the final one

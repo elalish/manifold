@@ -323,7 +323,6 @@ Properties Manifold::Impl::GetProperties() const {
         FaceAreaVolume({halfedge_, vertPos_, precision_})(i);
     const float t1 = area + area1;
     const float t2 = volume + volume1;
-    // we know that the elements are non-negative
     areaCompensation += (area - t1) + area1;
     volumeCompensation += (volume - t2) + volume1;
     area = t1;
