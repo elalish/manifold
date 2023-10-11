@@ -684,7 +684,9 @@ class EarClip {
         const glm::vec2 diffN = d2 > precision_ * precision_
                                     ? glm::normalize(diff)
                                     : glm::vec2(1, 0);
-        if (CCW(vert->rightDir, -diffN, -vert->left->rightDir, precision_) >=
+        // These are unit-vectors, so they use the unit-less tolerance rather
+        // than the precision which has length units.
+        if (CCW(vert->rightDir, -diffN, -vert->left->rightDir, kTolerance) >=
             0) {
           minD2 = d2;
           best = vert;
@@ -746,9 +748,9 @@ class EarClip {
     earsQueue_.clear();
 
     auto QueueVert = [&](VertItr v) {
-      v->PrintVert();
       ProcessEar(v);
       ++numTri;
+      v->PrintVert();
     };
 
     VertItr v = Loop(start, QueueVert);
