@@ -303,6 +303,21 @@ TEST(Polygon, Holes2) {
   TestPoly(polys, 20);
 };
 
+TEST(Polygon, CoincidentHole) {
+  Polygons polys;
+  polys.push_back({
+      {9.82835007, -0.939956188},  //
+      {10.1291866, -1.12029469},   //
+      {10.1291866, -0.759618163},  //
+  });
+  polys.push_back({
+      {9.82835007, -0.939956307},  //
+      {10.053978, -0.80470264},    //
+      {9.97876835, -1.0301255},    //
+  });
+  TestPoly(polys, 6);
+};
+
 TEST(Polygon, Colinear) {
   Polygons polys;
   polys.push_back({

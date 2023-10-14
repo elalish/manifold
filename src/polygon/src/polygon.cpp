@@ -380,7 +380,7 @@ class EarClip {
       float d = glm::determinant(glm::mat2(unit, v->pos - pos));
       if (glm::abs(d) < precision) {
         d = glm::determinant(glm::mat2(unit, v->right->pos - pos));
-        return d < precision ? kBest : 0;
+        return d < precision ? kBest : d;
       }
       return d;
     }
