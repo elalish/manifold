@@ -82,9 +82,9 @@ using SharedImpl = std::variant<std::shared_ptr<const Manifold::Impl>,
 struct GetImplPtr {
   const Manifold::Impl *operator()(const SharedImpl &p) {
     if (std::holds_alternative<std::shared_ptr<const Manifold::Impl>>(p)) {
-      return std::get<std::shared_ptr<const Manifold::Impl>>(p).get();
+      return std::get_if<std::shared_ptr<const Manifold::Impl>>(&p)->get();
     } else {
-      return std::get<std::shared_ptr<Manifold::Impl>>(p).get();
+      return std::get_if<std::shared_ptr<Manifold::Impl>>(&p)->get();
     }
   };
 };
@@ -495,7 +495,7 @@ std::shared_ptr<Manifold::Impl> CsgOpNode::BatchBoolean(
     group.run_and_wait(process);
     SharedImpl r;
     queue.try_pop(r);
-    return std::get<std::shared_ptr<Manifold::Impl>>(r);
+    return *std::get_if<std::shared_ptr<Manifold::Impl>>(&r);
   }
 #endif
   // apply boolean operations starting from smaller meshes
