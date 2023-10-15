@@ -322,8 +322,7 @@ NB_MODULE(manifold3d, m) {
              std::optional<nb::ndarray<uint32_t, nb::shape<3>>> &normalIdx) {
             glm::ivec3 v(0);
             if (normalIdx.has_value()) {
-              if (normalIdx->ndim() != 1 ||
-                  normalIdx->shape(0) != 3)
+              if (normalIdx->ndim() != 1 || normalIdx->shape(0) != 3)
                 throw std::runtime_error("Invalid vector shape, expected (3)");
               auto value = *normalIdx;
               v = glm::ivec3(value(0), value(1), value(2));
