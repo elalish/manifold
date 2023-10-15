@@ -321,7 +321,7 @@ struct Box {
 /**
  * Boolean operation type: Add (Union), Subtract (Difference), and Intersect.
  */
-enum class OpType { Add, Subtract, Intersect };
+enum class OpType { Add, Subtract, Intersect, KeepP, KeepQ };
 
 /**
  * These static properties control how circular shapes are quantized by

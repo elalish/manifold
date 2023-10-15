@@ -614,9 +614,15 @@ Manifold::Impl Boolean3::Result(OpType op) const {
 
   ASSERT((expandP_ > 0) == (op == OpType::Add), logicErr,
          "Result op type not compatible with constructor op type.");
-  const int c1 = op == OpType::Intersect ? 0 : 1;
-  const int c2 = op == OpType::Add ? 1 : 0;
-  const int c3 = op == OpType::Intersect ? 1 : -1;
+
+                     // Add, Subtract, Intersect, KeepP, KeepQ
+  const int c1tab[] = { 1, 1, 0, 1, 0 };
+  const int c2tab[] = { 1, 0, 0, 0, 1 };
+  const int c3tab[] = { -1, -1, 1, 0, 0 };
+
+  const int c1 = c1tab[ (int) op ];
+  const int c2 = c2tab[ (int) op ];
+  const int c3 = c3tab[ (int) op ];
 
   if (inP_.IsEmpty()) {
     if (!inQ_.IsEmpty() && op == OpType::Add) {
