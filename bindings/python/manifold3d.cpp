@@ -322,10 +322,9 @@ NB_MODULE(manifold3d, m) {
              std::optional<nb::ndarray<uint32_t, nb::shape<3>>> &normalIdx) {
             glm::ivec3 v(0);
             if (normalIdx.has_value()) {
-              if (normalIdx.value().ndim() != 1 ||
-                  normalIdx.value().shape(0) != 3)
+              if (normalIdx->ndim() != 1 || normalIdx->shape(0) != 3)
                 throw std::runtime_error("Invalid vector shape, expected (3)");
-              auto value = normalIdx.value();
+              auto value = *normalIdx;
               v = glm::ivec3(value(0), value(1), value(2));
             }
             return self.GetMeshGL(v);
@@ -624,7 +623,7 @@ NB_MODULE(manifold3d, m) {
                                                      runOriginalID->size());
 
             if (runTransform.has_value()) {
-              auto runTransform1 = runTransform.value();
+              auto runTransform1 = *runTransform;
               if (runTransform1.ndim() != 3 || runTransform1.shape(1) != 4 ||
                   runTransform1.shape(2) != 3)
                 throw std::runtime_error(
@@ -637,7 +636,7 @@ NB_MODULE(manifold3d, m) {
               out.faceID = toVector<uint32_t>(faceID->data(), faceID->size());
 
             if (halfedgeTangent.has_value()) {
-              auto halfedgeTangent1 = halfedgeTangent.value();
+              auto halfedgeTangent1 = *halfedgeTangent;
               if (halfedgeTangent1.ndim() != 3 ||
                   halfedgeTangent1.shape(1) != 3 ||
                   halfedgeTangent1.shape(2) != 4)
