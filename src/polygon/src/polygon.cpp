@@ -347,7 +347,7 @@ class EarClip {
           if (glm::abs(right->pos.y - start.y) <= precision) {
             // Head is at start.y
             VertItr next = right->right;
-            if (!(pos.x > start.x + precision &&
+            if (!(right->pos.x > start.x + precision &&
                   next->pos.y < start.y - precision &&
                   right->IsConvex(precision)) &&
                 !(onTop == -1 && next->pos.y <= start.y + precision)) {
