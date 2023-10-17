@@ -318,49 +318,52 @@ class EarClip {
     }
 
     // This function is the core of finding a proper place to keyhole. It runs
-    // on this Vert, which is represents the edge from this to right. It returns
+    // on this Vert, which represents the edge from this to right. It returns
     // an iterator to the vert to connect to (either this or right) and the
-    // x-value of the edge at the given y-level. If the edge is not a valid
-    // option for a keyhole (must be upwards and cross the y-value), the x-value
-    // is inf.
+    // x-value of the edge at the given start.y-level. If the edge is not a
+    // valid option for a keyhole (must be upwards and cross the start.y-value),
+    // the x-value is inf.
     //
     // If the edge terminates within the precision band, it checks the next edge
     // to ensure validity. No while loop is necessary because short edges have
-    // already been removed. The onTop value is 1 if the y-value is at the top
-    // of the polygon's bounding box, -1 if it's at the bottom, and 0 otherwise.
-    // This allows proper handling of horizontal edges.
-    std::pair<VertItr, float> InterpY2X(float y, int onTop,
+    // already been removed. The onTop value is 1 if the start.y-value is at the
+    // top of the polygon's bounding box, -1 if it's at the bottom, and 0
+    // otherwise. This allows proper handling of horizontal edges.
+    std::pair<VertItr, float> InterpY2X(glm::vec2 start, int onTop,
                                         float precision) const {
       const float p2 = precision * precision;
       if (pos.y < right->pos.y) {  // Edge goes up
-        if (glm::abs(pos.y - y) <= precision) {
-          if (glm::abs(right->pos.y - y) > precision) {
-            // Tail is at y
+        if (glm::abs(pos.y - start.y) <= precision) {
+          if (glm::abs(right->pos.y - start.y) > precision) {
+            // Tail is at start.y
             VertItr prev = left;
-            if (!(prev->pos.y > y + precision && IsConvex(precision)) &&
-                !(onTop == 1 && prev->pos.y > y - precision)) {
+            if (!(pos.x > start.x + precision &&
+                  prev->pos.y > start.y + precision && IsConvex(precision)) &&
+                !(onTop == 1 && prev->pos.y > start.y - precision)) {
               return std::make_pair(left->right, pos.x);
             }
           }  // Edges within the precision band are skipped
         } else {
-          if (glm::abs(right->pos.y - y) <= precision) {
-            // Head is at y
+          if (glm::abs(right->pos.y - start.y) <= precision) {
+            // Head is at start.y
             VertItr next = right->right;
-            if (!(next->pos.y < y - precision && right->IsConvex(precision)) &&
-                !(onTop == -1 && next->pos.y <= y + precision)) {
+            if (!(pos.x > start.x + precision &&
+                  next->pos.y < start.y - precision &&
+                  right->IsConvex(precision)) &&
+                !(onTop == -1 && next->pos.y <= start.y + precision)) {
               return std::make_pair(right, right->pos.x);
             }
-          } else if (pos.y < y && right->pos.y > y) {
-            // Edge crosses y
-            float a =
-                glm::clamp((y - pos.y) / (right->pos.y - pos.y), 0.0f, 1.0f);
+          } else if (pos.y < start.y && right->pos.y > start.y) {
+            // Edge crosses start.y
+            float a = glm::clamp((start.y - pos.y) / (right->pos.y - pos.y),
+                                 0.0f, 1.0f);
             const float x = glm::mix(pos.x, right->pos.x, a);
             const VertItr p = pos.x < right->pos.x ? right : left->right;
             return std::make_pair(p, x);
           }
         }
       }
-      // Edge does not cross y going up
+      // Edge does not cross start.y going up
       return std::make_pair(left, std::numeric_limits<float>::infinity());
     }
 
@@ -629,7 +632,7 @@ class EarClip {
 
     auto CheckEdge = [&](VertItr edge) {
       const std::pair<VertItr, float> pair =
-          edge->InterpY2X(start->pos.y, onTop, precision_);
+          edge->InterpY2X(start->pos, onTop, precision_);
       const float x = pair.second;
       // This ensures we capture all valid edges, but will choose the same
       // edge as precision == 0 would, if possible.
