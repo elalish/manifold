@@ -372,6 +372,10 @@ class EarClip {
       float d = glm::determinant(glm::mat2(unit, v->pos - pos));
       if (glm::abs(d) < precision) {
         d = glm::determinant(glm::mat2(unit, v->right->pos - pos));
+        if (d < precision) {
+          d = glm::max(d,
+                       glm::determinant(glm::mat2(unit, v->left->pos - pos)));
+        }
         return d < precision ? kBest : d;
       }
       return d;
@@ -393,9 +397,7 @@ class EarClip {
 
       const float openCost =
           glm::determinant(glm::mat2(openSide, v->pos - right->pos));
-      return (cost == 0 && glm::abs(openCost) < precision)
-                 ? kBest  // Not inside the ear
-                 : cost = glm::min(cost, openCost);
+      return glm::min(cost, openCost);
     }
 
     // For verts outside the ear, apply a cost based on the Delaunay condition
@@ -426,13 +428,16 @@ class EarClip {
       if (CCW(pos, left->pos, right->pos, precision) == 0) {
         return totalCost < -1 ? kBest : 0;
       }
-      VertItr test = right;
+      VertItr test = right->right;
       while (test != left) {
-        float cost = Cost(test, openSide, precision);
-        if (cost < -precision) {
-          cost = DelaunayCost(test->pos - center, scale, precision);
+        if (test->mesh_idx != mesh_idx && test->mesh_idx != left->mesh_idx &&
+            test->mesh_idx != right->mesh_idx) {  // Skip duplicated verts
+          float cost = Cost(test, openSide, precision);
+          if (cost < -precision) {
+            cost = DelaunayCost(test->pos - center, scale, precision);
+          }
+          totalCost = glm::max(totalCost, cost);
         }
-        totalCost = glm::max(totalCost, cost);
 
         test = test->right;
       }
