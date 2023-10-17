@@ -638,7 +638,7 @@ class EarClip {
       // edge as precision == 0 would, if possible.
       if (glm::isfinite(x) && x > startX - precision_ &&
           (!glm::isfinite(minX) || (x >= startX && x < minX) ||
-           (minX < startX && x > minX))) {
+           (minX < startX && x > minX && x < startX + precision_))) {
         minX = x;
         connector = pair.first;
       }
