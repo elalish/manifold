@@ -107,6 +107,16 @@ class VecView {
 
   bool empty() const { return size_ == 0; }
 
+#ifdef MANIFOLD_DEBUG
+  void Dump() {
+    std::cout << "Vec = " << std::endl;
+    for (int i = 0; i < size(); ++i) {
+      std::cout << i << ", " << ptr_[i] << ", " << std::endl;
+    }
+    std::cout << std::endl;
+  }
+#endif
+
  protected:
   T *ptr_ = nullptr;
   int size_ = 0;
