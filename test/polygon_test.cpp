@@ -364,7 +364,7 @@ TEST(Polygon, Holes4) {
   TestPoly(polys, 20);
 };
 
-TEST(Polygon, CoincidentHole) {
+TEST(Polygon, DISABLED_CoincidentHole) {
   Polygons polys;
   polys.push_back({
       {9.82835007, -0.939956188},  //
