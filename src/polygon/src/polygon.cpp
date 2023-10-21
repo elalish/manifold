@@ -570,13 +570,13 @@ class EarClip {
     float maxX = -std::numeric_limits<float>::infinity();
     Rect bBox;
     // Kahan summation
-    float area = 0;
-    float areaCompensation = 0;
+    double area = 0;
+    double areaCompensation = 0;
 
     auto AddPoint = [&](VertItr v) {
       bBox.Union(v->pos);
-      const float area1 = glm::determinant(glm::mat2(v->pos, v->right->pos));
-      const float t1 = area + area1;
+      const double area1 = glm::determinant(glm::dmat2(v->pos, v->right->pos));
+      const double t1 = area + area1;
       areaCompensation += (area - t1) + area1;
       area = t1;
 
@@ -593,7 +593,7 @@ class EarClip {
 
     area += areaCompensation;
     const glm::vec2 size = bBox.Size();
-    const float minArea = precision_ * glm::max(size.x, size.y);
+    const double minArea = precision_ * glm::max(size.x, size.y);
 
     if (area < -minArea) {
       holes_.insert(start);
