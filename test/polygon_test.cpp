@@ -364,6 +364,25 @@ TEST(Polygon, Holes4) {
   TestPoly(polys, 20);
 };
 
+TEST(Polygon, SmallHole) {
+  Polygons polys;
+  polys.push_back({
+      {8.93379593, -41.2573624},  //
+      {10.5178413, -41.2440758},  //
+      {8.99354267, -41.1997375},  //
+  });
+  polys.push_back({
+      {9.08317471, -41.2453728},  //
+      {9.08610725, -41.242527},   //
+      {9.0890007, -41.2397537},   //
+      {9.08943081, -41.2436409},  //
+      {9.08946514, -41.2439499},  //
+      {9.08924961, -41.2441826},  //
+      {9.0890007, -41.2444496},   //
+  });
+  TestPoly(polys, 10);
+};
+
 TEST(Polygon, DISABLED_CoincidentHole) {
   Polygons polys;
   polys.push_back({
