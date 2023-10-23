@@ -363,12 +363,8 @@ class EarClip {
     float SignedDist(VertItr v, glm::vec2 unit, float precision) const {
       float d = glm::determinant(glm::mat2(unit, v->pos - pos));
       if (glm::abs(d) < precision) {
-        d = glm::determinant(glm::mat2(unit, v->right->pos - pos));
-        if (d < precision) {
-          d = glm::max(d,
-                       glm::determinant(glm::mat2(unit, v->left->pos - pos)));
-        }
-        return d < precision ? kBest : d;
+        d = glm::max(d, glm::determinant(glm::mat2(unit, v->right->pos - pos)));
+        d = glm::max(d, glm::determinant(glm::mat2(unit, v->left->pos - pos)));
       }
       return d;
     }
@@ -418,6 +414,7 @@ class EarClip {
 
       float totalCost = glm::dot(left->rightDir, rightDir) - 1 - precision;
       if (CCW(pos, left->pos, right->pos, precision) == 0) {
+        // Clip folded ears first
         return totalCost < -1 ? kBest : 0;
       }
       VertItr test = right->right;
