@@ -443,13 +443,17 @@ class EarClip {
     }
   };
 
+  glm::vec2 SafeNormalize(glm::vec2 v) const {
+    glm::vec2 n = glm::normalize(v);
+    return glm::isfinite(n.x) ? n : glm::vec2(0, 0);
+  }
+
   // This function and JoinPolygons are the only functions that affect the
   // circular list data structure. This helps ensure it remains circular.
   void Link(VertItr left, VertItr right) const {
     left->right = right;
     right->left = left;
-    left->rightDir = glm::normalize(right->pos - left->pos);
-    if (!glm::isfinite(left->rightDir.x)) left->rightDir = {0, 0};
+    left->rightDir = SafeNormalize(right->pos - left->pos);
   }
 
   // When an ear vert is clipped, its neighbors get linked, so they get unlinked
@@ -699,9 +703,10 @@ class EarClip {
                            int onTop) {
     const float p2 = precision_ * precision_;
     const float above = guess->pos.y > start->pos.y ? 1 : -1;
-    const glm::vec2 left = start->pos - guess->pos;
-    const glm::vec2 right = intersection - guess->pos;
+    glm::vec2 left = start->pos - guess->pos;
+    const glm::vec2 right = SafeNormalize(intersection - guess->pos);
     float minD2 = glm::dot(left, left);
+    left = SafeNormalize(left);
     VertItr best = guess;
 
     auto CheckVert = [&](VertItr vert) {

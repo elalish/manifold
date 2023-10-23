@@ -435,6 +435,25 @@ TEST(Polygon, CoincidentHole3) {
   TestPoly(polys, 9, 0.0002);
 };
 
+TEST(Polygon, CoincidentHole4) {
+  Polygons polys;
+  polys.push_back({
+      {1.44564819, 9.71884632},  //
+      {1.48651409, 9.71884632},  //
+      {1.44735146, 9.76247501},  //
+  });
+  polys.push_back({
+      {1.4456495, 9.71884632},   //
+      {1.44564915, 9.71884632},  //
+      {1.44564879, 9.71884632},  //
+      {1.44564819, 9.71884632},  //
+      {1.44586205, 9.72430038},  //
+      {1.44992185, 9.72319221},  //
+      {1.44936395, 9.71884632},  //
+  });
+  TestPoly(polys, 10, 0.0002);
+};
+
 TEST(Polygon, Colinear) {
   Polygons polys;
   polys.push_back({
