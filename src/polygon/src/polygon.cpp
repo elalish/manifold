@@ -256,7 +256,7 @@ class EarClip {
 
     bool IsShort(float precision) const {
       const glm::vec2 edge = right->pos - pos;
-      return glm::dot(edge, edge) < precision * precision;
+      return glm::dot(edge, edge) * 4 < precision * precision;
     }
 
     // Like CCW, returns 1 if v is on the inside of the angle formed at this

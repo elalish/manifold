@@ -383,6 +383,20 @@ TEST(Polygon, SmallHole) {
   TestPoly(polys, 10);
 };
 
+TEST(Polygon, Precision4) {
+  Polygons polys;
+  polys.push_back({
+      {-7.57671118, -12.7964983},  //
+      {-7.57698059, -12.796319},   //
+      {-7.57698631, -12.7967968},  //
+      {-7.63940859, -12.9102335},  //
+      {-7.58357, -12.7919359},     //
+      {-7.58663845, -12.7898951},  //
+      {-7.63940859, -12.9102335},  //
+  });
+  TestPoly(polys, 5, 0.0004);
+};
+
 TEST(Polygon, DISABLED_CoincidentHole) {
   Polygons polys;
   polys.push_back({
