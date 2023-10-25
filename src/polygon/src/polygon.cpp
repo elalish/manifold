@@ -424,6 +424,10 @@ class EarClip {
       openSide = glm::normalize(openSide);
 
       float totalCost = glm::dot(left->rightDir, rightDir) - 1 - precision;
+      if (CCW(pos, left->pos, right->pos, precision) == 0) {
+        // Clip folded ears first
+        return totalCost < -1 ? kBest : 0;
+      }
       VertItr test = right->right;
       while (test != left) {
         if (test->mesh_idx != mesh_idx && test->mesh_idx != left->mesh_idx &&
@@ -666,11 +670,13 @@ class EarClip {
   VertItr FindCloserBridge(VertItr start, VertItr edge, int onTop) {
     const float p2 = precision_ * precision_;
     VertItr best = edge->pos.x > edge->right->pos.x ? edge : edge->right;
+    const float maxX = best->pos.x;
     const float above = best->pos.y > start->pos.y ? 1 : -1;
 
     auto CheckVert = [&](VertItr vert) {
       const float inside = above * CCW(start->pos, vert->pos, best->pos, 0);
       if (vert->pos.x > start->pos.x - precision_ &&
+          vert->pos.x < maxX + precision_ &&
           vert->pos.y * above > start->pos.y * above - precision_ &&
           (inside > 0 || (inside == 0 && vert->pos.x < best->pos.x)) &&
           vert->InsideEdge(edge, precision_, true) &&
