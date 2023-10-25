@@ -163,11 +163,9 @@ TEST(Boolean, Coplanar) {
   MeshGL cylinderGL = WithPositionColors(cylinder);
   cylinder = Manifold(cylinderGL);
 
-  Manifold cylinder2 = cylinder.Scale({0.5f, 0.5f, 1.0f})
-                           .Rotate(0, 0, 15)
-                           .Translate({0.25f, 0.25f, 0.0f});
+  Manifold cylinder2 = cylinder.Scale({0.8f, 0.8f, 1.0f}).Rotate(0, 0, 5);
   Manifold out = cylinder - cylinder2;
-  ExpectMeshes(out, {{32, 64, 3, 49}});
+  ExpectMeshes(out, {{32, 64, 3, 48}});
   EXPECT_EQ(out.NumDegenerateTris(), 0);
   EXPECT_EQ(out.Genus(), 1);
 
@@ -189,11 +187,9 @@ TEST(Boolean, CoplanarProp) {
   MeshGL cylinderGL = WithIndexColors(cylinder.GetMesh());
   cylinder = Manifold(cylinderGL);
 
-  Manifold cylinder2 = cylinder.Scale({0.5f, 0.5f, 1.0f})
-                           .Rotate(0, 0, 15)
-                           .Translate({0.25f, 0.25f, 0.0f});
+  Manifold cylinder2 = cylinder.Scale({0.8f, 0.8f, 1.0f}).Rotate(0, 0, 5);
   Manifold out = cylinder - cylinder2;
-  ExpectMeshes(out, {{42, 84, 3, 68}});
+  ExpectMeshes(out, {{52, 104, 3, 88}});
   EXPECT_EQ(out.NumDegenerateTris(), 0);
   EXPECT_EQ(out.Genus(), 1);
 

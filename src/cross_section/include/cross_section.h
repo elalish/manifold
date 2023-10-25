@@ -24,8 +24,6 @@
 
 namespace manifold {
 
-class Rect;
-
 /** @addtogroup Core
  *  @{
  */
@@ -170,66 +168,6 @@ class CrossSection {
   mutable glm::mat3x2 transform_ = glm::mat3x2(1.0f);
   CrossSection(std::shared_ptr<const PathImpl> paths);
   std::shared_ptr<const PathImpl> GetPaths() const;
-};
-/** @} */
-
-/** @addtogroup Connections
- *  @{
- */
-
-/**
- * Axis-aligned rectangular bounds.
- */
-class Rect {
- public:
-  glm::vec2 min = glm::vec2(0);
-  glm::vec2 max = glm::vec2(0);
-
-  /** @name Creation
-   *  Constructors
-   */
-  ///@{
-  Rect();
-  ~Rect();
-  Rect(const Rect& other);
-  Rect& operator=(const Rect& other);
-  Rect(Rect&&) noexcept;
-  Rect& operator=(Rect&&) noexcept;
-  Rect(const glm::vec2 a, const glm::vec2 b);
-  ///@}
-
-  /** @name Information
-   *  Details of the rectangle
-   */
-  ///@{
-  glm::vec2 Size() const;
-  float Area() const;
-  float Scale() const;
-  glm::vec2 Center() const;
-  bool Contains(const glm::vec2& pt) const;
-  bool Contains(const Rect& other) const;
-  bool DoesOverlap(const Rect& other) const;
-  bool IsEmpty() const;
-  bool IsFinite() const;
-  ///@}
-
-  /** @name Modification
-   */
-  ///@{
-  void Union(const glm::vec2 p);
-  Rect Union(const Rect& other) const;
-  Rect operator+(const glm::vec2 shift) const;
-  Rect& operator+=(const glm::vec2 shift);
-  Rect operator*(const glm::vec2 scale) const;
-  Rect& operator*=(const glm::vec2 scale);
-  Rect Transform(const glm::mat3x2& m) const;
-  ///@}
-
-  /** @name Conversion
-   */
-  ///@{
-  CrossSection AsCrossSection() const;
-  ///@}
 };
 /** @} */
 }  // namespace manifold

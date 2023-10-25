@@ -18,6 +18,7 @@
 #endif
 
 #include <algorithm>
+#include <numeric>
 #if MANIFOLD_PAR == 'T' && TBB_INTERFACE_VERSION >= 10000 && \
     __has_include(<pstl/glue_execution_defs.h>)
 #include <execution>
@@ -38,40 +39,12 @@ using namespace manifold;
 
 static ExecutionParams params;
 
+constexpr float kBest = -std::numeric_limits<float>::infinity();
+
 #ifdef MANIFOLD_DEBUG
 struct PolyEdge {
   int startVert, endVert;
 };
-
-bool OverlapAssert(bool condition, const char *file, int line,
-                   const std::string &cond, const std::string &msg) {
-  if (!params.processOverlaps) {
-    ASSERT(condition, geometryErr, msg);
-  }
-  return condition;
-}
-
-/**
- * Only use directly inside of the SweepForward() and SweepBack() functions! If
- * the asserted condition is false, it implies the monotone subdivision has
- * failed. This is most likely due to the input polygons being overlapped by
- * more than the input precision, but if not, then it indicates a bug. Either
- * way subdivision processing stops: if params.processOverlaps is false, then an
- * exception is thrown. Otherwise this returns true from the sweep function,
- * causing polygons to be left in their original state.
- *
- * The input polygons are then triangulated by the monotone triangulator, which
- * is robust enough to create a manifold triangulation for all input, but it
- * will not be geometrically-valid in this case. It may create inverted
- * triangles which are significantly larger than precision, but it depends on
- * the nature of the overlap.
- */
-#define OVERLAP_ASSERT(condition, msg)                                \
-  if (!OverlapAssert(condition, __FILE__, __LINE__, #condition, msg)) \
-    return true;
-
-#define PRINT(msg) \
-  if (params.verbose) std::cout << msg << std::endl;
 
 std::vector<PolyEdge> Polygons2Edges(const PolygonsIdx &polys) {
   std::vector<PolyEdge> halfedges;
@@ -124,15 +97,7 @@ void CheckTopology(const std::vector<PolyEdge> &halfedges) {
   for (int i = 0; i < n_edges; ++i) {
     ASSERT(forward[i].startVert == backward[i].startVert &&
                forward[i].endVert == backward[i].endVert,
-           topologyErr, "Forward and backward edge do not match.");
-    if (i > 0) {
-      ASSERT(forward[i - 1].startVert != forward[i].startVert ||
-                 forward[i - 1].endVert != forward[i].endVert,
-             topologyErr, "Not a 2-manifold.");
-      ASSERT(backward[i - 1].startVert != backward[i].startVert ||
-                 backward[i - 1].endVert != backward[i].endVert,
-             topologyErr, "Not a 2-manifold.");
-    }
+           topologyErr, "Not manifold.");
   }
 }
 
@@ -172,11 +137,11 @@ void Dump(const PolygonsIdx &polys) {
     std::cout << "});" << std::endl;
   }
   for (auto poly : polys) {
-    std::cout << "array([" << std::endl;
+    std::cout << "show(array([" << std::endl;
     for (auto v : poly) {
       std::cout << "  [" << v.pos.x << ", " << v.pos.y << "]," << std::endl;
     }
-    std::cout << "])" << std::endl;
+    std::cout << "]))" << std::endl;
   }
 }
 
@@ -192,900 +157,646 @@ void PrintFailure(const std::exception &e, const PolygonsIdx &polys,
               << triangles[j][2] << std::endl;
   }
 }
+
+#define PRINT(msg) \
+  if (params.verbose) std::cout << msg << std::endl;
 #else
-#define OVERLAP_ASSERT(condition, msg) \
-  if (!(condition)) return true;
 #define PRINT(msg)
 #endif
 
 /**
- * The class first turns input polygons into monotone polygons, then
- * triangulates them using the above class.
+ * Ear-clipping triangulator based on David Eberly's approach from Geometric
+ * Tools, but adjusted to handle epsilon-valid polygons, and including a
+ * fallback that ensures a manifold triangulation even for overlapping polygons.
+ * This is an O(n^2) algorithm, but hopefully this is not a big problem as the
+ * number of edges in a given polygon is generally much less than the number of
+ * triangles in a mesh, and relatively few faces even need triangulation.
+ *
+ * The main adjustments for robustness involve clipping the sharpest ears first
+ * (a known technique to get higher triangle quality), and doing an exhaustive
+ * search to determine ear convexity exactly if the first geometric result is
+ * within precision.
  */
-class Monotones {
+
+class EarClip {
  public:
-  Monotones(const PolygonsIdx &polys, float precision) : precision_(precision) {
-    VertItr start, last, current;
-    float bound = 0;
+  EarClip(const PolygonsIdx &polys, float precision) : precision_(precision) {
+    int numVert = 0;
     for (const SimplePolygonIdx &poly : polys) {
-      for (int i = 0; i < poly.size(); ++i) {
-        monotones_.push_back({poly[i].pos,  //
-                              poly[i].idx,  //
-                              0, monotones_.end(), monotones_.end(),
-                              activePairs_.end(), activePairs_.end()});
-        bound = glm::max(
-            bound, glm::max(glm::abs(poly[i].pos.x), glm::abs(poly[i].pos.y)));
+      numVert += poly.size();
+    }
+    polygon_.reserve(numVert + 2 * polys.size());
 
-        current = std::prev(monotones_.end());
-        if (i == 0)
-          start = current;
-        else
-          Link(last, current);
-        last = current;
-      }
-      Link(current, start);
+    std::vector<VertItr> starts = Initialize(polys);
+
+    for (VertItr v = polygon_.begin(); v != polygon_.end(); ++v) {
+      ClipIfDegenerate(v);
     }
 
-    if (precision_ < 0) precision_ = bound * kTolerance;
-
-    if (SweepForward()) return;
-    Check();
-
-    if (SweepBack()) return;
-    Check();
+    for (const VertItr first : starts) {
+      FindStart(first);
+    }
   }
 
-  void Triangulate(std::vector<glm::ivec3> &triangles) {
-    // Save the sweep-line order in the vert to check further down.
-    int i = 1;
-    for (auto &vert : monotones_) {
-      vert.index = i++;
+  std::vector<glm::ivec3> Triangulate() {
+    for (const VertItr start : holes_) {
+      CutKeyhole(start);
     }
-    int triangles_left = monotones_.size();
-    VertItr start = monotones_.begin();
-    while (start != monotones_.end()) {
-      PRINT(start->mesh_idx);
-      Triangulator triangulator(start, precision_);
-      start->SetProcessed(true);
-      VertItr vR = start->right;
-      VertItr vL = start->left;
-      while (vR != vL) {
-        // Process the neighbor vert that is next in the sweep-line.
-        if (vR->index < vL->index) {
-          PRINT(vR->mesh_idx);
-          triangulator.ProcessVert(vR, true, false, triangles);
-          vR->SetProcessed(true);
-          vR = vR->right;
-        } else {
-          PRINT(vL->mesh_idx);
-          triangulator.ProcessVert(vL, false, false, triangles);
-          vL->SetProcessed(true);
-          vL = vL->left;
-        }
-      }
-      PRINT(vR->mesh_idx);
-      triangulator.ProcessVert(vR, true, true, triangles);
-      vR->SetProcessed(true);
-      // validation
-      ASSERT(triangulator.NumTriangles() > 0, topologyErr,
-             "Monotone produced no triangles.");
-      triangles_left -= 2 + triangulator.NumTriangles();
-      // Find next monotone
-      start = std::find_if(monotones_.begin(), monotones_.end(),
-                           [](const VertAdj &v) { return !v.Processed(); });
-    }
-    ASSERT(triangles_left == 0, topologyErr,
-           "Triangulation produced wrong number of triangles.");
-  }
 
-  // A variety of sanity checks on the data structure. Expensive checks are only
-  // performed if params.intermediateChecks = true.
-  void Check() {
-#ifdef MANIFOLD_DEBUG
-    if (!params.intermediateChecks) return;
-    std::vector<PolyEdge> edges;
-    for (VertItr vert = monotones_.begin(); vert != monotones_.end(); vert++) {
-      vert->SetProcessed(false);
-      edges.push_back({vert->mesh_idx, vert->right->mesh_idx});
-      ASSERT(vert->right->right != vert, topologyErr, "two-edge monotone!");
-      ASSERT(vert->left->right == vert, topologyErr,
-             "monotone vert neighbors don't agree!");
+    for (const VertItr start : simples_) {
+      TriangulatePoly(start);
     }
-    if (params.verbose) {
-      VertItr start = monotones_.begin();
-      while (start != monotones_.end()) {
-        start->SetProcessed(true);
-        PRINT("monotone start: " << start->mesh_idx << ", " << start->pos.y);
-        VertItr v = start->right;
-        while (v != start) {
-          PRINT(v->mesh_idx << ", " << v->pos.y);
-          v->SetProcessed(true);
-          v = v->right;
-        }
-        PRINT("");
-        start = std::find_if(monotones_.begin(), monotones_.end(),
-                             [](const VertAdj &v) { return !v.Processed(); });
-      }
-    }
-#endif
+
+    return triangles_;
   }
 
   float GetPrecision() const { return precision_; }
 
  private:
-  struct VertAdj;
-  struct EdgePair;
-  enum VertType { Start, WestSide, EastSide, Merge, End, Skip };
-#if __has_include(<memory_resource>)
-  typedef std::pmr::list<VertAdj>::iterator VertItr;
-  typedef std::pmr::list<EdgePair>::iterator PairItr;
+  struct Vert;
+  typedef std::vector<Vert>::iterator VertItr;
+  struct MaxX {
+    bool operator()(const VertItr &a, const VertItr &b) const {
+      return a->pos.x > b->pos.x;
+    }
+  };
+  struct MinCost {
+    bool operator()(const VertItr &a, const VertItr &b) const {
+      return a->cost < b->cost;
+    }
+  };
+  typedef std::set<VertItr, MinCost>::iterator qItr;
 
-  std::pmr::monotonic_buffer_resource mbr;
-  std::pmr::polymorphic_allocator<int> pa{&mbr};
-  std::pmr::list<VertAdj> monotones_{pa};       // sweep-line list of verts
-  std::pmr::list<EdgePair> activePairs_{pa};    // west to east monotone edges
-  std::pmr::list<EdgePair> inactivePairs_{pa};  // completed monotones
-#else
-  typedef std::list<VertAdj>::iterator VertItr;
-  typedef std::list<EdgePair>::iterator PairItr;
+  // The flat list where all the Verts are stored. Not used much for traversal.
+  std::vector<Vert> polygon_;
+  // The set of right-most starting points, one for each negative-area contour.
+  std::multiset<VertItr, MaxX> holes_;
+  // The set of starting points, one for each positive-area contour.
+  std::vector<VertItr> outers_;
+  // The set of starting points, one for each simple polygon.
+  std::vector<VertItr> simples_;
+  // Maps each hole (by way of starting point) to its bounding box.
+  std::map<VertItr, Rect> hole2BBox_;
+  // A priority queue of valid ears - the multiset allows them to be updated.
+  std::multiset<VertItr, MinCost> earsQueue_;
+  // The output triangulation.
+  std::vector<glm::ivec3> triangles_;
+  // Working precision: max of float error and input value.
+  float precision_;
 
-  std::list<VertAdj> monotones_;       // sweep-line list of verts
-  std::list<EdgePair> activePairs_;    // west to east monotone edges
-  std::list<EdgePair> inactivePairs_;  // completed monotones
-#endif
-  float precision_;  // a triangle of this height or less is degenerate
-
-  /**
-   * This is the data structure of the polygons themselves. They are stored as a
-   * list in sweep-line order. The left and right pointers form the polygons,
-   * while the mesh_idx describes the input indices that will be transferred to
-   * the output triangulation. The edgeRight value represents an extra contraint
-   * from the mesh Boolean algorithm.
-   */
-  struct VertAdj {
-    glm::vec2 pos;
-    int mesh_idx;  // This is a global index into the manifold.
-    int index;
+  // A circularly-linked list representing the polygon(s) that still need to be
+  // triangulated. This gets smaller as ears are clipped until it degenerates to
+  // two points and terminates.
+  struct Vert {
+    int mesh_idx;
+    qItr ear;
+    glm::vec2 pos, rightDir;
     VertItr left, right;
-    PairItr eastPair, westPair;
+    float cost;
 
-    bool Processed() const { return index < 0; }
-    void SetSkip() { index = -2; }
-    void SetProcessed(bool processed) {
-      if (index == -2) return;
-      index = processed ? -1 : 0;
-    }
-    bool IsStart() const {
-      return (left->pos.y >= pos.y && right->pos.y > pos.y) ||
-             (left->pos.y == pos.y && right->pos.y == pos.y &&
-              left->pos.x <= pos.x && right->pos.x < pos.x);
-    }
-    bool IsPast(const VertItr other, float precision) const {
-      return pos.y > other->pos.y + precision;
-    }
-    bool operator<(const VertAdj &other) const { return pos.y < other.pos.y; }
-  };
-
-  /**
-   * The EdgePairs form the two active edges of a monotone polygon as they are
-   * being constructed. The sweep-line is horizontal and moves from -y to +y, or
-   * South to North. The West edge is a backwards edge while the East edge is
-   * forwards, a topological constraint. If the polygon is geometrically valid,
-   * then the West edge will also be to the -x side of the East edge, hence the
-   * name.
-   *
-   * The purpose of the certainty booleans is to represent if we're sure the
-   * pairs (or monotones) are in the right order. This is uncertain if they are
-   * degenerate, for instance if several active edges are colinear (within
-   * tolerance). If the order is uncertain, then as each vert is processed, if
-   * it yields new information, it can cause the order to be updated until
-   * certain.
-   */
-
-  struct EdgePair {
-    VertItr vWest, vEast, vMerge;
-    PairItr nextPair;
-    bool westCertain, eastCertain;
-
-    int WestOf(VertItr vert, float precision) const {
-      if (vEast->pos.x + precision < vert->pos.x &&
-          vEast->right->pos.x + precision < vert->pos.x)
-        return 1;
-      if (vEast->pos.x - precision > vert->pos.x &&
-          vEast->right->pos.x - precision > vert->pos.x)
-        return -1;
-      int westOf = CCW(vEast->right->pos, vEast->pos, vert->pos, precision);
-      if (westOf == 0 && !vert->right->Processed())
-        westOf =
-            CCW(vEast->right->pos, vEast->pos, vert->right->pos, precision);
-      if (westOf == 0 && !vert->left->Processed())
-        westOf = CCW(vEast->right->pos, vEast->pos, vert->left->pos, precision);
-      return westOf;
+    // Shorter than half of precision, to be conservative so that it doesn't
+    // cause CW triangles that exceed precision due to rounding error.
+    bool IsShort(float precision) const {
+      const glm::vec2 edge = right->pos - pos;
+      return glm::dot(edge, edge) * 4 < precision * precision;
     }
 
-    int EastOf(VertItr vert, float precision) const {
-      if (vWest->pos.x - precision > vert->pos.x &&
-          vWest->left->pos.x - precision > vert->pos.x)
-        return 1;
-      if (vWest->pos.x + precision < vert->pos.x &&
-          vWest->left->pos.x + precision < vert->pos.x)
-        return -1;
-      int eastOf = CCW(vWest->pos, vWest->left->pos, vert->pos, precision);
-      if (eastOf == 0 && !vert->right->Processed())
-        eastOf = CCW(vWest->pos, vWest->left->pos, vert->right->pos, precision);
-      if (eastOf == 0 && !vert->left->Processed())
-        eastOf = CCW(vWest->pos, vWest->left->pos, vert->left->pos, precision);
-      return eastOf;
-    }
-  };
-
-  /**
-   * This class takes sequential verts of a monotone polygon and outputs a
-   * geometrically valid triangulation, step by step.
-   */
-  class Triangulator {
-   public:
-    Triangulator(VertItr vert, float precision) : precision_(precision) {
-      reflex_chain_.push_back(vert);
-      other_side_ = vert;
-    }
-    int NumTriangles() const { return triangles_output_; }
-
-    /**
-     * The vert, vi, must attach to the free end (specified by onRight) of the
-     * polygon that has been input so far. The verts must also be processed in
-     * sweep-line order to get a geometrically valid result. If not, then the
-     * polygon is not monotone, as the result should be topologically valid, but
-     * not geometrically. The parameter, last, must be set true only for the
-     * final point, as this ensures the last triangle is output.
-     */
-    void ProcessVert(const VertItr vi, bool onRight, bool last,
-                     std::vector<glm::ivec3> &triangles) {
-      VertItr v_top = reflex_chain_.back();
-      if (reflex_chain_.size() < 2) {
-        reflex_chain_.push_back(vi);
-        onRight_ = onRight;
-        return;
+    // Like CCW, returns 1 if v is on the inside of the angle formed at this
+    // vert, -1 on the outside, and 0 if it's within precision of the boundary.
+    // Ensure v is more than precision from pos, as case this will not return 0.
+    int Interior(glm::vec2 v, float precision) const {
+      const glm::vec2 diff = v - pos;
+      if (glm::dot(diff, diff) < precision * precision) {
+        return 0;
       }
-      reflex_chain_.pop_back();
-      VertItr vj = reflex_chain_.back();
-      if (onRight_ == onRight && !last) {
-        // This only creates enough triangles to ensure the reflex chain is
-        // still reflex.
-        PRINT("same chain");
-        int ccw = CCW(vi->pos, vj->pos, v_top->pos, precision_);
-        while (ccw == (onRight_ ? 1 : -1) || ccw == 0) {
-          AddTriangle(triangles, vi, vj, v_top);
-          v_top = vj;
-          reflex_chain_.pop_back();
-          if (reflex_chain_.empty()) break;
-          vj = reflex_chain_.back();
-          ccw = CCW(vi->pos, vj->pos, v_top->pos, precision_);
-        }
-        reflex_chain_.push_back(v_top);
-        reflex_chain_.push_back(vi);
-      } else {
-        // This branch empties the reflex chain and switches sides. It must be
-        // used for the last point, as it will output all the triangles
-        // regardless of geometry.
-        PRINT("different chain");
-        onRight_ = !onRight_;
-        VertItr v_last = v_top;
-        while (!reflex_chain_.empty()) {
-          vj = reflex_chain_.back();
-          AddTriangle(triangles, vi, v_last, vj);
-          v_last = vj;
-          reflex_chain_.pop_back();
-        }
-        reflex_chain_.push_back(v_top);
-        reflex_chain_.push_back(vi);
-        other_side_ = v_top;
-      }
+      return CCW(pos, left->pos, right->pos, precision) +
+             CCW(pos, right->pos, v, precision) +
+             CCW(pos, v, left->pos, precision);
     }
 
-   private:
-    std::vector<VertItr> reflex_chain_;
-    VertItr other_side_;  // The end vertex across from the reflex chain
-    bool onRight_;        // The side the reflex chain is on
-    int triangles_output_ = 0;
-    const float precision_;
+    // Returns true if Vert is on the inside of the edge that goes from tail to
+    // tail->right. This will walk the edges if necessary until a clear answer
+    // is found (beyond precision). If toLeft is true, this Vert will walk its
+    // edges to the left. This should be chosen so that the edges walk in the
+    // same general direction - tail always walks to the right.
+    bool InsideEdge(VertItr tail, float precision, bool toLeft) const {
+      const float p2 = precision * precision;
+      VertItr nextL = left->right;
+      VertItr nextR = tail->right;
+      VertItr center = tail;
+      VertItr last = center;
 
-    void AddTriangle(std::vector<glm::ivec3> &triangles, VertItr v0, VertItr v1,
-                     VertItr v2) {
-      if (!onRight_) std::swap(v1, v2);
-      triangles.emplace_back(v0->mesh_idx, v1->mesh_idx, v2->mesh_idx);
-      ++triangles_output_;
-      PRINT(triangles.back());
-    }
-  };
-
-  void Link(VertItr left, VertItr right) {
-    left->right = right;
-    right->left = left;
-  }
-
-  void SetVWest(PairItr pair, VertItr vert) {
-    pair->vWest = vert;
-    vert->eastPair = pair;
-  }
-
-  void SetVEast(PairItr pair, VertItr vert) {
-    pair->vEast = vert;
-    vert->westPair = pair;
-  }
-
-  void SetEastCertainty(PairItr westPair, bool certain) {
-    westPair->eastCertain = certain;
-    std::next(westPair)->westCertain = certain;
-  }
-
-  PairItr GetPair(VertItr vert, VertType type) const {
-    // Merge returns westPair, as this is the one that will be removed.
-    return type == WestSide ? vert->eastPair : vert->westPair;
-  }
-
-  bool Coincident(glm::vec2 p0, glm::vec2 p1) const {
-    glm::vec2 sep = p0 - p1;
-    return glm::dot(sep, sep) < precision_ * precision_;
-  }
-
-  void CloseEnd(VertItr vert) {
-    PairItr eastPair = vert->right->eastPair;
-    PairItr westPair = vert->left->westPair;
-    SetVWest(eastPair, vert);
-    SetVEast(westPair, vert);
-    westPair->westCertain = true;
-    westPair->eastCertain = true;
-  }
-
-  /**
-   * This function is shared between the forward and backward sweeps and
-   * determines the topology of the vertex relative to the sweep line.
-   */
-  VertType ProcessVert(VertItr vert) {
-    PairItr eastPair = vert->right->eastPair;
-    PairItr westPair = vert->left->westPair;
-    if (vert->right->Processed()) {
-      if (vert->left->Processed()) {
-        if (westPair == eastPair) {
-          // facing in
-          PRINT("End");
-          CloseEnd(vert);
-          return End;
-        } else if (!eastPair->westCertain || !westPair->eastCertain ||
-                   (westPair != activePairs_.end() &&
-                    std::next(westPair) == eastPair)) {
-          if (!eastPair->westCertain)
-            activePairs_.splice(std::next(westPair), activePairs_, eastPair);
-          if (!westPair->eastCertain)
-            activePairs_.splice(eastPair, activePairs_, westPair);
-          // facing out
-          PRINT("Merge");
-          CloseEnd(vert);
-          // westPair will be removed and eastPair takes over.
-          SetVWest(eastPair, westPair->vWest);
-          return Merge;
-        } else {  // not neighbors
-          PRINT("Skip");
-          return Skip;
-        }
-      } else {
-        if (!vert->IsPast(vert->right, precision_) &&
-            !eastPair->vEast->right->IsPast(vert, precision_) &&
-            vert->IsPast(eastPair->vEast, precision_) &&
-            vert->pos.x > eastPair->vEast->right->pos.x + precision_) {
-          PRINT("Skip WEST");
-          return Skip;
-        }
-        SetVWest(eastPair, vert);
-        PRINT("WestSide");
-        return WestSide;
-      }
-    } else {
-      if (vert->left->Processed()) {
-        if (!vert->IsPast(vert->left, precision_) &&
-            !westPair->vWest->left->IsPast(vert, precision_) &&
-            vert->IsPast(westPair->vWest, precision_) &&
-            vert->pos.x < westPair->vWest->left->pos.x - precision_) {
-          PRINT("Skip EAST");
-          return Skip;
-        }
-        SetVEast(westPair, vert);
-        PRINT("EastSide");
-        return EastSide;
-      } else {
-        PRINT("Start");
-        return Start;
-      }
-    }
-  }
-
-  /**
-   * Remove this pair, but save it and mark the pair it was next to. When the
-   * reverse sweep happens, it will be placed next to its last neighbor instead
-   * of using geometry.
-   */
-  void RemovePair(PairItr pair) {
-    pair->nextPair = std::next(pair);
-    inactivePairs_.splice(inactivePairs_.end(), activePairs_, pair);
-  }
-
-  /**
-   * When vert is a Start, this determines if it is backwards (forming a void or
-   * hole). Usually the first return is adequate, but if it is degenerate, the
-   * function will continue to search up the neighbors until the degeneracy is
-   * broken and a certain answer is returned. Like CCW, this function returns 1
-   * for a hole, -1 for a start, and 0 only if the entire polygon degenerates to
-   * a line.
-   */
-  int IsHole(VertItr vert) const {
-    VertItr left = vert->left;
-    VertItr right = vert->right;
-    VertItr center = vert;
-    // TODO: if left or right is Processed(), determine from east/west
-    while (left != right) {
-      if (Coincident(left->pos, center->pos)) {
-        left = left->left;
-        continue;
-      }
-      if (Coincident(right->pos, center->pos)) {
-        right = right->right;
-        continue;
-      }
-      if (Coincident(left->pos, right->pos)) {
-        vert = center;
-        center = left;
-        left = left->left;
-        if (left == right) break;
-        right = right->right;
-        continue;
-      }
-      int isHole = CCW(right->pos, center->pos, left->pos, precision_);
-      if (center != vert) {
-        isHole += CCW(left->pos, center->pos, vert->pos, precision_) +
-                  CCW(vert->pos, center->pos, right->pos, precision_);
-      }
-      if (isHole != 0) return isHole;
-
-      glm::vec2 edgeLeft = left->pos - center->pos;
-      glm::vec2 edgeRight = right->pos - center->pos;
-      if (glm::dot(edgeLeft, edgeRight) > 0) {
-        if (glm::dot(edgeLeft, edgeLeft) < glm::dot(edgeRight, edgeRight)) {
-          center = left;
-          left = left->left;
-        } else {
-          center = right;
-          right = right->right;
-        }
-      } else {
-        if (left->pos.y < right->pos.y) {
-          left = left->left;
-        } else {
-          right = right->right;
-        }
-      }
-    }
-    return 0;
-  }
-
-  /**
-   * If the simple polygon connected to the input vert degenerates to a single
-   * line (more strict than IsHole==0), then any triangulation is admissible,
-   * since every possible triangle will be degenerate.
-   */
-  bool IsColinearPoly(const VertItr start) const {
-    VertItr vert = start;
-    VertItr left = start;
-    VertItr right = left->right;
-    // Find the longest edge to improve error
-    float length2 = 0;
-    while (right != start) {
-      glm::vec2 edge = left->pos - right->pos;
-      const float l2 = glm::dot(edge, edge);
-      if (l2 > length2) {
-        length2 = l2;
-        vert = left;
-      }
-      left = right;
-      right = right->right;
-    }
-
-    right = vert->right;
-    left = vert->left;
-    while (left != vert) {
-      if (CCW(left->pos, vert->pos, right->pos, precision_) != 0) return false;
-      left = left->left;
-    }
-    return true;
-  }
-
-  /**
-   * Causes the verts of the simple polygon attached to the input vert to be
-   * skipped during the forward and backward sweeps, causing this polygon to be
-   * triangulated as though it is monotone.
-   */
-  void SkipPoly(VertItr vert) {
-    vert->SetSkip();
-    VertItr right = vert->right;
-    while (right != vert) {
-      right->SetSkip();
-      right = right->right;
-    }
-  }
-
-  /**
-   * A backwards pair (hole) must be interior to a forwards pair for geometric
-   * validity. In this situation, this function is used to swap their east edges
-   * such that they become forward neighbor pairs. The outside becomes westPair
-   * and inside becomes eastPair.
-   */
-  void SwapHole(PairItr outside, PairItr inside) {
-    VertItr tmp = outside->vEast;
-    SetVEast(outside, inside->vEast);
-    SetVEast(inside, tmp);
-    inside->eastCertain = outside->eastCertain;
-
-    activePairs_.splice(std::next(outside), activePairs_, inside);
-    SetEastCertainty(outside, true);
-  }
-
-  /**
-   * This is the key function for handling east-west degeneracies, and is the
-   * purpose of running the sweep-line forwards and backwards. If the ordering
-   * of inputPair is uncertain, this function uses the edge ahead of vert to
-   * check if this new bit of geometric information is enough to place the pair
-   * with certainty. It can also invert the pair if it is determined to be a
-   * hole, in which case the inputPair becomes the eastPair while the pair it is
-   * inside of becomes the westPair.
-   *
-   * This function normally returns false, but will instead return true if the
-   * certainties conflict, indicating this vertex is not yet geometrically valid
-   * and must be skipped.
-   */
-  bool ShiftEast(const VertItr vert, const PairItr inputPair,
-                 const bool isHole) {
-    if (inputPair->eastCertain) return false;
-
-    PairItr potentialPair = std::next(inputPair);
-    while (potentialPair != activePairs_.end()) {
-      const int EastOf = potentialPair->EastOf(vert, precision_);
-      // This does not trigger a skip because ShiftWest may still succeed, and
-      // if not it will mark the skip.
-      if (EastOf > 0 && isHole) return false;
-
-      if (EastOf >= 0 && !isHole) {  // in the right place
-        activePairs_.splice(potentialPair, activePairs_, inputPair);
-        SetEastCertainty(inputPair, EastOf != 0);
-        return false;
-      }
-
-      const int outside = potentialPair->WestOf(vert, precision_);
-      if (outside <= 0 && isHole) {  // certainly a hole
-        SwapHole(potentialPair, inputPair);
-        return false;
-      }
-      ++potentialPair;
-    }
-    if (isHole) return true;
-
-    if (activePairs_.size() > 1) {
-      activePairs_.splice(activePairs_.end(), activePairs_, inputPair);
-      inputPair->eastCertain =
-          std::prev(inputPair)->WestOf(vert, precision_) > 0;
-    } else {
-      inputPair->eastCertain = true;
-    }
-    return false;
-  }
-
-  /**
-   * Identical to the above function, but swapped to search westward instead.
-   */
-  bool ShiftWest(const VertItr vert, const PairItr inputPair,
-                 const bool isHole) {
-    if (inputPair->westCertain) return false;
-
-    PairItr potentialPair = inputPair;
-    while (potentialPair != activePairs_.begin()) {
-      --potentialPair;
-      const int WestOf = potentialPair->WestOf(vert, precision_);
-      if (WestOf > 0 && isHole) return true;
-
-      if (WestOf >= 0 && !isHole) {  // in the right place
-        SetEastCertainty(potentialPair, WestOf != 0);
-        if (++potentialPair != inputPair)
-          activePairs_.splice(potentialPair, activePairs_, inputPair);
-        return false;
-      }
-
-      const int outside = potentialPair->EastOf(vert, precision_);
-      if (outside <= 0 && isHole) {  // certainly a hole
-        SwapHole(potentialPair, inputPair);
-        return false;
-      }
-    }
-    if (isHole) return true;
-
-    activePairs_.splice(activePairs_.begin(), activePairs_, inputPair);
-
-    const PairItr eastPair = std::next(inputPair);
-    if (eastPair != activePairs_.end()) {
-      inputPair->westCertain = eastPair->EastOf(vert, precision_) > 0;
-    } else {
-      inputPair->westCertain = true;
-    }
-
-    return false;
-  }
-
-  /**
-   * This function sweeps forward (South to North) keeping track of the
-   * monotones and reordering degenerates (monotone ordering in the x-direction
-   * and sweep line ordering in the y-direction). The input polygons
-   * (monotones_) is not changed during this process.
-   */
-  bool SweepForward() {
-    // Reversed so that minimum element is at queue.top() / vector.back().
-    auto cmp = [](VertItr a, VertItr b) { return *b < *a; };
-    std::priority_queue<VertItr, std::vector<VertItr>, decltype(cmp)>
-        nextAttached(cmp);
-
-    std::vector<VertItr> starts;
-    for (VertItr v = monotones_.begin(); v != monotones_.end(); v++) {
-      if (v->IsStart()) {
-        starts.push_back(v);
-      }
-    }
-#if MANIFOLD_PAR == 'T' && TBB_INTERFACE_VERSION >= 10000 && \
-    __has_include(<pstl/glue_execution_defs.h>)
-    std::stable_sort(std::execution::par_unseq, starts.begin(), starts.end(),
-                     cmp);
-#else
-    std::stable_sort(starts.begin(), starts.end(), cmp);
-#endif
-
-    std::vector<VertItr> skipped;
-    VertItr insertAt = monotones_.begin();
-
-    while (insertAt != monotones_.end()) {
-      // fallback for completely degenerate polygons that have no starts.
-      VertItr vert = insertAt;
-      if (!nextAttached.empty() &&
-          (starts.empty() ||
-           !nextAttached.top()->IsPast(starts.back(), precision_))) {
-        // Prefer neighbors, which may process starts without needing a new
-        // pair.
-        vert = nextAttached.top();
-        nextAttached.pop();
-      } else if (!starts.empty()) {
-        // Create a new pair with the next vert from the sorted list of starts.
-        vert = starts.back();
-        starts.pop_back();
-      } else {
-        ++insertAt;
-      }
-
-      PRINT("mesh_idx = " << vert->mesh_idx);
-
-      if (vert->Processed()) continue;
-
-      OVERLAP_ASSERT(
-          skipped.empty() || !vert->IsPast(skipped.back(), precision_),
-          "Not Geometrically Valid! None of the skipped verts is valid.");
-
-      VertType type = ProcessVert(vert);
-
-      PairItr newPair = activePairs_.end();
-      bool isHole = false;
-      if (type == Start) {
-        newPair = activePairs_.insert(
-            activePairs_.begin(),
-            {vert, vert, monotones_.end(), activePairs_.end(), false, false});
-        SetVWest(newPair, vert);
-        SetVEast(newPair, vert);
-        const int hole = IsHole(vert);
-        if (hole == 0 && IsColinearPoly(vert)) {
-          PRINT("Skip colinear polygon");
-          SkipPoly(vert);
-          activePairs_.erase(newPair);
+      while (nextL != nextR && tail != nextR) {
+        const glm::vec2 edgeL = nextL->pos - center->pos;
+        const float l2 = glm::dot(edgeL, edgeL);
+        if (l2 <= p2) {
+          nextL = toLeft ? nextL->left : nextL->right;
           continue;
         }
-        isHole = hole > 0;
-      }
 
-      const PairItr pair = GetPair(vert, type);
-      OVERLAP_ASSERT(type == Skip || pair != activePairs_.end(),
-                     "No active pair!");
-
-      if (type != Skip && ShiftEast(vert, pair, isHole)) type = Skip;
-      if (type != Skip && ShiftWest(vert, pair, isHole)) type = Skip;
-
-      if (type == Skip) {
-        OVERLAP_ASSERT(std::next(insertAt) != monotones_.end(),
-                       "Not Geometrically Valid! Tried to skip final vert.");
-        OVERLAP_ASSERT(
-            !nextAttached.empty() || !starts.empty(),
-            "Not Geometrically Valid! Tried to skip last queued vert.");
-        skipped.push_back(vert);
-        PRINT("Skipping vert");
-        // If a new pair was added, remove it.
-        if (newPair != activePairs_.end()) {
-          activePairs_.erase(newPair);
-          vert->westPair = activePairs_.end();
-          vert->eastPair = activePairs_.end();
+        const glm::vec2 edgeR = nextR->pos - center->pos;
+        const float r2 = glm::dot(edgeR, edgeR);
+        if (r2 <= p2) {
+          nextR = nextR->right;
+          continue;
         }
-        continue;
+
+        const glm::vec2 vecLR = nextR->pos - nextL->pos;
+        const float lr2 = glm::dot(vecLR, vecLR);
+        if (lr2 <= p2) {
+          last = center;
+          center = nextL;
+          nextL = toLeft ? nextL->left : nextL->right;
+          if (nextL == nextR) break;
+          nextR = nextR->right;
+          continue;
+        }
+
+        int convexity = CCW(nextL->pos, center->pos, nextR->pos, precision);
+        if (center != last) {
+          convexity += CCW(last->pos, center->pos, nextL->pos, precision) +
+                       CCW(nextR->pos, center->pos, last->pos, precision);
+        }
+        if (convexity != 0) return convexity > 0;
+
+        if (l2 < r2) {
+          center = nextL;
+          nextL = toLeft ? nextL->left : nextL->right;
+        } else {
+          center = nextR;
+          nextR = nextR->right;
+        }
+        last = center;
       }
-
-      if (vert == insertAt)
-        ++insertAt;
-      else
-        monotones_.splice(insertAt, monotones_, vert);
-
-      switch (type) {
-        case WestSide:
-          nextAttached.push(vert->left);
-          break;
-        case EastSide:
-          nextAttached.push(vert->right);
-          break;
-        case Start:
-          nextAttached.push(vert->left);
-          nextAttached.push(vert->right);
-          break;
-        case Merge:
-          // Mark merge as hole for sweep-back.
-          pair->vMerge = vert;
-        case End:
-          RemovePair(pair);
-          break;
-        case Skip:
-          break;
-      }
-
-      vert->SetProcessed(true);
-      // Push skipped verts back into unprocessed queue.
-      while (!skipped.empty()) {
-        starts.push_back(skipped.back());
-        skipped.pop_back();
-      }
-
-#ifdef MANIFOLD_DEBUG
-      if (params.verbose) ListPairs();
-#endif
+      // The whole polygon is degenerate - consider this to be convex.
+      return true;
     }
-    return false;
-  }  // namespace
 
-  /**
-   * This is the only function that actually changes monotones_; all the rest is
-   * bookkeeping. This divides polygons by connecting two verts. It duplicates
-   * these verts to break the polygons, then attaches them across to each other
-   * with two new edges.
-   */
-  VertItr SplitVerts(VertItr north, VertItr south) {
-    // at split events, add duplicate vertices to end of list and reconnect
-    PRINT("split from " << north->mesh_idx << " to " << south->mesh_idx);
+    // A major key to robustness is to only clip convex ears, but this is
+    // difficult to determine when an edge is folded back on itself. This
+    // function walks down the kinks in a degenerate portion of a polygon until
+    // it finds a clear geometric result. In the vast majority of cases the loop
+    // will only need one or two iterations.
+    bool IsConvex(float precision) const {
+      return left->InsideEdge(left->right, precision, true);
+    }
 
-    VertItr northEast = monotones_.insert(north, *north);
-    Link(north->left, northEast);
-    northEast->SetProcessed(true);
-
-    VertItr southEast = monotones_.insert(std::next(south), *south);
-    Link(southEast, south->right);
-    southEast->SetProcessed(true);
-
-    Link(south, north);
-    Link(northEast, southEast);
-
-    return northEast;
-  }
-
-  /**
-   * This function sweeps back, splitting the input polygons
-   * into monotone polygons without doing a single geometric calculation.
-   * Instead everything is based on the topology saved from the forward sweep,
-   * primarily the relative ordering of new monotones. Even though the sweep is
-   * going back, the polygon is considered rotated, so we still refer to
-   * sweeping from South to North and the pairs as ordered from West to East
-   * (though this is now the opposite order from the forward sweep).
-   */
-  bool SweepBack() {
-    for (auto &vert : monotones_) vert.SetProcessed(false);
-
-    VertItr vert = monotones_.end();
-    while (vert != monotones_.begin()) {
-      --vert;
-
-      PRINT("mesh_idx = " << vert->mesh_idx);
-
-      if (vert->Processed()) continue;
-
-      VertType type = ProcessVert(vert);
-      OVERLAP_ASSERT(type != Skip, "Skip should not happen on reverse sweep!");
-
-      PairItr westPair = GetPair(vert, type);
-      OVERLAP_ASSERT(type == Start || westPair != activePairs_.end(),
-                     "No active pair!");
-
-      switch (type) {
-        case Merge: {
-          PairItr eastPair = std::next(westPair);
-          if (eastPair->vMerge != monotones_.end())
-            vert = SplitVerts(vert, eastPair->vMerge);
-          eastPair->vMerge = vert;
+    // This function is the core of finding a proper place to keyhole. It runs
+    // on this Vert, which represents the edge from this to right. It returns
+    // an iterator to the vert to connect to (either this or right) and a bool
+    // denoting if the edge is a valid option for a keyhole (must be upwards and
+    // cross the start.y-value).
+    //
+    // If the edge terminates within the precision band, it checks the next edge
+    // to ensure validity. No while loop is necessary because short edges have
+    // already been removed. The onTop value is 1 if the start.y-value is at the
+    // top of the polygon's bounding box, -1 if it's at the bottom, and 0
+    // otherwise. This allows proper handling of horizontal edges.
+    std::pair<VertItr, bool> InterpY2X(glm::vec2 start, int onTop,
+                                       float precision) const {
+      const auto none = std::make_pair(left, false);
+      if (pos.y < start.y && right->pos.y >= start.y) {
+        return std::make_pair(left->right, true);
+      } else if (pos.x > start.x - precision && pos.y > start.y - precision &&
+                 pos.y < start.y + precision &&
+                 Interior(start, precision) >= 0) {
+        if (onTop > 0 && left->pos.x < pos.x &&
+            left->pos.y > start.y - precision) {
+          return none;
         }
-        case End:
-          RemovePair(westPair);
-        case WestSide:
-        case EastSide:
-          if (westPair->vMerge != monotones_.end()) {
-            VertItr eastVert = SplitVerts(vert, westPair->vMerge);
-            if (type == WestSide) westPair->vWest = eastVert;
-            westPair->vMerge = monotones_.end();
+        if (onTop < 0 && right->pos.x < pos.x &&
+            right->pos.y < start.y + precision) {
+          return none;
+        }
+        const VertItr p = pos.x < right->pos.x ? right : left->right;
+        return std::make_pair(p, true);
+      }
+      // Edge does not cross start.y going up
+      return none;
+    }
+
+    // This finds the cost of this vert relative to one of the two closed sides
+    // of the ear. Points are valid even when they touch, so long as their edge
+    // goes to the outside. No need to check the other side, since all verts are
+    // processed in the EarCost loop.
+    float SignedDist(VertItr v, glm::vec2 unit, float precision) const {
+      float d = glm::determinant(glm::mat2(unit, v->pos - pos));
+      if (glm::abs(d) < precision) {
+        d = glm::max(d, glm::determinant(glm::mat2(unit, v->right->pos - pos)));
+        d = glm::max(d, glm::determinant(glm::mat2(unit, v->left->pos - pos)));
+      }
+      return d;
+    }
+
+    // Find the cost of Vert v within this ear, where openSide is the unit
+    // vector from Verts right to left - passed in for reuse.
+    float Cost(VertItr v, glm::vec2 openSide, float precision) const {
+      float cost = glm::min(SignedDist(v, rightDir, precision),
+                            SignedDist(v, left->rightDir, precision));
+
+      const float openCost =
+          glm::determinant(glm::mat2(openSide, v->pos - right->pos));
+      return glm::min(cost, openCost);
+    }
+
+    // For verts outside the ear, apply a cost based on the Delaunay condition
+    // to aid in prioritization and produce cleaner triangulations. This doesn't
+    // affect robustness, but may be adjusted to improve output.
+    float DelaunayCost(glm::vec2 diff, float scale, float precision) const {
+      return -precision - scale * glm::dot(diff, diff);
+    }
+
+    // This is the O(n^2) part of the algorithm, checking this ear against every
+    // Vert to ensure none are inside. It may be possible to improve performance
+    // by using the Collider to get it down to nlogn or doing some
+    // parallelization, but that may be more trouble than it's worth.
+    //
+    // Think of a cost as vaguely a distance metric - 0 is right on the edge of
+    // being invalid. cost > precision is definitely invalid. Cost < -precision
+    // is definitely valid, so all improvement costs are designed to always give
+    // values < -precision so they will never affect validity. The first
+    // totalCost is designed to give priority to sharper angles. Any cost < (-1
+    // - precision) has satisfied the Delaunay condition.
+    float EarCost(float precision) const {
+      glm::vec2 openSide = left->pos - right->pos;
+      const glm::vec2 center = 0.5f * (left->pos + right->pos);
+      const float scale = 4 / glm::dot(openSide, openSide);
+      openSide = glm::normalize(openSide);
+
+      float totalCost = glm::dot(left->rightDir, rightDir) - 1 - precision;
+      if (CCW(pos, left->pos, right->pos, precision) == 0) {
+        // Clip folded ears first
+        return totalCost < -1 ? kBest : 0;
+      }
+      VertItr test = right->right;
+      while (test != left) {
+        if (test->mesh_idx != mesh_idx && test->mesh_idx != left->mesh_idx &&
+            test->mesh_idx != right->mesh_idx) {  // Skip duplicated verts
+          float cost = Cost(test, openSide, precision);
+          if (cost < -precision) {
+            cost = DelaunayCost(test->pos - center, scale, precision);
           }
-          break;
-        case Start: {
-          // Due to sweeping in the opposite direction, east and west are
-          // swapped and what was the next pair is now the previous pair and
-          // begin and end are swapped.
-          PairItr eastPair = westPair;
-          westPair = eastPair->nextPair;
-          activePairs_.splice(westPair == activePairs_.end()
-                                  ? activePairs_.begin()
-                                  : std::next(westPair),
-                              inactivePairs_, eastPair);
-
-          if (eastPair->vMerge == vert) {  // Hole
-            VertItr split = westPair->vMerge != monotones_.end()
-                                ? westPair->vMerge
-                            : westPair->vWest->pos.y < westPair->vEast->pos.y
-                                ? westPair->vWest
-                                : westPair->vEast;
-            VertItr eastVert = SplitVerts(vert, split);
-            westPair->vMerge = monotones_.end();
-            eastPair->vMerge = monotones_.end();
-            SetVWest(eastPair, eastVert);
-            SetVEast(eastPair, split == westPair->vEast ? eastVert->right
-                                                        : westPair->vEast);
-            SetVEast(westPair, vert);
-          } else {  // Start
-            SetVWest(eastPair, vert);
-            SetVEast(eastPair, vert);
-          }
-          break;
+          totalCost = glm::max(totalCost, cost);
         }
-        case Skip:
-          break;
+
+        test = test->right;
+      }
+      return totalCost;
+    }
+
+    void PrintVert() const {
+#ifdef MANIFOLD_DEBUG
+      if (!params.verbose) return;
+      std::cout << "vert: " << mesh_idx << ", left: " << left->mesh_idx
+                << ", right: " << right->mesh_idx << ", cost: " << cost
+                << std::endl;
+#endif
+    }
+  };
+
+  glm::vec2 SafeNormalize(glm::vec2 v) const {
+    glm::vec2 n = glm::normalize(v);
+    return glm::isfinite(n.x) ? n : glm::vec2(0, 0);
+  }
+
+  // This function and JoinPolygons are the only functions that affect the
+  // circular list data structure. This helps ensure it remains circular.
+  void Link(VertItr left, VertItr right) const {
+    left->right = right;
+    right->left = left;
+    left->rightDir = SafeNormalize(right->pos - left->pos);
+  }
+
+  // When an ear vert is clipped, its neighbors get linked, so they get unlinked
+  // from it, but it is still linked to them.
+  bool Clipped(VertItr v) const { return v->right->left != v; }
+
+  // Apply func to each un-clipped vert in a polygon and return an un-clipped
+  // vert.
+  VertItr Loop(VertItr first, std::function<void(VertItr)> func) {
+    VertItr v = first;
+    do {
+      if (Clipped(v)) {
+        // Update first to an un-clipped vert so we will return to it instead
+        // of infinite-looping.
+        first = v->right->left;
+        if (!Clipped(first)) {
+          v = first;
+          if (v->right == v->left) {
+            return polygon_.end();
+          }
+          func(v);
+        }
+      } else {
+        if (v->right == v->left) {
+          return polygon_.end();
+        }
+        func(v);
+      }
+      v = v->right;
+    } while (v != first);
+    return v;
+  }
+
+  // Remove this vert from the circular list and output a corresponding
+  // triangle.
+  void ClipEar(VertItr ear) {
+    Link(ear->left, ear->right);
+    if (ear->left->mesh_idx != ear->mesh_idx &&
+        ear->mesh_idx != ear->right->mesh_idx &&
+        ear->right->mesh_idx != ear->left->mesh_idx) {
+      // Filter out topological degenerates, which can form in bad
+      // triangulations of polygons with holes, due to vert duplication.
+      triangles_.push_back(
+          {ear->left->mesh_idx, ear->mesh_idx, ear->right->mesh_idx});
+#ifdef MANIFOLD_DEBUG
+      if (params.verbose) {
+        std::cout << "output tri: " << ear->mesh_idx << ", "
+                  << ear->right->mesh_idx << ", " << ear->left->mesh_idx
+                  << std::endl;
+      }
+#endif
+    } else {
+      PRINT("Topological degenerate!");
+    }
+  }
+
+  // If an ear will make a degenerate triangle, clip it early to avoid
+  // difficulty in key-holing. This function is recursive, as the process of
+  // clipping may cause the neighbors to degenerate. Reflex degenerates *must
+  // not* be clipped, unless they have a short edge.
+  void ClipIfDegenerate(VertItr ear) {
+    if (Clipped(ear)) {
+      return;
+    }
+    if (ear->left == ear->right) {
+      return;
+    }
+    if (ear->IsShort(precision_) ||
+        (CCW(ear->left->pos, ear->pos, ear->right->pos, precision_) == 0 &&
+         glm::dot(ear->left->pos - ear->pos, ear->right->pos - ear->pos) > 0 &&
+         ear->IsConvex(precision_))) {
+      ClipEar(ear);
+      ClipIfDegenerate(ear->left);
+      ClipIfDegenerate(ear->right);
+    }
+  }
+
+  // Build the circular list polygon structures.
+  std::vector<VertItr> Initialize(const PolygonsIdx &polys) {
+    std::vector<VertItr> starts;
+    float bound = 0;
+    for (const SimplePolygonIdx &poly : polys) {
+      auto vert = poly.begin();
+      polygon_.push_back({vert->idx, earsQueue_.end(), vert->pos});
+      const VertItr first = std::prev(polygon_.end());
+      VertItr last = first;
+      // This is not the real rightmost start, but just an arbitrary vert for
+      // now to identify each polygon.
+      starts.push_back(first);
+
+      for (++vert; vert != poly.end(); ++vert) {
+        polygon_.push_back({vert->idx, earsQueue_.end(), vert->pos});
+        VertItr next = std::prev(polygon_.end());
+
+        bound = glm::max(
+            bound, glm::max(glm::abs(next->pos.x), glm::abs(next->pos.y)));
+
+        Link(last, next);
+        last = next;
+      }
+      Link(last, first);
+    }
+
+    if (precision_ < 0) precision_ = bound * kTolerance;
+
+    // Slightly more than enough, since each hole can cause two extra triangles.
+    triangles_.reserve(polygon_.size() + 2 * starts.size());
+    return starts;
+  }
+
+  // Find the actual rightmost starts after degenerate removal. Also calculate
+  // the polygon bounding boxes.
+  void FindStart(VertItr first) {
+    VertItr start = first;
+    float maxX = -std::numeric_limits<float>::infinity();
+    Rect bBox;
+    // Kahan summation
+    double area = 0;
+    double areaCompensation = 0;
+
+    auto AddPoint = [&](VertItr v) {
+      bBox.Union(v->pos);
+      const double area1 = glm::determinant(glm::dmat2(v->pos, v->right->pos));
+      const double t1 = area + area1;
+      areaCompensation += (area - t1) + area1;
+      area = t1;
+
+      if (!v->IsConvex(precision_) && v->pos.x > maxX) {
+        maxX = v->pos.x;
+        start = v;
+      }
+    };
+
+    if (Loop(first, AddPoint) == polygon_.end()) {
+      // No polygon left if all ears were degenerate and already clipped.
+      return;
+    }
+
+    area += areaCompensation;
+    const glm::vec2 size = bBox.Size();
+    const double minArea = precision_ * glm::max(size.x, size.y);
+
+    if (area < -minArea) {
+      holes_.insert(start);
+      hole2BBox_.insert({start, bBox});
+    } else {
+      simples_.push_back(start);
+      if (area > minArea) {
+        outers_.push_back(start);
+      }
+    }
+  }
+
+  // All holes must be key-holed (attached to an outer polygon) before ear
+  // clipping can commence. Instead of relying on sorting, which may be
+  // incorrect due to precision, we check for polygon edges both ahead and
+  // behind to ensure all valid options are found.
+  void CutKeyhole(const VertItr start) {
+    const float startX = start->pos.x;
+    const Rect bBox = hole2BBox_[start];
+    const int onTop = start->pos.y >= bBox.max.y - precision_   ? 1
+                      : start->pos.y <= bBox.min.y + precision_ ? -1
+                                                                : 0;
+    VertItr connector = polygon_.end();
+
+    auto CheckEdge = [&](VertItr edge) {
+      const std::pair<VertItr, bool> pair =
+          edge->InterpY2X(start->pos, onTop, precision_);
+      if (pair.second && start->InsideEdge(pair.first, precision_, true) &&
+          (connector == polygon_.end() ||
+           (connector->pos.y < pair.first->pos.y
+                ? pair.first->InsideEdge(connector, precision_, false)
+                : !connector->InsideEdge(pair.first, precision_, false)))) {
+        connector = pair.first;
+      }
+    };
+
+    for (const VertItr first : outers_) {
+      Loop(first, CheckEdge);
+    }
+
+    if (connector == polygon_.end()) {
+      PRINT("hole did not find an outer contour!");
+      simples_.push_back(start);
+      return;
+    }
+
+    connector = FindCloserBridge(start, connector, onTop);
+
+    JoinPolygons(start, connector);
+
+#ifdef MANIFOLD_DEBUG
+    if (params.verbose) {
+      std::cout << "connected " << start->mesh_idx << " to "
+                << connector->mesh_idx << std::endl;
+    }
+#endif
+  }
+
+  // This converts the initial guess for the keyhole location into the final one
+  // and returns it. It does so by finding any reflex verts inside the triangle
+  // containing the best connection and the initial horizontal line.
+  VertItr FindCloserBridge(VertItr start, VertItr edge, int onTop) {
+    const float p2 = precision_ * precision_;
+    VertItr best = edge->pos.x > edge->right->pos.x ? edge : edge->right;
+    const float maxX = best->pos.x;
+    const float above = best->pos.y > start->pos.y ? 1 : -1;
+
+    auto CheckVert = [&](VertItr vert) {
+      const float inside = above * CCW(start->pos, vert->pos, best->pos, 0);
+      if (vert->pos.x > start->pos.x - precision_ &&
+          vert->pos.x < maxX + precision_ &&
+          vert->pos.y * above > start->pos.y * above - precision_ &&
+          (inside > 0 || (inside == 0 && vert->pos.x < best->pos.x)) &&
+          vert->InsideEdge(edge, precision_, true) &&
+          !vert->IsConvex(precision_)) {
+        if (vert->pos.y > start->pos.y - precision_ &&
+            vert->pos.y < start->pos.y + precision_) {
+          if (onTop > 0 && vert->left->pos.x < vert->pos.x &&
+              vert->left->pos.y > start->pos.y - precision_) {
+            return;
+          }
+          if (onTop < 0 && vert->right->pos.x < vert->pos.x &&
+              vert->right->pos.y < start->pos.y + precision_) {
+            return;
+          }
+        }
+        best = vert;
+      }
+    };
+
+    for (const VertItr first : outers_) {
+      Loop(first, CheckVert);
+    }
+
+    return best;
+  }
+
+  // Creates a keyhole between the start vert of a hole and the connector vert
+  // of an outer polygon. To do this, both verts are duplicated and reattached.
+  // This process may create degenerate ears, so these are clipped if necessary
+  // to keep from confusing subsequent key-holing operations.
+  void JoinPolygons(VertItr start, VertItr connector) {
+    polygon_.push_back(*start);
+    const VertItr newStart = std::prev(polygon_.end());
+    polygon_.push_back(*connector);
+    const VertItr newConnector = std::prev(polygon_.end());
+
+    start->right->left = newStart;
+    connector->left->right = newConnector;
+    Link(start, connector);
+    Link(newConnector, newStart);
+
+    ClipIfDegenerate(start);
+    ClipIfDegenerate(newStart);
+    ClipIfDegenerate(connector);
+    ClipIfDegenerate(newConnector);
+  }
+
+  // Recalculate the cost of the Vert v ear, updating it in the queue by
+  // removing and reinserting it.
+  void ProcessEar(VertItr v) {
+    if (v->ear != earsQueue_.end()) {
+      earsQueue_.erase(v->ear);
+      v->ear = earsQueue_.end();
+    }
+    if (v->IsShort(precision_)) {
+      v->cost = kBest;
+      v->ear = earsQueue_.insert(v);
+    } else if (v->IsConvex(precision_)) {
+      v->cost = v->EarCost(precision_);
+      v->ear = earsQueue_.insert(v);
+    }
+  }
+
+  // The main ear-clipping loop. This is called once for each simple polygon -
+  // all holes have already been key-holed and joined to an outer polygon.
+  void TriangulatePoly(VertItr start) {
+    // A simple polygon always creates two fewer triangles than it has verts.
+    int numTri = -2;
+    earsQueue_.clear();
+
+    auto QueueVert = [&](VertItr v) {
+      ProcessEar(v);
+      ++numTri;
+      v->PrintVert();
+    };
+
+    VertItr v = Loop(start, QueueVert);
+    if (v == polygon_.end()) return;
+    Dump(v);
+
+    while (numTri > 0) {
+      const qItr ear = earsQueue_.begin();
+      if (ear != earsQueue_.end()) {
+        v = *ear;
+        // Cost should always be negative, generally < -precision.
+        v->PrintVert();
+        earsQueue_.erase(ear);
+      } else {
+        PRINT("No ear found!");
       }
 
-      vert->SetProcessed(true);
+      ClipEar(v);
+      --numTri;
 
-#ifdef MANIFOLD_DEBUG
-      if (params.verbose) ListPairs();
-#endif
+      ProcessEar(v->left);
+      ProcessEar(v->right);
+      // This is a backup vert that is used if the queue is empty (geometrically
+      // invalid polygon), to ensure manifoldness.
+      v = v->right;
     }
-    return false;
+
+    ASSERT(v->right == v->left, logicErr, "Triangulator error!");
+    PRINT("Finished poly");
   }
 
+  void Dump(VertItr start) const {
 #ifdef MANIFOLD_DEBUG
-  void ListPairs() const {
-    std::cout << "active edges:" << std::endl;
-    for (const EdgePair &pair : activePairs_) {
-      std::cout << (pair.westCertain ? "certain " : "uncertain ");
-      std::cout << "edge West: S = " << pair.vWest->mesh_idx
-                << ", N = " << pair.vWest->left->mesh_idx << std::endl;
-      if (&*(pair.vWest->eastPair) != &pair)
-        std::cout << "west does not point back!" << std::endl;
-
-      std::cout << (pair.eastCertain ? "certain " : "uncertain ");
-      std::cout << "edge East: S = " << pair.vEast->mesh_idx
-                << ", N = " << pair.vEast->right->mesh_idx << std::endl;
-      if (&*(pair.vEast->westPair) != &pair)
-        std::cout << "east does not point back!" << std::endl;
-    }
-  }
+    if (!params.verbose) return;
+    VertItr v = start;
+    std::cout << "show(array([" << std::endl;
+    do {
+      std::cout << "  [" << v->pos.x << ", " << v->pos.y << "],# "
+                << v->mesh_idx << ", cost: " << v->cost << std::endl;
+      v = v->right;
+    } while (v != start);
+    std::cout << "  [" << v->pos.x << ", " << v->pos.y << "],# " << v->mesh_idx
+              << std::endl;
+    std::cout << "]))" << std::endl;
 #endif
+  }
 };
 }  // namespace
 
@@ -1108,13 +819,13 @@ std::vector<glm::ivec3> TriangulateIdx(const PolygonsIdx &polys,
                                        float precision) {
   std::vector<glm::ivec3> triangles;
   try {
-    Monotones monotones(polys, precision);
-    monotones.Triangulate(triangles);
+    EarClip triangulator(polys, precision);
+    triangles = triangulator.Triangulate();
 #ifdef MANIFOLD_DEBUG
     if (params.intermediateChecks) {
       CheckTopology(triangles, polys);
       if (!params.processOverlaps) {
-        CheckGeometry(triangles, polys, 2 * monotones.GetPrecision());
+        CheckGeometry(triangles, polys, 2 * triangulator.GetPrecision());
       }
     }
   } catch (const geometryErr &e) {
