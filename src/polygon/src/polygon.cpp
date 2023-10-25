@@ -254,6 +254,8 @@ class EarClip {
     VertItr left, right;
     float cost;
 
+    // Shorter than half of precision, to be conservative so that it doesn't
+    // cause CW triangles that exceed precision due to rounding error.
     bool IsShort(float precision) const {
       const glm::vec2 edge = right->pos - pos;
       return glm::dot(edge, edge) * 4 < precision * precision;
@@ -263,28 +265,32 @@ class EarClip {
     // vert, -1 on the outside, and 0 if it's within precision of the boundary.
     // Ensure v is more than precision from pos, as case this will not return 0.
     int Interior(glm::vec2 v, float precision) const {
+      const glm::vec2 diff = v - pos;
+      if (glm::dot(diff, diff) < precision * precision) {
+        return 0;
+      }
       return CCW(pos, left->pos, right->pos, precision) +
              CCW(pos, right->pos, v, precision) +
              CCW(pos, v, left->pos, precision);
     }
 
-    // A major key to robustness is to only clip convex ears, but this is
-    // difficult to determine when an edge is folded back on itself. This
-    // function walks down the kinks in a degenerate portion of a polygon until
-    // it finds a clear geometric result. In the vast majority of cases the loop
-    // will never run, and when it does, it usually only needs one iteration.
-    bool IsConvex(float precision) const {
+    // Returns true if Vert is on the inside of the edge that goes from tail to
+    // tail->right. This will walk the edges if necessary until a clear answer
+    // is found (beyond precision). If toLeft is true, this Vert will walk its
+    // edges to the left. This should be chosen so that the edges walk in the
+    // same general direction - tail always walks to the right.
+    bool InsideEdge(VertItr tail, float precision, bool toLeft) const {
       const float p2 = precision * precision;
-      VertItr nextL = left;
-      VertItr nextR = right;
-      VertItr center = left->right;
+      VertItr nextL = left->right;
+      VertItr nextR = tail->right;
+      VertItr center = tail;
       VertItr last = center;
 
-      while (nextL != nextR) {
+      while (nextL != nextR && tail != nextR) {
         const glm::vec2 edgeL = nextL->pos - center->pos;
         const float l2 = glm::dot(edgeL, edgeL);
         if (l2 <= p2) {
-          nextL = nextL->left;
+          nextL = toLeft ? nextL->left : nextL->right;
           continue;
         }
 
@@ -300,7 +306,7 @@ class EarClip {
         if (lr2 <= p2) {
           last = center;
           center = nextL;
-          nextL = nextL->left;
+          nextL = toLeft ? nextL->left : nextL->right;
           if (nextL == nextR) break;
           nextR = nextR->right;
           continue;
@@ -315,7 +321,7 @@ class EarClip {
 
         if (l2 < r2) {
           center = nextL;
-          nextL = nextL->left;
+          nextL = toLeft ? nextL->left : nextL->right;
         } else {
           center = nextR;
           nextR = nextR->right;
@@ -326,31 +332,44 @@ class EarClip {
       return true;
     }
 
+    // A major key to robustness is to only clip convex ears, but this is
+    // difficult to determine when an edge is folded back on itself. This
+    // function walks down the kinks in a degenerate portion of a polygon until
+    // it finds a clear geometric result. In the vast majority of cases the loop
+    // will only need one or two iterations.
+    bool IsConvex(float precision) const {
+      return left->InsideEdge(left->right, precision, true);
+    }
+
     // This function is the core of finding a proper place to keyhole. It runs
     // on this Vert, which represents the edge from this to right. It returns
-    // an iterator to the vert to connect to (either this or right) and the
-    // x-value of the edge at the given start.y-level. If the edge is not a
-    // valid option for a keyhole (must be upwards and cross the start.y-value),
-    // the x-value is inf.
+    // an iterator to the vert to connect to (either this or right) and a bool
+    // denoting if the edge is a valid option for a keyhole (must be upwards and
+    // cross the start.y-value).
     //
     // If the edge terminates within the precision band, it checks the next edge
     // to ensure validity. No while loop is necessary because short edges have
     // already been removed. The onTop value is 1 if the start.y-value is at the
     // top of the polygon's bounding box, -1 if it's at the bottom, and 0
     // otherwise. This allows proper handling of horizontal edges.
-    std::pair<VertItr, float> InterpY2X(glm::vec2 start, int onTop,
-                                        float precision) const {
-      const auto none =
-          std::make_pair(left, std::numeric_limits<float>::infinity());
-      if (pos.y < right->pos.y && pos.y < start.y && right->pos.y > start.y) {
-        // Edge goes up and crosses start.y
-        if (pos.y > start.y - precision || right->pos.y < start.y + precision) {
-          return none;  // Ignore verts in the precision band.
+    std::pair<VertItr, bool> InterpY2X(glm::vec2 start, int onTop,
+                                       float precision) const {
+      const auto none = std::make_pair(left, false);
+      if (pos.y < start.y && right->pos.y >= start.y) {
+        return std::make_pair(left->right, true);
+      } else if (pos.x > start.x - precision && pos.y > start.y - precision &&
+                 pos.y < start.y + precision &&
+                 Interior(start, precision) >= 0) {
+        if (onTop > 0 && left->pos.x < pos.x &&
+            left->pos.y > start.y - precision) {
+          return none;
         }
-        float a = (start.y - pos.y) / (right->pos.y - pos.y);
-        const float x = glm::mix(pos.x, right->pos.x, a);
+        if (onTop < 0 && right->pos.x < pos.x &&
+            right->pos.y < start.y + precision) {
+          return none;
+        }
         const VertItr p = pos.x < right->pos.x ? right : left->right;
-        return std::make_pair(p, x);
+        return std::make_pair(p, true);
       }
       // Edge does not cross start.y going up
       return none;
@@ -372,16 +391,8 @@ class EarClip {
     // Find the cost of Vert v within this ear, where openSide is the unit
     // vector from Verts right to left - passed in for reuse.
     float Cost(VertItr v, glm::vec2 openSide, float precision) const {
-      const glm::vec2 offset = v->pos - pos;
-      float cost = SignedDist(v, rightDir, precision);
-      if (!glm::isfinite(cost)) {
-        return cost;  // Not inside the ear
-      }
-
-      cost = glm::min(cost, SignedDist(v, left->rightDir, precision));
-      if (!glm::isfinite(cost)) {
-        return cost;  // Not inside the ear
-      }
+      float cost = glm::min(SignedDist(v, rightDir, precision),
+                            SignedDist(v, left->rightDir, precision));
 
       const float openCost =
           glm::determinant(glm::mat2(openSide, v->pos - right->pos));
@@ -413,10 +424,6 @@ class EarClip {
       openSide = glm::normalize(openSide);
 
       float totalCost = glm::dot(left->rightDir, rightDir) - 1 - precision;
-      if (CCW(pos, left->pos, right->pos, precision) == 0) {
-        // Clip folded ears first
-        return totalCost < -1 ? kBest : 0;
-      }
       VertItr test = right->right;
       while (test != left) {
         if (test->mesh_idx != mesh_idx && test->mesh_idx != left->mesh_idx &&
@@ -617,19 +624,16 @@ class EarClip {
     const int onTop = start->pos.y >= bBox.max.y - precision_   ? 1
                       : start->pos.y <= bBox.min.y + precision_ ? -1
                                                                 : 0;
-    float minX = std::numeric_limits<float>::infinity();
     VertItr connector = polygon_.end();
 
     auto CheckEdge = [&](VertItr edge) {
-      const std::pair<VertItr, float> pair =
+      const std::pair<VertItr, bool> pair =
           edge->InterpY2X(start->pos, onTop, precision_);
-      const float x = pair.second;
-      // This ensures we capture all valid edges, but will choose the same
-      // edge as precision == 0 would, if possible.
-      if (glm::isfinite(x) && x > startX - precision_ &&
-          (!glm::isfinite(minX) || (x >= startX && x < minX) ||
-           (minX < startX && x > minX && x < startX + precision_))) {
-        minX = x;
+      if (pair.second && start->InsideEdge(pair.first, precision_, true) &&
+          (connector == polygon_.end() ||
+           (connector->pos.y < pair.first->pos.y
+                ? pair.first->InsideEdge(connector, precision_, false)
+                : !connector->InsideEdge(pair.first, precision_, false)))) {
         connector = pair.first;
       }
     };
@@ -639,17 +643,12 @@ class EarClip {
     }
 
     if (connector == polygon_.end()) {
-      connector = FindBridge(start, onTop);
-    } else {
-      connector = FindCloserBridge(start, connector,
-                                   glm::vec2(minX, start->pos.y), onTop);
-    }
-
-    if (connector == polygon_.end()) {
       PRINT("hole did not find an outer contour!");
       simples_.push_back(start);
       return;
     }
+
+    connector = FindCloserBridge(start, connector, onTop);
 
     JoinPolygons(start, connector);
 
@@ -661,63 +660,21 @@ class EarClip {
 #endif
   }
 
-  VertItr FindBridge(VertItr start, int onTop) {
-    const float p2 = precision_ * precision_;
-    float minD2 = std::numeric_limits<float>::infinity();
-    VertItr best = polygon_.end();
-
-    auto CheckVert = [&](VertItr vert) {
-      const glm::vec2 diff = vert->pos - start->pos;
-      const float d2 = glm::dot(diff, diff);
-      if (d2 < minD2 && vert->pos.x > start->pos.x - precision_ &&
-          vert->pos.y > start->pos.y - precision_ &&
-          vert->pos.y < start->pos.y + precision_ &&
-          (d2 < p2 || vert->Interior(start->pos, precision_) >= 0)) {
-        if (onTop > 0 && vert->left->pos.x < vert->pos.x &&
-            vert->left->pos.y > start->pos.y - precision_) {
-          return;
-        }
-        if (onTop < 0 && vert->right->pos.x < vert->pos.x &&
-            vert->right->pos.y < start->pos.y + precision_) {
-          return;
-        }
-        minD2 = d2;
-        best = vert;
-      }
-    };
-
-    for (const VertItr first : outers_) {
-      Loop(first, CheckVert);
-    }
-
-    return best;
-  }
-
   // This converts the initial guess for the keyhole location into the final one
   // and returns it. It does so by finding any reflex verts inside the triangle
-  // containing the guessed connection and the initial horizontal line, and
-  // returning the closest one to the start vert. This function doesn't
-  // currently make much use of precision, but it remains to be seen if this may
-  // be necessary.
-  VertItr FindCloserBridge(VertItr start, VertItr guess, glm::vec2 intersection,
-                           int onTop) {
+  // containing the best connection and the initial horizontal line.
+  VertItr FindCloserBridge(VertItr start, VertItr edge, int onTop) {
     const float p2 = precision_ * precision_;
-    const float above = guess->pos.y > start->pos.y ? 1 : -1;
-    glm::vec2 left = start->pos - guess->pos;
-    const glm::vec2 right = SafeNormalize(intersection - guess->pos);
-    float minD2 = glm::dot(left, left);
-    left = SafeNormalize(left);
-    VertItr best = guess;
+    VertItr best = edge->pos.x > edge->right->pos.x ? edge : edge->right;
+    const float above = best->pos.y > start->pos.y ? 1 : -1;
 
     auto CheckVert = [&](VertItr vert) {
-      const glm::vec2 offset = vert->pos - guess->pos;
-      const glm::vec2 diff = vert->pos - start->pos;
-      const float d2 = glm::dot(diff, diff);
-      if (d2 < minD2 &&
+      const float inside = above * CCW(start->pos, vert->pos, best->pos, 0);
+      if (vert->pos.x > start->pos.x - precision_ &&
           vert->pos.y * above > start->pos.y * above - precision_ &&
-          above * glm::determinant(glm::mat2(left, offset)) > -precision_ &&
-          above * glm::determinant(glm::mat2(offset, right)) > -precision_ &&
-          (d2 < p2 || vert->Interior(start->pos, precision_) >= 0)) {
+          (inside > 0 || (inside == 0 && vert->pos.x < best->pos.x)) &&
+          vert->InsideEdge(edge, precision_, true) &&
+          !vert->IsConvex(precision_)) {
         if (vert->pos.y > start->pos.y - precision_ &&
             vert->pos.y < start->pos.y + precision_) {
           if (onTop > 0 && vert->left->pos.x < vert->pos.x &&
@@ -729,7 +686,6 @@ class EarClip {
             return;
           }
         }
-        minD2 = d2;
         best = vert;
       }
     };
@@ -778,7 +734,7 @@ class EarClip {
     }
   }
 
-  // The main ear-clipping loop. This is called once for each outer polygon -
+  // The main ear-clipping loop. This is called once for each simple polygon -
   // all holes have already been key-holed and joined to an outer polygon.
   void TriangulatePoly(VertItr start) {
     // A simple polygon always creates two fewer triangles than it has verts.
