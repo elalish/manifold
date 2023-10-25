@@ -188,11 +188,15 @@ struct UpdateProperties {
 
 struct CheckHalfedges {
   VecView<const Halfedge> halfedges;
+  VecView<const glm::vec3> vertPos;
 
   bool operator()(int edge) {
     const Halfedge halfedge = halfedges[edge];
-    if (halfedge.startVert == -1 && halfedge.endVert == -1) return true;
+    if (halfedge.startVert == -1 || halfedge.endVert == -1) return true;
     if (halfedge.pairedHalfedge == -1) return false;
+
+    if (!isfinite(vertPos[halfedge.startVert][0])) return false;
+    if (!isfinite(vertPos[halfedge.endVert][0])) return false;
 
     const Halfedge paired = halfedges[halfedge.pairedHalfedge];
     bool good = true;
@@ -272,7 +276,7 @@ bool Manifold::Impl::IsManifold() const {
   auto policy = autoPolicy(halfedge_.size());
 
   return all_of(policy, countAt(0), countAt(halfedge_.size()),
-                CheckHalfedges({halfedge_}));
+                CheckHalfedges({halfedge_, vertPos_}));
 }
 
 /**
@@ -323,7 +327,6 @@ Properties Manifold::Impl::GetProperties() const {
         FaceAreaVolume({halfedge_, vertPos_, precision_})(i);
     const float t1 = area + area1;
     const float t2 = volume + volume1;
-    // we know that the elements are non-negative
     areaCompensation += (area - t1) + area1;
     volumeCompensation += (volume - t2) + volume1;
     area = t1;

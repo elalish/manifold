@@ -301,8 +301,6 @@ ManifoldRect *manifold_rect_mul(void *mem, ManifoldRect *r, float x, float y);
 int manifold_rect_does_overlap_rect(ManifoldRect *a, ManifoldRect *r);
 int manifold_rect_is_empty(ManifoldRect *r);
 int manifold_rect_is_finite(ManifoldRect *r);
-ManifoldCrossSection *manifold_rect_as_cross_section(void *mem,
-                                                     ManifoldRect *r);
 
 // Bounding Box
 

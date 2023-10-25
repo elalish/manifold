@@ -145,24 +145,29 @@ namespace manifold {
 void Manifold::Impl::SimplifyTopology() {
   if (!halfedge_.size()) return;
 
-  int nbEdges = halfedge_.size();
+  const int nbEdges = halfedge_.size();
+  auto policy = autoPolicy(nbEdges);
   int numFlagged = 0;
   Vec<uint8_t> bflags(nbEdges);
 
-  Vec<SortEntry> entries(nbEdges);
-  auto policy = autoPolicy(halfedge_.size());
-  for_each_n(policy, countAt(0), nbEdges, [&](int i) {
-    entries[i].start = halfedge_[i].startVert;
-    entries[i].end = halfedge_[i].endVert;
-    entries[i].index = i;
-  });
+  // In the case of a very bad triangulation, it is possible to create pinched
+  // verts. They must be removed before edge collapse.
+  SplitPinchedVerts();
+
+  Vec<SortEntry> entries;
+  entries.reserve(nbEdges / 2);
+  for (int i = 0; i < nbEdges; ++i) {
+    if (halfedge_[i].IsForward()) {
+      entries.push_back({halfedge_[i].startVert, halfedge_[i].endVert, i});
+    }
+  }
 
   stable_sort(policy, entries.begin(), entries.end());
-  for (int i = 0; i < nbEdges - 1; ++i) {
+  for (int i = 0; i < entries.size() - 1; ++i) {
     if (entries[i].start == entries[i + 1].start &&
         entries[i].end == entries[i + 1].end) {
-      DedupeEdge(std::min(entries[i].index, entries[i + 1].index));
-      entries[i + 1].index = std::max(entries[i].index, entries[i + 1].index);
+      DedupeEdge(entries[i].index);
+      numFlagged++;
     }
   }
 
@@ -243,6 +248,8 @@ void Manifold::Impl::SimplifyTopology() {
 #endif
 }
 
+// Deduplicate the given 4-manifold edge by duplicating endVert, thus making the
+// edges distinct. Also duplicates startVert if it becomes pinched.
 void Manifold::Impl::DedupeEdge(const int edge) {
   // Orbit endVert
   const int startVert = halfedge_[edge].startVert;
@@ -251,6 +258,7 @@ void Manifold::Impl::DedupeEdge(const int edge) {
   while (current != edge) {
     const int vert = halfedge_[current].startVert;
     if (vert == startVert) {
+      // Single topological unit needs 2 faces added to be split
       const int newVert = vertPos_.size();
       vertPos_.push_back(vertPos_[endVert]);
       if (vertNormal_.size() > 0) vertNormal_.push_back(vertNormal_[endVert]);
@@ -296,6 +304,45 @@ void Manifold::Impl::DedupeEdge(const int edge) {
     }
 
     current = halfedge_[NextHalfedge(current)].pairedHalfedge;
+  }
+
+  if (current == edge) {
+    // Separate topological unit needs no new faces to be split
+    const int newVert = vertPos_.size();
+    vertPos_.push_back(vertPos_[endVert]);
+    if (vertNormal_.size() > 0) vertNormal_.push_back(vertNormal_[endVert]);
+
+    do {
+      halfedge_[current].endVert = newVert;
+      current = NextHalfedge(current);
+      halfedge_[current].startVert = newVert;
+      current = halfedge_[current].pairedHalfedge;
+    } while (current != edge);
+  }
+
+  // Orbit startVert
+  const int pair = halfedge_[edge].pairedHalfedge;
+  current = halfedge_[NextHalfedge(pair)].pairedHalfedge;
+  while (current != pair) {
+    const int vert = halfedge_[current].startVert;
+    if (vert == endVert) {
+      break;  // Connected: not a pinched vert
+    }
+    current = halfedge_[NextHalfedge(current)].pairedHalfedge;
+  }
+
+  if (current == pair) {
+    // Split the pinched vert the previous split created.
+    const int newVert = vertPos_.size();
+    vertPos_.push_back(vertPos_[endVert]);
+    if (vertNormal_.size() > 0) vertNormal_.push_back(vertNormal_[endVert]);
+
+    do {
+      halfedge_[current].endVert = newVert;
+      current = NextHalfedge(current);
+      halfedge_[current].startVert = newVert;
+      current = halfedge_[current].pairedHalfedge;
+    } while (current != pair);
   }
 }
 
@@ -380,6 +427,10 @@ void Manifold::Impl::RemoveIfFolded(int edge) {
   }
 }
 
+// Collapses the given edge by removing startVert. May split the mesh
+// topologically if the collapse would have resulted in a 4-manifold edge. Do
+// not collapse an edge if startVert is pinched - the vert will be marked NaN,
+// but other edges may still be pointing to it.
 void Manifold::Impl::CollapseEdge(const int edge, std::vector<int>& edges) {
   Vec<TriRef>& triRef = meshRelation_.triRef;
   Vec<glm::ivec3>& triProp = meshRelation_.triProperties;
