@@ -30,6 +30,8 @@ FetchContent_MakeAvailable(glm)
 FetchContent_Declare(Thrust
     GIT_REPOSITORY https://github.com/NVIDIA/thrust.git
     GIT_TAG 2.1.0
+    GIT_SHALLOW TRUE
+    GIT_PROGRESS TRUE
     FIND_PACKAGE_ARGS NAMES Thrust
 )
 FetchContent_MakeAvailable(Thrust)
