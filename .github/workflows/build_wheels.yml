@@ -38,7 +38,7 @@ jobs:
       with:
         path: dist/*.tar.gz
 
-  pypi-publish-beta:
+  pypi-publish:
     name: Upload release to PyPI
     needs: [build_wheels, make_sdist]
     runs-on: ubuntu-latest
