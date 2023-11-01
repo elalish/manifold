@@ -617,12 +617,18 @@ Manifold::Impl Boolean3::Result(OpType op) const {
 
                      // Add, Subtract, Intersect, KeepP
   const int c1tab[] = { 1, 1, 0, 1 };
-  const int c2tab[] = { 1, 0, 0, 0 };
-  const int c3tab[] = { -1, -1, 1, 0 };
+  const int c2tab[] = { -1, -1, 1, 1 };
+  const int c3tab[] = { -1, -1, 1, 1 };
+  const int c4tab[] = { -1, -1, 1, 1 };
+  const int c5tab[] = { 1, 0, 0, 0 };
+  const int c6tab[] = { -1, -1, 1, 0 };
 
   const int c1 = c1tab[ (int) op ];
   const int c2 = c2tab[ (int) op ];
   const int c3 = c3tab[ (int) op ];
+  const int c4 = c4tab[ (int) op ];
+  const int c5 = c5tab[ (int) op ];
+  const int c6 = c6tab[ (int) op ];
 
   if (inP_.IsEmpty()) {
     if (!inQ_.IsEmpty() && op == OpType::Add) {
@@ -644,14 +650,14 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   Vec<int> i03(w03_.size());
   Vec<int> i30(w30_.size());
 
+  transform(autoPolicy(w03_.size()), w03_.begin(), w03_.end(), i03.begin(),
+            c1 + c2 * _1);
   transform(autoPolicy(x12_.size()), x12_.begin(), x12_.end(), i12.begin(),
             c3 * _1);
   transform(autoPolicy(x21_.size()), x21_.begin(), x21_.end(), i21.begin(),
-            c3 * _1);
-  transform(autoPolicy(w03_.size()), w03_.begin(), w03_.end(), i03.begin(),
-            c1 + c3 * _1);
+            c4 * _1);
   transform(autoPolicy(w30_.size()), w30_.begin(), w30_.end(), i30.begin(),
-            c2 + c3 * _1);
+            c5 + c6 * _1);
 
   Vec<int> vP2R(inP_.NumVert());
   exclusive_scan(autoPolicy(i03.size()), i03.begin(), i03.end(), vP2R.begin(),
