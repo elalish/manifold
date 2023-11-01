@@ -44,6 +44,9 @@ C2::ClipType cliptype_of_op(OpType op) {
     case OpType::Intersect:
       ct = C2::ClipType::Intersection;
       break;
+    case OpType::KeepP:
+      ct = C2::ClipType::None;
+      break;
   };
   return ct;
 }

@@ -432,6 +432,21 @@ std::shared_ptr<CsgLeafNode> CsgOpNode::ToLeafNode() const {
         children_.push_back(
             std::make_shared<CsgLeafNode>(std::make_shared<Manifold::Impl>(
                 boolean.Result(OpType::Subtract))));
+        break;
+      };
+      case CsgNodeType::KeepP: {
+        // take the lhs out and treat the remaining nodes as the rhs, perform
+        // union optimization for them
+        auto lhs = std::dynamic_pointer_cast<CsgLeafNode>(children_.front());
+        children_.erase(children_.begin());
+        BatchUnion();
+        auto rhs = std::dynamic_pointer_cast<CsgLeafNode>(children_.front());
+        children_.clear();
+        Boolean3 boolean(*lhs->GetImpl(), *rhs->GetImpl(), OpType::KeepP);
+        children_.push_back(
+            std::make_shared<CsgLeafNode>(std::make_shared<Manifold::Impl>(
+                boolean.Result(OpType::KeepP))));
+        break;
       };
       case CsgNodeType::Leaf:
         // unreachable
@@ -626,6 +641,9 @@ void CsgOpNode::SetOp(OpType op) {
     case OpType::Intersect:
       op_ = CsgNodeType::Intersection;
       break;
+    case OpType::KeepP:
+      op_ = CsgNodeType::KeepP;
+      break;
   }
 }
 
@@ -637,6 +655,8 @@ bool CsgOpNode::IsOp(OpType op) {
       return op_ == CsgNodeType::Difference;
     case OpType::Intersect:
       return op_ == CsgNodeType::Intersection;
+    case OpType::KeepP:
+      return op_ == CsgNodeType::KeepP;
     default:
       return false;
   }
