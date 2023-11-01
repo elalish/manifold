@@ -159,11 +159,11 @@ TEST(Boolean, Perturb) {
 }
 
 TEST(Boolean, Coplanar) {
-  Manifold cylinder = Manifold::Cylinder(1.0f, 1.0f);
+  Manifold cylinder = Manifold::Cylinder(1.0, 1.0);
   MeshGL cylinderGL = WithPositionColors(cylinder);
   cylinder = Manifold(cylinderGL);
 
-  Manifold cylinder2 = cylinder.Scale({0.8f, 0.8f, 1.0f}).Rotate(0, 0, 5);
+  Manifold cylinder2 = cylinder.Scale({0.8, 0.8, 1.0}).Rotate(0, 0, 185);
   Manifold out = cylinder - cylinder2;
   ExpectMeshes(out, {{32, 64, 3, 48}});
   EXPECT_EQ(out.NumDegenerateTris(), 0);
