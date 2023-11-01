@@ -567,7 +567,7 @@ void CreateProperties(Manifold::Impl &outR, const Vec<TriRef> &refPQ,
           }
           if (uvw[j] == 0) edge = j;
         }
-        if (edge >= 0) {
+        if (edge >= 0) {  // This misses some edges
           // On an edge, both propVerts must match
           const int p0 = triProp[Next3(edge)];
           const int p1 = triProp[Prev3(edge)];
@@ -772,6 +772,7 @@ Manifold::Impl Boolean3::Result(OpType op) const {
 
   Vec<TriRef> refPQ = UpdateReference(outR, inP_, inQ_, invertQ);
 
+  // This causes some verts to be outside of their refPQ triangle.
   outR.SimplifyTopology();
 
   CreateProperties(outR, refPQ, inP_, inQ_);
