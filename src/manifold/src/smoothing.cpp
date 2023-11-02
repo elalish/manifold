@@ -196,10 +196,13 @@ struct SmoothBezier {
     const glm::vec3 edgeNormal =
         (triNormal[edge.face] + triNormal[halfedge[edge.pairedHalfedge].face]) /
         2.0f;
-    glm::vec3 dir = glm::normalize(glm::cross(glm::cross(edgeNormal, edgeVec),
-                                              vertNormal[edge.startVert]));
+    glm::vec3 dir = SafeNormalize(glm::cross(glm::cross(edgeNormal, edgeVec),
+                                             vertNormal[edge.startVert]));
 
-    const float weight = glm::abs(glm::dot(dir, glm::normalize(edgeVec)));
+    float weight = glm::abs(glm::dot(dir, SafeNormalize(edgeVec)));
+    if (weight == 0) {
+      weight = 1;
+    }
     // Quadratic weighted bezier for circular interpolation
     const glm::vec4 bz2 =
         weight *
