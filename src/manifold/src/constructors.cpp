@@ -220,6 +220,9 @@ Manifold Manifold::Sphere(float radius, int circularSegments) {
 /**
  * Constructs a manifold from a set of polygons by extruding them along the
  * Z-axis.
+ * Note that high twistDegrees with small nDivisions may cause
+ * self-intersection. This is not checked here and it is up to the user to
+ * choose the correct parameters.
  *
  * @param crossSection A set of non-overlapping polygons to extrude.
  * @param height Z-extent of extrusion.
