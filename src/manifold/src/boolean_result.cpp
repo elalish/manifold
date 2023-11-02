@@ -463,9 +463,8 @@ struct MapTriRef {
   }
 };
 
-Vec<TriRef> UpdateReference(Manifold::Impl &outR, const Manifold::Impl &inP,
-                            const Manifold::Impl &inQ, bool invertQ) {
-  Vec<TriRef> refPQ = outR.meshRelation_.triRef;
+void UpdateReference(Manifold::Impl &outR, const Manifold::Impl &inP,
+                     const Manifold::Impl &inQ, bool invertQ) {
   const int offsetQ = Manifold::Impl::meshIDCounter_;
   for_each_n(
       autoPolicy(outR.NumTri()), outR.meshRelation_.triRef.begin(),
@@ -480,7 +479,6 @@ Vec<TriRef> UpdateReference(Manifold::Impl &outR, const Manifold::Impl &inP,
     outR.meshRelation_.meshIDtransform[pair.first + offsetQ].backSide ^=
         invertQ;
   }
-  return refPQ;
 }
 
 struct Barycentric {
@@ -514,8 +512,8 @@ struct Barycentric {
   }
 };
 
-void CreateProperties(Manifold::Impl &outR, const Vec<TriRef> &refPQ,
-                      const Manifold::Impl &inP, const Manifold::Impl &inQ) {
+void CreateProperties(Manifold::Impl &outR, const Manifold::Impl &inP,
+                      const Manifold::Impl &inQ) {
   const int numPropP = inP.NumProp();
   const int numPropQ = inQ.NumProp();
   const int numProp = glm::max(numPropP, numPropQ);
@@ -526,7 +524,8 @@ void CreateProperties(Manifold::Impl &outR, const Vec<TriRef> &refPQ,
   outR.meshRelation_.triProperties.resize(numTri);
 
   Vec<glm::vec3> bary(outR.halfedge_.size());
-  for_each_n(autoPolicy(numTri), zip(countAt(0), refPQ.cbegin()), numTri,
+  for_each_n(autoPolicy(numTri),
+             zip(countAt(0), outR.meshRelation_.triRef.cbegin()), numTri,
              Barycentric({bary, inP.vertPos_, inQ.vertPos_, outR.vertPos_,
                           inP.halfedge_, inQ.halfedge_, outR.halfedge_,
                           outR.precision_}));
@@ -541,14 +540,14 @@ void CreateProperties(Manifold::Impl &outR, const Vec<TriRef> &refPQ,
     // Skip collapsed triangles
     if (outR.halfedge_[3 * tri].startVert < 0) continue;
 
-    const int triPQ = refPQ[tri].tri;
-    const bool PQ = refPQ[tri].meshID == 0;
+    const TriRef ref = outR.meshRelation_.triRef[tri];
+    const bool PQ = ref.meshID == 0;
     const int oldNumProp = PQ ? numPropP : numPropQ;
     const auto &properties =
         PQ ? inP.meshRelation_.properties : inQ.meshRelation_.properties;
     const glm::ivec3 &triProp = oldNumProp == 0 ? glm::ivec3(-1)
-                                : PQ ? inP.meshRelation_.triProperties[triPQ]
-                                     : inQ.meshRelation_.triProperties[triPQ];
+                                : PQ ? inP.meshRelation_.triProperties[ref.tri]
+                                     : inQ.meshRelation_.triProperties[ref.tri];
 
     for (const int i : {0, 1, 2}) {
       const int vert = outR.halfedge_[3 * tri + i].startVert;
@@ -556,8 +555,7 @@ void CreateProperties(Manifold::Impl &outR, const Vec<TriRef> &refPQ,
 
       glm::ivec4 key(PQ, idMissProp, -1, -1);
       if (oldNumProp > 0) {
-        key[1] = vert;
-        int edge = -1;
+        int edge = -2;
         for (const int j : {0, 1, 2}) {
           if (uvw[j] == 1) {
             // On a retained vert, the propVert must also match
@@ -571,8 +569,11 @@ void CreateProperties(Manifold::Impl &outR, const Vec<TriRef> &refPQ,
           // On an edge, both propVerts must match
           const int p0 = triProp[Next3(edge)];
           const int p1 = triProp[Prev3(edge)];
+          key[1] = vert;
           key[2] = glm::min(p0, p1);
           key[3] = glm::max(p0, p1);
+        } else if (edge == -2) {
+          key[1] = vert;
         }
       }
 
@@ -770,11 +771,11 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   if (ManifoldParams().intermediateChecks)
     ASSERT(outR.IsManifold(), logicErr, "triangulated mesh is not manifold!");
 
-  Vec<TriRef> refPQ = UpdateReference(outR, inP_, inQ_, invertQ);
+  CreateProperties(outR, inP_, inQ_);
+
+  UpdateReference(outR, inP_, inQ_, invertQ);
 
   outR.SimplifyTopology();
-
-  CreateProperties(outR, refPQ, inP_, inQ_);
 
   if (ManifoldParams().intermediateChecks)
     ASSERT(outR.Is2Manifold(), logicErr, "simplified mesh is not 2-manifold!");
