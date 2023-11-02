@@ -501,25 +501,20 @@ void Manifold::Impl::CollapseEdge(const int edge, std::vector<int>& edges) {
   const int tri1 = toRemove.pairedHalfedge / 3;
   const int triVert0 = (edge + 1) % 3;
   const int triVert1 = toRemove.pairedHalfedge % 3;
-  const int prop0 = triProp.size() > 0 ? triProp[tri0][edge % 3] : -1;
-  const int prop1 = triProp.size() > 0
-                        ? triProp[tri1][(toRemove.pairedHalfedge + 1) % 3]
-                        : -1;
   current = start;
   while (current != tri0edge[2]) {
     current = NextHalfedge(current);
 
-    // Update the shifted triangles to the vertBary of endVert
-    const int tri = current / 3;
-    const int vIdx = current - 3 * tri;
-
-    if (!shortEdge) {
-      if (triProp.size() > 0) {
-        if (triProp[tri][vIdx] == prop0) {
-          triProp[tri][vIdx] = triProp[tri0][triVert0];
-        } else if (triProp[tri][vIdx] == prop1) {
-          triProp[tri][vIdx] = triProp[tri1][triVert1];
-        }
+    if (triProp.size() > 0) {
+      // Update the shifted triangles to the vertBary of endVert
+      const int tri = current / 3;
+      const int vIdx = current - 3 * tri;
+      if (triRef[tri].meshID == triRef[tri0].meshID &&
+          triRef[tri].tri == triRef[tri0].tri) {
+        triProp[tri][vIdx] = triProp[tri0][triVert0];
+      } else if (triRef[tri].meshID == triRef[tri1].meshID &&
+                 triRef[tri].tri == triRef[tri1].tri) {
+        triProp[tri][vIdx] = triProp[tri1][triVert1];
       }
     }
 
