@@ -115,3 +115,21 @@ TEST(SDF, Resize) {
   EXPECT_EQ(layers.Status(), Manifold::Error::NoError);
   EXPECT_EQ(layers.Genus(), -8);
 }
+
+TEST(SDF, SineSurface) {
+  Mesh surface(LevelSet(
+      [](glm::vec3 p) {
+        float mid = glm::sin(p.x) + glm::sin(p.y);
+        return (p.z > mid - 0.5 && p.z < mid + 0.5) ? 1 : 0;
+      },
+      {glm::vec3(-4 * glm::pi<float>()), glm::vec3(4 * glm::pi<float>())}, 1));
+  Manifold smoothed = Manifold::Smooth(surface).Refine(2);
+
+  EXPECT_EQ(smoothed.Status(), Manifold::Error::NoError);
+  EXPECT_EQ(smoothed.Genus(), -2);
+
+#ifdef MANIFOLD_EXPORT
+  if (options.exportModels)
+    ExportMesh("sinesurface.glb", smoothed.GetMeshGL(), {});
+#endif
+}
