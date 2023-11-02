@@ -7,10 +7,6 @@
 
 [OpenSCAD](https://openscad.org/), [IFCjs](https://ifcjs.github.io/info/), [Grid.Space](https://grid.space/), and [OCADml](https://github.com/OCADml/OManifold) have all integrated our Manifold geometry kernel! Why? Because its reliability is guaranteed and it's 1,000 times faster than other libraries. See our [usage](https://github.com/elalish/manifold/discussions/340) and [performance](https://github.com/elalish/manifold/discussions/383) discussions for all the latest and to add your own projects & analyses.
 
-For example, here is a log-log plot of Manifold's performance vs. earlier OpenSCAD geometry backends:
-
-<img src="https://elalish.github.io/manifold/samples/models/perfSpheres.png" width="350px"/>
-
 ## [ManifoldCAD.org](https://manifoldcad.org)
 
 If you like OpenSCAD / JSCAD, you might also like ManifoldCAD - our own solid modelling web app. Our WASM is not multithreaded yet, but it's still quite fast and a good way to test out our Manifold library.
