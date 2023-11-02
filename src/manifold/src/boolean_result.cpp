@@ -556,8 +556,7 @@ void CreateProperties(Manifold::Impl &outR, const Vec<TriRef> &refPQ,
 
       glm::ivec4 key(PQ, idMissProp, -1, -1);
       if (oldNumProp > 0) {
-        key[1] = vert;
-        int edge = -1;
+        int edge = -2;
         for (const int j : {0, 1, 2}) {
           if (uvw[j] == 1) {
             // On a retained vert, the propVert must also match
@@ -567,12 +566,15 @@ void CreateProperties(Manifold::Impl &outR, const Vec<TriRef> &refPQ,
           }
           if (uvw[j] == 0) edge = j;
         }
-        if (edge >= 0) {  // This misses some edges
+        if (edge >= 0) {
           // On an edge, both propVerts must match
           const int p0 = triProp[Next3(edge)];
           const int p1 = triProp[Prev3(edge)];
+          key[1] = vert;
           key[2] = glm::min(p0, p1);
           key[3] = glm::max(p0, p1);
+        } else if (edge == -2) {
+          key[1] = vert;
         }
       }
 
@@ -772,10 +774,9 @@ Manifold::Impl Boolean3::Result(OpType op) const {
 
   Vec<TriRef> refPQ = UpdateReference(outR, inP_, inQ_, invertQ);
 
-  // This causes some verts to be outside of their refPQ triangle.
-  outR.SimplifyTopology();
-
   CreateProperties(outR, refPQ, inP_, inQ_);
+
+  outR.SimplifyTopology();
 
   if (ManifoldParams().intermediateChecks)
     ASSERT(outR.Is2Manifold(), logicErr, "simplified mesh is not 2-manifold!");
