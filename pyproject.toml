@@ -1,13 +1,13 @@
 [project]
 name = "manifold3d"
-version = "2.2.0"
+version = "2.2.1"
 authors = [
   { name="Emmett Lalish", email="elalish@gmail.com" },
 ]
 description = "Library for geometric robustness"
 readme = "README.md"
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "License :: OSI Approved :: Apache Software License",
     "Operating System :: OS Independent",
     "Programming Language :: C++",
