@@ -85,6 +85,10 @@ Offline building:
 The build instructions used by our CI are in [manifold.yml](https://github.com/elalish/manifold/blob/master/.github/workflows/manifold.yml), which is a good source to check if something goes wrong and for instructions specific to other platforms, like Windows.
 
 ### WASM
+
+> Note that we have only tested emscripten version 3.1.45. It is known that
+  3.1.48 has some issues compiling manifold.
+
 To build the JS WASM library, first install NodeJS and set up emscripten:
 
 (on Mac):
