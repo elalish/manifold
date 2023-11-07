@@ -97,7 +97,7 @@ export class EXTManifold extends Extension {
         manifoldPrimitive.setRunIndex(runIndex);
       }
 
-      if (manifoldDef.mergeIndices && manifoldDef.mergeValues) {
+      if (manifoldDef.mergeIndices != null && manifoldDef.mergeValues != null) {
         manifoldPrimitive.setMerge(
             context.accessors[manifoldDef.mergeIndices],
             context.accessors[manifoldDef.mergeValues]);

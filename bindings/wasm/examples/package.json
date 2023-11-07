@@ -23,10 +23,10 @@
     "three": "0.158.0"
   },
   "devDependencies": {
-    "@vitest/ui": "^0.34.6",
-    "@vitest/web-worker": "^0.34.6",
+    "@vitest/ui": "^0.31.1",
+    "@vitest/web-worker": "^0.31.1",
     "typescript": "5.2.2",
     "vite": "^4.5.0",
-    "vitest": "^0.34.6"
+    "vitest": "^0.31.1"
   }
 }
