@@ -93,8 +93,8 @@ target_include_directories(${PROJECT_NAME} INTERFACE
 )
 else()
 target_include_directories(${PROJECT_NAME} INTERFACE
-    ${THRUST_ROOT}
-    ${THRUST_ROOT}/dependencies/libcudacxx/include
+    ${_THRUST_INCLUDE_DIR}
+    ${_THRUST_INCLUDE_DIR}/dependencies/libcudacxx/include
 )
 endif()
 
