@@ -397,16 +397,18 @@ NB_MODULE(manifold3d, m) {
           "topologically disconnected. If everything is connected, the vector "
           "is length one, containing a copy of the original. It is the inverse "
           "operation of Compose().")
-      .def("split", [](Manifold &self, Manifold& cutter) {
+      .def(
+          "split",
+          [](Manifold &self, Manifold &cutter) {
             auto p = self.Split(cutter);
             return nb::make_tuple(p.first, p.second);
-           },
-           nb::arg("cutter"),
-           "Split cuts this manifold in two using the cutter manifold. The "
-           "first result is the intersection, second is the difference. This "
-           "is more efficient than doing them separately."
-           "\n\n"
-           ":param cutter: This is the manifold to cut by.\n")
+          },
+          nb::arg("cutter"),
+          "Split cuts this manifold in two using the cutter manifold. The "
+          "first result is the intersection, second is the difference. This "
+          "is more efficient than doing them separately."
+          "\n\n"
+          ":param cutter: This is the manifold to cut by.\n")
       .def(
           "split_by_plane",
           [](Manifold &self, Float3 normal, float originOffset) {
