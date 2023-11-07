@@ -32,9 +32,11 @@ FetchContent_Declare(Thrust
     GIT_TAG 2.1.0
     GIT_SHALLOW TRUE
     GIT_PROGRESS TRUE
-    FIND_PACKAGE_ARGS NAMES Thrust
 )
-FetchContent_MakeAvailable(Thrust)
+find_package(Thrust QUIET)
+if(NOT Thrust_FOUND AND NOT DEFINED thrust_SOURCE_DIR)
+    FetchContent_Populate(Thrust)
+endif()
 
 if (TRACY_ENABLE)
     include(FetchContent)
@@ -66,7 +68,7 @@ if(MANIFOLD_PAR STREQUAL "TBB")
             GIT_PROGRESS   TRUE
         )
         FetchContent_MakeAvailable(TBB)
-        set_property(DIRECTORY ${TBB_SOURCE_DIR} PROPERTY EXCLUDE_FROM_ALL YES)
+        set_property(DIRECTORY ${tbb_SOURCE_DIR} PROPERTY EXCLUDE_FROM_ALL YES)
     endif()
     target_compile_options(${PROJECT_NAME} INTERFACE -DMANIFOLD_PAR='T')
     if(TARGET TBB::tbb)
@@ -84,10 +86,10 @@ endif()
 
 target_include_directories(${PROJECT_NAME} INTERFACE ${PROJECT_SOURCE_DIR}/include)
 target_link_libraries(${PROJECT_NAME} INTERFACE glm::glm)
-if(DEFINED Thrust_SOURCE_DIR)
+if(DEFINED thrust_SOURCE_DIR)
 target_include_directories(${PROJECT_NAME} INTERFACE
-    ${Thrust_SOURCE_DIR}
-    ${Thrust_SOURCE_DIR}/dependencies/libcudacxx/include
+    ${thrust_SOURCE_DIR}
+    ${thrust_SOURCE_DIR}/dependencies/libcudacxx/include
 )
 else()
 target_include_directories(${PROJECT_NAME} INTERFACE

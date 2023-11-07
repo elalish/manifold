@@ -105,8 +105,8 @@ jobs:
         # setup emscripten
         git clone https://github.com/emscripten-core/emsdk.git
         cd emsdk
-        ./emsdk install latest
-        ./emsdk activate latest
+        ./emsdk install 3.1.45
+        ./emsdk activate 3.1.45
     - uses: jwlawson/actions-setup-cmake@v1.12
     - name: Build WASM
       run: |
