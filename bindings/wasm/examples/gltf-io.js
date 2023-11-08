@@ -180,11 +180,13 @@ export function writeMesh(doc, manifoldMesh, attributes, materials) {
   const mesh = doc.createMesh();
   const numPrimitive = manifoldMesh.runIndex.length - 1;
   for (let run = 0; run < numPrimitive; ++run) {
-    const indices = doc.createAccessor('indices')
+    const id = manifoldMesh.runOriginalID[run];
+    const indices = doc.createAccessor('index run of ID: ' + id)
                         .setBuffer(buffer)
                         .setType(Accessor.Type.SCALAR)
-                        .setArray(new Uint32Array());
-    const primitive = doc.createPrimitive().setIndices(indices);
+                        .setArray(new Uint32Array(1));
+    const primitive =
+        doc.createPrimitive('primitive of ID: ' + id).setIndices(indices);
     const material = materials[run];
     if (material) {
       primitive.setMaterial(material);
@@ -215,9 +217,10 @@ export function writeMesh(doc, manifoldMesh, attributes, materials) {
       }
     }
 
-    const accessor =
-        doc.createAccessor().setBuffer(buffer).setType(def.type).setArray(
-            array);
+    const accessor = doc.createAccessor(attribute)
+                         .setBuffer(buffer)
+                         .setType(def.type)
+                         .setArray(array);
 
     mesh.listPrimitives().forEach((primitive, pIdx) => {
       if (attributes[pIdx].length > aIdx &&
@@ -231,7 +234,7 @@ export function writeMesh(doc, manifoldMesh, attributes, materials) {
   const manifoldPrimitive = manifoldExtension.createManifoldPrimitive();
   mesh.setExtension('EXT_manifold', manifoldPrimitive);
 
-  const indices = doc.createAccessor('indices')
+  const indices = doc.createAccessor('manifold indices')
                       .setBuffer(buffer)
                       .setType(Accessor.Type.SCALAR)
                       .setArray(manifoldMesh.triVerts);
@@ -251,15 +254,17 @@ export function writeMesh(doc, manifoldMesh, attributes, materials) {
       val.push(newVert);
     }
   }
-  const indicesAccessor = doc.createAccessor()
-                              .setBuffer(buffer)
-                              .setType(Accessor.Type.SCALAR)
-                              .setArray(new Uint32Array(ind));
-  const valuesAccessor = doc.createAccessor()
-                             .setBuffer(buffer)
-                             .setType(Accessor.Type.SCALAR)
-                             .setArray(new Uint32Array(val));
-  manifoldPrimitive.setMerge(indicesAccessor, valuesAccessor);
+  if (ind.length > 0) {
+    const indicesAccessor = doc.createAccessor('merge from')
+                                .setBuffer(buffer)
+                                .setType(Accessor.Type.SCALAR)
+                                .setArray(new Uint32Array(ind));
+    const valuesAccessor = doc.createAccessor('merge to')
+                               .setBuffer(buffer)
+                               .setType(Accessor.Type.SCALAR)
+                               .setArray(new Uint32Array(val));
+    manifoldPrimitive.setMerge(indicesAccessor, valuesAccessor);
+  }
 
   return mesh;
 }
