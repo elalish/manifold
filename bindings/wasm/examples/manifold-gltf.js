@@ -15,6 +15,7 @@
 import {Extension, ExtensionProperty, PropertyType} from '@gltf-transform/core';
 
 const NAME = 'EXT_manifold';
+const MERGE = 'MERGE';
 
 export class ManifoldPrimitive extends ExtensionProperty {
   static EXTENSION_NAME = NAME;
@@ -65,6 +66,7 @@ export class ManifoldPrimitive extends ExtensionProperty {
 
 export class EXTManifold extends Extension {
   extensionName = NAME;
+  prewriteTypes = [PropertyType.ACCESSOR];
   static EXTENSION_NAME = NAME;
 
   createManifoldPrimitive() {
@@ -95,13 +97,27 @@ export class EXTManifold extends Extension {
         manifoldPrimitive.setRunIndex(runIndex);
       }
 
-      if (manifoldDef.mergeIndices && manifoldDef.mergeValues) {
+      if (manifoldDef.mergeIndices != null && manifoldDef.mergeValues != null) {
         manifoldPrimitive.setMerge(
             context.accessors[manifoldDef.mergeIndices],
             context.accessors[manifoldDef.mergeValues]);
       }
     });
 
+    return this;
+  }
+
+  prewrite(context) {
+    this.document.getRoot().listMeshes().forEach((mesh) => {
+      const manifoldPrimitive = mesh.getExtension(NAME);
+      if (!manifoldPrimitive) return;
+      const mergeFrom = manifoldPrimitive.getMergeIndices();
+      const mergeTo = manifoldPrimitive.getMergeValues();
+      if (!mergeFrom || !mergeTo) return;
+
+      context.addAccessorToUsageGroup(mergeFrom, MERGE);
+      context.addAccessorToUsageGroup(mergeTo, MERGE);
+    });
     return this;
   }
 
