@@ -587,7 +587,7 @@ NB_MODULE(manifold3d, m) {
                   return f(std::make_tuple(v.x, v.y, v.z));
                 },
                 bound, edgeLength, level, canParallel);
-            return Manifold::Manifold(result);
+            return Manifold(result);
           },
           nb::arg("f"), nb::arg("bounds"), nb::arg("edgeLength"),
           nb::arg("level") = 0.0, nb::arg("canParallel") = false,
