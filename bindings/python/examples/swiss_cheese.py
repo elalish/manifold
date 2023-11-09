@@ -14,26 +14,25 @@
  limitations under the License.
  """
  
-import time
 import random
 from manifold3d import Manifold, OpType
 from functools import reduce
 
 def run(n=10):
-    a = Manifold.cube(1, 1, 1).translate(-0.5, -0.5, -0.5)
+    block = Manifold.cube(1, 1, 1).translate(-0.5, -0.5, -0.5)
 
-    spheres = [Manifold.sphere(0.01+random.random()*0.2, 50).translate(random.random()-0.5, random.random()-0.5, random.random()-0.5)
+    holes = [Manifold.sphere(0.01+random.random()*0.2, 50).translate(random.random()-0.5, random.random()-0.5, random.random()-0.5)
                for i in range(n) for j in range(n)]
 
-    t0 = time.perf_counter()
-    combined_spheres = reduce(lambda a, b: a + b, spheres)
-    slow_cheese = a - combined_spheres
-    slow_mesh = slow_cheese.to_mesh()
-    print("Individual cheese:", (time.perf_counter() - t0)*1000.0, "ms")
+    # These techniques should be equivalent
+    cheese_1 = block - reduce(lambda a, b: a + b, holes)
+    cheese_2 = Manifold.batch_boolean([block]+holes, OpType.Subtract)
 
-    t0 = time.perf_counter()
-    fast_cheese = Manifold.batch_boolean([a]+spheres, OpType.Subtract)
-    fast_mesh = fast_cheese.to_mesh()
-    print("Batch cheese:", (time.perf_counter() - t0)*1000.0, "ms")
+    assert cheese_1.num_vert        () == cheese_2.num_vert        ()
+    assert cheese_1.num_edge        () == cheese_2.num_edge        ()
+    assert cheese_1.num_tri         () == cheese_2.num_tri         ()
+    assert cheese_1.genus           () == cheese_2.genus           ()
+    assert cheese_1.get_volume      () == cheese_2.get_volume      ()
+    assert cheese_1.get_surface_area() == cheese_2.get_surface_area()
 
-    return fast_cheese
+    return cheese_1
