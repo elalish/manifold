@@ -136,7 +136,9 @@ NB_MODULE(manifold3d, m) {
       .def(nb::self ^ nb::self, "Boolean intersection.")
       .def_static(
           "batch_boolean",
-          [](std::vector<Manifold> &ms, OpType op) { return Manifold::BatchBoolean(ms, op); },
+          [](std::vector<Manifold> &ms, OpType op) {
+            return Manifold::BatchBoolean(ms, op);
+          },
           "Compute the aggregate boolean operation of a set of manifolds.")
       .def(
           "hull", [](Manifold &self) { return self.Hull(); },
