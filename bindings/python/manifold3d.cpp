@@ -618,8 +618,7 @@ NB_MODULE(manifold3d, m) {
           "levelset_batch",
           [](const std::function<std::vector<float>(std::vector<float>)> &f,
              std::vector<float> bounds, float edgeLength, float level = 0.0,
-             bool canParallel = false,
-             std::function<void(const char *)> print = nullptr) {
+             bool canParallel = false) {
             // Same format as Manifold.bounding_box
             Box bound = {glm::vec3(bounds[0], bounds[1], bounds[2]),
                          glm::vec3(bounds[3], bounds[4], bounds[5])};
@@ -634,13 +633,11 @@ NB_MODULE(manifold3d, m) {
                   }
                   return f(coords);
                 },
-                bound, edgeLength, level, canParallel,
-                [](const char *str) { nb::print(str); });
+                bound, edgeLength, level, canParallel);
             return Manifold(result);
           },
           nb::arg("f"), nb::arg("bounds"), nb::arg("edgeLength"),
           nb::arg("level") = 0.0, nb::arg("canParallel") = false,
-          nb::arg("print") = nullptr,
           "Similar to LevelSet, this constructs a level-set Mesh from the input"
           "Signed-Distance Function (SDF). This variant feeds an std:vector of points"
           "to the function, allowing the function to compute signed distances using"
