@@ -362,8 +362,6 @@ Mesh LevelSet(std::function<float(glm::vec3)> sdf, Box bounds, float edgeLength,
   return out;
 }
 
-
-
 /**
  * Similar to LevelSet, this constructs a level-set Mesh from the input
  * Signed-Distance Function (SDF). This variant feeds an std:vector of points
@@ -469,7 +467,7 @@ Mesh LevelSetBatch(
 
     if (!gridVerts.Full()) {
       if (keep) {
-          gridVerts.D().Insert(i, gridVert);
+        gridVerts.D().Insert(i, gridVert);
       }
       vertPos.resize(vertIndex);  // Success
     } else {                      // Resize HashTable
