@@ -21,4 +21,8 @@
 namespace manifold {
 Mesh LevelSet(std::function<float(glm::vec3)> sdf, Box bounds, float edgeLength,
               float level = 0, bool canParallel = true);
+Mesh LevelSetBatch(
+              std::function<std::vector<float>(std::vector<glm::vec3>)> sdf,
+              Box bounds, float edgeLength,float level = 0, bool canParallel = true,
+              std::function<void(const char *)> print = nullptr);
 }

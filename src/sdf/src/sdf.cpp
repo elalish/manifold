@@ -99,7 +99,7 @@ Uint64 SqueezeBits3(Uint64 v) {
 // y, and z channel and 1 for w, filling the 64 bit total.
 Uint64 MortonCode(const glm::ivec4& index) {
   return static_cast<Uint64>(index.w) | (SpreadBits3(index.x) << 1) |
-         (SpreadBits3(index.y) << 2) | (SpreadBits3(index.z) << 3);
+          (SpreadBits3(index.y) << 2) | (SpreadBits3(index.z) << 3);
 }
 
 glm::ivec4 DecodeMorton(Uint64 code) {
@@ -388,7 +388,8 @@ Mesh LevelSet(std::function<float(glm::vec3)> sdf, Box bounds, float edgeLength,
  */
 Mesh LevelSetBatch(
     std::function<std::vector<float>(std::vector<glm::vec3>)> sdf, Box bounds,
-    float edgeLength, float level, bool canParallel) {
+    float edgeLength, float level, bool canParallel,
+    std::function<void(const char*)> print) {
   Mesh out;
 
   const glm::vec3 dim = bounds.Size();
@@ -424,18 +425,22 @@ Mesh LevelSetBatch(
   // Compute the distances at these coordinates
   std::vector<float> gridDistances = sdf(gridCoordinates);
 
+  print("Ran Python Function!");
+
   // Bound these distances - equivalent to BoundedSDF
   for (Uint64 i = 0; i < maxMorton + 1; i++) {
     const float d = gridDistances[i] - level;
     const glm::ivec4 gridIndex = DecodeMorton(i);
     const glm::ivec3 xyz(gridIndex);
     const bool onLowerBound = glm::any(glm::lessThanEqual(xyz, glm::ivec3(0)));
-    const bool onUpperBound = glm::any(glm::greaterThanEqual(xyz, gridSize));
+    const bool onUpperBound = glm::any(glm::greaterThanEqual(xyz, (gridSize+1)));
     const bool onHalfBound =
-        gridIndex.w == 1 && glm::any(glm::greaterThanEqual(xyz, gridSize - 1));
+        gridIndex.w == 1 && glm::any(glm::greaterThanEqual(xyz,   (gridSize+1) - 1));
     gridDistances[i] =
         (onLowerBound || onUpperBound || onHalfBound) ? glm::min(d, 0.0f) : d;
   }
+
+  print("Packaged grid distances!");
 
   // Check each grid coordinate to see if its neighbors cross the 0 threshold
   size_t vertIndex = 1;
@@ -444,32 +449,44 @@ Mesh LevelSetBatch(
     GridVert gridVert;
     gridVert.distance = gridDistances[i];
 
+    //print("Decoded Morton!");
+
     bool keep = false;
     // These seven edges are uniquely owned by this gridVert; any of them
     // which intersect the surface create a vert.
-    for (int i = 0; i < 7; ++i) {
-      glm::ivec4 neighborIndex = gridIndex + Neighbors(i);
+    for (int j = 0; j < 7; ++j) {
+      glm::ivec4 neighborIndex = gridIndex + Neighbors(j);
       if (neighborIndex.w == 2) {
         neighborIndex += 1;
         neighborIndex.w = 0;
       }
-      const float val = gridDistances[MortonCode(neighborIndex)];
+
+      //print("About to calculate value!");
+      const Uint64 neighborCode = MortonCode(neighborIndex);
+      if (neighborCode >= gridDistances.size()) continue; // Neighbors outside of the bounds...
+      const float val = gridDistances[neighborCode];
+      //print("Checking val!");
       if ((val > 0) == (gridVert.distance > 0)) continue;
       keep = true;
+
+      //print((std::string("Keeping vertex:") + std::to_string(vertIndex)).c_str());
+      //print((std::string("VertPos Size:") + std::to_string(vertPos.size())).c_str());
 
       vertIndex += 1;
       vertPos[vertIndex] =
           (val * gridCoordinates[i] -
            gridVert.distance * Position(neighborIndex, bounds.min, spacing)) /
           (val - gridVert.distance);
-      gridVert.edgeVerts[i] = vertIndex;
+      gridVert.edgeVerts[j] = vertIndex;
     }
+
+    //print("Sampled Neighbors!");
 
     if (!gridVerts.Full()) {
       if (keep) {
         gridVerts.D().Insert(i, gridVert);
       }
-      vertPos.resize(vertIndex);  // Success
+      //vertPos.resize(vertIndex);  // Success
     } else {                      // Resize HashTable
       const glm::vec3 lastVert = vertPos[vertIndex - 1];
       const Uint64 lastMorton =
@@ -483,6 +500,8 @@ Mesh LevelSetBatch(
       vertPos = Vec<glm::vec3>(gridVerts.Size() * 7);
     }
   }
+
+  print("Packaged vertPoses!");
 
   // END DIVERGENCE ------------------------------------------------------------
 

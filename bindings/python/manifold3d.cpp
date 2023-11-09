@@ -614,6 +614,55 @@ NB_MODULE(manifold3d, m) {
           "unregistered threads.This allows bindings use LevelSet despite "
           "being compiled with MANIFOLD_PAR active."
           ":return Manifold: This is guaranteed to be manifold.")
+      .def_static(
+          "levelset_batch",
+          [](const std::function<std::vector<float>(std::vector<float>)> &f,
+             std::vector<float> bounds, float edgeLength, float level = 0.0,
+             bool canParallel = false,
+             std::function<void(const char *)> print = nullptr) {
+            // Same format as Manifold.bounding_box
+            Box bound = {glm::vec3(bounds[0], bounds[1], bounds[2]),
+                         glm::vec3(bounds[3], bounds[4], bounds[5])};
+
+            Mesh result = LevelSetBatch(
+                [&f](std::vector<glm::vec3> &v) {
+                  std::vector<float> coords(v.size()*3);
+                  for (int i = 0; i < v.size(); i++) {
+                    coords[(i*3) + 0] = v[i].x;
+                    coords[(i*3) + 1] = v[i].y;
+                    coords[(i*3) + 2] = v[i].z;
+                  }
+                  return f(coords);
+                },
+                bound, edgeLength, level, canParallel,
+                [](const char *str) { nb::print(str); });
+            return Manifold(result);
+          },
+          nb::arg("f"), nb::arg("bounds"), nb::arg("edgeLength"),
+          nb::arg("level") = 0.0, nb::arg("canParallel") = false,
+          nb::arg("print") = nullptr,
+          "Similar to LevelSet, this constructs a level-set Mesh from the input"
+          "Signed-Distance Function (SDF). This variant feeds an std:vector of points"
+          "to the function, allowing the function to compute signed distances using"
+          ":param f: The signed-distance functor, containing this function "
+          "its own threading/parallelization paradigm."
+          "\n\n"
+          ":param f: The signed-distance functor, containing this function "
+          "signature: `def sdf(xyz : tuple) -> float:`, which returns the "
+          "signed distance of a given point in R^3. Positive values are "
+          "inside, negative outside."
+          ":param bounds: An axis-aligned box that defines the extent of the "
+          "grid."
+          ":param edgeLength: Approximate maximum edge length of the triangles "
+          "in the final result.This affects grid spacing, and hence has a "
+          "strong effect on performance."
+          ":param level: You can inset your Mesh by using a positive value, or "
+          "outset it with a negative value."
+          ":param canParallel: Parallel policies violate will crash language "
+          "runtimes with runtime locks that expect to not be called back by "
+          "unregistered threads.This allows bindings use LevelSet despite "
+          "being compiled with MANIFOLD_PAR active."
+          ":return Manifold: This is guaranteed to be manifold.")
       .def_static("reserve_ids", Manifold::ReserveIDs, nb::arg("n"),
                   "Returns the first of n sequential new unique mesh IDs for "
                   "marking sets of triangles that can be looked up after "
