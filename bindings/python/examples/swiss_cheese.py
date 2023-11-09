@@ -34,6 +34,6 @@ def run(n=10):
     t0 = time.perf_counter()
     fast_cheese = Manifold.batch_boolean([a]+spheres, OpType.Subtract)
     fast_mesh = fast_cheese.to_mesh()
-    print("Batch cheese: %s" % (time.perf_counter() - t0)*1000.0, "ms")
+    print("Batch cheese:", (time.perf_counter() - t0)*1000.0, "ms")
 
     return fast_cheese
