@@ -17,6 +17,7 @@
 
 #include "cross_section.h"
 #include "manifold.h"
+#include "sdf.h"
 #include "nanobind/nanobind.h"
 #include "nanobind/ndarray.h"
 #include "nanobind/operators.h"
@@ -574,6 +575,45 @@ NB_MODULE(manifold3d, m) {
           "four, as this sphere is constructed by refining an octahedron. This "
           "means there are a circle of vertices on all three of the axis "
           "planes. Default is calculated by the static Defaults.")
+      .def_static(
+          "levelset",
+          [](const std::function<float(Float3)> &f, std::vector<float> bounds,
+             float edgeLength, float level = 0.0, bool canParallel = false) {
+            // Same format as Manifold.bounding_box
+            Box bound = { glm::vec3(bounds[0], bounds[1], bounds[2]),
+                          glm::vec3(bounds[3], bounds[4], bounds[5]) };
+            Mesh result = LevelSet(
+                [&f](glm::vec3 &v) { 
+                    return f(std::make_tuple(v.x, v.y, v.z)); },
+                bound, edgeLength, level, canParallel);
+            return Manifold::Manifold(result);
+          },
+          nb::arg("f"), nb::arg("bounds"), nb::arg("edgeLength"), 
+          nb::arg("level") = 0.0, nb::arg("canParallel") = false,
+          "Constructs a level-set Mesh from the input Signed-Distance Function "
+          "(SDF) This uses a form of Marching Tetrahedra (akin to Marching "
+          "Cubes, but better for manifoldness). Instead of using a cubic grid, "
+          "it uses a body-centered cubic grid (two shifted cubic grids). This "
+          "means if your function's interior exceeds the given bounds, you "
+          "will see a kind of egg-crate shape closing off the manifold, which "
+          "is due to the underlying grid."
+          "\n\n"
+          ":param f: The signed-distance functor, containing this function "
+          "signature: `def sdf(xyz : tuple) -> float:`, which returns the "
+          "signed distance of a given point in R^3. Positive values are "
+          "inside, negative outside."
+          ":param bounds: An axis-aligned box that defines the extent of the "
+          "grid."
+          ":param edgeLength: Approximate maximum edge length of the triangles "
+          "in the final result.This affects grid spacing, and hence has a "
+          "strong effect on performance."
+          ":param level: You can inset your Mesh by using a positive value, or "
+          "outset it with a negative value."
+          ":param canParallel: Parallel policies violate will crash language "
+          "runtimes with runtime locks that expect to not be called back by "
+          "unregistered threads.This allows bindings use LevelSet despite "
+          "being compiled with MANIFOLD_PAR active."
+          ":return Manifold: This is guaranteed to be manifold.")
       .def_static("reserve_ids", Manifold::ReserveIDs, nb::arg("n"),
                   "Returns the first of n sequential new unique mesh IDs for "
                   "marking sets of triangles that can be looked up after "
