@@ -111,6 +111,11 @@ glm::ivec4 DecodeMorton(Uint64 code) {
   return index;
 }
 
+glm::vec3 Position(glm::ivec4 gridIndex, glm::vec3 origin, glm::vec3 spacing) {
+  return origin +
+         spacing * (glm::vec3(gridIndex) + (gridIndex.w == 1 ? 0.0f : -0.5f));
+}
+
 struct GridVert {
   float distance = NAN;
   int edgeVerts[7] = {-1, -1, -1, -1, -1, -1, -1};
@@ -356,5 +361,142 @@ Mesh LevelSet(std::function<float(glm::vec3)> sdf, Box bounds, float edgeLength,
   out.triVerts.insert(out.triVerts.end(), triVerts.begin(), triVerts.end());
   return out;
 }
+
+
+
+/**
+ * Similar to LevelSet, this constructs a level-set Mesh from the input 
+ * Signed-Distance Function (SDF). This variant feeds an std:vector of points
+ * to the function, allowing the function to compute signed distances using
+ * its own threading/parallelization paradigm.
+ *
+ * @param sdf The signed-distance functor, containing this function signature:
+ * `float operator()(glm::vec3 point)`, which returns the
+ * signed distance of a given point in R^3. Positive values are inside,
+ * negative outside.
+ * @param bounds An axis-aligned box that defines the extent of the grid.
+ * @param edgeLength Approximate maximum edge length of the triangles in the
+ * final result. This affects grid spacing, and hence has a strong effect on
+ * performance.
+ * @param level You can inset your Mesh by using a positive value, or outset
+ * it with a negative value.
+ * @param canParallel Parallel policies violate will crash language runtimes
+ * with runtime locks that expect to not be called back by unregistered threads.
+ * This allows bindings use LevelSet despite being compiled with MANIFOLD_PAR
+ * active.
+ * @return Mesh This class does not depend on Manifold, so it just returns a
+ * Mesh, but it is guaranteed to be manifold and so can always be used as
+ * input to the Manifold constructor for further operations.
+ */
+Mesh LevelSetBatch(std::function<std::vector<float>(
+              std::vector<glm::vec3>)> sdf, Box bounds, float edgeLength,
+              float level, bool canParallel) {
+  Mesh out;
+
+  const glm::vec3 dim = bounds.Size();
+  const float maxDim = std::max(dim[0], std::max(dim[1], dim[2]));
+  const glm::ivec3 gridSize(dim / edgeLength);
+  const glm::vec3 spacing = dim / (glm::vec3(gridSize));
+
+  const Uint64 maxMorton = MortonCode(glm::ivec4(gridSize + 1, 1));
+
+  // Parallel policies violate will crash language runtimes with runtime locks
+  // that expect to not be called back by unregistered threads. This allows
+  // bindings use LevelSet despite being compiled with MANIFOLD_PAR
+  // active.
+  const auto pol = canParallel ? autoPolicy(maxMorton) : ExecutionPolicy::Seq;
+
+  int tableSize = glm::min(
+      2 * maxMorton, static_cast<Uint64>(10 * glm::pow(maxMorton, 0.667)));
+  HashTable<GridVert, identity> gridVerts(tableSize);
+  Vec<glm::vec3> vertPos(gridVerts.Size() * 7);
+
+  // BEGIN DIVERGENCE ----------------------------------------------------------
+
+  // Precompute the Coordinates for the desired Morton Indices
+  std::vector<glm::vec3> gridCoordinates(maxMorton + 1);
+  for (Uint64 i = 0; i < maxMorton + 1; i++) {
+    const glm::ivec4 gridIndex = DecodeMorton(i);
+    // TODO: Handle grid indices outside of the traditional bounds...
+    // Indexing gets tough when coordinates are discarded...
+    //assert(!(glm::any(glm::greaterThan(glm::ivec3(gridIndex), gridSize))));
+    gridCoordinates[i] = Position(gridIndex, bounds.min, spacing);
+  }
+
+  // Compute the distances at these coordinates
+  std::vector<float> gridDistances = sdf(gridCoordinates);
+
+  // Bound these distances - equivalent to BoundedSDF
+  for (Uint64 i = 0; i < maxMorton + 1; i++) {
+    const float d = gridDistances[i] - level;
+    const glm::ivec4 gridIndex = DecodeMorton(i);
+    const glm::ivec3 xyz(gridIndex);
+    const bool onLowerBound = glm::any(glm::lessThanEqual(xyz, glm::ivec3(0)));
+    const bool onUpperBound = glm::any(glm::greaterThanEqual(xyz, gridSize));
+    const bool onHalfBound =
+        gridIndex.w == 1 && glm::any(glm::greaterThanEqual(xyz, gridSize - 1));
+    gridDistances[i] =
+        (onLowerBound || onUpperBound || onHalfBound) ? glm::min(d, 0.0f) : d;
+  }
+
+  // Check each grid coordinate to see if its neighbors cross the 0 threshold
+  size_t vertIndex = 1;
+  for (Uint64 i = 0; i < maxMorton + 1; i++) {
+    const glm::ivec4 gridIndex = DecodeMorton(i);
+    GridVert gridVert;
+    gridVert.distance = gridDistances[i];
+
+    bool keep = false;
+    // These seven edges are uniquely owned by this gridVert; any of them
+    // which intersect the surface create a vert.
+    for (int i = 0; i < 7; ++i) {
+      glm::ivec4 neighborIndex = gridIndex + Neighbors(i);
+      if (neighborIndex.w == 2) {
+        neighborIndex += 1;
+        neighborIndex.w = 0;
+      }
+      const float val = gridDistances[MortonCode(neighborIndex)];
+      if ((val > 0) == (gridVert.distance > 0)) continue;
+      keep = true;
+
+      vertIndex += 1;
+      vertPos[vertIndex] =
+          (val * gridCoordinates[i] -
+           gridVert.distance * Position(neighborIndex, bounds.min, spacing)) /
+          (val - gridVert.distance);
+      gridVert.edgeVerts[i] = vertIndex;
+    }
+
+    if (!gridVerts.Full()) {
+      if (keep) { gridVerts.D().Insert(i, gridVert); }
+      vertPos.resize(vertIndex); // Success
+    } else {  // Resize HashTable
+      const glm::vec3 lastVert = vertPos[vertIndex - 1];
+      const Uint64 lastMorton =
+          MortonCode(glm::ivec4((lastVert - bounds.min) / spacing, 1));
+      const float ratio = static_cast<float>(maxMorton) / lastMorton;
+      if (ratio > 1000)  // do not trust the ratio if it is too large
+        tableSize *= 2;
+      else
+        tableSize *= ratio;
+      gridVerts = HashTable<GridVert, identity>(tableSize);
+      vertPos = Vec<glm::vec3>(gridVerts.Size() * 7);
+    }
+  }
+
+  // END DIVERGENCE ------------------------------------------------------------
+
+  Vec<glm::ivec3> triVerts(gridVerts.Entries() * 12);  // worst case
+
+  Vec<int> index(1, 0);
+  for_each_n(pol, countAt(0), gridVerts.Size(),
+             BuildTris({triVerts, index, gridVerts.D()}));
+  triVerts.resize(index[0]);
+
+  out.vertPos.insert(out.vertPos.end(), vertPos.begin(), vertPos.end());
+  out.triVerts.insert(out.triVerts.end(), triVerts.begin(), triVerts.end());
+  return out;
+}
+
 /** @} */
 }  // namespace manifold

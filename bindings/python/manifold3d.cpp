@@ -577,14 +577,15 @@ NB_MODULE(manifold3d, m) {
           "planes. Default is calculated by the static Defaults.")
       .def_static(
           "levelset",
-          [](const std::function<float(float, float, float)> &f, std::vector<float> bounds,
-             float edgeLength, float level = 0.0, bool canParallel = false) {
+          [](const std::function<float(float, float, float)> &f,
+              std::vector<float> bounds, float edgeLength, float level = 0.0,
+              bool canParallel = false) {
             // Same format as Manifold.bounding_box
             Box bound = {glm::vec3(bounds[0], bounds[1], bounds[2]),
                          glm::vec3(bounds[3], bounds[4], bounds[5])};
-            Mesh result = LevelSet(
-                [&f](glm::vec3 &v) {return f(v.x, v.y, v.z);},
-                bound, edgeLength, level, canParallel);
+            Mesh result =
+                LevelSet([&f](glm::vec3 &v) { return f(v.x, v.y, v.z); }, bound,
+                         edgeLength, level, canParallel);
             return Manifold(result);
           },
           nb::arg("f"), nb::arg("bounds"), nb::arg("edgeLength"),
