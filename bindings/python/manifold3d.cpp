@@ -17,7 +17,6 @@
 
 #include "cross_section.h"
 #include "manifold.h"
-#include "sdf.h"
 #include "nanobind/nanobind.h"
 #include "nanobind/ndarray.h"
 #include "nanobind/operators.h"
@@ -25,6 +24,7 @@
 #include "nanobind/stl/optional.h"
 #include "nanobind/stl/tuple.h"
 #include "nanobind/stl/vector.h"
+#include "sdf.h"
 
 template <>
 struct nanobind::detail::type_caster<glm::vec3> {
@@ -584,7 +584,7 @@ NB_MODULE(manifold3d, m) {
                          glm::vec3(bounds[3], bounds[4], bounds[5])};
             Mesh result = LevelSet(
                 [&f](glm::vec3 &v) {
-                    return f(std::make_tuple(v.x, v.y, v.z));
+                  return f(std::make_tuple(v.x, v.y, v.z));
                 },
                 bound, edgeLength, level, canParallel);
             return Manifold::Manifold(result);
