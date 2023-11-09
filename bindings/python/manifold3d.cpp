@@ -134,6 +134,10 @@ NB_MODULE(manifold3d, m) {
       .def(nb::self + nb::self, "Boolean union.")
       .def(nb::self - nb::self, "Boolean difference.")
       .def(nb::self ^ nb::self, "Boolean intersection.")
+      .def_static(
+          "batch_boolean",
+          [](std::vector<Manifold> &ms, OpType op) { return Manifold::BatchBoolean(ms, op); },
+          "Compute the aggregate boolean operation of a set of manifolds.")
       .def(
           "hull", [](Manifold &self) { return self.Hull(); },
           "Compute the convex hull of all points in this manifold.")
@@ -695,6 +699,11 @@ NB_MODULE(manifold3d, m) {
       .def_ro("run_index", &MeshGL::runIndex)
       .def_ro("run_original_id", &MeshGL::runOriginalID)
       .def_ro("face_id", &MeshGL::faceID);
+
+  nb::enum_<OpType>(m, "OpType")
+      .value("Add", OpType::Add)
+      .value("Subtract", OpType::Subtract)
+      .value("Intersect", OpType::Intersect);
 
   nb::enum_<Manifold::Error>(m, "Error")
       .value("NoError", Manifold::Error::NoError)
