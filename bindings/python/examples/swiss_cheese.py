@@ -28,10 +28,12 @@ def run(n=10):
     t0 = time.perf_counter()
     combined_spheres = reduce(lambda a, b: a + b, spheres)
     slow_cheese = a - combined_spheres
+    slow_mesh = slow_cheese.to_mesh()
     print("Individual cheese:", (time.perf_counter() - t0)*1000.0, "ms")
 
     t0 = time.perf_counter()
     fast_cheese = Manifold.batch_boolean([a]+spheres, OpType.Subtract)
-    print("Batch cheese: %s" % (time.perf_counter() - t0))
+    fast_mesh = fast_cheese.to_mesh()
+    print("Batch cheese: %s" % (time.perf_counter() - t0)*1000.0, "ms")
 
     return fast_cheese
