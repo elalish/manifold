@@ -365,7 +365,7 @@ Mesh LevelSet(std::function<float(glm::vec3)> sdf, Box bounds, float edgeLength,
 
 
 /**
- * Similar to LevelSet, this constructs a level-set Mesh from the input 
+ * Similar to LevelSet, this constructs a level-set Mesh from the input
  * Signed-Distance Function (SDF). This variant feeds an std:vector of points
  * to the function, allowing the function to compute signed distances using
  * its own threading/parallelization paradigm.
@@ -388,9 +388,9 @@ Mesh LevelSet(std::function<float(glm::vec3)> sdf, Box bounds, float edgeLength,
  * Mesh, but it is guaranteed to be manifold and so can always be used as
  * input to the Manifold constructor for further operations.
  */
-Mesh LevelSetBatch(std::function<std::vector<float>(
-              std::vector<glm::vec3>)> sdf, Box bounds, float edgeLength,
-              float level, bool canParallel) {
+Mesh LevelSetBatch(
+    std::function<std::vector<float>(std::vector<glm::vec3>)> sdf, Box bounds,
+    float edgeLength, float level, bool canParallel) {
   Mesh out;
 
   const glm::vec3 dim = bounds.Size();
@@ -419,7 +419,7 @@ Mesh LevelSetBatch(std::function<std::vector<float>(
     const glm::ivec4 gridIndex = DecodeMorton(i);
     // TODO: Handle grid indices outside of the traditional bounds...
     // Indexing gets tough when coordinates are discarded...
-    //assert(!(glm::any(glm::greaterThan(glm::ivec3(gridIndex), gridSize))));
+    // assert(!(glm::any(glm::greaterThan(glm::ivec3(gridIndex), gridSize))));
     gridCoordinates[i] = Position(gridIndex, bounds.min, spacing);
   }
 
@@ -468,9 +468,11 @@ Mesh LevelSetBatch(std::function<std::vector<float>(
     }
 
     if (!gridVerts.Full()) {
-      if (keep) { gridVerts.D().Insert(i, gridVert); }
-      vertPos.resize(vertIndex); // Success
-    } else {  // Resize HashTable
+      if (keep) {
+          gridVerts.D().Insert(i, gridVert);
+      }
+      vertPos.resize(vertIndex);  // Success
+    } else {                      // Resize HashTable
       const glm::vec3 lastVert = vertPos[vertIndex - 1];
       const Uint64 lastMorton =
           MortonCode(glm::ivec4((lastVert - bounds.min) / spacing, 1));
