@@ -616,7 +616,9 @@ NB_MODULE(manifold3d, m) {
           ":return Manifold: This is guaranteed to be manifold.")
       .def_static(
           "levelset_batch",
-          [](const std::function<std::vector<float>(std::vector<float>)> &f,
+          [](const std::function<
+                 nb::ndarray<nb::numpy, const float, nb::c_contig>(
+                 nb::ndarray<nb::numpy, const float, nb::c_contig>)> &f,
              std::vector<float> bounds, float edgeLength, float level = 0.0,
              bool canParallel = false) {
             // Same format as Manifold.bounding_box
@@ -625,13 +627,11 @@ NB_MODULE(manifold3d, m) {
 
             Mesh result = LevelSetBatch(
                 [&f](std::vector<glm::vec3> &v) {
-                  std::vector<float> coords(v.size()*3);
-                  for (int i = 0; i < v.size(); i++) {
-                    coords[(i*3) + 0] = v[i].x;
-                    coords[(i*3) + 1] = v[i].y;
-                    coords[(i*3) + 2] = v[i].z;
-                  }
-                  return f(coords);
+                  size_t coordsShape[2] = {v.size(), 3};
+                  nb::ndarray<nb::numpy, const float, nb::c_contig> d =
+                      f(nb::ndarray<nb::numpy, const float, nb::c_contig>(
+                          v.data(), 2, coordsShape));
+                  return std::vector<float>(d.data(), d.data() + v.size());
                 },
                 bound, edgeLength, level, canParallel);
             return Manifold(result);
@@ -639,13 +639,12 @@ NB_MODULE(manifold3d, m) {
           nb::arg("f"), nb::arg("bounds"), nb::arg("edgeLength"),
           nb::arg("level") = 0.0, nb::arg("canParallel") = false,
           "Similar to LevelSet, this constructs a level-set Mesh from the input"
-          "Signed-Distance Function (SDF). This variant feeds an std:vector of points"
-          "to the function, allowing the function to compute signed distances using"
-          ":param f: The signed-distance functor, containing this function "
-          "its own threading/parallelization paradigm."
+          "Signed-Distance Function (SDF). This variant feeds a [N,3] ndarray"
+          "of points to the function, allowing the function to compute signed"
+          "distances using its own threading/parallelization paradigm."
           "\n\n"
           ":param f: The signed-distance functor, containing this function "
-          "signature: `def sdf(xyz : tuple) -> float:`, which returns the "
+          "signature: `def sdf(xyz : ndarray) -> ndarray:`, which returns the "
           "signed distance of a given point in R^3. Positive values are "
           "inside, negative outside."
           ":param bounds: An axis-aligned box that defines the extent of the "
