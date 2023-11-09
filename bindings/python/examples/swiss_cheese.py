@@ -26,8 +26,8 @@ def run(n=10):
                for i in range(n) for j in range(n)]
 
     t0 = time.perf_counter()
-    spheres = reduce(lambda a, b: a + b, spheres)
-    slow_cheese = a - spheres
+    combined_spheres = reduce(lambda a, b: a + b, spheres)
+    slow_cheese = a - combined_spheres
     print("Individual cheese:", (time.perf_counter() - t0)*1000.0, "ms")
 
     t0 = time.perf_counter()
