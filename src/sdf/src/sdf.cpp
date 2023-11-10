@@ -407,12 +407,12 @@ Mesh LevelSetBatch(
   int tableSize = glm::min(
       2 * maxMorton, static_cast<Uint64>(10 * glm::pow(maxMorton, 0.667)));
   HashTable<GridVert, identity> gridVerts(tableSize);
-  Vec<glm::vec3> vertPos(gridVerts.Size() * 7);
+  Vec<glm::vec3> vertPos(gridVerts.Size() * 7, glm::vec3(0.0));
 
   // BEGIN DIVERGENCE ----------------------------------------------------------
 
   // Precompute the Coordinates for the desired Morton Indices
-  std::vector<glm::vec3> gridCoordinates(maxMorton + 1);
+  std::vector<glm::vec3> gridCoordinates(maxMorton + 1, glm::vec3(0.0));
   for (Uint64 i = 0; i < maxMorton + 1; i++) {
     const glm::ivec4 gridIndex = DecodeMorton(i);
     // TODO: Handle grid indices outside of the traditional bounds...
@@ -438,46 +438,51 @@ Mesh LevelSetBatch(
         (onLowerBound || onUpperBound || onHalfBound) ? glm::min(d, 0.0f) : d;
   }
 
-  // Check each grid coordinate to see if its neighbors cross the 0 threshold
-  size_t vertIndex = 1;
-  for (Uint64 i = 0; i < maxMorton + 1; i++) {
-    const glm::ivec4 gridIndex = DecodeMorton(i);
-    GridVert gridVert;
-    gridVert.distance = gridDistances[i];
+  // Retry Implicit Construction with progressively larger and larger hashtables
+  while (1) {
+    // Check each grid coordinate to see if its neighbors cross the 0 threshold
+    size_t vertIndex  = 0;
+    Uint64 lastMorton = 0;
+    for (Uint64 i = 0; i < maxMorton + 1; i++) {
+      if (gridVerts.Full()) break; // Cancel out of loop if we've run out of space
 
-    bool keep = false;
-    // These seven edges are uniquely owned by this gridVert; any of them
-    // which intersect the surface create a vert.
-    for (int j = 0; j < 7; ++j) {
-      glm::ivec4 neighborIndex = gridIndex + Neighbors(j);
-      if (neighborIndex.w == 2) {
-        neighborIndex += 1;
-        neighborIndex.w = 0;
+      const glm::ivec4 gridIndex = DecodeMorton(i);
+      GridVert gridVert;
+      gridVert.distance = gridDistances[i];
+
+      bool keep = false;
+      // These seven edges are uniquely owned by this gridVert; any of them
+      // which intersect the surface create a vert.
+      for (int j = 0; j < 7; ++j) {
+        glm::ivec4 neighborIndex = gridIndex + Neighbors(j);
+        if (neighborIndex.w == 2) {
+          neighborIndex += 1;
+          neighborIndex.w = 0;
+        }
+
+        const Uint64 neighborCode = MortonCode(neighborIndex);
+        if (neighborCode >= gridDistances.size())
+          continue;  // Neighbors outside of the bounds...
+        const float val = gridDistances[neighborCode];
+        if ((val > 0) == (gridVert.distance > 0)) continue;
+        keep = true;
+
+        vertIndex += 1;
+        vertPos[vertIndex] =
+            (val * gridCoordinates[i] -
+             gridVert.distance * Position(neighborIndex, bounds.min, spacing)) /
+            (val - gridVert.distance);
+        gridVert.edgeVerts[j] = vertIndex;
       }
 
-      const Uint64 neighborCode = MortonCode(neighborIndex);
-      if (neighborCode >= gridDistances.size()) continue; // Neighbors outside of the bounds...
-      const float val = gridDistances[neighborCode];
-      if ((val > 0) == (gridVert.distance > 0)) continue;
-      keep = true;
-
-      vertIndex += 1;
-      vertPos[vertIndex] =
-          (val * gridCoordinates[i] -
-           gridVert.distance * Position(neighborIndex, bounds.min, spacing)) /
-          (val - gridVert.distance);
-      gridVert.edgeVerts[j] = vertIndex;
-    }
-
-    if (!gridVerts.Full()) {
       if (keep) {
         gridVerts.D().Insert(i, gridVert);
+        lastMorton = i;
       }
-      //vertPos.resize(vertIndex);  // Success - FIGURE OUT WHY THIS WAS HERE
-    } else {                      // Resize HashTable
-      const glm::vec3 lastVert = vertPos[vertIndex - 1];
-      const Uint64 lastMorton =
-          MortonCode(glm::ivec4((lastVert - bounds.min) / spacing, 1));
+    }
+
+    if (gridVerts.Full()) {  // Resize HashTable
+      const glm::vec3 lastVert = vertPos[vertIndex];
       const float ratio = static_cast<float>(maxMorton) / lastMorton;
       if (ratio > 1000)  // do not trust the ratio if it is too large
         tableSize *= 2;
@@ -485,6 +490,9 @@ Mesh LevelSetBatch(
         tableSize *= ratio;
       gridVerts = HashTable<GridVert, identity>(tableSize);
       vertPos = Vec<glm::vec3>(gridVerts.Size() * 7);
+    } else {
+      vertPos.resize(vertIndex+1);
+      break;
     }
   }
 
