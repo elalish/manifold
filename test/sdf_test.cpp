@@ -217,7 +217,6 @@ TEST(SDF, BatchSineSurface) {
 #endif
 }
 
-
 TEST(SDF, Bounds) {
   const float size = 4;
   const float edgeLength = 0.5;
