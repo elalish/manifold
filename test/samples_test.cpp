@@ -275,8 +275,8 @@ TEST(Samples, GenericTwinBooleanTest7863) {
   std::string dir = file.substr(0, file.rfind('/'));
   Manifold m1 = ImportMesh(dir + "/models/Generic_Twin_7863.1.t0_left.glb");
   Manifold m2 = ImportMesh(dir + "/models/Generic_Twin_7863.1.t0_right.glb");
-  Manifold res = m1 + m2; // Union
-  res.GetMeshGL();  // test crash
+  Manifold res = m1 + m2;  // Union
+  res.GetMeshGL();         // test crash
   manifold::PolygonParams().processOverlaps = false;
 }
 #endif
