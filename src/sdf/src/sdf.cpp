@@ -99,7 +99,7 @@ Uint64 SqueezeBits3(Uint64 v) {
 // y, and z channel and 1 for w, filling the 64 bit total.
 Uint64 MortonCode(const glm::ivec4& index) {
   return static_cast<Uint64>(index.w) | (SpreadBits3(index.x) << 1) |
-          (SpreadBits3(index.y) << 2) | (SpreadBits3(index.z) << 3);
+         (SpreadBits3(index.y) << 2) | (SpreadBits3(index.z) << 3);
 }
 
 glm::ivec4 DecodeMorton(Uint64 code) {
@@ -431,9 +431,10 @@ Mesh LevelSetBatch(
     const glm::ivec4 gridIndex = DecodeMorton(i);
     const glm::ivec3 xyz(gridIndex);
     const bool onLowerBound = glm::any(glm::lessThanEqual(xyz, glm::ivec3(0)));
-    const bool onUpperBound = glm::any(glm::greaterThanEqual(xyz, (gridSize+1)));
-    const bool onHalfBound =
-        gridIndex.w == 1 && glm::any(glm::greaterThanEqual(xyz,   (gridSize+1) - 1));
+    const bool onUpperBound =
+        glm::any(glm::greaterThanEqual(xyz, (gridSize + 1)));
+    const bool onHalfBound = gridIndex.w == 1 && glm::any(glm::greaterThanEqual(
+                                                     xyz, (gridSize + 1) - 1));
     gridDistances[i] =
         (onLowerBound || onUpperBound || onHalfBound) ? glm::min(d, 0.0f) : d;
   }
@@ -441,10 +442,11 @@ Mesh LevelSetBatch(
   // Retry Implicit Construction with progressively larger and larger hashtables
   while (1) {
     // Check each grid coordinate to see if its neighbors cross the 0 threshold
-    size_t vertIndex  = 0;
+    size_t vertIndex = 0;
     Uint64 lastMorton = 0;
     for (Uint64 i = 0; i < maxMorton + 1; i++) {
-      if (gridVerts.Full()) break; // Cancel out of loop if we've run out of space
+      if (gridVerts.Full())
+        break;  // Cancel out of loop if we've run out of space
 
       const glm::ivec4 gridIndex = DecodeMorton(i);
       GridVert gridVert;
@@ -491,7 +493,7 @@ Mesh LevelSetBatch(
       gridVerts = HashTable<GridVert, identity>(tableSize);
       vertPos = Vec<glm::vec3>(gridVerts.Size() * 7);
     } else {
-      vertPos.resize(vertIndex+1);
+      vertPos.resize(vertIndex + 1);
       break;
     }
   }

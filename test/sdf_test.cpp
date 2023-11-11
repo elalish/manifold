@@ -43,8 +43,7 @@ struct Layers {
 struct UnboundedGyroidSDF {
   float operator()(glm::vec3 p) const {
     auto qpi = glm::pi<float>() / 4.0;
-    return cos(p.x - qpi) * sin(p.y - qpi) + 
-           cos(p.y - qpi) * sin(p.z - qpi) +
+    return cos(p.x - qpi) * sin(p.y - qpi) + cos(p.y - qpi) * sin(p.z - qpi) +
            cos(p.z - qpi) * sin(p.x - qpi);
   }
 };
@@ -67,7 +66,7 @@ TEST(SDF, BatchValidation) {
   const float edgeLength = size / 15;
 
   Mesh levelSet = LevelSet(UnboundedGyroidSDF(),
-      {glm::vec3(-size), glm::vec3(size)}, edgeLength);
+                           {glm::vec3(-size), glm::vec3(size)}, edgeLength);
   Mesh levelSetBatch = LevelSetBatch(
       [](std::vector<glm::vec3> pvec) {
         std::vector<float> dvec(pvec.size());
@@ -78,37 +77,37 @@ TEST(SDF, BatchValidation) {
       },
       {glm::vec3(-size), glm::vec3(size)}, edgeLength);
 
-  
-  //EXPECT_EQ(levelSet.vertPos .size(), levelSetBatch.vertPos .size());
+  // EXPECT_EQ(levelSet.vertPos .size(), levelSetBatch.vertPos .size());
+
   EXPECT_EQ(levelSet.triVerts.size(), levelSetBatch.triVerts.size());
 
-  Manifold      gyroid(levelSet);
+  Manifold gyroid(levelSet);
   Manifold batchGyroid(levelSetBatch);
 
-  Box            bounds      =      gyroid.BoundingBox();
-  Box            boundsBatch = batchGyroid.BoundingBox();
-  const float precision      =      gyroid.Precision();
+  Box bounds = gyroid.BoundingBox();
+  Box boundsBatch = batchGyroid.BoundingBox();
+  const float precision = gyroid.Precision();
   const float precisionBatch = batchGyroid.Precision();
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) ExportMesh("batchcubeVoid.gltf", levelSetBatch, {});
 #endif
 
-  EXPECT_EQ  (     gyroid.Status(), Manifold::Error::NoError);
-  EXPECT_EQ  (batchGyroid.Status(), Manifold::Error::NoError);
-  EXPECT_EQ  (     gyroid.Genus (), batchGyroid.Genus ());
+  EXPECT_EQ(gyroid.Status(), Manifold::Error::NoError);
+  EXPECT_EQ(batchGyroid.Status(), Manifold::Error::NoError);
+  EXPECT_EQ(gyroid.Genus(), batchGyroid.Genus());
   const float outerBound = size + edgeLength / 2;
   EXPECT_NEAR(bounds.min.x, -outerBound, precision);
   EXPECT_NEAR(bounds.min.y, -outerBound, precision);
   EXPECT_NEAR(bounds.min.z, -outerBound, precision);
-  EXPECT_NEAR(bounds.max.x,  outerBound, precision);
-  EXPECT_NEAR(bounds.max.y,  outerBound, precision);
-  EXPECT_NEAR(bounds.max.z,  outerBound, precision);
+  EXPECT_NEAR(bounds.max.x, outerBound, precision);
+  EXPECT_NEAR(bounds.max.y, outerBound, precision);
+  EXPECT_NEAR(bounds.max.z, outerBound, precision);
   EXPECT_NEAR(boundsBatch.min.x, -outerBound, precisionBatch);
   EXPECT_NEAR(boundsBatch.min.y, -outerBound, precisionBatch);
   EXPECT_NEAR(boundsBatch.min.z, -outerBound, precisionBatch);
-  EXPECT_NEAR(boundsBatch.max.x,  outerBound, precisionBatch);
-  EXPECT_NEAR(boundsBatch.max.y,  outerBound, precisionBatch);
-  EXPECT_NEAR(boundsBatch.max.z,  outerBound, precisionBatch);
+  EXPECT_NEAR(boundsBatch.max.x, outerBound, precisionBatch);
+  EXPECT_NEAR(boundsBatch.max.y, outerBound, precisionBatch);
+  EXPECT_NEAR(boundsBatch.max.z, outerBound, precisionBatch);
 }
 
 TEST(SDF, BatchBounds) {
@@ -122,7 +121,8 @@ TEST(SDF, BatchBounds) {
           dvec[i] = CubeVoid()(pvec[i]);
         }
         return dvec;
-      }, {glm::vec3(-size / 2), glm::vec3(size / 2)}, edgeLength);
+      },
+      {glm::vec3(-size / 2), glm::vec3(size / 2)}, edgeLength);
   Manifold cubeVoid(levelSet);
   Box bounds = cubeVoid.BoundingBox();
   const float precision = cubeVoid.Precision();
@@ -152,7 +152,8 @@ TEST(SDF, BatchSurface) {
           dvec[i] = CubeVoid()(pvec[i]);
         }
         return dvec;
-      }, {glm::vec3(-size / 2), glm::vec3(size / 2)}, edgeLength));
+      },
+      {glm::vec3(-size / 2), glm::vec3(size / 2)}, edgeLength));
 
   Manifold cube = Manifold::Cube(glm::vec3(size), true);
   cube -= cubeVoid;
@@ -184,7 +185,8 @@ TEST(SDF, BatchResize) {
           dvec[i] = Layers()(pvec[i]);
         }
         return dvec;
-      }, {glm::vec3(0), glm::vec3(size)}, 1));
+      },
+      {glm::vec3(0), glm::vec3(size)}, 1));
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) ExportMesh("layers.gltf", layers.GetMesh(), {});
 #endif

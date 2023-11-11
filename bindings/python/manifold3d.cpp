@@ -705,7 +705,7 @@ NB_MODULE(manifold3d, m) {
             Box bound = {glm::vec3(bounds[0], bounds[1], bounds[2]),
                          glm::vec3(bounds[3], bounds[4], bounds[5])};
 
-            std::function<float(glm::vec3)> cppToPython = 
+            std::function<float(glm::vec3&)> cppToPython = 
                 [&f](glm::vec3 &v) { return f(v.x, v.y, v.z); };
             Mesh result =
                 LevelSet(cppToPython, bound,
@@ -750,7 +750,7 @@ NB_MODULE(manifold3d, m) {
             Box bound = {glm::vec3(bounds[0], bounds[1], bounds[2]),
                          glm::vec3(bounds[3], bounds[4], bounds[5])};
 
-            std::function <std::vector<float>(std::vector<glm::vec3>)> 
+            std::function <std::vector<float>(std::vector<glm::vec3>&)> 
                 cppToPython = [&f](std::vector<glm::vec3> &v) {
                   size_t coordsShape[2] = {v.size(), 3};
                   auto d = f(nb::ndarray<nb::numpy, const float, nb::c_contig>(
