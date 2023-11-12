@@ -266,9 +266,18 @@ TEST(Samples, SelfIntersect) {
   res.GetMeshGL();  // test crash
   manifold::PolygonParams().processOverlaps = false;
 }
-#endif
 
-#ifdef MANIFOLD_EXPORT
+TEST(Samples, DISABLED_GenericTwinBooleanTest7863) {
+  manifold::PolygonParams().processOverlaps = true;
+  std::string file = __FILE__;
+  std::string dir = file.substr(0, file.rfind('/'));
+  Manifold m1 = ImportMesh(dir + "/models/Generic_Twin_7863.1.t0_left.glb");
+  Manifold m2 = ImportMesh(dir + "/models/Generic_Twin_7863.1.t0_right.glb");
+  Manifold res = m1 + m2;  // Union
+  res.GetMeshGL();         // test crash
+  manifold::PolygonParams().processOverlaps = false;
+}
+
 TEST(Samples, Havocglass8Bool) {
   manifold::PolygonParams().processOverlaps = true;
   std::string file = __FILE__;
