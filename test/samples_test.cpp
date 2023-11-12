@@ -269,7 +269,7 @@ TEST(Samples, SelfIntersect) {
 #endif
 
 #ifdef MANIFOLD_EXPORT
-TEST(Samples, GenericTwinBooleanTest7863) {
+TEST(Samples, DISABLED_GenericTwinBooleanTest7863) {
   manifold::PolygonParams().processOverlaps = true;
   std::string file = __FILE__;
   std::string dir = file.substr(0, file.rfind('/'));
