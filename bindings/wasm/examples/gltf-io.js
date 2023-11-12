@@ -105,6 +105,8 @@ export function readMesh(mesh, attributes, materials) {
   const mergeFromVert = [];
   const mergeToVert = [];
   if (manifoldPrimitive != null) {
+    // TODO: for each attribute, need to check all primitives to find one with
+    // an accessor.
     vertPropArray = readPrimitive(primitives[0], numProp, attributes);
     for (const primitive of primitives) {
       triVertArray = [...triVertArray, ...primitive.getIndices().getArray()];
@@ -212,8 +214,11 @@ export function writeMesh(doc, manifoldMesh, attributes, materials) {
     const array = new Float32Array(n * numVert);
     for (let v = 0; v < numVert; ++v) {
       for (let i = 0; i < n; ++i) {
-        array[n * v + i] =
-            manifoldMesh.vertProperties[numProp * v + offset + i];
+        let x = manifoldMesh.vertProperties[numProp * v + offset + i];
+        if (attribute == 'COLOR_0') {
+          x = Math.max(0, Math.min(1, x));
+        }
+        array[n * v + i] = x;
       }
     }
 
@@ -225,6 +230,7 @@ export function writeMesh(doc, manifoldMesh, attributes, materials) {
     mesh.listPrimitives().forEach((primitive, pIdx) => {
       if (attributes[pIdx].length > aIdx &&
           attributeDefs[attributes[pIdx][aIdx]].type != null) {
+        // TODO: only add attributes that apply to this primitive.
         primitive.setAttribute(attribute, accessor);
       }
     });
