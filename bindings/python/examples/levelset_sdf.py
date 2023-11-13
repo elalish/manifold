@@ -24,8 +24,8 @@ def sphere_implicit(x, y, z):
     sphere2 = 0.5 - math.sqrt((x*x) + (y*y) + (z*z))
     return min(sphere1, -sphere2)
 
-def sphere_implicit_batched(coords):
-    coords = coords.copy()
+def sphere_implicit_batched(coords_readonly):
+    coords = coords_readonly.copy() # Copy read-only coords to modify in-place
     x = coords[:, 0]; y = coords[:, 1]; z = coords[:, 2]
     sphere1 = 0.5 - np.sqrt((x*x) + (y*y) + (z*z))
     x += 0.25; y += 0.25; z -= 0.25

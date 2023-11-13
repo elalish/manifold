@@ -363,14 +363,14 @@ Mesh LevelSet(std::function<float(glm::vec3)> sdf, Box bounds, float edgeLength,
 }
 
 /**
- * Similar to LevelSet, this constructs a level-set Mesh from the input
+ * Similar to LevelSet, this constructs a level-set Mesh from an input
  * Signed-Distance Function (SDF). This variant feeds an std:vector of points
  * to the function, allowing the function to compute signed distances using
  * its own threading/parallelization paradigm.
  *
  * @param sdf The signed-distance functor, containing this function signature:
- * `float operator()(glm::vec3 point)`, which returns the
- * signed distance of a given point in R^3. Positive values are inside,
+ * `std::vector<float> operator()(std::vector<glm::vec3> points)`, which returns
+ * the signed distances of each input point in R^3. Positive values are inside,
  * negative outside.
  * @param bounds An axis-aligned box that defines the extent of the grid.
  * @param edgeLength Approximate maximum edge length of the triangles in the
