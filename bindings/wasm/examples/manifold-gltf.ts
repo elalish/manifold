@@ -21,7 +21,7 @@ interface IManifoldPrimitive extends IProperty {
   mergeIndices: Accessor;
   mergeValues: Accessor;
   indices: Accessor;
-  runIndex: number[];
+  runIndex: number[]|Uint32Array;
 }
 
 interface ManifoldDef {
@@ -49,11 +49,11 @@ export class ManifoldPrimitive extends ExtensionProperty<IManifoldPrimitive> {
   }
 
   getMergeIndices() {
-    return this.getRef('mergeIndices')!;
+    return this.getRef('mergeIndices');
   }
 
   getMergeValues() {
-    return this.getRef('mergeValues')!;
+    return this.getRef('mergeValues');
   }
 
   setMerge(indicesAccessor: Accessor, valuesAccessor: Accessor) {
@@ -67,7 +67,7 @@ export class ManifoldPrimitive extends ExtensionProperty<IManifoldPrimitive> {
     return this.get('runIndex');
   }
 
-  setRunIndex(runIndex: number[]) {
+  setRunIndex(runIndex: number[]|Uint32Array) {
     return this.set('runIndex', runIndex);
   }
 
@@ -161,9 +161,9 @@ export class EXTManifold extends Extension {
       }
 
       const mergeIndicesIndex =
-          context.accessorIndexMap.get(manifoldPrimitive.getMergeIndices())!;
+          context.accessorIndexMap.get(manifoldPrimitive.getMergeIndices()!)!;
       const mergeValuesIndex =
-          context.accessorIndexMap.get(manifoldPrimitive.getMergeValues())!;
+          context.accessorIndexMap.get(manifoldPrimitive.getMergeValues()!)!;
       const mergeIndices = json.accessors![mergeIndicesIndex];
       const mergeValues = json.accessors![mergeValuesIndex];
 

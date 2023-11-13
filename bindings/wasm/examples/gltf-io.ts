@@ -12,9 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {Accessor} from '@gltf-transform/core';
+import {Accessor, Document, Material, Mesh, Primitive, Texture, WebIO} from '@gltf-transform/core';
 
-import {EXTManifold} from './manifold-gltf';
+import {EXTManifold, ManifoldPrimitive} from './manifold-gltf';
+import {Mesh as ManifoldMesh} from './public/manifold-encapsulated-types';
 
 export const attributeDefs = {
   'POSITION': {type: Accessor.Type.VEC3, components: 3},
@@ -31,24 +32,27 @@ export const attributeDefs = {
   'SKIP_4': {type: null, components: 4},
 };
 
-export function setupIO(io) {
+type Attribute = keyof(typeof attributeDefs);
+
+export function setupIO(io: WebIO) {
   return io.registerExtensions([EXTManifold]);
 }
 
-function readPrimitive(primitive, numProp, attributes) {
-  const position = primitive.getAttribute('POSITION');
+function readPrimitive(
+    primitive: Primitive, numProp: number, attributes: Attribute[]) {
+  const position = primitive.getAttribute('POSITION')!;
   const numVert = position.getCount();
   const vertProperties = [];
   let offset = 0;
   for (const attribute of attributes) {
     const size = attributeDefs[attribute].components;
-    if (attribute === 'SKIP') {
+    if (attributeDefs[attribute].type == null) {
       offset += size;
       continue;
     }
     const accessor = primitive.getAttribute(attribute);
     if (accessor) {
-      const array = accessor.getArray();
+      const array = accessor.getArray()!;
       for (let i = 0; i < numVert; ++i) {
         for (let j = 0; j < size; ++j) {
           vertProperties[numProp * i + offset + j] = array[i * size + j];
@@ -66,21 +70,23 @@ function readPrimitive(primitive, numProp, attributes) {
   return vertProperties;
 }
 
-export function readMesh(mesh, attributes, materials) {
+export function readMesh(
+    mesh: Mesh, attributes: Attribute[], materials: Material[]) {
   const primitives = mesh.listPrimitives();
   if (primitives.length === 0) {
     return {};
   }
 
   if (attributes.length === 0) {
-    const attributeSet = new Set();
+    const attributeSet = new Set<Attribute>();
     for (const primitive of primitives) {
-      const semantics = primitive.listSemantics();
+      const semantics = primitive.listSemantics() as Attribute[];
       for (const semantic of semantics) {
         attributeSet.add(semantic);
       }
     }
-    for (const semantic in attributeDefs) {
+    let semantic: Attribute;
+    for (semantic in attributeDefs) {
       if (attributeSet.has(semantic)) {
         attributes.push(semantic);
         attributeSet.delete(semantic);
@@ -97,10 +103,11 @@ export function readMesh(mesh, attributes, materials) {
   const numProp = attributes.map((def) => attributeDefs[def].components)
                       .reduce((a, b) => a + b);
 
-  const manifoldPrimitive = mesh.getExtension('EXT_manifold');
+  const manifoldPrimitive =
+      mesh.getExtension('EXT_manifold') as ManifoldPrimitive;
 
-  let vertPropArray = [];
-  let triVertArray = [];
+  let vertPropArray: number[] = [];
+  let triVertArray: number[] = [];
   const runIndexArray = [0];
   const mergeFromVert = [];
   const mergeToVert = [];
@@ -109,9 +116,14 @@ export function readMesh(mesh, attributes, materials) {
     // an accessor.
     vertPropArray = readPrimitive(primitives[0], numProp, attributes);
     for (const primitive of primitives) {
-      triVertArray = [...triVertArray, ...primitive.getIndices().getArray()];
+      const indices = primitive.getIndices();
+      if (!indices) {
+        console.log('Skipping non-indexed primitive ', primitive.getName());
+        continue;
+      }
+      triVertArray = [...triVertArray, ...indices.getArray()!];
       runIndexArray.push(triVertArray.length);
-      materials.push(primitive.getMaterial());
+      materials.push(primitive.getMaterial()!);
     }
     const mergeTriVert = manifoldPrimitive.getMergeIndices()?.getArray() ?? [];
     const mergeTo = manifoldPrimitive.getMergeValues()?.getArray() ?? [];
@@ -125,15 +137,18 @@ export function readMesh(mesh, attributes, materials) {
     }
   } else {
     for (const primitive of primitives) {
+      const indices = primitive.getIndices();
+      if (!indices) {
+        console.log('Skipping non-indexed primitive ', primitive.getName());
+        continue;
+      }
       const numVert = vertPropArray.length / numProp;
       vertPropArray =
           [...vertPropArray, ...readPrimitive(primitive, numProp, attributes)];
-      triVertArray = [
-        ...triVertArray,
-        ...primitive.getIndices().getArray().map((i) => i + numVert)
-      ];
+      triVertArray =
+          [...triVertArray, ...indices.getArray()!.map((i) => i + numVert)];
       runIndexArray.push(triVertArray.length);
-      materials.push(primitive.getMaterial());
+      materials.push(primitive.getMaterial()!);
     }
   }
   const vertProperties = new Float32Array(vertPropArray);
@@ -150,14 +165,16 @@ export function readMesh(mesh, attributes, materials) {
   };
 }
 
-export function writeMesh(doc, manifoldMesh, attributes, materials) {
+export function writeMesh(
+    doc: Document, manifoldMesh: ManifoldMesh, attributes: Attribute[][],
+    materials: Material[]) {
   if (doc.getRoot().listBuffers().length === 0) {
     doc.createBuffer();
   }
   const buffer = doc.getRoot().listBuffers()[0];
   const manifoldExtension = doc.createExtension(EXTManifold);
 
-  const attributeUnion = [];
+  const attributeUnion: Attribute[] = [];
   for (const matAttributes of attributes) {
     matAttributes.forEach((attribute, i) => {
       if (i >= attributeUnion.length) {
@@ -167,7 +184,7 @@ export function writeMesh(doc, manifoldMesh, attributes, materials) {
         const unionSize = attributeDefs[attributeUnion[i]].components;
         if (size != unionSize) {
           throw new Error(
-              'Attribute sizes do not correspond: ', attribute, ' and ',
+              'Attribute sizes do not correspond: ' + attribute + ' and ' +
               attributeUnion[i]);
         }
         if (attributeDefs[attributeUnion[i]].type == null) {
@@ -180,15 +197,18 @@ export function writeMesh(doc, manifoldMesh, attributes, materials) {
     throw new Error('First attribute must be "POSITION".');
 
   const mesh = doc.createMesh();
+  if (!manifoldMesh.runIndex) {
+    manifoldMesh.runIndex = new Uint32Array([0, 3 * manifoldMesh.numTri]);
+  }
   const numPrimitive = manifoldMesh.runIndex.length - 1;
   for (let run = 0; run < numPrimitive; ++run) {
-    const id = manifoldMesh.runOriginalID[run];
+    const id =
+        manifoldMesh.runOriginalID ? manifoldMesh.runOriginalID[run] : -1;
     const indices = doc.createAccessor('index run of ID: ' + id)
                         .setBuffer(buffer)
                         .setType(Accessor.Type.SCALAR)
                         .setArray(new Uint32Array(1));
-    const primitive =
-        doc.createPrimitive('primitive of ID: ' + id).setIndices(indices);
+    const primitive = doc.createPrimitive().setIndices(indices);
     const material = materials[run];
     if (material) {
       primitive.setMaterial(material);
@@ -200,13 +220,14 @@ export function writeMesh(doc, manifoldMesh, attributes, materials) {
   const numProp = manifoldMesh.numProp;
   let offset = 0;
   attributeUnion.forEach((attribute, aIdx) => {
-    if (attribute === 'SKIP') {
-      ++offset;
-      return;
-    }
     const def = attributeDefs[attribute];
     if (def == null)
       throw new Error(attribute + ' is not a recognized attribute.');
+
+    if (def.type == null) {
+      ++offset;
+      return;
+    }
 
     const n = def.components;
     if (offset + n > numProp) throw new Error('Too many attribute channels.');
@@ -248,16 +269,19 @@ export function writeMesh(doc, manifoldMesh, attributes, materials) {
   manifoldPrimitive.setRunIndex(manifoldMesh.runIndex);
 
   const vert2merge = [...Array(manifoldMesh.numVert).keys()];
-  for (const [i, from] of manifoldMesh.mergeFromVert.entries()) {
-    vert2merge[from] = manifoldMesh.mergeToVert[i];
-  }
   const ind = [];
   const val = [];
-  for (const [i, vert] of manifoldMesh.triVerts.entries()) {
-    const newVert = vert2merge[vert];
-    if (vert !== newVert) {
-      ind.push(i);
-      val.push(newVert);
+  if (manifoldMesh.mergeFromVert && manifoldMesh.mergeToVert) {
+    for (const [i, from] of manifoldMesh.mergeFromVert.entries()) {
+      vert2merge[from] = manifoldMesh.mergeToVert[i];
+    }
+
+    for (const [i, vert] of manifoldMesh.triVerts.entries()) {
+      const newVert = vert2merge[vert];
+      if (vert !== newVert) {
+        ind.push(i);
+        val.push(newVert);
+      }
     }
   }
   if (ind.length > 0) {
@@ -275,7 +299,7 @@ export function writeMesh(doc, manifoldMesh, attributes, materials) {
   return mesh;
 }
 
-export function disposeMesh(mesh) {
+export function disposeMesh(mesh: Mesh) {
   if (!mesh) return;
   const primitives = mesh.listPrimitives();
   for (const primitive of primitives) {
@@ -288,7 +312,7 @@ export function disposeMesh(mesh) {
   mesh.dispose();
 }
 
-export async function loadTexture(texture, uri) {
+export async function loadTexture(texture: Texture, uri: string) {
   const response = await fetch(uri);
   const blob = await response.blob();
   texture.setMimeType(blob.type);
