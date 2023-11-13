@@ -15,7 +15,7 @@
 import {Accessor, Document, Material, Mesh, Primitive, Texture, WebIO} from '@gltf-transform/core';
 
 import {EXTManifold, ManifoldPrimitive} from './manifold-gltf';
-import {Mesh as ManifoldMesh} from './public/manifold-encapsulated-types';
+import {Mesh as ManifoldMesh, MeshOptions} from './public/manifold-encapsulated-types';
 
 export const attributeDefs = {
   'POSITION': {type: Accessor.Type.VEC3, components: 3},
@@ -34,6 +34,15 @@ export const attributeDefs = {
 
 export type Attribute = keyof(typeof attributeDefs);
 
+export interface Properties {
+  material: Material;
+  attributes: Attribute[];
+}
+
+/**
+ * Call this first to register the manifold extension so that readMesh and
+ * writeMesh will work.
+ */
 export function setupIO(io: WebIO) {
   return io.registerExtensions([EXTManifold]);
 }
@@ -71,10 +80,11 @@ function readPrimitive(
 }
 
 export function readMesh(
-    mesh: Mesh, attributes: Attribute[], materials: Material[]) {
+    mesh: Mesh, attributes: Attribute[], materials: Material[]): MeshOptions|
+    null {
   const primitives = mesh.listPrimitives();
   if (primitives.length === 0) {
-    return {};
+    return null;
   }
 
   if (attributes.length === 0) {
@@ -109,8 +119,8 @@ export function readMesh(
   let vertPropArray: number[] = [];
   let triVertArray: number[] = [];
   const runIndexArray = [0];
-  const mergeFromVert = [];
-  const mergeToVert = [];
+  const mergeFromVertArray = [];
+  const mergeToVertArray = [];
   if (manifoldPrimitive != null) {
     // TODO: for each attribute, need to check all primitives to find one with
     // an accessor.
@@ -132,8 +142,8 @@ export function readMesh(
       vert2merge.set(triVertArray[idx], mergeTo[i]);
     }
     for (const [from, to] of vert2merge.entries()) {
-      mergeFromVert.push(from);
-      mergeToVert.push(to);
+      mergeFromVertArray.push(from);
+      mergeToVertArray.push(to);
     }
   } else {
     for (const primitive of primitives) {
@@ -154,6 +164,8 @@ export function readMesh(
   const vertProperties = new Float32Array(vertPropArray);
   const triVerts = new Uint32Array(triVertArray);
   const runIndex = new Uint32Array(runIndexArray);
+  const mergeFromVert = new Uint32Array(mergeFromVertArray);
+  const mergeToVert = new Uint32Array(mergeToVertArray);
 
   return {
     numProp,
@@ -167,7 +179,7 @@ export function readMesh(
 
 export function writeMesh(
     doc: Document, manifoldMesh: ManifoldMesh, attributes: Attribute[][],
-    materials: Material[]) {
+    materials: Material[]): Mesh {
   if (doc.getRoot().listBuffers().length === 0) {
     doc.createBuffer();
   }
@@ -204,7 +216,7 @@ export function writeMesh(
   for (let run = 0; run < numPrimitive; ++run) {
     const id =
         manifoldMesh.runOriginalID ? manifoldMesh.runOriginalID[run] : -1;
-    const indices = doc.createAccessor('index run of ID: ' + id)
+    const indices = doc.createAccessor('primitive indices of ID ' + id)
                         .setBuffer(buffer)
                         .setType(Accessor.Type.SCALAR)
                         .setArray(new Uint32Array(1));
@@ -299,6 +311,10 @@ export function writeMesh(
   return mesh;
 }
 
+/**
+ * Helper function to dispose of a Mesh, useful when replacing an existing Mesh
+ * with one from writeMesh.
+ */
 export function disposeMesh(mesh: Mesh) {
   if (!mesh) return;
   const primitives = mesh.listPrimitives();
@@ -312,6 +328,12 @@ export function disposeMesh(mesh: Mesh) {
   mesh.dispose();
 }
 
+/**
+ * Helper function to download an image and apply it to the given texture.
+ *
+ * @param texture The texture to update
+ * @param uri The location of the image to download
+ */
 export async function loadTexture(texture: Texture, uri: string) {
   const response = await fetch(uri);
   const blob = await response.blob();
