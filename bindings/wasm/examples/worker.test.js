@@ -73,7 +73,6 @@ async function runExample(name) {
           const manifold = wasm.Manifold(manifoldMesh);
           const prop = manifold.getProperties();
           const genus = manifold.genus();
-          console.log(genus);
           manifold.delete();
           resolve({...prop, genus});
         }

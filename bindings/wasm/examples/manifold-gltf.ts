@@ -132,6 +132,11 @@ export class EXTManifold extends Extension {
     this.document.getRoot().listMeshes().forEach((mesh) => {
       const manifoldPrimitive = mesh.getExtension(NAME) as ManifoldPrimitive;
       if (!manifoldPrimitive) return;
+
+      const indices = manifoldPrimitive.getIndices();
+      context.addAccessorToUsageGroup(
+          indices, WriterContext.BufferViewUsage.ELEMENT_ARRAY_BUFFER);
+
       const mergeFrom = manifoldPrimitive.getMergeIndices();
       const mergeTo = manifoldPrimitive.getMergeValues();
       if (!mergeFrom || !mergeTo) return;
