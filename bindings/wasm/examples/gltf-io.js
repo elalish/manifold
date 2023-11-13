@@ -14,7 +14,7 @@
 
 import {Accessor} from '@gltf-transform/core';
 
-import {EXTManifold} from './manifold-gltf.js';
+import {EXTManifold} from './manifold-gltf';
 
 export const attributeDefs = {
   'POSITION': {type: Accessor.Type.VEC3, components: 3},
