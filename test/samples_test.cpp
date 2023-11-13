@@ -267,7 +267,7 @@ TEST(Samples, SelfIntersect) {
   manifold::PolygonParams().processOverlaps = false;
 }
 
-TEST(Samples, DISABLED_GenericTwinBooleanTest7863) {
+TEST(Samples, GenericTwinBooleanTest7863) {
   manifold::PolygonParams().processOverlaps = true;
   std::string file = __FILE__;
   std::string dir = file.substr(0, file.rfind('/'));
@@ -278,7 +278,7 @@ TEST(Samples, DISABLED_GenericTwinBooleanTest7863) {
   manifold::PolygonParams().processOverlaps = false;
 }
 
-TEST(Samples, DISABLED_Havocglass8Bool) {
+TEST(Samples, Havocglass8Bool) {
   manifold::PolygonParams().processOverlaps = true;
   std::string file = __FILE__;
   std::string dir = file.substr(0, file.rfind('/'));

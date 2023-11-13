@@ -607,7 +607,7 @@ class EarClip {
     const glm::vec2 size = bBox.Size();
     const double minArea = precision_ * glm::max(size.x, size.y);
 
-    if (area < -minArea) {
+    if (glm::isfinite(maxX) && area < -minArea) {
       holes_.insert(start);
       hole2BBox_.insert({start, bBox});
     } else {
