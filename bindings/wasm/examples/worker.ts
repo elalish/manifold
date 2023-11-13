@@ -20,7 +20,7 @@ import * as glMatrix from 'gl-matrix';
 
 import Module from './built/manifold';
 //@ts-ignore
-import {setupIO, writeMesh} from './gltf-io';
+import {Attribute, setupIO, writeMesh} from './gltf-io';
 import type {GLTFMaterial, Quat} from './public/editor';
 import type {CrossSection, Manifold, ManifoldToplevel, Mesh, Vec3} from './public/manifold';
 
@@ -374,7 +374,7 @@ function addMesh(
   const manifoldMesh = manifold.getMesh();
 
   const materials = new Array<GLTFMaterial>();
-  const attributes = new Array<Array<string>>();
+  const attributes = new Array<Array<Attribute>>();
   for (const id of manifoldMesh.runOriginalID!) {
     const material = id2material.get(id) || backupMaterial;
     materials.push(material);

@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import {Attribute} from '../gltf-io';
+
 import {Manifold, Mat4, Vec2, Vec3} from './manifold';
 
 declare class GLTFNode {
@@ -26,7 +28,7 @@ declare class GLTFNode {
 }
 
 declare class GLTFMaterial {
-  attributes?: string[];
+  attributes?: Attribute[];
   roughness?: number;
   metallic?: number;
   baseColorFactor?: [number, number, number];

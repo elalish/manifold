@@ -32,7 +32,7 @@ export const attributeDefs = {
   'SKIP_4': {type: null, components: 4},
 };
 
-type Attribute = keyof(typeof attributeDefs);
+export type Attribute = keyof(typeof attributeDefs);
 
 export function setupIO(io: WebIO) {
   return io.registerExtensions([EXTManifold]);
