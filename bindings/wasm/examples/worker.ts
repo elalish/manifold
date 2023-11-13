@@ -20,7 +20,7 @@ import * as glMatrix from 'gl-matrix';
 
 import Module from './built/manifold';
 //@ts-ignore
-import {Attribute, setupIO, writeMesh} from './gltf-io';
+import {Attribute, Properties, setupIO, writeMesh} from './gltf-io';
 import type {GLTFMaterial, Quat} from './public/editor';
 import type {CrossSection, Manifold, ManifoldToplevel, Mesh, Vec3} from './public/manifold';
 
@@ -373,19 +373,16 @@ function addMesh(
   // From Z-up to Y-up (glTF)
   const manifoldMesh = manifold.getMesh();
 
-  const materials = new Array<GLTFMaterial>();
-  const attributes = new Array<Array<Attribute>>();
+  const id2properties = new Map<number, Properties>();
   for (const id of manifoldMesh.runOriginalID!) {
     const material = id2material.get(id) || backupMaterial;
-    materials.push(material);
-    attributes.push(['POSITION', ...material.attributes ?? []]);
+    id2properties.set(id, {
+      material: getCachedMaterial(doc, ghost ? GHOST : material),
+      attributes: ['POSITION', ...material.attributes ?? []]
+    });
   }
 
-  const gltfMaterials = materials.map((matDef) => {
-    return getCachedMaterial(doc, ghost ? GHOST : matDef);
-  });
-
-  node.setMesh(writeMesh(doc, manifoldMesh, attributes, gltfMaterials));
+  node.setMesh(writeMesh(doc, manifoldMesh, id2properties));
 
   const vertices = manifoldMesh.numProp === 3 ?
       manifoldMesh.vertProperties :
@@ -411,12 +408,12 @@ function addMesh(
     if (inMesh == null) {
       continue;
     }
-    const mat = single ? materials[run] : SHOW;
-    const debugNode =
-        doc.createNode('debug')
-            .setMesh(writeMesh(
-                doc, inMesh, attributes, [getCachedMaterial(doc, mat)]))
-            .setMatrix(manifoldMesh.transform(run));
+    if (single) {
+      id2properties.get(id)!.material = getCachedMaterial(doc, SHOW);
+    }
+    const debugNode = doc.createNode('debug')
+                          .setMesh(writeMesh(doc, inMesh, id2properties))
+                          .setMatrix(manifoldMesh.transform(run));
     node.addChild(debugNode);
   }
 }

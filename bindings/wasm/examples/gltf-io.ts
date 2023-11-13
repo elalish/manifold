@@ -79,9 +79,28 @@ function readPrimitive(
   return vertProperties;
 }
 
-export function readMesh(
-    mesh: Mesh, attributes: Attribute[], materials: Material[]): MeshOptions|
-    null {
+/**
+ * Read an input mesh into Manifold-compatible data structures, whether it
+ * contains the EXT_manifold extension or not.
+ *
+ * @param mesh The Mesh to read.
+ * @param attributes An array of attributes representing the order of desired
+ *     properties returned in the vertProperties array of the output mesh. If
+ *     omitted, this will be populated with the union of all attributes defined
+ *     in the primitives of the input mesh. If present, the first entry must be
+ *     'POSITION', and any attributes in the primitives that are not included in
+ *     this list will be ignored, while those in the list but not defined in a
+ *     primitive will be populated with zeros.
+ * @returns The returned mesh is suitable for initializing a Manifold or Mesh of
+ *     the Manifold library if desired. See Manifold documentation if you prefer
+ *     to use these GL arrays in a different library. The runProperties array
+ *     gives the Material and attributes list associated with each triangle run,
+ *     which in turn corresponds to a primitive of the input mesh. These
+ *     attributes are the intersection of the attributes present on the
+ *     primitive and those requested in the attributes input.
+ */
+export function readMesh(mesh: Mesh, attributes: Attribute[]):
+    {mesh: MeshOptions, runProperties: Properties[]}|null {
   const primitives = mesh.listPrimitives();
   if (primitives.length === 0) {
     return null;
@@ -110,8 +129,9 @@ export function readMesh(
   if (attributes.length < 1 || attributes[0] !== 'POSITION')
     throw new Error('First attribute must be "POSITION".');
 
-  const numProp = attributes.map((def) => attributeDefs[def].components)
-                      .reduce((a, b) => a + b);
+  let numProp = 0;
+  const attributeOffsets = attributes.map(
+      (numProp = 0, def => numProp += attributeDefs[def].components));
 
   const manifoldPrimitive =
       mesh.getExtension('EXT_manifold') as ManifoldPrimitive;
@@ -121,19 +141,42 @@ export function readMesh(
   const runIndexArray = [0];
   const mergeFromVertArray = [];
   const mergeToVertArray = [];
+  const runProperties: Properties[] = [];
   if (manifoldPrimitive != null) {
-    // TODO: for each attribute, need to check all primitives to find one with
-    // an accessor.
-    vertPropArray = readPrimitive(primitives[0], numProp, attributes);
+    const numVert = primitives[0].getAttribute('POSITION')!.getCount();
+    const foundAttribute = attributes.map((a) => attributeDefs[a].type == null);
+    vertPropArray = new Array<number>(numProp * numVert);
+
     for (const primitive of primitives) {
       const indices = primitive.getIndices();
       if (!indices) {
         console.log('Skipping non-indexed primitive ', primitive.getName());
         continue;
       }
+
+      attributes.forEach((attributeOut, idx) => {
+        if (foundAttribute[idx]) {
+          return;
+        }
+        for (const attributeIn of primitive.listSemantics()) {
+          if (attributeIn === attributeOut) {
+            foundAttribute[idx] = true;
+            const accessor = primitive.getAttribute(attributeIn)!;
+            const array = accessor.getArray()!;
+            const size = attributeDefs[attributeIn].components;
+            for (let i = 0; i < numVert; ++i) {
+              for (let j = 0; j < size; ++j) {
+                vertPropArray[numProp * i + attributeOffsets[idx] + j] =
+                    array[i * size + j];
+              }
+            }
+          }
+        }
+      });
+
       triVertArray = [...triVertArray, ...indices.getArray()!];
       runIndexArray.push(triVertArray.length);
-      materials.push(primitive.getMaterial()!);
+      runProperties.push({material: primitive.getMaterial()!, attributes});
     }
     const mergeTriVert = manifoldPrimitive.getMergeIndices()?.getArray() ?? [];
     const mergeTo = manifoldPrimitive.getMergeValues()?.getArray() ?? [];
@@ -158,7 +201,7 @@ export function readMesh(
       triVertArray =
           [...triVertArray, ...indices.getArray()!.map((i) => i + numVert)];
       runIndexArray.push(triVertArray.length);
-      materials.push(primitive.getMaterial()!);
+      runProperties.push({material: primitive.getMaterial()!, attributes});
     }
   }
   const vertProperties = new Float32Array(vertPropArray);
@@ -167,66 +210,90 @@ export function readMesh(
   const mergeFromVert = new Uint32Array(mergeFromVertArray);
   const mergeToVert = new Uint32Array(mergeToVertArray);
 
-  return {
-    numProp,
-    triVerts,
-    vertProperties,
-    runIndex,
-    mergeFromVert,
-    mergeToVert
-  };
+  const meshOut =
+      {numProp, triVerts, vertProperties, runIndex, mergeFromVert, mergeToVert};
+
+  return {mesh: meshOut, runProperties};
 }
 
+/**
+ * Write a Manifold Mesh into a glTF Mesh object, using the EXT_manifold
+ * extension to allow for lossless roundtrip of the manifold mesh through the
+ * glTF file.
+ *
+ * @param doc The glTF Document to which this Mesh will be added.
+ * @param manifoldMesh The Manifold Mesh to convert to glTF.
+ * @param id2properties A map from originalID to Properties that include the
+ *     glTF Material and the set of attributes to output. All triangle runs with
+ *     the same originalID will be combined into a single output primitive. Any
+ *     originalIDs not found in the map will have the glTF default material and
+ *     no attributes beyond 'POSITION'. Each attributes array must correspond to
+ *     the manifoldMesh vertProperties, thus the first attribute must always be
+ *     'POSITION'. Any properties that should not be output for a given
+ *     primitive must use the 'SKIP_*' attributes.
+ * @returns The glTF Mesh to add to the Document.
+ */
 export function writeMesh(
-    doc: Document, manifoldMesh: ManifoldMesh, attributes: Attribute[][],
-    materials: Material[]): Mesh {
+    doc: Document, manifoldMesh: ManifoldMesh,
+    id2properties: Map<number, Properties>): Mesh {
   if (doc.getRoot().listBuffers().length === 0) {
     doc.createBuffer();
   }
   const buffer = doc.getRoot().listBuffers()[0];
   const manifoldExtension = doc.createExtension(EXTManifold);
 
-  const attributeUnion: Attribute[] = [];
-  for (const matAttributes of attributes) {
-    matAttributes.forEach((attribute, i) => {
-      if (i >= attributeUnion.length) {
-        attributeUnion.push(attribute);
-      } else {
-        const size = attributeDefs[attribute].components;
-        const unionSize = attributeDefs[attributeUnion[i]].components;
-        if (size != unionSize) {
-          throw new Error(
-              'Attribute sizes do not correspond: ' + attribute + ' and ' +
-              attributeUnion[i]);
-        }
-        if (attributeDefs[attributeUnion[i]].type == null) {
-          attributeUnion[i] = attribute;
-        }
-      }
-    });
-  }
-  if (attributeUnion.length < 1 || attributeUnion[0] !== 'POSITION')
-    throw new Error('First attribute must be "POSITION".');
-
   const mesh = doc.createMesh();
-  if (!manifoldMesh.runIndex) {
-    manifoldMesh.runIndex = new Uint32Array([0, 3 * manifoldMesh.numTri]);
-  }
-  const numPrimitive = manifoldMesh.runIndex.length - 1;
-  for (let run = 0; run < numPrimitive; ++run) {
-    const id =
-        manifoldMesh.runOriginalID ? manifoldMesh.runOriginalID[run] : -1;
+  const runIndex = [];
+  const attributeUnion: Attribute[] = [];
+  const primitive2attributes = new Map<Primitive, Attribute[]>();
+  const numRun = manifoldMesh.runIndex.length - 1;
+  let lastID = -1;
+  for (let run = 0; run < numRun; ++run) {
+    const id = manifoldMesh.runOriginalID[run];
+    if (id == lastID) {
+      continue;
+    }
+    lastID = id;
+    runIndex.push(manifoldMesh.runIndex[run]);
+
     const indices = doc.createAccessor('primitive indices of ID ' + id)
                         .setBuffer(buffer)
                         .setType(Accessor.Type.SCALAR)
                         .setArray(new Uint32Array(1));
     const primitive = doc.createPrimitive().setIndices(indices);
-    const material = materials[run];
-    if (material) {
+
+    const properties = id2properties.get(id);
+    if (properties) {
+      const {material, attributes} = properties;
+      if (attributes.length < 1 || attributeUnion[0] !== 'POSITION')
+        throw new Error('First attribute must be "POSITION".');
+
       primitive.setMaterial(material);
+      primitive2attributes.set(primitive, attributes);
+
+      properties.attributes.forEach((attribute, i) => {
+        if (i >= attributeUnion.length) {
+          attributeUnion.push(attribute);
+        } else {
+          const size = attributeDefs[attribute].components;
+          const unionSize = attributeDefs[attributeUnion[i]].components;
+          if (size != unionSize) {
+            throw new Error(
+                'Attribute sizes do not correspond: ' + attribute + ' and ' +
+                attributeUnion[i]);
+          }
+          if (attributeDefs[attributeUnion[i]].type == null) {
+            attributeUnion[i] = attribute;
+          }
+        }
+      });
+    } else {
+      primitive2attributes.set(primitive, ['POSITION']);
     }
+
     mesh.addPrimitive(primitive);
   }
+  runIndex.push(manifoldMesh.runIndex[-1]);
 
   const numVert = manifoldMesh.numVert;
   const numProp = manifoldMesh.numProp;
@@ -260,13 +327,13 @@ export function writeMesh(
                          .setType(def.type)
                          .setArray(array);
 
-    mesh.listPrimitives().forEach((primitive, pIdx) => {
-      if (attributes[pIdx].length > aIdx &&
-          attributeDefs[attributes[pIdx][aIdx]].type != null) {
-        // TODO: only add attributes that apply to this primitive.
+    for (const primitive of mesh.listPrimitives()) {
+      const attributes = primitive2attributes.get(primitive)!;
+      if (attributes.length > aIdx &&
+          attributeDefs[attributes[aIdx]].type != null) {
         primitive.setAttribute(attribute, accessor);
       }
-    });
+    }
     offset += n;
   });
 
@@ -278,7 +345,7 @@ export function writeMesh(
                       .setType(Accessor.Type.SCALAR)
                       .setArray(manifoldMesh.triVerts);
   manifoldPrimitive.setIndices(indices);
-  manifoldPrimitive.setRunIndex(manifoldMesh.runIndex);
+  manifoldPrimitive.setRunIndex(runIndex);
 
   const vert2merge = [...Array(manifoldMesh.numVert).keys()];
   const ind = [];
