@@ -48,11 +48,11 @@
   <button id="download">Download manifold GLB</button>
   <model-viewer camera-controls shadow-intensity="1" alt="Output of mesh Boolean operation"></model-viewer>
 </body>
-<script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/2.0.1/model-viewer.min.js"></script>
+<script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.3.0/model-viewer.min.js"></script>
 <script type="module">
   import { Document, WebIO } from '@gltf-transform/core';
   import { clearNodeTransform, flatten, prune } from '@gltf-transform/functions';
-  import { loadTexture, readMesh, writeMesh, disposeMesh, setupIO } from './gltf-io.js';
+  import { loadTexture, readMesh, writeMesh, disposeMesh, setupIO } from './gltf-io';
   import Module from './built/manifold.js';
 
   const io = setupIO(new WebIO());
@@ -63,10 +63,9 @@
 
   const { Manifold, Mesh } = wasm;
 
-  const attributes = ['POSITION', 'TEXCOORD_0'];
-  const materialMap = new Map();
+  const id2properties = new Map();
 
-  async function readGLB(url, attributes, materialMap) {
+  async function readGLB(url) {
     const manifolds = [];
     const docIn = await io.read(url);
     await docIn.transform(flatten());
@@ -75,30 +74,33 @@
     for (const node of nodes) {
       clearNodeTransform(node);
       const materials = [];
-      const manifoldMesh = readMesh(node.getMesh(), attributes, materials);
-      manifoldMesh.runOriginalID = [];
-      const firstID = Manifold.reserveIDs(materials.length);
-      for (let i = 0; i < materials.length; ++i) {
-        manifoldMesh.runOriginalID.push(firstID + i);
+      const tmp = readMesh(node.getMesh());
+      tmp.mesh.runOriginalID = [];
+      const numID = tmp.runProperties.length;
+      const firstID = Manifold.reserveIDs(numID);
+      for (let i = 0; i < numID; ++i) {
+        tmp.mesh.runOriginalID.push(firstID + i);
         ids.push(firstID + i);
+        id2properties.set(firstID + i, tmp.runProperties[i]);
       }
-      manifolds.push(Manifold(new Mesh(manifoldMesh)));
+      manifolds.push(Manifold(new Mesh(tmp.mesh)));
     }
     // pull in materials, TODO: replace with transfer() when available
     const startIdx = doc.getRoot().listMaterials().length;
     doc.merge(docIn);
     doc.getRoot().listScenes().forEach((s) => s.dispose());
     doc.getRoot().listBuffers().forEach((s) => s.dispose());
+    doc.getRoot().listAccessors().forEach((s) => s.dispose());
     for (const [i, id] of ids.entries()) {
       const material = doc.getRoot().listMaterials()[startIdx + i];
-      materialMap.set(id, material);
+      id2properties.get(id).material = material;
     }
 
     return Manifold.union(manifolds);
   }
 
-  const space = await readGLB('/models/space.glb', attributes, materialMap);
-  const moon = await readGLB('/models/moon.glb', attributes, materialMap);
+  const space = await readGLB('/models/space.glb');
+  const moon = await readGLB('/models/moon.glb');
 
   const node = doc.createNode();
   doc.createScene().addChild(node);
@@ -129,13 +131,7 @@
     const manifoldMesh = manifold.rotate([-90, 0, 0]).getMesh();
 
     disposeMesh(node.getMesh());
-    const materials = [];
-    const matAttributes = [];
-    for (const id of manifoldMesh.runOriginalID) {
-      materials.push(materialMap.get(id));
-      matAttributes.push(attributes);
-    }
-    const mesh = writeMesh(doc, manifoldMesh, matAttributes, materials);
+    const mesh = writeMesh(doc, manifoldMesh, id2properties);
     node.setMesh(mesh);
     await doc.transform(prune());
 

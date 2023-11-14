@@ -12,16 +12,32 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {Extension, ExtensionProperty, PropertyType} from '@gltf-transform/core';
+import {Accessor, Extension, ExtensionProperty, GLTF, IProperty, PropertyType, ReaderContext, WriterContext} from '@gltf-transform/core';
 
 const NAME = 'EXT_manifold';
 const MERGE = 'MERGE';
 
-export class ManifoldPrimitive extends ExtensionProperty {
+interface IManifoldPrimitive extends IProperty {
+  mergeIndices: Accessor;
+  mergeValues: Accessor;
+  indices: Accessor;
+  runIndex: number[]|Uint32Array;
+}
+
+interface ManifoldDef {
+  manifoldPrimitive: GLTF.IMeshPrimitive;
+  mergeIndices: number;
+  mergeValues: number;
+}
+
+export class ManifoldPrimitive extends ExtensionProperty<IManifoldPrimitive> {
   static EXTENSION_NAME = NAME;
+  public declare extensionName: typeof NAME;
+  public declare propertyType: 'ManifoldPrimitive';
+  public declare parentTypes: [PropertyType.MESH];
 
   init() {
-    this.EXTENSION_NAME = NAME;
+    ManifoldPrimitive.EXTENSION_NAME = NAME;
     this.propertyType = 'ManifoldPrimitive';
     this.parentTypes = [PropertyType.MESH];
   }
@@ -40,7 +56,7 @@ export class ManifoldPrimitive extends ExtensionProperty {
     return this.getRef('mergeValues');
   }
 
-  setMerge(indicesAccessor, valuesAccessor) {
+  setMerge(indicesAccessor: Accessor, valuesAccessor: Accessor) {
     if (indicesAccessor.getCount() !== valuesAccessor.getCount())
       throw new Error('merge vectors must be the same length.');
     this.setRef('mergeIndices', indicesAccessor);
@@ -51,16 +67,16 @@ export class ManifoldPrimitive extends ExtensionProperty {
     return this.get('runIndex');
   }
 
-  setRunIndex(runIndex) {
+  setRunIndex(runIndex: number[]|Uint32Array) {
     return this.set('runIndex', runIndex);
   }
 
-  setIndices(indices) {
+  setIndices(indices: Accessor) {
     return this.setRef('indices', indices);
   }
 
   getIndices() {
-    return this.getRef('indices');
+    return this.getRef('indices')!;
   }
 }
 
@@ -73,7 +89,7 @@ export class EXTManifold extends Extension {
     return new ManifoldPrimitive(this.document.getGraph());
   }
 
-  read(context) {
+  read(context: ReaderContext) {
     const {json} = context.jsonDoc;
     const meshDefs = json.meshes || [];
 
@@ -84,17 +100,24 @@ export class EXTManifold extends Extension {
       const manifoldPrimitive = this.createManifoldPrimitive();
       mesh.setExtension(NAME, manifoldPrimitive);
 
-      const manifoldDef = meshDef.extensions[NAME];
+      const manifoldDef = meshDef.extensions[NAME] as ManifoldDef;
 
       if (manifoldDef.manifoldPrimitive) {
         let count = 0;
         const runIndex = [];
         runIndex.push(count);
         for (const primitive of mesh.listPrimitives()) {
-          count += primitive.getIndices().getCount();
+          const indices = primitive.getIndices();
+          if (!indices) {
+            console.log('Skipping non-indexed primitive ', primitive.getName());
+            continue;
+          }
+          count += indices.getCount();
           runIndex.push(count);
         }
         manifoldPrimitive.setRunIndex(runIndex);
+        manifoldPrimitive.setIndices(
+            context.accessors[manifoldDef.manifoldPrimitive.indices!]);
       }
 
       if (manifoldDef.mergeIndices != null && manifoldDef.mergeValues != null) {
@@ -107,10 +130,15 @@ export class EXTManifold extends Extension {
     return this;
   }
 
-  prewrite(context) {
+  prewrite(context: WriterContext) {
     this.document.getRoot().listMeshes().forEach((mesh) => {
-      const manifoldPrimitive = mesh.getExtension(NAME);
+      const manifoldPrimitive = mesh.getExtension(NAME) as ManifoldPrimitive;
       if (!manifoldPrimitive) return;
+
+      const indices = manifoldPrimitive.getIndices();
+      context.addAccessorToUsageGroup(
+          indices, WriterContext.BufferViewUsage.ELEMENT_ARRAY_BUFFER);
+
       const mergeFrom = manifoldPrimitive.getMergeIndices();
       const mergeTo = manifoldPrimitive.getMergeValues();
       if (!mergeFrom || !mergeTo) return;
@@ -121,15 +149,15 @@ export class EXTManifold extends Extension {
     return this;
   }
 
-  write(context) {
+  write(context: WriterContext) {
     const {json} = context.jsonDoc;
 
     this.document.getRoot().listMeshes().forEach((mesh) => {
-      const manifoldPrimitive = mesh.getExtension(NAME);
+      const manifoldPrimitive = mesh.getExtension(NAME) as ManifoldPrimitive;
       if (!manifoldPrimitive) return;
 
-      const meshIndex = context.meshIndexMap.get(mesh);
-      const meshDef = json.meshes[meshIndex];
+      const meshIndex = context.meshIndexMap.get(mesh)!;
+      const meshDef = json.meshes![meshIndex];
 
       const runIndex = manifoldPrimitive.getRunIndex();
       const numPrimitive = runIndex.length - 1;
@@ -140,20 +168,20 @@ export class EXTManifold extends Extension {
       }
 
       const mergeIndicesIndex =
-          context.accessorIndexMap.get(manifoldPrimitive.getMergeIndices());
+          context.accessorIndexMap.get(manifoldPrimitive.getMergeIndices()!)!;
       const mergeValuesIndex =
-          context.accessorIndexMap.get(manifoldPrimitive.getMergeValues());
-      const mergeIndices = json.accessors[mergeIndicesIndex];
-      const mergeValues = json.accessors[mergeValuesIndex];
+          context.accessorIndexMap.get(manifoldPrimitive.getMergeValues()!)!;
+      const mergeIndices = json.accessors![mergeIndicesIndex];
+      const mergeValues = json.accessors![mergeValuesIndex];
 
       const existingPrimitive = meshDef.primitives[0];
       const primitive = {
-        indices: context.accessorIndexMap.get(manifoldPrimitive.getIndices()),
+        indices: context.accessorIndexMap.get(manifoldPrimitive.getIndices())!,
         mode: existingPrimitive.mode,
         attributes: {'POSITION': existingPrimitive.attributes['POSITION']}
       };
 
-      const indices = json.accessors[primitive.indices];
+      const indices = json.accessors![primitive.indices];
       if (!indices) {
         return;
       }
@@ -162,21 +190,21 @@ export class EXTManifold extends Extension {
         indices.sparse = {
           count: mergeIndices.count,
           indices: {
-            bufferView: mergeIndices.bufferView,
+            bufferView: mergeIndices.bufferView!,
             byteOffset: mergeIndices.byteOffset,
             componentType: mergeIndices.componentType
           },
           values: {
-            bufferView: mergeValues.bufferView,
+            bufferView: mergeValues.bufferView!,
             byteOffset: mergeValues.byteOffset,
           }
         };
       }
 
       for (let i = 0; i < numPrimitive; ++i) {
-        const accessor = json.accessors[meshDef.primitives[i].indices];
+        const accessor = json.accessors![meshDef.primitives[i].indices!];
         accessor.bufferView = indices.bufferView;
-        accessor.byteOffset = indices.byteOffset + 4 * runIndex[i];
+        accessor.byteOffset = indices.byteOffset! + 4 * runIndex[i];
         accessor.count = runIndex[i + 1] - runIndex[i];
       }
 
