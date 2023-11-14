@@ -147,31 +147,30 @@
     const docIn = await io.read(url);
     const nodes = docIn.getRoot().listNodes();
     for (const node of nodes) {
-      const attributes = [];
       const mesh = node.getMesh();
       if (!mesh) {
         continue;
       }
 
-      const materials = [];
-      const tmpMesh = readMesh(mesh, attributes, materials);
-      tmpMesh.runOriginalID = [];
-      const firstID = Manifold.reserveIDs(materials.length);
-      for (let i = 0; i < materials.length; ++i) {
-        tmpMesh.runOriginalID.push(firstID + i);
-      }
-      const manifoldMesh = new Mesh(tmpMesh);
-      mesh.dispose();
+      const tmp = readMesh(mesh);
 
-      const matAttributes = [];
-      materials.forEach(() => matAttributes.push(attributes));
+      tmp.mesh.runOriginalID = [];
+      const id2properties = new Map();
+      const numID = tmp.runProperties.length;
+      const firstID = Manifold.reserveIDs(numID);
+      for (let i = 0; i < numID; ++i) {
+        tmp.mesh.runOriginalID.push(firstID + i);
+        id2properties.set(firstID + i, tmp.runProperties[i]);
+      }
+      const manifoldMesh = new Mesh(tmp.mesh);
+      mesh.dispose();
 
       manifoldMesh.merge();
 
       try {
         // Test manifoldness - will throw if not.
         const manifold = Manifold(manifoldMesh);
-        node.setMesh(writeMesh(docIn, manifold.getMesh(), matAttributes, materials));
+        node.setMesh(writeMesh(docIn, manifold.getMesh(), id2properties));
         manifold.delete();
         anyManifold = true;
       } catch (e) {

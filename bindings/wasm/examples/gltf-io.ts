@@ -99,7 +99,7 @@ function readPrimitive(
  *     attributes are the intersection of the attributes present on the
  *     primitive and those requested in the attributes input.
  */
-export function readMesh(mesh: Mesh, attributes: Attribute[]):
+export function readMesh(mesh: Mesh, attributes: Attribute[] = []):
     {mesh: MeshOptions, runProperties: Properties[]}|null {
   const primitives = mesh.listPrimitives();
   if (primitives.length === 0) {
@@ -130,8 +130,11 @@ export function readMesh(mesh: Mesh, attributes: Attribute[]):
     throw new Error('First attribute must be "POSITION".');
 
   let numProp = 0;
-  const attributeOffsets = attributes.map(
-      (numProp = 0, def => numProp += attributeDefs[def].components));
+  const attributeOffsets = attributes.map((numProp = 0, def => {
+    const last = numProp;
+    numProp += attributeDefs[def].components;
+    return last;
+  }));
 
   const manifoldPrimitive =
       mesh.getExtension('EXT_manifold') as ManifoldPrimitive;
@@ -154,11 +157,13 @@ export function readMesh(mesh: Mesh, attributes: Attribute[]):
         continue;
       }
 
+      const attributesIn = primitive.listSemantics() as Attribute[];
+
       attributes.forEach((attributeOut, idx) => {
         if (foundAttribute[idx]) {
           return;
         }
-        for (const attributeIn of primitive.listSemantics()) {
+        for (const attributeIn of attributesIn) {
           if (attributeIn === attributeOut) {
             foundAttribute[idx] = true;
             const accessor = primitive.getAttribute(attributeIn)!;
@@ -176,7 +181,10 @@ export function readMesh(mesh: Mesh, attributes: Attribute[]):
 
       triVertArray = [...triVertArray, ...indices.getArray()!];
       runIndexArray.push(triVertArray.length);
-      runProperties.push({material: primitive.getMaterial()!, attributes});
+      runProperties.push({
+        material: primitive.getMaterial()!,
+        attributes: attributesIn.filter(b => attributes.some(a => a == b))
+      });
     }
     const mergeTriVert = manifoldPrimitive.getMergeIndices()?.getArray() ?? [];
     const mergeTo = manifoldPrimitive.getMergeValues()?.getArray() ?? [];
@@ -201,7 +209,12 @@ export function readMesh(mesh: Mesh, attributes: Attribute[]):
       triVertArray =
           [...triVertArray, ...indices.getArray()!.map((i) => i + numVert)];
       runIndexArray.push(triVertArray.length);
-      runProperties.push({material: primitive.getMaterial()!, attributes});
+
+      const attributesIn = primitive.listSemantics() as Attribute[];
+      runProperties.push({
+        material: primitive.getMaterial()!,
+        attributes: attributesIn.filter(b => attributes.some(a => a == b))
+      });
     }
   }
   const vertProperties = new Float32Array(vertPropArray);
@@ -265,7 +278,7 @@ export function writeMesh(
     const properties = id2properties.get(id);
     if (properties) {
       const {material, attributes} = properties;
-      if (attributes.length < 1 || attributeUnion[0] !== 'POSITION')
+      if (attributes.length < 1 || attributes[0] !== 'POSITION')
         throw new Error('First attribute must be "POSITION".');
 
       primitive.setMaterial(material);
@@ -293,7 +306,7 @@ export function writeMesh(
 
     mesh.addPrimitive(primitive);
   }
-  runIndex.push(manifoldMesh.runIndex[-1]);
+  runIndex.push(manifoldMesh.runIndex[numRun]);
 
   const numVert = manifoldMesh.numVert;
   const numProp = manifoldMesh.numProp;
@@ -389,6 +402,18 @@ export function disposeMesh(mesh: Mesh) {
     primitive.getIndices()?.dispose();
     for (const accessor of primitive.listAttributes()) {
       accessor.dispose();
+    }
+  }
+
+  const manifoldPrimitive =
+      mesh.getExtension('EXT_manifold') as ManifoldPrimitive;
+  if (manifoldPrimitive) {
+    manifoldPrimitive.getIndices().dispose();
+    const mergeFrom = manifoldPrimitive.getMergeIndices();
+    const mergeTo = manifoldPrimitive.getMergeValues();
+    if (mergeFrom && mergeTo) {
+      mergeFrom.dispose();
+      mergeTo.dispose();
     }
   }
 

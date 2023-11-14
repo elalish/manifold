@@ -63,14 +63,12 @@ async function runExample(name) {
         const docIn = await io.read(glbURL);
         const nodes = docIn.getRoot().listNodes();
         for (const node of nodes) {
-          const mesh = node.getMesh();
-          if (!mesh) {
+          const docMesh = node.getMesh();
+          if (!docMesh) {
             continue;
           }
-          const attributes = [];
-          const materials = [];
-          const manifoldMesh = readMesh(mesh, attributes, materials);
-          const manifold = wasm.Manifold(manifoldMesh);
+          const {mesh} = readMesh(docMesh);
+          const manifold = wasm.Manifold(mesh);
           const prop = manifold.getProperties();
           const genus = manifold.genus();
           manifold.delete();
