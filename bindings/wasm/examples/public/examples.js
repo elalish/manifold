@@ -350,12 +350,12 @@ export const examples = {
 
         const hole = Manifold.compose(holes);
 
-        result = Manifold.difference(
-            result,
-            hole,
-            hole.rotate([90, 0, 0]),
-            hole.rotate([0, 90, 0]),
-        );
+        result = Manifold.difference([
+          result,
+          hole,
+          hole.rotate([90, 0, 0]),
+          hole.rotate([0, 90, 0]),
+        ]);
         return result;
       }
 

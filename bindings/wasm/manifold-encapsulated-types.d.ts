@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {Box, FillRule, JoinType, Mat4, Polygons, Properties, Rect, SealedFloat32Array, SealedUint32Array, SimplePolygon, Smoothness, Vec2, Vec3} from './manifold-global-types';
+import {Box, FillRule, JoinType, Mat3, Mat4, Polygons, Properties, Rect, SealedFloat32Array, SealedUint32Array, SimplePolygon, Smoothness, Vec2, Vec3} from './manifold-global-types';
 
 /**
  * Triangulates a set of /epsilon-valid polygons.
@@ -838,19 +838,7 @@ export class Manifold {
   delete(): void;
 }
 
-export class Mesh {
-  constructor(options: {
-    numProp: number,
-    vertProperties: Float32Array,
-    triVerts: Uint32Array,
-    mergeFromVert?: Uint32Array,
-    mergeToVert?: Uint32Array,
-    runIndex?: Uint32Array,
-    runOriginalID?: Uint32Array,
-    runTransform?: Float32Array,
-    faceID?: Uint32Array,
-    halfedgeTangent?: Float32Array
-  });
+export interface MeshOptions {
   numProp: number;
   vertProperties: Float32Array;
   triVerts: Uint32Array;
@@ -861,6 +849,20 @@ export class Mesh {
   runTransform?: Float32Array;
   faceID?: Uint32Array;
   halfedgeTangent?: Float32Array;
+}
+
+export class Mesh {
+  constructor(options: MeshOptions);
+  numProp: number;
+  vertProperties: Float32Array;
+  triVerts: Uint32Array;
+  mergeFromVert: Uint32Array;
+  mergeToVert: Uint32Array;
+  runIndex: Uint32Array;
+  runOriginalID: Uint32Array;
+  runTransform: Float32Array;
+  faceID: Uint32Array;
+  halfedgeTangent: Float32Array;
   get numTri(): number;
   get numVert(): number;
   get numRun(): number;

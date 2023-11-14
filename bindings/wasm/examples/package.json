@@ -8,9 +8,9 @@
     "build": "tsc --noEmit && vite build",
     "build:watch": "vite build --watch",
     "preview": "vite preview",
-    "test": "vitest",
+    "test": "vitest run",
     "test:ui": "vitest --ui",
-    "test:run": "vitest run"
+    "test:dev": "vitest"
   },
   "dependencies": {
     "@gltf-transform/core": "^3.8.0",

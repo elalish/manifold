@@ -25,8 +25,11 @@ declare class GLTFNode {
   clone(parent?: GLTFNode): GLTFNode;
 }
 
+type Attribute = 'POSITION'|'NORMAL'|'TANGENT'|'TEXCOORD_0'|'TEXCOORD_1'|
+    'COLOR_0'|'JOINTS_0'|'WEIGHTS_0'|'SKIP_1'|'SKIP_2'|'SKIP_3'|'SKIP_4';
+
 declare class GLTFMaterial {
-  attributes?: string[];
+  attributes?: Attribute[];
   roughness?: number;
   metallic?: number;
   baseColorFactor?: [number, number, number];
