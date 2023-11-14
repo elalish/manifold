@@ -178,6 +178,10 @@ void Manifold::Impl::SimplifyTopology() {
   }
 #endif
 
+  if (!ManifoldParams().cleanupTriangles) {
+    return;
+  }
+
   std::vector<int> scratchBuffer;
   scratchBuffer.reserve(10);
   {

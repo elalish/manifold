@@ -613,6 +613,8 @@ struct ExecutionParams {
   bool suppressErrors = false;
   /// Deterministic outputs. Will disable some parallel optimizations.
   bool deterministic = false;
+  /// Perform optional but recommended triangle cleanups in SimplifyTopology()
+  bool cleanupTriangles = true;
 };
 
 #ifdef MANIFOLD_DEBUG
