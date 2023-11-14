@@ -65,7 +65,7 @@
   import { prune } from '@gltf-transform/functions';
   import { KHRONOS_EXTENSIONS } from '@gltf-transform/extensions';
   import { SimpleDropzone } from 'simple-dropzone';
-  import { readMesh, writeMesh, setupIO } from './gltf-io';
+  import { readMesh, writeMesh, setupIO, disposeMesh } from './gltf-io';
   import Module from './built/manifold.js';
 
   const io = setupIO(new WebIO());
@@ -163,7 +163,7 @@
         id2properties.set(firstID + i, tmp.runProperties[i]);
       }
       const manifoldMesh = new Mesh(tmp.mesh);
-      mesh.dispose();
+      disposeMesh(mesh);
 
       manifoldMesh.merge();
 

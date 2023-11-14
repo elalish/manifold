@@ -408,13 +408,9 @@ export function disposeMesh(mesh: Mesh) {
   const manifoldPrimitive =
       mesh.getExtension('EXT_manifold') as ManifoldPrimitive;
   if (manifoldPrimitive) {
-    manifoldPrimitive.getIndices().dispose();
-    const mergeFrom = manifoldPrimitive.getMergeIndices();
-    const mergeTo = manifoldPrimitive.getMergeValues();
-    if (mergeFrom && mergeTo) {
-      mergeFrom.dispose();
-      mergeTo.dispose();
-    }
+    manifoldPrimitive.getIndices()?.dispose();
+    manifoldPrimitive.getMergeIndices()?.dispose();
+    manifoldPrimitive.getMergeValues()?.dispose();
   }
 
   mesh.dispose();

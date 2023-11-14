@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {Accessor, Extension, ExtensionProperty, IProperty, Primitive, PropertyType, ReaderContext, WriterContext} from '@gltf-transform/core';
+import {Accessor, Extension, ExtensionProperty, GLTF, IProperty, PropertyType, ReaderContext, WriterContext} from '@gltf-transform/core';
 
 const NAME = 'EXT_manifold';
 const MERGE = 'MERGE';
@@ -25,7 +25,7 @@ interface IManifoldPrimitive extends IProperty {
 }
 
 interface ManifoldDef {
-  manifoldPrimitive: Primitive;
+  manifoldPrimitive: GLTF.IMeshPrimitive;
   mergeIndices: number;
   mergeValues: number;
 }
@@ -116,6 +116,8 @@ export class EXTManifold extends Extension {
           runIndex.push(count);
         }
         manifoldPrimitive.setRunIndex(runIndex);
+        manifoldPrimitive.setIndices(
+            context.accessors[manifoldDef.manifoldPrimitive.indices!]);
       }
 
       if (manifoldDef.mergeIndices != null && manifoldDef.mergeValues != null) {
