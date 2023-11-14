@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {Attribute} from '../gltf-io';
-
 import {Manifold, Mat4, Vec2, Vec3} from './manifold';
 
 declare class GLTFNode {
@@ -26,6 +24,9 @@ declare class GLTFNode {
   constructor(parent?: GLTFNode);
   clone(parent?: GLTFNode): GLTFNode;
 }
+
+type Attribute = 'POSITION'|'NORMAL'|'TANGENT'|'TEXCOORD_0'|'TEXCOORD_1'|
+    'COLOR_0'|'JOINTS_0'|'WEIGHTS_0'|'SKIP_1'|'SKIP_2'|'SKIP_3'|'SKIP_4';
 
 declare class GLTFMaterial {
   attributes?: Attribute[];

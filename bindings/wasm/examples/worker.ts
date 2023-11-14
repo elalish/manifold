@@ -399,18 +399,15 @@ function addMesh(
       {vertices, indices: manifoldMesh.triVerts, id: `${nextGlobalID++}`});
 
   for (const [run, id] of manifoldMesh.runOriginalID!.entries()) {
-    let inMesh = shown.get(id);
-    let single = false;
-    if (inMesh == null) {
-      single = true;
-      inMesh = singles.get(id);
-    }
+    const show = shown.has(id);
+    const inMesh = show ? shown.get(id) : singles.get(id);
     if (inMesh == null) {
       continue;
     }
-    if (single) {
-      id2properties.get(id)!.material = getCachedMaterial(doc, SHOW);
-    }
+
+    id2properties.get(id)!.material = getCachedMaterial(
+        doc, show ? SHOW : (id2material.get(id) || backupMaterial));
+
     const debugNode = doc.createNode('debug')
                           .setMesh(writeMesh(doc, inMesh, id2properties))
                           .setMatrix(manifoldMesh.transform(run));

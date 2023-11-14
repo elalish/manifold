@@ -47,38 +47,6 @@ export function setupIO(io: WebIO) {
   return io.registerExtensions([EXTManifold]);
 }
 
-function readPrimitive(
-    primitive: Primitive, numProp: number, attributes: Attribute[]) {
-  const position = primitive.getAttribute('POSITION')!;
-  const numVert = position.getCount();
-  const vertProperties = [];
-  let offset = 0;
-  for (const attribute of attributes) {
-    const size = attributeDefs[attribute].components;
-    if (attributeDefs[attribute].type == null) {
-      offset += size;
-      continue;
-    }
-    const accessor = primitive.getAttribute(attribute);
-    if (accessor) {
-      const array = accessor.getArray()!;
-      for (let i = 0; i < numVert; ++i) {
-        for (let j = 0; j < size; ++j) {
-          vertProperties[numProp * i + offset + j] = array[i * size + j];
-        }
-      }
-    } else {
-      for (let i = 0; i < numVert; ++i) {
-        for (let j = 0; j < size; ++j) {
-          vertProperties[numProp * i + offset + j] = 0;
-        }
-      }
-    }
-    offset += size;
-  }
-  return vertProperties;
-}
-
 /**
  * Read an input mesh into Manifold-compatible data structures, whether it
  * contains the EXT_manifold extension or not.
@@ -167,14 +135,8 @@ export function readMesh(mesh: Mesh, attributes: Attribute[] = []):
           if (attributeIn === attributeOut) {
             foundAttribute[idx] = true;
             const accessor = primitive.getAttribute(attributeIn)!;
-            const array = accessor.getArray()!;
-            const size = attributeDefs[attributeIn].components;
-            for (let i = 0; i < numVert; ++i) {
-              for (let j = 0; j < size; ++j) {
-                vertPropArray[numProp * i + attributeOffsets[idx] + j] =
-                    array[i * size + j];
-              }
-            }
+            writeProperties(
+                vertPropArray, accessor, numProp, attributeOffsets[idx]);
           }
         }
       });
@@ -427,4 +389,36 @@ export async function loadTexture(texture: Texture, uri: string) {
   const blob = await response.blob();
   texture.setMimeType(blob.type);
   texture.setImage(new Uint8Array(await blob.arrayBuffer()));
+}
+
+function writeProperties(
+    vertProperties: number[], accessor: Accessor, numProp: number,
+    offset: number) {
+  const array = accessor.getArray()!;
+  const size = accessor.getElementSize();
+  const numVert = accessor.getCount();
+  for (let i = 0; i < numVert; ++i) {
+    for (let j = 0; j < size; ++j) {
+      vertProperties[numProp * i + offset + j] = array[i * size + j];
+    }
+  }
+}
+
+function readPrimitive(
+    primitive: Primitive, numProp: number, attributes: Attribute[]) {
+  const vertProperties: number[] = [];
+  let offset = 0;
+  for (const attribute of attributes) {
+    const size = attributeDefs[attribute].components;
+    if (attributeDefs[attribute].type == null) {
+      offset += size;
+      continue;
+    }
+    const accessor = primitive.getAttribute(attribute);
+    if (accessor) {
+      writeProperties(vertProperties, accessor, numProp, offset);
+    }
+    offset += size;
+  }
+  return vertProperties;
 }
