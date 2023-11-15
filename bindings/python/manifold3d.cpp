@@ -24,6 +24,7 @@
 #include "nanobind/stl/optional.h"
 #include "nanobind/stl/tuple.h"
 #include "nanobind/stl/vector.h"
+#include "sdf.h"
 
 template <>
 struct nanobind::detail::type_caster<glm::vec3> {
@@ -694,7 +695,50 @@ NB_MODULE(manifold3d, m) {
       .def_ro("merge_to_vert", &MeshGL::mergeToVert)
       .def_ro("run_index", &MeshGL::runIndex)
       .def_ro("run_original_id", &MeshGL::runOriginalID)
-      .def_ro("face_id", &MeshGL::faceID);
+      .def_ro("face_id", &MeshGL::faceID)
+      .def_static(
+          "levelset",
+          [](const std::function<float(float, float, float)> &f,
+             std::vector<float> bounds, float edgeLength, float level = 0.0,
+             bool canParallel = false) {
+            // Same format as Manifold.bounding_box
+            Box bound = {glm::vec3(bounds[0], bounds[1], bounds[2]),
+                         glm::vec3(bounds[3], bounds[4], bounds[5])};
+
+            std::function<float(glm::vec3)> cppToPython = 
+                [&f](glm::vec3 v) { return f(v.x, v.y, v.z); };
+            Mesh result =
+                LevelSet(cppToPython, bound,
+                         edgeLength, level, canParallel);
+            return MeshGL(result);
+          },
+          nb::arg("f"), nb::arg("bounds"), nb::arg("edgeLength"),
+          nb::arg("level") = 0.0, nb::arg("canParallel") = false,
+          "Constructs a level-set Mesh from the input Signed-Distance Function "
+          "(SDF) This uses a form of Marching Tetrahedra (akin to Marching "
+          "Cubes, but better for manifoldness). Instead of using a cubic grid, "
+          "it uses a body-centered cubic grid (two shifted cubic grids). This "
+          "means if your function's interior exceeds the given bounds, you "
+          "will see a kind of egg-crate shape closing off the manifold, which "
+          "is due to the underlying grid."
+          "\n\n"
+          ":param f: The signed-distance functor, containing this function "
+          "signature: `def sdf(xyz : tuple) -> float:`, which returns the "
+          "signed distance of a given point in R^3. Positive values are "
+          "inside, negative outside."
+          ":param bounds: An axis-aligned box that defines the extent of the "
+          "grid."
+          ":param edgeLength: Approximate maximum edge length of the triangles "
+          "in the final result.This affects grid spacing, and hence has a "
+          "strong effect on performance."
+          ":param level: You can inset your Mesh by using a positive value, or "
+          "outset it with a negative value."
+          ":param canParallel: Parallel policies violate will crash language "
+          "runtimes with runtime locks that expect to not be called back by "
+          "unregistered threads.This allows bindings use LevelSet despite "
+          "being compiled with MANIFOLD_PAR active."
+          ":return Mesh: This mesh is guaranteed to be manifold."
+          "Use Manifold.from_mesh(mesh) to create a Manifold");
 
   nb::enum_<Manifold::Error>(m, "Error")
       .value("NoError", Manifold::Error::NoError)
