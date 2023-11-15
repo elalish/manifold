@@ -304,6 +304,28 @@ NB_MODULE(manifold3d, m) {
           ":param propFunc: A function that modifies the properties of a given "
           "vertex.")
       .def(
+          "calculate_curvature",
+          [](Manifold &self, int gaussianIdx, int meanIdx) {
+            return self.CalculateCurvature(gaussianIdx, meanIdx);
+          },
+          nb::arg("gaussian_idx"), nb::arg("mean_idx"),
+          "Curvature is the inverse of the radius of curvature, and signed "
+          "such that positive is convex and negative is concave. There are two "
+          "orthogonal principal curvatures at any point on a manifold, with "
+          "one maximum and the other minimum. Gaussian curvature is their "
+          "product, while mean curvature is their sum. This approximates them "
+          "for every vertex and assigns them as vertex properties on the given "
+          "channels."
+          "\n\n"
+          ":param gaussianIdx: The property channel index in which to store "
+          "the Gaussian curvature. An index < 0 will be ignored (stores "
+          "nothing). The property set will be automatically expanded to "
+          "include the channel index specified."
+          ":param meanIdx: The property channel index in which to store the "
+          "mean curvature. An index < 0 will be ignored (stores nothing). The "
+          "property set will be automatically expanded to include the channel "
+          "index specified.")
+      .def(
           "refine", [](Manifold &self, int n) { return self.Refine(n); },
           nb::arg("n"),
           "Increase the density of the mesh by splitting every edge into n "
@@ -313,7 +335,7 @@ NB_MODULE(manifold3d, m) {
           "halfedgeTangents specified (e.g. from the Smooth() constructor), "
           "in which case the new vertices will be moved to the interpolated "
           "surface according to their barycentric coordinates.\n"
-          "\n"
+          "\n\n"
           ":param n: The number of pieces to split every edge into. Must be > "
           "1.")
       .def(
@@ -460,7 +482,12 @@ NB_MODULE(manifold3d, m) {
           "Gets the manifold bounding box as a tuple "
           "(xmin, ymin, zmin, xmax, ymax, zmax).")
       .def_static(
-          "smooth", [](const Mesh &mesh) { return Manifold::Smooth(mesh); },
+          "smooth",
+          [](const MeshGL &mesh,
+             const std::vector<Smoothness> &sharpenedEdges = {}) {
+            return Manifold::Smooth(mesh, sharpenedEdges);
+          },
+          nb::arg("mesh"), nb::arg("sharpened_edges"),
           "Constructs a smooth version of the input mesh by creating tangents; "
           "this method will throw if you have supplied tangents with your "
           "mesh already. The actual triangle resolution is unchanged; use the "
