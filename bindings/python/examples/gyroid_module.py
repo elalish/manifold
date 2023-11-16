@@ -33,14 +33,15 @@ def gyroid_levelset(level, period, size, n):
                       period / n, level)).scale(size / period)
 
 def rhombic_dodecahedron(size):
-  box = Manifold.cube(size * math.sqrt(2.0) * np.array([1, 1, 2]), True)
-  result = box.rotate(90, 45) ^ box.rotate(90, 45, 90)
-  return result ^ box.rotate(0, 0, 45)
+    box = Manifold.cube(size * math.sqrt(2.0) * np.array([1, 1, 2]), True)
+    result = box.rotate(90, 45) ^ box.rotate(90, 45, 90)
+    return result ^ box.rotate(0, 0, 45)
 
 def gyroid_module(size = 20, n = 15):
-  period = math.pi * 2.0
-  result = (rhombic_dodecahedron(size) ^ gyroid_levelset(-0.4, period, size, n)) - gyroid_levelset(0.4, period, size, n)
-  return result.rotate(-45, 0, 90).translate(0, 0, size / math.sqrt(2.0))
+    period = math.pi * 2.0
+    result = ((gyroid_levelset(-0.4, period, size, n) ^ rhombic_dodecahedron(size)) - 
+               gyroid_levelset( 0.4, period, size, n))
+    return result.rotate(-45, 0, 90).translate(0, 0, size / math.sqrt(2.0))
 
 def run(size = 20, n = 15):
     return gyroid_module(size, n)
