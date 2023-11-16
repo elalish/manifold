@@ -276,7 +276,7 @@ NB_MODULE(manifold3d, m) {
               auto result =
                   f(std::make_tuple(v.x, v.y, v.z),
                     nb::ndarray<nb::numpy, const float, nb::c_contig>(
-                        &oldProps, {static_cast<unsigned long>(oldNumProp)}));
+                        oldProps, {static_cast<unsigned long>(oldNumProp)}));
               nb::ndarray<float, nb::shape<nb::any>> array;
               std::vector<float> vec;
               if (nb::try_cast(result, array)) {
@@ -334,7 +334,7 @@ NB_MODULE(manifold3d, m) {
           "immediately collapsed) unless the Mesh/Manifold has "
           "halfedgeTangents specified (e.g. from the Smooth() constructor), "
           "in which case the new vertices will be moved to the interpolated "
-          "surface according to their barycentric coordinates.\n"
+          "surface according to their barycentric coordinates."
           "\n\n"
           ":param n: The number of pieces to split every edge into. Must be > "
           "1.")
@@ -484,8 +484,13 @@ NB_MODULE(manifold3d, m) {
       .def_static(
           "smooth",
           [](const MeshGL &mesh,
-             const std::vector<Smoothness> &sharpenedEdges = {}) {
-            return Manifold::Smooth(mesh, sharpenedEdges);
+             const std::vector<std::tuple<int, float>> &sharpenedEdges = {}) {
+            std::vector<Smoothness> vec(sharpenedEdges.size());
+            for (int i = 0; i < sharpenedEdges.size(); i++) {
+              vec[i] = {std::get<0>(sharpenedEdges[i]),
+                        std::get<1>(sharpenedEdges[i])};
+            }
+            return Manifold::Smooth(mesh, vec);
           },
           nb::arg("mesh"), nb::arg("sharpened_edges"),
           "Constructs a smooth version of the input mesh by creating tangents; "

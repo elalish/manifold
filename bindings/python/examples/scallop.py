@@ -30,17 +30,16 @@ def run():
     sharpness = 0.8
     n = 50
 
-    positions = []
     triangles = []
-    positions = np.array([[-offset, 0], [height, -offset], [0, -height]])
+    positions = [[-offset, 0, height], [-offset, 0, -height]]
     sharpenedEdges = []
 
-    delta = 3.14159 / wiggles
+    delta = np.pi / wiggles
     for i in range(2 * wiggles):
         theta = (i - wiggles) * delta
         amp = 0.5 * height * max(np.cos(0.8 * theta), 0)
 
-        positions.push(
+        positions.append(
             [
                 radius * np.cos(theta),
                 radius * np.sin(theta),
@@ -53,27 +52,27 @@ def run():
             j = 0
 
         smoothness = 1 - sharpness * np.cos((theta + delta / 2) / 2)
-        halfedge = triangles.length + 1
-        sharpenedEdges.push((halfedge, smoothness))
-        triangles.push(0, 2 + i, 2 + j)
+        halfedge = 3*len(triangles) + 1
+        sharpenedEdges.append((halfedge, smoothness))
+        triangles.append([0, 2 + i, 2 + j])
 
-        halfedge = triangles.length + 1
-        sharpenedEdges.push((halfedge, smoothness))
-        triangles.push(1, 2 + j, 2 + i)
+        halfedge = 3*len(triangles) + 1
+        sharpenedEdges.append((halfedge, smoothness))
+        triangles.append([1, 2 + j, 2 + i])
 
-    scallop = Mesh(tri_verts=triangles, vert_properties=positions)
+    scallop = Mesh(tri_verts=np.array(triangles, np.int32),
+                   vert_properties=np.array(positions, np.float32))
 
-    def colorCurvature(color, pos, oldProp):
+    def colorCurvature(_pos, oldProp):
         a = max(0, min(1, oldProp[0] / 3 + 0.5))
         b = a * a * (3 - 2 * a)
         red = [1, 0, 0]
         blue = [0, 0, 1]
-        for i in range(3):
-            color[i] = (1 - b) * blue[i] + b * red[i]
+        return [(1-b)*blue[i]+b*red[i] for i in range(3)]
 
     return (
         Manifold.smooth(scallop, sharpenedEdges)
         .refine(n)
-        .calculateCurvature(-1, 0)
-        .setProperties(3, colorCurvature)
+        .calculate_curvature(-1, 0)
+        .set_properties(3, colorCurvature)
     )
