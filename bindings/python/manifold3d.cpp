@@ -697,10 +697,9 @@ NB_MODULE(manifold3d, m) {
       .def_ro("run_original_id", &MeshGL::runOriginalID)
       .def_ro("face_id", &MeshGL::faceID)
       .def_static(
-          "levelset",
+          "level_set",
           [](const std::function<float(float, float, float)> &f,
-             std::vector<float> bounds, float edgeLength, float level = 0.0,
-             bool canParallel = false) {
+             std::vector<float> bounds, float edgeLength, float level = 0.0) {
             // Same format as Manifold.bounding_box
             Box bound = {glm::vec3(bounds[0], bounds[1], bounds[2]),
                          glm::vec3(bounds[3], bounds[4], bounds[5])};
@@ -709,11 +708,11 @@ NB_MODULE(manifold3d, m) {
                 [&f](glm::vec3 v) { return f(v.x, v.y, v.z); };
             Mesh result =
                 LevelSet(cppToPython, bound,
-                         edgeLength, level, canParallel);
+                         edgeLength, level, false);
             return MeshGL(result);
           },
           nb::arg("f"), nb::arg("bounds"), nb::arg("edgeLength"),
-          nb::arg("level") = 0.0, nb::arg("canParallel") = false,
+          nb::arg("level") = 0.0,
           "Constructs a level-set Mesh from the input Signed-Distance Function "
           "(SDF) This uses a form of Marching Tetrahedra (akin to Marching "
           "Cubes, but better for manifoldness). Instead of using a cubic grid, "
@@ -729,14 +728,10 @@ NB_MODULE(manifold3d, m) {
           ":param bounds: An axis-aligned box that defines the extent of the "
           "grid."
           ":param edgeLength: Approximate maximum edge length of the triangles "
-          "in the final result.This affects grid spacing, and hence has a "
+          "in the final result.  This affects grid spacing, and hence has a "
           "strong effect on performance."
           ":param level: You can inset your Mesh by using a positive value, or "
           "outset it with a negative value."
-          ":param canParallel: Parallel policies violate will crash language "
-          "runtimes with runtime locks that expect to not be called back by "
-          "unregistered threads.This allows bindings use LevelSet despite "
-          "being compiled with MANIFOLD_PAR active."
           ":return Mesh: This mesh is guaranteed to be manifold."
           "Use Manifold.from_mesh(mesh) to create a Manifold");
 
