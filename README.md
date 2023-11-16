@@ -151,9 +151,9 @@ We use https://github.com/google/fuzztest for fuzzing the triangulator.
 
 To enable fuzzing, make sure that you are using clang compiler (`-DCMAKE_CXX_COMPILER=clang -DCMAKE_C_COMPILER=clang`), running Linux, and enable fuzzing support by setting `-DMANIFOLD_FUZZ=ON`.
 
-To run the fuzzer, do
+To run the fuzzer and minimize testcase, do
 ```
-./test/polygon_fuzz --fuzz=PolygonFuzz.TriangulationNoCrash
+./minimizer.sh ./test/polygon_fuzz --fuzz=PolygonFuzz.TriangulationNoCrash
 ```
 
 ## About the author
