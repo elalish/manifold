@@ -52,23 +52,25 @@ def run():
             j = 0
 
         smoothness = 1 - sharpness * np.cos((theta + delta / 2) / 2)
-        halfedge = 3*len(triangles) + 1
+        halfedge = 3 * len(triangles) + 1
         sharpenedEdges.append((halfedge, smoothness))
         triangles.append([0, 2 + i, 2 + j])
 
-        halfedge = 3*len(triangles) + 1
+        halfedge = 3 * len(triangles) + 1
         sharpenedEdges.append((halfedge, smoothness))
         triangles.append([1, 2 + j, 2 + i])
 
-    scallop = Mesh(tri_verts=np.array(triangles, np.int32),
-                   vert_properties=np.array(positions, np.float32))
+    scallop = Mesh(
+        tri_verts=np.array(triangles, np.int32),
+        vert_properties=np.array(positions, np.float32),
+    )
 
     def colorCurvature(_pos, oldProp):
         a = max(0, min(1, oldProp[0] / 3 + 0.5))
         b = a * a * (3 - 2 * a)
         red = [1, 0, 0]
         blue = [0, 0, 1]
-        return [(1-b)*blue[i]+b*red[i] for i in range(3)]
+        return [(1 - b) * blue[i] + b * red[i] for i in range(3)]
 
     return (
         Manifold.smooth(scallop, sharpenedEdges)

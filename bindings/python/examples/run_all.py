@@ -24,10 +24,9 @@ from time import time
 if __name__ == "__main__":
     current_file = pathlib.Path(__file__)
     current_dir = current_file.parent
-    files = [f.parts[-1][:-3]
-             for f in current_dir.glob('*.py') if f != current_file]
+    files = [f.parts[-1][:-3] for f in current_dir.glob("*.py") if f != current_file]
 
-    export_models = len(sys.argv) == 2 and sys.argv[-1] == '-e'
+    export_models = len(sys.argv) == 2 and sys.argv[-1] == "-e"
 
     for f in files:
         module = importlib.import_module(f)
@@ -41,9 +40,10 @@ if __name__ == "__main__":
             else:
                 vertices = mesh.vert_properties
                 colors = None
-            meshOut = trimesh.Trimesh(vertices=vertices, faces=mesh.tri_verts,
-                                      vertex_colors=colors)
-            trimesh.exchange.export.export_mesh(meshOut, f'{f}.glb', 'glb')
-            print(f'Exported model to {f}.glb')
+            meshOut = trimesh.Trimesh(
+                vertices=vertices, faces=mesh.tri_verts, vertex_colors=colors
+            )
+            trimesh.exchange.export.export_mesh(meshOut, f"{f}.glb", "glb")
+            print(f"Exported model to {f}.glb")
         t1 = time()
-        print(f'Took {(t1-t0)*1000:.1f}ms for {f}')
+        print(f"Took {(t1-t0)*1000:.1f}ms for {f}")
