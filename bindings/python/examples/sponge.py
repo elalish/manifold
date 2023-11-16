@@ -4,20 +4,21 @@ import numpy as np
 
 def fractal(holes, hole, w, position, depth, maxDepth):
     w /= 3
-    holes.append(hole.scale([w, w, 1.0]).translate(
-        [position[0], position[1], 0.0]))
+    holes.append(hole.scale([w, w, 1.0]).translate([position[0], position[1], 0.0]))
     if depth == maxDepth:
         return
-    offsets = np.array([
-        [-w, -w],
-        [-w, 0.0],
-        [-w, w],
-        [0.0, w],
-        [w, w],
-        [w, 0.0],
-        [w, -w],
-        [0.0, -w],
-    ])
+    offsets = np.array(
+        [
+            [-w, -w],
+            [-w, 0.0],
+            [-w, w],
+            [0.0, w],
+            [w, w],
+            [w, 0.0],
+            [w, -w],
+            [0.0, -w],
+        ]
+    )
     for offset in offsets:
         fractal(holes, hole, w, position + offset, depth + 1, maxDepth)
 
