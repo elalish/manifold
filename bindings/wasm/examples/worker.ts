@@ -168,6 +168,8 @@ const materialCache = new Map<GLTFMaterial, Material>();
 const object2globalID = new Map<GLTFNode|Manifold, number>();
 let nextGlobalID = 0;
 let animation: Animation;
+let timesAccessor: Accessor;
+let hasAnimation: boolean;
 
 function cleanup() {
   ghost = false;
@@ -314,26 +316,21 @@ self.onmessage = async (e) => {
 
 function createGLTFnode(doc: Document, node: GLTFNode) {
   const out = doc.createNode(node.name);
-  const linear = globalDefaults.animationMode !== 'ping-pong';
-  const animationFrames = Math.round(globalDefaults.animationLength * FPS);
-  const finalFrames = animationFrames * (linear ? 1 : 2) + 1;
+  const nFrames = timesAccessor.getCount();
   const buffer = doc.getRoot().listBuffers()[0];
   if (node.translation) {
     if (typeof node.translation === 'function') {
-      const times = new Float32Array(finalFrames);
-      const frames = new Float32Array(3 * finalFrames);
-      for (let i = 0; i < finalFrames; ++i) {
-        const x = i / animationFrames;
-        times[i] = x * globalDefaults.animationLength;
+      const frames = new Float32Array(3 * nFrames);
+      for (let i = 0; i < nFrames; ++i) {
+        const x = i / (nFrames - 1);
         frames.set(
-            node.translation(linear ? x : (1 - Math.cos(x * Math.PI)) / 2),
+            node.translation(
+                globalDefaults.animationMode !== 'ping-pong' ?
+                    x :
+                    (1 - Math.cos(x * 2 * Math.PI)) / 2),
             3 * i);
       }
 
-      const timesAccessor = doc.createAccessor('animation times')
-                                .setBuffer(buffer)
-                                .setArray(times)
-                                .setType(Accessor.Type.SCALAR);
       const framesAccessor =
           doc.createAccessor(node.name + ' translation frames')
               .setBuffer(buffer)
@@ -349,6 +346,7 @@ function createGLTFnode(doc: Document, node: GLTFNode) {
                           .setSampler(sampler);
       animation.addSampler(sampler);
       animation.addChannel(channel);
+      hasAnimation = true;
     } else {
       out.setTranslation(node.translation);
     }
@@ -544,8 +542,18 @@ async function exportModels(defaults: GlobalDefaults, manifold?: Manifold) {
                       .setRotation([-halfRoot2, 0, 0, halfRoot2])
                       .setScale([mm2m, mm2m, mm2m]);
   doc.createScene().addChild(wrapper);
-  doc.createBuffer();
+
   animation = doc.createAnimation('');
+  hasAnimation = false;
+  const nFrames = Math.round(globalDefaults.animationLength * FPS) + 1;
+  const times = new Float32Array(nFrames);
+  for (let i = 0; i < nFrames; ++i) {
+    times[i] = i * globalDefaults.animationLength / (nFrames - 1);
+  }
+  timesAccessor = doc.createAccessor('animation times')
+                      .setBuffer(doc.createBuffer())
+                      .setArray(times)
+                      .setType(Accessor.Type.SCALAR);
 
   const to3mf = {
     meshes: [],
@@ -602,6 +610,11 @@ async function exportModels(defaults: GlobalDefaults, manifold?: Manifold) {
     addMesh(doc, to3mf, node, manifold);
     wrapper.addChild(node);
     to3mf.items.push({objectID: `${object2globalID.get(manifold)}`});
+  }
+
+  if (!hasAnimation) {
+    timesAccessor.dispose();
+    animation.dispose();
   }
 
   const glb = await io.writeBinary(doc);
