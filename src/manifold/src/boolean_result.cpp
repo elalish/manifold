@@ -533,7 +533,9 @@ void CreateProperties(Manifold::Impl &outR, const Manifold::Impl &inP,
   using Entry = std::pair<glm::ivec3, int>;
   int idMissProp = outR.NumVert();
   std::vector<std::vector<Entry>> propIdx(outR.NumVert() + 1);
-  std::vector<int> propMissIdx(outR.NumVert() * 6, -1);
+  std::vector<int> propMissIdx[2];
+  propMissIdx[0].resize(inQ.NumPropVert(), -1);
+  propMissIdx[1].resize(inP.NumPropVert(), -1);
   outR.meshRelation_.properties.reserve(outR.NumVert() * numProp);
   int idx = 0;
 
@@ -580,7 +582,7 @@ void CreateProperties(Manifold::Impl &outR, const Manifold::Impl &inP,
 
       if (key.y == idMissProp && key.z >= 0) {
         // only key.x/key.z matters
-        auto &entry = propMissIdx[key.z * 2 + key.x];
+        auto &entry = propMissIdx[key.x][key.z];
         if (entry >= 0) {
           outR.meshRelation_.triProperties[tri][i] = entry;
           continue;
