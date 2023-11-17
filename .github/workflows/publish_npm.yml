@@ -1,0 +1,25 @@
+name: publish_npm
+
+on: [release, workflow_dispatch]
+
+jobs:
+  deploy_github_pages:
+    runs-on: ubuntu-20.04
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Download built examples
+      uses: dawidd6/action-download-artifact@v2
+      with:
+        workflow: manifold.yml
+        workflow_conclusion: completed
+        name: wasm
+        path: ./bindings/wasm/
+
+    - name: Publish to npm
+      run: |
+        cd ./bindings/wasm/
+        npm publish
+      env:
+        NODE_AUTH_TOKEN: ${{secrets.NPM_TOKEN}}
