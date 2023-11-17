@@ -46,7 +46,8 @@ declare const globalDefaults: {
   baseColorFactor: [number, number, number],
   alpha: number,
   unlit: boolean,
-  animationLength: number
+  animationLength: number,
+  animationMode: 'loop'|'ping-pong';
 }
 
 /**

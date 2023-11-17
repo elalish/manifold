@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {Document, mat4, Material, Node, WebIO} from '@gltf-transform/core';
+import {Accessor, Animation, Document, mat4, Material, Node, WebIO} from '@gltf-transform/core';
 import {KHRMaterialsUnlit, KHRONOS_EXTENSIONS} from '@gltf-transform/extensions';
 import {fileForContentTypes, to3dmodel} from '@jscadui/3mf-export';
 import {strToU8, Zippable, zipSync} from 'fflate'
@@ -30,6 +30,7 @@ interface GlobalDefaults {
   alpha: number;
   unlit: boolean;
   animationLength: number;
+  animationMode: 'loop'|'ping-pong';
 }
 
 interface WorkerStatic extends ManifoldToplevel {
@@ -135,13 +136,16 @@ let ghost = false;
 const shown = new Map<number, Mesh>();
 const singles = new Map<number, Mesh>();
 
+const FPS = 30;
+
 const GLOBAL_DEFAULTS = {
   roughness: 0.2,
   metallic: 1,
   baseColorFactor: [1, 1, 0] as [number, number, number],
   alpha: 1,
   unlit: false,
-  animationLength: 1
+  animationLength: 1,
+  animationMode: 'loop'
 };
 
 const SHOW = {
@@ -161,8 +165,9 @@ const GHOST = {
 const nodes = new Array<GLTFNode>();
 const id2material = new Map<number, GLTFMaterial>();
 const materialCache = new Map<GLTFMaterial, Material>();
-let nextGlobalID = 0;
 const object2globalID = new Map<GLTFNode|Manifold, number>();
+let nextGlobalID = 0;
+let animation: Animation;
 
 function cleanup() {
   ghost = false;
@@ -215,9 +220,9 @@ interface To3MF {
 class GLTFNode {
   private _parent?: GLTFNode;
   manifold?: Manifold;
-  translation?: Vec3;
-  rotation?: Vec3;
-  scale?: Vec3;
+  translation?: Vec3|((t: number) => Vec3);
+  rotation?: Vec3;  //|((t: number) => Vec3);
+  scale?: Vec3;     //|((t: number) => Vec3);
   material?: GLTFMaterial;
   name?: string;
 
@@ -309,8 +314,44 @@ self.onmessage = async (e) => {
 
 function createGLTFnode(doc: Document, node: GLTFNode) {
   const out = doc.createNode(node.name);
+  const linear = globalDefaults.animationMode !== 'ping-pong';
+  const animationFrames = Math.round(globalDefaults.animationLength * FPS);
+  const finalFrames = animationFrames * (linear ? 1 : 2) + 1;
+  const buffer = doc.getRoot().listBuffers()[0];
   if (node.translation) {
-    out.setTranslation(node.translation);
+    if (typeof node.translation === 'function') {
+      const times = new Float32Array(finalFrames);
+      const frames = new Float32Array(3 * finalFrames);
+      for (let i = 0; i < finalFrames; ++i) {
+        const x = i / animationFrames;
+        times[i] = x * globalDefaults.animationLength;
+        frames.set(
+            node.translation(linear ? x : (1 - Math.cos(x * Math.PI)) / 2),
+            3 * i);
+      }
+
+      const timesAccessor = doc.createAccessor('animation times')
+                                .setBuffer(buffer)
+                                .setArray(times)
+                                .setType(Accessor.Type.SCALAR);
+      const framesAccessor =
+          doc.createAccessor(node.name + ' translation frames')
+              .setBuffer(buffer)
+              .setArray(frames)
+              .setType(Accessor.Type.VEC3);
+      const sampler = doc.createAnimationSampler()
+                          .setInput(timesAccessor)
+                          .setOutput(framesAccessor)
+                          .setInterpolation('LINEAR');
+      const channel = doc.createAnimationChannel()
+                          .setTargetPath('translation')
+                          .setTargetNode(out)
+                          .setSampler(sampler);
+      animation.addSampler(sampler);
+      animation.addChannel(channel);
+    } else {
+      out.setTranslation(node.translation);
+    }
   }
   if (node.rotation) {
     const {quat} = glMatrix;
@@ -503,6 +544,8 @@ async function exportModels(defaults: GlobalDefaults, manifold?: Manifold) {
                       .setRotation([-halfRoot2, 0, 0, halfRoot2])
                       .setScale([mm2m, mm2m, mm2m]);
   doc.createScene().addChild(wrapper);
+  doc.createBuffer();
+  animation = doc.createAnimation('');
 
   const to3mf = {
     meshes: [],
