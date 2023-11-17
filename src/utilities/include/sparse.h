@@ -48,7 +48,11 @@ class SparseIndices {
   }
 
   SparseIndices() = default;
-  SparseIndices(size_t size) : data_(size * sizeof(int64_t)) {}
+  SparseIndices(size_t size) {
+    if (size >= std::numeric_limits<int32_t>::max() / sizeof(int64_t))
+      throw std::out_of_range("SparseIndices too large");
+    data_ = Vec<char>(size * sizeof(int64_t));
+  }
 
   int size() const { return data_.size() / sizeof(int64_t); }
 
