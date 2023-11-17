@@ -1345,11 +1345,9 @@ TEST(Boolean, InterpolatedNormals) {
 TEST(Boolean, CreatePropertiesSlow) {
   Manifold a = Manifold::Sphere(10, 1024).SetProperties(
       3, [](float* newprop, glm::vec3 pos, const float* old) {
-        newprop[0] = 0.0;
-        newprop[1] = 0.0;
-        newprop[2] = 0.0;
+        for (int i = 0; i < 3; i++) newprop[i] = 0;
       });
-  Manifold b = Manifold::Sphere(10, 1024);
+  Manifold b = Manifold::Sphere(10, 1024).Translate({5, 0, 0});
   Manifold result = a + b;
   EXPECT_EQ(result.NumProp(), 3);
 }

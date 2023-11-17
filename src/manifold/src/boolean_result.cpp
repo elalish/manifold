@@ -14,8 +14,6 @@
 
 #include <algorithm>
 #include <array>
-#define GLM_ENABLE_EXPERIMENTAL
-#include <glm/gtx/hash.hpp>
 #include <map>
 
 #if MANIFOLD_PAR == 'T' && __has_include(<tbb/concurrent_map.h>)
@@ -534,7 +532,8 @@ void CreateProperties(Manifold::Impl &outR, const Manifold::Impl &inP,
 
   using Entry = std::pair<glm::ivec3, int>;
   int idMissProp = outR.NumVert();
-  std::vector<std::unordered_map<glm::ivec3, int>> propIdx(outR.NumVert() + 1);
+  std::vector<std::vector<Entry>> propIdx(outR.NumVert() + 1);
+  std::vector<int> propMissIdx(outR.NumVert() * 2, -1);
   outR.meshRelation_.properties.reserve(outR.NumVert() * numProp);
   int idx = 0;
 
@@ -579,15 +578,29 @@ void CreateProperties(Manifold::Impl &outR, const Manifold::Impl &inP,
         }
       }
 
-      auto &bin = propIdx[key.y];
-      auto entry = bin.find(glm::ivec3(key.x, key.z, key.w));
-      if (entry != bin.end()) {
-        outR.meshRelation_.triProperties[tri][i] = entry->second;
-        continue;
+      if (key.y == idMissProp && key.z >= 0) {
+        // only key.x/key.z matters
+        auto &entry = propMissIdx[key.z * 2 + key.x];
+        if (entry >= 0) {
+          outR.meshRelation_.triProperties[tri][i] = entry;
+          continue;
+        }
+        entry = idx;
+      } else {
+        auto &bin = propIdx[key.y];
+        bool bFound = false;
+        for (int k = 0; k < bin.size(); ++k) {
+          if (bin[k].first == glm::ivec3(key.x, key.z, key.w)) {
+            bFound = true;
+            outR.meshRelation_.triProperties[tri][i] = bin[k].second;
+            break;
+          }
+        }
+        if (bFound) continue;
+        bin.push_back(std::make_pair(glm::ivec3(key.x, key.z, key.w), idx));
       }
-      bin.insert(std::make_pair(glm::ivec3(key.x, key.z, key.w), idx));
-      outR.meshRelation_.triProperties[tri][i] = idx++;
 
+      outR.meshRelation_.triProperties[tri][i] = idx++;
       for (int p = 0; p < numProp; ++p) {
         if (p < oldNumProp) {
           glm::vec3 oldProps;
