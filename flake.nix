@@ -52,7 +52,7 @@
             }: pkgs.stdenv.mkDerivation {
               inherit doCheck;
               pname = "manifold-${parallel-backend}";
-              version = "2.2.1";
+              version = "2.2.2";
               src = self;
               nativeBuildInputs = (with pkgs; [
                 cmake
@@ -103,7 +103,7 @@
               parallelBackends)) // {
             manifold-js = pkgs.buildEmscriptenPackage {
               name = "manifold-js";
-              version = "2.2.1";
+              version = "2.2.2";
               src = self;
               nativeBuildInputs = (with pkgs; [ cmake python39 ]);
               buildInputs = [ pkgs.nodejs ];
@@ -134,7 +134,7 @@
             # but how should we make it work with other python versions?
             manifold3d = with pkgs.python3Packages; buildPythonPackage {
               pname = "manifold3d";
-              version = "2.2.1";
+              version = "2.2.2";
               src = self;
               propagatedBuildInputs = [
                 numpy
