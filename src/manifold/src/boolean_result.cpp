@@ -15,6 +15,8 @@
 #include <algorithm>
 #include <array>
 #include <map>
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/gtx/hash.hpp>
 
 #if MANIFOLD_PAR == 'T' && __has_include(<tbb/concurrent_map.h>)
 #define TBB_PREVIEW_CONCURRENT_ORDERED_CONTAINERS 1
@@ -533,7 +535,7 @@ void CreateProperties(Manifold::Impl &outR, const Manifold::Impl &inP,
   using Entry = std::pair<glm::ivec3, int>;
   int idMissProp = outR.NumVert();
   std::vector<std::vector<Entry>> propIdx(outR.NumVert() + 1);
-  std::vector<int> propMissIdx(outR.NumVert() * 2, -1);
+  std::unordered_map<glm::ivec2, int> propMissIdx[2];
   outR.meshRelation_.properties.reserve(outR.NumVert() * numProp);
   int idx = 0;
 
@@ -579,13 +581,12 @@ void CreateProperties(Manifold::Impl &outR, const Manifold::Impl &inP,
       }
 
       if (key.y == idMissProp && key.z >= 0) {
-        // only key.x/key.z matters
-        auto &entry = propMissIdx[key.z * 2 + key.x];
-        if (entry >= 0) {
-          outR.meshRelation_.triProperties[tri][i] = entry;
+        auto entry = propMissIdx[key.x].find(glm::ivec2(key.z, key.w));
+        if (entry != propMissIdx[key.x].end()) {
+          outR.meshRelation_.triProperties[tri][i] = entry->second;
           continue;
         }
-        entry = idx;
+        propMissIdx[key.x].insert({glm::ivec2(key.z, key.w), idx});
       } else {
         auto &bin = propIdx[key.y];
         bool bFound = false;
