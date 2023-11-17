@@ -19,20 +19,28 @@ import {strToU8, Zippable, zipSync} from 'fflate'
 import * as glMatrix from 'gl-matrix';
 
 import Module from './built/manifold';
-//@ts-ignore
-import {Attribute, Properties, setupIO, writeMesh} from './gltf-io';
-import type {GLTFMaterial, Quat} from './public/editor';
+import {Properties, setupIO, writeMesh} from './gltf-io';
+import {GLTFMaterial, Quat} from './public/editor';
 import type {CrossSection, Manifold, ManifoldToplevel, Mesh, Vec3} from './public/manifold';
+
+interface GlobalDefaults {
+  roughness: number;
+  metallic: number;
+  baseColorFactor: [number, number, number];
+  alpha: number;
+  unlit: boolean;
+  animationLength: number;
+}
 
 interface WorkerStatic extends ManifoldToplevel {
   GLTFNode: typeof GLTFNode;
   show(manifold: Manifold): Manifold;
   only(manifold: Manifold): Manifold;
-  setMaterial(manifold: Manifold, material: GLTFMaterial): void;
+  setMaterial(manifold: Manifold, material: GLTFMaterial): Manifold;
   cleanup(): void;
 }
 
-const module = await Module() as unknown as WorkerStatic;
+const module = await Module() as WorkerStatic;
 module.setup();
 
 // Faster on modern browsers than Float32Array
@@ -126,6 +134,15 @@ module.cleanup = function() {
 let ghost = false;
 const shown = new Map<number, Mesh>();
 const singles = new Map<number, Mesh>();
+
+const GLOBAL_DEFAULTS = {
+  roughness: 0.2,
+  metallic: 1,
+  baseColorFactor: [1, 1, 0] as [number, number, number],
+  alpha: 1,
+  unlit: false,
+  animationLength: 1
+};
 
 const SHOW = {
   baseColorFactor: [1, 0, 0],
@@ -221,6 +238,8 @@ class GLTFNode {
 
 module.GLTFNode = GLTFNode;
 
+const globalDefaults = {...GLOBAL_DEFAULTS};
+
 module.setMaterial = (manifold: Manifold, material: GLTFMaterial): Manifold => {
   const out = manifold.asOriginal();
   id2material.set(out.originalID(), material);
@@ -271,8 +290,8 @@ function log(...args: any[]) {
 }
 
 self.onmessage = async (e) => {
-  const content = e.data +
-      '\nreturn exportModels(typeof result === "undefined" ? undefined : result);\n';
+  const content = 'const globalDefaults = {};\n' + e.data +
+      '\nreturn exportModels(globalDefaults, typeof result === "undefined" ? undefined : result);\n';
   try {
     const f = new Function(
         'exportModels', 'glMatrix', 'module', ...exposedFunctions, content);
@@ -318,15 +337,13 @@ function getBackupMaterial(node?: GLTFNode): GLTFMaterial {
   return node.material;
 }
 
-function makeDefaultedMaterial(doc: Document, {
-  roughness = 0.2,
-  metallic = 1,
-  baseColorFactor = [1, 1, 0],
-  alpha = 1,
-  unlit = false,
-  name = ''
-}: GLTFMaterial = {}): Material {
-  const material = doc.createMaterial(name);
+function makeDefaultedMaterial(
+    doc: Document, matIn: GLTFMaterial = {}): Material {
+  const defaults = {...globalDefaults};
+  Object.assign(defaults, matIn);
+  const {roughness, metallic, baseColorFactor, alpha, unlit} = defaults;
+
+  const material = doc.createMaterial(matIn.name ?? '');
 
   if (unlit) {
     const unlit = doc.createExtension(KHRMaterialsUnlit).createUnlit();
@@ -475,7 +492,10 @@ function createNodeFromCache(
   return node;
 }
 
-async function exportModels(manifold?: Manifold) {
+async function exportModels(defaults: GlobalDefaults, manifold?: Manifold) {
+  Object.assign(globalDefaults, GLOBAL_DEFAULTS);
+  Object.assign(globalDefaults, defaults);
+
   const doc = new Document();
   const halfRoot2 = Math.sqrt(2) / 2;
   const mm2m = 1 / 1000;

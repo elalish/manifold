@@ -21,6 +21,8 @@ declare class GLTFNode {
   scale?: Vec3|((t: number) => Vec3);
   material?: GLTFMaterial;
   name?: string;
+  morphStart?: (Vec3) => Vec3;
+  morphEnd?: (Vec3) => Vec3;
   constructor(parent?: GLTFNode);
   clone(parent?: GLTFNode): GLTFNode;
 }
@@ -38,6 +40,15 @@ declare class GLTFMaterial {
   name?: string;
 }
 
+declare const globalDefaults: {
+  roughness: number,
+  metallic: number,
+  baseColorFactor: [number, number, number],
+  alpha: number,
+  unlit: boolean,
+  animationLength: number
+}
+
 /**
  * Set material properties on the input manifold. They will be carried along
  * through operations.
@@ -45,8 +56,8 @@ declare class GLTFMaterial {
  * @param manifold The object to add properties to - returned for chaining.
  * @param material A set of material properties to apply to this manifold.
  */
-declare function setMaterial(
-    manifold: Manifold, material: GLTFMaterial): Manifold;
+declare function setMaterial(manifold: Manifold, material: GLTFMaterial):
+    Manifold;
 
 /**
  * Wrap any shape object with this method to display it and any copies in
