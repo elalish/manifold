@@ -314,55 +314,76 @@ self.onmessage = async (e) => {
   }
 };
 
-function createGLTFnode(doc: Document, node: GLTFNode) {
-  const out = doc.createNode(node.name);
-  const nFrames = timesAccessor.getCount();
-  const buffer = doc.getRoot().listBuffers()[0];
-  if (node.translation) {
-    if (typeof node.translation === 'function') {
-      const frames = new Float32Array(3 * nFrames);
-      for (let i = 0; i < nFrames; ++i) {
-        const x = i / (nFrames - 1);
-        frames.set(
-            node.translation(
-                globalDefaults.animationMode !== 'ping-pong' ?
-                    x :
-                    (1 - Math.cos(x * 2 * Math.PI)) / 2),
-            3 * i);
-      }
+function euler2quat(rotation: Vec3): Quat {
+  const {quat} = glMatrix;
+  const deg2rad = Math.PI / 180;
+  const q = quat.create() as Quat;
+  quat.rotateZ(q, q, deg2rad * rotation[2]);
+  quat.rotateY(q, q, deg2rad * rotation[1]);
+  quat.rotateX(q, q, deg2rad * rotation[0]);
+  return q;
+}
 
-      const framesAccessor =
-          doc.createAccessor(node.name + ' translation frames')
-              .setBuffer(buffer)
-              .setArray(frames)
-              .setType(Accessor.Type.VEC3);
-      const sampler = doc.createAnimationSampler()
-                          .setInput(timesAccessor)
-                          .setOutput(framesAccessor)
-                          .setInterpolation('LINEAR');
-      const channel = doc.createAnimationChannel()
-                          .setTargetPath('translation')
-                          .setTargetNode(out)
-                          .setSampler(sampler);
-      animation.addSampler(sampler);
-      animation.addChannel(channel);
-      hasAnimation = true;
-    } else {
-      out.setTranslation(node.translation);
-    }
+function addMotion(
+    doc: Document, type: 'translation'|'rotation'|'scale', node: GLTFNode,
+    out: Node): Vec3|null {
+  const motion = node[type];
+  if (motion == null) {
+    return null;
   }
-  if (node.rotation) {
-    const {quat} = glMatrix;
-    const deg2rad = Math.PI / 180;
-    const q = quat.create() as Quat;
-    quat.rotateX(q, q, deg2rad * node.rotation[0]);
-    quat.rotateY(q, q, deg2rad * node.rotation[1]);
-    quat.rotateZ(q, q, deg2rad * node.rotation[2]);
-    out.setRotation(q);
+  if (typeof motion !== 'function') {
+    return motion;
   }
-  if (node.scale) {
-    out.setScale(node.scale);
+
+  const nFrames = timesAccessor.getCount();
+  const nEl = type == 'rotation' ? 4 : 3;
+  const frames = new Float32Array(nEl * nFrames);
+  for (let i = 0; i < nFrames; ++i) {
+    const x = i / (nFrames - 1);
+    const m = motion(
+        globalDefaults.animationMode !== 'ping-pong' ?
+            x :
+            (1 - Math.cos(x * 2 * Math.PI)) / 2);
+    frames.set(nEl === 4 ? euler2quat(m) : m, nEl * i);
   }
+
+  const framesAccessor =
+      doc.createAccessor(node.name + ' ' + type + ' frames')
+          .setBuffer(doc.getRoot().listBuffers()[0])
+          .setArray(frames)
+          .setType(nEl === 4 ? Accessor.Type.VEC4 : Accessor.Type.VEC3);
+  const sampler = doc.createAnimationSampler()
+                      .setInput(timesAccessor)
+                      .setOutput(framesAccessor)
+                      .setInterpolation('LINEAR');
+  const channel = doc.createAnimationChannel()
+                      .setTargetPath(type)
+                      .setTargetNode(out)
+                      .setSampler(sampler);
+  animation.addSampler(sampler);
+  animation.addChannel(channel);
+  hasAnimation = true;
+  return motion(0);
+}
+
+function createGLTFnode(doc: Document, node: GLTFNode): Node {
+  const out = doc.createNode(node.name);
+
+  const pos = addMotion(doc, 'translation', node, out);
+  if (pos != null) {
+    out.setTranslation(pos);
+  }
+
+  const rot = addMotion(doc, 'rotation', node, out);
+  if (rot != null) {
+    out.setRotation(euler2quat(rot));
+  }
+
+  const scale = addMotion(doc, 'scale', node, out);
+  if (scale != null) {
+    out.setScale(scale);
+  }
+
   return out;
 }
 

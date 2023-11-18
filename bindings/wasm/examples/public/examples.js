@@ -90,17 +90,28 @@ export const examples = {
 
       // Assigned materials are only applied to a GLTFNode. Note that material
       // definitions cascade, applying recursively to all child surfaces, but
-      // overridden by any materials defined lower down. Our default material:
-      // {
-      //   roughness = 0.2,
-      //   metallic = 1,
-      //   baseColorFactor = [1, 1, 0],
-      //   alpha = 1,
-      //   unlit = false,
-      //   name = ''
-      // }
+      // overridden by any materials defined lower down. The default material
+      // properties, as well as animation parameters can be set via
+      // globalDefaults.
+
       const node = new GLTFNode();
-      node.manifold = result;
+      node.rotation = [45, -Math.atan(1 / Math.sqrt(2)) * 180 / Math.PI, 120];
+
+      const fixed = new GLTFNode(node);
+      fixed.manifold = result;
+      fixed.rotation = [0, 0, 180];
+
+      const moving = new GLTFNode(node);
+      moving.manifold = result;
+      moving.translation = (t) => {
+        const a = 1 - t;
+        const x = a > 0.5 ? scale * 2 * (0.5 - a) : 0;
+        return [x, x, -2 * x + scale * 4 * (0.5 - Math.abs(0.5 - a))];
+      };
+      moving.rotation = (t) => [0, 0, 270 * 2 * (1 - t)];
+
+      globalDefaults.animationLength = 10;
+      globalDefaults.animationMode = 'ping-pong';
       return result;
     },
 
