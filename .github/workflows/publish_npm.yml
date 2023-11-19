@@ -1,13 +1,22 @@
 name: publish_npm
 
-on: [release, workflow_dispatch]
+on: 
+  release:
+    types: [published]
+  workflow_dispatch:
 
 jobs:
-  deploy_github_pages:
-    runs-on: ubuntu-20.04
+  publish_npm:
+    runs-on: ubuntu-22.04
 
     steps:
     - uses: actions/checkout@v3
+
+    - name: Setup Node
+      uses: actions/setup-node@v2
+      with:
+        node-version: '20.x'
+        registry-url: 'https://registry.npmjs.org'
 
     - name: Download built examples
       uses: dawidd6/action-download-artifact@v2
