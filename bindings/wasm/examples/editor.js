@@ -146,6 +146,7 @@ function addEdit(button) {
     const code = getScript(oldName);
     const form = document.createElement('form');
     const inputElement = document.createElement('input');
+    inputElement.classList.add('name');
     inputElement.value = oldName;
     label.textContent = '';
     button.appendChild(form);
@@ -322,6 +323,51 @@ require(['vs/editor/editor.main'], async function() {
   };
 });
 
+// Animation ------------------------------------------------------------
+const mv = document.querySelector('model-viewer');
+const animationContainer = document.querySelector('#animation');
+const playButton = document.querySelector('#play');
+const scrubber = document.querySelector('#scrubber');
+let paused = false;
+
+mv.addEventListener('load', () => {
+  const hasAnimation = mv.availableAnimations.length > 0;
+  animationContainer.style.display = hasAnimation ? 'flex' : 'none';
+  if (hasAnimation) {
+    play();
+  }
+});
+
+function play() {
+  mv.play();
+  playButton.classList.remove('play');
+  playButton.classList.add('pause');
+  paused = false;
+  scrubber.classList.add('hide');
+}
+
+function pause() {
+  mv.pause();
+  playButton.classList.remove('pause');
+  playButton.classList.add('play');
+  paused = true;
+  scrubber.max = mv.duration;
+  scrubber.value = mv.currentTime;
+  scrubber.classList.remove('hide');
+}
+
+playButton.onclick = function() {
+  if (paused) {
+    play();
+  } else {
+    pause();
+  }
+};
+
+scrubber.oninput = function() {
+  mv.currentTime = scrubber.value;
+};
+
 // Execution ------------------------------------------------------------
 const consoleElement = document.querySelector('#console');
 const oldLog = console.log;
@@ -357,7 +403,6 @@ function finishRun() {
       `Took ${(Math.round((t1 - t0) / 10) / 100).toLocaleString()} seconds`);
 }
 
-const mv = document.querySelector('model-viewer');
 const output = {
   glbURL: null,
   threeMFURL: null
