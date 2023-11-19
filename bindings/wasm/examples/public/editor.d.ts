@@ -21,8 +21,6 @@ declare class GLTFNode {
   scale?: Vec3|((t: number) => Vec3);
   material?: GLTFMaterial;
   name?: string;
-  morphStart?: (Vec3) => Vec3;
-  morphEnd?: (Vec3) => Vec3;
   constructor(parent?: GLTFNode);
   clone(parent?: GLTFNode): GLTFNode;
 }

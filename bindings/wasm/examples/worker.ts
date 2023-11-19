@@ -223,8 +223,8 @@ class GLTFNode {
   private _parent?: GLTFNode;
   manifold?: Manifold;
   translation?: Vec3|((t: number) => Vec3);
-  rotation?: Vec3;  //|((t: number) => Vec3);
-  scale?: Vec3;     //|((t: number) => Vec3);
+  rotation?: Vec3|((t: number) => Vec3);
+  scale?: Vec3|((t: number) => Vec3);
   material?: GLTFMaterial;
   name?: string;
 
