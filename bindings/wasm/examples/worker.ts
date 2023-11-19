@@ -12,27 +12,36 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {Document, mat4, Material, Node, WebIO} from '@gltf-transform/core';
+import {Accessor, Animation, Document, mat4, Material, Node, WebIO} from '@gltf-transform/core';
 import {KHRMaterialsUnlit, KHRONOS_EXTENSIONS} from '@gltf-transform/extensions';
 import {fileForContentTypes, to3dmodel} from '@jscadui/3mf-export';
 import {strToU8, Zippable, zipSync} from 'fflate'
 import * as glMatrix from 'gl-matrix';
 
 import Module from './built/manifold';
-//@ts-ignore
-import {Attribute, Properties, setupIO, writeMesh} from './gltf-io';
-import type {GLTFMaterial, Quat} from './public/editor';
+import {Properties, setupIO, writeMesh} from './gltf-io';
+import {GLTFMaterial, Quat} from './public/editor';
 import type {CrossSection, Manifold, ManifoldToplevel, Mesh, Vec3} from './public/manifold';
+
+interface GlobalDefaults {
+  roughness: number;
+  metallic: number;
+  baseColorFactor: [number, number, number];
+  alpha: number;
+  unlit: boolean;
+  animationLength: number;
+  animationMode: 'loop'|'ping-pong';
+}
 
 interface WorkerStatic extends ManifoldToplevel {
   GLTFNode: typeof GLTFNode;
   show(manifold: Manifold): Manifold;
   only(manifold: Manifold): Manifold;
-  setMaterial(manifold: Manifold, material: GLTFMaterial): void;
+  setMaterial(manifold: Manifold, material: GLTFMaterial): Manifold;
   cleanup(): void;
 }
 
-const module = await Module() as unknown as WorkerStatic;
+const module = await Module() as WorkerStatic;
 module.setup();
 
 // Faster on modern browsers than Float32Array
@@ -127,6 +136,18 @@ let ghost = false;
 const shown = new Map<number, Mesh>();
 const singles = new Map<number, Mesh>();
 
+const FPS = 30;
+
+const GLOBAL_DEFAULTS = {
+  roughness: 0.2,
+  metallic: 1,
+  baseColorFactor: [1, 1, 0] as [number, number, number],
+  alpha: 1,
+  unlit: false,
+  animationLength: 1,
+  animationMode: 'loop'
+};
+
 const SHOW = {
   baseColorFactor: [1, 0, 0],
   alpha: 0.25,
@@ -144,8 +165,11 @@ const GHOST = {
 const nodes = new Array<GLTFNode>();
 const id2material = new Map<number, GLTFMaterial>();
 const materialCache = new Map<GLTFMaterial, Material>();
-let nextGlobalID = 0;
 const object2globalID = new Map<GLTFNode|Manifold, number>();
+let nextGlobalID = 0;
+let animation: Animation;
+let timesAccessor: Accessor;
+let hasAnimation: boolean;
 
 function cleanup() {
   ghost = false;
@@ -198,9 +222,9 @@ interface To3MF {
 class GLTFNode {
   private _parent?: GLTFNode;
   manifold?: Manifold;
-  translation?: Vec3;
-  rotation?: Vec3;
-  scale?: Vec3;
+  translation?: Vec3|((t: number) => Vec3);
+  rotation?: Vec3|((t: number) => Vec3);
+  scale?: Vec3|((t: number) => Vec3);
   material?: GLTFMaterial;
   name?: string;
 
@@ -220,6 +244,8 @@ class GLTFNode {
 }
 
 module.GLTFNode = GLTFNode;
+
+const globalDefaults = {...GLOBAL_DEFAULTS};
 
 module.setMaterial = (manifold: Manifold, material: GLTFMaterial): Manifold => {
   const out = manifold.asOriginal();
@@ -271,8 +297,8 @@ function log(...args: any[]) {
 }
 
 self.onmessage = async (e) => {
-  const content = e.data +
-      '\nreturn exportModels(typeof result === "undefined" ? undefined : result);\n';
+  const content = 'const globalDefaults = {};\n' + e.data +
+      '\nreturn exportModels(globalDefaults, typeof result === "undefined" ? undefined : result);\n';
   try {
     const f = new Function(
         'exportModels', 'glMatrix', 'module', ...exposedFunctions, content);
@@ -288,23 +314,76 @@ self.onmessage = async (e) => {
   }
 };
 
-function createGLTFnode(doc: Document, node: GLTFNode) {
+function euler2quat(rotation: Vec3): Quat {
+  const {quat} = glMatrix;
+  const deg2rad = Math.PI / 180;
+  const q = quat.create() as Quat;
+  quat.rotateZ(q, q, deg2rad * rotation[2]);
+  quat.rotateY(q, q, deg2rad * rotation[1]);
+  quat.rotateX(q, q, deg2rad * rotation[0]);
+  return q;
+}
+
+function addMotion(
+    doc: Document, type: 'translation'|'rotation'|'scale', node: GLTFNode,
+    out: Node): Vec3|null {
+  const motion = node[type];
+  if (motion == null) {
+    return null;
+  }
+  if (typeof motion !== 'function') {
+    return motion;
+  }
+
+  const nFrames = timesAccessor.getCount();
+  const nEl = type == 'rotation' ? 4 : 3;
+  const frames = new Float32Array(nEl * nFrames);
+  for (let i = 0; i < nFrames; ++i) {
+    const x = i / (nFrames - 1);
+    const m = motion(
+        globalDefaults.animationMode !== 'ping-pong' ?
+            x :
+            (1 - Math.cos(x * 2 * Math.PI)) / 2);
+    frames.set(nEl === 4 ? euler2quat(m) : m, nEl * i);
+  }
+
+  const framesAccessor =
+      doc.createAccessor(node.name + ' ' + type + ' frames')
+          .setBuffer(doc.getRoot().listBuffers()[0])
+          .setArray(frames)
+          .setType(nEl === 4 ? Accessor.Type.VEC4 : Accessor.Type.VEC3);
+  const sampler = doc.createAnimationSampler()
+                      .setInput(timesAccessor)
+                      .setOutput(framesAccessor)
+                      .setInterpolation('LINEAR');
+  const channel = doc.createAnimationChannel()
+                      .setTargetPath(type)
+                      .setTargetNode(out)
+                      .setSampler(sampler);
+  animation.addSampler(sampler);
+  animation.addChannel(channel);
+  hasAnimation = true;
+  return motion(0);
+}
+
+function createGLTFnode(doc: Document, node: GLTFNode): Node {
   const out = doc.createNode(node.name);
-  if (node.translation) {
-    out.setTranslation(node.translation);
+
+  const pos = addMotion(doc, 'translation', node, out);
+  if (pos != null) {
+    out.setTranslation(pos);
   }
-  if (node.rotation) {
-    const {quat} = glMatrix;
-    const deg2rad = Math.PI / 180;
-    const q = quat.create() as Quat;
-    quat.rotateX(q, q, deg2rad * node.rotation[0]);
-    quat.rotateY(q, q, deg2rad * node.rotation[1]);
-    quat.rotateZ(q, q, deg2rad * node.rotation[2]);
-    out.setRotation(q);
+
+  const rot = addMotion(doc, 'rotation', node, out);
+  if (rot != null) {
+    out.setRotation(euler2quat(rot));
   }
-  if (node.scale) {
-    out.setScale(node.scale);
+
+  const scale = addMotion(doc, 'scale', node, out);
+  if (scale != null) {
+    out.setScale(scale);
   }
+
   return out;
 }
 
@@ -318,15 +397,13 @@ function getBackupMaterial(node?: GLTFNode): GLTFMaterial {
   return node.material;
 }
 
-function makeDefaultedMaterial(doc: Document, {
-  roughness = 0.2,
-  metallic = 1,
-  baseColorFactor = [1, 1, 0],
-  alpha = 1,
-  unlit = false,
-  name = ''
-}: GLTFMaterial = {}): Material {
-  const material = doc.createMaterial(name);
+function makeDefaultedMaterial(
+    doc: Document, matIn: GLTFMaterial = {}): Material {
+  const defaults = {...globalDefaults};
+  Object.assign(defaults, matIn);
+  const {roughness, metallic, baseColorFactor, alpha, unlit} = defaults;
+
+  const material = doc.createMaterial(matIn.name ?? '');
 
   if (unlit) {
     const unlit = doc.createExtension(KHRMaterialsUnlit).createUnlit();
@@ -475,7 +552,10 @@ function createNodeFromCache(
   return node;
 }
 
-async function exportModels(manifold?: Manifold) {
+async function exportModels(defaults: GlobalDefaults, manifold?: Manifold) {
+  Object.assign(globalDefaults, GLOBAL_DEFAULTS);
+  Object.assign(globalDefaults, defaults);
+
   const doc = new Document();
   const halfRoot2 = Math.sqrt(2) / 2;
   const mm2m = 1 / 1000;
@@ -483,6 +563,18 @@ async function exportModels(manifold?: Manifold) {
                       .setRotation([-halfRoot2, 0, 0, halfRoot2])
                       .setScale([mm2m, mm2m, mm2m]);
   doc.createScene().addChild(wrapper);
+
+  animation = doc.createAnimation('');
+  hasAnimation = false;
+  const nFrames = Math.round(globalDefaults.animationLength * FPS) + 1;
+  const times = new Float32Array(nFrames);
+  for (let i = 0; i < nFrames; ++i) {
+    times[i] = i * globalDefaults.animationLength / (nFrames - 1);
+  }
+  timesAccessor = doc.createAccessor('animation times')
+                      .setBuffer(doc.createBuffer())
+                      .setArray(times)
+                      .setType(Accessor.Type.SCALAR);
 
   const to3mf = {
     meshes: [],
@@ -539,6 +631,11 @@ async function exportModels(manifold?: Manifold) {
     addMesh(doc, to3mf, node, manifold);
     wrapper.addChild(node);
     to3mf.items.push({objectID: `${object2globalID.get(manifold)}`});
+  }
+
+  if (!hasAnimation) {
+    timesAccessor.dispose();
+    animation.dispose();
   }
 
   const glb = await io.writeBinary(doc);
