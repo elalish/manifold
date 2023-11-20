@@ -50,9 +50,9 @@ export const examples = {
 
     TetrahedronPuzzle: function() {
       // A tetrahedron cut into two identical halves that can screw together as
-      // a puzzle. This only outputs one of the halves. This demonstrates how
-      // redundant points along a polygon can be used to make twisted extrusions
-      // smoother. Based on the screw puzzle by George Hart:
+      // a puzzle. This demonstrates how redundant points along a polygon can be
+      // used to make twisted extrusions smoother. It also showcases animated
+      // assemblies. Based on the screw puzzle by George Hart:
       // https://www.thingiverse.com/thing:186372
 
       const edgeLength = 50;  // Length of each edge of the overall tetrahedron.
