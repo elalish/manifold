@@ -14,7 +14,7 @@
 
 import {Accessor, Animation, Document, mat4, Material, Node, WebIO} from '@gltf-transform/core';
 import {KHRMaterialsUnlit, KHRONOS_EXTENSIONS} from '@gltf-transform/extensions';
-import {fileForContentTypes, to3dmodel} from '@jscadui/3mf-export';
+import {fileForContentTypes, fileForRelThumbnail, to3dmodel} from '@jscadui/3mf-export';
 import {strToU8, Zippable, zipSync} from 'fflate'
 import * as glMatrix from 'gl-matrix';
 
@@ -645,6 +645,7 @@ async function exportModels(defaults: GlobalDefaults, manifold?: Manifold) {
   const files: Zippable = {};
   files['3D/3dmodel.model'] = strToU8(model);
   files[fileForContentTypes.name] = strToU8(fileForContentTypes.content);
+  files[fileForRelThumbnail.name] = strToU8(fileForRelThumbnail.content);
   const zipFile = zipSync(files);
   const blob3MF = new Blob(
       [zipFile],
