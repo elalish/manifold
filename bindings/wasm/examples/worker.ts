@@ -14,7 +14,7 @@
 
 import {Accessor, Animation, Document, mat4, Material, Node, WebIO} from '@gltf-transform/core';
 import {KHRMaterialsUnlit, KHRONOS_EXTENSIONS} from '@gltf-transform/extensions';
-import {fileForContentTypes, fileForRelThumbnail, to3dmodel} from '@jscadui/3mf-export';
+import {fileForContentTypes, FileForRelThumbnail, to3dmodel} from '@jscadui/3mf-export';
 import {strToU8, Zippable, zipSync} from 'fflate'
 import * as glMatrix from 'gl-matrix';
 
@@ -166,7 +166,8 @@ const nodes = new Array<GLTFNode>();
 const id2material = new Map<number, GLTFMaterial>();
 const materialCache = new Map<GLTFMaterial, Material>();
 const object2globalID = new Map<GLTFNode|Manifold, number>();
-let nextGlobalID = 0;
+// lib3mf doesn't like objectid=0
+let nextGlobalID = 1;
 let animation: Animation;
 let timesAccessor: Accessor;
 let hasAnimation: boolean;
@@ -179,7 +180,7 @@ function cleanup() {
   id2material.clear();
   materialCache.clear();
   object2globalID.clear();
-  nextGlobalID = 0;
+  nextGlobalID = 1;
 }
 
 interface Mesh3MF {
@@ -640,6 +641,9 @@ async function exportModels(defaults: GlobalDefaults, manifold?: Manifold) {
 
   const glb = await io.writeBinary(doc);
   const blobGLB = new Blob([glb], {type: 'application/octet-stream'});
+
+  const fileForRelThumbnail = new FileForRelThumbnail();
+  fileForRelThumbnail.add3dModel('3D/3dmodel.model')
 
   const model = to3dmodel(to3mf);
   const files: Zippable = {};
