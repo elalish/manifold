@@ -647,8 +647,10 @@ async function exportModels(defaults: GlobalDefaults, manifold?: Manifold) {
   files['3D/3dmodel.model'] = strToU8(model);
   files[fileForContentTypes.name] = strToU8(fileForContentTypes.content);
   files[fileForRelThumbnail.name] = strToU8(
-    // remove the thumbnail line
-    fileForRelThumbnail.content.split("\n").filter((line: string) => line.indexOf("thumbnail") == -1).join("\n"));
+      // remove the thumbnail line
+      fileForRelThumbnail.content.split('\n')
+          .filter((line: string) => line.indexOf('thumbnail') == -1)
+          .join('\n'));
   const zipFile = zipSync(files);
   const blob3MF = new Blob(
       [zipFile],
