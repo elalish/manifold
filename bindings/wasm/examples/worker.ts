@@ -166,7 +166,8 @@ const nodes = new Array<GLTFNode>();
 const id2material = new Map<number, GLTFMaterial>();
 const materialCache = new Map<GLTFMaterial, Material>();
 const object2globalID = new Map<GLTFNode|Manifold, number>();
-let nextGlobalID = 0;
+// lib3mf doesn't like objectid=0
+let nextGlobalID = 1;
 let animation: Animation;
 let timesAccessor: Accessor;
 let hasAnimation: boolean;
@@ -179,7 +180,7 @@ function cleanup() {
   id2material.clear();
   materialCache.clear();
   object2globalID.clear();
-  nextGlobalID = 0;
+  nextGlobalID = 1;
 }
 
 interface Mesh3MF {
@@ -645,7 +646,9 @@ async function exportModels(defaults: GlobalDefaults, manifold?: Manifold) {
   const files: Zippable = {};
   files['3D/3dmodel.model'] = strToU8(model);
   files[fileForContentTypes.name] = strToU8(fileForContentTypes.content);
-  files[fileForRelThumbnail.name] = strToU8(fileForRelThumbnail.content);
+  files[fileForRelThumbnail.name] = strToU8(
+    // remove the thumbnail line
+    fileForRelThumbnail.content.split("\n").filter((line: string) => line.indexOf("thumbnail") == -1).join("\n"));
   const zipFile = zipSync(files);
   const blob3MF = new Blob(
       [zipFile],
