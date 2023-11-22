@@ -14,7 +14,7 @@
 
 import {Accessor, Animation, Document, mat4, Material, Node, WebIO} from '@gltf-transform/core';
 import {KHRMaterialsUnlit, KHRONOS_EXTENSIONS} from '@gltf-transform/extensions';
-import {fileForContentTypes, fileForRelThumbnail, to3dmodel} from '@jscadui/3mf-export';
+import {fileForContentTypes, FileForRelThumbnail, to3dmodel} from '@jscadui/3mf-export';
 import {strToU8, Zippable, zipSync} from 'fflate'
 import * as glMatrix from 'gl-matrix';
 
@@ -642,15 +642,14 @@ async function exportModels(defaults: GlobalDefaults, manifold?: Manifold) {
   const glb = await io.writeBinary(doc);
   const blobGLB = new Blob([glb], {type: 'application/octet-stream'});
 
+  const fileForRelThumbnail = new FileForRelThumbnail();
+  fileForRelThumbnail.add3dModel('3D/3dmodel.model')
+
   const model = to3dmodel(to3mf);
   const files: Zippable = {};
   files['3D/3dmodel.model'] = strToU8(model);
   files[fileForContentTypes.name] = strToU8(fileForContentTypes.content);
-  files[fileForRelThumbnail.name] = strToU8(
-      // remove the thumbnail line
-      fileForRelThumbnail.content.split('\n')
-          .filter((line: string) => line.indexOf('thumbnail') == -1)
-          .join('\n'));
+  files[fileForRelThumbnail.name] = strToU8(fileForRelThumbnail.content);
   const zipFile = zipSync(files);
   const blob3MF = new Blob(
       [zipFile],
