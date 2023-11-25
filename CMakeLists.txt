@@ -21,11 +21,24 @@ set(MANIFOLD_PAR "NONE" CACHE STRING "Parallel backend, either \"TBB\" or \"NONE
 set(MANIFOLD_FLAGS "" CACHE STRING "Manifold compiler flags")
 option(MANIFOLD_EXPORT "Build mesh export (via assimp) utility library" OFF)
 option(MANIFOLD_TEST "Enable testing suite" ON)
+# fuzztest is a rather large dependency
+option(MANIFOLD_FUZZ "Enable fuzzing tests" OFF)
 option(MANIFOLD_DEBUG "Enable debug tracing/timing" OFF)
-
 option(MANIFOLD_PYBIND "Build python bindings" ON)
 option(MANIFOLD_CBIND "Build C (FFI) bindings" OFF)
 option(MANIFOLD_JSBIND "Build js binding" ${EMSCRIPTEN})
+
+if(MANIFOLD_FUZZ)
+  if(NOT CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+    message(FATAL_ERROR "fuzztest only supports clang" )
+  endif()
+  # we should enable debug checks
+  set(MANIFOLD_DEBUG ON)
+  # enable fuzztest fuzzing mode
+  set(FUZZTEST_FUZZING_MODE ON)
+  # address sanitizer required
+  set(CMAKE_CXX_FLAGS "$CMAKE_CXX_FLAGS -fsanitize=address")
+endif()
 
 option(TRACY_ENABLE "Use tracy profiling" OFF) 
 option(TRACY_MEMORY_USAGE "Track memory allocation with tracy (expensive)" OFF)
