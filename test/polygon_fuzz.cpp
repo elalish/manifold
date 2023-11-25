@@ -58,20 +58,44 @@ void TriangulationNoCrash(
   EXPECT_FALSE(faulted.load());
 }
 
+void TriangulationNoCrashRounded(
+    std::vector<std::vector<std::pair<float, float>>> input, float precision) {
+  TriangulationNoCrash(std::move(input), precision);
+}
+
 using Polygons = std::vector<std::vector<std::pair<float, float>>>;
 using TestCase = std::tuple<Polygons, float>;
 
 std::vector<TestCase> SeedProvider();
 
+auto PolygonDomain =
+    ContainerOf<Polygons>(ContainerOf<std::vector<std::pair<float, float>>>(
+                              PairOf(Finite<float>(), Finite<float>()))
+                              .WithMinSize(3)
+                              .WithMaxSize(10000))
+        .WithMinSize(1)
+        .WithMaxSize(10000);
+
 FUZZ_TEST(PolygonFuzz, TriangulationNoCrash)
-    .WithDomains(
-        ContainerOf<Polygons>(ContainerOf<std::vector<std::pair<float, float>>>(
-                                  PairOf(Finite<float>(), Finite<float>()))
-                                  .WithMinSize(3)
-                                  .WithMaxSize(10000))
-            .WithMinSize(1)
-            .WithMaxSize(10000),
-        InRange<float>(-1.0, 0.1))
+    .WithDomains(PolygonDomain, InRange<float>(-1.0, 0.1))
+    .WithSeeds(SeedProvider);
+
+FUZZ_TEST(PolygonFuzz, TriangulationNoCrashRounded)
+    .WithDomains(ReversibleMap(
+                     [](auto input) {
+                       for (auto &poly : input) {
+                         for (auto &pair : poly) {
+                           pair.first = std::round(pair.first);
+                           pair.second = std::round(pair.second);
+                         }
+                       }
+                       return input;
+                     },
+                     [](auto input) {
+                       return std::optional{std::tuple{input}};
+                     },
+                     PolygonDomain),
+                 InRange<float>(-1.0, 0.1))
     .WithSeeds(SeedProvider);
 
 static std::vector<TestCase> TestCases;

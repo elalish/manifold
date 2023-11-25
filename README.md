@@ -153,7 +153,7 @@ To enable fuzzing, make sure that you are using clang compiler (`-DCMAKE_CXX_COM
 
 To run the fuzzer and minimize testcase, do
 ```
-./minimizer.sh ./test/polygon_fuzz --fuzz=PolygonFuzz.TriangulationNoCrash
+../minimizer.sh ./test/polygon_fuzz --fuzz=PolygonFuzz.TriangulationNoCrash
 ```
 
 ## About the author

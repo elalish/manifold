@@ -48,8 +48,8 @@ target_link_libraries(${PROJECT_NAME} polygon GTest::gtest_main manifold sdf sam
 if(MANIFOLD_FUZZ)
   FetchContent_Declare(fuzztest
     GIT_REPOSITORY https://github.com/google/fuzztest.git
+    # note that if commit hash is used, it cannot be a shallow clone
     GIT_TAG        2606e04a43e5a7730e437a849604a61f1cb0ff28
-    GIT_SHALLOW    TRUE
     GIT_PROGRESS   TRUE
   )
   FetchContent_MakeAvailable(fuzztest)
