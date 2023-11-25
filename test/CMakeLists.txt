@@ -14,6 +14,7 @@
 
 project(manifold_test)
 
+set(CMAKE_CXX_STANDARD 17)
 enable_testing()
 
 set(SOURCE_FILES polygon_test.cpp cross_section_test.cpp manifold_test.cpp boolean_test.cpp sdf_test.cpp samples_test.cpp test_main.cpp)
@@ -43,6 +44,21 @@ endif()
 
 add_executable(${PROJECT_NAME} ${SOURCE_FILES})
 target_link_libraries(${PROJECT_NAME} polygon GTest::gtest_main manifold sdf samples cross_section)
+
+if(MANIFOLD_FUZZ)
+  FetchContent_Declare(fuzztest
+    GIT_REPOSITORY https://github.com/google/fuzztest.git
+    # note that if commit hash is used, it cannot be a shallow clone
+    GIT_TAG        2606e04a43e5a7730e437a849604a61f1cb0ff28
+    GIT_PROGRESS   TRUE
+  )
+  FetchContent_MakeAvailable(fuzztest)
+  fuzztest_setup_fuzzing_flags()
+  add_executable(polygon_fuzz polygon_fuzz.cpp)
+  target_link_libraries(polygon_fuzz PUBLIC polygon)
+  link_fuzztest(polygon_fuzz)
+  gtest_discover_tests(polygon_fuzz)
+endif()
 
 if(MANIFOLD_CBIND)
   target_link_libraries(${PROJECT_NAME} manifoldc)
