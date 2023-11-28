@@ -49,7 +49,7 @@ export function setupIO(io: WebIO) {
 
 /**
  * Read an input mesh into Manifold-compatible data structures, whether it
- * contains the EXT_manifold extension or not.
+ * contains the EXT_mesh_manifold extension or not.
  *
  * @param mesh The Mesh to read.
  * @param attributes An array of attributes representing the order of desired
@@ -105,7 +105,7 @@ export function readMesh(mesh: Mesh, attributes: Attribute[] = []):
   }));
 
   const manifoldPrimitive =
-      mesh.getExtension('EXT_manifold') as ManifoldPrimitive;
+      mesh.getExtension('EXT_mesh_manifold') as ManifoldPrimitive;
 
   let vertPropArray: number[] = [];
   let triVertArray: number[] = [];
@@ -192,7 +192,7 @@ export function readMesh(mesh: Mesh, attributes: Attribute[] = []):
 }
 
 /**
- * Write a Manifold Mesh into a glTF Mesh object, using the EXT_manifold
+ * Write a Manifold Mesh into a glTF Mesh object, using the EXT_mesh_manifold
  * extension to allow for lossless roundtrip of the manifold mesh through the
  * glTF file.
  *
@@ -313,7 +313,7 @@ export function writeMesh(
   });
 
   const manifoldPrimitive = manifoldExtension.createManifoldPrimitive();
-  mesh.setExtension('EXT_manifold', manifoldPrimitive);
+  mesh.setExtension('EXT_mesh_manifold', manifoldPrimitive);
 
   const indices = doc.createAccessor('manifold indices')
                       .setBuffer(buffer)
@@ -368,7 +368,7 @@ export function disposeMesh(mesh: Mesh) {
   }
 
   const manifoldPrimitive =
-      mesh.getExtension('EXT_manifold') as ManifoldPrimitive;
+      mesh.getExtension('EXT_mesh_manifold') as ManifoldPrimitive;
   if (manifoldPrimitive) {
     manifoldPrimitive.getIndices()?.dispose();
     manifoldPrimitive.getMergeIndices()?.dispose();

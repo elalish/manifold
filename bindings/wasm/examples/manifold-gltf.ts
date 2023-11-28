@@ -14,7 +14,7 @@
 
 import {Accessor, Extension, ExtensionProperty, GLTF, IProperty, PropertyType, ReaderContext, WriterContext} from '@gltf-transform/core';
 
-const NAME = 'EXT_manifold';
+const NAME = 'EXT_mesh_manifold';
 const MERGE = 'MERGE';
 
 interface IManifoldPrimitive extends IProperty {
