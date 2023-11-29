@@ -29,7 +29,7 @@ option(MANIFOLD_CBIND "Build C (FFI) bindings" OFF)
 option(MANIFOLD_JSBIND "Build js binding" ${EMSCRIPTEN})
 
 if(MANIFOLD_FUZZ)
-  if(NOT CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+  if(NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     message(FATAL_ERROR "fuzztest only supports clang" )
   endif()
   # we should enable debug checks

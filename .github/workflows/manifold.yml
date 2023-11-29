@@ -208,6 +208,31 @@ jobs:
         cd build/test
         ./manifold_test
 
+  build_mac_fuzzer:
+    timeout-minutes: 30
+    strategy:
+      matrix:
+        parallel_backend: [NONE, TBB]
+    runs-on: macos-latest
+    if: github.event.pull_request.draft == false
+    steps:
+    - name: Install common dependencies
+      run: |
+        brew install pkg-config googletest assimp
+        pip install trimesh
+    - name: Install TBB
+      if: matrix.parallel_backend == 'TBB'
+      run: brew install tbb
+    - uses: actions/checkout@v3
+      with:
+        submodules: recursive
+    - uses: jwlawson/actions-setup-cmake@v1.12
+    - name: Build
+      run: |
+        mkdir build
+        cd build
+        cmake -DCMAKE_INSTALL_PREFIX=$(pwd)/install -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DMANIFOLD_DEBUG=ON -DMANIFOLD_FUZZ=ON -DMANIFOLD_EXPORT=ON -DMANIFOLD_PAR=${{matrix.parallel_backend}} .. && make
+
   build_nix:
     timeout-minutes: 30
     strategy:
