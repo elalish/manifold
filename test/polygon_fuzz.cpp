@@ -34,11 +34,9 @@ void TriangulationNoCrash(
       size++;
     }
   }
-  std::atomic<pthread_t> tid;
   std::atomic<bool> faulted(true);
   auto asyncFuture =
-      std::async(std::launch::async, [&polys, &faulted, &tid, precision]() {
-        tid.store(pthread_self());
+      std::async(std::launch::async, [&polys, &faulted, precision]() {
         try {
           manifold::Triangulate(polys, precision);
           faulted.store(false);
@@ -49,10 +47,11 @@ void TriangulationNoCrash(
           printf("got unexpected error\n");
         }
       });
+
   if (asyncFuture.wait_for(std::chrono::milliseconds(
           std::max<size_t>(size, 10000))) == std::future_status::timeout) {
     printf("timeout after %ldms...\n", std::max<size_t>(size, 10000));
-    pthread_cancel(tid.load());
+    std::abort();
   }
 
   EXPECT_FALSE(faulted.load());
@@ -78,7 +77,11 @@ auto PolygonDomain =
 
 FUZZ_TEST(PolygonFuzz, TriangulationNoCrash)
     .WithDomains(PolygonDomain, InRange<float>(-1.0, 0.1))
+#ifdef __APPLE__
+    ;
+#else
     .WithSeeds(SeedProvider);
+#endif
 
 FUZZ_TEST(PolygonFuzz, TriangulationNoCrashRounded)
     .WithDomains(ReversibleMap(
@@ -96,7 +99,11 @@ FUZZ_TEST(PolygonFuzz, TriangulationNoCrashRounded)
                      },
                      PolygonDomain),
                  InRange<float>(-1.0, 0.1))
+#ifdef __APPLE__
+    ;
+#else
     .WithSeeds(SeedProvider);
+#endif
 
 static std::vector<TestCase> TestCases;
 void TestPoly(Polygons polys, int _unused, float precision = -1.0f) {
