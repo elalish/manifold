@@ -34,11 +34,11 @@ void TriangulationNoCrash(
       size++;
     }
   }
-  std::atomic<pid_t> tid;
+  std::atomic<pthread_t> tid;
   std::atomic<bool> faulted(true);
   auto asyncFuture =
       std::async(std::launch::async, [&polys, &faulted, &tid, precision]() {
-        tid.store(gettid());
+        tid.store(pthread_self());
         try {
           manifold::Triangulate(polys, precision);
           faulted.store(false);
