@@ -138,7 +138,7 @@ TEST(Polygon, Looping1) {
       {-1.f, 1.f},  //
       {1.f, 1.f},   //
   });
-  Triangulate(polys, 8);
+  TestPoly(polys, 9);
 }
 
 TEST(Polygon, Looping2) {
@@ -159,7 +159,7 @@ TEST(Polygon, Looping2) {
       {0.203703716f, 0.141975299f},     //
       {0.212962985f, 0.138888896f},     //
   });
-  Triangulate(polys, 8);
+  TestPoly(polys, 12);
 }
 
 TEST(Polygon, AlignedHoles) {
