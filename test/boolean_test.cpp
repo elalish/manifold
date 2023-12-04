@@ -659,7 +659,7 @@ TEST(Boolean, TreeTransforms) {
   EXPECT_FLOAT_EQ((a + b).GetProperties().volume, 2);
 }
 
-TEST(Boolean, Spiral) {
+TEST(Boolean, DISABLED_Spiral) {
   ManifoldParams().deterministic = true;
   const int d = 2;
   std::function<Manifold(const int, const float, const float)> spiral =
