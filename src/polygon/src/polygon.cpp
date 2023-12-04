@@ -551,6 +551,9 @@ class EarClip {
       auto vert = poly.begin();
       polygon_.push_back({vert->idx, earsQueue_.end(), vert->pos});
       const VertItr first = std::prev(polygon_.end());
+
+      bound = glm::max(
+          bound, glm::max(glm::abs(first->pos.x), glm::abs(first->pos.y)));
       VertItr last = first;
       // This is not the real rightmost start, but just an arbitrary vert for
       // now to identify each polygon.
