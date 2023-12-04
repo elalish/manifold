@@ -286,7 +286,8 @@ class EarClip {
       VertItr center = tail;
       VertItr last = center;
 
-      while (nextL != nextR && tail != nextR) {
+      while (nextL != nextR && tail != nextR &&
+             nextL != (toLeft ? right : left)) {
         const glm::vec2 edgeL = nextL->pos - center->pos;
         const float l2 = glm::dot(edgeL, edgeL);
         if (l2 <= p2) {
@@ -550,6 +551,9 @@ class EarClip {
       auto vert = poly.begin();
       polygon_.push_back({vert->idx, earsQueue_.end(), vert->pos});
       const VertItr first = std::prev(polygon_.end());
+
+      bound = glm::max(
+          bound, glm::max(glm::abs(first->pos.x), glm::abs(first->pos.y)));
       VertItr last = first;
       // This is not the real rightmost start, but just an arbitrary vert for
       // now to identify each polygon.
