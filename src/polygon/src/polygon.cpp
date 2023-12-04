@@ -286,7 +286,8 @@ class EarClip {
       VertItr center = tail;
       VertItr last = center;
 
-      while (nextL != nextR && tail != nextR && left != nextL) {
+      while (nextL != nextR && tail != nextR &&
+             nextL != (toLeft ? right : left)) {
         const glm::vec2 edgeL = nextL->pos - center->pos;
         const float l2 = glm::dot(edgeL, edgeL);
         if (l2 <= p2) {
