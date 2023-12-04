@@ -119,6 +119,49 @@ TEST(Polygon, SimpleHoles2) {
   TestPoly(polys, 17);
 }
 
+TEST(Polygon, Looping1) {
+  Polygons polys;
+  polys.push_back({
+      {0.f, -2.f},  //
+      {2.f, 2.f},   //
+      {0.f, 4.f},   //
+      {-3.f, 3.f},  //
+  });
+  polys.push_back({
+      {1.40282347e+38f, 1.40282347e+38f},  //
+      {-0.f, 0.f},                         //
+      {0.f, 1.f},                          //
+      {1.f, 0.f},                          //
+  });
+  polys.push_back({
+      {0.f, -1.f},  //
+      {-1.f, 1.f},  //
+      {1.f, 1.f},   //
+  });
+  TestPoly(polys, 5);
+}
+
+TEST(Polygon, Looping2) {
+  Polygons polys;
+  polys.push_back({
+      {-0.277777791f, 0.376543224f},  //
+      {0.5f, -0.233333275f},          //
+      {0.285185158f, 0.214814827f},   //
+  });
+  polys.push_back({
+      {0.325617313f, -0.055555556f},  //
+      {0.277777791f, 0.092592679f},   //
+      {0.328042328f, 0.0608465709f},  //
+  });
+  polys.push_back({
+      {3.40282347e+38f, 0.283553332f},  //
+      {0.212963f, 0.092592597f},        //
+      {0.203703716f, 0.141975299f},     //
+      {0.212962985f, 0.138888896f},     //
+  });
+  TestPoly(polys, 4);
+}
+
 TEST(Polygon, AlignedHoles) {
   Polygons polys;
   polys.push_back({
