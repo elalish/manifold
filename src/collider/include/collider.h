@@ -38,7 +38,9 @@ class Collider {
   Vec<thrust::pair<int, int>> internalChildren_;
 
   int NumInternal() const { return internalChildren_.size(); };
-  int NumLeaves() const { return NumInternal() + 1; };
+  int NumLeaves() const {
+    return internalChildren_.empty() ? 0 : (NumInternal() + 1);
+  };
 };
 
 }  // namespace manifold
