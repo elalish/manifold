@@ -22,6 +22,7 @@
 #include "hashtable.h"
 #include "mesh_fixes.h"
 #include "par.h"
+#include "svd.h"
 
 namespace {
 using namespace manifold;
@@ -776,11 +777,11 @@ Manifold::Impl Manifold::Impl::Transform(const glm::mat4x3& transform_) const {
   if (!result.collider_.Transform(transform_)) result.Update();
 
   result.CalculateBBox();
-  float scale = 0;
-  for (int i : {0, 1, 2})
-    scale =
-        glm::max(scale, transform_[0][i] + transform_[1][i] + transform_[2][i]);
-  result.precision_ *= scale;
+  // Scale the precision by the norm of the 3x3 portion of the transform.
+  result.precision_ *= SVD::spectralNorm(
+      SVD::Mat3x3(transform_[0][0], transform_[0][1], transform_[0][2],
+                  transform_[1][0], transform_[1][1], transform_[1][2],
+                  transform_[2][0], transform_[2][1], transform_[2][2]));
   // Maximum of inherited precision loss and translational precision loss.
   result.SetPrecision(result.precision_);
   return result;
