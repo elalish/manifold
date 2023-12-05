@@ -26,6 +26,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <glm/glm.hpp>
 #include <tuple>
 #include <utility>
 
@@ -58,94 +59,6 @@ struct quaternion {
   float x = 0.f, y = 0.f, z = 0.f, w = 1.f;
   float& operator[](int32_t arg) { return ((float*)this)[arg]; }
 };
-// A simple 3x3 Matrix class
-struct Mat3x3 {
-  float m_00 = 1.f, m_01 = 0.f, m_02 = 0.f;
-  float m_10 = 0.f, m_11 = 1.f, m_12 = 0.f;
-  float m_20 = 0.f, m_21 = 0.f, m_22 = 1.f;
-  static Mat3x3 fromPtr(float* ptr, int32_t i, int32_t offset) {
-    return Mat3x3{
-        ptr[i + 0 * offset], ptr[i + 1 * offset], ptr[i + 2 * offset],
-        ptr[i + 3 * offset], ptr[i + 4 * offset], ptr[i + 5 * offset],
-        ptr[i + 6 * offset], ptr[i + 7 * offset], ptr[i + 8 * offset]};
-  }
-  auto det() const {
-    return fmaf(m_00, fmaf(m_11, m_22, -m_21 * m_12),
-                fmaf(-m_01, fmaf(m_10, m_22, -m_20 * m_12),
-                     m_02 * fmaf(m_10, m_21, -m_20 * m_11)));
-  }
-  void toPtr(float* ptr, int32_t i, int32_t offset) const {
-    ptr[i + 0 * offset] = m_00;
-    ptr[i + 1 * offset] = m_01;
-    ptr[i + 2 * offset] = m_02;
-    ptr[i + 3 * offset] = m_10;
-    ptr[i + 4 * offset] = m_11;
-    ptr[i + 5 * offset] = m_12;
-    ptr[i + 6 * offset] = m_20;
-    ptr[i + 7 * offset] = m_21;
-    ptr[i + 8 * offset] = m_22;
-  }
-  Mat3x3(float a11 = 1.f, float a12 = 0.f, float a13 = 0.f, float a21 = 0.f,
-         float a22 = 1.f, float a23 = 0.f, float a31 = 0.f, float a32 = 0.f,
-         float a33 = 1.f)
-      : m_00(a11),
-        m_01(a12),
-        m_02(a13),
-        m_10(a21),
-        m_11(a22),
-        m_12(a23),
-        m_20(a31),
-        m_21(a32),
-        m_22(a33) {}
-  Mat3x3(const quaternion& q) {
-    m_00 = 1.f - 2.f * (fmaf(q.y, q.y, q.z * q.z));
-    m_01 = 2 * fmaf(q.x, q.y, -q.w * q.z);
-    m_02 = 2 * fmaf(q.x, q.z, q.w * q.y);
-    m_10 = 2.f * fmaf(q.x, q.y, +q.w * q.z);
-    m_11 = 1 - 2 * fmaf(q.x, q.x, q.z * q.z);
-    m_12 = 2 * fmaf(q.y, q.z, -q.w * q.x);
-    m_20 = 2.f * fmaf(q.x, q.z, -q.w * q.y);
-    m_21 = 2 * fmaf(q.y, q.z, q.w * q.x);
-    m_22 = 1 - 2 * fmaf(q.x, q.x, q.y * q.y);
-  }
-  Mat3x3 transpose() const {
-    return Mat3x3{m_00, m_10, m_20, m_01, m_11, m_21, m_02, m_12, m_22};
-  }
-  Mat3x3 operator*(const float& o) const {
-    return Mat3x3{
-        m_00 * o, m_01 * o, m_02 * o, m_10 * o, m_11 * o,
-        m_12 * o, m_20 * o, m_21 * o, m_22 * o,
-    };
-  }
-  Mat3x3& operator*=(const float& o) {
-    m_00 *= o;
-    m_01 *= o;
-    m_02 *= o;
-    m_10 *= o;
-    m_11 *= o;
-    m_12 *= o;
-    m_20 *= o;
-    m_21 *= o;
-    m_22 *= o;
-    return *this;
-  }
-  Mat3x3 operator-(const Mat3x3& o) const {
-    return Mat3x3{m_00 - o.m_00, m_01 - o.m_01, m_02 - o.m_02,
-                  m_10 - o.m_10, m_11 - o.m_11, m_12 - o.m_12,
-                  m_20 - o.m_20, m_21 - o.m_21, m_22 - o.m_22};
-  }
-  Mat3x3 operator*(const Mat3x3& o) const {
-    return Mat3x3{fmaf(m_00, o.m_00, fmaf(m_01, o.m_10, m_02 * o.m_20)),
-                  fmaf(m_00, o.m_01, fmaf(m_01, o.m_11, m_02 * o.m_21)),
-                  fmaf(m_00, o.m_02, fmaf(m_01, o.m_12, m_02 * o.m_22)),
-                  fmaf(m_10, o.m_00, fmaf(m_11, o.m_10, m_12 * o.m_20)),
-                  fmaf(m_10, o.m_01, fmaf(m_11, o.m_11, m_12 * o.m_21)),
-                  fmaf(m_10, o.m_02, fmaf(m_11, o.m_12, m_12 * o.m_22)),
-                  fmaf(m_20, o.m_00, fmaf(m_21, o.m_10, m_22 * o.m_20)),
-                  fmaf(m_20, o.m_01, fmaf(m_21, o.m_11, m_22 * o.m_21)),
-                  fmaf(m_20, o.m_02, fmaf(m_21, o.m_12, m_22 * o.m_22))};
-  }
-};
 // A simple symmetric 3x3 Matrix class (contains no storage for (0, 1) (0, 2)
 // and (1, 2)
 struct Symmetric3x3 {
@@ -156,13 +69,13 @@ struct Symmetric3x3 {
   Symmetric3x3(float a11 = 1.f, float a21 = 0.f, float a22 = 1.f,
                float a31 = 0.f, float a32 = 0.f, float a33 = 1.f)
       : m_00(a11), m_10(a21), m_11(a22), m_20(a31), m_21(a32), m_22(a33) {}
-  Symmetric3x3(Mat3x3 o)
-      : m_00(o.m_00),
-        m_10(o.m_10),
-        m_11(o.m_11),
-        m_20(o.m_20),
-        m_21(o.m_21),
-        m_22(o.m_22) {}
+  Symmetric3x3(glm::mat3 o)
+      : m_00(o[0][0]),
+        m_10(o[0][1]),
+        m_11(o[1][1]),
+        m_20(o[0][2]),
+        m_21(o[1][2]),
+        m_22(o[2][2]) {}
 };
 // Helper struct to store 2 floats to avoid OUT parameters on functions
 struct givens {
@@ -171,12 +84,12 @@ struct givens {
 };
 // Helper struct to store 2 Matrices to avoid OUT parameters on functions
 struct QR {
-  Mat3x3 Q;
-  Mat3x3 R;
+  glm::mat3 Q;
+  glm::mat3 R;
 };
 // Helper struct to store 3 Matrices to avoid OUT parameters on functions
 struct SVDSet {
-  Mat3x3 U, S, V;
+  glm::mat3 U, S, V;
 };
 // Calculates the squared norm of the vector [x y z] using a standard scalar
 // product d = x * x + y *y + z * z
@@ -242,44 +155,52 @@ void jacobiConjugation(const int32_t x, const int32_t y, const int32_t z,
 // Function used to contain the givens permutations and the loop of the jacobi
 // steps controlled by JACOBI_STEPS Returns the quaternion q containing the
 // cumulative result used to reconstruct S
-quaternion jacobiEigenAnalysis(Symmetric3x3 S) {
+glm::mat3 jacobiEigenAnalysis(Symmetric3x3 S) {
   quaternion q;
   for (int32_t i = 0; i < JACOBI_STEPS; i++) {
     jacobiConjugation(0, 1, 2, S, q);
     jacobiConjugation(1, 2, 0, S, q);
     jacobiConjugation(2, 0, 1, S, q);
   }
-  return q;
+  return glm::mat3(1.f - 2.f * (fmaf(q.y, q.y, q.z * q.z)),  //
+                   2.f * fmaf(q.x, q.y, +q.w * q.z),         //
+                   2.f * fmaf(q.x, q.z, -q.w * q.y),         //
+                   2 * fmaf(q.x, q.y, -q.w * q.z),           //
+                   1 - 2 * fmaf(q.x, q.x, q.z * q.z),        //
+                   2 * fmaf(q.y, q.z, q.w * q.x),            //
+                   2 * fmaf(q.x, q.z, q.w * q.y),            //
+                   2 * fmaf(q.y, q.z, -q.w * q.x),           //
+                   1 - 2 * fmaf(q.x, q.x, q.y * q.y));
 }
 // Implementation of Algorithm 3
-void sortSingularValues(Mat3x3& B, Mat3x3& V) {
-  float rho1 = dist2(B.m_00, B.m_10, B.m_20);
-  float rho2 = dist2(B.m_01, B.m_11, B.m_21);
-  float rho3 = dist2(B.m_02, B.m_12, B.m_22);
+void sortSingularValues(glm::mat3& B, glm::mat3& V) {
+  float rho1 = dist2(B[0][0], B[0][1], B[0][2]);
+  float rho2 = dist2(B[1][0], B[1][1], B[1][2]);
+  float rho3 = dist2(B[2][0], B[2][1], B[2][2]);
   bool c;
   c = rho1 < rho2;
-  condNegSwap(c, B.m_00, B.m_01);
-  condNegSwap(c, V.m_00, V.m_01);
-  condNegSwap(c, B.m_10, B.m_11);
-  condNegSwap(c, V.m_10, V.m_11);
-  condNegSwap(c, B.m_20, B.m_21);
-  condNegSwap(c, V.m_20, V.m_21);
+  condNegSwap(c, B[0][0], B[1][0]);
+  condNegSwap(c, V[0][0], V[1][0]);
+  condNegSwap(c, B[0][1], B[1][1]);
+  condNegSwap(c, V[0][1], V[1][1]);
+  condNegSwap(c, B[0][2], B[1][2]);
+  condNegSwap(c, V[0][2], V[1][2]);
   condSwap(c, rho1, rho2);
   c = rho1 < rho3;
-  condNegSwap(c, B.m_00, B.m_02);
-  condNegSwap(c, V.m_00, V.m_02);
-  condNegSwap(c, B.m_10, B.m_12);
-  condNegSwap(c, V.m_10, V.m_12);
-  condNegSwap(c, B.m_20, B.m_22);
-  condNegSwap(c, V.m_20, V.m_22);
+  condNegSwap(c, B[0][0], B[2][0]);
+  condNegSwap(c, V[0][0], V[2][0]);
+  condNegSwap(c, B[0][1], B[2][1]);
+  condNegSwap(c, V[0][1], V[2][1]);
+  condNegSwap(c, B[0][2], B[2][2]);
+  condNegSwap(c, V[0][2], V[2][2]);
   condSwap(c, rho1, rho3);
   c = rho2 < rho3;
-  condNegSwap(c, B.m_01, B.m_02);
-  condNegSwap(c, V.m_01, V.m_02);
-  condNegSwap(c, B.m_11, B.m_12);
-  condNegSwap(c, V.m_11, V.m_12);
-  condNegSwap(c, B.m_21, B.m_22);
-  condNegSwap(c, V.m_21, V.m_22);
+  condNegSwap(c, B[1][0], B[2][0]);
+  condNegSwap(c, V[1][0], V[2][0]);
+  condNegSwap(c, B[1][1], B[2][1]);
+  condNegSwap(c, V[1][1], V[2][1]);
+  condNegSwap(c, B[1][2], B[2][2]);
+  condNegSwap(c, V[1][2], V[2][2]);
 }
 // Implementation of Algorithm 4
 givens QRGivensQuaternion(float a1, float a2) {
@@ -296,50 +217,50 @@ givens QRGivensQuaternion(float a1, float a2) {
   return g;
 }
 // Implements a QR decomposition of a Matrix, see Sec 4.2
-QR QRDecomposition(Mat3x3& B) {
-  Mat3x3 Q, R;
+QR QRDecomposition(glm::mat3& B) {
+  glm::mat3 Q, R;
   // first givens rotation (ch,0,0,sh)
-  auto g1 = QRGivensQuaternion(B.m_00, B.m_10);
+  auto g1 = QRGivensQuaternion(B[0][0], B[0][1]);
   auto a = fmaf(-2.f, g1.sh * g1.sh, 1.f);
   auto b = 2.f * g1.ch * g1.sh;
   // apply B = Q' * B
-  R.m_00 = fmaf(a, B.m_00, b * B.m_10);
-  R.m_01 = fmaf(a, B.m_01, b * B.m_11);
-  R.m_02 = fmaf(a, B.m_02, b * B.m_12);
-  R.m_10 = fmaf(-b, B.m_00, a * B.m_10);
-  R.m_11 = fmaf(-b, B.m_01, a * B.m_11);
-  R.m_12 = fmaf(-b, B.m_02, a * B.m_12);
-  R.m_20 = B.m_20;
-  R.m_21 = B.m_21;
-  R.m_22 = B.m_22;
+  R[0][0] = fmaf(a, B[0][0], b * B[0][1]);
+  R[1][0] = fmaf(a, B[1][0], b * B[1][1]);
+  R[2][0] = fmaf(a, B[2][0], b * B[2][1]);
+  R[0][1] = fmaf(-b, B[0][0], a * B[0][1]);
+  R[1][1] = fmaf(-b, B[1][0], a * B[1][1]);
+  R[2][1] = fmaf(-b, B[2][0], a * B[2][1]);
+  R[0][2] = B[0][2];
+  R[1][2] = B[1][2];
+  R[2][2] = B[2][2];
   // second givens rotation (ch,0,-sh,0)
-  auto g2 = QRGivensQuaternion(R.m_00, R.m_20);
+  auto g2 = QRGivensQuaternion(R[0][0], R[0][2]);
   a = fmaf(-2.f, g2.sh * g2.sh, 1.f);
   b = 2.f * g2.ch * g2.sh;
   // apply B = Q' * B;
-  B.m_00 = fmaf(a, R.m_00, b * R.m_20);
-  B.m_01 = fmaf(a, R.m_01, b * R.m_21);
-  B.m_02 = fmaf(a, R.m_02, b * R.m_22);
-  B.m_10 = R.m_10;
-  B.m_11 = R.m_11;
-  B.m_12 = R.m_12;
-  B.m_20 = fmaf(-b, R.m_00, a * R.m_20);
-  B.m_21 = fmaf(-b, R.m_01, a * R.m_21);
-  B.m_22 = fmaf(-b, R.m_02, a * R.m_22);
+  B[0][0] = fmaf(a, R[0][0], b * R[0][2]);
+  B[1][0] = fmaf(a, R[1][0], b * R[1][2]);
+  B[2][0] = fmaf(a, R[2][0], b * R[2][2]);
+  B[0][1] = R[0][1];
+  B[1][1] = R[1][1];
+  B[2][1] = R[2][1];
+  B[0][2] = fmaf(-b, R[0][0], a * R[0][2]);
+  B[1][2] = fmaf(-b, R[1][0], a * R[1][2]);
+  B[2][2] = fmaf(-b, R[2][0], a * R[2][2]);
   // third givens rotation (ch,sh,0,0)
-  auto g3 = QRGivensQuaternion(B.m_11, B.m_21);
+  auto g3 = QRGivensQuaternion(B[1][1], B[1][2]);
   a = fmaf(-2.f, g3.sh * g3.sh, 1.f);
   b = 2.f * g3.ch * g3.sh;
   // R is now set to desired value
-  R.m_00 = B.m_00;
-  R.m_01 = B.m_01;
-  R.m_02 = B.m_02;
-  R.m_10 = fmaf(a, B.m_10, b * B.m_20);
-  R.m_11 = fmaf(a, B.m_11, b * B.m_21);
-  R.m_12 = fmaf(a, B.m_12, b * B.m_22);
-  R.m_20 = fmaf(-b, B.m_10, a * B.m_20);
-  R.m_21 = fmaf(-b, B.m_11, a * B.m_21);
-  R.m_22 = fmaf(-b, B.m_12, a * B.m_22);
+  R[0][0] = B[0][0];
+  R[1][0] = B[1][0];
+  R[2][0] = B[2][0];
+  R[0][1] = fmaf(a, B[0][1], b * B[0][2]);
+  R[1][1] = fmaf(a, B[1][1], b * B[1][2]);
+  R[2][1] = fmaf(a, B[2][1], b * B[2][2]);
+  R[0][2] = fmaf(-b, B[0][1], a * B[0][2]);
+  R[1][2] = fmaf(-b, B[1][1], a * B[1][2]);
+  R[2][2] = fmaf(-b, B[2][1], a * B[2][2]);
   // construct the cumulative rotation Q=Q1 * Q2 * Q3
   // the number of floating point operations for three quaternion
   // multiplications is more or less comparable to the explicit form of the
@@ -347,35 +268,35 @@ QR QRDecomposition(Mat3x3& B) {
   auto sh12 = 2.f * fmaf(g1.sh, g1.sh, -0.5f);
   auto sh22 = 2.f * fmaf(g2.sh, g2.sh, -0.5f);
   auto sh32 = 2.f * fmaf(g3.sh, g3.sh, -0.5f);
-  Q.m_00 = sh12 * sh22;
-  Q.m_01 = fmaf(4.f * g2.ch * g3.ch, sh12 * g2.sh * g3.sh,
-                2.f * g1.ch * g1.sh * sh32);
-  Q.m_02 = fmaf(4.f * g1.ch * g3.ch, g1.sh * g3.sh,
-                -2.f * g2.ch * sh12 * g2.sh * sh32);
+  Q[0][0] = sh12 * sh22;
+  Q[1][0] = fmaf(4.f * g2.ch * g3.ch, sh12 * g2.sh * g3.sh,
+                 2.f * g1.ch * g1.sh * sh32);
+  Q[2][0] = fmaf(4.f * g1.ch * g3.ch, g1.sh * g3.sh,
+                 -2.f * g2.ch * sh12 * g2.sh * sh32);
 
-  Q.m_10 = -2.f * g1.ch * g1.sh * sh22;
-  Q.m_11 =
+  Q[0][1] = -2.f * g1.ch * g1.sh * sh22;
+  Q[1][1] =
       fmaf(-8.f * g1.ch * g2.ch * g3.ch, g1.sh * g2.sh * g3.sh, sh12 * sh32);
-  Q.m_12 = fmaf(
+  Q[2][1] = fmaf(
       -2.f * g3.ch, g3.sh,
       4.f * g1.sh * fmaf(g3.ch * g1.sh, g3.sh, g1.ch * g2.ch * g2.sh * sh32));
 
-  Q.m_20 = 2.f * g2.ch * g2.sh;
-  Q.m_21 = -2.f * g3.ch * sh22 * g3.sh;
-  Q.m_22 = sh22 * sh32;
+  Q[0][2] = 2.f * g2.ch * g2.sh;
+  Q[1][2] = -2.f * g3.ch * sh22 * g3.sh;
+  Q[2][2] = sh22 * sh32;
   return QR{Q, R};
 }
 // Wrapping function used to contain all of the required sub calls.
-SVDSet svd(Mat3x3 A) {
-  Mat3x3 V(jacobiEigenAnalysis(A.transpose() * A));
+SVDSet svd(glm::mat3 A) {
+  glm::mat3 V = jacobiEigenAnalysis(glm::transpose(A) * A);
   auto B = A * V;
   sortSingularValues(B, V);
   QR qr = QRDecomposition(B);
   return SVDSet{qr.Q, qr.R, V};
 }
 // The largest singular value of A.
-float spectralNorm(Mat3x3 A) {
+float spectralNorm(glm::mat3 A) {
   SVDSet usv = svd(A);
-  return usv.S.m_00;
+  return usv.S[0][0];
 }
 }  // namespace SVD
