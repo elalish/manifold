@@ -768,3 +768,10 @@ TEST(Manifold, SweptCube) {
   auto sweptCube = Manifold::Hull(cubePts).Sweep({1, 0, 0});
   EXPECT_FLOAT_EQ(sweptCube.GetProperties().volume, 2);
 }
+
+TEST(Manifold, SweptComplex) {
+  auto sphere = Manifold::Sphere(0.6, 20);
+  auto cube = Manifold::Cube({1.0, 1.0, 1.0}, true);
+  auto sweptShape = (cube - sphere).Sweep({0.1, 0.3, 0.1});
+  EXPECT_FLOAT_EQ(sweptShape.GetProperties().volume, 0.7779319882392883);
+}
