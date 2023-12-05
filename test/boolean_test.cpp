@@ -659,6 +659,23 @@ TEST(Boolean, TreeTransforms) {
   EXPECT_FLOAT_EQ((a + b).GetProperties().volume, 2);
 }
 
+TEST(Boolean, Spiral) {
+  ManifoldParams().deterministic = true;
+  const int d = 2;
+  std::function<Manifold(const int, const float, const float)> spiral =
+      [&](const int rec, const float r, const float add) {
+        const float rot = 360.0f / (glm::pi<float>() * r * 2) * d;
+        const float rNext = r + add / 360 * rot;
+        const Manifold cube =
+            Manifold::Cube(glm::vec3(1), true).Translate({0, r, 0});
+        if (rec > 0)
+          return spiral(rec - 1, rNext, add).Rotate(0, 0, rot) + cube;
+        return cube;
+      };
+  const Manifold result = spiral(120, 25, 2);
+  EXPECT_EQ(result.Genus(), -120);
+}
+
 TEST(Boolean, Sweep) {
   PolygonParams().processOverlaps = true;
 
