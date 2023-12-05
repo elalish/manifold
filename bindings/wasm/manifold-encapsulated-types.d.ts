@@ -698,6 +698,16 @@ export class Manifold {
    */
   static hull(points: (Manifold|Vec3)[]): Manifold;
 
+  // Sweeps
+
+  /**
+   * Sweep this Manifold through space.
+   *
+   * @param v The vector to add to every vertex.
+   */
+  sweep(v: Vec3): Manifold;
+  sweep(x: number, y?: number, z?: number): Manifold;
+
   // Topological Operations
 
   /**

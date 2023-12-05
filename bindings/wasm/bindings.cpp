@@ -139,6 +139,7 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .function("_SplitByPlane", &man_js::SplitByPlane)
       .function("_TrimByPlane", &Manifold::TrimByPlane)
       .function("hull", select_overload<Manifold() const>(&Manifold::Hull))
+      .function("sweep", select_overload<Manifold() const>(&Manifold::Sweep))
       .function("_GetMeshJS", &js::GetMeshJS)
       .function("refine", &Manifold::Refine)
       .function("_Warp", &man_js::Warp)

@@ -824,4 +824,41 @@ Manifold Manifold::Hull() const { return Hull(GetMesh().vertPos); }
 Manifold Manifold::Hull(const std::vector<Manifold>& manifolds) {
   return Compose(manifolds).Hull();
 }
+
+/**
+ * Sweep this Manifold through space.
+ *
+ * @param v The vector to add to every vertex.
+ */
+Manifold Manifold::Sweep(glm::vec3 v) const {
+  // Slow(?) isConvex Check - Make Faster??
+  bool isConvex = GetProperties().volume == Hull().GetProperties().volume;
+
+  if (isConvex) {
+    // If Convex, just hull with its translated self
+    return Hull({*this, Translate(v)});
+  } else {
+    // Else, sweep each triangle individually
+    Mesh mesh = GetMesh();
+    Manifold output = AsOriginal();
+    for (size_t i = 0; i < mesh.triVerts.size(); i++) {
+      glm::vec3 normal = glm::cross(
+          mesh.vertPos[mesh.triVerts[i].y] - mesh.vertPos[mesh.triVerts[i].x],
+          mesh.vertPos[mesh.triVerts[i].z] - mesh.vertPos[mesh.triVerts[i].x]);
+      if (glm::dot(normal, v) > -0.0001f) { // Only Sweep Forward Triangles
+        Manifold sweptTriangle = Hull({
+            mesh.vertPos[mesh.triVerts[i].x],
+            mesh.vertPos[mesh.triVerts[i].y],
+            mesh.vertPos[mesh.triVerts[i].z],
+            mesh.vertPos[mesh.triVerts[i].x] + v,
+            mesh.vertPos[mesh.triVerts[i].y] + v,
+            mesh.vertPos[mesh.triVerts[i].z] + v,
+        });
+        output += sweptTriangle;
+      }
+    }
+    return output;
+  }
+}
+
 }  // namespace manifold

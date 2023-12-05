@@ -222,6 +222,13 @@ ManifoldManifold *manifold_hull_pts(void *mem, ManifoldVec3 *ps,
   return to_c(new (mem) Manifold(hulled));
 }
 
+ManifoldManifold *manifold_sweep(void *mem, ManifoldManifold *m, float x,
+                                 float y, float z) {
+  auto v = glm::vec3(x, y, z);
+  auto swept = from_c(m)->Sweep(v);
+  return to_c(new (mem) Manifold(swept));
+}
+
 ManifoldManifold *manifold_translate(void *mem, ManifoldManifold *m, float x,
                                      float y, float z) {
   auto v = glm::vec3(x, y, z);

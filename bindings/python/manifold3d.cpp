@@ -154,6 +154,21 @@ NB_MODULE(manifold3d, m) {
           },
           "Compute the convex hull enveloping a set of 3d points.")
       .def(
+          "sweep",
+          [](Manifold &self, float x = 0.0f, float y = 0.0f, float z = 0.0f) {
+            return self.Sweep(glm::vec3(x, y, z));
+          },
+          nb::arg("x") = 0.0f, nb::arg("y") = 0.0f, nb::arg("z") = 0.0f,
+          "Sweep this Manifold through space."
+          "\n\n"
+          ":param x: X axis translation. (default 0.0).\n"
+          ":param y: Y axis translation. (default 0.0).\n"
+          ":param z: Z axis translation. (default 0.0).")
+      .def("sweep", &Manifold::Sweep, nb::arg("t"),
+           "Sweep this Manifold through space."
+           "\n\n"
+           ":param v: The vector to add to every vertex.")
+      .def(
           "transform",
           [](Manifold &self, nb::ndarray<float, nb::shape<3, 4>> &mat) {
             if (mat.ndim() != 2 || mat.shape(0) != 3 || mat.shape(1) != 4)

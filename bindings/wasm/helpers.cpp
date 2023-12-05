@@ -187,6 +187,13 @@ Manifold IntersectionN(const std::vector<Manifold>& manifolds) {
   return Manifold::BatchBoolean(manifolds, OpType::Intersect);
 }
 
+Manifold Sweep(Manifold& manifold, const val& v) {
+  std::vector<float> array = convertJSArrayToNumberVector<float>(v);
+  glm::vec3 offset;
+  offset[0] = array[0]; offset[1] = array[1]; offset[2] = array[2];
+  return manifold.Sweep(offset);
+}
+
 Manifold Transform(Manifold& manifold, const val& mat) {
   std::vector<float> array = convertJSArrayToNumberVector<float>(mat);
   glm::mat4x3 matrix;

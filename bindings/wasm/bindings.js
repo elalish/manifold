@@ -244,6 +244,10 @@ Module.setup = function() {
     return out;
   };
 
+  Module.Manifold.prototype.sweep = function(...vec) {
+    return this.sweep(vararg2vec3(vec));
+  };
+
   Module.Manifold.prototype.translate = function(...vec) {
     return this._Translate(vararg2vec3(vec));
   };

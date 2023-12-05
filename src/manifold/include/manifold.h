@@ -238,6 +238,8 @@ class Manifold {
   static Manifold Hull(const std::vector<Manifold>& manifolds);
   static Manifold Hull(const std::vector<glm::vec3>& pts);
 
+  Manifold Sweep(glm::vec3) const;
+
   /** @name Testing hooks
    *  These are just for internal testing.
    */

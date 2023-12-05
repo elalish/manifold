@@ -759,3 +759,12 @@ TEST(Manifold, EmptyHull) {
       {0, 0, 0}, {1, 0, 0}, {0, 1, 0}, {1, 1, 0}};
   EXPECT_TRUE(Manifold::Hull(coplanar).IsEmpty());
 }
+
+TEST(Manifold, SweptCube) {
+  std::vector<glm::vec3> cubePts = {
+      {0, 0, 0},       {1, 0, 0},   {0, 1, 0},      {0, 0, 1},  // corners
+      {1, 1, 0},       {0, 1, 1},   {1, 0, 1},      {1, 1, 1},  // corners
+  };
+  auto sweptCube = Manifold::Hull(cubePts).Sweep({1, 0, 0});
+  EXPECT_FLOAT_EQ(sweptCube.GetProperties().volume, 2);
+}

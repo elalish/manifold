@@ -117,6 +117,11 @@ ManifoldManifold *manifold_hull(void *mem, ManifoldManifold *m);
 ManifoldManifold *manifold_batch_hull(void *mem, ManifoldManifoldVec *ms);
 ManifoldManifold *manifold_hull_pts(void *mem, ManifoldVec3 *ps, size_t length);
 
+// Sweeps
+
+ManifoldManifold *manifold_sweep(void *mem, ManifoldManifold *m, float x,
+                                     float y, float z);
+
 // Manifold Transformations
 
 ManifoldManifold *manifold_translate(void *mem, ManifoldManifold *m, float x,
