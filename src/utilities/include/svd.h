@@ -87,7 +87,7 @@ float Dist2(glm::vec3 v) { return glm::dot(v, v); }
 // elementary floating point operations See Algorithm 2 in reference. Given a
 // matrix A this function returns the Givens quaternion (x and w component, y
 // and z are 0)
-Givens SpproximateGivensQuaternion(Symmetric3x3& A) {
+Givens ApproximateGivensQuaternion(Symmetric3x3& A) {
   Givens g{2.f * (A.m_00 - A.m_11), A.m_10};
   bool b = _gamma * g.sh * g.sh < g.ch * g.ch;
   float w = 1.f / sqrt(fmaf(g.ch, g.ch, g.sh * g.sh));
@@ -98,7 +98,7 @@ Givens SpproximateGivensQuaternion(Symmetric3x3& A) {
 // updates the quaternion to contain the cumulative rotation
 void JacobiConjugation(const int32_t x, const int32_t y, const int32_t z,
                        Symmetric3x3& S, glm::vec4& q) {
-  auto g = SpproximateGivensQuaternion(S);
+  auto g = ApproximateGivensQuaternion(S);
   float scale = 1.f / fmaf(g.ch, g.ch, g.sh * g.sh);
   float a = fmaf(g.ch, g.ch, -g.sh * g.sh) * scale;
   float b = 2.f * g.sh * g.ch * scale;
