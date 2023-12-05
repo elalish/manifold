@@ -31,7 +31,7 @@
 #include <utility>
 
 namespace {
-// Constants used for calculation of givens quaternions
+// Constants used for calculation of Givens quaternions
 constexpr float _gamma = 5.828427124f;   // sqrt(8)+3;
 constexpr float _cStar = 0.923879532f;   // cos(pi/8)
 constexpr float _sStar = 0.3826834323f;  // sin(pi/8)
@@ -41,13 +41,13 @@ constexpr float _SVD_EPSILON = 1e-6f;
 constexpr int JACOBI_STEPS = 12;
 
 // Helper function used to swap X with Y and Y with  X if c == true
-void condSwap(bool c, float& X, float& Y) {
+void CondSwap(bool c, float& X, float& Y) {
   float Z = X;
   X = c ? Y : X;
   Y = c ? Z : Y;
 }
 // Helper function used to swap X with Y and Y with -X if c == true
-void condNegSwap(bool c, float& X, float& Y) {
+void CondNegSwap(bool c, float& X, float& Y) {
   float Z = -X;
   X = c ? Y : X;
   Y = c ? Z : Y;
@@ -71,7 +71,7 @@ struct Symmetric3x3 {
         m_22(o[2][2]) {}
 };
 // Helper struct to store 2 floats to avoid OUT parameters on functions
-struct givens {
+struct Givens {
   float ch = _cStar;
   float sh = _sStar;
 };
@@ -85,20 +85,20 @@ float Dist2(glm::vec3 v) { return glm::dot(v, v); }
 // http://pages.cs.wisc.edu/~sifakis/papers/SVD_TR1690.pdf Computing the
 // Singular Value Decomposition of 3 x 3 matrices with minimal branching and
 // elementary floating point operations See Algorithm 2 in reference. Given a
-// matrix A this function returns the givens quaternion (x and w component, y
+// matrix A this function returns the Givens quaternion (x and w component, y
 // and z are 0)
-givens approximateGivensQuaternion(Symmetric3x3& A) {
-  givens g{2.f * (A.m_00 - A.m_11), A.m_10};
+Givens SpproximateGivensQuaternion(Symmetric3x3& A) {
+  Givens g{2.f * (A.m_00 - A.m_11), A.m_10};
   bool b = _gamma * g.sh * g.sh < g.ch * g.ch;
   float w = 1.f / sqrt(fmaf(g.ch, g.ch, g.sh * g.sh));
   if (w != w) b = 0;
-  return givens{b ? w * g.ch : (float)_cStar, b ? w * g.sh : (float)_sStar};
+  return Givens{b ? w * g.ch : (float)_cStar, b ? w * g.sh : (float)_sStar};
 }
-// Function used to apply a givens rotation S. Calculates the weights and
+// Function used to apply a Givens rotation S. Calculates the weights and
 // updates the quaternion to contain the cumulative rotation
 void JacobiConjugation(const int32_t x, const int32_t y, const int32_t z,
                        Symmetric3x3& S, glm::vec4& q) {
-  auto g = approximateGivensQuaternion(S);
+  auto g = SpproximateGivensQuaternion(S);
   float scale = 1.f / fmaf(g.ch, g.ch, g.sh * g.sh);
   float a = fmaf(g.ch, g.ch, -g.sh * g.sh) * scale;
   float b = 2.f * g.sh * g.ch * scale;
@@ -136,7 +136,7 @@ void JacobiConjugation(const int32_t x, const int32_t y, const int32_t z,
   S.m_21 = _S.m_21;
   S.m_22 = _S.m_22;
 }
-// Function used to contain the givens permutations and the loop of the jacobi
+// Function used to contain the Givens permutations and the loop of the jacobi
 // steps controlled by JACOBI_STEPS Returns the quaternion q containing the
 // cumulative result used to reconstruct S
 glm::mat3 JacobiEigenAnalysis(Symmetric3x3 S) {
@@ -163,38 +163,38 @@ void SortSingularValues(glm::mat3& B, glm::mat3& V) {
   float rho3 = Dist2(B[2]);
   bool c;
   c = rho1 < rho2;
-  condNegSwap(c, B[0][0], B[1][0]);
-  condNegSwap(c, V[0][0], V[1][0]);
-  condNegSwap(c, B[0][1], B[1][1]);
-  condNegSwap(c, V[0][1], V[1][1]);
-  condNegSwap(c, B[0][2], B[1][2]);
-  condNegSwap(c, V[0][2], V[1][2]);
-  condSwap(c, rho1, rho2);
+  CondNegSwap(c, B[0][0], B[1][0]);
+  CondNegSwap(c, V[0][0], V[1][0]);
+  CondNegSwap(c, B[0][1], B[1][1]);
+  CondNegSwap(c, V[0][1], V[1][1]);
+  CondNegSwap(c, B[0][2], B[1][2]);
+  CondNegSwap(c, V[0][2], V[1][2]);
+  CondSwap(c, rho1, rho2);
   c = rho1 < rho3;
-  condNegSwap(c, B[0][0], B[2][0]);
-  condNegSwap(c, V[0][0], V[2][0]);
-  condNegSwap(c, B[0][1], B[2][1]);
-  condNegSwap(c, V[0][1], V[2][1]);
-  condNegSwap(c, B[0][2], B[2][2]);
-  condNegSwap(c, V[0][2], V[2][2]);
-  condSwap(c, rho1, rho3);
+  CondNegSwap(c, B[0][0], B[2][0]);
+  CondNegSwap(c, V[0][0], V[2][0]);
+  CondNegSwap(c, B[0][1], B[2][1]);
+  CondNegSwap(c, V[0][1], V[2][1]);
+  CondNegSwap(c, B[0][2], B[2][2]);
+  CondNegSwap(c, V[0][2], V[2][2]);
+  CondSwap(c, rho1, rho3);
   c = rho2 < rho3;
-  condNegSwap(c, B[1][0], B[2][0]);
-  condNegSwap(c, V[1][0], V[2][0]);
-  condNegSwap(c, B[1][1], B[2][1]);
-  condNegSwap(c, V[1][1], V[2][1]);
-  condNegSwap(c, B[1][2], B[2][2]);
-  condNegSwap(c, V[1][2], V[2][2]);
+  CondNegSwap(c, B[1][0], B[2][0]);
+  CondNegSwap(c, V[1][0], V[2][0]);
+  CondNegSwap(c, B[1][1], B[2][1]);
+  CondNegSwap(c, V[1][1], V[2][1]);
+  CondNegSwap(c, B[1][2], B[2][2]);
+  CondNegSwap(c, V[1][2], V[2][2]);
 }
 // Implementation of Algorithm 4
-givens QRGivensQuaternion(float a1, float a2) {
+Givens QRGivensQuaternion(float a1, float a2) {
   // a1 = pivot point on diagonal
   // a2 = lower triangular entry we want to annihilate
   float epsilon = (float)_SVD_EPSILON;
   float rho = sqrt(fmaf(a1, a1, +a2 * a2));
-  givens g{fabsf(a1) + fmaxf(rho, epsilon), rho > epsilon ? a2 : 0};
+  Givens g{fabsf(a1) + fmaxf(rho, epsilon), rho > epsilon ? a2 : 0};
   bool b = a1 < 0.f;
-  condSwap(b, g.sh, g.ch);
+  CondSwap(b, g.sh, g.ch);
   float w = 1.f / sqrt(fmaf(g.ch, g.ch, g.sh * g.sh));
   g.ch *= w;
   g.sh *= w;
@@ -203,7 +203,7 @@ givens QRGivensQuaternion(float a1, float a2) {
 // Implements a QR decomposition of a Matrix, see Sec 4.2
 QR QRDecomposition(glm::mat3& B) {
   glm::mat3 Q, R;
-  // first givens rotation (ch,0,0,sh)
+  // first Givens rotation (ch,0,0,sh)
   auto g1 = QRGivensQuaternion(B[0][0], B[0][1]);
   auto a = fmaf(-2.f, g1.sh * g1.sh, 1.f);
   auto b = 2.f * g1.ch * g1.sh;
@@ -217,7 +217,7 @@ QR QRDecomposition(glm::mat3& B) {
   R[0][2] = B[0][2];
   R[1][2] = B[1][2];
   R[2][2] = B[2][2];
-  // second givens rotation (ch,0,-sh,0)
+  // second Givens rotation (ch,0,-sh,0)
   auto g2 = QRGivensQuaternion(R[0][0], R[0][2]);
   a = fmaf(-2.f, g2.sh * g2.sh, 1.f);
   b = 2.f * g2.ch * g2.sh;
@@ -231,7 +231,7 @@ QR QRDecomposition(glm::mat3& B) {
   B[0][2] = fmaf(-b, R[0][0], a * R[0][2]);
   B[1][2] = fmaf(-b, R[1][0], a * R[1][2]);
   B[2][2] = fmaf(-b, R[2][0], a * R[2][2]);
-  // third givens rotation (ch,sh,0,0)
+  // third Givens rotation (ch,sh,0,0)
   auto g3 = QRGivensQuaternion(B[1][1], B[1][2]);
   a = fmaf(-2.f, g3.sh * g3.sh, 1.f);
   b = 2.f * g3.ch * g3.sh;
