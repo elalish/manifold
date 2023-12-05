@@ -190,7 +190,9 @@ Manifold IntersectionN(const std::vector<Manifold>& manifolds) {
 Manifold Sweep(Manifold& manifold, const val& v) {
   std::vector<float> array = convertJSArrayToNumberVector<float>(v);
   glm::vec3 offset;
-  offset[0] = array[0]; offset[1] = array[1]; offset[2] = array[2];
+  offset[0] = array[0];
+  offset[1] = array[1];
+  offset[2] = array[2];
   return manifold.Sweep(offset);
 }
 

@@ -845,7 +845,7 @@ Manifold Manifold::Sweep(glm::vec3 v) const {
       glm::vec3 normal = glm::cross(
           mesh.vertPos[mesh.triVerts[i].y] - mesh.vertPos[mesh.triVerts[i].x],
           mesh.vertPos[mesh.triVerts[i].z] - mesh.vertPos[mesh.triVerts[i].x]);
-      if (glm::dot(normal, v) > -0.0001f) { // Only Sweep Forward Triangles
+      if (glm::dot(normal, v) > -0.0001f) {  // Only Sweep Forward Triangles
         Manifold sweptTriangle = Hull({
             mesh.vertPos[mesh.triVerts[i].x],
             mesh.vertPos[mesh.triVerts[i].y],

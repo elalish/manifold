@@ -120,7 +120,7 @@ ManifoldManifold *manifold_hull_pts(void *mem, ManifoldVec3 *ps, size_t length);
 // Sweeps
 
 ManifoldManifold *manifold_sweep(void *mem, ManifoldManifold *m, float x,
-                                     float y, float z);
+                                 float y, float z);
 
 // Manifold Transformations
 
