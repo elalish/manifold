@@ -30,14 +30,14 @@
 #include <tuple>
 #include <utility>
 
-namespace SVD {
+namespace {
 // Constants used for calculation of givens quaternions
 constexpr float _gamma = 5.828427124f;   // sqrt(8)+3;
 constexpr float _cStar = 0.923879532f;   // cos(pi/8)
 constexpr float _sStar = 0.3826834323f;  // sin(pi/8)
 // Threshold value
 constexpr float _SVD_EPSILON = 1e-6f;
-// Iteration counts for Jacobi Eigen Analysis, influence precision
+// Iteration counts for Jacobi Eigen Analysis, influences precision
 constexpr int JACOBI_STEPS = 12;
 
 // Helper function used to swap X with Y and Y with  X if c == true
@@ -52,13 +52,6 @@ void condNegSwap(bool c, float& X, float& Y) {
   X = c ? Y : X;
   Y = c ? Z : Y;
 }
-// Helper class to contain a quaternion. Could be replaced with float4 (CUDA
-// based type) but this might lead to unintended conversions when using the
-// supplied matrices
-struct quaternion {
-  float x = 0.f, y = 0.f, z = 0.f, w = 1.f;
-  float& operator[](int32_t arg) { return ((float*)this)[arg]; }
-};
 // A simple symmetric 3x3 Matrix class (contains no storage for (0, 1) (0, 2)
 // and (1, 2)
 struct Symmetric3x3 {
@@ -84,16 +77,10 @@ struct givens {
 };
 // Helper struct to store 2 Matrices to avoid OUT parameters on functions
 struct QR {
-  glm::mat3 Q;
-  glm::mat3 R;
+  glm::mat3 Q, R;
 };
-// Helper struct to store 3 Matrices to avoid OUT parameters on functions
-struct SVDSet {
-  glm::mat3 U, S, V;
-};
-// Calculates the squared norm of the vector [x y z] using a standard scalar
-// product d = x * x + y *y + z * z
-float dist2(float x, float y, float z) { return fmaf(x, x, fmaf(y, y, z * z)); }
+// Calculates the squared norm of the vector.
+float Dist2(glm::vec3 v) { return glm::dot(v, v); }
 // For an explanation of the math see
 // http://pages.cs.wisc.edu/~sifakis/papers/SVD_TR1690.pdf Computing the
 // Singular Value Decomposition of 3 x 3 matrices with minimal branching and
@@ -109,8 +96,8 @@ givens approximateGivensQuaternion(Symmetric3x3& A) {
 }
 // Function used to apply a givens rotation S. Calculates the weights and
 // updates the quaternion to contain the cumulative rotation
-void jacobiConjugation(const int32_t x, const int32_t y, const int32_t z,
-                       Symmetric3x3& S, quaternion& q) {
+void JacobiConjugation(const int32_t x, const int32_t y, const int32_t z,
+                       Symmetric3x3& S, glm::vec4& q) {
   auto g = approximateGivensQuaternion(S);
   float scale = 1.f / fmaf(g.ch, g.ch, g.sh * g.sh);
   float a = fmaf(g.ch, g.ch, -g.sh * g.sh) * scale;
@@ -127,10 +114,7 @@ void jacobiConjugation(const int32_t x, const int32_t y, const int32_t z,
   S.m_21 = fmaf(-b, _S.m_20, a * _S.m_21);
   S.m_22 = _S.m_22;
   // update cumulative rotation qV
-  float tmp[3];
-  tmp[0] = q[0] * g.sh;
-  tmp[1] = q[1] * g.sh;
-  tmp[2] = q[2] * g.sh;
+  glm::vec3 tmp = g.sh * glm::vec3(q);
   g.sh *= q[3];
   // (x,y,z) corresponds to ((0,1,2),(1,2,0),(2,0,1)) for (p,q) =
   // ((0,1),(1,2),(0,2))
@@ -155,12 +139,12 @@ void jacobiConjugation(const int32_t x, const int32_t y, const int32_t z,
 // Function used to contain the givens permutations and the loop of the jacobi
 // steps controlled by JACOBI_STEPS Returns the quaternion q containing the
 // cumulative result used to reconstruct S
-glm::mat3 jacobiEigenAnalysis(Symmetric3x3 S) {
-  quaternion q;
+glm::mat3 JacobiEigenAnalysis(Symmetric3x3 S) {
+  glm::vec4 q(0, 0, 0, 1);
   for (int32_t i = 0; i < JACOBI_STEPS; i++) {
-    jacobiConjugation(0, 1, 2, S, q);
-    jacobiConjugation(1, 2, 0, S, q);
-    jacobiConjugation(2, 0, 1, S, q);
+    JacobiConjugation(0, 1, 2, S, q);
+    JacobiConjugation(1, 2, 0, S, q);
+    JacobiConjugation(2, 0, 1, S, q);
   }
   return glm::mat3(1.f - 2.f * (fmaf(q.y, q.y, q.z * q.z)),  //
                    2.f * fmaf(q.x, q.y, +q.w * q.z),         //
@@ -173,10 +157,10 @@ glm::mat3 jacobiEigenAnalysis(Symmetric3x3 S) {
                    1 - 2 * fmaf(q.x, q.x, q.y * q.y));
 }
 // Implementation of Algorithm 3
-void sortSingularValues(glm::mat3& B, glm::mat3& V) {
-  float rho1 = dist2(B[0][0], B[0][1], B[0][2]);
-  float rho2 = dist2(B[1][0], B[1][1], B[1][2]);
-  float rho3 = dist2(B[2][0], B[2][1], B[2][2]);
+void SortSingularValues(glm::mat3& B, glm::mat3& V) {
+  float rho1 = Dist2(B[0]);
+  float rho2 = Dist2(B[1]);
+  float rho3 = Dist2(B[2]);
   bool c;
   c = rho1 < rho2;
   condNegSwap(c, B[0][0], B[1][0]);
@@ -286,17 +270,41 @@ QR QRDecomposition(glm::mat3& B) {
   Q[2][2] = sh22 * sh32;
   return QR{Q, R};
 }
-// Wrapping function used to contain all of the required sub calls.
-SVDSet svd(glm::mat3 A) {
-  glm::mat3 V = jacobiEigenAnalysis(glm::transpose(A) * A);
+}  // namespace
+
+namespace manifold {
+/** @addtogroup Connections
+ *  @{
+ */
+
+/**
+ * The three matrices of a Singular Value Decomposition.
+ */
+struct SVDSet {
+  glm::mat3 U, S, V;
+};
+
+/**
+ * Returns the Singular Value Decomposition of A: A = U * S * glm::transpose(V).
+ *
+ * @param A The matrix to decompose.
+ */
+SVDSet SVD(glm::mat3 A) {
+  glm::mat3 V = JacobiEigenAnalysis(glm::transpose(A) * A);
   auto B = A * V;
-  sortSingularValues(B, V);
+  SortSingularValues(B, V);
   QR qr = QRDecomposition(B);
   return SVDSet{qr.Q, qr.R, V};
 }
-// The largest singular value of A.
-float spectralNorm(glm::mat3 A) {
-  SVDSet usv = svd(A);
+
+/**
+ * Returns the largest singular value of A.
+ *
+ * @param A The matrix to measure.
+ */
+float SpectralNorm(glm::mat3 A) {
+  SVDSet usv = SVD(A);
   return usv.S[0][0];
 }
-}  // namespace SVD
+/** @} */
+}  // namespace manifold

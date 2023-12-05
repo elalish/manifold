@@ -635,6 +635,13 @@ inline std::ostream& operator<<(std::ostream& stream, const glm::tvec4<T>& v) {
                 << ", w = " << v.w;
 }
 
+inline std::ostream& operator<<(std::ostream& stream, const glm::mat3& mat) {
+  glm::mat3 tam = glm::transpose(mat);
+  return stream << tam[0] << std::endl
+                << tam[1] << std::endl
+                << tam[2] << std::endl;
+}
+
 inline std::ostream& operator<<(std::ostream& stream, const glm::mat4x3& mat) {
   glm::mat3x4 tam = glm::transpose(mat);
   return stream << tam[0] << std::endl

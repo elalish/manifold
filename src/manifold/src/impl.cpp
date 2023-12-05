@@ -778,10 +778,7 @@ Manifold::Impl Manifold::Impl::Transform(const glm::mat4x3& transform_) const {
 
   result.CalculateBBox();
   // Scale the precision by the norm of the 3x3 portion of the transform.
-  result.precision_ *= SVD::spectralNorm(
-      SVD::Mat3x3(transform_[0][0], transform_[0][1], transform_[0][2],
-                  transform_[1][0], transform_[1][1], transform_[1][2],
-                  transform_[2][0], transform_[2][1], transform_[2][2]));
+  result.precision_ *= SpectralNorm(glm::mat3(transform_));
   // Maximum of inherited precision loss and translational precision loss.
   result.SetPrecision(result.precision_);
   return result;
