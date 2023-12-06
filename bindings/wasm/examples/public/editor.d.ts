@@ -49,14 +49,37 @@ declare const globalDefaults: {
 }
 
 /**
- * Set material properties on the input manifold. They will be carried along
- * through operations.
+ * Returns a shallow copy of the input manifold with the given material
+ * properties applied. They will be carried along through operations.
  *
- * @param manifold The object to add properties to - returned for chaining.
+ * @param manifold The input object.
  * @param material A set of material properties to apply to this manifold.
  */
 declare function setMaterial(manifold: Manifold, material: GLTFMaterial):
     Manifold;
+
+/**
+ * Apply a morphing animation to the input manifold. Specify the start
+ * function which will be applied to the vertex positions of the first frame and
+ * linearly interpolated across the length of the overall animation. This
+ * animation will only be shown if this manifold is used directly on a GLTFNode.
+ *
+ * @param manifold The object to add morphing animation to.
+ * @param func A warping function to apply to the first animation frame.
+ */
+declare function setMorphStart(
+    manifold: Manifold, func: (v: Vec3) => void): void;
+
+/**
+ * Apply a morphing animation to the input manifold. Specify the end
+ * function which will be applied to the vertex positions of the last frame and
+ * linearly interpolated across the length of the overall animation. This
+ * animation will only be shown if this manifold is used directly on a GLTFNode.
+ *
+ * @param manifold The object to add morphing animation to.
+ * @param func A warping function to apply to the last animation frame.
+ */
+declare function setMorphEnd(manifold: Manifold, func: (v: Vec3) => void): void;
 
 /**
  * Wrap any shape object with this method to display it and any copies in
