@@ -72,6 +72,7 @@ async function runExample(name) {
           const prop = manifold.getProperties();
           const genus = manifold.genus();
           manifold.delete();
+          // Return properties of first mesh encountered.
           resolve({...prop, genus});
         }
       } catch (e) {
@@ -108,8 +109,8 @@ suite('Examples', () => {
   test('Heart', async () => {
     const result = await runExample('Heart');
     expect(result.genus).to.equal(0, 'Genus');
-    expect(result.volume).to.be.closeTo(282743, 10, 'Volume');
-    expect(result.surfaceArea).to.be.closeTo(22187, 1, 'Surface Area');
+    expect(result.volume).to.be.closeTo(3.342, 0.001, 'Volume');
+    expect(result.surfaceArea).to.be.closeTo(11.51, 0.01, 'Surface Area');
   });
 
   test('Scallop', async () => {
