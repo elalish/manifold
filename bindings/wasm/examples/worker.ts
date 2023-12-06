@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {Accessor, Animation, Document, mat4, Material, Node, WebIO} from '@gltf-transform/core';
+import {Accessor, Animation, AnimationSampler, Document, mat4, Material, Mesh as GLTFMesh, Node, WebIO} from '@gltf-transform/core';
 import {KHRMaterialsUnlit, KHRONOS_EXTENSIONS} from '@gltf-transform/extensions';
 import {fileForContentTypes, FileForRelThumbnail, to3dmodel} from '@jscadui/3mf-export';
 import {strToU8, Zippable, zipSync} from 'fflate'
@@ -38,6 +38,8 @@ interface WorkerStatic extends ManifoldToplevel {
   show(manifold: Manifold): Manifold;
   only(manifold: Manifold): Manifold;
   setMaterial(manifold: Manifold, material: GLTFMaterial): Manifold;
+  setMorphStart(manifold: Manifold, func: (v: Vec3) => void): void;
+  setMorphEnd(manifold: Manifold, func: (v: Vec3) => void): void;
   cleanup(): void;
 }
 
@@ -75,7 +77,8 @@ const crossSectionMemberFunctions = [
 const toplevelConstructors = ['show', 'only', 'setMaterial'];
 const toplevel = [
   'setMinCircularAngle', 'setMinCircularEdgeLength', 'setCircularSegments',
-  'getCircularSegments', 'Mesh', 'GLTFNode', 'Manifold', 'CrossSection'
+  'getCircularSegments', 'Mesh', 'GLTFNode', 'Manifold', 'CrossSection',
+  'setMorphStart', 'setMorphEnd'
 ];
 const exposedFunctions = toplevelConstructors.concat(toplevel);
 
@@ -166,10 +169,13 @@ const nodes = new Array<GLTFNode>();
 const id2material = new Map<number, GLTFMaterial>();
 const materialCache = new Map<GLTFMaterial, Material>();
 const object2globalID = new Map<GLTFNode|Manifold, number>();
+const manifold2morph = new Map<Manifold, Morph>();
 // lib3mf doesn't like objectid=0
 let nextGlobalID = 1;
 let animation: Animation;
 let timesAccessor: Accessor;
+let weightsAccessor: Accessor;
+let weightsSampler: AnimationSampler;
 let hasAnimation: boolean;
 
 function cleanup() {
@@ -180,7 +186,13 @@ function cleanup() {
   id2material.clear();
   materialCache.clear();
   object2globalID.clear();
+  manifold2morph.clear();
   nextGlobalID = 1;
+}
+
+interface Morph {
+  start?: (v: Vec3) => void;
+  end?: (v: Vec3) => void;
 }
 
 interface Mesh3MF {
@@ -252,6 +264,24 @@ module.setMaterial = (manifold: Manifold, material: GLTFMaterial): Manifold => {
   const out = manifold.asOriginal();
   id2material.set(out.originalID(), material);
   return out;
+};
+
+module.setMorphStart = (manifold: Manifold, func: (v: Vec3) => void): void => {
+  const morph = manifold2morph.get(manifold);
+  if (morph != null) {
+    morph.start = func;
+  } else {
+    manifold2morph.set(manifold, {start: func});
+  }
+};
+
+module.setMorphEnd = (manifold: Manifold, func: (v: Vec3) => void): void => {
+  const morph = manifold2morph.get(manifold);
+  if (morph != null) {
+    morph.end = func;
+  } else {
+    manifold2morph.set(manifold, {end: func});
+  }
 };
 
 function debug(manifold: Manifold, map: Map<number, Mesh>) {
@@ -367,6 +397,76 @@ function addMotion(
   return motion(0);
 }
 
+function setMorph(doc: Document, node: Node, manifold: Manifold) {
+  if (manifold2morph.has(manifold)) {
+    const channel = doc.createAnimationChannel()
+                        .setTargetPath('weights')
+                        .setTargetNode(node)
+                        .setSampler(weightsSampler);
+    animation.addChannel(channel);
+    hasAnimation = true;
+  }
+}
+
+function morphStart(manifoldMesh: Mesh, morph?: Morph): number[] {
+  const inputPositions: number[] = [];
+  if (morph == null) {
+    return inputPositions;
+  }
+
+  for (let i = 0; i < manifoldMesh.numVert; ++i) {
+    for (let j = 0; j < 3; ++j)
+      inputPositions[i * 3 + j] =
+          manifoldMesh.vertProperties[i * manifoldMesh.numProp + j];
+  }
+  if (morph.start) {
+    for (let i = 0; i < manifoldMesh.numVert; ++i) {
+      const vertProp = manifoldMesh.vertProperties;
+      const offset = i * manifoldMesh.numProp;
+      const pos = inputPositions.slice(offset, offset + 3) as Vec3;
+      morph.start(pos);
+      for (let j = 0; j < 3; ++j) vertProp[offset + j] = pos[j];
+    }
+  }
+  return inputPositions;
+}
+
+function morphEnd(
+    doc: Document, manifoldMesh: Mesh, mesh: GLTFMesh, inputPositions: number[],
+    morph?: Morph) {
+  if (morph == null) {
+    return;
+  }
+
+  mesh.setWeights([0]);
+
+  mesh.listPrimitives().forEach((primitive, i) => {
+    if (morph.end) {
+      for (let i = 0; i < manifoldMesh.numVert; ++i) {
+        const pos = inputPositions.slice(3 * i, 3 * (i + 1)) as Vec3;
+        morph.end(pos);
+        inputPositions.splice(3 * i, 3, ...pos);
+      }
+    }
+
+    const startPosition = primitive.getAttribute('POSITION')!.getArray()!;
+    const array = new Float32Array(startPosition.length);
+
+    const offset = manifoldMesh.runIndex[i];
+    for (let j = 0; j < array.length; ++j) {
+      array[j] = inputPositions[offset + j] - startPosition[j];
+    }
+
+    const morphAccessor = doc.createAccessor(mesh.getName() + ' morph target')
+                              .setBuffer(doc.getRoot().listBuffers()[0])
+                              .setArray(array)
+                              .setType(Accessor.Type.VEC3);
+    const morphTarget =
+        doc.createPrimitiveTarget().setAttribute('POSITION', morphAccessor);
+    primitive.addTarget(morphTarget);
+  });
+}
+
 function createGLTFnode(doc: Document, node: GLTFNode): Node {
   const out = doc.createNode(node.name);
 
@@ -460,7 +560,14 @@ function addMesh(
     });
   }
 
-  node.setMesh(writeMesh(doc, manifoldMesh, id2properties));
+  const morph = manifold2morph.get(manifold);
+  const inputPositions = morphStart(manifoldMesh, morph);
+
+  const mesh = writeMesh(doc, manifoldMesh, id2properties);
+  mesh.setName(node.getName());
+  node.setMesh(mesh);
+
+  morphEnd(doc, manifoldMesh, mesh, inputPositions, morph);
 
   const vertices = manifoldMesh.numProp === 3 ?
       manifoldMesh.vertProperties :
@@ -522,6 +629,7 @@ function createNodeFromCache(
   const node = createGLTFnode(doc, nodeDef);
   const {manifold} = nodeDef;
   if (manifold != null) {
+    setMorph(doc, node, manifold);
     const backupMaterial = getBackupMaterial(nodeDef);
     const cachedNodes = manifold2node.get(manifold);
     if (cachedNodes == null) {
@@ -569,13 +677,27 @@ async function exportModels(defaults: GlobalDefaults, manifold?: Manifold) {
   hasAnimation = false;
   const nFrames = Math.round(globalDefaults.animationLength * FPS) + 1;
   const times = new Float32Array(nFrames);
+  const weights = new Float32Array(nFrames);
   for (let i = 0; i < nFrames; ++i) {
-    times[i] = i * globalDefaults.animationLength / (nFrames - 1);
+    const x = i / (nFrames - 1);
+    times[i] = x * globalDefaults.animationLength;
+    weights[i] = globalDefaults.animationMode !== 'ping-pong' ?
+        x :
+        (1 - Math.cos(x * 2 * Math.PI)) / 2;
   }
   timesAccessor = doc.createAccessor('animation times')
                       .setBuffer(doc.createBuffer())
                       .setArray(times)
                       .setType(Accessor.Type.SCALAR);
+  weightsAccessor = doc.createAccessor('animation weights')
+                        .setBuffer(doc.getRoot().listBuffers()[0])
+                        .setArray(weights)
+                        .setType(Accessor.Type.SCALAR);
+  weightsSampler = doc.createAnimationSampler()
+                       .setInput(timesAccessor)
+                       .setOutput(weightsAccessor)
+                       .setInterpolation('LINEAR');
+  animation.addSampler(weightsSampler);
 
   const to3mf = {
     meshes: [],
@@ -636,6 +758,8 @@ async function exportModels(defaults: GlobalDefaults, manifold?: Manifold) {
 
   if (!hasAnimation) {
     timesAccessor.dispose();
+    weightsAccessor.dispose();
+    weightsSampler.dispose();
     animation.dispose();
   }
 

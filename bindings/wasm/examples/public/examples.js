@@ -159,6 +159,7 @@ export const examples = {
       // Smooth, complex manifolds can be created using the warp() function.
       // This example recreates the Exploitable Heart by Emmett Lalish:
       // https://www.thingiverse.com/thing:6190
+      // It also demonstrates the use of setMorph to animate a warping function.
 
       const func = (v) => {
         const x2 = v[0] * v[0];
@@ -194,9 +195,20 @@ export const examples = {
       };
 
       const ball = Manifold.sphere(1, 200);
+
       const heart = ball.warp(func);
       const box = heart.boundingBox();
-      const result = heart.scale(100 / (box.max[0] - box.min[0]));
+      const scale = 100 / (box.max[0] - box.min[0]);
+
+      setMorphStart(ball, func);
+      const node = new GLTFNode();
+      node.manifold = ball;
+      node.scale = [scale, scale, scale];
+
+      globalDefaults.animationLength = 5;  // seconds
+      globalDefaults.animationMode = 'ping-pong';
+
+      const result = heart.scale(scale);
       return result;
     },
 
@@ -273,71 +285,68 @@ export const examples = {
       // an example of using the warp() method, thus avoiding any direct
       // handling of triangles.
 
-      // @param p The number of times the thread passes through the donut hole.
-      // @param q The number of times the thread circles the donut.
-      // @param majorRadius Radius of the interior of the imaginary donut.
-      // @param minorRadius Radius of the small cross-section of the imaginary
-      //   donut.
-      // @param threadRadius Radius of the small cross-section of the actual
-      //   object.
-      // @param circularSegments Number of linear segments making up the
-      //   threadRadius circle. Default is getCircularSegments(threadRadius).
-      // @param linearSegments Number of segments along the length of the knot.
-      //   Default makes roughly square facets.
+      // The number of times the thread passes through the donut hole.
+      const p = 1;
+      // The number of times the thread circles the donut.
+      const q = 3;
+      // Radius of the interior of the imaginary donut.
+      const majorRadius = 25;
+      // Radius of the small cross-section of the imaginary donut.
+      const minorRadius = 10;
+      // Radius of the small cross-section of the actual object.
+      const threadRadius = 3.75;
+      // Number of linear segments making up the threadRadius circle. Default is
+      // getCircularSegments(threadRadius).
+      const circularSegments = -1;
+      // Number of segments along the length of the knot. Default makes roughly
+      // square facets.
+      const linearSegments = -1;
 
-      function torusKnot(
-          p, q, majorRadius, minorRadius, threadRadius, circularSegments = 0,
-          linearSegments = 0) {
-        const {vec3} = glMatrix;
-
-        function gcd(a, b) {
-          return b == 0 ? a : gcd(b, a % b);
-        }
-
-        const kLoops = gcd(p, q);
-        p /= kLoops;
-        q /= kLoops;
-        const n = circularSegments > 2 ? circularSegments :
-                                         getCircularSegments(threadRadius);
-        const m = linearSegments > 2 ? linearSegments :
-                                       n * q * majorRadius / threadRadius;
-
-        const offset = 2
-        const circle = CrossSection.circle(1, n).translate([offset, 0]);
-
-        const func = (v) => {
-          const psi = q * Math.atan2(v[0], v[1]);
-          const theta = psi * p / q;
-          const x1 = Math.sqrt(v[0] * v[0] + v[1] * v[1]);
-          const phi = Math.atan2(x1 - offset, v[2]);
-          vec3.set(
-              v, threadRadius * Math.cos(phi), 0, threadRadius * Math.sin(phi));
-          const center = vec3.fromValues(0, 0, 0);
-          const r = majorRadius + minorRadius * Math.cos(theta);
-          vec3.rotateX(v, v, center, -Math.atan2(p * minorRadius, q * r));
-          v[0] += minorRadius;
-          vec3.rotateY(v, v, center, theta);
-          v[0] += majorRadius;
-          vec3.rotateZ(v, v, center, psi);
-        };
-
-        let knot = Manifold.revolve(circle, m).warp(func);
-
-        if (kLoops > 1) {
-          const knots = [];
-          for (let k = 0; k < kLoops; ++k) {
-            knots.push(knot.rotate([0, 0, 360 * (k / kLoops) * (q / p)]));
-          }
-          knot = Manifold.compose(knots);
-        }
-
-        return knot;
-      }
-
-      // This recreates Matlab Knot by Emmett Lalish:
+      // These default values recreate Matlab Knot by Emmett Lalish:
       // https://www.thingiverse.com/thing:7080
 
-      const result = torusKnot(1, 3, 25, 10, 3.75);
+      const {vec3} = glMatrix;
+
+      function gcd(a, b) {
+        return b == 0 ? a : gcd(b, a % b);
+      }
+
+      const kLoops = gcd(p, q);
+      const pk = p / kLoops;
+      const qk = q / kLoops;
+      const n = circularSegments > 2 ? circularSegments :
+                                       getCircularSegments(threadRadius);
+      const m = linearSegments > 2 ? linearSegments :
+                                     n * qk * majorRadius / threadRadius;
+
+      const offset = 2
+      const circle = CrossSection.circle(1, n).translate([offset, 0]);
+
+      const func = (v) => {
+        const psi = qk * Math.atan2(v[0], v[1]);
+        const theta = psi * pk / qk;
+        const x1 = Math.sqrt(v[0] * v[0] + v[1] * v[1]);
+        const phi = Math.atan2(x1 - offset, v[2]);
+        vec3.set(
+            v, threadRadius * Math.cos(phi), 0, threadRadius * Math.sin(phi));
+        const center = vec3.fromValues(0, 0, 0);
+        const r = majorRadius + minorRadius * Math.cos(theta);
+        vec3.rotateX(v, v, center, -Math.atan2(pk * minorRadius, qk * r));
+        v[0] += minorRadius;
+        vec3.rotateY(v, v, center, theta);
+        v[0] += majorRadius;
+        vec3.rotateZ(v, v, center, psi);
+      };
+
+      const result = Manifold.revolve(circle, m).warp(func);
+
+      for (let k = 0; k < kLoops; ++k) {
+        const node = new GLTFNode();
+        node.manifold = result;
+        node.rotation = [0, 0, 360 * (k / kLoops) * (qk / pk)];
+        node.translation = [0, 0, result.boundingBox().min[2]];
+      }
+
       return result;
     },
 
