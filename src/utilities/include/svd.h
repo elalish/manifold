@@ -32,22 +32,22 @@
 
 namespace {
 // Constants used for calculation of Givens quaternions
-constexpr float _gamma = 5.828427124f;   // sqrt(8)+3;
-constexpr float _cStar = 0.923879532f;   // cos(pi/8)
-constexpr float _sStar = 0.3826834323f;  // sin(pi/8)
+inline constexpr float _gamma = 5.828427124f;   // sqrt(8)+3;
+inline constexpr float _cStar = 0.923879532f;   // cos(pi/8)
+inline constexpr float _sStar = 0.3826834323f;  // sin(pi/8)
 // Threshold value
-constexpr float _SVD_EPSILON = 1e-6f;
+inline constexpr float _SVD_EPSILON = 1e-6f;
 // Iteration counts for Jacobi Eigen Analysis, influences precision
-constexpr int JACOBI_STEPS = 12;
+inline constexpr int JACOBI_STEPS = 12;
 
 // Helper function used to swap X with Y and Y with  X if c == true
-void CondSwap(bool c, float& X, float& Y) {
+inline void CondSwap(bool c, float& X, float& Y) {
   float Z = X;
   X = c ? Y : X;
   Y = c ? Z : Y;
 }
 // Helper function used to swap X with Y and Y with -X if c == true
-void CondNegSwap(bool c, float& X, float& Y) {
+inline void CondNegSwap(bool c, float& X, float& Y) {
   float Z = -X;
   X = c ? Y : X;
   Y = c ? Z : Y;
@@ -80,14 +80,14 @@ struct QR {
   glm::mat3 Q, R;
 };
 // Calculates the squared norm of the vector.
-float Dist2(glm::vec3 v) { return glm::dot(v, v); }
+inline float Dist2(glm::vec3 v) { return glm::dot(v, v); }
 // For an explanation of the math see
 // http://pages.cs.wisc.edu/~sifakis/papers/SVD_TR1690.pdf Computing the
 // Singular Value Decomposition of 3 x 3 matrices with minimal branching and
 // elementary floating point operations See Algorithm 2 in reference. Given a
 // matrix A this function returns the Givens quaternion (x and w component, y
 // and z are 0)
-Givens ApproximateGivensQuaternion(Symmetric3x3& A) {
+inline Givens ApproximateGivensQuaternion(Symmetric3x3& A) {
   Givens g{2.f * (A.m_00 - A.m_11), A.m_10};
   bool b = _gamma * g.sh * g.sh < g.ch * g.ch;
   float w = 1.f / sqrt(fmaf(g.ch, g.ch, g.sh * g.sh));
@@ -96,8 +96,8 @@ Givens ApproximateGivensQuaternion(Symmetric3x3& A) {
 }
 // Function used to apply a Givens rotation S. Calculates the weights and
 // updates the quaternion to contain the cumulative rotation
-void JacobiConjugation(const int32_t x, const int32_t y, const int32_t z,
-                       Symmetric3x3& S, glm::vec4& q) {
+inline void JacobiConjugation(const int32_t x, const int32_t y, const int32_t z,
+                              Symmetric3x3& S, glm::vec4& q) {
   auto g = ApproximateGivensQuaternion(S);
   float scale = 1.f / fmaf(g.ch, g.ch, g.sh * g.sh);
   float a = fmaf(g.ch, g.ch, -g.sh * g.sh) * scale;
@@ -139,7 +139,7 @@ void JacobiConjugation(const int32_t x, const int32_t y, const int32_t z,
 // Function used to contain the Givens permutations and the loop of the jacobi
 // steps controlled by JACOBI_STEPS Returns the quaternion q containing the
 // cumulative result used to reconstruct S
-glm::mat3 JacobiEigenAnalysis(Symmetric3x3 S) {
+inline glm::mat3 JacobiEigenAnalysis(Symmetric3x3 S) {
   glm::vec4 q(0, 0, 0, 1);
   for (int32_t i = 0; i < JACOBI_STEPS; i++) {
     JacobiConjugation(0, 1, 2, S, q);
@@ -157,7 +157,7 @@ glm::mat3 JacobiEigenAnalysis(Symmetric3x3 S) {
                    1 - 2 * fmaf(q.x, q.x, q.y * q.y));
 }
 // Implementation of Algorithm 3
-void SortSingularValues(glm::mat3& B, glm::mat3& V) {
+inline void SortSingularValues(glm::mat3& B, glm::mat3& V) {
   float rho1 = Dist2(B[0]);
   float rho2 = Dist2(B[1]);
   float rho3 = Dist2(B[2]);
@@ -187,7 +187,7 @@ void SortSingularValues(glm::mat3& B, glm::mat3& V) {
   CondNegSwap(c, V[1][2], V[2][2]);
 }
 // Implementation of Algorithm 4
-Givens QRGivensQuaternion(float a1, float a2) {
+inline Givens QRGivensQuaternion(float a1, float a2) {
   // a1 = pivot point on diagonal
   // a2 = lower triangular entry we want to annihilate
   float epsilon = (float)_SVD_EPSILON;
@@ -201,7 +201,7 @@ Givens QRGivensQuaternion(float a1, float a2) {
   return g;
 }
 // Implements a QR decomposition of a Matrix, see Sec 4.2
-QR QRDecomposition(glm::mat3& B) {
+inline QR QRDecomposition(glm::mat3& B) {
   glm::mat3 Q, R;
   // first Givens rotation (ch,0,0,sh)
   auto g1 = QRGivensQuaternion(B[0][0], B[0][1]);
@@ -289,7 +289,7 @@ struct SVDSet {
  *
  * @param A The matrix to decompose.
  */
-SVDSet SVD(glm::mat3 A) {
+inline SVDSet SVD(glm::mat3 A) {
   glm::mat3 V = JacobiEigenAnalysis(glm::transpose(A) * A);
   auto B = A * V;
   SortSingularValues(B, V);
@@ -302,7 +302,7 @@ SVDSet SVD(glm::mat3 A) {
  *
  * @param A The matrix to measure.
  */
-float SpectralNorm(glm::mat3 A) {
+inline float SpectralNorm(glm::mat3 A) {
   SVDSet usv = SVD(A);
   return usv.S[0][0];
 }
