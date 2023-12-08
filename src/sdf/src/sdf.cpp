@@ -307,7 +307,6 @@ Mesh LevelSet(std::function<float(glm::vec3)> sdf, Box bounds, float edgeLength,
   Mesh out;
 
   const glm::vec3 dim = bounds.Size();
-  const float maxDim = std::max(dim[0], std::max(dim[1], dim[2]));
   const glm::ivec3 gridSize(dim / edgeLength);
   const glm::vec3 spacing = dim / (glm::vec3(gridSize));
 

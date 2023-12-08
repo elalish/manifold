@@ -604,7 +604,7 @@ class EarClip {
 
     area += areaCompensation;
     const glm::vec2 size = bBox.Size();
-    const double minArea = precision_ * glm::max(size.x, size.y);
+    const float minArea = precision_ * glm::max(size.x, size.y);
 
     if (glm::isfinite(maxX) && area < -minArea) {
       holes_.insert(start);
@@ -622,7 +622,6 @@ class EarClip {
   // incorrect due to precision, we check for polygon edges both ahead and
   // behind to ensure all valid options are found.
   void CutKeyhole(const VertItr start) {
-    const float startX = start->pos.x;
     const Rect bBox = hole2BBox_[start];
     const int onTop = start->pos.y >= bBox.max.y - precision_   ? 1
                       : start->pos.y <= bBox.min.y + precision_ ? -1
@@ -667,7 +666,6 @@ class EarClip {
   // and returns it. It does so by finding any reflex verts inside the triangle
   // containing the best connection and the initial horizontal line.
   VertItr FindCloserBridge(VertItr start, VertItr edge, int onTop) {
-    const float p2 = precision_ * precision_;
     VertItr best = edge->pos.x > edge->right->pos.x ? edge : edge->right;
     const float maxX = best->pos.x;
     const float above = best->pos.y > start->pos.y ? 1 : -1;

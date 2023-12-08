@@ -285,7 +285,6 @@ void AppendPartialEdges(Manifold::Impl &outR, Vec<char> &wholeHalfedgeP,
     }
 
     int inclusion = i03[vStart];
-    bool reversed = inclusion < 0;
     EdgePos edgePos = {vP2R[vStart],
                        glm::dot(outR.vertPos_[vP2R[vStart]], edgeVec),
                        inclusion > 0};
@@ -295,7 +294,6 @@ void AppendPartialEdges(Manifold::Impl &outR, Vec<char> &wholeHalfedgeP,
     }
 
     inclusion = i03[vEnd];
-    reversed |= inclusion < 0;
     edgePos = {vP2R[vEnd], glm::dot(outR.vertPos_[vP2R[vEnd]], edgeVec),
                inclusion < 0};
     for (int j = 0; j < glm::abs(inclusion); ++j) {
@@ -403,7 +401,6 @@ struct DuplicateHalfedges {
     if (!thrust::get<0>(in)) return;
     Halfedge halfedge = thrust::get<1>(in);
     if (!halfedge.IsForward()) return;
-    const int edgeP = thrust::get<2>(in);
 
     const int inclusion = i03[halfedge.startVert];
     if (inclusion == 0) return;
@@ -744,7 +741,6 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   std::tie(faceEdge, facePQ2R) =
       SizeOutput(outR, inP_, inQ_, i03, i30, i12, i21, p1q2_, p2q1_, invertQ);
 
-  const int numFaceR = faceEdge.size() - 1;
   // This gets incremented for each halfedge that's added to a face so that the
   // next one knows where to slot in.
   Vec<int> facePtrR = faceEdge;
