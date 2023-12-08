@@ -151,6 +151,7 @@ struct ComputeVerts {
   }
 
   inline void operator()(Uint64 mortonCode) {
+    ZoneScoped;
     if (gridVerts.Full()) return;
 
     const glm::ivec4 gridIndex = DecodeMorton(mortonCode);
@@ -205,6 +206,7 @@ struct BuildTris {
   }
 
   void operator()(int idx) {
+    ZoneScoped;
     Uint64 basekey = gridVerts.KeyAt(idx);
     if (basekey == kOpen) return;
 

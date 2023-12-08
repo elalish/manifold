@@ -42,13 +42,12 @@ if (TRACY_ENABLE)
     include(FetchContent)
     FetchContent_Declare(tracy
         GIT_REPOSITORY https://github.com/wolfpld/tracy.git
-        GIT_TAG v0.9.1
+        GIT_TAG v0.10
         GIT_SHALLOW TRUE
         GIT_PROGRESS TRUE
     )
     FetchContent_MakeAvailable(tracy)
     target_link_libraries(${PROJECT_NAME} INTERFACE TracyClient)
-    target_compile_options(${PROJECT_NAME} INTERFACE -DTRACY_NO_CODE_TRANSFER=1)
 endif()
 
 if(MANIFOLD_PAR STREQUAL "TBB")
@@ -63,7 +62,7 @@ if(MANIFOLD_PAR STREQUAL "TBB")
         set(TBB_STRICT OFF CACHE INTERNAL "" FORCE)
         FetchContent_Declare(TBB
             GIT_REPOSITORY https://github.com/oneapi-src/oneTBB.git
-            GIT_TAG        v2021.10.0
+            GIT_TAG        v2021.11.0
             GIT_SHALLOW    TRUE
             GIT_PROGRESS   TRUE
         )

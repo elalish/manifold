@@ -155,6 +155,7 @@ Manifold::Manifold(const Mesh& mesh) {
  * saving or other operations outside of the context of this library.
  */
 Mesh Manifold::GetMesh() const {
+  ZoneScoped;
   const Impl& impl = *GetCsgLeafNode().GetImpl();
 
   Mesh result;
@@ -189,6 +190,7 @@ Mesh Manifold::GetMesh() const {
  * MeshGLs must use the same channels for their normals.
  */
 MeshGL Manifold::GetMeshGL(glm::ivec3 normalIdx) const {
+  ZoneScoped;
   const Impl& impl = *GetCsgLeafNode().GetImpl();
 
   const int numProp = NumProp();
@@ -787,6 +789,7 @@ ExecutionParams& ManifoldParams() { return manifoldParams; }
  * hull.
  */
 Manifold Manifold::Hull(const std::vector<glm::vec3>& pts) {
+  ZoneScoped;
   const int numVert = pts.size();
   if (numVert < 4) return Manifold();
 
