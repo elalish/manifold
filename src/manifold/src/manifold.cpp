@@ -777,6 +777,14 @@ Manifold Manifold::TrimByPlane(glm::vec3 normal, float originOffset) const {
   return *this ^ Halfspace(BoundingBox(), normal, originOffset);
 }
 
+/**
+ * Returns a cross section representing the projection of this object onto the
+ * X-Y plane.
+ */
+CrossSection Manifold::Project() const {
+  return GetCsgLeafNode().GetImpl()->Project();
+}
+
 ExecutionParams& ManifoldParams() { return manifoldParams; }
 
 /**

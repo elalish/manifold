@@ -182,11 +182,25 @@ TEST(Samples, Frame) {
 TEST(Samples, Bracelet) {
   Manifold bracelet = StretchyBracelet();
   CheckNormals(bracelet);
-  EXPECT_LE(bracelet.NumDegenerateTris(), 22);
+  EXPECT_EQ(bracelet.NumDegenerateTris(), 0);
   EXPECT_EQ(bracelet.Genus(), 1);
   CheckGL(bracelet);
+
+  CrossSection projection = bracelet.Project();
+  Rect rect = projection.Bounds();
+  Box box = bracelet.BoundingBox();
+  EXPECT_EQ(rect.min.x, box.min.x);
+  EXPECT_EQ(rect.min.y, box.min.y);
+  EXPECT_EQ(rect.max.x, box.max.x);
+  EXPECT_EQ(rect.max.y, box.max.y);
+  EXPECT_NEAR(projection.Area(), 649, 1);
+
 #ifdef MANIFOLD_EXPORT
-  if (options.exportModels) ExportMesh("bracelet.glb", bracelet.GetMesh(), {});
+  if (options.exportModels) {
+    ExportMesh("bracelet.glb", bracelet.GetMesh(), {});
+    ExportMesh("bracelet_projection.glb",
+               Manifold::Extrude(projection, 15).GetMesh(), {});
+  }
 #endif
 }
 
@@ -237,9 +251,20 @@ TEST(Samples, Sponge4) {
   EXPECT_EQ(cutSponge.first.Genus(), 13394);
   EXPECT_EQ(cutSponge.second.Genus(), 13394);
 
+  CrossSection projection = cutSponge.first.Project();
+  Rect rect = projection.Bounds();
+  Box box = cutSponge.first.BoundingBox();
+  EXPECT_EQ(rect.min.x, box.min.x);
+  EXPECT_EQ(rect.min.y, box.min.y);
+  EXPECT_EQ(rect.max.x, box.max.x);
+  EXPECT_EQ(rect.max.y, box.max.y);
+  EXPECT_NEAR(projection.Area(), 0.535, 0.001);
+
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) {
     ExportMesh("mengerHalf.glb", cutSponge.first.GetMesh(), {});
+    ExportMesh("mengerHalf_projection.glb",
+               Manifold::Extrude(projection, 1).GetMesh(), {});
 
     const Mesh out = sponge.GetMesh();
     ExportOptions options;

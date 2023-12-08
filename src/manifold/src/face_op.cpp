@@ -126,7 +126,9 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
   auto generalTriangulation = [&](int face) {
     const glm::vec3 normal = faceNormal_[face];
     const glm::mat3x2 projection = GetAxisAlignedProjection(normal);
-    const PolygonsIdx polys = Face2Polygons(face, projection, faceEdge);
+    const PolygonsIdx polys =
+        Face2Polygons(halfedge_.cbegin() + faceEdge[face],
+                      halfedge_.cbegin() + faceEdge[face + 1], projection);
     return TriangulateIdx(polys, precision_);
   };
 #if MANIFOLD_PAR == 'T' && __has_include(<tbb/tbb.h>)
@@ -194,17 +196,12 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
  * For the input face index, return a set of 2D polygons formed by the input
  * projection of the vertices.
  */
-PolygonsIdx Manifold::Impl::Face2Polygons(int face, glm::mat3x2 projection,
-                                          const Vec<int>& faceEdge) const {
-  const int firstEdge = faceEdge[face];
-  const int lastEdge = faceEdge[face + 1];
-
-  std::map<int, int> vert_edge;
-  for (int edge = firstEdge; edge < lastEdge; ++edge) {
-    const bool inserted =
-        vert_edge.emplace(std::make_pair(halfedge_[edge].startVert, edge))
-            .second;
-    ASSERT(inserted, topologyErr, "face has duplicate vertices.");
+PolygonsIdx Manifold::Impl::Face2Polygons(VecView<Halfedge>::IterC start,
+                                          VecView<Halfedge>::IterC end,
+                                          glm::mat3x2 projection) const {
+  std::multimap<int, int> vert_edge;
+  for (auto edge = start; edge != end; ++edge) {
+    vert_edge.emplace(std::make_pair(edge->startVert, edge - start));
   }
 
   PolygonsIdx polys;
@@ -217,13 +214,42 @@ PolygonsIdx Manifold::Impl::Face2Polygons(int face, glm::mat3x2 projection,
       thisEdge = startEdge;
       polys.push_back({});
     }
-    int vert = halfedge_[thisEdge].startVert;
+    int vert = (start + thisEdge)->startVert;
     polys.back().push_back({projection * vertPos_[vert], vert});
-    const auto result = vert_edge.find(halfedge_[thisEdge].endVert);
+    const auto result = vert_edge.find((start + thisEdge)->endVert);
     ASSERT(result != vert_edge.end(), topologyErr, "non-manifold edge");
     thisEdge = result->second;
     vert_edge.erase(result);
   }
   return polys;
+}
+
+CrossSection Manifold::Impl::Project() const {
+  const glm::mat3x2 projection = GetAxisAlignedProjection({0, 0, 1});
+  auto policy = autoPolicy(halfedge_.size());
+
+  Vec<Halfedge> cusps(NumEdge());
+  cusps.resize(copy_if<decltype(cusps.begin())>(
+                   policy, halfedge_.cbegin(), halfedge_.cend(), cusps.begin(),
+                   [&](Halfedge edge) {
+                     return faceNormal_[edge.face].z >= 0 &&
+                            faceNormal_[halfedge_[edge.pairedHalfedge].face].z <
+                                0;
+                   }) -
+               cusps.begin());
+
+  PolygonsIdx polysIndexed =
+      Face2Polygons(cusps.cbegin(), cusps.cend(), projection);
+
+  Polygons polys;
+  for (const auto& poly : polysIndexed) {
+    SimplePolygon simple;
+    for (const PolyVert& polyVert : poly) {
+      simple.push_back(polyVert.pos);
+    }
+    polys.push_back(simple);
+  }
+
+  return CrossSection(polys);
 }
 }  // namespace manifold
