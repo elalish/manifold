@@ -101,6 +101,7 @@ std::tuple<Vec<int>, Vec<int>> SizeOutput(
     const Vec<int> &i03, const Vec<int> &i30, const Vec<int> &i12,
     const Vec<int> &i21, const SparseIndices &p1q2, const SparseIndices &p2q1,
     bool invertQ) {
+  ZoneScoped;
   Vec<int> sidesPerFacePQ(inP.NumTri() + inQ.NumTri(), 0);
   auto sidesPerFaceP = sidesPerFacePQ.view(0, inP.NumTri());
   auto sidesPerFaceQ = sidesPerFacePQ.view(inP.NumTri(), inQ.NumTri());
@@ -167,6 +168,7 @@ void AddNewEdgeVerts(
     concurrent_map<std::pair<int, int>, std::vector<EdgePos>> &edgesNew,
     const SparseIndices &p1q2, const Vec<int> &i12, const Vec<int> &v12R,
     const Vec<Halfedge> &halfedgeP, bool forward) {
+  ZoneScoped;
   // For each edge of P that intersects a face of Q (p1q2), add this vertex to
   // P's corresponding edge vector and to the two new edges, which are
   // intersections between the face of Q and the two faces of P attached to the
@@ -256,6 +258,7 @@ void AppendPartialEdges(Manifold::Impl &outR, Vec<char> &wholeHalfedgeP,
                         Vec<TriRef> &halfedgeRef, const Manifold::Impl &inP,
                         const Vec<int> &i03, const Vec<int> &vP2R,
                         const Vec<int>::IterC faceP2R, bool forward) {
+  ZoneScoped;
   // Each edge in the map is partially retained; for each of these, look up
   // their original verts and include them based on their winding number (i03),
   // while remapping them to the output using vP2R. Use the verts position
@@ -282,7 +285,6 @@ void AppendPartialEdges(Manifold::Impl &outR, Vec<char> &wholeHalfedgeP,
     }
 
     int inclusion = i03[vStart];
-    bool reversed = inclusion < 0;
     EdgePos edgePos = {vP2R[vStart],
                        glm::dot(outR.vertPos_[vP2R[vStart]], edgeVec),
                        inclusion > 0};
@@ -292,7 +294,6 @@ void AppendPartialEdges(Manifold::Impl &outR, Vec<char> &wholeHalfedgeP,
     }
 
     inclusion = i03[vEnd];
-    reversed |= inclusion < 0;
     edgePos = {vP2R[vEnd], glm::dot(outR.vertPos_[vP2R[vEnd]], edgeVec),
                inclusion < 0};
     for (int j = 0; j < glm::abs(inclusion); ++j) {
@@ -337,6 +338,7 @@ void AppendNewEdges(
     Manifold::Impl &outR, Vec<int> &facePtrR,
     concurrent_map<std::pair<int, int>, std::vector<EdgePos>> &edgesNew,
     Vec<TriRef> &halfedgeRef, const Vec<int> &facePQ2R, const int numFaceP) {
+  ZoneScoped;
   // Pair up each edge's verts and distribute to faces based on indices in key.
   Vec<Halfedge> &halfedgeR = outR.halfedge_;
   Vec<glm::vec3> &vertPosR = outR.vertPos_;
@@ -399,7 +401,6 @@ struct DuplicateHalfedges {
     if (!thrust::get<0>(in)) return;
     Halfedge halfedge = thrust::get<1>(in);
     if (!halfedge.IsForward()) return;
-    const int edgeP = thrust::get<2>(in);
 
     const int inclusion = i03[halfedge.startVert];
     if (inclusion == 0) return;
@@ -442,6 +443,7 @@ void AppendWholeEdges(Manifold::Impl &outR, Vec<int> &facePtrR,
                       const Vec<char> wholeHalfedgeP, const Vec<int> &i03,
                       const Vec<int> &vP2R, VecView<const int> faceP2R,
                       bool forward) {
+  ZoneScoped;
   for_each_n(ManifoldParams().deterministic ? ExecutionPolicy::Seq
                                             : autoPolicy(inP.halfedge_.size()),
              zip(wholeHalfedgeP.begin(), inP.halfedge_.begin(), countAt(0)),
@@ -514,6 +516,7 @@ struct Barycentric {
 
 void CreateProperties(Manifold::Impl &outR, const Manifold::Impl &inP,
                       const Manifold::Impl &inQ) {
+  ZoneScoped;
   const int numPropP = inP.NumProp();
   const int numPropQ = inQ.NumProp();
   const int numProp = glm::max(numPropP, numPropQ);
@@ -738,7 +741,6 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   std::tie(faceEdge, facePQ2R) =
       SizeOutput(outR, inP_, inQ_, i03, i30, i12, i21, p1q2_, p2q1_, invertQ);
 
-  const int numFaceR = faceEdge.size() - 1;
   // This gets incremented for each halfedge that's added to a face so that the
   // next one knows where to slot in.
   Vec<int> facePtrR = faceEdge;

@@ -155,6 +155,7 @@ Manifold::Manifold(const Mesh& mesh) {
  * saving or other operations outside of the context of this library.
  */
 Mesh Manifold::GetMesh() const {
+  ZoneScoped;
   const Impl& impl = *GetCsgLeafNode().GetImpl();
 
   Mesh result;
@@ -189,6 +190,7 @@ Mesh Manifold::GetMesh() const {
  * MeshGLs must use the same channels for their normals.
  */
 MeshGL Manifold::GetMeshGL(glm::ivec3 normalIdx) const {
+  ZoneScoped;
   const Impl& impl = *GetCsgLeafNode().GetImpl();
 
   const int numProp = NumProp();
@@ -289,7 +291,7 @@ MeshGL Manifold::GetMeshGL(glm::ivec3 normalIdx) const {
   // Duplicate verts with different props
   std::vector<int> vert2idx(impl.NumVert(), -1);
   std::vector<std::vector<glm::ivec2>> vertPropPair(impl.NumVert());
-  out.vertProperties.reserve(numVert * out.numProp);
+  out.vertProperties.reserve(numVert * static_cast<size_t>(out.numProp));
 
   for (int run = 0; run < out.runOriginalID.size(); ++run) {
     for (int tri = out.runIndex[run] / 3; tri < out.runIndex[run + 1] / 3;
@@ -484,7 +486,7 @@ int Manifold::NumOverlaps(const Manifold& other) const {
 
   overlaps = other.GetCsgLeafNode().GetImpl()->EdgeCollisions(
       *GetCsgLeafNode().GetImpl());
-  return num_overlaps += overlaps.size();
+  return num_overlaps + overlaps.size();
 }
 
 /**
@@ -787,6 +789,7 @@ ExecutionParams& ManifoldParams() { return manifoldParams; }
  * hull.
  */
 Manifold Manifold::Hull(const std::vector<glm::vec3>& pts) {
+  ZoneScoped;
   const int numVert = pts.size();
   if (numVert < 4) return Manifold();
 

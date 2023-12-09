@@ -92,6 +92,7 @@ struct CopyFaceEdges {
 
 SparseIndices Filter11(const Manifold::Impl &inP, const Manifold::Impl &inQ,
                        const SparseIndices &p1q2, const SparseIndices &p2q1) {
+  ZoneScoped;
   SparseIndices p1q1(3 * p1q2.size() + 3 * p2q1.size());
   for_each_n(autoPolicy(p1q2.size()), zip(countAt(0), countAt(0)), p1q2.size(),
              CopyFaceEdges<false>({p1q2, p1q1, inQ.halfedge_}));
@@ -273,6 +274,7 @@ std::tuple<Vec<int>, Vec<glm::vec4>> Shadow11(SparseIndices &p1q1,
                                               const Manifold::Impl &inP,
                                               const Manifold::Impl &inQ,
                                               float expandP) {
+  ZoneScoped;
   Vec<int> s11(p1q1.size());
   Vec<glm::vec4> xyzz11(p1q1.size());
 
@@ -367,6 +369,7 @@ std::tuple<Vec<int>, Vec<float>> Shadow02(const Manifold::Impl &inP,
                                           const Manifold::Impl &inQ,
                                           SparseIndices &p0q2, bool forward,
                                           float expandP) {
+  ZoneScoped;
   Vec<int> s02(p0q2.size());
   Vec<float> z02(p0q2.size());
 
@@ -476,6 +479,7 @@ std::tuple<Vec<int>, Vec<glm::vec3>> Intersect12(
     const SparseIndices &p0q2, const Vec<int> &s11, const SparseIndices &p1q1,
     const Vec<float> &z02, const Vec<glm::vec4> &xyzz11, SparseIndices &p1q2,
     bool forward) {
+  ZoneScoped;
   Vec<int> x12(p1q2.size());
   Vec<glm::vec3> v12(p1q2.size());
 
@@ -492,6 +496,7 @@ std::tuple<Vec<int>, Vec<glm::vec3>> Intersect12(
 
 Vec<int> Winding03(const Manifold::Impl &inP, Vec<int> &vertices, Vec<int> &s02,
                    bool reverse) {
+  ZoneScoped;
   // verts that are not shadowed (not in p0q2) have winding number zero.
   Vec<int> w03(inP.NumVert(), 0);
   // checking is slow, so just sort and reduce

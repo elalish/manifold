@@ -316,6 +316,7 @@ int Manifold::Impl::NumDegenerateTris() const {
 }
 
 Properties Manifold::Impl::GetProperties() const {
+  ZoneScoped;
   if (IsEmpty()) return {0, 0};
   // Kahan summation
   float area = 0;
@@ -339,6 +340,7 @@ Properties Manifold::Impl::GetProperties() const {
 }
 
 void Manifold::Impl::CalculateCurvature(int gaussianIdx, int meanIdx) {
+  ZoneScoped;
   if (IsEmpty()) return;
   if (gaussianIdx < 0 && meanIdx < 0) return;
   Vec<float> vertMeanCurvature(NumVert(), 0);

@@ -154,20 +154,23 @@ void Manifold::Impl::SimplifyTopology() {
   // verts. They must be removed before edge collapse.
   SplitPinchedVerts();
 
-  Vec<SortEntry> entries;
-  entries.reserve(nbEdges / 2);
-  for (int i = 0; i < nbEdges; ++i) {
-    if (halfedge_[i].IsForward()) {
-      entries.push_back({halfedge_[i].startVert, halfedge_[i].endVert, i});
+  {
+    ZoneScopedN("DedupeEdge");
+    Vec<SortEntry> entries;
+    entries.reserve(nbEdges / 2);
+    for (int i = 0; i < nbEdges; ++i) {
+      if (halfedge_[i].IsForward()) {
+        entries.push_back({halfedge_[i].startVert, halfedge_[i].endVert, i});
+      }
     }
-  }
 
-  stable_sort(policy, entries.begin(), entries.end());
-  for (int i = 0; i < entries.size() - 1; ++i) {
-    if (entries[i].start == entries[i + 1].start &&
-        entries[i].end == entries[i + 1].end) {
-      DedupeEdge(entries[i].index);
-      numFlagged++;
+    stable_sort(policy, entries.begin(), entries.end());
+    for (int i = 0; i < entries.size() - 1; ++i) {
+      if (entries[i].start == entries[i + 1].start &&
+          entries[i].end == entries[i + 1].end) {
+        DedupeEdge(entries[i].index);
+        numFlagged++;
+      }
     }
   }
 
@@ -185,6 +188,7 @@ void Manifold::Impl::SimplifyTopology() {
   std::vector<int> scratchBuffer;
   scratchBuffer.reserve(10);
   {
+    ZoneScopedN("CollapseShortEdge");
     numFlagged = 0;
     ShortEdge se{halfedge_, vertPos_, precision_};
     for_each_n(policy, countAt(0), nbEdges, [&](int i) { bflags[i] = se(i); });
@@ -205,6 +209,7 @@ void Manifold::Impl::SimplifyTopology() {
 #endif
 
   {
+    ZoneScopedN("CollapseFlaggedEdge");
     numFlagged = 0;
     FlagEdge se{halfedge_, meshRelation_.triRef};
     for_each_n(policy, countAt(0), nbEdges, [&](int i) { bflags[i] = se(i); });
@@ -225,6 +230,7 @@ void Manifold::Impl::SimplifyTopology() {
 #endif
 
   {
+    ZoneScopedN("RecursiveEdgeSwap");
     numFlagged = 0;
     SwappableEdge se{halfedge_, vertPos_, faceNormal_, precision_};
     for_each_n(policy, countAt(0), nbEdges, [&](int i) { bflags[i] = se(i); });
@@ -655,6 +661,7 @@ void Manifold::Impl::RecursiveEdgeSwap(const int edge, int& tag,
 }
 
 void Manifold::Impl::SplitPinchedVerts() {
+  ZoneScoped;
   std::vector<bool> vertProcessed(NumVert(), false);
   std::vector<bool> halfedgeProcessed(halfedge_.size(), false);
   for (int i = 0; i < halfedge_.size(); ++i) {

@@ -300,6 +300,7 @@ void Manifold::Impl::Finish() {
  * Sorts the vertices according to their Morton code.
  */
 void Manifold::Impl::SortVerts() {
+  ZoneScoped;
   const int numVert = NumVert();
   Vec<uint32_t> vertMorton(numVert);
   auto policy = autoPolicy(numVert);
@@ -338,6 +339,7 @@ void Manifold::Impl::SortVerts() {
  * also given.
  */
 void Manifold::Impl::ReindexVerts(const Vec<int>& vertNew2Old, int oldNumVert) {
+  ZoneScoped;
   Vec<int> vertOld2New(oldNumVert);
   scatter(autoPolicy(oldNumVert), countAt(0), countAt(NumVert()),
           vertNew2Old.begin(), vertOld2New.begin());
@@ -349,6 +351,7 @@ void Manifold::Impl::ReindexVerts(const Vec<int>& vertNew2Old, int oldNumVert) {
  * Removes unreferenced property verts and reindexes triProperties.
  */
 void Manifold::Impl::CompactProps() {
+  ZoneScoped;
   if (meshRelation_.numProp == 0) return;
 
   const int numVerts = meshRelation_.properties.size() / meshRelation_.numProp;
@@ -377,6 +380,7 @@ void Manifold::Impl::CompactProps() {
  */
 void Manifold::Impl::GetFaceBoxMorton(Vec<Box>& faceBox,
                                       Vec<uint32_t>& faceMorton) const {
+  ZoneScoped;
   faceBox.resize(NumTri());
   faceMorton.resize(NumTri());
   for_each_n(autoPolicy(NumTri()),
@@ -389,6 +393,7 @@ void Manifold::Impl::GetFaceBoxMorton(Vec<Box>& faceBox,
  * bounding box and Morton code arrays are also sorted accordingly.
  */
 void Manifold::Impl::SortFaces(Vec<Box>& faceBox, Vec<uint32_t>& faceMorton) {
+  ZoneScoped;
   Vec<int> faceNew2Old(NumTri());
   auto policy = autoPolicy(faceNew2Old.size());
   sequence(policy, faceNew2Old.begin(), faceNew2Old.end());
@@ -419,6 +424,7 @@ void Manifold::Impl::SortFaces(Vec<Box>& faceBox, Vec<uint32_t>& faceMorton) {
  * faces to gather into this.
  */
 void Manifold::Impl::GatherFaces(const Vec<int>& faceNew2Old) {
+  ZoneScoped;
   const int numTri = faceNew2Old.size();
   if (meshRelation_.triRef.size() == NumTri())
     Permute(meshRelation_.triRef, faceNew2Old);
@@ -441,6 +447,7 @@ void Manifold::Impl::GatherFaces(const Vec<int>& faceNew2Old) {
 }
 
 void Manifold::Impl::GatherFaces(const Impl& old, const Vec<int>& faceNew2Old) {
+  ZoneScoped;
   const int numTri = faceNew2Old.size();
   auto policy = autoPolicy(numTri);
 
@@ -510,6 +517,7 @@ MeshGL::MeshGL(const Mesh& mesh) {
  * will report a Status if it is not manifold.
  */
 bool MeshGL::Merge() {
+  ZoneScoped;
   std::multiset<std::pair<int, int>> openEdges;
 
   std::vector<int> merge(NumVert());
