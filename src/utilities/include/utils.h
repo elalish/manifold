@@ -31,6 +31,9 @@
 #else
 #define FrameMarkStart(x)
 #define FrameMarkEnd(x)
+// putting ZoneScoped in a function will instrument the function execution when
+// TRACY_ENABLE is set, which allows the profiler to record more accurate
+// timing.
 #define ZoneScoped
 #define ZoneScopedN(name)
 #endif
