@@ -144,6 +144,7 @@ Contributions are welcome! A lower barrier contribution is to simply make a PR t
 
 There is now basic support for the [Tracy profiler](https://github.com/wolfpld/tracy) for our tests.
 To enable tracing, compile with `-DTRACY_ENABLE=on` cmake option, and run the test with Tracy server running.
+To enable memory profiling in addition to tracing, compile with `-DTRACY_MEMORY_USAGE=ON` in addition to `-DTRACY_ENABLE=ON`.
 
 ### Fuzzing Support
 

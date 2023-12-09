@@ -172,6 +172,7 @@ CsgNodeType CsgLeafNode::GetNodeType() const { return CsgNodeType::Leaf; }
  */
 Manifold::Impl CsgLeafNode::Compose(
     const std::vector<std::shared_ptr<CsgLeafNode>> &nodes) {
+  ZoneScoped;
   float precision = -1;
   int numVert = 0;
   int numEdge = 0;
@@ -454,6 +455,7 @@ std::shared_ptr<CsgLeafNode> CsgOpNode::ToLeafNode() const {
 std::shared_ptr<Manifold::Impl> CsgOpNode::BatchBoolean(
     OpType operation,
     std::vector<std::shared_ptr<const Manifold::Impl>> &results) {
+  ZoneScoped;
   auto getImplPtr = GetImplPtr();
   ASSERT(operation != OpType::Subtract, logicErr,
          "BatchBoolean doesn't support Difference.");
@@ -529,6 +531,7 @@ std::shared_ptr<Manifold::Impl> CsgOpNode::BatchBoolean(
  * `BatchBoolean` instead of using `Compose` for non-intersecting manifolds.
  */
 void CsgOpNode::BatchUnion() const {
+  ZoneScoped;
   // INVARIANT: children_ is a vector of leaf nodes
   // this kMaxUnionSize is a heuristic to avoid the pairwise disjoint check
   // with O(n^2) complexity to take too long.

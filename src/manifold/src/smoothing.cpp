@@ -323,6 +323,7 @@ namespace manifold {
  */
 void Manifold::Impl::CreateTangents(
     const std::vector<Smoothness>& sharpenedEdges) {
+  ZoneScoped;
   const int numHalfedge = halfedge_.size();
   halfedgeTangent_.resize(numHalfedge);
 
@@ -426,6 +427,7 @@ void Manifold::Impl::CreateTangents(
  * refinement (smoothing).
  */
 Vec<Barycentric> Manifold::Impl::Subdivide(int n) {
+  ZoneScoped;
   if (n < 2) return Vec<Barycentric>();
   faceNormal_.resize(0);
   vertNormal_.resize(0);

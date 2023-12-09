@@ -151,6 +151,7 @@ struct ComputeVerts {
   }
 
   inline void operator()(Uint64 mortonCode) {
+    ZoneScoped;
     if (gridVerts.Full()) return;
 
     const glm::ivec4 gridIndex = DecodeMorton(mortonCode);
@@ -205,6 +206,7 @@ struct BuildTris {
   }
 
   void operator()(int idx) {
+    ZoneScoped;
     Uint64 basekey = gridVerts.KeyAt(idx);
     if (basekey == kOpen) return;
 
@@ -305,7 +307,6 @@ Mesh LevelSet(std::function<float(glm::vec3)> sdf, Box bounds, float edgeLength,
   Mesh out;
 
   const glm::vec3 dim = bounds.Size();
-  const float maxDim = std::max(dim[0], std::max(dim[1], dim[2]));
   const glm::ivec3 gridSize(dim / edgeLength);
   const glm::vec3 spacing = dim / (glm::vec3(gridSize));
 

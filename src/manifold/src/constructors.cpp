@@ -238,6 +238,7 @@ Manifold Manifold::Sphere(float radius, int circularSegments) {
 Manifold Manifold::Extrude(const CrossSection& crossSection, float height,
                            int nDivisions, float twistDegrees,
                            glm::vec2 scaleTop) {
+  ZoneScoped;
   auto polygons = crossSection.ToPolygons();
   if (polygons.size() == 0 || height <= 0.0f) {
     return Invalid();
@@ -323,6 +324,7 @@ Manifold Manifold::Extrude(const CrossSection& crossSection, float height,
  */
 Manifold Manifold::Revolve(const CrossSection& crossSection,
                            int circularSegments, float revolveDegrees) {
+  ZoneScoped;
   Polygons polygons = crossSection.ToPolygons();
 
   if (polygons.size() == 0) {
@@ -467,6 +469,7 @@ Manifold Manifold::Compose(const std::vector<Manifold>& manifolds) {
  * containing a copy of the original. It is the inverse operation of Compose().
  */
 std::vector<Manifold> Manifold::Decompose() const {
+  ZoneScoped;
   UnionFind<> uf(NumVert());
   // Graph graph;
   auto pImpl_ = GetCsgLeafNode().GetImpl();

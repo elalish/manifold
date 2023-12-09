@@ -276,6 +276,7 @@ namespace manifold {
  */
 Collider::Collider(const VecView<const Box>& leafBB,
                    const VecView<const uint32_t>& leafMorton) {
+  ZoneScoped;
   ASSERT(leafBB.size() == leafMorton.size(), userErr,
          "vectors must be the same length");
   int num_nodes = 2 * leafBB.size() - 1;
@@ -299,6 +300,7 @@ Collider::Collider(const VecView<const Box>& leafBB,
  */
 template <const bool selfCollision, const bool inverted, typename T>
 SparseIndices Collider::Collisions(const VecView<const T>& queriesIn) const {
+  ZoneScoped;
   // note that the length is 1 larger than the number of queries so the last
   // element can store the sum when using exclusive scan
   if (queriesIn.size() < kSequentialThreshold) {
@@ -336,6 +338,7 @@ SparseIndices Collider::Collisions(const VecView<const T>& queriesIn) const {
  * hierarchy.
  */
 void Collider::UpdateBoxes(const VecView<const Box>& leafBB) {
+  ZoneScoped;
   ASSERT(leafBB.size() == NumLeaves(), userErr,
          "must have the same number of updated boxes as original");
   // copy in leaf node Boxes
@@ -355,6 +358,7 @@ void Collider::UpdateBoxes(const VecView<const Box>& leafBB) {
  * axis-aligned, abort and return false to indicate recalculation is necessary.
  */
 bool Collider::Transform(glm::mat4x3 transform) {
+  ZoneScoped;
   bool axisAligned = true;
   for (int row : {0, 1, 2}) {
     int count = 0;

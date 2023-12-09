@@ -157,7 +157,7 @@ class Vec : public VecView<T> {
     if (this->size_ != 0) {
       this->ptr_ = reinterpret_cast<T *>(malloc(this->size_ * sizeof(T)));
       if (this->ptr_ == nullptr) throw std::bad_alloc();
-      TracyAllocS(ptr_, size_ * sizeof(T), 3);
+      TracyAllocS(this->ptr_, this->size_ * sizeof(T), 3);
       uninitialized_copy(policy, vec.begin(), vec.end(), this->ptr_);
     }
   }
@@ -169,7 +169,7 @@ class Vec : public VecView<T> {
     if (this->size_ != 0) {
       this->ptr_ = reinterpret_cast<T *>(malloc(this->size_ * sizeof(T)));
       if (this->ptr_ == nullptr) throw std::bad_alloc();
-      TracyAllocS(ptr_, size_ * sizeof(T), 3);
+      TracyAllocS(this->ptr_, this->size_ * sizeof(T), 3);
       uninitialized_copy(policy, vec.begin(), vec.end(), this->ptr_);
     }
   }
@@ -188,7 +188,7 @@ class Vec : public VecView<T> {
 
   ~Vec() {
     if (this->ptr_ != nullptr) {
-      TracyFreeS(ptr_, 3);
+      TracyFreeS(this->ptr_, 3);
       free(this->ptr_);
     }
     this->ptr_ = nullptr;
@@ -208,7 +208,7 @@ class Vec : public VecView<T> {
     if (this->size_ != 0) {
       this->ptr_ = reinterpret_cast<T *>(malloc(this->size_ * sizeof(T)));
       if (this->ptr_ == nullptr) throw std::bad_alloc();
-      TracyAllocS(ptr_, size_ * sizeof(T), 3);
+      TracyAllocS(this->ptr_, this->size_ * sizeof(T), 3);
       uninitialized_copy(policy, other.begin(), other.end(), this->ptr_);
     }
     return *this;
@@ -217,7 +217,7 @@ class Vec : public VecView<T> {
   Vec<T> &operator=(Vec<T> &&other) {
     if (&other == this) return *this;
     if (this->ptr_ != nullptr) {
-      TracyFreeS(ptr_, 3);
+      TracyFreeS(this->ptr_, 3);
       free(this->ptr_);
     }
     this->size_ = other.size_;
@@ -257,7 +257,7 @@ class Vec : public VecView<T> {
         uninitialized_copy(autoPolicy(this->size_), this->ptr_,
                            this->ptr_ + this->size_, newBuffer);
       if (this->ptr_ != nullptr) {
-        TracyFreeS(ptr_, 3);
+        TracyFreeS(this->ptr_, 3);
         free(this->ptr_);
       }
       this->ptr_ = newBuffer;
@@ -281,12 +281,12 @@ class Vec : public VecView<T> {
     if (this->size_ > 0) {
       newBuffer = reinterpret_cast<T *>(malloc(this->size_ * sizeof(T)));
       if (newBuffer == nullptr) throw std::bad_alloc();
-      TracyAllocS(newBuffer, size_ * sizeof(T), 3);
+      TracyAllocS(newBuffer, this->size_ * sizeof(T), 3);
       uninitialized_copy(autoPolicy(this->size_), this->ptr_,
                          this->ptr_ + this->size_, newBuffer);
     }
     if (this->ptr_ != nullptr) {
-      TracyFreeS(ptr_, 3);
+      TracyFreeS(this->ptr_, 3);
       free(this->ptr_);
     }
     this->ptr_ = newBuffer;
