@@ -250,6 +250,6 @@ CrossSection Manifold::Impl::Project() const {
     polys.push_back(simple);
   }
 
-  return CrossSection(polys);
+  return CrossSection(polys).Simplify(precision_);
 }
 }  // namespace manifold

@@ -194,13 +194,13 @@ TEST(Samples, Bracelet) {
   EXPECT_EQ(rect.max.x, box.max.x);
   EXPECT_EQ(rect.max.y, box.max.y);
   EXPECT_NEAR(projection.Area(), 649, 1);
+  EXPECT_EQ(projection.NumContour(), 2);
+  Manifold extrusion = Manifold::Extrude(projection, 1);
+  EXPECT_EQ(extrusion.NumDegenerateTris(), 0);
+  EXPECT_EQ(extrusion.Genus(), 1);
 
 #ifdef MANIFOLD_EXPORT
-  if (options.exportModels) {
-    ExportMesh("bracelet.glb", bracelet.GetMesh(), {});
-    ExportMesh("bracelet_projection.glb",
-               Manifold::Extrude(projection, 15).GetMesh(), {});
-  }
+  if (options.exportModels) ExportMesh("bracelet.glb", bracelet.GetMesh(), {});
 #endif
 }
 
@@ -259,12 +259,13 @@ TEST(Samples, Sponge4) {
   EXPECT_EQ(rect.max.x, box.max.x);
   EXPECT_EQ(rect.max.y, box.max.y);
   EXPECT_NEAR(projection.Area(), 0.535, 0.001);
+  Manifold extrusion = Manifold::Extrude(projection, 1);
+  EXPECT_EQ(extrusion.NumDegenerateTris(), 0);
+  EXPECT_EQ(extrusion.Genus(), 502);
 
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) {
     ExportMesh("mengerHalf.glb", cutSponge.first.GetMesh(), {});
-    ExportMesh("mengerHalf_projection.glb",
-               Manifold::Extrude(projection, 1).GetMesh(), {});
 
     const Mesh out = sponge.GetMesh();
     ExportOptions options;

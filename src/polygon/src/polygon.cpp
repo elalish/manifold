@@ -582,6 +582,8 @@ class EarClip {
   // Find the actual rightmost starts after degenerate removal. Also calculate
   // the polygon bounding boxes.
   void FindStart(VertItr first) {
+    const glm::vec2 origin = first->pos;
+
     VertItr start = first;
     float maxX = -std::numeric_limits<float>::infinity();
     Rect bBox;
@@ -591,7 +593,8 @@ class EarClip {
 
     auto AddPoint = [&](VertItr v) {
       bBox.Union(v->pos);
-      const double area1 = glm::determinant(glm::dmat2(v->pos, v->right->pos));
+      const double area1 =
+          glm::determinant(glm::dmat2(v->pos - origin, v->right->pos - origin));
       const double t1 = area + area1;
       areaCompensation += (area - t1) + area1;
       area = t1;
