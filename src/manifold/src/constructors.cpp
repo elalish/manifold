@@ -233,6 +233,7 @@ Manifold Manifold::Sphere(float radius, int circularSegments) {
  * bottom, interpolated linearly for the divisions in between.
  * @param scaleTop Amount to scale the top (independently in X and Y). If the
  * scale is {0, 0}, a pure cone is formed with only a single vertex at the top.
+ * Note that scale is applied after twist.
  * Default {1, 1}.
  */
 Manifold Manifold::Extrude(const CrossSection& crossSection, float height,
@@ -268,9 +269,9 @@ Manifold Manifold::Extrude(const CrossSection& crossSection, float height,
   for (int i = 1; i < nDivisions + 1; ++i) {
     float alpha = i / float(nDivisions);
     float phi = alpha * twistDegrees;
-    glm::mat2 transform(cosd(phi), sind(phi), -sind(phi), cosd(phi));
     glm::vec2 scale = glm::mix(glm::vec2(1.0f), scaleTop, alpha);
-    transform = transform * glm::mat2(scale.x, 0.0f, 0.0f, scale.y);
+    glm::mat2 rotation(cosd(phi), sind(phi), -sind(phi), cosd(phi));
+    glm::mat2 transform = glm::mat2(scale.x, 0.0f, 0.0f, scale.y) * rotation;
     int j = 0;
     int idx = 0;
     for (const auto& poly : polygons) {
