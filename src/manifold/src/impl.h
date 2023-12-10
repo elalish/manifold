@@ -115,8 +115,10 @@ struct Manifold::Impl {
 
   // face_op.cu
   void Face2Tri(const Vec<int>& faceEdge, const Vec<TriRef>& halfedgeRef);
-  PolygonsIdx Face2Polygons(int face, glm::mat3x2 projection,
-                            const Vec<int>& faceEdge) const;
+  PolygonsIdx Face2Polygons(VecView<Halfedge>::IterC start,
+                            VecView<Halfedge>::IterC end,
+                            glm::mat3x2 projection) const;
+  CrossSection Project() const;
 
   // edge_op.cu
   void SimplifyTopology();
