@@ -193,8 +193,9 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
 }
 
 /**
- * For the input face index, return a set of 2D polygons formed by the input
- * projection of the vertices.
+ * Returns a set of 2D polygons formed by the input projection of the vertices
+ * of the list of Halfedges, which must be an even-manifold, meaning each vert
+ * must be referenced the same number of times as a startVert and endVert.
  */
 PolygonsIdx Manifold::Impl::Face2Polygons(VecView<Halfedge>::IterC start,
                                           VecView<Halfedge>::IterC end,
