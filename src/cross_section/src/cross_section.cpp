@@ -146,6 +146,18 @@ void decompose_hole(const C2::PolyTreeD* outline,
   }
 }
 
+void flatten(const C2::PolyTreeD* tree, C2::PathsD& polys, int i) {
+  auto n_outlines = tree->Count();
+  if (i < n_outlines) {
+    auto outline = tree->Child(i);
+    flatten(outline, polys, 0);
+    polys.push_back(outline->Polygon());
+    if (i < n_outlines - 1) {
+      flatten(tree, polys, i + 1);
+    }
+  }
+}
+
 bool V2Lesser(glm::vec2 a, glm::vec2 b) {
   if (a.x == b.x) return a.y < b.y;
   return a.x < b.x;
@@ -585,7 +597,28 @@ CrossSection CrossSection::Warp(
  * offseting operations are to be performed, which would compound the issue.
  */
 CrossSection CrossSection::Simplify(double epsilon) const {
-  auto ps = SimplifyPaths(GetPaths()->paths_, epsilon, false);
+  C2::PolyTreeD tree;
+  C2::BooleanOp(C2::ClipType::Union, C2::FillRule::Positive, GetPaths()->paths_,
+                C2::PathsD(), tree, precision_);
+
+  C2::PathsD polys;
+  flatten(&tree, polys, 0);
+
+  // Filter out contours less than epsilon wide.
+  C2::PathsD filtered;
+  for (C2::PathD poly : polys) {
+    auto area = C2::Area(poly);
+    Rect box;
+    for (auto vert : poly) {
+      box.Union(glm::vec2(vert.x, vert.y));
+    }
+    glm::vec2 size = box.Size();
+    if (glm::abs(area) > glm::max(size.x, size.y) * epsilon) {
+      filtered.push_back(poly);
+    }
+  }
+
+  auto ps = SimplifyPaths(filtered, epsilon, true);
   return CrossSection(shared_paths(ps));
 }
 
