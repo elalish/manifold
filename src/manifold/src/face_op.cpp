@@ -18,6 +18,7 @@
 #include <tbb/concurrent_map.h>
 #endif
 #include <map>
+#include <set>
 
 #include "impl.h"
 #include "polygon.h"
@@ -224,6 +225,68 @@ PolygonsIdx Manifold::Impl::Face2Polygons(VecView<Halfedge>::IterC start,
     vert_edge.erase(result);
   }
   return polys;
+}
+
+CrossSection Manifold::Impl::Slice(float height) const {
+  Box plane = bBox_;
+  plane.min.z = plane.max.z = height;
+  Vec<Box> query;
+  query.push_back(plane);
+  const SparseIndices collisions =
+      collider_.Collisions<false, false>(query.cview());
+
+  std::set<int> tris;
+  for (int i = 0; i < collisions.size(); ++i) {
+    const int tri = collisions.Get(i, 1);
+    float min = std::numeric_limits<float>::infinity();
+    float max = -std::numeric_limits<float>::infinity();
+    for (const int j : {0, 1, 2}) {
+      const float z = vertPos_[halfedge_[3 * tri + j].startVert].z;
+      min = glm::min(min, z);
+      max = glm::max(max, z);
+    }
+
+    if (min <= height && max > height) {
+      tris.insert(tri);
+    }
+  }
+
+  Polygons polys;
+  while (!tris.empty()) {
+    const int startTri = *tris.begin();
+    SimplePolygon poly;
+
+    int k = 0;
+    for (const int j : {0, 1, 2}) {
+      if (vertPos_[halfedge_[3 * startTri + j].startVert].z > height &&
+          vertPos_[halfedge_[3 * startTri + Next3(j)].startVert].z <= height) {
+        k = Next3(j);
+        break;
+      }
+    }
+
+    int tri = startTri;
+    do {
+      tris.erase(tris.find(tri));
+      if (vertPos_[halfedge_[3 * tri + k].endVert].z <= height) {
+        k = Next3(k);
+      }
+
+      Halfedge up = halfedge_[3 * tri + k];
+      const glm::vec3 below = vertPos_[up.startVert];
+      const glm::vec3 above = vertPos_[up.endVert];
+      const float a = (height - below.z) / (above.z - below.z);
+      poly.push_back(glm::vec2(glm::mix(below, above, a)));
+
+      const int pair = up.pairedHalfedge;
+      tri = pair / 3;
+      k = Next3(pair % 3);
+    } while (tri != startTri);
+
+    polys.push_back(poly);
+  }
+
+  return CrossSection(polys);
 }
 
 CrossSection Manifold::Impl::Project() const {

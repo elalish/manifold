@@ -780,6 +780,14 @@ Manifold Manifold::TrimByPlane(glm::vec3 normal, float originOffset) const {
 }
 
 /**
+ * Returns the cross section of this object parallel to the X-Y plane at the
+ * specified Z height, defaulting to zero.
+ */
+CrossSection Manifold::Slice(float height) const {
+  return GetCsgLeafNode().GetImpl()->Slice(height);
+}
+
+/**
  * Returns a cross section representing the projection of this object onto the
  * X-Y plane.
  */
