@@ -306,12 +306,12 @@ require(['vs/editor/editor.main'], async function() {
   if (window.location.hash.length > 0) {
     const name = unescape(window.location.hash.substring(1));
     switchTo(name);
-  } else if (params.get("url") != null) {
-    console.log(`Fetching ${params.get("url")}`);
+  } else if (params.get('url') != null) {
+    console.log(`Fetching ${params.get('url')}`);
     autoExecute = false;
-    const response = await fetch(params.get("url"));
+    const response = await fetch(params.get('url'));
     const code = await response.text();
-    const name = uniqueName(params.get("name") ?? "New Script");
+    const name = uniqueName(params.get('name') ?? 'New Script');
     setScript(name, code);
     const nextButton = createDropdownItem(name);
     newButton.insertAdjacentElement('afterend', nextButton.parentElement);
