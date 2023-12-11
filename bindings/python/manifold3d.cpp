@@ -799,7 +799,7 @@ NB_MODULE(manifold3d, m) {
              "join angle is less that 90 degrees. The squared edge will be at "
              "exactly the offset distance from the join vertex.")
       .value(
-          "Round", CrossSection::JoinType::Square,
+          "Round", CrossSection::JoinType::Round,
           "Rounding is applied to all joins that have convex external angles, "
           "and it maintains the exact offset distance from the join vertex.")
       .value(
@@ -924,7 +924,7 @@ NB_MODULE(manifold3d, m) {
           "intersections are not included in the result."
           "\n\n"
           ":param warpFunc: A function that modifies a given vertex position.")
-      .def("simplify", &CrossSection::Simplify,
+      .def("simplify", &CrossSection::Simplify, nb::arg("epsilon") = 1e-6,
            "Remove vertices from the contours in this CrossSection that are "
            "less than the specified distance epsilon from an imaginary line "
            "that passes through its two adjacent vertices. Near duplicate "
@@ -939,7 +939,7 @@ NB_MODULE(manifold3d, m) {
            "which would compound the issue.")
       .def("offset", &CrossSection::Offset, nb::arg("delta"),
            nb::arg("join_type"), nb::arg("miter_limit") = 2.0,
-           nb::arg("arc_tolerance") = 0.0,
+           nb::arg("circular_segments") = 0.0,
            "Inflate the contours in CrossSection by the specified delta, "
            "handling corners according to the given JoinType."
            "\n\n"
@@ -955,7 +955,7 @@ NB_MODULE(manifold3d, m) {
            "MiterLimit](http://www.angusj.com/clipper2/Docs/Units/"
            "Clipper.Offset/Classes/ClipperOffset/Properties/MiterLimit.htm) "
            "page for a visual example.\n"
-           ":param circularSegments: Number of segments per 360 degrees of "
+           ":param circular_segments: Number of segments per 360 degrees of "
            "<B>JoinType::Round</B> corners (roughly, the number of vertices "
            "that will be added to each contour). Default is calculated by the "
            "static Quality defaults according to the radius.")
