@@ -111,6 +111,7 @@ function createDropdownItem(name) {
   button.onclick = function() {
     saveCurrent();
     window.location.hash = `#${label.textContent}`;
+    window.location.search = '';
     switchTo(label.textContent);
   };
   // Stop text input spaces from triggering the button
@@ -301,10 +302,21 @@ require(['vs/editor/editor.main'], async function() {
       addEdit(button);
     }
   }
+  const params = new URLSearchParams(window.location.search);
   if (window.location.hash.length > 0) {
     const name = unescape(window.location.hash.substring(1));
-    if (exampleFunctions.get(name) != null || getScript(name) != null)
-      switchTo(name);
+    switchTo(name);
+  } else if (params.get("url") != null) {
+    console.log(`Fetching ${params.get("url")}`);
+    autoExecute = false;
+    const response = await fetch(params.get("url"));
+    const code = await response.text();
+    const name = uniqueName(params.get("name") ?? "New Script");
+    setScript(name, code);
+    const nextButton = createDropdownItem(name);
+    newButton.insertAdjacentElement('afterend', nextButton.parentElement);
+    addEdit(nextButton);
+    switchTo(name);
   } else {
     switchTo(currentName);
     window.location.hash = `#${currentName}`;
