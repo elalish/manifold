@@ -17,8 +17,7 @@
 #define TBB_PREVIEW_CONCURRENT_ORDERED_CONTAINERS 1
 #include <tbb/concurrent_map.h>
 #endif
-#include <map>
-#include <set>
+#include <unordered_set>
 
 #include "impl.h"
 #include "polygon.h"
@@ -235,7 +234,7 @@ CrossSection Manifold::Impl::Slice(float height) const {
   const SparseIndices collisions =
       collider_.Collisions<false, false>(query.cview());
 
-  std::set<int> tris;
+  std::unordered_set<int> tris;
   for (int i = 0; i < collisions.size(); ++i) {
     const int tri = collisions.Get(i, 1);
     float min = std::numeric_limits<float>::infinity();

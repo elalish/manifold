@@ -781,15 +781,17 @@ Manifold Manifold::TrimByPlane(glm::vec3 normal, float originOffset) const {
 
 /**
  * Returns the cross section of this object parallel to the X-Y plane at the
- * specified Z height, defaulting to zero.
+ * specified Z height, defaulting to zero. Using a height equal to the bottom of
+ * the bounding box will return the bottom faces, while using a height equal to
+ * the top of the bounding box will return empty.
  */
 CrossSection Manifold::Slice(float height) const {
   return GetCsgLeafNode().GetImpl()->Slice(height);
 }
 
 /**
- * Returns a cross section representing the projection of this object onto the
- * X-Y plane.
+ * Returns a cross section representing the projected outline of this object
+ * onto the X-Y plane.
  */
 CrossSection Manifold::Project() const {
   return GetCsgLeafNode().GetImpl()->Project();
