@@ -202,6 +202,17 @@ ManifoldManifold *manifold_trim_by_plane(void *mem, ManifoldManifold *m,
   return to_c(new (mem) Manifold(trimmed));
 }
 
+ManifoldCrossSection *manifold_slice(void *mem, ManifoldManifold *m,
+                                     float height) {
+  auto poly = from_c(m)->Slice(height);
+  return to_c(new (mem) CrossSection(poly));
+}
+
+ManifoldCrossSection *manifold_project(void *mem, ManifoldManifold *m) {
+  auto poly = from_c(m)->Project();
+  return to_c(new (mem) CrossSection(poly));
+}
+
 ManifoldManifold *manifold_hull(void *mem, ManifoldManifold *m) {
   auto hulled = from_c(m)->Hull();
   return to_c(new (mem) Manifold(hulled));
