@@ -1028,18 +1028,20 @@ NB_MODULE(manifold3d, m) {
           "single vertex at the top. Default (1, 1).")
       .def(
           "revolve",
-          [](CrossSection self, int circularSegments = 0) {
-            return Manifold::Revolve(self, circularSegments);
+          [](CrossSection self, int circularSegments = 0,
+             float revolveDegrees = 360.0f) {
+            return Manifold::Revolve(self, circularSegments, revolveDegrees);
           },
-          nb::arg("circular_segments") = 0,
+          nb::arg("circular_segments") = 0, nb::arg("revolve_degrees") = 360.0,
           "Constructs a manifold from the set of polygons by revolving this "
           "cross-section around its Y-axis and then setting this as the Z-axis "
           "of the resulting manifold. If the polygons cross the Y-axis, only "
           "the part on the positive X side is used. Geometrically valid input "
           "will result in geometrically valid output.\n"
           "\n"
-          ":param circularSegments: Number of segments along its diameter. "
-          "Default is calculated by the static Defaults.")
+          ":param circular_segments: Number of segments along its diameter. "
+          "Default is calculated by the static Defaults.\n"
+          ":param revolve_degrees: rotation angle for the sweep.")
       .def_static(
           "square",
           [](Float2 dims, bool center) {
