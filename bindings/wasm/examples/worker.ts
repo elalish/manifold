@@ -95,15 +95,13 @@ function addMembers(
   const cls = module[className];
   const obj = areStatic ? cls : cls.prototype;
   for (const name of methodNames) {
-    if (name != 'cylinder') {
-      const originalFn = obj[name];
-      obj[name] = function(...args: any) {
-        //@ts-ignore
-        const result = originalFn(...args);
-        memoryRegistry.push(result);
-        return result;
-      };
-    }
+    const originalFn = obj[name];
+    obj[name] = function(...args: any) {
+      //@ts-ignore
+      const result = originalFn(...args);
+      memoryRegistry.push(result);
+      return result;
+    };
   }
 }
 
