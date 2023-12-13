@@ -527,6 +527,14 @@ TEST(Manifold, Transform) {
   Identical(cube.GetMesh(), cube2.GetMesh());
 }
 
+TEST(Manifold, Slice) {
+  Manifold cube = Manifold::Cube();
+  CrossSection bottom = cube.Slice();
+  CrossSection top = cube.Slice(1);
+  EXPECT_EQ(bottom.Area(), 1);
+  EXPECT_EQ(top.Area(), 0);
+}
+
 TEST(Manifold, MeshRelation) {
   Mesh gyroidMesh = Gyroid();
   MeshGL gyroidMeshGL = WithIndexColors(gyroidMesh);

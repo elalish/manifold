@@ -237,6 +237,7 @@ class Manifold {
   /** @name 2D from 3D
    */
   ///@{
+  CrossSection Slice(float height = 0) const;
   CrossSection Project() const;
   ///@}
 

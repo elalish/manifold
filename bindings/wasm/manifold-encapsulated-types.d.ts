@@ -685,6 +685,22 @@ export class Manifold {
    */
   trimByPlane(normal: Vec3, originOffset: number): Manifold;
 
+  /**
+   * Returns the cross section of this object parallel to the X-Y plane at the
+   * specified height. Using a height equal to the bottom
+   * of the bounding box will return the bottom faces, while using a height
+   * equal to the top of the bounding box will return empty.
+   *
+   * @param height Z-level of slice.
+   */
+  slice(height: number): CrossSection;
+
+  /**
+   * Returns a cross section representing the projected outline of this object
+   * onto the X-Y plane.
+   */
+  project(): CrossSection;
+
   // Convex Hulls
 
   /**

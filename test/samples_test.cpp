@@ -199,6 +199,12 @@ TEST(Samples, Bracelet) {
   EXPECT_EQ(extrusion.NumDegenerateTris(), 0);
   EXPECT_EQ(extrusion.Genus(), 1);
 
+  CrossSection slice = bracelet.Slice();
+  EXPECT_EQ(slice.NumContour(), 2);
+  EXPECT_NEAR(slice.Area(), 230.6, 0.1);
+  extrusion = Manifold::Extrude(slice, 1);
+  EXPECT_EQ(extrusion.Genus(), 1);
+
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) ExportMesh("bracelet.glb", bracelet.GetMesh(), {});
 #endif
@@ -216,9 +222,16 @@ TEST(Samples, GyroidModule) {
   const float precision = gyroid.Precision();
   EXPECT_NEAR(bounds.min.z, 0, precision);
   EXPECT_NEAR(bounds.max.z, size * glm::sqrt(2.0f), precision);
+
+  CrossSection slice = gyroid.Slice(5);
+  EXPECT_EQ(slice.NumContour(), 4);
+  EXPECT_NEAR(slice.Area(), 121.9, 0.1);
+  Manifold extrusion = Manifold::Extrude(slice, 1);
+  EXPECT_EQ(extrusion.Genus(), -3);
+
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels)
-    ExportMesh("gyroidModule.gltf", gyroid.GetMesh(), {});
+    ExportMesh("gyroidModule.glb", gyroid.GetMesh(), {});
 #endif
 }
 
