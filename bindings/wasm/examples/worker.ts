@@ -61,7 +61,7 @@ const manifoldStaticFunctions = [
 const manifoldMemberFunctions = [
   'add', 'subtract', 'intersect', 'decompose', 'warp', 'transform', 'translate',
   'rotate', 'scale', 'mirror', 'refine', 'setProperties', 'asOriginal',
-  'trimByPlane', 'split', 'splitByPlane', 'hull'
+  'trimByPlane', 'split', 'splitByPlane', 'slice', 'project', 'hull'
 ];
 // CrossSection static methods (that return a new cross-section)
 const crossSectionStaticFunctions = [
@@ -95,15 +95,13 @@ function addMembers(
   const cls = module[className];
   const obj = areStatic ? cls : cls.prototype;
   for (const name of methodNames) {
-    if (name != 'cylinder') {
-      const originalFn = obj[name];
-      obj[name] = function(...args: any) {
-        //@ts-ignore
-        const result = originalFn(...args);
-        memoryRegistry.push(result);
-        return result;
-      };
-    }
+    const originalFn = obj[name];
+    obj[name] = function(...args: any) {
+      //@ts-ignore
+      const result = originalFn(...args);
+      memoryRegistry.push(result);
+      return result;
+    };
   }
 }
 

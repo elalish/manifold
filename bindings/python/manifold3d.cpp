@@ -464,6 +464,19 @@ NB_MODULE(manifold3d, m) {
           "vector from the plane.\n"
           ":param originOffset: The distance of the plane from the origin in "
           "the direction of the normal vector.")
+      .def(
+          "slice",
+          [](Manifold &self, float height) { return self.Slice(height); },
+          nb::arg("height"),
+          "Returns the cross section of this object parallel to the X-Y plane "
+          "at the specified height. Using a height equal to the bottom of the "
+          "bounding box will return the bottom faces, while using a height "
+          "equal to the top of the bounding box will return empty."
+          "\n\n"
+          ":param height: The Z-level of the slice, defaulting to zero.")
+      .def("project", &Manifold::Project,
+           "Returns a cross section representing the projected outline of this "
+           "object onto the X-Y plane.")
       .def("status", &Manifold::Status,
            "Returns the reason for an input Mesh producing an empty Manifold. "
            "This Status only applies to Manifolds newly-created from an input "
