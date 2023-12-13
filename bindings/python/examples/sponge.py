@@ -24,7 +24,7 @@ def fractal(holes, hole, w, position, depth, maxDepth):
 
 
 def posColors(pos, _):
-    return [1 - p / 2 for p in pos] + [1.0]
+    return [-p + 0.5 for p in pos] + [1.0]
 
 
 def run(n=1):

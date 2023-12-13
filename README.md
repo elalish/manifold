@@ -7,19 +7,22 @@
 
 [OpenSCAD](https://openscad.org/), [IFCjs](https://ifcjs.github.io/info/), [Grid.Space](https://grid.space/), and [OCADml](https://github.com/OCADml/OManifold) have all integrated our Manifold geometry kernel! Why? Because its reliability is guaranteed and it's 1,000 times faster than other libraries. See our [usage](https://github.com/elalish/manifold/discussions/340) and [performance](https://github.com/elalish/manifold/discussions/383) discussions for all the latest and to add your own projects & analyses.
 
-## [ManifoldCAD.org](https://manifoldcad.org)
+## Manifold Frontend Sandboxes
 
-If you like OpenSCAD / JSCAD, you might also like ManifoldCAD - our own solid modelling web app. Our WASM is not multithreaded yet, but it's still quite fast and a good way to test out our Manifold library.
+### [ManifoldCAD.org](https://manifoldcad.org)
+
+If you like OpenSCAD / JSCAD, you might also like ManifoldCAD - our own solid modelling web app where you script in JS/TS. This uses our npm package, [manifold-3d](https://www.npmjs.com/package/manifold-3d), built via WASM. It's not quite as fast as our raw C++, but it's hard to beat for interoperability.
+
+*Note for Firefox users: If you find the editor is stuck on **Loading...**, setting
+`dom.workers.modules.enabled: true` in your `about:config`, as mentioned in
+[issue#328](https://github.com/elalish/manifold/issues/328#issuecomment-1473847102)
+may solve the problem.*
+
+### [Python Colab Example](https://colab.research.google.com/drive/1VxrFYHPSHZgUbl9TeWzCeovlpXrPQ5J5?usp=sharing)
+
+If you prefer Python to JS/TS, make your own copy of the example notebook above. It demonstrates interop between our [`manifold3d`](https://pypi.org/project/manifold3d/) PyPI library and the popular [`trimesh`](https://pypi.org/project/trimesh/) library, including showing the interactive model right in the notebook and saving 3D model output.
 
 ![A metallic Menger sponge](https://elalish.github.io/manifold/samples/models/mengerSponge3.webp "A metallic Menger sponge")
-
-### Note for Firefox users
-
-If you find the editor is stuck on **Loading...**, setting
-`dom.workers.modules.enabled: true` in your `about:config`, as mentioned in the
-discussion of the
-[issue#328](https://github.com/elalish/manifold/issues/328#issuecomment-1473847102)
-of this repository may solve the problem.
 
 # Manifold
 
