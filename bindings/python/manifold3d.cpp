@@ -24,6 +24,7 @@
 #include "nanobind/stl/optional.h"
 #include "nanobind/stl/tuple.h"
 #include "nanobind/stl/vector.h"
+#include "polygon.h"
 #include "sdf.h"
 
 template <>
@@ -65,6 +66,36 @@ struct nanobind::detail::type_caster<glm::vec3> {
 };
 
 namespace nb = nanobind;
+
+// helper to convert std::vector<glm::vec*> to numpy
+template <class T, int N, glm::qualifier Precision>
+nb::ndarray<nb::numpy, T, nb::shape<nb::any, N>> to_numpy(
+    std::vector<glm::vec<N, T, Precision>> const &vecvec) {
+  // transfer ownership to PyObject
+  T *buffer = new T[vecvec.size() * N];
+  nb::capsule mem_mgr(buffer, [](void *p) noexcept { delete[](T *) p; });
+  for (int i = 0; i < vecvec.size(); i++) {
+    for (int j = 0; j < N; j++) {
+      buffer[i * N + j] = vecvec[i][j];
+    }
+  }
+  return {buffer, {vecvec.size(), N}, mem_mgr};
+}
+
+// helper to convert numpy to std::vector<glm::vec*>
+template <class T, size_t N, glm::qualifier Precision = glm::defaultp>
+std::vector<glm::vec<N, T, Precision>> to_glm_vector(
+    nb::ndarray<nb::numpy, T, nb::shape<nb::any, N>> const &arr) {
+  std::vector<glm::vec<N, T, Precision>> out;
+  out.reserve(arr.shape(0));
+  for (int i = 0; i < arr.shape(0); i++) {
+    out.emplace_back();
+    for (int j = 0; j < N; j++) {
+      out.back()[j] = arr(i, j);
+    }
+  }
+  return out;
+}
 
 using namespace manifold;
 
@@ -114,6 +145,22 @@ NB_MODULE(manifold3d, m) {
         "\n\n"
         ":param radius: For a given radius of circle, determine how many "
         "default");
+
+  m.def(
+      "triangulate",
+      [](std::vector<nb::ndarray<nb::numpy, float, nb::shape<nb::any, 2>>>
+             polys) {
+        std::vector<std::vector<glm::vec2>> polys_vec;
+        polys_vec.reserve(polys.size());
+        for (auto &numpy : polys) {
+          polys_vec.push_back(to_glm_vector(numpy));
+        }
+
+        return to_numpy(Triangulate(polys_vec));
+      },
+      "Given a list polygons (each polygon shape=(N,2) dtype=float), "
+      "returns the indices of the triangle vertices as a "
+      "numpy.ndarray(shape=(N, 3), dtype=np.uint32).");
 
   nb::class_<Manifold>(m, "Manifold")
       .def(nb::init<>())
@@ -728,11 +775,6 @@ NB_MODULE(manifold3d, m) {
                    }, nb::rv_policy::reference_internal)
       .def_prop_ro("halfedge_tangent",
                    [](const MeshGL &self) {
-                     float *data = new float[self.halfedgeTangent.size()];
-                     std::copy(self.halfedgeTangent.data(),
-                               self.halfedgeTangent.data() +
-                                   self.halfedgeTangent.size(),
-                               data);
                      return nb::ndarray<nb::numpy, const float, nb::c_contig>(
                          self.halfedgeTangent.data(), {self.halfedgeTangent.size() / 12, 3, 4});
                    }, nb::rv_policy::reference_internal)
@@ -869,7 +911,7 @@ NB_MODULE(manifold3d, m) {
            "Does the CrossSection contain any contours?")
       .def(
           "translate",
-          [](CrossSection self, Float2 v) {
+          [](CrossSection &self, Float2 v) {
             return self.Translate({std::get<0>(v), std::get<1>(v)});
           },
           "Move this CrossSection in space. This operation can be chained. "
@@ -884,7 +926,7 @@ NB_MODULE(manifold3d, m) {
            ":param degrees: degrees about the Z-axis to rotate.")
       .def(
           "scale",
-          [](CrossSection self, Float2 s) {
+          [](CrossSection &self, Float2 s) {
             return self.Scale({std::get<0>(s), std::get<1>(s)});
           },
           "Scale this CrossSection in space. This operation can be chained. "
@@ -893,7 +935,7 @@ NB_MODULE(manifold3d, m) {
           ":param v: The vector to multiply every vertex by per component.")
       .def(
           "mirror",
-          [](CrossSection self, Float2 ax) {
+          [](CrossSection &self, Float2 ax) {
             return self.Mirror({std::get<0>(ax), std::get<1>(ax)});
           },
           "Mirror this CrossSection over the arbitrary axis described by the "
@@ -904,7 +946,7 @@ NB_MODULE(manifold3d, m) {
           ":param ax: the axis to be mirrored over")
       .def(
           "transform",
-          [](CrossSection self, nb::ndarray<float, nb::shape<2, 3>> &mat) {
+          [](CrossSection &self, nb::ndarray<float, nb::shape<2, 3>> &mat) {
             if (mat.ndim() != 2 || mat.shape(0) != 2 || mat.shape(1) != 3)
               throw std::runtime_error("Invalid matrix shape, expected (2, 3)");
             glm::mat3x2 mat_glm;
@@ -923,7 +965,7 @@ NB_MODULE(manifold3d, m) {
           ":param m: The affine transform matrix to apply to all the vertices.")
       .def(
           "warp",
-          [](CrossSection self, const std::function<Float2(Float2)> &f) {
+          [](CrossSection &self, const std::function<Float2(Float2)> &f) {
             return self.Warp([&f](glm::vec2 &v) {
               Float2 fv = f(std::make_tuple(v.x, v.y));
               v.x = std::get<0>(fv);
@@ -998,25 +1040,18 @@ NB_MODULE(manifold3d, m) {
            "with zero or more holes.")
       .def(
           "to_polygons",
-          [](CrossSection self) {
-            const Polygons &data = self.ToPolygons();
+          [](CrossSection &self) {
             nb::list polygon_list;
-            for (int i = 0; i < data.size(); ++i) {
-              nb::list polygon;
-              for (int j = 0; j < data[i].size(); ++j) {
-                auto f = data[i][j];
-                nb::tuple vertex = nb::make_tuple(f[0], f[1]);
-                polygon.append(vertex);
-              }
-              polygon_list.append(polygon);
+            for (auto &poly : self.ToPolygons()) {
+              polygon_list.append(to_numpy(poly));
             }
             return polygon_list;
           },
-          "Returns the vertices of the cross-section's polygons as a "
-          "List[List[Tuple[float, float]]].")
+          "Returns the vertices of the cross-section's polygons "
+          "as a List[ndarray(shape=(*,2), dtype=float)].")
       .def(
           "extrude",
-          [](CrossSection self, float height, int nDivisions = 0,
+          [](CrossSection &self, float height, int nDivisions = 0,
              float twistDegrees = 0.0f,
              Float2 scaleTop = std::make_tuple(1.0f, 1.0f)) {
             glm::vec2 scaleTopVec(std::get<0>(scaleTop), std::get<1>(scaleTop));
@@ -1041,7 +1076,7 @@ NB_MODULE(manifold3d, m) {
           "single vertex at the top. Default (1, 1).")
       .def(
           "revolve",
-          [](CrossSection self, int circularSegments = 0,
+          [](CrossSection &self, int circularSegments = 0,
              float revolveDegrees = 360.0f) {
             return Manifold::Revolve(self, circularSegments, revolveDegrees);
           },

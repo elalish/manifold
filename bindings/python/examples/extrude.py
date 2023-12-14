@@ -10,7 +10,7 @@ def run():
     cross_section = CrossSection(polygons_points)
     polygons = cross_section.to_polygons()
     polygon = polygons[0]
-    if set(polygon) != set(polygon_points):
+    if set([tuple(p) for p in polygon]) != set(polygon_points):
         raise Exception(
             f"polygon={polygon} differs from polygon_points={polygon_points}"
         )
