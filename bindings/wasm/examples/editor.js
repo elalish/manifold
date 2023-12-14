@@ -213,10 +213,7 @@ function newItem(code, scriptName = undefined) {
   const nextButton = createDropdownItem(name);
   newButton.insertAdjacentElement('afterend', nextButton.parentElement);
   addEdit(nextButton);
-  return {
-    button: nextButton,
-    name
-  };
+  return {button: nextButton, name};
 };
 newButton.onclick = function() {
   newItem('').button.click();
