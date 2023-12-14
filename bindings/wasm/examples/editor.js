@@ -207,16 +207,19 @@ function addEdit(button) {
 }
 
 const newButton = document.querySelector('#new');
-function newItem(code) {
-  const name = uniqueName('New Script');
+function newItem(code, scriptName = undefined) {
+  const name = uniqueName(scriptName ?? 'New Script');
   setScript(name, code);
   const nextButton = createDropdownItem(name);
   newButton.insertAdjacentElement('afterend', nextButton.parentElement);
   addEdit(nextButton);
-  nextButton.click();
+  return {
+    button: nextButton,
+    name
+  };
 };
 newButton.onclick = function() {
-  newItem('');
+  newItem('').button.click();
 };
 
 const runButton = document.querySelector('#compile');
@@ -306,17 +309,12 @@ require(['vs/editor/editor.main'], async function() {
   if (window.location.hash.length > 0) {
     const name = unescape(window.location.hash.substring(1));
     switchTo(name);
-  } else if (params.get('url') != null) {
-    console.log(`Fetching ${params.get('url')}`);
+  } else if (params.get('script') != null) {
+    console.log(`Fetching ${params.get('script')}`);
     autoExecute = false;
-    const response = await fetch(params.get('url'));
+    const response = await fetch(params.get('script'));
     const code = await response.text();
-    const name = uniqueName(params.get('name') ?? 'New Script');
-    setScript(name, code);
-    const nextButton = createDropdownItem(name);
-    newButton.insertAdjacentElement('afterend', nextButton.parentElement);
-    addEdit(nextButton);
-    switchTo(name);
+    switchTo(newItem(code, params.get('name')).name);
   } else {
     switchTo(currentName);
     window.location.hash = `#${currentName}`;
@@ -334,7 +332,7 @@ require(['vs/editor/editor.main'], async function() {
     }
     if (isExample) {
       const cursor = editor.getPosition();
-      newItem(editor.getValue());
+      newItem(editor.getValue()).button.click();
       editor.setPosition(cursor);
     }
   });
