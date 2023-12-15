@@ -24,18 +24,18 @@
 using namespace manifold;
 
 struct CubeVoid {
-  float operator()(glm::vec3 p) const {
-    const glm::vec3 min = p + glm::vec3(1);
-    const glm::vec3 max = glm::vec3(1) - p;
-    const float min3 = glm::min(min.x, glm::min(min.y, min.z));
-    const float max3 = glm::min(max.x, glm::min(max.y, max.z));
-    return -1.0f * glm::min(min3, max3);
+  double operator()(glm::dvec3 p) const {
+    const glm::dvec3 min = p + glm::dvec3(1);
+    const glm::dvec3 max = glm::dvec3(1) - p;
+    const double min3 = glm::min(min.x, glm::min(min.y, min.z));
+    const double max3 = glm::min(max.x, glm::min(max.y, max.z));
+    return -1.0 * glm::min(min3, max3);
   }
 };
 
 struct Layers {
-  float operator()(glm::vec3 p) const {
-    int a = glm::mod(glm::round(2 * p.z), 4.0f);
+  double operator()(glm::dvec3 p) const {
+    int a = glm::mod(glm::round(2 * p.z), 4.0);
     return a == 0 ? 1 : (a == 2 ? -1 : 0);
   }
 };
@@ -54,21 +54,21 @@ TEST(SDF, CubeVoid) {
 }
 
 TEST(SDF, Bounds) {
-  const float size = 4;
-  const float edgeLength = 0.5;
+  const double size = 4;
+  const double edgeLength = 0.5;
 
   Mesh levelSet = LevelSet(
-      CubeVoid(), {glm::vec3(-size / 2), glm::vec3(size / 2)}, edgeLength);
+      CubeVoid(), {glm::dvec3(-size / 2), glm::dvec3(size / 2)}, edgeLength);
   Manifold cubeVoid(levelSet);
   Box bounds = cubeVoid.BoundingBox();
-  const float precision = cubeVoid.Precision();
+  const double precision = cubeVoid.Precision();
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) ExportMesh("cubeVoid.gltf", levelSet, {});
 #endif
 
   EXPECT_EQ(cubeVoid.Status(), Manifold::Error::NoError);
   EXPECT_EQ(cubeVoid.Genus(), -1);
-  const float outerBound = size / 2 + edgeLength / 2;
+  const double outerBound = size / 2 + edgeLength / 2;
   EXPECT_NEAR(bounds.min.x, -outerBound, precision);
   EXPECT_NEAR(bounds.min.y, -outerBound, precision);
   EXPECT_NEAR(bounds.min.z, -outerBound, precision);
@@ -78,16 +78,16 @@ TEST(SDF, Bounds) {
 }
 
 TEST(SDF, Surface) {
-  const float size = 4;
-  const float edgeLength = 0.5;
+  const double size = 4;
+  const double edgeLength = 0.5;
 
   Manifold cubeVoid(LevelSet(
-      CubeVoid(), {glm::vec3(-size / 2), glm::vec3(size / 2)}, edgeLength));
+      CubeVoid(), {glm::dvec3(-size / 2), glm::dvec3(size / 2)}, edgeLength));
 
-  Manifold cube = Manifold::Cube(glm::vec3(size), true);
+  Manifold cube = Manifold::Cube(glm::dvec3(size), true);
   cube -= cubeVoid;
   Box bounds = cube.BoundingBox();
-  const float precision = cube.Precision();
+  const double precision = cube.Precision();
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) ExportMesh("cube.gltf", cube.GetMesh(), {});
 #endif
@@ -106,8 +106,8 @@ TEST(SDF, Surface) {
 }
 
 TEST(SDF, Resize) {
-  const float size = 20;
-  Manifold layers(LevelSet(Layers(), {glm::vec3(0), glm::vec3(size)}, 1));
+  const double size = 20;
+  Manifold layers(LevelSet(Layers(), {glm::dvec3(0), glm::dvec3(size)}, 1));
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) ExportMesh("layers.gltf", layers.GetMesh(), {});
 #endif
@@ -118,11 +118,12 @@ TEST(SDF, Resize) {
 
 TEST(SDF, SineSurface) {
   Mesh surface(LevelSet(
-      [](glm::vec3 p) {
-        float mid = glm::sin(p.x) + glm::sin(p.y);
+      [](glm::dvec3 p) {
+        double mid = glm::sin(p.x) + glm::sin(p.y);
         return (p.z > mid - 0.5 && p.z < mid + 0.5) ? 1 : 0;
       },
-      {glm::vec3(-4 * glm::pi<float>()), glm::vec3(4 * glm::pi<float>())}, 1));
+      {glm::dvec3(-4 * glm::pi<double>()), glm::dvec3(4 * glm::pi<double>())},
+      1));
   Manifold smoothed = Manifold::Smooth(surface).Refine(2);
 
   EXPECT_EQ(smoothed.Status(), Manifold::Error::NoError);

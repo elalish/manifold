@@ -112,7 +112,7 @@ glm::ivec4 DecodeMorton(Uint64 code) {
 }
 
 struct GridVert {
-  float distance = NAN;
+  double distance = NAN;
   int edgeVerts[7] = {-1, -1, -1, -1, -1, -1, -1};
 
   int Inside() const { return distance > 0 ? 1 : -1; }
@@ -123,29 +123,29 @@ struct GridVert {
 };
 
 struct ComputeVerts {
-  VecView<glm::vec3> vertPos;
+  VecView<glm::dvec3> vertPos;
   VecView<int> vertIndex;
   HashTableD<GridVert, identity> gridVerts;
-  const std::function<float(glm::vec3)> sdf;
-  const glm::vec3 origin;
+  const std::function<double(glm::dvec3)> sdf;
+  const glm::dvec3 origin;
   const glm::ivec3 gridSize;
-  const glm::vec3 spacing;
-  const float level;
+  const glm::dvec3 spacing;
+  const double level;
 
-  inline glm::vec3 Position(glm::ivec4 gridIndex) const {
+  inline glm::dvec3 Position(glm::ivec4 gridIndex) const {
     return origin +
-           spacing * (glm::vec3(gridIndex) + (gridIndex.w == 1 ? 0.0f : -0.5f));
+           spacing * (glm::dvec3(gridIndex) + (gridIndex.w == 1 ? 0.0 : -0.5));
   }
 
-  inline float BoundedSDF(glm::ivec4 gridIndex) const {
-    const float d = sdf(Position(gridIndex)) - level;
+  inline double BoundedSDF(glm::ivec4 gridIndex) const {
+    const double d = sdf(Position(gridIndex)) - level;
 
     const glm::ivec3 xyz(gridIndex);
     const bool onLowerBound = glm::any(glm::lessThanEqual(xyz, glm::ivec3(0)));
     const bool onUpperBound = glm::any(glm::greaterThanEqual(xyz, gridSize));
     const bool onHalfBound =
         gridIndex.w == 1 && glm::any(glm::greaterThanEqual(xyz, gridSize - 1));
-    if (onLowerBound || onUpperBound || onHalfBound) return glm::min(d, 0.0f);
+    if (onLowerBound || onUpperBound || onHalfBound) return glm::min(d, 0.0);
 
     return d;
   }
@@ -158,7 +158,7 @@ struct ComputeVerts {
 
     if (glm::any(glm::greaterThan(glm::ivec3(gridIndex), gridSize))) return;
 
-    const glm::vec3 position = Position(gridIndex);
+    const glm::dvec3 position = Position(gridIndex);
 
     GridVert gridVert;
     gridVert.distance = BoundedSDF(gridIndex);
@@ -172,7 +172,7 @@ struct ComputeVerts {
         neighborIndex += 1;
         neighborIndex.w = 0;
       }
-      const float val = BoundedSDF(neighborIndex);
+      const double val = BoundedSDF(neighborIndex);
       if ((val > 0) == (gridVert.distance > 0)) continue;
       keep = true;
 
@@ -285,7 +285,7 @@ namespace manifold {
  * the manifold, which is due to the underlying grid.
  *
  * @param sdf The signed-distance functor, containing this function signature:
- * `float operator()(glm::vec3 point)`, which returns the
+ * `double operator()(glm::dvec3 point)`, which returns the
  * signed distance of a given point in R^3. Positive values are inside,
  * negative outside.
  * @param bounds An axis-aligned box that defines the extent of the grid.
@@ -302,13 +302,13 @@ namespace manifold {
  * Mesh, but it is guaranteed to be manifold and so can always be used as
  * input to the Manifold constructor for further operations.
  */
-Mesh LevelSet(std::function<float(glm::vec3)> sdf, Box bounds, float edgeLength,
-              float level, bool canParallel) {
+Mesh LevelSet(std::function<double(glm::dvec3)> sdf, Box bounds,
+              double edgeLength, double level, bool canParallel) {
   Mesh out;
 
-  const glm::vec3 dim = bounds.Size();
+  const glm::dvec3 dim(bounds.Size());
   const glm::ivec3 gridSize(dim / edgeLength);
-  const glm::vec3 spacing = dim / (glm::vec3(gridSize));
+  const glm::dvec3 spacing = dim / (glm::dvec3(gridSize));
 
   const Uint64 maxMorton = MortonCode(glm::ivec4(gridSize + 1, 1));
 
@@ -321,25 +321,26 @@ Mesh LevelSet(std::function<float(glm::vec3)> sdf, Box bounds, float edgeLength,
   int tableSize = glm::min(
       2 * maxMorton, static_cast<Uint64>(10 * glm::pow(maxMorton, 0.667)));
   HashTable<GridVert, identity> gridVerts(tableSize);
-  Vec<glm::vec3> vertPos(gridVerts.Size() * 7);
+  Vec<glm::dvec3> vertPos(gridVerts.Size() * 7);
 
   while (1) {
     Vec<int> index(1, 0);
-    for_each_n(pol, countAt(0), maxMorton + 1,
-               ComputeVerts({vertPos, index, gridVerts.D(), sdf, bounds.min,
-                             gridSize + 1, spacing, level}));
+    for_each_n(
+        pol, countAt(0), maxMorton + 1,
+        ComputeVerts({vertPos, index, gridVerts.D(), sdf,
+                      glm::dvec3(bounds.min), gridSize + 1, spacing, level}));
 
     if (gridVerts.Full()) {  // Resize HashTable
-      const glm::vec3 lastVert = vertPos[index[0] - 1];
-      const Uint64 lastMorton =
-          MortonCode(glm::ivec4((lastVert - bounds.min) / spacing, 1));
-      const float ratio = static_cast<float>(maxMorton) / lastMorton;
+      const glm::dvec3 lastVert = vertPos[index[0] - 1];
+      const Uint64 lastMorton = MortonCode(
+          glm::ivec4((lastVert - glm::dvec3(bounds.min)) / spacing, 1));
+      const double ratio = static_cast<double>(maxMorton) / lastMorton;
       if (ratio > 1000)  // do not trust the ratio if it is too large
         tableSize *= 2;
       else
         tableSize *= ratio;
       gridVerts = HashTable<GridVert, identity>(tableSize);
-      vertPos = Vec<glm::vec3>(gridVerts.Size() * 7);
+      vertPos = Vec<glm::dvec3>(gridVerts.Size() * 7);
     } else {  // Success
       vertPos.resize(index[0]);
       break;

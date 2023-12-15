@@ -262,7 +262,7 @@ struct BuildInternalBoxes {
 };
 
 struct TransformBox {
-  const glm::mat4x3 transform;
+  const glm::dmat4x3 transform;
   void operator()(Box& box) { box = box.Transform(transform); }
 };
 }  // namespace
@@ -357,7 +357,7 @@ void Collider::UpdateBoxes(const VecView<const Box>& leafBB) {
  * Apply axis-aligned transform to all bounding boxes. If transform is not
  * axis-aligned, abort and return false to indicate recalculation is necessary.
  */
-bool Collider::Transform(glm::mat4x3 transform) {
+bool Collider::Transform(glm::dmat4x3 transform) {
   ZoneScoped;
   bool axisAligned = true;
   for (int row : {0, 1, 2}) {
@@ -380,8 +380,8 @@ template SparseIndices Collider::Collisions<true, false, Box>(
 template SparseIndices Collider::Collisions<false, false, Box>(
     const VecView<const Box>&) const;
 
-template SparseIndices Collider::Collisions<false, false, glm::vec3>(
-    const VecView<const glm::vec3>&) const;
+template SparseIndices Collider::Collisions<false, false, glm::dvec3>(
+    const VecView<const glm::dvec3>&) const;
 
 template SparseIndices Collider::Collisions<true, true, Box>(
     const VecView<const Box>&) const;
@@ -389,7 +389,7 @@ template SparseIndices Collider::Collisions<true, true, Box>(
 template SparseIndices Collider::Collisions<false, true, Box>(
     const VecView<const Box>&) const;
 
-template SparseIndices Collider::Collisions<false, true, glm::vec3>(
-    const VecView<const glm::vec3>&) const;
+template SparseIndices Collider::Collisions<false, true, glm::dvec3>(
+    const VecView<const glm::dvec3>&) const;
 
 }  // namespace manifold

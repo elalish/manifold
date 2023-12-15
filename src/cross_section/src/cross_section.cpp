@@ -81,9 +81,9 @@ C2::JoinType jt(CrossSection::JoinType jointype) {
   return jt;
 }
 
-glm::vec2 v2_of_pd(const C2::PointD p) { return {p.x, p.y}; }
+glm::dvec2 v2_of_pd(const C2::PointD p) { return {p.x, p.y}; }
 
-C2::PointD v2_to_pd(const glm::vec2 v) { return C2::PointD(v.x, v.y); }
+C2::PointD v2_to_pd(const glm::dvec2 v) { return C2::PointD(v.x, v.y); }
 
 C2::PathD pathd_of_contour(const SimplePolygon& ctr) {
   auto p = C2::PathD();
@@ -94,8 +94,8 @@ C2::PathD pathd_of_contour(const SimplePolygon& ctr) {
   return p;
 }
 
-C2::PathsD transform(const C2::PathsD ps, const glm::mat3x2 m) {
-  const bool invert = glm::determinant(glm::mat2(m)) < 0;
+C2::PathsD transform(const C2::PathsD ps, const glm::dmat3x2 m) {
+  const bool invert = glm::determinant(glm::dmat2(m)) < 0;
   auto transformed = C2::PathsD();
   transformed.reserve(ps.size());
   for (auto path : ps) {
@@ -103,7 +103,7 @@ C2::PathsD transform(const C2::PathsD ps, const glm::mat3x2 m) {
     auto s = C2::PathD(sz);
     for (int i = 0; i < sz; ++i) {
       auto idx = invert ? sz - 1 - i : i;
-      s[idx] = v2_to_pd(m * glm::vec3(path[i].x, path[i].y, 1));
+      s[idx] = v2_to_pd(m * glm::dvec3(path[i].x, path[i].y, 1));
     }
     transformed.push_back(s);
   }
@@ -158,19 +158,19 @@ void flatten(const C2::PolyTreeD* tree, C2::PathsD& polys, int i) {
   }
 }
 
-bool V2Lesser(glm::vec2 a, glm::vec2 b) {
+bool V2Lesser(glm::dvec2 a, glm::dvec2 b) {
   if (a.x == b.x) return a.y < b.y;
   return a.x < b.x;
 }
 
-double Cross(glm::vec2 a, glm::vec2 b) { return a.x * b.y - a.y * b.x; }
+double Cross(glm::dvec2 a, glm::dvec2 b) { return a.x * b.y - a.y * b.x; }
 
-double SquaredDistance(glm::vec2 a, glm::vec2 b) {
+double SquaredDistance(glm::dvec2 a, glm::dvec2 b) {
   auto d = a - b;
   return glm::dot(d, d);
 }
 
-bool IsCw(glm::vec2 a, glm::vec2 b, glm::vec2 c) {
+bool IsCw(glm::dvec2 a, glm::dvec2 b, glm::dvec2 c) {
   double lhs = Cross(a - c, b - c);
   double rhs = 1e-18 * SquaredDistance(a, c) * SquaredDistance(b, c);
   return lhs * std::abs(lhs) <= rhs;
@@ -300,11 +300,11 @@ CrossSection::CrossSection(const Rect& rect) {
 // All access to paths_ should be done through the GetPaths() method, which
 // applies the accumulated transform_
 std::shared_ptr<const PathImpl> CrossSection::GetPaths() const {
-  if (transform_ == glm::mat3x2(1.0f)) {
+  if (transform_ == glm::dmat3x2(1.0)) {
     return paths_;
   }
   paths_ = shared_paths(::transform(paths_->paths_, transform_));
-  transform_ = glm::mat3x2(1.0f);
+  transform_ = glm::dmat3x2(1.0);
   return paths_;
 }
 
@@ -316,8 +316,8 @@ std::shared_ptr<const PathImpl> CrossSection::GetPaths() const {
  * @param size The X, and Y dimensions of the square.
  * @param center Set to true to shift the center to the origin.
  */
-CrossSection CrossSection::Square(const glm::vec2 size, bool center) {
-  if (size.x < 0.0f || size.y < 0.0f || glm::length(size) == 0.0f) {
+CrossSection CrossSection::Square(const glm::dvec2 size, bool center) {
+  if (size.x < 0.0 || size.y < 0.0 || glm::length(size) == 0.0) {
     return CrossSection();
   }
 
@@ -347,13 +347,13 @@ CrossSection CrossSection::Square(const glm::vec2 size, bool center) {
  * @param circularSegments Number of segments along its diameter. Default is
  * calculated by the static Quality defaults according to the radius.
  */
-CrossSection CrossSection::Circle(float radius, int circularSegments) {
-  if (radius <= 0.0f) {
+CrossSection CrossSection::Circle(double radius, int circularSegments) {
+  if (radius <= 0.0) {
     return CrossSection();
   }
   int n = circularSegments > 2 ? circularSegments
                                : Quality::GetCircularSegments(radius);
-  float dPhi = 360.0f / n;
+  double dPhi = 360.0 / n;
   auto circle = C2::PathD(n);
   for (int i = 0; i < n; ++i) {
     circle[i] = C2::PointD(radius * cosd(dPhi * i), radius * sind(dPhi * i));
@@ -491,10 +491,10 @@ std::vector<CrossSection> CrossSection::Decompose() const {
  *
  * @param v The vector to add to every vertex.
  */
-CrossSection CrossSection::Translate(const glm::vec2 v) const {
-  glm::mat3x2 m(1.0f, 0.0f,  //
-                0.0f, 1.0f,  //
-                v.x, v.y);
+CrossSection CrossSection::Translate(const glm::dvec2 v) const {
+  glm::dmat3x2 m(1.0, 0.0,  //
+                 0.0, 1.0,  //
+                 v.x, v.y);
   return Transform(m);
 }
 
@@ -504,12 +504,12 @@ CrossSection CrossSection::Translate(const glm::vec2 v) const {
  *
  * @param degrees degrees about the Z-axis to rotate.
  */
-CrossSection CrossSection::Rotate(float degrees) const {
+CrossSection CrossSection::Rotate(double degrees) const {
   auto s = sind(degrees);
   auto c = cosd(degrees);
-  glm::mat3x2 m(c, s,   //
-                -s, c,  //
-                0.0f, 0.0f);
+  glm::dmat3x2 m(c, s,   //
+                 -s, c,  //
+                 0.0, 0.0);
   return Transform(m);
 }
 
@@ -519,10 +519,10 @@ CrossSection CrossSection::Rotate(float degrees) const {
  *
  * @param v The vector to multiply every vertex by per component.
  */
-CrossSection CrossSection::Scale(const glm::vec2 scale) const {
-  glm::mat3x2 m(scale.x, 0.0f,  //
-                0.0f, scale.y,  //
-                0.0f, 0.0f);
+CrossSection CrossSection::Scale(const glm::dvec2 scale) const {
+  glm::dmat3x2 m(scale.x, 0.0,  //
+                 0.0, scale.y,  //
+                 0.0, 0.0);
   return Transform(m);
 }
 
@@ -534,12 +534,12 @@ CrossSection CrossSection::Scale(const glm::vec2 scale) const {
  *
  * @param ax the axis to be mirrored over
  */
-CrossSection CrossSection::Mirror(const glm::vec2 ax) const {
+CrossSection CrossSection::Mirror(const glm::dvec2 ax) const {
   if (glm::length(ax) == 0.) {
     return CrossSection();
   }
   auto n = glm::normalize(glm::abs(ax));
-  auto m = glm::mat3x2(glm::mat2(1.0f) - 2.0f * glm::outerProduct(n, n));
+  auto m = glm::dmat3x2(glm::dmat2(1.0) - 2.0 * glm::outerProduct(n, n));
   return Transform(m);
 }
 
@@ -550,9 +550,9 @@ CrossSection CrossSection::Mirror(const glm::vec2 ax) const {
  *
  * @param m The affine transform matrix to apply to all the vertices.
  */
-CrossSection CrossSection::Transform(const glm::mat3x2& m) const {
+CrossSection CrossSection::Transform(const glm::dmat3x2& m) const {
   auto transformed = CrossSection();
-  transformed.transform_ = m * glm::mat3(transform_);
+  transformed.transform_ = m * glm::dmat3(transform_);
   transformed.paths_ = paths_;
   return transformed;
 }
@@ -566,7 +566,7 @@ CrossSection CrossSection::Transform(const glm::mat3x2& m) const {
  * @param warpFunc A function that modifies a given vertex position.
  */
 CrossSection CrossSection::Warp(
-    std::function<void(glm::vec2&)> warpFunc) const {
+    std::function<void(glm::dvec2&)> warpFunc) const {
   auto paths = GetPaths();
   auto warped = C2::PathsD();
   warped.reserve(paths->paths_.size());
@@ -610,9 +610,9 @@ CrossSection CrossSection::Simplify(double epsilon) const {
     auto area = C2::Area(poly);
     Rect box;
     for (auto vert : poly) {
-      box.Union(glm::vec2(vert.x, vert.y));
+      box.Union(glm::dvec2(vert.x, vert.y));
     }
-    glm::vec2 size = box.Size();
+    glm::dvec2 size = box.Size();
     if (glm::abs(area) > glm::max(size.x, size.y) * epsilon) {
       filtered.push_back(poly);
     }

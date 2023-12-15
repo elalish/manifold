@@ -54,7 +54,7 @@ struct MeshGL {
   /// Flat, GL-style interleaved list of all vertex properties: propVal =
   /// vertProperties[vert * numProp + propIdx]. The first three properties are
   /// always the position x, y, z.
-  std::vector<float> vertProperties;
+  std::vector<double> vertProperties;
   /// The vertex indices of the three triangle corners in CCW (from the outside)
   /// order, for each triangle.
   std::vector<uint32_t> triVerts;
@@ -80,7 +80,7 @@ struct MeshGL {
   /// corresponding original mesh was transformed to create this triangle run.
   /// This matrix is stored in column-major order and the length of the overall
   /// vector is 12 * runOriginalID.size().
-  std::vector<float> runTransform;
+  std::vector<double> runTransform;
   /// Optional: Length NumTri, contains an ID of the source face this triangle
   /// comes from. When auto-generated, this ID will be a triangle index into the
   /// original mesh. All neighboring coplanar triangles from that input mesh
@@ -93,12 +93,12 @@ struct MeshGL {
   /// non-empty, must be exactly four times as long as Mesh.triVerts. Indexed
   /// as 4 * (3 * tri + i) + j, i < 3, j < 4, representing the tangent value
   /// Mesh.triVerts[tri][i] along the CCW edge. If empty, mesh is faceted.
-  std::vector<float> halfedgeTangent;
+  std::vector<double> halfedgeTangent;
   /// The absolute precision of the vertex positions, based on accrued rounding
   /// errors. When creating a Manifold, the precision used will be the maximum
   /// of this and a baseline precision from the size of the bounding box. Any
   /// edge shorter than precision may be collapsed.
-  float precision = 0;
+  double precision = 0;
 
   MeshGL() = default;
   MeshGL(const Mesh& mesh);
@@ -124,7 +124,7 @@ class Manifold {
   Manifold(Manifold&&) noexcept;
   Manifold& operator=(Manifold&&) noexcept;
 
-  Manifold(const MeshGL&, const std::vector<float>& propertyTolerance = {});
+  Manifold(const MeshGL&, const std::vector<double>& propertyTolerance = {});
   Manifold(const Mesh&);
 
   static Manifold Smooth(const MeshGL&,
@@ -132,17 +132,17 @@ class Manifold {
   static Manifold Smooth(const Mesh&,
                          const std::vector<Smoothness>& sharpenedEdges = {});
   static Manifold Tetrahedron();
-  static Manifold Cube(glm::vec3 size = glm::vec3(1.0f), bool center = false);
-  static Manifold Cylinder(float height, float radiusLow,
-                           float radiusHigh = -1.0f, int circularSegments = 0,
+  static Manifold Cube(glm::dvec3 size = glm::dvec3(1.0), bool center = false);
+  static Manifold Cylinder(double height, double radiusLow,
+                           double radiusHigh = -1.0, int circularSegments = 0,
                            bool center = false);
-  static Manifold Sphere(float radius, int circularSegments = 0);
-  static Manifold Extrude(const CrossSection& crossSection, float height,
-                          int nDivisions = 0, float twistDegrees = 0.0f,
-                          glm::vec2 scaleTop = glm::vec2(1.0f));
+  static Manifold Sphere(double radius, int circularSegments = 0);
+  static Manifold Extrude(const CrossSection& crossSection, double height,
+                          int nDivisions = 0, double twistDegrees = 0.0,
+                          glm::dvec2 scaleTop = glm::dvec2(1.0));
   static Manifold Revolve(const CrossSection& crossSection,
                           int circularSegments = 0,
-                          float revolveDegrees = 360.0f);
+                          double revolveDegrees = 360.0);
   ///@}
 
   /** @name Topological
@@ -181,7 +181,7 @@ class Manifold {
   int NumProp() const;
   int NumPropVert() const;
   Box BoundingBox() const;
-  float Precision() const;
+  double Precision() const;
   int Genus() const;
   Properties GetProperties() const;
   ///@}
@@ -199,19 +199,17 @@ class Manifold {
   /** @name Modification
    */
   ///@{
-  Manifold Translate(glm::vec3) const;
-  Manifold Scale(glm::vec3) const;
-  Manifold Rotate(float xDegrees, float yDegrees = 0.0f,
-                  float zDegrees = 0.0f) const;
-  Manifold Transform(const glm::mat4x3&) const;
-  Manifold Mirror(glm::vec3) const;
-  Manifold Warp(std::function<void(glm::vec3&)>) const;
+  Manifold Translate(glm::dvec3) const;
+  Manifold Scale(glm::dvec3) const;
+  Manifold Rotate(double xDegrees, double yDegrees = 0.0,
+                  double zDegrees = 0.0) const;
+  Manifold Transform(const glm::dmat4x3&) const;
+  Manifold Mirror(glm::dvec3) const;
+  Manifold Warp(std::function<void(glm::dvec3&)>) const;
   Manifold SetProperties(
-      int, std::function<void(float*, glm::vec3, const float*)>) const;
+      int, std::function<void(double*, glm::dvec3, const double*)>) const;
   Manifold CalculateCurvature(int gaussianIdx, int meanIdx) const;
   Manifold Refine(int) const;
-  // Manifold RefineToLength(float);
-  // Manifold RefineToPrecision(float);
   ///@}
 
   /** @name Boolean
@@ -229,15 +227,15 @@ class Manifold {
   Manifold operator^(const Manifold&) const;  // Intersect
   Manifold& operator^=(const Manifold&);
   std::pair<Manifold, Manifold> Split(const Manifold&) const;
-  std::pair<Manifold, Manifold> SplitByPlane(glm::vec3 normal,
-                                             float originOffset) const;
-  Manifold TrimByPlane(glm::vec3 normal, float originOffset) const;
+  std::pair<Manifold, Manifold> SplitByPlane(glm::dvec3 normal,
+                                             double originOffset) const;
+  Manifold TrimByPlane(glm::dvec3 normal, double originOffset) const;
   ///@}
 
   /** @name 2D from 3D
    */
   ///@{
-  CrossSection Slice(float height = 0) const;
+  CrossSection Slice(double height = 0) const;
   CrossSection Project() const;
   ///@}
 
@@ -246,7 +244,7 @@ class Manifold {
   ///@{
   Manifold Hull() const;
   static Manifold Hull(const std::vector<Manifold>& manifolds);
-  static Manifold Hull(const std::vector<glm::vec3>& pts);
+  static Manifold Hull(const std::vector<glm::dvec3>& pts);
   ///@}
 
   /** @name Testing hooks

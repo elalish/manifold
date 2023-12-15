@@ -30,27 +30,27 @@ namespace manifold {
 struct Manifold::Impl {
   struct Relation {
     int originalID = -1;
-    glm::mat4x3 transform = glm::mat4x3(1);
+    glm::dmat4x3 transform = glm::dmat4x3(1);
     bool backSide = false;
   };
   struct MeshRelationD {
     /// The originalID of this Manifold if it is an original; -1 otherwise.
     int originalID = -1;
     int numProp = 0;
-    Vec<float> properties;
+    Vec<double> properties;
     std::map<int, Relation> meshIDtransform;
     Vec<TriRef> triRef;
     Vec<glm::ivec3> triProperties;
   };
 
   Box bBox_;
-  float precision_ = -1;
+  double precision_ = -1;
   Error status_ = Error::NoError;
-  Vec<glm::vec3> vertPos_;
+  Vec<glm::dvec3> vertPos_;
   Vec<Halfedge> halfedge_;
-  Vec<glm::vec3> vertNormal_;
-  Vec<glm::vec3> faceNormal_;
-  Vec<glm::vec4> halfedgeTangent_;
+  Vec<glm::dvec3> vertNormal_;
+  Vec<glm::dvec3> faceNormal_;
+  Vec<glm::dvec4> halfedgeTangent_;
   MeshRelationD meshRelation_;
   Collider collider_;
 
@@ -61,12 +61,12 @@ struct Manifold::Impl {
   enum class Shape { Tetrahedron, Cube, Octahedron };
   Impl(Shape);
 
-  Impl(const MeshGL&, std::vector<float> propertyTolerance = {});
+  Impl(const MeshGL&, std::vector<double> propertyTolerance = {});
   Impl(const Mesh&, const MeshRelationD& relation,
-       const std::vector<float>& propertyTolerance = {},
+       const std::vector<double>& propertyTolerance = {},
        bool hasFaceIDs = false);
 
-  void CreateFaces(const std::vector<float>& propertyTolerance = {});
+  void CreateFaces(const std::vector<double>& propertyTolerance = {});
   void RemoveUnreferencedVerts(Vec<glm::ivec3>& triVerts);
   void InitializeOriginal();
   void CreateHalfedges(const Vec<glm::ivec3>& triVerts);
@@ -75,10 +75,10 @@ struct Manifold::Impl {
 
   void Update();
   void MarkFailure(Error status);
-  void Warp(std::function<void(glm::vec3&)> warpFunc);
-  Impl Transform(const glm::mat4x3& transform) const;
+  void Warp(std::function<void(glm::dvec3&)> warpFunc);
+  Impl Transform(const glm::dmat4x3& transform) const;
   SparseIndices EdgeCollisions(const Impl& B, bool inverted = false) const;
-  SparseIndices VertexCollisionsZ(VecView<const glm::vec3> vertsIn,
+  SparseIndices VertexCollisionsZ(VecView<const glm::dvec3> vertsIn,
                                   bool inverted = false) const;
 
   bool IsEmpty() const { return NumVert() == 0; }
@@ -97,7 +97,7 @@ struct Manifold::Impl {
   void CalculateBBox();
   bool IsFinite() const;
   bool IsIndexInBounds(VecView<const glm::ivec3> triVerts) const;
-  void SetPrecision(float minPrecision = -1);
+  void SetPrecision(double minPrecision = -1);
   bool IsManifold() const;
   bool Is2Manifold() const;
   bool MatchesTriNormals() const;
@@ -117,8 +117,8 @@ struct Manifold::Impl {
   void Face2Tri(const Vec<int>& faceEdge, const Vec<TriRef>& halfedgeRef);
   PolygonsIdx Face2Polygons(VecView<Halfedge>::IterC start,
                             VecView<Halfedge>::IterC end,
-                            glm::mat3x2 projection) const;
-  CrossSection Slice(float height) const;
+                            glm::dmat3x2 projection) const;
+  CrossSection Slice(double height) const;
   CrossSection Project() const;
 
   // edge_op.cu

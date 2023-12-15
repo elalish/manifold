@@ -49,7 +49,7 @@ TEST(CrossSection, MirrorUnion) {
 #endif
 
   EXPECT_FLOAT_EQ(2.5 * a.Area(), cross.Area());
-  EXPECT_TRUE(a.Mirror(glm::vec2(0)).IsEmpty());
+  EXPECT_TRUE(a.Mirror(glm::dvec2(0)).IsEmpty());
 }
 
 TEST(CrossSection, RoundOffset) {
@@ -75,8 +75,8 @@ TEST(CrossSection, Empty) {
 }
 
 TEST(CrossSection, Rect) {
-  float w = 10;
-  float h = 5;
+  double w = 10;
+  double h = 5;
   auto rect = Rect({0, 0}, {w, h});
   CrossSection cross(rect);
   auto area = rect.Area();
@@ -94,17 +94,17 @@ TEST(CrossSection, Transform) {
   auto sq = CrossSection::Square({10., 10.});
   auto a = sq.Rotate(45).Scale({2, 3}).Translate({4, 5});
 
-  glm::mat3x3 trans(1.0f, 0.0f, 0.0f,  //
-                    0.0f, 1.0f, 0.0f,  //
-                    4.0f, 5.0f, 1.0f);
-  glm::mat3x3 rot(cosd(45), sind(45), 0.0f,   //
-                  -sind(45), cosd(45), 0.0f,  //
-                  0.0f, 0.0f, 1.0f);
-  glm::mat3x3 scale(2.0f, 0.0f, 0.0f,  //
-                    0.0f, 3.0f, 0.0f,  //
-                    0.0f, 0.0f, 1.0f);
+  glm::dmat3x3 trans(1.0, 0.0, 0.0,  //
+                     0.0, 1.0, 0.0,  //
+                     4.0, 5.0, 1.0);
+  glm::dmat3x3 rot(cosd(45), sind(45), 0.0,   //
+                   -sind(45), cosd(45), 0.0,  //
+                   0.0, 0.0, 1.0);
+  glm::dmat3x3 scale(2.0, 0.0, 0.0,  //
+                     0.0, 3.0, 0.0,  //
+                     0.0, 0.0, 1.0);
 
-  auto b = sq.Transform(glm::mat3x2(trans * scale * rot));
+  auto b = sq.Transform(glm::dmat3x2(trans * scale * rot));
   auto b_copy = CrossSection(b);
 
   auto ex_b = Manifold::Extrude(b, 1.).GetMesh();
@@ -117,7 +117,7 @@ TEST(CrossSection, Transform) {
 TEST(CrossSection, Warp) {
   auto sq = CrossSection::Square({10., 10.});
   auto a = sq.Scale({2, 3}).Translate({4, 5});
-  auto b = sq.Warp([](glm::vec2 &v) {
+  auto b = sq.Warp([](glm::dvec2 &v) {
     v.x = v.x * 2 + 4;
     v.y = v.y * 3 + 5;
   });

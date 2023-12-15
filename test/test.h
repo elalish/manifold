@@ -41,7 +41,7 @@ struct MeshSize {
   int numPropVert = numVert;
 };
 
-Polygons SquareHole(float xOffset = 0.0);
+Polygons SquareHole(double xOffset = 0.0);
 Mesh Csaszar();
 Mesh Gyroid();
 Mesh Tet();
@@ -51,8 +51,8 @@ MeshGL WithIndexColors(const Mesh& in);
 MeshGL WithPositionColors(const Manifold& in);
 MeshGL WithNormals(const Manifold& in);
 MeshGL CubeUV();
-float GetMaxProperty(const MeshGL& mesh, int channel);
-float GetMinProperty(const MeshGL& mesh, int channel);
+double GetMaxProperty(const MeshGL& mesh, int channel);
+double GetMinProperty(const MeshGL& mesh, int channel);
 void Identical(const Mesh& mesh1, const Mesh& mesh2);
 void RelatedGL(const Manifold& out, const std::vector<MeshGL>& originals,
                bool checkNormals = false, bool updateNormals = false);

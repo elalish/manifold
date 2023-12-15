@@ -25,11 +25,11 @@ using namespace manifold;
 using namespace thrust::placeholders;
 
 struct ToSphere {
-  float length;
-  void operator()(glm::vec3& v) {
-    v = glm::cos(glm::half_pi<float>() * (1.0f - v));
+  double length;
+  void operator()(glm::dvec3& v) {
+    v = glm::cos(glm::half_pi<double>() * (1.0 - v));
     v = length * glm::normalize(v);
-    if (isnan(v.x)) v = glm::vec3(0.0);
+    if (isnan(v.x)) v = glm::dvec3(0.0);
   }
 };
 
@@ -85,7 +85,7 @@ Manifold Manifold::Smooth(const MeshGL& meshGL,
          "rather than Smooth().");
 
   // Don't allow any triangle merging.
-  std::vector<float> propertyTolerance(meshGL.numProp - 3, -1);
+  std::vector<double> propertyTolerance(meshGL.numProp - 3, -1);
   std::shared_ptr<Impl> impl =
       std::make_shared<Impl>(meshGL, propertyTolerance);
   impl->CreateTangents(sharpenedEdges);
@@ -148,14 +148,13 @@ Manifold Manifold::Tetrahedron() {
  * @param size The X, Y, and Z dimensions of the box.
  * @param center Set to true to shift the center to the origin.
  */
-Manifold Manifold::Cube(glm::vec3 size, bool center) {
-  if (size.x < 0.0f || size.y < 0.0f || size.z < 0.0f ||
-      glm::length(size) == 0.) {
+Manifold Manifold::Cube(glm::dvec3 size, bool center) {
+  if (size.x < 0.0 || size.y < 0.0 || size.z < 0.0 || glm::length(size) == 0.) {
     return Invalid();
   }
   auto cube = Manifold(std::make_shared<Impl>(Impl::Shape::Cube));
   cube = cube.Scale(size);
-  if (center) cube = cube.Translate(-size / 2.0f);
+  if (center) cube = cube.Translate(-size / 2.0);
   return cube.AsOriginal();
 }
 
@@ -172,22 +171,22 @@ Manifold Manifold::Cube(glm::vec3 size, bool center) {
  * @param center Set to true to shift the center to the origin. Default is
  * origin at the bottom.
  */
-Manifold Manifold::Cylinder(float height, float radiusLow, float radiusHigh,
+Manifold Manifold::Cylinder(double height, double radiusLow, double radiusHigh,
                             int circularSegments, bool center) {
-  if (height <= 0.0f || radiusLow <= 0.0f) {
+  if (height <= 0.0 || radiusLow <= 0.0) {
     return Invalid();
   }
-  float scale = radiusHigh >= 0.0f ? radiusHigh / radiusLow : 1.0f;
-  float radius = fmax(radiusLow, radiusHigh);
+  double scale = radiusHigh >= 0.0 ? radiusHigh / radiusLow : 1.0;
+  double radius = fmax(radiusLow, radiusHigh);
   int n = circularSegments > 2 ? circularSegments
                                : Quality::GetCircularSegments(radius);
 
   CrossSection circle = CrossSection::Circle(radiusLow, n);
   Manifold cylinder =
-      Manifold::Extrude(circle, height, 0, 0.0f, glm::vec2(scale));
+      Manifold::Extrude(circle, height, 0, 0.0, glm::dvec2(scale));
   if (center)
     cylinder =
-        cylinder.Translate(glm::vec3(0.0f, 0.0f, -height / 2.0f)).AsOriginal();
+        cylinder.Translate(glm::dvec3(0.0, 0.0, -height / 2.0)).AsOriginal();
   return cylinder;
 }
 
@@ -201,8 +200,8 @@ Manifold Manifold::Cylinder(float height, float radiusLow, float radiusHigh,
  * there are a circle of vertices on all three of the axis planes. Default is
  * calculated by the static Defaults.
  */
-Manifold Manifold::Sphere(float radius, int circularSegments) {
-  if (radius <= 0.0f) {
+Manifold Manifold::Sphere(double radius, int circularSegments) {
+  if (radius <= 0.0) {
     return Invalid();
   }
   int n = circularSegments > 0 ? (circularSegments + 3) / 4
@@ -236,17 +235,17 @@ Manifold Manifold::Sphere(float radius, int circularSegments) {
  * Note that scale is applied after twist.
  * Default {1, 1}.
  */
-Manifold Manifold::Extrude(const CrossSection& crossSection, float height,
-                           int nDivisions, float twistDegrees,
-                           glm::vec2 scaleTop) {
+Manifold Manifold::Extrude(const CrossSection& crossSection, double height,
+                           int nDivisions, double twistDegrees,
+                           glm::dvec2 scaleTop) {
   ZoneScoped;
   auto polygons = crossSection.ToPolygons();
-  if (polygons.size() == 0 || height <= 0.0f) {
+  if (polygons.size() == 0 || height <= 0.0) {
     return Invalid();
   }
 
-  scaleTop.x = glm::max(scaleTop.x, 0.0f);
-  scaleTop.y = glm::max(scaleTop.y, 0.0f);
+  scaleTop.x = glm::max(scaleTop.x, 0.0);
+  scaleTop.y = glm::max(scaleTop.y, 0.0);
 
   auto pImpl_ = std::make_shared<Impl>();
   ++nDivisions;
@@ -260,18 +259,18 @@ Manifold Manifold::Extrude(const CrossSection& crossSection, float height,
   for (auto& poly : polygons) {
     nCrossSection += poly.size();
     SimplePolygonIdx simpleIndexed;
-    for (const glm::vec2& polyVert : poly) {
-      vertPos.push_back({polyVert.x, polyVert.y, 0.0f});
+    for (const glm::dvec2& polyVert : poly) {
+      vertPos.push_back({polyVert.x, polyVert.y, 0.0});
       simpleIndexed.push_back({polyVert, idx++});
     }
     polygonsIndexed.push_back(simpleIndexed);
   }
   for (int i = 1; i < nDivisions + 1; ++i) {
-    float alpha = i / float(nDivisions);
-    float phi = alpha * twistDegrees;
-    glm::vec2 scale = glm::mix(glm::vec2(1.0f), scaleTop, alpha);
-    glm::mat2 rotation(cosd(phi), sind(phi), -sind(phi), cosd(phi));
-    glm::mat2 transform = glm::mat2(scale.x, 0.0f, 0.0f, scale.y) * rotation;
+    double alpha = i / double(nDivisions);
+    double phi = alpha * twistDegrees;
+    glm::dvec2 scale = glm::mix(glm::dvec2(1.0), scaleTop, alpha);
+    glm::dmat2 rotation(cosd(phi), sind(phi), -sind(phi), cosd(phi));
+    glm::dmat2 transform = glm::dmat2(scale.x, 0.0, 0.0, scale.y) * rotation;
     int j = 0;
     int idx = 0;
     for (const auto& poly : polygons) {
@@ -283,7 +282,7 @@ Manifold Manifold::Extrude(const CrossSection& crossSection, float height,
           triVerts.push_back({nCrossSection * i + j, lastVert - nCrossSection,
                               thisVert - nCrossSection});
         } else {
-          glm::vec2 pos = transform * poly[vert];
+          glm::dvec2 pos = transform * poly[vert];
           vertPos.push_back({pos.x, pos.y, height * alpha});
           triVerts.push_back({thisVert, lastVert, thisVert - nCrossSection});
           triVerts.push_back(
@@ -296,7 +295,7 @@ Manifold Manifold::Extrude(const CrossSection& crossSection, float height,
   }
   if (isCone)
     for (int j = 0; j < polygons.size(); ++j)  // Duplicate vertex for Genus
-      vertPos.push_back({0.0f, 0.0f, height});
+      vertPos.push_back({0.0, 0.0, height});
   std::vector<glm::ivec3> top = TriangulateIdx(polygonsIndexed);
   for (const glm::ivec3& tri : top) {
     triVerts.push_back({tri[0], tri[2], tri[1]});
@@ -324,7 +323,7 @@ Manifold Manifold::Extrude(const CrossSection& crossSection, float height,
  * @param revolveDegrees Number of degrees to revolve. Default is 360 degrees.
  */
 Manifold Manifold::Revolve(const CrossSection& crossSection,
-                           int circularSegments, float revolveDegrees) {
+                           int circularSegments, double revolveDegrees) {
   ZoneScoped;
   Polygons polygons = crossSection.ToPolygons();
 
@@ -338,25 +337,25 @@ Manifold Manifold::Revolve(const CrossSection& crossSection,
     return Invalid();
   } else if (bounds.min.x < 0) {
     // Take the x>=0 slice.
-    glm::vec2 min = bounds.min;
-    glm::vec2 max = bounds.max;
+    glm::dvec2 min = bounds.min;
+    glm::dvec2 max = bounds.max;
     CrossSection posBoundingBox = CrossSection(
         {{0.0, min.y}, {max.x, min.y}, {max.x, max.y}, {0.0, max.y}});
 
     polygons = (crossSection ^ posBoundingBox).ToPolygons();
   }
 
-  float radius = 0.0f;
+  double radius = 0.0;
   for (const auto& poly : polygons) {
     for (const auto& vert : poly) {
       radius = fmax(radius, vert.x);
     }
   }
 
-  if (revolveDegrees > 360.0f) {
-    revolveDegrees = 360.0f;
+  if (revolveDegrees > 360.0) {
+    revolveDegrees = 360.0;
   }
-  const bool isFullRevolution = revolveDegrees == 360.0f;
+  const bool isFullRevolution = revolveDegrees == 360.0;
 
   const int nDivisions = circularSegments > 2
                              ? circularSegments
@@ -370,7 +369,7 @@ Manifold Manifold::Revolve(const CrossSection& crossSection,
   std::vector<int> startPoses;
   std::vector<int> endPoses;
 
-  const float dPhi = revolveDegrees / nDivisions;
+  const double dPhi = revolveDegrees / nDivisions;
   // first and last slice are distinguished if not a full revolution.
   const int nSlices = isFullRevolution ? nDivisions : nDivisions + 1;
 
@@ -395,12 +394,12 @@ Manifold Manifold::Revolve(const CrossSection& crossSection,
           (polyVert == 0 ? nRevolveAxisVerts + (nSlices * nPosVerts) - nSlices
            : poly[polyVert - 1].x == 0.0 ? -1
                                          : -nSlices);
-      glm::vec2 currPolyVertex = poly[polyVert];
-      glm::vec2 prevPolyVertex =
+      glm::dvec2 currPolyVertex = poly[polyVert];
+      glm::dvec2 prevPolyVertex =
           poly[polyVert == 0 ? poly.size() - 1 : polyVert - 1];
 
       for (int slice = 0; slice < nSlices; ++slice) {
-        const float phi = slice * dPhi;
+        const double phi = slice * dPhi;
         if (slice == 0 || currPolyVertex.x > 0) {
           vertPos.push_back({currPolyVertex.x * cosd(phi),
                              currPolyVertex.x * sind(phi), currPolyVertex.y});

@@ -128,12 +128,12 @@ Module.setup = function() {
 
   Module.CrossSection.prototype.warp = function(func) {
     const wasmFuncPtr = addFunction(function(vec2Ptr) {
-      const x = getValue(vec2Ptr, 'float');
-      const y = getValue(vec2Ptr + 4, 'float');
+      const x = getValue(vec2Ptr, 'double');
+      const y = getValue(vec2Ptr + 8, 'double');
       const vert = [x, y];
       func(vert);
-      setValue(vec2Ptr, vert[0], 'float');
-      setValue(vec2Ptr + 4, vert[1], 'float');
+      setValue(vec2Ptr, vert[0], 'double');
+      setValue(vec2Ptr + 8, vert[1], 'double');
     }, 'vi');
     const out = this._Warp(wasmFuncPtr);
     removeFunction(wasmFuncPtr);
@@ -198,14 +198,14 @@ Module.setup = function() {
 
   Module.Manifold.prototype.warp = function(func) {
     const wasmFuncPtr = addFunction(function(vec3Ptr) {
-      const x = getValue(vec3Ptr, 'float');
-      const y = getValue(vec3Ptr + 4, 'float');
-      const z = getValue(vec3Ptr + 8, 'float');
+      const x = getValue(vec3Ptr, 'double');
+      const y = getValue(vec3Ptr + 8, 'double');
+      const z = getValue(vec3Ptr + 16, 'double');
       const vert = [x, y, z];
       func(vert);
-      setValue(vec3Ptr, vert[0], 'float');
-      setValue(vec3Ptr + 4, vert[1], 'float');
-      setValue(vec3Ptr + 8, vert[2], 'float');
+      setValue(vec3Ptr, vert[0], 'double');
+      setValue(vec3Ptr + 8, vert[1], 'double');
+      setValue(vec3Ptr + 16, vert[2], 'double');
     }, 'vi');
     const out = this._Warp(wasmFuncPtr);
     removeFunction(wasmFuncPtr);
@@ -222,21 +222,21 @@ Module.setup = function() {
     const wasmFuncPtr = addFunction(function(newPtr, vec3Ptr, oldPtr) {
       const newProp = [];
       for (let i = 0; i < numProp; ++i) {
-        newProp[i] = getValue(newPtr + 4 * i, 'float');
+        newProp[i] = getValue(newPtr + 8 * i, 'double');
       }
       const pos = [];
       for (let i = 0; i < 3; ++i) {
-        pos[i] = getValue(vec3Ptr + 4 * i, 'float');
+        pos[i] = getValue(vec3Ptr + 8 * i, 'double');
       }
       const oldProp = [];
       for (let i = 0; i < oldNumProp; ++i) {
-        oldProp[i] = getValue(oldPtr + 4 * i, 'float');
+        oldProp[i] = getValue(oldPtr + 8 * i, 'double');
       }
 
       func(newProp, pos, oldProp);
 
       for (let i = 0; i < numProp; ++i) {
-        setValue(newPtr + 4 * i, newProp[i], 'float');
+        setValue(newPtr + 8 * i, newProp[i], 'double');
       }
     }, 'viii');
     const out = this._SetProperties(numProp, wasmFuncPtr);
@@ -301,7 +301,7 @@ Module.setup = function() {
     constructor({
       numProp = 3,
       triVerts = new Uint32Array(),
-      vertProperties = new Float32Array(),
+      vertProperties = new Float64Array(),
       mergeFromVert,
       mergeToVert,
       runIndex,
@@ -615,12 +615,12 @@ Module.setup = function() {
       max: {x: bounds.max[0], y: bounds.max[1], z: bounds.max[2]},
     };
     const wasmFuncPtr = addFunction(function(vec3Ptr) {
-      const x = getValue(vec3Ptr, 'float');
-      const y = getValue(vec3Ptr + 4, 'float');
-      const z = getValue(vec3Ptr + 8, 'float');
+      const x = getValue(vec3Ptr, 'double');
+      const y = getValue(vec3Ptr + 8, 'double');
+      const z = getValue(vec3Ptr + 16, 'double');
       const vert = [x, y, z];
       return sdf(vert);
-    }, 'fi');
+    }, 'di');
     const out = Module._LevelSet(wasmFuncPtr, bounds2, edgeLength, level);
     removeFunction(wasmFuncPtr);
     return out;

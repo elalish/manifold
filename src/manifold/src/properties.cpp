@@ -22,30 +22,30 @@ using namespace manifold;
 
 struct FaceAreaVolume {
   VecView<const Halfedge> halfedges;
-  VecView<const glm::vec3> vertPos;
-  const float precision;
+  VecView<const glm::dvec3> vertPos;
+  const double precision;
 
-  thrust::pair<float, float> operator()(int face) {
-    float perimeter = 0;
-    glm::vec3 edge[3];
+  thrust::pair<double, double> operator()(int face) {
+    double perimeter = 0;
+    glm::dvec3 edge[3];
     for (int i : {0, 1, 2}) {
       const int j = (i + 1) % 3;
       edge[i] = vertPos[halfedges[3 * face + j].startVert] -
                 vertPos[halfedges[3 * face + i].startVert];
       perimeter += glm::length(edge[i]);
     }
-    glm::vec3 crossP = glm::cross(edge[0], edge[1]);
+    glm::dvec3 crossP = glm::cross(edge[0], edge[1]);
 
-    float area = glm::length(crossP);
-    float volume = glm::dot(crossP, vertPos[halfedges[3 * face].startVert]);
+    double area = glm::length(crossP);
+    double volume = glm::dot(crossP, vertPos[halfedges[3 * face].startVert]);
 
-    return thrust::make_pair(area / 2.0f, volume / 6.0f);
+    return thrust::make_pair(area / 2.0, volume / 6.0);
   }
 };
 
 struct PosMin
-    : public thrust::binary_function<glm::vec3, glm::vec3, glm::vec3> {
-  glm::vec3 operator()(glm::vec3 a, glm::vec3 b) {
+    : public thrust::binary_function<glm::dvec3, glm::dvec3, glm::dvec3> {
+  glm::dvec3 operator()(glm::dvec3 a, glm::dvec3 b) {
     if (isnan(a.x)) return b;
     if (isnan(b.x)) return a;
     return glm::min(a, b);
@@ -53,8 +53,8 @@ struct PosMin
 };
 
 struct PosMax
-    : public thrust::binary_function<glm::vec3, glm::vec3, glm::vec3> {
-  glm::vec3 operator()(glm::vec3 a, glm::vec3 b) {
+    : public thrust::binary_function<glm::dvec3, glm::dvec3, glm::dvec3> {
+  glm::dvec3 operator()(glm::dvec3 a, glm::dvec3 b) {
     if (isnan(a.x)) return b;
     if (isnan(b.x)) return a;
     return glm::max(a, b);
@@ -62,7 +62,7 @@ struct PosMax
 };
 
 struct FiniteVert {
-  bool operator()(glm::vec3 v) { return glm::all(glm::isfinite(v)); }
+  bool operator()(glm::dvec3 v) { return glm::all(glm::isfinite(v)); }
 };
 
 struct MakeMinMax {
@@ -81,11 +81,11 @@ struct MinMax
   }
 };
 
-struct SumPair : public thrust::binary_function<thrust::pair<float, float>,
-                                                thrust::pair<float, float>,
-                                                thrust::pair<float, float>> {
-  thrust::pair<float, float> operator()(thrust::pair<float, float> a,
-                                        thrust::pair<float, float> b) {
+struct SumPair : public thrust::binary_function<thrust::pair<double, double>,
+                                                thrust::pair<double, double>,
+                                                thrust::pair<double, double>> {
+  thrust::pair<double, double> operator()(thrust::pair<double, double> a,
+                                          thrust::pair<double, double> b) {
     a.first += b.first;
     a.second += b.second;
     return a;
@@ -93,17 +93,17 @@ struct SumPair : public thrust::binary_function<thrust::pair<float, float>,
 };
 
 struct CurvatureAngles {
-  VecView<float> meanCurvature;
-  VecView<float> gaussianCurvature;
-  VecView<float> area;
-  VecView<float> degree;
+  VecView<double> meanCurvature;
+  VecView<double> gaussianCurvature;
+  VecView<double> area;
+  VecView<double> degree;
   VecView<const Halfedge> halfedge;
-  VecView<const glm::vec3> vertPos;
-  VecView<const glm::vec3> triNormal;
+  VecView<const glm::dvec3> vertPos;
+  VecView<const glm::dvec3> triNormal;
 
   void operator()(int tri) {
-    glm::vec3 edge[3];
-    glm::vec3 edgeLength(0.0);
+    glm::dvec3 edge[3];
+    glm::dvec3 edgeLength(0.0);
     for (int i : {0, 1, 2}) {
       const int startVert = halfedge[3 * tri + i].startVert;
       const int endVert = halfedge[3 * tri + i].endVert;
@@ -111,21 +111,21 @@ struct CurvatureAngles {
       edgeLength[i] = glm::length(edge[i]);
       edge[i] /= edgeLength[i];
       const int neighborTri = halfedge[3 * tri + i].pairedHalfedge / 3;
-      const float dihedral =
+      const double dihedral =
           0.25 * edgeLength[i] *
           glm::asin(glm::dot(glm::cross(triNormal[tri], triNormal[neighborTri]),
                              edge[i]));
       AtomicAdd(meanCurvature[startVert], dihedral);
       AtomicAdd(meanCurvature[endVert], dihedral);
-      AtomicAdd(degree[startVert], 1.0f);
+      AtomicAdd(degree[startVert], 1.0);
     }
 
-    glm::vec3 phi;
+    glm::dvec3 phi;
     phi[0] = glm::acos(-glm::dot(edge[2], edge[0]));
     phi[1] = glm::acos(-glm::dot(edge[0], edge[1]));
-    phi[2] = glm::pi<float>() - phi[0] - phi[1];
-    const float area3 = edgeLength[0] * edgeLength[1] *
-                        glm::length(glm::cross(edge[0], edge[1])) / 6;
+    phi[2] = glm::pi<double>() - phi[0] - phi[1];
+    const double area3 = edgeLength[0] * edgeLength[1] *
+                         glm::length(glm::cross(edge[0], edge[1])) / 6;
 
     for (int i : {0, 1, 2}) {
       const int vert = halfedge[3 * tri + i].startVert;
@@ -136,24 +136,24 @@ struct CurvatureAngles {
 };
 
 struct NormalizeCurvature {
-  void operator()(thrust::tuple<float&, float&, float, float> inOut) {
-    float& meanCurvature = thrust::get<0>(inOut);
-    float& gaussianCurvature = thrust::get<1>(inOut);
-    float area = thrust::get<2>(inOut);
-    float degree = thrust::get<3>(inOut);
-    float factor = degree / (6 * area);
+  void operator()(thrust::tuple<double&, double&, double, double> inOut) {
+    double& meanCurvature = thrust::get<0>(inOut);
+    double& gaussianCurvature = thrust::get<1>(inOut);
+    double area = thrust::get<2>(inOut);
+    double degree = thrust::get<3>(inOut);
+    double factor = degree / (6 * area);
     meanCurvature *= factor;
     gaussianCurvature *= factor;
   }
 };
 
 struct UpdateProperties {
-  VecView<float> properties;
+  VecView<double> properties;
 
-  VecView<const float> oldProperties;
+  VecView<const double> oldProperties;
   VecView<const Halfedge> halfedge;
-  VecView<const float> meanCurvature;
-  VecView<const float> gaussianCurvature;
+  VecView<const double> meanCurvature;
+  VecView<const double> gaussianCurvature;
   const int oldNumProp;
   const int numProp;
   const int gaussianIdx;
@@ -188,7 +188,7 @@ struct UpdateProperties {
 
 struct CheckHalfedges {
   VecView<const Halfedge> halfedges;
-  VecView<const glm::vec3> vertPos;
+  VecView<const glm::dvec3> vertPos;
 
   bool operator()(int edge) {
     const Halfedge halfedge = halfedges[edge];
@@ -223,15 +223,15 @@ struct NoDuplicates {
 
 struct CheckCCW {
   VecView<const Halfedge> halfedges;
-  VecView<const glm::vec3> vertPos;
-  VecView<const glm::vec3> triNormal;
-  const float tol;
+  VecView<const glm::dvec3> vertPos;
+  VecView<const glm::dvec3> triNormal;
+  const double tol;
 
   bool operator()(int face) {
     if (halfedges[3 * face].pairedHalfedge < 0) return true;
 
-    const glm::mat3x2 projection = GetAxisAlignedProjection(triNormal[face]);
-    glm::vec2 v[3];
+    const glm::dmat3x2 projection = GetAxisAlignedProjection(triNormal[face]);
+    glm::dvec2 v[3];
     for (int i : {0, 1, 2})
       v[i] = projection * vertPos[halfedges[3 * face + i].startVert];
 
@@ -240,15 +240,15 @@ struct CheckCCW {
 
 #ifdef MANIFOLD_DEBUG
     if (tol > 0 && !check) {
-      glm::vec2 v1 = v[1] - v[0];
-      glm::vec2 v2 = v[2] - v[0];
-      float area = v1.x * v2.y - v1.y * v2.x;
-      float base2 = glm::max(glm::dot(v1, v1), glm::dot(v2, v2));
-      float base = glm::sqrt(base2);
-      glm::vec3 V0 = vertPos[halfedges[3 * face].startVert];
-      glm::vec3 V1 = vertPos[halfedges[3 * face + 1].startVert];
-      glm::vec3 V2 = vertPos[halfedges[3 * face + 2].startVert];
-      glm::vec3 norm = glm::cross(V1 - V0, V2 - V0);
+      glm::dvec2 v1 = v[1] - v[0];
+      glm::dvec2 v2 = v[2] - v[0];
+      double area = v1.x * v2.y - v1.y * v2.x;
+      double base2 = glm::max(glm::dot(v1, v1), glm::dot(v2, v2));
+      double base = glm::sqrt(base2);
+      glm::dvec3 V0 = vertPos[halfedges[3 * face].startVert];
+      glm::dvec3 V1 = vertPos[halfedges[3 * face + 1].startVert];
+      glm::dvec3 V2 = vertPos[halfedges[3 * face + 2].startVert];
+      glm::dvec3 norm = glm::cross(V1 - V0, V2 - V0);
       printf(
           "Tri %d does not match normal, approx height = %g, base = %g\n"
           "tol = %g, area2 = %g, base2*tol2 = %g\n"
@@ -319,15 +319,15 @@ Properties Manifold::Impl::GetProperties() const {
   ZoneScoped;
   if (IsEmpty()) return {0, 0};
   // Kahan summation
-  float area = 0;
-  float volume = 0;
-  float areaCompensation = 0;
-  float volumeCompensation = 0;
+  double area = 0;
+  double volume = 0;
+  double areaCompensation = 0;
+  double volumeCompensation = 0;
   for (int i = 0; i < NumTri(); ++i) {
     auto [area1, volume1] =
         FaceAreaVolume({halfedge_, vertPos_, precision_})(i);
-    const float t1 = area + area1;
-    const float t2 = volume + volume1;
+    const double t1 = area + area1;
+    const double t2 = volume + volume1;
     areaCompensation += (area - t1) + area1;
     volumeCompensation += (volume - t2) + volume1;
     area = t1;
@@ -343,10 +343,10 @@ void Manifold::Impl::CalculateCurvature(int gaussianIdx, int meanIdx) {
   ZoneScoped;
   if (IsEmpty()) return;
   if (gaussianIdx < 0 && meanIdx < 0) return;
-  Vec<float> vertMeanCurvature(NumVert(), 0);
-  Vec<float> vertGaussianCurvature(NumVert(), glm::two_pi<float>());
-  Vec<float> vertArea(NumVert(), 0);
-  Vec<float> degree(NumVert(), 0);
+  Vec<double> vertMeanCurvature(NumVert(), 0);
+  Vec<double> vertGaussianCurvature(NumVert(), glm::two_pi<double>());
+  Vec<double> vertArea(NumVert(), 0);
+  Vec<double> degree(NumVert(), 0);
   auto policy = autoPolicy(NumTri());
   for_each(policy, countAt(0), countAt(NumTri()),
            CurvatureAngles({vertMeanCurvature, vertGaussianCurvature, vertArea,
@@ -358,8 +358,8 @@ void Manifold::Impl::CalculateCurvature(int gaussianIdx, int meanIdx) {
 
   const int oldNumProp = NumProp();
   const int numProp = glm::max(oldNumProp, glm::max(gaussianIdx, meanIdx) + 1);
-  const Vec<float> oldProperties = meshRelation_.properties;
-  meshRelation_.properties = Vec<float>(numProp * NumPropVert(), 0);
+  const Vec<double> oldProperties = meshRelation_.properties;
+  meshRelation_.properties = Vec<double>(numProp * NumPropVert(), 0);
   meshRelation_.numProp = numProp;
   if (meshRelation_.triProperties.size() == 0) {
     meshRelation_.triProperties.resize(NumTri());
@@ -383,12 +383,12 @@ void Manifold::Impl::CalculateCurvature(int gaussianIdx, int meanIdx) {
  */
 void Manifold::Impl::CalculateBBox() {
   auto policy = autoPolicy(NumVert());
-  bBox_.min = reduce<glm::vec3>(
+  bBox_.min = reduce<glm::dvec3>(
       policy, vertPos_.begin(), vertPos_.end(),
-      glm::vec3(std::numeric_limits<float>::infinity()), PosMin());
-  bBox_.max = reduce<glm::vec3>(
+      glm::dvec3(std::numeric_limits<double>::infinity()), PosMin());
+  bBox_.max = reduce<glm::dvec3>(
       policy, vertPos_.begin(), vertPos_.end(),
-      glm::vec3(-std::numeric_limits<float>::infinity()), PosMax());
+      glm::dvec3(-std::numeric_limits<double>::infinity()), PosMax());
 }
 
 /**

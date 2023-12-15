@@ -10,30 +10,30 @@ inline int FlipHalfedge(int halfedge) {
 }
 
 struct TransformNormals {
-  const glm::mat3 transform;
+  const glm::dmat3 transform;
 
-  glm::vec3 operator()(glm::vec3 normal) {
+  glm::dvec3 operator()(glm::dvec3 normal) {
     normal = glm::normalize(transform * normal);
-    if (isnan(normal.x)) normal = glm::vec3(0.0f);
+    if (isnan(normal.x)) normal = glm::dvec3(0.0);
     return normal;
   }
 };
 
 struct TransformTangents {
-  const glm::mat3 transform;
+  const glm::dmat3 transform;
   const bool invert;
-  VecView<const glm::vec4> oldTangents;
+  VecView<const glm::dvec4> oldTangents;
   VecView<const Halfedge> halfedge;
 
-  void operator()(thrust::tuple<glm::vec4&, int> inOut) {
-    glm::vec4& tangent = thrust::get<0>(inOut);
+  void operator()(thrust::tuple<glm::dvec4&, int> inOut) {
+    glm::dvec4& tangent = thrust::get<0>(inOut);
     int edge = thrust::get<1>(inOut);
     if (invert) {
       edge = halfedge[FlipHalfedge(edge)].pairedHalfedge;
     }
 
-    tangent = glm::vec4(transform * glm::vec3(oldTangents[edge]),
-                        oldTangents[edge].w);
+    tangent = glm::dvec4(transform * glm::dvec3(oldTangents[edge]),
+                         oldTangents[edge].w);
   }
 };
 

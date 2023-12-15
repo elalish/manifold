@@ -25,7 +25,7 @@
 namespace manifold {
 
 using GeneralTriangulation = std::function<std::vector<glm::ivec3>(int)>;
-using AddTriangle = std::function<void(int, glm::ivec3, glm::vec3, TriRef)>;
+using AddTriangle = std::function<void(int, glm::ivec3, glm::dvec3, TriRef)>;
 
 /**
  * Triangulates the faces. In this case, the halfedge_ vector is not yet a set
@@ -41,7 +41,7 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
                               const Vec<TriRef>& halfedgeRef) {
   ZoneScoped;
   Vec<glm::ivec3> triVerts;
-  Vec<glm::vec3> triNormal;
+  Vec<glm::dvec3> triNormal;
   Vec<TriRef>& triRef = meshRelation_.triRef;
   triRef.resize(0);
   auto processFace = [&](GeneralTriangulation general, AddTriangle addTri,
@@ -50,7 +50,7 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
     const int lastEdge = faceEdge[face + 1];
     const int numEdge = lastEdge - firstEdge;
     ASSERT(numEdge >= 3, topologyErr, "face has less than three edges.");
-    const glm::vec3 normal = faceNormal_[face];
+    const glm::dvec3 normal = faceNormal_[face];
 
     if (numEdge == 3) {  // Single triangle
       int mapping[3] = {halfedge_[firstEdge].startVert,
@@ -75,7 +75,7 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
                         halfedge_[firstEdge + 1].startVert,
                         halfedge_[firstEdge + 2].startVert,
                         halfedge_[firstEdge + 3].startVert};
-      const glm::mat3x2 projection = GetAxisAlignedProjection(normal);
+      const glm::dmat3x2 projection = GetAxisAlignedProjection(normal);
       auto triCCW = [&projection, this](const glm::ivec3 tri) {
         return CCW(projection * this->vertPos_[tri[0]],
                    projection * this->vertPos_[tri[1]],
@@ -106,8 +106,8 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
         tri0[2] = tri1[0];
         tri1[2] = tri0[0];
       } else if (firstValid) {
-        glm::vec3 firstCross = vertPos_[tri0[0]] - vertPos_[tri1[0]];
-        glm::vec3 secondCross = vertPos_[tri0[1]] - vertPos_[tri1[1]];
+        glm::dvec3 firstCross = vertPos_[tri0[0]] - vertPos_[tri1[0]];
+        glm::dvec3 secondCross = vertPos_[tri0[1]] - vertPos_[tri1[1]];
         if (glm::dot(firstCross, firstCross) <
             glm::dot(secondCross, secondCross)) {
           tri0[2] = tri1[0];
@@ -125,8 +125,8 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
     }
   };
   auto generalTriangulation = [&](int face) {
-    const glm::vec3 normal = faceNormal_[face];
-    const glm::mat3x2 projection = GetAxisAlignedProjection(normal);
+    const glm::dvec3 normal = faceNormal_[face];
+    const glm::dmat3x2 projection = GetAxisAlignedProjection(normal);
     const PolygonsIdx polys =
         Face2Polygons(halfedge_.cbegin() + faceEdge[face],
                       halfedge_.cbegin() + faceEdge[face + 1], projection);
@@ -162,7 +162,7 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
 
   auto processFace2 = std::bind(
       processFace, [&](int face) { return std::move(results[face]); },
-      [&](int face, glm::ivec3 tri, glm::vec3 normal, TriRef r) {
+      [&](int face, glm::ivec3 tri, glm::dvec3 normal, TriRef r) {
         triVerts[triCount[face]] = tri;
         triNormal[triCount[face]] = normal;
         triRef[triCount[face]] = r;
@@ -178,7 +178,7 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
   triRef.reserve(faceEdge.size());
   auto processFace2 = std::bind(
       processFace, generalTriangulation,
-      [&](int _face, glm::ivec3 tri, glm::vec3 normal, TriRef r) {
+      [&](int _face, glm::ivec3 tri, glm::dvec3 normal, TriRef r) {
         triVerts.push_back(tri);
         triNormal.push_back(normal);
         triRef.push_back(r);
@@ -200,7 +200,7 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
  */
 PolygonsIdx Manifold::Impl::Face2Polygons(VecView<Halfedge>::IterC start,
                                           VecView<Halfedge>::IterC end,
-                                          glm::mat3x2 projection) const {
+                                          glm::dmat3x2 projection) const {
   std::multimap<int, int> vert_edge;
   for (auto edge = start; edge != end; ++edge) {
     vert_edge.emplace(std::make_pair(edge->startVert, edge - start));
@@ -226,7 +226,7 @@ PolygonsIdx Manifold::Impl::Face2Polygons(VecView<Halfedge>::IterC start,
   return polys;
 }
 
-CrossSection Manifold::Impl::Slice(float height) const {
+CrossSection Manifold::Impl::Slice(double height) const {
   Box plane = bBox_;
   plane.min.z = plane.max.z = height;
   Vec<Box> query;
@@ -237,10 +237,10 @@ CrossSection Manifold::Impl::Slice(float height) const {
   std::unordered_set<int> tris;
   for (int i = 0; i < collisions.size(); ++i) {
     const int tri = collisions.Get(i, 1);
-    float min = std::numeric_limits<float>::infinity();
-    float max = -std::numeric_limits<float>::infinity();
+    double min = std::numeric_limits<double>::infinity();
+    double max = -std::numeric_limits<double>::infinity();
     for (const int j : {0, 1, 2}) {
-      const float z = vertPos_[halfedge_[3 * tri + j].startVert].z;
+      const double z = vertPos_[halfedge_[3 * tri + j].startVert].z;
       min = glm::min(min, z);
       max = glm::max(max, z);
     }
@@ -272,10 +272,10 @@ CrossSection Manifold::Impl::Slice(float height) const {
       }
 
       Halfedge up = halfedge_[3 * tri + k];
-      const glm::vec3 below = vertPos_[up.startVert];
-      const glm::vec3 above = vertPos_[up.endVert];
-      const float a = (height - below.z) / (above.z - below.z);
-      poly.push_back(glm::vec2(glm::mix(below, above, a)));
+      const glm::dvec3 below = vertPos_[up.startVert];
+      const glm::dvec3 above = vertPos_[up.endVert];
+      const double a = (height - below.z) / (above.z - below.z);
+      poly.push_back(glm::dvec2(glm::mix(below, above, a)));
 
       const int pair = up.pairedHalfedge;
       tri = pair / 3;
@@ -289,7 +289,7 @@ CrossSection Manifold::Impl::Slice(float height) const {
 }
 
 CrossSection Manifold::Impl::Project() const {
-  const glm::mat3x2 projection = GetAxisAlignedProjection({0, 0, 1});
+  const glm::dmat3x2 projection = GetAxisAlignedProjection({0, 0, 1});
   auto policy = autoPolicy(halfedge_.size());
 
   Vec<Halfedge> cusps(NumEdge());

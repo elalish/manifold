@@ -13,7 +13,7 @@
 TEST(CBIND, sphere) {
   int n = 25;
   size_t sz = manifold_manifold_size();
-  ManifoldManifold *sphere = manifold_sphere(malloc(sz), 1.0f, 4 * n);
+  ManifoldManifold *sphere = manifold_sphere(malloc(sz), 1.0, 4 * n);
 
   EXPECT_EQ(manifold_status(sphere), MANIFOLD_NO_ERROR);
   EXPECT_EQ(manifold_num_tri(sphere), n * n * 8);
@@ -23,11 +23,12 @@ TEST(CBIND, sphere) {
 
 TEST(CBIND, warp_translation) {
   size_t sz = manifold_manifold_size();
-  ManifoldVec3 (*warp)(float, float, float) = [](float x, float y, float z) {
-    ManifoldVec3 v = {x + 15.0f, y, z};
+  ManifoldVec3 (*warp)(double, double, double) = [](double x, double y,
+                                                    double z) {
+    ManifoldVec3 v = {x + 15.0, y, z};
     return v;
   };
-  ManifoldManifold *sphere = manifold_sphere(malloc(sz), 1.0f, 100);
+  ManifoldManifold *sphere = manifold_sphere(malloc(sz), 1.0, 100);
   ManifoldManifold *trans = manifold_translate(malloc(sz), sphere, 15., 0., 0.);
   ManifoldManifold *warped = manifold_warp(malloc(sz), sphere, warp);
   ManifoldManifold *diff = manifold_difference(malloc(sz), trans, warped);
@@ -45,18 +46,18 @@ TEST(CBIND, warp_translation) {
 TEST(CBIND, level_set) {
   size_t sz = manifold_manifold_size();
   // can't convert lambda with captures to funptr
-  float (*sdf)(float, float, float) = [](float x, float y, float z) {
-    const float radius = 15;
-    const float xscale = 3;
-    const float yscale = 1;
-    const float zscale = 1;
-    float xs = x / xscale;
-    float ys = y / yscale;
-    float zs = z / zscale;
-    return radius - sqrtf(xs * xs + ys * ys + zs * zs);
+  double (*sdf)(double, double, double) = [](double x, double y, double z) {
+    const double radius = 15;
+    const double xscale = 3;
+    const double yscale = 1;
+    const double zscale = 1;
+    double xs = x / xscale;
+    double ys = y / yscale;
+    double zs = z / zscale;
+    return radius - sqrt(xs * xs + ys * ys + zs * zs);
   };
 
-  const float bb = 30;  // (radius * 2)
+  const double bb = 30;  // (radius * 2)
   // bounding box scaled according to factors used in *sdf
   ManifoldBox *bounds = manifold_box(malloc(manifold_box_size()), -bb * 3,
                                      -bb * 1, -bb * 1, bb * 3, bb * 1, bb * 1);
@@ -110,7 +111,7 @@ TEST(CBIND, extrude) {
 TEST(CBIND, compose_decompose) {
   size_t sz = manifold_manifold_size();
 
-  ManifoldManifold *s1 = manifold_sphere(malloc(sz), 1.0f, 100);
+  ManifoldManifold *s1 = manifold_sphere(malloc(sz), 1.0, 100);
   ManifoldManifold *s2 = manifold_translate(malloc(sz), s1, 2., 2., 2.);
   ManifoldManifoldVec *ss =
       manifold_manifold_vec(malloc(manifold_manifold_vec_size()), 2);

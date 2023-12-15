@@ -54,7 +54,7 @@ MeshGL MeshJS2GL(const val& mesh) {
   out.numProp = mesh["numProp"].as<int>();
   out.triVerts = convertJSArrayToNumberVector<uint32_t>(mesh["triVerts"]);
   out.vertProperties =
-      convertJSArrayToNumberVector<float>(mesh["vertProperties"]);
+      convertJSArrayToNumberVector<double>(mesh["vertProperties"]);
   if (mesh["mergeFromVert"] != val::undefined()) {
     out.mergeFromVert =
         convertJSArrayToNumberVector<uint32_t>(mesh["mergeFromVert"]);
@@ -75,11 +75,11 @@ MeshGL MeshJS2GL(const val& mesh) {
   }
   if (mesh["halfedgeTangent"] != val::undefined()) {
     out.halfedgeTangent =
-        convertJSArrayToNumberVector<float>(mesh["halfedgeTangent"]);
+        convertJSArrayToNumberVector<double>(mesh["halfedgeTangent"]);
   }
   if (mesh["runTransform"] != val::undefined()) {
     out.runTransform =
-        convertJSArrayToNumberVector<float>(mesh["runTransform"]);
+        convertJSArrayToNumberVector<double>(mesh["runTransform"]);
   }
   return out;
 }
@@ -106,7 +106,7 @@ Manifold Smooth(const val& mesh,
 }  // namespace js
 
 namespace cross_js {
-CrossSection OfPolygons(std::vector<std::vector<glm::vec2>> polygons,
+CrossSection OfPolygons(std::vector<std::vector<glm::dvec2>> polygons,
                         int fill_rule) {
   auto fr = fill_rule == 0   ? CrossSection::FillRule::EvenOdd
             : fill_rule == 1 ? CrossSection::FillRule::NonZero
@@ -140,15 +140,15 @@ CrossSection IntersectionN(const std::vector<CrossSection>& cross_sections) {
 }
 
 CrossSection Transform(CrossSection& cross_section, const val& mat) {
-  std::vector<float> array = convertJSArrayToNumberVector<float>(mat);
-  glm::mat3x2 matrix;
+  std::vector<double> array = convertJSArrayToNumberVector<double>(mat);
+  glm::dmat3x2 matrix;
   for (const int col : {0, 1, 2})
     for (const int row : {0, 1}) matrix[col][row] = array[col * 3 + row];
   return cross_section.Transform(matrix);
 }
 
 CrossSection Warp(CrossSection& cross_section, uintptr_t funcPtr) {
-  void (*f)(glm::vec2&) = reinterpret_cast<void (*)(glm::vec2&)>(funcPtr);
+  void (*f)(glm::dvec2&) = reinterpret_cast<void (*)(glm::dvec2&)>(funcPtr);
   return cross_section.Warp(f);
 }
 
@@ -160,7 +160,7 @@ CrossSection Offset(CrossSection& cross_section, double delta, int join_type,
   return cross_section.Offset(delta, jt, miter_limit, arc_tolerance);
 }
 
-void CollectVertices(std::vector<glm::vec2>& verts, const CrossSection& cs) {
+void CollectVertices(std::vector<glm::dvec2>& verts, const CrossSection& cs) {
   auto polys = cs.ToPolygons();
   for (auto poly : polys) verts.insert(verts.end(), poly.begin(), poly.end());
 }
@@ -188,28 +188,28 @@ Manifold IntersectionN(const std::vector<Manifold>& manifolds) {
 }
 
 Manifold Transform(Manifold& manifold, const val& mat) {
-  std::vector<float> array = convertJSArrayToNumberVector<float>(mat);
-  glm::mat4x3 matrix;
+  std::vector<double> array = convertJSArrayToNumberVector<double>(mat);
+  glm::dmat4x3 matrix;
   for (const int col : {0, 1, 2, 3})
     for (const int row : {0, 1, 2}) matrix[col][row] = array[col * 4 + row];
   return manifold.Transform(matrix);
 }
 
 Manifold Warp(Manifold& manifold, uintptr_t funcPtr) {
-  void (*f)(glm::vec3&) = reinterpret_cast<void (*)(glm::vec3&)>(funcPtr);
+  void (*f)(glm::dvec3&) = reinterpret_cast<void (*)(glm::dvec3&)>(funcPtr);
   return manifold.Warp(f);
 }
 
 Manifold SetProperties(Manifold& manifold, int numProp, uintptr_t funcPtr) {
-  void (*f)(float*, glm::vec3, const float*) =
-      reinterpret_cast<void (*)(float*, glm::vec3, const float*)>(funcPtr);
+  void (*f)(double*, glm::dvec3, const double*) =
+      reinterpret_cast<void (*)(double*, glm::dvec3, const double*)>(funcPtr);
   return manifold.SetProperties(numProp, f);
 }
 
-Manifold LevelSet(uintptr_t funcPtr, Box bounds, float edgeLength,
-                  float level) {
-  float (*f)(const glm::vec3&) =
-      reinterpret_cast<float (*)(const glm::vec3&)>(funcPtr);
+Manifold LevelSet(uintptr_t funcPtr, Box bounds, double edgeLength,
+                  double level) {
+  double (*f)(const glm::dvec3&) =
+      reinterpret_cast<double (*)(const glm::dvec3&)>(funcPtr);
   Mesh m = LevelSet(f, bounds, edgeLength, level);
   return Manifold(m);
 }
@@ -219,13 +219,13 @@ std::vector<Manifold> Split(Manifold& a, Manifold& b) {
   return {r1, r2};
 }
 
-std::vector<Manifold> SplitByPlane(Manifold& m, glm::vec3 normal,
-                                   float originOffset) {
+std::vector<Manifold> SplitByPlane(Manifold& m, glm::dvec3 normal,
+                                   double originOffset) {
   auto [a, b] = m.SplitByPlane(normal, originOffset);
   return {a, b};
 }
 
-void CollectVertices(std::vector<glm::vec3>& verts, const Manifold& manifold) {
+void CollectVertices(std::vector<glm::dvec3>& verts, const Manifold& manifold) {
   Mesh mesh = manifold.GetMesh();
   verts.insert(verts.end(), mesh.vertPos.begin(), mesh.vertPos.end());
 }

@@ -38,8 +38,8 @@ namespace manifold {
  * @param linearSegments Number of segments along the length of the knot.
  * Default makes roughly square facets.
  */
-Manifold TorusKnot(int p, int q, float majorRadius, float minorRadius,
-                   float threadRadius, int circularSegments,
+Manifold TorusKnot(int p, int q, double majorRadius, double minorRadius,
+                   double threadRadius, int circularSegments,
                    int linearSegments) {
   int kLoops = gcd(p, q);
   p /= kLoops;
@@ -53,16 +53,16 @@ Manifold TorusKnot(int p, int q, float majorRadius, float minorRadius,
   Manifold knot = Manifold::Revolve(circle, m);
 
   knot =
-      knot.Warp([p, q, majorRadius, minorRadius, threadRadius](glm::vec3& v) {
-        float psi = q * atan2(v.x, v.y);
-        float theta = psi * p / q;
-        glm::vec2 xy = glm::vec2(v);
-        float x1 = sqrt(glm::dot(xy, xy));
-        float phi = atan2(x1 - 2, v.z);
-        v = glm::vec3(cos(phi), 0.0f, sin(phi));
+      knot.Warp([p, q, majorRadius, minorRadius, threadRadius](glm::dvec3& v) {
+        double psi = q * atan2(v.x, v.y);
+        double theta = psi * p / q;
+        glm::dvec2 xy = glm::dvec2(v);
+        double x1 = sqrt(glm::dot(xy, xy));
+        double phi = atan2(x1 - 2, v.z);
+        v = glm::dvec3(cos(phi), 0.0f, sin(phi));
         v *= threadRadius;
-        float r = majorRadius + minorRadius * cos(theta);
-        v = glm::rotateX(v, -float(atan2(p * minorRadius, q * r)));
+        double r = majorRadius + minorRadius * cos(theta);
+        v = glm::rotateX(v, -double(atan2(p * minorRadius, q * r)));
         v.x += minorRadius;
         v = glm::rotateY(v, theta);
         v.x += majorRadius;
@@ -71,9 +71,9 @@ Manifold TorusKnot(int p, int q, float majorRadius, float minorRadius,
 
   if (kLoops > 1) {
     std::vector<Manifold> knots;
-    for (float k = 0; k < kLoops; ++k) {
+    for (double k = 0; k < kLoops; ++k) {
       knots.push_back(
-          knot.Rotate(0, 0, 360.0f * (k / kLoops) * (q / float(p))));
+          knot.Rotate(0, 0, 360.0 * (k / kLoops) * (q / double(p))));
     }
     knot = Manifold::Compose(knots);
   }

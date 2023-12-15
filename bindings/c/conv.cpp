@@ -119,9 +119,9 @@ ManifoldRect *to_c(manifold::Rect *m) {
   return reinterpret_cast<ManifoldRect *>(m);
 }
 
-ManifoldVec2 to_c(glm::vec2 v) { return {v.x, v.y}; }
+ManifoldVec2 to_c(glm::dvec2 v) { return {v.x, v.y}; }
 
-ManifoldVec3 to_c(glm::vec3 v) { return {v.x, v.y, v.z}; }
+ManifoldVec3 to_c(glm::dvec3 v) { return {v.x, v.y, v.z}; }
 
 ManifoldIVec3 to_c(glm::ivec3 v) { return {v.x, v.y, v.z}; }
 
@@ -217,16 +217,16 @@ const manifold::Rect *from_c(ManifoldRect *m) {
   return reinterpret_cast<manifold::Rect const *>(m);
 }
 
-glm::vec2 from_c(ManifoldVec2 v) { return glm::vec2(v.x, v.y); }
+glm::dvec2 from_c(ManifoldVec2 v) { return glm::dvec2(v.x, v.y); }
 
-glm::vec3 from_c(ManifoldVec3 v) { return glm::vec3(v.x, v.y, v.z); }
+glm::dvec3 from_c(ManifoldVec3 v) { return glm::dvec3(v.x, v.y, v.z); }
 
 glm::ivec3 from_c(ManifoldIVec3 v) { return glm::ivec3(v.x, v.y, v.z); }
 
-glm::vec4 from_c(ManifoldVec4 v) { return glm::vec4(v.x, v.y, v.z, v.w); }
+glm::dvec4 from_c(ManifoldVec4 v) { return glm::dvec4(v.x, v.y, v.z, v.w); }
 
-std::vector<glm::vec3> vector_of_vec_array(ManifoldVec3 *vs, size_t length) {
-  auto vec = std::vector<glm::vec3>();
+std::vector<glm::dvec3> vector_of_vec_array(ManifoldVec3 *vs, size_t length) {
+  auto vec = std::vector<glm::dvec3>();
   for (int i = 0; i < length; ++i) {
     vec.push_back(from_c(vs[i]));
   }
@@ -241,8 +241,8 @@ std::vector<glm::ivec3> vector_of_vec_array(ManifoldIVec3 *vs, size_t length) {
   return vec;
 }
 
-std::vector<glm::vec4> vector_of_vec_array(ManifoldVec4 *vs, size_t length) {
-  auto vec = std::vector<glm::vec4>();
+std::vector<glm::dvec4> vector_of_vec_array(ManifoldVec4 *vs, size_t length) {
+  auto vec = std::vector<glm::dvec4>();
   for (int i = 0; i < length; ++i) {
     vec.push_back(from_c(vs[i]));
   }

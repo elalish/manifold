@@ -42,14 +42,14 @@ struct MakeTri {
 };
 
 struct UpdateProperties {
-  float* properties;
+  double* properties;
   const int numProp;
-  const float* oldProperties;
+  const double* oldProperties;
   const int numOldProp;
-  const glm::vec3* vertPos;
+  const glm::dvec3* vertPos;
   const glm::ivec3* triProperties;
   const Halfedge* halfedges;
-  std::function<void(float*, glm::vec3, const float*)> propFunc;
+  std::function<void(double*, glm::dvec3, const double*)> propFunc;
 
   void operator()(int tri) {
     for (int i : {0, 1, 2}) {
@@ -61,16 +61,16 @@ struct UpdateProperties {
   }
 };
 
-Manifold Halfspace(Box bBox, glm::vec3 normal, float originOffset) {
+Manifold Halfspace(Box bBox, glm::dvec3 normal, double originOffset) {
   normal = glm::normalize(normal);
   Manifold cutter =
-      Manifold::Cube(glm::vec3(2.0f), true).Translate({1.0f, 0.0f, 0.0f});
-  float size = glm::length(bBox.Center() - normal * originOffset) +
-               0.5f * glm::length(bBox.Size());
-  cutter = cutter.Scale(glm::vec3(size)).Translate({originOffset, 0.0f, 0.0f});
-  float yDeg = glm::degrees(-glm::asin(normal.z));
-  float zDeg = glm::degrees(glm::atan(normal.y, normal.x));
-  return cutter.Rotate(0.0f, yDeg, zDeg);
+      Manifold::Cube(glm::dvec3(2.0), true).Translate({1.0, 0.0, 0.0});
+  double size = glm::length(bBox.Center() - normal * originOffset) +
+                0.5 * glm::length(bBox.Size());
+  cutter = cutter.Scale(glm::dvec3(size)).Translate({originOffset, 0.0, 0.0});
+  double yDeg = glm::degrees(-glm::asin(normal.z));
+  double zDeg = glm::degrees(glm::atan(normal.y, normal.x));
+  return cutter.Rotate(0.0, yDeg, zDeg);
 }
 }  // namespace
 
@@ -133,7 +133,7 @@ CsgLeafNode& Manifold::GetCsgLeafNode() const {
  * properties in the [-1, 1] range.
  */
 Manifold::Manifold(const MeshGL& meshGL,
-                   const std::vector<float>& propertyTolerance)
+                   const std::vector<double>& propertyTolerance)
     : pNode_(std::make_shared<CsgLeafNode>(
           std::make_shared<Impl>(meshGL, propertyTolerance))) {}
 
@@ -209,7 +209,7 @@ MeshGL Manifold::GetMeshGL(glm::ivec3 normalIdx) const {
   const int numHalfedge = impl.halfedgeTangent_.size();
   out.halfedgeTangent.resize(4 * numHalfedge);
   for (int i = 0; i < numHalfedge; ++i) {
-    const glm::vec4 t = impl.halfedgeTangent_[i];
+    const glm::dvec4 t = impl.halfedgeTangent_[i];
     out.halfedgeTangent[4 * i] = t.x;
     out.halfedgeTangent[4 * i + 1] = t.y;
     out.halfedgeTangent[4 * i + 2] = t.z;
@@ -230,16 +230,16 @@ MeshGL Manifold::GetMeshGL(glm::ivec3 normalIdx) const {
     });
   }
 
-  std::vector<glm::mat3> runNormalTransform;
+  std::vector<glm::dmat3> runNormalTransform;
 
   auto addRun = [updateNormals, isOriginal](
-                    MeshGL& out, std::vector<glm::mat3>& runNormalTransform,
+                    MeshGL& out, std::vector<glm::dmat3>& runNormalTransform,
                     int tri, const Impl::Relation& rel) {
     out.runIndex.push_back(3 * tri);
     out.runOriginalID.push_back(rel.originalID);
     if (updateNormals) {
       runNormalTransform.push_back(NormalTransform(rel.transform) *
-                                   (rel.backSide ? -1.0f : 1.0f));
+                                   (rel.backSide ? -1.0 : 1.0));
     }
     if (!isOriginal) {
       for (const int col : {0, 1, 2, 3}) {
@@ -280,7 +280,7 @@ MeshGL Manifold::GetMeshGL(glm::ivec3 normalIdx) const {
   if (numProp == 0) {
     out.vertProperties.resize(3 * numVert);
     for (int i = 0; i < numVert; ++i) {
-      const glm::vec3 v = impl.vertPos_[i];
+      const glm::dvec3 v = impl.vertPos_[i];
       out.vertProperties[3 * i] = v.x;
       out.vertProperties[3 * i + 1] = v.y;
       out.vertProperties[3 * i + 2] = v.z;
@@ -325,7 +325,7 @@ MeshGL Manifold::GetMeshGL(glm::ivec3 normalIdx) const {
         }
 
         if (updateNormals) {
-          glm::vec3 normal;
+          glm::dvec3 normal;
           const int start = out.vertProperties.size() - out.numProp;
           for (int i : {0, 1, 2}) {
             normal[i] = out.vertProperties[start + normalIdx[i]];
@@ -400,7 +400,7 @@ Box Manifold::BoundingBox() const { return GetCsgLeafNode().GetImpl()->bBox_; }
  * considered degenerate and removed. This is the value of &epsilon; defining
  * [&epsilon;-valid](https://github.com/elalish/manifold/wiki/Manifold-Library#definition-of-%CE%B5-valid).
  */
-float Manifold::Precision() const {
+double Manifold::Precision() const {
   return GetCsgLeafNode().GetImpl()->precision_;
 }
 
@@ -495,7 +495,7 @@ int Manifold::NumOverlaps(const Manifold& other) const {
  *
  * @param v The vector to add to every vertex.
  */
-Manifold Manifold::Translate(glm::vec3 v) const {
+Manifold Manifold::Translate(glm::dvec3 v) const {
   return Manifold(pNode_->Translate(v));
 }
 
@@ -505,7 +505,7 @@ Manifold Manifold::Translate(glm::vec3 v) const {
  *
  * @param v The vector to multiply every vertex by per component.
  */
-Manifold Manifold::Scale(glm::vec3 v) const {
+Manifold Manifold::Scale(glm::dvec3 v) const {
   return Manifold(pNode_->Scale(v));
 }
 
@@ -521,8 +521,8 @@ Manifold Manifold::Scale(glm::vec3 v) const {
  * @param yDegrees Second rotation, degrees about the Y-axis.
  * @param zDegrees Third rotation, degrees about the Z-axis.
  */
-Manifold Manifold::Rotate(float xDegrees, float yDegrees,
-                          float zDegrees) const {
+Manifold Manifold::Rotate(double xDegrees, double yDegrees,
+                          double zDegrees) const {
   return Manifold(pNode_->Rotate(xDegrees, yDegrees, zDegrees));
 }
 
@@ -533,7 +533,7 @@ Manifold Manifold::Rotate(float xDegrees, float yDegrees,
  *
  * @param m The affine transform matrix to apply to all the vertices.
  */
-Manifold Manifold::Transform(const glm::mat4x3& m) const {
+Manifold Manifold::Transform(const glm::dmat4x3& m) const {
   return Manifold(pNode_->Transform(m));
 }
 
@@ -545,12 +545,12 @@ Manifold Manifold::Transform(const glm::mat4x3& m) const {
  *
  * @param normal The normal vector of the plane to be mirrored over
  */
-Manifold Manifold::Mirror(glm::vec3 normal) const {
+Manifold Manifold::Mirror(glm::dvec3 normal) const {
   if (glm::length(normal) == 0.) {
     return Manifold();
   }
   auto n = glm::normalize(normal);
-  auto m = glm::mat4x3(glm::mat3(1.0f) - 2.0f * glm::outerProduct(n, n));
+  auto m = glm::dmat4x3(glm::dmat3(1.0) - 2.0 * glm::outerProduct(n, n));
   return Manifold(pNode_->Transform(m));
 }
 
@@ -563,7 +563,7 @@ Manifold Manifold::Mirror(glm::vec3 normal) const {
  *
  * @param warpFunc A function that modifies a given vertex position.
  */
-Manifold Manifold::Warp(std::function<void(glm::vec3&)> warpFunc) const {
+Manifold Manifold::Warp(std::function<void(glm::dvec3&)> warpFunc) const {
   auto pImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
   pImpl->Warp(warpFunc);
   return Manifold(std::make_shared<CsgLeafNode>(pImpl));
@@ -580,12 +580,12 @@ Manifold Manifold::Warp(std::function<void(glm::vec3&)> warpFunc) const {
  * @param propFunc A function that modifies the properties of a given vertex.
  */
 Manifold Manifold::SetProperties(
-    int numProp, std::function<void(float* newProp, glm::vec3 position,
-                                    const float* oldProp)>
+    int numProp, std::function<void(double* newProp, glm::dvec3 position,
+                                    const double* oldProp)>
                      propFunc) const {
   auto pImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
   const int oldNumProp = NumProp();
-  const Vec<float> oldProperties = pImpl->meshRelation_.properties;
+  const Vec<double> oldProperties = pImpl->meshRelation_.properties;
 
   auto& triProperties = pImpl->meshRelation_.triProperties;
   if (numProp == 0) {
@@ -601,9 +601,9 @@ Manifold Manifold::SetProperties(
           triProperties[i][j] = idx++;
         }
       }
-      pImpl->meshRelation_.properties = Vec<float>(numProp * idx, 0);
+      pImpl->meshRelation_.properties = Vec<double>(numProp * idx, 0);
     } else {
-      pImpl->meshRelation_.properties = Vec<float>(numProp * NumPropVert(), 0);
+      pImpl->meshRelation_.properties = Vec<double>(numProp * NumPropVert(), 0);
     }
     thrust::for_each_n(
         thrust::host, countAt(0), NumTri(),
@@ -761,8 +761,8 @@ std::pair<Manifold, Manifold> Manifold::Split(const Manifold& cutter) const {
  * @param originOffset The distance of the plane from the origin in the
  * direction of the normal vector.
  */
-std::pair<Manifold, Manifold> Manifold::SplitByPlane(glm::vec3 normal,
-                                                     float originOffset) const {
+std::pair<Manifold, Manifold> Manifold::SplitByPlane(
+    glm::dvec3 normal, double originOffset) const {
   return Split(Halfspace(BoundingBox(), normal, originOffset));
 }
 
@@ -775,7 +775,7 @@ std::pair<Manifold, Manifold> Manifold::SplitByPlane(glm::vec3 normal,
  * @param originOffset The distance of the plane from the origin in the
  * direction of the normal vector.
  */
-Manifold Manifold::TrimByPlane(glm::vec3 normal, float originOffset) const {
+Manifold Manifold::TrimByPlane(glm::dvec3 normal, double originOffset) const {
   return *this ^ Halfspace(BoundingBox(), normal, originOffset);
 }
 
@@ -785,7 +785,7 @@ Manifold Manifold::TrimByPlane(glm::vec3 normal, float originOffset) const {
  * the bounding box will return the bottom faces, while using a height equal to
  * the top of the bounding box will return empty.
  */
-CrossSection Manifold::Slice(float height) const {
+CrossSection Manifold::Slice(double height) const {
   return GetCsgLeafNode().GetImpl()->Slice(height);
 }
 
@@ -806,7 +806,7 @@ ExecutionParams& ManifoldParams() { return manifoldParams; }
  * @param pts A vector of 3-dimensional points over which to compute a convex
  * hull.
  */
-Manifold Manifold::Hull(const std::vector<glm::vec3>& pts) {
+Manifold Manifold::Hull(const std::vector<glm::dvec3>& pts) {
   ZoneScoped;
   const int numVert = pts.size();
   if (numVert < 4) return Manifold();

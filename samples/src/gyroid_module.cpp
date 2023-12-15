@@ -20,15 +20,15 @@ namespace {
 using namespace manifold;
 
 struct Gyroid {
-  float operator()(glm::vec3 p) const {
-    p -= glm::pi<float>() / 4;
+  double operator()(glm::dvec3 p) const {
+    p -= glm::pi<double>() / 4;
     return cos(p.x) * sin(p.y) + cos(p.y) * sin(p.z) + cos(p.z) * sin(p.x);
   }
 };
 
-Manifold RhombicDodecahedron(float size) {
+Manifold RhombicDodecahedron(double size) {
   Manifold box =
-      Manifold::Cube(size * glm::sqrt(2.0f) * glm::vec3(1, 1, 2), true);
+      Manifold::Cube(size * glm::sqrt(2.0f) * glm::dvec3(1, 1, 2), true);
   Manifold result = box.Rotate(90, 45) ^ box.Rotate(90, 45, 90);
   return result ^ box.Rotate(0, 0, 45);
 }
@@ -44,16 +44,17 @@ namespace manifold {
  * demonstrates the use of a Signed Distance Function (SDF) to create smooth,
  * complex manifolds.
  */
-Manifold GyroidModule(float size, int n) {
-  auto gyroid = [&](float level) {
-    const float period = glm::two_pi<float>();
-    return Manifold(LevelSet(Gyroid(), {glm::vec3(-period), glm::vec3(period)},
+Manifold GyroidModule(double size, int n) {
+  auto gyroid = [&](double level) {
+    const double period = glm::two_pi<double>();
+    return Manifold(LevelSet(Gyroid(),
+                             {glm::dvec3(-period), glm::dvec3(period)},
                              period / n, level))
-        .Scale(glm::vec3(size / period));
+        .Scale(glm::dvec3(size / period));
   };
 
   Manifold result = (RhombicDodecahedron(size) ^ gyroid(-0.4)) - gyroid(0.4);
 
-  return result.Rotate(-45, 0, 90).Translate({0, 0, size / glm::sqrt(2.0f)});
+  return result.Rotate(-45, 0, 90).Translate({0, 0, size / glm::sqrt(2.0)});
 }
 }  // namespace manifold

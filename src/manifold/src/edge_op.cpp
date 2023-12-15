@@ -26,9 +26,9 @@ glm::ivec3 TriOf(int edge) {
   return triEdge;
 }
 
-bool Is01Longest(glm::vec2 v0, glm::vec2 v1, glm::vec2 v2) {
-  const glm::vec2 e[3] = {v1 - v0, v2 - v1, v0 - v2};
-  float l[3];
+bool Is01Longest(glm::dvec2 v0, glm::dvec2 v1, glm::dvec2 v2) {
+  const glm::dvec2 e[3] = {v1 - v0, v2 - v1, v0 - v2};
+  double l[3];
   for (int i : {0, 1, 2}) l[i] = glm::dot(e[i], e[i]);
   return l[0] > l[1] && l[0] > l[2];
 }
@@ -46,13 +46,13 @@ struct DuplicateEdge {
 
 struct ShortEdge {
   VecView<const Halfedge> halfedge;
-  VecView<const glm::vec3> vertPos;
-  const float precision;
+  VecView<const glm::dvec3> vertPos;
+  const double precision;
 
   bool operator()(int edge) const {
     if (halfedge[edge].pairedHalfedge < 0) return false;
     // Flag short edges
-    const glm::vec3 delta =
+    const glm::dvec3 delta =
         vertPos[halfedge[edge].endVert] - vertPos[halfedge[edge].startVert];
     return glm::dot(delta, delta) < precision * precision;
   }
@@ -83,17 +83,17 @@ struct FlagEdge {
 
 struct SwappableEdge {
   VecView<const Halfedge> halfedge;
-  VecView<const glm::vec3> vertPos;
-  VecView<const glm::vec3> triNormal;
-  const float precision;
+  VecView<const glm::dvec3> vertPos;
+  VecView<const glm::dvec3> triNormal;
+  const double precision;
 
   bool operator()(int edge) const {
     if (halfedge[edge].pairedHalfedge < 0) return false;
 
     int tri = halfedge[edge].face;
     glm::ivec3 triedge = TriOf(edge);
-    glm::mat3x2 projection = GetAxisAlignedProjection(triNormal[tri]);
-    glm::vec2 v[3];
+    glm::dmat3x2 projection = GetAxisAlignedProjection(triNormal[tri]);
+    glm::dvec2 v[3];
     for (int i : {0, 1, 2})
       v[i] = projection * vertPos[halfedge[triedge[i]].startVert];
     if (CCW(v[0], v[1], v[2], precision) > 0 || !Is01Longest(v[0], v[1], v[2]))
@@ -417,13 +417,13 @@ void Manifold::Impl::RemoveIfFolded(int edge) {
     if (halfedge_[tri0edge[1]].pairedHalfedge == tri1edge[2]) {
       if (halfedge_[tri0edge[2]].pairedHalfedge == tri1edge[1]) {
         for (int i : {0, 1, 2})
-          vertPos_[halfedge_[tri0edge[i]].startVert] = glm::vec3(NAN);
+          vertPos_[halfedge_[tri0edge[i]].startVert] = glm::dvec3(NAN);
       } else {
-        vertPos_[halfedge_[tri0edge[1]].startVert] = glm::vec3(NAN);
+        vertPos_[halfedge_[tri0edge[1]].startVert] = glm::dvec3(NAN);
       }
     } else {
       if (halfedge_[tri0edge[2]].pairedHalfedge == tri1edge[1]) {
-        vertPos_[halfedge_[tri1edge[1]].startVert] = glm::vec3(NAN);
+        vertPos_[halfedge_[tri1edge[1]].startVert] = glm::dvec3(NAN);
       }
     }
     PairUp(halfedge_[tri0edge[1]].pairedHalfedge,
@@ -452,9 +452,9 @@ void Manifold::Impl::CollapseEdge(const int edge, std::vector<int>& edges) {
   const glm::ivec3 tri0edge = TriOf(edge);
   const glm::ivec3 tri1edge = TriOf(toRemove.pairedHalfedge);
 
-  const glm::vec3 pNew = vertPos_[endVert];
-  const glm::vec3 pOld = vertPos_[toRemove.startVert];
-  const glm::vec3 delta = pNew - pOld;
+  const glm::dvec3 pNew = vertPos_[endVert];
+  const glm::dvec3 pOld = vertPos_[toRemove.startVert];
+  const glm::dvec3 delta = pNew - pOld;
   const bool shortEdge = glm::dot(delta, delta) < precision_ * precision_;
 
   // Orbit endVert
@@ -470,13 +470,14 @@ void Manifold::Impl::CollapseEdge(const int edge, std::vector<int>& edges) {
   if (!shortEdge) {
     current = start;
     TriRef refCheck = triRef[toRemove.pairedHalfedge / 3];
-    glm::vec3 pLast = vertPos_[halfedge_[tri1edge[1]].endVert];
+    glm::dvec3 pLast = vertPos_[halfedge_[tri1edge[1]].endVert];
     while (current != tri0edge[2]) {
       current = NextHalfedge(current);
-      glm::vec3 pNext = vertPos_[halfedge_[current].endVert];
+      glm::dvec3 pNext = vertPos_[halfedge_[current].endVert];
       const int tri = current / 3;
       const TriRef ref = triRef[tri];
-      const glm::mat3x2 projection = GetAxisAlignedProjection(faceNormal_[tri]);
+      const glm::dmat3x2 projection =
+          GetAxisAlignedProjection(faceNormal_[tri]);
       // Don't collapse if the edge is not redundant (this may have changed due
       // to the collapse of neighbors).
       if (ref.meshID != refCheck.meshID || ref.tri != refCheck.tri) {
@@ -503,7 +504,7 @@ void Manifold::Impl::CollapseEdge(const int edge, std::vector<int>& edges) {
   }
 
   // Remove toRemove.startVert and replace with endVert.
-  vertPos_[toRemove.startVert] = glm::vec3(NAN);
+  vertPos_[toRemove.startVert] = glm::dvec3(NAN);
   CollapseTri(tri1edge);
 
   // Orbit startVert
@@ -564,8 +565,8 @@ void Manifold::Impl::RecursiveEdgeSwap(const int edge, int& tag,
   const glm::ivec3 perm0 = TriOf(edge % 3);
   const glm::ivec3 perm1 = TriOf(pair % 3);
 
-  glm::mat3x2 projection = GetAxisAlignedProjection(faceNormal_[edge / 3]);
-  glm::vec2 v[4];
+  glm::dmat3x2 projection = GetAxisAlignedProjection(faceNormal_[edge / 3]);
+  glm::dvec2 v[4];
   for (int i : {0, 1, 2})
     v[i] = projection * vertPos_[halfedge_[tri0edge[i]].startVert];
   // Only operate on the long edge of a degenerate triangle.
@@ -594,13 +595,13 @@ void Manifold::Impl::RecursiveEdgeSwap(const int edge, int& tag,
     const int tri1 = halfedge_[tri1edge[0]].face;
     faceNormal_[tri0] = faceNormal_[tri1];
     triRef[tri0] = triRef[tri1];
-    const float l01 = glm::length(v[1] - v[0]);
-    const float l02 = glm::length(v[2] - v[0]);
-    const float a = glm::max(0.0f, glm::min(1.0f, l02 / l01));
+    const double l01 = glm::length(v[1] - v[0]);
+    const double l02 = glm::length(v[2] - v[0]);
+    const double a = glm::max(0.0, glm::min(1.0, l02 / l01));
     // Update properties if applicable
     if (meshRelation_.properties.size() > 0) {
       Vec<glm::ivec3>& triProp = meshRelation_.triProperties;
-      Vec<float>& prop = meshRelation_.properties;
+      Vec<double>& prop = meshRelation_.properties;
       triProp[tri0] = triProp[tri1];
       triProp[tri0][perm0[1]] = triProp[tri1][perm1[0]];
       triProp[tri0][perm0[0]] = triProp[tri1][perm1[2]];
@@ -635,7 +636,7 @@ void Manifold::Impl::RecursiveEdgeSwap(const int edge, int& tag,
     if (!Is01Longest(v[1], v[0], v[3])) return;
     // Two facing, long-edge degenerates can swap.
     SwapEdge();
-    const glm::vec2 e23 = v[3] - v[2];
+    const glm::dvec2 e23 = v[3] - v[2];
     if (glm::dot(e23, e23) < precision_ * precision_) {
       tag++;
       CollapseEdge(tri0edge[2], edges);

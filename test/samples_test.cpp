@@ -91,8 +91,9 @@ TEST(Samples, Scallop) {
     }
     for (int i = 0; i < numHalfedge; ++i) {
       const int vert = in.triVerts[i / 3][i % 3];
-      in.vertPos.push_back(in.vertPos[vert] + glm::vec3(in.halfedgeTangent[i]) *
-                                                  in.halfedgeTangent[i].w);
+      in.vertPos.push_back(in.vertPos[vert] +
+                           glm::dvec3(in.halfedgeTangent[i]) *
+                               in.halfedgeTangent[i].w);
       options.mat.vertColor.push_back({0.5, 0.5, 0, 1});
       const int j = edgePair[i % 3 == 0 ? i + 2 : i - 1];
       in.triVerts.push_back({vert, numVert + i, numVert + j});
@@ -103,13 +104,13 @@ TEST(Samples, Scallop) {
   }
 #endif
 
-  auto colorCurvature = [](float* newProp, glm::vec3 pos,
-                           const float* oldProp) {
-    const float curvature = oldProp[0];
-    const glm::vec3 red(1, 0, 0);
-    const glm::vec3 blue(0, 0, 1);
-    const float limit = 15;
-    glm::vec3 color =
+  auto colorCurvature = [](double* newProp, glm::dvec3 pos,
+                           const double* oldProp) {
+    const double curvature = oldProp[0];
+    const glm::dvec3 red(1, 0, 0);
+    const glm::dvec3 blue(0, 0, 1);
+    const double limit = 15;
+    glm::dvec3 color =
         glm::mix(blue, red, glm::smoothstep(-limit, limit, curvature));
     for (const int i : {0, 1, 2}) {
       newProp[i] = color[i];
@@ -211,7 +212,7 @@ TEST(Samples, Bracelet) {
 }
 
 TEST(Samples, GyroidModule) {
-  const float size = 20;
+  const double size = 20;
   Manifold gyroid = GyroidModule(size);
   CheckNormals(gyroid);
   EXPECT_LE(gyroid.NumDegenerateTris(), 4);
@@ -219,9 +220,9 @@ TEST(Samples, GyroidModule) {
   CheckGL(gyroid);
 
   const Box bounds = gyroid.BoundingBox();
-  const float precision = gyroid.Precision();
+  const double precision = gyroid.Precision();
   EXPECT_NEAR(bounds.min.z, 0, precision);
-  EXPECT_NEAR(bounds.max.z, size * glm::sqrt(2.0f), precision);
+  EXPECT_NEAR(bounds.max.z, size * glm::sqrt(2.0), precision);
 
   CrossSection slice = gyroid.Slice(5);
   EXPECT_EQ(slice.NumContour(), 4);
@@ -285,8 +286,8 @@ TEST(Samples, Sponge4) {
     options.faceted = true;
     options.mat.roughness = 0.2;
     options.mat.metalness = 1.0;
-    for (const glm::vec3 pos : out.vertPos) {
-      options.mat.vertColor.push_back(glm::vec4(0.5f * (pos + 0.5f), 1.0f));
+    for (const glm::dvec3 pos : out.vertPos) {
+      options.mat.vertColor.push_back(glm::dvec4(0.5 * (pos + 0.5), 1.0));
     }
     ExportMesh("mengerSponge.glb", out, options);
   }

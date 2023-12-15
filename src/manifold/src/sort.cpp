@@ -56,13 +56,13 @@ uint32_t SpreadBits3(uint32_t v) {
   return v;
 }
 
-uint32_t MortonCode(glm::vec3 position, Box bBox) {
+uint32_t MortonCode(glm::dvec3 position, Box bBox) {
   // Unreferenced vertices are marked NaN, and this will sort them to the end
   // (the Morton code only uses the first 30 of 32 bits).
   if (isnan(position.x)) return kNoCode;
 
-  glm::vec3 xyz = (position - bBox.min) / (bBox.max - bBox.min);
-  xyz = glm::min(glm::vec3(1023.0f), glm::max(glm::vec3(0.0f), 1024.0f * xyz));
+  glm::dvec3 xyz = (position - bBox.min) / (bBox.max - bBox.min);
+  xyz = glm::min(glm::dvec3(1023.0), glm::max(glm::dvec3(0.0), 1024.0 * xyz));
   uint32_t x = SpreadBits3(static_cast<uint32_t>(xyz.x));
   uint32_t y = SpreadBits3(static_cast<uint32_t>(xyz.y));
   uint32_t z = SpreadBits3(static_cast<uint32_t>(xyz.z));
@@ -72,15 +72,15 @@ uint32_t MortonCode(glm::vec3 position, Box bBox) {
 struct Morton {
   const Box bBox;
 
-  void operator()(thrust::tuple<uint32_t&, const glm::vec3&> inout) {
-    glm::vec3 position = thrust::get<1>(inout);
+  void operator()(thrust::tuple<uint32_t&, const glm::dvec3&> inout) {
+    glm::dvec3 position = thrust::get<1>(inout);
     thrust::get<0>(inout) = MortonCode(position, bBox);
   }
 };
 
 struct FaceMortonBox {
   VecView<const Halfedge> halfedge;
-  VecView<const glm::vec3> vertPos;
+  VecView<const glm::dvec3> vertPos;
   const Box bBox;
 
   void operator()(thrust::tuple<uint32_t&, Box&, int> inout) {
@@ -96,10 +96,10 @@ struct FaceMortonBox {
       return;
     }
 
-    glm::vec3 center(0.0f);
+    glm::dvec3 center(0.0);
 
     for (const int i : {0, 1, 2}) {
-      const glm::vec3 pos = vertPos[halfedge[3 * face + i].startVert];
+      const glm::dvec3 pos = vertPos[halfedge[3 * face + i].startVert];
       center += pos;
       faceBox.Union(pos);
     }
@@ -131,8 +131,8 @@ struct MarkProp {
 };
 
 struct GatherProps {
-  VecView<float> properties;
-  VecView<const float> oldProperties;
+  VecView<double> properties;
+  VecView<const double> oldProperties;
   const int numProp;
 
   void operator()(thrust::tuple<int, int, int> in) {
@@ -165,13 +165,13 @@ void Permute(Vec<T>& inOut, const Vec<int>& new2Old) {
 }
 
 template void Permute<TriRef>(Vec<TriRef>&, const Vec<int>&);
-template void Permute<glm::vec3>(Vec<glm::vec3>&, const Vec<int>&);
+template void Permute<glm::dvec3>(Vec<glm::dvec3>&, const Vec<int>&);
 
 struct ReindexFace {
   VecView<Halfedge> halfedge;
-  VecView<glm::vec4> halfedgeTangent;
+  VecView<glm::dvec4> halfedgeTangent;
   VecView<const Halfedge> oldHalfedge;
-  VecView<const glm::vec4> oldHalfedgeTangent;
+  VecView<const glm::dvec4> oldHalfedgeTangent;
   VecView<const int> faceNew2Old;
   VecView<const int> faceOld2New;
 
@@ -194,9 +194,9 @@ struct ReindexFace {
 };
 
 struct VertMortonBox {
-  VecView<const float> vertProperties;
+  VecView<const double> vertProperties;
   const uint32_t numProp;
-  const float tol;
+  const double tol;
   const Box bBox;
 
   void operator()(thrust::tuple<uint32_t&, Box&, int> inout) {
@@ -204,9 +204,9 @@ struct VertMortonBox {
     Box& vertBox = thrust::get<1>(inout);
     int vert = thrust::get<2>(inout);
 
-    const glm::vec3 center(vertProperties[numProp * vert],
-                           vertProperties[numProp * vert + 1],
-                           vertProperties[numProp * vert + 2]);
+    const glm::dvec3 center(vertProperties[numProp * vert],
+                            vertProperties[numProp * vert + 1],
+                            vertProperties[numProp * vert + 2]);
 
     vertBox.min = center - tol / 2;
     vertBox.max = center + tol / 2;
@@ -216,16 +216,16 @@ struct VertMortonBox {
 };
 
 struct Duplicate {
-  thrust::pair<float, float> operator()(float x) {
+  thrust::pair<double, double> operator()(double x) {
     return thrust::make_pair(x, x);
   }
 };
 
-struct MinMax : public thrust::binary_function<thrust::pair<float, float>,
-                                               thrust::pair<float, float>,
-                                               thrust::pair<float, float>> {
-  thrust::pair<float, float> operator()(thrust::pair<float, float> a,
-                                        thrust::pair<float, float> b) {
+struct MinMax : public thrust::binary_function<thrust::pair<double, double>,
+                                               thrust::pair<double, double>,
+                                               thrust::pair<double, double>> {
+  thrust::pair<double, double> operator()(thrust::pair<double, double> a,
+                                          thrust::pair<double, double> b) {
     return thrust::make_pair(glm::min(a.first, b.first),
                              glm::max(a.second, b.second));
   }
@@ -363,7 +363,7 @@ void Manifold::Impl::CompactProps() {
   Vec<int> propOld2New(numVerts + 1, 0);
   inclusive_scan(policy, keep.begin(), keep.end(), propOld2New.begin() + 1);
 
-  Vec<float> oldProp = meshRelation_.properties;
+  Vec<double> oldProp = meshRelation_.properties;
   const int numVertsNew = propOld2New[numVerts];
   meshRelation_.properties.resize(meshRelation_.numProp * numVertsNew);
   for_each_n(
@@ -433,7 +433,7 @@ void Manifold::Impl::GatherFaces(const Vec<int>& faceNew2Old) {
   if (faceNormal_.size() == NumTri()) Permute(faceNormal_, faceNew2Old);
 
   Vec<Halfedge> oldHalfedge(std::move(halfedge_));
-  Vec<glm::vec4> oldHalfedgeTangent(std::move(halfedgeTangent_));
+  Vec<glm::dvec4> oldHalfedgeTangent(std::move(halfedgeTangent_));
   Vec<int> faceOld2New(oldHalfedge.size() / 3);
   auto policy = autoPolicy(numTri);
   scatter(policy, countAt(0), countAt(numTri), faceNew2Old.begin(),
@@ -555,15 +555,15 @@ bool MeshGL::Merge() {
     openVerts[i++] = vert;
   }
 
-  Vec<float> vertPropD(vertProperties);
+  Vec<double> vertPropD(vertProperties);
   Box bBox;
   for (const int i : {0, 1, 2}) {
-    strided_range<Vec<float>::Iter> iPos(vertPropD.begin() + i, vertPropD.end(),
-                                         numProp);
-    auto minMax = transform_reduce<thrust::pair<float, float>>(
+    strided_range<Vec<double>::Iter> iPos(vertPropD.begin() + i,
+                                          vertPropD.end(), numProp);
+    auto minMax = transform_reduce<thrust::pair<double, double>>(
         autoPolicy(numVert), iPos.begin(), iPos.end(), Duplicate(),
-        thrust::make_pair(std::numeric_limits<float>::infinity(),
-                          -std::numeric_limits<float>::infinity()),
+        thrust::make_pair(std::numeric_limits<double>::infinity(),
+                          -std::numeric_limits<double>::infinity()),
         MinMax());
     bBox.min[i] = minMax.first;
     bBox.max[i] = minMax.second;
