@@ -73,7 +73,7 @@ nb::ndarray<nb::numpy, T, nb::shape<nb::any, N>> to_numpy(
     std::vector<glm::vec<N, T, Precision>> const &vecvec) {
   // transfer ownership to PyObject
   T *buffer = new T[vecvec.size() * N];
-  nb::capsule mem_mgr(buffer, [](void *p) noexcept { delete[] (T *)p; });
+  nb::capsule mem_mgr(buffer, [](void *p) noexcept { delete[](T *) p; });
   for (int i = 0; i < vecvec.size(); i++) {
     for (int j = 0; j < N; j++) {
       buffer[i * N + j] = vecvec[i][j];
