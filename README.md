@@ -146,7 +146,10 @@ Contributions are welcome! A lower barrier contribution is to simply make a PR t
 ### Formatting
 
 There is a formatting script `format.sh` that automatically formats everything.
-It requires clang-format 14 and black formatter for python.
+It requires clang-format 11 and black formatter for python.
+
+If you have clang-format installed but without clang-11, you can specify the
+clang-format executable by setting the `CLANG_FORMAT` environment variable.
 
 ### Profiling
 

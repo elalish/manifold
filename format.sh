@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 
 shopt -s extglob
-CLANG_FORMAT=$(dirname $(which clang-14))/clang-format
+if [ -z "$CLANG_FORMAT" ]; then
+CLANG_FORMAT=$(dirname $(which clang-11))/clang-format
+fi
 
 $CLANG_FORMAT -i extras/*.cpp
 $CLANG_FORMAT -i meshIO/**/*.{h,cpp}
