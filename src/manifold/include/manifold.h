@@ -249,6 +249,13 @@ class Manifold {
   static Manifold Hull(const std::vector<glm::vec3>& pts);
   ///@}
 
+  /** @name Voronoi Fracture
+   */
+  ///@{
+  std::vector<Manifold> Fracture(const std::vector<glm::vec3>& pts,
+                                 const std::vector<float>& weights) const;
+  ///@}
+
   /** @name Testing hooks
    *  These are just for internal testing.
    */

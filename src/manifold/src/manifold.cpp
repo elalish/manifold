@@ -17,6 +17,7 @@
 #include <numeric>
 
 #include "QuickHull.hpp"
+#include "voro++.hh"
 #include "boolean3.h"
 #include "csg_tree.h"
 #include "impl.h"
@@ -844,5 +845,37 @@ Manifold Manifold::Hull() const { return Hull(GetMesh().vertPos); }
  */
 Manifold Manifold::Hull(const std::vector<Manifold>& manifolds) {
   return Compose(manifolds).Hull();
+}
+
+/**
+ * Compute the fracturing of this Manifold into convex chunks.
+ *
+ * @param pts A vector of points over which to fracture the manifold.
+ * @param pts A vector of weights controlling the relative size of each chunk.
+ */
+std::vector<Manifold> Manifold::Fracture(const std::vector<glm::vec3>& pts,
+                                         const std::vector<float>& weights) const {
+  voro::container_poly container(-0.5, 0.5, -0.5, 0.5, -0.5, 0.5, pts.size(), pts.size(), pts.size(), false, false, false, 0);
+  for (size_t i = 0; i < pts.size(); i++) { container.put(i, pts[i].x, pts[i].y, pts[i].z, weights[i]); }
+  container.compute_all_cells();
+
+  std::vector<Manifold> manifolds;
+  manifolds.reserve(pts.size());
+  voro::voronoicell c(container);
+  voro::c_loop_all vl(container);
+  if (vl.start()) {
+    do {
+      std::vector<glm::vec3> verts;
+      verts.reserve(c.p);
+      for (size_t i = 0; i < c.p; i++) {
+        verts.push_back(
+          glm::vec3(c.pts[(i * 3) + 0],
+                    c.pts[(i * 3) + 1],
+                    c.pts[(i * 3) + 2]));
+      }
+      manifolds.push_back(Hull(verts) ^ *this);
+    } while (vl.inc());
+  }
+  return manifolds;
 }
 }  // namespace manifold

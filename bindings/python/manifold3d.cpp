@@ -524,6 +524,27 @@ NB_MODULE(manifold3d, m) {
       .def("project", &Manifold::Project,
            "Returns a cross section representing the projected outline of this "
            "object onto the X-Y plane.")
+      .def(
+          "fracture",
+           [](Manifold & self,
+             const nb::ndarray<nb::numpy, const float, nb::c_contig, nb::shape<nb::any, 3>> &pts,
+             const nb::ndarray<nb::numpy, const float, nb::c_contig, nb::shape<nb::any>> &weights) {
+            std::vector<glm::vec3> pts_vec;
+            std::vector<float> weights_vec;
+            auto pointData = pts.data();
+            auto pointShape = pts.shape(0);
+            auto weightData = weights.data();
+            auto weightShape = weights.shape(0);
+            for (int i = 0; i < pointShape; i+=3) {
+              pts_vec.push_back({pointData[i], pointData[i+1], pointData[i+2]});
+            }
+            for (int i = 0; i < weightShape; i++) {
+              weights_vec.push_back(weightData[i]);
+            }
+            return self.Fracture(pts_vec, weights_vec);
+          },
+          "This operation Compute the fracturing of this Manifold into convex "
+          "chunks around the supplied points.")
       .def("status", &Manifold::Status,
            "Returns the reason for an input Mesh producing an empty Manifold. "
            "This Status only applies to Manifolds newly-created from an input "
