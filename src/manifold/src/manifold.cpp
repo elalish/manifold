@@ -16,6 +16,7 @@
 #include <map>
 #include <numeric>
 #include <io.h>
+#include <unordered_set>
 
 #include "QuickHull.hpp"
 #include "voro++.hh"
@@ -872,7 +873,6 @@ std::vector<Manifold> Manifold::Fracture(const std::vector<glm::vec3>& pts,
   for (size_t i = 0; i < pts.size(); i++) {
     container.put(i, pts[i].x, pts[i].y, pts[i].z, hasWeights ? weights[i] : 1.0f);
   }
-  size_t cell_coord = 0;
   voro::voronoicell c(container);
   voro::c_loop_all vl(container);
   if (vl.start()) do {
@@ -886,8 +886,10 @@ std::vector<Manifold> Manifold::Fracture(const std::vector<glm::vec3>& pts,
                 y + 0.5 * c.pts[(vl.ps*i) + 1],
                 z + 0.5 * c.pts[(vl.ps*i) + 2]));
           }
-          cell_coord++;
-          output.push_back(Hull(verts) ^ *this);
+          Manifold outputManifold = Hull(verts) ^ *this;
+          if (outputManifold.GetProperties().volume > 0.0) {
+            output.push_back(outputManifold);
+          }
           verts.clear();
       }
   } while (vl.inc());
@@ -895,8 +897,69 @@ std::vector<Manifold> Manifold::Fracture(const std::vector<glm::vec3>& pts,
 }
 
 std::vector<Manifold> Manifold::ConvexDecomposition() const {
-  
-  return Fracture(GetMesh().vertPos, std::vector<float>());
+  // Step 1. Get a list of all unique triangle faces with at least one reflex edge
+  std::cout << "About to get unique triangles" << std::endl;
+  std::unordered_set<int> uniqueReflexFaceSet;
+  const Impl& impl = *GetCsgLeafNode().GetImpl();
+  for(size_t i = 0; i < impl.halfedge_.size(); i++){
+    //std::cout << "1" << std::endl;
+    Halfedge halfedge = impl.halfedge_[i];
+    int faceA = halfedge.face;
+    //std::cout << "2" << std::endl;
+    int faceB = impl.halfedge_[halfedge.pairedHalfedge].face;
+    //std::cout << "3" << std::endl;
+    glm::vec3 tangent = glm::cross(impl.faceNormal_[faceA],
+        impl.vertPos_[halfedge.endVert] - impl.vertPos_[halfedge.startVert]);
+    //glm::vec3 tangent(impl.halfedgeTangent_[i].x, impl.halfedgeTangent_[i].y,
+    //                  impl.halfedgeTangent_[i].z);
+    //std::cout << "3.5" << std::endl;
+    float tangentProjection = glm::dot(impl.faceNormal_[faceB], tangent);
+    //std::cout << "4" << std::endl;
+    // If we've found a pair of reflex triangles, add them to the map
+    if (tangentProjection < 0.0f) {
+      uniqueReflexFaceSet.insert(faceA);
+      uniqueReflexFaceSet.insert(faceB);
+    }
+  }
+  std::vector<int> uniqueFaces; // Copy to a vector for indexed access
+  uniqueFaces.insert(uniqueFaces.end(), uniqueReflexFaceSet.begin(),
+                     uniqueReflexFaceSet.end());
 
+  // Step 2. Calculate the Circumcircles (centers + radii) of these triangles
+  std::cout << "About to Calculate Circumcircles" << std::endl;
+  std::vector<glm::vec3> circumcenters(uniqueFaces.size());
+  std::vector<float>     circumradii  (uniqueFaces.size());
+  for(size_t i = 0; i < uniqueFaces.size(); i++){
+    glm::vec4 circumcircle = impl.Circumcircle(impl.vertPos_, uniqueFaces[i]);
+    circumcenters[i] = glm::vec3(circumcircle.x, circumcircle.y, circumcircle.z);
+    circumradii[i] = circumcircle.w;
+  }
+
+  // Step 3. If any two circumcenters are identical, joggle one of the triangle vertices, and store in a hashmap
+  std::cout << "About to get to Joggling" << std::endl;
+  Vec<glm::vec3> joggledVerts(impl.vertPos_);
+  for (size_t i = 0; i < circumcenters.size() - 1; i++) {
+    for (size_t j = i + 1; j < circumcenters.size(); j++) {
+      if (glm::distance(circumcenters[i], circumcenters[i]) < 0.00001) {
+        //std::cout << "I AM AN IDENTICAL CIRCUMCENTER" << std::endl;
+        joggledVerts[impl.halfedge_[uniqueFaces[i] + 0].startVert] +=
+            glm::vec3(3.14159265359f, 3.14159265359f, 3.14159265359f) * 0.00001f;
+      }
+    }
+  }
+
+  // Step 4. Recalculate the circumcenters
+  for (size_t i = 0; i < uniqueFaces.size(); i++) {
+    glm::vec4 circumcircle = impl.Circumcircle(joggledVerts, uniqueFaces[i]);
+    circumcenters[i] = glm::vec3(circumcircle.x, circumcircle.y, circumcircle.z);
+    circumradii[i] = circumcircle.w;
+  }
+
+  // Step 5. Calculate the Voronoi Fracturing
+  return Fracture(circumcenters, circumradii);
+
+  // TODO:
+  // Step 6. Unjoggle the voronoi region vertices
+  // Step 7. Hull and Intersect with the original Manifold
 }
 }  // namespace manifold

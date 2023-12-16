@@ -316,4 +316,24 @@ CrossSection Manifold::Impl::Project() const {
 
   return CrossSection(polys).Simplify(precision_);
 }
+
+glm::vec4 Manifold::Impl::Circumcircle(Vec<glm::vec3> verts, int face) const {
+  glm::vec3 va = verts[this->halfedge_[face + 0].startVert];
+  glm::vec3 vb = verts[this->halfedge_[face + 1].startVert];
+  glm::vec3 vc = verts[this->halfedge_[face + 2].startVert];
+
+  glm::vec3 a = va - vc;
+  glm::vec3 b = vb - vc;
+  float a_length = glm::length(a);
+  float b_length = glm::length(b);
+  glm::vec3 numerator =
+      glm::cross((((a_length * a_length) * b) - ((b_length * b_length) * a)),
+                 glm::cross(a, b));
+  float crs = glm::length(glm::cross(a, b));
+  float denominator = 2.0 * (crs * crs);
+  glm::vec3 circumcenter = (numerator / denominator) + vc;
+  float circumradius = glm::length(circumcenter - vc);
+  return glm::vec4(circumcenter.x, circumcenter.y, circumcenter.z,
+                   circumradius);
+}
 }  // namespace manifold
