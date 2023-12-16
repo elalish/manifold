@@ -143,6 +143,14 @@ For more detailed documentation, please refer to the C++ API.
 
 Contributions are welcome! A lower barrier contribution is to simply make a PR that adds a test, especially if it repros an issue you've found. Simply name it prepended with DISABLED_, so that it passes the CI. That will be a very strong signal to me to fix your issue. However, if you know how to fix it yourself, then including the fix in your PR would be much appreciated!
 
+### Formatting
+
+There is a formatting script `format.sh` that automatically formats everything.
+It requires clang-format 11 and black formatter for python.
+
+If you have clang-format installed but without clang-11, you can specify the
+clang-format executable by setting the `CLANG_FORMAT` environment variable.
+
 ### Profiling
 
 There is now basic support for the [Tracy profiler](https://github.com/wolfpld/tracy) for our tests.
