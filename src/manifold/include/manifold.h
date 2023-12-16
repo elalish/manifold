@@ -249,11 +249,12 @@ class Manifold {
   static Manifold Hull(const std::vector<glm::vec3>& pts);
   ///@}
 
-  /** @name Voronoi Fracture
+  /** @name Voronoi Functions
    */
   ///@{
   std::vector<Manifold> Fracture(const std::vector<glm::vec3>& pts,
                                  const std::vector<float>& weights) const;
+  std::vector<Manifold> ConvexDecomposition() const;
   ///@}
 
   /** @name Testing hooks

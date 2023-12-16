@@ -532,17 +532,18 @@ NB_MODULE(manifold3d, m) {
             std::vector<glm::vec3> pts_vec;
             std::vector<float> weights_vec;
             auto pointData = pts.data();
-            auto pointShape = pts.shape(0);
             auto weightData = weights.data();
-            auto weightShape = weights.shape(0);
-            for (int i = 0; i < pointShape; i+=3) {
+            for (int i = 0; i < pts.shape(0) * pts.shape(1); i += pts.shape(1)) {
               pts_vec.push_back({pointData[i], pointData[i+1], pointData[i+2]});
             }
-            for (int i = 0; i < weightShape; i++) {
+            for (int i = 0; i < weights.shape(0); i++) {
               weights_vec.push_back(weightData[i]);
             }
             return self.Fracture(pts_vec, weights_vec);
           },
+          "This operation Compute the fracturing of this Manifold into convex "
+          "chunks around the supplied points.")
+      .def("convex_decomposition", &Manifold::ConvexDecomposition,
           "This operation Compute the fracturing of this Manifold into convex "
           "chunks around the supplied points.")
       .def("status", &Manifold::Status,

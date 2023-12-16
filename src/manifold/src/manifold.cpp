@@ -15,6 +15,7 @@
 #include <algorithm>
 #include <map>
 #include <numeric>
+#include <io.h>
 
 #include "QuickHull.hpp"
 #include "voro++.hh"
@@ -848,34 +849,54 @@ Manifold Manifold::Hull(const std::vector<Manifold>& manifolds) {
 }
 
 /**
- * Compute the fracturing of this Manifold into convex chunks.
+ * Compute the voronoi fracturing of this Manifold into convex chunks.
  *
  * @param pts A vector of points over which to fracture the manifold.
  * @param pts A vector of weights controlling the relative size of each chunk.
  */
 std::vector<Manifold> Manifold::Fracture(const std::vector<glm::vec3>& pts,
                                          const std::vector<float>& weights) const {
-  voro::container_poly container(-0.5, 0.5, -0.5, 0.5, -0.5, 0.5, pts.size(), pts.size(), pts.size(), false, false, false, 0);
-  for (size_t i = 0; i < pts.size(); i++) { container.put(i, pts[i].x, pts[i].y, pts[i].z, weights[i]); }
-  container.compute_all_cells();
+  std::vector<Manifold> output;
+  output.reserve(pts.size());
 
-  std::vector<Manifold> manifolds;
-  manifolds.reserve(pts.size());
+  Box bounds = BoundingBox();
+  glm::vec3 min = bounds.min - 0.1f;
+  glm::vec3 max = bounds.max + 0.1f;
+  float V = (max.x - min.x) * (max.y - min.y) * (max.z - min.z);
+  float Nthird = powf((float)pts.size() / V, 1.0f / 3.0f);
+  voro::container_poly container(
+      min.x, max.x, min.y, max.y, min.z, max.z, std::roundf(Nthird * 4),
+      std::roundf(Nthird * 4), std::roundf(Nthird * 4), false, false, false, pts.size());
+
+  bool hasWeights = weights.size() == pts.size();
+  for (size_t i = 0; i < pts.size(); i++) {
+    container.put(i, pts[i].x, pts[i].y, pts[i].z, hasWeights ? weights[i] : 1.0f);
+  }
+  size_t cell_coord = 0;
   voro::voronoicell c(container);
   voro::c_loop_all vl(container);
-  if (vl.start()) {
-    do {
-      std::vector<glm::vec3> verts;
-      verts.reserve(c.p);
-      for (size_t i = 0; i < c.p; i++) {
-        verts.push_back(
-          glm::vec3(c.pts[(i * 3) + 0],
-                    c.pts[(i * 3) + 1],
-                    c.pts[(i * 3) + 2]));
+  if (vl.start()) do {
+      if (container.compute_cell(c, vl)) {
+          std::vector<glm::vec3> verts;
+          verts.reserve(c.p);
+          int id; double x, y, z, r; vl.pos(id, x, y, z, r);
+          for (size_t i = 0; i < c.p; i++) {
+            verts.push_back(glm::vec3(
+                x + 0.5 * c.pts[(vl.ps*i) + 0],
+                y + 0.5 * c.pts[(vl.ps*i) + 1],
+                z + 0.5 * c.pts[(vl.ps*i) + 2]));
+          }
+          cell_coord++;
+          output.push_back(Hull(verts) ^ *this);
+          verts.clear();
       }
-      manifolds.push_back(Hull(verts) ^ *this);
-    } while (vl.inc());
-  }
-  return manifolds;
+  } while (vl.inc());
+  return output;
+}
+
+std::vector<Manifold> Manifold::ConvexDecomposition() const {
+  
+  return Fracture(GetMesh().vertPos, std::vector<float>());
+
 }
 }  // namespace manifold
