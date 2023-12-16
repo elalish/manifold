@@ -20,7 +20,7 @@ add_library(${PROJECT_NAME} ${SOURCE_FILES})
 target_include_directories(${PROJECT_NAME} PUBLIC ${PROJECT_SOURCE_DIR}/include)
 target_link_libraries(${PROJECT_NAME}
     PUBLIC utilities cross_section
-    PRIVATE collider polygon ${MANIFOLD_INCLUDE} Clipper2 quickhull
+    PRIVATE collider polygon ${MANIFOLD_INCLUDE} Clipper2 quickhull voro++
 )
 
 target_compile_options(${PROJECT_NAME} PRIVATE ${MANIFOLD_FLAGS})

@@ -7,3 +7,8 @@ add_subdirectory(clipper2/CPP)
 add_library(quickhull quickhull/QuickHull.cpp)
 target_include_directories(quickhull PUBLIC quickhull)
 target_compile_features(quickhull PUBLIC cxx_std_17)
+
+file(GLOB VORO_SOURCES voro/src/*.cc)
+file(GLOB NOT_VORO_SOURCES voro/src/v_base_wl.cc src/voro++.cc)
+list(REMOVE_ITEM VORO_SOURCES ${NOT_VORO_SOURCES})
+add_library(voro++ STATIC ${VORO_SOURCES})
