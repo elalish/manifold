@@ -237,6 +237,7 @@ NB_MODULE(manifold3d, m) {
         "constraint is applied.");
 
   m.def("get_circular_segments", Quality::GetCircularSegments,
+        nb::arg("radius"),
         "Determine the result of the SetMinCircularAngle(), "
         "SetMinCircularEdgeLength(), and SetCircularSegments() defaults."
         "\n\n"
@@ -252,6 +253,7 @@ NB_MODULE(manifold3d, m) {
   nb::class_<Manifold>(m, "Manifold")
       .def(nb::init<>(), "Construct empty Manifold object")
       .def(nb::init<const MeshGL &>(),
+          nb::arg("mesh"),
            "Convert a MeshGL into a Manifold, retaining its properties and "
            "merging only"
            "the positions according to the merge vectors. Will return an empty "
@@ -288,10 +290,12 @@ NB_MODULE(manifold3d, m) {
       .def_static(
           "batch_hull",
           [](std::vector<Manifold> ms) { return Manifold::Hull(ms); },
+          nb::arg("manifolds"),
           "Compute the convex hull enveloping a set of manifolds.")
       .def_static(
           "hull_points",
           [](std::vector<glm::vec3> pts) { return Manifold::Hull(pts); },
+          nb::arg("pts"),
           "Compute the convex hull enveloping a set of 3d points.")
       .def(
           "transform", &Manifold::Transform, nb::arg("mat"),
@@ -844,6 +848,7 @@ NB_MODULE(manifold3d, m) {
            "\n\n"
            ":param v: The vector to add to every vertex.")
       .def("rotate", &CrossSection::Rotate,
+            nb::arg("angle"),
            "Applies a (Z-axis) rotation to the CrossSection, in degrees. This "
            "operation can be chained. Transforms are combined and applied "
            "lazily."
