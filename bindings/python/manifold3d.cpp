@@ -546,11 +546,10 @@ NB_MODULE(manifold3d, m) {
             return self.Fracture(pts_vec, weights_vec);
           },
           "This operation computes the fracturing of this Manifold into the "
-          "minimal "
-          "number of representative convex pieces.")
+          "chunks around the supplied points.")
       .def("convex_decomposition", &Manifold::ConvexDecomposition,
-          "This operation computes the fracturing of this Manifold into the minimal "
-          "number of representative convex pieces.")
+           "This operation computes the fracturing of this Manifold into the "
+           "minimal number of representative convex pieces.")
       .def("status", &Manifold::Status,
            "Returns the reason for an input Mesh producing an empty Manifold. "
            "This Status only applies to Manifolds newly-created from an input "
