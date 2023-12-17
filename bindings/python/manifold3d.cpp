@@ -252,35 +252,25 @@ NB_MODULE(manifold3d, m) {
 
   nb::class_<Manifold>(m, "Manifold")
       .def(nb::init<>(), "Construct empty Manifold object")
-      .def(nb::init<const MeshGL &>(),
-          nb::arg("mesh"),
+      .def(nb::init<const MeshGL &>(), nb::arg("mesh"),
            "Convert a MeshGL into a Manifold, retaining its properties and "
-           "merging only"
-           "the positions according to the merge vectors. Will return an empty "
-           "Manifold"
-           "and set an Error Status if the result is not an oriented "
-           "2-manifold. Will"
-           "collapse degenerate triangles and unnecessary vertices.\n\n"
+           "merging onlythe positions according to the merge vectors. Will "
+           "return an empty Manifoldand set an Error Status if the result is "
+           "not an oriented 2-manifold. Willcollapse degenerate triangles and "
+           "unnecessary vertices.\n\n"
            "All fields are read, making this structure suitable for a lossless "
-           "round-trip"
-           "of data from GetMeshGL. For multi-material input, use ReserveIDs "
-           "to set a"
-           "unique originalID for each material, and sort the materials into "
-           "triangle"
-           "runs.\n\n"
+           "round-tripof data from GetMeshGL. For multi-material input, use "
+           "ReserveIDs to set aunique originalID for each material, and sort "
+           "the materials into triangleruns.\n\n"
            ":param meshGL: The input MeshGL.\n"
            ":param propertyTolerance: A vector of precision values for each "
-           "property"
-           "beyond position. If specified, the propertyTolerance vector must "
-           "have size ="
-           "numProp - 3. This is the amount of interpolation error allowed "
-           "before two"
-           "neighboring triangles are considered to be on a property boundary "
-           "edge."
-           "Property boundary edges will be retained across operations even if "
-           "the"
-           "triangles are coplanar. Defaults to 1e-5, which works well for most"
-           "properties in the [-1, 1] range.")
+           "property beyond position. If specified, the propertyTolerance "
+           "vector must have size = numProp - 3. This is the amount of "
+           "interpolation error allowed before two neighboring triangles are "
+           "considered to be on a property boundary edge. Property boundary "
+           "edges will be retained across operations even if thetriangles are "
+           "coplanar. Defaults to 1e-5, which works well for most properties "
+           "in the [-1, 1] range.")
       .def(nb::self + nb::self, "Boolean union.")
       .def(nb::self - nb::self, "Boolean difference.")
       .def(nb::self ^ nb::self, "Boolean intersection.")
@@ -298,7 +288,7 @@ NB_MODULE(manifold3d, m) {
           nb::arg("pts"),
           "Compute the convex hull enveloping a set of 3d points.")
       .def(
-          "transform", &Manifold::Transform, nb::arg("mat"),
+          "transform", &Manifold::Transform, nb::arg("m"),
           "Transform this Manifold in space. The first three columns form a "
           "3x3 matrix transform and the last is a translation vector. This "
           "operation can be chained. Transforms are combined and applied "
@@ -388,8 +378,8 @@ NB_MODULE(manifold3d, m) {
           "undefined behavior will result if you read past the number of input "
           "properties or write past the number of output properties."
           "\n\n"
-          ":param numProp: The new number of properties per vertex."
-          ":param propFunc: A function that modifies the properties of a given "
+          ":param new_num_prop: The new number of properties per vertex."
+          ":param f: A function that modifies the properties of a given "
           "vertex.")
       .def(
           "calculate_curvature", &Manifold::CalculateCurvature,
@@ -463,12 +453,12 @@ NB_MODULE(manifold3d, m) {
            "meaningful for a single mesh, so it is best to call Decompose() "
            "first.")
       .def(
-          "get_volume",
+          "volume",
           [](Manifold const &self) { return self.GetProperties().volume; },
           "Get the volume of the manifold\n This is clamped to zero for a "
           "given face if they are within the Q().")
       .def(
-          "get_surface_area",
+          "surface_area",
           [](Manifold const &self) { return self.GetProperties().surfaceArea; },
           "Get the surface area of the manifold\n This is clamped to zero for "
           "a given face if they are within the Q().")
@@ -503,7 +493,7 @@ NB_MODULE(manifold3d, m) {
            ":param normal: This vector is normal to the cutting plane and its "
            "length does not matter. The first result is in the direction of "
            "this vector, the second result is on the opposite side.\n"
-           ":param originOffset: The distance of the plane from the origin in "
+           ":param origin_offset: The distance of the plane from the origin in "
            "the direction of the normal vector.")
       .def(
           "trim_by_plane", &Manifold::TrimByPlane, nb::arg("normal"),
@@ -514,7 +504,7 @@ NB_MODULE(manifold3d, m) {
           ":param normal: This vector is normal to the cutting plane and its "
           "length does not matter. The result is in the direction of this "
           "vector from the plane.\n"
-          ":param originOffset: The distance of the plane from the origin in "
+          ":param origin_offset: The distance of the plane from the origin in "
           "the direction of the normal vector.")
       .def("slice", &Manifold::Slice, nb::arg("height"),
            "Returns the cross section of this object parallel to the X-Y plane "
@@ -545,13 +535,20 @@ NB_MODULE(manifold3d, m) {
           "(xmin, ymin, zmin, xmax, ymax, zmax).")
       .def_static(
           "smooth",
-          [](const MeshGL &mesh,
-             std::vector<std::pair<int, float>> sharpenedEdges) {
-            std::vector<Smoothness> vec;
-            for (auto &s : sharpenedEdges) vec.push_back({s.first, s.second});
+          [](const MeshGL &mesh, std::vector<int> sharpened_edges,
+             std::vector<float> edge_smoothness) {
+            if (sharpened_edges.size() != edge_smoothness.size()) {
+              throw std::runtime_error(
+                  "sharpened_edges.size() != edge_smoothness.size()");
+            }
+            std::vector<Smoothness> vec(sharpened_edges.size());
+            for (int i = 0; i < vec.size(); i++) {
+              vec[i] = {sharpened_edges[i], edge_smoothness[i]};
+            }
             return Manifold::Smooth(mesh, vec);
           },
           nb::arg("mesh"), nb::arg("sharpened_edges") = nb::list(),
+          nb::arg("edge_smoothness") = nb::list(),
           "Constructs a smooth version of the input mesh by creating tangents; "
           "this method will throw if you have supplied tangents with your "
           "mesh already. The actual triangle resolution is unchanged; use the "
@@ -564,13 +561,14 @@ NB_MODULE(manifold3d, m) {
           "constraints on their boundaries."
           "\n\n"
           ":param mesh: input Mesh.\n"
-          ":param sharpenedEdges: If desired, you can supply a vector of "
+          ":param sharpened_edges: If desired, you can supply a vector of "
           "sharpened halfedges, which should in general be a small subset of "
-          "all halfedges. Order of entries doesn't matter, as each one "
-          "specifies the desired smoothness (between zero and one, with one "
-          "the default for all unspecified halfedges) and the halfedge index "
+          "all halfedges. The halfedge index is "
           "(3 * triangle index + [0,1,2] where 0 is the edge between triVert 0 "
           "and 1, etc)."
+          ":param edge_smoothness: must be same length as shapened_edges. "
+          "Each entry specifies the desired smoothness (between zero and one, "
+          "with one being the default for all unspecified halfedges)"
           "\n\n"
           "At a smoothness value of zero, a sharp crease is made. The "
           "smoothness is interpolated along each edge, so the specified value "
@@ -603,9 +601,9 @@ NB_MODULE(manifold3d, m) {
           "circle. Can also form cones if both radii are specified."
           "\n\n"
           ":param height: Z-extent\n"
-          ":param radiusLow: Radius of bottom circle. Must be positive.\n"
-          ":param radiusHigh: Radius of top circle. Can equal zero. Default "
-          "(-1) is equal to radiusLow.\n"
+          ":param radius_low: Radius of bottom circle. Must be positive.\n"
+          ":param radius_high: Radius of top circle. Can equal zero. Default "
+          "(-1) is equal to radius_low.\n"
           ":param circular_segments: How many line segments to use around the "
           "circle. Default (-1) is calculated by the static Defaults.\n"
           ":param center: Set to true to shift the center to the origin. "
@@ -847,8 +845,7 @@ NB_MODULE(manifold3d, m) {
            "Transforms are combined and applied lazily."
            "\n\n"
            ":param v: The vector to add to every vertex.")
-      .def("rotate", &CrossSection::Rotate,
-            nb::arg("angle"),
+      .def("rotate", &CrossSection::Rotate, nb::arg("angle"),
            "Applies a (Z-axis) rotation to the CrossSection, in degrees. This "
            "operation can be chained. Transforms are combined and applied "
            "lazily."
@@ -868,7 +865,7 @@ NB_MODULE(manifold3d, m) {
           "\n\n"
           ":param ax: the axis to be mirrored over")
       .def(
-          "transform", &CrossSection::Transform, nb::arg("mat"),
+          "transform", &CrossSection::Transform, nb::arg("m"),
           "Transform this CrossSection in space. The first two columns form a "
           "2x2 matrix transform and the last is a translation vector. This "
           "operation can be chained. Transforms are combined and applied "
@@ -977,7 +974,7 @@ NB_MODULE(manifold3d, m) {
           "Default is calculated by the static Defaults.\n"
           ":param revolve_degrees: rotation angle for the sweep.")
       .def_static(
-          "square", &CrossSection::Square, nb::arg("dims"),
+          "square", &CrossSection::Square, nb::arg("size"),
           nb::arg("center") = false,
           "Constructs a square with the given XY dimensions. By default it is "
           "positioned in the first quadrant, touching the origin. If any "
