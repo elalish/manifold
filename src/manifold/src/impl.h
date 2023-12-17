@@ -120,7 +120,8 @@ struct Manifold::Impl {
                             glm::mat3x2 projection) const;
   CrossSection Slice(float height) const;
   CrossSection Project() const;
-  glm::highp_f64vec4 Circumcircle(Vec<glm::highp_f64vec3> verts, int face) const;
+  glm::highp_f64vec4 Circumcircle(Vec<glm::highp_f64vec3> verts,
+                                  int face) const;
 
   // edge_op.cu
   void SimplifyTopology();
