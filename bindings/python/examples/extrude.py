@@ -18,7 +18,7 @@ def run():
     # extrude a polygon to create a manifold
     extruded_polygon = cross_section.extrude(10.0)
     eps = 0.001
-    observed_volume = extruded_polygon.get_volume()
+    observed_volume = extruded_polygon.volume()
     expected_volume = 10.0
     if abs(observed_volume - expected_volume) > eps:
         raise Exception(
