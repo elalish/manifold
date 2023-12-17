@@ -24,6 +24,7 @@
 // #include "optional_assert.h"
 #include "par.h"
 #include "public.h"
+#include "vec_view.h"
 
 namespace manifold {
 
@@ -32,100 +33,6 @@ namespace manifold {
  */
 template <typename T>
 class Vec;
-
-/**
- * View for Vec, can perform offset operation.
- * This will be invalidated when the original vector is dropped or changes
- * length.
- */
-template <typename T>
-class VecView {
- public:
-  using Iter = T *;
-  using IterC = const T *;
-
-  VecView(T *ptr_, int size_) : ptr_(ptr_), size_(size_) {}
-
-  VecView(const VecView &other) {
-    ptr_ = other.ptr_;
-    size_ = other.size_;
-  }
-
-  VecView &operator=(const VecView &other) {
-    ptr_ = other.ptr_;
-    size_ = other.size_;
-    return *this;
-  }
-
-  // allows conversion to a const VecView
-  operator VecView<const T>() const { return {ptr_, size_}; }
-
-  inline const T &operator[](int i) const {
-    if (i < 0 || i >= size_) throw std::out_of_range("Vec out of range");
-    return ptr_[i];
-  }
-
-  inline T &operator[](int i) {
-    if (i < 0 || i >= size_) throw std::out_of_range("Vec out of range");
-    return ptr_[i];
-  }
-
-  IterC cbegin() const { return ptr_; }
-  IterC cend() const { return ptr_ + size_; }
-
-  IterC begin() const { return cbegin(); }
-  IterC end() const { return cend(); }
-
-  Iter begin() { return ptr_; }
-  Iter end() { return ptr_ + size_; }
-
-  const T &front() const {
-    if (size_ == 0)
-      throw std::out_of_range("attempt to take the front of an empty vector");
-    return ptr_[0];
-  }
-
-  const T &back() const {
-    if (size_ == 0)
-      throw std::out_of_range("attempt to take the back of an empty vector");
-    return ptr_[size_ - 1];
-  }
-
-  T &front() {
-    if (size_ == 0)
-      throw std::out_of_range("attempt to take the front of an empty vector");
-    return ptr_[0];
-  }
-
-  T &back() {
-    if (size_ == 0)
-      throw std::out_of_range("attempt to take the back of an empty vector");
-    return ptr_[size_ - 1];
-  }
-
-  int size() const { return size_; }
-
-  bool empty() const { return size_ == 0; }
-
-#ifdef MANIFOLD_DEBUG
-  void Dump() {
-    std::cout << "Vec = " << std::endl;
-    for (int i = 0; i < size(); ++i) {
-      std::cout << i << ", " << ptr_[i] << ", " << std::endl;
-    }
-    std::cout << std::endl;
-  }
-#endif
-
- protected:
-  T *ptr_ = nullptr;
-  int size_ = 0;
-
-  VecView() = default;
-  friend class Vec<T>;
-  friend class Vec<typename std::remove_const<T>::type>;
-  friend class VecView<typename std::remove_const<T>::type>;
-};
 
 /*
  * Specialized vector implementation with multithreaded fill and uninitialized

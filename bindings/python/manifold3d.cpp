@@ -70,37 +70,59 @@ namespace nb = nanobind;
 // helper to convert std::vector<glm::vec*> to numpy
 template <class T, int N, glm::qualifier Precision>
 nb::ndarray<nb::numpy, T, nb::shape<nb::any, N>> to_numpy(
-    std::vector<glm::vec<N, T, Precision>> const &vecvec) {
+    glm::vec<N, T, Precision> const *begin,
+    glm::vec<N, T, Precision> const *end) {
   // transfer ownership to PyObject
-  T *buffer = new T[vecvec.size() * N];
+  size_t nvert = end - begin;
+  T *buffer = new T[nvert * N];
   nb::capsule mem_mgr(buffer, [](void *p) noexcept { delete[](T *) p; });
-  for (int i = 0; i < vecvec.size(); i++) {
+  for (int i = 0; i < nvert; i++) {
     for (int j = 0; j < N; j++) {
-      buffer[i * N + j] = vecvec[i][j];
+      buffer[i * N + j] = begin[i][j];
     }
   }
-  return {buffer, {vecvec.size(), N}, mem_mgr};
+  return {buffer, {nvert, N}, mem_mgr};
+}
+
+// helper to convert std::vector<glm::vec*> to numpy
+template <class T, int N, glm::qualifier Precision>
+nb::ndarray<nb::numpy, T, nb::shape<nb::any, N>> to_numpy(
+    std::vector<glm::vec<N, T, Precision>> const &vec) {
+  return to_numpy(vec.data(), vec.data() + vec.size());
 }
 
 // helper to convert numpy to std::vector<glm::vec*>
 template <class T, size_t N, glm::qualifier Precision = glm::defaultp>
-std::vector<glm::vec<N, T, Precision>> to_glm_vector(
-    nb::ndarray<nb::numpy, T, nb::shape<nb::any, N>> const &arr) {
-  std::vector<glm::vec<N, T, Precision>> out;
-  out.reserve(arr.shape(0));
+void to_glm_range(nb::ndarray<nb::numpy, T, nb::shape<nb::any, N>> const &arr,
+                  glm::vec<int(N), T, Precision> *begin,
+                  glm::vec<int(N), T, Precision> *end) {
+  if (arr.shape(0) != end - begin) {
+    throw std::runtime_error(
+        "received numpy.shape[0]: " + std::to_string(arr.shape(0)) +
+        " expected: " + std::to_string(int(end - begin)));
+  }
   for (int i = 0; i < arr.shape(0); i++) {
-    out.emplace_back();
     for (int j = 0; j < N; j++) {
-      out.back()[j] = arr(i, j);
+      begin[i][j] = arr(i, j);
     }
   }
-  return out;
+}
+// helper to convert numpy to std::vector<glm::vec*>
+template <class T, size_t N, glm::qualifier Precision = glm::defaultp>
+void to_glm_vector(nb::ndarray<nb::numpy, T, nb::shape<nb::any, N>> const &arr,
+                   std::vector<glm::vec<int(N), T, Precision>> &out) {
+  out.resize(arr.shape(0));
+  to_glm_range(arr, out.data(), out.data() + out.size());
 }
 
 using namespace manifold;
 
 typedef std::tuple<float, float> Float2;
 typedef std::tuple<float, float, float> Float3;
+
+using NumpyFloatNx2 = nb::ndarray<nb::numpy, float, nb::shape<nb::any, 2>>;
+using NumpyFloatNx3 = nb::ndarray<nb::numpy, float, nb::shape<nb::any, 3>>;
+using NumpyUintNx3 = nb::ndarray<nb::numpy, uint32_t, nb::shape<nb::any, 3>>;
 
 template <typename T>
 std::vector<T> toVector(const T *arr, size_t size) {
@@ -150,12 +172,10 @@ NB_MODULE(manifold3d, m) {
       "triangulate",
       [](std::vector<nb::ndarray<nb::numpy, float, nb::shape<nb::any, 2>>>
              polys) {
-        std::vector<std::vector<glm::vec2>> polys_vec;
-        polys_vec.reserve(polys.size());
-        for (auto &numpy : polys) {
-          polys_vec.push_back(to_glm_vector(numpy));
+        std::vector<std::vector<glm::vec2>> polys_vec(polys.size());
+        for (int i = 0; i < polys.size(); i++) {
+          to_glm_vector(polys[i], polys_vec[i]);
         }
-
         return to_numpy(Triangulate(polys_vec));
       },
       "Given a list polygons (each polygon shape=(N,2) dtype=float), "
@@ -309,7 +329,23 @@ NB_MODULE(manifold3d, m) {
           "one which overlaps, but that is not checked here, so it is up to "
           "the user to choose their function with discretion."
           "\n\n"
-          ":param warpFunc: A function that modifies a given vertex position.")
+          ":param f: A function that modifies a given vertex position.")
+      .def(
+          "warp_batch",
+          [](Manifold &self,
+             const std::function<NumpyFloatNx3(NumpyFloatNx3)> &f) {
+            return self.WarpBatch([&f](VecView<glm::vec3> vecs) {
+              NumpyFloatNx3 arr = f(to_numpy(vecs.begin(), vecs.end()));
+              to_glm_range(arr, vecs.begin(), vecs.end());
+            });
+          },
+          nb::arg("f"),
+          "Same as Manifold.warp but calls `f` with a "
+          "ndarray(shape=(N,3), dtype=float) and expects an ndarray "
+          "of the same shape and type in return. The input array can be "
+          "modified and returned if desired. "
+          "\n\n"
+          ":param f: A function that modifies multiple vertex positions.")
       .def(
           "set_properties",
           [](Manifold &self, int newNumProp,
@@ -979,6 +1015,22 @@ NB_MODULE(manifold3d, m) {
           "intersections are not included in the result."
           "\n\n"
           ":param warpFunc: A function that modifies a given vertex position.")
+      .def(
+          "warp_batch",
+          [](CrossSection &self,
+             const std::function<NumpyFloatNx2(NumpyFloatNx2)> &f) {
+            return self.WarpBatch([&f](VecView<glm::vec2> vecs) {
+              NumpyFloatNx2 arr = f(to_numpy(vecs.begin(), vecs.end()));
+              to_glm_range(arr, vecs.begin(), vecs.end());
+            });
+          },
+          nb::arg("f"),
+          "Same as CrossSection.warp but calls `f` with a "
+          "ndarray(shape=(N,2), dtype=float) and expects an ndarray "
+          "of the same shape and type in return. The input array can be "
+          "modified and returned if desired. "
+          "\n\n"
+          ":param f: A function that modifies multiple vertex positions.")
       .def("simplify", &CrossSection::Simplify, nb::arg("epsilon") = 1e-6,
            "Remove vertices from the contours in this CrossSection that are "
            "less than the specified distance epsilon from an imaginary line "
