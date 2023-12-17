@@ -15,16 +15,15 @@
 #include <algorithm>
 #include <map>
 #include <numeric>
-//#include <io.h>
-#include <unordered_set>
 #include <random>
+#include <unordered_set>
 
 #include "QuickHull.hpp"
-#include "voro++.hh"
 #include "boolean3.h"
 #include "csg_tree.h"
 #include "impl.h"
 #include "par.h"
+#include "voro++.hh"
 
 namespace {
 using namespace manifold;
