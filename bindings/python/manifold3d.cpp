@@ -92,7 +92,7 @@ struct nb::detail::type_caster<glm::mat<C, R, T, Q>> {
     size_t rows = nb::len(src);
     if (rows != R) return false;
     for (size_t i = 0; i < R; i++) {
-      nb::object const &slice = src[i];
+      const nb::object &slice = src[i];
       size_t cols = nb::len(slice);
       if (cols != C) return false;
       for (size_t j = 0; j < C; j++) {
@@ -275,7 +275,7 @@ NB_MODULE(manifold3d, m) {
       .def(nb::self - nb::self, "Boolean difference.")
       .def(nb::self ^ nb::self, "Boolean intersection.")
       .def(
-          "hull", [](Manifold const &self) { return self.Hull(); },
+          "hull", [](const Manifold &self) { return self.Hull(); },
           "Compute the convex hull of all points in this manifold.")
       .def_static(
           "batch_hull",
@@ -312,7 +312,7 @@ NB_MODULE(manifold3d, m) {
            ":param mirror: The vector defining the axis of mirroring.")
       .def(
           "rotate",
-          [](Manifold const &self, glm::vec3 v) {
+          [](const Manifold &self, glm::vec3 v) {
             return self.Rotate(v.x, v.y, v.z);
           },
           nb::arg("v"),
@@ -343,7 +343,7 @@ NB_MODULE(manifold3d, m) {
            ":param f: A function that modifies multiple vertex positions.")
       .def(
           "set_properties",  // TODO this needs a batch version!
-          [](Manifold const &self, int newNumProp,
+          [](const Manifold &self, int newNumProp,
              const std::function<nb::object(
                  glm::vec3, const nb::ndarray<nb::numpy, const float,
                                               nb::c_contig> &)> &f) {
@@ -454,12 +454,12 @@ NB_MODULE(manifold3d, m) {
            "first.")
       .def(
           "volume",
-          [](Manifold const &self) { return self.GetProperties().volume; },
+          [](const Manifold &self) { return self.GetProperties().volume; },
           "Get the volume of the manifold\n This is clamped to zero for a "
           "given face if they are within the Q().")
       .def(
           "surface_area",
-          [](Manifold const &self) { return self.GetProperties().surfaceArea; },
+          [](const Manifold &self) { return self.GetProperties().surfaceArea; },
           "Get the surface area of the manifold\n This is clamped to zero for "
           "a given face if they are within the Q().")
       .def("original_id", &Manifold::OriginalID,
@@ -526,7 +526,7 @@ NB_MODULE(manifold3d, m) {
            "be collapsed to nothing.")
       .def(
           "bounding_box",
-          [](Manifold const &self) {
+          [](const Manifold &self) {
             Box b = self.BoundingBox();
             return nb::make_tuple(b.min[0], b.min[1], b.min[2], b.max[0],
                                   b.max[1], b.max[2]);
@@ -834,7 +834,7 @@ NB_MODULE(manifold3d, m) {
            "Does the CrossSection contain any contours?")
       .def(
           "bounds",
-          [](CrossSection const &self) {
+          [](const CrossSection &self) {
             Rect r = self.Bounds();
             return nb::make_tuple(r.min[0], r.min[1], r.max[0], r.max[1]);
           },
@@ -925,7 +925,7 @@ NB_MODULE(manifold3d, m) {
       .def(nb::self - nb::self, "Boolean difference.")
       .def(nb::self ^ nb::self, "Boolean intersection.")
       .def(
-          "hull", [](CrossSection const &self) { return self.Hull(); },
+          "hull", [](const CrossSection &self) { return self.Hull(); },
           "Compute the convex hull of this cross-section.")
       .def_static(
           "batch_hull",
