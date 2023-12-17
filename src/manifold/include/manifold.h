@@ -18,6 +18,7 @@
 
 #include "cross_section.h"
 #include "public.h"
+#include "vec_view.h"
 
 namespace manifold {
 
@@ -206,6 +207,7 @@ class Manifold {
   Manifold Transform(const glm::mat4x3&) const;
   Manifold Mirror(glm::vec3) const;
   Manifold Warp(std::function<void(glm::vec3&)>) const;
+  Manifold WarpBatch(std::function<void(VecView<glm::vec3>)>) const;
   Manifold SetProperties(
       int, std::function<void(float*, glm::vec3, const float*)>) const;
   Manifold CalculateCurvature(int gaussianIdx, int meanIdx) const;
