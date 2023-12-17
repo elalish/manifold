@@ -57,7 +57,7 @@ struct glm_name<glm::mat3x2> {
   static constexpr char const name[] = "Float2x3";
 };
 
-// handle glm::vec*
+// handle glm::vecN
 template <class T, int N, glm::qualifier Q>
 struct nb::detail::type_caster<glm::vec<N, T, Q>> {
   using glm_type = glm::vec<N, T, Q>;
@@ -81,7 +81,7 @@ struct nb::detail::type_caster<glm::vec<N, T, Q>> {
   }
 };
 
-// handle glm::mat4x3
+// handle glm::matMxN
 template <class T, int C, int R, glm::qualifier Q>
 struct nb::detail::type_caster<glm::mat<C, R, T, Q>> {
   using glm_type = glm::mat<C, R, T, Q>;
@@ -119,7 +119,7 @@ struct nb::detail::type_caster<glm::mat<C, R, T, Q>> {
   }
 };
 
-// handle std::vector<glm::vec*>
+// handle std::vector<glm::vecN>
 template <class T, int N, glm::qualifier Q>
 struct nb::detail::type_caster<std::vector<glm::vec<N, T, Q>>> {
   using glm_type = glm::vec<N, T, Q>;
@@ -283,11 +283,11 @@ NB_MODULE(manifold3d, m) {
       .def(nb::self - nb::self, "Boolean difference.")
       .def(nb::self ^ nb::self, "Boolean intersection.")
       .def(
-          "hull", [](Manifold &self) { return self.Hull(); },
+          "hull", [](Manifold const &self) { return self.Hull(); },
           "Compute the convex hull of all points in this manifold.")
       .def_static(
           "batch_hull",
-          [](std::vector<Manifold> &ms) { return Manifold::Hull(ms); },
+          [](std::vector<Manifold> ms) { return Manifold::Hull(ms); },
           "Compute the convex hull enveloping a set of manifolds.")
       .def_static(
           "hull_points",
@@ -318,7 +318,7 @@ NB_MODULE(manifold3d, m) {
            ":param mirror: The vector defining the axis of mirroring.")
       .def(
           "rotate",
-          [](Manifold &self, glm::vec3 v) {
+          [](Manifold const &self, glm::vec3 v) {
             return self.Rotate(v.x, v.y, v.z);
           },
           nb::arg("v"),
@@ -349,7 +349,7 @@ NB_MODULE(manifold3d, m) {
            ":param f: A function that modifies multiple vertex positions.")
       .def(
           "set_properties",  // TODO this needs a batch version!
-          [](Manifold &self, int newNumProp,
+          [](Manifold const &self, int newNumProp,
              const std::function<nb::object(
                  glm::vec3, const nb::ndarray<nb::numpy, const float,
                                               nb::c_contig> &)> &f) {
@@ -460,12 +460,12 @@ NB_MODULE(manifold3d, m) {
            "first.")
       .def(
           "get_volume",
-          [](Manifold &self) { return self.GetProperties().volume; },
+          [](Manifold const &self) { return self.GetProperties().volume; },
           "Get the volume of the manifold\n This is clamped to zero for a "
           "given face if they are within the Q().")
       .def(
           "get_surface_area",
-          [](Manifold &self) { return self.GetProperties().surfaceArea; },
+          [](Manifold const &self) { return self.GetProperties().surfaceArea; },
           "Get the surface area of the manifold\n This is clamped to zero for "
           "a given face if they are within the Q().")
       .def("original_id", &Manifold::OriginalID,
@@ -530,10 +530,10 @@ NB_MODULE(manifold3d, m) {
            "as empty. Likewise, empty meshes may still show NoError, for "
            "instance if they are small enough relative to their precision to "
            "be collapsed to nothing.")
-      .def_prop_ro(
+      .def(
           "bounding_box",
-          [](Manifold &self) {
-            auto b = self.BoundingBox();
+          [](Manifold const &self) {
+            Box b = self.BoundingBox();
             return nb::make_tuple(b.min[0], b.min[1], b.min[2], b.max[0],
                                   b.max[1], b.max[2]);
           },
@@ -602,7 +602,7 @@ NB_MODULE(manifold3d, m) {
           ":param radiusLow: Radius of bottom circle. Must be positive.\n"
           ":param radiusHigh: Radius of top circle. Can equal zero. Default "
           "(-1) is equal to radiusLow.\n"
-          ":param circularSegments: How many line segments to use around the "
+          ":param circular_segments: How many line segments to use around the "
           "circle. Default (-1) is calculated by the static Defaults.\n"
           ":param center: Set to true to shift the center to the origin. "
           "Default is origin at the bottom.")
@@ -612,7 +612,7 @@ NB_MODULE(manifold3d, m) {
           "Constructs a geodesic sphere of a given radius.\n"
           "\n"
           ":param radius: Radius of the sphere. Must be positive.\n"
-          ":param circularSegments: Number of segments along its diameter. "
+          ":param circular_segments: Number of segments along its diameter. "
           "This number will always be rounded up to the nearest factor of "
           "four, as this sphere is constructed by refining an octahedron. This "
           "means there are a circle of vertices on all three of the axis "
@@ -832,7 +832,7 @@ NB_MODULE(manifold3d, m) {
            "Does the CrossSection contain any contours?")
       .def(
           "bounds",
-          [](CrossSection &self) {
+          [](CrossSection const &self) {
             Rect r = self.Bounds();
             return nb::make_tuple(r.min[0], r.min[1], r.max[0], r.max[1]);
           },
@@ -923,7 +923,7 @@ NB_MODULE(manifold3d, m) {
       .def(nb::self - nb::self, "Boolean difference.")
       .def(nb::self ^ nb::self, "Boolean intersection.")
       .def(
-          "hull", [](CrossSection &self) { return self.Hull(); },
+          "hull", [](CrossSection const &self) { return self.Hull(); },
           "Compute the convex hull of this cross-section.")
       .def_static(
           "batch_hull",
@@ -983,11 +983,11 @@ NB_MODULE(manifold3d, m) {
           ":param center: Set to true to shift the center to the origin.")
       .def_static(
           "circle", &CrossSection::Circle, nb::arg("radius"),
-          nb::arg("circularSegments") = 0,
+          nb::arg("circular_segments") = 0,
           "Constructs a circle of a given radius."
           "\n\n"
           ":param radius: Radius of the circle. Must be positive.\n"
-          ":param circularSegments: Number of segments along its diameter. "
+          ":param circular_segments: Number of segments along its diameter. "
           "Default is calculated by the static Quality defaults according to "
           "the radius.");
 }
