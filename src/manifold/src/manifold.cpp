@@ -17,6 +17,7 @@
 #include <numeric>
 #include <io.h>
 #include <unordered_set>
+#include <random>
 
 #include "QuickHull.hpp"
 #include "voro++.hh"
@@ -849,6 +850,7 @@ Manifold Manifold::Hull(const std::vector<Manifold>& manifolds) {
   return Compose(manifolds).Hull();
 }
 
+// TODO: Handle Joggling in the Fracture Function Directly? 
 /**
  * Compute the voronoi fracturing of this Manifold into convex chunks.
  *
@@ -856,20 +858,20 @@ Manifold Manifold::Hull(const std::vector<Manifold>& manifolds) {
  * @param pts A vector of weights controlling the relative size of each chunk.
  */
 std::vector<Manifold> Manifold::Fracture(
-    const std::vector<glm::vec3>& pts,
-    const std::vector<float>& weights) const {
+    const std::vector<glm::highp_f64vec3>& pts,
+    const std::vector<double>& weights) const {
   std::vector<Manifold> output;
   output.reserve(pts.size());
 
   Box bounds = BoundingBox();
   glm::vec3 min = bounds.min - 0.1f;
   glm::vec3 max = bounds.max + 0.1f;
-  float V = (max.x - min.x) * (max.y - min.y) * (max.z - min.z);
-  float Nthird = powf((float)pts.size() / V, 1.0f / 3.0f);
+  double V = (max.x - min.x) * (max.y - min.y) * (max.z - min.z);
+  double Nthird = powf((double)pts.size() / V, 1.0f / 3.0f);
   voro::container_poly container(min.x, max.x, min.y, max.y, min.z, max.z,
-                                 std::roundf(Nthird * (max.x - min.x)),
-                                 std::roundf(Nthird * (max.y - min.y)),
-                                 std::roundf(Nthird * (max.z - min.z)), false,
+                                 std::round(Nthird * (max.x - min.x)),
+                                 std::round(Nthird * (max.y - min.y)),
+                                 std::round(Nthird * (max.z - min.z)), false,
                                  false, false, pts.size());
 
   bool hasWeights = weights.size() == pts.size();
@@ -879,7 +881,7 @@ std::vector<Manifold> Manifold::Fracture(
   }
   voro::voronoicell c(container);
   voro::c_loop_all vl(container);
-  if (vl.start()) do {
+  if (vl.start()) do { // TODO: Parallelize this loop!
       if (container.compute_cell(c, vl)) {
         std::vector<glm::vec3> verts;
         verts.reserve(c.p);
@@ -891,7 +893,7 @@ std::vector<Manifold> Manifold::Fracture(
                                     y + 0.5 * c.pts[(vl.ps * i) + 1],
                                     z + 0.5 * c.pts[(vl.ps * i) + 2]));
         }
-        Manifold outputManifold = Hull(verts) ^ *this;
+        Manifold outputManifold = Hull(verts) ^ *this; // TODO: Replace this intersection with a voro++ wall implementation or cutting the cell directly...
         if (outputManifold.GetProperties().volume > 0.0) {
           output.push_back(outputManifold);
         }
@@ -900,30 +902,31 @@ std::vector<Manifold> Manifold::Fracture(
     } while (vl.inc());
   return output;
 }
+std::vector<Manifold> Manifold::Fracture(
+    const std::vector<glm::vec3>& pts,
+    const std::vector<float>& weights) const {
+  std::vector<glm::highp_f64vec3> highpVerts(pts.size());
+  std::vector<double> highpWeights(weights.size());
+  for (size_t i = 0; i < pts.size(); i++) {
+    highpVerts[i] = pts[i]; highpWeights[i] = weights[i];
+  }
+  return Fracture(highpVerts, highpWeights);
+}
 
 std::vector<Manifold> Manifold::ConvexDecomposition() const {
-  // Step 1. Get a list of all unique triangle faces with at least one reflex
-  // edge
-  std::cout << "About to get unique triangles" << std::endl;
+  // Step 1. Get a list of all unique triangle faces with at least one reflex edge
   std::unordered_set<int> uniqueReflexFaceSet;
   const Impl& impl = *GetCsgLeafNode().GetImpl();
   for (size_t i = 0; i < impl.halfedge_.size(); i++) {
-    // std::cout << "1" << std::endl;
     Halfedge halfedge = impl.halfedge_[i];
     int faceA = halfedge.face;
-    // std::cout << "2" << std::endl;
     int faceB = impl.halfedge_[halfedge.pairedHalfedge].face;
-    // std::cout << "3" << std::endl;
     glm::vec3 tangent = glm::cross(
         impl.faceNormal_[faceA],
-        impl.vertPos_[halfedge.endVert] - impl.vertPos_[halfedge.startVert]);
-    // glm::vec3 tangent(impl.halfedgeTangent_[i].x, impl.halfedgeTangent_[i].y,
-    //                   impl.halfedgeTangent_[i].z);
-    // std::cout << "3.5" << std::endl;
+        impl.vertPos_[impl.halfedge_[i].endVert] - impl.vertPos_[impl.halfedge_[i].startVert]);
     float tangentProjection = glm::dot(impl.faceNormal_[faceB], tangent);
-    // std::cout << "4" << std::endl;
-    //  If we've found a pair of reflex triangles, add them to the map
-    if (tangentProjection < 0.0f) {
+    //  If we've found a pair of reflex triangles, add them to the set
+    if (tangentProjection > 0.0f) {
       uniqueReflexFaceSet.insert(faceA);
       uniqueReflexFaceSet.insert(faceB);
     }
@@ -933,44 +936,49 @@ std::vector<Manifold> Manifold::ConvexDecomposition() const {
                      uniqueReflexFaceSet.end());
 
   // Step 2. Calculate the Circumcircles (centers + radii) of these triangles
-  std::cout << "About to Calculate Circumcircles" << std::endl;
-  std::vector<glm::vec3> circumcenters(uniqueFaces.size());
-  std::vector<float> circumradii(uniqueFaces.size());
+  std::vector<glm::highp_f64vec3> circumcenters(uniqueFaces.size());
+  std::vector<double> circumradii(uniqueFaces.size());
+  Vec<glm::highp_f64vec3> joggledVerts(impl.vertPos_.size());
+  for (size_t i = 0; i < impl.vertPos_.size(); i++) {
+    joggledVerts[i] = impl.vertPos_[i];
+  }
   for (size_t i = 0; i < uniqueFaces.size(); i++) {
-    glm::vec4 circumcircle = impl.Circumcircle(impl.vertPos_, uniqueFaces[i]);
+    glm::highp_f64vec4 circumcircle = impl.Circumcircle(joggledVerts, uniqueFaces[i]);
     circumcenters[i] =
-        glm::vec3(circumcircle.x, circumcircle.y, circumcircle.z);
+        glm::highp_f64vec3(circumcircle.x, circumcircle.y, circumcircle.z);
     circumradii[i] = circumcircle.w;
   }
 
   // Step 3. If any two circumcenters are identical, joggle one of the triangle
-  // vertices, and store in a hashmap
-  std::cout << "About to get to Joggling" << std::endl;
-  Vec<glm::vec3> joggledVerts(impl.vertPos_);
+  // vertices, TODO: and store in a hashmap
+  //std::random_device rd;
+  std::mt19937 mt(1337);
+  std::uniform_real_distribution<double> dist(0.0, 1.0);
+  double randOffset = 0.0f;
   for (size_t i = 0; i < circumcenters.size() - 1; i++) {
     for (size_t j = i + 1; j < circumcenters.size(); j++) {
-      if (glm::distance(circumcenters[i], circumcenters[i]) < 0.00001) {
-        // std::cout << "I AM AN IDENTICAL CIRCUMCENTER" << std::endl;
-        joggledVerts[impl.halfedge_[uniqueFaces[i] + 0].startVert] +=
-            glm::vec3(3.14159265359f, 3.14159265359f, 3.14159265359f) *
-            0.00001f;
+      if (glm::distance(circumcenters[i], circumcenters[j]) < 0.00001) {
+        joggledVerts[impl.halfedge_[(uniqueFaces[i] * 3) + 0].startVert] +=
+            glm::highp_f64vec3(dist(mt) * 0.00000000001, dist(mt) * 0.00000000001, dist(mt) * 0.00000000001);
       }
     }
   }
 
   // Step 4. Recalculate the circumcenters
   for (size_t i = 0; i < uniqueFaces.size(); i++) {
-    glm::vec4 circumcircle = impl.Circumcircle(joggledVerts, uniqueFaces[i]);
+    glm::highp_f64vec4 circumcircle = impl.Circumcircle(joggledVerts, uniqueFaces[i]);
     circumcenters[i] =
-        glm::vec3(circumcircle.x, circumcircle.y, circumcircle.z);
+        glm::highp_f64vec3(circumcircle.x, circumcircle.y, circumcircle.z);
     circumradii[i] = circumcircle.w;
   }
 
   // Step 5. Calculate the Voronoi Fracturing
-  return Fracture(circumcenters, circumradii);
+  std::vector<Manifold> output = Fracture(circumcenters, circumradii);
 
   // TODO:
   // Step 6. Unjoggle the voronoi region vertices
   // Step 7. Hull and Intersect with the original Manifold
+
+  return output;
 }
 }  // namespace manifold

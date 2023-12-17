@@ -527,10 +527,10 @@ NB_MODULE(manifold3d, m) {
       .def(
           "fracture",
            [](Manifold & self,
-             const nb::ndarray<nb::numpy, const float, nb::c_contig, nb::shape<nb::any, 3>> &pts,
-             const nb::ndarray<nb::numpy, const float, nb::c_contig, nb::shape<nb::any>> &weights) {
-            std::vector<glm::vec3> pts_vec;
-            std::vector<float> weights_vec;
+             const nb::ndarray<nb::numpy, const double, nb::c_contig, nb::shape<nb::any, 3>> &pts,
+             const nb::ndarray<nb::numpy, const double, nb::c_contig, nb::shape<nb::any>> &weights) {
+            std::vector<glm::highp_f64vec3> pts_vec;
+            std::vector<double> weights_vec;
             auto pointData = pts.data();
             auto weightData = weights.data();
             for (int i = 0; i < pts.shape(0) * pts.shape(1); i += pts.shape(1)) {
