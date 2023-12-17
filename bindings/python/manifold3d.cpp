@@ -526,15 +526,19 @@ NB_MODULE(manifold3d, m) {
            "object onto the X-Y plane.")
       .def(
           "fracture",
-           [](Manifold & self,
-             const nb::ndarray<nb::numpy, const double, nb::c_contig, nb::shape<nb::any, 3>> &pts,
-             const nb::ndarray<nb::numpy, const double, nb::c_contig, nb::shape<nb::any>> &weights) {
+          [](Manifold &self,
+             const nb::ndarray<nb::numpy, const double, nb::c_contig,
+                               nb::shape<nb::any, 3>> &pts,
+             const nb::ndarray<nb::numpy, const double, nb::c_contig,
+                               nb::shape<nb::any>> &weights) {
             std::vector<glm::highp_f64vec3> pts_vec;
             std::vector<double> weights_vec;
             auto pointData = pts.data();
             auto weightData = weights.data();
-            for (int i = 0; i < pts.shape(0) * pts.shape(1); i += pts.shape(1)) {
-              pts_vec.push_back({pointData[i], pointData[i+1], pointData[i+2]});
+            for (int i = 0; i < pts.shape(0) * pts.shape(1);
+                 i += pts.shape(1)) {
+              pts_vec.push_back(
+                  {pointData[i], pointData[i + 1], pointData[i + 2]});
             }
             for (int i = 0; i < weights.shape(0); i++) {
               weights_vec.push_back(weightData[i]);

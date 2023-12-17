@@ -317,7 +317,8 @@ CrossSection Manifold::Impl::Project() const {
   return CrossSection(polys).Simplify(precision_);
 }
 
-glm::highp_f64vec4 Manifold::Impl::Circumcircle(Vec<glm::highp_f64vec3> verts, int face) const {
+glm::highp_f64vec4 Manifold::Impl::Circumcircle(Vec<glm::highp_f64vec3> verts,
+                                                int face) const {
   glm::highp_f64vec3 va = verts[this->halfedge_[(face * 3) + 0].startVert];
   glm::highp_f64vec3 vb = verts[this->halfedge_[(face * 3) + 1].startVert];
   glm::highp_f64vec3 vc = verts[this->halfedge_[(face * 3) + 2].startVert];
@@ -334,6 +335,6 @@ glm::highp_f64vec4 Manifold::Impl::Circumcircle(Vec<glm::highp_f64vec3> verts, i
   glm::highp_f64vec3 circumcenter = (numerator / denominator) + vc;
   double circumradius = glm::length(circumcenter - vc);
   return glm::highp_f64vec4(circumcenter.x, circumcenter.y, circumcenter.z,
-                   circumradius);
+                            circumradius);
 }
 }  // namespace manifold
