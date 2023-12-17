@@ -546,7 +546,8 @@ NB_MODULE(manifold3d, m) {
             return self.Fracture(pts_vec, weights_vec);
           },
           "This operation computes the fracturing of this Manifold into the "
-          "minimal number of representative convex pieces.")
+          "minimal "
+          "number of representative convex pieces.")
       .def("convex_decomposition", &Manifold::ConvexDecomposition,
           "This operation computes the fracturing of this Manifold into the minimal "
           "number of representative convex pieces.")
