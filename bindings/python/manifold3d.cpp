@@ -16,6 +16,7 @@
 #include <string>
 
 #include "cross_section.h"
+#include "docstrings.inl"
 #include "manifold.h"
 #include "nanobind/nanobind.h"
 #include "nanobind/ndarray.h"
@@ -206,73 +207,26 @@ NB_MODULE(manifold3d, m) {
   m.doc() = "Python binding for the Manifold library.";
 
   m.def("set_min_circular_angle", Quality::SetMinCircularAngle,
-        nb::arg("angle"),
-        "Sets an angle constraint the default number of circular segments for "
-        "the CrossSection::Circle(), Manifold::Cylinder(), Manifold::Sphere(), "
-        "and Manifold::Revolve() constructors. The number of segments will be "
-        "rounded up to the nearest factor of four."
-        "\n\n"
-        ":param angle: The minimum angle in degrees between consecutive "
-        "segments. The angle will increase if the the segments hit the minimum "
-        "edge length.\n"
-        "Default is 10 degrees.");
+        nb::arg("angle"), manifold_docs::set_min_circular_angle);
 
   m.def("set_min_circular_edge_length", Quality::SetMinCircularEdgeLength,
-        nb::arg("length"),
-        "Sets a length constraint the default number of circular segments for "
-        "the CrossSection::Circle(), Manifold::Cylinder(), Manifold::Sphere(), "
-        "and Manifold::Revolve() constructors. The number of segments will be "
-        "rounded up to the nearest factor of four."
-        "\n\n"
-        ":param length: The minimum length of segments. The length will "
-        "increase if the the segments hit the minimum angle. Default is 1.0.");
+        nb::arg("length"), manifold_docs::set_min_circular_edge_length);
 
   m.def("set_circular_segments", Quality::SetCircularSegments,
-        nb::arg("number"),
-        "Sets the default number of circular segments for the "
-        "CrossSection::Circle(), Manifold::Cylinder(), Manifold::Sphere(), and "
-        "Manifold::Revolve() constructors. Overrides the edge length and angle "
-        "constraints and sets the number of segments to exactly this value."
-        "\n\n"
-        ":param number: Number of circular segments. Default is 0, meaning no "
-        "constraint is applied.");
+        nb::arg("number"), manifold_docs::set_circular_segments);
 
   m.def("get_circular_segments", Quality::GetCircularSegments,
-        nb::arg("radius"),
-        "Determine the result of the SetMinCircularAngle(), "
-        "SetMinCircularEdgeLength(), and SetCircularSegments() defaults."
-        "\n\n"
-        ":param radius: For a given radius of circle, determine how many "
-        "default");
+        nb::arg("radius"), manifold_docs::get_circular_segments);
 
   m.def("triangulate", &Triangulate, nb::arg("polygons"),
         nb::arg("precision") = -1,  // TODO document
-        "Given a list polygons (each polygon shape=(N,2) dtype=float), "
-        "returns the indices of the triangle vertices as a "
-        "numpy.ndarray(shape=(N,3), dtype=np.uint32).");
+        manifold_docs::triangulate);
 
   nb::class_<Manifold>(m, "Manifold")
-      .def(nb::init<>(), "Construct empty Manifold object")
+      .def(nb::init<>(), manifold_docs::manifold_manifold)
       .def(nb::init<const MeshGL &, const std::vector<float> &>(),
            nb::arg("mesh"), nb::arg("property_tolerance") = nb::list(),
-           "Convert a MeshGL into a Manifold, retaining its properties and "
-           "merging onlythe positions according to the merge vectors. Will "
-           "return an empty Manifoldand set an Error Status if the result is "
-           "not an oriented 2-manifold. Willcollapse degenerate triangles and "
-           "unnecessary vertices.\n\n"
-           "All fields are read, making this structure suitable for a lossless "
-           "round-tripof data from GetMeshGL. For multi-material input, use "
-           "ReserveIDs to set aunique originalID for each material, and sort "
-           "the materials into triangleruns.\n\n"
-           ":param meshGL: The input MeshGL.\n"
-           ":param propertyTolerance: A vector of precision values for each "
-           "property beyond position. If specified, the propertyTolerance "
-           "vector must have size = numProp - 3. This is the amount of "
-           "interpolation error allowed before two neighboring triangles are "
-           "considered to be on a property boundary edge. Property boundary "
-           "edges will be retained across operations even if thetriangles are "
-           "coplanar. Defaults to 1e-5, which works well for most properties "
-           "in the [-1, 1] range.")
+           manifold_docs::manifold_manifold_5)
       .def(nb::self + nb::self, "Boolean union.")
       .def(nb::self - nb::self, "Boolean difference.")
       .def(nb::self ^ nb::self, "Boolean intersection.")
