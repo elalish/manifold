@@ -7,3 +7,6 @@
 [submodule "bindings/python/third_party/nanobind"]
 	path = bindings/python/third_party/nanobind
 	url = https://github.com/wjakob/nanobind
+[submodule "src/third_party/voro"]
+	path = src/third_party/voro
+	url = https://github.com/chr1shr/voro
