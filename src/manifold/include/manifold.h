@@ -261,6 +261,13 @@ class Manifold {
   std::vector<Manifold> ConvexDecomposition() const;
   ///@}
 
+  /** @name Minkowski Functions
+   */
+  ///@{
+  static Manifold Manifold::Minkowski(const Manifold& a, const Manifold& b,
+                                      bool useNaive = false);
+  ///@}
+
   /** @name Testing hooks
    *  These are just for internal testing.
    */

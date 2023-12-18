@@ -201,11 +201,11 @@ NB_MODULE(manifold3d, m) {
           },
           "Compute the convex hull enveloping a set of 3d points.")
       .def_static(
-          "batch_batch_hull", //Manifold::BatchHull,
-          [](std::vector <std::vector<Manifold>> & ms) {
-            return Manifold::BatchHull(ms);
-          },
+          "batch_batch_hull", Manifold::BatchHull,
           "Compute the convex hulls enveloping multiple sets of manifolds.")
+      .def_static("minkowski", Manifold::Minkowski, nb::arg("a"), nb::arg("b"),
+                  nb::arg("useNaive"),
+          "Compute the minkowski sum of two manifolds.")
       .def(
           "transform",
           [](Manifold &self, nb::ndarray<float, nb::shape<3, 4>> &mat) {
@@ -687,9 +687,9 @@ NB_MODULE(manifold3d, m) {
           "Default is origin at the bottom.")
       .def_static(
           "sphere",
-          [](float radius, int circularSegments = 0) {
-            return Manifold::Sphere(radius, circularSegments);
-          },
+          [](float radius,
+             int circularSegments =
+                 0) { return Manifold::Sphere(radius, circularSegments); },
           nb::arg("radius"), nb::arg("circular_segments") = 0,
           "Constructs a geodesic sphere of a given radius.\n"
           "\n"

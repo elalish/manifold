@@ -1032,4 +1032,43 @@ std::vector<Manifold> Manifold::ConvexDecomposition() const {
 
   return output;
 }
+
+/**
+ * Compute the minkowski sum of two manifolds.
+ *
+ * @param a The first manifold in the sum.
+ * @param b The second manifold in the sum.
+ */
+Manifold Manifold::Minkowski(const Manifold& a, const Manifold& b,
+                             bool useNaive) {
+  std::vector<Manifold> aDecomposition = a.ConvexDecomposition();
+  std::vector<Manifold> bDecomposition = b.ConvexDecomposition();
+
+  std::vector<std::vector<Manifold>> composedParts;
+  std::vector<Manifold> composedHulls({a});
+  if (!useNaive) {  // Use the general method
+    for (Manifold aPart : aDecomposition) {
+      manifold::Mesh aMesh = aPart.GetMesh();
+      for (Manifold bPart : bDecomposition) {
+        std::vector<Manifold> abComposition;
+        for (glm::vec3 vertexPosition : aMesh.vertPos) {
+          abComposition.push_back(bPart.Translate(vertexPosition));
+        }
+        composedParts.push_back(abComposition);
+      }
+    }
+    auto newHulls = Manifold::BatchHull(composedParts);
+    composedHulls.insert(composedHulls.end(), newHulls.begin(), newHulls.end());
+  } else {  // Use the naive method, which is only valid when b is convex
+    manifold::Mesh aMesh = a.GetMesh();
+    for (glm::ivec3 vertexIndices : aMesh.triVerts) {
+      composedParts.push_back({b.Translate(aMesh.vertPos[vertexIndices.x]),
+                               b.Translate(aMesh.vertPos[vertexIndices.y]),
+                               b.Translate(aMesh.vertPos[vertexIndices.z])});
+    }
+    auto newHulls = Manifold::BatchHull(composedParts);
+    composedHulls.insert(composedHulls.end(), newHulls.begin(), newHulls.end());
+  }
+  return Manifold::BatchBoolean(composedHulls, manifold::OpType::Add);
+}
 }  // namespace manifold
