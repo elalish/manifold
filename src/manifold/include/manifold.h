@@ -247,6 +247,8 @@ class Manifold {
   Manifold Hull() const;
   static Manifold Hull(const std::vector<Manifold>& manifolds);
   static Manifold Hull(const std::vector<glm::vec3>& pts);
+  static std::vector<Manifold> BatchHull(
+      const std::vector<std::vector<Manifold>>& manifolds);
   ///@}
 
   /** @name Voronoi Functions

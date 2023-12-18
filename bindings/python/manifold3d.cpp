@@ -200,6 +200,12 @@ NB_MODULE(manifold3d, m) {
             return Manifold::Hull(vec);
           },
           "Compute the convex hull enveloping a set of 3d points.")
+      .def_static(
+          "batch_batch_hull", //Manifold::BatchHull,
+          [](std::vector <std::vector<Manifold>> & ms) {
+            return Manifold::BatchHull(ms);
+          },
+          "Compute the convex hulls enveloping multiple sets of manifolds.")
       .def(
           "transform",
           [](Manifold &self, nb::ndarray<float, nb::shape<3, 4>> &mat) {

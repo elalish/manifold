@@ -873,16 +873,35 @@ Manifold Manifold::Hull(const std::vector<Manifold>& manifolds) {
   return Compose(manifolds).Hull();
 }
 
+/**
+ * Compute the convex hulls enveloping many sets of manifolds.
+ *
+ * @param manifolds A vector of vectors of manifolds over which compute hulls.
+ */
+std::vector<Manifold> Manifold::BatchHull(
+    const std::vector<std::vector<Manifold>>& manifolds) {
+  ZoneScoped;
+  std::vector<Manifold> output;
+  output.reserve(manifolds.size());
+  output.resize(manifolds.size());
+  thrust::for_each_n(
+      thrust::host, zip(manifolds.begin(), output.begin()), manifolds.size(),
+      [](thrust::tuple<std::vector<Manifold>, Manifold&> inOut) {
+        thrust::get<1>(inOut) = Manifold::Hull(thrust::get<0>(inOut));
+      });
+  return output;
+}
+
 // TODO: Handle Joggling in the Fracture Function Directly?
 /**
  * Compute the voronoi fracturing of this Manifold into convex chunks.
  *
  * @param pts A vector of points over which to fracture the manifold.
- * @param pts A vector of weights controlling the relative size of each chunk.
+ * @param wts A vector of weights controlling the relative size of each chunk.
  */
 std::vector<Manifold> Manifold::Fracture(
     const std::vector<glm::dvec3>& pts,
-    const std::vector<double>& weights) const {
+    const std::vector<double>& wts) const {
   ZoneScoped;
   std::vector<Manifold> output;
   output.reserve(pts.size());
@@ -899,10 +918,9 @@ std::vector<Manifold> Manifold::Fracture(
                                  std::round(Nthird * (max.z - min.z)),  //
                                  false, false, false, pts.size());
 
-  bool hasWeights = weights.size() == pts.size();
+  bool hasWeights = wts.size() == pts.size();
   for (size_t i = 0; i < pts.size(); i++) {
-    container.put(i, pts[i].x, pts[i].y, pts[i].z,
-                  hasWeights ? weights[i] : 1.0f);
+    container.put(i, pts[i].x, pts[i].y, pts[i].z, hasWeights ? wts[i] : 1.0f);
   }
 
   // Prepare Parallel Voronoi Computation
