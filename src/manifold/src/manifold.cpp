@@ -959,6 +959,12 @@ std::vector<Manifold> Manifold::ConvexDecomposition() const {
       uniqueReflexFaceSet.insert(faceB);
     }
   }
+
+  // Early-Exit if the part is already convex
+  if (uniqueReflexFaceSet.size() == 0) {
+    return std::vector<Manifold>(1, *this);
+  }
+
   std::vector<int> uniqueFaces;  // Copy to a vector for indexed access
   uniqueFaces.insert(uniqueFaces.end(), uniqueReflexFaceSet.begin(),
                      uniqueReflexFaceSet.end());
