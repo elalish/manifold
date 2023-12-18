@@ -64,6 +64,30 @@ struct UpdateProperties {
   }
 };
 
+struct ComputeVoronoiCell {
+  voro::container_poly* container;
+  const Manifold* original;
+  std::vector<Manifold>* output;
+  void operator()(thrust::tuple<int, glm::ivec3&, glm::dvec4&> inOut) {
+    const int idx = thrust::get<0>(inOut);
+    glm::ivec3& cell_idx = thrust::get<1>(inOut);
+    glm::dvec4& cell_pos = thrust::get<2>(inOut);
+    voro::voronoicell c(*container);
+
+    if (container->compute_cell(c, cell_idx.y, cell_idx.z)) {
+      std::vector<glm::vec3> verts;
+      verts.reserve(c.p);
+      for (size_t i = 0; i < c.p; i++) {
+        verts.push_back(glm::vec3(cell_pos.x + 0.5 * c.pts[(4 * i) + 0],
+                                  cell_pos.y + 0.5 * c.pts[(4 * i) + 1],
+                                  cell_pos.z + 0.5 * c.pts[(4 * i) + 2]));
+      }
+      (*output)[idx] = Manifold::Hull(verts) ^ *original;
+      verts.clear();
+    }
+  }
+};
+
 Manifold Halfspace(Box bBox, glm::vec3 normal, float originOffset) {
   normal = glm::normalize(normal);
   Manifold cutter =
@@ -859,8 +883,10 @@ Manifold Manifold::Hull(const std::vector<Manifold>& manifolds) {
 std::vector<Manifold> Manifold::Fracture(
     const std::vector<glm::dvec3>& pts,
     const std::vector<double>& weights) const {
+  ZoneScoped;
   std::vector<Manifold> output;
   output.reserve(pts.size());
+  output.resize(pts.size());
 
   Box bounds = BoundingBox();
   glm::vec3 min = bounds.min - 0.1f;
@@ -870,35 +896,34 @@ std::vector<Manifold> Manifold::Fracture(
   voro::container_poly container(min.x, max.x, min.y, max.y, min.z, max.z,
                                  std::round(Nthird * (max.x - min.x)),
                                  std::round(Nthird * (max.y - min.y)),
-                                 std::round(Nthird * (max.z - min.z)), false,
-                                 false, false, pts.size());
+                                 std::round(Nthird * (max.z - min.z)),  //
+                                 false, false, false, pts.size());
 
   bool hasWeights = weights.size() == pts.size();
   for (size_t i = 0; i < pts.size(); i++) {
     container.put(i, pts[i].x, pts[i].y, pts[i].z,
                   hasWeights ? weights[i] : 1.0f);
   }
-  voro::voronoicell c(container);
+
+  // Prepare Parallel Voronoi Computation
+  std::vector<glm::ivec3> cellIndices;
+  std::vector<glm::dvec4> cellPosWeight;
   voro::c_loop_all vl(container);
-  if (vl.start()) do {  // TODO: Parallelize this loop!
-      if (container.compute_cell(c, vl)) {
-        std::vector<glm::vec3> verts;
-        verts.reserve(c.p);
-        int id;
-        double x, y, z, r;
-        vl.pos(id, x, y, z, r);
-        for (size_t i = 0; i < c.p; i++) {
-          verts.push_back(glm::vec3(x + 0.5 * c.pts[(vl.ps * i) + 0],
-                                    y + 0.5 * c.pts[(vl.ps * i) + 1],
-                                    z + 0.5 * c.pts[(vl.ps * i) + 2]));
-        }
-        Manifold outputManifold = Hull(verts) ^ *this;
-        if (outputManifold.GetProperties().volume > 0.0) {
-          output.push_back(outputManifold);
-        }
-        verts.clear();
-      }
+  if (vl.start()) do {
+      int id;
+      double x, y, z, r;
+      vl.pos(id, x, y, z, r);
+      cellIndices.push_back({id, vl.ijk, vl.q});
+      cellPosWeight.push_back({x, y, z, r});
     } while (vl.inc());
+
+  ComputeVoronoiCell computeVoronoiCell;
+  computeVoronoiCell.container = &container;
+  computeVoronoiCell.original = this;
+  computeVoronoiCell.output = &output;
+  thrust::for_each_n(
+      thrust::host, zip(countAt(0), cellIndices.begin(), cellPosWeight.begin()),
+      cellIndices.size(), computeVoronoiCell);
   return output;
 }
 std::vector<Manifold> Manifold::Fracture(
@@ -914,6 +939,7 @@ std::vector<Manifold> Manifold::Fracture(
 }
 
 std::vector<Manifold> Manifold::ConvexDecomposition() const {
+  ZoneScoped;
   // Step 1. Get a list of all unique triangle faces with at least one reflex
   // edge
   std::unordered_set<int> uniqueReflexFaceSet;
