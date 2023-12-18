@@ -317,22 +317,22 @@ CrossSection Manifold::Impl::Project() const {
   return CrossSection(polys).Simplify(precision_);
 }
 
-glm::highp_f64vec4 Manifold::Impl::Circumcircle(Vec<glm::highp_f64vec3> verts,
+glm::highp_f64vec4 Manifold::Impl::Circumcircle(Vec<glm::dvec3> verts,
                                                 int face) const {
-  glm::highp_f64vec3 va = verts[this->halfedge_[(face * 3) + 0].startVert];
-  glm::highp_f64vec3 vb = verts[this->halfedge_[(face * 3) + 1].startVert];
-  glm::highp_f64vec3 vc = verts[this->halfedge_[(face * 3) + 2].startVert];
+  glm::dvec3 va = verts[this->halfedge_[(face * 3) + 0].startVert];
+  glm::dvec3 vb = verts[this->halfedge_[(face * 3) + 1].startVert];
+  glm::dvec3 vc = verts[this->halfedge_[(face * 3) + 2].startVert];
 
-  glm::highp_f64vec3 a = va - vc;
-  glm::highp_f64vec3 b = vb - vc;
+  glm::dvec3 a = va - vc;
+  glm::dvec3 b = vb - vc;
   double a_length = glm::length(a);
   double b_length = glm::length(b);
-  glm::highp_f64vec3 numerator =
+  glm::dvec3 numerator =
       glm::cross((((a_length * a_length) * b) - ((b_length * b_length) * a)),
                  glm::cross(a, b));
   double crs = glm::length(glm::cross(a, b));
   double denominator = 2.0 * (crs * crs);
-  glm::highp_f64vec3 circumcenter = (numerator / denominator) + vc;
+  glm::dvec3 circumcenter = (numerator / denominator) + vc;
   double circumradius = glm::length(circumcenter - vc);
   return glm::highp_f64vec4(circumcenter.x, circumcenter.y, circumcenter.z,
                             circumradius);

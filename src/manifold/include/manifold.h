@@ -252,7 +252,7 @@ class Manifold {
   /** @name Voronoi Functions
    */
   ///@{
-  std::vector<Manifold> Fracture(const std::vector<glm::highp_f64vec3>& pts,
+  std::vector<Manifold> Fracture(const std::vector<glm::dvec3>& pts,
                                  const std::vector<double>& weights) const;
   std::vector<Manifold> Fracture(const std::vector<glm::vec3>& pts,
                                  const std::vector<float>& weights) const;

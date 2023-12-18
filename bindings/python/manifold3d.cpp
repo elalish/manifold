@@ -531,7 +531,7 @@ NB_MODULE(manifold3d, m) {
                                nb::shape<nb::any, 3>> &pts,
              const nb::ndarray<nb::numpy, const double, nb::c_contig,
                                nb::shape<nb::any>> &weights) {
-            std::vector<glm::highp_f64vec3> pts_vec;
+            std::vector<glm::dvec3> pts_vec;
             std::vector<double> weights_vec;
             auto pointData = pts.data();
             auto weightData = weights.data();

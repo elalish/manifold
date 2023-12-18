@@ -857,7 +857,7 @@ Manifold Manifold::Hull(const std::vector<Manifold>& manifolds) {
  * @param pts A vector of weights controlling the relative size of each chunk.
  */
 std::vector<Manifold> Manifold::Fracture(
-    const std::vector<glm::highp_f64vec3>& pts,
+    const std::vector<glm::dvec3>& pts,
     const std::vector<double>& weights) const {
   std::vector<Manifold> output;
   output.reserve(pts.size());
@@ -907,7 +907,7 @@ std::vector<Manifold> Manifold::Fracture(
 std::vector<Manifold> Manifold::Fracture(
     const std::vector<glm::vec3>& pts,
     const std::vector<float>& weights) const {
-  std::vector<glm::highp_f64vec3> highpVerts(pts.size());
+  std::vector<glm::dvec3> highpVerts(pts.size());
   std::vector<double> highpWeights(weights.size());
   for (size_t i = 0; i < pts.size(); i++) {
     highpVerts[i] = pts[i];
@@ -941,9 +941,9 @@ std::vector<Manifold> Manifold::ConvexDecomposition() const {
                      uniqueReflexFaceSet.end());
 
   // Step 2. Calculate the Circumcircles (centers + radii) of these triangles
-  std::vector<glm::highp_f64vec3> circumcenters(uniqueFaces.size());
+  std::vector<glm::dvec3> circumcenters(uniqueFaces.size());
   std::vector<double> circumradii(uniqueFaces.size());
-  Vec<glm::highp_f64vec3> joggledVerts(impl.vertPos_.size());
+  Vec<glm::dvec3> joggledVerts(impl.vertPos_.size());
   for (size_t i = 0; i < impl.vertPos_.size(); i++) {
     joggledVerts[i] = impl.vertPos_[i];
   }
@@ -951,7 +951,7 @@ std::vector<Manifold> Manifold::ConvexDecomposition() const {
     glm::highp_f64vec4 circumcircle =
         impl.Circumcircle(joggledVerts, uniqueFaces[i]);
     circumcenters[i] =
-        glm::highp_f64vec3(circumcircle.x, circumcircle.y, circumcircle.z);
+        glm::dvec3(circumcircle.x, circumcircle.y, circumcircle.z);
     circumradii[i] = circumcircle.w;
   }
 
@@ -964,9 +964,9 @@ std::vector<Manifold> Manifold::ConvexDecomposition() const {
     for (size_t j = i + 1; j < circumcenters.size(); j++) {
       if (glm::distance(circumcenters[i], circumcenters[j]) < 0.00001) {
         joggledVerts[impl.halfedge_[(uniqueFaces[i] * 3) + 0].startVert] +=
-            glm::highp_f64vec3(dist(mt) * 0.00000000001,
-                               dist(mt) * 0.00000000001,
-                               dist(mt) * 0.00000000001);
+            glm::dvec3(dist(mt) * 0.00000000001,
+                       dist(mt) * 0.00000000001,
+                       dist(mt) * 0.00000000001);
       }
     }
   }
@@ -976,7 +976,7 @@ std::vector<Manifold> Manifold::ConvexDecomposition() const {
     glm::highp_f64vec4 circumcircle =
         impl.Circumcircle(joggledVerts, uniqueFaces[i]);
     circumcenters[i] =
-        glm::highp_f64vec3(circumcircle.x, circumcircle.y, circumcircle.z);
+        glm::dvec3(circumcircle.x, circumcircle.y, circumcircle.z);
     circumradii[i] = circumcircle.w;
   }
 
