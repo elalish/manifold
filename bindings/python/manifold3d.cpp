@@ -64,7 +64,7 @@ struct nb::detail::type_caster<glm::vec<N, T, Q>> {
   NB_TYPE_CASTER(glm_type, const_name(glm_name<glm_type>::name));
 
   bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept {
-    size_t size = nb::len(src);
+    int size = PyObject_Size(src.ptr());  // negative on failure
     if (size != N) return false;
     make_caster<T> t_cast;
     for (size_t i = 0; i < size; i++) {
@@ -89,11 +89,11 @@ struct nb::detail::type_caster<glm::mat<C, R, T, Q>> {
   NB_TYPE_CASTER(glm_type, const_name(glm_name<glm_type>::name));
 
   bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept {
-    size_t rows = nb::len(src);
+    int rows = PyObject_Size(src.ptr());  // negative on failure
     if (rows != R) return false;
     for (size_t i = 0; i < R; i++) {
       const nb::object &slice = src[i];
-      size_t cols = nb::len(slice);
+      int cols = PyObject_Size(slice.ptr());  // negative on failure
       if (cols != C) return false;
       for (size_t j = 0; j < C; j++) {
         make_caster<T> t_cast;
@@ -138,7 +138,8 @@ struct nb::detail::type_caster<std::vector<glm::vec<N, T, Q>>> {
         }
       }
     } else {
-      int num_vec = nb::len(src);
+      int num_vec = PyObject_Size(src.ptr());  // negative on failure
+      if (num_vec < 0) return false;
       value.resize(num_vec);
       for (int i = 0; i < num_vec; i++) {
         make_caster<glm_type> vec_cast;
@@ -252,7 +253,8 @@ NB_MODULE(manifold3d, m) {
 
   nb::class_<Manifold>(m, "Manifold")
       .def(nb::init<>(), "Construct empty Manifold object")
-      .def(nb::init<const MeshGL &>(), nb::arg("mesh"),
+      .def(nb::init<const MeshGL &, const std::vector<float> &>(),
+           nb::arg("mesh"), nb::arg("property_tolerance") = nb::list(),
            "Convert a MeshGL into a Manifold, retaining its properties and "
            "merging onlythe positions according to the merge vectors. Will "
            "return an empty Manifoldand set an Error Status if the result is "
@@ -305,6 +307,16 @@ NB_MODULE(manifold3d, m) {
            "Transforms are combined and applied lazily."
            "\n\n"
            ":param v: The vector to multiply every vertex by component.")
+      .def(
+          "scale",
+          [](const Manifold &m, float s) {
+            m.Scale({s, s, s});
+          },
+          nb::arg("s"),
+          "Scale this Manifold in space. This operation can be chained. "
+          "Transforms are combined and applied lazily."
+          "\n\n"
+          ":param s: The scalar to multiply every vertex by component.")
       .def("mirror", &Manifold::Mirror, nb::arg("v"),
            "Mirror this Manifold in space. This operation can be chained. "
            "Transforms are combined and applied lazily."
@@ -456,12 +468,12 @@ NB_MODULE(manifold3d, m) {
           "volume",
           [](const Manifold &self) { return self.GetProperties().volume; },
           "Get the volume of the manifold\n This is clamped to zero for a "
-          "given face if they are within the Q().")
+          "given face if they are within the Precision().")
       .def(
           "surface_area",
           [](const Manifold &self) { return self.GetProperties().surfaceArea; },
           "Get the surface area of the manifold\n This is clamped to zero for "
-          "a given face if they are within the Q().")
+          "a given face if they are within the Precision().")
       .def("original_id", &Manifold::OriginalID,
            "If this mesh is an original, this returns its meshID that can be "
            "referenced by product manifolds' MeshRelation. If this manifold is "
@@ -587,7 +599,8 @@ NB_MODULE(manifold3d, m) {
           "Constructs a tetrahedron centered at the origin with one vertex at "
           "(1,1,1) and the rest at similarly symmetric points.")
       .def_static(
-          "cube", &Manifold::Cube, nb::arg("size"), nb::arg("center") = false,
+          "cube", &Manifold::Cube, nb::arg("size") = glm::vec3{1, 1, 1},
+          nb::arg("center") = false,
           "Constructs a unit cube (edge lengths all one), by default in the "
           "first octant, touching the origin."
           "\n\n"
@@ -720,7 +733,6 @@ NB_MODULE(manifold3d, m) {
       .def_ro("face_id", &MeshGL::faceID)
       .def_static(
           "level_set", 
-          // SDF needs refactoring to enable batched callback
           [](const std::function<float(float, float, float)> &f,
              std::vector<float> bounds, float edgeLength, float level = 0.0) {
     // Same format as Manifold.bounding_box
@@ -856,6 +868,16 @@ NB_MODULE(manifold3d, m) {
            "Transforms are combined and applied lazily."
            "\n\n"
            ":param v: The vector to multiply every vertex by per component.")
+      .def(
+          "scale",
+          [](const CrossSection &self, float s) {
+            self.Scale({s, s});
+          },
+          nb::arg("s"),
+          "Scale this CrossSection in space. This operation can be chained. "
+          "Transforms are combined and applied lazily."
+          "\n\n"
+          ":param s: The scalar to multiply every vertex by per component.")
       .def(
           "mirror", &CrossSection::Mirror, nb::arg("ax"),
           "Mirror this CrossSection over the arbitrary axis described by the "

@@ -90,7 +90,12 @@ def all_manifold():
     m = m.warp_batch(lambda ps: ps * [1, 0.5, 2] + [1, 0, 0])
 
 
-if __name__ == "__main__":
+def run():
     all_root_level()
     all_cross_section()
     all_manifold()
+    return Manifold()
+
+
+if __name__ == "__main__":
+    run()
