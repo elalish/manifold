@@ -296,7 +296,7 @@ Module.setup = function() {
       for (const m of points) {
         if (m instanceof Array && typeof m[0] == 'number' && m.length >= 3) {
           pts.push_back({x: m[0], y: m[1], z: m[2]});
-          if (m.length >= 4){
+          if (m.length >= 4) {
             wts.push_back(m[3]);
           }
         } else if (m.x) {
