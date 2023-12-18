@@ -78,7 +78,10 @@ inline float cosd(float x) { return sind(x + 90.0f); }
 inline glm::mat4x3 RotateUp(glm::vec3 up) {
   up = glm::normalize(up);
   glm::vec3 axis = glm::cross(up, {0, 0, 1});
-  float angle = glm::asin(glm::length(axis));
+  float length = glm::length(axis);
+  if (!isfinite(length)) length = 0;
+  float angle = glm::asin(length);
+  if (length == 0) axis = {1, 0, 0};
   if (glm::dot(up, {0, 0, 1}) < 0) angle = glm::pi<float>() - angle;
   return glm::mat4x3(glm::rotate(glm::mat4(1), angle, axis));
 }

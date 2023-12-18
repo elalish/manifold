@@ -41,6 +41,32 @@ struct MakeTri {
   }
 };
 
+struct ConvexEdge {
+  VecView<bool> vertConvex;
+  VecView<const Halfedge> halfedge;
+  VecView<const glm::vec3> vertPos;
+  VecView<const glm::vec3> faceNormal;
+  const bool inset;
+
+  bool operator()(int idx) {
+    const Halfedge edge = halfedge[idx];
+    if (!edge.IsForward()) return false;
+
+    const glm::vec3 edgeVec = vertPos[edge.endVert] - vertPos[edge.startVert];
+    const bool convex =
+        inset ^
+        (glm::dot(edgeVec,
+                  glm::cross(faceNormal[edge.face],
+                             faceNormal[halfedge[edge.pairedHalfedge].face])) >
+         0);
+    if (convex) {
+      vertConvex[edge.startVert] = true;
+      vertConvex[edge.endVert] = true;
+    }
+    return convex;
+  }
+};
+
 struct UpdateProperties {
   float* properties;
   const int numProp;
@@ -567,6 +593,93 @@ Manifold Manifold::Warp(std::function<void(glm::vec3&)> warpFunc) const {
   auto pImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
   pImpl->Warp(warpFunc);
   return Manifold(std::make_shared<CsgLeafNode>(pImpl));
+}
+
+/**
+ * Inflate the Manifold by the specified delta, rounding convex vertices.
+ *
+ * @param delta Positive deltas will add volume to all surfaces of the Manifold,
+ * dilating it. Negative deltas will have the opposite effect, eroding it.
+ * @param circularSegments Denotes the resolution of the sphere used at convex
+ * vertices. Default is calculated by the static Quality defaults according to
+ * the radius, which is delta.
+ */
+Manifold Manifold::Offset(float delta, int circularSegments) const {
+  auto pImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
+
+  if (delta == 0) {
+    return Manifold(std::make_shared<CsgLeafNode>(pImpl));
+  }
+
+  const bool inset = delta < 0;
+  const int n = circularSegments > 0 ? (circularSegments + 3) / 4
+                                     : Quality::GetCircularSegments(delta) / 4;
+  const Manifold sphere = Manifold::Sphere(delta, circularSegments);
+  const Manifold cylinder = Manifold::Cylinder(1, delta, delta, 4 * n);
+  const SimplePolygon triangle = {{-1, -1}, {1, 0}, {0, 1}};
+  const Manifold block = Manifold::Extrude(triangle, 1);
+
+  Vec<int> convexEdges(NumEdge());
+  Vec<bool> vertConvex(NumVert(), false);
+  convexEdges.resize(
+      copy_if(countAt(0), countAt(pImpl->halfedge_.size()), convexEdges.begin(),
+              ConvexEdge({vertConvex, pImpl->halfedge_, pImpl->vertPos_,
+                          pImpl->faceNormal_, inset})) -
+      convexEdges.begin());
+
+  Vec<int> convexVerts(NumVert());
+  convexVerts.resize(copy_if(countAt(0), countAt(NumVert()), vertConvex.begin(),
+                             convexVerts.begin(), thrust::identity()) -
+                     convexVerts.begin());
+
+  const int edgeOffset = 1 + NumTri();
+  const int vertOffset = edgeOffset + convexEdges.size();
+  std::vector<Manifold> batch(vertOffset + convexVerts.size());
+  batch[0] = *this;
+
+  for_each_n(countAt(0), NumTri(), [&batch, &block, &pImpl, delta](int tri) {
+    glm::mat3 triPos;
+    for (const int i : {0, 1, 2}) {
+      triPos[i] = pImpl->vertPos_[pImpl->halfedge_[3 * tri + i].startVert];
+    }
+    const glm::vec3 normal = delta * pImpl->faceNormal_[tri];
+    batch[1 + tri] = block.Warp([triPos, normal](glm::vec3& pos) {
+      const float dir = pos.z > 0 ? 1.0f : -1.0f;
+      if (pos.x < 0) {
+        pos = triPos[0];
+      } else if (pos.x > 0) {
+        pos = triPos[1];
+      } else {
+        pos = triPos[2];
+      }
+      pos += dir * normal;
+    });
+  });
+
+  for_each_n(countAt(0), convexEdges.size(),
+             [&batch, &cylinder, &pImpl, &convexEdges, edgeOffset](int idx) {
+               const Halfedge halfedge = pImpl->halfedge_[convexEdges[idx]];
+               glm::vec3 edge = pImpl->vertPos_[halfedge.endVert] -
+                                pImpl->vertPos_[halfedge.startVert];
+               const float length = glm::length(edge);
+               // Reverse RotateUp
+               edge.x *= -1;
+               edge.y *= -1;
+               glm::mat4x3 rot = RotateUp(edge);
+               if (!isfinite(rot[0][0])) rot = glm::mat4x3(1);
+               batch[edgeOffset + idx] =
+                   cylinder.Scale({1, 1, length})
+                       .Transform(rot)
+                       .Translate(pImpl->vertPos_[halfedge.startVert]);
+             });
+
+  for_each_n(countAt(0), convexVerts.size(),
+             [&batch, &sphere, &pImpl, &convexVerts, vertOffset](int idx) {
+               batch[vertOffset + idx] =
+                   sphere.Translate(pImpl->vertPos_[convexVerts[idx]]);
+             });
+
+  return BatchBoolean(batch, inset ? OpType::Subtract : OpType::Add);
 }
 
 /**

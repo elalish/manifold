@@ -592,6 +592,21 @@ TEST(Boolean, Subtract) {
   first.GetMesh();
 }
 
+TEST(Boolean, Offset) {
+  Manifold cutout = Manifold::Cube(glm::vec3(100)) - Manifold::Sphere(60);
+  Manifold fat = cutout.Offset(20);
+  // Manifold thin = cutout.Offset(-20);
+  EXPECT_EQ(fat.Genus(), cutout.Genus());
+  // EXPECT_EQ(thin.Genus(), -7);
+
+#ifdef MANIFOLD_EXPORT
+  if (options.exportModels) {
+    ExportMesh("fat.glb", fat.GetMesh(), {});
+    // ExportMesh("thin.glb", thin.GetMesh(), {});
+  }
+#endif
+}
+
 TEST(Boolean, Close) {
   PolygonParams().processOverlaps = true;
 
