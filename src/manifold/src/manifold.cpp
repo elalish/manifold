@@ -948,8 +948,7 @@ std::vector<Manifold> Manifold::ConvexDecomposition() const {
     joggledVerts[i] = impl.vertPos_[i];
   }
   for (size_t i = 0; i < uniqueFaces.size(); i++) {
-    glm::dvec4 circumcircle =
-        impl.Circumcircle(joggledVerts, uniqueFaces[i]);
+    glm::dvec4 circumcircle = impl.Circumcircle(joggledVerts, uniqueFaces[i]);
     circumcenters[i] =
         glm::dvec3(circumcircle.x, circumcircle.y, circumcircle.z);
     circumradii[i] = circumcircle.w;
@@ -972,8 +971,7 @@ std::vector<Manifold> Manifold::ConvexDecomposition() const {
 
   // Step 4. Recalculate the circumcenters
   for (size_t i = 0; i < uniqueFaces.size(); i++) {
-    glm::dvec4 circumcircle =
-        impl.Circumcircle(joggledVerts, uniqueFaces[i]);
+    glm::dvec4 circumcircle = impl.Circumcircle(joggledVerts, uniqueFaces[i]);
     circumcenters[i] =
         glm::dvec3(circumcircle.x, circumcircle.y, circumcircle.z);
     circumradii[i] = circumcircle.w;
