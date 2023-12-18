@@ -205,7 +205,7 @@ NB_MODULE(manifold3d, m) {
           "Compute the convex hulls enveloping multiple sets of manifolds.")
       .def_static("minkowski", Manifold::Minkowski, nb::arg("a"), nb::arg("b"),
                   nb::arg("useNaive"),
-          "Compute the minkowski sum of two manifolds.")
+                  "Compute the minkowski sum of two manifolds.")
       .def(
           "transform",
           [](Manifold &self, nb::ndarray<float, nb::shape<3, 4>> &mat) {

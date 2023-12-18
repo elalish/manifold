@@ -899,9 +899,8 @@ std::vector<Manifold> Manifold::BatchHull(
  * @param pts A vector of points over which to fracture the manifold.
  * @param wts A vector of weights controlling the relative size of each chunk.
  */
-std::vector<Manifold> Manifold::Fracture(
-    const std::vector<glm::dvec3>& pts,
-    const std::vector<double>& wts) const {
+std::vector<Manifold> Manifold::Fracture(const std::vector<glm::dvec3>& pts,
+                                         const std::vector<double>& wts) const {
   ZoneScoped;
   std::vector<Manifold> output;
   output.reserve(pts.size());
