@@ -264,8 +264,8 @@ class Manifold {
   /** @name Minkowski Functions
    */
   ///@{
-  static Manifold Manifold::Minkowski(const Manifold& a, const Manifold& b,
-                                      bool useNaive = false);
+  static Manifold Minkowski(const Manifold& a, const Manifold& b,
+                            bool useNaive = false);
   ///@}
 
   /** @name Testing hooks
