@@ -778,7 +778,7 @@ TEST(Manifold, ConvexDecomposition) {
 
   float originalVolume = nonConvex.GetProperties().volume;
   float convex_volume = 0.0;
-  Manifold manifold_union = Manifold::Manifold();
+  Manifold manifold_union = convexParts[0].AsOriginal();
   for (Manifold cur_manifold : convexParts) {
     manifold_union += cur_manifold.Hull();
   }
