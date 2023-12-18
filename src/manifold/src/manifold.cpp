@@ -892,10 +892,7 @@ std::vector<Manifold> Manifold::Fracture(
                                     y + 0.5 * c.pts[(vl.ps * i) + 1],
                                     z + 0.5 * c.pts[(vl.ps * i) + 2]));
         }
-        Manifold outputManifold =
-            Hull(verts) ^
-            *this;  // TODO: Replace this intersection with a voro++ wall
-                    // implementation or cutting the cell directly...
+        Manifold outputManifold = Hull(verts) ^ *this;
         if (outputManifold.GetProperties().volume > 0.0) {
           output.push_back(outputManifold);
         }
