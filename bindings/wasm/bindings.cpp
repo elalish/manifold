@@ -152,6 +152,8 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .function("_Mirror", &Manifold::Mirror)
       .function("_Decompose", select_overload<std::vector<Manifold>() const>(
                                   &Manifold::Decompose))
+      .function("_Fracture", &Manifold::Fracture)
+      .function("_ConvexDecomposition", &Manifold::ConvexDecomposition)
       .function("isEmpty", &Manifold::IsEmpty)
       .function("status", &Manifold::Status)
       .function("numVert", &Manifold::NumVert)

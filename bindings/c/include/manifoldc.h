@@ -166,6 +166,11 @@ ManifoldManifold *manifold_revolve(void *mem, ManifoldCrossSection *cs,
 ManifoldManifold *manifold_compose(void *mem, ManifoldManifoldVec *ms);
 ManifoldManifoldVec *manifold_decompose(void *mem, ManifoldManifold *m);
 ManifoldManifold *manifold_as_original(void *mem, ManifoldManifold *m);
+ManifoldManifoldVec *manifold_fracture(void *mem, ManifoldManifold *m, 
+                                       ManifoldVec3 *points, float *weights, 
+                                       size_t length);
+ManifoldManifoldVec *manifold_convex_decomposition(void *mem,
+                                                   ManifoldManifold *m);
 
 // Manifold Info
 

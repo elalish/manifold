@@ -289,6 +289,52 @@ Module.setup = function() {
     return result;
   };
 
+  Module.Manifold.prototype.fracture = function(points, weights) {
+    if (points instanceof Array){
+      let pts = new Module.Vector_vec3();
+      let wts = new Module.Vector_f32();
+      for (const m of points) {
+        if (m instanceof Array && typeof m[0] == 'number' && m.length >= 3) {
+          pts.push_back({x: m[0], y: m[1], z: m[2]});
+          if(m.length >= 4){
+            wts.push_back(m[3]);
+          }
+        } else if (m.x) {
+          pts.push_back(m);
+        } else {
+          pushVec3(pts, m);
+        }
+      }
+      if (weights instanceof Array && weights.length == points.length) {
+        for (const m of weights) {
+          if (typeof m == 'number') {
+            wts.push_back(m);
+          }
+        }
+      } else {
+        if (wts.size() == 0){
+          for (const m of points) {
+            wts.push_back(1.0);
+          }
+        }
+      }
+
+      const vec = this._Fracture(pts, wts);
+      pts.delete();
+      wts.delete();
+      const result = fromVec(vec);
+      vec.delete();
+      return result;
+    }
+  };
+
+  Module.Manifold.prototype.convexDecomposition = function() {
+    const vec = this._ConvexDecomposition();
+    const result = fromVec(vec);
+    vec.delete();
+    return result;
+  };
+
   Module.Manifold.prototype.boundingBox = function() {
     const result = this._boundingBox();
     return {
