@@ -931,7 +931,7 @@ std::vector<Manifold> Manifold::ConvexDecomposition() const {
                        impl.vertPos_[impl.halfedge_[i].startVert]);
     float tangentProjection = glm::dot(impl.faceNormal_[faceB], tangent);
     //  If we've found a pair of reflex triangles, add them to the set
-    if (tangentProjection > 0.0f) {
+    if (tangentProjection > 1e-6) {
       uniqueReflexFaceSet.insert(faceA);
       uniqueReflexFaceSet.insert(faceB);
     }
@@ -958,13 +958,12 @@ std::vector<Manifold> Manifold::ConvexDecomposition() const {
   // vertices, TODO: and store in a hashmap
   std::mt19937 mt(1337);
   std::uniform_real_distribution<double> dist(0.0, 1.0);
-  double randOffset = 0.0f;
+  double randOffset = 0.0;
   for (size_t i = 0; i < circumcenters.size() - 1; i++) {
     for (size_t j = i + 1; j < circumcenters.size(); j++) {
-      if (glm::distance(circumcenters[i], circumcenters[j]) < 0.00001) {
+      if (glm::distance(circumcenters[i], circumcenters[j]) < 1e-6) {
         joggledVerts[impl.halfedge_[(uniqueFaces[i] * 3) + 0].startVert] +=
-            glm::dvec3(dist(mt) * 0.00000000001, dist(mt) * 0.00000000001,
-                       dist(mt) * 0.00000000001);
+            glm::dvec3(dist(mt), dist(mt), dist(mt)) * 1e-11;
       }
     }
   }
