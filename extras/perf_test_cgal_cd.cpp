@@ -59,7 +59,8 @@ class BuildFromManifold : public CGAL::Modifier_base<HDS> {
 };
 
 int main(int argc, char **argv) {
-  Manifold spherecube = Manifold::Cube(glm::vec3(1), true) - Manifold::Sphere(0.6, 100);
+  Manifold spherecube =
+      Manifold::Cube(glm::vec3(1), true) - Manifold::Sphere(0.6, 100);
   Manifold smallsphere = Manifold::Sphere(0.1, 20);
 
   BuildFromManifold<HalfedgeDS> build(spherecube);
@@ -70,8 +71,7 @@ int main(int argc, char **argv) {
   poly.delegate(build);
   std::cout << "to Polyhedron took "
             << (std::chrono::high_resolution_clock::now() - start).count() / 1e9
-            << " sec"
-            << std::endl;
+            << " sec" << std::endl;
 
   start = std::chrono::high_resolution_clock::now();
   NefPolyhedron np(poly);
@@ -81,10 +81,10 @@ int main(int argc, char **argv) {
 
   start = std::chrono::high_resolution_clock::now();
   auto convexDecomposition = spherecube.ConvexDecomposition();
-  std::cout << "[MANIFOLD] decomposed into " << convexDecomposition.size() << " parts in "
+  std::cout << "[MANIFOLD] decomposed into " << convexDecomposition.size()
+            << " parts in "
             << (std::chrono::high_resolution_clock::now() - start).count() / 1e9
-            << " sec"
-            << std::endl;
+            << " sec" << std::endl;
 
   start = std::chrono::high_resolution_clock::now();
   auto generalMinkowskiSum = Manifold::Minkowski(spherecube, smallsphere);
@@ -100,10 +100,10 @@ int main(int argc, char **argv) {
 
   start = std::chrono::high_resolution_clock::now();
   CGAL::convex_decomposition_3(np);
-  std::cout << "[CGAL] decomposed into " << np.number_of_volumes() << " parts in "
+  std::cout << "[CGAL] decomposed into " << np.number_of_volumes()
+            << " parts in "
             << (std::chrono::high_resolution_clock::now() - start).count() / 1e9
-            << " sec"
-            << std::endl;
+            << " sec" << std::endl;
 
   // Create the Small Sphere NEF Polyhedron for Minkowski Summing
   Polyhedron poly2;

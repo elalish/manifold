@@ -113,16 +113,16 @@ struct ComputeTriangleTriangleHull {
     std::pair<glm::ivec3, glm::ivec3> tris = thrust::get<1>(inOut);
     auto vertPosA = *vertPosAPtr;
     auto vertPosB = *vertPosBPtr;
-    (*output)[idx] = Manifold::Hull(
-        {vertPosA[tris.first.x] + vertPosB[tris.second.x],
-         vertPosA[tris.first.x] + vertPosB[tris.second.y],
-         vertPosA[tris.first.x] + vertPosB[tris.second.z],
-         vertPosA[tris.first.y] + vertPosB[tris.second.x],
-         vertPosA[tris.first.y] + vertPosB[tris.second.y],
-         vertPosA[tris.first.y] + vertPosB[tris.second.z],
-         vertPosA[tris.first.z] + vertPosB[tris.second.x],
-         vertPosA[tris.first.z] + vertPosB[tris.second.y],
-         vertPosA[tris.first.z] + vertPosB[tris.second.z]});
+    (*output)[idx] =
+        Manifold::Hull({vertPosA[tris.first.x] + vertPosB[tris.second.x],
+                        vertPosA[tris.first.x] + vertPosB[tris.second.y],
+                        vertPosA[tris.first.x] + vertPosB[tris.second.z],
+                        vertPosA[tris.first.y] + vertPosB[tris.second.x],
+                        vertPosA[tris.first.y] + vertPosB[tris.second.y],
+                        vertPosA[tris.first.y] + vertPosB[tris.second.z],
+                        vertPosA[tris.first.z] + vertPosB[tris.second.x],
+                        vertPosA[tris.first.z] + vertPosB[tris.second.y],
+                        vertPosA[tris.first.z] + vertPosB[tris.second.z]});
   }
 };
 
@@ -1099,8 +1099,9 @@ Manifold Manifold::Minkowski(const Manifold& a, const Manifold& b,
 
     // If the convex manifold was supplied first, swap them!
     Manifold aM = a, bM = b;
-    if (aConvex && !bConvex) { 
-      aM = b; bM = a;
+    if (aConvex && !bConvex) {
+      aM = b;
+      bM = a;
       aConvex = !aConvex;
       bConvex = !bConvex;
     }
@@ -1117,7 +1118,7 @@ Manifold Manifold::Minkowski(const Manifold& a, const Manifold& b,
       // Convex - Non-Convex Minkowski: Slower
     } else if (!aConvex && bConvex) {
       // Speed Equivalent?
-      //for (glm::ivec3 vertexIndices : aMesh.triVerts) {
+      // for (glm::ivec3 vertexIndices : aMesh.triVerts) {
       //  composedParts.push_back({bM.Translate(aMesh.vertPos[vertexIndices.x]),
       //                           bM.Translate(aMesh.vertPos[vertexIndices.y]),
       //                           bM.Translate(aMesh.vertPos[vertexIndices.z])});
@@ -1163,9 +1164,8 @@ Manifold Manifold::Minkowski(const Manifold& a, const Manifold& b,
         }
       }
       composedHulls.resize(trianglePairs.size() + 1);
-      thrust::for_each_n(
-          thrust::host, zip(countAt(1), trianglePairs.begin()),
-          trianglePairs.size(),
+      thrust::for_each_n(thrust::host, zip(countAt(1), trianglePairs.begin()),
+                         trianglePairs.size(),
                          ComputeTriangleTriangleHull(
                              {&aMesh.vertPos, &bMesh.vertPos, &composedHulls}));
     }
