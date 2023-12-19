@@ -303,6 +303,23 @@ TEST(Manifold, Warp2) {
   EXPECT_NEAR(propBefore.volume, 321, 1);
 }
 
+TEST(Manifold, WarpBatch) {
+  Manifold shape1 =
+      Manifold::Cube({2, 3, 4}).Warp([](glm::vec3& v) { v.x += v.z * v.z; });
+  auto prop1 = shape1.GetProperties();
+
+  Manifold shape2 =
+      Manifold::Cube({2, 3, 4}).WarpBatch([](VecView<glm::vec3> vecs) {
+        for (glm::vec3& v : vecs) {
+          v.x += v.z * v.z;
+        }
+      });
+  auto prop2 = shape2.GetProperties();
+
+  EXPECT_EQ(prop1.volume, prop2.volume);
+  EXPECT_EQ(prop1.surfaceArea, prop2.surfaceArea);
+}
+
 TEST(Manifold, Smooth) {
   Manifold tet = Manifold::Tetrahedron();
   Manifold smooth = Manifold::Smooth(tet.GetMesh());

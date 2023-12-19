@@ -18,13 +18,13 @@ def run():
     # extrude a polygon to create a manifold
     extruded_polygon = cross_section.extrude(10.0)
     eps = 0.001
-    observed_volume = extruded_polygon.get_volume()
+    observed_volume = extruded_polygon.volume()
     expected_volume = 10.0
     if abs(observed_volume - expected_volume) > eps:
         raise Exception(
             f"observed_volume={observed_volume} differs from expected_volume={expected_volume}"
         )
-    observed_surface_area = extruded_polygon.get_surface_area()
+    observed_surface_area = extruded_polygon.surface_area()
     expected_surface_area = 42.0
     if abs(observed_surface_area - expected_surface_area) > eps:
         raise Exception(
@@ -32,7 +32,7 @@ def run():
         )
 
     # get bounding box from manifold
-    observed_bbox = extruded_polygon.bounding_box
+    observed_bbox = extruded_polygon.bounding_box()
     expected_bbox = (0.0, 0.0, 0.0, 1.0, 1.0, 10.0)
     if observed_bbox != expected_bbox:
         raise Exception(

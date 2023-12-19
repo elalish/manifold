@@ -567,21 +567,42 @@ CrossSection CrossSection::Transform(const glm::mat3x2& m) const {
  */
 CrossSection CrossSection::Warp(
     std::function<void(glm::vec2&)> warpFunc) const {
-  auto paths = GetPaths();
-  auto warped = C2::PathsD();
-  warped.reserve(paths->paths_.size());
-  for (auto path : paths->paths_) {
-    auto sz = path.size();
-    auto s = C2::PathD(sz);
-    for (int i = 0; i < sz; ++i) {
-      auto v = v2_of_pd(path[i]);
-      warpFunc(v);
-      s[i] = v2_to_pd(v);
+  return WarpBatch([&warpFunc](VecView<glm::vec2> vecs) {
+    for (glm::vec2& p : vecs) {
+      warpFunc(p);
     }
-    warped.push_back(s);
+  });
+}
+
+/**
+ * Same as CrossSection::Warp but calls warpFunc with
+ * a VecView which is roughly equivalent to std::span
+ * pointing to all vec2 elements to be modified in-place
+ *
+ * @param warpFunc A function that modifies multiple vertex positions.
+ */
+CrossSection CrossSection::WarpBatch(
+    std::function<void(VecView<glm::vec2>)> warpFunc) const {
+  std::vector<glm::vec2> tmp_verts;
+  C2::PathsD paths = GetPaths()->paths_;  // deep copy
+  for (C2::PathD const& path : paths) {
+    for (C2::PointD const& p : path) {
+      tmp_verts.push_back(v2_of_pd(p));
+    }
   }
+
+  warpFunc(VecView<glm::vec2>(tmp_verts.data(), tmp_verts.size()));
+
+  auto cursor = tmp_verts.begin();
+  for (C2::PathD& path : paths) {
+    for (C2::PointD& p : path) {
+      p = v2_to_pd(*cursor);
+      ++cursor;
+    }
+  }
+
   return CrossSection(
-      shared_paths(C2::Union(warped, C2::FillRule::Positive, precision_)));
+      shared_paths(C2::Union(paths, C2::FillRule::Positive, precision_)));
 }
 
 /**
