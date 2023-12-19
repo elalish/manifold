@@ -16,6 +16,7 @@
 #include <CGAL/Nef_polyhedron_3.h>
 #include <CGAL/Polyhedron_3.h>
 #include <CGAL/convex_decomposition_3.h>
+#include <CGAL/minkowski_sum_3.h>
 
 #include <chrono>
 #include <iostream>
@@ -59,6 +60,7 @@ class BuildFromManifold : public CGAL::Modifier_base<HDS> {
 
 int main(int argc, char **argv) {
   Manifold spherecube = Manifold::Cube(glm::vec3(1), true) - Manifold::Sphere(0.6, 100);
+  Manifold smallsphere = Manifold::Sphere(0.1, 20);
 
   BuildFromManifold<HalfedgeDS> build(spherecube);
   std::cout << "nTri = " << spherecube.NumTri() << std::endl;
@@ -85,10 +87,34 @@ int main(int argc, char **argv) {
             << std::endl;
 
   start = std::chrono::high_resolution_clock::now();
+  auto generalMinkowskiSum = Manifold::Minkowski(spherecube, smallsphere);
+  std::cout << "[MANIFOLD] general minkowski summed in "
+            << (std::chrono::high_resolution_clock::now() - start).count() / 1e9
+            << " sec" << std::endl;
+
+  start = std::chrono::high_resolution_clock::now();
+  auto naiveMinkowskiSum = Manifold::Minkowski(spherecube, smallsphere, true);
+  std::cout << "[MANIFOLD] naive minkowski summed in "
+            << (std::chrono::high_resolution_clock::now() - start).count() / 1e9
+            << " sec" << std::endl;
+
+  start = std::chrono::high_resolution_clock::now();
   CGAL::convex_decomposition_3(np);
   std::cout << "[CGAL] decomposed into " << np.number_of_volumes() << " parts in "
             << (std::chrono::high_resolution_clock::now() - start).count() / 1e9
             << " sec"
             << std::endl;
+
+  // Create the Small Sphere NEF Polyhedron for Minkowski Summing
+  Polyhedron poly2;
+  poly.delegate(BuildFromManifold<HalfedgeDS>(smallsphere));
+  NefPolyhedron np2(poly);
+
+  start = std::chrono::high_resolution_clock::now();
+  CGAL::minkowski_sum_3(np, np2);
+  std::cout << "[CGAL] minkowski summed in "
+            << (std::chrono::high_resolution_clock::now() - start).count() / 1e9
+            << " sec" << std::endl;
+
   return 0;
 }
