@@ -210,6 +210,9 @@ NB_MODULE(manifold3d, m) {
           [](std::vector<Manifold> &ms) { return Manifold::Hull(ms); },
           "Compute the convex hull enveloping a set of manifolds.")
       .def_static(
+          "batch_batch_hull", Manifold::BatchHull,
+          "Compute the convex hulls enveloping multiple sets of manifolds.")
+      .def_static(
           "hull_points",
           [](std::vector<Float3> &pts) {
             std::vector<glm::vec3> vec(pts.size());
@@ -220,6 +223,9 @@ NB_MODULE(manifold3d, m) {
             return Manifold::Hull(vec);
           },
           "Compute the convex hull enveloping a set of 3d points.")
+      .def_static("minkowski", Manifold::Minkowski, nb::arg("a"), nb::arg("b"),
+                  nb::arg("useThreading"),
+                  "Compute the minkowski sum of two manifolds.")
       .def(
           "transform",
           [](Manifold &self, nb::ndarray<float, nb::shape<3, 4>> &mat) {

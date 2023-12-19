@@ -784,3 +784,73 @@ TEST(Manifold, EmptyHull) {
       {0, 0, 0}, {1, 0, 0}, {0, 1, 0}, {1, 1, 0}};
   EXPECT_TRUE(Manifold::Hull(coplanar).IsEmpty());
 }
+
+TEST(Manifold, ConvexConvexMinkowski) {
+  Manifold sphere = Manifold::Sphere(0.1, 20);
+  Manifold cube = Manifold::Cube();
+  Manifold sum = Manifold::Minkowski(cube, sphere);
+  EXPECT_FLOAT_EQ(sum.GetProperties().volume, 1.6966598f);
+}
+
+TEST(Manifold, ConvexConvexMinkowskiThreaded) {
+  Manifold sphere = Manifold::Sphere(0.1, 20);
+  Manifold cube = Manifold::Cube();
+  Manifold sum = Manifold::Minkowski(cube, sphere, true);
+  EXPECT_FLOAT_EQ(sum.GetProperties().volume, 1.6966598f);
+}
+
+TEST(Manifold, NonConvexConvexMinkowski) {
+  Manifold sphere = Manifold::Sphere(0.6, 20);
+  Manifold cube = Manifold::Cube({1.0, 1.0, 1.0}, true);
+  Manifold nonConvex = cube - sphere;
+  Manifold sum = Manifold::Minkowski(nonConvex, Manifold::Sphere(0.1, 20));
+  EXPECT_FLOAT_EQ(sum.GetProperties().volume, 1.0686193f);
+}
+
+TEST(Manifold, NonConvexConvexMinkowskiThreaded) {
+  Manifold sphere = Manifold::Sphere(0.6, 20);
+  Manifold cube = Manifold::Cube({1.0, 1.0, 1.0}, true);
+  Manifold nonConvex = cube - sphere;
+  Manifold sum = Manifold::Minkowski(nonConvex, Manifold::Sphere(0.1, 20), true);
+  EXPECT_FLOAT_EQ(sum.GetProperties().volume, 1.0686193f);
+}
+
+TEST(Manifold, NonConvexNonConvexMinkowski) {
+  Manifold smallCube = Manifold::Cube({0.1, 0.1, 0.1}, true);
+  std::vector<glm::vec3> verts = smallCube.GetMesh().vertPos;
+  Manifold star = Manifold::Manifold();
+  for (glm::vec3 point :
+       {glm::vec3(0.2, 0.0, 0.0), glm::vec3(-0.2, 0.0, 0.0),
+        glm::vec3(0.0, 0.2, 0.0), glm::vec3(0.0, -0.2, 0.0),
+        glm::vec3(0.0, 0.0, 0.2), glm::vec3(0.0, 0.0, -0.2)}) {
+    verts.push_back(point);
+    star += Manifold::Hull(verts);
+    verts.pop_back();
+  }
+
+  Manifold sphere = Manifold::Sphere(0.6, 20);
+  Manifold cube = Manifold::Cube({1.0, 1.0, 1.0}, true);
+  Manifold nonConvex = cube - sphere;
+  Manifold sum = Manifold::Minkowski(nonConvex, star);
+  EXPECT_FLOAT_EQ(sum.GetProperties().volume, 1.643248);
+}
+
+TEST(Manifold, NonConvexNonConvexMinkowskiThreaded) {
+  Manifold smallCube = Manifold::Cube({0.1, 0.1, 0.1}, true);
+  std::vector<glm::vec3> verts = smallCube.GetMesh().vertPos;
+  Manifold star = Manifold::Manifold();
+  for (glm::vec3 point :
+       {glm::vec3(0.2, 0.0, 0.0), glm::vec3(-0.2, 0.0, 0.0),
+        glm::vec3(0.0, 0.2, 0.0), glm::vec3(0.0, -0.2, 0.0),
+        glm::vec3(0.0, 0.0, 0.2), glm::vec3(0.0, 0.0, -0.2)}) {
+    verts.push_back(point);
+    star += Manifold::Hull(verts);
+    verts.pop_back();
+  }
+
+  Manifold sphere = Manifold::Sphere(0.6, 20);
+  Manifold cube = Manifold::Cube({1.0, 1.0, 1.0}, true);
+  Manifold nonConvex = cube - sphere;
+  Manifold sum = Manifold::Minkowski(nonConvex, star, true);
+  EXPECT_FLOAT_EQ(sum.GetProperties().volume, 1.643248);
+}

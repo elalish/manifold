@@ -61,6 +61,40 @@ struct UpdateProperties {
   }
 };
 
+struct ComputeTriangleHull {
+  const Manifold* manifold;
+  std::vector<glm::vec3>* vertPos;
+  std::vector<Manifold>* output;
+  void operator()(thrust::tuple<int, glm::ivec3&> inOut) {
+    const int idx = thrust::get<0>(inOut);
+    glm::ivec3& tri = thrust::get<1>(inOut);
+    (*output)[idx] = Manifold::Hull({(*manifold).Translate((*vertPos)[tri.x]),
+                                     (*manifold).Translate((*vertPos)[tri.y]),
+                                     (*manifold).Translate((*vertPos)[tri.z])});
+  }
+};
+
+struct ComputeTriangleTriangleHull {
+  std::vector<glm::vec3>* vertPosAPtr;
+  std::vector<glm::vec3>* vertPosBPtr;
+  std::vector<Manifold>* output;
+  void operator()(thrust::tuple<int, std::pair<glm::ivec3, glm::ivec3>> inOut) {
+    const int idx = thrust::get<0>(inOut);
+    std::pair<glm::ivec3, glm::ivec3> tris = thrust::get<1>(inOut);
+    std::vector<glm::vec3> vertPosA = *vertPosAPtr, vertPosB = *vertPosBPtr;
+    (*output)[idx] =
+        Manifold::Hull({vertPosA[tris.first.x] + vertPosB[tris.second.x],
+                        vertPosA[tris.first.x] + vertPosB[tris.second.y],
+                        vertPosA[tris.first.x] + vertPosB[tris.second.z],
+                        vertPosA[tris.first.y] + vertPosB[tris.second.x],
+                        vertPosA[tris.first.y] + vertPosB[tris.second.y],
+                        vertPosA[tris.first.y] + vertPosB[tris.second.z],
+                        vertPosA[tris.first.z] + vertPosB[tris.second.x],
+                        vertPosA[tris.first.z] + vertPosB[tris.second.y],
+                        vertPosA[tris.first.z] + vertPosB[tris.second.z]});
+  }
+};
+
 Manifold Halfspace(Box bBox, glm::vec3 normal, float originOffset) {
   normal = glm::normalize(normal);
   Manifold cutter =
@@ -858,5 +892,108 @@ Manifold Manifold::Hull() const { return Hull(GetMesh().vertPos); }
  */
 Manifold Manifold::Hull(const std::vector<Manifold>& manifolds) {
   return Compose(manifolds).Hull();
+}
+
+/**
+ * Compute the convex hulls enveloping many sets of manifolds.
+ *
+ * @param manifolds A vector of vectors of manifolds over which compute hulls.
+ */
+std::vector<Manifold> Manifold::BatchHull(
+    const std::vector<std::vector<Manifold>>& manifolds) {
+  ZoneScoped;
+  std::vector<Manifold> output;
+  output.reserve(manifolds.size());
+  output.resize(manifolds.size());
+  thrust::for_each_n(
+      thrust::host, zip(manifolds.begin(), output.begin()), manifolds.size(),
+      [](thrust::tuple<std::vector<Manifold>, Manifold&> inOut) {
+        thrust::get<1>(inOut) = Manifold::Hull(thrust::get<0>(inOut));
+      });
+  return output;
+}
+
+/**
+ * Compute the minkowski sum of two manifolds.
+ *
+ * @param a The first manifold in the sum.
+ * @param b The second manifold in the sum.
+ */
+Manifold Manifold::Minkowski(const Manifold& a, const Manifold& b,
+                             bool useThreading) {
+  std::vector<Manifold> composedHulls({a});
+  bool aConvex = a.GetCsgLeafNode().GetImpl()->ReflexFaces().size() == 0;
+  bool bConvex = b.GetCsgLeafNode().GetImpl()->ReflexFaces().size() == 0;
+
+  // If the convex manifold was supplied first, swap them!
+  Manifold aM = a, bM = b;
+  if (aConvex && !bConvex) {
+    aM = b;
+    bM = a;
+    aConvex = !aConvex;
+    bConvex = !bConvex;
+  }
+
+  manifold::Mesh aMesh = aM.GetMesh();
+
+  // Convex-Convex Minkowski: Very Fast
+  if (aConvex && bConvex) {
+    std::vector<Manifold> simpleHull;
+    for (glm::vec3 vertex : aMesh.vertPos) {
+      simpleHull.push_back(bM.Translate(vertex));
+    }
+    composedHulls.push_back(Manifold::Hull(simpleHull));
+    // Convex - Non-Convex Minkowski: Slower
+  } else if (!aConvex && bConvex) {
+    if (useThreading) {
+      composedHulls.resize(aMesh.triVerts.size() + 1);
+      thrust::for_each_n(
+          thrust::host, zip(countAt(1), aMesh.triVerts.begin()),
+          aMesh.triVerts.size(),
+          ComputeTriangleHull({&bM, &aMesh.vertPos, &composedHulls}));
+    } else {
+      std::vector<std::vector<Manifold>> composedParts;
+      for (glm::ivec3 vertexIndices : aMesh.triVerts) {
+        composedParts.push_back({bM.Translate(aMesh.vertPos[vertexIndices.x]),
+                                 bM.Translate(aMesh.vertPos[vertexIndices.y]),
+                                 bM.Translate(aMesh.vertPos[vertexIndices.z])});
+      }
+      auto newHulls = Manifold::BatchHull(composedParts);
+      composedHulls.insert(composedHulls.end(), newHulls.begin(),
+                           newHulls.end());
+    }
+    // Non-Convex - Non-Convex Minkowski: Very Slow
+  } else if (!aConvex && !bConvex) {
+    manifold::Mesh bMesh = bM.GetMesh();
+    if (useThreading) {
+      std::vector<std::pair<glm::ivec3, glm::ivec3>> trianglePairs;
+      for (glm::ivec3 aVertexIndices : aMesh.triVerts) {
+        for (glm::ivec3 bVertexIndices : bMesh.triVerts) {
+          trianglePairs.push_back({aVertexIndices, bVertexIndices});
+        }
+      }
+      composedHulls.resize(trianglePairs.size() + 1);
+      thrust::for_each_n(thrust::host, zip(countAt(1), trianglePairs.begin()),
+                         trianglePairs.size(),
+                         ComputeTriangleTriangleHull(
+                             {&aMesh.vertPos, &bMesh.vertPos, &composedHulls}));
+    } else {
+      for (glm::ivec3 aIndices : aMesh.triVerts) {
+        for (glm::ivec3 bIndices : bMesh.triVerts) {
+          composedHulls.push_back(Manifold::Hull(
+              {aMesh.vertPos[aIndices.x] + bMesh.vertPos[bIndices.x],
+               aMesh.vertPos[aIndices.x] + bMesh.vertPos[bIndices.y],
+               aMesh.vertPos[aIndices.x] + bMesh.vertPos[bIndices.z],
+               aMesh.vertPos[aIndices.y] + bMesh.vertPos[bIndices.x],
+               aMesh.vertPos[aIndices.y] + bMesh.vertPos[bIndices.y],
+               aMesh.vertPos[aIndices.y] + bMesh.vertPos[bIndices.z],
+               aMesh.vertPos[aIndices.z] + bMesh.vertPos[bIndices.x],
+               aMesh.vertPos[aIndices.z] + bMesh.vertPos[bIndices.y],
+               aMesh.vertPos[aIndices.z] + bMesh.vertPos[bIndices.z]}));
+        }
+      }
+    }
+  }
+  return Manifold::BatchBoolean(composedHulls, manifold::OpType::Add);
 }
 }  // namespace manifold

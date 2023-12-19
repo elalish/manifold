@@ -249,6 +249,15 @@ class Manifold {
   Manifold Hull() const;
   static Manifold Hull(const std::vector<Manifold>& manifolds);
   static Manifold Hull(const std::vector<glm::vec3>& pts);
+  static std::vector<Manifold> BatchHull(
+      const std::vector<std::vector<Manifold>>& manifolds);
+  ///@}
+
+  /** @name Minkowski Functions
+   */
+  ///@{
+  static Manifold Minkowski(const Manifold& a, const Manifold& b,
+                            bool useThreading = false);
   ///@}
 
   /** @name Testing hooks

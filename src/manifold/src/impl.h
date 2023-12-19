@@ -121,6 +121,7 @@ struct Manifold::Impl {
                             glm::mat3x2 projection) const;
   CrossSection Slice(float height) const;
   CrossSection Project() const;
+  std::vector<int> ReflexFaces(double tolerance = 1e-8) const;
 
   // edge_op.cu
   void SimplifyTopology();

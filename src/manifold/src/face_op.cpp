@@ -316,4 +316,28 @@ CrossSection Manifold::Impl::Project() const {
 
   return CrossSection(polys).Simplify(precision_);
 }
+
+std::vector<int> Manifold::Impl::ReflexFaces(double tolerance) const {
+  std::unordered_set<int> uniqueReflexFaceSet;
+  for (size_t i = 0; i < halfedge_.size(); i++) {
+    Halfedge halfedge = halfedge_[i];
+    int faceA = halfedge.face;
+    int faceB = halfedge_[halfedge.pairedHalfedge].face;
+    glm::dvec3 tangent =
+        glm::cross((glm::dvec3)faceNormal_[faceA],
+                   (glm::dvec3)vertPos_[halfedge_[i].endVert] -
+                       (glm::dvec3)vertPos_[halfedge_[i].startVert]);
+    double tangentProjection =
+        glm::dot((glm::dvec3)faceNormal_[faceB], tangent);
+    //  If we've found a pair of reflex triangles, add them to the set
+    if (tangentProjection > tolerance) {
+      uniqueReflexFaceSet.insert(faceA);
+      uniqueReflexFaceSet.insert(faceB);
+    }
+  }
+  std::vector<int> uniqueFaces;  // Copy to a vector for indexed access
+  uniqueFaces.insert(uniqueFaces.end(), uniqueReflexFaceSet.begin(),
+                     uniqueReflexFaceSet.end());
+  return uniqueFaces;
+}
 }  // namespace manifold
