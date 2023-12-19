@@ -1043,12 +1043,11 @@ std::vector<Manifold> Manifold::ConvexDecomposition() const {
  */
 Manifold Manifold::Minkowski(const Manifold& a, const Manifold& b,
                              bool useNaive) {
-  std::vector<Manifold> aDecomposition = a.ConvexDecomposition();
-  std::vector<Manifold> bDecomposition = b.ConvexDecomposition();
-
   std::vector<std::vector<Manifold>> composedParts;
   std::vector<Manifold> composedHulls({a});
   if (!useNaive) {  // Use the general method
+    std::vector<Manifold> aDecomposition = a.ConvexDecomposition();
+    std::vector<Manifold> bDecomposition = b.ConvexDecomposition();
     for (Manifold aPart : aDecomposition) {
       manifold::Mesh aMesh = aPart.GetMesh();
       for (Manifold bPart : bDecomposition) {
@@ -1059,12 +1058,42 @@ Manifold Manifold::Minkowski(const Manifold& a, const Manifold& b,
         composedParts.push_back(abComposition);
       }
     }
-  } else {  // Use the naive method, which is only valid when b is convex
+  } else {  // Use the naive method TODO: Add Deeper Multithreading
+    bool aConvex = a.ReflexFaces().size() == 0;
+    bool bConvex = b.ReflexFaces().size() == 0;
     manifold::Mesh aMesh = a.GetMesh();
-    for (glm::ivec3 vertexIndices : aMesh.triVerts) {
-      composedParts.push_back({b.Translate(aMesh.vertPos[vertexIndices.x]),
-                               b.Translate(aMesh.vertPos[vertexIndices.y]),
-                               b.Translate(aMesh.vertPos[vertexIndices.z])});
+
+    // Convex-Convex Minkowski: Very Fast
+    if (aConvex && bConvex) {
+      std::vector<Manifold> simpleHull;
+      for (glm::vec3 vertex : aMesh.vertPos) {
+        simpleHull.push_back({b.Translate(vertex)});
+      }
+      composedHulls.push_back(Manifold::Hull(simpleHull));
+      // Convex - Non-Convex Minkowski: Slower
+    } else if (!aConvex && bConvex) {
+      for (glm::ivec3 vertexIndices : aMesh.triVerts) {
+        composedParts.push_back({b.Translate(aMesh.vertPos[vertexIndices.x]),
+                                 b.Translate(aMesh.vertPos[vertexIndices.y]),
+                                 b.Translate(aMesh.vertPos[vertexIndices.z])});
+      }
+      // Non-Convex - Non-Convex Minkowski: Very Slow
+    } else if (!aConvex && !bConvex) {
+      manifold::Mesh bMesh = b.GetMesh();
+      for (glm::ivec3 aVertexIndices : aMesh.triVerts) {
+        for (glm::ivec3 bVertexIndices : bMesh.triVerts) {
+          composedHulls.push_back(Manifold::Hull(
+              {aMesh.vertPos[aVertexIndices.x] + bMesh.vertPos[bVertexIndices.x],
+               aMesh.vertPos[aVertexIndices.x] + bMesh.vertPos[bVertexIndices.y],
+               aMesh.vertPos[aVertexIndices.x] + bMesh.vertPos[bVertexIndices.z],
+               aMesh.vertPos[aVertexIndices.y] + bMesh.vertPos[bVertexIndices.x],
+               aMesh.vertPos[aVertexIndices.y] + bMesh.vertPos[bVertexIndices.y],
+               aMesh.vertPos[aVertexIndices.y] + bMesh.vertPos[bVertexIndices.z],
+               aMesh.vertPos[aVertexIndices.z] + bMesh.vertPos[bVertexIndices.x],
+               aMesh.vertPos[aVertexIndices.z] + bMesh.vertPos[bVertexIndices.y],
+               aMesh.vertPos[aVertexIndices.z] + bMesh.vertPos[bVertexIndices.z]}));
+        }
+      }
     }
   }
   auto newHulls = Manifold::BatchHull(composedParts);
