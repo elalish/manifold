@@ -1061,25 +1061,34 @@ Manifold Manifold::Minkowski(const Manifold& a, const Manifold& b,
   } else {  // Use the naive method TODO: Add Deeper Multithreading
     bool aConvex = a.ReflexFaces().size() == 0;
     bool bConvex = b.ReflexFaces().size() == 0;
-    manifold::Mesh aMesh = a.GetMesh();
+
+    // If the convex manifold was supplied first, swap them!
+    Manifold aM = a, bM = b;
+    if (aConvex && !bConvex) { 
+      aM = b; bM = a;
+      aConvex = !aConvex;
+      bConvex = !bConvex;
+    }
+
+    manifold::Mesh aMesh = aM.GetMesh();
 
     // Convex-Convex Minkowski: Very Fast
     if (aConvex && bConvex) {
       std::vector<Manifold> simpleHull;
       for (glm::vec3 vertex : aMesh.vertPos) {
-        simpleHull.push_back({b.Translate(vertex)});
+        simpleHull.push_back({bM.Translate(vertex)});
       }
       composedHulls.push_back(Manifold::Hull(simpleHull));
       // Convex - Non-Convex Minkowski: Slower
     } else if (!aConvex && bConvex) {
       for (glm::ivec3 vertexIndices : aMesh.triVerts) {
-        composedParts.push_back({b.Translate(aMesh.vertPos[vertexIndices.x]),
-                                 b.Translate(aMesh.vertPos[vertexIndices.y]),
-                                 b.Translate(aMesh.vertPos[vertexIndices.z])});
+        composedParts.push_back({bM.Translate(aMesh.vertPos[vertexIndices.x]),
+                                 bM.Translate(aMesh.vertPos[vertexIndices.y]),
+                                 bM.Translate(aMesh.vertPos[vertexIndices.z])});
       }
       // Non-Convex - Non-Convex Minkowski: Very Slow
     } else if (!aConvex && !bConvex) {
-      manifold::Mesh bMesh = b.GetMesh();
+      manifold::Mesh bMesh = bM.GetMesh();
       for (glm::ivec3 aVertexIndices : aMesh.triVerts) {
         for (glm::ivec3 bVertexIndices : bMesh.triVerts) {
           composedHulls.push_back(Manifold::Hull(
