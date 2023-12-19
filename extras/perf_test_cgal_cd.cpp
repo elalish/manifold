@@ -59,31 +59,36 @@ class BuildFromManifold : public CGAL::Modifier_base<HDS> {
 
 int main(int argc, char **argv) {
   Manifold spherecube = Manifold::Cube(glm::vec3(1), true) - Manifold::Sphere(0.6, 100);
+
   BuildFromManifold<HalfedgeDS> build(spherecube);
   std::cout << "nTri = " << spherecube.NumTri() << std::endl;
 
   auto start = std::chrono::high_resolution_clock::now();
   Polyhedron poly;
   poly.delegate(build);
-  auto end = std::chrono::high_resolution_clock::now();
-  std::chrono::duration<double> elapsed = end - start;
-  std::cout << "to Polyhedron took " << elapsed.count() << " sec"
+  std::cout << "to Polyhedron took "
+            << (std::chrono::high_resolution_clock::now() - start).count() / 1e9
+            << " sec"
             << std::endl;
 
   start = std::chrono::high_resolution_clock::now();
   NefPolyhedron np(poly);
-  end = std::chrono::high_resolution_clock::now();
-  elapsed = end - start;
-  std::cout << "conversion to Nef Polyhedron took " << elapsed.count()
+  std::cout << "conversion to Nef Polyhedron took "
+            << (std::chrono::high_resolution_clock::now() - start).count() / 1e9
             << " sec" << std::endl;
 
   start = std::chrono::high_resolution_clock::now();
-  CGAL::convex_decomposition_3(np);
-  std::cout << "decomposed into " << np.number_of_volumes() << " parts"
+  auto convexDecomposition = spherecube.ConvexDecomposition();
+  std::cout << "[MANIFOLD] decomposed into " << convexDecomposition.size() << " parts in "
+            << (std::chrono::high_resolution_clock::now() - start).count() / 1e9
+            << " sec"
             << std::endl;
-  end = std::chrono::high_resolution_clock::now();
-  elapsed = end - start;
-  std::cout << "decomposition took " << elapsed.count() << " sec" << std::endl
+
+  start = std::chrono::high_resolution_clock::now();
+  CGAL::convex_decomposition_3(np);
+  std::cout << "[CGAL] decomposed into " << np.number_of_volumes() << " parts in "
+            << (std::chrono::high_resolution_clock::now() - start).count() / 1e9
+            << " sec"
             << std::endl;
   return 0;
 }
