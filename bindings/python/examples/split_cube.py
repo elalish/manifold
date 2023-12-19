@@ -18,6 +18,6 @@ from manifold3d import Manifold
 
 
 def run():
-    a = Manifold.cube(1.0, 1.0, 1.0)
-    b = Manifold.cube(1.0, 1.0, 1.0).rotate(45.0, 45.0, 45.0)
+    a = Manifold.cube([1.0, 1.0, 1.0])
+    b = Manifold.cube([1.0, 1.0, 1.0]).rotate([45.0, 45.0, 45.0])
     return a.split(b)[0]
