@@ -72,7 +72,7 @@ struct ComputeVoronoiCell {
     const int idx = thrust::get<0>(inOut);
     glm::ivec3& cell_idx = thrust::get<1>(inOut);
     glm::dvec4& cell_pos = thrust::get<2>(inOut);
-    voro::voronoicell c(*container);
+    voro::voronoicell_neighbor c(*container);
 
     if (container->compute_cell(c, cell_idx.y, cell_idx.z)) {
       std::vector<glm::vec3> verts;
@@ -82,8 +82,11 @@ struct ComputeVoronoiCell {
                                   cell_pos.y + 0.5 * c.pts[(4 * i) + 1],
                                   cell_pos.z + 0.5 * c.pts[(4 * i) + 2]));
       }
-      (*output)[idx] = Manifold::Hull(verts) ^ *original;
+      (*output)[cell_idx.x] = Manifold::Hull(verts) ^ *original;
       verts.clear();
+    } else {
+      std::cout << "[ERROR] Degenerate Voronoi Cell at Index: " << cell_idx.x
+                << std::endl;
     }
   }
 };
@@ -906,7 +909,6 @@ std::vector<Manifold> Manifold::BatchHull(
   return output;
 }
 
-// TODO: Handle Joggling in the Fracture Function Directly?
 /**
  * Compute the voronoi fracturing of this Manifold into convex chunks.
  *
@@ -969,81 +971,68 @@ std::vector<Manifold> Manifold::Fracture(
   return Fracture(highpVerts, highpWeights);
 }
 
-std::vector<Manifold> Manifold::ConvexDecomposition() const {
-  ZoneScoped;
-  // Step 1. Get a list of all unique triangle faces with at least one reflex
-  // edge
+std::vector<int> Manifold::ReflexFaces(double tolerance) const {
   std::unordered_set<int> uniqueReflexFaceSet;
   const Impl& impl = *GetCsgLeafNode().GetImpl();
   for (size_t i = 0; i < impl.halfedge_.size(); i++) {
     Halfedge halfedge = impl.halfedge_[i];
     int faceA = halfedge.face;
     int faceB = impl.halfedge_[halfedge.pairedHalfedge].face;
-    glm::vec3 tangent =
-        glm::cross(impl.faceNormal_[faceA],
-                   impl.vertPos_[impl.halfedge_[i].endVert] -
-                       impl.vertPos_[impl.halfedge_[i].startVert]);
-    float tangentProjection = glm::dot(impl.faceNormal_[faceB], tangent);
+    glm::dvec3 tangent =
+        glm::cross((glm::dvec3)impl.faceNormal_[faceA],
+                   (glm::dvec3)impl.vertPos_[impl.halfedge_[i].endVert] -
+                       (glm::dvec3)impl.vertPos_[impl.halfedge_[i].startVert]);
+    double tangentProjection =
+        glm::dot((glm::dvec3)impl.faceNormal_[faceB], tangent);
     //  If we've found a pair of reflex triangles, add them to the set
-    if (tangentProjection > 1e-6) {
+    if (tangentProjection > tolerance) {
       uniqueReflexFaceSet.insert(faceA);
       uniqueReflexFaceSet.insert(faceB);
     }
   }
-
-  // Early-Exit if the part is already convex
-  if (uniqueReflexFaceSet.size() == 0) {
-    return std::vector<Manifold>(1, *this);
-  }
-
   std::vector<int> uniqueFaces;  // Copy to a vector for indexed access
   uniqueFaces.insert(uniqueFaces.end(), uniqueReflexFaceSet.begin(),
                      uniqueReflexFaceSet.end());
+  return uniqueFaces;
+}
 
-  // Step 2. Calculate the Circumcircles (centers + radii) of these triangles
+std::vector<Manifold> Manifold::ConvexDecomposition() const {
+  ZoneScoped;
+  std::vector<int> uniqueFaces = ReflexFaces();
+
+  // Early-Exit if the manifold is already convex
+  if (uniqueFaces.size() == 0) {
+    return std::vector<Manifold>(1, *this);
+  }
+
+  const Impl& impl = *GetCsgLeafNode().GetImpl();
   std::vector<glm::dvec3> circumcenters(uniqueFaces.size());
   std::vector<double> circumradii(uniqueFaces.size());
-  Vec<glm::dvec3> joggledVerts(impl.vertPos_.size());
+  Vec<glm::dvec3> dVerts(impl.vertPos_.size());
   for (size_t i = 0; i < impl.vertPos_.size(); i++) {
-    joggledVerts[i] = impl.vertPos_[i];
+    dVerts[i] = impl.vertPos_[i];
   }
   for (size_t i = 0; i < uniqueFaces.size(); i++) {
-    glm::dvec4 circumcircle = impl.Circumcircle(joggledVerts, uniqueFaces[i]);
+    glm::dvec4 circumcircle = impl.Circumcircle(dVerts, uniqueFaces[i]);
     circumcenters[i] =
         glm::dvec3(circumcircle.x, circumcircle.y, circumcircle.z);
     circumradii[i] = circumcircle.w;
   }
 
-  // Step 3. If any two circumcenters are identical, joggle one of the triangle
-  // vertices, TODO: and store in a hashmap
-  std::mt19937 mt(1337);
-  std::uniform_real_distribution<double> dist(0.0, 1.0);
-  double randOffset = 0.0;
   for (size_t i = 0; i < circumcenters.size() - 1; i++) {
-    for (size_t j = i + 1; j < circumcenters.size(); j++) {
-      if (glm::distance(circumcenters[i], circumcenters[j]) < 1e-6) {
-        joggledVerts[impl.halfedge_[(uniqueFaces[i] * 3) + 0].startVert] +=
-            glm::dvec3(dist(mt), dist(mt), dist(mt)) * 1e-11;
+    for (size_t j = circumcenters.size() - 1; j > i; j--) {
+      if (glm::distance(circumcenters[i], circumcenters[j]) < 1e-9) {
+        std::vector<glm::dvec3>::iterator it = circumcenters.begin();
+        std::advance(it, j);
+        circumcenters.erase(it);
+        std::vector<double>::iterator it2 = circumradii.begin();
+        std::advance(it2, j);
+        circumradii.erase(it2);
       }
     }
   }
 
-  // Step 4. Recalculate the circumcenters
-  for (size_t i = 0; i < uniqueFaces.size(); i++) {
-    glm::dvec4 circumcircle = impl.Circumcircle(joggledVerts, uniqueFaces[i]);
-    circumcenters[i] =
-        glm::dvec3(circumcircle.x, circumcircle.y, circumcircle.z);
-    circumradii[i] = circumcircle.w;
-  }
-
-  // Step 5. Calculate the Voronoi Fracturing
-  std::vector<Manifold> output = Fracture(circumcenters, circumradii);
-
-  // TODO:
-  // Step 6. Unjoggle the voronoi region vertices
-  // Step 7. Hull and Intersect with the original Manifold
-
-  return output;
+  return Fracture(circumcenters, circumradii);
 }
 
 /**
@@ -1070,8 +1059,6 @@ Manifold Manifold::Minkowski(const Manifold& a, const Manifold& b,
         composedParts.push_back(abComposition);
       }
     }
-    auto newHulls = Manifold::BatchHull(composedParts);
-    composedHulls.insert(composedHulls.end(), newHulls.begin(), newHulls.end());
   } else {  // Use the naive method, which is only valid when b is convex
     manifold::Mesh aMesh = a.GetMesh();
     for (glm::ivec3 vertexIndices : aMesh.triVerts) {
@@ -1079,9 +1066,9 @@ Manifold Manifold::Minkowski(const Manifold& a, const Manifold& b,
                                b.Translate(aMesh.vertPos[vertexIndices.y]),
                                b.Translate(aMesh.vertPos[vertexIndices.z])});
     }
-    auto newHulls = Manifold::BatchHull(composedParts);
-    composedHulls.insert(composedHulls.end(), newHulls.begin(), newHulls.end());
   }
+  auto newHulls = Manifold::BatchHull(composedParts);
+  composedHulls.insert(composedHulls.end(), newHulls.begin(), newHulls.end());
   return Manifold::BatchBoolean(composedHulls, manifold::OpType::Add);
 }
 }  // namespace manifold
