@@ -17,6 +17,6 @@ def run():
         star += Manifold.hull_points(np.concatenate((cube_vertices, offset), axis=0))
 
     sphere = Manifold.sphere(0.6, 30)
-    cube = Manifold.cube(1.0, 1.0, 1.0, True)
+    cube = Manifold.cube([1.0, 1.0, 1.0], True)
     sphereless_cube = cube - sphere
     return Manifold.minkowski(sphereless_cube, star, False)
