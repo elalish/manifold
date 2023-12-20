@@ -24,6 +24,16 @@ target_compile_options(manifold3d PRIVATE ${MANIFOLD_FLAGS} -DMODULE_NAME=manifo
 target_compile_features(manifold3d PUBLIC cxx_std_17)
 set_target_properties(manifold3d PROPERTIES OUTPUT_NAME "manifold3d")
 
+message(Python_EXECUTABLE = ${Python_EXECUTABLE})
+add_custom_target(
+  autogen_docstrings
+  ${Python_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/gen_docs.py
+  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+  BYPRODUCTS autogen_docstrings.inl
+)
+target_include_directories(manifold3d PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
+add_dependencies(manifold3d autogen_docstrings)
+
 if(SKBUILD)
 install(
   TARGETS manifold3d

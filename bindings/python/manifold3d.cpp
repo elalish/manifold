@@ -15,7 +15,7 @@
 #include <optional>
 #include <string>
 
-#include "autogen_docstrings.inl"
+#include "autogen_docstrings.inl"  // generated in build folder
 #include "cross_section.h"
 #include "manifold.h"
 #include "nanobind/nanobind.h"
