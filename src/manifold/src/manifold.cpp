@@ -642,6 +642,7 @@ Manifold Manifold::Offset(float delta, int circularSegments, bool useHullMethod)
     const int edgeOffset = 1 + NumTri();
     const int vertOffset = edgeOffset + convexEdges.size();
     batch.resize(vertOffset + convexVerts.size());
+    batch[0] = (*this);
 
     for_each_n(countAt(0), NumTri(), [&batch, &block, &pImpl, radius](int tri) {
       glm::mat3 triPos;
