@@ -1,0 +1,25 @@
+import numpy as np
+from manifold3d import Manifold
+
+
+def run():
+    small_cube = Manifold.cube(0.1, 0.1, 0.1, True)
+    star = Manifold.as_original(small_cube)
+    for offset in [
+        [[0.2, 0.0, 0.0]],
+        [[-0.2, 0.0, 0.0]],
+        [[0.0, 0.2, 0.0]],
+        [[0.0, -0.2, 0.0]],
+        [[0.0, 0.0, 0.2]],
+        [[0.0, 0.0, -0.2]],
+    ]:
+        star += Manifold.hull_points(
+            np.concatenate(
+                (small_cube.to_mesh().vert_properties[:, :3], offset), axis=0
+            )
+        )
+
+    sphere = Manifold.sphere(0.6, 30)
+    cube = Manifold.cube(1.0, 1.0, 1.0, True)
+    sphereless_cube = cube - sphere
+    return Manifold.minkowski(sphereless_cube, star, False)
