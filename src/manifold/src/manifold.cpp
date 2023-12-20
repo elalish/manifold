@@ -604,7 +604,7 @@ Manifold Manifold::Warp(std::function<void(glm::vec3&)> warpFunc) const {
  * vertices. Default is calculated by the static Quality defaults according to
  * the radius, which is delta.
  */
-Manifold Manifold::Offset(float delta, int circularSegments) const {
+Manifold Manifold::Offset(float delta, int circularSegments, bool useHullMethod) const {
   auto pImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
 
   if (delta == 0) {
@@ -616,68 +616,91 @@ Manifold Manifold::Offset(float delta, int circularSegments) const {
   const int n = circularSegments > 0 ? (circularSegments + 3) / 4
                                      : Quality::GetCircularSegments(delta) / 4;
   const Manifold sphere = Manifold::Sphere(radius, circularSegments);
-  const Manifold cylinder = Manifold::Cylinder(1, radius, radius, 4 * n);
-  const SimplePolygon triangle = {{-1, -1}, {1, 0}, {0, 1}};
-  const Manifold block = Manifold::Extrude(triangle, 1);
+  std::vector<Manifold> batch;
+  batch.push_back(*this);
 
-  Vec<int> convexEdges(NumEdge());
-  Vec<bool> vertConvex(NumVert(), false);
-  convexEdges.resize(
-      copy_if(countAt(0), countAt(pImpl->halfedge_.size()), convexEdges.begin(),
-              ConvexEdge({vertConvex, pImpl->halfedge_, pImpl->vertPos_,
-                          pImpl->faceNormal_, inset})) -
-      convexEdges.begin());
+  if (!useHullMethod) {
+    const Manifold cylinder = Manifold::Cylinder(1, radius, radius, 4 * n);
+    const SimplePolygon triangle = {{-1, -1}, {1, 0}, {0, 1}};
+    const Manifold block = Manifold::Extrude(triangle, 1);
 
-  Vec<int> convexVerts(NumVert());
-  convexVerts.resize(copy_if(countAt(0), countAt(NumVert()), vertConvex.begin(),
-                             convexVerts.begin(), thrust::identity()) -
-                     convexVerts.begin());
+    Vec<int> convexEdges(NumEdge());
+    Vec<bool> vertConvex(NumVert(), false);
+    convexEdges.resize(
+        copy_if(countAt(0), countAt(pImpl->halfedge_.size()),
+                convexEdges.begin(),
+                ConvexEdge({vertConvex, pImpl->halfedge_, pImpl->vertPos_,
+                            pImpl->faceNormal_, inset})) -
+        convexEdges.begin());
 
-  const int edgeOffset = 1 + NumTri();
-  const int vertOffset = edgeOffset + convexEdges.size();
-  std::vector<Manifold> batch(vertOffset + convexVerts.size());
-  batch[0] = *this;
+    Vec<int> convexVerts(NumVert());
+    convexVerts.resize(copy_if(countAt(0), countAt(NumVert()),
+                               vertConvex.begin(), convexVerts.begin(),
+                               thrust::identity()) -
+                       convexVerts.begin());
 
-  for_each_n(countAt(0), NumTri(), [&batch, &block, &pImpl, radius](int tri) {
-    glm::mat3 triPos;
-    for (const int i : {0, 1, 2}) {
-      triPos[i] = pImpl->vertPos_[pImpl->halfedge_[3 * tri + i].startVert];
-    }
-    const glm::vec3 normal = radius * pImpl->faceNormal_[tri];
-    batch[1 + tri] = block.Warp([triPos, normal](glm::vec3& pos) {
-      const float dir = pos.z > 0 ? 1.0f : -1.0f;
-      if (pos.x < 0) {
-        pos = triPos[0];
-      } else if (pos.x > 0) {
-        pos = triPos[1];
-      } else {
-        pos = triPos[2];
+    const int edgeOffset = 1 + NumTri();
+    const int vertOffset = edgeOffset + convexEdges.size();
+    batch.resize(vertOffset + convexVerts.size());
+
+    for_each_n(countAt(0), NumTri(), [&batch, &block, &pImpl, radius](int tri) {
+      glm::mat3 triPos;
+      for (const int i : {0, 1, 2}) {
+        triPos[i] = pImpl->vertPos_[pImpl->halfedge_[3 * tri + i].startVert];
       }
-      pos += dir * normal;
+      const glm::vec3 normal = radius * pImpl->faceNormal_[tri];
+      batch[1 + tri] = block.Warp([triPos, normal](glm::vec3& pos) {
+        const float dir = pos.z > 0 ? 1.0f : -1.0f;
+        if (pos.x < 0) {
+          pos = triPos[0];
+        } else if (pos.x > 0) {
+          pos = triPos[1];
+        } else {
+          pos = triPos[2];
+        }
+        pos += dir * normal;
+      });
     });
-  });
 
-  for_each_n(countAt(0), convexEdges.size(),
-             [&batch, &cylinder, &pImpl, &convexEdges, edgeOffset](int idx) {
-               const Halfedge halfedge = pImpl->halfedge_[convexEdges[idx]];
-               glm::vec3 edge = pImpl->vertPos_[halfedge.endVert] -
-                                pImpl->vertPos_[halfedge.startVert];
-               const float length = glm::length(edge);
-               // Reverse RotateUp
-               edge.x *= -1;
-               edge.y *= -1;
-               batch[edgeOffset + idx] =
-                   cylinder.Scale({1, 1, length})
-                       .Transform(RotateUp(edge))
-                       .Translate(pImpl->vertPos_[halfedge.startVert]);
-             });
+    for_each_n(countAt(0), convexEdges.size(),
+               [&batch, &cylinder, &pImpl, &convexEdges, edgeOffset](int idx) {
+                 const Halfedge halfedge = pImpl->halfedge_[convexEdges[idx]];
+                 glm::vec3 edge = pImpl->vertPos_[halfedge.endVert] -
+                                  pImpl->vertPos_[halfedge.startVert];
+                 const float length = glm::length(edge);
+                 // Reverse RotateUp
+                 edge.x *= -1;
+                 edge.y *= -1;
+                 batch[edgeOffset + idx] =
+                     cylinder.Scale({1, 1, length})
+                         .Transform(RotateUp(edge))
+                         .Translate(pImpl->vertPos_[halfedge.startVert]);
+               });
 
-  for_each_n(countAt(0), convexVerts.size(),
-             [&batch, &sphere, &pImpl, &convexVerts, vertOffset](int idx) {
-               batch[vertOffset + idx] =
-                   sphere.Translate(pImpl->vertPos_[convexVerts[idx]]);
-             });
-
+    for_each_n(countAt(0), convexVerts.size(),
+               [&batch, &sphere, &pImpl, &convexVerts, vertOffset](int idx) {
+                 batch[vertOffset + idx] =
+                     sphere.Translate(pImpl->vertPos_[convexVerts[idx]]);
+               });
+  } else {
+    manifold::Mesh aMesh = this->GetMesh();
+    std::vector<std::vector<Manifold>> composedParts;
+    for (glm::ivec3 vertexIndices : aMesh.triVerts) {
+      composedParts.push_back({sphere.Translate(aMesh.vertPos[vertexIndices.x]),
+                               sphere.Translate(aMesh.vertPos[vertexIndices.y]),
+                               sphere.Translate(aMesh.vertPos[vertexIndices.z])});
+    }
+    std::vector<Manifold> newHulls;
+    newHulls.reserve(composedParts.size());
+    newHulls.resize(composedParts.size());
+    thrust::for_each_n(
+        thrust::host, zip(composedParts.begin(), newHulls.begin()),
+        composedParts.size(),
+        [](thrust::tuple<std::vector<Manifold>, Manifold&> inOut) {
+          thrust::get<1>(inOut) = Manifold::Hull(thrust::get<0>(inOut));
+        });
+    batch.insert(batch.end(), newHulls.begin(), newHulls.end());
+  }
   return BatchBoolean(batch, inset ? OpType::Subtract : OpType::Add);
 }
 

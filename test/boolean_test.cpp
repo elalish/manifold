@@ -611,6 +611,25 @@ TEST(Boolean, Offset) {
   PolygonParams().processOverlaps = false;
 }
 
+TEST(Boolean, OffsetHull) {
+  PolygonParams().processOverlaps = true;
+
+  Manifold cutout = Manifold::Cube(glm::vec3(100), true) - Manifold::Sphere(60);
+  Manifold fat = cutout.Offset(5, 0, true);
+  Manifold thin = cutout.Offset(-5, 0, true);
+  EXPECT_EQ(fat.Genus(), cutout.Genus());
+  EXPECT_EQ(thin.Genus(), -7);
+
+#ifdef MANIFOLD_EXPORT
+  if (options.exportModels) {
+    ExportMesh("fatHulled.glb", fat.GetMesh(), {});
+    ExportMesh("thinHulled.glb", thin.GetMesh(), {});
+  }
+#endif
+
+  PolygonParams().processOverlaps = false;
+}
+
 TEST(Boolean, Close) {
   PolygonParams().processOverlaps = true;
 
