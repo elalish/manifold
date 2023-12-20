@@ -900,7 +900,7 @@ Manifold Manifold::Hull(const std::vector<Manifold>& manifolds) {
  * @param a The first manifold in the sum.
  * @param b The second manifold in the sum.
  */
-Manifold Manifold::Minkowski(const Manifold& a, const Manifold& b,
+Manifold Manifold::Minkowski(const Manifold& a, const Manifold& b, bool inset,
                              bool useThreading) {
   std::vector<Manifold> composedHulls({a});
   bool aConvex = a.GetCsgLeafNode().GetImpl()->ReflexFaces().size() == 0;
@@ -983,6 +983,8 @@ Manifold Manifold::Minkowski(const Manifold& a, const Manifold& b,
       }
     }
   }
-  return Manifold::BatchBoolean(composedHulls, manifold::OpType::Add);
+  return Manifold::BatchBoolean(composedHulls, inset
+                                                   ? manifold::OpType::Subtract
+                                                   : manifold::OpType::Add);
 }
 }  // namespace manifold

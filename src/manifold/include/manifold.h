@@ -255,7 +255,7 @@ class Manifold {
    */
   ///@{
   static Manifold Minkowski(const Manifold& a, const Manifold& b,
-                            bool useThreading = false);
+                            bool inset = false, bool useThreading = false);
   ///@}
 
   /** @name Testing hooks
