@@ -1033,9 +1033,9 @@ std::vector<int> Manifold::ReflexFaces(double tolerance) const {
 
 std::vector<Manifold> Manifold::ConvexDecomposition() const {
   ZoneScoped;
-  std::vector<int> uniqueFaces = ReflexFaces();
 
   // Early-Exit if the manifold is already convex
+  std::vector<int> uniqueFaces = ReflexFaces();
   if (uniqueFaces.size() == 0) {
     return std::vector<Manifold>(1, *this);
   }
@@ -1047,16 +1047,40 @@ std::vector<Manifold> Manifold::ConvexDecomposition() const {
   for (size_t i = 0; i < impl.vertPos_.size(); i++) {
     dVerts[i] = impl.vertPos_[i];
   }
+  std::vector<Manifold> debugShapes;
   for (size_t i = 0; i < uniqueFaces.size(); i++) {
     glm::dvec4 circumcircle = impl.Circumcircle(dVerts, uniqueFaces[i]);
     circumcenters[i] =
         glm::dvec3(circumcircle.x, circumcircle.y, circumcircle.z);
     circumradii[i] = circumcircle.w;
+
+    // Debug Draw the Circumcenter and Triangle of Degenerate Triangles 
+    // if (circumcircle.w < 0.0) {
+    //   std::cout << "Circumradius: " << circumcircle.w << std::endl;
+    //   debugShapes.push_back(Hull(
+    //       {Manifold::Sphere(circumcircle.w * 0.1, 10)
+    //            .Translate(glm::vec3(
+    //                dVerts[impl.halfedge_[(uniqueFaces[i] * 3) +
+    //                0].startVert])),
+    //        Manifold::Sphere(circumcircle.w * 0.1, 10)
+    //            .Translate(glm::vec3(
+    //                dVerts[impl.halfedge_[(uniqueFaces[i] * 3) +
+    //                1].startVert])),
+    //        Manifold::Sphere(circumcircle.w * 0.1, 10)
+    //            .Translate(glm::vec3(
+    //                dVerts[impl.halfedge_[(uniqueFaces[i] * 3) +
+    //                2].startVert]))
+    //     }));
+    //
+    //   debugShapes.push_back(Manifold::Sphere(circumcircle.w * 0.2, 10)
+    //                             .Translate(glm::vec3(circumcenters[i])));
+    // }
   }
 
   for (size_t i = 0; i < circumcenters.size() - 1; i++) {
     for (size_t j = circumcenters.size() - 1; j > i; j--) {
-      if (glm::distance(circumcenters[i], circumcenters[j]) < 1e-9) {
+      if (glm::distance(circumcenters[i], circumcenters[j]) < 1e-9 ||
+          circumradii[j] < 0.0) {
         std::vector<glm::dvec3>::iterator it = circumcenters.begin();
         std::advance(it, j);
         circumcenters.erase(it);
@@ -1067,7 +1091,9 @@ std::vector<Manifold> Manifold::ConvexDecomposition() const {
     }
   }
 
-  return Fracture(circumcenters, circumradii);
+  std::vector<Manifold> output = Fracture(circumcenters, circumradii);
+  output.insert(output.end(), debugShapes.begin(), debugShapes.end());
+  return output;
 }
 
 /**
@@ -1093,7 +1119,7 @@ Manifold Manifold::Minkowski(const Manifold& a, const Manifold& b,
         composedParts.push_back(abComposition);
       }
     }
-  } else {  // Use the naive method TODO: Add Deeper Multithreading
+  } else {  // Use the naive method
     bool aConvex = a.ReflexFaces().size() == 0;
     bool bConvex = b.ReflexFaces().size() == 0;
 
