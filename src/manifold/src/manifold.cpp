@@ -52,13 +52,13 @@ struct ConvexEdge {
     const Halfedge edge = halfedge[idx];
     if (!edge.IsForward()) return false;
 
+    const glm::vec3 normal0 = faceNormal[edge.face];
+    const glm::vec3 normal1 = faceNormal[halfedge[edge.pairedHalfedge].face];
+    if (glm::all(glm::equal(normal0, normal1))) return false;
+
     const glm::vec3 edgeVec = vertPos[edge.endVert] - vertPos[edge.startVert];
-    const bool convex =
-        inset ^
-        (glm::dot(edgeVec,
-                  glm::cross(faceNormal[edge.face],
-                             faceNormal[halfedge[edge.pairedHalfedge].face])) >
-         0);
+    const bool convex = ((inset ? -1 : 1) *
+                         glm::dot(edgeVec, glm::cross(normal0, normal1))) > 0;
     if (convex) {
       vertConvex[edge.startVert] = true;
       vertConvex[edge.endVert] = true;
@@ -612,10 +612,11 @@ Manifold Manifold::Offset(float delta, int circularSegments) const {
   }
 
   const bool inset = delta < 0;
+  const float radius = glm::abs(delta);
   const int n = circularSegments > 0 ? (circularSegments + 3) / 4
                                      : Quality::GetCircularSegments(delta) / 4;
-  const Manifold sphere = Manifold::Sphere(delta, circularSegments);
-  const Manifold cylinder = Manifold::Cylinder(1, delta, delta, 4 * n);
+  const Manifold sphere = Manifold::Sphere(radius, circularSegments);
+  const Manifold cylinder = Manifold::Cylinder(1, radius, radius, 4 * n);
   const SimplePolygon triangle = {{-1, -1}, {1, 0}, {0, 1}};
   const Manifold block = Manifold::Extrude(triangle, 1);
 
@@ -637,12 +638,12 @@ Manifold Manifold::Offset(float delta, int circularSegments) const {
   std::vector<Manifold> batch(vertOffset + convexVerts.size());
   batch[0] = *this;
 
-  for_each_n(countAt(0), NumTri(), [&batch, &block, &pImpl, delta](int tri) {
+  for_each_n(countAt(0), NumTri(), [&batch, &block, &pImpl, radius](int tri) {
     glm::mat3 triPos;
     for (const int i : {0, 1, 2}) {
       triPos[i] = pImpl->vertPos_[pImpl->halfedge_[3 * tri + i].startVert];
     }
-    const glm::vec3 normal = delta * pImpl->faceNormal_[tri];
+    const glm::vec3 normal = radius * pImpl->faceNormal_[tri];
     batch[1 + tri] = block.Warp([triPos, normal](glm::vec3& pos) {
       const float dir = pos.z > 0 ? 1.0f : -1.0f;
       if (pos.x < 0) {
@@ -665,11 +666,9 @@ Manifold Manifold::Offset(float delta, int circularSegments) const {
                // Reverse RotateUp
                edge.x *= -1;
                edge.y *= -1;
-               glm::mat4x3 rot = RotateUp(edge);
-               if (!isfinite(rot[0][0])) rot = glm::mat4x3(1);
                batch[edgeOffset + idx] =
                    cylinder.Scale({1, 1, length})
-                       .Transform(rot)
+                       .Transform(RotateUp(edge))
                        .Translate(pImpl->vertPos_[halfedge.startVert]);
              });
 

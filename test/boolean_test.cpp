@@ -593,18 +593,22 @@ TEST(Boolean, Subtract) {
 }
 
 TEST(Boolean, Offset) {
-  Manifold cutout = Manifold::Cube(glm::vec3(100)) - Manifold::Sphere(60);
-  Manifold fat = cutout.Offset(20);
-  // Manifold thin = cutout.Offset(-20);
+  PolygonParams().processOverlaps = true;
+
+  Manifold cutout = Manifold::Cube(glm::vec3(100), true) - Manifold::Sphere(60);
+  Manifold fat = cutout.Offset(5);
+  Manifold thin = cutout.Offset(-5);
   EXPECT_EQ(fat.Genus(), cutout.Genus());
-  // EXPECT_EQ(thin.Genus(), -7);
+  EXPECT_EQ(thin.Genus(), -7);
 
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) {
     ExportMesh("fat.glb", fat.GetMesh(), {});
-    // ExportMesh("thin.glb", thin.GetMesh(), {});
+    ExportMesh("thin.glb", thin.GetMesh(), {});
   }
 #endif
+
+  PolygonParams().processOverlaps = false;
 }
 
 TEST(Boolean, Close) {

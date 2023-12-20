@@ -80,7 +80,7 @@ inline glm::mat4x3 RotateUp(glm::vec3 up) {
   glm::vec3 axis = glm::cross(up, {0, 0, 1});
   float length = glm::length(axis);
   if (!isfinite(length)) length = 0;
-  float angle = glm::asin(length);
+  float angle = glm::asin(glm::min(length, 1.0f));
   if (length == 0) axis = {1, 0, 0};
   if (glm::dot(up, {0, 0, 1}) < 0) angle = glm::pi<float>() - angle;
   return glm::mat4x3(glm::rotate(glm::mat4(1), angle, axis));
