@@ -895,25 +895,6 @@ Manifold Manifold::Hull(const std::vector<Manifold>& manifolds) {
 }
 
 /**
- * Compute the convex hulls enveloping many sets of manifolds.
- *
- * @param manifolds A vector of vectors of manifolds over which compute hulls.
- */
-std::vector<Manifold> Manifold::BatchHull(
-    const std::vector<std::vector<Manifold>>& manifolds) {
-  ZoneScoped;
-  std::vector<Manifold> output;
-  output.reserve(manifolds.size());
-  output.resize(manifolds.size());
-  thrust::for_each_n(
-      thrust::host, zip(manifolds.begin(), output.begin()), manifolds.size(),
-      [](thrust::tuple<std::vector<Manifold>, Manifold&> inOut) {
-        thrust::get<1>(inOut) = Manifold::Hull(thrust::get<0>(inOut));
-      });
-  return output;
-}
-
-/**
  * Compute the minkowski sum of two manifolds.
  *
  * @param a The first manifold in the sum.
@@ -958,7 +939,15 @@ Manifold Manifold::Minkowski(const Manifold& a, const Manifold& b,
                                  bM.Translate(aMesh.vertPos[vertexIndices.y]),
                                  bM.Translate(aMesh.vertPos[vertexIndices.z])});
       }
-      auto newHulls = Manifold::BatchHull(composedParts);
+      std::vector<Manifold> newHulls;
+      newHulls.reserve(composedParts.size());
+      newHulls.resize(composedParts.size());
+      thrust::for_each_n(
+          thrust::host, zip(composedParts.begin(), newHulls.begin()),
+          composedParts.size(),
+          [](thrust::tuple<std::vector<Manifold>, Manifold&> inOut) {
+            thrust::get<1>(inOut) = Manifold::Hull(thrust::get<0>(inOut));
+          });
       composedHulls.insert(composedHulls.end(), newHulls.begin(),
                            newHulls.end());
     }

@@ -210,9 +210,6 @@ NB_MODULE(manifold3d, m) {
           [](std::vector<Manifold> &ms) { return Manifold::Hull(ms); },
           "Compute the convex hull enveloping a set of manifolds.")
       .def_static(
-          "batch_batch_hull", Manifold::BatchHull,
-          "Compute the convex hulls enveloping multiple sets of manifolds.")
-      .def_static(
           "hull_points",
           [](std::vector<Float3> &pts) {
             std::vector<glm::vec3> vec(pts.size());
