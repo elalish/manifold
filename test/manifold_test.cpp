@@ -817,6 +817,7 @@ TEST(Manifold, NonConvexConvexMinkowskiThreaded) {
 }
 
 TEST(Manifold, NonConvexNonConvexMinkowski) {
+  ManifoldParams().deterministic = true;
   Manifold star = Manifold::Cube({0.1, 0.1, 0.1}, true);
   std::vector<glm::vec3> verts = star.GetMesh().vertPos;
   for (glm::vec3 point :
@@ -836,6 +837,7 @@ TEST(Manifold, NonConvexNonConvexMinkowski) {
 }
 
 TEST(Manifold, NonConvexNonConvexMinkowskiThreaded) {
+  ManifoldParams().deterministic = true;
   Manifold star = Manifold::Cube({0.1, 0.1, 0.1}, true);
   std::vector<glm::vec3> verts = star.GetMesh().vertPos;
   for (glm::vec3 point :
