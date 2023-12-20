@@ -15,8 +15,8 @@
 #include <optional>
 #include <string>
 
+#include "autogen_docstrings.inl"
 #include "cross_section.h"
-#include "docstrings.inl"
 #include "manifold.h"
 #include "nanobind/nanobind.h"
 #include "nanobind/ndarray.h"
@@ -203,58 +203,58 @@ std::vector<T> toVector(const T *arr, size_t size) {
   return std::vector<T>(arr, arr + size);
 }
 
-using namespace manifold_docs;
+using namespace manifold_docstrings;
 
 // strip original :params: and replace with ours
-const std::string manifold__rotate_vec =
-    std::string(manifold__rotate_f0bb7b7d2f38)
-        .substr(0, std::string(manifold__rotate_f0bb7b7d2f38).find(":param")) +
+const std::string manifold__rotate_xyz =
+    manifold__rotate__x_degrees__y_degrees__z_degrees;
+const std::string manifold__rotate__v =
+    manifold__rotate_xyz.substr(0, manifold__rotate_xyz.find(":param")) +
     ":param v: [X, Y, Z] rotation in degrees.";
 
 NB_MODULE(manifold3d, m) {
   m.doc() = "Python binding for the Manifold library.";
 
   m.def("set_min_circular_angle", Quality::SetMinCircularAngle,
-        nb::arg("angle"), set_min_circular_angle_69463d0b8fac);
+        nb::arg("angle"), set_min_circular_angle__angle);
 
   m.def("set_min_circular_edge_length", Quality::SetMinCircularEdgeLength,
-        nb::arg("length"), set_min_circular_edge_length_bb1c70addca7);
+        nb::arg("length"), set_min_circular_edge_length__length);
 
   m.def("set_circular_segments", Quality::SetCircularSegments,
-        nb::arg("number"), set_circular_segments_7ebd2a75022a);
+        nb::arg("number"), set_circular_segments__number);
 
   m.def("get_circular_segments", Quality::GetCircularSegments,
-        nb::arg("radius"), get_circular_segments_3f31ccff2bbc);
+        nb::arg("radius"), get_circular_segments__radius);
 
   m.def("triangulate", &Triangulate, nb::arg("polygons"),
         nb::arg("precision") = -1,  // TODO document
-        triangulate_025ab0b4046f);
+        triangulate__polygons__precision);
 
   nb::class_<Manifold>(m, "Manifold")
-      .def(nb::init<>(), manifold__manifold_c130481162c9)
+      .def(nb::init<>(), manifold__manifold)
       .def(nb::init<const MeshGL &, const std::vector<float> &>(),
            nb::arg("mesh"), nb::arg("property_tolerance") = nb::list(),
-           manifold__manifold_37129c244d43)
-      .def(nb::self + nb::self, "Boolean union.")
-      .def(nb::self - nb::self, "Boolean difference.")
-      .def(nb::self ^ nb::self, "Boolean intersection.")
+           manifold__manifold__mesh_gl__property_tolerance)
+      .def(nb::self + nb::self, manifold__operator_plus__q)
+      .def(nb::self - nb::self, manifold__operator_minus__q)
+      .def(nb::self ^ nb::self, manifold__operator_xor__q)
       .def(
           "hull", [](const Manifold &self) { return self.Hull(); },
-          manifold__hull_1fd92449f7cb)
+          manifold__hull)
       .def_static(
           "batch_hull",
           [](std::vector<Manifold> ms) { return Manifold::Hull(ms); },
-          nb::arg("manifolds"), manifold__hull_e1568f7f16f2)
+          nb::arg("manifolds"), manifold__hull__manifolds)
       .def_static(
           "hull_points",
           [](std::vector<glm::vec3> pts) { return Manifold::Hull(pts); },
-          nb::arg("pts"), manifold__hull_b0113f48020a)
+          nb::arg("pts"), manifold__hull__pts)
       .def("transform", &Manifold::Transform, nb::arg("m"),
-           manifold__transform_0390744b2b46)
+           manifold__transform__m)
       .def("translate", &Manifold::Translate, nb::arg("t"),
-           manifold__translate_fcadc2ca8d6d)
-      .def("scale", &Manifold::Scale, nb::arg("v"),
-           manifold__scale_244be87a307d)
+           manifold__translate__v)
+      .def("scale", &Manifold::Scale, nb::arg("v"), manifold__scale__v)
       .def(
           "scale",
           [](const Manifold &m, float s) {
@@ -262,22 +262,21 @@ NB_MODULE(manifold3d, m) {
           },
           nb::arg("s"),
           "Scale this Manifold in space. This operation can be chained. "
-          "Transforms are combined and applied lazily."
-          "\n\n"
+          "Transforms are combined and applied lazily.\n\n"
           ":param s: The scalar to multiply every vertex by component.")
-      .def("mirror", &Manifold::Mirror, nb::arg("v"),
-           manifold__mirror_d798a49656cc)
+      .def("mirror", &Manifold::Mirror, nb::arg("v"), manifold__mirror__normal)
       .def(
           "rotate",
           [](const Manifold &self, glm::vec3 v) {
             return self.Rotate(v.x, v.y, v.z);
           },
-          nb::arg("v"), manifold__rotate_vec.c_str())
-      .def("warp", &Manifold::Warp, nb::arg("f"), manifold__warp_4cc67905f424)
-      .def("warp_batch", &Manifold::WarpBatch, nb::arg("f"),
-           manifold__warp_batch_0b44f7bbe36b)
+          nb::arg("v"), manifold__rotate__v.c_str())
+      .def("warp", &Manifold::Warp, nb::arg("warp_func"),
+           manifold__warp__warp_func)
+      .def("warp_batch", &Manifold::WarpBatch, nb::arg("warp_func"),
+           manifold__warp_batch__warp_func)
       .def(
-          "set_properties",  // TODO this needs a batch version!
+          "set_properties",
           [](const Manifold &self, int newNumProp,
              const std::function<nb::object(
                  glm::vec3, const nb::ndarray<nb::numpy, const float,
@@ -306,23 +305,21 @@ NB_MODULE(manifold3d, m) {
             });
           },
           nb::arg("new_num_prop"), nb::arg("f"),
-          manifold__set_properties_6a3457d9ec71)
+          manifold__set_properties__num_prop__prop_func)
       .def("calculate_curvature", &Manifold::CalculateCurvature,
            nb::arg("gaussian_idx"), nb::arg("mean_idx"),
-           manifold__calculate_curvature_0bb0af918c76)
-      .def("refine", &Manifold::Refine, nb::arg("n"),
-           manifold__refine_c64a4fc78137)
+           manifold__calculate_curvature__gaussian_idx__mean_idx)
+      .def("refine", &Manifold::Refine, nb::arg("n"), manifold__refine__n)
       .def("to_mesh", &Manifold::GetMeshGL,
            nb::arg("normal_idx") = glm::ivec3(0),
-           manifold__get_mesh_gl_731af09ec81f)
-      .def("num_vert", &Manifold::NumVert, manifold__num_vert_93a4106c8a53)
-      .def("num_edge", &Manifold::NumEdge, manifold__num_edge_61b0f3dc7f99)
-      .def("num_tri", &Manifold::NumTri, manifold__num_tri_56a67713dff8)
-      .def("num_prop", &Manifold::NumProp, manifold__num_prop_745ca800e017)
-      .def("num_prop_vert", &Manifold::NumPropVert,
-           manifold__num_prop_vert_a7ba865d3e11)
-      .def("precision", &Manifold::Precision, manifold__precision_bb888ab8ec11)
-      .def("genus", &Manifold::Genus, manifold__genus_75c215a950f8)
+           manifold__get_mesh_gl__normal_idx)
+      .def("num_vert", &Manifold::NumVert, manifold__num_vert)
+      .def("num_edge", &Manifold::NumEdge, manifold__num_edge)
+      .def("num_tri", &Manifold::NumTri, manifold__num_tri)
+      .def("num_prop", &Manifold::NumProp, manifold__num_prop)
+      .def("num_prop_vert", &Manifold::NumPropVert, manifold__num_prop_vert)
+      .def("precision", &Manifold::Precision, manifold__precision)
+      .def("genus", &Manifold::Genus, manifold__genus)
       .def(
           "volume",
           [](const Manifold &self) { return self.GetProperties().volume; },
@@ -333,22 +330,22 @@ NB_MODULE(manifold3d, m) {
           [](const Manifold &self) { return self.GetProperties().surfaceArea; },
           "Get the surface area of the manifold\n This is clamped to zero for "
           "a given face if they are within the Precision().")
-      .def("original_id", &Manifold::OriginalID,
-           manifold__original_id_d1c064807f94)
-      .def("as_original", &Manifold::AsOriginal,
-           manifold__as_original_2653ccf900dd)
-      .def("is_empty", &Manifold::IsEmpty, manifold__is_empty_8f3c4e98cca8)
-      .def("decompose", &Manifold::Decompose, manifold__decompose_88ccab82c740)
+      .def("original_id", &Manifold::OriginalID, manifold__original_id)
+      .def("as_original", &Manifold::AsOriginal, manifold__as_original)
+      .def("is_empty", &Manifold::IsEmpty, manifold__is_empty)
+      .def("decompose", &Manifold::Decompose, manifold__decompose)
       .def("split", &Manifold::Split, nb::arg("cutter"),
-           manifold__split_fc2847c7afae)
+           manifold__split__cutter)
       .def("split_by_plane", &Manifold::SplitByPlane, nb::arg("normal"),
-           nb::arg("origin_offset"), manifold__split_by_plane_f411533a14aa)
+           nb::arg("origin_offset"),
+           manifold__split_by_plane__normal__origin_offset)
       .def("trim_by_plane", &Manifold::TrimByPlane, nb::arg("normal"),
-           nb::arg("origin_offset"), manifold__trim_by_plane_066ac34a84b0)
+           nb::arg("origin_offset"),
+           manifold__trim_by_plane__normal__origin_offset)
       .def("slice", &Manifold::Slice, nb::arg("height"),
-           manifold__slice_7d90a75e7913)
-      .def("project", &Manifold::Project, manifold__project_e28980e0f682)
-      .def("status", &Manifold::Status, manifold__status_b1c2b69ee41e)
+           manifold__slice__height)
+      .def("project", &Manifold::Project, manifold__project)
+      .def("status", &Manifold::Status, manifold__status)
       .def(
           "bounding_box",
           [](const Manifold &self) {
@@ -375,22 +372,22 @@ NB_MODULE(manifold3d, m) {
           nb::arg("mesh"), nb::arg("sharpened_edges") = nb::list(),
           nb::arg("edge_smoothness") = nb::list(),
           // todo params slightly diff
-          manifold__smooth_66eaffd9331b)
+          manifold__smooth__mesh_gl__sharpened_edges)
       .def_static("compose", &Manifold::Compose, nb::arg("manifolds"),
-                  manifold__compose_6c382bb1612b)
-      .def_static("tetrahedron", &Manifold::Tetrahedron,
-                  manifold__tetrahedron_7e95f682f35b)
+                  manifold__compose__manifolds)
+      .def_static("tetrahedron", &Manifold::Tetrahedron, manifold__tetrahedron)
       .def_static("cube", &Manifold::Cube, nb::arg("size") = glm::vec3{1, 1, 1},
-                  nb::arg("center") = false, manifold__cube_64d1c43c52ed)
-      .def_static("cylinder", &Manifold::Cylinder, nb::arg("height"),
-                  nb::arg("radius_low"), nb::arg("radius_high") = -1.0f,
-                  nb::arg("circular_segments") = 0, nb::arg("center") = false,
-                  manifold__cylinder_af7b1b7dc893)
+                  nb::arg("center") = false, manifold__cube__size__center)
+      .def_static(
+          "cylinder", &Manifold::Cylinder, nb::arg("height"),
+          nb::arg("radius_low"), nb::arg("radius_high") = -1.0f,
+          nb::arg("circular_segments") = 0, nb::arg("center") = false,
+          manifold__cylinder__height__radius_low__radius_high__circular_segments__center)
       .def_static("sphere", &Manifold::Sphere, nb::arg("radius"),
                   nb::arg("circular_segments") = 0,
-                  manifold__sphere_6781451731f0)
+                  manifold__sphere__radius__circular_segments)
       .def_static("reserve_ids", Manifold::ReserveIDs, nb::arg("n"),
-                  manifold__reserve_ids_a514f84c6343);
+                  manifold__reserve_ids__n);
 
   nb::class_<MeshGL>(m, "Mesh")
       .def(
@@ -575,19 +572,16 @@ NB_MODULE(manifold3d, m) {
       "onwards). This class makes use of the "
       "[Clipper2](http://www.angusj.com/clipper2/Docs/Overview.htm) library "
       "for polygon clipping (boolean) and offsetting operations.")
-      .def(nb::init<>(), cross_section__cross_section_381df1ec382b)
+      .def(nb::init<>(), cross_section__cross_section)
       .def(nb::init<std::vector<std::vector<glm::vec2>>,
                     CrossSection::FillRule>(),
-           nb::arg("polygons"),
+           nb::arg("contours"),
            nb::arg("fillrule") = CrossSection::FillRule::Positive,
-           cross_section__cross_section_4459865c1e2f)
-      .def("area", &CrossSection::Area, cross_section__area_f5458809be32)
-      .def("num_vert", &CrossSection::NumVert,
-           cross_section__num_vert_9dd2efd31062)
-      .def("num_contour", &CrossSection::NumContour,
-           cross_section__num_contour_5894fa74e5f5)
-      .def("is_empty", &CrossSection::IsEmpty,
-           cross_section__is_empty_25b4b2d4e0ad)
+           cross_section__cross_section__contours__fillrule)
+      .def("area", &CrossSection::Area, cross_section__area)
+      .def("num_vert", &CrossSection::NumVert, cross_section__num_vert)
+      .def("num_contour", &CrossSection::NumContour, cross_section__num_contour)
+      .def("is_empty", &CrossSection::IsEmpty, cross_section__is_empty)
       .def(
           "bounds",
           [](const CrossSection &self) {
@@ -597,11 +591,11 @@ NB_MODULE(manifold3d, m) {
           "Return bounding box of CrossSection as tuple("
           "min_x, min_y, max_x, max_y)")
       .def("translate", &CrossSection::Translate, nb::arg("v"),
-           cross_section__translate_339895387e15)
-      .def("rotate", &CrossSection::Rotate, nb::arg("angle"),
-           cross_section__rotate_7c6bae9524e7)
-      .def("scale", &CrossSection::Scale, nb::arg("v"),
-           cross_section__scale_8913c878f656)
+           cross_section__translate__v)
+      .def("rotate", &CrossSection::Rotate, nb::arg("degrees"),
+           cross_section__rotate__degrees)
+      .def("scale", &CrossSection::Scale, nb::arg("scale"),
+           cross_section__scale__scale)
       .def(
           "scale",
           [](const CrossSection &self, float s) {
@@ -613,45 +607,48 @@ NB_MODULE(manifold3d, m) {
           "\n\n"
           ":param s: The scalar to multiply every vertex by per component.")
       .def("mirror", &CrossSection::Mirror, nb::arg("ax"),
-           cross_section__mirror_a10119e40f21)
+           cross_section__mirror__ax)
       .def("transform", &CrossSection::Transform, nb::arg("m"),
-           cross_section__transform_baddfca7ede3)
-      .def("warp", &CrossSection::Warp, nb::arg("f"),
-           cross_section__warp_180cafeaaad1)
-      .def("warp_batch", &CrossSection::WarpBatch, nb::arg("f"),
-           cross_section__warp_batch_f843ce28c677)
+           cross_section__transform__m)
+      .def("warp", &CrossSection::Warp, nb::arg("warp_func"),
+           cross_section__warp__warp_func)
+      .def("warp_batch", &CrossSection::WarpBatch, nb::arg("warp_func"),
+           cross_section__warp_batch__warp_func)
       .def("simplify", &CrossSection::Simplify, nb::arg("epsilon") = 1e-6,
-           cross_section__simplify_dbac3e60acf4)
-      .def("offset", &CrossSection::Offset, nb::arg("delta"),
-           nb::arg("join_type"), nb::arg("miter_limit") = 2.0,
-           nb::arg("circular_segments") = 0, cross_section__offset_b3675b4b0ed0)
-      .def(nb::self + nb::self, cross_section__operator_plus_d3c26b9c5ca3)
-      .def(nb::self - nb::self, cross_section__operator_minus_04b4d727817f)
-      .def(nb::self ^ nb::self, cross_section__operator_xor_76de317c9be1)
+           cross_section__simplify__epsilon)
+      .def(
+          "offset", &CrossSection::Offset, nb::arg("delta"),
+          nb::arg("join_type"), nb::arg("miter_limit") = 2.0,
+          nb::arg("circular_segments") = 0,
+          cross_section__offset__delta__jointype__miter_limit__circular_segments)
+      .def(nb::self + nb::self, cross_section__operator_plus__q)
+      .def(nb::self - nb::self, cross_section__operator_minus__q)
+      .def(nb::self ^ nb::self, cross_section__operator_xor__q)
       .def(
           "hull", [](const CrossSection &self) { return self.Hull(); },
-          cross_section__hull_3f1ad9eaa499)
+          cross_section__hull)
       .def_static(
           "batch_hull",
           [](std::vector<CrossSection> cs) { return CrossSection::Hull(cs); },
-          nb::arg("cross_sections"), cross_section__hull_014f76304d06)
+          nb::arg("cross_sections"), cross_section__hull__cross_sections)
       .def_static(
           "hull_points",
           [](std::vector<glm::vec2> pts) { return CrossSection::Hull(pts); },
-          nb::arg("pts"), cross_section__hull_c94ccc3c0fe6)
-      .def("decompose", &CrossSection::Decompose,
-           cross_section__decompose_17ae5159e6e5)
-      .def("to_polygons", &CrossSection::ToPolygons,
-           cross_section__to_polygons_6f4cb60dbd78)
-      .def("extrude", &Manifold::Extrude, nb::arg("height"),
-           nb::arg("n_divisions") = 0, nb::arg("twist_degrees") = 0.0f,
-           nb::arg("scale_top") = std::make_tuple(1.0f, 1.0f),
-           manifold__extrude_bc84f1554abe)
+          nb::arg("pts"), cross_section__hull__pts)
+      .def("decompose", &CrossSection::Decompose, cross_section__decompose)
+      .def("to_polygons", &CrossSection::ToPolygons, cross_section__to_polygons)
+      .def(
+          "extrude", &Manifold::Extrude, nb::arg("height"),
+          nb::arg("n_divisions") = 0, nb::arg("twist_degrees") = 0.0f,
+          nb::arg("scale_top") = std::make_tuple(1.0f, 1.0f),
+          manifold__extrude__cross_section__height__n_divisions__twist_degrees__scale_top)
       .def("revolve", &Manifold::Revolve, nb::arg("circular_segments") = 0,
-           nb::arg("revolve_degrees") = 360.0, manifold__revolve_c916603e7a75)
+           nb::arg("revolve_degrees") = 360.0,
+           manifold__revolve__cross_section__circular_segments__revolve_degrees)
       .def_static("square", &CrossSection::Square, nb::arg("size"),
-                  nb::arg("center") = false, cross_section__square_67088e89831e)
+                  nb::arg("center") = false,
+                  cross_section__square__size__center)
       .def_static("circle", &CrossSection::Circle, nb::arg("radius"),
                   nb::arg("circular_segments") = 0,
-                  cross_section__circle_72e80d0e2b44);
+                  cross_section__circle__radius__circular_segments);
 }
