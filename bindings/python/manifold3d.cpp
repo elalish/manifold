@@ -221,7 +221,7 @@ NB_MODULE(manifold3d, m) {
           },
           "Compute the convex hull enveloping a set of 3d points.")
       .def_static("minkowski", Manifold::Minkowski, nb::arg("a"), nb::arg("b"),
-                  nb::arg("useThreading"),
+                  nb::arg("inset"), nb::arg("useThreading"),
                   "Compute the minkowski sum of two manifolds.")
       .def(
           "transform",
