@@ -806,7 +806,8 @@ TEST(Manifold, NonConvexConvexMinkowski) {
   Manifold nonConvex = cube - sphere;
   Manifold sum = nonConvex.MinkowskiSum(Manifold::Sphere(0.1, 20));
   EXPECT_FLOAT_EQ(sum.GetProperties().volume, 4.8406339f);
-  Manifold difference = nonConvex.MinkowskiDifference(Manifold::Sphere(0.1, 20));
+  Manifold difference =
+      nonConvex.MinkowskiDifference(Manifold::Sphere(0.1, 20));
   EXPECT_FLOAT_EQ(difference.GetProperties().volume, 0.2029168f);
   ManifoldParams().deterministic = oldDeterministic;
 }
