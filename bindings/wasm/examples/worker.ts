@@ -59,10 +59,13 @@ const manifoldStaticFunctions = [
 ];
 // manifold member functions (that return a new manifold)
 const manifoldMemberFunctions = [
-  'add', 'subtract', 'intersect', 'decompose', 'warp', 'transform', 'translate',
-  'rotate', 'scale', 'mirror', 'refine', 'setProperties', 'asOriginal',
-  'trimByPlane', 'split', 'splitByPlane', 'slice', 'project', 'hull',
-  'minkowskiAdd', 'minkowskiSubtract'
+  'add',          'subtract',     'intersect',
+  'decompose',    'warp',         'transform',
+  'translate',    'rotate',       'scale',
+  'mirror',       'refine',       'setProperties',
+  'asOriginal',   'trimByPlane',  'split',
+  'splitByPlane', 'slice',        'project',
+  'hull',         'minkowskiAdd', 'minkowskiSubtract'
 ];
 // CrossSection static methods (that return a new cross-section)
 const crossSectionStaticFunctions = [
