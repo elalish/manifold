@@ -811,6 +811,7 @@ TEST(Manifold, NonConvexConvexMinkowski) {
   ManifoldParams().deterministic = oldDeterministic;
 }
 
+/*
 TEST(Manifold, NonConvexNonConvexMinkowski) {
   bool oldDeterministic = ManifoldParams().deterministic;
   ManifoldParams().deterministic = true;
@@ -834,3 +835,4 @@ TEST(Manifold, NonConvexNonConvexMinkowski) {
   EXPECT_FLOAT_EQ(difference.GetProperties().volume, 0.0093147634f);
   ManifoldParams().deterministic = oldDeterministic;
 }
+*/

@@ -686,6 +686,20 @@ export class Manifold {
   trimByPlane(normal: Vec3, originOffset: number): Manifold;
 
   /**
+   * Compute the minkowski sum of this manifold with another.
+   *
+   * @param other The other manifold to minkowski sum to this one.
+   */
+  minkowskiAdd(other: Manifold): Manifold;
+
+  /**
+   * Subtract the sweep of the other manifold across this manifold's surface.
+   *
+   * @param other The other manifold to minkowski subtract from this one.
+   */
+  minkowskiSubtract(other: Manifold): Manifold;
+
+  /**
    * Returns the cross section of this object parallel to the X-Y plane at the
    * specified height. Using a height equal to the bottom
    * of the bounding box will return the bottom faces, while using a height

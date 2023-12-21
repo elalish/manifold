@@ -138,6 +138,8 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .function("_Split", &man_js::Split)
       .function("_SplitByPlane", &man_js::SplitByPlane)
       .function("_TrimByPlane", &Manifold::TrimByPlane)
+      .function("minkowskiAdd", &Manifold::MinkowskiAdd)
+      .function("minkowskiSubtract", &Manifold::MinkowskiSubtract)
       .function("slice", &Manifold::Slice)
       .function("project", &Manifold::Project)
       .function("hull", select_overload<Manifold() const>(&Manifold::Hull))
