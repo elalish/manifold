@@ -796,8 +796,8 @@ Manifold Manifold::TrimByPlane(glm::vec3 normal, float originOffset) const {
 /**
  * Compute the minkowski sum of two manifolds.
  *
- * @param a The first manifold in the sum.
- * @param b The second manifold in the sum.
+ * @param other The other manifold to minkowski sum to this one.
+ * @param inset Whether it should add or subtract from the manifold.
  */
 Manifold Manifold::Minkowski(const Manifold& other, bool inset) {
   std::vector<Manifold> composedHulls({*this});
