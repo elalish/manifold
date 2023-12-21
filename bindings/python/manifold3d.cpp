@@ -253,6 +253,14 @@ NB_MODULE(manifold3d, m) {
            "Transforms are combined and applied lazily."
            "\n\n"
            ":param v: The vector to multiply every vertex by component.")
+      .def("offset", &Manifold::Offset, nb::arg("delta"), nb::arg("circularSegments"),
+           nb::arg("useHullMethod"),
+           " * Inflate the Manifold by the specified delta, rounding convex vertices."
+           "\n\n"
+           ":param delta: Positive deltas will add volume to all surfaces of the Manifold,"
+           "dilating it. Negative deltas will have the opposite effect, eroding it."
+            ":param circularSegments Denotes the resolution of the sphere used at convex"
+            "vertices.  Default is calculated by the static Quality defaults according to the radius, which is delta.")
       .def("mirror", &Manifold::Mirror, nb::arg("v"),
            "Mirror this Manifold in space. This operation can be chained. "
            "Transforms are combined and applied lazily."
