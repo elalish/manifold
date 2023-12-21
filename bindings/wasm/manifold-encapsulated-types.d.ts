@@ -687,17 +687,19 @@ export class Manifold {
 
   /**
    * Compute the minkowski sum of this manifold with another.
+   * This corresponds to the morphological dilation of the manifold.
    *
    * @param other The other manifold to minkowski sum to this one.
    */
-  minkowskiAdd(other: Manifold): Manifold;
+  minkowskiSum(other: Manifold): Manifold;
 
   /**
    * Subtract the sweep of the other manifold across this manifold's surface.
+   * This corresponds to the morphological erosion of the manifold.
    *
    * @param other The other manifold to minkowski subtract from this one.
    */
-  minkowskiSubtract(other: Manifold): Manifold;
+  minkowskiDifference(other: Manifold): Manifold;
 
   /**
    * Returns the cross section of this object parallel to the X-Y plane at the

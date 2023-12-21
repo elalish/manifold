@@ -65,7 +65,7 @@ const manifoldMemberFunctions = [
   'mirror',       'refine',       'setProperties',
   'asOriginal',   'trimByPlane',  'split',
   'splitByPlane', 'slice',        'project',
-  'hull',         'minkowskiAdd', 'minkowskiSubtract'
+  'hull',         'minkowskiSum', 'minkowskiDifference'
 ];
 // CrossSection static methods (that return a new cross-section)
 const crossSectionStaticFunctions = [

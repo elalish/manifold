@@ -202,15 +202,15 @@ ManifoldManifold *manifold_trim_by_plane(void *mem, ManifoldManifold *m,
   return to_c(new (mem) Manifold(trimmed));
 }
 
-ManifoldManifold *manifold_minkowski_add(void *mem, ManifoldManifold *a,
+ManifoldManifold *manifold_minkowski_sum(void *mem, ManifoldManifold *a,
                                          ManifoldManifold *b) {
-  auto m = (*from_c(a)).MinkowskiAdd(*from_c(b));
+  auto m = (*from_c(a)).MinkowskiSum(*from_c(b));
   return to_c(new (mem) Manifold(m));
 }
 
-ManifoldManifold *manifold_minkowski_subtract(void *mem, ManifoldManifold *a,
-                                              ManifoldManifold *b) {
-  auto m = (*from_c(a)).MinkowskiSubtract(*from_c(b));
+ManifoldManifold *manifold_minkowski_difference(void *mem, ManifoldManifold *a,
+                                                ManifoldManifold *b) {
+  auto m = (*from_c(a)).MinkowskiDifference(*from_c(b));
   return to_c(new (mem) Manifold(m));
 }
 

@@ -518,13 +518,16 @@ NB_MODULE(manifold3d, m) {
           "vector from the plane.\n"
           ":param origin_offset: The distance of the plane from the origin in "
           "the direction of the normal vector.")
-      .def("minkowski_add", &Manifold::MinkowskiAdd, nb::arg("other"),
+      .def("minkowski_sum", &Manifold::MinkowskiSum, nb::arg("other"),
            "Compute the minkowski sum of this manifold with another."
+           "This corresponds to the morphological dilation of the manifold."
            "\n\n"
            ":param other: The other manifold to minkowski sum to this one.")
-      .def("minkowski_subtract", &Manifold::MinkowskiSubtract, nb::arg("other"),
+      .def("minkowski_difference", &Manifold::MinkowskiDifference,
+           nb::arg("other"),
            "Subtract the sweep of the other manifold across this manifold's "
            "surface."
+           "This corresponds to the morphological erosion of the manifold."
            "\n\n"
            ":param other: The other manifold to minkowski subtract from this "
            "one.")

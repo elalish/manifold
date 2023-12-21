@@ -865,19 +865,21 @@ Manifold Manifold::Minkowski(const Manifold& other, bool inset) const {
 
 /**
  * Compute the minkowski sum of this manifold with another.
+ * This corresponds to the morphological dilation of the manifold.
  *
  * @param other The other manifold to minkowski sum to this one.
  */
-Manifold Manifold::MinkowskiAdd(const Manifold& other) const {
+Manifold Manifold::MinkowskiSum(const Manifold& other) const {
   return this->Minkowski(other, false);
 }
 
 /**
  * Subtract the sweep of the other manifold across this manifold's surface.
+ * This corresponds to the morphological erosion of the manifold.
  *
  * @param other The other manifold to minkowski subtract from this one.
  */
-Manifold Manifold::MinkowskiSubtract(const Manifold& other) const {
+Manifold Manifold::MinkowskiDifference(const Manifold& other) const {
   return this->Minkowski(other, true);
 }
 
