@@ -234,8 +234,8 @@ class Manifold {
   std::pair<Manifold, Manifold> SplitByPlane(glm::vec3 normal,
                                              float originOffset) const;
   Manifold TrimByPlane(glm::vec3 normal, float originOffset) const;
-  Manifold MinkowskiAdd(const Manifold&);
-  Manifold MinkowskiSubtract(const Manifold&);
+  Manifold MinkowskiAdd(const Manifold&) const;
+  Manifold MinkowskiSubtract(const Manifold&) const;
   ///@}
 
   /** @name 2D from 3D
@@ -272,7 +272,7 @@ class Manifold {
 
   CsgLeafNode& GetCsgLeafNode() const;
 
-  Manifold Minkowski(const Manifold&, bool inset = false);
+  Manifold Minkowski(const Manifold&, bool inset = false) const;
 };
 /** @} */
 }  // namespace manifold

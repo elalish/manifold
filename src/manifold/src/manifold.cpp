@@ -799,7 +799,7 @@ Manifold Manifold::TrimByPlane(glm::vec3 normal, float originOffset) const {
  * @param other The other manifold to minkowski sum to this one.
  * @param inset Whether it should add or subtract from the manifold.
  */
-Manifold Manifold::Minkowski(const Manifold& other, bool inset) {
+Manifold Manifold::Minkowski(const Manifold& other, bool inset) const {
   std::vector<Manifold> composedHulls({*this});
   bool aConvex = this->GetCsgLeafNode().GetImpl()->ReflexFaces().size() == 0;
   bool bConvex = other.GetCsgLeafNode().GetImpl()->ReflexFaces().size() == 0;
@@ -868,7 +868,7 @@ Manifold Manifold::Minkowski(const Manifold& other, bool inset) {
  *
  * @param other The other manifold to minkowski sum to this one.
  */
-Manifold Manifold::MinkowskiAdd(const Manifold& other) {
+Manifold Manifold::MinkowskiAdd(const Manifold& other) const {
   return this->Minkowski(other, false);
 }
 
@@ -877,7 +877,7 @@ Manifold Manifold::MinkowskiAdd(const Manifold& other) {
  *
  * @param other The other manifold to minkowski subtract from this one.
  */
-Manifold Manifold::MinkowskiSubtract(const Manifold& other) {
+Manifold Manifold::MinkowskiSubtract(const Manifold& other) const {
   return this->Minkowski(other, true);
 }
 
