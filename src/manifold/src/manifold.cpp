@@ -588,8 +588,6 @@ Manifold Manifold::Offset(float delta, int circularSegments) const {
 
   const bool inset = delta < 0;
   const float radius = glm::abs(delta);
-  // This is unused in the original implementation, 
-  // and I can't find a value that looks good in all cases
   const int n = circularSegments > 0 ? (circularSegments + 3) / 4
                                      : Quality::GetCircularSegments(delta) / 4;
   const Manifold sphere = Manifold::Sphere(radius, circularSegments);
@@ -636,8 +634,8 @@ Manifold Manifold::Offset(float delta, int circularSegments) const {
 
       std::vector<glm::vec3> wedgePointsStart;
       std::vector<glm::vec3> wedgePointsEnd;
-      for (int seg = 0; seg <= circularSegments; seg++) {
-        float wdgAlpha = (float)seg / circularSegments;
+      for (int seg = 0; seg <= (4*n); seg++) {
+        float wdgAlpha = (float)seg / (4*n);
         glm::qua rotation = glm::angleAxis(wdgAlpha * normal0Tonormal1Angle,
                                            glm::normalize(edgeVec));
         glm::vec3 wedgePt = rotation * (normal0 * delta);
