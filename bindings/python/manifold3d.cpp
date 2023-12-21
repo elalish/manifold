@@ -518,12 +518,16 @@ NB_MODULE(manifold3d, m) {
           "vector from the plane.\n"
           ":param origin_offset: The distance of the plane from the origin in "
           "the direction of the normal vector.")
-      .def("minkowski", &Manifold::Minkowski, nb::arg("other"),
-           nb::arg("inset"),
-           "Compute the minkowski sum of two manifolds."
+      .def("minkowski_add", &Manifold::MinkowskiAdd, nb::arg("other"),
+           "Compute the minkowski sum of this manifold with another."
            "\n\n"
-           ":param other: The other manifold to minkowski sum to this one."
-           ":param inset: Whether it should add or subtract from the manifold.")
+           ":param other: The other manifold to minkowski sum to this one.")
+      .def("minkowski_subtract", &Manifold::MinkowskiSubtract, nb::arg("other"),
+           "Subtract the sweep of the other manifold across this manifold's "
+           "surface."
+           "\n\n"
+           ":param other: The other manifold to minkowski subtract from this "
+           "one.")
       .def("slice", &Manifold::Slice, nb::arg("height"),
            "Returns the cross section of this object parallel to the X-Y plane "
            "at the specified height. Using a height equal to the bottom of the "

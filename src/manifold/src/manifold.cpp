@@ -864,6 +864,24 @@ Manifold Manifold::Minkowski(const Manifold& other, bool inset) {
 }
 
 /**
+ * Compute the minkowski sum of this manifold with another.
+ *
+ * @param other The other manifold to minkowski sum to this one.
+ */
+Manifold Manifold::MinkowskiAdd(const Manifold& other) {
+  return this->Minkowski(other, false);
+}
+
+/**
+ * Subtract the sweep of the other manifold across this manifold's surface.
+ *
+ * @param other The other manifold to minkowski subtract from this one.
+ */
+Manifold Manifold::MinkowskiSubtract(const Manifold& other) {
+  return this->Minkowski(other, true);
+}
+
+/**
  * Returns the cross section of this object parallel to the X-Y plane at the
  * specified Z height, defaulting to zero. Using a height equal to the bottom of
  * the bounding box will return the bottom faces, while using a height equal to
