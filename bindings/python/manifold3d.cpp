@@ -254,7 +254,6 @@ NB_MODULE(manifold3d, m) {
            "\n\n"
            ":param v: The vector to multiply every vertex by component.")
       .def("offset", &Manifold::Offset, nb::arg("delta"), nb::arg("circularSegments"),
-           nb::arg("useHullMethod"),
            " * Inflate the Manifold by the specified delta, rounding convex vertices."
            "\n\n"
            ":param delta: Positive deltas will add volume to all surfaces of the Manifold,"

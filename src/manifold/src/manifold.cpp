@@ -579,8 +579,7 @@ Manifold Manifold::Warp(std::function<void(glm::vec3&)> warpFunc) const {
  * vertices. Default is calculated by the static Quality defaults according to
  * the radius, which is delta.
  */
-Manifold Manifold::Offset(float delta, int circularSegments,
-                          bool useHullMethod) const {
+Manifold Manifold::Offset(float delta, int circularSegments) const {
   auto pImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
 
   if (delta == 0) {
@@ -589,6 +588,8 @@ Manifold Manifold::Offset(float delta, int circularSegments,
 
   const bool inset = delta < 0;
   const float radius = glm::abs(delta);
+  // This is unused in the original implementation, 
+  // and I can't find a value that looks good in all cases
   const int n = circularSegments > 0 ? (circularSegments + 3) / 4
                                      : Quality::GetCircularSegments(delta) / 4;
   const Manifold sphere = Manifold::Sphere(radius, circularSegments);

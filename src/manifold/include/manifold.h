@@ -206,7 +206,7 @@ class Manifold {
   Manifold Transform(const glm::mat4x3&) const;
   Manifold Mirror(glm::vec3) const;
   Manifold Warp(std::function<void(glm::vec3&)>) const;
-  Manifold Offset(float delta, int circularSegments = 0, bool useHullMethod = false) const;
+  Manifold Offset(float delta, int circularSegments = 0) const;
   Manifold SetProperties(
       int, std::function<void(float*, glm::vec3, const float*)>) const;
   Manifold CalculateCurvature(int gaussianIdx, int meanIdx) const;
