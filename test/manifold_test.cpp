@@ -786,21 +786,33 @@ TEST(Manifold, EmptyHull) {
 }
 
 TEST(Manifold, ConvexConvexMinkowski) {
+  bool oldDeterministic = ManifoldParams().deterministic;
+  ManifoldParams().deterministic = true;
   Manifold sphere = Manifold::Sphere(0.1, 20);
-  Manifold cube = Manifold::Cube();
-  Manifold sum = cube.Minkowski(sphere);
-  EXPECT_FLOAT_EQ(sum.GetProperties().volume, 1.6966598f);
+  Manifold cube = Manifold::Cube({2.0, 2.0, 2.0});
+  Manifold sum = cube.MinkowskiAdd(sphere);
+  EXPECT_FLOAT_EQ(sum.GetProperties().volume, 10.589364f);
+  Manifold difference =
+      Manifold::Cube({2.0, 2.0, 2.0}).MinkowskiSubtract(sphere);
+  EXPECT_FLOAT_EQ(difference.GetProperties().volume, 5.8319983f);
+  ManifoldParams().deterministic = oldDeterministic;
 }
 
 TEST(Manifold, NonConvexConvexMinkowski) {
-  Manifold sphere = Manifold::Sphere(0.6, 20);
-  Manifold cube = Manifold::Cube({1.0, 1.0, 1.0}, true);
+  bool oldDeterministic = ManifoldParams().deterministic;
+  ManifoldParams().deterministic = true;
+  Manifold sphere = Manifold::Sphere(1.2, 20);
+  Manifold cube = Manifold::Cube({2.0, 2.0, 2.0}, true);
   Manifold nonConvex = cube - sphere;
-  Manifold sum = nonConvex.Minkowski(Manifold::Sphere(0.1, 20));
-  EXPECT_FLOAT_EQ(sum.GetProperties().volume, 1.0686193f);
+  Manifold sum = nonConvex.MinkowskiAdd(Manifold::Sphere(0.1, 20));
+  EXPECT_FLOAT_EQ(sum.GetProperties().volume, 4.8406339f);
+  Manifold difference = nonConvex.MinkowskiSubtract(Manifold::Sphere(0.1, 20));
+  EXPECT_FLOAT_EQ(difference.GetProperties().volume, 0.2029168f);
+  ManifoldParams().deterministic = oldDeterministic;
 }
 
 TEST(Manifold, NonConvexNonConvexMinkowski) {
+  bool oldDeterministic = ManifoldParams().deterministic;
   ManifoldParams().deterministic = true;
   Manifold star = Manifold::Cube({0.1, 0.1, 0.1}, true);
   std::vector<glm::vec3> verts = star.GetMesh().vertPos;
@@ -813,9 +825,12 @@ TEST(Manifold, NonConvexNonConvexMinkowski) {
     verts.pop_back();
   }
 
-  Manifold sphere = Manifold::Sphere(0.6, 20);
-  Manifold cube = Manifold::Cube({1.0, 1.0, 1.0}, true);
+  Manifold sphere = Manifold::Sphere(1.2, 20);
+  Manifold cube = Manifold::Cube({2.0, 2.0, 2.0}, true);
   Manifold nonConvex = cube - sphere;
-  Manifold sum = nonConvex.Minkowski(star);
-  EXPECT_FLOAT_EQ(sum.GetProperties().volume, 1.643248);
+  Manifold sum = nonConvex.MinkowskiAdd(star);
+  EXPECT_FLOAT_EQ(sum.GetProperties().volume, 7.0875549f);
+  Manifold difference = nonConvex.MinkowskiSubtract(star);
+  EXPECT_FLOAT_EQ(difference.GetProperties().volume, 0.0093147634f);
+  ManifoldParams().deterministic = oldDeterministic;
 }

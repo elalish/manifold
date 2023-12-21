@@ -816,14 +816,14 @@ Manifold Manifold::Minkowski(const Manifold& other, bool inset) const {
   manifold::Mesh aMesh = a.GetMesh();
 
   // Convex-Convex Minkowski: Very Fast
-  if (aConvex && bConvex) {
+  if (!inset && aConvex && bConvex) {
     std::vector<Manifold> simpleHull;
     for (glm::vec3 vertex : aMesh.vertPos) {
       simpleHull.push_back(b.Translate(vertex));
     }
     composedHulls.push_back(Manifold::Hull(simpleHull));
     // Convex - Non-Convex Minkowski: Slower
-  } else if (!aConvex && bConvex) {
+  } else if ((inset || !aConvex) && bConvex) {
     std::vector<std::vector<Manifold>> composedParts;
     for (glm::ivec3 vertexIndices : aMesh.triVerts) {
       composedParts.push_back({b.Translate(aMesh.vertPos[vertexIndices.x]),
