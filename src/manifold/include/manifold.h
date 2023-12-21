@@ -234,6 +234,8 @@ class Manifold {
   std::pair<Manifold, Manifold> SplitByPlane(glm::vec3 normal,
                                              float originOffset) const;
   Manifold TrimByPlane(glm::vec3 normal, float originOffset) const;
+  Manifold Minkowski(const Manifold&, bool inset = false,
+                     bool useThreading = false);
   ///@}
 
   /** @name 2D from 3D
@@ -249,13 +251,6 @@ class Manifold {
   Manifold Hull() const;
   static Manifold Hull(const std::vector<Manifold>& manifolds);
   static Manifold Hull(const std::vector<glm::vec3>& pts);
-  ///@}
-
-  /** @name Minkowski Functions
-   */
-  ///@{
-  static Manifold Minkowski(const Manifold& a, const Manifold& b,
-                            bool inset = false, bool useThreading = false);
   ///@}
 
   /** @name Testing hooks

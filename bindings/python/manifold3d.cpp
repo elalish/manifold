@@ -220,9 +220,6 @@ NB_MODULE(manifold3d, m) {
             return Manifold::Hull(vec);
           },
           "Compute the convex hull enveloping a set of 3d points.")
-      .def_static("minkowski", Manifold::Minkowski, nb::arg("a"), nb::arg("b"),
-                  nb::arg("inset"), nb::arg("useThreading"),
-                  "Compute the minkowski sum of two manifolds.")
       .def(
           "transform",
           [](Manifold &self, nb::ndarray<float, nb::shape<3, 4>> &mat) {
@@ -550,6 +547,9 @@ NB_MODULE(manifold3d, m) {
           "vector from the plane.\n"
           ":param originOffset: The distance of the plane from the origin in "
           "the direction of the normal vector.")
+      .def("minkowski", Manifold::Minkowski, nb::arg("other"), nb::arg("inset"),
+           nb::arg("useThreading"),
+           "Compute the minkowski sum of two manifolds.")
       .def(
           "slice",
           [](Manifold &self, float height) { return self.Slice(height); },

@@ -788,14 +788,14 @@ TEST(Manifold, EmptyHull) {
 TEST(Manifold, ConvexConvexMinkowski) {
   Manifold sphere = Manifold::Sphere(0.1, 20);
   Manifold cube = Manifold::Cube();
-  Manifold sum = Manifold::Minkowski(cube, sphere);
+  Manifold sum = cube.Minkowski(sphere);
   EXPECT_FLOAT_EQ(sum.GetProperties().volume, 1.6966598f);
 }
 
 TEST(Manifold, ConvexConvexMinkowskiThreaded) {
   Manifold sphere = Manifold::Sphere(0.1, 20);
   Manifold cube = Manifold::Cube();
-  Manifold sum = Manifold::Minkowski(cube, sphere, true);
+  Manifold sum = cube.Minkowski(sphere, true);
   EXPECT_FLOAT_EQ(sum.GetProperties().volume, 1.6966598f);
 }
 
@@ -803,7 +803,7 @@ TEST(Manifold, NonConvexConvexMinkowski) {
   Manifold sphere = Manifold::Sphere(0.6, 20);
   Manifold cube = Manifold::Cube({1.0, 1.0, 1.0}, true);
   Manifold nonConvex = cube - sphere;
-  Manifold sum = Manifold::Minkowski(nonConvex, Manifold::Sphere(0.1, 20));
+  Manifold sum = nonConvex.Minkowski(Manifold::Sphere(0.1, 20));
   EXPECT_FLOAT_EQ(sum.GetProperties().volume, 1.0686193f);
 }
 
@@ -811,8 +811,7 @@ TEST(Manifold, NonConvexConvexMinkowskiThreaded) {
   Manifold sphere = Manifold::Sphere(0.6, 20);
   Manifold cube = Manifold::Cube({1.0, 1.0, 1.0}, true);
   Manifold nonConvex = cube - sphere;
-  Manifold sum =
-      Manifold::Minkowski(nonConvex, Manifold::Sphere(0.1, 20), true);
+  Manifold sum = nonConvex.Minkowski(Manifold::Sphere(0.1, 20), true);
   EXPECT_FLOAT_EQ(sum.GetProperties().volume, 1.0686193f);
 }
 
@@ -832,7 +831,7 @@ TEST(Manifold, NonConvexNonConvexMinkowski) {
   Manifold sphere = Manifold::Sphere(0.6, 20);
   Manifold cube = Manifold::Cube({1.0, 1.0, 1.0}, true);
   Manifold nonConvex = cube - sphere;
-  Manifold sum = Manifold::Minkowski(nonConvex, star);
+  Manifold sum = nonConvex.Minkowski(star);
   EXPECT_FLOAT_EQ(sum.GetProperties().volume, 1.643248);
 }
 
@@ -852,6 +851,6 @@ TEST(Manifold, NonConvexNonConvexMinkowskiThreaded) {
   Manifold sphere = Manifold::Sphere(0.6, 20);
   Manifold cube = Manifold::Cube({1.0, 1.0, 1.0}, true);
   Manifold nonConvex = cube - sphere;
-  Manifold sum = Manifold::Minkowski(nonConvex, star, true);
+  Manifold sum = nonConvex.Minkowski(star, true);
   EXPECT_FLOAT_EQ(sum.GetProperties().volume, 1.643248);
 }
