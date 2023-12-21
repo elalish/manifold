@@ -591,20 +591,31 @@ Manifold Manifold::Offset(float delta, int circularSegments) const {
   const int n = circularSegments > 0 ? (circularSegments + 3) / 4
                                      : Quality::GetCircularSegments(delta) / 4;
   const Manifold sphere = Manifold::Sphere(radius, circularSegments);
+  const SimplePolygon triangle = {{-1, -1}, {1, 0}, {0, 1}};
+  const Manifold block = Manifold::Extrude(triangle, 1);
+
   std::vector<Manifold> batch;
   batch.push_back(*this);
 
   // Extrude Triangles
-  batch.resize(NumTri() + 1);
-  for_each_n(countAt(0), NumTri(), [&batch, &pImpl, delta](int tri) {
-    const glm::vec3 off = delta * pImpl->faceNormal_[tri];
-    batch[1 + tri] =
-        Hull({pImpl->vertPos_[pImpl->halfedge_[3 * tri + 0].startVert],
-              pImpl->vertPos_[pImpl->halfedge_[3 * tri + 1].startVert],
-              pImpl->vertPos_[pImpl->halfedge_[3 * tri + 2].startVert],
-              pImpl->vertPos_[pImpl->halfedge_[3 * tri + 0].startVert] + off,
-              pImpl->vertPos_[pImpl->halfedge_[3 * tri + 1].startVert] + off,
-              pImpl->vertPos_[pImpl->halfedge_[3 * tri + 2].startVert] + off});
+  batch.resize(NumTri() + batch.size());
+  for_each_n(countAt(0), NumTri(), [&batch, &block, &pImpl, radius](int tri) {
+    glm::mat3 triPos;
+    for (const int i : {0, 1, 2}) {
+      triPos[i] = pImpl->vertPos_[pImpl->halfedge_[3 * tri + i].startVert];
+    }
+    const glm::vec3 normal = radius * pImpl->faceNormal_[tri];
+    batch[1 + tri] = block.Warp([triPos, normal](glm::vec3& pos) {
+      const float dir = pos.z > 0 ? 1.0f : -1.0f;
+      if (pos.x < 0) {
+        pos = triPos[0];
+      } else if (pos.x > 0) {
+        pos = triPos[1];
+      } else {
+        pos = triPos[2];
+      }
+      pos += dir * normal;
+    });
   });
 
   // Iterate over all the edges to find the convex edges and vertices
