@@ -19,4 +19,4 @@ def run():
     sphere = Manifold.sphere(0.6, 20)
     cube = Manifold.cube([1.0, 1.0, 1.0], True)
     sphereless_cube = cube - sphere
-    return sphereless_cube.minkowski(star, False)
+    return sphereless_cube.minkowski_add(star)
