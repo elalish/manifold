@@ -72,8 +72,9 @@ def run():
         blue = [0, 0, 1]
         return [(1 - b) * blue[i] + b * red[i] for i in range(3)]
 
+    edges, smoothing = zip(*sharpenedEdges)
     return (
-        Manifold.smooth(scallop, sharpenedEdges)
+        Manifold.smooth(scallop, edges, smoothing)
         .refine(n)
         .calculate_curvature(-1, 0)
         .set_properties(3, colorCurvature)
