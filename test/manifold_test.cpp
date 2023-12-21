@@ -792,26 +792,11 @@ TEST(Manifold, ConvexConvexMinkowski) {
   EXPECT_FLOAT_EQ(sum.GetProperties().volume, 1.6966598f);
 }
 
-TEST(Manifold, ConvexConvexMinkowskiThreaded) {
-  Manifold sphere = Manifold::Sphere(0.1, 20);
-  Manifold cube = Manifold::Cube();
-  Manifold sum = cube.Minkowski(sphere, true);
-  EXPECT_FLOAT_EQ(sum.GetProperties().volume, 1.6966598f);
-}
-
 TEST(Manifold, NonConvexConvexMinkowski) {
   Manifold sphere = Manifold::Sphere(0.6, 20);
   Manifold cube = Manifold::Cube({1.0, 1.0, 1.0}, true);
   Manifold nonConvex = cube - sphere;
   Manifold sum = nonConvex.Minkowski(Manifold::Sphere(0.1, 20));
-  EXPECT_FLOAT_EQ(sum.GetProperties().volume, 1.0686193f);
-}
-
-TEST(Manifold, NonConvexConvexMinkowskiThreaded) {
-  Manifold sphere = Manifold::Sphere(0.6, 20);
-  Manifold cube = Manifold::Cube({1.0, 1.0, 1.0}, true);
-  Manifold nonConvex = cube - sphere;
-  Manifold sum = nonConvex.Minkowski(Manifold::Sphere(0.1, 20), true);
   EXPECT_FLOAT_EQ(sum.GetProperties().volume, 1.0686193f);
 }
 
@@ -832,25 +817,5 @@ TEST(Manifold, NonConvexNonConvexMinkowski) {
   Manifold cube = Manifold::Cube({1.0, 1.0, 1.0}, true);
   Manifold nonConvex = cube - sphere;
   Manifold sum = nonConvex.Minkowski(star);
-  EXPECT_FLOAT_EQ(sum.GetProperties().volume, 1.643248);
-}
-
-TEST(Manifold, NonConvexNonConvexMinkowskiThreaded) {
-  ManifoldParams().deterministic = true;
-  Manifold star = Manifold::Cube({0.1, 0.1, 0.1}, true);
-  std::vector<glm::vec3> verts = star.GetMesh().vertPos;
-  for (glm::vec3 point :
-       {glm::vec3(0.2, 0.0, 0.0), glm::vec3(-0.2, 0.0, 0.0),
-        glm::vec3(0.0, 0.2, 0.0), glm::vec3(0.0, -0.2, 0.0),
-        glm::vec3(0.0, 0.0, 0.2), glm::vec3(0.0, 0.0, -0.2)}) {
-    verts.push_back(point);
-    star += Manifold::Hull(verts);
-    verts.pop_back();
-  }
-
-  Manifold sphere = Manifold::Sphere(0.6, 20);
-  Manifold cube = Manifold::Cube({1.0, 1.0, 1.0}, true);
-  Manifold nonConvex = cube - sphere;
-  Manifold sum = nonConvex.Minkowski(star, true);
   EXPECT_FLOAT_EQ(sum.GetProperties().volume, 1.643248);
 }

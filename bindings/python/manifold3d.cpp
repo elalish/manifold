@@ -548,7 +548,6 @@ NB_MODULE(manifold3d, m) {
           ":param originOffset: The distance of the plane from the origin in "
           "the direction of the normal vector.")
       .def("minkowski", Manifold::Minkowski, nb::arg("other"), nb::arg("inset"),
-           nb::arg("useThreading"),
            "Compute the minkowski sum of two manifolds.")
       .def(
           "slice",

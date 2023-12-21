@@ -234,8 +234,7 @@ class Manifold {
   std::pair<Manifold, Manifold> SplitByPlane(glm::vec3 normal,
                                              float originOffset) const;
   Manifold TrimByPlane(glm::vec3 normal, float originOffset) const;
-  Manifold Minkowski(const Manifold&, bool inset = false,
-                     bool useThreading = false);
+  Manifold Minkowski(const Manifold&, bool inset = false);
   ///@}
 
   /** @name 2D from 3D
