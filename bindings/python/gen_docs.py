@@ -4,6 +4,12 @@ import re
 
 base = dirname(dirname(dirname(__file__)))
 
+# This script runs with no CLI arguments
+# and scrapes documentation comments and c++ function signatures
+# from the manifold sources, in order to generate a c++ header file 
+# exposing the comments as string variables named by function names.
+# This allows python bindings to re-use the c++ comments directly.
+# Some snake-casing of params is applied for python use case.
 
 def snake_case(name):
     return re.sub("([a-z0-9])([A-Z])", r"\1_\2", name).lower()
