@@ -643,10 +643,12 @@ Manifold Manifold::Offset(float delta, int circularSegments) const {
                 glm::dot(normal0, normal1)),
           glm::two_pi<float>());
 
+      int numSegments = abs((int)((normal0Tonormal1Angle / glm::two_pi<float>()) * (n * 4)));
+
       std::vector<glm::vec3> wedgePointsStart;
       std::vector<glm::vec3> wedgePointsEnd;
-      for (int seg = 0; seg <= (4*n); seg++) {
-        float wdgAlpha = (float)seg / (4*n);
+      for (int seg = 0; seg <= numSegments; seg++) {
+        float wdgAlpha = (float)seg / numSegments;
         glm::qua rotation = glm::angleAxis(wdgAlpha * normal0Tonormal1Angle,
                                            glm::normalize(edgeVec));
         glm::vec3 wedgePt = rotation * (normal0 * delta);
