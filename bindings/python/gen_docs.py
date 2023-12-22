@@ -4,19 +4,17 @@ import re
 
 base = dirname(dirname(dirname(__file__)))
 
-# This script runs with no CLI arguments
-# and scrapes documentation comments and c++ function signatures
-# from the manifold sources, in order to generate a c++ header file 
-# exposing the comments as string variables named by function names.
-# This allows python bindings to re-use the c++ comments directly.
-# Some snake-casing of params is applied for python use case.
-
 def snake_case(name):
     return re.sub("([a-z0-9])([A-Z])", r"\1_\2", name).lower()
 
 
-def param_snake_case(m):
-    return f":{snake_case(m[0][1:])}:"
+def python_param_modifier(comment):
+    # p = f":{snake_case(m[0][1:])}:"
+    comment = re.sub(r"@(param \w+)", lambda m: f':{snake_case(m[1])}:', comment)
+    # python API renames `MeshGL` to `Mesh`
+    comment = re.sub('mesh_gl', 'mesh', comment)
+    comment = re.sub('MeshGL', 'Mesh', comment)
+    return comment
 
 
 def method_key(name):
@@ -47,8 +45,7 @@ def parse_args(s):
     return out
 
 
-def collect(fname, matcher):
-    param_re = re.compile(r"@param (\w+)")
+def collect(fname, matcher, param_modifier=python_param_modifier):
     comment = ""
     with open(fname) as f:
         for line in f:
@@ -66,7 +63,8 @@ def collect(fname, matcher):
                         break
 
                 method = method_key(snake_case(m[1]))
-                comment = re.sub(param_re, param_snake_case, comment)
+                # comment = re.sub(param_re, param_modifier, comment)
+                comment = param_modifier(comment)
                 method = "__".join([method, *args])
                 assert method not in comments
                 comments[method] = comment
