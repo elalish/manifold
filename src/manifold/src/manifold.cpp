@@ -604,17 +604,16 @@ Manifold Manifold::Offset(float delta, int circularSegments) const {
     for (const int i : {0, 1, 2}) {
       triPos[i] = pImpl->vertPos_[pImpl->halfedge_[3 * tri + i].startVert];
     }
-    const glm::vec3 normal = radius * pImpl->faceNormal_[tri];
+    const glm::dvec3 normal =
+        (double)radius * (glm::dvec3)pImpl->faceNormal_[tri];
     batch[1 + tri] = block.Warp([triPos, normal](glm::vec3& pos) {
-      const float dir = pos.z > 0 ? 1.0f : -1.0f;
       if (pos.x < 0) {
-        pos = triPos[0];
+        pos = ((glm::dvec3)triPos[0] + (pos.z > 0 ? normal : -normal));
       } else if (pos.x > 0) {
-        pos = triPos[1];
+        pos = ((glm::dvec3)triPos[1] + (pos.z > 0 ? normal : -normal));
       } else {
-        pos = triPos[2];
+        pos = ((glm::dvec3)triPos[2] + (pos.z > 0 ? normal : -normal));
       }
-      pos += dir * normal;
     });
   });
 
