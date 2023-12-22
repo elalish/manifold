@@ -830,9 +830,7 @@ Manifold Manifold::Minkowski(const Manifold& other, bool inset) const {
                                b.Translate(aMesh.vertPos[vertexIndices.y]),
                                b.Translate(aMesh.vertPos[vertexIndices.z])});
     }
-    std::vector<Manifold> newHulls;
-    newHulls.reserve(composedParts.size());
-    newHulls.resize(composedParts.size());
+    std::vector<Manifold> newHulls(composedParts.size());
     thrust::for_each_n(
         thrust::host, zip(composedParts.begin(), newHulls.begin()),
         composedParts.size(),

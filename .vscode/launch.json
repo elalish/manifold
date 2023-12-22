@@ -1,17 +1,14 @@
 {
-  // Use IntelliSense to learn about possible attributes.
-  // Hover to view descriptions of existing attributes.
-  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "manifold test",
+      "name": "C/C++: clang++ build and debug active file",
       "type": "cppdbg",
       "request": "launch",
       "program": "${workspaceFolder}/build/test/manifold_test",
       "args": [
         "--gtest_break_on_failure",
-        "--gtest_filter=Manifold.GetMesh"
+        "--gtest_filter=Manifold.NonConvexNonConvexMinkowski"
       ],
       "stopAtEntry": false,
       "cwd": "${workspaceFolder}/build/test",
@@ -20,7 +17,10 @@
           "name": "MALLOC_CHECK_",
           "value": "2"
         }
-      ]
+      ],
+      "externalConsole": false,
+      "MIMode": "lldb",
+      "preLaunchTask": "C/C++: clang++ build active file"
     }
   ]
 }
