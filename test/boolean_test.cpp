@@ -296,7 +296,7 @@ TEST(Boolean, SplitByPlane60) {
               splits.second.GetProperties().volume, 1e-5);
 }
 
-TEST(Manifold, ConvexConvexMinkowski) {
+TEST(Boolean, ConvexConvexMinkowski) {
   float offsetRadius = 0.1f;
   float cubeWidth = 2.0f;
   Manifold sphere = Manifold::Sphere(offsetRadius, 20);
@@ -311,7 +311,7 @@ TEST(Manifold, ConvexConvexMinkowski) {
   EXPECT_EQ(difference.Genus(), 0);
 }
 
-TEST(Manifold, NonConvexConvexMinkowski) {
+TEST(Boolean, NonConvexConvexMinkowski) {
   Manifold sphere = Manifold::Sphere(1.2, 20);
   Manifold cube = Manifold::Cube({2.0, 2.0, 2.0}, true);
   Manifold nonConvex = cube - sphere;
@@ -327,7 +327,7 @@ TEST(Manifold, NonConvexConvexMinkowski) {
   EXPECT_EQ(difference.Genus(), 5);
 }
 
-TEST(Manifold, NonConvexNonConvexMinkowski) {
+TEST(Boolean, NonConvexNonConvexMinkowski) {
   bool oldDeterministic = ManifoldParams().deterministic;
   ManifoldParams().deterministic = true;
   PolygonParams().processOverlaps = true;
@@ -347,8 +347,7 @@ TEST(Manifold, NonConvexNonConvexMinkowski) {
   EXPECT_EQ(difference.Genus(), 0);
 
 #ifdef MANIFOLD_EXPORT
-  if (options.exportModels)
-    ExportMesh("minkowski.glb", difference.GetMesh(), {});
+  if (options.exportModels) ExportMesh("minkowski.glb", sum.GetMesh(), {});
 #endif
 
   ManifoldParams().deterministic = oldDeterministic;
