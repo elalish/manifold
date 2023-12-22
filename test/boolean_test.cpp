@@ -296,6 +296,67 @@ TEST(Boolean, SplitByPlane60) {
               splits.second.GetProperties().volume, 1e-5);
 }
 
+TEST(Manifold, ConvexConvexMinkowski) {
+  bool oldDeterministic = ManifoldParams().deterministic;
+  ManifoldParams().deterministic = true;
+  float offsetRadius = 0.1f;
+  float cubeWidth = 2.0f;
+  Manifold sphere = Manifold::Sphere(offsetRadius, 20);
+  Manifold cube = Manifold::Cube({cubeWidth, cubeWidth, cubeWidth});
+  Manifold sum = cube.MinkowskiSum(sphere);
+  EXPECT_NEAR(sum.GetProperties().volume,
+              powf(cubeWidth + (2 * offsetRadius), 3.f), 0.06f);
+  EXPECT_EQ(sum.Genus(), 0);
+  Manifold difference = Manifold::Cube({cubeWidth, cubeWidth, cubeWidth})
+                            .MinkowskiDifference(sphere);
+  EXPECT_NEAR(difference.GetProperties().volume,
+              powf(cubeWidth - (2 * offsetRadius), 3.f), 1e-5);
+  EXPECT_EQ(difference.Genus(), 0);
+  ManifoldParams().deterministic = oldDeterministic;
+}
+
+TEST(Manifold, DISABLED_NonConvexConvexMinkowski) {
+  bool oldDeterministic = ManifoldParams().deterministic;
+  ManifoldParams().deterministic = true;
+  Manifold sphere = Manifold::Sphere(1.2, 20);
+  Manifold cube = Manifold::Cube({2.0, 2.0, 2.0}, true);
+  Manifold nonConvex = cube - sphere;
+  Manifold sum = nonConvex.MinkowskiSum(Manifold::Sphere(0.1, 20));
+  EXPECT_NEAR(sum.GetProperties().volume, 4.8406339f, 1e-5);
+  EXPECT_EQ(sum.Genus(), 5);
+  Manifold difference =
+      nonConvex.MinkowskiDifference(Manifold::Sphere(0.1, 20));
+  EXPECT_NEAR(difference.GetProperties().volume, 0.2029168f, 1e-5);
+  EXPECT_EQ(difference.Genus(), 5); // Genus comes out to -7
+  ManifoldParams().deterministic = oldDeterministic;
+}
+
+TEST(Manifold, DISABLED_NonConvexNonConvexMinkowski) {
+  bool oldDeterministic = ManifoldParams().deterministic;
+  ManifoldParams().deterministic = true;
+  Manifold star = Manifold::Cube({0.1, 0.1, 0.1}, true);
+  std::vector<glm::vec3> verts = star.GetMesh().vertPos;
+  for (glm::vec3 point :
+       {glm::vec3(0.2, 0.0, 0.0), glm::vec3(-0.2, 0.0, 0.0),
+        glm::vec3(0.0, 0.2, 0.0), glm::vec3(0.0, -0.2, 0.0),
+        glm::vec3(0.0, 0.0, 0.2), glm::vec3(0.0, 0.0, -0.2)}) {
+    verts.push_back(point);
+    star += Manifold::Hull(verts);
+    verts.pop_back();
+  }
+
+  Manifold sphere = Manifold::Sphere(1.2, 20);
+  Manifold cube = Manifold::Cube({2.0, 2.0, 2.0}, true);
+  Manifold nonConvex = cube - sphere;
+  Manifold sum = nonConvex.MinkowskiSum(star);
+  EXPECT_NEAR(sum.GetProperties().volume, 7.0875549f, 1e-5);
+  EXPECT_EQ(sum.Genus(), 5);
+  Manifold difference = nonConvex.MinkowskiDifference(star);
+  EXPECT_NEAR(difference.GetProperties().volume, 0.0093147634f, 1e-5);
+  EXPECT_EQ(difference.Genus(), 5);  // Genus comes out to -7
+  ManifoldParams().deterministic = oldDeterministic;
+}
+
 /**
  * This tests that non-intersecting geometry is properly retained.
  */
