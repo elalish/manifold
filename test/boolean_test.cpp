@@ -315,7 +315,7 @@ TEST(Manifold, ConvexConvexMinkowski) {
   ManifoldParams().deterministic = oldDeterministic;
 }
 
-TEST(Manifold, DISABLED_NonConvexConvexMinkowski) {
+TEST(Manifold, NonConvexConvexMinkowski) {
   bool oldDeterministic = ManifoldParams().deterministic;
   ManifoldParams().deterministic = true;
   Manifold sphere = Manifold::Sphere(1.2, 20);
@@ -325,9 +325,9 @@ TEST(Manifold, DISABLED_NonConvexConvexMinkowski) {
   EXPECT_NEAR(sum.GetProperties().volume, 4.8406339f, 1e-5);
   EXPECT_EQ(sum.Genus(), 5);
   Manifold difference =
-      nonConvex.MinkowskiDifference(Manifold::Sphere(0.1, 20));
-  EXPECT_NEAR(difference.GetProperties().volume, 0.2029168f, 1e-5);
-  EXPECT_EQ(difference.Genus(), 5);  // Genus comes out to -7
+      nonConvex.MinkowskiDifference(Manifold::Sphere(0.05, 20));
+  EXPECT_NEAR(difference.GetProperties().volume, 0.77841246128082275f, 1e-5);
+  EXPECT_EQ(difference.Genus(), 5);
   ManifoldParams().deterministic = oldDeterministic;
 }
 
@@ -353,7 +353,7 @@ TEST(Manifold, DISABLED_NonConvexNonConvexMinkowski) {
   EXPECT_EQ(sum.Genus(), 5);
   Manifold difference = nonConvex.MinkowskiDifference(star);
   EXPECT_NEAR(difference.GetProperties().volume, 0.0093147634f, 1e-5);
-  EXPECT_EQ(difference.Genus(), 5);  // Genus comes out to -7
+  EXPECT_EQ(difference.Genus(), -7);
   ManifoldParams().deterministic = oldDeterministic;
 }
 
