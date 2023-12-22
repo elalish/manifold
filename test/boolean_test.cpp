@@ -304,13 +304,12 @@ TEST(Manifold, ConvexConvexMinkowski) {
   Manifold sphere = Manifold::Sphere(offsetRadius, 20);
   Manifold cube = Manifold::Cube({cubeWidth, cubeWidth, cubeWidth});
   Manifold sum = cube.MinkowskiSum(sphere);
-  EXPECT_NEAR(sum.GetProperties().volume,
-              powf(cubeWidth + (2 * offsetRadius), 3.f), 0.06f);
+  EXPECT_NEAR(sum.GetProperties().volume, 10.589364051818848f, 1e-5);
   EXPECT_EQ(sum.Genus(), 0);
   Manifold difference = Manifold::Cube({cubeWidth, cubeWidth, cubeWidth})
                             .MinkowskiDifference(sphere);
-  EXPECT_NEAR(difference.GetProperties().volume,
-              powf(cubeWidth - (2 * offsetRadius), 3.f), 1e-5);
+  EXPECT_NEAR(difference.GetProperties().volume, 5.8319993019104004f, 1e-5);
+  EXPECT_NEAR(difference.GetProperties().surfaceArea, 19.439998626708984, 1e-5);
   EXPECT_EQ(difference.Genus(), 0);
   ManifoldParams().deterministic = oldDeterministic;
 }
@@ -323,10 +322,13 @@ TEST(Manifold, NonConvexConvexMinkowski) {
   Manifold nonConvex = cube - sphere;
   Manifold sum = nonConvex.MinkowskiSum(Manifold::Sphere(0.1, 20));
   EXPECT_NEAR(sum.GetProperties().volume, 4.8406339f, 1e-5);
+  EXPECT_NEAR(sum.GetProperties().surfaceArea, 34.063014984130859f, 1e-5);
   EXPECT_EQ(sum.Genus(), 5);
   Manifold difference =
       nonConvex.MinkowskiDifference(Manifold::Sphere(0.05, 20));
   EXPECT_NEAR(difference.GetProperties().volume, 0.77841246128082275f, 1e-5);
+  EXPECT_NEAR(difference.GetProperties().surfaceArea, 16.703733444213867f,
+              1e-5);
   EXPECT_EQ(difference.Genus(), 5);
   ManifoldParams().deterministic = oldDeterministic;
 }
@@ -350,9 +352,11 @@ TEST(Manifold, DISABLED_NonConvexNonConvexMinkowski) {
   Manifold nonConvex = cube - sphere;
   Manifold sum = nonConvex.MinkowskiSum(star);
   EXPECT_NEAR(sum.GetProperties().volume, 7.0875549f, 1e-5);
+  EXPECT_NEAR(sum.GetProperties().surfaceArea, 0.0f, 1e-5);
   EXPECT_EQ(sum.Genus(), 5);
   Manifold difference = nonConvex.MinkowskiDifference(star);
   EXPECT_NEAR(difference.GetProperties().volume, 0.0093147634f, 1e-5);
+  EXPECT_NEAR(difference.GetProperties().surfaceArea, 0.0f, 1e-5);
   EXPECT_EQ(difference.Genus(), -7);
   ManifoldParams().deterministic = oldDeterministic;
 }
