@@ -327,7 +327,7 @@ TEST(Manifold, DISABLED_NonConvexConvexMinkowski) {
   Manifold difference =
       nonConvex.MinkowskiDifference(Manifold::Sphere(0.1, 20));
   EXPECT_NEAR(difference.GetProperties().volume, 0.2029168f, 1e-5);
-  EXPECT_EQ(difference.Genus(), 5); // Genus comes out to -7
+  EXPECT_EQ(difference.Genus(), 5);  // Genus comes out to -7
   ManifoldParams().deterministic = oldDeterministic;
 }
 
