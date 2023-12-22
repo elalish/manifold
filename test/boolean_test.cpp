@@ -297,8 +297,6 @@ TEST(Boolean, SplitByPlane60) {
 }
 
 TEST(Manifold, ConvexConvexMinkowski) {
-  bool oldDeterministic = ManifoldParams().deterministic;
-  ManifoldParams().deterministic = true;
   float offsetRadius = 0.1f;
   float cubeWidth = 2.0f;
   Manifold sphere = Manifold::Sphere(offsetRadius, 20);
@@ -311,12 +309,9 @@ TEST(Manifold, ConvexConvexMinkowski) {
   EXPECT_NEAR(difference.GetProperties().volume, 5.8319993019104004f, 1e-5);
   EXPECT_NEAR(difference.GetProperties().surfaceArea, 19.439998626708984, 1e-5);
   EXPECT_EQ(difference.Genus(), 0);
-  ManifoldParams().deterministic = oldDeterministic;
 }
 
 TEST(Manifold, NonConvexConvexMinkowski) {
-  bool oldDeterministic = ManifoldParams().deterministic;
-  ManifoldParams().deterministic = true;
   Manifold sphere = Manifold::Sphere(1.2, 20);
   Manifold cube = Manifold::Cube({2.0, 2.0, 2.0}, true);
   Manifold nonConvex = cube - sphere;
@@ -330,35 +325,34 @@ TEST(Manifold, NonConvexConvexMinkowski) {
   EXPECT_NEAR(difference.GetProperties().surfaceArea, 16.703733444213867f,
               1e-5);
   EXPECT_EQ(difference.Genus(), 5);
-  ManifoldParams().deterministic = oldDeterministic;
 }
 
-TEST(Manifold, DISABLED_NonConvexNonConvexMinkowski) {
+TEST(Manifold, NonConvexNonConvexMinkowski) {
   bool oldDeterministic = ManifoldParams().deterministic;
   ManifoldParams().deterministic = true;
-  Manifold star = Manifold::Cube({0.1, 0.1, 0.1}, true);
-  std::vector<glm::vec3> verts = star.GetMesh().vertPos;
-  for (glm::vec3 point :
-       {glm::vec3(0.2, 0.0, 0.0), glm::vec3(-0.2, 0.0, 0.0),
-        glm::vec3(0.0, 0.2, 0.0), glm::vec3(0.0, -0.2, 0.0),
-        glm::vec3(0.0, 0.0, 0.2), glm::vec3(0.0, 0.0, -0.2)}) {
-    verts.push_back(point);
-    star += Manifold::Hull(verts);
-    verts.pop_back();
-  }
+  PolygonParams().processOverlaps = true;
 
-  Manifold sphere = Manifold::Sphere(1.2, 20);
-  Manifold cube = Manifold::Cube({2.0, 2.0, 2.0}, true);
-  Manifold nonConvex = cube - sphere;
-  Manifold sum = nonConvex.MinkowskiSum(star);
-  EXPECT_NEAR(sum.GetProperties().volume, 7.0875549f, 1e-5);
-  EXPECT_NEAR(sum.GetProperties().surfaceArea, 0.0f, 1e-5);
-  EXPECT_EQ(sum.Genus(), 5);
-  Manifold difference = nonConvex.MinkowskiDifference(star);
-  EXPECT_NEAR(difference.GetProperties().volume, 0.0093147634f, 1e-5);
-  EXPECT_NEAR(difference.GetProperties().surfaceArea, 0.0f, 1e-5);
-  EXPECT_EQ(difference.Genus(), -7);
+  Manifold tet = Manifold::Tetrahedron();
+  Manifold nonConvex = tet - tet.Rotate(0, 0, 90).Translate(glm::vec3(1));
+
+  Manifold sum = nonConvex.MinkowskiSum(nonConvex.Scale(glm::vec3(0.5)));
+  EXPECT_NEAR(sum.GetProperties().volume, 8.65625f, 1e-5);
+  EXPECT_NEAR(sum.GetProperties().surfaceArea, 31.176914f, 1e-5);
+  EXPECT_EQ(sum.Genus(), -9);
+
+  Manifold difference =
+      nonConvex.MinkowskiDifference(nonConvex.Scale(glm::vec3(0.1)));
+  EXPECT_NEAR(difference.GetProperties().volume, 0.81554f, 1e-5);
+  EXPECT_NEAR(difference.GetProperties().surfaceArea, 6.95045f, 1e-5);
+  EXPECT_EQ(difference.Genus(), 0);
+
+#ifdef MANIFOLD_EXPORT
+  if (options.exportModels)
+    ExportMesh("minkowski.glb", difference.GetMesh(), {});
+#endif
+
   ManifoldParams().deterministic = oldDeterministic;
+  PolygonParams().processOverlaps = false;
 }
 
 /**

@@ -301,6 +301,7 @@ Collider::Collider(const VecView<const Box>& leafBB,
 template <const bool selfCollision, const bool inverted, typename T>
 SparseIndices Collider::Collisions(const VecView<const T>& queriesIn) const {
   ZoneScoped;
+  if (NumInternal() == 0 || queriesIn.size() == 0) return SparseIndices();
   // note that the length is 1 larger than the number of queries so the last
   // element can store the sum when using exclusive scan
   if (queriesIn.size() < kSequentialThreshold) {
