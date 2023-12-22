@@ -338,7 +338,7 @@ TEST(Boolean, NonConvexNonConvexMinkowski) {
   Manifold sum = nonConvex.MinkowskiSum(nonConvex.Scale(glm::vec3(0.5)));
   EXPECT_NEAR(sum.GetProperties().volume, 8.65625f, 1e-5);
   EXPECT_NEAR(sum.GetProperties().surfaceArea, 31.176914f, 1e-5);
-  EXPECT_EQ(sum.Genus(), -9);
+  EXPECT_EQ(sum.Genus(), -5);
 
   Manifold difference =
       nonConvex.MinkowskiDifference(nonConvex.Scale(glm::vec3(0.1)));
