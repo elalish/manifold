@@ -22,3 +22,19 @@ so if you add a new one, you will need to add it in gen_docs.py.
 Similarly, the list of source files to parse is also white listed,
 so if you define functions in new files that need python wrappers,
 you will also need to up gen_docs.py.
+
+To verify that python docs are correct after changes, you can
+run the following commends from the manifold repo root:
+```
+pip install .
+python -c 'import manifold3d; help(manifold3d)'
+```
+
+Alternateively you could generate stubs with roughly the same info
+```
+pip install nanobind-stubgen
+pip install .
+nanobind-stubgen manifold3d
+```
+It will emit some warnings and write a file `manifold3d.pyi`
+which will show all the function signatures and docstrings.

@@ -32,6 +32,7 @@ add_custom_target(
   BYPRODUCTS autogen_docstrings.inl
 )
 target_include_directories(manifold3d PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
+add_dependencies(autogen_docstrings manifold sdf polygon)
 add_dependencies(manifold3d autogen_docstrings)
 
 if(SKBUILD)
