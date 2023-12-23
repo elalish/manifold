@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "impl.h"
+#include "optional_assert.h"
 #include "par.h"
 
 namespace {
@@ -256,6 +257,9 @@ void Manifold::Impl::SimplifyTopology() {
     std::cout << "found " << numFlagged << " edges to swap" << std::endl;
   }
 #endif
+
+  if (ManifoldParams().intermediateChecks)
+    ASSERT(Is2Manifold(), logicErr, "simplified mesh is not 2-manifold!");
 }
 
 // Deduplicate the given 4-manifold edge by duplicating endVert, thus making the

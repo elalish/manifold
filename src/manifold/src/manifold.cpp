@@ -438,11 +438,7 @@ int Manifold::OriginalID() const {
  */
 Manifold Manifold::AsOriginal() const {
   auto newImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
-  newImpl->meshRelation_.originalID = ReserveIDs(1);
-  newImpl->InitializeOriginal();
-  newImpl->CreateFaces();
-  newImpl->SimplifyTopology();
-  newImpl->Finish();
+  newImpl->AsOriginal();
   return Manifold(std::make_shared<CsgLeafNode>(newImpl));
 }
 

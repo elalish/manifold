@@ -779,8 +779,8 @@ Manifold::Impl Boolean3::Result(OpType op) const {
 
 #ifdef MANIFOLD_DEBUG
   triangulate.Stop();
-  Timer simplify;
-  simplify.Start();
+  Timer finish;
+  finish.Start();
 #endif
 
   if (ManifoldParams().intermediateChecks)
@@ -788,29 +788,22 @@ Manifold::Impl Boolean3::Result(OpType op) const {
 
   CreateProperties(outR, inP_, inQ_);
 
-  UpdateReference(outR, inP_, inQ_, invertQ);
+  if (ManifoldParams().alwaysAsOriginal) {
+    outR.AsOriginal();
+  } else {
+    UpdateReference(outR, inP_, inQ_, invertQ);
+    outR.SimplifyTopology();
+    outR.Finish();
+  }
 
-  outR.SimplifyTopology();
-
-  if (ManifoldParams().intermediateChecks)
-    ASSERT(outR.Is2Manifold(), logicErr, "simplified mesh is not 2-manifold!");
-
-#ifdef MANIFOLD_DEBUG
-  simplify.Stop();
-  Timer sort;
-  sort.Start();
-#endif
-
-  outR.Finish();
   outR.IncrementMeshIDs();
 
 #ifdef MANIFOLD_DEBUG
-  sort.Stop();
+  finish.Stop();
   if (ManifoldParams().verbose) {
     assemble.Print("Assembly");
     triangulate.Print("Triangulation");
-    simplify.Print("Simplification");
-    sort.Print("Sorting");
+    finish.Print("Finishing");
     std::cout << outR.NumVert() << " verts and " << outR.NumTri() << " tris"
               << std::endl;
   }

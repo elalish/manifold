@@ -615,6 +615,10 @@ struct ExecutionParams {
   bool deterministic = false;
   /// Perform optional but recommended triangle cleanups in SimplifyTopology()
   bool cleanupTriangles = true;
+  /// Speed up Boolean operations by resetting each result to an original,
+  /// allowing more simplification to happen, but losing the relationships to
+  /// input meshes.
+  bool alwaysAsOriginal = false;
 };
 
 #ifdef MANIFOLD_DEBUG

@@ -661,6 +661,14 @@ void Manifold::Impl::CreateFaces(const std::vector<float>& propertyTolerance) {
   }
 }
 
+void Manifold::Impl::AsOriginal() {
+  meshRelation_.originalID = ReserveIDs(1);
+  InitializeOriginal();
+  CreateFaces();
+  SimplifyTopology();
+  Finish();
+}
+
 /**
  * Create the halfedge_ data structure from an input triVerts array like Mesh.
  */
