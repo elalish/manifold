@@ -1,4 +1,3 @@
-# %%
 import numpy as np
 from manifold3d import *
 
@@ -9,7 +8,7 @@ from manifold3d import *
 # handling of triangles.
 
 
-def run():
+def run(warp_single=False):
     # The number of times the thread passes through the donut hole.
     p = 1
     # The number of times the thread circles the donut.
@@ -72,16 +71,18 @@ def run():
         m2[:, 3, 0] = majorRadius
         m3 = ax_rotate(2, psi)
 
-        v = v[:, None, :] @ (m1 @ m2 @ m3)
-        return v[:, 0, :3]
+        v = v[:, None, :] @ m1 @ m2 @ m3
+        pts[:] = v[:, 0, :3]
 
     def func_single(v):
-        pts = np.array(v)[None, :]
-        pts = func(pts)
-        return tuple(pts[0])
+        pts = np.array([v])
+        func(pts)
+        return pts[0]
 
-    return circle.revolve(int(m)).warp_batch(func)
-    # return circle.revolve(int(m)).warp(func_single)
+    if warp_single:
+        return circle.revolve(int(m)).warp(func_single)
+    else:
+        return circle.revolve(int(m)).warp_batch(func)
 
 
 if __name__ == "__main__":
