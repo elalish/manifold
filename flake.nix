@@ -60,7 +60,7 @@
                 glm
                 ninja
                 (python39.withPackages
-                  (ps: with ps; [ trimesh ]))
+                  (ps: with ps; [ trimesh pytest ]))
                 gtest
               ]) ++ build-tools;
               cmakeFlags = [
@@ -74,6 +74,7 @@
                 ./manifold_test
                 cd ../../
                 PYTHONPATH=$PYTHONPATH:$(pwd)/build/bindings/python python3 bindings/python/examples/run_all.py
+                PYTHONPATH=$PYTHONPATH:$(pwd)/build/bindings/python python3 -m pytest
                 cd build
               '';
             };
@@ -155,12 +156,14 @@
               ];
               checkInputs = [
                 trimesh
+                pytest
               ];
               format = "pyproject";
               dontUseCmakeConfigure = true;
               doCheck = true;
               checkPhase = ''
                 python3 bindings/python/examples/run_all.py
+                python3 -m pytest
               '';
             };
           };
