@@ -271,8 +271,14 @@ NB_MODULE(manifold3d, m) {
             return self.Rotate(v.x, v.y, v.z);
           },
           nb::arg("v"), manifold__rotate__v.c_str())
-      .def("warp", &Manifold::Warp, nb::arg("warp_func"),
-           manifold__warp__warp_func)
+      .def(
+          "warp",
+          [](const Manifold &self,
+             std::function<glm::vec3(glm::vec3)> warp_func) {
+            // need a wrapper because python cant modify a reference in-place
+            return self.Warp([&warp_func](glm::vec3 &v) { v = warp_func(v); });
+          },
+          nb::arg("warp_func"), manifold__warp__warp_func)
       .def("warp_batch", &Manifold::WarpBatch, nb::arg("warp_func"),
            manifold__warp_batch__warp_func)
       .def(
@@ -610,8 +616,14 @@ NB_MODULE(manifold3d, m) {
            cross_section__mirror__ax)
       .def("transform", &CrossSection::Transform, nb::arg("m"),
            cross_section__transform__m)
-      .def("warp", &CrossSection::Warp, nb::arg("warp_func"),
-           cross_section__warp__warp_func)
+      .def(
+          "warp",
+          [](const CrossSection &self,
+             std::function<glm::vec2(glm::vec2)> warp_func) {
+            // need a wrapper because python cant modify a reference in-place
+            return self.Warp([&warp_func](glm::vec2 &v) { v = warp_func(v); });
+          },
+          nb::arg("warp_func"), cross_section__warp__warp_func)
       .def("warp_batch", &CrossSection::WarpBatch, nb::arg("warp_func"),
            cross_section__warp_batch__warp_func)
       .def("simplify", &CrossSection::Simplify, nb::arg("epsilon") = 1e-6,
