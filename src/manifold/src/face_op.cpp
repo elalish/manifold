@@ -316,5 +316,4 @@ CrossSection Manifold::Impl::Project() const {
 
   return CrossSection(polys).Simplify(precision_);
 }
-
 }  // namespace manifold
