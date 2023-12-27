@@ -1,5 +1,6 @@
-import numpy as np
 from manifold3d import *
+import numpy as np
+import pytest
 
 # Creates a classic torus knot, defined as a string wrapping periodically
 # around the surface of an imaginary donut. If p and q have a common
@@ -83,6 +84,14 @@ def run(warp_single=False):
         return circle.revolve(int(m)).warp(func_single)
     else:
         return circle.revolve(int(m)).warp_batch(func)
+
+
+@pytest.mark.parametrize("warp_single", [True, False])
+def test_warp(warp_single):
+    m = run(warp_single=warp_single)
+    assert m.volume() == pytest.approx(20785.76)
+    assert m.surface_area() == pytest.approx(11176.8)
+    assert m.genus() == 1
 
 
 if __name__ == "__main__":
