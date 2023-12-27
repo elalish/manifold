@@ -801,34 +801,41 @@ Manifold Manifold::TrimByPlane(glm::vec3 normal, float originOffset) const {
  */
 Manifold Manifold::Minkowski(const Manifold& other, bool inset) const {
   std::vector<Manifold> composedHulls({*this});
-  bool aConvex = this->GetCsgLeafNode().GetImpl()->IsConvex();
-  bool bConvex = other.GetCsgLeafNode().GetImpl()->IsConvex();
+  auto aImpl = this->GetCsgLeafNode().GetImpl();
+  auto bImpl = other.GetCsgLeafNode().GetImpl();
+
+  bool aConvex = aImpl->IsConvex();
+  bool bConvex = bImpl->IsConvex();
 
   // If the convex manifold was supplied first, swap them!
   Manifold a = *this, b = other;
   if (aConvex && !bConvex) {
     a = other;
     b = *this;
+    aImpl = other.GetCsgLeafNode().GetImpl();
+    bImpl = this->GetCsgLeafNode().GetImpl();
     aConvex = !aConvex;
     bConvex = !bConvex;
   }
 
-  manifold::Mesh aMesh = a.GetMesh();
-
   // Convex-Convex Minkowski: Very Fast
   if (!inset && aConvex && bConvex) {
     std::vector<Manifold> simpleHull;
-    for (glm::vec3 vertex : aMesh.vertPos) {
+    for (glm::vec3 vertex : aImpl->vertPos_) {
       simpleHull.push_back(b.Translate(vertex));
     }
     composedHulls.push_back(Manifold::Hull(simpleHull));
     // Convex - Non-Convex Minkowski: Slower
   } else if ((inset || !aConvex) && bConvex) {
     std::vector<std::vector<Manifold>> composedParts;
-    for (glm::ivec3 vertexIndices : aMesh.triVerts) {
-      composedParts.push_back({b.Translate(aMesh.vertPos[vertexIndices.x]),
-                               b.Translate(aMesh.vertPos[vertexIndices.y]),
-                               b.Translate(aMesh.vertPos[vertexIndices.z])});
+    for (size_t face = 0; face < aImpl->NumTri(); face++) {
+      composedParts.push_back(
+          {b.Translate(
+               aImpl->vertPos_[aImpl->halfedge_[(face * 3) + 0].startVert]),
+           b.Translate(
+               aImpl->vertPos_[aImpl->halfedge_[(face * 3) + 1].startVert]),
+           b.Translate(
+               aImpl->vertPos_[aImpl->halfedge_[(face * 3) + 2].startVert])});
     }
     std::vector<Manifold> newHulls(composedParts.size());
     thrust::for_each_n(
@@ -840,19 +847,23 @@ Manifold Manifold::Minkowski(const Manifold& other, bool inset) const {
     composedHulls.insert(composedHulls.end(), newHulls.begin(), newHulls.end());
     // Non-Convex - Non-Convex Minkowski: Very Slow
   } else if (!aConvex && !bConvex) {
-    manifold::Mesh bMesh = b.GetMesh();
-    for (glm::ivec3 aIndices : aMesh.triVerts) {
-      for (glm::ivec3 bIndices : bMesh.triVerts) {
-        composedHulls.push_back(Manifold::Hull(
-            {aMesh.vertPos[aIndices.x] + bMesh.vertPos[bIndices.x],
-             aMesh.vertPos[aIndices.x] + bMesh.vertPos[bIndices.y],
-             aMesh.vertPos[aIndices.x] + bMesh.vertPos[bIndices.z],
-             aMesh.vertPos[aIndices.y] + bMesh.vertPos[bIndices.x],
-             aMesh.vertPos[aIndices.y] + bMesh.vertPos[bIndices.y],
-             aMesh.vertPos[aIndices.y] + bMesh.vertPos[bIndices.z],
-             aMesh.vertPos[aIndices.z] + bMesh.vertPos[bIndices.x],
-             aMesh.vertPos[aIndices.z] + bMesh.vertPos[bIndices.y],
-             aMesh.vertPos[aIndices.z] + bMesh.vertPos[bIndices.z]}));
+    for (size_t aFace = 0; aFace < aImpl->NumTri(); aFace++) {
+      for (size_t bFace = 0; bFace < bImpl->NumTri(); bFace++) {
+        const bool coplanar = glm::all(glm::equal(aImpl->faceNormal_[aFace],
+                                                  bImpl->faceNormal_[bFace])) ||
+                              glm::all(glm::equal(aImpl->faceNormal_[aFace],
+                                                  -bImpl->faceNormal_[bFace]));
+        if (coplanar) continue;  // Skip Coplanar Triangles
+
+        auto a1 = aImpl->vertPos_[aImpl->halfedge_[(aFace * 3) + 0].startVert];
+        auto a2 = aImpl->vertPos_[aImpl->halfedge_[(aFace * 3) + 1].startVert];
+        auto a3 = aImpl->vertPos_[aImpl->halfedge_[(aFace * 3) + 2].startVert];
+        auto b1 = bImpl->vertPos_[bImpl->halfedge_[(bFace * 3) + 0].startVert];
+        auto b2 = bImpl->vertPos_[bImpl->halfedge_[(bFace * 3) + 1].startVert];
+        auto b3 = bImpl->vertPos_[bImpl->halfedge_[(bFace * 3) + 2].startVert];
+        composedHulls.push_back(
+            Manifold::Hull({a1 + b1, a1 + b2, a1 + b3, a2 + b1, a2 + b2,
+                            a2 + b3, a3 + b1, a3 + b2, a3 + b3}));
       }
     }
   }
