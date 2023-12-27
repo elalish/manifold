@@ -15,11 +15,7 @@
  """
 
 import math
-import sys
 import numpy as np
-
-sys.path.append("/Users/k/projects/python/badcad/wip/manifold/build/bindings/python")
-
 from manifold3d import Mesh, Manifold
 
 
