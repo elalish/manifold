@@ -801,10 +801,8 @@ Manifold Manifold::TrimByPlane(glm::vec3 normal, float originOffset) const {
  */
 Manifold Manifold::Minkowski(const Manifold& other, bool inset) const {
   std::vector<Manifold> composedHulls({*this});
-  bool aConvex = this->Genus() == 0 &&
-                 this->GetCsgLeafNode().GetImpl()->ReflexFaces().size() == 0;
-  bool bConvex = other.Genus() == 0 &&
-                 other.GetCsgLeafNode().GetImpl()->ReflexFaces().size() == 0;
+  bool aConvex = this->GetCsgLeafNode().GetImpl()->IsConvex();
+  bool bConvex = other.GetCsgLeafNode().GetImpl()->IsConvex();
 
   // If the convex manifold was supplied first, swap them!
   Manifold a = *this, b = other;
