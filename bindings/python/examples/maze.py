@@ -4039,4 +4039,4 @@ def run():
 
     ball([10, 10, 10], 0.4)
 
-    return Manifold.cube((n + 1) * np.array([1, 1, 1])) - Manifold(cavity)
+    return Manifold.cube([n + 1] * 3) - sum(cavity, Manifold())

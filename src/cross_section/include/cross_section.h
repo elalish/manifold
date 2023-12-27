@@ -21,6 +21,7 @@
 #include "glm/ext/matrix_float3x2.hpp"
 #include "glm/ext/vector_float2.hpp"
 #include "public.h"
+#include "vec_view.h"
 
 namespace manifold {
 
@@ -97,6 +98,8 @@ class CrossSection {
   CrossSection Mirror(const glm::vec2 ax) const;
   CrossSection Transform(const glm::mat3x2& m) const;
   CrossSection Warp(std::function<void(glm::vec2&)> warpFunc) const;
+  CrossSection WarpBatch(
+      std::function<void(VecView<glm::vec2>)> warpFunc) const;
   CrossSection Simplify(double epsilon = 1e-6) const;
 
   // Adapted from Clipper2 docs:

@@ -90,9 +90,9 @@ function switchTo(scriptName) {
     switching = true;
     currentFileElement.textContent = scriptName;
     setScript('currentName', scriptName);
-    const code =
-        exampleFunctions.get(scriptName) ?? getScript(scriptName) ?? '';
     isExample = exampleFunctions.get(scriptName) != null;
+    const code = isExample ? exampleFunctions.get(scriptName).substring(1) :
+                             getScript(scriptName) ?? '';
     editor.setValue(code);
   }
 }
@@ -110,6 +110,8 @@ function createDropdownItem(name) {
 
   button.onclick = function() {
     saveCurrent();
+    window.location.hash = `#${label.textContent}`;
+    window.location.search = '';
     switchTo(label.textContent);
   };
   // Stop text input spaces from triggering the button
@@ -196,6 +198,7 @@ function addEdit(button) {
       removeScript(label.textContent);
       if (currentFileElement.textContent == label.textContent) {
         switchTo('Intro');
+        window.location.hash = '#Intro';
       }
       const container = button.parentElement;
       container.parentElement.removeChild(container);
@@ -204,16 +207,16 @@ function addEdit(button) {
 }
 
 const newButton = document.querySelector('#new');
-function newItem(code) {
-  const name = uniqueName('New Script');
+function newItem(code, scriptName = undefined) {
+  const name = uniqueName(scriptName ?? 'New Script');
   setScript(name, code);
   const nextButton = createDropdownItem(name);
   newButton.insertAdjacentElement('afterend', nextButton.parentElement);
   addEdit(nextButton);
-  nextButton.click();
+  return {button: nextButton, name};
 };
 newButton.onclick = function() {
-  newItem('');
+  newItem('').button.click();
 };
 
 const runButton = document.querySelector('#compile');
@@ -299,7 +302,20 @@ require(['vs/editor/editor.main'], async function() {
       addEdit(button);
     }
   }
-  switchTo(currentName);
+  const params = new URLSearchParams(window.location.search);
+  if (window.location.hash.length > 0) {
+    const name = unescape(window.location.hash.substring(1));
+    switchTo(name);
+  } else if (params.get('script') != null) {
+    console.log(`Fetching ${params.get('script')}`);
+    autoExecute = false;
+    const response = await fetch(params.get('script'));
+    const code = await response.text();
+    switchTo(newItem(code, params.get('name')).name);
+  } else {
+    switchTo(currentName);
+    window.location.hash = `#${currentName}`;
+  }
 
   if (manifoldInitialized) {
     initializeRun();
@@ -313,7 +329,7 @@ require(['vs/editor/editor.main'], async function() {
     }
     if (isExample) {
       const cursor = editor.getPosition();
-      newItem(editor.getValue());
+      newItem(editor.getValue()).button.click();
       editor.setPosition(cursor);
     }
   });

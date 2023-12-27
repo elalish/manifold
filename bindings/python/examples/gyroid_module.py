@@ -31,20 +31,20 @@ def gyroid(x, y, z):
 
 
 def gyroid_levelset(level, period, size, n):
-    return Manifold.from_mesh(
+    return Manifold(
         Mesh.level_set(
             gyroid,
             [-period, -period, -period, period, period, period],
             period / n,
             level,
         )
-    ).scale(size / period)
+    ).scale([size / period] * 3)
 
 
 def rhombic_dodecahedron(size):
     box = Manifold.cube(size * math.sqrt(2.0) * np.array([1, 1, 2]), True)
-    result = box.rotate(90, 45) ^ box.rotate(90, 45, 90)
-    return result ^ box.rotate(0, 0, 45)
+    result = box.rotate([90, 45, 0]) ^ box.rotate([90, 45, 90])
+    return result ^ box.rotate([0, 0, 45])
 
 
 def gyroid_module(size=20, n=15):
@@ -52,7 +52,7 @@ def gyroid_module(size=20, n=15):
     result = (
         gyroid_levelset(-0.4, period, size, n) ^ rhombic_dodecahedron(size)
     ) - gyroid_levelset(0.4, period, size, n)
-    return result.rotate(-45, 0, 90).translate(0, 0, size / math.sqrt(2.0))
+    return result.rotate([-45, 0, 90]).translate([0, 0, size / math.sqrt(2.0)])
 
 
 def run(size=20, n=15):
