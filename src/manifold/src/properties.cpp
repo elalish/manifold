@@ -372,7 +372,6 @@ void Manifold::Impl::CalculateCurvature(int gaussianIdx, int meanIdx) {
                         numProp, gaussianIdx, meanIdx}));
 
   CreateFaces();
-  SimplifyTopology();
   Finish();
 }
 
