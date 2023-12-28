@@ -737,7 +737,6 @@ void Manifold::Impl::WarpBatch(
   CalculateNormals();
   SetPrecision();
   CreateFaces();
-  SimplifyTopology();
   Finish();
 }
 
