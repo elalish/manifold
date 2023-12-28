@@ -629,7 +629,6 @@ Manifold Manifold::SetProperties(
 
   pImpl->meshRelation_.numProp = numProp;
   pImpl->CreateFaces();
-  pImpl->SimplifyTopology();
   pImpl->Finish();
   return Manifold(std::make_shared<CsgLeafNode>(pImpl));
 }
