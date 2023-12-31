@@ -526,7 +526,6 @@ Manifold::Impl::Impl(const Mesh& mesh, const MeshRelationD& relation,
     CreateFaces(propertyTolerance);
   }
 
-  SimplifyTopology();
   Finish();
 }
 
