@@ -19,7 +19,7 @@ import {strToU8, Zippable, zipSync} from 'fflate'
 import * as glMatrix from 'gl-matrix';
 
 import Module from './built/manifold';
-import {Properties, setupIO, writeMesh} from './gltf-io';
+import {Properties, readMesh, setupIO, writeMesh} from './gltf-io';
 import {GLTFMaterial, Quat} from './public/editor';
 import type {CrossSection, Manifold, ManifoldToplevel, Mesh, Vec3} from './public/manifold';
 
@@ -326,13 +326,15 @@ function log(...args: any[]) {
 }
 
 self.onmessage = async (e) => {
-  const content = 'const globalDefaults = {};\n' + e.data +
-      '\nreturn exportModels(globalDefaults, typeof result === "undefined" ? undefined : result);\n';
+  const needProps = e.data.needProps ?? false;
+  const content = 'const globalDefaults = {};\n' + e.data.script +
+      '\nreturn exportModels(needProps, globalDefaults, typeof result === "undefined" ? undefined : result);\n';
   try {
     const f = new Function(
-        'exportModels', 'glMatrix', 'module', ...exposedFunctions, content);
+        'needProps', 'exportModels', 'glMatrix', 'module', ...exposedFunctions,
+        content);
     await f(
-        exportModels, glMatrix, module,  //@ts-ignore
+        needProps, exportModels, glMatrix, module,  //@ts-ignore
         ...exposedFunctions.map(name => module[name]));
   } catch (error: any) {
     console.log(error.toString());
@@ -659,7 +661,8 @@ function createNodeFromCache(
   return node;
 }
 
-async function exportModels(defaults: GlobalDefaults, manifold?: Manifold) {
+async function exportModels(
+    needProps: boolean, defaults: GlobalDefaults, manifold?: Manifold) {
   Object.assign(globalDefaults, GLOBAL_DEFAULTS);
   Object.assign(globalDefaults, defaults);
 
@@ -777,8 +780,29 @@ async function exportModels(defaults: GlobalDefaults, manifold?: Manifold) {
       [zipFile],
       {type: 'application/vnd.ms-package.3dmanufacturing-3dmodel+xml'});
 
-  self.postMessage({
+  const result: any = {
     glbURL: URL.createObjectURL(blobGLB),
     threeMFURL: URL.createObjectURL(blob3MF)
-  });
+  };
+
+  if (needProps) {
+    const docIn = await io.read(result.glbURL);
+    const nodes = docIn.getRoot().listNodes();
+    for (const node of nodes) {
+      const docMesh = node.getMesh();
+      if (!docMesh) {
+        continue;
+      }
+      const {mesh} = readMesh(docMesh) ?? {mesh: undefined};
+      if (mesh != undefined) {
+        const manifold = new module.Manifold(mesh as Mesh);
+        result['prop'] = manifold.getProperties();
+        result['genus'] = manifold.genus();
+        manifold.delete();
+      }
+      break;
+    }
+  }
+
+  self.postMessage(result);
 }

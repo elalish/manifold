@@ -93,6 +93,9 @@ jobs:
     timeout-minutes: 30
     runs-on: ubuntu-22.04
     if: github.event.pull_request.draft == false
+    strategy:
+      matrix:
+        parallel_backend: [NONE, TBB]
     steps:
     - name: Install dependencies
       run: |
@@ -114,11 +117,23 @@ jobs:
         source ./emsdk/emsdk_env.sh
         mkdir build
         cd build
-        emcmake cmake -DCMAKE_BUILD_TYPE=Release .. && emmake make
+        # this system processor thing is to avoid TBB from emitting
+        # architecture-specific compiler flags
+        emcmake cmake -DCMAKE_BUILD_TYPE=MinSizeRel \
+          -DMANIFOLD_PAR=${{matrix.parallel_backend}}\
+          -DEMSCRIPTEN_SYSTEM_PROCESSOR=web ..
+        emmake make
+    - name: patch wasm with pthread
+      if: matrix.parallel_backend == 'TBB'
+      run: |
+        ./patch-emscripten.sh build/test
     - name: Test WASM
       run: |
         cd build/test
-        node ./manifold_test.js
+        echo '{"type":"module"}' > package.json
+        node --experimental-wasm-threads -e \
+          '(async () => {const module = await import("./manifold_test.js");'\
+          ' await module.default();})()'
     - name: Test examples
       run: |
         cd bindings/wasm/examples
@@ -126,6 +141,7 @@ jobs:
         npm run build
         npm test
     - name: Upload WASM files
+      if: matrix.parallel_backend == 'NONE'
       uses: actions/upload-artifact@v3
       with:
         name: wasm

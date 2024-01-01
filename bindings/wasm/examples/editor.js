@@ -473,7 +473,8 @@ async function run() {
   clearConsole();
   console.log('Running...');
   const output = await tsWorker.getEmitOutput(editor.getModel().uri.toString());
-  manifoldWorker.postMessage(output.outputFiles[0].text);
+  manifoldWorker.postMessage(
+      {needProps: false, script: output.outputFiles[0].text});
   t0 = performance.now();
 }
 
