@@ -124,9 +124,7 @@
               checkPhase = ''
                 cd test
                 echo '{"type":"module"}' > package.json
-                node --experimental-wasm-threads -e \
-                  '(async () => {const module = await import("./manifold_test.js");'\
-                  ' await module.default();})()'
+                node --experimental-wasm-threads -e '(async () => {const module = await import("./manifold_test.js"); await module.default();})()'
                 cd ../
               '';
               installPhase = ''
