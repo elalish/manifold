@@ -818,6 +818,10 @@ Manifold Manifold::Minkowski(const Manifold& other, bool inset) const {
     bConvex = !bConvex;
   }
 
+  // Early-exit if either input is empty
+  if (b.IsEmpty()) return a;
+  if (a.IsEmpty()) return b;
+
   // Convex-Convex Minkowski: Very Fast
   if (!inset && aConvex && bConvex) {
     std::vector<Manifold> simpleHull;
