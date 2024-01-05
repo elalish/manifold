@@ -140,5 +140,6 @@ struct Manifold::Impl {
   void CreateTangents(const std::vector<Smoothness>&);
   Vec<Barycentric> Subdivide(int n);
   void Refine(int n);
+  void RefineToLength(float length);
 };
 }  // namespace manifold

@@ -671,6 +671,12 @@ Manifold Manifold::Refine(int n) const {
   return Manifold(std::make_shared<CsgLeafNode>(pImpl));
 }
 
+Manifold Manifold::RefineToLength(float length) const {
+  auto pImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
+  pImpl->RefineToLength(length);
+  return Manifold(std::make_shared<CsgLeafNode>(pImpl));
+}
+
 /**
  * The central operation of this library: the Boolean combines two manifolds
  * into another by calculating their intersections and removing the unused

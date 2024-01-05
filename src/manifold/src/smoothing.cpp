@@ -308,6 +308,54 @@ struct InterpTri {
     pos = HNormalize(posH);
   }
 };
+
+class Partition {
+ public:
+  std::vector<glm::vec3> interiorBary;
+  std::vector<glm::ivec3> triVert;
+
+  static Partition GetPartition(glm::ivec3 divisions, glm::ivec3 tri,
+                                glm::ivec3 edgeOffsets, int interiorOffset,
+                                glm::mat3 vertPos) {
+    glm::ivec3 sortedDiv = divisions;
+    glm::ivec3 divNew2Old = {0, 1, 2};
+    if (sortedDiv[2] > sortedDiv[1]) std::swap(sortedDiv[2], sortedDiv[1]);
+    if (sortedDiv[1] > sortedDiv[0]) {
+      std::swap(sortedDiv[1], sortedDiv[0]);
+      if (sortedDiv[2] > sortedDiv[1]) std::swap(sortedDiv[2], sortedDiv[1]);
+    }
+    Partition partition = GetCachedPartition(sortedDiv);
+    std::vector<int> vertOld2New;
+    for (glm::vec3& pos : partition.interiorBary) {
+      pos = vertPos * pos;
+    }
+    return partition;
+  }
+
+ private:
+  static std::unordered_map<glm::ivec3, Partition> cache;
+
+  static Partition GetCachedPartition(glm::ivec3 n) {
+    auto cached = cache.find(n);
+    if (cached != cache.end()) {
+      return cached->second;
+    }
+    Partition partition;
+    const float f = n[2] * n[2] + n[0] * n[0];
+    if (n[1] < f - glm::sqrt(2.0f) * n[0] * n[2]) {
+      const int n1 = glm::round((f - n[1] * n[1]) / (2 * n[0]));
+      const int n2 = glm::round(glm::sqrt(n[2] * n[2] - n1 * n1));
+      // GetPartition({n[0]-n1,n[1],n2})
+      // GetPartition({n1,n2,n[2]})
+      // Put these together
+    } else {
+      // for i:n[0], make a row of triangles that cut off the small side (n[2]),
+      // where new side has divisions = round(n[2] * (n[0] - i) / n[0])
+    }
+    cache.insert({n, partition});
+    return partition;
+  }
+};
 }  // namespace
 
 namespace manifold {
@@ -489,5 +537,13 @@ void Manifold::Impl::Refine(int n) {
 
   halfedgeTangent_.resize(0);
   Finish();
+}
+
+void Manifold::Impl::RefineToLength(float length) {
+  // calculate edge divisions
+  // scan to create edge offsets
+  // make vertPos vector with input verts and new edge verts
+  // for each tri, append interior verts and partition tris
+  // Also optimize Subdivide by using Partition({n,n,n}) instead
 }
 }  // namespace manifold
