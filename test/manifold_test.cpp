@@ -232,6 +232,14 @@ TEST(Manifold, Revolve2) {
   EXPECT_NEAR(prop.surfaceArea, 96.0f * glm::pi<float>(), 1.0f);
 }
 
+TEST(Manifold, Revolve3) {
+  CrossSection circle = CrossSection::Circle(1, 32);
+  Manifold sphere = Manifold::Revolve(circle, 32);
+  auto prop = sphere.GetProperties();
+  EXPECT_NEAR(prop.volume, 4.0f / 3.0f * glm::pi<float>(), 0.1);
+  EXPECT_NEAR(prop.surfaceArea, 4 * glm::pi<float>(), 0.15);
+}
+
 TEST(Manifold, PartialRevolveOnYAxis) {
   Polygons polys = SquareHole(2.0f);
   Polygons offsetPolys = SquareHole(10.0f);
