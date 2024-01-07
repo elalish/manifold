@@ -352,9 +352,10 @@ Manifold Manifold::Revolve(const CrossSection& crossSection,
   }
   const bool isFullRevolution = revolveDegrees == 360.0f;
 
-  const int nDivisions = circularSegments > 2
-                             ? circularSegments
-                             : Quality::GetCircularSegments(radius);
+  const int nDivisions =
+      circularSegments > 2
+          ? circularSegments
+          : Quality::GetCircularSegments(radius) * revolveDegrees / 360;
 
   auto pImpl_ = std::make_shared<Impl>();
   auto& vertPos = pImpl_->vertPos_;
