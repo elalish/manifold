@@ -125,6 +125,7 @@ jobs:
         npm ci
         npm run build
         npm test
+        cp ../manifold.* ./dist/
     - name: Upload WASM files
       uses: actions/upload-artifact@v3
       with:
