@@ -125,6 +125,7 @@ jobs:
         npm ci
         npm run build
         npm test
+        cp ../manifold.* ./dist/
     - name: Upload WASM files
       uses: actions/upload-artifact@v3
       with:
@@ -191,7 +192,7 @@ jobs:
     - name: Install common dependencies
       run: |
         brew install pkg-config googletest assimp
-        pip install trimesh
+        pip install trimesh pytest
     - name: Install TBB
       if: matrix.parallel_backend == 'TBB'
       run: brew install tbb

@@ -55,7 +55,7 @@ install.components = ["bindings"]
 
 [tool.cibuildwheel]
 build-frontend = "build"
-test-requires = ["trimesh"]
+test-requires = ["trimesh", "pytest"]
 test-command = "python {project}/bindings/python/examples/run_all.py"
 # Setuptools bug causes collision between pypy and cpython artifacts
 manylinux-x86_64-image = "manylinux_2_28"
