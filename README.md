@@ -125,7 +125,7 @@ use the extension, please add `$BUILD_DIR/bindings/python` to your `PYTHONPATH`,
 can be found in `bindings/python/examples`. To see exported samples, run:
 ```
 sudo apt install pkg-config libpython3-dev python3 python3-distutils python3-pip
-pip install trimesh
+pip install trimesh pytest
 python3 run_all.py -e
 ```
 

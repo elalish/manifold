@@ -191,7 +191,7 @@ jobs:
     - name: Install common dependencies
       run: |
         brew install pkg-config googletest assimp
-        pip install trimesh
+        pip install trimesh pytest
     - name: Install TBB
       if: matrix.parallel_backend == 'TBB'
       run: brew install tbb
