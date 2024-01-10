@@ -385,13 +385,15 @@ NB_MODULE(manifold3d, m) {
       .def_static("cube", &Manifold::Cube, nb::arg("size") = glm::vec3{1, 1, 1},
                   nb::arg("center") = false, manifold__cube__size__center)
       .def_static(
-          "extrude", &Manifold::Extrude, nb::arg("crossSection"), nb::arg("height"),
-          nb::arg("n_divisions") = 0, nb::arg("twist_degrees") = 0.0f,
+          "extrude", &Manifold::Extrude, nb::arg("crossSection"),
+          nb::arg("height"), nb::arg("n_divisions") = 0,
+          nb::arg("twist_degrees") = 0.0f,
           nb::arg("scale_top") = std::make_tuple(1.0f, 1.0f),
           manifold__extrude__cross_section__height__n_divisions__twist_degrees__scale_top)
-      .def_static("revolve", &Manifold::Revolve, nb::arg("crossSection"), nb::arg("circular_segments") = 0,
-           nb::arg("revolve_degrees") = 360.0,
-           manifold__revolve__cross_section__circular_segments__revolve_degrees)
+      .def_static(
+          "revolve", &Manifold::Revolve, nb::arg("crossSection"),
+          nb::arg("circular_segments") = 0, nb::arg("revolve_degrees") = 360.0,
+          manifold__revolve__cross_section__circular_segments__revolve_degrees)
       .def_static(
           "cylinder", &Manifold::Cylinder, nb::arg("height"),
           nb::arg("radius_low"), nb::arg("radius_high") = -1.0f,
