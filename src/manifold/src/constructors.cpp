@@ -333,8 +333,9 @@ Manifold Manifold::Revolve(const CrossSection& crossSection,
   }
 
   const Rect bounds = crossSection.Bounds();
+  const float radius = bounds.max.x;
 
-  if (bounds.max.x <= 0) {
+  if (radius <= 0) {
     return Invalid();
   } else if (bounds.min.x < 0) {
     // Take the x>=0 slice.
@@ -346,21 +347,15 @@ Manifold Manifold::Revolve(const CrossSection& crossSection,
     polygons = (crossSection ^ posBoundingBox).ToPolygons();
   }
 
-  float radius = 0.0f;
-  for (const auto& poly : polygons) {
-    for (const auto& vert : poly) {
-      radius = fmax(radius, vert.x);
-    }
-  }
-
   if (revolveDegrees > 360.0f) {
     revolveDegrees = 360.0f;
   }
   const bool isFullRevolution = revolveDegrees == 360.0f;
 
-  const int nDivisions = circularSegments > 2
-                             ? circularSegments
-                             : Quality::GetCircularSegments(radius);
+  const int nDivisions =
+      circularSegments > 2
+          ? circularSegments
+          : Quality::GetCircularSegments(radius) * revolveDegrees / 360;
 
   auto pImpl_ = std::make_shared<Impl>();
   auto& vertPos = pImpl_->vertPos_;
@@ -390,14 +385,14 @@ Manifold Manifold::Revolve(const CrossSection& crossSection,
 
       if (!isFullRevolution) startPoses.push_back(startPosIndex);
 
+      const glm::vec2 currPolyVertex = poly[polyVert];
+      const glm::vec2 prevPolyVertex =
+          poly[polyVert == 0 ? poly.size() - 1 : polyVert - 1];
+
       const int prevStartPosIndex =
           startPosIndex +
-          (polyVert == 0 ? nRevolveAxisVerts + (nSlices * nPosVerts) - nSlices
-           : poly[polyVert - 1].x == 0.0 ? -1
-                                         : -nSlices);
-      glm::vec2 currPolyVertex = poly[polyVert];
-      glm::vec2 prevPolyVertex =
-          poly[polyVert == 0 ? poly.size() - 1 : polyVert - 1];
+          (polyVert == 0 ? nRevolveAxisVerts + (nSlices * nPosVerts) : 0) +
+          (prevPolyVertex.x == 0.0 ? -1 : -nSlices);
 
       for (int slice = 0; slice < nSlices; ++slice) {
         const float phi = slice * dPhi;
