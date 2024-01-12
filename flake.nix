@@ -41,6 +41,7 @@
                 (python3.withPackages
                   (ps: with ps; [ trimesh pytest ]))
                 gtest
+                pkg-config
               ]) ++ build-tools;
               buildInputs = with pkgs; [
                 glm
@@ -120,6 +121,7 @@
               buildInputs = with pkgs; [
                 tbb_2021_8
                 glm
+                clipper2
               ];
               nativeBuildInputs = with pkgs; [
                 cmake
