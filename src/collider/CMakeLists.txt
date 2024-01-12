@@ -26,6 +26,10 @@ target_compile_options(${PROJECT_NAME} PRIVATE ${MANIFOLD_FLAGS})
 target_compile_features(${PROJECT_NAME}
     PUBLIC cxx_std_17
 )
-install(TARGETS ${PROJECT_NAME}
-    EXPORT manifoldTargets FILE_SET HEADERS
-    DESTINATION include/manifold)
+if(CMAKE_VERSION VERSION_LESS "3.23.0")
+    install(FILES include/collider.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/manifold)
+else()
+    install(TARGETS ${PROJECT_NAME}
+        EXPORT manifoldTargets FILE_SET HEADERS
+        DESTINATION include/manifold)
+endif()
