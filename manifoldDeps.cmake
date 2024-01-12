@@ -48,22 +48,20 @@ if(NOT glm_FOUND)
     install(EXPORT glmTargets DESTINATION ${CMAKE_INSTALL_DATADIR}/glm)
 endif()
 
-if(MANIFOLD_PAR STREQUAL "TBB")
-    if(NOT TBB_FOUND)
-        message(STATUS "tbb not found, downloading from source")
-        include(FetchContent)
-        set(TBB_TEST OFF CACHE INTERNAL "" FORCE)
-        set(TBB_STRICT OFF CACHE INTERNAL "" FORCE)
-        FetchContent_Declare(TBB
-            GIT_REPOSITORY https://github.com/oneapi-src/oneTBB.git
-            GIT_TAG        v2021.11.0
-            GIT_SHALLOW    TRUE
-            GIT_PROGRESS   TRUE
-        )
-        FetchContent_MakeAvailable(TBB)
-        set_property(DIRECTORY ${tbb_SOURCE_DIR} PROPERTY EXCLUDE_FROM_ALL YES)
-        # note: we do want to install tbb to the user machine when built from
-        # source
-        install(TARGETS tbb)
-    endif()
+if(MANIFOLD_PAR STREQUAL "TBB" AND NOT TBB_FOUND)
+    message(STATUS "tbb not found, downloading from source")
+    include(FetchContent)
+    set(TBB_TEST OFF CACHE INTERNAL "" FORCE)
+    set(TBB_STRICT OFF CACHE INTERNAL "" FORCE)
+    FetchContent_Declare(TBB
+        GIT_REPOSITORY https://github.com/oneapi-src/oneTBB.git
+        GIT_TAG        v2021.11.0
+        GIT_SHALLOW    TRUE
+        GIT_PROGRESS   TRUE
+    )
+    FetchContent_MakeAvailable(TBB)
+    set_property(DIRECTORY ${tbb_SOURCE_DIR} PROPERTY EXCLUDE_FROM_ALL YES)
+    # note: we do want to install tbb to the user machine when built from
+    # source
+    install(TARGETS tbb)
 endif()

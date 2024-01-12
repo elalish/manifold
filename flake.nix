@@ -72,7 +72,7 @@
             }
           ];
         in
-        rec {
+        {
           packages = (builtins.listToAttrs
             (map
               (x: {
@@ -87,6 +87,8 @@
               nativeBuildInputs = (with pkgs; [ cmake python39 ]);
               buildInputs = [ pkgs.nodejs ];
               configurePhase = ''
+                cp -r ${clipper2-src} clipper2
+                chmod -R +w clipper2
                 mkdir -p .emscriptencache
                 export EM_CACHE=$(pwd)/.emscriptencache
                 mkdir build
@@ -94,7 +96,8 @@
                 emcmake cmake -DCMAKE_BUILD_TYPE=Release \
                 -DFETCHCONTENT_SOURCE_DIR_GLM=${pkgs.glm.src} \
                 -DFETCHCONTENT_SOURCE_DIR_GOOGLETEST=${gtest-src} \
-                -DFETCHCONTENT_SOURCE_DIR_THRUST=${thrust-src} ..
+                -DFETCHCONTENT_SOURCE_DIR_THRUST=${thrust-src} \
+                -DFETCHCONTENT_SOURCE_DIR_CLIPPER2=../clipper2 ..
               '';
               buildPhase = ''
                 emmake make -j''${NIX_BUILD_CORES}
@@ -132,9 +135,7 @@
                 pathspec
                 pkg-config
               ];
-              cmakeFlags = [
-                "-DFETCHCONTENT_SOURCE_DIR_THRUST=${thrust-src}"
-              ];
+              SKBUILD_CMAKE_DEFINE = "FETCHCONTENT_SOURCE_DIR_THRUST=${thrust-src}";
               checkInputs = [
                 trimesh
                 pytest
