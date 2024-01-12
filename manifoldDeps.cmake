@@ -13,6 +13,10 @@ if(Clipper2_FOUND)
     target_include_directories(Clipper2 INTERFACE ${Clipper2_INCLUDE_DIRS})
 else()
     message(STATUS "clipper2 not found, downloading from source")
+    set(CLIPPER2_UTILS OFF)
+    set(CLIPPER2_EXAMPLES OFF)
+    set(CLIPPER2_TESTS OFF)
+    set(CLIPPER2_USINGZ "OFF" CACHE STRING "Preempt cache default of USINGZ (we only use 2d)")
     FetchContent_Declare(Clipper2
         GIT_REPOSITORY https://github.com/AngusJohnson/Clipper2.git
         GIT_TAG Clipper2_1.3.0
@@ -58,7 +62,8 @@ if(MANIFOLD_PAR STREQUAL "TBB")
         )
         FetchContent_MakeAvailable(TBB)
         set_property(DIRECTORY ${tbb_SOURCE_DIR} PROPERTY EXCLUDE_FROM_ALL YES)
-        install(TARGETS TBB::tbb EXPORT tbbTargets)
-        install(EXPORT tbbTargets DESTINATION ${CMAKE_INSTALL_DATADIR}/tbb)
+        # note: we do want to install tbb to the user machine when built from
+        # source
+        install(TARGETS tbb)
     endif()
 endif()
