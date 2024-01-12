@@ -28,6 +28,7 @@ option(MANIFOLD_PYBIND "Build python bindings" ON)
 option(MANIFOLD_CBIND "Build C (FFI) bindings" OFF)
 option(MANIFOLD_JSBIND "Build js binding" ${EMSCRIPTEN})
 option(BUILD_SHARED_LIBS "Build shared library" ON)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 if(MANIFOLD_FUZZ)
   if(NOT CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
