@@ -25,4 +25,4 @@ target_compile_options(${PROJECT_NAME} PRIVATE ${MANIFOLD_FLAGS})
 target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_17)
 
 install(TARGETS ${PROJECT_NAME} EXPORT manifoldTargets)
-install(FILES include/polygon.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/manifold)
+install(FILES include/polygon.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})

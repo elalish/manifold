@@ -22,4 +22,4 @@ target_link_libraries(${PROJECT_NAME} PUBLIC utilities)
 
 target_compile_options(${PROJECT_NAME} PRIVATE ${MANIFOLD_FLAGS})
 install(TARGETS ${PROJECT_NAME} EXPORT manifoldTargets)
-install(FILES include/sdf.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/manifold)
+install(FILES include/sdf.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})

@@ -62,6 +62,8 @@ if(EMSCRIPTEN)
   set(MANIFOLD_PYBIND OFF)
 endif()
 
+include(${CMAKE_CURRENT_SOURCE_DIR}/manifoldDeps.cmake)
+
 if(MANIFOLD_PYBIND)
   set(CMAKE_POSITION_INDEPENDENT_CODE ON)
   if(Python_VERSION VERSION_LESS 3.12)
@@ -115,16 +117,17 @@ set(MANIFOLD_VERSION_PATCH 1)
 set(MANIFOLD_VERSION "${MANIFOLD_VERSION_MAJOR}.${MANIFOLD_VERSION_MINOR}.${MANIFOLD_VERSION_PATCH}")
 set_property(TARGET manifold PROPERTY VERSION "${MANIFOLD_VERSION}")
 set_property(TARGET manifold PROPERTY SOVERSION 2)
-install(EXPORT manifoldTargets DESTINATION ${CMAKE_INSTALL_DATADIR}/manifold)
 
 include(CMakePackageConfigHelpers)
 write_basic_package_version_file(
-    ${CMAKE_BINARY_DIR}/cmake/manifoldVersion.cmake
-    VERSION ${MANIFOLD_VERSION}
-    COMPATIBILITY SameMajorVersion
+  ${CMAKE_BINARY_DIR}/cmake/manifoldConfigVersion.cmake
+  VERSION ${MANIFOLD_VERSION}
+  COMPATIBILITY SameMajorVersion
 )
+install(EXPORT manifoldTargets DESTINATION ${CMAKE_INSTALL_DATADIR}/manifold)
 install(FILES
   ${CMAKE_CURRENT_SOURCE_DIR}/manifoldConfig.cmake
-  ${CMAKE_CURRENT_BINARY_DIR}/cmake/manifoldVersion.cmake
+  ${CMAKE_CURRENT_SOURCE_DIR}/manifoldDeps.cmake
+  ${CMAKE_CURRENT_BINARY_DIR}/cmake/manifoldConfigVersion.cmake
   DESTINATION ${CMAKE_INSTALL_DATADIR}/manifold
 )

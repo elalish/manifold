@@ -19,4 +19,4 @@ target_compile_options(${PROJECT_NAME} PRIVATE ${MANIFOLD_FLAGS})
 target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_17)
 
 install(TARGETS ${PROJECT_NAME} EXPORT manifoldTargets)
-install(FILES include/manifoldc.h include/types.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/manifold)
+install(FILES include/manifoldc.h include/types.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
