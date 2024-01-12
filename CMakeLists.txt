@@ -133,6 +133,7 @@ set(MANIFOLD_VERSION "${MANIFOLD_VERSION_MAJOR}.${MANIFOLD_VERSION_MINOR}.${MANI
 set_property(TARGET manifold PROPERTY VERSION "${MANIFOLD_VERSION}")
 set_property(TARGET manifold PROPERTY SOVERSION 2)
 
+if(NOT EMSCRIPTEN)
 include(CMakePackageConfigHelpers)
 write_basic_package_version_file(
   ${CMAKE_BINARY_DIR}/cmake/manifoldConfigVersion.cmake
@@ -147,3 +148,4 @@ install(FILES
   ${CMAKE_CURRENT_BINARY_DIR}/manifoldConfig.cmake
   DESTINATION ${CMAKE_INSTALL_DATADIR}/manifold
 )
+endif()

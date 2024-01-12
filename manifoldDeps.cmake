@@ -25,11 +25,13 @@ else()
         SOURCE_SUBDIR CPP
     )
     FetchContent_MakeAvailable(Clipper2)
-    set_target_properties(Clipper2 PROPERTIES
-        INTERFACE_INCLUDE_DIRECTORIES
-        "$<INSTALL_INTERFACE:include>$<BUILD_INTERFACE:${Clipper2_SOURCE_DIR}/Clipper2Lib/include>")
-    install(TARGETS Clipper2 EXPORT clipper2Targets)
-    install(EXPORT clipper2Targets DESTINATION ${CMAKE_INSTALL_DATADIR}/clipper2)
+    if(NOT EMSCRIPTEN)
+        set_target_properties(Clipper2 PROPERTIES
+            INTERFACE_INCLUDE_DIRECTORIES
+            "$<INSTALL_INTERFACE:include>$<BUILD_INTERFACE:${Clipper2_SOURCE_DIR}/Clipper2Lib/include>")
+        install(TARGETS Clipper2 EXPORT clipper2Targets)
+        install(EXPORT clipper2Targets DESTINATION ${CMAKE_INSTALL_DATADIR}/clipper2)
+    endif()
 endif()
 
 FetchContent_Declare(glm
@@ -43,9 +45,11 @@ FetchContent_MakeAvailable(glm)
 
 if(NOT glm_FOUND)
     message(STATUS "glm not found, downloading from source")
-    install(TARGETS glm EXPORT glmTargets)
-    install(TARGETS glm-header-only EXPORT glmTargets)
-    install(EXPORT glmTargets DESTINATION ${CMAKE_INSTALL_DATADIR}/glm)
+    if(NOT EMSCRIPTEN)
+        install(TARGETS glm EXPORT glmTargets)
+        install(TARGETS glm-header-only EXPORT glmTargets)
+        install(EXPORT glmTargets DESTINATION ${CMAKE_INSTALL_DATADIR}/glm)
+    endif()
 endif()
 
 if(MANIFOLD_PAR STREQUAL "TBB" AND NOT TBB_FOUND)
@@ -63,5 +67,7 @@ if(MANIFOLD_PAR STREQUAL "TBB" AND NOT TBB_FOUND)
     set_property(DIRECTORY ${tbb_SOURCE_DIR} PROPERTY EXCLUDE_FROM_ALL YES)
     # note: we do want to install tbb to the user machine when built from
     # source
-    install(TARGETS tbb)
+    if(NOT EMSCRIPTEN)
+        install(TARGETS tbb)
+    endif()
 endif()
