@@ -2,6 +2,9 @@ include(FetchContent)
 find_package(PkgConfig)
 if (PKG_CONFIG_FOUND)
     pkg_check_modules(Clipper2 Clipper2)
+    if(MANIFOLD_PAR STREQUAL "TBB")
+        pkg_check_modules(TBB tbb)
+    endif()
 endif()
 if(Clipper2_FOUND)
     add_library(Clipper2 SHARED IMPORTED)
@@ -9,6 +12,7 @@ if(Clipper2_FOUND)
         IMPORTED_LOCATION ${Clipper2_LINK_LIBRARIES})
     target_include_directories(Clipper2 INTERFACE ${Clipper2_INCLUDE_DIRS})
 else()
+    message(STATUS "clipper2 not found, downloading from source")
     FetchContent_Declare(Clipper2
         GIT_REPOSITORY https://github.com/AngusJohnson/Clipper2.git
         GIT_TAG Clipper2_1.3.0
@@ -34,7 +38,27 @@ FetchContent_Declare(glm
 FetchContent_MakeAvailable(glm)
 
 if(NOT glm_FOUND)
+    message(STATUS "glm not found, downloading from source")
     install(TARGETS glm EXPORT glmTargets)
     install(TARGETS glm-header-only EXPORT glmTargets)
     install(EXPORT glmTargets DESTINATION ${CMAKE_INSTALL_DATADIR}/glm)
+endif()
+
+if(MANIFOLD_PAR STREQUAL "TBB")
+    if(NOT TBB_FOUND)
+        message(STATUS "tbb not found, downloading from source")
+        include(FetchContent)
+        set(TBB_TEST OFF CACHE INTERNAL "" FORCE)
+        set(TBB_STRICT OFF CACHE INTERNAL "" FORCE)
+        FetchContent_Declare(TBB
+            GIT_REPOSITORY https://github.com/oneapi-src/oneTBB.git
+            GIT_TAG        v2021.11.0
+            GIT_SHALLOW    TRUE
+            GIT_PROGRESS   TRUE
+        )
+        FetchContent_MakeAvailable(TBB)
+        set_property(DIRECTORY ${tbb_SOURCE_DIR} PROPERTY EXCLUDE_FROM_ALL YES)
+        install(TARGETS TBB::tbb EXPORT tbbTargets)
+        install(EXPORT tbbTargets DESTINATION ${CMAKE_INSTALL_DATADIR}/tbb)
+    endif()
 endif()

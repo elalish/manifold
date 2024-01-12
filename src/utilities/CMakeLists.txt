@@ -42,24 +42,6 @@ if (TRACY_ENABLE)
 endif()
 
 if(MANIFOLD_PAR STREQUAL "TBB")
-    find_package(PkgConfig)
-    if (PKG_CONFIG_FOUND)
-        pkg_check_modules(TBB tbb)
-    endif()
-    if(NOT TBB_FOUND)
-        message(STATUS "tbb not found, downloading from source")
-        include(FetchContent)
-        set(TBB_TEST OFF CACHE INTERNAL "" FORCE)
-        set(TBB_STRICT OFF CACHE INTERNAL "" FORCE)
-        FetchContent_Declare(TBB
-            GIT_REPOSITORY https://github.com/oneapi-src/oneTBB.git
-            GIT_TAG        v2021.11.0
-            GIT_SHALLOW    TRUE
-            GIT_PROGRESS   TRUE
-        )
-        FetchContent_MakeAvailable(TBB)
-        set_property(DIRECTORY ${tbb_SOURCE_DIR} PROPERTY EXCLUDE_FROM_ALL YES)
-    endif()
     target_compile_options(${PROJECT_NAME} INTERFACE -DMANIFOLD_PAR='T')
     if(TARGET TBB::tbb)
         target_link_libraries(${PROJECT_NAME} INTERFACE TBB::tbb)

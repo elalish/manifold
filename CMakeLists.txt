@@ -125,9 +125,10 @@ write_basic_package_version_file(
   COMPATIBILITY SameMajorVersion
 )
 install(EXPORT manifoldTargets DESTINATION ${CMAKE_INSTALL_DATADIR}/manifold)
+configure_file(manifoldConfig.cmake.in ${CMAKE_CURRENT_BINARY_DIR}/manifoldConfig.cmake @ONLY)
 install(FILES
-  ${CMAKE_CURRENT_SOURCE_DIR}/manifoldConfig.cmake
   ${CMAKE_CURRENT_SOURCE_DIR}/manifoldDeps.cmake
   ${CMAKE_CURRENT_BINARY_DIR}/cmake/manifoldConfigVersion.cmake
+  ${CMAKE_CURRENT_BINARY_DIR}/manifoldConfig.cmake
   DESTINATION ${CMAKE_INSTALL_DATADIR}/manifold
 )
