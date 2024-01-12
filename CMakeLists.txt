@@ -108,3 +108,23 @@ if(MANIFOLD_TEST)
   add_subdirectory(test)
   add_subdirectory(extras)
 endif()
+
+set(MANIFOLD_VERSION_MAJOR 2)
+set(MANIFOLD_VERSION_MINOR 3)
+set(MANIFOLD_VERSION_PATCH 1)
+set(MANIFOLD_VERSION "${MANIFOLD_VERSION_MAJOR}.${MANIFOLD_VERSION_MINOR}.${MANIFOLD_VERSION_PATCH}")
+set_property(TARGET manifold PROPERTY VERSION "${MANIFOLD_VERSION}")
+set_property(TARGET manifold PROPERTY SOVERSION 2)
+install(EXPORT manifoldTargets DESTINATION ${CMAKE_INSTALL_DATADIR}/manifold)
+
+include(CMakePackageConfigHelpers)
+write_basic_package_version_file(
+    ${CMAKE_BINARY_DIR}/cmake/manifoldVersion.cmake
+    VERSION ${MANIFOLD_VERSION}
+    COMPATIBILITY SameMajorVersion
+)
+install(FILES
+  ${CMAKE_CURRENT_SOURCE_DIR}/manifoldConfig.cmake
+  ${CMAKE_CURRENT_BINARY_DIR}/cmake/manifoldVersion.cmake
+  DESTINATION ${CMAKE_INSTALL_DATADIR}/manifold
+)

@@ -18,9 +18,10 @@ find_package(assimp REQUIRED)
 
 add_library(${PROJECT_NAME} src/meshIO.cpp)
 
-target_include_directories(${PROJECT_NAME}
-    PUBLIC ${PROJECT_SOURCE_DIR}/include
-)
+target_sources(${PROJECT_NAME} PUBLIC
+    FILE_SET HEADERS
+    BASE_DIRS include
+    FILES include/meshIO.h)
 
 target_link_libraries(${PROJECT_NAME}
     PUBLIC manifold
@@ -30,13 +31,6 @@ target_link_libraries(${PROJECT_NAME}
 target_compile_options(${PROJECT_NAME} PRIVATE ${MANIFOLD_FLAGS})
 target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_17)
 
-install(
-  TARGETS ${PROJECT_NAME}
-  LIBRARY DESTINATION ${CMAKE_INSTALL_FULL_LIBDIR}
-  COMPONENT devel
-)
-install(
-  DIRECTORY include/
-  DESTINATION ${CMAKE_INSTALL_FULL_INCLUDEDIR}/manifold
-  COMPONENT devel
-)
+install(TARGETS ${PROJECT_NAME}
+    EXPORT manifoldTargets FILE_SET HEADERS
+    DESTINATION include/manifold)

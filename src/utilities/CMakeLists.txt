@@ -83,18 +83,21 @@ else()
         "Should be \"TBB\" or \"NONE\"")
 endif()
 
-target_include_directories(${PROJECT_NAME} INTERFACE ${PROJECT_SOURCE_DIR}/include)
+target_sources(${PROJECT_NAME} INTERFACE
+    FILE_SET HEADERS
+    BASE_DIRS include
+    FILES include/public.h include/vec_view.h)
 target_link_libraries(${PROJECT_NAME} INTERFACE glm::glm)
 if(DEFINED thrust_SOURCE_DIR)
-target_include_directories(${PROJECT_NAME} INTERFACE
-    ${thrust_SOURCE_DIR}
-    ${thrust_SOURCE_DIR}/dependencies/libcudacxx/include
-)
+    target_include_directories(${PROJECT_NAME} INTERFACE
+        ${thrust_SOURCE_DIR}
+        ${thrust_SOURCE_DIR}/dependencies/libcudacxx/include
+    )
 else()
-target_include_directories(${PROJECT_NAME} INTERFACE
-    ${_THRUST_INCLUDE_DIR}
-    ${_THRUST_INCLUDE_DIR}/dependencies/libcudacxx/include
-)
+    target_include_directories(${PROJECT_NAME} INTERFACE
+        ${_THRUST_INCLUDE_DIR}
+        ${_THRUST_INCLUDE_DIR}/dependencies/libcudacxx/include
+    )
 endif()
 
 target_compile_options(${PROJECT_NAME} INTERFACE
@@ -108,9 +111,6 @@ endif()
 
 target_compile_features(${PROJECT_NAME} INTERFACE cxx_std_17)
 
-install(
-  FILES include/public.h
-  DESTINATION ${CMAKE_INSTALL_FULL_INCLUDEDIR}/manifold
-  COMPONENT devel
-)
-
+install(TARGETS ${PROJECT_NAME}
+    EXPORT manifoldTargets FILE_SET HEADERS
+    DESTINATION include/manifold)

@@ -1,15 +1,32 @@
 {
   "nodes": {
+    "clipper2-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1701175684,
+        "narHash": "sha256-3TKhb48cABl0QcbeG12xlA1taQ/8/RdUUHSp0Qh85eE=",
+        "owner": "AngusJohnson",
+        "repo": "Clipper2",
+        "rev": "98db5662e8dd1808a5a7b50c5605a2289bb390e8",
+        "type": "github"
+      },
+      "original": {
+        "owner": "AngusJohnson",
+        "ref": "Clipper2_1.3.0",
+        "repo": "Clipper2",
+        "type": "github"
+      }
+    },
     "flake-utils": {
       "inputs": {
         "systems": "systems"
       },
       "locked": {
-        "lastModified": 1692799911,
-        "narHash": "sha256-3eihraek4qL744EvQXsK1Ha6C3CR7nnT8X2qWap4RNk=",
+        "lastModified": 1701680307,
+        "narHash": "sha256-kAuep2h5ajznlPMD9rnQyffWG8EM/C73lejGofXvdM8=",
         "owner": "numtide",
         "repo": "flake-utils",
-        "rev": "f9e7cf818399d17d347f847525c5a5a8032e4e44",
+        "rev": "4022d587cbbfd70fe950c1e2083a02621806a725",
         "type": "github"
       },
       "original": {
@@ -37,11 +54,11 @@
     },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1692734709,
-        "narHash": "sha256-SCFnyHCyYjwEmgUsHDDuU0TsbVMKeU1vwkR+r7uS2Rg=",
+        "lastModified": 1704722960,
+        "narHash": "sha256-mKGJ3sPsT6//s+Knglai5YflJUF2DGj7Ai6Ynopz0kI=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "b85ed9dcbf187b909ef7964774f8847d554fab3b",
+        "rev": "317484b1ead87b9c1b8ac5261a8d2dd748a0492d",
         "type": "github"
       },
       "original": {
@@ -52,9 +69,11 @@
     },
     "root": {
       "inputs": {
+        "clipper2-src": "clipper2-src",
         "flake-utils": "flake-utils",
         "gtest-src": "gtest-src",
-        "nixpkgs": "nixpkgs"
+        "nixpkgs": "nixpkgs",
+        "thrust-src": "thrust-src"
       }
     },
     "systems": {
@@ -70,6 +89,24 @@
         "owner": "nix-systems",
         "repo": "default",
         "type": "github"
+      }
+    },
+    "thrust-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1696873248,
+        "narHash": "sha256-mUhMXGPbO2t83EvI8YNDRLngvLiwfzs4EgRrcxKfhHs=",
+        "ref": "refs/heads/main",
+        "rev": "756c5afc0750f1413da05bd2b6505180e84c53d4",
+        "revCount": 4758,
+        "submodules": true,
+        "type": "git",
+        "url": "https://github.com/NVIDIA/thrust.git"
+      },
+      "original": {
+        "submodules": true,
+        "type": "git",
+        "url": "https://github.com/NVIDIA/thrust.git"
       }
     }
   },
