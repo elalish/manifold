@@ -83,10 +83,9 @@ else()
         "Should be \"TBB\" or \"NONE\"")
 endif()
 
-target_sources(${PROJECT_NAME} INTERFACE
-    FILE_SET HEADERS
-    BASE_DIRS include
-    FILES include/public.h include/vec_view.h)
+target_include_directories(${PROJECT_NAME} INTERFACE
+    $<INSTALL_INTERFACE:include>
+    $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>)
 target_link_libraries(${PROJECT_NAME} INTERFACE glm::glm)
 if(DEFINED thrust_SOURCE_DIR)
     target_include_directories(${PROJECT_NAME} INTERFACE
@@ -111,10 +110,5 @@ endif()
 
 target_compile_features(${PROJECT_NAME} INTERFACE cxx_std_17)
 
-if(CMAKE_VERSION VERSION_LESS "3.23.0")
-    install(FILES include/public.h include/vec_view.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/manifold)
-else()
-    install(TARGETS ${PROJECT_NAME}
-        EXPORT manifoldTargets FILE_SET HEADERS
-        DESTINATION include/manifold)
-endif()
+install(TARGETS ${PROJECT_NAME} EXPORT manifoldTargets)
+install(FILES include/public.h include/vec_view.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/manifold)

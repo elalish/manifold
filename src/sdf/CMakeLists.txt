@@ -15,17 +15,11 @@
 project(sdf)
 
 add_library(${PROJECT_NAME} OBJECT src/sdf.cpp)
-target_sources(${PROJECT_NAME} PUBLIC
-    FILE_SET HEADERS
-    BASE_DIRS include
-    FILES include/sdf.h)
+target_include_directories(${PROJECT_NAME} PUBLIC
+    $<INSTALL_INTERFACE:include>
+    $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>)
 target_link_libraries(${PROJECT_NAME} PUBLIC utilities)
 
 target_compile_options(${PROJECT_NAME} PRIVATE ${MANIFOLD_FLAGS})
-if(CMAKE_VERSION VERSION_LESS "3.23.0")
-    install(FILES include/sdf.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/manifold)
-else()
-    install(TARGETS ${PROJECT_NAME}
-        EXPORT manifoldTargets FILE_SET HEADERS
-        DESTINATION include/manifold)
-endif()
+install(TARGETS ${PROJECT_NAME} EXPORT manifoldTargets)
+install(FILES include/sdf.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/manifold)
