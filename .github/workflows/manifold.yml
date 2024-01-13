@@ -67,7 +67,11 @@ jobs:
         fail_ci_if_error: false
         name: ${{matrix.parallel_backend}}
     - name: test cmake consumer
-      run: ./test-cmake.sh
+      run: |
+        cd build
+        sudo cmake --install .
+        cd ..
+        ./test-cmake.sh
 
   build_cbind:
     timeout-minutes: 30
@@ -163,7 +167,11 @@ jobs:
         ./Release/manifold_test.exe
         cd ../../
     - name: test cmake consumer
-      run: ./test-cmake.sh
+      run: |
+        cd build
+        cmake --install .
+        cd ..
+        ./test-cmake.sh
 
   build_mxe:
     timeout-minutes: 30
@@ -217,7 +225,11 @@ jobs:
         ./manifold_test
         cd ../../
     - name: test cmake consumer
-      run: ./test-cmake.sh
+      run: |
+        cd build
+        sudo cmake --install .
+        cd ..
+        ./test-cmake.sh
 
   build_nix:
     timeout-minutes: 30

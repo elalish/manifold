@@ -1,7 +1,4 @@
 #!/usr/bin/env bash
-cd build
-cmake --install .
-cd ..
 mkdir cmake-consumer
 cd cmake-consumer
 
