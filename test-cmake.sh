@@ -3,6 +3,7 @@ mkdir cmake-consumer
 cd cmake-consumer
 
 cat <<EOT >> CMakeLists.txt
+cmake_minimum_required(VERSION 3.18)
 project(testing LANGUAGES CXX)
 find_package(manifold "2.3.1" REQUIRED)
 add_executable(testing test.cpp)
