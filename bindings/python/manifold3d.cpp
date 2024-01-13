@@ -659,6 +659,14 @@ NB_MODULE(manifold3d, m) {
           nb::arg("pts"), cross_section__hull__pts)
       .def("decompose", &CrossSection::Decompose, cross_section__decompose)
       .def("to_polygons", &CrossSection::ToPolygons, cross_section__to_polygons)
+     .def("extrude", &Manifold::Extrude, nb::arg("height"),
+          nb::arg("n_divisions") = 0, nb::arg("twist_degrees") = 0.0f,
+          nb::arg("scale_top") = std::make_tuple(1.0f, 1.0f),
+          manifold__extrude__cross_section__height__n_divisions__twist_degrees__scale_top)
+      .def("revolve", &Manifold::Revolve, nb::arg("circular_segments") = 0,
+           nb::arg("revolve_degrees") = 360.0,
+           manifold__revolve__cross_section__circular_segments__revolve_degrees)
+
       .def_static("square", &CrossSection::Square, nb::arg("size"),
                   nb::arg("center") = false,
                   cross_section__square__size__center)
