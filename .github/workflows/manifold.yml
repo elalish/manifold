@@ -59,12 +59,15 @@ jobs:
         lcov --capture --directory . --output-file ./code_coverage_test.info
         lcov --add-tracefile ./code_coverage_init.info --add-tracefile ./code_coverage_test.info --output-file ./code_coverage_total.info
         lcov --remove ./code_coverage_total.info '/usr/*' '*/third_party/*' '*/test/*' '*/extras/*' '*/bindings/*' --output-file ./code_coverage.info
+        cd ../
     - uses: codecov/codecov-action@v2
       if: matrix.parallel_backend == 'NONE'
       with:
         files: build/code_coverage.info
         fail_ci_if_error: false
         name: ${{matrix.parallel_backend}}
+    - name: test cmake consumer
+      run: ./test-cmake.sh
 
   build_cbind:
     timeout-minutes: 30
@@ -158,6 +161,9 @@ jobs:
       run: |
         cd build/test
         ./Release/manifold_test.exe
+        cd ../../
+    - name: test cmake consumer
+      run: ./test-cmake.sh
 
   build_mxe:
     timeout-minutes: 30
@@ -209,6 +215,9 @@ jobs:
       run: |
         cd build/test
         ./manifold_test
+        cd ../../
+    - name: test cmake consumer
+      run: ./test-cmake.sh
 
   build_nix:
     timeout-minutes: 30
