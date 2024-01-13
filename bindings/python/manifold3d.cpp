@@ -648,6 +648,8 @@ NB_MODULE(manifold3d, m) {
           [](std::vector<glm::vec2> pts) { return CrossSection::Hull(pts); },
           nb::arg("pts"), cross_section__hull__pts)
       .def("decompose", &CrossSection::Decompose, cross_section__decompose)
+      .def_static("compose", &CrossSection::Compose, nb::arg("cross_sections"),
+                  cross_section__compose__cross_sections)
       .def("to_polygons", &CrossSection::ToPolygons, cross_section__to_polygons)
       .def(
           "extrude", &Manifold::Extrude, nb::arg("height"),

@@ -22,6 +22,7 @@ def all_cross_section():
     c = CrossSection.batch_hull([c, c.translate((1, 0))])
     b = c.bounds()
     c = CrossSection.circle(1)
+    c = CrossSection.compose([c, c.translate((1, 0))])
     cs = c.decompose()
     m = c.extrude(1)
     c = c.hull()
