@@ -71,3 +71,7 @@ if(MANIFOLD_PAR STREQUAL "TBB" AND NOT TBB_FOUND)
         install(TARGETS tbb)
     endif()
 endif()
+
+if(MANIFOLD_EXPORT)
+    find_package(assimp REQUIRED)
+endif()

@@ -14,8 +14,6 @@
 
 project(meshIO)
 
-find_package(assimp REQUIRED)
-
 add_library(${PROJECT_NAME} src/meshIO.cpp)
 
 target_include_directories(${PROJECT_NAME} PUBLIC
