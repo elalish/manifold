@@ -226,11 +226,10 @@ jobs:
         cd ../../
     - name: test cmake consumer
       run: |
-        mkdir install
         cd build
-        cmake --install . --prefix ../install
+        sudo cmake --install .
         cd ..
-        CMAKE_PREFIX_PATH=$CMAKE_PREFIX_PATH:$(pwd)/install ./test-cmake.sh
+        ./test-cmake.sh
 
   build_nix:
     timeout-minutes: 30

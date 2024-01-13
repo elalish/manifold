@@ -1,4 +1,5 @@
 include(FetchContent)
+include(GNUInstallDirs)
 find_package(PkgConfig)
 if (PKG_CONFIG_FOUND)
     pkg_check_modules(Clipper2 Clipper2)
