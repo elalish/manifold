@@ -123,15 +123,10 @@ jobs:
           -DMANIFOLD_PAR=${{matrix.parallel_backend}}\
           -DEMSCRIPTEN_SYSTEM_PROCESSOR=web ..
         emmake make
-    - name: patch wasm with pthread
-      if: matrix.parallel_backend == 'TBB'
-      run: |
-        ./patch-emscripten.sh build/test
     - name: Test WASM
       run: |
         cd build/test
-        echo '{"type":"module"}' > package.json
-        node --experimental-wasm-threads -e '(async () => {const module = await import("./manifold_test.js"); await module.default();})()'
+        node --experimental-wasm-threads ./test_manifold.js
     - name: Test examples
       run: |
         cd bindings/wasm/examples

@@ -122,10 +122,7 @@
                 emmake make -j''${NIX_BUILD_CORES}
               '';
               checkPhase = ''
-                cd test
-                echo '{"type":"module"}' > package.json
-                node --experimental-wasm-threads -e '(async () => {const module = await import("./manifold_test.js"); await module.default();})()'
-                cd ../
+                node --experimental-wasm-threads ./test/manifold_test.js
               '';
               installPhase = ''
                 mkdir -p $out
