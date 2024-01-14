@@ -84,7 +84,7 @@ inline constexpr ExecutionPolicy autoPolicy(int size) {
     return thrust::NAME(thrust::cpp::par, args...);                 \
   }
 
-#if MANIFOLD_PAR != 'T' || \
+#if MANIFOLD_PAR != 'T' ||                                         \
     (!defined(__EMSCRIPTEN__) && TBB_INTERFACE_VERSION >= 10000 && \
      __has_include(<pstl/glue_execution_defs.h>))
 #if MANIFOLD_PAR == 'T'
