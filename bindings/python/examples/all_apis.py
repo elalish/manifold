@@ -57,6 +57,8 @@ def all_manifold():
     m = Manifold.cube((1, 1, 1))
     m = Manifold.cylinder(1, 1)
     ms = m.decompose()
+    m = Manifold.extrude(CrossSection.circle(1), 1)
+    m = Manifold.revolve(CrossSection.circle(1))
     g = m.genus()
     a = m.surface_area()
     v = m.volume()
