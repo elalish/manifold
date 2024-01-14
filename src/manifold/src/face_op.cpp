@@ -132,7 +132,8 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
                       halfedge_.cbegin() + faceEdge[face + 1], projection);
     return TriangulateIdx(polys, precision_);
   };
-#if MANIFOLD_PAR == 'T' && __has_include(<tbb/tbb.h>)
+  // emscripten does not like fine parallel tasks...
+#if MANIFOLD_PAR == 'T' && __has_include(<tbb/tbb.h>) && !defined(__EMSCRIPTEN__)
   tbb::task_group group;
   // map from face to triangle
   tbb::concurrent_unordered_map<int, std::vector<glm::ivec3>> results;
