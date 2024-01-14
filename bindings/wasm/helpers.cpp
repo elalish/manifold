@@ -210,7 +210,7 @@ Manifold LevelSet(uintptr_t funcPtr, Box bounds, float edgeLength,
                   float level) {
   float (*f)(const glm::vec3&) =
       reinterpret_cast<float (*)(const glm::vec3&)>(funcPtr);
-  Mesh m = LevelSet(f, bounds, edgeLength, level);
+  Mesh m = LevelSet(f, bounds, edgeLength, level, false);
   return Manifold(m);
 }
 
