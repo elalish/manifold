@@ -38,8 +38,6 @@ namespace {
 ManifoldMeshGL *level_set(void *mem, float (*sdf)(float, float, float),
                           ManifoldBox *bounds, float edge_length, float level,
                           bool seq) {
-  // typing with std::function rather than auto compiles when CUDA is on,
-  // passing it into GPU (and crashing) is avoided dynamically in `sdf.h`
   std::function<float(glm::vec3)> fun = [sdf](glm::vec3 v) {
     return (sdf(v.x, v.y, v.z));
   };
