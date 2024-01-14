@@ -106,17 +106,6 @@ inline bool Shadows(float p, float q, float dir) {
   return p == q ? dir < 0 : p < q;
 }
 
-/**
- * Since this function is called from two different places, it is necessary that
- * it returns identical results for identical input to keep consistency.
- * Normally this is trivial as computers make floating-point errors, but are
- * at least deterministic. However, in the case of CUDA, these functions can be
- * compiled by two different compilers (for the CPU and GPU). We have found that
- * the different compilers can cause slightly different rounding errors, so it
- * is critical that the two places this function is called both use the same
- * compiled function (they must agree on CPU or GPU). This is now taken care of
- * by the shared policy_ member.
- */
 inline thrust::pair<int, glm::vec2> Shadow01(
     const int p0, const int q1, VecView<const glm::vec3> vertPosP,
     VecView<const glm::vec3> vertPosQ, VecView<const Halfedge> halfedgeQ,
@@ -621,7 +610,6 @@ Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ,
   if (ManifoldParams().verbose) {
     broad.Print("Broad phase");
     intersections.Print("Intersections");
-    MemUsage();
   }
 #endif
 }
