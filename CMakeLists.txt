@@ -58,7 +58,7 @@ endif()
 if(EMSCRIPTEN)
   message("Building for Emscripten")
   set(MANIFOLD_FLAGS -fexceptions -D_LIBCUDACXX_HAS_THREAD_API_EXTERNAL -D_LIBCUDACXX_HAS_THREAD_API_CUDA)
-  # ALLOW_MEMORY_GROWTH is slow, so we just allow 2gb of memory usage
+  # ALLOW_MEMORY_GROWTH is slow, so we just allow 4gb of memory usage
   set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -sINITIAL_MEMORY=4gb -fexceptions -sDISABLE_EXCEPTION_CATCHING=0")
   set(MANIFOLD_PYBIND OFF)
   if(MANIFOLD_PAR STREQUAL "TBB")
