@@ -85,7 +85,8 @@ inline constexpr ExecutionPolicy autoPolicy(int size) {
   }
 
 #if MANIFOLD_PAR != 'T' || \
-    (TBB_INTERFACE_VERSION >= 10000 && __has_include(<pstl/glue_execution_defs.h>))
+    (!defined(__EMSCRIPTEN__) && TBB_INTERFACE_VERSION >= 10000 && \
+     __has_include(<pstl/glue_execution_defs.h>))
 #if MANIFOLD_PAR == 'T'
 #define STL_DYNAMIC_BACKEND(NAME, RET)                        \
   template <typename Ret = RET, typename... Args>             \
