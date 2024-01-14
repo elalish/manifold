@@ -14,25 +14,12 @@
 
 project(sdf)
 
-add_library(${PROJECT_NAME} src/sdf.cpp)
-
-target_include_directories(${PROJECT_NAME}
-    PUBLIC
-    ${PROJECT_SOURCE_DIR}/include
-)
-
+add_library(${PROJECT_NAME} OBJECT src/sdf.cpp)
+target_include_directories(${PROJECT_NAME} PUBLIC
+    $<INSTALL_INTERFACE:include>
+    $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>)
 target_link_libraries(${PROJECT_NAME} PUBLIC utilities)
 
 target_compile_options(${PROJECT_NAME} PRIVATE ${MANIFOLD_FLAGS})
-
-install(
-  TARGETS ${PROJECT_NAME}
-  LIBRARY DESTINATION ${CMAKE_INSTALL_FULL_LIBDIR}
-  COMPONENT runtime
-)
-install(
-  DIRECTORY include/
-  DESTINATION ${CMAKE_INSTALL_FULL_INCLUDEDIR}/manifold
-  COMPONENT devel
-)
-
+install(TARGETS ${PROJECT_NAME} EXPORT manifoldTargets)
+install(FILES include/sdf.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})

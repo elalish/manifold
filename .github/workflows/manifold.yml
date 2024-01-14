@@ -59,12 +59,19 @@ jobs:
         lcov --capture --directory . --output-file ./code_coverage_test.info
         lcov --add-tracefile ./code_coverage_init.info --add-tracefile ./code_coverage_test.info --output-file ./code_coverage_total.info
         lcov --remove ./code_coverage_total.info '/usr/*' '*/third_party/*' '*/test/*' '*/extras/*' '*/bindings/*' --output-file ./code_coverage.info
+        cd ../
     - uses: codecov/codecov-action@v2
       if: matrix.parallel_backend == 'NONE'
       with:
         files: build/code_coverage.info
         fail_ci_if_error: false
         name: ${{matrix.parallel_backend}}
+    - name: test cmake consumer
+      run: |
+        cd build
+        sudo cmake --install .
+        cd ..
+        ./test-cmake.sh
 
   build_cbind:
     timeout-minutes: 30
@@ -133,6 +140,7 @@ jobs:
         npm ci
         npm run build
         npm test
+        cp ../manifold.* ./dist/
     - name: Upload WASM files
       if: matrix.parallel_backend == 'NONE'
       uses: actions/upload-artifact@v3
@@ -158,7 +166,7 @@ jobs:
     - name: Build ${{matrix.backend}}
       shell: powershell
       run: |
-        cmake . -DCMAKE_BUILD_TYPE=Release -B build -DMANIFOLD_DEBUG=ON -DPYBIND11_FINDPYTHON=OFF -DMANIFOLD_PAR=${{matrix.parallel_backend}} -A x64
+        cmake . -DCMAKE_BUILD_TYPE=Release -B build -DBUILD_SHARED_LIBS=OFF -DMANIFOLD_DEBUG=ON -DPYBIND11_FINDPYTHON=OFF -DMANIFOLD_PAR=${{matrix.parallel_backend}} -A x64
         cd build
         cmake --build . --target ALL_BUILD --config Release
     - name: Test ${{matrix.parallel_backend}}
@@ -166,6 +174,13 @@ jobs:
       run: |
         cd build/test
         ./Release/manifold_test.exe
+        cd ../../
+    - name: test cmake consumer
+      run: |
+        cd build
+        cmake --install .
+        cd ..
+        ./test-cmake.sh
 
   build_mxe:
     timeout-minutes: 30
@@ -200,7 +215,7 @@ jobs:
     - name: Install common dependencies
       run: |
         brew install pkg-config googletest assimp
-        pip install trimesh
+        pip install trimesh pytest
     - name: Install TBB
       if: matrix.parallel_backend == 'TBB'
       run: brew install tbb
@@ -217,6 +232,13 @@ jobs:
       run: |
         cd build/test
         ./manifold_test
+        cd ../../
+    - name: test cmake consumer
+      run: |
+        cd build
+        sudo cmake --install .
+        cd ..
+        ./test-cmake.sh
 
   build_nix:
     timeout-minutes: 30

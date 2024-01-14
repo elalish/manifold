@@ -18,15 +18,6 @@ add_library(${PROJECT_NAME} INTERFACE)
 message("Parallel Backend: ${MANIFOLD_PAR}")
 
 include(FetchContent)
-FetchContent_Declare(glm
-    GIT_REPOSITORY https://github.com/g-truc/glm.git
-    GIT_TAG 0.9.9.8
-    GIT_SHALLOW TRUE
-    GIT_PROGRESS TRUE
-    FIND_PACKAGE_ARGS NAMES glm
-)
-FetchContent_MakeAvailable(glm)
-
 FetchContent_Declare(Thrust
     GIT_REPOSITORY https://github.com/NVIDIA/thrust.git
     GIT_TAG 2.1.0
@@ -51,29 +42,11 @@ if (TRACY_ENABLE)
 endif()
 
 if(MANIFOLD_PAR STREQUAL "TBB")
-    find_package(PkgConfig)
-    if (PKG_CONFIG_FOUND)
-        pkg_check_modules(TBB tbb)
-    endif()
-    if(NOT TBB_FOUND)
-        message(STATUS "tbb not found, downloading from source")
-        include(FetchContent)
-        set(TBB_TEST OFF CACHE INTERNAL "" FORCE)
-        set(TBB_STRICT OFF CACHE INTERNAL "" FORCE)
-        FetchContent_Declare(TBB
-            GIT_REPOSITORY https://github.com/oneapi-src/oneTBB.git
-            GIT_TAG        v2021.11.0
-            GIT_SHALLOW    TRUE
-            GIT_PROGRESS   TRUE
-        )
-        FetchContent_MakeAvailable(TBB)
-        set_property(DIRECTORY ${tbb_SOURCE_DIR} PROPERTY EXCLUDE_FROM_ALL YES)
-    endif()
     target_compile_options(${PROJECT_NAME} INTERFACE -DMANIFOLD_PAR='T')
     if(TARGET TBB::tbb)
         target_link_libraries(${PROJECT_NAME} INTERFACE TBB::tbb)
     else()
-        target_include_directories(${PROJECT_NAME} INTERFACE ${TBB_INCLUDE_DIRS})
+        target_include_directories(${PROJECT_NAME} INTERFACE $<BUILD_INTERFACE:${TBB_INCLUDE_DIRS}>)
         target_link_libraries(${PROJECT_NAME} INTERFACE ${TBB_LINK_LIBRARIES})
     endif()
 elseif(MANIFOLD_PAR STREQUAL "NONE")
@@ -83,19 +56,19 @@ else()
         "Should be \"TBB\" or \"NONE\"")
 endif()
 
-target_include_directories(${PROJECT_NAME} INTERFACE ${PROJECT_SOURCE_DIR}/include)
+target_include_directories(${PROJECT_NAME} INTERFACE
+    $<INSTALL_INTERFACE:include>
+    $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>)
 target_link_libraries(${PROJECT_NAME} INTERFACE glm::glm)
-if(DEFINED thrust_SOURCE_DIR)
-target_include_directories(${PROJECT_NAME} INTERFACE
-    ${thrust_SOURCE_DIR}
-    ${thrust_SOURCE_DIR}/dependencies/libcudacxx/include
-)
-else()
-target_include_directories(${PROJECT_NAME} INTERFACE
-    ${_THRUST_INCLUDE_DIR}
-    ${_THRUST_INCLUDE_DIR}/dependencies/libcudacxx/include
-)
+
+if(NOT DEFINED thrust_SOURCE_DIR)
+    set(thrust_SOURCE_DIR ${_THRUST_INCLUDE_DIR})
 endif()
+
+target_include_directories(${PROJECT_NAME} INTERFACE
+    $<BUILD_INTERFACE:${thrust_SOURCE_DIR}>
+    $<BUILD_INTERFACE:${thrust_SOURCE_DIR}/dependencies/libcudacxx/include>
+)
 
 target_compile_options(${PROJECT_NAME} INTERFACE
     -DTHRUST_DEVICE_SYSTEM=THRUST_DEVICE_SYSTEM_${MANIFOLD_PAR}
@@ -108,9 +81,5 @@ endif()
 
 target_compile_features(${PROJECT_NAME} INTERFACE cxx_std_17)
 
-install(
-  FILES include/public.h
-  DESTINATION ${CMAKE_INSTALL_FULL_INCLUDEDIR}/manifold
-  COMPONENT devel
-)
-
+install(TARGETS ${PROJECT_NAME} EXPORT manifoldTargets)
+install(FILES include/public.h include/vec_view.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
