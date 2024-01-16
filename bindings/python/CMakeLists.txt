@@ -44,7 +44,7 @@ install(
 else()
 install(
   TARGETS manifold3d
-  LIBRARY DESTINATION ${CMAKE_INSTALL_FULL_LIBDIR}
+  LIBRARY DESTINATION ${Python_SITEARCH}
   COMPONENT bindings
 )
 endif()
