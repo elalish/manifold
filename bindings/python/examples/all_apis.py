@@ -19,6 +19,14 @@ def all_cross_section():
     c = CrossSection([poly])
     c = CrossSection() + c
     a = c.area()
+    c = CrossSection.batch_boolean(
+        [
+            CrossSection.circle(1),
+            CrossSection.square((3, 3)),
+            CrossSection.circle(3).translate((1, 1)),
+        ],
+        OpType.Add,
+    )
     c = CrossSection.batch_hull([c, c.translate((1, 0))])
     b = c.bounds()
     c = CrossSection.circle(1)
@@ -50,6 +58,14 @@ def all_manifold():
     m = Manifold(mesh)
     m = Manifold() + m
     m = m.as_original()
+    m = Manifold.batch_boolean(
+        [
+            Manifold.cylinder(4, 1),
+            Manifold.cube((3, 2, 1)),
+            Manifold.cylinder(5, 3).translate((1, 1, 1)),
+        ],
+        OpType.Add,
+    )
     m = Manifold.batch_hull([m, m.translate((0, 0, 1))])
     b = m.bounding_box()
     m = m.calculate_curvature(4, 5)
