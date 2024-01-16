@@ -379,6 +379,9 @@ NB_MODULE(manifold3d, m) {
           nb::arg("edge_smoothness") = nb::list(),
           // todo params slightly diff
           manifold__smooth__mesh_gl__sharpened_edges)
+      .def_static("batch_boolean", &Manifold::BatchBoolean,
+                  nb::arg("manifolds"), nb::arg("op"),
+                  manifold__batch_boolean__manifolds__op)
       .def_static("compose", &Manifold::Compose, nb::arg("manifolds"),
                   manifold__compose__manifolds)
       .def_static("tetrahedron", &Manifold::Tetrahedron, manifold__tetrahedron)
@@ -581,6 +584,11 @@ NB_MODULE(manifold3d, m) {
           "joins would exceed a given maximum miter distance (relative to the "
           "offset distance), these are 'squared' instead.");
 
+  nb::enum_<OpType>(m, "OpType", "Operation types for batch_boolean")
+      .value("Add", OpType::Add)
+      .value("Subtract", OpType::Subtract)
+      .value("Intersect", OpType::Intersect);
+
   nb::class_<CrossSection>(
       m, "CrossSection",
       "Two-dimensional cross sections guaranteed to be without "
@@ -658,6 +666,9 @@ NB_MODULE(manifold3d, m) {
           [](std::vector<glm::vec2> pts) { return CrossSection::Hull(pts); },
           nb::arg("pts"), cross_section__hull__pts)
       .def("decompose", &CrossSection::Decompose, cross_section__decompose)
+      .def_static("batch_boolean", &CrossSection::BatchBoolean,
+                  nb::arg("cross_sections"), nb::arg("op"),
+                  cross_section__batch_boolean__cross_sections__op)
       .def_static("compose", &CrossSection::Compose, nb::arg("cross_sections"),
                   cross_section__compose__cross_sections)
       .def("to_polygons", &CrossSection::ToPolygons, cross_section__to_polygons)
