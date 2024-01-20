@@ -327,6 +327,17 @@ TEST(Samples, Havocglass8Bool) {
   res.GetMeshGL();         // test crash
   manifold::PolygonParams().processOverlaps = false;
 }
+
+TEST(Samples, CraycloudBool) {
+  std::string file = __FILE__;
+  std::string dir = file.substr(0, file.rfind('/'));
+  Manifold m1 = ImportMesh(dir + "/models/Cray_left.glb");
+  Manifold m2 = ImportMesh(dir + "/models/Cray_right.glb");
+  Manifold res = m1 - m2;
+  EXPECT_EQ(res.Status(), Manifold::Error::NoError);
+  EXPECT_TRUE(res.IsEmpty());
+}
+
 #endif
 
 TEST(Samples, CondensedMatter16) {
