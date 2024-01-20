@@ -28,36 +28,38 @@ namespace {
 // cases to ensure consistency.
 
 glm::vec2 Interpolate(glm::vec3 pL, glm::vec3 pR, float x) {
-  float dxL = x - pL.x;
-  float dxR = x - pR.x;
+  const float dxL = x - pL.x;
+  const float dxR = x - pR.x;
 #ifdef MANIFOLD_DEBUG
   if (dxL * dxR > 0) printf("Not in domain!\n");
 #endif
-  bool useL = fabs(dxL) < fabs(dxR);
-  float lambda = (useL ? dxL : dxR) / (pR.x - pL.x);
-  if (!isfinite(lambda)) return glm::vec2(pL.y, pL.z);
+  const bool useL = fabs(dxL) < fabs(dxR);
+  const glm::vec3 dLR = pR - pL;
+  const float lambda = (useL ? dxL : dxR) / dLR.x;
+  if (!isfinite(lambda) || !isfinite(dLR.y) || !isfinite(dLR.z))
+    return glm::vec2(pL.y, pL.z);
   glm::vec2 yz;
-  yz[0] = (useL ? pL.y : pR.y) + lambda * (pR.y - pL.y);
-  yz[1] = (useL ? pL.z : pR.z) + lambda * (pR.z - pL.z);
+  yz[0] = (useL ? pL.y : pR.y) + lambda * dLR.y;
+  yz[1] = (useL ? pL.z : pR.z) + lambda * dLR.z;
   return yz;
 }
 
 glm::vec4 Intersect(const glm::vec3 &pL, const glm::vec3 &pR,
                     const glm::vec3 &qL, const glm::vec3 &qR) {
-  float dyL = qL.y - pL.y;
-  float dyR = qR.y - pR.y;
+  const float dyL = qL.y - pL.y;
+  const float dyR = qR.y - pR.y;
 #ifdef MANIFOLD_DEBUG
   if (dyL * dyR > 0) printf("No intersection!\n");
 #endif
-  bool useL = fabs(dyL) < fabs(dyR);
-  float dx = pR.x - pL.x;
+  const bool useL = fabs(dyL) < fabs(dyR);
+  const float dx = pR.x - pL.x;
   float lambda = (useL ? dyL : dyR) / (dyL - dyR);
   if (!isfinite(lambda)) lambda = 0.0f;
   glm::vec4 xyzz;
   xyzz.x = (useL ? pL.x : pR.x) + lambda * dx;
-  float pDy = pR.y - pL.y;
-  float qDy = qR.y - qL.y;
-  bool useP = fabs(pDy) < fabs(qDy);
+  const float pDy = pR.y - pL.y;
+  const float qDy = qR.y - qL.y;
+  const bool useP = fabs(pDy) < fabs(qDy);
   xyzz.y = (useL ? (useP ? pL.y : qL.y) : (useP ? pR.y : qR.y)) +
            lambda * (useP ? pDy : qDy);
   xyzz.z = (useL ? pL.z : pR.z) + lambda * (pR.z - pL.z);
