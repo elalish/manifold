@@ -311,7 +311,7 @@ struct InterpTri {
 
 class Partition {
  public:
-  std::vector<glm::vec3> interiorBary;
+  std::vector<glm::vec3> vertBary;
   std::vector<glm::ivec3> triVert;
 
   static Partition GetPartition(glm::ivec3 divisions, glm::ivec3 tri,
@@ -326,7 +326,7 @@ class Partition {
     }
     Partition partition = GetCachedPartition(sortedDiv);
     std::vector<int> vertOld2New;
-    for (glm::vec3& pos : partition.interiorBary) {
+    for (glm::vec3& pos : partition.vertBary) {
       pos = vertPos * pos;
     }
     return partition;
@@ -335,22 +335,41 @@ class Partition {
  private:
   static std::unordered_map<glm::ivec3, Partition> cache;
 
+  // n[0] >= n[1] >= n[2] > 0
   static Partition GetCachedPartition(glm::ivec3 n) {
     auto cached = cache.find(n);
     if (cached != cache.end()) {
       return cached->second;
     }
     Partition partition;
+    partition.vertBary = {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}};
+    for (const int i : {0, 1, 2}) {
+      const glm::vec3 nextBary = partition.vertBary[(i + 1) % 3];
+      for (int j = 1; j < n[i]; ++j) {
+        partition.vertBary.push_back(
+            glm::mix(partition.vertBary[i], nextBary, (float)j / n[i]));
+      }
+    }
+    const glm::ivec3 edgeOffsets = {3, 3 + n[0] - 1, 3 + n[0] - 1 + n[1] - 1};
     const float f = n[2] * n[2] + n[0] * n[0];
     if (n[1] < f - glm::sqrt(2.0f) * n[0] * n[2]) {
+      // portion of n[0] under n[2]
       const int n1 = glm::round((f - n[1] * n[1]) / (2 * n[0]));
+      // height from n[0]
       const int n2 = glm::round(glm::sqrt(n[2] * n[2] - n1 * n1));
+
       // GetPartition({n[0]-n1,n[1],n2})
       // GetPartition({n1,n2,n[2]})
       // Put these together
     } else {
-      // for i:n[0], make a row of triangles that cut off the small side (n[2]),
-      // where new side has divisions = round(n[2] * (n[0] - i) / n[0])
+      partition.triVert.push_back({edgeOffsets[1] - 1, 1, edgeOffsets[1] + 1});
+      if (n[0] > 1) {
+        PartitionQuad(partition.triVert, partition.vertBary,
+                      {0, edgeOffsets[1] - 1, edgeOffsets[1] + 1, 2},
+                      {edgeOffsets[0], -1, edgeOffsets[1] + 1, edgeOffsets[2]},
+                      {n[0] - 2, 0, n[1] - 2, n[2] - 1},
+                      {true, true, true, true});
+      }
     }
     cache.insert({n, partition});
     return partition;
@@ -359,7 +378,7 @@ class Partition {
   static void PartitionQuad(std::vector<glm::ivec3>& triVert,
                             std::vector<glm::vec3>& vertBary,
                             glm::ivec4 cornerVerts, glm::ivec4 edgeOffsets,
-                            glm::ivec4 edgeAdded) {
+                            glm::ivec4 edgeAdded, glm::bvec4 edgeFwd) {
     int corner = -1;
     int last = 3;
     int minEdge = 0;
@@ -390,41 +409,50 @@ class Partition {
     const glm::ivec4 edge = (minEdge + glm::ivec4(0, 1, 2, 3)) % 4;
     const int partitions = 1 + glm::min(edgeAdded[edge[1]], edgeAdded[edge[3]]);
     int lastEdgeOffset = vertBary.size();
-    for (int j = 0; j < edgeAdded[edge[0]]; ++j) {
-      vertBary.push_back(glm::mix(vertBary[cornerVerts[edge[0]]],
-                                  vertBary[cornerVerts[edge[1]]],
-                                  (j + 1.0f) / (edgeAdded[edge[0]] + 1.0f)));
-    }
     glm::ivec2 lastEdgeVerts = {0, 0};
-    for (int i = 0; i < partitions; ++i) {
+    for (int i = 1; i < partitions - 1; ++i) {
       const int newEdgeOffset = vertBary.size();
-      const int edgeVert1 = (edgeAdded[edge[1]] * (i + 1)) / partitions;
-      const int vert1 = i + 1 < partitions ? edgeOffsets[edge[1]] + edgeVert1
-                                           : cornerVerts[edge[2]];
-      const int edgeVert2 = (edgeAdded[edge[3]] * (i + 1)) / partitions;
-      const int vert2 = i + 1 < partitions ? edgeOffsets[edge[3]] + edgeVert2
-                                           : cornerVerts[edge[3]];
+      const int edgeVert1 = (edgeAdded[edge[1]] * i) / partitions;
+      const int vert1 =
+          edgeOffsets[edge[1]] +
+          (edgeFwd[edge[1]] ? edgeVert1 : edgeAdded[edge[1]] - 1 - edgeVert1);
+      const int edgeVert2 = (edgeAdded[edge[3]] * i) / partitions;
+      const int vert2 =
+          edgeOffsets[edge[3]] +
+          (edgeFwd[edge[3]] ? edgeVert2 : edgeAdded[edge[3]] - 1 - edgeVert2);
       const int added = glm::mix(edgeAdded[edge[0]], edgeAdded[edge[2]],
-                                 (i + 1.0f) / partitions);
+                                 (float)i / partitions);
       for (int j = 0; j < added; ++j) {
         vertBary.push_back(glm::mix(vertBary[vert1], vertBary[vert2],
                                     (j + 1.0f) / (added + 1.0f)));
       }
       PartitionQuad(  // TODO: account for edge directions
           triVert, vertBary,
-          {i == 0 ? cornerVerts[edge[0]]
+          {i == 1 ? cornerVerts[edge[0]]
                   : edgeOffsets[edge[3]] + lastEdgeVerts[1],
-           i == 0 ? cornerVerts[edge[1]]
+           i == 1 ? cornerVerts[edge[1]]
                   : edgeOffsets[edge[1]] + lastEdgeVerts[0],
            vert1, vert2},
-          {i == 0 ? edgeOffsets[edge[0]] : lastEdgeOffset, lastEdgeVerts[0],
-           i + 1 == partitions ? edgeOffsets[edge[2]] : newEdgeOffset,
-           lastEdgeVerts[1]},
-          {newEdgeOffset - lastEdgeOffset, edgeVert1 - lastEdgeVerts[0], added,
-           edgeVert2 - lastEdgeVerts[1]});
+          {i == 1 ? edgeOffsets[edge[0]] : lastEdgeOffset, lastEdgeVerts[0],
+           newEdgeOffset, lastEdgeVerts[1]},
+          {i == 1 ? edgeAdded[edge[0]] : newEdgeOffset - lastEdgeOffset,
+           edgeVert1 - lastEdgeVerts[0], added, edgeVert2 - lastEdgeVerts[1]},
+          {i == 1 ? edgeFwd[edge[0]] : false, edgeFwd[edge[1]], true,
+           edgeFwd[edge[3]]});
       lastEdgeOffset = newEdgeOffset;
       lastEdgeVerts = {edgeVert1, edgeVert2};
     }
+    PartitionQuad(  // TODO: account for edge directions
+        triVert, vertBary,
+        {edgeOffsets[edge[3]] + lastEdgeVerts[1],
+         edgeOffsets[edge[1]] + lastEdgeVerts[0], cornerVerts[edge[2]],
+         cornerVerts[edge[3]]},
+        {lastEdgeOffset, lastEdgeVerts[0], edgeOffsets[edge[2]],
+         lastEdgeVerts[1]},
+        {vertBary.size() - lastEdgeOffset,
+         edgeAdded[edge[1]] - lastEdgeVerts[0], edgeAdded[edge[2]],
+         edgeAdded[edge[3]] - lastEdgeVerts[1]},
+        {false, edgeFwd[edge[1]], edgeFwd[edge[2]], edgeFwd[edge[3]]});
   }
 };
 }  // namespace
