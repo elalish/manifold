@@ -21,7 +21,6 @@ else()
     FetchContent_Declare(Clipper2
         GIT_REPOSITORY https://github.com/AngusJohnson/Clipper2.git
         GIT_TAG Clipper2_1.3.0
-        GIT_SHALLOW TRUE
         GIT_PROGRESS TRUE
         SOURCE_SUBDIR CPP
     )
@@ -38,7 +37,6 @@ endif()
 FetchContent_Declare(glm
     GIT_REPOSITORY https://github.com/g-truc/glm.git
     GIT_TAG b06b775c1c80af51a1183c0e167f9de3b2351a79
-    GIT_SHALLOW TRUE
     GIT_PROGRESS TRUE
     FIND_PACKAGE_ARGS NAMES glm
 )
@@ -61,7 +59,6 @@ if(MANIFOLD_PAR STREQUAL "TBB" AND NOT TBB_FOUND)
     FetchContent_Declare(TBB
         GIT_REPOSITORY https://github.com/oneapi-src/oneTBB.git
         GIT_TAG        v2021.11.0
-        GIT_SHALLOW    TRUE
         GIT_PROGRESS   TRUE
     )
     FetchContent_MakeAvailable(TBB)
