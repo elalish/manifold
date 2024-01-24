@@ -244,10 +244,10 @@ class EarClip {
   // two points and terminates.
   struct Vert {
     int mesh_idx;
+    float cost;
     qItr ear;
     glm::vec2 pos, rightDir;
     VertItr left, right;
-    float cost;
 
     // Shorter than half of precision, to be conservative so that it doesn't
     // cause CW triangles that exceed precision due to rounding error.
@@ -377,7 +377,7 @@ class EarClip {
     // processed in the EarCost loop.
     float SignedDist(VertItr v, glm::vec2 unit, float precision) const {
       float d = glm::determinant(glm::mat2(unit, v->pos - pos));
-      if (glm::abs(d) < precision) {
+      if (std::abs(d) < precision) {
         d = glm::max(d, glm::determinant(glm::mat2(unit, v->right->pos - pos)));
         d = glm::max(d, glm::determinant(glm::mat2(unit, v->left->pos - pos)));
       }
@@ -425,9 +425,11 @@ class EarClip {
         return totalCost < -1 ? kBest : 0;
       }
       VertItr test = right->right;
+      auto lid = left->mesh_idx;
+      auto rid = right->mesh_idx;
       while (test != left) {
-        if (test->mesh_idx != mesh_idx && test->mesh_idx != left->mesh_idx &&
-            test->mesh_idx != right->mesh_idx) {  // Skip duplicated verts
+        if (test->mesh_idx != mesh_idx && test->mesh_idx != lid &&
+            test->mesh_idx != rid) {  // Skip duplicated verts
           float cost = Cost(test, openSide, precision);
           if (cost < -precision) {
             cost = DelaunayCost(test->pos - center, scale, precision);
@@ -544,22 +546,22 @@ class EarClip {
     float bound = 0;
     for (const SimplePolygonIdx &poly : polys) {
       auto vert = poly.begin();
-      polygon_.push_back({vert->idx, earsQueue_.end(), vert->pos});
+      polygon_.push_back({vert->idx, 0.0f, earsQueue_.end(), vert->pos});
       const VertItr first = std::prev(polygon_.end());
 
       bound = glm::max(
-          bound, glm::max(glm::abs(first->pos.x), glm::abs(first->pos.y)));
+          bound, glm::max(std::abs(first->pos.x), std::abs(first->pos.y)));
       VertItr last = first;
       // This is not the real rightmost start, but just an arbitrary vert for
       // now to identify each polygon.
       starts.push_back(first);
 
       for (++vert; vert != poly.end(); ++vert) {
-        polygon_.push_back({vert->idx, earsQueue_.end(), vert->pos});
-        VertItr next = std::prev(polygon_.end());
-
         bound = glm::max(
-            bound, glm::max(glm::abs(next->pos.x), glm::abs(next->pos.y)));
+            bound, glm::max(std::abs(vert->pos.x), std::abs(vert->pos.y)));
+
+        polygon_.push_back({vert->idx, 0.0f, earsQueue_.end(), vert->pos});
+        VertItr next = std::prev(polygon_.end());
 
         Link(last, next);
         last = next;
