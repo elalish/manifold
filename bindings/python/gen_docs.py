@@ -18,12 +18,12 @@ def python_param_modifier(comment):
 
 
 def method_key(name):
-    name = re.sub("\+", "_plus", name)
-    name = re.sub("\-", "_minus", name)
-    name = re.sub("\^", "_xor", name)
-    name = re.sub("\=", "_eq", name)
-    name = re.sub("\:", "_", name)
-    name = re.sub("\~", "destroy_", name)
+    name = re.sub(r"\+", "_plus", name)
+    name = re.sub(r"\-", "_minus", name)
+    name = re.sub(r"\^", "_xor", name)
+    name = re.sub(r"\=", "_eq", name)
+    name = re.sub(r"\:", "_", name)
+    name = re.sub(r"\~", "destroy_", name)
     return name
 
 
