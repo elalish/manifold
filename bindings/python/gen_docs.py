@@ -1,5 +1,4 @@
 from os.path import dirname
-from hashlib import md5
 import re
 
 base = dirname(dirname(dirname(__file__)))
@@ -98,7 +97,7 @@ collect(f"{base}/src/utilities/include/public.h", select_functions)
 
 comments = dict(sorted(comments.items()))
 
-gen_h = f"autogen_docstrings.inl"
+gen_h = "autogen_docstrings.inl"
 with open(gen_h, "w") as f:
     f.write("#pragma once\n\n")
     f.write("// --- AUTO GENERATED ---\n")
