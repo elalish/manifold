@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #pragma once
+#define GLM_ENABLE_EXPERIMENTAL  // needed for glm/gtx/compatibility.hpp
 #define GLM_FORCE_EXPLICIT_CTOR
 #include <glm/ext/matrix_transform.hpp>
 #include <glm/glm.hpp>
