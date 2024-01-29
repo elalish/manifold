@@ -59,7 +59,7 @@ struct Manifold::Impl {
 
   Impl() {}
   enum class Shape { Tetrahedron, Cube, Octahedron };
-  Impl(Shape);
+  Impl(Shape, const glm::mat4x3 = glm::mat4x3(1));
 
   Impl(const MeshGL&, std::vector<float> propertyTolerance = {});
   Impl(const Mesh&, const MeshRelationD& relation,
