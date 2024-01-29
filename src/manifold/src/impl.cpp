@@ -534,7 +534,7 @@ Manifold::Impl::Impl(const Mesh& mesh, const MeshRelationD& relation,
  * Create either a unit tetrahedron, cube or octahedron. The cube is in the
  * first octant, while the others are symmetric about the origin.
  */
-Manifold::Impl::Impl(Shape shape) {
+Manifold::Impl::Impl(Shape shape, const glm::mat4x3 m) {
   std::vector<glm::vec3> vertPos;
   std::vector<glm::ivec3> triVerts;
   switch (shape) {
@@ -547,19 +547,19 @@ Manifold::Impl::Impl(Shape shape) {
       break;
     case Shape::Cube:
       vertPos = {{0.0f, 0.0f, 0.0f},  //
-                 {1.0f, 0.0f, 0.0f},  //
-                 {1.0f, 1.0f, 0.0f},  //
-                 {0.0f, 1.0f, 0.0f},  //
                  {0.0f, 0.0f, 1.0f},  //
+                 {0.0f, 1.0f, 0.0f},  //
+                 {0.0f, 1.0f, 1.0f},  //
+                 {1.0f, 0.0f, 0.0f},  //
                  {1.0f, 0.0f, 1.0f},  //
-                 {1.0f, 1.0f, 1.0f},  //
-                 {0.0f, 1.0f, 1.0f}};
-      triVerts = {{0, 2, 1}, {0, 3, 2},  //
-                  {4, 5, 6}, {4, 6, 7},  //
-                  {0, 1, 5}, {0, 5, 4},  //
-                  {1, 2, 6}, {1, 6, 5},  //
-                  {2, 3, 7}, {2, 7, 6},  //
-                  {3, 0, 4}, {3, 4, 7}};
+                 {1.0f, 1.0f, 0.0f},  //
+                 {1.0f, 1.0f, 1.0f}};
+      triVerts = {{1, 0, 4}, {2, 4, 0},  //
+                  {1, 3, 0}, {3, 1, 5},  //
+                  {3, 2, 0}, {3, 7, 2},  //
+                  {5, 4, 6}, {5, 1, 4},  //
+                  {6, 4, 2}, {7, 6, 2},  //
+                  {7, 3, 5}, {7, 5, 6}};
       break;
     case Shape::Octahedron:
       vertPos = {{1.0f, 0.0f, 0.0f},   //
@@ -575,6 +575,7 @@ Manifold::Impl::Impl(Shape shape) {
       break;
   }
   vertPos_ = vertPos;
+  for (auto& v : vertPos_) v = m * glm::vec4(v, 1.0f);
   CreateHalfedges(triVerts);
   Finish();
   meshRelation_.originalID = ReserveIDs(1);

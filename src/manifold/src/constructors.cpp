@@ -153,10 +153,9 @@ Manifold Manifold::Cube(glm::vec3 size, bool center) {
       glm::length(size) == 0.) {
     return Invalid();
   }
-  auto cube = Manifold(std::make_shared<Impl>(Impl::Shape::Cube));
-  cube = cube.Scale(size);
-  if (center) cube = cube.Translate(-size / 2.0f);
-  return cube.AsOriginal();
+  glm::mat4x3 m =
+      glm::translate(center ? (-size / 2.0f) : glm::vec3(0)) * glm::scale(size);
+  return Manifold(std::make_shared<Impl>(Manifold::Impl::Shape::Cube, m));
 }
 
 /**
