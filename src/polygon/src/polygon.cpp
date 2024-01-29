@@ -15,12 +15,8 @@
 #include "polygon.h"
 
 #include <algorithm>
-#include <list>
 #include <map>
-#include <numeric>
-#include <queue>
 #include <set>
-#include <stack>
 
 #include "optional_assert.h"
 #include "utils.h"
@@ -31,6 +27,11 @@ using namespace manifold;
 static ExecutionParams params;
 
 constexpr float kBest = -std::numeric_limits<float>::infinity();
+
+// it seems that MSVC cannot optimize glm::determinant(glm::mat2(a, b))
+constexpr float determinant2x2(glm::vec2 a, glm::vec2 b) {
+  return a.x * b.y - a.y * b.x;
+}
 
 #ifdef MANIFOLD_DEBUG
 struct PolyEdge {
@@ -376,10 +377,10 @@ class EarClip {
     // goes to the outside. No need to check the other side, since all verts are
     // processed in the EarCost loop.
     float SignedDist(VertItr v, glm::vec2 unit, float precision) const {
-      float d = glm::determinant(glm::mat2(unit, v->pos - pos));
+      float d = determinant2x2(unit, v->pos - pos);
       if (std::abs(d) < precision) {
-        d = glm::max(d, glm::determinant(glm::mat2(unit, v->right->pos - pos)));
-        d = glm::max(d, glm::determinant(glm::mat2(unit, v->left->pos - pos)));
+        d = glm::max(d, determinant2x2(unit, v->right->pos - pos));
+        d = glm::max(d, determinant2x2(unit, v->left->pos - pos));
       }
       return d;
     }
@@ -390,8 +391,7 @@ class EarClip {
       float cost = glm::min(SignedDist(v, rightDir, precision),
                             SignedDist(v, left->rightDir, precision));
 
-      const float openCost =
-          glm::determinant(glm::mat2(openSide, v->pos - right->pos));
+      const float openCost = determinant2x2(openSide, v->pos - right->pos);
       return glm::min(cost, openCost);
     }
 
@@ -591,7 +591,7 @@ class EarClip {
     auto AddPoint = [&](VertItr v) {
       bBox.Union(v->pos);
       const double area1 =
-          glm::determinant(glm::dmat2(v->pos - origin, v->right->pos - origin));
+          determinant2x2(v->pos - origin, v->right->pos - origin);
       const double t1 = area + area1;
       areaCompensation += (area - t1) + area1;
       area = t1;
