@@ -342,6 +342,20 @@ TEST(Manifold, Smooth) {
 #endif
 }
 
+TEST(Manifold, Smooth2Length) {
+  Manifold tet = Manifold::Tetrahedron();
+  Manifold smooth = Manifold::Smooth(tet.GetMesh());
+  smooth = smooth.RefineToLength(1);
+  ExpectMeshes(smooth, {{20002, 40000}});
+  auto prop = smooth.GetProperties();
+  EXPECT_NEAR(prop.volume, 17.38, 0.1);
+  EXPECT_NEAR(prop.surfaceArea, 33.38, 0.1);
+
+#ifdef MANIFOLD_EXPORT
+  if (options.exportModels) ExportMesh("smoothTet.glb", smooth.GetMesh(), {});
+#endif
+}
+
 TEST(Manifold, SmoothSphere) {
   int n[5] = {4, 8, 16, 32, 64};
   float precision[5] = {0.03, 0.003, 0.003, 0.0005, 0.00006};

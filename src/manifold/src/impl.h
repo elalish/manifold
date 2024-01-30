@@ -139,6 +139,7 @@ struct Manifold::Impl {
   // smoothing.cu
   void CreateTangents(const std::vector<Smoothness>&);
   Vec<Barycentric> Subdivide(int n);
+  Vec<Barycentric> Subdivide(float length);
   void Refine(int n);
   void RefineToLength(float length);
 };

@@ -17,6 +17,14 @@
 #include "impl.h"
 #include "par.h"
 
+template <>
+struct std::hash<glm::ivec3> {
+  size_t operator()(const glm::ivec3& p) const {
+    return std::hash<int>()(p.x) ^ std::hash<int>()(p.y) ^
+           std::hash<int>()(p.z);
+  }
+};
+
 namespace {
 using namespace manifold;
 
@@ -311,25 +319,61 @@ struct InterpTri {
 
 class Partition {
  public:
+  glm::ivec3 idx;
+  glm::ivec3 sortedDivisions;
   std::vector<glm::vec3> vertBary;
   std::vector<glm::ivec3> triVert;
 
-  static Partition GetPartition(glm::ivec3 divisions, glm::ivec3 tri,
-                                glm::ivec3 edgeOffsets, int interiorOffset,
-                                glm::mat3 vertPos) {
+  static Partition GetPartition(glm::ivec3 divisions) {
     glm::ivec3 sortedDiv = divisions;
-    glm::ivec3 divNew2Old = {0, 1, 2};
-    if (sortedDiv[2] > sortedDiv[1]) std::swap(sortedDiv[2], sortedDiv[1]);
+    glm::ivec3 triIdx = {0, 1, 2};
+    if (sortedDiv[2] > sortedDiv[1]) {
+      std::swap(sortedDiv[2], sortedDiv[1]);
+      std::swap(triIdx[2], triIdx[1]);
+    }
     if (sortedDiv[1] > sortedDiv[0]) {
       std::swap(sortedDiv[1], sortedDiv[0]);
-      if (sortedDiv[2] > sortedDiv[1]) std::swap(sortedDiv[2], sortedDiv[1]);
+      std::swap(triIdx[1], triIdx[0]);
+      if (sortedDiv[2] > sortedDiv[1]) {
+        std::swap(sortedDiv[2], sortedDiv[1]);
+        std::swap(triIdx[2], triIdx[1]);
+      }
     }
+
     Partition partition = GetCachedPartition(sortedDiv);
-    std::vector<int> vertOld2New;
-    for (glm::vec3& pos : partition.vertBary) {
-      pos = vertPos * pos;
-    }
+    partition.idx = triIdx;
+    partition.sortedDivisions = sortedDiv;
+
     return partition;
+  }
+
+  Vec<glm::ivec3> Reindex(glm::ivec3 tri, glm::ivec3 edgeOffsets,
+                          glm::bvec3 edgeFwd, int interiorOffset) const {
+    Vec<int> newVerts;
+    newVerts.reserve(vertBary.size());
+    for (const int i : {0, 1, 2}) {
+      newVerts.push_back(tri[idx[i]]);
+    }
+    for (const int i : {0, 1, 2}) {
+      const int n = sortedDivisions[i] - 1;
+      int offset = edgeOffsets[idx[i]] + (edgeFwd[idx[i]] ? 0 : n);
+      for (int j = 0; j < n; ++j) {
+        newVerts.push_back(offset);
+        offset += edgeFwd[idx[i]] ? 1 : -1;
+      }
+    }
+    const int offset = interiorOffset - newVerts.size();
+    for (int i = newVerts.size(); i < vertBary.size(); ++i) {
+      newVerts.push_back(i + offset);
+    }
+
+    Vec<glm::ivec3> newTriVert(triVert.size());
+    for (int i = 0; i < triVert.size(); ++i) {
+      for (const int j : {0, 1, 2}) {
+        newTriVert[i][j] = newVerts[triVert[i][j]];
+      }
+    }
+    return newTriVert;
   }
 
  private:
@@ -455,6 +499,8 @@ class Partition {
         {false, edgeFwd[edge[1]], edgeFwd[edge[2]], edgeFwd[edge[3]]});
   }
 };
+
+auto Partition::cache = std::unordered_map<glm::ivec3, Partition>();
 }  // namespace
 
 namespace manifold {
@@ -623,6 +669,121 @@ Vec<Barycentric> Manifold::Impl::Subdivide(int n) {
   return vertBary;
 }
 
+Vec<Barycentric> Manifold::Impl::Subdivide(float length) {
+  Vec<TmpEdge> edges = CreateTmpEdges(halfedge_);
+  const int numEdge = edges.size();
+  Vec<int> half2Edge(2 * numEdge);
+  auto policy = autoPolicy(numEdge);
+  for_each_n(policy, zip(countAt(0), edges.begin()), numEdge,
+             ReindexHalfedge({half2Edge}));
+
+  Vec<int> edgeAdded(numEdge);
+  for_each_n(policy, zip(edgeAdded.begin(), edges.cbegin()), numEdge,
+             [length, this](thrust::tuple<int&, TmpEdge> inOut) {
+               const TmpEdge edge = thrust::get<1>(inOut);
+               const glm::vec3 vec =
+                   this->vertPos_[edge.first] - this->vertPos_[edge.second];
+               thrust::get<0>(inOut) = glm::length(vec) / length;
+             });
+
+  Vec<int> edgeOffset(numEdge);
+  exclusive_scan(policy, edgeAdded.begin(), edgeAdded.end(), edgeOffset.begin(),
+                 NumVert());
+
+  Vec<Barycentric> vertBary(edgeOffset.back() + edgeAdded.back());
+  FillRetainedVerts(vertBary, halfedge_);
+  for_each_n(policy, zip(edges.begin(), edgeAdded.begin(), edgeOffset.begin()),
+             numEdge, [&vertBary](thrust::tuple<TmpEdge, int, int> in) {
+               const TmpEdge edge = thrust::get<0>(in);
+               const int n = thrust::get<1>(in);
+               const int offset = thrust::get<2>(in);
+               const float frac = 1.0f / (n + 1);
+               const int v0 = edge.halfedgeIdx % 3;
+               const int v1 = Next3(v0);
+               const int tri = edge.halfedgeIdx / 3;
+               for (int i = 0; i < n; ++i) {
+                 glm::vec3& uvw = vertBary[offset + i].uvw;
+                 uvw[v1] = (i + 1) * frac;
+                 uvw[v0] = 1 - uvw[v1];
+                 vertBary[offset + i].tri = tri;
+               }
+             });
+
+  const int numTri = NumTri();
+  Vec<Partition> subTris(numTri);
+  for_each_n(policy, countAt(0), numTri,
+             [&subTris, &half2Edge, &edgeAdded](int tri) {
+               glm::ivec3 divisions;
+               for (const int i : {0, 1, 2}) {
+                 divisions[i] = edgeAdded[half2Edge[3 * tri + i]];
+               }
+               subTris[tri] = Partition::GetPartition(divisions);
+             });
+
+  Vec<int> triOffset(numTri);
+  auto numSubTris = thrust::make_transform_iterator(
+      subTris.begin(),
+      [](const Partition& part) { return part.triVert.size(); });
+  exclusive_scan(policy, numSubTris, numSubTris + numTri, triOffset.begin(),
+                 numTri);
+
+  Vec<int> interiorOffset(numTri);
+  auto numInterior = thrust::make_transform_iterator(
+      subTris.begin(),
+      [](const Partition& part) { return part.vertBary.size(); });
+  exclusive_scan(policy, numInterior, numInterior + numTri,
+                 interiorOffset.begin(), NumVert());
+
+  Vec<glm::ivec3> triVerts(triOffset.back() + subTris.back().triVert.size());
+  vertBary.resize(interiorOffset.back() + subTris.back().vertBary.size());
+  for_each_n(policy, countAt(0), numTri,
+             [this, &triVerts, &vertBary, &subTris, &edgeOffset, &half2Edge,
+              &triOffset, &interiorOffset](int tri) {
+               glm::ivec3 edgeOffsets;
+               glm::bvec3 edgeFwd;
+               for (const int i : {0, 1, 2}) {
+                 const Halfedge& halfedge = this->halfedge_[3 * tri + i];
+                 triVerts[tri][i] = halfedge.startVert;
+                 edgeOffsets[i] = edgeOffset[half2Edge[3 * tri + i]];
+                 edgeFwd[i] = halfedge.IsForward();
+               }
+
+               Vec<glm::ivec3> newTris = subTris[tri].Reindex(
+                   triVerts[tri], edgeOffsets, edgeFwd, interiorOffset[tri]);
+               copy(ExecutionPolicy::Seq, newTris.begin(), newTris.end(),
+                    triVerts.begin() + triOffset[tri]);
+
+               const auto& subBary = subTris[tri].vertBary;
+               transform(ExecutionPolicy::Seq, subBary.begin(), subBary.end(),
+                         vertBary.begin() + interiorOffset[tri],
+                         [tri](glm::vec3 bary) {
+                           return Barycentric({tri, bary});
+                         });
+             });
+
+  Vec<glm::vec3> newVertPos(vertBary.size());
+  for_each_n(
+      policy, zip(newVertPos.begin(), vertBary.begin()), vertBary.size(),
+      [this](thrust::tuple<glm::vec3&, Barycentric> inOut) {
+        const Barycentric bary = thrust::get<1>(inOut);
+        glm::mat3 triPos;
+        for (const int i : {0, 1, 2}) {
+          triPos[i] =
+              this->vertPos_[this->halfedge_[3 * bary.tri + i].startVert];
+        }
+        thrust::get<0>(inOut) = triPos * bary.uvw;
+      });
+  vertPos_ = newVertPos;
+
+  CreateHalfedges(triVerts);
+  // Make original since the subdivided faces are intended to be warped into
+  // being non-coplanar, and hence not being related to the original faces.
+  meshRelation_.originalID = ReserveIDs(1);
+  InitializeOriginal();
+
+  return vertBary;
+}
+
 void Manifold::Impl::Refine(int n) {
   Manifold::Impl old = *this;
   Vec<Barycentric> vertBary = Subdivide(n);
@@ -639,10 +800,18 @@ void Manifold::Impl::Refine(int n) {
 }
 
 void Manifold::Impl::RefineToLength(float length) {
-  // calculate edge divisions
-  // scan to create edge offsets
-  // make vertPos vector with input verts and new edge verts
-  // for each tri, append interior verts and partition tris
+  Manifold::Impl old = *this;
+  Vec<Barycentric> vertBary = Subdivide(length);
+  if (vertBary.size() == 0) return;
+
+  if (old.halfedgeTangent_.size() == old.halfedge_.size()) {
+    for_each_n(autoPolicy(NumTri()), zip(vertPos_.begin(), vertBary.begin()),
+               NumVert(),
+               InterpTri({old.halfedge_, old.halfedgeTangent_, old.vertPos_}));
+  }
+
+  halfedgeTangent_.resize(0);
+  Finish();
   // Also optimize Subdivide by using Partition({n,n,n}) instead
 }
 }  // namespace manifold
