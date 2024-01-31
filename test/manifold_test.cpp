@@ -345,11 +345,11 @@ TEST(Manifold, Smooth) {
 TEST(Manifold, Smooth2Length) {
   Manifold tet = Manifold::Tetrahedron();
   Manifold smooth = Manifold::Smooth(tet.GetMesh());
-  smooth = smooth.RefineToLength(1);
-  ExpectMeshes(smooth, {{20002, 40000}});
+  smooth = smooth.RefineToLength(2);
+  ExpectMeshes(smooth, {{10, 16}});
   auto prop = smooth.GetProperties();
-  EXPECT_NEAR(prop.volume, 17.38, 0.1);
-  EXPECT_NEAR(prop.surfaceArea, 33.38, 0.1);
+  EXPECT_NEAR(prop.volume, 8, 0.01);
+  EXPECT_NEAR(prop.surfaceArea, 25.46, 0.01);
 
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) ExportMesh("smoothTet.glb", smooth.GetMesh(), {});

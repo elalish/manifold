@@ -61,12 +61,14 @@ void FillRetainedVerts(Vec<Barycentric>& vertBary,
 
 struct ReindexHalfedge {
   VecView<int> half2Edge;
+  const VecView<Halfedge> halfedges;
 
   void operator()(thrust::tuple<int, TmpEdge> in) {
     const int edge = thrust::get<0>(in);
     const int halfedge = thrust::get<1>(in).halfedgeIdx;
 
     half2Edge[halfedge] = edge;
+    half2Edge[halfedges[halfedge].pairedHalfedge] = edge;
   }
 };
 
@@ -319,10 +321,13 @@ struct InterpTri {
 
 class Partition {
  public:
+  int interiorOffset;
   glm::ivec3 idx;
   glm::ivec3 sortedDivisions;
   std::vector<glm::vec3> vertBary;
   std::vector<glm::ivec3> triVert;
+
+  int NumInterior() const { return vertBary.size() - interiorOffset; }
 
   static Partition GetPartition(glm::ivec3 divisions) {
     glm::ivec3 sortedDiv = divisions;
@@ -356,7 +361,7 @@ class Partition {
     }
     for (const int i : {0, 1, 2}) {
       const int n = sortedDivisions[i] - 1;
-      int offset = edgeOffsets[idx[i]] + (edgeFwd[idx[i]] ? 0 : n);
+      int offset = edgeOffsets[idx[i]] + (edgeFwd[idx[i]] ? 0 : n - 1);
       for (int j = 0; j < n; ++j) {
         newVerts.push_back(offset);
         offset += edgeFwd[idx[i]] ? 1 : -1;
@@ -394,9 +399,12 @@ class Partition {
             glm::mix(partition.vertBary[i], nextBary, (float)j / n[i]));
       }
     }
+    partition.interiorOffset = partition.vertBary.size();
     const glm::ivec3 edgeOffsets = {3, 3 + n[0] - 1, 3 + n[0] - 1 + n[1] - 1};
+
     const float f = n[2] * n[2] + n[0] * n[0];
-    if (n[1] < f - glm::sqrt(2.0f) * n[0] * n[2]) {
+    if (false) {  // n[1] < f - glm::sqrt(2.0f) * n[0] * n[2]
+      std::cout << f - glm::sqrt(2.0f) * n[0] * n[2] << std::endl;
       // portion of n[0] under n[2]
       const int n1 = glm::round((f - n[1] * n[1]) / (2 * n[0]));
       // height from n[0]
@@ -406,10 +414,10 @@ class Partition {
       // GetPartition({n1,n2,n[2]})
       // Put these together
     } else {
-      partition.triVert.push_back({edgeOffsets[1] - 1, 1, edgeOffsets[1] + 1});
+      partition.triVert.push_back({edgeOffsets[1] - 1, 1, edgeOffsets[1]});
       if (n[0] > 1) {
         PartitionQuad(partition.triVert, partition.vertBary,
-                      {0, edgeOffsets[1] - 1, edgeOffsets[1] + 1, 2},
+                      {0, edgeOffsets[1] - 1, edgeOffsets[1], 2},
                       {edgeOffsets[0], -1, edgeOffsets[1] + 1, edgeOffsets[2]},
                       {n[0] - 2, 0, n[1] - 2, n[2] - 1},
                       {true, true, true, true});
@@ -642,7 +650,7 @@ Vec<Barycentric> Manifold::Impl::Subdivide(int n) {
   Vec<int> half2Edge(2 * numEdge);
   auto policy = autoPolicy(numEdge);
   for_each_n(policy, zip(countAt(0), edges.begin()), numEdge,
-             ReindexHalfedge({half2Edge}));
+             ReindexHalfedge({half2Edge, halfedge_}));
   for_each_n(policy, zip(countAt(0), edges.begin()), numEdge,
              EdgeVerts({vertPos_, vertBary, numVert, n}));
   for_each_n(policy, countAt(0), numTri,
@@ -675,7 +683,7 @@ Vec<Barycentric> Manifold::Impl::Subdivide(float length) {
   Vec<int> half2Edge(2 * numEdge);
   auto policy = autoPolicy(numEdge);
   for_each_n(policy, zip(countAt(0), edges.begin()), numEdge,
-             ReindexHalfedge({half2Edge}));
+             ReindexHalfedge({half2Edge, halfedge_}));
 
   Vec<int> edgeAdded(numEdge);
   for_each_n(policy, zip(edgeAdded.begin(), edges.cbegin()), numEdge,
@@ -715,7 +723,7 @@ Vec<Barycentric> Manifold::Impl::Subdivide(float length) {
              [&subTris, &half2Edge, &edgeAdded](int tri) {
                glm::ivec3 divisions;
                for (const int i : {0, 1, 2}) {
-                 divisions[i] = edgeAdded[half2Edge[3 * tri + i]];
+                 divisions[i] = edgeAdded[half2Edge[3 * tri + i]] + 1;
                }
                subTris[tri] = Partition::GetPartition(divisions);
              });
@@ -724,32 +732,32 @@ Vec<Barycentric> Manifold::Impl::Subdivide(float length) {
   auto numSubTris = thrust::make_transform_iterator(
       subTris.begin(),
       [](const Partition& part) { return part.triVert.size(); });
-  exclusive_scan(policy, numSubTris, numSubTris + numTri, triOffset.begin(),
-                 numTri);
+  exclusive_scan(policy, numSubTris, numSubTris + numTri, triOffset.begin(), 0);
 
   Vec<int> interiorOffset(numTri);
   auto numInterior = thrust::make_transform_iterator(
       subTris.begin(),
-      [](const Partition& part) { return part.vertBary.size(); });
+      [](const Partition& part) { return part.NumInterior(); });
   exclusive_scan(policy, numInterior, numInterior + numTri,
-                 interiorOffset.begin(), NumVert());
+                 interiorOffset.begin(), vertBary.size());
 
   Vec<glm::ivec3> triVerts(triOffset.back() + subTris.back().triVert.size());
-  vertBary.resize(interiorOffset.back() + subTris.back().vertBary.size());
+  vertBary.resize(interiorOffset.back() + subTris.back().NumInterior());
   for_each_n(policy, countAt(0), numTri,
              [this, &triVerts, &vertBary, &subTris, &edgeOffset, &half2Edge,
               &triOffset, &interiorOffset](int tri) {
+               glm::ivec3 tri3;
                glm::ivec3 edgeOffsets;
                glm::bvec3 edgeFwd;
                for (const int i : {0, 1, 2}) {
                  const Halfedge& halfedge = this->halfedge_[3 * tri + i];
-                 triVerts[tri][i] = halfedge.startVert;
+                 tri3[i] = halfedge.startVert;
                  edgeOffsets[i] = edgeOffset[half2Edge[3 * tri + i]];
                  edgeFwd[i] = halfedge.IsForward();
                }
 
                Vec<glm::ivec3> newTris = subTris[tri].Reindex(
-                   triVerts[tri], edgeOffsets, edgeFwd, interiorOffset[tri]);
+                   tri3, edgeOffsets, edgeFwd, interiorOffset[tri]);
                copy(ExecutionPolicy::Seq, newTris.begin(), newTris.end(),
                     triVerts.begin() + triOffset[tri]);
 
@@ -774,6 +782,8 @@ Vec<Barycentric> Manifold::Impl::Subdivide(float length) {
         thrust::get<0>(inOut) = triPos * bary.uvw;
       });
   vertPos_ = newVertPos;
+
+  faceNormal_.resize(0);
 
   CreateHalfedges(triVerts);
   // Make original since the subdivided faces are intended to be warped into
