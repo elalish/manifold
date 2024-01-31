@@ -57,7 +57,7 @@ else()
 endif()
 
 target_include_directories(${PROJECT_NAME} INTERFACE
-    $<INSTALL_INTERFACE:include>
+    $<INSTALL_INTERFACE:include/${CMAKE_PROJECT_NAME}>
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>)
 target_link_libraries(${PROJECT_NAME} INTERFACE glm::glm)
 
@@ -82,4 +82,4 @@ endif()
 target_compile_features(${PROJECT_NAME} INTERFACE cxx_std_17)
 
 install(TARGETS ${PROJECT_NAME} EXPORT manifoldTargets)
-install(FILES include/public.h include/vec_view.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+install(FILES include/public.h include/vec_view.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${CMAKE_PROJECT_NAME})
