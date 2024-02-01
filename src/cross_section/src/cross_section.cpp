@@ -163,8 +163,12 @@ bool V2Lesser(glm::vec2 a, glm::vec2 b) {
   return a.x < b.x;
 }
 
-double Cross(glm::vec2 a, glm::vec2 b, glm::vec2 c) {
-  return (a.x - c.x) * (b.y - c.y) - (a.y - c.y) * (b.x - c.x);
+void HullBacktrack(const glm::vec2& pt, std::vector<glm::vec2>& stack) {
+  auto sz = stack.size();
+  while (sz >= 2 && CCW(stack[sz - 2], stack[sz - 1], pt, 1e-18) <= 0) {
+    stack.pop_back();
+    sz = stack.size();
+  }
 }
 
 // Based on method described here:
@@ -179,20 +183,12 @@ C2::PathD HullImpl(SimplePolygon& pts) {
 
   auto lower = std::vector<glm::vec2>{};
   for (int i = 0; i < len; i++) {
-    auto sz = lower.size();
-    while (sz >= 2 && Cross(lower[sz - 2], lower[sz - 1], pts[i]) <= 0) {
-      lower.pop_back();
-      sz = lower.size();
-    }
+    HullBacktrack(pts[i], lower);
     lower.push_back(pts[i]);
   }
   auto upper = std::vector<glm::vec2>{};
   for (int i = len - 1; i >= 0; i--) {
-    auto sz = upper.size();
-    while (sz >= 2 && Cross(upper[sz - 2], upper[sz - 1], pts[i]) <= 0) {
-      upper.pop_back();
-      sz = upper.size();
-    }
+    HullBacktrack(pts[i], upper);
     upper.push_back(pts[i]);
   }
 
