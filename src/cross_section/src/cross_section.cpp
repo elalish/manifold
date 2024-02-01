@@ -187,7 +187,7 @@ C2::PathD HullImpl(SimplePolygon& pts) {
     lower.push_back(pts[i]);
   }
   auto upper = std::vector<glm::vec2>{};
-  for (int i = len-1; i >= 0; i--) {
+  for (int i = len - 1; i >= 0; i--) {
     auto sz = upper.size();
     while (sz >= 2 && Cross(upper[sz - 2], upper[sz - 1], pts[i]) <= 0) {
       upper.pop_back();
@@ -204,7 +204,7 @@ C2::PathD HullImpl(SimplePolygon& pts) {
     path[i] = v2_to_pd(lower[i]);
   }
   auto llen = lower.size();
-	int sz = upper.size(); // "fix" -Waggressive-loop-optimizations warning.
+  int sz = upper.size();  // "fix" -Waggressive-loop-optimizations warning.
   for (int i = 0; i < sz; i++) {
     path[i + llen] = v2_to_pd(upper[i]);
   }
