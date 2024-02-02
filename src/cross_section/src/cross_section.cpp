@@ -165,7 +165,7 @@ bool V2Lesser(glm::vec2 a, glm::vec2 b) {
 
 void HullBacktrack(const glm::vec2& pt, std::vector<glm::vec2>& stack) {
   auto sz = stack.size();
-  while (sz >= 2 && CCW(stack[sz - 2], stack[sz - 1], pt, 1e-18) <= 0) {
+  while (sz >= 2 && CCW(stack[sz - 2], stack[sz - 1], pt, 0.0f) <= 0.0f) {
     stack.pop_back();
     sz = stack.size();
   }
