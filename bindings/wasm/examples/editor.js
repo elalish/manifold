@@ -35,6 +35,12 @@ undoButton.onclick = () => editor.trigger('ignored', 'undo');
 redoButton.onclick = () => editor.trigger('ignored', 'redo');
 formatButton.onclick = () =>
     editor.trigger('ignored', 'editor.action.formatDocument');
+shareButton.onclick = () => {
+  const url = new URL(window.location.toString());
+  url.searchParams.set('name', currentFileElement.textContent);
+  url.searchParams.set('script', editor.getValue());
+  navigator.clipboard.writeText(url.toString());
+};
 
 // File UI ------------------------------------------------------------
 const fileButton = document.querySelector('#file');
@@ -241,7 +247,7 @@ function initializeRun() {
   if (autoExecute) {
     runButton.click();
   } else {
-    poster.textContent = 'Auto-run disabled due to prior failure';
+    poster.textContent = 'Auto-run disabled';
   }
 }
 
@@ -315,18 +321,18 @@ require(['vs/editor/editor.main'], async function() {
     }
   }
   const params = new URLSearchParams(window.location.search);
-  if (window.location.hash.length > 0) {
-    const name = unescape(window.location.hash.substring(1));
-    switchTo(name);
-  } else if (params.get('script') != null) {
-    console.log(`Fetching ${params.get('script')}`);
-    autoExecute = false;
-    const response = await fetch(params.get('script'));
-    const code = await response.text();
-    switchTo(newItem(code, params.get('name')).name);
-  } else {
-    switchTo(currentName);
-    window.location.hash = `#${currentName}`;
+  const codeEncoded = params.get('script');
+  const nameEncoded = params.get('name');
+  if (nameEncoded != null) {
+    const name = decodeURIComponent(nameEncoded);
+    if (codeEncoded != null) {
+      autoExecute = false;
+      switchTo(newItem(decodeURIComponent(codeEncoded), name).name);
+    } else {
+      switchTo(name);
+    }
+  } else if (window.location.hash.length > 0) {
+    switchTo(decodeURIComponent(window.location.hash.substring(1)));
   }
 
   if (manifoldInitialized) {
