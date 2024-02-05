@@ -18,7 +18,7 @@ file(GLOB_RECURSE SOURCE_FILES CONFIGURE_DEPENDS *.cpp)
 add_library(${PROJECT_NAME} ${SOURCE_FILES})
 
 target_include_directories(${PROJECT_NAME} PUBLIC
-    $<INSTALL_INTERFACE:include>
+    $<INSTALL_INTERFACE:include/${CMAKE_PROJECT_NAME}>
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>)
 target_link_libraries(${PROJECT_NAME}
     PUBLIC utilities cross_section sdf
@@ -32,4 +32,4 @@ target_compile_features(${PROJECT_NAME}
 )
 
 install(TARGETS ${PROJECT_NAME} EXPORT manifoldTargets)
-install(FILES include/manifold.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+install(FILES include/manifold.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${CMAKE_PROJECT_NAME})
