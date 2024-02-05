@@ -24,6 +24,18 @@ if (navigator.serviceWorker) {
 
 let editor = undefined;
 
+// Edit UI ------------------------------------------------------------
+
+const undoButton = document.querySelector('#undo');
+const redoButton = document.querySelector('#redo');
+const formatButton = document.querySelector('#format');
+const shareButton = document.querySelector('#share');
+
+undoButton.onclick = () => editor.trigger('ignored', 'undo');
+redoButton.onclick = () => editor.trigger('ignored', 'redo');
+formatButton.onclick = () =>
+    editor.trigger('ignored', 'editor.action.formatDocument');
+
 // File UI ------------------------------------------------------------
 const fileButton = document.querySelector('#file');
 const currentFileElement = document.querySelector('#current');

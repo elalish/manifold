@@ -168,6 +168,28 @@ model-viewer {
   position: relative;
 }
 
+.top-edit {
+  display: inline-block;
+  position: absolute;
+  height: 36px;
+  top: 18px;
+  border: none;
+  border-radius: 18px;
+}
+
+.top-icon {
+  display: inline-block;
+  width: 36px;
+  background-size: 24px;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-color: transparent;
+}
+
+.squish {
+  margin-right: -12px;
+}
+
 .icon {
   display: inline-block;
   background-color: transparent;
@@ -178,6 +200,22 @@ model-viewer {
   background-size: 20px;
   background-repeat: no-repeat;
   background-position: center;
+}
+
+.undo {
+  background-image: url(/icons/undo.png);
+}
+
+.redo {
+  background-image: url(/icons/redo.png);
+}
+
+.star {
+  background-image: url(/icons/star.png);
+}
+
+.share {
+  background-image: url(/icons/share.png);
 }
 
 .cancel {
@@ -205,6 +243,10 @@ model-viewer {
 }
 
 .icon:hover {
+  background-color: rgba(0, 0, 0, 0.2);
+}
+
+.top-icon:hover {
   background-color: rgba(0, 0, 0, 0.2);
 }
 
