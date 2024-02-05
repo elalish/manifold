@@ -347,7 +347,6 @@ class Partition {
 
     Partition partition = GetCachedPartition(sortedDiv);
     partition.idx = triIdx;
-    partition.sortedDivisions = sortedDiv;
 
     return partition;
   }
@@ -391,6 +390,7 @@ class Partition {
       return cached->second;
     }
     Partition partition;
+    partition.sortedDivisions = n;
     partition.vertBary = {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}};
     for (const int i : {0, 1, 2}) {
       const glm::vec3 nextBary = partition.vertBary[(i + 1) % 3];
@@ -403,7 +403,18 @@ class Partition {
     const glm::ivec3 edgeOffsets = {3, 3 + n[0] - 1, 3 + n[0] - 1 + n[1] - 1};
 
     const float f = n[2] * n[2] + n[0] * n[0];
-    if (false) {  // n[1] < f - glm::sqrt(2.0f) * n[0] * n[2]
+    if (n[1] == 1) {
+      if (n[0] == 1) {
+        partition.triVert.push_back({0, 1, 2});
+      } else {
+        int last = 0;
+        for (int i = 0; i < n[0]; ++i) {
+          partition.triVert.push_back({last, edgeOffsets[i], 2});
+          last = edgeOffsets[i];
+        }
+        partition.triVert.push_back({last, 1, 2});
+      }
+    } else if (false) {  // n[1] < f - glm::sqrt(2.0f) * n[0] * n[2]
       std::cout << f - glm::sqrt(2.0f) * n[0] * n[2] << std::endl;
       // portion of n[0] under n[2]
       const int n1 = glm::round((f - n[1] * n[1]) / (2 * n[0]));
@@ -423,6 +434,12 @@ class Partition {
                       {true, true, true, true});
       }
     }
+
+    Dump(partition.vertBary);
+    Dump(partition.triVert);
+    std::cout << partition.interiorOffset << ", " << partition.sortedDivisions
+              << std::endl;
+
     cache.insert({n, partition});
     return partition;
   }
@@ -431,6 +448,7 @@ class Partition {
                             std::vector<glm::vec3>& vertBary,
                             glm::ivec4 cornerVerts, glm::ivec4 edgeOffsets,
                             glm::ivec4 edgeAdded, glm::bvec4 edgeFwd) {
+    std::cout << edgeAdded << std::endl;
     int corner = -1;
     int last = 3;
     int minEdge = 0;
@@ -502,8 +520,8 @@ class Partition {
         {lastEdgeOffset, lastEdgeVerts[0], edgeOffsets[edge[2]],
          lastEdgeVerts[1]},
         {vertBary.size() - lastEdgeOffset,
-         edgeAdded[edge[1]] - lastEdgeVerts[0], edgeAdded[edge[2]],
-         edgeAdded[edge[3]] - lastEdgeVerts[1]},
+         edgeAdded[edge[1]] - 1 - lastEdgeVerts[0], edgeAdded[edge[2]],
+         edgeAdded[edge[3]] - 1 - lastEdgeVerts[1]},
         {false, edgeFwd[edge[1]], edgeFwd[edge[2]], edgeFwd[edge[3]]});
   }
 };
