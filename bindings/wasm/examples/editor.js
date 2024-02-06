@@ -342,6 +342,7 @@ require(['vs/editor/editor.main'], async function() {
     runButton.disabled = false;
     if (switching) {
       switching = false;
+      editor.setScrollTop(0);
       return;
     }
     if (isExample) {
