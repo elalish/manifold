@@ -179,6 +179,7 @@ model-viewer {
 
 .top-icon {
   display: inline-block;
+  vertical-align: middle;
   width: 36px;
   background-size: 24px;
   background-repeat: no-repeat;
