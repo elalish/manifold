@@ -24,6 +24,25 @@ if (navigator.serviceWorker) {
 
 let editor = undefined;
 
+// Edit UI ------------------------------------------------------------
+
+const undoButton = document.querySelector('#undo');
+const redoButton = document.querySelector('#redo');
+const formatButton = document.querySelector('#format');
+const shareButton = document.querySelector('#share');
+
+undoButton.onclick = () => editor.trigger('ignored', 'undo');
+redoButton.onclick = () => editor.trigger('ignored', 'redo');
+formatButton.onclick = () =>
+    editor.trigger('ignored', 'editor.action.formatDocument');
+shareButton.onclick = () => {
+  const url = new URL(window.location.toString());
+  url.hash = `#${currentFileElement.textContent}`;
+  url.searchParams.set('script', editor.getValue());
+  navigator.clipboard.writeText(url.toString());
+  console.log('Sharable link copied to clipboard!');
+};
+
 // File UI ------------------------------------------------------------
 const fileButton = document.querySelector('#file');
 const currentFileElement = document.querySelector('#current');
@@ -229,7 +248,7 @@ function initializeRun() {
   if (autoExecute) {
     runButton.click();
   } else {
-    poster.textContent = 'Auto-run disabled due to prior failure';
+    poster.textContent = 'Auto-run disabled';
   }
 }
 
@@ -303,18 +322,16 @@ require(['vs/editor/editor.main'], async function() {
     }
   }
   const params = new URLSearchParams(window.location.search);
+  const codeEncoded = params.get('script');
   if (window.location.hash.length > 0) {
-    const name = unescape(window.location.hash.substring(1));
-    switchTo(name);
-  } else if (params.get('script') != null) {
-    console.log(`Fetching ${params.get('script')}`);
-    autoExecute = false;
-    const response = await fetch(params.get('script'));
-    const code = await response.text();
-    switchTo(newItem(code, params.get('name')).name);
-  } else {
-    switchTo(currentName);
-    window.location.hash = `#${currentName}`;
+    const name = decodeURIComponent(window.location.hash.substring(1))
+    if (codeEncoded != null) {
+      autoExecute = false;
+      switchTo(newItem(decodeURIComponent(codeEncoded), name).name);
+    }
+    else {
+      switchTo(name);
+    }
   }
 
   if (manifoldInitialized) {
@@ -325,6 +342,7 @@ require(['vs/editor/editor.main'], async function() {
     runButton.disabled = false;
     if (switching) {
       switching = false;
+      editor.setScrollTop(0);
       return;
     }
     if (isExample) {
