@@ -37,9 +37,10 @@ formatButton.onclick = () =>
     editor.trigger('ignored', 'editor.action.formatDocument');
 shareButton.onclick = () => {
   const url = new URL(window.location.toString());
-  url.searchParams.set('name', currentFileElement.textContent);
+  url.hash = `#${currentFileElement.textContent}`;
   url.searchParams.set('script', editor.getValue());
   navigator.clipboard.writeText(url.toString());
+  console.log('Sharable link copied to clipboard!');
 };
 
 // File UI ------------------------------------------------------------
@@ -322,17 +323,15 @@ require(['vs/editor/editor.main'], async function() {
   }
   const params = new URLSearchParams(window.location.search);
   const codeEncoded = params.get('script');
-  const nameEncoded = params.get('name');
-  if (nameEncoded != null) {
-    const name = decodeURIComponent(nameEncoded);
+  if (window.location.hash.length > 0) {
+    const name = decodeURIComponent(window.location.hash.substring(1))
     if (codeEncoded != null) {
       autoExecute = false;
       switchTo(newItem(decodeURIComponent(codeEncoded), name).name);
-    } else {
+    }
+    else {
       switchTo(name);
     }
-  } else if (window.location.hash.length > 0) {
-    switchTo(decodeURIComponent(window.location.hash.substring(1)));
   }
 
   if (manifoldInitialized) {

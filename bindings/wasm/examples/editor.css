@@ -82,7 +82,7 @@ button:hover {
 }
 
 p {
-  margin: 1em;
+  margin: 18px;
   text-align: left;
 }
 
@@ -130,7 +130,7 @@ model-viewer {
 
 .header .margin {
   font-size: 16px;
-  margin: 1em 0.5em;
+  margin: 18px 8px;
 }
 
 .dropdown {
@@ -170,7 +170,7 @@ model-viewer {
 
 .top-edit {
   display: inline-block;
-  position: absolute;
+  vertical-align: middle;
   height: 36px;
   top: 18px;
   border: none;
@@ -316,7 +316,7 @@ model-viewer {
   cursor: pointer;
 }
 
-@media only screen and (max-width: 600px) {
+@media only screen and (max-width: 820px) {
   .container {
     flex-direction: column;
     width: 100%;
