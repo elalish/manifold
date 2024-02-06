@@ -428,9 +428,9 @@ class Partition {
       partition.triVert.push_back({edgeOffsets[1] - 1, 1, edgeOffsets[1]});
       if (n[0] > 1) {
         PartitionQuad(partition.triVert, partition.vertBary,
-                      {0, edgeOffsets[1] - 1, edgeOffsets[1], 2},
-                      {edgeOffsets[0], -1, edgeOffsets[1] + 1, edgeOffsets[2]},
-                      {n[0] - 2, 0, n[1] - 2, n[2] - 1},
+                      {edgeOffsets[1] - 1, edgeOffsets[1], 2, 0},
+                      {-1, edgeOffsets[1] + 1, edgeOffsets[2], edgeOffsets[0]},
+                      {0, n[1] - 2, n[2] - 1, n[0] - 2},
                       {true, true, true, true});
       }
     }
@@ -444,6 +444,9 @@ class Partition {
     return partition;
   }
 
+  // edgeAdded[0] is the minimum - partitions are parallel to this edge unless
+  // edgeAdded[1] or edgeAdded[3] are also zero, in which case a terminal
+  // triangulation is performed.
   static void PartitionQuad(std::vector<glm::ivec3>& triVert,
                             std::vector<glm::vec3>& vertBary,
                             glm::ivec4 cornerVerts, glm::ivec4 edgeOffsets,
@@ -451,17 +454,22 @@ class Partition {
     std::cout << edgeAdded << std::endl;
     int corner = -1;
     int last = 3;
-    int minEdge = 0;
+    int maxEdge = -1;
     for (const int i : {0, 1, 2, 3}) {
       if (edgeAdded[i] == 0 && edgeAdded[last] == 0) {
         corner = i;
       }
-      if (edgeAdded[i] < edgeAdded[minEdge]) {
-        minEdge = i;
+      if (edgeAdded[i] > 0) {
+        if (maxEdge == -1) {
+          maxEdge = i;
+        } else {
+          maxEdge = -2;
+        }
       }
       last = i;
     }
     if (corner >= 0) {  // terminate
+      std::cout << corner << edgeOffsets << std::endl;
       for (const int j : {1, 2}) {
         const int side = (corner + j) % 4;
         int sideVert = cornerVerts[side];
@@ -476,53 +484,45 @@ class Partition {
       return;
     }
     // recursively partition
-    const glm::ivec4 edge = (minEdge + glm::ivec4(0, 1, 2, 3)) % 4;
-    const int partitions = 1 + glm::min(edgeAdded[edge[1]], edgeAdded[edge[3]]);
+    const int partitions = 1 + glm::min(edgeAdded[1], edgeAdded[3]);
+    std::cout << partitions << std::endl;
     int lastEdgeOffset = vertBary.size();
     glm::ivec2 lastEdgeVerts = {0, 0};
-    for (int i = 1; i < partitions - 1; ++i) {
+    for (int i = 1; i < partitions; ++i) {
       const int newEdgeOffset = vertBary.size();
-      const int edgeVert1 = (edgeAdded[edge[1]] * i) / partitions;
-      const int vert1 =
-          edgeOffsets[edge[1]] +
-          (edgeFwd[edge[1]] ? edgeVert1 : edgeAdded[edge[1]] - 1 - edgeVert1);
-      const int edgeVert2 = (edgeAdded[edge[3]] * i) / partitions;
-      const int vert2 =
-          edgeOffsets[edge[3]] +
-          (edgeFwd[edge[3]] ? edgeVert2 : edgeAdded[edge[3]] - 1 - edgeVert2);
-      const int added = glm::mix(edgeAdded[edge[0]], edgeAdded[edge[2]],
-                                 (float)i / partitions);
+      const int edgeVert1 = (edgeAdded[1] * i) / partitions;
+      const int vert1 = edgeOffsets[1] +
+                        (edgeFwd[1] ? edgeVert1 : edgeAdded[1] - 1 - edgeVert1);
+      const int edgeVert2 = (edgeAdded[3] * i) / partitions;
+      const int vert2 = edgeOffsets[3] +
+                        (edgeFwd[3] ? edgeVert2 : edgeAdded[3] - 1 - edgeVert2);
+      const int added =
+          glm::mix(edgeAdded[0], edgeAdded[2], (float)i / partitions);
       for (int j = 0; j < added; ++j) {
         vertBary.push_back(glm::mix(vertBary[vert1], vertBary[vert2],
                                     (j + 1.0f) / (added + 1.0f)));
       }
       PartitionQuad(  // TODO: account for edge directions
           triVert, vertBary,
-          {i == 1 ? cornerVerts[edge[0]]
-                  : edgeOffsets[edge[3]] + lastEdgeVerts[1],
-           i == 1 ? cornerVerts[edge[1]]
-                  : edgeOffsets[edge[1]] + lastEdgeVerts[0],
-           vert1, vert2},
-          {i == 1 ? edgeOffsets[edge[0]] : lastEdgeOffset, lastEdgeVerts[0],
-           newEdgeOffset, lastEdgeVerts[1]},
-          {i == 1 ? edgeAdded[edge[0]] : newEdgeOffset - lastEdgeOffset,
-           edgeVert1 - lastEdgeVerts[0], added, edgeVert2 - lastEdgeVerts[1]},
-          {i == 1 ? edgeFwd[edge[0]] : false, edgeFwd[edge[1]], true,
-           edgeFwd[edge[3]]});
+          {vert2, i == 1 ? cornerVerts[0] : edgeOffsets[3] + lastEdgeVerts[1],
+           i == 1 ? cornerVerts[1] : edgeOffsets[1] + lastEdgeVerts[0], vert1},
+          {lastEdgeVerts[1], i == 1 ? edgeOffsets[0] : lastEdgeOffset,
+           lastEdgeVerts[0], newEdgeOffset},
+          {edgeVert2 - lastEdgeVerts[1],
+           i == 1 ? edgeAdded[0] : newEdgeOffset - lastEdgeOffset,
+           edgeVert1 - lastEdgeVerts[0], added},
+          {edgeFwd[3], i == 1 ? edgeFwd[0] : false, edgeFwd[1], true});
       lastEdgeOffset = newEdgeOffset;
       lastEdgeVerts = {edgeVert1, edgeVert2};
     }
     PartitionQuad(  // TODO: account for edge directions
         triVert, vertBary,
-        {edgeOffsets[edge[3]] + lastEdgeVerts[1],
-         edgeOffsets[edge[1]] + lastEdgeVerts[0], cornerVerts[edge[2]],
-         cornerVerts[edge[3]]},
-        {lastEdgeOffset, lastEdgeVerts[0], edgeOffsets[edge[2]],
-         lastEdgeVerts[1]},
-        {vertBary.size() - lastEdgeOffset,
-         edgeAdded[edge[1]] - 1 - lastEdgeVerts[0], edgeAdded[edge[2]],
-         edgeAdded[edge[3]] - 1 - lastEdgeVerts[1]},
-        {false, edgeFwd[edge[1]], edgeFwd[edge[2]], edgeFwd[edge[3]]});
+        {cornerVerts[3], edgeOffsets[3] + lastEdgeVerts[1],
+         edgeOffsets[1] + lastEdgeVerts[0], cornerVerts[2]},
+        {lastEdgeVerts[1], lastEdgeOffset, lastEdgeVerts[0], edgeOffsets[2]},
+        {edgeAdded[3] - 1 - lastEdgeVerts[1], vertBary.size() - lastEdgeOffset,
+         edgeAdded[1] - 1 - lastEdgeVerts[0], edgeAdded[2]},
+        {edgeFwd[3], false, edgeFwd[1], edgeFwd[2]});
   }
 };
 
