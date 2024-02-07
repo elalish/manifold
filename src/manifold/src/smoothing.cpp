@@ -321,13 +321,16 @@ struct InterpTri {
 
 class Partition {
  public:
-  int interiorOffset;
   glm::ivec3 idx;
   glm::ivec3 sortedDivisions;
   std::vector<glm::vec3> vertBary;
   std::vector<glm::ivec3> triVert;
 
-  int NumInterior() const { return vertBary.size() - interiorOffset; }
+  int InteriorOffset() const {
+    return sortedDivisions[0] + sortedDivisions[1] + sortedDivisions[2];
+  }
+
+  int NumInterior() const { return vertBary.size() - InteriorOffset(); }
 
   static Partition GetPartition(glm::ivec3 divisions) {
     glm::ivec3 sortedDiv = divisions;
@@ -399,7 +402,6 @@ class Partition {
             glm::mix(partition.vertBary[i], nextBary, (float)j / n[i]));
       }
     }
-    partition.interiorOffset = partition.vertBary.size();
     const glm::ivec3 edgeOffsets = {3, 3 + n[0] - 1, 3 + n[0] - 1 + n[1] - 1};
 
     const float f = n[2] * n[2] + n[0] * n[0];
@@ -437,8 +439,7 @@ class Partition {
 
     Dump(partition.vertBary);
     Dump(partition.triVert);
-    std::cout << partition.interiorOffset << ", " << partition.sortedDivisions
-              << std::endl;
+    std::cout << partition.sortedDivisions << std::endl;
 
     cache.insert({n, partition});
     return partition;
@@ -804,12 +805,14 @@ Vec<Barycentric> Manifold::Impl::Subdivide(float length) {
                     triVerts.begin() + triOffset[tri]);
 
                const auto& subBary = subTris[tri].vertBary;
-               transform(ExecutionPolicy::Seq, subBary.begin(), subBary.end(),
-                         vertBary.begin() + interiorOffset[tri],
+               transform(ExecutionPolicy::Seq,
+                         subBary.begin() + subTris[tri].InteriorOffset(),
+                         subBary.end(), vertBary.begin() + interiorOffset[tri],
                          [tri](glm::vec3 bary) {
                            return Barycentric({tri, bary});
                          });
              });
+  vertBary.Dump();
 
   Vec<glm::vec3> newVertPos(vertBary.size());
   for_each_n(
