@@ -345,7 +345,7 @@ TEST(Manifold, Smooth) {
 TEST(Manifold, Smooth2Length) {
   Manifold tet = Manifold::Tetrahedron();
   Manifold smooth = Manifold::Smooth(tet.GetMesh());
-  smooth = smooth.RefineToLength(1);
+  smooth = smooth.RefineToLength(0.7);
   ExpectMeshes(smooth, {{10, 16}});
   auto prop = smooth.GetProperties();
   EXPECT_NEAR(prop.volume, 8, 0.01);
