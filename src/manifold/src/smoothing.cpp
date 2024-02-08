@@ -437,9 +437,9 @@ class Partition {
       }
     }
 
-    Dump(partition.vertBary);
-    Dump(partition.triVert);
-    std::cout << partition.sortedDivisions << std::endl;
+    // Dump(partition.vertBary);
+    // Dump(partition.triVert);
+    // std::cout << partition.sortedDivisions << std::endl;
 
     cache.insert({n, partition});
     return partition;
@@ -455,15 +455,15 @@ class Partition {
       return edgeOffsets[edge] + (edgeFwd[edge] ? 1 : -1) * idx;
     };
 
-    std::cout << "added: " << edgeAdded << std::endl;
-    std::cout << "corner: " << cornerVerts << std::endl;
-    std::cout << "offset: " << edgeOffsets << std::endl;
+    // std::cout << "added: " << edgeAdded << std::endl;
+    // std::cout << "corner: " << cornerVerts << std::endl;
+    // std::cout << "offset: " << edgeOffsets << std::endl;
 
     int corner = -1;
     int last = 3;
     int maxEdge = -1;
     for (const int i : {0, 1, 2, 3}) {
-      if (edgeAdded[i] == 0 && edgeAdded[last] == 0) {
+      if (corner == -1 && edgeAdded[i] == 0 && edgeAdded[last] == 0) {
         corner = i;
       }
       if (edgeAdded[i] > 0) {
@@ -476,22 +476,41 @@ class Partition {
       last = i;
     }
     if (corner >= 0) {  // terminate
-      for (const int j : {1, 2}) {
-        const int side = (corner + j) % 4;
-        int sideVert = cornerVerts[side];
-        for (int i = 0; i < edgeAdded[side]; ++i) {
-          const int nextVert = edgeOffsets[side] + i;
-          triVert.push_back({cornerVerts[corner], sideVert, nextVert});
-          sideVert = nextVert;
+      if (maxEdge >= 0) {
+        glm::ivec4 edge = (glm::ivec4(0, 1, 2, 3) + maxEdge) % 4;
+        const int middle = edgeAdded[maxEdge] / 2;
+        triVert.push_back({cornerVerts[edge[2]], cornerVerts[edge[3]],
+                           edgeOffsets[maxEdge] + middle});
+        int last = cornerVerts[edge[0]];
+        for (int i = 0; i <= middle; ++i) {
+          const int next = edgeOffsets[maxEdge] + i;
+          triVert.push_back({cornerVerts[edge[3]], last, next});
+          last = next;
         }
-        triVert.push_back(
-            {cornerVerts[corner], sideVert, cornerVerts[(corner + j + 1) % 4]});
+        last = cornerVerts[edge[1]];
+        for (int i = edgeAdded[maxEdge] - 1; i >= middle; --i) {
+          const int next = edgeOffsets[maxEdge] + i;
+          triVert.push_back({cornerVerts[edge[2]], next, last});
+          last = next;
+        }
+      } else {
+        for (const int j : {1, 2}) {
+          const int side = (corner + j) % 4;
+          int sideVert = cornerVerts[side];
+          for (int i = 0; i < edgeAdded[side]; ++i) {
+            const int nextVert = edgeOffsets[side] + i;
+            triVert.push_back({cornerVerts[corner], sideVert, nextVert});
+            sideVert = nextVert;
+          }
+          triVert.push_back({cornerVerts[corner], sideVert,
+                             cornerVerts[(corner + j + 1) % 4]});
+        }
       }
       return;
     }
     // recursively partition
     const int partitions = 1 + glm::min(edgeAdded[1], edgeAdded[3]);
-    std::cout << partitions << std::endl;
+    // std::cout << partitions << std::endl;
     glm::ivec4 newCornerVerts = {cornerVerts[1], -1, -1, cornerVerts[0]};
     glm::ivec4 newEdgeOffsets = {edgeOffsets[1], -1, -1, edgeOffsets[0]};
     glm::ivec4 newEdgeAdded = {0, -1, 0, edgeAdded[0]};
