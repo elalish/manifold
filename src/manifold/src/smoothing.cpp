@@ -422,37 +422,40 @@ class Partition {
                     {true, true, true, true});
     } else {  // obtuse -> spit into two acute
       // portion of n[0] under n[2]
-      const int ns = glm::round((f - n[1] * n[1]) / (2 * n[0]));
-      // height from n[0]
-      const int nh = glm::max(1., glm::sqrt(n[2] * n[2] - ns * ns));
+      const int ns = (f - n[1] * n[1]) / (2 * n[0]);
+      // height from n[0]: nh <= n[2]
+      const int nh = glm::max(1., glm::round(glm::sqrt(n[2] * n[2] - ns * ns)));
       std::cout << ns << ", " << nh << std::endl;
 
       const int hOffset = partition.vertBary.size();
       const glm::vec3 middleBary = partition.vertBary[edgeOffsets[0] + ns];
-      for (int j = 1; j < ns; ++j) {
+      for (int j = 1; j < nh; ++j) {
         partition.vertBary.push_back(
-            glm::mix(partition.vertBary[2], middleBary, (float)j / ns));
+            glm::mix(partition.vertBary[2], middleBary, (float)j / nh));
       }
 
       partition.triVert.push_back({edgeOffsets[1] - 1, 1, edgeOffsets[1]});
       PartitionQuad(
           partition.triVert, partition.vertBary,
-          {edgeOffsets[1] - 1, edgeOffsets[1], 2, edgeOffsets[0] + ns},
-          {-1, edgeOffsets[1] + 1, hOffset, edgeOffsets[0] + ns + 1},
+          {edgeOffsets[1] - 1, edgeOffsets[1], 2, edgeOffsets[0] + ns - 1},
+          {-1, edgeOffsets[1] + 1, hOffset, edgeOffsets[0] + ns},
           {0, n[1] - 2, nh - 1, n[0] - ns - 2}, {true, true, true, true});
 
       if (n[2] == 1) {
-        ASSERT(nh == 1, logicErr, "unexpected height!");
-        PartitionFan(partition.triVert, {0, edgeOffsets[0] + ns, 2}, ns - 1,
+        PartitionFan(partition.triVert, {0, edgeOffsets[0] + ns - 1, 2}, ns - 1,
                      edgeOffsets[0]);
       } else {
-        ASSERT(ns > 1, logicErr, "unexpected size!");
-        partition.triVert.push_back({hOffset - 1, 0, edgeOffsets[0]});
-        PartitionQuad(
-            partition.triVert, partition.vertBary,
-            {hOffset - 1, edgeOffsets[0], edgeOffsets[0] + ns, 2},
-            {-1, edgeOffsets[0] + 1, hOffset + nh - 1, edgeOffsets[2]},
-            {0, ns - 2, nh - 1, n[2] - 2}, {true, true, false, true});
+        if (ns == 1) {
+          partition.triVert.push_back({hOffset, 2, edgeOffsets[2]});
+          PartitionQuad(partition.triVert, partition.vertBary, {}, {}, {}, {});
+        } else {
+          partition.triVert.push_back({hOffset - 1, 0, edgeOffsets[0]});
+          PartitionQuad(
+              partition.triVert, partition.vertBary,
+              {hOffset - 1, edgeOffsets[0], edgeOffsets[0] + ns - 1, 2},
+              {-1, edgeOffsets[0] + 1, hOffset + nh - 1, edgeOffsets[2]},
+              {0, ns - 2, nh - 1, n[2] - 2}, {true, true, false, true});
+        }
       }
     }
 
@@ -875,6 +878,8 @@ Vec<Barycentric> Manifold::Impl::Subdivide(float length) {
         thrust::get<0>(inOut) = triPos * bary.uvw;
       });
   vertPos_ = newVertPos;
+
+  triVerts.Dump();
 
   faceNormal_.resize(0);
 
