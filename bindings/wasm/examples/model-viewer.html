@@ -46,9 +46,10 @@
     <option value="union">Union</option>
   </select>
   <button id="download">Download manifold GLB</button>
-  <model-viewer camera-controls shadow-intensity="1" alt="Output of mesh Boolean operation"></model-viewer>
+  <model-viewer camera-controls shadow-intensity="1" tone-mapping="commerce"
+    alt="Output of mesh Boolean operation"></model-viewer>
 </body>
-<script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.3.0/model-viewer.min.js"></script>
+<script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
 <script type="module">
   import { Document, WebIO } from '@gltf-transform/core';
   import { clearNodeTransform, flatten, prune } from '@gltf-transform/functions';
