@@ -112,6 +112,8 @@ function switchTo(scriptName) {
     isExample = exampleFunctions.get(scriptName) != null;
     const code = isExample ? exampleFunctions.get(scriptName).substring(1) :
                              getScript(scriptName) ?? '';
+    window.location.hash = `#${scriptName}`;
+    window.location.search = '';
     editor.setValue(code);
   }
 }
@@ -129,8 +131,6 @@ function createDropdownItem(name) {
 
   button.onclick = function() {
     saveCurrent();
-    window.location.hash = `#${label.textContent}`;
-    window.location.search = '';
     switchTo(label.textContent);
   };
   // Stop text input spaces from triggering the button
@@ -217,7 +217,6 @@ function addEdit(button) {
       removeScript(label.textContent);
       if (currentFileElement.textContent == label.textContent) {
         switchTo('Intro');
-        window.location.hash = '#Intro';
       }
       const container = button.parentElement;
       container.parentElement.removeChild(container);
@@ -332,6 +331,8 @@ require(['vs/editor/editor.main'], async function() {
     else {
       switchTo(name);
     }
+  } else {
+    switchTo(currentName);
   }
 
   if (manifoldInitialized) {
