@@ -343,9 +343,10 @@ TEST(Manifold, Smooth) {
 }
 
 TEST(Manifold, Smooth2Length) {
-  Manifold tet = Manifold::Tetrahedron();
-  Manifold smooth = Manifold::Smooth(tet.GetMesh());
-  smooth = smooth.RefineToLength(1);
+  Manifold cone = Manifold::Extrude(
+      CrossSection::Circle(10, 20).Translate({10, 0}), 2, 0, 0, {0, 0});
+  Manifold smooth = Manifold::Smooth(cone.GetMesh());
+  smooth = smooth.RefineToLength(4);
   ExpectMeshes(smooth, {{10, 16}});
   auto prop = smooth.GetProperties();
   EXPECT_NEAR(prop.volume, 8, 0.01);

@@ -404,17 +404,14 @@ class Partition {
     }
     const glm::ivec3 edgeOffsets = {3, 3 + n[0] - 1, 3 + n[0] - 1 + n[1] - 1};
 
+    std::cout << partition.sortedDivisions << std::endl;
+
     const float f = n[2] * n[2] + n[0] * n[0];
     if (n[1] == 1) {
       if (n[0] == 1) {
         partition.triVert.push_back({0, 1, 2});
-      } else {  // fan
-        int last = 0;
-        for (int i = 0; i < n[0]; ++i) {
-          partition.triVert.push_back({last, edgeOffsets[i], 2});
-          last = edgeOffsets[i];
-        }
-        partition.triVert.push_back({last, 1, 2});
+      } else {
+        PartitionFan(partition.triVert, {0, 1, 2}, n[0] - 1, edgeOffsets[0]);
       }
     } else if (n[1] * n[1] > f - glm::sqrt(2.0f) * n[0] * n[2]) {  // acute-ish
       partition.triVert.push_back({edgeOffsets[1] - 1, 1, edgeOffsets[1]});
@@ -423,11 +420,12 @@ class Partition {
                     {-1, edgeOffsets[1] + 1, edgeOffsets[2], edgeOffsets[0]},
                     {0, n[1] - 2, n[2] - 1, n[0] - 2},
                     {true, true, true, true});
-    } else {  // obtuse
+    } else {  // obtuse -> spit into two acute
       // portion of n[0] under n[2]
       const int ns = glm::round((f - n[1] * n[1]) / (2 * n[0]));
       // height from n[0]
-      const int nh = glm::round(glm::sqrt(n[2] * n[2] - ns * ns));
+      const int nh = glm::max(1., glm::sqrt(n[2] * n[2] - ns * ns));
+      std::cout << ns << ", " << nh << std::endl;
 
       const int hOffset = partition.vertBary.size();
       const glm::vec3 middleBary = partition.vertBary[edgeOffsets[0] + ns];
@@ -443,19 +441,38 @@ class Partition {
           {-1, edgeOffsets[1] + 1, hOffset, edgeOffsets[0] + ns + 1},
           {0, n[1] - 2, nh - 1, n[0] - ns - 2}, {true, true, true, true});
 
-      partition.triVert.push_back({hOffset - 1, 0, edgeOffsets[0]});
-      PartitionQuad(partition.triVert, partition.vertBary,
-                    {hOffset - 1, edgeOffsets[0], edgeOffsets[0] + ns, 2},
-                    {-1, edgeOffsets[0] + 1, hOffset + nh - 1, edgeOffsets[2]},
-                    {0, ns - 2, nh - 1, n[2] - 2}, {true, true, false, true});
+      if (n[2] == 1) {
+        ASSERT(nh == 1, logicErr, "unexpected height!");
+        PartitionFan(partition.triVert, {0, edgeOffsets[0] + ns, 2}, ns - 1,
+                     edgeOffsets[0]);
+      } else {
+        ASSERT(ns > 1, logicErr, "unexpected size!");
+        partition.triVert.push_back({hOffset - 1, 0, edgeOffsets[0]});
+        PartitionQuad(
+            partition.triVert, partition.vertBary,
+            {hOffset - 1, edgeOffsets[0], edgeOffsets[0] + ns, 2},
+            {-1, edgeOffsets[0] + 1, hOffset + nh - 1, edgeOffsets[2]},
+            {0, ns - 2, nh - 1, n[2] - 2}, {true, true, false, true});
+      }
     }
 
-    // Dump(partition.vertBary);
-    // Dump(partition.triVert);
-    // std::cout << partition.sortedDivisions << std::endl;
+    Dump(partition.vertBary);
+    Dump(partition.triVert);
 
     cache.insert({n, partition});
     return partition;
+  }
+
+  // Side 0 has added edges while sides 1 and 2 do not. Fan spreads from vert 2.
+  static void PartitionFan(std::vector<glm::ivec3>& triVert,
+                           glm::ivec3 cornerVerts, int added, int edgeOffset) {
+    int last = cornerVerts[0];
+    for (int i = 0; i < added; ++i) {
+      const int next = edgeOffset + i;
+      triVert.push_back({last, next, cornerVerts[2]});
+      last = next;
+    }
+    triVert.push_back({last, cornerVerts[1], cornerVerts[2]});
   }
 
   // Partitions are parallel to the first edge unless two consecutive edgeAdded
@@ -468,9 +485,12 @@ class Partition {
       return edgeOffsets[edge] + (edgeFwd[edge] ? 1 : -1) * idx;
     };
 
-    // std::cout << "added: " << edgeAdded << std::endl;
-    // std::cout << "corner: " << cornerVerts << std::endl;
-    // std::cout << "offset: " << edgeOffsets << std::endl;
+    std::cout << "added: " << edgeAdded << std::endl;
+    std::cout << "corner: " << cornerVerts << std::endl;
+    std::cout << "offset: " << edgeOffsets << std::endl;
+
+    ASSERT(glm::all(glm::greaterThanEqual(edgeAdded, glm::ivec4(0))), logicErr,
+           "negative divisions!");
 
     int corner = -1;
     int last = 3;
