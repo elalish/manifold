@@ -408,7 +408,7 @@ class Partition {
     if (n[1] == 1) {
       if (n[0] == 1) {
         partition.triVert.push_back({0, 1, 2});
-      } else {
+      } else {  // fan
         int last = 0;
         for (int i = 0; i < n[0]; ++i) {
           partition.triVert.push_back({last, edgeOffsets[i], 2});
@@ -416,25 +416,38 @@ class Partition {
         }
         partition.triVert.push_back({last, 1, 2});
       }
-    } else if (false) {  // n[1] < f - glm::sqrt(2.0f) * n[0] * n[2]
-      std::cout << f - glm::sqrt(2.0f) * n[0] * n[2] << std::endl;
-      // portion of n[0] under n[2]
-      const int n1 = glm::round((f - n[1] * n[1]) / (2 * n[0]));
-      // height from n[0]
-      const int n2 = glm::round(glm::sqrt(n[2] * n[2] - n1 * n1));
-
-      // GetPartition({n[0]-n1,n[1],n2})
-      // GetPartition({n1,n2,n[2]})
-      // Put these together
-    } else {
+    } else if (n[1] * n[1] > f - glm::sqrt(2.0f) * n[0] * n[2]) {  // acute-ish
       partition.triVert.push_back({edgeOffsets[1] - 1, 1, edgeOffsets[1]});
-      if (n[0] > 1) {
-        PartitionQuad(partition.triVert, partition.vertBary,
-                      {edgeOffsets[1] - 1, edgeOffsets[1], 2, 0},
-                      {-1, edgeOffsets[1] + 1, edgeOffsets[2], edgeOffsets[0]},
-                      {0, n[1] - 2, n[2] - 1, n[0] - 2},
-                      {true, true, true, true});
+      PartitionQuad(partition.triVert, partition.vertBary,
+                    {edgeOffsets[1] - 1, edgeOffsets[1], 2, 0},
+                    {-1, edgeOffsets[1] + 1, edgeOffsets[2], edgeOffsets[0]},
+                    {0, n[1] - 2, n[2] - 1, n[0] - 2},
+                    {true, true, true, true});
+    } else {  // obtuse
+      // portion of n[0] under n[2]
+      const int ns = glm::round((f - n[1] * n[1]) / (2 * n[0]));
+      // height from n[0]
+      const int nh = glm::round(glm::sqrt(n[2] * n[2] - ns * ns));
+
+      const int hOffset = partition.vertBary.size();
+      const glm::vec3 middleBary = partition.vertBary[edgeOffsets[0] + ns];
+      for (int j = 1; j < ns; ++j) {
+        partition.vertBary.push_back(
+            glm::mix(partition.vertBary[2], middleBary, (float)j / ns));
       }
+
+      partition.triVert.push_back({edgeOffsets[1] - 1, 1, edgeOffsets[1]});
+      PartitionQuad(
+          partition.triVert, partition.vertBary,
+          {edgeOffsets[1] - 1, edgeOffsets[1], 2, edgeOffsets[0] + ns},
+          {-1, edgeOffsets[1] + 1, hOffset, edgeOffsets[0] + ns + 1},
+          {0, n[1] - 2, nh - 1, n[0] - ns - 2}, {true, true, true, true});
+
+      partition.triVert.push_back({hOffset - 1, 0, edgeOffsets[0]});
+      PartitionQuad(partition.triVert, partition.vertBary,
+                    {hOffset - 1, edgeOffsets[0], edgeOffsets[0] + ns, 2},
+                    {-1, edgeOffsets[0] + 1, hOffset + nh - 1, edgeOffsets[2]},
+                    {0, ns - 2, nh - 1, n[2] - 2}, {true, true, false, true});
     }
 
     // Dump(partition.vertBary);
