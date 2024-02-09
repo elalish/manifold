@@ -14,6 +14,7 @@
 
 import ManifoldWorker from './worker?worker';
 
+const CODE_START = '<code>';
 // Loaded globally by examples.js
 const exampleFunctions = self.examples.functionBodies;
 
@@ -37,8 +38,10 @@ formatButton.onclick = () =>
     editor.trigger('ignored', 'editor.action.formatDocument');
 shareButton.onclick = () => {
   const url = new URL(window.location.toString());
-  url.hash = `#${currentFileElement.textContent}`;
-  url.searchParams.set('script', editor.getValue());
+  url.hash =
+      '#' +
+      encodeURIComponent(
+          currentFileElement.textContent + CODE_START + editor.getValue());
   navigator.clipboard.writeText(url.toString());
   console.log('Sharable link copied to clipboard!');
 };
@@ -112,8 +115,7 @@ function switchTo(scriptName) {
     isExample = exampleFunctions.get(scriptName) != null;
     const code = isExample ? exampleFunctions.get(scriptName).substring(1) :
                              getScript(scriptName) ?? '';
-    window.location.hash = `#${scriptName}`;
-    window.location.search = '';
+    window.location.hash = '#' + scriptName;
     editor.setValue(code);
   }
 }
@@ -320,16 +322,20 @@ require(['vs/editor/editor.main'], async function() {
       addEdit(button);
     }
   }
-  const params = new URLSearchParams(window.location.search);
-  const codeEncoded = params.get('script');
+
   if (window.location.hash.length > 0) {
-    const name = decodeURIComponent(window.location.hash.substring(1))
-    if (codeEncoded != null) {
-      autoExecute = false;
-      switchTo(newItem(decodeURIComponent(codeEncoded), name).name);
-    }
-    else {
-      switchTo(name);
+    const fragment = decodeURIComponent(window.location.hash.substring(1));
+    const codeIdx = fragment.indexOf(CODE_START);
+    if (codeIdx != -1) {
+      autoExecute = true;
+      const name = fragment.substring(0, codeIdx);
+      switchTo(
+          newItem(fragment.substring(codeIdx + CODE_START.length), name).name);
+    } else {
+      if (fragment != currentName) {
+        autoExecute = true;
+      }
+      switchTo(fragment);
     }
   } else {
     switchTo(currentName);
