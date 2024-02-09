@@ -447,7 +447,11 @@ class Partition {
       } else {
         if (ns == 1) {
           partition.triVert.push_back({hOffset, 2, edgeOffsets[2]});
-          PartitionQuad(partition.triVert, partition.vertBary, {}, {}, {}, {});
+          PartitionQuad(partition.triVert, partition.vertBary,
+                        {hOffset, edgeOffsets[2], 0, edgeOffsets[0]},
+                        {-1, edgeOffsets[2] + 1, -1, hOffset + nh - 2},
+                        {0, n[2] - 2, ns - 1, nh - 2},
+                        {true, true, true, false});
         } else {
           partition.triVert.push_back({hOffset - 1, 0, edgeOffsets[0]});
           PartitionQuad(
