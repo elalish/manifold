@@ -358,8 +358,15 @@ class Partition {
                           glm::bvec3 edgeFwd, int interiorOffset) const {
     Vec<int> newVerts;
     newVerts.reserve(vertBary.size());
+    glm::ivec3 triIdx = idx;
+    std::vector<int> outTri = {0, 1, 2};
+    if (idx[1] != Next3(idx[0])) {
+      triIdx = {idx[2], idx[0], idx[1]};
+      edgeFwd = glm::not_(edgeFwd);
+      std::swap(outTri[0], outTri[1]);
+    }
     for (const int i : {0, 1, 2}) {
-      newVerts.push_back(tri[idx[i]]);
+      newVerts.push_back(tri[triIdx[i]]);
     }
     for (const int i : {0, 1, 2}) {
       const int n = sortedDivisions[i] - 1;
@@ -377,7 +384,7 @@ class Partition {
     Vec<glm::ivec3> newTriVert(triVert.size());
     for (int i = 0; i < triVert.size(); ++i) {
       for (const int j : {0, 1, 2}) {
-        newTriVert[i][j] = newVerts[triVert[i][j]];
+        newTriVert[i][outTri[j]] = newVerts[triVert[i][j]];
       }
     }
     return newTriVert;
@@ -457,7 +464,7 @@ class Partition {
           PartitionQuad(
               partition.triVert, partition.vertBary,
               {hOffset - 1, edgeOffsets[0], edgeOffsets[0] + ns - 1, 2},
-              {-1, edgeOffsets[0] + 1, hOffset + nh - 1, edgeOffsets[2]},
+              {-1, edgeOffsets[0] + 1, hOffset + nh - 2, edgeOffsets[2]},
               {0, ns - 2, nh - 1, n[2] - 2}, {true, true, false, true});
         }
       }

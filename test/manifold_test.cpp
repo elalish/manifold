@@ -344,7 +344,7 @@ TEST(Manifold, Smooth) {
 
 TEST(Manifold, Smooth2Length) {
   Manifold cone = Manifold::Extrude(
-      CrossSection::Circle(10, 5).Translate({10, 0}), 2, 0, 0, {0, 0});
+      CrossSection::Circle(10, 8).Translate({10, 0}), 2, 0, 0, {0, 0});
   Manifold smooth = Manifold::Smooth(cone.GetMesh());
   smooth = smooth.RefineToLength(8);
   ExpectMeshes(smooth, {{10, 16}});
