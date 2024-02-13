@@ -560,7 +560,8 @@ class Partition {
     const int partitions = 1 + glm::min(edgeAdded[1], edgeAdded[3]);
     // std::cout << partitions << std::endl;
     glm::ivec4 newCornerVerts = {cornerVerts[1], -1, -1, cornerVerts[0]};
-    glm::ivec4 newEdgeOffsets = {edgeOffsets[1], -1, -1, edgeOffsets[0]};
+    glm::ivec4 newEdgeOffsets = {
+        edgeOffsets[1], -1, edgeOffsets[3] + edgeAdded[3] + 1, edgeOffsets[0]};
     glm::ivec4 newEdgeAdded = {0, -1, 0, edgeAdded[0]};
     glm::bvec4 newEdgeFwd = {edgeFwd[1], true, edgeFwd[3], edgeFwd[0]};
 
@@ -575,11 +576,11 @@ class Partition {
 
       newCornerVerts[1] = GetEdgeVert(1, cornerOffset1);
       newCornerVerts[2] = GetEdgeVert(3, cornerOffset3);
-      newEdgeOffsets[1] = vertBary.size();
-      newEdgeOffsets[2] = nextOffset3;
       newEdgeAdded[0] = std::abs(nextOffset1 - newEdgeOffsets[0]) - 1;
       newEdgeAdded[1] = added;
-      newEdgeAdded[2] = std::abs(nextOffset3 - newEdgeOffsets[2]);
+      newEdgeAdded[2] = std::abs(nextOffset3 - newEdgeOffsets[2]) - 1;
+      newEdgeOffsets[1] = vertBary.size();
+      newEdgeOffsets[2] = nextOffset3;
 
       for (int j = 0; j < added; ++j) {
         vertBary.push_back(glm::mix(vertBary[newCornerVerts[1]],
