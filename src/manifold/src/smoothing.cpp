@@ -323,8 +323,8 @@ class Partition {
  public:
   glm::ivec3 idx;
   glm::ivec3 sortedDivisions;
-  std::vector<glm::vec3> vertBary;
-  std::vector<glm::ivec3> triVert;
+  Vec<glm::vec3> vertBary;
+  Vec<glm::ivec3> triVert;
 
   int InteriorOffset() const {
     return sortedDivisions[0] + sortedDivisions[1] + sortedDivisions[2];
@@ -401,7 +401,9 @@ class Partition {
     }
     Partition partition;
     partition.sortedDivisions = n;
-    partition.vertBary = {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}};
+    partition.vertBary.push_back({1, 0, 0});
+    partition.vertBary.push_back({0, 1, 0});
+    partition.vertBary.push_back({0, 0, 1});
     for (const int i : {0, 1, 2}) {
       const glm::vec3 nextBary = partition.vertBary[(i + 1) % 3];
       for (int j = 1; j < n[i]; ++j) {
@@ -470,16 +472,16 @@ class Partition {
       }
     }
 
-    Dump(partition.vertBary);
-    Dump(partition.triVert);
+    partition.vertBary.Dump();
+    partition.triVert.Dump();
 
     cache.insert({n, partition});
     return partition;
   }
 
   // Side 0 has added edges while sides 1 and 2 do not. Fan spreads from vert 2.
-  static void PartitionFan(std::vector<glm::ivec3>& triVert,
-                           glm::ivec3 cornerVerts, int added, int edgeOffset) {
+  static void PartitionFan(Vec<glm::ivec3>& triVert, glm::ivec3 cornerVerts,
+                           int added, int edgeOffset) {
     int last = cornerVerts[0];
     for (int i = 0; i < added; ++i) {
       const int next = edgeOffset + i;
@@ -491,8 +493,7 @@ class Partition {
 
   // Partitions are parallel to the first edge unless two consecutive edgeAdded
   // are zero, in which case a terminal triangulation is performed.
-  static void PartitionQuad(std::vector<glm::ivec3>& triVert,
-                            std::vector<glm::vec3>& vertBary,
+  static void PartitionQuad(Vec<glm::ivec3>& triVert, Vec<glm::vec3>& vertBary,
                             glm::ivec4 cornerVerts, glm::ivec4 edgeOffsets,
                             glm::ivec4 edgeAdded, glm::bvec4 edgeFwd) {
     auto GetEdgeVert = [&](int edge, int idx) {
