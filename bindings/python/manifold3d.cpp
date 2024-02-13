@@ -538,7 +538,8 @@ NB_MODULE(manifold3d, m) {
           ":param level: You can inset your Mesh by using a positive value, or "
           "outset it with a negative value."
           ":return Mesh: This mesh is guaranteed to be manifold."
-          "Use Manifold.from_mesh(mesh) to create a Manifold");
+          "Use Manifold.from_mesh(mesh) to create a Manifold")
+      .def("merge", &MeshGL::Merge, mesh_gl__merge);
 
   nb::enum_<Manifold::Error>(m, "Error")
       .value("NoError", Manifold::Error::NoError)

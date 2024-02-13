@@ -89,6 +89,7 @@ def select_functions(s):
 
 collect(f"{base}/src/manifold/src/manifold.cpp", lambda s: method_re.search(s))
 collect(f"{base}/src/manifold/src/constructors.cpp", lambda s: method_re.search(s))
+collect(f"{base}/src/manifold/src/sort.cpp", lambda s: method_re.search(s))
 collect(
     f"{base}/src/cross_section/src/cross_section.cpp", lambda s: method_re.search(s)
 )
