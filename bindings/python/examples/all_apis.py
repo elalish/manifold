@@ -102,6 +102,7 @@ def all_manifold():
     e = m.status()
     m = Manifold.tetrahedron()
     mesh = m.to_mesh()
+    ok = mesh.merge()
     m = m.transform([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0]])
     m = m.translate((0, 0, 0))
     m = m.trim_by_plane((0, 0, 1), 0)
