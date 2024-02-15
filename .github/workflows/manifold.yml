@@ -177,9 +177,7 @@ jobs:
     - name: Test ${{matrix.parallel_backend}}
       shell: bash
       run: |
-        cd build
-        ls bindings/c
-        cd test
+        cd build/test
         ./Release/manifold_test.exe
         cd ../../
     - name: test cmake consumer
