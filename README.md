@@ -144,8 +144,8 @@ For more detailed documentation, please refer to the C++ API.
 Windows users should build with `-DBUILD_SHARED_LIBS=OFF`, as enabling shared
 libraries in general makes things very complicated.
 
-The DLL file for manifoldc (C FFI bindings) when built with msvc is in `${CMAKE_BINARY_DIR}/bin/manifoldc.dll`.
-For example, for the following command, the path relative to the project root directory is `build/bin/manifoldc.dll`.
+The DLL file for manifoldc (C FFI bindings) when built with msvc is in `${CMAKE_BINARY_DIR}/bin/${BUILD_TYPE}/manifoldc.dll`.
+For example, for the following command, the path relative to the project root directory is `build/bin/Release/manifoldc.dll`.
 ```sh
 cmake . -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DMANIFOLD_DEBUG=ON -DMANIFOLD_PAR=${{matrix.parallel_backend}} -A x64 -B build
 ```
