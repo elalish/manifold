@@ -123,16 +123,19 @@ class HashTableD {
 template <typename V, hash_fun_t H = hash64bit>
 class HashTable {
  public:
-  HashTable(uint32_t size, uint32_t step = 1)
-      : keys_{1 << (int)ceil(log2(size)), kOpen},
-        values_{1 << (int)ceil(log2(size)), {}},
-        table_{keys_, values_, used_, step} {}
+  HashTable(size_t size, uint32_t step = 1)
+      : keys_{1ul << (int)ceil(log2(size)), kOpen},
+        values_{1ul << (int)ceil(log2(size)), {}},
+        table_{keys_, values_, used_, step} {
+    if (keys_.size() >= std::numeric_limits<int>::max())
+      throw std::out_of_range("HashTable too large");
+  }
 
   HashTableD<V, H> D() { return table_; }
 
   int Entries() const { return AtomicLoad(used_[0]); }
 
-  int Size() const { return table_.Size(); }
+  size_t Size() const { return table_.Size(); }
 
   bool Full() const { return AtomicLoad(used_[0]) * 2 > Size(); }
 

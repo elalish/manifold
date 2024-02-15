@@ -351,6 +351,11 @@ Manifold::Impl::Impl(const MeshGL& meshGL,
   const int numVert = meshGL.NumVert();
   const int numTri = meshGL.NumTri();
 
+  if (meshGL.numProp > 3 &&
+      static_cast<size_t>(numVert) * static_cast<size_t>(meshGL.numProp - 3) >=
+          std::numeric_limits<int>::max())
+    throw std::out_of_range("mesh too large");
+
   if (meshGL.numProp < 3) {
     MarkFailure(Error::MissingPositionProperties);
     return;
@@ -381,7 +386,7 @@ Manifold::Impl::Impl(const MeshGL& meshGL,
 
   std::vector<int> prop2vert(numVert);
   std::iota(prop2vert.begin(), prop2vert.end(), 0);
-  for (int i = 0; i < meshGL.mergeFromVert.size(); ++i) {
+  for (size_t i = 0; i < meshGL.mergeFromVert.size(); ++i) {
     const int from = meshGL.mergeFromVert[i];
     const int to = meshGL.mergeToVert[i];
     if (from >= numVert || to >= numVert) {
@@ -390,8 +395,8 @@ Manifold::Impl::Impl(const MeshGL& meshGL,
     }
     prop2vert[from] = to;
   }
-  for (int i = 0; i < numTri; ++i) {
-    for (const int j : {0, 1, 2}) {
+  for (size_t i = 0; i < numTri; ++i) {
+    for (const size_t j : {0, 1, 2}) {
       const int vert = meshGL.triVerts[3 * i + j];
       if (vert < 0 || vert >= numVert) {
         MarkFailure(Error::VertexOutOfBounds);
@@ -405,8 +410,8 @@ Manifold::Impl::Impl(const MeshGL& meshGL,
 
   if (meshGL.numProp > 3) {
     relation.triProperties.resize(numTri);
-    for (int i = 0; i < numTri; ++i) {
-      for (const int j : {0, 1, 2}) {
+    for (size_t i = 0; i < numTri; ++i) {
+      for (const size_t j : {0, 1, 2}) {
         relation.triProperties[i][j] = meshGL.triVerts[3 * i + j];
       }
     }
@@ -480,11 +485,13 @@ Manifold::Impl::Impl(const Mesh& mesh, const MeshRelationD& relation,
                      const std::vector<float>& propertyTolerance,
                      bool hasFaceIDs)
     : vertPos_(mesh.vertPos), halfedgeTangent_(mesh.halfedgeTangent) {
+  if (mesh.triVerts.size() >= std::numeric_limits<int>::max())
+    throw std::out_of_range("mesh too large");
   meshRelation_ = {relation.originalID, relation.numProp, relation.properties,
                    relation.meshIDtransform};
 
   Vec<glm::ivec3> triVerts;
-  for (int i = 0; i < mesh.triVerts.size(); ++i) {
+  for (size_t i = 0; i < mesh.triVerts.size(); ++i) {
     const glm::ivec3 tri = mesh.triVerts[i];
     // Remove topological degenerates
     if (tri[0] != tri[1] && tri[1] != tri[2] && tri[2] != tri[0]) {
@@ -875,10 +882,10 @@ SparseIndices Manifold::Impl::EdgeCollisions(const Impl& Q,
     q1p2 = collider_.Collisions<false, false>(QedgeBB.cview());
 
   if (inverted)
-    for_each(policy, countAt(0), countAt(q1p2.size()),
+    for_each(policy, countAt(0ul), countAt(q1p2.size()),
              ReindexEdge<true>({edges, q1p2}));
   else
-    for_each(policy, countAt(0), countAt(q1p2.size()),
+    for_each(policy, countAt(0ul), countAt(q1p2.size()),
              ReindexEdge<false>({edges, q1p2}));
   return q1p2;
 }

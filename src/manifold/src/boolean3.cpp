@@ -71,9 +71,9 @@ struct CopyFaceEdges {
   SparseIndices &pXq1;
   VecView<const Halfedge> halfedgesQ;
 
-  void operator()(thrust::tuple<int, int> in) {
+  void operator()(thrust::tuple<size_t, size_t> in) {
     int idx = 3 * thrust::get<0>(in);
-    int i = thrust::get<1>(in);
+    size_t i = thrust::get<1>(in);
     int pX = p1q1.Get(i, inverted);
     int q2 = p1q1.Get(i, !inverted);
 
@@ -83,7 +83,7 @@ struct CopyFaceEdges {
       int a = pX;
       int b = edge.IsForward() ? q1 : edge.pairedHalfedge;
       if (inverted) std::swap(a, b);
-      pXq1.Set(idx + j, a, b);
+      pXq1.Set(idx + static_cast<size_t>(j), a, b);
     }
   }
 };
@@ -92,9 +92,9 @@ SparseIndices Filter11(const Manifold::Impl &inP, const Manifold::Impl &inQ,
                        const SparseIndices &p1q2, const SparseIndices &p2q1) {
   ZoneScoped;
   SparseIndices p1q1(3 * p1q2.size() + 3 * p2q1.size());
-  for_each_n(autoPolicy(p1q2.size()), zip(countAt(0), countAt(0)), p1q2.size(),
-             CopyFaceEdges<false>({p1q2, p1q1, inQ.halfedge_}));
-  for_each_n(autoPolicy(p2q1.size()), zip(countAt(p1q2.size()), countAt(0)),
+  for_each_n(autoPolicy(p1q2.size()), zip(countAt(0ul), countAt(0ul)),
+             p1q2.size(), CopyFaceEdges<false>({p1q2, p1q1, inQ.halfedge_}));
+  for_each_n(autoPolicy(p2q1.size()), zip(countAt(p1q2.size()), countAt(0ul)),
              p2q1.size(), CopyFaceEdges<true>({p2q1, p1q1, inP.halfedge_}));
   p1q1.Unique();
   return p1q1;
@@ -137,14 +137,14 @@ inline thrust::pair<int, glm::vec2> Shadow01(
 
 // https://github.com/scandum/binary_search/blob/master/README.md
 // much faster than standard binary search on large arrays
-int monobound_quaternary_search(VecView<const int64_t> array, int64_t key) {
+size_t monobound_quaternary_search(VecView<const int64_t> array, int64_t key) {
   if (array.size() == 0) {
     return -1;
   }
-  unsigned int bot = 0;
-  unsigned int top = array.size();
+  size_t bot = 0;
+  size_t top = array.size();
   while (top >= 65536) {
-    unsigned int mid = top / 4;
+    size_t mid = top / 4;
     top -= mid * 3;
     if (key < array[bot + mid * 2]) {
       if (key >= array[bot + mid]) {
@@ -159,7 +159,7 @@ int monobound_quaternary_search(VecView<const int64_t> array, int64_t key) {
   }
 
   while (top > 3) {
-    unsigned int mid = top / 2;
+    size_t mid = top / 2;
     if (key >= array[bot + mid]) {
       bot += mid;
     }
@@ -183,7 +183,7 @@ struct Kernel11 {
   VecView<const glm::vec3> normalP;
   const SparseIndices &p1q1;
 
-  void operator()(thrust::tuple<int, glm::vec4 &, int &> inout) {
+  void operator()(thrust::tuple<size_t, glm::vec4 &, int &> inout) {
     const int p1 = p1q1.Get(thrust::get<0>(inout), false);
     const int q1 = p1q1.Get(thrust::get<0>(inout), true);
     glm::vec4 &xyzz11 = thrust::get<1>(inout);
@@ -261,7 +261,7 @@ std::tuple<Vec<int>, Vec<glm::vec4>> Shadow11(SparseIndices &p1q1,
   Vec<glm::vec4> xyzz11(p1q1.size());
 
   for_each_n(autoPolicy(p1q1.size()),
-             zip(countAt(0), xyzz11.begin(), s11.begin()), p1q1.size(),
+             zip(countAt(0ul), xyzz11.begin(), s11.begin()), p1q1.size(),
              Kernel11({inP.vertPos_, inQ.vertPos_, inP.halfedge_, inQ.halfedge_,
                        expandP, inP.vertNormal_, p1q1}));
 
@@ -279,7 +279,7 @@ struct Kernel02 {
   const SparseIndices &p0q2;
   const bool forward;
 
-  void operator()(thrust::tuple<int, int &, float &> inout) {
+  void operator()(thrust::tuple<size_t, int &, float &> inout) {
     const int p0 = p0q2.Get(thrust::get<0>(inout), !forward);
     const int q2 = p0q2.Get(thrust::get<0>(inout), forward);
     int &s02 = thrust::get<1>(inout);
@@ -351,8 +351,8 @@ std::tuple<Vec<int>, Vec<float>> Shadow02(const Manifold::Impl &inP,
   Vec<float> z02(p0q2.size());
 
   auto vertNormalP = forward ? inP.vertNormal_ : inQ.vertNormal_;
-  for_each_n(autoPolicy(p0q2.size()), zip(countAt(0), s02.begin(), z02.begin()),
-             p0q2.size(),
+  for_each_n(autoPolicy(p0q2.size()),
+             zip(countAt(0ul), s02.begin(), z02.begin()), p0q2.size(),
              Kernel02({inP.vertPos_, inQ.halfedge_, inQ.vertPos_, expandP,
                        vertNormalP, p0q2, forward}));
 
@@ -374,7 +374,7 @@ struct Kernel12 {
   const bool forward;
   const SparseIndices &p1q2;
 
-  void operator()(thrust::tuple<int, int &, glm::vec3 &> inout) {
+  void operator()(thrust::tuple<size_t, int &, glm::vec3 &> inout) {
     int p1 = p1q2.Get(thrust::get<0>(inout), !forward);
     int q2 = p1q2.Get(thrust::get<0>(inout), forward);
     int &x12 = thrust::get<1>(inout);
@@ -394,7 +394,7 @@ struct Kernel12 {
     for (int vert : {edge.startVert, edge.endVert}) {
       const int64_t key = forward ? SparseIndices::EncodePQ(vert, q2)
                                   : SparseIndices::EncodePQ(q2, vert);
-      const int idx = monobound_quaternary_search(p0q2, key);
+      const size_t idx = monobound_quaternary_search(p0q2, key);
       if (idx != -1) {
         const int s = s02[idx];
         x12 += s * ((vert == edge.startVert) == forward ? 1 : -1);
@@ -415,7 +415,7 @@ struct Kernel12 {
       const int q1F = edge.IsForward() ? q1 : edge.pairedHalfedge;
       const int64_t key = forward ? SparseIndices::EncodePQ(p1, q1F)
                                   : SparseIndices::EncodePQ(q1F, p1);
-      const int idx = monobound_quaternary_search(p1q1, key);
+      const size_t idx = monobound_quaternary_search(p1q1, key);
       if (idx != -1) {  // s is implicitly zero for anything not found
         const int s = s11[idx];
         x12 -= s * (edge.IsForward() ? 1 : -1);
@@ -456,7 +456,7 @@ std::tuple<Vec<int>, Vec<glm::vec3>> Intersect12(
   Vec<glm::vec3> v12(p1q2.size());
 
   for_each_n(
-      autoPolicy(p1q2.size()), zip(countAt(0), x12.begin(), v12.begin()),
+      autoPolicy(p1q2.size()), zip(countAt(0ul), x12.begin(), v12.begin()),
       p1q2.size(),
       Kernel12({p0q2.AsVec64(), s02, z02, p1q1.AsVec64(), s11, xyzz11,
                 inP.halfedge_, inQ.halfedge_, inP.vertPos_, forward, p1q2}));
@@ -577,6 +577,14 @@ Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ,
   std::tie(x21_, v21_) =
       Intersect12(inQ, inP, s20, p2q0, s11, p1q1, z20, xyzz11, p2q1_, false);
   PRINT("x21 size = " << x21_.size());
+
+  if (p0q2.size() >= std::numeric_limits<int>::max() ||
+      p2q0.size() >= std::numeric_limits<int>::max() ||
+      x12_.size() >= std::numeric_limits<int>::max() ||
+      x21_.size() >= std::numeric_limits<int>::max() ||
+      w03_.size() >= std::numeric_limits<int>::max() ||
+      w30_.size() >= std::numeric_limits<int>::max())
+    throw std::out_of_range("mesh too large");
 
   Vec<int> p0 = p0q2.Copy(false);
   p0q2.Resize(0);
