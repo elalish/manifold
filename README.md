@@ -139,6 +139,17 @@ python binding documentation:
 
 For more detailed documentation, please refer to the C++ API.
 
+### Windows Shenanigans
+
+Windows users should build with `-DBUILD_SHARED_LIBS=OFF`, as enabling shared
+libraries in general makes things very complicated.
+
+The DLL file for manifoldc (C FFI bindings) when built with msvc is in `${CMAKE_BINARY_DIR}/bin/${BUILD_TYPE}/manifoldc.dll`.
+For example, for the following command, the path relative to the project root directory is `build/bin/Release/manifoldc.dll`.
+```sh
+cmake . -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DMANIFOLD_DEBUG=ON -DMANIFOLD_PAR=${{matrix.parallel_backend}} -A x64 -B build
+```
+
 ## Contributing
 
 Contributions are welcome! A lower barrier contribution is to simply make a PR that adds a test, especially if it repros an issue you've found. Simply name it prepended with DISABLED_, so that it passes the CI. That will be a very strong signal to me to fix your issue. However, if you know how to fix it yourself, then including the fix in your PR would be much appreciated!
