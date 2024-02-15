@@ -26,6 +26,7 @@ FetchContent_Declare(Thrust
 )
 find_package(Thrust QUIET)
 if(NOT Thrust_FOUND AND NOT DEFINED thrust_SOURCE_DIR)
+    message("thrust not found, downloading from source")
     FetchContent_Populate(Thrust)
 endif()
 
