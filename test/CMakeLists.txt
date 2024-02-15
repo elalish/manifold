@@ -60,7 +60,7 @@ if(MANIFOLD_FUZZ)
   gtest_discover_tests(polygon_fuzz)
 endif()
 
-if(MANIFOLD_CBIND)
+if(MANIFOLD_CBIND AND NOT EMSCRIPTEN)
   target_link_libraries(${PROJECT_NAME} manifoldc)
 endif()
 
