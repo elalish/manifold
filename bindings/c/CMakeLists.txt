@@ -1,6 +1,7 @@
 project(manifoldc)
 
-add_library(${PROJECT_NAME} manifoldc.cpp conv.cpp)
+# this is a shared library for FFI bindings
+add_library(${PROJECT_NAME} SHARED manifoldc.cpp conv.cpp)
 
 if(MANIFOLD_EXPORT)
     target_link_libraries(${PROJECT_NAME} PRIVATE meshIO)
