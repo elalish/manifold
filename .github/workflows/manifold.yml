@@ -163,8 +163,8 @@ jobs:
     - name: Test ${{matrix.parallel_backend}}
       shell: bash
       run: |
-        cd build/test
-        ./Release/manifold_test.exe
+        cd build/bin
+        ./manifold_test.exe
         cd ../../
     - name: test cmake consumer
       run: |
