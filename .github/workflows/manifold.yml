@@ -163,7 +163,7 @@ jobs:
     - name: Install Clipper2
       shell: powershell
       run: |
-        cd clipper2
+        cd clipper2/CPP
         cmake . -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -A x64 -B build
         cd build
         cmake --build . --target ALL_BUILD --config Release
