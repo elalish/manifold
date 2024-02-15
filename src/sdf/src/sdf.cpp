@@ -334,10 +334,15 @@ Mesh LevelSet(std::function<float(glm::vec3)> sdf, Box bounds, float edgeLength,
       const Uint64 lastMorton =
           MortonCode(glm::ivec4((lastVert - bounds.min) / spacing, 1));
       const float ratio = static_cast<float>(maxMorton) / lastMorton;
+      if (tableSize == std::numeric_limits<int>::max() - 1)
+        throw std::out_of_range("mesh too large");
+
       if (ratio > 1000)  // do not trust the ratio if it is too large
         tableSize *= 2;
       else
         tableSize *= ratio;
+      if (tableSize >= std::numeric_limits<int>::max())
+        tableSize = std::numeric_limits<int>::max() - 1;
       gridVerts = HashTable<GridVert, identity>(tableSize);
       vertPos = Vec<glm::vec3>(gridVerts.Size() * 7);
     } else {  // Success
