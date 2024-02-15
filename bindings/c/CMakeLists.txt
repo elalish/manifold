@@ -3,6 +3,14 @@ project(manifoldc)
 # this is a shared library for FFI bindings
 add_library(${PROJECT_NAME} SHARED manifoldc.cpp conv.cpp)
 
+if(MSVC)
+    set_target_properties(${PROJECT_NAME} PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
+    set_target_properties(${PROJECT_NAME} PROPERTIES RUNTIME_OUTPUT_DIRECTORY 
+        ${CMAKE_BINARY_DIR}/bin )
+    set_target_properties(${PROJECT_NAME} PROPERTIES LIBRARY_OUTPUT_DIRECTORY
+        ${CMAKE_BINARY_DIR}/bin )
+endif()
+
 if(MANIFOLD_EXPORT)
     target_link_libraries(${PROJECT_NAME} PRIVATE meshIO)
     target_compile_options(${PROJECT_NAME} PUBLIC -DMANIFOLD_EXPORT)

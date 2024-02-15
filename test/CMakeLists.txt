@@ -77,5 +77,11 @@ add_test(test_all ${PROJECT_NAME})
 if(EMSCRIPTEN)
   set_target_properties(${PROJECT_NAME} PROPERTIES LINK_FLAGS
     "-s ASSERTIONS=1 -s DEMANGLE_SUPPORT=1 --bind")
-else()
+endif()
+
+if(MSVC)
+    set_target_properties(${PROJECT_NAME} PROPERTIES RUNTIME_OUTPUT_DIRECTORY 
+        ${CMAKE_BINARY_DIR}/bin )
+    set_target_properties(${PROJECT_NAME} PROPERTIES LIBRARY_OUTPUT_DIRECTORY
+        ${CMAKE_BINARY_DIR}/bin )
 endif()
