@@ -222,7 +222,7 @@ void AddNewEdgeVerts(
         [&](size_t hash) { mutexes[hash % mutexes.size()].unlock(); },
         std::placeholders::_1);
     tbb::parallel_for(
-        tbb::blocked_range<size_t>(static_cast<size_t>(0), p1q2.size(), 32),
+        tbb::blocked_range<size_t>(0ul, p1q2.size(), 32),
         [&](const tbb::blocked_range<size_t> &range) {
           for (size_t i = range.begin(); i != range.end(); i++) processFun(i);
         },

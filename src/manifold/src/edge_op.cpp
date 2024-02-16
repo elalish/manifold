@@ -191,7 +191,7 @@ void Manifold::Impl::SimplifyTopology() {
     ZoneScopedN("CollapseShortEdge");
     numFlagged = 0;
     ShortEdge se{halfedge_, vertPos_, precision_};
-    for_each_n(policy, countAt(static_cast<size_t>(0)), nbEdges,
+    for_each_n(policy, countAt(0ul), nbEdges,
                [&](size_t i) { bflags[i] = se(i); });
     for (size_t i = 0; i < nbEdges; ++i) {
       if (bflags[i]) {
@@ -213,7 +213,7 @@ void Manifold::Impl::SimplifyTopology() {
     ZoneScopedN("CollapseFlaggedEdge");
     numFlagged = 0;
     FlagEdge se{halfedge_, meshRelation_.triRef};
-    for_each_n(policy, countAt(static_cast<size_t>(0)), nbEdges,
+    for_each_n(policy, countAt(0ul), nbEdges,
                [&](size_t i) { bflags[i] = se(i); });
     for (size_t i = 0; i < nbEdges; ++i) {
       if (bflags[i]) {
@@ -235,7 +235,7 @@ void Manifold::Impl::SimplifyTopology() {
     ZoneScopedN("RecursiveEdgeSwap");
     numFlagged = 0;
     SwappableEdge se{halfedge_, vertPos_, faceNormal_, precision_};
-    for_each_n(policy, countAt(static_cast<size_t>(0)), nbEdges,
+    for_each_n(policy, countAt(0ul), nbEdges,
                [&](size_t i) { bflags[i] = se(i); });
     std::vector<int> edgeSwapStack;
     std::vector<int> visited(halfedge_.size(), -1);

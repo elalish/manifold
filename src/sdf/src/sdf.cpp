@@ -325,7 +325,7 @@ Mesh LevelSet(std::function<float(glm::vec3)> sdf, Box bounds, float edgeLength,
 
   while (1) {
     Vec<int> index(1, 0);
-    for_each_n(pol, countAt(static_cast<size_t>(0)), maxMorton + 1,
+    for_each_n(pol, countAt(0ul), maxMorton + 1,
                ComputeVerts({vertPos, index, gridVerts.D(), sdf, bounds.min,
                              gridSize + 1, spacing, level}));
 
@@ -355,7 +355,7 @@ Mesh LevelSet(std::function<float(glm::vec3)> sdf, Box bounds, float edgeLength,
   Vec<glm::ivec3> triVerts(gridVerts.Entries() * 12);  // worst case
 
   Vec<int> index(1, 0);
-  for_each_n(pol, countAt(static_cast<size_t>(0)), gridVerts.Size(),
+  for_each_n(pol, countAt(0ul), gridVerts.Size(),
              BuildTris({triVerts, index, gridVerts.D()}));
   triVerts.resize(index[0]);
 

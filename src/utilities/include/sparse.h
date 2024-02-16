@@ -57,8 +57,7 @@ class SparseIndices {
     size_t offset = pOffset;
     if (use_q) offset = 1 - offset;
     const int* p = ptr();
-    for_each(autoPolicy(out.size()), countAt(static_cast<size_t>(0)),
-             countAt(out.size()),
+    for_each(autoPolicy(out.size()), countAt(0ul), countAt(out.size()),
              [&](size_t i) { out[i] = p[i * 2 + offset]; });
     return out;
   }
