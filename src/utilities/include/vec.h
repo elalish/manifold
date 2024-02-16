@@ -21,7 +21,6 @@
 #define TracyFreeS(ptr, n) (void)0
 #endif
 
-// #include "optional_assert.h"
 #include "par.h"
 #include "public.h"
 #include "vec_view.h"
@@ -50,12 +49,12 @@ class Vec : public VecView<T> {
   // Note that the vector constructed with this constructor will contain
   // uninitialized memory. Please specify `val` if you need to make sure that
   // the data is initialized.
-  Vec(int size) {
+  Vec(size_t size) {
     reserve(size);
     this->size_ = size;
   }
 
-  Vec(int size, T val) { resize(size, val); }
+  Vec(size_t size, T val) { resize(size, val); }
 
   Vec(const Vec<T> &vec) {
     this->size_ = vec.size();
@@ -155,7 +154,7 @@ class Vec : public VecView<T> {
     this->ptr_[this->size_++] = val;
   }
 
-  void reserve(int n) {
+  void reserve(size_t n) {
     if (n > capacity_) {
       T *newBuffer = reinterpret_cast<T *>(malloc(n * sizeof(T)));
       if (newBuffer == nullptr) throw std::bad_alloc();
@@ -172,7 +171,7 @@ class Vec : public VecView<T> {
     }
   }
 
-  void resize(int newSize, T val = T()) {
+  void resize(size_t newSize, T val = T()) {
     bool shrink = this->size_ > 2 * newSize;
     reserve(newSize);
     if (this->size_ < newSize) {
@@ -200,8 +199,9 @@ class Vec : public VecView<T> {
     capacity_ = this->size_;
   }
 
-  VecView<T> view(int offset = 0, int length = -1) {
-    if (length == -1) {
+  VecView<T> view(size_t offset = 0,
+                  size_t length = std::numeric_limits<size_t>::max()) {
+    if (length == std::numeric_limits<size_t>::max()) {
       length = this->size_ - offset;
       if (length < 0) throw std::out_of_range("Vec::view out of range");
     } else if (offset + length > this->size_ || offset < 0) {
@@ -212,8 +212,10 @@ class Vec : public VecView<T> {
     return VecView<T>(this->ptr_ + offset, length);
   }
 
-  VecView<const T> cview(int offset = 0, int length = -1) const {
-    if (length == -1) {
+  VecView<const T> cview(
+      size_t offset = 0,
+      size_t length = std::numeric_limits<size_t>::max()) const {
+    if (length == std::numeric_limits<size_t>::max()) {
       length = this->size_ - offset;
       if (length < 0) throw std::out_of_range("Vec::cview out of range");
     } else if (offset + length > this->size_ || offset < 0) {
@@ -224,7 +226,9 @@ class Vec : public VecView<T> {
     return VecView<const T>(this->ptr_ + offset, length);
   }
 
-  VecView<const T> view(int offset = 0, int length = -1) const {
+  VecView<const T> view(
+      size_t offset = 0,
+      size_t length = std::numeric_limits<size_t>::max()) const {
     return cview(offset, length);
   }
 
@@ -232,7 +236,7 @@ class Vec : public VecView<T> {
   const T *data() const { return this->ptr_; }
 
  private:
-  int capacity_ = 0;
+  size_t capacity_ = 0;
 };
 /** @} */
 }  // namespace manifold

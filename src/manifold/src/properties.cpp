@@ -190,7 +190,7 @@ struct CheckHalfedges {
   VecView<const Halfedge> halfedges;
   VecView<const glm::vec3> vertPos;
 
-  bool operator()(int edge) {
+  bool operator()(size_t edge) {
     const Halfedge halfedge = halfedges[edge];
     if (halfedge.startVert == -1 || halfedge.endVert == -1) return true;
     if (halfedge.pairedHalfedge == -1) return false;
@@ -275,7 +275,7 @@ bool Manifold::Impl::IsManifold() const {
   if (halfedge_.size() == 0) return true;
   auto policy = autoPolicy(halfedge_.size());
 
-  return all_of(policy, countAt(0), countAt(halfedge_.size()),
+  return all_of(policy, countAt(0_z), countAt(halfedge_.size()),
                 CheckHalfedges({halfedge_, vertPos_}));
 }
 
