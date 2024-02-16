@@ -578,12 +578,8 @@ Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ,
       Intersect12(inQ, inP, s20, p2q0, s11, p1q1, z20, xyzz11, p2q1_, false);
   PRINT("x21 size = " << x21_.size());
 
-  if (p0q2.size() >= std::numeric_limits<int>::max() ||
-      p2q0.size() >= std::numeric_limits<int>::max() ||
-      x12_.size() >= std::numeric_limits<int>::max() ||
-      x21_.size() >= std::numeric_limits<int>::max() ||
-      w03_.size() >= std::numeric_limits<int>::max() ||
-      w30_.size() >= std::numeric_limits<int>::max())
+  if (x12_.size() + x21_.size() >= std::numeric_limits<int>::max() ||
+      w03_.size() + w30_.size() >= std::numeric_limits<int>::max())
     throw std::out_of_range("mesh too large");
 
   Vec<int> p0 = p0q2.Copy(false);
