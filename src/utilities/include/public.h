@@ -31,6 +31,8 @@
 #include <sstream>
 #endif
 
+constexpr std::size_t operator"" _z(unsigned long long n) { return n; }
+
 namespace manifold {
 
 constexpr float kTolerance = 1e-5;

@@ -199,8 +199,9 @@ class Vec : public VecView<T> {
     capacity_ = this->size_;
   }
 
-  VecView<T> view(size_t offset = 0, size_t length = -1) {
-    if (length == -1) {
+  VecView<T> view(size_t offset = 0,
+                  size_t length = std::numeric_limits<size_t>::max()) {
+    if (length == std::numeric_limits<size_t>::max()) {
       length = this->size_ - offset;
       if (length < 0) throw std::out_of_range("Vec::view out of range");
     } else if (offset + length > this->size_ || offset < 0) {
@@ -211,8 +212,10 @@ class Vec : public VecView<T> {
     return VecView<T>(this->ptr_ + offset, length);
   }
 
-  VecView<const T> cview(size_t offset = 0, size_t length = -1) const {
-    if (length == -1) {
+  VecView<const T> cview(
+      size_t offset = 0,
+      size_t length = std::numeric_limits<size_t>::max()) const {
+    if (length == std::numeric_limits<size_t>::max()) {
       length = this->size_ - offset;
       if (length < 0) throw std::out_of_range("Vec::cview out of range");
     } else if (offset + length > this->size_ || offset < 0) {
@@ -223,7 +226,9 @@ class Vec : public VecView<T> {
     return VecView<const T>(this->ptr_ + offset, length);
   }
 
-  VecView<const T> view(size_t offset = 0, size_t length = -1) const {
+  VecView<const T> view(
+      size_t offset = 0,
+      size_t length = std::numeric_limits<size_t>::max()) const {
     return cview(offset, length);
   }
 

@@ -275,7 +275,7 @@ bool Manifold::Impl::IsManifold() const {
   if (halfedge_.size() == 0) return true;
   auto policy = autoPolicy(halfedge_.size());
 
-  return all_of(policy, countAt(0ul), countAt(halfedge_.size()),
+  return all_of(policy, countAt(0_z), countAt(halfedge_.size()),
                 CheckHalfedges({halfedge_, vertPos_}));
 }
 
