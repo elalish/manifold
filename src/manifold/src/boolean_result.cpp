@@ -103,6 +103,10 @@ std::tuple<Vec<int>, Vec<int>> SizeOutput(
     bool invertQ) {
   ZoneScoped;
   Vec<int> sidesPerFacePQ(inP.NumTri() + inQ.NumTri(), 0);
+  // note: numFaceR <= facePQ2R.size() = sidesPerFacePQ.size() + 1
+  if (sidesPerFacePQ.size() + 1 >= std::numeric_limits<int>::max())
+    throw std::out_of_range("boolean result too large");
+
   auto sidesPerFaceP = sidesPerFacePQ.view(0, inP.NumTri());
   auto sidesPerFaceQ = sidesPerFacePQ.view(inP.NumTri(), inQ.NumTri());
 
@@ -175,7 +179,7 @@ void AddNewEdgeVerts(
   // edge. The direction and duplicity are given by i12, while v12R remaps to
   // the output vert index. When forward is false, all is reversed.
   auto process = [&](std::function<void(size_t)> lock,
-                     std::function<void(size_t)> unlock, int i) {
+                     std::function<void(size_t)> unlock, size_t i) {
     const int edgeP = p1q2.Get(i, !forward);
     const int faceQ = p1q2.Get(i, forward);
     const int vert = v12R[i];
@@ -218,9 +222,9 @@ void AddNewEdgeVerts(
         [&](size_t hash) { mutexes[hash % mutexes.size()].unlock(); },
         std::placeholders::_1);
     tbb::parallel_for(
-        tbb::blocked_range<int>(0, p1q2.size(), 32),
-        [&](const tbb::blocked_range<int> &range) {
-          for (int i = range.begin(); i != range.end(); i++) processFun(i);
+        tbb::blocked_range<size_t>(0_z, p1q2.size(), 32),
+        [&](const tbb::blocked_range<size_t> &range) {
+          for (size_t i = range.begin(); i != range.end(); i++) processFun(i);
         },
         ap);
     return;
@@ -228,7 +232,7 @@ void AddNewEdgeVerts(
 #endif
   auto processFun = std::bind(
       process, [](size_t _) {}, [](size_t _) {}, std::placeholders::_1);
-  for (int i = 0; i < p1q2.size(); ++i) processFun(i);
+  for (size_t i = 0; i < p1q2.size(); ++i) processFun(i);
 }
 
 std::vector<Halfedge> PairUp(std::vector<EdgePos> &edgePos) {
@@ -239,7 +243,7 @@ std::vector<Halfedge> PairUp(std::vector<EdgePos> &edgePos) {
   // a heuristic.
   ASSERT(edgePos.size() % 2 == 0, topologyErr,
          "Non-manifold edge! Not an even number of points.");
-  int nEdges = edgePos.size() / 2;
+  size_t nEdges = edgePos.size() / 2;
   auto middle = std::partition(edgePos.begin(), edgePos.end(),
                                [](EdgePos x) { return x.isStart; });
   ASSERT(middle - edgePos.begin() == nEdges, topologyErr, "Non-manifold edge!");
@@ -247,7 +251,7 @@ std::vector<Halfedge> PairUp(std::vector<EdgePos> &edgePos) {
   std::stable_sort(edgePos.begin(), middle, cmp);
   std::stable_sort(middle, edgePos.end(), cmp);
   std::vector<Halfedge> edges;
-  for (int i = 0; i < nEdges; ++i)
+  for (size_t i = 0; i < nEdges; ++i)
     edges.push_back({edgePos[i].vert, edgePos[i + nEdges].vert, -1, -1});
   return edges;
 }
@@ -539,6 +543,11 @@ void CreateProperties(Manifold::Impl &outR, const Manifold::Impl &inP,
   std::vector<int> propMissIdx[2];
   propMissIdx[0].resize(inQ.NumPropVert(), -1);
   propMissIdx[1].resize(inP.NumPropVert(), -1);
+
+  if (static_cast<size_t>(outR.NumVert()) * static_cast<size_t>(numProp) >=
+      std::numeric_limits<int>::max())
+    throw std::out_of_range("too many vertices");
+
   outR.meshRelation_.properties.reserve(outR.NumVert() * numProp);
   int idx = 0;
 

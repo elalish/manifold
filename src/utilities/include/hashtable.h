@@ -63,13 +63,15 @@ namespace manifold {
 template <typename V, hash_fun_t H = hash64bit>
 class HashTableD {
  public:
-  HashTableD(Vec<Uint64>& keys, Vec<V>& values, Vec<uint32_t>& used,
+  HashTableD(Vec<Uint64>& keys, Vec<V>& values, std::atomic<size_t>& used,
              uint32_t step = 1)
       : step_{step}, keys_{keys}, values_{values}, used_{used} {}
 
   int Size() const { return keys_.size(); }
 
-  bool Full() const { return AtomicLoad(used_[0]) * 2 > Size(); }
+  bool Full() const {
+    return used_.load(std::memory_order_relaxed) * 2 > Size();
+  }
 
   void Insert(Uint64 key, const V& val) {
     uint32_t idx = H(key) & (Size() - 1);
@@ -78,7 +80,7 @@ class HashTableD {
       Uint64& k = keys_[idx];
       const Uint64 found = AtomicCAS(k, kOpen, key);
       if (found == kOpen) {
-        AtomicAdd(used_[0], 0x1u);
+        used_.fetch_add(1, std::memory_order_relaxed);
         values_[idx] = val;
         return;
       }
@@ -117,27 +119,44 @@ class HashTableD {
   uint32_t step_;
   VecView<Uint64> keys_;
   VecView<V> values_;
-  VecView<uint32_t> used_;
+  std::atomic<size_t>& used_;
 };
 
 template <typename V, hash_fun_t H = hash64bit>
 class HashTable {
  public:
-  HashTable(uint32_t size, uint32_t step = 1)
-      : keys_{1 << (int)ceil(log2(size)), kOpen},
-        values_{1 << (int)ceil(log2(size)), {}},
-        table_{keys_, values_, used_, step} {}
+  HashTable(size_t size, uint32_t step = 1)
+      : keys_{size == 0 ? 0 : 1_z << (int)ceil(log2(size)), kOpen},
+        values_{size == 0 ? 0 : 1_z << (int)ceil(log2(size)), {}},
+        step_(step) {}
 
-  HashTableD<V, H> D() { return table_; }
+  HashTable(const HashTable& other)
+      : keys_(other.keys_),
+        values_(other.values_),
+        used_(other.used_),
+        step_(other.step_) {}
 
-  int Entries() const { return AtomicLoad(used_[0]); }
+  HashTable& operator=(const HashTable& other) {
+    if (this == &other) return *this;
+    keys_ = other.keys_;
+    values_ = other.values_;
+    used_.store(other.used_.load());
+    step_ = other.step_;
+    return *this;
+  }
 
-  int Size() const { return table_.Size(); }
+  HashTableD<V, H> D() { return {keys_, values_, used_, step_}; }
 
-  bool Full() const { return AtomicLoad(used_[0]) * 2 > Size(); }
+  int Entries() const { return used_.load(std::memory_order_relaxed); }
+
+  size_t Size() const { return keys_.size(); }
+
+  bool Full() const {
+    return used_.load(std::memory_order_relaxed) * 2 > Size();
+  }
 
   float FilledFraction() const {
-    return static_cast<float>(AtomicLoad(used_[0])) / Size();
+    return static_cast<float>(used_.load(std::memory_order_relaxed)) / Size();
   }
 
   Vec<V>& GetValueStore() { return values_; }
@@ -147,8 +166,8 @@ class HashTable {
  private:
   Vec<Uint64> keys_;
   Vec<V> values_;
-  Vec<uint32_t> used_ = Vec<uint32_t>(1, 0);
-  HashTableD<V, H> table_;
+  std::atomic<size_t> used_ = 0;
+  uint32_t step_;
 };
 
 /** @} */

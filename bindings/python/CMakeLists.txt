@@ -26,8 +26,18 @@ target_compile_features(manifold3d PUBLIC cxx_std_17)
 set_target_properties(manifold3d PROPERTIES OUTPUT_NAME "manifold3d")
 
 message(Python_EXECUTABLE = ${Python_EXECUTABLE})
+# ideally we should generate a dependency file from python...
+set(DOCSTRING_DEPS
+  ${CMAKE_CURRENT_SOURCE_DIR}/../../src/manifold/src/manifold.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/../../src/manifold/src/constructors.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/../../src/manifold/src/sort.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/../../src/cross_section/src/cross_section.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/../../src/polygon/src/polygon.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/../../src/utilities/include/public.h
+  )
 add_custom_command(
   OUTPUT autogen_docstrings.inl
+  DEPENDS ${DOCSTRING_DEPS}
   COMMAND ${Python_EXECUTABLE} ARGS ${CMAKE_CURRENT_SOURCE_DIR}/gen_docs.py
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
 )

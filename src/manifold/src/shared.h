@@ -212,7 +212,7 @@ struct ReindexEdge {
   VecView<const TmpEdge> edges;
   SparseIndices& indices;
 
-  void operator()(int i) {
+  void operator()(size_t i) {
     int& edge = indices.Get(i, inverted);
     edge = edges[edge].halfedgeIdx;
   }
