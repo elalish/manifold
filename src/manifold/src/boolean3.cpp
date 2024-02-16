@@ -352,7 +352,7 @@ std::tuple<Vec<int>, Vec<float>> Shadow02(const Manifold::Impl &inP,
 
   auto vertNormalP = forward ? inP.vertNormal_ : inQ.vertNormal_;
   for_each_n(autoPolicy(p0q2.size()),
-             zip(countAt(0ll), s02.begin(), z02.begin()), p0q2.size(),
+             zip(countAt(0_z), s02.begin(), z02.begin()), p0q2.size(),
              Kernel02({inP.vertPos_, inQ.halfedge_, inQ.vertPos_, expandP,
                        vertNormalP, p0q2, forward}));
 
@@ -578,8 +578,7 @@ Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ,
       Intersect12(inQ, inP, s20, p2q0, s11, p1q1, z20, xyzz11, p2q1_, false);
   PRINT("x21 size = " << x21_.size());
 
-  if (x12_.size() + x21_.size() >= std::numeric_limits<int>::max() ||
-      w03_.size() + w30_.size() >= std::numeric_limits<int>::max())
+  if (x12_.size() + x21_.size() >= std::numeric_limits<int>::max())
     throw std::out_of_range("mesh too large");
 
   Vec<int> p0 = p0q2.Copy(false);

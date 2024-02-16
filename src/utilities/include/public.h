@@ -31,7 +31,7 @@
 #include <sstream>
 #endif
 
-constexpr std::size_t operator"" _z(unsigned long long n) { return n; }
+constexpr std::size_t operator""_z(unsigned long long n) { return n; }
 
 namespace manifold {
 
