@@ -237,6 +237,8 @@ class Vec : public VecView<T> {
 
  private:
   size_t capacity_ = 0;
+
+  static_assert(std::is_trivially_destructible<T>::value);
 };
 /** @} */
 }  // namespace manifold

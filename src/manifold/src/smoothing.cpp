@@ -264,7 +264,7 @@ class Partition {
   }
 
  private:
-  static std::unordered_map<glm::ivec3, Partition> cache;
+  static inline auto cache = std::unordered_map<glm::ivec3, Partition>();
 
   // n[0] >= n[1] >= n[2] > 0
   static Partition GetCachedPartition(glm::ivec3 n) {
@@ -479,8 +479,6 @@ class Partition {
                   newEdgeAdded, newEdgeFwd);
   }
 };
-
-auto Partition::cache = std::unordered_map<glm::ivec3, Partition>();
 }  // namespace
 
 namespace manifold {
