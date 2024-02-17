@@ -642,7 +642,7 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
              });
 
   const int numTri = NumTri();
-  Vec<Partition> subTris(numTri);
+  std::vector<Partition> subTris(numTri);
   for_each_n(policy, countAt(0), numTri,
              [&subTris, &half2Edge, &edgeAdded](int tri) {
                glm::ivec3 divisions;
