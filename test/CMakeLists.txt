@@ -19,7 +19,7 @@ enable_testing()
 
 set(SOURCE_FILES polygon_test.cpp cross_section_test.cpp manifold_test.cpp boolean_test.cpp sdf_test.cpp samples_test.cpp test_main.cpp)
 
-if(MANIFOLD_CBIND)
+if(MANIFOLD_CBIND AND NOT EMSCRIPTEN)
   list(APPEND SOURCE_FILES manifoldc_test.cpp)
 endif()
 
@@ -60,7 +60,7 @@ if(MANIFOLD_FUZZ)
   gtest_discover_tests(polygon_fuzz)
 endif()
 
-if(MANIFOLD_CBIND)
+if(MANIFOLD_CBIND AND NOT EMSCRIPTEN)
   target_link_libraries(${PROJECT_NAME} manifoldc)
 endif()
 
@@ -77,5 +77,11 @@ add_test(test_all ${PROJECT_NAME})
 if(EMSCRIPTEN)
   set_target_properties(${PROJECT_NAME} PROPERTIES LINK_FLAGS
     "-s ASSERTIONS=1 -s DEMANGLE_SUPPORT=1 --bind")
-else()
+endif()
+
+if(MSVC)
+    set_target_properties(${PROJECT_NAME} PROPERTIES RUNTIME_OUTPUT_DIRECTORY 
+        ${CMAKE_BINARY_DIR}/bin )
+    set_target_properties(${PROJECT_NAME} PROPERTIES LIBRARY_OUTPUT_DIRECTORY
+        ${CMAKE_BINARY_DIR}/bin )
 endif()

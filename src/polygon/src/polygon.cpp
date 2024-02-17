@@ -15,12 +15,8 @@
 #include "polygon.h"
 
 #include <algorithm>
-#include <list>
 #include <map>
-#include <numeric>
-#include <queue>
 #include <set>
-#include <stack>
 
 #include "optional_assert.h"
 #include "utils.h"
@@ -31,6 +27,11 @@ using namespace manifold;
 static ExecutionParams params;
 
 constexpr float kBest = -std::numeric_limits<float>::infinity();
+
+// it seems that MSVC cannot optimize glm::determinant(glm::mat2(a, b))
+constexpr float determinant2x2(glm::vec2 a, glm::vec2 b) {
+  return a.x * b.y - a.y * b.x;
+}
 
 #ifdef MANIFOLD_DEBUG
 struct PolyEdge {
@@ -244,10 +245,10 @@ class EarClip {
   // two points and terminates.
   struct Vert {
     int mesh_idx;
+    float cost;
     qItr ear;
     glm::vec2 pos, rightDir;
     VertItr left, right;
-    float cost;
 
     // Shorter than half of precision, to be conservative so that it doesn't
     // cause CW triangles that exceed precision due to rounding error.
@@ -376,10 +377,10 @@ class EarClip {
     // goes to the outside. No need to check the other side, since all verts are
     // processed in the EarCost loop.
     float SignedDist(VertItr v, glm::vec2 unit, float precision) const {
-      float d = glm::determinant(glm::mat2(unit, v->pos - pos));
-      if (glm::abs(d) < precision) {
-        d = glm::max(d, glm::determinant(glm::mat2(unit, v->right->pos - pos)));
-        d = glm::max(d, glm::determinant(glm::mat2(unit, v->left->pos - pos)));
+      float d = determinant2x2(unit, v->pos - pos);
+      if (std::abs(d) < precision) {
+        d = glm::max(d, determinant2x2(unit, v->right->pos - pos));
+        d = glm::max(d, determinant2x2(unit, v->left->pos - pos));
       }
       return d;
     }
@@ -390,8 +391,7 @@ class EarClip {
       float cost = glm::min(SignedDist(v, rightDir, precision),
                             SignedDist(v, left->rightDir, precision));
 
-      const float openCost =
-          glm::determinant(glm::mat2(openSide, v->pos - right->pos));
+      const float openCost = determinant2x2(openSide, v->pos - right->pos);
       return glm::min(cost, openCost);
     }
 
@@ -425,9 +425,11 @@ class EarClip {
         return totalCost < -1 ? kBest : 0;
       }
       VertItr test = right->right;
+      auto lid = left->mesh_idx;
+      auto rid = right->mesh_idx;
       while (test != left) {
-        if (test->mesh_idx != mesh_idx && test->mesh_idx != left->mesh_idx &&
-            test->mesh_idx != right->mesh_idx) {  // Skip duplicated verts
+        if (test->mesh_idx != mesh_idx && test->mesh_idx != lid &&
+            test->mesh_idx != rid) {  // Skip duplicated verts
           float cost = Cost(test, openSide, precision);
           if (cost < -precision) {
             cost = DelaunayCost(test->pos - center, scale, precision);
@@ -544,22 +546,22 @@ class EarClip {
     float bound = 0;
     for (const SimplePolygonIdx &poly : polys) {
       auto vert = poly.begin();
-      polygon_.push_back({vert->idx, earsQueue_.end(), vert->pos});
+      polygon_.push_back({vert->idx, 0.0f, earsQueue_.end(), vert->pos});
       const VertItr first = std::prev(polygon_.end());
 
       bound = glm::max(
-          bound, glm::max(glm::abs(first->pos.x), glm::abs(first->pos.y)));
+          bound, glm::max(std::abs(first->pos.x), std::abs(first->pos.y)));
       VertItr last = first;
       // This is not the real rightmost start, but just an arbitrary vert for
       // now to identify each polygon.
       starts.push_back(first);
 
       for (++vert; vert != poly.end(); ++vert) {
-        polygon_.push_back({vert->idx, earsQueue_.end(), vert->pos});
-        VertItr next = std::prev(polygon_.end());
-
         bound = glm::max(
-            bound, glm::max(glm::abs(next->pos.x), glm::abs(next->pos.y)));
+            bound, glm::max(std::abs(vert->pos.x), std::abs(vert->pos.y)));
+
+        polygon_.push_back({vert->idx, 0.0f, earsQueue_.end(), vert->pos});
+        VertItr next = std::prev(polygon_.end());
 
         Link(last, next);
         last = next;
@@ -589,7 +591,7 @@ class EarClip {
     auto AddPoint = [&](VertItr v) {
       bBox.Union(v->pos);
       const double area1 =
-          glm::determinant(glm::dmat2(v->pos - origin, v->right->pos - origin));
+          determinant2x2(v->pos - origin, v->right->pos - origin);
       const double t1 = area + area1;
       areaCompensation += (area - t1) + area1;
       area = t1;

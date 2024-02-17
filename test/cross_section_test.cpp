@@ -191,3 +191,21 @@ TEST(CrossSection, Hull) {
       circ_area * 2.5,
       (CrossSection::BatchBoolean(circs, OpType::Add) - tri).Area());
 }
+
+TEST(CrossSection, HullError) {
+  auto rounded_rectangle = [](float x, float y, float radius, int segments) {
+    auto circ = CrossSection::Circle(radius, segments);
+    std::vector<CrossSection> vl{};
+    vl.push_back(circ.Translate(glm::vec2{radius, radius}));
+    vl.push_back(circ.Translate(glm::vec2{x - radius, radius}));
+    vl.push_back(circ.Translate(glm::vec2{x - radius, y - radius}));
+    vl.push_back(circ.Translate(glm::vec2{radius, y - radius}));
+    return CrossSection::Hull(vl);
+  };
+  auto rr = rounded_rectangle(51, 36, 9.0, 36);
+
+  auto rr_area = rr.Area();
+  auto rr_verts = rr.NumVert();
+  EXPECT_FLOAT_EQ(rr_area, 1765.1790375559026);
+  EXPECT_FLOAT_EQ(rr_verts, 40);
+}

@@ -379,11 +379,24 @@ NB_MODULE(manifold3d, m) {
           nb::arg("edge_smoothness") = nb::list(),
           // todo params slightly diff
           manifold__smooth__mesh_gl__sharpened_edges)
+      .def_static("batch_boolean", &Manifold::BatchBoolean,
+                  nb::arg("manifolds"), nb::arg("op"),
+                  manifold__batch_boolean__manifolds__op)
       .def_static("compose", &Manifold::Compose, nb::arg("manifolds"),
                   manifold__compose__manifolds)
       .def_static("tetrahedron", &Manifold::Tetrahedron, manifold__tetrahedron)
       .def_static("cube", &Manifold::Cube, nb::arg("size") = glm::vec3{1, 1, 1},
                   nb::arg("center") = false, manifold__cube__size__center)
+      .def_static(
+          "extrude", &Manifold::Extrude, nb::arg("crossSection"),
+          nb::arg("height"), nb::arg("n_divisions") = 0,
+          nb::arg("twist_degrees") = 0.0f,
+          nb::arg("scale_top") = std::make_tuple(1.0f, 1.0f),
+          manifold__extrude__cross_section__height__n_divisions__twist_degrees__scale_top)
+      .def_static(
+          "revolve", &Manifold::Revolve, nb::arg("crossSection"),
+          nb::arg("circular_segments") = 0, nb::arg("revolve_degrees") = 360.0,
+          manifold__revolve__cross_section__circular_segments__revolve_degrees)
       .def_static(
           "cylinder", &Manifold::Cylinder, nb::arg("height"),
           nb::arg("radius_low"), nb::arg("radius_high") = -1.0f,
@@ -525,7 +538,8 @@ NB_MODULE(manifold3d, m) {
           ":param level: You can inset your Mesh by using a positive value, or "
           "outset it with a negative value."
           ":return Mesh: This mesh is guaranteed to be manifold."
-          "Use Manifold.from_mesh(mesh) to create a Manifold");
+          "Use Manifold.from_mesh(mesh) to create a Manifold")
+      .def("merge", &MeshGL::Merge, mesh_gl__merge);
 
   nb::enum_<Manifold::Error>(m, "Error")
       .value("NoError", Manifold::Error::NoError)
@@ -570,6 +584,11 @@ NB_MODULE(manifold3d, m) {
           "Classes/ClipperOffset/Properties/MiterLimit.htm)). So where mitered "
           "joins would exceed a given maximum miter distance (relative to the "
           "offset distance), these are 'squared' instead.");
+
+  nb::enum_<OpType>(m, "OpType", "Operation types for batch_boolean")
+      .value("Add", OpType::Add)
+      .value("Subtract", OpType::Subtract)
+      .value("Intersect", OpType::Intersect);
 
   nb::class_<CrossSection>(
       m, "CrossSection",
@@ -648,6 +667,11 @@ NB_MODULE(manifold3d, m) {
           [](std::vector<glm::vec2> pts) { return CrossSection::Hull(pts); },
           nb::arg("pts"), cross_section__hull__pts)
       .def("decompose", &CrossSection::Decompose, cross_section__decompose)
+      .def_static("batch_boolean", &CrossSection::BatchBoolean,
+                  nb::arg("cross_sections"), nb::arg("op"),
+                  cross_section__batch_boolean__cross_sections__op)
+      .def_static("compose", &CrossSection::Compose, nb::arg("cross_sections"),
+                  cross_section__compose__cross_sections)
       .def("to_polygons", &CrossSection::ToPolygons, cross_section__to_polygons)
       .def(
           "extrude", &Manifold::Extrude, nb::arg("height"),
@@ -657,6 +681,7 @@ NB_MODULE(manifold3d, m) {
       .def("revolve", &Manifold::Revolve, nb::arg("circular_segments") = 0,
            nb::arg("revolve_degrees") = 360.0,
            manifold__revolve__cross_section__circular_segments__revolve_degrees)
+
       .def_static("square", &CrossSection::Square, nb::arg("size"),
                   nb::arg("center") = false,
                   cross_section__square__size__center)

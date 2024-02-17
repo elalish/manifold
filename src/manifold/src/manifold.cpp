@@ -696,6 +696,10 @@ Manifold Manifold::Boolean(const Manifold& second, OpType op) const {
   return Manifold(pNode_->Boolean(second.pNode_, op));
 }
 
+/**
+ * Perform the given boolean operation on a list of Manifolds. In case of
+ * Subtract, all Manifolds in the tail are differenced from the head.
+ */
 Manifold Manifold::BatchBoolean(const std::vector<Manifold>& manifolds,
                                 OpType op) {
   if (manifolds.size() == 0)

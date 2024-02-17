@@ -28,36 +28,34 @@ namespace {
 // cases to ensure consistency.
 
 glm::vec2 Interpolate(glm::vec3 pL, glm::vec3 pR, float x) {
-  float dxL = x - pL.x;
-  float dxR = x - pR.x;
-#ifdef MANIFOLD_DEBUG
-  if (dxL * dxR > 0) printf("Not in domain!\n");
-#endif
-  bool useL = fabs(dxL) < fabs(dxR);
-  float lambda = (useL ? dxL : dxR) / (pR.x - pL.x);
-  if (!isfinite(lambda)) return glm::vec2(pL.y, pL.z);
+  const float dxL = x - pL.x;
+  const float dxR = x - pR.x;
+  ASSERT(dxL * dxR <= 0, logicErr, "Boolean manifold error: not in domain");
+  const bool useL = fabs(dxL) < fabs(dxR);
+  const glm::vec3 dLR = pR - pL;
+  const float lambda = (useL ? dxL : dxR) / dLR.x;
+  if (!isfinite(lambda) || !isfinite(dLR.y) || !isfinite(dLR.z))
+    return glm::vec2(pL.y, pL.z);
   glm::vec2 yz;
-  yz[0] = (useL ? pL.y : pR.y) + lambda * (pR.y - pL.y);
-  yz[1] = (useL ? pL.z : pR.z) + lambda * (pR.z - pL.z);
+  yz[0] = (useL ? pL.y : pR.y) + lambda * dLR.y;
+  yz[1] = (useL ? pL.z : pR.z) + lambda * dLR.z;
   return yz;
 }
 
 glm::vec4 Intersect(const glm::vec3 &pL, const glm::vec3 &pR,
                     const glm::vec3 &qL, const glm::vec3 &qR) {
-  float dyL = qL.y - pL.y;
-  float dyR = qR.y - pR.y;
-#ifdef MANIFOLD_DEBUG
-  if (dyL * dyR > 0) printf("No intersection!\n");
-#endif
-  bool useL = fabs(dyL) < fabs(dyR);
-  float dx = pR.x - pL.x;
+  const float dyL = qL.y - pL.y;
+  const float dyR = qR.y - pR.y;
+  ASSERT(dyL * dyR <= 0, logicErr, "Boolean manifold error: no intersection");
+  const bool useL = fabs(dyL) < fabs(dyR);
+  const float dx = pR.x - pL.x;
   float lambda = (useL ? dyL : dyR) / (dyL - dyR);
   if (!isfinite(lambda)) lambda = 0.0f;
   glm::vec4 xyzz;
   xyzz.x = (useL ? pL.x : pR.x) + lambda * dx;
-  float pDy = pR.y - pL.y;
-  float qDy = qR.y - qL.y;
-  bool useP = fabs(pDy) < fabs(qDy);
+  const float pDy = pR.y - pL.y;
+  const float qDy = qR.y - qL.y;
+  const bool useP = fabs(pDy) < fabs(qDy);
   xyzz.y = (useL ? (useP ? pL.y : qL.y) : (useP ? pR.y : qR.y)) +
            lambda * (useP ? pDy : qDy);
   xyzz.z = (useL ? pL.z : pR.z) + lambda * (pR.z - pL.z);
@@ -73,9 +71,9 @@ struct CopyFaceEdges {
   SparseIndices &pXq1;
   VecView<const Halfedge> halfedgesQ;
 
-  void operator()(thrust::tuple<int, int> in) {
+  void operator()(thrust::tuple<size_t, size_t> in) {
     int idx = 3 * thrust::get<0>(in);
-    int i = thrust::get<1>(in);
+    size_t i = thrust::get<1>(in);
     int pX = p1q1.Get(i, inverted);
     int q2 = p1q1.Get(i, !inverted);
 
@@ -85,7 +83,7 @@ struct CopyFaceEdges {
       int a = pX;
       int b = edge.IsForward() ? q1 : edge.pairedHalfedge;
       if (inverted) std::swap(a, b);
-      pXq1.Set(idx + j, a, b);
+      pXq1.Set(idx + static_cast<size_t>(j), a, b);
     }
   }
 };
@@ -94,9 +92,9 @@ SparseIndices Filter11(const Manifold::Impl &inP, const Manifold::Impl &inQ,
                        const SparseIndices &p1q2, const SparseIndices &p2q1) {
   ZoneScoped;
   SparseIndices p1q1(3 * p1q2.size() + 3 * p2q1.size());
-  for_each_n(autoPolicy(p1q2.size()), zip(countAt(0), countAt(0)), p1q2.size(),
-             CopyFaceEdges<false>({p1q2, p1q1, inQ.halfedge_}));
-  for_each_n(autoPolicy(p2q1.size()), zip(countAt(p1q2.size()), countAt(0)),
+  for_each_n(autoPolicy(p1q2.size()), zip(countAt(0_z), countAt(0_z)),
+             p1q2.size(), CopyFaceEdges<false>({p1q2, p1q1, inQ.halfedge_}));
+  for_each_n(autoPolicy(p2q1.size()), zip(countAt(p1q2.size()), countAt(0_z)),
              p2q1.size(), CopyFaceEdges<true>({p2q1, p1q1, inP.halfedge_}));
   p1q1.Unique();
   return p1q1;
@@ -106,17 +104,6 @@ inline bool Shadows(float p, float q, float dir) {
   return p == q ? dir < 0 : p < q;
 }
 
-/**
- * Since this function is called from two different places, it is necessary that
- * it returns identical results for identical input to keep consistency.
- * Normally this is trivial as computers make floating-point errors, but are
- * at least deterministic. However, in the case of CUDA, these functions can be
- * compiled by two different compilers (for the CPU and GPU). We have found that
- * the different compilers can cause slightly different rounding errors, so it
- * is critical that the two places this function is called both use the same
- * compiled function (they must agree on CPU or GPU). This is now taken care of
- * by the shared policy_ member.
- */
 inline thrust::pair<int, glm::vec2> Shadow01(
     const int p0, const int q1, VecView<const glm::vec3> vertPosP,
     VecView<const glm::vec3> vertPosQ, VecView<const Halfedge> halfedgeQ,
@@ -150,14 +137,14 @@ inline thrust::pair<int, glm::vec2> Shadow01(
 
 // https://github.com/scandum/binary_search/blob/master/README.md
 // much faster than standard binary search on large arrays
-int monobound_quaternary_search(VecView<const int64_t> array, int64_t key) {
+size_t monobound_quaternary_search(VecView<const int64_t> array, int64_t key) {
   if (array.size() == 0) {
     return -1;
   }
-  unsigned int bot = 0;
-  unsigned int top = array.size();
+  size_t bot = 0;
+  size_t top = array.size();
   while (top >= 65536) {
-    unsigned int mid = top / 4;
+    size_t mid = top / 4;
     top -= mid * 3;
     if (key < array[bot + mid * 2]) {
       if (key >= array[bot + mid]) {
@@ -172,7 +159,7 @@ int monobound_quaternary_search(VecView<const int64_t> array, int64_t key) {
   }
 
   while (top > 3) {
-    unsigned int mid = top / 2;
+    size_t mid = top / 2;
     if (key >= array[bot + mid]) {
       bot += mid;
     }
@@ -196,7 +183,7 @@ struct Kernel11 {
   VecView<const glm::vec3> normalP;
   const SparseIndices &p1q1;
 
-  void operator()(thrust::tuple<int, glm::vec4 &, int &> inout) {
+  void operator()(thrust::tuple<size_t, glm::vec4 &, int &> inout) {
     const int p1 = p1q1.Get(thrust::get<0>(inout), false);
     const int q1 = p1q1.Get(thrust::get<0>(inout), true);
     glm::vec4 &xyzz11 = thrust::get<1>(inout);
@@ -249,12 +236,7 @@ struct Kernel11 {
     if (s11 == 0) {  // No intersection
       xyzz11 = glm::vec4(NAN);
     } else {
-#ifdef MANIFOLD_DEBUG
-      // Assert left and right were both found
-      if (k != 2) {
-        printf("k = %d\n", k);
-      }
-#endif
+      ASSERT(k == 2, logicErr, "Boolean manifold error: s11");
       xyzz11 = Intersect(pRL[0], pRL[1], qRL[0], qRL[1]);
 
       const int p1s = halfedgeP[p1].startVert;
@@ -279,7 +261,7 @@ std::tuple<Vec<int>, Vec<glm::vec4>> Shadow11(SparseIndices &p1q1,
   Vec<glm::vec4> xyzz11(p1q1.size());
 
   for_each_n(autoPolicy(p1q1.size()),
-             zip(countAt(0), xyzz11.begin(), s11.begin()), p1q1.size(),
+             zip(countAt(0_z), xyzz11.begin(), s11.begin()), p1q1.size(),
              Kernel11({inP.vertPos_, inQ.vertPos_, inP.halfedge_, inQ.halfedge_,
                        expandP, inP.vertNormal_, p1q1}));
 
@@ -297,7 +279,7 @@ struct Kernel02 {
   const SparseIndices &p0q2;
   const bool forward;
 
-  void operator()(thrust::tuple<int, int &, float &> inout) {
+  void operator()(thrust::tuple<size_t, int &, float &> inout) {
     const int p0 = p0q2.Get(thrust::get<0>(inout), !forward);
     const int q2 = p0q2.Get(thrust::get<0>(inout), forward);
     int &s02 = thrust::get<1>(inout);
@@ -346,12 +328,7 @@ struct Kernel02 {
     if (s02 == 0) {  // No intersection
       z02 = NAN;
     } else {
-#ifdef MANIFOLD_DEBUG
-      // Assert left and right were both found
-      if (k != 2) {
-        printf("k = %d\n", k);
-      }
-#endif
+      ASSERT(k == 2, logicErr, "Boolean manifold error: s02");
       glm::vec3 vertPos = vertPosP[p0];
       z02 = Interpolate(yzzRL[0], yzzRL[1], vertPos.y)[1];
       if (forward) {
@@ -374,8 +351,8 @@ std::tuple<Vec<int>, Vec<float>> Shadow02(const Manifold::Impl &inP,
   Vec<float> z02(p0q2.size());
 
   auto vertNormalP = forward ? inP.vertNormal_ : inQ.vertNormal_;
-  for_each_n(autoPolicy(p0q2.size()), zip(countAt(0), s02.begin(), z02.begin()),
-             p0q2.size(),
+  for_each_n(autoPolicy(p0q2.size()),
+             zip(countAt(0_z), s02.begin(), z02.begin()), p0q2.size(),
              Kernel02({inP.vertPos_, inQ.halfedge_, inQ.vertPos_, expandP,
                        vertNormalP, p0q2, forward}));
 
@@ -397,7 +374,7 @@ struct Kernel12 {
   const bool forward;
   const SparseIndices &p1q2;
 
-  void operator()(thrust::tuple<int, int &, glm::vec3 &> inout) {
+  void operator()(thrust::tuple<size_t, int &, glm::vec3 &> inout) {
     int p1 = p1q2.Get(thrust::get<0>(inout), !forward);
     int q2 = p1q2.Get(thrust::get<0>(inout), forward);
     int &x12 = thrust::get<1>(inout);
@@ -417,7 +394,7 @@ struct Kernel12 {
     for (int vert : {edge.startVert, edge.endVert}) {
       const int64_t key = forward ? SparseIndices::EncodePQ(vert, q2)
                                   : SparseIndices::EncodePQ(q2, vert);
-      const int idx = monobound_quaternary_search(p0q2, key);
+      const size_t idx = monobound_quaternary_search(p0q2, key);
       if (idx != -1) {
         const int s = s02[idx];
         x12 += s * ((vert == edge.startVert) == forward ? 1 : -1);
@@ -438,7 +415,7 @@ struct Kernel12 {
       const int q1F = edge.IsForward() ? q1 : edge.pairedHalfedge;
       const int64_t key = forward ? SparseIndices::EncodePQ(p1, q1F)
                                   : SparseIndices::EncodePQ(q1F, p1);
-      const int idx = monobound_quaternary_search(p1q1, key);
+      const size_t idx = monobound_quaternary_search(p1q1, key);
       if (idx != -1) {  // s is implicitly zero for anything not found
         const int s = s11[idx];
         x12 -= s * (edge.IsForward() ? 1 : -1);
@@ -459,12 +436,7 @@ struct Kernel12 {
     if (x12 == 0) {  // No intersection
       v12 = glm::vec3(NAN);
     } else {
-#ifdef MANIFOLD_DEBUG
-      // Assert left and right were both found
-      if (k != 2) {
-        printf("k = %d\n", k);
-      }
-#endif
+      ASSERT(k == 2, logicErr, "Boolean manifold error: v12");
       const glm::vec4 xzyy =
           Intersect(xzyLR0[0], xzyLR0[1], xzyLR1[0], xzyLR1[1]);
       v12.x = xzyy[0];
@@ -484,7 +456,7 @@ std::tuple<Vec<int>, Vec<glm::vec3>> Intersect12(
   Vec<glm::vec3> v12(p1q2.size());
 
   for_each_n(
-      autoPolicy(p1q2.size()), zip(countAt(0), x12.begin(), v12.begin()),
+      autoPolicy(p1q2.size()), zip(countAt(0_z), x12.begin(), v12.begin()),
       p1q2.size(),
       Kernel12({p0q2.AsVec64(), s02, z02, p1q1.AsVec64(), s11, xyzz11,
                 inP.halfedge_, inQ.halfedge_, inP.vertPos_, forward, p1q2}));
@@ -606,6 +578,9 @@ Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ,
       Intersect12(inQ, inP, s20, p2q0, s11, p1q1, z20, xyzz11, p2q1_, false);
   PRINT("x21 size = " << x21_.size());
 
+  if (x12_.size() + x21_.size() >= std::numeric_limits<int>::max())
+    throw std::out_of_range("mesh too large");
+
   Vec<int> p0 = p0q2.Copy(false);
   p0q2.Resize(0);
   Vec<int> q0 = p2q0.Copy(true);
@@ -621,7 +596,6 @@ Boolean3::Boolean3(const Manifold::Impl &inP, const Manifold::Impl &inQ,
   if (ManifoldParams().verbose) {
     broad.Print("Broad phase");
     intersections.Print("Intersections");
-    MemUsage();
   }
 #endif
 }

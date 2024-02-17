@@ -48,21 +48,17 @@ class SparseIndices {
   }
 
   SparseIndices() = default;
-  SparseIndices(size_t size) {
-    if (size >= std::numeric_limits<int32_t>::max() / sizeof(int64_t))
-      throw std::out_of_range("SparseIndices too large");
-    data_ = Vec<char>(size * sizeof(int64_t));
-  }
+  SparseIndices(size_t size) { data_ = Vec<char>(size * sizeof(int64_t)); }
 
-  int size() const { return data_.size() / sizeof(int64_t); }
+  size_t size() const { return data_.size() / sizeof(int64_t); }
 
   Vec<int> Copy(bool use_q) const {
     Vec<int> out(size());
-    int offset = pOffset;
+    size_t offset = pOffset;
     if (use_q) offset = 1 - offset;
     const int* p = ptr();
-    for_each(autoPolicy(out.size()), countAt(0), countAt((int)out.size()),
-             [&](int i) { out[i] = p[i * 2 + offset]; });
+    for_each(autoPolicy(out.size()), countAt(0_z), countAt(out.size()),
+             [&](size_t i) { out[i] = p[i * 2 + offset]; });
     return out;
   }
 
@@ -71,33 +67,33 @@ class SparseIndices {
     stable_sort(autoPolicy(size()), view.begin(), view.end());
   }
 
-  void Resize(int size) { data_.resize(size * sizeof(int64_t), -1); }
+  void Resize(size_t size) { data_.resize(size * sizeof(int64_t), -1); }
 
-  inline int& Get(int i, bool use_q) {
+  inline int& Get(size_t i, bool use_q) {
     if (use_q)
       return ptr()[2 * i + 1 - pOffset];
     else
       return ptr()[2 * i + pOffset];
   }
 
-  inline int Get(int i, bool use_q) const {
+  inline int Get(size_t i, bool use_q) const {
     if (use_q)
       return ptr()[2 * i + 1 - pOffset];
     else
       return ptr()[2 * i + pOffset];
   }
 
-  inline int64_t GetPQ(int i) const {
+  inline int64_t GetPQ(size_t i) const {
     VecView<const int64_t> view = AsVec64();
     return view[i];
   }
 
-  inline void Set(int i, int p, int q) {
+  inline void Set(size_t i, int p, int q) {
     VecView<int64_t> view = AsVec64();
     view[i] = EncodePQ(p, q);
   }
 
-  inline void SetPQ(int i, int64_t pq) {
+  inline void SetPQ(size_t i, int64_t pq) {
     VecView<int64_t> view = AsVec64();
     view[i] = pq;
   }
@@ -132,7 +128,7 @@ class SparseIndices {
   void Unique() {
     Sort();
     VecView<int64_t> view = AsVec64();
-    int newSize = std::unique(view.begin(), view.end()) - view.begin();
+    size_t newSize = std::unique(view.begin(), view.end()) - view.begin();
     Resize(newSize);
   }
 
@@ -186,7 +182,7 @@ class SparseIndices {
   void Dump() const {
     std::cout << "SparseIndices = " << std::endl;
     const int* p = ptr();
-    for (int i = 0; i < size(); ++i) {
+    for (size_t i = 0; i < size(); ++i) {
       std::cout << i << ", p = " << Get(i, false) << ", q = " << Get(i, true)
                 << std::endl;
     }

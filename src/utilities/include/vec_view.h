@@ -29,7 +29,7 @@ class VecView {
   using Iter = T *;
   using IterC = const T *;
 
-  VecView(T *ptr_, int size_) : ptr_(ptr_), size_(size_) {}
+  VecView(T *ptr_, size_t size_) : ptr_(ptr_), size_(size_) {}
 
   VecView(const VecView &other) {
     ptr_ = other.ptr_;
@@ -45,13 +45,13 @@ class VecView {
   // allows conversion to a const VecView
   operator VecView<const T>() const { return {ptr_, size_}; }
 
-  inline const T &operator[](int i) const {
-    if (i < 0 || i >= size_) throw std::out_of_range("Vec out of range");
+  inline const T &operator[](size_t i) const {
+    if (i >= size_) throw std::out_of_range("Vec out of range");
     return ptr_[i];
   }
 
-  inline T &operator[](int i) {
-    if (i < 0 || i >= size_) throw std::out_of_range("Vec out of range");
+  inline T &operator[](size_t i) {
+    if (i >= size_) throw std::out_of_range("Vec out of range");
     return ptr_[i];
   }
 
@@ -88,14 +88,14 @@ class VecView {
     return ptr_[size_ - 1];
   }
 
-  int size() const { return size_; }
+  size_t size() const { return size_; }
 
   bool empty() const { return size_ == 0; }
 
 #ifdef MANIFOLD_DEBUG
   void Dump() {
     std::cout << "Vec = " << std::endl;
-    for (int i = 0; i < size(); ++i) {
+    for (size_t i = 0; i < size(); ++i) {
       std::cout << i << ", " << ptr_[i] << ", " << std::endl;
     }
     std::cout << std::endl;
@@ -104,7 +104,7 @@ class VecView {
 
  protected:
   T *ptr_ = nullptr;
-  int size_ = 0;
+  size_t size_ = 0;
 
   VecView() = default;
 };

@@ -1,5 +1,4 @@
 from os.path import dirname
-from hashlib import md5
 import re
 
 base = dirname(dirname(dirname(__file__)))
@@ -18,12 +17,12 @@ def python_param_modifier(comment):
 
 
 def method_key(name):
-    name = re.sub("\+", "_plus", name)
-    name = re.sub("\-", "_minus", name)
-    name = re.sub("\^", "_xor", name)
-    name = re.sub("\=", "_eq", name)
-    name = re.sub("\:", "_", name)
-    name = re.sub("\~", "destroy_", name)
+    name = re.sub(r"\+", "_plus", name)
+    name = re.sub(r"\-", "_minus", name)
+    name = re.sub(r"\^", "_xor", name)
+    name = re.sub(r"\=", "_eq", name)
+    name = re.sub(r"\:", "_", name)
+    name = re.sub(r"\~", "destroy_", name)
     return name
 
 
@@ -90,6 +89,7 @@ def select_functions(s):
 
 collect(f"{base}/src/manifold/src/manifold.cpp", lambda s: method_re.search(s))
 collect(f"{base}/src/manifold/src/constructors.cpp", lambda s: method_re.search(s))
+collect(f"{base}/src/manifold/src/sort.cpp", lambda s: method_re.search(s))
 collect(
     f"{base}/src/cross_section/src/cross_section.cpp", lambda s: method_re.search(s)
 )
@@ -98,7 +98,7 @@ collect(f"{base}/src/utilities/include/public.h", select_functions)
 
 comments = dict(sorted(comments.items()))
 
-gen_h = f"autogen_docstrings.inl"
+gen_h = "autogen_docstrings.inl"
 with open(gen_h, "w") as f:
     f.write("#pragma once\n\n")
     f.write("// --- AUTO GENERATED ---\n")

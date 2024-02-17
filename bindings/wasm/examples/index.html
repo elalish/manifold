@@ -39,7 +39,14 @@
 <body>
   <div class="page">
     <div class="container header" style="background-color: #A288B3;">
-      <p style="flex: 2;"><a target="_blank" href="https://github.com/elalish/manifold">Manifold</a>CAD </p>
+      <p style="flex: 2;"><a target="_blank" href="https://github.com/elalish/manifold">Manifold</a>CAD
+        &nbsp;&nbsp;<span class="top-edit blue">
+          <button type="button" id="undo" class="top-icon undo squish"></button>
+          <button type="button" id="redo" class="top-icon redo squish"></button>
+          <button type="button" id="format" class="top-icon star squish"></button>
+          <button type="button" id="share" class="top-icon share"></button>
+        </span>
+      </p>
       <div class="margin" id="file-margin">
         <button type="button" id="file" class="blue item"><b class="uparrow"></b>&nbsp;&nbsp;<span
             id="current">Intro</span></button>
@@ -66,7 +73,7 @@
       <div id="editor" class="col"></div>
       <div class="col container" style="flex-direction: column;">
         <model-viewer camera-controls min-camera-orbit="auto 0deg auto" max-camera-orbit="auto 180deg auto"
-          shadow-intensity="1" interaction-prompt="none" alt="Editor 3D output">
+          shadow-intensity="1" tone-mapping="commerce" interaction-prompt="none" alt="Editor 3D output">
           <div class="center" slot="poster">
             <p id="poster" style="text-align: center; line-height: 36px;"> Loading... </p>
           </div>
@@ -88,6 +95,6 @@
   integrity="sha512-iQEIc0rsSDujsfjtD+lfyJ1W23Bh/lbgriubKDAym6VlEIDRj9rrbSIyJRyshOrl8s0yRcQ0+gyrZfSLyjJGWQ=="
   crossorigin="anonymous" referrerpolicy="no-referrer">
 <script type="module" src="editor.js"></script>
-<script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.3.0/model-viewer.min.js"></script>
+<script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
 
 </html>

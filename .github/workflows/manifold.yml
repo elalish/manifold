@@ -33,7 +33,7 @@ jobs:
       run: |
         mkdir build
         cd build
-        cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DMANIFOLD_DEBUG=ON -DMANIFOLD_EXPORT=ON -DMANIFOLD_PAR=${{matrix.parallel_backend}} .. && make
+        cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DMANIFOLD_PYBIND=ON -DMANIFOLD_DEBUG=ON -DMANIFOLD_EXPORT=ON -DMANIFOLD_PAR=${{matrix.parallel_backend}} .. && make
     - name: Test ${{matrix.parallel_backend}}
       if: matrix.parallel_backend != 'NONE'
       run: |
@@ -59,12 +59,19 @@ jobs:
         lcov --capture --directory . --output-file ./code_coverage_test.info
         lcov --add-tracefile ./code_coverage_init.info --add-tracefile ./code_coverage_test.info --output-file ./code_coverage_total.info
         lcov --remove ./code_coverage_total.info '/usr/*' '*/third_party/*' '*/test/*' '*/extras/*' '*/bindings/*' --output-file ./code_coverage.info
+        cd ../
     - uses: codecov/codecov-action@v2
       if: matrix.parallel_backend == 'NONE'
       with:
         files: build/code_coverage.info
         fail_ci_if_error: false
         name: ${{matrix.parallel_backend}}
+    - name: test cmake consumer
+      run: |
+        cd build
+        sudo cmake --install .
+        cd ..
+        ./test-cmake.sh
 
   build_cbind:
     timeout-minutes: 30
@@ -83,7 +90,7 @@ jobs:
       run: |
         mkdir build
         cd build
-        cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DMANIFOLD_DEBUG=ON -DMANIFOLD_CBIND=ON -DMANIFOLD_PAR=TBB .. && make
+        cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DMANIFOLD_PYBIND=ON -DMANIFOLD_DEBUG=ON -DMANIFOLD_CBIND=ON -DMANIFOLD_PAR=TBB .. && make
     - name: Test ${{matrix.parallel_backend}}
       run: |
         cd build/test
@@ -150,14 +157,21 @@ jobs:
     - name: Build ${{matrix.backend}}
       shell: powershell
       run: |
-        cmake . -DCMAKE_BUILD_TYPE=Release -B build -DMANIFOLD_DEBUG=ON -DPYBIND11_FINDPYTHON=OFF -DMANIFOLD_PAR=${{matrix.parallel_backend}} -A x64
+        cmake . -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DMANIFOLD_DEBUG=ON -DMANIFOLD_PAR=${{matrix.parallel_backend}} -A x64 -B build
         cd build
         cmake --build . --target ALL_BUILD --config Release
     - name: Test ${{matrix.parallel_backend}}
       shell: bash
       run: |
-        cd build/test
-        ./Release/manifold_test.exe
+        cd build/bin/Release
+        ./manifold_test.exe
+        cd ../../
+    - name: test cmake consumer
+      run: |
+        cd build
+        cmake --install .
+        cd ..
+        ./test-cmake.sh
 
   build_mxe:
     timeout-minutes: 30
@@ -204,11 +218,18 @@ jobs:
       run: |
         mkdir build
         cd build
-        cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DMANIFOLD_DEBUG=ON -DMANIFOLD_EXPORT=ON -DMANIFOLD_PAR=${{matrix.parallel_backend}} .. && make
+        cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DMANIFOLD_DEBUG=ON -DMANIFOLD_PYBIND=ON -DMANIFOLD_EXPORT=ON -DMANIFOLD_PAR=${{matrix.parallel_backend}} .. && make
     - name: Test
       run: |
         cd build/test
         ./manifold_test
+        cd ../../
+    - name: test cmake consumer
+      run: |
+        cd build
+        sudo cmake --install .
+        cd ..
+        ./test-cmake.sh
 
   build_nix:
     timeout-minutes: 30

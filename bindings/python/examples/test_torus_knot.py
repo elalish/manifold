@@ -81,9 +81,9 @@ def run(warp_single=False):
         return pts[0]
 
     if warp_single:
-        return circle.revolve(int(m)).warp(func_single)
+        return Manifold.revolve(circle, int(m)).warp(func_single)
     else:
-        return circle.revolve(int(m)).warp_batch(func)
+        return Manifold.revolve(circle, int(m)).warp_batch(func)
 
 
 @pytest.mark.parametrize("warp_single", [True, False])

@@ -136,12 +136,12 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
   tbb::task_group group;
   // map from face to triangle
   tbb::concurrent_unordered_map<int, std::vector<glm::ivec3>> results;
-  Vec<int> triCount(faceEdge.size());
+  Vec<size_t> triCount(faceEdge.size());
   triCount.back() = 0;
   // precompute number of triangles per face, and launch async tasks to
   // triangulate complex faces
-  for_each(autoPolicy(faceEdge.size()), countAt(0),
-           countAt(faceEdge.size() - 1), [&](int face) {
+  for_each(autoPolicy(faceEdge.size()), countAt(0_z),
+           countAt(faceEdge.size() - 1), [&](size_t face) {
              triCount[face] = faceEdge[face + 1] - faceEdge[face] - 2;
              ASSERT(triCount[face] >= 1, topologyErr,
                     "face has less than three edges.");
@@ -155,13 +155,15 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
   group.wait();
   // prefix sum computation (assign unique index to each face) and preallocation
   exclusive_scan(autoPolicy(triCount.size()), triCount.begin(), triCount.end(),
-                 triCount.begin(), 0);
+                 triCount.begin(), 0_z);
+  if (triCount.back() >= std::numeric_limits<int>::max())
+    throw std::out_of_range("too many triangles");
   triVerts.resize(triCount.back());
   triNormal.resize(triCount.back());
   triRef.resize(triCount.back());
 
   auto processFace2 = std::bind(
-      processFace, [&](int face) { return std::move(results[face]); },
+      processFace, [&](size_t face) { return std::move(results[face]); },
       [&](int face, glm::ivec3 tri, glm::vec3 normal, TriRef r) {
         triVerts[triCount[face]] = tri;
         triNormal[triCount[face]] = normal;
@@ -170,7 +172,7 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
       },
       std::placeholders::_1);
   // set triangles in parallel
-  for_each(autoPolicy(faceEdge.size()), countAt(0),
+  for_each(autoPolicy(faceEdge.size()), countAt(0_z),
            countAt(faceEdge.size() - 1), processFace2);
 #else
   triVerts.reserve(faceEdge.size());
