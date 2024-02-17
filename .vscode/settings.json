@@ -117,8 +117,7 @@
     "-DMANIFOLD_CBIND=ON",
     "-DMANIFOLD_EXPORT=ON",
     "-DMANIFOLD_DEBUG=ON",
-    "-DMANIFOLD_USE_CUDA=OFF",
-    "-DMANIFOLD_PAR=NONE",
+    "-DMANIFOLD_PAR=TBB",
     "-DCODE_COVERAGE=OFF",
     "-DCMAKE_CXX_FLAGS=''" //'-fsanitize=address,undefined'"
   ],

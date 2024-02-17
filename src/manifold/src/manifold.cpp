@@ -667,7 +667,7 @@ Manifold Manifold::CalculateCurvature(int gaussianIdx, int meanIdx) const {
  */
 Manifold Manifold::Refine(int n) const {
   auto pImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
-  pImpl->Refine([n](glm::vec3 edge) { return n; });
+  pImpl->Refine([n](glm::vec3 edge) { return n - 1; });
   return Manifold(std::make_shared<CsgLeafNode>(pImpl));
 }
 
