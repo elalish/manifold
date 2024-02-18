@@ -346,15 +346,16 @@ TEST(Manifold, Smooth) {
 TEST(Manifold, Smooth2Length) {
   Manifold cone = Manifold::Extrude(
       CrossSection::Circle(10, 10).Translate({10, 0}), 2, 0, 0, {0, 0});
+  cone += cone.Scale({1, 1, -5});
   Manifold smooth = Manifold::Smooth(cone.GetMesh());
   smooth = smooth.RefineToLength(0.1);
-  ExpectMeshes(smooth, {{10, 16}});
+  ExpectMeshes(smooth, {{85586, 171168}});
   auto prop = smooth.GetProperties();
-  EXPECT_NEAR(prop.volume, 8, 0.01);
-  EXPECT_NEAR(prop.surfaceArea, 25.46, 0.01);
+  EXPECT_NEAR(prop.volume, 4688, 1);
+  EXPECT_NEAR(prop.surfaceArea, 1369, 1);
 
 #ifdef MANIFOLD_EXPORT
-  if (options.exportModels) ExportMesh("smoothTet.glb", smooth.GetMesh(), {});
+  if (options.exportModels) ExportMesh("smoothCones.glb", smooth.GetMesh(), {});
 #endif
 }
 
