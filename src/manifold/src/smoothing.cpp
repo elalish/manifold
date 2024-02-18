@@ -194,6 +194,9 @@ struct InterpTri {
 
 class Partition {
  public:
+  // The cached partitions don't have idx - it's added to the copy returned
+  // from GetPartition that contains the mapping of the input divisions into the
+  // sorted divisions that are uniquely cached.
   glm::ivec3 idx;
   glm::ivec3 sortedDivisions;
   Vec<glm::vec3> vertBary;
@@ -266,7 +269,11 @@ class Partition {
  private:
   static inline auto cache = std::unordered_map<glm::ivec3, Partition>();
 
-  // n[0] >= n[1] >= n[2] > 0
+  // This triangulation is purely topological - it depends only on the number of
+  // divisions of the three sides of the triangle. This allows them to be cached
+  // and reused for similar triangles. The shape of the final surface is defined
+  // by the tangents and the barycentric coordinates of the new verts. The input
+  // must be sorted: n[0] >= n[1] >= n[2] > 0
   static Partition GetCachedPartition(glm::ivec3 n) {
     auto cached = cache.find(n);
     if (cached != cache.end()) {
@@ -724,6 +731,14 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
   // being non-coplanar, and hence not being related to the original faces.
   meshRelation_.originalID = ReserveIDs(1);
   InitializeOriginal();
+
+  if (meshRelation_.numProp > 0) {
+    meshRelation_.properties.resize(meshRelation_.numProp * NumVert());
+    meshRelation_.triProperties.resize(meshRelation_.triRef.size());
+    // Fill properties according to barycentric.
+    // Set triProp to share properties on continuous edges.
+    // Duplicate properties will be removed during sorting.
+  }
 
   return vertBary;
 }
