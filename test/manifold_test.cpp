@@ -331,8 +331,9 @@ TEST(Manifold, WarpBatch) {
 TEST(Manifold, Smooth) {
   Manifold tet = Manifold::Tetrahedron();
   Manifold smooth = Manifold::Smooth(tet.GetMesh());
-  smooth = smooth.Refine(100);
-  ExpectMeshes(smooth, {{20002, 40000}});
+  int n = 100;
+  smooth = smooth.Refine(n);
+  ExpectMeshes(smooth, {{2 * n * n + 2, 4 * n * n}});
   auto prop = smooth.GetProperties();
   EXPECT_NEAR(prop.volume, 17.38, 0.1);
   EXPECT_NEAR(prop.surfaceArea, 33.38, 0.1);

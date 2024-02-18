@@ -437,8 +437,8 @@ class Partition {
           edgeAdded[3] - 1 - (edgeAdded[3] * i) / partitions;
       const int nextOffset1 = GetEdgeVert(1, cornerOffset1 + 1);
       const int nextOffset3 = GetEdgeVert(3, cornerOffset3 + 1);
-      const int added =
-          glm::mix(edgeAdded[0], edgeAdded[2], (float)i / partitions);
+      const int added = glm::round(glm::mix(
+          (float)edgeAdded[0], (float)edgeAdded[2], (float)i / partitions));
 
       newCornerVerts[1] = GetEdgeVert(1, cornerOffset1);
       newCornerVerts[2] = GetEdgeVert(3, cornerOffset3);
