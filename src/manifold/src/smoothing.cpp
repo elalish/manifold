@@ -632,9 +632,10 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
                const int v1 = Next3(v0);
                const int tri = edge.halfedgeIdx / 3;
                for (int i = 0; i < n; ++i) {
-                 glm::vec3& uvw = vertBary[offset + i].uvw;
+                 glm::vec3 uvw(0);
                  uvw[v1] = (i + 1) * frac;
                  uvw[v0] = 1 - uvw[v1];
+                 vertBary[offset + i].uvw = uvw;
                  vertBary[offset + i].tri = tri;
                }
              });

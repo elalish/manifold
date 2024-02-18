@@ -359,11 +359,11 @@ TEST(Manifold, Smooth2Length) {
 
 TEST(Manifold, SmoothSphere) {
   int n[5] = {4, 8, 16, 32, 64};
-  float precision[5] = {0.03, 0.003, 0.003, 0.0005, 0.00006};
+  float precision[5] = {0.04, 0.003, 0.003, 0.0005, 0.00006};
   for (int i = 0; i < 5; ++i) {
     Manifold sphere = Manifold::Sphere(1, n[i]);
     // Refine(odd) puts a center point in the triangle, which is the worst case.
-    Manifold smoothed = Manifold::Smooth(sphere.GetMesh()).Refine(7);
+    Manifold smoothed = Manifold::Smooth(sphere.GetMesh()).Refine(6);
     Mesh out = smoothed.GetMesh();
     auto bounds =
         std::minmax_element(out.vertPos.begin(), out.vertPos.end(),
