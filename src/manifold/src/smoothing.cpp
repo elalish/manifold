@@ -395,11 +395,7 @@ class Partition {
         corner = i;
       }
       if (edgeAdded[i] > 0) {
-        if (maxEdge == -1) {
-          maxEdge = i;
-        } else {
-          maxEdge = -2;
-        }
+        maxEdge = maxEdge == -1 ? i : -2;
       }
       last = i;
     }
@@ -633,7 +629,8 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
   exclusive_scan(policy, edgeAdded.begin(), edgeAdded.end(), edgeOffset.begin(),
                  NumVert());
 
-  Vec<Barycentric> vertBary(edgeOffset.back() + edgeAdded.back());
+  const int totalEdgeAdded = edgeOffset.back() + edgeAdded.back();
+  Vec<Barycentric> vertBary(totalEdgeAdded);
   FillRetainedVerts(vertBary, halfedge_);
   for_each_n(policy, zip(edges.begin(), edgeAdded.begin(), edgeOffset.begin()),
              numEdge, [&vertBary](thrust::tuple<TmpEdge, int, int> in) {
@@ -732,19 +729,89 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
 
   faceNormal_.resize(0);
 
+  if (meshRelation_.numProp > 0) {
+    Vec<float> prop(meshRelation_.numProp * (NumVert() + totalEdgeAdded));
+
+    for_each_n(
+        policy, zip(countAt(0), vertBary.begin()), vertBary.size(),
+        [this, &prop](thrust::tuple<int, Barycentric> in) {
+          const int vert = thrust::get<0>(in);
+          const Barycentric bary = thrust::get<1>(in);
+          auto& rel = this->meshRelation_;
+
+          for (int p = 0; p < rel.numProp; ++p) {
+            glm::vec3 triProp;
+            for (const int i : {0, 1, 2}) {
+              triProp[i] =
+                  rel.properties[rel.triProperties[bary.tri][i] * rel.numProp +
+                                 p];
+            }
+            prop[vert * rel.numProp + p] = glm::dot(triProp, bary.uvw);
+          }
+        });
+
+    for_each_n(
+        policy, zip(edges.begin(), edgeAdded.begin(), edgeOffset.begin()),
+        numEdge, [this, &prop](thrust::tuple<TmpEdge, int, int> in) {
+          const TmpEdge edge = thrust::get<0>(in);
+          const int n = thrust::get<1>(in);
+          const int offset = thrust::get<2>(in) + this->NumVert();
+          auto& rel = this->meshRelation_;
+
+          const float frac = 1.0f / (n + 1);
+          const int halfedgeIdx =
+              this->halfedge_[edge.halfedgeIdx].pairedHalfedge;
+          const int v0 = halfedgeIdx % 3;
+          const int v1 = Next3(v0);
+          const int tri = halfedgeIdx / 3;
+          for (int i = 0; i < n; ++i) {
+            glm::vec3 uvw(0);
+            uvw[v1] = (i + 1) * frac;
+            uvw[v0] = 1 - uvw[v1];
+            for (int p = 0; p < rel.numProp; ++p) {
+              glm::vec3 triProp;
+              for (const int i : {0, 1, 2}) {
+                triProp[i] =
+                    rel.properties[rel.triProperties[tri][i] * rel.numProp + p];
+              }
+              prop[offset * rel.numProp + p] = glm::dot(triProp, uvw);
+            }
+          }
+        });
+
+    Vec<glm::ivec3> triProp(triVerts.size());
+
+    for_each_n(policy, countAt(0), numTri,
+               [this, &triProp, &subTris, &edgeOffset, &half2Edge, &triOffset,
+                &interiorOffset](int tri) {
+                 auto& rel = this->meshRelation_;
+                 const glm::ivec3 tri3 = rel.triProperties[tri];
+                 glm::ivec3 edgeOffsets;
+                 glm::bvec3 edgeFwd;
+                 for (const int i : {0, 1, 2}) {
+                   const Halfedge& halfedge = this->halfedge_[3 * tri + i];
+                   edgeOffsets[i] = edgeOffset[half2Edge[3 * tri + i]];
+                   if (!halfedge.IsForward()) {
+                     edgeOffsets[i] += this->NumVert();
+                   }
+                   edgeFwd[i] = true;
+                 }
+
+                 Vec<glm::ivec3> newTris = subTris[tri].Reindex(
+                     tri3, edgeOffsets, edgeFwd, interiorOffset[tri]);
+                 copy(ExecutionPolicy::Seq, newTris.begin(), newTris.end(),
+                      triProp.begin() + triOffset[tri]);
+               });
+
+    meshRelation_.properties = prop;
+    meshRelation_.triProperties = triProp;
+  }
+
   CreateHalfedges(triVerts);
   // Make original since the subdivided faces are intended to be warped into
   // being non-coplanar, and hence not being related to the original faces.
   meshRelation_.originalID = ReserveIDs(1);
   InitializeOriginal();
-
-  if (meshRelation_.numProp > 0) {
-    meshRelation_.properties.resize(meshRelation_.numProp * NumVert());
-    meshRelation_.triProperties.resize(meshRelation_.triRef.size());
-    // Fill properties according to barycentric.
-    // Set triProp to share properties on continuous edges.
-    // Duplicate properties will be removed during sorting.
-  }
 
   return vertBary;
 }
