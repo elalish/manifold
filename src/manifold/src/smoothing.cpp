@@ -267,7 +267,9 @@ class Partition {
   }
 
  private:
-  static inline auto cache = std::unordered_map<glm::ivec3, Partition>();
+  static inline auto cacheLock = std::mutex();
+  static inline auto cache =
+      std::unordered_map<glm::ivec3, std::unique_ptr<Partition>>();
 
   // This triangulation is purely topological - it depends only on the number of
   // divisions of the three sides of the triangle. This allows them to be cached
@@ -275,9 +277,12 @@ class Partition {
   // by the tangents and the barycentric coordinates of the new verts. The input
   // must be sorted: n[0] >= n[1] >= n[2] > 0
   static Partition GetCachedPartition(glm::ivec3 n) {
-    auto cached = cache.find(n);
-    if (cached != cache.end()) {
-      return cached->second;
+    {
+      auto lockGuard = std::lock_guard<std::mutex>(cacheLock);
+      auto cached = cache.find(n);
+      if (cached != cache.end()) {
+        return *cached->second;
+      }
     }
     Partition partition;
     partition.sortedDivisions = n;
@@ -349,7 +354,8 @@ class Partition {
       }
     }
 
-    cache.insert({n, partition});
+    auto lockGuard = std::lock_guard<std::mutex>(cacheLock);
+    cache.insert({n, std::make_unique<Partition>(partition)});
     return partition;
   }
 
