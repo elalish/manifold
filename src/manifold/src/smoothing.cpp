@@ -626,11 +626,12 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
              });
 
   Vec<int> edgeOffset(numEdge);
+  const int numVert = NumVert();
   exclusive_scan(policy, edgeAdded.begin(), edgeAdded.end(), edgeOffset.begin(),
-                 NumVert());
+                 numVert);
 
-  const int totalEdgeAdded = edgeOffset.back() + edgeAdded.back();
-  Vec<Barycentric> vertBary(totalEdgeAdded);
+  Vec<Barycentric> vertBary(edgeOffset.back() + edgeAdded.back());
+  const int totalEdgeAdded = vertBary.size() - numVert;
   FillRetainedVerts(vertBary, halfedge_);
   for_each_n(policy, zip(edges.begin(), edgeAdded.begin(), edgeOffset.begin()),
              numEdge, [&vertBary](thrust::tuple<TmpEdge, int, int> in) {
@@ -676,9 +677,10 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
 
   Vec<glm::ivec3> triVerts(triOffset.back() + subTris.back().triVert.size());
   vertBary.resize(interiorOffset.back() + subTris.back().NumInterior());
+  Vec<TriRef> triRef(triVerts.size());
   for_each_n(
       policy, countAt(0), numTri,
-      [this, &triVerts, &vertBary, &subTris, &edgeOffset, &half2Edge,
+      [this, &triVerts, &triRef, &vertBary, &subTris, &edgeOffset, &half2Edge,
        &triOffset, &interiorOffset](int tri) {
         glm::ivec3 tri3;
         glm::ivec3 edgeOffsets;
@@ -694,6 +696,9 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
             tri3, edgeOffsets, edgeFwd, interiorOffset[tri]);
         copy(ExecutionPolicy::Seq, newTris.begin(), newTris.end(),
              triVerts.begin() + triOffset[tri]);
+        auto start = triRef.begin() + triOffset[tri];
+        fill(ExecutionPolicy::Seq, start, start + newTris.size(),
+             meshRelation_.triRef[tri]);
 
         const glm::ivec3 idx = subTris[tri].idx;
         const glm::ivec3 vIdx =
@@ -712,6 +717,7 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
                         {tri, {bary[rIdx[0]], bary[rIdx[1]], bary[rIdx[2]]}});
                   });
       });
+  meshRelation_.triRef = triRef;
 
   Vec<glm::vec3> newVertPos(vertBary.size());
   for_each_n(
@@ -750,12 +756,15 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
           }
         });
 
+    const int backOffset = NumVert() - numVert;
+
     for_each_n(
         policy, zip(edges.begin(), edgeAdded.begin(), edgeOffset.begin()),
-        numEdge, [this, &prop](thrust::tuple<TmpEdge, int, int> in) {
+        numEdge,
+        [this, &prop, backOffset](thrust::tuple<TmpEdge, int, int> in) {
           const TmpEdge edge = thrust::get<0>(in);
           const int n = thrust::get<1>(in);
-          const int offset = thrust::get<2>(in) + this->NumVert();
+          const int offset = thrust::get<2>(in) + backOffset;
           auto& rel = this->meshRelation_;
 
           const float frac = 1.0f / (n + 1);
@@ -783,7 +792,7 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
 
     for_each_n(policy, countAt(0), numTri,
                [this, &triProp, &subTris, &edgeOffset, &half2Edge, &triOffset,
-                &interiorOffset](int tri) {
+                &interiorOffset, backOffset](int tri) {
                  auto& rel = this->meshRelation_;
                  const glm::ivec3 tri3 = rel.triProperties[tri];
                  glm::ivec3 edgeOffsets;
@@ -792,7 +801,7 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
                    const Halfedge& halfedge = this->halfedge_[3 * tri + i];
                    edgeOffsets[i] = edgeOffset[half2Edge[3 * tri + i]];
                    if (!halfedge.IsForward()) {
-                     edgeOffsets[i] += this->NumVert();
+                     edgeOffsets[i] += backOffset;
                    }
                    edgeFwd[i] = true;
                  }
@@ -808,10 +817,6 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
   }
 
   CreateHalfedges(triVerts);
-  // Make original since the subdivided faces are intended to be warped into
-  // being non-coplanar, and hence not being related to the original faces.
-  meshRelation_.originalID = ReserveIDs(1);
-  InitializeOriginal();
 
   return vertBary;
 }
@@ -825,6 +830,10 @@ void Manifold::Impl::Refine(std::function<int(glm::vec3)> edgeDivisions) {
     for_each_n(autoPolicy(NumTri()), zip(vertPos_.begin(), vertBary.begin()),
                NumVert(),
                InterpTri({old.halfedge_, old.halfedgeTangent_, old.vertPos_}));
+    // Make original since the subdivided faces have been warped into
+    // being non-coplanar, and hence not being related to the original faces.
+    meshRelation_.originalID = ReserveIDs(1);
+    InitializeOriginal();
   }
 
   halfedgeTangent_.resize(0);

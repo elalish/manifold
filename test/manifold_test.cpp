@@ -606,8 +606,15 @@ TEST(Manifold, MeshRelationRefine) {
   Manifold csaszar(inGL);
 
   RelatedGL(csaszar, {inGL});
-  csaszar.Refine(4);
+  csaszar = csaszar.Refine(4);
   RelatedGL(csaszar, {inGL});
+
+#ifdef MANIFOLD_EXPORT
+  ExportOptions opt;
+  opt.mat.roughness = 1;
+  opt.mat.colorChannels = glm::ivec4(3, 4, 5, -1);
+  if (options.exportModels) ExportMesh("csaszar.glb", csaszar.GetMeshGL(), opt);
+#endif
 }
 
 TEST(Manifold, MeshGLRoundTrip) {
