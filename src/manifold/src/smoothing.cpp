@@ -738,8 +738,13 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
   if (meshRelation_.numProp > 0) {
     Vec<float> prop(meshRelation_.numProp * (NumVert() + totalEdgeAdded));
 
+    copy(policy, meshRelation_.properties.begin(),
+         meshRelation_.properties.begin() + numVert * meshRelation_.numProp,
+         prop.begin());
+
     for_each_n(
-        policy, zip(countAt(0), vertBary.begin()), vertBary.size(),
+        policy, zip(countAt(numVert), vertBary.begin() + numVert),
+        vertBary.size() - numVert,
         [this, &prop](thrust::tuple<int, Barycentric> in) {
           const int vert = thrust::get<0>(in);
           const Barycentric bary = thrust::get<1>(in);
