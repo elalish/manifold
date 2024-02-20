@@ -607,6 +607,7 @@ TEST(Manifold, MeshRelationRefine) {
 
   RelatedGL(csaszar, {inGL});
   csaszar = csaszar.RefineToLength(1);
+  ExpectMeshes(csaszar, {{9225, 18450, 3}});
   RelatedGL(csaszar, {inGL});
 
 #ifdef MANIFOLD_EXPORT

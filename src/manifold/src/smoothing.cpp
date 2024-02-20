@@ -805,10 +805,19 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
                  for (const int i : {0, 1, 2}) {
                    const Halfedge& halfedge = this->halfedge_[3 * tri + i];
                    edgeOffsets[i] = edgeOffset[half2Edge[3 * tri + i]];
-                   if (!halfedge.IsForward()) {
-                     edgeOffsets[i] += backOffset;
-                   }
                    edgeFwd[i] = true;
+                   if (!halfedge.IsForward()) {
+                     const int pairTri = halfedge.pairedHalfedge / 3;
+                     const int j = halfedge.pairedHalfedge % 3;
+                     if (rel.triProperties[pairTri][j] !=
+                             rel.triProperties[tri][Next3(i)] ||
+                         rel.triProperties[pairTri][Next3(j)] !=
+                             rel.triProperties[tri][i]) {
+                       edgeOffsets[i] += backOffset;
+                     } else {
+                       edgeFwd[i] = false;
+                     }
+                   }
                  }
 
                  Vec<glm::ivec3> newTris = subTris[tri].Reindex(
