@@ -779,11 +779,11 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
             uvw[v0] = 1 - uvw[v1];
             for (int p = 0; p < rel.numProp; ++p) {
               glm::vec3 triProp;
-              for (const int i : {0, 1, 2}) {
-                triProp[i] =
-                    rel.properties[rel.triProperties[tri][i] * rel.numProp + p];
+              for (const int j : {0, 1, 2}) {
+                triProp[j] =
+                    rel.properties[rel.triProperties[tri][j] * rel.numProp + p];
               }
-              prop[offset * rel.numProp + p] = glm::dot(triProp, uvw);
+              prop[(offset + i) * rel.numProp + p] = glm::dot(triProp, uvw);
             }
           }
         });
