@@ -736,16 +736,18 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
   faceNormal_.resize(0);
 
   if (meshRelation_.numProp > 0) {
-    Vec<float> prop(meshRelation_.numProp * (NumVert() + totalEdgeAdded));
+    const int numPropVert = NumPropVert();
+    const int addedVerts = NumVert() - numVert;
+    const int propOffset = numPropVert - numVert;
+    Vec<float> prop(meshRelation_.numProp *
+                    (numPropVert + addedVerts + totalEdgeAdded));
 
     copy(policy, meshRelation_.properties.begin(),
-         meshRelation_.properties.begin() + numVert * meshRelation_.numProp,
-         prop.begin());
+         meshRelation_.properties.end(), prop.begin());
 
     for_each_n(
-        policy, zip(countAt(numVert), vertBary.begin() + numVert),
-        vertBary.size() - numVert,
-        [this, &prop](thrust::tuple<int, Barycentric> in) {
+        policy, zip(countAt(numPropVert), vertBary.begin() + numVert),
+        addedVerts, [this, &prop](thrust::tuple<int, Barycentric> in) {
           const int vert = thrust::get<0>(in);
           const Barycentric bary = thrust::get<1>(in);
           auto& rel = this->meshRelation_;
@@ -761,15 +763,14 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
           }
         });
 
-    const int backOffset = NumVert() - numVert;
-
     for_each_n(
         policy, zip(edges.begin(), edgeAdded.begin(), edgeOffset.begin()),
         numEdge,
-        [this, &prop, backOffset](thrust::tuple<TmpEdge, int, int> in) {
+        [this, &prop, propOffset,
+         addedVerts](thrust::tuple<TmpEdge, int, int> in) {
           const TmpEdge edge = thrust::get<0>(in);
           const int n = thrust::get<1>(in);
-          const int offset = thrust::get<2>(in) + backOffset;
+          const int offset = thrust::get<2>(in) + propOffset + addedVerts;
           auto& rel = this->meshRelation_;
 
           const float frac = 1.0f / (n + 1);
@@ -797,15 +798,14 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
 
     for_each_n(policy, countAt(0), numTri,
                [this, &triProp, &subTris, &edgeOffset, &half2Edge, &triOffset,
-                &interiorOffset, backOffset](int tri) {
+                &interiorOffset, propOffset, addedVerts](int tri) {
                  auto& rel = this->meshRelation_;
                  const glm::ivec3 tri3 = rel.triProperties[tri];
                  glm::ivec3 edgeOffsets;
-                 glm::bvec3 edgeFwd;
+                 glm::bvec3 edgeFwd(true);
                  for (const int i : {0, 1, 2}) {
                    const Halfedge& halfedge = this->halfedge_[3 * tri + i];
                    edgeOffsets[i] = edgeOffset[half2Edge[3 * tri + i]];
-                   edgeFwd[i] = true;
                    if (!halfedge.IsForward()) {
                      const int pairTri = halfedge.pairedHalfedge / 3;
                      const int j = halfedge.pairedHalfedge % 3;
@@ -813,7 +813,7 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
                              rel.triProperties[tri][Next3(i)] ||
                          rel.triProperties[pairTri][Next3(j)] !=
                              rel.triProperties[tri][i]) {
-                       edgeOffsets[i] += backOffset;
+                       edgeOffsets[i] += addedVerts;
                      } else {
                        edgeFwd[i] = false;
                      }
@@ -821,7 +821,8 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
                  }
 
                  Vec<glm::ivec3> newTris = subTris[tri].Reindex(
-                     tri3, edgeOffsets, edgeFwd, interiorOffset[tri]);
+                     tri3, edgeOffsets + propOffset, edgeFwd,
+                     interiorOffset[tri] + propOffset);
                  copy(ExecutionPolicy::Seq, newTris.begin(), newTris.end(),
                       triProp.begin() + triOffset[tri]);
                });

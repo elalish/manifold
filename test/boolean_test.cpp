@@ -391,6 +391,16 @@ TEST(Boolean, Sphere) {
   EXPECT_EQ(result.NumDegenerateTris(), 0);
 
   RelatedGL(result, {sphereGL});
+  result = result.Refine(4);
+  RelatedGL(result, {sphereGL});
+
+#ifdef MANIFOLD_EXPORT
+  ExportOptions opt;
+  opt.mat.roughness = 1;
+  opt.mat.colorChannels = glm::ivec4(3, 4, 5, -1);
+  if (options.exportModels)
+    ExportMesh("sphereUnion.glb", result.GetMeshGL(), opt);
+#endif
 }
 
 TEST(Boolean, MeshRelation) {
@@ -404,6 +414,7 @@ TEST(Boolean, MeshRelation) {
   EXPECT_TRUE(gyroid.MatchesTriNormals());
   EXPECT_LE(gyroid.NumDegenerateTris(), 0);
   Manifold result = gyroid + gyroid2;
+  // result = result.RefineToLength(0.1);
 
 #ifdef MANIFOLD_EXPORT
   ExportOptions opt;
