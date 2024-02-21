@@ -296,6 +296,64 @@ TEST(Boolean, SplitByPlane60) {
               splits.second.GetProperties().volume, 1e-5);
 }
 
+TEST(Boolean, ConvexConvexMinkowski) {
+  float offsetRadius = 0.1f;
+  float cubeWidth = 2.0f;
+  Manifold sphere = Manifold::Sphere(offsetRadius, 20);
+  Manifold cube = Manifold::Cube({cubeWidth, cubeWidth, cubeWidth});
+  Manifold sum = cube.MinkowskiSum(sphere);
+  EXPECT_NEAR(sum.GetProperties().volume, 10.589364051818848f, 1e-5);
+  EXPECT_EQ(sum.Genus(), 0);
+  Manifold difference = Manifold::Cube({cubeWidth, cubeWidth, cubeWidth})
+                            .MinkowskiDifference(sphere);
+  EXPECT_NEAR(difference.GetProperties().volume, 5.8319993019104004f, 1e-5);
+  EXPECT_NEAR(difference.GetProperties().surfaceArea, 19.439998626708984, 1e-5);
+  EXPECT_EQ(difference.Genus(), 0);
+}
+
+TEST(Boolean, NonConvexConvexMinkowski) {
+  Manifold sphere = Manifold::Sphere(1.2, 20);
+  Manifold cube = Manifold::Cube({2.0, 2.0, 2.0}, true);
+  Manifold nonConvex = cube - sphere;
+  Manifold sum = nonConvex.MinkowskiSum(Manifold::Sphere(0.1, 20));
+  EXPECT_NEAR(sum.GetProperties().volume, 4.8406339f, 1e-5);
+  EXPECT_NEAR(sum.GetProperties().surfaceArea, 34.063014984130859f, 1e-5);
+  EXPECT_EQ(sum.Genus(), 5);
+  Manifold difference =
+      nonConvex.MinkowskiDifference(Manifold::Sphere(0.05, 20));
+  EXPECT_NEAR(difference.GetProperties().volume, 0.77841246128082275f, 1e-5);
+  EXPECT_NEAR(difference.GetProperties().surfaceArea, 16.703733444213867f,
+              1e-5);
+  EXPECT_EQ(difference.Genus(), 5);
+}
+
+TEST(Boolean, NonConvexNonConvexMinkowski) {
+  bool oldDeterministic = ManifoldParams().deterministic;
+  ManifoldParams().deterministic = true;
+  PolygonParams().processOverlaps = true;
+
+  Manifold tet = Manifold::Tetrahedron();
+  Manifold nonConvex = tet - tet.Rotate(0, 0, 90).Translate(glm::vec3(1));
+
+  Manifold sum = nonConvex.MinkowskiSum(nonConvex.Scale(glm::vec3(0.5)));
+  EXPECT_NEAR(sum.GetProperties().volume, 8.65625f, 1e-5);
+  EXPECT_NEAR(sum.GetProperties().surfaceArea, 31.176914f, 1e-5);
+  EXPECT_EQ(sum.Genus(), -5);
+
+  Manifold difference =
+      nonConvex.MinkowskiDifference(nonConvex.Scale(glm::vec3(0.1)));
+  EXPECT_NEAR(difference.GetProperties().volume, 0.81554f, 1e-5);
+  EXPECT_NEAR(difference.GetProperties().surfaceArea, 6.95045f, 1e-5);
+  EXPECT_EQ(difference.Genus(), 0);
+
+#ifdef MANIFOLD_EXPORT
+  if (options.exportModels) ExportMesh("minkowski.glb", sum.GetMesh(), {});
+#endif
+
+  ManifoldParams().deterministic = oldDeterministic;
+  PolygonParams().processOverlaps = false;
+}
+
 /**
  * This tests that non-intersecting geometry is properly retained.
  */

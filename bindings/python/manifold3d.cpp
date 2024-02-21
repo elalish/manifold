@@ -348,6 +348,10 @@ NB_MODULE(manifold3d, m) {
       .def("trim_by_plane", &Manifold::TrimByPlane, nb::arg("normal"),
            nb::arg("origin_offset"),
            manifold__trim_by_plane__normal__origin_offset)
+      .def("minkowski_sum", &Manifold::MinkowskiSum, nb::arg("other"),
+           manifold__minkowski_sum__other)
+      .def("minkowski_difference", &Manifold::MinkowskiDifference,
+           nb::arg("other"), manifold__minkowski_difference__other)
       .def("slice", &Manifold::Slice, nb::arg("height"),
            manifold__slice__height)
       .def("project", &Manifold::Project, manifold__project)

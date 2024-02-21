@@ -135,6 +135,7 @@ struct Manifold::Impl {
   void FormLoop(int current, int end);
   void CollapseTri(const glm::ivec3& triEdge);
   void SplitPinchedVerts();
+  bool IsConvex(float tolerance = 1e-8f) const;
 
   // smoothing.cu
   void CreateTangents(const std::vector<Smoothness>&);
