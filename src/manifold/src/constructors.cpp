@@ -183,10 +183,9 @@ Manifold Manifold::Cylinder(float height, float radiusLow, float radiusHigh,
 
   CrossSection circle = CrossSection::Circle(radiusLow, n);
   Manifold cylinder =
-      Manifold::Extrude(circle, height, 0, 0.0f, glm::vec2(scale));
-  if (center)
-    cylinder =
-        cylinder.Translate(glm::vec3(0.0f, 0.0f, -height / 2.0f)).AsOriginal();
+      Manifold::ExtrudeTransforming(circle, height, 0, 0.0f, glm::vec2(scale),
+                                    center ? -height / 2.0f : 0.0f, true);
+
   return cylinder;
 }
 
@@ -217,6 +216,37 @@ Manifold Manifold::Sphere(float radius, int circularSegments) {
 }
 
 /**
+ * Constructs a manifold from lists of vertices and triangles.
+ *
+ * @param vertices A vector of glm::vec3.
+ * @param triangles A vector of glm::ivec3.
+ *
+ */
+Manifold Manifold::CreateFromVertsAndTriangles(
+    std::vector<glm::vec3> verts, std::vector<glm::ivec3> triangles) {
+  ZoneScoped;
+
+  auto pImpl_ = std::make_shared<Impl>();
+  auto& vertPos = pImpl_->vertPos_;
+  Vec<glm::ivec3> triVertsDH;
+  auto& triVerts = triVertsDH;
+
+  for (auto v : verts) {
+    vertPos.push_back(v);
+  }
+  for (auto tri : triangles) {
+    triVerts.push_back(tri);
+  }
+
+  pImpl_->CreateHalfedges(triVertsDH);
+  pImpl_->Finish();
+  pImpl_->meshRelation_.originalID = ReserveIDs(1);
+  pImpl_->InitializeOriginal();
+  pImpl_->CreateFaces();
+  return Manifold(pImpl_);
+}
+
+/**
  * Constructs a manifold from a set of polygons by extruding them along the
  * Z-axis.
  * Note that high twistDegrees with small nDivisions may cause
@@ -231,13 +261,38 @@ Manifold Manifold::Sphere(float radius, int circularSegments) {
  * @param twistDegrees Amount to twist the top crossSection relative to the
  * bottom, interpolated linearly for the divisions in between.
  * @param scaleTop Amount to scale the top (independently in X and Y). If the
- * scale is {0, 0}, a pure cone is formed with only a single vertex at the top.
- * Note that scale is applied after twist.
- * Default {1, 1}.
+ * scale is {0, 0}, a pure cone is formed with only a single vertex at the
+ * top. Note that scale is applied after twist. Default {1, 1}.
  */
 Manifold Manifold::Extrude(const CrossSection& crossSection, float height,
                            int nDivisions, float twistDegrees,
                            glm::vec2 scaleTop) {
+  return ExtrudeTransforming(crossSection, height, nDivisions, twistDegrees,
+                             scaleTop);
+}
+
+/**
+ * Constructs a manifold from a set of polygons by extruding them along the
+ * Z-axis.
+ * Note that high twistDegrees with small nDivisions may cause
+ * self-intersection. This is not checked here and it is up to the user to
+ * choose the correct parameters.
+ *
+ * @param crossSection A set of non-overlapping polygons to extrude.
+ * @param height Z-extent of extrusion.
+ * @param nDivisions Number of extra copies of the crossSection to insert into
+ * the shape vertically; especially useful in combination with twistDegrees to
+ * avoid interpolation artifacts. Default is none.
+ * @param twistDegrees Amount to twist the top crossSection relative to the
+ * bottom, interpolated linearly for the divisions in between.
+ * @param scaleTop Amount to scale the top (independently in X and Y). If the
+ * scale is {0, 0}, a pure cone is formed with only a single vertex at the
+ * top. Note that scale is applied after twist. Default {1, 1}.
+ */
+Manifold Manifold::ExtrudeTransforming(const CrossSection& crossSection,
+                                       float height, int nDivisions,
+                                       float twistDegrees, glm::vec2 scaleTop,
+                                       float initialZ, bool isConvex) {
   ZoneScoped;
   auto polygons = crossSection.ToPolygons();
   if (polygons.size() == 0 || height <= 0.0f) {
@@ -260,7 +315,7 @@ Manifold Manifold::Extrude(const CrossSection& crossSection, float height,
     nCrossSection += poly.size();
     SimplePolygonIdx simpleIndexed;
     for (const glm::vec2& polyVert : poly) {
-      vertPos.push_back({polyVert.x, polyVert.y, 0.0f});
+      vertPos.push_back({polyVert.x, polyVert.y, initialZ});
       simpleIndexed.push_back({polyVert, idx++});
     }
     polygonsIndexed.push_back(simpleIndexed);
@@ -283,7 +338,7 @@ Manifold Manifold::Extrude(const CrossSection& crossSection, float height,
                               thisVert - nCrossSection});
         } else {
           glm::vec2 pos = transform * poly[vert];
-          vertPos.push_back({pos.x, pos.y, height * alpha});
+          vertPos.push_back({pos.x, pos.y, (height + initialZ) * alpha});
           triVerts.push_back({thisVert, lastVert, thisVert - nCrossSection});
           triVerts.push_back(
               {lastVert, lastVert - nCrossSection, thisVert - nCrossSection});
@@ -295,11 +350,26 @@ Manifold Manifold::Extrude(const CrossSection& crossSection, float height,
   }
   if (isCone)
     for (int j = 0; j < polygons.size(); ++j)  // Duplicate vertex for Genus
-      vertPos.push_back({0.0f, 0.0f, height});
-  std::vector<glm::ivec3> top = TriangulateIdx(polygonsIndexed);
-  for (const glm::ivec3& tri : top) {
-    triVerts.push_back({tri[0], tri[2], tri[1]});
-    if (!isCone) triVerts.push_back(tri + nCrossSection * nDivisions);
+      vertPos.push_back({0.0f, 0.0f, height + initialZ});
+  if (isConvex && polygons.size() == 1) {  // Fan triangulation algorithm
+    auto poly = polygons[0];
+    int n = poly.size();
+    int chosen = 0;
+    auto nvc = nCrossSection * nDivisions;
+    for (int i = 1; i < n - 1; i++) {
+      int cur = i;
+      int next = i + 1;
+      // Bottom cap
+      triVerts.push_back({next, cur, chosen});
+      // Top cap
+      if (!isCone) triVerts.push_back({chosen + nvc, cur + nvc, next + nvc});
+    }
+  } else {  // EarCut triangulation algorithm
+    std::vector<glm::ivec3> top = TriangulateIdx(polygonsIndexed);
+    for (const glm::ivec3& tri : top) {
+      triVerts.push_back({tri[0], tri[2], tri[1]});
+      if (!isCone) triVerts.push_back(tri + nCrossSection * nDivisions);
+    }
   }
 
   pImpl_->CreateHalfedges(triVertsDH);

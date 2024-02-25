@@ -74,6 +74,11 @@ class CrossSection {
   CrossSection(const Polygons& contours,
                FillRule fillrule = FillRule::Positive);
   CrossSection(const Rect& rect);
+  static CrossSection CreateFromPolygonsUnchecked(
+      std::vector<std::vector<glm::vec2>> paths);
+  static CrossSection RoundedRectangle(const glm::vec2 size, float radius,
+                                       int circularSegments = 0,
+                                       bool center = false);
   static CrossSection Square(const glm::vec2 dims, bool center = false);
   static CrossSection Circle(float radius, int circularSegments = 0);
   ///@}

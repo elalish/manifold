@@ -146,9 +146,17 @@ class Manifold {
                            float radiusHigh = -1.0f, int circularSegments = 0,
                            bool center = false);
   static Manifold Sphere(float radius, int circularSegments = 0);
+  static Manifold CreateFromVertsAndTriangles(
+      std::vector<glm::vec3> verts, std::vector<glm::ivec3> triangles);
   static Manifold Extrude(const CrossSection& crossSection, float height,
                           int nDivisions = 0, float twistDegrees = 0.0f,
                           glm::vec2 scaleTop = glm::vec2(1.0f));
+  static Manifold ExtrudeTransforming(const CrossSection& crossSection,
+                                      float height, int nDivisions = 0,
+                                      float twistDegrees = 0.0f,
+                                      glm::vec2 scaleTop = glm::vec2(1.0f),
+                                      float initialZ = 0.0f,
+                                      bool isConvex = false);
   static Manifold Revolve(const CrossSection& crossSection,
                           int circularSegments = 0,
                           float revolveDegrees = 360.0f);

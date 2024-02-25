@@ -305,6 +305,129 @@ std::shared_ptr<const PathImpl> CrossSection::GetPaths() const {
 }
 
 /**
+ * Constructs a CrossSection from a vector of polygons.
+ * No checking is done, so don't have self-intersecting paths
+ * Polygon contours should be wound CCW.
+ * Polygon holes should be wound CW.
+ *
+ * @param polygons A vector of a vector of path points.
+ */
+CrossSection CrossSection::CreateFromPolygonsUnchecked(
+    std::vector<std::vector<glm::vec2>> polygons) {
+  if (polygons.size() < 1) {
+    return CrossSection();
+  }
+  for (int i = 0; i < polygons.size(); i++) {
+    if (polygons[i].size() < 3) {
+      return CrossSection();
+    }
+  }
+
+  auto ps = C2::PathsD(polygons.size());
+
+  for (int i = 0; i < ps.size(); i++) {
+    auto path = polygons[i];
+    auto p = C2::PathD(polygons[i].size());
+    for (int j = 0; j < p.size(); j++) {
+      auto v = path[j];
+      p[j] = C2::PointD(v.x, v.y);
+    }
+    ps[i] = p;
+  }
+  return CrossSection(shared_paths(ps));
+}
+
+/**
+ * Constructs a rounded rectangle from given size and radius.
+ *
+ * @param size The X, and Y dimensions of the square.
+ * @param radius Radius of the circle. Must be positive.
+ * @param circularSegments Number of segments along its diameter. Default is
+ * calculated by the static Quality defaults according to the radius.
+ * @param center Set to true to shift the center to the origin.
+ */
+CrossSection CrossSection::RoundedRectangle(const glm::vec2 size, float radius,
+                                            int circularSegments, bool center) {
+  if (size.x < 0.0f || size.y < 0.0f || glm::length(size) == 0.0f) {
+    return CrossSection();
+  }
+  if (radius <= 0.0f) {
+    return CrossSection();
+  }
+  auto n = circularSegments > 2 ? circularSegments
+                                : Quality::GetCircularSegments(radius);
+  int segs_per_arc = std::trunc(n / 4) + 1;
+  float degs_per_seg = 90.0f / segs_per_arc;
+  auto arc = [segs_per_arc, degs_per_seg](float start) {
+    std::vector<glm::vec2> l;
+    auto end = start + 90.0f;
+    auto deg = start;
+    for (auto i = 0; i < segs_per_arc - 1; i++) {
+      l.push_back(glm::vec2(cosd(deg), sind(deg)));
+      deg += degs_per_seg;
+    }
+    l.push_back(glm::vec2(cosd(end), sind(end)));
+    return l;
+  };
+  static std::unordered_map<int, std::vector<std::vector<glm::vec2>>> arc_map =
+      {};
+
+  std::vector<std::vector<glm::vec2>> arcs;
+  auto search = arc_map.find(n);
+  if (search != arc_map.end()) {
+    arcs = search->second;
+  } else {
+    arcs = std::vector<std::vector<glm::vec2>>();
+    arcs.push_back(arc(180));  // Bottom left
+    arcs.push_back(arc(270));  // Bottom right
+    arcs.push_back(arc(0));    // Top right
+    arcs.push_back(arc(90));   // Top left
+    arc_map[n] = arcs;
+  }
+  auto bl = arcs[0];  // Bottom left
+  auto br = arcs[1];  // Bottom right
+  auto tr = arcs[2];  // Top right
+  auto tl = arcs[3];  // Top left
+
+  auto len_arc = bl.size();
+
+  auto x = size.x;
+  auto y = size.y;
+
+  auto x_off = 0.0f;
+  auto y_off = 0.0f;
+
+  if (center) {
+    x_off = -x / 2.0;
+    y_off = -y / 2.0;
+  }
+
+  auto rr = C2::PathD(4 * len_arc);
+  int pdidx = 0;
+  for (auto vec : bl) {  // Bottom left
+    rr[pdidx] = C2::PointD(radius + radius * vec.x + x_off,
+                           radius + radius * vec.y + y_off);
+    pdidx++;
+  }
+  for (auto vec : br) {  // Bottom right
+    rr[pdidx] = C2::PointD((x - radius) + radius * vec.x + x_off,
+                           radius + radius * vec.y + y_off);
+    pdidx++;
+  }
+  for (auto vec : tr) {  // Top right
+    rr[pdidx] = C2::PointD((x - radius) + radius * vec.x + x_off,
+                           (y - radius) + radius * vec.y + y_off);
+    pdidx++;
+  }
+  for (auto vec : tl) {  // Top left
+    rr[pdidx] = C2::PointD(radius + radius * vec.x + x_off,
+                           (y - radius) + radius * vec.y + y_off);
+    pdidx++;
+  }
+  return CrossSection(shared_paths(C2::PathsD{rr}));
+}
+
+/**
  * Constructs a square with the given XY dimensions. By default it is
  * positioned in the first quadrant, touching the origin. If any dimensions in
  * size are negative, or if all are zero, an empty Manifold will be returned.

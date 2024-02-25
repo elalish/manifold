@@ -387,6 +387,17 @@ NB_MODULE(manifold3d, m) {
       .def_static("tetrahedron", &Manifold::Tetrahedron, manifold__tetrahedron)
       .def_static("cube", &Manifold::Cube, nb::arg("size") = glm::vec3{1, 1, 1},
                   nb::arg("center") = false, manifold__cube__size__center)
+      .def_static("create_from_verts_and_triangles",
+                  &Manifold::CreateFromVertsAndTriangles, nb::arg("verts"),
+                  nb::arg("triangles"),
+                  manifold__create_from_verts_and_triangles__verts__triangles)
+      .def_static(
+          "extrude_transforming", &Manifold::ExtrudeTransforming,
+          nb::arg("crossSection"), nb::arg("height"),
+          nb::arg("n_divisions") = 0, nb::arg("twist_degrees") = 0.0f,
+          nb::arg("scale_top") = std::make_tuple(1.0f, 1.0f),
+          nb::arg("initial_z") = 0.0f, nb::arg("is_convex") = false,
+          manifold__extrude_transforming__cross_section__height__n_divisions__twist_degrees__scale_top__initial_z__is_convex)
       .def_static(
           "extrude", &Manifold::Extrude, nb::arg("crossSection"),
           nb::arg("height"), nb::arg("n_divisions") = 0,
@@ -681,11 +692,19 @@ NB_MODULE(manifold3d, m) {
       .def("revolve", &Manifold::Revolve, nb::arg("circular_segments") = 0,
            nb::arg("revolve_degrees") = 360.0,
            manifold__revolve__cross_section__circular_segments__revolve_degrees)
-
+      .def_static("create_from_polygons_unchecked",
+                  &CrossSection::CreateFromPolygonsUnchecked,
+                  nb::arg("polygons"),
+                  cross_section__create_from_polygons_unchecked__polygons)
       .def_static("square", &CrossSection::Square, nb::arg("size"),
                   nb::arg("center") = false,
                   cross_section__square__size__center)
       .def_static("circle", &CrossSection::Circle, nb::arg("radius"),
                   nb::arg("circular_segments") = 0,
-                  cross_section__circle__radius__circular_segments);
+                  cross_section__circle__radius__circular_segments)
+      .def_static(
+          "rounded_rectangle", &CrossSection::RoundedRectangle, nb::arg("size"),
+          nb::arg("radius"), nb::arg("circular_segments") = 0,
+          nb::arg("center") = false,
+          cross_section__rounded_rectangle__size__radius__circular_segments__center);
 }
