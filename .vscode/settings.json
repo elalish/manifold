@@ -108,7 +108,12 @@
     "latch": "cpp",
     "semaphore": "cpp",
     "span": "cpp",
-    "__sso_allocator": "cpp"
+    "__sso_allocator": "cpp",
+    "source_location": "cpp",
+    "format": "cpp",
+    "numbers": "cpp",
+    "ranges": "cpp",
+    "stop_token": "cpp"
   },
   "C_Cpp.clang_format_fallbackStyle": "google",
   "editor.formatOnSave": true,

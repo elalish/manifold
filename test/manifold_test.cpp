@@ -349,7 +349,7 @@ TEST(Manifold, Smooth2Length) {
   cone += cone.Scale({1, 1, -5});
   Manifold smooth = Manifold::Smooth(cone.GetMesh());
   smooth = smooth.RefineToLength(0.1);
-  ExpectMeshes(smooth, {{85586, 171168}});
+  ExpectMeshes(smooth, {{85250, 170496}});
   auto prop = smooth.GetProperties();
   EXPECT_NEAR(prop.volume, 4688, 1);
   EXPECT_NEAR(prop.surfaceArea, 1369, 1);
@@ -607,7 +607,7 @@ TEST(Manifold, MeshRelationRefine) {
 
   RelatedGL(csaszar, {inGL});
   csaszar = csaszar.RefineToLength(1);
-  ExpectMeshes(csaszar, {{9225, 18450, 3}});
+  ExpectMeshes(csaszar, {{9019, 18038, 3}});
   RelatedGL(csaszar, {inGL});
 
 #ifdef MANIFOLD_EXPORT

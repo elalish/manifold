@@ -414,7 +414,7 @@ TEST(Boolean, MeshRelation) {
   EXPECT_TRUE(gyroid.MatchesTriNormals());
   EXPECT_LE(gyroid.NumDegenerateTris(), 0);
   Manifold result = gyroid + gyroid2;
-  // result = result.RefineToLength(0.1);
+  result = result.RefineToLength(0.1);
 
 #ifdef MANIFOLD_EXPORT
   ExportOptions opt;

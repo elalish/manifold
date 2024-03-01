@@ -314,7 +314,8 @@ class Partition {
                     {true, true, true, true});
     } else {  // obtuse -> spit into two acute
       // portion of n[0] under n[2]
-      const int ns = (f - n[1] * n[1]) / (2 * n[0]);
+      const int ns =
+          glm::min(n[0] - 2, (int)glm::round((f - n[1] * n[1]) / (2 * n[0])));
       // height from n[0]: nh <= n[2]
       const int nh = glm::max(1., glm::round(glm::sqrt(n[2] * n[2] - ns * ns)));
 
@@ -404,16 +405,16 @@ class Partition {
         glm::ivec4 edge = (glm::ivec4(0, 1, 2, 3) + maxEdge) % 4;
         const int middle = edgeAdded[maxEdge] / 2;
         triVert.push_back({cornerVerts[edge[2]], cornerVerts[edge[3]],
-                           edgeOffsets[maxEdge] + middle});
+                           GetEdgeVert(maxEdge, middle)});
         int last = cornerVerts[edge[0]];
         for (int i = 0; i <= middle; ++i) {
-          const int next = edgeOffsets[maxEdge] + i;
+          const int next = GetEdgeVert(maxEdge, i);
           triVert.push_back({cornerVerts[edge[3]], last, next});
           last = next;
         }
         last = cornerVerts[edge[1]];
         for (int i = edgeAdded[maxEdge] - 1; i >= middle; --i) {
-          const int next = edgeOffsets[maxEdge] + i;
+          const int next = GetEdgeVert(maxEdge, i);
           triVert.push_back({cornerVerts[edge[2]], next, last});
           last = next;
         }
@@ -422,7 +423,7 @@ class Partition {
           const int side = (corner + j) % 4;
           int sideVert = cornerVerts[side];
           for (int i = 0; i < edgeAdded[side]; ++i) {
-            const int nextVert = edgeOffsets[side] + i;
+            const int nextVert = GetEdgeVert(side, i);
             triVert.push_back({cornerVerts[corner], sideVert, nextVert});
             sideVert = nextVert;
           }
