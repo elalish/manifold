@@ -419,7 +419,7 @@ class Partition {
           last = next;
         }
       } else {
-        int sideVert;
+        int sideVert = cornerVerts[0];  // initial value is unused
         for (const int j : {1, 2}) {
           const int side = (corner + j) % 4;
           if (j == 2 && edgeAdded[side] > 0) {
