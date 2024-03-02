@@ -419,16 +419,24 @@ class Partition {
           last = next;
         }
       } else {
+        int sideVert;
         for (const int j : {1, 2}) {
           const int side = (corner + j) % 4;
-          int sideVert = cornerVerts[side];
+          if (j == 2 && edgeAdded[side] > 0) {
+            triVert.push_back(
+                {cornerVerts[side], GetEdgeVert(side, 0), sideVert});
+          } else {
+            sideVert = cornerVerts[side];
+          }
           for (int i = 0; i < edgeAdded[side]; ++i) {
             const int nextVert = GetEdgeVert(side, i);
             triVert.push_back({cornerVerts[corner], sideVert, nextVert});
             sideVert = nextVert;
           }
-          triVert.push_back({cornerVerts[corner], sideVert,
-                             cornerVerts[(corner + j + 1) % 4]});
+          if (j == 2 || edgeAdded[side] == 0) {
+            triVert.push_back({cornerVerts[corner], sideVert,
+                               cornerVerts[(corner + j + 1) % 4]});
+          }
         }
       }
       return;
