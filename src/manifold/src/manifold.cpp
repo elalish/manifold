@@ -685,9 +685,8 @@ Manifold Manifold::Refine(int n) const {
 Manifold Manifold::RefineToLength(float length) const {
   length = glm::abs(length);
   auto pImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
-  pImpl->Refine([length](glm::vec3 edge) {
-    return glm::round(glm::length(edge) / length);
-  });
+  pImpl->Refine(
+      [length](glm::vec3 edge) { return glm::length(edge) / length; });
   return Manifold(std::make_shared<CsgLeafNode>(pImpl));
 }
 
