@@ -235,7 +235,7 @@ class Partition {
     Vec<int> newVerts;
     newVerts.reserve(vertBary.size());
     glm::ivec3 triIdx = idx;
-    std::vector<int> outTri = {0, 1, 2};
+    glm::ivec3 outTri = {0, 1, 2};
     if (idx[1] != Next3(idx[0])) {
       triIdx = {idx[2], idx[0], idx[1]};
       edgeFwd = glm::not_(edgeFwd);
@@ -257,12 +257,16 @@ class Partition {
       newVerts.push_back(i + offset);
     }
 
-    Vec<glm::ivec3> newTriVert(triVert.size());
-    for (int i = 0; i < triVert.size(); ++i) {
-      for (const int j : {0, 1, 2}) {
-        newTriVert[i][outTri[j]] = newVerts[triVert[i][j]];
-      }
-    }
+    const int numTri = triVert.size();
+    Vec<glm::ivec3> newTriVert(numTri);
+    for_each_n(
+        autoPolicy(numTri), zip(newTriVert.begin(), triVert.begin()), numTri,
+        [&outTri, &newVerts](thrust::tuple<glm::ivec3&, glm::ivec3> inOut) {
+          for (const int j : {0, 1, 2}) {
+            thrust::get<0>(inOut)[outTri[j]] =
+                newVerts[thrust::get<1>(inOut)[j]];
+          }
+        });
     return newTriVert;
   }
 
@@ -380,10 +384,6 @@ class Partition {
     auto GetEdgeVert = [&](int edge, int idx) {
       return edgeOffsets[edge] + (edgeFwd[edge] ? 1 : -1) * idx;
     };
-
-    // std::cout << "added: " << edgeAdded << std::endl;
-    // std::cout << "corner: " << cornerVerts << std::endl;
-    // std::cout << "offset: " << edgeOffsets << std::endl;
 
     ASSERT(glm::all(glm::greaterThanEqual(edgeAdded, glm::ivec4(0))), logicErr,
            "negative divisions!");
