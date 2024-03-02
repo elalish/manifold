@@ -305,6 +305,12 @@ ManifoldManifold *manifold_refine(void *mem, ManifoldManifold *m, int refine) {
   return to_c(new (mem) Manifold(refined));
 }
 
+ManifoldManifold *manifold_refine_to_length(void *mem, ManifoldManifold *m,
+                                            float length) {
+  auto refined = from_c(m)->RefineToLength(length);
+  return to_c(new (mem) Manifold(refined));
+}
+
 ManifoldManifold *manifold_empty(void *mem) {
   return to_c(new (mem) Manifold());
 }
