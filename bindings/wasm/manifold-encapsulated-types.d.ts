@@ -572,6 +572,18 @@ export class Manifold {
   refine(n: number): Manifold;
 
   /**
+   * Increase the density of the mesh by splitting each edge into pieces of
+   * roughly the input length. Interior verts are added to keep the rest of the
+   * triangulation edges also of roughly the same length. If halfedgeTangents
+   * are present (e.g. from the Smooth() constructor), the new vertices will be
+   * moved to the interpolated surface according to their barycentric
+   * coordinates.
+   *
+   * @param length The length that edges will be broken down to.
+   */
+  refineToLength(length: number): Manifold;
+
+  /**
    * Create a new copy of this manifold with updated vertex properties by
    * supplying a function that takes the existing position and properties as
    * input. You may specify any number of output properties, allowing creation

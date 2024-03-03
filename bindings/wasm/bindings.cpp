@@ -143,6 +143,7 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .function("hull", select_overload<Manifold() const>(&Manifold::Hull))
       .function("_GetMeshJS", &js::GetMeshJS)
       .function("refine", &Manifold::Refine)
+      .function("refineToLength", &Manifold::RefineToLength)
       .function("_Warp", &man_js::Warp)
       .function("_SetProperties", &man_js::SetProperties)
       .function("transform", &man_js::Transform)

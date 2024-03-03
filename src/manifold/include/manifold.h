@@ -220,7 +220,7 @@ class Manifold {
       int, std::function<void(float*, glm::vec3, const float*)>) const;
   Manifold CalculateCurvature(int gaussianIdx, int meanIdx) const;
   Manifold Refine(int) const;
-  // Manifold RefineToLength(float);
+  Manifold RefineToLength(float) const;
   // Manifold RefineToPrecision(float);
   ///@}
 

@@ -316,6 +316,8 @@ NB_MODULE(manifold3d, m) {
            nb::arg("gaussian_idx"), nb::arg("mean_idx"),
            manifold__calculate_curvature__gaussian_idx__mean_idx)
       .def("refine", &Manifold::Refine, nb::arg("n"), manifold__refine__n)
+      .def("refine_to_length", &Manifold::RefineToLength, nb::arg("length"),
+           manifold__refine_to_length__length)
       .def("to_mesh", &Manifold::GetMeshGL,
            nb::arg("normal_idx") = glm::ivec3(0),
            manifold__get_mesh_gl__normal_idx)

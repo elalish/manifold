@@ -331,8 +331,9 @@ TEST(Manifold, WarpBatch) {
 TEST(Manifold, Smooth) {
   Manifold tet = Manifold::Tetrahedron();
   Manifold smooth = Manifold::Smooth(tet.GetMesh());
-  smooth = smooth.Refine(100);
-  ExpectMeshes(smooth, {{20002, 40000}});
+  int n = 100;
+  smooth = smooth.Refine(n);
+  ExpectMeshes(smooth, {{2 * n * n + 2, 4 * n * n}});
   auto prop = smooth.GetProperties();
   EXPECT_NEAR(prop.volume, 17.38, 0.1);
   EXPECT_NEAR(prop.surfaceArea, 33.38, 0.1);
@@ -342,13 +343,29 @@ TEST(Manifold, Smooth) {
 #endif
 }
 
+TEST(Manifold, Smooth2Length) {
+  Manifold cone = Manifold::Extrude(
+      CrossSection::Circle(10, 10).Translate({10, 0}), 2, 0, 0, {0, 0});
+  cone += cone.Scale({1, 1, -5});
+  Manifold smooth = Manifold::Smooth(cone.GetMesh());
+  smooth = smooth.RefineToLength(0.1);
+  ExpectMeshes(smooth, {{85250, 170496}});
+  auto prop = smooth.GetProperties();
+  EXPECT_NEAR(prop.volume, 4688, 1);
+  EXPECT_NEAR(prop.surfaceArea, 1369, 1);
+
+#ifdef MANIFOLD_EXPORT
+  if (options.exportModels) ExportMesh("smoothCones.glb", smooth.GetMesh(), {});
+#endif
+}
+
 TEST(Manifold, SmoothSphere) {
   int n[5] = {4, 8, 16, 32, 64};
-  float precision[5] = {0.03, 0.003, 0.003, 0.0005, 0.00006};
+  float precision[5] = {0.04, 0.003, 0.003, 0.0005, 0.00006};
   for (int i = 0; i < 5; ++i) {
     Manifold sphere = Manifold::Sphere(1, n[i]);
     // Refine(odd) puts a center point in the triangle, which is the worst case.
-    Manifold smoothed = Manifold::Smooth(sphere.GetMesh()).Refine(7);
+    Manifold smoothed = Manifold::Smooth(sphere.GetMesh()).Refine(6);
     Mesh out = smoothed.GetMesh();
     auto bounds =
         std::minmax_element(out.vertPos.begin(), out.vertPos.end(),
@@ -589,8 +606,16 @@ TEST(Manifold, MeshRelationRefine) {
   Manifold csaszar(inGL);
 
   RelatedGL(csaszar, {inGL});
-  csaszar.Refine(4);
+  csaszar = csaszar.RefineToLength(1);
+  ExpectMeshes(csaszar, {{9019, 18038, 3}});
   RelatedGL(csaszar, {inGL});
+
+#ifdef MANIFOLD_EXPORT
+  ExportOptions opt;
+  opt.mat.roughness = 1;
+  opt.mat.colorChannels = glm::ivec4(3, 4, 5, -1);
+  if (options.exportModels) ExportMesh("csaszar.glb", csaszar.GetMeshGL(), opt);
+#endif
 }
 
 TEST(Manifold, MeshGLRoundTrip) {

@@ -667,7 +667,26 @@ Manifold Manifold::CalculateCurvature(int gaussianIdx, int meanIdx) const {
  */
 Manifold Manifold::Refine(int n) const {
   auto pImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
-  pImpl->Refine(n);
+  if (n > 1) {
+    pImpl->Refine([n](glm::vec3 edge) { return n - 1; });
+  }
+  return Manifold(std::make_shared<CsgLeafNode>(pImpl));
+}
+
+/**
+ * Increase the density of the mesh by splitting each edge into pieces of
+ * roughly the input length. Interior verts are added to keep the rest of the
+ * triangulation edges also of roughly the same length. If halfedgeTangents are
+ * present (e.g. from the Smooth() constructor), the new vertices will be moved
+ * to the interpolated surface according to their barycentric coordinates.
+ *
+ * @param length The length that edges will be broken down to.
+ */
+Manifold Manifold::RefineToLength(float length) const {
+  length = glm::abs(length);
+  auto pImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
+  pImpl->Refine(
+      [length](glm::vec3 edge) { return glm::length(edge) / length; });
   return Manifold(std::make_shared<CsgLeafNode>(pImpl));
 }
 
