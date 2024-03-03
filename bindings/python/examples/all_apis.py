@@ -91,6 +91,7 @@ def all_manifold():
     p = m.precision()
     c = m.project()
     m = m.refine(2)
+    m = m.refine_to_length(0.1)
     i = Manifold.reserve_ids(1)
     m = m.scale((1, 2, 3))
     m = m.set_properties(3, lambda pos, prop: pos)

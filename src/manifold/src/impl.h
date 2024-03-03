@@ -138,7 +138,7 @@ struct Manifold::Impl {
 
   // smoothing.cu
   void CreateTangents(const std::vector<Smoothness>&);
-  Vec<Barycentric> Subdivide(int n);
-  void Refine(int n);
+  Vec<Barycentric> Subdivide(std::function<int(glm::vec3)>);
+  void Refine(std::function<int(glm::vec3)>);
 };
 }  // namespace manifold

@@ -140,6 +140,8 @@ ManifoldManifold *manifold_mirror(void *mem, ManifoldManifold *m, float nx,
 ManifoldManifold *manifold_warp(void *mem, ManifoldManifold *m,
                                 ManifoldVec3 (*fun)(float, float, float));
 ManifoldManifold *manifold_refine(void *mem, ManifoldManifold *m, int refine);
+ManifoldManifold *manifold_refine_to_length(void *mem, ManifoldManifold *m,
+                                            float length);
 
 // Manifold Shapes / Constructors
 
