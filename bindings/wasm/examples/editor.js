@@ -43,7 +43,8 @@ shareButton.onclick = () => {
       encodeURIComponent(
           currentFileElement.textContent + CODE_START + editor.getValue());
   navigator.clipboard.writeText(url.toString());
-  console.log('Sharable link copied to clipboard!');
+  console.log('Shareable link copied to clipboard!');
+  console.log('Consider shortening this URL using tinyURL.com');
 };
 
 // File UI ------------------------------------------------------------
