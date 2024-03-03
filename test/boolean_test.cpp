@@ -142,6 +142,28 @@ TEST(Boolean, SelfSubtract) {
   EXPECT_FLOAT_EQ(prop.surfaceArea, 0.0f);
 }
 
+TEST(Boolean, SelfIntersect) {
+  Manifold cube = Manifold::Cube();
+  Manifold intersect = cube ^ cube;
+
+  auto cubeProp = cube.GetProperties();
+  auto intersectProp = intersect.GetProperties();
+
+  EXPECT_FLOAT_EQ(cubeProp.volume, intersectProp.volume);
+  EXPECT_FLOAT_EQ(cubeProp.surfaceArea, intersectProp.surfaceArea);
+}
+
+TEST(Boolean, Intersect) {
+  Manifold a = Manifold::Cube({1.0f, 1.0f, 1.0f});
+  Manifold b = Manifold::Cube({1.0f, 1.0f, 1.0f}).Translate({0.5f, 0.0f, 0.0f});
+  Manifold intersect = a ^ b;
+
+  auto prop = intersect.GetProperties();
+
+  EXPECT_FLOAT_EQ(prop.volume, 0.5f);
+  EXPECT_FLOAT_EQ(prop.surfaceArea, 4.0f);
+}
+
 TEST(Boolean, Perturb) {
   Mesh tmp;
   tmp.vertPos = {{0.0f, 0.0f, 0.0f},
