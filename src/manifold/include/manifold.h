@@ -120,6 +120,31 @@ struct MeshGL {
  *  @brief The central classes of the library
  *  @{
  */
+
+/**
+ * This library's internal representation of an oriented, 2-manifold, triangle
+ * mesh - a simple boundary-representation of a solid object. Use this class to
+ * store and operate on solids, and use MeshGL for input and output, or
+ * potentially Mesh if only basic geometry is required.
+ *
+ * In addition to storing geometric data, a Manifold can also store an arbitrary
+ * number of vertex properties. These could be anything, e.g. UV coordinates,
+ * colors, bone weights, etc, but this library is completely agnostic. All
+ * properties are merely float values indexed by channel number. It is up to the
+ * user to associate channel numbers with meaning.
+ *
+ * Manifold allows vertex properties to be shared for efficient storage, or to
+ * have multiple property verts associated with a single geometric vertex,
+ * allowing sudden property changes, e.g. at Boolean intersections, without
+ * sacrificing manifoldness.
+ *
+ * Manifolds also keep track of their relationships to their inputs, via
+ * OriginalIDs and the faceIDs and transforms accessible through MeshGL. This
+ * allows object-level properties to be re-associated with the output after many
+ * operations, particularly useful for materials. Since separate object's
+ * properties are not mixed, there is no requirement that channels have
+ * consistent meaning between different inputs.
+ */
 class Manifold {
  public:
   /** @name Creation
