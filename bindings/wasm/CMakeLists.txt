@@ -30,7 +30,14 @@ file(MAKE_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/examples/built)
 # ensure that interface files are copied over when modified
 add_custom_target(js_deps ALL
         DEPENDS manifoldjs
-               ${CMAKE_CURRENT_SOURCE_DIR}/manifold*.d.ts)
+               ${CMAKE_CURRENT_SOURCE_DIR}/manifold*.d.ts
+               ${CMAKE_SOURCE_DIR}/patch-emscripten.sh)
+
+if(MANIFOLD_PAR STREQUAL "TBB")
+add_custom_command(
+        TARGET js_deps POST_BUILD
+        COMMAND ${CMAKE_SOURCE_DIR}/patch-emscripten.sh ${CMAKE_CURRENT_BINARY_DIR})
+endif()
 
 # copy WASM build back here for publishing to npm
 add_custom_command(

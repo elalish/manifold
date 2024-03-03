@@ -14,18 +14,10 @@
 
 import '@vitest/web-worker';
 
-import {WebIO} from '@gltf-transform/core';
 import {expect, suite, test} from 'vitest';
 
-import Module from './built/manifold.js';
-import {readMesh, setupIO} from './gltf-io';
 import {examples} from './public/examples.js';
 import ManifoldWorker from './worker?worker';
-
-const io = setupIO(new WebIO());
-
-const wasm = await Module();
-wasm.setup();
 
 function initialized(worker) {
   return new Promise((resolve) => {
@@ -58,29 +50,16 @@ async function runExample(name) {
         URL.revokeObjectURL(glbURL);
         glbURL = e.data.glbURL;
         if (glbURL == null) {
-          reject('no glbURL)');
+          reject('no glbURL');
         }
-        const docIn = await io.read(glbURL);
-        const nodes = docIn.getRoot().listNodes();
-        for (const node of nodes) {
-          const docMesh = node.getMesh();
-          if (!docMesh) {
-            continue;
-          }
-          const {mesh} = readMesh(docMesh);
-          const manifold = wasm.Manifold(mesh);
-          const prop = manifold.getProperties();
-          const genus = manifold.genus();
-          manifold.delete();
-          // Return properties of first mesh encountered.
-          resolve({...prop, genus});
-        }
+        resolve({...e.data.prop, genus: e.data.genus});
       } catch (e) {
         reject(e);
       }
     };
 
-    worker.postMessage(examples.functionBodies.get(name));
+    worker.postMessage(
+        {needProps: true, script: examples.functionBodies.get(name)});
   });
 }
 

@@ -107,9 +107,7 @@
                 emmake make -j''${NIX_BUILD_CORES}
               '';
               checkPhase = ''
-                cd test
-                node manifold_test.js
-                cd ../
+                node --experimental-wasm-threads ./test/manifold_test.js
               '';
               installPhase = ''
                 mkdir -p $out
