@@ -293,6 +293,8 @@ class Manifold {
   int NumOverlaps(const Manifold& second) const;
   ///@}
 
+  float MinGap(const Manifold& other, float searchLength) const;
+
   struct Impl;
 
  private:
