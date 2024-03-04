@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-20.04
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
     - name: Doxygen Action
       uses: mattnotmitt/doxygen-action@v1
@@ -22,7 +22,7 @@ jobs:
         mv ./docs ./public
 
     - name: Download built examples
-      uses: dawidd6/action-download-artifact@v2
+      uses: dawidd6/action-download-artifact@v3
       with:
         workflow: manifold.yml
         workflow_conclusion: completed
