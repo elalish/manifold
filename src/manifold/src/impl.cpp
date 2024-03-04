@@ -848,7 +848,7 @@ void Manifold::Impl::SetNormals(glm::ivec3 normalIdx, float minSharpAngle) {
   if (IsEmpty()) return;
   if (glm::any(glm::lessThan(normalIdx, glm::ivec3(0)))) return;
 
-  VecDH<TriRef> triRefOriginal = meshRelation_.triRef;
+  Vec<TriRef> triRefOriginal = meshRelation_.triRef;
   const int oldNumProp = NumProp();
   // Find flat faces regardless of existing properties
   CreateFaces(
@@ -866,13 +866,13 @@ void Manifold::Impl::SetNormals(glm::ivec3 normalIdx, float minSharpAngle) {
   const int numProp = glm::max(
       oldNumProp,
       glm::max(normalIdx[0], glm::max(normalIdx[1], normalIdx[2])) + 1);
-  const VecDH<float> oldProperties = meshRelation_.properties;
-  VecDH<float> properties(numProp * NumPropVert(), 0);
+  const Vec<float> oldProperties = meshRelation_.properties;
+  Vec<float> properties(numProp * NumPropVert(), 0);
   meshRelation_.numProp = numProp;
   if (meshRelation_.triProperties.size() == 0) {
     meshRelation_.triProperties.resize(numTri);
   }
-  VecDH<glm::ivec3> oldTriProp(numTri, {-1, -1, -1});
+  Vec<glm::ivec3> oldTriProp(numTri, {-1, -1, -1});
   meshRelation_.triProperties.swap(oldTriProp);
 
   for (int tri = 0; tri < numTri; ++tri) {
