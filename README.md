@@ -1,41 +1,46 @@
 [![codecov](https://codecov.io/github/elalish/manifold/branch/master/graph/badge.svg?token=IIA8G5HVS7)](https://codecov.io/github/elalish/manifold)
+[![PyPI version](https://badge.fury.io/py/manifold3d.svg)](https://badge.fury.io/py/manifold3d)
+[![npm version](https://badge.fury.io/js/manifold-3d.svg)](https://badge.fury.io/js/manifold-3d)
 [![twitter](https://img.shields.io/twitter/follow/manifoldcad?style=social&logo=twitter)](https://twitter.com/intent/follow?screen_name=manifoldcad)
 
 ## Users
 
 [OpenSCAD](https://openscad.org/), [IFCjs](https://ifcjs.github.io/info/), [Grid.Space](https://grid.space/), and [OCADml](https://github.com/OCADml/OManifold) have all integrated our Manifold geometry kernel! Why? Because its reliability is guaranteed and it's 1,000 times faster than other libraries. See our [usage](https://github.com/elalish/manifold/discussions/340) and [performance](https://github.com/elalish/manifold/discussions/383) discussions for all the latest and to add your own projects & analyses.
 
-For example, here is a log-log plot of Manifold's performance vs. earlier OpenSCAD geometry backends:
+## Manifold Frontend Sandboxes
 
-<img src="https://elalish.github.io/manifold/samples/models/perfSpheres.png" width="350px"/>
+### [ManifoldCAD.org](https://manifoldcad.org)
 
-## [ManifoldCAD.org](https://manifoldcad.org)
+If you like OpenSCAD / JSCAD, you might also like ManifoldCAD - our own solid modelling web app where you script in JS/TS. This uses our npm package, [manifold-3d](https://www.npmjs.com/package/manifold-3d), built via WASM. It's not quite as fast as our raw C++, but it's hard to beat for interoperability.
 
-If you like OpenSCAD / JSCAD, you might also like ManifoldCAD - our own solid modelling web app. Our WASM is not GPU-accelerated, but it's still quite fast and a good way to test out our Manifold library.
+*Note for Firefox users: If you find the editor is stuck on **Loading...**, setting
+`dom.workers.modules.enabled: true` in your `about:config`, as mentioned in
+[issue#328](https://github.com/elalish/manifold/issues/328#issuecomment-1473847102)
+may solve the problem.*
+
+### [Python Colab Example](https://colab.research.google.com/drive/1VxrFYHPSHZgUbl9TeWzCeovlpXrPQ5J5?usp=sharing)
+
+If you prefer Python to JS/TS, make your own copy of the example notebook above. It demonstrates interop between our [`manifold3d`](https://pypi.org/project/manifold3d/) PyPI library and the popular [`trimesh`](https://pypi.org/project/trimesh/) library, including showing the interactive model right in the notebook and saving 3D model output.
 
 ![A metallic Menger sponge](https://elalish.github.io/manifold/samples/models/mengerSponge3.webp "A metallic Menger sponge")
 
-### Note for Firefox users
-
-If you find the editor is stuck on **Loading...**, setting
-`dom.workers.modules.enabled: true` in your `about:config`, as mentioned in the
-discussion of the
-[issue#328](https://github.com/elalish/manifold/issues/328#issuecomment-1473847102)
-of this repository may solve the problem.
-
 # Manifold
 
-[**API Documentation**](https://elalish.github.io/manifold/docs/html/modules.html) | [**Algorithm Documentation**](https://github.com/elalish/manifold/wiki/Manifold-Library) | [**Blog Posts**](https://elalish.blogspot.com/search/label/Manifold) | [**Web Examples**](https://elalish.github.io/manifold/model-viewer.html)
+[**API Documentation**](https://elalish.github.io/manifold/docs/html/topics.html) | [**Algorithm Documentation**](https://github.com/elalish/manifold/wiki/Manifold-Library) | [**Blog Posts**](https://elalish.blogspot.com/search/label/Manifold) | [**Web Examples**](https://elalish.github.io/manifold/model-viewer.html)
 
 [Manifold](https://github.com/elalish/manifold) is a geometry library dedicated to creating and operating on manifold triangle meshes. A [manifold mesh](https://github.com/elalish/manifold/wiki/Manifold-Library#manifoldness) is a mesh that represents a solid object, and so is very important in manufacturing, CAD, structural analysis, etc. Further information can be found on the [wiki](https://github.com/elalish/manifold/wiki/Manifold-Library).
 
-This is a modern C++ library that Github's CI verifies builds and runs on a variety of platforms. Additionally, we build bindings for JavaScript ([manifold-3d](https://www.npmjs.com/package/manifold-3d) on npm), Python, and C to make this library more portable and easy to use.
+This is a modern C++ library that Github's CI verifies builds and runs on a variety of platforms. Additionally, we build bindings for JavaScript ([manifold-3d](https://www.npmjs.com/package/manifold-3d) on npm), Python ([manifold3d](https://pypi.org/project/manifold3d/)), and C to make this library more portable and easy to use.
 
-We have four core dependencies, making use of submodules to ensure compatibility:
-- `graphlite`: connected components algorithm
-- `Clipper2`: provides our 2D subsystem
-- `GLM`: a compact vector library
-- `Thrust`: Nvidia's parallel algorithms library (basically a superset of C++17 std::parallel_algorithms)
+System Dependencies (note that we will automatically download the dependency if there is no such package on the system):
+- [`GLM`](https://github.com/g-truc/glm/): A compact header-only vector library.
+- [`Thrust`](https://github.com/NVIDIA/thrust): NVIDIA's parallel algorithms library (basically a superset of C++17 std::parallel_algorithms)
+- [`tbb`](https://github.com/oneapi-src/oneTBB/): Intel's thread building blocks library. (only when `MANIFOLD_PAR=TBB` is enabled)
+- [`gtest`](https://github.com/google/googletest/): Google test library (only when test is enabled, i.e. `MANIFOLD_TEST=ON`)
+
+Other dependencies:
+- [`Clipper2`](https://github.com/AngusJohnson/Clipper2): provides our 2D subsystem
+- [`quickhull`](https://github.com/akuukka/quickhull): 3D convex hull algorithm.
 
 ## What's here
 
@@ -43,7 +48,9 @@ This library is fast with guaranteed manifold output. As such you need manifold 
 
 The most significant contribution here is a guaranteed-manifold [mesh Boolean](https://github.com/elalish/manifold/wiki/Manifold-Library#mesh-boolean) algorithm, which I believe is the first of its kind. If you know of another, please open a discussion - a mesh Boolean algorithm robust to edge cases has been an open problem for many years. Likewise, if the Boolean here ever fails you, please submit an issue! This Boolean forms the basis of a CAD kernel, as it allows simple shapes to be combined into more complex ones.
 
-To aid in speed, this library makes extensive use of parallelization, generally through Nvidia's Thrust library. You can switch between the CUDA, OMP, TBB, and serial C++ backends by setting a CMake flag. Not everything is so parallelizable, for instance a [polygon triangulation](https://github.com/elalish/manifold/wiki/Manifold-Library#polygon-triangulation) algorithm is included which is serial. Even if compiled for CUDA, the code will still run without a GPU, falling back to the serial version of the algorithms. The WASM build is serial-only for now, but still fast.
+To aid in speed, this library makes extensive use of parallelization, generally through Nvidia's Thrust library. You can switch between the TBB, and serial C++ backends by setting a CMake flag. Not everything is so parallelizable, for instance a [polygon triangulation](https://github.com/elalish/manifold/wiki/Manifold-Library#polygon-triangulation) algorithm is included which is serial. Even if compiled with parallel backend, the code will still fall back to the serial version of the algorithms if the problem size is small. The WASM build is serial-only for now, but still fast.
+
+> Note: OMP and CUDA backends are now removed
 
 Look in the [samples](https://github.com/elalish/manifold/tree/master/samples) directory for examples of how to use this library to make interesting 3D models. You may notice that some of these examples bare a certain resemblance to my OpenSCAD designs on [Thingiverse](https://www.thingiverse.com/emmett), which is no accident. Much as I love OpenSCAD, my library is dramatically faster and the code is more flexible.
 
@@ -61,16 +68,30 @@ cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON .. && make
 test/manifold_test
 ```
 
-CMake flags (usage e.g. `-DMANIFOLD_USE_CUDA=ON`):
-- `MANIFOLD_USE_CUDA=[<OFF>, ON]`: Provides Nvidia GPU parallelization, requires CUDA Toolkit and its nvcc compiler.
-- `MANIFOLD_PAR=[<NONE>, OMP, TBB]`: Provides multi-thread parallelization, requires `libomp-dev` or `libtbb-dev`.
+CMake flags (usage e.g. `-DMANIFOLD_DEBUG=ON`):
+- `MANIFOLD_JSBIND=[OFF, <ON>]`: Build js binding when using emscripten.
+- `MANIFOLD_CBIND=[<OFF>, ON]`: Build C FFI binding.
+- `MANIFOLD_PYBIND=[OFF, <ON>]`: Build python binding.
+- `MANIFOLD_PAR=[<NONE>, TBB]`: Provides multi-thread parallelization, requires `libtbb-dev` if `TBB` backend is selected.
 - `MANIFOLD_EXPORT=[<OFF>, ON]`: Enables GLB export of 3D models from the tests, requires `libassimp-dev`.
 - `MANIFOLD_DEBUG=[<OFF>, ON]`: Enables internal assertions and exceptions.
+- `MANIFOLD_TEST=[OFF, <ON>]`: Build unittests.
+- `TRACY_ENABLE=[<OFF>, ON]`: Enable integration with tracy profiler. 
+  See profiling section below.
 - `BUILD_TEST_CGAL=[<OFF>, ON]`: Builds a CGAL-based performance [comparison](https://github.com/elalish/manifold/tree/master/extras), requires `libcgal-dev`.
+
+Offline building:
+- `FETCHCONTENT_SOURCE_DIR_GLM`: path to glm source.
+- `FETCHCONTENT_SOURCE_DIR_GOOGLETEST`: path to googletest source.
+- `FETCHCONTENT_SOURCE_DIR_THRUST`: path to NVIDIA thrust source.
 
 The build instructions used by our CI are in [manifold.yml](https://github.com/elalish/manifold/blob/master/.github/workflows/manifold.yml), which is a good source to check if something goes wrong and for instructions specific to other platforms, like Windows.
 
 ### WASM
+
+> Note that we have only tested emscripten version 3.1.45. It is known that
+  3.1.48 has some issues compiling manifold.
+
 To build the JS WASM library, first install NodeJS and set up emscripten:
 
 (on Mac):
@@ -98,13 +119,13 @@ node test/manifold_test.js
 
 ### Python
 
-The CMake script will build the python binding `pymanifold` automatically. To
-use the extension, please add `$BUILD_DIR/tools` to your `PYTHONPATH`, where
+The CMake script will build the python binding `manifold3d` automatically. To
+use the extension, please add `$BUILD_DIR/bindings/python` to your `PYTHONPATH`, where
 `$BUILD_DIR` is the build directory for CMake. Examples using the python binding
 can be found in `bindings/python/examples`. To see exported samples, run:
 ```
 sudo apt install pkg-config libpython3-dev python3 python3-distutils python3-pip
-pip install trimesh
+pip install trimesh pytest
 python3 run_all.py -e
 ```
 
@@ -112,15 +133,51 @@ Run the following code in the interpreter for
 python binding documentation:
 
 ```
->>> import pymanifold
->>> help(pymanifold)
+>>> import manifold3d
+>>> help(manifold3d)
 ```
 
 For more detailed documentation, please refer to the C++ API.
 
+### Windows Shenanigans
+
+Windows users should build with `-DBUILD_SHARED_LIBS=OFF`, as enabling shared
+libraries in general makes things very complicated.
+
+The DLL file for manifoldc (C FFI bindings) when built with msvc is in `${CMAKE_BINARY_DIR}/bin/${BUILD_TYPE}/manifoldc.dll`.
+For example, for the following command, the path relative to the project root directory is `build/bin/Release/manifoldc.dll`.
+```sh
+cmake . -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DMANIFOLD_DEBUG=ON -DMANIFOLD_PAR=${{matrix.parallel_backend}} -A x64 -B build
+```
+
 ## Contributing
 
 Contributions are welcome! A lower barrier contribution is to simply make a PR that adds a test, especially if it repros an issue you've found. Simply name it prepended with DISABLED_, so that it passes the CI. That will be a very strong signal to me to fix your issue. However, if you know how to fix it yourself, then including the fix in your PR would be much appreciated!
+
+### Formatting
+
+There is a formatting script `format.sh` that automatically formats everything.
+It requires clang-format 11 and black formatter for python.
+
+If you have clang-format installed but without clang-11, you can specify the
+clang-format executable by setting the `CLANG_FORMAT` environment variable.
+
+### Profiling
+
+There is now basic support for the [Tracy profiler](https://github.com/wolfpld/tracy) for our tests.
+To enable tracing, compile with `-DTRACY_ENABLE=on` cmake option, and run the test with Tracy server running.
+To enable memory profiling in addition to tracing, compile with `-DTRACY_MEMORY_USAGE=ON` in addition to `-DTRACY_ENABLE=ON`.
+
+### Fuzzing Support
+
+We use https://github.com/google/fuzztest for fuzzing the triangulator.
+
+To enable fuzzing, make sure that you are using clang compiler (`-DCMAKE_CXX_COMPILER=clang -DCMAKE_C_COMPILER=clang`), running Linux, and enable fuzzing support by setting `-DMANIFOLD_FUZZ=ON`.
+
+To run the fuzzer and minimize testcase, do
+```
+../minimizer.sh ./test/polygon_fuzz --fuzz=PolygonFuzz.TriangulationNoCrash
+```
 
 ## About the author
 

@@ -14,26 +14,22 @@
 
 #pragma once
 
-#include <clipper2/clipper.h>
-
+#include <functional>
 #include <memory>
 #include <vector>
 
-#include "clipper2/clipper.core.h"
-#include "clipper2/clipper.offset.h"
 #include "glm/ext/matrix_float3x2.hpp"
 #include "glm/ext/vector_float2.hpp"
 #include "public.h"
-
-namespace C2 = Clipper2Lib;
+#include "vec_view.h"
 
 namespace manifold {
-
-class Rect;
 
 /** @addtogroup Core
  *  @{
  */
+
+struct PathImpl;
 
 /**
  * Two-dimensional cross sections guaranteed to be without self-intersections,
@@ -77,6 +73,7 @@ class CrossSection {
                FillRule fillrule = FillRule::Positive);
   CrossSection(const Polygons& contours,
                FillRule fillrule = FillRule::Positive);
+  CrossSection(const Rect& rect);
   static CrossSection Square(const glm::vec2 dims, bool center = false);
   static CrossSection Circle(float radius, int circularSegments = 0);
   ///@}
@@ -101,6 +98,8 @@ class CrossSection {
   CrossSection Mirror(const glm::vec2 ax) const;
   CrossSection Transform(const glm::mat3x2& m) const;
   CrossSection Warp(std::function<void(glm::vec2&)> warpFunc) const;
+  CrossSection WarpBatch(
+      std::function<void(VecView<glm::vec2>)> warpFunc) const;
   CrossSection Simplify(double epsilon = 1e-6) const;
 
   // Adapted from Clipper2 docs:
@@ -143,7 +142,6 @@ class CrossSection {
   CrossSection& operator-=(const CrossSection&);
   CrossSection operator^(const CrossSection&) const;
   CrossSection& operator^=(const CrossSection&);
-  CrossSection RectClip(const Rect& rect) const;
   ///@}
 
   /** @name Topological
@@ -153,6 +151,15 @@ class CrossSection {
   std::vector<CrossSection> Decompose() const;
   ///@}
 
+  /** @name Convex Hulling
+   */
+  ///@{
+  CrossSection Hull() const;
+  static CrossSection Hull(const std::vector<CrossSection>& crossSections);
+  static CrossSection Hull(const SimplePolygon poly);
+  static CrossSection Hull(const Polygons polys);
+  ///@}
+  ///
   /** @name Conversion
    */
   ///@{
@@ -160,69 +167,10 @@ class CrossSection {
   ///@}
 
  private:
-  mutable std::shared_ptr<const C2::PathsD> paths_;
+  mutable std::shared_ptr<const PathImpl> paths_;
   mutable glm::mat3x2 transform_ = glm::mat3x2(1.0f);
-  CrossSection(C2::PathsD paths);
-  C2::PathsD GetPaths() const;
-};
-/** @} */
-
-/** @addtogroup Connections
- *  @{
- */
-
-/**
- * Axis-aligned rectangular bounds.
- */
-class Rect {
- public:
-  glm::vec2 min = glm::vec2(0);
-  glm::vec2 max = glm::vec2(0);
-
-  /** @name Creation
-   *  Constructors
-   */
-  ///@{
-  Rect();
-  ~Rect();
-  Rect(const Rect& other);
-  Rect& operator=(const Rect& other);
-  Rect(Rect&&) noexcept;
-  Rect& operator=(Rect&&) noexcept;
-  Rect(const glm::vec2 a, const glm::vec2 b);
-  ///@}
-
-  /** @name Information
-   *  Details of the rectangle
-   */
-  ///@{
-  glm::vec2 Size() const;
-  float Scale() const;
-  glm::vec2 Center() const;
-  bool Contains(const glm::vec2& pt) const;
-  bool Contains(const Rect& other) const;
-  bool DoesOverlap(const Rect& other) const;
-  bool IsEmpty() const;
-  bool IsFinite() const;
-  ///@}
-
-  /** @name Modification
-   */
-  ///@{
-  void Union(const glm::vec2 p);
-  Rect Union(const Rect& other) const;
-  Rect operator+(const glm::vec2 shift) const;
-  Rect& operator+=(const glm::vec2 shift);
-  Rect operator*(const glm::vec2 scale) const;
-  Rect& operator*=(const glm::vec2 scale);
-  Rect Transform(const glm::mat3x2& m) const;
-  ///@}
-
-  /** @name Conversion
-   */
-  ///@{
-  CrossSection AsCrossSection() const;
-  ///@}
+  CrossSection(std::shared_ptr<const PathImpl> paths);
+  std::shared_ptr<const PathImpl> GetPaths() const;
 };
 /** @} */
 }  // namespace manifold

@@ -114,10 +114,6 @@ Module.setup = function() {
     return this._Translate(vararg2vec2(vec));
   };
 
-  Module.CrossSection.prototype.rotate = function(vec) {
-    return this._Rotate(...vec);
-  };
-
   Module.CrossSection.prototype.scale = function(vec) {
     // if only one factor provided, scale both x and y with it
     if (typeof vec == 'number') {
@@ -165,14 +161,6 @@ Module.setup = function() {
         delta, joinTypeToInt(joinType), miterLimit, circularSegments);
   };
 
-  Module.CrossSection.prototype.rectClip = function(rect) {
-    const rect2 = {
-      min: {x: rect.min[0], y: rect.min[1]},
-      max: {x: rect.max[0], y: rect.max[1]},
-    };
-    return this._RectClip(rect2);
-  };
-
   Module.CrossSection.prototype.extrude = function(
       height, nDivisions = 0, twistDegrees = 0.0, scaleTop = [1.0, 1.0],
       center = false) {
@@ -182,8 +170,9 @@ Module.setup = function() {
     return (center ? man.translate([0., 0., -height / 2.]) : man);
   };
 
-  Module.CrossSection.prototype.revolve = function(circularSegments = 0) {
-    return Module._Revolve(this, circularSegments);
+  Module.CrossSection.prototype.revolve = function(
+      circularSegments = 0, revolveDegrees = 360.0) {
+    return Module._Revolve(this, circularSegments, revolveDegrees);
   };
 
   Module.CrossSection.prototype.add = function(other) {
@@ -483,6 +472,36 @@ Module.setup = function() {
   Module.CrossSection.difference = crossSectionBatchbool('DifferenceN');
   Module.CrossSection.intersection = crossSectionBatchbool('IntersectionN');
 
+  function pushVec2(vec, ps) {
+    toVec(vec, ps, p => {
+      if (p instanceof Array) return {x: p[0], y: p[1]};
+      return p;
+    })
+  }
+
+  Module.CrossSection.hull = function(...args) {
+    if (args.length == 1) args = args[0];
+    let pts = new Module.Vector_vec2();
+    for (const cs of args) {
+      if (cs instanceof CrossSectionCtor) {
+        Module._crossSectionCollectVertices(pts, cs);
+      } else if (
+          cs instanceof Array && cs.length == 2 && typeof cs[0] == 'number') {
+        pts.push_back({x: cs[0], y: cs[1]});
+      } else if (cs.x) {
+        pts.push_back(cs);
+      } else {
+        const wrap =
+            ((cs[0].length == 2 && typeof cs[0][0] == 'number') || cs[0].x);
+        const polys = wrap ? [cs] : cs;
+        for (const poly of polys) pushVec2(pts, poly);
+      }
+    }
+    const result = Module._crossSectionHullPoints(pts);
+    pts.delete();
+    return result;
+  };
+
   Module.CrossSection.prototype = Object.create(CrossSectionCtor.prototype);
 
   // Because the constructor and prototype are being replaced, instanceof will
@@ -555,11 +574,12 @@ Module.setup = function() {
     return cs.extrude(height, nDivisions, twistDegrees, scaleTop, center);
   };
 
-  Module.Manifold.revolve = function(polygons, circularSegments = 0) {
+  Module.Manifold.revolve = function(
+      polygons, circularSegments = 0, revolveDegrees = 360.0) {
     const cs = (polygons instanceof CrossSectionCtor) ?
         polygons :
         Module.CrossSection(polygons, 'Positive');
-    return cs.revolve(circularSegments);
+    return cs.revolve(circularSegments, revolveDegrees);
   };
 
   Module.Manifold.reserveIDs = function(n) {
@@ -604,6 +624,33 @@ Module.setup = function() {
     const out = Module._LevelSet(wasmFuncPtr, bounds2, edgeLength, level);
     removeFunction(wasmFuncPtr);
     return out;
+  };
+
+  function pushVec3(vec, ps) {
+    toVec(vec, ps, p => {
+      if (p instanceof Array) return {x: p[0], y: p[1], z: p[2]};
+      return p;
+    })
+  }
+
+  Module.Manifold.hull = function(...args) {
+    if (args.length == 1) args = args[0];
+    let pts = new Module.Vector_vec3();
+    for (const m of args) {
+      if (m instanceof ManifoldCtor) {
+        Module._manifoldCollectVertices(pts, m);
+      } else if (
+          m instanceof Array && m.length == 3 && typeof m[0] == 'number') {
+        pts.push_back({x: m[0], y: m[1], z: m[2]});
+      } else if (m.x) {
+        pts.push_back(m);
+      } else {
+        pushVec3(pts, m);
+      }
+    }
+    const result = Module._manifoldHullPoints(pts);
+    pts.delete();
+    return result;
   };
 
   Module.Manifold.prototype = Object.create(ManifoldCtor.prototype);

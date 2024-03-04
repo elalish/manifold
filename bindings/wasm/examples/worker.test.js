@@ -18,7 +18,7 @@ import {WebIO} from '@gltf-transform/core';
 import {expect, suite, test} from 'vitest';
 
 import Module from './built/manifold.js';
-import {readMesh, setupIO} from './gltf-io.js';
+import {readMesh, setupIO} from './gltf-io';
 import {examples} from './public/examples.js';
 import ManifoldWorker from './worker?worker';
 
@@ -39,7 +39,7 @@ function initialized(worker) {
   });
 }
 
-let objectURL = null;
+let glbURL = null;
 
 async function runExample(name) {
   const worker = new ManifoldWorker();
@@ -55,26 +55,24 @@ async function runExample(name) {
 
     worker.onmessage = async function(e) {
       try {
-        URL.revokeObjectURL(objectURL);
-        objectURL = e.data.objectURL;
-        if (objectURL == null) {
-          reject('no objectURL');
+        URL.revokeObjectURL(glbURL);
+        glbURL = e.data.glbURL;
+        if (glbURL == null) {
+          reject('no glbURL)');
         }
-        const docIn = await io.read(objectURL);
+        const docIn = await io.read(glbURL);
         const nodes = docIn.getRoot().listNodes();
         for (const node of nodes) {
-          const mesh = node.getMesh();
-          if (!mesh) {
+          const docMesh = node.getMesh();
+          if (!docMesh) {
             continue;
           }
-          const attributes = [];
-          const materials = [];
-          const manifoldMesh = readMesh(mesh, attributes, materials);
-          const manifold = wasm.Manifold(manifoldMesh);
+          const {mesh} = readMesh(docMesh);
+          const manifold = wasm.Manifold(mesh);
           const prop = manifold.getProperties();
           const genus = manifold.genus();
-          console.log(genus);
           manifold.delete();
+          // Return properties of first mesh encountered.
           resolve({...prop, genus});
         }
       } catch (e) {
@@ -97,8 +95,8 @@ suite('Examples', () => {
   test('Tetrahedron Puzzle', async () => {
     const result = await runExample('Tetrahedron Puzzle');
     expect(result.genus).to.equal(0, 'Genus');
-    expect(result.volume).to.be.closeTo(7297, 1, 'Volume');
-    expect(result.surfaceArea).to.be.closeTo(3303, 1, 'Surface Area');
+    expect(result.volume).to.be.closeTo(7240, 1, 'Volume');
+    expect(result.surfaceArea).to.be.closeTo(3235, 1, 'Surface Area');
   });
 
   test('Rounded Frame', async () => {
@@ -111,8 +109,8 @@ suite('Examples', () => {
   test('Heart', async () => {
     const result = await runExample('Heart');
     expect(result.genus).to.equal(0, 'Genus');
-    expect(result.volume).to.be.closeTo(282743, 10, 'Volume');
-    expect(result.surfaceArea).to.be.closeTo(22187, 1, 'Surface Area');
+    expect(result.volume).to.be.closeTo(3.342, 0.001, 'Volume');
+    expect(result.surfaceArea).to.be.closeTo(11.51, 0.01, 'Surface Area');
   });
 
   test('Scallop', async () => {

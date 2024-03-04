@@ -12,10 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <thrust/count.h>
-#include <thrust/logical.h>
-#include <thrust/transform_reduce.h>
-
 #include <limits>
 
 #include "impl.h"
@@ -25,11 +21,11 @@ namespace {
 using namespace manifold;
 
 struct FaceAreaVolume {
-  const Halfedge* halfedges;
-  const glm::vec3* vertPos;
+  VecView<const Halfedge> halfedges;
+  VecView<const glm::vec3> vertPos;
   const float precision;
 
-  __host__ __device__ thrust::pair<float, float> operator()(int face) {
+  thrust::pair<float, float> operator()(int face) {
     float perimeter = 0;
     glm::vec3 edge[3];
     for (int i : {0, 1, 2}) {
@@ -49,7 +45,7 @@ struct FaceAreaVolume {
 
 struct PosMin
     : public thrust::binary_function<glm::vec3, glm::vec3, glm::vec3> {
-  __host__ __device__ glm::vec3 operator()(glm::vec3 a, glm::vec3 b) {
+  glm::vec3 operator()(glm::vec3 a, glm::vec3 b) {
     if (isnan(a.x)) return b;
     if (isnan(b.x)) return a;
     return glm::min(a, b);
@@ -58,7 +54,7 @@ struct PosMin
 
 struct PosMax
     : public thrust::binary_function<glm::vec3, glm::vec3, glm::vec3> {
-  __host__ __device__ glm::vec3 operator()(glm::vec3 a, glm::vec3 b) {
+  glm::vec3 operator()(glm::vec3 a, glm::vec3 b) {
     if (isnan(a.x)) return b;
     if (isnan(b.x)) return a;
     return glm::max(a, b);
@@ -66,13 +62,11 @@ struct PosMax
 };
 
 struct FiniteVert {
-  __host__ __device__ bool operator()(glm::vec3 v) {
-    return glm::all(glm::isfinite(v));
-  }
+  bool operator()(glm::vec3 v) { return glm::all(glm::isfinite(v)); }
 };
 
 struct MakeMinMax {
-  __host__ __device__ glm::ivec2 operator()(glm::ivec3 tri) {
+  glm::ivec2 operator()(glm::ivec3 tri) {
     return glm::ivec2(glm::min(tri[0], glm::min(tri[1], tri[2])),
                       glm::max(tri[0], glm::max(tri[1], tri[2])));
   }
@@ -80,7 +74,7 @@ struct MakeMinMax {
 
 struct MinMax
     : public thrust::binary_function<glm::ivec2, glm::ivec2, glm::ivec2> {
-  __host__ __device__ glm::ivec2 operator()(glm::ivec2 a, glm::ivec2 b) {
+  glm::ivec2 operator()(glm::ivec2 a, glm::ivec2 b) {
     a[0] = glm::min(a[0], b[0]);
     a[1] = glm::max(a[1], b[1]);
     return a;
@@ -90,8 +84,8 @@ struct MinMax
 struct SumPair : public thrust::binary_function<thrust::pair<float, float>,
                                                 thrust::pair<float, float>,
                                                 thrust::pair<float, float>> {
-  __host__ __device__ thrust::pair<float, float> operator()(
-      thrust::pair<float, float> a, thrust::pair<float, float> b) {
+  thrust::pair<float, float> operator()(thrust::pair<float, float> a,
+                                        thrust::pair<float, float> b) {
     a.first += b.first;
     a.second += b.second;
     return a;
@@ -99,15 +93,15 @@ struct SumPair : public thrust::binary_function<thrust::pair<float, float>,
 };
 
 struct CurvatureAngles {
-  float* meanCurvature;
-  float* gaussianCurvature;
-  float* area;
-  float* degree;
-  const Halfedge* halfedge;
-  const glm::vec3* vertPos;
-  const glm::vec3* triNormal;
+  VecView<float> meanCurvature;
+  VecView<float> gaussianCurvature;
+  VecView<float> area;
+  VecView<float> degree;
+  VecView<const Halfedge> halfedge;
+  VecView<const glm::vec3> vertPos;
+  VecView<const glm::vec3> triNormal;
 
-  __host__ __device__ void operator()(int tri) {
+  void operator()(int tri) {
     glm::vec3 edge[3];
     glm::vec3 edgeLength(0.0);
     for (int i : {0, 1, 2}) {
@@ -142,8 +136,7 @@ struct CurvatureAngles {
 };
 
 struct NormalizeCurvature {
-  __host__ __device__ void operator()(
-      thrust::tuple<float&, float&, float, float> inOut) {
+  void operator()(thrust::tuple<float&, float&, float, float> inOut) {
     float& meanCurvature = thrust::get<0>(inOut);
     float& gaussianCurvature = thrust::get<1>(inOut);
     float area = thrust::get<2>(inOut);
@@ -155,18 +148,19 @@ struct NormalizeCurvature {
 };
 
 struct UpdateProperties {
-  float* properties;
+  VecView<float> properties;
 
-  const float* oldProperties;
-  const Halfedge* halfedge;
-  const float* meanCurvature;
-  const float* gaussianCurvature;
+  VecView<const float> oldProperties;
+  VecView<const Halfedge> halfedge;
+  VecView<const float> meanCurvature;
+  VecView<const float> gaussianCurvature;
   const int oldNumProp;
   const int numProp;
   const int gaussianIdx;
   const int meanIdx;
 
-  __host__ __device__ void operator()(thrust::tuple<glm::ivec3&, int> inOut) {
+  // FIXME: race condition
+  void operator()(thrust::tuple<glm::ivec3&, int> inOut) {
     glm::ivec3& triProp = thrust::get<0>(inOut);
     const int tri = thrust::get<1>(inOut);
 
@@ -193,13 +187,16 @@ struct UpdateProperties {
 };
 
 struct CheckHalfedges {
-  const Halfedge* halfedges;
+  VecView<const Halfedge> halfedges;
+  VecView<const glm::vec3> vertPos;
 
-  __host__ __device__ bool operator()(int edge) {
+  bool operator()(size_t edge) {
     const Halfedge halfedge = halfedges[edge];
-    if (halfedge.startVert == -1 && halfedge.endVert == -1 &&
-        halfedge.pairedHalfedge == -1)
-      return true;
+    if (halfedge.startVert == -1 || halfedge.endVert == -1) return true;
+    if (halfedge.pairedHalfedge == -1) return false;
+
+    if (!isfinite(vertPos[halfedge.startVert][0])) return false;
+    if (!isfinite(vertPos[halfedge.endVert][0])) return false;
 
     const Halfedge paired = halfedges[halfedge.pairedHalfedge];
     bool good = true;
@@ -212,9 +209,9 @@ struct CheckHalfedges {
 };
 
 struct NoDuplicates {
-  const Halfedge* halfedges;
+  VecView<const Halfedge> halfedges;
 
-  __host__ __device__ bool operator()(int edge) {
+  bool operator()(int edge) {
     const Halfedge halfedge = halfedges[edge];
     if (halfedge.startVert == -1 && halfedge.endVert == -1 &&
         halfedge.pairedHalfedge == -1)
@@ -225,12 +222,12 @@ struct NoDuplicates {
 };
 
 struct CheckCCW {
-  const Halfedge* halfedges;
-  const glm::vec3* vertPos;
-  const glm::vec3* triNormal;
+  VecView<const Halfedge> halfedges;
+  VecView<const glm::vec3> vertPos;
+  VecView<const glm::vec3> triNormal;
   const float tol;
 
-  __host__ __device__ bool operator()(int face) {
+  bool operator()(int face) {
     if (halfedges[3 * face].pairedHalfedge < 0) return true;
 
     const glm::mat3x2 projection = GetAxisAlignedProjection(triNormal[face]);
@@ -278,8 +275,8 @@ bool Manifold::Impl::IsManifold() const {
   if (halfedge_.size() == 0) return true;
   auto policy = autoPolicy(halfedge_.size());
 
-  return all_of(policy, countAt(0), countAt(halfedge_.size()),
-                CheckHalfedges({halfedge_.cptrD()}));
+  return all_of(policy, countAt(0_z), countAt(halfedge_.size()),
+                CheckHalfedges({halfedge_, vertPos_}));
 }
 
 /**
@@ -292,11 +289,11 @@ bool Manifold::Impl::Is2Manifold() const {
 
   if (!IsManifold()) return false;
 
-  VecDH<Halfedge> halfedge(halfedge_);
-  sort(policy, halfedge.begin(), halfedge.end());
+  Vec<Halfedge> halfedge(halfedge_);
+  stable_sort(policy, halfedge.begin(), halfedge.end());
 
   return all_of(policy, countAt(0), countAt(2 * NumEdge() - 1),
-                NoDuplicates({halfedge.cptrD()}));
+                NoDuplicates({halfedge}));
 }
 
 /**
@@ -305,8 +302,7 @@ bool Manifold::Impl::Is2Manifold() const {
 bool Manifold::Impl::MatchesTriNormals() const {
   if (halfedge_.size() == 0 || faceNormal_.size() != NumTri()) return true;
   return all_of(autoPolicy(NumTri()), countAt(0), countAt(NumTri()),
-                CheckCCW({halfedge_.cptrD(), vertPos_.cptrD(),
-                          faceNormal_.cptrD(), 2 * precision_}));
+                CheckCCW({halfedge_, vertPos_, faceNormal_, 2 * precision_}));
 }
 
 /**
@@ -314,33 +310,47 @@ bool Manifold::Impl::MatchesTriNormals() const {
  */
 int Manifold::Impl::NumDegenerateTris() const {
   if (halfedge_.size() == 0 || faceNormal_.size() != NumTri()) return true;
-  return count_if(autoPolicy(NumTri()), countAt(0), countAt(NumTri()),
-                  CheckCCW({halfedge_.cptrD(), vertPos_.cptrD(),
-                            faceNormal_.cptrD(), -1 * precision_ / 2}));
+  return count_if(
+      autoPolicy(NumTri()), countAt(0), countAt(NumTri()),
+      CheckCCW({halfedge_, vertPos_, faceNormal_, -1 * precision_ / 2}));
 }
 
 Properties Manifold::Impl::GetProperties() const {
+  ZoneScoped;
   if (IsEmpty()) return {0, 0};
-  auto areaVolume = transform_reduce<thrust::pair<float, float>>(
-      autoPolicy(NumTri()), countAt(0), countAt(NumTri()),
-      FaceAreaVolume({halfedge_.cptrD(), vertPos_.cptrD(), precision_}),
-      thrust::make_pair(0.0f, 0.0f), SumPair());
-  return {areaVolume.first, areaVolume.second};
+  // Kahan summation
+  float area = 0;
+  float volume = 0;
+  float areaCompensation = 0;
+  float volumeCompensation = 0;
+  for (int i = 0; i < NumTri(); ++i) {
+    auto [area1, volume1] =
+        FaceAreaVolume({halfedge_, vertPos_, precision_})(i);
+    const float t1 = area + area1;
+    const float t2 = volume + volume1;
+    areaCompensation += (area - t1) + area1;
+    volumeCompensation += (volume - t2) + volume1;
+    area = t1;
+    volume = t2;
+  }
+  area += areaCompensation;
+  volume += volumeCompensation;
+
+  return {area, volume};
 }
 
 void Manifold::Impl::CalculateCurvature(int gaussianIdx, int meanIdx) {
+  ZoneScoped;
   if (IsEmpty()) return;
   if (gaussianIdx < 0 && meanIdx < 0) return;
-  VecDH<float> vertMeanCurvature(NumVert(), 0);
-  VecDH<float> vertGaussianCurvature(NumVert(), glm::two_pi<float>());
-  VecDH<float> vertArea(NumVert(), 0);
-  VecDH<float> degree(NumVert(), 0);
+  Vec<float> vertMeanCurvature(NumVert(), 0);
+  Vec<float> vertGaussianCurvature(NumVert(), glm::two_pi<float>());
+  Vec<float> vertArea(NumVert(), 0);
+  Vec<float> degree(NumVert(), 0);
   auto policy = autoPolicy(NumTri());
-  for_each(
-      policy, countAt(0), countAt(NumTri()),
-      CurvatureAngles({vertMeanCurvature.ptrD(), vertGaussianCurvature.ptrD(),
-                       vertArea.ptrD(), degree.ptrD(), halfedge_.cptrD(),
-                       vertPos_.cptrD(), faceNormal_.cptrD()}));
+  for_each(policy, countAt(0), countAt(NumTri()),
+           CurvatureAngles({vertMeanCurvature, vertGaussianCurvature, vertArea,
+                            degree, halfedge_, vertPos_, faceNormal_}));
   for_each_n(policy,
              zip(vertMeanCurvature.begin(), vertGaussianCurvature.begin(),
                  vertArea.begin(), degree.begin()),
@@ -348,8 +358,8 @@ void Manifold::Impl::CalculateCurvature(int gaussianIdx, int meanIdx) {
 
   const int oldNumProp = NumProp();
   const int numProp = glm::max(oldNumProp, glm::max(gaussianIdx, meanIdx) + 1);
-  const VecDH<float> oldProperties = meshRelation_.properties;
-  meshRelation_.properties = VecDH<float>(numProp * NumPropVert(), 0);
+  const Vec<float> oldProperties = meshRelation_.properties;
+  meshRelation_.properties = Vec<float>(numProp * NumPropVert(), 0);
   meshRelation_.numProp = numProp;
   if (meshRelation_.triProperties.size() == 0) {
     meshRelation_.triProperties.resize(NumTri());
@@ -357,13 +367,11 @@ void Manifold::Impl::CalculateCurvature(int gaussianIdx, int meanIdx) {
 
   for_each_n(
       policy, zip(meshRelation_.triProperties.begin(), countAt(0)), NumTri(),
-      UpdateProperties({meshRelation_.properties.ptrD(), oldProperties.cptrD(),
-                        halfedge_.cptrD(), vertMeanCurvature.cptrD(),
-                        vertGaussianCurvature.cptrD(), oldNumProp, numProp,
-                        gaussianIdx, meanIdx}));
+      UpdateProperties({meshRelation_.properties, oldProperties, halfedge_,
+                        vertMeanCurvature, vertGaussianCurvature, oldNumProp,
+                        numProp, gaussianIdx, meanIdx}));
 
   CreateFaces();
-  SimplifyTopology();
   Finish();
 }
 
@@ -397,7 +405,7 @@ bool Manifold::Impl::IsFinite() const {
  * Checks that the input triVerts array has all indices inside bounds of the
  * vertPos_ array.
  */
-bool Manifold::Impl::IsIndexInBounds(const VecDH<glm::ivec3>& triVerts) const {
+bool Manifold::Impl::IsIndexInBounds(VecView<const glm::ivec3> triVerts) const {
   auto policy = autoPolicy(triVerts.size());
   glm::ivec2 minmax = transform_reduce<glm::ivec2>(
       policy, triVerts.begin(), triVerts.end(), MakeMinMax(),

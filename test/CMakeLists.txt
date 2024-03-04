@@ -14,36 +14,59 @@
 
 project(manifold_test)
 
-add_subdirectory(third_party)
-
+set(CMAKE_CXX_STANDARD 17)
 enable_testing()
 
 set(SOURCE_FILES polygon_test.cpp cross_section_test.cpp manifold_test.cpp boolean_test.cpp sdf_test.cpp samples_test.cpp test_main.cpp)
 
-if(MANIFOLD_CBIND)
+if(MANIFOLD_CBIND AND NOT EMSCRIPTEN)
   list(APPEND SOURCE_FILES manifoldc_test.cpp)
 endif()
 
-add_executable(${PROJECT_NAME} ${SOURCE_FILES})
-target_link_libraries(${PROJECT_NAME} polygon GTest::GTest manifold sdf samples samplesGPU cross_section)
+set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+# Prevent installation of GTest with your project
+set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
+set(INSTALL_GMOCK OFF CACHE BOOL "" FORCE)
 
-if(MANIFOLD_CBIND)
+include(FetchContent)
+FetchContent_Declare(googletest
+  GIT_REPOSITORY https://github.com/google/googletest.git
+  GIT_TAG        v1.14.0
+  GIT_SHALLOW    TRUE
+  GIT_PROGRESS   TRUE
+  FIND_PACKAGE_ARGS NAMES GTest gtest
+)
+FetchContent_MakeAvailable(googletest)
+
+if(NOT TARGET GTest::gtest_main)
+    add_library(GTest::gtest_main ALIAS gtest_main)
+endif()
+
+add_executable(${PROJECT_NAME} ${SOURCE_FILES})
+target_link_libraries(${PROJECT_NAME} polygon GTest::gtest_main manifold sdf samples cross_section)
+
+if(MANIFOLD_FUZZ)
+  FetchContent_Declare(fuzztest
+    GIT_REPOSITORY https://github.com/google/fuzztest.git
+    # note that if commit hash is used, it cannot be a shallow clone
+    GIT_TAG        2606e04a43e5a7730e437a849604a61f1cb0ff28
+    GIT_PROGRESS   TRUE
+  )
+  FetchContent_MakeAvailable(fuzztest)
+  fuzztest_setup_fuzzing_flags()
+  add_executable(polygon_fuzz polygon_fuzz.cpp)
+  target_link_libraries(polygon_fuzz PUBLIC polygon)
+  link_fuzztest(polygon_fuzz)
+  gtest_discover_tests(polygon_fuzz)
+endif()
+
+if(MANIFOLD_CBIND AND NOT EMSCRIPTEN)
   target_link_libraries(${PROJECT_NAME} manifoldc)
 endif()
 
 if(MANIFOLD_EXPORT)
   target_link_libraries(${PROJECT_NAME} meshIO)
   target_compile_options(${PROJECT_NAME} PUBLIC -DMANIFOLD_EXPORT)
-endif()
-
-if(MANIFOLD_USE_CUDA)
-  set(CUDA_FILES test_main.cpp sdf_test.cpp)
-  if(MANIFOLD_CBIND)
-    list(APPEND CUDA_FILES manifoldc_test.cpp)
-  endif()
-
-  set_source_files_properties(${CUDA_FILES} PROPERTIES LANGUAGE CUDA)
-  set_property(TARGET ${PROJECT_NAME} PROPERTY CUDA_ARCHITECTURES 61)
 endif()
 
 target_compile_options(${PROJECT_NAME} PRIVATE ${MANIFOLD_FLAGS})
@@ -54,5 +77,11 @@ add_test(test_all ${PROJECT_NAME})
 if(EMSCRIPTEN)
   set_target_properties(${PROJECT_NAME} PROPERTIES LINK_FLAGS
     "-s ASSERTIONS=1 -s DEMANGLE_SUPPORT=1 --bind")
-else()
+endif()
+
+if(MSVC)
+    set_target_properties(${PROJECT_NAME} PROPERTIES RUNTIME_OUTPUT_DIRECTORY 
+        ${CMAKE_BINARY_DIR}/bin )
+    set_target_properties(${PROJECT_NAME} PROPERTIES LIBRARY_OUTPUT_DIRECTORY
+        ${CMAKE_BINARY_DIR}/bin )
 endif()

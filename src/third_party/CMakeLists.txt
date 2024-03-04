@@ -1,10 +1,8 @@
-add_subdirectory(glm)
-add_subdirectory(graphlite)
+add_library(quickhull OBJECT quickhull/QuickHull.cpp)
+target_include_directories(quickhull PUBLIC
+    $<INSTALL_INTERFACE:quickhull>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/quickhull>)
 
-set(CLIPPER2_UTILS OFF)
-set(CLIPPER2_EXAMPLES OFF)
-set(CLIPPER2_TESTS OFF)
-set(CLIPPER2_USINGZ "OFF" CACHE STRING "Preempt cache default of USINGZ (we only use 2d)")
-add_definitions(-D_HAS_EXCEPTIONS=0) # disable exceptions for STL
+target_compile_features(quickhull PUBLIC cxx_std_17)
+install(TARGETS quickhull EXPORT manifoldTargets)
 
-add_subdirectory(clipper2/CPP)

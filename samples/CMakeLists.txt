@@ -14,37 +14,17 @@
 
 project(samples)
 
-add_library(samples src/bracelet.cpp src/knot.cpp src/menger_sponge.cpp src/rounded_frame.cpp src/scallop.cpp src/tet_puzzle.cpp)
+add_library(samples src/bracelet.cpp src/knot.cpp src/menger_sponge.cpp
+    src/rounded_frame.cpp src/scallop.cpp src/tet_puzzle.cpp
+    src/gyroid_module.cpp src/condensed_matter.cpp)
 
 target_include_directories(samples
     PUBLIC ${PROJECT_SOURCE_DIR}/include
 )
 
 target_link_libraries(samples
-    PUBLIC manifold
+    PUBLIC manifold sdf
 )
 
 target_compile_options(samples PRIVATE ${MANIFOLD_FLAGS})
 target_compile_features(samples PUBLIC cxx_std_17)
-
-project(samplesGPU)
-
-add_library(samplesGPU src/gyroid_module.cpp)
-
-if(MANIFOLD_USE_CUDA)
-    set_source_files_properties(src/gyroid_module.cpp PROPERTIES LANGUAGE CUDA)
-    set_property(TARGET samplesGPU PROPERTY CUDA_ARCHITECTURES 61)
-endif()
-
-target_include_directories(samplesGPU
-    PUBLIC ${PROJECT_SOURCE_DIR}/include
-)
-
-target_link_libraries(samplesGPU
-    PUBLIC manifold sdf
-)
-
-target_compile_options(samplesGPU PRIVATE ${MANIFOLD_FLAGS})
-target_compile_features(samplesGPU
-    PUBLIC cxx_std_17
-)

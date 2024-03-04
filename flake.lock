@@ -1,39 +1,112 @@
 {
   "nodes": {
-    "flake-utils": {
+    "clipper2-src": {
+      "flake": false,
       "locked": {
-        "lastModified": 1649676176,
-        "narHash": "sha256-OWKJratjt2RW151VUlJPRALb7OU2S5s+f0vLj4o1bHM=",
+        "lastModified": 1701175684,
+        "narHash": "sha256-3TKhb48cABl0QcbeG12xlA1taQ/8/RdUUHSp0Qh85eE=",
+        "owner": "AngusJohnson",
+        "repo": "Clipper2",
+        "rev": "98db5662e8dd1808a5a7b50c5605a2289bb390e8",
+        "type": "github"
+      },
+      "original": {
+        "owner": "AngusJohnson",
+        "ref": "Clipper2_1.3.0",
+        "repo": "Clipper2",
+        "type": "github"
+      }
+    },
+    "flake-utils": {
+      "inputs": {
+        "systems": "systems"
+      },
+      "locked": {
+        "lastModified": 1701680307,
+        "narHash": "sha256-kAuep2h5ajznlPMD9rnQyffWG8EM/C73lejGofXvdM8=",
         "owner": "numtide",
         "repo": "flake-utils",
-        "rev": "a4b154ebbdc88c8498a5c7b01589addc9e9cb678",
+        "rev": "4022d587cbbfd70fe950c1e2083a02621806a725",
         "type": "github"
       },
       "original": {
         "owner": "numtide",
         "repo": "flake-utils",
+        "type": "github"
+      }
+    },
+    "gtest-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1690989893,
+        "narHash": "sha256-t0RchAHTJbuI5YW4uyBPykTvcjy90JW9AOPNjIhwh6U=",
+        "owner": "google",
+        "repo": "googletest",
+        "rev": "f8d7d77c06936315286eb55f8de22cd23c188571",
+        "type": "github"
+      },
+      "original": {
+        "owner": "google",
+        "ref": "v1.14.0",
+        "repo": "googletest",
         "type": "github"
       }
     },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1657296039,
-        "narHash": "sha256-Ghh39+aS+pw5sTP/ZO8VIKE6sBhMadDaQZtf+3yu4Vc=",
+        "lastModified": 1704722960,
+        "narHash": "sha256-mKGJ3sPsT6//s+Knglai5YflJUF2DGj7Ai6Ynopz0kI=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "71d7a4c037dc4f3e98d5c4a81b941933cf5bf675",
+        "rev": "317484b1ead87b9c1b8ac5261a8d2dd748a0492d",
         "type": "github"
       },
       "original": {
         "id": "nixpkgs",
-        "ref": "nixos-22.05",
+        "ref": "nixos-unstable",
         "type": "indirect"
       }
     },
     "root": {
       "inputs": {
+        "clipper2-src": "clipper2-src",
         "flake-utils": "flake-utils",
-        "nixpkgs": "nixpkgs"
+        "gtest-src": "gtest-src",
+        "nixpkgs": "nixpkgs",
+        "thrust-src": "thrust-src"
+      }
+    },
+    "systems": {
+      "locked": {
+        "lastModified": 1681028828,
+        "narHash": "sha256-Vy1rq5AaRuLzOxct8nz4T6wlgyUR7zLU309k9mBC768=",
+        "owner": "nix-systems",
+        "repo": "default",
+        "rev": "da67096a3b9bf56a91d16901293e51ba5b49a27e",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nix-systems",
+        "repo": "default",
+        "type": "github"
+      }
+    },
+    "thrust-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1696873248,
+        "narHash": "sha256-mUhMXGPbO2t83EvI8YNDRLngvLiwfzs4EgRrcxKfhHs=",
+        "ref": "refs/heads/main",
+        "rev": "756c5afc0750f1413da05bd2b6505180e84c53d4",
+        "revCount": 4758,
+        "submodules": true,
+        "type": "git",
+        "url": "https://github.com/NVIDIA/thrust.git"
+      },
+      "original": {
+        "submodules": true,
+        "type": "git",
+        "url": "https://github.com/NVIDIA/thrust.git"
       }
     }
   },

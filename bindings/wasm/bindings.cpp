@@ -14,14 +14,14 @@
 
 #include <emscripten/bind.h>
 #include <emscripten/val.h>
-#include <manifold.h>
-#include <polygon.h>
-#include <sdf.h>
 
 #include <vector>
 
 #include "cross_section.h"
 #include "helpers.cpp"
+#include "manifold.h"
+#include "polygon.h"
+#include "sdf.h"
 
 using namespace emscripten;
 using namespace manifold;
@@ -103,7 +103,7 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .function("_Warp", &cross_js::Warp)
       .function("transform", &cross_js::Transform)
       .function("_Translate", &CrossSection::Translate)
-      .function("_Rotate", &CrossSection::Rotate)
+      .function("rotate", &CrossSection::Rotate)
       .function("_Scale", &CrossSection::Scale)
       .function("_Mirror", &CrossSection::Mirror)
       .function("_Decompose", &CrossSection::Decompose)
@@ -114,8 +114,9 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .function("_Bounds", &CrossSection::Bounds)
       .function("simplify", &CrossSection::Simplify)
       .function("_Offset", &cross_js::Offset)
-      .function("_RectClip", &CrossSection::RectClip)
-      .function("_ToPolygons", &CrossSection::ToPolygons);
+      .function("_ToPolygons", &CrossSection::ToPolygons)
+      .function("hull",
+                select_overload<CrossSection() const>(&CrossSection::Hull));
 
   // CrossSection Static Methods
   function("_Square", &CrossSection::Square);
@@ -124,6 +125,10 @@ EMSCRIPTEN_BINDINGS(whatever) {
   function("_crossSectionUnionN", &cross_js::UnionN);
   function("_crossSectionDifferenceN", &cross_js::DifferenceN);
   function("_crossSectionIntersectionN", &cross_js::IntersectionN);
+  function("_crossSectionCollectVertices", &cross_js::CollectVertices);
+  function("_crossSectionHullPoints",
+           select_overload<CrossSection(std::vector<glm::vec2>)>(
+               &CrossSection::Hull));
 
   class_<Manifold>("Manifold")
       .constructor(&man_js::FromMeshJS)
@@ -133,8 +138,12 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .function("_Split", &man_js::Split)
       .function("_SplitByPlane", &man_js::SplitByPlane)
       .function("_TrimByPlane", &Manifold::TrimByPlane)
+      .function("slice", &Manifold::Slice)
+      .function("project", &Manifold::Project)
+      .function("hull", select_overload<Manifold() const>(&Manifold::Hull))
       .function("_GetMeshJS", &js::GetMeshJS)
       .function("refine", &Manifold::Refine)
+      .function("refineToLength", &Manifold::RefineToLength)
       .function("_Warp", &man_js::Warp)
       .function("_SetProperties", &man_js::SetProperties)
       .function("transform", &man_js::Transform)
@@ -175,6 +184,10 @@ EMSCRIPTEN_BINDINGS(whatever) {
   function("_manifoldUnionN", &man_js::UnionN);
   function("_manifoldDifferenceN", &man_js::DifferenceN);
   function("_manifoldIntersectionN", &man_js::IntersectionN);
+  function("_manifoldCollectVertices", &man_js::CollectVertices);
+  function("_manifoldHullPoints",
+           select_overload<Manifold(const std::vector<glm::vec3>&)>(
+               &Manifold::Hull));
 
   // Quality Globals
   function("setMinCircularAngle", &Quality::SetMinCircularAngle);

@@ -14,7 +14,21 @@
 
 #include "cross_section.h"
 
+#include "clipper2/clipper.core.h"
+#include "clipper2/clipper.h"
+#include "clipper2/clipper.offset.h"
+
+namespace C2 = Clipper2Lib;
+
 using namespace manifold;
+
+namespace manifold {
+struct PathImpl {
+  PathImpl(const C2::PathsD paths_) : paths_(paths_) {}
+  operator const C2::PathsD&() const { return paths_; }
+  const C2::PathsD paths_;
+};
+}  // namespace manifold
 
 namespace {
 const int precision_ = 8;
@@ -96,8 +110,8 @@ C2::PathsD transform(const C2::PathsD ps, const glm::mat3x2 m) {
   return transformed;
 }
 
-std::shared_ptr<const C2::PathsD> shared_paths(const C2::PathsD& ps) {
-  return std::make_shared<const C2::PathsD>(ps);
+std::shared_ptr<const PathImpl> shared_paths(const C2::PathsD& ps) {
+  return std::make_shared<const PathImpl>(ps);
 }
 
 // forward declaration for mutual recursion
@@ -132,6 +146,66 @@ void decompose_hole(const C2::PolyTreeD* outline,
   }
 }
 
+void flatten(const C2::PolyTreeD* tree, C2::PathsD& polys, int i) {
+  auto n_outlines = tree->Count();
+  if (i < n_outlines) {
+    auto outline = tree->Child(i);
+    flatten(outline, polys, 0);
+    polys.push_back(outline->Polygon());
+    if (i < n_outlines - 1) {
+      flatten(tree, polys, i + 1);
+    }
+  }
+}
+
+bool V2Lesser(glm::vec2 a, glm::vec2 b) {
+  if (a.x == b.x) return a.y < b.y;
+  return a.x < b.x;
+}
+
+void HullBacktrack(const glm::vec2& pt, std::vector<glm::vec2>& stack) {
+  auto sz = stack.size();
+  while (sz >= 2 && CCW(stack[sz - 2], stack[sz - 1], pt, 0.0f) <= 0.0f) {
+    stack.pop_back();
+    sz = stack.size();
+  }
+}
+
+// Based on method described here:
+// https://www.hackerearth.com/practice/math/geometry/line-sweep-technique/tutorial/
+// Changed to follow:
+// https://en.wikibooks.org/wiki/Algorithm_Implementation/Geometry/Convex_hull/Monotone_chain
+// This is the same algorithm (Andrew, also called Montone Chain).
+C2::PathD HullImpl(SimplePolygon& pts) {
+  int len = pts.size();
+  if (len < 3) return C2::PathD();  // not enough points to create a polygon
+  std::sort(pts.begin(), pts.end(), V2Lesser);
+
+  auto lower = std::vector<glm::vec2>{};
+  for (int i = 0; i < len; i++) {
+    HullBacktrack(pts[i], lower);
+    lower.push_back(pts[i]);
+  }
+  auto upper = std::vector<glm::vec2>{};
+  for (int i = len - 1; i >= 0; i--) {
+    HullBacktrack(pts[i], upper);
+    upper.push_back(pts[i]);
+  }
+
+  upper.pop_back();
+  lower.pop_back();
+
+  auto path = C2::PathD(lower.size() + upper.size());
+  for (int i = 0; i < lower.size(); i++) {
+    path[i] = v2_to_pd(lower[i]);
+  }
+  auto llen = lower.size();
+  int sz = upper.size();  // "fix" -Waggressive-loop-optimizations warning.
+  for (int i = 0; i < sz; i++) {
+    path[i + llen] = v2_to_pd(upper[i]);
+  }
+  return path;
+}
 }  // namespace
 
 namespace manifold {
@@ -139,7 +213,9 @@ namespace manifold {
 /**
  * The default constructor is an empty cross-section (containing no contours).
  */
-CrossSection::CrossSection() { paths_ = shared_paths(C2::PathsD()); }
+CrossSection::CrossSection() {
+  paths_ = std::make_shared<const PathImpl>(C2::PathsD());
+}
 
 CrossSection::~CrossSection() = default;
 CrossSection::CrossSection(CrossSection&&) noexcept = default;
@@ -166,7 +242,7 @@ CrossSection& CrossSection::operator=(const CrossSection& other) {
 };
 
 // Private, skips unioning.
-CrossSection::CrossSection(C2::PathsD ps) { paths_ = shared_paths(ps); }
+CrossSection::CrossSection(std::shared_ptr<const PathImpl> ps) { paths_ = ps; }
 
 /**
  * Create a 2d cross-section from a single contour. A boolean union operation
@@ -202,16 +278,30 @@ CrossSection::CrossSection(const Polygons& contours, FillRule fillrule) {
   paths_ = shared_paths(C2::Union(ps, fr(fillrule), precision_));
 }
 
+/**
+ * Create a 2d cross-section from an axis-aligned rectangle (bounding box).
+ *
+ * @param rect An axis-aligned rectangular bounding box.
+ */
+CrossSection::CrossSection(const Rect& rect) {
+  C2::PathD p(4);
+  p[0] = C2::PointD(rect.min.x, rect.min.y);
+  p[1] = C2::PointD(rect.max.x, rect.min.y);
+  p[2] = C2::PointD(rect.max.x, rect.max.y);
+  p[3] = C2::PointD(rect.min.x, rect.max.y);
+  paths_ = shared_paths(C2::PathsD{p});
+}
+
 // Private
 // All access to paths_ should be done through the GetPaths() method, which
 // applies the accumulated transform_
-C2::PathsD CrossSection::GetPaths() const {
+std::shared_ptr<const PathImpl> CrossSection::GetPaths() const {
   if (transform_ == glm::mat3x2(1.0f)) {
-    return *paths_;
+    return paths_;
   }
-  paths_ = shared_paths(transform(*paths_, transform_));
+  paths_ = shared_paths(::transform(paths_->paths_, transform_));
   transform_ = glm::mat3x2(1.0f);
-  return *paths_;
+  return paths_;
 }
 
 /**
@@ -243,7 +333,7 @@ CrossSection CrossSection::Square(const glm::vec2 size, bool center) {
     p[2] = C2::PointD(x, y);
     p[3] = C2::PointD(0.0, y);
   }
-  return CrossSection(C2::PathsD{p});
+  return CrossSection(shared_paths(C2::PathsD{p}));
 }
 
 /**
@@ -264,7 +354,7 @@ CrossSection CrossSection::Circle(float radius, int circularSegments) {
   for (int i = 0; i < n; ++i) {
     circle[i] = C2::PointD(radius * cosd(dPhi * i), radius * sind(dPhi * i));
   }
-  return CrossSection(C2::PathsD{circle});
+  return CrossSection(shared_paths(C2::PathsD{circle}));
 }
 
 /**
@@ -273,9 +363,9 @@ CrossSection CrossSection::Circle(float radius, int circularSegments) {
 CrossSection CrossSection::Boolean(const CrossSection& second,
                                    OpType op) const {
   auto ct = cliptype_of_op(op);
-  auto res = C2::BooleanOp(ct, C2::FillRule::Positive, GetPaths(),
-                           second.GetPaths(), precision_);
-  return CrossSection(res);
+  auto res = C2::BooleanOp(ct, C2::FillRule::Positive, GetPaths()->paths_,
+                           second.GetPaths()->paths_, precision_);
+  return CrossSection(shared_paths(res));
 }
 
 /**
@@ -292,19 +382,19 @@ CrossSection CrossSection::BatchBoolean(
   auto subjs = crossSections[0].GetPaths();
   int n_clips = 0;
   for (int i = 1; i < crossSections.size(); ++i) {
-    n_clips += crossSections[i].GetPaths().size();
+    n_clips += crossSections[i].GetPaths()->paths_.size();
   }
   auto clips = C2::PathsD();
   clips.reserve(n_clips);
   for (int i = 1; i < crossSections.size(); ++i) {
     auto ps = crossSections[i].GetPaths();
-    clips.insert(clips.end(), ps.begin(), ps.end());
+    clips.insert(clips.end(), ps->paths_.begin(), ps->paths_.end());
   }
 
   auto ct = cliptype_of_op(op);
-  auto res =
-      C2::BooleanOp(ct, C2::FillRule::Positive, subjs, clips, precision_);
-  return CrossSection(res);
+  auto res = C2::BooleanOp(ct, C2::FillRule::Positive, subjs->paths_, clips,
+                           precision_);
+  return CrossSection(shared_paths(res));
 }
 
 /**
@@ -375,7 +465,7 @@ std::vector<CrossSection> CrossSection::Decompose() const {
   }
 
   C2::PolyTreeD tree;
-  C2::BooleanOp(C2::ClipType::Union, C2::FillRule::Positive, GetPaths(),
+  C2::BooleanOp(C2::ClipType::Union, C2::FillRule::Positive, GetPaths()->paths_,
                 C2::PathsD(), tree, precision_);
 
   auto polys = std::vector<C2::PathsD>();
@@ -385,22 +475,10 @@ std::vector<CrossSection> CrossSection::Decompose() const {
   auto comps = std::vector<CrossSection>(n_polys);
   // reverse the stack while wrapping
   for (int i = 0; i < n_polys; ++i) {
-    comps[n_polys - i - 1] = CrossSection(polys[i]);
+    comps[n_polys - i - 1] = CrossSection(shared_paths(polys[i]));
   }
 
   return comps;
-}
-
-/**
- * Compute the intersection between a cross-section and an axis-aligned
- * rectangle. This operation has much higher performance (<B>O(n)</B> vs
- * <B>O(n<SUP>3</SUP>)</B>) than the general purpose intersection algorithm
- * used for sets of cross-sections.
- */
-CrossSection CrossSection::RectClip(const Rect& rect) const {
-  auto r = C2::RectD(rect.min.x, rect.min.y, rect.max.x, rect.max.y);
-  auto ps = C2::RectClip(r, GetPaths(), precision_);
-  return CrossSection(ps);
 }
 
 /**
@@ -485,20 +563,42 @@ CrossSection CrossSection::Transform(const glm::mat3x2& m) const {
  */
 CrossSection CrossSection::Warp(
     std::function<void(glm::vec2&)> warpFunc) const {
-  auto paths = GetPaths();
-  auto warped = C2::PathsD();
-  warped.reserve(paths.size());
-  for (auto path : paths) {
-    auto sz = path.size();
-    auto s = C2::PathD(sz);
-    for (int i = 0; i < sz; ++i) {
-      auto v = v2_of_pd(path[i]);
-      warpFunc(v);
-      s[i] = v2_to_pd(v);
+  return WarpBatch([&warpFunc](VecView<glm::vec2> vecs) {
+    for (glm::vec2& p : vecs) {
+      warpFunc(p);
     }
-    warped.push_back(s);
+  });
+}
+
+/**
+ * Same as CrossSection::Warp but calls warpFunc with
+ * a VecView which is roughly equivalent to std::span
+ * pointing to all vec2 elements to be modified in-place
+ *
+ * @param warpFunc A function that modifies multiple vertex positions.
+ */
+CrossSection CrossSection::WarpBatch(
+    std::function<void(VecView<glm::vec2>)> warpFunc) const {
+  std::vector<glm::vec2> tmp_verts;
+  C2::PathsD paths = GetPaths()->paths_;  // deep copy
+  for (C2::PathD const& path : paths) {
+    for (C2::PointD const& p : path) {
+      tmp_verts.push_back(v2_of_pd(p));
+    }
   }
-  return CrossSection(C2::Union(warped, C2::FillRule::Positive, precision_));
+
+  warpFunc(VecView<glm::vec2>(tmp_verts.data(), tmp_verts.size()));
+
+  auto cursor = tmp_verts.begin();
+  for (C2::PathD& path : paths) {
+    for (C2::PointD& p : path) {
+      p = v2_to_pd(*cursor);
+      ++cursor;
+    }
+  }
+
+  return CrossSection(
+      shared_paths(C2::Union(paths, C2::FillRule::Positive, precision_)));
 }
 
 /**
@@ -514,8 +614,29 @@ CrossSection CrossSection::Warp(
  * offseting operations are to be performed, which would compound the issue.
  */
 CrossSection CrossSection::Simplify(double epsilon) const {
-  auto ps = SimplifyPaths(GetPaths(), epsilon, false);
-  return CrossSection(ps);
+  C2::PolyTreeD tree;
+  C2::BooleanOp(C2::ClipType::Union, C2::FillRule::Positive, GetPaths()->paths_,
+                C2::PathsD(), tree, precision_);
+
+  C2::PathsD polys;
+  flatten(&tree, polys, 0);
+
+  // Filter out contours less than epsilon wide.
+  C2::PathsD filtered;
+  for (C2::PathD poly : polys) {
+    auto area = C2::Area(poly);
+    Rect box;
+    for (auto vert : poly) {
+      box.Union(glm::vec2(vert.x, vert.y));
+    }
+    glm::vec2 size = box.Size();
+    if (glm::abs(area) > glm::max(size.x, size.y) * epsilon) {
+      filtered.push_back(poly);
+    }
+  }
+
+  auto ps = SimplifyPaths(filtered, epsilon, true);
+  return CrossSection(shared_paths(ps));
 }
 
 /**
@@ -553,23 +674,81 @@ CrossSection CrossSection::Offset(double delta, JoinType jointype,
     arc_tol = (std::cos(Clipper2Lib::PI / n) - 1) * -scaled_delta;
   }
   auto ps =
-      C2::InflatePaths(GetPaths(), delta, jt(jointype), C2::EndType::Polygon,
-                       miter_limit, precision_, arc_tol);
-  return CrossSection(ps);
+      C2::InflatePaths(GetPaths()->paths_, delta, jt(jointype),
+                       C2::EndType::Polygon, miter_limit, precision_, arc_tol);
+  return CrossSection(shared_paths(ps));
+}
+
+/**
+ * Compute the convex hull enveloping a set of cross-sections.
+ *
+ * @param crossSections A vector of cross-sections over which to compute a
+ * convex hull.
+ */
+CrossSection CrossSection::Hull(
+    const std::vector<CrossSection>& crossSections) {
+  int n = 0;
+  for (auto cs : crossSections) n += cs.NumVert();
+  SimplePolygon pts;
+  pts.reserve(n);
+  for (auto cs : crossSections) {
+    auto paths = cs.GetPaths()->paths_;
+    for (auto path : paths) {
+      for (auto p : path) {
+        pts.push_back(v2_of_pd(p));
+      }
+    }
+  }
+  return CrossSection(shared_paths(C2::PathsD{HullImpl(pts)}));
+}
+
+/**
+ * Compute the convex hull of this cross-section.
+ */
+CrossSection CrossSection::Hull() const {
+  return Hull(std::vector<CrossSection>{*this});
+}
+
+/**
+ * Compute the convex hull of a set of points. If the given points are fewer
+ * than 3, an empty CrossSection will be returned.
+ *
+ * @param pts A vector of 2-dimensional points over which to compute a convex
+ * hull.
+ */
+CrossSection CrossSection::Hull(SimplePolygon pts) {
+  return CrossSection(shared_paths(C2::PathsD{HullImpl(pts)}));
+}
+
+/**
+ * Compute the convex hull of a set of points/polygons. If the given points are
+ * fewer than 3, an empty CrossSection will be returned.
+ *
+ * @param pts A vector of vectors of 2-dimensional points over which to compute
+ * a convex hull.
+ */
+CrossSection CrossSection::Hull(const Polygons polys) {
+  SimplePolygon pts;
+  for (auto poly : polys) {
+    for (auto p : poly) {
+      pts.push_back(p);
+    }
+  }
+  return Hull(pts);
 }
 
 /**
  * Return the total area covered by complex polygons making up the
  * CrossSection.
  */
-double CrossSection::Area() const { return C2::Area(GetPaths()); }
+double CrossSection::Area() const { return C2::Area(GetPaths()->paths_); }
 
 /**
  * Return the number of vertices in the CrossSection.
  */
 int CrossSection::NumVert() const {
   int n = 0;
-  auto paths = GetPaths();
+  auto paths = GetPaths()->paths_;
   for (auto p : paths) {
     n += p.size();
   }
@@ -580,19 +759,19 @@ int CrossSection::NumVert() const {
  * Return the number of contours (both outer and inner paths) in the
  * CrossSection.
  */
-int CrossSection::NumContour() const { return GetPaths().size(); }
+int CrossSection::NumContour() const { return GetPaths()->paths_.size(); }
 
 /**
  * Does the CrossSection contain any contours?
  */
-bool CrossSection::IsEmpty() const { return GetPaths().empty(); }
+bool CrossSection::IsEmpty() const { return GetPaths()->paths_.empty(); }
 
 /**
  * Returns the axis-aligned bounding rectangle of all the CrossSections'
  * vertices.
  */
 Rect CrossSection::Bounds() const {
-  auto r = C2::GetBounds(GetPaths());
+  auto r = C2::GetBounds(GetPaths()->paths_);
   return Rect({r.left, r.bottom}, {r.right, r.top});
 }
 
@@ -601,7 +780,7 @@ Rect CrossSection::Bounds() const {
  */
 Polygons CrossSection::ToPolygons() const {
   auto polys = Polygons();
-  auto paths = GetPaths();
+  auto paths = GetPaths()->paths_;
   polys.reserve(paths.size());
   for (auto p : paths) {
     auto sp = SimplePolygon();
@@ -613,166 +792,4 @@ Polygons CrossSection::ToPolygons() const {
   }
   return polys;
 }
-
-// Rect
-
-/**
- * Default constructor is an empty rectangle..
- */
-Rect::Rect() {}
-
-Rect::~Rect() = default;
-Rect::Rect(Rect&&) noexcept = default;
-Rect& Rect::operator=(Rect&&) noexcept = default;
-Rect::Rect(const Rect& other) {
-  min = glm::vec2(other.min);
-  max = glm::vec2(other.max);
-}
-
-/**
- * Create a rectangle that contains the two given points.
- */
-Rect::Rect(const glm::vec2 a, const glm::vec2 b) {
-  min = glm::min(a, b);
-  max = glm::max(a, b);
-}
-
-/**
- * Return the dimensions of the rectangle.
- */
-glm::vec2 Rect::Size() const { return max - min; }
-
-/**
- * Returns the absolute-largest coordinate value of any contained
- * point.
- */
-float Rect::Scale() const {
-  glm::vec2 absMax = glm::max(glm::abs(min), glm::abs(max));
-  return glm::max(absMax.x, absMax.y);
-}
-
-/**
- * Returns the center point of the rectangle.
- */
-glm::vec2 Rect::Center() const { return 0.5f * (max + min); }
-
-/**
- * Does this rectangle contain (includes equal) the given point?
- */
-bool Rect::Contains(const glm::vec2& p) const {
-  return glm::all(glm::greaterThanEqual(p, min)) &&
-         glm::all(glm::greaterThanEqual(max, p));
-}
-
-/**
- * Does this rectangle contain (includes equal) the given rectangle?
- */
-bool Rect::Contains(const Rect& rect) const {
-  return glm::all(glm::greaterThanEqual(rect.min, min)) &&
-         glm::all(glm::greaterThanEqual(max, rect.max));
-}
-
-/**
- * Does this rectangle overlap the one given (including equality)?
- */
-bool Rect::DoesOverlap(const Rect& rect) const {
-  return min.x <= rect.max.x && min.y <= rect.max.y && max.x >= rect.min.x &&
-         max.y >= rect.min.y;
-}
-
-/**
- * Is the rectangle empty (containing no space)?
- */
-bool Rect::IsEmpty() const { return max.y <= min.y || max.x <= min.x; };
-
-/**
- * Does this recangle have finite bounds?
- */
-bool Rect::IsFinite() const {
-  return glm::all(glm::isfinite(min)) && glm::all(glm::isfinite(max));
-}
-
-/**
- * Expand this rectangle (in place) to include the given point.
- */
-void Rect::Union(const glm::vec2 p) {
-  min = glm::min(min, p);
-  max = glm::max(max, p);
-}
-
-/**
- * Expand this rectangle to include the given Rect.
- */
-Rect Rect::Union(const Rect& rect) const {
-  Rect out;
-  out.min = glm::min(min, rect.min);
-  out.max = glm::max(max, rect.max);
-  return out;
-}
-
-/**
- * Shift this rectangle by the given vector.
- */
-Rect Rect::operator+(const glm::vec2 shift) const {
-  Rect out;
-  out.min = min + shift;
-  out.max = max + shift;
-  return out;
-}
-
-/**
- * Shift this rectangle in-place by the given vector.
- */
-Rect& Rect::operator+=(const glm::vec2 shift) {
-  min += shift;
-  max += shift;
-  return *this;
-}
-
-/**
- * Scale this rectangle by the given vector.
- */
-Rect Rect::operator*(const glm::vec2 scale) const {
-  Rect out;
-  out.min = min * scale;
-  out.max = max * scale;
-  return out;
-}
-
-/**
- * Scale this rectangle in-place by the given vector.
- */
-Rect& Rect::operator*=(const glm::vec2 scale) {
-  min *= scale;
-  max *= scale;
-  return *this;
-}
-
-/**
- * Transform the rectangle by the given axis-aligned affine transform.
- *
- * Ensure the transform passed in is axis-aligned (rotations are all
- * multiples of 90 degrees), or else the resulting rectangle will no longer
- * bound properly.
- */
-Rect Rect::Transform(const glm::mat3x2& m) const {
-  Rect rect;
-  rect.min = m * glm::vec3(min, 1);
-  rect.max = m * glm::vec3(max, 1);
-  return rect;
-}
-
-/**
- * Return a CrossSection with an outline defined by this axis-aligned
- * rectangle.
- */
-CrossSection Rect::AsCrossSection() const {
-  SimplePolygon p(4);
-  p[0] = glm::vec2(min.x, max.y);
-  p[1] = glm::vec2(max.x, max.y);
-  p[2] = glm::vec2(max.x, min.y);
-  p[3] = glm::vec2(min.x, min.y);
-  return CrossSection(p);
-}
-
 }  // namespace manifold

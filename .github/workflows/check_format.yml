@@ -17,5 +17,8 @@ jobs:
         source: '.'
         exclude: '*/third_party'
         extensions: 'h,cpp,js,ts,html'
-        clangFormatVersion: 12
-
+        clangFormatVersion: 11
+    - uses: psf/black@stable
+      with:
+        options: "--check --verbose"
+        src: "./bindings/python/examples"

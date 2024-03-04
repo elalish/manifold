@@ -14,6 +14,8 @@
 
 #include "manifold.h"
 
+#include <algorithm>
+
 #include "cross_section.h"
 #include "test.h"
 
@@ -197,13 +199,28 @@ TEST(Manifold, ExtrudeCone) {
   EXPECT_FLOAT_EQ(donut.GetProperties().volume, 4.0f);
 }
 
+Polygons RotatePolygons(Polygons polys, const int index) {
+  Polygons rotatedPolys;
+  for (auto& polygon : polys) {
+    auto rotatedPolygon = polygon;
+    std::rotate(rotatedPolygon.begin(), rotatedPolygon.begin() + index,
+                rotatedPolygon.end());
+    rotatedPolys.push_back(rotatedPolygon);
+  }
+  return rotatedPolys;
+}
+
 TEST(Manifold, Revolve) {
   Polygons polys = SquareHole();
-  Manifold vug = Manifold::Revolve(polys, 48);
-  EXPECT_EQ(vug.Genus(), -1);
-  auto prop = vug.GetProperties();
-  EXPECT_NEAR(prop.volume, 14.0f * glm::pi<float>(), 0.2f);
-  EXPECT_NEAR(prop.surfaceArea, 30.0f * glm::pi<float>(), 0.2f);
+  Manifold vug;
+  for (int i = 0; i < polys[0].size(); i++) {
+    Polygons rotatedPolys = RotatePolygons(polys, i);
+    vug = Manifold::Revolve(rotatedPolys, 48);
+    EXPECT_EQ(vug.Genus(), -1);
+    auto prop = vug.GetProperties();
+    EXPECT_NEAR(prop.volume, 14.0f * glm::pi<float>(), 0.2f);
+    EXPECT_NEAR(prop.surfaceArea, 30.0f * glm::pi<float>(), 0.2f);
+  }
 }
 
 TEST(Manifold, Revolve2) {
@@ -213,6 +230,46 @@ TEST(Manifold, Revolve2) {
   auto prop = donutHole.GetProperties();
   EXPECT_NEAR(prop.volume, 48.0f * glm::pi<float>(), 1.0f);
   EXPECT_NEAR(prop.surfaceArea, 96.0f * glm::pi<float>(), 1.0f);
+}
+
+TEST(Manifold, Revolve3) {
+  CrossSection circle = CrossSection::Circle(1, 32);
+  Manifold sphere = Manifold::Revolve(circle, 32);
+  auto prop = sphere.GetProperties();
+  EXPECT_NEAR(prop.volume, 4.0f / 3.0f * glm::pi<float>(), 0.1);
+  EXPECT_NEAR(prop.surfaceArea, 4 * glm::pi<float>(), 0.15);
+}
+
+TEST(Manifold, PartialRevolveOnYAxis) {
+  Polygons polys = SquareHole(2.0f);
+  Polygons offsetPolys = SquareHole(10.0f);
+
+  Manifold revolute;
+  for (int i = 0; i < polys[0].size(); i++) {
+    Polygons rotatedPolys = RotatePolygons(polys, i);
+    revolute = Manifold::Revolve(rotatedPolys, 48, 180);
+    EXPECT_EQ(revolute.Genus(), 1);
+    auto prop = revolute.GetProperties();
+    EXPECT_NEAR(prop.volume, 24.0f * glm::pi<float>(), 1.0f);
+    EXPECT_NEAR(
+        prop.surfaceArea,
+        48.0f * glm::pi<float>() + 4.0f * 4.0f * 2.0f - 2.0f * 2.0f * 2.0f,
+        1.0f);
+  }
+}
+
+TEST(Manifold, PartialRevolveOffset) {
+  Polygons polys = SquareHole(10.0f);
+
+  Manifold revolute;
+  for (int i = 0; i < polys[0].size(); i++) {
+    Polygons rotatedPolys = RotatePolygons(polys, i);
+    revolute = Manifold::Revolve(rotatedPolys, 48, 180);
+    auto prop = revolute.GetProperties();
+    EXPECT_EQ(revolute.Genus(), 1);
+    EXPECT_NEAR(prop.surfaceArea, 777.0f, 1.0f);
+    EXPECT_NEAR(prop.volume, 376.0f, 1.0f);
+  }
 }
 
 TEST(Manifold, Warp) {
@@ -254,11 +311,29 @@ TEST(Manifold, Warp2) {
   EXPECT_NEAR(propBefore.volume, 321, 1);
 }
 
+TEST(Manifold, WarpBatch) {
+  Manifold shape1 =
+      Manifold::Cube({2, 3, 4}).Warp([](glm::vec3& v) { v.x += v.z * v.z; });
+  auto prop1 = shape1.GetProperties();
+
+  Manifold shape2 =
+      Manifold::Cube({2, 3, 4}).WarpBatch([](VecView<glm::vec3> vecs) {
+        for (glm::vec3& v : vecs) {
+          v.x += v.z * v.z;
+        }
+      });
+  auto prop2 = shape2.GetProperties();
+
+  EXPECT_EQ(prop1.volume, prop2.volume);
+  EXPECT_EQ(prop1.surfaceArea, prop2.surfaceArea);
+}
+
 TEST(Manifold, Smooth) {
   Manifold tet = Manifold::Tetrahedron();
   Manifold smooth = Manifold::Smooth(tet.GetMesh());
-  smooth = smooth.Refine(100);
-  ExpectMeshes(smooth, {{20002, 40000}});
+  int n = 100;
+  smooth = smooth.Refine(n);
+  ExpectMeshes(smooth, {{2 * n * n + 2, 4 * n * n}});
   auto prop = smooth.GetProperties();
   EXPECT_NEAR(prop.volume, 17.38, 0.1);
   EXPECT_NEAR(prop.surfaceArea, 33.38, 0.1);
@@ -268,13 +343,29 @@ TEST(Manifold, Smooth) {
 #endif
 }
 
+TEST(Manifold, Smooth2Length) {
+  Manifold cone = Manifold::Extrude(
+      CrossSection::Circle(10, 10).Translate({10, 0}), 2, 0, 0, {0, 0});
+  cone += cone.Scale({1, 1, -5});
+  Manifold smooth = Manifold::Smooth(cone.GetMesh());
+  smooth = smooth.RefineToLength(0.1);
+  ExpectMeshes(smooth, {{85250, 170496}});
+  auto prop = smooth.GetProperties();
+  EXPECT_NEAR(prop.volume, 4688, 1);
+  EXPECT_NEAR(prop.surfaceArea, 1369, 1);
+
+#ifdef MANIFOLD_EXPORT
+  if (options.exportModels) ExportMesh("smoothCones.glb", smooth.GetMesh(), {});
+#endif
+}
+
 TEST(Manifold, SmoothSphere) {
   int n[5] = {4, 8, 16, 32, 64};
-  float precision[5] = {0.03, 0.003, 0.003, 0.0005, 0.00006};
+  float precision[5] = {0.04, 0.003, 0.003, 0.0005, 0.00006};
   for (int i = 0; i < 5; ++i) {
     Manifold sphere = Manifold::Sphere(1, n[i]);
     // Refine(odd) puts a center point in the triangle, which is the worst case.
-    Manifold smoothed = Manifold::Smooth(sphere.GetMesh()).Refine(7);
+    Manifold smoothed = Manifold::Smooth(sphere.GetMesh()).Refine(6);
     Mesh out = smoothed.GetMesh();
     auto bounds =
         std::minmax_element(out.vertPos.begin(), out.vertPos.end(),
@@ -478,6 +569,14 @@ TEST(Manifold, Transform) {
   Identical(cube.GetMesh(), cube2.GetMesh());
 }
 
+TEST(Manifold, Slice) {
+  Manifold cube = Manifold::Cube();
+  CrossSection bottom = cube.Slice();
+  CrossSection top = cube.Slice(1);
+  EXPECT_EQ(bottom.Area(), 1);
+  EXPECT_EQ(top.Area(), 0);
+}
+
 TEST(Manifold, MeshRelation) {
   Mesh gyroidMesh = Gyroid();
   MeshGL gyroidMeshGL = WithIndexColors(gyroidMesh);
@@ -507,8 +606,16 @@ TEST(Manifold, MeshRelationRefine) {
   Manifold csaszar(inGL);
 
   RelatedGL(csaszar, {inGL});
-  csaszar.Refine(4);
+  csaszar = csaszar.RefineToLength(1);
+  ExpectMeshes(csaszar, {{9019, 18038, 3}});
   RelatedGL(csaszar, {inGL});
+
+#ifdef MANIFOLD_EXPORT
+  ExportOptions opt;
+  opt.mat.roughness = 1;
+  opt.mat.colorChannels = glm::ivec4(3, 4, 5, -1);
+  if (options.exportModels) ExportMesh("csaszar.glb", csaszar.GetMeshGL(), opt);
+#endif
 }
 
 TEST(Manifold, MeshGLRoundTrip) {
@@ -595,7 +702,7 @@ TEST(Manifold, Invalid) {
   auto invalid = Manifold::Error::InvalidConstruction;
   auto circ = CrossSection::Circle(10.);
   auto empty_circ = CrossSection::Circle(-2.);
-  auto empty_sq = CrossSection::Square(glm::vec3(0.0f));
+  auto empty_sq = CrossSection::Square(glm::vec2(0.0f));
 
   EXPECT_EQ(Manifold::Sphere(0).Status(), invalid);
   EXPECT_EQ(Manifold::Cylinder(0, 5).Status(), invalid);
@@ -614,4 +721,99 @@ TEST(Manifold, MultiCompose) {
                          part.Mirror({1, 0, 0}).Translate({10, 0, 0}),
                          part.Mirror({1, 0, 0}).Translate({10, 10, 0})});
   EXPECT_FLOAT_EQ(finalAssembly.GetProperties().volume, 4000);
+}
+
+TEST(Manifold, MergeDegenerates) {
+  MeshGL cube = Manifold::Cube(glm::vec3(1), true).GetMeshGL();
+  MeshGL squash;
+  squash.vertProperties = cube.vertProperties;
+  squash.triVerts = cube.triVerts;
+  // Move one vert to the position of its neighbor and remove one triangle
+  // linking them to break the manifold.
+  squash.vertProperties[squash.vertProperties.size() - 1] *= -1;
+  squash.triVerts.resize(squash.triVerts.size() - 3);
+  // Rotate the degenerate triangle to the middle to catch more problems.
+  std::rotate(squash.triVerts.begin(), squash.triVerts.begin() + 3 * 5,
+              squash.triVerts.end());
+  // Merge should remove the now duplicate vertex.
+  EXPECT_TRUE(squash.Merge());
+  // Manifold should remove the triangle with two references to the same vert.
+  Manifold squashed = Manifold(squash);
+  EXPECT_FALSE(squashed.IsEmpty());
+  EXPECT_EQ(squashed.Status(), Manifold::Error::NoError);
+}
+
+TEST(Manifold, PinchedVert) {
+  Mesh shape;
+  shape.vertPos = {{0, 0, 0},         //
+                   {1, 1, 0},         //
+                   {1, -1, 0},        //
+                   {-0.00001, 0, 0},  //
+                   {-1, -1, -0},      //
+                   {-1, 1, 0},        //
+                   {0, 0, 2},         //
+                   {0, 0, -2}};
+  shape.triVerts = {{0, 2, 6},  //
+                    {2, 1, 6},  //
+                    {1, 0, 6},  //
+                    {4, 3, 6},  //
+                    {3, 5, 6},  //
+                    {5, 4, 6},  //
+                    {2, 0, 4},  //
+                    {0, 3, 4},  //
+                    {3, 0, 1},  //
+                    {3, 1, 5},  //
+                    {7, 2, 4},  //
+                    {7, 4, 5},  //
+                    {7, 5, 1},  //
+                    {7, 1, 2}};
+  Manifold touch(shape);
+  EXPECT_FALSE(touch.IsEmpty());
+  EXPECT_EQ(touch.Status(), Manifold::Error::NoError);
+  EXPECT_EQ(touch.Genus(), 0);
+}
+
+TEST(Manifold, TictacHull) {
+  const float tictacRad = 100;
+  const float tictacHeight = 500;
+  const int tictacSeg = 1000;
+  const float tictacMid = tictacHeight - 2 * tictacRad;
+  const auto sphere = Manifold::Sphere(tictacRad, tictacSeg);
+  const std::vector<Manifold> spheres{sphere,
+                                      sphere.Translate({0, 0, tictacMid})};
+  const auto tictac = Manifold::Hull(spheres);
+
+#ifdef MANIFOLD_EXPORT
+  if (options.exportModels) {
+    ExportMesh("tictac_hull.glb", tictac.GetMesh(), {});
+  }
+#endif
+
+  EXPECT_EQ(sphere.NumVert() + tictacSeg, tictac.NumVert());
+}
+
+TEST(Manifold, HollowHull) {
+  auto sphere = Manifold::Sphere(100, 360);
+  auto hollow = sphere - sphere.Scale({0.8, 0.8, 0.8});
+  const float sphere_vol = sphere.GetProperties().volume;
+  EXPECT_FLOAT_EQ(hollow.Hull().GetProperties().volume, sphere_vol);
+}
+
+TEST(Manifold, CubeHull) {
+  std::vector<glm::vec3> cubePts = {
+      {0, 0, 0},       {1, 0, 0},   {0, 1, 0},      {0, 0, 1},  // corners
+      {1, 1, 0},       {0, 1, 1},   {1, 0, 1},      {1, 1, 1},  // corners
+      {0.5, 0.5, 0.5}, {0.5, 0, 0}, {0.5, 0.7, 0.2}  // internal points
+  };
+  auto cube = Manifold::Hull(cubePts);
+  EXPECT_FLOAT_EQ(cube.GetProperties().volume, 1);
+}
+
+TEST(Manifold, EmptyHull) {
+  const std::vector<glm::vec3> tooFew{{0, 0, 0}, {1, 0, 0}, {0, 1, 0}};
+  EXPECT_TRUE(Manifold::Hull(tooFew).IsEmpty());
+
+  const std::vector<glm::vec3> coplanar{
+      {0, 0, 0}, {1, 0, 0}, {0, 1, 0}, {1, 1, 0}};
+  EXPECT_TRUE(Manifold::Hull(coplanar).IsEmpty());
 }

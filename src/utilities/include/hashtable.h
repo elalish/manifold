@@ -18,48 +18,36 @@
 
 #include "public.h"
 #include "utils.h"
-#include "vec_dh.h"
+#include "vec.h"
 
 namespace {
 typedef unsigned long long int Uint64;
 typedef Uint64 (*hash_fun_t)(Uint64);
-constexpr Uint64 kOpen = std::numeric_limits<Uint64>::max();
+inline constexpr Uint64 kOpen = std::numeric_limits<Uint64>::max();
 
 template <typename T>
-__host__ __device__ T AtomicCAS(T& target, T compare, T val) {
-#ifdef __CUDA_ARCH__
-  return atomicCAS(&target, compare, val);
-#else
+T AtomicCAS(T& target, T compare, T val) {
   std::atomic<T>& tar = reinterpret_cast<std::atomic<T>&>(target);
   tar.compare_exchange_strong(compare, val, std::memory_order_acq_rel);
   return compare;
-#endif
 }
 
 template <typename T>
-__host__ __device__ void AtomicStore(T& target, T val) {
-#ifdef __CUDA_ARCH__
-  target = val;
-#else
+void AtomicStore(T& target, T val) {
   std::atomic<T>& tar = reinterpret_cast<std::atomic<T>&>(target);
   // release is good enough, although not really something general
   tar.store(val, std::memory_order_release);
-#endif
 }
 
 template <typename T>
-__host__ __device__ T AtomicLoad(const T& target) {
-#ifdef __CUDA_ARCH__
-  return target;
-#else
+T AtomicLoad(const T& target) {
   const std::atomic<T>& tar = reinterpret_cast<const std::atomic<T>&>(target);
   // acquire is good enough, although not general
   return tar.load(std::memory_order_acquire);
-#endif
 }
 
 // https://stackoverflow.com/questions/664014/what-integer-hash-function-are-good-that-accepts-an-integer-hash-key
-__host__ __device__ inline Uint64 hash64bit(Uint64 x) {
+inline Uint64 hash64bit(Uint64 x) {
   x = (x ^ (x >> 30)) * 0xbf58476d1ce4e5b9ull;
   x = (x ^ (x >> 27)) * 0x94d049bb133111ebull;
   x = x ^ (x >> 31);
@@ -75,24 +63,24 @@ namespace manifold {
 template <typename V, hash_fun_t H = hash64bit>
 class HashTableD {
  public:
-  HashTableD(VecDH<Uint64>& keys, VecDH<V>& values, VecDH<uint32_t>& used,
+  HashTableD(Vec<Uint64>& keys, Vec<V>& values, std::atomic<size_t>& used,
              uint32_t step = 1)
       : step_{step}, keys_{keys}, values_{values}, used_{used} {}
 
-  __host__ __device__ int Size() const { return keys_.size(); }
+  int Size() const { return keys_.size(); }
 
-  __host__ __device__ bool Full() const {
-    return AtomicLoad(used_[0]) * 2 > Size();
+  bool Full() const {
+    return used_.load(std::memory_order_relaxed) * 2 > Size();
   }
 
-  __host__ __device__ void Insert(Uint64 key, const V& val) {
+  void Insert(Uint64 key, const V& val) {
     uint32_t idx = H(key) & (Size() - 1);
     while (1) {
       if (Full()) return;
       Uint64& k = keys_[idx];
       const Uint64 found = AtomicCAS(k, kOpen, key);
       if (found == kOpen) {
-        AtomicAdd(used_[0], 0x1u);
+        used_.fetch_add(1, std::memory_order_relaxed);
         values_[idx] = val;
         return;
       }
@@ -101,7 +89,7 @@ class HashTableD {
     }
   }
 
-  __host__ __device__ V& operator[](Uint64 key) const {
+  V& operator[](Uint64 key) {
     uint32_t idx = H(key) & (Size() - 1);
     while (1) {
       const Uint64 k = AtomicLoad(keys_[idx]);
@@ -112,47 +100,74 @@ class HashTableD {
     }
   }
 
-  __host__ __device__ Uint64 KeyAt(int idx) const {
-    return AtomicLoad(keys_[idx]);
+  const V& operator[](Uint64 key) const {
+    uint32_t idx = H(key) & (Size() - 1);
+    while (1) {
+      const Uint64 k = AtomicLoad(keys_[idx]);
+      if (k == key || k == kOpen) {
+        return values_[idx];
+      }
+      idx = (idx + step_) & (Size() - 1);
+    }
   }
-  __host__ __device__ V& At(int idx) const { return values_[idx]; }
+
+  Uint64 KeyAt(int idx) const { return AtomicLoad(keys_[idx]); }
+  V& At(int idx) { return values_[idx]; }
+  const V& At(int idx) const { return values_[idx]; }
 
  private:
   uint32_t step_;
-  VecD<Uint64> keys_;
-  VecD<V> values_;
-  VecD<uint32_t> used_;
+  VecView<Uint64> keys_;
+  VecView<V> values_;
+  std::atomic<size_t>& used_;
 };
 
 template <typename V, hash_fun_t H = hash64bit>
 class HashTable {
  public:
-  HashTable(uint32_t size, uint32_t step = 1)
-      : keys_{1 << (int)ceil(log2(size)), kOpen},
-        values_{1 << (int)ceil(log2(size)), {}},
-        table_{keys_, values_, used_, step} {}
+  HashTable(size_t size, uint32_t step = 1)
+      : keys_{size == 0 ? 0 : 1_z << (int)ceil(log2(size)), kOpen},
+        values_{size == 0 ? 0 : 1_z << (int)ceil(log2(size)), {}},
+        step_(step) {}
 
-  HashTableD<V, H> D() { return table_; }
+  HashTable(const HashTable& other)
+      : keys_(other.keys_),
+        values_(other.values_),
+        used_(other.used_),
+        step_(other.step_) {}
 
-  int Entries() const { return AtomicLoad(used_[0]); }
-
-  int Size() const { return table_.Size(); }
-
-  bool Full() const { return AtomicLoad(used_[0]) * 2 > Size(); }
-
-  float FilledFraction() const {
-    return static_cast<float>(AtomicLoad(used_[0])) / Size();
+  HashTable& operator=(const HashTable& other) {
+    if (this == &other) return *this;
+    keys_ = other.keys_;
+    values_ = other.values_;
+    used_.store(other.used_.load());
+    step_ = other.step_;
+    return *this;
   }
 
-  VecDH<V>& GetValueStore() { return values_; }
+  HashTableD<V, H> D() { return {keys_, values_, used_, step_}; }
+
+  int Entries() const { return used_.load(std::memory_order_relaxed); }
+
+  size_t Size() const { return keys_.size(); }
+
+  bool Full() const {
+    return used_.load(std::memory_order_relaxed) * 2 > Size();
+  }
+
+  float FilledFraction() const {
+    return static_cast<float>(used_.load(std::memory_order_relaxed)) / Size();
+  }
+
+  Vec<V>& GetValueStore() { return values_; }
 
   static Uint64 Open() { return kOpen; }
 
  private:
-  VecDH<Uint64> keys_;
-  VecDH<V> values_;
-  VecDH<uint32_t> used_ = VecDH<uint32_t>(1, 0);
-  HashTableD<V, H> table_;
+  Vec<Uint64> keys_;
+  Vec<V> values_;
+  std::atomic<size_t> used_ = 0;
+  uint32_t step_;
 };
 
 /** @} */

@@ -46,7 +46,7 @@
 <body>
   <p>Load a glTF/GLB model and our <a href="https://github.com/elalish/manifold">Manifold</a> library will attempt to
     merge it into a set of manifold objects. If the model is water-tight, you can download the new GLB which will have
-    our <a href="https://github.com/KhronosGroup/glTF/pull/2286">EXT_manifold</a> extension, thus preserving the
+    our <a href="https://github.com/KhronosGroup/glTF/pull/2286">EXT_mesh_manifold</a> extension, thus preserving the
     manifold data without losing any mesh properties.</p>
   <p> If the View Manifold GLB checkbox is enabled, then some meshes in the model have open edges and don't represent a
     solid object. Check this box to see only the manifold parts, which will also enable them to be downloaded. If the
@@ -55,17 +55,17 @@
   <button id="download" disabled>Download manifold GLB</button>
   <input type="checkbox" id="viewFinal" disabled>
   <label for="viewFinal">View Manifold GLB</label>
-  <model-viewer camera-controls shadow-intensity="1" alt="Loaded GLB model">
+  <model-viewer camera-controls shadow-intensity="1" tone-mapping="commerce" alt="Loaded GLB model">
     <span id="poster" slot="poster">Drop a GLB here</span>
   </model-viewer>
 </body>
-<script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/2.0.1/model-viewer.min.js"></script>
+<script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
 <script type="module">
   import { WebIO } from '@gltf-transform/core';
   import { prune } from '@gltf-transform/functions';
   import { KHRONOS_EXTENSIONS } from '@gltf-transform/extensions';
   import { SimpleDropzone } from 'simple-dropzone';
-  import { readMesh, writeMesh, setupIO } from './gltf-io.js';
+  import { readMesh, writeMesh, setupIO, disposeMesh } from './gltf-io';
   import Module from './built/manifold.js';
 
   const io = setupIO(new WebIO());
@@ -73,6 +73,8 @@
 
   const wasm = await Module();
   wasm.setup();
+
+  const { Manifold, Mesh } = wasm;
 
   const mv = document.querySelector('model-viewer');
   const inputEl = document.querySelector('#input');
@@ -145,31 +147,30 @@
     const docIn = await io.read(url);
     const nodes = docIn.getRoot().listNodes();
     for (const node of nodes) {
-      const attributes = [];
       const mesh = node.getMesh();
       if (!mesh) {
         continue;
       }
 
-      const materials = [];
-      const tmpMesh = readMesh(mesh, attributes, materials);
-      tmpMesh.runOriginalID = [];
-      const firstID = wasm.reserveIDs(materials.length);
-      for (let i = 0; i < materials.length; ++i) {
-        tmpMesh.runOriginalID.push(firstID + i);
-      }
-      const manifoldMesh = new wasm.Mesh(tmpMesh);
-      mesh.dispose();
+      const tmp = readMesh(mesh);
 
-      const matAttributes = [];
-      materials.forEach(() => matAttributes.push(attributes));
+      tmp.mesh.runOriginalID = [];
+      const id2properties = new Map();
+      const numID = tmp.runProperties.length;
+      const firstID = Manifold.reserveIDs(numID);
+      for (let i = 0; i < numID; ++i) {
+        tmp.mesh.runOriginalID.push(firstID + i);
+        id2properties.set(firstID + i, tmp.runProperties[i]);
+      }
+      const manifoldMesh = new Mesh(tmp.mesh);
+      disposeMesh(mesh);
 
       manifoldMesh.merge();
 
       try {
         // Test manifoldness - will throw if not.
-        const manifold = wasm.Manifold(manifoldMesh);
-        node.setMesh(writeMesh(docIn, manifold.getMesh(), matAttributes, materials));
+        const manifold = Manifold(manifoldMesh);
+        node.setMesh(writeMesh(docIn, manifold.getMesh(), id2properties));
         manifold.delete();
         anyManifold = true;
       } catch (e) {

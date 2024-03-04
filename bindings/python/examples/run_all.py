@@ -18,15 +18,15 @@ import pathlib
 import sys
 import importlib
 import trimesh
+import numpy as np
 from time import time
 
 if __name__ == "__main__":
     current_file = pathlib.Path(__file__)
     current_dir = current_file.parent
-    files = [f.parts[-1][:-3]
-             for f in current_dir.glob('*.py') if f != current_file]
+    files = [f.parts[-1][:-3] for f in current_dir.glob("*.py") if f != current_file]
 
-    export_models = len(sys.argv) == 2 and sys.argv[-1] == '-e'
+    export_models = len(sys.argv) == 2 and sys.argv[-1] == "-e"
 
     for f in files:
         module = importlib.import_module(f)
@@ -34,9 +34,16 @@ if __name__ == "__main__":
         model = module.run()
         mesh = model.to_mesh()
         if export_models:
+            if mesh.vert_properties.shape[1] > 3:
+                vertices = mesh.vert_properties[:, :3]
+                colors = (mesh.vert_properties[:, 3:] * 255).astype(np.uint8)
+            else:
+                vertices = mesh.vert_properties
+                colors = None
             meshOut = trimesh.Trimesh(
-                vertices=mesh.vert_pos, faces=mesh.tri_verts)
-            trimesh.exchange.export.export_mesh(meshOut, f'{f}.glb', 'glb')
-            print(f'Exported model to {f}.glb')
+                vertices=vertices, faces=mesh.tri_verts, vertex_colors=colors
+            )
+            trimesh.exchange.export.export_mesh(meshOut, f"{f}.glb", "glb")
+            print(f"Exported model to {f}.glb")
         t1 = time()
-        print(f'Took {(t1-t0)*1000:.1f}ms for {f}')
+        print(f"Took {(t1-t0)*1000:.1f}ms for {f}")

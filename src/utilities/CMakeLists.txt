@@ -14,53 +14,73 @@
 
 project(utilities)
 
-file(GLOB_RECURSE SOURCE_FILES CONFIGURE_DEPENDS *.cpp)
-add_library(${PROJECT_NAME} OBJECT ${SOURCE_FILES})
-
-message("CUDA Support: ${MANIFOLD_USE_CUDA}")
+add_library(${PROJECT_NAME} INTERFACE)
 message("Parallel Backend: ${MANIFOLD_PAR}")
 
-target_include_directories(${PROJECT_NAME} INTERFACE ${PROJECT_SOURCE_DIR}/include)
-target_include_directories(${PROJECT_NAME} INTERFACE ${THRUST_INC_DIR}/dependencies/libcudacxx/include)
+include(FetchContent)
+FetchContent_Declare(Thrust
+    GIT_REPOSITORY https://github.com/NVIDIA/thrust.git
+    GIT_TAG 2.1.0
+    GIT_SHALLOW TRUE
+    GIT_PROGRESS TRUE
+)
+find_package(Thrust QUIET)
+if(NOT Thrust_FOUND AND NOT DEFINED thrust_SOURCE_DIR)
+    message("thrust not found, downloading from source")
+    FetchContent_Populate(Thrust)
+endif()
 
-if(MANIFOLD_PAR STREQUAL "OMP")
-    find_package(OpenMP REQUIRED)
-    target_include_directories(${PROJECT_NAME} PUBLIC OpenMP::OpenMP_CXX)
-    target_compile_options(${PROJECT_NAME} PUBLIC -DMANIFOLD_PAR='O' -fopenmp)
-    target_link_options(${PROJECT_NAME} PUBLIC -fopenmp)
-elseif(MANIFOLD_PAR STREQUAL "TBB")
-    find_package(PkgConfig REQUIRED)
-    pkg_check_modules(TBB REQUIRED tbb)
-    target_include_directories(${PROJECT_NAME} PUBLIC ${TBB_INCLUDE_DIRS})
-    target_compile_options(${PROJECT_NAME} PUBLIC -DMANIFOLD_PAR='T')
-    target_link_libraries(${PROJECT_NAME} PUBLIC ${TBB_LINK_LIBRARIES})
+if (TRACY_ENABLE)
+    include(FetchContent)
+    FetchContent_Declare(tracy
+        GIT_REPOSITORY https://github.com/wolfpld/tracy.git
+        GIT_TAG v0.10
+        GIT_SHALLOW TRUE
+        GIT_PROGRESS TRUE
+    )
+    FetchContent_MakeAvailable(tracy)
+    target_link_libraries(${PROJECT_NAME} INTERFACE TracyClient)
+endif()
+
+if(MANIFOLD_PAR STREQUAL "TBB")
+    target_compile_options(${PROJECT_NAME} INTERFACE -DMANIFOLD_PAR='T')
+    if(TARGET TBB::tbb)
+        target_link_libraries(${PROJECT_NAME} INTERFACE TBB::tbb)
+    else()
+        target_include_directories(${PROJECT_NAME} INTERFACE $<BUILD_INTERFACE:${TBB_INCLUDE_DIRS}>)
+        target_link_libraries(${PROJECT_NAME} INTERFACE ${TBB_LINK_LIBRARIES})
+    endif()
 elseif(MANIFOLD_PAR STREQUAL "NONE")
     set(MANIFOLD_PAR "CPP")
 else()
     message(FATAL_ERROR "Invalid value for MANIFOLD_PAR: ${MANIFOLD_PAR}. "
-        "Should be one of \"TBB\", \"OMP\", \"NONE\"")
+        "Should be \"TBB\" or \"NONE\"")
 endif()
 
-target_include_directories(${PROJECT_NAME} PUBLIC ${THRUST_INC_DIR})
-target_link_libraries(${PROJECT_NAME} PUBLIC glm)
+target_include_directories(${PROJECT_NAME} INTERFACE
+    $<INSTALL_INTERFACE:include/${CMAKE_PROJECT_NAME}>
+    $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>)
+target_link_libraries(${PROJECT_NAME} INTERFACE glm::glm)
 
-if(MANIFOLD_USE_CUDA)
-    set_source_files_properties(${SOURCE_FILES} PROPERTIES LANGUAGE CUDA)
-    set_property(TARGET ${PROJECT_NAME} PROPERTY CUDA_ARCHITECTURES 61)
-    target_compile_options(${PROJECT_NAME}
-        PUBLIC ${MANIFOLD_FLAGS} -DMANIFOLD_USE_CUDA
-        "$<$<COMPILE_LANGUAGE:CUDA>:${MANIFOLD_NVCC_FLAGS}>"
-    )
-else()
-    target_compile_options(${PROJECT_NAME}
-        PUBLIC ${MANIFOLD_FLAGS}
-        -DTHRUST_DEVICE_SYSTEM=THRUST_DEVICE_SYSTEM_${MANIFOLD_PAR}
-    )
+if(NOT DEFINED thrust_SOURCE_DIR)
+    set(thrust_SOURCE_DIR ${_THRUST_INCLUDE_DIR})
 endif()
+
+target_include_directories(${PROJECT_NAME} INTERFACE
+    $<BUILD_INTERFACE:${thrust_SOURCE_DIR}>
+    $<BUILD_INTERFACE:${thrust_SOURCE_DIR}/dependencies/libcudacxx/include>
+)
+
+target_compile_options(${PROJECT_NAME} INTERFACE
+    -DTHRUST_DEVICE_SYSTEM=THRUST_DEVICE_SYSTEM_${MANIFOLD_PAR}
+)
 
 if(MANIFOLD_DEBUG)
     target_compile_options(${PROJECT_NAME}
-        PUBLIC -DMANIFOLD_DEBUG)
+        INTERFACE -DMANIFOLD_DEBUG)
 endif()
 
-target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_17)
+target_compile_features(${PROJECT_NAME} INTERFACE cxx_std_17)
+
+install(TARGETS ${PROJECT_NAME} EXPORT manifoldTargets)
+install(FILES include/public.h include/vec_view.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${CMAKE_PROJECT_NAME})

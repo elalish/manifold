@@ -11,11 +11,20 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+#include <algorithm>
 
 #include "manifold.h"
 #include "polygon.h"
 #include "sdf.h"
 #include "test.h"
+
+// we need to call some tracy API to establish the connection
+#if __has_include(<tracy/Tracy.hpp>)
+#include <tracy/Tracy.hpp>
+#else
+#define FrameMarkStart(x)
+#define FrameMarkEnd(x)
+#endif
 
 using namespace manifold;
 
@@ -33,6 +42,9 @@ void print_usage() {
 
 int main(int argc, char** argv) {
   ::testing::InitGoogleTest(&argc, argv);
+
+  const char* name = "test setup";
+  FrameMarkStart(name);
 
   for (int i = 1; i < argc; i++) {
     if (argv[i][0] != '-') {
@@ -67,6 +79,7 @@ int main(int argc, char** argv) {
   manifold::PolygonParams().intermediateChecks = true;
   manifold::PolygonParams().processOverlaps = false;
 
+  FrameMarkEnd(name);
   return RUN_ALL_TESTS();
 }
 
@@ -114,7 +127,7 @@ Mesh Csaszar() {
 }
 
 struct GyroidSDF {
-  __host__ __device__ float operator()(glm::vec3 p) const {
+  float operator()(glm::vec3 p) const {
     const glm::vec3 min = p;
     const glm::vec3 max = glm::vec3(glm::two_pi<float>()) - p;
     const float min3 = glm::min(min.x, glm::min(min.y, min.z));
@@ -249,6 +262,31 @@ MeshGL WithNormals(const Manifold& in) {
   return out;
 }
 
+MeshGL CubeUV() {
+  MeshGL mgl;
+  mgl.numProp = 5;
+  mgl.vertProperties = {0.5,  -0.5, 0.5,  0.5,  0.66,  //
+                        -0.5, -0.5, 0.5,  0.25, 0.66,  //
+                        0.5,  0.5,  0.5,  0.5,  0.33,  //
+                        -0.5, 0.5,  0.5,  0.25, 0.33,  //
+                        -0.5, -0.5, -0.5, 1.0,  0.66,  //
+                        0.5,  -0.5, -0.5, 0.75, 0.66,  //
+                        -0.5, 0.5,  -0.5, 1.0,  0.33,  //
+                        0.5,  0.5,  -0.5, 0.75, 0.33,  //
+                        -0.5, -0.5, -0.5, 0.0,  0.66,  //
+                        -0.5, 0.5,  -0.5, 0.0,  0.33,  //
+                        -0.5, 0.5,  -0.5, 0.25, 0.0,   //
+                        0.5,  0.5,  -0.5, 0.5,  0.0,   //
+                        -0.5, -0.5, -0.5, 0.25, 1.0,   //
+                        0.5,  -0.5, -0.5, 0.5,  1.0};
+  mgl.triVerts = {3, 1, 0, 3, 0, 2, 7,  5,  4, 7,  4, 6, 2, 0, 5,  2, 5,  7,
+                  9, 8, 1, 9, 1, 3, 11, 10, 3, 11, 3, 2, 0, 1, 12, 0, 12, 13};
+  mgl.mergeFromVert = {8, 12, 13, 9, 10, 11};
+  mgl.mergeToVert = {4, 4, 5, 6, 6, 7};
+  mgl.runOriginalID.push_back(Manifold::ReserveIDs(1));
+  return mgl;
+}
+
 float GetMaxProperty(const MeshGL& mesh, int channel) {
   float max = -std::numeric_limits<float>::infinity();
   const int numVert = mesh.NumVert();
@@ -335,7 +373,7 @@ void RelatedGL(const Manifold& out, const std::vector<MeshGL>& originals,
         glm::vec3 edges[3];
         for (int k : {0, 1, 2}) edges[k] = inTriPos[k] - outTriPos[j];
         const float volume = glm::dot(edges[0], glm::cross(edges[1], edges[2]));
-        ASSERT_LE(volume, area * 100 * out.Precision());
+        ASSERT_LE(volume, area * out.Precision());
 
         if (checkNormals) {
           glm::vec3 normal;
@@ -344,7 +382,7 @@ void RelatedGL(const Manifold& out, const std::vector<MeshGL>& originals,
           ASSERT_NEAR(glm::length(normal), 1, 0.0001);
           ASSERT_GT(glm::dot(normal, outNormal), 0);
         } else {
-          for (int p = 3; p < output.numProp; ++p) {
+          for (int p = 3; p < inMesh.numProp; ++p) {
             const float propOut =
                 output.vertProperties[vert * output.numProp + p];
 
@@ -358,7 +396,7 @@ void RelatedGL(const Manifold& out, const std::vector<MeshGL>& originals,
             const float volumeP =
                 glm::dot(edgesP[0], glm::cross(edgesP[1], edgesP[2]));
 
-            ASSERT_LE(volumeP, area * 100 * out.Precision());
+            ASSERT_LE(volumeP, area * out.Precision());
           }
         }
       }

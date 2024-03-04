@@ -1,3 +1,17 @@
+// Copyright 2023 The Manifold Authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 #include <conv.h>
 #include <cross_section.h>
 #include <manifold.h>
@@ -24,13 +38,23 @@ namespace {
 ManifoldMeshGL *level_set(void *mem, float (*sdf)(float, float, float),
                           ManifoldBox *bounds, float edge_length, float level,
                           bool seq) {
-  // typing with std::function rather than auto compiles when CUDA is on,
-  // passing it into GPU (and crashing) is avoided dynamically in `sdf.h`
   std::function<float(glm::vec3)> fun = [sdf](glm::vec3 v) {
     return (sdf(v.x, v.y, v.z));
   };
-  auto pol = seq ? std::make_optional(ExecutionPolicy::Seq) : std::nullopt;
-  auto mesh = LevelSet(fun, *from_c(bounds), edge_length, level, pol);
+  auto mesh = LevelSet(fun, *from_c(bounds), edge_length, level, !seq);
+  return to_c(new (mem) MeshGL(mesh));
+}
+ManifoldMeshGL *level_set_context(
+    void *mem, float (*sdf_context)(float, float, float, void *),
+    ManifoldBox *bounds, float edge_length, float level, bool seq, void *ctx) {
+  // Bind function with context argument to one without
+  using namespace std::placeholders;
+  std::function<float(float, float, float)> sdf =
+      std::bind(sdf_context, _1, _2, _3, ctx);
+  std::function<float(glm::vec3)> fun = [sdf](glm::vec3 v) {
+    return (sdf(v.x, v.y, v.z));
+  };
+  auto mesh = LevelSet(fun, *from_c(bounds), edge_length, level, !seq);
   return to_c(new (mem) MeshGL(mesh));
 }
 }  // namespace
@@ -176,6 +200,37 @@ ManifoldManifold *manifold_trim_by_plane(void *mem, ManifoldManifold *m,
   return to_c(new (mem) Manifold(trimmed));
 }
 
+ManifoldCrossSection *manifold_slice(void *mem, ManifoldManifold *m,
+                                     float height) {
+  auto poly = from_c(m)->Slice(height);
+  return to_c(new (mem) CrossSection(poly));
+}
+
+ManifoldCrossSection *manifold_project(void *mem, ManifoldManifold *m) {
+  auto poly = from_c(m)->Project();
+  return to_c(new (mem) CrossSection(poly));
+}
+
+ManifoldManifold *manifold_hull(void *mem, ManifoldManifold *m) {
+  auto hulled = from_c(m)->Hull();
+  return to_c(new (mem) Manifold(hulled));
+}
+
+ManifoldManifold *manifold_batch_hull(void *mem, ManifoldManifoldVec *ms) {
+  auto hulled = Manifold::Hull(*from_c(ms));
+  return to_c(new (mem) Manifold(hulled));
+}
+
+ManifoldManifold *manifold_hull_pts(void *mem, ManifoldVec3 *ps,
+                                    size_t length) {
+  std::vector<glm::vec3> vec(length);
+  for (int i = 0; i < length; ++i) {
+    vec[i] = {ps[i].x, ps[i].y, ps[i].z};
+  }
+  auto hulled = Manifold::Hull(vec);
+  return to_c(new (mem) Manifold(hulled));
+}
+
 ManifoldManifold *manifold_translate(void *mem, ManifoldManifold *m, float x,
                                      float y, float z) {
   auto v = glm::vec3(x, y, z);
@@ -233,8 +288,26 @@ ManifoldMeshGL *manifold_level_set_seq(void *mem,
   return level_set(mem, sdf, bounds, edge_length, level, true);
 }
 
+ManifoldMeshGL *manifold_level_set_context(
+    void *mem, float (*sdf)(float, float, float, void *), ManifoldBox *bounds,
+    float edge_length, float level, void *ctx) {
+  return level_set_context(mem, sdf, bounds, edge_length, level, false, ctx);
+}
+
+ManifoldMeshGL *manifold_level_set_seq_context(
+    void *mem, float (*sdf)(float, float, float, void *), ManifoldBox *bounds,
+    float edge_length, float level, void *ctx) {
+  return level_set_context(mem, sdf, bounds, edge_length, level, true, ctx);
+}
+
 ManifoldManifold *manifold_refine(void *mem, ManifoldManifold *m, int refine) {
   auto refined = from_c(m)->Refine(refine);
+  return to_c(new (mem) Manifold(refined));
+}
+
+ManifoldManifold *manifold_refine_to_length(void *mem, ManifoldManifold *m,
+                                            float length) {
+  auto refined = from_c(m)->RefineToLength(length);
   return to_c(new (mem) Manifold(refined));
 }
 

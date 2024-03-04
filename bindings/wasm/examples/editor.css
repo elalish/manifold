@@ -65,7 +65,7 @@ button:hover {
   filter: brightness(0.9);
 }
 
-input {
+.name {
   border: none;
   height: 36px;
   background-color: transparent;
@@ -77,12 +77,12 @@ input {
   -webkit-font-smoothing: antialiased;
 }
 
-input:focus {
+.name:focus {
   outline: none;
 }
 
 p {
-  margin: 1em;
+  margin: 18px;
   text-align: left;
 }
 
@@ -130,24 +130,24 @@ model-viewer {
 
 .header .margin {
   font-size: 16px;
-  margin: 1em;
-}
-
-#file {
-  width: 250px;
+  margin: 18px 8px;
 }
 
 .dropdown {
   display: none;
   position: absolute;
   z-index: 1;
-  width: 250px;
+  width: 100%;
   max-height: 80vh;
   overflow-y: auto;
 }
 
 .show {
   display: block;
+}
+
+.hide {
+  display: none;
 }
 
 .uparrow {
@@ -168,15 +168,55 @@ model-viewer {
   position: relative;
 }
 
+.top-edit {
+  display: inline-block;
+  vertical-align: middle;
+  height: 36px;
+  top: 18px;
+  border: none;
+  border-radius: 18px;
+}
+
+.top-icon {
+  display: inline-block;
+  vertical-align: middle;
+  width: 36px;
+  background-size: 24px;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-color: transparent;
+}
+
+.squish {
+  margin-right: -12px;
+}
+
 .icon {
   display: inline-block;
   background-color: transparent;
   position: absolute;
   width: 36px;
   top: 0px;
+  right: 0px;
   background-size: 20px;
   background-repeat: no-repeat;
   background-position: center;
+}
+
+.undo {
+  background-image: url(/icons/undo.png);
+}
+
+.redo {
+  background-image: url(/icons/redo.png);
+}
+
+.star {
+  background-image: url(/icons/star.png);
+}
+
+.share {
+  background-image: url(/icons/share.png);
 }
 
 .cancel {
@@ -193,10 +233,21 @@ model-viewer {
 
 .trash {
   background-image: url(/icons/trash.png);
-  right: 0px;
+}
+
+.play {
+  background-image: url(/icons/play.png);
+}
+
+.pause {
+  background-image: url(/icons/pause.png);
 }
 
 .icon:hover {
+  background-color: rgba(0, 0, 0, 0.2);
+}
+
+.top-icon:hover {
   background-color: rgba(0, 0, 0, 0.2);
 }
 
@@ -212,7 +263,61 @@ model-viewer {
   background-color: rgb(255, 177, 177);
 }
 
-@media only screen and (max-width: 600px) {
+#file-margin {
+  position: relative;
+  width: 250px;
+}
+
+#save {
+  width: 125px;
+}
+
+#animation {
+  display: none;
+  align-items: center;
+  position: absolute;
+  width: 100%;
+  bottom: 0px;
+  margin: 2px;
+}
+
+#play {
+  position: relative;
+  background-color: #ccc;
+  margin: 8px;
+}
+
+.slider {
+  position: relative;
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 10px;
+  border-radius: 5px;
+  margin-right: 16px;
+  background: #ffffff55;
+  outline: none;
+}
+
+.slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 25px;
+  height: 25px;
+  border-radius: 50%;
+  background: #ccc;
+  cursor: pointer;
+}
+
+.slider::-moz-range-thumb {
+  width: 25px;
+  height: 25px;
+  border-radius: 50%;
+  background: #ccc;
+  cursor: pointer;
+}
+
+@media only screen and (max-width: 820px) {
   .container {
     flex-direction: column;
     width: 100%;
@@ -220,5 +325,31 @@ model-viewer {
 
   .col {
     width: 100%;
+    height: 50%;
+  }
+
+  #file-margin {
+    width: calc(100% - 32px);
+  }
+
+  p {
+    margin: .2em 1em;
+    text-align: center;
+  }
+
+  .header .margin {
+    margin: 0.2em 16px;
+  }
+
+  #button-container {
+    flex-direction: row;
+    margin-left: 8px;
+    margin-right: 8px;
+    width: calc(100% - 16px);
+  }
+
+  #button-container .margin {
+    width: calc(50% - 16px);
+    margin: 8px;
   }
 }

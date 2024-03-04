@@ -1,0 +1,34 @@
+name: publish_npm
+
+on: 
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  publish_npm:
+    runs-on: ubuntu-22.04
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Setup Node
+      uses: actions/setup-node@v2
+      with:
+        node-version: '20.x'
+        registry-url: 'https://registry.npmjs.org'
+
+    - name: Download built examples
+      uses: dawidd6/action-download-artifact@v2
+      with:
+        workflow: manifold.yml
+        workflow_conclusion: completed
+        name: wasm
+        path: ./bindings/wasm/
+
+    - name: Publish to npm
+      run: |
+        cd ./bindings/wasm/
+        npm publish
+      env:
+        NODE_AUTH_TOKEN: ${{secrets.NPM_TOKEN}}

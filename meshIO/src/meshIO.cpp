@@ -234,6 +234,7 @@ void ExportMesh(const std::string& filename, const MeshGL& mesh,
                    ? 1
                    : mesh.vertProperties[i * mesh.numProp +
                                          options.mat.colorChannels[j]];
+      c = glm::saturate(c);
       mesh_out->mColors[0][i] = aiColor4D(c.r, c.g, c.b, c.a);
     }
   }

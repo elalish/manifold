@@ -15,10 +15,44 @@
 project(python)
 
 add_subdirectory(third_party)
-pybind11_add_module(pymanifold pymanifold.cpp)
-target_link_libraries(pymanifold PRIVATE manifold)
-target_compile_options(pymanifold PRIVATE ${MANIFOLD_FLAGS})
-target_compile_features(pymanifold PUBLIC cxx_std_17)
-target_include_directories(pymanifold
-    PRIVATE ${PYBIND11_DIR}/include
+nanobind_add_module(
+  manifold3d
+  NB_STATIC STABLE_ABI LTO
+  autogen_docstrings.inl
+  manifold3d.cpp)
+target_link_libraries(manifold3d PRIVATE manifold sdf polygon)
+target_compile_options(manifold3d PRIVATE ${MANIFOLD_FLAGS} -DMODULE_NAME=manifold3d)
+target_compile_features(manifold3d PUBLIC cxx_std_17)
+set_target_properties(manifold3d PROPERTIES OUTPUT_NAME "manifold3d")
+
+message(Python_EXECUTABLE = ${Python_EXECUTABLE})
+# ideally we should generate a dependency file from python...
+set(DOCSTRING_DEPS
+  ${CMAKE_CURRENT_SOURCE_DIR}/../../src/manifold/src/manifold.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/../../src/manifold/src/constructors.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/../../src/manifold/src/sort.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/../../src/cross_section/src/cross_section.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/../../src/polygon/src/polygon.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/../../src/utilities/include/public.h
+  )
+add_custom_command(
+  OUTPUT autogen_docstrings.inl
+  DEPENDS ${DOCSTRING_DEPS}
+  COMMAND ${Python_EXECUTABLE} ARGS ${CMAKE_CURRENT_SOURCE_DIR}/gen_docs.py
+  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
 )
+target_include_directories(manifold3d PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
+
+if(SKBUILD)
+install(
+  TARGETS manifold3d
+  LIBRARY DESTINATION ${SKBUILD_PLATLIB_DIR}
+  COMPONENT bindings
+)
+else()
+install(
+  TARGETS manifold3d
+  LIBRARY DESTINATION ${Python_SITEARCH}
+  COMPONENT bindings
+)
+endif()
