@@ -139,6 +139,7 @@ jobs:
         name: wasm
         path: bindings/wasm/examples/dist/
         retention-days: 90
+        overwrite: true
 
   build_windows:
     timeout-minutes: 30
