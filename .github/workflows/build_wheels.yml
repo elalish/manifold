@@ -23,7 +23,7 @@ jobs:
         uses: pypa/cibuildwheel@v2.16.5
       - uses: actions/upload-artifact@v4
         with:
-          name: python-${{ matrix.runs-on }}
+          name: python-${{ matrix.os }}
           path: ./wheelhouse/*.whl
 
   make_sdist:
