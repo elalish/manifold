@@ -20,7 +20,7 @@ jobs:
         with:
           submodules: recursive
       - name: Build wheels
-        uses: pypa/cibuildwheel@v2.16.5
+        uses: pypa/cibuildwheel@v2.16
       - uses: actions/upload-artifact@v4
         with:
           name: python-${{ matrix.os }}
@@ -44,7 +44,6 @@ jobs:
     name: Upload release to PyPI
     needs: [build_wheels, make_sdist]
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/master'
     environment:
       name: pypi
       url: https://pypi.org/p/manifold3d
