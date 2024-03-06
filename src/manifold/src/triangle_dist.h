@@ -42,5 +42,7 @@ namespace manifold {
  * @param t2 Second triangle.
  */
 float TriangleDistance(const std::array<glm::vec3, 3>& t1,
-                       const std::array<glm::vec3, 3>& t2);
+                       const std::array<glm::vec3, 3>& t2) {
+  return 0.0f;
+}
 }  // namespace manifold
