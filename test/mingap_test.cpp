@@ -82,7 +82,6 @@ TEST(MinGap, SphereSphereOutOfBounds) {
   EXPECT_FLOAT_EQ(distance, 0.1f);
 }
 
-// failing
 TEST(MinGap, ClosestPointOnEdge) {
   auto a = Manifold::Cube();
 
@@ -94,7 +93,6 @@ TEST(MinGap, ClosestPointOnEdge) {
   EXPECT_FLOAT_EQ(distance, 1);
 }
 
-// failing
 TEST(MinGap, ClosestPointOnTriangleFace) {
   auto a = Manifold::Cube();
   a.Translate({0.0f, -0.25f, 0.0f});

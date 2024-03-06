@@ -21,6 +21,7 @@
 #include "csg_tree.h"
 #include "impl.h"
 #include "par.h"
+#include "triangle_dist.h"
 
 namespace {
 using namespace manifold;
@@ -897,40 +898,9 @@ float Manifold::MinGap(const Manifold& other, float searchLength) const {
 
   float minDistance = searchLength;
 
-  // Helper functions
-  auto closestPointOnLineSegment = [](const glm::vec3& v, const glm::vec3& w,
-                                      const glm::vec3& p) -> glm::vec3 {
-    const float t = glm::dot(p - v, w - v) / glm::length(w - v);
-
-    if (t < 0.0f) return v;
-    if (t > 1.0f) return w;
-
-    return v + t * (w - v);
-  };
-
-  // Assumes orientation, not sure if correct
-  auto triangleDistance = [&closestPointOnLineSegment](
-                              const glm::vec3& A, const glm::vec3& B,
-                              const glm::vec3& C, const glm::vec3& D,
-                              const glm::vec3& E, const glm::vec3& F) -> float {
-    glm::vec3 closestAB = closestPointOnLineSegment(A, B, D);
-    glm::vec3 closestBC = closestPointOnLineSegment(B, C, D);
-    glm::vec3 closestCA = closestPointOnLineSegment(C, A, D);
-
-    glm::vec3 closestDE = closestPointOnLineSegment(D, E, A);
-    glm::vec3 closestEF = closestPointOnLineSegment(E, F, A);
-    glm::vec3 closestFD = closestPointOnLineSegment(F, D, A);
-
-    float distAB_DE = glm::length(closestAB - D);
-    float distBC_EF = glm::length(closestBC - E);
-    float distCA_FD = glm::length(closestCA - F);
-
-    return std::min({distAB_DE, distBC_EF, distCA_FD});
-  };
-
   // Iterate over triangles from the first manifold
   for (const auto& firstTriVert : firstMesh.triVerts) {
-    // Create AABB around the triangles, expanded by 2 * searchLength
+    // Create AABB around the first triangle, expanded by 2 * searchLength
     glm::vec3 minBoundsFirst =
         glm::min(glm::min(firstMesh.vertPos[firstTriVert.x],
                           firstMesh.vertPos[firstTriVert.y]),
@@ -945,7 +915,7 @@ float Manifold::MinGap(const Manifold& other, float searchLength) const {
 
     // Iterate over triangles from the second manifold
     for (const auto& secondTriVert : secondMesh.triVerts) {
-      // Create AABB around the second manifold's triangles, expanded by 2 *
+      // Create AABB around the second triangle, expanded by 2 *
       // searchLength
       glm::vec3 minBoundsSecond =
           glm::min(glm::min(secondMesh.vertPos[secondTriVert.x],
@@ -967,12 +937,13 @@ float Manifold::MinGap(const Manifold& other, float searchLength) const {
           minBoundsFirst.z <= maxBoundsSecond.z &&
           maxBoundsFirst.z >= minBoundsSecond.z) {
         // AABBs overlap, calculate triangle-to-triangle distance
-        float distance = triangleDistance(firstMesh.vertPos[firstTriVert.x],
-                                          firstMesh.vertPos[firstTriVert.y],
-                                          firstMesh.vertPos[firstTriVert.z],
-                                          secondMesh.vertPos[secondTriVert.x],
-                                          secondMesh.vertPos[secondTriVert.y],
-                                          secondMesh.vertPos[secondTriVert.z]);
+        float distance =
+            TriangleDistance({firstMesh.vertPos[firstTriVert.x],
+                              firstMesh.vertPos[firstTriVert.y],
+                              firstMesh.vertPos[firstTriVert.z]},
+                             {secondMesh.vertPos[secondTriVert.x],
+                              secondMesh.vertPos[secondTriVert.y],
+                              secondMesh.vertPos[secondTriVert.z]});
 
         minDistance = std::min(minDistance, distance);
       }
