@@ -501,21 +501,27 @@ class Partition {
 
 namespace manifold {
 
-/**
- * Instead of calculating the internal shared normals like CalculateNormals
- * does, this method fills in vertex properties, unshared across edges that are
- * bent more than minSharpAngle.
- */
-void Manifold::Impl::SetNormals(glm::ivec3 normalIdx, float minSharpAngle) {
-  if (IsEmpty()) return;
-  if (glm::any(glm::lessThan(normalIdx, glm::ivec3(0)))) return;
+// sharpenedEdges are referenced to the input Mesh, but the triangles have
+// been sorted in creating the Manifold, so the indices are converted using
+// meshRelation_.
+std::vector<Smoothness> Manifold::Impl::UpdateSharpenedEdges(
+    const std::vector<Smoothness>& sharpenedEdges) const {
+  std::vector<int> oldHalfedge2New(halfedge_.size());
+  for (int tri = 0; tri < NumTri(); ++tri) {
+    int oldTri = meshRelation_.triRef[tri].tri;
+    for (int i : {0, 1, 2}) oldHalfedge2New[3 * oldTri + i] = 3 * tri + i;
+  }
+  std::vector<Smoothness> newSharp = sharpenedEdges;
+  for (Smoothness& edge : newSharp) {
+    edge.halfedge = oldHalfedge2New[edge.halfedge];
+  }
+  return newSharp;
+}
 
-  Vec<TriRef> triRefOriginal = meshRelation_.triRef;
-  const int oldNumProp = NumProp();
+// Find faces containing at least 3 triangles - these will not have
+// interpolated normals - all their vert normals must match their face normal.
+std::vector<bool> Manifold::Impl::FlatFaces() const {
   const int numTri = NumTri();
-
-  // Find faces containing at least 3 triangles - these will not have
-  // interpolated normals - all their vert normals must match their face normal.
   std::vector<bool> triIsFlatFace(numTri, false);
   for (int tri = 0; tri < numTri; ++tri) {
     const TriRef& ref = meshRelation_.triRef[tri];
@@ -523,7 +529,7 @@ void Manifold::Impl::SetNormals(glm::ivec3 normalIdx, float minSharpAngle) {
     glm::ivec3 faceTris = {-1, -1, -1};
     for (const int j : {0, 1, 2}) {
       const int neighborTri =
-          halfedge_[halfedge_[3 * tri * j].pairedHalfedge].face;
+          halfedge_[halfedge_[3 * tri + j].pairedHalfedge].face;
       const TriRef& jRef = meshRelation_.triRef[neighborTri];
       if (jRef.meshID == ref.meshID && jRef.tri == ref.tri) {
         ++faceNeighbors;
@@ -539,6 +545,41 @@ void Manifold::Impl::SetNormals(glm::ivec3 normalIdx, float minSharpAngle) {
       }
     }
   }
+  return triIsFlatFace;
+}
+
+// Returns a vector of length numVert that has a tri that is part of a
+// neighboring flat face if there is only one flat face. If there are none it
+// gets -1, and if there are more than one it gets -2.
+std::vector<int> Manifold::Impl::VertFlatFace(
+    const std::vector<bool>& flatFaces) const {
+  std::vector<int> vertFlatFace(NumVert(), -1);
+  for (int tri = 0; tri < NumTri(); ++tri) {
+    if (flatFaces[tri]) {
+      for (const int j : {0, 1, 2}) {
+        const int vert = halfedge_[3 * tri + j].startVert;
+        if (vertFlatFace[vert] == tri) continue;
+        vertFlatFace[vert] = vertFlatFace[vert] == -1 ? tri : -2;
+      }
+    }
+  }
+  return vertFlatFace;
+}
+
+/**
+ * Instead of calculating the internal shared normals like CalculateNormals
+ * does, this method fills in vertex properties, unshared across edges that
+ * are bent more than minSharpAngle.
+ */
+void Manifold::Impl::SetNormals(glm::ivec3 normalIdx, float minSharpAngle) {
+  if (IsEmpty()) return;
+  if (glm::any(glm::lessThan(normalIdx, glm::ivec3(0)))) return;
+
+  Vec<TriRef> triRefOriginal = meshRelation_.triRef;
+  const int oldNumProp = NumProp();
+  const int numTri = NumTri();
+
+  std::vector<bool> triIsFlatFace = FlatFaces();
 
   const int numProp = glm::max(
       oldNumProp,
@@ -659,29 +700,26 @@ void Manifold::Impl::CreateTangents(
   const int numHalfedge = halfedge_.size();
   halfedgeTangent_.resize(numHalfedge);
 
+  std::vector<bool> triIsFlatFace = FlatFaces();
+  std::vector<int> vertFlatFace = VertFlatFace(triIsFlatFace);
+  Vec<glm::vec3> vertNormal = vertNormal_;
+  for (int v = 0; v < NumVert(); ++v) {
+    if (vertFlatFace[v] >= 0) {
+      vertNormal[v] = faceNormal_[vertFlatFace[v]];
+    }
+  }
+
   for_each_n(autoPolicy(numHalfedge),
              zip(halfedgeTangent_.begin(), halfedge_.cbegin()), numHalfedge,
-             SmoothBezier({vertPos_, faceNormal_, vertNormal_, halfedge_}));
+             SmoothBezier({vertPos_, faceNormal_, vertNormal, halfedge_}));
 
   if (sharpenedEdges.empty()) return;
-
-  const Vec<TriRef>& triRef = meshRelation_.triRef;
-
-  // sharpenedEdges are referenced to the input Mesh, but the triangles have
-  // been sorted in creating the Manifold, so the indices are converted using
-  // meshRelation_.
-  std::vector<int> oldHalfedge2New(halfedge_.size());
-  for (int tri = 0; tri < NumTri(); ++tri) {
-    int oldTri = triRef[tri].tri;
-    for (int i : {0, 1, 2}) oldHalfedge2New[3 * oldTri + i] = 3 * tri + i;
-  }
 
   using Pair = std::pair<Smoothness, Smoothness>;
   // Fill in missing pairs with default smoothness = 1.
   std::map<int, Pair> edges;
   for (Smoothness edge : sharpenedEdges) {
     if (edge.smoothness == 1) continue;
-    edge.halfedge = oldHalfedge2New[edge.halfedge];
     int pair = halfedge_[edge.halfedge].pairedHalfedge;
     if (edges.find(pair) == edges.end()) {
       edges[edge.halfedge] = {edge, {pair, 1}};
@@ -755,8 +793,8 @@ void Manifold::Impl::CreateTangents(
 /**
  * Split each edge into n pieces as defined by calling the edgeDivisions
  * function, and sub-triangulate each triangle accordingly. This function
- * doesn't run Finish(), as that is expensive and it'll need to be run after the
- * new vertices have moved, which is a likely scenario after refinement
+ * doesn't run Finish(), as that is expensive and it'll need to be run after
+ * the new vertices have moved, which is a likely scenario after refinement
  * (smoothing).
  */
 Vec<Barycentric> Manifold::Impl::Subdivide(
