@@ -246,6 +246,7 @@ class Manifold {
   Manifold CalculateCurvature(int gaussianIdx, int meanIdx) const;
   Manifold CalculateNormals(glm::ivec3 normalIdx,
                             float minSharpAngle = 180) const;
+  Manifold Smooth(float minSharpAngle = 60, float minSmoothness = 0) const;
   Manifold Refine(int) const;
   Manifold RefineToLength(float) const;
   // Manifold RefineToPrecision(float);

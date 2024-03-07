@@ -506,7 +506,7 @@ namespace manifold {
 // meshRelation_.
 std::vector<Smoothness> Manifold::Impl::UpdateSharpenedEdges(
     const std::vector<Smoothness>& sharpenedEdges) const {
-  std::vector<int> oldHalfedge2New(halfedge_.size());
+  Vec<int> oldHalfedge2New(halfedge_.size());
   for (int tri = 0; tri < NumTri(); ++tri) {
     int oldTri = meshRelation_.triRef[tri].tri;
     for (int i : {0, 1, 2}) oldHalfedge2New[3 * oldTri + i] = 3 * tri + i;
@@ -520,9 +520,9 @@ std::vector<Smoothness> Manifold::Impl::UpdateSharpenedEdges(
 
 // Find faces containing at least 3 triangles - these will not have
 // interpolated normals - all their vert normals must match their face normal.
-std::vector<bool> Manifold::Impl::FlatFaces() const {
+Vec<bool> Manifold::Impl::FlatFaces() const {
   const int numTri = NumTri();
-  std::vector<bool> triIsFlatFace(numTri, false);
+  Vec<bool> triIsFlatFace(numTri, false);
   for (int tri = 0; tri < numTri; ++tri) {
     const TriRef& ref = meshRelation_.triRef[tri];
     int faceNeighbors = 0;
@@ -551,9 +551,8 @@ std::vector<bool> Manifold::Impl::FlatFaces() const {
 // Returns a vector of length numVert that has a tri that is part of a
 // neighboring flat face if there is only one flat face. If there are none it
 // gets -1, and if there are more than one it gets -2.
-std::vector<int> Manifold::Impl::VertFlatFace(
-    const std::vector<bool>& flatFaces) const {
-  std::vector<int> vertFlatFace(NumVert(), -1);
+Vec<int> Manifold::Impl::VertFlatFace(const Vec<bool>& flatFaces) const {
+  Vec<int> vertFlatFace(NumVert(), -1);
   for (int tri = 0; tri < NumTri(); ++tri) {
     if (flatFaces[tri]) {
       for (const int j : {0, 1, 2}) {
@@ -564,6 +563,22 @@ std::vector<int> Manifold::Impl::VertFlatFace(
     }
   }
   return vertFlatFace;
+}
+
+std::vector<Smoothness> Manifold::Impl::SharpenEdges(
+    float minSharpAngle, float minSmoothness) const {
+  std::vector<Smoothness> sharpenedEdges;
+  for (int e = 0; e < halfedge_.size(); ++e) {
+    if (!halfedge_[e].IsForward()) continue;
+    const int pair = halfedge_[e].pairedHalfedge;
+    const float dihedral = glm::degrees(
+        glm::acos(glm::dot(faceNormal_[e / 3], faceNormal_[pair / 3])));
+    if (dihedral > minSharpAngle) {
+      sharpenedEdges.push_back({e, minSmoothness});
+      sharpenedEdges.push_back({pair, minSmoothness});
+    }
+  }
+  return sharpenedEdges;
 }
 
 /**
@@ -579,7 +594,7 @@ void Manifold::Impl::SetNormals(glm::ivec3 normalIdx, float minSharpAngle) {
   const int oldNumProp = NumProp();
   const int numTri = NumTri();
 
-  std::vector<bool> triIsFlatFace = FlatFaces();
+  Vec<bool> triIsFlatFace = FlatFaces();
 
   const int numProp = glm::max(
       oldNumProp,
@@ -699,8 +714,8 @@ void Manifold::Impl::CreateTangents(std::vector<Smoothness> sharpenedEdges) {
   const int numHalfedge = halfedge_.size();
   halfedgeTangent_.resize(numHalfedge);
 
-  std::vector<bool> triIsFlatFace = FlatFaces();
-  std::vector<int> vertFlatFace = VertFlatFace(triIsFlatFace);
+  Vec<bool> triIsFlatFace = FlatFaces();
+  Vec<int> vertFlatFace = VertFlatFace(triIsFlatFace);
   Vec<glm::vec3> vertNormal = vertNormal_;
   for (int v = 0; v < NumVert(); ++v) {
     if (vertFlatFace[v] >= 0) {
@@ -1042,6 +1057,7 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
 }
 
 void Manifold::Impl::Refine(std::function<int(glm::vec3)> edgeDivisions) {
+  if (IsEmpty()) return;
   Manifold::Impl old = *this;
   Vec<Barycentric> vertBary = Subdivide(edgeDivisions);
   if (vertBary.size() == 0) return;

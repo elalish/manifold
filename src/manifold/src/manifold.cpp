@@ -677,6 +677,32 @@ Manifold Manifold::CalculateNormals(glm::ivec3 normalIdx,
 }
 
 /**
+ * Smooths the Manifold by filling in the halfedgeTangent vectors. The geometry
+ * will remain unchanged until Refine or RefineToLength is called to interpolate
+ * the surface.
+ *
+ * @param minSharpAngle degrees, default 60. Any edges with angles greater than
+ * this value will remain sharp. The rest will be smoothed to G1 continuity,
+ * with the caveat that flat faces of three or more triangles will always remain
+ * flat. With a value of zero, the model is faceted, but in this case there is
+ * no point of smoothing.
+ *
+ * @param minSmoothness range: 0 - 1, default 0. The smoothness applied to sharp
+ * angles. The default gives a hard edge, while values > 0 will give a small
+ * fillet on these sharp edges. A value of 1 is equivalent to a minSharpAngle of
+ * 180 - all edges will be smooth.
+ */
+Manifold Manifold::Smooth(float minSharpAngle, float minSmoothness) const {
+  auto pImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
+  if (!IsEmpty()) {
+    std::vector<Smoothness> sharpenedEdges =
+        pImpl->SharpenEdges(minSharpAngle, minSmoothness);
+    pImpl->CreateTangents(pImpl->UpdateSharpenedEdges(sharpenedEdges));
+  }
+  return Manifold(std::make_shared<CsgLeafNode>(pImpl));
+}
+
+/**
  * Increase the density of the mesh by splitting every edge into n pieces. For
  * instance, with n = 2, each triangle will be split into 4 triangles. These
  * will all be coplanar (and will not be immediately collapsed) unless the

@@ -343,6 +343,19 @@ TEST(Manifold, Smooth) {
 #endif
 }
 
+TEST(Manifold, SmoothFlat) {
+  Manifold cone = Manifold::Cylinder(10, 10, 0, 6);
+  cone = cone.TrimByPlane({0, 0, -1}, -5).Smooth();
+  Manifold smooth = cone.RefineToLength(0.1);
+  auto prop = smooth.GetProperties();
+  EXPECT_NEAR(prop.volume, 17.38, 0.1);
+  EXPECT_NEAR(prop.surfaceArea, 33.38, 0.1);
+
+#ifdef MANIFOLD_EXPORT
+  if (options.exportModels) ExportMesh("smoothCone.glb", smooth.GetMesh(), {});
+#endif
+}
+
 TEST(Manifold, Smooth2Length) {
   Manifold cone = Manifold::Extrude(
       CrossSection::Circle(10, 10).Translate({10, 0}), 2, 0, 0, {0, 0});
