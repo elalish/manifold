@@ -694,8 +694,7 @@ void Manifold::Impl::SetNormals(glm::ivec3 normalIdx, float minSharpAngle) {
  * curvature there, while the tangents of the sharp edges themselves are aligned
  * for continuity.
  */
-void Manifold::Impl::CreateTangents(
-    const std::vector<Smoothness>& sharpenedEdges) {
+void Manifold::Impl::CreateTangents(std::vector<Smoothness> sharpenedEdges) {
   ZoneScoped;
   const int numHalfedge = halfedge_.size();
   halfedgeTangent_.resize(numHalfedge);
@@ -713,18 +712,34 @@ void Manifold::Impl::CreateTangents(
              zip(halfedgeTangent_.begin(), halfedge_.cbegin()), numHalfedge,
              SmoothBezier({vertPos_, faceNormal_, vertNormal, halfedge_}));
 
+  // Add sharpened edges around faces, just on the face side.
+  for (int tri = 0; tri < NumTri(); ++tri) {
+    if (!triIsFlatFace[tri]) continue;
+    for (const int j : {0, 1, 2}) {
+      const int tri2 = halfedge_[3 * tri + j].pairedHalfedge / 3;
+      if (!triIsFlatFace[tri2] ||
+          !meshRelation_.triRef[tri].SameFace(meshRelation_.triRef[tri2])) {
+        sharpenedEdges.push_back({3 * tri + j, 0});
+      }
+    }
+  }
+
   if (sharpenedEdges.empty()) return;
 
   using Pair = std::pair<Smoothness, Smoothness>;
   // Fill in missing pairs with default smoothness = 1.
   std::map<int, Pair> edges;
   for (Smoothness edge : sharpenedEdges) {
-    if (edge.smoothness == 1) continue;
-    int pair = halfedge_[edge.halfedge].pairedHalfedge;
-    if (edges.find(pair) == edges.end()) {
-      edges[edge.halfedge] = {edge, {pair, 1}};
+    if (edge.smoothness >= 1) continue;
+    const bool forward = halfedge_[edge.halfedge].IsForward();
+    const int pair = halfedge_[edge.halfedge].pairedHalfedge;
+    const int idx = forward ? edge.halfedge : pair;
+    if (edges.find(idx) == edges.end()) {
+      edges[idx] = {edge, {pair, 1}};
+      if (!forward) std::swap(edges[idx].first, edges[idx].second);
     } else {
-      edges[pair].second = edge;
+      Smoothness& e = forward ? edges[idx].first : edges[idx].second;
+      e.smoothness = glm::min(edge.smoothness, e.smoothness);
     }
   }
 

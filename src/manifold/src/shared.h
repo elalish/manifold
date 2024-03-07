@@ -157,6 +157,10 @@ struct TriRef {
   /// The triangle index of the original triangle this was part of:
   /// Mesh.triVerts[tri].
   int tri;
+
+  bool SameFace(const TriRef& other) const {
+    return meshID == other.meshID && tri == other.tri;
+  }
 };
 
 /**
