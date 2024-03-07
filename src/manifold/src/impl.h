@@ -71,7 +71,6 @@ struct Manifold::Impl {
   void InitializeOriginal();
   void CreateHalfedges(const Vec<glm::ivec3>& triVerts);
   void CalculateNormals();
-  void SetNormals(glm::ivec3 normalIdx, float minSharpAngle);
   void IncrementMeshIDs();
 
   void Update();
@@ -138,6 +137,7 @@ struct Manifold::Impl {
   void SplitPinchedVerts();
 
   // smoothing.cu
+  void SetNormals(glm::ivec3 normalIdx, float minSharpAngle);
   void CreateTangents(const std::vector<Smoothness>&);
   Vec<Barycentric> Subdivide(std::function<int(glm::vec3)>);
   void Refine(std::function<int(glm::vec3)>);
