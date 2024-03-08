@@ -700,23 +700,44 @@ void Manifold::Impl::SetNormals(glm::ivec3 normalIdx, float minSharpAngle) {
         } while (current != endEdge);
         // The first and last are part of the same face
         normals.front() += normals.back();
-        normals.back() = normals.front();
+        group.back() = 0;
         for (auto& normal : normals) {
           normal = glm::normalize(normal);
         }
 
-        do {  // TODO: rewrite
+        int lastGroup = 0;
+        int lastProp = -1;
+        int idx = 0;
+        do {
           current = NextHalfedge(halfedge_[current].pairedHalfedge);
           const int thisTri = current / 3;
           const int j = current - 3 * thisTri;
           const int prop = oldTriProp[thisTri][j];
-          meshRelation_.triProperties[thisTri][j] = prop;
-          for (int i = 0; i < oldNumProp; ++i)
-            meshRelation_.properties[prop * numProp + i] =
-                oldProperties[prop * oldNumProp + i];
-          for (const int i : {0, 1, 2})
-            meshRelation_.properties[prop * numProp + normalIdx[i]] =
-                normals[j][i];
+
+          if (group[idx] != lastGroup && group[idx] != 0 && prop == lastProp) {
+            lastGroup = group[idx];
+            lastProp = NumPropVert();
+            meshRelation_.properties.resize(meshRelation_.properties.size() +
+                                            numProp);
+            for (int i = 0; i < oldNumProp; ++i)
+              meshRelation_.properties[lastProp * numProp + i] =
+                  oldProperties[prop * oldNumProp + i];
+            for (const int i : {0, 1, 2}) {
+              meshRelation_.properties[lastProp * numProp + normalIdx[i]] =
+                  normals[group[idx]][i];
+            }
+          } else if (prop != lastProp) {
+            lastProp = prop;
+            for (int i = 0; i < oldNumProp; ++i)
+              meshRelation_.properties[prop * numProp + i] =
+                  oldProperties[prop * oldNumProp + i];
+            for (const int i : {0, 1, 2})
+              meshRelation_.properties[prop * numProp + normalIdx[i]] =
+                  normals[group[idx]][i];
+          }
+
+          meshRelation_.triProperties[thisTri][j] = lastProp;
+          ++idx;
         } while (current != endEdge);
       }
     }

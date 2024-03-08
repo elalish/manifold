@@ -344,14 +344,19 @@ TEST(Manifold, Smooth) {
 }
 
 TEST(Manifold, SmoothFlat) {
-  Manifold cone = Manifold::Cylinder(5, 10, 5).Smooth();
+  Manifold cone =
+      Manifold::Cylinder(5, 10, 5, 6).Smooth().CalculateNormals({0, 1, 2});
   Manifold smooth = cone.RefineToLength(0.1);
   auto prop = smooth.GetProperties();
   EXPECT_NEAR(prop.volume, 1105, 1);
   EXPECT_NEAR(prop.surfaceArea, 759, 1);
 
 #ifdef MANIFOLD_EXPORT
-  if (options.exportModels) ExportMesh("smoothCone.glb", smooth.GetMesh(), {});
+  ExportOptions options2;
+  options2.faceted = false;
+  options2.mat.normalChannels = {3, 4, 5};
+  if (options.exportModels)
+    ExportMesh("smoothCone.glb", cone.GetMeshGL(), options2);
 #endif
 }
 
