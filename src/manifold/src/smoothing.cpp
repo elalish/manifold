@@ -506,7 +506,7 @@ namespace manifold {
 // meshRelation_.
 std::vector<Smoothness> Manifold::Impl::UpdateSharpenedEdges(
     const std::vector<Smoothness>& sharpenedEdges) const {
-  Vec<int> oldHalfedge2New(halfedge_.size());
+  std::unordered_map<int, int> oldHalfedge2New;
   for (int tri = 0; tri < NumTri(); ++tri) {
     int oldTri = meshRelation_.triRef[tri].tri;
     for (int i : {0, 1, 2}) oldHalfedge2New[3 * oldTri + i] = 3 * tri + i;
@@ -531,7 +531,7 @@ Vec<bool> Manifold::Impl::FlatFaces() const {
       const int neighborTri =
           halfedge_[halfedge_[3 * tri + j].pairedHalfedge].face;
       const TriRef& jRef = meshRelation_.triRef[neighborTri];
-      if (jRef.meshID == ref.meshID && jRef.tri == ref.tri) {
+      if (jRef.SameFace(ref)) {
         ++faceNeighbors;
         faceTris[j] = neighborTri;
       }
@@ -553,11 +553,13 @@ Vec<bool> Manifold::Impl::FlatFaces() const {
 // gets -1, and if there are more than one it gets -2.
 Vec<int> Manifold::Impl::VertFlatFace(const Vec<bool>& flatFaces) const {
   Vec<int> vertFlatFace(NumVert(), -1);
+  Vec<TriRef> vertRef(NumVert(), {-1, -1, -1});
   for (int tri = 0; tri < NumTri(); ++tri) {
     if (flatFaces[tri]) {
       for (const int j : {0, 1, 2}) {
         const int vert = halfedge_[3 * tri + j].startVert;
-        if (vertFlatFace[vert] == tri) continue;
+        if (vertRef[vert].SameFace(meshRelation_.triRef[tri])) continue;
+        vertRef[vert] = meshRelation_.triRef[tri];
         vertFlatFace[vert] = vertFlatFace[vert] == -1 ? tri : -2;
       }
     }
@@ -786,11 +788,7 @@ void Manifold::Impl::CreateTangents(std::vector<Smoothness> sharpenedEdges) {
       auto SmoothHalf = [&](int first, int last, float smoothness) {
         int current = NextHalfedge(halfedge_[first].pairedHalfedge);
         while (current != last) {
-          const float cosBeta =
-              glm::dot(newTangent, glm::normalize(glm::vec3(tangent[current])));
-          const float factor =
-              (1 - smoothness) * cosBeta * cosBeta + smoothness;
-          tangent[current] = glm::vec4(factor * glm::vec3(tangent[current]),
+          tangent[current] = glm::vec4(smoothness * glm::vec3(tangent[current]),
                                        tangent[current].w);
           current = NextHalfedge(halfedge_[current].pairedHalfedge);
         }

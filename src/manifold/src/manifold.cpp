@@ -695,9 +695,7 @@ Manifold Manifold::CalculateNormals(glm::ivec3 normalIdx,
 Manifold Manifold::Smooth(float minSharpAngle, float minSmoothness) const {
   auto pImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
   if (!IsEmpty()) {
-    std::vector<Smoothness> sharpenedEdges =
-        pImpl->SharpenEdges(minSharpAngle, minSmoothness);
-    pImpl->CreateTangents(pImpl->UpdateSharpenedEdges(sharpenedEdges));
+    pImpl->CreateTangents(pImpl->SharpenEdges(minSharpAngle, minSmoothness));
   }
   return Manifold(std::make_shared<CsgLeafNode>(pImpl));
 }
