@@ -592,17 +592,41 @@ void Manifold::Impl::SetNormals(glm::ivec3 normalIdx, float minSharpAngle) {
   if (IsEmpty()) return;
   if (glm::any(glm::lessThan(normalIdx, glm::ivec3(0)))) return;
 
-  Vec<TriRef> triRefOriginal = meshRelation_.triRef;
   const int oldNumProp = NumProp();
   const int numTri = NumTri();
 
   Vec<bool> triIsFlatFace = FlatFaces();
+  Vec<int> vertFlatFace = VertFlatFace(triIsFlatFace);
+  Vec<int> vertNumSharp(NumVert(), 0);
+  for (int e = 0; e < halfedge_.size(); ++e) {
+    if (!halfedge_[e].IsForward()) continue;
+    const int pair = halfedge_[e].pairedHalfedge;
+    const int tri1 = e / 3;
+    const int tri2 = pair / 3;
+    const float dihedral =
+        glm::degrees(glm::acos(glm::dot(faceNormal_[tri1], faceNormal_[tri2])));
+    if (dihedral > minSharpAngle) {
+      ++vertNumSharp[halfedge_[e].startVert];
+      ++vertNumSharp[halfedge_[e].endVert];
+    } else {
+      const bool faceSplit =
+          triIsFlatFace[tri1] != triIsFlatFace[tri2] ||
+          (triIsFlatFace[tri1] && triIsFlatFace[tri2] &&
+           !meshRelation_.triRef[tri1].SameFace(meshRelation_.triRef[tri2]));
+      if (vertFlatFace[halfedge_[e].startVert] == -2 && faceSplit) {
+        ++vertNumSharp[halfedge_[e].startVert];
+      }
+      if (vertFlatFace[halfedge_[e].endVert] == -2 && faceSplit) {
+        ++vertNumSharp[halfedge_[e].endVert];
+      }
+    }
+  }
 
   const int numProp = glm::max(
       oldNumProp,
       glm::max(normalIdx[0], glm::max(normalIdx[1], normalIdx[2])) + 1);
-  const Vec<float> oldProperties = meshRelation_.properties;
-  Vec<float> properties(numProp * NumPropVert(), 0);
+  Vec<float> oldProperties(numProp * NumPropVert(), 0);
+  meshRelation_.properties.swap(oldProperties);
   meshRelation_.numProp = numProp;
   if (meshRelation_.triProperties.size() == 0) {
     meshRelation_.triProperties.resize(numTri);
@@ -615,91 +639,88 @@ void Manifold::Impl::SetNormals(glm::ivec3 normalIdx, float minSharpAngle) {
       if (meshRelation_.triProperties[tri][i] >= 0) continue;
       int current = 3 * tri + i;
       const int endEdge = current;
-      const Halfedge halfedge = halfedge_[current];
-      const int vert = halfedge.startVert;
-      const glm::vec3 centerPos = vertPos_[vert];
-      int prop = oldNumProp == 0 ? vert : oldTriProp[tri][i];
+      const int vert = halfedge_[current].startVert;
 
-      // Length degree
-      std::vector<int> props;
-      std::vector<int> edges;
-      std::vector<int> group;
-      // Length number of normals
-      std::vector<glm::vec3> normals = {glm::vec3(0)};
-      std::vector<bool> isFlat = {false};
+      if (vertNumSharp[vert] < 2) {
+        const glm::vec3 normal = vertFlatFace[vert] >= 0
+                                     ? faceNormal_[vertFlatFace[vert]]
+                                     : vertNormal_[vert];
+        int lastProp = -1;
+        do {
+          current = NextHalfedge(halfedge_[current].pairedHalfedge);
+          const int thisTri = current / 3;
+          const int j = current - 3 * thisTri;
+          const int prop = oldTriProp[thisTri][j];
+          meshRelation_.triProperties[thisTri][j] = prop;
+          if (prop == lastProp) continue;
+          lastProp = prop;
+          for (int i = 0; i < oldNumProp; ++i)
+            meshRelation_.properties[prop * numProp + i] =
+                oldProperties[prop * oldNumProp + i];
+          for (const int i : {0, 1, 2})
+            meshRelation_.properties[prop * numProp + normalIdx[i]] = normal[i];
+        } while (current != endEdge);
+      } else {
+        const glm::vec3 centerPos = vertPos_[vert];
+        // Length degree
+        std::vector<int> group;
+        // Length number of normals
+        std::vector<glm::vec3> normals = {glm::vec3(0)};
+        int j = 0;
+        int prevFace = halfedge_[halfedge_[NextHalfedge(NextHalfedge(current))]
+                                     .pairedHalfedge]
+                           .face;
+        do {
+          current = halfedge_[current].pairedHalfedge;
+          const glm::vec3 edgeVec =
+              vertPos_[halfedge_[current].startVert] - centerPos;
 
-      int j = 0;
-      const int prevFace =
-          halfedge_[halfedge_[NextHalfedge(NextHalfedge(current))]
-                        .pairedHalfedge]
-              .face;
-      glm::vec3 lastFaceNormal = faceNormal_[prevFace];
-      int lastFace = -1;
-      do {
-        current = halfedge_[current].pairedHalfedge;
-        const glm::vec3 edgeVec =
-            vertPos_[halfedge_[current].startVert] - centerPos;
+          current = NextHalfedge(current);
+          const int face = halfedge_[current].face;
 
-        current = NextHalfedge(current);
-        edges.push_back(current);
-        const int face = halfedge_[current].face;
-        props.push_back(oldNumProp == 0 ? vert
-                                        : oldTriProp[face][current - 3 * face]);
-
-        const float dihedral = glm::degrees(
-            glm::acos(glm::dot(faceNormal_[face], lastFaceNormal)));
-        if (dihedral > minSharpAngle ||
-            (isFlat[j] && triIsFlatFace[face] &&
-             lastFace != meshRelation_.triRef[tri].tri)) {
-          ++j;
-          normals.push_back(glm::vec3(0));
-          isFlat.push_back(false);
-        }
-        group.push_back(j);
-
-        if (!isFlat[j]) {
-          if (triIsFlatFace[face]) {
-            normals[j] = faceNormal_[face];
-            isFlat[j] = true;
-            lastFace = meshRelation_.triRef[tri].tri;
-          } else {
-            float dot = -glm::dot(
-                edgeVec, vertPos_[halfedge_[current].endVert] - centerPos);
-            const float phi =
-                dot >= 1 ? 0 : (dot <= -1 ? glm::pi<float>() : glm::acos(dot));
-            normals[j] += faceNormal_[face] * phi;
+          const float dihedral = glm::degrees(
+              glm::acos(glm::dot(faceNormal_[face], faceNormal_[prevFace])));
+          if (dihedral > minSharpAngle ||
+              (triIsFlatFace[face] != triIsFlatFace[prevFace] ||
+               (triIsFlatFace[face] && triIsFlatFace[prevFace] &&
+                !meshRelation_.triRef[face].SameFace(
+                    meshRelation_.triRef[prevFace])))) {
+            ++j;
+            normals.push_back(glm::vec3(0));
           }
-        }
+          group.push_back(j);
 
-        lastFaceNormal = faceNormal_[face];
-      } while (current != endEdge);
+          float dot = -glm::dot(
+              edgeVec, vertPos_[halfedge_[current].endVert] - centerPos);
+          const float phi =
+              dot >= 1 ? 0 : (dot <= -1 ? glm::pi<float>() : glm::acos(dot));
+          normals[j] += faceNormal_[face] * phi;
 
-      if (normals.size() > 1) {
+          prevFace = face;
+        } while (current != endEdge);
         // The first and last are part of the same face
         normals.front() += normals.back();
         normals.back() = normals.front();
-      }
+        for (auto& normal : normals) {
+          normal = glm::normalize(normal);
+        }
 
-      for (auto& normal : normals) {
-        normal = glm::normalize(normal);
-      }
-
-      const int degree = edges.size();
-      for (j = 0; j < degree; ++j) {
-        const int tri = halfedge_[edges[j]].face;
-        // Need to duplicate properties for unique (props[j],group[j]) pairs
-        meshRelation_.triProperties[tri][edges[j] - 3 * tri] = props[j];
-        for (int i = 0; i < oldNumProp; ++i)
-          meshRelation_.properties[props[j] * numProp + i] =
-              oldProperties[props[j] * oldNumProp + i];
-        for (const int i : {0, 1, 2})
-          meshRelation_.properties[props[j] * numProp + normalIdx[i]] =
-              normals[group[j]][i];
+        do {  // TODO: rewrite
+          current = NextHalfedge(halfedge_[current].pairedHalfedge);
+          const int thisTri = current / 3;
+          const int j = current - 3 * thisTri;
+          const int prop = oldTriProp[thisTri][j];
+          meshRelation_.triProperties[thisTri][j] = prop;
+          for (int i = 0; i < oldNumProp; ++i)
+            meshRelation_.properties[prop * numProp + i] =
+                oldProperties[prop * oldNumProp + i];
+          for (const int i : {0, 1, 2})
+            meshRelation_.properties[prop * numProp + normalIdx[i]] =
+                normals[j][i];
+        } while (current != endEdge);
       }
     }
   }
-
-  meshRelation_.triRef = triRefOriginal;
 }
 
 /**
