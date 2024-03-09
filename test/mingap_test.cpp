@@ -93,7 +93,7 @@ TEST(MinGap, ClosestPointOnEdge) {
 
 TEST(MinGap, ClosestPointOnTriangleFace) {
   auto a = Manifold::Cube().Translate({0.0f, -0.25f, 0.0f});
-  auto b = Manifold::Sphere(1.0f).Translate({13.0f, 0.0f, 0.5f});
+  auto b = Manifold::Sphere(1.0f).Translate({3.0f, 0.0f, 0.5f});
 
   float distance = a.MinGap(b, 10);
 

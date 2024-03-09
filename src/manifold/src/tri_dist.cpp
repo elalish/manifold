@@ -16,6 +16,12 @@
 
 namespace manifold {
 
+template <typename T>
+const T& clamp(const T& v, const T& lo, const T& hi) {
+  assert(!(hi < lo));
+  return (v < lo) ? lo : (hi < v) ? hi : v;
+}
+
 // From NVIDIA-Omniverse PhysX - BSD 3-Clause "New" or "Revised" License
 // https://github.com/NVIDIA-Omniverse/PhysX/blob/main/LICENSE.md
 // https://github.com/NVIDIA-Omniverse/PhysX/blob/main/physx/source/geomutils/src/sweep/GuSweepCapsuleCapsule.cpp
@@ -41,7 +47,7 @@ void EdgeEdgeDist(glm::vec3& x, glm::vec3& y,  // closest points
 
   double t;  // We will clamp result so t is on the segment (p, a)
   if (Denom != 0.0f)
-    t = std::clamp((ADotT * BDotB - BDotT * ADotB) / Denom, 0.0, 1.0);
+    t = clamp((ADotT * BDotB - BDotT * ADotB) / Denom, 0.0, 1.0);
   else
     t = 0.0f;
 
@@ -55,20 +61,20 @@ void EdgeEdgeDist(glm::vec3& x, glm::vec3& y,  // closest points
     if (u < 0.0f) {
       u = 0.0f;
       if (ADotA != 0.0f)
-        t = std::clamp(ADotT / ADotA, 0.0, 1.0);
+        t = clamp(ADotT / ADotA, 0.0, 1.0);
       else
         t = 0.0f;
     } else if (u > 1.0f) {
       u = 1.0f;
       if (ADotA != 0.0f)
-        t = std::clamp((ADotB + ADotT) / ADotA, 0.0, 1.0);
+        t = clamp((ADotB + ADotT) / ADotA, 0.0, 1.0);
       else
         t = 0.0f;
     }
   } else {
     u = 0.0f;
     if (ADotA != 0.0f)
-      t = std::clamp(ADotT / ADotA, 0.0, 1.0);
+      t = clamp(ADotT / ADotA, 0.0, 1.0);
     else
       t = 0.0f;
   }
