@@ -21,7 +21,7 @@
 #include "csg_tree.h"
 #include "impl.h"
 #include "par.h"
-#include "triangle_dist.h"
+#include "tri_dist.h"
 
 namespace {
 using namespace manifold;
@@ -937,19 +937,23 @@ float Manifold::MinGap(const Manifold& other, float searchLength) const {
           minBoundsFirst.z <= maxBoundsSecond.z &&
           maxBoundsFirst.z >= minBoundsSecond.z) {
         // AABBs overlap, calculate triangle-to-triangle distance
-        float distance =
-            TriangleDistance({firstMesh.vertPos[firstTriVert.x],
-                              firstMesh.vertPos[firstTriVert.y],
-                              firstMesh.vertPos[firstTriVert.z]},
-                             {secondMesh.vertPos[secondTriVert.x],
-                              secondMesh.vertPos[secondTriVert.y],
-                              secondMesh.vertPos[secondTriVert.z]});
+        glm::vec3 cp;
+        glm::vec3 cq;
+
+        glm::vec3 p[3] = {firstMesh.vertPos[firstTriVert.x],
+                          firstMesh.vertPos[firstTriVert.y],
+                          firstMesh.vertPos[firstTriVert.z]};
+        glm::vec3 q[3] = {secondMesh.vertPos[secondTriVert.x],
+                          secondMesh.vertPos[secondTriVert.y],
+                          secondMesh.vertPos[secondTriVert.z]};
+
+        float distance = DistanceTriangleTriangleSquared(cp, cq, p, q);
 
         minDistance = std::min(minDistance, distance);
       }
     }
   }
 
-  return minDistance;
+  return sqrt(minDistance);
 }
 }  // namespace manifold
