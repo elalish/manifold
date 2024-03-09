@@ -896,7 +896,7 @@ float Manifold::MinGap(const Manifold& other, float searchLength) const {
   auto firstMesh = this->GetMesh();
   auto secondMesh = other.GetMesh();
 
-  float minDistance = searchLength;
+  float minDistanceSquared = searchLength * searchLength;
 
   // Iterate over triangles from the first manifold
   for (const auto& firstTriVert : firstMesh.triVerts) {
@@ -947,13 +947,13 @@ float Manifold::MinGap(const Manifold& other, float searchLength) const {
                           secondMesh.vertPos[secondTriVert.y],
                           secondMesh.vertPos[secondTriVert.z]};
 
-        float distance = DistanceTriangleTriangleSquared(cp, cq, p, q);
+        float distanceSquared = DistanceTriangleTriangleSquared(cp, cq, p, q);
 
-        minDistance = std::min(minDistance, distance);
+        minDistanceSquared = std::min(minDistanceSquared, distanceSquared);
       }
     }
   }
 
-  return sqrt(minDistance);
+  return sqrt(minDistanceSquared);
 }
 }  // namespace manifold

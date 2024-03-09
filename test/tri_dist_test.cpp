@@ -18,11 +18,6 @@
 #include "public.h"
 #include "test.h"
 
-void printVec(glm::vec3 vec) {
-  std::cout << "{" << vec.x << ", " << vec.y << ", " << vec.z << "}"
-            << std::endl;
-}
-
 TEST(TriangleDistance, ClosestPointsOnVertices) {
   glm::vec3 cp;
   glm::vec3 cq;
