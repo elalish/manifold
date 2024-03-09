@@ -16,7 +16,11 @@
 
 namespace manifold {
 
-void edgeEdgeDist(glm::vec3& x, glm::vec3& y,  // closest points
+// From NVIDIA-Omniverse PhysX - BSD 3-Clause "New" or "Revised" License
+// https://github.com/NVIDIA-Omniverse/PhysX/blob/main/LICENSE.md
+// https://github.com/NVIDIA-Omniverse/PhysX/blob/main/physx/source/geomutils/src/sweep/GuSweepCapsuleCapsule.cpp
+// With minor modifications to use glm::vec3 type.
+void EdgeEdgeDist(glm::vec3& x, glm::vec3& y,  // closest points
                   const glm::vec3& p,
                   const glm::vec3& a,  // seg 1 origin, vector
                   const glm::vec3& q,
@@ -72,12 +76,10 @@ void edgeEdgeDist(glm::vec3& x, glm::vec3& y,  // closest points
   y = q + b * static_cast<float>(u);
 }
 
-/**
- * Returns the minimum squared distance between two triangles.
- *
- * @param t1 First  triangle.
- * @param t2 Second triangle.
- */
+// From NVIDIA-Omniverse PhysX - BSD 3-Clause "New" or "Revised" License
+// https://github.com/NVIDIA-Omniverse/PhysX/blob/main/LICENSE.md
+// https://github.com/NVIDIA-Omniverse/PhysX/blob/main/physx/source/geomutils/src/distance/GuDistanceTriangleTriangle.cpp
+// With minor modifications to use glm::vec3 type.
 float DistanceTriangleTriangleSquared(glm::vec3& cp, glm::vec3& cq,
                                       const glm::vec3 p[3],
                                       const glm::vec3 q[3]) {
@@ -98,7 +100,7 @@ float DistanceTriangleTriangleSquared(glm::vec3& cp, glm::vec3& cq,
 
   for (uint32_t i = 0; i < 3; i++) {
     for (uint32_t j = 0; j < 3; j++) {
-      edgeEdgeDist(cp, cq, p[i], Sv[i], q[j], Tv[j]);
+      EdgeEdgeDist(cp, cq, p[i], Sv[i], q[j], Tv[j]);
       const glm::vec3 V = cq - cp;
       const float dd = glm::dot(V, V);
 

@@ -19,14 +19,26 @@
 
 namespace manifold {
 
-void edgeEdgeDist(glm::vec3& x, glm::vec3& y, const glm::vec3& p,
+/**
+ * Returns the distance between two line segments.
+ *
+ * @param[out] cq Closest point on line segment pa.
+ * @param[out] cp Closest point on line segment qb.
+ * @param[in]  p  Endpoint of first line segment.
+ * @param[in]  q  Endpoint of first line segment.
+ * @param[in]  p  Endpoint of second line segment.
+ * @param[in]  q  Endpoint of second line segment.
+ */
+void EdgeEdgeDist(glm::vec3& x, glm::vec3& y, const glm::vec3& p,
                   const glm::vec3& a, const glm::vec3& q, const glm::vec3& b);
 
 /**
  * Returns the minimum squared distance between two triangles.
  *
- * @param t1 First  triangle.
- * @param t2 Second triangle.
+ * @param[out] cq Closest point on first triangle.
+ * @param[out] cp Closest point on second triangle.
+ * @param[in]  p  First  triangle.
+ * @param[in]  q  Second triangle.
  */
 float DistanceTriangleTriangleSquared(glm::vec3& cp, glm::vec3& cq,
                                       const glm::vec3 p[3],

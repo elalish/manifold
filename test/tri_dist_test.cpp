@@ -51,6 +51,20 @@ TEST(TriangleDistance, ClosestPointOnEdge) {
   EXPECT_FLOAT_EQ(distance, 1.0f);
 }
 
+TEST(TriangleDistance, ClosestPointOnEdge2) {
+  glm::vec3 cp;
+  glm::vec3 cq;
+
+  glm::vec3 p[3] = {
+      {-1.0f, 0.0f, 0.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}};
+
+  glm::vec3 q[3] = {{1.0f, 1.0f, 0.0f}, {3.0f, 1.0f, 0.0f}, {2.0f, 2.0f, 0.0f}};
+
+  float distance = DistanceTriangleTriangleSquared(cp, cq, p, q);
+
+  EXPECT_FLOAT_EQ(distance, 0.5f);
+}
+
 TEST(TriangleDistance, ClosestPointOnFace) {
   glm::vec3 cp;
   glm::vec3 cq;
@@ -64,18 +78,4 @@ TEST(TriangleDistance, ClosestPointOnFace) {
   float distance = DistanceTriangleTriangleSquared(cp, cq, p, q);
 
   EXPECT_FLOAT_EQ(distance, 1.0f);
-}
-
-TEST(TriangleDistance, test) {
-  glm::vec3 cp;
-  glm::vec3 cq;
-
-  glm::vec3 p[3] = {
-      {-1.0f, 0.0f, 0.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}};
-
-  glm::vec3 q[3] = {{1.0f, 1.0f, 0.0f}, {3.0f, 1.0f, 0.0f}, {2.0f, 2.0f, 0.0f}};
-
-  float distance = DistanceTriangleTriangleSquared(cp, cq, p, q);
-
-  EXPECT_FLOAT_EQ(distance, 0.5f);
 }
