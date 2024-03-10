@@ -294,6 +294,7 @@ class Manifold {
   ///@}
 
   float MinGap(const Manifold& other, float searchLength) const;
+  float MinGapCollider(const Manifold& other, float searchLength) const;
 
   struct Impl;
 

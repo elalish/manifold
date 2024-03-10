@@ -956,4 +956,46 @@ float Manifold::MinGap(const Manifold& other, float searchLength) const {
 
   return sqrt(minDistanceSquared);
 }
+
+float Manifold::MinGapCollider(const Manifold& other,
+                               float searchLength) const {
+  // Get intersection
+  auto intersect = *this ^ other;
+  auto prop = intersect.GetProperties();
+
+  // If intersection is non zero, return zero (overlapping)
+  if (prop.volume != 0) {
+    return 0.0f;
+  }
+
+  Vec<Box> faceBox;
+  Vec<uint32_t> faceMorton;
+
+  this->GetCsgLeafNode().GetImpl()->GetFaceBoxMorton(faceBox, faceMorton);
+
+  std::transform(faceBox.begin(), faceBox.end(), faceBox.begin(),
+                 [searchLength](Box box) {
+                   return Box(box.min - glm::vec3(searchLength),
+                              box.max + glm::vec3(searchLength));
+                 });
+
+  Vec<Box> faceBoxOther;
+  Vec<uint32_t> faceMortonOther;
+
+  other.GetCsgLeafNode().GetImpl()->GetFaceBoxMorton(faceBox, faceMorton);
+
+  std::transform(faceBoxOther.begin(), faceBoxOther.end(), faceBoxOther.begin(),
+                 [searchLength](Box box) {
+                   return Box(box.min - glm::vec3(searchLength),
+                              box.max + glm::vec3(searchLength));
+                 });
+
+  Collider collider(faceBox, faceMorton);
+
+  SparseIndices collisions = collider.Collisions(faceBoxOther.cview());
+
+  std::cout << collisions.size() << std::endl;  // 0
+
+  return 0;
+}
 }  // namespace manifold

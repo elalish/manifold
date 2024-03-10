@@ -113,7 +113,10 @@
     "format": "cpp",
     "numbers": "cpp",
     "ranges": "cpp",
-    "stop_token": "cpp"
+    "stop_token": "cpp",
+    "*.inc": "cpp",
+    "csetjmp": "cpp",
+    "cuchar": "cpp"
   },
   "C_Cpp.clang_format_fallbackStyle": "google",
   "editor.formatOnSave": true,
