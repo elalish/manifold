@@ -141,7 +141,7 @@ For more detailed documentation, please refer to the C++ API.
 
 ### Java / Clojure
 
-Unoffocial java bindings are currently maintained in [a fork](https://github.com/SovereignShop/manifold).
+Unofficial java bindings are currently maintained in [a fork](https://github.com/SovereignShop/manifold).
 
 There is also a Clojure [library](https://github.com/SovereignShop/clj-manifold3d).
 
