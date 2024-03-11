@@ -971,7 +971,7 @@ float Manifold::MinGapCollider(const Manifold& other,
   Vec<Box> faceBox;
   Vec<uint32_t> faceMorton;
 
-  this->GetCsgLeafNode().GetImpl()->GetFaceBoxMorton(faceBox, faceMorton);
+  GetCsgLeafNode().GetImpl()->GetFaceBoxMorton(faceBox, faceMorton);
 
   std::transform(faceBox.begin(), faceBox.end(), faceBox.begin(),
                  [searchLength](Box box) {
@@ -979,10 +979,22 @@ float Manifold::MinGapCollider(const Manifold& other,
                               box.max + glm::vec3(searchLength));
                  });
 
+  Vec<int> faceNew2Old(NumTri());
+  auto policy = autoPolicy(faceNew2Old.size());
+  sequence(policy, faceNew2Old.begin(), faceNew2Old.end());
+
+  stable_sort(policy, zip(faceMorton.begin(), faceNew2Old.begin()),
+              zip(faceMorton.end(), faceNew2Old.end()),
+              [](const thrust::tuple<uint32_t, int>& a,
+                 const thrust::tuple<uint32_t, int>& b) {
+                return thrust::get<0>(a) < thrust::get<0>(b);
+              });
+
   Vec<Box> faceBoxOther;
   Vec<uint32_t> faceMortonOther;
 
-  other.GetCsgLeafNode().GetImpl()->GetFaceBoxMorton(faceBox, faceMorton);
+  other.GetCsgLeafNode().GetImpl()->GetFaceBoxMorton(faceBoxOther,
+                                                     faceMortonOther);
 
   std::transform(faceBoxOther.begin(), faceBoxOther.end(), faceBoxOther.begin(),
                  [searchLength](Box box) {
@@ -990,12 +1002,64 @@ float Manifold::MinGapCollider(const Manifold& other,
                               box.max + glm::vec3(searchLength));
                  });
 
+  Vec<int> faceNew2Old2(other.NumTri());
+  auto policy2 = autoPolicy(faceNew2Old2.size());
+  sequence(policy, faceNew2Old2.begin(), faceNew2Old2.end());
+
+  stable_sort(policy, zip(faceMortonOther.begin(), faceNew2Old2.begin()),
+              zip(faceMortonOther.end(), faceNew2Old2.end()),
+              [](const thrust::tuple<uint32_t, int>& a,
+                 const thrust::tuple<uint32_t, int>& b) {
+                return thrust::get<0>(a) < thrust::get<0>(b);
+              });
+
+  // Tris were flagged for removal with pairedHalfedge = -1 and assigned kNoCode
+  // to sort them to the end, which allows them to be removed.
+
   Collider collider(faceBox, faceMorton);
 
   SparseIndices collisions = collider.Collisions(faceBoxOther.cview());
 
+  float minDistanceSquared = searchLength;
+
+  for (int i = 0; i < collisions.size(); ++i) {
+    const int tri = collisions.Get(i, 0);
+    const int triOther = collisions.Get(i, 1);
+
+    glm::vec3 p[3];
+    glm::vec3 q[3];
+
+    for (const int j : {0, 1, 2}) {
+      auto vertPos = GetMesh().vertPos;
+      auto halfedge = GetCsgLeafNode().GetImpl()->halfedge_;
+
+      const float x = vertPos[halfedge[3 * tri + j].startVert].x;
+      const float y = vertPos[halfedge[3 * tri + j].startVert].y;
+      const float z = vertPos[halfedge[3 * tri + j].startVert].z;
+
+      auto vertPosOther = other.GetMesh().vertPos;
+      auto halfedgeOther = other.GetCsgLeafNode().GetImpl()->halfedge_;
+
+      const float x2 = vertPosOther[halfedgeOther[3 * tri + j].startVert].x;
+      const float y2 = vertPosOther[halfedgeOther[3 * tri + j].startVert].y;
+      const float z2 = vertPosOther[halfedgeOther[3 * tri + j].startVert].z;
+
+      p[j] = vertPos[halfedge[3 * tri + j].startVert];
+      q[j] = vertPosOther[halfedgeOther[3 * tri + j].startVert];
+
+      std::cout << "x: " << x << " y: " << y << " z: " << z << std::endl;
+      std::cout << "x2: " << x2 << " y2: " << y2 << " z2: " << z2 << std::endl;
+    }
+
+    glm::vec3 cp;
+    glm::vec3 cq;
+
+    float distanceSquared = DistanceTriangleTriangleSquared(cp, cq, p, q);
+    minDistanceSquared = std::min(minDistanceSquared, distanceSquared);
+  }
+
   std::cout << collisions.size() << std::endl;  // 0
 
-  return 0;
+  return sqrt(minDistanceSquared);
 }
 }  // namespace manifold
