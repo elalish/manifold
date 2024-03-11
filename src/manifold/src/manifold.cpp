@@ -884,10 +884,10 @@ Manifold Manifold::Hull(const std::vector<Manifold>& manifolds) {
 }
 
 /**
- * Compute the minimum distance between two manifolds. Returns a float between 0
- * and searchLength.
+ * Computes the minimum distance between two manifolds. Returns a float between
+ * 0 and searchLength.
  *
- * @param other The other manifold to compute the minimum distance to.
+ * @param other The other manifold to compute the minimum gap to.
  * @param searchLength The maximum distance to search for a minimum gap.
  */
 float Manifold::MinGap(const Manifold& other, float searchLength) const {
@@ -901,11 +901,11 @@ float Manifold::MinGap(const Manifold& other, float searchLength) const {
 
   GetCsgLeafNode().GetImpl()->GetFaceBoxMorton(faceBox, faceMorton);
 
-  std::transform(faceBox.begin(), faceBox.end(), faceBox.begin(),
-                 [searchLength](Box box) {
-                   return Box(box.min - glm::vec3(searchLength),
-                              box.max + glm::vec3(searchLength));
-                 });
+  transform(autoPolicy(faceBox.size()), faceBox.begin(), faceBox.end(),
+            faceBox.begin(), [searchLength](Box box) {
+              return Box(box.min - glm::vec3(searchLength),
+                         box.max + glm::vec3(searchLength));
+            });
 
   GetCsgLeafNode().GetImpl()->SortFaceBoxMorton(faceBox, faceMorton);
 
@@ -915,11 +915,11 @@ float Manifold::MinGap(const Manifold& other, float searchLength) const {
   other.GetCsgLeafNode().GetImpl()->GetFaceBoxMorton(faceBoxOther,
                                                      faceMortonOther);
 
-  std::transform(faceBoxOther.begin(), faceBoxOther.end(), faceBoxOther.begin(),
-                 [searchLength](Box box) {
-                   return Box(box.min - glm::vec3(searchLength),
-                              box.max + glm::vec3(searchLength));
-                 });
+  transform(autoPolicy(faceBoxOther.size()), faceBoxOther.begin(),
+            faceBoxOther.end(), faceBoxOther.begin(), [searchLength](Box box) {
+              return Box(box.min - glm::vec3(searchLength),
+                         box.max + glm::vec3(searchLength));
+            });
 
   other.GetCsgLeafNode().GetImpl()->SortFaceBoxMorton(faceBoxOther,
                                                       faceMortonOther);
