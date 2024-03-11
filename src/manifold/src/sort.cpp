@@ -418,6 +418,33 @@ void Manifold::Impl::SortFaces(Vec<Box>& faceBox, Vec<uint32_t>& faceMorton) {
   GatherFaces(faceNew2Old);
 }
 
+void Manifold::Impl::SortFaceBoxMorton(Vec<Box>& faceBox,
+                                       Vec<uint32_t>& faceMorton) const {
+  ZoneScoped;
+  Vec<int> faceNew2Old(NumTri());
+  auto policy = autoPolicy(faceNew2Old.size());
+  sequence(policy, faceNew2Old.begin(), faceNew2Old.end());
+
+  stable_sort(policy, zip(faceMorton.begin(), faceNew2Old.begin()),
+              zip(faceMorton.end(), faceNew2Old.end()),
+              [](const thrust::tuple<uint32_t, int>& a,
+                 const thrust::tuple<uint32_t, int>& b) {
+                return thrust::get<0>(a) < thrust::get<0>(b);
+              });
+
+  // maybe dont need this
+  // Tris were flagged for removal with pairedHalfedge = -1 and assigned kNoCode
+  // to sort them to the end, which allows them to be removed.
+  const int newNumTri =
+      find<decltype(faceMorton.begin())>(policy, faceMorton.begin(),
+                                         faceMorton.end(), kNoCode) -
+      faceMorton.begin();
+  faceMorton.resize(newNumTri);
+  faceNew2Old.resize(newNumTri);
+
+  Permute(faceBox, faceNew2Old);
+}
+
 /**
  * Creates the halfedge_ vector for this manifold by copying a set of faces from
  * another manifold, given by oldHalfedge. Input faceNew2Old defines the old

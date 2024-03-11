@@ -883,90 +883,18 @@ Manifold Manifold::Hull(const std::vector<Manifold>& manifolds) {
   return Compose(manifolds).Hull();
 }
 
+/**
+ * Compute the minimum distance between two manifolds. Returns a float between 0
+ * and searchLength.
+ *
+ * @param other The other manifold to compute the minimum distance to.
+ * @param searchLength The maximum distance to search for a minimum gap.
+ */
 float Manifold::MinGap(const Manifold& other, float searchLength) const {
-  // Get intersection
   auto intersect = *this ^ other;
   auto prop = intersect.GetProperties();
 
-  // If intersection is non zero, return zero (overlapping)
-  if (prop.volume != 0) {
-    return 0.0f;
-  }
-
-  auto firstMesh = this->GetMesh();
-  auto secondMesh = other.GetMesh();
-
-  float minDistanceSquared = searchLength * searchLength;
-
-  // Iterate over triangles from the first manifold
-  for (const auto& firstTriVert : firstMesh.triVerts) {
-    // Create AABB around the first triangle, expanded by 2 * searchLength
-    glm::vec3 minBoundsFirst =
-        glm::min(glm::min(firstMesh.vertPos[firstTriVert.x],
-                          firstMesh.vertPos[firstTriVert.y]),
-                 firstMesh.vertPos[firstTriVert.z]) -
-        glm::vec3(searchLength);
-
-    glm::vec3 maxBoundsFirst =
-        glm::max(glm::max(firstMesh.vertPos[firstTriVert.x],
-                          firstMesh.vertPos[firstTriVert.y]),
-                 firstMesh.vertPos[firstTriVert.z]) +
-        glm::vec3(searchLength);
-
-    // Iterate over triangles from the second manifold
-    for (const auto& secondTriVert : secondMesh.triVerts) {
-      // Create AABB around the second triangle, expanded by 2 *
-      // searchLength
-      glm::vec3 minBoundsSecond =
-          glm::min(glm::min(secondMesh.vertPos[secondTriVert.x],
-                            secondMesh.vertPos[secondTriVert.y]),
-                   secondMesh.vertPos[secondTriVert.z]) -
-          glm::vec3(searchLength);
-
-      glm::vec3 maxBoundsSecond =
-          glm::max(glm::max(secondMesh.vertPos[secondTriVert.x],
-                            secondMesh.vertPos[secondTriVert.y]),
-                   secondMesh.vertPos[secondTriVert.z]) +
-          glm::vec3(searchLength);
-
-      // Check for AABB collision
-      if (minBoundsFirst.x <= maxBoundsSecond.x &&
-          maxBoundsFirst.x >= minBoundsSecond.x &&
-          minBoundsFirst.y <= maxBoundsSecond.y &&
-          maxBoundsFirst.y >= minBoundsSecond.y &&
-          minBoundsFirst.z <= maxBoundsSecond.z &&
-          maxBoundsFirst.z >= minBoundsSecond.z) {
-        // AABBs overlap, calculate triangle-to-triangle distance
-        glm::vec3 cp;
-        glm::vec3 cq;
-
-        glm::vec3 p[3] = {firstMesh.vertPos[firstTriVert.x],
-                          firstMesh.vertPos[firstTriVert.y],
-                          firstMesh.vertPos[firstTriVert.z]};
-        glm::vec3 q[3] = {secondMesh.vertPos[secondTriVert.x],
-                          secondMesh.vertPos[secondTriVert.y],
-                          secondMesh.vertPos[secondTriVert.z]};
-
-        float distanceSquared = DistanceTriangleTriangleSquared(cp, cq, p, q);
-
-        minDistanceSquared = std::min(minDistanceSquared, distanceSquared);
-      }
-    }
-  }
-
-  return sqrt(minDistanceSquared);
-}
-
-float Manifold::MinGapCollider(const Manifold& other,
-                               float searchLength) const {
-  // Get intersection
-  auto intersect = *this ^ other;
-  auto prop = intersect.GetProperties();
-
-  // If intersection is non zero, return zero (overlapping)
-  if (prop.volume != 0) {
-    return 0.0f;
-  }
+  if (prop.volume != 0) return 0.0f;
 
   Vec<Box> faceBox;
   Vec<uint32_t> faceMorton;
@@ -979,16 +907,7 @@ float Manifold::MinGapCollider(const Manifold& other,
                               box.max + glm::vec3(searchLength));
                  });
 
-  Vec<int> faceNew2Old(NumTri());
-  auto policy = autoPolicy(faceNew2Old.size());
-  sequence(policy, faceNew2Old.begin(), faceNew2Old.end());
-
-  stable_sort(policy, zip(faceMorton.begin(), faceNew2Old.begin()),
-              zip(faceMorton.end(), faceNew2Old.end()),
-              [](const thrust::tuple<uint32_t, int>& a,
-                 const thrust::tuple<uint32_t, int>& b) {
-                return thrust::get<0>(a) < thrust::get<0>(b);
-              });
+  GetCsgLeafNode().GetImpl()->SortFaceBoxMorton(faceBox, faceMorton);
 
   Vec<Box> faceBoxOther;
   Vec<uint32_t> faceMortonOther;
@@ -1002,64 +921,42 @@ float Manifold::MinGapCollider(const Manifold& other,
                               box.max + glm::vec3(searchLength));
                  });
 
-  Vec<int> faceNew2Old2(other.NumTri());
-  auto policy2 = autoPolicy(faceNew2Old2.size());
-  sequence(policy, faceNew2Old2.begin(), faceNew2Old2.end());
+  other.GetCsgLeafNode().GetImpl()->SortFaceBoxMorton(faceBoxOther,
+                                                      faceMortonOther);
 
-  stable_sort(policy, zip(faceMortonOther.begin(), faceNew2Old2.begin()),
-              zip(faceMortonOther.end(), faceNew2Old2.end()),
-              [](const thrust::tuple<uint32_t, int>& a,
-                 const thrust::tuple<uint32_t, int>& b) {
-                return thrust::get<0>(a) < thrust::get<0>(b);
-              });
-
-  // Tris were flagged for removal with pairedHalfedge = -1 and assigned kNoCode
-  // to sort them to the end, which allows them to be removed.
-
-  Collider collider(faceBox, faceMorton);
+  Collider collider{faceBox, faceMorton};
 
   SparseIndices collisions = collider.Collisions(faceBoxOther.cview());
 
-  float minDistanceSquared = searchLength;
+  float minDistanceSquared = searchLength * searchLength;
+
+  auto vertPos = GetMesh().vertPos;
+  auto halfedge = GetCsgLeafNode().GetImpl()->halfedge_;
+
+  auto vertPosOther = other.GetMesh().vertPos;
+  auto halfedgeOther = other.GetCsgLeafNode().GetImpl()->halfedge_;
 
   for (int i = 0; i < collisions.size(); ++i) {
-    const int tri = collisions.Get(i, 0);
-    const int triOther = collisions.Get(i, 1);
+    const int tri = collisions.Get(i, 1);
+    const int triOther = collisions.Get(i, 0);
+
+    glm::vec3 cp;
+    glm::vec3 cq;
 
     glm::vec3 p[3];
     glm::vec3 q[3];
 
     for (const int j : {0, 1, 2}) {
-      auto vertPos = GetMesh().vertPos;
-      auto halfedge = GetCsgLeafNode().GetImpl()->halfedge_;
-
-      const float x = vertPos[halfedge[3 * tri + j].startVert].x;
-      const float y = vertPos[halfedge[3 * tri + j].startVert].y;
-      const float z = vertPos[halfedge[3 * tri + j].startVert].z;
-
-      auto vertPosOther = other.GetMesh().vertPos;
-      auto halfedgeOther = other.GetCsgLeafNode().GetImpl()->halfedge_;
-
-      const float x2 = vertPosOther[halfedgeOther[3 * tri + j].startVert].x;
-      const float y2 = vertPosOther[halfedgeOther[3 * tri + j].startVert].y;
-      const float z2 = vertPosOther[halfedgeOther[3 * tri + j].startVert].z;
-
       p[j] = vertPos[halfedge[3 * tri + j].startVert];
-      q[j] = vertPosOther[halfedgeOther[3 * tri + j].startVert];
-
-      std::cout << "x: " << x << " y: " << y << " z: " << z << std::endl;
-      std::cout << "x2: " << x2 << " y2: " << y2 << " z2: " << z2 << std::endl;
+      q[j] = vertPosOther[halfedgeOther[3 * triOther + j].startVert];
     }
 
-    glm::vec3 cp;
-    glm::vec3 cq;
-
     float distanceSquared = DistanceTriangleTriangleSquared(cp, cq, p, q);
+
     minDistanceSquared = std::min(minDistanceSquared, distanceSquared);
   }
 
-  std::cout << collisions.size() << std::endl;  // 0
-
   return sqrt(minDistanceSquared);
 }
+
 }  // namespace manifold
