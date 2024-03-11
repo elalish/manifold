@@ -293,7 +293,7 @@ class Manifold {
   int NumOverlaps(const Manifold& second) const;
   ///@}
 
-  /** @name MinGap
+  /** @name Utilities
    */
   ///@{
   float MinGap(const Manifold& other, float searchLength) const;

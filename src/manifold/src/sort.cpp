@@ -418,6 +418,9 @@ void Manifold::Impl::SortFaces(Vec<Box>& faceBox, Vec<uint32_t>& faceMorton) {
   GatherFaces(faceNew2Old);
 }
 
+/**
+ * Sorts the bounding box and Morton code arrays based on the Morton codes.
+ */
 void Manifold::Impl::SortFaceBoxMorton(Vec<Box>& faceBox,
                                        Vec<uint32_t>& faceMorton) const {
   ZoneScoped;
@@ -432,7 +435,6 @@ void Manifold::Impl::SortFaceBoxMorton(Vec<Box>& faceBox,
                 return thrust::get<0>(a) < thrust::get<0>(b);
               });
 
-  // maybe dont need this
   // Tris were flagged for removal with pairedHalfedge = -1 and assigned kNoCode
   // to sort them to the end, which allows them to be removed.
   const int newNumTri =
