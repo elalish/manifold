@@ -543,6 +543,13 @@ ManifoldManifold *manifold_calculate_curvature(void *mem, ManifoldManifold *m,
   return to_c(new (mem) Manifold(man));
 }
 
+ManifoldManifold *manifold_calculate_normals(void *mem, ManifoldManifold *m,
+                                             int normal_idx,
+                                             int min_sharp_angle) {
+  auto man = from_c(m)->CalculateNormals(normal_idx, min_sharp_angle);
+  return to_c(new (mem) Manifold(man));
+}
+
 // Static Quality Globals
 
 void manifold_set_min_circular_angle(float degrees) {

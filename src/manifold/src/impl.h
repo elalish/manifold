@@ -143,7 +143,7 @@ struct Manifold::Impl {
   Vec<int> VertFlatFace(const Vec<bool>&) const;
   std::vector<Smoothness> SharpenEdges(float minSharpAngle,
                                        float minSmoothness) const;
-  void SetNormals(glm::ivec3 normalIdx, float minSharpAngle);
+  void SetNormals(int normalIdx, float minSharpAngle);
   void CreateTangents(std::vector<Smoothness>);
   Vec<Barycentric> Subdivide(std::function<int(glm::vec3)>);
   void Refine(std::function<int(glm::vec3)>);

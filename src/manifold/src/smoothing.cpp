@@ -588,9 +588,9 @@ std::vector<Smoothness> Manifold::Impl::SharpenEdges(
  * does, this method fills in vertex properties, unshared across edges that
  * are bent more than minSharpAngle.
  */
-void Manifold::Impl::SetNormals(glm::ivec3 normalIdx, float minSharpAngle) {
+void Manifold::Impl::SetNormals(int normalIdx, float minSharpAngle) {
   if (IsEmpty()) return;
-  if (glm::any(glm::lessThan(normalIdx, glm::ivec3(0)))) return;
+  if (normalIdx < 0) return;
 
   const int oldNumProp = NumProp();
   const int numTri = NumTri();
@@ -622,9 +622,7 @@ void Manifold::Impl::SetNormals(glm::ivec3 normalIdx, float minSharpAngle) {
     }
   }
 
-  const int numProp = glm::max(
-      oldNumProp,
-      glm::max(normalIdx[0], glm::max(normalIdx[1], normalIdx[2])) + 1);
+  const int numProp = glm::max(oldNumProp, normalIdx + 3);
   Vec<float> oldProperties(numProp * NumPropVert(), 0);
   meshRelation_.properties.swap(oldProperties);
   meshRelation_.numProp = numProp;
@@ -663,7 +661,8 @@ void Manifold::Impl::SetNormals(glm::ivec3 normalIdx, float minSharpAngle) {
             meshRelation_.properties[prop * numProp + i] =
                 oldProperties[prop * oldNumProp + i];
           for (const int i : {0, 1, 2})
-            meshRelation_.properties[prop * numProp + normalIdx[i]] = normal[i];
+            meshRelation_.properties[prop * numProp + normalIdx + i] =
+                normal[i];
         } while (current != startEdge);
       } else {
         const glm::vec3 centerPos = vertPos_[vert];
@@ -743,7 +742,7 @@ void Manifold::Impl::SetNormals(glm::ivec3 normalIdx, float minSharpAngle) {
               meshRelation_.properties[newProp * numProp + i] =
                   oldProperties[prop * oldNumProp + i];
             for (const int i : {0, 1, 2}) {
-              meshRelation_.properties[newProp * numProp + normalIdx[i]] =
+              meshRelation_.properties[newProp * numProp + normalIdx + i] =
                   normals[group[idx]][i];
             }
           } else if (prop != lastProp) {
@@ -753,7 +752,7 @@ void Manifold::Impl::SetNormals(glm::ivec3 normalIdx, float minSharpAngle) {
               meshRelation_.properties[prop * numProp + i] =
                   oldProperties[prop * oldNumProp + i];
             for (const int i : {0, 1, 2})
-              meshRelation_.properties[prop * numProp + normalIdx[i]] =
+              meshRelation_.properties[prop * numProp + normalIdx + i] =
                   normals[group[idx]][i];
           }
 
