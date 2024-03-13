@@ -16,13 +16,14 @@ jobs:
       - run: |
           git config --global submodule.fetchJobs 8
           git config --global core.longpaths true
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           submodules: recursive
       - name: Build wheels
-        uses: pypa/cibuildwheel@v2.15.0
-      - uses: actions/upload-artifact@v3
+        uses: pypa/cibuildwheel@v2.16
+      - uses: actions/upload-artifact@v4
         with:
+          name: python-${{ matrix.os }}
           path: ./wheelhouse/*.whl
 
   make_sdist:
@@ -34,24 +35,25 @@ jobs:
         submodules: recursive
     - name: Build SDist
       run: pipx run build --sdist
-    - uses: actions/upload-artifact@v3
+    - uses: actions/upload-artifact@v4
       with:
+        name: python-sdist
         path: dist/*.tar.gz
 
   pypi-publish:
     name: Upload release to PyPI
     needs: [build_wheels, make_sdist]
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/master'
     environment:
       name: pypi
       url: https://pypi.org/p/manifold3d
     permissions:
       id-token: write  # IMPORTANT: this permission is mandatory for trusted publishing
     steps:
-    - uses: actions/download-artifact@v3
+    - uses: actions/download-artifact@v4
       with:
-        name: artifact
+        pattern: python-*
+        merge-multiple: true
         path: dist
     - name: Publish package distributions to PyPI
       uses: pypa/gh-action-pypi-publish@release/v1
