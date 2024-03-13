@@ -318,9 +318,13 @@ NB_MODULE(manifold3d, m) {
       .def("calculate_normals", &Manifold::CalculateNormals,
            nb::arg("normal_idx"), nb::arg("min_sharp_angle"),
            manifold__calculate_normals__normal_idx__min_sharp_angle)
-      .def("smooth", &Manifold::Smooth, nb::arg("min_sharp_angle"),
-           nb::arg("min_smoothness"),
-           manifold__smooth__min_sharp_angle__min_smoothness)
+      .def(
+          "smooth",
+          [](const Manifold &self, float minSharpAngle, float minSmoothness) {
+            return self.Smooth(minSharpAngle, minSmoothness);
+          },
+          nb::arg("min_sharp_angle") = 60, nb::arg("min_smoothness") = 0,
+          manifold__smooth__min_sharp_angle__min_smoothness)
       .def("refine", &Manifold::Refine, nb::arg("n"), manifold__refine__n)
       .def("refine_to_length", &Manifold::RefineToLength, nb::arg("length"),
            manifold__refine_to_length__length)
