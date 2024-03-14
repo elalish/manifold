@@ -902,7 +902,7 @@ float Manifold::MinGap(const Manifold& other, float searchLength) const {
   GetCsgLeafNode().GetImpl()->GetFaceBoxMorton(faceBox, faceMorton);
 
   transform(autoPolicy(faceBox.size()), faceBox.begin(), faceBox.end(),
-            faceBox.begin(), [searchLength](Box box) {
+            faceBox.begin(), [searchLength](const Box& box) {
               return Box(box.min - glm::vec3(searchLength),
                          box.max + glm::vec3(searchLength));
             });
@@ -916,7 +916,8 @@ float Manifold::MinGap(const Manifold& other, float searchLength) const {
                                                      faceMortonOther);
 
   transform(autoPolicy(faceBoxOther.size()), faceBoxOther.begin(),
-            faceBoxOther.end(), faceBoxOther.begin(), [searchLength](Box box) {
+            faceBoxOther.end(), faceBoxOther.begin(),
+            [searchLength](const Box& box) {
               return Box(box.min - glm::vec3(searchLength),
                          box.max + glm::vec3(searchLength));
             });

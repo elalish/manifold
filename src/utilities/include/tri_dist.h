@@ -12,7 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "tri_dist.h"
+#pragma once
+
+#include <array>
+#include <glm/glm.hpp>
 
 namespace manifold {
 
@@ -26,6 +29,17 @@ const T& clamp(const T& v, const T& lo, const T& hi) {
 // https://github.com/NVIDIA-Omniverse/PhysX/blob/main/LICENSE.md
 // https://github.com/NVIDIA-Omniverse/PhysX/blob/main/physx/source/geomutils/src/sweep/GuSweepCapsuleCapsule.cpp
 // With minor modifications to use glm::vec3 type.
+
+/**
+ * Returns the distance between two line segments.
+ *
+ * @param[out] cq Closest point on line segment pa.
+ * @param[out] cp Closest point on line segment qb.
+ * @param[in]  p  One endpoint of the first line segment.
+ * @param[in]  q  Other endpoint of the first line segment.
+ * @param[in]  p  One endpoint of the second line segment.
+ * @param[in]  q  Other endpoint of the second line segment.
+ */
 void EdgeEdgeDist(glm::vec3& x, glm::vec3& y,  // closest points
                   const glm::vec3& p,
                   const glm::vec3& a,  // seg 1 origin, vector
@@ -86,6 +100,15 @@ void EdgeEdgeDist(glm::vec3& x, glm::vec3& y,  // closest points
 // https://github.com/NVIDIA-Omniverse/PhysX/blob/main/LICENSE.md
 // https://github.com/NVIDIA-Omniverse/PhysX/blob/main/physx/source/geomutils/src/distance/GuDistanceTriangleTriangle.cpp
 // With minor modifications to use glm::vec3 type.
+
+/**
+ * Returns the minimum squared distance between two triangles.
+ *
+ * @param[out] cq Closest point on the first triangle.
+ * @param[out] cp Closest point on the second triangle.
+ * @param[in]  p  First  triangle.
+ * @param[in]  q  Second triangle.
+ */
 float DistanceTriangleTriangleSquared(glm::vec3& cp, glm::vec3& cq,
                                       const glm::vec3 p[3],
                                       const glm::vec3 q[3]) {
