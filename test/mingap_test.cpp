@@ -15,10 +15,6 @@
 #include "manifold.h"
 #include "test.h"
 
-#ifdef MANIFOLD_EXPORT
-#include "meshIO.h"
-#endif
-
 TEST(MinGap, CubeCube) {
   auto a = Manifold::Cube();
   auto b = Manifold::Cube().Translate({2.0f, 2.0f, 0.0f});
