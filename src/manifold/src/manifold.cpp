@@ -896,32 +896,25 @@ float Manifold::MinGap(const Manifold& other, float searchLength) const {
 
   if (prop.volume != 0) return 0.0f;
 
-  auto expandBox = [searchLength](const Box& box) -> Box {
-    return Box(box.min - glm::vec3(searchLength),
-               box.max + glm::vec3(searchLength));
+  auto getSortedExpandedFaceBoxMorton = [searchLength](
+                                            const Manifold& manifold) {
+    Vec<Box> faceBox;
+    Vec<uint32_t> faceMorton;
+
+    manifold.GetCsgLeafNode().GetImpl()->GetFaceBoxMorton(faceBox, faceMorton);
+
+    transform(autoPolicy(faceBox.size()), faceBox.begin(), faceBox.end(),
+              faceBox.begin(), [searchLength](const Box& box) {
+                return Box(box.min - glm::vec3(searchLength),
+                           box.max + glm::vec3(searchLength));
+              });
+
+    manifold.GetCsgLeafNode().GetImpl()->SortFaceBoxMorton(faceBox, faceMorton);
+    return std::pair{faceBox, faceMorton};
   };
 
-  Vec<Box> faceBox;
-  Vec<uint32_t> faceMorton;
-
-  GetCsgLeafNode().GetImpl()->GetFaceBoxMorton(faceBox, faceMorton);
-
-  transform(autoPolicy(faceBox.size()), faceBox.begin(), faceBox.end(),
-            faceBox.begin(), expandBox);
-
-  GetCsgLeafNode().GetImpl()->SortFaceBoxMorton(faceBox, faceMorton);
-
-  Vec<Box> faceBoxOther;
-  Vec<uint32_t> faceMortonOther;
-
-  other.GetCsgLeafNode().GetImpl()->GetFaceBoxMorton(faceBoxOther,
-                                                     faceMortonOther);
-
-  transform(autoPolicy(faceBoxOther.size()), faceBoxOther.begin(),
-            faceBoxOther.end(), faceBoxOther.begin(), expandBox);
-
-  other.GetCsgLeafNode().GetImpl()->SortFaceBoxMorton(faceBoxOther,
-                                                      faceMortonOther);
+  auto [faceBox, faceMorton] = getSortedExpandedFaceBoxMorton(*this);
+  auto [faceBoxOther, faceMortonOther] = getSortedExpandedFaceBoxMorton(other);
 
   Collider collider{faceBox, faceMorton};
 
