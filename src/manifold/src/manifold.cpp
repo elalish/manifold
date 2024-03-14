@@ -896,16 +896,18 @@ float Manifold::MinGap(const Manifold& other, float searchLength) const {
 
   if (prop.volume != 0) return 0.0f;
 
+  auto expandBox = [searchLength](const Box& box) -> Box {
+    return Box(box.min - glm::vec3(searchLength),
+               box.max + glm::vec3(searchLength));
+  };
+
   Vec<Box> faceBox;
   Vec<uint32_t> faceMorton;
 
   GetCsgLeafNode().GetImpl()->GetFaceBoxMorton(faceBox, faceMorton);
 
   transform(autoPolicy(faceBox.size()), faceBox.begin(), faceBox.end(),
-            faceBox.begin(), [searchLength](const Box& box) {
-              return Box(box.min - glm::vec3(searchLength),
-                         box.max + glm::vec3(searchLength));
-            });
+            faceBox.begin(), expandBox);
 
   GetCsgLeafNode().GetImpl()->SortFaceBoxMorton(faceBox, faceMorton);
 
@@ -916,11 +918,7 @@ float Manifold::MinGap(const Manifold& other, float searchLength) const {
                                                      faceMortonOther);
 
   transform(autoPolicy(faceBoxOther.size()), faceBoxOther.begin(),
-            faceBoxOther.end(), faceBoxOther.begin(),
-            [searchLength](const Box& box) {
-              return Box(box.min - glm::vec3(searchLength),
-                         box.max + glm::vec3(searchLength));
-            });
+            faceBoxOther.end(), faceBoxOther.begin(), expandBox);
 
   other.GetCsgLeafNode().GetImpl()->SortFaceBoxMorton(faceBoxOther,
                                                       faceMortonOther);
