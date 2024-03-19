@@ -523,28 +523,30 @@ std::vector<Smoothness> Manifold::Impl::UpdateSharpenedEdges(
 Vec<bool> Manifold::Impl::FlatFaces() const {
   const int numTri = NumTri();
   Vec<bool> triIsFlatFace(numTri, false);
-  for (int tri = 0; tri < numTri; ++tri) {
-    const TriRef& ref = meshRelation_.triRef[tri];
-    int faceNeighbors = 0;
-    glm::ivec3 faceTris = {-1, -1, -1};
-    for (const int j : {0, 1, 2}) {
-      const int neighborTri =
-          halfedge_[halfedge_[3 * tri + j].pairedHalfedge].face;
-      const TriRef& jRef = meshRelation_.triRef[neighborTri];
-      if (jRef.SameFace(ref)) {
-        ++faceNeighbors;
-        faceTris[j] = neighborTri;
-      }
-    }
-    if (faceNeighbors > 1) {
-      triIsFlatFace[tri] = true;
-      for (const int j : {0, 1, 2}) {
-        if (faceTris[j] >= 0) {
-          triIsFlatFace[faceTris[j]] = true;
+  for_each_n(
+      autoPolicy(numTri), countAt(0), numTri,
+      [this, &triIsFlatFace](const int tri) {
+        const TriRef& ref = this->meshRelation_.triRef[tri];
+        int faceNeighbors = 0;
+        glm::ivec3 faceTris = {-1, -1, -1};
+        for (const int j : {0, 1, 2}) {
+          const int neighborTri =
+              this->halfedge_[this->halfedge_[3 * tri + j].pairedHalfedge].face;
+          const TriRef& jRef = this->meshRelation_.triRef[neighborTri];
+          if (jRef.SameFace(ref)) {
+            ++faceNeighbors;
+            faceTris[j] = neighborTri;
+          }
         }
-      }
-    }
-  }
+        if (faceNeighbors > 1) {
+          triIsFlatFace[tri] = true;
+          for (const int j : {0, 1, 2}) {
+            if (faceTris[j] >= 0) {
+              triIsFlatFace[faceTris[j]] = true;
+            }
+          }
+        }
+      });
   return triIsFlatFace;
 }
 
@@ -570,12 +572,13 @@ Vec<int> Manifold::Impl::VertFlatFace(const Vec<bool>& flatFaces) const {
 std::vector<Smoothness> Manifold::Impl::SharpenEdges(
     float minSharpAngle, float minSmoothness) const {
   std::vector<Smoothness> sharpenedEdges;
+  const float minRadians = glm::radians(minSharpAngle);
   for (int e = 0; e < halfedge_.size(); ++e) {
     if (!halfedge_[e].IsForward()) continue;
     const int pair = halfedge_[e].pairedHalfedge;
-    const float dihedral = glm::degrees(
-        glm::acos(glm::dot(faceNormal_[e / 3], faceNormal_[pair / 3])));
-    if (dihedral > minSharpAngle) {
+    const float dihedral =
+        glm::acos(glm::dot(faceNormal_[e / 3], faceNormal_[pair / 3]));
+    if (dihedral > minRadians) {
       sharpenedEdges.push_back({e, minSmoothness});
       sharpenedEdges.push_back({pair, minSmoothness});
     }
@@ -657,9 +660,9 @@ void Manifold::Impl::SetNormals(int normalIdx, float minSharpAngle) {
           meshRelation_.triProperties[thisTri][j] = prop;
           if (prop == lastProp) continue;
           lastProp = prop;
-          for (int i = 0; i < oldNumProp; ++i)
-            meshRelation_.properties[prop * numProp + i] =
-                oldProperties[prop * oldNumProp + i];
+          auto start = oldProperties.begin() + prop * oldNumProp;
+          std::copy(start, start + oldNumProp,
+                    meshRelation_.properties.begin() + prop * numProp);
           for (const int i : {0, 1, 2})
             meshRelation_.properties[prop * numProp + normalIdx + i] =
                 normal[i];
@@ -732,15 +735,15 @@ void Manifold::Impl::SetNormals(int normalIdx, float minSharpAngle) {
           const int thisTri = current / 3;
           const int j = current - 3 * thisTri;
           const int prop = oldTriProp[thisTri][j];
+          auto start = oldProperties.begin() + prop * oldNumProp;
 
           if (group[idx] != lastGroup && group[idx] != 0 && prop == lastProp) {
             lastGroup = group[idx];
             newProp = NumPropVert();
             meshRelation_.properties.resize(meshRelation_.properties.size() +
                                             numProp);
-            for (int i = 0; i < oldNumProp; ++i)
-              meshRelation_.properties[newProp * numProp + i] =
-                  oldProperties[prop * oldNumProp + i];
+            std::copy(start, start + oldNumProp,
+                      meshRelation_.properties.begin() + newProp * numProp);
             for (const int i : {0, 1, 2}) {
               meshRelation_.properties[newProp * numProp + normalIdx + i] =
                   normals[group[idx]][i];
@@ -748,9 +751,8 @@ void Manifold::Impl::SetNormals(int normalIdx, float minSharpAngle) {
           } else if (prop != lastProp) {
             lastProp = prop;
             newProp = prop;
-            for (int i = 0; i < oldNumProp; ++i)
-              meshRelation_.properties[prop * numProp + i] =
-                  oldProperties[prop * oldNumProp + i];
+            std::copy(start, start + oldNumProp,
+                      meshRelation_.properties.begin() + prop * numProp);
             for (const int i : {0, 1, 2})
               meshRelation_.properties[prop * numProp + normalIdx + i] =
                   normals[group[idx]][i];
