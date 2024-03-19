@@ -139,6 +139,8 @@ ManifoldManifold *manifold_mirror(void *mem, ManifoldManifold *m, float nx,
                                   float ny, float nz);
 ManifoldManifold *manifold_warp(void *mem, ManifoldManifold *m,
                                 ManifoldVec3 (*fun)(float, float, float));
+ManifoldManifold *manifold_smooth_out(void *mem, ManifoldManifold *m,
+                                      float minSharpAngle, float minSmoothness);
 ManifoldManifold *manifold_refine(void *mem, ManifoldManifold *m, int refine);
 ManifoldManifold *manifold_refine_to_length(void *mem, ManifoldManifold *m,
                                             float length);

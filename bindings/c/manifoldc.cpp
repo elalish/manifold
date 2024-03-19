@@ -300,6 +300,13 @@ ManifoldMeshGL *manifold_level_set_seq_context(
   return level_set_context(mem, sdf, bounds, edge_length, level, true, ctx);
 }
 
+ManifoldManifold *manifold_smooth_out(void *mem, ManifoldManifold *m,
+                                      float minSharpAngle,
+                                      float minSmoothness) {
+  auto smoothed = from_c(m)->SmoothOut(minSharpAngle, minSmoothness);
+  return to_c(new (mem) Manifold(smoothed));
+}
+
 ManifoldManifold *manifold_refine(void *mem, ManifoldManifold *m, int refine) {
   auto refined = from_c(m)->Refine(refine);
   return to_c(new (mem) Manifold(refined));

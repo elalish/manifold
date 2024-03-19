@@ -575,7 +575,7 @@ export class Manifold {
    * small fillet on these sharp edges. A value of 1 is equivalent to a
    * minSharpAngle of 180 - all edges will be smooth.
    */
-  smooth(minSharpAngle?: number, minSmoothness?: number): Manifold;
+  smoothOut(minSharpAngle?: number, minSmoothness?: number): Manifold;
 
   /**
    * Increase the density of the mesh by splitting every edge into n pieces. For

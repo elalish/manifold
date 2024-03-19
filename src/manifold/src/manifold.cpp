@@ -692,7 +692,7 @@ Manifold Manifold::CalculateNormals(int normalIdx, float minSharpAngle) const {
  * fillet on these sharp edges. A value of 1 is equivalent to a minSharpAngle of
  * 180 - all edges will be smooth.
  */
-Manifold Manifold::Smooth(float minSharpAngle, float minSmoothness) const {
+Manifold Manifold::SmoothOut(float minSharpAngle, float minSmoothness) const {
   auto pImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
   if (!IsEmpty()) {
     pImpl->CreateTangents(pImpl->SharpenEdges(minSharpAngle, minSmoothness));
