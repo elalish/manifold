@@ -677,15 +677,15 @@ Manifold Manifold::CalculateNormals(int normalIdx, float minSharpAngle) const {
 }
 
 /**
- * Smooths the Manifold by filling in the halfedgeTangent vectors. The geometry
- * will remain unchanged until Refine or RefineToLength is called to interpolate
- * the surface.
+ * Smooths out the Manifold by filling in the halfedgeTangent vectors. The
+ * geometry will remain unchanged until Refine or RefineToLength is called to
+ * interpolate the surface.
  *
  * @param minSharpAngle degrees, default 60. Any edges with angles greater than
  * this value will remain sharp. The rest will be smoothed to G1 continuity,
  * with the caveat that flat faces of three or more triangles will always remain
  * flat. With a value of zero, the model is faceted, but in this case there is
- * no point of smoothing.
+ * no point in smoothing.
  *
  * @param minSmoothness range: 0 - 1, default 0. The smoothness applied to sharp
  * angles. The default gives a hard edge, while values > 0 will give a small

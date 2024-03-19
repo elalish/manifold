@@ -560,7 +560,7 @@ export class Manifold {
   warp(warpFunc: (vert: Vec3) => void): Manifold;
 
   /**
-   * Smooths the Manifold by filling in the halfedgeTangent vectors. The
+   * Smooths out the Manifold by filling in the halfedgeTangent vectors. The
    * geometry will remain unchanged until Refine or RefineToLength is called to
    * interpolate the surface.
    *
@@ -568,7 +568,7 @@ export class Manifold {
    * than this value will remain sharp. The rest will be smoothed to G1
    * continuity, with the caveat that flat faces of three or more triangles will
    * always remain flat. With a value of zero, the model is faceted, but in this
-   * case there is no point of smoothing.
+   * case there is no point in smoothing.
    *
    * @param minSmoothness range: 0 - 1, default 0. The smoothness applied to
    * sharp angles. The default gives a hard edge, while values > 0 will give a

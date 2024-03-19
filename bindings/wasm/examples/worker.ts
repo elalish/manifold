@@ -71,7 +71,7 @@ const manifoldMemberFunctions = [
   'mirror',
   'calculateCurvature',
   'calculateNormals',
-  'smooth',
+  'smoothOut',
   'refine',
   'refineToLength',
   'setProperties',
