@@ -316,7 +316,7 @@ NB_MODULE(manifold3d, m) {
            nb::arg("gaussian_idx"), nb::arg("mean_idx"),
            manifold__calculate_curvature__gaussian_idx__mean_idx)
       .def("calculate_normals", &Manifold::CalculateNormals,
-           nb::arg("normal_idx"), nb::arg("min_sharp_angle"),
+           nb::arg("normal_idx"), nb::arg("min_sharp_angle") = 60,
            manifold__calculate_normals__normal_idx__min_sharp_angle)
       .def("smooth_out", &Manifold::SmoothOut, nb::arg("min_sharp_angle") = 60,
            nb::arg("min_smoothness") = 0,
