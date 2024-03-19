@@ -315,6 +315,12 @@ NB_MODULE(manifold3d, m) {
       .def("calculate_curvature", &Manifold::CalculateCurvature,
            nb::arg("gaussian_idx"), nb::arg("mean_idx"),
            manifold__calculate_curvature__gaussian_idx__mean_idx)
+      .def("calculate_normals", &Manifold::CalculateNormals,
+           nb::arg("normal_idx"), nb::arg("min_sharp_angle") = 60,
+           manifold__calculate_normals__normal_idx__min_sharp_angle)
+      .def("smooth_out", &Manifold::SmoothOut, nb::arg("min_sharp_angle") = 60,
+           nb::arg("min_smoothness") = 0,
+           manifold__smooth_out__min_sharp_angle__min_smoothness)
       .def("refine", &Manifold::Refine, nb::arg("n"), manifold__refine__n)
       .def("refine_to_length", &Manifold::RefineToLength, nb::arg("length"),
            manifold__refine_to_length__length)

@@ -139,6 +139,8 @@ ManifoldManifold *manifold_mirror(void *mem, ManifoldManifold *m, float nx,
                                   float ny, float nz);
 ManifoldManifold *manifold_warp(void *mem, ManifoldManifold *m,
                                 ManifoldVec3 (*fun)(float, float, float));
+ManifoldManifold *manifold_smooth_out(void *mem, ManifoldManifold *m,
+                                      float minSharpAngle, float minSmoothness);
 ManifoldManifold *manifold_refine(void *mem, ManifoldManifold *m, int refine);
 ManifoldManifold *manifold_refine_to_length(void *mem, ManifoldManifold *m,
                                             float length);
@@ -188,6 +190,9 @@ ManifoldManifold *manifold_set_properties(
     void (*fun)(float *new_prop, ManifoldVec3 position, const float *old_prop));
 ManifoldManifold *manifold_calculate_curvature(void *mem, ManifoldManifold *m,
                                                int gaussian_idx, int mean_idx);
+ManifoldManifold *manifold_calculate_normals(void *mem, ManifoldManifold *m,
+                                             int normal_idx,
+                                             int min_sharp_angle);
 
 // CrossSection Shapes/Constructors
 
