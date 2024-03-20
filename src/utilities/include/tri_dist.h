@@ -54,10 +54,9 @@ inline void EdgeEdgeDist(glm::vec3& x, glm::vec3& y,  // closest points
   const float Denom = ADotA * BDotB - ADotB * ADotB;
 
   float t;  // We will clamp result so t is on the segment (p, a)
-  if (Denom != 0.0f)
-    t = glm::clamp((ADotT * BDotB - BDotT * ADotB) / Denom, 0.0f, 1.0f);
-  else
-    t = 0.0f;
+  t = Denom != 0.0f
+          ? glm::clamp((ADotT * BDotB - BDotT * ADotB) / Denom, 0.0f, 1.0f)
+          : 0.0f;
 
   // find u for point on ray (q, b) closest to point at t
   float u;
@@ -68,23 +67,15 @@ inline void EdgeEdgeDist(glm::vec3& x, glm::vec3& y,  // closest points
     // otherwise, clamp u, recompute and clamp t
     if (u < 0.0f) {
       u = 0.0f;
-      if (ADotA != 0.0f)
-        t = glm::clamp(ADotT / ADotA, 0.0f, 1.0f);
-      else
-        t = 0.0f;
+      t = ADotA != 0.0f ? glm::clamp(ADotT / ADotA, 0.0f, 1.0f) : 0.0f;
     } else if (u > 1.0f) {
       u = 1.0f;
-      if (ADotA != 0.0f)
-        t = glm::clamp((ADotB + ADotT) / ADotA, 0.0f, 1.0f);
-      else
-        t = 0.0f;
+      t = ADotA != 0.0f ? glm::clamp((ADotB + ADotT) / ADotA, 0.0f, 1.0f)
+                        : 0.0f;
     }
   } else {
     u = 0.0f;
-    if (ADotA != 0.0f)
-      t = glm::clamp(ADotT / ADotA, 0.0f, 1.0f);
-    else
-      t = 0.0f;
+    t = ADotA != 0.0f ? glm::clamp(ADotT / ADotA, 0.0f, 1.0f) : 0.0f;
   }
   x = p + a * static_cast<float>(t);
   y = q + b * static_cast<float>(u);
@@ -164,16 +155,10 @@ inline float DistanceTriangleTriangleSquared(glm::vec3& cp, glm::vec3& cq,
 
     int index = -1;
     if ((Tp[0] > 0.0f) && (Tp[1] > 0.0f) && (Tp[2] > 0.0f)) {
-      if (Tp[0] < Tp[1])
-        index = 0;
-      else
-        index = 1;
+      index = Tp[0] < Tp[1] ? 0 : 1;
       if (Tp[2] < Tp[index]) index = 2;
     } else if ((Tp[0] < 0.0f) && (Tp[1] < 0.0f) && (Tp[2] < 0.0f)) {
-      if (Tp[0] > Tp[1])
-        index = 0;
-      else
-        index = 1;
+      index = Tp[0] > Tp[1] ? 0 : 1;
       if (Tp[2] > Tp[index]) index = 2;
     }
 
@@ -209,16 +194,10 @@ inline float DistanceTriangleTriangleSquared(glm::vec3& cp, glm::vec3& cq,
 
     int index = -1;
     if ((Sp[0] > 0.0f) && (Sp[1] > 0.0f) && (Sp[2] > 0.0f)) {
-      if (Sp[0] < Sp[1])
-        index = 0;
-      else
-        index = 1;
+      index = Sp[0] < Sp[1] ? 0 : 1;
       if (Sp[2] < Sp[index]) index = 2;
     } else if ((Sp[0] < 0.0f) && (Sp[1] < 0.0f) && (Sp[2] < 0.0f)) {
-      if (Sp[0] > Sp[1])
-        index = 0;
-      else
-        index = 1;
+      index = Sp[0] > Sp[1] ? 0 : 1;
       if (Sp[2] > Sp[index]) index = 2;
     }
 
