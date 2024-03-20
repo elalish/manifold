@@ -932,9 +932,6 @@ float Manifold::MinGap(const Manifold& other, float searchLength) const {
     const int tri = collisions.Get(i, 1);
     const int triOther = collisions.Get(i, 0);
 
-    glm::vec3 cp;
-    glm::vec3 cq;
-
     glm::vec3 p[3];
     glm::vec3 q[3];
 
@@ -943,7 +940,7 @@ float Manifold::MinGap(const Manifold& other, float searchLength) const {
       q[j] = vertPosOther[halfedgeOther[3 * triOther + j].startVert];
     }
 
-    float distanceSquared = DistanceTriangleTriangleSquared(cp, cq, p, q);
+    float distanceSquared = DistanceTriangleTriangleSquared(p, q);
 
     minDistanceSquared = std::min(minDistanceSquared, distanceSquared);
   }

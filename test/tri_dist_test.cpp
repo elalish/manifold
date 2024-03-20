@@ -19,58 +19,47 @@
 #include "test.h"
 
 TEST(TriangleDistance, ClosestPointsOnVertices) {
-  glm::vec3 cp;
-  glm::vec3 cq;
-
   glm::vec3 p[3] = {
       {-1.0f, 0.0f, 0.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}};
 
   glm::vec3 q[3] = {{2.0f, 0.0f, 0.0f}, {4.0f, 0.0f, 0.0f}, {3.0f, 1.0f, 0.0f}};
-  float distance = DistanceTriangleTriangleSquared(cp, cq, p, q);
+
+  float distance = DistanceTriangleTriangleSquared(p, q);
 
   EXPECT_FLOAT_EQ(distance, 1.0f);
 }
 
 TEST(TriangleDistance, ClosestPointOnEdge) {
-  glm::vec3 cp;
-  glm::vec3 cq;
-
   glm::vec3 p[3] = {
       {-1.0f, 0.0f, 0.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}};
 
   glm::vec3 q[3] = {
       {-1.0f, 2.0f, 0.0f}, {1.0f, 2.0f, 0.0f}, {0.0f, 3.0f, 0.0f}};
 
-  float distance = DistanceTriangleTriangleSquared(cp, cq, p, q);
+  float distance = DistanceTriangleTriangleSquared(p, q);
 
   EXPECT_FLOAT_EQ(distance, 1.0f);
 }
 
 TEST(TriangleDistance, ClosestPointOnEdge2) {
-  glm::vec3 cp;
-  glm::vec3 cq;
-
   glm::vec3 p[3] = {
       {-1.0f, 0.0f, 0.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}};
 
   glm::vec3 q[3] = {{1.0f, 1.0f, 0.0f}, {3.0f, 1.0f, 0.0f}, {2.0f, 2.0f, 0.0f}};
 
-  float distance = DistanceTriangleTriangleSquared(cp, cq, p, q);
+  float distance = DistanceTriangleTriangleSquared(p, q);
 
   EXPECT_FLOAT_EQ(distance, 0.5f);
 }
 
 TEST(TriangleDistance, ClosestPointOnFace) {
-  glm::vec3 cp;
-  glm::vec3 cq;
-
   glm::vec3 p[3] = {
       {-1.0f, 0.0f, 0.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}};
 
   glm::vec3 q[3] = {
       {-1.0f, 2.0f, -0.5f}, {1.0f, 2.0f, -0.5f}, {0.0f, 2.0f, 1.5f}};
 
-  float distance = DistanceTriangleTriangleSquared(cp, cq, p, q);
+  float distance = DistanceTriangleTriangleSquared(p, q);
 
   EXPECT_FLOAT_EQ(distance, 1.0f);
 }

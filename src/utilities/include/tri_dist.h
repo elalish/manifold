@@ -94,8 +94,7 @@ inline void EdgeEdgeDist(glm::vec3& x, glm::vec3& y,  // closest points
  * @param[in]  p  First  triangle.
  * @param[in]  q  Second triangle.
  */
-inline float DistanceTriangleTriangleSquared(glm::vec3& cp, glm::vec3& cq,
-                                             const glm::vec3 p[3],
+inline float DistanceTriangleTriangleSquared(const glm::vec3 p[3],
                                              const glm::vec3 q[3]) {
   std::array<glm::vec3, 3> Sv;
   Sv[0] = p[1] - p[0];
@@ -107,20 +106,19 @@ inline float DistanceTriangleTriangleSquared(glm::vec3& cp, glm::vec3& cq,
   Tv[1] = q[2] - q[1];
   Tv[2] = q[0] - q[2];
 
-  glm::vec3 minP, minQ;
   bool shown_disjoint = false;
 
   float mindd = std::numeric_limits<float>::max();
 
   for (uint32_t i = 0; i < 3; i++) {
     for (uint32_t j = 0; j < 3; j++) {
+      glm::vec3 cp;
+      glm::vec3 cq;
       EdgeEdgeDist(cp, cq, p[i], Sv[i], q[j], Tv[j]);
       const glm::vec3 V = cq - cp;
       const float dd = glm::dot(V, V);
 
       if (dd <= mindd) {
-        minP = cp;
-        minQ = cq;
         mindd = dd;
 
         uint32_t id = i + 2;
@@ -176,8 +174,8 @@ inline float DistanceTriangleTriangleSquared(glm::vec3& cp, glm::vec3& cq,
           V = qIndex - p[2];
           Z = glm::cross(Sn, Sv[2]);
           if (glm::dot(V, Z) > 0.0f) {
-            cp = qIndex + Sn * Tp[index] / Snl;
-            cq = qIndex;
+            glm::vec3 cp = qIndex + Sn * Tp[index] / Snl;
+            glm::vec3 cq = qIndex;
             return glm::dot(cp - cq, cp - cq);
           }
         }
@@ -215,8 +213,8 @@ inline float DistanceTriangleTriangleSquared(glm::vec3& cp, glm::vec3& cq,
           V = pIndex - q[2];
           Z = glm::cross(Tn, Tv[2]);
           if (glm::dot(V, Z) > 0.0f) {
-            cp = pIndex;
-            cq = pIndex + Tn * Sp[index] / Tnl;
+            glm::vec3 cp = pIndex;
+            glm::vec3 cq = pIndex + Tn * Sp[index] / Tnl;
             return glm::dot(cp - cq, cp - cq);
           }
         }
@@ -224,12 +222,6 @@ inline float DistanceTriangleTriangleSquared(glm::vec3& cp, glm::vec3& cq,
     }
   }
 
-  if (shown_disjoint) {
-    cp = minP;
-    cq = minQ;
-    return mindd;
-  } else {
-    return 0.0f;
-  }
+  return shown_disjoint ? mindd : 0.0f;
 };
 }  // namespace manifold
