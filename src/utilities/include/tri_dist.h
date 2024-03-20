@@ -20,7 +20,7 @@
 namespace manifold {
 
 template <typename T>
-const T& clamp(const T& v, const T& lo, const T& hi) {
+inline const T& clamp(const T& v, const T& lo, const T& hi) {
   assert(!(hi < lo));
   return (v < lo) ? lo : (hi < v) ? hi : v;
 }
@@ -40,11 +40,11 @@ const T& clamp(const T& v, const T& lo, const T& hi) {
  * @param[in]  p  One endpoint of the second line segment.
  * @param[in]  q  Other endpoint of the second line segment.
  */
-void EdgeEdgeDist(glm::vec3& x, glm::vec3& y,  // closest points
-                  const glm::vec3& p,
-                  const glm::vec3& a,  // seg 1 origin, vector
-                  const glm::vec3& q,
-                  const glm::vec3& b)  // seg 2 origin, vector
+inline void EdgeEdgeDist(glm::vec3& x, glm::vec3& y,  // closest points
+                         const glm::vec3& p,
+                         const glm::vec3& a,  // seg 1 origin, vector
+                         const glm::vec3& q,
+                         const glm::vec3& b)  // seg 2 origin, vector
 {
   const glm::vec3 T = q - p;
   const double ADotA = glm::dot(a, a);
@@ -109,9 +109,9 @@ void EdgeEdgeDist(glm::vec3& x, glm::vec3& y,  // closest points
  * @param[in]  p  First  triangle.
  * @param[in]  q  Second triangle.
  */
-float DistanceTriangleTriangleSquared(glm::vec3& cp, glm::vec3& cq,
-                                      const glm::vec3 p[3],
-                                      const glm::vec3 q[3]) {
+inline float DistanceTriangleTriangleSquared(glm::vec3& cp, glm::vec3& cq,
+                                             const glm::vec3 p[3],
+                                             const glm::vec3 q[3]) {
   std::array<glm::vec3, 3> Sv;
   Sv[0] = p[1] - p[0];
   Sv[1] = p[2] - p[1];

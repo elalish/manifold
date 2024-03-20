@@ -922,10 +922,10 @@ float Manifold::MinGap(const Manifold& other, float searchLength) const {
 
   float minDistanceSquared = searchLength * searchLength;
 
-  auto vertPos = GetMesh().vertPos;
+  auto vertPos = GetCsgLeafNode().GetImpl()->vertPos_;
   auto halfedge = GetCsgLeafNode().GetImpl()->halfedge_;
 
-  auto vertPosOther = other.GetMesh().vertPos;
+  auto vertPosOther = other.GetCsgLeafNode().GetImpl()->vertPos_;
   auto halfedgeOther = other.GetCsgLeafNode().GetImpl()->halfedge_;
 
   for (int i = 0; i < collisions.size(); ++i) {

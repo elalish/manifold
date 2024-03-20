@@ -218,6 +218,7 @@ class Manifold {
   float Precision() const;
   int Genus() const;
   Properties GetProperties() const;
+  float MinGap(const Manifold& other, float searchLength) const;
   ///@}
 
   /** @name Mesh ID
@@ -291,12 +292,6 @@ class Manifold {
   bool MatchesTriNormals() const;
   int NumDegenerateTris() const;
   int NumOverlaps(const Manifold& second) const;
-  ///@}
-
-  /** @name Utilities
-   */
-  ///@{
-  float MinGap(const Manifold& other, float searchLength) const;
   ///@}
 
   struct Impl;
