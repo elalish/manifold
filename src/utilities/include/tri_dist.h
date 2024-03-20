@@ -19,12 +19,6 @@
 
 namespace manifold {
 
-template <typename T>
-inline const T& clamp(const T& v, const T& lo, const T& hi) {
-  assert(!(hi < lo));
-  return (v < lo) ? lo : (hi < v) ? hi : v;
-}
-
 // From NVIDIA-Omniverse PhysX - BSD 3-Clause "New" or "Revised" License
 // https://github.com/NVIDIA-Omniverse/PhysX/blob/main/LICENSE.md
 // https://github.com/NVIDIA-Omniverse/PhysX/blob/main/physx/source/geomutils/src/sweep/GuSweepCapsuleCapsule.cpp
@@ -47,26 +41,26 @@ inline void EdgeEdgeDist(glm::vec3& x, glm::vec3& y,  // closest points
                          const glm::vec3& b)  // seg 2 origin, vector
 {
   const glm::vec3 T = q - p;
-  const double ADotA = glm::dot(a, a);
-  const double BDotB = glm::dot(b, b);
-  const double ADotB = glm::dot(a, b);
-  const double ADotT = glm::dot(a, T);
-  const double BDotT = glm::dot(b, T);
+  const float ADotA = glm::dot(a, a);
+  const float BDotB = glm::dot(b, b);
+  const float ADotB = glm::dot(a, b);
+  const float ADotT = glm::dot(a, T);
+  const float BDotT = glm::dot(b, T);
 
   // t parameterizes ray (p, a)
   // u parameterizes ray (q, b)
 
   // Compute t for the closest point on ray (p, a) to ray (q, b)
-  const double Denom = ADotA * BDotB - ADotB * ADotB;
+  const float Denom = ADotA * BDotB - ADotB * ADotB;
 
-  double t;  // We will clamp result so t is on the segment (p, a)
+  float t;  // We will clamp result so t is on the segment (p, a)
   if (Denom != 0.0f)
-    t = clamp((ADotT * BDotB - BDotT * ADotB) / Denom, 0.0, 1.0);
+    t = glm::clamp((ADotT * BDotB - BDotT * ADotB) / Denom, 0.0f, 1.0f);
   else
     t = 0.0f;
 
   // find u for point on ray (q, b) closest to point at t
-  double u;
+  float u;
   if (BDotB != 0.0f) {
     u = (t * ADotB - BDotT) / BDotB;
 
@@ -75,20 +69,20 @@ inline void EdgeEdgeDist(glm::vec3& x, glm::vec3& y,  // closest points
     if (u < 0.0f) {
       u = 0.0f;
       if (ADotA != 0.0f)
-        t = clamp(ADotT / ADotA, 0.0, 1.0);
+        t = glm::clamp(ADotT / ADotA, 0.0f, 1.0f);
       else
         t = 0.0f;
     } else if (u > 1.0f) {
       u = 1.0f;
       if (ADotA != 0.0f)
-        t = clamp((ADotB + ADotT) / ADotA, 0.0, 1.0);
+        t = glm::clamp((ADotB + ADotT) / ADotA, 0.0f, 1.0f);
       else
         t = 0.0f;
     }
   } else {
     u = 0.0f;
     if (ADotA != 0.0f)
-      t = clamp(ADotT / ADotA, 0.0, 1.0);
+      t = glm::clamp(ADotT / ADotA, 0.0f, 1.0f);
     else
       t = 0.0f;
   }
