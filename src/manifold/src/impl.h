@@ -137,6 +137,7 @@ struct Manifold::Impl {
   void SplitPinchedVerts();
 
   // smoothing.cu
+  glm::vec3 GetNormal(int halfedge, int normalIdx) const;
   std::vector<Smoothness> UpdateSharpenedEdges(
       const std::vector<Smoothness>&) const;
   Vec<bool> FlatFaces() const;
@@ -144,6 +145,7 @@ struct Manifold::Impl {
   std::vector<Smoothness> SharpenEdges(float minSharpAngle,
                                        float minSmoothness) const;
   void SetNormals(int normalIdx, float minSharpAngle);
+  void CreateTangents(int normalIdx);
   void CreateTangents(std::vector<Smoothness>);
   Vec<Barycentric> Subdivide(std::function<int(glm::vec3)>);
   void Refine(std::function<int(glm::vec3)>);

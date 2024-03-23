@@ -661,8 +661,8 @@ Manifold Manifold::CalculateCurvature(int gaussianIdx, int meanIdx) const {
  *
  * @param normalIdx The property channel in which to store the X
  * values of the normals. The X, Y, and Z channels will be sequential. The
- * property set will be automatically expanded to include up through normalIdx
- * + 2.
+ * property set will be automatically expanded such that NumProp will be at
+ * least normalIdx + 3.
  *
  * @param minSharpAngle Any edges with angles greater than this value will
  * remain sharp, getting different normal vector properties on each side of the
@@ -679,7 +679,26 @@ Manifold Manifold::CalculateNormals(int normalIdx, float minSharpAngle) const {
 /**
  * Smooths out the Manifold by filling in the halfedgeTangent vectors. The
  * geometry will remain unchanged until Refine or RefineToLength is called to
- * interpolate the surface.
+ * interpolate the surface. This version uses the supplied vertex normal
+ * properties to define the tangent vectors.
+ *
+ * @param normalIdx The first property channel of the normals. NumProp must be
+ * at least normalIdx + 3. Any vertex where multiple normals exist and don't
+ * agree will result in a sharp edge.
+ */
+Manifold Manifold::SmoothByNormals(int normalIdx) const {
+  auto pImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
+  if (!IsEmpty()) {
+    pImpl->CreateTangents(normalIdx);
+  }
+  return Manifold(std::make_shared<CsgLeafNode>(pImpl));
+}
+
+/**
+ * Smooths out the Manifold by filling in the halfedgeTangent vectors. The
+ * geometry will remain unchanged until Refine or RefineToLength is called to
+ * interpolate the surface. This version uses the geometry of the triangles and
+ * pseudo-normals to define the tangent vectors.
  *
  * @param minSharpAngle degrees, default 60. Any edges with angles greater than
  * this value will remain sharp. The rest will be smoothed to G1 continuity,

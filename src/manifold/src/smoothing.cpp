@@ -501,6 +501,18 @@ class Partition {
 
 namespace manifold {
 
+glm::vec3 Manifold::Impl::GetNormal(int halfedge, int normalIdx) const {
+  const int tri = halfedge / 3;
+  const int j = halfedge % 3;
+  const int prop = meshRelation_.triProperties[tri][j];
+  glm::vec3 normal;
+  for (const int i : {0, 1, 2}) {
+    normal[i] =
+        meshRelation_.properties[prop * meshRelation_.numProp + normalIdx + i];
+  }
+  return normal;
+}
+
 // sharpenedEdges are referenced to the input Mesh, but the triangles have
 // been sorted in creating the Manifold, so the indices are converted using
 // meshRelation_.
@@ -762,6 +774,87 @@ void Manifold::Impl::SetNormals(int normalIdx, float minSharpAngle) {
           ++idx;
         } while (current != endEdge);
       }
+    }
+  }
+}
+
+/**
+ * Calculates halfedgeTangent_, allowing the manifold to be refined and
+ * smoothed. The tangents form weighted cubic Beziers along each edge. This
+ * function creates circular arcs where possible (minimizing maximum curvature),
+ * constrained to the indicated property normals. Across edges that form
+ * discontinuities in the normals, the tangent vectors are zero-length, allowing
+ * the shape to form a sharp corner with minimal oscillation.
+ */
+void Manifold::Impl::CreateTangents(int normalIdx) {
+  ZoneScoped;
+  const int numVert = NumVert();
+  const int numHalfedge = halfedge_.size();
+  halfedgeTangent_.resize(numHalfedge);
+
+  Vec<glm::vec3> vertNormal(numVert);
+  Vec<glm::ivec2> vertSharpHalfedge(numVert, glm::ivec2(-1));
+  for (int e = 0; e < numHalfedge; ++e) {
+    const int vert = halfedge_[e].startVert;
+    if (vertSharpHalfedge[vert][0] >= 0 && vertSharpHalfedge[vert][1] >= 0)
+      continue;
+
+    const int numProp = NumProp();
+    int numNormals = 0;
+    glm::vec3 lastNormal = {0, 0, 0};
+    int idx = 0;
+    int current = e;
+    do {
+      current = NextHalfedge(halfedge_[current].pairedHalfedge);
+      const glm::vec3 normal = GetNormal(current, normalIdx);
+      const glm::vec3 diff = lastNormal - normal;
+      if (glm::dot(diff, diff) > kTolerance * kTolerance) {
+        if (idx > 1) {
+          vertSharpHalfedge[vert][0] = -1;
+        } else {
+          vertSharpHalfedge[vert][idx++] = current;
+        }
+      }
+      lastNormal = normal;
+    } while (current != e);
+
+    vertNormal[vert] = lastNormal;  // Only used when there is only one.
+  }
+
+  for_each_n(autoPolicy(numHalfedge),
+             zip(halfedgeTangent_.begin(), halfedge_.cbegin()), numHalfedge,
+             SmoothBezier({vertPos_, faceNormal_, vertNormal, halfedge_}));
+
+  Vec<glm::vec4>& tangent = halfedgeTangent_;
+  for (int vert = 0; vert < numVert; ++vert) {
+    const int first = vertSharpHalfedge[vert][0];
+    const int second = vertSharpHalfedge[vert][1];
+    if (second == -1) continue;
+    if (first != -1) {  // Make continuous edge
+      const glm::vec3 newTangent = glm::normalize(glm::cross(
+          GetNormal(first, normalIdx), GetNormal(second, normalIdx)));
+      if (!isfinite(newTangent[0])) continue;
+
+      tangent[first] =
+          glm::vec4(glm::length(glm::vec3(tangent[first])) * newTangent,
+                    tangent[first].w);
+      tangent[second] =
+          glm::vec4(-glm::length(glm::vec3(tangent[second])) * newTangent,
+                    tangent[second].w);
+
+      int current = first;
+      do {
+        if (current != first && current != second) {
+          tangent[current] = glm::vec4(0);
+        }
+        current = NextHalfedge(halfedge_[current].pairedHalfedge);
+      } while (current != first);
+    } else {  // Sharpen vertex uniformly
+      int current = first;
+      do {
+        tangent[current] = glm::vec4(0);
+        current = NextHalfedge(halfedge_[current].pairedHalfedge);
+      } while (current != first);
     }
   }
 }
