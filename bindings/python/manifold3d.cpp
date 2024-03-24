@@ -323,6 +323,12 @@ NB_MODULE(manifold3d, m) {
           nb::arg("other"), nb::arg("search_length"),
           "Returns the minimum distance between two manifolds."
           "Returns a float between 0 and searchLength.")
+      .def("calculate_normals", &Manifold::CalculateNormals,
+           nb::arg("normal_idx"), nb::arg("min_sharp_angle") = 60,
+           manifold__calculate_normals__normal_idx__min_sharp_angle)
+      .def("smooth_out", &Manifold::SmoothOut, nb::arg("min_sharp_angle") = 60,
+           nb::arg("min_smoothness") = 0,
+           manifold__smooth_out__min_sharp_angle__min_smoothness)
       .def("refine", &Manifold::Refine, nb::arg("n"), manifold__refine__n)
       .def("refine_to_length", &Manifold::RefineToLength, nb::arg("length"),
            manifold__refine_to_length__length)

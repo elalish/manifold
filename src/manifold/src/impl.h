@@ -140,7 +140,14 @@ struct Manifold::Impl {
   void SplitPinchedVerts();
 
   // smoothing.cu
-  void CreateTangents(const std::vector<Smoothness>&);
+  std::vector<Smoothness> UpdateSharpenedEdges(
+      const std::vector<Smoothness>&) const;
+  Vec<bool> FlatFaces() const;
+  Vec<int> VertFlatFace(const Vec<bool>&) const;
+  std::vector<Smoothness> SharpenEdges(float minSharpAngle,
+                                       float minSmoothness) const;
+  void SetNormals(int normalIdx, float minSharpAngle);
+  void CreateTangents(std::vector<Smoothness>);
   Vec<Barycentric> Subdivide(std::function<int(glm::vec3)>);
   void Refine(std::function<int(glm::vec3)>);
 };

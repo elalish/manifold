@@ -501,6 +501,271 @@ class Partition {
 
 namespace manifold {
 
+// sharpenedEdges are referenced to the input Mesh, but the triangles have
+// been sorted in creating the Manifold, so the indices are converted using
+// meshRelation_.
+std::vector<Smoothness> Manifold::Impl::UpdateSharpenedEdges(
+    const std::vector<Smoothness>& sharpenedEdges) const {
+  std::unordered_map<int, int> oldHalfedge2New;
+  for (int tri = 0; tri < NumTri(); ++tri) {
+    int oldTri = meshRelation_.triRef[tri].tri;
+    for (int i : {0, 1, 2}) oldHalfedge2New[3 * oldTri + i] = 3 * tri + i;
+  }
+  std::vector<Smoothness> newSharp = sharpenedEdges;
+  for (Smoothness& edge : newSharp) {
+    edge.halfedge = oldHalfedge2New[edge.halfedge];
+  }
+  return newSharp;
+}
+
+// Find faces containing at least 3 triangles - these will not have
+// interpolated normals - all their vert normals must match their face normal.
+Vec<bool> Manifold::Impl::FlatFaces() const {
+  const int numTri = NumTri();
+  Vec<bool> triIsFlatFace(numTri, false);
+  for_each_n(
+      autoPolicy(numTri), countAt(0), numTri,
+      [this, &triIsFlatFace](const int tri) {
+        const TriRef& ref = this->meshRelation_.triRef[tri];
+        int faceNeighbors = 0;
+        glm::ivec3 faceTris = {-1, -1, -1};
+        for (const int j : {0, 1, 2}) {
+          const int neighborTri =
+              this->halfedge_[this->halfedge_[3 * tri + j].pairedHalfedge].face;
+          const TriRef& jRef = this->meshRelation_.triRef[neighborTri];
+          if (jRef.SameFace(ref)) {
+            ++faceNeighbors;
+            faceTris[j] = neighborTri;
+          }
+        }
+        if (faceNeighbors > 1) {
+          triIsFlatFace[tri] = true;
+          for (const int j : {0, 1, 2}) {
+            if (faceTris[j] >= 0) {
+              triIsFlatFace[faceTris[j]] = true;
+            }
+          }
+        }
+      });
+  return triIsFlatFace;
+}
+
+// Returns a vector of length numVert that has a tri that is part of a
+// neighboring flat face if there is only one flat face. If there are none it
+// gets -1, and if there are more than one it gets -2.
+Vec<int> Manifold::Impl::VertFlatFace(const Vec<bool>& flatFaces) const {
+  Vec<int> vertFlatFace(NumVert(), -1);
+  Vec<TriRef> vertRef(NumVert(), {-1, -1, -1});
+  for (int tri = 0; tri < NumTri(); ++tri) {
+    if (flatFaces[tri]) {
+      for (const int j : {0, 1, 2}) {
+        const int vert = halfedge_[3 * tri + j].startVert;
+        if (vertRef[vert].SameFace(meshRelation_.triRef[tri])) continue;
+        vertRef[vert] = meshRelation_.triRef[tri];
+        vertFlatFace[vert] = vertFlatFace[vert] == -1 ? tri : -2;
+      }
+    }
+  }
+  return vertFlatFace;
+}
+
+std::vector<Smoothness> Manifold::Impl::SharpenEdges(
+    float minSharpAngle, float minSmoothness) const {
+  std::vector<Smoothness> sharpenedEdges;
+  const float minRadians = glm::radians(minSharpAngle);
+  for (int e = 0; e < halfedge_.size(); ++e) {
+    if (!halfedge_[e].IsForward()) continue;
+    const int pair = halfedge_[e].pairedHalfedge;
+    const float dihedral =
+        glm::acos(glm::dot(faceNormal_[e / 3], faceNormal_[pair / 3]));
+    if (dihedral > minRadians) {
+      sharpenedEdges.push_back({e, minSmoothness});
+      sharpenedEdges.push_back({pair, minSmoothness});
+    }
+  }
+  return sharpenedEdges;
+}
+
+/**
+ * Instead of calculating the internal shared normals like CalculateNormals
+ * does, this method fills in vertex properties, unshared across edges that
+ * are bent more than minSharpAngle.
+ */
+void Manifold::Impl::SetNormals(int normalIdx, float minSharpAngle) {
+  if (IsEmpty()) return;
+  if (normalIdx < 0) return;
+
+  const int oldNumProp = NumProp();
+  const int numTri = NumTri();
+
+  Vec<bool> triIsFlatFace = FlatFaces();
+  Vec<int> vertFlatFace = VertFlatFace(triIsFlatFace);
+  Vec<int> vertNumSharp(NumVert(), 0);
+  for (int e = 0; e < halfedge_.size(); ++e) {
+    if (!halfedge_[e].IsForward()) continue;
+    const int pair = halfedge_[e].pairedHalfedge;
+    const int tri1 = e / 3;
+    const int tri2 = pair / 3;
+    const float dihedral =
+        glm::degrees(glm::acos(glm::dot(faceNormal_[tri1], faceNormal_[tri2])));
+    if (dihedral > minSharpAngle) {
+      ++vertNumSharp[halfedge_[e].startVert];
+      ++vertNumSharp[halfedge_[e].endVert];
+    } else {
+      const bool faceSplit =
+          triIsFlatFace[tri1] != triIsFlatFace[tri2] ||
+          (triIsFlatFace[tri1] && triIsFlatFace[tri2] &&
+           !meshRelation_.triRef[tri1].SameFace(meshRelation_.triRef[tri2]));
+      if (vertFlatFace[halfedge_[e].startVert] == -2 && faceSplit) {
+        ++vertNumSharp[halfedge_[e].startVert];
+      }
+      if (vertFlatFace[halfedge_[e].endVert] == -2 && faceSplit) {
+        ++vertNumSharp[halfedge_[e].endVert];
+      }
+    }
+  }
+
+  const int numProp = glm::max(oldNumProp, normalIdx + 3);
+  Vec<float> oldProperties(numProp * NumPropVert(), 0);
+  meshRelation_.properties.swap(oldProperties);
+  meshRelation_.numProp = numProp;
+  if (meshRelation_.triProperties.size() == 0) {
+    meshRelation_.triProperties.resize(numTri);
+    for_each_n(autoPolicy(numTri), countAt(0), numTri, [this](int tri) {
+      for (const int j : {0, 1, 2})
+        this->meshRelation_.triProperties[tri][j] =
+            this->halfedge_[3 * tri + j].startVert;
+    });
+  }
+  Vec<glm::ivec3> oldTriProp(numTri, {-1, -1, -1});
+  meshRelation_.triProperties.swap(oldTriProp);
+
+  for (int tri = 0; tri < numTri; ++tri) {
+    for (const int i : {0, 1, 2}) {
+      if (meshRelation_.triProperties[tri][i] >= 0) continue;
+      int current = 3 * tri + i;
+      const int startEdge = current;
+      const int vert = halfedge_[current].startVert;
+
+      if (vertNumSharp[vert] < 2) {
+        const glm::vec3 normal = vertFlatFace[vert] >= 0
+                                     ? faceNormal_[vertFlatFace[vert]]
+                                     : vertNormal_[vert];
+        int lastProp = -1;
+        do {
+          current = NextHalfedge(halfedge_[current].pairedHalfedge);
+          const int thisTri = current / 3;
+          const int j = current - 3 * thisTri;
+          const int prop = oldTriProp[thisTri][j];
+          meshRelation_.triProperties[thisTri][j] = prop;
+          if (prop == lastProp) continue;
+          lastProp = prop;
+          auto start = oldProperties.begin() + prop * oldNumProp;
+          std::copy(start, start + oldNumProp,
+                    meshRelation_.properties.begin() + prop * numProp);
+          for (const int i : {0, 1, 2})
+            meshRelation_.properties[prop * numProp + normalIdx + i] =
+                normal[i];
+        } while (current != startEdge);
+      } else {
+        const glm::vec3 centerPos = vertPos_[vert];
+        // Length degree
+        std::vector<int> group;
+        // Length number of normals
+        std::vector<glm::vec3> normals;
+        int prevFace = halfedge_[current].face;
+
+        do {
+          int next = NextHalfedge(halfedge_[current].pairedHalfedge);
+          const int face = halfedge_[next].face;
+
+          const float dihedral = glm::degrees(
+              glm::acos(glm::dot(faceNormal_[face], faceNormal_[prevFace])));
+          if (dihedral > minSharpAngle ||
+              triIsFlatFace[face] != triIsFlatFace[prevFace] ||
+              (triIsFlatFace[face] && triIsFlatFace[prevFace] &&
+               !meshRelation_.triRef[face].SameFace(
+                   meshRelation_.triRef[prevFace]))) {
+            break;
+          }
+          current = next;
+          prevFace = face;
+        } while (current != startEdge);
+
+        const int endEdge = current;
+        glm::vec3 prevEdgeVec =
+            glm::normalize(vertPos_[halfedge_[current].endVert] - centerPos);
+
+        do {
+          current = NextHalfedge(halfedge_[current].pairedHalfedge);
+          const int face = halfedge_[current].face;
+
+          const float dihedral = glm::degrees(
+              glm::acos(glm::dot(faceNormal_[face], faceNormal_[prevFace])));
+          if (dihedral > minSharpAngle ||
+              triIsFlatFace[face] != triIsFlatFace[prevFace] ||
+              (triIsFlatFace[face] && triIsFlatFace[prevFace] &&
+               !meshRelation_.triRef[face].SameFace(
+                   meshRelation_.triRef[prevFace]))) {
+            normals.push_back(glm::vec3(0));
+          }
+          group.push_back(normals.size() - 1);
+
+          const glm::vec3 edgeVec =
+              glm::normalize(vertPos_[halfedge_[current].endVert] - centerPos);
+          float dot = glm::dot(prevEdgeVec, edgeVec);
+          const float phi =
+              dot >= 1 ? 0 : (dot <= -1 ? glm::pi<float>() : glm::acos(dot));
+          normals.back() += faceNormal_[face] * phi;
+
+          prevFace = face;
+          prevEdgeVec = edgeVec;
+        } while (current != endEdge);
+
+        for (auto& normal : normals) {
+          normal = glm::normalize(normal);
+        }
+
+        int lastGroup = 0;
+        int lastProp = -1;
+        int newProp = -1;
+        int idx = 0;
+        do {
+          current = NextHalfedge(halfedge_[current].pairedHalfedge);
+          const int thisTri = current / 3;
+          const int j = current - 3 * thisTri;
+          const int prop = oldTriProp[thisTri][j];
+          auto start = oldProperties.begin() + prop * oldNumProp;
+
+          if (group[idx] != lastGroup && group[idx] != 0 && prop == lastProp) {
+            lastGroup = group[idx];
+            newProp = NumPropVert();
+            meshRelation_.properties.resize(meshRelation_.properties.size() +
+                                            numProp);
+            std::copy(start, start + oldNumProp,
+                      meshRelation_.properties.begin() + newProp * numProp);
+            for (const int i : {0, 1, 2}) {
+              meshRelation_.properties[newProp * numProp + normalIdx + i] =
+                  normals[group[idx]][i];
+            }
+          } else if (prop != lastProp) {
+            lastProp = prop;
+            newProp = prop;
+            std::copy(start, start + oldNumProp,
+                      meshRelation_.properties.begin() + prop * numProp);
+            for (const int i : {0, 1, 2})
+              meshRelation_.properties[prop * numProp + normalIdx + i] =
+                  normals[group[idx]][i];
+          }
+
+          meshRelation_.triProperties[thisTri][j] = newProp;
+          ++idx;
+        } while (current != endEdge);
+      }
+    }
+  }
+}
+
 /**
  * Calculates halfedgeTangent_, allowing the manifold to be refined and
  * smoothed. The tangents form weighted cubic Beziers along each edge. This
@@ -510,101 +775,109 @@ namespace manifold {
  * curvature there, while the tangents of the sharp edges themselves are aligned
  * for continuity.
  */
-void Manifold::Impl::CreateTangents(
-    const std::vector<Smoothness>& sharpenedEdges) {
+void Manifold::Impl::CreateTangents(std::vector<Smoothness> sharpenedEdges) {
   ZoneScoped;
   const int numHalfedge = halfedge_.size();
   halfedgeTangent_.resize(numHalfedge);
 
+  Vec<bool> triIsFlatFace = FlatFaces();
+  Vec<int> vertFlatFace = VertFlatFace(triIsFlatFace);
+  Vec<glm::vec3> vertNormal = vertNormal_;
+  for (int v = 0; v < NumVert(); ++v) {
+    if (vertFlatFace[v] >= 0) {
+      vertNormal[v] = faceNormal_[vertFlatFace[v]];
+    }
+  }
+
   for_each_n(autoPolicy(numHalfedge),
              zip(halfedgeTangent_.begin(), halfedge_.cbegin()), numHalfedge,
-             SmoothBezier({vertPos_, faceNormal_, vertNormal_, halfedge_}));
+             SmoothBezier({vertPos_, faceNormal_, vertNormal, halfedge_}));
 
-  if (!sharpenedEdges.empty()) {
-    const Vec<TriRef>& triRef = meshRelation_.triRef;
-
-    // sharpenedEdges are referenced to the input Mesh, but the triangles have
-    // been sorted in creating the Manifold, so the indices are converted using
-    // meshRelation_.
-    std::vector<int> oldHalfedge2New(halfedge_.size());
-    for (int tri = 0; tri < NumTri(); ++tri) {
-      int oldTri = triRef[tri].tri;
-      for (int i : {0, 1, 2}) oldHalfedge2New[3 * oldTri + i] = 3 * tri + i;
-    }
-
-    using Pair = std::pair<Smoothness, Smoothness>;
-    // Fill in missing pairs with default smoothness = 1.
-    std::map<int, Pair> edges;
-    for (Smoothness edge : sharpenedEdges) {
-      if (edge.smoothness == 1) continue;
-      edge.halfedge = oldHalfedge2New[edge.halfedge];
-      int pair = halfedge_[edge.halfedge].pairedHalfedge;
-      if (edges.find(pair) == edges.end()) {
-        edges[edge.halfedge] = {edge, {pair, 1}};
-      } else {
-        edges[pair].second = edge;
+  // Add sharpened edges around faces, just on the face side.
+  for (int tri = 0; tri < NumTri(); ++tri) {
+    if (!triIsFlatFace[tri]) continue;
+    for (const int j : {0, 1, 2}) {
+      const int tri2 = halfedge_[3 * tri + j].pairedHalfedge / 3;
+      if (!triIsFlatFace[tri2] ||
+          !meshRelation_.triRef[tri].SameFace(meshRelation_.triRef[tri2])) {
+        sharpenedEdges.push_back({3 * tri + j, 0});
       }
     }
+  }
 
-    std::map<int, std::vector<Pair>> vertTangents;
-    for (const auto& value : edges) {
-      const Pair edge = value.second;
-      vertTangents[halfedge_[edge.first.halfedge].startVert].push_back(edge);
-      vertTangents[halfedge_[edge.second.halfedge].startVert].push_back(
-          {edge.second, edge.first});
+  if (sharpenedEdges.empty()) return;
+
+  using Pair = std::pair<Smoothness, Smoothness>;
+  // Fill in missing pairs with default smoothness = 1.
+  std::map<int, Pair> edges;
+  for (Smoothness edge : sharpenedEdges) {
+    if (edge.smoothness >= 1) continue;
+    const bool forward = halfedge_[edge.halfedge].IsForward();
+    const int pair = halfedge_[edge.halfedge].pairedHalfedge;
+    const int idx = forward ? edge.halfedge : pair;
+    if (edges.find(idx) == edges.end()) {
+      edges[idx] = {edge, {pair, 1}};
+      if (!forward) std::swap(edges[idx].first, edges[idx].second);
+    } else {
+      Smoothness& e = forward ? edges[idx].first : edges[idx].second;
+      e.smoothness = glm::min(edge.smoothness, e.smoothness);
     }
+  }
 
-    Vec<glm::vec4>& tangent = halfedgeTangent_;
-    for (const auto& value : vertTangents) {
-      const std::vector<Pair>& vert = value.second;
-      // Sharp edges that end are smooth at their terminal vert.
-      if (vert.size() == 1) continue;
-      if (vert.size() == 2) {  // Make continuous edge
-        const int first = vert[0].first.halfedge;
-        const int second = vert[1].first.halfedge;
-        const glm::vec3 newTangent = glm::normalize(glm::vec3(tangent[first]) -
-                                                    glm::vec3(tangent[second]));
-        tangent[first] =
-            glm::vec4(glm::length(glm::vec3(tangent[first])) * newTangent,
-                      tangent[first].w);
-        tangent[second] =
-            glm::vec4(-glm::length(glm::vec3(tangent[second])) * newTangent,
-                      tangent[second].w);
+  std::map<int, std::vector<Pair>> vertTangents;
+  for (const auto& value : edges) {
+    const Pair edge = value.second;
+    vertTangents[halfedge_[edge.first.halfedge].startVert].push_back(edge);
+    vertTangents[halfedge_[edge.second.halfedge].startVert].push_back(
+        {edge.second, edge.first});
+  }
 
-        auto SmoothHalf = [&](int first, int last, float smoothness) {
-          int current = NextHalfedge(halfedge_[first].pairedHalfedge);
-          while (current != last) {
-            const float cosBeta = glm::dot(
-                newTangent, glm::normalize(glm::vec3(tangent[current])));
-            const float factor =
-                (1 - smoothness) * cosBeta * cosBeta + smoothness;
-            tangent[current] = glm::vec4(factor * glm::vec3(tangent[current]),
-                                         tangent[current].w);
-            current = NextHalfedge(halfedge_[current].pairedHalfedge);
-          }
-        };
+  Vec<glm::vec4>& tangent = halfedgeTangent_;
+  for (const auto& value : vertTangents) {
+    const std::vector<Pair>& vert = value.second;
+    // Sharp edges that end are smooth at their terminal vert.
+    if (vert.size() == 1) continue;
+    if (vert.size() == 2) {  // Make continuous edge
+      const int first = vert[0].first.halfedge;
+      const int second = vert[1].first.halfedge;
+      const glm::vec3 newTangent = glm::normalize(glm::vec3(tangent[first]) -
+                                                  glm::vec3(tangent[second]));
+      tangent[first] =
+          glm::vec4(glm::length(glm::vec3(tangent[first])) * newTangent,
+                    tangent[first].w);
+      tangent[second] =
+          glm::vec4(-glm::length(glm::vec3(tangent[second])) * newTangent,
+                    tangent[second].w);
 
-        SmoothHalf(first, second,
-                   (vert[0].second.smoothness + vert[1].first.smoothness) / 2);
-        SmoothHalf(second, first,
-                   (vert[1].second.smoothness + vert[0].first.smoothness) / 2);
-
-      } else {  // Sharpen vertex uniformly
-        float smoothness = 0;
-        for (const Pair& pair : vert) {
-          smoothness += pair.first.smoothness;
-          smoothness += pair.second.smoothness;
-        }
-        smoothness /= 2 * vert.size();
-
-        const int start = vert[0].first.halfedge;
-        int current = start;
-        do {
+      auto SmoothHalf = [&](int first, int last, float smoothness) {
+        int current = NextHalfedge(halfedge_[first].pairedHalfedge);
+        while (current != last) {
           tangent[current] = glm::vec4(smoothness * glm::vec3(tangent[current]),
                                        tangent[current].w);
           current = NextHalfedge(halfedge_[current].pairedHalfedge);
-        } while (current != start);
+        }
+      };
+
+      SmoothHalf(first, second,
+                 (vert[0].second.smoothness + vert[1].first.smoothness) / 2);
+      SmoothHalf(second, first,
+                 (vert[1].second.smoothness + vert[0].first.smoothness) / 2);
+
+    } else {  // Sharpen vertex uniformly
+      float smoothness = 0;
+      for (const Pair& pair : vert) {
+        smoothness += pair.first.smoothness;
+        smoothness += pair.second.smoothness;
       }
+      smoothness /= 2 * vert.size();
+
+      const int start = vert[0].first.halfedge;
+      int current = start;
+      do {
+        tangent[current] = glm::vec4(smoothness * glm::vec3(tangent[current]),
+                                     tangent[current].w);
+        current = NextHalfedge(halfedge_[current].pairedHalfedge);
+      } while (current != start);
     }
   }
 }
@@ -612,8 +885,8 @@ void Manifold::Impl::CreateTangents(
 /**
  * Split each edge into n pieces as defined by calling the edgeDivisions
  * function, and sub-triangulate each triangle accordingly. This function
- * doesn't run Finish(), as that is expensive and it'll need to be run after the
- * new vertices have moved, which is a likely scenario after refinement
+ * doesn't run Finish(), as that is expensive and it'll need to be run after
+ * the new vertices have moved, which is a likely scenario after refinement
  * (smoothing).
  */
 Vec<Barycentric> Manifold::Impl::Subdivide(
@@ -846,6 +1119,7 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
 }
 
 void Manifold::Impl::Refine(std::function<int(glm::vec3)> edgeDivisions) {
+  if (IsEmpty()) return;
   Manifold::Impl old = *this;
   Vec<Barycentric> vertBary = Subdivide(edgeDivisions);
   if (vertBary.size() == 0) return;

@@ -128,8 +128,8 @@ struct MeshGL {
  * potentially Mesh if only basic geometry is required.
  *
  * In addition to storing geometric data, a Manifold can also store an arbitrary
- * number of vertex properties. These could be anything, e.g. UV coordinates,
- * colors, bone weights, etc, but this library is completely agnostic. All
+ * number of vertex properties. These could be anything, e.g. normals, UV
+ * coordinates, colors, etc, but this library is completely agnostic. All
  * properties are merely float values indexed by channel number. It is up to the
  * user to associate channel numbers with meaning.
  *
@@ -245,6 +245,8 @@ class Manifold {
   Manifold SetProperties(
       int, std::function<void(float*, glm::vec3, const float*)>) const;
   Manifold CalculateCurvature(int gaussianIdx, int meanIdx) const;
+  Manifold CalculateNormals(int normalIdx, float minSharpAngle = 60) const;
+  Manifold SmoothOut(float minSharpAngle = 60, float minSmoothness = 0) const;
   Manifold Refine(int) const;
   Manifold RefineToLength(float) const;
   // Manifold RefineToPrecision(float);

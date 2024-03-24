@@ -300,6 +300,13 @@ ManifoldMeshGL *manifold_level_set_seq_context(
   return level_set_context(mem, sdf, bounds, edge_length, level, true, ctx);
 }
 
+ManifoldManifold *manifold_smooth_out(void *mem, ManifoldManifold *m,
+                                      float minSharpAngle,
+                                      float minSmoothness) {
+  auto smoothed = from_c(m)->SmoothOut(minSharpAngle, minSmoothness);
+  return to_c(new (mem) Manifold(smoothed));
+}
+
 ManifoldManifold *manifold_refine(void *mem, ManifoldManifold *m, int refine) {
   auto refined = from_c(m)->Refine(refine);
   return to_c(new (mem) Manifold(refined));
@@ -546,6 +553,14 @@ ManifoldManifold *manifold_calculate_curvature(void *mem, ManifoldManifold *m,
 float manifold_min_gap(ManifoldManifold *m, ManifoldManifold *other,
                        float searchLength) {
   return from_c(m)->MinGap(*from_c(other), searchLength);
+}
+  
+ManifoldManifold *manifold_calculate_normals(void *mem, ManifoldManifold *m,
+                                             int normal_idx,
+                                             int min_sharp_angle) {
+  auto man = from_c(m)->CalculateNormals(normal_idx, min_sharp_angle);
+  return to_c(new (mem) Manifold(man));
+
 }
 
 // Static Quality Globals

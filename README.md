@@ -139,6 +139,12 @@ python binding documentation:
 
 For more detailed documentation, please refer to the C++ API.
 
+### Java / Clojure
+
+Unofficial java bindings are currently maintained in [a fork](https://github.com/SovereignShop/manifold).
+
+There is also a Clojure [library](https://github.com/SovereignShop/clj-manifold3d).
+
 ### Windows Shenanigans
 
 Windows users should build with `-DBUILD_SHARED_LIBS=OFF`, as enabling shared
