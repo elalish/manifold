@@ -847,7 +847,7 @@ export class Manifold {
 
 
   /*
-   * Returns the minimum distance between two manifolds. Returns a float between
+   * Returns the minimum gap between two manifolds. Returns a float between
    * 0 and searchLength.
    */
   minGap(other: Manifold, searchLength: number): number;

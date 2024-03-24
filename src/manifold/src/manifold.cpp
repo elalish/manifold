@@ -929,7 +929,7 @@ Manifold Manifold::Hull(const std::vector<Manifold>& manifolds) {
 }
 
 /**
- * Computes the minimum distance between two manifolds. Returns a float between
+ * Returns the minimum gap between two manifolds. Returns a float between
  * 0 and searchLength.
  *
  * @param other The other manifold to compute the minimum gap to.

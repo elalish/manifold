@@ -904,7 +904,7 @@ SparseIndices Manifold::Impl::VertexCollisionsZ(
     return collider_.Collisions<false, false>(vertsIn);
 }
 /*
- * Computes the minimum distance between two manifolds. Returns a float between
+ * Returns the minimum gap between two manifolds. Returns a float between
  * 0 and searchLength.
  */
 float Manifold::Impl::MinGap(const Manifold::Impl& other,

@@ -321,7 +321,7 @@ NB_MODULE(manifold3d, m) {
             return self.MinGap(other, searchLength);
           },
           nb::arg("other"), nb::arg("search_length"),
-          "Returns the minimum distance between two manifolds."
+          "Returns the minimum gap between two manifolds."
           "Returns a float between 0 and searchLength.")
       .def("calculate_normals", &Manifold::CalculateNormals,
            nb::arg("normal_idx"), nb::arg("min_sharp_angle") = 60,

@@ -22,7 +22,7 @@ namespace manifold {
 // From NVIDIA-Omniverse PhysX - BSD 3-Clause "New" or "Revised" License
 // https://github.com/NVIDIA-Omniverse/PhysX/blob/main/LICENSE.md
 // https://github.com/NVIDIA-Omniverse/PhysX/blob/main/physx/source/geomutils/src/sweep/GuSweepCapsuleCapsule.cpp
-// With minor modifications to use glm::vec3 type.
+// With minor modifications
 
 /**
  * Returns the distance between two line segments.
@@ -84,15 +84,13 @@ inline void EdgeEdgeDist(glm::vec3& x, glm::vec3& y,  // closest points
 // From NVIDIA-Omniverse PhysX - BSD 3-Clause "New" or "Revised" License
 // https://github.com/NVIDIA-Omniverse/PhysX/blob/main/LICENSE.md
 // https://github.com/NVIDIA-Omniverse/PhysX/blob/main/physx/source/geomutils/src/distance/GuDistanceTriangleTriangle.cpp
-// With minor modifications to use glm::vec3 type.
+// With minor modifications
 
 /**
  * Returns the minimum squared distance between two triangles.
  *
- * @param[out] cq Closest point on the first triangle.
- * @param[out] cp Closest point on the second triangle.
- * @param[in]  p  First  triangle.
- * @param[in]  q  Second triangle.
+ * @param  p  First  triangle.
+ * @param  q  Second triangle.
  */
 inline float DistanceTriangleTriangleSquared(
     const std::array<glm::vec3, 3>& p, const std::array<glm::vec3, 3>& q) {

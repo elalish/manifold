@@ -420,6 +420,7 @@ void Manifold::Impl::SortFaces(Vec<Box>& faceBox, Vec<uint32_t>& faceMorton) {
 
 /**
  * Sorts the bounding box and Morton code arrays based on the Morton codes.
+ * Leaves the original manifold untouched.
  */
 void Manifold::Impl::SortFaceBoxMorton(Vec<Box>& faceBox,
                                        Vec<uint32_t>& faceMorton) const {
