@@ -94,8 +94,8 @@ inline void EdgeEdgeDist(glm::vec3& x, glm::vec3& y,  // closest points
  * @param[in]  p  First  triangle.
  * @param[in]  q  Second triangle.
  */
-inline float DistanceTriangleTriangleSquared(const glm::vec3 p[3],
-                                             const glm::vec3 q[3]) {
+inline float DistanceTriangleTriangleSquared(
+    const std::array<glm::vec3, 3>& p, const std::array<glm::vec3, 3>& q) {
   std::array<glm::vec3, 3> Sv;
   Sv[0] = p[1] - p[0];
   Sv[1] = p[2] - p[1];

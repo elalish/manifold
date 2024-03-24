@@ -940,8 +940,8 @@ float Manifold::Impl::MinGap(const Manifold::Impl& other,
     const int tri = collisions.Get(i, 1);
     const int triOther = collisions.Get(i, 0);
 
-    glm::vec3 p[3];
-    glm::vec3 q[3];
+    std::array<glm::vec3, 3> p;
+    std::array<glm::vec3, 3> q;
 
     for (const int j : {0, 1, 2}) {
       p[j] = vertPos_[halfedge_[3 * tri + j].startVert];

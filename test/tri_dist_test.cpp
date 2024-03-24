@@ -19,10 +19,13 @@
 #include "test.h"
 
 TEST(TriangleDistance, ClosestPointsOnVertices) {
-  glm::vec3 p[3] = {
-      {-1.0f, 0.0f, 0.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}};
+  std::array<glm::vec3, 3> p = {glm::vec3{-1.0f, 0.0f, 0.0f},
+                                glm::vec3{1.0f, 0.0f, 0.0f},
+                                glm::vec3{0.0f, 1.0f, 0.0f}};
 
-  glm::vec3 q[3] = {{2.0f, 0.0f, 0.0f}, {4.0f, 0.0f, 0.0f}, {3.0f, 1.0f, 0.0f}};
+  std::array<glm::vec3, 3> q = {glm::vec3{2.0f, 0.0f, 0.0f},
+                                glm::vec3{4.0f, 0.0f, 0.0f},
+                                glm::vec3{3.0f, 1.0f, 0.0f}};
 
   float distance = DistanceTriangleTriangleSquared(p, q);
 
@@ -30,11 +33,13 @@ TEST(TriangleDistance, ClosestPointsOnVertices) {
 }
 
 TEST(TriangleDistance, ClosestPointOnEdge) {
-  glm::vec3 p[3] = {
-      {-1.0f, 0.0f, 0.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}};
+  std::array<glm::vec3, 3> p = {glm::vec3{-1.0f, 0.0f, 0.0f},
+                                glm::vec3{1.0f, 0.0f, 0.0f},
+                                glm::vec3{0.0f, 1.0f, 0.0f}};
 
-  glm::vec3 q[3] = {
-      {-1.0f, 2.0f, 0.0f}, {1.0f, 2.0f, 0.0f}, {0.0f, 3.0f, 0.0f}};
+  std::array<glm::vec3, 3> q = {glm::vec3{-1.0f, 2.0f, 0.0f},
+                                glm::vec3{1.0f, 2.0f, 0.0f},
+                                glm::vec3{0.0f, 3.0f, 0.0f}};
 
   float distance = DistanceTriangleTriangleSquared(p, q);
 
@@ -42,10 +47,13 @@ TEST(TriangleDistance, ClosestPointOnEdge) {
 }
 
 TEST(TriangleDistance, ClosestPointOnEdge2) {
-  glm::vec3 p[3] = {
-      {-1.0f, 0.0f, 0.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}};
+  std::array<glm::vec3, 3> p = {glm::vec3{-1.0f, 0.0f, 0.0f},
+                                glm::vec3{1.0f, 0.0f, 0.0f},
+                                glm::vec3{0.0f, 1.0f, 0.0f}};
 
-  glm::vec3 q[3] = {{1.0f, 1.0f, 0.0f}, {3.0f, 1.0f, 0.0f}, {2.0f, 2.0f, 0.0f}};
+  std::array<glm::vec3, 3> q = {glm::vec3{1.0f, 1.0f, 0.0f},
+                                glm::vec3{3.0f, 1.0f, 0.0f},
+                                glm::vec3{2.0f, 2.0f, 0.0f}};
 
   float distance = DistanceTriangleTriangleSquared(p, q);
 
@@ -53,11 +61,13 @@ TEST(TriangleDistance, ClosestPointOnEdge2) {
 }
 
 TEST(TriangleDistance, ClosestPointOnFace) {
-  glm::vec3 p[3] = {
-      {-1.0f, 0.0f, 0.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}};
+  std::array<glm::vec3, 3> p = {glm::vec3{-1.0f, 0.0f, 0.0f},
+                                glm::vec3{1.0f, 0.0f, 0.0f},
+                                glm::vec3{0.0f, 1.0f, 0.0f}};
 
-  glm::vec3 q[3] = {
-      {-1.0f, 2.0f, -0.5f}, {1.0f, 2.0f, -0.5f}, {0.0f, 2.0f, 1.5f}};
+  std::array<glm::vec3, 3> q = {glm::vec3{-1.0f, 2.0f, -0.5f},
+                                glm::vec3{1.0f, 2.0f, -0.5f},
+                                glm::vec3{0.0f, 2.0f, 1.5f}};
 
   float distance = DistanceTriangleTriangleSquared(p, q);
 

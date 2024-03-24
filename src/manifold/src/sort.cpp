@@ -435,15 +435,6 @@ void Manifold::Impl::SortFaceBoxMorton(Vec<Box>& faceBox,
                 return thrust::get<0>(a) < thrust::get<0>(b);
               });
 
-  // Tris were flagged for removal with pairedHalfedge = -1 and assigned kNoCode
-  // to sort them to the end, which allows them to be removed.
-  const int newNumTri =
-      find<decltype(faceMorton.begin())>(policy, faceMorton.begin(),
-                                         faceMorton.end(), kNoCode) -
-      faceMorton.begin();
-  faceMorton.resize(newNumTri);
-  faceNew2Old.resize(newNumTri);
-
   Permute(faceBox, faceNew2Old);
 }
 
