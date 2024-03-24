@@ -48,7 +48,7 @@ TEST(MinGap, CubeSphereOverlapping) {
 
   float distance = a.MinGap(b, 10);
 
-  EXPECT_FLOAT_EQ(distance, 0);
+  EXPECT_FLOAT_EQ(distance, 0.0f);
 }
 
 TEST(MinGap, SphereSphere) {
@@ -57,7 +57,7 @@ TEST(MinGap, SphereSphere) {
 
   float distance = a.MinGap(b, 10);
 
-  EXPECT_FLOAT_EQ(distance, 3);
+  EXPECT_FLOAT_EQ(distance, 3.0f);
 }
 
 TEST(MinGap, SphereSphere2) {
@@ -80,18 +80,20 @@ TEST(MinGap, SphereSphereOutOfBounds) {
 
 TEST(MinGap, ClosestPointOnEdge) {
   auto a = Manifold::Cube();
-  auto b = Manifold::Sphere(1.0f).Translate({3.0f, 0.0f, 0.5f});
+  auto b = Manifold::Cube().Translate({2.0f, 1.0f, 0.5f});
 
   float distance = a.MinGap(b, 10);
 
-  EXPECT_FLOAT_EQ(distance, 1);
+  EXPECT_FLOAT_EQ(distance, 1.0f);
 }
 
 TEST(MinGap, ClosestPointOnTriangleFace) {
-  auto a = Manifold::Cube().Translate({0.0f, -0.25f, 0.0f});
-  auto b = Manifold::Sphere(1.0f).Translate({3.0f, 0.0f, 0.5f});
+  auto a = Manifold::Cube();
+  auto b = Manifold::Cube()
+               .Scale({10.0f, 10.0f, 10.0f})
+               .Translate({2.0f, -5.0f, -1.0f});
 
   float distance = a.MinGap(b, 10);
 
-  EXPECT_FLOAT_EQ(distance, 1);
+  EXPECT_FLOAT_EQ(distance, 1.0f);
 }

@@ -73,3 +73,17 @@ TEST(TriangleDistance, ClosestPointOnFace) {
 
   EXPECT_FLOAT_EQ(distance, 1.0f);
 }
+
+TEST(TriangleDistance, Overlapping) {
+  std::array<glm::vec3, 3> p = {glm::vec3{-1.0f, 0.0f, 0.0f},
+                                glm::vec3{1.0f, 0.0f, 0.0f},
+                                glm::vec3{0.0f, 1.0f, 0.0f}};
+
+  std::array<glm::vec3, 3> q = {glm::vec3{-1.0f, 0.0f, 0.0f},
+                                glm::vec3{1.0f, 0.5f, 0.0f},
+                                glm::vec3{0.0f, 1.0f, 0.0f}};
+
+  float distance = DistanceTriangleTriangleSquared(p, q);
+
+  EXPECT_FLOAT_EQ(distance, 0.0f);
+}
