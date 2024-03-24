@@ -543,6 +543,11 @@ ManifoldManifold *manifold_calculate_curvature(void *mem, ManifoldManifold *m,
   return to_c(new (mem) Manifold(man));
 }
 
+float manifold_min_gap(ManifoldManifold *m, ManifoldManifold *other,
+                       float searchLength) {
+  return from_c(m)->MinGap(*from_c(other), searchLength);
+}
+
 // Static Quality Globals
 
 void manifold_set_min_circular_angle(float degrees) {

@@ -188,6 +188,8 @@ ManifoldManifold *manifold_set_properties(
     void (*fun)(float *new_prop, ManifoldVec3 position, const float *old_prop));
 ManifoldManifold *manifold_calculate_curvature(void *mem, ManifoldManifold *m,
                                                int gaussian_idx, int mean_idx);
+float manifold_min_gap(ManifoldManifold *m, ManifoldManifold *other,
+                       float searchLength);
 
 // CrossSection Shapes/Constructors
 

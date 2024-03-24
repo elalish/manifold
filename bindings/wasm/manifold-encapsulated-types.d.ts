@@ -809,6 +809,13 @@ export class Manifold {
    */
   getProperties(): Properties;
 
+
+  /*
+   * Returns the minimum distance between two manifolds. Returns a float between
+   * 0 and searchLength.
+   */
+  minGap(other: Manifold, searchLength: number): number;
+
   // Export
 
   /**
