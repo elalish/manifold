@@ -81,6 +81,7 @@ struct Manifold::Impl {
   SparseIndices EdgeCollisions(const Impl& B, bool inverted = false) const;
   SparseIndices VertexCollisionsZ(VecView<const glm::vec3> vertsIn,
                                   bool inverted = false) const;
+  float MinGap(const Impl& other, float searchLength) const;
 
   bool IsEmpty() const { return NumVert() == 0; }
   int NumVert() const { return vertPos_.size(); }

@@ -896,56 +896,7 @@ float Manifold::MinGap(const Manifold& other, float searchLength) const {
 
   if (prop.volume != 0) return 0.0f;
 
-  auto getSortedExpandedFaceBoxMorton = [searchLength](
-                                            const Manifold& manifold) {
-    Vec<Box> faceBox;
-    Vec<uint32_t> faceMorton;
-
-    manifold.GetCsgLeafNode().GetImpl()->GetFaceBoxMorton(faceBox, faceMorton);
-
-    transform(autoPolicy(faceBox.size()), faceBox.begin(), faceBox.end(),
-              faceBox.begin(), [searchLength](const Box& box) {
-                return Box(box.min - glm::vec3(searchLength),
-                           box.max + glm::vec3(searchLength));
-              });
-
-    manifold.GetCsgLeafNode().GetImpl()->SortFaceBoxMorton(faceBox, faceMorton);
-    return std::pair{faceBox, faceMorton};
-  };
-
-  auto [faceBox, faceMorton] = getSortedExpandedFaceBoxMorton(*this);
-  auto [faceBoxOther, faceMortonOther] = getSortedExpandedFaceBoxMorton(other);
-
-  Collider collider{faceBox, faceMorton};
-
-  SparseIndices collisions = collider.Collisions(faceBoxOther.cview());
-
-  float minDistanceSquared = searchLength * searchLength;
-
-  auto vertPos = GetCsgLeafNode().GetImpl()->vertPos_;
-  auto halfedge = GetCsgLeafNode().GetImpl()->halfedge_;
-
-  auto vertPosOther = other.GetCsgLeafNode().GetImpl()->vertPos_;
-  auto halfedgeOther = other.GetCsgLeafNode().GetImpl()->halfedge_;
-
-  for (int i = 0; i < collisions.size(); ++i) {
-    const int tri = collisions.Get(i, 1);
-    const int triOther = collisions.Get(i, 0);
-
-    glm::vec3 p[3];
-    glm::vec3 q[3];
-
-    for (const int j : {0, 1, 2}) {
-      p[j] = vertPos[halfedge[3 * tri + j].startVert];
-      q[j] = vertPosOther[halfedgeOther[3 * triOther + j].startVert];
-    }
-
-    float distanceSquared = DistanceTriangleTriangleSquared(p, q);
-
-    minDistanceSquared = std::min(minDistanceSquared, distanceSquared);
-  }
-
-  return sqrt(minDistanceSquared);
+  return GetCsgLeafNode().GetImpl()->MinGap(*other.GetCsgLeafNode().GetImpl(),
+                                            searchLength);
 }
-
 }  // namespace manifold
