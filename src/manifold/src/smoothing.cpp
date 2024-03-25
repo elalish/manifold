@@ -858,7 +858,8 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
     } else {  // Sharpen vertex uniformly
       int current = first;
       do {
-        halfedgeTangent_[current] = glm::vec4(0);
+        halfedgeTangent_[current] =
+            glm::vec4(0, 0, 0, halfedgeTangent_[current].w);
         current = NextHalfedge(halfedge_[current].pairedHalfedge);
       } while (current != first);
     }
