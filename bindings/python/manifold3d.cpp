@@ -107,7 +107,7 @@ struct nb::detail::type_caster<glm::mat<C, R, T, Q>> {
   static handle from_cpp(glm_type mat, rv_policy policy,
                          cleanup_list *cleanup) noexcept {
     T *buffer = new T[R * C];
-    nb::capsule mem_mgr(buffer, [](void *p) noexcept { delete[](T *) p; });
+    nb::capsule mem_mgr(buffer, [](void *p) noexcept { delete[] (T *)p; });
     for (int i = 0; i < R; i++) {
       for (int j = 0; j < C; j++) {
         // py is (Rows, Cols), glm is (Cols, Rows)
@@ -154,7 +154,7 @@ struct nb::detail::type_caster<std::vector<glm::vec<N, T, Q>>> {
                          cleanup_list *cleanup) noexcept {
     size_t num_vec = vec.size();
     T *buffer = new T[num_vec * N];
-    nb::capsule mem_mgr(buffer, [](void *p) noexcept { delete[](T *) p; });
+    nb::capsule mem_mgr(buffer, [](void *p) noexcept { delete[] (T *)p; });
     for (int i = 0; i < num_vec; i++) {
       for (int j = 0; j < N; j++) {
         buffer[i * N + j] = vec[i][j];
@@ -318,6 +318,8 @@ NB_MODULE(manifold3d, m) {
       .def("calculate_normals", &Manifold::CalculateNormals,
            nb::arg("normal_idx"), nb::arg("min_sharp_angle") = 60,
            manifold__calculate_normals__normal_idx__min_sharp_angle)
+      .def("smooth_by_normals", &Manifold::SmoothByNormals,
+           nb::arg("normal_idx") manifold__smooth_by_normals__normal_idx)
       .def("smooth_out", &Manifold::SmoothOut, nb::arg("min_sharp_angle") = 60,
            nb::arg("min_smoothness") = 0,
            manifold__smooth_out__min_sharp_angle__min_smoothness)

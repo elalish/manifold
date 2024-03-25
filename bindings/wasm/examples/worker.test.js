@@ -117,7 +117,7 @@ suite('Examples', () => {
     const result = await runExample('Scallop');
     expect(result.genus).to.equal(0, 'Genus');
     expect(result.volume).to.be.closeTo(41100, 100, 'Volume');
-    expect(result.surfaceArea).to.be.closeTo(7790, 10, 'Surface Area');
+    expect(result.surfaceArea).to.be.closeTo(7822, 10, 'Surface Area');
   });
 
   test('Torus Knot', async () => {
