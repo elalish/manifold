@@ -796,29 +796,35 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
   Vec<glm::ivec2> vertSharpHalfedge(numVert, glm::ivec2(-1));
   for (int e = 0; e < numHalfedge; ++e) {
     const int vert = halfedge_[e].startVert;
-    if (vertSharpHalfedge[vert][0] >= 0 && vertSharpHalfedge[vert][1] >= 0)
-      continue;
+    auto& sharpHalfedge = vertSharpHalfedge[vert];
+    if (sharpHalfedge[0] >= 0 && sharpHalfedge[1] >= 0) continue;
 
-    const int numProp = NumProp();
-    int numNormals = 0;
-    glm::vec3 lastNormal = {0, 0, 0};
     int idx = 0;
-    int current = e;
-    do {
-      current = NextHalfedge(halfedge_[current].pairedHalfedge);
-      const glm::vec3 normal = GetNormal(current, normalIdx);
-      const glm::vec3 diff = lastNormal - normal;
-      if (glm::dot(diff, diff) > kTolerance * kTolerance) {
-        if (idx > 1) {
-          vertSharpHalfedge[vert][0] = -1;
-        } else {
-          vertSharpHalfedge[vert][idx++] = current;
-        }
-      }
-      lastNormal = normal;
-    } while (current != e);
+    // Only used when there is only one.
+    glm::vec3& lastNormal = vertNormal[vert];
 
-    vertNormal[vert] = lastNormal;  // Only used when there is only one.
+    ForVert<glm::vec3>(
+        e,
+        [normalIdx, this](int halfedge) {
+          return GetNormal(halfedge, normalIdx);
+        },
+        [&sharpHalfedge, &idx, &lastNormal](int halfedge,
+                                            const glm::vec3& normal,
+                                            const glm::vec3& nextNormal) {
+          const glm::vec3 diff = nextNormal - normal;
+          if (glm::dot(diff, diff) > kTolerance * kTolerance) {
+            if (idx > 1) {
+              sharpHalfedge[0] = -1;
+            } else {
+              sharpHalfedge[idx++] = halfedge;
+            }
+          }
+          lastNormal = normal;
+        });
+
+    if (vert == 0) {
+      std::cout << sharpHalfedge << std::endl;
+    }
   }
 
   for_each_n(autoPolicy(numHalfedge),
@@ -842,13 +848,19 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
           glm::vec4(-glm::length(glm::vec3(tangent[second])) * newTangent,
                     tangent[second].w);
 
-      int current = first;
-      do {
+      ForVert(first, [this, first, second](int current) {
         if (current != first && current != second) {
-          tangent[current] = glm::vec4(0);
+          halfedgeTangent_[current] = glm::vec4(0);
         }
-        current = NextHalfedge(halfedge_[current].pairedHalfedge);
-      } while (current != first);
+      });
+
+      if (vert == 0) {
+        std::cout << vertPos_[vert] << std::endl;
+        ForVert(first, [this](int current) {
+          std::cout << halfedgeTangent_[current] << ": "
+                    << vertPos_[halfedge_[current].endVert] << std::endl;
+        });
+      }
     } else {  // Sharpen vertex uniformly
       int current = first;
       do {

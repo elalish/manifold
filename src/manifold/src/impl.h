@@ -66,6 +66,29 @@ struct Manifold::Impl {
        const std::vector<float>& propertyTolerance = {},
        bool hasFaceIDs = false);
 
+  inline void ForVert(int halfedge, std::function<void(int halfedge)> func) {
+    int current = halfedge;
+    do {
+      func(current);
+      current = NextHalfedge(halfedge_[current].pairedHalfedge);
+    } while (current != halfedge);
+  }
+
+  template <typename T>
+  void ForVert(int halfedge, std::function<T(int halfedge)> transform,
+               std::function<void(int halfedge, const T& here, const T& next)>
+                   binaryOp) {
+    T here = transform(halfedge);
+    int current = halfedge;
+    do {
+      const int nextHalfedge = NextHalfedge(halfedge_[current].pairedHalfedge);
+      const T next = transform(nextHalfedge);
+      binaryOp(current, here, next);
+      here = next;
+      current = nextHalfedge;
+    } while (current != halfedge);
+  }
+
   void CreateFaces(const std::vector<float>& propertyTolerance = {});
   void RemoveUnreferencedVerts(Vec<glm::ivec3>& triVerts);
   void InitializeOriginal();

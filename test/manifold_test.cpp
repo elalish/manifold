@@ -395,6 +395,25 @@ TEST(Manifold, SmoothSphere) {
   }
 }
 
+TEST(Manifold, SmoothNormals) {
+  Manifold cylinder = Manifold::Cylinder(10, 5, 5, 8);
+  Manifold out = cylinder.SmoothOut().RefineToLength(0.1);
+  MeshGL test = cylinder.CalculateNormals(0).GetMeshGL();
+  Dump(test.vertProperties);
+
+  Manifold byNormals =
+      cylinder.CalculateNormals(0).SmoothByNormals(0).RefineToLength(0.1);
+  auto outProp = out.GetProperties();
+  auto byNormalsProp = byNormals.GetProperties();
+  EXPECT_FLOAT_EQ(outProp.volume, byNormalsProp.volume);
+  EXPECT_FLOAT_EQ(outProp.surfaceArea, byNormalsProp.surfaceArea);
+
+#ifdef MANIFOLD_EXPORT
+  if (options.exportModels)
+    ExportMesh("smoothCylinder.glb", byNormals.GetMesh(), {});
+#endif
+}
+
 TEST(Manifold, ManualSmooth) {
   // Unit Octahedron
   const Mesh oct = Manifold::Sphere(1, 4).GetMesh();
