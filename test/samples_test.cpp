@@ -121,7 +121,7 @@ TEST(Samples, Scallop) {
   CheckNormals(scallop);
   auto prop = scallop.GetProperties();
   EXPECT_NEAR(prop.volume, 41.1, 0.1);
-  EXPECT_NEAR(prop.surfaceArea, 77.9, 0.1);
+  EXPECT_NEAR(prop.surfaceArea, 78.2, 0.1);
   CheckGL(scallop);
 
 #ifdef MANIFOLD_EXPORT
