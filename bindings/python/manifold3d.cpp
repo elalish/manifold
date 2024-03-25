@@ -319,7 +319,7 @@ NB_MODULE(manifold3d, m) {
            nb::arg("normal_idx"), nb::arg("min_sharp_angle") = 60,
            manifold__calculate_normals__normal_idx__min_sharp_angle)
       .def("smooth_by_normals", &Manifold::SmoothByNormals,
-           nb::arg("normal_idx") manifold__smooth_by_normals__normal_idx)
+           nb::arg("normal_idx"), manifold__smooth_by_normals__normal_idx)
       .def("smooth_out", &Manifold::SmoothOut, nb::arg("min_sharp_angle") = 60,
            nb::arg("min_smoothness") = 0,
            manifold__smooth_out__min_sharp_angle__min_smoothness)
