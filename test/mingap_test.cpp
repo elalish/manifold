@@ -97,3 +97,15 @@ TEST(MinGap, ClosestPointOnTriangleFace) {
 
   EXPECT_FLOAT_EQ(distance, 1.0f);
 }
+
+TEST(MinGap, AfterTransformations) {
+  auto a = Manifold::Sphere(1.0f, 100);
+  auto b = Manifold::Sphere(1.0f, 100)
+               .Scale({3.0f, 1.0f, 1.0f})
+               .Rotate(0, 90, 45)
+               .Translate({3.0f, 0.0f, 0.0f});
+
+  float distance = a.MinGap(b, 10);
+
+  ASSERT_NEAR(distance, 1.0f, 0.001f);
+}

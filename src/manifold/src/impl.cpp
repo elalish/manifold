@@ -923,7 +923,7 @@ float Manifold::Impl::MinGap(const Manifold::Impl& other,
                                box.max + glm::vec3(searchLength));
                   });
 
-        impl.SortFaceBoxMorton(faceBox, faceMorton);
+        // impl.SortFaceBoxMorton(faceBox, faceMorton);
         return std::pair{faceBox, faceMorton};
       };
 
