@@ -851,15 +851,13 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
 
       ForVert(first, [this, first, second](int current) {
         if (current != first && current != second) {
-          halfedgeTangent_[current] =
-              glm::vec4(0, 0, 0, halfedgeTangent_[current].w);
+          halfedgeTangent_[current] = glm::vec4(0);
         }
       });
     } else {  // Sharpen vertex uniformly
       int current = first;
       do {
-        halfedgeTangent_[current] =
-            glm::vec4(0, 0, 0, halfedgeTangent_[current].w);
+        halfedgeTangent_[current] = glm::vec4(0);
         current = NextHalfedge(halfedge_[current].pairedHalfedge);
       } while (current != first);
     }
@@ -952,8 +950,7 @@ void Manifold::Impl::CreateTangents(std::vector<Smoothness> sharpenedEdges) {
       auto SmoothHalf = [&](int first, int last, float smoothness) {
         int current = NextHalfedge(halfedge_[first].pairedHalfedge);
         while (current != last) {
-          tangent[current] = glm::vec4(smoothness * glm::vec3(tangent[current]),
-                                       tangent[current].w);
+          tangent[current] = smoothness * tangent[current];
           current = NextHalfedge(halfedge_[current].pairedHalfedge);
         }
       };
@@ -973,8 +970,7 @@ void Manifold::Impl::CreateTangents(std::vector<Smoothness> sharpenedEdges) {
       const int start = vert[0].first.halfedge;
       int current = start;
       do {
-        tangent[current] = glm::vec4(smoothness * glm::vec3(tangent[current]),
-                                     tangent[current].w);
+        tangent[current] = smoothness * tangent[current];
         current = NextHalfedge(halfedge_[current].pairedHalfedge);
       } while (current != start);
     }
