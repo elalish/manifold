@@ -144,6 +144,7 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .function("_GetMeshJS", &js::GetMeshJS)
       .function("refine", &Manifold::Refine)
       .function("refineToLength", &Manifold::RefineToLength)
+      .function("smoothByNormals", &Manifold::SmoothByNormals)
       .function("smoothOut", &Manifold::SmoothOut)
       .function("_Warp", &man_js::Warp)
       .function("_SetProperties", &man_js::SetProperties)

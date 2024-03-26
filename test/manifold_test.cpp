@@ -347,8 +347,8 @@ TEST(Manifold, SmoothFlat) {
   Manifold cone = Manifold::Cylinder(5, 10, 5).SmoothOut().CalculateNormals(0);
   Manifold smooth = cone.RefineToLength(0.1);
   auto prop = smooth.GetProperties();
-  EXPECT_NEAR(prop.volume, 1105, 1);
-  EXPECT_NEAR(prop.surfaceArea, 759, 1);
+  EXPECT_NEAR(prop.volume, 1157, 1);
+  EXPECT_NEAR(prop.surfaceArea, 779, 1);
 
 #ifdef MANIFOLD_EXPORT
   ExportOptions options2;
@@ -393,6 +393,22 @@ TEST(Manifold, SmoothSphere) {
     EXPECT_NEAR(min, 1, precision[i]);
     EXPECT_NEAR(max, 1, precision[i]);
   }
+}
+
+TEST(Manifold, SmoothNormals) {
+  Manifold cylinder = Manifold::Cylinder(10, 5, 5, 8);
+  Manifold out = cylinder.SmoothOut().RefineToLength(0.1);
+  Manifold byNormals =
+      cylinder.CalculateNormals(0).SmoothByNormals(0).RefineToLength(0.1);
+  auto outProp = out.GetProperties();
+  auto byNormalsProp = byNormals.GetProperties();
+  EXPECT_FLOAT_EQ(outProp.volume, byNormalsProp.volume);
+  EXPECT_FLOAT_EQ(outProp.surfaceArea, byNormalsProp.surfaceArea);
+
+#ifdef MANIFOLD_EXPORT
+  if (options.exportModels)
+    ExportMesh("smoothCylinder.glb", byNormals.GetMesh(), {});
+#endif
 }
 
 TEST(Manifold, ManualSmooth) {

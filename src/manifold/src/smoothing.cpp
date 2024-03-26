@@ -51,6 +51,27 @@ void FillRetainedVerts(Vec<Barycentric>& vertBary,
   }
 }
 
+// Calculate a tangent vector in the form of a weighted cubic Bezier taking as
+// input the desired tangent direction (length doesn't matter) and the edge
+// vector to the neighboring vertex. In a symmetric situation where the tangents
+// at each end are mirror images of each other, this will result in a circular
+// arc.
+glm::vec4 CircularTangent(const glm::vec3& tangent, const glm::vec3& edgeVec) {
+  const glm::vec3 dir = SafeNormalize(tangent);
+
+  float weight = glm::abs(glm::dot(dir, SafeNormalize(edgeVec)));
+  if (weight == 0) {
+    weight = 1;
+  }
+  // Quadratic weighted bezier for circular interpolation
+  const glm::vec4 bz2 =
+      weight * glm::vec4(dir * glm::length(edgeVec) / (2 * weight), 1);
+  // Equivalent cubic weighted bezier
+  const glm::vec4 bz3 = glm::mix(glm::vec4(0, 0, 0, 1), bz2, 2 / 3.0f);
+  // Convert from homogeneous form to geometric form
+  return glm::vec4(glm::vec3(bz3) / bz3.w, bz3.w);
+}
+
 struct ReindexHalfedge {
   VecView<int> half2Edge;
   const VecView<Halfedge> halfedges;
@@ -74,26 +95,13 @@ struct SmoothBezier {
     glm::vec4& tangent = thrust::get<0>(inOut);
     const Halfedge edge = thrust::get<1>(inOut);
 
-    const glm::vec3 startV = vertPos[edge.startVert];
-    const glm::vec3 edgeVec = vertPos[edge.endVert] - startV;
+    const glm::vec3 edgeVec = vertPos[edge.endVert] - vertPos[edge.startVert];
     const glm::vec3 edgeNormal =
         (triNormal[edge.face] + triNormal[halfedge[edge.pairedHalfedge].face]) /
         2.0f;
-    glm::vec3 dir = SafeNormalize(glm::cross(glm::cross(edgeNormal, edgeVec),
-                                             vertNormal[edge.startVert]));
-
-    float weight = glm::abs(glm::dot(dir, SafeNormalize(edgeVec)));
-    if (weight == 0) {
-      weight = 1;
-    }
-    // Quadratic weighted bezier for circular interpolation
-    const glm::vec4 bz2 =
-        weight *
-        glm::vec4(startV + dir * glm::length(edgeVec) / (2 * weight), 1.0f);
-    // Equivalent cubic weighted bezier
-    const glm::vec4 bz3 = glm::mix(glm::vec4(startV, 1.0f), bz2, 2 / 3.0f);
-    // Convert from homogeneous form to geometric form
-    tangent = glm::vec4(glm::vec3(bz3) / bz3.w - startV, bz3.w);
+    glm::vec3 dir =
+        glm::cross(glm::cross(edgeNormal, edgeVec), vertNormal[edge.startVert]);
+    tangent = CircularTangent(dir, edgeVec);
   }
 };
 
@@ -501,6 +509,18 @@ class Partition {
 
 namespace manifold {
 
+glm::vec3 Manifold::Impl::GetNormal(int halfedge, int normalIdx) const {
+  const int tri = halfedge / 3;
+  const int j = halfedge % 3;
+  const int prop = meshRelation_.triProperties[tri][j];
+  glm::vec3 normal;
+  for (const int i : {0, 1, 2}) {
+    normal[i] =
+        meshRelation_.properties[prop * meshRelation_.numProp + normalIdx + i];
+  }
+  return normal;
+}
+
 // sharpenedEdges are referenced to the input Mesh, but the triangles have
 // been sorted in creating the Manifold, so the indices are converted using
 // meshRelation_.
@@ -770,6 +790,84 @@ void Manifold::Impl::SetNormals(int normalIdx, float minSharpAngle) {
  * Calculates halfedgeTangent_, allowing the manifold to be refined and
  * smoothed. The tangents form weighted cubic Beziers along each edge. This
  * function creates circular arcs where possible (minimizing maximum curvature),
+ * constrained to the indicated property normals. Across edges that form
+ * discontinuities in the normals, the tangent vectors are zero-length, allowing
+ * the shape to form a sharp corner with minimal oscillation.
+ */
+void Manifold::Impl::CreateTangents(int normalIdx) {
+  ZoneScoped;
+  const int numVert = NumVert();
+  const int numHalfedge = halfedge_.size();
+  halfedgeTangent_.resize(numHalfedge);
+
+  Vec<glm::vec3> vertNormal(numVert);
+  Vec<glm::ivec2> vertSharpHalfedge(numVert, glm::ivec2(-1));
+  for (int e = 0; e < numHalfedge; ++e) {
+    const int vert = halfedge_[e].startVert;
+    auto& sharpHalfedge = vertSharpHalfedge[vert];
+    if (sharpHalfedge[0] >= 0 && sharpHalfedge[1] >= 0) continue;
+
+    int idx = 0;
+    // Only used when there is only one.
+    glm::vec3& lastNormal = vertNormal[vert];
+
+    ForVert<glm::vec3>(
+        e,
+        [normalIdx, this](int halfedge) {
+          return GetNormal(halfedge, normalIdx);
+        },
+        [&sharpHalfedge, &idx, &lastNormal](int halfedge,
+                                            const glm::vec3& normal,
+                                            const glm::vec3& nextNormal) {
+          const glm::vec3 diff = nextNormal - normal;
+          if (glm::dot(diff, diff) > kTolerance * kTolerance) {
+            if (idx > 1) {
+              sharpHalfedge[0] = -1;
+            } else {
+              sharpHalfedge[idx++] = halfedge;
+            }
+          }
+          lastNormal = normal;
+        });
+  }
+
+  for_each_n(autoPolicy(numHalfedge),
+             zip(halfedgeTangent_.begin(), halfedge_.cbegin()), numHalfedge,
+             SmoothBezier({vertPos_, faceNormal_, vertNormal, halfedge_}));
+
+  for (int vert = 0; vert < numVert; ++vert) {
+    const int first = vertSharpHalfedge[vert][0];
+    const int second = vertSharpHalfedge[vert][1];
+    if (second == -1) continue;
+    if (first != -1) {  // Make continuous edge
+      const glm::vec3 newTangent = glm::normalize(glm::cross(
+          GetNormal(first, normalIdx), GetNormal(second, normalIdx)));
+      if (!isfinite(newTangent[0])) continue;
+
+      halfedgeTangent_[first] = CircularTangent(
+          newTangent, vertPos_[halfedge_[first].endVert] - vertPos_[vert]);
+      halfedgeTangent_[second] = CircularTangent(
+          -newTangent, vertPos_[halfedge_[second].endVert] - vertPos_[vert]);
+
+      ForVert(first, [this, first, second](int current) {
+        if (current != first && current != second) {
+          halfedgeTangent_[current] = glm::vec4(0);
+        }
+      });
+    } else {  // Sharpen vertex uniformly
+      int current = first;
+      do {
+        halfedgeTangent_[current] = glm::vec4(0);
+        current = NextHalfedge(halfedge_[current].pairedHalfedge);
+      } while (current != first);
+    }
+  }
+}
+
+/**
+ * Calculates halfedgeTangent_, allowing the manifold to be refined and
+ * smoothed. The tangents form weighted cubic Beziers along each edge. This
+ * function creates circular arcs where possible (minimizing maximum curvature),
  * constrained to the vertex normals. Where sharpenedEdges are specified, the
  * tangents are shortened that intersect the sharpened edge, concentrating the
  * curvature there, while the tangents of the sharp edges themselves are aligned
@@ -842,18 +940,17 @@ void Manifold::Impl::CreateTangents(std::vector<Smoothness> sharpenedEdges) {
       const int second = vert[1].first.halfedge;
       const glm::vec3 newTangent = glm::normalize(glm::vec3(tangent[first]) -
                                                   glm::vec3(tangent[second]));
+
+      const glm::vec3 pos = vertPos_[halfedge_[first].startVert];
       tangent[first] =
-          glm::vec4(glm::length(glm::vec3(tangent[first])) * newTangent,
-                    tangent[first].w);
-      tangent[second] =
-          glm::vec4(-glm::length(glm::vec3(tangent[second])) * newTangent,
-                    tangent[second].w);
+          CircularTangent(newTangent, vertPos_[halfedge_[first].endVert] - pos);
+      tangent[second] = CircularTangent(
+          -newTangent, vertPos_[halfedge_[second].endVert] - pos);
 
       auto SmoothHalf = [&](int first, int last, float smoothness) {
         int current = NextHalfedge(halfedge_[first].pairedHalfedge);
         while (current != last) {
-          tangent[current] = glm::vec4(smoothness * glm::vec3(tangent[current]),
-                                       tangent[current].w);
+          tangent[current] = smoothness * tangent[current];
           current = NextHalfedge(halfedge_[current].pairedHalfedge);
         }
       };
@@ -862,7 +959,6 @@ void Manifold::Impl::CreateTangents(std::vector<Smoothness> sharpenedEdges) {
                  (vert[0].second.smoothness + vert[1].first.smoothness) / 2);
       SmoothHalf(second, first,
                  (vert[1].second.smoothness + vert[0].first.smoothness) / 2);
-
     } else {  // Sharpen vertex uniformly
       float smoothness = 0;
       for (const Pair& pair : vert) {
@@ -874,8 +970,7 @@ void Manifold::Impl::CreateTangents(std::vector<Smoothness> sharpenedEdges) {
       const int start = vert[0].first.halfedge;
       int current = start;
       do {
-        tangent[current] = glm::vec4(smoothness * glm::vec3(tangent[current]),
-                                     tangent[current].w);
+        tangent[current] = smoothness * tangent[current];
         current = NextHalfedge(halfedge_[current].pairedHalfedge);
       } while (current != start);
     }
