@@ -69,8 +69,8 @@ struct Manifold::Impl {
   inline void ForVert(int halfedge, std::function<void(int halfedge)> func) {
     int current = halfedge;
     do {
-      func(current);
       current = NextHalfedge(halfedge_[current].pairedHalfedge);
+      func(current);
     } while (current != halfedge);
   }
 

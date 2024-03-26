@@ -325,12 +325,10 @@ void Manifold::Impl::DedupeEdge(const int edge) {
     vertPos_.push_back(vertPos_[endVert]);
     if (vertNormal_.size() > 0) vertNormal_.push_back(vertNormal_[endVert]);
 
-    do {
+    ForVert(current, [this, newVert](int current) {
       halfedge_[current].endVert = newVert;
-      current = NextHalfedge(current);
-      halfedge_[current].startVert = newVert;
-      current = halfedge_[current].pairedHalfedge;
-    } while (current != edge);
+      halfedge_[halfedge_[current].pairedHalfedge].startVert = newVert;
+    });
   }
 
   // Orbit startVert
@@ -350,12 +348,10 @@ void Manifold::Impl::DedupeEdge(const int edge) {
     vertPos_.push_back(vertPos_[endVert]);
     if (vertNormal_.size() > 0) vertNormal_.push_back(vertNormal_[endVert]);
 
-    do {
+    ForVert(current, [this, newVert](int current) {
       halfedge_[current].endVert = newVert;
-      current = NextHalfedge(current);
-      halfedge_[current].startVert = newVert;
-      current = halfedge_[current].pairedHalfedge;
-    } while (current != pair);
+      halfedge_[halfedge_[current].pairedHalfedge].startVert = newVert;
+    });
   }
 }
 
@@ -676,14 +672,11 @@ void Manifold::Impl::SplitPinchedVerts() {
     } else {
       vertProcessed[vert] = true;
     }
-    int current = i;
-    do {
+    ForVert(i, [this, &halfedgeProcessed, vert](int current) {
       halfedgeProcessed[current] = true;
       halfedge_[current].startVert = vert;
-      current = halfedge_[current].pairedHalfedge;
-      halfedge_[current].endVert = vert;
-      current = NextHalfedge(current);
-    } while (current != i);
+      halfedge_[halfedge_[current].pairedHalfedge].endVert = vert;
+    });
   }
 }
 }  // namespace manifold
