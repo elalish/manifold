@@ -947,18 +947,17 @@ void Manifold::Impl::CreateTangents(std::vector<Smoothness> sharpenedEdges) {
       tangent[second] = CircularTangent(
           -newTangent, vertPos_[halfedge_[second].endVert] - pos);
 
-      auto SmoothHalf = [&](int first, int last, float smoothness) {
-        int current = NextHalfedge(halfedge_[first].pairedHalfedge);
-        while (current != last) {
-          tangent[current] = smoothness * tangent[current];
-          current = NextHalfedge(halfedge_[current].pairedHalfedge);
-        }
-      };
-
-      SmoothHalf(first, second,
-                 (vert[0].second.smoothness + vert[1].first.smoothness) / 2);
-      SmoothHalf(second, first,
-                 (vert[1].second.smoothness + vert[0].first.smoothness) / 2);
+      float smoothness =
+          (vert[0].second.smoothness + vert[1].first.smoothness) / 2;
+      ForVert(
+          first, [&tangent, &smoothness, &vert, first, second](int current) {
+            if (current == second) {
+              smoothness =
+                  (vert[1].second.smoothness + vert[0].first.smoothness) / 2;
+            } else if (current != first) {
+              tangent[current] = smoothness * tangent[current];
+            }
+          });
     } else {  // Sharpen vertex uniformly
       float smoothness = 0;
       for (const Pair& pair : vert) {
