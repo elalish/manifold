@@ -79,12 +79,13 @@ TEST(MinGap, SphereSphereOutOfBounds) {
 }
 
 TEST(MinGap, ClosestPointOnEdge) {
-  auto a = Manifold::Cube();
-  auto b = Manifold::Cube().Translate({2.0f, 1.0f, 0.5f});
+  auto a = Manifold::Cube().Rotate(0.0f, 0.0f, 45.0f);
+  auto b =
+      Manifold::Cube().Rotate(0.0f, 45.0f, 0.0f).Translate({1.0f, 0.0f, 0.5f});
 
   float distance = a.MinGap(b, 10);
 
-  EXPECT_FLOAT_EQ(distance, 1.0f);
+  EXPECT_FLOAT_EQ(distance, 1.0f - sqrt(2) / 2);
 }
 
 TEST(MinGap, ClosestPointOnTriangleFace) {
