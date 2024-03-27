@@ -18,10 +18,10 @@
 #include "par.h"
 
 template <>
-struct std::hash<glm::ivec3> {
-  size_t operator()(const glm::ivec3& p) const {
+struct std::hash<glm::ivec4> {
+  size_t operator()(const glm::ivec4& p) const {
     return std::hash<int>()(p.x) ^ std::hash<int>()(p.y) ^
-           std::hash<int>()(p.z);
+           std::hash<int>()(p.z) ^ std::hash<int>()(p.w);
   }
 };
 
@@ -205,20 +205,21 @@ class Partition {
   // The cached partitions don't have idx - it's added to the copy returned
   // from GetPartition that contains the mapping of the input divisions into the
   // sorted divisions that are uniquely cached.
-  glm::ivec3 idx;
-  glm::ivec3 sortedDivisions;
+  glm::ivec4 idx;
+  glm::ivec4 sortedDivisions;
   Vec<glm::vec3> vertBary;
   Vec<glm::ivec3> triVert;
 
   int InteriorOffset() const {
-    return sortedDivisions[0] + sortedDivisions[1] + sortedDivisions[2];
+    return sortedDivisions[0] + sortedDivisions[1] + sortedDivisions[2] +
+           sortedDivisions[3];
   }
 
   int NumInterior() const { return vertBary.size() - InteriorOffset(); }
 
-  static Partition GetPartition(glm::ivec3 divisions) {
-    glm::ivec3 sortedDiv = divisions;
-    glm::ivec3 triIdx = {0, 1, 2};
+  static Partition GetPartition(glm::ivec4 divisions) {
+    glm::ivec4 sortedDiv = divisions;
+    glm::ivec4 triIdx = {0, 1, 2, 3};
     if (sortedDiv[2] > sortedDiv[1]) {
       std::swap(sortedDiv[2], sortedDiv[1]);
       std::swap(triIdx[2], triIdx[1]);
@@ -238,14 +239,14 @@ class Partition {
     return partition;
   }
 
-  Vec<glm::ivec3> Reindex(glm::ivec3 tri, glm::ivec3 edgeOffsets,
-                          glm::bvec3 edgeFwd, int interiorOffset) const {
+  Vec<glm::ivec3> Reindex(glm::ivec4 tri, glm::ivec4 edgeOffsets,
+                          glm::bvec4 edgeFwd, int interiorOffset) const {
     Vec<int> newVerts;
     newVerts.reserve(vertBary.size());
-    glm::ivec3 triIdx = idx;
-    glm::ivec3 outTri = {0, 1, 2};
+    glm::ivec4 triIdx = idx;
+    glm::ivec4 outTri = {0, 1, 2, 3};
     if (idx[1] != Next3(idx[0])) {
-      triIdx = {idx[2], idx[0], idx[1]};
+      triIdx = {idx[2], idx[0], idx[1], idx[3]};
       edgeFwd = glm::not_(edgeFwd);
       std::swap(outTri[0], outTri[1]);
     }
@@ -281,14 +282,14 @@ class Partition {
  private:
   static inline auto cacheLock = std::mutex();
   static inline auto cache =
-      std::unordered_map<glm::ivec3, std::unique_ptr<Partition>>();
+      std::unordered_map<glm::ivec4, std::unique_ptr<Partition>>();
 
   // This triangulation is purely topological - it depends only on the number of
   // divisions of the three sides of the triangle. This allows them to be cached
   // and reused for similar triangles. The shape of the final surface is defined
   // by the tangents and the barycentric coordinates of the new verts. The input
   // must be sorted: n[0] >= n[1] >= n[2] > 0
-  static Partition GetCachedPartition(glm::ivec3 n) {
+  static Partition GetCachedPartition(glm::ivec4 n) {
     {
       auto lockGuard = std::lock_guard<std::mutex>(cacheLock);
       auto cached = cache.find(n);
@@ -543,30 +544,29 @@ std::vector<Smoothness> Manifold::Impl::UpdateSharpenedEdges(
 Vec<bool> Manifold::Impl::FlatFaces() const {
   const int numTri = NumTri();
   Vec<bool> triIsFlatFace(numTri, false);
-  for_each_n(
-      autoPolicy(numTri), countAt(0), numTri,
-      [this, &triIsFlatFace](const int tri) {
-        const TriRef& ref = this->meshRelation_.triRef[tri];
-        int faceNeighbors = 0;
-        glm::ivec3 faceTris = {-1, -1, -1};
-        for (const int j : {0, 1, 2}) {
-          const int neighborTri =
-              this->halfedge_[this->halfedge_[3 * tri + j].pairedHalfedge].face;
-          const TriRef& jRef = this->meshRelation_.triRef[neighborTri];
-          if (jRef.SameFace(ref)) {
-            ++faceNeighbors;
-            faceTris[j] = neighborTri;
-          }
-        }
-        if (faceNeighbors > 1) {
-          triIsFlatFace[tri] = true;
-          for (const int j : {0, 1, 2}) {
-            if (faceTris[j] >= 0) {
-              triIsFlatFace[faceTris[j]] = true;
-            }
-          }
-        }
-      });
+  for_each_n(autoPolicy(numTri), countAt(0), numTri,
+             [this, &triIsFlatFace](const int tri) {
+               const TriRef& ref = meshRelation_.triRef[tri];
+               int faceNeighbors = 0;
+               glm::ivec3 faceTris = {-1, -1, -1};
+               for (const int j : {0, 1, 2}) {
+                 const int neighborTri =
+                     halfedge_[halfedge_[3 * tri + j].pairedHalfedge].face;
+                 const TriRef& jRef = meshRelation_.triRef[neighborTri];
+                 if (jRef.SameFace(ref)) {
+                   ++faceNeighbors;
+                   faceTris[j] = neighborTri;
+                 }
+               }
+               if (faceNeighbors > 1) {
+                 triIsFlatFace[tri] = true;
+                 for (const int j : {0, 1, 2}) {
+                   if (faceTris[j] >= 0) {
+                     triIsFlatFace[faceTris[j]] = true;
+                   }
+                 }
+               }
+             });
   return triIsFlatFace;
 }
 
@@ -653,8 +653,7 @@ void Manifold::Impl::SetNormals(int normalIdx, float minSharpAngle) {
     meshRelation_.triProperties.resize(numTri);
     for_each_n(autoPolicy(numTri), countAt(0), numTri, [this](int tri) {
       for (const int j : {0, 1, 2})
-        this->meshRelation_.triProperties[tri][j] =
-            this->halfedge_[3 * tri + j].startVert;
+        meshRelation_.triProperties[tri][j] = halfedge_[3 * tri + j].startVert;
     });
   }
   Vec<glm::ivec3> oldTriProp(numTri, {-1, -1, -1});
@@ -994,7 +993,7 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
              [edgeDivisions, this](thrust::tuple<int&, TmpEdge> inOut) {
                const TmpEdge edge = thrust::get<1>(inOut);
                const glm::vec3 vec =
-                   this->vertPos_[edge.first] - this->vertPos_[edge.second];
+                   vertPos_[edge.first] - vertPos_[edge.second];
                thrust::get<0>(inOut) = edgeDivisions(vec);
              });
 
@@ -1028,7 +1027,7 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
   std::vector<Partition> subTris(numTri);
   for_each_n(policy, countAt(0), numTri,
              [&subTris, &half2Edge, &edgeAdded](int tri) {
-               glm::ivec3 divisions;
+               glm::ivec4 divisions(0);
                for (const int i : {0, 1, 2}) {
                  divisions[i] = edgeAdded[half2Edge[3 * tri + i]] + 1;
                }
@@ -1051,59 +1050,59 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
   Vec<glm::ivec3> triVerts(triOffset.back() + subTris.back().triVert.size());
   vertBary.resize(interiorOffset.back() + subTris.back().NumInterior());
   Vec<TriRef> triRef(triVerts.size());
-  for_each_n(
-      policy, countAt(0), numTri,
-      [this, &triVerts, &triRef, &vertBary, &subTris, &edgeOffset, &half2Edge,
-       &triOffset, &interiorOffset](int tri) {
-        glm::ivec3 tri3;
-        glm::ivec3 edgeOffsets;
-        glm::bvec3 edgeFwd;
-        for (const int i : {0, 1, 2}) {
-          const Halfedge& halfedge = this->halfedge_[3 * tri + i];
-          tri3[i] = halfedge.startVert;
-          edgeOffsets[i] = edgeOffset[half2Edge[3 * tri + i]];
-          edgeFwd[i] = halfedge.IsForward();
-        }
+  for_each_n(policy, countAt(0), numTri,
+             [this, &triVerts, &triRef, &vertBary, &subTris, &edgeOffset,
+              &half2Edge, &triOffset, &interiorOffset](int tri) {
+               glm::ivec4 tri3;
+               glm::ivec4 edgeOffsets;
+               glm::bvec4 edgeFwd;
+               for (const int i : {0, 1, 2}) {
+                 const Halfedge& halfedge = halfedge_[3 * tri + i];
+                 tri3[i] = halfedge.startVert;
+                 edgeOffsets[i] = edgeOffset[half2Edge[3 * tri + i]];
+                 edgeFwd[i] = halfedge.IsForward();
+               }
 
-        Vec<glm::ivec3> newTris = subTris[tri].Reindex(
-            tri3, edgeOffsets, edgeFwd, interiorOffset[tri]);
-        copy(ExecutionPolicy::Seq, newTris.begin(), newTris.end(),
-             triVerts.begin() + triOffset[tri]);
-        auto start = triRef.begin() + triOffset[tri];
-        fill(ExecutionPolicy::Seq, start, start + newTris.size(),
-             meshRelation_.triRef[tri]);
+               Vec<glm::ivec3> newTris = subTris[tri].Reindex(
+                   tri3, edgeOffsets, edgeFwd, interiorOffset[tri]);
+               copy(ExecutionPolicy::Seq, newTris.begin(), newTris.end(),
+                    triVerts.begin() + triOffset[tri]);
+               auto start = triRef.begin() + triOffset[tri];
+               fill(ExecutionPolicy::Seq, start, start + newTris.size(),
+                    meshRelation_.triRef[tri]);
 
-        const glm::ivec3 idx = subTris[tri].idx;
-        const glm::ivec3 vIdx =
-            idx[1] == Next3(idx[0]) ? idx : glm::ivec3(idx[2], idx[0], idx[1]);
-        glm::ivec3 rIdx;
-        for (const int i : {0, 1, 2}) {
-          rIdx[vIdx[i]] = i;
-        }
+               const glm::ivec4 idx = subTris[tri].idx;
+               const glm::ivec4 vIdx =
+                   idx[1] == Next3(idx[0])
+                       ? idx
+                       : glm::ivec4(idx[2], idx[0], idx[1], idx[3]);
+               glm::ivec3 rIdx;
+               for (const int i : {0, 1, 2}) {
+                 rIdx[vIdx[i]] = i;
+               }
 
-        const auto& subBary = subTris[tri].vertBary;
-        transform(ExecutionPolicy::Seq,
-                  subBary.begin() + subTris[tri].InteriorOffset(),
-                  subBary.end(), vertBary.begin() + interiorOffset[tri],
-                  [tri, rIdx](glm::vec3 bary) {
-                    return Barycentric(
-                        {tri, {bary[rIdx[0]], bary[rIdx[1]], bary[rIdx[2]]}});
-                  });
-      });
+               const auto& subBary = subTris[tri].vertBary;
+               transform(
+                   ExecutionPolicy::Seq,
+                   subBary.begin() + subTris[tri].InteriorOffset(),
+                   subBary.end(), vertBary.begin() + interiorOffset[tri],
+                   [tri, rIdx](glm::vec3 bary) {
+                     return Barycentric(
+                         {tri, {bary[rIdx[0]], bary[rIdx[1]], bary[rIdx[2]]}});
+                   });
+             });
   meshRelation_.triRef = triRef;
 
   Vec<glm::vec3> newVertPos(vertBary.size());
-  for_each_n(
-      policy, zip(newVertPos.begin(), vertBary.begin()), vertBary.size(),
-      [this](thrust::tuple<glm::vec3&, Barycentric> inOut) {
-        const Barycentric bary = thrust::get<1>(inOut);
-        glm::mat3 triPos;
-        for (const int i : {0, 1, 2}) {
-          triPos[i] =
-              this->vertPos_[this->halfedge_[3 * bary.tri + i].startVert];
-        }
-        thrust::get<0>(inOut) = triPos * bary.uvw;
-      });
+  for_each_n(policy, zip(newVertPos.begin(), vertBary.begin()), vertBary.size(),
+             [this](thrust::tuple<glm::vec3&, Barycentric> inOut) {
+               const Barycentric bary = thrust::get<1>(inOut);
+               glm::mat3 triPos;
+               for (const int i : {0, 1, 2}) {
+                 triPos[i] = vertPos_[halfedge_[3 * bary.tri + i].startVert];
+               }
+               thrust::get<0>(inOut) = triPos * bary.uvw;
+             });
   vertPos_ = newVertPos;
 
   faceNormal_.resize(0);
@@ -1123,7 +1122,7 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
         addedVerts, [this, &prop](thrust::tuple<int, Barycentric> in) {
           const int vert = thrust::get<0>(in);
           const Barycentric bary = thrust::get<1>(in);
-          auto& rel = this->meshRelation_;
+          auto& rel = meshRelation_;
 
           for (int p = 0; p < rel.numProp; ++p) {
             glm::vec3 triProp;
@@ -1144,11 +1143,10 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
           const TmpEdge edge = thrust::get<0>(in);
           const int n = thrust::get<1>(in);
           const int offset = thrust::get<2>(in) + propOffset + addedVerts;
-          auto& rel = this->meshRelation_;
+          auto& rel = meshRelation_;
 
           const float frac = 1.0f / (n + 1);
-          const int halfedgeIdx =
-              this->halfedge_[edge.halfedgeIdx].pairedHalfedge;
+          const int halfedgeIdx = halfedge_[edge.halfedgeIdx].pairedHalfedge;
           const int v0 = halfedgeIdx % 3;
           const int v1 = Next3(v0);
           const int tri = halfedgeIdx / 3;
@@ -1172,12 +1170,12 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
     for_each_n(policy, countAt(0), numTri,
                [this, &triProp, &subTris, &edgeOffset, &half2Edge, &triOffset,
                 &interiorOffset, propOffset, addedVerts](int tri) {
-                 auto& rel = this->meshRelation_;
-                 const glm::ivec3 tri3 = rel.triProperties[tri];
-                 glm::ivec3 edgeOffsets;
-                 glm::bvec3 edgeFwd(true);
+                 auto& rel = meshRelation_;
+                 const glm::ivec4 tri3(rel.triProperties[tri], -1);
+                 glm::ivec4 edgeOffsets;
+                 glm::bvec4 edgeFwd(true);
                  for (const int i : {0, 1, 2}) {
-                   const Halfedge& halfedge = this->halfedge_[3 * tri + i];
+                   const Halfedge& halfedge = halfedge_[3 * tri + i];
                    edgeOffsets[i] = edgeOffset[half2Edge[3 * tri + i]];
                    if (!halfedge.IsForward()) {
                      const int pairTri = halfedge.pairedHalfedge / 3;
