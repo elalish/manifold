@@ -111,7 +111,7 @@ def all_manifold():
     m = m.trim_by_plane((0, 0, 1), 0)
     m = m.warp(lambda p: (p[0] + 1, p[1] / 2, p[2] * 2))
     m = m.warp_batch(lambda ps: ps * [1, 0.5, 2] + [1, 0, 0])
-    m = Manifold.cube() 
+    m = Manifold.cube()
     m2 = Manifold.cube().translate([2, 0, 0])
     d = m.min_gap(m2, 2)
 
