@@ -315,14 +315,10 @@ NB_MODULE(manifold3d, m) {
       .def("calculate_curvature", &Manifold::CalculateCurvature,
            nb::arg("gaussian_idx"), nb::arg("mean_idx"),
            manifold__calculate_curvature__gaussian_idx__mean_idx)
-      .def(
-          "min_gap",
-          [](const Manifold &self, const Manifold &other, float searchLength) {
-            return self.MinGap(other, searchLength);
-          },
-          nb::arg("other"), nb::arg("search_length"),
-          "Returns the minimum gap between two manifolds."
-          "Returns a float between 0 and searchLength.")
+      .def("min_gap", &Manifold::MinGap, nb::arg("other"),
+           nb::arg("search_length"),
+           "Returns the minimum gap between two manifolds."
+           "Returns a float between 0 and searchLength.")
       .def("calculate_normals", &Manifold::CalculateNormals,
            nb::arg("normal_idx"), nb::arg("min_sharp_angle") = 60,
            manifold__calculate_normals__normal_idx__min_sharp_angle)
