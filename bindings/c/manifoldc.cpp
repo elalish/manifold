@@ -556,6 +556,11 @@ ManifoldManifold *manifold_calculate_curvature(void *mem, ManifoldManifold *m,
   return to_c(new (mem) Manifold(man));
 }
 
+float manifold_min_gap(ManifoldManifold *m, ManifoldManifold *other,
+                       float searchLength) {
+  return from_c(m)->MinGap(*from_c(other), searchLength);
+}
+
 ManifoldManifold *manifold_calculate_normals(void *mem, ManifoldManifold *m,
                                              int normal_idx,
                                              int min_sharp_angle) {
