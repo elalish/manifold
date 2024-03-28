@@ -849,3 +849,93 @@ TEST(Manifold, EmptyHull) {
       {0, 0, 0}, {1, 0, 0}, {0, 1, 0}, {1, 1, 0}};
   EXPECT_TRUE(Manifold::Hull(coplanar).IsEmpty());
 }
+
+TEST(Manifold, VHACDHULL) {
+  const float tictacRad = 100;
+  const float tictacHeight = 500;
+  const int tictacSeg = 100;
+  const float tictacMid = tictacHeight - 2 * tictacRad;
+  const auto sphere = Manifold::Sphere(tictacRad, tictacSeg);
+  const std::vector<Manifold> spheres{sphere,
+                                      sphere.Translate({0, 0, tictacMid})};
+  const auto tictac = Manifold::Hull2(spheres);
+
+#ifdef MANIFOLD_EXPORT
+  if (options.exportModels) {
+    ExportMesh("tictac_hull2.glb", tictac.GetMesh(), {});
+  }
+#endif
+
+  EXPECT_EQ(sphere.NumVert() + tictacSeg, tictac.NumVert());
+}
+
+TEST(Manifold, HollowHull2) {
+  auto sphere = Manifold::Sphere(100, 360);
+  auto hollow = sphere - sphere.Scale({0.8, 0.8, 0.8});
+  const float sphere_vol = sphere.GetProperties().volume;
+  EXPECT_FLOAT_EQ(hollow.Hull2().GetProperties().volume, sphere_vol);
+}
+
+TEST(Manifold, CubeHull2) {
+  std::vector<glm::vec3> cubePts = {
+      {0, 0, 0},       {1, 0, 0},   {0, 1, 0},      {0, 0, 1},  // corners
+      {1, 1, 0},       {0, 1, 1},   {1, 0, 1},      {1, 1, 1},  // corners
+      {0.5, 0.5, 0.5}, {0.5, 0, 0}, {0.5, 0.7, 0.2}  // internal points
+  };
+  auto cube = Manifold::Hull2(cubePts);
+  EXPECT_FLOAT_EQ(cube.GetProperties().volume, 1);
+}
+
+TEST(Manifold, EmptyHull2) {
+  const std::vector<glm::vec3> tooFew{{0, 0, 0}, {1, 0, 0}, {0, 1, 0}};
+  EXPECT_TRUE(Manifold::Hull2(tooFew).IsEmpty());
+
+  const std::vector<glm::vec3> coplanar{
+      {0, 0, 0}, {1, 0, 0}, {0, 1, 0}, {1, 1, 0}};
+  EXPECT_TRUE(Manifold::Hull2(coplanar).IsEmpty());
+}
+
+TEST(Manifold, QUICKHULL2) {
+  const float tictacRad = 100;
+  const float tictacHeight = 500;
+  const int tictacSeg = 100;
+  const float tictacMid = tictacHeight - 2 * tictacRad;
+  const auto sphere = Manifold::Sphere(tictacRad, tictacSeg);
+  const std::vector<Manifold> spheres{sphere,
+                                      sphere.Translate({0, 0, tictacMid})};
+  const auto tictac = Manifold::Hull3(spheres);
+
+#ifdef MANIFOLD_EXPORT
+  if (options.exportModels) {
+    ExportMesh("tictac_hull3.glb", tictac.GetMesh(), {});
+  }
+#endif
+
+  EXPECT_EQ(sphere.NumVert() + tictacSeg, tictac.NumVert());
+}
+
+TEST(Manifold, HollowHull3) {
+  auto sphere = Manifold::Sphere(100, 100);
+  auto hollow = sphere - sphere.Scale({0.8, 0.8, 0.8});
+  const float sphere_vol = sphere.GetProperties().volume;
+  EXPECT_FLOAT_EQ(hollow.Hull3().GetProperties().volume, sphere_vol);
+}
+
+TEST(Manifold, CubeHull3) {
+  std::vector<glm::vec3> cubePts = {
+      {0, 0, 0},       {1, 0, 0},   {0, 1, 0},      {0, 0, 1},  // corners
+      {1, 1, 0},       {0, 1, 1},   {1, 0, 1},      {1, 1, 1},  // corners
+      {0.5, 0.5, 0.5}, {0.5, 0, 0}, {0.5, 0.7, 0.2}  // internal points
+  };
+  auto cube = Manifold::Hull3(cubePts);
+  EXPECT_FLOAT_EQ(cube.GetProperties().volume, 1);
+}
+
+TEST(Manifold, EmptyHull3) {
+  const std::vector<glm::vec3> tooFew{{0, 0, 0}, {1, 0, 0}, {0, 1, 0}};
+  EXPECT_TRUE(Manifold::Hull3(tooFew).IsEmpty());
+
+  const std::vector<glm::vec3> coplanar{
+      {0, 0, 0}, {1, 0, 0}, {0, 1, 0}, {1, 1, 0}};
+  EXPECT_TRUE(Manifold::Hull3(coplanar).IsEmpty());
+}

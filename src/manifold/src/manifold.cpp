@@ -21,6 +21,10 @@
 #include "csg_tree.h"
 #include "impl.h"
 #include "par.h"
+#define ENABLE_VHACD_IMPLEMENTATION 1
+#include "VHACD.h"
+#define QUICKHULL_IMPLEMENTATION
+#include "quickhull2.h"
 
 namespace {
 using namespace manifold;
@@ -933,9 +937,191 @@ Manifold Manifold::Hull(const std::vector<glm::vec3>& pts) {
 }
 
 /**
+ * Compute the convex hull of a set of points using VHACD's Convex Hull
+ * Implementation. If the given points are fewer than 4, or they are all
+ * coplanar, an empty Manifold will be returned.
+ *
+ * @param pts A vector of 3-dimensional points over which to compute a convex
+ * hull.
+ */
+Manifold Manifold::Hull2(const std::vector<glm::vec3>& pts) {
+  ZoneScoped;
+  const int numVert = pts.size();
+  if (numVert < 4) return Manifold();
+
+  std::vector<VHACD::Vertex> vertices(numVert);
+  for (int i = 0; i < numVert; i++) {
+    vertices[i].mX = pts[i].x;
+    vertices[i].mY = pts[i].y;
+    vertices[i].mZ = pts[i].z;
+  }
+
+  // Compute the Convex Hull
+  VHACD::ConvexHull hull(vertices, double(0.0000001));
+
+  Mesh mesh;
+
+  auto& vlist = hull.GetVertexPool();
+  if (!vlist.empty()) {
+    mesh.vertPos.resize(vlist.size());
+    for (int i = 0; i < vlist.size(); i++) {
+      mesh.vertPos[i] = {vlist[i].GetX(), vlist[i].GetY(), vlist[i].GetZ()};
+    }
+  }
+
+  auto outputVertices = hull.GetList();
+  mesh.triVerts.reserve(outputVertices.size());
+  for (std::list<VHACD::ConvexHullFace>::const_iterator node =
+           outputVertices.begin();
+       node != outputVertices.end(); ++node) {
+    const VHACD::ConvexHullFace& face = *node;
+    mesh.triVerts.push_back(
+        {face.m_index[0], face.m_index[1], face.m_index[2]});
+  }
+
+  return Manifold(mesh);
+}
+
+/**
+ * Compute the convex hull of a set of points using Karimnaaji's Quick Hull
+ * Implementation. If the given points are fewer than 4, or they are all
+ * coplanar, an empty Manifold will be returned.
+ *
+ * @param pts A vector of 3-dimensional points over which to compute a convex
+ * hull.
+ */
+Manifold Manifold::Hull3(const std::vector<glm::vec3>& pts) {
+    ZoneScoped;
+    const int numVert = pts.size();
+    if (numVert < 4) return Manifold();
+
+  //  Generic Hash Function, can try to find the optimum hash function to improve effeciency
+
+    // struct qh_vertex_hash {
+    //     std::size_t operator()(const qh_vertex_t& vertex) const {
+    //         // Custom hash function for qh_vertex_t
+    //         return std::hash<float>()(vertex.x) ^
+    //                std::hash<float>()(vertex.y) ^
+    //                std::hash<float>()(vertex.z);
+    //     }
+    // };
+
+    // struct qh_vertex_equal {
+    //     bool operator()(const qh_vertex_t& lhs, const qh_vertex_t& rhs) const {
+    //         // Custom equality function for qh_vertex_t
+    //         return std::tie(lhs.x, lhs.y, lhs.z) == std::tie(rhs.x, rhs.y,rhs.z);
+    //     }
+    // };
+
+    struct qh_vertex_compare {
+        bool operator()(const qh_vertex_t& lhs, const qh_vertex_t& rhs) const
+        {
+            if (lhs.x != rhs.x) return lhs.x < rhs.x;
+            if (lhs.y != rhs.y) return lhs.y < rhs.y;
+            return lhs.z < rhs.z;
+        }
+    };
+
+    // We can also use unordered_map with custom hash and equality functions
+    // std::unordered_map<qh_vertex_t, int, qh_vertex_hash, qh_vertex_equal> vertexIndexMap; 
+
+    std::map<qh_vertex_t, int, qh_vertex_compare> vertexIndexMap; 
+
+    // Converting input pts to a format that the algorithm accepts
+    std::vector<qh_vertex_t> uniqueVertices;
+    std::vector<int> indices; qh_vertex_t input_pts[pts.size()]; 
+    for (int i=0;i<pts.size();i++)
+    {
+      input_pts[i]={pts[i].x,pts[i].y,pts[i].z};
+    }
+
+    // std::cout << pts.size() << std::endl;
+
+    // Standard Algorithm Call
+    float epsilon;
+    qh_context_t context;
+    std::cout << "Before standard algorithm call" << std::endl;
+    epsilon = qh__compute_epsilon(input_pts, pts.size());
+    qh__init_context(&context, input_pts, pts.size());
+    qh__remove_vertex_duplicates(&context, epsilon);
+
+    // The function just below gives the segfault error for larger cases, and we need to look into how we can fix it.
+    qh__build_tetrahedron(&context, epsilon);
+
+    unsigned int failurestep = 0;
+    qh__build_hull(&context, epsilon);
+    int valid = qh__test_hull(&context, epsilon, 0);
+
+    // I tried running this function directly without the valid check to see if it works, but even this segfaults, so I included the valid check as it helps identify where the issue might be
+    qh_mesh_t mesh_quick = qh_quickhull3d(input_pts, pts.size());
+    std::cout << "After standard algorithm call" << std::endl;
+    if (!valid) {
+      std::cout << "Invalid Output by algorithm" << std::endl;
+      return Manifold();
+    }
+    qh__free_context(&context);
+
+    // Iterating through the vertices array to create a map of the vertices, since the vertices array has the vertices not indices, and the indices array in the algorithm isn't correct, I looked into the code the indices array is essentially just assigning indices[i]=i always
+    for (int i=0;i<mesh_quick.nvertices;i++) {
+        qh_vertex_t vertex =mesh_quick.vertices[i];
+        auto it = vertexIndexMap.find(vertex);
+        if (it == vertexIndexMap.end()) {
+            int newIndex = uniqueVertices.size();
+            vertexIndexMap[vertex] = newIndex;
+            uniqueVertices.push_back(vertex);
+            indices.push_back(newIndex);
+        } else {
+            indices.push_back(it->second);
+        }
+    }
+
+    // Standard checks to prevent segfaults
+
+    // If no unique vertices were present
+    if (uniqueVertices.empty()) {
+        // std::cerr << "Error: No unique vertices found." << std::endl;
+        return Manifold();
+    }
+
+    //  In case the indices or number of indices was empty
+    if (mesh_quick.indices == nullptr || mesh_quick.nindices <= 0) {
+        return Manifold();
+    }
+
+    // Inputting the output in the format expected by our Mesh Function
+    const int numTris = mesh_quick.nindices / 3;
+    Mesh mesh;
+    mesh.vertPos.reserve(uniqueVertices.size());
+    mesh.triVerts.reserve(numTris);
+
+    for (const auto& vertex : uniqueVertices) {
+        mesh.vertPos.push_back({vertex.x, vertex.y, vertex.z});
+    }
+
+    for (int i = 0; i < mesh_quick.nindices; i += 3) {
+        int idx1 = vertexIndexMap[mesh_quick.vertices[i]];
+        int idx2 = vertexIndexMap[mesh_quick.vertices[i+1]];
+        int idx3 = vertexIndexMap[mesh_quick.vertices[i+2]];
+        mesh.triVerts.push_back({idx1, idx2, idx3});
+    }
+    qh_free_mesh(mesh_quick);
+    return Manifold(mesh);
+}
+
+/**
  * Compute the convex hull of this manifold.
  */
 Manifold Manifold::Hull() const { return Hull(GetMesh().vertPos); }
+
+/**
+ * Compute the convex hull of this manifold.
+ */
+Manifold Manifold::Hull2() const { return Hull2(GetMesh().vertPos); }
+
+/**
+ * Compute the convex hull of this manifold.
+ */
+Manifold Manifold::Hull3() const { return Hull3(GetMesh().vertPos); }
 
 /**
  * Compute the convex hull enveloping a set of manifolds.
@@ -944,5 +1130,23 @@ Manifold Manifold::Hull() const { return Hull(GetMesh().vertPos); }
  */
 Manifold Manifold::Hull(const std::vector<Manifold>& manifolds) {
   return Compose(manifolds).Hull();
+}
+
+/**
+ * Compute the convex hull enveloping a set of manifolds.
+ *
+ * @param manifolds A vector of manifolds over which to compute a convex hull.
+ */
+Manifold Manifold::Hull2(const std::vector<Manifold>& manifolds) {
+  return Compose(manifolds).Hull2();
+}
+
+/**
+ * Compute the convex hull enveloping a set of manifolds.
+ *
+ * @param manifolds A vector of manifolds over which to compute a convex hull.
+ */
+Manifold Manifold::Hull3(const std::vector<Manifold>& manifolds) {
+  return Compose(manifolds).Hull3();
 }
 }  // namespace manifold

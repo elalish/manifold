@@ -244,7 +244,7 @@ class Manifold {
   Manifold SetProperties(
       int, std::function<void(float*, glm::vec3, const float*)>) const;
   Manifold CalculateCurvature(int gaussianIdx, int meanIdx) const;
-  Manifold CalculateNormals(int normalIdx, float minSharpAngle = 60) const;
+    Manifold CalculateNormals(int normalIdx, float minSharpAngle = 60) const;
   Manifold SmoothByNormals(int normalIdx) const;
   Manifold SmoothOut(float minSharpAngle = 60, float minSmoothness = 0) const;
   Manifold Refine(int) const;
@@ -283,8 +283,14 @@ class Manifold {
    */
   ///@{
   Manifold Hull() const;
+  Manifold Hull2() const;
   static Manifold Hull(const std::vector<Manifold>& manifolds);
   static Manifold Hull(const std::vector<glm::vec3>& pts);
+  static Manifold Hull2(const std::vector<Manifold>& manifolds);
+  static Manifold Hull2(const std::vector<glm::vec3>& pts);
+  Manifold Hull3() const;
+  static Manifold Hull3(const std::vector<Manifold>& manifolds);
+  static Manifold Hull3(const std::vector<glm::vec3>& pts);
   ///@}
 
   /** @name Testing hooks
