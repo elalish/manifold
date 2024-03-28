@@ -244,7 +244,7 @@ class Manifold {
   Manifold SetProperties(
       int, std::function<void(float*, glm::vec3, const float*)>) const;
   Manifold CalculateCurvature(int gaussianIdx, int meanIdx) const;
-    Manifold CalculateNormals(int normalIdx, float minSharpAngle = 60) const;
+  Manifold CalculateNormals(int normalIdx, float minSharpAngle = 60) const;
   Manifold SmoothByNormals(int normalIdx) const;
   Manifold SmoothOut(float minSharpAngle = 60, float minSmoothness = 0) const;
   Manifold Refine(int) const;
