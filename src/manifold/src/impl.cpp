@@ -910,25 +910,23 @@ SparseIndices Manifold::Impl::VertexCollisionsZ(
 float Manifold::Impl::MinGap(const Manifold::Impl& other,
                              float searchLength) const {
   ZoneScoped;
-  auto getSortedExpandedFaceBoxMorton =
-      [searchLength](const Manifold::Impl& impl) {
-        Vec<Box> faceBox;
-        Vec<uint32_t> faceMorton;
+  Vec<Box> faceBox;
+  Vec<uint32_t> faceMorton;
 
-        impl.GetFaceBoxMorton(faceBox, faceMorton);
+  this->GetFaceBoxMorton(faceBox, faceMorton);
+  this->SortFaceBoxMorton(faceBox, faceMorton);
 
-        transform(autoPolicy(faceBox.size()), faceBox.begin(), faceBox.end(),
-                  faceBox.begin(), [searchLength](const Box& box) {
-                    return Box(box.min - glm::vec3(searchLength),
-                               box.max + glm::vec3(searchLength));
-                  });
+  transform(autoPolicy(faceBox.size()), faceBox.begin(), faceBox.end(),
+            faceBox.begin(), [searchLength](const Box& box) {
+              return Box(box.min - glm::vec3(searchLength),
+                         box.max + glm::vec3(searchLength));
+            });
 
-        impl.SortFaceBoxMorton(faceBox, faceMorton);
-        return std::pair{faceBox, faceMorton};
-      };
+  Vec<Box> faceBoxOther;
+  Vec<uint32_t> faceMortonOther;
 
-  auto [faceBox, faceMorton] = getSortedExpandedFaceBoxMorton(*this);
-  auto [faceBoxOther, faceMortonOther] = getSortedExpandedFaceBoxMorton(other);
+  other.GetFaceBoxMorton(faceBoxOther, faceMortonOther);
+  other.SortFaceBoxMorton(faceBoxOther, faceMortonOther);
 
   Collider collider{faceBox, faceMorton};
 
