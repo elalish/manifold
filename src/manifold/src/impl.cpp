@@ -926,7 +926,6 @@ float Manifold::Impl::MinGap(const Manifold::Impl& other,
   Vec<uint32_t> faceMortonOther;
 
   other.GetFaceBoxMorton(faceBoxOther, faceMortonOther);
-  other.SortFaceBoxMorton(faceBoxOther, faceMortonOther);
 
   Collider collider{faceBox, faceMorton};
 

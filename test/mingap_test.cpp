@@ -111,17 +111,14 @@ TEST(MinGap, AfterTransformations) {
   ASSERT_NEAR(distance, 1.0f, 0.001f);
 }
 
-TEST(MinGap, AfterTransformationsDummyBooleanOp) {
+TEST(MinGap, AfterTransformationsOutOfRange) {
   auto a = Manifold::Sphere(1.0f, 100);
   auto b = Manifold::Sphere(1.0f, 100)
                .Scale({3.0f, 1.0f, 1.0f})
                .Rotate(0, 90, 45)
                .Translate({3.0f, 0.0f, 0.0f});
 
-  a = a + a;
-  b = b + b;
+  float distance = a.MinGap(b, 0.95f);
 
-  float distance = a.MinGap(b, 1.1f);
-
-  ASSERT_NEAR(distance, 1.0f, 0.001f);
+  ASSERT_NEAR(distance, 0.95f, 0.001f);
 }
