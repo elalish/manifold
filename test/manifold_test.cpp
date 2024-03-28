@@ -916,8 +916,8 @@ TEST(Manifold, MinGapClosestPointOnTriangleFace) {
   EXPECT_FLOAT_EQ(distance, 1);
 }
 
-TEST(Manifold, MingapComplex) {
-  auto a = Manifold::Sphere(1, 256);
+TEST(Manifold, MingapAfterTransformations) {
+  auto a = Manifold::Sphere(1, 256).Rotate(30, 30, 30);
   auto b =
       Manifold::Sphere(1, 256).Scale({3, 1, 1}).Rotate(0, 90, 45).Translate(
           {3, 0, 0});
@@ -927,8 +927,8 @@ TEST(Manifold, MingapComplex) {
   ASSERT_NEAR(distance, 1, 0.001f);
 }
 
-TEST(Manifold, MinGapComplexOutOfRange) {
-  auto a = Manifold::Sphere(1, 256);
+TEST(Manifold, MinGapAfterTransformationsOutOfBounds) {
+  auto a = Manifold::Sphere(1, 256).Rotate(30, 30, 30);
   auto b =
       Manifold::Sphere(1, 256).Scale({3, 1, 1}).Rotate(0, 90, 45).Translate(
           {3, 0, 0});
