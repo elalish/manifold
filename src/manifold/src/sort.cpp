@@ -419,27 +419,6 @@ void Manifold::Impl::SortFaces(Vec<Box>& faceBox, Vec<uint32_t>& faceMorton) {
 }
 
 /**
- * Sorts the bounding box and Morton code arrays based on the Morton codes.
- * Leaves the original manifold untouched.
- */
-void Manifold::Impl::SortFaceBoxMorton(Vec<Box>& faceBox,
-                                       Vec<uint32_t>& faceMorton) const {
-  ZoneScoped;
-  Vec<int> faceNew2Old(NumTri());
-  auto policy = autoPolicy(faceNew2Old.size());
-  sequence(policy, faceNew2Old.begin(), faceNew2Old.end());
-
-  stable_sort(policy, zip(faceMorton.begin(), faceNew2Old.begin()),
-              zip(faceMorton.end(), faceNew2Old.end()),
-              [](const thrust::tuple<uint32_t, int>& a,
-                 const thrust::tuple<uint32_t, int>& b) {
-                return thrust::get<0>(a) < thrust::get<0>(b);
-              });
-
-  Permute(faceBox, faceNew2Old);
-}
-
-/**
  * Creates the halfedge_ vector for this manifold by copying a set of faces from
  * another manifold, given by oldHalfedge. Input faceNew2Old defines the old
  * faces to gather into this.

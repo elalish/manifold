@@ -910,26 +910,19 @@ SparseIndices Manifold::Impl::VertexCollisionsZ(
 float Manifold::Impl::MinGap(const Manifold::Impl& other,
                              float searchLength) const {
   ZoneScoped;
-  Vec<Box> faceBox;
-  Vec<uint32_t> faceMorton;
-
-  this->GetFaceBoxMorton(faceBox, faceMorton);
-  this->SortFaceBoxMorton(faceBox, faceMorton);
-
-  transform(autoPolicy(faceBox.size()), faceBox.begin(), faceBox.end(),
-            faceBox.begin(), [searchLength](const Box& box) {
-              return Box(box.min - glm::vec3(searchLength),
-                         box.max + glm::vec3(searchLength));
-            });
-
   Vec<Box> faceBoxOther;
   Vec<uint32_t> faceMortonOther;
 
   other.GetFaceBoxMorton(faceBoxOther, faceMortonOther);
 
-  Collider collider{faceBox, faceMorton};
+  transform(autoPolicy(faceBoxOther.size()), faceBoxOther.begin(),
+            faceBoxOther.end(), faceBoxOther.begin(),
+            [searchLength](const Box& box) {
+              return Box(box.min - glm::vec3(searchLength),
+                         box.max + glm::vec3(searchLength));
+            });
 
-  SparseIndices collisions = collider.Collisions(faceBoxOther.cview());
+  SparseIndices collisions = collider_.Collisions(faceBoxOther.cview());
 
   float minDistanceSquared = searchLength * searchLength;
 

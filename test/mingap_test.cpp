@@ -100,8 +100,8 @@ TEST(MinGap, ClosestPointOnTriangleFace) {
 }
 
 TEST(MinGap, AfterTransformations) {
-  auto a = Manifold::Sphere(1.0f, 100);
-  auto b = Manifold::Sphere(1.0f, 100)
+  auto a = Manifold::Sphere(1.0f, 256);
+  auto b = Manifold::Sphere(1.0f, 256)
                .Scale({3.0f, 1.0f, 1.0f})
                .Rotate(0, 90, 45)
                .Translate({3.0f, 0.0f, 0.0f});
@@ -112,8 +112,8 @@ TEST(MinGap, AfterTransformations) {
 }
 
 TEST(MinGap, AfterTransformationsOutOfRange) {
-  auto a = Manifold::Sphere(1.0f, 100);
-  auto b = Manifold::Sphere(1.0f, 100)
+  auto a = Manifold::Sphere(1.0f, 256);
+  auto b = Manifold::Sphere(1.0f, 256)
                .Scale({3.0f, 1.0f, 1.0f})
                .Rotate(0, 90, 45)
                .Translate({3.0f, 0.0f, 0.0f});
