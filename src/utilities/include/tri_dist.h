@@ -27,12 +27,12 @@ namespace manifold {
 /**
  * Returns the distance between two line segments.
  *
- * @param[out] cq Closest point on line segment pa.
- * @param[out] cp Closest point on line segment qb.
+ * @param[out] x Closest point on line segment pa.
+ * @param[out] y Closest point on line segment qb.
  * @param[in]  p  One endpoint of the first line segment.
- * @param[in]  q  Other endpoint of the first line segment.
+ * @param[in]  a  Other endpoint of the first line segment.
  * @param[in]  p  One endpoint of the second line segment.
- * @param[in]  q  Other endpoint of the second line segment.
+ * @param[in]  b  Other endpoint of the second line segment.
  */
 inline void EdgeEdgeDist(glm::vec3& x, glm::vec3& y,  // closest points
                          const glm::vec3& p,
