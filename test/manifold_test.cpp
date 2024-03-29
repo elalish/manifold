@@ -911,7 +911,7 @@ TEST(Manifold, QUICKHULL2) {
   }
 #endif
 
-  EXPECT_NEAR(sphere.NumVert() + tictacSeg, tictac.NumVert(),3);
+  EXPECT_NEAR(sphere.NumVert() + tictacSeg, tictac.NumVert(), 3);
 }
 
 // TEST(Manifold, HollowHull3) {

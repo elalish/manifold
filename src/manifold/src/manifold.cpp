@@ -295,7 +295,8 @@ MeshGL Manifold::GetMeshGL(glm::ivec3 normalIdx) const {
   // Duplicate verts with different props
   std::vector<int> vert2idx(impl.NumVert(), -1);
   std::vector<std::vector<glm::ivec2>> vertPropPair(impl.NumVert());
-  out.vertProperties.reserve(numVert * static_cast<size_t>(out.numProp));
+  out.vertProperties.reserve(static_cast<size_t>(numVert) *
+                             static_cast<size_t>(out.numProp));
 
   for (int run = 0; run < out.runOriginalID.size(); ++run) {
     for (int tri = out.runIndex[run] / 3; tri < out.runIndex[run + 1] / 3;
