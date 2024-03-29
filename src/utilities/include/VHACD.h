@@ -4469,10 +4469,8 @@ void Volume::RaycastFill(const AABBTree& aabbTree) {
               VHACD::Vect3(1, 0, 0),
               VHACD::Vect3(-1, 0, 0),  // this was 1, 0, 0 in the original code,
                                        // but looks wrong
-              VHACD::Vect3(0, 1, 0),
-              VHACD::Vect3(0, -1, 0),
-              VHACD::Vect3(0, 0, 1),
-              VHACD::Vect3(0, 0, -1)};
+              VHACD::Vect3(0, 1, 0), VHACD::Vect3(0, -1, 0),
+              VHACD::Vect3(0, 0, 1), VHACD::Vect3(0, 0, -1)};
 
           for (uint32_t r = 0; r < 6; r++) {
             aabbTree.TraceRay(start, directions[r], insideCount, outsideCount);
