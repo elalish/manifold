@@ -995,7 +995,12 @@ Manifold Manifold::Hull3(const std::vector<glm::vec3>& pts) {
   ZoneScoped;
   const int numVert = pts.size();
   if (numVert < 4) return Manifold();
-
+  qh_vertex_t input_pts[numVert];
+  for (int i = 0; i < numVert; i++) {
+    input_pts[i].x = pts[i].x;
+    input_pts[i].y = pts[i].y;
+    input_pts[i].z = pts[i].z;
+  }
   //  Generic Hash Function, can try to find the optimum hash function to
   //  improve effeciency
 
@@ -1033,12 +1038,6 @@ Manifold Manifold::Hull3(const std::vector<glm::vec3>& pts) {
   // Converting input pts to a format that the algorithm accepts
   std::vector<qh_vertex_t> uniqueVertices;
   std::vector<int> indices;
-  qh_vertex_t input_pts[pts.size()];
-  for (int i = 0; i < pts.size(); i++) {
-    input_pts[i].x = pts[i].x;
-    input_pts[i].y = pts[i].y;
-    input_pts[i].z = pts[i].z;
-  }
 
   // std::cout << pts.size() << std::endl;
 
@@ -1067,7 +1066,7 @@ Manifold Manifold::Hull3(const std::vector<glm::vec3>& pts) {
     std::cout << "Invalid Output by algorithm" << std::endl;
     return Manifold();
   }
-  qh_mesh_t mesh_quick = qh_quickhull3d(input_pts, pts.size());
+  qh_mesh_t mesh_quick = qh_quickhull3d(input_pts, numVert);
 
   // Iterating through the vertices array to create a map of the vertices, since
   // the vertices array has the vertices not indices, and the indices array in
@@ -1102,10 +1101,10 @@ Manifold Manifold::Hull3(const std::vector<glm::vec3>& pts) {
   }
 
   // Inputting the output in the format expected by our Mesh Function
-  const int numTris = mesh_quick.nindices / 3;
+  const unsigned int numTris = mesh_quick.nindices / 3;
   Mesh mesh;
   mesh.vertPos.reserve(uniqueVertices.size());
-  mesh.triVerts.reserve(numTris);
+  mesh.triVerts.reserve(static_cast<size_t>(numTris));
 
   for (const auto& vertex : uniqueVertices) {
     mesh.vertPos.push_back({vertex.x, vertex.y, vertex.z});
