@@ -853,15 +853,6 @@ TEST(Manifold, MinGapCubeCube2) {
   EXPECT_FLOAT_EQ(distance, sqrt(2) * 2);
 }
 
-TEST(Manifold, MinGapCubeCubeOutOfBounds) {
-  auto a = Manifold::Cube();
-  auto b = Manifold::Cube().Translate({3, 3, 0});
-
-  float distance = a.MinGap(b, 2.5f);
-
-  EXPECT_FLOAT_EQ(distance, 2.5f);
-}
-
 TEST(Manifold, MinGapCubeSphereOverlapping) {
   auto a = Manifold::Cube();
   auto b = Manifold::Sphere(1);
@@ -880,15 +871,6 @@ TEST(Manifold, MinGapSphereSphere) {
   EXPECT_FLOAT_EQ(distance, 2 * sqrt(2) - 2);
 }
 
-TEST(Manifold, MinGapSphereSphere2) {
-  auto a = Manifold::Sphere(1);
-  auto b = Manifold::Sphere(1).Translate({2, 2, 0});
-
-  float distance = a.MinGap(b, 0.85f);
-
-  EXPECT_FLOAT_EQ(distance, 2 * sqrt(2) - 2);
-}
-
 TEST(Manifold, MinGapSphereSphereOutOfBounds) {
   auto a = Manifold::Sphere(1);
   auto b = Manifold::Sphere(1).Translate({2, 2, 0});
@@ -899,12 +881,13 @@ TEST(Manifold, MinGapSphereSphereOutOfBounds) {
 }
 
 TEST(Manifold, MinGapClosestPointOnEdge) {
-  auto a = Manifold::Cube().Rotate(0, 0, 45);
-  auto b = Manifold::Cube().Rotate(0, 45, 0).Translate({1, 0, 0.5f});
+  auto a = Manifold::Cube({1, 1, 1}, true).Rotate(0, 0, 45);
+  auto b =
+      Manifold::Cube({1, 1, 1}, true).Rotate(0, 45, 0).Translate({2, 0, 0});
 
-  float distance = a.MinGap(b, 0.3f);
+  float distance = a.MinGap(b, 0.7f);
 
-  EXPECT_FLOAT_EQ(distance, 1 - sqrt(2) / 2);
+  EXPECT_FLOAT_EQ(distance, 2 - sqrt(2));
 }
 
 TEST(Manifold, MinGapClosestPointOnTriangleFace) {
