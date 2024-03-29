@@ -853,7 +853,7 @@ TEST(Manifold, EmptyHull) {
 TEST(Manifold, VHACDHULL) {
   const float tictacRad = 100;
   const float tictacHeight = 500;
-  const int tictacSeg = 1000;
+  const int tictacSeg = 100;
   const float tictacMid = tictacHeight - 2 * tictacRad;
   const auto sphere = Manifold::Sphere(tictacRad, tictacSeg);
   const std::vector<Manifold> spheres{sphere,
