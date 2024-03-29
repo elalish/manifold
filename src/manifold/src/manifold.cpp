@@ -993,10 +993,10 @@ Manifold Manifold::Hull2(const std::vector<glm::vec3>& pts) {
  */
 Manifold Manifold::Hull3(const std::vector<glm::vec3>& pts) {
   ZoneScoped;
-  const int numVert = pts.size();
+  const unsigned int numVert = pts.size();
   if (numVert < 4) return Manifold();
   qh_vertex_t input_pts[numVert];
-  for (int i = 0; i < numVert; i++) {
+  for (unsigned int i = 0; i < numVert; i++) {
     input_pts[i].x = pts[i].x;
     input_pts[i].y = pts[i].y;
     input_pts[i].z = pts[i].z;
@@ -1105,7 +1105,7 @@ Manifold Manifold::Hull3(const std::vector<glm::vec3>& pts) {
     mesh.vertPos.push_back({vertex.x, vertex.y, vertex.z});
   }
 
-  for (int i = 0; i < mesh_quick.nindices; i += 3) {
+  for (unsigned int i = 0; i < mesh_quick.nindices; i += 3) {
     unsigned int idx1 = vertexIndexMap[mesh_quick.vertices[i]];
     unsigned int idx2 = vertexIndexMap[mesh_quick.vertices[i + 1]];
     unsigned int idx3 = vertexIndexMap[mesh_quick.vertices[i + 2]];
