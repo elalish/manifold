@@ -39,7 +39,6 @@ endif()
 
 find_package(glm QUIET)
 if(NOT glm_FOUND)
-    set(GLM_BUILD_INSTALL "ON" CACHE STRING "install glm")
     FetchContent_Declare(glm
         GIT_REPOSITORY https://github.com/g-truc/glm.git
         GIT_TAG b06b775c1c80af51a1183c0e167f9de3b2351a79
@@ -48,6 +47,9 @@ if(NOT glm_FOUND)
     FetchContent_MakeAvailable(glm)
     message(STATUS "glm not found, downloading from source")
     if(NOT EMSCRIPTEN)
+        set_target_properties(glm PROPERTIES
+            INTERFACE_INCLUDE_DIRECTORIES
+            "$<INSTALL_INTERFACE:>$<BUILD_INTERFACE:${glm_SOURCE_DIR}/>")
         install(TARGETS glm EXPORT glmTargets)
         install(TARGETS glm-header-only EXPORT glmTargets)
         install(EXPORT glmTargets DESTINATION ${CMAKE_INSTALL_DATADIR}/glm)

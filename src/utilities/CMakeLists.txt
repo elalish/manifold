@@ -60,7 +60,7 @@ endif()
 target_include_directories(${PROJECT_NAME} INTERFACE
     $<INSTALL_INTERFACE:include/${CMAKE_PROJECT_NAME}>
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>)
-target_link_libraries(${PROJECT_NAME} INTERFACE $<BUILD_INTERFACE:glm::glm>)
+target_link_libraries(${PROJECT_NAME} INTERFACE glm::glm)
 
 if(NOT DEFINED thrust_SOURCE_DIR)
     set(thrust_SOURCE_DIR ${_THRUST_INCLUDE_DIR})
