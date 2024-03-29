@@ -1033,11 +1033,10 @@ Manifold Manifold::Hull3(const std::vector<glm::vec3>& pts) {
   // std::unordered_map<qh_vertex_t, int, qh_vertex_hash, qh_vertex_equal>
   // vertexIndexMap;
 
-  std::map<qh_vertex_t, int, qh_vertex_compare> vertexIndexMap;
+  std::map<qh_vertex_t, unsigned int, qh_vertex_compare> vertexIndexMap;
 
   // Converting input pts to a format that the algorithm accepts
   std::vector<qh_vertex_t> uniqueVertices;
-  std::vector<int> indices;
 
   // std::cout << pts.size() << std::endl;
 
@@ -1066,7 +1065,7 @@ Manifold Manifold::Hull3(const std::vector<glm::vec3>& pts) {
     std::cout << "Invalid Output by algorithm" << std::endl;
     return Manifold();
   }
-  qh_mesh_t mesh_quick = qh_quickhull3d(input_pts, numVert);
+  qh_mesh_t mesh_quick = qh_quickhull3d(input_pts, pts.size());
 
   // Iterating through the vertices array to create a map of the vertices, since
   // the vertices array has the vertices not indices, and the indices array in
@@ -1076,12 +1075,8 @@ Manifold Manifold::Hull3(const std::vector<glm::vec3>& pts) {
     qh_vertex_t vertex = mesh_quick.vertices[i];
     auto it = vertexIndexMap.find(vertex);
     if (it == vertexIndexMap.end()) {
-      int newIndex = uniqueVertices.size();
-      vertexIndexMap[vertex] = newIndex;
+      vertexIndexMap[vertex] = uniqueVertices.size();
       uniqueVertices.push_back(vertex);
-      indices.push_back(newIndex);
-    } else {
-      indices.push_back(it->second);
     }
   }
 
@@ -1111,9 +1106,9 @@ Manifold Manifold::Hull3(const std::vector<glm::vec3>& pts) {
   }
 
   for (int i = 0; i < mesh_quick.nindices; i += 3) {
-    int idx1 = vertexIndexMap[mesh_quick.vertices[i]];
-    int idx2 = vertexIndexMap[mesh_quick.vertices[i + 1]];
-    int idx3 = vertexIndexMap[mesh_quick.vertices[i + 2]];
+    unsigned int idx1 = vertexIndexMap[mesh_quick.vertices[i]];
+    unsigned int idx2 = vertexIndexMap[mesh_quick.vertices[i + 1]];
+    unsigned int idx3 = vertexIndexMap[mesh_quick.vertices[i + 2]];
     mesh.triVerts.push_back({idx1, idx2, idx3});
   }
   qh_free_mesh(mesh_quick);
