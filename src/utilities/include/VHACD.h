@@ -4358,8 +4358,8 @@ void Volume::Voxelize(const std::vector<VHACD::Vertex>& points,
   VHACD::Vect3 pt;
   const VHACD::Vect3 boxhalfsize(double(0.5));
   for (size_t t = 0; t < indices.size(); ++t) {
-    size_t i0=0, j0=0, k0=0;
-    size_t i1=0, j1=0, k1=0;
+    size_t i0 = 0, j0 = 0, k0 = 0;
+    size_t i1 = 0, j1 = 0, k1 = 0;
     VHACD::Vector3<uint32_t> tri = indices[t];
     for (int32_t c = 0; c < 3; ++c) {
       pt = points[tri[c]];
