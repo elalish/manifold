@@ -1034,7 +1034,7 @@ Manifold Manifold::Hull3(const std::vector<glm::vec3>& pts) {
   std::vector<int> indices;
   qh_vertex_t input_pts[pts.size()];
   for (int i = 0; i < pts.size(); i++) {
-    input_pts[i] = {pts[i].x, pts[i].y, pts[i].z};
+    input_pts[i] = {{pts[i].x, pts[i].y, pts[i].z}};
   }
 
   // std::cout << pts.size() << std::endl;
