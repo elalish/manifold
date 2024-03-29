@@ -1060,13 +1060,13 @@ Manifold Manifold::Hull3(const std::vector<glm::vec3>& pts) {
   // I tried running this function directly without the valid check to see if it
   // works, but even this segfaults, so I included the valid check as it helps
   // identify where the issue might be
-  qh_mesh_t mesh_quick = qh_quickhull3d(input_pts, pts.size());
+  qh__free_context(&context);
   std::cout << "After standard algorithm call" << std::endl;
   if (!valid) {
     std::cout << "Invalid Output by algorithm" << std::endl;
     return Manifold();
   }
-  qh__free_context(&context);
+  qh_mesh_t mesh_quick = qh_quickhull3d(input_pts, pts.size());
 
   // Iterating through the vertices array to create a map of the vertices, since
   // the vertices array has the vertices not indices, and the indices array in
@@ -1090,11 +1090,13 @@ Manifold Manifold::Hull3(const std::vector<glm::vec3>& pts) {
   // If no unique vertices were present
   if (uniqueVertices.empty()) {
     // std::cerr << "Error: No unique vertices found." << std::endl;
+    qh_free_mesh(mesh_quick);
     return Manifold();
   }
 
   //  In case the indices or number of indices was empty
   if (mesh_quick.indices == nullptr || mesh_quick.nindices <= 0) {
+    qh_free_mesh(mesh_quick);
     return Manifold();
   }
 
