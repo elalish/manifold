@@ -17,6 +17,7 @@
 #include <algorithm>
 
 #include "cross_section.h"
+#include "samples.h"
 #include "test.h"
 #include "tri_dist.h"
 
@@ -908,6 +909,15 @@ TEST(Manifold, MingapAfterTransformations) {
   float distance = a.MinGap(b, 1.1f);
 
   ASSERT_NEAR(distance, 1, 0.001f);
+}
+
+TEST(Manifold, MingapStretchyBracelet) {
+  auto a = StretchyBracelet();
+  auto b = StretchyBracelet().Translate({0, 0, 20});
+
+  float distance = a.MinGap(b, 10);
+
+  ASSERT_NEAR(distance, 5, 0.001f);
 }
 
 TEST(Manifold, MinGapAfterTransformationsOutOfBounds) {
