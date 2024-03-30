@@ -77,8 +77,8 @@ inline void EdgeEdgeDist(glm::vec3& x, glm::vec3& y,  // closest points
     u = 0.0f;
     t = ADotA != 0.0f ? glm::clamp(ADotT / ADotA, 0.0f, 1.0f) : 0.0f;
   }
-  x = p + a * static_cast<float>(t);
-  y = q + b * static_cast<float>(u);
+  x = p + a * t;
+  y = q + b * u;
 }
 
 // From NVIDIA-Omniverse PhysX - BSD 3-Clause "New" or "Revised" License
