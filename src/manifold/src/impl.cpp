@@ -903,6 +903,30 @@ SparseIndices Manifold::Impl::VertexCollisionsZ(
   else
     return collider_.Collisions<false, false>(vertsIn);
 }
+
+struct GetDistanceTriangleTriangleSquared {
+  const SparseIndices& collisions;
+  const VecView<glm::vec3> vertPos_;
+  const VecView<glm::vec3> vertPosOther_;
+  const VecView<Halfedge> halfedge_;
+  const VecView<Halfedge> halfedgeOther_;
+
+  float operator()(int i) {
+    const int tri = collisions.Get(i, 1);
+    const int triOther = collisions.Get(i, 0);
+
+    std::array<glm::vec3, 3> p;
+    std::array<glm::vec3, 3> q;
+
+    for (const int j : {0, 1, 2}) {
+      p[j] = vertPos_[halfedge_[3 * tri + j].startVert];
+      q[j] = vertPosOther_[halfedgeOther_[3 * triOther + j].startVert];
+    }
+
+    return DistanceTriangleTriangleSquared(p, q);
+  }
+};
+
 /*
  * Returns the minimum gap between two manifolds. Returns a float between
  * 0 and searchLength.
@@ -924,24 +948,12 @@ float Manifold::Impl::MinGap(const Manifold::Impl& other,
 
   SparseIndices collisions = collider_.Collisions(faceBoxOther.cview());
 
-  float minDistanceSquared = searchLength * searchLength;
-
-  for (int i = 0; i < collisions.size(); ++i) {
-    const int tri = collisions.Get(i, 1);
-    const int triOther = collisions.Get(i, 0);
-
-    std::array<glm::vec3, 3> p;
-    std::array<glm::vec3, 3> q;
-
-    for (const int j : {0, 1, 2}) {
-      p[j] = vertPos_[halfedge_[3 * tri + j].startVert];
-      q[j] = other.vertPos_[other.halfedge_[3 * triOther + j].startVert];
-    }
-
-    float distanceSquared = DistanceTriangleTriangleSquared(p, q);
-
-    minDistanceSquared = std::min(minDistanceSquared, distanceSquared);
-  }
+  float minDistanceSquared = transform_reduce<float>(
+      autoPolicy(collisions.size()), thrust::counting_iterator<int>(0),
+      thrust::counting_iterator<int>(collisions.size()),
+      GetDistanceTriangleTriangleSquared{collisions, vertPos_, other.vertPos_,
+                                         halfedge_, other.halfedge_},
+      searchLength * searchLength, thrust::minimum<float>());
 
   return sqrt(minDistanceSquared);
 };

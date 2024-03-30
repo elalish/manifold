@@ -900,9 +900,9 @@ TEST(Manifold, MinGapClosestPointOnTriangleFace) {
 }
 
 TEST(Manifold, MingapAfterTransformations) {
-  auto a = Manifold::Sphere(1, 256).Rotate(30, 30, 30);
+  auto a = Manifold::Sphere(1, 1024).Rotate(30, 30, 30);
   auto b =
-      Manifold::Sphere(1, 256).Scale({3, 1, 1}).Rotate(0, 90, 45).Translate(
+      Manifold::Sphere(1, 1024).Scale({3, 1, 1}).Rotate(0, 90, 45).Translate(
           {3, 0, 0});
 
   float distance = a.MinGap(b, 1.1f);
@@ -911,9 +911,9 @@ TEST(Manifold, MingapAfterTransformations) {
 }
 
 TEST(Manifold, MinGapAfterTransformationsOutOfBounds) {
-  auto a = Manifold::Sphere(1, 256).Rotate(30, 30, 30);
+  auto a = Manifold::Sphere(1, 1024).Rotate(30, 30, 30);
   auto b =
-      Manifold::Sphere(1, 256).Scale({3, 1, 1}).Rotate(0, 90, 45).Translate(
+      Manifold::Sphere(1, 1024).Scale({3, 1, 1}).Rotate(0, 90, 45).Translate(
           {3, 0, 0});
 
   float distance = a.MinGap(b, 0.95f);
