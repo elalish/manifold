@@ -1242,27 +1242,44 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
     Vec<float> prop(meshRelation_.numProp *
                     (numPropVert + addedVerts + totalEdgeAdded));
 
+    // copy retained prop verts
     copy(policy, meshRelation_.properties.begin(),
          meshRelation_.properties.end(), prop.begin());
 
+    // copy interior prop verts and forward edge prop verts
     for_each_n(
         policy, zip(countAt(numPropVert), vertBary.begin() + numVert),
         addedVerts, [this, &prop](thrust::tuple<int, Barycentric> in) {
           const int vert = thrust::get<0>(in);
           const Barycentric bary = thrust::get<1>(in);
+          glm::ivec4 halfedges = GetHalfedges(bary.tri);
           auto& rel = meshRelation_;
 
           for (int p = 0; p < rel.numProp; ++p) {
-            glm::vec3 triProp;
-            for (const int i : {0, 1, 2}) {
-              triProp[i] =
-                  rel.properties[rel.triProperties[bary.tri][i] * rel.numProp +
-                                 p];
+            if (halfedges[3] < 0) {
+              glm::vec3 triProp;
+              for (const int i : {0, 1, 2}) {
+                triProp[i] = rel.properties[rel.triProperties[bary.tri][i] *
+                                                rel.numProp +
+                                            p];
+              }
+              prop[vert * rel.numProp + p] = glm::dot(triProp, bary.uvw);
+            } else {
+              glm::vec4 quadProp;
+              for (const int i : {0, 1, 2, 3}) {
+                const int tri = halfedges[i] / 3;
+                const int j = halfedges[i] % 3;
+                quadProp[i] =
+                    rel.properties[rel.triProperties[tri][j] * rel.numProp + p];
+              }
+              prop[vert * rel.numProp + p] = glm::mix(
+                  glm::mix(quadProp[0], quadProp[1], bary.uvw[0]),
+                  glm::mix(quadProp[3], quadProp[2], bary.uvw[0]), bary.uvw[1]);
             }
-            prop[vert * rel.numProp + p] = glm::dot(triProp, bary.uvw);
           }
         });
 
+    // copy backward edge prop verts
     for_each_n(
         policy, zip(edges.begin(), edgeAdded.begin(), edgeOffset.begin()),
         numEdge,
@@ -1276,25 +1293,19 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
           const float frac = 1.0f / (n + 1);
           const int halfedgeIdx = halfedge_[edge.halfedgeIdx].pairedHalfedge;
           const int v0 = halfedgeIdx % 3;
-          const int v1 = Next3(v0);
           const int tri = halfedgeIdx / 3;
+          const int prop0 = rel.triProperties[tri][v0];
+          const int prop1 = rel.triProperties[tri][Next3(v0)];
           for (int i = 0; i < n; ++i) {
-            glm::vec3 uvw(0);
-            uvw[v1] = (i + 1) * frac;
-            uvw[v0] = 1 - uvw[v1];
             for (int p = 0; p < rel.numProp; ++p) {
-              glm::vec3 triProp;
-              for (const int j : {0, 1, 2}) {
-                triProp[j] =
-                    rel.properties[rel.triProperties[tri][j] * rel.numProp + p];
-              }
-              prop[(offset + i) * rel.numProp + p] = glm::dot(triProp, uvw);
+              prop[(offset + i) * rel.numProp + p] = glm::mix(
+                  rel.properties[prop0 * rel.numProp + p],
+                  rel.properties[prop1 * rel.numProp + p], (i + 1) * frac);
             }
           }
         });
 
     Vec<glm::ivec3> triProp(triVerts.size());
-
     for_each_n(policy, countAt(0), numTri,
                [this, &triProp, &subTris, &edgeOffset, &half2Edge, &triOffset,
                 &interiorOffset, propOffset, addedVerts](int tri) {
