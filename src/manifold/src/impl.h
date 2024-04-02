@@ -160,7 +160,9 @@ struct Manifold::Impl {
   void SplitPinchedVerts();
 
   // smoothing.cu
+  bool IsInsideQuad(int halfedge) const;
   glm::vec3 GetNormal(int halfedge, int normalIdx) const;
+  glm::ivec4 GetHalfedges(int tri) const;
   std::vector<Smoothness> UpdateSharpenedEdges(
       const std::vector<Smoothness>&) const;
   Vec<bool> FlatFaces() const;
