@@ -1075,34 +1075,34 @@ Manifold Manifold::Hull3(const std::vector<glm::vec3>& pts) {
   // the vertices array has the vertices not indices, and the indices array in
   // the algorithm isn't correct, I looked into the code the indices array is
   // essentially just assigning indices[i]=i always
-  for (int i = 0; i < mesh_quick.nvertices; i++) {
-    qh_vertex_t vertex = mesh_quick.vertices[i];
-    if (vertexIndexMap.find(vertex) == vertexIndexMap.end()) {
-      vertexIndexMap[vertex] = uniqueVertices.size();
-      uniqueVertices.push_back(vertex);
-    }
-  }
+  // for (int i = 0; i < mesh_quick.nvertices; i++) {
+  //   qh_vertex_t vertex = mesh_quick.vertices[i];
+  //   if (vertexIndexMap.find(vertex) == vertexIndexMap.end()) {
+  //     vertexIndexMap[vertex] = uniqueVertices.size();
+  //     uniqueVertices.push_back(vertex);
+  //   }
+  // }
 
   // Standard checks to prevent segfaults
 
   // If no unique vertices were present
-  if (uniqueVertices.empty()) {
-    // std::cerr << "Error: No unique vertices found." << std::endl;
-    qh_free_mesh(mesh_quick);
-    return Manifold();
-  }
+  // if (uniqueVertices.empty()) {
+  //   // std::cerr << "Error: No unique vertices found." << std::endl;
+  //   qh_free_mesh(mesh_quick);
+  //   return Manifold();
+  // }
 
-  //  In case the indices or number of indices was empty
-  if (mesh_quick.indices == nullptr || mesh_quick.nindices <= 0) {
-    qh_free_mesh(mesh_quick);
-    return Manifold();
-  }
+  // //  In case the indices or number of indices was empty
+  // if (mesh_quick.indices == nullptr || mesh_quick.nindices <= 0) {
+  //   qh_free_mesh(mesh_quick);
+  //   return Manifold();
+  // }
 
   // Inputting the output in the format expected by our Mesh Function
-  const unsigned int numTris = mesh_quick.nindices / 3;
-  Mesh mesh;
-  mesh.vertPos.reserve(uniqueVertices.size());
-  mesh.triVerts.reserve(numTris);
+  // const unsigned int numTris = mesh_quick.nindices / 3;
+  // Mesh mesh;
+  // mesh.vertPos.reserve(uniqueVertices.size());
+  // mesh.triVerts.reserve(numTris);
 
   // for (const auto& vertex : uniqueVertices) {
   //   mesh.vertPos.push_back({vertex.x, vertex.y, vertex.z});
