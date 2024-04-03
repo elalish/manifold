@@ -1095,4 +1095,3 @@ TEST(Manifold, TriangleDistanceOverlapping) {
 
   EXPECT_FLOAT_EQ(distance, 0);
 }
-
