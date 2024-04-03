@@ -218,6 +218,7 @@ class Manifold {
   float Precision() const;
   int Genus() const;
   Properties GetProperties() const;
+  float MinGap(const Manifold& other, float searchLength) const;
   ///@}
 
   /** @name Mesh ID

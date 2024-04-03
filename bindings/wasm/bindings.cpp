@@ -166,6 +166,7 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .function("precision", &Manifold::Precision)
       .function("genus", &Manifold::Genus)
       .function("getProperties", &Manifold::GetProperties)
+      .function("minGap", &Manifold::MinGap)
       .function("calculateCurvature", &Manifold::CalculateCurvature)
       .function("calculateNormals", &Manifold::CalculateNormals)
       .function("originalID", &Manifold::OriginalID)
