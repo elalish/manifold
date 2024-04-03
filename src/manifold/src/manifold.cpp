@@ -1159,7 +1159,8 @@ Manifold Manifold::Hull2(const std::vector<Manifold>& manifolds) {
  */
 Manifold Manifold::Hull3(const std::vector<Manifold>& manifolds) {
   return Compose(manifolds).Hull3();
-
+}
+/**
  * Returns the minimum gap between two manifolds. Returns a float between
  * 0 and searchLength.
  *
@@ -1167,12 +1168,12 @@ Manifold Manifold::Hull3(const std::vector<Manifold>& manifolds) {
  * @param searchLength The maximum distance to search for a minimum gap.
  */
 float Manifold::MinGap(const Manifold& other, float searchLength) const {
-   auto intersect = *this ^ other;
-   auto prop = intersect.GetProperties();
+  auto intersect = *this ^ other;
+  auto prop = intersect.GetProperties();
 
-   if (prop.volume != 0) return 0.0f;
+  if (prop.volume != 0) return 0.0f;
 
-   return GetCsgLeafNode().GetImpl()->MinGap(*other.GetCsgLeafNode().GetImpl(),
-                                             searchLength);
- }
+  return GetCsgLeafNode().GetImpl()->MinGap(*other.GetCsgLeafNode().GetImpl(),
+                                            searchLength);
+}
 }  // namespace manifold
