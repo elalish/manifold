@@ -997,13 +997,14 @@ Manifold Manifold::Hull3(const std::vector<glm::vec3>& pts) {
   ZoneScoped;
   const int numVert = pts.size();
   if (numVert < 4) return Manifold();
-  // qh_vertex_t input_pts[numVert];
+  qh_vertex_t* input_pts = new qh_vertex_t [numVert];
+  // std::vector<qh_vertex_t> input_pts(numVert);
   //  Let's assume for now pts[i].x is float too
   // pts.size() ideally returns unsigned int
   // for (int i = 0; i < numVert; i++) {
-  //   input_pts[i].x = std::static_cast<float>(pts[i].x);
-  //   input_pts[i].y = std::static_cast<float>(pts[i].y);
-  //   input_pts[i].z = std::static_cast<float>(pts[i].z);
+  //   input_pts[i].x = static_cast<float>(pts[i].x);
+  //   input_pts[i].y = static_cast<float>(pts[i].y);
+  //   input_pts[i].z = static_cast<float>(pts[i].z);
   // }
   //  Generic Hash Function, can try to find the optimum hash function to
   //  improve effeciency
