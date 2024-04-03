@@ -897,24 +897,24 @@ TEST(Manifold, EmptyHull2) {
   EXPECT_TRUE(Manifold::Hull2(coplanar).IsEmpty());
 }
 
-TEST(Manifold, QUICKHULL2) {
-  const float tictacRad = 100;
-  const float tictacHeight = 500;
-  const int tictacSeg = 50;
-  const float tictacMid = tictacHeight - 2 * tictacRad;
-  const auto sphere = Manifold::Sphere(tictacRad, tictacSeg);
-  const std::vector<Manifold> spheres{sphere,
-                                      sphere.Translate({0, 0, tictacMid})};
-  const auto tictac = Manifold::Hull3(spheres);
+// TEST(Manifold, QUICKHULL2) {
+//   const float tictacRad = 100;
+//   const float tictacHeight = 500;
+//   const int tictacSeg = 50;
+//   const float tictacMid = tictacHeight - 2 * tictacRad;
+//   const auto sphere = Manifold::Sphere(tictacRad, tictacSeg);
+//   const std::vector<Manifold> spheres{sphere,
+//                                       sphere.Translate({0, 0, tictacMid})};
+//   const auto tictac = Manifold::Hull3(spheres);
 
-#ifdef MANIFOLD_EXPORT
-  if (options.exportModels) {
-    ExportMesh("tictac_hull3.glb", tictac.GetMesh(), {});
-  }
-#endif
+// #ifdef MANIFOLD_EXPORT
+//   if (options.exportModels) {
+//     ExportMesh("tictac_hull3.glb", tictac.GetMesh(), {});
+//   }
+// #endif
 
-  EXPECT_NEAR(sphere.NumVert() + tictacSeg, tictac.NumVert(), 3);
-}
+//   EXPECT_NEAR(sphere.NumVert() + tictacSeg, tictac.NumVert(), 3);
+// }
 
 // TEST(Manifold, HollowHull3) {
 //   auto sphere = Manifold::Sphere(100, 100);
