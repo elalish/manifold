@@ -1045,31 +1045,34 @@ Manifold Manifold::Hull3(const std::vector<glm::vec3>& pts) {
   // std::cout << pts.size() << std::endl;
 
   // Standard Algorithm Call
-  float epsilon;
-  qh_context_t context;
-  std::cout << "Before standard algorithm call" << std::endl;
-  epsilon = qh__compute_epsilon(input_pts, pts.size());
-  qh__init_context(&context, input_pts, pts.size());
-  qh__remove_vertex_duplicates(&context, epsilon);
+  // float epsilon;
+  // qh_context_t context;
+  // std::cout << "Before standard algorithm call" << std::endl;
+  // epsilon = qh__compute_epsilon(input_pts, pts.size());
+  // qh__init_context(&context, input_pts, pts.size());
+  // qh__remove_vertex_duplicates(&context, epsilon);
 
-  // The function just below gives the segfault error for larger cases, and we
-  // need to look into how we can fix it.
-  qh__build_tetrahedron(&context, epsilon);
+  // // The function just below gives the segfault error for larger cases, and
+  // we
+  // // need to look into how we can fix it.
+  // qh__build_tetrahedron(&context, epsilon);
 
-  unsigned int failurestep = 0;
-  qh__build_hull(&context, epsilon);
-  int valid = qh__test_hull(&context, epsilon, 0);
+  // unsigned int failurestep = 0;
+  // qh__build_hull(&context, epsilon);
+  // int valid = qh__test_hull(&context, epsilon, 0);
 
-  // I tried running this function directly without the valid check to see if it
-  // works, but even this segfaults, so I included the valid check as it helps
-  // identify where the issue might be
-  qh__free_context(&context);
-  std::cout << "After standard algorithm call" << std::endl;
-  if (!valid) {
-    std::cout << "Invalid Output by algorithm" << std::endl;
-    return Manifold();
-  }
-  qh_mesh_t mesh_quick = qh_quickhull3d(input_pts, pts.size());
+  // // I tried running this function directly without the valid check to see if
+  // it
+  // // works, but even this segfaults, so I included the valid check as it
+  // helps
+  // // identify where the issue might be
+  // qh__free_context(&context);
+  // std::cout << "After standard algorithm call" << std::endl;
+  // if (!valid) {
+  //   std::cout << "Invalid Output by algorithm" << std::endl;
+  //   return Manifold();
+  // }
+  // qh_mesh_t mesh_quick = qh_quickhull3d(input_pts, pts.size());
 
   // Iterating through the vertices array to create a map of the vertices, since
   // the vertices array has the vertices not indices, and the indices array in
@@ -1114,8 +1117,9 @@ Manifold Manifold::Hull3(const std::vector<glm::vec3>& pts) {
   //   unsigned int idx3 = vertexIndexMap[mesh_quick.vertices[i + 2]];
   //   mesh.triVerts.push_back({idx1, idx2, idx3});
   // }
-  qh_free_mesh(mesh_quick);
-  return Manifold(mesh);
+  // qh_free_mesh(mesh_quick);
+  // return Manifold(mesh);
+  return Manifold();
 }
 
 /**
