@@ -1119,7 +1119,7 @@ Manifold Manifold::Hull3(const std::vector<glm::vec3>& pts) {
   // }
   // qh_free_mesh(mesh_quick);
   // return Manifold(mesh);
-  // return Manifold();
+  return Manifold();
 }
 
 /**
