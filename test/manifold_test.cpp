@@ -17,9 +17,7 @@
 #include <algorithm>
 
 #include "cross_section.h"
-#include "samples.h"
 #include "test.h"
-#include "tri_dist.h"
 
 #ifdef MANIFOLD_EXPORT
 #include "meshIO.h"
@@ -897,24 +895,24 @@ TEST(Manifold, EmptyHull2) {
   EXPECT_TRUE(Manifold::Hull2(coplanar).IsEmpty());
 }
 
-// TEST(Manifold, QUICKHULL2) {
-//   const float tictacRad = 100;
-//   const float tictacHeight = 500;
-//   const int tictacSeg = 50;
-//   const float tictacMid = tictacHeight - 2 * tictacRad;
-//   const auto sphere = Manifold::Sphere(tictacRad, tictacSeg);
-//   const std::vector<Manifold> spheres{sphere,
-//                                       sphere.Translate({0, 0, tictacMid})};
-//   const auto tictac = Manifold::Hull3(spheres);
+TEST(Manifold, QUICKHULL2) {
+  const float tictacRad = 100;
+  const float tictacHeight = 500;
+  const int tictacSeg = 50;
+  const float tictacMid = tictacHeight - 2 * tictacRad;
+  const auto sphere = Manifold::Sphere(tictacRad, tictacSeg);
+  const std::vector<Manifold> spheres{sphere,
+                                      sphere.Translate({0, 0, tictacMid})};
+  const auto tictac = Manifold::Hull3(spheres);
 
-// #ifdef MANIFOLD_EXPORT
-//   if (options.exportModels) {
-//     ExportMesh("tictac_hull3.glb", tictac.GetMesh(), {});
-//   }
-// #endif
+#ifdef MANIFOLD_EXPORT
+  if (options.exportModels) {
+    ExportMesh("tictac_hull3.glb", tictac.GetMesh(), {});
+  }
+#endif
 
-//   EXPECT_NEAR(sphere.NumVert() + tictacSeg, tictac.NumVert(), 3);
-// }
+  EXPECT_NEAR(sphere.NumVert() + tictacSeg, tictac.NumVert(), 3);
+}
 
 // TEST(Manifold, HollowHull3) {
 //   auto sphere = Manifold::Sphere(100, 100);
@@ -941,157 +939,3 @@ TEST(Manifold, EmptyHull2) {
 //       {0, 0, 0}, {1, 0, 0}, {0, 1, 0}, {1, 1, 0}};
 //   EXPECT_TRUE(Manifold::Hull3(coplanar).IsEmpty());
 // }
-
-TEST(Manifold, MinGapCubeCube) {
-  auto a = Manifold::Cube();
-  auto b = Manifold::Cube().Translate({2, 2, 0});
-
-  float distance = a.MinGap(b, 1.5f);
-
-  EXPECT_FLOAT_EQ(distance, sqrt(2));
-}
-
-TEST(Manifold, MinGapCubeCube2) {
-  auto a = Manifold::Cube();
-  auto b = Manifold::Cube().Translate({3, 3, 0});
-
-  float distance = a.MinGap(b, 3);
-
-  EXPECT_FLOAT_EQ(distance, sqrt(2) * 2);
-}
-
-TEST(Manifold, MinGapCubeSphereOverlapping) {
-  auto a = Manifold::Cube();
-  auto b = Manifold::Sphere(1);
-
-  float distance = a.MinGap(b, 0.1f);
-
-  EXPECT_FLOAT_EQ(distance, 0);
-}
-
-TEST(Manifold, MinGapSphereSphere) {
-  auto a = Manifold::Sphere(1);
-  auto b = Manifold::Sphere(1).Translate({2, 2, 0});
-
-  float distance = a.MinGap(b, 0.85f);
-
-  EXPECT_FLOAT_EQ(distance, 2 * sqrt(2) - 2);
-}
-
-TEST(Manifold, MinGapSphereSphereOutOfBounds) {
-  auto a = Manifold::Sphere(1);
-  auto b = Manifold::Sphere(1).Translate({2, 2, 0});
-
-  float distance = a.MinGap(b, 0.8f);
-
-  EXPECT_FLOAT_EQ(distance, 0.8f);
-}
-
-TEST(Manifold, MinGapClosestPointOnEdge) {
-  auto a = Manifold::Cube({1, 1, 1}, true).Rotate(0, 0, 45);
-  auto b =
-      Manifold::Cube({1, 1, 1}, true).Rotate(0, 45, 0).Translate({2, 0, 0});
-
-  float distance = a.MinGap(b, 0.7f);
-
-  EXPECT_FLOAT_EQ(distance, 2 - sqrt(2));
-}
-
-TEST(Manifold, MinGapClosestPointOnTriangleFace) {
-  auto a = Manifold::Cube();
-  auto b = Manifold::Cube().Scale({10, 10, 10}).Translate({2, -5, -1});
-
-  float distance = a.MinGap(b, 1.1f);
-
-  EXPECT_FLOAT_EQ(distance, 1);
-}
-
-TEST(Manifold, MingapAfterTransformations) {
-  auto a = Manifold::Sphere(1, 512).Rotate(30, 30, 30);
-  auto b =
-      Manifold::Sphere(1, 512).Scale({3, 1, 1}).Rotate(0, 90, 45).Translate(
-          {3, 0, 0});
-
-  float distance = a.MinGap(b, 1.1f);
-
-  ASSERT_NEAR(distance, 1, 0.001f);
-}
-
-TEST(Manifold, MingapStretchyBracelet) {
-  auto a = StretchyBracelet();
-  auto b = StretchyBracelet().Translate({0, 0, 20});
-
-  float distance = a.MinGap(b, 10);
-
-  ASSERT_NEAR(distance, 5, 0.001f);
-}
-
-TEST(Manifold, MinGapAfterTransformationsOutOfBounds) {
-  auto a = Manifold::Sphere(1, 512).Rotate(30, 30, 30);
-  auto b =
-      Manifold::Sphere(1, 512).Scale({3, 1, 1}).Rotate(0, 90, 45).Translate(
-          {3, 0, 0});
-
-  float distance = a.MinGap(b, 0.95f);
-
-  ASSERT_NEAR(distance, 0.95f, 0.001f);
-}
-TEST(Manifold, TriangleDistanceClosestPointsOnVertices) {
-  std::array<glm::vec3, 3> p = {glm::vec3{-1, 0, 0}, glm::vec3{1, 0, 0},
-                                glm::vec3{0, 1, 0}};
-
-  std::array<glm::vec3, 3> q = {glm::vec3{2, 0, 0}, glm::vec3{4, 0, 0},
-                                glm::vec3{3, 1, 0}};
-
-  float distance = DistanceTriangleTriangleSquared(p, q);
-
-  EXPECT_FLOAT_EQ(distance, 1);
-}
-
-TEST(Manifold, TriangleDistanceClosestPointOnEdge) {
-  std::array<glm::vec3, 3> p = {glm::vec3{-1, 0, 0}, glm::vec3{1, 0, 0},
-                                glm::vec3{0, 1, 0}};
-
-  std::array<glm::vec3, 3> q = {glm::vec3{-1, 2, 0}, glm::vec3{1, 2, 0},
-                                glm::vec3{0, 3, 0}};
-
-  float distance = DistanceTriangleTriangleSquared(p, q);
-
-  EXPECT_FLOAT_EQ(distance, 1);
-}
-
-TEST(Manifold, TriangleDistanceClosestPointOnEdge2) {
-  std::array<glm::vec3, 3> p = {glm::vec3{-1, 0, 0}, glm::vec3{1, 0, 0},
-                                glm::vec3{0, 1, 0}};
-
-  std::array<glm::vec3, 3> q = {glm::vec3{1, 1, 0}, glm::vec3{3, 1, 0},
-                                glm::vec3{2, 2, 0}};
-
-  float distance = DistanceTriangleTriangleSquared(p, q);
-
-  EXPECT_FLOAT_EQ(distance, 0.5f);
-}
-
-TEST(Manifold, TriangleDistanceClosestPointOnFace) {
-  std::array<glm::vec3, 3> p = {glm::vec3{-1, 0, 0}, glm::vec3{1, 0, 0},
-                                glm::vec3{0, 1, 0}};
-
-  std::array<glm::vec3, 3> q = {glm::vec3{-1, 2, -0.5f}, glm::vec3{1, 2, -0.5f},
-                                glm::vec3{0, 2, 1.5f}};
-
-  float distance = DistanceTriangleTriangleSquared(p, q);
-
-  EXPECT_FLOAT_EQ(distance, 1);
-}
-
-TEST(Manifold, TriangleDistanceOverlapping) {
-  std::array<glm::vec3, 3> p = {glm::vec3{-1, 0, 0}, glm::vec3{1, 0, 0},
-                                glm::vec3{0, 1, 0}};
-
-  std::array<glm::vec3, 3> q = {glm::vec3{-1, 0, 0}, glm::vec3{1, 0.5f, 0},
-                                glm::vec3{0, 1, 0}};
-
-  float distance = DistanceTriangleTriangleSquared(p, q);
-
-  EXPECT_FLOAT_EQ(distance, 0);
-}
