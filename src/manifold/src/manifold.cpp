@@ -1001,11 +1001,11 @@ Manifold Manifold::Hull3(const std::vector<glm::vec3>& pts) {
   // std::vector<qh_vertex_t> input_pts(numVert);
   //  Let's assume for now pts[i].x is float too
   // pts.size() ideally returns unsigned int
-  // for (int i = 0; i < numVert; i++) {
-  //   input_pts[i].x = static_cast<float>(pts[i].x);
-  //   input_pts[i].y = static_cast<float>(pts[i].y);
-  //   input_pts[i].z = static_cast<float>(pts[i].z);
-  // }
+  for (int i = 0; i < numVert; i++) {
+    input_pts[i].x = static_cast<float>(pts[i].x);
+    input_pts[i].y = static_cast<float>(pts[i].y);
+    input_pts[i].z = static_cast<float>(pts[i].z);
+  }
   //  Generic Hash Function, can try to find the optimum hash function to
   //  improve effeciency
 
@@ -1026,101 +1026,95 @@ Manifold Manifold::Hull3(const std::vector<glm::vec3>& pts) {
   //     }
   // };
 
-  // struct qh_vertex_compare {
-  //   bool operator()(const qh_vertex_t& lhs, const qh_vertex_t& rhs) const {
-  //     if (lhs.x != rhs.x) return lhs.x < rhs.x;
-  //     if (lhs.y != rhs.y) return lhs.y < rhs.y;
-  //     return lhs.z < rhs.z;
-  //   }
-  // };
+  struct qh_vertex_compare {
+    bool operator()(const qh_vertex_t& lhs, const qh_vertex_t& rhs) const {
+      if (lhs.x != rhs.x) return lhs.x < rhs.x;
+      if (lhs.y != rhs.y) return lhs.y < rhs.y;
+      return lhs.z < rhs.z;
+    }
+  };
 
   // We can also use unordered_map with custom hash and equality functions
   // std::unordered_map<qh_vertex_t, int, qh_vertex_hash, qh_vertex_equal>
   // vertexIndexMap;
 
-  // std::map<qh_vertex_t, unsigned int, qh_vertex_compare> vertexIndexMap;
+  std::map<qh_vertex_t, unsigned int, qh_vertex_compare> vertexIndexMap;
 
   // Converting input pts to a format that the algorithm accepts
-  // std::vector<qh_vertex_t> uniqueVertices;
+  std::vector<qh_vertex_t> uniqueVertices;
 
   // std::cout << pts.size() << std::endl;
 
   // Standard Algorithm Call
-  // float epsilon;
-  // qh_context_t context;
-  // std::cout << "Before standard algorithm call" << std::endl;
-  // epsilon = qh__compute_epsilon(input_pts, pts.size());
-  // qh__init_context(&context, input_pts, pts.size());
-  // qh__remove_vertex_duplicates(&context, epsilon);
+  float epsilon;
+  qh_context_t context;
+  std::cout << "Before standard algorithm call" << std::endl;
+  epsilon = qh__compute_epsilon(input_pts, pts.size());
+  qh__init_context(&context, input_pts, pts.size());
+  qh__remove_vertex_duplicates(&context, epsilon);
 
-  // // The function just below gives the segfault error for larger cases, and
-  // we
-  // // need to look into how we can fix it.
-  // qh__build_tetrahedron(&context, epsilon);
+  // The function just below gives the segfault error for larger cases, and we need to look into how we can fix it.
+  qh__build_tetrahedron(&context, epsilon);
 
-  // unsigned int failurestep = 0;
-  // qh__build_hull(&context, epsilon);
-  // int valid = qh__test_hull(&context, epsilon, 0);
+  unsigned int failurestep = 0;
+  qh__build_hull(&context, epsilon);
+  int valid = qh__test_hull(&context, epsilon, 0);
 
-  // // I tried running this function directly without the valid check to see if
-  // it
-  // // works, but even this segfaults, so I included the valid check as it
-  // helps
-  // // identify where the issue might be
-  // qh__free_context(&context);
-  // std::cout << "After standard algorithm call" << std::endl;
-  // if (!valid) {
-  //   std::cout << "Invalid Output by algorithm" << std::endl;
-  //   return Manifold();
-  // }
-  // qh_mesh_t mesh_quick = qh_quickhull3d(input_pts, pts.size());
+  // I tried running this function directly without the valid check to see if itworks, but even this segfaults, so I included the valid check as it helps identify where the issue might be
+  qh__free_context(&context);
+  std::cout << "After standard algorithm call" << std::endl;
+  if (!valid) {
+    std::cout << "Invalid Output by algorithm" << std::endl;
+    return Manifold();
+  }
+  qh_mesh_t mesh_quick = qh_quickhull3d(input_pts, pts.size());
 
   // Iterating through the vertices array to create a map of the vertices, since
   // the vertices array has the vertices not indices, and the indices array in
   // the algorithm isn't correct, I looked into the code the indices array is
   // essentially just assigning indices[i]=i always
-  // for (int i = 0; i < mesh_quick.nvertices; i++) {
-  //   qh_vertex_t vertex = mesh_quick.vertices[i];
-  //   if (vertexIndexMap.find(vertex) == vertexIndexMap.end()) {
-  //     vertexIndexMap[vertex] = uniqueVertices.size();
-  //     uniqueVertices.push_back(vertex);
-  //   }
-  // }
+  for (int i = 0; i < mesh_quick.nvertices; i++) {
+    qh_vertex_t vertex = mesh_quick.vertices[i];
+    if (vertexIndexMap.find(vertex) == vertexIndexMap.end()) {
+      vertexIndexMap[vertex] = uniqueVertices.size();
+      uniqueVertices.push_back(vertex);
+    }
+  }
 
   // Standard checks to prevent segfaults
 
   // If no unique vertices were present
-  // if (uniqueVertices.empty()) {
-  //   // std::cerr << "Error: No unique vertices found." << std::endl;
-  //   qh_free_mesh(mesh_quick);
-  //   return Manifold();
-  // }
+  if (uniqueVertices.empty()) {
+    // std::cerr << "Error: No unique vertices found." << std::endl;
+    qh_free_mesh(mesh_quick);
+    return Manifold();
+  }
 
-  // //  In case the indices or number of indices was empty
-  // if (mesh_quick.indices == nullptr || mesh_quick.nindices <= 0) {
-  //   qh_free_mesh(mesh_quick);
-  //   return Manifold();
-  // }
+  //  In case the indices or number of indices was empty
+  if (mesh_quick.indices == nullptr || mesh_quick.nindices <= 0) {
+    qh_free_mesh(mesh_quick);
+    return Manifold();
+  }
 
   // Inputting the output in the format expected by our Mesh Function
-  // const unsigned int numTris = mesh_quick.nindices / 3;
-  // Mesh mesh;
-  // mesh.vertPos.reserve(uniqueVertices.size());
-  // mesh.triVerts.reserve(numTris);
+  const unsigned int numTris = mesh_quick.nindices / 3;
+  Mesh mesh;
+  mesh.vertPos.reserve(uniqueVertices.size());
+  mesh.triVerts.reserve(numTris);
 
-  // for (const auto& vertex : uniqueVertices) {
-  //   mesh.vertPos.push_back({vertex.x, vertex.y, vertex.z});
-  // }
+  for (const auto& vertex : uniqueVertices) {
+    mesh.vertPos.push_back({vertex.x, vertex.y, vertex.z});
+  }
 
-  // for (unsigned int i = 0; i < mesh_quick.nindices; i += 3) {
-  //   unsigned int idx1 = vertexIndexMap[mesh_quick.vertices[i]];
-  //   unsigned int idx2 = vertexIndexMap[mesh_quick.vertices[i + 1]];
-  //   unsigned int idx3 = vertexIndexMap[mesh_quick.vertices[i + 2]];
-  //   mesh.triVerts.push_back({idx1, idx2, idx3});
-  // }
-  // qh_free_mesh(mesh_quick);
-  // return Manifold(mesh);
-  return Manifold();
+  for (unsigned int i = 0; i < mesh_quick.nindices; i += 3) {
+    unsigned int idx1 = vertexIndexMap[mesh_quick.vertices[i]];
+    unsigned int idx2 = vertexIndexMap[mesh_quick.vertices[i + 1]];
+    unsigned int idx3 = vertexIndexMap[mesh_quick.vertices[i + 2]];
+    mesh.triVerts.push_back({idx1, idx2, idx3});
+  }
+  qh_free_mesh(mesh_quick);
+  return Manifold(mesh);
+  // return Manifold();
 }
 
 /**
