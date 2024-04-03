@@ -993,10 +993,12 @@ Manifold Manifold::Hull2(const std::vector<glm::vec3>& pts) {
  */
 Manifold Manifold::Hull3(const std::vector<glm::vec3>& pts) {
   ZoneScoped;
-  const unsigned int numVert = pts.size();
+  const int numVert = pts.size();
   if (numVert < 4) return Manifold();
   qh_vertex_t input_pts[numVert];
-  for (unsigned int i = 0; i < numVert; i++) {
+  //  Let's assume for now pts[i].x is float too
+  // pts.size() ideally returns unsigned int
+  for (int i = 0; i < numVert; i++) {
     input_pts[i].x = pts[i].x;
     input_pts[i].y = pts[i].y;
     input_pts[i].z = pts[i].z;
@@ -1073,8 +1075,7 @@ Manifold Manifold::Hull3(const std::vector<glm::vec3>& pts) {
   // essentially just assigning indices[i]=i always
   for (int i = 0; i < mesh_quick.nvertices; i++) {
     qh_vertex_t vertex = mesh_quick.vertices[i];
-    auto it = vertexIndexMap.find(vertex);
-    if (it == vertexIndexMap.end()) {
+    if (vertexIndexMap.find(vertex) == vertexIndexMap.end()) {
       vertexIndexMap[vertex] = uniqueVertices.size();
       uniqueVertices.push_back(vertex);
     }
@@ -1099,7 +1100,7 @@ Manifold Manifold::Hull3(const std::vector<glm::vec3>& pts) {
   const unsigned int numTris = mesh_quick.nindices / 3;
   Mesh mesh;
   mesh.vertPos.reserve(uniqueVertices.size());
-  mesh.triVerts.reserve(static_cast<size_t>(numTris));
+  mesh.triVerts.reserve(numTris);
 
   for (const auto& vertex : uniqueVertices) {
     mesh.vertPos.push_back({vertex.x, vertex.y, vertex.z});
