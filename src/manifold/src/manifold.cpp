@@ -997,7 +997,7 @@ Manifold Manifold::Hull3(const std::vector<glm::vec3>& pts) {
   ZoneScoped;
   const int numVert = pts.size();
   if (numVert < 4) return Manifold();
-  qh_vertex_t* input_pts = new qh_vertex_t [numVert];
+  qh_vertex_t* input_pts = new qh_vertex_t[numVert];
   // std::vector<qh_vertex_t> input_pts(numVert);
   //  Let's assume for now pts[i].x is float too
   // pts.size() ideally returns unsigned int
@@ -1053,14 +1053,17 @@ Manifold Manifold::Hull3(const std::vector<glm::vec3>& pts) {
   qh__init_context(&context, input_pts, pts.size());
   qh__remove_vertex_duplicates(&context, epsilon);
 
-  // The function just below gives the segfault error for larger cases, and we need to look into how we can fix it.
+  // The function just below gives the segfault error for larger cases, and we
+  // need to look into how we can fix it.
   qh__build_tetrahedron(&context, epsilon);
 
   unsigned int failurestep = 0;
   qh__build_hull(&context, epsilon);
   int valid = qh__test_hull(&context, epsilon, 0);
 
-  // I tried running this function directly without the valid check to see if itworks, but even this segfaults, so I included the valid check as it helps identify where the issue might be
+  // I tried running this function directly without the valid check to see if
+  // itworks, but even this segfaults, so I included the valid check as it helps
+  // identify where the issue might be
   qh__free_context(&context);
   std::cout << "After standard algorithm call" << std::endl;
   if (!valid) {
