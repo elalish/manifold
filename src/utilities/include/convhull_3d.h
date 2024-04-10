@@ -677,7 +677,7 @@ void convhull_3d_build_alloc(ch_vertex* const in_vertices, const int nVert,
     df[i] = dfi;
   }
   CH_FLOAT
-      A[(CONVHULL_3D_MAX_DIMENSIONS + 1) * (CONVHULL_3D_MAX_DIMENSIONS + 1)];
+  A[(CONVHULL_3D_MAX_DIMENSIONS + 1) * (CONVHULL_3D_MAX_DIMENSIONS + 1)];
   int fVec[CONVHULL_3D_MAX_DIMENSIONS + 1];
   int face_tmp[2];
 
@@ -1056,7 +1056,7 @@ void convhull_3d_export_obj(ch_vertex* const vertices, const int nVert,
                             const int keepOnlyUsedVerticesFLAG,
                             char* const obj_filename) {
   int i, j;
-  char path[strlen(obj_filename) + 1] = "\0";
+  char* path = (char*)calloc(strlen(obj_filename) + 1, sizeof(char));
   // char* path = new char[strlen(obj_filename) + 1]; // Allocate memory for
   // destination buffer
   strcpy(path, obj_filename);
@@ -1326,7 +1326,7 @@ void convhull_nd_build_alloc(CH_FLOAT* const in_vertices, const int nVert,
     df[i] = dfi;
   }
   CH_FLOAT
-      A[(CONVHULL_ND_MAX_DIMENSIONS + 1) * (CONVHULL_ND_MAX_DIMENSIONS + 1)];
+  A[(CONVHULL_ND_MAX_DIMENSIONS + 1) * (CONVHULL_ND_MAX_DIMENSIONS + 1)];
   int fVec[CONVHULL_ND_MAX_DIMENSIONS + 1];
   int face_tmp[2];
 
