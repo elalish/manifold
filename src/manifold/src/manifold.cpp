@@ -28,6 +28,10 @@
 #include "quickhull2.h"
 #include "tri_dist.h"
 
+#define CONVHULL_3D_USE_SINGLE_PRECISION
+#define CONVHULL_3D_ENABLE
+#include "convhull_3d.h"
+
 namespace {
 using namespace manifold;
 using namespace thrust::placeholders;
@@ -1071,7 +1075,7 @@ Manifold Manifold::Hull3(const std::vector<glm::vec3>& pts) {
     return Manifold();
   }
   qh_mesh_t mesh_quick = qh_quickhull3d(input_pts, pts.size());
-
+  delete[] input_pts;
   // Iterating through the vertices array to create a map of the vertices, since
   // the vertices array has the vertices not indices, and the indices array in
   // the algorithm isn't correct, I looked into the code the indices array is
@@ -1121,6 +1125,51 @@ Manifold Manifold::Hull3(const std::vector<glm::vec3>& pts) {
 }
 
 /**
+ * Compute the convex hull of a set of points using VHACD's Convex Hull
+ * Implementation. If the given points are fewer than 4, or they are all
+ * coplanar, an empty Manifold will be returned.
+ *
+ * @param pts A vector of 3-dimensional points over which to compute a convex
+ * hull.
+ */
+Manifold Manifold::Hull4(const std::vector<glm::vec3>& pts) {
+  ZoneScoped;
+  const int numVert = pts.size();
+  if (numVert < 4) return Manifold();
+
+  ch_vertex* vertices;
+  vertices = (ch_vertex*)malloc(numVert * sizeof(ch_vertex));
+  for (int i = 0; i < numVert; i++) {
+    vertices[i].x = pts[i].x;
+    vertices[i].y = pts[i].y;
+    vertices[i].z = pts[i].z;
+  }
+
+  int* faceIndices = NULL;
+  int nFaces;
+  convhull_3d_build(vertices, numVert, &faceIndices, &nFaces);
+  free(vertices);
+
+  Mesh mesh;
+  mesh.vertPos = pts;
+  // std::cout << nFaces << std::endl;
+  mesh.triVerts.reserve(nFaces);
+  // int index=0;
+  for (int i = 0; i < nFaces; i++) {
+    const int j = i * 3;
+    // std::cout << "ok" << std::endl;
+    // std::cout << faceIndices[j] << " " << faceIndices[j+1] << " " <<
+    // faceIndices[j+2] << std::endl; index++;
+    mesh.triVerts.push_back(
+        {faceIndices[j], faceIndices[j + 1], faceIndices[j + 2]});
+  }
+  // std::cout << index << std::endl;
+  free(faceIndices);
+
+  return Manifold(mesh);
+}
+
+/**
  * Compute the convex hull of this manifold.
  */
 Manifold Manifold::Hull() const { return Hull(GetMesh().vertPos); }
@@ -1134,6 +1183,11 @@ Manifold Manifold::Hull2() const { return Hull2(GetMesh().vertPos); }
  * Compute the convex hull of this manifold.
  */
 Manifold Manifold::Hull3() const { return Hull3(GetMesh().vertPos); }
+
+/**
+ * Compute the convex hull of this manifold.
+ */
+Manifold Manifold::Hull4() const { return Hull4(GetMesh().vertPos); }
 
 /**
  * Compute the convex hull enveloping a set of manifolds.
@@ -1161,6 +1215,15 @@ Manifold Manifold::Hull2(const std::vector<Manifold>& manifolds) {
  */
 Manifold Manifold::Hull3(const std::vector<Manifold>& manifolds) {
   return Compose(manifolds).Hull3();
+}
+
+/**
+ * Compute the convex hull enveloping a set of manifolds.
+ *
+ * @param manifolds A vector of manifolds over which to compute a convex hull.
+ */
+Manifold Manifold::Hull4(const std::vector<Manifold>& manifolds) {
+  return Compose(manifolds).Hull4();
 }
 /**
  * Returns the minimum gap between two manifolds. Returns a float between
