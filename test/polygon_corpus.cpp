@@ -4747,3 +4747,10 @@ TEST(Polygon, Woodgrain2) {
   });
   TestPoly(polys, 9, 0.00145);
 }
+
+TEST(Polygon, Separate_Quad_And_Tri) {
+  Polygons polys;
+  polys.push_back({{3, 1}, {3, 0}, {2, 0}});
+  polys.push_back({{0.8, 0.8}, {1, 1}, {0, 1}, {0.2, 0.8}});
+  TestPoly(polys, 3);
+}
