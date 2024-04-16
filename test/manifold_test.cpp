@@ -345,6 +345,13 @@ TEST(Manifold, Smooth) {
 #endif
 }
 
+TEST(Manifold, HullFail) {
+  Manifold body = Manifold(ImportMesh("../hull-body.glb", false));
+  Manifold mask = Manifold(ImportMesh("../hull-mask.glb", false));
+  Manifold ret = body - mask;
+  MeshGL mesh = ret.GetMesh();
+}
+
 TEST(Manifold, SmoothFlat) {
   Manifold cone = Manifold::Cylinder(5, 10, 5).SmoothOut().CalculateNormals(0);
   Manifold smooth = cone.RefineToLength(0.1);
