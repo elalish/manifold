@@ -346,8 +346,10 @@ TEST(Manifold, Smooth) {
 }
 
 TEST(Manifold, HullFail) {
-  Manifold body = Manifold(ImportMesh("../hull-body.glb", false));
-  Manifold mask = Manifold(ImportMesh("../hull-mask.glb", false));
+  std::string file = __FILE__;
+  std::string dir = file.substr(0, file.rfind('/'));
+  Manifold body = Manifold(ImportMesh(dir + "/models/hull-body.glb", false));
+  Manifold mask = Manifold(ImportMesh(dir + "/models/hull-mask.glb", false));
   Manifold ret = body - mask;
   MeshGL mesh = ret.GetMesh();
 }
