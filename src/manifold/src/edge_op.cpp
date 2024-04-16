@@ -73,9 +73,7 @@ struct FlagEdge {
       current = NextHalfedge(halfedge[current].pairedHalfedge);
       int tri = current / 3;
       const TriRef ref = triRef[tri];
-      if ((ref.meshID != ref0.meshID || ref.tri != ref0.tri) &&
-          (ref.meshID != ref1.meshID || ref.tri != ref1.tri))
-        return false;
+      if (!ref.SameFace(ref0) && !ref.SameFace(ref1)) return false;
     }
     return true;
   }
@@ -325,12 +323,10 @@ void Manifold::Impl::DedupeEdge(const int edge) {
     vertPos_.push_back(vertPos_[endVert]);
     if (vertNormal_.size() > 0) vertNormal_.push_back(vertNormal_[endVert]);
 
-    do {
-      halfedge_[current].endVert = newVert;
-      current = NextHalfedge(current);
-      halfedge_[current].startVert = newVert;
-      current = halfedge_[current].pairedHalfedge;
-    } while (current != edge);
+    ForVert(NextHalfedge(current), [this, newVert](int e) {
+      halfedge_[e].startVert = newVert;
+      halfedge_[halfedge_[e].pairedHalfedge].endVert = newVert;
+    });
   }
 
   // Orbit startVert
@@ -350,12 +346,10 @@ void Manifold::Impl::DedupeEdge(const int edge) {
     vertPos_.push_back(vertPos_[endVert]);
     if (vertNormal_.size() > 0) vertNormal_.push_back(vertNormal_[endVert]);
 
-    do {
-      halfedge_[current].endVert = newVert;
-      current = NextHalfedge(current);
-      halfedge_[current].startVert = newVert;
-      current = halfedge_[current].pairedHalfedge;
-    } while (current != pair);
+    ForVert(NextHalfedge(current), [this, newVert](int e) {
+      halfedge_[e].startVert = newVert;
+      halfedge_[halfedge_[e].pairedHalfedge].endVert = newVert;
+    });
   }
 }
 
@@ -482,9 +476,9 @@ void Manifold::Impl::CollapseEdge(const int edge, std::vector<int>& edges) {
       const glm::mat3x2 projection = GetAxisAlignedProjection(faceNormal_[tri]);
       // Don't collapse if the edge is not redundant (this may have changed due
       // to the collapse of neighbors).
-      if (ref.meshID != refCheck.meshID || ref.tri != refCheck.tri) {
+      if (!ref.SameFace(refCheck)) {
         refCheck = triRef[edge / 3];
-        if (ref.meshID != refCheck.meshID || ref.tri != refCheck.tri) {
+        if (!ref.SameFace(refCheck)) {
           return;
         } else {
           // Don't collapse if the edges separating the faces are not colinear
@@ -522,11 +516,9 @@ void Manifold::Impl::CollapseEdge(const int edge, std::vector<int>& edges) {
       // Update the shifted triangles to the vertBary of endVert
       const int tri = current / 3;
       const int vIdx = current - 3 * tri;
-      if (triRef[tri].meshID == triRef[tri0].meshID &&
-          triRef[tri].tri == triRef[tri0].tri) {
+      if (triRef[tri].SameFace(triRef[tri0])) {
         triProp[tri][vIdx] = triProp[tri0][triVert0];
-      } else if (triRef[tri].meshID == triRef[tri1].meshID &&
-                 triRef[tri].tri == triRef[tri1].tri) {
+      } else if (triRef[tri].SameFace(triRef[tri1])) {
         triProp[tri][vIdx] = triProp[tri1][triVert1];
       }
     }
@@ -676,14 +668,11 @@ void Manifold::Impl::SplitPinchedVerts() {
     } else {
       vertProcessed[vert] = true;
     }
-    int current = i;
-    do {
+    ForVert(i, [this, &halfedgeProcessed, vert](int current) {
       halfedgeProcessed[current] = true;
       halfedge_[current].startVert = vert;
-      current = halfedge_[current].pairedHalfedge;
-      halfedge_[current].endVert = vert;
-      current = NextHalfedge(current);
-    } while (current != i);
+      halfedge_[halfedge_[current].pairedHalfedge].endVert = vert;
+    });
   }
 }
 }  // namespace manifold

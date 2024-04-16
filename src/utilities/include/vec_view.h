@@ -46,12 +46,16 @@ class VecView {
   operator VecView<const T>() const { return {ptr_, size_}; }
 
   inline const T &operator[](size_t i) const {
-    if (i >= size_) throw std::out_of_range("Vec out of range");
+    if (i >= size_) {
+      throw std::out_of_range("Vec out of range");
+    }
     return ptr_[i];
   }
 
   inline T &operator[](size_t i) {
-    if (i >= size_) throw std::out_of_range("Vec out of range");
+    if (i >= size_) {
+      throw std::out_of_range("Vec out of range");
+    }
     return ptr_[i];
   }
 
@@ -93,7 +97,7 @@ class VecView {
   bool empty() const { return size_ == 0; }
 
 #ifdef MANIFOLD_DEBUG
-  void Dump() {
+  void Dump() const {
     std::cout << "Vec = " << std::endl;
     for (size_t i = 0; i < size(); ++i) {
       std::cout << i << ", " << ptr_[i] << ", " << std::endl;
