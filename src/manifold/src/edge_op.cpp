@@ -323,9 +323,9 @@ void Manifold::Impl::DedupeEdge(const int edge) {
     vertPos_.push_back(vertPos_[endVert]);
     if (vertNormal_.size() > 0) vertNormal_.push_back(vertNormal_[endVert]);
 
-    ForVert(current, [this, newVert](int current) {
-      halfedge_[current].endVert = newVert;
-      halfedge_[halfedge_[current].pairedHalfedge].startVert = newVert;
+    ForVert(NextHalfedge(current), [this, newVert](int e) {
+      halfedge_[e].startVert = newVert;
+      halfedge_[halfedge_[e].pairedHalfedge].endVert = newVert;
     });
   }
 
@@ -346,9 +346,9 @@ void Manifold::Impl::DedupeEdge(const int edge) {
     vertPos_.push_back(vertPos_[endVert]);
     if (vertNormal_.size() > 0) vertNormal_.push_back(vertNormal_[endVert]);
 
-    ForVert(current, [this, newVert](int current) {
-      halfedge_[current].endVert = newVert;
-      halfedge_[halfedge_[current].pairedHalfedge].startVert = newVert;
+    ForVert(NextHalfedge(current), [this, newVert](int e) {
+      halfedge_[e].startVert = newVert;
+      halfedge_[halfedge_[e].pairedHalfedge].endVert = newVert;
     });
   }
 }

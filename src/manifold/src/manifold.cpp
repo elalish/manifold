@@ -21,6 +21,7 @@
 #include "csg_tree.h"
 #include "impl.h"
 #include "par.h"
+#include "tri_dist.h"
 
 namespace {
 using namespace manifold;
@@ -944,5 +945,22 @@ Manifold Manifold::Hull() const { return Hull(GetMesh().vertPos); }
  */
 Manifold Manifold::Hull(const std::vector<Manifold>& manifolds) {
   return Compose(manifolds).Hull();
+}
+
+/**
+ * Returns the minimum gap between two manifolds. Returns a float between
+ * 0 and searchLength.
+ *
+ * @param other The other manifold to compute the minimum gap to.
+ * @param searchLength The maximum distance to search for a minimum gap.
+ */
+float Manifold::MinGap(const Manifold& other, float searchLength) const {
+  auto intersect = *this ^ other;
+  auto prop = intersect.GetProperties();
+
+  if (prop.volume != 0) return 0.0f;
+
+  return GetCsgLeafNode().GetImpl()->MinGap(*other.GetCsgLeafNode().GetImpl(),
+                                            searchLength);
 }
 }  // namespace manifold

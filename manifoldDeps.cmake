@@ -1,8 +1,8 @@
 include(FetchContent)
 include(GNUInstallDirs)
-find_package(PkgConfig)
+find_package(PkgConfig QUIET)
 if(MANIFOLD_PAR STREQUAL "TBB")
-    find_package(TBB)
+    find_package(TBB QUIET)
 endif()
 if (PKG_CONFIG_FOUND)
     pkg_check_modules(Clipper2 Clipper2)
@@ -37,20 +37,18 @@ else()
     endif()
 endif()
 
-FetchContent_Declare(glm
-    GIT_REPOSITORY https://github.com/g-truc/glm.git
-    GIT_TAG b06b775c1c80af51a1183c0e167f9de3b2351a79
-    GIT_PROGRESS TRUE
-    FIND_PACKAGE_ARGS NAMES glm
-)
-FetchContent_MakeAvailable(glm)
-
+find_package(glm QUIET)
 if(NOT glm_FOUND)
     message(STATUS "glm not found, downloading from source")
+    set(GLM_BUILD_INSTALL "ON" CACHE STRING "")
+    FetchContent_Declare(glm
+        GIT_REPOSITORY https://github.com/g-truc/glm.git
+        GIT_TAG b06b775c1c80af51a1183c0e167f9de3b2351a79
+        GIT_PROGRESS TRUE
+    )
+    FetchContent_MakeAvailable(glm)
     if(NOT EMSCRIPTEN)
-        install(TARGETS glm EXPORT glmTargets)
-        install(TARGETS glm-header-only EXPORT glmTargets)
-        install(EXPORT glmTargets DESTINATION ${CMAKE_INSTALL_DATADIR}/glm)
+         install(TARGETS glm)
     endif()
 endif()
 
