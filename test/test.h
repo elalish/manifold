@@ -19,6 +19,10 @@
 #include "manifold.h"
 #include "public.h"
 
+#ifdef MANIFOLD_EXPORT
+#include "meshIO.h"
+#endif
+
 // somehow gcc11 + gtest 1.11.0 is unable to print glm::ivec3
 namespace glm {
 inline void PrintTo(const ivec3& point, std::ostream* os) {
@@ -61,3 +65,6 @@ void ExpectMeshes(const Manifold& manifold,
 void CheckNormals(const Manifold& manifold);
 void CheckStrictly(const Manifold& manifold);
 void CheckGL(const Manifold& manifold);
+#ifdef MANIFOLD_EXPORT
+Manifold ReadMesh(const std::string& filename);
+#endif

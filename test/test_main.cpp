@@ -456,3 +456,11 @@ void CheckGL(const Manifold& manifold) {
   }
   EXPECT_EQ(meshGL.faceID.size(), meshGL.NumTri());
 }
+
+#ifdef MANIFOLD_EXPORT
+Manifold ReadMesh(const std::string& filename) {
+  std::string file = __FILE__;
+  std::string dir = file.substr(0, file.rfind('/'));
+  return Manifold(ImportMesh(dir + "/models/" + filename));
+}
+#endif

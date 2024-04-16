@@ -6,10 +6,6 @@
 #include "sdf.h"
 #include "types.h"
 
-#ifdef MANIFOLD_EXPORT
-#include "meshIO.h"
-#endif
-
 TEST(CBIND, sphere) {
   int n = 25;
   size_t sz = manifold_manifold_size();

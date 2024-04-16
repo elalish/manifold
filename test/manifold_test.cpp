@@ -21,10 +21,6 @@
 #include "test.h"
 #include "tri_dist.h"
 
-#ifdef MANIFOLD_EXPORT
-#include "meshIO.h"
-#endif
-
 namespace {
 
 using namespace manifold;
@@ -345,14 +341,14 @@ TEST(Manifold, Smooth) {
 #endif
 }
 
+#ifdef MANIFOLD_EXPORT
 TEST(Manifold, HullFail) {
-  std::string file = __FILE__;
-  std::string dir = file.substr(0, file.rfind('/'));
-  Manifold body = Manifold(ImportMesh(dir + "/models/hull-body.glb", false));
-  Manifold mask = Manifold(ImportMesh(dir + "/models/hull-mask.glb", false));
+  Manifold body = ReadMesh("hull-body.glb");
+  Manifold mask = ReadMesh("hull-mask.glb");
   Manifold ret = body - mask;
   MeshGL mesh = ret.GetMesh();
 }
+#endif
 
 TEST(Manifold, SmoothFlat) {
   Manifold cone = Manifold::Cylinder(5, 10, 5).SmoothOut().CalculateNormals(0);
