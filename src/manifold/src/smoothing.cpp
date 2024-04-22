@@ -86,18 +86,24 @@ struct ReindexHalfedge {
 };
 
 struct SmoothBezier {
-  VecView<const glm::vec3> vertPos;
-  VecView<const glm::vec3> triNormal;
+  const Manifold::Impl* impl;
   VecView<const glm::vec3> vertNormal;
-  VecView<const Halfedge> halfedge;
 
-  void operator()(thrust::tuple<glm::vec4&, Halfedge> inOut) {
+  void operator()(thrust::tuple<glm::vec4&, Halfedge, int> inOut) {
     glm::vec4& tangent = thrust::get<0>(inOut);
     const Halfedge edge = thrust::get<1>(inOut);
+    const int edgeIdx = thrust::get<2>(inOut);
 
-    const glm::vec3 edgeVec = vertPos[edge.endVert] - vertPos[edge.startVert];
+    if (impl->IsInsideQuad(edgeIdx)) {
+      tangent = glm::vec4(0, 0, 0, -1);
+      return;
+    }
+
+    const glm::vec3 edgeVec =
+        impl->vertPos_[edge.endVert] - impl->vertPos_[edge.startVert];
     const glm::vec3 edgeNormal =
-        (triNormal[edge.face] + triNormal[halfedge[edge.pairedHalfedge].face]) /
+        (impl->faceNormal_[edge.face] +
+         impl->faceNormal_[impl->halfedge_[edge.pairedHalfedge].face]) /
         2.0f;
     glm::vec3 dir =
         glm::cross(glm::cross(edgeNormal, edgeVec), vertNormal[edge.startVert]);
@@ -329,7 +335,7 @@ class Partition {
       edgeOffsets[0] = 4;
       for (const int i : {0, 1, 2, 3}) {
         if (i > 0) {
-          edgeOffsets[i] = edgeOffsets[i - 1] + n[i] - 1;
+          edgeOffsets[i] = edgeOffsets[i - 1] + n[i - 1] - 1;
         }
         const glm::vec3 nextBary = partition.vertBary[(i + 1) % 4];
         for (int j = 1; j < n[i]; ++j) {
@@ -338,7 +344,7 @@ class Partition {
         }
       }
       PartitionQuad(partition.triVert, partition.vertBary, {0, 1, 2, 3},
-                    edgeOffsets, n, {true, true, true, true});
+                    edgeOffsets, n - 1, {true, true, true, true});
     } else {  // tri
       partition.vertBary.push_back({1, 0, 0});
       partition.vertBary.push_back({0, 1, 0});
@@ -576,7 +582,8 @@ bool Manifold::Impl::IsInsideQuad(int halfedge) const {
   if (!ref.SameFace(pairRef)) return false;
 
   auto SameFace = [this](int halfedge, const TriRef& ref) {
-    return ref.SameFace(meshRelation_.triRef[halfedge_[halfedge].face]);
+    return ref.SameFace(
+        meshRelation_.triRef[halfedge_[halfedge].pairedHalfedge / 3]);
   };
 
   int neighbor = NextHalfedge(halfedge);
@@ -940,8 +947,8 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
   }
 
   for_each_n(autoPolicy(numHalfedge),
-             zip(halfedgeTangent_.begin(), halfedge_.cbegin()), numHalfedge,
-             SmoothBezier({vertPos_, faceNormal_, vertNormal, halfedge_}));
+             zip(halfedgeTangent_.begin(), halfedge_.cbegin(), countAt(0)),
+             numHalfedge, SmoothBezier({this, vertNormal}));
 
   for (int vert = 0; vert < numVert; ++vert) {
     const int first = vertSharpHalfedge[vert][0];
@@ -994,8 +1001,8 @@ void Manifold::Impl::CreateTangents(std::vector<Smoothness> sharpenedEdges) {
   }
 
   for_each_n(autoPolicy(numHalfedge),
-             zip(halfedgeTangent_.begin(), halfedge_.cbegin()), numHalfedge,
-             SmoothBezier({vertPos_, faceNormal_, vertNormal, halfedge_}));
+             zip(halfedgeTangent_.begin(), halfedge_.cbegin(), countAt(0)),
+             numHalfedge, SmoothBezier({this, vertNormal}));
 
   // Add sharpened edges around faces, just on the face side.
   for (int tri = 0; tri < NumTri(); ++tri) {
@@ -1060,7 +1067,7 @@ void Manifold::Impl::CreateTangents(std::vector<Smoothness> sharpenedEdges) {
             if (current == second) {
               smoothness =
                   (vert[1].second.smoothness + vert[0].first.smoothness) / 2;
-            } else if (current != first) {
+            } else if (current != first && tangent[current].w > -0.5) {
               tangent[current] = smoothness * tangent[current];
             }
           });
@@ -1073,7 +1080,9 @@ void Manifold::Impl::CreateTangents(std::vector<Smoothness> sharpenedEdges) {
       smoothness /= 2 * vert.size();
 
       ForVert(vert[0].first.halfedge, [&tangent, smoothness](int current) {
-        tangent[current] = smoothness * tangent[current];
+        if (tangent[current].w > -0.5) {
+          tangent[current] = smoothness * tangent[current];
+        }
       });
     }
   }
@@ -1192,7 +1201,7 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
                    idx[1] == Next3(idx[0])
                        ? idx
                        : glm::ivec4(idx[2], idx[0], idx[1], idx[3]);
-               glm::ivec3 rIdx;
+               glm::ivec4 rIdx(0);
                for (const int i : {0, 1, 2}) {
                  rIdx[vIdx[i]] = i;
                }

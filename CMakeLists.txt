@@ -91,7 +91,7 @@ else()
   else()
     set(WARNING_FLAGS -Werror -Wall -Wno-sign-compare -Wno-unused)
   endif()
-  set(MANIFOLD_FLAGS ${MANIFOLD_FLAGS} ${WARNING_FLAGS} -O3)
+  set(MANIFOLD_FLAGS ${MANIFOLD_FLAGS} ${WARNING_FLAGS})
 endif()
 
 if(CODE_COVERAGE AND NOT MSVC)

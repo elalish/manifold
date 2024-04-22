@@ -350,6 +350,20 @@ TEST(Manifold, HullFail) {
 }
 #endif
 
+TEST(Manifold, RefineQuads) {
+  Manifold cylinder =
+      Manifold(WithPositionColors(Manifold::Cylinder(2, 1, -1, 8).SmoothOut()))
+          .RefineToLength(0.75);
+  EXPECT_EQ(cylinder.NumTri(), 17876);
+
+#ifdef MANIFOLD_EXPORT
+  ExportOptions options2;
+  options2.mat.colorChannels = {3, 4, 5, -1};
+  if (options.exportModels)
+    ExportMesh("refinedCylinder.glb", cylinder.GetMeshGL(), options2);
+#endif
+}
+
 TEST(Manifold, SmoothFlat) {
   Manifold cone = Manifold::Cylinder(5, 10, 5).SmoothOut().CalculateNormals(0);
   Manifold smooth = cone.RefineToLength(0.1);
