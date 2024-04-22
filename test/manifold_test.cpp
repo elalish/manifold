@@ -352,8 +352,9 @@ TEST(Manifold, HullFail) {
 
 TEST(Manifold, RefineQuads) {
   Manifold cylinder =
-      Manifold(WithPositionColors(Manifold::Cylinder(2, 1, -1, 8).SmoothOut()))
-          .RefineToLength(0.75);
+      FlattenTangents(
+          WithPositionColors(Manifold::Cylinder(2, 1, -1, 12).SmoothOut()))
+          .RefineToLength(0.1);
   EXPECT_EQ(cylinder.NumTri(), 17876);
 
 #ifdef MANIFOLD_EXPORT

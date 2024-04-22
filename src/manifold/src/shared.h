@@ -133,7 +133,7 @@ struct Halfedge {
 
 struct Barycentric {
   int tri;
-  glm::vec3 uvw;
+  glm::vec4 uvw;
 };
 
 struct TriRef {
