@@ -94,9 +94,7 @@ struct SmoothBezier {
 };
 
 struct InterpTri {
-  VecView<const Halfedge> halfedge;
-  VecView<const glm::vec4> halfedgeTangent;
-  VecView<const glm::vec3> vertPos;
+  const Manifold::Impl* impl;
 
   glm::vec4 Homogeneous(glm::vec4 v) const {
     v.x *= v.w;
@@ -135,56 +133,69 @@ struct InterpTri {
     const int tri = thrust::get<1>(inOut).tri;
     const glm::vec4 uvw = thrust::get<1>(inOut).uvw;
 
+    const glm::ivec4 halfedges = impl->GetHalfedges(tri);
     glm::vec4 posH(0);
-    const glm::mat3 corners = {vertPos[halfedge[3 * tri].startVert],
-                               vertPos[halfedge[3 * tri + 1].startVert],
-                               vertPos[halfedge[3 * tri + 2].startVert]};
 
-    for (const int i : {0, 1, 2}) {
-      if (uvw[i] == 1) {
-        pos = glm::vec3(corners[i]);
-        return;
+    if (halfedges[3] < 0) {  // tri
+      const glm::mat3 corners = {
+          impl->vertPos_[impl->halfedge_[halfedges[0]].startVert],
+          impl->vertPos_[impl->halfedge_[halfedges[1]].startVert],
+          impl->vertPos_[impl->halfedge_[halfedges[2]].startVert]};
+
+      for (const int i : {0, 1, 2}) {
+        if (uvw[i] == 1) {
+          pos = glm::vec3(corners[i]);
+          return;
+        }
       }
+
+      const glm::mat3x4 tangentR = {impl->halfedgeTangent_[halfedges[0]],
+                                    impl->halfedgeTangent_[halfedges[1]],
+                                    impl->halfedgeTangent_[halfedges[2]]};
+      const glm::mat3x4 tangentL = {
+          impl->halfedgeTangent_[impl->halfedge_[halfedges[2]].pairedHalfedge],
+          impl->halfedgeTangent_[impl->halfedge_[halfedges[0]].pairedHalfedge],
+          impl->halfedgeTangent_[impl->halfedge_[halfedges[1]].pairedHalfedge]};
+
+      for (const int i : {0, 1, 2}) {
+        const int j = (i + 1) % 3;
+        const int k = (i + 2) % 3;
+        const float x = uvw[k] / (1 - uvw[i]);
+
+        const glm::mat2x4 bez = CubicBezier2Linear(
+            Homogeneous(corners[j]), Bezier(corners[j], tangentR[j]),
+            Bezier(corners[k], tangentL[k]), Homogeneous(corners[k]), x);
+        const glm::vec3 end = BezierPoint(bez, x);
+        const glm::vec3 tangent = BezierTangent(bez);
+
+        const glm::vec3 jBitangent = SafeNormalize(OrthogonalTo(
+            glm::vec3(tangentL[j]), SafeNormalize(glm::vec3(tangentR[j]))));
+        const glm::vec3 kBitangent = SafeNormalize(OrthogonalTo(
+            glm::vec3(tangentR[k]), -SafeNormalize(glm::vec3(tangentL[k]))));
+        const glm::vec3 normal = SafeNormalize(
+            glm::cross(glm::mix(jBitangent, kBitangent, x), tangent));
+        const glm::vec3 delta = OrthogonalTo(
+            glm::mix(glm::vec3(tangentL[j]), glm::vec3(tangentR[k]), x),
+            normal);
+        const float deltaW = glm::mix(tangentL[j].w, tangentR[k].w, x);
+
+        const glm::mat2x4 bez1 = CubicBezier2Linear(
+            Homogeneous(end), Homogeneous(glm::vec4(end + delta, deltaW)),
+            Bezier(corners[i], glm::mix(tangentR[i], tangentL[i], x)),
+            Homogeneous(corners[i]), uvw[i]);
+        const glm::vec3 p = BezierPoint(bez1, uvw[i]);
+        float w = uvw[j] * uvw[j] * uvw[k] * uvw[k];
+        posH += Homogeneous(glm::vec4(p, w));
+      }
+      pos = HNormalize(posH);
+    } else {  // quad
+      const glm::mat4x3 corners = {
+          impl->vertPos_[impl->halfedge_[halfedges[0]].startVert],
+          impl->vertPos_[impl->halfedge_[halfedges[1]].startVert],
+          impl->vertPos_[impl->halfedge_[halfedges[2]].startVert],
+          impl->vertPos_[impl->halfedge_[halfedges[3]].startVert]};
+      pos = corners * uvw;
     }
-
-    const glm::mat3x4 tangentR = {halfedgeTangent[3 * tri],
-                                  halfedgeTangent[3 * tri + 1],
-                                  halfedgeTangent[3 * tri + 2]};
-    const glm::mat3x4 tangentL = {
-        halfedgeTangent[halfedge[3 * tri + 2].pairedHalfedge],
-        halfedgeTangent[halfedge[3 * tri].pairedHalfedge],
-        halfedgeTangent[halfedge[3 * tri + 1].pairedHalfedge]};
-
-    for (const int i : {0, 1, 2}) {
-      const int j = (i + 1) % 3;
-      const int k = (i + 2) % 3;
-      const float x = uvw[k] / (1 - uvw[i]);
-
-      const glm::mat2x4 bez = CubicBezier2Linear(
-          Homogeneous(corners[j]), Bezier(corners[j], tangentR[j]),
-          Bezier(corners[k], tangentL[k]), Homogeneous(corners[k]), x);
-      const glm::vec3 end = BezierPoint(bez, x);
-      const glm::vec3 tangent = BezierTangent(bez);
-
-      const glm::vec3 jBitangent = SafeNormalize(OrthogonalTo(
-          glm::vec3(tangentL[j]), SafeNormalize(glm::vec3(tangentR[j]))));
-      const glm::vec3 kBitangent = SafeNormalize(OrthogonalTo(
-          glm::vec3(tangentR[k]), -SafeNormalize(glm::vec3(tangentL[k]))));
-      const glm::vec3 normal = SafeNormalize(
-          glm::cross(glm::mix(jBitangent, kBitangent, x), tangent));
-      const glm::vec3 delta = OrthogonalTo(
-          glm::mix(glm::vec3(tangentL[j]), glm::vec3(tangentR[k]), x), normal);
-      const float deltaW = glm::mix(tangentL[j].w, tangentR[k].w, x);
-
-      const glm::mat2x4 bez1 = CubicBezier2Linear(
-          Homogeneous(end), Homogeneous(glm::vec4(end + delta, deltaW)),
-          Bezier(corners[i], glm::mix(tangentR[i], tangentL[i], x)),
-          Homogeneous(corners[i]), uvw[i]);
-      const glm::vec3 p = BezierPoint(bez1, uvw[i]);
-      float w = uvw[j] * uvw[j] * uvw[k] * uvw[k];
-      posH += Homogeneous(glm::vec4(p, w));
-    }
-    pos = HNormalize(posH);
   }
 };
 
@@ -1403,8 +1414,7 @@ void Manifold::Impl::Refine(std::function<int(glm::vec3)> edgeDivisions) {
 
   if (old.halfedgeTangent_.size() == old.halfedge_.size()) {
     for_each_n(autoPolicy(NumTri()), zip(vertPos_.begin(), vertBary.begin()),
-               NumVert(),
-               InterpTri({old.halfedge_, old.halfedgeTangent_, old.vertPos_}));
+               NumVert(), InterpTri({&old}));
     // Make original since the subdivided faces have been warped into
     // being non-coplanar, and hence not being related to the original faces.
     meshRelation_.originalID = ReserveIDs(1);

@@ -354,8 +354,8 @@ TEST(Manifold, RefineQuads) {
   Manifold cylinder =
       FlattenTangents(
           WithPositionColors(Manifold::Cylinder(2, 1, -1, 12).SmoothOut()))
-          .RefineToLength(0.1);
-  EXPECT_EQ(cylinder.NumTri(), 17876);
+          .RefineToLength(0.05);
+  EXPECT_EQ(cylinder.NumTri(), 16892);
 
 #ifdef MANIFOLD_EXPORT
   ExportOptions options2;
