@@ -13,10 +13,17 @@
 // limitations under the License.
 
 
+#include "manifold.h"
+#include "polygon.h"
+#include "test.h"
+
+using namespace manifold;
+
 /**
 * These tests verify correct topology and geometry for complex boolean
 * operations between valid shapes with many faces.
 */
+
 TEST(Boolean, Sphere) {
  Manifold sphere = Manifold::Sphere(1.0f, 12);
  MeshGL sphereGL = WithPositionColors(sphere);
