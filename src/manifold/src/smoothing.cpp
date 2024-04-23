@@ -33,24 +33,6 @@ glm::vec3 OrthogonalTo(glm::vec3 in, glm::vec3 ref) {
   return in;
 }
 
-/**
- * Retained verts are part of several triangles, and it doesn't matter which one
- * the vertBary refers to. Here, whichever is last will win and it's done on the
- * CPU for simplicity for now. Using AtomicCAS on .tri should work for a GPU
- * version if desired.
- */
-void FillRetainedVerts(Vec<Barycentric>& vertBary,
-                       const Vec<Halfedge>& halfedge_) {
-  const int numTri = halfedge_.size() / 3;
-  for (int tri = 0; tri < numTri; ++tri) {
-    for (const int i : {0, 1, 2}) {
-      glm::vec4 uvw(0);
-      uvw[i] = 1;
-      vertBary[halfedge_[3 * tri + i].startVert] = {tri, uvw};
-    }
-  }
-}
-
 // Calculate a tangent vector in the form of a weighted cubic Bezier taking as
 // input the desired tangent direction (length doesn't matter) and the edge
 // vector to the neighboring vertex. In a symmetric situation where the tangents
@@ -597,6 +579,17 @@ bool Manifold::Impl::IsInsideQuad(int halfedge) const {
   return true;
 }
 
+int Manifold::Impl::GetNeighbor(int tri) const {
+  int neighbor = -1;
+  for (const int i : {0, 1, 2}) {
+    if (halfedgeTangent_.size() == halfedge_.size() &&
+        halfedgeTangent_[3 * tri + i].w < -0.5) {
+      neighbor = neighbor == -1 ? i : -2;
+    }
+  }
+  return neighbor;
+}
+
 /**
  * For the given triangle index, returns either the three halfedge indices of
  * that triangle and halfedges[3] = -1, or if the triangle is part of a quad, it
@@ -605,14 +598,10 @@ bool Manifold::Impl::IsInsideQuad(int halfedge) const {
  */
 glm::ivec4 Manifold::Impl::GetHalfedges(int tri) const {
   glm::ivec4 halfedges(-1);
-  int neighbor = -1;
   for (const int i : {0, 1, 2}) {
     halfedges[i] = 3 * tri + i;
-    if (halfedgeTangent_.size() == halfedge_.size() &&
-        halfedgeTangent_[3 * tri + i].w < -0.5) {
-      neighbor = neighbor == -1 ? i : -2;
-    }
   }
+  const int neighbor = GetNeighbor(tri);
   if (neighbor >= 0) {  // quad
     const int pair = halfedge_[3 * tri + neighbor].pairedHalfedge;
     if (pair / 3 < tri) {
@@ -634,6 +623,46 @@ glm::ivec4 Manifold::Impl::GetHalfedges(int tri) const {
     }
   }
   return halfedges;
+}
+
+Manifold::Impl::BaryIndices Manifold::Impl::GetIndices(int halfedge) const {
+  int tri = halfedge / 3;
+  int idx = halfedge % 3;
+  const int neighbor = GetNeighbor(tri);
+  if (idx == neighbor) {
+    return {-1, -1, -1};
+  }
+
+  if (neighbor < 0) {  // tri
+    return {tri, idx, Next3(idx)};
+  } else {  // quad
+    const int pair = halfedge_[3 * tri + neighbor].pairedHalfedge;
+    if (pair / 3 < tri) {
+      tri = pair / 3;
+      const int j = pair % 3;
+      idx = Next3(neighbor) == idx ? j : (j + 1) % 4;
+    }
+    return {tri, idx, (idx + 1) % 4};
+  }
+}
+
+/**
+ * Retained verts are part of several triangles, and it doesn't matter which one
+ * the vertBary refers to. Here, whichever is last will win and it's done on the
+ * CPU for simplicity for now. Using AtomicCAS on .tri should work for a GPU
+ * version if desired.
+ */
+void Manifold::Impl::FillRetainedVerts(Vec<Barycentric>& vertBary) const {
+  const int numTri = halfedge_.size() / 3;
+  for (int tri = 0; tri < numTri; ++tri) {
+    for (const int i : {0, 1, 2}) {
+      const BaryIndices indices = GetIndices(3 * tri + i);
+      if (indices.start4 < 0) continue;
+      glm::vec4 uvw(0);
+      uvw[indices.start4] = 1;
+      vertBary[halfedge_[3 * tri + i].startVert] = {indices.tri, uvw};
+    }
+  }
 }
 
 // sharpenedEdges are referenced to the input Mesh, but the triangles have
@@ -1120,22 +1149,25 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
 
   Vec<Barycentric> vertBary(edgeOffset.back() + edgeAdded.back());
   const int totalEdgeAdded = vertBary.size() - numVert;
-  FillRetainedVerts(vertBary, halfedge_);
+  FillRetainedVerts(vertBary);
   for_each_n(policy, zip(edges.begin(), edgeAdded.begin(), edgeOffset.begin()),
-             numEdge, [&vertBary](thrust::tuple<TmpEdge, int, int> in) {
+             numEdge, [this, &vertBary](thrust::tuple<TmpEdge, int, int> in) {
                const TmpEdge edge = thrust::get<0>(in);
                const int n = thrust::get<1>(in);
                const int offset = thrust::get<2>(in);
+
+               const BaryIndices indices = GetIndices(edge.halfedgeIdx);
+               if (indices.tri < 0) {
+                 return;  // inside quad
+               }
                const float frac = 1.0f / (n + 1);
-               const int v0 = edge.halfedgeIdx % 3;
-               const int v1 = Next3(v0);
-               const int tri = edge.halfedgeIdx / 3;
+
                for (int i = 0; i < n; ++i) {
                  glm::vec4 uvw(0);
-                 uvw[v1] = (i + 1) * frac;
-                 uvw[v0] = 1 - uvw[v1];
+                 uvw[indices.end4] = (i + 1) * frac;
+                 uvw[indices.start4] = 1 - uvw[indices.end4];
                  vertBary[offset + i].uvw = uvw;
-                 vertBary[offset + i].tri = tri;
+                 vertBary[offset + i].tri = indices.tri;
                }
              });
 
@@ -1143,7 +1175,7 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
   std::vector<Partition> subTris(numTri);
   for_each_n(policy, countAt(0), numTri,
              [this, &subTris, &half2Edge, &edgeAdded](int tri) {
-               glm::ivec4 halfedges = GetHalfedges(tri);
+               const glm::ivec4 halfedges = GetHalfedges(tri);
                glm::ivec4 divisions(0);
                for (const int i : {0, 1, 2, 3}) {
                  if (halfedges[i] >= 0) {
@@ -1172,7 +1204,7 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
   for_each_n(policy, countAt(0), numTri,
              [this, &triVerts, &triRef, &vertBary, &subTris, &edgeOffset,
               &half2Edge, &triOffset, &interiorOffset](int tri) {
-               glm::ivec4 halfedges = GetHalfedges(tri);
+               const glm::ivec4 halfedges = GetHalfedges(tri);
                if (halfedges[0] < 0) return;
                glm::ivec4 tri3;
                glm::ivec4 edgeOffsets;
@@ -1224,10 +1256,8 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
                glm::vec3& pos = thrust::get<0>(inOut);
                const Barycentric bary = thrust::get<1>(inOut);
 
-               glm::ivec4 halfedges = GetHalfedges(bary.tri);
-               if (halfedges[0] < 0) {
-                 return;
-               } else if (halfedges[3] < 0) {
+               const glm::ivec4 halfedges = GetHalfedges(bary.tri);
+               if (halfedges[3] < 0) {
                  glm::mat3 triPos;
                  for (const int i : {0, 1, 2}) {
                    triPos[i] = vertPos_[halfedge_[halfedges[i]].startVert];
@@ -1262,7 +1292,7 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
         addedVerts, [this, &prop](thrust::tuple<int, Barycentric> in) {
           const int vert = thrust::get<0>(in);
           const Barycentric bary = thrust::get<1>(in);
-          glm::ivec4 halfedges = GetHalfedges(bary.tri);
+          const glm::ivec4 halfedges = GetHalfedges(bary.tri);
           auto& rel = meshRelation_;
 
           for (int p = 0; p < rel.numProp; ++p) {
@@ -1283,9 +1313,7 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
                 quadProp[i] =
                     rel.properties[rel.triProperties[tri][j] * rel.numProp + p];
               }
-              prop[vert * rel.numProp + p] = glm::mix(
-                  glm::mix(quadProp[0], quadProp[1], bary.uvw[0]),
-                  glm::mix(quadProp[3], quadProp[2], bary.uvw[0]), bary.uvw[1]);
+              prop[vert * rel.numProp + p] = glm::dot(quadProp, bary.uvw);
             }
           }
         });
@@ -1319,21 +1347,31 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
     Vec<glm::ivec3> triProp(triVerts.size());
     for_each_n(policy, countAt(0), numTri,
                [this, &triProp, &subTris, &edgeOffset, &half2Edge, &triOffset,
-                &interiorOffset, propOffset, addedVerts](int tri) {
+                &interiorOffset, propOffset, addedVerts](const int tri) {
+                 const glm::ivec4 halfedges = GetHalfedges(tri);
+                 if (halfedges[0] < 0) return;
+
                  auto& rel = meshRelation_;
-                 const glm::ivec4 tri3(rel.triProperties[tri], -1);
+                 glm::ivec4 tri3;
                  glm::ivec4 edgeOffsets;
                  glm::bvec4 edgeFwd(true);
-                 for (const int i : {0, 1, 2}) {
-                   const Halfedge& halfedge = halfedge_[3 * tri + i];
-                   edgeOffsets[i] = edgeOffset[half2Edge[3 * tri + i]];
+                 for (const int i : {0, 1, 2, 3}) {
+                   if (halfedges[i] < 0) {
+                     tri3[i] = -1;
+                     continue;
+                   }
+                   const int thisTri = halfedges[i] / 3;
+                   const int j = halfedges[i] % 3;
+                   const Halfedge& halfedge = halfedge_[halfedges[i]];
+                   tri3[i] = rel.triProperties[thisTri][j];
+                   edgeOffsets[i] = edgeOffset[half2Edge[halfedges[i]]];
                    if (!halfedge.IsForward()) {
                      const int pairTri = halfedge.pairedHalfedge / 3;
-                     const int j = halfedge.pairedHalfedge % 3;
-                     if (rel.triProperties[pairTri][j] !=
-                             rel.triProperties[tri][Next3(i)] ||
-                         rel.triProperties[pairTri][Next3(j)] !=
-                             rel.triProperties[tri][i]) {
+                     const int k = halfedge.pairedHalfedge % 3;
+                     if (rel.triProperties[pairTri][k] !=
+                             rel.triProperties[thisTri][Next3(j)] ||
+                         rel.triProperties[pairTri][Next3(k)] !=
+                             rel.triProperties[thisTri][j]) {
                        edgeOffsets[i] += addedVerts;
                      } else {
                        edgeFwd[i] = false;
