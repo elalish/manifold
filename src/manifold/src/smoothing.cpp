@@ -1046,13 +1046,16 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
           -newTangent, vertPos_[halfedge_[second].endVert] - vertPos_[vert]);
 
       ForVert(first, [this, first, second](int current) {
-        if (current != first && current != second) {
+        if (current != first && current != second &&
+            halfedgeTangent_[current].w > -0.5) {
           halfedgeTangent_[current] = glm::vec4(0);
         }
       });
     } else {  // Sharpen vertex uniformly
       ForVert(first, [this](int current) {
-        halfedgeTangent_[current] = glm::vec4(0);
+        if (halfedgeTangent_[current].w > -0.5) {
+          halfedgeTangent_[current] = glm::vec4(0);
+        }
       });
     }
   }
