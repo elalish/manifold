@@ -165,7 +165,6 @@ TEST(Boolean, Cylinders) {
   EXPECT_LE(m1.NumDegenerateTris(), 12);
 }
 
-
 TEST(Boolean, NoRetainedVerts) {
   Manifold cube = Manifold::Cube(glm::vec3(1), true);
   Manifold oct = Manifold::Sphere(1, 4);
