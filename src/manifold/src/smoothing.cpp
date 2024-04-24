@@ -233,8 +233,8 @@ struct InterpTri {
           {corners[1], corners[2], corners[3], corners[0]},
           {tangentsY[1], tangentsY[2], tangentsY[3], tangentsY[0]},
           {tangentsX[1], tangentsX[2], tangentsX[3], tangentsX[0]}, y, 1 - x);
-      posH += Homogeneous(glm::vec4(pX, y * (1 - y)));
-      posH += Homogeneous(glm::vec4(pY, x * (1 - x)));
+      posH += Homogeneous(glm::vec4(pX, x * (1 - x)));
+      posH += Homogeneous(glm::vec4(pY, y * (1 - y)));
     }
     pos = HNormalize(posH);
   }
