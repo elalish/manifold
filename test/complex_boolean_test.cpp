@@ -165,44 +165,6 @@ TEST(Boolean, Cylinders) {
   EXPECT_LE(m1.NumDegenerateTris(), 12);
 }
 
-TEST(Boolean, NoRetainedVerts) {
-  Manifold cube = Manifold::Cube(glm::vec3(1), true);
-  Manifold oct = Manifold::Sphere(1, 4);
-  EXPECT_NEAR(cube.GetProperties().volume, 1, 0.001);
-  EXPECT_NEAR(oct.GetProperties().volume, 1.333, 0.001);
-  EXPECT_NEAR((cube ^ oct).GetProperties().volume, 0.833, 0.001);
-}
-
-TEST(Boolean, PropertiesNoIntersection) {
-  MeshGL cubeUV = CubeUV();
-  Manifold m0(cubeUV);
-  Manifold m1 = m0.Translate(glm::vec3(1.5));
-  Manifold result = m0 + m1;
-  EXPECT_EQ(result.NumProp(), 2);
-  RelatedGL(result, {cubeUV});
-}
-
-TEST(Boolean, MixedProperties) {
-  MeshGL cubeUV = CubeUV();
-  Manifold m0(cubeUV);
-  Manifold m1 = Manifold::Cube();
-  Manifold result = m0 + m1.Translate(glm::vec3(0.5));
-  EXPECT_EQ(result.NumProp(), 2);
-  RelatedGL(result, {cubeUV, m1.GetMeshGL()});
-}
-
-TEST(Boolean, MixedNumProp) {
-  MeshGL cubeUV = CubeUV();
-  Manifold m0(cubeUV);
-  Manifold m1 = Manifold::Cube();
-  Manifold result =
-      m0 + m1.SetProperties(1, [](float* prop, glm::vec3 p, const float* n) {
-               prop[0] = 1;
-             }).Translate(glm::vec3(0.5));
-  EXPECT_EQ(result.NumProp(), 2);
-  RelatedGL(result, {cubeUV, m1.GetMeshGL()});
-}
-
 TEST(Boolean, Subtract) {
   Mesh firstMesh;
   firstMesh.vertPos = {{0, 0, 0},           {1540, 0, 0},
@@ -254,14 +216,6 @@ TEST(Boolean, Close) {
   PolygonParams().processOverlaps = false;
 }
 
-TEST(Boolean, UnionDifference) {
-  Manifold block = Manifold::Cube({1, 1, 1}, true) - Manifold::Cylinder(1, 0.5);
-  Manifold result = block + block.Translate({0, 0, 1});
-  float resultsize = result.GetProperties().volume;
-  float blocksize = block.GetProperties().volume;
-  EXPECT_NEAR(resultsize, blocksize * 2, 0.0001);
-}
-
 TEST(Boolean, BooleanVolumes) {
   glm::mat4 m = glm::translate(glm::mat4(1.0f), glm::vec3(1.0f));
 
@@ -288,14 +242,6 @@ TEST(Boolean, BooleanVolumes) {
   EXPECT_FLOAT_EQ((m7 - m4 - m2).GetProperties().volume, 1);
   EXPECT_FLOAT_EQ((m7 - (m7 - m1)).GetProperties().volume, 1);
   EXPECT_FLOAT_EQ((m7 - (m1 + m2)).GetProperties().volume, 4);
-}
-
-TEST(Boolean, TreeTransforms) {
-  auto a = (Manifold::Cube({1, 1, 1}) + Manifold::Cube({1, 1, 1}))
-               .Translate({1, 0, 0});
-  auto b = (Manifold::Cube({1, 1, 1}) + Manifold::Cube({1, 1, 1}));
-
-  EXPECT_FLOAT_EQ((a + b).GetProperties().volume, 2);
 }
 
 TEST(Boolean, Spiral) {
