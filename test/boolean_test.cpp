@@ -261,9 +261,6 @@ TEST(Boolean, CornerUnion) {
   ExpectMeshes(cubes, {{8, 12}, {8, 12}});
 }
 
-
-
-
 /**
  * These tests verify that the spliting helper functions return meshes with
  * volumes that make sense.
