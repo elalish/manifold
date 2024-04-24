@@ -369,8 +369,8 @@ TEST(Manifold, SmoothFlat) {
   Manifold cone = Manifold::Cylinder(5, 10, 5).SmoothOut().CalculateNormals(0);
   Manifold smooth = cone.RefineToLength(0.1);
   auto prop = smooth.GetProperties();
-  EXPECT_NEAR(prop.volume, 1157, 1);
-  EXPECT_NEAR(prop.surfaceArea, 779, 1);
+  EXPECT_NEAR(prop.volume, 1162, 1);
+  EXPECT_NEAR(prop.surfaceArea, 772, 1);
 
 #ifdef MANIFOLD_EXPORT
   ExportOptions options2;

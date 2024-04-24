@@ -1188,10 +1188,16 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
   Vec<int> edgeAdded(numEdge);
   for_each_n(policy, zip(edgeAdded.begin(), edges.cbegin()), numEdge,
              [edgeDivisions, this](thrust::tuple<int&, TmpEdge> inOut) {
+               int& divisions = thrust::get<0>(inOut);
                const TmpEdge edge = thrust::get<1>(inOut);
+               if (halfedgeTangent_.size() == halfedge_.size() &&
+                   halfedgeTangent_[edge.halfedgeIdx].w < -0.5) {
+                 divisions = 0;
+                 return;
+               }
                const glm::vec3 vec =
                    vertPos_[edge.first] - vertPos_[edge.second];
-               thrust::get<0>(inOut) = edgeDivisions(vec);
+               divisions = edgeDivisions(vec);
              });
 
   Vec<int> edgeOffset(numEdge);
