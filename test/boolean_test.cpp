@@ -370,4 +370,3 @@ TEST(Boolean, Precision2) {
   cube2 = cube2.Translate(glm::vec3(scale * kTolerance));
   EXPECT_FALSE((cube ^ cube2).IsEmpty());
 }
-
