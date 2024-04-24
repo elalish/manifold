@@ -352,10 +352,12 @@ TEST(Manifold, HullFail) {
 
 TEST(Manifold, RefineQuads) {
   Manifold cylinder =
-      FlattenTangents(
-          WithPositionColors(Manifold::Cylinder(2, 1, -1, 12).SmoothOut()))
+      Manifold(WithPositionColors(Manifold::Cylinder(2, 1, -1, 12).SmoothOut()))
           .RefineToLength(0.05);
   EXPECT_EQ(cylinder.NumTri(), 16892);
+  auto prop = cylinder.GetProperties();
+  EXPECT_NEAR(prop.volume, 2 * glm::pi<float>(), 0.003);
+  EXPECT_NEAR(prop.surfaceArea, 6 * glm::pi<float>(), 0.0003);
 
 #ifdef MANIFOLD_EXPORT
   ExportOptions options2;

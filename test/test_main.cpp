@@ -262,16 +262,6 @@ MeshGL WithNormals(const Manifold& in) {
   return out;
 }
 
-Manifold FlattenTangents(const MeshGL& in) {
-  MeshGL out = in;
-  for (int e = 0; e < in.triVerts.size(); ++e) {
-    for (int i : {0, 1, 2}) {  // leave w to indicate quads
-      out.halfedgeTangent[4 * e + i] = 0;
-    }
-  }
-  return Manifold(out);
-}
-
 MeshGL CubeUV() {
   MeshGL mgl;
   mgl.numProp = 5;
