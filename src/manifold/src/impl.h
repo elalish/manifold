@@ -165,6 +165,7 @@ struct Manifold::Impl {
 
   // smoothing.cu
   bool IsInsideQuad(int halfedge) const;
+  bool IsMarkedInsideQuad(int halfedge) const;
   glm::vec3 GetNormal(int halfedge, int normalIdx) const;
   int GetNeighbor(int tri) const;
   glm::ivec4 GetHalfedges(int tri) const;

@@ -608,6 +608,9 @@ glm::vec3 Manifold::Impl::GetNormal(int halfedge, int normalIdx) const {
 }
 
 bool Manifold::Impl::IsInsideQuad(int halfedge) const {
+  if (halfedgeTangent_.size() > 0) {
+    return halfedgeTangent_[halfedge].w < 0;
+  }
   const int tri = halfedge_[halfedge].face;
   const TriRef ref = meshRelation_.triRef[tri];
   const int pair = halfedge_[halfedge].pairedHalfedge;
@@ -631,11 +634,14 @@ bool Manifold::Impl::IsInsideQuad(int halfedge) const {
   return true;
 }
 
+bool Manifold::Impl::IsMarkedInsideQuad(int halfedge) const {
+  return halfedgeTangent_.size() > 0 && halfedgeTangent_[halfedge].w < 0;
+}
+
 int Manifold::Impl::GetNeighbor(int tri) const {
   int neighbor = -1;
   for (const int i : {0, 1, 2}) {
-    if (halfedgeTangent_.size() == halfedge_.size() &&
-        halfedgeTangent_[3 * tri + i].w < -0.5) {
+    if (IsMarkedInsideQuad(3 * tri + i)) {
       neighbor = neighbor == -1 ? i : -2;
     }
   }
@@ -994,7 +1000,8 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
   ZoneScoped;
   const int numVert = NumVert();
   const int numHalfedge = halfedge_.size();
-  halfedgeTangent_.resize(numHalfedge);
+  halfedgeTangent_.resize(0);
+  Vec<glm::vec4> tangent(numHalfedge);
 
   Vec<glm::vec3> vertNormal(numVert);
   Vec<glm::ivec2> vertSharpHalfedge(numVert, glm::ivec2(-1));
@@ -1028,8 +1035,10 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
   }
 
   for_each_n(autoPolicy(numHalfedge),
-             zip(halfedgeTangent_.begin(), halfedge_.cbegin(), countAt(0)),
-             numHalfedge, SmoothBezier({this, vertNormal}));
+             zip(tangent.begin(), halfedge_.cbegin(), countAt(0)), numHalfedge,
+             SmoothBezier({this, vertNormal}));
+
+  halfedgeTangent_.swap(tangent);
 
   for (int vert = 0; vert < numVert; ++vert) {
     const int first = vertSharpHalfedge[vert][0];
@@ -1047,13 +1056,13 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
 
       ForVert(first, [this, first, second](int current) {
         if (current != first && current != second &&
-            halfedgeTangent_[current].w > -0.5) {
+            !IsMarkedInsideQuad(current)) {
           halfedgeTangent_[current] = glm::vec4(0);
         }
       });
     } else {  // Sharpen vertex uniformly
       ForVert(first, [this](int current) {
-        if (halfedgeTangent_[current].w > -0.5) {
+        if (!IsMarkedInsideQuad(current)) {
           halfedgeTangent_[current] = glm::vec4(0);
         }
       });
@@ -1073,7 +1082,8 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
 void Manifold::Impl::CreateTangents(std::vector<Smoothness> sharpenedEdges) {
   ZoneScoped;
   const int numHalfedge = halfedge_.size();
-  halfedgeTangent_.resize(numHalfedge);
+  halfedgeTangent_.resize(0);
+  Vec<glm::vec4> tangent(numHalfedge);
 
   Vec<bool> triIsFlatFace = FlatFaces();
   Vec<int> vertFlatFace = VertFlatFace(triIsFlatFace);
@@ -1085,8 +1095,10 @@ void Manifold::Impl::CreateTangents(std::vector<Smoothness> sharpenedEdges) {
   }
 
   for_each_n(autoPolicy(numHalfedge),
-             zip(halfedgeTangent_.begin(), halfedge_.cbegin(), countAt(0)),
-             numHalfedge, SmoothBezier({this, vertNormal}));
+             zip(tangent.begin(), halfedge_.cbegin(), countAt(0)), numHalfedge,
+             SmoothBezier({this, vertNormal}));
+
+  halfedgeTangent_.swap(tangent);
 
   // Add sharpened edges around faces, just on the face side.
   for (int tri = 0; tri < NumTri(); ++tri) {
@@ -1127,7 +1139,6 @@ void Manifold::Impl::CreateTangents(std::vector<Smoothness> sharpenedEdges) {
         {edge.second, edge.first});
   }
 
-  Vec<glm::vec4>& tangent = halfedgeTangent_;
   for (const auto& value : vertTangents) {
     const std::vector<Pair>& vert = value.second;
     // Sharp edges that end are smooth at their terminal vert.
@@ -1135,26 +1146,26 @@ void Manifold::Impl::CreateTangents(std::vector<Smoothness> sharpenedEdges) {
     if (vert.size() == 2) {  // Make continuous edge
       const int first = vert[0].first.halfedge;
       const int second = vert[1].first.halfedge;
-      const glm::vec3 newTangent = glm::normalize(glm::vec3(tangent[first]) -
-                                                  glm::vec3(tangent[second]));
+      const glm::vec3 newTangent =
+          glm::normalize(glm::vec3(halfedgeTangent_[first]) -
+                         glm::vec3(halfedgeTangent_[second]));
 
       const glm::vec3 pos = vertPos_[halfedge_[first].startVert];
-      tangent[first] =
+      halfedgeTangent_[first] =
           CircularTangent(newTangent, vertPos_[halfedge_[first].endVert] - pos);
-      tangent[second] = CircularTangent(
+      halfedgeTangent_[second] = CircularTangent(
           -newTangent, vertPos_[halfedge_[second].endVert] - pos);
 
       float smoothness =
           (vert[0].second.smoothness + vert[1].first.smoothness) / 2;
-      ForVert(
-          first, [&tangent, &smoothness, &vert, first, second](int current) {
-            if (current == second) {
-              smoothness =
-                  (vert[1].second.smoothness + vert[0].first.smoothness) / 2;
-            } else if (current != first && tangent[current].w > -0.5) {
-              tangent[current] = smoothness * tangent[current];
-            }
-          });
+      ForVert(first, [this, &smoothness, &vert, first, second](int current) {
+        if (current == second) {
+          smoothness =
+              (vert[1].second.smoothness + vert[0].first.smoothness) / 2;
+        } else if (current != first && !IsMarkedInsideQuad(current)) {
+          halfedgeTangent_[current] = smoothness * halfedgeTangent_[current];
+        }
+      });
     } else {  // Sharpen vertex uniformly
       float smoothness = 0;
       for (const Pair& pair : vert) {
@@ -1163,9 +1174,9 @@ void Manifold::Impl::CreateTangents(std::vector<Smoothness> sharpenedEdges) {
       }
       smoothness /= 2 * vert.size();
 
-      ForVert(vert[0].first.halfedge, [&tangent, smoothness](int current) {
-        if (tangent[current].w > -0.5) {
-          tangent[current] = smoothness * tangent[current];
+      ForVert(vert[0].first.halfedge, [this, smoothness](int current) {
+        if (!IsMarkedInsideQuad(current)) {
+          halfedgeTangent_[current] = smoothness * halfedgeTangent_[current];
         }
       });
     }
@@ -1193,8 +1204,7 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
              [edgeDivisions, this](thrust::tuple<int&, TmpEdge> inOut) {
                int& divisions = thrust::get<0>(inOut);
                const TmpEdge edge = thrust::get<1>(inOut);
-               if (halfedgeTangent_.size() == halfedge_.size() &&
-                   halfedgeTangent_[edge.halfedgeIdx].w < -0.5) {
+               if (IsMarkedInsideQuad(edge.halfedgeIdx)) {
                  divisions = 0;
                  return;
                }
