@@ -287,6 +287,9 @@ class Partition {
           next = n;
         }
       }
+      // Backwards (mirrored) quads get a separate cache key for now for
+      // simplicity, so there is no reversal necessary for quads when
+      // re-indexing.
       glm::ivec4 tmp = sortedDiv;
       for (const int i : {0, 1, 2, 3}) {
         triIdx[i] = (i + minIdx) % 4;
@@ -348,8 +351,8 @@ class Partition {
   // This triangulation is purely topological - it depends only on the number of
   // divisions of the three sides of the triangle. This allows them to be cached
   // and reused for similar triangles. The shape of the final surface is defined
-  // by the tangents and the barycentric coordinates of the new verts. The input
-  // must be sorted: n[0] >= n[1] >= n[2] > 0
+  // by the tangents and the barycentric coordinates of the new verts. For
+  // triangles, the input must be sorted: n[0] >= n[1] >= n[2] > 0.
   static Partition GetCachedPartition(glm::ivec4 n) {
     {
       auto lockGuard = std::lock_guard<std::mutex>(cacheLock);
@@ -595,6 +598,10 @@ class Partition {
 
 namespace manifold {
 
+/**
+ * Get the property normal associated with the startVert of this halfedge, where
+ * normalIdx shows the beginning of where normals are stored in the properties.
+ */
 glm::vec3 Manifold::Impl::GetNormal(int halfedge, int normalIdx) const {
   const int tri = halfedge / 3;
   const int j = halfedge % 3;
@@ -607,6 +614,11 @@ glm::vec3 Manifold::Impl::GetNormal(int halfedge, int normalIdx) const {
   return normal;
 }
 
+/**
+ * Returns true if this halfedge should be marked as the interior of a quad, as
+ * defined by its two triangles referring to the same face, and those triangles
+ * having no further face neighbors beyond.
+ */
 bool Manifold::Impl::IsInsideQuad(int halfedge) const {
   if (halfedgeTangent_.size() > 0) {
     return halfedgeTangent_[halfedge].w < 0;
@@ -634,10 +646,18 @@ bool Manifold::Impl::IsInsideQuad(int halfedge) const {
   return true;
 }
 
+/**
+ * Returns true if this halfedge is an interior of a quad, as defined by its
+ * halfedge tangent having negative weight.
+ */
 bool Manifold::Impl::IsMarkedInsideQuad(int halfedge) const {
   return halfedgeTangent_.size() > 0 && halfedgeTangent_[halfedge].w < 0;
 }
 
+/**
+ * Returns the tri index of the other side of this quad if this tri is part of a
+ * quad, or -1 otherwise.
+ */
 int Manifold::Impl::GetNeighbor(int tri) const {
   int neighbor = -1;
   for (const int i : {0, 1, 2}) {
@@ -683,6 +703,12 @@ glm::ivec4 Manifold::Impl::GetHalfedges(int tri) const {
   return halfedges;
 }
 
+/**
+ * Returns the BaryIndices, which gives the tri and indices (0-3), such that
+ * GetHalfedges(val.tri)[val.start4] points back to this halfedge, and val.end4
+ * will point to the next one. This function handles this for both triangles and
+ * quads.
+ */
 Manifold::Impl::BaryIndices Manifold::Impl::GetIndices(int halfedge) const {
   int tri = halfedge / 3;
   int idx = halfedge % 3;
