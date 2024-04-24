@@ -368,16 +368,17 @@ TEST(Manifold, RefineQuads) {
 }
 
 TEST(Manifold, SmoothFlat) {
-  Manifold cone = Manifold::Cylinder(5, 10, 5).SmoothOut().CalculateNormals(0);
-  Manifold smooth = cone.RefineToLength(0.1);
+  Manifold cone = Manifold::Cylinder(5, 10, 5, 12).SmoothOut();
+  Manifold smooth = cone.RefineToLength(0.1).CalculateNormals(0);
   auto prop = smooth.GetProperties();
-  EXPECT_NEAR(prop.volume, 1162.48, 0.01);
-  EXPECT_NEAR(prop.surfaceArea, 772.05, 0.01);
+  EXPECT_NEAR(prop.volume, 1159.02, 0.01);
+  EXPECT_NEAR(prop.surfaceArea, 771.45, 0.01);
 
 #ifdef MANIFOLD_EXPORT
   ExportOptions options2;
   options2.faceted = false;
   options2.mat.normalChannels = {3, 4, 5};
+  options2.mat.roughness = 0;
   if (options.exportModels)
     ExportMesh("smoothCone.glb", smooth.GetMeshGL(), options2);
 #endif
