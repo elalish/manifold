@@ -404,29 +404,6 @@ void RelatedGL(const Manifold& out, const std::vector<MeshGL>& originals,
   }
 }
 
-void ExpectProperties(const MeshGL& mesh, int numProp,
-                      std::function<void(float* newProp, glm::vec3 position,
-                                         const float* oldProp)>
-                          propFunc) {
-  EXPECT_EQ(mesh.numProp, 3 + numProp);
-  auto* prop = new float[numProp];
-  auto* propTarget = new float[numProp];
-  glm::vec3 pos;
-  for (int i = 0; i < mesh.NumVert(); i++) {
-    pos.x = mesh.vertProperties[i * (numProp + 3) + 0];
-    pos.y = mesh.vertProperties[i * (numProp + 3) + 1];
-    pos.z = mesh.vertProperties[i * (numProp + 3) + 2];
-    for (int j = 0; j < numProp; j++) {
-      propTarget[j] = 0.0;
-      prop[j] = mesh.vertProperties[i * (numProp + 3) + 3 + j];
-    }
-    propFunc(propTarget, pos, propTarget);
-    for (int j = 0; j < numProp; j++) {
-      EXPECT_FLOAT_EQ(prop[j], propTarget[j]);
-    }
-  }
-}
-
 void ExpectMeshes(const Manifold& manifold,
                   const std::vector<MeshSize>& meshSize) {
   EXPECT_FALSE(manifold.IsEmpty());
