@@ -139,6 +139,10 @@ ManifoldManifold *manifold_mirror(void *mem, ManifoldManifold *m, float nx,
                                   float ny, float nz);
 ManifoldManifold *manifold_warp(void *mem, ManifoldManifold *m,
                                 ManifoldVec3 (*fun)(float, float, float));
+ManifoldManifold *manifold_warp_context(void *mem, ManifoldManifold *m,
+                                        ManifoldVec3 (*fun)(float, float, float,
+                                                            void *),
+                                        void *ctx);
 ManifoldManifold *manifold_smooth_by_normals(void *mem, ManifoldManifold *m,
                                              int normalIdx);
 ManifoldManifold *manifold_smooth_out(void *mem, ManifoldManifold *m,
@@ -190,6 +194,11 @@ uint32_t manifold_reserve_ids(uint32_t n);
 ManifoldManifold *manifold_set_properties(
     void *mem, ManifoldManifold *m, int num_prop,
     void (*fun)(float *new_prop, ManifoldVec3 position, const float *old_prop));
+ManifoldManifold *manifold_set_properties_context(
+    void *mem, ManifoldManifold *m, int num_prop,
+    void (*fun)(float *new_prop, ManifoldVec3 position, const float *old_prop,
+                void *ctx),
+    void *ctx);
 ManifoldManifold *manifold_calculate_curvature(void *mem, ManifoldManifold *m,
                                                int gaussian_idx, int mean_idx);
 float manifold_min_gap(ManifoldManifold *m, ManifoldManifold *other,
@@ -279,6 +288,9 @@ ManifoldCrossSection *manifold_cross_section_transform(void *mem,
                                                        float x3, float y3);
 ManifoldCrossSection *manifold_cross_section_warp(
     void *mem, ManifoldCrossSection *cs, ManifoldVec2 (*fun)(float, float));
+ManifoldCrossSection *manifold_cross_section_warp_context(
+    void *mem, ManifoldCrossSection *cs,
+    ManifoldVec2 (*fun)(float, float, void *), void *ctx);
 ManifoldCrossSection *manifold_cross_section_simplify(void *mem,
                                                       ManifoldCrossSection *cs,
                                                       double epsilon);

@@ -275,6 +275,21 @@ ManifoldManifold *manifold_warp(void *mem, ManifoldManifold *m,
   return to_c(new (mem) Manifold(warped));
 }
 
+ManifoldManifold *manifold_warp_context(void *mem, ManifoldManifold *m,
+                                        ManifoldVec3 (*fun)(float, float, float,
+                                                            void *),
+                                        void *ctx) {
+  // Bind function with context argument to one without
+  using namespace std::placeholders;
+  std::function<ManifoldVec3(float, float, float)> f3 =
+      std::bind(fun, _1, _2, _3, ctx);
+  std::function<void(glm::vec3 & v)> warp = [f3](glm::vec3 &v) {
+    v = from_c(f3(v.x, v.y, v.z));
+  };
+  auto warped = from_c(m)->Warp(warp);
+  return to_c(new (mem) Manifold(warped));
+}
+
 ManifoldMeshGL *manifold_level_set(void *mem, float (*sdf)(float, float, float),
                                    ManifoldBox *bounds, float edge_length,
                                    float level) {
@@ -545,6 +560,23 @@ ManifoldManifold *manifold_set_properties(void *mem, ManifoldManifold *m,
   std::function<void(float *, glm::vec3, const float *)> f =
       [fun](float *new_prop, glm::vec3 v, const float *old_prop) {
         fun(new_prop, to_c(v), old_prop);
+      };
+  auto man = from_c(m)->SetProperties(num_prop, f);
+  return to_c(new (mem) Manifold(man));
+};
+
+ManifoldManifold *manifold_set_properties_context(
+    void *mem, ManifoldManifold *m, int num_prop,
+    void (*fun)(float *new_prop, ManifoldVec3 position, const float *old_prop,
+                void *ctx),
+    void *ctx) {
+  // Bind function with context argument to one without
+  using namespace std::placeholders;
+  std::function<void(float *, ManifoldVec3, const float *)> f3 =
+      std::bind(fun, _1, _2, _3, ctx);
+  std::function<void(float *, glm::vec3, const float *)> f =
+      [f3](float *new_prop, glm::vec3 v, const float *old_prop) {
+        return (f3(new_prop, to_c(v), old_prop));
       };
   auto man = from_c(m)->SetProperties(num_prop, f);
   return to_c(new (mem) Manifold(man));
