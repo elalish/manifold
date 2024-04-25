@@ -60,9 +60,10 @@ float GetMinProperty(const MeshGL& mesh, int channel);
 void Identical(const Mesh& mesh1, const Mesh& mesh2);
 void RelatedGL(const Manifold& out, const std::vector<MeshGL>& originals,
                bool checkNormals = false, bool updateNormals = false);
-void ExpectProperties(const MeshGL& mesh, int numProp, std::function<void(float* newProp, glm::vec3 position,
-                                    const float* oldProp)>
-                     propFunc);
+void ExpectProperties(const MeshGL& mesh, int numProp,
+                      std::function<void(float* newProp, glm::vec3 position,
+                                         const float* oldProp)>
+                          propFunc);
 void ExpectMeshes(const Manifold& manifold,
                   const std::vector<MeshSize>& meshSize);
 void CheckNormals(const Manifold& manifold);
