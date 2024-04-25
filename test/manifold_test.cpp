@@ -357,12 +357,24 @@ TEST(Manifold, RefineQuads) {
   EXPECT_EQ(cylinder.NumTri(), 16892);
   auto prop = cylinder.GetProperties();
   EXPECT_NEAR(prop.volume, 2 * glm::pi<float>(), 0.003);
-  EXPECT_NEAR(prop.surfaceArea, 6 * glm::pi<float>(), 0.0003);
-  MeshGL out = cylinder.GetMeshGL();
+  EXPECT_NEAR(prop.surfaceArea, 6 * glm::pi<float>(), 0.004);
+  const MeshGL out = cylinder.GetMeshGL();
   CheckGL(out);
+
+  const MeshGL baseline = WithPositionColors(cylinder);
+  float maxDiff = 0;
+  for (int i = 0; i < out.vertProperties.size(); ++i) {
+    maxDiff = glm::max(
+        maxDiff, glm::abs(out.vertProperties[i] - baseline.vertProperties[i]));
+  }
+  // This has a wide tolerance because the triangle colors on the ends are still
+  // being stretched out into circular arcs, which introduces unavoidable error.
+  EXPECT_LE(maxDiff, 0.07);
 
 #ifdef MANIFOLD_EXPORT
   ExportOptions options2;
+  options2.mat.metalness = 0;
+  options2.mat.roughness = 0.5;
   options2.mat.colorChannels = {3, 4, 5, -1};
   if (options.exportModels) ExportMesh("refinedCylinder.glb", out, options2);
 #endif
@@ -372,8 +384,8 @@ TEST(Manifold, SmoothFlat) {
   Manifold cone = Manifold::Cylinder(5, 10, 5, 12).SmoothOut();
   Manifold smooth = cone.RefineToLength(0.1).CalculateNormals(0);
   auto prop = smooth.GetProperties();
-  EXPECT_NEAR(prop.volume, 1159.02, 0.01);
-  EXPECT_NEAR(prop.surfaceArea, 771.45, 0.01);
+  EXPECT_NEAR(prop.volume, 1142.9, 0.01);
+  EXPECT_NEAR(prop.surfaceArea, 764.28, 0.01);
   MeshGL out = smooth.GetMeshGL();
   CheckGL(out);
 
