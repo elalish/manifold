@@ -307,13 +307,13 @@ float GetMinProperty(const MeshGL& mesh, int channel) {
 
 void CheckFinite(const MeshGL& mesh) {
   for (float v : mesh.vertProperties) {
-    ASSERT_TRUE(isfinite(v));
+    ASSERT_TRUE(glm::isfinite(v));
   }
   for (float v : mesh.runTransform) {
-    ASSERT_TRUE(isfinite(v));
+    ASSERT_TRUE(glm::isfinite(v));
   }
   for (float v : mesh.halfedgeTangent) {
-    ASSERT_TRUE(isfinite(v));
+    ASSERT_TRUE(glm::isfinite(v));
   }
 }
 
