@@ -160,6 +160,32 @@ TEST(Manifold, Decompose) {
   RelatedGL(manifolds, input);
 }
 
+TEST(Manifold, DecomposeProps) {
+  auto posNorm = [](float* newProp, glm::vec3 pos,
+                           const float* oldProp) {
+    newProp[0] = hypotf(hypotf(pos.x, pos.y), pos.z);
+  };
+  std::vector<Manifold> manifoldList;
+  manifoldList.emplace_back(Manifold::Tetrahedron().SetProperties(1, posNorm));
+  manifoldList.emplace_back(Manifold::Cube().SetProperties(1, posNorm));
+  manifoldList.emplace_back(Manifold::Sphere(1, 4).SetProperties(1, posNorm));
+  Manifold manifolds = Manifold::Compose(manifoldList);
+
+  ExpectMeshes(manifolds, {{8, 12, 1}, {6, 8, 1}, {4, 4, 1}});
+  ExpectProperties(manifolds.GetMeshGL(), 1, posNorm);
+
+  std::vector<MeshGL> input;
+
+  for (const Manifold& manifold : manifoldList) {
+    EXPECT_GE(manifold.OriginalID(), 0);
+    auto mesh = manifold.GetMeshGL();
+    input.emplace_back(mesh);
+    ExpectProperties(mesh, 1, posNorm);
+  }
+
+  RelatedGL(manifolds, input);
+}
+
 /**
  * These tests check the various manifold constructors.
  */

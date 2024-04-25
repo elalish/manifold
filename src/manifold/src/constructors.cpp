@@ -509,7 +509,6 @@ std::vector<Manifold> Manifold::Decompose() const {
 
     impl->GatherFaces(*pImpl_, faceNew2Old);
     impl->ReindexVerts(vertNew2Old, pImpl_->NumVert());
-
     impl->Finish();
 
     meshes.push_back(Manifold(impl));
