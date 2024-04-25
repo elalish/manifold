@@ -84,9 +84,8 @@ struct SmoothBezier {
     const glm::vec3 edgeVec =
         impl->vertPos_[edge.endVert] - impl->vertPos_[edge.startVert];
     const glm::vec3 edgeNormal =
-        (impl->faceNormal_[edge.face] +
-         impl->faceNormal_[impl->halfedge_[edge.pairedHalfedge].face]) /
-        2.0f;
+        impl->faceNormal_[edge.face] +
+        impl->faceNormal_[impl->halfedge_[edge.pairedHalfedge].face];
     glm::vec3 dir =
         glm::cross(glm::cross(edgeNormal, edgeVec), vertNormal[edge.startVert]);
     tangent = CircularTangent(dir, edgeVec);
@@ -966,7 +965,7 @@ void Manifold::Impl::SetNormals(int normalIdx, float minSharpAngle) {
               group.push_back(normals.size() - 1);
               float dot = glm::dot(here.edgeVec, next.edgeVec);
               const float phi =
-                  dot >= 1 ? 0
+                  dot >= 1 ? kTolerance
                            : (dot <= -1 ? glm::pi<float>() : glm::acos(dot));
               normals.back() += faceNormal_[next.face] * phi;
             });
@@ -1012,6 +1011,35 @@ void Manifold::Impl::SetNormals(int normalIdx, float minSharpAngle) {
       }
     }
   }
+}
+
+/**
+ * Tangents get flattened to create sharp edges by setting their weight to zero.
+ * This is the natural limit of reducing the weight to increase the sharpness
+ * smoothly. This limit gives a decent shape, but it causes the parameterization
+ * to be stretched and compresses it near the edges, which is good for resolving
+ * tight curvature, but bad for property interpolation. This function fixes the
+ * parameter stretch at the limit for sharp edges, since there is no curvature
+ * to resolve. Note this also changes the overall shape - making it more evenly
+ * curved.
+ */
+void Manifold::Impl::LinearizeFlatTangents() {
+  const int n = halfedgeTangent_.size();
+  for_each_n(autoPolicy(n), zip(halfedgeTangent_.begin(), countAt(0)), n,
+             [this](thrust::tuple<glm::vec4&, int> inOut) {
+               glm::vec4& tangent = thrust::get<0>(inOut);
+               const int halfedge = thrust::get<1>(inOut);
+               if (tangent.w != 0) {
+                 return;
+               }
+
+               const glm::vec4 otherTangent =
+                   halfedgeTangent_[halfedge_[halfedge].pairedHalfedge];
+               glm::vec3 edge = vertPos_[halfedge_[halfedge].endVert] +
+                                glm::vec3(otherTangent) -
+                                vertPos_[halfedge_[halfedge].startVert];
+               tangent = glm::vec4(edge / 3.0f, 1);
+             });
 }
 
 /**
@@ -1094,6 +1122,7 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
       });
     }
   }
+  LinearizeFlatTangents();
 }
 
 /**
@@ -1207,6 +1236,7 @@ void Manifold::Impl::CreateTangents(std::vector<Smoothness> sharpenedEdges) {
       });
     }
   }
+  LinearizeFlatTangents();
 }
 
 /**
@@ -1517,6 +1547,7 @@ void Manifold::Impl::Refine(std::function<int(glm::vec3)> edgeDivisions) {
     // being non-coplanar, and hence not being related to the original faces.
     meshRelation_.originalID = ReserveIDs(1);
     InitializeOriginal();
+    CreateFaces();
   }
 
   halfedgeTangent_.resize(0);
