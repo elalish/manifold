@@ -305,6 +305,18 @@ float GetMinProperty(const MeshGL& mesh, int channel) {
   return min;
 }
 
+void CheckFinite(const MeshGL& mesh) {
+  for (float v : mesh.vertProperties) {
+    ASSERT_TRUE(isfinite(v));
+  }
+  for (float v : mesh.runTransform) {
+    ASSERT_TRUE(isfinite(v));
+  }
+  for (float v : mesh.halfedgeTangent) {
+    ASSERT_TRUE(isfinite(v));
+  }
+}
+
 void Identical(const Mesh& mesh1, const Mesh& mesh2) {
   ASSERT_EQ(mesh1.vertPos.size(), mesh2.vertPos.size());
   for (int i = 0; i < mesh1.vertPos.size(); ++i)
@@ -455,6 +467,7 @@ void CheckGL(const Manifold& manifold) {
     EXPECT_EQ(meshGL.runTransform.size(), 12 * meshGL.runOriginalID.size());
   }
   EXPECT_EQ(meshGL.faceID.size(), meshGL.NumTri());
+  CheckFinite(meshGL);
 }
 
 #ifdef MANIFOLD_EXPORT

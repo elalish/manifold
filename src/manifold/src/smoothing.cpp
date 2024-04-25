@@ -966,7 +966,7 @@ void Manifold::Impl::SetNormals(int normalIdx, float minSharpAngle) {
               group.push_back(normals.size() - 1);
               float dot = glm::dot(here.edgeVec, next.edgeVec);
               const float phi =
-                  dot >= 1 ? 0
+                  dot >= 1 ? kTolerance
                            : (dot <= -1 ? glm::pi<float>() : glm::acos(dot));
               normals.back() += faceNormal_[next.face] * phi;
             });

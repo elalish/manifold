@@ -358,12 +358,13 @@ TEST(Manifold, RefineQuads) {
   auto prop = cylinder.GetProperties();
   EXPECT_NEAR(prop.volume, 2 * glm::pi<float>(), 0.003);
   EXPECT_NEAR(prop.surfaceArea, 6 * glm::pi<float>(), 0.0003);
+  MeshGL out = cylinder.GetMeshGL();
+  CheckGL(out);
 
 #ifdef MANIFOLD_EXPORT
   ExportOptions options2;
   options2.mat.colorChannels = {3, 4, 5, -1};
-  if (options.exportModels)
-    ExportMesh("refinedCylinder.glb", cylinder.GetMeshGL(), options2);
+  if (options.exportModels) ExportMesh("refinedCylinder.glb", out, options2);
 #endif
 }
 
@@ -373,14 +374,15 @@ TEST(Manifold, SmoothFlat) {
   auto prop = smooth.GetProperties();
   EXPECT_NEAR(prop.volume, 1159.02, 0.01);
   EXPECT_NEAR(prop.surfaceArea, 771.45, 0.01);
+  MeshGL out = smooth.GetMeshGL();
+  CheckGL(out);
 
 #ifdef MANIFOLD_EXPORT
   ExportOptions options2;
   options2.faceted = false;
   options2.mat.normalChannels = {3, 4, 5};
   options2.mat.roughness = 0;
-  if (options.exportModels)
-    ExportMesh("smoothCone.glb", smooth.GetMeshGL(), options2);
+  if (options.exportModels) ExportMesh("smoothCone.glb", out, options2);
 #endif
 }
 
