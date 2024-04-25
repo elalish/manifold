@@ -350,17 +350,35 @@ TEST(Manifold, HullFail) {
 }
 #endif
 
+TEST(Manifold, RefineQuads) {
+  Manifold cylinder =
+      Manifold(WithPositionColors(Manifold::Cylinder(2, 1, -1, 12).SmoothOut()))
+          .RefineToLength(0.05);
+  EXPECT_EQ(cylinder.NumTri(), 16892);
+  auto prop = cylinder.GetProperties();
+  EXPECT_NEAR(prop.volume, 2 * glm::pi<float>(), 0.003);
+  EXPECT_NEAR(prop.surfaceArea, 6 * glm::pi<float>(), 0.0003);
+
+#ifdef MANIFOLD_EXPORT
+  ExportOptions options2;
+  options2.mat.colorChannels = {3, 4, 5, -1};
+  if (options.exportModels)
+    ExportMesh("refinedCylinder.glb", cylinder.GetMeshGL(), options2);
+#endif
+}
+
 TEST(Manifold, SmoothFlat) {
-  Manifold cone = Manifold::Cylinder(5, 10, 5).SmoothOut().CalculateNormals(0);
-  Manifold smooth = cone.RefineToLength(0.1);
+  Manifold cone = Manifold::Cylinder(5, 10, 5, 12).SmoothOut();
+  Manifold smooth = cone.RefineToLength(0.1).CalculateNormals(0);
   auto prop = smooth.GetProperties();
-  EXPECT_NEAR(prop.volume, 1157, 1);
-  EXPECT_NEAR(prop.surfaceArea, 779, 1);
+  EXPECT_NEAR(prop.volume, 1159.02, 0.01);
+  EXPECT_NEAR(prop.surfaceArea, 771.45, 0.01);
 
 #ifdef MANIFOLD_EXPORT
   ExportOptions options2;
   options2.faceted = false;
   options2.mat.normalChannels = {3, 4, 5};
+  options2.mat.roughness = 0;
   if (options.exportModels)
     ExportMesh("smoothCone.glb", smooth.GetMeshGL(), options2);
 #endif

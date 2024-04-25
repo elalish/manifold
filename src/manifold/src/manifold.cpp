@@ -681,7 +681,8 @@ Manifold Manifold::CalculateNormals(int normalIdx, float minSharpAngle) const {
  * Smooths out the Manifold by filling in the halfedgeTangent vectors. The
  * geometry will remain unchanged until Refine or RefineToLength is called to
  * interpolate the surface. This version uses the supplied vertex normal
- * properties to define the tangent vectors.
+ * properties to define the tangent vectors. Faces of two coplanar triangles
+ * will be marked as quads, while faces with three or more will be flat.
  *
  * @param normalIdx The first property channel of the normals. NumProp must be
  * at least normalIdx + 3. Any vertex where multiple normals exist and don't
@@ -699,7 +700,8 @@ Manifold Manifold::SmoothByNormals(int normalIdx) const {
  * Smooths out the Manifold by filling in the halfedgeTangent vectors. The
  * geometry will remain unchanged until Refine or RefineToLength is called to
  * interpolate the surface. This version uses the geometry of the triangles and
- * pseudo-normals to define the tangent vectors.
+ * pseudo-normals to define the tangent vectors. Faces of two coplanar triangles
+ * will be marked as quads.
  *
  * @param minSharpAngle degrees, default 60. Any edges with angles greater than
  * this value will remain sharp. The rest will be smoothed to G1 continuity,
@@ -722,11 +724,12 @@ Manifold Manifold::SmoothOut(float minSharpAngle, float minSmoothness) const {
 
 /**
  * Increase the density of the mesh by splitting every edge into n pieces. For
- * instance, with n = 2, each triangle will be split into 4 triangles. These
- * will all be coplanar (and will not be immediately collapsed) unless the
- * Mesh/Manifold has halfedgeTangents specified (e.g. from the Smooth()
- * constructor), in which case the new vertices will be moved to the
- * interpolated surface according to their barycentric coordinates.
+ * instance, with n = 2, each triangle will be split into 4 triangles. Quads
+ * will ignore their interior triangle bisector. These will all be coplanar (and
+ * will not be immediately collapsed) unless the Mesh/Manifold has
+ * halfedgeTangents specified (e.g. from the Smooth() constructor), in which
+ * case the new vertices will be moved to the interpolated surface according to
+ * their barycentric coordinates.
  *
  * @param n The number of pieces to split every edge into. Must be > 1.
  */
@@ -743,7 +746,8 @@ Manifold Manifold::Refine(int n) const {
  * roughly the input length. Interior verts are added to keep the rest of the
  * triangulation edges also of roughly the same length. If halfedgeTangents are
  * present (e.g. from the Smooth() constructor), the new vertices will be moved
- * to the interpolated surface according to their barycentric coordinates.
+ * to the interpolated surface according to their barycentric coordinates. Quads
+ * will ignore their interior triangle bisector.
  *
  * @param length The length that edges will be broken down to.
  */

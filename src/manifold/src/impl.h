@@ -42,6 +42,9 @@ struct Manifold::Impl {
     Vec<TriRef> triRef;
     Vec<glm::ivec3> triProperties;
   };
+  struct BaryIndices {
+    int tri, start4, end4;
+  };
 
   Box bBox_;
   float precision_ = -1;
@@ -161,7 +164,13 @@ struct Manifold::Impl {
   void SplitPinchedVerts();
 
   // smoothing.cu
+  bool IsInsideQuad(int halfedge) const;
+  bool IsMarkedInsideQuad(int halfedge) const;
   glm::vec3 GetNormal(int halfedge, int normalIdx) const;
+  int GetNeighbor(int tri) const;
+  glm::ivec4 GetHalfedges(int tri) const;
+  BaryIndices GetIndices(int halfedge) const;
+  void FillRetainedVerts(Vec<Barycentric>& vertBary) const;
   std::vector<Smoothness> UpdateSharpenedEdges(
       const std::vector<Smoothness>&) const;
   Vec<bool> FlatFaces() const;
