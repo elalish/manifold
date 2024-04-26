@@ -360,6 +360,17 @@ std::vector<Smoothness> Manifold::Impl::SharpenEdges(
 }
 
 /**
+ * Sharpen tangents that intersect an edge to sharpen that edge. The weight is
+ * unchanged, as this has a squared effect on radius of curvature, except
+ * in the case of zero radius, which is marked with weight = 0.
+ */
+void Manifold::Impl::SharpenTangent(int halfedge, float smoothness) {
+  halfedgeTangent_[halfedge] =
+      glm::vec4(smoothness * glm::vec3(halfedgeTangent_[halfedge]),
+                smoothness == 0 ? 0 : halfedgeTangent_[halfedge].w);
+}
+
+/**
  * Instead of calculating the internal shared normals like CalculateNormals
  * does, this method fills in vertex properties, unshared across edges that
  * are bent more than minSharpAngle.
@@ -638,13 +649,13 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
       ForVert(first, [this, first, second](int current) {
         if (current != first && current != second &&
             !IsMarkedInsideQuad(current)) {
-          halfedgeTangent_[current] = glm::vec4(0);
+          SharpenTangent(current, 0);
         }
       });
     } else {  // Sharpen vertex uniformly
       ForVert(first, [this](int current) {
         if (!IsMarkedInsideQuad(current)) {
-          halfedgeTangent_[current] = glm::vec4(0);
+          SharpenTangent(current, 0);
         }
       });
     }
@@ -745,7 +756,7 @@ void Manifold::Impl::CreateTangents(std::vector<Smoothness> sharpenedEdges) {
           smoothness =
               (vert[1].second.smoothness + vert[0].first.smoothness) / 2;
         } else if (current != first && !IsMarkedInsideQuad(current)) {
-          halfedgeTangent_[current] = smoothness * halfedgeTangent_[current];
+          SharpenTangent(current, smoothness);
         }
       });
     } else {  // Sharpen vertex uniformly
@@ -758,7 +769,7 @@ void Manifold::Impl::CreateTangents(std::vector<Smoothness> sharpenedEdges) {
 
       ForVert(vert[0].first.halfedge, [this, smoothness](int current) {
         if (!IsMarkedInsideQuad(current)) {
-          halfedgeTangent_[current] = smoothness * halfedgeTangent_[current];
+          SharpenTangent(current, smoothness);
         }
       });
     }
