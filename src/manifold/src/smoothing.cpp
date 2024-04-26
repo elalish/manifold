@@ -113,7 +113,8 @@ struct InterpTri {
   glm::mat2x4 Bezier2Bezier(const glm::mat2x3& corners,
                             const glm::mat2x4& tangentsX,
                             const glm::mat2x4& tangentsY, float x,
-                            const glm::bvec2& pointedEnds) const {
+                            const glm::bvec2& pointedEnds,
+                            const glm::vec3& anchor) const {
     const glm::mat2x4 bez = CubicBezier2Linear(
         Homogeneous(corners[0]), Bezier(corners[0], tangentsX[0]),
         Bezier(corners[1], tangentsX[1]), Homogeneous(corners[1]), x);
@@ -123,8 +124,12 @@ struct InterpTri {
     const glm::mat2x3 nTangentsX(SafeNormalize(glm::vec3(tangentsX[0])),
                                  -SafeNormalize(glm::vec3(tangentsX[1])));
     const glm::mat2x3 biTangents = {
-        SafeNormalize(OrthogonalTo(glm::vec3(tangentsY[0]), nTangentsX[0])),
-        SafeNormalize(OrthogonalTo(glm::vec3(tangentsY[1]), nTangentsX[1]))};
+        SafeNormalize(OrthogonalTo(
+            glm::vec3(tangentsY[0]) + kTolerance * (anchor - corners[0]),
+            nTangentsX[0])),
+        SafeNormalize(OrthogonalTo(
+            glm::vec3(tangentsY[1]) + kTolerance * (anchor - corners[1]),
+            nTangentsX[1]))};
 
     const glm::quat q0 =
         glm::quat_cast(glm::mat3(nTangentsX[0], biTangents[0],
@@ -150,12 +155,13 @@ struct InterpTri {
 
   glm::vec3 Bezier2D(const glm::mat4x3& corners, const glm::mat4& tangentsX,
                      const glm::mat4& tangentsY, float x, float y) const {
-    glm::mat2x4 bez0 =
-        Bezier2Bezier({corners[0], corners[1]}, {tangentsX[0], tangentsX[1]},
-                      {tangentsY[0], tangentsY[1]}, x, {false, false});
-    glm::mat2x4 bez1 =
-        Bezier2Bezier({corners[2], corners[3]}, {tangentsX[2], tangentsX[3]},
-                      {tangentsY[2], tangentsY[3]}, 1 - x, {false, false});
+    const glm::vec3 centroid = corners * glm::vec4(0.25);
+    glm::mat2x4 bez0 = Bezier2Bezier(
+        {corners[0], corners[1]}, {tangentsX[0], tangentsX[1]},
+        {tangentsY[0], tangentsY[1]}, x, {false, false}, centroid);
+    glm::mat2x4 bez1 = Bezier2Bezier(
+        {corners[2], corners[3]}, {tangentsX[2], tangentsX[3]},
+        {tangentsY[2], tangentsY[3]}, 1 - x, {false, false}, centroid);
 
     const glm::mat2x4 bez =
         CubicBezier2Linear(bez0[0], bez0[1], bez1[1], bez1[0], y);
@@ -193,6 +199,7 @@ struct InterpTri {
           impl->halfedgeTangent_[impl->halfedge_[halfedges[2]].pairedHalfedge],
           impl->halfedgeTangent_[impl->halfedge_[halfedges[0]].pairedHalfedge],
           impl->halfedgeTangent_[impl->halfedge_[halfedges[1]].pairedHalfedge]};
+      const glm::vec3 centroid = glm::mat3(corners) * glm::vec3(1.0f / 3);
 
       for (const int i : {0, 1, 2}) {
         const int j = Next3(i);
@@ -201,10 +208,10 @@ struct InterpTri {
 
         const glm::mat2x4 bezJ = Bezier2Bezier(
             {corners[i], corners[j]}, {tangentR[i], tangentL[j]},
-            {tangentL[i], tangentR[j]}, 1 - uvw[i], {true, false});
-        const glm::mat2x4 bezK =
-            Bezier2Bezier({corners[k], corners[i]}, {tangentR[k], tangentL[i]},
-                          {tangentL[k], tangentR[i]}, uvw[i], {false, true});
+            {tangentL[i], tangentR[j]}, 1 - uvw[i], {true, false}, centroid);
+        const glm::mat2x4 bezK = Bezier2Bezier(
+            {corners[k], corners[i]}, {tangentR[k], tangentL[i]},
+            {tangentL[k], tangentR[i]}, uvw[i], {false, true}, centroid);
 
         const glm::mat2x4 bez =
             CubicBezier2Linear(bezJ[0], bezJ[1], bezK[1], bezK[0], x);
