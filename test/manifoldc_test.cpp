@@ -143,11 +143,13 @@ TEST(CBIND, level_set) {
   float a = context[0] * context[1];
   float b = context[0] * context[2];
   float c = context[0] * context[3];
-  float s =
-      4.0f * M_PI *
-      powf(((powf(a * b, 1.6) + powf(a * c, 1.6) + powf(b * c, 1.6)) / 3.0f),
-           1.0f / 1.6f);
-  float v = 4.0f * M_PI / 3.0f * a * b * c;
+  float s = 4.0f * glm::pi<float>() *
+            glm::pow<float>(
+                ((glm::pow<float>(a * b, 1.6f) + glm::pow<float>(a * c, 1.6f) +
+                  glm::pow<float>(b * c, 1.6f)) /
+                 3.0f),
+                1.0f / 1.6f);
+  float v = 4.0f * glm::pi<float>() / 3.0f * a * b * c;
 
   // Numerical calculations for volume and surface area
   ManifoldProperties sdf_props = manifold_get_properties(sdf_man);
@@ -173,7 +175,10 @@ TEST(CBIND, properties) {
   void (*props)(float *, ManifoldVec3, const float *,
                 void *) = [](float *new_prop, ManifoldVec3 position,
                              const float *old_prop, void *ctx) {
-    new_prop[0] = hypotf(position.x, hypot(position.y, position.z)) * 5.0f;
+    new_prop[0] =
+        glm::sqrt(glm::sqrt(position.x * position.x + position.y * position.y) +
+                  position.z * position.z) *
+        5.0f;
   };
   float *context = (float *)malloc(1 * sizeof(float));
   context[0] = 5.0f;
@@ -181,7 +186,9 @@ TEST(CBIND, properties) {
                        void *) = [](float *new_prop, ManifoldVec3 position,
                                     const float *old_prop, void *ctx) {
     new_prop[0] =
-        hypotf(position.x, hypot(position.y, position.z)) * ((float *)ctx)[0];
+        glm::sqrt(glm::sqrt(position.x * position.x + position.y * position.y) +
+                  position.z * position.z) *
+        ((float *)ctx)[0];
   };
 
   ManifoldManifold *cube =
