@@ -182,15 +182,6 @@ ManifoldCrossSection *manifold_cross_section_transform(void *mem,
 }
 
 ManifoldCrossSection *manifold_cross_section_warp(
-    void *mem, ManifoldCrossSection *cs, ManifoldVec2 (*fun)(float, float)) {
-  std::function<void(glm::vec2 & v)> warp = [fun](glm::vec2 &v) {
-    v = from_c(fun(v.x, v.y));
-  };
-  auto warped = from_c(cs)->Warp(warp);
-  return to_c(new (mem) CrossSection(warped));
-}
-
-ManifoldCrossSection *manifold_cross_section_warp_context(
     void *mem, ManifoldCrossSection *cs,
     ManifoldVec2 (*fun)(float, float, void *), void *ctx) {
   // Bind function with context argument to one without

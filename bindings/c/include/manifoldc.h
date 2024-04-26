@@ -59,20 +59,10 @@ ManifoldMeshGL *manifold_meshgl_copy(void *mem, ManifoldMeshGL *m);
 // using these bindings from a language that has a runtime lock preventing the
 // parallel execution of closures, then you should use manifold_level_set_seq to
 // force sequential execution.
-ManifoldMeshGL *manifold_level_set(void *mem, float (*sdf)(float, float, float),
-                                   ManifoldBox *bounds, float edge_length,
-                                   float level);
-ManifoldMeshGL *manifold_level_set_seq(void *mem,
-                                       float (*sdf)(float, float, float),
-                                       ManifoldBox *bounds, float edge_length,
-                                       float level);
-// The _context variants of manifold_level_set allow a pointer to be passed
-// back to each invocation of the sdf function pointer, for languages that
-// need additional data.
-ManifoldMeshGL *manifold_level_set_context(
+ManifoldMeshGL *manifold_level_set(
     void *mem, float (*sdf)(float, float, float, void *), ManifoldBox *bounds,
     float edge_length, float level, void *ctx);
-ManifoldMeshGL *manifold_level_set_seq_context(
+ManifoldMeshGL *manifold_level_set_seq(
     void *mem, float (*sdf)(float, float, float, void *), ManifoldBox *bounds,
     float edge_length, float level, void *ctx);
 
@@ -138,8 +128,6 @@ ManifoldManifold *manifold_transform(void *mem, ManifoldManifold *m, float x1,
 ManifoldManifold *manifold_mirror(void *mem, ManifoldManifold *m, float nx,
                                   float ny, float nz);
 ManifoldManifold *manifold_warp(void *mem, ManifoldManifold *m,
-                                ManifoldVec3 (*fun)(float, float, float));
-ManifoldManifold *manifold_warp_context(void *mem, ManifoldManifold *m,
                                         ManifoldVec3 (*fun)(float, float, float,
                                                             void *),
                                         void *ctx);
@@ -192,9 +180,6 @@ int manifold_get_circular_segments(float radius);
 int manifold_original_id(ManifoldManifold *m);
 uint32_t manifold_reserve_ids(uint32_t n);
 ManifoldManifold *manifold_set_properties(
-    void *mem, ManifoldManifold *m, int num_prop,
-    void (*fun)(float *new_prop, ManifoldVec3 position, const float *old_prop));
-ManifoldManifold *manifold_set_properties_context(
     void *mem, ManifoldManifold *m, int num_prop,
     void (*fun)(float *new_prop, ManifoldVec3 position, const float *old_prop,
                 void *ctx),
