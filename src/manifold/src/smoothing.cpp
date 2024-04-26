@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <glm/gtx/quaternion.hpp>
+
 #include "impl.h"
 #include "par.h"
 
@@ -104,24 +106,43 @@ struct InterpTri {
     return glm::normalize(HNormalize(points[1]) - HNormalize(points[0]));
   }
 
+  glm::vec3 RotateFromTo(glm::vec3 v, glm::quat start, glm::quat end) const {
+    return end * glm::conjugate(start) * v;
+  }
+
   glm::mat2x4 Bezier2Bezier(const glm::mat2x3& corners,
                             const glm::mat2x4& tangentsX,
-                            const glm::mat2x4& tangentsY, float x) const {
+                            const glm::mat2x4& tangentsY, float x,
+                            const glm::bvec2& pointedEnds) const {
     const glm::mat2x4 bez = CubicBezier2Linear(
         Homogeneous(corners[0]), Bezier(corners[0], tangentsX[0]),
         Bezier(corners[1], tangentsX[1]), Homogeneous(corners[1]), x);
     const glm::vec3 end = BezierPoint(bez, x);
     const glm::vec3 tangent = BezierTangent(bez);
 
+    const glm::mat2x3 nTangentsX(SafeNormalize(glm::vec3(tangentsX[0])),
+                                 -SafeNormalize(glm::vec3(tangentsX[1])));
     const glm::mat2x3 biTangents = {
-        SafeNormalize(OrthogonalTo(glm::vec3(tangentsY[0]),
-                                   SafeNormalize(glm::vec3(tangentsX[0])))),
-        SafeNormalize(OrthogonalTo(glm::vec3(tangentsY[1]),
-                                   -SafeNormalize(glm::vec3(tangentsX[1]))))};
-    const glm::vec3 normal = SafeNormalize(
-        glm::cross(glm::mix(biTangents[0], biTangents[1], x), tangent));
-    const glm::vec3 delta = OrthogonalTo(
-        glm::mix(glm::vec3(tangentsY[0]), glm::vec3(tangentsY[1]), x), normal);
+        SafeNormalize(OrthogonalTo(glm::vec3(tangentsY[0]), nTangentsX[0])),
+        SafeNormalize(OrthogonalTo(glm::vec3(tangentsY[1]), nTangentsX[1]))};
+
+    const glm::quat q0 =
+        glm::quat_cast(glm::mat3(nTangentsX[0], biTangents[0],
+                                 glm::cross(nTangentsX[0], biTangents[0])));
+    const glm::quat q1 =
+        glm::quat_cast(glm::mat3(nTangentsX[1], biTangents[1],
+                                 glm::cross(nTangentsX[1], biTangents[1])));
+    const glm::quat qTmp = glm::slerp(q0, q1, x);
+    const glm::quat q =
+        glm::rotation(qTmp * glm::vec3(1, 0, 0), tangent) * qTmp;
+
+    const glm::vec3 end0 = pointedEnds[0]
+                               ? glm::vec3(0)
+                               : RotateFromTo(glm::vec3(tangentsY[0]), q0, q);
+    const glm::vec3 end1 = pointedEnds[1]
+                               ? glm::vec3(0)
+                               : RotateFromTo(glm::vec3(tangentsY[1]), q1, q);
+    const glm::vec3 delta = glm::mix(end0, end1, x);
     const float deltaW = glm::mix(tangentsY[0].w, tangentsY[1].w, x);
 
     return {Homogeneous(end), Homogeneous(glm::vec4(end + delta, deltaW))};
@@ -131,10 +152,10 @@ struct InterpTri {
                      const glm::mat4& tangentsY, float x, float y) const {
     glm::mat2x4 bez0 =
         Bezier2Bezier({corners[0], corners[1]}, {tangentsX[0], tangentsX[1]},
-                      {tangentsY[0], tangentsY[1]}, x);
+                      {tangentsY[0], tangentsY[1]}, x, {false, false});
     glm::mat2x4 bez1 =
         Bezier2Bezier({corners[2], corners[3]}, {tangentsX[2], tangentsX[3]},
-                      {tangentsY[2], tangentsY[3]}, 1 - x);
+                      {tangentsY[2], tangentsY[3]}, 1 - x, {false, false});
 
     const glm::mat2x4 bez =
         CubicBezier2Linear(bez0[0], bez0[1], bez1[1], bez1[0], y);
@@ -176,20 +197,18 @@ struct InterpTri {
       for (const int i : {0, 1, 2}) {
         const int j = (i + 1) % 3;
         const int k = (i + 2) % 3;
-        const float x = uvw[k] / (1 - uvw[i]);
 
-        const glm::mat2x4 bez =
-            Bezier2Bezier({corners[j], corners[k]}, {tangentR[j], tangentL[k]},
-                          {tangentL[j], tangentR[k]}, x);
+        const glm::mat2x4 bezJ = Bezier2Bezier(
+            {corners[i], corners[j]}, {tangentR[i], tangentL[j]},
+            {tangentL[i], tangentR[j]}, 1 - uvw[i], {true, false});
+        const glm::mat2x4 bezK =
+            Bezier2Bezier({corners[k], corners[i]}, {tangentR[k], tangentL[i]},
+                          {tangentL[k], tangentR[i]}, uvw[i], {false, true});
 
-        const glm::mat2x4 bez1 = CubicBezier2Linear(
-            bez[0], bez[1],
-            // Homogeneous(end), Homogeneous(glm::vec4(end + delta, deltaW)),
-            Bezier(corners[i], glm::mix(tangentR[i], tangentL[i], x)),
-            Homogeneous(corners[i]), uvw[i]);
-        const glm::vec3 p = BezierPoint(bez1, uvw[i]);
-        float w = uvw[j] * uvw[j] * uvw[k] * uvw[k];
-        posH += Homogeneous(glm::vec4(p, w));
+        const glm::mat2x4 bez = CubicBezier2Linear(
+            bezJ[0], bezJ[1], bezK[1], bezK[0], uvw[k] / (1 - uvw[j]));
+        const glm::vec3 p = BezierPoint(bez, uvw[i]);
+        posH += Homogeneous(glm::vec4(p, uvw[i]));
       }
     } else {  // quad
       const glm::mat4 tangentsX = {
