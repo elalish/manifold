@@ -144,10 +144,10 @@ TEST(CBIND, level_set) {
   float b = context[0] * context[2];
   float c = context[0] * context[3];
   float s =
-      4.0f * M_PIf *
+      4.0f * M_PI *
       powf(((powf(a * b, 1.6) + powf(a * c, 1.6) + powf(b * c, 1.6)) / 3.0f),
            1.0f / 1.6f);
-  float v = 4.0f * M_PIf / 3.0f * a * b * c;
+  float v = 4.0f * M_PI / 3.0f * a * b * c;
 
   // Numerical calculations for volume and surface area
   ManifoldProperties sdf_props = manifold_get_properties(sdf_man);
