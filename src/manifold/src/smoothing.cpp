@@ -195,8 +195,9 @@ struct InterpTri {
           impl->halfedgeTangent_[impl->halfedge_[halfedges[1]].pairedHalfedge]};
 
       for (const int i : {0, 1, 2}) {
-        const int j = (i + 1) % 3;
-        const int k = (i + 2) % 3;
+        const int j = Next3(i);
+        const int k = Prev3(i);
+        const float x = uvw[k] / (1 - uvw[i]);
 
         const glm::mat2x4 bezJ = Bezier2Bezier(
             {corners[i], corners[j]}, {tangentR[i], tangentL[j]},
@@ -205,10 +206,10 @@ struct InterpTri {
             Bezier2Bezier({corners[k], corners[i]}, {tangentR[k], tangentL[i]},
                           {tangentL[k], tangentR[i]}, uvw[i], {false, true});
 
-        const glm::mat2x4 bez = CubicBezier2Linear(
-            bezJ[0], bezJ[1], bezK[1], bezK[0], uvw[k] / (1 - uvw[j]));
-        const glm::vec3 p = BezierPoint(bez, uvw[i]);
-        posH += Homogeneous(glm::vec4(p, uvw[i]));
+        const glm::mat2x4 bez =
+            CubicBezier2Linear(bezJ[0], bezJ[1], bezK[1], bezK[0], x);
+        const glm::vec3 p = BezierPoint(bez, x);
+        posH += Homogeneous(glm::vec4(p, uvw[i] * uvw[i]));
       }
     } else {  // quad
       const glm::mat4 tangentsX = {
