@@ -161,7 +161,8 @@ TEST(Manifold, Decompose) {
 }
 
 TEST(Manifold, DecomposeProps) {
-  auto posNorm = [](float* newProp, glm::vec3 pos, const float* oldProp) {
+  auto posNorm = [](float* newProp, glm::vec3 pos,
+                           const float* oldProp) {
     newProp[0] = hypotf(hypotf(pos.x, pos.y), pos.z);
   };
   std::vector<Manifold> manifoldList;
