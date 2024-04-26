@@ -35,9 +35,10 @@
 using namespace manifold;
 
 namespace {
-ManifoldMeshGL *level_set(
-    void *mem, float (*sdf_context)(float, float, float, void *),
-    ManifoldBox *bounds, float edge_length, float level, bool seq, void *ctx) {
+ManifoldMeshGL *level_set(void *mem,
+                          float (*sdf_context)(float, float, float, void *),
+                          ManifoldBox *bounds, float edge_length, float level,
+                          bool seq, void *ctx) {
   // Bind function with context argument to one without
   using namespace std::placeholders;
   std::function<float(float, float, float)> sdf =
@@ -258,9 +259,9 @@ ManifoldManifold *manifold_mirror(void *mem, ManifoldManifold *m, float nx,
 }
 
 ManifoldManifold *manifold_warp(void *mem, ManifoldManifold *m,
-                                        ManifoldVec3 (*fun)(float, float, float,
-                                                            void *),
-                                        void *ctx) {
+                                ManifoldVec3 (*fun)(float, float, float,
+                                                    void *),
+                                void *ctx) {
   // Bind function with context argument to one without
   using namespace std::placeholders;
   std::function<ManifoldVec3(float, float, float)> f3 =
@@ -272,9 +273,10 @@ ManifoldManifold *manifold_warp(void *mem, ManifoldManifold *m,
   return to_c(new (mem) Manifold(warped));
 }
 
-ManifoldMeshGL *manifold_level_set(
-    void *mem, float (*sdf)(float, float, float, void *), ManifoldBox *bounds,
-    float edge_length, float level, void *ctx) {
+ManifoldMeshGL *manifold_level_set(void *mem,
+                                   float (*sdf)(float, float, float, void *),
+                                   ManifoldBox *bounds, float edge_length,
+                                   float level, void *ctx) {
   return level_set(mem, sdf, bounds, edge_length, level, false, ctx);
 }
 

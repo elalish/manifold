@@ -46,10 +46,14 @@ TEST(CBIND, warp_translation) {
   EXPECT_NEAR(props.volume, 0, 0.0001);
   EXPECT_NEAR(propscontext.volume, 0, 0.0001);
 
-  ManifoldBox *sphere_bounds = manifold_bounding_box(malloc(manifold_box_size()), sphere);
-  ManifoldBox *trans_bounds = manifold_bounding_box(malloc(manifold_box_size()), trans);
-  ManifoldBox *warped_bounds = manifold_bounding_box(malloc(manifold_box_size()), warped);
-  ManifoldBox *warped_context_bounds = manifold_bounding_box(malloc(manifold_box_size()), warpedcontext);
+  ManifoldBox *sphere_bounds =
+      manifold_bounding_box(malloc(manifold_box_size()), sphere);
+  ManifoldBox *trans_bounds =
+      manifold_bounding_box(malloc(manifold_box_size()), trans);
+  ManifoldBox *warped_bounds =
+      manifold_bounding_box(malloc(manifold_box_size()), warped);
+  ManifoldBox *warped_context_bounds =
+      manifold_bounding_box(malloc(manifold_box_size()), warpedcontext);
 
   ManifoldVec3 sphere_dims = manifold_box_dimensions(sphere_bounds);
   ManifoldVec3 trans_dims = manifold_box_dimensions(sphere_bounds);

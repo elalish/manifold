@@ -59,9 +59,10 @@ ManifoldMeshGL *manifold_meshgl_copy(void *mem, ManifoldMeshGL *m);
 // using these bindings from a language that has a runtime lock preventing the
 // parallel execution of closures, then you should use manifold_level_set_seq to
 // force sequential execution.
-ManifoldMeshGL *manifold_level_set(
-    void *mem, float (*sdf)(float, float, float, void *), ManifoldBox *bounds,
-    float edge_length, float level, void *ctx);
+ManifoldMeshGL *manifold_level_set(void *mem,
+                                   float (*sdf)(float, float, float, void *),
+                                   ManifoldBox *bounds, float edge_length,
+                                   float level, void *ctx);
 ManifoldMeshGL *manifold_level_set_seq(
     void *mem, float (*sdf)(float, float, float, void *), ManifoldBox *bounds,
     float edge_length, float level, void *ctx);
@@ -128,9 +129,9 @@ ManifoldManifold *manifold_transform(void *mem, ManifoldManifold *m, float x1,
 ManifoldManifold *manifold_mirror(void *mem, ManifoldManifold *m, float nx,
                                   float ny, float nz);
 ManifoldManifold *manifold_warp(void *mem, ManifoldManifold *m,
-                                        ManifoldVec3 (*fun)(float, float, float,
-                                                            void *),
-                                        void *ctx);
+                                ManifoldVec3 (*fun)(float, float, float,
+                                                    void *),
+                                void *ctx);
 ManifoldManifold *manifold_smooth_by_normals(void *mem, ManifoldManifold *m,
                                              int normalIdx);
 ManifoldManifold *manifold_smooth_out(void *mem, ManifoldManifold *m,
