@@ -144,11 +144,11 @@ TEST(CBIND, level_set) {
   float b = context[0] * context[2];
   float c = context[0] * context[3];
   float s = 4.0f * glm::pi<float>() *
-            glm::pow<float>(
-                ((glm::pow<float>(a * b, 1.6f) + glm::pow<float>(a * c, 1.6f) +
-                  glm::pow<float>(b * c, 1.6f)) /
-                 3.0f),
-                1.0f / 1.6f);
+            glm::pow<float, float>(((glm::pow<float, float>(a * b, 1.6f) +
+                                     glm::pow<float, float>(a * c, 1.6f) +
+                                     glm::pow<float, float>(b * c, 1.6f)) /
+                                    3.0f),
+                                   1.0f / 1.6f);
   float v = 4.0f * glm::pi<float>() / 3.0f * a * b * c;
 
   // Numerical calculations for volume and surface area
