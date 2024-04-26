@@ -464,7 +464,6 @@ void Manifold::Impl::GatherFaces(const Impl& old, const Vec<int>& faceNew2Old) {
     gather(policy, faceNew2Old.begin(), faceNew2Old.end(),
            old.meshRelation_.triProperties.begin(),
            meshRelation_.triProperties.begin());
-    meshRelation_.numProp = old.meshRelation_.numProp;
     meshRelation_.properties = old.meshRelation_.properties;
   }
 
