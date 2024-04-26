@@ -12,7 +12,7 @@
       "program": "${workspaceFolder}/build/test/manifold_test",
       "args": [
         "--gtest_break_on_failure",
-        "--gtest_filter=Manifold.HullFail"
+        "--gtest_filter=Manifold.RefineQuads"
       ],
       "stopAtEntry": false,
       "cwd": "${workspaceFolder}/build/test",

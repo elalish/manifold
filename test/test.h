@@ -51,12 +51,13 @@ Mesh Gyroid();
 Mesh Tet();
 MeshGL TetGL();
 MeshGL CubeSTL();
+MeshGL CubeUV();
 MeshGL WithIndexColors(const Mesh& in);
 MeshGL WithPositionColors(const Manifold& in);
 MeshGL WithNormals(const Manifold& in);
-MeshGL CubeUV();
 float GetMaxProperty(const MeshGL& mesh, int channel);
 float GetMinProperty(const MeshGL& mesh, int channel);
+void CheckFinite(const MeshGL& mesh);
 void Identical(const Mesh& mesh1, const Mesh& mesh2);
 void RelatedGL(const Manifold& out, const std::vector<MeshGL>& originals,
                bool checkNormals = false, bool updateNormals = false);
