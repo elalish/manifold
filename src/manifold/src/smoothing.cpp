@@ -83,7 +83,9 @@ struct InterpTri {
 
   glm::vec4 Homogeneous(glm::vec3 v) const { return glm::vec4(v, 1.0f); }
 
-  glm::vec3 HNormalize(glm::vec4 v) const { return glm::vec3(v) / v.w; }
+  glm::vec3 HNormalize(glm::vec4 v) const {
+    return v.w == 0 ? v : (glm::vec3(v) / v.w);
+  }
 
   glm::vec4 Bezier(glm::vec3 point, glm::vec4 tangent) const {
     return Homogeneous(glm::vec4(point, 0) + tangent);
@@ -103,7 +105,7 @@ struct InterpTri {
   }
 
   glm::vec3 BezierTangent(glm::mat2x4 points) const {
-    return glm::normalize(HNormalize(points[1]) - HNormalize(points[0]));
+    return SafeNormalize(HNormalize(points[1]) - HNormalize(points[0]));
   }
 
   glm::vec3 RotateFromTo(glm::vec3 v, glm::quat start, glm::quat end) const {

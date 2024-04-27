@@ -119,7 +119,7 @@ TEST(SDF, SineSurface) {
         return (p.z > mid - 0.5 && p.z < mid + 0.5) ? 1 : 0;
       },
       {glm::vec3(-4 * glm::pi<float>()), glm::vec3(4 * glm::pi<float>())}, 1));
-  Manifold smoothed = Manifold::Smooth(surface).Refine(2);
+  Manifold smoothed = Manifold::Smooth(surface).Refine(8);
 
   EXPECT_EQ(smoothed.Status(), Manifold::Error::NoError);
   EXPECT_EQ(smoothed.Genus(), -2);
