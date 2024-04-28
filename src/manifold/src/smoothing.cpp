@@ -592,21 +592,31 @@ void Manifold::Impl::SetNormals(int normalIdx, float minSharpAngle) {
  */
 void Manifold::Impl::LinearizeFlatTangents() {
   const int n = halfedgeTangent_.size();
-  for_each_n(autoPolicy(n), zip(halfedgeTangent_.begin(), countAt(0)), n,
-             [this](thrust::tuple<glm::vec4&, int> inOut) {
-               glm::vec4& tangent = thrust::get<0>(inOut);
-               const int halfedge = thrust::get<1>(inOut);
-               if (tangent.w != 0) {
-                 return;
-               }
+  for_each_n(
+      autoPolicy(n), zip(halfedgeTangent_.begin(), countAt(0)), n,
+      [this](thrust::tuple<glm::vec4&, int> inOut) {
+        glm::vec4& tangent = thrust::get<0>(inOut);
+        const int halfedge = thrust::get<1>(inOut);
+        glm::vec4& otherTangent =
+            halfedgeTangent_[halfedge_[halfedge].pairedHalfedge];
 
-               const glm::vec4 otherTangent =
-                   halfedgeTangent_[halfedge_[halfedge].pairedHalfedge];
-               glm::vec3 edge = vertPos_[halfedge_[halfedge].endVert] +
-                                glm::vec3(otherTangent) -
-                                vertPos_[halfedge_[halfedge].startVert];
-               tangent = glm::vec4(edge / 3.0f, 1);
-             });
+        const glm::bvec2 flat(tangent.w == 0, otherTangent.w == 0);
+        if (!halfedge_[halfedge].IsForward() || (!flat[0] && !flat[1])) {
+          return;
+        }
+
+        const glm::vec3 edgeVec = vertPos_[halfedge_[halfedge].endVert] -
+                                  vertPos_[halfedge_[halfedge].startVert];
+
+        if (flat[0] && flat[1]) {
+          tangent = glm::vec4(edgeVec / 3.0f, 1);
+          otherTangent = glm::vec4(-edgeVec / 3.0f, 1);
+        } else if (flat[0]) {
+          tangent = glm::vec4((edgeVec + glm::vec3(otherTangent)) / 2.0f, 1);
+        } else {
+          otherTangent = glm::vec4((-edgeVec + glm::vec3(tangent)) / 2.0f, 1);
+        }
+      });
 }
 
 /**
@@ -629,7 +639,7 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
   for (int e = 0; e < numHalfedge; ++e) {
     const int vert = halfedge_[e].startVert;
     auto& sharpHalfedge = vertSharpHalfedge[vert];
-    if (sharpHalfedge[0] >= 0 && sharpHalfedge[1] >= 0) continue;
+    if (sharpHalfedge[0] >= 0 || sharpHalfedge[1] >= 0) continue;
 
     int idx = 0;
     // Only used when there is only one.
@@ -645,10 +655,10 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
                                             const glm::vec3& nextNormal) {
           const glm::vec3 diff = nextNormal - normal;
           if (glm::dot(diff, diff) > kTolerance * kTolerance) {
-            if (idx > 1) {
-              sharpHalfedge[0] = -1;
-            } else {
+            if (idx < 2) {
               sharpHalfedge[idx++] = halfedge;
+            } else {
+              sharpHalfedge[0] = -1;  // marks more than 2 sharp edges
             }
           }
           lastNormal = normal;
@@ -682,7 +692,7 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
         }
       });
     } else {  // Sharpen vertex uniformly
-      ForVert(first, [this](int current) {
+      ForVert(second, [this](int current) {
         if (!IsMarkedInsideQuad(current)) {
           SharpenTangent(current, 0);
         }

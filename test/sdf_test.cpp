@@ -113,19 +113,24 @@ TEST(SDF, Resize) {
 }
 
 TEST(SDF, SineSurface) {
-  Mesh surface(LevelSet(
+  MeshGL surface = LevelSet(
       [](glm::vec3 p) {
         float mid = glm::sin(p.x) + glm::sin(p.y);
-        return (p.z > mid - 0.5 && p.z < mid + 0.5) ? 1 : 0;
+        return (p.z > mid - 0.5 && p.z < mid + 0.5) ? 1 : -1;
       },
-      {glm::vec3(-4 * glm::pi<float>()), glm::vec3(4 * glm::pi<float>())}, 1));
-  Manifold smoothed = Manifold::Smooth(surface).Refine(8);
+      {glm::vec3(-2 * glm::pi<float>() + 0.2),
+       glm::vec3(0 * glm::pi<float>() - 0.2)},
+      1);
+  Manifold smoothed = Manifold(surface).SmoothOut(50).Refine(8);
 
   EXPECT_EQ(smoothed.Status(), Manifold::Error::NoError);
-  EXPECT_EQ(smoothed.Genus(), -2);
+  EXPECT_EQ(smoothed.Genus(), 0);
 
 #ifdef MANIFOLD_EXPORT
-  if (options.exportModels)
-    ExportMesh("sinesurface.glb", smoothed.GetMeshGL(), {});
+  if (options.exportModels) {
+    ExportOptions options2;
+    // options2.mat.colorChannels = {3, 4, 5, -1};
+    ExportMesh("sinesurface.glb", smoothed.GetMeshGL(), options2);
+  }
 #endif
 }
