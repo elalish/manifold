@@ -147,6 +147,29 @@ TEST(Manifold, Decompose) {
   RelatedGL(manifolds, input);
 }
 
+TEST(Manifold, DecomposeProps) {
+  std::vector<MeshGL> input;
+  std::vector<Manifold> manifoldList;
+  auto tet = WithPositionColors(Manifold::Tetrahedron());
+  manifoldList.emplace_back(tet);
+  input.emplace_back(tet);
+  auto cube = WithPositionColors(Manifold::Cube());
+  manifoldList.emplace_back(cube);
+  input.emplace_back(cube);
+  auto sphere = WithPositionColors(Manifold::Sphere(1, 4));
+  manifoldList.emplace_back(sphere);
+  input.emplace_back(sphere);
+  Manifold manifolds = Manifold::Compose(manifoldList);
+
+  ExpectMeshes(manifolds, {{8, 12, 3}, {6, 8, 3}, {4, 4, 3}});
+
+  RelatedGL(manifolds, input);
+
+  for (const Manifold& manifold : manifolds.Decompose()) {
+    RelatedGL(manifold, input);
+  }
+}
+
 /**
  * These tests check the various manifold constructors.
  */

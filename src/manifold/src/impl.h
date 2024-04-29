@@ -163,14 +163,17 @@ struct Manifold::Impl {
   void CollapseTri(const glm::ivec3& triEdge);
   void SplitPinchedVerts();
 
-  // smoothing.cu
-  bool IsInsideQuad(int halfedge) const;
-  bool IsMarkedInsideQuad(int halfedge) const;
-  glm::vec3 GetNormal(int halfedge, int normalIdx) const;
+  // subdivision.cpp
   int GetNeighbor(int tri) const;
   glm::ivec4 GetHalfedges(int tri) const;
   BaryIndices GetIndices(int halfedge) const;
   void FillRetainedVerts(Vec<Barycentric>& vertBary) const;
+  Vec<Barycentric> Subdivide(std::function<int(glm::vec3)>);
+
+  // smoothing.cpp
+  bool IsInsideQuad(int halfedge) const;
+  bool IsMarkedInsideQuad(int halfedge) const;
+  glm::vec3 GetNormal(int halfedge, int normalIdx) const;
   std::vector<Smoothness> UpdateSharpenedEdges(
       const std::vector<Smoothness>&) const;
   Vec<bool> FlatFaces() const;
@@ -181,7 +184,6 @@ struct Manifold::Impl {
   void LinearizeFlatTangents();
   void CreateTangents(int normalIdx);
   void CreateTangents(std::vector<Smoothness>);
-  Vec<Barycentric> Subdivide(std::function<int(glm::vec3)>);
   void Refine(std::function<int(glm::vec3)>);
 };
 }  // namespace manifold
