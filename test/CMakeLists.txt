@@ -21,7 +21,7 @@ set(SOURCE_FILES polygon_test.cpp cross_section_test.cpp manifold_test.cpp boole
         boolean_complex_test.cpp
         manifold_advanced_test.cpp
         manifold_smooth_test.cpp
-        manifold_minigap_test.cpp)
+        manifold_mingap_test.cpp)
 
 if(MANIFOLD_CBIND AND NOT EMSCRIPTEN)
   list(APPEND SOURCE_FILES manifoldc_test.cpp)
