@@ -18,6 +18,7 @@
 
 #include "cross_section.h"
 #include "samples.h"
+#include "sdf.h"
 #include "test.h"
 #include "tri_dist.h"
 
@@ -466,6 +467,29 @@ TEST(Manifold, SmoothTorus) {
 #endif
 }
 
+TEST(Manifold, SineSurface) {
+  MeshGL surface = LevelSet(
+      [](glm::vec3 p) {
+        float mid = glm::sin(p.x) + glm::sin(p.y);
+        return (p.z > mid - 0.5 && p.z < mid + 0.5) ? 1 : -1;
+      },
+      {glm::vec3(-2 * glm::pi<float>() + 0.2),
+       glm::vec3(0 * glm::pi<float>() - 0.2)},
+      1);
+  Manifold smoothed = Manifold(surface).SmoothOut(50).Refine(8);
+
+  EXPECT_EQ(smoothed.Status(), Manifold::Error::NoError);
+  EXPECT_EQ(smoothed.Genus(), 0);
+
+#ifdef MANIFOLD_EXPORT
+  if (options.exportModels) {
+    ExportOptions options2;
+    // options2.mat.colorChannels = {3, 4, 5, -1};
+    ExportMesh("sinesurface.glb", smoothed.GetMeshGL(), options2);
+  }
+#endif
+}
+
 TEST(Manifold, Smooth2Length) {
   Manifold cone = Manifold::Extrude(
       CrossSection::Circle(10, 10).Translate({10, 0}), 2, 0, 0, {0, 0});
@@ -487,7 +511,8 @@ TEST(Manifold, SmoothSphere) {
   float precision[5] = {0.006, 0.003, 0.003, 0.0005, 0.00006};
   for (int i = 0; i < 5; ++i) {
     Manifold sphere = Manifold::Sphere(1, n[i]);
-    // Refine(3*x) puts a center point in the triangle, which is the worst case.
+    // Refine(3*x) puts a center point in the triangle, which is the worst
+    // case.
     Manifold smoothed = Manifold::Smooth(sphere.GetMesh()).Refine(6);
     Mesh out = smoothed.GetMesh();
     auto bounds =
@@ -650,9 +675,9 @@ TEST(Manifold, Precision3) {
  * positive is convex and negative is concave. There are two orthogonal
  * principal curvatures at any point on a manifold, with one maximum and the
  * other minimum. Gaussian curvature is their product, while mean
- * curvature is their sum. Here we check our discrete approximations calculated
- * at each vertex against the constant expected values of spheres of different
- * radii and at different mesh resolutions.
+ * curvature is their sum. Here we check our discrete approximations
+ * calculated at each vertex against the constant expected values of spheres
+ * of different radii and at different mesh resolutions.
  */
 TEST(Manifold, CalculateCurvature) {
   const float precision = 0.015;
