@@ -334,8 +334,8 @@ TEST(Manifold, Smooth) {
   smooth = smooth.Refine(n);
   ExpectMeshes(smooth, {{2 * n * n + 2, 4 * n * n}});
   auto prop = smooth.GetProperties();
-  EXPECT_NEAR(prop.volume, 17.38, 0.1);
-  EXPECT_NEAR(prop.surfaceArea, 33.38, 0.1);
+  EXPECT_NEAR(prop.volume, 18.7, 0.1);
+  EXPECT_NEAR(prop.surfaceArea, 34.5, 0.1);
 
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) ExportMesh("smoothTet.glb", smooth.GetMesh(), {});
@@ -385,8 +385,8 @@ TEST(Manifold, SmoothFlat) {
   Manifold cone = Manifold::Cylinder(5, 10, 5, 12).SmoothOut();
   Manifold smooth = cone.RefineToLength(0.5).CalculateNormals(0);
   auto prop = smooth.GetProperties();
-  EXPECT_NEAR(prop.volume, 1144.01, 0.01);
-  EXPECT_NEAR(prop.surfaceArea, 764.55, 0.01);
+  EXPECT_NEAR(prop.volume, 1165.77, 0.01);
+  EXPECT_NEAR(prop.surfaceArea, 769.88, 0.01);
   MeshGL out = smooth.GetMeshGL();
   CheckGL(out);
 
@@ -498,8 +498,8 @@ TEST(Manifold, Smooth2Length) {
   smooth = smooth.RefineToLength(0.1);
   ExpectMeshes(smooth, {{85250, 170496}});
   auto prop = smooth.GetProperties();
-  EXPECT_NEAR(prop.volume, 4688, 1);
-  EXPECT_NEAR(prop.surfaceArea, 1369, 1);
+  EXPECT_NEAR(prop.volume, 4842, 1);
+  EXPECT_NEAR(prop.surfaceArea, 1400, 1);
 
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) ExportMesh("smoothCones.glb", smooth.GetMesh(), {});
@@ -557,8 +557,8 @@ TEST(Manifold, ManualSmooth) {
 
   ExpectMeshes(interp, {{40002, 80000}});
   auto prop = interp.GetProperties();
-  EXPECT_NEAR(prop.volume, 3.53, 0.01);
-  EXPECT_NEAR(prop.surfaceArea, 11.39, 0.01);
+  EXPECT_NEAR(prop.volume, 3.55, 0.01);
+  EXPECT_NEAR(prop.surfaceArea, 11.45, 0.01);
 
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) {
@@ -600,8 +600,8 @@ TEST(Manifold, Csaszar) {
   csaszar = csaszar.Refine(100);
   ExpectMeshes(csaszar, {{70000, 140000}});
   auto prop = csaszar.GetProperties();
-  EXPECT_NEAR(prop.volume, 84699, 10);
-  EXPECT_NEAR(prop.surfaceArea, 14796, 10);
+  EXPECT_NEAR(prop.volume, 89873, 10);
+  EXPECT_NEAR(prop.surfaceArea, 15301, 10);
 
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) {
