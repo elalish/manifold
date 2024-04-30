@@ -548,36 +548,32 @@ TEST(Manifold, ManualSmooth) {
   const Mesh oct = Manifold::Sphere(1, 4).GetMesh();
   Mesh smooth = Manifold::Smooth(oct).GetMesh();
   // Sharpen the edge from vert 4 to 5
-  smooth.halfedgeTangent[6] = {0, 0, 0, 1};
-  smooth.halfedgeTangent[22] = {0, 0, 0, 1};
-  smooth.halfedgeTangent[16] = {0, 0, 0, 1};
-  smooth.halfedgeTangent[18] = {0, 0, 0, 1};
+  smooth.halfedgeTangent[6].w = 0;
+  smooth.halfedgeTangent[22].w = 0;
+  smooth.halfedgeTangent[16].w = 0;
+  smooth.halfedgeTangent[18].w = 0;
   Manifold interp(smooth);
   interp = interp.Refine(100);
 
   ExpectMeshes(interp, {{40002, 80000}});
   auto prop = interp.GetProperties();
-  EXPECT_NEAR(prop.volume, 3.55, 0.01);
-  EXPECT_NEAR(prop.surfaceArea, 11.45, 0.01);
+  EXPECT_NEAR(prop.volume, 3.83, 0.01);
+  EXPECT_NEAR(prop.surfaceArea, 11.95, 0.01);
 
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) {
-    const Mesh out = interp.GetMesh();
+    interp = interp.CalculateCurvature(-1, 0).SetProperties(
+        3, [](float* newProp, glm::vec3 pos, const float* oldProp) {
+          const glm::vec3 red(1, 0, 0);
+          const glm::vec3 purple(1, 0, 1);
+          glm::vec3 color =
+              glm::mix(purple, red, glm::smoothstep(0.0f, 2.0f, oldProp[0]));
+          for (const int i : {0, 1, 2}) newProp[i] = color[i];
+        });
+    const MeshGL out = interp.GetMeshGL();
     ExportOptions options;
-    options.faceted = false;
     options.mat.roughness = 0.1;
-
-    options.mat.vertColor.resize(interp.NumVert());
-    const glm::vec4 red(1, 0, 0, 1);
-    const glm::vec4 purple(1, 0, 1, 1);
-    for (int tri = 0; tri < interp.NumTri(); ++tri) {
-      for (int i : {0, 1, 2}) {
-        const glm::vec3& uvw = {0.5, 0.5, 0.0};
-        const float alpha = glm::min(uvw[0], glm::min(uvw[1], uvw[2]));
-        options.mat.vertColor[out.triVerts[tri][i]] =
-            glm::mix(purple, red, glm::smoothstep(0.0f, 0.2f, alpha));
-      }
-    }
+    options.mat.colorChannels = {3, 4, 5, -1};
     ExportMesh("sharpenedSphere.glb", out, options);
   }
 #endif
