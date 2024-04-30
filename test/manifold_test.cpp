@@ -584,15 +584,19 @@ TEST(Manifold, ManualSmooth) {
 }
 
 TEST(Manifold, SmoothMirrored) {
-  const Mesh tet = Manifold::Tetrahedron().GetMesh();
+  const Mesh tet = Manifold::Tetrahedron().Scale({1, 2, 3}).GetMesh();
   Manifold smooth = Manifold::Smooth(tet);
-  Manifold mirror = smooth.Scale({-1, 1, 2}).Refine(10);
-  smooth = smooth.Refine(10).Scale({1, 1, 2});
+  Manifold mirror = smooth.Scale({-2, 2, 2}).Refine(10);
+  smooth = smooth.Refine(10).Scale({2, 2, 2});
 
   auto prop0 = smooth.GetProperties();
   auto prop1 = mirror.GetProperties();
   EXPECT_NEAR(prop0.volume, prop1.volume, 0.1);
   EXPECT_NEAR(prop0.surfaceArea, prop1.surfaceArea, 0.1);
+
+#ifdef MANIFOLD_EXPORT
+  if (options.exportModels) ExportMesh("mirrored.glb", mirror.GetMesh(), {});
+#endif
 }
 
 TEST(Manifold, Csaszar) {
