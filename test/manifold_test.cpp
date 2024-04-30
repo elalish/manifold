@@ -382,7 +382,7 @@ TEST(Manifold, RefineQuads) {
 
 TEST(Manifold, SmoothFlat) {
   Manifold cone = Manifold::Cylinder(5, 10, 5, 12).SmoothOut();
-  Manifold smooth = cone.RefineToLength(0.1).CalculateNormals(0);
+  Manifold smooth = cone.RefineToLength(0.5).CalculateNormals(0);
   auto prop = smooth.GetProperties();
   EXPECT_NEAR(prop.volume, 1144.01, 0.01);
   EXPECT_NEAR(prop.surfaceArea, 764.55, 0.01);
@@ -395,6 +395,74 @@ TEST(Manifold, SmoothFlat) {
   options2.mat.normalChannels = {3, 4, 5};
   options2.mat.roughness = 0;
   if (options.exportModels) ExportMesh("smoothCone.glb", out, options2);
+#endif
+}
+
+glm::vec4 CircularTangent(const glm::vec3& tangent, const glm::vec3& edgeVec) {
+  const glm::vec3 dir = glm::normalize(tangent);
+
+  float weight = glm::abs(glm::dot(dir, glm::normalize(edgeVec)));
+  if (weight == 0) {
+    weight = 1;
+  }
+  // Quadratic weighted bezier for circular interpolation
+  const glm::vec4 bz2 =
+      weight * glm::vec4(dir * glm::length(edgeVec) / (2 * weight), 1);
+  // Equivalent cubic weighted bezier
+  const glm::vec4 bz3 = glm::mix(glm::vec4(0, 0, 0, 1), bz2, 2 / 3.0f);
+  // Convert from homogeneous form to geometric form
+  return glm::vec4(glm::vec3(bz3) / bz3.w, bz3.w);
+}
+
+TEST(Manifold, SmoothTorus) {
+  Mesh torusMesh =
+      Manifold::Revolve(CrossSection::Circle(1, 8).Translate({2, 0}), 6)
+          .GetMesh();
+  const int numTri = torusMesh.triVerts.size();
+
+  // Create correct toroidal halfedge tangents - SmoothOut() is too generic to
+  // do this perfectly.
+  torusMesh.halfedgeTangent.resize(3 * numTri);
+  for (int tri = 0; tri < numTri; ++tri) {
+    for (const int i : {0, 1, 2}) {
+      glm::vec4& tangent = torusMesh.halfedgeTangent[3 * tri + i];
+      const glm::vec3 v = torusMesh.vertPos[torusMesh.triVerts[tri][i]];
+      const glm::vec3 edge =
+          torusMesh.vertPos[torusMesh.triVerts[tri][(i + 1) % 3]] - v;
+      if (edge.z == 0) {
+        glm::vec3 tan(v.y, -v.x, 0);
+        tan *= glm::sign(glm::dot(tan, edge));
+        tangent = CircularTangent(tan, edge);
+      } else if (glm::abs(glm::determinant(
+                     glm::mat2(glm::vec2(v), glm::vec2(edge)))) < kTolerance) {
+        const float theta = glm::asin(v.z);
+        glm::vec2 xy(v);
+        const float r = glm::length(xy);
+        xy = xy / r * v.z * (r > 2 ? -1.0f : 1.0f);
+        glm::vec3 tan(xy.x, xy.y, glm::cos(theta));
+        tan *= glm::sign(glm::dot(tan, edge));
+        tangent = CircularTangent(tan, edge);
+      } else {
+        tangent = {0, 0, 0, -1};
+      }
+    }
+  }
+
+  Manifold smooth = Manifold(torusMesh).RefineToLength(0.1).CalculateNormals(0);
+  Mesh out = smooth.GetMesh();
+  for (glm::vec3 v : out.vertPos) {
+    glm::vec3 p(v.x, v.y, 0);
+    p = glm::normalize(p) * 2.0f;
+    float r = glm::length(v - p);
+    ASSERT_NEAR(r, 1, 0.005);
+  }
+
+#ifdef MANIFOLD_EXPORT
+  ExportOptions options2;
+  options2.faceted = false;
+  options2.mat.normalChannels = {3, 4, 5};
+  options2.mat.roughness = 0;
+  if (options.exportModels) ExportMesh("smoothTorus.glb", out, options2);
 #endif
 }
 
@@ -416,10 +484,10 @@ TEST(Manifold, Smooth2Length) {
 
 TEST(Manifold, SmoothSphere) {
   int n[5] = {4, 8, 16, 32, 64};
-  float precision[5] = {0.04, 0.003, 0.003, 0.0005, 0.00006};
+  float precision[5] = {0.006, 0.003, 0.003, 0.0005, 0.00006};
   for (int i = 0; i < 5; ++i) {
     Manifold sphere = Manifold::Sphere(1, n[i]);
-    // Refine(odd) puts a center point in the triangle, which is the worst case.
+    // Refine(3*x) puts a center point in the triangle, which is the worst case.
     Manifold smoothed = Manifold::Smooth(sphere.GetMesh()).Refine(6);
     Mesh out = smoothed.GetMesh();
     auto bounds =
