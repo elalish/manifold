@@ -477,8 +477,9 @@ TEST(Manifold, SineSurface) {
        glm::vec3(0 * glm::pi<float>() - 0.2)},
       1);
   Manifold smoothed = Manifold(surface).SmoothOut(50).Refine(8);
-
-  EXPECT_EQ(smoothed.Status(), Manifold::Error::NoError);
+  auto prop = smoothed.GetProperties();
+  EXPECT_NEAR(prop.volume, 8.08, 0.01);
+  EXPECT_NEAR(prop.surfaceArea, 30.85, 0.01);
   EXPECT_EQ(smoothed.Genus(), 0);
 
 #ifdef MANIFOLD_EXPORT

@@ -87,6 +87,10 @@ struct InterpTri {
     return v.w == 0 ? v : (glm::vec3(v) / v.w);
   }
 
+  glm::vec4 Scale(glm::vec4 v, float scale) const {
+    return glm::vec4(scale * glm::vec3(v), v.w);
+  }
+
   glm::vec4 Bezier(glm::vec3 point, glm::vec4 tangent) const {
     return Homogeneous(glm::vec4(point, 0) + tangent);
   }
@@ -172,12 +176,8 @@ struct InterpTri {
     const float scale = glm::length(glm::vec3(bez0[0] - bez1[0])) / flatLen;
 
     const glm::mat2x4 bez = CubicBezier2Linear(
-        bez0[0],
-        Bezier(glm::vec3(bez0[0]),
-               glm::vec4(scale * glm::vec3(bez0[1]), bez0[1].w)),
-        Bezier(glm::vec3(bez1[0]),
-               glm::vec4(scale * glm::vec3(bez1[1]), bez1[1].w)),
-        bez1[0], y);
+        bez0[0], Bezier(glm::vec3(bez0[0]), Scale(bez0[1], scale)),
+        Bezier(glm::vec3(bez1[0]), Scale(bez1[1], scale)), bez1[0], y);
     return BezierPoint(bez, y);
   }
 
@@ -647,7 +647,7 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
   for (int e = 0; e < numHalfedge; ++e) {
     const int vert = halfedge_[e].startVert;
     auto& sharpHalfedge = vertSharpHalfedge[vert];
-    if (sharpHalfedge[0] >= 0 || sharpHalfedge[1] >= 0) continue;
+    if (sharpHalfedge[0] >= 0 && sharpHalfedge[1] >= 0) continue;
 
     int idx = 0;
     // Only used when there is only one.
