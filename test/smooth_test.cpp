@@ -29,8 +29,8 @@ TEST(Smooth, Tetrahedron) {
   smooth = smooth.Refine(n);
   ExpectMeshes(smooth, {{2 * n * n + 2, 4 * n * n}});
   auto prop = smooth.GetProperties();
-  EXPECT_NEAR(prop.volume, 17.38, 0.1);
-  EXPECT_NEAR(prop.surfaceArea, 33.38, 0.1);
+  EXPECT_NEAR(prop.volume, 18.7, 0.1);
+  EXPECT_NEAR(prop.surfaceArea, 34.5, 0.1);
 
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) ExportMesh("smoothTet.glb", smooth.GetMesh(), {});
@@ -69,10 +69,10 @@ TEST(Smooth, RefineQuads) {
 
 TEST(Smooth, SmoothFlat) {
   Manifold cone = Manifold::Cylinder(5, 10, 5, 12).SmoothOut();
-  Manifold smooth = cone.RefineToLength(0.1).CalculateNormals(0);
+  Manifold smooth = cone.RefineToLength(0.5).CalculateNormals(0);
   auto prop = smooth.GetProperties();
-  EXPECT_NEAR(prop.volume, 1142.9, 0.01);
-  EXPECT_NEAR(prop.surfaceArea, 764.28, 0.01);
+  EXPECT_NEAR(prop.volume, 1165.77, 0.01);
+  EXPECT_NEAR(prop.surfaceArea, 769.88, 0.01);
   MeshGL out = smooth.GetMeshGL();
   CheckGL(out);
 
@@ -93,8 +93,8 @@ TEST(Smooth, Smooth2Length) {
   smooth = smooth.RefineToLength(0.1);
   ExpectMeshes(smooth, {{85250, 170496}});
   auto prop = smooth.GetProperties();
-  EXPECT_NEAR(prop.volume, 4688, 1);
-  EXPECT_NEAR(prop.surfaceArea, 1369, 1);
+  EXPECT_NEAR(prop.volume, 4842, 1);
+  EXPECT_NEAR(prop.surfaceArea, 1400, 1);
 
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) ExportMesh("smoothCones.glb", smooth.GetMesh(), {});
@@ -103,11 +103,13 @@ TEST(Smooth, Smooth2Length) {
 
 TEST(Smooth, SmoothSphere) {
   int n[5] = {4, 8, 16, 32, 64};
-  float precision[5] = {0.04, 0.003, 0.003, 0.0005, 0.00006};
+  float precision[5] = {0.006, 0.003, 0.003, 0.0005, 0.00006};
   for (int i = 0; i < 5; ++i) {
     Manifold sphere = Manifold::Sphere(1, n[i]);
     // Refine(odd) puts a center point in the triangle, which is the worst case.
     Manifold smoothed = Manifold::Smooth(sphere.GetMesh()).Refine(6);
+    // Refine(3*x) puts a center point in the triangle, which is the worst
+    // case.
     Mesh out = smoothed.GetMesh();
     auto bounds =
         std::minmax_element(out.vertPos.begin(), out.vertPos.end(),
@@ -137,56 +139,56 @@ TEST(Smooth, SmoothNormals) {
 #endif
 }
 
-TEST(Smooth, ManualSmooth) {
+TEST(Manifold, ManualSmooth) {
   // Unit Octahedron
   const Mesh oct = Manifold::Sphere(1, 4).GetMesh();
   Mesh smooth = Manifold::Smooth(oct).GetMesh();
   // Sharpen the edge from vert 4 to 5
-  smooth.halfedgeTangent[6] = {0, 0, 0, 1};
-  smooth.halfedgeTangent[22] = {0, 0, 0, 1};
-  smooth.halfedgeTangent[16] = {0, 0, 0, 1};
-  smooth.halfedgeTangent[18] = {0, 0, 0, 1};
+  smooth.halfedgeTangent[6].w = 0;
+  smooth.halfedgeTangent[22].w = 0;
+  smooth.halfedgeTangent[16].w = 0;
+  smooth.halfedgeTangent[18].w = 0;
   Manifold interp(smooth);
   interp = interp.Refine(100);
 
   ExpectMeshes(interp, {{40002, 80000}});
   auto prop = interp.GetProperties();
-  EXPECT_NEAR(prop.volume, 3.53, 0.01);
-  EXPECT_NEAR(prop.surfaceArea, 11.39, 0.01);
+  EXPECT_NEAR(prop.volume, 3.83, 0.01);
+  EXPECT_NEAR(prop.surfaceArea, 11.95, 0.01);
 
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) {
-    const Mesh out = interp.GetMesh();
+    interp = interp.CalculateCurvature(-1, 0).SetProperties(
+        3, [](float* newProp, glm::vec3 pos, const float* oldProp) {
+          const glm::vec3 red(1, 0, 0);
+          const glm::vec3 purple(1, 0, 1);
+          glm::vec3 color =
+              glm::mix(purple, red, glm::smoothstep(0.0f, 2.0f, oldProp[0]));
+          for (const int i : {0, 1, 2}) newProp[i] = color[i];
+        });
+    const MeshGL out = interp.GetMeshGL();
     ExportOptions options;
-    options.faceted = false;
     options.mat.roughness = 0.1;
-
-    options.mat.vertColor.resize(interp.NumVert());
-    const glm::vec4 red(1, 0, 0, 1);
-    const glm::vec4 purple(1, 0, 1, 1);
-    for (int tri = 0; tri < interp.NumTri(); ++tri) {
-      for (int i : {0, 1, 2}) {
-        const glm::vec3& uvw = {0.5, 0.5, 0.0};
-        const float alpha = glm::min(uvw[0], glm::min(uvw[1], uvw[2]));
-        options.mat.vertColor[out.triVerts[tri][i]] =
-            glm::mix(purple, red, glm::smoothstep(0.0f, 0.2f, alpha));
-      }
-    }
+    options.mat.colorChannels = {3, 4, 5, -1};
     ExportMesh("sharpenedSphere.glb", out, options);
   }
 #endif
 }
 
 TEST(Smooth, SmoothMirrored) {
-  const Mesh tet = Manifold::Tetrahedron().GetMesh();
+  const Mesh tet = Manifold::Tetrahedron().Scale({1, 2, 3}).GetMesh();
   Manifold smooth = Manifold::Smooth(tet);
-  Manifold mirror = smooth.Scale({-1, 1, 2}).Refine(10);
-  smooth = smooth.Refine(10).Scale({1, 1, 2});
+  Manifold mirror = smooth.Scale({-2, 2, 2}).Refine(10);
+  smooth = smooth.Refine(10).Scale({2, 2, 2});
 
   auto prop0 = smooth.GetProperties();
   auto prop1 = mirror.GetProperties();
   EXPECT_NEAR(prop0.volume, prop1.volume, 0.1);
   EXPECT_NEAR(prop0.surfaceArea, prop1.surfaceArea, 0.1);
+
+#ifdef MANIFOLD_EXPORT
+  if (options.exportModels) ExportMesh("mirrored.glb", mirror.GetMesh(), {});
+#endif
 }
 
 TEST(Smooth, Csaszar) {
@@ -194,8 +196,8 @@ TEST(Smooth, Csaszar) {
   csaszar = csaszar.Refine(100);
   ExpectMeshes(csaszar, {{70000, 140000}});
   auto prop = csaszar.GetProperties();
-  EXPECT_NEAR(prop.volume, 84699, 10);
-  EXPECT_NEAR(prop.surfaceArea, 14796, 10);
+  EXPECT_NEAR(prop.volume, 89873, 10);
+  EXPECT_NEAR(prop.surfaceArea, 15301, 10);
 
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) {

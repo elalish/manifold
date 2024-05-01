@@ -71,9 +71,9 @@ TEST(Manifold, Precision3) {
  * positive is convex and negative is concave. There are two orthogonal
  * principal curvatures at any point on a manifold, with one maximum and the
  * other minimum. Gaussian curvature is their product, while mean
- * curvature is their sum. Here we check our discrete approximations calculated
- * at each vertex against the constant expected values of spheres of different
- * radii and at different mesh resolutions.
+ * curvature is their sum. Here we check our discrete approximations
+ * calculated at each vertex against the constant expected values of spheres
+ * of different radii and at different mesh resolutions.
  */
 TEST(Manifold, CalculateCurvature) {
   const float precision = 0.015;
