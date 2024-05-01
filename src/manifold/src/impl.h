@@ -180,6 +180,7 @@ struct Manifold::Impl {
   Vec<int> VertFlatFace(const Vec<bool>&) const;
   std::vector<Smoothness> SharpenEdges(float minSharpAngle,
                                        float minSmoothness) const;
+  void SharpenTangent(int halfedge, float smoothness);
   void SetNormals(int normalIdx, float minSharpAngle);
   void LinearizeFlatTangents();
   void CreateTangents(int normalIdx);

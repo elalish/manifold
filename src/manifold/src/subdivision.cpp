@@ -398,8 +398,8 @@ class Partition {
 namespace manifold {
 
 /**
- * Returns the tri index of the other side of this quad if this tri is part of a
- * quad, or -1 otherwise.
+ * Returns the tri side index (0-2) connected to the other side of this quad if
+ * this tri is part of a quad, or -1 otherwise.
  */
 int Manifold::Impl::GetNeighbor(int tri) const {
   int neighbor = -1;
@@ -450,7 +450,7 @@ glm::ivec4 Manifold::Impl::GetHalfedges(int tri) const {
  * Returns the BaryIndices, which gives the tri and indices (0-3), such that
  * GetHalfedges(val.tri)[val.start4] points back to this halfedge, and val.end4
  * will point to the next one. This function handles this for both triangles and
- * quads.
+ * quads. Returns {-1, -1, -1} if the edge is the interior of a quad.
  */
 Manifold::Impl::BaryIndices Manifold::Impl::GetIndices(int halfedge) const {
   int tri = halfedge / 3;
@@ -468,6 +468,8 @@ Manifold::Impl::BaryIndices Manifold::Impl::GetIndices(int halfedge) const {
       tri = pair / 3;
       const int j = pair % 3;
       idx = Next3(neighbor) == idx ? j : (j + 1) % 4;
+    } else if (idx > neighbor) {
+      ++idx;
     }
     return {tri, idx, (idx + 1) % 4};
   }
@@ -484,7 +486,7 @@ void Manifold::Impl::FillRetainedVerts(Vec<Barycentric>& vertBary) const {
   for (int tri = 0; tri < numTri; ++tri) {
     for (const int i : {0, 1, 2}) {
       const BaryIndices indices = GetIndices(3 * tri + i);
-      if (indices.start4 < 0) continue;
+      if (indices.start4 < 0) continue;  // skip quad interiors
       glm::vec4 uvw(0);
       uvw[indices.start4] = 1;
       vertBary[halfedge_[3 * tri + i].startVert] = {indices.tri, uvw};
