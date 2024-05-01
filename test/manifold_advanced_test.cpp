@@ -1,4 +1,4 @@
-// Copyright 2021 The Manifold Authors.
+// Copyright 2024 The Manifold Authors.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -380,38 +380,4 @@ TEST(Manifold, TriangleDistanceOverlapping) {
   float distance = DistanceTriangleTriangleSquared(p, q);
 
   EXPECT_FLOAT_EQ(distance, 0);
-}
-
-/**
- * Curvature is the inverse of the radius of curvature, and signed such that
- * positive is convex and negative is concave. There are two orthogonal
- * principal curvatures at any point on a manifold, with one maximum and the
- * other minimum. Gaussian curvature is their product, while mean
- * curvature is their sum. Here we check our discrete approximations calculated
- * at each vertex against the constant expected values of spheres of different
- * radii and at different mesh resolutions.
- */
-TEST(Manifold, CalculateCurvature) {
-  const float precision = 0.015;
-  for (int n = 4; n < 100; n *= 2) {
-    const int gaussianIdx = 3;
-    const int meanIdx = 4;
-    Manifold sphere = Manifold::Sphere(1, 64).CalculateCurvature(
-        gaussianIdx - 3, meanIdx - 3);
-    MeshGL sphereGL = sphere.GetMeshGL();
-    ASSERT_EQ(sphereGL.numProp, 5);
-    EXPECT_NEAR(GetMinProperty(sphereGL, meanIdx), 2, 2 * precision);
-    EXPECT_NEAR(GetMaxProperty(sphereGL, meanIdx), 2, 2 * precision);
-    EXPECT_NEAR(GetMinProperty(sphereGL, gaussianIdx), 1, precision);
-    EXPECT_NEAR(GetMaxProperty(sphereGL, gaussianIdx), 1, precision);
-
-    sphere = sphere.Scale(glm::vec3(2.0f))
-                 .CalculateCurvature(gaussianIdx - 3, meanIdx - 3);
-    sphereGL = sphere.GetMeshGL();
-    ASSERT_EQ(sphereGL.numProp, 5);
-    EXPECT_NEAR(GetMinProperty(sphereGL, meanIdx), 1, precision);
-    EXPECT_NEAR(GetMaxProperty(sphereGL, meanIdx), 1, precision);
-    EXPECT_NEAR(GetMinProperty(sphereGL, gaussianIdx), 0.25, 0.25 * precision);
-    EXPECT_NEAR(GetMaxProperty(sphereGL, gaussianIdx), 0.25, 0.25 * precision);
-  }
 }

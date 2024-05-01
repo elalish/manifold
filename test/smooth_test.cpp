@@ -22,7 +22,7 @@
 
 using namespace manifold;
 
-TEST(Manifold, Smooth) {
+TEST(Smooth, Tetrahedron) {
   Manifold tet = Manifold::Tetrahedron();
   Manifold smooth = Manifold::Smooth(tet.GetMesh());
   int n = 100;
@@ -37,7 +37,7 @@ TEST(Manifold, Smooth) {
 #endif
 }
 
-TEST(Manifold, RefineQuads) {
+TEST(Smooth, RefineQuads) {
   Manifold cylinder =
       Manifold(WithPositionColors(Manifold::Cylinder(2, 1, -1, 12).SmoothOut()))
           .RefineToLength(0.05);
@@ -67,7 +67,7 @@ TEST(Manifold, RefineQuads) {
 #endif
 }
 
-TEST(Manifold, SmoothFlat) {
+TEST(Smooth, SmoothFlat) {
   Manifold cone = Manifold::Cylinder(5, 10, 5, 12).SmoothOut();
   Manifold smooth = cone.RefineToLength(0.1).CalculateNormals(0);
   auto prop = smooth.GetProperties();
@@ -85,7 +85,7 @@ TEST(Manifold, SmoothFlat) {
 #endif
 }
 
-TEST(Manifold, Smooth2Length) {
+TEST(Smooth, Smooth2Length) {
   Manifold cone = Manifold::Extrude(
       CrossSection::Circle(10, 10).Translate({10, 0}), 2, 0, 0, {0, 0});
   cone += cone.Scale({1, 1, -5});
@@ -101,7 +101,7 @@ TEST(Manifold, Smooth2Length) {
 #endif
 }
 
-TEST(Manifold, SmoothSphere) {
+TEST(Smooth, SmoothSphere) {
   int n[5] = {4, 8, 16, 32, 64};
   float precision[5] = {0.04, 0.003, 0.003, 0.0005, 0.00006};
   for (int i = 0; i < 5; ++i) {
@@ -121,7 +121,7 @@ TEST(Manifold, SmoothSphere) {
   }
 }
 
-TEST(Manifold, SmoothNormals) {
+TEST(Smooth, SmoothNormals) {
   Manifold cylinder = Manifold::Cylinder(10, 5, 5, 8);
   Manifold out = cylinder.SmoothOut().RefineToLength(0.1);
   Manifold byNormals =
@@ -137,7 +137,7 @@ TEST(Manifold, SmoothNormals) {
 #endif
 }
 
-TEST(Manifold, ManualSmooth) {
+TEST(Smooth, ManualSmooth) {
   // Unit Octahedron
   const Mesh oct = Manifold::Sphere(1, 4).GetMesh();
   Mesh smooth = Manifold::Smooth(oct).GetMesh();
@@ -177,7 +177,7 @@ TEST(Manifold, ManualSmooth) {
 #endif
 }
 
-TEST(Manifold, SmoothMirrored) {
+TEST(Smooth, SmoothMirrored) {
   const Mesh tet = Manifold::Tetrahedron().GetMesh();
   Manifold smooth = Manifold::Smooth(tet);
   Manifold mirror = smooth.Scale({-1, 1, 2}).Refine(10);
@@ -189,7 +189,7 @@ TEST(Manifold, SmoothMirrored) {
   EXPECT_NEAR(prop0.surfaceArea, prop1.surfaceArea, 0.1);
 }
 
-TEST(Manifold, Csaszar) {
+TEST(Smooth, Csaszar) {
   Manifold csaszar = Manifold::Smooth(Csaszar());
   csaszar = csaszar.Refine(100);
   ExpectMeshes(csaszar, {{70000, 140000}});

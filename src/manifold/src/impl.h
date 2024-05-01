@@ -107,7 +107,6 @@ struct Manifold::Impl {
   SparseIndices EdgeCollisions(const Impl& B, bool inverted = false) const;
   SparseIndices VertexCollisionsZ(VecView<const glm::vec3> vertsIn,
                                   bool inverted = false) const;
-  float MinGap(const Impl& other, float searchLength) const;
 
   bool IsEmpty() const { return NumVert() == 0; }
   int NumVert() const { return vertPos_.size(); }
@@ -130,6 +129,7 @@ struct Manifold::Impl {
   bool Is2Manifold() const;
   bool MatchesTriNormals() const;
   int NumDegenerateTris() const;
+  float MinGap(const Impl& other, float searchLength) const;
 
   // sort.cu
   void Finish();
