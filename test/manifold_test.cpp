@@ -18,6 +18,7 @@
 
 #include "cross_section.h"
 #include "samples.h"
+#include "sdf.h"
 #include "test.h"
 #include "tri_dist.h"
 

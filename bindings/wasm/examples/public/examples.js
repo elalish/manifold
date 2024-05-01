@@ -221,7 +221,7 @@ export const examples = {
       const radius = 30;
       const offset = 20;
       const wiggles = 12;
-      const sharpness = 0.6;
+      const sharpness = 0.8;
       const n = 50;
 
       const positions = [];

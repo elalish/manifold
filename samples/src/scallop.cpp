@@ -25,7 +25,7 @@ Manifold Scallop() {
   constexpr float radius = 3;
   constexpr float offset = 2;
   constexpr int wiggles = 12;
-  constexpr float sharpness = 0.6;
+  constexpr float sharpness = 0.8;
 
   Mesh scallop;
   std::vector<Smoothness> sharpenedEdges;
