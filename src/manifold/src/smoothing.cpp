@@ -642,71 +642,86 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
   halfedgeTangent_.resize(0);
   Vec<glm::vec4> tangent(numHalfedge);
 
-  Vec<glm::vec3> vertNormal(numVert);
-  Vec<glm::ivec2> vertSharpHalfedge(numVert, glm::ivec2(-1));
+  Vec<int> vertHalfedge(numVert, -1);
   for (int e = 0; e < numHalfedge; ++e) {
     const int vert = halfedge_[e].startVert;
-    auto& sharpHalfedge = vertSharpHalfedge[vert];
-    if (sharpHalfedge[0] >= 0 && sharpHalfedge[1] >= 0) continue;
+    if (vertHalfedge[vert] >= 0) continue;
+    vertHalfedge[vert] = e;
 
-    int idx = 0;
-    // Only used when there is only one.
-    glm::vec3& lastNormal = vertNormal[vert];
+    int numSharpEdges = 0;
+    glm::ivec2 faceEdges(-1, -1);
 
-    ForVert<glm::vec3>(
+    struct FlatNormal {
+      bool isFlatFace;
+      glm::vec3 normal;
+    };
+
+    ForVert<FlatNormal>(
         e,
         [normalIdx, this](int halfedge) {
-          return GetNormal(halfedge, normalIdx);
+          const glm::vec3 normal = GetNormal(halfedge, normalIdx);
+          const glm::vec3 diff = faceNormal_[halfedge / 3] - normal;
+          return FlatNormal(
+              {glm::dot(diff, diff) < kTolerance * kTolerance, normal});
         },
-        [&sharpHalfedge, &idx, &lastNormal](int halfedge,
-                                            const glm::vec3& normal,
-                                            const glm::vec3& nextNormal) {
-          const glm::vec3 diff = nextNormal - normal;
-          if (glm::dot(diff, diff) > kTolerance * kTolerance) {
-            if (idx < 2) {
-              sharpHalfedge[idx++] = halfedge;
+        [&numSharpEdges, &faceEdges, &tangent, this](
+            int halfedge, const FlatNormal& here, const FlatNormal& next) {
+          const glm::vec3 diff = next.normal - here.normal;
+          const bool differentNormals =
+              glm::dot(diff, diff) > kTolerance * kTolerance;
+          if (IsInsideQuad(halfedge)) {
+            tangent[halfedge] = {0, 0, 0, -1};
+          } else if (differentNormals) {
+            ++numSharpEdges;
+            const glm::vec3 edge = vertPos_[halfedge_[halfedge].endVert] -
+                                   vertPos_[halfedge_[halfedge].startVert];
+            const glm::vec3 dir = glm::cross(here.normal, next.normal);
+            tangent[halfedge] =
+                CircularTangent(glm::sign(glm::dot(dir, edge)) * dir, edge);
+          } else {
+            tangent[halfedge] = {0, 0, 0, 0};
+          }
+
+          if (here.isFlatFace != next.isFlatFace) {
+            ++numSharpEdges;
+            if (faceEdges[0] == -1) {
+              faceEdges[0] = halfedge;
+            } else if (faceEdges[1] == -1) {
+              faceEdges[1] = halfedge;
             } else {
-              sharpHalfedge[0] = -1;  // marks more than 2 sharp edges
+              faceEdges[0] = -2;
             }
           }
-          lastNormal = normal;
         });
-  }
 
-  for_each_n(autoPolicy(numHalfedge),
-             zip(tangent.begin(), halfedge_.cbegin(), countAt(0)), numHalfedge,
-             SmoothBezier({this, vertNormal}));
+    if (numSharpEdges == 2 && faceEdges[0] >= 0 && faceEdges[1] >= 0) {
+      const glm::vec3 edge0 = vertPos_[halfedge_[faceEdges[0]].endVert] -
+                              vertPos_[halfedge_[faceEdges[0]].startVert];
+      const glm::vec3 edge1 = vertPos_[halfedge_[faceEdges[1]].endVert] -
+                              vertPos_[halfedge_[faceEdges[1]].startVert];
+      const glm::vec3 newTangent =
+          glm::normalize(edge0) - glm::normalize(edge1);
+      tangent[faceEdges[0]] = CircularTangent(newTangent, edge0);
+      tangent[faceEdges[1]] = CircularTangent(-newTangent, edge1);
+    }
 
-  halfedgeTangent_.swap(tangent);
-
-  for (int vert = 0; vert < numVert; ++vert) {
-    const int first = vertSharpHalfedge[vert][0];
-    const int second = vertSharpHalfedge[vert][1];
-    if (second == -1) continue;
-    if (first != -1) {  // Make continuous edge
-      const glm::vec3 newTangent = glm::normalize(glm::cross(
-          GetNormal(first, normalIdx), GetNormal(second, normalIdx)));
-      if (!isfinite(newTangent[0])) continue;
-
-      halfedgeTangent_[first] = CircularTangent(
-          newTangent, vertPos_[halfedge_[first].endVert] - vertPos_[vert]);
-      halfedgeTangent_[second] = CircularTangent(
-          -newTangent, vertPos_[halfedge_[second].endVert] - vertPos_[vert]);
-
-      ForVert(first, [this, first, second](int current) {
-        if (current != first && current != second &&
-            !IsMarkedInsideQuad(current)) {
-          SharpenTangent(current, 0);
-        }
-      });
-    } else {  // Sharpen vertex uniformly
-      ForVert(second, [this](int current) {
-        if (!IsMarkedInsideQuad(current)) {
-          SharpenTangent(current, 0);
+    if (numSharpEdges <= 2) {  // smooth
+      ForVert(e, [&tangent, normalIdx, this](int halfedge) {
+        if (tangent[halfedge].w == 0) {  // only edges that were skipped above
+          const glm::vec3 normal = GetNormal(halfedge, normalIdx);
+          const glm::vec3 edge = vertPos_[halfedge_[halfedge].endVert] -
+                                 vertPos_[halfedge_[halfedge].startVert];
+          tangent[halfedge] =
+              CircularTangent(OrthogonalTo(edge, normal),
+                              vertPos_[halfedge_[halfedge].endVert] -
+                                  vertPos_[halfedge_[halfedge].startVert]);
         }
       });
     }
   }
+
+  halfedgeTangent_.swap(tangent);
+
   LinearizeFlatTangents();
 }
 
@@ -734,12 +749,6 @@ void Manifold::Impl::CreateTangents(std::vector<Smoothness> sharpenedEdges) {
     }
   }
 
-  for_each_n(autoPolicy(numHalfedge),
-             zip(tangent.begin(), halfedge_.cbegin(), countAt(0)), numHalfedge,
-             SmoothBezier({this, vertNormal}));
-
-  halfedgeTangent_.swap(tangent);
-
   // Add sharpened edges around faces, just on the face side.
   for (int tri = 0; tri < NumTri(); ++tri) {
     if (!triIsFlatFace[tri]) continue;
@@ -751,8 +760,6 @@ void Manifold::Impl::CreateTangents(std::vector<Smoothness> sharpenedEdges) {
       }
     }
   }
-
-  if (sharpenedEdges.empty()) return;
 
   using Pair = std::pair<Smoothness, Smoothness>;
   // Fill in missing pairs with default smoothness = 1.
@@ -778,6 +785,14 @@ void Manifold::Impl::CreateTangents(std::vector<Smoothness> sharpenedEdges) {
     vertTangents[halfedge_[edge.second.halfedge].startVert].push_back(
         {edge.second, edge.first});
   }
+
+  for_each_n(autoPolicy(numHalfedge),
+             zip(tangent.begin(), halfedge_.cbegin(), countAt(0)), numHalfedge,
+             SmoothBezier({this, vertNormal}));
+
+  halfedgeTangent_.swap(tangent);
+
+  if (sharpenedEdges.empty()) return;
 
   for (const auto& value : vertTangents) {
     const std::vector<Pair>& vert = value.second;

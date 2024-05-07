@@ -499,7 +499,8 @@ TEST(Manifold, SineSurface) {
       {glm::vec3(-2 * glm::pi<float>() + 0.2),
        glm::vec3(0 * glm::pi<float>() - 0.2)},
       1);
-  Manifold smoothed = Manifold(surface).SmoothOut(50).Refine(8);
+  Manifold smoothed =
+      Manifold(surface).CalculateNormals(0, 50).SmoothByNormals(0).Refine(8);
   auto prop = smoothed.GetProperties();
   EXPECT_NEAR(prop.volume, 8.08, 0.01);
   EXPECT_NEAR(prop.surfaceArea, 30.85, 0.01);
@@ -508,7 +509,8 @@ TEST(Manifold, SineSurface) {
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) {
     ExportOptions options2;
-    // options2.mat.colorChannels = {3, 4, 5, -1};
+    // options2.faceted = false;
+    // options2.mat.normalChannels = {3, 4, 5};
     ExportMesh("sinesurface.glb", smoothed.GetMeshGL(), options2);
   }
 #endif
