@@ -44,8 +44,8 @@ let allManifold = true;
 let anyManifold = false;
 
 // The processing is run when a glTF is drag-and-dropped onto this element.
-dropCtrl.on('drop', async ({files}) => {
-  for (const [path, file] of files) {
+dropCtrl.on('drop', async ({files}: {files: Map<string, File>}) => {
+  for (const [_path, file] of files) {
     const filename = file.name.toLowerCase();
     if (filename.match(/\.(gltf|glb)$/)) {
       URL.revokeObjectURL(inputGLBurl);
