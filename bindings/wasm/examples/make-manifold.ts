@@ -18,26 +18,32 @@ import {prune} from '@gltf-transform/functions';
 import {SimpleDropzone} from 'simple-dropzone';
 
 import Module from './built/manifold.js';
-import {disposeMesh, readMesh, setupIO, writeMesh} from './gltf-io';
+import {disposeMesh, Properties, readMesh, setupIO, writeMesh} from './gltf-io';
 
+// Set up gltf-transform
 const io = setupIO(new WebIO());
 io.registerExtensions(KHRONOS_EXTENSIONS);
 
+// Set up Manifold WASM library
 const wasm = await Module();
 wasm.setup();
 const {Manifold, Mesh} = wasm;
 
+// UX elements
 const mv = document.querySelector('model-viewer');
 const inputEl = document.querySelector('#input') as HTMLInputElement;
 const downloadButton = document.querySelector('#download') as HTMLButtonElement;
 const checkbox = document.querySelector('#viewFinal') as HTMLInputElement;
 const dropCtrl = new SimpleDropzone(mv, inputEl) as any;
 
+// glTF objects in memory
 let inputGLBurl = '';
 let outputGLBurl = '';
+// Status of manifoldness of all meshes
 let allManifold = true;
 let anyManifold = false;
 
+// The processing is run when a glTF is drag-and-dropped onto this element.
 dropCtrl.on('drop', async ({files}) => {
   for (const [path, file] of files) {
     const filename = file.name.toLowerCase();
@@ -50,6 +56,8 @@ dropCtrl.on('drop', async ({files}) => {
     }
   }
 });
+
+// UI functions
 
 function updateUI() {
   if (allManifold) {
@@ -79,7 +87,9 @@ downloadButton.onclick = () => {
   link.click();
 };
 
-async function writeGLB(doc: Document) {
+// Write output glTF using gltf-transform, which contains only the meshes that
+// are manifold, and using the EXT_mesh_manifold extension.
+async function writeGLB(doc: Document): Promise<void> {
   URL.revokeObjectURL(outputGLBurl);
   if (!anyManifold) {
     return;
@@ -90,7 +100,9 @@ async function writeGLB(doc: Document) {
   outputGLBurl = URL.createObjectURL(blob);
 }
 
-async function readGLB(url: string) {
+// Read the glTF ObjectURL and return a gltf-transform document with all the
+// non-manifold meshes stripped out.
+async function readGLB(url: string): Promise<Document> {
   allManifold = false;
   anyManifold = false;
   updateUI();
@@ -104,7 +116,7 @@ async function readGLB(url: string) {
     const tmp = readMesh(mesh);
     if (!tmp) continue;
 
-    const id2properties = new Map();
+    const id2properties = new Map<number, Properties>();
     const numID = tmp.runProperties.length;
     const firstID = Manifold.reserveIDs(numID);
     tmp.mesh.runOriginalID = new Uint32Array(numID);
@@ -114,12 +126,13 @@ async function readGLB(url: string) {
     }
     const manifoldMesh = new Mesh(tmp.mesh);
     disposeMesh(mesh);
-
+    // Make the mesh manifold if it's close.
     manifoldMesh.merge();
 
     try {
       // Test manifoldness - will throw if not.
       const manifold = new Manifold(manifoldMesh);
+      // Replace the mesh with a manifold version
       node.setMesh(writeMesh(docIn, manifold.getMesh(), id2properties));
       manifold.delete();
       anyManifold = true;
@@ -129,6 +142,7 @@ async function readGLB(url: string) {
     }
   }
 
+  // Prune the leftovers after non-manifold mesh removal.
   await docIn.transform(prune());
 
   return docIn;
