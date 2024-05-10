@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {WebIO} from '@gltf-transform/core';
+import {Document, WebIO} from '@gltf-transform/core';
 import {KHRONOS_EXTENSIONS} from '@gltf-transform/extensions';
 import {prune} from '@gltf-transform/functions';
 import {SimpleDropzone} from 'simple-dropzone';
@@ -25,17 +25,16 @@ io.registerExtensions(KHRONOS_EXTENSIONS);
 
 const wasm = await Module();
 wasm.setup();
-
 const {Manifold, Mesh} = wasm;
 
 const mv = document.querySelector('model-viewer');
-const inputEl = document.querySelector('#input');
-const downloadButton = document.querySelector('#download');
-const checkbox = document.querySelector('#viewFinal');
-const dropCtrl = new SimpleDropzone(mv, inputEl);
+const inputEl = document.querySelector('#input') as HTMLInputElement;
+const downloadButton = document.querySelector('#download') as HTMLButtonElement;
+const checkbox = document.querySelector('#viewFinal') as HTMLInputElement;
+const dropCtrl = new SimpleDropzone(mv, inputEl) as any;
 
-let inputGLBurl = null;
-let outputGLBurl = null;
+let inputGLBurl = '';
+let outputGLBurl = '';
 let allManifold = true;
 let anyManifold = false;
 
@@ -69,18 +68,18 @@ function updateUI() {
 checkbox.onclick = onClick;
 
 function onClick() {
-  mv.src = checkbox.checked ? outputGLBurl : inputGLBurl;
+  (mv as any).src = checkbox.checked ? outputGLBurl : inputGLBurl;
   downloadButton.disabled = !checkbox.checked;
 };
 
-downloadButton.onclick = function() {
+downloadButton.onclick = () => {
   const link = document.createElement('a');
   link.download = 'manifold.glb';
   link.href = outputGLBurl;
   link.click();
 };
 
-async function writeGLB(doc) {
+async function writeGLB(doc: Document) {
   URL.revokeObjectURL(outputGLBurl);
   if (!anyManifold) {
     return;
@@ -91,7 +90,7 @@ async function writeGLB(doc) {
   outputGLBurl = URL.createObjectURL(blob);
 }
 
-async function readGLB(url) {
+async function readGLB(url: string) {
   allManifold = false;
   anyManifold = false;
   updateUI();
@@ -100,18 +99,17 @@ async function readGLB(url) {
   const nodes = docIn.getRoot().listNodes();
   for (const node of nodes) {
     const mesh = node.getMesh();
-    if (!mesh) {
-      continue;
-    }
+    if (!mesh) continue;
 
     const tmp = readMesh(mesh);
+    if (!tmp) continue;
 
-    tmp.mesh.runOriginalID = [];
     const id2properties = new Map();
     const numID = tmp.runProperties.length;
     const firstID = Manifold.reserveIDs(numID);
+    tmp.mesh.runOriginalID = new Uint32Array(numID);
     for (let i = 0; i < numID; ++i) {
-      tmp.mesh.runOriginalID.push(firstID + i);
+      tmp.mesh.runOriginalID[i] = firstID + i;
       id2properties.set(firstID + i, tmp.runProperties[i]);
     }
     const manifoldMesh = new Mesh(tmp.mesh);
@@ -121,7 +119,7 @@ async function readGLB(url) {
 
     try {
       // Test manifoldness - will throw if not.
-      const manifold = Manifold(manifoldMesh);
+      const manifold = new Manifold(manifoldMesh);
       node.setMesh(writeMesh(docIn, manifold.getMesh(), id2properties));
       manifold.delete();
       anyManifold = true;
