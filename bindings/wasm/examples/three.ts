@@ -14,7 +14,7 @@
 
 import {BoxGeometry, BufferAttribute, BufferGeometry, IcosahedronGeometry, Mesh as ThreeMesh, MeshLambertMaterial, MeshNormalMaterial, PerspectiveCamera, PointLight, Scene, WebGLRenderer} from 'three';
 
-import Module, {Mesh} from './built/manifold.js';
+import Module, {Mesh} from './built/manifold';
 
 // Load Manifold WASM library
 const wasm = await Module();
@@ -82,7 +82,7 @@ function csg(operation: BooleanOp) {
 }
 
 csg('union');
-const selectElement = document.querySelector('select') as HTMLSelectElement;
+const selectElement = document.querySelector('select')!;
 selectElement.onchange = function() {
   csg(selectElement.value as BooleanOp);
 };
