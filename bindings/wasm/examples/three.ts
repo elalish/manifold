@@ -64,8 +64,9 @@ cube.addGroup(18, Infinity, 1);  // Rest of faces are red
 
 const icosahedron = new IcosahedronGeometry(0.16);
 icosahedron.clearGroups();
+icosahedron.addGroup(30, Infinity, 2);  // Last faces are blue
 icosahedron.addGroup(0, 30, 0);         // First 10 faces colored by normal
-icosahedron.addGroup(30, Infinity, 2);  // Rest of faces are blue
+// The above groups are in reversed order to demonstrate the need for sorting.
 
 // Convert Three.js input meshes to Manifolds
 const manifoldCube = new Manifold(geometry2mesh(cube));
@@ -95,15 +96,18 @@ function geometry2mesh(geometry: BufferGeometry) {
   const triVerts = geometry.index != null ?
       geometry.index.array as Uint32Array :
       new Uint32Array(vertProperties.length / 3).map((_, idx) => idx);
-  // Create a triangle run for each group (material).
-  const runIndex =
-      new Uint32Array(geometry.groups.length + 1)
-          .map((_, idx) => geometry.groups[idx]?.start ?? triVerts.length);
-  // Map the materials to ID
-  const runOriginalID =
-      new Uint32Array(geometry.groups.length)
-          .map((_, idx) => ids[geometry.groups[idx].materialIndex!]);
-
+  // Create a triangle run for each group (material) - akin to a draw call.
+  const starts = [...Array(geometry.groups.length)].map(
+      (_, idx) => geometry.groups[idx].start);
+  // Map the materials to ID.
+  const originalIDs = [...Array(geometry.groups.length)].map(
+      (_, idx) => ids[geometry.groups[idx].materialIndex!]);
+  // List the runs in sequence.
+  const indices = Array.from(starts.keys())
+  indices.sort((a, b) => starts[a] - starts[b])
+  const runIndex = new Uint32Array(indices.map(i => starts[i]));
+  const runOriginalID = new Uint32Array(indices.map(i => originalIDs[i]));
+  // Create the MeshGL for I/O with Manifold library.
   const mesh =
       new Mesh({numProp: 3, vertProperties, triVerts, runIndex, runOriginalID});
   // Automatically merge vertices with nearly identical positions to create a
