@@ -14,7 +14,7 @@
 
 import {BoxGeometry, BufferAttribute, BufferGeometry, IcosahedronGeometry, Mesh as ThreeMesh, MeshLambertMaterial, MeshNormalMaterial, PerspectiveCamera, PointLight, Scene, WebGLRenderer} from 'three';
 
-import Module, {Mesh} from './built/manifold.js';
+import Module, {Mesh} from './built/manifold';
 
 // Load Manifold WASM library
 const wasm = await Module();

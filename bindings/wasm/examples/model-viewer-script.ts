@@ -15,8 +15,8 @@
 import {Document, WebIO} from '@gltf-transform/core';
 import {clearNodeTransform, flatten, prune} from '@gltf-transform/functions';
 
-import Module from './built/manifold.js';
-import {disposeMesh, loadTexture, readMesh, setupIO, writeMesh} from './gltf-io';
+import Module, {Manifold, Mesh} from './built/manifold';
+import {disposeMesh, readMesh, setupIO, writeMesh} from './gltf-io';
 
 const io = setupIO(new WebIO());
 const doc = new Document();
@@ -27,8 +27,8 @@ const {Manifold, Mesh} = wasm;
 
 const id2properties = new Map();
 
-async function readGLB(url) {
-  const manifolds = Array();
+async function readGLB(url: string) {
+  const manifolds = Array<Manifold>();
   const docIn = await io.read(url);
   await docIn.transform(flatten());
   const nodes = docIn.getRoot().listNodes();
@@ -94,7 +94,7 @@ downloadButton.onclick = function() {
   link.click();
 };
 
-async function push2MV(manifold) {
+async function push2MV(manifold: Manifold) {
   // From Z-up to Y-up (glTF)
   const manifoldMesh = manifold.rotate([-90, 0, 0]).getMesh();
 

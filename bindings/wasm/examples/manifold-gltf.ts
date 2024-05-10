@@ -104,7 +104,7 @@ export class EXTManifold extends Extension {
 
       if (manifoldDef.manifoldPrimitive) {
         let count = 0;
-        const runIndex = [];
+        const runIndex = Array<number>();
         runIndex.push(count);
         for (const primitive of mesh.listPrimitives()) {
           const indices = primitive.getIndices();
