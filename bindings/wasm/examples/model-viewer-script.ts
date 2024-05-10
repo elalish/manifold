@@ -16,17 +16,25 @@ import {Document, WebIO} from '@gltf-transform/core';
 import {clearNodeTransform, flatten, prune} from '@gltf-transform/functions';
 
 import Module, {Manifold, Mesh} from './built/manifold';
-import {disposeMesh, readMesh, setupIO, writeMesh} from './gltf-io';
+import {disposeMesh, Properties, readMesh, setupIO, writeMesh} from './gltf-io';
 
+// Set up gltf-transform
 const io = setupIO(new WebIO());
 const doc = new Document();
 
+
+// Set up Manifold WASM library
 const wasm = await Module();
 wasm.setup();
 const {Manifold, Mesh} = wasm;
 
-const id2properties = new Map();
+// Map of OriginalID to glTF material and attributes
+const id2properties = new Map<number, Properties>();
 
+// Wrapper for gltf-io readMesh() that processes a whole glTF and stores the
+// properties in the above map. This function is simplified and intended only
+// for reading single-object glTFs, as it simply unions any extra meshes
+// together rather than returning a scene hierarchy.
 async function readGLB(url: string) {
   const manifolds = Array<Manifold>();
   const docIn = await io.read(url);
@@ -58,12 +66,13 @@ async function readGLB(url: string) {
   doc.getRoot().listAccessors().forEach((s) => s.dispose());
   for (const [i, id] of ids.entries()) {
     const material = doc.getRoot().listMaterials()[startIdx + i];
-    id2properties.get(id).material = material;
+    id2properties.get(id)!.material = material;
   }
 
   return Manifold.union(manifolds);
 }
 
+// Read static input glTFs
 const space = await readGLB('/models/space.glb');
 const moon = await readGLB('/models/moon.glb');
 
@@ -83,9 +92,10 @@ selectElement.onchange = function() {
   csg(selectElement.value as BooleanOp);
 };
 
-const mv = document.querySelector('model-viewer');
+// The resulting glTF
 let objectURL = '';
 
+// Set up download UI
 const downloadButton = document.querySelector('#download') as HTMLButtonElement;
 downloadButton.onclick = function() {
   const link = document.createElement('a');
@@ -94,12 +104,14 @@ downloadButton.onclick = function() {
   link.click();
 };
 
-async function push2MV(manifold: Manifold) {
-  // From Z-up to Y-up (glTF)
-  const manifoldMesh = manifold.rotate([-90, 0, 0]).getMesh();
+// <model-viewer> element for rendering resulting glTF.
+const mv = document.querySelector('model-viewer');
 
+// Use gltf-io and gltf-transform to convert the resulting Manifold to a glTF
+// and display it with <model-viewer>.
+async function push2MV(manifold: Manifold) {
   disposeMesh(node.getMesh()!);
-  const mesh = writeMesh(doc, manifoldMesh, id2properties);
+  const mesh = writeMesh(doc, manifold.getMesh(), id2properties);
   node.setMesh(mesh);
   await doc.transform(prune());
 
