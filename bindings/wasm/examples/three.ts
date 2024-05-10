@@ -13,11 +13,10 @@
 // limitations under the License.
 
 import {BufferAttribute, BufferGeometry, IcosahedronGeometry, Mesh as ThreeMesh, MeshNormalMaterial, PerspectiveCamera, Scene, WebGLRenderer} from 'three';
-import {mergeVertices} from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 import Module, {Mesh} from './built/manifold.js';
 
-type Boolean = 'union'|'difference'|'intersection';
+type BooleanOp = 'union'|'difference'|'intersection';
 
 const wasm = await Module();
 wasm.setup();
@@ -33,12 +32,12 @@ const mesh =
     new ThreeMesh(undefined, new MeshNormalMaterial({flatShading: true}));
 scene.add(mesh);
 
-const icosahedron = simplify(new IcosahedronGeometry(0.16));
+const icosahedron = new IcosahedronGeometry(0.16);
 
 const manifold_1 = Manifold.cube([0.2, 0.2, 0.2], true);
 const manifold_2 = new Manifold(geometry2mesh(icosahedron));
 
-const csg = function(operation: Boolean) {
+const csg = function(operation: BooleanOp) {
   mesh.geometry?.dispose();
   mesh.geometry =
       mesh2geometry(Manifold[operation](manifold_1, manifold_2).getMesh());
@@ -47,7 +46,7 @@ const csg = function(operation: Boolean) {
 const selectElement = document.querySelector('select') as HTMLSelectElement;
 
 selectElement.onchange = function() {
-  csg(selectElement.value as Boolean);
+  csg(selectElement.value as BooleanOp);
 };
 
 csg('difference');
@@ -65,8 +64,12 @@ renderer.setAnimationLoop(function(time: number) {
 // functions to convert between three.js and wasm
 function geometry2mesh(geometry: BufferGeometry) {
   const vertProperties = geometry.attributes.position.array as Float32Array;
-  const triVerts = geometry.index!.array as Uint32Array;
-  return new Mesh({numProp: 3, vertProperties, triVerts});
+  const triVerts = geometry.index != null ?
+      geometry.index.array as Uint32Array :
+      new Uint32Array(vertProperties.length / 3).map((_, idx) => idx);
+  const mesh = new Mesh({numProp: 3, vertProperties, triVerts});
+  mesh.merge();
+  return mesh;
 }
 
 function mesh2geometry(mesh: Mesh) {
@@ -75,13 +78,4 @@ function mesh2geometry(mesh: Mesh) {
       'position', new BufferAttribute(mesh.vertProperties, 3));
   geometry.setIndex(new BufferAttribute(mesh.triVerts, 1));
   return geometry;
-}
-
-// most of three.js geometries aren't manifolds, so...
-function simplify(geometry: BufferGeometry) {
-  delete geometry.attributes.normal;
-  delete geometry.attributes.uv;
-  const simplified = mergeVertices(geometry);
-  simplified.computeVertexNormals();
-  return simplified;
 }
