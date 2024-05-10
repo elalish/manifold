@@ -17,6 +17,7 @@
     "@gltf-transform/extensions": "^3.8.0",
     "@gltf-transform/functions": "^3.8.0",
     "@jscadui/3mf-export": "^0.5.0",
+    "@types/three": "^0.164.0",
     "fflate": "^0.8.0",
     "gl-matrix": "^3.4.3",
     "simple-dropzone": "0.8.3",
