@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {BufferAttribute, BufferGeometry, IcosahedronGeometry, Mesh as ThreeMesh, MeshNormalMaterial, PerspectiveCamera, Scene, WebGLRenderer} from 'three';
+import {BoxGeometry, BufferAttribute, BufferGeometry, IcosahedronGeometry, Mesh as ThreeMesh, MeshLambertMaterial, MeshNormalMaterial, PerspectiveCamera, Scene, WebGLRenderer} from 'three';
 
 import Module, {Mesh} from './built/manifold.js';
 
@@ -28,18 +28,29 @@ const camera = new PerspectiveCamera(30, 1, 0.01, 10);
 camera.position.z = 1;
 
 const scene = new Scene();
-const mesh =
+const materials = [
+  new MeshNormalMaterial({flatShading: true}),
+  new MeshLambertMaterial({color: 'red', flatShading: true}),
+  new MeshLambertMaterial({color: 'blue', flatShading: true})
+];
+const result =
     new ThreeMesh(undefined, new MeshNormalMaterial({flatShading: true}));
-scene.add(mesh);
+scene.add(result);
+
+const cube = new BoxGeometry(0.2, 0.2, 0.2);
+cube.addGroup(0, 18, 0);
+cube.addGroup(18, Infinity, 1);
 
 const icosahedron = new IcosahedronGeometry(0.16);
+icosahedron.addGroup(0, 30, 0);
+icosahedron.addGroup(30, Infinity, 2);
 
-const manifold_1 = Manifold.cube([0.2, 0.2, 0.2], true);
+const manifold_1 = new Manifold(geometry2mesh(cube));
 const manifold_2 = new Manifold(geometry2mesh(icosahedron));
 
 const csg = function(operation: BooleanOp) {
-  mesh.geometry?.dispose();
-  mesh.geometry =
+  result.geometry?.dispose();
+  result.geometry =
       mesh2geometry(Manifold[operation](manifold_1, manifold_2).getMesh());
 };
 
@@ -56,8 +67,8 @@ const renderer = new WebGLRenderer({canvas: output, antialias: true});
 const dim = output.getBoundingClientRect();
 renderer.setSize(dim.width, dim.height);
 renderer.setAnimationLoop(function(time: number) {
-  mesh.rotation.x = time / 2000;
-  mesh.rotation.y = time / 1000;
+  result.rotation.x = time / 2000;
+  result.rotation.y = time / 1000;
   renderer.render(scene, camera);
 });
 
