@@ -82,7 +82,7 @@ function csg(operation: BooleanOp) {
 }
 
 csg('union');
-const selectElement = document.querySelector('select') as HTMLSelectElement;
+const selectElement = document.querySelector('select')!;
 selectElement.onchange = function() {
   csg(selectElement.value as BooleanOp);
 };
