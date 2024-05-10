@@ -37,7 +37,7 @@ const materials = [
   new MeshLambertMaterial({color: 'blue', flatShading: true})
 ];
 const firstID = Manifold.reserveIDs(materials.length);
-const ids = Array<number>(materials.length).map((_, idx) => firstID + idx);
+const ids = [...Array<number>(materials.length)].map((_, idx) => firstID + idx);
 const id2matIndex = new Map();
 ids.forEach((id, idx) => id2matIndex.set(id, idx));
 
@@ -69,7 +69,7 @@ selectElement.onchange = function() {
   csg(selectElement.value as BooleanOp);
 };
 
-csg('difference');
+csg('union');
 
 const output = document.querySelector('#output')!;
 const renderer = new WebGLRenderer({canvas: output, antialias: true});
@@ -105,10 +105,17 @@ function mesh2geometry(mesh: Mesh) {
   geometry.setAttribute(
       'position', new BufferAttribute(mesh.vertProperties, 3));
   geometry.setIndex(new BufferAttribute(mesh.triVerts, 1));
+
+  let id = mesh.runOriginalID[0];
+  let start = mesh.runIndex[0];
   for (let run = 0; run < mesh.numRun; ++run) {
-    geometry.addGroup(
-        mesh.runIndex[run], mesh.runIndex[run + 1] - mesh.runIndex[run],
-        id2matIndex.get(mesh.runOriginalID[run]));
+    const nextID = mesh.runOriginalID[run + 1];
+    if (nextID !== id) {
+      const end = mesh.runIndex[run + 1];
+      geometry.addGroup(start, end - start, id2matIndex.get(id));
+      id = nextID;
+      start = end;
+    }
   }
   return geometry;
 }
