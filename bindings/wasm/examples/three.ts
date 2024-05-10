@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {AmbientLight, BoxGeometry, BufferAttribute, BufferGeometry, IcosahedronGeometry, Mesh as ThreeMesh, MeshLambertMaterial, MeshNormalMaterial, MeshPhongMaterial, MeshStandardMaterial, PerspectiveCamera, PointLight, Scene, WebGLRenderer} from 'three';
+import {BoxGeometry, BufferAttribute, BufferGeometry, IcosahedronGeometry, Mesh as ThreeMesh, MeshLambertMaterial, MeshNormalMaterial, PerspectiveCamera, PointLight, Scene, WebGLRenderer} from 'three';
 
 import Module, {Mesh} from './built/manifold.js';
 
@@ -36,6 +36,11 @@ const materials = [
   new MeshLambertMaterial({color: 'red', flatShading: true}),
   new MeshLambertMaterial({color: 'blue', flatShading: true})
 ];
+const firstID = Manifold.reserveIDs(materials.length);
+const ids = Array<number>(materials.length).map((_, idx) => firstID + idx);
+const id2matIndex = new Map();
+ids.forEach((id, idx) => id2matIndex.set(id, idx));
+
 const result = new ThreeMesh(undefined, materials);
 scene.add(result);
 
@@ -54,8 +59,8 @@ const manifold_2 = new Manifold(geometry2mesh(icosahedron));
 
 const csg = function(operation: BooleanOp) {
   result.geometry?.dispose();
-  result.geometry = cube;
-  // mesh2geometry(Manifold[operation](manifold_1, manifold_2).getMesh());
+  result.geometry =
+      mesh2geometry(Manifold[operation](manifold_1, manifold_2).getMesh());
 };
 
 const selectElement = document.querySelector('select') as HTMLSelectElement;
@@ -82,7 +87,15 @@ function geometry2mesh(geometry: BufferGeometry) {
   const triVerts = geometry.index != null ?
       geometry.index.array as Uint32Array :
       new Uint32Array(vertProperties.length / 3).map((_, idx) => idx);
-  const mesh = new Mesh({numProp: 3, vertProperties, triVerts});
+  const runIndex = new Uint32Array(geometry.groups.length + 1)
+                       .map((_, idx) => geometry.groups[idx]?.start ?? 0);
+  runIndex.set([triVerts.length], runIndex.length - 1);
+  const runOriginalID =
+      new Uint32Array(geometry.groups.length)
+          .map((_, idx) => ids[geometry.groups[idx].materialIndex!]);
+
+  const mesh =
+      new Mesh({numProp: 3, vertProperties, triVerts, runIndex, runOriginalID});
   mesh.merge();
   return mesh;
 }
@@ -92,5 +105,10 @@ function mesh2geometry(mesh: Mesh) {
   geometry.setAttribute(
       'position', new BufferAttribute(mesh.vertProperties, 3));
   geometry.setIndex(new BufferAttribute(mesh.triVerts, 1));
+  for (let run = 0; run < mesh.numRun; ++run) {
+    geometry.addGroup(
+        mesh.runIndex[run], mesh.runIndex[run + 1] - mesh.runIndex[run],
+        id2matIndex.get(mesh.runOriginalID[run]));
+  }
   return geometry;
 }
