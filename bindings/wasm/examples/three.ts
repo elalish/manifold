@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {BoxGeometry, BufferAttribute, BufferGeometry, IcosahedronGeometry, Mesh as ThreeMesh, MeshLambertMaterial, MeshNormalMaterial, PerspectiveCamera, Scene, WebGLRenderer} from 'three';
+import {AmbientLight, BoxGeometry, BufferAttribute, BufferGeometry, IcosahedronGeometry, Mesh as ThreeMesh, MeshLambertMaterial, MeshNormalMaterial, MeshPhongMaterial, MeshStandardMaterial, PerspectiveCamera, PointLight, Scene, WebGLRenderer} from 'three';
 
 import Module, {Mesh} from './built/manifold.js';
 
@@ -28,20 +28,24 @@ const camera = new PerspectiveCamera(30, 1, 0.01, 10);
 camera.position.z = 1;
 
 const scene = new Scene();
+scene.add(camera);
+camera.add(new PointLight(0xffffff, 1));
+
 const materials = [
   new MeshNormalMaterial({flatShading: true}),
   new MeshLambertMaterial({color: 'red', flatShading: true}),
   new MeshLambertMaterial({color: 'blue', flatShading: true})
 ];
-const result =
-    new ThreeMesh(undefined, new MeshNormalMaterial({flatShading: true}));
+const result = new ThreeMesh(undefined, materials);
 scene.add(result);
 
 const cube = new BoxGeometry(0.2, 0.2, 0.2);
+cube.clearGroups();
 cube.addGroup(0, 18, 0);
 cube.addGroup(18, Infinity, 1);
 
 const icosahedron = new IcosahedronGeometry(0.16);
+icosahedron.clearGroups();
 icosahedron.addGroup(0, 30, 0);
 icosahedron.addGroup(30, Infinity, 2);
 
@@ -50,8 +54,8 @@ const manifold_2 = new Manifold(geometry2mesh(icosahedron));
 
 const csg = function(operation: BooleanOp) {
   result.geometry?.dispose();
-  result.geometry =
-      mesh2geometry(Manifold[operation](manifold_1, manifold_2).getMesh());
+  result.geometry = cube;
+  // mesh2geometry(Manifold[operation](manifold_1, manifold_2).getMesh());
 };
 
 const selectElement = document.querySelector('select') as HTMLSelectElement;
