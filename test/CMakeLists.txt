@@ -44,6 +44,9 @@ endif()
 
 add_executable(${PROJECT_NAME} ${SOURCE_FILES})
 target_link_libraries(${PROJECT_NAME} polygon GTest::gtest_main manifold sdf samples cross_section)
+if(MANIFOLD_HULL)
+    target_link_libraries(${PROJECT_NAME} hull)
+endif()
 
 if(MANIFOLD_FUZZ)
   FetchContent_Declare(fuzztest

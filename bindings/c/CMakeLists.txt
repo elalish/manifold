@@ -21,6 +21,10 @@ target_link_libraries(
     PRIVATE manifold sdf cross_section
 )
 
+if(MANIFOLD_HULL)
+    target_link_libraries(${PROJECT_NAME} PRIVATE hull)
+endif()
+
 target_include_directories(${PROJECT_NAME} PUBLIC
     $<INSTALL_INTERFACE:include/${CMAKE_PROJECT_NAME}>
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>)

@@ -16,9 +16,6 @@
 #include <map>
 #include <numeric>
 
-#ifdef MANIFOLD_HULL
-#include "QuickHull.hpp"
-#endif
 #include "boolean3.h"
 #include "csg_tree.h"
 #include "impl.h"
@@ -905,55 +902,6 @@ CrossSection Manifold::Project() const {
 }
 
 ExecutionParams& ManifoldParams() { return manifoldParams; }
-
-#ifdef MANIFOLD_HULL
-/**
- * Compute the convex hull of a set of points. If the given points are fewer
- * than 4, or they are all coplanar, an empty Manifold will be returned.
- *
- * @param pts A vector of 3-dimensional points over which to compute a convex
- * hull.
- */
-Manifold Manifold::Hull(const std::vector<glm::vec3>& pts) {
-  ZoneScoped;
-  const int numVert = pts.size();
-  if (numVert < 4) return Manifold();
-
-  std::vector<quickhull::Vector3<double>> vertices(numVert);
-  for (int i = 0; i < numVert; i++) {
-    vertices[i] = {pts[i].x, pts[i].y, pts[i].z};
-  }
-
-  quickhull::QuickHull<double> qh;
-  // bools: correct triangle winding, and use original indices
-  auto hull = qh.getConvexHull(vertices, false, true);
-  const auto& triangles = hull.getIndexBuffer();
-  const int numTris = triangles.size() / 3;
-
-  Mesh mesh;
-  mesh.vertPos = pts;
-  mesh.triVerts.reserve(numTris);
-  for (int i = 0; i < numTris; i++) {
-    const int j = i * 3;
-    mesh.triVerts.push_back({triangles[j], triangles[j + 1], triangles[j + 2]});
-  }
-  return Manifold(mesh);
-}
-
-/**
- * Compute the convex hull of this manifold.
- */
-Manifold Manifold::Hull() const { return Hull(GetMesh().vertPos); }
-
-/**
- * Compute the convex hull enveloping a set of manifolds.
- *
- * @param manifolds A vector of manifolds over which to compute a convex hull.
- */
-Manifold Manifold::Hull(const std::vector<Manifold>& manifolds) {
-  return Compose(manifolds).Hull();
-}
-#endif
 
 /**
  * Returns the minimum gap between two manifolds. Returns a float between
