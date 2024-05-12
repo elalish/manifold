@@ -14,15 +14,15 @@
 
 project (manifold)
 
-file(GLOB_RECURSE SOURCE_FILES CONFIGURE_DEPENDS *.cpp)
+file(GLOB_RECURSE SOURCE_FILES CONFIGURE_DEPENDS src/*.cpp)
 add_library(${PROJECT_NAME} ${SOURCE_FILES})
 
 target_include_directories(${PROJECT_NAME} PUBLIC
     $<INSTALL_INTERFACE:include/${CMAKE_PROJECT_NAME}>
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>)
 target_link_libraries(${PROJECT_NAME}
-    PUBLIC utilities cross_section sdf
-    PRIVATE collider polygon ${MANIFOLD_INCLUDE} quickhull
+    PUBLIC utilities cross_section
+    PRIVATE collider polygon
 )
 
 target_compile_options(${PROJECT_NAME} PRIVATE ${MANIFOLD_FLAGS})
@@ -32,4 +32,17 @@ target_compile_features(${PROJECT_NAME}
 )
 
 install(TARGETS ${PROJECT_NAME} EXPORT manifoldTargets)
+
+if(MANIFOLD_HULL)
+add_library(hull module/hull.cpp)
+target_link_libraries(hull
+    PRIVATE manifold quickhull
+)
+target_compile_options(hull PRIVATE ${MANIFOLD_FLAGS})
+target_compile_features(hull
+    PUBLIC cxx_std_17
+)
+install(TARGETS hull EXPORT manifoldTargets)
+endif()
+
 install(FILES include/manifold.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${CMAKE_PROJECT_NAME})

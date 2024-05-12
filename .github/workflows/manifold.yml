@@ -28,7 +28,7 @@ jobs:
       with:
         submodules: recursive
     - uses: jwlawson/actions-setup-cmake@v2
-    - name: Build ${{matrix.backend}}
+    - name: Build ${{matrix.parallel_backend}}
       if: matrix.parallel_backend != 'NONE'
       run: |
         mkdir build
@@ -91,7 +91,7 @@ jobs:
         mkdir build
         cd build
         cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DMANIFOLD_PYBIND=ON -DMANIFOLD_DEBUG=ON -DMANIFOLD_CBIND=ON -DMANIFOLD_PAR=TBB .. && make
-    - name: Test ${{matrix.parallel_backend}}
+    - name: Test
       run: |
         cd build/test
         ./manifold_test --gtest_filter=CBIND.*
@@ -155,10 +155,10 @@ jobs:
         submodules: recursive
     - uses: jwlawson/actions-setup-cmake@v2
     - uses: ilammy/msvc-dev-cmd@v1
-    - name: Build ${{matrix.backend}}
+    - name: Build ${{matrix.parallel_backend}}
       shell: powershell
       run: |
-        cmake . -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DMANIFOLD_DEBUG=ON -DMANIFOLD_PAR=${{matrix.parallel_backend}} -A x64 -B build
+        cmake . -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DMANIFOLD_DEBUG=ON -DMANIFOLD_HULL=${{matrix.parallel_backend == 'NONE' && 'ON' || 'OFF'}} -DMANIFOLD_PAR=${{matrix.parallel_backend}} -A x64 -B build
         cd build
         cmake --build . --target ALL_BUILD --config Release
     - name: Test ${{matrix.parallel_backend}}

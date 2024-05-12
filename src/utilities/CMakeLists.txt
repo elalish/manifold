@@ -80,6 +80,11 @@ if(MANIFOLD_DEBUG)
         INTERFACE -DMANIFOLD_DEBUG)
 endif()
 
+if(MANIFOLD_HULL)
+    target_compile_options(${PROJECT_NAME}
+        INTERFACE -DMANIFOLD_HULL)
+endif()
+
 target_compile_features(${PROJECT_NAME} INTERFACE cxx_std_17)
 
 install(TARGETS ${PROJECT_NAME} EXPORT manifoldTargets)

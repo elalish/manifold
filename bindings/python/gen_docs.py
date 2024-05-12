@@ -3,16 +3,17 @@ import re
 
 base = dirname(dirname(dirname(__file__)))
 
+
 def snake_case(name):
     return re.sub("([a-z0-9])([A-Z])", r"\1_\2", name).lower()
 
 
 def python_param_modifier(comment):
     # p = f":{snake_case(m[0][1:])}:"
-    comment = re.sub(r"@(param \w+)", lambda m: f':{snake_case(m[1])}:', comment)
+    comment = re.sub(r"@(param \w+)", lambda m: f":{snake_case(m[1])}:", comment)
     # python API renames `MeshGL` to `Mesh`
-    comment = re.sub('mesh_gl', 'mesh', comment)
-    comment = re.sub('MeshGL', 'Mesh', comment)
+    comment = re.sub("mesh_gl", "mesh", comment)
+    comment = re.sub("MeshGL", "Mesh", comment)
     return comment
 
 
@@ -90,6 +91,7 @@ def select_functions(s):
 collect(f"{base}/src/manifold/src/manifold.cpp", lambda s: method_re.search(s))
 collect(f"{base}/src/manifold/src/constructors.cpp", lambda s: method_re.search(s))
 collect(f"{base}/src/manifold/src/sort.cpp", lambda s: method_re.search(s))
+collect(f"{base}/src/manifold/module/hull.cpp", lambda s: method_re.search(s))
 collect(
     f"{base}/src/cross_section/src/cross_section.cpp", lambda s: method_re.search(s)
 )

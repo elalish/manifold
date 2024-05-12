@@ -26,5 +26,9 @@ target_link_libraries(samples
     PUBLIC manifold sdf
 )
 
+if(MANIFOLD_HULL)
+    target_link_libraries(${PROJECT_NAME} PRIVATE hull)
+endif()
+
 target_compile_options(samples PRIVATE ${MANIFOLD_FLAGS})
 target_compile_features(samples PUBLIC cxx_std_17)
