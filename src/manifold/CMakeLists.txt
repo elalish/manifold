@@ -21,9 +21,14 @@ target_include_directories(${PROJECT_NAME} PUBLIC
     $<INSTALL_INTERFACE:include/${CMAKE_PROJECT_NAME}>
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>)
 target_link_libraries(${PROJECT_NAME}
-    PUBLIC utilities cross_section sdf
-    PRIVATE collider polygon ${MANIFOLD_INCLUDE} quickhull
+    PUBLIC utilities cross_section
+    PRIVATE collider polygon
 )
+if(MANIFOLD_HULL)
+target_link_libraries(${PROJECT_NAME}
+    PRIVATE quickhull
+)
+endif()
 
 target_compile_options(${PROJECT_NAME} PRIVATE ${MANIFOLD_FLAGS})
 

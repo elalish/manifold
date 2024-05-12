@@ -19,6 +19,7 @@ set(CMAKE_VERBOSE_MAKEFILE ON)
 
 set(MANIFOLD_PAR "NONE" CACHE STRING "Parallel backend, either \"TBB\" or \"NONE\"")
 set(MANIFOLD_FLAGS "" CACHE STRING "Manifold compiler flags")
+option(MANIFOLD_HULL "Build 3D convex hull support (via quickhull)" ON)
 option(MANIFOLD_EXPORT "Build mesh export (via assimp) utility library" OFF)
 option(MANIFOLD_TEST "Enable testing suite" ON)
 # fuzztest is a rather large dependency

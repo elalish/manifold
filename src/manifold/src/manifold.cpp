@@ -16,7 +16,9 @@
 #include <map>
 #include <numeric>
 
+#ifdef MANIFOLD_HULL
 #include "QuickHull.hpp"
+#endif
 #include "boolean3.h"
 #include "csg_tree.h"
 #include "impl.h"
@@ -913,6 +915,7 @@ ExecutionParams& ManifoldParams() { return manifoldParams; }
  */
 Manifold Manifold::Hull(const std::vector<glm::vec3>& pts) {
   ZoneScoped;
+#ifdef MANIFOLD_HULL
   const int numVert = pts.size();
   if (numVert < 4) return Manifold();
 
@@ -935,6 +938,9 @@ Manifold Manifold::Hull(const std::vector<glm::vec3>& pts) {
     mesh.triVerts.push_back({triangles[j], triangles[j + 1], triangles[j + 2]});
   }
   return Manifold(mesh);
+#else
+  return Manifold();
+#endif
 }
 
 /**
