@@ -906,6 +906,7 @@ CrossSection Manifold::Project() const {
 
 ExecutionParams& ManifoldParams() { return manifoldParams; }
 
+#ifdef MANIFOLD_HULL
 /**
  * Compute the convex hull of a set of points. If the given points are fewer
  * than 4, or they are all coplanar, an empty Manifold will be returned.
@@ -915,7 +916,6 @@ ExecutionParams& ManifoldParams() { return manifoldParams; }
  */
 Manifold Manifold::Hull(const std::vector<glm::vec3>& pts) {
   ZoneScoped;
-#ifdef MANIFOLD_HULL
   const int numVert = pts.size();
   if (numVert < 4) return Manifold();
 
@@ -938,9 +938,6 @@ Manifold Manifold::Hull(const std::vector<glm::vec3>& pts) {
     mesh.triVerts.push_back({triangles[j], triangles[j + 1], triangles[j + 2]});
   }
   return Manifold(mesh);
-#else
-  return Manifold();
-#endif
 }
 
 /**
@@ -956,6 +953,7 @@ Manifold Manifold::Hull() const { return Hull(GetMesh().vertPos); }
 Manifold Manifold::Hull(const std::vector<Manifold>& manifolds) {
   return Compose(manifolds).Hull();
 }
+#endif
 
 /**
  * Returns the minimum gap between two manifolds. Returns a float between
