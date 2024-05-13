@@ -16,6 +16,7 @@
 
 #include "impl.h"
 #include "par.h"
+#include "tri_dist.h"
 
 namespace {
 using namespace manifold;
@@ -415,4 +416,48 @@ bool Manifold::Impl::IsIndexInBounds(VecView<const glm::ivec3> triVerts) const {
 
   return minmax[0] >= 0 && minmax[1] < NumVert();
 }
+
+/*
+ * Returns the minimum gap between two manifolds. Returns a float between
+ * 0 and searchLength.
+ */
+float Manifold::Impl::MinGap(const Manifold::Impl& other,
+                             float searchLength) const {
+  ZoneScoped;
+  Vec<Box> faceBoxOther;
+  Vec<uint32_t> faceMortonOther;
+
+  other.GetFaceBoxMorton(faceBoxOther, faceMortonOther);
+
+  transform(autoPolicy(faceBoxOther.size()), faceBoxOther.begin(),
+            faceBoxOther.end(), faceBoxOther.begin(),
+            [searchLength](const Box& box) {
+              return Box(box.min - glm::vec3(searchLength),
+                         box.max + glm::vec3(searchLength));
+            });
+
+  SparseIndices collisions = collider_.Collisions(faceBoxOther.cview());
+
+  float minDistanceSquared = transform_reduce<float>(
+      autoPolicy(collisions.size()), thrust::counting_iterator<int>(0),
+      thrust::counting_iterator<int>(collisions.size()),
+      [&collisions, this, &other](int i) {
+        const int tri = collisions.Get(i, 1);
+        const int triOther = collisions.Get(i, 0);
+
+        std::array<glm::vec3, 3> p;
+        std::array<glm::vec3, 3> q;
+
+        for (const int j : {0, 1, 2}) {
+          p[j] = vertPos_[halfedge_[3 * tri + j].startVert];
+          q[j] = other.vertPos_[other.halfedge_[3 * triOther + j].startVert];
+        }
+
+        return DistanceTriangleTriangleSquared(p, q);
+      },
+      searchLength * searchLength, thrust::minimum<float>());
+
+  return sqrt(minDistanceSquared);
+};
+
 }  // namespace manifold
