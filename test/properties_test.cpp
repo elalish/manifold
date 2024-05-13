@@ -196,3 +196,63 @@ TEST(Manifold, MinGapAfterTransformationsOutOfBounds) {
 
   ASSERT_NEAR(distance, 0.95f, 0.001f);
 }
+
+TEST(Manifold, TriangleDistanceClosestPointsOnVertices) {
+  std::array<glm::vec3, 3> p = {glm::vec3{-1, 0, 0}, glm::vec3{1, 0, 0},
+                                glm::vec3{0, 1, 0}};
+
+  std::array<glm::vec3, 3> q = {glm::vec3{2, 0, 0}, glm::vec3{4, 0, 0},
+                                glm::vec3{3, 1, 0}};
+
+  float distance = DistanceTriangleTriangleSquared(p, q);
+
+  EXPECT_FLOAT_EQ(distance, 1);
+}
+
+TEST(Manifold, TriangleDistanceClosestPointOnEdge) {
+  std::array<glm::vec3, 3> p = {glm::vec3{-1, 0, 0}, glm::vec3{1, 0, 0},
+                                glm::vec3{0, 1, 0}};
+
+  std::array<glm::vec3, 3> q = {glm::vec3{-1, 2, 0}, glm::vec3{1, 2, 0},
+                                glm::vec3{0, 3, 0}};
+
+  float distance = DistanceTriangleTriangleSquared(p, q);
+
+  EXPECT_FLOAT_EQ(distance, 1);
+}
+
+TEST(Manifold, TriangleDistanceClosestPointOnEdge2) {
+  std::array<glm::vec3, 3> p = {glm::vec3{-1, 0, 0}, glm::vec3{1, 0, 0},
+                                glm::vec3{0, 1, 0}};
+
+  std::array<glm::vec3, 3> q = {glm::vec3{1, 1, 0}, glm::vec3{3, 1, 0},
+                                glm::vec3{2, 2, 0}};
+
+  float distance = DistanceTriangleTriangleSquared(p, q);
+
+  EXPECT_FLOAT_EQ(distance, 0.5f);
+}
+
+TEST(Manifold, TriangleDistanceClosestPointOnFace) {
+  std::array<glm::vec3, 3> p = {glm::vec3{-1, 0, 0}, glm::vec3{1, 0, 0},
+                                glm::vec3{0, 1, 0}};
+
+  std::array<glm::vec3, 3> q = {glm::vec3{-1, 2, -0.5f}, glm::vec3{1, 2, -0.5f},
+                                glm::vec3{0, 2, 1.5f}};
+
+  float distance = DistanceTriangleTriangleSquared(p, q);
+
+  EXPECT_FLOAT_EQ(distance, 1);
+}
+
+TEST(Manifold, TriangleDistanceOverlapping) {
+  std::array<glm::vec3, 3> p = {glm::vec3{-1, 0, 0}, glm::vec3{1, 0, 0},
+                                glm::vec3{0, 1, 0}};
+
+  std::array<glm::vec3, 3> q = {glm::vec3{-1, 0, 0}, glm::vec3{1, 0.5f, 0},
+                                glm::vec3{0, 1, 0}};
+
+  float distance = DistanceTriangleTriangleSquared(p, q);
+
+  EXPECT_FLOAT_EQ(distance, 0);
+}
