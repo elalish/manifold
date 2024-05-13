@@ -17,7 +17,7 @@ import '@vitest/web-worker';
 import {WebIO} from '@gltf-transform/core';
 import {expect, suite, test} from 'vitest';
 
-import Module from './built/manifold.js';
+import Module from './built/manifold';
 import {readMesh, setupIO} from './gltf-io';
 import {examples} from './public/examples.js';
 import ManifoldWorker from './worker?worker';

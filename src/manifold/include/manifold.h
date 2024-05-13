@@ -77,7 +77,10 @@ struct MeshGL {
   /// Optional: Indicates runs of triangles that correspond to a particular
   /// input mesh instance. The runs encompass all of triVerts and are sorted
   /// by runOriginalID. Run i begins at triVerts[runIndex[i]] and ends at
-  /// triVerts[runIndex[i+1]]. All runIndex values are divisible by 3.
+  /// triVerts[runIndex[i+1]]. All runIndex values are divisible by 3. Returned
+  /// runIndex will always be 1 longer than runOriginalID, but same length is
+  /// also allowed as input: triVerts.size() will be automatically appended in
+  /// this case.
   std::vector<uint32_t> runIndex;
   /// Optional: The OriginalID of the mesh this triangle run came from. This ID
   /// is ideal for reapplying materials to the output mesh. Multiple runs may

@@ -35,114 +35,24 @@
 </head>
 
 <body>
-  <p>This example demonstrates feeding Manifold's output into <a
-      href="https://modelviewer.dev/">&lt;model-viewer&gt;</a> via <a
-      href="https://gltf-transform.donmccurdy.com/index.html">gltf-transform</a>. It also shows how to pass mesh
-    properties like UV coordinates through Manifold and how to re-associate textures after operations. A more basic
-    three.js example is <a href="three.html">here</a>. </p>
+  <p>This example demonstrates reading and writing glTF models using <a
+      href="https://gltf-transform.donmccurdy.com/index.html">gltf-transform</a> and using this to feed Manifold's
+    output into <a href="https://modelviewer.dev/">&lt;model-viewer&gt;</a>. It also shows how to pass mesh properties
+    like UV coordinates through Manifold and how to re-associate textures and materials after operations, made simple
+    using our `gltf-io.ts` library. The resulting glTF includes the EXT_mesh_manifold extension, using our
+    `manifold-gltf.ts` extension to gltf-transform, which ensures lossless data transfer.</p>
+  <p>Please open dev tools to inspect our source code - everything is source mapped back to our TS files and commented
+    thoroughly. A more basic three.js example is <a href="three.html">here</a>. </p>
   <select>
     <option value="difference" selected>Difference</option>
     <option value="intersection">Intersection</option>
     <option value="union">Union</option>
   </select>
   <button id="download">Download manifold GLB</button>
-  <model-viewer camera-controls shadow-intensity="1" tone-mapping="commerce"
+  <model-viewer camera-controls shadow-intensity="1" tone-mapping="neutral"
     alt="Output of mesh Boolean operation"></model-viewer>
 </body>
-<script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
-<script type="module">
-  import { Document, WebIO } from '@gltf-transform/core';
-  import { clearNodeTransform, flatten, prune } from '@gltf-transform/functions';
-  import { loadTexture, readMesh, writeMesh, disposeMesh, setupIO } from './gltf-io';
-  import Module from './built/manifold.js';
-
-  const io = setupIO(new WebIO());
-  const doc = new Document();
-
-  const wasm = await Module();
-  wasm.setup();
-
-  const { Manifold, Mesh } = wasm;
-
-  const id2properties = new Map();
-
-  async function readGLB(url) {
-    const manifolds = [];
-    const docIn = await io.read(url);
-    await docIn.transform(flatten());
-    const nodes = docIn.getRoot().listNodes();
-    const ids = [];
-    for (const node of nodes) {
-      clearNodeTransform(node);
-      const materials = [];
-      const tmp = readMesh(node.getMesh());
-      tmp.mesh.runOriginalID = [];
-      const numID = tmp.runProperties.length;
-      const firstID = Manifold.reserveIDs(numID);
-      for (let i = 0; i < numID; ++i) {
-        tmp.mesh.runOriginalID.push(firstID + i);
-        ids.push(firstID + i);
-        id2properties.set(firstID + i, tmp.runProperties[i]);
-      }
-      manifolds.push(Manifold(new Mesh(tmp.mesh)));
-    }
-    // pull in materials, TODO: replace with transfer() when available
-    const startIdx = doc.getRoot().listMaterials().length;
-    doc.merge(docIn);
-    doc.getRoot().listScenes().forEach((s) => s.dispose());
-    doc.getRoot().listBuffers().forEach((s) => s.dispose());
-    doc.getRoot().listAccessors().forEach((s) => s.dispose());
-    for (const [i, id] of ids.entries()) {
-      const material = doc.getRoot().listMaterials()[startIdx + i];
-      id2properties.get(id).material = material;
-    }
-
-    return Manifold.union(manifolds);
-  }
-
-  const space = await readGLB('/models/space.glb');
-  const moon = await readGLB('/models/moon.glb');
-
-  const node = doc.createNode();
-  doc.createScene().addChild(node);
-
-  function csg(operation) {
-    push2MV(Manifold[operation](space, moon));
-  };
-
-  document.querySelector('select').onchange = function (event) {
-    csg(event.target.value);
-  };
-
-  csg('difference');
-
-  const mv = document.querySelector('model-viewer');
-  let objectURL = null;
-
-  const downloadButton = document.querySelector('#download');
-  downloadButton.onclick = function () {
-    const link = document.createElement('a');
-    link.download = 'manifold.glb';
-    link.href = objectURL;
-    link.click();
-  };
-
-  async function push2MV(manifold) {
-    // From Z-up to Y-up (glTF)
-    const manifoldMesh = manifold.rotate([-90, 0, 0]).getMesh();
-
-    disposeMesh(node.getMesh());
-    const mesh = writeMesh(doc, manifoldMesh, id2properties);
-    node.setMesh(mesh);
-    await doc.transform(prune());
-
-    const glb = await io.writeBinary(doc);
-
-    const blob = new Blob([glb], { type: 'application/octet-stream' });
-    URL.revokeObjectURL(objectURL);
-    objectURL = URL.createObjectURL(blob);
-    mv.src = objectURL;
-  }
-</script>
+<script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.5.0/model-viewer.min.js"></script>
+<script type="module" src="model-viewer-script.ts"></script>
 
 </html>
