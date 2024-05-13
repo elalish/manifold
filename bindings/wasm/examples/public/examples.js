@@ -12,6 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+/** @type {import("../../manifold-encapsulated-types")["Manifold"]} */
+const Manifold = globalThis.Manifold;
+
 export const examples = {
   functions: {
     Intro: function() {
@@ -536,7 +539,37 @@ export const examples = {
         0, 0, size / Math.sqrt(2)
       ]);
       return result;
-    }
+    },
+
+    Split: function() {
+      // This example shows how you can use the .split method to performs
+      // a subtraction and an intersection at once
+      const {tetrahedron, sphere} = Manifold;
+      const box = tetrahedron().scale(100);
+      const ball = sphere(90, 100);
+
+      const [inside, outside] = box.split(ball);
+
+      const rootNode = new GLTFNode();
+
+      const outsideNode = new GLTFNode(rootNode);
+      outsideNode.manifold = outside;
+
+      const insideNode = new GLTFNode(rootNode);
+      insideNode.scale = (t) => (t = t * 0.8 + 0.2, [t, t, t]);
+      insideNode.material = {
+        metallic: 0,
+        baseColorFactor: [0, 0.3, 1.0],
+        roughness: 1
+      };
+      insideNode.manifold = inside;
+
+      globalDefaults.animationLength = 3;  // seconds
+      globalDefaults.animationMode = 'ping-pong';
+
+      const result = outside;
+      return result;
+    },
   },
 
   functionBodies: new Map()

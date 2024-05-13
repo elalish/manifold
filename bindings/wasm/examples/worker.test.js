@@ -147,4 +147,11 @@ suite('Examples', () => {
     expect(result.volume).to.be.closeTo(4167, 1, 'Volume');
     expect(result.surfaceArea).to.be.closeTo(5642, 1, 'Surface Area');
   });
+
+  test('Split', async () => {
+    const result = await runExample('Split');
+    expect(result.genus).to.equal(3, 'Genus');
+    expect(result.volume).to.be.closeTo(651871, 1, 'Volume');
+    expect(result.surfaceArea).to.be.closeTo(107690, 1, 'Surface Area');
+  });
 });
