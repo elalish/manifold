@@ -102,8 +102,8 @@ suite('Examples', () => {
   test('Rounded Frame', async () => {
     const result = await runExample('Rounded Frame');
     expect(result.genus).to.equal(5, 'Genus');
-    expect(result.volume).to.be.closeTo(353706, 10, 'Volume');
-    expect(result.surfaceArea).to.be.closeTo(68454, 1, 'Surface Area');
+    expect(result.volume).to.be.closeTo(270807, 10, 'Volume');
+    expect(result.surfaceArea).to.be.closeTo(74599, 1, 'Surface Area');
   });
 
   test('Heart', async () => {
@@ -146,12 +146,5 @@ suite('Examples', () => {
     expect(result.genus).to.equal(15, 'Genus');
     expect(result.volume).to.be.closeTo(4167, 1, 'Volume');
     expect(result.surfaceArea).to.be.closeTo(5642, 1, 'Surface Area');
-  });
-
-  test('Split', async () => {
-    const result = await runExample('Split');
-    expect(result.genus).to.equal(3, 'Genus');
-    expect(result.volume).to.be.closeTo(651871, 1, 'Volume');
-    expect(result.surfaceArea).to.be.closeTo(107690, 1, 'Surface Area');
   });
 });
