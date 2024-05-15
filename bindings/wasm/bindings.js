@@ -248,8 +248,12 @@ Module.setup = function() {
     return this._Translate(vararg2vec3(vec));
   };
 
-  Module.Manifold.prototype.rotate = function(vec) {
-    return this._Rotate(...vec);
+  Module.Manifold.prototype.rotate = function(xOrVec, y, z) {
+    if (Array.isArray(xOrVec)) {
+      return this._Rotate(...xOrVec);
+    } else {
+      return this._Rotate(xOrVec, y || 0, z || 0);
+    }
   };
 
   Module.Manifold.prototype.scale = function(vec) {
@@ -269,14 +273,14 @@ Module.setup = function() {
   };
 
   Module.Manifold.prototype.split = function(manifold) {
-    const vec = this._split(manifold);
+    const vec = this._Split(manifold);
     const result = fromVec(vec);
     vec.delete();
     return result;
   };
 
   Module.Manifold.prototype.splitByPlane = function(normal, offset = 0.) {
-    const vec = this._splitByPlane(vararg2vec3([normal]), offset);
+    const vec = this._SplitByPlane(vararg2vec3([normal]), offset);
     const result = fromVec(vec);
     vec.delete();
     return result;

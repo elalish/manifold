@@ -102,8 +102,8 @@ suite('Examples', () => {
   test('Rounded Frame', async () => {
     const result = await runExample('Rounded Frame');
     expect(result.genus).to.equal(5, 'Genus');
-    expect(result.volume).to.be.closeTo(353706, 10, 'Volume');
-    expect(result.surfaceArea).to.be.closeTo(68454, 1, 'Surface Area');
+    expect(result.volume).to.be.closeTo(270807, 10, 'Volume');
+    expect(result.surfaceArea).to.be.closeTo(74599, 1, 'Surface Area');
   });
 
   test('Heart', async () => {
