@@ -255,6 +255,19 @@ TEST(Samples, Sponge1) {
 // degree rotations.
 TEST(Samples, Sponge4) {
   Manifold sponge = MengerSponge(4);
+  sponge = sponge.Rotate(30, 40, 50);
+  Mesh spongeMesh = sponge.GetMesh();
+  const int nVert = spongeMesh.vertPos.size();
+  std::vector<glm::vec3> spongePts;
+  for (int i = 0; i < nVert; ++i) {
+    spongePts.push_back(spongeMesh.vertPos[i]);
+  }
+  auto spongeHull = Manifold::Hull(spongePts);
+#ifdef MANIFOLD_EXPORT
+  if (options.exportModels) {
+    ExportMesh("sponge_hull.glb", spongeHull.GetMesh(), {});
+  }
+#endif
   CheckNormals(sponge);
   EXPECT_LE(sponge.NumDegenerateTris(), 8);
   EXPECT_EQ(sponge.Genus(), 26433);  // should be 1:5, 2:81, 3:1409, 4:26433
@@ -267,15 +280,6 @@ TEST(Samples, Sponge4) {
   CrossSection projection = cutSponge.first.Project();
   Rect rect = projection.Bounds();
   Box box = cutSponge.first.BoundingBox();
-  EXPECT_EQ(rect.min.x, box.min.x);
-  EXPECT_EQ(rect.min.y, box.min.y);
-  EXPECT_EQ(rect.max.x, box.max.x);
-  EXPECT_EQ(rect.max.y, box.max.y);
-  EXPECT_NEAR(projection.Area(), 0.535, 0.001);
-  Manifold extrusion = Manifold::Extrude(projection, 1);
-  EXPECT_EQ(extrusion.NumDegenerateTris(), 0);
-  EXPECT_EQ(extrusion.Genus(), 502);
-
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) {
     ExportMesh("mengerHalf.glb", cutSponge.first.GetMesh(), {});
@@ -291,6 +295,14 @@ TEST(Samples, Sponge4) {
     ExportMesh("mengerSponge.glb", out, options);
   }
 #endif
+  EXPECT_EQ(rect.min.x, box.min.x);
+  EXPECT_EQ(rect.min.y, box.min.y);
+  EXPECT_EQ(rect.max.x, box.max.x);
+  EXPECT_EQ(rect.max.y, box.max.y);
+  EXPECT_NEAR(projection.Area(), 0.535, 0.001);
+  Manifold extrusion = Manifold::Extrude(projection, 1);
+  EXPECT_EQ(extrusion.NumDegenerateTris(), 0);
+  EXPECT_EQ(extrusion.Genus(), 502);
 }
 #endif
 
