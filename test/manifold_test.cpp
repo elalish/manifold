@@ -17,7 +17,6 @@
 #include <algorithm>
 
 #include "cross_section.h"
-
 #include "samples.h"
 #include "sdf.h"
 #include "test.h"
@@ -553,7 +552,6 @@ TEST(Manifold, MergeDegenerates) {
   EXPECT_EQ(squashed.Status(), Manifold::Error::NoError);
 }
 
-
 TEST(Manifold, PinchedVert) {
   Mesh shape;
   shape.vertPos = {{0, 0, 0},         //
@@ -764,4 +762,3 @@ TEST(Manifold, EmptyHull4) {
       {0, 0, 0}, {1, 0, 0}, {0, 1, 0}, {1, 1, 0}};
   EXPECT_TRUE(Manifold::Hull4(coplanar).IsEmpty());
 }
-
