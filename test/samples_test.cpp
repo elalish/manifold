@@ -17,10 +17,6 @@
 #include "polygon.h"
 #include "test.h"
 
-#ifdef MANIFOLD_EXPORT
-#include "meshIO.h"
-#endif
-
 using namespace manifold;
 
 std::vector<int> EdgePairs(const Mesh in) {
@@ -120,8 +116,8 @@ TEST(Samples, Scallop) {
       3, colorCurvature);
   CheckNormals(scallop);
   auto prop = scallop.GetProperties();
-  EXPECT_NEAR(prop.volume, 41.5, 0.1);
-  EXPECT_NEAR(prop.surfaceArea, 78.8, 0.1);
+  EXPECT_NEAR(prop.volume, 41.4, 0.1);
+  EXPECT_NEAR(prop.surfaceArea, 77.7, 0.1);
   CheckGL(scallop);
 
 #ifdef MANIFOLD_EXPORT
@@ -309,10 +305,8 @@ TEST(Samples, Sponge4) {
 #ifdef MANIFOLD_EXPORT
 TEST(Samples, SelfIntersect) {
   manifold::PolygonParams().processOverlaps = true;
-  std::string file = __FILE__;
-  std::string dir = file.substr(0, file.rfind('/'));
-  Manifold m1 = ImportMesh(dir + "/models/self_intersectA.glb");
-  Manifold m2 = ImportMesh(dir + "/models/self_intersectB.glb");
+  Manifold m1 = ReadMesh("self_intersectA.glb");
+  Manifold m2 = ReadMesh("self_intersectB.glb");
   Manifold res = m1 + m2;
   res.GetMeshGL();  // test crash
   manifold::PolygonParams().processOverlaps = false;
@@ -321,8 +315,8 @@ TEST(Samples, SelfIntersect) {
 TEST(Samples, GenericTwinBooleanTest7081) {
   std::string file = __FILE__;
   std::string dir = file.substr(0, file.rfind('/'));
-  Manifold m1 = ImportMesh(dir + "/models/Generic_Twin_7081.1.t0_left.glb");
-  Manifold m2 = ImportMesh(dir + "/models/Generic_Twin_7081.1.t0_right.glb");
+  Manifold m1 = ReadMesh("Generic_Twin_7081.1.t0_left.glb");
+  Manifold m2 = ReadMesh("Generic_Twin_7081.1.t0_right.glb");
   Manifold res = m1 + m2;  // Union
   res.GetMeshGL();         // test crash
 }
@@ -331,8 +325,8 @@ TEST(Samples, GenericTwinBooleanTest7863) {
   manifold::PolygonParams().processOverlaps = true;
   std::string file = __FILE__;
   std::string dir = file.substr(0, file.rfind('/'));
-  Manifold m1 = ImportMesh(dir + "/models/Generic_Twin_7863.1.t0_left.glb");
-  Manifold m2 = ImportMesh(dir + "/models/Generic_Twin_7863.1.t0_right.glb");
+  Manifold m1 = ReadMesh("Generic_Twin_7863.1.t0_left.glb");
+  Manifold m2 = ReadMesh("Generic_Twin_7863.1.t0_right.glb");
   Manifold res = m1 + m2;  // Union
   res.GetMeshGL();         // test crash
   manifold::PolygonParams().processOverlaps = false;
@@ -342,8 +336,8 @@ TEST(Samples, Havocglass8Bool) {
   manifold::PolygonParams().processOverlaps = true;
   std::string file = __FILE__;
   std::string dir = file.substr(0, file.rfind('/'));
-  Manifold m1 = ImportMesh(dir + "/models/Havocglass8_left.glb");
-  Manifold m2 = ImportMesh(dir + "/models/Havocglass8_right.glb");
+  Manifold m1 = ReadMesh("Havocglass8_left.glb");
+  Manifold m2 = ReadMesh("Havocglass8_right.glb");
   Manifold res = m1 + m2;  // Union
   res.GetMeshGL();         // test crash
   manifold::PolygonParams().processOverlaps = false;
@@ -352,8 +346,8 @@ TEST(Samples, Havocglass8Bool) {
 TEST(Samples, CraycloudBool) {
   std::string file = __FILE__;
   std::string dir = file.substr(0, file.rfind('/'));
-  Manifold m1 = ImportMesh(dir + "/models/Cray_left.glb");
-  Manifold m2 = ImportMesh(dir + "/models/Cray_right.glb");
+  Manifold m1 = ReadMesh("Cray_left.glb");
+  Manifold m2 = ReadMesh("Cray_right.glb");
   Manifold res = m1 - m2;
   EXPECT_EQ(res.Status(), Manifold::Error::NoError);
   EXPECT_TRUE(res.IsEmpty());

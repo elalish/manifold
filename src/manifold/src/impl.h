@@ -42,6 +42,9 @@ struct Manifold::Impl {
     Vec<TriRef> triRef;
     Vec<glm::ivec3> triProperties;
   };
+  struct BaryIndices {
+    int tri, start4, end4;
+  };
 
   Box bBox_;
   float precision_ = -1;
@@ -104,7 +107,6 @@ struct Manifold::Impl {
   SparseIndices EdgeCollisions(const Impl& B, bool inverted = false) const;
   SparseIndices VertexCollisionsZ(VecView<const glm::vec3> vertsIn,
                                   bool inverted = false) const;
-  float MinGap(const Impl& other, float searchLength) const;
 
   bool IsEmpty() const { return NumVert() == 0; }
   int NumVert() const { return vertPos_.size(); }
@@ -127,6 +129,7 @@ struct Manifold::Impl {
   bool Is2Manifold() const;
   bool MatchesTriNormals() const;
   int NumDegenerateTris() const;
+  float MinGap(const Impl& other, float searchLength) const;
 
   // sort.cu
   void Finish();
@@ -160,7 +163,16 @@ struct Manifold::Impl {
   void CollapseTri(const glm::ivec3& triEdge);
   void SplitPinchedVerts();
 
-  // smoothing.cu
+  // subdivision.cpp
+  int GetNeighbor(int tri) const;
+  glm::ivec4 GetHalfedges(int tri) const;
+  BaryIndices GetIndices(int halfedge) const;
+  void FillRetainedVerts(Vec<Barycentric>& vertBary) const;
+  Vec<Barycentric> Subdivide(std::function<int(glm::vec3)>);
+
+  // smoothing.cpp
+  bool IsInsideQuad(int halfedge) const;
+  bool IsMarkedInsideQuad(int halfedge) const;
   glm::vec3 GetNormal(int halfedge, int normalIdx) const;
   std::vector<Smoothness> UpdateSharpenedEdges(
       const std::vector<Smoothness>&) const;
@@ -168,10 +180,11 @@ struct Manifold::Impl {
   Vec<int> VertFlatFace(const Vec<bool>&) const;
   std::vector<Smoothness> SharpenEdges(float minSharpAngle,
                                        float minSmoothness) const;
+  void SharpenTangent(int halfedge, float smoothness);
   void SetNormals(int normalIdx, float minSharpAngle);
+  void LinearizeFlatTangents();
   void CreateTangents(int normalIdx);
   void CreateTangents(std::vector<Smoothness>);
-  Vec<Barycentric> Subdivide(std::function<int(glm::vec3)>);
   void Refine(std::function<int(glm::vec3)>);
 };
 }  // namespace manifold

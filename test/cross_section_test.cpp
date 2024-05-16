@@ -24,10 +24,6 @@
 #include "public.h"
 #include "test.h"
 
-#ifdef MANIFOLD_EXPORT
-#include "meshIO.h"
-#endif
-
 using namespace manifold;
 
 TEST(CrossSection, Square) {

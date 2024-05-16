@@ -7,11 +7,12 @@
     {
       "name": "manifold test",
       "type": "cppdbg",
+      "MIMode": "lldb",
       "request": "launch",
       "program": "${workspaceFolder}/build/test/manifold_test",
       "args": [
         "--gtest_break_on_failure",
-        "--gtest_filter=Manifold.GetMesh"
+        "--gtest_filter=SDF.SineSurface"
       ],
       "stopAtEntry": false,
       "cwd": "${workspaceFolder}/build/test",
@@ -20,7 +21,8 @@
           "name": "MALLOC_CHECK_",
           "value": "2"
         }
-      ]
+      ],
+      "externalConsole": false
     }
   ]
 }

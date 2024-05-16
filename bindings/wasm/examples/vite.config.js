@@ -9,6 +9,7 @@ export default defineConfig({
   },
   build: {
     target: 'esnext',
+    sourcemap: true,
     rollupOptions: {
       input: {
         manifoldCAD: resolve(__dirname, 'index.html'),

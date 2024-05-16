@@ -375,7 +375,8 @@ Manifold::Impl::Impl(const MeshGL& meshGL,
   }
 
   if (!meshGL.runOriginalID.empty() && !meshGL.runIndex.empty() &&
-      meshGL.runOriginalID.size() + 1 != meshGL.runIndex.size()) {
+      meshGL.runOriginalID.size() + 1 != meshGL.runIndex.size() &&
+      meshGL.runOriginalID.size() != meshGL.runIndex.size()) {
     MarkFailure(Error::RunIndexWrongLength);
     return;
   }
@@ -443,8 +444,11 @@ Manifold::Impl::Impl(const MeshGL& meshGL,
     relation.originalID = Impl::ReserveIDs(1);
   } else {
     std::vector<uint32_t> runIndex = meshGL.runIndex;
+    const uint32_t runEnd = meshGL.triVerts.size();
     if (runIndex.empty()) {
-      runIndex = {0, 3 * meshGL.NumTri()};
+      runIndex = {0, runEnd};
+    } else if (runIndex.size() == meshGL.runOriginalID.size()) {
+      runIndex.push_back(runEnd);
     }
     relation.triRef.resize(meshGL.NumTri());
     const int startID = Impl::ReserveIDs(meshGL.runOriginalID.size());
@@ -903,48 +907,5 @@ SparseIndices Manifold::Impl::VertexCollisionsZ(
   else
     return collider_.Collisions<false, false>(vertsIn);
 }
-
-/*
- * Returns the minimum gap between two manifolds. Returns a float between
- * 0 and searchLength.
- */
-float Manifold::Impl::MinGap(const Manifold::Impl& other,
-                             float searchLength) const {
-  ZoneScoped;
-  Vec<Box> faceBoxOther;
-  Vec<uint32_t> faceMortonOther;
-
-  other.GetFaceBoxMorton(faceBoxOther, faceMortonOther);
-
-  transform(autoPolicy(faceBoxOther.size()), faceBoxOther.begin(),
-            faceBoxOther.end(), faceBoxOther.begin(),
-            [searchLength](const Box& box) {
-              return Box(box.min - glm::vec3(searchLength),
-                         box.max + glm::vec3(searchLength));
-            });
-
-  SparseIndices collisions = collider_.Collisions(faceBoxOther.cview());
-
-  float minDistanceSquared = transform_reduce<float>(
-      autoPolicy(collisions.size()), thrust::counting_iterator<int>(0),
-      thrust::counting_iterator<int>(collisions.size()),
-      [&collisions, this, &other](int i) {
-        const int tri = collisions.Get(i, 1);
-        const int triOther = collisions.Get(i, 0);
-
-        std::array<glm::vec3, 3> p;
-        std::array<glm::vec3, 3> q;
-
-        for (const int j : {0, 1, 2}) {
-          p[j] = vertPos_[halfedge_[3 * tri + j].startVert];
-          q[j] = other.vertPos_[other.halfedge_[3 * triOther + j].startVert];
-        }
-
-        return DistanceTriangleTriangleSquared(p, q);
-      },
-      searchLength * searchLength, thrust::minimum<float>());
-
-  return sqrt(minDistanceSquared);
-};
 
 }  // namespace manifold

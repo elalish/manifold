@@ -17,7 +17,7 @@ import '@vitest/web-worker';
 import {WebIO} from '@gltf-transform/core';
 import {expect, suite, test} from 'vitest';
 
-import Module from './built/manifold.js';
+import Module from './built/manifold';
 import {readMesh, setupIO} from './gltf-io';
 import {examples} from './public/examples.js';
 import ManifoldWorker from './worker?worker';
@@ -102,8 +102,8 @@ suite('Examples', () => {
   test('Rounded Frame', async () => {
     const result = await runExample('Rounded Frame');
     expect(result.genus).to.equal(5, 'Genus');
-    expect(result.volume).to.be.closeTo(353706, 10, 'Volume');
-    expect(result.surfaceArea).to.be.closeTo(68454, 1, 'Surface Area');
+    expect(result.volume).to.be.closeTo(270807, 10, 'Volume');
+    expect(result.surfaceArea).to.be.closeTo(74599, 1, 'Surface Area');
   });
 
   test('Heart', async () => {
@@ -116,8 +116,8 @@ suite('Examples', () => {
   test('Scallop', async () => {
     const result = await runExample('Scallop');
     expect(result.genus).to.equal(0, 'Genus');
-    expect(result.volume).to.be.closeTo(41500, 100, 'Volume');
-    expect(result.surfaceArea).to.be.closeTo(7880, 10, 'Surface Area');
+    expect(result.volume).to.be.closeTo(41400, 100, 'Volume');
+    expect(result.surfaceArea).to.be.closeTo(7770, 10, 'Surface Area');
   });
 
   test('Torus Knot', async () => {
