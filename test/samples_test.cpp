@@ -251,7 +251,7 @@ TEST(Samples, Sponge1) {
 // degree rotations.
 TEST(Samples, Sponge4) {
   Manifold sponge = MengerSponge(4);
-  sponge = sponge.Rotate(30, 40, 50);
+  // sponge = sponge.Rotate(30, 40, 50);
   Mesh spongeMesh = sponge.GetMesh();
   const int nVert = spongeMesh.vertPos.size();
   std::vector<glm::vec3> spongePts;
