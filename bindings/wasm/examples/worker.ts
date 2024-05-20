@@ -18,10 +18,9 @@ import {fileForContentTypes, FileForRelThumbnail, to3dmodel} from '@jscadui/3mf-
 import {strToU8, Zippable, zipSync} from 'fflate'
 import * as glMatrix from 'gl-matrix';
 
-import Module from './built/manifold';
+import Module, {CrossSection, Manifold, ManifoldToplevel, Mesh, Vec3} from './built/manifold';
 import {Properties, setupIO, writeMesh} from './gltf-io';
 import {GLTFMaterial, Quat} from './public/editor';
-import type {CrossSection, Manifold, ManifoldToplevel, Mesh, Vec3} from './public/manifold';
 
 interface GlobalDefaults {
   roughness: number;
@@ -788,7 +787,7 @@ async function exportModels(defaults: GlobalDefaults, manifold?: Manifold) {
   const fileForRelThumbnail = new FileForRelThumbnail();
   fileForRelThumbnail.add3dModel('3D/3dmodel.model')
 
-  const model = to3dmodel(to3mf);
+  const model = to3dmodel(to3mf as any);
   const files: Zippable = {};
   files['3D/3dmodel.model'] = strToU8(model);
   files[fileForContentTypes.name] = strToU8(fileForContentTypes.content);
