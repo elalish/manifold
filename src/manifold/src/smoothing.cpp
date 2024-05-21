@@ -672,13 +672,15 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
             },
             [&faceEdges, &tangent, this](int halfedge, const FlatNormal& here,
                                          const FlatNormal& next) {
+              if (IsInsideQuad(halfedge)) {
+                tangent[halfedge] = {0, 0, 0, -1};
+                return;
+              }
+              // mark special edges
               const glm::vec3 diff = next.normal - here.normal;
               const bool differentNormals =
                   glm::dot(diff, diff) > kTolerance * kTolerance;
-              if (IsInsideQuad(halfedge)) {
-                tangent[halfedge] = {0, 0, 0, -1};
-              } else if (differentNormals ||
-                         here.isFlatFace != next.isFlatFace) {
+              if (differentNormals || here.isFlatFace != next.isFlatFace) {
                 if (faceEdges[0] == -1) {
                   faceEdges[0] = halfedge;
                 } else if (faceEdges[1] == -1) {
@@ -686,16 +688,17 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
                 } else {
                   faceEdges[0] = -2;
                 }
-                if (differentNormals) {
-                  const glm::vec3 edge =
-                      vertPos_[halfedge_[halfedge].endVert] -
-                      vertPos_[halfedge_[halfedge].startVert];
-                  const glm::vec3 dir = glm::cross(here.normal, next.normal);
-                  tangent[halfedge] = CircularTangent(
-                      glm::sign(glm::dot(dir, edge)) * dir, edge);
-                }
+              }
+              // calculate tangents
+              const glm::vec3 edge = vertPos_[halfedge_[halfedge].endVert] -
+                                     vertPos_[halfedge_[halfedge].startVert];
+              if (differentNormals) {
+                const glm::vec3 dir = glm::cross(here.normal, next.normal);
+                tangent[halfedge] =
+                    CircularTangent(glm::sign(glm::dot(dir, edge)) * dir, edge);
               } else {
-                tangent[halfedge] = {0, 0, 0, 0};
+                tangent[halfedge] =
+                    CircularTangent(OrthogonalTo(edge, here.normal), edge);
               }
             });
 
@@ -709,24 +712,9 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
           tangent[faceEdges[0]] = CircularTangent(newTangent, edge0);
           tangent[faceEdges[1]] = CircularTangent(-newTangent, edge1);
         }
-
-        if (faceEdges[0] != -2) {  // smooth
-          ForVert(e, [&tangent, normalIdx, this](int halfedge) {
-            if (tangent[halfedge].w ==
-                0) {  // only edges that were skipped above
-              const glm::vec3 normal = GetNormal(halfedge, normalIdx);
-              const glm::vec3 edge = vertPos_[halfedge_[halfedge].endVert] -
-                                     vertPos_[halfedge_[halfedge].startVert];
-              tangent[halfedge] =
-                  CircularTangent(OrthogonalTo(edge, normal), edge);
-            }
-          });
-        }
       });
 
   halfedgeTangent_.swap(tangent);
-
-  LinearizeFlatTangents();
 }
 
 /**

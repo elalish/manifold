@@ -303,8 +303,8 @@ TEST(Manifold, SineSurface) {
   Manifold smoothed =
       Manifold(surface).CalculateNormals(0, 50).SmoothByNormals(0).Refine(8);
   auto prop = smoothed.GetProperties();
-  EXPECT_NEAR(prop.volume, 8.01, 0.01);
-  EXPECT_NEAR(prop.surfaceArea, 30.72, 0.01);
+  EXPECT_NEAR(prop.volume, 7.87, 0.01);
+  EXPECT_NEAR(prop.surfaceArea, 30.58, 0.01);
   EXPECT_EQ(smoothed.Genus(), 0);
 
 #ifdef MANIFOLD_EXPORT
