@@ -14,6 +14,10 @@ if(Clipper2_FOUND)
     add_library(Clipper2 SHARED IMPORTED)
     set_property(TARGET Clipper2 PROPERTY
         IMPORTED_LOCATION ${Clipper2_LINK_LIBRARIES})
+    if(WIN32)
+        set_property(TARGET Clipper2 PROPERTY
+            IMPORTED_IMPLIB ${Clipper2_LINK_LIBRARIES})
+    endif()
     target_include_directories(Clipper2 INTERFACE ${Clipper2_INCLUDE_DIRS})
 else()
     message(STATUS "clipper2 not found, downloading from source")
