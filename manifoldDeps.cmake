@@ -47,7 +47,7 @@ if(NOT glm_FOUND)
     set(GLM_BUILD_INSTALL "ON" CACHE STRING "")
     FetchContent_Declare(glm
         GIT_REPOSITORY https://github.com/g-truc/glm.git
-        GIT_TAG b06b775c1c80af51a1183c0e167f9de3b2351a79
+        GIT_TAG 1.0.1
         GIT_PROGRESS TRUE
     )
     FetchContent_MakeAvailable(glm)
