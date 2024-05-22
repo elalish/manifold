@@ -25,6 +25,13 @@ glm::vec3 OrthogonalTo(glm::vec3 in, glm::vec3 ref) {
   return in;
 }
 
+// Get the angle between two unit-vectors.
+float AngleBetween(glm::vec3 a, glm::vec3 b) {
+  const float dot = glm::dot(a, b);
+  return dot >= 1 ? kTolerance
+                  : (dot <= -1 ? glm::pi<float>() : glm::acos(dot));
+}
+
 // Calculate a tangent vector in the form of a weighted cubic Bezier taking as
 // input the desired tangent direction (length doesn't matter) and the edge
 // vector to the neighboring vertex. In a symmetric situation where the tangents
@@ -538,11 +545,8 @@ void Manifold::Impl::SetNormals(int normalIdx, float minSharpAngle) {
                 normals.push_back(glm::vec3(0));
               }
               group.push_back(normals.size() - 1);
-              float dot = glm::dot(here.edgeVec, next.edgeVec);
-              const float phi =
-                  dot >= 1 ? kTolerance
-                           : (dot <= -1 ? glm::pi<float>() : glm::acos(dot));
-              normals.back() += faceNormal_[next.face] * phi;
+              normals.back() += faceNormal_[next.face] *
+                                AngleBetween(here.edgeVec, next.edgeVec);
             });
 
         for (auto& normal : normals) {
@@ -628,6 +632,82 @@ void Manifold::Impl::LinearizeFlatTangents() {
 }
 
 /**
+ * Redistribute the tangents around each vertex so that the angles between them
+ * have the same ratios as the angles of the triangles between the corresponding
+ * edges. This avoids folding the output shape and gives smoother results. There
+ * must be at least one fixed halfedge on a vertex for that vertex to be
+ * operated on. If there is only one, then that halfedge is not treated as
+ * fixed, but the whole circle is turned to an average orientation.
+ */
+void Manifold::Impl::DistributeTangents(const Vec<bool>& fixedHalfedges) {
+  const int numHalfedge = fixedHalfedges.size();
+  for_each_n(
+      autoPolicy(numHalfedge), countAt(0), numHalfedge,
+      [this, &fixedHalfedges](int halfedge) {
+        if (!fixedHalfedges[halfedge]) return;
+
+        if (IsMarkedInsideQuad(halfedge)) {
+          halfedge = NextHalfedge(halfedge_[halfedge].pairedHalfedge);
+        }
+
+        glm::vec3 normal(0);
+        Vec<float> currentAngle;
+        Vec<float> desiredAngle;
+
+        const glm::vec3 approxNormal =
+            vertNormal_[halfedge_[halfedge].startVert];
+        const glm::vec3 center = vertPos_[halfedge_[halfedge].startVert];
+        glm::vec3 lastEdgeVec =
+            SafeNormalize(vertPos_[halfedge_[halfedge].endVert] - center);
+        glm::vec3 lastTangent =
+            SafeNormalize(glm::vec3(halfedgeTangent_[halfedge]));
+        int current = halfedge;
+        do {
+          current = NextHalfedge(halfedge_[current].pairedHalfedge);
+          if (IsMarkedInsideQuad(current)) continue;
+          const glm::vec3 thisEdgeVec =
+              SafeNormalize(vertPos_[halfedge_[current].endVert] - center);
+          const glm::vec3 thisTangent =
+              SafeNormalize(glm::vec3(halfedgeTangent_[current]));
+          const glm::vec3 cp = glm::cross(thisTangent, lastTangent);
+          normal += cp;
+          // cumulative sum
+          desiredAngle.push_back(
+              AngleBetween(thisEdgeVec, lastEdgeVec) +
+              (desiredAngle.size() > 0 ? desiredAngle.back() : 0));
+          currentAngle.push_back(
+              AngleBetween(thisTangent, lastTangent) *
+                  glm::sign(glm::dot(cp, approxNormal)) +
+              (currentAngle.size() > 0 ? currentAngle.back() : 0));
+          lastEdgeVec = thisEdgeVec;
+          lastTangent = thisTangent;
+        } while (!fixedHalfedges[current]);
+
+        const float scale = currentAngle.back() / desiredAngle.back();
+        float offset = 0;
+        if (current == halfedge) {  // only one - find average offset
+          for (int i = 0; i < currentAngle.size(); ++i) {
+            offset += currentAngle[i] - scale * desiredAngle[i];
+          }
+          offset /= currentAngle.size();
+        }
+
+        current = halfedge;
+        int i = 0;
+        do {
+          current = NextHalfedge(halfedge_[current].pairedHalfedge);
+          if (IsMarkedInsideQuad(current)) continue;
+          const float angle =
+              currentAngle[i] - scale * desiredAngle[i] - offset;
+          glm::vec3 tangent(halfedgeTangent_[current]);
+          halfedgeTangent_[current] = glm::vec4(
+              glm::rotate(tangent, angle, normal), halfedgeTangent_[current].w);
+          ++i;
+        } while (!fixedHalfedges[current]);
+      });
+}
+
+/**
  * Calculates halfedgeTangent_, allowing the manifold to be refined and
  * smoothed. The tangents form weighted cubic Beziers along each edge. This
  * function creates circular arcs where possible (minimizing maximum curvature),
@@ -652,9 +732,11 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
                vertHalfedge[halfedge.startVert] = idx;
              });
 
+  Vec<bool> fixedHalfedge(numHalfedge, false);
+
   for_each_n(
       policy, vertHalfedge.begin(), numVert,
-      [this, &tangent, normalIdx](int e) {
+      [this, &tangent, &fixedHalfedge, normalIdx](int e) {
         struct FlatNormal {
           bool isFlatFace;
           glm::vec3 normal;
@@ -670,8 +752,8 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
               return FlatNormal(
                   {glm::dot(diff, diff) < kTolerance * kTolerance, normal});
             },
-            [&faceEdges, &tangent, this](int halfedge, const FlatNormal& here,
-                                         const FlatNormal& next) {
+            [&faceEdges, &tangent, &fixedHalfedge, this](
+                int halfedge, const FlatNormal& here, const FlatNormal& next) {
               if (IsInsideQuad(halfedge)) {
                 tangent[halfedge] = {0, 0, 0, -1};
                 return;
@@ -681,6 +763,7 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
               const bool differentNormals =
                   glm::dot(diff, diff) > kTolerance * kTolerance;
               if (differentNormals || here.isFlatFace != next.isFlatFace) {
+                fixedHalfedge[halfedge] = true;
                 if (faceEdges[0] == -1) {
                   faceEdges[0] = halfedge;
                 } else if (faceEdges[1] == -1) {
@@ -711,10 +794,13 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
               glm::normalize(edge0) - glm::normalize(edge1);
           tangent[faceEdges[0]] = CircularTangent(newTangent, edge0);
           tangent[faceEdges[1]] = CircularTangent(-newTangent, edge1);
+        } else if (faceEdges[0] == -1 && faceEdges[0] == -1) {
+          fixedHalfedge[e] = true;
         }
       });
 
   halfedgeTangent_.swap(tangent);
+  DistributeTangents(fixedHalfedge);
 }
 
 /**
