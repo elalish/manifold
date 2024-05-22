@@ -683,6 +683,8 @@ void Manifold::Impl::DistributeTangents(const Vec<bool>& fixedHalfedges) {
           lastTangent = thisTangent;
         } while (!fixedHalfedges[current]);
 
+        if (currentAngle.size() == 1) return;
+
         const float scale = currentAngle.back() / desiredAngle.back();
         float offset = 0;
         if (current == halfedge) {  // only one - find average offset
