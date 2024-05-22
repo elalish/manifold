@@ -10,7 +10,7 @@
     flake = false;
   };
   inputs.clipper2-src = {
-    url = "github:AngusJohnson/Clipper2/Clipper2_1.3.0";
+    url = "github:AngusJohnson/Clipper2";
     flake = false;
   };
   outputs = { self, nixpkgs, flake-utils, gtest-src, thrust-src, clipper2-src }:
@@ -22,7 +22,7 @@
             config.allowUnfree = true;
           };
           clipper2 = pkgs.clipper2.overrideAttrs (_: _: {
-            version = "1.3.0";
+            version = "14052024";
             src = clipper2-src;
           });
           manifold =
