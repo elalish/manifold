@@ -717,7 +717,18 @@ Manifold Manifold::SmoothByNormals(int normalIdx) const {
 Manifold Manifold::SmoothOut(float minSharpAngle, float minSmoothness) const {
   auto pImpl = std::make_shared<Impl>(*GetCsgLeafNode().GetImpl());
   if (!IsEmpty()) {
-    pImpl->CreateTangents(pImpl->SharpenEdges(minSharpAngle, minSmoothness));
+    if (minSmoothness == 0) {
+      const int numProp = pImpl->meshRelation_.numProp;
+      Vec<float> properties = pImpl->meshRelation_.properties;
+      Vec<glm::ivec3> triProperties = pImpl->meshRelation_.triProperties;
+      pImpl->SetNormals(0, minSharpAngle);
+      pImpl->CreateTangents(0);
+      pImpl->meshRelation_.numProp = 0;
+      pImpl->meshRelation_.properties.swap(properties);
+      pImpl->meshRelation_.triProperties.swap(triProperties);
+    } else {
+      pImpl->CreateTangents(pImpl->SharpenEdges(minSharpAngle, minSmoothness));
+    }
   }
   return Manifold(std::make_shared<CsgLeafNode>(pImpl));
 }
