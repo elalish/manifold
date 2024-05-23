@@ -51,6 +51,7 @@ ManifoldMeshGL *manifold_meshgl_w_tangents(void *mem, float *vert_props,
                                            float *halfedge_tangent);
 ManifoldMeshGL *manifold_get_meshgl(void *mem, ManifoldManifold *m);
 ManifoldMeshGL *manifold_meshgl_copy(void *mem, ManifoldMeshGL *m);
+ManifoldMeshGL *manifold_meshgl_merge(void *mem, ManifoldMeshGL *m);
 
 // SDF
 // By default, the execution policy (sequential or parallel) of
