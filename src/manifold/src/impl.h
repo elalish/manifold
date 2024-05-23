@@ -183,6 +183,7 @@ struct Manifold::Impl {
                                        float minSmoothness) const;
   void SharpenTangent(int halfedge, float smoothness);
   void SetNormals(int normalIdx, float minSharpAngle);
+  void LinearizeFlatTangents();
   void DistributeTangents(const Vec<bool>& fixedHalfedges);
   void CreateTangents(int normalIdx);
   void CreateTangents(std::vector<Smoothness>);
