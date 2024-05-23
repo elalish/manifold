@@ -178,6 +178,7 @@ struct Manifold::Impl {
       const std::vector<Smoothness>&) const;
   Vec<bool> FlatFaces() const;
   Vec<int> VertFlatFace(const Vec<bool>&) const;
+  Vec<int> VertHalfedge() const;
   std::vector<Smoothness> SharpenEdges(float minSharpAngle,
                                        float minSmoothness) const;
   void SharpenTangent(int halfedge, float smoothness);

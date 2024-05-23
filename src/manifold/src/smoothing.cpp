@@ -386,6 +386,19 @@ Vec<int> Manifold::Impl::VertFlatFace(const Vec<bool>& flatFaces) const {
   return vertFlatFace;
 }
 
+Vec<int> Manifold::Impl::VertHalfedge() const {
+  Vec<int> vertHalfedge(NumVert());
+  for_each_n(autoPolicy(halfedge_.size()), zip(countAt(0), halfedge_.begin()),
+             halfedge_.size(),
+             [&vertHalfedge](thrust::tuple<int, Halfedge> in) {
+               const int idx = thrust::get<0>(in);
+               const Halfedge halfedge = thrust::get<1>(in);
+               // arbitrary, last one wins.
+               vertHalfedge[halfedge.startVert] = idx;
+             });
+  return vertHalfedge;
+}
+
 std::vector<Smoothness> Manifold::Impl::SharpenEdges(
     float minSharpAngle, float minSmoothness) const {
   std::vector<Smoothness> sharpenedEdges;
@@ -683,21 +696,11 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
   const int numHalfedge = halfedge_.size();
   halfedgeTangent_.resize(0);
   Vec<glm::vec4> tangent(numHalfedge);
-
-  const ExecutionPolicy policy = autoPolicy(numVert);
-  Vec<int> vertHalfedge(numVert, -1);
-  for_each_n(policy, zip(countAt(0), halfedge_.begin()), numHalfedge,
-             [&vertHalfedge](thrust::tuple<int, Halfedge> in) {
-               const int idx = thrust::get<0>(in);
-               const Halfedge halfedge = thrust::get<1>(in);
-               // arbitrary, last one wins.
-               vertHalfedge[halfedge.startVert] = idx;
-             });
-
   Vec<bool> fixedHalfedge(numHalfedge, false);
 
+  Vec<int> vertHalfedge = VertHalfedge();
   for_each_n(
-      policy, vertHalfedge.begin(), numVert,
+      autoPolicy(numVert), vertHalfedge.begin(), numVert,
       [this, &tangent, &fixedHalfedge, normalIdx](int e) {
         struct FlatNormal {
           bool isFlatFace;
@@ -779,7 +782,9 @@ void Manifold::Impl::CreateTangents(std::vector<Smoothness> sharpenedEdges) {
   const int numHalfedge = halfedge_.size();
   halfedgeTangent_.resize(0);
   Vec<glm::vec4> tangent(numHalfedge);
+  Vec<bool> fixedHalfedge(numHalfedge, false);
 
+  Vec<int> vertHalfedge = VertHalfedge();
   Vec<bool> triIsFlatFace = FlatFaces();
   Vec<int> vertFlatFace = VertFlatFace(triIsFlatFace);
   Vec<glm::vec3> vertNormal = vertNormal_;
@@ -788,6 +793,12 @@ void Manifold::Impl::CreateTangents(std::vector<Smoothness> sharpenedEdges) {
       vertNormal[v] = faceNormal_[vertFlatFace[v]];
     }
   }
+
+  for_each_n(autoPolicy(numHalfedge),
+             zip(tangent.begin(), halfedge_.cbegin(), countAt(0)), numHalfedge,
+             SmoothBezier({this, vertNormal}));
+
+  halfedgeTangent_.swap(tangent);
 
   // Add sharpened edges around faces, just on the face side.
   for (int tri = 0; tri < NumTri(); ++tri) {
@@ -826,56 +837,62 @@ void Manifold::Impl::CreateTangents(std::vector<Smoothness> sharpenedEdges) {
         {edge.second, edge.first});
   }
 
-  for_each_n(autoPolicy(numHalfedge),
-             zip(tangent.begin(), halfedge_.cbegin(), countAt(0)), numHalfedge,
-             SmoothBezier({this, vertNormal}));
+  const int numVert = NumVert();
+  for_each_n(
+      autoPolicy(numVert), countAt(0), numVert,
+      [this, &vertTangents, &fixedHalfedge, &vertHalfedge](int v) {
+        auto it = vertTangents.find(v);
+        if (it == vertTangents.end()) {
+          fixedHalfedge[vertHalfedge[v]] == true;
+          return;
+        }
+        const std::vector<Pair>& vert = it->second;
+        // Sharp edges that end are smooth at their terminal vert.
+        if (vert.size() == 1) return;
+        if (vert.size() == 2) {  // Make continuous edge
+          const int first = vert[0].first.halfedge;
+          const int second = vert[1].first.halfedge;
+          fixedHalfedge[first] = true;
+          fixedHalfedge[second] = true;
+          const glm::vec3 newTangent =
+              glm::normalize(glm::vec3(halfedgeTangent_[first]) -
+                             glm::vec3(halfedgeTangent_[second]));
 
-  halfedgeTangent_.swap(tangent);
+          const glm::vec3 pos = vertPos_[halfedge_[first].startVert];
+          halfedgeTangent_[first] = CircularTangent(
+              newTangent, vertPos_[halfedge_[first].endVert] - pos);
+          halfedgeTangent_[second] = CircularTangent(
+              -newTangent, vertPos_[halfedge_[second].endVert] - pos);
 
-  if (sharpenedEdges.empty()) return;
+          float smoothness =
+              (vert[0].second.smoothness + vert[1].first.smoothness) / 2;
+          ForVert(first, [this, &smoothness, &vert, first,
+                          second](int current) {
+            if (current == second) {
+              smoothness =
+                  (vert[1].second.smoothness + vert[0].first.smoothness) / 2;
+            } else if (current != first && !IsMarkedInsideQuad(current)) {
+              SharpenTangent(current, smoothness);
+            }
+          });
+        } else {  // Sharpen vertex uniformly
+          fixedHalfedge[vertHalfedge[v]] == true;
+          float smoothness = 0;
+          for (const Pair& pair : vert) {
+            smoothness += pair.first.smoothness;
+            smoothness += pair.second.smoothness;
+          }
+          smoothness /= 2 * vert.size();
 
-  for (const auto& value : vertTangents) {
-    const std::vector<Pair>& vert = value.second;
-    // Sharp edges that end are smooth at their terminal vert.
-    if (vert.size() == 1) continue;
-    if (vert.size() == 2) {  // Make continuous edge
-      const int first = vert[0].first.halfedge;
-      const int second = vert[1].first.halfedge;
-      const glm::vec3 newTangent =
-          glm::normalize(glm::vec3(halfedgeTangent_[first]) -
-                         glm::vec3(halfedgeTangent_[second]));
-
-      const glm::vec3 pos = vertPos_[halfedge_[first].startVert];
-      halfedgeTangent_[first] =
-          CircularTangent(newTangent, vertPos_[halfedge_[first].endVert] - pos);
-      halfedgeTangent_[second] = CircularTangent(
-          -newTangent, vertPos_[halfedge_[second].endVert] - pos);
-
-      float smoothness =
-          (vert[0].second.smoothness + vert[1].first.smoothness) / 2;
-      ForVert(first, [this, &smoothness, &vert, first, second](int current) {
-        if (current == second) {
-          smoothness =
-              (vert[1].second.smoothness + vert[0].first.smoothness) / 2;
-        } else if (current != first && !IsMarkedInsideQuad(current)) {
-          SharpenTangent(current, smoothness);
+          ForVert(vert[0].first.halfedge, [this, smoothness](int current) {
+            if (!IsMarkedInsideQuad(current)) {
+              SharpenTangent(current, smoothness);
+            }
+          });
         }
       });
-    } else {  // Sharpen vertex uniformly
-      float smoothness = 0;
-      for (const Pair& pair : vert) {
-        smoothness += pair.first.smoothness;
-        smoothness += pair.second.smoothness;
-      }
-      smoothness /= 2 * vert.size();
 
-      ForVert(vert[0].first.halfedge, [this, smoothness](int current) {
-        if (!IsMarkedInsideQuad(current)) {
-          SharpenTangent(current, smoothness);
-        }
-      });
-    }
-  }
+  DistributeTangents(fixedHalfedge);
 }
 
 void Manifold::Impl::Refine(std::function<int(glm::vec3)> edgeDivisions) {
