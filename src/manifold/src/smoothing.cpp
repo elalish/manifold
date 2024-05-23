@@ -405,13 +405,12 @@ std::vector<Smoothness> Manifold::Impl::SharpenEdges(
 
 /**
  * Sharpen tangents that intersect an edge to sharpen that edge. The weight is
- * unchanged, as this has a squared effect on radius of curvature, except
- * in the case of zero radius, which is marked with weight = 0.
+ * unchanged, as this has a squared effect on radius of curvature.
  */
 void Manifold::Impl::SharpenTangent(int halfedge, float smoothness) {
   halfedgeTangent_[halfedge] =
       glm::vec4(smoothness * glm::vec3(halfedgeTangent_[halfedge]),
-                smoothness == 0 ? 0 : halfedgeTangent_[halfedge].w);
+                halfedgeTangent_[halfedge].w);
 }
 
 /**
@@ -590,45 +589,6 @@ void Manifold::Impl::SetNormals(int normalIdx, float minSharpAngle) {
       }
     }
   }
-}
-
-/**
- * Tangents get flattened to create sharp edges by setting their weight to zero.
- * This is the natural limit of reducing the weight to increase the sharpness
- * smoothly. This limit gives a decent shape, but it causes the parameterization
- * to be stretched and compresses it near the edges, which is good for resolving
- * tight curvature, but bad for property interpolation. This function fixes the
- * parameter stretch at the limit for sharp edges, since there is no curvature
- * to resolve. Note this also changes the overall shape - making it more evenly
- * curved.
- */
-void Manifold::Impl::LinearizeFlatTangents() {
-  const int n = halfedgeTangent_.size();
-  for_each_n(
-      autoPolicy(n), zip(halfedgeTangent_.begin(), countAt(0)), n,
-      [this](thrust::tuple<glm::vec4&, int> inOut) {
-        glm::vec4& tangent = thrust::get<0>(inOut);
-        const int halfedge = thrust::get<1>(inOut);
-        glm::vec4& otherTangent =
-            halfedgeTangent_[halfedge_[halfedge].pairedHalfedge];
-
-        const glm::bvec2 flat(tangent.w == 0, otherTangent.w == 0);
-        if (!halfedge_[halfedge].IsForward() || (!flat[0] && !flat[1])) {
-          return;
-        }
-
-        const glm::vec3 edgeVec = vertPos_[halfedge_[halfedge].endVert] -
-                                  vertPos_[halfedge_[halfedge].startVert];
-
-        if (flat[0] && flat[1]) {
-          tangent = glm::vec4(edgeVec / 3.0f, 1);
-          otherTangent = glm::vec4(-edgeVec / 3.0f, 1);
-        } else if (flat[0]) {
-          tangent = glm::vec4((edgeVec + glm::vec3(otherTangent)) / 2.0f, 1);
-        } else {
-          otherTangent = glm::vec4((-edgeVec + glm::vec3(tangent)) / 2.0f, 1);
-        }
-      });
 }
 
 /**
@@ -916,7 +876,6 @@ void Manifold::Impl::CreateTangents(std::vector<Smoothness> sharpenedEdges) {
       });
     }
   }
-  LinearizeFlatTangents();
 }
 
 void Manifold::Impl::Refine(std::function<int(glm::vec3)> edgeDivisions) {
