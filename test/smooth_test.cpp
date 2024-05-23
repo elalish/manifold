@@ -307,10 +307,16 @@ TEST(Manifold, SineSurface) {
   EXPECT_NEAR(prop.surfaceArea, 30.61, 0.01);
   EXPECT_EQ(smoothed.Genus(), 0);
 
-  Manifold smoothed2 = Manifold(surface).SmoothOut(180).Refine(8);
+  Manifold smoothed1 = Manifold(surface).SmoothOut(50).Refine(8);
+  auto prop1 = smoothed1.GetProperties();
+  EXPECT_FLOAT_EQ(prop1.volume, prop.volume);
+  EXPECT_FLOAT_EQ(prop1.surfaceArea, prop.surfaceArea);
+  EXPECT_EQ(smoothed1.Genus(), 0);
+
+  Manifold smoothed2 = Manifold(surface).SmoothOut(180, 1).Refine(8);
   auto prop2 = smoothed2.GetProperties();
-  EXPECT_NEAR(prop2.volume, 8.97, 0.01);
-  EXPECT_NEAR(prop2.surfaceArea, 33.71, 0.01);
+  EXPECT_NEAR(prop2.volume, 9.06, 0.01);
+  EXPECT_NEAR(prop2.surfaceArea, 33.81, 0.01);
   EXPECT_EQ(smoothed2.Genus(), 0);
 
   Manifold smoothed3 = Manifold(surface).SmoothOut(50, 0.5).Refine(8);
