@@ -880,7 +880,8 @@ void Manifold::Impl::CreateTangents(std::vector<Smoothness> sharpenedEdges) {
   const int numVert = NumVert();
   for_each_n(
       autoPolicy(numVert), countAt(0), numVert,
-      [this, &vertTangents, &fixedHalfedge, &vertHalfedge](int v) {
+      [this, &vertTangents, &fixedHalfedge, &vertHalfedge,
+       &triIsFlatFace](int v) {
         auto it = vertTangents.find(v);
         if (it == vertTangents.end()) {
           fixedHalfedge[vertHalfedge[v]] == true;
@@ -918,17 +919,25 @@ void Manifold::Impl::CreateTangents(std::vector<Smoothness> sharpenedEdges) {
         } else {  // Sharpen vertex uniformly
           fixedHalfedge[vertHalfedge[v]] == true;
           float smoothness = 0;
+          float denom = 0;
           for (const Pair& pair : vert) {
             smoothness += pair.first.smoothness;
             smoothness += pair.second.smoothness;
+            denom += pair.first.smoothness == 0 ? 0 : 1;
+            denom += pair.second.smoothness == 0 ? 0 : 1;
           }
-          smoothness /= 2 * vert.size();
+          smoothness /= denom;
 
-          ForVert(vert[0].first.halfedge, [this, smoothness](int current) {
-            if (!IsMarkedInsideQuad(current)) {
-              SharpenTangent(current, smoothness);
-            }
-          });
+          ForVert(vert[0].first.halfedge,
+                  [this, &triIsFlatFace, smoothness](int current) {
+                    if (!IsMarkedInsideQuad(current)) {
+                      const int pair = halfedge_[current].pairedHalfedge;
+                      SharpenTangent(current, triIsFlatFace[current / 3] ||
+                                                      triIsFlatFace[pair / 3]
+                                                  ? 0
+                                                  : smoothness);
+                    }
+                  });
         }
       });
 
