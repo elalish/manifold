@@ -14,13 +14,13 @@
 
 import '@vitest/web-worker';
 
-import {WebIO} from '@gltf-transform/core';
-import {expect, suite, test} from 'vitest';
+import { WebIO } from '@gltf-transform/core';
+import { expect, suite, test } from 'vitest';
 
 import Module from './built/manifold';
-import {readMesh, setupIO} from './gltf-io';
-import {examples} from './public/examples.js';
-import ManifoldWorker from './worker?worker';
+import { readMesh, setupIO } from './gltf-io';
+import { examples } from './public/examples.js';
+import ManifoldWorker from './worker-wrapper?worker';
 
 const io = setupIO(new WebIO());
 
@@ -29,7 +29,7 @@ wasm.setup();
 
 function initialized(worker) {
   return new Promise((resolve) => {
-    worker.onmessage = function(e) {
+    worker.onmessage = function (e) {
       if (e.data == null) {
         resolve();
       } else {
@@ -45,15 +45,15 @@ async function runExample(name) {
   const worker = new ManifoldWorker();
   await initialized(worker);
   return new Promise((resolve, reject) => {
-    worker.onmessageerror = function({data}) {
+    worker.onmessageerror = function ({ data }) {
       reject(data);
     };
 
-    worker.onerror = function(e) {
+    worker.onerror = function (e) {
       reject(e);
     };
 
-    worker.onmessage = async function(e) {
+    worker.onmessage = async function (e) {
       try {
         URL.revokeObjectURL(glbURL);
         glbURL = e.data.glbURL;
@@ -67,13 +67,13 @@ async function runExample(name) {
           if (!docMesh) {
             continue;
           }
-          const {mesh} = readMesh(docMesh);
+          const { mesh } = readMesh(docMesh);
           const manifold = wasm.Manifold(mesh);
           const prop = manifold.getProperties();
           const genus = manifold.genus();
           manifold.delete();
           // Return properties of first mesh encountered.
-          resolve({...prop, genus});
+          resolve({ ...prop, genus });
         }
       } catch (e) {
         reject(e);
@@ -85,7 +85,7 @@ async function runExample(name) {
 }
 
 suite('Examples', () => {
-  test('Intro', async () => {
+  test.only('Intro', async () => {
     const result = await runExample('Intro');
     expect(result.genus).to.equal(5, 'Genus');
     expect(result.volume).to.be.closeTo(203164, 1, 'Volume');

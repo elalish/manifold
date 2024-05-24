@@ -150,4 +150,5 @@
   },
   "python.formatting.provider": "none",
   "clang-format.executable": "clang-format",
+  "cmake.configureOnOpen": false,
 }
