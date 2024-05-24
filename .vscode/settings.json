@@ -116,7 +116,7 @@
     "stop_token": "cpp"
   },
   "C_Cpp.clang_format_fallbackStyle": "google",
-  // "editor.formatOnSave": true,
+  "editor.formatOnSave": false,
   "cmake.configureArgs": [
     "-DBUILD_SHARED_LIBS=ON",
     "-DMANIFOLD_CBIND=ON",

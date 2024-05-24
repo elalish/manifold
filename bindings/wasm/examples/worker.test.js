@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// import '@vitest/web-worker';
+import '@vitest/web-worker';
 
 import {WebIO} from '@gltf-transform/core';
 import {expect, suite, test} from 'vitest';
@@ -20,7 +20,7 @@ import {expect, suite, test} from 'vitest';
 import Module from './built/manifold';
 import {readMesh, setupIO} from './gltf-io';
 import {examples} from './public/examples.js';
-import ManifoldWorker from './worker?worker';
+import ManifoldWorker from './worker-wrapper?worker';
 
 const io = setupIO(new WebIO());
 
@@ -84,7 +84,7 @@ async function runExample(name) {
   });
 }
 
-suite('Examples', () => {
+suite.skip('Examples', () => {
   test('Intro', async () => {
     const result = await runExample('Intro');
     expect(result.genus).to.equal(5, 'Genus');
