@@ -1,16 +1,12 @@
 import { WebIO } from "@gltf-transform/core";
 import { expect, suite, test } from "vitest";
 import assert from "node:assert";
-import Module from "./built/manifold";
 import { readMesh, setupIO } from "./gltf-io";
 import { cleanup, module, evaluateCADToModel } from "./worker";
 // @ts-ignore
 import { examples } from "./public/examples.js";
 
 const io = setupIO(new WebIO());
-
-const wasm = await Module();
-wasm.setup();
 
 async function runExample(name: string) {
   const code = examples.functionBodies.get(name);
@@ -27,7 +23,7 @@ async function runExample(name: string) {
       continue;
     }
     const { mesh } = readMesh(docMesh)!;
-    const manifold = new wasm.Manifold(mesh as any);
+    const manifold = new module.Manifold(mesh as any);
     const prop = manifold.getProperties();
     const genus = manifold.genus();
     manifold.delete();
