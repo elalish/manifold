@@ -33,7 +33,7 @@ else()
     )
     FetchContent_MakeAvailable(Clipper2)
     if(NOT EMSCRIPTEN)
-        install(TARGETS Clipper2)
+        install(TARGETS Clipper2 EXPORT clipper2Targets)
     endif()
 endif()
 
