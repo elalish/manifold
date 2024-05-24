@@ -1,5 +1,4 @@
-import { module, exportModels, exposedFunctions, cleanup } from "./worker";
-import * as glMatrix from 'gl-matrix';
+import { module, cleanup, evaluateCADToModel } from "./worker";
 
 // Setup complete
 self.postMessage(null);
@@ -23,14 +22,8 @@ if (self.console) {
 }
 
 self.onmessage = async (e) => {
-  const content = 'const globalDefaults = {};\n' + e.data +
-    '\nreturn exportModels(globalDefaults, typeof result === "undefined" ? undefined : result);\n';
   try {
-    const f = new Function(
-      'exportModels', 'glMatrix', 'module', ...exposedFunctions, content);
-    const result = await f(
-      exportModels, glMatrix, module,  //@ts-ignore
-      ...exposedFunctions.map(name => module[name]));
+    const result = await evaluateCADToModel(e.data);
     self.postMessage(result);
   } catch (error: any) {
     console.log(error.toString());

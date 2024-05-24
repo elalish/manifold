@@ -84,8 +84,9 @@ async function runExample(name) {
   });
 }
 
-suite.skip('Examples', () => {
-  test('Intro', async () => {
+suite('Examples', () => {
+  // TODO: somehow "Intro" is actually fine with vitest web-worker?
+  test.only('Intro', async () => {
     const result = await runExample('Intro');
     expect(result.genus).to.equal(5, 'Genus');
     expect(result.volume).to.be.closeTo(203164, 1, 'Volume');
