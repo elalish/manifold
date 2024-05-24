@@ -3,7 +3,7 @@ import { expect, suite, test } from "vitest";
 import assert from "node:assert";
 import Module from "./built/manifold";
 import { readMesh, setupIO } from "./gltf-io";
-import { evaluateCADToModel } from "./worker";
+import { cleanup, module, evaluateCADToModel } from "./worker";
 // @ts-ignore
 import { examples } from "./public/examples.js";
 
@@ -15,8 +15,11 @@ wasm.setup();
 async function runExample(name: string) {
   const code = examples.functionBodies.get(name);
   const result = await evaluateCADToModel(code);
+  module.cleanup();
+  cleanup();
   assert.ok(result?.glbURL);
   const docIn = await io.read(result.glbURL);
+  URL.revokeObjectURL(result.glbURL);
   const nodes = docIn.getRoot().listNodes();
   for (const node of nodes) {
     const docMesh = node.getMesh();
@@ -27,13 +30,14 @@ async function runExample(name: string) {
     const manifold = new wasm.Manifold(mesh as any);
     const prop = manifold.getProperties();
     const genus = manifold.genus();
+    manifold.delete();
     return { ...prop, genus };
   }
   assert.ok(false);
 }
 
 suite("Examples", () => {
-  test.only('Intro', async () => {
+  test('Intro', async () => {
     const result = await runExample('Intro');
     expect(result.genus).to.equal(5, 'Genus');
     expect(result.volume).to.be.closeTo(203164, 1, 'Volume');
