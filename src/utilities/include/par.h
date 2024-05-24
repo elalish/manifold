@@ -13,19 +13,10 @@
 // limitations under the License.
 
 #pragma once
-#include <thrust/binary_search.h>
-#include <thrust/count.h>
-#include <thrust/execution_policy.h>
-#include <thrust/gather.h>
-#include <thrust/logical.h>
-#include <thrust/remove.h>
-#include <thrust/sequence.h>
-#include <thrust/sort.h>
-#include <thrust/system/cpp/execution_policy.h>
-#include <thrust/uninitialized_copy.h>
-
 #include <algorithm>
 #include <numeric>
+
+#include "public.h"
 #if MANIFOLD_PAR == 'T'
 #include <thrust/system/tbb/execution_policy.h>
 
@@ -34,7 +25,6 @@
 #include <execution>
 #endif
 
-#include "tbb/tbb.h"
 #define MANIFOLD_PAR_NS tbb
 #else
 #define MANIFOLD_PAR_NS cpp
@@ -164,11 +154,43 @@ THRUST_DYNAMIC_BACKEND_VOID(exclusive_scan)
 THRUST_DYNAMIC_BACKEND(copy_if, void)
 #endif
 
-THRUST_DYNAMIC_BACKEND_VOID(gather)
-THRUST_DYNAMIC_BACKEND_VOID(scatter)
-THRUST_DYNAMIC_BACKEND_VOID(for_each)
-THRUST_DYNAMIC_BACKEND_VOID(for_each_n)
-THRUST_DYNAMIC_BACKEND_VOID(sequence)
+template <typename T>
+thrust::counting_iterator<T> countAt(T i) {
+  return thrust::make_counting_iterator(i);
+}
+
+template <typename InputIterator1, typename InputIterator2,
+          typename OutputIterator>
+void scatter(ExecutionPolicy policy, InputIterator1 first, InputIterator1 last,
+              InputIterator2 mapFirst, OutputIterator outputFirst) {
+  for_each(policy, countAt(0_z),
+           countAt(static_cast<size_t>(std::distance(first, last))),
+           [first, mapFirst, outputFirst](size_t i) {
+             outputFirst[mapFirst[i]] = first[i];
+           });
+}
+
+template <typename InputIterator, typename RandomAccessIterator,
+          typename OutputIterator>
+void gather(ExecutionPolicy policy, InputIterator mapFirst,
+            InputIterator mapLast, RandomAccessIterator inputFirst,
+            OutputIterator outputFirst) {
+  for_each(policy, countAt(0_z),
+           countAt(static_cast<size_t>(std::distance(mapFirst, mapLast))),
+           [mapFirst, inputFirst, outputFirst](size_t i) {
+             outputFirst[i] = inputFirst[mapFirst[i]];
+           });
+}
+
+template <typename Iterator>
+void sequence(ExecutionPolicy policy, Iterator first, Iterator last) {
+  for_each(policy, countAt(0_z),
+           countAt(static_cast<size_t>(std::distance(first, last))),
+           [first](size_t i) { first[i] = i; });
+}
+
+STL_DYNAMIC_BACKEND_VOID(for_each)
+STL_DYNAMIC_BACKEND_VOID(for_each_n)
 STL_DYNAMIC_BACKEND_VOID(transform)
 STL_DYNAMIC_BACKEND_VOID(uninitialized_fill)
 STL_DYNAMIC_BACKEND_VOID(uninitialized_copy)
@@ -181,7 +203,6 @@ STL_DYNAMIC_BACKEND_VOID(copy_n)
 // void implies that the user have to specify the return type in the template
 // argument, as we are unable to deduce it
 THRUST_DYNAMIC_BACKEND(transform_reduce, void)
-THRUST_DYNAMIC_BACKEND(gather_if, void)
 THRUST_DYNAMIC_BACKEND(reduce_by_key, void)
 STL_DYNAMIC_BACKEND(remove, void)
 STL_DYNAMIC_BACKEND(find, void)

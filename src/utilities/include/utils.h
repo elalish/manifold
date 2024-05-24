@@ -73,11 +73,6 @@ thrust::permutation_iterator<A, B> perm(A a, B b) {
   return thrust::make_permutation_iterator(a, b);
 }
 
-template <typename T>
-thrust::counting_iterator<T> countAt(T i) {
-  return thrust::make_counting_iterator(i);
-}
-
 inline int Next3(int i) {
   constexpr glm::ivec3 next3(1, 2, 0);
   return next3[i];
