@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import '@vitest/web-worker';
+// import '@vitest/web-worker';
 
 import { WebIO } from '@gltf-transform/core';
 import { expect, suite, test } from 'vitest';
