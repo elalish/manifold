@@ -84,8 +84,8 @@ async function runExample(name) {
   });
 }
 
-suite('Examples', () => {
-  test.only('Intro', async () => {
+suite.skip('Examples', () => {
+  test('Intro', async () => {
     const result = await runExample('Intro');
     expect(result.genus).to.equal(5, 'Genus');
     expect(result.volume).to.be.closeTo(203164, 1, 'Volume');

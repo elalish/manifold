@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import ManifoldWorker from './worker?worker';
+import ManifoldWorker from './worker-wrapper?worker';
 
 const CODE_START = '<code>';
 // Loaded globally by examples.js
@@ -20,7 +20,7 @@ const exampleFunctions = self.examples.functionBodies;
 
 if (navigator.serviceWorker) {
   navigator.serviceWorker.register(
-      '/service-worker.js', {scope: './index.html'});
+    '/service-worker.js', { scope: './index.html' });
 }
 
 let editor = undefined;
@@ -35,13 +35,13 @@ const shareButton = document.querySelector('#share');
 undoButton.onclick = () => editor.trigger('ignored', 'undo');
 redoButton.onclick = () => editor.trigger('ignored', 'redo');
 formatButton.onclick = () =>
-    editor.trigger('ignored', 'editor.action.formatDocument');
+  editor.trigger('ignored', 'editor.action.formatDocument');
 shareButton.onclick = () => {
   const url = new URL(window.location.toString());
   url.hash =
-      '#' +
-      encodeURIComponent(
-          currentFileElement.textContent + CODE_START + editor.getValue());
+    '#' +
+    encodeURIComponent(
+      currentFileElement.textContent + CODE_START + editor.getValue());
   navigator.clipboard.writeText(url.toString());
   console.log('Shareable link copied to clipboard!');
   console.log('Consider shortening this URL using tinyURL.com');
@@ -56,18 +56,18 @@ const saveContainer = document.querySelector('#save');
 const saveDropdown = document.querySelector('#saveDropdown');
 const saveArrow = document.querySelector('#save .uparrow');
 
-const hideDropdown = function() {
+const hideDropdown = function () {
   fileDropdown.classList.remove('show');
   saveDropdown.classList.remove('show');
   fileArrow.classList.remove('down');
   saveArrow.classList.remove('down');
 };
-const toggleFileDropdown = function(event) {
+const toggleFileDropdown = function (event) {
   event.stopPropagation();
   fileDropdown.classList.toggle('show');
   fileArrow.classList.toggle('down');
 };
-const toggleSaveDropdown = function(event) {
+const toggleSaveDropdown = function (event) {
   event.stopPropagation();
   saveDropdown.classList.toggle('show');
   saveArrow.classList.toggle('down');
@@ -115,7 +115,7 @@ function switchTo(scriptName) {
     setScript('currentName', scriptName);
     isExample = exampleFunctions.get(scriptName) != null;
     const code = isExample ? exampleFunctions.get(scriptName).substring(1) :
-                             getScript(scriptName) ?? '';
+      getScript(scriptName) ?? '';
     window.location.hash = '#' + scriptName;
     editor.setValue(code);
   }
@@ -132,12 +132,12 @@ function createDropdownItem(name) {
   button.appendChild(label);
   label.textContent = name;
 
-  button.onclick = function() {
+  button.onclick = function () {
     saveCurrent();
     switchTo(label.textContent);
   };
   // Stop text input spaces from triggering the button
-  button.onkeyup = function(event) {
+  button.onkeyup = function (event) {
     event.preventDefault();
   };
   return button;
@@ -164,7 +164,7 @@ function addEdit(button) {
   const edit = addIcon(button);
   edit.classList.add('edit');
 
-  edit.onclick = function(event) {
+  edit.onclick = function (event) {
     event.stopPropagation();
     const oldName = label.textContent;
     const code = getScript(oldName);
@@ -192,11 +192,11 @@ function addEdit(button) {
     }
 
     form.onsubmit = rename;
-    inputElement.onclick = function(event) {
+    inputElement.onclick = function (event) {
       event.stopPropagation();
     };
 
-    inputElement.onblur = function() {
+    inputElement.onblur = function () {
       button.removeChild(form);
       label.textContent = oldName;
     };
@@ -206,16 +206,16 @@ function addEdit(button) {
   trash.classList.add('trash');
   let lastClick = 0;
 
-  trash.onclick = function(event) {
+  trash.onclick = function (event) {
     event.stopPropagation();
     if (button.classList.contains('blue')) {
       lastClick = performance.now();
       button.classList.remove('blue');
       button.classList.add('red');
-      document.body.addEventListener('click', function() {
+      document.body.addEventListener('click', function () {
         button.classList.add('blue');
         button.classList.remove('red');
-      }, {once: true});
+      }, { once: true });
     } else if (performance.now() - lastClick > 500) {
       removeScript(label.textContent);
       if (currentFileElement.textContent == label.textContent) {
@@ -234,9 +234,9 @@ function newItem(code, scriptName = undefined) {
   const nextButton = createDropdownItem(name);
   newButton.insertAdjacentElement('afterend', nextButton.parentElement);
   addEdit(nextButton);
-  return {button: nextButton, name};
+  return { button: nextButton, name };
 };
-newButton.onclick = function() {
+newButton.onclick = function () {
   newItem('').button.click();
 };
 
@@ -259,10 +259,10 @@ let tsWorker = undefined;
 
 async function getManifoldDTS() {
   const global = await fetch('/manifold-global-types.d.ts')
-                     .then(response => response.text());
+    .then(response => response.text());
 
   const encapsulated = await fetch('/manifold-encapsulated-types.d.ts')
-                           .then(response => response.text());
+    .then(response => response.text());
 
   return `
 ${global.replaceAll('export', '')}
@@ -289,19 +289,19 @@ async function getEditorDTS() {
 
 require.config({
   paths:
-      {vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.34.0/min/vs'}
+    { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.34.0/min/vs' }
 });
-require(['vs/editor/editor.main'], async function() {
+require(['vs/editor/editor.main'], async function () {
   monaco.languages.typescript.typescriptDefaults.addExtraLib(
-      await getManifoldDTS());
+    await getManifoldDTS());
   monaco.languages.typescript.typescriptDefaults.addExtraLib(
-      await getEditorDTS());
+    await getEditorDTS());
   editor = monaco.editor.create(
-      document.getElementById('editor'),
-      {language: 'typescript', automaticLayout: true});
+    document.getElementById('editor'),
+    { language: 'typescript', automaticLayout: true });
   const w = await monaco.languages.typescript.getTypeScriptWorker();
   tsWorker = await w(editor.getModel().uri);
-  editor.getModel().updateOptions({tabSize: 2});
+  editor.getModel().updateOptions({ tabSize: 2 });
 
   for (const [name] of exampleFunctions) {
     const button = createDropdownItem(name);
@@ -331,7 +331,7 @@ require(['vs/editor/editor.main'], async function() {
       autoExecute = true;
       const name = fragment.substring(0, codeIdx);
       switchTo(
-          newItem(fragment.substring(codeIdx + CODE_START.length), name).name);
+        newItem(fragment.substring(codeIdx + CODE_START.length), name).name);
     } else {
       if (fragment != currentName) {
         autoExecute = true;
@@ -398,7 +398,7 @@ function pause() {
   scrubber.classList.remove('hide');
 }
 
-playButton.onclick = function() {
+playButton.onclick = function () {
   if (paused) {
     play();
   } else {
@@ -406,14 +406,14 @@ playButton.onclick = function() {
   }
 };
 
-scrubber.oninput = function() {
+scrubber.oninput = function () {
   mv.currentTime = scrubber.value;
 };
 
 // Execution ------------------------------------------------------------
 const consoleElement = document.querySelector('#console');
 const oldLog = console.log;
-console.log = function(message) {
+console.log = function (message) {
   consoleElement.textContent += message + '\r\n';
   consoleElement.scrollTop = consoleElement.scrollHeight;
   oldLog(message);
@@ -442,7 +442,7 @@ function finishRun() {
   // Remove "Running..."
   consoleElement.textContent = log.substring(log.indexOf('\n') + 1);
   console.log(
-      `Took ${(Math.round((t1 - t0) / 10) / 100).toLocaleString()} seconds`);
+    `Took ${(Math.round((t1 - t0) / 10) / 100).toLocaleString()} seconds`);
 }
 
 const output = {
@@ -453,7 +453,7 @@ let manifoldWorker = null;
 
 function createWorker() {
   manifoldWorker = new ManifoldWorker();
-  manifoldWorker.onmessage = function(e) {
+  manifoldWorker.onmessage = function (e) {
     if (e.data == null) {
       if (tsWorker != null && !manifoldInitialized) {
         initializeRun();
@@ -487,7 +487,7 @@ function createWorker() {
     } else {
       setScript('safe', 'true');
     }
-  }
+  };
 }
 
 createWorker();
@@ -510,7 +510,7 @@ function cancel() {
   console.log('Run canceled');
 }
 
-runButton.onclick = function() {
+runButton.onclick = function () {
   if (runButton.classList.contains('cancel')) {
     cancel();
   } else {
