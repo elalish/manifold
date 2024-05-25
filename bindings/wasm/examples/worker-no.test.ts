@@ -1,10 +1,11 @@
-import { WebIO } from "@gltf-transform/core";
-import { expect, suite, test } from "vitest";
-import assert from "node:assert";
-import { readMesh, setupIO } from "./gltf-io";
-import { cleanup, module, evaluateCADToModel } from "./worker";
+import {WebIO} from '@gltf-transform/core';
+import assert from 'node:assert';
+import {expect, suite, test} from 'vitest';
+
+import {readMesh, setupIO} from './gltf-io';
 // @ts-ignore
-import { examples } from "./public/examples.js";
+import {examples} from './public/examples.js';
+import {cleanup, evaluateCADToModel, module} from './worker';
 
 const io = setupIO(new WebIO());
 
@@ -22,17 +23,17 @@ async function runExample(name: string) {
     if (!docMesh) {
       continue;
     }
-    const { mesh } = readMesh(docMesh)!;
+    const {mesh} = readMesh(docMesh)!;
     const manifold = new module.Manifold(mesh as any);
     const prop = manifold.getProperties();
     const genus = manifold.genus();
     manifold.delete();
-    return { ...prop, genus };
+    return {...prop, genus};
   }
   assert.ok(false);
 }
 
-suite("Examples", () => {
+suite('Examples', () => {
   test('Intro', async () => {
     const result = await runExample('Intro');
     expect(result.genus).to.equal(5, 'Genus');

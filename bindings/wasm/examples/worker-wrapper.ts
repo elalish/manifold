@@ -1,11 +1,11 @@
-import { module, cleanup, evaluateCADToModel } from "./worker";
+import {cleanup, evaluateCADToModel, module} from './worker';
 
 // Setup complete
 self.postMessage(null);
 
 if (self.console) {
   const oldLog = self.console.log;
-  self.console.log = function (...args) {
+  self.console.log = function(...args) {
     let message = '';
     for (const arg of args) {
       if (arg == null) {
@@ -16,7 +16,7 @@ if (self.console) {
         message += arg.toString();
       }
     }
-    self.postMessage({ log: message });
+    self.postMessage({log: message});
     oldLog(...args);
   };
 }
@@ -27,7 +27,7 @@ self.onmessage = async (e) => {
     self.postMessage(result);
   } catch (error: any) {
     console.log(error.toString());
-    self.postMessage({ objectURL: null });
+    self.postMessage({objectURL: null});
   } finally {
     module.cleanup();
     cleanup();

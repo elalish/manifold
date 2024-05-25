@@ -340,14 +340,15 @@ module.only = (manifold) => {
 
 // Swallow informational logs in testing framework
 function log(...args: any[]) {
-  if (typeof self !== "undefined" && self.console) {
+  if (typeof self !== 'undefined' && self.console) {
     self.console.log(...args);
   }
 }
 
 // self.onmessage = async (e) => {
 //   const content = 'const globalDefaults = {};\n' + e.data +
-//       '\nreturn exportModels(globalDefaults, typeof result === "undefined" ? undefined : result);\n';
+//       '\nreturn exportModels(globalDefaults, typeof result === "undefined" ?
+//       undefined : result);\n';
 //   try {
 //     const f = new Function(
 //         'exportModels', 'glMatrix', 'module', ...exposedFunctions, content);
@@ -799,7 +800,7 @@ async function exportModels(defaults: GlobalDefaults, manifold?: Manifold) {
 
   return {
     glbURL: URL.createObjectURL(blobGLB),
-    threeMFURL: URL.createObjectURL(blob3MF)
+        threeMFURL: URL.createObjectURL(blob3MF)
   }
   // self.postMessage({
   //   glbURL: URL.createObjectURL(blobGLB),
@@ -820,18 +821,18 @@ if (typeof result !== "undefined") {
     glMatrix,
     module,
     ...Object.fromEntries(
-      exposedFunctions.map((name) => [name, (module as any)[name]]),
-    ),
+        exposedFunctions.map((name) => [name, (module as any)[name]]),
+        ),
   };
   const evalFn = new Function(
-    ...Object.keys(context),
-    code + ";\n" + footerCode,
+      ...Object.keys(context),
+      code + ';\n' + footerCode,
   );
   const manifold = evalFn(...Object.values(context));
-  return { globalDefaults, manifold };
+  return {globalDefaults, manifold};
 }
 
 export async function evaluateCADToModel(code: string) {
-  const { globalDefaults, manifold } = evaluateCADToManifold(code);
+  const {globalDefaults, manifold} = evaluateCADToManifold(code);
   return await exportModels(globalDefaults as any, manifold);
 }
