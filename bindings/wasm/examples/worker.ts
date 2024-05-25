@@ -798,10 +798,10 @@ async function exportModels(defaults: GlobalDefaults, manifold?: Manifold) {
       [zipFile],
       {type: 'application/vnd.ms-package.3dmanufacturing-3dmodel+xml'});
 
-  return {
+  return ({
     glbURL: URL.createObjectURL(blobGLB),
-        threeMFURL: URL.createObjectURL(blob3MF)
-  }
+    threeMFURL: URL.createObjectURL(blob3MF)
+  });
   // self.postMessage({
   //   glbURL: URL.createObjectURL(blobGLB),
   //   threeMFURL: URL.createObjectURL(blob3MF)
