@@ -1,6 +1,6 @@
 import {WebIO} from '@gltf-transform/core';
 import assert from 'node:assert';
-import {expect, suite, test} from 'vitest';
+import {afterEach, expect, suite, test} from 'vitest';
 
 import {readMesh, setupIO} from './gltf-io';
 // @ts-ignore
@@ -32,6 +32,12 @@ async function runExample(name: string) {
   }
   assert.ok(false);
 }
+
+// allow vitest to report progress after each test
+// before going into heavy computation which blocks main thread
+afterEach(async () => {
+  await new Promise(resolve => setTimeout(resolve, 500))
+})
 
 suite('Examples', () => {
   test('Intro', async () => {
