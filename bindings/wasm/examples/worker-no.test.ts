@@ -35,9 +35,7 @@ async function runExample(name: string) {
 
 // allow vitest to report progress after each test
 // before going into heavy computation which blocks main thread
-afterEach(async () => {
-  await new Promise(resolve => setTimeout(resolve, 500))
-})
+afterEach(async () => {await new Promise(resolve => setTimeout(resolve, 500))})
 
 suite('Examples', () => {
   test('Intro', async () => {
