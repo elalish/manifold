@@ -15,13 +15,16 @@
 #include <CGAL/Exact_predicates_exact_constructions_kernel.h>
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
 #include <CGAL/Polygon_mesh_processing/corefinement.h>
+#include <CGAL/Polygon_mesh_processing/measure.h>
 #include <CGAL/Surface_mesh.h>
+#include <CGAL/convex_hull_3.h>
 
 #include <chrono>
 #include <fstream>
 #include <iostream>
 
 #include "manifold.h"
+#include "samples.h"
 
 using namespace manifold;
 
@@ -54,7 +57,13 @@ void manifoldToCGALSurfaceMesh(Manifold &manifold, TriangleMesh &cgalMesh) {
   }
 }
 
-int main(int argc, char **argv) {
+void computeCGALConvexHull(const std::vector<Point> &points,
+                           TriangleMesh &hullMesh) {
+  CGAL::convex_hull_3(points.begin(), points.end(), hullMesh);
+}
+
+// Performance test for CGAL (original main function)
+void perfTestCGAL() {
   for (int i = 0; i < 8; ++i) {
     Manifold sphere = Manifold::Sphere(1, (8 << i) * 4);
     Manifold sphere2 = sphere.Translate(glm::vec3(0.5));
@@ -75,4 +84,77 @@ int main(int argc, char **argv) {
     std::cout << "nTri = " << sphere.NumTri() << ", time = " << elapsed.count()
               << " sec" << std::endl;
   }
+}
+
+// Prints the volume and area of the manifold, the convex hull of the manifold,
+// and the CGAL implementations.
+void PrintVolArea(Manifold &manfiold_obj, TriangleMesh &manifoldMesh,
+                  TriangleMesh &hullMesh, Manifold &hullManifold) {
+  std::cout << "Vol CGAL = "
+            << CGAL::Polygon_mesh_processing::volume(manifoldMesh) << std::endl;
+  std::cout << "Vol Manifold = " << manfiold_obj.GetProperties().volume
+            << std::endl;
+  std::cout << "Vol Hull = " << hullManifold.GetProperties().volume
+            << std::endl;
+  std::cout << "Vol CGAL Hull = "
+            << CGAL::Polygon_mesh_processing::volume(hullMesh) << std::endl;
+  std::cout << "Area CGAL = "
+            << CGAL::Polygon_mesh_processing::area(manifoldMesh) << std::endl;
+  std::cout << "Area Manifold = " << manfiold_obj.GetProperties().surfaceArea
+            << std::endl;
+  std::cout << "Area Hull = " << hullManifold.GetProperties().surfaceArea
+            << std::endl;
+  std::cout << "Area CGAL Hull = "
+            << CGAL::Polygon_mesh_processing::area(hullMesh) << std::endl;
+}
+
+// Constructs a Menger Sponge, and tests the convex hull implementation on it
+// (you can pass the specific hull implementation to be tested). Comparing the
+// volume and surface area with CGAL implementation, for various values of
+// rotation
+void MengerTestHull(Manifold (*hull_func)(const std::vector<Manifold> &),
+                    float rx, float ry, float rz) {
+  Manifold sponge = MengerSponge(4);
+  sponge = sponge.Rotate(rx, ry, rz);
+  TriangleMesh spongeCGAL;
+  manifoldToCGALSurfaceMesh(sponge, spongeCGAL);
+  std::vector<Point> points;
+  for (const auto &vert : spongeCGAL.vertices()) {
+    points.push_back(spongeCGAL.point(vert));
+  }
+
+  TriangleMesh hullMesh;
+  computeCGALConvexHull(points, hullMesh);
+  std::vector<Manifold> sponges{sponge};
+  Manifold hullManifold = hull_func(sponges);
+  PrintVolArea(sponge, spongeCGAL, hullMesh, hullManifold);
+}
+
+// Constructs a high quality sphere, and tests the convex hull implementation on
+// it (you can pass the specific hull implementation to be tested). Comparing
+// the volume and surface area with CGAL implementation
+void SphereTestHull(Manifold (*hull_func)(const std::vector<Manifold> &)) {
+  Manifold sphere = Manifold::Sphere(1, 6000);
+  sphere = sphere.Translate(glm::vec3(0.5));
+
+  TriangleMesh cgalSphere;
+  manifoldToCGALSurfaceMesh(sphere, cgalSphere);
+  std::vector<Point> points;
+  for (const auto &vert : cgalSphere.vertices()) {
+    points.push_back(cgalSphere.point(vert));
+  }
+
+  // Convex Hull
+  TriangleMesh hullMesh;
+  computeCGALConvexHull(points, hullMesh);
+  std::vector<Manifold> spheres{sphere};
+  Manifold hullManifold = hull_func(spheres);
+
+  PrintVolArea(sphere, cgalSphere, hullMesh, hullManifold);
+}
+
+int main(int argc, char **argv) {
+  perfTestCGAL();
+  SphereTestHull(Manifold::Hull);
+  MengerTestHull(Manifold::Hull, 1, 2, 3);
 }
