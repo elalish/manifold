@@ -809,11 +809,6 @@ async function exportModels(defaults: GlobalDefaults, manifold?: Manifold) {
 }
 
 function evaluateCADToManifold(code: string) {
-  const footerCode = `
-if (typeof result !== "undefined") {
-  return result;
-}
-`;
   const globalDefaults = {} as GlobalDefaults;
   const context = {
     globalDefaults,
@@ -826,7 +821,7 @@ if (typeof result !== "undefined") {
   };
   const evalFn = new Function(
       ...Object.keys(context),
-      code + ';\n' + footerCode,
+      code + '\n return typeof result === "undefined" ? undefined : result',
   );
   const manifold = evalFn(...Object.values(context));
   return {globalDefaults, manifold};
