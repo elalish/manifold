@@ -134,7 +134,7 @@ void MengerTestHull(Manifold (*hull_func)(const std::vector<Manifold> &),
 // it (you can pass the specific hull implementation to be tested). Comparing
 // the volume and surface area with CGAL implementation
 void SphereTestHull(Manifold (*hull_func)(const std::vector<Manifold> &)) {
-  Manifold sphere = Manifold::Sphere(1, 6000);
+  Manifold sphere = Manifold::Sphere(1, 10000);
   sphere = sphere.Translate(glm::vec3(0.5));
 
   TriangleMesh cgalSphere;
