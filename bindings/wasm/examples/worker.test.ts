@@ -1,3 +1,17 @@
+// Copyright 2022 The Manifold Authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 import {WebIO} from '@gltf-transform/core';
 import assert from 'node:assert';
 import {afterEach, expect, suite, test} from 'vitest';
@@ -5,6 +19,7 @@ import {afterEach, expect, suite, test} from 'vitest';
 import {readMesh, setupIO} from './gltf-io';
 // @ts-ignore
 import {examples} from './public/examples.js';
+import {Mesh} from './public/manifold';
 import {cleanup, evaluateCADToModel, module} from './worker';
 
 const io = setupIO(new WebIO());
@@ -23,7 +38,7 @@ async function runExample(name: string) {
       continue;
     }
     const {mesh} = readMesh(docMesh)!;
-    const manifold = new module.Manifold(mesh as any);
+    const manifold = new module.Manifold(mesh as Mesh);
     const prop = manifold.getProperties();
     const genus = manifold.genus();
     manifold.delete();

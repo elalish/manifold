@@ -784,5 +784,5 @@ function evaluateCADToManifold(code: string) {
 
 export async function evaluateCADToModel(code: string) {
   const {globalDefaults, manifold} = evaluateCADToManifold(code);
-  return await exportModels(globalDefaults as any, manifold);
+  return await exportModels(globalDefaults, manifold);
 }
