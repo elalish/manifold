@@ -417,6 +417,15 @@ ManifoldMeshGL *manifold_meshgl_copy(void *mem, ManifoldMeshGL *m) {
   return to_c(new (mem) MeshGL(*from_c(m)));
 }
 
+ManifoldMeshGL *manifold_meshgl_merge(void *mem, ManifoldMeshGL *m) {
+  auto duplicate = new (mem) MeshGL(*from_c(m));
+  if (duplicate->Merge()) {
+    return to_c(duplicate);
+  }
+  delete duplicate;
+  return m;
+}
+
 int manifold_meshgl_num_prop(ManifoldMeshGL *m) { return from_c(m)->numProp; }
 int manifold_meshgl_num_vert(ManifoldMeshGL *m) { return from_c(m)->NumVert(); }
 int manifold_meshgl_num_tri(ManifoldMeshGL *m) { return from_c(m)->NumTri(); }
