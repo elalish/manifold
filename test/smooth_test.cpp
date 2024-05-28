@@ -82,7 +82,8 @@ TEST(Smooth, TruncatedCone) {
   options2.faceted = false;
   options2.mat.normalChannels = {3, 4, 5};
   options2.mat.roughness = 0;
-  if (options.exportModels) ExportMesh("truncatedCone.glb", out, options2);
+  if (options.exportModels)
+    ExportMesh("smoothTruncatedCone.glb", out, options2);
 #endif
 }
 
@@ -98,7 +99,8 @@ TEST(Smooth, ToLength) {
   EXPECT_NEAR(prop.surfaceArea, 1400, 1);
 
 #ifdef MANIFOLD_EXPORT
-  if (options.exportModels) ExportMesh("toLength.glb", smooth.GetMesh(), {});
+  if (options.exportModels)
+    ExportMesh("smoothToLength.glb", smooth.GetMesh(), {});
 #endif
 }
 
@@ -135,7 +137,8 @@ TEST(Smooth, Normals) {
   EXPECT_FLOAT_EQ(outProp.surfaceArea, byNormalsProp.surfaceArea);
 
 #ifdef MANIFOLD_EXPORT
-  if (options.exportModels) ExportMesh("normals.glb", byNormals.GetMesh(), {});
+  if (options.exportModels)
+    ExportMesh("smoothNormals.glb", byNormals.GetMesh(), {});
 #endif
 }
 
@@ -187,7 +190,8 @@ TEST(Smooth, Mirrored) {
   EXPECT_NEAR(prop0.surfaceArea, prop1.surfaceArea, 0.1);
 
 #ifdef MANIFOLD_EXPORT
-  if (options.exportModels) ExportMesh("mirrored.glb", mirror.GetMesh(), {});
+  if (options.exportModels)
+    ExportMesh("smoothMirrored.glb", mirror.GetMesh(), {});
 #endif
 }
 
@@ -217,7 +221,7 @@ TEST(Smooth, Csaszar) {
             glm::mix(yellow, blue, glm::smoothstep(0.0f, 0.2f, alpha));
       }
     }
-    ExportMesh("csaszar.glb", out, options);
+    ExportMesh("smoothCsaszar.glb", out, options);
   }
 #endif
 }
@@ -286,7 +290,7 @@ TEST(Smooth, Torus) {
   options2.faceted = false;
   options2.mat.normalChannels = {3, 4, 5};
   options2.mat.roughness = 0;
-  if (options.exportModels) ExportMesh("torus.glb", out, options2);
+  if (options.exportModels) ExportMesh("smoothTorus.glb", out, options2);
 #endif
 }
 
@@ -329,7 +333,7 @@ TEST(Smooth, SineSurface) {
     ExportOptions options2;
     // options2.faceted = false;
     // options2.mat.normalChannels = {3, 4, 5};
-    ExportMesh("sineSurface.glb", smoothed.GetMeshGL(), options2);
+    ExportMesh("smoothSineSurface.glb", smoothed.GetMeshGL(), options2);
   }
 #endif
 }
