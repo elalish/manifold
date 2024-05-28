@@ -97,8 +97,8 @@ const crossSectionMemberFunctions = [
 const toplevelConstructors = ['show', 'only', 'setMaterial'];
 const toplevel = [
   'setMinCircularAngle', 'setMinCircularEdgeLength', 'setCircularSegments',
-  'getCircularSegments', 'Mesh', 'GLTFNode', 'Manifold', 'CrossSection',
-  'setMorphStart', 'setMorphEnd'
+  'getCircularSegments', 'resetToCircularDefaults', 'Mesh', 'GLTFNode',
+  'Manifold', 'CrossSection', 'setMorphStart', 'setMorphEnd'
 ];
 const exposedFunctions = toplevelConstructors.concat(toplevel);
 
@@ -821,7 +821,8 @@ function evaluateCADToManifold(code: string) {
   };
   const evalFn = new Function(
       ...Object.keys(context),
-      code + '\n return typeof result === "undefined" ? undefined : result',
+      'resetToCircularDefaults();\n' + code +
+          '\n return typeof result === "undefined" ? undefined : result;',
   );
   const manifold = evalFn(...Object.values(context));
   return {globalDefaults, manifold};

@@ -492,6 +492,9 @@ struct Rect {
  */
 enum class OpType { Add, Subtract, Intersect };
 
+constexpr int DEFAULT_SEGMENTS = 0;
+constexpr float DEFAULT_ANGLE = 10.0f;
+constexpr float DEFAULT_LENGTH = 1.0f;
 /**
  * These static properties control how circular shapes are quantized by
  * default on construction. If circularSegments is specified, it takes
@@ -502,9 +505,9 @@ enum class OpType { Add, Subtract, Intersect };
  */
 class Quality {
  private:
-  inline static int circularSegments_ = 0;
-  inline static float circularAngle_ = 10.0f;
-  inline static float circularEdgeLength_ = 1.0f;
+  inline static int circularSegments_ = DEFAULT_SEGMENTS;
+  inline static float circularAngle_ = DEFAULT_ANGLE;
+  inline static float circularEdgeLength_ = DEFAULT_LENGTH;
 
  public:
   /**
@@ -564,6 +567,12 @@ class Quality {
     int nSeg = fmin(nSegA, nSegL) + 3;
     nSeg -= nSeg % 4;
     return std::max(nSeg, 3);
+  }
+
+  static void ResetToDefaults() {
+    circularSegments_ = DEFAULT_SEGMENTS;
+    circularAngle_ = DEFAULT_ANGLE;
+    circularEdgeLength_ = DEFAULT_LENGTH;
   }
 };
 /** @} */

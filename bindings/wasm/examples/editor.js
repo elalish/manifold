@@ -276,6 +276,7 @@ declare interface ManifoldToplevel {
   setMinCircularEdgeLength: typeof T.setMinCircularEdgeLength;
   setCircularSegments: typeof T.setCircularSegments;
   getCircularSegments: typeof T.getCircularSegments;
+  resetToCircularDefaults: typeof T.resetToCircularDefaults;
   setup: () => void;
 }
 declare const module: ManifoldToplevel;
