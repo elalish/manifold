@@ -1,4 +1,4 @@
-import {cleanup, evaluateCADToModel, module} from './worker';
+import {cleanup, evaluateCADToModel} from './worker';
 
 // Setup complete
 self.postMessage(null);
@@ -29,7 +29,6 @@ self.onmessage = async (e) => {
     console.log(error.toString());
     self.postMessage({objectURL: null});
   } finally {
-    module.cleanup();
     cleanup();
   }
 };

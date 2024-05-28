@@ -12,7 +12,6 @@ const io = setupIO(new WebIO());
 async function runExample(name: string) {
   const code = examples.functionBodies.get(name);
   const result = await evaluateCADToModel(code);
-  module.cleanup();
   cleanup();
   assert.ok(result?.glbURL);
   const docIn = await io.read(result.glbURL);

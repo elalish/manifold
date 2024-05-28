@@ -141,17 +141,6 @@ for (const name of toplevelConstructors) {
   };
 }
 
-module.cleanup = function() {
-  for (const obj of memoryRegistry) {
-    // decompose result is an array of manifolds
-    if (obj instanceof Array)
-      for (const elem of obj) elem.delete();
-    else
-      obj.delete();
-  }
-  memoryRegistry.length = 0;
-};
-
 // Debug setup to show source meshes
 let ghost = false;
 const shown = new Map<number, Mesh>();
@@ -197,6 +186,15 @@ let weightsSampler: AnimationSampler;
 let hasAnimation: boolean;
 
 export function cleanup() {
+  for (const obj of memoryRegistry) {
+    // decompose result is an array of manifolds
+    if (obj instanceof Array)
+      for (const elem of obj) elem.delete();
+    else
+      obj.delete();
+  }
+  memoryRegistry.length = 0;
+
   ghost = false;
   shown.clear();
   singles.clear();
@@ -317,52 +315,12 @@ module.only = (manifold) => {
   return debug(manifold, singles);
 };
 
-// Setup complete
-// self.postMessage(null);
-
-// if (self.console) {
-//   const oldLog = self.console.log;
-//   self.console.log = function(...args) {
-//     let message = '';
-//     for (const arg of args) {
-//       if (arg == null) {
-//         message += 'undefined';
-//       } else if (typeof arg == 'object') {
-//         message += JSON.stringify(arg, null, 4);
-//       } else {
-//         message += arg.toString();
-//       }
-//     }
-//     self.postMessage({log: message});
-//     oldLog(...args);
-//   };
-// }
-
 // Swallow informational logs in testing framework
 function log(...args: any[]) {
   if (typeof self !== 'undefined' && self.console) {
     self.console.log(...args);
   }
 }
-
-// self.onmessage = async (e) => {
-//   const content = 'const globalDefaults = {};\n' + e.data +
-//       '\nreturn exportModels(globalDefaults, typeof result === "undefined" ?
-//       undefined : result);\n';
-//   try {
-//     const f = new Function(
-//         'exportModels', 'glMatrix', 'module', ...exposedFunctions, content);
-//     await f(
-//         exportModels, glMatrix, module,  //@ts-ignore
-//         ...exposedFunctions.map(name => module[name]));
-//   } catch (error: any) {
-//     console.log(error.toString());
-//     self.postMessage({objectURL: null});
-//   } finally {
-//     module.cleanup();
-//     cleanup();
-//   }
-// };
 
 function euler2quat(rotation: Vec3): Quat {
   const {quat} = glMatrix;
@@ -802,10 +760,6 @@ async function exportModels(defaults: GlobalDefaults, manifold?: Manifold) {
     glbURL: URL.createObjectURL(blobGLB),
     threeMFURL: URL.createObjectURL(blob3MF)
   });
-  // self.postMessage({
-  //   glbURL: URL.createObjectURL(blobGLB),
-  //   threeMFURL: URL.createObjectURL(blob3MF)
-  // });
 }
 
 function evaluateCADToManifold(code: string) {
