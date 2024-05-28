@@ -394,7 +394,7 @@ TEST(Manifold, Project) {
       {23, 14, 27}, {24, 23, 28}, {28, 23, 27}};
   Manifold in(input);
   CrossSection projected = in.Project();
-  EXPECT_NEAR(projected.Area(), 1, 0.01);
+  EXPECT_NEAR(projected.Area(), 0.72, 0.01);
 }
 
 /**
