@@ -38,6 +38,7 @@ export function setMinCircularAngle(angle: number): void;
 export function setMinCircularEdgeLength(length: number): void;
 export function setCircularSegments(segments: number): void;
 export function getCircularSegments(radius: number): number;
+export function resetToCircularDefaults(): void;
 ///@}
 
 export class CrossSection {

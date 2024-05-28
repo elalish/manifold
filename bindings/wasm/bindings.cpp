@@ -198,4 +198,5 @@ EMSCRIPTEN_BINDINGS(whatever) {
   function("setMinCircularEdgeLength", &Quality::SetMinCircularEdgeLength);
   function("setCircularSegments", &Quality::SetCircularSegments);
   function("getCircularSegments", &Quality::GetCircularSegments);
+  function("resetToCircularDefaults", &Quality::ResetToDefaults);
 }
