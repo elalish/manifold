@@ -72,8 +72,8 @@ TEST(Smooth, SmoothFlat) {
   Manifold cone = Manifold::Cylinder(5, 10, 5, 12).SmoothOut();
   Manifold smooth = cone.RefineToLength(0.5).CalculateNormals(0);
   auto prop = smooth.GetProperties();
-  EXPECT_NEAR(prop.volume, 1165.77, 0.01);
-  EXPECT_NEAR(prop.surfaceArea, 769.88, 0.01);
+  EXPECT_NEAR(prop.volume, 1063.61, 0.01);
+  EXPECT_NEAR(prop.surfaceArea, 751.78, 0.01);
   MeshGL out = smooth.GetMeshGL();
   CheckGL(out);
 
@@ -291,7 +291,7 @@ TEST(Smooth, SmoothTorus) {
 #endif
 }
 
-TEST(Smooth, SineSurface) {
+TEST(Manifold, SineSurface) {
   MeshGL surface = LevelSet(
       [](glm::vec3 p) {
         float mid = glm::sin(p.x) + glm::sin(p.y);
@@ -300,16 +300,36 @@ TEST(Smooth, SineSurface) {
       {glm::vec3(-2 * glm::pi<float>() + 0.2),
        glm::vec3(0 * glm::pi<float>() - 0.2)},
       1);
-  Manifold smoothed = Manifold(surface).SmoothOut(50).Refine(8);
+  Manifold smoothed =
+      Manifold(surface).CalculateNormals(0, 50).SmoothByNormals(0).Refine(8);
   auto prop = smoothed.GetProperties();
-  EXPECT_NEAR(prop.volume, 8.08, 0.01);
-  EXPECT_NEAR(prop.surfaceArea, 30.85, 0.01);
+  EXPECT_NEAR(prop.volume, 7.89, 0.01);
+  EXPECT_NEAR(prop.surfaceArea, 30.61, 0.01);
   EXPECT_EQ(smoothed.Genus(), 0);
+
+  Manifold smoothed1 = Manifold(surface).SmoothOut(50).Refine(8);
+  auto prop1 = smoothed1.GetProperties();
+  EXPECT_FLOAT_EQ(prop1.volume, prop.volume);
+  EXPECT_FLOAT_EQ(prop1.surfaceArea, prop.surfaceArea);
+  EXPECT_EQ(smoothed1.Genus(), 0);
+
+  Manifold smoothed2 = Manifold(surface).SmoothOut(180, 1).Refine(8);
+  auto prop2 = smoothed2.GetProperties();
+  EXPECT_NEAR(prop2.volume, 9.06, 0.01);
+  EXPECT_NEAR(prop2.surfaceArea, 33.81, 0.01);
+  EXPECT_EQ(smoothed2.Genus(), 0);
+
+  Manifold smoothed3 = Manifold(surface).SmoothOut(50, 0.5).Refine(8);
+  auto prop3 = smoothed3.GetProperties();
+  EXPECT_NEAR(prop3.volume, 8.46, 0.01);
+  EXPECT_NEAR(prop3.surfaceArea, 31.77, 0.01);
+  EXPECT_EQ(smoothed3.Genus(), 0);
 
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) {
     ExportOptions options2;
-    // options2.mat.colorChannels = {3, 4, 5, -1};
+    // options2.faceted = false;
+    // options2.mat.normalChannels = {3, 4, 5};
     ExportMesh("sinesurface.glb", smoothed.GetMeshGL(), options2);
   }
 #endif

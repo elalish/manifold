@@ -379,8 +379,10 @@ class EarClip {
     float SignedDist(VertItr v, glm::vec2 unit, float precision) const {
       float d = determinant2x2(unit, v->pos - pos);
       if (std::abs(d) < precision) {
-        d = glm::max(d, determinant2x2(unit, v->right->pos - pos));
-        d = glm::max(d, determinant2x2(unit, v->left->pos - pos));
+        float dR = determinant2x2(unit, v->right->pos - pos);
+        if (std::abs(dR) > precision) return dR;
+        float dL = determinant2x2(unit, v->left->pos - pos);
+        if (std::abs(dL) > precision) return dL;
       }
       return d;
     }
