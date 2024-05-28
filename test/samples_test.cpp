@@ -290,59 +290,6 @@ TEST(Samples, Sponge4) {
 }
 #endif
 
-#ifdef MANIFOLD_EXPORT
-TEST(Samples, SelfIntersect) {
-  manifold::PolygonParams().processOverlaps = true;
-  Manifold m1 = ReadMesh("self_intersectA.glb");
-  Manifold m2 = ReadMesh("self_intersectB.glb");
-  Manifold res = m1 + m2;
-  res.GetMeshGL();  // test crash
-  manifold::PolygonParams().processOverlaps = false;
-}
-
-TEST(Samples, GenericTwinBooleanTest7081) {
-  std::string file = __FILE__;
-  std::string dir = file.substr(0, file.rfind('/'));
-  Manifold m1 = ReadMesh("Generic_Twin_7081.1.t0_left.glb");
-  Manifold m2 = ReadMesh("Generic_Twin_7081.1.t0_right.glb");
-  Manifold res = m1 + m2;  // Union
-  res.GetMeshGL();         // test crash
-}
-
-TEST(Samples, GenericTwinBooleanTest7863) {
-  manifold::PolygonParams().processOverlaps = true;
-  std::string file = __FILE__;
-  std::string dir = file.substr(0, file.rfind('/'));
-  Manifold m1 = ReadMesh("Generic_Twin_7863.1.t0_left.glb");
-  Manifold m2 = ReadMesh("Generic_Twin_7863.1.t0_right.glb");
-  Manifold res = m1 + m2;  // Union
-  res.GetMeshGL();         // test crash
-  manifold::PolygonParams().processOverlaps = false;
-}
-
-TEST(Samples, Havocglass8Bool) {
-  manifold::PolygonParams().processOverlaps = true;
-  std::string file = __FILE__;
-  std::string dir = file.substr(0, file.rfind('/'));
-  Manifold m1 = ReadMesh("Havocglass8_left.glb");
-  Manifold m2 = ReadMesh("Havocglass8_right.glb");
-  Manifold res = m1 + m2;  // Union
-  res.GetMeshGL();         // test crash
-  manifold::PolygonParams().processOverlaps = false;
-}
-
-TEST(Samples, CraycloudBool) {
-  std::string file = __FILE__;
-  std::string dir = file.substr(0, file.rfind('/'));
-  Manifold m1 = ReadMesh("Cray_left.glb");
-  Manifold m2 = ReadMesh("Cray_right.glb");
-  Manifold res = m1 - m2;
-  EXPECT_EQ(res.Status(), Manifold::Error::NoError);
-  EXPECT_TRUE(res.IsEmpty());
-}
-
-#endif
-
 TEST(Samples, CondensedMatter16) {
   // FIXME: it should be geometrically valid
   manifold::PolygonParams().processOverlaps = true;

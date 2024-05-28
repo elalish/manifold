@@ -23,37 +23,7 @@
 
 using namespace manifold;
 
-TEST(Manifold, PinchedVert) {
-  Mesh shape;
-  shape.vertPos = {{0, 0, 0},         //
-                   {1, 1, 0},         //
-                   {1, -1, 0},        //
-                   {-0.00001, 0, 0},  //
-                   {-1, -1, -0},      //
-                   {-1, 1, 0},        //
-                   {0, 0, 2},         //
-                   {0, 0, -2}};
-  shape.triVerts = {{0, 2, 6},  //
-                    {2, 1, 6},  //
-                    {1, 0, 6},  //
-                    {4, 3, 6},  //
-                    {3, 5, 6},  //
-                    {5, 4, 6},  //
-                    {2, 0, 4},  //
-                    {0, 3, 4},  //
-                    {3, 0, 1},  //
-                    {3, 1, 5},  //
-                    {7, 2, 4},  //
-                    {7, 4, 5},  //
-                    {7, 5, 1},  //
-                    {7, 1, 2}};
-  Manifold touch(shape);
-  EXPECT_FALSE(touch.IsEmpty());
-  EXPECT_EQ(touch.Status(), Manifold::Error::NoError);
-  EXPECT_EQ(touch.Genus(), 0);
-}
-
-TEST(Manifold, TictacHull) {
+TEST(Hull, Tictac) {
   const float tictacRad = 100;
   const float tictacHeight = 500;
   const int tictacSeg = 1000;
@@ -73,7 +43,7 @@ TEST(Manifold, TictacHull) {
 }
 
 #ifdef MANIFOLD_EXPORT
-TEST(Manifold, HullFail) {
+TEST(Hull, Fail) {
   Manifold body = ReadMesh("hull-body.glb");
   Manifold mask = ReadMesh("hull-mask.glb");
   Manifold ret = body - mask;
@@ -81,14 +51,14 @@ TEST(Manifold, HullFail) {
 }
 #endif
 
-TEST(Manifold, HollowHull) {
+TEST(Hull, Hollow) {
   auto sphere = Manifold::Sphere(100, 360);
   auto hollow = sphere - sphere.Scale({0.8, 0.8, 0.8});
   const float sphere_vol = sphere.GetProperties().volume;
   EXPECT_FLOAT_EQ(hollow.Hull().GetProperties().volume, sphere_vol);
 }
 
-TEST(Manifold, CubeHull) {
+TEST(Hull, Cube) {
   std::vector<glm::vec3> cubePts = {
       {0, 0, 0},       {1, 0, 0},   {0, 1, 0},      {0, 0, 1},  // corners
       {1, 1, 0},       {0, 1, 1},   {1, 0, 1},      {1, 1, 1},  // corners
@@ -98,7 +68,7 @@ TEST(Manifold, CubeHull) {
   EXPECT_FLOAT_EQ(cube.GetProperties().volume, 1);
 }
 
-TEST(Manifold, EmptyHull) {
+TEST(Hull, Empty) {
   const std::vector<glm::vec3> tooFew{{0, 0, 0}, {1, 0, 0}, {0, 1, 0}};
   EXPECT_TRUE(Manifold::Hull(tooFew).IsEmpty());
 

@@ -64,11 +64,11 @@ TEST(Smooth, RefineQuads) {
   options2.mat.metalness = 0;
   options2.mat.roughness = 0.5;
   options2.mat.colorChannels = {3, 4, 5, -1};
-  if (options.exportModels) ExportMesh("refinedCylinder.glb", out, options2);
+  if (options.exportModels) ExportMesh("refineQuads.glb", out, options2);
 #endif
 }
 
-TEST(Smooth, SmoothFlat) {
+TEST(Smooth, TruncatedCone) {
   Manifold cone = Manifold::Cylinder(5, 10, 5, 12).SmoothOut();
   Manifold smooth = cone.RefineToLength(0.5).CalculateNormals(0);
   auto prop = smooth.GetProperties();
@@ -82,11 +82,11 @@ TEST(Smooth, SmoothFlat) {
   options2.faceted = false;
   options2.mat.normalChannels = {3, 4, 5};
   options2.mat.roughness = 0;
-  if (options.exportModels) ExportMesh("smoothCone.glb", out, options2);
+  if (options.exportModels) ExportMesh("truncatedCone.glb", out, options2);
 #endif
 }
 
-TEST(Smooth, Smooth2Length) {
+TEST(Smooth, ToLength) {
   Manifold cone = Manifold::Extrude(
       CrossSection::Circle(10, 10).Translate({10, 0}), 2, 0, 0, {0, 0});
   cone += cone.Scale({1, 1, -5});
@@ -98,11 +98,11 @@ TEST(Smooth, Smooth2Length) {
   EXPECT_NEAR(prop.surfaceArea, 1400, 1);
 
 #ifdef MANIFOLD_EXPORT
-  if (options.exportModels) ExportMesh("smoothCones.glb", smooth.GetMesh(), {});
+  if (options.exportModels) ExportMesh("toLength.glb", smooth.GetMesh(), {});
 #endif
 }
 
-TEST(Smooth, SmoothSphere) {
+TEST(Smooth, Sphere) {
   int n[5] = {4, 8, 16, 32, 64};
   float precision[5] = {0.006, 0.003, 0.003, 0.0005, 0.00006};
   for (int i = 0; i < 5; ++i) {
@@ -124,7 +124,7 @@ TEST(Smooth, SmoothSphere) {
   }
 }
 
-TEST(Smooth, SmoothNormals) {
+TEST(Smooth, Normals) {
   Manifold cylinder = Manifold::Cylinder(10, 5, 5, 8);
   Manifold out = cylinder.SmoothOut().RefineToLength(0.1);
   Manifold byNormals =
@@ -135,12 +135,11 @@ TEST(Smooth, SmoothNormals) {
   EXPECT_FLOAT_EQ(outProp.surfaceArea, byNormalsProp.surfaceArea);
 
 #ifdef MANIFOLD_EXPORT
-  if (options.exportModels)
-    ExportMesh("smoothCylinder.glb", byNormals.GetMesh(), {});
+  if (options.exportModels) ExportMesh("normals.glb", byNormals.GetMesh(), {});
 #endif
 }
 
-TEST(Manifold, ManualSmooth) {
+TEST(Smooth, Manual) {
   // Unit Octahedron
   const Mesh oct = Manifold::Sphere(1, 4).GetMesh();
   Mesh smooth = Manifold::Smooth(oct).GetMesh();
@@ -171,12 +170,12 @@ TEST(Manifold, ManualSmooth) {
     ExportOptions options;
     options.mat.roughness = 0.1;
     options.mat.colorChannels = {3, 4, 5, -1};
-    ExportMesh("sharpenedSphere.glb", out, options);
+    ExportMesh("manual.glb", out, options);
   }
 #endif
 }
 
-TEST(Smooth, SmoothMirrored) {
+TEST(Smooth, Mirrored) {
   const Mesh tet = Manifold::Tetrahedron().Scale({1, 2, 3}).GetMesh();
   Manifold smooth = Manifold::Smooth(tet);
   Manifold mirror = smooth.Scale({-2, 2, 2}).Refine(10);
@@ -218,7 +217,7 @@ TEST(Smooth, Csaszar) {
             glm::mix(yellow, blue, glm::smoothstep(0.0f, 0.2f, alpha));
       }
     }
-    ExportMesh("smoothCsaszar.glb", out, options);
+    ExportMesh("csaszar.glb", out, options);
   }
 #endif
 }
@@ -239,7 +238,7 @@ glm::vec4 CircularTangent(const glm::vec3& tangent, const glm::vec3& edgeVec) {
   return glm::vec4(glm::vec3(bz3) / bz3.w, bz3.w);
 }
 
-TEST(Smooth, SmoothTorus) {
+TEST(Smooth, Torus) {
   Mesh torusMesh =
       Manifold::Revolve(CrossSection::Circle(1, 8).Translate({2, 0}), 6)
           .GetMesh();
@@ -287,11 +286,11 @@ TEST(Smooth, SmoothTorus) {
   options2.faceted = false;
   options2.mat.normalChannels = {3, 4, 5};
   options2.mat.roughness = 0;
-  if (options.exportModels) ExportMesh("smoothTorus.glb", out, options2);
+  if (options.exportModels) ExportMesh("torus.glb", out, options2);
 #endif
 }
 
-TEST(Manifold, SineSurface) {
+TEST(Smooth, SineSurface) {
   MeshGL surface = LevelSet(
       [](glm::vec3 p) {
         float mid = glm::sin(p.x) + glm::sin(p.y);
@@ -330,7 +329,7 @@ TEST(Manifold, SineSurface) {
     ExportOptions options2;
     // options2.faceted = false;
     // options2.mat.normalChannels = {3, 4, 5};
-    ExportMesh("sinesurface.glb", smoothed.GetMeshGL(), options2);
+    ExportMesh("sineSurface.glb", smoothed.GetMeshGL(), options2);
   }
 #endif
 }
