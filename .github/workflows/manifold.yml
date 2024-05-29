@@ -21,7 +21,6 @@ jobs:
     env:
       CC: gcc-${{ matrix.gcc }}
       CXX: g++-${{ matrix.gcc }}
-    if: github.event.pull_request.draft == false
     steps:
     - uses: actions/setup-python@v5
       with:
