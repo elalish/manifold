@@ -39,7 +39,14 @@ if(MANIFOLD_EXPORT)
 endif()
 
 if(BUILD_TEST_CGAL)
-    add_executable(perfTestCGAL perf_test_cgal.cpp)
+    add_executable(perfTestCGAL perf_test_cgal.cpp ${PROJECT_SOURCE_DIR}/../samples/src/menger_sponge.cpp)
+    target_include_directories(perfTestCGAL
+          PUBLIC ${PROJECT_SOURCE_DIR}/../samples/include
+      )
+      target_include_directories(perfTestCGAL
+          PUBLIC ${PROJECT_SOURCE_DIR}/../src/manifold/include
+      )
+    target_link_libraries(perfTestCGAL manifold)
     find_package(CGAL REQUIRED COMPONENTS Core)
     find_package(Boost REQUIRED COMPONENTS thread)
     target_compile_definitions(perfTestCGAL PRIVATE CGAL_USE_GMPXX)
