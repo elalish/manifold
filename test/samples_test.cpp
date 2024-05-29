@@ -291,21 +291,15 @@ TEST(Samples, Sponge4) {
 #endif
 
 TEST(Samples, CondensedMatter16) {
-  // FIXME: it should be geometrically valid
-  manifold::PolygonParams().processOverlaps = true;
   Manifold cm = CondensedMatter(16);
   CheckGL(cm);
   // FIXME: normals should be correct
-  // CheckNormals(cm);
-  manifold::PolygonParams().processOverlaps = false;
+  CheckNormals(cm);
 }
 
 TEST(Samples, CondensedMatter64) {
-  // FIXME: it should be geometrically valid
-  manifold::PolygonParams().processOverlaps = true;
   Manifold cm = CondensedMatter(64);
   CheckGL(cm);
   // FIXME: normals should be correct
   // CheckNormals(cm);
-  manifold::PolygonParams().processOverlaps = false;
 }
