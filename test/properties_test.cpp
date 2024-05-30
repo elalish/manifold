@@ -25,7 +25,7 @@ using namespace manifold;
 /**
  * These tests verify the calculation of a manifold's geometric properties.
  */
-TEST(Manifold, GetProperties) {
+TEST(Properties, GetProperties) {
   Manifold cube = Manifold::Cube();
   auto prop = cube.GetProperties();
   EXPECT_FLOAT_EQ(prop.volume, 1.0f);
@@ -37,7 +37,7 @@ TEST(Manifold, GetProperties) {
   EXPECT_FLOAT_EQ(prop.surfaceArea, 6.0f);
 }
 
-TEST(Manifold, Precision) {
+TEST(Properties, Precision) {
   Manifold cube = Manifold::Cube();
   EXPECT_FLOAT_EQ(cube.Precision(), kTolerance);
   cube = cube.Scale({0.1, 1, 10});
@@ -46,13 +46,13 @@ TEST(Manifold, Precision) {
   EXPECT_FLOAT_EQ(cube.Precision(), 100 * kTolerance);
 }
 
-TEST(Manifold, Precision2) {
+TEST(Properties, Precision2) {
   Manifold cube = Manifold::Cube();
   cube = cube.Translate({-0.5, 0, 0}).Scale({2, 1, 1});
   EXPECT_FLOAT_EQ(cube.Precision(), 2 * kTolerance);
 }
 
-TEST(Manifold, Precision3) {
+TEST(Properties, Precision3) {
   Manifold cylinder = Manifold::Cylinder(1, 1, 1, 1000);
   const auto prop = cylinder.GetProperties();
 
@@ -75,7 +75,7 @@ TEST(Manifold, Precision3) {
  * calculated at each vertex against the constant expected values of spheres
  * of different radii and at different mesh resolutions.
  */
-TEST(Manifold, CalculateCurvature) {
+TEST(Properties, CalculateCurvature) {
   const float precision = 0.015;
   for (int n = 4; n < 100; n *= 2) {
     const int gaussianIdx = 3;
@@ -102,7 +102,7 @@ TEST(Manifold, CalculateCurvature) {
 
 // These tests verify the calculation of MinGap functions.
 
-TEST(Manifold, MinGapCubeCube) {
+TEST(Properties, MinGapCubeCube) {
   auto a = Manifold::Cube();
   auto b = Manifold::Cube().Translate({2, 2, 0});
 
@@ -111,7 +111,7 @@ TEST(Manifold, MinGapCubeCube) {
   EXPECT_FLOAT_EQ(distance, sqrt(2));
 }
 
-TEST(Manifold, MinGapCubeCube2) {
+TEST(Properties, MinGapCubeCube2) {
   auto a = Manifold::Cube();
   auto b = Manifold::Cube().Translate({3, 3, 0});
 
@@ -120,7 +120,7 @@ TEST(Manifold, MinGapCubeCube2) {
   EXPECT_FLOAT_EQ(distance, sqrt(2) * 2);
 }
 
-TEST(Manifold, MinGapCubeSphereOverlapping) {
+TEST(Properties, MinGapCubeSphereOverlapping) {
   auto a = Manifold::Cube();
   auto b = Manifold::Sphere(1);
 
@@ -129,7 +129,7 @@ TEST(Manifold, MinGapCubeSphereOverlapping) {
   EXPECT_FLOAT_EQ(distance, 0);
 }
 
-TEST(Manifold, MinGapSphereSphere) {
+TEST(Properties, MinGapSphereSphere) {
   auto a = Manifold::Sphere(1);
   auto b = Manifold::Sphere(1).Translate({2, 2, 0});
 
@@ -138,7 +138,7 @@ TEST(Manifold, MinGapSphereSphere) {
   EXPECT_FLOAT_EQ(distance, 2 * sqrt(2) - 2);
 }
 
-TEST(Manifold, MinGapSphereSphereOutOfBounds) {
+TEST(Properties, MinGapSphereSphereOutOfBounds) {
   auto a = Manifold::Sphere(1);
   auto b = Manifold::Sphere(1).Translate({2, 2, 0});
 
@@ -147,7 +147,7 @@ TEST(Manifold, MinGapSphereSphereOutOfBounds) {
   EXPECT_FLOAT_EQ(distance, 0.8f);
 }
 
-TEST(Manifold, MinGapClosestPointOnEdge) {
+TEST(Properties, MinGapClosestPointOnEdge) {
   auto a = Manifold::Cube({1, 1, 1}, true).Rotate(0, 0, 45);
   auto b =
       Manifold::Cube({1, 1, 1}, true).Rotate(0, 45, 0).Translate({2, 0, 0});
@@ -157,7 +157,7 @@ TEST(Manifold, MinGapClosestPointOnEdge) {
   EXPECT_FLOAT_EQ(distance, 2 - sqrt(2));
 }
 
-TEST(Manifold, MinGapClosestPointOnTriangleFace) {
+TEST(Properties, MinGapClosestPointOnTriangleFace) {
   auto a = Manifold::Cube();
   auto b = Manifold::Cube().Scale({10, 10, 10}).Translate({2, -5, -1});
 
@@ -166,7 +166,7 @@ TEST(Manifold, MinGapClosestPointOnTriangleFace) {
   EXPECT_FLOAT_EQ(distance, 1);
 }
 
-TEST(Manifold, MingapAfterTransformations) {
+TEST(Properties, MingapAfterTransformations) {
   auto a = Manifold::Sphere(1, 512).Rotate(30, 30, 30);
   auto b =
       Manifold::Sphere(1, 512).Scale({3, 1, 1}).Rotate(0, 90, 45).Translate(
@@ -177,7 +177,7 @@ TEST(Manifold, MingapAfterTransformations) {
   ASSERT_NEAR(distance, 1, 0.001f);
 }
 
-TEST(Manifold, MingapStretchyBracelet) {
+TEST(Properties, MingapStretchyBracelet) {
   auto a = StretchyBracelet();
   auto b = StretchyBracelet().Translate({0, 0, 20});
 
@@ -186,7 +186,7 @@ TEST(Manifold, MingapStretchyBracelet) {
   ASSERT_NEAR(distance, 5, 0.001f);
 }
 
-TEST(Manifold, MinGapAfterTransformationsOutOfBounds) {
+TEST(Properties, MinGapAfterTransformationsOutOfBounds) {
   auto a = Manifold::Sphere(1, 512).Rotate(30, 30, 30);
   auto b =
       Manifold::Sphere(1, 512).Scale({3, 1, 1}).Rotate(0, 90, 45).Translate(
@@ -197,7 +197,7 @@ TEST(Manifold, MinGapAfterTransformationsOutOfBounds) {
   ASSERT_NEAR(distance, 0.95f, 0.001f);
 }
 
-TEST(Manifold, TriangleDistanceClosestPointsOnVertices) {
+TEST(Properties, TriangleDistanceClosestPointsOnVertices) {
   std::array<glm::vec3, 3> p = {glm::vec3{-1, 0, 0}, glm::vec3{1, 0, 0},
                                 glm::vec3{0, 1, 0}};
 
@@ -209,7 +209,7 @@ TEST(Manifold, TriangleDistanceClosestPointsOnVertices) {
   EXPECT_FLOAT_EQ(distance, 1);
 }
 
-TEST(Manifold, TriangleDistanceClosestPointOnEdge) {
+TEST(Properties, TriangleDistanceClosestPointOnEdge) {
   std::array<glm::vec3, 3> p = {glm::vec3{-1, 0, 0}, glm::vec3{1, 0, 0},
                                 glm::vec3{0, 1, 0}};
 
@@ -221,7 +221,7 @@ TEST(Manifold, TriangleDistanceClosestPointOnEdge) {
   EXPECT_FLOAT_EQ(distance, 1);
 }
 
-TEST(Manifold, TriangleDistanceClosestPointOnEdge2) {
+TEST(Properties, TriangleDistanceClosestPointOnEdge2) {
   std::array<glm::vec3, 3> p = {glm::vec3{-1, 0, 0}, glm::vec3{1, 0, 0},
                                 glm::vec3{0, 1, 0}};
 
@@ -233,7 +233,7 @@ TEST(Manifold, TriangleDistanceClosestPointOnEdge2) {
   EXPECT_FLOAT_EQ(distance, 0.5f);
 }
 
-TEST(Manifold, TriangleDistanceClosestPointOnFace) {
+TEST(Properties, TriangleDistanceClosestPointOnFace) {
   std::array<glm::vec3, 3> p = {glm::vec3{-1, 0, 0}, glm::vec3{1, 0, 0},
                                 glm::vec3{0, 1, 0}};
 
@@ -245,7 +245,7 @@ TEST(Manifold, TriangleDistanceClosestPointOnFace) {
   EXPECT_FLOAT_EQ(distance, 1);
 }
 
-TEST(Manifold, TriangleDistanceOverlapping) {
+TEST(Properties, TriangleDistanceOverlapping) {
   std::array<glm::vec3, 3> p = {glm::vec3{-1, 0, 0}, glm::vec3{1, 0, 0},
                                 glm::vec3{0, 1, 0}};
 
