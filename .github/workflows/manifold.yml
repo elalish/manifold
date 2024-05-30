@@ -17,12 +17,11 @@ jobs:
       matrix:
         parallel_backend: [NONE, TBB]
         gcc: [13, 14]
-      max-parallel: 1
-      fail-fast: false
     runs-on: ubuntu-24.04
     env:
       CC: gcc-${{ matrix.gcc }}
       CXX: g++-${{ matrix.gcc }}
+    if: github.event.pull_request.draft == false
     steps:
     - uses: actions/setup-python@v5
       with:
