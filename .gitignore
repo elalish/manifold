@@ -11,6 +11,12 @@
 *.o
 *.obj
 
+# Thingi10K dataset
+extras/Thingi10K/*
+
+# Output file
+*/output_log_fin.txt
+
 # Precompiled Headers
 *.gch
 *.pch

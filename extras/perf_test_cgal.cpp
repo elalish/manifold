@@ -20,10 +20,12 @@
 #include <CGAL/convex_hull_3.h>
 
 #include <chrono>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 
 #include "manifold.h"
+#include "meshIO.h"
 #include "samples.h"
 
 using namespace manifold;
@@ -108,53 +110,85 @@ void PrintVolArea(Manifold &manfiold_obj, TriangleMesh &manifoldMesh,
             << CGAL::Polygon_mesh_processing::area(hullMesh) << std::endl;
 }
 
-// Constructs a Menger Sponge, and tests the convex hull implementation on it
-// (you can pass the specific hull implementation to be tested). Comparing the
-// volume and surface area with CGAL implementation, for various values of
-// rotation
-void MengerTestHull(Manifold (*hull_func)(const std::vector<Manifold> &),
-                    float rx, float ry, float rz) {
-  Manifold sponge = MengerSponge(4);
-  sponge = sponge.Rotate(rx, ry, rz);
-  TriangleMesh spongeCGAL;
-  manifoldToCGALSurfaceMesh(sponge, spongeCGAL);
+void PrintManifold(Manifold input, Manifold (Manifold::*hull_func)() const) {
+  TriangleMesh cgalInput;
+  manifoldToCGALSurfaceMesh(input, cgalInput);
   std::vector<Point> points;
-  for (const auto &vert : spongeCGAL.vertices()) {
-    points.push_back(spongeCGAL.point(vert));
-  }
-
-  TriangleMesh hullMesh;
-  computeCGALConvexHull(points, hullMesh);
-  std::vector<Manifold> sponges{sponge};
-  Manifold hullManifold = hull_func(sponges);
-  PrintVolArea(sponge, spongeCGAL, hullMesh, hullManifold);
-}
-
-// Constructs a high quality sphere, and tests the convex hull implementation on
-// it (you can pass the specific hull implementation to be tested). Comparing
-// the volume and surface area with CGAL implementation
-void SphereTestHull(Manifold (*hull_func)(const std::vector<Manifold> &)) {
-  Manifold sphere = Manifold::Sphere(1, 10000);
-  sphere = sphere.Translate(glm::vec3(0.5));
-
-  TriangleMesh cgalSphere;
-  manifoldToCGALSurfaceMesh(sphere, cgalSphere);
-  std::vector<Point> points;
-  for (const auto &vert : cgalSphere.vertices()) {
-    points.push_back(cgalSphere.point(vert));
+  for (const auto &vert : cgalInput.vertices()) {
+    points.push_back(cgalInput.point(vert));
   }
 
   // Convex Hull
   TriangleMesh hullMesh;
   computeCGALConvexHull(points, hullMesh);
-  std::vector<Manifold> spheres{sphere};
-  Manifold hullManifold = hull_func(spheres);
+  Manifold hullManifold = (input.*hull_func)();
+  PrintVolArea(input, cgalInput, hullMesh, hullManifold);
+}
 
-  PrintVolArea(sphere, cgalSphere, hullMesh, hullManifold);
+// Constructs a Menger Sponge, and tests the convex hull implementation on it
+// (you can pass the specific hull implementation to be tested). Comparing the
+// volume and surface area with CGAL implementation, for various values of
+// rotation
+void MengerTestHull(Manifold (Manifold::*hull_func)() const, float rx, float ry,
+                    float rz) {
+  Manifold sponge = MengerSponge(4);
+  sponge = sponge.Rotate(rx, ry, rz);
+  PrintManifold(sponge, hull_func);
+}
+
+// Constructs a high quality sphere, and tests the convex hull implementation on
+// it (you can pass the specific hull implementation to be tested). Comparing
+// the volume and surface area with CGAL implementation
+void SphereTestHull(Manifold (Manifold::*hull_func)() const) {
+  Manifold sphere = Manifold::Sphere(1, 6000);
+  sphere = sphere.Translate(glm::vec3(0.5));
+  PrintManifold(sphere, hull_func);
+}
+
+void RunThingi10K(Manifold (Manifold::*hull_func)() const) {
+  std::string folderPath = "../extras/Thingi10K/raw_meshes";
+  std::string logFilePath = "../extras/output_log.txt";
+
+  // Create an ofstream object to write to a temporary file
+  std::ofstream logFile(logFilePath);
+  if (!logFile) {
+    std::cerr << "Error opening log file: " << logFilePath << std::endl;
+    return;
+  }
+
+  // Redirect std::cout to the log file
+  std::streambuf *originalCoutBuffer = std::cout.rdbuf();
+  std::streambuf *originalCerrBuffer = std::cerr.rdbuf();
+  std::cout.rdbuf(logFile.rdbuf());
+  std::cerr.rdbuf(logFile.rdbuf());
+  // Iterate through the directory
+  for (const auto &entry : std::filesystem::directory_iterator(folderPath)) {
+    if (entry.is_regular_file() && (entry.path().filename() == "74463.stl" ||
+                                    entry.path().filename() == "286163.stl" ||
+                                    entry.path().filename() == "49911.stl" ||
+                                    entry.path().filename() == "81313.obj" ||
+                                    entry.path().filename() == "77942.stl")) {
+    } else if (entry.is_regular_file()) {
+      std::cout << entry.path().filename() << std::endl;
+      auto inputMesh = ImportMesh(entry.path(), 1);
+      Manifold inputManifold = Manifold(inputMesh);
+      PrintManifold(inputManifold, hull_func);
+    }
+  }
+  std::cout.rdbuf(originalCoutBuffer);
+  std::cerr.rdbuf(originalCerrBuffer);
+
+  // Close the log file
+  logFile.close();
 }
 
 int main(int argc, char **argv) {
-  perfTestCGAL();
-  SphereTestHull(Manifold::Hull);
-  MengerTestHull(Manifold::Hull, 1, 2, 3);
+  // perfTestCGAL();
+  // SphereTestHull(Manifold::Hull);
+  // MengerTestHull(Manifold::Hull, 1, 2, 3);
+  auto start = std::chrono::high_resolution_clock::now();
+  RunThingi10K(&Manifold::Hull);
+  auto end = std::chrono::high_resolution_clock::now();
+  std::chrono::duration<double> elapsed = end - start;
+  std::cout << "time = " << elapsed.count() << " sec" << std::endl;
 }

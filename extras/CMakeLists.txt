@@ -43,10 +43,8 @@ if(BUILD_TEST_CGAL)
     target_include_directories(perfTestCGAL
           PUBLIC ${PROJECT_SOURCE_DIR}/../samples/include
       )
-      target_include_directories(perfTestCGAL
-          PUBLIC ${PROJECT_SOURCE_DIR}/../src/manifold/include
-      )
     target_link_libraries(perfTestCGAL manifold)
+    target_link_libraries(perfTestCGAL meshIO)
     find_package(CGAL REQUIRED COMPONENTS Core)
     find_package(Boost REQUIRED COMPONENTS thread)
     target_compile_definitions(perfTestCGAL PRIVATE CGAL_USE_GMPXX)

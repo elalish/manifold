@@ -117,7 +117,8 @@
     "csetjmp": "cpp",
     "cuchar": "cpp",
     "propagate_const": "cpp",
-    "scoped_allocator": "cpp"
+    "scoped_allocator": "cpp",
+    "filesystem": "cpp"
   },
   "C_Cpp.clang_format_fallbackStyle": "google",
   "editor.formatOnSave": true,
