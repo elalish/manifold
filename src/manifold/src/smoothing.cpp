@@ -127,7 +127,6 @@ struct InterpTri {
   glm::mat2x4 Bezier2Bezier(const glm::mat2x3& corners,
                             const glm::mat2x4& tangentsX,
                             const glm::mat2x4& tangentsY, float x,
-                            const glm::bvec2& pointedEnds,
                             const glm::vec3& anchor) const {
     const glm::mat2x4 bez = CubicBezier2Linear(
         Homogeneous(corners[0]), Bezier(corners[0], tangentsX[0]),
@@ -154,14 +153,10 @@ struct InterpTri {
     const glm::quat qTmp = glm::slerp(q0, q1, x);
     const glm::quat q =
         glm::rotation(qTmp * glm::vec3(1, 0, 0), tangent) * qTmp;
+    const glm::vec3 normal = q * glm::vec3(0, 0, 1);
 
-    const glm::vec3 end0 = pointedEnds[0]
-                               ? glm::vec3(0)
-                               : RotateFromTo(glm::vec3(tangentsY[0]), q0, q);
-    const glm::vec3 end1 = pointedEnds[1]
-                               ? glm::vec3(0)
-                               : RotateFromTo(glm::vec3(tangentsY[1]), q1, q);
-    const glm::vec3 delta = glm::mix(end0, end1, x);
+    const glm::vec3 delta = OrthogonalTo(
+        glm::mix(glm::vec3(tangentsY[0]), glm::vec3(tangentsY[1]), x), normal);
     const float deltaW = glm::mix(tangentsY[0].w, tangentsY[1].w, x);
 
     return {Homogeneous(end), glm::vec4(delta, deltaW)};
@@ -169,23 +164,17 @@ struct InterpTri {
 
   glm::vec3 Bezier2D(const glm::mat4x3& corners, const glm::mat4& tangentsX,
                      const glm::mat4& tangentsY, float x, float y,
-                     const glm::vec3& centroid, bool isTriangle) const {
-    glm::mat2x4 bez0 = Bezier2Bezier(
-        {corners[0], corners[1]}, {tangentsX[0], tangentsX[1]},
-        {tangentsY[0], tangentsY[1]}, x, {isTriangle, false}, centroid);
-    glm::mat2x4 bez1 = Bezier2Bezier(
-        {corners[2], corners[3]}, {tangentsX[2], tangentsX[3]},
-        {tangentsY[2], tangentsY[3]}, 1 - x, {false, isTriangle}, centroid);
+                     const glm::vec3& centroid) const {
+    glm::mat2x4 bez0 =
+        Bezier2Bezier({corners[0], corners[1]}, {tangentsX[0], tangentsX[1]},
+                      {tangentsY[0], tangentsY[1]}, x, centroid);
+    glm::mat2x4 bez1 =
+        Bezier2Bezier({corners[2], corners[3]}, {tangentsX[2], tangentsX[3]},
+                      {tangentsY[2], tangentsY[3]}, 1 - x, centroid);
 
-    const float flatLen =
-        isTriangle ? x * glm::length(corners[1] - corners[2])
-                   : glm::length(glm::mix(corners[0], corners[1], x) -
-                                 glm::mix(corners[3], corners[2], x));
-    const float scale = glm::length(glm::vec3(bez0[0] - bez1[0])) / flatLen;
-
-    const glm::mat2x4 bez = CubicBezier2Linear(
-        bez0[0], Bezier(glm::vec3(bez0[0]), Scale(bez0[1], scale)),
-        Bezier(glm::vec3(bez1[0]), Scale(bez1[1], scale)), bez1[0], y);
+    const glm::mat2x4 bez =
+        CubicBezier2Linear(bez0[0], Bezier(glm::vec3(bez0[0]), bez0[1]),
+                           Bezier(glm::vec3(bez1[0]), bez1[1]), bez1[0], y);
     return BezierPoint(bez, y);
   }
 
@@ -226,12 +215,18 @@ struct InterpTri {
         const int j = Next3(i);
         const int k = Prev3(i);
         const float x = uvw[k] / (1 - uvw[i]);
-        const glm::vec3 p =
-            Bezier2D({corners[i], corners[j], corners[k], corners[i]},
-                     {tangentR[i], tangentL[j], tangentR[k], tangentL[i]},
-                     {tangentL[i], tangentR[j], tangentL[k], tangentR[i]},
-                     1 - uvw[i], x, centroid, true);
-        posH += Homogeneous(glm::vec4(p, uvw[i]));
+
+        const glm::mat2x4 bez =
+            Bezier2Bezier({corners[j], corners[k]}, {tangentR[j], tangentL[k]},
+                          {tangentL[j], tangentR[k]}, x, centroid);
+
+        const glm::mat2x4 bez1 = CubicBezier2Linear(
+            bez[0], Bezier(glm::vec3(bez[0]), bez[1]),
+            Bezier(corners[i], glm::mix(tangentR[i], tangentL[i], x)),
+            Homogeneous(corners[i]), uvw[i]);
+        const glm::vec3 p = BezierPoint(bez1, uvw[i]);
+        float w = uvw[j] * uvw[j] * uvw[k] * uvw[k] + 0.0001;
+        posH += Homogeneous(glm::vec4(p, w));
       }
     } else {  // quad
       const glm::mat4 tangentsX = {
@@ -248,12 +243,12 @@ struct InterpTri {
       const float x = uvw[1] + uvw[2];
       const float y = uvw[2] + uvw[3];
       const glm::vec3 pX =
-          Bezier2D(corners, tangentsX, tangentsY, x, y, centroid, false);
+          Bezier2D(corners, tangentsX, tangentsY, x, y, centroid);
       const glm::vec3 pY =
           Bezier2D({corners[1], corners[2], corners[3], corners[0]},
                    {tangentsY[1], tangentsY[2], tangentsY[3], tangentsY[0]},
                    {tangentsX[1], tangentsX[2], tangentsX[3], tangentsX[0]}, y,
-                   1 - x, centroid, false);
+                   1 - x, centroid);
       posH += Homogeneous(glm::vec4(pX, x * (1 - x)));
       posH += Homogeneous(glm::vec4(pY, y * (1 - y)));
     }
@@ -885,7 +880,7 @@ void Manifold::Impl::CreateTangents(std::vector<Smoothness> sharpenedEdges) {
        &triIsFlatFace](int v) {
         auto it = vertTangents.find(v);
         if (it == vertTangents.end()) {
-          fixedHalfedge[vertHalfedge[v]] == true;
+          fixedHalfedge[vertHalfedge[v]] = true;
           return;
         }
         const std::vector<Pair>& vert = it->second;
@@ -918,7 +913,7 @@ void Manifold::Impl::CreateTangents(std::vector<Smoothness> sharpenedEdges) {
             }
           });
         } else {  // Sharpen vertex uniformly
-          fixedHalfedge[vertHalfedge[v]] == true;
+          fixedHalfedge[vertHalfedge[v]] = true;
           float smoothness = 0;
           float denom = 0;
           for (const Pair& pair : vert) {
