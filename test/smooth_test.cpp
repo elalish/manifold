@@ -33,6 +33,14 @@ TEST(Smooth, Tetrahedron) {
   EXPECT_NEAR(prop.volume, 18.7, 0.1);
   EXPECT_NEAR(prop.surfaceArea, 34.5, 0.1);
 
+  MeshGL out = smooth.CalculateCurvature(-1, 0).GetMeshGL();
+  float maxMeanCurvature = 0;
+  for (int i = 3; i < out.vertProperties.size(); i += 4) {
+    maxMeanCurvature =
+        glm::max(maxMeanCurvature, glm::abs(out.vertProperties[i]));
+  }
+  EXPECT_NEAR(maxMeanCurvature, 2.32, 0.01);
+
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels) ExportMesh("smoothTet.glb", smooth.GetMesh(), {});
 #endif
@@ -97,6 +105,14 @@ TEST(Smooth, ToLength) {
   auto prop = smooth.GetProperties();
   EXPECT_NEAR(prop.volume, 4842, 1);
   EXPECT_NEAR(prop.surfaceArea, 1400, 1);
+
+  MeshGL out = smooth.CalculateCurvature(-1, 0).GetMeshGL();
+  float maxMeanCurvature = 0;
+  for (int i = 3; i < out.vertProperties.size(); i += 4) {
+    maxMeanCurvature =
+        glm::max(maxMeanCurvature, glm::abs(out.vertProperties[i]));
+  }
+  EXPECT_NEAR(maxMeanCurvature, 1.45, 0.01);
 
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels)
@@ -276,19 +292,28 @@ TEST(Smooth, Torus) {
     }
   }
 
-  Manifold smooth = Manifold(torusMesh).RefineToLength(0.1).CalculateNormals(0);
-  Mesh out = smooth.GetMesh();
-  for (glm::vec3 v : out.vertPos) {
+  Manifold smooth = Manifold(torusMesh)
+                        .RefineToLength(0.1)
+                        .CalculateCurvature(-1, 0)
+                        .CalculateNormals(1);
+  MeshGL out = smooth.GetMeshGL();
+  float maxMeanCurvature = 0;
+  for (int i = 0; i < out.vertProperties.size(); i += 7) {
+    glm::vec3 v(out.vertProperties[i], out.vertProperties[i + 1],
+                out.vertProperties[i + 2]);
     glm::vec3 p(v.x, v.y, 0);
     p = glm::normalize(p) * 2.0f;
     float r = glm::length(v - p);
     ASSERT_NEAR(r, 1, 0.005);
+    maxMeanCurvature =
+        glm::max(maxMeanCurvature, glm::abs(out.vertProperties[i + 3]));
   }
+  EXPECT_NEAR(maxMeanCurvature, 1.48, 0.01);
 
 #ifdef MANIFOLD_EXPORT
   ExportOptions options2;
   options2.faceted = false;
-  options2.mat.normalChannels = {3, 4, 5};
+  options2.mat.normalChannels = {4, 5, 6};
   options2.mat.roughness = 0;
   if (options.exportModels) ExportMesh("smoothTorus.glb", out, options2);
 #endif
