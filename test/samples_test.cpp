@@ -116,8 +116,8 @@ TEST(Samples, Scallop) {
       3, colorCurvature);
   CheckNormals(scallop);
   auto prop = scallop.GetProperties();
-  EXPECT_NEAR(prop.volume, 40.9, 0.1);
-  EXPECT_NEAR(prop.surfaceArea, 77.4, 0.1);
+  EXPECT_NEAR(prop.volume, 39.9, 0.1);
+  EXPECT_NEAR(prop.surfaceArea, 79.3, 0.1);
   CheckGL(scallop);
 
 #ifdef MANIFOLD_EXPORT
