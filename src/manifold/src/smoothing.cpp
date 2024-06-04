@@ -176,10 +176,10 @@ struct InterpTri {
     const glm::quat qTmp = Slerp(q0, q1, x, longWay);
     const glm::quat q =
         glm::rotation(qTmp * glm::vec3(1, 0, 0), tangent) * qTmp;
-    const glm::vec3 normal = q * glm::vec3(0, 0, 1);
 
-    const glm::vec3 delta = OrthogonalTo(
-        glm::mix(glm::vec3(tangentsY[0]), glm::vec3(tangentsY[1]), x), normal);
+    const glm::vec3 delta =
+        glm::mix(RotateFromTo(glm::vec3(tangentsY[0]), q0, q),
+                 RotateFromTo(glm::vec3(tangentsY[1]), q1, q), x);
     const float deltaW = glm::mix(tangentsY[0].w, tangentsY[1].w, x);
 
     return {Homogeneous(end), glm::vec4(delta, deltaW)};
@@ -248,7 +248,7 @@ struct InterpTri {
             Bezier(corners[i], glm::mix(tangentR[i], tangentL[i], x)),
             Homogeneous(corners[i]), uvw[i]);
         const glm::vec3 p = BezierPoint(bez1, uvw[i]);
-        float w = uvw[j] * uvw[j] * uvw[k] * uvw[k] + 0.0001;
+        float w = uvw[j] * uvw[k];
         posH += Homogeneous(glm::vec4(p, w));
       }
     } else {  // quad
