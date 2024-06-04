@@ -43,7 +43,7 @@ glm::vec4 CircularTangent(const glm::vec3& tangent, const glm::vec3& edgeVec) {
 
   float weight = glm::max(0.5f, glm::dot(dir, SafeNormalize(edgeVec)));
   // Quadratic weighted bezier for circular interpolation
-  const glm::vec4 bz2 = glm::vec4(dir * glm::length(edgeVec) * 0.5f, weight);
+  const glm::vec4 bz2 = glm::vec4(dir * 0.5f * glm::length(edgeVec), weight);
   // Equivalent cubic weighted bezier
   const glm::vec4 bz3 = glm::mix(glm::vec4(0, 0, 0, 1), bz2, 2 / 3.0f);
   // Convert from homogeneous form to geometric form
@@ -78,29 +78,29 @@ struct SmoothBezier {
 struct InterpTri {
   const Manifold::Impl* impl;
 
-  glm::vec4 Homogeneous(glm::vec4 v) const {
+  static glm::vec4 Homogeneous(glm::vec4 v) {
     v.x *= v.w;
     v.y *= v.w;
     v.z *= v.w;
     return v;
   }
 
-  glm::vec4 Homogeneous(glm::vec3 v) const { return glm::vec4(v, 1.0f); }
+  static glm::vec4 Homogeneous(glm::vec3 v) { return glm::vec4(v, 1.0f); }
 
-  glm::vec3 HNormalize(glm::vec4 v) const {
+  static glm::vec3 HNormalize(glm::vec4 v) {
     return v.w == 0 ? v : (glm::vec3(v) / v.w);
   }
 
-  glm::vec4 Scale(glm::vec4 v, float scale) const {
+  static glm::vec4 Scale(glm::vec4 v, float scale) {
     return glm::vec4(scale * glm::vec3(v), v.w);
   }
 
-  glm::vec4 Bezier(glm::vec3 point, glm::vec4 tangent) const {
+  static glm::vec4 Bezier(glm::vec3 point, glm::vec4 tangent) {
     return Homogeneous(glm::vec4(point, 0) + tangent);
   }
 
-  glm::mat2x4 CubicBezier2Linear(glm::vec4 p0, glm::vec4 p1, glm::vec4 p2,
-                                 glm::vec4 p3, float x) const {
+  static glm::mat2x4 CubicBezier2Linear(glm::vec4 p0, glm::vec4 p1,
+                                        glm::vec4 p2, glm::vec4 p3, float x) {
     glm::mat2x4 out;
     glm::vec4 p12 = glm::mix(p1, p2, x);
     out[0] = glm::mix(glm::mix(p0, p1, x), p12, x);
@@ -108,46 +108,42 @@ struct InterpTri {
     return out;
   }
 
-  glm::vec3 BezierPoint(glm::mat2x4 points, float x) const {
+  static glm::vec3 BezierPoint(glm::mat2x4 points, float x) {
     return HNormalize(glm::mix(points[0], points[1], x));
   }
 
-  glm::vec3 BezierTangent(glm::mat2x4 points) const {
+  static glm::vec3 BezierTangent(glm::mat2x4 points) {
     return SafeNormalize(HNormalize(points[1]) - HNormalize(points[0]));
   }
 
-  glm::vec3 RotateFromTo(glm::vec3 v, glm::quat start, glm::quat end) const {
+  static glm::vec3 RotateFromTo(glm::vec3 v, glm::quat start, glm::quat end) {
     return end * glm::conjugate(start) * v;
   }
 
-  glm::quat Slerp(const glm::quat& x, const glm::quat& y, float a,
-                  bool longWay) const {
+  static glm::quat Slerp(const glm::quat& x, const glm::quat& y, float a,
+                         bool longWay) {
     glm::quat z = y;
     float cosTheta = glm::dot(x, y);
 
-    // If cosTheta < 0, the interpolation will take the long way around the
-    // sphere. To fix this, one quat must be negated.
+    // Take the long way around the sphere only when requested
     if ((cosTheta < 0) != longWay) {
       z = -y;
       cosTheta = -cosTheta;
     }
 
-    // Perform a linear interpolation when cosTheta is close to 1 to avoid side
-    // effect of sin(angle) becoming a zero denominator
     if (cosTheta > 1.0f - glm::epsilon<float>()) {
-      return glm::lerp(x, z, a);
+      return glm::lerp(x, z, a);  // for numerical stability
     } else {
-      // Essential Mathematics, page 467
       float angle = glm::acos(cosTheta);
       return (glm::sin((1.0f - a) * angle) * x + glm::sin(a * angle) * z) /
              glm::sin(angle);
     }
   }
 
-  glm::mat2x4 Bezier2Bezier(const glm::mat2x3& corners,
-                            const glm::mat2x4& tangentsX,
-                            const glm::mat2x4& tangentsY, float x,
-                            const glm::vec3& anchor) const {
+  static glm::mat2x4 Bezier2Bezier(const glm::mat2x3& corners,
+                                   const glm::mat2x4& tangentsX,
+                                   const glm::mat2x4& tangentsY, float x,
+                                   const glm::vec3& anchor) {
     const glm::mat2x4 bez = CubicBezier2Linear(
         Homogeneous(corners[0]), Bezier(corners[0], tangentsX[0]),
         Bezier(corners[1], tangentsX[1]), Homogeneous(corners[1]), x);
@@ -185,9 +181,10 @@ struct InterpTri {
     return {Homogeneous(end), glm::vec4(delta, deltaW)};
   }
 
-  glm::vec3 Bezier2D(const glm::mat4x3& corners, const glm::mat4& tangentsX,
-                     const glm::mat4& tangentsY, float x, float y,
-                     const glm::vec3& centroid) const {
+  static glm::vec3 Bezier2D(const glm::mat4x3& corners,
+                            const glm::mat4& tangentsX,
+                            const glm::mat4& tangentsY, float x, float y,
+                            const glm::vec3& centroid) {
     glm::mat2x4 bez0 =
         Bezier2Bezier({corners[0], corners[1]}, {tangentsX[0], tangentsX[1]},
                       {tangentsY[0], tangentsY[1]}, x, centroid);
@@ -201,7 +198,7 @@ struct InterpTri {
     return BezierPoint(bez, y);
   }
 
-  void operator()(thrust::tuple<glm::vec3&, Barycentric> inOut) {
+  void operator()(thrust::tuple<glm::vec3&, Barycentric> inOut) const {
     glm::vec3& pos = thrust::get<0>(inOut);
     const int tri = thrust::get<1>(inOut).tri;
     const glm::vec4 uvw = thrust::get<1>(inOut).uvw;
@@ -248,8 +245,7 @@ struct InterpTri {
             Bezier(corners[i], glm::mix(tangentR[i], tangentL[i], x)),
             Homogeneous(corners[i]), uvw[i]);
         const glm::vec3 p = BezierPoint(bez1, uvw[i]);
-        float w = uvw[j] * uvw[k];
-        posH += Homogeneous(glm::vec4(p, w));
+        posH += Homogeneous(glm::vec4(p, uvw[j] * uvw[k]));
       }
     } else {  // quad
       const glm::mat4 tangentsX = {
