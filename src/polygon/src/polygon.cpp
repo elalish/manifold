@@ -180,9 +180,10 @@ bool IsConvex(const PolygonsIdx &polys) {
  * avoid creating high-degree vertices.
  */
 std::vector<glm::ivec3> TriangulateConvex(const PolygonsIdx &polys) {
-  const int numTri = reduce(
-      polys.begin(), polys.end(), 0,
-      [](int i, const SimplePolygonIdx &poly) { return poly.size() - 2; });
+  const int numTri = transform_reduce<int>(
+      autoPolicy(polys.size()), polys.begin(), polys.end(),
+      [](const SimplePolygonIdx &poly) { return poly.size() - 2; }, 0,
+      thrust::plus<int>());
   std::vector<glm::ivec3> triangles;
   triangles.reserve(numTri);
   for (const SimplePolygonIdx &poly : polys) {
