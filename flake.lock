@@ -3,16 +3,15 @@
     "clipper2-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1701175684,
-        "narHash": "sha256-3TKhb48cABl0QcbeG12xlA1taQ/8/RdUUHSp0Qh85eE=",
+        "lastModified": 1715688111,
+        "narHash": "sha256-iy2QV8IVEEIPijWIpzIQtqIQeTU4bfiH41pC0X6m72U=",
         "owner": "AngusJohnson",
         "repo": "Clipper2",
-        "rev": "98db5662e8dd1808a5a7b50c5605a2289bb390e8",
+        "rev": "ff378668baae3570e9d8070aa9eb339bdd5a6aba",
         "type": "github"
       },
       "original": {
         "owner": "AngusJohnson",
-        "ref": "Clipper2_1.3.0",
         "repo": "Clipper2",
         "type": "github"
       }

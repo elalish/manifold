@@ -42,7 +42,7 @@ interface WorkerStatic extends ManifoldToplevel {
   cleanup(): void;
 }
 
-const module = await Module() as WorkerStatic;
+export const module = await Module() as WorkerStatic;
 module.setup();
 
 // Faster on modern browsers than Float32Array
@@ -97,8 +97,8 @@ const crossSectionMemberFunctions = [
 const toplevelConstructors = ['show', 'only', 'setMaterial'];
 const toplevel = [
   'setMinCircularAngle', 'setMinCircularEdgeLength', 'setCircularSegments',
-  'getCircularSegments', 'Mesh', 'GLTFNode', 'Manifold', 'CrossSection',
-  'setMorphStart', 'setMorphEnd'
+  'getCircularSegments', 'resetToCircularDefaults', 'Mesh', 'GLTFNode',
+  'Manifold', 'CrossSection', 'setMorphStart', 'setMorphEnd'
 ];
 const exposedFunctions = toplevelConstructors.concat(toplevel);
 
@@ -140,17 +140,6 @@ for (const name of toplevelConstructors) {
     return result;
   };
 }
-
-module.cleanup = function() {
-  for (const obj of memoryRegistry) {
-    // decompose result is an array of manifolds
-    if (obj instanceof Array)
-      for (const elem of obj) elem.delete();
-    else
-      obj.delete();
-  }
-  memoryRegistry.length = 0;
-};
 
 // Debug setup to show source meshes
 let ghost = false;
@@ -196,7 +185,16 @@ let weightsAccessor: Accessor;
 let weightsSampler: AnimationSampler;
 let hasAnimation: boolean;
 
-function cleanup() {
+export function cleanup() {
+  for (const obj of memoryRegistry) {
+    // decompose result is an array of manifolds
+    if (obj instanceof Array)
+      for (const elem of obj) elem.delete();
+    else
+      obj.delete();
+  }
+  memoryRegistry.length = 0;
+
   ghost = false;
   shown.clear();
   singles.clear();
@@ -317,51 +315,12 @@ module.only = (manifold) => {
   return debug(manifold, singles);
 };
 
-// Setup complete
-self.postMessage(null);
-
-if (self.console) {
-  const oldLog = self.console.log;
-  self.console.log = function(...args) {
-    let message = '';
-    for (const arg of args) {
-      if (arg == null) {
-        message += 'undefined';
-      } else if (typeof arg == 'object') {
-        message += JSON.stringify(arg, null, 4);
-      } else {
-        message += arg.toString();
-      }
-    }
-    self.postMessage({log: message});
-    oldLog(...args);
-  };
-}
-
 // Swallow informational logs in testing framework
 function log(...args: any[]) {
-  if (self.console) {
+  if (typeof self !== 'undefined' && self.console) {
     self.console.log(...args);
   }
 }
-
-self.onmessage = async (e) => {
-  const content = 'const globalDefaults = {};\n' + e.data +
-      '\nreturn exportModels(globalDefaults, typeof result === "undefined" ? undefined : result);\n';
-  try {
-    const f = new Function(
-        'exportModels', 'glMatrix', 'module', ...exposedFunctions, content);
-    await f(
-        exportModels, glMatrix, module,  //@ts-ignore
-        ...exposedFunctions.map(name => module[name]));
-  } catch (error: any) {
-    console.log(error.toString());
-    self.postMessage({objectURL: null});
-  } finally {
-    module.cleanup();
-    cleanup();
-  }
-};
 
 function euler2quat(rotation: Vec3): Quat {
   const {quat} = glMatrix;
@@ -797,8 +756,33 @@ async function exportModels(defaults: GlobalDefaults, manifold?: Manifold) {
       [zipFile],
       {type: 'application/vnd.ms-package.3dmanufacturing-3dmodel+xml'});
 
-  self.postMessage({
+  return ({
     glbURL: URL.createObjectURL(blobGLB),
     threeMFURL: URL.createObjectURL(blob3MF)
   });
+}
+
+function evaluateCADToManifold(code: string) {
+  const globalDefaults = {} as GlobalDefaults;
+  const context = {
+    globalDefaults,
+    exportModels,
+    glMatrix,
+    module,
+    ...Object.fromEntries(
+        exposedFunctions.map((name) => [name, (module as any)[name]]),
+        ),
+  };
+  const evalFn = new Function(
+      ...Object.keys(context),
+      'resetToCircularDefaults();\n' + code +
+          '\n return typeof result === "undefined" ? undefined : result;',
+  );
+  const manifold = evalFn(...Object.values(context));
+  return {globalDefaults, manifold};
+}
+
+export async function evaluateCADToModel(code: string) {
+  const {globalDefaults, manifold} = evaluateCADToManifold(code);
+  return await exportModels(globalDefaults, manifold);
 }

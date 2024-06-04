@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import ManifoldWorker from './worker?worker';
+import ManifoldWorker from './worker-wrapper?worker';
 
 const CODE_START = '<code>';
 // Loaded globally by examples.js
@@ -276,6 +276,7 @@ declare interface ManifoldToplevel {
   setMinCircularEdgeLength: typeof T.setMinCircularEdgeLength;
   setCircularSegments: typeof T.setCircularSegments;
   getCircularSegments: typeof T.getCircularSegments;
+  resetToCircularDefaults: typeof T.resetToCircularDefaults;
   setup: () => void;
 }
 declare const module: ManifoldToplevel;
