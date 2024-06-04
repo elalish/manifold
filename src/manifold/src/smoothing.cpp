@@ -41,13 +41,9 @@ float AngleBetween(glm::vec3 a, glm::vec3 b) {
 glm::vec4 CircularTangent(const glm::vec3& tangent, const glm::vec3& edgeVec) {
   const glm::vec3 dir = SafeNormalize(tangent);
 
-  float weight = glm::abs(glm::dot(dir, SafeNormalize(edgeVec)));
-  if (weight == 0) {
-    weight = 1;
-  }
+  float weight = glm::max(0.5f, glm::dot(dir, SafeNormalize(edgeVec)));
   // Quadratic weighted bezier for circular interpolation
-  const glm::vec4 bz2 =
-      weight * glm::vec4(dir * glm::length(edgeVec) / (2 * weight), 1);
+  const glm::vec4 bz2 = glm::vec4(dir * glm::length(edgeVec) * 0.5f, weight);
   // Equivalent cubic weighted bezier
   const glm::vec4 bz3 = glm::mix(glm::vec4(0, 0, 0, 1), bz2, 2 / 3.0f);
   // Convert from homogeneous form to geometric form
@@ -124,6 +120,30 @@ struct InterpTri {
     return end * glm::conjugate(start) * v;
   }
 
+  glm::quat Slerp(const glm::quat& x, const glm::quat& y, float a,
+                  bool longWay) const {
+    glm::quat z = y;
+    float cosTheta = glm::dot(x, y);
+
+    // If cosTheta < 0, the interpolation will take the long way around the
+    // sphere. To fix this, one quat must be negated.
+    if ((cosTheta < 0) != longWay) {
+      z = -y;
+      cosTheta = -cosTheta;
+    }
+
+    // Perform a linear interpolation when cosTheta is close to 1 to avoid side
+    // effect of sin(angle) becoming a zero denominator
+    if (cosTheta > 1.0f - glm::epsilon<float>()) {
+      return glm::lerp(x, z, a);
+    } else {
+      // Essential Mathematics, page 467
+      float angle = glm::acos(cosTheta);
+      return (glm::sin((1.0f - a) * angle) * x + glm::sin(a * angle) * z) /
+             glm::sin(angle);
+    }
+  }
+
   glm::mat2x4 Bezier2Bezier(const glm::mat2x3& corners,
                             const glm::mat2x4& tangentsX,
                             const glm::mat2x4& tangentsY, float x,
@@ -150,7 +170,10 @@ struct InterpTri {
     const glm::quat q1 =
         glm::quat_cast(glm::mat3(nTangentsX[1], biTangents[1],
                                  glm::cross(nTangentsX[1], biTangents[1])));
-    const glm::quat qTmp = glm::slerp(q0, q1, x);
+    const glm::vec3 edge = corners[1] - corners[0];
+    const bool longWay =
+        glm::dot(nTangentsX[0], edge) + glm::dot(nTangentsX[1], edge) < 0;
+    const glm::quat qTmp = Slerp(q0, q1, x, longWay);
     const glm::quat q =
         glm::rotation(qTmp * glm::vec3(1, 0, 0), tangent) * qTmp;
     const glm::vec3 normal = q * glm::vec3(0, 0, 1);
