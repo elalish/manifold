@@ -157,6 +157,53 @@ void PrintFailure(const std::exception &e, const PolygonsIdx &polys,
 #endif
 
 /**
+ * Tests if the input polygons are convex by searching for any reflex vertices.
+ * Exactly colinear edges and zero-length edges are treated conservatively as
+ * reflex. Does not check for overlaps.
+ */
+bool IsConvex(const PolygonsIdx &polys) {
+  for (const SimplePolygonIdx &poly : polys) {
+    const glm::vec2 firstEdge = poly[0].pos - poly[poly.size() - 1].pos;
+    glm::vec2 lastEdge = firstEdge;
+    for (int v = 0; v < poly.size(); ++v) {
+      glm::vec2 edge =
+          v + 1 < poly.size() ? poly[v + 1].pos - poly[v].pos : firstEdge;
+      if (determinant2x2(lastEdge, edge) <= 0) return false;
+      lastEdge = edge;
+    }
+  }
+  return true;
+}
+
+/**
+ * Triangulates a set of convex polygons by alternating instead of a fan, to
+ * avoid creating high-degree vertices.
+ */
+std::vector<glm::ivec3> TriangulateConvex(const PolygonsIdx &polys) {
+  const int numTri = reduce(
+      polys.begin(), polys.end(), 0,
+      [](int i, const SimplePolygonIdx &poly) { return poly.size() - 2; });
+  std::vector<glm::ivec3> triangles;
+  triangles.reserve(numTri);
+  for (const SimplePolygonIdx &poly : polys) {
+    int i = 0;
+    int k = poly.size() - 1;
+    bool right = true;
+    while (i + 1 < k) {
+      const int j = right ? i + 1 : k - 1;
+      triangles.push_back({poly[i].idx, poly[j].idx, poly[k].idx});
+      if (right) {
+        i = j;
+      } else {
+        k = j;
+      }
+      right = !right;
+    }
+  }
+  return triangles;
+}
+
+/**
  * Ear-clipping triangulator based on David Eberly's approach from Geometric
  * Tools, but adjusted to handle epsilon-valid polygons, and including a
  * fallback that ensures a manifold triangulation even for overlapping polygons.
@@ -825,13 +872,19 @@ std::vector<glm::ivec3> TriangulateIdx(const PolygonsIdx &polys,
                                        float precision) {
   std::vector<glm::ivec3> triangles;
   try {
-    EarClip triangulator(polys, precision);
-    triangles = triangulator.Triangulate();
+    float updatedPrecision = precision;
+    if (IsConvex(polys)) {  // fast path
+      triangles = TriangulateConvex(polys);
+    } else {
+      EarClip triangulator(polys, precision);
+      triangles = triangulator.Triangulate();
+      updatedPrecision = triangulator.GetPrecision();
+    }
 #ifdef MANIFOLD_DEBUG
     if (params.intermediateChecks) {
       CheckTopology(triangles, polys);
       if (!params.processOverlaps) {
-        CheckGeometry(triangles, polys, 2 * triangulator.GetPrecision());
+        CheckGeometry(triangles, polys, 2 * updatedPrecision);
       }
     }
   } catch (const geometryErr &e) {
