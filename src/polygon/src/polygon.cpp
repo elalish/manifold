@@ -762,13 +762,16 @@ class EarClip {
     Vec<VertItr> itr;
     const Box box(glm::vec3(bBox_.min, 0), glm::vec3(bBox_.max, 0));
 
-    Loop(start, [&vertBox, &vertMorton, &itr, &box](VertItr v) {
+    Loop(start, [&vertBox, &vertMorton, &itr, &box, this](VertItr v) {
       itr.push_back(v);
       const glm::vec3 pos(v->pos, 0);
-      vertBox.push_back({});
-      vertBox.back().Union(pos);
+      vertBox.push_back({pos - precision_, pos + precision_});
       vertMorton.push_back(Collider::MortonCode(pos, box));
     });
+
+    if (itr.empty()) {
+      return {Collider(), itr};
+    }
 
     stable_sort(autoPolicy(itr.size()),
                 zip(vertMorton.begin(), vertBox.begin(), itr.begin()),
@@ -787,6 +790,11 @@ class EarClip {
     ZoneScoped;
 
     const IdxCollider vertCollider = VertCollider(start);
+
+    if (vertCollider.itr.empty()) {
+      PRINT("Empty poly");
+      return;
+    }
 
     // A simple polygon always creates two fewer triangles than it has verts.
     int numTri = -2;
