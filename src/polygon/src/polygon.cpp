@@ -212,6 +212,7 @@ class EarClip {
  private:
   struct Vert;
   typedef std::vector<Vert>::iterator VertItr;
+  typedef std::vector<Vert>::const_iterator VertItrC;
   struct MaxX {
     bool operator()(const VertItr &a, const VertItr &b) const {
       return a->pos.x > b->pos.x;
@@ -408,7 +409,7 @@ class EarClip {
     // For verts outside the ear, apply a cost based on the Delaunay condition
     // to aid in prioritization and produce cleaner triangulations. This doesn't
     // affect robustness, but may be adjusted to improve output.
-    float DelaunayCost(glm::vec2 diff, float scale, float precision) const {
+    static float DelaunayCost(glm::vec2 diff, float scale, float precision) {
       return -precision - scale * glm::dot(diff, diff);
     }
 
@@ -446,7 +447,8 @@ class EarClip {
       const int rid = right->mesh_idx;
       for (int i = 0; i < toTest.size(); ++i) {
         const VertItr test = collider.itr[toTest.Get(i, true)];
-        if (test->mesh_idx != mesh_idx && test->mesh_idx != lid &&
+        if (!Clipped(test) && test->mesh_idx != mesh_idx &&
+            test->mesh_idx != lid &&
             test->mesh_idx != rid) {  // Skip duplicated verts
           float cost = Cost(test, openSide, precision);
           if (cost < -precision) {
@@ -469,14 +471,14 @@ class EarClip {
     }
   };
 
-  glm::vec2 SafeNormalize(glm::vec2 v) const {
+  static glm::vec2 SafeNormalize(glm::vec2 v) {
     glm::vec2 n = glm::normalize(v);
     return glm::isfinite(n.x) ? n : glm::vec2(0, 0);
   }
 
   // This function and JoinPolygons are the only functions that affect the
   // circular list data structure. This helps ensure it remains circular.
-  void Link(VertItr left, VertItr right) const {
+  static void Link(VertItr left, VertItr right) {
     left->right = right;
     right->left = left;
     left->rightDir = SafeNormalize(right->pos - left->pos);
@@ -484,11 +486,11 @@ class EarClip {
 
   // When an ear vert is clipped, its neighbors get linked, so they get unlinked
   // from it, but it is still linked to them.
-  bool Clipped(VertItr v) const { return v->right->left != v; }
+  static bool Clipped(VertItr v) { return v->right->left != v; }
 
   // Apply func to each un-clipped vert in a polygon and return an un-clipped
   // vert.
-  VertItr Loop(VertItr first, std::function<void(VertItr)> func) {
+  VertItrC Loop(VertItr first, std::function<void(VertItr)> func) const {
     VertItr v = first;
     do {
       if (Clipped(v)) {
@@ -515,7 +517,7 @@ class EarClip {
 
   // Remove this vert from the circular list and output a corresponding
   // triangle.
-  void ClipEar(VertItr ear) {
+  void ClipEar(VertItrC ear) {
     Link(ear->left, ear->right);
     if (ear->left->mesh_idx != ear->mesh_idx &&
         ear->mesh_idx != ear->right->mesh_idx &&
@@ -756,7 +758,7 @@ class EarClip {
     }
   }
 
-  IdxCollider VertCollider(VertItr start) {
+  IdxCollider VertCollider(VertItr start) const {
     Vec<Box> vertBox;
     Vec<uint32_t> vertMorton;
     Vec<VertItr> itr;
@@ -806,7 +808,7 @@ class EarClip {
       v->PrintVert();
     };
 
-    VertItr v = Loop(start, QueueVert);
+    VertItrC v = Loop(start, QueueVert);
     if (v == polygon_.end()) return;
     Dump(v);
 
@@ -835,10 +837,10 @@ class EarClip {
     PRINT("Finished poly");
   }
 
-  void Dump(VertItr start) const {
+  void Dump(VertItrC start) const {
 #ifdef MANIFOLD_DEBUG
     if (!params.verbose) return;
-    VertItr v = start;
+    VertItrC v = start;
     std::cout << "show(array([" << std::endl;
     do {
       std::cout << "  [" << v->pos.x << ", " << v->pos.y << "],# "
