@@ -413,10 +413,9 @@ class EarClip {
       return -precision - scale * glm::dot(diff, diff);
     }
 
-    // This is the O(n^2) part of the algorithm, checking this ear against every
-    // Vert to ensure none are inside. It may be possible to improve performance
-    // by using the Collider to get it down to nlogn or doing some
-    // parallelization, but that may be more trouble than it's worth.
+    // This is the expensive part of the algorithm, checking this ear against
+    // every Vert to ensure none are inside. The Collider brings the total
+    // triangulator cost down from O(n^2) to O(nlogn) for most large polygons.
     //
     // Think of a cost as vaguely a distance metric - 0 is right on the edge of
     // being invalid. cost > precision is definitely invalid. Cost < -precision
@@ -758,6 +757,9 @@ class EarClip {
     }
   }
 
+  // Create a collider of all vertices in this polygon, each expanded by
+  // precision_. Each ear uses this BVH to quickly find a subset of vertices to
+  // check for cost.
   IdxCollider VertCollider(VertItr start) const {
     Vec<Box> vertBox;
     Vec<uint32_t> vertMorton;
