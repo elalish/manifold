@@ -47,7 +47,7 @@ class CsgLeafNode;
 struct MeshGL {
   /// Number of property vertices
   uint32_t NumVert() const {
-#if MANIFOLD_EXCEPTIONS 
+#if MANIFOLD_EXCEPTIONS
     if (vertProperties.size() / numProp >=
         std::numeric_limits<unsigned int>::max())
       throw std::out_of_range("mesh too large");
@@ -56,7 +56,7 @@ struct MeshGL {
   };
   /// Number of triangles
   uint32_t NumTri() const {
-#if MANIFOLD_EXCEPTIONS 
+#if MANIFOLD_EXCEPTIONS
     if (vertProperties.size() / numProp >=
         std::numeric_limits<unsigned int>::max())
       throw std::out_of_range("mesh too large");
