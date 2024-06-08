@@ -68,7 +68,7 @@ struct nb::detail::type_caster<glm::vec<N, T, Q>> {
     int size = PyObject_Size(src.ptr());  // negative on failure
     if (size != N) return false;
     make_caster<T> t_cast;
-    for (size_t i = 0; i < size; i++) {
+    for (int i = 0; i < size; i++) {
       if (!t_cast.from_python(src[i], flags, cleanup)) return false;
       value[i] = t_cast.value;
     }
@@ -298,7 +298,7 @@ NB_MODULE(manifold3d, m) {
               nb::ndarray<float, nb::shape<nb::any>> array;
               std::vector<float> vec;
               if (nb::try_cast(result, array)) {
-                if (array.ndim() != 1 || array.shape(0) != newNumProp)
+                if (array.ndim() != 1 || array.shape(0) != static_cast<size_t>(newNumProp))
                   throw std::runtime_error("Invalid vector shape, expected (" +
                                            std::to_string(newNumProp) + ")");
                 for (int i = 0; i < newNumProp; i++) newProps[i] = array(i);
@@ -384,7 +384,7 @@ NB_MODULE(manifold3d, m) {
                   "sharpened_edges.size() != edge_smoothness.size()");
             }
             std::vector<Smoothness> vec(sharpened_edges.size());
-            for (int i = 0; i < vec.size(); i++) {
+            for (size_t i = 0; i < vec.size(); i++) {
               vec[i] = {sharpened_edges[i], edge_smoothness[i]};
             }
             return Manifold::Smooth(mesh, vec);
