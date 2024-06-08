@@ -107,7 +107,7 @@ struct nb::detail::type_caster<glm::mat<C, R, T, Q>> {
   static handle from_cpp(glm_type mat, rv_policy policy,
                          cleanup_list *cleanup) noexcept {
     T *buffer = new T[R * C];
-    nb::capsule mem_mgr(buffer, [](void *p) noexcept { delete[](T *) p; });
+    nb::capsule mem_mgr(buffer, [](void *p) noexcept { delete[] (T *)p; });
     for (int i = 0; i < R; i++) {
       for (int j = 0; j < C; j++) {
         // py is (Rows, Cols), glm is (Cols, Rows)
@@ -154,7 +154,7 @@ struct nb::detail::type_caster<std::vector<glm::vec<N, T, Q>>> {
                          cleanup_list *cleanup) noexcept {
     size_t num_vec = vec.size();
     T *buffer = new T[num_vec * N];
-    nb::capsule mem_mgr(buffer, [](void *p) noexcept { delete[](T *) p; });
+    nb::capsule mem_mgr(buffer, [](void *p) noexcept { delete[] (T *)p; });
     for (size_t i = 0; i < num_vec; i++) {
       for (int j = 0; j < N; j++) {
         buffer[i * N + j] = vec[i][j];
@@ -298,7 +298,8 @@ NB_MODULE(manifold3d, m) {
               nb::ndarray<float, nb::shape<nb::any>> array;
               std::vector<float> vec;
               if (nb::try_cast(result, array)) {
-                if (array.ndim() != 1 || array.shape(0) != static_cast<size_t>(newNumProp))
+                if (array.ndim() != 1 ||
+                    array.shape(0) != static_cast<size_t>(newNumProp))
                   throw std::runtime_error("Invalid vector shape, expected (" +
                                            std::to_string(newNumProp) + ")");
                 for (int i = 0; i < newNumProp; i++) newProps[i] = array(i);
