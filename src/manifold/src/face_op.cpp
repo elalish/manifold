@@ -188,7 +188,7 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
         triRef.push_back(r);
       },
       std::placeholders::_1);
-  for (int face = 0; face < faceEdge.size() - 1; ++face) {
+  for (size_t face = 0; face < faceEdge.size() - 1; ++face) {
     processFace2(face);
   }
 #endif

@@ -155,7 +155,7 @@ struct nb::detail::type_caster<std::vector<glm::vec<N, T, Q>>> {
     size_t num_vec = vec.size();
     T *buffer = new T[num_vec * N];
     nb::capsule mem_mgr(buffer, [](void *p) noexcept { delete[](T *) p; });
-    for (int i = 0; i < num_vec; i++) {
+    for (size_t i = 0; i < num_vec; i++) {
       for (int j = 0; j < N; j++) {
         buffer[i * N + j] = vec[i][j];
       }
@@ -517,7 +517,7 @@ NB_MODULE(manifold3d, m) {
       .def_ro("run_original_id", &MeshGL::runOriginalID)
       .def_ro("face_id", &MeshGL::faceID)
       .def_static(
-          "level_set", 
+          "level_set",
           [](const std::function<float(float, float, float)> &f,
              std::vector<float> bounds, float edgeLength, float level = 0.0) {
                 // Same format as Manifold.bounding_box
