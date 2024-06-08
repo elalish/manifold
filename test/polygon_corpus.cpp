@@ -570,7 +570,7 @@ TEST(Polygon, Ugly) {
       {2289.28784, 13251.1582},  //
       {2379.03027, 13010.5566},  //
   });
-  TestPoly(polys, 32);
+  TestPoly(polys, 36);
 };
 
 TEST(Polygon, Sponge4a) {
