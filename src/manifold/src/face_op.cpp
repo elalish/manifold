@@ -156,8 +156,10 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
   // prefix sum computation (assign unique index to each face) and preallocation
   exclusive_scan(autoPolicy(triCount.size()), triCount.begin(), triCount.end(),
                  triCount.begin(), 0_z);
+#if MANIFOLD_EXCEPTIONS
   if (triCount.back() >= std::numeric_limits<int>::max())
     throw std::out_of_range("too many triangles");
+#endif
   triVerts.resize(triCount.back());
   triNormal.resize(triCount.back());
   triRef.resize(triCount.back());

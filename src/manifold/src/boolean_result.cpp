@@ -104,8 +104,10 @@ std::tuple<Vec<int>, Vec<int>> SizeOutput(
   ZoneScoped;
   Vec<int> sidesPerFacePQ(inP.NumTri() + inQ.NumTri(), 0);
   // note: numFaceR <= facePQ2R.size() = sidesPerFacePQ.size() + 1
+#if MANIFOLD_EXCEPTIONS
   if (sidesPerFacePQ.size() + 1 >= std::numeric_limits<int>::max())
     throw std::out_of_range("boolean result too large");
+#endif
 
   auto sidesPerFaceP = sidesPerFacePQ.view(0, inP.NumTri());
   auto sidesPerFaceQ = sidesPerFacePQ.view(inP.NumTri(), inQ.NumTri());
@@ -544,9 +546,11 @@ void CreateProperties(Manifold::Impl &outR, const Manifold::Impl &inP,
   propMissIdx[0].resize(inQ.NumPropVert(), -1);
   propMissIdx[1].resize(inP.NumPropVert(), -1);
 
+#if MANIFOLD_EXCEPTIONS
   if (static_cast<size_t>(outR.NumVert()) * static_cast<size_t>(numProp) >=
       std::numeric_limits<int>::max())
     throw std::out_of_range("too many vertices");
+#endif
 
   outR.meshRelation_.properties.reserve(outR.NumVert() * numProp);
   int idx = 0;

@@ -875,9 +875,12 @@ namespace manifold {
 std::vector<glm::ivec3> TriangulateIdx(const PolygonsIdx &polys,
                                        float precision) {
   std::vector<glm::ivec3> triangles;
+#if MANIFOLD_EXCEPTIONS
   try {
+#endif
     EarClip triangulator(polys, precision);
     triangles = triangulator.Triangulate();
+#if MANIFOLD_EXCEPTIONS
 #ifdef MANIFOLD_DEBUG
     if (params.intermediateChecks) {
       CheckTopology(triangles, polys);
@@ -897,6 +900,7 @@ std::vector<glm::ivec3> TriangulateIdx(const PolygonsIdx &polys,
   } catch (const std::exception &e) {
 #endif
   }
+#endif
   return triangles;
 }
 

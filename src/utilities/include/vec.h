@@ -13,7 +13,9 @@
 // limitations under the License.
 
 #pragma once
+#if MANIFOLD_EXCEPTIONS
 #include <exception>
+#endif
 #if TRACY_ENABLE && TRACY_MEMORY_USAGE
 #include "tracy/Tracy.hpp"
 #else
@@ -62,7 +64,9 @@ class Vec : public VecView<T> {
     auto policy = autoPolicy(this->size_);
     if (this->size_ != 0) {
       this->ptr_ = reinterpret_cast<T *>(malloc(this->size_ * sizeof(T)));
+#if MANIFOLD_EXCEPTIONS
       if (this->ptr_ == nullptr) throw std::bad_alloc();
+#endif
       TracyAllocS(this->ptr_, this->size_ * sizeof(T), 3);
       uninitialized_copy(policy, vec.begin(), vec.end(), this->ptr_);
     }
@@ -74,7 +78,9 @@ class Vec : public VecView<T> {
     auto policy = autoPolicy(this->size_);
     if (this->size_ != 0) {
       this->ptr_ = reinterpret_cast<T *>(malloc(this->size_ * sizeof(T)));
+#if MANIFOLD_EXCEPTIONS
       if (this->ptr_ == nullptr) throw std::bad_alloc();
+#endif
       TracyAllocS(this->ptr_, this->size_ * sizeof(T), 3);
       uninitialized_copy(policy, vec.begin(), vec.end(), this->ptr_);
     }
@@ -113,7 +119,9 @@ class Vec : public VecView<T> {
     auto policy = autoPolicy(this->size_);
     if (this->size_ != 0) {
       this->ptr_ = reinterpret_cast<T *>(malloc(this->size_ * sizeof(T)));
+#if MANIFOLD_EXCEPTIONS
       if (this->ptr_ == nullptr) throw std::bad_alloc();
+#endif
       TracyAllocS(this->ptr_, this->size_ * sizeof(T), 3);
       uninitialized_copy(policy, other.begin(), other.end(), this->ptr_);
     }
@@ -157,7 +165,9 @@ class Vec : public VecView<T> {
   void reserve(size_t n) {
     if (n > capacity_) {
       T *newBuffer = reinterpret_cast<T *>(malloc(n * sizeof(T)));
+#if MANIFOLD_EXCEPTIONS
       if (newBuffer == nullptr) throw std::bad_alloc();
+#endif
       TracyAllocS(newBuffer, n * sizeof(T), 3);
       if (this->size_ > 0)
         uninitialized_copy(autoPolicy(this->size_), this->ptr_,
@@ -186,7 +196,9 @@ class Vec : public VecView<T> {
     T *newBuffer = nullptr;
     if (this->size_ > 0) {
       newBuffer = reinterpret_cast<T *>(malloc(this->size_ * sizeof(T)));
+#if MANIFOLD_EXCEPTIONS
       if (newBuffer == nullptr) throw std::bad_alloc();
+#endif
       TracyAllocS(newBuffer, this->size_ * sizeof(T), 3);
       uninitialized_copy(autoPolicy(this->size_), this->ptr_,
                          this->ptr_ + this->size_, newBuffer);
@@ -203,12 +215,17 @@ class Vec : public VecView<T> {
                   size_t length = std::numeric_limits<size_t>::max()) {
     if (length == std::numeric_limits<size_t>::max()) {
       length = this->size_ - offset;
+#if MANIFOLD_EXCEPTIONS
       if (length < 0) throw std::out_of_range("Vec::view out of range");
-    } else if (offset + length > this->size_ || offset < 0) {
+#endif
+    }
+#if MANIFOLD_EXCEPTIONS
+    else if (offset + length > this->size_ || offset < 0) {
       throw std::out_of_range("Vec::view out of range");
     } else if (length < 0) {
       throw std::out_of_range("Vec::view negative length is not allowed");
     }
+#endif
     return VecView<T>(this->ptr_ + offset, length);
   }
 
@@ -217,12 +234,17 @@ class Vec : public VecView<T> {
       size_t length = std::numeric_limits<size_t>::max()) const {
     if (length == std::numeric_limits<size_t>::max()) {
       length = this->size_ - offset;
+#if MANIFOLD_EXCEPTIONS
       if (length < 0) throw std::out_of_range("Vec::cview out of range");
-    } else if (offset + length > this->size_ || offset < 0) {
+#endif
+    }
+#if MANIFOLD_EXCEPTIONS
+    else if (offset + length > this->size_ || offset < 0) {
       throw std::out_of_range("Vec::cview out of range");
     } else if (length < 0) {
       throw std::out_of_range("Vec::cview negative length is not allowed");
     }
+#endif
     return VecView<const T>(this->ptr_ + offset, length);
   }
 

@@ -350,8 +350,14 @@ Manifold::Impl::Impl(const MeshGL& meshGL,
 
   if (meshGL.numProp > 3 &&
       static_cast<size_t>(numVert) * static_cast<size_t>(meshGL.numProp - 3) >=
-          std::numeric_limits<int>::max())
+          std::numeric_limits<int>::max()) {
+#if MANIFOLD_EXCEPTIONS
     throw std::out_of_range("mesh too large");
+#else
+    MarkFailure(Error::InvalidConstruction);
+    return;
+#endif
+  }
 
   if (meshGL.numProp < 3) {
     MarkFailure(Error::MissingPositionProperties);
@@ -486,8 +492,14 @@ Manifold::Impl::Impl(const Mesh& mesh, const MeshRelationD& relation,
                      const std::vector<float>& propertyTolerance,
                      bool hasFaceIDs)
     : vertPos_(mesh.vertPos), halfedgeTangent_(mesh.halfedgeTangent) {
-  if (mesh.triVerts.size() >= std::numeric_limits<int>::max())
+  if (mesh.triVerts.size() >= std::numeric_limits<int>::max()) {
+#if MANIFOLD_EXCEPTIONS
     throw std::out_of_range("mesh too large");
+#else
+    MarkFailure(Error::InvalidConstruction);
+    return;
+#endif
+  }
   meshRelation_ = {relation.originalID, relation.numProp, relation.properties,
                    relation.meshIDtransform};
 
