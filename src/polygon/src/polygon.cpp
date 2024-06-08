@@ -42,7 +42,7 @@ struct PolyEdge {
 std::vector<PolyEdge> Polygons2Edges(const PolygonsIdx &polys) {
   std::vector<PolyEdge> halfedges;
   for (const auto &poly : polys) {
-    for (int i = 1; i < poly.size(); ++i) {
+    for (size_t i = 1; i < poly.size(); ++i) {
       halfedges.push_back({poly[i - 1].idx, poly[i].idx});
     }
     halfedges.push_back({poly.back().idx, poly[0].idx});
@@ -64,7 +64,7 @@ std::vector<PolyEdge> Triangles2Edges(
 
 void CheckTopology(const std::vector<PolyEdge> &halfedges) {
   ASSERT(halfedges.size() % 2 == 0, topologyErr, "Odd number of halfedges.");
-  size_t n_edges = halfedges.size() / 2;
+  ssize_t n_edges = halfedges.size() / 2;
   std::vector<PolyEdge> forward(halfedges.size()), backward(halfedges.size());
 
   auto end = std::copy_if(halfedges.begin(), halfedges.end(), forward.begin(),
@@ -87,7 +87,7 @@ void CheckTopology(const std::vector<PolyEdge> &halfedges) {
   };
   std::stable_sort(forward.begin(), forward.end(), cmp);
   std::stable_sort(backward.begin(), backward.end(), cmp);
-  for (int i = 0; i < n_edges; ++i) {
+  for (ssize_t i = 0; i < n_edges; ++i) {
     ASSERT(forward[i].startVert == backward[i].startVert &&
                forward[i].endVert == backward[i].endVert,
            topologyErr, "Not manifold.");
@@ -108,7 +108,7 @@ void CheckGeometry(const std::vector<glm::ivec3> &triangles,
                    const PolygonsIdx &polys, float precision) {
   std::unordered_map<int, glm::vec2> vertPos;
   for (const auto &poly : polys) {
-    for (int i = 0; i < poly.size(); ++i) {
+    for (size_t i = 0; i < poly.size(); ++i) {
       vertPos[poly[i].idx] = poly[i].pos;
     }
   }
@@ -145,7 +145,7 @@ void PrintFailure(const std::exception &e, const PolygonsIdx &polys,
   std::cout << e.what() << std::endl;
   Dump(polys);
   std::cout << "produced this triangulation:" << std::endl;
-  for (int j = 0; j < triangles.size(); ++j) {
+  for (size_t j = 0; j < triangles.size(); ++j) {
     std::cout << triangles[j][0] << ", " << triangles[j][1] << ", "
               << triangles[j][2] << std::endl;
   }

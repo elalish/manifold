@@ -75,6 +75,12 @@ target_compile_options(${PROJECT_NAME} INTERFACE
     -DTHRUST_DEVICE_SYSTEM=THRUST_DEVICE_SYSTEM_${MANIFOLD_PAR}
 )
 
+if(MANIFOLD_EXCEPTIONS)
+    target_compile_options(${PROJECT_NAME} INTERFACE
+        -DMANIFOLD_EXCEPTIONS=1
+    )
+endif()
+
 if(MANIFOLD_DEBUG)
     target_compile_options(${PROJECT_NAME}
         INTERFACE -DMANIFOLD_DEBUG)

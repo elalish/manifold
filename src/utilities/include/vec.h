@@ -235,9 +235,7 @@ class Vec : public VecView<T> {
   T *data() { return this->ptr_; }
   const T *data() const { return this->ptr_; }
 
-  size_t capacity() const {
-    return capacity_;
-  }
+  size_t capacity() const { return capacity_; }
 
  private:
   size_t capacity_ = 0;

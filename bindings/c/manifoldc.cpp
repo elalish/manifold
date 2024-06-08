@@ -68,7 +68,7 @@ ManifoldPolygons *manifold_polygons(void *mem, ManifoldSimplePolygon **ps,
                                     size_t length) {
   auto vec = new (mem) std::vector<SimplePolygon>;
   auto polys = reinterpret_cast<SimplePolygon **>(ps);
-  for (size_t  i = 0; i < length; ++i) {
+  for (size_t i = 0; i < length; ++i) {
     vec->push_back(*polys[i]);
   }
   return to_c(vec);

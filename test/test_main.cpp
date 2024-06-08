@@ -348,8 +348,8 @@ void RelatedGL(const Manifold& out, const std::vector<MeshGL>& originals,
     }
     ASSERT_LT(i, originals.size());
     const MeshGL& inMesh = originals[i];
-    for (uint32_t tri = output.runIndex[run] / 3; tri < output.runIndex[run + 1] / 3;
-         ++tri) {
+    for (uint32_t tri = output.runIndex[run] / 3;
+         tri < output.runIndex[run + 1] / 3; ++tri) {
       if (!output.faceID.empty()) {
         ASSERT_LT(tri, output.faceID.size());
       }

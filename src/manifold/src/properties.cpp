@@ -251,7 +251,7 @@ struct CheckCCW {
       glm::vec3 V2 = vertPos[halfedges[3 * face + 2].startVert];
       glm::vec3 norm = glm::cross(V1 - V0, V2 - V0);
       printf(
-          "Tri %d does not match normal, approx height = %g, base = %g\n"
+          "Tri %ld does not match normal, approx height = %g, base = %g\n"
           "tol = %g, area2 = %g, base2*tol2 = %g\n"
           "normal = %g, %g, %g\n"
           "norm = %g, %g, %g\nverts: %d, %d, %d\n",

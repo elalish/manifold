@@ -255,14 +255,14 @@ void Manifold::Impl::Finish() {
 #endif
 
   ASSERT(extrema.startVert >= 0, topologyErr, "Vertex index is negative!");
-  ASSERT(extrema.endVert < NumVert(), topologyErr,
+  ASSERT(extrema.endVert < static_cast<int>(NumVert()), topologyErr,
          "Vertex index exceeds number of verts!");
   ASSERT(extrema.face >= 0, topologyErr, "Face index is negative!");
-  ASSERT(extrema.face < NumTri(), topologyErr,
+  ASSERT(extrema.face < static_cast<int>(NumTri()), topologyErr,
          "Face index exceeds number of faces!");
   ASSERT(extrema.pairedHalfedge >= 0, topologyErr,
          "Halfedge index is negative!");
-  ASSERT(extrema.pairedHalfedge < 2 * NumEdge(), topologyErr,
+  ASSERT(extrema.pairedHalfedge < 2 * static_cast<int>(NumEdge()), topologyErr,
          "Halfedge index exceeds number of halfedges!");
   ASSERT(meshRelation_.triRef.size() == NumTri() ||
              meshRelation_.triRef.size() == 0,
