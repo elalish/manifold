@@ -72,7 +72,7 @@
             { parallel-backend = "none"; }
             {
               parallel-backend = "tbb";
-              build-tools = with pkgs; [ tbb_2021_8 pkg-config ];
+              build-tools = with pkgs; [ tbb pkg-config ];
             }
           ];
         in
@@ -126,7 +126,7 @@
                 numpy
               ];
               buildInputs = with pkgs; [
-                tbb_2021_8
+                tbb
                 glm
                 clipper2
               ];
@@ -156,7 +156,7 @@
           devShell = pkgs.mkShell {
             buildInputs = with pkgs; [
               cmake
-              tbb_2021_8
+              tbb
               gtest
             ];
           };
