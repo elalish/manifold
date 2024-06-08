@@ -101,7 +101,7 @@ C2::PathsD transform(const C2::PathsD ps, const glm::mat3x2 m) {
   for (auto path : ps) {
     auto sz = path.size();
     auto s = C2::PathD(sz);
-    for (int i = 0; i < sz; ++i) {
+    for (size_t i = 0; i < sz; ++i) {
       auto idx = invert ? sz - 1 - i : i;
       s[idx] = v2_to_pd(m * glm::vec3(path[i].x, path[i].y, 1));
     }
@@ -117,10 +117,10 @@ std::shared_ptr<const PathImpl> shared_paths(const C2::PathsD& ps) {
 // forward declaration for mutual recursion
 void decompose_hole(const C2::PolyTreeD* outline,
                     std::vector<C2::PathsD>& polys, C2::PathsD& poly,
-                    int n_holes, int j);
+                    size_t n_holes, size_t j);
 
 void decompose_outline(const C2::PolyTreeD* tree,
-                       std::vector<C2::PathsD>& polys, int i) {
+                       std::vector<C2::PathsD>& polys, size_t i) {
   auto n_outlines = tree->Count();
   if (i < n_outlines) {
     auto outline = tree->Child(i);
@@ -137,7 +137,7 @@ void decompose_outline(const C2::PolyTreeD* tree,
 
 void decompose_hole(const C2::PolyTreeD* outline,
                     std::vector<C2::PathsD>& polys, C2::PathsD& poly,
-                    int n_holes, int j) {
+                    size_t n_holes, size_t j) {
   if (j < n_holes) {
     auto child = outline->Child(j);
     decompose_outline(child, polys, 0);
@@ -146,7 +146,7 @@ void decompose_hole(const C2::PolyTreeD* outline,
   }
 }
 
-void flatten(const C2::PolyTreeD* tree, C2::PathsD& polys, int i) {
+void flatten(const C2::PolyTreeD* tree, C2::PathsD& polys, size_t i) {
   auto n_outlines = tree->Count();
   if (i < n_outlines) {
     auto outline = tree->Child(i);
@@ -177,33 +177,28 @@ void HullBacktrack(const glm::vec2& pt, std::vector<glm::vec2>& stack) {
 // https://en.wikibooks.org/wiki/Algorithm_Implementation/Geometry/Convex_hull/Monotone_chain
 // This is the same algorithm (Andrew, also called Montone Chain).
 C2::PathD HullImpl(SimplePolygon& pts) {
-  int len = pts.size();
+  size_t len = pts.size();
   if (len < 3) return C2::PathD();  // not enough points to create a polygon
   std::sort(pts.begin(), pts.end(), V2Lesser);
 
   auto lower = std::vector<glm::vec2>{};
-  for (int i = 0; i < len; i++) {
-    HullBacktrack(pts[i], lower);
-    lower.push_back(pts[i]);
+  for (auto& pt : pts) {
+    HullBacktrack(pt, lower);
+    lower.push_back(pt);
   }
   auto upper = std::vector<glm::vec2>{};
-  for (int i = len - 1; i >= 0; i--) {
-    HullBacktrack(pts[i], upper);
-    upper.push_back(pts[i]);
+  for (auto pt_iter = pts.rbegin(); pt_iter != pts.rend(); pt_iter++) {
+    HullBacktrack(*pt_iter, upper);
+    upper.push_back(*pt_iter);
   }
 
   upper.pop_back();
   lower.pop_back();
 
-  auto path = C2::PathD(lower.size() + upper.size());
-  for (int i = 0; i < lower.size(); i++) {
-    path[i] = v2_to_pd(lower[i]);
-  }
-  auto llen = lower.size();
-  int sz = upper.size();  // "fix" -Waggressive-loop-optimizations warning.
-  for (int i = 0; i < sz; i++) {
-    path[i + llen] = v2_to_pd(upper[i]);
-  }
+  auto path = C2::PathD();
+  path.reserve(lower.size() + upper.size());
+  for (const auto& l : lower) path.push_back(v2_to_pd(l));
+  for (const auto& u : upper) path.push_back(v2_to_pd(u));
   return path;
 }
 }  // namespace
@@ -381,12 +376,12 @@ CrossSection CrossSection::BatchBoolean(
 
   auto subjs = crossSections[0].GetPaths();
   int n_clips = 0;
-  for (int i = 1; i < crossSections.size(); ++i) {
+  for (size_t i = 1; i < crossSections.size(); ++i) {
     n_clips += crossSections[i].GetPaths()->paths_.size();
   }
   auto clips = C2::PathsD();
   clips.reserve(n_clips);
-  for (int i = 1; i < crossSections.size(); ++i) {
+  for (size_t i = 1; i < crossSections.size(); ++i) {
     auto ps = crossSections[i].GetPaths();
     clips.insert(clips.end(), ps->paths_.begin(), ps->paths_.end());
   }
@@ -471,12 +466,11 @@ std::vector<CrossSection> CrossSection::Decompose() const {
   auto polys = std::vector<C2::PathsD>();
   decompose_outline(&tree, polys, 0);
 
-  auto n_polys = polys.size();
-  auto comps = std::vector<CrossSection>(n_polys);
+  auto comps = std::vector<CrossSection>();
+  comps.reserve(polys.size());
   // reverse the stack while wrapping
-  for (int i = 0; i < n_polys; ++i) {
-    comps[n_polys - i - 1] = CrossSection(shared_paths(polys[i]));
-  }
+  for (auto poly = polys.rbegin(); poly != polys.rend(); ++poly)
+    comps.emplace_back(CrossSection(shared_paths(*poly)));
 
   return comps;
 }

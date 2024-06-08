@@ -340,7 +340,7 @@ bool Manifold::Impl::IsMarkedInsideQuad(int halfedge) const {
 std::vector<Smoothness> Manifold::Impl::UpdateSharpenedEdges(
     const std::vector<Smoothness>& sharpenedEdges) const {
   std::unordered_map<int, int> oldHalfedge2New;
-  for (int tri = 0; tri < NumTri(); ++tri) {
+  for (size_t tri = 0; tri < NumTri(); ++tri) {
     int oldTri = meshRelation_.triRef[tri].tri;
     for (int i : {0, 1, 2}) oldHalfedge2New[3 * oldTri + i] = 3 * tri + i;
   }
@@ -388,7 +388,7 @@ Vec<bool> Manifold::Impl::FlatFaces() const {
 Vec<int> Manifold::Impl::VertFlatFace(const Vec<bool>& flatFaces) const {
   Vec<int> vertFlatFace(NumVert(), -1);
   Vec<TriRef> vertRef(NumVert(), {-1, -1, -1});
-  for (int tri = 0; tri < NumTri(); ++tri) {
+  for (size_t tri = 0; tri < NumTri(); ++tri) {
     if (flatFaces[tri]) {
       for (const int j : {0, 1, 2}) {
         const int vert = halfedge_[3 * tri + j].startVert;
@@ -418,7 +418,7 @@ std::vector<Smoothness> Manifold::Impl::SharpenEdges(
     float minSharpAngle, float minSmoothness) const {
   std::vector<Smoothness> sharpenedEdges;
   const float minRadians = glm::radians(minSharpAngle);
-  for (int e = 0; e < halfedge_.size(); ++e) {
+  for (int e = 0; e < static_cast<int>(halfedge_.size()); ++e) {
     if (!halfedge_[e].IsForward()) continue;
     const int pair = halfedge_[e].pairedHalfedge;
     const float dihedral =
@@ -457,7 +457,7 @@ void Manifold::Impl::SetNormals(int normalIdx, float minSharpAngle) {
   Vec<bool> triIsFlatFace = FlatFaces();
   Vec<int> vertFlatFace = VertFlatFace(triIsFlatFace);
   Vec<int> vertNumSharp(NumVert(), 0);
-  for (int e = 0; e < halfedge_.size(); ++e) {
+  for (size_t e = 0; e < halfedge_.size(); ++e) {
     if (!halfedge_[e].IsForward()) continue;
     const int pair = halfedge_[e].pairedHalfedge;
     const int tri1 = e / 3;
@@ -716,7 +716,7 @@ void Manifold::Impl::DistributeTangents(const Vec<bool>& fixedHalfedges) {
         const float scale = currentAngle.back() / desiredAngle.back();
         float offset = 0;
         if (current == halfedge) {  // only one - find average offset
-          for (int i = 0; i < currentAngle.size(); ++i) {
+          for (size_t i = 0; i < currentAngle.size(); ++i) {
             offset += currentAngle[i] - scale * desiredAngle[i];
           }
           offset /= currentAngle.size();
@@ -843,7 +843,7 @@ void Manifold::Impl::CreateTangents(std::vector<Smoothness> sharpenedEdges) {
   Vec<bool> triIsFlatFace = FlatFaces();
   Vec<int> vertFlatFace = VertFlatFace(triIsFlatFace);
   Vec<glm::vec3> vertNormal = vertNormal_;
-  for (int v = 0; v < NumVert(); ++v) {
+  for (size_t v = 0; v < NumVert(); ++v) {
     if (vertFlatFace[v] >= 0) {
       vertNormal[v] = faceNormal_[vertFlatFace[v]];
     }
@@ -856,7 +856,7 @@ void Manifold::Impl::CreateTangents(std::vector<Smoothness> sharpenedEdges) {
   halfedgeTangent_.swap(tangent);
 
   // Add sharpened edges around faces, just on the face side.
-  for (int tri = 0; tri < NumTri(); ++tri) {
+  for (int tri = 0; tri < static_cast<int>(NumTri()); ++tri) {
     if (!triIsFlatFace[tri]) continue;
     for (const int j : {0, 1, 2}) {
       const int tri2 = halfedge_[3 * tri + j].pairedHalfedge / 3;

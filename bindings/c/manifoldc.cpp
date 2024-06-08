@@ -58,7 +58,7 @@ extern "C" {
 ManifoldSimplePolygon *manifold_simple_polygon(void *mem, ManifoldVec2 *ps,
                                                size_t length) {
   auto vec = new (mem) std::vector<glm::vec2>;
-  for (int i = 0; i < length; ++i) {
+  for (size_t i = 0; i < length; ++i) {
     vec->push_back({ps[i].x, ps[i].y});
   }
   return to_c(vec);
@@ -68,7 +68,7 @@ ManifoldPolygons *manifold_polygons(void *mem, ManifoldSimplePolygon **ps,
                                     size_t length) {
   auto vec = new (mem) std::vector<SimplePolygon>;
   auto polys = reinterpret_cast<SimplePolygon **>(ps);
-  for (int i = 0; i < length; ++i) {
+  for (size_t  i = 0; i < length; ++i) {
     vec->push_back(*polys[i]);
   }
   return to_c(vec);
@@ -216,7 +216,7 @@ ManifoldManifold *manifold_batch_hull(void *mem, ManifoldManifoldVec *ms) {
 ManifoldManifold *manifold_hull_pts(void *mem, ManifoldVec3 *ps,
                                     size_t length) {
   std::vector<glm::vec3> vec(length);
-  for (int i = 0; i < length; ++i) {
+  for (size_t i = 0; i < length; ++i) {
     vec[i] = {ps[i].x, ps[i].y, ps[i].z};
   }
   auto hulled = Manifold::Hull(vec);

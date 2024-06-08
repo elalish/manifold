@@ -444,7 +444,7 @@ class EarClip {
 
       const int lid = left->mesh_idx;
       const int rid = right->mesh_idx;
-      for (int i = 0; i < toTest.size(); ++i) {
+      for (size_t i = 0; i < toTest.size(); ++i) {
         const VertItr test = collider.itr[toTest.Get(i, true)];
         if (!Clipped(test) && test->mesh_idx != mesh_idx &&
             test->mesh_idx != lid &&

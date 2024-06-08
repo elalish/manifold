@@ -603,10 +603,10 @@ void CreateProperties(Manifold::Impl &outR, const Manifold::Impl &inP,
       } else {
         auto &bin = propIdx[key.y];
         bool bFound = false;
-        for (int k = 0; k < bin.size(); ++k) {
-          if (bin[k].first == glm::ivec3(key.x, key.z, key.w)) {
+        for (const auto &b : bin) {
+          if (b.first == glm::ivec3(key.x, key.z, key.w)) {
             bFound = true;
-            outR.meshRelation_.triProperties[tri][i] = bin[k].second;
+            outR.meshRelation_.triProperties[tri][i] = b.second;
             break;
           }
         }

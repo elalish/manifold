@@ -84,7 +84,7 @@ struct CreateRadixTree {
   }
 
   int PrefixLength(int i, int j) const {
-    if (j < 0 || j >= leafMorton_.size()) {
+    if (j < 0 || j >= static_cast<int>(leafMorton_.size())) {
       return -1;
     } else {
       int out;

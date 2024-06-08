@@ -74,7 +74,7 @@ struct UpdateMeshIDs {
 struct CheckOverlap {
   VecView<const Box> boxes;
   const size_t i;
-  bool operator()(int j) { return boxes[i].DoesOverlap(boxes[j]); }
+  bool operator()(size_t j) { return boxes[i].DoesOverlap(boxes[j]); }
 };
 
 using SharedImpl = std::variant<std::shared_ptr<const Manifold::Impl>,
@@ -313,7 +313,7 @@ Manifold::Impl CsgLeafNode::Compose(
                   UpdateMeshIDs({offset}));
       });
 
-  for (int i = 0; i < nodes.size(); i++) {
+  for (size_t i = 0; i < nodes.size(); i++) {
     auto &node = nodes[i];
     const int offset = i * Manifold::Impl::meshIDCounter_;
 
@@ -546,11 +546,9 @@ void CsgOpNode::BatchUnion() const {
                           : 0;
     Vec<Box> boxes;
     boxes.reserve(children_.size() - start);
-    for (int i = start; i < children_.size(); i++) {
-      boxes.push_back(std::dynamic_pointer_cast<CsgLeafNode>(children_[i])
-                          ->GetImpl()
-                          ->bBox_);
-    }
+    for (const auto &child : children_)
+      boxes.push_back(
+          std::dynamic_pointer_cast<CsgLeafNode>(child)->GetImpl()->bBox_);
     // partition the children into a set of disjoint sets
     // each set contains a set of children that are pairwise disjoint
     std::vector<Vec<size_t>> disjointSets;

@@ -137,7 +137,7 @@ inline thrust::pair<int, glm::vec2> Shadow01(
 
 // https://github.com/scandum/binary_search/blob/master/README.md
 // much faster than standard binary search on large arrays
-size_t monobound_quaternary_search(VecView<const int64_t> array, int64_t key) {
+ssize_t monobound_quaternary_search(VecView<const int64_t> array, int64_t key) {
   if (array.size() == 0) {
     return -1;
   }
@@ -394,7 +394,7 @@ struct Kernel12 {
     for (int vert : {edge.startVert, edge.endVert}) {
       const int64_t key = forward ? SparseIndices::EncodePQ(vert, q2)
                                   : SparseIndices::EncodePQ(q2, vert);
-      const size_t idx = monobound_quaternary_search(p0q2, key);
+      const ssize_t idx = monobound_quaternary_search(p0q2, key);
       if (idx != -1) {
         const int s = s02[idx];
         x12 += s * ((vert == edge.startVert) == forward ? 1 : -1);
@@ -415,7 +415,7 @@ struct Kernel12 {
       const int q1F = edge.IsForward() ? q1 : edge.pairedHalfedge;
       const int64_t key = forward ? SparseIndices::EncodePQ(p1, q1F)
                                   : SparseIndices::EncodePQ(q1F, p1);
-      const size_t idx = monobound_quaternary_search(p1q1, key);
+      const ssize_t idx = monobound_quaternary_search(p1q1, key);
       if (idx != -1) {  // s is implicitly zero for anything not found
         const int s = s11[idx];
         x12 -= s * (edge.IsForward() ? 1 : -1);

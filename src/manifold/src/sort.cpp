@@ -288,7 +288,7 @@ void Manifold::Impl::Finish() {
  */
 void Manifold::Impl::SortVerts() {
   ZoneScoped;
-  const int numVert = NumVert();
+  const auto numVert = NumVert();
   Vec<uint32_t> vertMorton(numVert);
   auto policy = autoPolicy(numVert);
   for_each_n(policy, zip(vertMorton.begin(), vertPos_.cbegin()), numVert,
@@ -328,8 +328,9 @@ void Manifold::Impl::SortVerts() {
 void Manifold::Impl::ReindexVerts(const Vec<int>& vertNew2Old, int oldNumVert) {
   ZoneScoped;
   Vec<int> vertOld2New(oldNumVert);
-  scatter(autoPolicy(oldNumVert), countAt(0), countAt(NumVert()),
-          vertNew2Old.begin(), vertOld2New.begin());
+  scatter(autoPolicy(oldNumVert), countAt(0),
+          countAt(static_cast<int>(NumVert())), vertNew2Old.begin(),
+          vertOld2New.begin());
   for_each(autoPolicy(oldNumVert), halfedge_.begin(), halfedge_.end(),
            Reindex({vertOld2New}));
 }
@@ -477,15 +478,15 @@ MeshGL::MeshGL(const Mesh& mesh) {
   numProp = 3;
   precision = mesh.precision;
   vertProperties.resize(numProp * mesh.vertPos.size());
-  for (int i = 0; i < mesh.vertPos.size(); ++i) {
+  for (size_t i = 0; i < mesh.vertPos.size(); ++i) {
     for (int j : {0, 1, 2}) vertProperties[3 * i + j] = mesh.vertPos[i][j];
   }
   triVerts.resize(3 * mesh.triVerts.size());
-  for (int i = 0; i < mesh.triVerts.size(); ++i) {
+  for (size_t i = 0; i < mesh.triVerts.size(); ++i) {
     for (int j : {0, 1, 2}) triVerts[3 * i + j] = mesh.triVerts[i][j];
   }
   halfedgeTangent.resize(4 * mesh.halfedgeTangent.size());
-  for (int i = 0; i < mesh.halfedgeTangent.size(); ++i) {
+  for (size_t i = 0; i < mesh.halfedgeTangent.size(); ++i) {
     for (int j : {0, 1, 2, 3})
       halfedgeTangent[4 * i + j] = mesh.halfedgeTangent[i][j];
   }
@@ -510,14 +511,14 @@ bool MeshGL::Merge() {
 
   std::vector<int> merge(NumVert());
   std::iota(merge.begin(), merge.end(), 0);
-  for (int i = 0; i < mergeFromVert.size(); ++i) {
+  for (size_t i = 0; i < mergeFromVert.size(); ++i) {
     merge[mergeFromVert[i]] = mergeToVert[i];
   }
 
-  const int numVert = NumVert();
-  const int numTri = NumTri();
+  const auto numVert = NumVert();
+  const auto numTri = NumTri();
   const int next[3] = {1, 2, 0};
-  for (int tri = 0; tri < numTri; ++tri) {
+  for (size_t tri = 0; tri < numTri; ++tri) {
     for (int i : {0, 1, 2}) {
       auto edge = std::make_pair(merge[triVerts[3 * tri + next[i]]],
                                  merge[triVerts[3 * tri + i]]);
@@ -579,19 +580,19 @@ bool MeshGL::Merge() {
   SparseIndices toMerge = collider.Collisions<true>(vertBox.cview());
 
   UnionFind<> uf(numVert);
-  for (int i = 0; i < mergeFromVert.size(); ++i) {
+  for (size_t i = 0; i < mergeFromVert.size(); ++i) {
     uf.unionXY(static_cast<int>(mergeFromVert[i]),
                static_cast<int>(mergeToVert[i]));
   }
-  for (int i = 0; i < toMerge.size(); ++i) {
+  for (size_t i = 0; i < toMerge.size(); ++i) {
     uf.unionXY(openVerts[toMerge.Get(i, false)],
                openVerts[toMerge.Get(i, true)]);
   }
 
   mergeToVert.clear();
   mergeFromVert.clear();
-  for (int v = 0; v < numVert; ++v) {
-    const int mergeTo = uf.find(v);
+  for (size_t v = 0; v < numVert; ++v) {
+    const size_t mergeTo = uf.find(v);
     if (mergeTo != v) {
       mergeFromVert.push_back(v);
       mergeToVert.push_back(mergeTo);

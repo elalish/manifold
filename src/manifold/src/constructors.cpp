@@ -271,13 +271,13 @@ Manifold Manifold::Extrude(const CrossSection& crossSection, float height,
     glm::vec2 scale = glm::mix(glm::vec2(1.0f), scaleTop, alpha);
     glm::mat2 rotation(cosd(phi), sind(phi), -sind(phi), cosd(phi));
     glm::mat2 transform = glm::mat2(scale.x, 0.0f, 0.0f, scale.y) * rotation;
-    int j = 0;
-    int idx = 0;
+    size_t j = 0;
+    size_t idx = 0;
     for (const auto& poly : polygons) {
-      for (int vert = 0; vert < poly.size(); ++vert) {
-        int offset = idx + nCrossSection * i;
-        int thisVert = vert + offset;
-        int lastVert = (vert == 0 ? poly.size() : vert) - 1 + offset;
+      for (size_t vert = 0; vert < poly.size(); ++vert) {
+        size_t offset = idx + nCrossSection * i;
+        size_t thisVert = vert + offset;
+        size_t lastVert = (vert == 0 ? poly.size() : vert) - 1 + offset;
         if (i == nDivisions && isCone) {
           triVerts.push_back({nCrossSection * i + j, lastVert - nCrossSection,
                               thisVert - nCrossSection});
@@ -294,7 +294,7 @@ Manifold Manifold::Extrude(const CrossSection& crossSection, float height,
     }
   }
   if (isCone)
-    for (int j = 0; j < polygons.size(); ++j)  // Duplicate vertex for Genus
+    for (size_t j = 0; j < polygons.size(); ++j)  // Duplicate vertex for Genus
       vertPos.push_back({0.0f, 0.0f, height});
   std::vector<glm::ivec3> top = TriangulateIdx(polygonsIndexed);
   for (const glm::ivec3& tri : top) {
@@ -379,7 +379,7 @@ Manifold Manifold::Revolve(const CrossSection& crossSection,
       }
     }
 
-    for (int polyVert = 0; polyVert < poly.size(); ++polyVert) {
+    for (size_t polyVert = 0; polyVert < poly.size(); ++polyVert) {
       const int startPosIndex = vertPos.size();
 
       if (!isFullRevolution) startPoses.push_back(startPosIndex);

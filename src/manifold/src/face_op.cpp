@@ -237,7 +237,7 @@ CrossSection Manifold::Impl::Slice(float height) const {
       collider_.Collisions<false, false>(query.cview());
 
   std::unordered_set<int> tris;
-  for (int i = 0; i < collisions.size(); ++i) {
+  for (size_t i = 0; i < collisions.size(); ++i) {
     const int tri = collisions.Get(i, 1);
     float min = std::numeric_limits<float>::infinity();
     float max = -std::numeric_limits<float>::infinity();

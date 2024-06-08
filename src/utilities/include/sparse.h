@@ -121,7 +121,7 @@ class SparseIndices {
   }
 
   inline void Add(int p, int q) {
-    for (int i = 0; i < sizeof(int64_t); ++i) data_.push_back(-1);
+    for (unsigned int i = 0; i < sizeof(int64_t); ++i) data_.push_back(-1);
     Set(size() - 1, p, q);
   }
 

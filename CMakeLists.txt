@@ -86,10 +86,10 @@ if (MSVC)
   set(MANIFOLD_FLAGS ${MANIFOLD_FLAGS} /DNOMINMAX)
 else()
   if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    set(WARNING_FLAGS -Werror -Wall -Wno-sign-compare -Wno-unused -Wno-array-bounds
+    set(WARNING_FLAGS -Werror -Wall -Wno-unused -Wno-array-bounds
       -Wno-stringop-overflow -Wno-alloc-size-larger-than)
   else()
-    set(WARNING_FLAGS -Werror -Wall -Wno-sign-compare -Wno-unused)
+    set(WARNING_FLAGS -Werror -Wall -Wno-unused)
   endif()
   set(MANIFOLD_FLAGS ${MANIFOLD_FLAGS} ${WARNING_FLAGS})
 endif()

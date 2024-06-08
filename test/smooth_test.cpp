@@ -35,7 +35,7 @@ TEST(Smooth, Tetrahedron) {
 
   MeshGL out = smooth.CalculateCurvature(-1, 0).GetMeshGL();
   float maxMeanCurvature = 0;
-  for (int i = 3; i < out.vertProperties.size(); i += 4) {
+  for (size_t i = 3; i < out.vertProperties.size(); i += 4) {
     maxMeanCurvature =
         glm::max(maxMeanCurvature, glm::abs(out.vertProperties[i]));
   }
@@ -59,7 +59,7 @@ TEST(Smooth, RefineQuads) {
 
   const MeshGL baseline = WithPositionColors(cylinder);
   float maxDiff = 0;
-  for (int i = 0; i < out.vertProperties.size(); ++i) {
+  for (size_t i = 0; i < out.vertProperties.size(); ++i) {
     maxDiff = glm::max(
         maxDiff, glm::abs(out.vertProperties[i] - baseline.vertProperties[i]));
   }
@@ -108,7 +108,7 @@ TEST(Smooth, ToLength) {
 
   MeshGL out = smooth.CalculateCurvature(-1, 0).GetMeshGL();
   float maxMeanCurvature = 0;
-  for (int i = 3; i < out.vertProperties.size(); i += 4) {
+  for (size_t i = 3; i < out.vertProperties.size(); i += 4) {
     maxMeanCurvature =
         glm::max(maxMeanCurvature, glm::abs(out.vertProperties[i]));
   }
@@ -298,7 +298,7 @@ TEST(Smooth, Torus) {
                         .CalculateNormals(1);
   MeshGL out = smooth.GetMeshGL();
   float maxMeanCurvature = 0;
-  for (int i = 0; i < out.vertProperties.size(); i += 7) {
+  for (size_t i = 0; i < out.vertProperties.size(); i += 7) {
     glm::vec3 v(out.vertProperties[i], out.vertProperties[i + 1],
                 out.vertProperties[i + 2]);
     glm::vec3 p(v.x, v.y, 0);

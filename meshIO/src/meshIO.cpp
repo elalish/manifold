@@ -144,14 +144,14 @@ Mesh ImportMesh(const std::string& filename, bool forceCleanup) {
   ASSERT(scene, userErr, importer.GetErrorString());
 
   Mesh mesh_out;
-  for (int i = 0; i < scene->mNumMeshes; ++i) {
+  for (size_t i = 0; i < scene->mNumMeshes; ++i) {
     const aiMesh* mesh_i = scene->mMeshes[i];
-    for (int j = 0; j < mesh_i->mNumVertices; ++j) {
+    for (size_t j = 0; j < mesh_i->mNumVertices; ++j) {
       const aiVector3D vert = mesh_i->mVertices[j];
       mesh_out.vertPos.push_back(isYup ? glm::vec3(vert.z, vert.x, vert.y)
                                        : glm::vec3(vert.x, vert.y, vert.z));
     }
-    for (int j = 0; j < mesh_i->mNumFaces; ++j) {
+    for (size_t j = 0; j < mesh_i->mNumFaces; ++j) {
       const aiFace face = mesh_i->mFaces[j];
       ASSERT(face.mNumIndices == 3, userErr,
              "Non-triangular face in " + filename);
@@ -214,7 +214,7 @@ void ExportMesh(const std::string& filename, const MeshGL& mesh,
   ASSERT(validChannels, userErr, "Invalid colorChannels.");
   if (hasColor) mesh_out->mColors[0] = new aiColor4D[mesh_out->mNumVertices];
 
-  for (int i = 0; i < mesh_out->mNumVertices; ++i) {
+  for (size_t i = 0; i < mesh_out->mNumVertices; ++i) {
     glm::vec3 v;
     for (int j : {0, 1, 2}) v[j] = mesh.vertProperties[i * mesh.numProp + j];
     mesh_out->mVertices[i] =
@@ -242,7 +242,7 @@ void ExportMesh(const std::string& filename, const MeshGL& mesh,
   mesh_out->mNumFaces = mesh.NumTri();
   mesh_out->mFaces = new aiFace[mesh_out->mNumFaces];
 
-  for (int i = 0; i < mesh_out->mNumFaces; ++i) {
+  for (size_t i = 0; i < mesh_out->mNumFaces; ++i) {
     aiFace& face = mesh_out->mFaces[i];
     face.mNumIndices = 3;
     face.mIndices = new glm::uint[face.mNumIndices];
@@ -295,7 +295,7 @@ void ExportMesh(const std::string& filename, const Mesh& mesh,
     mesh_out->mColors[0] = new aiColor4D[mesh_out->mNumVertices];
   }
 
-  for (int i = 0; i < mesh_out->mNumVertices; ++i) {
+  for (size_t i = 0; i < mesh_out->mNumVertices; ++i) {
     const glm::vec3& v = mesh.vertPos[i];
     mesh_out->mVertices[i] =
         isYup ? aiVector3D(v.y, v.z, v.x) : aiVector3D(v.x, v.y, v.z);
@@ -313,7 +313,7 @@ void ExportMesh(const std::string& filename, const Mesh& mesh,
   mesh_out->mNumFaces = mesh.triVerts.size();
   mesh_out->mFaces = new aiFace[mesh_out->mNumFaces];
 
-  for (int i = 0; i < mesh_out->mNumFaces; ++i) {
+  for (size_t i = 0; i < mesh_out->mNumFaces; ++i) {
     aiFace& face = mesh_out->mFaces[i];
     face.mNumIndices = 3;
     face.mIndices = new glm::uint[face.mNumIndices];
