@@ -344,6 +344,13 @@ class EarClip {
     // it finds a clear geometric result. In the vast majority of cases the loop
     // will only need one or two iterations.
     bool IsConvex(float precision) const {
+      const int convexity = CCW(left->pos, pos, right->pos, precision);
+      if (convexity != 0) {
+        return convexity > 0;
+      }
+      if (glm::dot(left->pos - pos, right->pos - pos) <= 0) {
+        return true;
+      }
       return left->InsideEdge(left->right, precision, true);
     }
 
@@ -363,8 +370,8 @@ class EarClip {
       const auto none = std::make_pair(left, false);
       if (pos.y < start.y && right->pos.y >= start.y) {
         return std::make_pair(left->right, true);
-      } else if (pos.x > start.x - precision && pos.y > start.y - precision &&
-                 pos.y < start.y + precision &&
+      } else if (onTop != 0 && pos.x > start.x - precision &&
+                 pos.y > start.y - precision && pos.y < start.y + precision &&
                  Interior(start, precision) >= 0) {
         if (onTop > 0 && left->pos.x < pos.x &&
             left->pos.y > start.y - precision) {
@@ -433,7 +440,7 @@ class EarClip {
       float totalCost = glm::dot(left->rightDir, rightDir) - 1 - precision;
       if (CCW(pos, left->pos, right->pos, precision) == 0) {
         // Clip folded ears first
-        return totalCost < -1 ? kBest : 0;
+        return totalCost;
       }
 
       Vec<Box> earBox;
@@ -611,7 +618,7 @@ class EarClip {
       areaCompensation += (area - t1) + area1;
       area = t1;
 
-      if (!v->IsConvex(precision_) && v->pos.x > maxX) {
+      if (v->pos.x > maxX) {
         maxX = v->pos.x;
         start = v;
       }
@@ -754,6 +761,8 @@ class EarClip {
     } else if (v->IsConvex(precision_)) {
       v->cost = v->EarCost(precision_, collider);
       v->ear = earsQueue_.insert(v);
+    } else {
+      v->cost = 1;  // not used, but marks reflex verts for debug
     }
   }
 
@@ -852,6 +861,15 @@ class EarClip {
     std::cout << "  [" << v->pos.x << ", " << v->pos.y << "],# " << v->mesh_idx
               << std::endl;
     std::cout << "]))" << std::endl;
+
+    v = start;
+    std::cout << "polys.push_back({" << std::setprecision(9) << std::endl;
+    do {
+      std::cout << "    {" << v->pos.x << ", " << v->pos.y << "},  //"
+                << std::endl;
+      v = v->right;
+    } while (v != start);
+    std::cout << "});" << std::endl;
 #endif
   }
 };
@@ -875,23 +893,25 @@ namespace manifold {
 std::vector<glm::ivec3> TriangulateIdx(const PolygonsIdx &polys,
                                        float precision) {
   std::vector<glm::ivec3> triangles;
+  float updatedPrecision = precision;
   try {
     EarClip triangulator(polys, precision);
+    updatedPrecision = triangulator.GetPrecision();
     triangles = triangulator.Triangulate();
 #ifdef MANIFOLD_DEBUG
     if (params.intermediateChecks) {
       CheckTopology(triangles, polys);
       if (!params.processOverlaps) {
-        CheckGeometry(triangles, polys, 2 * triangulator.GetPrecision());
+        CheckGeometry(triangles, polys, 2 * updatedPrecision);
       }
     }
   } catch (const geometryErr &e) {
     if (!params.suppressErrors) {
-      PrintFailure(e, polys, triangles, precision);
+      PrintFailure(e, polys, triangles, updatedPrecision);
     }
     throw;
   } catch (const std::exception &e) {
-    PrintFailure(e, polys, triangles, precision);
+    PrintFailure(e, polys, triangles, updatedPrecision);
     throw;
 #else
   } catch (const std::exception &e) {
