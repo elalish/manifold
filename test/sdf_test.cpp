@@ -116,7 +116,7 @@ TEST(SDF, SineSurface) {
   Mesh surface(LevelSet(
       [](glm::vec3 p) {
         float mid = glm::sin(p.x) + glm::sin(p.y);
-        return (p.z > mid - 0.5 && p.z < mid + 0.5) ? 1 : 0;
+        return (p.z > mid - 0.5 && p.z < mid + 0.5) ? 1.0f : 0.0f;
       },
       {glm::vec3(-4 * glm::pi<float>()), glm::vec3(4 * glm::pi<float>())}, 1));
   Manifold smoothed = Manifold::Smooth(surface).Refine(2);

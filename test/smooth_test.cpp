@@ -323,7 +323,7 @@ TEST(Smooth, SineSurface) {
   MeshGL surface = LevelSet(
       [](glm::vec3 p) {
         float mid = glm::sin(p.x) + glm::sin(p.y);
-        return (p.z > mid - 0.5 && p.z < mid + 0.5) ? 1 : -1;
+        return (p.z > mid - 0.5 && p.z < mid + 0.5) ? 1.0f : -1.0f;
       },
       {glm::vec3(-2 * glm::pi<float>() + 0.2),
        glm::vec3(0 * glm::pi<float>() - 0.2)},
