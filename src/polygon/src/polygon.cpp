@@ -354,6 +354,13 @@ class EarClip {
       return left->InsideEdge(left->right, precision, true);
     }
 
+    // Subtly different from !IsConvex because IsConvex will return true for
+    // colinear non-folded verts, while IsReflex will always check until actual
+    // certainty is determined.
+    bool IsReflex(float precision) const {
+      return !left->InsideEdge(left->right, precision, true);
+    }
+
     // This function is the core of finding a proper place to keyhole. It runs
     // on this Vert, which represents the edge from this to right. It returns
     // an iterator to the vert to connect to (either this or right) and a bool
@@ -368,7 +375,8 @@ class EarClip {
     std::pair<VertItr, bool> InterpY2X(glm::vec2 start, int onTop,
                                        float precision) const {
       const auto none = std::make_pair(left, false);
-      if (pos.y < start.y && right->pos.y >= start.y) {
+      if (pos.y < start.y && right->pos.y >= start.y &&
+          (pos.x > start.x - precision || right->pos.x > start.x - precision)) {
         return std::make_pair(left->right, true);
       } else if (onTop != 0 && pos.x > start.x - precision &&
                  pos.y > start.y - precision && pos.y < start.y + precision &&
@@ -532,13 +540,6 @@ class EarClip {
       // triangulations of polygons with holes, due to vert duplication.
       triangles_.push_back(
           {ear->left->mesh_idx, ear->mesh_idx, ear->right->mesh_idx});
-#ifdef MANIFOLD_DEBUG
-      if (params.verbose) {
-        std::cout << "output tri: " << ear->mesh_idx << ", "
-                  << ear->right->mesh_idx << ", " << ear->left->mesh_idx
-                  << std::endl;
-      }
-#endif
     } else {
       PRINT("Topological degenerate!");
     }
@@ -704,7 +705,7 @@ class EarClip {
           vert->pos.y * above > start->pos.y * above - precision_ &&
           (inside > 0 || (inside == 0 && vert->pos.x < best->pos.x)) &&
           vert->InsideEdge(edge, precision_, true) &&
-          !vert->IsConvex(precision_)) {
+          vert->IsReflex(precision_)) {
         if (vert->pos.y > start->pos.y - precision_ &&
             vert->pos.y < start->pos.y + precision_) {
           if (onTop > 0 && vert->left->pos.x < vert->pos.x &&
