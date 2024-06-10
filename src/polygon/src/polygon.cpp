@@ -158,6 +158,60 @@ void PrintFailure(const std::exception &e, const PolygonsIdx &polys,
 #endif
 
 /**
+ * Tests if the input polygons are convex by searching for any reflex vertices.
+ * Exactly colinear edges and zero-length edges are treated conservatively as
+ * reflex. Does not check for overlaps.
+ */
+bool IsConvex(const PolygonsIdx &polys, float precision) {
+  for (const SimplePolygonIdx &poly : polys) {
+    const glm::vec2 firstEdge = poly[0].pos - poly[poly.size() - 1].pos;
+    // Zero-length edges comes out NaN, which won't trip the early return, but
+    // it's okay because that zero-length edge will also get tested
+    // non-normalized and will trip det == 0.
+    glm::vec2 lastEdge = glm::normalize(firstEdge);
+    for (int v = 0; v < poly.size(); ++v) {
+      const glm::vec2 edge =
+          v + 1 < poly.size() ? poly[v + 1].pos - poly[v].pos : firstEdge;
+      const float det = determinant2x2(lastEdge, edge);
+      if (det <= 0 ||
+          (glm::abs(det) < precision && glm::dot(lastEdge, edge) < 0))
+        return false;
+      lastEdge = glm::normalize(edge);
+    }
+  }
+  return true;
+}
+
+/**
+ * Triangulates a set of convex polygons by alternating instead of a fan, to
+ * avoid creating high-degree vertices.
+ */
+std::vector<glm::ivec3> TriangulateConvex(const PolygonsIdx &polys) {
+  const int numTri = transform_reduce<int>(
+      autoPolicy(polys.size()), polys.begin(), polys.end(),
+      [](const SimplePolygonIdx &poly) { return poly.size() - 2; }, 0,
+      thrust::plus<int>());
+  std::vector<glm::ivec3> triangles;
+  triangles.reserve(numTri);
+  for (const SimplePolygonIdx &poly : polys) {
+    int i = 0;
+    int k = poly.size() - 1;
+    bool right = true;
+    while (i + 1 < k) {
+      const int j = right ? i + 1 : k - 1;
+      triangles.push_back({poly[i].idx, poly[j].idx, poly[k].idx});
+      if (right) {
+        i = j;
+      } else {
+        k = j;
+      }
+      right = !right;
+    }
+  }
+  return triangles;
+}
+
+/**
  * Ear-clipping triangulator based on David Eberly's approach from Geometric
  * Tools, but adjusted to handle epsilon-valid polygons, and including a
  * fallback that ensures a manifold triangulation even for overlapping polygons.
@@ -896,9 +950,14 @@ std::vector<glm::ivec3> TriangulateIdx(const PolygonsIdx &polys,
   std::vector<glm::ivec3> triangles;
   float updatedPrecision = precision;
   try {
-    EarClip triangulator(polys, precision);
-    updatedPrecision = triangulator.GetPrecision();
-    triangles = triangulator.Triangulate();
+    float updatedPrecision = precision;
+    if (IsConvex(polys, precision)) {  // fast path
+      triangles = TriangulateConvex(polys);
+    } else {
+      EarClip triangulator(polys, precision);
+      triangles = triangulator.Triangulate();
+      updatedPrecision = triangulator.GetPrecision();
+    }
 #ifdef MANIFOLD_DEBUG
     if (params.intermediateChecks) {
       CheckTopology(triangles, polys);
