@@ -162,15 +162,21 @@ void PrintFailure(const std::exception &e, const PolygonsIdx &polys,
  * Exactly colinear edges and zero-length edges are treated conservatively as
  * reflex. Does not check for overlaps.
  */
-bool IsConvex(const PolygonsIdx &polys) {
+bool IsConvex(const PolygonsIdx &polys, float precision) {
   for (const SimplePolygonIdx &poly : polys) {
     const glm::vec2 firstEdge = poly[0].pos - poly[poly.size() - 1].pos;
-    glm::vec2 lastEdge = firstEdge;
+    // Zero-length edges comes out NaN, which won't trip the early return, but
+    // it's okay because that zero-length edge will also get tested
+    // non-normalized and will trip det == 0.
+    glm::vec2 lastEdge = glm::normalize(firstEdge);
     for (int v = 0; v < poly.size(); ++v) {
-      glm::vec2 edge =
+      const glm::vec2 edge =
           v + 1 < poly.size() ? poly[v + 1].pos - poly[v].pos : firstEdge;
-      if (determinant2x2(lastEdge, edge) <= 0) return false;
-      lastEdge = edge;
+      const float det = determinant2x2(lastEdge, edge);
+      if (det <= 0 ||
+          (glm::abs(det) < precision && glm::dot(lastEdge, edge) < 0))
+        return false;
+      lastEdge = glm::normalize(edge);
     }
   }
   return true;
@@ -945,7 +951,7 @@ std::vector<glm::ivec3> TriangulateIdx(const PolygonsIdx &polys,
   float updatedPrecision = precision;
   try {
     float updatedPrecision = precision;
-    if (IsConvex(polys)) {  // fast path
+    if (IsConvex(polys, precision)) {  // fast path
       triangles = TriangulateConvex(polys);
     } else {
       EarClip triangulator(polys, precision);

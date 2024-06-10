@@ -994,6 +994,19 @@ TEST(Polygon, Duplicate) {
   TestPoly(polys, 20);
 }
 
+TEST(Polygon, Duplicate2) {
+  Polygons polys;
+  polys.push_back({
+      {0, 0},   //
+      {0, -1},  //
+      {1, 1},   //
+      {-1, 0},  //
+      {0, 0},   //
+
+  });
+  TestPoly(polys, 3);
+}
+
 TEST(Polygon, Folded) {
   Polygons polys;
   polys.push_back({
@@ -1138,6 +1151,18 @@ TEST(Polygon, Sliver9) {
       {1.4869014, -0.2462958697996},   //
   });
   TestPoly(polys, 4);
+}
+
+TEST(Polygon, Sliver10) {
+  Polygons polys;
+  polys.push_back({
+      {-1.20783484, 9.82835007},  //
+      {-1.12029445, 10.1291866},  //
+      {-1.39725339, 10.0962286},  //
+      {-1.20783472, 9.82835007},  //
+      {-1.39725339, 10.0962286},  //
+  });
+  TestPoly(polys, 3, 0.000230642);
 }
 
 TEST(Polygon, Colinear2) {
