@@ -48,25 +48,12 @@ struct Extrema : public thrust::binary_function<Halfedge, Halfedge, Halfedge> {
   }
 };
 
-uint32_t SpreadBits3(uint32_t v) {
-  v = 0xFF0000FFu & (v * 0x00010001u);
-  v = 0x0F00F00Fu & (v * 0x00000101u);
-  v = 0xC30C30C3u & (v * 0x00000011u);
-  v = 0x49249249u & (v * 0x00000005u);
-  return v;
-}
-
 uint32_t MortonCode(glm::vec3 position, Box bBox) {
   // Unreferenced vertices are marked NaN, and this will sort them to the end
   // (the Morton code only uses the first 30 of 32 bits).
   if (isnan(position.x)) return kNoCode;
 
-  glm::vec3 xyz = (position - bBox.min) / (bBox.max - bBox.min);
-  xyz = glm::min(glm::vec3(1023.0f), glm::max(glm::vec3(0.0f), 1024.0f * xyz));
-  uint32_t x = SpreadBits3(static_cast<uint32_t>(xyz.x));
-  uint32_t y = SpreadBits3(static_cast<uint32_t>(xyz.y));
-  uint32_t z = SpreadBits3(static_cast<uint32_t>(xyz.z));
-  return x * 4 + y * 2 + z;
+  return Collider::MortonCode(position, bBox);
 }
 
 struct Morton {

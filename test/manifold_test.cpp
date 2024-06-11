@@ -193,6 +193,12 @@ TEST(Manifold, Sphere) {
   EXPECT_EQ(sphere.NumTri(), n * n * 8);
 }
 
+TEST(Manifold, Cylinder) {
+  int n = 10000;
+  Manifold cylinder = Manifold::Cylinder(2, 2, 2, n);
+  EXPECT_EQ(cylinder.NumTri(), 4 * n - 4);
+}
+
 TEST(Manifold, Normals) {
   Mesh cube = Manifold::Cube(glm::vec3(1), true).GetMesh();
   const int nVert = cube.vertPos.size();

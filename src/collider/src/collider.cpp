@@ -265,6 +265,14 @@ struct TransformBox {
   const glm::mat4x3 transform;
   void operator()(Box& box) { box = box.Transform(transform); }
 };
+
+uint32_t SpreadBits3(uint32_t v) {
+  v = 0xFF0000FFu & (v * 0x00010001u);
+  v = 0x0F00F00Fu & (v * 0x00000101u);
+  v = 0xC30C30C3u & (v * 0x00000011u);
+  v = 0x49249249u & (v * 0x00000005u);
+  return v;
+}
 }  // namespace
 
 namespace manifold {
@@ -374,6 +382,18 @@ bool Collider::Transform(glm::mat4x3 transform) {
   return axisAligned;
 }
 
+/**
+ * Calculate the 32-bit Morton code of a position within a bounding box.
+ */
+uint32_t Collider::MortonCode(glm::vec3 position, Box bBox) {
+  glm::vec3 xyz = (position - bBox.min) / (bBox.max - bBox.min);
+  xyz = glm::min(glm::vec3(1023.0f), glm::max(glm::vec3(0.0f), 1024.0f * xyz));
+  uint32_t x = SpreadBits3(static_cast<uint32_t>(xyz.x));
+  uint32_t y = SpreadBits3(static_cast<uint32_t>(xyz.y));
+  uint32_t z = SpreadBits3(static_cast<uint32_t>(xyz.z));
+  return x * 4 + y * 2 + z;
+}
+
 template SparseIndices Collider::Collisions<true, false, Box>(
     const VecView<const Box>&) const;
 
@@ -391,5 +411,4 @@ template SparseIndices Collider::Collisions<false, true, Box>(
 
 template SparseIndices Collider::Collisions<false, true, glm::vec3>(
     const VecView<const glm::vec3>&) const;
-
 }  // namespace manifold
