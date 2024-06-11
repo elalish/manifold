@@ -501,7 +501,7 @@ void Manifold::Impl::SetNormals(int normalIdx, float minSharpAngle) {
       int startEdge = 3 * tri + i;
       const int vert = halfedge_[startEdge].startVert;
 
-      if (vertNumSharp[vert] < 2) {
+      if (vertNumSharp[vert] < 2) {  // vertex has single normal
         const glm::vec3 normal = vertFlatFace[vert] >= 0
                                      ? faceNormal_[vertFlatFace[vert]]
                                      : vertNormal_[vert];
@@ -513,6 +513,7 @@ void Manifold::Impl::SetNormals(int normalIdx, float minSharpAngle) {
           meshRelation_.triProperties[thisTri][j] = prop;
           if (prop == lastProp) return;
           lastProp = prop;
+          // update property vertex
           auto start = oldProperties.begin() + prop * oldNumProp;
           std::copy(start, start + oldNumProp,
                     meshRelation_.properties.begin() + prop * numProp);
@@ -520,7 +521,7 @@ void Manifold::Impl::SetNormals(int normalIdx, float minSharpAngle) {
             meshRelation_.properties[prop * numProp + normalIdx + i] =
                 normal[i];
         });
-      } else {
+      } else {  // vertex has multiple normals
         const glm::vec3 centerPos = vertPos_[vert];
         // Length degree
         std::vector<int> group;
@@ -529,7 +530,7 @@ void Manifold::Impl::SetNormals(int normalIdx, float minSharpAngle) {
         int current = startEdge;
         int prevFace = halfedge_[current].face;
 
-        do {
+        do {  // find a sharp edge to start on
           int next = NextHalfedge(halfedge_[current].pairedHalfedge);
           const int face = halfedge_[next].face;
 
@@ -553,16 +554,33 @@ void Manifold::Impl::SetNormals(int normalIdx, float minSharpAngle) {
           glm::vec3 edgeVec;
         };
 
+        // calculate pseudo-normals between each sharp edge
         ForVert<FaceEdge>(
             endEdge,
-            [this, centerPos](int current) {
+            [this, centerPos, &vertNumSharp, &vertFlatFace](int current) {
+              if (IsInsideQuad(current)) {
+                return FaceEdge({halfedge_[current].face, glm::vec3(NAN)});
+              }
+              const int vert = halfedge_[current].endVert;
+              glm::vec3 pos = vertPos_[vert];
+              const glm::vec3 edgeVec = centerPos - pos;
+              if (vertNumSharp[vert] < 2) {
+                // opposite vert has fixed normal
+                const glm::vec3 normal = vertFlatFace[vert] >= 0
+                                             ? faceNormal_[vertFlatFace[vert]]
+                                             : vertNormal_[vert];
+                // Flair out the normal we're calculating to give the edge a
+                // more constant curvature to meet the opposite normal. Achieve
+                // this by pointing the tangent toward the opposite bezier
+                // control point instead of the vert itself.
+                pos += glm::vec3(
+                    CircularTangent(OrthogonalTo(edgeVec, normal), edgeVec));
+              }
               return FaceEdge(
-                  {halfedge_[current].face,
-                   glm::normalize(vertPos_[halfedge_[current].endVert] -
-                                  centerPos)});
+                  {halfedge_[current].face, SafeNormalize(pos - centerPos)});
             },
             [this, &triIsFlatFace, &normals, &group, minSharpAngle](
-                int current, const FaceEdge& here, const FaceEdge& next) {
+                int current, const FaceEdge& here, FaceEdge& next) {
               const float dihedral = glm::degrees(glm::acos(
                   glm::dot(faceNormal_[here.face], faceNormal_[next.face])));
               if (dihedral > minSharpAngle ||
@@ -573,12 +591,17 @@ void Manifold::Impl::SetNormals(int normalIdx, float minSharpAngle) {
                 normals.push_back(glm::vec3(0));
               }
               group.push_back(normals.size() - 1);
-              normals.back() += faceNormal_[next.face] *
-                                AngleBetween(here.edgeVec, next.edgeVec);
+              if (glm::isfinite(next.edgeVec.x)) {
+                normals.back() +=
+                    SafeNormalize(glm::cross(next.edgeVec, here.edgeVec)) *
+                    AngleBetween(here.edgeVec, next.edgeVec);
+              } else {
+                next.edgeVec = here.edgeVec;
+              }
             });
 
         for (auto& normal : normals) {
-          normal = glm::normalize(normal);
+          normal = SafeNormalize(normal);
         }
 
         int lastGroup = 0;
@@ -592,6 +615,7 @@ void Manifold::Impl::SetNormals(int normalIdx, float minSharpAngle) {
           auto start = oldProperties.begin() + prop * oldNumProp;
 
           if (group[idx] != lastGroup && group[idx] != 0 && prop == lastProp) {
+            // split property vertex, duplicating but with an updated normal
             lastGroup = group[idx];
             newProp = NumPropVert();
             meshRelation_.properties.resize(meshRelation_.properties.size() +
@@ -603,6 +627,7 @@ void Manifold::Impl::SetNormals(int normalIdx, float minSharpAngle) {
                   normals[group[idx]][i];
             }
           } else if (prop != lastProp) {
+            // update property vertex
             lastProp = prop;
             newProp = prop;
             std::copy(start, start + oldNumProp,
@@ -612,6 +637,7 @@ void Manifold::Impl::SetNormals(int normalIdx, float minSharpAngle) {
                   normals[group[idx]][i];
           }
 
+          // point to updated property vertex
           meshRelation_.triProperties[thisTri][j] = newProp;
           ++idx;
         });

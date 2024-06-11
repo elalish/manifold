@@ -80,8 +80,8 @@ TEST(Smooth, TruncatedCone) {
   Manifold cone = Manifold::Cylinder(5, 10, 5, 12).SmoothOut();
   Manifold smooth = cone.RefineToLength(0.5).CalculateNormals(0);
   auto prop = smooth.GetProperties();
-  EXPECT_NEAR(prop.volume, 1062.27, 0.01);
-  EXPECT_NEAR(prop.surfaceArea, 751.46, 0.01);
+  EXPECT_NEAR(prop.volume, 1158.61, 0.01);
+  EXPECT_NEAR(prop.surfaceArea, 768.12, 0.01);
   MeshGL out = smooth.GetMeshGL();
   CheckGL(out);
 
@@ -331,8 +331,8 @@ TEST(Smooth, SineSurface) {
   Manifold smoothed =
       Manifold(surface).CalculateNormals(0, 50).SmoothByNormals(0).Refine(8);
   auto prop = smoothed.GetProperties();
-  EXPECT_NEAR(prop.volume, 7.89, 0.01);
-  EXPECT_NEAR(prop.surfaceArea, 30.60, 0.01);
+  EXPECT_NEAR(prop.volume, 8.07, 0.01);
+  EXPECT_NEAR(prop.surfaceArea, 30.88, 0.01);
   EXPECT_EQ(smoothed.Genus(), 0);
 
   Manifold smoothed1 = Manifold(surface).SmoothOut(50).Refine(8);

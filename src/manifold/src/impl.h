@@ -78,14 +78,14 @@ struct Manifold::Impl {
   }
 
   template <typename T>
-  void ForVert(int halfedge, std::function<T(int halfedge)> transform,
-               std::function<void(int halfedge, const T& here, const T& next)>
-                   binaryOp) {
+  void ForVert(
+      int halfedge, std::function<T(int halfedge)> transform,
+      std::function<void(int halfedge, const T& here, T& next)> binaryOp) {
     T here = transform(halfedge);
     int current = halfedge;
     do {
       const int nextHalfedge = NextHalfedge(halfedge_[current].pairedHalfedge);
-      const T next = transform(nextHalfedge);
+      T next = transform(nextHalfedge);
       binaryOp(current, here, next);
       here = next;
       current = nextHalfedge;
