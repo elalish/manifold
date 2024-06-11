@@ -116,13 +116,14 @@ TEST(SDF, SineSurface) {
   Mesh surface(LevelSet(
       [](glm::vec3 p) {
         float mid = glm::sin(p.x) + glm::sin(p.y);
-        return (p.z > mid - 0.5 && p.z < mid + 0.5) ? 1.0f : 0.0f;
+        return (p.z > mid - 0.5 && p.z < mid + 0.5) ? 1.0f : -1.0f;
       },
-      {glm::vec3(-4 * glm::pi<float>()), glm::vec3(4 * glm::pi<float>())}, 1));
-  Manifold smoothed = Manifold::Smooth(surface).Refine(2);
+      {glm::vec3(-1.75 * glm::pi<float>()), glm::vec3(1.75 * glm::pi<float>())},
+      1));
+  Manifold smoothed = Manifold(surface).SmoothOut(180).RefineToLength(0.05);
 
   EXPECT_EQ(smoothed.Status(), Manifold::Error::NoError);
-  EXPECT_EQ(smoothed.Genus(), -2);
+  EXPECT_EQ(smoothed.Genus(), 38);
 
 #ifdef MANIFOLD_EXPORT
   if (options.exportModels)
