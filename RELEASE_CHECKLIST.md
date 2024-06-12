@@ -11,3 +11,4 @@
 1. Check the Actions and verify that both PyPI and npm publishing actions ran successfully.
 1. Verify the npm [package](https://www.npmjs.com/package/manifold-3d?activeTab=code) looks good - unpacked size should be close to 1MB.
 1. Verify PyPI [package](https://pypi.org/project/manifold3d/#files) looks good - a bunch of built distributions ranging from ~600kB to ~1.1MB.
+1. If there's a problem with release deployment, the release workflows can be triggered separately, manually for any branch, under the Actions tab.
