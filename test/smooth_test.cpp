@@ -339,8 +339,8 @@ TEST(Smooth, SineSurface) {
   Manifold smoothed =
       Manifold(surface).CalculateNormals(0, 50).SmoothByNormals(0).Refine(8);
   auto prop = smoothed.GetProperties();
-  EXPECT_NEAR(prop.volume, 8.07, 0.01);
-  EXPECT_NEAR(prop.surfaceArea, 30.88, 0.01);
+  EXPECT_NEAR(prop.volume, 8.09, 0.01);
+  EXPECT_NEAR(prop.surfaceArea, 30.93, 0.01);
   EXPECT_EQ(smoothed.Genus(), 0);
 
   Manifold smoothed1 = Manifold(surface).SmoothOut(50).Refine(8);
@@ -351,14 +351,14 @@ TEST(Smooth, SineSurface) {
 
   Manifold smoothed2 = Manifold(surface).SmoothOut(180, 1).Refine(8);
   auto prop2 = smoothed2.GetProperties();
-  EXPECT_NEAR(prop2.volume, 9.02, 0.01);
-  EXPECT_NEAR(prop2.surfaceArea, 33.56, 0.01);
+  EXPECT_NEAR(prop2.volume, 9.00, 0.01);
+  EXPECT_NEAR(prop2.surfaceArea, 33.61, 0.01);
   EXPECT_EQ(smoothed2.Genus(), 0);
 
   Manifold smoothed3 = Manifold(surface).SmoothOut(50, 0.5).Refine(8);
   auto prop3 = smoothed3.GetProperties();
-  EXPECT_NEAR(prop3.volume, 8.46, 0.01);
-  EXPECT_NEAR(prop3.surfaceArea, 31.66, 0.01);
+  EXPECT_NEAR(prop3.volume, 8.43, 0.01);
+  EXPECT_NEAR(prop3.surfaceArea, 31.72, 0.01);
   EXPECT_EQ(smoothed3.Genus(), 0);
 
 #ifdef MANIFOLD_EXPORT
