@@ -64,14 +64,7 @@ struct SmoothBezier {
       return;
     }
 
-    const glm::vec3 edgeVec =
-        impl->vertPos_[edge.endVert] - impl->vertPos_[edge.startVert];
-    const glm::vec3 edgeNormal =
-        impl->faceNormal_[edge.face] +
-        impl->faceNormal_[impl->halfedge_[edge.pairedHalfedge].face];
-    glm::vec3 dir =
-        glm::cross(glm::cross(edgeNormal, edgeVec), vertNormal[edge.startVert]);
-    tangent = CircularTangent(dir, edgeVec);
+    tangent = impl->TangentFromNormal(vertNormal[edge.startVert], edgeIdx);
   }
 };
 
@@ -292,6 +285,20 @@ glm::vec3 Manifold::Impl::GetNormal(int halfedge, int normalIdx) const {
         meshRelation_.properties[prop * meshRelation_.numProp + normalIdx + i];
   }
   return normal;
+}
+
+/**
+ * Returns a circular tangent for the requested halfedge, orthogonal to the
+ * given normal vector, and avoiding folding.
+ */
+glm::vec4 Manifold::Impl::TangentFromNormal(const glm::vec3& normal,
+                                            int halfedge) const {
+  const Halfedge edge = halfedge_[halfedge];
+  const glm::vec3 edgeVec = vertPos_[edge.endVert] - vertPos_[edge.startVert];
+  const glm::vec3 edgeNormal =
+      faceNormal_[edge.face] + faceNormal_[halfedge_[edge.pairedHalfedge].face];
+  glm::vec3 dir = glm::cross(glm::cross(edgeNormal, edgeVec), normal);
+  return CircularTangent(dir, edgeVec);
 }
 
 /**
@@ -819,15 +826,15 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
                 }
               }
               // calculate tangents
-              const glm::vec3 edge = vertPos_[halfedge_[halfedge].endVert] -
-                                     vertPos_[halfedge_[halfedge].startVert];
               if (differentNormals) {
+                const glm::vec3 edgeVec =
+                    vertPos_[halfedge_[halfedge].endVert] -
+                    vertPos_[halfedge_[halfedge].startVert];
                 const glm::vec3 dir = glm::cross(here.normal, next.normal);
-                tangent[halfedge] =
-                    CircularTangent(glm::sign(glm::dot(dir, edge)) * dir, edge);
+                tangent[halfedge] = CircularTangent(
+                    glm::sign(glm::dot(dir, edgeVec)) * dir, edgeVec);
               } else {
-                tangent[halfedge] =
-                    CircularTangent(OrthogonalTo(edge, here.normal), edge);
+                tangent[halfedge] = TangentFromNormal(here.normal, halfedge);
               }
             });
 

@@ -174,6 +174,7 @@ struct Manifold::Impl {
   bool IsInsideQuad(int halfedge) const;
   bool IsMarkedInsideQuad(int halfedge) const;
   glm::vec3 GetNormal(int halfedge, int normalIdx) const;
+  glm::vec4 TangentFromNormal(const glm::vec3& normal, int halfedge) const;
   std::vector<Smoothness> UpdateSharpenedEdges(
       const std::vector<Smoothness>&) const;
   Vec<bool> FlatFaces() const;
