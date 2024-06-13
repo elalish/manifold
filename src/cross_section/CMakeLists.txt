@@ -18,9 +18,16 @@ add_library(${PROJECT_NAME} OBJECT ${SOURCE_FILES})
 target_include_directories(${PROJECT_NAME} PUBLIC
     $<INSTALL_INTERFACE:include/${CMAKE_PROJECT_NAME}>
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>)
-target_link_libraries(${PROJECT_NAME}
-    PUBLIC utilities
-    PRIVATE Clipper2)
+
+if(TARGET Clipper2::Clipper2)
+    target_link_libraries(${PROJECT_NAME}
+        PUBLIC utilities
+        PRIVATE Clipper2::Clipper2)
+else()
+    target_link_libraries(${PROJECT_NAME}
+        PUBLIC utilities
+        PRIVATE Clipper2)
+endif()
 
 target_compile_options(${PROJECT_NAME} PRIVATE ${MANIFOLD_FLAGS})
 target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_17)

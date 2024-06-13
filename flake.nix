@@ -10,7 +10,7 @@
     flake = false;
   };
   inputs.clipper2-src = {
-    url = "github:AngusJohnson/Clipper2/Clipper2_1.3.0";
+    url = "github:AngusJohnson/Clipper2";
     flake = false;
   };
   outputs = { self, nixpkgs, flake-utils, gtest-src, thrust-src, clipper2-src }:
@@ -22,7 +22,7 @@
             config.allowUnfree = true;
           };
           clipper2 = pkgs.clipper2.overrideAttrs (_: _: {
-            version = "1.3.0";
+            version = "14052024";
             src = clipper2-src;
           });
           manifold =
@@ -33,7 +33,7 @@
             }: pkgs.stdenv.mkDerivation {
               inherit doCheck;
               pname = "manifold-${parallel-backend}";
-              version = "2.4.5";
+              version = "2.5.0";
               src = self;
               nativeBuildInputs = (with pkgs; [
                 cmake
@@ -86,7 +86,7 @@
               parallelBackends)) // {
             manifold-js = pkgs.buildEmscriptenPackage {
               name = "manifold-js";
-              version = "2.4.5";
+              version = "2.5.0";
               src = self;
               nativeBuildInputs = (with pkgs; [ cmake python39 ]);
               buildInputs = [ pkgs.nodejs ];
@@ -120,7 +120,7 @@
             # but how should we make it work with other python versions?
             manifold3d = with pkgs.python3Packages; buildPythonPackage {
               pname = "manifold3d";
-              version = "2.4.5";
+              version = "2.5.0";
               src = self;
               propagatedBuildInputs = [
                 numpy

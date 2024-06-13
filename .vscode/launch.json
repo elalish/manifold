@@ -12,7 +12,7 @@
       "program": "${workspaceFolder}/build/test/manifold_test",
       "args": [
         "--gtest_break_on_failure",
-        "--gtest_filter=SDF.SineSurface"
+        "--gtest_filter=Smooth.TruncatedCone"
       ],
       "stopAtEntry": false,
       "cwd": "${workspaceFolder}/build/test",

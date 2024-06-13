@@ -317,7 +317,7 @@ Manifold::Impl CsgLeafNode::Compose(
     auto &node = nodes[i];
     const int offset = i * Manifold::Impl::meshIDCounter_;
 
-    for (const auto pair : node->pImpl_->meshRelation_.meshIDtransform) {
+    for (const auto &pair : node->pImpl_->meshRelation_.meshIDtransform) {
       combined.meshRelation_.meshIDtransform[pair.first + offset] = pair.second;
     }
   }

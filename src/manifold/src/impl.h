@@ -78,14 +78,14 @@ struct Manifold::Impl {
   }
 
   template <typename T>
-  void ForVert(int halfedge, std::function<T(int halfedge)> transform,
-               std::function<void(int halfedge, const T& here, const T& next)>
-                   binaryOp) {
+  void ForVert(
+      int halfedge, std::function<T(int halfedge)> transform,
+      std::function<void(int halfedge, const T& here, T& next)> binaryOp) {
     T here = transform(halfedge);
     int current = halfedge;
     do {
       const int nextHalfedge = NextHalfedge(halfedge_[current].pairedHalfedge);
-      const T next = transform(nextHalfedge);
+      T next = transform(nextHalfedge);
       binaryOp(current, here, next);
       here = next;
       current = nextHalfedge;
@@ -178,11 +178,13 @@ struct Manifold::Impl {
       const std::vector<Smoothness>&) const;
   Vec<bool> FlatFaces() const;
   Vec<int> VertFlatFace(const Vec<bool>&) const;
+  Vec<int> VertHalfedge() const;
   std::vector<Smoothness> SharpenEdges(float minSharpAngle,
                                        float minSmoothness) const;
   void SharpenTangent(int halfedge, float smoothness);
   void SetNormals(int normalIdx, float minSharpAngle);
   void LinearizeFlatTangents();
+  void DistributeTangents(const Vec<bool>& fixedHalfedges);
   void CreateTangents(int normalIdx);
   void CreateTangents(std::vector<Smoothness>);
   void Refine(std::function<int(glm::vec3)>);

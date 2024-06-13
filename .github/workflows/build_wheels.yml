@@ -11,7 +11,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-22.04, windows-latest, macos-latest]
+        os: [ubuntu-22.04, windows-2019, macos-latest]
     steps:
       - run: |
           git config --global submodule.fetchJobs 8
@@ -20,7 +20,7 @@ jobs:
         with:
           submodules: recursive
       - name: Build wheels
-        uses: pypa/cibuildwheel@v2.16
+        uses: pypa/cibuildwheel@v2.19
       - uses: actions/upload-artifact@v4
         with:
           name: python-${{ matrix.os }}
