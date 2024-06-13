@@ -16,12 +16,12 @@
 #include <algorithm>
 #include <numeric>
 
-#include "thrust/copy.h"
-#include "thrust/reduce.h"
-#include "thrust/transform_reduce.h"
-#include "thrust/iterator/counting_iterator.h"
-#include "thrust/system/cpp/execution_policy.h"
 #include "public.h"
+#include "thrust/copy.h"
+#include "thrust/iterator/counting_iterator.h"
+#include "thrust/reduce.h"
+#include "thrust/system/cpp/execution_policy.h"
+#include "thrust/transform_reduce.h"
 
 #if MANIFOLD_PAR == 'T'
 #if MANIFOLD_PAR == 'T' && TBB_INTERFACE_VERSION >= 10000 && \

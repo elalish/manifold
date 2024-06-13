@@ -24,11 +24,11 @@
 #endif
 
 #include "par.h"
-#include "vec.h"
-#include "thrust/tuple.h"
-#include "thrust/iterator/transform_iterator.h"
 #include "thrust/iterator/permutation_iterator.h"
+#include "thrust/iterator/transform_iterator.h"
 #include "thrust/iterator/zip_iterator.h"
+#include "thrust/tuple.h"
+#include "vec.h"
 
 #if __has_include(<tracy/Tracy.hpp>)
 #include <tracy/Tracy.hpp>
