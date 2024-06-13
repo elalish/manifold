@@ -21,16 +21,21 @@
 namespace {
 using namespace manifold;
 
-glm::vec3 OrthogonalTo(glm::vec3 in, glm::vec3 ref) {
-  in -= glm::dot(in, ref) * ref;
-  return in;
+// Returns a normalized vector orthogonal to ref, in the plane of ref and in,
+// unless in and ref are colinear, in which case it falls back to the plane of
+// ref and altIn.
+glm::vec3 OrthogonalTo(glm::vec3 in, glm::vec3 altIn, glm::vec3 ref) {
+  glm::vec3 out = in - glm::dot(in, ref) * ref;
+  if (glm::dot(out, out) < kTolerance * glm::dot(in, in)) {
+    out = altIn - glm::dot(altIn, ref) * ref;
+  }
+  return SafeNormalize(out);
 }
 
 // Get the angle between two unit-vectors.
 float AngleBetween(glm::vec3 a, glm::vec3 b) {
   const float dot = glm::dot(a, b);
-  return dot >= 1 ? kTolerance
-                  : (dot <= -1 ? glm::pi<float>() : glm::acos(dot));
+  return dot >= 1 ? 0 : (dot <= -1 ? glm::pi<float>() : glm::acos(dot));
 }
 
 // Calculate a tangent vector in the form of a weighted cubic Bezier taking as
@@ -146,12 +151,10 @@ struct InterpTri {
     const glm::mat2x3 nTangentsX(SafeNormalize(glm::vec3(tangentsX[0])),
                                  -SafeNormalize(glm::vec3(tangentsX[1])));
     const glm::mat2x3 biTangents = {
-        SafeNormalize(OrthogonalTo(
-            glm::vec3(tangentsY[0]) + kTolerance * (anchor - corners[0]),
-            nTangentsX[0])),
-        SafeNormalize(OrthogonalTo(
-            glm::vec3(tangentsY[1]) + kTolerance * (anchor - corners[1]),
-            nTangentsX[1]))};
+        OrthogonalTo(glm::vec3(tangentsY[0]), (anchor - corners[0]),
+                     nTangentsX[0]),
+        OrthogonalTo(glm::vec3(tangentsY[1]), (anchor - corners[1]),
+                     nTangentsX[1])};
 
     const glm::quat q0 =
         glm::quat_cast(glm::mat3(nTangentsX[0], biTangents[0],
@@ -580,8 +583,8 @@ void Manifold::Impl::SetNormals(int normalIdx, float minSharpAngle) {
                 // more constant curvature to meet the opposite normal. Achieve
                 // this by pointing the tangent toward the opposite bezier
                 // control point instead of the vert itself.
-                pos += glm::vec3(
-                    CircularTangent(OrthogonalTo(edgeVec, normal), edgeVec));
+                pos += glm::vec3(TangentFromNormal(
+                    normal, halfedge_[current].pairedHalfedge));
               }
               return FaceEdge(
                   {halfedge_[current].face, SafeNormalize(pos - centerPos)});
@@ -720,8 +723,9 @@ void Manifold::Impl::DistributeTangents(const Vec<bool>& fixedHalfedges) {
         const glm::vec3 center = vertPos_[halfedge_[halfedge].startVert];
         glm::vec3 lastEdgeVec =
             SafeNormalize(vertPos_[halfedge_[halfedge].endVert] - center);
-        glm::vec3 lastTangent =
+        const glm::vec3 firstTangent =
             SafeNormalize(glm::vec3(halfedgeTangent_[halfedge]));
+        glm::vec3 lastTangent = firstTangent;
         int current = halfedge;
         do {
           current = NextHalfedge(halfedge_[current].pairedHalfedge);
@@ -730,16 +734,20 @@ void Manifold::Impl::DistributeTangents(const Vec<bool>& fixedHalfedges) {
               SafeNormalize(vertPos_[halfedge_[current].endVert] - center);
           const glm::vec3 thisTangent =
               SafeNormalize(glm::vec3(halfedgeTangent_[current]));
-          const glm::vec3 cp = glm::cross(thisTangent, lastTangent);
-          normal += cp;
+          normal += glm::cross(thisTangent, lastTangent);
           // cumulative sum
           desiredAngle.push_back(
               AngleBetween(thisEdgeVec, lastEdgeVec) +
               (desiredAngle.size() > 0 ? desiredAngle.back() : 0));
-          currentAngle.push_back(
-              AngleBetween(thisTangent, lastTangent) *
-                  glm::sign(glm::dot(cp, approxNormal)) +
-              (currentAngle.size() > 0 ? currentAngle.back() : 0));
+          if (current == halfedge) {
+            currentAngle.push_back(glm::two_pi<float>());
+          } else {
+            currentAngle.push_back(AngleBetween(thisTangent, firstTangent));
+            if (glm::dot(approxNormal, glm::cross(thisTangent, firstTangent)) <
+                0) {
+              currentAngle.back() = glm::two_pi<float>() - currentAngle.back();
+            }
+          }
           lastEdgeVec = thisEdgeVec;
           lastTangent = thisTangent;
         } while (!fixedHalfedges[current]);
@@ -760,8 +768,17 @@ void Manifold::Impl::DistributeTangents(const Vec<bool>& fixedHalfedges) {
         do {
           current = NextHalfedge(halfedge_[current].pairedHalfedge);
           if (IsMarkedInsideQuad(current)) continue;
-          const float angle =
-              currentAngle[i] - scale * desiredAngle[i] - offset;
+          desiredAngle[i] *= scale;
+          const float lastAngle = i > 0 ? desiredAngle[i - 1] : 0;
+          // shrink obtuse angles
+          if (desiredAngle[i] - lastAngle > glm::pi<float>()) {
+            desiredAngle[i] = lastAngle + glm::pi<float>();
+          } else if (i + 1 < desiredAngle.size() &&
+                     scale * desiredAngle[i + 1] - desiredAngle[i] >
+                         glm::pi<float>()) {
+            desiredAngle[i] = scale * desiredAngle[i + 1] - glm::pi<float>();
+          }
+          const float angle = currentAngle[i] - desiredAngle[i] - offset;
           glm::vec3 tangent(halfedgeTangent_[current]);
           halfedgeTangent_[current] = glm::vec4(
               glm::rotate(tangent, angle, normal), halfedgeTangent_[current].w);
