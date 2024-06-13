@@ -16,15 +16,20 @@
 #include <algorithm>
 #include <numeric>
 
+#include "thrust/copy.h"
+#include "thrust/reduce.h"
+#include "thrust/transform_reduce.h"
+#include "thrust/iterator/counting_iterator.h"
+#include "thrust/system/cpp/execution_policy.h"
 #include "public.h"
-#if MANIFOLD_PAR == 'T'
-#include <thrust/system/tbb/execution_policy.h>
 
+#if MANIFOLD_PAR == 'T'
 #if MANIFOLD_PAR == 'T' && TBB_INTERFACE_VERSION >= 10000 && \
     __has_include(<pstl/glue_execution_defs.h>)
 #include <execution>
 #endif
 
+#include "thrust/system/tbb/execution_policy.h"
 #define MANIFOLD_PAR_NS tbb
 #else
 #define MANIFOLD_PAR_NS cpp
@@ -74,9 +79,7 @@ inline constexpr ExecutionPolicy autoPolicy(size_t size) {
     return thrust::NAME(thrust::cpp::par, args...);                 \
   }
 
-#if MANIFOLD_PAR != 'T' || \
-    (TBB_INTERFACE_VERSION >= 10000 && __has_include(<pstl/glue_execution_defs.h>))
-#if MANIFOLD_PAR == 'T'
+#if MANIFOLD_PAR == 'T' && __has_include(<pstl/glue_execution_defs.h>)
 #define STL_DYNAMIC_BACKEND(NAME, RET)                        \
   template <typename Ret = RET, typename... Args>             \
   Ret NAME(ExecutionPolicy policy, Args... args) {            \
@@ -146,14 +149,6 @@ OutputIterator copy_if(ExecutionPolicy policy, InputIterator1 first,
 #endif
 }
 
-#else
-#define STL_DYNAMIC_BACKEND(NAME, RET) THRUST_DYNAMIC_BACKEND(NAME, RET)
-#define STL_DYNAMIC_BACKEND_VOID(NAME) THRUST_DYNAMIC_BACKEND_VOID(NAME)
-
-THRUST_DYNAMIC_BACKEND_VOID(exclusive_scan)
-THRUST_DYNAMIC_BACKEND(copy_if, void)
-#endif
-
 template <typename T>
 thrust::counting_iterator<T> countAt(T i) {
   return thrust::make_counting_iterator(i);
@@ -162,7 +157,7 @@ thrust::counting_iterator<T> countAt(T i) {
 template <typename InputIterator1, typename InputIterator2,
           typename OutputIterator>
 void scatter(ExecutionPolicy policy, InputIterator1 first, InputIterator1 last,
-              InputIterator2 mapFirst, OutputIterator outputFirst) {
+             InputIterator2 mapFirst, OutputIterator outputFirst) {
   for_each(policy, countAt(0_z),
            countAt(static_cast<size_t>(std::distance(first, last))),
            [first, mapFirst, outputFirst](size_t i) {
