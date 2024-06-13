@@ -77,13 +77,21 @@ TEST(Smooth, RefineQuads) {
 }
 
 TEST(Smooth, TruncatedCone) {
-  Manifold cone = Manifold::Cylinder(5, 10, 5, 12).SmoothOut();
-  Manifold smooth = cone.RefineToLength(0.5).CalculateNormals(0);
+  Manifold cone = Manifold::Cylinder(5, 10, 5, 12);
+  Manifold smooth = cone.SmoothOut().RefineToLength(0.5).CalculateNormals(0);
   auto prop = smooth.GetProperties();
   EXPECT_NEAR(prop.volume, 1158.61, 0.01);
   EXPECT_NEAR(prop.surfaceArea, 768.12, 0.01);
   MeshGL out = smooth.GetMeshGL();
   CheckGL(out);
+
+  Manifold smooth1 = cone.SmoothOut(180, 1).RefineToLength(0.5);
+  auto prop1 = smooth1.GetProperties();
+
+  Manifold smooth2 = cone.SmoothOut(180, 0).RefineToLength(0.5);
+  auto prop2 = smooth2.GetProperties();
+  EXPECT_NEAR(prop2.volume, prop1.volume, 0.01);
+  EXPECT_NEAR(prop2.surfaceArea, prop1.surfaceArea, 0.01);
 
 #ifdef MANIFOLD_EXPORT
   ExportOptions options2;
