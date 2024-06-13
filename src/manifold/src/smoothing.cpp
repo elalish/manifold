@@ -32,6 +32,12 @@ glm::vec3 OrthogonalTo(glm::vec3 in, glm::vec3 altIn, glm::vec3 ref) {
   return SafeNormalize(out);
 }
 
+float Wrap(float radians) {
+  return radians < -glm::pi<float>()  ? radians + glm::two_pi<float>()
+         : radians > glm::pi<float>() ? radians - glm::two_pi<float>()
+                                      : radians;
+}
+
 // Get the angle between two unit-vectors.
 float AngleBetween(glm::vec3 a, glm::vec3 b) {
   const float dot = glm::dot(a, b);
@@ -758,7 +764,7 @@ void Manifold::Impl::DistributeTangents(const Vec<bool>& fixedHalfedges) {
         float offset = 0;
         if (current == halfedge) {  // only one - find average offset
           for (int i = 0; i < currentAngle.size(); ++i) {
-            offset += currentAngle[i] - scale * desiredAngle[i];
+            offset += Wrap(currentAngle[i] - scale * desiredAngle[i]);
           }
           offset /= currentAngle.size();
         }
