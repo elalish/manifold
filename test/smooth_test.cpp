@@ -48,7 +48,8 @@ TEST(Smooth, Tetrahedron) {
 
 TEST(Smooth, RefineQuads) {
   Manifold cylinder =
-      Manifold(WithPositionColors(Manifold::Cylinder(2, 1, -1, 12).SmoothOut()))
+      Manifold(WithPositionColors(Manifold::Cylinder(2, 1, -1, 12)))
+          .SmoothOut()
           .RefineToLength(0.05);
   EXPECT_EQ(cylinder.NumTri(), 16892);
   auto prop = cylinder.GetProperties();
