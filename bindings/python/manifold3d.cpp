@@ -107,7 +107,7 @@ struct nb::detail::type_caster<glm::mat<C, R, T, Q>> {
   static handle from_cpp(glm_type mat, rv_policy policy,
                          cleanup_list *cleanup) noexcept {
     T *buffer = new T[R * C];
-    nb::capsule mem_mgr(buffer, [](void *p) noexcept { delete[](T *) p; });
+    nb::capsule mem_mgr(buffer, [](void *p) noexcept { delete[] (T *)p; });
     for (int i = 0; i < R; i++) {
       for (int j = 0; j < C; j++) {
         // py is (Rows, Cols), glm is (Cols, Rows)
@@ -154,7 +154,7 @@ struct nb::detail::type_caster<std::vector<glm::vec<N, T, Q>>> {
                          cleanup_list *cleanup) noexcept {
     size_t num_vec = vec.size();
     T *buffer = new T[num_vec * N];
-    nb::capsule mem_mgr(buffer, [](void *p) noexcept { delete[](T *) p; });
+    nb::capsule mem_mgr(buffer, [](void *p) noexcept { delete[] (T *)p; });
     for (int i = 0; i < num_vec; i++) {
       for (int j = 0; j < N; j++) {
         buffer[i * N + j] = vec[i][j];
@@ -362,9 +362,18 @@ NB_MODULE(manifold3d, m) {
       .def("trim_by_plane", &Manifold::TrimByPlane, nb::arg("normal"),
            nb::arg("origin_offset"),
            manifold__trim_by_plane__normal__origin_offset)
-      .def("slice", &Manifold::Slice, nb::arg("height"),
-           manifold__slice__height)
-      .def("project", &Manifold::Project, manifold__project)
+      .def(
+          "slice",
+          [](const Manifold &self, float height) {
+            return CrossSection(self.Slice(height));
+          },
+          nb::arg("height"), manifold__slice__height)
+      .def(
+          "project",
+          [](const Manifold &self) {
+            return CrossSection(self.Project()).Simplify(self.Precision());
+          },
+          manifold__project)
       .def("status", &Manifold::Status, manifold__status)
       .def(
           "bounding_box",
@@ -402,14 +411,25 @@ NB_MODULE(manifold3d, m) {
       .def_static("cube", &Manifold::Cube, nb::arg("size") = glm::vec3{1, 1, 1},
                   nb::arg("center") = false, manifold__cube__size__center)
       .def_static(
-          "extrude", &Manifold::Extrude, nb::arg("crossSection"),
-          nb::arg("height"), nb::arg("n_divisions") = 0,
-          nb::arg("twist_degrees") = 0.0f,
+          "extrude",
+          [](const CrossSection &crossSection, float height, int nDivisions,
+             float twistDegrees, glm::vec2 scaleTop) {
+            return Manifold::Extrude(crossSection.ToPolygons(), height,
+                                     nDivisions, twistDegrees, scaleTop);
+          },
+          nb::arg("crossSection"), nb::arg("height"),
+          nb::arg("n_divisions") = 0, nb::arg("twist_degrees") = 0.0f,
           nb::arg("scale_top") = std::make_tuple(1.0f, 1.0f),
           manifold__extrude__cross_section__height__n_divisions__twist_degrees__scale_top)
       .def_static(
-          "revolve", &Manifold::Revolve, nb::arg("crossSection"),
-          nb::arg("circular_segments") = 0, nb::arg("revolve_degrees") = 360.0,
+          "revolve",
+          [](const CrossSection &crossSection, int circularSegments,
+             float revolveDegrees) {
+            return Manifold::Revolve(crossSection.ToPolygons(),
+                                     circularSegments, revolveDegrees);
+          },
+          nb::arg("crossSection"), nb::arg("circular_segments") = 0,
+          nb::arg("revolve_degrees") = 360.0,
           manifold__revolve__cross_section__circular_segments__revolve_degrees)
       .def_static(
           "cylinder", &Manifold::Cylinder, nb::arg("height"),

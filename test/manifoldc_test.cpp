@@ -211,13 +211,10 @@ TEST(CBIND, extrude) {
       malloc(manifold_simple_polygon_size()), &pts[0], 4)};
   ManifoldPolygons *polys =
       manifold_polygons(malloc(manifold_polygons_size()), sq, 1);
-  ManifoldCrossSection *cross =
-      manifold_cross_section_of_polygons(malloc(manifold_cross_section_size()),
-                                         polys, MANIFOLD_FILL_RULE_POSITIVE);
 
   ManifoldManifold *cube = manifold_cube(malloc(sz), 1., 1., 1., 0);
   ManifoldManifold *extrusion =
-      manifold_extrude(malloc(sz), cross, 1, 0, 0, 1, 1);
+      manifold_extrude(malloc(sz), polys, 1, 0, 0, 1, 1);
 
   ManifoldManifold *diff = manifold_difference(malloc(sz), cube, extrusion);
   ManifoldProperties props = manifold_get_properties(diff);

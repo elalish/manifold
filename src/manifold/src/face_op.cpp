@@ -228,7 +228,7 @@ PolygonsIdx Manifold::Impl::Face2Polygons(VecView<Halfedge>::IterC start,
   return polys;
 }
 
-CrossSection Manifold::Impl::Slice(float height) const {
+Polygons Manifold::Impl::Slice(float height) const {
   Box plane = bBox_;
   plane.min.z = plane.max.z = height;
   Vec<Box> query;
@@ -287,10 +287,10 @@ CrossSection Manifold::Impl::Slice(float height) const {
     polys.push_back(poly);
   }
 
-  return CrossSection(polys);
+  return polys;
 }
 
-CrossSection Manifold::Impl::Project() const {
+Polygons Manifold::Impl::Project() const {
   const glm::mat3x2 projection = GetAxisAlignedProjection({0, 0, 1});
   auto policy = autoPolicy(halfedge_.size());
 
@@ -316,6 +316,6 @@ CrossSection Manifold::Impl::Project() const {
     polys.push_back(simple);
   }
 
-  return CrossSection(polys).Simplify(precision_);
+  return polys;
 }
 }  // namespace manifold

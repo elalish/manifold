@@ -901,15 +901,17 @@ Manifold Manifold::TrimByPlane(glm::vec3 normal, float originOffset) const {
  * the bounding box will return the bottom faces, while using a height equal to
  * the top of the bounding box will return empty.
  */
-CrossSection Manifold::Slice(float height) const {
+Polygons Manifold::Slice(float height) const {
   return GetCsgLeafNode().GetImpl()->Slice(height);
 }
 
 /**
- * Returns a cross section representing the projected outline of this object
- * onto the X-Y plane.
+ * Returns polygons representing the projected outline of this object
+ * onto the X-Y plane. These polygons will often self-intersect, so it is
+ * recommended to run them through the positive fill rule of CrossSection to get
+ * a sensible result before using them.
  */
-CrossSection Manifold::Project() const {
+Polygons Manifold::Project() const {
   return GetCsgLeafNode().GetImpl()->Project();
 }
 
