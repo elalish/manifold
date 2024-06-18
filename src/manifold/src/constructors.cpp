@@ -152,8 +152,8 @@ Manifold Manifold::Cube(glm::vec3 size, bool center) {
       glm::length(size) == 0.) {
     return Invalid();
   }
-  glm::mat4x3 m =
-      glm::translate(center ? (-size / 2.0f) : glm::vec3(0)) * glm::scale(size);
+  glm::mat4x3 m(glm::translate(center ? (-size / 2.0f) : glm::vec3(0)) *
+                glm::scale(size));
   return Manifold(std::make_shared<Impl>(Manifold::Impl::Shape::Cube, m));
 }
 
@@ -330,7 +330,7 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments,
   ZoneScoped;
 
   Polygons polygons;
-  float radius;
+  float radius = 0;
   for (const SimplePolygon& poly : crossSection) {
     int i = 0;
     while (i < poly.size() && poly[i].x < 0) {
