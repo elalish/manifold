@@ -139,14 +139,15 @@ template <typename DerivedPolicy, typename InputIterator1,
 OutputIterator copy_if(ExecutionPolicy policy, InputIterator1 first,
                        InputIterator1 last, OutputIterator result,
                        Predicate pred) {
-#if MANIFOLD_PAR == 'T'
-  if (policy == ExecutionPolicy::Seq)
-    return std::copy_if(first, last, result, pred);
-  else
-    return std::copy_if(std::execution::par_unseq, first, last, result, pred);
-#else
+  // #if MANIFOLD_PAR == 'T'
+  //   if (policy == ExecutionPolicy::Seq)
+  //     return std::copy_if(first, last, result, pred);
+  //   else
+  //     return std::copy_if(std::execution::par_unseq, first, last, result,
+  //     pred);
+  // #else
   return std::copy_if(first, last, result, pred);
-#endif
+  // #endif
 }
 
 template <typename T>
@@ -197,7 +198,7 @@ STL_DYNAMIC_BACKEND_VOID(copy_n)
 
 // void implies that the user have to specify the return type in the template
 // argument, as we are unable to deduce it
-THRUST_DYNAMIC_BACKEND(transform_reduce, void)
+STL_DYNAMIC_BACKEND(transform_reduce, void)
 THRUST_DYNAMIC_BACKEND(reduce_by_key, void)
 STL_DYNAMIC_BACKEND(remove, void)
 STL_DYNAMIC_BACKEND(find, void)

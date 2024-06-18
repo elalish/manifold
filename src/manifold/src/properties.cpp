@@ -397,9 +397,8 @@ void Manifold::Impl::CalculateBBox() {
  */
 bool Manifold::Impl::IsFinite() const {
   auto policy = autoPolicy(NumVert());
-  return transform_reduce<bool>(policy, vertPos_.begin(), vertPos_.end(),
-                                FiniteVert(), true,
-                                thrust::logical_and<bool>());
+  return transform_reduce<bool>(policy, vertPos_.begin(), vertPos_.end(), true,
+                                thrust::logical_and<bool>(), FiniteVert());
 }
 
 /**
@@ -408,11 +407,11 @@ bool Manifold::Impl::IsFinite() const {
  */
 bool Manifold::Impl::IsIndexInBounds(VecView<const glm::ivec3> triVerts) const {
   auto policy = autoPolicy(triVerts.size());
-  glm::ivec2 minmax = transform_reduce<glm::ivec2>(
-      policy, triVerts.begin(), triVerts.end(), MakeMinMax(),
-      glm::ivec2(std::numeric_limits<int>::max(),
-                 std::numeric_limits<int>::min()),
-      MinMax());
+  glm::ivec2 minmax =
+      transform_reduce<glm::ivec2>(policy, triVerts.begin(), triVerts.end(),
+                                   glm::ivec2(std::numeric_limits<int>::max(),
+                                              std::numeric_limits<int>::min()),
+                                   MinMax(), MakeMinMax());
 
   return minmax[0] >= 0 && minmax[1] < NumVert();
 }
@@ -441,6 +440,7 @@ float Manifold::Impl::MinGap(const Manifold::Impl& other,
   float minDistanceSquared = transform_reduce<float>(
       autoPolicy(collisions.size()), thrust::counting_iterator<int>(0),
       thrust::counting_iterator<int>(collisions.size()),
+      searchLength * searchLength, thrust::minimum<float>(),
       [&collisions, this, &other](int i) {
         const int tri = collisions.Get(i, 1);
         const int triOther = collisions.Get(i, 0);
@@ -454,8 +454,7 @@ float Manifold::Impl::MinGap(const Manifold::Impl& other,
         }
 
         return DistanceTriangleTriangleSquared(p, q);
-      },
-      searchLength * searchLength, thrust::minimum<float>());
+      });
 
   return sqrt(minDistanceSquared);
 };
