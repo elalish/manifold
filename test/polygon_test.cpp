@@ -74,3 +74,4 @@ void TestPoly(const Polygons &polys, int expectedNumTri,
 }  // namespace
 
 #include "polygon_corpus.cpp"
+#include "zebra.cpp"

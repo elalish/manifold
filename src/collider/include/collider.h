@@ -30,6 +30,7 @@ class Collider {
   template <const bool selfCollision = false, const bool inverted = false,
             typename T>
   SparseIndices Collisions(const VecView<const T>& queriesIn) const;
+  static uint32_t MortonCode(glm::vec3 position, Box bBox);
 
  private:
   Vec<Box> nodeBBox_;

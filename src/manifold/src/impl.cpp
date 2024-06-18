@@ -733,7 +733,9 @@ void Manifold::Impl::MarkFailure(Error status) {
 
 void Manifold::Impl::Warp(std::function<void(glm::vec3&)> warpFunc) {
   WarpBatch([&warpFunc](VecView<glm::vec3> vecs) {
-    thrust::for_each(thrust::host, vecs.begin(), vecs.end(), warpFunc);
+    for (auto& v : vecs) {
+      warpFunc(v);
+    }
   });
 }
 
