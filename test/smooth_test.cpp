@@ -48,7 +48,8 @@ TEST(Smooth, Tetrahedron) {
 
 TEST(Smooth, RefineQuads) {
   Manifold cylinder =
-      Manifold(WithPositionColors(Manifold::Cylinder(2, 1, -1, 12).SmoothOut()))
+      Manifold(WithPositionColors(Manifold::Cylinder(2, 1, -1, 12)))
+          .SmoothOut()
           .RefineToLength(0.05);
   EXPECT_EQ(cylinder.NumTri(), 16892);
   auto prop = cylinder.GetProperties();
@@ -77,13 +78,21 @@ TEST(Smooth, RefineQuads) {
 }
 
 TEST(Smooth, TruncatedCone) {
-  Manifold cone = Manifold::Cylinder(5, 10, 5, 12).SmoothOut();
-  Manifold smooth = cone.RefineToLength(0.5).CalculateNormals(0);
+  Manifold cone = Manifold::Cylinder(5, 10, 5, 12);
+  Manifold smooth = cone.SmoothOut().RefineToLength(0.5).CalculateNormals(0);
   auto prop = smooth.GetProperties();
   EXPECT_NEAR(prop.volume, 1158.61, 0.01);
   EXPECT_NEAR(prop.surfaceArea, 768.12, 0.01);
   MeshGL out = smooth.GetMeshGL();
   CheckGL(out);
+
+  Manifold smooth1 = cone.SmoothOut(180, 1).RefineToLength(0.5);
+  auto prop1 = smooth1.GetProperties();
+
+  Manifold smooth2 = cone.SmoothOut(180, 0).RefineToLength(0.5);
+  auto prop2 = smooth2.GetProperties();
+  EXPECT_NEAR(prop2.volume, prop1.volume, 0.01);
+  EXPECT_NEAR(prop2.surfaceArea, prop1.surfaceArea, 0.01);
 
 #ifdef MANIFOLD_EXPORT
   ExportOptions options2;
@@ -331,8 +340,8 @@ TEST(Smooth, SineSurface) {
   Manifold smoothed =
       Manifold(surface).CalculateNormals(0, 50).SmoothByNormals(0).Refine(8);
   auto prop = smoothed.GetProperties();
-  EXPECT_NEAR(prop.volume, 8.07, 0.01);
-  EXPECT_NEAR(prop.surfaceArea, 30.88, 0.01);
+  EXPECT_NEAR(prop.volume, 8.09, 0.01);
+  EXPECT_NEAR(prop.surfaceArea, 30.93, 0.01);
   EXPECT_EQ(smoothed.Genus(), 0);
 
   Manifold smoothed1 = Manifold(surface).SmoothOut(50).Refine(8);
@@ -343,14 +352,14 @@ TEST(Smooth, SineSurface) {
 
   Manifold smoothed2 = Manifold(surface).SmoothOut(180, 1).Refine(8);
   auto prop2 = smoothed2.GetProperties();
-  EXPECT_NEAR(prop2.volume, 9.02, 0.01);
-  EXPECT_NEAR(prop2.surfaceArea, 33.56, 0.01);
+  EXPECT_NEAR(prop2.volume, 9.00, 0.01);
+  EXPECT_NEAR(prop2.surfaceArea, 33.61, 0.01);
   EXPECT_EQ(smoothed2.Genus(), 0);
 
   Manifold smoothed3 = Manifold(surface).SmoothOut(50, 0.5).Refine(8);
   auto prop3 = smoothed3.GetProperties();
-  EXPECT_NEAR(prop3.volume, 8.46, 0.01);
-  EXPECT_NEAR(prop3.surfaceArea, 31.66, 0.01);
+  EXPECT_NEAR(prop3.volume, 8.44, 0.01);
+  EXPECT_NEAR(prop3.surfaceArea, 31.72, 0.01);
   EXPECT_EQ(smoothed3.Genus(), 0);
 
 #ifdef MANIFOLD_EXPORT

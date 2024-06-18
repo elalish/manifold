@@ -196,6 +196,11 @@ Module.setup = function() {
 
   // Manifold methods
 
+  Module.Manifold.prototype.smoothOut = function(
+      minSharpAngle = 60, minSmoothness = 0) {
+    return this._SmoothOut(minSharpAngle, minSmoothness);
+  };
+
   Module.Manifold.prototype.warp = function(func) {
     const wasmFuncPtr = addFunction(function(vec3Ptr) {
       const x = getValue(vec3Ptr, 'float');
@@ -215,6 +220,11 @@ Module.setup = function() {
       throw new Module.ManifoldError(status.value);
     }
     return out;
+  };
+
+  Module.Manifold.prototype.calculateNormals = function(
+      normalIdx, minSharpAngle = 60) {
+    return this._CalculateNormals(normalIdx, minSharpAngle);
   };
 
   Module.Manifold.prototype.setProperties = function(numProp, func) {
@@ -270,6 +280,10 @@ Module.setup = function() {
 
   Module.Manifold.prototype.trimByPlane = function(normal, offset = 0.) {
     return this._TrimByPlane(vararg2vec3([normal]), offset);
+  };
+
+  Module.Manifold.prototype.slice = function(height = 0.) {
+    return this._Slice(height);
   };
 
   Module.Manifold.prototype.split = function(manifold) {
