@@ -24,8 +24,7 @@
 #include "thrust/transform_reduce.h"
 
 #if MANIFOLD_PAR == 'T'
-#if MANIFOLD_PAR == 'T' && TBB_INTERFACE_VERSION >= 10000 && \
-    __has_include(<pstl/glue_execution_defs.h>)
+#if MANIFOLD_PAR == 'T' && TBB_INTERFACE_VERSION >= 10000 && __has_include(<execution>)
 #include <execution>
 #endif
 
@@ -79,7 +78,7 @@ inline constexpr ExecutionPolicy autoPolicy(size_t size) {
     return thrust::NAME(thrust::cpp::par, args...);                 \
   }
 
-#if MANIFOLD_PAR == 'T' && __has_include(<pstl/glue_execution_defs.h>)
+#if MANIFOLD_PAR == 'T' && __has_include(<execution>)
 #define STL_DYNAMIC_BACKEND(NAME, RET)                        \
   template <typename Ret = RET, typename... Args>             \
   Ret NAME(ExecutionPolicy policy, Args... args) {            \
@@ -139,15 +138,14 @@ template <typename DerivedPolicy, typename InputIterator1,
 OutputIterator copy_if(ExecutionPolicy policy, InputIterator1 first,
                        InputIterator1 last, OutputIterator result,
                        Predicate pred) {
-  // #if MANIFOLD_PAR == 'T'
-  //   if (policy == ExecutionPolicy::Seq)
-  //     return std::copy_if(first, last, result, pred);
-  //   else
-  //     return std::copy_if(std::execution::par_unseq, first, last, result,
-  //     pred);
-  // #else
+#if MANIFOLD_PAR == 'T' && _LIBCPP_VERSION
+  if (policy == ExecutionPolicy::Seq)
+    return std::copy_if(first, last, result, pred);
+  else
+    return std::copy_if(std::execution::par_unseq, first, last, result, pred);
+#else
   return std::copy_if(first, last, result, pred);
-  // #endif
+#endif
 }
 
 template <typename T>
@@ -188,8 +186,6 @@ void sequence(ExecutionPolicy policy, Iterator first, Iterator last) {
 STL_DYNAMIC_BACKEND_VOID(for_each)
 STL_DYNAMIC_BACKEND_VOID(for_each_n)
 STL_DYNAMIC_BACKEND_VOID(transform)
-STL_DYNAMIC_BACKEND_VOID(uninitialized_fill)
-STL_DYNAMIC_BACKEND_VOID(uninitialized_copy)
 STL_DYNAMIC_BACKEND_VOID(stable_sort)
 STL_DYNAMIC_BACKEND_VOID(fill)
 STL_DYNAMIC_BACKEND_VOID(copy)
@@ -206,6 +202,24 @@ STL_DYNAMIC_BACKEND(all_of, bool)
 STL_DYNAMIC_BACKEND(is_sorted, bool)
 STL_DYNAMIC_BACKEND(reduce, void)
 STL_DYNAMIC_BACKEND(count_if, int)
+
+#ifdef _LIBCPP_VERSION
+template <typename... Args>
+void uninitialized_fill(ExecutionPolicy policy, Args... args) {
+  std::uninitialized_fill(args...);
+}
+template <typename... Args>
+void uninitialized_copy(ExecutionPolicy policy, Args... args) {
+  std::uninitialized_copy(args...);
+}
+template <typename Ret = void, typename... Args>
+Ret remove_if(ExecutionPolicy policy, Args... args) {
+  return std::remove_if(args...);
+}
+#else
+STL_DYNAMIC_BACKEND_VOID(uninitialized_fill)
+STL_DYNAMIC_BACKEND_VOID(uninitialized_copy)
 STL_DYNAMIC_BACKEND(remove_if, void)
+#endif
 
 }  // namespace manifold
