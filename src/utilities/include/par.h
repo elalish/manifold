@@ -181,8 +181,6 @@ STL_DYNAMIC_BACKEND_VOID(copy_n)
 // void implies that the user have to specify the return type in the template
 // argument, as we are unable to deduce it
 THRUST_DYNAMIC_BACKEND(transform_reduce, void)
-THRUST_DYNAMIC_BACKEND(gather_if, void)
-THRUST_DYNAMIC_BACKEND(reduce_by_key, void)
 STL_DYNAMIC_BACKEND(remove, void)
 STL_DYNAMIC_BACKEND(find, void)
 STL_DYNAMIC_BACKEND(find_if, void)

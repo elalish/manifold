@@ -477,26 +477,13 @@ Vec<int> Winding03(const Manifold::Impl &inP, Vec<int> &vertices, Vec<int> &s02,
   ZoneScoped;
   // verts that are not shadowed (not in p0q2) have winding number zero.
   Vec<int> w03(inP.NumVert(), 0);
-  // checking is slow, so just sort and reduce
   auto policy = autoPolicy(vertices.size());
-  stable_sort(
-      policy, zip(vertices.begin(), s02.begin()),
-      zip(vertices.end(), s02.end()),
-      [](const thrust::tuple<int, int> &a, const thrust::tuple<int, int> &b) {
-        return thrust::get<0>(a) < thrust::get<0>(b);
-      });
-  Vec<int> w03val(w03.size());
-  Vec<int> w03vert(w03.size());
-  // sum known s02 values into w03 (winding number)
-  auto endPair = reduce_by_key<
-      thrust::pair<decltype(w03val.begin()), decltype(w03val.begin())>>(
-      policy, vertices.begin(), vertices.end(), s02.begin(), w03vert.begin(),
-      w03val.begin());
-  scatter(policy, w03val.begin(), endPair.second, w03vert.begin(), w03.begin());
-
-  if (reverse)
-    transform(policy, w03.begin(), w03.end(), w03.begin(),
-              thrust::negate<int>());
+  for_each_n(policy, zip(vertices.begin(), s02.begin()), s02.size(),
+             [&w03, reverse](const thrust::tuple<int, int> &in) {
+               const int vert = thrust::get<0>(in);
+               const int s = thrust::get<1>(in);
+               AtomicAdd(w03[vert], s * (reverse ? -1 : 1));
+             });
   return w03;
 };
 }  // namespace
