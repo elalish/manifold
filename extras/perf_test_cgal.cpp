@@ -92,37 +92,44 @@ void perfTestCGAL() {
 // and the CGAL implementations.
 void PrintVolArea(Manifold &manfiold_obj, TriangleMesh &manifoldMesh,
                   TriangleMesh &hullMesh, Manifold &hullManifold) {
-  std::cout << "Vol CGAL = "
-            << CGAL::Polygon_mesh_processing::volume(manifoldMesh) << std::endl;
-  std::cout << "Vol Manifold = " << manfiold_obj.GetProperties().volume
-            << std::endl;
-  std::cout << "Vol Hull = " << hullManifold.GetProperties().volume
-            << std::endl;
-  std::cout << "Vol CGAL Hull = "
-            << CGAL::Polygon_mesh_processing::volume(hullMesh) << std::endl;
-  std::cout << "Area CGAL = "
-            << CGAL::Polygon_mesh_processing::area(manifoldMesh) << std::endl;
-  std::cout << "Area Manifold = " << manfiold_obj.GetProperties().surfaceArea
-            << std::endl;
-  std::cout << "Area Hull = " << hullManifold.GetProperties().surfaceArea
-            << std::endl;
-  std::cout << "Area CGAL Hull = "
-            << CGAL::Polygon_mesh_processing::area(hullMesh) << std::endl;
+  // std::cout << CGAL::Polygon_mesh_processing::volume(manifoldMesh) << ",";
+  // std::cout << CGAL::Polygon_mesh_processing::volume(hullMesh) << ",";
+  // std::cout << CGAL::Polygon_mesh_processing::area(manifoldMesh) << ",";
+  // std::cout << CGAL::Polygon_mesh_processing::area(hullMesh) << ",";
+  // std::cout << std::distance(manifoldMesh.faces_begin(),manifoldMesh.faces_end())
+  //           << ",";
+  // std::cout << std::distance(hullMesh.faces_begin(), hullMesh.faces_end())
+  //           << ",";
+  std::cout << manfiold_obj.GetProperties().volume
+            << ",";
+  std::cout << hullManifold.GetProperties().volume
+            << ",";
+  std::cout << manfiold_obj.GetProperties().surfaceArea
+            << ",";
+  std::cout << hullManifold.GetProperties().surfaceArea
+            << ",";
+  std::cout << manfiold_obj.NumTri() << ",";
+  std::cout << hullManifold.NumTri() << ",";
 }
 
 void PrintManifold(Manifold input, Manifold (Manifold::*hull_func)() const) {
   TriangleMesh cgalInput;
-  manifoldToCGALSurfaceMesh(input, cgalInput);
-  std::vector<Point> points;
-  for (const auto &vert : cgalInput.vertices()) {
-    points.push_back(cgalInput.point(vert));
-  }
+  // manifoldToCGALSurfaceMesh(input, cgalInput);
+  // std::vector<Point> points;
+  // for (const auto &vert : cgalInput.vertices()) {
+  //   points.push_back(cgalInput.point(vert));
+  // }
 
   // Convex Hull
   TriangleMesh hullMesh;
-  computeCGALConvexHull(points, hullMesh);
+  auto start = std::chrono::high_resolution_clock::now();
+  // computeCGALConvexHull(points, hullMesh);
   Manifold hullManifold = (input.*hull_func)();
+  auto end = std::chrono::high_resolution_clock::now();
+  // Manifold hullManifold;
   PrintVolArea(input, cgalInput, hullMesh, hullManifold);
+  std::chrono::duration<double> elapsed = end - start;
+  std::cout << elapsed.count() << " sec" ;
 }
 
 // Constructs a Menger Sponge, and tests the convex hull implementation on it
@@ -186,9 +193,10 @@ int main(int argc, char **argv) {
   // perfTestCGAL();
   // SphereTestHull(Manifold::Hull);
   // MengerTestHull(Manifold::Hull, 1, 2, 3);
-  auto start = std::chrono::high_resolution_clock::now();
-  RunThingi10K(&Manifold::Hull);
-  auto end = std::chrono::high_resolution_clock::now();
-  std::chrono::duration<double> elapsed = end - start;
-  std::cout << "time = " << elapsed.count() << " sec" << std::endl;
+  
+  // std::cout << argv[1] << std::endl;
+  auto inputMesh = ImportMesh(argv[1], 1);
+  Manifold inputManifold = Manifold(inputMesh);
+  PrintManifold(inputManifold, &Manifold::Hull3);
+  // RunThingi10K(&Manifold::Hull4);
 }
