@@ -169,7 +169,7 @@ bool IsConvex(const PolygonsIdx &polys, float precision) {
     // it's okay because that zero-length edge will also get tested
     // non-normalized and will trip det == 0.
     glm::vec2 lastEdge = glm::normalize(firstEdge);
-    for (int v = 0; v < poly.size(); ++v) {
+    for (size_t v = 0; v < poly.size(); ++v) {
       const glm::vec2 edge =
           v + 1 < poly.size() ? poly[v + 1].pos - poly[v].pos : firstEdge;
       const float det = determinant2x2(lastEdge, edge);
@@ -187,18 +187,18 @@ bool IsConvex(const PolygonsIdx &polys, float precision) {
  * avoid creating high-degree vertices.
  */
 std::vector<glm::ivec3> TriangulateConvex(const PolygonsIdx &polys) {
-  const int numTri = transform_reduce<int>(
+  const size_t numTri = transform_reduce<size_t>(
       autoPolicy(polys.size()), polys.begin(), polys.end(),
       [](const SimplePolygonIdx &poly) { return poly.size() - 2; }, 0,
-      thrust::plus<int>());
+      thrust::plus<size_t>());
   std::vector<glm::ivec3> triangles;
   triangles.reserve(numTri);
   for (const SimplePolygonIdx &poly : polys) {
-    int i = 0;
-    int k = poly.size() - 1;
+    size_t i = 0;
+    size_t k = poly.size() - 1;
     bool right = true;
     while (i + 1 < k) {
-      const int j = right ? i + 1 : k - 1;
+      const size_t j = right ? i + 1 : k - 1;
       triangles.push_back({poly[i].idx, poly[j].idx, poly[k].idx});
       if (right) {
         i = j;
@@ -230,7 +230,7 @@ class EarClip {
   EarClip(const PolygonsIdx &polys, float precision) : precision_(precision) {
     ZoneScoped;
 
-    int numVert = 0;
+    size_t numVert = 0;
     for (const SimplePolygonIdx &poly : polys) {
       numVert += poly.size();
     }
