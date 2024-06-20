@@ -537,18 +537,20 @@ void CsgOpNode::BatchUnion() const {
   // with O(n^2) complexity to take too long.
   // If the number of children exceeded this limit, we will operate on chunks
   // with size kMaxUnionSize.
-  constexpr int kMaxUnionSize = 1000;
+  constexpr size_t kMaxUnionSize = 1000;
   auto impl = impl_.GetGuard();
   auto &children_ = impl->children_;
   while (children_.size() > 1) {
-    const int start = (children_.size() > kMaxUnionSize)
-                          ? (children_.size() - kMaxUnionSize)
-                          : 0;
+    const size_t start = (children_.size() > kMaxUnionSize)
+                             ? (children_.size() - kMaxUnionSize)
+                             : 0;
     Vec<Box> boxes;
     boxes.reserve(children_.size() - start);
-    for (const auto &child : children_)
-      boxes.push_back(
-          std::dynamic_pointer_cast<CsgLeafNode>(child)->GetImpl()->bBox_);
+    for (size_t i = start; i < children_.size(); i++) {
+      boxes.push_back(std::dynamic_pointer_cast<CsgLeafNode>(children_[i])
+                          ->GetImpl()
+                          ->bBox_);
+    }
     // partition the children into a set of disjoint sets
     // each set contains a set of children that are pairwise disjoint
     std::vector<Vec<size_t>> disjointSets;
