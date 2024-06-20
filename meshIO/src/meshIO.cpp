@@ -154,7 +154,7 @@ Mesh ImportMesh(const std::string& filename, bool forceCleanup) {
     for (size_t j = 0; j < mesh_i->mNumFaces; ++j) {
       const aiFace face = mesh_i->mFaces[j];
       DEBUG_ASSERT(face.mNumIndices == 3, userErr,
-             "Non-triangular face in " + filename);
+                   "Non-triangular face in " + filename);
       mesh_out.triVerts.emplace_back(face.mIndices[0], face.mIndices[1],
                                      face.mIndices[2]);
     }
@@ -199,8 +199,9 @@ void ExportMesh(const std::string& filename, const MeshGL& mesh,
       int c = options.mat.normalChannels[i];
       validChannels &= c >= 3 && c < (int)mesh.numProp;
     }
-    DEBUG_ASSERT(validChannels, userErr,
-           "When faceted is false, valid normalChannels must be supplied.");
+    DEBUG_ASSERT(
+        validChannels, userErr,
+        "When faceted is false, valid normalChannels must be supplied.");
     mesh_out->mNormals = new aiVector3D[mesh_out->mNumVertices];
   }
 
@@ -291,7 +292,7 @@ void ExportMesh(const std::string& filename, const Mesh& mesh,
   }
   if (!options.mat.vertColor.empty()) {
     DEBUG_ASSERT(mesh.vertPos.size() == options.mat.vertColor.size(), userErr,
-           "If present, vertColor must be the same length as vertPos.");
+                 "If present, vertColor must be the same length as vertPos.");
     mesh_out->mColors[0] = new aiColor4D[mesh_out->mNumVertices];
   }
 

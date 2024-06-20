@@ -67,7 +67,7 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
         std::swap(ends[1], ends[2]);
       }
       DEBUG_ASSERT(ends[0] == tri[1] && ends[1] == tri[2] && ends[2] == tri[0],
-             topologyErr, "These 3 edges do not form a triangle!");
+                   topologyErr, "These 3 edges do not form a triangle!");
 
       addTri(face, tri, normal, halfedgeRef[firstEdge]);
     } else if (numEdge == 4) {  // Pair of triangles
@@ -95,8 +95,8 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
         }
       }
       DEBUG_ASSERT(glm::all(glm::greaterThanEqual(tri0, glm::ivec3(0))) &&
-                 glm::all(glm::greaterThanEqual(tri1, glm::ivec3(0))),
-             topologyErr, "non-manifold quad!");
+                       glm::all(glm::greaterThanEqual(tri1, glm::ivec3(0))),
+                   topologyErr, "non-manifold quad!");
       bool firstValid = triCCW(tri0) && triCCW(tri1);
       tri0[2] = tri1[1];
       tri1[2] = tri0[1];
@@ -144,7 +144,7 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
            countAt(faceEdge.size() - 1), [&](size_t face) {
              triCount[face] = faceEdge[face + 1] - faceEdge[face] - 2;
              DEBUG_ASSERT(triCount[face] >= 1, topologyErr,
-                    "face has less than three edges.");
+                          "face has less than three edges.");
              if (triCount[face] > 2)
                group.run([&, face] {
                  std::vector<glm::ivec3> newTris = generalTriangulation(face);

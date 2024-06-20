@@ -39,7 +39,7 @@ void Assert(bool condition, const char* file, int line, const std::string& cond,
 
 #if MANIFOLD_EXCEPTIONS
 #define ASSERT(condition, EX) \
-  if (!(condition)) throw (EX);
+  if (!(condition)) throw(EX);
 #else
 #define ASSERT(condition, EX)
 #endif

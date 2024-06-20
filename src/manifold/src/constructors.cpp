@@ -81,8 +81,8 @@ namespace manifold {
 Manifold Manifold::Smooth(const MeshGL& meshGL,
                           const std::vector<Smoothness>& sharpenedEdges) {
   DEBUG_ASSERT(meshGL.halfedgeTangent.empty(), std::runtime_error,
-         "when supplying tangents, the normal constructor should be used "
-         "rather than Smooth().");
+               "when supplying tangents, the normal constructor should be used "
+               "rather than Smooth().");
 
   // Don't allow any triangle merging.
   std::vector<float> propertyTolerance(meshGL.numProp - 3, -1);
@@ -123,8 +123,8 @@ Manifold Manifold::Smooth(const MeshGL& meshGL,
 Manifold Manifold::Smooth(const Mesh& mesh,
                           const std::vector<Smoothness>& sharpenedEdges) {
   DEBUG_ASSERT(mesh.halfedgeTangent.empty(), std::runtime_error,
-         "when supplying tangents, the normal constructor should be used "
-         "rather than Smooth().");
+               "when supplying tangents, the normal constructor should be used "
+               "rather than Smooth().");
 
   Impl::MeshRelationD relation = {(int)ReserveIDs(1)};
   std::shared_ptr<Impl> impl = std::make_shared<Impl>(mesh, relation);

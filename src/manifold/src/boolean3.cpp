@@ -30,7 +30,8 @@ namespace {
 glm::vec2 Interpolate(glm::vec3 pL, glm::vec3 pR, float x) {
   const float dxL = x - pL.x;
   const float dxR = x - pR.x;
-  DEBUG_ASSERT(dxL * dxR <= 0, logicErr, "Boolean manifold error: not in domain");
+  DEBUG_ASSERT(dxL * dxR <= 0, logicErr,
+               "Boolean manifold error: not in domain");
   const bool useL = fabs(dxL) < fabs(dxR);
   const glm::vec3 dLR = pR - pL;
   const float lambda = (useL ? dxL : dxR) / dLR.x;
@@ -46,7 +47,8 @@ glm::vec4 Intersect(const glm::vec3 &pL, const glm::vec3 &pR,
                     const glm::vec3 &qL, const glm::vec3 &qR) {
   const float dyL = qL.y - pL.y;
   const float dyR = qR.y - pR.y;
-  DEBUG_ASSERT(dyL * dyR <= 0, logicErr, "Boolean manifold error: no intersection");
+  DEBUG_ASSERT(dyL * dyR <= 0, logicErr,
+               "Boolean manifold error: no intersection");
   const bool useL = fabs(dyL) < fabs(dyR);
   const float dx = pR.x - pL.x;
   float lambda = (useL ? dyL : dyR) / (dyL - dyR);

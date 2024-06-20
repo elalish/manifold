@@ -281,8 +281,8 @@ class Partition {
       return edgeOffsets[edge] + (edgeFwd[edge] ? 1 : -1) * idx;
     };
 
-    DEBUG_ASSERT(glm::all(glm::greaterThanEqual(edgeAdded, glm::ivec4(0))), logicErr,
-           "negative divisions!");
+    DEBUG_ASSERT(glm::all(glm::greaterThanEqual(edgeAdded, glm::ivec4(0))),
+                 logicErr, "negative divisions!");
 
     int corner = -1;
     int last = 3;
