@@ -21,16 +21,27 @@
 namespace {
 using namespace manifold;
 
-glm::vec3 OrthogonalTo(glm::vec3 in, glm::vec3 ref) {
-  in -= glm::dot(in, ref) * ref;
-  return in;
+// Returns a normalized vector orthogonal to ref, in the plane of ref and in,
+// unless in and ref are colinear, in which case it falls back to the plane of
+// ref and altIn.
+glm::vec3 OrthogonalTo(glm::vec3 in, glm::vec3 altIn, glm::vec3 ref) {
+  glm::vec3 out = in - glm::dot(in, ref) * ref;
+  if (glm::dot(out, out) < kTolerance * glm::dot(in, in)) {
+    out = altIn - glm::dot(altIn, ref) * ref;
+  }
+  return SafeNormalize(out);
+}
+
+float Wrap(float radians) {
+  return radians < -glm::pi<float>()  ? radians + glm::two_pi<float>()
+         : radians > glm::pi<float>() ? radians - glm::two_pi<float>()
+                                      : radians;
 }
 
 // Get the angle between two unit-vectors.
 float AngleBetween(glm::vec3 a, glm::vec3 b) {
   const float dot = glm::dot(a, b);
-  return dot >= 1 ? kTolerance
-                  : (dot <= -1 ? glm::pi<float>() : glm::acos(dot));
+  return dot >= 1 ? 0 : (dot <= -1 ? glm::pi<float>() : glm::acos(dot));
 }
 
 // Calculate a tangent vector in the form of a weighted cubic Bezier taking as
@@ -64,14 +75,7 @@ struct SmoothBezier {
       return;
     }
 
-    const glm::vec3 edgeVec =
-        impl->vertPos_[edge.endVert] - impl->vertPos_[edge.startVert];
-    const glm::vec3 edgeNormal =
-        impl->faceNormal_[edge.face] +
-        impl->faceNormal_[impl->halfedge_[edge.pairedHalfedge].face];
-    glm::vec3 dir =
-        glm::cross(glm::cross(edgeNormal, edgeVec), vertNormal[edge.startVert]);
-    tangent = CircularTangent(dir, edgeVec);
+    tangent = impl->TangentFromNormal(vertNormal[edge.startVert], edgeIdx);
   }
 };
 
@@ -153,12 +157,10 @@ struct InterpTri {
     const glm::mat2x3 nTangentsX(SafeNormalize(glm::vec3(tangentsX[0])),
                                  -SafeNormalize(glm::vec3(tangentsX[1])));
     const glm::mat2x3 biTangents = {
-        SafeNormalize(OrthogonalTo(
-            glm::vec3(tangentsY[0]) + kTolerance * (anchor - corners[0]),
-            nTangentsX[0])),
-        SafeNormalize(OrthogonalTo(
-            glm::vec3(tangentsY[1]) + kTolerance * (anchor - corners[1]),
-            nTangentsX[1]))};
+        OrthogonalTo(glm::vec3(tangentsY[0]), (anchor - corners[0]),
+                     nTangentsX[0]),
+        OrthogonalTo(glm::vec3(tangentsY[1]), (anchor - corners[1]),
+                     nTangentsX[1])};
 
     const glm::quat q0 =
         glm::quat_cast(glm::mat3(nTangentsX[0], biTangents[0],
@@ -292,6 +294,20 @@ glm::vec3 Manifold::Impl::GetNormal(int halfedge, int normalIdx) const {
         meshRelation_.properties[prop * meshRelation_.numProp + normalIdx + i];
   }
   return normal;
+}
+
+/**
+ * Returns a circular tangent for the requested halfedge, orthogonal to the
+ * given normal vector, and avoiding folding.
+ */
+glm::vec4 Manifold::Impl::TangentFromNormal(const glm::vec3& normal,
+                                            int halfedge) const {
+  const Halfedge edge = halfedge_[halfedge];
+  const glm::vec3 edgeVec = vertPos_[edge.endVert] - vertPos_[edge.startVert];
+  const glm::vec3 edgeNormal =
+      faceNormal_[edge.face] + faceNormal_[halfedge_[edge.pairedHalfedge].face];
+  glm::vec3 dir = glm::cross(glm::cross(edgeNormal, edgeVec), normal);
+  return CircularTangent(dir, edgeVec);
 }
 
 /**
@@ -501,7 +517,7 @@ void Manifold::Impl::SetNormals(int normalIdx, float minSharpAngle) {
       int startEdge = 3 * tri + i;
       const int vert = halfedge_[startEdge].startVert;
 
-      if (vertNumSharp[vert] < 2) {
+      if (vertNumSharp[vert] < 2) {  // vertex has single normal
         const glm::vec3 normal = vertFlatFace[vert] >= 0
                                      ? faceNormal_[vertFlatFace[vert]]
                                      : vertNormal_[vert];
@@ -513,6 +529,7 @@ void Manifold::Impl::SetNormals(int normalIdx, float minSharpAngle) {
           meshRelation_.triProperties[thisTri][j] = prop;
           if (prop == lastProp) return;
           lastProp = prop;
+          // update property vertex
           auto start = oldProperties.begin() + prop * oldNumProp;
           std::copy(start, start + oldNumProp,
                     meshRelation_.properties.begin() + prop * numProp);
@@ -520,7 +537,7 @@ void Manifold::Impl::SetNormals(int normalIdx, float minSharpAngle) {
             meshRelation_.properties[prop * numProp + normalIdx + i] =
                 normal[i];
         });
-      } else {
+      } else {  // vertex has multiple normals
         const glm::vec3 centerPos = vertPos_[vert];
         // Length degree
         std::vector<int> group;
@@ -529,7 +546,7 @@ void Manifold::Impl::SetNormals(int normalIdx, float minSharpAngle) {
         int current = startEdge;
         int prevFace = halfedge_[current].face;
 
-        do {
+        do {  // find a sharp edge to start on
           int next = NextHalfedge(halfedge_[current].pairedHalfedge);
           const int face = halfedge_[next].face;
 
@@ -553,16 +570,33 @@ void Manifold::Impl::SetNormals(int normalIdx, float minSharpAngle) {
           glm::vec3 edgeVec;
         };
 
+        // calculate pseudo-normals between each sharp edge
         ForVert<FaceEdge>(
             endEdge,
-            [this, centerPos](int current) {
+            [this, centerPos, &vertNumSharp, &vertFlatFace](int current) {
+              if (IsInsideQuad(current)) {
+                return FaceEdge({halfedge_[current].face, glm::vec3(NAN)});
+              }
+              const int vert = halfedge_[current].endVert;
+              glm::vec3 pos = vertPos_[vert];
+              const glm::vec3 edgeVec = centerPos - pos;
+              if (vertNumSharp[vert] < 2) {
+                // opposite vert has fixed normal
+                const glm::vec3 normal = vertFlatFace[vert] >= 0
+                                             ? faceNormal_[vertFlatFace[vert]]
+                                             : vertNormal_[vert];
+                // Flair out the normal we're calculating to give the edge a
+                // more constant curvature to meet the opposite normal. Achieve
+                // this by pointing the tangent toward the opposite bezier
+                // control point instead of the vert itself.
+                pos += glm::vec3(TangentFromNormal(
+                    normal, halfedge_[current].pairedHalfedge));
+              }
               return FaceEdge(
-                  {halfedge_[current].face,
-                   glm::normalize(vertPos_[halfedge_[current].endVert] -
-                                  centerPos)});
+                  {halfedge_[current].face, SafeNormalize(pos - centerPos)});
             },
             [this, &triIsFlatFace, &normals, &group, minSharpAngle](
-                int current, const FaceEdge& here, const FaceEdge& next) {
+                int current, const FaceEdge& here, FaceEdge& next) {
               const float dihedral = glm::degrees(glm::acos(
                   glm::dot(faceNormal_[here.face], faceNormal_[next.face])));
               if (dihedral > minSharpAngle ||
@@ -573,12 +607,17 @@ void Manifold::Impl::SetNormals(int normalIdx, float minSharpAngle) {
                 normals.push_back(glm::vec3(0));
               }
               group.push_back(normals.size() - 1);
-              normals.back() += faceNormal_[next.face] *
-                                AngleBetween(here.edgeVec, next.edgeVec);
+              if (glm::isfinite(next.edgeVec.x)) {
+                normals.back() +=
+                    SafeNormalize(glm::cross(next.edgeVec, here.edgeVec)) *
+                    AngleBetween(here.edgeVec, next.edgeVec);
+              } else {
+                next.edgeVec = here.edgeVec;
+              }
             });
 
         for (auto& normal : normals) {
-          normal = glm::normalize(normal);
+          normal = SafeNormalize(normal);
         }
 
         int lastGroup = 0;
@@ -592,6 +631,7 @@ void Manifold::Impl::SetNormals(int normalIdx, float minSharpAngle) {
           auto start = oldProperties.begin() + prop * oldNumProp;
 
           if (group[idx] != lastGroup && group[idx] != 0 && prop == lastProp) {
+            // split property vertex, duplicating but with an updated normal
             lastGroup = group[idx];
             newProp = NumPropVert();
             meshRelation_.properties.resize(meshRelation_.properties.size() +
@@ -603,6 +643,7 @@ void Manifold::Impl::SetNormals(int normalIdx, float minSharpAngle) {
                   normals[group[idx]][i];
             }
           } else if (prop != lastProp) {
+            // update property vertex
             lastProp = prop;
             newProp = prop;
             std::copy(start, start + oldNumProp,
@@ -612,6 +653,7 @@ void Manifold::Impl::SetNormals(int normalIdx, float minSharpAngle) {
                   normals[group[idx]][i];
           }
 
+          // point to updated property vertex
           meshRelation_.triProperties[thisTri][j] = newProp;
           ++idx;
         });
@@ -687,8 +729,9 @@ void Manifold::Impl::DistributeTangents(const Vec<bool>& fixedHalfedges) {
         const glm::vec3 center = vertPos_[halfedge_[halfedge].startVert];
         glm::vec3 lastEdgeVec =
             SafeNormalize(vertPos_[halfedge_[halfedge].endVert] - center);
-        glm::vec3 lastTangent =
+        const glm::vec3 firstTangent =
             SafeNormalize(glm::vec3(halfedgeTangent_[halfedge]));
+        glm::vec3 lastTangent = firstTangent;
         int current = halfedge;
         do {
           current = NextHalfedge(halfedge_[current].pairedHalfedge);
@@ -697,16 +740,20 @@ void Manifold::Impl::DistributeTangents(const Vec<bool>& fixedHalfedges) {
               SafeNormalize(vertPos_[halfedge_[current].endVert] - center);
           const glm::vec3 thisTangent =
               SafeNormalize(glm::vec3(halfedgeTangent_[current]));
-          const glm::vec3 cp = glm::cross(thisTangent, lastTangent);
-          normal += cp;
+          normal += glm::cross(thisTangent, lastTangent);
           // cumulative sum
           desiredAngle.push_back(
               AngleBetween(thisEdgeVec, lastEdgeVec) +
               (desiredAngle.size() > 0 ? desiredAngle.back() : 0));
-          currentAngle.push_back(
-              AngleBetween(thisTangent, lastTangent) *
-                  glm::sign(glm::dot(cp, approxNormal)) +
-              (currentAngle.size() > 0 ? currentAngle.back() : 0));
+          if (current == halfedge) {
+            currentAngle.push_back(glm::two_pi<float>());
+          } else {
+            currentAngle.push_back(AngleBetween(thisTangent, firstTangent));
+            if (glm::dot(approxNormal, glm::cross(thisTangent, firstTangent)) <
+                0) {
+              currentAngle.back() = glm::two_pi<float>() - currentAngle.back();
+            }
+          }
           lastEdgeVec = thisEdgeVec;
           lastTangent = thisTangent;
         } while (!fixedHalfedges[current]);
@@ -717,7 +764,7 @@ void Manifold::Impl::DistributeTangents(const Vec<bool>& fixedHalfedges) {
         float offset = 0;
         if (current == halfedge) {  // only one - find average offset
           for (size_t i = 0; i < currentAngle.size(); ++i) {
-            offset += currentAngle[i] - scale * desiredAngle[i];
+            offset += Wrap(currentAngle[i] - scale * desiredAngle[i]);
           }
           offset /= currentAngle.size();
         }
@@ -727,8 +774,17 @@ void Manifold::Impl::DistributeTangents(const Vec<bool>& fixedHalfedges) {
         do {
           current = NextHalfedge(halfedge_[current].pairedHalfedge);
           if (IsMarkedInsideQuad(current)) continue;
-          const float angle =
-              currentAngle[i] - scale * desiredAngle[i] - offset;
+          desiredAngle[i] *= scale;
+          const float lastAngle = i > 0 ? desiredAngle[i - 1] : 0;
+          // shrink obtuse angles
+          if (desiredAngle[i] - lastAngle > glm::pi<float>()) {
+            desiredAngle[i] = lastAngle + glm::pi<float>();
+          } else if (i + 1 < desiredAngle.size() &&
+                     scale * desiredAngle[i + 1] - desiredAngle[i] >
+                         glm::pi<float>()) {
+            desiredAngle[i] = scale * desiredAngle[i + 1] - glm::pi<float>();
+          }
+          const float angle = currentAngle[i] - desiredAngle[i] - offset;
           glm::vec3 tangent(halfedgeTangent_[current]);
           halfedgeTangent_[current] = glm::vec4(
               glm::rotate(tangent, angle, normal), halfedgeTangent_[current].w);
@@ -793,15 +849,15 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
                 }
               }
               // calculate tangents
-              const glm::vec3 edge = vertPos_[halfedge_[halfedge].endVert] -
-                                     vertPos_[halfedge_[halfedge].startVert];
               if (differentNormals) {
+                const glm::vec3 edgeVec =
+                    vertPos_[halfedge_[halfedge].endVert] -
+                    vertPos_[halfedge_[halfedge].startVert];
                 const glm::vec3 dir = glm::cross(here.normal, next.normal);
-                tangent[halfedge] =
-                    CircularTangent(glm::sign(glm::dot(dir, edge)) * dir, edge);
+                tangent[halfedge] = CircularTangent(
+                    glm::sign(glm::dot(dir, edgeVec)) * dir, edgeVec);
               } else {
-                tangent[halfedge] =
-                    CircularTangent(OrthogonalTo(edge, here.normal), edge);
+                tangent[halfedge] = TangentFromNormal(here.normal, halfedge);
               }
             });
 

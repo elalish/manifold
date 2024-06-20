@@ -158,6 +158,60 @@ void PrintFailure(const std::exception &e, const PolygonsIdx &polys,
 #endif
 
 /**
+ * Tests if the input polygons are convex by searching for any reflex vertices.
+ * Exactly colinear edges and zero-length edges are treated conservatively as
+ * reflex. Does not check for overlaps.
+ */
+bool IsConvex(const PolygonsIdx &polys, float precision) {
+  for (const SimplePolygonIdx &poly : polys) {
+    const glm::vec2 firstEdge = poly[0].pos - poly[poly.size() - 1].pos;
+    // Zero-length edges comes out NaN, which won't trip the early return, but
+    // it's okay because that zero-length edge will also get tested
+    // non-normalized and will trip det == 0.
+    glm::vec2 lastEdge = glm::normalize(firstEdge);
+    for (int v = 0; v < poly.size(); ++v) {
+      const glm::vec2 edge =
+          v + 1 < poly.size() ? poly[v + 1].pos - poly[v].pos : firstEdge;
+      const float det = determinant2x2(lastEdge, edge);
+      if (det <= 0 ||
+          (glm::abs(det) < precision && glm::dot(lastEdge, edge) < 0))
+        return false;
+      lastEdge = glm::normalize(edge);
+    }
+  }
+  return true;
+}
+
+/**
+ * Triangulates a set of convex polygons by alternating instead of a fan, to
+ * avoid creating high-degree vertices.
+ */
+std::vector<glm::ivec3> TriangulateConvex(const PolygonsIdx &polys) {
+  const int numTri = transform_reduce<int>(
+      autoPolicy(polys.size()), polys.begin(), polys.end(),
+      [](const SimplePolygonIdx &poly) { return poly.size() - 2; }, 0,
+      thrust::plus<int>());
+  std::vector<glm::ivec3> triangles;
+  triangles.reserve(numTri);
+  for (const SimplePolygonIdx &poly : polys) {
+    int i = 0;
+    int k = poly.size() - 1;
+    bool right = true;
+    while (i + 1 < k) {
+      const int j = right ? i + 1 : k - 1;
+      triangles.push_back({poly[i].idx, poly[j].idx, poly[k].idx});
+      if (right) {
+        i = j;
+      } else {
+        k = j;
+      }
+      right = !right;
+    }
+  }
+  return triangles;
+}
+
+/**
  * Ear-clipping triangulator based on David Eberly's approach from Geometric
  * Tools, but adjusted to handle epsilon-valid polygons, and including a
  * fallback that ensures a manifold triangulation even for overlapping polygons.
@@ -344,7 +398,21 @@ class EarClip {
     // it finds a clear geometric result. In the vast majority of cases the loop
     // will only need one or two iterations.
     bool IsConvex(float precision) const {
+      const int convexity = CCW(left->pos, pos, right->pos, precision);
+      if (convexity != 0) {
+        return convexity > 0;
+      }
+      if (glm::dot(left->pos - pos, right->pos - pos) <= 0) {
+        return true;
+      }
       return left->InsideEdge(left->right, precision, true);
+    }
+
+    // Subtly different from !IsConvex because IsConvex will return true for
+    // colinear non-folded verts, while IsReflex will always check until actual
+    // certainty is determined.
+    bool IsReflex(float precision) const {
+      return !left->InsideEdge(left->right, precision, true);
     }
 
     // This function is the core of finding a proper place to keyhole. It runs
@@ -361,10 +429,11 @@ class EarClip {
     std::pair<VertItr, bool> InterpY2X(glm::vec2 start, int onTop,
                                        float precision) const {
       const auto none = std::make_pair(left, false);
-      if (pos.y < start.y && right->pos.y >= start.y) {
+      if (pos.y < start.y && right->pos.y >= start.y &&
+          (pos.x > start.x - precision || right->pos.x > start.x - precision)) {
         return std::make_pair(left->right, true);
-      } else if (pos.x > start.x - precision && pos.y > start.y - precision &&
-                 pos.y < start.y + precision &&
+      } else if (onTop != 0 && pos.x > start.x - precision &&
+                 pos.y > start.y - precision && pos.y < start.y + precision &&
                  Interior(start, precision) >= 0) {
         if (onTop > 0 && left->pos.x < pos.x &&
             left->pos.y > start.y - precision) {
@@ -433,7 +502,7 @@ class EarClip {
       float totalCost = glm::dot(left->rightDir, rightDir) - 1 - precision;
       if (CCW(pos, left->pos, right->pos, precision) == 0) {
         // Clip folded ears first
-        return totalCost < -1 ? kBest : 0;
+        return totalCost;
       }
 
       Vec<Box> earBox;
@@ -525,13 +594,6 @@ class EarClip {
       // triangulations of polygons with holes, due to vert duplication.
       triangles_.push_back(
           {ear->left->mesh_idx, ear->mesh_idx, ear->right->mesh_idx});
-#ifdef MANIFOLD_DEBUG
-      if (params.verbose) {
-        std::cout << "output tri: " << ear->mesh_idx << ", "
-                  << ear->right->mesh_idx << ", " << ear->left->mesh_idx
-                  << std::endl;
-      }
-#endif
     } else {
       PRINT("Topological degenerate!");
     }
@@ -611,7 +673,7 @@ class EarClip {
       areaCompensation += (area - t1) + area1;
       area = t1;
 
-      if (!v->IsConvex(precision_) && v->pos.x > maxX) {
+      if (v->pos.x > maxX) {
         maxX = v->pos.x;
         start = v;
       }
@@ -697,7 +759,7 @@ class EarClip {
           vert->pos.y * above > start->pos.y * above - precision_ &&
           (inside > 0 || (inside == 0 && vert->pos.x < best->pos.x)) &&
           vert->InsideEdge(edge, precision_, true) &&
-          !vert->IsConvex(precision_)) {
+          vert->IsReflex(precision_)) {
         if (vert->pos.y > start->pos.y - precision_ &&
             vert->pos.y < start->pos.y + precision_) {
           if (onTop > 0 && vert->left->pos.x < vert->pos.x &&
@@ -754,6 +816,8 @@ class EarClip {
     } else if (v->IsConvex(precision_)) {
       v->cost = v->EarCost(precision_, collider);
       v->ear = earsQueue_.insert(v);
+    } else {
+      v->cost = 1;  // not used, but marks reflex verts for debug
     }
   }
 
@@ -852,6 +916,15 @@ class EarClip {
     std::cout << "  [" << v->pos.x << ", " << v->pos.y << "],# " << v->mesh_idx
               << std::endl;
     std::cout << "]))" << std::endl;
+
+    v = start;
+    std::cout << "polys.push_back({" << std::setprecision(9) << std::endl;
+    do {
+      std::cout << "    {" << v->pos.x << ", " << v->pos.y << "},  //"
+                << std::endl;
+      v = v->right;
+    } while (v != start);
+    std::cout << "});" << std::endl;
 #endif
   }
 };
@@ -875,26 +948,32 @@ namespace manifold {
 std::vector<glm::ivec3> TriangulateIdx(const PolygonsIdx &polys,
                                        float precision) {
   std::vector<glm::ivec3> triangles;
-#if MANIFOLD_EXCEPTIONS
+  float updatedPrecision = precision;
+#if MANIFOLD_EXCEPTION
   try {
 #endif
-    EarClip triangulator(polys, precision);
-    triangles = triangulator.Triangulate();
-#if MANIFOLD_EXCEPTIONS
+    if (IsConvex(polys, precision)) {  // fast path
+      triangles = TriangulateConvex(polys);
+    } else {
+      EarClip triangulator(polys, precision);
+      triangles = triangulator.Triangulate();
+      updatedPrecision = triangulator.GetPrecision();
+    }
+#if MANIFOLD_EXCEPTION
 #ifdef MANIFOLD_DEBUG
     if (params.intermediateChecks) {
       CheckTopology(triangles, polys);
       if (!params.processOverlaps) {
-        CheckGeometry(triangles, polys, 2 * triangulator.GetPrecision());
+        CheckGeometry(triangles, polys, 2 * updatedPrecision);
       }
     }
   } catch (const geometryErr &e) {
     if (!params.suppressErrors) {
-      PrintFailure(e, polys, triangles, precision);
+      PrintFailure(e, polys, triangles, updatedPrecision);
     }
     throw;
   } catch (const std::exception &e) {
-    PrintFailure(e, polys, triangles, precision);
+    PrintFailure(e, polys, triangles, updatedPrecision);
     throw;
 #else
   } catch (const std::exception &e) {

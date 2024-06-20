@@ -723,7 +723,7 @@ Manifold Manifold::SmoothOut(float minSharpAngle, float minSmoothness) const {
       Vec<glm::ivec3> triProperties = pImpl->meshRelation_.triProperties;
       pImpl->SetNormals(0, minSharpAngle);
       pImpl->CreateTangents(0);
-      pImpl->meshRelation_.numProp = 0;
+      pImpl->meshRelation_.numProp = numProp;
       pImpl->meshRelation_.properties.swap(properties);
       pImpl->meshRelation_.triProperties.swap(triProperties);
     } else {

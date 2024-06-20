@@ -155,29 +155,16 @@ export const examples = {
       setMinCircularAngle(3);
       setMinCircularEdgeLength(0.5);
       const result = roundedFrame(100, 10);
-      // Demonstrate how you can use the .split method to performs
+      // Demonstrate how you can use the .split method to perform
       // a subtraction and an intersection at once
       const [inside, outside] = result.split(cube(100, true));
 
-      const rootNode = new GLTFNode();
-
-      const outsideNode = new GLTFNode(rootNode);
+      const outsideNode = new GLTFNode();
       outsideNode.manifold = outside;
 
-      const insideNode = new GLTFNode(rootNode);
-      insideNode.scale = (t) => {
-        const isInsideVisible = t < 0.5;
-        return isInsideVisible ? [1, 1, 1] : [0, 0, 0];
-      };
-      insideNode.material = {
-        metallic: 1,
-        baseColorFactor: [1, 1, .3],
-        roughness: .5,
-      };
+      const insideNode = new GLTFNode();
       insideNode.manifold = inside;
-
-      globalDefaults.animationLength = 3;  // seconds
-      globalDefaults.animationMode = 'ping-pong';
+      insideNode.material = {baseColorFactor: [0, 1, 1]};
 
       return result;
     },

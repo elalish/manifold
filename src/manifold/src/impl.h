@@ -78,14 +78,14 @@ struct Manifold::Impl {
   }
 
   template <typename T>
-  void ForVert(int halfedge, std::function<T(int halfedge)> transform,
-               std::function<void(int halfedge, const T& here, const T& next)>
-                   binaryOp) {
+  void ForVert(
+      int halfedge, std::function<T(int halfedge)> transform,
+      std::function<void(int halfedge, const T& here, T& next)> binaryOp) {
     T here = transform(halfedge);
     int current = halfedge;
     do {
       const int nextHalfedge = NextHalfedge(halfedge_[current].pairedHalfedge);
-      const T next = transform(nextHalfedge);
+      T next = transform(nextHalfedge);
       binaryOp(current, here, next);
       here = next;
       current = nextHalfedge;
@@ -174,6 +174,7 @@ struct Manifold::Impl {
   bool IsInsideQuad(int halfedge) const;
   bool IsMarkedInsideQuad(int halfedge) const;
   glm::vec3 GetNormal(int halfedge, int normalIdx) const;
+  glm::vec4 TangentFromNormal(const glm::vec3& normal, int halfedge) const;
   std::vector<Smoothness> UpdateSharpenedEdges(
       const std::vector<Smoothness>&) const;
   Vec<bool> FlatFaces() const;
