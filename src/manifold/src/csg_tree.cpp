@@ -457,7 +457,7 @@ std::shared_ptr<Manifold::Impl> CsgOpNode::BatchBoolean(
     std::vector<std::shared_ptr<const Manifold::Impl>> &results) {
   ZoneScoped;
   auto getImplPtr = GetImplPtr();
-  ASSERT(operation != OpType::Subtract, logicErr,
+  DEBUG_ASSERT(operation != OpType::Subtract, logicErr,
          "BatchBoolean doesn't support Difference.");
   // common cases
   if (results.size() == 0) return std::make_shared<Manifold::Impl>();

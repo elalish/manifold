@@ -80,7 +80,7 @@ namespace manifold {
  */
 Manifold Manifold::Smooth(const MeshGL& meshGL,
                           const std::vector<Smoothness>& sharpenedEdges) {
-  ASSERT(meshGL.halfedgeTangent.empty(), std::runtime_error,
+  DEBUG_ASSERT(meshGL.halfedgeTangent.empty(), std::runtime_error,
          "when supplying tangents, the normal constructor should be used "
          "rather than Smooth().");
 
@@ -122,7 +122,7 @@ Manifold Manifold::Smooth(const MeshGL& meshGL,
  */
 Manifold Manifold::Smooth(const Mesh& mesh,
                           const std::vector<Smoothness>& sharpenedEdges) {
-  ASSERT(mesh.halfedgeTangent.empty(), std::runtime_error,
+  DEBUG_ASSERT(mesh.halfedgeTangent.empty(), std::runtime_error,
          "when supplying tangents, the normal constructor should be used "
          "rather than Smooth().");
 

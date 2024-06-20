@@ -133,7 +133,7 @@ class SparseIndices {
   }
 
   size_t RemoveZeros(Vec<int>& S) {
-    ASSERT(S.size() == size(), userErr,
+    DEBUG_ASSERT(S.size() == size(), userErr,
            "Different number of values than indicies!");
     VecView<int64_t> view = AsVec64();
     auto zBegin = zip(S.begin(), view.begin());
@@ -164,7 +164,7 @@ class SparseIndices {
 
   template <typename T>
   size_t KeepFinite(Vec<T>& v, Vec<int>& x) {
-    ASSERT(x.size() == size(), userErr,
+    DEBUG_ASSERT(x.size() == size(), userErr,
            "Different number of values than indicies!");
     VecView<int64_t> view = AsVec64();
     auto zBegin = zip(v.begin(), x.begin(), view.begin());

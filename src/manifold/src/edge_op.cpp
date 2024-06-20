@@ -368,7 +368,7 @@ void Manifold::Impl::UpdateVert(int vert, int startEdge, int endEdge) {
     current = NextHalfedge(current);
     halfedge_[current].startVert = vert;
     current = halfedge_[current].pairedHalfedge;
-    ASSERT(current != startEdge, logicErr, "infinite loop in decimator!");
+    DEBUG_ASSERT(current != startEdge, logicErr, "infinite loop in decimator!");
   }
 }
 

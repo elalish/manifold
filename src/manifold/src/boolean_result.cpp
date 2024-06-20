@@ -243,12 +243,12 @@ std::vector<Halfedge> PairUp(std::vector<EdgePos> &edgePos) {
   // geometrically valid. If the order does not go start-end-start-end... then
   // the input and output are not geometrically valid and this algorithm becomes
   // a heuristic.
-  ASSERT(edgePos.size() % 2 == 0, topologyErr,
+  DEBUG_ASSERT(edgePos.size() % 2 == 0, topologyErr,
          "Non-manifold edge! Not an even number of points.");
   ssize_t nEdges = edgePos.size() / 2;
   auto middle = std::partition(edgePos.begin(), edgePos.end(),
                                [](EdgePos x) { return x.isStart; });
-  ASSERT(middle - edgePos.begin() == nEdges, topologyErr, "Non-manifold edge!");
+  DEBUG_ASSERT(middle - edgePos.begin() == nEdges, topologyErr, "Non-manifold edge!");
   auto cmp = [](EdgePos a, EdgePos b) { return a.edgePos < b.edgePos; };
   std::stable_sort(edgePos.begin(), middle, cmp);
   std::stable_sort(middle, edgePos.end(), cmp);
@@ -642,7 +642,7 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   assemble.Start();
 #endif
 
-  ASSERT((expandP_ > 0) == (op == OpType::Add), logicErr,
+  DEBUG_ASSERT((expandP_ > 0) == (op == OpType::Add), logicErr,
          "Result op type not compatible with constructor op type.");
   const int c1 = op == OpType::Intersect ? 0 : 1;
   const int c2 = op == OpType::Add ? 1 : 0;
@@ -786,7 +786,7 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   // Level 6
 
   if (ManifoldParams().intermediateChecks)
-    ASSERT(outR.IsManifold(), logicErr, "polygon mesh is not manifold!");
+    DEBUG_ASSERT(outR.IsManifold(), logicErr, "polygon mesh is not manifold!");
 
   outR.Face2Tri(faceEdge, halfedgeRef);
 
@@ -797,7 +797,7 @@ Manifold::Impl Boolean3::Result(OpType op) const {
 #endif
 
   if (ManifoldParams().intermediateChecks)
-    ASSERT(outR.IsManifold(), logicErr, "triangulated mesh is not manifold!");
+    DEBUG_ASSERT(outR.IsManifold(), logicErr, "triangulated mesh is not manifold!");
 
   CreateProperties(outR, inP_, inQ_);
 
@@ -806,7 +806,7 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   outR.SimplifyTopology();
 
   if (ManifoldParams().intermediateChecks)
-    ASSERT(outR.Is2Manifold(), logicErr, "simplified mesh is not 2-manifold!");
+    DEBUG_ASSERT(outR.Is2Manifold(), logicErr, "simplified mesh is not 2-manifold!");
 
 #ifdef MANIFOLD_DEBUG
   simplify.Stop();

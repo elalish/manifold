@@ -285,7 +285,7 @@ namespace manifold {
 Collider::Collider(const VecView<const Box>& leafBB,
                    const VecView<const uint32_t>& leafMorton) {
   ZoneScoped;
-  ASSERT(leafBB.size() == leafMorton.size(), userErr,
+  DEBUG_ASSERT(leafBB.size() == leafMorton.size(), userErr,
          "vectors must be the same length");
   int num_nodes = 2 * leafBB.size() - 1;
   // assign and allocate members
@@ -347,7 +347,7 @@ SparseIndices Collider::Collisions(const VecView<const T>& queriesIn) const {
  */
 void Collider::UpdateBoxes(const VecView<const Box>& leafBB) {
   ZoneScoped;
-  ASSERT(leafBB.size() == NumLeaves(), userErr,
+  DEBUG_ASSERT(leafBB.size() == NumLeaves(), userErr,
          "must have the same number of updated boxes as original");
   // copy in leaf node Boxes
   strided_range<Vec<Box>::Iter> leaves(nodeBBox_.begin(), nodeBBox_.end(), 2);

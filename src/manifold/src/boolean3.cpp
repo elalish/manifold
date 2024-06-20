@@ -30,7 +30,7 @@ namespace {
 glm::vec2 Interpolate(glm::vec3 pL, glm::vec3 pR, float x) {
   const float dxL = x - pL.x;
   const float dxR = x - pR.x;
-  ASSERT(dxL * dxR <= 0, logicErr, "Boolean manifold error: not in domain");
+  DEBUG_ASSERT(dxL * dxR <= 0, logicErr, "Boolean manifold error: not in domain");
   const bool useL = fabs(dxL) < fabs(dxR);
   const glm::vec3 dLR = pR - pL;
   const float lambda = (useL ? dxL : dxR) / dLR.x;
@@ -46,7 +46,7 @@ glm::vec4 Intersect(const glm::vec3 &pL, const glm::vec3 &pR,
                     const glm::vec3 &qL, const glm::vec3 &qR) {
   const float dyL = qL.y - pL.y;
   const float dyR = qR.y - pR.y;
-  ASSERT(dyL * dyR <= 0, logicErr, "Boolean manifold error: no intersection");
+  DEBUG_ASSERT(dyL * dyR <= 0, logicErr, "Boolean manifold error: no intersection");
   const bool useL = fabs(dyL) < fabs(dyR);
   const float dx = pR.x - pL.x;
   float lambda = (useL ? dyL : dyR) / (dyL - dyR);
@@ -236,7 +236,7 @@ struct Kernel11 {
     if (s11 == 0) {  // No intersection
       xyzz11 = glm::vec4(NAN);
     } else {
-      ASSERT(k == 2, logicErr, "Boolean manifold error: s11");
+      DEBUG_ASSERT(k == 2, logicErr, "Boolean manifold error: s11");
       xyzz11 = Intersect(pRL[0], pRL[1], qRL[0], qRL[1]);
 
       const int p1s = halfedgeP[p1].startVert;
@@ -328,13 +328,13 @@ struct Kernel02 {
     if (s02 == 0) {  // No intersection
       z02 = NAN;
     } else {
-      ASSERT(k == 2, logicErr, "Boolean manifold error: s02");
+      DEBUG_ASSERT(k == 2, logicErr, "Boolean manifold error: s02");
       glm::vec3 vertPos = vertPosP[p0];
       z02 = Interpolate(yzzRL[0], yzzRL[1], vertPos.y)[1];
       if (forward) {
         if (!Shadows(vertPos.z, z02, expandP * vertNormalP[p0].z)) s02 = 0;
       } else {
-        // ASSERT(closestVert != -1, topologyErr, "No closest vert");
+        // DEBUG_ASSERT(closestVert != -1, topologyErr, "No closest vert");
         if (!Shadows(z02, vertPos.z, expandP * vertNormalP[closestVert].z))
           s02 = 0;
       }
@@ -436,7 +436,7 @@ struct Kernel12 {
     if (x12 == 0) {  // No intersection
       v12 = glm::vec3(NAN);
     } else {
-      ASSERT(k == 2, logicErr, "Boolean manifold error: v12");
+      DEBUG_ASSERT(k == 2, logicErr, "Boolean manifold error: v12");
       const glm::vec4 xzyy =
           Intersect(xzyLR0[0], xzyLR0[1], xzyLR1[0], xzyLR1[1]);
       v12.x = xzyy[0];

@@ -63,19 +63,19 @@ std::vector<PolyEdge> Triangles2Edges(
 }
 
 void CheckTopology(const std::vector<PolyEdge> &halfedges) {
-  ASSERT(halfedges.size() % 2 == 0, topologyErr, "Odd number of halfedges.");
+  DEBUG_ASSERT(halfedges.size() % 2 == 0, topologyErr, "Odd number of halfedges.");
   ssize_t n_edges = halfedges.size() / 2;
   std::vector<PolyEdge> forward(halfedges.size()), backward(halfedges.size());
 
   auto end = std::copy_if(halfedges.begin(), halfedges.end(), forward.begin(),
                           [](PolyEdge e) { return e.endVert > e.startVert; });
-  ASSERT(std::distance(forward.begin(), end) == n_edges, topologyErr,
+  DEBUG_ASSERT(std::distance(forward.begin(), end) == n_edges, topologyErr,
          "Half of halfedges should be forward.");
   forward.resize(n_edges);
 
   end = std::copy_if(halfedges.begin(), halfedges.end(), backward.begin(),
                      [](PolyEdge e) { return e.endVert < e.startVert; });
-  ASSERT(std::distance(backward.begin(), end) == n_edges, topologyErr,
+  DEBUG_ASSERT(std::distance(backward.begin(), end) == n_edges, topologyErr,
          "Half of halfedges should be backward.");
   backward.resize(n_edges);
 
@@ -88,7 +88,7 @@ void CheckTopology(const std::vector<PolyEdge> &halfedges) {
   std::stable_sort(forward.begin(), forward.end(), cmp);
   std::stable_sort(backward.begin(), backward.end(), cmp);
   for (ssize_t i = 0; i < n_edges; ++i) {
-    ASSERT(forward[i].startVert == backward[i].startVert &&
+    DEBUG_ASSERT(forward[i].startVert == backward[i].startVert &&
                forward[i].endVert == backward[i].endVert,
            topologyErr, "Not manifold.");
   }
@@ -112,7 +112,7 @@ void CheckGeometry(const std::vector<glm::ivec3> &triangles,
       vertPos[poly[i].idx] = poly[i].pos;
     }
   }
-  ASSERT(std::all_of(triangles.begin(), triangles.end(),
+  DEBUG_ASSERT(std::all_of(triangles.begin(), triangles.end(),
                      [&vertPos, precision](const glm::ivec3 &tri) {
                        return CCW(vertPos[tri[0]], vertPos[tri[1]],
                                   vertPos[tri[2]], precision) >= 0;
@@ -899,7 +899,7 @@ class EarClip {
       v = v->right;
     }
 
-    ASSERT(v->right == v->left, logicErr, "Triangulator error!");
+    DEBUG_ASSERT(v->right == v->left, logicErr, "Triangulator error!");
     PRINT("Finished poly");
   }
 

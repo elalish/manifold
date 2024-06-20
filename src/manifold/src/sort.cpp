@@ -245,7 +245,7 @@ void Manifold::Impl::Finish() {
   if (halfedge_.size() == 0) return;
   CompactProps();
 
-  ASSERT(halfedge_.size() % 6 == 0, topologyErr,
+  DEBUG_ASSERT(halfedge_.size() % 6 == 0, topologyErr,
          "Not an even number of faces after sorting faces!");
 
 #ifdef MANIFOLD_DEBUG
@@ -254,25 +254,25 @@ void Manifold::Impl::Finish() {
                              halfedge_.end(), extrema, Extrema());
 #endif
 
-  ASSERT(extrema.startVert >= 0, topologyErr, "Vertex index is negative!");
-  ASSERT(extrema.endVert < static_cast<int>(NumVert()), topologyErr,
+  DEBUG_ASSERT(extrema.startVert >= 0, topologyErr, "Vertex index is negative!");
+  DEBUG_ASSERT(extrema.endVert < static_cast<int>(NumVert()), topologyErr,
          "Vertex index exceeds number of verts!");
-  ASSERT(extrema.face >= 0, topologyErr, "Face index is negative!");
-  ASSERT(extrema.face < static_cast<int>(NumTri()), topologyErr,
+  DEBUG_ASSERT(extrema.face >= 0, topologyErr, "Face index is negative!");
+  DEBUG_ASSERT(extrema.face < static_cast<int>(NumTri()), topologyErr,
          "Face index exceeds number of faces!");
-  ASSERT(extrema.pairedHalfedge >= 0, topologyErr,
+  DEBUG_ASSERT(extrema.pairedHalfedge >= 0, topologyErr,
          "Halfedge index is negative!");
-  ASSERT(extrema.pairedHalfedge < 2 * static_cast<int>(NumEdge()), topologyErr,
+  DEBUG_ASSERT(extrema.pairedHalfedge < 2 * static_cast<int>(NumEdge()), topologyErr,
          "Halfedge index exceeds number of halfedges!");
-  ASSERT(meshRelation_.triRef.size() == NumTri() ||
+  DEBUG_ASSERT(meshRelation_.triRef.size() == NumTri() ||
              meshRelation_.triRef.size() == 0,
          logicErr, "Mesh Relation doesn't fit!");
-  ASSERT(faceNormal_.size() == NumTri() || faceNormal_.size() == 0, logicErr,
+  DEBUG_ASSERT(faceNormal_.size() == NumTri() || faceNormal_.size() == 0, logicErr,
          "faceNormal size = " + std::to_string(faceNormal_.size()) +
              ", NumTri = " + std::to_string(NumTri()));
   // TODO: figure out why this has a flaky failure and then enable reading
   // vertNormals from a Mesh.
-  // ASSERT(vertNormal_.size() == NumVert() || vertNormal_.size() == 0,
+  // DEBUG_ASSERT(vertNormal_.size() == NumVert() || vertNormal_.size() == 0,
   // logicErr,
   //        "vertNormal size = " + std::to_string(vertNormal_.size()) +
   //            ", NumVert = " + std::to_string(NumVert()));
@@ -280,7 +280,7 @@ void Manifold::Impl::Finish() {
   CalculateNormals();
   collider_ = Collider(faceBox, faceMorton);
 
-  ASSERT(Is2Manifold(), logicErr, "mesh is not 2-manifold!");
+  DEBUG_ASSERT(Is2Manifold(), logicErr, "mesh is not 2-manifold!");
 }
 
 /**

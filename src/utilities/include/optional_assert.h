@@ -31,8 +31,8 @@ void Assert(bool condition, const char* file, int line, const std::string& cond,
     throw Ex(output.str());
   }
 }
-#define ASSERT(condition, EX, msg) \
+#define DEBUG_ASSERT(condition, EX, msg) \
   Assert<EX>(condition, __FILE__, __LINE__, #condition, msg);
 #else
-#define ASSERT(condition, EX, msg)
+#define DEBUG_ASSERT(condition, EX, msg)
 #endif

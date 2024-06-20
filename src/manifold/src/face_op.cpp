@@ -49,7 +49,7 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
     const int firstEdge = faceEdge[face];
     const int lastEdge = faceEdge[face + 1];
     const int numEdge = lastEdge - firstEdge;
-    ASSERT(numEdge >= 3, topologyErr, "face has less than three edges.");
+    DEBUG_ASSERT(numEdge >= 3, topologyErr, "face has less than three edges.");
     const glm::vec3 normal = faceNormal_[face];
 
     if (numEdge == 3) {  // Single triangle
@@ -66,7 +66,7 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
         std::swap(tri[1], tri[2]);
         std::swap(ends[1], ends[2]);
       }
-      ASSERT(ends[0] == tri[1] && ends[1] == tri[2] && ends[2] == tri[0],
+      DEBUG_ASSERT(ends[0] == tri[1] && ends[1] == tri[2] && ends[2] == tri[0],
              topologyErr, "These 3 edges do not form a triangle!");
 
       addTri(face, tri, normal, halfedgeRef[firstEdge]);
@@ -94,7 +94,7 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
           tri1[1] = halfedge_[firstEdge + i].startVert;
         }
       }
-      ASSERT(glm::all(glm::greaterThanEqual(tri0, glm::ivec3(0))) &&
+      DEBUG_ASSERT(glm::all(glm::greaterThanEqual(tri0, glm::ivec3(0))) &&
                  glm::all(glm::greaterThanEqual(tri1, glm::ivec3(0))),
              topologyErr, "non-manifold quad!");
       bool firstValid = triCCW(tri0) && triCCW(tri1);
@@ -143,7 +143,7 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
   for_each(autoPolicy(faceEdge.size()), countAt(0_z),
            countAt(faceEdge.size() - 1), [&](size_t face) {
              triCount[face] = faceEdge[face + 1] - faceEdge[face] - 2;
-             ASSERT(triCount[face] >= 1, topologyErr,
+             DEBUG_ASSERT(triCount[face] >= 1, topologyErr,
                     "face has less than three edges.");
              if (triCount[face] > 2)
                group.run([&, face] {
@@ -223,7 +223,7 @@ PolygonsIdx Manifold::Impl::Face2Polygons(VecView<Halfedge>::IterC start,
     int vert = (start + thisEdge)->startVert;
     polys.back().push_back({projection * vertPos_[vert], vert});
     const auto result = vert_edge.find((start + thisEdge)->endVert);
-    ASSERT(result != vert_edge.end(), topologyErr, "non-manifold edge");
+    DEBUG_ASSERT(result != vert_edge.end(), topologyErr, "non-manifold edge");
     thisEdge = result->second;
     vert_edge.erase(result);
   }

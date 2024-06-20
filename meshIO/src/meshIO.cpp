@@ -91,7 +91,7 @@ void ExportScene(aiScene* scene, const std::string& filename) {
 
   delete scene;
 
-  ASSERT(result == AI_SUCCESS, userErr, exporter.GetErrorString());
+  DEBUG_ASSERT(result == AI_SUCCESS, userErr, exporter.GetErrorString());
 }
 }  // namespace
 
@@ -141,7 +141,7 @@ Mesh ImportMesh(const std::string& filename, bool forceCleanup) {
 
   const aiScene* scene = importer.ReadFile(filename, flags);
 
-  ASSERT(scene, userErr, importer.GetErrorString());
+  DEBUG_ASSERT(scene, userErr, importer.GetErrorString());
 
   Mesh mesh_out;
   for (size_t i = 0; i < scene->mNumMeshes; ++i) {
@@ -153,7 +153,7 @@ Mesh ImportMesh(const std::string& filename, bool forceCleanup) {
     }
     for (size_t j = 0; j < mesh_i->mNumFaces; ++j) {
       const aiFace face = mesh_i->mFaces[j];
-      ASSERT(face.mNumIndices == 3, userErr,
+      DEBUG_ASSERT(face.mNumIndices == 3, userErr,
              "Non-triangular face in " + filename);
       mesh_out.triVerts.emplace_back(face.mIndices[0], face.mIndices[1],
                                      face.mIndices[2]);
@@ -199,7 +199,7 @@ void ExportMesh(const std::string& filename, const MeshGL& mesh,
       int c = options.mat.normalChannels[i];
       validChannels &= c >= 3 && c < (int)mesh.numProp;
     }
-    ASSERT(validChannels, userErr,
+    DEBUG_ASSERT(validChannels, userErr,
            "When faceted is false, valid normalChannels must be supplied.");
     mesh_out->mNormals = new aiVector3D[mesh_out->mNumVertices];
   }
@@ -211,7 +211,7 @@ void ExportMesh(const std::string& filename, const MeshGL& mesh,
     validChannels &= c < (int)mesh.numProp;
     hasColor |= c >= 0;
   }
-  ASSERT(validChannels, userErr, "Invalid colorChannels.");
+  DEBUG_ASSERT(validChannels, userErr, "Invalid colorChannels.");
   if (hasColor) mesh_out->mColors[0] = new aiColor4D[mesh_out->mNumVertices];
 
   for (size_t i = 0; i < mesh_out->mNumVertices; ++i) {
@@ -284,13 +284,13 @@ void ExportMesh(const std::string& filename, const Mesh& mesh,
   mesh_out->mNumVertices = mesh.vertPos.size();
   mesh_out->mVertices = new aiVector3D[mesh_out->mNumVertices];
   if (!options.faceted) {
-    ASSERT(
+    DEBUG_ASSERT(
         mesh.vertNormal.size() == mesh.vertPos.size(), userErr,
         "vertNormal must be the same length as vertPos when faceted is false.");
     mesh_out->mNormals = new aiVector3D[mesh_out->mNumVertices];
   }
   if (!options.mat.vertColor.empty()) {
-    ASSERT(mesh.vertPos.size() == options.mat.vertColor.size(), userErr,
+    DEBUG_ASSERT(mesh.vertPos.size() == options.mat.vertColor.size(), userErr,
            "If present, vertColor must be the same length as vertPos.");
     mesh_out->mColors[0] = new aiColor4D[mesh_out->mNumVertices];
   }
