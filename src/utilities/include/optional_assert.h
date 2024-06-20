@@ -36,3 +36,10 @@ void Assert(bool condition, const char* file, int line, const std::string& cond,
 #else
 #define DEBUG_ASSERT(condition, EX, msg)
 #endif
+
+#if MANIFOLD_EXCEPTIONS
+#define ASSERT(condition, EX) \
+  if (!(condition)) throw (EX);
+#else
+#define ASSERT(condition, EX)
+#endif

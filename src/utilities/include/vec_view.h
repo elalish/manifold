@@ -18,6 +18,8 @@
 #include <stdexcept>
 #endif
 
+#include "optional_assert.h"
+
 namespace manifold {
 
 /**
@@ -48,16 +50,12 @@ class VecView {
   operator VecView<const T>() const { return {ptr_, size_}; }
 
   inline const T &operator[](size_t i) const {
-#if MANIFOLD_EXCEPTIONS
-    if (i >= size_) throw std::out_of_range("Vec out of range");
-#endif
+    ASSERT(i < size_, std::out_of_range("Vec out of range"));
     return ptr_[i];
   }
 
   inline T &operator[](size_t i) {
-#if MANIFOLD_EXCEPTIONS
-    if (i >= size_) throw std::out_of_range("Vec out of range");
-#endif
+    ASSERT(i < size_, std::out_of_range("Vec out of range"));
     return ptr_[i];
   }
 
@@ -71,34 +69,26 @@ class VecView {
   Iter end() { return ptr_ + size_; }
 
   const T &front() const {
-#if MANIFOLD_EXCEPTIONS
-    if (size_ == 0)
-      throw std::out_of_range("attempt to take the front of an empty vector");
-#endif
+    ASSERT(size_ != 0,
+           std::out_of_range("Attempt to take the front of an empty vector"));
     return ptr_[0];
   }
 
   const T &back() const {
-#if MANIFOLD_EXCEPTIONS
-    if (size_ == 0)
-      throw std::out_of_range("attempt to take the back of an empty vector");
-#endif
+    ASSERT(size_ != 0,
+           std::out_of_range("Attempt to take the back of an empty vector"));
     return ptr_[size_ - 1];
   }
 
   T &front() {
-#if MANIFOLD_EXCEPTIONS
-    if (size_ == 0)
-      throw std::out_of_range("attempt to take the front of an empty vector");
-#endif
+    ASSERT(size_ != 0,
+           std::out_of_range("Attempt to take the front of an empty vector"));
     return ptr_[0];
   }
 
   T &back() {
-#if MANIFOLD_EXCEPTIONS
-    if (size_ == 0)
-      throw std::out_of_range("attempt to take the back of an empty vector");
-#endif
+    ASSERT(size_ != 0,
+           std::out_of_range("Attempt to take the back of an empty vector"));
     return ptr_[size_ - 1];
   }
 
