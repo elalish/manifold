@@ -770,7 +770,7 @@ void Manifold::Impl::DistributeTangents(const Vec<bool>& fixedHalfedges) {
         }
 
         current = halfedge;
-        int i = 0;
+        size_t i = 0;
         do {
           current = NextHalfedge(halfedge_[current].pairedHalfedge);
           if (IsMarkedInsideQuad(current)) continue;
