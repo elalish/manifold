@@ -11,6 +11,7 @@ suffixes = ['', '_hull2', '_hull3', '_hull4', '_CGAL']
 # Function to calculate statistics for each base and implementation
 def calculate_stats(column, status,suffix):
     filtered_df = df[(df['Status'+suffix] == status) & ~df[column].isnull()]
+    # filtered_df = df[(df['Status'+suffix] == status) & ~df[column].isnull() & (df['Time'+suffix] > 0.001) & (df['Time'] > 0.001)]
     success_count = filtered_df.shape[0]
     
     if success_count > 0:

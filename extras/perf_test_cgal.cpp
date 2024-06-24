@@ -127,8 +127,17 @@ void PrintManifold(Manifold input, Manifold (Manifold::*hull_func)() const) {
   Manifold hullManifold = (input.*hull_func)();
   auto end = std::chrono::high_resolution_clock::now();
   // Manifold hullManifold;
+  // Manifold hullManifold2 = hullManifold.Hull2();
   PrintVolArea(input, cgalInput, hullMesh, hullManifold);
+  // PrintVolArea(input, cgalInput, hullMesh, hullManifold2);
+  // Manifold Fin21 = hullManifold2 - hullManifold;
+  // Manifold Fin12 = hullManifold - hullManifold2;
   std::chrono::duration<double> elapsed = end - start;
+  // ExportMesh("1750623.glb", Fin.GetMesh(), {});
+  // ExportMesh("39202_hull2_hull1.glb", Fin21.GetMesh(), {});
+  // ExportMesh("39202_hull1_hull2.glb", Fin12.GetMesh(), {});
+  // ExportMesh("39202_hull1.glb", hullManifold.GetMesh(), {});
+  // ExportMesh("39202_hull2.glb", hullManifold2.GetMesh(), {});
   std::cout << elapsed.count() << " sec" ;
 }
 
@@ -197,6 +206,6 @@ int main(int argc, char **argv) {
   // std::cout << argv[1] << std::endl;
   auto inputMesh = ImportMesh(argv[1], 1);
   Manifold inputManifold = Manifold(inputMesh);
-  PrintManifold(inputManifold, &Manifold::Hull3);
+  PrintManifold(inputManifold, &Manifold::Hull);
   // RunThingi10K(&Manifold::Hull4);
 }

@@ -11,7 +11,9 @@ for col in time_columns:
 base_columns = ['VolManifold', 'VolHull', 'AreaManifold', 'AreaHull', 'ManifoldTri', 'HullTri', 'Time']
 # List of suffixes to normalize
 suffixes = ['_hull2', '_hull3', '_hull4', '_CGAL']
-
+# for suffix in suffixes : 
+# For time metric avoiding cases with time less than 0.001 seconds
+df = df[(df['Time'] > 0.001)]
 # Normalize the columns and check for zero base values
 stl_files_with_diff = []
 
