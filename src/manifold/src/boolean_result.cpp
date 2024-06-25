@@ -52,14 +52,14 @@ struct AbsSum : public thrust::binary_function<int, int, int> {
 
 struct DuplicateVerts {
   VecView<glm::vec3> vertPosR;
+  VecView<const int> inclusion;
+  VecView<const int> vertR;
+  VecView<const glm::vec3> vertPosP;
 
-  void operator()(thrust::tuple<int, int, glm::vec3> in) {
-    int inclusion = abs(thrust::get<0>(in));
-    int vertR = thrust::get<1>(in);
-    glm::vec3 vertPosP = thrust::get<2>(in);
-
-    for (int i = 0; i < inclusion; ++i) {
-      vertPosR[vertR + i] = vertPosP;
+  void operator()(const int vert) {
+    const int n = glm::abs(inclusion[vert]);
+    for (int i = 0; i < n; ++i) {
+      vertPosR[vertR[vert] + i] = vertPosP[vert];
     }
   }
 };
@@ -77,13 +77,14 @@ template <const bool inverted>
 struct CountNewVerts {
   VecView<int> countP;
   VecView<int> countQ;
+  VecView<const int> i12;
   const SparseIndices &pq;
   VecView<const Halfedge> halfedges;
 
-  void operator()(thrust::tuple<int, int> in) {
-    int edgeP = pq.Get(thrust::get<0>(in), inverted);
-    int faceQ = pq.Get(thrust::get<0>(in), !inverted);
-    int inclusion = glm::abs(thrust::get<1>(in));
+  void operator()(const int idx) {
+    int edgeP = pq.Get(idx, inverted);
+    int faceQ = pq.Get(idx, !inverted);
+    int inclusion = glm::abs(i12[idx]);
 
     AtomicAdd(countQ[faceQ], inclusion);
     const Halfedge half = halfedges[edgeP];
@@ -114,12 +115,13 @@ std::tuple<Vec<int>, Vec<int>> SizeOutput(
            inP.halfedge_.end(), CountVerts({sidesPerFaceP, i03}));
   for_each(autoPolicy(inP.halfedge_.size()), inQ.halfedge_.begin(),
            inQ.halfedge_.end(), CountVerts({sidesPerFaceQ, i30}));
-  for_each_n(autoPolicy(i12.size()), zip(countAt(0), i12.begin()), i12.size(),
+
+  for_each_n(autoPolicy(i12.size()), countAt(0), i12.size(),
              CountNewVerts<false>(
-                 {sidesPerFaceP, sidesPerFaceQ, p1q2, inP.halfedge_}));
-  for_each_n(
-      autoPolicy(i21.size()), zip(countAt(0), i21.begin()), i21.size(),
-      CountNewVerts<true>({sidesPerFaceQ, sidesPerFaceP, p2q1, inQ.halfedge_}));
+                 {sidesPerFaceP, sidesPerFaceQ, i12, p1q2, inP.halfedge_}));
+  for_each_n(autoPolicy(i21.size()), countAt(0), i21.size(),
+             CountNewVerts<true>(
+                 {sidesPerFaceQ, sidesPerFaceP, i21, p2q1, inQ.halfedge_}));
 
   Vec<int> facePQ2R(inP.NumTri() + inQ.NumTri() + 1, 0);
   auto keepFace =
@@ -395,15 +397,16 @@ struct DuplicateHalfedges {
   VecView<Halfedge> halfedgesR;
   VecView<TriRef> halfedgeRef;
   VecView<int> facePtr;
+  VecView<const char> wholeHalfedgeP;
   VecView<const Halfedge> halfedgesP;
   VecView<const int> i03;
   VecView<const int> vP2R;
   VecView<const int> faceP2R;
   const bool forward;
 
-  void operator()(thrust::tuple<bool, Halfedge, int> in) {
-    if (!thrust::get<0>(in)) return;
-    Halfedge halfedge = thrust::get<1>(in);
+  void operator()(const int idx) {
+    if (!wholeHalfedgeP[idx]) return;
+    Halfedge halfedge = halfedgesP[idx];
     if (!halfedge.IsForward()) return;
 
     const int inclusion = i03[halfedge.startVert];
@@ -448,12 +451,12 @@ void AppendWholeEdges(Manifold::Impl &outR, Vec<int> &facePtrR,
                       const Vec<int> &vP2R, VecView<const int> faceP2R,
                       bool forward) {
   ZoneScoped;
-  for_each_n(ManifoldParams().deterministic ? ExecutionPolicy::Seq
-                                            : autoPolicy(inP.halfedge_.size()),
-             zip(wholeHalfedgeP.begin(), inP.halfedge_.begin(), countAt(0)),
-             inP.halfedge_.size(),
-             DuplicateHalfedges({outR.halfedge_, halfedgeRef, facePtrR,
-                                 inP.halfedge_, i03, vP2R, faceP2R, forward}));
+  for_each_n(
+      ManifoldParams().deterministic ? ExecutionPolicy::Seq
+                                     : autoPolicy(inP.halfedge_.size()),
+      countAt(0), inP.halfedge_.size(),
+      DuplicateHalfedges({outR.halfedge_, halfedgeRef, facePtrR, wholeHalfedgeP,
+                          inP.halfedge_, i03, vP2R, faceP2R, forward}));
 }
 
 struct MapTriRef {
@@ -489,6 +492,7 @@ void UpdateReference(Manifold::Impl &outR, const Manifold::Impl &inP,
 
 struct Barycentric {
   VecView<glm::vec3> uvw;
+  VecView<const TriRef> ref;
   VecView<const glm::vec3> vertPosP;
   VecView<const glm::vec3> vertPosQ;
   VecView<const glm::vec3> vertPosR;
@@ -497,9 +501,8 @@ struct Barycentric {
   VecView<const Halfedge> halfedgeR;
   const float precision;
 
-  void operator()(thrust::tuple<int, TriRef> in) {
-    const int tri = thrust::get<0>(in);
-    const TriRef refPQ = thrust::get<1>(in);
+  void operator()(const int tri) {
+    const TriRef refPQ = ref[tri];
     if (halfedgeR[3 * tri].startVert < 0) return;
 
     const int triPQ = refPQ.tri;
@@ -531,11 +534,10 @@ void CreateProperties(Manifold::Impl &outR, const Manifold::Impl &inP,
   outR.meshRelation_.triProperties.resize(numTri);
 
   Vec<glm::vec3> bary(outR.halfedge_.size());
-  for_each_n(autoPolicy(numTri),
-             zip(countAt(0), outR.meshRelation_.triRef.cbegin()), numTri,
-             Barycentric({bary, inP.vertPos_, inQ.vertPos_, outR.vertPos_,
-                          inP.halfedge_, inQ.halfedge_, outR.halfedge_,
-                          outR.precision_}));
+  for_each_n(autoPolicy(numTri), countAt(0), numTri,
+             Barycentric({bary, outR.meshRelation_.triRef, inP.vertPos_,
+                          inQ.vertPos_, outR.vertPos_, inP.halfedge_,
+                          inQ.halfedge_, outR.halfedge_, outR.precision_}));
 
   using Entry = std::pair<glm::ivec3, int>;
   int idMissProp = outR.NumVert();
@@ -711,19 +713,15 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   outR.vertPos_.resize(numVertR);
   // Add vertices, duplicating for inclusion numbers not in [-1, 1].
   // Retained vertices from P and Q:
-  for_each_n(autoPolicy(inP_.NumVert()),
-             zip(i03.begin(), vP2R.begin(), inP_.vertPos_.begin()),
-             inP_.NumVert(), DuplicateVerts({outR.vertPos_}));
-  for_each_n(autoPolicy(inQ_.NumVert()),
-             zip(i30.begin(), vQ2R.begin(), inQ_.vertPos_.begin()),
-             inQ_.NumVert(), DuplicateVerts({outR.vertPos_}));
+  for_each_n(autoPolicy(inP_.NumVert()), countAt(0), inP_.NumVert(),
+             DuplicateVerts({outR.vertPos_, i03, vP2R, inP_.vertPos_}));
+  for_each_n(autoPolicy(inQ_.NumVert()), countAt(0), inQ_.NumVert(),
+             DuplicateVerts({outR.vertPos_, i30, vQ2R, inQ_.vertPos_}));
   // New vertices created from intersections:
-  for_each_n(autoPolicy(i12.size()),
-             zip(i12.begin(), v12R.begin(), v12_.begin()), i12.size(),
-             DuplicateVerts({outR.vertPos_}));
-  for_each_n(autoPolicy(i21.size()),
-             zip(i21.begin(), v21R.begin(), v21_.begin()), i21.size(),
-             DuplicateVerts({outR.vertPos_}));
+  for_each_n(autoPolicy(i12.size()), countAt(0), i12.size(),
+             DuplicateVerts({outR.vertPos_, i12, v12R, v12_}));
+  for_each_n(autoPolicy(i21.size()), countAt(0), i21.size(),
+             DuplicateVerts({outR.vertPos_, i21, v21R, v21_}));
 
   PRINT(nPv << " verts from inP");
   PRINT(nQv << " verts from inQ");
