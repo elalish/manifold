@@ -813,7 +813,7 @@ class EarClip {
     if (v->IsShort(precision_)) {
       v->cost = kBest;
       v->ear = earsQueue_.insert(v);
-    } else if (v->IsConvex(precision_)) {
+    } else if (v->IsConvex(2 * precision_)) {
       v->cost = v->EarCost(precision_, collider);
       v->ear = earsQueue_.insert(v);
     } else {
