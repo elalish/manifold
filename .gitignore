@@ -117,6 +117,8 @@ __pycache__
 *.sublime-project
 *.sublime-workspace
 .cache
+.pyodide-xbuildenv*
+dist
 
 # PyCharm
 .idea

@@ -28,9 +28,8 @@ set_target_properties(manifoldjs PROPERTIES OUTPUT_NAME "manifold")
 file(MAKE_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/examples/built)
 
 # ensure that interface files are copied over when modified
-add_custom_target(js_deps ALL
-        DEPENDS manifoldjs
-               ${CMAKE_CURRENT_SOURCE_DIR}/manifold*.d.ts)
+FILE(GLOB TS_SIGNATURE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/manifold*.d.ts)
+add_custom_target(js_deps ALL DEPENDS manifoldjs ${TS_SIGNATURE_FILES})
 
 # copy WASM build back here for publishing to npm
 add_custom_command(
