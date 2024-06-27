@@ -549,10 +549,10 @@ bool MeshGL::Merge() {
     strided_range<Vec<float>::Iter> iPos(vertPropD.begin() + i, vertPropD.end(),
                                          numProp);
     auto minMax = transform_reduce<thrust::pair<float, float>>(
-        autoPolicy(numVert), iPos.begin(), iPos.end(), Duplicate(),
+        autoPolicy(numVert), iPos.begin(), iPos.end(),
         thrust::make_pair(std::numeric_limits<float>::infinity(),
                           -std::numeric_limits<float>::infinity()),
-        MinMax());
+        MinMax(), Duplicate());
     bBox.min[i] = minMax.first;
     bBox.max[i] = minMax.second;
   }

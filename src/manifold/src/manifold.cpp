@@ -171,8 +171,13 @@ Mesh Manifold::GetMesh() const {
 
   result.triVerts.resize(NumTri());
   // note that `triVerts` is `std::vector`, so we cannot use thrust::device
-  thrust::for_each_n(thrust::host, zip(result.triVerts.begin(), countAt(0)),
-                     NumTri(), MakeTri({impl.halfedge_}));
+  for (int i = 0; i < NumTri(); i++) {
+    glm::ivec3& tri = result.triVerts[i];
+    const int face = 3 * i;
+    for (int i : {0, 1, 2}) {
+      tri[i] = impl.halfedge_[face + i].startVert;
+    }
+  }
 
   return result;
 }
@@ -620,12 +625,13 @@ Manifold Manifold::SetProperties(
     } else {
       pImpl->meshRelation_.properties = Vec<float>(numProp * NumPropVert(), 0);
     }
-    thrust::for_each_n(
-        thrust::host, countAt(0), NumTri(),
-        UpdateProperties({pImpl->meshRelation_.properties.data(), numProp,
-                          oldProperties.data(), oldNumProp,
-                          pImpl->vertPos_.data(), triProperties.data(),
-                          pImpl->halfedge_.data(), propFunc}));
+    auto up = UpdateProperties({pImpl->meshRelation_.properties.data(), numProp,
+                                oldProperties.data(), oldNumProp,
+                                pImpl->vertPos_.data(), triProperties.data(),
+                                pImpl->halfedge_.data(), propFunc});
+    for (int i = 0; i < NumTri(); i++) {
+      up(i);
+    }
   }
 
   pImpl->meshRelation_.numProp = numProp;
