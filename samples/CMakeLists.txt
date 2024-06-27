@@ -23,7 +23,7 @@ target_include_directories(samples
 )
 
 target_link_libraries(samples
-    PUBLIC manifold sdf
+    PUBLIC manifold sdf cross_section
 )
 
 target_compile_options(samples PRIVATE ${MANIFOLD_FLAGS})

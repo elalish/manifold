@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "cross_section.h"
 #include "manifold.h"
 #include "polygon.h"
 #include "test.h"
@@ -333,7 +334,7 @@ TEST(BooleanComplex, Sweep) {
       vertex.x = vertex.x * cos(angle);
     };
 
-    return Manifold::Extrude(profile, nSegments - 1, nSegments - 2)
+    return Manifold::Extrude(profile.ToPolygons(), nSegments - 1, nSegments - 2)
         .Warp(warpFunc);
   };
 
@@ -353,7 +354,7 @@ TEST(BooleanComplex, Sweep) {
     float distance = sqrt(diff.x * diff.x + diff.y * diff.y);
     float angle = atan2(diff.y, diff.x);
     Manifold extrusionPrimitive =
-        Manifold::Extrude(profile, distance)
+        Manifold::Extrude(profile.ToPolygons(), distance)
             .Rotate(90, 0, -90)
             .Translate(glm::vec3(distance, 0, 0))
             .Rotate(0, 0, angle * 180 / glm::pi<float>())
