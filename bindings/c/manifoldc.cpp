@@ -192,15 +192,14 @@ ManifoldManifold *manifold_trim_by_plane(void *mem, ManifoldManifold *m,
   return to_c(new (mem) Manifold(trimmed));
 }
 
-ManifoldCrossSection *manifold_slice(void *mem, ManifoldManifold *m,
-                                     float height) {
+ManifoldPolygons *manifold_slice(void *mem, ManifoldManifold *m, float height) {
   auto poly = from_c(m)->Slice(height);
-  return to_c(new (mem) CrossSection(poly));
+  return to_c(new (mem) Polygons(poly));
 }
 
-ManifoldCrossSection *manifold_project(void *mem, ManifoldManifold *m) {
+ManifoldPolygons *manifold_project(void *mem, ManifoldManifold *m) {
   auto poly = from_c(m)->Project();
-  return to_c(new (mem) CrossSection(poly));
+  return to_c(new (mem) Polygons(poly));
 }
 
 ManifoldManifold *manifold_hull(void *mem, ManifoldManifold *m) {
@@ -382,7 +381,7 @@ ManifoldManifold *manifold_of_meshgl(void *mem, ManifoldMeshGL *mesh) {
   return to_c(new (mem) Manifold(m));
 }
 
-ManifoldManifold *manifold_extrude(void *mem, ManifoldCrossSection *cs,
+ManifoldManifold *manifold_extrude(void *mem, ManifoldPolygons *cs,
                                    float height, int slices,
                                    float twist_degrees, float scale_x,
                                    float scale_y) {
@@ -391,7 +390,7 @@ ManifoldManifold *manifold_extrude(void *mem, ManifoldCrossSection *cs,
   return to_c(new (mem) Manifold(m));
 }
 
-ManifoldManifold *manifold_revolve(void *mem, ManifoldCrossSection *cs,
+ManifoldManifold *manifold_revolve(void *mem, ManifoldPolygons *cs,
                                    int circular_segments) {
   auto m = Manifold::Revolve(*from_c(cs), circular_segments);
   return to_c(new (mem) Manifold(m));

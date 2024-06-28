@@ -363,9 +363,18 @@ NB_MODULE(manifold3d, m) {
       .def("trim_by_plane", &Manifold::TrimByPlane, nb::arg("normal"),
            nb::arg("origin_offset"),
            manifold__trim_by_plane__normal__origin_offset)
-      .def("slice", &Manifold::Slice, nb::arg("height"),
-           manifold__slice__height)
-      .def("project", &Manifold::Project, manifold__project)
+      .def(
+          "slice",
+          [](const Manifold &self, float height) {
+            return CrossSection(self.Slice(height));
+          },
+          nb::arg("height"), manifold__slice__height)
+      .def(
+          "project",
+          [](const Manifold &self) {
+            return CrossSection(self.Project()).Simplify(self.Precision());
+          },
+          manifold__project)
       .def("status", &Manifold::Status, manifold__status)
       .def(
           "bounding_box",
@@ -403,14 +412,25 @@ NB_MODULE(manifold3d, m) {
       .def_static("cube", &Manifold::Cube, nb::arg("size") = glm::vec3{1, 1, 1},
                   nb::arg("center") = false, manifold__cube__size__center)
       .def_static(
-          "extrude", &Manifold::Extrude, nb::arg("crossSection"),
-          nb::arg("height"), nb::arg("n_divisions") = 0,
-          nb::arg("twist_degrees") = 0.0f,
+          "extrude",
+          [](const CrossSection &crossSection, float height, int nDivisions,
+             float twistDegrees, glm::vec2 scaleTop) {
+            return Manifold::Extrude(crossSection.ToPolygons(), height,
+                                     nDivisions, twistDegrees, scaleTop);
+          },
+          nb::arg("crossSection"), nb::arg("height"),
+          nb::arg("n_divisions") = 0, nb::arg("twist_degrees") = 0.0f,
           nb::arg("scale_top") = std::make_tuple(1.0f, 1.0f),
           manifold__extrude__cross_section__height__n_divisions__twist_degrees__scale_top)
       .def_static(
-          "revolve", &Manifold::Revolve, nb::arg("crossSection"),
-          nb::arg("circular_segments") = 0, nb::arg("revolve_degrees") = 360.0,
+          "revolve",
+          [](const CrossSection &crossSection, int circularSegments,
+             float revolveDegrees) {
+            return Manifold::Revolve(crossSection.ToPolygons(),
+                                     circularSegments, revolveDegrees);
+          },
+          nb::arg("crossSection"), nb::arg("circular_segments") = 0,
+          nb::arg("revolve_degrees") = 360.0,
           manifold__revolve__cross_section__circular_segments__revolve_degrees)
       .def_static(
           "cylinder", &Manifold::Cylinder, nb::arg("height"),
@@ -689,13 +709,25 @@ NB_MODULE(manifold3d, m) {
                   cross_section__compose__cross_sections)
       .def("to_polygons", &CrossSection::ToPolygons, cross_section__to_polygons)
       .def(
-          "extrude", &Manifold::Extrude, nb::arg("height"),
-          nb::arg("n_divisions") = 0, nb::arg("twist_degrees") = 0.0f,
+          "extrude",
+          [](const CrossSection &self, float height, int nDivisions,
+             float twistDegrees, glm::vec2 scaleTop) {
+            return Manifold::Extrude(self.ToPolygons(), height, nDivisions,
+                                     twistDegrees, scaleTop);
+          },
+          nb::arg("height"), nb::arg("n_divisions") = 0,
+          nb::arg("twist_degrees") = 0.0f,
           nb::arg("scale_top") = std::make_tuple(1.0f, 1.0f),
           manifold__extrude__cross_section__height__n_divisions__twist_degrees__scale_top)
-      .def("revolve", &Manifold::Revolve, nb::arg("circular_segments") = 0,
-           nb::arg("revolve_degrees") = 360.0,
-           manifold__revolve__cross_section__circular_segments__revolve_degrees)
+      .def(
+          "revolve",
+          [](const CrossSection &self, int circularSegments,
+             float revolveDegrees) {
+            return Manifold::Revolve(self.ToPolygons(), circularSegments,
+                                     revolveDegrees);
+          },
+          nb::arg("circular_segments") = 0, nb::arg("revolve_degrees") = 360.0,
+          manifold__revolve__cross_section__circular_segments__revolve_degrees)
 
       .def_static("square", &CrossSection::Square, nb::arg("size"),
                   nb::arg("center") = false,

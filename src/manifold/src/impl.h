@@ -146,8 +146,8 @@ struct Manifold::Impl {
   PolygonsIdx Face2Polygons(VecView<Halfedge>::IterC start,
                             VecView<Halfedge>::IterC end,
                             glm::mat3x2 projection) const;
-  CrossSection Slice(float height) const;
-  CrossSection Project() const;
+  Polygons Slice(float height) const;
+  Polygons Project() const;
 
   // edge_op.cu
   void SimplifyTopology();

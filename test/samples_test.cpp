@@ -14,6 +14,7 @@
 
 #include "samples.h"
 
+#include "cross_section.h"
 #include "polygon.h"
 #include "test.h"
 
@@ -182,7 +183,8 @@ TEST(Samples, Bracelet) {
   EXPECT_EQ(bracelet.Genus(), 1);
   CheckGL(bracelet);
 
-  CrossSection projection = bracelet.Project();
+  CrossSection projection(bracelet.Project());
+  projection = projection.Simplify(bracelet.Precision());
   Rect rect = projection.Bounds();
   Box box = bracelet.BoundingBox();
   EXPECT_EQ(rect.min.x, box.min.x);
@@ -191,14 +193,14 @@ TEST(Samples, Bracelet) {
   EXPECT_EQ(rect.max.y, box.max.y);
   EXPECT_NEAR(projection.Area(), 649, 1);
   EXPECT_EQ(projection.NumContour(), 2);
-  Manifold extrusion = Manifold::Extrude(projection, 1);
+  Manifold extrusion = Manifold::Extrude(projection.ToPolygons(), 1);
   EXPECT_EQ(extrusion.NumDegenerateTris(), 0);
   EXPECT_EQ(extrusion.Genus(), 1);
 
-  CrossSection slice = bracelet.Slice();
+  CrossSection slice(bracelet.Slice());
   EXPECT_EQ(slice.NumContour(), 2);
   EXPECT_NEAR(slice.Area(), 230.6, 0.1);
-  extrusion = Manifold::Extrude(slice, 1);
+  extrusion = Manifold::Extrude(slice.ToPolygons(), 1);
   EXPECT_EQ(extrusion.Genus(), 1);
 
 #ifdef MANIFOLD_EXPORT
@@ -219,10 +221,10 @@ TEST(Samples, GyroidModule) {
   EXPECT_NEAR(bounds.min.z, 0, precision);
   EXPECT_NEAR(bounds.max.z, size * glm::sqrt(2.0f), precision);
 
-  CrossSection slice = gyroid.Slice(5);
+  CrossSection slice(gyroid.Slice(5));
   EXPECT_EQ(slice.NumContour(), 4);
   EXPECT_NEAR(slice.Area(), 121.9, 0.1);
-  Manifold extrusion = Manifold::Extrude(slice, 1);
+  Manifold extrusion = Manifold::Extrude(slice.ToPolygons(), 1);
   EXPECT_EQ(extrusion.Genus(), -3);
 
 #ifdef MANIFOLD_EXPORT
@@ -260,7 +262,8 @@ TEST(Samples, Sponge4) {
   EXPECT_EQ(cutSponge.first.Genus(), 13394);
   EXPECT_EQ(cutSponge.second.Genus(), 13394);
 
-  CrossSection projection = cutSponge.first.Project();
+  CrossSection projection(cutSponge.first.Project());
+  projection = projection.Simplify(cutSponge.first.Precision());
   Rect rect = projection.Bounds();
   Box box = cutSponge.first.BoundingBox();
   EXPECT_EQ(rect.min.x, box.min.x);
@@ -268,7 +271,7 @@ TEST(Samples, Sponge4) {
   EXPECT_EQ(rect.max.x, box.max.x);
   EXPECT_EQ(rect.max.y, box.max.y);
   EXPECT_NEAR(projection.Area(), 0.535, 0.001);
-  Manifold extrusion = Manifold::Extrude(projection, 1);
+  Manifold extrusion = Manifold::Extrude(projection.ToPolygons(), 1);
   EXPECT_EQ(extrusion.NumDegenerateTris(), 0);
   EXPECT_EQ(extrusion.Genus(), 502);
 

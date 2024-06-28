@@ -106,7 +106,8 @@ TEST(Smooth, TruncatedCone) {
 
 TEST(Smooth, ToLength) {
   Manifold cone = Manifold::Extrude(
-      CrossSection::Circle(10, 10).Translate({10, 0}), 2, 0, 0, {0, 0});
+      CrossSection::Circle(10, 10).Translate({10, 0}).ToPolygons(), 2, 0, 0,
+      {0, 0});
   cone += cone.Scale({1, 1, -5});
   Manifold smooth = Manifold::Smooth(cone.GetMesh());
   smooth = smooth.RefineToLength(0.1);
@@ -269,7 +270,8 @@ glm::vec4 CircularTangent(const glm::vec3& tangent, const glm::vec3& edgeVec) {
 
 TEST(Smooth, Torus) {
   Mesh torusMesh =
-      Manifold::Revolve(CrossSection::Circle(1, 8).Translate({2, 0}), 6)
+      Manifold::Revolve(
+          CrossSection::Circle(1, 8).Translate({2, 0}).ToPolygons(), 6)
           .GetMesh();
   const int numTri = torusMesh.triVerts.size();
 
