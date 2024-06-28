@@ -35,8 +35,7 @@ void AtomicAddVec3(glm::vec3& target, const glm::vec3& add) {
     std::atomic<float>& tar = reinterpret_cast<std::atomic<float>&>(target[i]);
     float old_val = tar.load(std::memory_order_relaxed);
     while (!tar.compare_exchange_weak(old_val, old_val + add[i],
-                                      std::memory_order_relaxed))
-      ;
+                                      std::memory_order_relaxed));
   }
 }
 
@@ -774,15 +773,15 @@ Manifold::Impl Manifold::Impl::Transform(const glm::mat4x3& transform_) const {
   const bool invert = glm::determinant(glm::mat3(transform_)) < 0;
 
   if (halfedgeTangent_.size() > 0) {
-    for_each_n(policy, zip(result.halfedgeTangent_.begin(), countAt(0)),
-               halfedgeTangent_.size(),
-               TransformTangents({glm::mat3(transform_), invert,
-                                  halfedgeTangent_, halfedge_}));
+    for_each_n(
+        policy, countAt(0), halfedgeTangent_.size(),
+        TransformTangents({result.halfedgeTangent_, 0, glm::mat3(transform_),
+                           invert, halfedgeTangent_, halfedge_}));
   }
 
   if (invert) {
-    for_each_n(policy, zip(result.meshRelation_.triRef.begin(), countAt(0)),
-               result.NumTri(), FlipTris({result.halfedge_}));
+    for_each_n(policy, countAt(0), result.NumTri(),
+               FlipTris({result.halfedge_}));
   }
 
   // This optimization does a cheap collider update if the transform is

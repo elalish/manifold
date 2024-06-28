@@ -290,18 +290,15 @@ Manifold::Impl CsgLeafNode::Compose(
                  combined.faceNormal_.begin() + triIndices[i]);
 
           const bool invert = glm::determinant(glm::mat3(node->transform_)) < 0;
-          for_each_n(policy,
-                     zip(combined.halfedgeTangent_.begin() + edgeIndices[i],
-                         countAt(0)),
-                     node->pImpl_->halfedgeTangent_.size(),
-                     TransformTangents{glm::mat3(node->transform_), invert,
-                                       node->pImpl_->halfedgeTangent_,
-                                       node->pImpl_->halfedge_});
+          for_each_n(
+              policy, countAt(0), node->pImpl_->halfedgeTangent_.size(),
+              TransformTangents{combined.halfedgeTangent_, edgeIndices[i],
+                                glm::mat3(node->transform_), invert,
+                                node->pImpl_->halfedgeTangent_,
+                                node->pImpl_->halfedge_});
           if (invert)
-            for_each_n(policy,
-                       zip(combined.meshRelation_.triRef.begin(),
-                           countAt(triIndices[i])),
-                       node->pImpl_->NumTri(), FlipTris({combined.halfedge_}));
+            for_each_n(policy, countAt(triIndices[i]), node->pImpl_->NumTri(),
+                       FlipTris({combined.halfedge_}));
         }
         // Since the nodes may be copies containing the same meshIDs, it is
         // important to add an offset so that each node instance gets
