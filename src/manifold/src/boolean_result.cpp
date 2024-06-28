@@ -241,16 +241,16 @@ std::vector<Halfedge> PairUp(std::vector<EdgePos> &edgePos) {
   // a heuristic.
   DEBUG_ASSERT(edgePos.size() % 2 == 0, topologyErr,
                "Non-manifold edge! Not an even number of points.");
-  ssize_t nEdges = edgePos.size() / 2;
+  size_t nEdges = edgePos.size() / 2;
   auto middle = std::partition(edgePos.begin(), edgePos.end(),
                                [](EdgePos x) { return x.isStart; });
-  DEBUG_ASSERT(middle - edgePos.begin() == nEdges, topologyErr,
-               "Non-manifold edge!");
+  DEBUG_ASSERT(static_cast<size_t>(middle - edgePos.begin()) == nEdges,
+               topologyErr, "Non-manifold edge!");
   auto cmp = [](EdgePos a, EdgePos b) { return a.edgePos < b.edgePos; };
   std::stable_sort(edgePos.begin(), middle, cmp);
   std::stable_sort(middle, edgePos.end(), cmp);
   std::vector<Halfedge> edges;
-  for (ssize_t i = 0; i < nEdges; ++i)
+  for (size_t i = 0; i < nEdges; ++i)
     edges.push_back({edgePos[i].vert, edgePos[i + nEdges].vert, -1, -1});
   return edges;
 }

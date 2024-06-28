@@ -59,16 +59,16 @@ struct glm_name<glm::mat3x2> {
 };
 
 // handle glm::vecN
-template <class T, size_t N, glm::qualifier Q>
+template <class T, int N, glm::qualifier Q>
 struct nb::detail::type_caster<glm::vec<N, T, Q>> {
   using glm_type = glm::vec<N, T, Q>;
   NB_TYPE_CASTER(glm_type, const_name(glm_name<glm_type>::name));
 
   bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept {
-    size_t size = PyObject_Size(src.ptr());  // negative on failure
+    int size = PyObject_Size(src.ptr());  // negative on failure
     if (size != N) return false;
     make_caster<T> t_cast;
-    for (size_t i = 0; i < size; i++) {
+    for (int i = 0; i < size; i++) {
       if (!t_cast.from_python(src[i], flags, cleanup)) return false;
       value[i] = t_cast.value;
     }
@@ -77,26 +77,26 @@ struct nb::detail::type_caster<glm::vec<N, T, Q>> {
   static handle from_cpp(glm_type vec, rv_policy policy,
                          cleanup_list *cleanup) noexcept {
     nb::list out;
-    for (size_t i = 0; i < N; i++) out.append(vec[i]);
+    for (int i = 0; i < N; i++) out.append(vec[i]);
     return out.release();
   }
 };
 
 // handle glm::matMxN
-template <class T, size_t C, size_t R, glm::qualifier Q>
+template <class T, int C, int R, glm::qualifier Q>
 struct nb::detail::type_caster<glm::mat<C, R, T, Q>> {
   using glm_type = glm::mat<C, R, T, Q>;
   using numpy_type = nb::ndarray<nb::numpy, T, nb::shape<R, C>>;
   NB_TYPE_CASTER(glm_type, const_name(glm_name<glm_type>::name));
 
   bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept {
-    size_t rows = PyObject_Size(src.ptr());  // negative on failure
+    int rows = PyObject_Size(src.ptr());  // negative on failure
     if (rows != R) return false;
-    for (size_t i = 0; i < R; i++) {
+    for (int i = 0; i < R; i++) {
       const nb::object &slice = src[i];
-      size_t cols = PyObject_Size(slice.ptr());  // negative on failure
+      int cols = PyObject_Size(slice.ptr());  // negative on failure
       if (cols != C) return false;
-      for (size_t j = 0; j < C; j++) {
+      for (int j = 0; j < C; j++) {
         make_caster<T> t_cast;
         if (!t_cast.from_python(slice[j], flags, cleanup)) return false;
         value[j][i] = t_cast.value;
@@ -107,9 +107,9 @@ struct nb::detail::type_caster<glm::mat<C, R, T, Q>> {
   static handle from_cpp(glm_type mat, rv_policy policy,
                          cleanup_list *cleanup) noexcept {
     T *buffer = new T[R * C];
-    nb::capsule mem_mgr(buffer, [](void *p) noexcept { delete[](T *) p; });
-    for (size_t i = 0; i < R; i++) {
-      for (size_t j = 0; j < C; j++) {
+    nb::capsule mem_mgr(buffer, [](void *p) noexcept { delete[] (T *)p; });
+    for (int i = 0; i < R; i++) {
+      for (int j = 0; j < C; j++) {
         // py is (Rows, Cols), glm is (Cols, Rows)
         buffer[i * C + j] = mat[j][i];
       }
@@ -121,10 +121,10 @@ struct nb::detail::type_caster<glm::mat<C, R, T, Q>> {
 };
 
 // handle std::vector<glm::vecN>
-template <class T, size_t N, glm::qualifier Q>
+template <class T, int N, glm::qualifier Q>
 struct nb::detail::type_caster<std::vector<glm::vec<N, T, Q>>> {
   using glm_type = glm::vec<N, T, Q>;
-  using numpy_type = nb::ndarray<nb::numpy, T, nb::shape<nb::any, N>>;
+  using numpy_type = nb::ndarray<nb::numpy, T, nb::shape<-1, N>>;
   NB_TYPE_CASTER(std::vector<glm_type>,
                  const_name(glm_name<glm_type>::multi_name));
 
@@ -134,7 +134,7 @@ struct nb::detail::type_caster<std::vector<glm::vec<N, T, Q>>> {
       size_t num_vec = arr_cast.value.shape(0);
       value.resize(num_vec);
       for (size_t i = 0; i < num_vec; i++) {
-        for (size_t j = 0; j < N; j++) {
+        for (int j = 0; j < N; j++) {
           value[i][j] = arr_cast.value(i, j);
         }
       }
@@ -154,23 +154,23 @@ struct nb::detail::type_caster<std::vector<glm::vec<N, T, Q>>> {
                          cleanup_list *cleanup) noexcept {
     size_t num_vec = vec.size();
     T *buffer = new T[num_vec * N];
-    nb::capsule mem_mgr(buffer, [](void *p) noexcept { delete[](T *) p; });
+    nb::capsule mem_mgr(buffer, [](void *p) noexcept { delete[] (T *)p; });
     for (size_t i = 0; i < num_vec; i++) {
-      for (size_t j = 0; j < N; j++) {
+      for (int j = 0; j < N; j++) {
         buffer[i * N + j] = vec[i][j];
       }
     }
     numpy_type arr{buffer, {num_vec, N}, std::move(mem_mgr)};
-    return ndarray_wrap(arr.handle(), int(ndarray_framework::numpy), policy,
+    return ndarray_wrap(arr.handle(), ndarray_framework::numpy, policy,
                         cleanup);
   }
 };
 
 // handle VecView<glm::vec*>
-template <class T, size_t N, glm::qualifier Q>
+template <class T, int N, glm::qualifier Q>
 struct nb::detail::type_caster<manifold::VecView<glm::vec<N, T, Q>>> {
   using glm_type = glm::vec<N, T, Q>;
-  using numpy_type = nb::ndarray<nb::numpy, T, nb::shape<nb::any, N>>;
+  using numpy_type = nb::ndarray<nb::numpy, T, nb::shape<-1, N>>;
   NB_TYPE_CASTER(manifold::VecView<glm_type>,
                  const_name(glm_name<glm_type>::multi_name));
 
@@ -181,7 +181,7 @@ struct nb::detail::type_caster<manifold::VecView<glm::vec<N, T, Q>>> {
     size_t num_vec = arr_cast.value.shape(0);
     if (num_vec != value.size()) return false;
     for (size_t i = 0; i < num_vec; i++) {
-      for (size_t j = 0; j < N; j++) {
+      for (int j = 0; j < N; j++) {
         value[i][j] = arr_cast.value(i, j);
       }
     }
@@ -189,11 +189,12 @@ struct nb::detail::type_caster<manifold::VecView<glm::vec<N, T, Q>>> {
   }
   static handle from_cpp(Value vec, rv_policy policy,
                          cleanup_list *cleanup) noexcept {
+    // do we have ownership issue here?
     size_t num_vec = vec.size();
     static_assert(sizeof(vec[0]) == (N * sizeof(T)),
                   "VecView -> numpy requires packed structs");
-    numpy_type arr{&vec[0], {num_vec, N}};
-    return ndarray_wrap(arr.handle(), int(ndarray_framework::numpy), policy,
+    numpy_type arr{&vec[0], {num_vec, N}, nb::handle()};
+    return ndarray_wrap(arr.handle(), ndarray_framework::numpy, policy,
                         cleanup);
   }
 };
@@ -294,8 +295,9 @@ NB_MODULE(manifold3d, m) {
                                                       const float *oldProps) {
               auto result =
                   f(v, nb::ndarray<nb::numpy, const float, nb::c_contig>(
-                           oldProps, {static_cast<unsigned long>(oldNumProp)}));
-              nb::ndarray<float, nb::shape<nb::any>> array;
+                           oldProps, {static_cast<unsigned long>(oldNumProp)},
+                           nb::handle()));
+              nb::ndarray<float, nb::shape<-1>> array;
               std::vector<float> vec;
               if (nb::try_cast(result, array)) {
                 if (array.ndim() != 1 ||
@@ -449,59 +451,59 @@ NB_MODULE(manifold3d, m) {
           // affect the original array passed into the function
           "__init__",
           [](MeshGL *self,
-             nb::ndarray<float, nb::shape<nb::any, nb::any>, nb::c_contig>
-                 &vertProp,
-             nb::ndarray<uint32_t, nb::shape<nb::any, 3>, nb::c_contig>
-                 &triVerts,
-             const std::optional<nb::ndarray<uint32_t, nb::shape<nb::any>,
+             nb::ndarray<float, nb::shape<-1, -1>, nb::c_contig> &vertProp,
+             nb::ndarray<uint32_t, nb::shape<-1, 3>, nb::c_contig> &triVerts,
+             const std::optional<nb::ndarray<uint32_t, nb::shape<-1>,
                                              nb::c_contig>> &mergeFromVert,
-             const std::optional<nb::ndarray<uint32_t, nb::shape<nb::any>,
+             const std::optional<nb::ndarray<uint32_t, nb::shape<-1>,
                                              nb::c_contig>> &mergeToVert,
-             const std::optional<nb::ndarray<uint32_t, nb::shape<nb::any>,
-                                             nb::c_contig>> &runIndex,
-             const std::optional<nb::ndarray<uint32_t, nb::shape<nb::any>,
+             const std::optional<
+                 nb::ndarray<uint32_t, nb::shape<-1>, nb::c_contig>> &runIndex,
+             const std::optional<nb::ndarray<uint32_t, nb::shape<-1>,
                                              nb::c_contig>> &runOriginalID,
-             std::optional<nb::ndarray<float, nb::shape<nb::any, 4, 3>,
+             std::optional<nb::ndarray<float, nb::shape<-1, 4, 3>,
                                        nb::c_contig>> &runTransform,
-             const std::optional<nb::ndarray<uint32_t, nb::shape<nb::any>,
-                                             nb::c_contig>> &faceID,
-             const std::optional<nb::ndarray<float, nb::shape<nb::any, 3, 4>,
+             const std::optional<
+                 nb::ndarray<uint32_t, nb::shape<-1>, nb::c_contig>> &faceID,
+             const std::optional<nb::ndarray<float, nb::shape<-1, 3, 4>,
                                              nb::c_contig>> &halfedgeTangent,
              float precision) {
-    new (self) MeshGL();
-    MeshGL &out = *self;
-    out.numProp = vertProp.shape(1);
-    out.vertProperties = toVector<float>(vertProp.data(), vertProp.size());
+            new (self) MeshGL();
+            MeshGL &out = *self;
+            out.numProp = vertProp.shape(1);
+            out.vertProperties =
+                toVector<float>(vertProp.data(), vertProp.size());
 
-    out.triVerts = toVector<uint32_t>(triVerts.data(), triVerts.size());
+            out.triVerts = toVector<uint32_t>(triVerts.data(), triVerts.size());
 
-    if (mergeFromVert.has_value())
-      out.mergeFromVert =
-          toVector<uint32_t>(mergeFromVert->data(), mergeFromVert->size());
+            if (mergeFromVert.has_value())
+              out.mergeFromVert = toVector<uint32_t>(mergeFromVert->data(),
+                                                     mergeFromVert->size());
 
-    if (mergeToVert.has_value())
-      out.mergeToVert =
-          toVector<uint32_t>(mergeToVert->data(), mergeToVert->size());
+            if (mergeToVert.has_value())
+              out.mergeToVert =
+                  toVector<uint32_t>(mergeToVert->data(), mergeToVert->size());
 
-    if (runIndex.has_value())
-      out.runIndex = toVector<uint32_t>(runIndex->data(), runIndex->size());
+            if (runIndex.has_value())
+              out.runIndex =
+                  toVector<uint32_t>(runIndex->data(), runIndex->size());
 
-    if (runOriginalID.has_value())
-      out.runOriginalID =
-          toVector<uint32_t>(runOriginalID->data(), runOriginalID->size());
+            if (runOriginalID.has_value())
+              out.runOriginalID = toVector<uint32_t>(runOriginalID->data(),
+                                                     runOriginalID->size());
 
-    if (runTransform.has_value()) {
-      out.runTransform =
-          toVector<float>(runTransform->data(), runTransform->size());
-    }
+            if (runTransform.has_value()) {
+              out.runTransform =
+                  toVector<float>(runTransform->data(), runTransform->size());
+            }
 
-    if (faceID.has_value())
-      out.faceID = toVector<uint32_t>(faceID->data(), faceID->size());
+            if (faceID.has_value())
+              out.faceID = toVector<uint32_t>(faceID->data(), faceID->size());
 
-    if (halfedgeTangent.has_value()) {
-      out.halfedgeTangent =
-          toVector<float>(halfedgeTangent->data(), halfedgeTangent->size());
-    }
+            if (halfedgeTangent.has_value()) {
+              out.halfedgeTangent = toVector<float>(halfedgeTangent->data(),
+                                                    halfedgeTangent->size());
+            }
           },
           nb::arg("vert_properties"), nb::arg("tri_verts"),
           nb::arg("merge_from_vert") = nb::none(),
@@ -511,27 +513,39 @@ NB_MODULE(manifold3d, m) {
           nb::arg("run_transform") = nb::none(),
           nb::arg("face_id") = nb::none(),
           nb::arg("halfedge_tangent") = nb::none(), nb::arg("precision") = 0)
-      .def_prop_ro("vert_properties",
-                   [](const MeshGL &self) {
-    return nb::ndarray<nb::numpy, const float, nb::c_contig>(
-        self.vertProperties.data(),
-        {self.vertProperties.size() / self.numProp, self.numProp});
-                   }, nb::rv_policy::reference_internal)
-      .def_prop_ro("tri_verts",
-                   [](const MeshGL &self) {
-    return nb::ndarray<nb::numpy, const int, nb::c_contig>(
-        self.triVerts.data(), {self.triVerts.size() / 3, 3});
-                   }, nb::rv_policy::reference_internal)
-      .def_prop_ro("run_transform",
-                   [](const MeshGL &self) {
-    return nb::ndarray<nb::numpy, const float, nb::c_contig>(
-        self.runTransform.data(), {self.runTransform.size() / 12, 4, 3});
-                   }, nb::rv_policy::reference_internal)
-      .def_prop_ro("halfedge_tangent",
-                   [](const MeshGL &self) {
-    return nb::ndarray<nb::numpy, const float, nb::c_contig>(
-        self.halfedgeTangent.data(), {self.halfedgeTangent.size() / 12, 3, 4});
-                   }, nb::rv_policy::reference_internal)
+      .def_prop_ro(
+          "vert_properties",
+          [](const MeshGL &self) {
+            return nb::ndarray<nb::numpy, const float, nb::c_contig>(
+                self.vertProperties.data(),
+                {self.vertProperties.size() / self.numProp, self.numProp},
+                nb::handle());
+          },
+          nb::rv_policy::reference_internal)
+      .def_prop_ro(
+          "tri_verts",
+          [](const MeshGL &self) {
+            return nb::ndarray<nb::numpy, const int, nb::c_contig>(
+                self.triVerts.data(), {self.triVerts.size() / 3, 3},
+                nb::handle());
+          },
+          nb::rv_policy::reference_internal)
+      .def_prop_ro(
+          "run_transform",
+          [](const MeshGL &self) {
+            return nb::ndarray<nb::numpy, const float, nb::c_contig>(
+                self.runTransform.data(), {self.runTransform.size() / 12, 4, 3},
+                nb::handle());
+          },
+          nb::rv_policy::reference_internal)
+      .def_prop_ro(
+          "halfedge_tangent",
+          [](const MeshGL &self) {
+            return nb::ndarray<nb::numpy, const float, nb::c_contig>(
+                self.halfedgeTangent.data(),
+                {self.halfedgeTangent.size() / 12, 3, 4}, nb::handle());
+          },
+          nb::rv_policy::reference_internal)
       .def_ro("merge_from_vert", &MeshGL::mergeFromVert)
       .def_ro("merge_to_vert", &MeshGL::mergeToVert)
       .def_ro("run_index", &MeshGL::runIndex)
@@ -541,15 +555,16 @@ NB_MODULE(manifold3d, m) {
           "level_set",
           [](const std::function<float(float, float, float)> &f,
              std::vector<float> bounds, float edgeLength, float level = 0.0) {
-                // Same format as Manifold.bounding_box
-                Box bound = {glm::vec3(bounds[0], bounds[1], bounds[2]),
-                            glm::vec3(bounds[3], bounds[4], bounds[5])};
+            // Same format as Manifold.bounding_box
+            Box bound = {glm::vec3(bounds[0], bounds[1], bounds[2]),
+                         glm::vec3(bounds[3], bounds[4], bounds[5])};
 
-                std::function<float(glm::vec3)> cppToPython = [&f](glm::vec3 v) {
-                  return f(v.x, v.y, v.z);
-                };
-                Mesh result = LevelSet(cppToPython, bound, edgeLength, level, false);
-                return MeshGL(result);
+            std::function<float(glm::vec3)> cppToPython = [&f](glm::vec3 v) {
+              return f(v.x, v.y, v.z);
+            };
+            Mesh result =
+                LevelSet(cppToPython, bound, edgeLength, level, false);
+            return MeshGL(result);
           },
           nb::arg("f"), nb::arg("bounds"), nb::arg("edgeLength"),
           nb::arg("level") = 0.0,
