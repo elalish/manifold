@@ -192,11 +192,11 @@ Vec<TmpEdge> inline CreateTmpEdges(const Vec<Halfedge>& halfedge) {
   for_each_n(autoPolicy(edges.size()),
              zip(edges.begin(), halfedge.begin(), countAt(0)), edges.size(),
              Halfedge2Tmp());
-  int numEdge =
+  size_t numEdge =
       remove_if<decltype(edges.begin())>(
           autoPolicy(edges.size()), edges.begin(), edges.end(), TmpInvalid()) -
       edges.begin();
-  ASSERT(numEdge == halfedge.size() / 2, topologyErr, "Not oriented!");
+  DEBUG_ASSERT(numEdge == halfedge.size() / 2, topologyErr, "Not oriented!");
   edges.resize(numEdge);
   return edges;
 }

@@ -46,14 +46,16 @@ class CsgLeafNode;
 struct MeshGL {
   /// Number of property vertices
   uint32_t NumVert() const {
-    if (vertProperties.size() / numProp >= std::numeric_limits<int>::max())
-      throw std::out_of_range("mesh too large");
+    ASSERT(vertProperties.size() / numProp <
+               static_cast<size_t>(std::numeric_limits<uint32_t>::max()),
+           std::out_of_range("mesh too large for MeshGL"));
     return vertProperties.size() / numProp;
   };
   /// Number of triangles
   uint32_t NumTri() const {
-    if (vertProperties.size() / numProp >= std::numeric_limits<int>::max())
-      throw std::out_of_range("mesh too large");
+    ASSERT(triVerts.size() / 3 <
+               static_cast<size_t>(std::numeric_limits<uint32_t>::max()),
+           std::out_of_range("mesh too large for MeshGL"));
     return triVerts.size() / 3;
   };
 

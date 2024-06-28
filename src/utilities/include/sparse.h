@@ -121,7 +121,7 @@ class SparseIndices {
   }
 
   inline void Add(int p, int q) {
-    for (int i = 0; i < sizeof(int64_t); ++i) data_.push_back(-1);
+    for (unsigned int i = 0; i < sizeof(int64_t); ++i) data_.push_back(-1);
     Set(size() - 1, p, q);
   }
 
@@ -133,8 +133,8 @@ class SparseIndices {
   }
 
   size_t RemoveZeros(Vec<int>& S) {
-    ASSERT(S.size() == size(), userErr,
-           "Different number of values than indicies!");
+    DEBUG_ASSERT(S.size() == size(), userErr,
+                 "Different number of values than indicies!");
     VecView<int64_t> view = AsVec64();
     auto zBegin = zip(S.begin(), view.begin());
     auto zEnd = zip(S.end(), view.end());
@@ -164,8 +164,8 @@ class SparseIndices {
 
   template <typename T>
   size_t KeepFinite(Vec<T>& v, Vec<int>& x) {
-    ASSERT(x.size() == size(), userErr,
-           "Different number of values than indicies!");
+    DEBUG_ASSERT(x.size() == size(), userErr,
+                 "Different number of values than indicies!");
     VecView<int64_t> view = AsVec64();
     auto zBegin = zip(v.begin(), x.begin(), view.begin());
     auto zEnd = zip(v.end(), x.end(), view.end());

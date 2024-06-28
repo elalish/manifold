@@ -79,9 +79,9 @@ namespace manifold {
  */
 Manifold Manifold::Smooth(const MeshGL& meshGL,
                           const std::vector<Smoothness>& sharpenedEdges) {
-  ASSERT(meshGL.halfedgeTangent.empty(), std::runtime_error,
-         "when supplying tangents, the normal constructor should be used "
-         "rather than Smooth().");
+  DEBUG_ASSERT(meshGL.halfedgeTangent.empty(), std::runtime_error,
+               "when supplying tangents, the normal constructor should be used "
+               "rather than Smooth().");
 
   // Don't allow any triangle merging.
   std::vector<float> propertyTolerance(meshGL.numProp - 3, -1);
@@ -121,9 +121,9 @@ Manifold Manifold::Smooth(const MeshGL& meshGL,
  */
 Manifold Manifold::Smooth(const Mesh& mesh,
                           const std::vector<Smoothness>& sharpenedEdges) {
-  ASSERT(mesh.halfedgeTangent.empty(), std::runtime_error,
-         "when supplying tangents, the normal constructor should be used "
-         "rather than Smooth().");
+  DEBUG_ASSERT(mesh.halfedgeTangent.empty(), std::runtime_error,
+               "when supplying tangents, the normal constructor should be used "
+               "rather than Smooth().");
 
   Impl::MeshRelationD relation = {(int)ReserveIDs(1)};
   std::shared_ptr<Impl> impl = std::make_shared<Impl>(mesh, relation);
@@ -257,14 +257,14 @@ Manifold Manifold::Extrude(const Polygons& crossSection, float height,
   auto& triVerts = triVertsDH;
   int nCrossSection = 0;
   bool isCone = scaleTop.x == 0.0 && scaleTop.y == 0.0;
-  int idx = 0;
+  size_t idx = 0;
   PolygonsIdx polygonsIndexed;
   for (auto& poly : crossSection) {
     nCrossSection += poly.size();
     SimplePolygonIdx simpleIndexed;
     for (const glm::vec2& polyVert : poly) {
       vertPos.push_back({polyVert.x, polyVert.y, 0.0f});
-      simpleIndexed.push_back({polyVert, idx++});
+      simpleIndexed.push_back({polyVert, static_cast<int>(idx++)});
     }
     polygonsIndexed.push_back(simpleIndexed);
   }
@@ -274,13 +274,13 @@ Manifold Manifold::Extrude(const Polygons& crossSection, float height,
     glm::vec2 scale = glm::mix(glm::vec2(1.0f), scaleTop, alpha);
     glm::mat2 rotation(cosd(phi), sind(phi), -sind(phi), cosd(phi));
     glm::mat2 transform = glm::mat2(scale.x, 0.0f, 0.0f, scale.y) * rotation;
-    int j = 0;
-    int idx = 0;
+    size_t j = 0;
+    size_t idx = 0;
     for (const auto& poly : crossSection) {
-      for (int vert = 0; vert < poly.size(); ++vert) {
-        int offset = idx + nCrossSection * i;
-        int thisVert = vert + offset;
-        int lastVert = (vert == 0 ? poly.size() : vert) - 1 + offset;
+      for (size_t vert = 0; vert < poly.size(); ++vert) {
+        size_t offset = idx + nCrossSection * i;
+        size_t thisVert = vert + offset;
+        size_t lastVert = (vert == 0 ? poly.size() : vert) - 1 + offset;
         if (i == nDivisions && isCone) {
           triVerts.push_back({nCrossSection * i + j, lastVert - nCrossSection,
                               thisVert - nCrossSection});
@@ -297,7 +297,8 @@ Manifold Manifold::Extrude(const Polygons& crossSection, float height,
     }
   }
   if (isCone)
-    for (int j = 0; j < crossSection.size(); ++j)  // Duplicate vertex for Genus
+    for (size_t j = 0; j < crossSection.size();
+         ++j)  // Duplicate vertex for Genus
       vertPos.push_back({0.0f, 0.0f, height});
   std::vector<glm::ivec3> top = TriangulateIdx(polygonsIndexed);
   for (const glm::ivec3& tri : top) {
@@ -332,7 +333,7 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments,
   Polygons polygons;
   float radius = 0;
   for (const SimplePolygon& poly : crossSection) {
-    int i = 0;
+    size_t i = 0;
     while (i < poly.size() && poly[i].x < 0) {
       ++i;
     }
@@ -340,13 +341,13 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments,
       continue;
     }
     polygons.push_back({});
-    const int start = i;
+    const size_t start = i;
     do {
       if (poly[i].x >= 0) {
         polygons.back().push_back(poly[i]);
         radius = glm::max(radius, poly[i].x);
       }
-      const int next = i + 1 == poly.size() ? 0 : i + 1;
+      const size_t next = i + 1 == poly.size() ? 0 : i + 1;
       if ((poly[next].x < 0) != (poly[i].x < 0)) {
         const float y = poly[next].y + poly[next].x *
                                            (poly[i].y - poly[next].y) /
@@ -394,8 +395,8 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments,
       }
     }
 
-    for (int polyVert = 0; polyVert < poly.size(); ++polyVert) {
-      const int startPosIndex = vertPos.size();
+    for (size_t polyVert = 0; polyVert < poly.size(); ++polyVert) {
+      const size_t startPosIndex = vertPos.size();
 
       if (!isFullRevolution) startPoses.push_back(startPosIndex);
 

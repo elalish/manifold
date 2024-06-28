@@ -58,7 +58,7 @@ extern "C" {
 ManifoldSimplePolygon *manifold_simple_polygon(void *mem, ManifoldVec2 *ps,
                                                size_t length) {
   auto vec = new (mem) std::vector<glm::vec2>;
-  for (int i = 0; i < length; ++i) {
+  for (size_t i = 0; i < length; ++i) {
     vec->push_back({ps[i].x, ps[i].y});
   }
   return to_c(vec);
@@ -68,7 +68,7 @@ ManifoldPolygons *manifold_polygons(void *mem, ManifoldSimplePolygon **ps,
                                     size_t length) {
   auto vec = new (mem) std::vector<SimplePolygon>;
   auto polys = reinterpret_cast<SimplePolygon **>(ps);
-  for (int i = 0; i < length; ++i) {
+  for (size_t i = 0; i < length; ++i) {
     vec->push_back(*polys[i]);
   }
   return to_c(vec);
@@ -215,7 +215,7 @@ ManifoldManifold *manifold_batch_hull(void *mem, ManifoldManifoldVec *ms) {
 ManifoldManifold *manifold_hull_pts(void *mem, ManifoldVec3 *ps,
                                     size_t length) {
   std::vector<glm::vec3> vec(length);
-  for (int i = 0; i < length; ++i) {
+  for (size_t i = 0; i < length; ++i) {
     vec[i] = {ps[i].x, ps[i].y, ps[i].z};
   }
   auto hulled = Manifold::Hull(vec);
@@ -366,10 +366,10 @@ ManifoldMeshGL *manifold_meshgl_w_tangents(void *mem, float *vert_props,
 }
 
 ManifoldManifold *manifold_smooth(void *mem, ManifoldMeshGL *mesh,
-                                  int *half_edges, float *smoothness,
-                                  int n_edges) {
+                                  size_t *half_edges, float *smoothness,
+                                  size_t n_edges) {
   auto smooth = std::vector<Smoothness>();
-  for (int i = 0; i < n_edges; ++i) {
+  for (size_t i = 0; i < n_edges; ++i) {
     smooth.push_back({half_edges[i], smoothness[i]});
   }
   auto m = Manifold::Smooth(*from_c(mesh), smooth);
@@ -391,7 +391,6 @@ ManifoldManifold *manifold_extrude(void *mem, ManifoldPolygons *cs,
 }
 
 ManifoldManifold *manifold_revolve(void *mem, ManifoldPolygons *cs,
-
                                    int circular_segments) {
   auto m = Manifold::Revolve(*from_c(cs), circular_segments);
   return to_c(new (mem) Manifold(m));

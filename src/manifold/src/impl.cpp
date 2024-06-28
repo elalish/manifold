@@ -327,13 +327,9 @@ void DedupePropVerts(manifold::Vec<glm::ivec3>& triProp,
   const int numLabels = GetLabels(vertLabels, vert2vert, vert2vert.size());
 
   std::vector<int> label2vert(numLabels);
-  for (int v = 0; v < vert2vert.size(); ++v) {
-    label2vert[vertLabels[v]] = v;
-  }
-  for (int tri = 0; tri < triProp.size(); ++tri) {
-    for (int i : {0, 1, 2})
-      triProp[tri][i] = label2vert[vertLabels[triProp[tri][i]]];
-  }
+  for (size_t v = 0; v < vert2vert.size(); ++v) label2vert[vertLabels[v]] = v;
+  for (auto& prop : triProp)
+    for (int i : {0, 1, 2}) prop[i] = label2vert[vertLabels[prop[i]]];
 }
 }  // namespace
 
@@ -349,13 +345,8 @@ Manifold::Impl::Impl(const MeshGL& meshGL,
                      std::vector<float> propertyTolerance) {
   Mesh mesh;
   mesh.precision = meshGL.precision;
-  const int numVert = meshGL.NumVert();
-  const int numTri = meshGL.NumTri();
-
-  if (meshGL.numProp > 3 &&
-      static_cast<size_t>(numVert) * static_cast<size_t>(meshGL.numProp - 3) >=
-          std::numeric_limits<int>::max())
-    throw std::out_of_range("mesh too large");
+  const auto numVert = meshGL.NumVert();
+  const auto numTri = meshGL.NumTri();
 
   if (meshGL.numProp < 3) {
     MarkFailure(Error::MissingPositionProperties);
@@ -391,7 +382,7 @@ Manifold::Impl::Impl(const MeshGL& meshGL,
   for (size_t i = 0; i < meshGL.mergeFromVert.size(); ++i) {
     const int from = meshGL.mergeFromVert[i];
     const int to = meshGL.mergeToVert[i];
-    if (from >= numVert || to >= numVert) {
+    if (from >= static_cast<int>(numVert) || to >= static_cast<int>(numVert)) {
       MarkFailure(Error::MergeIndexOutOfBounds);
       return;
     }
@@ -400,7 +391,7 @@ Manifold::Impl::Impl(const MeshGL& meshGL,
   for (size_t i = 0; i < numTri; ++i) {
     for (const size_t j : {0, 1, 2}) {
       const int vert = meshGL.triVerts[3 * i + j];
-      if (vert < 0 || vert >= numVert) {
+      if (vert < 0 || vert >= static_cast<int>(numVert)) {
         MarkFailure(Error::VertexOutOfBounds);
         return;
       }
@@ -419,23 +410,23 @@ Manifold::Impl::Impl(const MeshGL& meshGL,
     }
   }
 
-  const int numProp = meshGL.numProp - 3;
+  const auto numProp = meshGL.numProp - 3;
   relation.numProp = numProp;
   relation.properties.resize(meshGL.NumVert() * numProp);
   // This will have unreferenced duplicate positions that will be removed by
   // Impl::RemoveUnreferencedVerts().
   mesh.vertPos.resize(meshGL.NumVert());
 
-  for (int i = 0; i < meshGL.NumVert(); ++i) {
+  for (size_t i = 0; i < meshGL.NumVert(); ++i) {
     for (const int j : {0, 1, 2})
       mesh.vertPos[i][j] = meshGL.vertProperties[meshGL.numProp * i + j];
-    for (int j = 0; j < numProp; ++j)
+    for (size_t j = 0; j < numProp; ++j)
       relation.properties[i * numProp + j] =
           meshGL.vertProperties[meshGL.numProp * i + 3 + j];
   }
 
   mesh.halfedgeTangent.resize(meshGL.halfedgeTangent.size() / 4);
-  for (int i = 0; i < mesh.halfedgeTangent.size(); ++i) {
+  for (size_t i = 0; i < mesh.halfedgeTangent.size(); ++i) {
     for (const int j : {0, 1, 2, 3})
       mesh.halfedgeTangent[i][j] = meshGL.halfedgeTangent[4 * i + j];
   }
@@ -452,10 +443,10 @@ Manifold::Impl::Impl(const MeshGL& meshGL,
     }
     relation.triRef.resize(meshGL.NumTri());
     const int startID = Impl::ReserveIDs(meshGL.runOriginalID.size());
-    for (int i = 0; i < meshGL.runOriginalID.size(); ++i) {
+    for (size_t i = 0; i < meshGL.runOriginalID.size(); ++i) {
       const int meshID = startID + i;
       const int originalID = meshGL.runOriginalID[i];
-      for (int tri = runIndex[i] / 3; tri < runIndex[i + 1] / 3; ++tri) {
+      for (size_t tri = runIndex[i] / 3; tri < runIndex[i + 1] / 3; ++tri) {
         TriRef& ref = relation.triRef[tri];
         ref.meshID = meshID;
         ref.originalID = originalID;
@@ -490,8 +481,6 @@ Manifold::Impl::Impl(const Mesh& mesh, const MeshRelationD& relation,
                      const std::vector<float>& propertyTolerance,
                      bool hasFaceIDs)
     : vertPos_(mesh.vertPos), halfedgeTangent_(mesh.halfedgeTangent) {
-  if (mesh.triVerts.size() >= std::numeric_limits<int>::max())
-    throw std::out_of_range("mesh too large");
   meshRelation_ = {relation.originalID, relation.numProp, relation.properties,
                    relation.meshIDtransform};
 
@@ -652,7 +641,7 @@ void Manifold::Impl::CreateFaces(const std::vector<float>& propertyTolerance) {
   const int numComponent = GetLabels(components, face2face, NumTri());
 
   Vec<int> comp2tri(numComponent, -1);
-  for (int tri = 0; tri < NumTri(); ++tri) {
+  for (size_t tri = 0; tri < NumTri(); ++tri) {
     const int comp = components[tri];
     const int current = comp2tri[comp];
     if (current < 0 || triArea[tri] > triArea[current]) {
@@ -666,7 +655,7 @@ void Manifold::Impl::CreateFaces(const std::vector<float>& propertyTolerance) {
                  {comp2tri, halfedge_, vertPos_, &components, precision_}));
 
   Vec<TriRef>& triRef = meshRelation_.triRef;
-  for (int tri = 0; tri < NumTri(); ++tri) {
+  for (size_t tri = 0; tri < NumTri(); ++tri) {
     const int referenceTri = comp2tri[components[tri]];
     if (referenceTri >= 0) {
       triRef[tri].tri = referenceTri;

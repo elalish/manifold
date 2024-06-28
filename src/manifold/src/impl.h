@@ -109,11 +109,11 @@ struct Manifold::Impl {
                                   bool inverted = false) const;
 
   bool IsEmpty() const { return NumVert() == 0; }
-  int NumVert() const { return vertPos_.size(); }
-  int NumEdge() const { return halfedge_.size() / 2; }
-  int NumTri() const { return halfedge_.size() / 3; }
-  int NumProp() const { return meshRelation_.numProp; }
-  int NumPropVert() const {
+  size_t NumVert() const { return vertPos_.size(); }
+  size_t NumEdge() const { return halfedge_.size() / 2; }
+  size_t NumTri() const { return halfedge_.size() / 3; }
+  size_t NumProp() const { return meshRelation_.numProp; }
+  size_t NumPropVert() const {
     return NumProp() == 0 ? NumVert()
                           : meshRelation_.properties.size() / NumProp();
   }

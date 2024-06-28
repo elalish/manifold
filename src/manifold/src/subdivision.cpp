@@ -125,9 +125,9 @@ class Partition {
       }
     }
     const int offset = interiorOffset - newVerts.size();
-    for (int i = newVerts.size(); i < vertBary.size(); ++i) {
-      newVerts.push_back(i + offset);
-    }
+    size_t old = newVerts.size();
+    newVerts.resize(vertBary.size());
+    std::iota(newVerts.begin() + old, newVerts.end(), old + offset);
 
     const int numTri = triVert.size();
     Vec<glm::ivec3> newTriVert(numTri);
@@ -281,8 +281,8 @@ class Partition {
       return edgeOffsets[edge] + (edgeFwd[edge] ? 1 : -1) * idx;
     };
 
-    ASSERT(glm::all(glm::greaterThanEqual(edgeAdded, glm::ivec4(0))), logicErr,
-           "negative divisions!");
+    DEBUG_ASSERT(glm::all(glm::greaterThanEqual(edgeAdded, glm::ivec4(0))),
+                 logicErr, "negative divisions!");
 
     int corner = -1;
     int last = 3;
@@ -577,8 +577,9 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
 
   Vec<int> triOffset(numTri);
   auto numSubTris = thrust::make_transform_iterator(
-      subTris.begin(),
-      [](const Partition& part) { return part.triVert.size(); });
+      subTris.begin(), [](const Partition& part) {
+        return static_cast<int>(part.triVert.size());
+      });
   exclusive_scan(policy, numSubTris, numSubTris + numTri, triOffset.begin(), 0);
 
   Vec<int> interiorOffset(numTri);

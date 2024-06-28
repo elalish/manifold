@@ -55,12 +55,12 @@ TEST(Manifold, GetMeshGL) {
   MeshGL meshGL_out = manifold.GetMeshGL();
   ASSERT_EQ(meshGL_out.NumVert(), mesh_out.vertPos.size());
   ASSERT_EQ(meshGL_out.NumTri(), mesh_out.triVerts.size());
-  for (int i = 0; i < meshGL_out.NumVert(); ++i) {
+  for (size_t i = 0; i < meshGL_out.NumVert(); ++i) {
     for (const int j : {0, 1, 2}) {
       ASSERT_EQ(meshGL_out.vertProperties[3 * i + j], mesh_out.vertPos[i][j]);
     }
   }
-  for (int i = 0; i < meshGL_out.NumTri(); ++i) {
+  for (size_t i = 0; i < meshGL_out.NumTri(); ++i) {
     for (const int j : {0, 1, 2})
       ASSERT_EQ(meshGL_out.triVerts[3 * i + j], mesh_out.triVerts[i][j]);
   }
@@ -241,7 +241,7 @@ Polygons RotatePolygons(Polygons polys, const int index) {
 TEST(Manifold, Revolve) {
   Polygons polys = SquareHole();
   Manifold vug;
-  for (int i = 0; i < polys[0].size(); i++) {
+  for (size_t i = 0; i < polys[0].size(); i++) {
     Polygons rotatedPolys = RotatePolygons(polys, i);
     vug = Manifold::Revolve(rotatedPolys, 48);
     EXPECT_EQ(vug.Genus(), -1);
@@ -273,7 +273,7 @@ TEST(Manifold, PartialRevolveOnYAxis) {
   Polygons offsetPolys = SquareHole(10.0f);
 
   Manifold revolute;
-  for (int i = 0; i < polys[0].size(); i++) {
+  for (size_t i = 0; i < polys[0].size(); i++) {
     Polygons rotatedPolys = RotatePolygons(polys, i);
     revolute = Manifold::Revolve(rotatedPolys, 48, 180);
     EXPECT_EQ(revolute.Genus(), 1);
@@ -290,7 +290,7 @@ TEST(Manifold, PartialRevolveOffset) {
   Polygons polys = SquareHole(10.0f);
 
   Manifold revolute;
-  for (int i = 0; i < polys[0].size(); i++) {
+  for (size_t i = 0; i < polys[0].size(); i++) {
     Polygons rotatedPolys = RotatePolygons(polys, i);
     revolute = Manifold::Revolve(rotatedPolys, 48, 180);
     auto prop = revolute.GetProperties();

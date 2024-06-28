@@ -176,7 +176,7 @@ MeshGL CubeSTL() {
   MeshGL cube;
   cube.numProp = 6;
 
-  for (int tri = 0, vert = 0; tri < cubeIn.NumTri(); tri++) {
+  for (size_t tri = 0, vert = 0; tri < cubeIn.NumTri(); tri++) {
     glm::mat3 triPos;
     for (const int i : {0, 1, 2}) {
       cube.triVerts.push_back(vert++);
@@ -249,14 +249,14 @@ MeshGL WithNormals(const Manifold& in) {
   out.runOriginalID = {Manifold::ReserveIDs(1)};
   out.numProp = 6;
   out.vertProperties.resize(out.numProp * mesh.vertPos.size());
-  for (int i = 0; i < mesh.vertPos.size(); ++i) {
+  for (size_t i = 0; i < mesh.vertPos.size(); ++i) {
     for (int j : {0, 1, 2}) {
       out.vertProperties[6 * i + j] = mesh.vertPos[i][j];
       out.vertProperties[6 * i + 3 + j] = mesh.vertNormal[i][j];
     }
   }
   out.triVerts.resize(3 * mesh.triVerts.size());
-  for (int i = 0; i < mesh.triVerts.size(); ++i) {
+  for (size_t i = 0; i < mesh.triVerts.size(); ++i) {
     for (int j : {0, 1, 2}) out.triVerts[3 * i + j] = mesh.triVerts[i][j];
   }
   return out;
@@ -319,12 +319,12 @@ void CheckFinite(const MeshGL& mesh) {
 
 void Identical(const Mesh& mesh1, const Mesh& mesh2) {
   ASSERT_EQ(mesh1.vertPos.size(), mesh2.vertPos.size());
-  for (int i = 0; i < mesh1.vertPos.size(); ++i)
+  for (size_t i = 0; i < mesh1.vertPos.size(); ++i)
     for (int j : {0, 1, 2})
       ASSERT_NEAR(mesh1.vertPos[i][j], mesh2.vertPos[i][j], 0.0001);
 
   ASSERT_EQ(mesh1.triVerts.size(), mesh2.triVerts.size());
-  for (int i = 0; i < mesh1.triVerts.size(); ++i)
+  for (size_t i = 0; i < mesh1.triVerts.size(); ++i)
     ASSERT_EQ(mesh1.triVerts[i], mesh2.triVerts[i]);
 }
 
@@ -334,22 +334,22 @@ void RelatedGL(const Manifold& out, const std::vector<MeshGL>& originals,
   const glm::ivec3 normalIdx =
       updateNormals ? glm::ivec3(3, 4, 5) : glm::ivec3(0);
   MeshGL output = out.GetMeshGL(normalIdx);
-  for (int run = 0; run < output.runOriginalID.size(); ++run) {
+  for (size_t run = 0; run < output.runOriginalID.size(); ++run) {
     const float* m = output.runTransform.data() + 12 * run;
     const glm::mat4x3 transform =
         output.runTransform.empty()
             ? glm::mat4x3(1.0f)
             : glm::mat4x3(m[0], m[1], m[2], m[3], m[4], m[5], m[6], m[7], m[8],
                           m[9], m[10], m[11]);
-    int i = 0;
+    size_t i = 0;
     for (; i < originals.size(); ++i) {
       ASSERT_EQ(originals[i].runOriginalID.size(), 1);
       if (originals[i].runOriginalID[0] == output.runOriginalID[run]) break;
     }
     ASSERT_LT(i, originals.size());
     const MeshGL& inMesh = originals[i];
-    for (int tri = output.runIndex[run] / 3; tri < output.runIndex[run + 1] / 3;
-         ++tri) {
+    for (uint32_t tri = output.runIndex[run] / 3;
+         tri < output.runIndex[run + 1] / 3; ++tri) {
       if (!output.faceID.empty()) {
         ASSERT_LT(tri, output.faceID.size());
       }
@@ -394,7 +394,7 @@ void RelatedGL(const Manifold& out, const std::vector<MeshGL>& originals,
           ASSERT_NEAR(glm::length(normal), 1, 0.0001);
           ASSERT_GT(glm::dot(normal, outNormal), 0);
         } else {
-          for (int p = 3; p < inMesh.numProp; ++p) {
+          for (size_t p = 3; p < inMesh.numProp; ++p) {
             const float propOut =
                 output.vertProperties[vert * output.numProp + p];
 
@@ -427,7 +427,7 @@ void ExpectMeshes(const Manifold& manifold,
               return a.NumVert() != b.NumVert() ? a.NumVert() > b.NumVert()
                                                 : a.NumTri() > b.NumTri();
             });
-  for (int i = 0; i < manifolds.size(); ++i) {
+  for (size_t i = 0; i < manifolds.size(); ++i) {
     EXPECT_EQ(manifolds[i].NumVert(), meshSize[i].numVert);
     EXPECT_EQ(manifolds[i].NumTri(), meshSize[i].numTri);
     EXPECT_EQ(manifolds[i].NumProp(), meshSize[i].numProp);
