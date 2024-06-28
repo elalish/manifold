@@ -136,19 +136,8 @@ struct CurvatureAngles {
   }
 };
 
-struct NormalizeCurvature {
-  void operator()(thrust::tuple<float&, float&, float, float> inOut) {
-    float& meanCurvature = thrust::get<0>(inOut);
-    float& gaussianCurvature = thrust::get<1>(inOut);
-    float area = thrust::get<2>(inOut);
-    float degree = thrust::get<3>(inOut);
-    float factor = degree / (6 * area);
-    meanCurvature *= factor;
-    gaussianCurvature *= factor;
-  }
-};
-
 struct UpdateProperties {
+  VecView<glm::ivec3> triProp;
   VecView<float> properties;
 
   VecView<const float> oldProperties;
@@ -161,16 +150,13 @@ struct UpdateProperties {
   const int meanIdx;
 
   // FIXME: race condition
-  void operator()(thrust::tuple<glm::ivec3&, size_t> inOut) {
-    glm::ivec3& triProp = thrust::get<0>(inOut);
-    const auto tri = thrust::get<1>(inOut);
-
+  void operator()(const size_t tri) {
     for (const int i : {0, 1, 2}) {
       const int vert = halfedge[3 * tri + i].startVert;
       if (oldNumProp == 0) {
-        triProp[i] = vert;
+        triProp[tri][i] = vert;
       }
-      const int propVert = triProp[i];
+      const int propVert = triProp[tri][i];
 
       for (int p = 0; p < oldNumProp; ++p) {
         properties[numProp * propVert + p] =
@@ -352,10 +338,13 @@ void Manifold::Impl::CalculateCurvature(int gaussianIdx, int meanIdx) {
   for_each(policy, countAt(0_z), countAt(NumTri()),
            CurvatureAngles({vertMeanCurvature, vertGaussianCurvature, vertArea,
                             degree, halfedge_, vertPos_, faceNormal_}));
-  for_each_n(policy,
-             zip(vertMeanCurvature.begin(), vertGaussianCurvature.begin(),
-                 vertArea.begin(), degree.begin()),
-             NumVert(), NormalizeCurvature());
+  for_each_n(policy, countAt(0), NumVert(),
+             [&vertMeanCurvature, &vertGaussianCurvature, &vertArea,
+              &degree](const int vert) {
+               const float factor = degree[vert] / (6 * vertArea[vert]);
+               vertMeanCurvature[vert] *= factor;
+               vertGaussianCurvature[vert] *= factor;
+             });
 
   const int oldNumProp = NumProp();
   const int numProp = glm::max(oldNumProp, glm::max(gaussianIdx, meanIdx) + 1);
@@ -367,10 +356,11 @@ void Manifold::Impl::CalculateCurvature(int gaussianIdx, int meanIdx) {
   }
 
   for_each_n(
-      policy, zip(meshRelation_.triProperties.begin(), countAt(0_z)), NumTri(),
-      UpdateProperties({meshRelation_.properties, oldProperties, halfedge_,
-                        vertMeanCurvature, vertGaussianCurvature, oldNumProp,
-                        numProp, gaussianIdx, meanIdx}));
+      policy, countAt(0_z), NumTri(),
+      UpdateProperties({meshRelation_.triProperties, meshRelation_.properties,
+                        oldProperties, halfedge_, vertMeanCurvature,
+                        vertGaussianCurvature, oldNumProp, numProp, gaussianIdx,
+                        meanIdx}));
 
   CreateFaces();
   Finish();

@@ -68,11 +68,6 @@ thrust::zip_iterator<thrust::tuple<Iters...>> zip(Iters... iters) {
   return thrust::make_zip_iterator(thrust::make_tuple(iters...));
 }
 
-template <typename A, typename B>
-thrust::permutation_iterator<A, B> perm(A a, B b) {
-  return thrust::make_permutation_iterator(a, b);
-}
-
 template <typename T>
 thrust::counting_iterator<T> countAt(T i) {
   return thrust::make_counting_iterator(i);
