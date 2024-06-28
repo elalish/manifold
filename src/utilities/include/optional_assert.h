@@ -16,7 +16,7 @@
 
 #include "public.h"
 #if MANIFOLD_EXCEPTIONS
-#include <exception>
+#include <stdexcept>
 #endif
 
 #ifdef MANIFOLD_DEBUG

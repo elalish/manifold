@@ -154,7 +154,7 @@ struct nb::detail::type_caster<std::vector<glm::vec<N, T, Q>>> {
                          cleanup_list *cleanup) noexcept {
     size_t num_vec = vec.size();
     T *buffer = new T[num_vec * N];
-    nb::capsule mem_mgr(buffer, [](void *p) noexcept { delete[] (T *)p; });
+    nb::capsule mem_mgr(buffer, [](void *p) noexcept { delete[](T *) p; });
     for (size_t i = 0; i < num_vec; i++) {
       for (size_t j = 0; j < N; j++) {
         buffer[i * N + j] = vec[i][j];
