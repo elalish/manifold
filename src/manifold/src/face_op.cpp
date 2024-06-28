@@ -49,7 +49,7 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
     const int firstEdge = faceEdge[face];
     const int lastEdge = faceEdge[face + 1];
     const int numEdge = lastEdge - firstEdge;
-    ASSERT(numEdge >= 3, topologyErr, "face has less than three edges.");
+    DEBUG_ASSERT(numEdge >= 3, topologyErr, "face has less than three edges.");
     const glm::vec3 normal = faceNormal_[face];
 
     if (numEdge == 3) {  // Single triangle
@@ -66,8 +66,8 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
         std::swap(tri[1], tri[2]);
         std::swap(ends[1], ends[2]);
       }
-      ASSERT(ends[0] == tri[1] && ends[1] == tri[2] && ends[2] == tri[0],
-             topologyErr, "These 3 edges do not form a triangle!");
+      DEBUG_ASSERT(ends[0] == tri[1] && ends[1] == tri[2] && ends[2] == tri[0],
+                   topologyErr, "These 3 edges do not form a triangle!");
 
       addTri(face, tri, normal, halfedgeRef[firstEdge]);
     } else if (numEdge == 4) {  // Pair of triangles
@@ -94,9 +94,9 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
           tri1[1] = halfedge_[firstEdge + i].startVert;
         }
       }
-      ASSERT(glm::all(glm::greaterThanEqual(tri0, glm::ivec3(0))) &&
-                 glm::all(glm::greaterThanEqual(tri1, glm::ivec3(0))),
-             topologyErr, "non-manifold quad!");
+      DEBUG_ASSERT(glm::all(glm::greaterThanEqual(tri0, glm::ivec3(0))) &&
+                       glm::all(glm::greaterThanEqual(tri1, glm::ivec3(0))),
+                   topologyErr, "non-manifold quad!");
       bool firstValid = triCCW(tri0) && triCCW(tri1);
       tri0[2] = tri1[1];
       tri1[2] = tri0[1];
@@ -143,8 +143,8 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
   for_each(autoPolicy(faceEdge.size()), countAt(0_z),
            countAt(faceEdge.size() - 1), [&](size_t face) {
              triCount[face] = faceEdge[face + 1] - faceEdge[face] - 2;
-             ASSERT(triCount[face] >= 1, topologyErr,
-                    "face has less than three edges.");
+             DEBUG_ASSERT(triCount[face] >= 1, topologyErr,
+                          "face has less than three edges.");
              if (triCount[face] > 2)
                group.run([&, face] {
                  std::vector<glm::ivec3> newTris = generalTriangulation(face);
@@ -156,8 +156,6 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
   // prefix sum computation (assign unique index to each face) and preallocation
   exclusive_scan(autoPolicy(triCount.size()), triCount.begin(), triCount.end(),
                  triCount.begin(), 0_z);
-  if (triCount.back() >= std::numeric_limits<int>::max())
-    throw std::out_of_range("too many triangles");
   triVerts.resize(triCount.back());
   triNormal.resize(triCount.back());
   triRef.resize(triCount.back());
@@ -186,7 +184,7 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
         triRef.push_back(r);
       },
       std::placeholders::_1);
-  for (int face = 0; face < faceEdge.size() - 1; ++face) {
+  for (size_t face = 0; face < faceEdge.size() - 1; ++face) {
     processFace2(face);
   }
 #endif
@@ -221,14 +219,14 @@ PolygonsIdx Manifold::Impl::Face2Polygons(VecView<Halfedge>::IterC start,
     int vert = (start + thisEdge)->startVert;
     polys.back().push_back({projection * vertPos_[vert], vert});
     const auto result = vert_edge.find((start + thisEdge)->endVert);
-    ASSERT(result != vert_edge.end(), topologyErr, "non-manifold edge");
+    DEBUG_ASSERT(result != vert_edge.end(), topologyErr, "non-manifold edge");
     thisEdge = result->second;
     vert_edge.erase(result);
   }
   return polys;
 }
 
-CrossSection Manifold::Impl::Slice(float height) const {
+Polygons Manifold::Impl::Slice(float height) const {
   Box plane = bBox_;
   plane.min.z = plane.max.z = height;
   Vec<Box> query;
@@ -237,7 +235,7 @@ CrossSection Manifold::Impl::Slice(float height) const {
       collider_.Collisions<false, false>(query.cview());
 
   std::unordered_set<int> tris;
-  for (int i = 0; i < collisions.size(); ++i) {
+  for (size_t i = 0; i < collisions.size(); ++i) {
     const int tri = collisions.Get(i, 1);
     float min = std::numeric_limits<float>::infinity();
     float max = -std::numeric_limits<float>::infinity();
@@ -287,10 +285,10 @@ CrossSection Manifold::Impl::Slice(float height) const {
     polys.push_back(poly);
   }
 
-  return CrossSection(polys);
+  return polys;
 }
 
-CrossSection Manifold::Impl::Project() const {
+Polygons Manifold::Impl::Project() const {
   const glm::mat3x2 projection = GetAxisAlignedProjection({0, 0, 1});
   auto policy = autoPolicy(halfedge_.size());
 
@@ -316,6 +314,6 @@ CrossSection Manifold::Impl::Project() const {
     polys.push_back(simple);
   }
 
-  return CrossSection(polys).Simplify(precision_);
+  return polys;
 }
 }  // namespace manifold

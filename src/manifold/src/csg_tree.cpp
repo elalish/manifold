@@ -74,7 +74,7 @@ struct UpdateMeshIDs {
 struct CheckOverlap {
   VecView<const Box> boxes;
   const size_t i;
-  bool operator()(int j) { return boxes[i].DoesOverlap(boxes[j]); }
+  bool operator()(size_t j) { return boxes[i].DoesOverlap(boxes[j]); }
 };
 
 using SharedImpl = std::variant<std::shared_ptr<const Manifold::Impl>,
@@ -313,7 +313,7 @@ Manifold::Impl CsgLeafNode::Compose(
                   UpdateMeshIDs({offset}));
       });
 
-  for (int i = 0; i < nodes.size(); i++) {
+  for (size_t i = 0; i < nodes.size(); i++) {
     auto &node = nodes[i];
     const int offset = i * Manifold::Impl::meshIDCounter_;
 
@@ -457,8 +457,8 @@ std::shared_ptr<Manifold::Impl> CsgOpNode::BatchBoolean(
     std::vector<std::shared_ptr<const Manifold::Impl>> &results) {
   ZoneScoped;
   auto getImplPtr = GetImplPtr();
-  ASSERT(operation != OpType::Subtract, logicErr,
-         "BatchBoolean doesn't support Difference.");
+  DEBUG_ASSERT(operation != OpType::Subtract, logicErr,
+               "BatchBoolean doesn't support Difference.");
   // common cases
   if (results.size() == 0) return std::make_shared<Manifold::Impl>();
   if (results.size() == 1)
@@ -537,16 +537,16 @@ void CsgOpNode::BatchUnion() const {
   // with O(n^2) complexity to take too long.
   // If the number of children exceeded this limit, we will operate on chunks
   // with size kMaxUnionSize.
-  constexpr int kMaxUnionSize = 1000;
+  constexpr size_t kMaxUnionSize = 1000;
   auto impl = impl_.GetGuard();
   auto &children_ = impl->children_;
   while (children_.size() > 1) {
-    const int start = (children_.size() > kMaxUnionSize)
-                          ? (children_.size() - kMaxUnionSize)
-                          : 0;
+    const size_t start = (children_.size() > kMaxUnionSize)
+                             ? (children_.size() - kMaxUnionSize)
+                             : 0;
     Vec<Box> boxes;
     boxes.reserve(children_.size() - start);
-    for (int i = start; i < children_.size(); i++) {
+    for (size_t i = start; i < children_.size(); i++) {
       boxes.push_back(std::dynamic_pointer_cast<CsgLeafNode>(children_[i])
                           ->GetImpl()
                           ->bBox_);

@@ -58,7 +58,7 @@ extern "C" {
 ManifoldSimplePolygon *manifold_simple_polygon(void *mem, ManifoldVec2 *ps,
                                                size_t length) {
   auto vec = new (mem) std::vector<glm::vec2>;
-  for (int i = 0; i < length; ++i) {
+  for (size_t i = 0; i < length; ++i) {
     vec->push_back({ps[i].x, ps[i].y});
   }
   return to_c(vec);
@@ -68,7 +68,7 @@ ManifoldPolygons *manifold_polygons(void *mem, ManifoldSimplePolygon **ps,
                                     size_t length) {
   auto vec = new (mem) std::vector<SimplePolygon>;
   auto polys = reinterpret_cast<SimplePolygon **>(ps);
-  for (int i = 0; i < length; ++i) {
+  for (size_t i = 0; i < length; ++i) {
     vec->push_back(*polys[i]);
   }
   return to_c(vec);
@@ -192,15 +192,14 @@ ManifoldManifold *manifold_trim_by_plane(void *mem, ManifoldManifold *m,
   return to_c(new (mem) Manifold(trimmed));
 }
 
-ManifoldCrossSection *manifold_slice(void *mem, ManifoldManifold *m,
-                                     float height) {
+ManifoldPolygons *manifold_slice(void *mem, ManifoldManifold *m, float height) {
   auto poly = from_c(m)->Slice(height);
-  return to_c(new (mem) CrossSection(poly));
+  return to_c(new (mem) Polygons(poly));
 }
 
-ManifoldCrossSection *manifold_project(void *mem, ManifoldManifold *m) {
+ManifoldPolygons *manifold_project(void *mem, ManifoldManifold *m) {
   auto poly = from_c(m)->Project();
-  return to_c(new (mem) CrossSection(poly));
+  return to_c(new (mem) Polygons(poly));
 }
 
 ManifoldManifold *manifold_hull(void *mem, ManifoldManifold *m) {
@@ -216,7 +215,7 @@ ManifoldManifold *manifold_batch_hull(void *mem, ManifoldManifoldVec *ms) {
 ManifoldManifold *manifold_hull_pts(void *mem, ManifoldVec3 *ps,
                                     size_t length) {
   std::vector<glm::vec3> vec(length);
-  for (int i = 0; i < length; ++i) {
+  for (size_t i = 0; i < length; ++i) {
     vec[i] = {ps[i].x, ps[i].y, ps[i].z};
   }
   auto hulled = Manifold::Hull(vec);
@@ -367,10 +366,10 @@ ManifoldMeshGL *manifold_meshgl_w_tangents(void *mem, float *vert_props,
 }
 
 ManifoldManifold *manifold_smooth(void *mem, ManifoldMeshGL *mesh,
-                                  int *half_edges, float *smoothness,
-                                  int n_edges) {
+                                  size_t *half_edges, float *smoothness,
+                                  size_t n_edges) {
   auto smooth = std::vector<Smoothness>();
-  for (int i = 0; i < n_edges; ++i) {
+  for (size_t i = 0; i < n_edges; ++i) {
     smooth.push_back({half_edges[i], smoothness[i]});
   }
   auto m = Manifold::Smooth(*from_c(mesh), smooth);
@@ -382,7 +381,7 @@ ManifoldManifold *manifold_of_meshgl(void *mem, ManifoldMeshGL *mesh) {
   return to_c(new (mem) Manifold(m));
 }
 
-ManifoldManifold *manifold_extrude(void *mem, ManifoldCrossSection *cs,
+ManifoldManifold *manifold_extrude(void *mem, ManifoldPolygons *cs,
                                    float height, int slices,
                                    float twist_degrees, float scale_x,
                                    float scale_y) {
@@ -391,8 +390,7 @@ ManifoldManifold *manifold_extrude(void *mem, ManifoldCrossSection *cs,
   return to_c(new (mem) Manifold(m));
 }
 
-ManifoldManifold *manifold_revolve(void *mem, ManifoldCrossSection *cs,
-
+ManifoldManifold *manifold_revolve(void *mem, ManifoldPolygons *cs,
                                    int circular_segments) {
   auto m = Manifold::Revolve(*from_c(cs), circular_segments);
   return to_c(new (mem) Manifold(m));

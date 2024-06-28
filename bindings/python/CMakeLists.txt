@@ -20,7 +20,7 @@ nanobind_add_module(
   NB_STATIC STABLE_ABI LTO
   autogen_docstrings.inl
   manifold3d.cpp)
-target_link_libraries(manifold3d PRIVATE manifold sdf polygon)
+target_link_libraries(manifold3d PRIVATE manifold sdf polygon cross_section)
 target_compile_options(manifold3d PRIVATE ${MANIFOLD_FLAGS} -DMODULE_NAME=manifold3d)
 target_compile_features(manifold3d PUBLIC cxx_std_17)
 set_target_properties(manifold3d PROPERTIES OUTPUT_NAME "manifold3d")

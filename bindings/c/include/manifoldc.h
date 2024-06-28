@@ -105,9 +105,8 @@ ManifoldManifold *manifold_trim_by_plane(void *mem, ManifoldManifold *m,
 
 // 3D to 2D
 
-ManifoldCrossSection *manifold_slice(void *mem, ManifoldManifold *m,
-                                     float height);
-ManifoldCrossSection *manifold_project(void *mem, ManifoldManifold *m);
+ManifoldPolygons *manifold_slice(void *mem, ManifoldManifold *m, float height);
+ManifoldPolygons *manifold_project(void *mem, ManifoldManifold *m);
 
 // Convex Hulls
 
@@ -155,13 +154,13 @@ ManifoldManifold *manifold_sphere(void *mem, float radius,
                                   int circular_segments);
 ManifoldManifold *manifold_of_meshgl(void *mem, ManifoldMeshGL *mesh);
 ManifoldManifold *manifold_smooth(void *mem, ManifoldMeshGL *mesh,
-                                  int *half_edges, float *smoothness,
-                                  int n_idxs);
-ManifoldManifold *manifold_extrude(void *mem, ManifoldCrossSection *cs,
+                                  size_t *half_edges, float *smoothness,
+                                  size_t n_idxs);
+ManifoldManifold *manifold_extrude(void *mem, ManifoldPolygons *cs,
                                    float height, int slices,
                                    float twist_degrees, float scale_x,
                                    float scale_y);
-ManifoldManifold *manifold_revolve(void *mem, ManifoldCrossSection *cs,
+ManifoldManifold *manifold_revolve(void *mem, ManifoldPolygons *cs,
                                    int circular_segments);
 ManifoldManifold *manifold_compose(void *mem, ManifoldManifoldVec *ms);
 ManifoldManifoldVec *manifold_decompose(void *mem, ManifoldManifold *m);

@@ -294,8 +294,8 @@ MeshGL Manifold::GetMeshGL(glm::ivec3 normalIdx) const {
   std::vector<std::vector<glm::ivec2>> vertPropPair(impl.NumVert());
   out.vertProperties.reserve(numVert * static_cast<size_t>(out.numProp));
 
-  for (int run = 0; run < out.runOriginalID.size(); ++run) {
-    for (int tri = out.runIndex[run] / 3; tri < out.runIndex[run + 1] / 3;
+  for (size_t run = 0; run < out.runOriginalID.size(); ++run) {
+    for (size_t tri = out.runIndex[run] / 3; tri < out.runIndex[run + 1] / 3;
          ++tri) {
       const glm::ivec3 triProp =
           impl.meshRelation_.triProperties[triNew2Old[tri]];
@@ -305,10 +305,10 @@ MeshGL Manifold::GetMeshGL(glm::ivec3 normalIdx) const {
 
         auto& bin = vertPropPair[vert];
         bool bFound = false;
-        for (int k = 0; k < bin.size(); ++k) {
-          if (bin[k].x == prop) {
+        for (const auto& b : bin) {
+          if (b.x == prop) {
             bFound = true;
-            out.triVerts[3 * tri + i] = bin[k].y;
+            out.triVerts[3 * tri + i] = b.y;
             break;
           }
         }
@@ -901,15 +901,17 @@ Manifold Manifold::TrimByPlane(glm::vec3 normal, float originOffset) const {
  * the bounding box will return the bottom faces, while using a height equal to
  * the top of the bounding box will return empty.
  */
-CrossSection Manifold::Slice(float height) const {
+Polygons Manifold::Slice(float height) const {
   return GetCsgLeafNode().GetImpl()->Slice(height);
 }
 
 /**
- * Returns a cross section representing the projected outline of this object
- * onto the X-Y plane.
+ * Returns polygons representing the projected outline of this object
+ * onto the X-Y plane. These polygons will often self-intersect, so it is
+ * recommended to run them through the positive fill rule of CrossSection to get
+ * a sensible result before using them.
  */
-CrossSection Manifold::Project() const {
+Polygons Manifold::Project() const {
   return GetCsgLeafNode().GetImpl()->Project();
 }
 

@@ -35,7 +35,7 @@ TEST(Smooth, Tetrahedron) {
 
   MeshGL out = smooth.CalculateCurvature(-1, 0).GetMeshGL();
   float maxMeanCurvature = 0;
-  for (int i = 3; i < out.vertProperties.size(); i += 4) {
+  for (size_t i = 3; i < out.vertProperties.size(); i += 4) {
     maxMeanCurvature =
         glm::max(maxMeanCurvature, glm::abs(out.vertProperties[i]));
   }
@@ -60,7 +60,7 @@ TEST(Smooth, RefineQuads) {
 
   const MeshGL baseline = WithPositionColors(cylinder);
   float maxDiff = 0;
-  for (int i = 0; i < out.vertProperties.size(); ++i) {
+  for (size_t i = 0; i < out.vertProperties.size(); ++i) {
     maxDiff = glm::max(
         maxDiff, glm::abs(out.vertProperties[i] - baseline.vertProperties[i]));
   }
@@ -106,7 +106,8 @@ TEST(Smooth, TruncatedCone) {
 
 TEST(Smooth, ToLength) {
   Manifold cone = Manifold::Extrude(
-      CrossSection::Circle(10, 10).Translate({10, 0}), 2, 0, 0, {0, 0});
+      CrossSection::Circle(10, 10).Translate({10, 0}).ToPolygons(), 2, 0, 0,
+      {0, 0});
   cone += cone.Scale({1, 1, -5});
   Manifold smooth = Manifold::Smooth(cone.GetMesh());
   smooth = smooth.RefineToLength(0.1);
@@ -117,7 +118,7 @@ TEST(Smooth, ToLength) {
 
   MeshGL out = smooth.CalculateCurvature(-1, 0).GetMeshGL();
   float maxMeanCurvature = 0;
-  for (int i = 3; i < out.vertProperties.size(); i += 4) {
+  for (size_t i = 3; i < out.vertProperties.size(); i += 4) {
     maxMeanCurvature =
         glm::max(maxMeanCurvature, glm::abs(out.vertProperties[i]));
   }
@@ -269,7 +270,8 @@ glm::vec4 CircularTangent(const glm::vec3& tangent, const glm::vec3& edgeVec) {
 
 TEST(Smooth, Torus) {
   Mesh torusMesh =
-      Manifold::Revolve(CrossSection::Circle(1, 8).Translate({2, 0}), 6)
+      Manifold::Revolve(
+          CrossSection::Circle(1, 8).Translate({2, 0}).ToPolygons(), 6)
           .GetMesh();
   const int numTri = torusMesh.triVerts.size();
 
@@ -307,7 +309,7 @@ TEST(Smooth, Torus) {
                         .CalculateNormals(1);
   MeshGL out = smooth.GetMeshGL();
   float maxMeanCurvature = 0;
-  for (int i = 0; i < out.vertProperties.size(); i += 7) {
+  for (size_t i = 0; i < out.vertProperties.size(); i += 7) {
     glm::vec3 v(out.vertProperties[i], out.vertProperties[i + 1],
                 out.vertProperties[i + 2]);
     glm::vec3 p(v.x, v.y, 0);

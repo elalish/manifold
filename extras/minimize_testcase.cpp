@@ -61,11 +61,11 @@ inline bool intersect(glm::vec2 p0, glm::vec2 p1, glm::vec2 q0, glm::vec2 q1,
 // check if removing point j in polygon i will introduce self-intersection
 // this checks if the new edge j-1 <-> j+1 intersects with any other edges,
 // assuming the original polygon does not contain self-intersection
-bool safeToRemove(const Polygons &polys, int i, int j, float precision) {
+bool safeToRemove(const Polygons &polys, size_t i, size_t j, float precision) {
   if (polys[i].size() == 3) return false;
   glm::vec2 prev = polys[i][j == 0 ? polys[i].size() - 1 : (j - 1)];
   glm::vec2 next = polys[i][j == (polys[i].size() - 1) ? 0 : (j + 1)];
-  for (int k = 0; k < polys.size(); k++) {
+  for (size_t k = 0; k < polys.size(); k++) {
     auto ll = [&](size_t l) {
       return l == (polys[k].size() - 1) ? 0 : (l + 1);
     };
@@ -74,7 +74,7 @@ bool safeToRemove(const Polygons &polys, int i, int j, float precision) {
 #if MANIFOLD_PAR == 'T' && __has_include(<pstl/glue_execution_defs.h>)
             std::execution::par,
 #endif
-            countAt((size_t)0), countAt(polys[k].size()), [=](size_t l) {
+            countAt(0_z), countAt(polys[k].size()), [=](size_t l) {
               if (i == k && (l == j || ll(l) == j)) return true;
               return !intersect(prev, next, polysk[l], polysk[ll(l)],
                                 precision);
@@ -84,8 +84,8 @@ bool safeToRemove(const Polygons &polys, int i, int j, float precision) {
   return true;
 }
 
-std::pair<int, int> findIndex(const Polygons &polys, int i) {
-  int outer = 0;
+std::pair<int, int> findIndex(const Polygons &polys, size_t i) {
+  size_t outer = 0;
   while (i >= polys[outer].size()) i -= polys[outer++].size();
   return std::make_pair(outer, i);
 }
@@ -139,9 +139,9 @@ bool rayHit(glm::vec2 point, glm::vec2 q0, glm::vec2 q1) {
 // this enumerates over the first point in all other polygons,
 // and check if they are inside the current polygon
 // this algorithm assumes that polygons are non-intersecting
-std::vector<int> getChildren(const Polygons &polys, int i) {
+std::vector<int> getChildren(const Polygons &polys, size_t i) {
   std::vector<int> results;
-  for (int j = 0; j < polys.size(); j++) {
+  for (size_t j = 0; j < polys.size(); j++) {
     if (i == j) continue;
     glm::vec2 point = polys[j][0];
     auto k1 = [&](size_t k) {
@@ -173,7 +173,7 @@ void simplify(Polygons &polys, float precision = -1) {
 
     removedSomething = false;
     // try to remove simple polygons
-    for (int i = 0; i < polys.size(); i++) {
+    for (size_t i = 0; i < polys.size(); i++) {
       std::vector<int> children = getChildren(polys, i);
       // if there are children, we can't remove it or we will mess up with
       // winding direction...
@@ -195,9 +195,9 @@ void simplify(Polygons &polys, float precision = -1) {
       }
     }
 
-    for (int i = 0; i < polys.size(); i++) {
+    for (size_t i = 0; i < polys.size(); i++) {
       std::vector<int> children = getChildren(polys, i);
-      for (int j = 0; j < polys[i].size(); j++) {
+      for (size_t j = 0; j < polys[i].size(); j++) {
         // removed vertex cannot change inclusion relation
         // we just check if the vertex
         // x: intersects with j0, j (original edge 1)
@@ -205,8 +205,8 @@ void simplify(Polygons &polys, float precision = -1) {
         // z: intersects with j0, j1 (new edge)
         // if (x ^ y ^ z) is true, it means that the count % 2 is changed,
         // and we changed inclusion relation, so vertex j cannot be removed
-        int j0 = j == 0 ? polys[i].size() - 1 : j - 1;
-        int j1 = j == polys[i].size() - 1 ? 0 : j + 1;
+        size_t j0 = j == 0 ? polys[i].size() - 1 : j - 1;
+        size_t j1 = j == polys[i].size() - 1 ? 0 : j + 1;
         if (std::any_of(children.begin(), children.end(), [&](int k) {
               return rayHit(polys[k][0], polys[i][j0], polys[i][j]) ^
                      rayHit(polys[k][0], polys[i][j], polys[i][j1]) ^
@@ -318,7 +318,7 @@ int main(int argc, char **argv) {
   SimplePolygon poly;
   // search for precision first
   while (std::getline(fin, line)) {
-    int index = line.find("Precision = ");
+    size_t index = line.find("Precision = ");
     if (index != std::string::npos) {
       std::istringstream iss(line.substr(index + 12));
       if (!(iss >> precision)) {
