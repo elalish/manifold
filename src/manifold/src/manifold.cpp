@@ -29,19 +29,6 @@ using namespace thrust::placeholders;
 
 ExecutionParams manifoldParams;
 
-struct MakeTri {
-  VecView<const Halfedge> halfedges;
-
-  void operator()(thrust::tuple<glm::ivec3&, int> inOut) {
-    glm::ivec3& tri = thrust::get<0>(inOut);
-    const int face = 3 * thrust::get<1>(inOut);
-
-    for (int i : {0, 1, 2}) {
-      tri[i] = halfedges[face + i].startVert;
-    }
-  }
-};
-
 struct UpdateProperties {
   float* properties;
   const int numProp;
@@ -170,9 +157,14 @@ Mesh Manifold::GetMesh() const {
                                 impl.halfedgeTangent_.end());
 
   result.triVerts.resize(NumTri());
-  // note that `triVerts` is `std::vector`, so we cannot use thrust::device
-  thrust::for_each_n(thrust::host, zip(result.triVerts.begin(), countAt(0)),
-                     NumTri(), MakeTri({impl.halfedge_}));
+  auto& triVerts = result.triVerts;
+  const auto& halfedges = impl.halfedge_;
+  for_each_n(autoPolicy(NumTri()), countAt(0), NumTri(),
+             [&triVerts, &halfedges](const int tri) {
+               for (int i : {0, 1, 2}) {
+                 triVerts[tri][i] = halfedges[3 * tri + i].startVert;
+               }
+             });
 
   return result;
 }

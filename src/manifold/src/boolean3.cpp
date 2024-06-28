@@ -478,11 +478,9 @@ Vec<int> Winding03(const Manifold::Impl &inP, Vec<int> &vertices, Vec<int> &s02,
   // verts that are not shadowed (not in p0q2) have winding number zero.
   Vec<int> w03(inP.NumVert(), 0);
   auto policy = autoPolicy(vertices.size());
-  for_each_n(policy, zip(vertices.begin(), s02.begin()), s02.size(),
-             [&w03, reverse](const thrust::tuple<int, int> &in) {
-               const int vert = thrust::get<0>(in);
-               const int s = thrust::get<1>(in);
-               AtomicAdd(w03[vert], s * (reverse ? -1 : 1));
+  for_each_n(policy, countAt(0), s02.size(),
+             [&w03, &vertices, &s02, reverse](const int i) {
+               AtomicAdd(w03[vertices[i]], s02[i] * (reverse ? -1 : 1));
              });
   return w03;
 };
