@@ -367,10 +367,10 @@ ManifoldMeshGL *manifold_meshgl_w_tangents(void *mem, float *vert_props,
 }
 
 ManifoldManifold *manifold_smooth(void *mem, ManifoldMeshGL *mesh,
-                                  int *half_edges, float *smoothness,
-                                  int n_edges) {
+                                  size_t *half_edges, float *smoothness,
+                                  size_t n_edges) {
   auto smooth = std::vector<Smoothness>();
-  for (int i = 0; i < n_edges; ++i) {
+  for (size_t i = 0; i < n_edges; ++i) {
     smooth.push_back({half_edges[i], smoothness[i]});
   }
   auto m = Manifold::Smooth(*from_c(mesh), smooth);
@@ -392,7 +392,6 @@ ManifoldManifold *manifold_extrude(void *mem, ManifoldCrossSection *cs,
 }
 
 ManifoldManifold *manifold_revolve(void *mem, ManifoldCrossSection *cs,
-
                                    int circular_segments) {
   auto m = Manifold::Revolve(*from_c(cs), circular_segments);
   return to_c(new (mem) Manifold(m));

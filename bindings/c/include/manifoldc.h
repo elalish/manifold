@@ -155,8 +155,8 @@ ManifoldManifold *manifold_sphere(void *mem, float radius,
                                   int circular_segments);
 ManifoldManifold *manifold_of_meshgl(void *mem, ManifoldMeshGL *mesh);
 ManifoldManifold *manifold_smooth(void *mem, ManifoldMeshGL *mesh,
-                                  int *half_edges, float *smoothness,
-                                  int n_idxs);
+                                  size_t *half_edges, float *smoothness,
+                                  size_t n_idxs);
 ManifoldManifold *manifold_extrude(void *mem, ManifoldCrossSection *cs,
                                    float height, int slices,
                                    float twist_degrees, float scale_x,

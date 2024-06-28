@@ -65,19 +65,21 @@ std::vector<PolyEdge> Triangles2Edges(
 void CheckTopology(const std::vector<PolyEdge> &halfedges) {
   DEBUG_ASSERT(halfedges.size() % 2 == 0, topologyErr,
                "Odd number of halfedges.");
-  ssize_t n_edges = halfedges.size() / 2;
+  size_t n_edges = halfedges.size() / 2;
   std::vector<PolyEdge> forward(halfedges.size()), backward(halfedges.size());
 
   auto end = std::copy_if(halfedges.begin(), halfedges.end(), forward.begin(),
                           [](PolyEdge e) { return e.endVert > e.startVert; });
-  DEBUG_ASSERT(std::distance(forward.begin(), end) == n_edges, topologyErr,
-               "Half of halfedges should be forward.");
+  DEBUG_ASSERT(
+      static_cast<size_t>(std::distance(forward.begin(), end)) == n_edges,
+      topologyErr, "Half of halfedges should be forward.");
   forward.resize(n_edges);
 
   end = std::copy_if(halfedges.begin(), halfedges.end(), backward.begin(),
                      [](PolyEdge e) { return e.endVert < e.startVert; });
-  DEBUG_ASSERT(std::distance(backward.begin(), end) == n_edges, topologyErr,
-               "Half of halfedges should be backward.");
+  DEBUG_ASSERT(
+      static_cast<size_t>(std::distance(backward.begin(), end)) == n_edges,
+      topologyErr, "Half of halfedges should be backward.");
   backward.resize(n_edges);
 
   std::for_each(backward.begin(), backward.end(),
@@ -88,7 +90,7 @@ void CheckTopology(const std::vector<PolyEdge> &halfedges) {
   };
   std::stable_sort(forward.begin(), forward.end(), cmp);
   std::stable_sort(backward.begin(), backward.end(), cmp);
-  for (ssize_t i = 0; i < n_edges; ++i) {
+  for (size_t i = 0; i < n_edges; ++i) {
     DEBUG_ASSERT(forward[i].startVert == backward[i].startVert &&
                      forward[i].endVert == backward[i].endVert,
                  topologyErr, "Not manifold.");

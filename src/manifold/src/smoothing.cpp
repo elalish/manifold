@@ -434,9 +434,9 @@ std::vector<Smoothness> Manifold::Impl::SharpenEdges(
     float minSharpAngle, float minSmoothness) const {
   std::vector<Smoothness> sharpenedEdges;
   const float minRadians = glm::radians(minSharpAngle);
-  for (int e = 0; e < static_cast<int>(halfedge_.size()); ++e) {
+  for (size_t e = 0; e < halfedge_.size(); ++e) {
     if (!halfedge_[e].IsForward()) continue;
-    const int pair = halfedge_[e].pairedHalfedge;
+    const size_t pair = halfedge_[e].pairedHalfedge;
     const float dihedral =
         glm::acos(glm::dot(faceNormal_[e / 3], faceNormal_[pair / 3]));
     if (dihedral > minRadians) {
@@ -912,7 +912,7 @@ void Manifold::Impl::CreateTangents(std::vector<Smoothness> sharpenedEdges) {
   halfedgeTangent_.swap(tangent);
 
   // Add sharpened edges around faces, just on the face side.
-  for (int tri = 0; tri < static_cast<int>(NumTri()); ++tri) {
+  for (size_t tri = 0; tri < NumTri(); ++tri) {
     if (!triIsFlatFace[tri]) continue;
     for (const int j : {0, 1, 2}) {
       const int tri2 = halfedge_[3 * tri + j].pairedHalfedge / 3;
@@ -932,7 +932,7 @@ void Manifold::Impl::CreateTangents(std::vector<Smoothness> sharpenedEdges) {
     const int pair = halfedge_[edge.halfedge].pairedHalfedge;
     const int idx = forward ? edge.halfedge : pair;
     if (edges.find(idx) == edges.end()) {
-      edges[idx] = {edge, {pair, 1}};
+      edges[idx] = {edge, {static_cast<size_t>(pair), 1}};
       if (!forward) std::swap(edges[idx].first, edges[idx].second);
     } else {
       Smoothness& e = forward ? edges[idx].first : edges[idx].second;

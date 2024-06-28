@@ -48,14 +48,14 @@ struct MeshGL {
   /// Number of property vertices
   uint32_t NumVert() const {
     ASSERT(vertProperties.size() / numProp <
-               static_cast<size_t>(std::numeric_limits<unsigned int>::max()),
+               static_cast<size_t>(std::numeric_limits<uint32_t>::max()),
            std::out_of_range("mesh too large for MeshGL"));
     return vertProperties.size() / numProp;
   };
   /// Number of triangles
   uint32_t NumTri() const {
     ASSERT(triVerts.size() / 3 <
-               static_cast<size_t>(std::numeric_limits<unsigned int>::max()),
+               static_cast<size_t>(std::numeric_limits<uint32_t>::max()),
            std::out_of_range("mesh too large for MeshGL"));
     return triVerts.size() / 3;
   };

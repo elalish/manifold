@@ -14,10 +14,6 @@
 
 #pragma once
 
-#if MANIFOLD_EXCEPTIONS
-#include <stdexcept>
-#endif
-
 #include "optional_assert.h"
 
 namespace manifold {

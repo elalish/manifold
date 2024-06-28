@@ -13,9 +13,6 @@
 // limitations under the License.
 
 #pragma once
-#if MANIFOLD_EXCEPTIONS
-#include <exception>
-#endif
 #if TRACY_ENABLE && TRACY_MEMORY_USAGE
 #include "tracy/Tracy.hpp"
 #else

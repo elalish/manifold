@@ -59,16 +59,16 @@ struct glm_name<glm::mat3x2> {
 };
 
 // handle glm::vecN
-template <class T, int N, glm::qualifier Q>
+template <class T, size_t N, glm::qualifier Q>
 struct nb::detail::type_caster<glm::vec<N, T, Q>> {
   using glm_type = glm::vec<N, T, Q>;
   NB_TYPE_CASTER(glm_type, const_name(glm_name<glm_type>::name));
 
   bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept {
-    int size = PyObject_Size(src.ptr());  // negative on failure
+    size_t size = PyObject_Size(src.ptr());  // negative on failure
     if (size != N) return false;
     make_caster<T> t_cast;
-    for (int i = 0; i < size; i++) {
+    for (size_t i = 0; i < size; i++) {
       if (!t_cast.from_python(src[i], flags, cleanup)) return false;
       value[i] = t_cast.value;
     }
@@ -77,24 +77,24 @@ struct nb::detail::type_caster<glm::vec<N, T, Q>> {
   static handle from_cpp(glm_type vec, rv_policy policy,
                          cleanup_list *cleanup) noexcept {
     nb::list out;
-    for (int i = 0; i < N; i++) out.append(vec[i]);
+    for (size_t i = 0; i < N; i++) out.append(vec[i]);
     return out.release();
   }
 };
 
 // handle glm::matMxN
-template <class T, int C, int R, glm::qualifier Q>
+template <class T, size_t C, size_t R, glm::qualifier Q>
 struct nb::detail::type_caster<glm::mat<C, R, T, Q>> {
   using glm_type = glm::mat<C, R, T, Q>;
   using numpy_type = nb::ndarray<nb::numpy, T, nb::shape<R, C>>;
   NB_TYPE_CASTER(glm_type, const_name(glm_name<glm_type>::name));
 
   bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept {
-    int rows = PyObject_Size(src.ptr());  // negative on failure
+    size_t rows = PyObject_Size(src.ptr());  // negative on failure
     if (rows != R) return false;
     for (size_t i = 0; i < R; i++) {
       const nb::object &slice = src[i];
-      int cols = PyObject_Size(slice.ptr());  // negative on failure
+      size_t cols = PyObject_Size(slice.ptr());  // negative on failure
       if (cols != C) return false;
       for (size_t j = 0; j < C; j++) {
         make_caster<T> t_cast;
@@ -108,8 +108,8 @@ struct nb::detail::type_caster<glm::mat<C, R, T, Q>> {
                          cleanup_list *cleanup) noexcept {
     T *buffer = new T[R * C];
     nb::capsule mem_mgr(buffer, [](void *p) noexcept { delete[](T *) p; });
-    for (int i = 0; i < R; i++) {
-      for (int j = 0; j < C; j++) {
+    for (size_t i = 0; i < R; i++) {
+      for (size_t j = 0; j < C; j++) {
         // py is (Rows, Cols), glm is (Cols, Rows)
         buffer[i * C + j] = mat[j][i];
       }
@@ -121,7 +121,7 @@ struct nb::detail::type_caster<glm::mat<C, R, T, Q>> {
 };
 
 // handle std::vector<glm::vecN>
-template <class T, int N, glm::qualifier Q>
+template <class T, size_t N, glm::qualifier Q>
 struct nb::detail::type_caster<std::vector<glm::vec<N, T, Q>>> {
   using glm_type = glm::vec<N, T, Q>;
   using numpy_type = nb::ndarray<nb::numpy, T, nb::shape<nb::any, N>>;
@@ -131,18 +131,18 @@ struct nb::detail::type_caster<std::vector<glm::vec<N, T, Q>>> {
   bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept {
     make_caster<numpy_type> arr_cast;
     if (arr_cast.from_python(src, flags, cleanup)) {
-      int num_vec = arr_cast.value.shape(0);
+      size_t num_vec = arr_cast.value.shape(0);
       value.resize(num_vec);
-      for (int i = 0; i < num_vec; i++) {
-        for (int j = 0; j < N; j++) {
+      for (size_t i = 0; i < num_vec; i++) {
+        for (size_t j = 0; j < N; j++) {
           value[i][j] = arr_cast.value(i, j);
         }
       }
     } else {
-      int num_vec = PyObject_Size(src.ptr());  // negative on failure
-      if (num_vec < 0) return false;
+      size_t num_vec = PyObject_Size(src.ptr());  // negative on failure
+      if (num_vec == static_cast<size_t>(-1)) return false;
       value.resize(num_vec);
-      for (int i = 0; i < num_vec; i++) {
+      for (size_t i = 0; i < num_vec; i++) {
         make_caster<glm_type> vec_cast;
         if (!vec_cast.from_python(src[i], flags, cleanup)) return false;
         value[i] = vec_cast.value;
@@ -154,9 +154,9 @@ struct nb::detail::type_caster<std::vector<glm::vec<N, T, Q>>> {
                          cleanup_list *cleanup) noexcept {
     size_t num_vec = vec.size();
     T *buffer = new T[num_vec * N];
-    nb::capsule mem_mgr(buffer, [](void *p) noexcept { delete[](T *) p; });
+    nb::capsule mem_mgr(buffer, [](void *p) noexcept { delete[] (T *)p; });
     for (size_t i = 0; i < num_vec; i++) {
-      for (int j = 0; j < N; j++) {
+      for (size_t j = 0; j < N; j++) {
         buffer[i * N + j] = vec[i][j];
       }
     }
@@ -167,7 +167,7 @@ struct nb::detail::type_caster<std::vector<glm::vec<N, T, Q>>> {
 };
 
 // handle VecView<glm::vec*>
-template <class T, int N, glm::qualifier Q>
+template <class T, size_t N, glm::qualifier Q>
 struct nb::detail::type_caster<manifold::VecView<glm::vec<N, T, Q>>> {
   using glm_type = glm::vec<N, T, Q>;
   using numpy_type = nb::ndarray<nb::numpy, T, nb::shape<nb::any, N>>;
@@ -178,10 +178,10 @@ struct nb::detail::type_caster<manifold::VecView<glm::vec<N, T, Q>>> {
     make_caster<numpy_type> arr_cast;
     if (!arr_cast.from_python(src, flags, cleanup)) return false;
     // TODO try 2d iterators if numpy cast fails
-    int num_vec = arr_cast.value.shape(0);
+    size_t num_vec = arr_cast.value.shape(0);
     if (num_vec != value.size()) return false;
-    for (int i = 0; i < num_vec; i++) {
-      for (int j = 0; j < N; j++) {
+    for (size_t i = 0; i < num_vec; i++) {
+      for (size_t j = 0; j < N; j++) {
         value[i][j] = arr_cast.value(i, j);
       }
     }
@@ -378,7 +378,7 @@ NB_MODULE(manifold3d, m) {
           "(xmin, ymin, zmin, xmax, ymax, zmax).")
       .def_static(
           "smooth",
-          [](const MeshGL &mesh, std::vector<int> sharpened_edges,
+          [](const MeshGL &mesh, std::vector<size_t> sharpened_edges,
              std::vector<float> edge_smoothness) {
             if (sharpened_edges.size() != edge_smoothness.size()) {
               throw std::runtime_error(

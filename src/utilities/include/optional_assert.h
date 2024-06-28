@@ -15,6 +15,9 @@
 #pragma once
 
 #include "public.h"
+#if MANIFOLD_EXCEPTIONS
+#include <exception>
+#endif
 
 #ifdef MANIFOLD_DEBUG
 #include <iostream>

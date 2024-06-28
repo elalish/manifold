@@ -112,7 +112,7 @@ struct SwappableEdge {
 struct SortEntry {
   int start;
   int end;
-  unsigned int index;
+  size_t index;
   inline bool operator<(const SortEntry& other) const {
     return start == other.start ? end < other.end : start < other.start;
   }
@@ -156,7 +156,7 @@ void Manifold::Impl::SimplifyTopology() {
     ZoneScopedN("DedupeEdge");
     Vec<SortEntry> entries;
     entries.reserve(nbEdges / 2);
-    for (unsigned int i = 0; i < nbEdges; ++i) {
+    for (size_t i = 0; i < nbEdges; ++i) {
       if (halfedge_[i].IsForward()) {
         entries.push_back({halfedge_[i].startVert, halfedge_[i].endVert, i});
       }
