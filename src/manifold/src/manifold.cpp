@@ -15,6 +15,7 @@
 #include <algorithm>
 #include <map>
 #include <numeric>
+#include <QuickHull/FastQuickHull.h>
 
 #include "QuickHull.hpp"
 #include "boolean3.h"
@@ -31,6 +32,8 @@
 #define CONVHULL_3D_USE_SINGLE_PRECISION
 #define CONVHULL_3D_ENABLE
 #include "convhull_3d.h"
+
+#include "quickhull.hpp"
 
 namespace {
 using namespace manifold;
@@ -1174,6 +1177,210 @@ Manifold Manifold::Hull4(const std::vector<glm::vec3>& pts) {
 }
 
 /**
+ * Compute the convex hull of a set of points using VHACD's Convex Hull
+ * Implementation. If the given points are fewer than 4, or they are all
+ * coplanar, an empty Manifold will be returned.
+ *
+ * @param pts A vector of 3-dimensional points over which to compute a convex
+ * hull.
+ */
+Manifold Manifold::Hull5(const std::vector<glm::vec3>& pts) {
+  ZoneScoped;
+  const int numVert = pts.size();
+
+  if (numVert < 4) return Manifold();
+
+  using F = float;
+  constexpr std::size_t dim = 3;
+  using Points = std::vector<std::array<F, dim>>;
+  Points points; // input
+  for (int i = 0; i < numVert; i++) {
+    points.push_back({pts[i].x, pts[i].y, pts[i].z});
+  }
+    //  Generic Hash Function, can try to find the optimum hash function to
+  //  improve effeciency
+
+  // struct qh_vertex_hash {
+  //     std::size_t operator()(const qh_vertex_t& vertex) const {
+  //         // Custom hash function for qh_vertex_t
+  //         return std::hash<float>()(vertex.x) ^
+  //                std::hash<float>()(vertex.y) ^
+  //                std::hash<float>()(vertex.z);
+  //     }
+  // };
+
+  // struct qh_vertex_equal {
+  //     bool operator()(const qh_vertex_t& lhs, const qh_vertex_t& rhs) const {
+  //         // Custom equality function for qh_vertex_t
+  //         return std::tie(lhs.x, lhs.y, lhs.z) == std::tie(rhs.x,
+  //         rhs.y,rhs.z);
+  //     }
+  // };
+
+  struct qh_vertex_compare {
+    bool operator()(const glm::vec3& lhs, const glm::vec3& rhs) const {
+      if (lhs[0] != rhs[0]) return lhs[0] < rhs[0];
+      if (lhs[1] != rhs[1]) return lhs[1] < rhs[1];
+      return lhs[2] < rhs[2];
+    }
+  };
+
+  // We can also use unordered_map with custom hash and equality functions
+  // std::unordered_map<qh_vertex_t, int, qh_vertex_hash, qh_vertex_equal>
+  // vertexIndexMap;
+
+  std::map<glm::vec3, unsigned int, qh_vertex_compare> vertexIndexMap;
+
+  // Converting input pts to a format that the algorithm accepts
+  std::vector<glm::vec3> uniqueVertices;
+  
+  // std::cout << pts.size() << std::endl;
+  const auto eps = std::numeric_limits<F>::epsilon();
+  quick_hull<typename Points::const_iterator> qh{dim, eps};
+  qh.add_points(std::cbegin(points), std::cend(points));
+  auto initial_simplex = qh.get_affine_basis();
+  if (initial_simplex.size() < dim + 1) {
+      std::cout << "Degenerated input set" << std::endl;
+      return Manifold(); // degenerated input set
+  }
+  qh.create_initial_simplex(std::cbegin(initial_simplex), std::prev(std::cend(initial_simplex)));
+  qh.create_convex_hull();
+  // if (!qh.check()) {
+  //     std::cout << "Resulted structure is not convex" << std::endl;
+  //     return Manifold(); // resulted structure is not convex (generally due to precision errors)
+  // }
+  // qh.facets_; // use as result
+
+  int nFacesVert = qh.facets_.size();
+  Mesh mesh;
+  mesh.vertPos = pts;
+  // // std::cout << nFaces << std::endl;
+  mesh.triVerts.reserve(nFacesVert);
+  for (int i = 0; i < pts.size(); i++) {
+    if (vertexIndexMap.find(pts[i]) == vertexIndexMap.end()) {
+      vertexIndexMap[pts[i]] = uniqueVertices.size();
+      uniqueVertices.push_back(pts[i]);
+    }
+  }
+  if (uniqueVertices.empty()) {
+    // std::cerr << "Error: No unique vertices found." << std::endl;
+    std::cout << "No unique vertices found" << std::endl;
+    return Manifold();
+  }
+
+  // Inputting the output in the format expected by our Mesh Function
+
+  for (auto const & facet_ : qh.facets_) {
+              auto const & vertices_ = facet_.vertices_;
+              glm::vec3 pts_temp[3];
+              int temp_index=0;
+              int temp_index2=0;
+              for (auto const & vertex_ : vertices_) {
+                for (float const & coordinate_ : *vertex_) {
+                      pts_temp[temp_index][temp_index2] = coordinate_;
+                      temp_index2++;
+                }
+                temp_index2=0;
+                temp_index++;
+              }
+
+              unsigned int idx1 = vertexIndexMap[pts_temp[0]];
+              unsigned int idx2 = vertexIndexMap[pts_temp[1]];
+              unsigned int idx3 = vertexIndexMap[pts_temp[2]];
+              mesh.triVerts.push_back({idx1, idx2, idx3});
+  }
+  return Manifold(mesh);
+  // }
+    
+  // // int index=0;
+  // for (int i = 0; i < nFaces; i++) {
+  //   const int j = i * 3;
+  //   // std::cout << "ok" << std::endl;
+  //   // std::cout << faceIndices[j] << " " << faceIndices[j+1] << " " <<
+  //   // faceIndices[j+2] << std::endl; index++;
+  //   mesh.triVerts.push_back(
+  //       {faceIndices[j], faceIndices[j + 1], faceIndices[j + 2]});
+  // }
+  // // std::cout << index << std::endl;
+
+  // return Manifold(mesh);
+}
+
+/**
+ * Compute the convex hull of a set of points. If the given points are fewer
+ * than 4, or they are all coplanar, an empty Manifold will be returned.
+ *
+ * @param pts A vector of 3-dimensional points over which to compute a convex
+ * hull.
+ */
+
+hull::Coordinate convert_function(const glm::vec3 &vector) {
+  return hull::Coordinate{vector.x, vector.y,
+                          vector.z};
+};
+
+Manifold Manifold::Hull6(const std::vector<glm::vec3>& pts) {
+  ZoneScoped;
+  const int numVert = pts.size();
+  if (numVert < 4) return Manifold();
+
+  // compute the incidences (index of the vertices in the passed points cloud,
+  // which delimits each facet), of the facets constituting the convex hull of
+  // the points
+  qh::ConvexHullContext context;
+  context.thread_pool_size = 0;
+  std::vector<hull::Coordinate> normals;
+  std::vector<qh::FacetIncidences>
+  incidences;
+  try{
+   incidences= // qh::FacetIncidences is an array of incidences:
+                  // std::array<std::size_t, 3>
+  qh::convex_hull(pts.begin(), pts.end(), convert_function,normals,context);
+  }
+  catch(const std::exception &e)
+  {
+    std::cerr << e.what() << std::endl;
+  }
+  Mesh mesh;
+  mesh.vertPos = pts;
+  
+  int numTris=incidences.size();
+  mesh.triVerts.reserve(numTris);
+  for (int i=0;i<numTris ; i++)
+  {
+    std::size_t v1 = incidences[i][0];
+    std::size_t v2 = incidences[i][1];
+    std::size_t v3 = incidences[i][2];
+
+    // Compute the normal of the triangle
+    glm::vec3 edge1 = pts[v2] - pts[v1];
+    glm::vec3 edge2 = pts[v3] - pts[v1];
+    glm::vec3 triangleNormal = glm::normalize(glm::cross(edge1, edge2));
+
+    // Check if the normal direction matches the expected direction (from normals vector)
+    hull::Coordinate& normal = normals[i];  // Assuming normals are already computed
+    glm::vec3 normalVector(normal.x, normal.y, normal.z);
+    float dotProduct = glm::dot(triangleNormal, normalVector);
+
+    // Adjust vertex order if necessary to ensure counterclockwise orientation
+    if (dotProduct < 0.0) {
+        mesh.triVerts.push_back({ v1, v3, v2 });  // Reverse order
+    } else {
+        mesh.triVerts.push_back({ v1, v2, v3 });  // Correct order
+    }
+    // mesh.triVerts.push_back({incidences[i][0],incidences[i][1],incidences[i][2]});
+    // std::cout << pts[incidences[i][0]].x << " " << pts[incidences[i][0]].y << " " << pts[incidences[i][0]].z << std::endl;
+    // std::cout << pts[incidences[i][1]].x << " " << pts[incidences[i][1]].y << " " << pts[incidences[i][1]].z << std::endl;
+    // std::cout << pts[incidences[i][2]].x << " " << pts[incidences[i][2]].y << " " << pts[incidences[i][2]].z << std::endl;
+    // std::cout << "\n";
+    // std::cout << incidences[i][0] << " " << incidences[i][1] << " " << incidences[i][2] << std::endl;
+  }
+
+  return Manifold(mesh);
+}
+
+
+/**
  * Compute the convex hull of this manifold.
  */
 Manifold Manifold::Hull() const { return Hull(GetMesh().vertPos); }
@@ -1192,6 +1399,16 @@ Manifold Manifold::Hull3() const { return Hull3(GetMesh().vertPos); }
  * Compute the convex hull of this manifold.
  */
 Manifold Manifold::Hull4() const { return Hull4(GetMesh().vertPos); }
+
+/**
+ * Compute the convex hull of this manifold.
+ */
+Manifold Manifold::Hull5() const { return Hull5(GetMesh().vertPos); }
+
+/**
+ * Compute the convex hull of this manifold.
+ */
+Manifold Manifold::Hull6() const { return Hull6(GetMesh().vertPos); }
 
 /**
  * Compute the convex hull enveloping a set of manifolds.
@@ -1229,6 +1446,25 @@ Manifold Manifold::Hull3(const std::vector<Manifold>& manifolds) {
 Manifold Manifold::Hull4(const std::vector<Manifold>& manifolds) {
   return Compose(manifolds).Hull4();
 }
+
+/**
+ * Compute the convex hull enveloping a set of manifolds.
+ *
+ * @param manifolds A vector of manifolds over which to compute a convex hull.
+ */
+Manifold Manifold::Hull5(const std::vector<Manifold>& manifolds) {
+  return Compose(manifolds).Hull5();
+}
+
+/**
+ * Compute the convex hull enveloping a set of manifolds.
+ *
+ * @param manifolds A vector of manifolds over which to compute a convex hull.
+ */
+Manifold Manifold::Hull6(const std::vector<Manifold>& manifolds) {
+  return Compose(manifolds).Hull6();
+}
+
 /**
  * Returns the minimum gap between two manifolds. Returns a float between
  * 0 and searchLength.

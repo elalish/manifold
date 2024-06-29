@@ -7,6 +7,7 @@ algorithm_counts = {
     '_hull3': 0,
     '_hull2': 0,
     '_hull4': 0,
+    '_hull5': 0,
     '_CGAL': 0
 }
 
@@ -17,7 +18,7 @@ for index, row in df.iterrows():
     fastest_algorithm = None
     fastest_time = float('inf') 
     # Iterating through columns corresponding to each algorithm
-    for algorithm in ['','_hull3', '_hull2', '_hull4', '_CGAL']:
+    for algorithm in ['','_hull3', '_hull2', '_hull4','_hull5', '_CGAL']:
         time_column = f'Time{algorithm}'
         # print(row)
         if type(row[time_column]) is str:

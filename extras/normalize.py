@@ -10,7 +10,7 @@ for col in time_columns:
 # List of base columns to normalize against
 base_columns = ['VolManifold', 'VolHull', 'AreaManifold', 'AreaHull', 'ManifoldTri', 'HullTri', 'Time']
 # List of suffixes to normalize
-suffixes = ['_hull2', '_hull3', '_hull4', '_CGAL']
+suffixes = ['_hull2', '_hull3', '_hull4', '_hull5','_CGAL']
 # for suffix in suffixes : 
 # For time metric avoiding cases with time less than 0.001 seconds
 df = df[(df['Time'] > 0.001)]

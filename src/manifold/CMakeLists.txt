@@ -13,7 +13,18 @@
 # limitations under the License.
 
 project (manifold)
+# Include FetchContent module to fetch external projects.
+include(FetchContent)
 
+# Declare the Fast-Quick-Hull library.
+FetchContent_Declare(
+  qhull_lib
+  GIT_REPOSITORY https://github.com/andreacasalino/Fast-Quick-hull.git
+  GIT_TAG master
+)
+
+# Fetch the declared library.
+FetchContent_MakeAvailable(qhull_lib)
 file(GLOB_RECURSE SOURCE_FILES CONFIGURE_DEPENDS *.cpp)
 add_library(${PROJECT_NAME} ${SOURCE_FILES})
 
@@ -22,9 +33,9 @@ target_include_directories(${PROJECT_NAME} PUBLIC
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>)
 target_link_libraries(${PROJECT_NAME}
     PUBLIC utilities cross_section sdf
-    PRIVATE collider polygon ${MANIFOLD_INCLUDE} quickhull
+    PRIVATE collider polygon ${MANIFOLD_INCLUDE} quickhull Fast-Quick-Hull
 )
-
+# target_link_libraries(${PROJECT_NAME} Fast-Quick-Hull)
 target_compile_options(${PROJECT_NAME} PRIVATE ${MANIFOLD_FLAGS})
 
 target_compile_features(${PROJECT_NAME}

@@ -134,5 +134,5 @@ def parse_csv_and_merge(csv_files, output_file='merged_data.csv'):
 
     merged_data.to_csv(output_file, index=False)
 
-csv_files = [('Hull1.csv','hull1'),('Hull2.csv', 'hull2'),('Hull3.csv', 'hull3'),('Hull4.csv', 'hull4'), ('CGAL.csv', 'CGAL')]
+csv_files = [('Hull1.csv','hull1'),('Hull2.csv', 'hull2'),('Hull3.csv', 'hull3'),('Hull4.csv', 'hull4'),('Hull5.csv', 'hull5'), ('CGAL.csv', 'CGAL')]
 parse_csv_and_merge(csv_files)

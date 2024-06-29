@@ -6,7 +6,7 @@ df = pd.read_csv(file_path)
 # Columns for statistics calculation
 columns = ['VolHull', 'AreaHull', 'HullTri', 'Time']
 # Columns suffixes to use
-suffixes = ['', '_hull2', '_hull3', '_hull4', '_CGAL']
+suffixes = ['', '_hull2', '_hull3', '_hull4','_hull5', '_CGAL']
 
 # Function to calculate statistics for each base and implementation
 def calculate_stats(column, status,suffix):

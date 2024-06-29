@@ -24,10 +24,17 @@
 #include <fstream>
 #include <iostream>
 
+#include <algorithm>
+#include <random>
+
 #include "manifold.h"
 #include "meshIO.h"
 #include "samples.h"
 
+#include <fstream>
+#include <sstream> // For string manipulation
+using namespace std;
+using namespace glm;
 using namespace manifold;
 
 // Epick = Exact predicates Inexact constructions. Seems fair to use to compare
@@ -198,14 +205,174 @@ void RunThingi10K(Manifold (Manifold::*hull_func)() const) {
   logFile.close();
 }
 
+bool runHullAlgorithm(std::vector<glm::vec3>& pts) {
+    
+    std::ostringstream errBuffer;
+    std::streambuf* originalCerr = std::cerr.rdbuf(errBuffer.rdbuf());
+    
+    bool hasError = false;
+
+    try {
+        Manifold output = Manifold::Hull(pts);
+    } catch (...) {
+        hasError = true;
+    }
+    
+    // Restore the original std::cerr
+    std::cerr.rdbuf(originalCerr);
+
+    if (!errBuffer.str().empty()) {
+        std::cerr << "Captured error: " << errBuffer.str() << std::endl;
+        hasError = true;
+    }
+
+    return hasError;
+}
+
+void savePointsToFile( const std::vector<glm::vec3>& points,const string& filename) {
+    ofstream outfile(filename);
+
+    if (outfile.is_open()) {
+        outfile << points.size() << endl;
+        outfile << fixed << setprecision(10); // Set precision to 15 decimal places
+        for (const glm::vec3& point : points) {
+            outfile << point.x << " " << point.y << " " << point.z << endl;
+        }
+
+        outfile.close();
+        cout << "Points saved to file: " << filename << endl;
+    } else {
+        cerr << "Error opening file for writing: " << filename << endl;
+    }
+}
+
+
+void saveBinaryData(const std::vector<glm::vec3>& data, const std::string& filename) {
+    std::ofstream outFile(filename, std::ios::binary);
+    if (!outFile) {
+        std::cerr << "Error opening file for writing!" << std::endl;
+        return;
+    }
+    for (const glm::vec3& vec : data) {
+        outFile.write(reinterpret_cast<const char*>(&vec), sizeof(glm::vec3));
+    }
+    outFile.close();
+}
+
+std::vector<glm::vec3> readBinaryData(const std::string& filename) {
+    std::ifstream inFile(filename, std::ios::binary);
+    if (!inFile) {
+        std::cerr << "Error opening file for reading!" << std::endl;
+        return {};
+    }
+    std::vector<glm::vec3> data;
+    glm::vec3 vec;
+    while (inFile.read(reinterpret_cast<char*>(&vec), sizeof(glm::vec3))) {
+        data.push_back(vec);
+    }
+    inFile.close();
+    return data;
+}
+
+std::vector<glm::vec3> loadPointsFromFile(const string& filename) {
+    ifstream infile(filename);
+    vector<glm::vec3> points;
+
+    if (infile.is_open()) {
+        int numPoints;
+        infile >> numPoints;
+
+        for (int i = 0; i < numPoints; ++i) {
+            string line;
+            getline(infile, line); // Read entire line
+
+            stringstream ss(line);
+            float x, y, z;
+
+            ss >> x >> y >> z;
+
+            points.push_back(glm::vec3(x, y, z));
+        }
+
+        infile.close();
+        cout << "Points loaded from file: " << filename << endl;
+    } else {
+        cerr << "Error opening file for reading: " << filename << endl;
+    }
+
+    return points;
+}
+
+
+std::vector<glm::vec3> getRandomSubset(const std::vector<glm::vec3>& pts, int size) {
+    std::vector<glm::vec3> subset;
+    
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    
+    std::vector<glm::vec3> shuffled_points = pts;
+    std::shuffle(shuffled_points.begin(), shuffled_points.end(), gen);
+    
+    subset.assign(shuffled_points.begin(), shuffled_points.begin() + size);
+    
+    return subset;
+}
+
+std::vector<glm::vec3> narrowDownPoints(const std::vector<glm::vec3>& points, int initialSize) {
+    std::vector <glm::vec3> prev_subset = points;
+    std::vector<glm::vec3> subset = getRandomSubset(points, initialSize);
+    
+    int step = 0;
+    while (subset.size() > 5) {
+        
+        if (runHullAlgorithm(subset)) {
+            // If errors occur, narrow down further
+            // savePointsToFile(subset, "points_step_" + std::to_string(step) + ".txt");
+            saveBinaryData(subset, "points_step_" + std::to_string(step) + ".bin");
+            // Manifold temp = Manifold::Hull(subset);
+            // ExportMesh("Horizon_hull_" + std::to_string(step) + ".glb", temp.GetMesh(), {});
+            std::cout << "Step " << step << ": " << subset.size() << " points\n";
+            prev_subset = subset;
+            subset = getRandomSubset(subset, subset.size() / 2); // Halve the subset size
+        }         
+        else
+        {
+          subset=getRandomSubset(prev_subset, prev_subset.size() / 2);
+        }
+        step++;
+    }
+    
+    return subset;
+}
+
+
 int main(int argc, char **argv) {
   // perfTestCGAL();
   // SphereTestHull(Manifold::Hull);
   // MengerTestHull(Manifold::Hull, 1, 2, 3);
   
   // std::cout << argv[1] << std::endl;
-  auto inputMesh = ImportMesh(argv[1], 1);
-  Manifold inputManifold = Manifold(inputMesh);
-  PrintManifold(inputManifold, &Manifold::Hull);
+
+  // Narrowing down points
+  // auto inputMesh = ImportMesh(argv[1], 1);
+  // std::vector<glm::vec3> problematicPoints = narrowDownPoints(inputMesh.vertPos, inputMesh.vertPos.size());
+
+  // // Print the problematic points (if any)
+  // std::cout << "Problematic points causing errors:\n";
+  // for (const auto& p : problematicPoints) {
+  //     std::cout << "(" << p.x << ", " << p.y << ", " << p.z << ")\n";
+  // }
+
+  // Rendering the points
+
+  std::vector <glm::vec3> narrowed_points = readBinaryData("points_step_12409164.bin");
+  Manifold HorizonMesh = Manifold::Hull(narrowed_points);
+  ExportMesh("Horizon_hull.glb", HorizonMesh.GetMesh(), {});
+  // auto inputMesh = ImportMesh(argv[1], 1);
+  // Manifold temp = Manifold::Hull(inputMesh.vertPos);
+  // Manifold inputManifold = Manifold(inputMesh);
+  // PrintManifold(inputManifold, &Manifold::Hull6);
+
+
   // RunThingi10K(&Manifold::Hull4);
 }
