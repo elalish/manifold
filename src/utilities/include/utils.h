@@ -63,11 +63,6 @@ struct Timer {
 };
 #endif
 
-template <typename... Iters>
-thrust::zip_iterator<thrust::tuple<Iters...>> zip(Iters... iters) {
-  return thrust::make_zip_iterator(thrust::make_tuple(iters...));
-}
-
 template <typename T>
 thrust::counting_iterator<T> countAt(T i) {
   return thrust::make_counting_iterator(i);
