@@ -87,17 +87,6 @@ struct ReindexProps {
   }
 };
 
-template <typename T>
-void Permute(Vec<T>& inOut, const Vec<int>& new2Old) {
-  Vec<T> tmp(std::move(inOut));
-  inOut.resize(new2Old.size());
-  gather(autoPolicy(new2Old.size()), new2Old.begin(), new2Old.end(),
-         tmp.begin(), inOut.begin());
-}
-
-template void Permute<TriRef>(Vec<TriRef>&, const Vec<int>&);
-template void Permute<glm::vec3>(Vec<glm::vec3>&, const Vec<int>&);
-
 struct ReindexFace {
   VecView<Halfedge> halfedge;
   VecView<glm::vec4> halfedgeTangent;

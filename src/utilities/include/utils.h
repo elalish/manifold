@@ -84,12 +84,19 @@ inline int Prev3(int i) {
 }
 
 template <typename T>
+void Permute(Vec<T>& inOut, const Vec<int>& new2Old) {
+  Vec<T> tmp(std::move(inOut));
+  inOut.resize(new2Old.size());
+  gather(autoPolicy(new2Old.size()), new2Old.begin(), new2Old.end(),
+         tmp.begin(), inOut.begin());
+}
+
+template <typename T>
 T AtomicAdd(T& target, T add) {
   std::atomic<T>& tar = reinterpret_cast<std::atomic<T>&>(target);
   T old_val = tar.load();
   while (!tar.compare_exchange_weak(old_val, old_val + add,
-                                    std::memory_order_seq_cst))
-    ;
+                                    std::memory_order_seq_cst));
   return old_val;
 }
 

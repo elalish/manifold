@@ -844,13 +844,18 @@ class EarClip {
       return {Collider(), itr};
     }
 
-    stable_sort(autoPolicy(itr.size()),
-                zip(vertMorton.begin(), vertBox.begin(), itr.begin()),
-                zip(vertMorton.end(), vertBox.end(), itr.end()),
-                [](const thrust::tuple<uint32_t, Box, VertItr> &a,
-                   const thrust::tuple<uint32_t, Box, VertItr> &b) {
-                  return thrust::get<0>(a) < thrust::get<0>(b);
+    const int numVert = itr.size();
+    auto policy = autoPolicy(numVert);
+    Vec<int> vertNew2Old(numVert);
+    sequence(policy, vertNew2Old.begin(), vertNew2Old.end());
+
+    stable_sort(policy, vertNew2Old.begin(), vertNew2Old.end(),
+                [&vertMorton](const int a, const int b) {
+                  return vertMorton[a] < vertMorton[b];
                 });
+    Permute(vertMorton, vertNew2Old);
+    Permute(vertBox, vertNew2Old);
+    Permute(itr, vertNew2Old);
 
     return {Collider(vertBox, vertMorton), itr};
   }
