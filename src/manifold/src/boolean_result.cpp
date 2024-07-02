@@ -104,8 +104,6 @@ std::tuple<Vec<int>, Vec<int>> SizeOutput(
   ZoneScoped;
   Vec<int> sidesPerFacePQ(inP.NumTri() + inQ.NumTri(), 0);
   // note: numFaceR <= facePQ2R.size() = sidesPerFacePQ.size() + 1
-  if (sidesPerFacePQ.size() + 1 >= std::numeric_limits<int>::max())
-    throw std::out_of_range("boolean result too large");
 
   auto sidesPerFaceP = sidesPerFacePQ.view(0, inP.NumTri());
   auto sidesPerFaceQ = sidesPerFacePQ.view(inP.NumTri(), inQ.NumTri());
@@ -241,12 +239,13 @@ std::vector<Halfedge> PairUp(std::vector<EdgePos> &edgePos) {
   // geometrically valid. If the order does not go start-end-start-end... then
   // the input and output are not geometrically valid and this algorithm becomes
   // a heuristic.
-  ASSERT(edgePos.size() % 2 == 0, topologyErr,
-         "Non-manifold edge! Not an even number of points.");
+  DEBUG_ASSERT(edgePos.size() % 2 == 0, topologyErr,
+               "Non-manifold edge! Not an even number of points.");
   size_t nEdges = edgePos.size() / 2;
   auto middle = std::partition(edgePos.begin(), edgePos.end(),
                                [](EdgePos x) { return x.isStart; });
-  ASSERT(middle - edgePos.begin() == nEdges, topologyErr, "Non-manifold edge!");
+  DEBUG_ASSERT(static_cast<size_t>(middle - edgePos.begin()) == nEdges,
+               topologyErr, "Non-manifold edge!");
   auto cmp = [](EdgePos a, EdgePos b) { return a.edgePos < b.edgePos; };
   std::stable_sort(edgePos.begin(), middle, cmp);
   std::stable_sort(middle, edgePos.end(), cmp);
@@ -544,10 +543,6 @@ void CreateProperties(Manifold::Impl &outR, const Manifold::Impl &inP,
   propMissIdx[0].resize(inQ.NumPropVert(), -1);
   propMissIdx[1].resize(inP.NumPropVert(), -1);
 
-  if (static_cast<size_t>(outR.NumVert()) * static_cast<size_t>(numProp) >=
-      std::numeric_limits<int>::max())
-    throw std::out_of_range("too many vertices");
-
   outR.meshRelation_.properties.reserve(outR.NumVert() * numProp);
   int idx = 0;
 
@@ -603,10 +598,10 @@ void CreateProperties(Manifold::Impl &outR, const Manifold::Impl &inP,
       } else {
         auto &bin = propIdx[key.y];
         bool bFound = false;
-        for (int k = 0; k < bin.size(); ++k) {
-          if (bin[k].first == glm::ivec3(key.x, key.z, key.w)) {
+        for (const auto &b : bin) {
+          if (b.first == glm::ivec3(key.x, key.z, key.w)) {
             bFound = true;
-            outR.meshRelation_.triProperties[tri][i] = bin[k].second;
+            outR.meshRelation_.triProperties[tri][i] = b.second;
             break;
           }
         }
@@ -638,8 +633,8 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   assemble.Start();
 #endif
 
-  ASSERT((expandP_ > 0) == (op == OpType::Add), logicErr,
-         "Result op type not compatible with constructor op type.");
+  DEBUG_ASSERT((expandP_ > 0) == (op == OpType::Add), logicErr,
+               "Result op type not compatible with constructor op type.");
   const int c1 = op == OpType::Intersect ? 0 : 1;
   const int c2 = op == OpType::Add ? 1 : 0;
   const int c3 = op == OpType::Intersect ? 1 : -1;
@@ -782,7 +777,7 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   // Level 6
 
   if (ManifoldParams().intermediateChecks)
-    ASSERT(outR.IsManifold(), logicErr, "polygon mesh is not manifold!");
+    DEBUG_ASSERT(outR.IsManifold(), logicErr, "polygon mesh is not manifold!");
 
   outR.Face2Tri(faceEdge, halfedgeRef);
 
@@ -793,7 +788,8 @@ Manifold::Impl Boolean3::Result(OpType op) const {
 #endif
 
   if (ManifoldParams().intermediateChecks)
-    ASSERT(outR.IsManifold(), logicErr, "triangulated mesh is not manifold!");
+    DEBUG_ASSERT(outR.IsManifold(), logicErr,
+                 "triangulated mesh is not manifold!");
 
   CreateProperties(outR, inP_, inQ_);
 
@@ -802,7 +798,8 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   outR.SimplifyTopology();
 
   if (ManifoldParams().intermediateChecks)
-    ASSERT(outR.Is2Manifold(), logicErr, "simplified mesh is not 2-manifold!");
+    DEBUG_ASSERT(outR.Is2Manifold(), logicErr,
+                 "simplified mesh is not 2-manifold!");
 
 #ifdef MANIFOLD_DEBUG
   simplify.Stop();

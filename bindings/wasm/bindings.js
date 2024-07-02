@@ -165,14 +165,15 @@ Module.setup = function() {
       height, nDivisions = 0, twistDegrees = 0.0, scaleTop = [1.0, 1.0],
       center = false) {
     scaleTop = vararg2vec2([scaleTop]);
-    const man =
-        Module._Extrude(this, height, nDivisions, twistDegrees, scaleTop);
+    const man = Module._Extrude(
+        this._ToPolygons(), height, nDivisions, twistDegrees, scaleTop);
     return (center ? man.translate([0., 0., -height / 2.]) : man);
   };
 
   Module.CrossSection.prototype.revolve = function(
       circularSegments = 0, revolveDegrees = 360.0) {
-    return Module._Revolve(this, circularSegments, revolveDegrees);
+    return Module._Revolve(
+        this._ToPolygons(), circularSegments, revolveDegrees);
   };
 
   Module.CrossSection.prototype.add = function(other) {
@@ -283,7 +284,11 @@ Module.setup = function() {
   };
 
   Module.Manifold.prototype.slice = function(height = 0.) {
-    return this._Slice(height);
+    return Module.CrossSection(this._Slice(height));
+  };
+
+  Module.Manifold.prototype.project = function() {
+    return Module.CrossSection(this._Project()).simplify(this.precision());
   };
 
   Module.Manifold.prototype.split = function(manifold) {

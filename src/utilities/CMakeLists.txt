@@ -75,6 +75,12 @@ target_compile_options(${PROJECT_NAME} INTERFACE
     -DTHRUST_DEVICE_SYSTEM=THRUST_DEVICE_SYSTEM_${MANIFOLD_PAR}
 )
 
+if(MANIFOLD_EXCEPTIONS)
+    target_compile_options(${PROJECT_NAME} INTERFACE
+        -DMANIFOLD_EXCEPTIONS=1
+    )
+endif()
+
 if(MANIFOLD_DEBUG)
     target_compile_options(${PROJECT_NAME}
         INTERFACE -DMANIFOLD_DEBUG)
@@ -83,4 +89,6 @@ endif()
 target_compile_features(${PROJECT_NAME} INTERFACE cxx_std_17)
 
 install(TARGETS ${PROJECT_NAME} EXPORT manifoldTargets)
-install(FILES include/public.h include/vec_view.h include/tri_dist.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${CMAKE_PROJECT_NAME})
+install(FILES
+    include/public.h include/vec_view.h include/tri_dist.h include/optional_assert.h
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${CMAKE_PROJECT_NAME})

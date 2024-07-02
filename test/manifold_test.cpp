@@ -55,12 +55,12 @@ TEST(Manifold, GetMeshGL) {
   MeshGL meshGL_out = manifold.GetMeshGL();
   ASSERT_EQ(meshGL_out.NumVert(), mesh_out.vertPos.size());
   ASSERT_EQ(meshGL_out.NumTri(), mesh_out.triVerts.size());
-  for (int i = 0; i < meshGL_out.NumVert(); ++i) {
+  for (size_t i = 0; i < meshGL_out.NumVert(); ++i) {
     for (const int j : {0, 1, 2}) {
       ASSERT_EQ(meshGL_out.vertProperties[3 * i + j], mesh_out.vertPos[i][j]);
     }
   }
-  for (int i = 0; i < meshGL_out.NumTri(); ++i) {
+  for (size_t i = 0; i < meshGL_out.NumTri(); ++i) {
     for (const int j : {0, 1, 2})
       ASSERT_EQ(meshGL_out.triVerts[3 * i + j], mesh_out.triVerts[i][j]);
   }
@@ -241,7 +241,7 @@ Polygons RotatePolygons(Polygons polys, const int index) {
 TEST(Manifold, Revolve) {
   Polygons polys = SquareHole();
   Manifold vug;
-  for (int i = 0; i < polys[0].size(); i++) {
+  for (size_t i = 0; i < polys[0].size(); i++) {
     Polygons rotatedPolys = RotatePolygons(polys, i);
     vug = Manifold::Revolve(rotatedPolys, 48);
     EXPECT_EQ(vug.Genus(), -1);
@@ -262,7 +262,7 @@ TEST(Manifold, Revolve2) {
 
 TEST(Manifold, Revolve3) {
   CrossSection circle = CrossSection::Circle(1, 32);
-  Manifold sphere = Manifold::Revolve(circle, 32);
+  Manifold sphere = Manifold::Revolve(circle.ToPolygons(), 32);
   auto prop = sphere.GetProperties();
   EXPECT_NEAR(prop.volume, 4.0f / 3.0f * glm::pi<float>(), 0.1);
   EXPECT_NEAR(prop.surfaceArea, 4 * glm::pi<float>(), 0.15);
@@ -273,7 +273,7 @@ TEST(Manifold, PartialRevolveOnYAxis) {
   Polygons offsetPolys = SquareHole(10.0f);
 
   Manifold revolute;
-  for (int i = 0; i < polys[0].size(); i++) {
+  for (size_t i = 0; i < polys[0].size(); i++) {
     Polygons rotatedPolys = RotatePolygons(polys, i);
     revolute = Manifold::Revolve(rotatedPolys, 48, 180);
     EXPECT_EQ(revolute.Genus(), 1);
@@ -290,7 +290,7 @@ TEST(Manifold, PartialRevolveOffset) {
   Polygons polys = SquareHole(10.0f);
 
   Manifold revolute;
-  for (int i = 0; i < polys[0].size(); i++) {
+  for (size_t i = 0; i < polys[0].size(); i++) {
     Polygons rotatedPolys = RotatePolygons(polys, i);
     revolute = Manifold::Revolve(rotatedPolys, 48, 180);
     auto prop = revolute.GetProperties();
@@ -302,9 +302,10 @@ TEST(Manifold, PartialRevolveOffset) {
 
 TEST(Manifold, Warp) {
   CrossSection square = CrossSection::Square({1, 1});
-  Manifold shape = Manifold::Extrude(square, 2, 10).Warp([](glm::vec3& v) {
-    v.x += v.z * v.z;
-  });
+  Manifold shape =
+      Manifold::Extrude(square.ToPolygons(), 2, 10).Warp([](glm::vec3& v) {
+        v.x += v.z * v.z;
+      });
   auto propBefore = shape.GetProperties();
 
   Manifold simplified = Manifold::Compose({shape});
@@ -319,15 +320,16 @@ TEST(Manifold, Warp2) {
   CrossSection circle =
       CrossSection::Circle(5, 20).Translate(glm::vec2(10.0, 10.0));
 
-  Manifold shape = Manifold::Extrude(circle, 2, 10).Warp([](glm::vec3& v) {
-    int nSegments = 10;
-    double angleStep = 2.0 / 3.0 * glm::pi<float>() / nSegments;
-    int zIndex = nSegments - 1 - std::round(v.z);
-    double angle = zIndex * angleStep;
-    v.z = v.y;
-    v.y = v.x * sin(angle);
-    v.x = v.x * cos(angle);
-  });
+  Manifold shape =
+      Manifold::Extrude(circle.ToPolygons(), 2, 10).Warp([](glm::vec3& v) {
+        int nSegments = 10;
+        double angleStep = 2.0 / 3.0 * glm::pi<float>() / nSegments;
+        int zIndex = nSegments - 1 - std::round(v.z);
+        double angle = zIndex * angleStep;
+        v.z = v.y;
+        v.y = v.x * sin(angle);
+        v.x = v.x * cos(angle);
+      });
 
   auto propBefore = shape.GetProperties();
 
@@ -602,9 +604,9 @@ TEST(Manifold, Invalid) {
   EXPECT_EQ(Manifold::Cylinder(2, -5).Status(), invalid);
   EXPECT_EQ(Manifold::Cube(glm::vec3(0.0f)).Status(), invalid);
   EXPECT_EQ(Manifold::Cube({-1, 1, 1}).Status(), invalid);
-  EXPECT_EQ(Manifold::Extrude(circ, 0.).Status(), invalid);
-  EXPECT_EQ(Manifold::Extrude(empty_circ, 10.).Status(), invalid);
-  EXPECT_EQ(Manifold::Revolve(empty_sq).Status(), invalid);
+  EXPECT_EQ(Manifold::Extrude(circ.ToPolygons(), 0.).Status(), invalid);
+  EXPECT_EQ(Manifold::Extrude(empty_circ.ToPolygons(), 10.).Status(), invalid);
+  EXPECT_EQ(Manifold::Revolve(empty_sq.ToPolygons()).Status(), invalid);
 }
 
 TEST(Manifold, MultiCompose) {

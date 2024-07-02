@@ -107,6 +107,9 @@ jobs:
     timeout-minutes: 30
     runs-on: ubuntu-22.04
     if: github.event.pull_request.draft == false
+    strategy:
+      matrix:
+        exception: [ON, OFF]
     steps:
     - name: Install dependencies
       run: |
@@ -128,7 +131,7 @@ jobs:
         source ./emsdk/emsdk_env.sh
         mkdir build
         cd build
-        emcmake cmake -DCMAKE_BUILD_TYPE=Release .. && emmake make
+        emcmake cmake -DCMAKE_BUILD_TYPE=Release -DMANIFOLD_EXCEPTIONS=${{matrix.exception}} .. && emmake make
     - name: Test WASM
       run: |
         cd build/test
@@ -142,6 +145,7 @@ jobs:
         cp ../manifold.* ./dist/
     - name: Upload WASM files
       uses: actions/upload-artifact@v4
+      if: matrix.exception == 'ON'
       with:
         name: wasm
         path: bindings/wasm/examples/dist/

@@ -16,7 +16,6 @@
 #include <functional>
 #include <memory>
 
-#include "cross_section.h"
 #include "public.h"
 #include "vec_view.h"
 
@@ -47,14 +46,16 @@ class CsgLeafNode;
 struct MeshGL {
   /// Number of property vertices
   uint32_t NumVert() const {
-    if (vertProperties.size() / numProp >= std::numeric_limits<int>::max())
-      throw std::out_of_range("mesh too large");
+    ASSERT(vertProperties.size() / numProp <
+               static_cast<size_t>(std::numeric_limits<uint32_t>::max()),
+           std::out_of_range("mesh too large for MeshGL"));
     return vertProperties.size() / numProp;
   };
   /// Number of triangles
   uint32_t NumTri() const {
-    if (vertProperties.size() / numProp >= std::numeric_limits<int>::max())
-      throw std::out_of_range("mesh too large");
+    ASSERT(triVerts.size() / 3 <
+               static_cast<size_t>(std::numeric_limits<uint32_t>::max()),
+           std::out_of_range("mesh too large for MeshGL"));
     return triVerts.size() / 3;
   };
 
@@ -174,10 +175,10 @@ class Manifold {
                            float radiusHigh = -1.0f, int circularSegments = 0,
                            bool center = false);
   static Manifold Sphere(float radius, int circularSegments = 0);
-  static Manifold Extrude(const CrossSection& crossSection, float height,
+  static Manifold Extrude(const Polygons& crossSection, float height,
                           int nDivisions = 0, float twistDegrees = 0.0f,
                           glm::vec2 scaleTop = glm::vec2(1.0f));
-  static Manifold Revolve(const CrossSection& crossSection,
+  static Manifold Revolve(const Polygons& crossSection,
                           int circularSegments = 0,
                           float revolveDegrees = 360.0f);
   ///@}
@@ -279,8 +280,8 @@ class Manifold {
   /** @name 2D from 3D
    */
   ///@{
-  CrossSection Slice(float height = 0) const;
-  CrossSection Project() const;
+  Polygons Slice(float height = 0) const;
+  Polygons Project() const;
   ///@}
 
   /** @name Convex hull

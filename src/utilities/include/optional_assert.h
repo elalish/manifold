@@ -15,6 +15,9 @@
 #pragma once
 
 #include "public.h"
+#if MANIFOLD_EXCEPTIONS
+#include <stdexcept>
+#endif
 
 #ifdef MANIFOLD_DEBUG
 #include <iostream>
@@ -31,8 +34,15 @@ void Assert(bool condition, const char* file, int line, const std::string& cond,
     throw Ex(output.str());
   }
 }
-#define ASSERT(condition, EX, msg) \
+#define DEBUG_ASSERT(condition, EX, msg) \
   Assert<EX>(condition, __FILE__, __LINE__, #condition, msg);
 #else
-#define ASSERT(condition, EX, msg)
+#define DEBUG_ASSERT(condition, EX, msg)
+#endif
+
+#if MANIFOLD_EXCEPTIONS
+#define ASSERT(condition, EX) \
+  if (!(condition)) throw(EX);
+#else
+#define ASSERT(condition, EX)
 #endif
