@@ -35,7 +35,8 @@ void AtomicAddVec3(glm::vec3& target, const glm::vec3& add) {
     std::atomic<float>& tar = reinterpret_cast<std::atomic<float>&>(target[i]);
     float old_val = tar.load(std::memory_order_relaxed);
     while (!tar.compare_exchange_weak(old_val, old_val + add[i],
-                                      std::memory_order_relaxed));
+                                      std::memory_order_relaxed)) {
+    }
   }
 }
 

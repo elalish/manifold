@@ -429,8 +429,7 @@ float Manifold::Impl::MinGap(const Manifold::Impl& other,
   SparseIndices collisions = collider_.Collisions(faceBoxOther.cview());
 
   float minDistanceSquared = transform_reduce<float>(
-      autoPolicy(collisions.size()), thrust::counting_iterator<int>(0),
-      thrust::counting_iterator<int>(collisions.size()),
+      autoPolicy(collisions.size()), countAt(0_z), countAt(collisions.size()),
       [&collisions, this, &other](int i) {
         const int tri = collisions.Get(i, 1);
         const int triOther = collisions.Get(i, 0);

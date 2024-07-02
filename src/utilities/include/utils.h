@@ -91,7 +91,8 @@ T AtomicAdd(T& target, T add) {
   std::atomic<T>& tar = reinterpret_cast<std::atomic<T>&>(target);
   T old_val = tar.load();
   while (!tar.compare_exchange_weak(old_val, old_val + add,
-                                    std::memory_order_seq_cst));
+                                    std::memory_order_seq_cst)) {
+  }
   return old_val;
 }
 
