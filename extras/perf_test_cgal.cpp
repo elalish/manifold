@@ -229,6 +229,26 @@ bool runHullAlgorithm(std::vector<glm::vec3>& pts) {
     return hasError;
 }
 
+bool runHullAlgorithm2(std::vector<glm::vec3>& pts) {
+
+
+    try {
+        Manifold output = Manifold::Hull(pts);
+        Manifold output2 = Manifold::Hull2(pts);
+        if (output.GetProperties().volume - output2.GetProperties().volume > 200 || output.GetProperties().volume - output2.GetProperties().volume < -200) {
+            std::cout << "Volume difference: " << output.GetProperties().volume - output2.GetProperties().volume << std::endl;
+            return true;
+        }
+        else
+        {
+          return false;
+        }
+    } catch (...) {
+        return false;
+    }
+    
+}
+
 void savePointsToFile( const std::vector<glm::vec3>& points,const string& filename) {
     ofstream outfile(filename);
 
@@ -318,14 +338,52 @@ std::vector<glm::vec3> getRandomSubset(const std::vector<glm::vec3>& pts, int si
     return subset;
 }
 
+std::vector<glm::vec3> getRandomSubset2(const std::vector<glm::vec3>& pts, const std::vector<glm::vec3>& required_pts, int size) {
+    std::vector<glm::vec3> subset;
+
+    // Ensure the required points are part of the subset
+    subset.insert(subset.end(), required_pts.begin(), required_pts.end());
+
+    // Calculate the number of remaining points needed
+    int remaining_size = size - required_pts.size();
+    if (remaining_size <= 0) {
+        return std::vector<glm::vec3>(subset.begin(), subset.begin() + size);
+    }
+
+    // Initialize random number generator
+    std::random_device rd;
+    std::mt19937 gen(rd());
+
+    // Create a list of points excluding the required points
+    std::vector<glm::vec3> remaining_points;
+    for (const auto& pt : pts) {
+        if (std::find(required_pts.begin(), required_pts.end(), pt) == required_pts.end()) {
+            remaining_points.push_back(pt);
+        }
+    }
+
+    // Shuffle the remaining points
+    std::shuffle(remaining_points.begin(), remaining_points.end(), gen);
+
+    // Add the required number of points from the shuffled list to the subset
+    subset.insert(subset.end(), remaining_points.begin(), remaining_points.begin() + remaining_size);
+
+    return subset;
+}
+
 std::vector<glm::vec3> narrowDownPoints(const std::vector<glm::vec3>& points, int initialSize) {
     std::vector <glm::vec3> prev_subset = points;
+    Manifold Hull1 = Manifold::Hull(points);
+    Manifold Hull2 = Manifold::Hull2(points);
+    // std::vector <glm::vec3> saved_points = (Hull1-Hull2).GetMesh().vertPos;
+    // std::cout << "Saved Size" << saved_points.size() << std::endl;
     std::vector<glm::vec3> subset = getRandomSubset(points, initialSize);
+    // std::vector<glm::vec3> subset = getRandomSubset2(points,saved_points, initialSize);
     
     int step = 0;
     while (subset.size() > 5) {
         
-        if (runHullAlgorithm(subset)) {
+        if (runHullAlgorithm2(subset)) {
             // If errors occur, narrow down further
             // savePointsToFile(subset, "points_step_" + std::to_string(step) + ".txt");
             saveBinaryData(subset, "points_step_" + std::to_string(step) + ".bin");
@@ -334,10 +392,12 @@ std::vector<glm::vec3> narrowDownPoints(const std::vector<glm::vec3>& points, in
             std::cout << "Step " << step << ": " << subset.size() << " points\n";
             prev_subset = subset;
             subset = getRandomSubset(subset, subset.size() / 2); // Halve the subset size
+            // subset = getRandomSubset2(subset,saved_points, subset.size() / 2); // Halve the subset size
         }         
         else
         {
-          subset=getRandomSubset(prev_subset, prev_subset.size() / 2);
+          subset=getRandomSubset(prev_subset,prev_subset.size() / 2);
+          // subset=getRandomSubset2(prev_subset, saved_points,prev_subset.size() / 2);
         }
         step++;
     }
@@ -355,7 +415,14 @@ int main(int argc, char **argv) {
 
   // Narrowing down points
   // auto inputMesh = ImportMesh(argv[1], 1);
+  // Manfiold inputManifold = Manifold(inputMesh);
+  // inputMesh = inputManifold.GetMesh();
   // std::vector<glm::vec3> problematicPoints = narrowDownPoints(inputMesh.vertPos, inputMesh.vertPos.size());
+
+  // M2
+  // std::vector <glm::vec3> narrowed_points = readBinaryData("points_step_265052.bin");
+  // std::vector<glm::vec3> problematicPoints = narrowDownPoints(narrowed_points, narrowed_points.size());
+
 
   // // Print the problematic points (if any)
   // std::cout << "Problematic points causing errors:\n";
@@ -365,9 +432,22 @@ int main(int argc, char **argv) {
 
   // Rendering the points
 
-  std::vector <glm::vec3> narrowed_points = readBinaryData("points_step_12409164.bin");
+  std::vector <glm::vec3> narrowed_points = readBinaryData("points_step_108368.bin");
   Manifold HorizonMesh = Manifold::Hull(narrowed_points);
-  ExportMesh("Horizon_hull.glb", HorizonMesh.GetMesh(), {});
+  Manifold HorizonMesh2 = Manifold::Hull2(narrowed_points);
+  for (auto pts : HorizonMesh.GetMesh().vertPos)
+  {
+    std::cout << pts.x << "," << pts.y << "," << pts.z << std::endl;
+  }
+  std::cout << std::endl;
+  for (auto pts : HorizonMesh2.GetMesh().vertPos)
+  {
+    std::cout << pts.x << "," << pts.y << "," << pts.z << std::endl;
+  }
+  ExportMesh("HorizonMeshhope1.glb", HorizonMesh.GetMesh(), {});
+  ExportMesh("HorizonMeshhope2.glb", HorizonMesh2.GetMesh(), {});
+  std::cout << "HorizonMeshhope1 volume: " << HorizonMesh.GetProperties().volume << std::endl;
+  std::cout << "HorizonMeshhope2 volume: " << HorizonMesh2.GetProperties().volume << std::endl;
   // auto inputMesh = ImportMesh(argv[1], 1);
   // Manifold temp = Manifold::Hull(inputMesh.vertPos);
   // Manifold inputManifold = Manifold(inputMesh);
