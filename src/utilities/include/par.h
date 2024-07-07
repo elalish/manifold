@@ -34,12 +34,12 @@
 #include <execution>
 #endif
 
-#include "iters.h"
 #define MANIFOLD_PAR_NS tbb
 #else
 #define MANIFOLD_PAR_NS cpp
 #endif
 
+#include "iters.h"
 namespace manifold {
 
 enum class ExecutionPolicy {
