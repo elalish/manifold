@@ -129,19 +129,6 @@ void exclusive_scan(ExecutionPolicy policy, Args... args) {
   std::exclusive_scan(args...);
 }
 template <typename DerivedPolicy, typename InputIterator1,
-          typename InputIterator2, typename OutputIterator, typename Predicate>
-OutputIterator copy_if(ExecutionPolicy policy, InputIterator1 first,
-                       InputIterator1 last, InputIterator2 stencil,
-                       OutputIterator result, Predicate pred) {
-  if (policy == ExecutionPolicy::Seq)
-    return thrust::copy_if(thrust::cpp::par, first, last, stencil, result,
-                           pred);
-  else
-    // note: this is not a typo, see
-    // https://github.com/NVIDIA/thrust/issues/1977
-    return thrust::copy_if(first, last, stencil, result, pred);
-}
-template <typename DerivedPolicy, typename InputIterator1,
           typename OutputIterator, typename Predicate>
 OutputIterator copy_if(ExecutionPolicy policy, InputIterator1 first,
                        InputIterator1 last, OutputIterator result,
@@ -197,6 +184,36 @@ OutputIterator copy_n(ExecutionPolicy policy, InputIterator first, size_t n,
     return std::copy_n(std::execution::par_unseq, first, n, result);
 #endif
   return std::copy_n(first, n, result);
+}
+
+template <typename InputIterator1, typename InputIterator2,
+          typename OutputIterator>
+void scatter(ExecutionPolicy policy, InputIterator1 first, InputIterator1 last,
+             InputIterator2 mapFirst, OutputIterator outputFirst) {
+  for_each(policy, countAt(0_z),
+           countAt(static_cast<size_t>(std::distance(first, last))),
+           [first, mapFirst, outputFirst](size_t i) {
+             outputFirst[mapFirst[i]] = first[i];
+           });
+}
+
+template <typename InputIterator, typename RandomAccessIterator,
+          typename OutputIterator>
+void gather(ExecutionPolicy policy, InputIterator mapFirst,
+            InputIterator mapLast, RandomAccessIterator inputFirst,
+            OutputIterator outputFirst) {
+  for_each(policy, countAt(0_z),
+           countAt(static_cast<size_t>(std::distance(mapFirst, mapLast))),
+           [mapFirst, inputFirst, outputFirst](size_t i) {
+             outputFirst[i] = inputFirst[mapFirst[i]];
+           });
+}
+
+template <typename Iterator>
+void sequence(ExecutionPolicy policy, Iterator first, Iterator last) {
+  for_each(policy, countAt(0_z),
+           countAt(static_cast<size_t>(std::distance(first, last))),
+           [first](size_t i) { first[i] = i; });
 }
 
 // void implies that the user have to specify the return type in the template

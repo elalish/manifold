@@ -14,6 +14,7 @@
 
 #include <algorithm>
 #include <array>
+#include <iostream>
 #include <map>
 
 #if MANIFOLD_PAR == 'T' && __has_include(<tbb/concurrent_map.h>)
@@ -128,21 +129,39 @@ std::tuple<Vec<int>, Vec<int>> SizeOutput(
   facePQ2R.resize(inP.NumTri() + inQ.NumTri());
 
   outR.faceNormal_.resize(numFaceR);
-  auto next = copy_if<decltype(outR.faceNormal_.begin())>(
-      autoPolicy(inP.faceNormal_.size()), inP.faceNormal_.begin(),
-      inP.faceNormal_.end(), keepFace, outR.faceNormal_.begin(),
-      Identity<bool>());
+
+  Vec<size_t> tmpBuffer(outR.faceNormal_.size());
+  auto faceIds = TransformIterator(countAt(0_z), [&sidesPerFacePQ](size_t i) {
+    if (sidesPerFacePQ[i] > 0) return i;
+    return std::numeric_limits<size_t>::max();
+  });
+
+  auto next = copy_if<decltype(tmpBuffer.begin())>(
+      autoPolicy(inP.faceNormal_.size()), faceIds,
+      faceIds + inP.faceNormal_.size(), tmpBuffer.begin(),
+      [](size_t v) { return v != std::numeric_limits<size_t>::max(); });
+
+  gather(autoPolicy(inP.faceNormal_.size()), tmpBuffer.begin(), next,
+         inP.faceNormal_.begin(), outR.faceNormal_.begin());
+
+  auto faceIdsQ =
+      TransformIterator(countAt(0_z), [&sidesPerFacePQ, &inP](size_t i) {
+        if (sidesPerFacePQ[i + inP.faceNormal_.size()] > 0) return i;
+        return std::numeric_limits<size_t>::max();
+      });
+  auto end = copy_if<decltype(tmpBuffer.begin())>(
+      autoPolicy(inQ.faceNormal_.size()), faceIdsQ,
+      faceIdsQ + inQ.faceNormal_.size(), next,
+      [](size_t v) { return v != std::numeric_limits<size_t>::max(); });
+
   if (invertQ) {
-    auto start =
-        TransformIterator(inQ.faceNormal_.begin(), Negate<glm::vec3>());
-    auto end = TransformIterator(inQ.faceNormal_.end(), Negate<glm::vec3>());
-    copy_if<decltype(inQ.faceNormal_.begin())>(
-        autoPolicy(inQ.faceNormal_.size()), start, end, keepFace + inP.NumTri(),
-        next, Identity<bool>());
+    gather(autoPolicy(inQ.faceNormal_.size()), next, end,
+           TransformIterator(inQ.faceNormal_.begin(), Negate<glm::vec3>()),
+           outR.faceNormal_.begin() + std::distance(tmpBuffer.begin(), next));
   } else {
-    copy_if<decltype(inQ.faceNormal_.begin())>(
-        autoPolicy(inQ.faceNormal_.size()), inQ.faceNormal_.begin(),
-        inQ.faceNormal_.end(), keepFace + inP.NumTri(), next, Identity<bool>());
+    gather(autoPolicy(inQ.faceNormal_.size()), next, end,
+           inQ.faceNormal_.begin(),
+           outR.faceNormal_.begin() + std::distance(tmpBuffer.begin(), next));
   }
 
   auto newEnd = remove<decltype(sidesPerFacePQ.begin())>(

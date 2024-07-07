@@ -539,11 +539,21 @@ void Manifold::Impl::RemoveUnreferencedVerts(Vec<glm::ivec3>& triVerts) {
            MarkVerts({vertOld2New.view(1)}));
 
   const Vec<glm::vec3> oldVertPos = vertPos_;
-  vertPos_.resize(copy_if<decltype(vertPos_.begin())>(
-                      policy, oldVertPos.cbegin(), oldVertPos.cend(),
-                      vertOld2New.cbegin() + 1, vertPos_.begin(),
-                      Identity<int>()) -
-                  vertPos_.begin());
+
+  Vec<size_t> tmpBuffer(oldVertPos.size());
+  auto vertIdIter = TransformIterator(countAt(0_z), [&vertOld2New](size_t i) {
+    if (vertOld2New[i + 1] > 0) return i;
+    return std::numeric_limits<size_t>::max();
+  });
+
+  auto next = copy_if<decltype(tmpBuffer.begin())>(
+      autoPolicy(tmpBuffer.size()), vertIdIter, vertIdIter + tmpBuffer.size(),
+      tmpBuffer.begin(),
+      [](size_t v) { return v != std::numeric_limits<size_t>::max(); });
+  gather(autoPolicy(tmpBuffer.size()), tmpBuffer.begin(), next,
+         oldVertPos.begin(), vertPos_.begin());
+
+  vertPos_.resize(std::distance(tmpBuffer.begin(), next));
 
   inclusive_scan(policy, vertOld2New.begin() + 1, vertOld2New.end(),
                  vertOld2New.begin() + 1);
