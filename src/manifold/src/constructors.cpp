@@ -12,41 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <thrust/sequence.h>
-
 #include "csg_tree.h"
 #include "impl.h"
 #include "par.h"
 #include "polygon.h"
-
-namespace {
-using namespace manifold;
-using namespace thrust::placeholders;
-
-struct ToSphere {
-  float length;
-  void operator()(glm::vec3& v) {
-    v = glm::cos(glm::half_pi<float>() * (1.0f - v));
-    v = length * glm::normalize(v);
-    if (isnan(v.x)) v = glm::vec3(0.0);
-  }
-};
-
-struct Equals {
-  int val;
-  bool operator()(int x) { return x == val; }
-};
-
-struct RemoveFace {
-  VecView<const Halfedge> halfedge;
-  VecView<const int> vertLabel;
-  const int keepLabel;
-
-  bool operator()(int face) {
-    return vertLabel[halfedge[3 * face].startVert] != keepLabel;
-  }
-};
-}  // namespace
 
 namespace manifold {
 /**
@@ -213,7 +182,11 @@ Manifold Manifold::Sphere(float radius, int circularSegments) {
   auto pImpl_ = std::make_shared<Impl>(Impl::Shape::Octahedron);
   pImpl_->Subdivide([n](glm::vec3 edge) { return n - 1; });
   for_each_n(autoPolicy(pImpl_->NumVert()), pImpl_->vertPos_.begin(),
-             pImpl_->NumVert(), ToSphere({radius}));
+             pImpl_->NumVert(), [radius](glm::vec3& v) {
+               v = glm::cos(glm::half_pi<float>() * (1.0f - v));
+               v = radius * glm::normalize(v);
+               if (isnan(v.x)) v = glm::vec3(0.0);
+             });
   pImpl_->Finish();
   // Ignore preceding octahedron.
   pImpl_->InitializeOriginal();
@@ -497,30 +470,34 @@ std::vector<Manifold> Manifold::Decompose() const {
   }
   Vec<int> vertLabel(componentIndices);
 
+  const int numVert = NumVert();
+  auto policy = autoPolicy(numVert);
   std::vector<Manifold> meshes;
   for (int i = 0; i < numComponents; ++i) {
     auto impl = std::make_shared<Impl>();
     // inherit original object's precision
     impl->precision_ = pImpl_->precision_;
-    impl->vertPos_.resize(NumVert());
-    Vec<int> vertNew2Old(NumVert());
-    auto policy = autoPolicy(NumVert());
-    auto start = zip(impl->vertPos_.begin(), vertNew2Old.begin());
-    int nVert =
-        copy_if<decltype(start)>(
-            policy, zip(pImpl_->vertPos_.begin(), countAt(0)),
-            zip(pImpl_->vertPos_.end(), countAt(NumVert())), vertLabel.begin(),
-            zip(impl->vertPos_.begin(), vertNew2Old.begin()), Equals({i})) -
-        start;
+
+    Vec<int> vertNew2Old(numVert);
+    const int nVert =
+        copy_if<decltype(vertNew2Old.begin())>(
+            policy, countAt(0), countAt(numVert), vertNew2Old.begin(),
+            [i, &vertLabel](int v) { return vertLabel[v] == i; }) -
+        vertNew2Old.begin();
     impl->vertPos_.resize(nVert);
+    vertNew2Old.resize(nVert);
+    gather(policy, vertNew2Old.begin(), vertNew2Old.end(),
+           pImpl_->vertPos_.begin(), impl->vertPos_.begin());
 
     Vec<int> faceNew2Old(NumTri());
-    sequence(policy, faceNew2Old.begin(), faceNew2Old.end());
-
-    int nFace = remove_if<decltype(faceNew2Old.begin())>(
-                    policy, faceNew2Old.begin(), faceNew2Old.end(),
-                    RemoveFace({pImpl_->halfedge_, vertLabel, i})) -
-                faceNew2Old.begin();
+    const auto& halfedge = pImpl_->halfedge_;
+    const int nFace =
+        copy_if<decltype(faceNew2Old.begin())>(
+            policy, countAt(0), countAt(NumTri()), faceNew2Old.begin(),
+            [i, &vertLabel, &halfedge](int face) {
+              return vertLabel[halfedge[3 * face].startVert] == i;
+            }) -
+        faceNew2Old.begin();
     faceNew2Old.resize(nFace);
 
     impl->GatherFaces(*pImpl_, faceNew2Old);

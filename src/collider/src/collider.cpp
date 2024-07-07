@@ -154,15 +154,13 @@ struct CreateRadixTree {
 
 template <typename T, const bool selfCollision, typename Recorder>
 struct FindCollisions {
+  VecView<const T> queries;
   VecView<const Box> nodeBBox_;
   VecView<const thrust::pair<int, int>> internalChildren_;
   Recorder recorder;
 
-  int RecordCollision(int node, thrust::tuple<T, int>& query) {
-    const T& queryObj = thrust::get<0>(query);
-    const int queryIdx = thrust::get<1>(query);
-
-    bool overlaps = nodeBBox_[node].DoesOverlap(queryObj);
+  int RecordCollision(int node, const int queryIdx) {
+    bool overlaps = nodeBBox_[node].DoesOverlap(queries[queryIdx]);
     if (overlaps && IsLeaf(node)) {
       int leafIdx = Node2Leaf(node);
       if (!selfCollision || leafIdx != queryIdx) {
@@ -172,14 +170,13 @@ struct FindCollisions {
     return overlaps && IsInternal(node);  // Should traverse into node
   }
 
-  void operator()(thrust::tuple<T, int> query) {
+  void operator()(const int queryIdx) {
     // stack cannot overflow because radix tree has max depth 30 (Morton code) +
     // 32 (index).
     int stack[64];
     int top = -1;
     // Depth-first search
     int node = kRoot;
-    const int queryIdx = thrust::get<1>(query);
     // same implies that this query do not have any collision
     if (recorder.earlyexit(queryIdx)) return;
     while (1) {
@@ -187,8 +184,8 @@ struct FindCollisions {
       int child1 = internalChildren_[internal].first;
       int child2 = internalChildren_[internal].second;
 
-      int traverse1 = RecordCollision(child1, query);
-      int traverse2 = RecordCollision(child2, query);
+      int traverse1 = RecordCollision(child1, queryIdx);
+      int traverse2 = RecordCollision(child2, queryIdx);
 
       if (!traverse1 && !traverse2) {
         if (top < 0) break;   // done
@@ -313,30 +310,30 @@ SparseIndices Collider::Collisions(const VecView<const T>& queriesIn) const {
   // element can store the sum when using exclusive scan
   if (queriesIn.size() < kSequentialThreshold) {
     SparseIndices queryTri;
-    for_each_n(ExecutionPolicy::Seq, zip(queriesIn.cbegin(), countAt(0)),
-               queriesIn.size(),
+    for_each_n(ExecutionPolicy::Seq, countAt(0), queriesIn.size(),
                FindCollisions<T, selfCollision, SeqCollisionRecorder<inverted>>{
-                   nodeBBox_, internalChildren_, {queryTri}});
+                   queriesIn, nodeBBox_, internalChildren_, {queryTri}});
     return queryTri;
   } else {
     // compute the number of collisions to determine the size for allocation and
     // offset, this avoids the need for atomic
     Vec<int> counts(queriesIn.size() + 1, 0);
     Vec<char> empty(queriesIn.size(), 0);
-    for_each_n(ExecutionPolicy::Par, zip(queriesIn.cbegin(), countAt(0)),
-               queriesIn.size(),
+    for_each_n(ExecutionPolicy::Par, countAt(0), queriesIn.size(),
                FindCollisions<T, selfCollision, CountCollisions>{
-                   nodeBBox_, internalChildren_, {counts, empty}});
+                   queriesIn, nodeBBox_, internalChildren_, {counts, empty}});
     // compute start index for each query and total count
     exclusive_scan(ExecutionPolicy::Par, counts.begin(), counts.end(),
                    counts.begin(), 0, std::plus<int>());
     if (counts.back() == 0) return SparseIndices(0);
     SparseIndices queryTri(counts.back());
     // actually recording collisions
-    for_each_n(ExecutionPolicy::Par, zip(queriesIn.cbegin(), countAt(0)),
-               queriesIn.size(),
+    for_each_n(ExecutionPolicy::Par, countAt(0), queriesIn.size(),
                FindCollisions<T, selfCollision, ParCollisionRecorder<inverted>>{
-                   nodeBBox_, internalChildren_, {queryTri, counts, empty}});
+                   queriesIn,
+                   nodeBBox_,
+                   internalChildren_,
+                   {queryTri, counts, empty}});
     return queryTri;
   }
 }
@@ -350,7 +347,7 @@ void Collider::UpdateBoxes(const VecView<const Box>& leafBB) {
   DEBUG_ASSERT(leafBB.size() == NumLeaves(), userErr,
                "must have the same number of updated boxes as original");
   // copy in leaf node Boxes
-  strided_range<Vec<Box>::Iter> leaves(nodeBBox_.begin(), nodeBBox_.end(), 2);
+  auto leaves = StridedRange(nodeBBox_.begin(), nodeBBox_.end(), 2);
   auto policy = autoPolicy(NumInternal());
   copy(policy, leafBB.cbegin(), leafBB.cend(), leaves.begin());
   // create global counters

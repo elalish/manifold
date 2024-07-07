@@ -56,46 +56,6 @@ uint32_t MortonCode(glm::vec3 position, Box bBox) {
   return Collider::MortonCode(position, bBox);
 }
 
-struct Morton {
-  const Box bBox;
-
-  void operator()(thrust::tuple<uint32_t&, const glm::vec3&> inout) {
-    glm::vec3 position = thrust::get<1>(inout);
-    thrust::get<0>(inout) = MortonCode(position, bBox);
-  }
-};
-
-struct FaceMortonBox {
-  VecView<const Halfedge> halfedge;
-  VecView<const glm::vec3> vertPos;
-  const Box bBox;
-
-  void operator()(thrust::tuple<uint32_t&, Box&, int> inout) {
-    uint32_t& mortonCode = thrust::get<0>(inout);
-    Box& faceBox = thrust::get<1>(inout);
-    int face = thrust::get<2>(inout);
-
-    // Removed tris are marked by all halfedges having pairedHalfedge = -1, and
-    // this will sort them to the end (the Morton code only uses the first 30 of
-    // 32 bits).
-    if (halfedge[3 * face].pairedHalfedge < 0) {
-      mortonCode = kNoCode;
-      return;
-    }
-
-    glm::vec3 center(0.0f);
-
-    for (const int i : {0, 1, 2}) {
-      const glm::vec3 pos = vertPos[halfedge[3 * face + i].startVert];
-      center += pos;
-      faceBox.Union(pos);
-    }
-    center /= 3;
-
-    mortonCode = MortonCode(center, bBox);
-  }
-};
-
 struct Reindex {
   VecView<const int> indexInv;
 
@@ -117,22 +77,6 @@ struct MarkProp {
   }
 };
 
-struct GatherProps {
-  VecView<float> properties;
-  VecView<const float> oldProperties;
-  const int numProp;
-
-  void operator()(thrust::tuple<int, int, int> in) {
-    const int oldIdx = thrust::get<0>(in);
-    const int newIdx = thrust::get<1>(in);
-    const int keep = thrust::get<2>(in);
-    if (keep == 0) return;
-    for (int p = 0; p < numProp; ++p) {
-      properties[newIdx * numProp + p] = oldProperties[oldIdx * numProp + p];
-    }
-  }
-};
-
 struct ReindexProps {
   VecView<const int> old2new;
 
@@ -142,17 +86,6 @@ struct ReindexProps {
     }
   }
 };
-
-template <typename T>
-void Permute(Vec<T>& inOut, const Vec<int>& new2Old) {
-  Vec<T> tmp(std::move(inOut));
-  inOut.resize(new2Old.size());
-  gather(autoPolicy(new2Old.size()), new2Old.begin(), new2Old.end(),
-         tmp.begin(), inOut.begin());
-}
-
-template void Permute<TriRef>(Vec<TriRef>&, const Vec<int>&);
-template void Permute<glm::vec3>(Vec<glm::vec3>&, const Vec<int>&);
 
 struct ReindexFace {
   VecView<Halfedge> halfedge;
@@ -177,28 +110,6 @@ struct ReindexFace {
         halfedgeTangent[newEdge] = oldHalfedgeTangent[oldEdge];
       }
     }
-  }
-};
-
-struct VertMortonBox {
-  VecView<const float> vertProperties;
-  const uint32_t numProp;
-  const float tol;
-  const Box bBox;
-
-  void operator()(thrust::tuple<uint32_t&, Box&, int> inout) {
-    uint32_t& mortonCode = thrust::get<0>(inout);
-    Box& vertBox = thrust::get<1>(inout);
-    int vert = thrust::get<2>(inout);
-
-    const glm::vec3 center(vertProperties[numProp * vert],
-                           vertProperties[numProp * vert + 1],
-                           vertProperties[numProp * vert + 2]);
-
-    vertBox.min = center - tol / 2;
-    vertBox.max = center + tol / 2;
-
-    mortonCode = MortonCode(center, bBox);
   }
 };
 
@@ -293,26 +204,28 @@ void Manifold::Impl::SortVerts() {
   const auto numVert = NumVert();
   Vec<uint32_t> vertMorton(numVert);
   auto policy = autoPolicy(numVert);
-  for_each_n(policy, zip(vertMorton.begin(), vertPos_.cbegin()), numVert,
-             Morton({bBox_}));
+  for_each_n(policy, countAt(0), numVert, [this, &vertMorton](const int vert) {
+    vertMorton[vert] = MortonCode(vertPos_[vert], bBox_);
+  });
 
   Vec<int> vertNew2Old(numVert);
   sequence(policy, vertNew2Old.begin(), vertNew2Old.end());
 
-  stable_sort(policy, zip(vertMorton.begin(), vertNew2Old.begin()),
-              zip(vertMorton.end(), vertNew2Old.end()),
-              [](const thrust::tuple<uint32_t, int>& a,
-                 const thrust::tuple<uint32_t, int>& b) {
-                return thrust::get<0>(a) < thrust::get<0>(b);
+  stable_sort(policy, vertNew2Old.begin(), vertNew2Old.end(),
+              [&vertMorton](const int& a, const int& b) {
+                return vertMorton[a] < vertMorton[b];
               });
 
   ReindexVerts(vertNew2Old, numVert);
 
   // Verts were flagged for removal with NaNs and assigned kNoCode to sort
   // them to the end, which allows them to be removed.
-  const int newNumVert =
-      std::lower_bound(vertMorton.begin(), vertMorton.end(), kNoCode) -
-      vertMorton.begin();
+  const int newNumVert = find_if<decltype(vertNew2Old.begin())>(
+                             policy, vertNew2Old.begin(), vertNew2Old.end(),
+                             [&vertMorton](const int vert) {
+                               return vertMorton[vert] == kNoCode;
+                             }) -
+                         vertNew2Old.begin();
 
   vertNew2Old.resize(newNumVert);
   Permute(vertPos_, vertNew2Old);
@@ -355,10 +268,18 @@ void Manifold::Impl::CompactProps() {
 
   Vec<float> oldProp = meshRelation_.properties;
   const int numVertsNew = propOld2New[numVerts];
-  meshRelation_.properties.resize(meshRelation_.numProp * numVertsNew);
+  const int numProp = meshRelation_.numProp;
+  auto& properties = meshRelation_.properties;
+  properties.resize(numProp * numVertsNew);
   for_each_n(
-      policy, zip(countAt(0), propOld2New.cbegin(), keep.cbegin()), numVerts,
-      GatherProps({meshRelation_.properties, oldProp, meshRelation_.numProp}));
+      policy, countAt(0), numVerts,
+      [&properties, &oldProp, &propOld2New, &keep, &numProp](const int oldIdx) {
+        if (keep[oldIdx] == 0) return;
+        for (int p = 0; p < numProp; ++p) {
+          properties[propOld2New[oldIdx] * numProp + p] =
+              oldProp[oldIdx * numProp + p];
+        }
+      });
   for_each_n(policy, meshRelation_.triProperties.begin(), NumTri(),
              ReindexProps({propOld2New}));
 }
@@ -373,9 +294,28 @@ void Manifold::Impl::GetFaceBoxMorton(Vec<Box>& faceBox,
   ZoneScoped;
   faceBox.resize(NumTri());
   faceMorton.resize(NumTri());
-  for_each_n(autoPolicy(NumTri()),
-             zip(faceMorton.begin(), faceBox.begin(), countAt(0)), NumTri(),
-             FaceMortonBox({halfedge_, vertPos_, bBox_}));
+  for_each_n(autoPolicy(NumTri()), countAt(0), NumTri(),
+             [this, &faceBox, &faceMorton](const int face) {
+               // Removed tris are marked by all halfedges having pairedHalfedge
+               // = -1, and this will sort them to the end (the Morton code only
+               // uses the first 30 of 32 bits).
+               if (halfedge_[3 * face].pairedHalfedge < 0) {
+                 faceMorton[face] = kNoCode;
+                 return;
+               }
+
+               glm::vec3 center(0.0f);
+
+               for (const int i : {0, 1, 2}) {
+                 const glm::vec3 pos =
+                     vertPos_[halfedge_[3 * face + i].startVert];
+                 center += pos;
+                 faceBox[face].Union(pos);
+               }
+               center /= 3;
+
+               faceMorton[face] = MortonCode(center, bBox_);
+             });
 }
 
 /**
@@ -388,22 +328,22 @@ void Manifold::Impl::SortFaces(Vec<Box>& faceBox, Vec<uint32_t>& faceMorton) {
   auto policy = autoPolicy(faceNew2Old.size());
   sequence(policy, faceNew2Old.begin(), faceNew2Old.end());
 
-  stable_sort(policy, zip(faceMorton.begin(), faceNew2Old.begin()),
-              zip(faceMorton.end(), faceNew2Old.end()),
-              [](const thrust::tuple<uint32_t, int>& a,
-                 const thrust::tuple<uint32_t, int>& b) {
-                return thrust::get<0>(a) < thrust::get<0>(b);
+  stable_sort(policy, faceNew2Old.begin(), faceNew2Old.end(),
+              [&faceMorton](const int& a, const int& b) {
+                return faceMorton[a] < faceMorton[b];
               });
 
   // Tris were flagged for removal with pairedHalfedge = -1 and assigned kNoCode
   // to sort them to the end, which allows them to be removed.
-  const int newNumTri =
-      find<decltype(faceMorton.begin())>(policy, faceMorton.begin(),
-                                         faceMorton.end(), kNoCode) -
-      faceMorton.begin();
-  faceMorton.resize(newNumTri);
+  const int newNumTri = find_if<decltype(faceNew2Old.begin())>(
+                            policy, faceNew2Old.begin(), faceNew2Old.end(),
+                            [&faceMorton](const int face) {
+                              return faceMorton[face] == kNoCode;
+                            }) -
+                        faceNew2Old.begin();
   faceNew2Old.resize(newNumTri);
 
+  Permute(faceMorton, faceNew2Old);
   Permute(faceBox, faceNew2Old);
   GatherFaces(faceNew2Old);
 }
@@ -549,8 +489,7 @@ bool MeshGL::Merge() {
   Vec<float> vertPropD(vertProperties);
   Box bBox;
   for (const int i : {0, 1, 2}) {
-    strided_range<Vec<float>::Iter> iPos(vertPropD.begin() + i, vertPropD.end(),
-                                         numProp);
+    auto iPos = StridedRange(vertPropD.begin() + i, vertPropD.end(), numProp);
     auto minMax = transform_reduce<thrust::pair<float, float>>(
         autoPolicy(numVert), iPos.begin(), iPos.end(), Duplicate(),
         thrust::make_pair(std::numeric_limits<float>::infinity(),
@@ -566,17 +505,31 @@ bool MeshGL::Merge() {
   Vec<Box> vertBox(numOpenVert);
   Vec<uint32_t> vertMorton(numOpenVert);
 
-  for_each_n(policy,
-             zip(vertMorton.begin(), vertBox.begin(), openVerts.cbegin()),
-             numOpenVert, VertMortonBox({vertPropD, numProp, precision, bBox}));
+  for_each_n(policy, countAt(0), numOpenVert,
+             [&vertMorton, &vertBox, &openVerts, &bBox, this](const int i) {
+               int vert = openVerts[i];
 
-  stable_sort(policy,
-              zip(vertMorton.begin(), vertBox.begin(), openVerts.begin()),
-              zip(vertMorton.end(), vertBox.end(), openVerts.end()),
-              [](const thrust::tuple<uint32_t, Box, int>& a,
-                 const thrust::tuple<uint32_t, Box, int>& b) {
-                return thrust::get<0>(a) < thrust::get<0>(b);
+               const glm::vec3 center(vertProperties[numProp * vert],
+                                      vertProperties[numProp * vert + 1],
+                                      vertProperties[numProp * vert + 2]);
+
+               vertBox[i].min = center - precision / 2;
+               vertBox[i].max = center + precision / 2;
+
+               vertMorton[i] = MortonCode(center, bBox);
+             });
+
+  Vec<int> vertNew2Old(numOpenVert);
+  sequence(policy, vertNew2Old.begin(), vertNew2Old.end());
+
+  stable_sort(policy, vertNew2Old.begin(), vertNew2Old.end(),
+              [&vertMorton](const int& a, const int& b) {
+                return vertMorton[a] < vertMorton[b];
               });
+
+  Permute(vertMorton, vertNew2Old);
+  Permute(vertBox, vertNew2Old);
+  Permute(openVerts, vertNew2Old);
 
   Collider collider(vertBox, vertMorton);
   SparseIndices toMerge = collider.Collisions<true>(vertBox.cview());

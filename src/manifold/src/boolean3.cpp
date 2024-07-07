@@ -68,14 +68,13 @@ glm::vec4 Intersect(const glm::vec3 &pL, const glm::vec3 &pR,
 template <const bool inverted>
 struct CopyFaceEdges {
   const SparseIndices &p1q1;
-  // const int *p1q1;
   // x can be either vert or edge (0 or 1).
   SparseIndices &pXq1;
   VecView<const Halfedge> halfedgesQ;
+  const size_t offset;
 
-  void operator()(thrust::tuple<size_t, size_t> in) {
-    int idx = 3 * thrust::get<0>(in);
-    size_t i = thrust::get<1>(in);
+  void operator()(const size_t i) {
+    int idx = 3 * (i + offset);
     int pX = p1q1.Get(i, inverted);
     int q2 = p1q1.Get(i, !inverted);
 
@@ -94,10 +93,10 @@ SparseIndices Filter11(const Manifold::Impl &inP, const Manifold::Impl &inQ,
                        const SparseIndices &p1q2, const SparseIndices &p2q1) {
   ZoneScoped;
   SparseIndices p1q1(3 * p1q2.size() + 3 * p2q1.size());
-  for_each_n(autoPolicy(p1q2.size()), zip(countAt(0_z), countAt(0_z)),
-             p1q2.size(), CopyFaceEdges<false>({p1q2, p1q1, inQ.halfedge_}));
-  for_each_n(autoPolicy(p2q1.size()), zip(countAt(p1q2.size()), countAt(0_z)),
-             p2q1.size(), CopyFaceEdges<true>({p2q1, p1q1, inP.halfedge_}));
+  for_each_n(autoPolicy(p1q2.size()), countAt(0_z), p1q2.size(),
+             CopyFaceEdges<false>({p1q2, p1q1, inQ.halfedge_, 0_z}));
+  for_each_n(autoPolicy(p2q1.size()), countAt(0_z), p2q1.size(),
+             CopyFaceEdges<true>({p2q1, p1q1, inP.halfedge_, p1q2.size()}));
   p1q1.Unique();
   return p1q1;
 }
@@ -177,19 +176,21 @@ size_t monobound_quaternary_search(VecView<const int64_t> array, int64_t key) {
 }
 
 struct Kernel11 {
+  VecView<glm::vec4> xyzz;
+  VecView<int> s;
   VecView<const glm::vec3> vertPosP;
   VecView<const glm::vec3> vertPosQ;
   VecView<const Halfedge> halfedgeP;
   VecView<const Halfedge> halfedgeQ;
-  float expandP;
+  const float expandP;
   VecView<const glm::vec3> normalP;
   const SparseIndices &p1q1;
 
-  void operator()(thrust::tuple<size_t, glm::vec4 &, int &> inout) {
-    const int p1 = p1q1.Get(thrust::get<0>(inout), false);
-    const int q1 = p1q1.Get(thrust::get<0>(inout), true);
-    glm::vec4 &xyzz11 = thrust::get<1>(inout);
-    int &s11 = thrust::get<2>(inout);
+  void operator()(const size_t idx) {
+    const int p1 = p1q1.Get(idx, false);
+    const int q1 = p1q1.Get(idx, true);
+    glm::vec4 &xyzz11 = xyzz[idx];
+    int &s11 = s[idx];
 
     // For pRL[k], qRL[k], k==0 is the left and k==1 is the right.
     int k = 0;
@@ -262,10 +263,9 @@ std::tuple<Vec<int>, Vec<glm::vec4>> Shadow11(SparseIndices &p1q1,
   Vec<int> s11(p1q1.size());
   Vec<glm::vec4> xyzz11(p1q1.size());
 
-  for_each_n(autoPolicy(p1q1.size()),
-             zip(countAt(0_z), xyzz11.begin(), s11.begin()), p1q1.size(),
-             Kernel11({inP.vertPos_, inQ.vertPos_, inP.halfedge_, inQ.halfedge_,
-                       expandP, inP.vertNormal_, p1q1}));
+  for_each_n(autoPolicy(p1q1.size()), countAt(0_z), p1q1.size(),
+             Kernel11({xyzz11, s11, inP.vertPos_, inQ.vertPos_, inP.halfedge_,
+                       inQ.halfedge_, expandP, inP.vertNormal_, p1q1}));
 
   p1q1.KeepFinite(xyzz11, s11);
 
@@ -273,6 +273,8 @@ std::tuple<Vec<int>, Vec<glm::vec4>> Shadow11(SparseIndices &p1q1,
 };
 
 struct Kernel02 {
+  VecView<int> s;
+  VecView<float> z;
   VecView<const glm::vec3> vertPosP;
   VecView<const Halfedge> halfedgeQ;
   VecView<const glm::vec3> vertPosQ;
@@ -281,11 +283,11 @@ struct Kernel02 {
   const SparseIndices &p0q2;
   const bool forward;
 
-  void operator()(thrust::tuple<size_t, int &, float &> inout) {
-    const int p0 = p0q2.Get(thrust::get<0>(inout), !forward);
-    const int q2 = p0q2.Get(thrust::get<0>(inout), forward);
-    int &s02 = thrust::get<1>(inout);
-    float &z02 = thrust::get<2>(inout);
+  void operator()(const size_t idx) {
+    const int p0 = p0q2.Get(idx, !forward);
+    const int q2 = p0q2.Get(idx, forward);
+    int &s02 = s[idx];
+    float &z02 = z[idx];
 
     // For yzzLR[k], k==0 is the left and k==1 is the right.
     int k = 0;
@@ -353,10 +355,9 @@ std::tuple<Vec<int>, Vec<float>> Shadow02(const Manifold::Impl &inP,
   Vec<float> z02(p0q2.size());
 
   auto vertNormalP = forward ? inP.vertNormal_ : inQ.vertNormal_;
-  for_each_n(autoPolicy(p0q2.size()),
-             zip(countAt(0_z), s02.begin(), z02.begin()), p0q2.size(),
-             Kernel02({inP.vertPos_, inQ.halfedge_, inQ.vertPos_, expandP,
-                       vertNormalP, p0q2, forward}));
+  for_each_n(autoPolicy(p0q2.size()), countAt(0_z), p0q2.size(),
+             Kernel02({s02, z02, inP.vertPos_, inQ.halfedge_, inQ.vertPos_,
+                       expandP, vertNormalP, p0q2, forward}));
 
   p0q2.KeepFinite(z02, s02);
 
@@ -364,6 +365,8 @@ std::tuple<Vec<int>, Vec<float>> Shadow02(const Manifold::Impl &inP,
 };
 
 struct Kernel12 {
+  VecView<int> x;
+  VecView<glm::vec3> v;
   VecView<const int64_t> p0q2;
   VecView<const int> s02;
   VecView<const float> z02;
@@ -376,11 +379,11 @@ struct Kernel12 {
   const bool forward;
   const SparseIndices &p1q2;
 
-  void operator()(thrust::tuple<size_t, int &, glm::vec3 &> inout) {
-    int p1 = p1q2.Get(thrust::get<0>(inout), !forward);
-    int q2 = p1q2.Get(thrust::get<0>(inout), forward);
-    int &x12 = thrust::get<1>(inout);
-    glm::vec3 &v12 = thrust::get<2>(inout);
+  void operator()(const size_t idx) {
+    int p1 = p1q2.Get(idx, !forward);
+    int q2 = p1q2.Get(idx, forward);
+    int &x12 = x[idx];
+    glm::vec3 &v12 = v[idx];
 
     // For xzyLR-[k], k==0 is the left and k==1 is the right.
     int k = 0;
@@ -460,9 +463,8 @@ std::tuple<Vec<int>, Vec<glm::vec3>> Intersect12(
   Vec<glm::vec3> v12(p1q2.size());
 
   for_each_n(
-      autoPolicy(p1q2.size()), zip(countAt(0_z), x12.begin(), v12.begin()),
-      p1q2.size(),
-      Kernel12({p0q2.AsVec64(), s02, z02, p1q1.AsVec64(), s11, xyzz11,
+      autoPolicy(p1q2.size()), countAt(0_z), p1q2.size(),
+      Kernel12({x12, v12, p0q2.AsVec64(), s02, z02, p1q1.AsVec64(), s11, xyzz11,
                 inP.halfedge_, inQ.halfedge_, inP.vertPos_, forward, p1q2}));
 
   p1q2.KeepFinite(v12, x12);
@@ -475,26 +477,11 @@ Vec<int> Winding03(const Manifold::Impl &inP, Vec<int> &vertices, Vec<int> &s02,
   ZoneScoped;
   // verts that are not shadowed (not in p0q2) have winding number zero.
   Vec<int> w03(inP.NumVert(), 0);
-  // checking is slow, so just sort and reduce
   auto policy = autoPolicy(vertices.size());
-  stable_sort(
-      policy, zip(vertices.begin(), s02.begin()),
-      zip(vertices.end(), s02.end()),
-      [](const thrust::tuple<int, int> &a, const thrust::tuple<int, int> &b) {
-        return thrust::get<0>(a) < thrust::get<0>(b);
-      });
-  Vec<int> w03val(w03.size());
-  Vec<int> w03vert(w03.size());
-  // sum known s02 values into w03 (winding number)
-  auto endPair = reduce_by_key<
-      thrust::pair<decltype(w03val.begin()), decltype(w03val.begin())>>(
-      policy, vertices.begin(), vertices.end(), s02.begin(), w03vert.begin(),
-      w03val.begin());
-  scatter(policy, w03val.begin(), endPair.second, w03vert.begin(), w03.begin());
-
-  if (reverse)
-    transform(policy, w03.begin(), w03.end(), w03.begin(),
-              thrust::negate<int>());
+  for_each_n(policy, countAt(0), s02.size(),
+             [&w03, &vertices, &s02, reverse](const int i) {
+               AtomicAdd(w03[vertices[i]], s02[i] * (reverse ? -1 : 1));
+             });
   return w03;
 };
 }  // namespace

@@ -34,12 +34,12 @@
 #include <execution>
 #endif
 
-#include "tbb/tbb.h"
 #define MANIFOLD_PAR_NS tbb
 #else
 #define MANIFOLD_PAR_NS cpp
 #endif
 
+#include "iters.h"
 namespace manifold {
 
 enum class ExecutionPolicy {
@@ -174,15 +174,34 @@ STL_DYNAMIC_BACKEND_VOID(uninitialized_fill)
 STL_DYNAMIC_BACKEND_VOID(uninitialized_copy)
 STL_DYNAMIC_BACKEND_VOID(stable_sort)
 STL_DYNAMIC_BACKEND_VOID(fill)
-STL_DYNAMIC_BACKEND_VOID(copy)
 STL_DYNAMIC_BACKEND_VOID(inclusive_scan)
-STL_DYNAMIC_BACKEND_VOID(copy_n)
+
+// there are some issues with thrust copy
+template <typename InputIterator, typename OutputIterator>
+OutputIterator copy(ExecutionPolicy policy, InputIterator first,
+                    InputIterator last, OutputIterator result) {
+#if MANIFOLD_PAR == 'T' && \
+    (TBB_INTERFACE_VERSION >= 10000 && __has_include(<pstl/glue_execution_defs.h>))
+  if (policy == ExecutionPolicy::Par)
+    return std::copy(std::execution::par_unseq, first, last, result);
+#endif
+  return std::copy(first, last, result);
+}
+
+template <typename InputIterator, typename OutputIterator>
+OutputIterator copy_n(ExecutionPolicy policy, InputIterator first, size_t n,
+                      OutputIterator result) {
+#if MANIFOLD_PAR == 'T' && \
+    (TBB_INTERFACE_VERSION >= 10000 && __has_include(<pstl/glue_execution_defs.h>))
+  if (policy == ExecutionPolicy::Par)
+    return std::copy_n(std::execution::par_unseq, first, n, result);
+#endif
+  return std::copy_n(first, n, result);
+}
 
 // void implies that the user have to specify the return type in the template
 // argument, as we are unable to deduce it
 THRUST_DYNAMIC_BACKEND(transform_reduce, void)
-THRUST_DYNAMIC_BACKEND(gather_if, void)
-THRUST_DYNAMIC_BACKEND(reduce_by_key, void)
 STL_DYNAMIC_BACKEND(remove, void)
 STL_DYNAMIC_BACKEND(find, void)
 STL_DYNAMIC_BACKEND(find_if, void)

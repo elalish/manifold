@@ -35,14 +35,10 @@ void AtomicAddVec3(glm::vec3& target, const glm::vec3& add) {
     std::atomic<float>& tar = reinterpret_cast<std::atomic<float>&>(target[i]);
     float old_val = tar.load(std::memory_order_relaxed);
     while (!tar.compare_exchange_weak(old_val, old_val + add[i],
-                                      std::memory_order_relaxed))
-      ;
+                                      std::memory_order_relaxed)) {
+    }
   }
 }
-
-struct Normalize {
-  void operator()(glm::vec3& v) { v = SafeNormalize(v); }
-};
 
 struct Transform4x3 {
   const glm::mat4x3 transform;
@@ -53,15 +49,15 @@ struct Transform4x3 {
 };
 
 struct AssignNormals {
+  VecView<glm::vec3> faceNormal;
   VecView<glm::vec3> vertNormal;
   VecView<const glm::vec3> vertPos;
   VecView<const Halfedge> halfedges;
   const float precision;
   const bool calculateTriNormal;
 
-  void operator()(thrust::tuple<glm::vec3&, int> in) {
-    glm::vec3& triNormal = thrust::get<0>(in);
-    const int face = thrust::get<1>(in);
+  void operator()(const int face) {
+    glm::vec3& triNormal = faceNormal[face];
 
     glm::ivec3 triVerts;
     for (int i : {0, 1, 2}) triVerts[i] = halfedges[3 * face + i].startVert;
@@ -88,26 +84,6 @@ struct AssignNormals {
     // assign weighted sum
     for (int i : {0, 1, 2}) {
       AtomicAddVec3(vertNormal[triVerts[i]], phi[i] * triNormal);
-    }
-  }
-};
-
-struct Tri2Halfedges {
-  VecView<Halfedge> halfedges;
-  VecView<glm::uint64_t> edges;
-
-  void operator()(thrust::tuple<int, const glm::ivec3&> in) {
-    const int tri = thrust::get<0>(in);
-    const glm::ivec3& triVerts = thrust::get<1>(in);
-    for (const int i : {0, 1, 2}) {
-      const int j = (i + 1) % 3;
-      const int edge = 3 * tri + i;
-      halfedges[edge] = {triVerts[i], triVerts[j], -1, tri};
-      // Sort the forward halfedges in front of the backward ones by setting the
-      // highest-order bit.
-      edges[edge] = glm::uint64_t(triVerts[i] < triVerts[j] ? 1 : 0) << 63 |
-                    ((glm::uint64_t)glm::min(triVerts[i], triVerts[j])) << 32 |
-                    glm::max(triVerts[i], triVerts[j]);
     }
   }
 };
@@ -146,20 +122,6 @@ struct ReindexTriVerts {
   }
 };
 
-struct InitializeTriRef {
-  const int meshID;
-  VecView<const Halfedge> halfedge;
-
-  void operator()(thrust::tuple<TriRef&, int> inOut) {
-    TriRef& baryRef = thrust::get<0>(inOut);
-    int tri = thrust::get<1>(inOut);
-
-    baryRef.meshID = meshID;
-    baryRef.originalID = meshID;
-    baryRef.tri = tri;
-  }
-};
-
 struct UpdateMeshID {
   const HashTableD<uint32_t> meshIDold2new;
 
@@ -167,6 +129,8 @@ struct UpdateMeshID {
 };
 
 struct CoplanarEdge {
+  VecView<thrust::pair<int, int>> face2face;
+  VecView<thrust::pair<int, int>> vert2vert;
   VecView<float> triArea;
   VecView<const Halfedge> halfedge;
   VecView<const glm::vec3> vertPos;
@@ -178,13 +142,7 @@ struct CoplanarEdge {
   const float precision;
 
   // FIXME: race condition
-  void operator()(
-      thrust::tuple<thrust::pair<int, int>&, thrust::pair<int, int>&, int>
-          inOut) {
-    thrust::pair<int, int>& face2face = thrust::get<0>(inOut);
-    thrust::pair<int, int>& vert2vert = thrust::get<1>(inOut);
-    const int edgeIdx = thrust::get<2>(inOut);
-
+  void operator()(const int edgeIdx) {
     const Halfedge edge = halfedge[edgeIdx];
     const Halfedge pair = halfedge[edge.pairedHalfedge];
 
@@ -206,8 +164,7 @@ struct CoplanarEdge {
         }
       }
       if (propEqual) {
-        vert2vert.first = prop0;
-        vert2vert.second = prop1;
+        vert2vert[edgeIdx] = thrust::make_pair(prop0, prop1);
       }
     }
 
@@ -264,8 +221,7 @@ struct CoplanarEdge {
       }
     }
 
-    face2face.first = edge.face;
-    face2face.second = pair.face;
+    face2face[edgeIdx] = thrust::make_pair(edge.face, pair.face);
   }
 };
 
@@ -297,15 +253,6 @@ struct CheckCoplanarity {
         break;
       }
     }
-  }
-};
-
-struct EdgeBox {
-  VecView<const glm::vec3> vertPos;
-
-  void operator()(thrust::tuple<Box&, const TmpEdge&> inout) {
-    const TmpEdge& edge = thrust::get<1>(inout);
-    thrust::get<0>(inout) = Box(vertPos[edge.first], vertPos[edge.second]);
   }
 };
 
@@ -609,10 +556,12 @@ void Manifold::Impl::InitializeOriginal() {
   const int meshID = meshRelation_.originalID;
   // Don't initialize if it's not an original
   if (meshID < 0) return;
-  meshRelation_.triRef.resize(NumTri());
-  for_each_n(autoPolicy(NumTri()),
-             zip(meshRelation_.triRef.begin(), countAt(0)), NumTri(),
-             InitializeTriRef({meshID, halfedge_}));
+  auto& triRef = meshRelation_.triRef;
+  triRef.resize(NumTri());
+  for_each_n(autoPolicy(NumTri()), countAt(0), NumTri(),
+             [meshID, &triRef](const int tri) {
+               triRef[tri] = {meshID, meshID, tri};
+             });
   meshRelation_.meshIDtransform.clear();
   meshRelation_.meshIDtransform[meshID] = {meshID};
 }
@@ -626,12 +575,11 @@ void Manifold::Impl::CreateFaces(const std::vector<float>& propertyTolerance) {
   Vec<thrust::pair<int, int>> face2face(halfedge_.size(), {-1, -1});
   Vec<thrust::pair<int, int>> vert2vert(halfedge_.size(), {-1, -1});
   Vec<float> triArea(NumTri());
-  for_each_n(
-      autoPolicy(halfedge_.size()),
-      zip(face2face.begin(), vert2vert.begin(), countAt(0)), halfedge_.size(),
-      CoplanarEdge({triArea, halfedge_, vertPos_, meshRelation_.triRef,
-                    meshRelation_.triProperties, meshRelation_.properties,
-                    propertyToleranceD, meshRelation_.numProp, precision_}));
+  for_each_n(autoPolicy(halfedge_.size()), countAt(0), halfedge_.size(),
+             CoplanarEdge({face2face, vert2vert, triArea, halfedge_, vertPos_,
+                           meshRelation_.triRef, meshRelation_.triProperties,
+                           meshRelation_.properties, propertyToleranceD,
+                           meshRelation_.numProp, precision_}));
 
   if (meshRelation_.triProperties.size() > 0) {
     DedupePropVerts(meshRelation_.triProperties, vert2vert);
@@ -677,19 +625,29 @@ void Manifold::Impl::CreateHalfedges(const Vec<glm::ivec3>& triVerts) {
   Vec<int> ids(numHalfedge);
   auto policy = autoPolicy(numTri);
   sequence(policy, ids.begin(), ids.end());
-  for_each_n(policy, zip(countAt(0), triVerts.begin()), numTri,
-             Tri2Halfedges({halfedge_, edge}));
+  for_each_n(policy, countAt(0), numTri,
+             [this, &edge, &triVerts](const int tri) {
+               const glm::ivec3& verts = triVerts[tri];
+               for (const int i : {0, 1, 2}) {
+                 const int j = (i + 1) % 3;
+                 const int e = 3 * tri + i;
+                 halfedge_[e] = {verts[i], verts[j], -1, tri};
+                 // Sort the forward halfedges in front of the backward ones by
+                 // setting the highest-order bit.
+                 edge[e] = glm::uint64_t(verts[i] < verts[j] ? 1 : 0) << 63 |
+                           ((glm::uint64_t)glm::min(verts[i], verts[j])) << 32 |
+                           glm::max(verts[i], verts[j]);
+               }
+             });
   // Stable sort is required here so that halfedges from the same face are
   // paired together (the triangles were created in face order). In some
   // degenerate situations the triangulator can add the same internal edge in
   // two different faces, causing this edge to not be 2-manifold. These are
   // fixed by duplicating verts in SimplifyTopology.
-  stable_sort(policy, zip(edge.begin(), ids.begin()),
-              zip(edge.end(), ids.end()),
-              [](const thrust::tuple<uint64_t, int>& a,
-                 const thrust::tuple<uint64_t, int>& b) {
-                return thrust::get<0>(a) < thrust::get<0>(b);
-              });
+  stable_sort(
+      policy, ids.begin(), ids.end(),
+      [&edge](const int& a, const int& b) { return edge[a] < edge[b]; });
+
   // Once sorted, the first half of the range is the forward halfedges, which
   // correspond to their backward pair at the same offset in the second half
   // of the range.
@@ -774,15 +732,15 @@ Manifold::Impl Manifold::Impl::Transform(const glm::mat4x3& transform_) const {
   const bool invert = glm::determinant(glm::mat3(transform_)) < 0;
 
   if (halfedgeTangent_.size() > 0) {
-    for_each_n(policy, zip(result.halfedgeTangent_.begin(), countAt(0)),
-               halfedgeTangent_.size(),
-               TransformTangents({glm::mat3(transform_), invert,
-                                  halfedgeTangent_, halfedge_}));
+    for_each_n(
+        policy, countAt(0), halfedgeTangent_.size(),
+        TransformTangents({result.halfedgeTangent_, 0, glm::mat3(transform_),
+                           invert, halfedgeTangent_, halfedge_}));
   }
 
   if (invert) {
-    for_each_n(policy, zip(result.meshRelation_.triRef.begin(), countAt(0)),
-               result.NumTri(), FlipTris({result.halfedge_}));
+    for_each_n(policy, countAt(0), result.NumTri(),
+               FlipTris({result.halfedge_}));
   }
 
   // This optimization does a cheap collider update if the transform is
@@ -827,10 +785,11 @@ void Manifold::Impl::CalculateNormals() {
     faceNormal_.resize(NumTri());
     calculateTriNormal = true;
   }
-  for_each_n(policy, zip(faceNormal_.begin(), countAt(0)), NumTri(),
-             AssignNormals({vertNormal_, vertPos_, halfedge_, precision_,
-                            calculateTriNormal}));
-  for_each(policy, vertNormal_.begin(), vertNormal_.end(), Normalize());
+  for_each_n(policy, countAt(0), NumTri(),
+             AssignNormals({faceNormal_, vertNormal_, vertPos_, halfedge_,
+                            precision_, calculateTriNormal}));
+  for_each(policy, vertNormal_.begin(), vertNormal_.end(),
+           [](glm::vec3& v) { v = SafeNormalize(v); });
 }
 
 /**
@@ -865,9 +824,12 @@ SparseIndices Manifold::Impl::EdgeCollisions(const Impl& Q,
   Vec<TmpEdge> edges = CreateTmpEdges(Q.halfedge_);
   const int numEdge = edges.size();
   Vec<Box> QedgeBB(numEdge);
+  const auto& vertPos = Q.vertPos_;
   auto policy = autoPolicy(numEdge);
-  for_each_n(policy, zip(QedgeBB.begin(), edges.cbegin()), numEdge,
-             EdgeBox({Q.vertPos_}));
+  for_each_n(
+      policy, countAt(0), numEdge, [&QedgeBB, &edges, &vertPos](const int e) {
+        QedgeBB[e] = Box(vertPos[edges[e].first], vertPos[edges[e].second]);
+      });
 
   SparseIndices q1p2(0);
   if (inverted)

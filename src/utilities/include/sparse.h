@@ -135,46 +135,61 @@ class SparseIndices {
   size_t RemoveZeros(Vec<int>& S) {
     DEBUG_ASSERT(S.size() == size(), userErr,
                  "Different number of values than indicies!");
-    VecView<int64_t> view = AsVec64();
-    auto zBegin = zip(S.begin(), view.begin());
-    auto zEnd = zip(S.end(), view.end());
-    size_t size =
-        remove_if<decltype(zBegin)>(autoPolicy(S.size()), zBegin, zEnd,
-                                    [](thrust::tuple<int, int64_t> x) {
-                                      return thrust::get<0>(x) == 0;
-                                    }) -
-        zBegin;
-    S.resize(size, -1);
+
+    Vec<int> new2Old(S.size());
+    auto policy = autoPolicy(S.size());
+    sequence(policy, new2Old.begin(), new2Old.end());
+
+    size_t size = copy_if<decltype(new2Old.begin())>(
+                      policy, countAt(0_z), countAt(S.size()), new2Old.begin(),
+                      [&S](const int i) { return S[i] != 0; }) -
+                  new2Old.begin();
+    new2Old.resize(size);
+
+    Permute(S, new2Old);
+    Vec<char> tmp(std::move(data_));
     Resize(size);
+    gather(policy, new2Old.begin(), new2Old.end(),
+           reinterpret_cast<int64_t*>(tmp.data()),
+           reinterpret_cast<int64_t*>(data_.data()));
+
     return size;
   }
 
   template <typename T>
-  struct firstNonFinite {
-    bool NotFinite(float v) const { return !isfinite(v); }
-    bool NotFinite(glm::vec2 v) const { return !isfinite(v[0]); }
-    bool NotFinite(glm::vec3 v) const { return !isfinite(v[0]); }
-    bool NotFinite(glm::vec4 v) const { return !isfinite(v[0]); }
+  struct firstFinite {
+    VecView<T> v;
 
-    bool operator()(thrust::tuple<T, int, int64_t> x) const {
-      bool result = NotFinite(thrust::get<0>(x));
-      return result;
-    }
+    bool Finite(float v) const { return isfinite(v); }
+    bool Finite(glm::vec2 v) const { return isfinite(v[0]); }
+    bool Finite(glm::vec3 v) const { return isfinite(v[0]); }
+    bool Finite(glm::vec4 v) const { return isfinite(v[0]); }
+
+    bool operator()(const int i) const { return Finite(v[i]); }
   };
 
   template <typename T>
   size_t KeepFinite(Vec<T>& v, Vec<int>& x) {
     DEBUG_ASSERT(x.size() == size(), userErr,
                  "Different number of values than indicies!");
-    VecView<int64_t> view = AsVec64();
-    auto zBegin = zip(v.begin(), x.begin(), view.begin());
-    auto zEnd = zip(v.end(), x.end(), view.end());
-    size_t size = remove_if<decltype(zBegin)>(autoPolicy(v.size()), zBegin,
-                                              zEnd, firstNonFinite<T>()) -
-                  zBegin;
-    v.resize(size);
-    x.resize(size);
+
+    Vec<int> new2Old(v.size());
+    auto policy = autoPolicy(v.size());
+
+    size_t size = copy_if<decltype(new2Old.begin())>(
+                      policy, countAt(0_z), countAt(v.size()), new2Old.begin(),
+                      firstFinite<T>({v})) -
+                  new2Old.begin();
+    new2Old.resize(size);
+
+    Permute(v, new2Old);
+    Permute(x, new2Old);
+    Vec<char> tmp(std::move(data_));
     Resize(size);
+    gather(policy, new2Old.begin(), new2Old.end(),
+           reinterpret_cast<int64_t*>(tmp.data()),
+           reinterpret_cast<int64_t*>(data_.data()));
+
     return size;
   }
 
