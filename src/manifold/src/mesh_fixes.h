@@ -39,11 +39,10 @@ struct FlipTris {
   VecView<Halfedge> halfedge;
 
   void operator()(const int tri) {
-    thrust::swap(halfedge[3 * tri], halfedge[3 * tri + 2]);
+    std::swap(halfedge[3 * tri], halfedge[3 * tri + 2]);
 
     for (const int i : {0, 1, 2}) {
-      thrust::swap(halfedge[3 * tri + i].startVert,
-                   halfedge[3 * tri + i].endVert);
+      std::swap(halfedge[3 * tri + i].startVert, halfedge[3 * tri + i].endVert);
       halfedge[3 * tri + i].pairedHalfedge =
           FlipHalfedge(halfedge[3 * tri + i].pairedHalfedge);
     }

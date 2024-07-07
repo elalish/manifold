@@ -26,7 +26,7 @@ struct FaceAreaVolume {
   VecView<const glm::vec3> vertPos;
   const float precision;
 
-  thrust::pair<float, float> operator()(int face) {
+  std::pair<float, float> operator()(int face) {
     float perimeter = 0;
     glm::vec3 edge[3];
     for (int i : {0, 1, 2}) {
@@ -40,12 +40,11 @@ struct FaceAreaVolume {
     float area = glm::length(crossP);
     float volume = glm::dot(crossP, vertPos[halfedges[3 * face].startVert]);
 
-    return thrust::make_pair(area / 2.0f, volume / 6.0f);
+    return std::make_pair(area / 2.0f, volume / 6.0f);
   }
 };
 
-struct PosMin
-    : public thrust::binary_function<glm::vec3, glm::vec3, glm::vec3> {
+struct PosMin {
   glm::vec3 operator()(glm::vec3 a, glm::vec3 b) {
     if (isnan(a.x)) return b;
     if (isnan(b.x)) return a;
@@ -53,8 +52,7 @@ struct PosMin
   }
 };
 
-struct PosMax
-    : public thrust::binary_function<glm::vec3, glm::vec3, glm::vec3> {
+struct PosMax {
   glm::vec3 operator()(glm::vec3 a, glm::vec3 b) {
     if (isnan(a.x)) return b;
     if (isnan(b.x)) return a;
@@ -73,8 +71,7 @@ struct MakeMinMax {
   }
 };
 
-struct MinMax
-    : public thrust::binary_function<glm::ivec2, glm::ivec2, glm::ivec2> {
+struct MinMax {
   glm::ivec2 operator()(glm::ivec2 a, glm::ivec2 b) {
     a[0] = glm::min(a[0], b[0]);
     a[1] = glm::max(a[1], b[1]);
@@ -82,11 +79,9 @@ struct MinMax
   }
 };
 
-struct SumPair : public thrust::binary_function<thrust::pair<float, float>,
-                                                thrust::pair<float, float>,
-                                                thrust::pair<float, float>> {
-  thrust::pair<float, float> operator()(thrust::pair<float, float> a,
-                                        thrust::pair<float, float> b) {
+struct SumPair {
+  std::pair<float, float> operator()(std::pair<float, float> a,
+                                     std::pair<float, float> b) {
     a.first += b.first;
     a.second += b.second;
     return a;
@@ -389,7 +384,7 @@ bool Manifold::Impl::IsFinite() const {
   auto policy = autoPolicy(NumVert());
   return transform_reduce<bool>(policy, vertPos_.begin(), vertPos_.end(),
                                 FiniteVert(), true,
-                                thrust::logical_and<bool>());
+                                [](bool a, bool b) { return a && b; });
 }
 
 /**
@@ -444,7 +439,8 @@ float Manifold::Impl::MinGap(const Manifold::Impl& other,
 
         return DistanceTriangleTriangleSquared(p, q);
       },
-      searchLength * searchLength, thrust::minimum<float>());
+      searchLength * searchLength,
+      [](float a, float b) { return std::min(a, b); });
 
   return sqrt(minDistanceSquared);
 };

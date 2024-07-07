@@ -30,10 +30,8 @@ using concurrent_map = std::map<K, V>;
 #endif
 #include "boolean3.h"
 #include "par.h"
-#include "polygon.h"
 
 using namespace manifold;
-using namespace thrust::placeholders;
 
 template <>
 struct std::hash<std::pair<int, int>> {
@@ -46,7 +44,7 @@ namespace {
 
 constexpr int kParallelThreshold = 128;
 
-struct AbsSum : public thrust::binary_function<int, int, int> {
+struct AbsSum {
   int operator()(int a, int b) { return abs(a) + abs(b); }
 };
 
@@ -93,7 +91,7 @@ struct CountNewVerts {
   }
 };
 
-struct NotZero : public thrust::unary_function<int, int> {
+struct NotZero {
   int operator()(int x) const { return x > 0 ? 1 : 0; }
 };
 
@@ -133,20 +131,18 @@ std::tuple<Vec<int>, Vec<int>> SizeOutput(
   auto next = copy_if<decltype(outR.faceNormal_.begin())>(
       autoPolicy(inP.faceNormal_.size()), inP.faceNormal_.begin(),
       inP.faceNormal_.end(), keepFace, outR.faceNormal_.begin(),
-      thrust::identity<bool>());
+      Identity<bool>());
   if (invertQ) {
     auto start =
-        TransformIterator(inQ.faceNormal_.begin(), thrust::negate<glm::vec3>());
-    auto end =
-        TransformIterator(inQ.faceNormal_.end(), thrust::negate<glm::vec3>());
+        TransformIterator(inQ.faceNormal_.begin(), Negate<glm::vec3>());
+    auto end = TransformIterator(inQ.faceNormal_.end(), Negate<glm::vec3>());
     copy_if<decltype(inQ.faceNormal_.begin())>(
         autoPolicy(inQ.faceNormal_.size()), start, end, keepFace + inP.NumTri(),
-        next, thrust::identity<bool>());
+        next, Identity<bool>());
   } else {
     copy_if<decltype(inQ.faceNormal_.begin())>(
         autoPolicy(inQ.faceNormal_.size()), inQ.faceNormal_.begin(),
-        inQ.faceNormal_.end(), keepFace + inP.NumTri(), next,
-        thrust::identity<bool>());
+        inQ.faceNormal_.end(), keepFace + inP.NumTri(), next, Identity<bool>());
   }
 
   auto newEnd = remove<decltype(sidesPerFacePQ.begin())>(
@@ -662,13 +658,13 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   Vec<int> i30(w30_.size());
 
   transform(autoPolicy(x12_.size()), x12_.begin(), x12_.end(), i12.begin(),
-            c3 * _1);
+            [c3](int v) { return c3 * v; });
   transform(autoPolicy(x21_.size()), x21_.begin(), x21_.end(), i21.begin(),
-            c3 * _1);
+            [c3](int v) { return c3 * v; });
   transform(autoPolicy(w03_.size()), w03_.begin(), w03_.end(), i03.begin(),
-            c1 + c3 * _1);
+            [c1, c3](int v) { return c1 + c3 * v; });
   transform(autoPolicy(w30_.size()), w30_.begin(), w30_.end(), i30.begin(),
-            c2 + c3 * _1);
+            [c2, c3](int v) { return c2 + c3 * v; });
 
   Vec<int> vP2R(inP_.NumVert());
   exclusive_scan(autoPolicy(i03.size()), i03.begin(), i03.end(), vP2R.begin(),

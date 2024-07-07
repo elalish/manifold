@@ -36,7 +36,7 @@ class Collider {
   Vec<Box> nodeBBox_;
   Vec<int> nodeParent_;
   // even nodes are leaves, odd nodes are internal, root is 1
-  Vec<thrust::pair<int, int>> internalChildren_;
+  Vec<std::pair<int, int>> internalChildren_;
 
   size_t NumInternal() const { return internalChildren_.size(); };
   size_t NumLeaves() const {
