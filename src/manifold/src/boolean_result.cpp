@@ -135,10 +135,10 @@ std::tuple<Vec<int>, Vec<int>> SizeOutput(
       inP.faceNormal_.end(), keepFace, outR.faceNormal_.begin(),
       thrust::identity<bool>());
   if (invertQ) {
-    auto start = TransformIterator(inQ.faceNormal_.begin(),
-                                                 thrust::negate<glm::vec3>());
-    auto end = TransformIterator(inQ.faceNormal_.end(),
-                                               thrust::negate<glm::vec3>());
+    auto start =
+        TransformIterator(inQ.faceNormal_.begin(), thrust::negate<glm::vec3>());
+    auto end =
+        TransformIterator(inQ.faceNormal_.end(), thrust::negate<glm::vec3>());
     copy_if<decltype(inQ.faceNormal_.begin())>(
         autoPolicy(inQ.faceNormal_.size()), start, end, keepFace + inP.NumTri(),
         next, thrust::identity<bool>());
