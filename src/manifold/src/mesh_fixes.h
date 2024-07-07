@@ -10,9 +10,9 @@ inline int FlipHalfedge(int halfedge) {
 }
 
 struct TransformNormals {
-  const glm::mat3 transform;
+  glm::mat3 transform;
 
-  glm::vec3 operator()(glm::vec3 normal) {
+  glm::vec3 operator()(glm::vec3 normal) const {
     normal = glm::normalize(transform * normal);
     if (isnan(normal.x)) normal = glm::vec3(0.0f);
     return normal;

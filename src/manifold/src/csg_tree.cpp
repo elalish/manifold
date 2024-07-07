@@ -32,9 +32,9 @@ constexpr int kParallelThreshold = 4096;
 namespace {
 using namespace manifold;
 struct Transform4x3 {
-  const glm::mat4x3 transform;
+  glm::mat4x3 transform;
 
-  glm::vec3 operator()(glm::vec3 position) {
+  glm::vec3 operator()(glm::vec3 position) const {
     return transform * glm::vec4(position, 1.0f);
   }
 };
@@ -277,13 +277,13 @@ Manifold::Impl CsgLeafNode::Compose(
         } else {
           // no need to apply the transform to the node, just copy the vertices
           // and face normals and apply transform on the fly
-          auto vertPosBegin = thrust::make_transform_iterator(
+          auto vertPosBegin = TransformIterator(
               node->pImpl_->vertPos_.begin(), Transform4x3({node->transform_}));
           glm::mat3 normalTransform =
               glm::inverse(glm::transpose(glm::mat3(node->transform_)));
-          auto faceNormalBegin = thrust::make_transform_iterator(
-              node->pImpl_->faceNormal_.begin(),
-              TransformNormals({normalTransform}));
+          auto faceNormalBegin =
+              TransformIterator(node->pImpl_->faceNormal_.begin(),
+                                TransformNormals({normalTransform}));
           copy_n(policy, vertPosBegin, node->pImpl_->vertPos_.size(),
                  combined.vertPos_.begin() + vertIndices[i]);
           copy_n(policy, faceNormalBegin, node->pImpl_->faceNormal_.size(),

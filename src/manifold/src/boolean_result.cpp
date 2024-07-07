@@ -122,8 +122,8 @@ std::tuple<Vec<int>, Vec<int>> SizeOutput(
                  {sidesPerFaceQ, sidesPerFaceP, i21, p2q1, inQ.halfedge_}));
 
   Vec<int> facePQ2R(inP.NumTri() + inQ.NumTri() + 1, 0);
-  auto keepFace =
-      thrust::make_transform_iterator(sidesPerFacePQ.begin(), NotZero());
+  auto keepFace = TransformIterator(sidesPerFacePQ.begin(), NotZero());
+
   inclusive_scan(autoPolicy(sidesPerFacePQ.size()), keepFace,
                  keepFace + sidesPerFacePQ.size(), facePQ2R.begin() + 1);
   int numFaceR = facePQ2R.back();
@@ -135,9 +135,9 @@ std::tuple<Vec<int>, Vec<int>> SizeOutput(
       inP.faceNormal_.end(), keepFace, outR.faceNormal_.begin(),
       thrust::identity<bool>());
   if (invertQ) {
-    auto start = thrust::make_transform_iterator(inQ.faceNormal_.begin(),
+    auto start = TransformIterator(inQ.faceNormal_.begin(),
                                                  thrust::negate<glm::vec3>());
-    auto end = thrust::make_transform_iterator(inQ.faceNormal_.end(),
+    auto end = TransformIterator(inQ.faceNormal_.end(),
                                                thrust::negate<glm::vec3>());
     copy_if<decltype(inQ.faceNormal_.begin())>(
         autoPolicy(inQ.faceNormal_.size()), start, end, keepFace + inP.NumTri(),

@@ -560,14 +560,14 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
              });
 
   Vec<int> triOffset(numTri);
-  auto numSubTris = thrust::make_transform_iterator(
-      subTris.begin(), [](const Partition& part) {
+  auto numSubTris =
+      TransformIterator(subTris.begin(), [](const Partition& part) {
         return static_cast<int>(part.triVert.size());
       });
   exclusive_scan(policy, numSubTris, numSubTris + numTri, triOffset.begin(), 0);
 
   Vec<int> interiorOffset(numTri);
-  auto numInterior = thrust::make_transform_iterator(
+  auto numInterior = TransformIterator(
       subTris.begin(),
       [](const Partition& part) { return part.NumInterior(); });
   exclusive_scan(policy, numInterior, numInterior + numTri,

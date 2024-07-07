@@ -15,7 +15,9 @@
 
 #pragma once
 #include <atomic>
+#include <iterator>
 #include <mutex>
+#include <type_traits>
 #include <unordered_map>
 
 #ifdef MANIFOLD_DEBUG
@@ -234,6 +236,80 @@ struct UnionFind {
       }
     }
     return toLabel.size() + lonelyNodes;
+  }
+};
+
+template <typename Iter, typename = void>
+struct InnerIter {
+  using pointer = typename std::iterator_traits<Iter>::pointer;
+  using reference = typename std::iterator_traits<Iter>::reference;
+  using difference_type = typename std::iterator_traits<Iter>::difference_type;
+  using value_type = typename std::iterator_traits<Iter>::value_type;
+  using iterator_category =
+      typename std::iterator_traits<Iter>::iterator_category;
+};
+
+template <typename Iter>
+struct InnerIter<Iter, typename std::enable_if_t<std::is_pointer_v<Iter>>> {
+  using pointer = Iter;
+  using reference = std::remove_pointer_t<Iter>&;
+  using difference_type = std::ptrdiff_t;
+  using value_type = std::remove_pointer_t<Iter>;
+  using iterator_category = std::random_access_iterator_tag;
+};
+
+template <typename F, typename Iter>
+struct TransformIterator {
+ private:
+  Iter iter;
+  F f;
+
+ public:
+  using pointer = typename InnerIter<Iter>::pointer;
+  using reference = typename InnerIter<Iter>::reference;
+  using difference_type = typename InnerIter<Iter>::difference_type;
+  using value_type =
+      std::invoke_result_t<F, typename InnerIter<Iter>::value_type>;
+  using iterator_category = typename InnerIter<Iter>::iterator_category;
+
+  TransformIterator(Iter iter, F f) : iter(iter), f(f) {}
+
+  value_type operator*() const { return f(*iter); }
+
+  value_type operator[](int i) const { return f(iter[i]); }
+
+  TransformIterator& operator++() {
+    iter++;
+    return *this;
+  }
+
+  TransformIterator operator+(int n) const {
+    return TransformIterator(iter + n, f);
+  }
+
+  TransformIterator& operator+=(int n) {
+    iter += n;
+    return *this;
+  }
+
+  friend bool operator==(TransformIterator a, TransformIterator b) {
+    return a.iter == b.iter;
+  }
+
+  friend bool operator!=(TransformIterator a, TransformIterator b) {
+    return !(a.iter == b.iter);
+  }
+
+  friend bool operator<(TransformIterator a, TransformIterator b) {
+    return a.iter < b.iter;
+  }
+
+  friend difference_type operator-(TransformIterator a, TransformIterator b) {
+    return a.iter - b.iter;
+  }
+
+  operator TransformIterator<F, const Iter>() const {
+    return TransformIterator(f, iter);
   }
 };
 /** @} */
