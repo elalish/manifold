@@ -44,15 +44,22 @@ struct TransformIterator {
   F f;
 
  public:
-  // users are not suppposed to take pointer/reference of the iterator.
   using pointer = void;
-  using reference = void;
+  using reference =
+      std::invoke_result_t<F, typename InnerIter<Iter>::value_type>;
   using difference_type = typename InnerIter<Iter>::difference_type;
   using value_type =
       std::invoke_result_t<F, typename InnerIter<Iter>::value_type>;
   using iterator_category = typename InnerIter<Iter>::iterator_category;
 
   TransformIterator(Iter iter, F f) : iter(iter), f(f) {}
+
+  TransformIterator& operator=(const TransformIterator& other) {
+    if (this == &other) return *this;
+    // don't copy function, should be the same
+    iter = other.iter;
+    return *this;
+  }
 
   value_type operator*() const { return f(*iter); }
 
@@ -71,6 +78,19 @@ struct TransformIterator {
     return old;
   }
 
+  // prefix increment
+  TransformIterator& operator--() {
+    iter -= 1;
+    return *this;
+  }
+
+  // postfix
+  TransformIterator operator--(int) {
+    auto old = *this;
+    operator--();
+    return old;
+  }
+
   TransformIterator operator+(size_t n) const {
     return TransformIterator(iter + n, f);
   }
@@ -80,20 +100,25 @@ struct TransformIterator {
     return *this;
   }
 
-  friend bool operator==(TransformIterator a, TransformIterator b) {
-    return a.iter == b.iter;
+  TransformIterator operator-(size_t n) const {
+    return TransformIterator(iter - n, f);
   }
 
-  friend bool operator!=(TransformIterator a, TransformIterator b) {
-    return !(a.iter == b.iter);
+  TransformIterator& operator-=(size_t n) {
+    iter -= n;
+    return *this;
   }
 
-  friend bool operator<(TransformIterator a, TransformIterator b) {
-    return a.iter < b.iter;
+  bool operator==(TransformIterator other) const { return iter == other.iter; }
+
+  bool operator!=(TransformIterator other) const {
+    return !(iter == other.iter);
   }
 
-  friend difference_type operator-(TransformIterator a, TransformIterator b) {
-    return a.iter - b.iter;
+  bool operator<(TransformIterator other) const { return iter < other.iter; }
+
+  difference_type operator-(TransformIterator other) const {
+    return iter - other.iter;
   }
 
   operator TransformIterator<F, const Iter>() const {
@@ -131,12 +156,34 @@ struct CountingIterator {
     return old;
   }
 
+  // prefix increment
+  CountingIterator& operator--() {
+    counter -= 1;
+    return *this;
+  }
+
+  // postfix
+  CountingIterator operator--(int) {
+    auto old = *this;
+    operator--();
+    return old;
+  }
+
   CountingIterator operator+(T n) const {
     return CountingIterator(counter + n);
   }
 
   CountingIterator& operator+=(T n) {
     counter += n;
+    return *this;
+  }
+
+  CountingIterator operator-(T n) const {
+    return CountingIterator(counter - n);
+  }
+
+  CountingIterator& operator-=(T n) {
+    counter -= n;
     return *this;
   }
 
@@ -204,12 +251,34 @@ struct StridedRange {
       return old;
     }
 
+    // prefix increment
+    StridedRangeIter& operator--() {
+      iter -= stride;
+      return *this;
+    }
+
+    // postfix
+    StridedRangeIter operator--(int) {
+      auto old = *this;
+      operator--();
+      return old;
+    }
+
     StridedRangeIter operator+(size_t n) const {
       return StridedRangeIter(iter + n * stride, stride);
     }
 
     StridedRangeIter& operator+=(size_t n) {
       iter += n * stride;
+      return *this;
+    }
+
+    StridedRangeIter operator-(size_t n) const {
+      return StridedRangeIter(iter - n * stride, stride);
+    }
+
+    StridedRangeIter& operator-=(size_t n) {
+      iter -= n * stride;
       return *this;
     }
 

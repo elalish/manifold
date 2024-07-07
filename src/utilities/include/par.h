@@ -40,6 +40,7 @@
 #endif
 
 #include "iters.h"
+#include "public.h"
 namespace manifold {
 
 enum class ExecutionPolicy {
@@ -218,7 +219,6 @@ void sequence(ExecutionPolicy policy, Iterator first, Iterator last) {
 
 // void implies that the user have to specify the return type in the template
 // argument, as we are unable to deduce it
-THRUST_DYNAMIC_BACKEND(transform_reduce, void)
 STL_DYNAMIC_BACKEND(remove, void)
 STL_DYNAMIC_BACKEND(find, void)
 STL_DYNAMIC_BACKEND(find_if, void)

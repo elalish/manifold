@@ -114,7 +114,9 @@ struct ReindexFace {
 };
 
 struct Duplicate {
-  std::pair<float, float> operator()(float x) { return std::make_pair(x, x); }
+  std::pair<float, float> operator()(float x) const {
+    return std::make_pair(x, x);
+  }
 };
 
 struct MinMax {
@@ -486,8 +488,9 @@ bool MeshGL::Merge() {
   Box bBox;
   for (const int i : {0, 1, 2}) {
     auto iPos = StridedRange(vertPropD.begin() + i, vertPropD.end(), numProp);
-    auto minMax = transform_reduce<std::pair<float, float>>(
-        autoPolicy(numVert), iPos.begin(), iPos.end(), Duplicate(),
+    auto minMax = reduce<std::pair<float, float>>(
+        autoPolicy(numVert), TransformIterator(iPos.begin(), Duplicate()),
+        TransformIterator(iPos.end(), Duplicate()),
         std::make_pair(std::numeric_limits<float>::infinity(),
                        -std::numeric_limits<float>::infinity()),
         MinMax());
