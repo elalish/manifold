@@ -13,11 +13,20 @@
 // limitations under the License.
 
 #pragma once
+#if MANIFOLD_PAR == 'T'
+#if __has_include(<pstl/glue_execution_defs.h>)
+#include <execution>
+#define HAS_PAR_UNSEQ
+#elif __has_include(<oneapi/dpl/execution>)
+#include <oneapi/dpl/algorithm>
+#include <oneapi/dpl/execution>
+#include <oneapi/dpl/memory>
+#include <oneapi/dpl/numeric>
+#define HAS_PAR_UNSEQ
+#endif
+#endif
 #include <algorithm>
 #include <numeric>
-#if MANIFOLD_PAR == 'T' && __has_include(<pstl/glue_execution_defs.h>)
-#include <execution>
-#endif
 
 #include "iters.h"
 #include "public.h"
@@ -40,7 +49,7 @@ inline constexpr ExecutionPolicy autoPolicy(size_t size) {
   return ExecutionPolicy::Par;
 }
 
-#if MANIFOLD_PAR == 'T' && __has_include(<pstl/glue_execution_defs.h>)
+#ifdef HAS_PAR_UNSEQ
 #define STL_DYNAMIC_BACKEND(NAME, RET)                        \
   template <typename Ret = RET, typename... Args>             \
   Ret NAME(ExecutionPolicy policy, Args... args) {            \

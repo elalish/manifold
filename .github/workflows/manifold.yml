@@ -221,7 +221,7 @@ jobs:
         pip install trimesh pytest
     - name: Install TBB
       if: matrix.parallel_backend == 'TBB'
-      run: brew install tbb
+      run: brew install tbb onedpl
     - uses: actions/checkout@v4
       with:
         submodules: recursive
