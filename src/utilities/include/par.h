@@ -34,7 +34,7 @@
 #include <execution>
 #endif
 
-#include "tbb/tbb.h"
+#include "iters.h"
 #define MANIFOLD_PAR_NS tbb
 #else
 #define MANIFOLD_PAR_NS cpp
