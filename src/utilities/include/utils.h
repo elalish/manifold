@@ -65,11 +65,6 @@ struct Timer {
 };
 #endif
 
-template <typename T>
-thrust::counting_iterator<T> countAt(T i) {
-  return thrust::make_counting_iterator(i);
-}
-
 inline int Next3(int i) {
   constexpr glm::ivec3 next3(1, 2, 0);
   return next3[i];
@@ -104,53 +99,6 @@ inline int AtomicAdd(int& target, int add) {
   int old_val = tar.fetch_add(add, std::memory_order_seq_cst);
   return old_val;
 }
-
-// Copied from
-// https://github.com/thrust/thrust/blob/master/examples/strided_range.cu
-template <typename Iterator>
-class strided_range {
- public:
-  typedef typename thrust::iterator_difference<Iterator>::type difference_type;
-
-  struct stride_functor
-      : public thrust::unary_function<difference_type, difference_type> {
-    difference_type stride;
-
-    stride_functor(difference_type stride) : stride(stride) {}
-
-    difference_type operator()(const difference_type& i) const {
-      return stride * i;
-    }
-  };
-
-  typedef typename thrust::counting_iterator<difference_type> CountingIterator;
-  typedef typename thrust::transform_iterator<stride_functor, CountingIterator>
-      TransformIterator;
-  typedef typename thrust::permutation_iterator<Iterator, TransformIterator>
-      PermutationIterator;
-
-  // type of the strided_range iterator
-  typedef PermutationIterator iterator;
-
-  // construct strided_range for the range [first,last)
-  strided_range(Iterator first, Iterator last, difference_type stride)
-      : first(first), last(last), stride(stride) {}
-  strided_range() {}
-
-  iterator begin(void) const {
-    return PermutationIterator(
-        first, TransformIterator(CountingIterator(0), stride_functor(stride)));
-  }
-
-  iterator end(void) const {
-    return begin() + ((last - first) + (stride - 1)) / stride;
-  }
-
- protected:
-  Iterator first;
-  Iterator last;
-  difference_type stride;
-};
 
 template <typename T>
 class ConcurrentSharedPtr {
@@ -265,8 +213,9 @@ struct TransformIterator {
   F f;
 
  public:
-  using pointer = typename InnerIter<Iter>::pointer;
-  using reference = typename InnerIter<Iter>::reference;
+  // users are not suppposed to take pointer/reference of the iterator.
+  using pointer = void;
+  using reference = void;
   using difference_type = typename InnerIter<Iter>::difference_type;
   using value_type =
       std::invoke_result_t<F, typename InnerIter<Iter>::value_type>;
@@ -276,18 +225,18 @@ struct TransformIterator {
 
   value_type operator*() const { return f(*iter); }
 
-  value_type operator[](int i) const { return f(iter[i]); }
+  value_type operator[](size_t i) const { return f(iter[i]); }
 
   TransformIterator& operator++() {
     iter++;
     return *this;
   }
 
-  TransformIterator operator+(int n) const {
+  TransformIterator operator+(size_t n) const {
     return TransformIterator(iter + n, f);
   }
 
-  TransformIterator& operator+=(int n) {
+  TransformIterator& operator+=(size_t n) {
     iter += n;
     return *this;
   }
@@ -312,5 +261,126 @@ struct TransformIterator {
     return TransformIterator(f, iter);
   }
 };
+
+template <typename T>
+struct CountingIterator {
+ private:
+  T counter;
+
+ public:
+  using pointer = void;
+  using reference = T;
+  using difference_type = std::make_signed_t<T>;
+  using value_type = T;
+  using iterator_category = std::random_access_iterator_tag;
+
+  CountingIterator(T counter) : counter(counter) {}
+
+  value_type operator*() const { return counter; }
+  value_type operator[](T i) const { return counter + i; }
+  CountingIterator& operator++() {
+    counter++;
+    return *this;
+  }
+  CountingIterator operator+(T n) const {
+    return CountingIterator(counter + n);
+  }
+  CountingIterator& operator+=(T n) {
+    counter += n;
+    return *this;
+  }
+  friend bool operator==(CountingIterator a, CountingIterator b) {
+    return a.counter == b.counter;
+  }
+  friend bool operator!=(CountingIterator a, CountingIterator b) {
+    return a.counter != b.counter;
+  }
+  friend bool operator<(CountingIterator a, CountingIterator b) {
+    return a.counter < b.counter;
+  }
+  friend difference_type operator-(CountingIterator a, CountingIterator b) {
+    return a.counter - b.counter;
+  }
+  operator CountingIterator<const T>() const {
+    return CountingIterator(counter);
+  }
+};
+
+template <typename T>
+CountingIterator<T> countAt(T i) {
+  return CountingIterator(i);
+}
+
+template <typename Iter>
+struct StridedRange {
+ private:
+  struct StridedRangeIter {
+   private:
+    Iter iter;
+    size_t stride;
+
+   public:
+    using pointer = void;
+    using reference = void;
+    using difference_type = typename InnerIter<Iter>::difference_type;
+    using value_type = typename InnerIter<Iter>::value_type;
+    using iterator_category = typename InnerIter<Iter>::iterator_category;
+
+    StridedRangeIter(Iter iter, int stride) : iter(iter), stride(stride) {}
+
+    value_type& operator*() { return *iter; }
+
+    const value_type& operator*() const { return *iter; }
+
+    value_type& operator[](size_t i) { return iter[i * stride]; }
+
+    const value_type& operator[](size_t i) const { return iter[i * stride]; }
+
+    StridedRangeIter& operator++() {
+      iter += stride;
+      return *this;
+    }
+
+    StridedRangeIter operator+(size_t n) const {
+      return StridedRangeIter(iter + n * stride, stride);
+    }
+
+    StridedRangeIter& operator+=(size_t n) {
+      iter += n * stride;
+      return *this;
+    }
+
+    friend bool operator==(StridedRangeIter a, StridedRangeIter b) {
+      return a.iter == b.iter;
+    }
+
+    friend bool operator!=(StridedRangeIter a, StridedRangeIter b) {
+      return !(a.iter == b.iter);
+    }
+
+    friend bool operator<(StridedRangeIter a, StridedRangeIter b) {
+      return a.iter < b.iter;
+    }
+
+    friend difference_type operator-(StridedRangeIter a, StridedRangeIter b) {
+      // note that this is not well-defined if a.stride != b.stride...
+      return (a.iter - b.iter) / a.stride;
+    }
+  };
+  Iter _start, _end;
+  const size_t stride;
+
+ public:
+  StridedRange(Iter start, Iter end, size_t stride)
+      : _start(start), _end(end), stride(stride) {}
+
+  StridedRangeIter begin() const { return StridedRangeIter(_start, stride); }
+
+  StridedRangeIter end() const {
+    return StridedRangeIter(_start, stride) +
+           ((std::distance(_start, _end) + (stride - 1)) / stride);
+  }
+};
+
 /** @} */
 }  // namespace manifold

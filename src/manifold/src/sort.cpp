@@ -489,8 +489,7 @@ bool MeshGL::Merge() {
   Vec<float> vertPropD(vertProperties);
   Box bBox;
   for (const int i : {0, 1, 2}) {
-    strided_range<Vec<float>::Iter> iPos(vertPropD.begin() + i, vertPropD.end(),
-                                         numProp);
+    auto iPos = StridedRange(vertPropD.begin() + i, vertPropD.end(), numProp);
     auto minMax = transform_reduce<thrust::pair<float, float>>(
         autoPolicy(numVert), iPos.begin(), iPos.end(), Duplicate(),
         thrust::make_pair(std::numeric_limits<float>::infinity(),

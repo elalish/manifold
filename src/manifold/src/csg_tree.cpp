@@ -253,9 +253,9 @@ Manifold::Impl CsgLeafNode::Compose(
             auto &oldProp = node->pImpl_->meshRelation_.properties;
             auto &newProp = combined.meshRelation_.properties;
             for (int p = 0; p < numProp; ++p) {
-              strided_range<Vec<float>::IterC> oldRange(oldProp.begin() + p,
-                                                        oldProp.end(), numProp);
-              strided_range<Vec<float>::Iter> newRange(
+              auto oldRange =
+                  StridedRange(oldProp.cbegin() + p, oldProp.cend(), numProp);
+              auto newRange = StridedRange(
                   newProp.begin() + numPropOut * propVertIndices[i] + p,
                   newProp.end(), numPropOut);
               copy(policy, oldRange.begin(), oldRange.end(), newRange.begin());

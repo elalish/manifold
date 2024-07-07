@@ -347,7 +347,7 @@ void Collider::UpdateBoxes(const VecView<const Box>& leafBB) {
   DEBUG_ASSERT(leafBB.size() == NumLeaves(), userErr,
                "must have the same number of updated boxes as original");
   // copy in leaf node Boxes
-  strided_range<Vec<Box>::Iter> leaves(nodeBBox_.begin(), nodeBBox_.end(), 2);
+  auto leaves = StridedRange(nodeBBox_.begin(), nodeBBox_.end(), 2);
   auto policy = autoPolicy(NumInternal());
   copy(policy, leafBB.cbegin(), leafBB.cend(), leaves.begin());
   // create global counters
