@@ -112,20 +112,6 @@ struct ReindexFace {
     }
   }
 };
-
-struct Duplicate {
-  std::pair<float, float> operator()(float x) const {
-    return std::make_pair(x, x);
-  }
-};
-
-struct MinMax {
-  std::pair<float, float> operator()(std::pair<float, float> a,
-                                     std::pair<float, float> b) {
-    return std::make_pair(glm::min(a.first, b.first),
-                          glm::max(a.second, b.second));
-  }
-};
 }  // namespace
 
 namespace manifold {
@@ -488,12 +474,15 @@ bool MeshGL::Merge() {
   Box bBox;
   for (const int i : {0, 1, 2}) {
     auto iPos = StridedRange(vertPropD.begin() + i, vertPropD.end(), numProp);
-    auto minMax = reduce<std::pair<float, float>>(
-        autoPolicy(numVert), TransformIterator(iPos.begin(), Duplicate()),
-        TransformIterator(iPos.end(), Duplicate()),
+    auto minMax = transform_reduce<std::pair<float, float>>(
+        autoPolicy(numVert), iPos.begin(), iPos.end(),
         std::make_pair(std::numeric_limits<float>::infinity(),
                        -std::numeric_limits<float>::infinity()),
-        MinMax());
+        [](auto a, auto b) {
+          return std::make_pair(glm::min(a.first, b.first),
+                                glm::max(a.second, b.second));
+        },
+        [](float f) { return std::make_pair(f, f); });
     bBox.min[i] = minMax.first;
     bBox.max[i] = minMax.second;
   }

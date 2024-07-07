@@ -44,50 +44,6 @@ struct FaceAreaVolume {
   }
 };
 
-struct PosMin {
-  glm::vec3 operator()(glm::vec3 a, glm::vec3 b) {
-    if (isnan(a.x)) return b;
-    if (isnan(b.x)) return a;
-    return glm::min(a, b);
-  }
-};
-
-struct PosMax {
-  glm::vec3 operator()(glm::vec3 a, glm::vec3 b) {
-    if (isnan(a.x)) return b;
-    if (isnan(b.x)) return a;
-    return glm::max(a, b);
-  }
-};
-
-struct FiniteVert {
-  bool operator()(glm::vec3 v) const { return glm::all(glm::isfinite(v)); }
-};
-
-struct MakeMinMax {
-  glm::ivec2 operator()(glm::ivec3 tri) const {
-    return glm::ivec2(glm::min(tri[0], glm::min(tri[1], tri[2])),
-                      glm::max(tri[0], glm::max(tri[1], tri[2])));
-  }
-};
-
-struct MinMax {
-  glm::ivec2 operator()(glm::ivec2 a, glm::ivec2 b) {
-    a[0] = glm::min(a[0], b[0]);
-    a[1] = glm::max(a[1], b[1]);
-    return a;
-  }
-};
-
-struct SumPair {
-  std::pair<float, float> operator()(std::pair<float, float> a,
-                                     std::pair<float, float> b) {
-    a.first += b.first;
-    a.second += b.second;
-    return a;
-  }
-};
-
 struct CurvatureAngles {
   VecView<float> meanCurvature;
   VecView<float> gaussianCurvature;
@@ -370,10 +326,18 @@ void Manifold::Impl::CalculateBBox() {
   auto policy = autoPolicy(NumVert());
   bBox_.min = reduce<glm::vec3>(
       policy, vertPos_.begin(), vertPos_.end(),
-      glm::vec3(std::numeric_limits<float>::infinity()), PosMin());
+      glm::vec3(std::numeric_limits<float>::infinity()), [](auto a, auto b) {
+        if (isnan(a.x)) return b;
+        if (isnan(b.x)) return a;
+        return glm::min(a, b);
+      });
   bBox_.max = reduce<glm::vec3>(
       policy, vertPos_.begin(), vertPos_.end(),
-      glm::vec3(-std::numeric_limits<float>::infinity()), PosMax());
+      glm::vec3(-std::numeric_limits<float>::infinity()), [](auto a, auto b) {
+        if (isnan(a.x)) return b;
+        if (isnan(b.x)) return a;
+        return glm::max(a, b);
+      });
 }
 
 /**
@@ -382,9 +346,10 @@ void Manifold::Impl::CalculateBBox() {
  */
 bool Manifold::Impl::IsFinite() const {
   auto policy = autoPolicy(NumVert());
-  return reduce<bool>(policy, TransformIterator(vertPos_.begin(), FiniteVert()),
-                      TransformIterator(vertPos_.end(), FiniteVert()), true,
-                      [](bool a, bool b) { return a && b; });
+  return transform_reduce<bool>(
+      policy, vertPos_.begin(), vertPos_.end(), true,
+      [](bool a, bool b) { return a && b; },
+      [](auto v) { return glm::all(glm::isfinite(v)); });
 }
 
 /**
@@ -393,12 +358,19 @@ bool Manifold::Impl::IsFinite() const {
  */
 bool Manifold::Impl::IsIndexInBounds(VecView<const glm::ivec3> triVerts) const {
   auto policy = autoPolicy(triVerts.size());
-  glm::ivec2 minmax = reduce<glm::ivec2>(
-      policy, TransformIterator(triVerts.begin(), MakeMinMax()),
-      TransformIterator(triVerts.end(), MakeMinMax()),
+  glm::ivec2 minmax = transform_reduce<glm::ivec2>(
+      policy, triVerts.begin(), triVerts.end(),
       glm::ivec2(std::numeric_limits<int>::max(),
                  std::numeric_limits<int>::min()),
-      MinMax());
+      [](auto a, auto b) {
+        a[0] = glm::min(a[0], b[0]);
+        a[1] = glm::max(a[1], b[1]);
+        return a;
+      },
+      [](auto tri) {
+        return glm::ivec2(glm::min(tri[0], glm::min(tri[1], tri[2])),
+                          glm::max(tri[0], glm::max(tri[1], tri[2])));
+      });
 
   return minmax[0] >= 0 && minmax[1] < static_cast<int>(NumVert());
 }
@@ -424,25 +396,24 @@ float Manifold::Impl::MinGap(const Manifold::Impl& other,
 
   SparseIndices collisions = collider_.Collisions(faceBoxOther.cview());
 
-  auto f = [&collisions, this, &other](int i) {
-    const int tri = collisions.Get(i, 1);
-    const int triOther = collisions.Get(i, 0);
-
-    std::array<glm::vec3, 3> p;
-    std::array<glm::vec3, 3> q;
-
-    for (const int j : {0, 1, 2}) {
-      p[j] = vertPos_[halfedge_[3 * tri + j].startVert];
-      q[j] = other.vertPos_[other.halfedge_[3 * triOther + j].startVert];
-    }
-
-    return DistanceTriangleTriangleSquared(p, q);
-  };
-  float minDistanceSquared = reduce<float>(
-      autoPolicy(collisions.size()), TransformIterator(countAt(0_z), f),
-      TransformIterator(countAt(collisions.size()), f),
+  float minDistanceSquared = transform_reduce<float>(
+      autoPolicy(collisions.size()), countAt(0_z), countAt(collisions.size()),
       searchLength * searchLength,
-      [](float a, float b) { return std::min(a, b); });
+      [](float a, float b) { return std::min(a, b); },
+      [&collisions, this, &other](int i) {
+        const int tri = collisions.Get(i, 1);
+        const int triOther = collisions.Get(i, 0);
+
+        std::array<glm::vec3, 3> p;
+        std::array<glm::vec3, 3> q;
+
+        for (const int j : {0, 1, 2}) {
+          p[j] = vertPos_[halfedge_[3 * tri + j].startVert];
+          q[j] = other.vertPos_[other.halfedge_[3 * triOther + j].startVert];
+        }
+
+        return DistanceTriangleTriangleSquared(p, q);
+      });
 
   return sqrt(minDistanceSquared);
 };

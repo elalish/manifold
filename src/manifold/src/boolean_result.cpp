@@ -92,10 +92,6 @@ struct CountNewVerts {
   }
 };
 
-struct NotZero {
-  int operator()(int x) const { return x > 0 ? 1 : 0; }
-};
-
 std::tuple<Vec<int>, Vec<int>> SizeOutput(
     Manifold::Impl &outR, const Manifold::Impl &inP, const Manifold::Impl &inQ,
     const Vec<int> &i03, const Vec<int> &i30, const Vec<int> &i12,
@@ -121,7 +117,8 @@ std::tuple<Vec<int>, Vec<int>> SizeOutput(
                  {sidesPerFaceQ, sidesPerFaceP, i21, p2q1, inQ.halfedge_}));
 
   Vec<int> facePQ2R(inP.NumTri() + inQ.NumTri() + 1, 0);
-  auto keepFace = TransformIterator(sidesPerFacePQ.begin(), NotZero());
+  auto keepFace = TransformIterator(sidesPerFacePQ.begin(),
+                                    [](int x) { return x > 0 ? 1 : 0; });
 
   inclusive_scan(autoPolicy(sidesPerFacePQ.size()), keepFace,
                  keepFace + sidesPerFacePQ.size(), facePQ2R.begin() + 1);
