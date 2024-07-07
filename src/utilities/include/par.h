@@ -124,6 +124,7 @@ STL_DYNAMIC_BACKEND(reduce, void)
 STL_DYNAMIC_BACKEND(count_if, int)
 STL_DYNAMIC_BACKEND(remove_if, void)
 STL_DYNAMIC_BACKEND(copy_if, void)
+STL_DYNAMIC_BACKEND(unique, void)
 
 STL_DYNAMIC_BACKEND_VOID(for_each)
 STL_DYNAMIC_BACKEND_VOID(for_each_n)
