@@ -13,30 +13,10 @@
 // limitations under the License.
 
 #pragma once
-#include <thrust/binary_search.h>
-#include <thrust/count.h>
-#include <thrust/execution_policy.h>
-#include <thrust/gather.h>
-#include <thrust/logical.h>
-#include <thrust/remove.h>
-#include <thrust/sequence.h>
-#include <thrust/sort.h>
-#include <thrust/system/cpp/execution_policy.h>
-#include <thrust/uninitialized_copy.h>
-
 #include <algorithm>
 #include <numeric>
-#if MANIFOLD_PAR == 'T'
-#include <thrust/system/tbb/execution_policy.h>
-
-#if MANIFOLD_PAR == 'T' && TBB_INTERFACE_VERSION >= 10000 && \
-    __has_include(<pstl/glue_execution_defs.h>)
+#if MANIFOLD_PAR == 'T' && __has_include(<pstl/glue_execution_defs.h>)
 #include <execution>
-#endif
-
-#define MANIFOLD_PAR_NS tbb
-#else
-#define MANIFOLD_PAR_NS cpp
 #endif
 
 #include "iters.h"
@@ -60,34 +40,7 @@ inline constexpr ExecutionPolicy autoPolicy(size_t size) {
   return ExecutionPolicy::Par;
 }
 
-#define THRUST_DYNAMIC_BACKEND_VOID(NAME)                    \
-  template <typename... Args>                                \
-  void NAME(ExecutionPolicy policy, Args... args) {          \
-    switch (policy) {                                        \
-      case ExecutionPolicy::Par:                             \
-        thrust::NAME(thrust::MANIFOLD_PAR_NS::par, args...); \
-        break;                                               \
-      case ExecutionPolicy::Seq:                             \
-        thrust::NAME(thrust::cpp::par, args...);             \
-        break;                                               \
-    }                                                        \
-  }
-
-#define THRUST_DYNAMIC_BACKEND(NAME, RET)                           \
-  template <typename Ret = RET, typename... Args>                   \
-  Ret NAME(ExecutionPolicy policy, Args... args) {                  \
-    switch (policy) {                                               \
-      case ExecutionPolicy::Par:                                    \
-        return thrust::NAME(thrust::MANIFOLD_PAR_NS::par, args...); \
-      case ExecutionPolicy::Seq:                                    \
-        break;                                                      \
-    }                                                               \
-    return thrust::NAME(thrust::cpp::par, args...);                 \
-  }
-
-#if MANIFOLD_PAR != 'T' || \
-    (TBB_INTERFACE_VERSION >= 10000 && __has_include(<pstl/glue_execution_defs.h>))
-#if MANIFOLD_PAR == 'T'
+#if MANIFOLD_PAR == 'T' && __has_include(<pstl/glue_execution_defs.h>)
 #define STL_DYNAMIC_BACKEND(NAME, RET)                        \
   template <typename Ret = RET, typename... Args>             \
   Ret NAME(ExecutionPolicy policy, Args... args) {            \
@@ -128,63 +81,6 @@ template <typename... Args>
 void exclusive_scan(ExecutionPolicy policy, Args... args) {
   // https://github.com/llvm/llvm-project/issues/59810
   std::exclusive_scan(args...);
-}
-template <typename DerivedPolicy, typename InputIterator1,
-          typename OutputIterator, typename Predicate>
-OutputIterator copy_if(ExecutionPolicy policy, InputIterator1 first,
-                       InputIterator1 last, OutputIterator result,
-                       Predicate pred) {
-#if MANIFOLD_PAR == 'T'
-  if (policy == ExecutionPolicy::Seq)
-    return std::copy_if(first, last, result, pred);
-  else
-    return std::copy_if(std::execution::par_unseq, first, last, result, pred);
-#else
-  return std::copy_if(first, last, result, pred);
-#endif
-}
-
-#else
-#define STL_DYNAMIC_BACKEND(NAME, RET) THRUST_DYNAMIC_BACKEND(NAME, RET)
-#define STL_DYNAMIC_BACKEND_VOID(NAME) THRUST_DYNAMIC_BACKEND_VOID(NAME)
-
-THRUST_DYNAMIC_BACKEND_VOID(exclusive_scan)
-THRUST_DYNAMIC_BACKEND(copy_if, void)
-#endif
-
-THRUST_DYNAMIC_BACKEND_VOID(gather)
-THRUST_DYNAMIC_BACKEND_VOID(scatter)
-THRUST_DYNAMIC_BACKEND_VOID(for_each)
-THRUST_DYNAMIC_BACKEND_VOID(for_each_n)
-THRUST_DYNAMIC_BACKEND_VOID(sequence)
-STL_DYNAMIC_BACKEND_VOID(transform)
-STL_DYNAMIC_BACKEND_VOID(uninitialized_fill)
-STL_DYNAMIC_BACKEND_VOID(uninitialized_copy)
-STL_DYNAMIC_BACKEND_VOID(stable_sort)
-STL_DYNAMIC_BACKEND_VOID(fill)
-STL_DYNAMIC_BACKEND_VOID(inclusive_scan)
-
-// there are some issues with thrust copy
-template <typename InputIterator, typename OutputIterator>
-OutputIterator copy(ExecutionPolicy policy, InputIterator first,
-                    InputIterator last, OutputIterator result) {
-#if MANIFOLD_PAR == 'T' && \
-    (TBB_INTERFACE_VERSION >= 10000 && __has_include(<pstl/glue_execution_defs.h>))
-  if (policy == ExecutionPolicy::Par)
-    return std::copy(std::execution::par_unseq, first, last, result);
-#endif
-  return std::copy(first, last, result);
-}
-
-template <typename InputIterator, typename OutputIterator>
-OutputIterator copy_n(ExecutionPolicy policy, InputIterator first, size_t n,
-                      OutputIterator result) {
-#if MANIFOLD_PAR == 'T' && \
-    (TBB_INTERFACE_VERSION >= 10000 && __has_include(<pstl/glue_execution_defs.h>))
-  if (policy == ExecutionPolicy::Par)
-    return std::copy_n(std::execution::par_unseq, first, n, result);
-#endif
-  return std::copy_n(first, n, result);
 }
 
 template <typename InputIterator1, typename InputIterator2,
@@ -227,5 +123,17 @@ STL_DYNAMIC_BACKEND(is_sorted, bool)
 STL_DYNAMIC_BACKEND(reduce, void)
 STL_DYNAMIC_BACKEND(count_if, int)
 STL_DYNAMIC_BACKEND(remove_if, void)
+STL_DYNAMIC_BACKEND(copy_if, void)
+
+STL_DYNAMIC_BACKEND_VOID(for_each)
+STL_DYNAMIC_BACKEND_VOID(for_each_n)
+STL_DYNAMIC_BACKEND_VOID(transform)
+STL_DYNAMIC_BACKEND_VOID(uninitialized_fill)
+STL_DYNAMIC_BACKEND_VOID(uninitialized_copy)
+STL_DYNAMIC_BACKEND_VOID(stable_sort)
+STL_DYNAMIC_BACKEND_VOID(fill)
+STL_DYNAMIC_BACKEND_VOID(inclusive_scan)
+STL_DYNAMIC_BACKEND_VOID(copy)
+STL_DYNAMIC_BACKEND_VOID(copy_n)
 
 }  // namespace manifold

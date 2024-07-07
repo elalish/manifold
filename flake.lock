@@ -71,8 +71,7 @@
         "clipper2-src": "clipper2-src",
         "flake-utils": "flake-utils",
         "gtest-src": "gtest-src",
-        "nixpkgs": "nixpkgs",
-        "thrust-src": "thrust-src"
+        "nixpkgs": "nixpkgs"
       }
     },
     "systems": {
@@ -88,24 +87,6 @@
         "owner": "nix-systems",
         "repo": "default",
         "type": "github"
-      }
-    },
-    "thrust-src": {
-      "flake": false,
-      "locked": {
-        "lastModified": 1696873248,
-        "narHash": "sha256-mUhMXGPbO2t83EvI8YNDRLngvLiwfzs4EgRrcxKfhHs=",
-        "ref": "refs/heads/main",
-        "rev": "756c5afc0750f1413da05bd2b6505180e84c53d4",
-        "revCount": 4758,
-        "submodules": true,
-        "type": "git",
-        "url": "https://github.com/NVIDIA/thrust.git"
-      },
-      "original": {
-        "submodules": true,
-        "type": "git",
-        "url": "https://github.com/NVIDIA/thrust.git"
       }
     }
   },
