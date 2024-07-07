@@ -320,8 +320,8 @@ struct StridedRange {
     size_t stride;
 
    public:
-    using pointer = void;
-    using reference = void;
+    using pointer = typename InnerIter<Iter>::pointer;
+    using reference = typename InnerIter<Iter>::reference;
     using difference_type = typename InnerIter<Iter>::difference_type;
     using value_type = typename InnerIter<Iter>::value_type;
     using iterator_category = typename InnerIter<Iter>::iterator_category;
