@@ -546,10 +546,10 @@ void Manifold::Impl::RemoveUnreferencedVerts(Vec<glm::ivec3>& triVerts) {
     return std::numeric_limits<size_t>::max();
   });
 
-  auto next = copy_if(
-      autoPolicy(tmpBuffer.size()), vertIdIter, vertIdIter + tmpBuffer.size(),
-      tmpBuffer.begin(),
-      [](size_t v) { return v != std::numeric_limits<size_t>::max(); });
+  auto next =
+      copy_if(autoPolicy(tmpBuffer.size()), vertIdIter,
+              vertIdIter + tmpBuffer.size(), tmpBuffer.begin(),
+              [](size_t v) { return v != std::numeric_limits<size_t>::max(); });
   gather(autoPolicy(tmpBuffer.size()), tmpBuffer.begin(), next,
          oldVertPos.begin(), vertPos_.begin());
 
