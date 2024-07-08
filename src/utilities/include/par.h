@@ -239,9 +239,10 @@ struct CopyIfScanBody {
   void operator()(const tbb::blocked_range<size_t> &r, Tag) {
     size_t temp = sum;
     for (size_t i = r.begin(); i < r.end(); ++i) {
-      bool good = pred(input[i]);
-      temp += good;
-      if (Tag::is_final_scan() && good) output[temp - 1] = input[i];
+      if (pred(input[i])) {
+        temp += 1;
+        if (Tag::is_final_scan()) output[temp - 1] = input[i];
+      }
     }
     sum = temp;
   }
