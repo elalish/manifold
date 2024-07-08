@@ -128,6 +128,7 @@ void inclusive_scan(ExecutionPolicy policy, InputIter first, InputIter last,
   std::inclusive_scan(first, last, d_first);
 }
 
+#if MANIFOLD_PAR == 'T'
 template <typename T, typename InputIter, typename OutputIter, typename BinOp>
 struct ScanBody {
   T sum;
@@ -158,6 +159,7 @@ struct ScanBody {
   void reverse_join(ScanBody &a) { sum = f(a.sum, sum); }
   void assign(ScanBody &b) { sum = b.sum; }
 };
+#endif
 
 template <typename InputIter, typename OutputIter,
           typename BinOp = decltype(std::plus<typename std::iterator_traits<
@@ -221,6 +223,7 @@ bool all_of(ExecutionPolicy policy, InputIter first, InputIter last, P pred) {
                 [](bool a, bool b) { return a && b; });
 }
 
+#if MANIFOLD_PAR == 'T'
 template <typename InputIter, typename OutputIter, typename P>
 struct CopyIfScanBody {
   size_t sum;
@@ -246,6 +249,7 @@ struct CopyIfScanBody {
   void reverse_join(CopyIfScanBody &a) { sum = a.sum + sum; }
   void assign(CopyIfScanBody &b) { sum = b.sum; }
 };
+#endif
 
 // note that you should not have alias between input and output...
 // in general it is impossible to check if there is any alias, as the input
