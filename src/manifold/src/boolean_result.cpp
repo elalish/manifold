@@ -14,6 +14,7 @@
 
 #include <algorithm>
 #include <array>
+#include <iostream>
 #include <map>
 
 #if MANIFOLD_PAR == 'T' && __has_include(<tbb/concurrent_map.h>)
@@ -30,10 +31,8 @@ using concurrent_map = std::map<K, V>;
 #endif
 #include "boolean3.h"
 #include "par.h"
-#include "polygon.h"
 
 using namespace manifold;
-using namespace thrust::placeholders;
 
 template <>
 struct std::hash<std::pair<int, int>> {
@@ -46,7 +45,7 @@ namespace {
 
 constexpr int kParallelThreshold = 128;
 
-struct AbsSum : public thrust::binary_function<int, int, int> {
+struct AbsSum {
   int operator()(int a, int b) { return abs(a) + abs(b); }
 };
 
@@ -93,10 +92,6 @@ struct CountNewVerts {
   }
 };
 
-struct NotZero : public thrust::unary_function<int, int> {
-  int operator()(int x) const { return x > 0 ? 1 : 0; }
-};
-
 std::tuple<Vec<int>, Vec<int>> SizeOutput(
     Manifold::Impl &outR, const Manifold::Impl &inP, const Manifold::Impl &inQ,
     const Vec<int> &i03, const Vec<int> &i30, const Vec<int> &i12,
@@ -122,7 +117,8 @@ std::tuple<Vec<int>, Vec<int>> SizeOutput(
                  {sidesPerFaceQ, sidesPerFaceP, i21, p2q1, inQ.halfedge_}));
 
   Vec<int> facePQ2R(inP.NumTri() + inQ.NumTri() + 1, 0);
-  auto keepFace = TransformIterator(sidesPerFacePQ.begin(), NotZero());
+  auto keepFace = TransformIterator(sidesPerFacePQ.begin(),
+                                    [](int x) { return x > 0 ? 1 : 0; });
 
   inclusive_scan(autoPolicy(sidesPerFacePQ.size()), keepFace,
                  keepFace + sidesPerFacePQ.size(), facePQ2R.begin() + 1);
@@ -130,23 +126,39 @@ std::tuple<Vec<int>, Vec<int>> SizeOutput(
   facePQ2R.resize(inP.NumTri() + inQ.NumTri());
 
   outR.faceNormal_.resize(numFaceR);
-  auto next = copy_if<decltype(outR.faceNormal_.begin())>(
-      autoPolicy(inP.faceNormal_.size()), inP.faceNormal_.begin(),
-      inP.faceNormal_.end(), keepFace, outR.faceNormal_.begin(),
-      thrust::identity<bool>());
+
+  Vec<size_t> tmpBuffer(outR.faceNormal_.size());
+  auto faceIds = TransformIterator(countAt(0_z), [&sidesPerFacePQ](size_t i) {
+    if (sidesPerFacePQ[i] > 0) return i;
+    return std::numeric_limits<size_t>::max();
+  });
+
+  auto next = copy_if<decltype(tmpBuffer.begin())>(
+      autoPolicy(inP.faceNormal_.size()), faceIds,
+      faceIds + inP.faceNormal_.size(), tmpBuffer.begin(),
+      [](size_t v) { return v != std::numeric_limits<size_t>::max(); });
+
+  gather(autoPolicy(inP.faceNormal_.size()), tmpBuffer.begin(), next,
+         inP.faceNormal_.begin(), outR.faceNormal_.begin());
+
+  auto faceIdsQ =
+      TransformIterator(countAt(0_z), [&sidesPerFacePQ, &inP](size_t i) {
+        if (sidesPerFacePQ[i + inP.faceNormal_.size()] > 0) return i;
+        return std::numeric_limits<size_t>::max();
+      });
+  auto end = copy_if<decltype(tmpBuffer.begin())>(
+      autoPolicy(inQ.faceNormal_.size()), faceIdsQ,
+      faceIdsQ + inQ.faceNormal_.size(), next,
+      [](size_t v) { return v != std::numeric_limits<size_t>::max(); });
+
   if (invertQ) {
-    auto start =
-        TransformIterator(inQ.faceNormal_.begin(), thrust::negate<glm::vec3>());
-    auto end =
-        TransformIterator(inQ.faceNormal_.end(), thrust::negate<glm::vec3>());
-    copy_if<decltype(inQ.faceNormal_.begin())>(
-        autoPolicy(inQ.faceNormal_.size()), start, end, keepFace + inP.NumTri(),
-        next, thrust::identity<bool>());
+    gather(autoPolicy(inQ.faceNormal_.size()), next, end,
+           TransformIterator(inQ.faceNormal_.begin(), Negate<glm::vec3>()),
+           outR.faceNormal_.begin() + std::distance(tmpBuffer.begin(), next));
   } else {
-    copy_if<decltype(inQ.faceNormal_.begin())>(
-        autoPolicy(inQ.faceNormal_.size()), inQ.faceNormal_.begin(),
-        inQ.faceNormal_.end(), keepFace + inP.NumTri(), next,
-        thrust::identity<bool>());
+    gather(autoPolicy(inQ.faceNormal_.size()), next, end,
+           inQ.faceNormal_.begin(),
+           outR.faceNormal_.begin() + std::distance(tmpBuffer.begin(), next));
   }
 
   auto newEnd = remove<decltype(sidesPerFacePQ.begin())>(
@@ -662,13 +674,13 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   Vec<int> i30(w30_.size());
 
   transform(autoPolicy(x12_.size()), x12_.begin(), x12_.end(), i12.begin(),
-            c3 * _1);
+            [c3](int v) { return c3 * v; });
   transform(autoPolicy(x21_.size()), x21_.begin(), x21_.end(), i21.begin(),
-            c3 * _1);
+            [c3](int v) { return c3 * v; });
   transform(autoPolicy(w03_.size()), w03_.begin(), w03_.end(), i03.begin(),
-            c1 + c3 * _1);
+            [c1, c3](int v) { return c1 + c3 * v; });
   transform(autoPolicy(w30_.size()), w30_.begin(), w30_.end(), i30.begin(),
-            c2 + c3 * _1);
+            [c2, c3](int v) { return c2 + c3 * v; });
 
   Vec<int> vP2R(inP_.NumVert());
   exclusive_scan(autoPolicy(i03.size()), i03.begin(), i03.end(), vP2R.begin(),

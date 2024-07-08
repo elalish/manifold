@@ -105,7 +105,7 @@ inline bool Shadows(float p, float q, float dir) {
   return p == q ? dir < 0 : p < q;
 }
 
-inline thrust::pair<int, glm::vec2> Shadow01(
+inline std::pair<int, glm::vec2> Shadow01(
     const int p0, const int q1, VecView<const glm::vec3> vertPosP,
     VecView<const glm::vec3> vertPosQ, VecView<const Halfedge> halfedgeQ,
     const float expandP, VecView<const glm::vec3> normalP, const bool reverse) {
@@ -133,7 +133,7 @@ inline thrust::pair<int, glm::vec2> Shadow01(
       if (!Shadows(vertPosP[p0].y, yz01[0], expandP * normalP[p0].y)) s01 = 0;
     }
   }
-  return thrust::make_pair(s01, yz01);
+  return std::make_pair(s01, yz01);
 }
 
 // https://github.com/scandum/binary_search/blob/master/README.md
@@ -406,7 +406,7 @@ struct Kernel12 {
         if (k < 2 && (k == 0 || (s != 0) != shadows)) {
           shadows = s != 0;
           xzyLR0[k] = vertPosP[vert];
-          thrust::swap(xzyLR0[k].y, xzyLR0[k].z);
+          std::swap(xzyLR0[k].y, xzyLR0[k].z);
           xzyLR1[k] = xzyLR0[k];
           xzyLR1[k][1] = z02[idx];
           k++;
@@ -434,7 +434,7 @@ struct Kernel12 {
           xzyLR0[k][2] = xyzz.y;
           xzyLR1[k] = xzyLR0[k];
           xzyLR1[k][1] = xyzz.w;
-          if (!forward) thrust::swap(xzyLR0[k][1], xzyLR1[k][1]);
+          if (!forward) std::swap(xzyLR0[k][1], xzyLR1[k][1]);
           k++;
         }
       }

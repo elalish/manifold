@@ -24,7 +24,7 @@ using namespace manifold;
 
 constexpr uint32_t kNoCode = 0xFFFFFFFFu;
 
-struct Extrema : public thrust::binary_function<Halfedge, Halfedge, Halfedge> {
+struct Extrema {
   void MakeForward(Halfedge& a) {
     if (!a.IsForward()) {
       int tmp = a.startVert;
@@ -110,22 +110,6 @@ struct ReindexFace {
         halfedgeTangent[newEdge] = oldHalfedgeTangent[oldEdge];
       }
     }
-  }
-};
-
-struct Duplicate {
-  thrust::pair<float, float> operator()(float x) {
-    return thrust::make_pair(x, x);
-  }
-};
-
-struct MinMax : public thrust::binary_function<thrust::pair<float, float>,
-                                               thrust::pair<float, float>,
-                                               thrust::pair<float, float>> {
-  thrust::pair<float, float> operator()(thrust::pair<float, float> a,
-                                        thrust::pair<float, float> b) {
-    return thrust::make_pair(glm::min(a.first, b.first),
-                             glm::max(a.second, b.second));
   }
 };
 }  // namespace
@@ -490,11 +474,15 @@ bool MeshGL::Merge() {
   Box bBox;
   for (const int i : {0, 1, 2}) {
     auto iPos = StridedRange(vertPropD.begin() + i, vertPropD.end(), numProp);
-    auto minMax = transform_reduce<thrust::pair<float, float>>(
-        autoPolicy(numVert), iPos.begin(), iPos.end(), Duplicate(),
-        thrust::make_pair(std::numeric_limits<float>::infinity(),
-                          -std::numeric_limits<float>::infinity()),
-        MinMax());
+    auto minMax = transform_reduce<std::pair<float, float>>(
+        autoPolicy(numVert), iPos.begin(), iPos.end(),
+        std::make_pair(std::numeric_limits<float>::infinity(),
+                       -std::numeric_limits<float>::infinity()),
+        [](auto a, auto b) {
+          return std::make_pair(glm::min(a.first, b.first),
+                                glm::max(a.second, b.second));
+        },
+        [](float f) { return std::make_pair(f, f); });
     bBox.min[i] = minMax.first;
     bBox.max[i] = minMax.second;
   }

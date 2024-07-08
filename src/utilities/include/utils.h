@@ -184,5 +184,16 @@ struct UnionFind {
     return toLabel.size() + lonelyNodes;
   }
 };
+
+template <typename T>
+struct Identity {
+  T operator()(T v) const { return v; }
+};
+
+template <typename T>
+struct Negate {
+  T operator()(T v) const { return -v; }
+};
+
 /** @} */
 }  // namespace manifold

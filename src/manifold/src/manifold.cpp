@@ -21,11 +21,9 @@
 #include "csg_tree.h"
 #include "impl.h"
 #include "par.h"
-#include "tri_dist.h"
 
 namespace {
 using namespace manifold;
-using namespace thrust::placeholders;
 
 ExecutionParams manifoldParams;
 
@@ -612,12 +610,11 @@ Manifold Manifold::SetProperties(
     } else {
       pImpl->meshRelation_.properties = Vec<float>(numProp * NumPropVert(), 0);
     }
-    thrust::for_each_n(
-        thrust::host, countAt(0), NumTri(),
-        UpdateProperties({pImpl->meshRelation_.properties.data(), numProp,
-                          oldProperties.data(), oldNumProp,
-                          pImpl->vertPos_.data(), triProperties.data(),
-                          pImpl->halfedge_.data(), propFunc}));
+    for_each_n(ExecutionPolicy::Seq, countAt(0), NumTri(),
+               UpdateProperties({pImpl->meshRelation_.properties.data(),
+                                 numProp, oldProperties.data(), oldNumProp,
+                                 pImpl->vertPos_.data(), triProperties.data(),
+                                 pImpl->halfedge_.data(), propFunc}));
   }
 
   pImpl->meshRelation_.numProp = numProp;

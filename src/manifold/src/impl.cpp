@@ -129,8 +129,8 @@ struct UpdateMeshID {
 };
 
 struct CoplanarEdge {
-  VecView<thrust::pair<int, int>> face2face;
-  VecView<thrust::pair<int, int>> vert2vert;
+  VecView<std::pair<int, int>> face2face;
+  VecView<std::pair<int, int>> vert2vert;
   VecView<float> triArea;
   VecView<const Halfedge> halfedge;
   VecView<const glm::vec3> vertPos;
@@ -164,7 +164,7 @@ struct CoplanarEdge {
         }
       }
       if (propEqual) {
-        vert2vert[edgeIdx] = thrust::make_pair(prop0, prop1);
+        vert2vert[edgeIdx] = std::make_pair(prop0, prop1);
       }
     }
 
@@ -221,7 +221,7 @@ struct CoplanarEdge {
       }
     }
 
-    face2face[edgeIdx] = thrust::make_pair(edge.face, pair.face);
+    face2face[edgeIdx] = std::make_pair(edge.face, pair.face);
   }
 };
 
@@ -257,7 +257,7 @@ struct CheckCoplanarity {
 };
 
 int GetLabels(std::vector<int>& components,
-              const Vec<thrust::pair<int, int>>& edges, int numNodes) {
+              const Vec<std::pair<int, int>>& edges, int numNodes) {
   UnionFind<> uf(numNodes);
   for (auto edge : edges) {
     if (edge.first == -1 || edge.second == -1) continue;
@@ -268,7 +268,7 @@ int GetLabels(std::vector<int>& components,
 }
 
 void DedupePropVerts(manifold::Vec<glm::ivec3>& triProp,
-                     const Vec<thrust::pair<int, int>>& vert2vert) {
+                     const Vec<std::pair<int, int>>& vert2vert) {
   ZoneScoped;
   std::vector<int> vertLabels;
   const int numLabels = GetLabels(vertLabels, vert2vert, vert2vert.size());
@@ -539,11 +539,21 @@ void Manifold::Impl::RemoveUnreferencedVerts(Vec<glm::ivec3>& triVerts) {
            MarkVerts({vertOld2New.view(1)}));
 
   const Vec<glm::vec3> oldVertPos = vertPos_;
-  vertPos_.resize(copy_if<decltype(vertPos_.begin())>(
-                      policy, oldVertPos.cbegin(), oldVertPos.cend(),
-                      vertOld2New.cbegin() + 1, vertPos_.begin(),
-                      thrust::identity<int>()) -
-                  vertPos_.begin());
+
+  Vec<size_t> tmpBuffer(oldVertPos.size());
+  auto vertIdIter = TransformIterator(countAt(0_z), [&vertOld2New](size_t i) {
+    if (vertOld2New[i + 1] > 0) return i;
+    return std::numeric_limits<size_t>::max();
+  });
+
+  auto next = copy_if<decltype(tmpBuffer.begin())>(
+      autoPolicy(tmpBuffer.size()), vertIdIter, vertIdIter + tmpBuffer.size(),
+      tmpBuffer.begin(),
+      [](size_t v) { return v != std::numeric_limits<size_t>::max(); });
+  gather(autoPolicy(tmpBuffer.size()), tmpBuffer.begin(), next,
+         oldVertPos.begin(), vertPos_.begin());
+
+  vertPos_.resize(std::distance(tmpBuffer.begin(), next));
 
   inclusive_scan(policy, vertOld2New.begin() + 1, vertOld2New.end(),
                  vertOld2New.begin() + 1);
@@ -572,8 +582,8 @@ void Manifold::Impl::CreateFaces(const std::vector<float>& propertyTolerance) {
       propertyTolerance.empty() ? Vec<float>(meshRelation_.numProp, kTolerance)
                                 : propertyTolerance;
 
-  Vec<thrust::pair<int, int>> face2face(halfedge_.size(), {-1, -1});
-  Vec<thrust::pair<int, int>> vert2vert(halfedge_.size(), {-1, -1});
+  Vec<std::pair<int, int>> face2face(halfedge_.size(), {-1, -1});
+  Vec<std::pair<int, int>> vert2vert(halfedge_.size(), {-1, -1});
   Vec<float> triArea(NumTri());
   for_each_n(autoPolicy(halfedge_.size()), countAt(0), halfedge_.size(),
              CoplanarEdge({face2face, vert2vert, triArea, halfedge_, vertPos_,
@@ -680,7 +690,7 @@ void Manifold::Impl::MarkFailure(Error status) {
 
 void Manifold::Impl::Warp(std::function<void(glm::vec3&)> warpFunc) {
   WarpBatch([&warpFunc](VecView<glm::vec3> vecs) {
-    thrust::for_each(thrust::host, vecs.begin(), vecs.end(), warpFunc);
+    for_each(ExecutionPolicy::Seq, vecs.begin(), vecs.end(), warpFunc);
   });
 }
 

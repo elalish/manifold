@@ -26,7 +26,7 @@ struct FaceAreaVolume {
   VecView<const glm::vec3> vertPos;
   const float precision;
 
-  thrust::pair<float, float> operator()(int face) {
+  std::pair<float, float> operator()(int face) {
     float perimeter = 0;
     glm::vec3 edge[3];
     for (int i : {0, 1, 2}) {
@@ -40,56 +40,7 @@ struct FaceAreaVolume {
     float area = glm::length(crossP);
     float volume = glm::dot(crossP, vertPos[halfedges[3 * face].startVert]);
 
-    return thrust::make_pair(area / 2.0f, volume / 6.0f);
-  }
-};
-
-struct PosMin
-    : public thrust::binary_function<glm::vec3, glm::vec3, glm::vec3> {
-  glm::vec3 operator()(glm::vec3 a, glm::vec3 b) {
-    if (isnan(a.x)) return b;
-    if (isnan(b.x)) return a;
-    return glm::min(a, b);
-  }
-};
-
-struct PosMax
-    : public thrust::binary_function<glm::vec3, glm::vec3, glm::vec3> {
-  glm::vec3 operator()(glm::vec3 a, glm::vec3 b) {
-    if (isnan(a.x)) return b;
-    if (isnan(b.x)) return a;
-    return glm::max(a, b);
-  }
-};
-
-struct FiniteVert {
-  bool operator()(glm::vec3 v) { return glm::all(glm::isfinite(v)); }
-};
-
-struct MakeMinMax {
-  glm::ivec2 operator()(glm::ivec3 tri) {
-    return glm::ivec2(glm::min(tri[0], glm::min(tri[1], tri[2])),
-                      glm::max(tri[0], glm::max(tri[1], tri[2])));
-  }
-};
-
-struct MinMax
-    : public thrust::binary_function<glm::ivec2, glm::ivec2, glm::ivec2> {
-  glm::ivec2 operator()(glm::ivec2 a, glm::ivec2 b) {
-    a[0] = glm::min(a[0], b[0]);
-    a[1] = glm::max(a[1], b[1]);
-    return a;
-  }
-};
-
-struct SumPair : public thrust::binary_function<thrust::pair<float, float>,
-                                                thrust::pair<float, float>,
-                                                thrust::pair<float, float>> {
-  thrust::pair<float, float> operator()(thrust::pair<float, float> a,
-                                        thrust::pair<float, float> b) {
-    a.first += b.first;
-    a.second += b.second;
-    return a;
+    return std::make_pair(area / 2.0f, volume / 6.0f);
   }
 };
 
@@ -375,10 +326,18 @@ void Manifold::Impl::CalculateBBox() {
   auto policy = autoPolicy(NumVert());
   bBox_.min = reduce<glm::vec3>(
       policy, vertPos_.begin(), vertPos_.end(),
-      glm::vec3(std::numeric_limits<float>::infinity()), PosMin());
+      glm::vec3(std::numeric_limits<float>::infinity()), [](auto a, auto b) {
+        if (isnan(a.x)) return b;
+        if (isnan(b.x)) return a;
+        return glm::min(a, b);
+      });
   bBox_.max = reduce<glm::vec3>(
       policy, vertPos_.begin(), vertPos_.end(),
-      glm::vec3(-std::numeric_limits<float>::infinity()), PosMax());
+      glm::vec3(-std::numeric_limits<float>::infinity()), [](auto a, auto b) {
+        if (isnan(a.x)) return b;
+        if (isnan(b.x)) return a;
+        return glm::max(a, b);
+      });
 }
 
 /**
@@ -387,9 +346,10 @@ void Manifold::Impl::CalculateBBox() {
  */
 bool Manifold::Impl::IsFinite() const {
   auto policy = autoPolicy(NumVert());
-  return transform_reduce<bool>(policy, vertPos_.begin(), vertPos_.end(),
-                                FiniteVert(), true,
-                                thrust::logical_and<bool>());
+  return transform_reduce<bool>(
+      policy, vertPos_.begin(), vertPos_.end(), true,
+      [](bool a, bool b) { return a && b; },
+      [](auto v) { return glm::all(glm::isfinite(v)); });
 }
 
 /**
@@ -399,10 +359,18 @@ bool Manifold::Impl::IsFinite() const {
 bool Manifold::Impl::IsIndexInBounds(VecView<const glm::ivec3> triVerts) const {
   auto policy = autoPolicy(triVerts.size());
   glm::ivec2 minmax = transform_reduce<glm::ivec2>(
-      policy, triVerts.begin(), triVerts.end(), MakeMinMax(),
+      policy, triVerts.begin(), triVerts.end(),
       glm::ivec2(std::numeric_limits<int>::max(),
                  std::numeric_limits<int>::min()),
-      MinMax());
+      [](auto a, auto b) {
+        a[0] = glm::min(a[0], b[0]);
+        a[1] = glm::max(a[1], b[1]);
+        return a;
+      },
+      [](auto tri) {
+        return glm::ivec2(glm::min(tri[0], glm::min(tri[1], tri[2])),
+                          glm::max(tri[0], glm::max(tri[1], tri[2])));
+      });
 
   return minmax[0] >= 0 && minmax[1] < static_cast<int>(NumVert());
 }
@@ -430,6 +398,8 @@ float Manifold::Impl::MinGap(const Manifold::Impl& other,
 
   float minDistanceSquared = transform_reduce<float>(
       autoPolicy(collisions.size()), countAt(0_z), countAt(collisions.size()),
+      searchLength * searchLength,
+      [](float a, float b) { return std::min(a, b); },
       [&collisions, this, &other](int i) {
         const int tri = collisions.Get(i, 1);
         const int triOther = collisions.Get(i, 0);
@@ -443,8 +413,7 @@ float Manifold::Impl::MinGap(const Manifold::Impl& other,
         }
 
         return DistanceTriangleTriangleSquared(p, q);
-      },
-      searchLength * searchLength, thrust::minimum<float>());
+      });
 
   return sqrt(minDistanceSquared);
 };

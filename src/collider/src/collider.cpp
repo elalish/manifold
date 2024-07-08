@@ -69,7 +69,7 @@ int Leaf2Node(int leaf) { return leaf * 2; }
 
 struct CreateRadixTree {
   VecView<int> nodeParent_;
-  VecView<thrust::pair<int, int>> internalChildren_;
+  VecView<std::pair<int, int>> internalChildren_;
   const VecView<const uint32_t> leafMorton_;
 
   int PrefixLength(uint32_t a, uint32_t b) const {
@@ -137,7 +137,7 @@ struct CreateRadixTree {
     int first = internal;
     // Find the range of objects with a common prefix
     int last = RangeEnd(first);
-    if (first > last) thrust::swap(first, last);
+    if (first > last) std::swap(first, last);
     // Determine where the next-highest difference occurs
     int split = FindSplit(first, last);
     int child1 = split == first ? Leaf2Node(split) : Internal2Node(split);
@@ -156,7 +156,7 @@ template <typename T, const bool selfCollision, typename Recorder>
 struct FindCollisions {
   VecView<const T> queries;
   VecView<const Box> nodeBBox_;
-  VecView<const thrust::pair<int, int>> internalChildren_;
+  VecView<const std::pair<int, int>> internalChildren_;
   Recorder recorder;
 
   int RecordCollision(int node, const int queryIdx) {
@@ -244,7 +244,7 @@ struct BuildInternalBoxes {
   VecView<Box> nodeBBox_;
   VecView<int> counter_;
   const VecView<int> nodeParent_;
-  const VecView<thrust::pair<int, int>> internalChildren_;
+  const VecView<std::pair<int, int>> internalChildren_;
 
   void operator()(int leaf) {
     int node = Leaf2Node(leaf);
@@ -288,7 +288,7 @@ Collider::Collider(const VecView<const Box>& leafBB,
   // assign and allocate members
   nodeBBox_.resize(num_nodes);
   nodeParent_.resize(num_nodes, -1);
-  internalChildren_.resize(leafBB.size() - 1, thrust::make_pair(-1, -1));
+  internalChildren_.resize(leafBB.size() - 1, std::make_pair(-1, -1));
   // organize tree
   for_each_n(autoPolicy(NumInternal()), countAt(0), NumInternal(),
              CreateRadixTree({nodeParent_, internalChildren_, leafMorton}));

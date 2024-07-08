@@ -5,15 +5,11 @@
     url = "github:google/googletest/v1.14.0";
     flake = false;
   };
-  inputs.thrust-src = {
-    url = "git+https://github.com/NVIDIA/thrust.git?submodules=1";
-    flake = false;
-  };
   inputs.clipper2-src = {
     url = "github:AngusJohnson/Clipper2";
     flake = false;
   };
-  outputs = { self, nixpkgs, flake-utils, gtest-src, thrust-src, clipper2-src }:
+  outputs = { self, nixpkgs, flake-utils, gtest-src, clipper2-src }:
     flake-utils.lib.eachDefaultSystem
       (system:
         let
@@ -52,7 +48,6 @@
                 "-DMANIFOLD_PYBIND=ON"
                 "-DMANIFOLD_CBIND=ON"
                 "-DBUILD_SHARED_LIBS=ON"
-                "-DFETCHCONTENT_SOURCE_DIR_THRUST=${thrust-src}"
                 "-DMANIFOLD_PAR=${pkgs.lib.strings.toUpper parallel-backend}"
               ];
               prePatch = ''
@@ -100,7 +95,6 @@
                 emcmake cmake -DCMAKE_BUILD_TYPE=Release \
                 -DFETCHCONTENT_SOURCE_DIR_GLM=${pkgs.glm.src} \
                 -DFETCHCONTENT_SOURCE_DIR_GOOGLETEST=${gtest-src} \
-                -DFETCHCONTENT_SOURCE_DIR_THRUST=${thrust-src} \
                 -DFETCHCONTENT_SOURCE_DIR_CLIPPER2=../clipper2 ..
               '';
               buildPhase = ''
@@ -139,7 +133,6 @@
                 pathspec
                 pkg-config
               ];
-              SKBUILD_CMAKE_DEFINE = "FETCHCONTENT_SOURCE_DIR_THRUST=${thrust-src}";
               checkInputs = [
                 trimesh
                 pytest
