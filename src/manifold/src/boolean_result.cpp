@@ -46,7 +46,7 @@ namespace {
 constexpr int kParallelThreshold = 128;
 
 struct AbsSum {
-  int operator()(int a, int b) { return abs(a) + abs(b); }
+  int operator()(int a, int b) const { return abs(a) + abs(b); }
 };
 
 struct DuplicateVerts {
@@ -133,10 +133,10 @@ std::tuple<Vec<int>, Vec<int>> SizeOutput(
     return std::numeric_limits<size_t>::max();
   });
 
-  auto next = copy_if<decltype(tmpBuffer.begin())>(
-      autoPolicy(inP.faceNormal_.size()), faceIds,
-      faceIds + inP.faceNormal_.size(), tmpBuffer.begin(),
-      [](size_t v) { return v != std::numeric_limits<size_t>::max(); });
+  auto next =
+      copy_if(autoPolicy(inP.faceNormal_.size()), faceIds,
+              faceIds + inP.faceNormal_.size(), tmpBuffer.begin(),
+              [](size_t v) { return v != std::numeric_limits<size_t>::max(); });
 
   gather(autoPolicy(inP.faceNormal_.size()), tmpBuffer.begin(), next,
          inP.faceNormal_.begin(), outR.faceNormal_.begin());
@@ -146,10 +146,10 @@ std::tuple<Vec<int>, Vec<int>> SizeOutput(
         if (sidesPerFacePQ[i + inP.faceNormal_.size()] > 0) return i;
         return std::numeric_limits<size_t>::max();
       });
-  auto end = copy_if<decltype(tmpBuffer.begin())>(
-      autoPolicy(inQ.faceNormal_.size()), faceIdsQ,
-      faceIdsQ + inQ.faceNormal_.size(), next,
-      [](size_t v) { return v != std::numeric_limits<size_t>::max(); });
+  auto end = copy_if(autoPolicy(inQ.faceNormal_.size()), faceIdsQ,
+                     faceIdsQ + inQ.faceNormal_.size(), next, [](size_t v) {
+                       return v != std::numeric_limits<size_t>::max();
+                     });
 
   if (invertQ) {
     gather(autoPolicy(inQ.faceNormal_.size()), next, end,

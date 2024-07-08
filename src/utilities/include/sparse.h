@@ -142,10 +142,10 @@ class SparseIndices {
     auto policy = autoPolicy(S.size());
     sequence(policy, new2Old.begin(), new2Old.end());
 
-    size_t size = copy_if<decltype(new2Old.begin())>(
-                      policy, countAt(0_z), countAt(S.size()), new2Old.begin(),
-                      [&S](const int i) { return S[i] != 0; }) -
-                  new2Old.begin();
+    size_t size =
+        copy_if(policy, countAt(0_z), countAt(S.size()), new2Old.begin(),
+                [&S](const int i) { return S[i] != 0; }) -
+        new2Old.begin();
     new2Old.resize(size);
 
     Permute(S, new2Old);
@@ -178,9 +178,8 @@ class SparseIndices {
     Vec<int> new2Old(v.size());
     auto policy = autoPolicy(v.size());
 
-    size_t size = copy_if<decltype(new2Old.begin())>(
-                      policy, countAt(0_z), countAt(v.size()), new2Old.begin(),
-                      firstFinite<T>({v})) -
+    size_t size = copy_if(policy, countAt(0_z), countAt(v.size()),
+                          new2Old.begin(), firstFinite<T>({v})) -
                   new2Old.begin();
     new2Old.resize(size);
 

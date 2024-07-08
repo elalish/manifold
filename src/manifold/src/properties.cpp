@@ -128,7 +128,7 @@ struct CheckHalfedges {
   VecView<const Halfedge> halfedges;
   VecView<const glm::vec3> vertPos;
 
-  bool operator()(size_t edge) {
+  bool operator()(size_t edge) const {
     const Halfedge halfedge = halfedges[edge];
     if (halfedge.startVert == -1 || halfedge.endVert == -1) return true;
     if (halfedge.pairedHalfedge == -1) return false;
@@ -149,7 +149,7 @@ struct CheckHalfedges {
 struct NoDuplicates {
   VecView<const Halfedge> halfedges;
 
-  bool operator()(size_t edge) {
+  bool operator()(size_t edge) const {
     const Halfedge halfedge = halfedges[edge];
     if (halfedge.startVert == -1 && halfedge.endVert == -1 &&
         halfedge.pairedHalfedge == -1)
@@ -165,7 +165,7 @@ struct CheckCCW {
   VecView<const glm::vec3> triNormal;
   const float tol;
 
-  bool operator()(size_t face) {
+  bool operator()(size_t face) const {
     if (halfedges[3 * face].pairedHalfedge < 0) return true;
 
     const glm::mat3x2 projection = GetAxisAlignedProjection(triNormal[face]);
@@ -324,20 +324,20 @@ void Manifold::Impl::CalculateCurvature(int gaussianIdx, int meanIdx) {
  */
 void Manifold::Impl::CalculateBBox() {
   auto policy = autoPolicy(NumVert());
-  bBox_.min = reduce<glm::vec3>(
-      policy, vertPos_.begin(), vertPos_.end(),
-      glm::vec3(std::numeric_limits<float>::infinity()), [](auto a, auto b) {
-        if (isnan(a.x)) return b;
-        if (isnan(b.x)) return a;
-        return glm::min(a, b);
-      });
-  bBox_.max = reduce<glm::vec3>(
-      policy, vertPos_.begin(), vertPos_.end(),
-      glm::vec3(-std::numeric_limits<float>::infinity()), [](auto a, auto b) {
-        if (isnan(a.x)) return b;
-        if (isnan(b.x)) return a;
-        return glm::max(a, b);
-      });
+  bBox_.min = reduce(policy, vertPos_.begin(), vertPos_.end(),
+                     glm::vec3(std::numeric_limits<float>::infinity()),
+                     [](auto a, auto b) {
+                       if (isnan(a.x)) return b;
+                       if (isnan(b.x)) return a;
+                       return glm::min(a, b);
+                     });
+  bBox_.max = reduce(policy, vertPos_.begin(), vertPos_.end(),
+                     glm::vec3(-std::numeric_limits<float>::infinity()),
+                     [](auto a, auto b) {
+                       if (isnan(a.x)) return b;
+                       if (isnan(b.x)) return a;
+                       return glm::max(a, b);
+                     });
 }
 
 /**
@@ -346,7 +346,7 @@ void Manifold::Impl::CalculateBBox() {
  */
 bool Manifold::Impl::IsFinite() const {
   auto policy = autoPolicy(NumVert());
-  return transform_reduce<bool>(
+  return transform_reduce(
       policy, vertPos_.begin(), vertPos_.end(), true,
       [](bool a, bool b) { return a && b; },
       [](auto v) { return glm::all(glm::isfinite(v)); });
@@ -358,7 +358,7 @@ bool Manifold::Impl::IsFinite() const {
  */
 bool Manifold::Impl::IsIndexInBounds(VecView<const glm::ivec3> triVerts) const {
   auto policy = autoPolicy(triVerts.size());
-  glm::ivec2 minmax = transform_reduce<glm::ivec2>(
+  glm::ivec2 minmax = transform_reduce(
       policy, triVerts.begin(), triVerts.end(),
       glm::ivec2(std::numeric_limits<int>::max(),
                  std::numeric_limits<int>::min()),
@@ -396,7 +396,7 @@ float Manifold::Impl::MinGap(const Manifold::Impl& other,
 
   SparseIndices collisions = collider_.Collisions(faceBoxOther.cview());
 
-  float minDistanceSquared = transform_reduce<float>(
+  float minDistanceSquared = transform_reduce(
       autoPolicy(collisions.size()), countAt(0_z), countAt(collisions.size()),
       searchLength * searchLength,
       [](float a, float b) { return std::min(a, b); },

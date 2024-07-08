@@ -293,14 +293,13 @@ Polygons Manifold::Impl::Project() const {
   auto policy = autoPolicy(halfedge_.size());
 
   Vec<Halfedge> cusps(NumEdge());
-  cusps.resize(copy_if<decltype(cusps.begin())>(
-                   policy, halfedge_.cbegin(), halfedge_.cend(), cusps.begin(),
-                   [&](Halfedge edge) {
-                     return faceNormal_[edge.face].z >= 0 &&
-                            faceNormal_[halfedge_[edge.pairedHalfedge].face].z <
-                                0;
-                   }) -
-               cusps.begin());
+  cusps.resize(
+      copy_if(policy, halfedge_.cbegin(), halfedge_.cend(), cusps.begin(),
+              [&](Halfedge edge) {
+                return faceNormal_[edge.face].z >= 0 &&
+                       faceNormal_[halfedge_[edge.pairedHalfedge].face].z < 0;
+              }) -
+      cusps.begin());
 
   PolygonsIdx polysIndexed =
       Face2Polygons(cusps.cbegin(), cusps.cend(), projection);

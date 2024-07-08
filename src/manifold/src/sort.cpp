@@ -25,7 +25,7 @@ using namespace manifold;
 constexpr uint32_t kNoCode = 0xFFFFFFFFu;
 
 struct Extrema {
-  void MakeForward(Halfedge& a) {
+  void MakeForward(Halfedge& a) const {
     if (!a.IsForward()) {
       int tmp = a.startVert;
       a.startVert = a.endVert;
@@ -33,11 +33,11 @@ struct Extrema {
     }
   }
 
-  int MaxOrMinus(int a, int b) {
+  int MaxOrMinus(int a, int b) const {
     return glm::min(a, b) < 0 ? -1 : glm::max(a, b);
   }
 
-  Halfedge operator()(Halfedge a, Halfedge b) {
+  Halfedge operator()(Halfedge a, Halfedge b) const {
     MakeForward(a);
     MakeForward(b);
     a.startVert = glm::min(a.startVert, b.startVert);
@@ -145,8 +145,8 @@ void Manifold::Impl::Finish() {
 
 #ifdef MANIFOLD_DEBUG
   Halfedge extrema = {0, 0, 0, 0};
-  extrema = reduce<Halfedge>(autoPolicy(halfedge_.size()), halfedge_.begin(),
-                             halfedge_.end(), extrema, Extrema());
+  extrema = reduce(autoPolicy(halfedge_.size()), halfedge_.begin(),
+                   halfedge_.end(), extrema, Extrema());
 #endif
 
   DEBUG_ASSERT(extrema.startVert >= 0, topologyErr,
@@ -204,11 +204,10 @@ void Manifold::Impl::SortVerts() {
 
   // Verts were flagged for removal with NaNs and assigned kNoCode to sort
   // them to the end, which allows them to be removed.
-  const int newNumVert = find_if<decltype(vertNew2Old.begin())>(
-                             policy, vertNew2Old.begin(), vertNew2Old.end(),
-                             [&vertMorton](const int vert) {
-                               return vertMorton[vert] == kNoCode;
-                             }) -
+  const int newNumVert = std::find_if(vertNew2Old.begin(), vertNew2Old.end(),
+                                      [&vertMorton](const int vert) {
+                                        return vertMorton[vert] == kNoCode;
+                                      }) -
                          vertNew2Old.begin();
 
   vertNew2Old.resize(newNumVert);
@@ -319,11 +318,10 @@ void Manifold::Impl::SortFaces(Vec<Box>& faceBox, Vec<uint32_t>& faceMorton) {
 
   // Tris were flagged for removal with pairedHalfedge = -1 and assigned kNoCode
   // to sort them to the end, which allows them to be removed.
-  const int newNumTri = find_if<decltype(faceNew2Old.begin())>(
-                            policy, faceNew2Old.begin(), faceNew2Old.end(),
-                            [&faceMorton](const int face) {
-                              return faceMorton[face] == kNoCode;
-                            }) -
+  const int newNumTri = std::find_if(faceNew2Old.begin(), faceNew2Old.end(),
+                                     [&faceMorton](const int face) {
+                                       return faceMorton[face] == kNoCode;
+                                     }) -
                         faceNew2Old.begin();
   faceNew2Old.resize(newNumTri);
 
@@ -474,7 +472,7 @@ bool MeshGL::Merge() {
   Box bBox;
   for (const int i : {0, 1, 2}) {
     auto iPos = StridedRange(vertPropD.begin() + i, vertPropD.end(), numProp);
-    auto minMax = transform_reduce<std::pair<float, float>>(
+    auto minMax = transform_reduce(
         autoPolicy(numVert), iPos.begin(), iPos.end(),
         std::make_pair(std::numeric_limits<float>::infinity(),
                        -std::numeric_limits<float>::infinity()),

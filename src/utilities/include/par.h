@@ -14,6 +14,9 @@
 
 #pragma once
 #if MANIFOLD_PAR == 'T'
+#include <tbb/parallel_for.h>
+#include <tbb/parallel_reduce.h>
+#include <tbb/parallel_scan.h>
 #if __has_include(<pstl/glue_execution_defs.h>)
 #include <execution>
 #define HAS_PAR_UNSEQ
@@ -27,6 +30,7 @@
 #endif
 #include <algorithm>
 #include <numeric>
+#include <vector>
 
 #include "iters.h"
 #include "public.h"
@@ -47,6 +51,278 @@ inline constexpr ExecutionPolicy autoPolicy(size_t size) {
     return ExecutionPolicy::Seq;
   }
   return ExecutionPolicy::Par;
+}
+
+template <typename Iter, typename F>
+void for_each(ExecutionPolicy policy, Iter first, Iter last, F f) {
+#if MANIFOLD_PAR == 'T'
+  if (policy == ExecutionPolicy::Par) {
+    tbb::parallel_for(tbb::blocked_range<Iter>(first, last),
+                      [&f](const tbb::blocked_range<Iter> &range) {
+                        for (Iter i = range.begin(); i != range.end(); i++)
+                          f(*i);
+                      });
+    return;
+  }
+#endif
+  std::for_each(first, last, f);
+}
+
+template <typename Iter, typename F>
+void for_each_n(ExecutionPolicy policy, Iter first, size_t n, F f) {
+  for_each(policy, first, first + n, f);
+}
+
+template <typename InputIter, typename BinaryOp,
+          typename T = typename std::iterator_traits<InputIter>::value_type>
+T reduce(ExecutionPolicy policy, InputIter first, InputIter last, T init,
+         BinaryOp f) {
+#if MANIFOLD_PAR == 'T'
+  if (policy == ExecutionPolicy::Par) {
+    // should we use deterministic reduce here?
+    return tbb::parallel_reduce(
+        tbb::blocked_range<InputIter>(first, last), init,
+        [&f](const tbb::blocked_range<InputIter> &range, T value) {
+          for (InputIter i = range.begin(); i != range.end(); i++)
+            value = f(value, *i);
+          return value;
+        },
+        f);
+  }
+#endif
+  return std::reduce(first, last, init, f);
+}
+
+template <typename InputIter, typename BinaryOp, typename UnaryOp,
+          typename T = std::invoke_result_t<
+              UnaryOp, typename std::iterator_traits<InputIter>::value_type>>
+T transform_reduce(ExecutionPolicy policy, InputIter first, InputIter last,
+                   T init, BinaryOp f, UnaryOp g) {
+  return reduce(policy, TransformIterator(first, g), TransformIterator(last, g),
+                init, f);
+}
+
+template <typename InputIter, typename OutputIter,
+          typename T = typename std::iterator_traits<InputIter>::value_type,
+          typename Dummy = void>
+void inclusive_scan(ExecutionPolicy policy, InputIter first, InputIter last,
+                    OutputIter d_first) {
+#if MANIFOLD_PAR == 'T'
+  if (policy == ExecutionPolicy::Par) {
+    tbb::parallel_scan(
+        tbb::blocked_range<size_t>(0, std::distance(first, last)),
+        static_cast<T>(0),
+        [&](const tbb::blocked_range<size_t> &range, T sum,
+            bool is_final_scan) {
+          T temp = sum;
+          for (size_t i = range.begin(); i < range.end(); ++i) {
+            temp = temp + first[i];
+            if (is_final_scan) d_first[i] = temp;
+          }
+          return temp;
+        },
+        std::plus<T>());
+    return;
+  }
+#endif
+  std::inclusive_scan(first, last, d_first);
+}
+
+template <typename T, typename InputIter, typename OutputIter, typename BinOp>
+struct ScanBody {
+  T sum;
+  T identity;
+  BinOp &f;
+  InputIter input;
+  OutputIter output;
+
+  ScanBody(T sum, T identity, BinOp &f, InputIter input, OutputIter output)
+      : sum(sum), identity(identity), f(f), input(input), output(output) {}
+  ScanBody(ScanBody &b, tbb::split)
+      : sum(b.identity),
+        identity(b.identity),
+        f(b.f),
+        input(b.input),
+        output(b.output) {}
+  template <typename Tag>
+  void operator()(const tbb::blocked_range<size_t> &r, Tag) {
+    T temp = sum;
+    for (size_t i = r.begin(); i < r.end(); ++i) {
+      T inputTmp = input[i];
+      if (Tag::is_final_scan()) output[i] = temp;
+      temp = f(temp, inputTmp);
+    }
+    sum = temp;
+  }
+  T get_sum() const { return sum; }
+  void reverse_join(ScanBody &a) { sum = f(a.sum, sum); }
+  void assign(ScanBody &b) { sum = b.sum; }
+};
+
+template <typename InputIter, typename OutputIter,
+          typename BinOp = decltype(std::plus<typename std::iterator_traits<
+                                        InputIter>::value_type>()),
+          typename T = typename std::iterator_traits<InputIter>::value_type>
+void exclusive_scan(ExecutionPolicy policy, InputIter first, InputIter last,
+                    OutputIter d_first, T init = static_cast<T>(0),
+                    BinOp f = std::plus<T>(), T identity = static_cast<T>(0)) {
+#if MANIFOLD_PAR == 'T'
+  if (policy == ExecutionPolicy::Par) {
+    ScanBody<T, InputIter, OutputIter, BinOp> body(init, identity, f, first,
+                                                   d_first);
+    tbb::parallel_scan(
+        tbb::blocked_range<size_t>(0, std::distance(first, last)), body);
+    return;
+  }
+#endif
+  std::exclusive_scan(first, last, d_first, init, f);
+}
+
+// TODO: use STL variant when parallelization is not enabled?
+
+template <typename InputIter, typename OutputIter, typename F>
+void transform(ExecutionPolicy policy, InputIter first, InputIter last,
+               OutputIter d_first, F f) {
+  for_each_n(policy, countAt(0_z), std::distance(first, last),
+             [&](size_t i) { d_first[i] = f(first[i]); });
+}
+
+template <typename InputIter, typename OutputIter>
+void copy(ExecutionPolicy policy, InputIter first, InputIter last,
+          OutputIter d_first) {
+  for_each_n(policy, countAt(0_z), std::distance(first, last),
+             [&](size_t i) { d_first[i] = first[i]; });
+}
+
+template <typename InputIter, typename OutputIter>
+void copy_n(ExecutionPolicy policy, InputIter first, size_t n,
+            OutputIter d_first) {
+  for_each_n(policy, countAt(0_z), n, [&](size_t i) { d_first[i] = first[i]; });
+}
+
+template <typename OutputIter, typename T>
+void fill(ExecutionPolicy policy, OutputIter first, OutputIter last, T value) {
+  for_each_n(policy, countAt(0_z), std::distance(first, last),
+             [&](size_t i) { first[i] = value; });
+}
+
+template <typename InputIter, typename P>
+size_t count_if(ExecutionPolicy policy, InputIter first, InputIter last,
+                P pred) {
+  return reduce(policy, TransformIterator(first, pred),
+                TransformIterator(last, pred), 0_z, std::plus<size_t>());
+}
+
+template <typename InputIter, typename P>
+bool all_of(ExecutionPolicy policy, InputIter first, InputIter last, P pred) {
+  // can probably optimize a bit for short-circuiting
+  return reduce(policy, TransformIterator(first, pred),
+                TransformIterator(last, pred), true,
+                [](bool a, bool b) { return a && b; });
+}
+
+template <typename InputIter, typename OutputIter, typename P>
+struct CopyIfScanBody {
+  size_t sum;
+  P &pred;
+  InputIter input;
+  OutputIter output;
+
+  CopyIfScanBody(P &pred, InputIter input, OutputIter output)
+      : sum(0), pred(pred), input(input), output(output) {}
+  CopyIfScanBody(CopyIfScanBody &b, tbb::split)
+      : sum(0), pred(b.pred), input(b.input), output(b.output) {}
+  template <typename Tag>
+  void operator()(const tbb::blocked_range<size_t> &r, Tag) {
+    size_t temp = sum;
+    for (size_t i = r.begin(); i < r.end(); ++i) {
+      bool good = pred(input[i]);
+      temp += good;
+      if (Tag::is_final_scan() && good) output[temp - 1] = input[i];
+    }
+    sum = temp;
+  }
+  size_t get_sum() const { return sum; }
+  void reverse_join(CopyIfScanBody &a) { sum = a.sum + sum; }
+  void assign(CopyIfScanBody &b) { sum = b.sum; }
+};
+
+// note that you should not have alias between input and output...
+// in general it is impossible to check if there is any alias, as the input
+// iterator can be computed on-the-fly depending on the output position and may
+// not have a pointer
+template <typename InputIter, typename OutputIter, typename P>
+OutputIter copy_if(ExecutionPolicy policy, InputIter first, InputIter last,
+                   OutputIter d_first, P pred) {
+#if MANIFOLD_PAR == 'T'
+  if (policy == ExecutionPolicy::Par) {
+    CopyIfScanBody body(pred, first, d_first);
+    tbb::parallel_scan(
+        tbb::blocked_range<size_t>(0, std::distance(first, last)), body);
+    return d_first + body.get_sum();
+  }
+#endif
+  return std::copy_if(first, last, d_first, pred);
+}
+
+template <typename Iter, typename P,
+          typename T = typename std::iterator_traits<Iter>::value_type>
+Iter remove_if(ExecutionPolicy policy, Iter first, Iter last, P pred) {
+#if MANIFOLD_PAR == 'T'
+  if (policy == ExecutionPolicy::Par) {
+    std::vector<T> tmp(std::distance(first, last));
+    auto back = copy_if(policy, first, last, tmp.begin(),
+                        [&](T v) { return !pred(v); });
+    copy(policy, tmp.begin(), back, first);
+    return first + std::distance(tmp.begin(), back);
+  }
+#endif
+  return std::remove_if(first, last, pred);
+}
+
+template <typename Iter,
+          typename T = typename std::iterator_traits<Iter>::value_type>
+Iter remove(ExecutionPolicy policy, Iter first, Iter last, T value) {
+#if MANIFOLD_PAR == 'T'
+  if (policy == ExecutionPolicy::Par) {
+    std::vector<T> tmp(std::distance(first, last));
+    auto back = copy_if(policy, first, last, tmp.begin(),
+                        [&](T v) { return v != value; });
+    copy(policy, tmp.begin(), back, first);
+    return first + std::distance(tmp.begin(), back);
+  }
+#endif
+  return std::remove(first, last, value);
+}
+
+template <typename InputIterator1, typename InputIterator2,
+          typename OutputIterator>
+void scatter(ExecutionPolicy policy, InputIterator1 first, InputIterator1 last,
+             InputIterator2 mapFirst, OutputIterator outputFirst) {
+  for_each(policy, countAt(0_z),
+           countAt(static_cast<size_t>(std::distance(first, last))),
+           [first, mapFirst, outputFirst](size_t i) {
+             outputFirst[mapFirst[i]] = first[i];
+           });
+}
+
+template <typename InputIterator, typename RandomAccessIterator,
+          typename OutputIterator>
+void gather(ExecutionPolicy policy, InputIterator mapFirst,
+            InputIterator mapLast, RandomAccessIterator inputFirst,
+            OutputIterator outputFirst) {
+  for_each(policy, countAt(0_z),
+           countAt(static_cast<size_t>(std::distance(mapFirst, mapLast))),
+           [mapFirst, inputFirst, outputFirst](size_t i) {
+             outputFirst[i] = inputFirst[mapFirst[i]];
+           });
+}
+
+template <typename Iterator>
+void sequence(ExecutionPolicy policy, Iterator first, Iterator last) {
+  for_each(policy, countAt(0_z),
+           countAt(static_cast<size_t>(std::distance(first, last))),
+           [first](size_t i) { first[i] = i; });
 }
 
 #ifdef HAS_PAR_UNSEQ
@@ -86,73 +362,11 @@ inline constexpr ExecutionPolicy autoPolicy(size_t size) {
   }
 #endif
 
-template <typename... Args>
-void exclusive_scan(ExecutionPolicy policy, Args... args) {
-  // https://github.com/llvm/llvm-project/issues/59810
-  std::exclusive_scan(args...);
-}
-
-template <typename InputIterator1, typename InputIterator2,
-          typename OutputIterator>
-void scatter(ExecutionPolicy policy, InputIterator1 first, InputIterator1 last,
-             InputIterator2 mapFirst, OutputIterator outputFirst) {
-  for_each(policy, countAt(0_z),
-           countAt(static_cast<size_t>(std::distance(first, last))),
-           [first, mapFirst, outputFirst](size_t i) {
-             outputFirst[mapFirst[i]] = first[i];
-           });
-}
-
-template <typename InputIterator, typename RandomAccessIterator,
-          typename OutputIterator>
-void gather(ExecutionPolicy policy, InputIterator mapFirst,
-            InputIterator mapLast, RandomAccessIterator inputFirst,
-            OutputIterator outputFirst) {
-  for_each(policy, countAt(0_z),
-           countAt(static_cast<size_t>(std::distance(mapFirst, mapLast))),
-           [mapFirst, inputFirst, outputFirst](size_t i) {
-             outputFirst[i] = inputFirst[mapFirst[i]];
-           });
-}
-
-template <typename Iterator>
-void sequence(ExecutionPolicy policy, Iterator first, Iterator last) {
-  for_each(policy, countAt(0_z),
-           countAt(static_cast<size_t>(std::distance(first, last))),
-           [first](size_t i) { first[i] = i; });
-}
-
 // void implies that the user have to specify the return type in the template
 // argument, as we are unable to deduce it
-STL_DYNAMIC_BACKEND(remove, void)
-STL_DYNAMIC_BACKEND(find, void)
-STL_DYNAMIC_BACKEND(find_if, void)
-STL_DYNAMIC_BACKEND(all_of, bool)
-STL_DYNAMIC_BACKEND(is_sorted, bool)
-// STL_DYNAMIC_BACKEND(reduce, void)
-template <typename Ret = void, typename... Args>
-Ret reduce(ExecutionPolicy policy, Args... args) {
-  return std::reduce(args...);
-}
-STL_DYNAMIC_BACKEND(count_if, int)
-STL_DYNAMIC_BACKEND(remove_if, void)
-STL_DYNAMIC_BACKEND(copy_if, void)
 STL_DYNAMIC_BACKEND(unique, void)
-// STL_DYNAMIC_BACKEND(transform_reduce, void)
-template <typename Ret = void, typename... Args>
-Ret transform_reduce(ExecutionPolicy policy, Args... args) {
-  return std::transform_reduce(args...);
-}
-
-STL_DYNAMIC_BACKEND_VOID(for_each)
-STL_DYNAMIC_BACKEND_VOID(for_each_n)
-STL_DYNAMIC_BACKEND_VOID(transform)
 STL_DYNAMIC_BACKEND_VOID(uninitialized_fill)
 STL_DYNAMIC_BACKEND_VOID(uninitialized_copy)
 STL_DYNAMIC_BACKEND_VOID(stable_sort)
-STL_DYNAMIC_BACKEND_VOID(fill)
-STL_DYNAMIC_BACKEND_VOID(inclusive_scan)
-STL_DYNAMIC_BACKEND_VOID(copy)
-STL_DYNAMIC_BACKEND_VOID(copy_n)
 
 }  // namespace manifold

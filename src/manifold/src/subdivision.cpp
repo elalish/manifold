@@ -567,11 +567,12 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
   exclusive_scan(policy, numSubTris, numSubTris + numTri, triOffset.begin(), 0);
 
   Vec<int> interiorOffset(numTri);
-  auto numInterior = TransformIterator(
-      subTris.begin(),
-      [](const Partition& part) { return part.NumInterior(); });
+  auto numInterior =
+      TransformIterator(subTris.begin(), [](const Partition& part) {
+        return static_cast<int>(part.NumInterior());
+      });
   exclusive_scan(policy, numInterior, numInterior + numTri,
-                 interiorOffset.begin(), vertBary.size());
+                 interiorOffset.begin(), static_cast<int>(vertBary.size()));
 
   Vec<glm::ivec3> triVerts(triOffset.back() + subTris.back().triVert.size());
   vertBary.resize(interiorOffset.back() + subTris.back().NumInterior());
